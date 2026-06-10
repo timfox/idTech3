@@ -8,7 +8,7 @@ The Vulkan + **Dear ImGui** overlay (`r_imgui`, toggle **F11** / `toggle_imgui`)
 - **Shaders** — filterable clipper list of `tr.sortedShaders`, plus **`r_reloadShaders`** shortcut  
 - **Profiler** — adds the same scene batch counts  
 
-Scene snapshots are gathered through **`vk_imgui_scene.c`** (C only) because `tr_local.h` uses identifiers that are invalid in C++ (`or`, linkage clashes with ImGui TU).
+Scene snapshots are gathered through **`vk_imgui_scene.cpp`** (`-fno-operator-names` on GCC/Clang so `tr_local.h` field names like `or` remain valid).
 
 This document describes the optional **Studio** layer: lightweight, in-game workflow helpers reminiscent of classic **id Studio** (session strip + command strip), not a full map editor.
 
@@ -38,11 +38,13 @@ Single-line command entry (Enter or **Run**) that appends to the main **command 
 
 Entity keys and conventions shared with **idTech3Radiant** are documented in **[EDITOR_BRIDGE.md](EDITOR_BRIDGE.md)**.
 
+## Two-way editor sync (Radiant)
+
+Export from **Studio / Entities** writes `studio_exportents.cfg`. In idTech3Radiant, run `Editor/bridge_tools.py` (from [examples/radiant/Editor/](../examples/radiant/Editor/)) to paste the block into your `.map`. See [RADIANT.md](RADIANT.md).
+
 ## Future work (non-goals for this pass)
 
 - Live game view texture in the Viewport panel  
 - Full scene graph / property grid wired to entities  
 - Shader live hot-reload beyond `r_reloadShaders` / `vid_restart`  
-- Two-way IPC with the external editor  
-
-Those remain roadmap items; the Studio layer is intentionally small and safe to ship disabled by default.
+- Native IPC with the external editor (file bridge is the current approach)

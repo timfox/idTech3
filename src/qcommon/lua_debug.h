@@ -5,6 +5,15 @@
 typedef void (*LuaDebug_EngineRegisterFn)( void *luaState );
 void LuaDebug_SetEngineRegisterCallback( LuaDebug_EngineRegisterFn fn );
 
+void LuaDebug_InitCvars( void );
+void LuaDebug_WatchTick( int nowMs );
+
+qboolean LuaDebug_ReloadScriptPath( const char *scriptPath );
+qboolean LuaDebug_BeginHotloadReload( void );
+void LuaDebug_FinishHotloadReload( void );
+void LuaDebug_SetScriptFallbackRoot( const char *root );
+void LuaDebug_CallAppCrdtMessage( int msgMajor, const char *payload );
+
 void Cmd_ScriptReload_f( void );
 void Cmd_ScriptList_f( void );
 void Cmd_ScriptDump_f( void );

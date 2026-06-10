@@ -977,3 +977,96 @@ extern "C" qboolean Nav_BakeSectorTileToPath( const char *bspPath, const char *n
 	Com_Printf( "Nav: baked %s -> %s (%d bytes)\n", bspPath, navOutPath, tileSize );
 	return qtrue;
 }
+
+extern "C" qboolean Nav_ValidateTileFileAtPoint( const char *navPath, const vec3_t worldPos, float maxHorizDist ) {
+	FILE *f;
+	long fileSize;
+	unsigned char *data;
+	navMeshHandle_t mesh;
+	dtStatus status;
+	dtTileRef tileRef;
+	dtPolyRef polyRef;
+	float spos[3];
+	float nearPt[3];
+	float ext[3];
+	dtQueryFilter filter;
+	NavMeshInstance *inst;
+
+	if ( !navPath || !worldPos || maxHorizDist <= 0.0f ) {
+		return qfalse;
+	}
+	if ( !navInitialized ) {
+		Nav_Init();
+	}
+	openWorldMeshHandle = -1;
+	mesh = Nav_CreateOpenWorldMesh();
+	if ( mesh < 0 ) {
+		return qfalse;
+	}
+	inst = &navMeshes[mesh];
+	if ( !inst->navMesh || !inst->navQuery ) {
+		return qfalse;
+	}
+
+	f = fopen( navPath, "rb" );
+	if ( !f ) {
+		return qfalse;
+	}
+	if ( fseek( f, 0, SEEK_END ) != 0 ) {
+		fclose( f );
+		return qfalse;
+	}
+	fileSize = ftell( f );
+	if ( fileSize <= 64 ) {
+		fclose( f );
+		return qfalse;
+	}
+	rewind( f );
+	data = (unsigned char *)dtAlloc( (size_t)fileSize, DT_ALLOC_PERM );
+	if ( !data ) {
+		fclose( f );
+		return qfalse;
+	}
+	if ( fread( data, 1, (size_t)fileSize, f ) != (size_t)fileSize ) {
+		fclose( f );
+		dtFree( data );
+		return qfalse;
+	}
+	fclose( f );
+
+	status = inst->navMesh->addTile( data, (int)fileSize, DT_TILE_FREE_DATA, 0, &tileRef );
+	if ( dtStatusFailed( status ) ) {
+		dtFree( data );
+		return qfalse;
+	}
+
+	spos[0] = worldPos[0];
+	spos[2] = -worldPos[1];
+	ext[0] = maxHorizDist;
+	ext[1] = 96.0f;
+	ext[2] = maxHorizDist;
+	filter.setIncludeFlags( 0xFFFF );
+	filter.setExcludeFlags( 0 );
+
+	for ( float probeZ = 32.0f; probeZ <= 256.0f; probeZ += 16.0f ) {
+		spos[1] = probeZ;
+		inst->navQuery->findNearestPoly( spos, ext, &filter, &polyRef, nearPt );
+		if ( polyRef ) {
+			return qtrue;
+		}
+	}
+
+	{
+		vec3_t start, end;
+		navPath_t path;
+
+		VectorCopy( worldPos, start );
+		VectorCopy( worldPos, end );
+		end[0] += 256.0f;
+		if ( Nav_FindPath( mesh, start, end, &path ) && path.valid && path.numPoints > 0 ) {
+			return qtrue;
+		}
+	}
+
+	return qfalse;
+}

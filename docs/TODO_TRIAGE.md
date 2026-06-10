@@ -63,7 +63,9 @@ TODOs/FIXMEs in `src/external/` are from third-party code (duktape, zstd, cjson,
 | r_renderMode 2 | tr_render_mode_vk.c | Latched Forward+ primary: sets `r_forwardPlus` / `r_forwardPlusShade` (GPU cap 64; classic `dlightBits` still 32). |
 | r_hdr 3 64-bit output | `vk_post_process_pipeline.c`, HDR format helpers | Infrastructure in place (vk_hdr64_active, _hdr64 modules, pipeline selection). glslangValidator rejects dvec4/f64vec4 fragment shader outputs. Falls back to RGBA32F. When glslang adds support, compile HDR64 variants and return RGBA64F from get_hdr_format. |
 | Vegetation wind draw | `vk_vegetation_wind.c` + `tr_shade.c` | **Same-frame deform:** `vk_vegetation_wind_prepare_draw()` runs before the stage iterator on `SURF_VEGETATION` batches; compute writes deformed positions back into `tess.xyz`. Staging is filled during `RB_DrawSurfs`. Optional future: bind `vegwind_vertex_buffer` as stream 0 to skip CPU readback. |
-| Vulkan RTX | CMake `USE_VULKAN_RTX`, `vk_rtx.c` / `vk_rtx_world.c` / `vk_rtx_entities.c`, `r_rtx` / `r_rtxDemo` / `r_rtxWorldPrimCap` / `r_rtxEntities` | Demo: world BSP BLAS (capped) + trace + blit when `r_rtxDemo` 1; **`r_rtxEntities` 1** adds proxy AABB entity BLAS in TLAS (not full mesh AS). Real lighting still TODO. See `docs/RENDERERS_FUTURE.md`. |
+| Vulkan RTX | CMake `USE_VULKAN_RTX`, `vk_rtx.c` / `vk_rtx_world.c` / `vk_rtx_entities.c`, `r_rtx` / `r_rtxDemo` / `r_rtxWorldPrimCap` / `r_rtxEntities` | Demo: world BSP BLAS (capped) + trace + blit when `r_rtxDemo` 1; **`r_rtxEntities` 1** adds proxy AABB entity BLAS in TLAS (not full mesh AS). Real lighting still TODO. **`USE_VULKAN_RTX` OFF**: `#else` stubs in `vk_rtx.c`, `vk_hybrid1.c`, `vk_pathtrace.c`, etc. See `docs/RENDERERS_FUTURE.md`. |
+| Experimental renderers | `USE_EXPERIMENTAL_RENDERERS` (default ON) | NIV/NIST/NVC/VFGI/NDGI/NSLM/RenderFormer/VkSplat/WPT/MGS/WSP. OFF → `vk_experimental_renderer_stubs.c`. |
+| FreeType off | `BUILD_FREETYPE` OFF | `tr_font_stub.c` + `tr_vector_font_stub.c` (cached `.dat` fonts; no TTF/vector load). |
 
 ## Subsystem audit log (rolling)
 

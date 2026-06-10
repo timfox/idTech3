@@ -1099,6 +1099,14 @@ void vk_init_vulkan_library( void )
 			vk.colorWriteMaskDynamic = qfalse;
 	}
 
+	if ( vk.meshShaderNV ) {
+		INIT_DEVICE_FUNCTION_EXT( vkCmdDrawMeshTasksNV );
+		if ( !qvkCmdDrawMeshTasksNV ) {
+			ri.Printf( PRINT_WARNING, "[VK] VK_NV_mesh_shader enabled but vkCmdDrawMeshTasksNV missing; disabling mesh path\n" );
+			vk.meshShaderNV = qfalse;
+		}
+	}
+
 	INIT_DEVICE_FUNCTION_EXT(vkCmdClearColorImage)
 
 #ifdef USE_VUDA
@@ -1173,6 +1181,7 @@ void vk_deinit_device_functions( void )
 	qvkCmdCopyImageToBuffer = NULL;
 	qvkCmdDraw = NULL;
 	qvkCmdDrawIndexed = NULL;
+	qvkCmdDrawMeshTasksNV = NULL;
 	qvkCmdDispatch = NULL;
 	qvkCmdEndRenderPass = NULL;
 	qvkCmdNextSubpass = NULL;

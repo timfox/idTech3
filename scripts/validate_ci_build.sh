@@ -37,7 +37,13 @@ echo ""
 
 echo "4. CTest (mirrors ubuntu-x86_64 job: smoke + renderer + scripts + units)..."
 if [ -d build-vk-Release ]; then
+  if [ -x ./scripts/install_research_python.sh ]; then
+    ./scripts/install_research_python.sh --ci-only || true
+  fi
   ( cd build-vk-Release && ctest -C Release --output-on-failure )
+  echo ""
+  echo "4b. Sector stream matrix (open-world path subset)..."
+  ( cd build-vk-Release && ctest -R '^sector_stream_matrix$' --output-on-failure )
 else
   echo "Warning: build-vk-Release missing; skip ctest (run compile_engine.sh vulkan first)" >&2
 fi

@@ -36,6 +36,19 @@ Legacy `make`-first instructions are no longer the primary build path for this f
 
 Artifacts are copied to `release/` and the build trees live under `build-vk-Release/` and `build-vk-Debug/`.
 
+**s&box-style staged bootstrap** (engine → shaders → content), mirroring [Source-2 `Bootstrap.bat`](https://github.com/timfox/Source-2):
+
+```bash
+./scripts/bootstrap.sh all       # engine + shaders + demo content
+./scripts/bootstrap.sh engine    # compile only
+./scripts/new_mod_from_template.sh game.minimal mygame ./release/mygame
+./scripts/generate_mod_workspace.sh ./release/mygame
+```
+
+See [docs/MOD_MANIFEST.md](docs/MOD_MANIFEST.md) for `game.idproj` mod manifests and live Lua coding (`com_scriptWatch`).
+
+**idTech3Radiant (hybrid map editor):** `./scripts/install_radiant_gamepack.sh <mod>` deploys entity defs + `Editor/` scripts; see [docs/RADIANT.md](docs/RADIANT.md).
+
 **Minimal game data next to binaries:** see [docs/MINIMAL_GAME_SHELL.md](docs/MINIMAL_GAME_SHELL.md) (bootstrap `base/*.pk3` with `default.cfg`).
 
 **Optional Git submodules** (not required to compile the engine):

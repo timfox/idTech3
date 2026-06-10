@@ -15,6 +15,8 @@ extern "C" {
 #include "../navigation/nav_recast.h"
 #include "../qcommon/engine_sprite_map.h"
 #include "../qcommon/cm_stream.h"
+#include "../qcommon/cm_public.h"
+#include "../qcommon/cluster_graph.h"
 }
 
 #include <cstring>
@@ -571,6 +573,11 @@ extern "C" void CL_OpenWorld_Frame( void ) {
 		return;
 	}
 	WorldOpen_UpdateView( cl.snap.ps.origin, 0.0f );
+	if ( ClusterGraph_ReachEnabled() ) {
+		const int leafnum = CM_PointLeafnum( cl.snap.ps.origin );
+		const int cluster = CM_LeafCluster( leafnum );
+		ClusterGraph_UpdateReachability( cluster, -1 );
+	}
 	CL_OpenWorld_UpdateBspStream();
 	CL_OpenWorld_DrawSprites();
 }

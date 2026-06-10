@@ -535,7 +535,7 @@ void Com_DL_Done( download_t *dl )
 	if ( dl->func.lib )
 		Sys_UnloadLibrary( dl->func.lib );
 	dl->func.lib = NULL;
-	memset( &dl->func, 0, sizeof( dl->func ) );
+	Com_Memset( &dl->func, 0, sizeof( dl->func ) );
 }
 
 

@@ -12,6 +12,211 @@ Client demo record/playback: extracted from cl_main.c for modularization.
 #include "cl_curl.h"
 #endif
 
+cvar_t *cl_autoRecordDemo;
+cvar_t *cl_drawRecording;
+cvar_t *cl_aviFrameRate;
+cvar_t *cl_aviMotionJpeg;
+cvar_t *cl_forceavidemo;
+cvar_t *cl_aviPipeFormat;
+
+static void CL_Video_f( void );
+static void CL_StopVideo_f( void );
+static void CL_CompleteVideoName( const char *args, int argNum );
+
+static void CL_Demo_RegisterCvars( void ) {
+	cl_autoRecordDemo = Cvar_Get( "cl_autoRecordDemo", "0", CVAR_ARCHIVE );
+	Cvar_SetDescription( cl_autoRecordDemo, "Auto-record demos when starting or joining a game." );
+	cl_drawRecording = Cvar_Get( "cl_drawRecording", "1", CVAR_ARCHIVE );
+	Cvar_SetDescription( cl_drawRecording, "Hide (0) or shorten (1) \"RECORDING\" HUD message when recording demo." );
+
+	cl_aviFrameRate = Cvar_Get( "cl_aviFrameRate", "25", CVAR_ARCHIVE );
+	Cvar_CheckRange( cl_aviFrameRate, "1", "1000", CV_INTEGER );
+	Cvar_SetDescription( cl_aviFrameRate, "The framerate used for capturing video." );
+	cl_aviMotionJpeg = Cvar_Get( "cl_aviMotionJpeg", "1", CVAR_ARCHIVE );
+	Cvar_SetDescription( cl_aviMotionJpeg, "Enable/disable the MJPEG codec for avi output." );
+	cl_forceavidemo = Cvar_Get( "cl_forceavidemo", "0", 0 );
+	Cvar_SetDescription( cl_forceavidemo, "Forces all demo recording into a sequence of screenshots in TGA format." );
+
+	cl_aviPipeFormat = Cvar_Get( "cl_aviPipeFormat",
+		"-preset medium -crf 23 -c:v libx264 -flags +cgop -pix_fmt yuvj420p "
+		"-bf 2 -c:a aac -strict -2 -b:a 160k -movflags faststart",
+		CVAR_ARCHIVE );
+	Cvar_SetDescription( cl_aviPipeFormat, "Encoder parameters used for \\video-pipe." );
+}
+
+//===========================================================================================
+
+
+/*
+===============
+CL_Video_f
+
+video
+video [filename]
+===============
+*/
+static void CL_Video_f( void )
+{
+	char filename[ MAX_OSPATH ];
+	const char *ext;
+	qboolean pipe;
+	int i;
+
+	if( !clc.demoplaying )
+	{
+		Com_Printf( "The %s command can only be used when playing back demos\n", Cmd_Argv( 0 ) );
+		return;
+	}
+
+	pipe = ( Q_stricmp( Cmd_Argv( 0 ), "video-pipe" ) == 0 );
+
+	if ( pipe )
+		ext = "mp4";
+	else
+		ext = "avi";
+
+	if ( Cmd_Argc() == 2 )
+	{
+		// explicit filename
+		Com_sprintf( filename, sizeof( filename ), "videos/%s", Cmd_Argv( 1 ) );
+
+		// override video file extension
+		if ( pipe )
+		{
+			char *sep = strrchr( filename, '/' ); // last path separator
+			char *e = strrchr( filename, '.' );
+
+			if ( e && e > sep && *(e+1) != '\0' ) {
+				ext = e + 1;
+				*e = '\0';
+			}
+		}
+	}
+	else
+	{
+		 // scan for a free filename
+		for ( i = 0; i <= 9999; i++ )
+		{
+			Com_sprintf( filename, sizeof( filename ), "videos/video%04d.%s", i, ext );
+			if ( !FS_FileExists( filename ) )
+				break; // file doesn't exist
+		}
+
+		if ( i > 9999 )
+		{
+			Com_Printf( S_COLOR_RED "ERROR: no free file names to create video\n" );
+			return;
+		}
+
+		// without extension
+		Com_sprintf( filename, sizeof( filename ), "videos/video%04d", i );
+	}
+
+
+	clc.aviSoundFrameRemainder = 0.0f;
+	clc.aviVideoFrameRemainder = 0.0f;
+
+	Q_strncpyz( clc.videoName, filename, sizeof( clc.videoName ) );
+	clc.videoIndex = 0;
+
+	CL_OpenAVIForWriting( va( "%s.%s", clc.videoName, ext ), pipe, qfalse );
+}
+
+
+/*
+===============
+CL_StopVideo_f
+===============
+*/
+static void CL_StopVideo_f( void )
+{
+	CL_CloseAVI( qfalse );
+}
+
+
+/*
+====================
+CL_CompleteRecordName
+====================
+*/
+static void CL_CompleteVideoName(const char *args, int argNum )
+{
+	(void)args;
+	if ( argNum == 2 )
+	{
+		Field_CompleteFilename( "videos", ".avi", qtrue, FS_MATCH_EXTERN | FS_MATCH_STICK );
+	}
+}
+
+/*
+==================
+CL_Demo_Frame
+
+Demo AVI capture timing and auto-record before the main simulation step.
+==================
+*/
+void CL_Demo_Frame( int *msec, int *realMsec ) {
+	// if recording an avi, lock to a fixed fps
+	if ( CL_VideoRecording() && *msec ) {
+		// save the current screen
+		if ( cls.state == CA_ACTIVE || cl_forceavidemo->integer ) {
+			float fps, frameDuration;
+
+			if ( com_timescale->value > 0.0001f )
+				fps = MIN( cl_aviFrameRate->value / com_timescale->value, 1000.0f );
+			else
+				fps = 1000.0f;
+
+			frameDuration = MAX( 1000.0f / fps, 1.0f ) + clc.aviVideoFrameRemainder;
+
+			CL_TakeVideoFrame();
+
+			*msec = (int)frameDuration;
+			clc.aviVideoFrameRemainder = frameDuration - *msec;
+
+			*realMsec = *msec; // sync sound duration
+		}
+	}
+
+	if ( cl_autoRecordDemo->integer && !clc.demoplaying ) {
+		if ( cls.state == CA_ACTIVE && !clc.demorecording ) {
+			// If not recording a demo, and we should be, start one
+			qtime_t	now;
+			const char	*nowString;
+			char		*p;
+			char		mapName[ MAX_QPATH ];
+			char		serverName[ MAX_OSPATH ];
+
+			Com_RealTime( &now );
+			nowString = va( "%04d%02d%02d%02d%02d%02d",
+					1900 + now.tm_year,
+					1 + now.tm_mon,
+					now.tm_mday,
+					now.tm_hour,
+					now.tm_min,
+					now.tm_sec );
+
+			Q_strncpyz( serverName, cls.servername, MAX_OSPATH );
+			// Replace the ":" in the address as it is not a valid
+			// file name character
+			p = strchr( serverName, ':' );
+			if ( p ) {
+				*p = '.';
+			}
+
+			Q_strncpyz( mapName, COM_SkipPath( cl.mapname ), sizeof( cl.mapname ) );
+			COM_StripExtension(mapName, mapName, sizeof(mapName));
+
+			Cbuf_ExecuteText( EXEC_NOW,
+					va( "record %s-%s-%s", nowString, serverName, mapName ) );
+		}
+		else if ( cls.state != CA_ACTIVE && clc.demorecording ) {
+			// Recording, but not CA_ACTIVE, so stop recording
+			CL_StopRecord_f();
+		}
+	}
+}
+
 /*
 =======================================================================
 
@@ -614,16 +819,31 @@ static void CL_PlayDemo_f( void ) {
 	clc.firstDemoFrameSkipped = qfalse;
 }
 
-void CL_Demo_InitCommands( void ) {
+void CL_Demo_Init( void ) {
+	CL_Demo_RegisterCvars();
 	Cmd_AddCommand( "record", CL_Record_f );
 	Cmd_SetCommandCompletionFunc( "record", CL_CompleteRecordName );
 	Cmd_AddCommand( "demo", CL_PlayDemo_f );
 	Cmd_SetCommandCompletionFunc( "demo", CL_CompleteDemoName );
 	Cmd_AddCommand( "stoprecord", CL_StopRecord_f );
+	Cmd_AddCommand( "video", CL_Video_f );
+	Cmd_AddCommand( "video-pipe", CL_Video_f );
+	Cmd_SetCommandCompletionFunc( "video", CL_CompleteVideoName );
+	Cmd_AddCommand( "stopvideo", CL_StopVideo_f );
 }
 
-void CL_Demo_ShutdownCommands( void ) {
+void CL_Demo_Shutdown( void ) {
 	Cmd_RemoveCommand( "record" );
 	Cmd_RemoveCommand( "demo" );
 	Cmd_RemoveCommand( "stoprecord" );
+	Cmd_RemoveCommand( "video" );
+	Cmd_RemoveCommand( "stopvideo" );
+}
+
+void CL_Demo_InitCommands( void ) {
+	CL_Demo_Init();
+}
+
+void CL_Demo_ShutdownCommands( void ) {
+	CL_Demo_Shutdown();
 }

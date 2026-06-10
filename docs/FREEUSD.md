@@ -27,6 +27,7 @@ cmake -DUSE_FREEUSD=OFF ...                        # disable (smaller link; no u
 | fallback | ASCII vertex soup (`tr_model_mesh_import.c`) if FreeUSD fails or is off |
 
 - World-space positions use composed `local_to_world` from `BuildEngineSceneSnapshot`.
+- `EngineSceneNode.world_bound` includes `UsdGeom.Mesh` point bounds and unions descendant geometry for transform-only assemblies (district residency / sector grids).
 - N-gons are fan-triangulated; result is a static MD3 mesh (no skeleton/animation yet).
 - `primvars:st` applied when point count matches; `material:binding` → `UsdPreviewSurface` diffuse texture → Q3 shader name (`r_freeusdShaderMap`).
 - Arbitrary binary `.usdc` scene decode is **not** supported unless the root layer is USDA or FreeUSD’s embedded-crate path applies.
@@ -65,7 +66,7 @@ Disable mesh import at runtime with `r_freeusd 0` (falls back to ASCII vertex so
 
 ## World districts (proxy meshes)
 
-FreeUSD `BuildEngineSceneSnapshot` also feeds the **district manifest** parser (`district_load`). District assemblies and `purpose=proxy` prims drive proxy/full residency and optional `cm_stream` sector loads. See **[DISTRICTS.md](DISTRICTS.md)**.
+FreeUSD `BuildEngineSceneSnapshot` also feeds the **district manifest** parser (`district_load`). District assemblies and `purpose=proxy` prims drive proxy/full residency and optional `cm_stream` sector loads. Registered proxy/full `.usda` meshes draw at manifest **`xformOp:translate`** origins when **`r_districtDraw` 1**. See **[DISTRICTS.md](DISTRICTS.md)**.
 
 ## Test assets
 

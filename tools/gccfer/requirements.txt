@@ -1,0 +1,9 @@
+torch>=2.0.0
+torchvision>=0.15.0
+transformers>=4.36.0
+numpy>=1.24.0
+opencv-python>=4.8.0
+scikit-learn>=1.3.0
+tqdm>=4.66.0
+# Optional AU extraction (paper uses Py-Feat):
+# py-feat>=0.6.0

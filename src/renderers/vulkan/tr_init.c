@@ -200,6 +200,7 @@ cvar_t	*r_deferredGBufferDebug;
 cvar_t	*r_deferredLighting;
 cvar_t	*r_deferredUnlitBase;
 cvar_t	*r_deferredLightingStrength;
+cvar_t	*r_deferredSpecular;
 cvar_t	*r_hdr;
 cvar_t	*r_bloom;
 cvar_t	*r_bloom_threshold;
@@ -237,6 +238,7 @@ cvar_t	*r_renderHeight;
 cvar_t	*r_renderScale;
 cvar_t	*r_temporalDebug;
 cvar_t	*r_temporalCustomShaderMotion;
+cvar_t	*r_temporalCpuSkinPrev;
 cvar_t	*r_screenMapScale;
 cvar_t	*r_ext_supersample;
 cvar_t	*r_ext_smaa;
@@ -265,6 +267,7 @@ cvar_t	*r_rtxComposite;
 cvar_t	*r_rtxSamples;
 cvar_t	*r_rtxEntities;
 cvar_t	*r_rtxEntityCap;
+cvar_t	*r_rtxTlasUpdate;
 cvar_t	*r_pathtrace;
 cvar_t	*r_pathtrace_arch;
 cvar_t	*r_pathtrace_bounces;
@@ -3749,6 +3752,14 @@ static void R_Register( void )
 	ri.Cvar_SetDescription( r_deferredLightingStrength,
 		"Scale for deferred dynamic diffuse contribution (0=off, 1=default)." );
 	ri.Cvar_SetGroup( r_deferredLightingStrength, CVG_RENDERER );
+	r_deferredSpecular = ri.Cvar_Get( "r_deferredSpecular", "1", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_deferredSpecular, "0", "1", CV_INTEGER );
+	ri.Cvar_SetDescription( r_deferredSpecular,
+		"With r_deferredLighting 1: Blinn-Phong specular on dynamic lights in deferred pass (0=diffuse only)." );
+	ri.Cvar_SetGroup( r_deferredSpecular, CVG_RENDERER );
+	if ( r_deferredSpecular && r_deferredSpecular->integer && r_deferredLighting && r_deferredLighting->integer ) {
+		ri.Printf( PRINT_ALL, "[VK][deferred] r_deferredSpecular=1 (dynamic specular in deferred pass)\n" );
+	}
 	r_hdr = ri.Cvar_Get( "r_hdr", "2", CVAR_ARCHIVE_ND | CVAR_LATCH );
 	ri.Cvar_CheckRange( r_hdr, "-1", "3", CV_INTEGER );
 	ri.Cvar_SetDescription(r_hdr, "HDR frame buffer format. Requires \\r_fbo 1.\n -1: 4-bit (B4G4R4A4), testing only\n  0: 8-bit, moderate banding\n  1: 16-bit float (RGBA16F)\n  2: 32-bit float (RGBA32F), default, fallback to 16F if unsupported\n  3: 64-bit float (RGBA64F), optional; falls back to 32F (glslang lacks dvec4 fragment output support)\n" );
@@ -3979,11 +3990,13 @@ static void R_Register( void )
 	r_taaMotionVectors = ri.Cvar_Get( "r_taaMotionVectors", "1", CVAR_ARCHIVE_ND );
 	ri.Cvar_CheckRange( r_taaMotionVectors, "0", "1", CV_INTEGER );
 	ri.Cvar_SetDescription( r_taaMotionVectors, "TAA history UV: 1=main-pass motion vectors (gen_frag out_motion), 0=depth reprojection only." );
-	{
-		cvar_t *r_temporalCpuSkinPrev = ri.Cvar_Get( "r_temporalCpuSkinPrev", "1", CVAR_ARCHIVE_ND );
-		ri.Cvar_SetDescription( r_temporalCpuSkinPrev,
-			"Store previous-frame skin matrices for CPU tess / glTF fallback motion vectors." );
-	}
+	r_temporalCpuSkinPrev = ri.Cvar_Get( "r_temporalCpuSkinPrev", "1", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_temporalCpuSkinPrev, "0", "1", CV_INTEGER );
+	ri.Cvar_SetDescription( r_temporalCpuSkinPrev,
+		"Temporal motion on animated RT_MODEL entities:\n"
+		" 1 (default) per-entity fallback (prev MVP = current when CPU skin lacks prev pose; TAA keeps running).\n"
+		" 0 conservative: new/spawning animated entities mark the whole frame motion-unreliable." );
+	ri.Cvar_SetGroup( r_temporalCpuSkinPrev, CVG_RENDERER );
 	ri.Cvar_Get( "r_temporalScopeReduce", "1", CVAR_ARCHIVE_ND );
 	ri.Cvar_SetGroup( r_taaMotionVectors, CVG_RENDERER );
 
@@ -4015,6 +4028,11 @@ static void R_Register( void )
 	ri.Cvar_CheckRange( r_rtxEntityCap, "0", "1024", CV_INTEGER );
 	ri.Cvar_SetDescription( r_rtxEntityCap, "Max RT_MODEL entities packed into the entity BLAS when \\r_rtxEntities 1 (latched)." );
 	ri.Cvar_SetGroup( r_rtxEntityCap, CVG_RENDERER );
+	r_rtxTlasUpdate = ri.Cvar_Get( "r_rtxTlasUpdate", "1", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_rtxTlasUpdate, "0", "1", CV_INTEGER );
+	ri.Cvar_SetDescription( r_rtxTlasUpdate,
+		"When \\r_rtxEntities 1: 1=TLAS UPDATE when instance count stable (faster hybrid path); 0=full TLAS rebuild each frame." );
+	ri.Cvar_SetGroup( r_rtxTlasUpdate, CVG_RENDERER );
 	r_pathtrace = ri.Cvar_Get( "r_pathtrace", "0", CVAR_ARCHIVE_ND | CVAR_LATCH );
 	ri.Cvar_CheckRange( r_pathtrace, "0", "1", CV_INTEGER );
 	ri.Cvar_SetDescription( r_pathtrace,
@@ -4197,6 +4215,9 @@ static void R_Register( void )
 	ri.Cvar_SetGroup( r_temporalCustomShaderMotion, CVG_RENDERER );
 	if ( r_temporalCustomShaderMotion && r_temporalCustomShaderMotion->integer ) {
 		ri.Printf( PRINT_ALL, "[VK][temporal] r_temporalCustomShaderMotion=1 (customShader entities use prev-model motion; may ghost if stages deform)\n" );
+	}
+	if ( r_temporalCpuSkinPrev && !r_temporalCpuSkinPrev->integer ) {
+		ri.Printf( PRINT_ALL, "[VK][temporal] r_temporalCpuSkinPrev=0 (conservative whole-frame motion invalidation on spawning animated entities)\n" );
 	}
 	#endif // USE_VULKAN
 

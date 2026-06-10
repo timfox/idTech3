@@ -12,6 +12,13 @@
 
 int com_frameTime = 0;
 
+int64_t Sys_Microseconds( void )
+{
+	static int64_t t;
+	t += 1000;
+	return t;
+}
+
 void QDECL Com_DPrintf( const char *fmt, ... )
 {
 	(void)fmt;

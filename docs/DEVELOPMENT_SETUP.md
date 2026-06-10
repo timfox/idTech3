@@ -17,7 +17,9 @@ sudo apt-get install cmake ninja-build pkg-config \
 ### Compiler Requirements
 - **Clang 18+** (recommended) or **GCC 15+**
 - C23 support required (falls back to C17 if unavailable)
-- C++23 for external libraries (opus, flac, cflux2)
+- **C++20** for engine-owned `.cpp` modules (ECS, navigation, physics, world layer, ImGui inspector, FreeUSD bridges)
+- C++23-only language features are deferred until the C++20 baseline is stable on all CI targets
+- Third-party C++ dependencies (opus, flac, cflux2, ImGui, Bullet, EnTT) use their upstream standards
 
 ### Optional Video Codec Dependencies
 ```bash
@@ -221,6 +223,9 @@ Requires Steamworks SDK with `steam_api.h` (and `isteamnetworkingsockets.h` for 
 
 - **USE_STEAM**: Achievements, overlay, rich presence, Steam Deck auto-detection. When Deck is detected, `base/steamdeck.cfg` is auto-exec'd.
 - **USE_STEAM_NETWORKING**: SDR transport. Use `net_sdr 1` at runtime. Connect via `connect steam:STEAMID` when server advertises its SteamID.
+- **USE_VULKAN_RTX** (default OFF): KHR ray tracing (`r_rtx`, Hybrid1, path trace, GRTX, Raygun). Without it, `#else` stubs log at init and cvars remain inert.
+- **USE_EXPERIMENTAL_RENDERERS** (default ON): Neural/scaffold paths (`r_niv`, `r_renderformer`, `r_vksplat`, `r_mgs`, `r_wpt`, etc.). Set OFF for lean renderer builds; `vk_experimental_renderer_stubs.c` supplies no-op symbols.
+- **BUILD_FREETYPE** (default ON): TTF rasterization + GPU vector font load. OFF uses `tr_font_stub.c` / `tr_vector_font_stub.c` (cached `.dat` fonts only).
 
 ### DTLS Network Encryption
 ```bash

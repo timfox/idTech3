@@ -56,8 +56,8 @@ PY
 
 echo "[test_cm_stream_merge] demo + proc scatter wiring..."
 test -f examples/demo_game/mod/maps/sector_0_0.bsp
-rg -q 'WorldProc_FormatScatterRegionPath' src/world/world_proc.c
-rg -q 'r_procScatterRegion' src/world/world_proc.c
+rg -q 'WorldProc_FormatScatterRegionPath' src/world/world_proc.cpp
+rg -q 'r_procScatterRegion' src/world/world_proc.cpp
 rg -q 'WorldProc_FormatScatterRegionPath' src/client/cl_openworld.cpp
 
 echo "[test_cm_stream_merge] ok"

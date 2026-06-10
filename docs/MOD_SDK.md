@@ -95,6 +95,10 @@ Full enum: [g_public.h](../src/game/g_public.h) (before `G_TRAP_GETVALUE` = 700)
 | `r_bspStream` | 1 | Renderer overlay for streamed sector BSP |
 | `r_proc` | 0 | Procedural region/palette typing per sector |
 | `com_loc_language` | "en" | i18n table selection |
+| `com_app_crdt` | 0 | Distributed Lua App CRDT (server push); see [APP_CRDT.md](APP_CRDT.md) |
+| `com_app_crdt_version` | 0.0.0 | Authoritative app semver (systeminfo) |
+| `com_app_crdt_auto` | 1 | Auto-publish idtech3backend manifest on map load |
+| `com_app_crdt_backend` | 1 | Use idtech3backend submodule for App CRDT scripts |
 
 Grouped lists: renderer [RENDERERS.md](RENDERERS.md), Lua [LUA_API.md](LUA_API.md), physics [PHYSICS.md](PHYSICS.md).
 

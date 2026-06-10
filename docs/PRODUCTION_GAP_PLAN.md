@@ -47,7 +47,7 @@ Launch: `./idtech3 +set fs_game yourmod +map yourmap` with `demo_sp_slice.cfg` e
 |------|--------|
 | Temporal | `r_taa`, `r_temporalCpuSkinPrev`, transparents: enable `r_temporalCustomShaderMotion` for billboard/decals |
 | FSR2 / upscale | `r_upscale` — SP preset in `demo_sp_slice.cfg` comments |
-| Sector stream | `cm_stream 1`, `cl_sectorPrefetch 1`, `sv_sectorURL` |
+| Sector stream | `cm_stream 1`, `cl_sectorPrefetch 1`, `sv_sectorURL` — CI: `ctest -R test_sector_stream_fidelity` (collision multi-sector + visual BSP lumps + MP sync list + stress + nav walkable probe) |
 | Retarget | [ANIMGRAPH.md](ANIMGRAPH.md) + `scripts/retarget_skel.py` |
 | Neural Dynamic GI | Experimental — [NEURAL_DYNAMIC_GI.md](NEURAL_DYNAMIC_GI.md); `r_ndgi`, `ndgi/<map>.ndgi` |
 | Neural Irradiance Volume | Experimental — [NEURAL_IRRADIANCE_VOLUME.md](NEURAL_IRRADIANCE_VOLUME.md); `r_niv`, G-buffer + `niv/<map>.niv` |
@@ -66,6 +66,9 @@ See [PLATFORM_GATED.md](PLATFORM_GATED.md). No work until product SKU requires s
 
 ```bash
 ./scripts/compile_engine.sh vulkan demo
+cd build-vk-Release && ctest --output-on-failure
+cd build-vk-Release && ctest -L sector_stream --output-on-failure   # Phase C stream path only
+cd build-vk-Release && make test-sector-stream                      # wiring + stream matrix
 cd build-vk-Release && ctest -R 'smoke|renderer_regression|gpu_golden|test_demo_game_pk3|test_validate_assets|test_check_loc|test_crash_report|test_engine_save'
 ./scripts/renderer_regression_check.sh
 ```

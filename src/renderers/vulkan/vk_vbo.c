@@ -38,6 +38,18 @@ void vk_release_vbo( void )
 	vk.vbo.buffer_memory = VK_NULL_HANDLE;
 }
 
+
+void vk_release_stream_vbo( void )
+{
+	if ( vk.vbo.stream_vertex_buffer )
+		qvkDestroyBuffer( vk.device, vk.vbo.stream_vertex_buffer, NULL );
+	vk.vbo.stream_vertex_buffer = VK_NULL_HANDLE;
+
+	if ( vk.vbo.stream_buffer_memory )
+		qvkFreeMemory( vk.device, vk.vbo.stream_buffer_memory, NULL );
+	vk.vbo.stream_buffer_memory = VK_NULL_HANDLE;
+}
+
 qboolean vk_alloc_vbo( const byte *vbo_data, int vbo_size )
 {
 	VkMemoryRequirements vb_mem_reqs;
@@ -93,6 +105,70 @@ qboolean vk_alloc_vbo( const byte *vbo_data, int vbo_size )
 
 	SET_OBJECT_NAME( vk.vbo.vertex_buffer, "static VBO", VK_DEBUG_REPORT_OBJECT_TYPE_BUFFER_EXT );
 	SET_OBJECT_NAME( vk.vbo.buffer_memory, "static VBO memory", VK_DEBUG_REPORT_OBJECT_TYPE_DEVICE_MEMORY_EXT );
+
+	return qtrue;
+}
+
+
+qboolean vk_upload_stream_vbo( const byte *vbo_data, int vbo_size )
+{
+	VkMemoryRequirements vb_mem_reqs;
+	VkMemoryAllocateInfo alloc_info;
+	VkBufferCreateInfo desc;
+	VkDeviceSize vertex_buffer_offset;
+	VkDeviceSize allocationSize;
+	uint32_t memory_type_bits;
+	VkCommandBuffer command_buffer;
+	VkBufferCopy copyRegion[1];
+	VkDeviceSize uploadDone;
+
+	if ( vbo_size <= 0 ) {
+		vk_release_stream_vbo();
+		return qfalse;
+	}
+
+	vk_release_stream_vbo();
+
+	desc.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+	desc.pNext = NULL;
+	desc.flags = 0;
+	desc.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+	desc.queueFamilyIndexCount = 0;
+	desc.pQueueFamilyIndices = NULL;
+	desc.size = (VkDeviceSize)vbo_size;
+	desc.usage = VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT;
+	VK_CHECK( qvkCreateBuffer( vk.device, &desc, NULL, &vk.vbo.stream_vertex_buffer ) );
+
+	qvkGetBufferMemoryRequirements( vk.device, vk.vbo.stream_vertex_buffer, &vb_mem_reqs );
+	vertex_buffer_offset = 0;
+	allocationSize = vertex_buffer_offset + vb_mem_reqs.size;
+	memory_type_bits = vb_mem_reqs.memoryTypeBits;
+
+	alloc_info.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+	alloc_info.pNext = NULL;
+	alloc_info.allocationSize = allocationSize;
+	alloc_info.memoryTypeIndex = vk_find_memory_type( vk.physical_device, memory_type_bits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT );
+	VK_CHECK( qvkAllocateMemory( vk.device, &alloc_info, NULL, &vk.vbo.stream_buffer_memory ) );
+	qvkBindBufferMemory( vk.device, vk.vbo.stream_vertex_buffer, vk.vbo.stream_buffer_memory, vertex_buffer_offset );
+
+	uploadDone = 0;
+	while ( uploadDone < (VkDeviceSize)vbo_size ) {
+		VkDeviceSize uploadSize = vk.staging_buffer.size;
+		if ( uploadDone + uploadSize > (VkDeviceSize)vbo_size ) {
+			uploadSize = (VkDeviceSize)vbo_size - uploadDone;
+		}
+		memcpy( vk.staging_buffer.ptr + 0, vbo_data + uploadDone, uploadSize );
+		command_buffer = vk_begin_command_buffer();
+		copyRegion[0].srcOffset = 0;
+		copyRegion[0].dstOffset = uploadDone;
+		copyRegion[0].size = uploadSize;
+		qvkCmdCopyBuffer( command_buffer, vk.staging_buffer.handle, vk.vbo.stream_vertex_buffer, 1, &copyRegion[0] );
+		vk_end_command_buffer( command_buffer, __func__ );
+		uploadDone += uploadSize;
+	}
+
+	SET_OBJECT_NAME( vk.vbo.stream_vertex_buffer, "stream VBO", VK_DEBUG_REPORT_OBJECT_TYPE_BUFFER_EXT );
+	SET_OBJECT_NAME( vk.vbo.stream_buffer_memory, "stream VBO memory", VK_DEBUG_REPORT_OBJECT_TYPE_DEVICE_MEMORY_EXT );
 
 	return qtrue;
 }
@@ -567,6 +643,7 @@ void VBO_PushData( int itemIndex, shaderCommands_t *input )
 void VBO_UnBind( void )
 {
 	tess.vboIndex = 0;
+	tess.vboStreamItem = NULL;
 }
 
 
@@ -831,6 +908,7 @@ void VBO_Cleanup( void )
 	int i;
 
 	memset( &world_vbo, 0, sizeof( world_vbo ) );
+	VBO_StreamClear();
 
 	for ( i = 0; i < tr.numShaders; i++ )
 	{
@@ -927,6 +1005,7 @@ void VBO_Flush( void )
 	{
 		RB_EndSurface();
 		tess.vboIndex = 0;
+		tess.vboStreamItem = NULL;
 		RB_BeginSurface( tess.shader, tess.fogNum );
 	}
 }
@@ -1022,5 +1101,338 @@ void VBO_PrepareQueues( void )
 		i += item_run;
 	}
 }
+
+
+/*
+===========================================================================
+Stream sector VBO — GPU-resident geometry for RE_BspStream overlays.
+
+Each streamed surface gets a self-contained item with absolute offsets in
+vk.vbo.stream_vertex_buffer (separate from world_vbo).  vboItemIndex on the
+surface is tagged with VBO_STREAM_ITEM_FLAG.
+===========================================================================
+*/
+
+#define VBO_STREAM_INIT_BYTES (512 * 1024)
+
+_Static_assert( VBO_STREAM_MAX_ITEMS > 0, "VBO_STREAM_MAX_ITEMS must be positive" );
+
+typedef struct {
+	byte *vbo_buffer;
+	int vbo_offset;
+	int vbo_size;
+	stream_vbo_item_t items[VBO_STREAM_MAX_ITEMS + 1];
+	int items_count;
+} stream_vbo_t;
+
+static stream_vbo_t stream_vbo;
+
+
+static void VBO_StreamEnsureCapacity( int extraBytes )
+{
+	int newSize;
+	byte *newBuf;
+
+	if ( stream_vbo.vbo_buffer && stream_vbo.vbo_offset + extraBytes <= stream_vbo.vbo_size ) {
+		return;
+	}
+
+	newSize = stream_vbo.vbo_size ? stream_vbo.vbo_size : VBO_STREAM_INIT_BYTES;
+	while ( newSize < stream_vbo.vbo_offset + extraBytes ) {
+		newSize *= 2;
+	}
+
+	newBuf = ri.Malloc( newSize );
+	if ( stream_vbo.vbo_buffer && stream_vbo.vbo_offset > 0 ) {
+		memcpy( newBuf, stream_vbo.vbo_buffer, stream_vbo.vbo_offset );
+	}
+	if ( stream_vbo.vbo_buffer ) {
+		ri.Free( stream_vbo.vbo_buffer );
+	}
+	stream_vbo.vbo_buffer = newBuf;
+	stream_vbo.vbo_size = newSize;
+}
+
+
+static int VBO_StreamLayoutStages( stream_vbo_item_t *item, const shaderCommands_t *input, int baseOffs )
+{
+	int offs = baseOffs;
+	int offs_st[3] = { 0, 0, 0 };
+	int offs_cl[3] = { 0, 0, 0 };
+	int i;
+
+	item->numStages = 0;
+	for ( i = 0; i < MAX_VBO_STAGES; i++ ) {
+		const shaderStage_t *pStage = input->xstages[i];
+
+		if ( !pStage ) {
+			break;
+		}
+
+		item->numStages = i + 1;
+
+		if ( pStage->tessFlags & TESS_RGBA0 ) {
+			offs_cl[0] = offs;
+			item->stages[i].rgb_offset[0] = offs;
+			offs += input->numVertexes * (int)sizeof( color4ub_t );
+		} else {
+			item->stages[i].rgb_offset[0] = offs_cl[0];
+		}
+
+		if ( pStage->tessFlags & TESS_RGBA1 ) {
+			offs_cl[1] = offs;
+			item->stages[i].rgb_offset[1] = offs;
+			offs += input->numVertexes * (int)sizeof( color4ub_t );
+		} else {
+			item->stages[i].rgb_offset[1] = offs_cl[1];
+		}
+
+		if ( pStage->tessFlags & TESS_RGBA2 ) {
+			offs_cl[2] = offs;
+			item->stages[i].rgb_offset[2] = offs;
+			offs += input->numVertexes * (int)sizeof( color4ub_t );
+		} else {
+			item->stages[i].rgb_offset[2] = offs_cl[2];
+		}
+
+		if ( pStage->tessFlags & TESS_ST0 ) {
+			offs_st[0] = offs;
+			item->stages[i].tex_offset[0] = offs;
+			offs += input->numVertexes * (int)sizeof( vec2_t );
+		} else {
+			item->stages[i].tex_offset[0] = offs_st[0];
+		}
+
+		if ( pStage->tessFlags & TESS_ST1 ) {
+			offs_st[1] = offs;
+			item->stages[i].tex_offset[1] = offs;
+			offs += input->numVertexes * (int)sizeof( vec2_t );
+		} else {
+			item->stages[i].tex_offset[1] = offs_st[1];
+		}
+
+		if ( pStage->tessFlags & TESS_ST2 ) {
+			offs_st[2] = offs;
+			item->stages[i].tex_offset[2] = offs;
+			offs += input->numVertexes * (int)sizeof( vec2_t );
+		} else {
+			item->stages[i].tex_offset[2] = offs_st[2];
+		}
+	}
+
+	return offs;
+}
+
+
+static void VBO_StreamWriteGeometry( stream_vbo_item_t *item, shaderCommands_t *input )
+{
+	const shaderStage_t *pStage;
+	int svarsSize;
+	int offs, size, i;
+
+	svarsSize = input->shader->svarsSize;
+#ifdef USE_VK_PBR
+	if ( vk.pbrActive ) {
+		svarsSize += (int)( input->numVertexes * ( sizeof( input->qtangent[0] ) + sizeof( input->lightdir[0] ) ) );
+	}
+#endif
+
+	VBO_StreamEnsureCapacity( input->numIndexes * (int)sizeof( input->indexes[0] ) +
+		input->numVertexes * ( (int)sizeof( input->xyz[0] ) + (int)sizeof( input->normal[0] ) + svarsSize ) );
+
+	item->iboOffset = stream_vbo.vbo_offset;
+	stream_vbo.vbo_offset += input->numIndexes * (int)sizeof( input->indexes[0] );
+
+	item->vboOffset = stream_vbo.vbo_offset;
+	item->normalOffset = item->vboOffset + input->numVertexes * (int)sizeof( input->xyz[0] );
+	offs = item->normalOffset + input->numVertexes * (int)sizeof( input->normal[0] );
+
+#ifdef USE_VK_PBR
+	if ( vk.pbrActive ) {
+		item->qtangentOffset = offs;
+		item->lightdirOffset = offs + input->numVertexes * (int)sizeof( input->qtangent[0] );
+		offs = item->lightdirOffset + input->numVertexes * (int)sizeof( input->lightdir[0] );
+	}
+#endif
+
+	stream_vbo.vbo_offset = VBO_StreamLayoutStages( item, input, offs );
+
+	offs = item->iboOffset;
+	size = input->numIndexes * (int)sizeof( input->indexes[0] );
+	memcpy( stream_vbo.vbo_buffer + offs, input->indexes, size );
+
+	offs = item->vboOffset;
+	size = input->numVertexes * (int)sizeof( input->xyz[0] );
+	memcpy( stream_vbo.vbo_buffer + offs, input->xyz, size );
+
+	offs = item->normalOffset;
+	size = input->numVertexes * (int)sizeof( input->normal[0] );
+	memcpy( stream_vbo.vbo_buffer + offs, input->normal, size );
+
+#ifdef USE_VK_PBR
+	if ( vk.pbrActive ) {
+		offs = item->qtangentOffset;
+		size = input->numVertexes * (int)sizeof( input->qtangent[0] );
+		memcpy( stream_vbo.vbo_buffer + offs, input->qtangent, size );
+
+		offs = item->lightdirOffset;
+		size = input->numVertexes * (int)sizeof( input->lightdir[0] );
+		memcpy( stream_vbo.vbo_buffer + offs, input->lightdir, size );
+	}
+#endif
+
+	for ( i = 0; i < MAX_VBO_STAGES; i++ ) {
+		pStage = input->xstages[i];
+		if ( !pStage ) {
+			break;
+		}
+
+		if ( pStage->tessFlags & TESS_RGBA0 ) {
+			R_ComputeColors( 0, tess.svars.colors[0], pStage );
+			offs = item->stages[i].rgb_offset[0];
+			size = input->numVertexes * (int)sizeof( color4ub_t );
+			memcpy( stream_vbo.vbo_buffer + offs, input->svars.colors[0], size );
+		}
+		if ( pStage->tessFlags & TESS_RGBA1 ) {
+			R_ComputeColors( 1, tess.svars.colors[1], pStage );
+			offs = item->stages[i].rgb_offset[1];
+			size = input->numVertexes * (int)sizeof( color4ub_t );
+			memcpy( stream_vbo.vbo_buffer + offs, input->svars.colors[1], size );
+		}
+		if ( pStage->tessFlags & TESS_RGBA2 ) {
+			R_ComputeColors( 2, tess.svars.colors[2], pStage );
+			offs = item->stages[i].rgb_offset[2];
+			size = input->numVertexes * (int)sizeof( color4ub_t );
+			memcpy( stream_vbo.vbo_buffer + offs, input->svars.colors[2], size );
+		}
+
+		if ( pStage->tessFlags & TESS_ST0 ) {
+			R_ComputeTexCoords( 0, &pStage->bundle[0] );
+			offs = item->stages[i].tex_offset[0];
+			size = input->numVertexes * (int)sizeof( vec2_t );
+			memcpy( stream_vbo.vbo_buffer + offs, input->svars.texcoordPtr[0], size );
+		}
+		if ( pStage->tessFlags & TESS_ST1 ) {
+			R_ComputeTexCoords( 1, &pStage->bundle[1] );
+			offs = item->stages[i].tex_offset[1];
+			size = input->numVertexes * (int)sizeof( vec2_t );
+			memcpy( stream_vbo.vbo_buffer + offs, input->svars.texcoordPtr[1], size );
+		}
+		if ( pStage->tessFlags & TESS_ST2 ) {
+			R_ComputeTexCoords( 2, &pStage->bundle[2] );
+			offs = item->stages[i].tex_offset[2];
+			size = input->numVertexes * (int)sizeof( vec2_t );
+			memcpy( stream_vbo.vbo_buffer + offs, input->svars.texcoordPtr[2], size );
+		}
+	}
+
+	item->num_indexes = input->numIndexes;
+	item->num_vertexes = input->numVertexes;
+}
+
+
+qboolean VBO_StreamFlushGpu( void )
+{
+	if ( stream_vbo.vbo_offset <= 0 || !stream_vbo.vbo_buffer ) {
+		vk_release_stream_vbo();
+		return qfalse;
+	}
+
+	if ( !vk_upload_stream_vbo( stream_vbo.vbo_buffer, stream_vbo.vbo_offset ) ) {
+		return qfalse;
+	}
+
+	ri.Printf( PRINT_DEVELOPER, "[bsp_stream] stream VBO uploaded %d bytes, %d items\n",
+		stream_vbo.vbo_offset, stream_vbo.items_count );
+	return qtrue;
+}
+
+
+void VBO_StreamClear( void )
+{
+	vk_release_stream_vbo();
+	if ( stream_vbo.vbo_buffer ) {
+		ri.Free( stream_vbo.vbo_buffer );
+	}
+	Com_Memset( &stream_vbo, 0, sizeof( stream_vbo ) );
+}
+
+
+const stream_vbo_item_t *VBO_StreamGetItem( int itemIndex )
+{
+	if ( itemIndex <= 0 || itemIndex > stream_vbo.items_count ) {
+		return NULL;
+	}
+	return &stream_vbo.items[itemIndex];
+}
+
+
+qboolean VBO_StreamUploadSurface( surfaceType_t *surface, shader_t *shader, int *outVboItemIndex )
+{
+	stream_vbo_item_t *item;
+	int itemIndex;
+	int savedIndexes;
+	int savedVertexes;
+	shader_t *savedShader;
+
+	if ( !surface || !shader || !outVboItemIndex || !r_vbo || !r_vbo->integer ) {
+		return qfalse;
+	}
+	if ( !tr.world || !isStaticShader( shader ) ) {
+		return qfalse;
+	}
+	if ( stream_vbo.items_count >= VBO_STREAM_MAX_ITEMS ) {
+		ri.Printf( PRINT_WARNING, "[bsp_stream] stream VBO item table full\n" );
+		return qfalse;
+	}
+
+	savedIndexes = tess.numIndexes;
+	savedVertexes = tess.numVertexes;
+	savedShader = tess.shader;
+
+	itemIndex = stream_vbo.items_count + 1;
+	item = &stream_vbo.items[itemIndex];
+	Com_Memset( item, 0, sizeof( *item ) );
+
+	RB_BeginSurface( shader, 0 );
+	tess.allowVBO = qfalse;
+#ifdef USE_TESS_NEEDS_NORMAL
+	tess.needsNormal = qtrue;
+#endif
+#ifdef USE_TESS_NEEDS_ST2
+	tess.needsST2 = qtrue;
+#endif
+	rb_surfaceTable[*surface]( surface );
+	if ( tess.numIndexes <= 0 || tess.numVertexes <= 0 ) {
+		tess.numIndexes = savedIndexes;
+		tess.numVertexes = savedVertexes;
+		tess.shader = savedShader;
+		return qfalse;
+	}
+
+	VBO_StreamWriteGeometry( item, &tess );
+	stream_vbo.items_count = itemIndex;
+
+	tess.numIndexes = savedIndexes;
+	tess.numVertexes = savedVertexes;
+	tess.shader = savedShader;
+
+	*outVboItemIndex = itemIndex | VBO_STREAM_ITEM_FLAG;
+	return qtrue;
+}
+
+
+void VBO_RenderStreamItem( void )
+{
+	const stream_vbo_item_t *item = tess.vboStreamItem;
+
+	if ( !item || !vk.vbo.stream_vertex_buffer ) {
+		return;
+	}
+
+	vk_bind_index_buffer( vk.vbo.stream_vertex_buffer, (uint32_t)item->iboOffset );
+	vk_draw_indexed( (uint32_t)item->num_indexes, 0 );
+}
+
 
 #endif // USE_VBO

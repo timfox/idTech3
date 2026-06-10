@@ -2,20 +2,46 @@
 
 ## ctest presets (unified)
 
-From the build directory after configuring with tests enabled:
+From the build directory after configuring with tests enabled (`BUILD_UNIT_TESTS=ON` by default):
 
 ```bash
-ctest --output-on-failure                    # all registered tests
+make test                                  # all registered CTest targets
+ctest --output-on-failure                  # same
 ctest -L unit                              # unit_* binaries
-ctest -L validation                          # smoke, renderer_regression, gpu_golden, scripts
-ctest -R gpu_golden                          # Tier A golden manifest (no GPU)
+ctest -L validation                        # smoke, renderer_regression, gpu_golden, scripts
+ctest -L sector_stream                     # open-world sector stream path matrix members
+ctest -R sector_stream_matrix -V           # wiring guard + runs full stream path suite
+make test-sector-stream                    # same matrix without full `make test`
+ctest -R gpu_golden                        # Tier A golden manifest (no GPU)
 ctest -R renderer_regression_check           # 125+ source/shader guards
 ```
 
-CI runs the same labels via `.github/workflows/build.yml` (`make test` / `ctest`).
+CI and local parity: `./scripts/validate_ci_build.sh` runs full `ctest`; `./scripts/production_readiness.sh` runs the same after a Vulkan build.
 
-- **Unit** (`BUILD_UNIT_TESTS=ON`): `unit_macros`, `unit_qmath`, `unit_surfaceflags`, `unit_qhelpers`, `unit_crc`, `unit_pathutil`, `unit_msg`, `unit_info`, `unit_cm_bounds`, `unit_parse`, `unit_endian` (CRC, COM path, `Info_*`, `COM_Parse*`, and endian tests use the same minimal `stub_qcommon_min.c` + `q_shared.c` + `q_math.c` link as `unit_qhelpers`; `unit_msg` links `msg.c` + `huffman_static.c` with `stub_qcommon_min.c`, `stub_msg_cvar.c`, and `-DDEDICATED`; `unit_cm_bounds` links `cm_bounds.c` + `q_math.c` only) — run `ctest -R unit_` or `./unit_*` from the build directory.
-- **Script regression tests**: `test_botlib_bounded_strings` (botlib string invariants). Run with `ctest -R test_botlib_bounded_strings` from the build directory.
-- **GPU golden (Tier A)**: `gpu_golden_compare` — `./scripts/gpu_golden_capture.sh --compare` (manifest + placeholder; Tier B: [docs/GPU_GOLDEN_TIER_B.md](../docs/GPU_GOLDEN_TIER_B.md)).
-- **i18n / assets / crash hooks**: `test_check_loc`, `test_validate_assets`, `test_crash_report`.
-- **Validation**: `smoke_test`, `renderer_regression_check`, `gpu_golden_compare`, `check_artifacts`, `test_run_vulkan_script`, `test_compile_engine_lto`, `test_demo_game_pk3`, `test_vk_vegetation_dispatch_order`, `test_vulkan_mesh_shader_opt_in`, `test_vulkan_runtime_regressions`, `test_botlib_chat_message_bounds`, `test_vulkan_renderer_guards`, `test_vulkan_regression_source_guards`, `test_gltf_vulkan_regressions` (legacy test name may still be `test_gltf_opengl_regressions` in CMake), `test_botlib_bounded_strings` — see `scripts/`, `tests/scripts/`, and `docs/RENDERER_CONFIDENCE.md`.
+### Sector stream matrix (`sector_stream` label)
+
+End-to-end coverage for **Phase C sector streaming** (collision merge, nav tiles, MP sync list, residency, graph compute, runtime fidelity):
+
+| Layer | CTest name |
+|-------|------------|
+| Wiring | `test_openworld`, `test_cm_stream_merge`, `test_nav_bake`, `test_openworld_sync`, `test_openworld_residency`, `test_graph_compute`, `test_proc`, `test_demo_openworld_pk3` |
+| Runtime | `test_openworld_runtime`, `test_sector_stream_fidelity` |
+| Units | `unit_world_residency`, `unit_sector_graph`, `unit_cluster_graph`, `unit_openworld_nav` (when `USE_RECAST_NAV`) |
+| Orchestrator | `sector_stream_matrix` — verifies label registration, then runs all of the above |
+
+Quick commands:
+
+```bash
+cd build-vk-Release
+ctest -L sector_stream --output-on-failure
+# or
+make test-sector-stream
+```
+
+### Other suites
+
+- **Unit** (`BUILD_UNIT_TESTS=ON`): `unit_macros`, `unit_qmath`, … — `ctest -R '^unit_'`
+- **Script regression**: `test_botlib_bounded_strings`, renderer guards, temporal (`test_temporal_motion_policy`), vector font mode 2, etc.
+- **GPU golden (Tier A)**: `gpu_golden_compare` — `./scripts/gpu_golden_capture.sh --compare`
+- **i18n / assets / crash hooks**: `test_check_loc`, `test_validate_assets`, `test_crash_report`
+- **Validation**: `smoke_test`, `renderer_regression_check`, `check_artifacts`, … — see `docs/RENDERER_CONFIDENCE.md`

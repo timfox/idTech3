@@ -11,21 +11,28 @@ ECS implementation using EnTT. Alternative to gentity; coexists with it.
 */
 
 #include "ecs.h"
+
+extern "C" {
 #include "../qcommon/q_shared.h"
-
-#include <cstring>
-#include <cctype>
-
-static int strcasecmp_c( const char *a, const char *b ) {
-	for ( ; *a && *b; a++, b++ ) {
-		int ca = std::tolower( (unsigned char)*a );
-		int cb = std::tolower( (unsigned char)*b );
-		if ( ca != cb ) return ca - cb;
-	}
-	return std::tolower( (unsigned char)*a ) - std::tolower( (unsigned char)*b );
 }
 
+#include <cctype>
+#include <cstring>
+
 #include <entt/entt.hpp>
+
+[[nodiscard]] static int ECS_StrCaseCmp( const char *a, const char *b )
+{
+	for ( ; *a && *b; a++, b++ ) {
+		const int ca = std::tolower( static_cast<unsigned char>( *a ) );
+		const int cb = std::tolower( static_cast<unsigned char>( *b ) );
+		if ( ca != cb ) {
+			return ca - cb;
+		}
+	}
+	return std::tolower( static_cast<unsigned char>( *a ) ) -
+		std::tolower( static_cast<unsigned char>( *b ) );
+}
 
 /* Component structs matching ecs_component_id_t */
 struct PositionComponent {
@@ -265,7 +272,7 @@ int ECS_GetGentityLink( ecs_entity_t e ) {
 ecs_component_id_t ECS_ComponentFromName( const char *name ) {
 	if ( !name ) return ECS_COMP_COUNT;
 	for ( int i = 0; i < ECS_COMP_COUNT; i++ ) {
-		if ( strcasecmp_c( name, s_compNames[i] ) == 0 )
+		if ( !ECS_StrCaseCmp( name, s_compNames[i] ) )
 			return (ecs_component_id_t)i;
 	}
 	return ECS_COMP_COUNT;

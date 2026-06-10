@@ -13,6 +13,7 @@ extern "C" {
 
 #ifdef USE_FREEUSD
 
+#include "cl_freeusd_util.hpp"
 #include <cstring>
 #include <string>
 
@@ -102,6 +103,9 @@ extern "C" qboolean WorldDistrict_ParseManifestFreeUSD( const char *osPath, cons
 			Q_strncpyz( d->manifestPath, qpath, sizeof( d->manifestPath ) );
 		}
 		WD_BoundsFromNode( node, d->boundsMin, d->boundsMax );
+		d->origin[0] = (float)node.local_to_world_transform.m[12];
+		d->origin[1] = (float)node.local_to_world_transform.m[13];
+		d->origin[2] = (float)node.local_to_world_transform.m[14];
 		d->active = qtrue;
 		d->state = WD_STATE_UNLOADED;
 		count++;
@@ -181,14 +185,12 @@ static void CL_District_LoadManifest_f( void ) {
 
 #ifdef USE_FREEUSD
 	{
-		const char *base = Cvar_VariableString( "fs_basepath" );
-		const char *game = Cvar_VariableString( "fs_game" );
-		char *os = FS_BuildOSPath( base, game, qpath );
-		if ( !os || !os[0] ) {
+		std::string os = Cl_FreeusdBuildOsPath( qpath );
+		if ( os.empty() ) {
 			Com_Printf( S_COLOR_YELLOW "[world_district] could not resolve '%s'\n", qpath );
 			return;
 		}
-		if ( !WorldDistrict_ParseManifestFreeUSD( os, qpath, parsed, WORLD_DISTRICT_MAX, &count ) ) {
+		if ( !WorldDistrict_ParseManifestFreeUSD( os.c_str(), qpath, parsed, WORLD_DISTRICT_MAX, &count ) ) {
 			Com_Printf( S_COLOR_YELLOW "[world_district] parse failed for '%s'\n", qpath );
 			return;
 		}
@@ -262,7 +264,10 @@ extern "C" void CL_District_Init( void ) {
 	Cmd_AddCommand( "district_load_full", CL_District_LoadFull_f );
 	Cmd_AddCommand( "district_unload", CL_District_Unload_f );
 
-	Com_Printf( "World districts: district_load, district_list, district_proxy (r_district 1)\n" );
+	Cvar_SetDescription( Cvar_Get( "r_districtDraw", "1", CVAR_ARCHIVE ),
+		"When 1, draw loaded district proxy/full FreeUSD meshes at manifest origins each frame." );
+
+	Com_Printf( "World districts: district_load, district_list, district_proxy (r_district 1, r_districtDraw 1)\n" );
 }
 
 extern "C" void CL_District_Frame( void ) {
@@ -273,4 +278,52 @@ extern "C" void CL_District_Frame( void ) {
 	}
 	radius = Cvar_Get( "r_districtLoadRadius", "8192", CVAR_ARCHIVE );
 	WorldDistrict_UpdateView( cl.snap.ps.origin, radius ? radius->value : 8192.0f );
+}
+
+
+extern "C" void CL_District_AddRefEntitiesToScene( void ) {
+	cvar_t *districtDraw;
+	int i;
+
+	if ( !Cvar_VariableIntegerValue( "r_district" ) ) {
+		return;
+	}
+	districtDraw = Cvar_Get( "r_districtDraw", "1", CVAR_ARCHIVE );
+	if ( !districtDraw || !districtDraw->integer ) {
+		return;
+	}
+
+	for ( i = 0; i < WorldDistrict_GetCount(); i++ ) {
+		const worldDistrict_t *d = WorldDistrict_Get( i );
+		refEntity_t ent;
+		qhandle_t model = 0;
+
+		if ( !d ) {
+			continue;
+		}
+		switch ( d->state ) {
+		case WD_STATE_PROXY:
+			model = d->proxyModel;
+			break;
+		case WD_STATE_STREAMING:
+		case WD_STATE_LOADED:
+			model = d->fullModel ? d->fullModel : d->proxyModel;
+			break;
+		default:
+			continue;
+		}
+		if ( !model ) {
+			continue;
+		}
+
+		Com_Memset( &ent, 0, sizeof( ent ) );
+		ent.reType = RT_MODEL;
+		ent.hModel = model;
+		VectorCopy( d->origin, ent.origin );
+		ent.axis[0][0] = 1.0f;
+		ent.axis[1][1] = 1.0f;
+		ent.axis[2][2] = 1.0f;
+		ent.renderfx = RF_NOSHADOW;
+		re.AddRefEntityToScene( &ent, qfalse );
+	}
 }

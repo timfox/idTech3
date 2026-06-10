@@ -186,6 +186,63 @@ void vk_bind_geometry( uint32_t flags )
 
 #ifdef USE_VBO
 	if ( tess.vboIndex ) {
+		if ( tess.vboStreamItem && vk.vbo.stream_vertex_buffer ) {
+			const stream_vbo_item_t *item = tess.vboStreamItem;
+			const stream_vbo_stage_t *stage = &item->stages[tess.vboStage];
+
+			shade_bufs[0] = shade_bufs[1] = shade_bufs[2] = shade_bufs[3] = shade_bufs[4] =
+				shade_bufs[5] = shade_bufs[6] = shade_bufs[7] = vk.vbo.stream_vertex_buffer;
+#ifdef USE_VK_PBR
+			shade_bufs[8] = vk.vbo.stream_vertex_buffer;
+			shade_bufs[9] = vk.vbo.stream_vertex_buffer;
+#endif
+
+			if ( flags & TESS_XYZ ) {
+				vk.cmd->vbo_offset[0] = item->vboOffset;
+				vk_bind_index_attr( 0 );
+			}
+			if ( flags & TESS_RGBA0 ) {
+				vk.cmd->vbo_offset[1] = stage->rgb_offset[0];
+				vk_bind_index_attr( 1 );
+			}
+			if ( flags & TESS_ST0 ) {
+				vk.cmd->vbo_offset[2] = stage->tex_offset[0];
+				vk_bind_index_attr( 2 );
+			}
+			if ( flags & TESS_ST1 ) {
+				vk.cmd->vbo_offset[3] = stage->tex_offset[1];
+				vk_bind_index_attr( 3 );
+			}
+			if ( flags & TESS_ST2 ) {
+				vk.cmd->vbo_offset[4] = stage->tex_offset[2];
+				vk_bind_index_attr( 4 );
+			}
+			if ( flags & TESS_NNN ) {
+				vk.cmd->vbo_offset[5] = item->normalOffset;
+				vk_bind_index_attr( 5 );
+			}
+			if ( flags & TESS_RGBA1 ) {
+				vk.cmd->vbo_offset[6] = stage->rgb_offset[1];
+				vk_bind_index_attr( 6 );
+			}
+			if ( flags & TESS_RGBA2 ) {
+				vk.cmd->vbo_offset[7] = stage->rgb_offset[2];
+				vk_bind_index_attr( 7 );
+			}
+#ifdef USE_VK_PBR
+			if ( flags & TESS_PBR ) {
+				vk.cmd->vbo_offset[5] = item->normalOffset;
+				vk_bind_index_attr( 5 );
+				vk.cmd->vbo_offset[8] = item->qtangentOffset;
+				vk_bind_index_attr( 8 );
+				vk.cmd->vbo_offset[9] = item->lightdirOffset;
+				vk_bind_index_attr( 9 );
+			}
+#endif
+
+			qvkCmdBindVertexBuffers( vk.cmd->command_buffer, bind_base, bind_count, shade_bufs, vk.cmd->vbo_offset + bind_base );
+			return;
+		}
 
 		shade_bufs[0] = shade_bufs[1] = shade_bufs[2] = shade_bufs[3] = shade_bufs[4] = shade_bufs[5] = shade_bufs[6] = shade_bufs[7] = vk.vbo.vertex_buffer;
 #ifdef USE_VK_PBR
@@ -529,7 +586,9 @@ void vk_draw_geometry( Vk_Depth_Range depth_range, qboolean indexed ) {
 
 	// issue draw call(s)
 #ifdef USE_VBO
-	if ( tess.vboIndex )
+	if ( tess.vboStreamItem )
+		VBO_RenderStreamItem();
+	else if ( tess.vboIndex )
 		VBO_RenderIBOItems();
 	else
 #endif

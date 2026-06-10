@@ -48,7 +48,7 @@ Startup log when enabled: `[world_residency] enabled epsilon=… k_col=… max_s
 
 ## Graph reachability pre-filter
 
-When **`r_graphStreamReach 1`**, [`WorldResidency`](src/world/world_residency.c) intersects candidates with the sector graph k-hop mask from [`SectorGraph_UpdateReachability`](src/world/sector_graph.c). MP server path uses the union of all active player origins as BFS sources. See [GRAPH_COMPUTE.md](GRAPH_COMPUTE.md).
+When **`r_graphStreamReach 1`**, [`WorldResidency`](src/world/world_residency.cpp) intersects candidates with the sector graph k-hop mask from [`SectorGraph_UpdateReachability`](src/world/sector_graph.cpp). MP server path uses the union of all active player origins as BFS sources. See [GRAPH_COMPUTE.md](GRAPH_COMPUTE.md).
 
 ## District integration
 

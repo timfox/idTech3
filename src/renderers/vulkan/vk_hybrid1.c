@@ -1781,7 +1781,15 @@ void vk_hybrid1_record_pass( VkCommandBuffer cmd )
 
 #else /* !USE_VULKAN_RTX */
 
-void vk_hybrid1_init( void ) {}
+void vk_hybrid1_init( void )
+{
+	static qboolean s_logged;
+
+	if ( !s_logged ) {
+		ri.Printf( PRINT_ALL, "[VK][Hybrid1] stub (build with -DUSE_VULKAN_RTX=ON)\n" );
+		s_logged = qtrue;
+	}
+}
 void vk_hybrid1_shutdown( void ) {}
 void vk_hybrid1_frame_begin( void ) {}
 qboolean vk_hybrid1_active( void ) { return qfalse; }

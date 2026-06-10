@@ -1,0 +1,18 @@
+{
+  "Schema": 1,
+  "Type": "addon",
+  "Org": "local",
+  "Ident": "addon.minimal",
+  "Title": "Minimal Addon",
+  "HasCode": true,
+  "CodePath": "scripts/lua/",
+  "Scripts": [
+    "scripts/lua/addon.lua"
+  ],
+  "PackageReferences": [],
+  "Metadata": {
+    "ProjectTemplate": {
+      "Description": "Layered addon mod (s&box addon.minimal analogue)"
+    }
+  }
+}

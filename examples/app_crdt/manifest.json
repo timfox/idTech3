@@ -1,0 +1,6 @@
+{
+  "version": "1.0.0",
+  "scripts": [
+    "scripts/lua/app_spec.lua"
+  ]
+}

@@ -92,8 +92,8 @@ def pack_dsurface(
     first_index: int,
     num_indexes: int,
     plane_normal: Tuple[float, float, float] = (0.0, 0.0, 1.0),
+    lightmap_num: int = -1,
 ) -> bytes:
-    lightmap_num = -1
     lightmap_x = lightmap_y = lightmap_w = lightmap_h = 0
     origin = (0.0, 0.0, 0.0)
     vecs = (
@@ -135,6 +135,12 @@ def axial_box_planes(mins: Tuple[float, float, float], maxs: Tuple[float, float,
     ]
 
 
+def build_sector_lightmap(level: int = 168) -> bytes:
+    """Single 128x128 RGB lightmap tile for streamed sector visual geometry."""
+    pixel = bytes((level, level, level))
+    return pixel * (128 * 128)
+
+
 def build_visual_lumps(
     platform_mins: Tuple[float, float, float],
     platform_maxs: Tuple[float, float, float],
@@ -147,14 +153,20 @@ def build_visual_lumps(
         (platform_mins[0], platform_maxs[1], z),
     ]
     normal = (0.0, 0.0, 1.0)
+    lm_coords = [
+        (0.0, 0.0),
+        (1.0, 0.0),
+        (1.0, 1.0),
+        (0.0, 1.0),
+    ]
     drawverts_data = b"".join(
         pack_drawvert(
             xyz,
             (xyz[0] / 64.0, xyz[1] / 64.0),
-            (0.0, 0.0),
+            lm_coords[i],
             normal,
         )
-        for xyz in corners
+        for i, xyz in enumerate(corners)
     )
     indexes_data = struct.pack("<6i", 0, 1, 2, 0, 2, 3)
     surfaces_data = pack_dsurface(
@@ -165,6 +177,7 @@ def build_visual_lumps(
         first_index=0,
         num_indexes=6,
         plane_normal=normal,
+        lightmap_num=0,
     )
     return drawverts_data, indexes_data, surfaces_data
 
@@ -210,6 +223,8 @@ def build_sector_bsp(
         drawverts_data, indexes_data, surfaces_data = build_visual_lumps(
             platform_mins, platform_maxs,
         )
+        lightmaps_data = build_sector_lightmap()
+        lumps[LUMP_LIGHTMAPS] = (LUMP_LIGHTMAPS, lightmaps_data)
         lumps[LUMP_DRAWVERTS] = (LUMP_DRAWVERTS, drawverts_data)
         lumps[LUMP_DRAWINDEXES] = (LUMP_DRAWINDEXES, indexes_data)
         lumps[LUMP_SURFACES] = (LUMP_SURFACES, surfaces_data)

@@ -145,7 +145,7 @@ With **`r_graphStreamReach 1`**, residency candidates must lie within **k** hops
 
 ### Renderer visual overlay
 
-**`r_bspStream 1`** (default) draws streamed sector BSP as a world overlay (parallel to `cm_stream_merge`). When a sector BSP includes **`LUMP_SURFACES`** (e.g. `gen_sector_bsp.py --visual`), planar faces are rendered with authored shaders; otherwise brush-top quads are inferred from collision brushes.
+**`r_bspStream 1`** (default) draws streamed sector BSP as a world overlay (parallel to `cm_stream_merge`). When a sector BSP includes **`LUMP_SURFACES`** (e.g. `gen_sector_bsp.py --visual`), planar faces and patches are rendered with authored shaders; otherwise brush-top quads are inferred from collision brushes.
 
 ## Modular BSP collision merge (v2)
 
@@ -174,7 +174,7 @@ Traces and `CM_PointContents` query merged sector brushes after the base BSP tre
 - **Hub map required**: Load `maps/open_void.bsp` (or your playfield) before sector merge; generator: `scripts/tools/gen_hub_bsp.py`.
 - **Collision default off on client**: Enable `cm_openWorldCollision 1` for view-driven merge (`openworld_start` / `demo_openworld.cfg` do this).
 - **MP sync scope**: `CS_ENGINE_OPENWORLD_SECTORS` is driven by **server collision residency**; clients also load **nav** when `r_openWorldNav 1` + `cl_openWorldSync 1`. Scatter/sprites remain view-driven unless loaded locally.
-- **Renderer overlay**: `r_bspStream` draws planar faces / brush-top quads from hunk memory (`r_bspStreamResident 1` logs face counts). Patches (`MST_PATCH`), lightmap atlasing, and world-VBO residency for streamed sectors are not implemented yet — streamed faces use the immediate tessellation path (`vboItemIndex=0`). Overlays clear on hub map load via `RE_BspStream_ClearAll`.
+- **Renderer overlay**: `r_bspStream` draws planar faces, Bezier patches (`MST_PATCH` via `R_SubdividePatchToGrid`), or brush-top quads from hunk memory (`r_bspStreamResident 1` logs face counts, stream VBO surfaces, and sector lightmap tiles). With **`r_bspStreamBake 1`** (default), patch grids are baked to static triangle soup at merge time using `r_lodCurveError` LOD — avoiding per-frame `SF_GRID` tessellation. With **`r_bspStreamVbo 1`** (default, requires **`r_vbo 1`**), every merge/unmerge calls **`R_BspStream_RebuildVbo()`** — full clear and re-upload of all active static surfaces (not incremental append); surfaces whose shaders fail **`isStaticShader()`** still CPU-tessellate each frame like hub world VBO. With **`r_bspStreamLightmaps 1`** (default), sector `LUMP_LIGHTMAPS` upload into a dedicated stream lightmap atlas in `tr.lightmaps` (fixed `lightmapCountX × lightmapCountY` tile grid per atlas texture; many sectors can exhaust it). When **`tr.worldDeluxeMapping`** is on, RGB + deluxe pairs upload into paired stream atlases (`tr.deluxemaps`); sector lumps with RGB-only data log and skip deluxe tiles. Unmerging a sector compacts atlas tiles by reloading remaining patches (`R_BspStream_CompactLightmaps`); hub reload via **`RE_BspStream_ClearAll`** resets the atlas entirely. **Brush-top fallback** (collision-only sector BSP) draws a flat **`tr.defaultShader`** quad with no authored lightmap/shader. Stream faces get PBR lightdirs + MikkT (`vk_mikkt_bsp_face_generate`) like hub **`ParseFace`** when **`USE_VK_PBR`** is on. Limits: **64** patches × **16** faces; patch hash (**128** slots) warns when full. `ctest -R test_bsp_stream_vbo` validates VBO/lightmap wiring.
 - **Districts**: With `r_openWorld 1`, `district_load_full` streams through **WorldOpen** (collision + nav + scatter). With `r_openWorld 0`, districts use **cm_stream collision only** (legacy).
 
 ## Related
@@ -189,9 +189,12 @@ Traces and `CM_PointContents` query merged sector brushes after the base BSP tre
 
 ```bash
 ctest -R test_openworld_runtime -V
+ctest -R test_sector_stream_fidelity -V
 ```
 
-Loads `maps/open_void.bsp`, merges `sector_0_0`, traces platform at `(2048,2048)` expecting hit z ≈ 128. Nav fixture size is checked when `tests/data/openworld/nav/sector_0_0.nav` exists.
+`test_openworld_runtime` loads `maps/open_void.bsp`, merges `sector_0_0`, traces platform at `(2048,2048)` expecting hit z ≈ 128.
+
+`test_sector_stream_fidelity` runs **`openworld_smoke_fidelity`** on the dedicated server: multi-sector collision at world offsets, visual BSP lump checks (for **`r_bspStream`**), simulated MP sync list build/unload, 32-cycle load stress, and **`unit_openworld_nav`** Detour walkable probes at sector platform centers.
 
 **Demo pk3** (open-world assets ship in `idtech3_demo.pk3` when built with `--target demo_game_pk3`):
 

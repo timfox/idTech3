@@ -22,6 +22,7 @@ This is **not** a standalone game: it is a **tiny mod** (`.pk3` of configs) you 
 3. **Lightweight game code** - `demo_hooks.js` registers `idtech3.on('map_load')` and `idtech3.on('frame')` and draws an occasional HUD line (proves the `idtech3` Duktape API in `src/qcommon/js_debug.c`).
 4. **Lua (optional)** - `demo_lua.cfg` runs `script_reload scripts/lua/demo_hooks.lua`. Requires a Lua-enabled engine build; otherwise the console reports Lua disabled.
 5. **Subsystem hooks** - the engine already runs Director, Horde bridge, particles, nav crowd, behavior trees, etc. in `CL_GameFrame` when `cl_physicsEnabled` / `cl_navEnabled` / … are on - see `demo_gameplay.cfg` and `buildnavmesh`.
+6. **Fog bioaerosol ecology** - `demo_fog_biology.cfg` (Maine coastal), `demo_fog_biology_namib.cfg`, `demo_fog_biology_openworld.cfg` (streaming + coastal gradient). See [docs/FOG_BIOLOGY.md](../../docs/FOG_BIOLOGY.md).
 
 ## Build the demo pack
 

@@ -7,8 +7,12 @@ NanoVDB → dense float grid for Vulkan 3D fog textures (real-time path).
 */
 
 #include "vk_nanovdb_decode.h"
+#include "../../qcommon/jobs.h"
 #include <string.h>
 #include <math.h>
+
+#define NANOVDB_LEAF_PARALLEL_MIN   8u
+#define NANOVDB_LEAF_PARALLEL_BATCH 4u
 
 #define NANOVDB_MAGIC_NUMB 0x304244566f6e614eULL /* "NanoVDB0" */
 #define NANOVDB_MAGIC_GRID 0x314244566f6e614eULL /* "NanoVDB1" */
@@ -306,13 +310,72 @@ static uint32_t leaf_stride_for_type( uint32_t gridType ) {
 	}
 }
 
+typedef struct {
+	const byte          *grid;
+	const byte          *tree;
+	uint32_t            gridType;
+	float               *dense;
+	vdbNanoIndexBBox_t  idx;
+	int64_t             leafBaseOff;
+	uint32_t            leafStride;
+	int64_t             gridSize;
+} nanoLeafDecodeCtx_t;
+
+static void decode_one_leaf( const nanoLeafDecodeCtx_t *ctx, uint32_t leafIndex )
+{
+	const byte *leaf;
+	int32_t ox, oy, oz;
+	uint32_t n;
+	int dimX = ctx->idx.dimX;
+	int dimY = ctx->idx.dimY;
+	int dimZ = ctx->idx.dimZ;
+
+	leaf = ctx->tree + ctx->leafBaseOff + (int64_t)leafIndex * (int64_t)ctx->leafStride;
+	if ( leaf + (int64_t)ctx->leafStride > ctx->grid + ctx->gridSize ) {
+		return;
+	}
+
+	ox = read_i32( leaf + 0 );
+	oy = read_i32( leaf + 4 );
+	oz = read_i32( leaf + 8 );
+
+	for ( n = 0; n < LEAF_VOXELS; n++ ) {
+		int lx, ly, lz;
+		int gx, gy, gz;
+		int di;
+
+		if ( !nanovdb_mask_on( leaf + 16, n ) ) {
+			continue;
+		}
+		lx = (int)( n & 7u );
+		ly = (int)( ( n >> 3 ) & 7u );
+		lz = (int)( ( n >> 6 ) & 7u );
+		gx = ox + lx - ctx->idx.indexMin[0];
+		gy = oy + ly - ctx->idx.indexMin[1];
+		gz = oz + lz - ctx->idx.indexMin[2];
+		if ( gx < 0 || gy < 0 || gz < 0 || gx >= dimX || gy >= dimY || gz >= dimZ ) {
+			continue;
+		}
+		di = dense_index( dimX, dimY, gx, gy, gz );
+		if ( di >= 0 && di < dimX * dimY * dimZ ) {
+			ctx->dense[di] = read_leaf_value( leaf, ctx->gridType, n );
+		}
+	}
+}
+
+static void decode_leaf_job( void *data, uint32_t leafIndex )
+{
+	decode_one_leaf( (const nanoLeafDecodeCtx_t *)data, leafIndex );
+}
+
 static qboolean decode_leaf_array( const byte *grid, const byte *tree, uint32_t gridType,
 	float *dense, const vdbNanoIndexBBox_t *idx ) {
 	uint32_t leafCount;
 	int64_t leafBaseOff, leafEndOff;
-	uint32_t leafStride, i;
-	int dimX, dimY, dimZ;
+	uint32_t leafStride;
 	int64_t gridSize;
+	nanoLeafDecodeCtx_t ctx;
+	jobHandle_t group;
 
 	leafCount = read_u32( tree + OFF_NODE_COUNT );
 	leafBaseOff = read_i64( tree + OFF_NODE_OFFSET );
@@ -331,46 +394,28 @@ static qboolean decode_leaf_array( const byte *grid, const byte *tree, uint32_t 
 		}
 	}
 
-	dimX = idx->dimX;
-	dimY = idx->dimY;
-	dimZ = idx->dimZ;
+	ctx = (nanoLeafDecodeCtx_t){
+		.grid = grid,
+		.tree = tree,
+		.gridType = gridType,
+		.dense = dense,
+		.idx = *idx,
+		.leafBaseOff = leafBaseOff,
+		.leafStride = leafStride,
+		.gridSize = gridSize,
+	};
 
-	for ( i = 0; i < leafCount; i++ ) {
-		const byte *leaf;
-		int32_t ox, oy, oz;
-		uint32_t n;
-
-		leaf = tree + leafBaseOff + (int64_t)i * (int64_t)leafStride;
-		if ( leaf + (int64_t)leafStride > grid + gridSize ) {
-			break;
+	if ( leafCount >= NANOVDB_LEAF_PARALLEL_MIN && Jobs_WorkerCount() > 0 ) {
+		group = Jobs_ParallelFor( decode_leaf_job, &ctx, leafCount,
+			NANOVDB_LEAF_PARALLEL_BATCH, JOB_PRIORITY_NORMAL );
+		if ( group != JOBS_INVALID_HANDLE ) {
+			Jobs_Wait( group );
+			return qtrue;
 		}
+	}
 
-		ox = read_i32( leaf + 0 );
-		oy = read_i32( leaf + 4 );
-		oz = read_i32( leaf + 8 );
-
-		for ( n = 0; n < LEAF_VOXELS; n++ ) {
-			int lx, ly, lz;
-			int gx, gy, gz;
-			int di;
-
-			if ( !nanovdb_mask_on( leaf + 16, n ) ) {
-				continue;
-			}
-			lx = (int)( n & 7u );
-			ly = (int)( ( n >> 3 ) & 7u );
-			lz = (int)( ( n >> 6 ) & 7u );
-			gx = ox + lx - idx->indexMin[0];
-			gy = oy + ly - idx->indexMin[1];
-			gz = oz + lz - idx->indexMin[2];
-			if ( gx < 0 || gy < 0 || gz < 0 || gx >= dimX || gy >= dimY || gz >= dimZ ) {
-				continue;
-			}
-			di = dense_index( dimX, dimY, gx, gy, gz );
-			if ( di >= 0 && di < dimX * dimY * dimZ ) {
-				dense[di] = read_leaf_value( leaf, gridType, n );
-			}
-		}
+	for ( uint32_t i = 0; i < leafCount; i++ ) {
+		decode_one_leaf( &ctx, i );
 	}
 	return qtrue;
 }

@@ -24,6 +24,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 #ifdef USE_LUA
 #include "lua_debug.h"
+#include "app_crdt.h"
 #endif
 #include "js_debug.h"
 #include "csharp_debug.h"
@@ -1178,7 +1179,8 @@ void Cmd_Init( void ) {
 	Cmd_AddCommand ("wait", Cmd_Wait_f);
 
 #ifdef USE_LUA
-	// Script debugging commands
+	LuaDebug_InitCvars();
+	AppCrdt_Init();
 	extern void Cmd_ScriptReload_f(void);
 	extern void Cmd_ScriptList_f(void);
 	extern void Cmd_ScriptDump_f(void);

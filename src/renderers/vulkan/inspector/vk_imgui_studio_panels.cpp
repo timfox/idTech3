@@ -32,6 +32,9 @@ void PushHistoryLine( std::string_view line )
 	if ( line.empty() ) {
 		return;
 	}
+	if ( !g_history.empty() && g_history.back() == line ) {
+		return;
+	}
 	if ( g_history.size() >= kMaxHistory ) {
 		g_history.erase( g_history.begin() );
 	}

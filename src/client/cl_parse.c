@@ -23,6 +23,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 #include "client.h"
 #include "cl_voip.h"
+#include "cl_app_crdt.h"
 #include "script_emit.h"
 #if defined(USE_DUKTAPE) || defined(USE_CSHARP)
 #include "../game/bg_public.h"
@@ -858,6 +859,12 @@ static void CL_ParseCommandString( msg_t *msg ) {
 	index = seq & (MAX_RELIABLE_COMMANDS-1);
 	Q_strncpyz( clc.serverCommands[ index ], s, sizeof( clc.serverCommands[ index ] ) );
 	clc.serverCommandsIgnore[ index ] = qfalse;
+
+#ifdef USE_LUA
+	if ( CL_AppCrdt_TryServerCommand( s ) ) {
+		return;
+	}
+#endif
 
 #ifdef USE_CURL
 	if ( !clc.cURLUsed )

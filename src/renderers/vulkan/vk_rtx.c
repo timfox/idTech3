@@ -94,9 +94,31 @@ static struct {
 	VkBuffer		entity_blas_buffer;
 	VkDeviceMemory	entity_blas_memory;
 	char			world_name[MAX_QPATH];
+	uint32_t		tlas_instance_count;
+	qboolean		tlas_valid;
+	qboolean		cmd_registered;
 } rtx;
 
 static void vk_rtx_destroy_entity_blas( void );
+
+static void RTX_Status_f( void )
+{
+	const char *wn = ( tr.world && tr.world->name[0] ) ? tr.world->name : "(none)";
+
+	ri.Printf( PRINT_ALL, "[VK][RTX] ready=%d rtxAvailable=%d demo=%d hybrid=%d raygun=%d\n",
+		rtx.ready ? 1 : 0, vk.rtxAvailable ? 1 : 0,
+		( r_rtxDemo && r_rtxDemo->integer ) ? 1 : 0,
+		( r_hybrid1 && r_hybrid1->integer ) ? 1 : 0,
+		( r_raygun && r_raygun->integer ) ? 1 : 0 );
+	ri.Printf( PRINT_ALL, "[VK][RTX] world=%s blas_tris=%u entity_proxies=%u tlas_instances=%u tlas_update=%d\n",
+		wn, rtx.world_primitive_count, rtx.entity_packed_count, rtx.tlas_instance_count,
+		( r_rtxTlasUpdate && r_rtxTlasUpdate->integer ) ? 1 : 0 );
+	ri.Printf( PRINT_ALL, "[VK][RTX] trace_extent=%ux%u r_rtx=%d composite=%.2f samples=%d\n",
+		rtx.width, rtx.height,
+		( r_rtx && r_rtx->integer > 0 ) ? r_rtx->integer : 0,
+		r_rtxComposite ? r_rtxComposite->value : 0.0f,
+		( r_rtxSamples && r_rtxSamples->integer > 0 ) ? r_rtxSamples->integer : 1 );
+}
 
 static VkShaderModule vk_rtx_shader_module( const uint8_t *code, uint32_t codeSize, const char *name )
 {
@@ -336,8 +358,7 @@ static void vk_rtx_rebuild_world_blas( void )
 	}
 
 	wn = ( tr.world && tr.world->name[0] && !( tr.refdef.rdflags & RDF_NOWORLDMODEL ) ) ? tr.world->name : "";
-	if ( rtx.world_blas_valid && !strcmp( rtx.world_name, wn ) &&
-		!( r_rtxEntities && r_rtxEntities->integer ) ) {
+	if ( rtx.world_blas_valid && !strcmp( rtx.world_name, wn ) ) {
 		return;
 	}
 
@@ -348,6 +369,8 @@ static void vk_rtx_rebuild_world_blas( void )
 	vk_rtx_destroy_as( &rtx.tlas );
 	vk_rtx_destroy_as( &rtx.blas );
 	vk_rtx_destroy_as( &rtx.entity_blas );
+	rtx.tlas_valid = qfalse;
+	rtx.tlas_instance_count = 0u;
 	vk_rtx_destroy_buffer( &rtx.tlas_buffer, &rtx.tlas_memory );
 	vk_rtx_destroy_buffer( &rtx.instance_buffer, &rtx.instance_memory );
 	vk_rtx_destroy_buffer( &rtx.blas_buffer, &rtx.blas_memory );
@@ -487,7 +510,8 @@ static void vk_rtx_rebuild_world_blas( void )
 	Com_Memset( &buildInfoTLAS, 0, sizeof( buildInfoTLAS ) );
 	buildInfoTLAS.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_BUILD_GEOMETRY_INFO_KHR;
 	buildInfoTLAS.type = VK_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL_KHR;
-	buildInfoTLAS.flags = VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR;
+	buildInfoTLAS.flags = VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR
+		| VK_BUILD_ACCELERATION_STRUCTURE_ALLOW_UPDATE_BIT_KHR;
 	buildInfoTLAS.geometryCount = 1;
 	buildInfoTLAS.pGeometries = &geometryTLAS;
 
@@ -521,43 +545,55 @@ static void vk_rtx_rebuild_world_blas( void )
 	VK_CHECK( qvkEndCommandBuffer( buildCmd ) );
 	vk_rtx_submit_oneshot_build( buildCmd );
 
-	vk_rtx_alloc_buffer( sizeInfoTLAS.accelerationStructureSize,
-		VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_STORAGE_BIT_KHR | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
-		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, &rtx.tlas_buffer, &rtx.tlas_memory, NULL );
+	/* Entity TLAS path owns TLAS when r_rtxEntities 1 (per-frame instance refresh). */
+	if ( !r_rtxEntities || !r_rtxEntities->integer ) {
+		vk_rtx_destroy_as( &rtx.tlas );
+		vk_rtx_destroy_buffer( &rtx.tlas_buffer, &rtx.tlas_memory );
+		vk_rtx_destroy_buffer( &rtx.instance_buffer, &rtx.instance_memory );
+		rtx.tlas_valid = qfalse;
+		rtx.tlas_instance_count = 0u;
 
-	Com_Memset( &asci, 0, sizeof( asci ) );
-	asci.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_CREATE_INFO_KHR;
-	asci.buffer = rtx.tlas_buffer;
-	asci.offset = 0;
-	asci.size = sizeInfoTLAS.accelerationStructureSize;
-	asci.type = VK_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL_KHR;
-	VK_CHECK( qvkCreateAccelerationStructureKHR( vk.device, &asci, NULL, &rtx.tlas ) );
+		vk_rtx_alloc_buffer( sizeInfoTLAS.accelerationStructureSize,
+			VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_STORAGE_BIT_KHR | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
+			VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, &rtx.tlas_buffer, &rtx.tlas_memory, NULL );
 
-	Com_Memset( &rangeTLAS, 0, sizeof( rangeTLAS ) );
-	rangeTLAS.primitiveCount = 1u;
-	pRangeTLAS = &rangeTLAS;
-	buildInfoTLAS.mode = VK_BUILD_ACCELERATION_STRUCTURE_MODE_BUILD_KHR;
-	buildInfoTLAS.dstAccelerationStructure = rtx.tlas;
-	buildInfoTLAS.scratchData.deviceAddress = scratchAddr;
+		Com_Memset( &asci, 0, sizeof( asci ) );
+		asci.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_CREATE_INFO_KHR;
+		asci.buffer = rtx.tlas_buffer;
+		asci.offset = 0;
+		asci.size = sizeInfoTLAS.accelerationStructureSize;
+		asci.type = VK_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL_KHR;
+		VK_CHECK( qvkCreateAccelerationStructureKHR( vk.device, &asci, NULL, &rtx.tlas ) );
 
-	VK_CHECK( qvkBeginCommandBuffer( buildCmd, &beginInfo ) );
-	qvkCmdBuildAccelerationStructuresKHR( buildCmd, 1, &buildInfoTLAS, &pRangeTLAS );
-	VK_CHECK( qvkEndCommandBuffer( buildCmd ) );
-	vk_rtx_submit_oneshot_build( buildCmd );
+		Com_Memset( &rangeTLAS, 0, sizeof( rangeTLAS ) );
+		rangeTLAS.primitiveCount = 1u;
+		pRangeTLAS = &rangeTLAS;
+		buildInfoTLAS.mode = VK_BUILD_ACCELERATION_STRUCTURE_MODE_BUILD_KHR;
+		buildInfoTLAS.dstAccelerationStructure = rtx.tlas;
+		buildInfoTLAS.scratchData.deviceAddress = scratchAddr;
 
-	Com_Memset( &asWrite, 0, sizeof( asWrite ) );
-	asWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET_ACCELERATION_STRUCTURE_KHR;
-	asWrite.accelerationStructureCount = 1;
-	asWrite.pAccelerationStructures = &rtx.tlas;
+		VK_CHECK( qvkBeginCommandBuffer( buildCmd, &beginInfo ) );
+		qvkCmdBuildAccelerationStructuresKHR( buildCmd, 1, &buildInfoTLAS, &pRangeTLAS );
+		VK_CHECK( qvkEndCommandBuffer( buildCmd ) );
+		vk_rtx_submit_oneshot_build( buildCmd );
 
-	Com_Memset( &writeAS, 0, sizeof( writeAS ) );
-	writeAS.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-	writeAS.dstSet = rtx.descriptor_set;
-	writeAS.dstBinding = 0;
-	writeAS.descriptorCount = 1;
-	writeAS.descriptorType = VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR;
-	writeAS.pNext = &asWrite;
-	qvkUpdateDescriptorSets( vk.device, 1, &writeAS, 0, NULL );
+		Com_Memset( &asWrite, 0, sizeof( asWrite ) );
+		asWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET_ACCELERATION_STRUCTURE_KHR;
+		asWrite.accelerationStructureCount = 1;
+		asWrite.pAccelerationStructures = &rtx.tlas;
+
+		Com_Memset( &writeAS, 0, sizeof( writeAS ) );
+		writeAS.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+		writeAS.dstSet = rtx.descriptor_set;
+		writeAS.dstBinding = 0;
+		writeAS.descriptorCount = 1;
+		writeAS.descriptorType = VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR;
+		writeAS.pNext = &asWrite;
+		qvkUpdateDescriptorSets( vk.device, 1, &writeAS, 0, NULL );
+
+		rtx.tlas_valid = qtrue;
+		rtx.tlas_instance_count = 1u;
+	}
 
 	Q_strncpyz( rtx.world_name, wn, sizeof( rtx.world_name ) );
 	rtx.blas_geo_is_world = ( wn[0] != '\0' && useWorld ) ? qtrue : qfalse;
@@ -615,8 +651,11 @@ static void vk_rtx_rebuild_entity_tlas( void )
 	uint32_t packedEnt;
 	uint8_t *instMap;
 	VkDeviceSize scratchSize = 0;
+	VkDeviceSize instBufSize = 0;
 	VkDeviceAddress vbAddr = 0;
 	VkDeviceAddress ibAddr = 0;
+	qboolean tlasUpdate;
+	qboolean tlasCanUpdate;
 
 	if ( !rtx.ready || !rtx.descriptor_set || !rtx.blas || !rtx.world_blas_valid ) {
 		return;
@@ -631,9 +670,6 @@ static void vk_rtx_rebuild_entity_tlas( void )
 	addrInfo.accelerationStructure = rtx.blas;
 	worldBlasAddr = qvkGetAccelerationStructureDeviceAddressKHR( vk.device, &addrInfo );
 
-	vk_rtx_destroy_as( &rtx.tlas );
-	vk_rtx_destroy_buffer( &rtx.tlas_buffer, &rtx.tlas_memory );
-	vk_rtx_destroy_buffer( &rtx.instance_buffer, &rtx.instance_memory );
 	vk_rtx_destroy_entity_blas();
 
 	capEnt = ( r_rtxEntityCap && r_rtxEntityCap->integer > 0 ) ? (uint32_t)r_rtxEntityCap->integer : 128u;
@@ -752,12 +788,23 @@ static void vk_rtx_rebuild_entity_tlas( void )
 		instances[1].accelerationStructureReference = entityBlasAddr;
 	}
 
-	vk_rtx_alloc_buffer( sizeof( instances[0] ) * maxInstTLAS,
-		VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT | VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR,
-		VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-		&rtx.instance_buffer, &rtx.instance_memory, &instAddr );
-	VK_CHECK( qvkMapMemory( vk.device, rtx.instance_memory, 0, sizeof( instances[0] ) * maxInstTLAS, 0, (void **)&instMap ) );
-	Com_Memcpy( instMap, instances, sizeof( instances[0] ) * maxInstTLAS );
+	instBufSize = sizeof( instances[0] ) * maxInstTLAS;
+	if ( rtx.instance_buffer == VK_NULL_HANDLE || rtx.tlas_instance_count != maxInstTLAS ) {
+		vk_rtx_destroy_buffer( &rtx.instance_buffer, &rtx.instance_memory );
+		vk_rtx_alloc_buffer( instBufSize,
+			VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT | VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR,
+			VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+			&rtx.instance_buffer, &rtx.instance_memory, &instAddr );
+	} else {
+		VkBufferDeviceAddressInfo bda;
+
+		Com_Memset( &bda, 0, sizeof( bda ) );
+		bda.sType = VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO;
+		bda.buffer = rtx.instance_buffer;
+		instAddr = qvkGetBufferDeviceAddress( vk.device, &bda );
+	}
+	VK_CHECK( qvkMapMemory( vk.device, rtx.instance_memory, 0, instBufSize, 0, (void **)&instMap ) );
+	Com_Memcpy( instMap, instances, instBufSize );
 	qvkUnmapMemory( vk.device, rtx.instance_memory );
 
 	Com_Memset( &instGeom, 0, sizeof( instGeom ) );
@@ -773,7 +820,8 @@ static void vk_rtx_rebuild_entity_tlas( void )
 	Com_Memset( &buildInfoTLAS, 0, sizeof( buildInfoTLAS ) );
 	buildInfoTLAS.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_BUILD_GEOMETRY_INFO_KHR;
 	buildInfoTLAS.type = VK_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL_KHR;
-	buildInfoTLAS.flags = VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR;
+	buildInfoTLAS.flags = VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR
+		| VK_BUILD_ACCELERATION_STRUCTURE_ALLOW_UPDATE_BIT_KHR;
 	buildInfoTLAS.geometryCount = 1;
 	buildInfoTLAS.pGeometries = &geometryTLAS;
 
@@ -781,6 +829,10 @@ static void vk_rtx_rebuild_entity_tlas( void )
 	sizeInfoTLAS.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_BUILD_SIZES_INFO_KHR;
 	qvkGetAccelerationStructureBuildSizesKHR( vk.device, VK_ACCELERATION_STRUCTURE_BUILD_TYPE_DEVICE_KHR,
 		&buildInfoTLAS, &maxInstTLAS, &sizeInfoTLAS );
+
+	tlasCanUpdate = rtx.tlas_valid && rtx.tlas != VK_NULL_HANDLE
+		&& rtx.tlas_instance_count == maxInstTLAS;
+	tlasUpdate = tlasCanUpdate && r_rtxTlasUpdate && r_rtxTlasUpdate->integer;
 
 	if ( sizeInfoTLAS.buildScratchSize > scratchSize ) {
 		scratchSize = sizeInfoTLAS.buildScratchSize;
@@ -792,29 +844,51 @@ static void vk_rtx_rebuild_entity_tlas( void )
 			VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, &rtx.scratch_buffer, &rtx.scratch_memory, &scratchAddr );
 	}
 
-	vk_rtx_alloc_buffer( sizeInfoTLAS.accelerationStructureSize,
-		VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_STORAGE_BIT_KHR | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
-		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, &rtx.tlas_buffer, &rtx.tlas_memory, NULL );
+	if ( !tlasUpdate ) {
+		vk_rtx_destroy_as( &rtx.tlas );
+		vk_rtx_destroy_buffer( &rtx.tlas_buffer, &rtx.tlas_memory );
 
-	Com_Memset( &asci, 0, sizeof( asci ) );
-	asci.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_CREATE_INFO_KHR;
-	asci.buffer = rtx.tlas_buffer;
-	asci.size = sizeInfoTLAS.accelerationStructureSize;
-	asci.type = VK_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL_KHR;
-	VK_CHECK( qvkCreateAccelerationStructureKHR( vk.device, &asci, NULL, &rtx.tlas ) );
+		vk_rtx_alloc_buffer( sizeInfoTLAS.accelerationStructureSize,
+			VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_STORAGE_BIT_KHR | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
+			VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, &rtx.tlas_buffer, &rtx.tlas_memory, NULL );
+
+		Com_Memset( &asci, 0, sizeof( asci ) );
+		asci.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_CREATE_INFO_KHR;
+		asci.buffer = rtx.tlas_buffer;
+		asci.size = sizeInfoTLAS.accelerationStructureSize;
+		asci.type = VK_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL_KHR;
+		VK_CHECK( qvkCreateAccelerationStructureKHR( vk.device, &asci, NULL, &rtx.tlas ) );
+	}
 
 	Com_Memset( &rangeTLAS, 0, sizeof( rangeTLAS ) );
 	rangeTLAS.primitiveCount = maxInstTLAS;
 	pRangeTLAS = &rangeTLAS;
-	buildInfoTLAS.mode = VK_BUILD_ACCELERATION_STRUCTURE_MODE_BUILD_KHR;
+	buildInfoTLAS.mode = tlasUpdate
+		? VK_BUILD_ACCELERATION_STRUCTURE_MODE_UPDATE_KHR
+		: VK_BUILD_ACCELERATION_STRUCTURE_MODE_BUILD_KHR;
+	buildInfoTLAS.srcAccelerationStructure = tlasUpdate ? rtx.tlas : VK_NULL_HANDLE;
 	buildInfoTLAS.dstAccelerationStructure = rtx.tlas;
 	buildInfoTLAS.scratchData.deviceAddress = scratchAddr;
 
 	buildCmd = vk.tess[0].command_buffer;
+	Com_Memset( &beginInfo, 0, sizeof( beginInfo ) );
+	beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+	beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
 	VK_CHECK( qvkBeginCommandBuffer( buildCmd, &beginInfo ) );
 	qvkCmdBuildAccelerationStructuresKHR( buildCmd, 1, &buildInfoTLAS, &pRangeTLAS );
 	VK_CHECK( qvkEndCommandBuffer( buildCmd ) );
 	vk_rtx_submit_oneshot_build( buildCmd );
+
+	rtx.tlas_valid = qtrue;
+	rtx.tlas_instance_count = maxInstTLAS;
+
+	if ( tlasUpdate ) {
+		static qboolean tlas_update_logged;
+		if ( !tlas_update_logged ) {
+			ri.Printf( PRINT_DEVELOPER, "[VK][RTX] TLAS UPDATE path active (r_rtxTlasUpdate 1)\n" );
+			tlas_update_logged = qtrue;
+		}
+	}
 
 	Com_Memset( &asWrite, 0, sizeof( asWrite ) );
 	asWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET_ACCELERATION_STRUCTURE_KHR;
@@ -841,6 +915,11 @@ static void vk_rtx_rebuild_entity_tlas( void )
 
 void vk_rtx_shutdown( void )
 {
+	if ( rtx.cmd_registered ) {
+		ri.Cmd_RemoveCommand( "rtx_status" );
+		rtx.cmd_registered = qfalse;
+	}
+
 	if ( !rtx.ready ) {
 		return;
 	}
@@ -1157,11 +1236,15 @@ void vk_rtx_init( void )
 	qvkUnmapMemory( vk.device, rtx.sbt_memory );
 
 	rtx.ready = qtrue;
+	if ( !rtx.cmd_registered ) {
+		ri.Cmd_AddCommand( "rtx_status", RTX_Status_f );
+		rtx.cmd_registered = qtrue;
+	}
 	sampleCount = ( r_rtxSamples && r_rtxSamples->integer > 0 ) ? r_rtxSamples->integer : 1;
 	if ( sampleCount > 8 ) {
 		sampleCount = 8;
 	}
-	ri.Printf( PRINT_ALL, "[VK][RTX] Ray pass ready (r_rtx=%d, samples=%d, blend=%.2f): world BLAS when map loaded, else fallback triangle\n",
+	ri.Printf( PRINT_ALL, "[VK][RTX] Ray pass ready (r_rtx=%d, samples=%d, blend=%.2f): world BLAS when map loaded, else fallback triangle; rtx_status for TLAS/BLAS state\n",
 		r_rtx->integer, sampleCount, r_rtxComposite ? r_rtxComposite->value : 0.0f );
 }
 
@@ -1451,7 +1534,15 @@ void vk_rtx_bind_tlas_descriptor( VkDescriptorSet set )
 
 #else /* !USE_VULKAN_RTX */
 
-void vk_rtx_init( void ) {}
+void vk_rtx_init( void )
+{
+	static qboolean s_logged;
+
+	if ( !s_logged ) {
+		ri.Printf( PRINT_ALL, "[VK][RTX] stub (build with -DUSE_VULKAN_RTX=ON)\n" );
+		s_logged = qtrue;
+	}
+}
 void vk_rtx_shutdown( void ) {}
 void vk_rtx_frame_begin( void ) {}
 void vk_rtx_record_demo_pass( VkCommandBuffer cmd ) { (void)cmd; }

@@ -37,7 +37,7 @@ Auto-resolved paths (slug = lowercase name after `District_` prefix):
 
 ## Build
 
-Requires **`USE_FREEUSD=ON`** (default) for manifest parse. Core state machine lives in `src/world/world_district.c` (qcommon); FreeUSD parse and console commands in `src/client/cl_district.cpp`.
+Requires **`USE_FREEUSD=ON`** (default) for manifest parse. Core state machine lives in `src/world/world_district.cpp` (qcommon); FreeUSD parse and console commands in `src/client/cl_district.cpp`. Loaded meshes register via **`RegisterModel`** (`r_freeusd` 1) and draw each frame through **`CL_District_AddRefEntitiesToScene`** (wrapped into **`re.RenderScene`**).
 
 ## Console
 
@@ -59,6 +59,7 @@ Requires **`USE_FREEUSD=ON`** (default) for manifest parse. Core state machine l
 | `cm_districtStream` | `1` | Call `CM_Stream_LoadSector` for district sector grid on full load |
 | `r_districtSectorSize` | `4096` | World units per sector cell when deriving grid from bounds |
 | `r_districtLoadRadius` | `8192` | View residency radius (units) |
+| `r_districtDraw` | `1` | Draw loaded proxy/full USDA meshes at manifest origins |
 
 Startup log: `[world_district] districts + proxy mesh layer initialized`.
 

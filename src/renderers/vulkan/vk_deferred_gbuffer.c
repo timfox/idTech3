@@ -34,7 +34,12 @@ typedef struct {
 	uint32_t maxPerTile;
 	uint32_t numLights;
 	uint32_t additive;
+	uint32_t specular;
 } vk_deferred_light_push_t;
+
+typedef struct {
+	uint32_t additive;
+} vk_deferred_composite_push_t;
 
 static void vk_dgb_destroy_composite_gfx_pipeline( void )
 {
@@ -663,6 +668,7 @@ static void vk_dgb_fill_light_push( vk_deferred_light_push_t *push, uint32_t wid
 	push->maxPerTile = vk.forward_plus.max_per_tile;
 	push->numLights = vk.forward_plus.last_packed_count;
 	push->additive = vk_deferred_unlit_base_wanted() ? 1u : 0u;
+	push->specular = ( r_deferredSpecular && r_deferredSpecular->integer ) ? 1u : 0u;
 }
 
 static void vk_dgb_dispatch_lighting_compute( uint32_t width, uint32_t height )
@@ -689,10 +695,11 @@ static void vk_dgb_dispatch_lighting_compute( uint32_t width, uint32_t height )
 
 	if ( !vk.deferred_gbuffer.lighting_logged ) {
 		ri.Printf( PRINT_ALL,
-			"[VK][deferred] r_deferredLighting=1 (%s dynamic; point+spot; strength=%.2f)\n",
-			vk_deferred_unlit_base_wanted() ? "additive" : "multiply",
+			"[VK][deferred] r_deferredLighting=1 (%s dynamic; point+spot; strength=%.2f; specular=%s)\n",
+			vk_deferred_unlit_base_wanted() ? "additive+sceneBase" : "multiply",
 			( r_deferredLightingStrength && r_deferredLightingStrength->value > 0.0f ) ?
-				r_deferredLightingStrength->value : 1.0f );
+				r_deferredLightingStrength->value : 1.0f,
+			( r_deferredSpecular && r_deferredSpecular->integer ) ? "on" : "off" );
 		vk.deferred_gbuffer.lighting_logged = qtrue;
 	}
 
@@ -735,8 +742,9 @@ static void vk_dgb_dispatch_lighting_compute( uint32_t width, uint32_t height )
 
 static void vk_dgb_create_composite_gfx_pipeline( void )
 {
-	VkDescriptorSetLayoutBinding binding;
+	VkDescriptorSetLayoutBinding bindings[2];
 	VkDescriptorSetLayoutCreateInfo layout_ci;
+	VkPushConstantRange push_range;
 	VkPipelineLayoutCreateInfo pl_ci;
 	VkPipelineShaderStageCreateInfo stages[2];
 	VkPipelineVertexInputStateCreateInfo vertex_input;
@@ -762,22 +770,32 @@ static void vk_dgb_create_composite_gfx_pipeline( void )
 		return;
 	}
 
-	Com_Memset( &binding, 0, sizeof( binding ) );
-	binding.binding = 0;
-	binding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-	binding.descriptorCount = 1;
-	binding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+	Com_Memset( bindings, 0, sizeof( bindings ) );
+	bindings[0].binding = 0;
+	bindings[0].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+	bindings[0].descriptorCount = 1;
+	bindings[0].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+	bindings[1].binding = 1;
+	bindings[1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+	bindings[1].descriptorCount = 1;
+	bindings[1].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
 
 	Com_Memset( &layout_ci, 0, sizeof( layout_ci ) );
 	layout_ci.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-	layout_ci.bindingCount = 1;
-	layout_ci.pBindings = &binding;
+	layout_ci.bindingCount = 2;
+	layout_ci.pBindings = bindings;
 	VK_CHECK( qvkCreateDescriptorSetLayout( vk.device, &layout_ci, NULL, &vk.deferred_gbuffer.composite_gfx_layout ) );
+
+	push_range.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+	push_range.offset = 0;
+	push_range.size = sizeof( vk_deferred_composite_push_t );
 
 	Com_Memset( &pl_ci, 0, sizeof( pl_ci ) );
 	pl_ci.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
 	pl_ci.setLayoutCount = 1;
 	pl_ci.pSetLayouts = &vk.deferred_gbuffer.composite_gfx_layout;
+	pl_ci.pushConstantRangeCount = 1;
+	pl_ci.pPushConstantRanges = &push_range;
 	VK_CHECK( qvkCreatePipelineLayout( vk.device, &pl_ci, NULL, &vk.deferred_gbuffer.composite_gfx_pipeline_layout ) );
 
 	Com_Memset( stages, 0, sizeof( stages ) );
@@ -843,7 +861,7 @@ static void vk_dgb_create_composite_gfx_pipeline( void )
 	VK_CHECK( qvkCreateGraphicsPipelines( vk.device, VK_NULL_HANDLE, 1, &pipe_ci, NULL, &vk.deferred_gbuffer.composite_gfx_pipeline ) );
 
 	pool_size.type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-	pool_size.descriptorCount = 1;
+	pool_size.descriptorCount = 2;
 	Com_Memset( &pool_ci, 0, sizeof( pool_ci ) );
 	pool_ci.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
 	pool_ci.maxSets = 1;
@@ -863,11 +881,13 @@ static void vk_dgb_create_composite_gfx_pipeline( void )
 
 static void vk_dgb_update_composite_descriptor( void )
 {
-	VkDescriptorImageInfo info;
-	VkWriteDescriptorSet write;
+	VkDescriptorImageInfo img_infos[2];
+	VkWriteDescriptorSet writes[2];
 	Vk_Sampler_Def sd;
+	int i;
 
-	if ( vk.deferred_gbuffer.composite_gfx_descriptor == VK_NULL_HANDLE || vk.deferred_lighting_view == VK_NULL_HANDLE ) {
+	if ( vk.deferred_gbuffer.composite_gfx_descriptor == VK_NULL_HANDLE ||
+		vk.deferred_lighting_view == VK_NULL_HANDLE || vk.deferred_gbuffer_albedo_view == VK_NULL_HANDLE ) {
 		return;
 	}
 
@@ -876,23 +896,29 @@ static void vk_dgb_update_composite_descriptor( void )
 	sd.address_mode = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
 	sd.noAnisotropy = qtrue;
 
-	Com_Memset( &info, 0, sizeof( info ) );
-	info.sampler = vk_find_sampler( &sd );
-	info.imageView = vk.deferred_lighting_view;
-	info.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+	Com_Memset( img_infos, 0, sizeof( img_infos ) );
+	img_infos[0].sampler = vk_find_sampler( &sd );
+	img_infos[0].imageView = vk.deferred_gbuffer_albedo_view;
+	img_infos[0].imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+	img_infos[1].sampler = vk_find_sampler( &sd );
+	img_infos[1].imageView = vk.deferred_lighting_view;
+	img_infos[1].imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 
-	Com_Memset( &write, 0, sizeof( write ) );
-	write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-	write.dstSet = vk.deferred_gbuffer.composite_gfx_descriptor;
-	write.dstBinding = 0;
-	write.descriptorCount = 1;
-	write.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-	write.pImageInfo = &info;
-	qvkUpdateDescriptorSets( vk.device, 1, &write, 0, NULL );
+	Com_Memset( writes, 0, sizeof( writes ) );
+	for ( i = 0; i < 2; i++ ) {
+		writes[i].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+		writes[i].dstSet = vk.deferred_gbuffer.composite_gfx_descriptor;
+		writes[i].dstBinding = (uint32_t)i;
+		writes[i].descriptorCount = 1;
+		writes[i].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+		writes[i].pImageInfo = &img_infos[i];
+	}
+	qvkUpdateDescriptorSets( vk.device, 2, writes, 0, NULL );
 }
 
 static void vk_dgb_composite_lit_to_color( uint32_t width, uint32_t height )
 {
+	vk_deferred_composite_push_t push;
 	qboolean resume_main = ( vk.inRenderPass && vk.renderPassIndex == RENDER_PASS_MAIN ) ? qtrue : qfalse;
 
 	if ( vk.inRenderPass ) {
@@ -906,9 +932,13 @@ static void vk_dgb_composite_lit_to_color( uint32_t width, uint32_t height )
 	vk_begin_post_bloom_render_pass();
 	vk_dgb_update_composite_descriptor();
 
+	push.additive = vk_deferred_unlit_base_wanted() ? 1u : 0u;
+
 	qvkCmdBindPipeline( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.deferred_gbuffer.composite_gfx_pipeline );
 	qvkCmdBindDescriptorSets( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
 		vk.deferred_gbuffer.composite_gfx_pipeline_layout, 0, 1, &vk.deferred_gbuffer.composite_gfx_descriptor, 0, NULL );
+	qvkCmdPushConstants( vk.cmd->command_buffer, vk.deferred_gbuffer.composite_gfx_pipeline_layout,
+		VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof( push ), &push );
 	vk_set_fullscreen_viewport_scissor( width, height );
 	qvkCmdDraw( vk.cmd->command_buffer, 4, 1, 0, 0 );
 	vk_end_render_pass();
@@ -945,7 +975,9 @@ void vk_deferred_lighting_apply_after_geometry( void )
 	}
 
 	if ( !vk.deferred_gbuffer.composite_logged ) {
-		ri.Printf( PRINT_ALL, "[VK][deferred] composite deferred lighting to scene color after geometry\n" );
+		ri.Printf( PRINT_ALL,
+			"[VK][deferred] composite scene base + dynamic lighting to color (additive=%s)\n",
+			vk_deferred_unlit_base_wanted() ? "1" : "0" );
 		vk.deferred_gbuffer.composite_logged = qtrue;
 	}
 

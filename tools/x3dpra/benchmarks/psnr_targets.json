@@ -1,0 +1,35 @@
+{
+  "circle": {
+    "mode": "2d",
+    "nx": 30,
+    "ny": 30,
+    "solver": "lsqr_tv",
+    "gamma": 0.04,
+    "max_iter": 40,
+    "psnr_min": 17.8,
+    "psnr_max": 21.8,
+    "notes": "Section V Fig 5, TVAL3 2D"
+  },
+  "square": {
+    "mode": "2d",
+    "nx": 30,
+    "ny": 30,
+    "solver": "lsqr_tv",
+    "gamma": 0.042,
+    "max_iter": 40,
+    "psnr_min": 14.3,
+    "psnr_max": 18.3
+  },
+  "two_cylinders": {
+    "mode": "3d",
+    "nx": 20,
+    "ny": 20,
+    "nz": 5,
+    "solver": "admm",
+    "gamma": 0.04,
+    "max_iter": 30,
+    "psnr_min": 8.0,
+    "psnr_max": 13.0,
+    "notes": "3D ADMM coarse grid CI band (not valid in 2D center slice)"
+  }
+}

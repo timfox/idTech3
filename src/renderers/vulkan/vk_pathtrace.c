@@ -1112,7 +1112,15 @@ void vk_pathtrace_record_pass( VkCommandBuffer cmd )
 
 #else /* !USE_VULKAN_RTX */
 
-void vk_pathtrace_init( void ) {}
+void vk_pathtrace_init( void )
+{
+	static qboolean s_logged;
+
+	if ( !s_logged ) {
+		ri.Printf( PRINT_ALL, "[VK][PathTrace] stub (build with -DUSE_VULKAN_RTX=ON)\n" );
+		s_logged = qtrue;
+	}
+}
 void vk_pathtrace_shutdown( void ) {}
 void vk_pathtrace_frame_begin( void ) {}
 qboolean vk_pathtrace_active( void ) { return qfalse; }

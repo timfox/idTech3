@@ -53,9 +53,6 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "linux_local.h"
 #include "unix_glw.h"
 
-#ifdef USE_OPENGL_API
-#include "../renderers/opengl/qgl.h"
-#endif
 
 #include <X11/Xlib.h>
 #include <X11/Xutil.h>
@@ -103,9 +100,6 @@ Display *dpy = NULL;
 int scrnum;
 
 Window win = 0;
-#ifdef USE_OPENGL_API
-static GLXContext ctx = NULL;
-#endif
 static Atom wmDeleteEvent = None;
 static Atom motifWMHints = None;
 
@@ -1092,83 +1086,6 @@ void GLimp_SetGamma( unsigned char red[256], unsigned char green[256], unsigned 
 }
 
 
-#ifdef USE_OPENGL_API
-/*
-** GLimp_Shutdown
-**
-** This routine does all OS specific shutdown procedures for the OpenGL
-** subsystem.  Under OpenGL this means NULLing out the current DC and
-** HGLRC, deleting the rendering context, and releasing the DC acquired
-** for the window.  The state structure is also nulled out.
-**
-*/
-void GLimp_Shutdown( qboolean unloadDLL )
-{
-	IN_DeactivateMouse();
-
-	IN_Shutdown();
-
-	if ( dpy )
-	{
-		XSync( dpy, True );
-
-		if ( glw_state.randr_gamma && glw_state.gammaSet )
-		{
-			RandR_RestoreGamma();
-			glw_state.gammaSet = qfalse;
-		}
-
-		RandR_RestoreMode();
-
-		if ( ctx )
-		{
-			qglXMakeCurrent( dpy, None, NULL );
-			qglXDestroyContext( dpy, ctx );
-			ctx = NULL;
-		}
-
-		if ( win )
-		{
-			XDestroyWindow( dpy, win );
-			win = 0;
-		}
-
-		if ( glw_state.gammaSet )
-		{
-			VidMode_RestoreGamma();
-			glw_state.gammaSet = qfalse;
-		}
-
-		if ( glw_state.vidmode_active )
-			VidMode_RestoreMode();
-
-		XSync( dpy, False );
-
-		// NOTE TTimo opening/closing the display should be necessary only once per run
-		// but it seems QGL_Shutdown gets called in a lot of occasion
-		// in some cases, this XCloseDisplay is known to raise some X errors
-		// ( https://zerowing.idsoftware.com/bugzilla/show_bug.cgi?id=33 )
-		if ( unloadDLL )
-		{
-			XCloseDisplay( dpy );
-			dpy = NULL;
-		}
-	}
-
-	if ( unloadDLL )
-	{
-		RandR_Done();
-		VidMode_Done();
-	}
-
-	glw_state.desktop_ok = qfalse;
-	glw_state.cdsFullscreen = qfalse;
-
-	unsetenv( "vblank_mode" );
-
-	QGL_Shutdown( unloadDLL );
-}
-#endif // USE_OPENGL_API
 
 
 #ifdef USE_VULKAN_API
@@ -1292,116 +1209,6 @@ static rserr_t GLW_StartDriverAndSetMode( int mode, const char *modeFS, qboolean
 }
 
 
-#ifdef USE_OPENGL_API
-static XVisualInfo *GL_SelectVisual( int colorbits, int depthbits, int stencilbits, glconfig_t *config )
-{
-	// these match in the array
-	#define ATTR_RED_IDX     3
-	#define ATTR_GREEN_IDX   5
-	#define ATTR_BLUE_IDX    7
-	#define ATTR_ALPHA_IDX   9
-	#define ATTR_DEPTH_IDX   11
-	#define ATTR_STENCIL_IDX 13
-
-	static int attrib[] =
-	{
-		GLX_RGBA,             // 0
-		GLX_DOUBLEBUFFER,     // 1
-		GLX_RED_SIZE,     8,  // 2, 3
-		GLX_GREEN_SIZE,   8,  // 4, 5
-		GLX_BLUE_SIZE,    8,  // 6, 7
-		GLX_ALPHA_SIZE,   8,  // 8, 9
-		GLX_DEPTH_SIZE,   24, // 10, 11
-		GLX_STENCIL_SIZE, 8,  // 12, 13
-		None
-	};
-
-	int tcolorbits, tdepthbits, tstencilbits, i;
-	XVisualInfo *visinfo = NULL;
-
-	for ( i = 0; i < 16; i++ )
-	{
-		// 0 - default
-		// 1 - minus colorbits
-		// 2 - minus depthbits
-		// 3 - minus stencil
-		if ( (i % 4) == 0 && i )
-		{
-			// one pass, reduce
-			switch (i / 4)
-			{
-			case 2 :
-				if ( colorbits == 24 )
-					colorbits = 16;
-				break;
-			case 1 :
-				if ( depthbits == 24 )
-					depthbits = 16;
-			case 3 :
-				if ( stencilbits == 8 )
-					stencilbits = 0;
-			}
-		}
-
-		tcolorbits = colorbits;
-		tdepthbits = depthbits;
-		tstencilbits = stencilbits;
-
-		if ( (i % 4) == 3 )
-		{ // reduce colorbits
-			if ( tcolorbits == 24 )
-				tcolorbits = 16;
-		}
-
-		if ( (i % 4) == 2 )
-		{ // reduce depthbits
-			if ( tdepthbits == 24 )
-				tdepthbits = 16;
-		}
-
-		if ((i % 4) == 1)
-		{ // reduce stencilbits
-			if ( tstencilbits == 8 )
-				tstencilbits = 0;
-		}
-
-		if (tcolorbits == 24)
-		{
-			attrib[ATTR_RED_IDX] = 8;
-			attrib[ATTR_GREEN_IDX] = 8;
-			attrib[ATTR_BLUE_IDX] = 8;
-			attrib[ATTR_ALPHA_IDX] = 8;
-		}
-		else
-		{
-			// must be 16 bit
-			attrib[ATTR_RED_IDX] = 4;
-			attrib[ATTR_GREEN_IDX] = 4;
-			attrib[ATTR_BLUE_IDX] = 4;
-			attrib[ATTR_ALPHA_IDX] = 0; // prefer smallest available alpha
-		}
-
-		attrib[ATTR_DEPTH_IDX] = tdepthbits; // default to 24 depth
-		attrib[ATTR_STENCIL_IDX] = tstencilbits;
-
-		visinfo = qglXChooseVisual( dpy, scrnum, attrib );
-		if ( !visinfo )
-			continue;
-
-		Com_Printf( "Using %d/%d/%d Color bits, %d depth, %d stencil display.\n", 
-			attrib[ATTR_RED_IDX], attrib[ATTR_GREEN_IDX], attrib[ATTR_BLUE_IDX],
-			attrib[ATTR_DEPTH_IDX], attrib[ATTR_STENCIL_IDX]);
-
-		config->colorBits = tcolorbits;
-		config->depthBits = tdepthbits;
-		config->stencilBits = tstencilbits;
-
-		break;
-	}
-
-	return visinfo;
-}
-#endif // USE_OPENGL_API
 
 
 #ifdef USE_VULKAN_API
@@ -1580,10 +1387,6 @@ int GLW_SetMode( int mode, const char *modeFS, qboolean fullscreen, qboolean vul
 	if ( vulkan )
 		visinfo = VK_SelectVisual( colorbits, depthbits, stencilbits, config );
 #endif
-#ifdef USE_OPENGL_API
-	if ( !vulkan )
-		visinfo = GL_SelectVisual( colorbits, depthbits, stencilbits, config );
-#endif
 
 	if ( !visinfo )
 	{
@@ -1672,29 +1475,6 @@ int GLW_SetMode( int mode, const char *modeFS, qboolean fullscreen, qboolean vul
 //	XSync( dpy, False );
 
 	// create rendering context
-#ifdef USE_OPENGL_API
-	if ( !vulkan )
-	{
-		ctx = qglXCreateContext( dpy, visinfo, NULL, True );
-
-		if ( ctx == NULL )
-		{
-			Com_Error( ERR_FATAL, "Error creating GLX context" );
-		}
-
-		/* GH: Free the visinfo after we're done with it */
-		XFree( visinfo );
-
-		if ( !qglXMakeCurrent( dpy, win, ctx ) )
-		{
-			Com_Error( ERR_FATAL, "Error setting GLX context" );
-		}
-	}
-	else
-	{
-		// nothing to do
-	}
-#endif
 
 	Key_ClearStates();
 
@@ -1777,191 +1557,6 @@ static void InitCvars( void )
 }
 
 
-#ifdef USE_OPENGL_API
-/*
-** GLW_LoadOpenGL
-**
-** GLimp_win.c internal function that that attempts to load and use 
-** a specific OpenGL DLL.
-*/
-static qboolean GLW_LoadOpenGL( const char *name )
-{
-	qboolean fullscreen;
-
-	if ( r_swapInterval->integer )
-		setenv( "vblank_mode", "2", 1 );
-	else
-		setenv( "vblank_mode", "1", 1 );
-
-	// load the QGL layer
-	if ( QGL_Init( name ) )
-	{
-		rserr_t err;
-		fullscreen = (r_fullscreen->integer != 0);
-
-		// create the window and set up the context
-		err = GLW_StartDriverAndSetMode( r_mode->integer, r_modeFullscreen->string, fullscreen, qfalse /* vulkan */ );
-		if ( err != RSERR_OK )
-		{
-			if ( err == RSERR_FATAL_ERROR )
-				goto fail;
-
-			if ( r_mode->integer != 3 || ( fullscreen && atoi( r_modeFullscreen->string ) != 3 ) )
-			{
-				Com_Printf( "Setting \\r_mode %d failed, falling back on \\r_mode %d\n", r_mode->integer, 3 );
-
-				err = GLW_StartDriverAndSetMode( 3, "", fullscreen, qfalse /* vulkan */ );
-				if ( err != RSERR_OK )
-				{
-					Com_Printf( "r_mode 3 failed, trying r_mode -1 (640x480)\n" );
-					Cvar_Set( "r_customWidth", "640" );
-					Cvar_Set( "r_customHeight", "480" );
-					err = GLW_StartDriverAndSetMode( -1, "", fullscreen, qfalse /* vulkan */ );
-					if ( err == RSERR_OK )
-						Cvar_Set( "r_mode", "-1" );
-				}
-				if ( err != RSERR_OK )
-				{
-					Com_Printf( "r_mode -1 (640x480) failed, trying 800x600\n" );
-					Cvar_Set( "r_customWidth", "800" );
-					Cvar_Set( "r_customHeight", "600" );
-					err = GLW_StartDriverAndSetMode( -1, "", fullscreen, qfalse /* vulkan */ );
-					if ( err == RSERR_OK )
-						Cvar_Set( "r_mode", "-1" );
-				}
-				if ( err != RSERR_OK && fullscreen )
-				{
-					Com_Printf( "Fullscreen failed, trying windowed mode\n" );
-					Cvar_Set( "r_fullscreen", "0" );
-					err = GLW_StartDriverAndSetMode( 3, "", qfalse, qfalse /* vulkan */ );
-				}
-				if ( err != RSERR_OK )
-				{
-					goto fail;
-				}
-			}
-			else
-			{
-				goto fail;
-			}
-		}
-		return qtrue;
-	}
-	fail:
-
-	QGL_Shutdown( qtrue );
-
-	return qfalse;
-}
-
-
-static qboolean GLW_StartOpenGL( void )
-{
-	//
-	// load and initialize the specific OpenGL driver
-	//
-	if ( !GLW_LoadOpenGL( r_glDriver->string ) )
-	{
-		if ( Q_stricmp( r_glDriver->string, OPENGL_DRIVER_NAME ) != 0 )
-		{
-			// try default driver
-			if ( GLW_LoadOpenGL( OPENGL_DRIVER_NAME ) )
-			{
-				Cvar_Set( "r_glDriver", OPENGL_DRIVER_NAME );
-				r_glDriver->modified = qfalse;
-				return qtrue;
-			}
-		}
-
-		Com_Error( ERR_FATAL, "GLW_StartOpenGL() - could not load OpenGL subsystem\n" );
-		return qfalse;
-	}
-
-	return qtrue;
-}
-
-
-/*
-** GLimp_Init
-**
-** This routine is responsible for initializing the OS specific portions
-** of OpenGL.
-*/
-void GLimp_Init( glconfig_t *config )
-{
-	InitSig();
-
-	// initialize variables that may be referenced during window creation/setup
-	InitCvars();
-
-	// set up our custom error handler for X failures
-	XSetErrorHandler( &qXErrorHandler );
-
-	// feedback to renderer configuration
-	glw_state.config = config;
-
-	// load and initialize the specific OpenGL driver
-	if ( !GLW_StartOpenGL() )
-	{
-		return;
-	}
-
-	// These values force the UI to disable driver selection
-	config->driverType = GLDRV_ICD;
-	config->hardwareType = GLHW_GENERIC;
-
-	// optional
-#define GLE( ret, name, ... ) q##name = GL_GetProcAddress( XSTRING( name ) );
-	QGL_Swp_PROCS;
-#undef GLE
-
-	if ( qglXSwapIntervalEXT || qglXSwapIntervalMESA || qglXSwapIntervalSGI )
-	{
-		Com_Printf( "...using GLX_EXT_swap_control\n" );
-		Cvar_SetModified( "r_swapInterval", qtrue ); // force a set next frame
-	}
-	else
-	{
-		Com_Printf( "...GLX_EXT_swap_control not found\n" );
-	}
-
-	Key_ClearStates();
-
-	IN_Init();
-}
-
-
-/*
-** GLimp_EndFrame
-** 
-** Responsible for doing a swapbuffers and possibly for other stuff
-** as yet to be determined.  Probably better not to make this a GLimp
-** function and instead do a call to GLimp_SwapBuffers.
-*/
-void GLimp_EndFrame( void )
-{
-	//
-	// swapinterval stuff
-	//
-	if ( r_swapInterval->modified ) {
-		r_swapInterval->modified = qfalse;
-
-		if ( qglXSwapIntervalEXT ) {
-			qglXSwapIntervalEXT( dpy, win, r_swapInterval->integer );
-		} else if ( qglXSwapIntervalMESA ) {
-			qglXSwapIntervalMESA( r_swapInterval->integer );
-		} else if ( qglXSwapIntervalSGI ) {
-			qglXSwapIntervalSGI( r_swapInterval->integer );
-		}
-	}
-
-	// don't flip if drawing to front buffer
-	if ( Q_stricmp( cl_drawBuffer->string, "GL_FRONT" ) != 0 )
-	{
-		qglXSwapBuffers( dpy, win );
-	}
-}
-#endif // USE_OPENGL_API
 
 
 #ifdef USE_VULKAN_API

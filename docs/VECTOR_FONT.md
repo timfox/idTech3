@@ -20,15 +20,23 @@ Requires **Vulkan**, **FreeType** (`BUILD_FREETYPE`), and a valid **`r_font`** T
 | Value | Name | Status |
 |-------|------|--------|
 | **0** | Lengyel 2017 | **Default** when `r_vectorFont 1` — curve texture + winding-number fragment shader (`uiVectorText`) |
-| **2** | Loop & Blinn + mesh | **Not implemented** — falls back to mode 0; see [research/amd-gpuopen-loop-blinn-mesh-fonts.md](research/amd-gpuopen-loop-blinn-mesh-fonts.md) |
+| **2** | Loop & Blinn + mesh | **Implemented** — ear-clip solid fill + curve triangles; vertex fallback always, **`VK_NV_mesh_shader`** string dispatch when **`r_vk_meshShaderNV 1`** |
 
 ```text
 set r_vectorFont 1
-set r_vectorFontMode 0    // Lengyel (default)
-// set r_vectorFontMode 2  // future: AMD GPUOpen glyphlet + mesh shader per string
+set r_vectorFontMode 2    // Loop & Blinn glyphlets (+ r_vk_meshShaderNV 1 for NV mesh dispatch)
+// set r_vectorFontMode 0  // Lengyel winding-number (default)
 ```
 
-## How mode 0 works (Lengyel JCGT 2017)
+## Mode 2 (Loop & Blinn + optional NV mesh dispatch)
+
+1. **CPU (load):** FreeType outline → ear-clipped solid triangles + convex/concave curve triangles (`tr_vector_font_glyphlet.c`).
+2. **Draw (fallback):** Expanded indexed triangles + `frag_ui_vector_glyphlet` (Loop & Blinn `u² − v` discard).
+3. **Draw (NV mesh):** When **`r_vk_meshShaderNV 1`**, one **`CmdDrawMeshTasksNV`** per string from glyphlet SSBOs (`mesh_nv_ui_vector_font.mesh`).
+
+Code: `src/renderers/vulkan/vk_vector_font.c`, shaders under `src/renderers/vulkan/shaders/glsl/`.
+
+## Mode 0 (Lengyel JCGT 2017)
 
 1. **CPU (load):** FreeType decomposes each glyph outline into quadratic Bézier segments; control points pack into a large float **`curveTexture`** (`fonts/_vcur_*`).
 2. **Draw:** Each glyph is a screen-aligned quad; em-space UVs index the curve range (`curveStart`, `curveCount` push constants).
@@ -36,24 +44,12 @@ set r_vectorFontMode 0    // Lengyel (default)
 
 Code: `src/renderers/common/tr_vector_font.c`, `src/client/cl_vector_font.c`, shader `src/renderers/vulkan/shaders/glsl/frag_ui_vector_text.frag`.
 
-## Planned mode 2 (AMD GPUOpen / Loop & Blinn)
+## Planned extensions
 
-[AMD’s mesh-shader font article](https://gpuopen.com/learn/mesh_shaders/mesh_shaders-font-rendering/) describes:
-
-- **Loop & Blinn (2005):** CDT solid fill + convex/concave curve triangles; fragment discard with `u² − v` on canonical Bézier coords.
-- **Mesh shaders:** Per-primitive `triangleType`; **one dispatch renders an entire string** from glyphlet SSBOs.
-
-Prerequisites not yet in-tree:
-
-- `VK_EXT_mesh_shader` pipelines (RDNA) — today only optional **`VK_NV_mesh_shader`** enablement via `r_vk_meshShaderNV` (no draw path).
-- Glyphlet build (vertex + index + per-primitive-type buffers) at font load.
-- Optional `VK_KHR_fragment_shader_barycentric` for a non-mesh Loop & Blinn fallback.
-
-See [research/amd-gpuopen-loop-blinn-mesh-fonts.md](research/amd-gpuopen-loop-blinn-mesh-fonts.md).
+- **`VK_EXT_mesh_shader`** (AMD RDNA) — same glyphlet buffers; NV path is the first wired implementation.
+- Deluxe/barycentric variants per [research/amd-gpuopen-loop-blinn-mesh-fonts.md](research/amd-gpuopen-loop-blinn-mesh-fonts.md).
 
 ## Comparison to other text paths
-
-| Path | Cvars | Notes |
 |------|-------|-------|
 | FreeType atlas | `cl_builtInTtf 1`, `r_font` | Default; CPU raster each reload |
 | SDF | `r_sdfEnable 1`, `r_sdfFont` | Pre-baked `.fnt` + atlas |

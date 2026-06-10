@@ -454,7 +454,12 @@ void CL_AddReliableCommand( const char *cmd, qboolean isDisconnectCmd );
 
 void CL_StartHunkUsers( void );
 
+void CL_SendPureChecksums( void );
+void CL_ResetPureClientAtServer( void );
+void CL_ShutdownVMs( void );
+
 void CL_Disconnect_f( void );
+void CL_UpdateGUID( const char *prefix, int prefix_len );
 void CL_ReadDemoMessage( void );
 void CL_StopRecord_f( void );
 

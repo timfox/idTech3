@@ -1,9 +1,9 @@
 #version 450
 
 /*
- * Experimental deferred diffuse (point + spot via Forward+ tile lists).
- * Input: G-buffer albedo/normal/material + depth; Forward+ light/tile SSBOs.
- * Output: RGBA16F lit color (composite replaces scene color when r_deferredLighting 1).
+ * Experimental deferred lighting (point + spot via Forward+ tile lists).
+ * Additive path (r_deferredUnlitBase 1): writes dynamic-only to outLit; composite adds scene base.
+ * Multiply path: writes full lit color (legacy).
  */
 
 layout(local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
@@ -34,6 +34,7 @@ layout(push_constant) uniform Push {
 	uint maxPerTile;
 	uint numLights;
 	uint additive;
+	uint specular;
 } pc;
 
 float viewZFromDepth( float depth ) {
@@ -51,41 +52,44 @@ vec3 toViewDir( vec3 worldDir ) {
 	return normalize( ( pc.viewMatrix * vec4( worldDir, 0.0 ) ).xyz );
 }
 
-float evalPointLight( vec3 lView, vec3 viewPos, vec3 N, vec3 lightRgb, float rad ) {
+float evalPointLight( vec3 lView, vec3 viewPos, vec3 N, float rad, out vec3 L ) {
 	vec3 toLight = lView - viewPos;
 	float dist = length( toLight );
 	if ( dist > rad ) {
+		L = vec3( 0.0 );
 		return 0.0;
 	}
-	vec3 L = toLight / max( dist, 1e-4 );
+	L = toLight / max( dist, 1e-4 );
 	float dr = dist / rad;
 	float att = clamp( 1.0 - dr * dr, 0.0, 1.0 );
 	float nl = max( dot( N, L ), 0.0 );
 	return att * nl;
 }
 
-float evalSpotLight( vec3 lView, vec3 viewPos, vec3 N, vec3 lightRgb, float rad,
-	vec3 axisView, float cosOuter, float cosInner, float segLen ) {
+float evalSpotLight( vec3 lView, vec3 viewPos, vec3 N, float rad,
+	vec3 axisView, float cosOuter, float cosInner, float segLen, out vec3 L ) {
 	vec3 v = viewPos - lView;
 	float tAx = dot( v, axisView );
 	float tCl = clamp( tAx, 0.0, segLen );
 	vec3 closest = lView + axisView * tCl;
 	float dPerp = length( viewPos - closest );
 	if ( dPerp > rad ) {
+		L = vec3( 0.0 );
 		return 0.0;
 	}
 	vec3 wDir = v / max( length( v ), 1e-4 );
 	float cosAng = dot( wDir, axisView );
 	float cone = smoothstep( cosOuter, cosInner, cosAng );
 	if ( cone <= 1e-4 ) {
+		L = vec3( 0.0 );
 		return 0.0;
 	}
 	float axAtt = 1.0 - smoothstep( segLen * 0.85, segLen, tCl );
 	float rp = dPerp / max( rad, 1e-4 );
 	float radAtt = clamp( 1.0 - rp * rp, 0.0, 1.0 );
 	float att = cone * axAtt * radAtt;
-	vec3 Ldir = -wDir;
-	float nl = max( dot( N, Ldir ), 0.0 );
+	L = -wDir;
+	float nl = max( dot( N, L ), 0.0 );
 	return att * nl;
 }
 
@@ -106,7 +110,10 @@ void main() {
 	vec3 viewPos = reconstructViewPos( uv, depth );
 	vec3 N = normalize( texture( normalTex, uv ).xyz );
 	vec3 albedo = texture( albedoTex, uv ).rgb;
+	float metalness = texture( materialTex, uv ).r;
 	float roughness = texture( materialTex, uv ).g;
+	vec3 V = normalize( -viewPos );
+	vec3 F0 = mix( vec3( 0.04 ), albedo, metalness );
 
 	uint tilesX = max( pc.tileGrid.x, 1u );
 	uint tilesY = max( pc.tileGrid.y, 1u );
@@ -122,6 +129,9 @@ void main() {
 	uint maxPer = min( pc.maxPerTile, MAX_PER_TILE );
 
 	vec3 irradiance = vec3( 0.0 );
+	vec3 specularAcc = vec3( 0.0 );
+	float specPow = mix( 96.0, 4.0, roughness );
+
 	for ( uint k = 0u; k < maxPer; k++ ) {
 		uint li = tiles.cells[ tbase + k ];
 		if ( li == 0xFFFFFFFFu ) {
@@ -137,28 +147,37 @@ void main() {
 		vec4 lpack = lights.data[ b0 + 2u ];
 		vec4 ltail = lights.data[ b0 + 3u ];
 		vec3 lView = ( pc.viewMatrix * vec4( lWorld, 1.0 ) ).xyz;
+		vec3 L;
 		float nlAtt;
 		float addBoost = mix( 1.0, 1.25, step( 0.5, ltail.z ) );
 
 		if ( lc.w < 0.5 ) {
-			nlAtt = evalPointLight( lView, viewPos, N, lc.rgb, rad );
+			nlAtt = evalPointLight( lView, viewPos, N, rad, L );
 		} else {
 			vec3 axisView = toViewDir( lpack.xyz );
-			nlAtt = evalSpotLight( lView, viewPos, N, lc.rgb, rad, axisView, lpack.w, ltail.x, ltail.y );
+			nlAtt = evalSpotLight( lView, viewPos, N, rad, axisView, lpack.w, ltail.x, ltail.y, L );
 		}
 		if ( nlAtt <= 0.0 ) {
 			continue;
 		}
 		irradiance += lc.rgb * addBoost * nlAtt;
+		if ( pc.specular != 0u ) {
+			vec3 H = normalize( L + V );
+			float specTerm = pow( max( dot( N, H ), 0.0 ), specPow );
+			specularAcc += lc.rgb * addBoost * specTerm * nlAtt * F0 * 0.65;
+		}
 	}
 
 	float roughMod = mix( 1.0, 0.85, roughness );
 	vec3 lit;
 	if ( pc.additive != 0u ) {
-		vec3 base = albedo;
-		lit = base + base * irradiance * roughMod * pc.strength;
+		vec3 dynamic = ( irradiance + specularAcc ) * roughMod * pc.strength;
+		lit = dynamic;
 	} else {
 		lit = albedo * ( vec3( 0.04 ) + irradiance ) * roughMod * pc.strength;
+		if ( pc.specular != 0u ) {
+			lit += specularAcc * roughMod * pc.strength;
+		}
 	}
 	imageStore( outLit, ivec2( pix ), vec4( lit, 1.0 ) );
 }

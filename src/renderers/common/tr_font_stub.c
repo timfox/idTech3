@@ -199,7 +199,8 @@ float RE_GetFontKerning( const fontInfo_t *font, int prevIndex, int nextIndex ) 
 
 void R_InitFreeType( void ) {
 	registeredFontCount = 0;
-	ri.Printf( PRINT_DEVELOPER, "Font system: using cached font data (FreeType not available)\n" );
+	ri.Printf( PRINT_ALL,
+		"[Font] stub: cached .dat fonts only (build with -DBUILD_FREETYPE=ON for TTF rasterization)\n" );
 }
 
 void R_DoneFreeType( void ) {

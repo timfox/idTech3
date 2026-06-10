@@ -45,6 +45,9 @@ set(DEMO_MOD_FILES
 	"${DEMO_MOD_DIR}/demo_usd.cfg"
 	"${DEMO_MOD_DIR}/demo_districts.cfg"
 	"${DEMO_MOD_DIR}/demo_openworld.cfg"
+	"${DEMO_MOD_DIR}/demo_fog_biology.cfg"
+	"${DEMO_MOD_DIR}/demo_fog_biology_namib.cfg"
+	"${DEMO_MOD_DIR}/demo_fog_biology_openworld.cfg"
 	"${DEMO_MOD_DIR}/demo_physics.cfg"
 	"${DEMO_MOD_DIR}/sprites/sector_0_0.ents"
 	"${DEMO_MOD_DIR}/demo_sprites.cfg"
@@ -185,6 +188,12 @@ add_custom_command(
 	COMMAND ${CMAKE_COMMAND} -E copy_if_different
 		"${DEMO_MOD_DIR}/demo_openworld.cfg" "${DEMO_PACK_STAGING}/demo_openworld.cfg"
 	COMMAND ${CMAKE_COMMAND} -E copy_if_different
+		"${DEMO_MOD_DIR}/demo_fog_biology.cfg" "${DEMO_PACK_STAGING}/demo_fog_biology.cfg"
+	COMMAND ${CMAKE_COMMAND} -E copy_if_different
+		"${DEMO_MOD_DIR}/demo_fog_biology_namib.cfg" "${DEMO_PACK_STAGING}/demo_fog_biology_namib.cfg"
+	COMMAND ${CMAKE_COMMAND} -E copy_if_different
+		"${DEMO_MOD_DIR}/demo_fog_biology_openworld.cfg" "${DEMO_PACK_STAGING}/demo_fog_biology_openworld.cfg"
+	COMMAND ${CMAKE_COMMAND} -E copy_if_different
 		"${DEMO_MOD_DIR}/demo_physics.cfg" "${DEMO_PACK_STAGING}/demo_physics.cfg"
 	COMMAND ${CMAKE_COMMAND} -E copy_if_different
 		"${DEMO_MOD_DIR}/sprites/sector_0_0.ents" "${DEMO_PACK_STAGING}/sprites/sector_0_0.ents"
@@ -292,7 +301,7 @@ add_custom_command(
 		"$<TARGET_FILE:demo_ui_skeleton>" "${DEMO_PACK_STAGING}/${DEMO_UI_DOT_ZIP}"
 	COMMAND ${CMAKE_COMMAND} -E chdir "${DEMO_PACK_STAGING}"
 		${CMAKE_COMMAND} -E tar cf "${DEMO_PK3}" --format=zip
-		autoexec.cfg gameinfo.txt demo_features.cfg demo_js.cfg demo_lua.cfg demo_csharp.cfg demo_gameplay.cfg demo_usd.cfg demo_districts.cfg demo_openworld.cfg demo_physics.cfg demo_sprites.cfg demo_audio.cfg demo_sp_slice.cfg gpu_golden_capture.cfg readme_demo.txt
+		autoexec.cfg gameinfo.txt demo_features.cfg demo_js.cfg demo_lua.cfg demo_csharp.cfg demo_gameplay.cfg demo_usd.cfg demo_districts.cfg demo_openworld.cfg demo_fog_biology.cfg demo_fog_biology_namib.cfg demo_fog_biology_openworld.cfg demo_physics.cfg demo_sprites.cfg demo_audio.cfg demo_sp_slice.cfg gpu_golden_capture.cfg readme_demo.txt
 		sound/soundevents.txt animgraph/idle_run.txt ndgi/demo.ndgi niv/demo.niv nslm/demo.nslm nist/demo.nist nvc/demo.nvc fsa/demo.fsa vfgi/demo.vfgi renderformer/demo.rfm vuda/demo.vuda grtx/demo.grtx mgs/demo.mgs wsp/demo.wsp sqz/demo.sqz loc/en.loc
 		scripts/js/demo_hooks.js scripts/js/README.txt
 		scripts/lua/demo_hooks.lua

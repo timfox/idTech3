@@ -22,6 +22,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 // cmodel.c -- model loading
 
 #include "cm_local.h"
+#include "cluster_graph.h"
 
 #ifdef BSPC
 
@@ -701,6 +702,9 @@ void CM_LoadMap( const char *name, qboolean clientload, int *checksum ) {
 
 	CM_FloodAreaConnections();
 
+	ClusterGraph_Init();
+	ClusterGraph_RebuildFromMap();
+
 	// allow this to be cached if it is loaded by the server
 	if ( !clientload ) {
 		Q_strncpyz( cm.name, name, sizeof( cm.name ) );
@@ -714,6 +718,7 @@ CM_ClearMap
 ==================
 */
 void CM_ClearMap( void ) {
+	ClusterGraph_Shutdown();
 	Com_Memset( &cm, 0, sizeof( cm ) );
 	CM_ClearLevelPatches();
 }
