@@ -1746,59 +1746,15 @@ static void * QDECL loadNative( const char *name, vmMainFunc_t *entryPoint, dllS
 	void		*sym;
 	void		*vmMainAddr;
 	qboolean	isGenericModule = qfalse;
+	char		moduleNames[3][MAX_QPATH];
+	int			moduleCount;
+	int			i;
 
-	// For ui, game, cgame, qagame and custom aliases, try generic names first.
-	if ( Q_stricmp( name, "ui" ) == 0 || Q_stricmp( name, "game" ) == 0 || Q_stricmp( name, "cgame" ) == 0 ||
-		 Q_stricmp( name, "qagame" ) == 0 || Q_stricmp( name, "frontend" ) == 0 ||
-		 Q_stricmp( name, "client" ) == 0 || Q_stricmp( name, "server" ) == 0 ) {
+	moduleCount = VM_BuildNativeModuleLoadOrder( name, moduleNames, (int)ARRAY_LEN( moduleNames ) );
+	if ( moduleCount > 0 ) {
 		isGenericModule = qtrue;
-
-		libHandle = VM_TryLoadNativeModule( name, filename, sizeof( filename ) );
-		if ( libHandle ) {
-			goto loadSuccess;
-		}
-
-		// qagame has historically been loaded from game.* as an alias.
-		if ( Q_stricmp( name, "qagame" ) == 0 ) {
-			libHandle = VM_TryLoadNativeModule( "game", filename, sizeof( filename ) );
-			if ( libHandle ) {
-				goto loadSuccess;
-			}
-		}
-
-		// Support renamed native modules for this project.
-		if ( Q_stricmp( name, "qagame" ) == 0 || Q_stricmp( name, "game" ) == 0 ) {
-			libHandle = VM_TryLoadNativeModule( "server", filename, sizeof( filename ) );
-			if ( libHandle ) {
-				goto loadSuccess;
-			}
-		}
-		if ( Q_stricmp( name, "cgame" ) == 0 ) {
-			libHandle = VM_TryLoadNativeModule( "client", filename, sizeof( filename ) );
-			if ( libHandle ) {
-				goto loadSuccess;
-			}
-		}
-		if ( Q_stricmp( name, "ui" ) == 0 ) {
-			libHandle = VM_TryLoadNativeModule( "frontend", filename, sizeof( filename ) );
-			if ( libHandle ) {
-				goto loadSuccess;
-			}
-		}
-		if ( Q_stricmp( name, "server" ) == 0 ) {
-			libHandle = VM_TryLoadNativeModule( "game", filename, sizeof( filename ) );
-			if ( libHandle ) {
-				goto loadSuccess;
-			}
-		}
-		if ( Q_stricmp( name, "client" ) == 0 ) {
-			libHandle = VM_TryLoadNativeModule( "cgame", filename, sizeof( filename ) );
-			if ( libHandle ) {
-				goto loadSuccess;
-			}
-		}
-		if ( Q_stricmp( name, "frontend" ) == 0 ) {
-			libHandle = VM_TryLoadNativeModule( "ui", filename, sizeof( filename ) );
+		for ( i = 0; i < moduleCount; i++ ) {
+			libHandle = VM_TryLoadNativeModule( moduleNames[i], filename, sizeof( filename ) );
 			if ( libHandle ) {
 				goto loadSuccess;
 			}
@@ -2051,7 +2007,6 @@ intptr_t QDECL VM_Call( vm_t *vm, int nargs, int callnum, ... )
 {
 	//vm_t	*oldVM;
 	intptr_t r;
-	int i;
 
 	if ( !vm ) {
 		Com_Error( ERR_FATAL, "VM_Call with NULL vm" );
@@ -2077,19 +2032,10 @@ intptr_t QDECL VM_Call( vm_t *vm, int nargs, int callnum, ... )
 	// if we have a dll loaded, call it directly
 	if ( vm->entryPoint )
 	{
-		/* Pass three arg slots: native vmMain only receives nargs from varargs; zero the rest
-		 * so e.g. UI_GETAPIVERSION (nargs=0) does not read stack garbage. */
-		int32_t args[MAX_VMMAIN_CALL_ARGS-1];
-		Com_Memset( args, 0, sizeof( args ) );
 		va_list ap;
 		va_start( ap, callnum );
-		for ( i = 0; i < nargs; i++ ) {
-			args[i] = va_arg( ap, int32_t );
-		}
+		r = VM_CallNativeModuleEntryPoint( vm->entryPoint, nargs, callnum, ap );
 		va_end( ap );
-
-		// add more arguments if you're changed MAX_VMMAIN_CALL_ARGS:
-		r = vm->entryPoint( callnum, args[0], args[1], args[2] );
 	} else {
 #if id386 && !defined __clang__ // calling convention doesn't need conversion in some cases
 #ifndef NO_VM_COMPILED
@@ -2100,6 +2046,7 @@ intptr_t QDECL VM_Call( vm_t *vm, int nargs, int callnum, ... )
 			r = VM_CallInterpreted2( vm, nargs+1, (int32_t*)&callnum );
 #else
 		int32_t args[MAX_VMMAIN_CALL_ARGS];
+		int i;
 		va_list ap;
 
 		args[0] = callnum;
