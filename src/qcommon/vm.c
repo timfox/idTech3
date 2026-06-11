@@ -2033,6 +2033,8 @@ intptr_t QDECL VM_Call( vm_t *vm, int nargs, int callnum, ... )
 	if ( vm->entryPoint )
 	{
 		va_list ap;
+		_Static_assert( VM_NATIVE_MODULE_ARG_COUNT == MAX_VMMAIN_CALL_ARGS - 1,
+			"native vmMain helper must pass every native arg slot" );
 		va_start( ap, callnum );
 		r = VM_CallNativeModuleEntryPoint( vm->entryPoint, nargs, callnum, ap );
 		va_end( ap );

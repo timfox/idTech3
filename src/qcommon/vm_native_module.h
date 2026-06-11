@@ -1,7 +1,9 @@
 #ifndef VM_NATIVE_MODULE_H
 #define VM_NATIVE_MODULE_H
 
-#include "qcommon.h"
+#include "q_shared.h"
+
+#define VM_NATIVE_MODULE_ARG_COUNT 3
 
 typedef intptr_t (QDECL *vmNativeModuleEntryPoint_t)( int command, int arg0, int arg1, int arg2 );
 

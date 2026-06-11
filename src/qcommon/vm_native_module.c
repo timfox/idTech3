@@ -76,7 +76,7 @@ int VM_BuildNativeModuleLoadOrder( const char *moduleName, char out[][MAX_QPATH]
 }
 
 intptr_t VM_CallNativeModuleEntryPoint( vmNativeModuleEntryPoint_t entryPoint, int nargs, int callnum, va_list ap ) {
-	int32_t args[MAX_VMMAIN_CALL_ARGS - 1];
+	int32_t args[VM_NATIVE_MODULE_ARG_COUNT];
 	int i;
 
 	Com_Memset( args, 0, sizeof( args ) );
