@@ -14,7 +14,7 @@ Carter, Hitschfeld & Navarro, arXiv:2504.20937.
 #include "vk_cmd.h"
 
 #ifdef USE_MIMIR_CUDA
-#include "../../mimir/mimir_cuda.h"
+#include "mimir/mimir_cuda.h"
 #include <unistd.h>
 #endif
 

@@ -2,8 +2,8 @@
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 
-grep -q 'Iris_ModelBenchmark' "$ROOT/src/iris/iris_model.c"
-grep -q 'Iris_SerializeAtlas' "$ROOT/src/iris/iris_io.c"
+grep -q 'Iris_ModelBenchmark' "$ROOT/src/extensions/research/iris/iris_model.c"
+grep -q 'Iris_SerializeAtlas' "$ROOT/src/extensions/research/iris/iris_io.c"
 grep -q 'iris_load' "$ROOT/src/renderers/vulkan/vk_iris.c"
 grep -q 'mipBilinear' "$ROOT/src/renderers/vulkan/shaders/glsl/iris/iris_compose.comp"
 grep -q 'Iris_DispatchSpdForHrTiles' "$ROOT/src/renderers/vulkan/vk_iris.c"

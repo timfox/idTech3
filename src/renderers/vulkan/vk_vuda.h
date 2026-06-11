@@ -2,7 +2,7 @@
 
 #ifdef USE_VULKAN
 
-#include "../../vuda/vuda_types.h"
+#include "vuda/vuda_types.h"
 
 void R_VUDA_Init( void );
 void R_VUDA_Shutdown( void );

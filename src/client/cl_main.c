@@ -230,8 +230,10 @@ void CL_Init( void ) {
 #ifdef USE_TRELLIS
 	CL_Trellis_Init();
 #endif
-#ifdef USE_GENETIC_GAN
+#if defined( USE_FLUX ) || defined( USE_TRELLIS ) || defined( USE_GENETIC_GAN )
 	CL_MlWorker_Init();
+#endif
+#ifdef USE_GENETIC_GAN
 	CL_GeneticGan_Init();
 #endif
 #ifdef USE_VUDA

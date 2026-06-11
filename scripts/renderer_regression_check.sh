@@ -8,9 +8,23 @@ set -euo pipefail
 #
 # Usage:
 #   ./scripts/renderer_regression_check.sh
+#   ./scripts/renderer_regression_check.sh -profile core|game|full
 #   GAME_BASE=/path/to/game/base ./scripts/renderer_regression_check.sh
 #
 # Prerequisites: glslangValidator for GLSL validation (same as smoke_test.sh).
+
+PROFILE="full"
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    -profile|--profile)
+      PROFILE="${2:-full}"
+      shift 2
+      ;;
+    *)
+      shift
+      ;;
+  esac
+done
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 if [ -f "$SCRIPT_DIR/../CMakeLists.txt" ]; then
@@ -27,7 +41,34 @@ FAIL=0
 pass() { PASS=$((PASS + 1)); echo "  ✓ $1"; }
 fail() { FAIL=$((FAIL + 1)); echo "  ✗ $1" >&2; }
 
-echo "=== Renderer regression check (headless) ==="
+echo "=== Renderer regression check (headless) profile=${PROFILE} ==="
+echo ""
+
+echo "Build profile manifests:"
+if [ -f "$PROJECT_ROOT/cmake/renderers/VulkanCoreSources.cmake" ]; then
+  pass "VulkanCoreSources.cmake present"
+else
+  fail "missing cmake/renderers/VulkanCoreSources.cmake"
+fi
+if [ -f "$PROJECT_ROOT/cmake/renderers/VulkanExtensionSources.cmake" ]; then
+  pass "VulkanExtensionSources.cmake present"
+else
+  fail "missing cmake/renderers/VulkanExtensionSources.cmake"
+fi
+case "$PROFILE" in
+  core)
+    grep -q 'USE_EXPERIMENTAL_RENDERERS OFF' "$PROJECT_ROOT/cmake/IdTech3Profile.cmake" && pass "core disables experimental renderers" || fail "profile core manifest"
+    ;;
+  game)
+    grep -q 'USE_EXPERIMENTAL_RENDERERS OFF' "$PROJECT_ROOT/cmake/IdTech3Profile.cmake" && pass "game disables experimental renderers" || fail "profile game manifest"
+    ;;
+  full|research)
+    grep -q 'USE_EXPERIMENTAL_RENDERERS ON' "$PROJECT_ROOT/cmake/IdTech3Profile.cmake" && pass "full enables experimental renderers" || fail "profile full manifest"
+    ;;
+  *)
+    fail "unknown profile: $PROFILE"
+    ;;
+esac
 echo ""
 
 echo "Repo manifest (docs + generated shaders):"

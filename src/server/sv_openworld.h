@@ -12,8 +12,13 @@ Dedicated-server open-world collision sector residency (cm_stream merge).
 extern "C" {
 #endif
 
+#ifdef USE_OPEN_WORLD
 void SV_OpenWorld_Init( void );
 void SV_OpenWorld_Frame( void );
+#else
+static inline void SV_OpenWorld_Init( void ) {}
+static inline void SV_OpenWorld_Frame( void ) {}
+#endif
 
 #ifdef __cplusplus
 }

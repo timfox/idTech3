@@ -12,11 +12,13 @@ This is an **idTech3 engine fork**
 
 ### Building
 
-See `CLAUDE.md` for canonical build commands. The primary build script is `./scripts/compile_engine.sh`. Key examples:
+See `CLAUDE.md` for canonical build commands. The primary build script is `./scripts/compile_engine.sh`. **Build profiles** (`IDTECH3_PROFILE`, default **`game`**): `core` | `game` | `full` | `research` — see **`docs/ENGINE_MODULE_MANIFEST.md`**.
 
 ```
-./scripts/compile_engine.sh vulkan          # Vulkan renderer, Release
-./scripts/compile_engine.sh vulkan debug    # Vulkan renderer, Debug
+./scripts/compile_engine.sh vulkan          # game profile (default), Release
+./scripts/compile_engine.sh vulkan full     # kitchen-sink parity (all extensions)
+./scripts/compile_engine.sh vulkan core     # Q3/OA fast path (no open world / research)
+./scripts/compile_engine.sh vulkan debug    # Debug build
 ./scripts/compile_engine.sh vulkan demo     # Also builds idtech3_demo.pk3 → release/demo_game/
 ./scripts/compile_engine.sh vulkan rtx      # Same + USE_VULKAN_RTX=ON (RTX demo path)
 ./scripts/compile_engine.sh clean vulkan    # Clean build
@@ -72,7 +74,7 @@ Build artifacts go to `build-vk-Release/` and are copied to `release/`.
 - **Sector BSP fixtures**: **`python3 scripts/tools/gen_sector_bsp.py maps/sector_0_0.bsp`** — minimal collision overlay for **`cm_streamMerge`**. **`ctest -R test_cm_stream_merge`**.
 - **Nav sector bake**: **`nav_bake_sector 0 0`** / **`nav_bake_view`** — Recast tile from sector BSP → **`nav/sector_X_Y.nav`**. Server collision residency: **`sv_openWorld 1`**. **`ctest -R test_nav_bake`**.
 - **MP sector sync**: **`sv_openWorldSync` 1** → **`CS_ENGINE_OPENWORLD_SECTORS`**; client **`cl_openWorldSync` 1**. Visual overlay: **`r_bspStream` 1**. **`ctest -R test_openworld_sync`**; full stream path: **`ctest -L sector_stream`** or **`make test-sector-stream`** (from build dir).
-- **Research modules (Python + C console)**: **RadiusFPS** (`cl_radiusfps_*`, `tools/radiusfps/`, `docs/RADIUSFPS.md`; optional GPU: **`-DUSE_RADIUSFPS_CUDA=ON`**); **x3DPRA** (`cl_x3dpra_*`, `tools/x3dpra/`, `docs/X3DPRA.md`); **GCC-FER/CA-FER** (`cl_gccfer_*`, `tools/gccfer/`, `docs/GCCFER.md`); **DaX** (`cl_dax_*`, `tools/dax/fixtures/mini_bench/`, `docs/DAX.md`). Python CI deps: **`./scripts/install_research_python.sh --ci-only`**. Smokes: `tests/scripts/test_{radiusfps,x3dpra,gccfer,dax}.sh`.
+- **Research modules (Python + C console)**: **RadiusFPS** (`cl_radiusfps_*`, `src/extensions/research/radiusfps/`); **x3DPRA**, **GCC-FER**, **DaX** under `src/extensions/research/` — see respective docs.
 
 ### Linting / Static Analysis
 

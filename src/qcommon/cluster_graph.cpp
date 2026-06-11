@@ -4,6 +4,8 @@ Copyright (C) 2026 Gopex LLC. All rights reserved.
 ===========================================================================
 */
 
+/* C++20 migration: extern "C" API boundary preserved. */
+
 extern "C" {
 #include "q_shared.h"
 #include "qcommon.h"

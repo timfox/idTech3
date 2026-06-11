@@ -71,7 +71,9 @@ void CL_Frame( int msec, int realMsec ) {
 	CL_GenerativeFrame();
 #endif
 
+#if defined( USE_FLUX ) || defined( USE_TRELLIS ) || defined( USE_GENETIC_GAN )
 	CL_MlWorker_Frame();
+#endif
 
 #ifdef USE_VUDA
 	CL_VUDA_Frame();

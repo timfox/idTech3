@@ -11,7 +11,7 @@ Client-side VUDA scheduler: imports Vulkan exports and runs CUDA in render gaps.
 
 #ifdef USE_VUDA
 
-#include "../vuda/vuda_cuda.h"
+#include "vuda/vuda_cuda.h"
 #include "../renderers/common/tr_public.h"
 
 static cvar_t *cl_vuda;
