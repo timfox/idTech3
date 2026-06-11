@@ -55,6 +55,11 @@ option(BUILD_EXAMPLE_DEMO_GAME "Build examples/demo_game (idtech3_demo.pk3 + hel
 option(USE_FREEUSD "Link FreeUSD for USDA mesh import and USD scene tools (GPL-2.0-or-later)" ON)
 option(USE_IDTECH3_BACKEND "Require idtech3backend submodule (timfox/idtech3backend); wiring TBD" OFF)
 
+set(IDTECH3_PROFILE "game" CACHE STRING "Build profile: core|game|full|research")
+set_property(CACHE IDTECH3_PROFILE PROPERTY STRINGS core game full research)
+option(USE_RESEARCH_EXTENSIONS "Research/paper-repro qcommon modules (RadiusFPS, DaX, GCC-FER, ...)" ON)
+option(USE_OPEN_WORLD "Open-world, districts, sector graph, fog biology, genetic GAN core" ON)
+
 include(${CMAKE_SOURCE_DIR}/cmake/IdTech3Backend.cmake)
 
 if(C_STANDARD_STRICT)
@@ -1094,6 +1099,12 @@ if(USE_RADIUSFPS_CUDA)
     set(USE_RADIUSFPS_CUDA OFF CACHE BOOL "" FORCE)
   endif()
 endif()
+
+include(${CMAKE_SOURCE_DIR}/cmake/IdTech3Profile.cmake)
+if(EXISTS "${CMAKE_SOURCE_DIR}/cmake/profiles/${IDTECH3_PROFILE}.cmake")
+  include("${CMAKE_SOURCE_DIR}/cmake/profiles/${IDTECH3_PROFILE}.cmake")
+endif()
+
 OPTION(USE_METAL_RENDERER "Build native Metal renderer (Apple only)" OFF)
 OPTION(USE_DXR_RENDERER "Build DirectX 12 + DXR renderer (Windows only)" OFF)
 
@@ -1233,34 +1244,11 @@ if(BUILD_FREETYPE)
 endif()
 
 AUX_SOURCE_DIRECTORY(src/qcommon QCOMMON_SRCS)
-list(APPEND QCOMMON_SRCS src/vuda/vuda_model.c src/vuda/vuda_console.c)
-list(APPEND QCOMMON_SRCS src/vksplat/vksplat_model.c src/vksplat/vksplat_console.c)
-list(APPEND QCOMMON_SRCS src/vksplat/vksplat_model.c src/vksplat/vksplat_console.c)
-list(APPEND QCOMMON_SRCS src/curast/curast_model.c src/curast/curast_console.c)
-list(APPEND QCOMMON_SRCS src/infernux/infernux_model.c src/infernux/infernux_console.c)
-list(APPEND QCOMMON_SRCS src/mimir/mimir_model.c src/mimir/mimir_console.c)
-list(APPEND QCOMMON_SRCS src/iris/iris_model.c src/iris/iris_console.c src/iris/iris_io.c)
-list(APPEND QCOMMON_SRCS src/radiusfps/radiusfps_cpu.c src/radiusfps/radiusfps_console.c)
-list(APPEND QCOMMON_SRCS src/gccfer/gccfer_dataset.c src/gccfer/gccfer_cafer.c src/gccfer/gccfer_model.c src/gccfer/gccfer_console.c)
-list(APPEND QCOMMON_SRCS src/dax/dax_benchmark.c src/dax/dax_model.c src/dax/dax_eval.c src/dax/dax_console.c)
-list(APPEND QCOMMON_SRCS src/x3dpra/x3dpra_physics.c src/x3dpra/x3dpra_scene.c src/x3dpra/x3dpra_opt.c src/x3dpra/x3dpra_forward.c src/x3dpra/x3dpra_console.c)
+include(${CMAKE_SOURCE_DIR}/cmake/IdTech3IncludeDirs.cmake)
+include(${CMAKE_SOURCE_DIR}/cmake/IdTech3QcommonExtensions.cmake)
+idtech3_append_research_qcommon_sources()
 list(APPEND QCOMMON_SRCS src/qcommon/app_crdt.c)
-if(USE_RADIUSFPS_CUDA)
-  enable_language(CUDA)
-  find_package(CUDAToolkit REQUIRED)
-  list(APPEND QCOMMON_SRCS src/radiusfps/radiusfps_cuda.cu)
-  message(STATUS "RadiusFPS-G: CUDA acceleration enabled (cl_radiusfps_backend gpu)")
-endif()
-list(APPEND QCOMMON_SRCS src/world/world_district.cpp)
-list(APPEND QCOMMON_SRCS src/world/world_open.cpp)
-list(APPEND QCOMMON_SRCS src/world/world_residency.cpp)
-list(APPEND QCOMMON_SRCS src/world/sector_graph.cpp)
-list(APPEND QCOMMON_SRCS src/world/fog_biology.cpp)
-list(APPEND QCOMMON_SRCS src/world/genetic_gan.cpp)
-list(APPEND QCOMMON_SRCS src/qcommon/cluster_graph.cpp)
-list(APPEND QCOMMON_SRCS src/world/world_proc.cpp)
-list(APPEND QCOMMON_SRCS src/qcommon/cm_stream_merge.c)
-list(APPEND QCOMMON_SRCS src/qcommon/com_openworld_smoke.c)
+idtech3_append_open_world_qcommon_sources()
 # exclude platform-dependent QVM JIT compilers; add the active backend below
 list(FILTER QCOMMON_SRCS EXCLUDE REGEX ".*vm_(aarch64|armv7l|powerpc|x86)\\.c")
 # exclude optional network modules; add when options enabled
@@ -1477,6 +1465,9 @@ if(USE_GLM)
 endif()
 
 AUX_SOURCE_DIRECTORY(src/server SERVER_SRCS)
+include(${CMAKE_SOURCE_DIR}/cmake/server/ServerExtensionSources.cmake)
+idtech3_strip_server_extension_sources()
+idtech3_append_server_extension_sources()
 list(APPEND SERVER_SRCS src/server/sv_app_crdt.c)
 
 # universal binary
@@ -1492,6 +1483,8 @@ target_include_directories(qcommon PRIVATE
   ${CMAKE_SOURCE_DIR}/src/client
   ${CMAKE_SOURCE_DIR}/src/audio
 )
+idtech3_apply_research_include_dirs(qcommon)
+idtech3_apply_research_compile_defs(qcommon)
 set_property(TARGET qcommon PROPERTY POSITION_INDEPENDENT_CODE ON)
 if(USE_LUA AND LUA_FOUND)
   target_compile_definitions(qcommon PRIVATE USE_LUA)
@@ -1546,6 +1539,8 @@ target_include_directories(qcommon_ded PRIVATE
   ${CMAKE_SOURCE_DIR}/src/client
   ${CMAKE_SOURCE_DIR}/src/audio
 )
+idtech3_apply_research_include_dirs(qcommon_ded)
+idtech3_apply_research_compile_defs(qcommon_ded)
 set_property(TARGET qcommon_ded PROPERTY POSITION_INDEPENDENT_CODE ON)
 if(USE_LUA AND LUA_FOUND)
   target_compile_definitions(qcommon_ded PRIVATE USE_LUA)
@@ -1667,6 +1662,9 @@ list(APPEND CLIENT_SRCS
   src/client/cl_window_title.c
   src/client/cl_app_crdt.c
 )
+include(${CMAKE_SOURCE_DIR}/cmake/client/ClientExtensionSources.cmake)
+idtech3_strip_client_extension_sources()
+idtech3_append_client_extension_sources()
 # include architecture-specific assembly implementations (snd_mix etc)
 # Only include x86/x86_64 assembly files on x86/x86_64 architectures on Unix-like systems
 # Assembly is disabled on Windows due to preprocessor macro issues with MSYS2/MinGW
@@ -1814,10 +1812,10 @@ if(ANDROID)
 endif()
 # --- End modern video codec support ---
 
-if(USE_VUDA)
+if(USE_VUDA AND USE_RESEARCH_EXTENSIONS)
   list(APPEND CLIENT_SRCS
     src/client/cl_vuda.c
-    src/vuda/vuda_cuda.c
+    src/extensions/research/vuda/vuda_cuda.c
   )
 endif()
 
@@ -1829,6 +1827,7 @@ IF(USE_SYSTEM_JPEG)
 	find_package(JPEG REQUIRED)
 	TARGET_COMPILE_DEFINITIONS(client PRIVATE -DUSE_SYSTEM_JPEG)
 	target_include_directories(client PRIVATE ${CMAKE_SOURCE_DIR}/src/game)
+	target_include_directories(client PRIVATE ${CMAKE_SOURCE_DIR}/src/extensions/generative)
 	if(USE_OPUS)
 		target_compile_definitions(client PRIVATE INCLUDE_INTTYPES_H=1 INCLUDE_SYS_TYPES_H=1)
 	endif()
@@ -1854,6 +1853,7 @@ ELSE()
 		${CMAKE_SOURCE_DIR}/src/audio
 		${CMAKE_SOURCE_DIR}/src/audio/codecs
 		${CMAKE_SOURCE_DIR}/src/client
+		${CMAKE_SOURCE_DIR}/src/extensions/generative
 	)
 	if(USE_OPUS)
 		target_compile_definitions(client PRIVATE INCLUDE_INTTYPES_H=1 INCLUDE_SYS_TYPES_H=1)
@@ -1880,11 +1880,12 @@ if(USE_GENETIC_GAN)
 	target_compile_definitions(client PRIVATE USE_GENETIC_GAN)
 endif()
 
-list(APPEND CLIENT_SRCS src/client/cl_genetic_gan.c)
-list(APPEND CLIENT_SRCS src/client/cl_ml_worker.c)
-list(APPEND CLIENT_SRCS src/client/cl_district.cpp)
-list(APPEND CLIENT_SRCS src/client/cl_openworld.cpp)
-list(APPEND CLIENT_SRCS src/client/cl_proc.cpp)
+idtech3_apply_research_compile_defs(client)
+
+if(USE_OPEN_WORLD)
+	target_compile_definitions(qcommon PRIVATE USE_OPEN_WORLD=1)
+	target_compile_definitions(qcommon_ded PRIVATE USE_OPEN_WORLD=1)
+endif()
 
 # renderers
 set(RENDERER_COMMON_SRCS
@@ -1936,34 +1937,11 @@ AUX_SOURCE_DIRECTORY(src/renderers/vulkan RENDERER_VK_SRCS)
 list(FILTER RENDERER_VK_SRCS EXCLUDE REGEX ".*/shaders/spirv/generated/shader_data\\.c$")
 list(FILTER RENDERER_VK_SRCS EXCLUDE REGEX ".*/shaders/spirv/generated/shader_binding\\.c$")
 list(FILTER RENDERER_VK_SRCS EXCLUDE REGEX ".*/vk_experimental_renderer_stubs\\.c$")
-set(VK_EXPERIMENTAL_RENDERER_SRCS
-	src/renderers/vulkan/vk_niv.c
-	src/renderers/vulkan/vk_nist.c
-	src/renderers/vulkan/vk_nvc.c
-	src/renderers/vulkan/vk_vfgi.c
-	src/renderers/vulkan/vk_vfgi_world.c
-	src/renderers/vulkan/vk_ndgi.c
-	src/renderers/vulkan/vk_nslm.c
-	src/renderers/vulkan/vk_renderformer.c
-	src/renderers/vulkan/vk_renderformer_scene.c
-	src/renderers/vulkan/vk_vksplat.c
-	src/renderers/vulkan/vk_wpt.c
-	src/renderers/vulkan/vk_mgs.c
-	src/renderers/vulkan/vk_wsp.c
-)
-if(USE_EXPERIMENTAL_RENDERERS)
-	message(STATUS "Experimental renderers: ON (NIV/NIST/NVC/VFGI/NDGI/NSLM/RenderFormer/VkSplat/WPT/MGS/WSP)")
-else()
-	list(REMOVE_ITEM RENDERER_VK_SRCS ${VK_EXPERIMENTAL_RENDERER_SRCS})
-	list(APPEND RENDERER_VK_SRCS src/renderers/vulkan/vk_experimental_renderer_stubs.c)
-	message(STATUS "Experimental renderers: OFF (vk_experimental_renderer_stubs.c)")
-endif()
+include(${CMAKE_SOURCE_DIR}/cmake/renderers/VulkanExtensionSources.cmake)
+idtech3_apply_vulkan_extension_sources()
 list(APPEND RENDERER_VK_SRCS
     src/renderers/vulkan/utils/mikktspace/mikktspace.c
 )
-if(USE_MIMIR_CUDA)
-  list(APPEND RENDERER_VK_SRCS src/mimir/mimir_cuda.c)
-endif()
 set(VK_SHADER_DIR "${CMAKE_SOURCE_DIR}/src/renderers/vulkan/shaders")
 set(VK_SPIRV_DIR "${VK_SHADER_DIR}/spirv")
 set(VK_GEN_DIR "${VK_SPIRV_DIR}/generated")
@@ -2049,6 +2027,7 @@ IF(USE_RENDERER_DLOPEN)
 		target_link_libraries(${RENDERER_PREFIX}_vulkan${RENDEXT} PRIVATE idtech3_freetype)
 	ENDIF()
 	target_include_directories(${RENDERER_PREFIX}_vulkan${RENDEXT} PRIVATE ${CMAKE_SOURCE_DIR}/src)
+	idtech3_apply_research_include_dirs(${RENDERER_PREFIX}_vulkan${RENDEXT})
 	if(USE_FREEUSD)
 		target_link_libraries(${RENDERER_PREFIX}_vulkan${RENDEXT} PRIVATE idtech3_freeusd freeusd::c)
 	endif()
@@ -2120,6 +2099,7 @@ ELSE()
 		target_link_libraries(${RENDERER_PREFIX}_vulkan PRIVATE idtech3_freetype)
 	ENDIF()
 	target_include_directories(${RENDERER_PREFIX}_vulkan PRIVATE ${CMAKE_SOURCE_DIR}/src)
+	idtech3_apply_research_include_dirs(${RENDERER_PREFIX}_vulkan)
 	if(USE_FREEUSD)
 		target_link_libraries(${RENDERER_PREFIX}_vulkan PRIVATE idtech3_freeusd freeusd::c)
 	endif()
@@ -2500,6 +2480,11 @@ if(USE_RECAST_NAV)
     target_compile_options(recast_nav PRIVATE -Wno-unused-parameter -Wno-sign-compare -Wno-cast-qual -Wno-shadow)
   endif()
   message(STATUS "Recast Navigation: enabled")
+else()
+  ADD_LIBRARY(recast_nav STATIC src/navigation/nav_recast_stub.c)
+  target_include_directories(recast_nav PRIVATE ${CMAKE_SOURCE_DIR}/src/navigation ${CMAKE_SOURCE_DIR}/src/qcommon)
+  set_property(TARGET recast_nav PROPERTY POSITION_INDEPENDENT_CODE ON)
+  message(STATUS "Recast Navigation: stub (USE_RECAST_NAV=OFF)")
 endif()
 
 # --- ECS (EnTT) module - alternative to gentity ---
@@ -2608,7 +2593,7 @@ endif()
 if(TARGET Threads::Threads)
   TARGET_LINK_LIBRARIES(${CNAME}${BINEXT} PRIVATE Threads::Threads)
 endif()
-if(USE_RECAST_NAV AND TARGET recast_nav)
+if(TARGET recast_nav)
   TARGET_LINK_LIBRARIES(${CNAME}${BINEXT} PRIVATE recast_nav)
 endif()
 TARGET_LINK_LIBRARIES(${CNAME}${BINEXT} PRIVATE ecs_module)
@@ -2877,49 +2862,49 @@ add_test(NAME test_vuda
 	WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
 set_tests_properties(test_vuda PROPERTIES
 	LABELS "scripts;validation"
-	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_vuda.sh;${CMAKE_SOURCE_DIR}/src/vuda/vuda_model.c")
+	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_vuda.sh;${CMAKE_SOURCE_DIR}/src/extensions/research/vuda/vuda_model.c")
 
 add_test(NAME test_vksplat
 	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_vksplat.sh
 	WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
 set_tests_properties(test_vksplat PROPERTIES
 	LABELS "scripts;validation"
-	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_vksplat.sh;${CMAKE_SOURCE_DIR}/src/vksplat/vksplat_model.c")
+	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_vksplat.sh;${CMAKE_SOURCE_DIR}/src/extensions/research/vksplat/vksplat_model.c")
 
 add_test(NAME test_curast
 	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_curast.sh
 	WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
 set_tests_properties(test_curast PROPERTIES
 	LABELS "scripts;validation"
-	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_curast.sh;${CMAKE_SOURCE_DIR}/src/curast/curast_model.c")
+	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_curast.sh;${CMAKE_SOURCE_DIR}/src/extensions/research/curast/curast_model.c")
 
 add_test(NAME test_radiusfps
 	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_radiusfps.sh
 	WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
 set_tests_properties(test_radiusfps PROPERTIES
 	LABELS "scripts;validation"
-	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_radiusfps.sh;${CMAKE_SOURCE_DIR}/src/radiusfps/radiusfps_cpu.c")
+	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_radiusfps.sh;${CMAKE_SOURCE_DIR}/src/extensions/research/radiusfps/radiusfps_cpu.c")
 
 add_test(NAME test_x3dpra
 	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_x3dpra.sh
 	${CMAKE_BINARY_DIR})
 set_tests_properties(test_x3dpra PROPERTIES
 	LABELS "smoke;validation"
-	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_x3dpra.sh;${CMAKE_SOURCE_DIR}/src/x3dpra/x3dpra_physics.c")
+	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_x3dpra.sh;${CMAKE_SOURCE_DIR}/src/extensions/research/x3dpra/x3dpra_physics.c")
 
 add_test(NAME test_dax
 	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_dax.sh
 	${CMAKE_BINARY_DIR})
 set_tests_properties(test_dax PROPERTIES
 	LABELS "smoke;validation"
-	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_dax.sh;${CMAKE_SOURCE_DIR}/src/dax/dax_benchmark.c")
+	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_dax.sh;${CMAKE_SOURCE_DIR}/src/extensions/research/dax/dax_benchmark.c")
 
 add_test(NAME test_gccfer
 	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_gccfer.sh
 	WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
 set_tests_properties(test_gccfer PROPERTIES
 	LABELS "scripts;validation"
-	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_gccfer.sh;${CMAKE_SOURCE_DIR}/src/gccfer/gccfer_dataset.c")
+	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_gccfer.sh;${CMAKE_SOURCE_DIR}/src/extensions/research/gccfer/gccfer_dataset.c")
 
 add_test(NAME test_python
 	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_python.sh
@@ -2940,14 +2925,14 @@ add_test(NAME test_mimir
 	WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
 set_tests_properties(test_mimir PROPERTIES
 	LABELS "scripts;validation"
-	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_mimir.sh;${CMAKE_SOURCE_DIR}/src/mimir/mimir_model.c")
+	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_mimir.sh;${CMAKE_SOURCE_DIR}/src/extensions/research/mimir/mimir_model.c")
 
 add_test(NAME test_iris
 	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_iris.sh
 	WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
 set_tests_properties(test_iris PROPERTIES
 	LABELS "scripts;validation"
-	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_iris.sh;${CMAKE_SOURCE_DIR}/src/iris/iris_model.c")
+	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_iris.sh;${CMAKE_SOURCE_DIR}/src/extensions/research/iris/iris_model.c")
 
 add_test(NAME test_physics
 	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_physics.sh
@@ -3046,6 +3031,18 @@ add_test(NAME test_cpp20_sources
 set_tests_properties(test_cpp20_sources PROPERTIES
 	LABELS "scripts;validation"
 	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_cpp20_sources.sh;${CMAKE_SOURCE_DIR}/CMakeLists.txt;${CMAKE_SOURCE_DIR}/src/world/world_open.cpp;${CMAKE_SOURCE_DIR}/src/qcommon/cluster_graph.cpp")
+
+add_test(NAME test_engine_module_manifest
+	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_engine_module_manifest.sh)
+set_tests_properties(test_engine_module_manifest PROPERTIES
+	LABELS "scripts;validation;manifest"
+	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_engine_module_manifest.sh;${CMAKE_SOURCE_DIR}/docs/ENGINE_MODULE_MANIFEST.md")
+
+add_test(NAME test_build_profiles
+	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_build_profiles.sh)
+set_tests_properties(test_build_profiles PROPERTIES
+	LABELS "scripts;validation;manifest"
+	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_build_profiles.sh;${CMAKE_SOURCE_DIR}/cmake/IdTech3Profile.cmake")
 
 add_test(NAME test_vector_font_mode2
 	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_vector_font_mode2.sh ${CMAKE_SOURCE_DIR})
@@ -3175,12 +3172,12 @@ set_tests_properties(test_botlib_bounded_strings PROPERTIES
 option(BUILD_UNIT_TESTS "Build unit tests" ON)
 if(BUILD_UNIT_TESTS)
 	add_executable(unit_macros tests/unit/test_macros.c)
-	target_include_directories(unit_macros PRIVATE ${CMAKE_SOURCE_DIR}/src)
+	target_include_directories(unit_macros PRIVATE ${CMAKE_SOURCE_DIR}/src ${CMAKE_SOURCE_DIR}/src/extensions/research)
 	add_test(NAME unit_macros COMMAND unit_macros)
 	set_tests_properties(unit_macros PROPERTIES LABELS "unit;validation")
 
 	add_executable(unit_qmath tests/unit/test_q_math.c src/qcommon/q_math.c)
-	target_include_directories(unit_qmath PRIVATE ${CMAKE_SOURCE_DIR}/src)
+	target_include_directories(unit_qmath PRIVATE ${CMAKE_SOURCE_DIR}/src ${CMAKE_SOURCE_DIR}/src/extensions/research)
 	if(NOT MSVC)
 		target_link_libraries(unit_qmath PRIVATE m)
 	endif()
@@ -3188,7 +3185,7 @@ if(BUILD_UNIT_TESTS)
 	set_tests_properties(unit_qmath PROPERTIES LABELS "unit;validation")
 
 	add_executable(unit_surfaceflags tests/unit/test_surfaceflags.c)
-	target_include_directories(unit_surfaceflags PRIVATE ${CMAKE_SOURCE_DIR}/src)
+	target_include_directories(unit_surfaceflags PRIVATE ${CMAKE_SOURCE_DIR}/src ${CMAKE_SOURCE_DIR}/src/extensions/research)
 	add_test(NAME unit_surfaceflags COMMAND unit_surfaceflags)
 	set_tests_properties(unit_surfaceflags PROPERTIES LABELS "unit;validation")
 
@@ -3197,7 +3194,7 @@ if(BUILD_UNIT_TESTS)
 		tests/stub_qcommon_min.c
 		src/qcommon/q_shared.c
 		src/qcommon/q_math.c)
-	target_include_directories(unit_qhelpers PRIVATE ${CMAKE_SOURCE_DIR}/src)
+	target_include_directories(unit_qhelpers PRIVATE ${CMAKE_SOURCE_DIR}/src ${CMAKE_SOURCE_DIR}/src/extensions/research)
 	if(NOT MSVC)
 		target_link_libraries(unit_qhelpers PRIVATE m)
 	endif()
@@ -3209,7 +3206,7 @@ if(BUILD_UNIT_TESTS)
 		tests/stub_qcommon_min.c
 		src/qcommon/q_shared.c
 		src/qcommon/q_math.c)
-	target_include_directories(unit_crc PRIVATE ${CMAKE_SOURCE_DIR}/src)
+	target_include_directories(unit_crc PRIVATE ${CMAKE_SOURCE_DIR}/src ${CMAKE_SOURCE_DIR}/src/extensions/research)
 	if(NOT MSVC)
 		target_link_libraries(unit_crc PRIVATE m)
 	endif()
@@ -3221,7 +3218,7 @@ if(BUILD_UNIT_TESTS)
 		tests/stub_qcommon_min.c
 		src/qcommon/q_shared.c
 		src/qcommon/q_math.c)
-	target_include_directories(unit_pathutil PRIVATE ${CMAKE_SOURCE_DIR}/src)
+	target_include_directories(unit_pathutil PRIVATE ${CMAKE_SOURCE_DIR}/src ${CMAKE_SOURCE_DIR}/src/extensions/research)
 	if(NOT MSVC)
 		target_link_libraries(unit_pathutil PRIVATE m)
 	endif()
@@ -3234,7 +3231,7 @@ if(BUILD_UNIT_TESTS)
 		tests/stub_msg_cvar.c
 		src/qcommon/msg.c
 		src/qcommon/huffman_static.c)
-	target_include_directories(unit_msg PRIVATE ${CMAKE_SOURCE_DIR}/src)
+	target_include_directories(unit_msg PRIVATE ${CMAKE_SOURCE_DIR}/src ${CMAKE_SOURCE_DIR}/src/extensions/research)
 	target_compile_definitions(unit_msg PRIVATE DEDICATED)
 	if(NOT MSVC)
 		target_link_libraries(unit_msg PRIVATE m)
@@ -3247,7 +3244,7 @@ if(BUILD_UNIT_TESTS)
 		tests/stub_qcommon_min.c
 		src/qcommon/q_shared.c
 		src/qcommon/q_math.c)
-	target_include_directories(unit_info PRIVATE ${CMAKE_SOURCE_DIR}/src)
+	target_include_directories(unit_info PRIVATE ${CMAKE_SOURCE_DIR}/src ${CMAKE_SOURCE_DIR}/src/extensions/research)
 	if(NOT MSVC)
 		target_link_libraries(unit_info PRIVATE m)
 	endif()
@@ -3258,7 +3255,7 @@ if(BUILD_UNIT_TESTS)
 		tests/unit/test_cm_bounds.c
 		src/qcommon/cm_bounds.c
 		src/qcommon/q_math.c)
-	target_include_directories(unit_cm_bounds PRIVATE ${CMAKE_SOURCE_DIR}/src)
+	target_include_directories(unit_cm_bounds PRIVATE ${CMAKE_SOURCE_DIR}/src ${CMAKE_SOURCE_DIR}/src/extensions/research)
 	if(NOT MSVC)
 		target_link_libraries(unit_cm_bounds PRIVATE m)
 	endif()
@@ -3270,7 +3267,7 @@ if(BUILD_UNIT_TESTS)
 		tests/stub_qcommon_min.c
 		src/qcommon/q_shared.c
 		src/qcommon/q_math.c)
-	target_include_directories(unit_parse PRIVATE ${CMAKE_SOURCE_DIR}/src)
+	target_include_directories(unit_parse PRIVATE ${CMAKE_SOURCE_DIR}/src ${CMAKE_SOURCE_DIR}/src/extensions/research)
 	if(NOT MSVC)
 		target_link_libraries(unit_parse PRIVATE m)
 	endif()
@@ -3283,7 +3280,7 @@ if(BUILD_UNIT_TESTS)
 		src/qcommon/q_shared.c
 		src/qcommon/q_math.c
 		src/qcommon/engine_sprite_map.c)
-	target_include_directories(unit_engine_sprite_map PRIVATE ${CMAKE_SOURCE_DIR}/src)
+	target_include_directories(unit_engine_sprite_map PRIVATE ${CMAKE_SOURCE_DIR}/src ${CMAKE_SOURCE_DIR}/src/extensions/research)
 	if(NOT MSVC)
 		target_link_libraries(unit_engine_sprite_map PRIVATE m)
 	endif()
@@ -3296,7 +3293,7 @@ if(BUILD_UNIT_TESTS)
 		src/qcommon/q_shared.c
 		src/qcommon/q_math.c
 		src/qcommon/engine_decal_map.c)
-	target_include_directories(unit_engine_decal_map PRIVATE ${CMAKE_SOURCE_DIR}/src)
+	target_include_directories(unit_engine_decal_map PRIVATE ${CMAKE_SOURCE_DIR}/src ${CMAKE_SOURCE_DIR}/src/extensions/research)
 	if(UNIX)
 		target_link_libraries(unit_engine_decal_map PRIVATE m)
 	endif()
@@ -3307,7 +3304,7 @@ if(BUILD_UNIT_TESTS)
 		tests/unit/test_aiwc_metrics.c
 		src/qcommon/aiwc_metrics.c
 		src/qcommon/aiwc_matmul.c)
-	target_include_directories(unit_aiwc PRIVATE ${CMAKE_SOURCE_DIR}/src)
+	target_include_directories(unit_aiwc PRIVATE ${CMAKE_SOURCE_DIR}/src ${CMAKE_SOURCE_DIR}/src/extensions/research)
 	if(NOT MSVC)
 		target_link_libraries(unit_aiwc PRIVATE m)
 	endif()
@@ -3318,7 +3315,7 @@ if(BUILD_UNIT_TESTS)
 		tests/unit/test_ttp_model.c
 		src/qcommon/ttp_model.c
 		src/qcommon/ttp_sim.c)
-	target_include_directories(unit_ttp PRIVATE ${CMAKE_SOURCE_DIR}/src)
+	target_include_directories(unit_ttp PRIVATE ${CMAKE_SOURCE_DIR}/src ${CMAKE_SOURCE_DIR}/src/extensions/research)
 	if(NOT MSVC)
 		target_link_libraries(unit_ttp PRIVATE m)
 	endif()
@@ -3327,8 +3324,8 @@ if(BUILD_UNIT_TESTS)
 
 	add_executable(unit_vuda_model
 		tests/unit/test_vuda_model.c
-		src/vuda/vuda_model.c)
-	target_include_directories(unit_vuda_model PRIVATE ${CMAKE_SOURCE_DIR}/src)
+		src/extensions/research/vuda/vuda_model.c)
+	target_include_directories(unit_vuda_model PRIVATE ${CMAKE_SOURCE_DIR}/src ${CMAKE_SOURCE_DIR}/src/extensions/research)
 	if(NOT MSVC)
 		target_link_libraries(unit_vuda_model PRIVATE m)
 	endif()
@@ -3337,8 +3334,8 @@ if(BUILD_UNIT_TESTS)
 
 	add_executable(unit_vksplat_model
 		tests/unit/test_vksplat_model.c
-		src/vksplat/vksplat_model.c)
-	target_include_directories(unit_vksplat_model PRIVATE ${CMAKE_SOURCE_DIR}/src)
+		src/extensions/research/vksplat/vksplat_model.c)
+	target_include_directories(unit_vksplat_model PRIVATE ${CMAKE_SOURCE_DIR}/src ${CMAKE_SOURCE_DIR}/src/extensions/research)
 	if(NOT MSVC)
 		target_link_libraries(unit_vksplat_model PRIVATE m)
 	endif()
@@ -3347,8 +3344,8 @@ if(BUILD_UNIT_TESTS)
 
 	add_executable(unit_curast_model
 		tests/unit/test_curast_model.c
-		src/curast/curast_model.c)
-	target_include_directories(unit_curast_model PRIVATE ${CMAKE_SOURCE_DIR}/src)
+		src/extensions/research/curast/curast_model.c)
+	target_include_directories(unit_curast_model PRIVATE ${CMAKE_SOURCE_DIR}/src ${CMAKE_SOURCE_DIR}/src/extensions/research)
 	if(NOT MSVC)
 		target_link_libraries(unit_curast_model PRIVATE m)
 	endif()
@@ -3357,8 +3354,8 @@ if(BUILD_UNIT_TESTS)
 
 	add_executable(unit_infernux_model
 		tests/unit/test_infernux_model.c
-		src/infernux/infernux_model.c)
-	target_include_directories(unit_infernux_model PRIVATE ${CMAKE_SOURCE_DIR}/src)
+		src/extensions/research/infernux/infernux_model.c)
+	target_include_directories(unit_infernux_model PRIVATE ${CMAKE_SOURCE_DIR}/src ${CMAKE_SOURCE_DIR}/src/extensions/research)
 	if(NOT MSVC)
 		target_link_libraries(unit_infernux_model PRIVATE m)
 	endif()
@@ -3371,7 +3368,7 @@ if(BUILD_UNIT_TESTS)
 		src/qcommon/app_crdt.c
 		src/qcommon/q_shared.c
 		src/qcommon/q_math.c)
-	target_include_directories(unit_app_crdt PRIVATE ${CMAKE_SOURCE_DIR}/src)
+	target_include_directories(unit_app_crdt PRIVATE ${CMAKE_SOURCE_DIR}/src ${CMAKE_SOURCE_DIR}/src/extensions/research)
 	target_compile_definitions(unit_app_crdt PRIVATE APP_CRDT_UNIT_TEST)
 	if(NOT MSVC)
 		target_link_libraries(unit_app_crdt PRIVATE m)
@@ -3381,8 +3378,8 @@ if(BUILD_UNIT_TESTS)
 
 	add_executable(unit_mimir_model
 		tests/unit/test_mimir_model.c
-		src/mimir/mimir_model.c)
-	target_include_directories(unit_mimir_model PRIVATE ${CMAKE_SOURCE_DIR}/src)
+		src/extensions/research/mimir/mimir_model.c)
+	target_include_directories(unit_mimir_model PRIVATE ${CMAKE_SOURCE_DIR}/src ${CMAKE_SOURCE_DIR}/src/extensions/research)
 	if(NOT MSVC)
 		target_link_libraries(unit_mimir_model PRIVATE m)
 	endif()
@@ -3391,8 +3388,8 @@ if(BUILD_UNIT_TESTS)
 
 	add_executable(unit_iris_model
 		tests/unit/test_iris_model.c
-		src/iris/iris_model.c)
-	target_include_directories(unit_iris_model PRIVATE ${CMAKE_SOURCE_DIR}/src)
+		src/extensions/research/iris/iris_model.c)
+	target_include_directories(unit_iris_model PRIVATE ${CMAKE_SOURCE_DIR}/src ${CMAKE_SOURCE_DIR}/src/extensions/research)
 	if(NOT MSVC)
 		target_link_libraries(unit_iris_model PRIVATE m)
 	endif()
@@ -3401,13 +3398,13 @@ if(BUILD_UNIT_TESTS)
 
 	add_executable(unit_radiusfps
 		tests/unit/test_radiusfps.c
-		src/radiusfps/radiusfps_cpu.c)
-	target_include_directories(unit_radiusfps PRIVATE ${CMAKE_SOURCE_DIR}/src)
+		src/extensions/research/radiusfps/radiusfps_cpu.c)
+	target_include_directories(unit_radiusfps PRIVATE ${CMAKE_SOURCE_DIR}/src ${CMAKE_SOURCE_DIR}/src/extensions/research)
 	if(NOT MSVC)
 		target_link_libraries(unit_radiusfps PRIVATE m)
 	endif()
 	if(USE_RADIUSFPS_CUDA)
-		target_sources(unit_radiusfps PRIVATE src/radiusfps/radiusfps_cuda.cu)
+		target_sources(unit_radiusfps PRIVATE src/extensions/research/radiusfps/radiusfps_cuda.cu)
 		set_property(TARGET unit_radiusfps PROPERTY CUDA_SEPARABLE_COMPILATION ON)
 		target_compile_definitions(unit_radiusfps PRIVATE RADIUSFPS_HAVE_CUDA=1)
 		target_link_libraries(unit_radiusfps PRIVATE CUDA::cudart)
@@ -3417,10 +3414,10 @@ if(BUILD_UNIT_TESTS)
 
 	add_executable(unit_gccfer
 		tests/unit/test_gccfer.c
-		src/gccfer/gccfer_dataset.c
-		src/gccfer/gccfer_cafer.c
-		src/gccfer/gccfer_model.c)
-	target_include_directories(unit_gccfer PRIVATE ${CMAKE_SOURCE_DIR}/src)
+		src/extensions/research/gccfer/gccfer_dataset.c
+		src/extensions/research/gccfer/gccfer_cafer.c
+		src/extensions/research/gccfer/gccfer_model.c)
+	target_include_directories(unit_gccfer PRIVATE ${CMAKE_SOURCE_DIR}/src ${CMAKE_SOURCE_DIR}/src/extensions/research)
 	if(NOT MSVC)
 		target_link_libraries(unit_gccfer PRIVATE m)
 	endif()
@@ -3429,10 +3426,10 @@ if(BUILD_UNIT_TESTS)
 
 	add_executable(unit_dax
 		tests/unit/test_dax.c
-		src/dax/dax_benchmark.c
-		src/dax/dax_model.c
-		src/dax/dax_eval.c)
-	target_include_directories(unit_dax PRIVATE ${CMAKE_SOURCE_DIR}/src)
+		src/extensions/research/dax/dax_benchmark.c
+		src/extensions/research/dax/dax_model.c
+		src/extensions/research/dax/dax_eval.c)
+	target_include_directories(unit_dax PRIVATE ${CMAKE_SOURCE_DIR}/src ${CMAKE_SOURCE_DIR}/src/extensions/research)
 	if(UNIX AND NOT APPLE)
 		target_link_libraries(unit_dax PRIVATE m)
 	endif()
@@ -3441,11 +3438,11 @@ if(BUILD_UNIT_TESTS)
 
 	add_executable(unit_x3dpra
 		tests/unit/test_x3dpra.c
-		src/x3dpra/x3dpra_physics.c
-		src/x3dpra/x3dpra_scene.c
-		src/x3dpra/x3dpra_opt.c
-		src/x3dpra/x3dpra_forward.c)
-	target_include_directories(unit_x3dpra PRIVATE ${CMAKE_SOURCE_DIR}/src)
+		src/extensions/research/x3dpra/x3dpra_physics.c
+		src/extensions/research/x3dpra/x3dpra_scene.c
+		src/extensions/research/x3dpra/x3dpra_opt.c
+		src/extensions/research/x3dpra/x3dpra_forward.c)
+	target_include_directories(unit_x3dpra PRIVATE ${CMAKE_SOURCE_DIR}/src ${CMAKE_SOURCE_DIR}/src/extensions/research)
 	if(UNIX AND NOT APPLE)
 		target_link_libraries(unit_x3dpra PRIVATE m)
 	endif()
@@ -3454,11 +3451,11 @@ if(BUILD_UNIT_TESTS)
 
 	add_executable(unit_iris_io
 		tests/unit/test_iris_io.c
-		src/iris/iris_io.c
+		src/extensions/research/iris/iris_io.c
 		tests/stub_qcommon_min.c
 		src/qcommon/q_shared.c
 		src/qcommon/q_math.c)
-	target_include_directories(unit_iris_io PRIVATE ${CMAKE_SOURCE_DIR}/src)
+	target_include_directories(unit_iris_io PRIVATE ${CMAKE_SOURCE_DIR}/src ${CMAKE_SOURCE_DIR}/src/extensions/research)
 	if(NOT MSVC)
 		target_link_libraries(unit_iris_io PRIVATE m)
 	endif()
@@ -3470,7 +3467,7 @@ if(BUILD_UNIT_TESTS)
 		tests/stub_qcommon_min.c
 		src/qcommon/q_shared.c
 		src/qcommon/q_math.c)
-	target_include_directories(unit_endian PRIVATE ${CMAKE_SOURCE_DIR}/src)
+	target_include_directories(unit_endian PRIVATE ${CMAKE_SOURCE_DIR}/src ${CMAKE_SOURCE_DIR}/src/extensions/research)
 	if(NOT MSVC)
 		target_link_libraries(unit_endian PRIVATE m)
 	endif()
@@ -3480,7 +3477,7 @@ if(BUILD_UNIT_TESTS)
 	add_executable(unit_vm_native_module
 		tests/unit/test_vm_native_module.c
 		src/qcommon/vm_native_module.c)
-	target_include_directories(unit_vm_native_module PRIVATE ${CMAKE_SOURCE_DIR}/src)
+	target_include_directories(unit_vm_native_module PRIVATE ${CMAKE_SOURCE_DIR}/src ${CMAKE_SOURCE_DIR}/src/extensions/research)
 	add_test(NAME unit_vm_native_module COMMAND unit_vm_native_module)
 	set_tests_properties(unit_vm_native_module PROPERTIES LABELS "unit;validation")
 
@@ -3510,7 +3507,7 @@ if(BUILD_UNIT_TESTS)
 			tests/stub_openworld_nav.c
 			src/qcommon/q_shared.c
 			src/qcommon/q_math.c)
-		target_include_directories(unit_openworld_nav PRIVATE ${CMAKE_SOURCE_DIR}/src)
+		target_include_directories(unit_openworld_nav PRIVATE ${CMAKE_SOURCE_DIR}/src ${CMAKE_SOURCE_DIR}/src/extensions/research)
 		target_link_libraries(unit_openworld_nav PRIVATE recast_nav)
 		if(NOT MSVC)
 			target_link_libraries(unit_openworld_nav PRIVATE m)
@@ -3530,7 +3527,7 @@ if(BUILD_UNIT_TESTS)
 		src/qcommon/q_shared.c
 		src/qcommon/q_math.c)
 	target_compile_definitions(unit_world_residency PRIVATE WORLD_RESIDENCY_UNIT_TEST)
-	target_include_directories(unit_world_residency PRIVATE ${CMAKE_SOURCE_DIR}/src)
+	target_include_directories(unit_world_residency PRIVATE ${CMAKE_SOURCE_DIR}/src ${CMAKE_SOURCE_DIR}/src/extensions/research)
 	if(NOT MSVC)
 		target_link_libraries(unit_world_residency PRIVATE m)
 	endif()
@@ -3545,7 +3542,7 @@ if(BUILD_UNIT_TESTS)
 		src/qcommon/q_shared.c
 		src/qcommon/q_math.c)
 	target_compile_definitions(unit_sector_graph PRIVATE SECTOR_GRAPH_UNIT_TEST)
-	target_include_directories(unit_sector_graph PRIVATE ${CMAKE_SOURCE_DIR}/src)
+	target_include_directories(unit_sector_graph PRIVATE ${CMAKE_SOURCE_DIR}/src ${CMAKE_SOURCE_DIR}/src/extensions/research)
 	if(NOT MSVC)
 		target_link_libraries(unit_sector_graph PRIVATE m)
 	endif()
@@ -3560,7 +3557,7 @@ if(BUILD_UNIT_TESTS)
 		src/qcommon/q_shared.c
 		src/qcommon/q_math.c)
 	target_compile_definitions(unit_cluster_graph PRIVATE CLUSTER_GRAPH_UNIT_TEST)
-	target_include_directories(unit_cluster_graph PRIVATE ${CMAKE_SOURCE_DIR}/src)
+	target_include_directories(unit_cluster_graph PRIVATE ${CMAKE_SOURCE_DIR}/src ${CMAKE_SOURCE_DIR}/src/extensions/research)
 	if(NOT MSVC)
 		target_link_libraries(unit_cluster_graph PRIVATE m)
 	endif()
@@ -3575,7 +3572,7 @@ if(BUILD_UNIT_TESTS)
 		src/qcommon/md5.c
 		src/qcommon/q_shared.c
 		src/qcommon/q_math.c)
-	target_include_directories(unit_sv_auth PRIVATE ${CMAKE_SOURCE_DIR}/src)
+	target_include_directories(unit_sv_auth PRIVATE ${CMAKE_SOURCE_DIR}/src ${CMAKE_SOURCE_DIR}/src/extensions/research)
 	if(NOT MSVC)
 		target_link_libraries(unit_sv_auth PRIVATE m)
 	endif()
@@ -3590,7 +3587,7 @@ if(BUILD_UNIT_TESTS)
 		src/qcommon/q_shared.c
 		src/qcommon/q_math.c)
 	target_compile_definitions(unit_fog_biology PRIVATE FOG_BIOLOGY_UNIT_TEST)
-	target_include_directories(unit_fog_biology PRIVATE ${CMAKE_SOURCE_DIR}/src)
+	target_include_directories(unit_fog_biology PRIVATE ${CMAKE_SOURCE_DIR}/src ${CMAKE_SOURCE_DIR}/src/extensions/research)
 	if(NOT MSVC)
 		target_link_libraries(unit_fog_biology PRIVATE m)
 	endif()
@@ -3605,7 +3602,7 @@ if(BUILD_UNIT_TESTS)
 		src/qcommon/q_shared.c
 		src/qcommon/q_math.c)
 	target_compile_definitions(unit_genetic_gan PRIVATE GENETIC_GAN_UNIT_TEST)
-	target_include_directories(unit_genetic_gan PRIVATE ${CMAKE_SOURCE_DIR}/src)
+	target_include_directories(unit_genetic_gan PRIVATE ${CMAKE_SOURCE_DIR}/src ${CMAKE_SOURCE_DIR}/src/extensions/research)
 	if(NOT MSVC)
 		target_link_libraries(unit_genetic_gan PRIVATE m)
 	endif()
@@ -3619,7 +3616,7 @@ if(BUILD_UNIT_TESTS)
 		src/qcommon/jobs.c
 		src/qcommon/q_shared.c
 		src/qcommon/q_math.c)
-	target_include_directories(unit_jobs PRIVATE ${CMAKE_SOURCE_DIR}/src)
+	target_include_directories(unit_jobs PRIVATE ${CMAKE_SOURCE_DIR}/src ${CMAKE_SOURCE_DIR}/src/extensions/research)
 	if(NOT MSVC)
 		target_link_libraries(unit_jobs PRIVATE m pthread)
 	endif()

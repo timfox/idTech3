@@ -21,8 +21,10 @@ Ticks all gameplay subsystems each client frame:
 #include "cl_gameframe.h"
 #include "cl_district.h"
 #include "cl_openworld.h"
+#ifdef USE_OPEN_WORLD
 #include "../world/world_open.h"
 #include "../world/fog_biology.h"
+#endif
 #include "cl_particles.h"
 #include "cl_map_background.h"
 #include "cl_window_title.h"
@@ -217,7 +219,9 @@ void CL_InitGameSystems(void) {
 	g_ecsMotion = Cvar_Get( "g_ecsMotion", "1", CVAR_ARCHIVE_ND );
 	Cvar_SetDescription( g_ecsMotion, "When 1, integrate ECS velocity into position each client frame." );
 	MobileFog_Init();
+#ifdef USE_OPEN_WORLD
 	FogBiology_Init();
+#endif
 	BgMap_Init();
 	WinTitle_Init();
 
@@ -253,7 +257,9 @@ void CL_ShutdownGameSystems(void) {
 	EDA_Shutdown();
 	BT_Shutdown();
 	ECS_Shutdown();
+#ifdef USE_OPEN_WORLD
 	FogBiology_Shutdown();
+#endif
 	BgMap_Shutdown();
 
 	activeNavMesh = -1;
@@ -277,6 +283,7 @@ void CL_GameFrame(float frametime) {
 
 	CL_District_Frame();
 	CL_OpenWorld_Frame();
+#ifdef USE_OPEN_WORLD
 	if ( FogBiology_Enabled() && cls.state == CA_ACTIVE && cl.snap.valid ) {
 		FogBiology_SetPlayerOrigin( cl.snap.ps.origin );
 	} else {
@@ -296,6 +303,7 @@ void CL_GameFrame(float frametime) {
 		EngineTelemetry_Record( "fog_bio_pathogen_risk", (double)FogBiology_GetPathogenDepositionRisk() );
 		EngineTelemetry_Record( "fog_bio_pathogen_taxa", (double)fogBioComm.pathogenTaxaScore );
 	}
+#endif
 
 	if ( g_ecsMotion && g_ecsMotion->integer ) {
 		ECS_StepMotion( frametime );
@@ -303,9 +311,11 @@ void CL_GameFrame(float frametime) {
 
 	if ( cl_navEnabled && cl_navEnabled->integer ) {
 		int navMesh = activeNavMesh;
+#ifdef USE_OPEN_WORLD
 		if ( navMesh < 0 && WorldOpen_IsEnabled() ) {
 			navMesh = Nav_GetOpenWorldMesh();
 		}
+#endif
 		if ( navMesh >= 0 ) {
 			Nav_UpdateCrowd( navMesh, frametime );
 		}

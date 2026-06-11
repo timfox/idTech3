@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # Guard: C→C++20 world/open-world migration sources stay .cpp and CMake stays on C++20.
+# CI toolchains (GCC 15+ / Clang 18+) expose cxx_std_20; C++17 fallback is not checked here.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
@@ -38,6 +39,25 @@ rg -q 'set\(IDTECH3_CXX_STANDARD 20\)' "$CMAKE" \
 rg -q 'CMAKE_CXX_STANDARD \$\{IDTECH3_CXX_STANDARD\}' "$CMAKE" \
 	|| fail "CMakeLists.txt must wire CMAKE_CXX_STANDARD to IDTECH3_CXX_STANDARD"
 ok "IDTECH3_CXX_STANDARD 20 wired in CMake"
+
+echo "[test_cpp20_sources] checking open-world .cpp modules in IdTech3QcommonExtensions.cmake..."
+QC_EXT="${ROOT}/cmake/IdTech3QcommonExtensions.cmake"
+WORLD_QCOMMON=(
+	world_open
+	world_district
+	world_residency
+	sector_graph
+	fog_biology
+	genetic_gan
+	world_proc
+)
+for mod in "${WORLD_QCOMMON[@]}"; do
+	rg -q "src/world/${mod}\\.cpp" "$QC_EXT" \
+		|| fail "open-world macro must list src/world/${mod}.cpp"
+done
+rg -q 'src/qcommon/cluster_graph\.cpp' "$QC_EXT" \
+	|| fail "open-world macro must list src/qcommon/cluster_graph.cpp"
+ok "open-world qcommon modules are .cpp in IdTech3QcommonExtensions.cmake"
 
 echo "[test_cpp20_sources] checking migrated .cpp sources..."
 for rel in "${MIGRATED_CPP[@]}"; do

@@ -2,7 +2,7 @@
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 
-grep -q 'Mimir_Benchmark' "$ROOT/src/mimir/mimir_model.c"
+grep -q 'Mimir_Benchmark' "$ROOT/src/extensions/research/mimir/mimir_model.c"
 grep -q 'mimir_step' "$ROOT/src/renderers/vulkan/vk_mimir.c"
 grep -q 'mimir_brownian.comp' "$ROOT/scripts/compile_shaders.sh"
 grep -q 'Mimir_ConsoleInit' "$ROOT/src/qcommon/common.c"

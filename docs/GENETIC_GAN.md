@@ -95,11 +95,17 @@ Tokens: `%R` repo, `%B` base, `%E` engine base (wrapper path), `%P` python, `%G`
 
 `USE_GENETIC_GAN` (default ON). Disable with `-DUSE_GENETIC_GAN=OFF`.
 
+Implementation:
+
+- **Genome API** (crossover, mutation, phenotype, job status): [`src/world/genetic_gan.cpp`](../src/world/genetic_gan.cpp) — linked via qcommon (client + dedicated server).
+- **Async decode + model import**: [`src/client/cl_genetic_gan.c`](../src/client/cl_genetic_gan.c) — `genome_generate`, job queue, `RegisterModel` on main thread.
+
 Tests:
 
 ```bash
 ./tests/scripts/test_genetic_gan.sh build-vk-Release
-ctest -R unit_genetic_gan
+ctest -R 'test_genetic_gan|unit_genetic_gan'
+./tests/scripts/test_cpp20_sources.sh   # migration revert guard
 ```
 
 ## Integration notes

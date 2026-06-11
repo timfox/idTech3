@@ -203,6 +203,8 @@ void CL_Shutdown( const char *finalmsg, qboolean quit ) {
 
 #ifdef USE_GENETIC_GAN
 	CL_GeneticGan_Shutdown();
+#endif
+#if defined( USE_FLUX ) || defined( USE_TRELLIS ) || defined( USE_GENETIC_GAN )
 	CL_MlWorker_Shutdown();
 #endif
 

@@ -25,6 +25,9 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "qcommon.h"
 #include "aiwc.h"
 #include "ttp.h"
+#include "jobs.h"
+#include "defer.h"
+#ifdef USE_RESEARCH_EXTENSIONS
 #include "vuda/vuda_console.h"
 #include "vksplat/vksplat_console.h"
 #include "curast/curast_console.h"
@@ -35,8 +38,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "gccfer/gccfer_console.h"
 #include "dax/dax_console.h"
 #include "x3dpra/x3dpra_console.h"
-#include "jobs.h"
-#include "defer.h"
+#endif
 #ifdef USE_DUKTAPE
 #include "js_debug.h"
 #include "csharp_debug.h"
@@ -4218,6 +4220,7 @@ void Com_Init( char *commandLine ) {
 	Jobs_Init();
 	AIWC_Init();
 	TTP_Init();
+#ifdef USE_RESEARCH_EXTENSIONS
 	Vuda_ConsoleInit();
 	Vksplat_ConsoleInit();
 	Curast_ConsoleInit();
@@ -4228,6 +4231,7 @@ void Com_Init( char *commandLine ) {
 	Gccfer_ConsoleInit();
 	Dax_ConsoleInit();
 	X3dpra_ConsoleInit();
+#endif
 
 	Com_Printf( "--- Common Initialization Complete ---\n" );
 

@@ -504,6 +504,7 @@ jobs:
             -DRENDERER_DEFAULT=vulkan \
             -DSKIP_IDPAK_CHECK=ON \
             -DSKIP_SHADER_REGEN=ON \
+            -DIDTECH3_PROFILE=full \
             -Wno-dev
           cmake --build build-vk-${{ matrix.btype }} -j$(nproc)
           mkdir -p bin
@@ -558,6 +559,62 @@ jobs:
           path: bin
           if-no-files-found: error
           retention-days: 5
+
+  linux-core:
+    name: Profile core (Release)
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Install tools
+        run: |
+          sudo apt-get -o Acquire::Retries=5 -qq update
+          sudo apt-get -o Acquire::Retries=5 -y install cmake ninja-build g++ libstdc++-14-dev libcurl4-openssl-dev libssl-dev mesa-common-dev libxxf86dga-dev libxrandr-dev libxxf86vm-dev libasound-dev libsdl2-dev libopenal-dev libfreetype6-dev lua5.4 liblua5.4-dev libbullet-dev pkg-config glslang-tools python3
+      - uses: actions/checkout@v4
+      - name: Build core profile
+        run: |
+          ./scripts/compile_engine.sh vulkan core Release skipshaders
+          mkdir -p release
+          cp -f build-vk-Release/idtech3* release/
+      - name: Smoke + compat
+        run: |
+          chmod +x scripts/smoke_test.sh scripts/q3_openarena_compat_check.sh scripts/ci/audit_unconditional_sources.sh
+          ./scripts/smoke_test.sh release
+          ./scripts/q3_openarena_compat_check.sh release
+          ./scripts/ci/audit_unconditional_sources.sh
+      - name: Core unit tests
+        run: |
+          cd build-vk-Release && ctest -R '^unit_(macros|qmath|msg)$' --output-on-failure || ctest -R 'unit_' --output-on-failure -N | head -20
+
+  linux-game:
+    name: Profile game (Release)
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Install tools
+        run: |
+          sudo apt-get -o Acquire::Retries=5 -qq update
+          sudo apt-get -o Acquire::Retries=5 -y install cmake ninja-build g++ libstdc++-14-dev libcurl4-openssl-dev libssl-dev mesa-common-dev libxxf86dga-dev libxrandr-dev libxxf86vm-dev libasound-dev libsdl2-dev libopenal-dev libfreetype6-dev lua5.4 liblua5.4-dev libbullet-dev pkg-config glslang-tools python3
+      - uses: actions/checkout@v4
+      - name: Build game profile
+        run: ./scripts/compile_engine.sh vulkan game Release skipshaders
+      - name: Game profile tests
+        run: |
+          cd build-vk-Release
+          ctest -R 'test_build_profiles|test_engine_module_manifest|test_cpp20_sources' --output-on-failure
+          ctest -L sector_stream --output-on-failure
+
+  linux-full:
+    name: Profile full (Release)
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Install tools
+        run: |
+          sudo apt-get -o Acquire::Retries=5 -qq update
+          sudo apt-get -o Acquire::Retries=5 -y install cmake ninja-build g++ libstdc++-14-dev libcurl4-openssl-dev libssl-dev mesa-common-dev libxxf86dga-dev libxrandr-dev libxxf86vm-dev libasound-dev libsdl2-dev libopenal-dev libfreetype6-dev lua5.4 liblua5.4-dev libbullet-dev pkg-config glslang-tools python3
+      - uses: actions/checkout@v4
+      - name: Build full profile
+        run: ./scripts/compile_engine.sh vulkan full Release skipshaders
+      - name: Full ctest
+        run: |
+          cd build-vk-Release && ctest --output-on-failure
 
   ubuntu-asan:
     name: Ubuntu x86_64 ASAN (Debug)

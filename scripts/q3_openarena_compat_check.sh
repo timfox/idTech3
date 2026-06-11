@@ -54,7 +54,7 @@ fi
 # Optional generative hooks must default off (no impact on classic play).
 _trellis_default_ok=0
 for _trellis_src in \
-	"$PROJECT_ROOT/src/client/cl_trellis.c" \
+	"$PROJECT_ROOT/src/extensions/generative/cl_trellis.c" \
 	"$PROJECT_ROOT/src/client/cl_main.c"; do
 	if [ -f "$_trellis_src" ] && \
 	   grep -q 'cl_trellis_enable' "$_trellis_src" && \

@@ -10,8 +10,8 @@ use Defer_Add for main-thread finalization.
 
 #pragma once
 
-#include "../qcommon/q_shared.h"
-#include "../qcommon/jobs.h"
+#include "../../qcommon/q_shared.h"
+#include "../../qcommon/jobs.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -39,6 +39,8 @@ typedef struct clMlTask_s {
 #endif
 } clMlTask_t;
 
+#if defined( USE_FLUX ) || defined( USE_TRELLIS ) || defined( USE_GENETIC_GAN )
+
 void        CL_MlWorker_Init( void );
 void        CL_MlWorker_Shutdown( void );
 
@@ -53,6 +55,23 @@ void        CL_MlWorker_InitTask( clMlTask_t *task, const char *name, clMlWorker
 
 void        CL_MlWorker_Cancel( clMlTask_t *task );
 void        CL_MlWorker_Release( const char *name );
+
+#else
+
+static inline void CL_MlWorker_Init( void ) {}
+static inline void CL_MlWorker_Shutdown( void ) {}
+static inline qboolean CL_MlWorker_IsBusy( void ) { return qfalse; }
+static inline const char *CL_MlWorker_Owner( void ) { return ""; }
+static inline qboolean CL_MlWorker_Submit( clMlTask_t *task ) { (void)task; return qfalse; }
+static inline void CL_MlWorker_Frame( void ) {}
+static inline void CL_MlWorker_InitTask( clMlTask_t *task, const char *name, clMlWorkerFn_t worker,
+                clMlDeferFn_t defer, void *data ) {
+	(void)task; (void)name; (void)worker; (void)defer; (void)data;
+}
+static inline void CL_MlWorker_Cancel( clMlTask_t *task ) { (void)task; }
+static inline void CL_MlWorker_Release( const char *name ) { (void)name; }
+
+#endif
 
 #ifdef __cplusplus
 }

@@ -16,13 +16,38 @@
       }
     },
     {
-      "name": "vulkan-release",
+      "name": "vulkan-game-release",
       "inherits": "base",
-      "binaryDir": "${sourceDir}/build/presets/vulkan-release",
+      "binaryDir": "${sourceDir}/build/presets/vulkan-game-release",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Release",
-        "RENDERER_DEFAULT": "vulkan"
+        "RENDERER_DEFAULT": "vulkan",
+        "IDTECH3_PROFILE": "game"
       }
+    },
+    {
+      "name": "vulkan-core-release",
+      "inherits": "base",
+      "binaryDir": "${sourceDir}/build/presets/vulkan-core-release",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "RENDERER_DEFAULT": "vulkan",
+        "IDTECH3_PROFILE": "core"
+      }
+    },
+    {
+      "name": "vulkan-full-release",
+      "inherits": "base",
+      "binaryDir": "${sourceDir}/build/presets/vulkan-full-release",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "RENDERER_DEFAULT": "vulkan",
+        "IDTECH3_PROFILE": "full"
+      }
+    },
+    {
+      "name": "vulkan-release",
+      "inherits": "vulkan-full-release"
     },
     {
       "name": "vulkan-debug",

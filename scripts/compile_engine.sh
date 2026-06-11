@@ -67,9 +67,15 @@ fi
 
 RELEASE_DIR="$PROJECT_ROOT/release"
 
+IDTECH3_PROFILE="game"
+
 # Argument parsing
 while [[ $# -gt 0 ]]; do
   case "$1" in
+    core|game|full|research)
+      IDTECH3_PROFILE="$1"
+      shift
+      ;;
     clean)
       CLEAN=1
       shift
@@ -260,6 +266,7 @@ echo "Building id Tech 3 engine (${BUILD_TYPE})..."
 echo "Project root: $PROJECT_ROOT"
 echo "Build dir:    $BUILD_DIR"
 echo "Release dir:  $RELEASE_DIR"
+echo "Profile:      $IDTECH3_PROFILE"
 [[ -n "$EXTRA_OUT_DIR" ]] && echo "Extra out:    $EXTRA_OUT_DIR"
 
 if [ "$CLEAN" -eq 1 ]; then
@@ -385,6 +392,8 @@ else
 fi
 
 CMAKE_FLAGS+=("-DRENDERER_DEFAULT=vulkan")
+CMAKE_FLAGS+=("-DIDTECH3_PROFILE=${IDTECH3_PROFILE}")
+echo "CMake: IDTECH3_PROFILE=${IDTECH3_PROFILE}"
 
 if [ "$SKIP_IDPAK" -eq 1 ]; then
   CMAKE_FLAGS+=("-DSKIP_IDPAK_CHECK=ON")
