@@ -5,7 +5,7 @@ set -euo pipefail
 # Notes:
 # - build type defaults to Release
 # - Vulkan is the only renderer backend
-# - demo: BUILD_EXAMPLE_DEMO_GAME=ON, builds demo_game_pk3 (idtech3_demo.pk3), copies to release/demo_game/ when present
+# - demo: BUILD_SAMPLES_DEMO_GAME=ON, builds demo_game_pk3 (idtech3_demo.pk3), copies to release/demo_game/ when present
 # - aarch64: cross-compile for Linux aarch64 (requires gcc-aarch64-linux-gnu); may fail without ARM sysroot
 # - mac-app wraps the legacy bundle script (requires release|debug target, optional architecture)
 # - mac-ub2 compiles universal-2 binaries (release only) and can optionally notarize
@@ -406,8 +406,8 @@ if command -v ccache &>/dev/null; then
 fi
 
 if [ "$BUILD_DEMO_PK3" -eq 1 ]; then
-  CMAKE_FLAGS+=("-DBUILD_EXAMPLE_DEMO_GAME=ON")
-  echo "CMake: BUILD_EXAMPLE_DEMO_GAME=ON (idtech3_demo.pk3 via demo_game_pk3)"
+  CMAKE_FLAGS+=("-DBUILD_SAMPLES_DEMO_GAME=ON")
+  echo "CMake: BUILD_SAMPLES_DEMO_GAME=ON (idtech3_demo.pk3 via demo_game_pk3)"
 fi
 
 if [ "$LTO" -eq 1 ]; then

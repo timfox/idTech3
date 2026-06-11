@@ -51,7 +51,12 @@ option(USE_GENETIC_GAN "Enable genetic genome + external GAN body decode API" ON
 option(ENABLE_FORTIFY_SOURCE "Enable _FORTIFY_SOURCE=2 buffer overflow protection (GCC/Clang)" ON)
 option(ENABLE_ASAN "Enable AddressSanitizer for memory error detection (Debug builds)" OFF)
 option(ENABLE_LTO "Enable IPO/LTO for Release and RelWithDebInfo (GCC/Clang; longer links, smaller/faster binaries)" OFF)
-option(BUILD_EXAMPLE_DEMO_GAME "Build examples/demo_game (idtech3_demo.pk3 + helper)" OFF)
+option(BUILD_SAMPLES_DEMO_GAME "Build samples/demo_game (idtech3_demo.pk3 + helper)" OFF)
+option(BUILD_EXAMPLE_DEMO_GAME "Deprecated alias for BUILD_SAMPLES_DEMO_GAME" OFF)
+if(BUILD_EXAMPLE_DEMO_GAME AND NOT BUILD_SAMPLES_DEMO_GAME)
+  set(BUILD_SAMPLES_DEMO_GAME ON CACHE BOOL "Build samples/demo_game (idtech3_demo.pk3 + helper)" FORCE)
+  message(WARNING "BUILD_EXAMPLE_DEMO_GAME is deprecated; use BUILD_SAMPLES_DEMO_GAME (samples/ → examples/ symlink)")
+endif()
 option(USE_FREEUSD "Link FreeUSD for USDA mesh import and USD scene tools (GPL-2.0-or-later)" ON)
 option(USE_IDTECH3_BACKEND "Require idtech3backend submodule (timfox/idtech3backend); wiring TBD" OFF)
 
@@ -59,6 +64,7 @@ set(IDTECH3_PROFILE "game" CACHE STRING "Build profile: core|game|full|research"
 set_property(CACHE IDTECH3_PROFILE PROPERTY STRINGS core game full research)
 option(USE_RESEARCH_EXTENSIONS "Research/paper-repro qcommon modules (RadiusFPS, DaX, GCC-FER, ...)" ON)
 option(USE_OPEN_WORLD "Open-world, districts, sector graph, fog biology, genetic GAN core" ON)
+option(USE_GAME_AI_MIDDLEWARE "Director/GOAP/Horde/BT gameplay middleware (g_director, g_goap, …)" ON)
 
 include(${CMAKE_SOURCE_DIR}/cmake/IdTech3Backend.cmake)
 
@@ -1244,6 +1250,7 @@ if(BUILD_FREETYPE)
 endif()
 
 AUX_SOURCE_DIRECTORY(src/qcommon QCOMMON_SRCS)
+include(${CMAKE_SOURCE_DIR}/cmake/IdTech3Extension.cmake)
 include(${CMAKE_SOURCE_DIR}/cmake/IdTech3IncludeDirs.cmake)
 include(${CMAKE_SOURCE_DIR}/cmake/IdTech3QcommonExtensions.cmake)
 idtech3_append_research_qcommon_sources()
@@ -1662,6 +1669,7 @@ list(APPEND CLIENT_SRCS
   src/client/cl_window_title.c
   src/client/cl_app_crdt.c
 )
+# USE_GAME_AI_MIDDLEWARE strip/append via cmake/modules/ClientGameAiSources.cmake — pending stub headers for core profile.
 include(${CMAKE_SOURCE_DIR}/cmake/client/ClientExtensionSources.cmake)
 idtech3_strip_client_extension_sources()
 idtech3_append_client_extension_sources()
@@ -3042,7 +3050,7 @@ add_test(NAME test_build_profiles
 	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_build_profiles.sh)
 set_tests_properties(test_build_profiles PROPERTIES
 	LABELS "scripts;validation;manifest"
-	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_build_profiles.sh;${CMAKE_SOURCE_DIR}/cmake/IdTech3Profile.cmake")
+  REQUIRED_FILES "${CMAKE_SOURCE_DIR}/cmake/IdTech3Extension.cmake;${CMAKE_SOURCE_DIR}/cmake/IdTech3Profile.cmake")
 
 add_test(NAME test_vector_font_mode2
 	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_vector_font_mode2.sh ${CMAKE_SOURCE_DIR})
@@ -3631,7 +3639,7 @@ if(BUILD_UNIT_TESTS)
 		REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_genetic_gan.sh;${CMAKE_SOURCE_DIR}/src/world/genetic_gan.cpp;${CMAKE_SOURCE_DIR}/src/world/genetic_gan.h")
 endif()
 
-# Example mod pack (config-only .pk3); optional - see examples/demo_game/README.md
-if(BUILD_EXAMPLE_DEMO_GAME AND NOT ANDROID)
+# Demo mod pack (config-only .pk3); optional - see samples/demo_game/README.md
+if(BUILD_SAMPLES_DEMO_GAME AND NOT ANDROID)
 	include("${CMAKE_SOURCE_DIR}/examples/demo_game/CMakeLists.txt")
 endif()

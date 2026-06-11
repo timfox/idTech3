@@ -97,8 +97,8 @@ Tokens: `%R` repo, `%B` base, `%E` engine base (wrapper path), `%P` python, `%G`
 
 Implementation:
 
-- **Genome API** (crossover, mutation, phenotype, job status): [`src/world/genetic_gan.cpp`](../src/world/genetic_gan.cpp) — linked via qcommon (client + dedicated server).
-- **Async decode + model import**: [`src/client/cl_genetic_gan.c`](../src/client/cl_genetic_gan.c) — `genome_generate`, job queue, `RegisterModel` on main thread.
+- **Genome API** (crossover, mutation, phenotype, job status): [`src/world/genetic_gan.cpp`](../src/world/genetic_gan.cpp) — linked via qcommon when `USE_OPEN_WORLD` (client + dedicated server).
+- **Async decode + model import**: [`src/extensions/generative/cl_genetic_gan.c`](../src/extensions/generative/cl_genetic_gan.c) — `genome_generate`, job queue, `RegisterModel` on main thread (requires `USE_GENETIC_GAN`, ON in `full` profile).
 
 Tests:
 

@@ -26,6 +26,8 @@ See `CLAUDE.md` for canonical build commands. The primary build script is `./scr
 
 Build artifacts go to `build-vk-Release/` and are copied to `release/`.
 
+**Repository layout (2026):** [docs/core/REPOSITORY_LAYOUT_2026.md](docs/core/REPOSITORY_LAYOUT_2026.md) — `src/extensions/`, `samples/`, `third_party/` symlinks, profile matrix in [BUILD.md](BUILD.md). Feature docs: [docs/README.md](docs/README.md) tier hubs (not duplicated below).
+
 ### Gotchas
 
 - **C++ linker dependency**: The build requires `libstdc++-14-dev` because Clang 18 (the default `c++` on Ubuntu 24.04) selects the GCC 14 installation but only GCC 13 dev files are installed by default. The update script installs this.

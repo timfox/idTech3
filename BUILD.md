@@ -36,6 +36,30 @@ Legacy `make`-first instructions are no longer the primary build path for this f
 
 Artifacts are copied to `release/` and the build trees live under `build-vk-Release/` and `build-vk-Debug/`.
 
+### Build profiles (`IDTECH3_PROFILE`)
+
+Default profile is **`game`** (SP conversion stack). **`full`** matches the pre-2026 kitchen-sink build.
+
+| Profile | Command | Typical use |
+|---------|---------|-------------|
+| `game` | `./scripts/compile_engine.sh vulkan` | Recommended default — open world, nav, USD |
+| `full` | `./scripts/compile_engine.sh vulkan full` | All generative + research + neural renderer pack |
+| `core` | `./scripts/compile_engine.sh vulkan core` | Q3/OA compat, minimal TU count |
+| `research` | `./scripts/compile_engine.sh vulkan research` | Paper-repro tooling emphasis |
+
+| Flag / gate | `core` | `game` | `full` |
+|-------------|--------|--------|--------|
+| `USE_OPEN_WORLD` | OFF | ON | ON |
+| `USE_FREEUSD` | OFF | ON | ON |
+| `USE_RECAST_NAV` | OFF | ON | ON |
+| `USE_RESEARCH_EXTENSIONS` | OFF | OFF | ON |
+| `USE_FLUX` / `USE_TRELLIS` / `USE_GENETIC_GAN` | OFF | OFF | ON |
+| `USE_EXPERIMENTAL_RENDERERS` | OFF | OFF | ON |
+
+Authoritative source list: [docs/ENGINE_MODULE_MANIFEST.md](docs/ENGINE_MODULE_MANIFEST.md). Layout target: [docs/core/REPOSITORY_LAYOUT_2026.md](docs/core/REPOSITORY_LAYOUT_2026.md).
+
+CMake presets: `vulkan-game-release`, `vulkan-core-release`, `vulkan-full-release` (see `CMakePresets.json`).
+
 **s&box-style staged bootstrap** (engine → shaders → content), mirroring [Source-2 `Bootstrap.bat`](https://github.com/timfox/Source-2):
 
 ```bash
