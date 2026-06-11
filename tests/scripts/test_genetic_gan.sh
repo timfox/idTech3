@@ -22,7 +22,7 @@ do
 	test -f "$f" || fail "missing $f"
 done
 
-rg -q 'genetic_gan.cpp' CMakeLists.txt
+rg -q 'genetic_gan.cpp' cmake/IdTech3QcommonExtensions.cmake CMakeLists.txt
 
 echo "[test_genetic_gan] grep API symbols..."
 rg -q 'GeneticGan_Init' src/world/genetic_gan.cpp
@@ -37,7 +37,7 @@ rg -q 'cl_geneticGanSyncJob' src/world/genetic_gan.cpp
 
 echo "[test_genetic_gan] grep cross-module wiring..."
 rg -q 'CL_GeneticGan_Init' src/client/cl_main.c
-rg -q 'CL_GeneticGan_Frame' src/client/cl_generative.c
+rg -q 'CL_GeneticGan_Frame' src/extensions/generative/cl_generative.c
 rg -q 'genome_generate' src/extensions/generative/cl_genetic_gan.c
 rg -q 'GeneticGan_WriteGenomeJson' src/extensions/generative/cl_genetic_gan.c
 rg -q 'l_genome_create' src/game/g_lua_bindings.c

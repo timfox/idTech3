@@ -11,6 +11,7 @@ APPLY="${ROOT}/cmake/IdTech3Profile.cmake"
 [ -f "$APPLY" ] || fail "missing IdTech3Profile.cmake"
 
 grep -q 'idtech3_apply_build_profile' "$APPLY" || fail "profile apply function missing"
+grep -q 'idtech3_gate_append' "$ROOT/cmake/IdTech3Extension.cmake" || fail "IdTech3Extension.cmake missing gate helper"
 
 for p in core game full research; do
   [ -f "${PROFILE_DIR}/${p}.cmake" ] || fail "missing profile ${p}.cmake"
@@ -40,5 +41,10 @@ grep -q 'IDTECH3_PROFILE' "$CE_SH" || fail "compile_engine.sh missing IDTECH3_PR
 
 # Default profile game in CMakeLists
 grep -q 'IDTECH3_PROFILE "game"' "${ROOT}/CMakeLists.txt" || fail "CMake default profile not game"
+
+# 2026 samples alias (symlink to examples/)
+[ -e "${ROOT}/samples" ] || fail "missing samples/ alias (symlink to examples/)"
+[ -e "${ROOT}/third_party" ] || fail "missing third_party/ alias (symlink to src/external/)"
+grep -q 'BUILD_SAMPLES_DEMO_GAME' "${ROOT}/CMakeLists.txt" || fail "BUILD_SAMPLES_DEMO_GAME option missing"
 
 echo "test_build_profiles: passed"

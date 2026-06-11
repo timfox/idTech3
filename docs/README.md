@@ -45,4 +45,4 @@ Documentation is grouped by **tier**. Most files remain at their historical path
 
 ## Archive
 
-Historical FBO audits and stale roadmaps — see `docs/FBO_*`, `docs/PRODUCTION_GAP_PLAN.md` (migration to `docs/archive/` is incremental).
+Historical FBO audits and stale roadmaps — see [docs/archive/fbo_investigation.md](archive/fbo_investigation.md); migration rollout: [ENGINE_REORG_PLAN.md](ENGINE_REORG_PLAN.md).

@@ -124,6 +124,9 @@ RTX: **`USE_VULKAN_RTX`** (separate from experimental pack).
 
 ---
 
-## Deferred (Phase 6+)
+## Deferred (Phase 5+)
 
-Top-level rename `engine/`, `runtime/`, `modules/`, `third_party/` — not shipped in 2026 Q2; tracked in roadmap only.
+- Top-level `engine/`, `runtime/`, `modules/` physical roots — [REPOSITORY_LAYOUT_2026.md](core/REPOSITORY_LAYOUT_2026.md)
+- `src/external/` → `third_party/` rename
+- `USE_GAME_AI_MIDDLEWARE` compile gate — scaffold in `cmake/modules/ClientGameAiSources.cmake` (needs stub headers for `g_lua_bindings.c`)
+- MSVC project codegen from CMake
