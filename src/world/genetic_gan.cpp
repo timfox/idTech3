@@ -1,16 +1,14 @@
-/*
-===========================================================================
-Copyright (C) 2026 Gopex LLC. All rights reserved.
-===========================================================================
-*/
+/* C++20 migration: extern "C" API boundary preserved. */
+#include <algorithm>
+#include <cstdio>
+#include <cstring>
+#include <span>
 
+extern "C" {
 #include "../qcommon/q_shared.h"
 #include "../qcommon/qcommon.h"
 #include "genetic_gan.h"
-
-#include <math.h>
-#include <stdio.h>
-#include <string.h>
+}
 
 static cvar_t *cl_geneticGan;
 static cvar_t *cl_geneticGanDim;
@@ -49,15 +47,9 @@ static qboolean GG_FeatureActive( void )
 	return GeneticGan_Enabled();
 }
 
-static float GG_Clamp01( float v )
+[[nodiscard]] static float GG_Clamp01( float v )
 {
-	if ( v < 0.0f ) {
-		return 0.0f;
-	}
-	if ( v > 1.0f ) {
-		return 1.0f;
-	}
-	return v;
+	return std::clamp( v, 0.0f, 1.0f );
 }
 
 static int GG_EffectiveDim( void )
@@ -101,14 +93,13 @@ static int GG_AllocSlot( void )
 
 static void GG_FillRandom( geneticGanSlot_t *slot )
 {
-	int i;
-	int dim = GG_EffectiveDim();
-
-	for ( i = 0; i < dim; i++ ) {
-		slot->genes[i] = GG_Rand01();
+	const int dim = GG_EffectiveDim();
+	std::span<float> genes( slot->genes, GENETIC_GAN_MAX_DIM );
+	for ( int i = 0; i < dim; i++ ) {
+		genes[i] = GG_Rand01();
 	}
-	for ( ; i < GENETIC_GAN_MAX_DIM; i++ ) {
-		slot->genes[i] = 0.0f;
+	for ( int i = dim; i < GENETIC_GAN_MAX_DIM; i++ ) {
+		genes[i] = 0.0f;
 	}
 }
 
@@ -126,6 +117,8 @@ static void GG_UpdateSyncCvars( void )
 	Com_sprintf( cl_geneticGanSyncSlotStr, sizeof( cl_geneticGanSyncSlotStr ), "%d", s_jobSlot );
 	Com_sprintf( cl_geneticGanSyncCountStr, sizeof( cl_geneticGanSyncCountStr ), "%d", count );
 }
+
+extern "C" {
 
 void GeneticGan_Init( void )
 {
@@ -720,3 +713,4 @@ int GeneticGan_BreedForTest( int parentA, int parentB, float mutationRate )
 	return GeneticGan_Breed( parentA, parentB, mutationRate, "test_child" );
 }
 #endif
+}

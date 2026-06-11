@@ -1,15 +1,14 @@
-/*
-===========================================================================
-Copyright (C) 2026 Gopex LLC. All rights reserved.
-===========================================================================
-*/
+/* C++20 migration: extern "C" API boundary preserved. */
+#include <algorithm>
+#include <cmath>
+#include <cstring>
+#include <span>
 
+extern "C" {
 #include "../qcommon/q_shared.h"
 #include "../qcommon/qcommon.h"
 #include "fog_biology.h"
-
-#include <math.h>
-#include <string.h>
+}
 
 static cvar_t *r_fogBiology;
 static cvar_t *r_fogBiologySite;
@@ -32,34 +31,27 @@ static fogBioCommunity_t s_current;
 
 #define FOG_BIO_POST_FOG_FRAMES 300
 
-static float FB_Clamp01( float v )
+[[nodiscard]] static float FB_Clamp01( float v )
 {
-	if ( v < 0.0f ) {
-		return 0.0f;
-	}
-	if ( v > 1.0f ) {
-		return 1.0f;
-	}
-	return v;
+	return std::clamp( v, 0.0f, 1.0f );
 }
 
-static float FB_Shannon( const float *weights, int count )
+[[nodiscard]] static float FB_Shannon( std::span<const float> weights )
 {
 	float h = 0.0f;
-	int i;
-	for ( i = 0; i < count; i++ ) {
-		if ( weights[i] > 1e-6f ) {
-			h -= weights[i] * logf( weights[i] );
+	for ( float w : weights ) {
+		if ( w > 1e-6f ) {
+			h -= w * std::log( w );
 		}
 	}
 	return h;
 }
 
-static void FB_NormalizePhyla( float *phylum, int count )
+static void FB_NormalizePhyla( std::span<float> phylum )
 {
 	float sum = 0.0f;
-	int i;
-	for ( i = 0; i < count; i++ ) {
+	const int count = static_cast<int>( phylum.size() );
+	for ( int i = 0; i < count; i++ ) {
 		if ( phylum[i] < 0.0f ) {
 			phylum[i] = 0.0f;
 		}
@@ -69,7 +61,7 @@ static void FB_NormalizePhyla( float *phylum, int count )
 		phylum[FOG_BIO_PHYLUM_PROTEOBACTERIA] = 1.0f;
 		return;
 	}
-	for ( i = 0; i < count; i++ ) {
+	for ( int i = 0; i < count; i++ ) {
 		phylum[i] /= sum;
 	}
 }
@@ -178,7 +170,7 @@ static void FB_BuildCommunity( fogBioSite_t site, fogBioPhase_t phase, float mar
 	if ( phase != FOG_BIO_PHASE_CLEAR ) {
 		FB_ApplyPhaseDeltas( site, phase, phylum );
 	}
-	FB_NormalizePhyla( phylum, FOG_BIO_PHYLUM_COUNT );
+	FB_NormalizePhyla( phylum );
 
 	Com_Memcpy( out->phylum, phylum, sizeof( phylum ) );
 	out->marineFraction = marineInfluence;
@@ -186,7 +178,7 @@ static void FB_BuildCommunity( fogBioSite_t site, fogBioPhase_t phase, float mar
 	out->depositionMultiplier = ( phase == FOG_BIO_PHASE_FOG ) ? 2.9f : 1.0f;
 	out->culturableRichness = ( phase == FOG_BIO_PHASE_FOG ) ? 2.0f : 1.0f;
 
-	out->shannonDiversity = FB_Shannon( phylum, FOG_BIO_PHYLUM_COUNT );
+	out->shannonDiversity = FB_Shannon( std::span<const float>( phylum, FOG_BIO_PHYLUM_COUNT ) );
 	if ( phase == FOG_BIO_PHASE_FOG ) {
 		out->shannonDiversity *= 1.12f;
 	} else if ( phase == FOG_BIO_PHASE_POST_FOG ) {
@@ -215,6 +207,8 @@ static void FB_LogEnableOnce( void )
 		r_fogBiologyCoastKm ? r_fogBiologyCoastKm->value : 0.0f,
 		r_fogBiologyAuto ? r_fogBiologyAuto->integer : 0 );
 }
+
+extern "C" {
 
 void FogBiology_Init( void )
 {
@@ -715,3 +709,4 @@ void FogBiology_BuildCommunityForTest( fogBioSite_t site, fogBioPhase_t phase,
 	FB_BuildCommunity( site, phase, marineInfluence, out );
 }
 #endif
+}

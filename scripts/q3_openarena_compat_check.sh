@@ -69,6 +69,22 @@ else
 	fail "cl_trellis_enable default not 0"
 fi
 
+if [ -f "$PROJECT_ROOT/src/world/fog_biology.cpp" ] && \
+   grep -q 'r_fogBiology' "$PROJECT_ROOT/src/world/fog_biology.cpp" && \
+   grep -q '"r_fogBiology", "0"' "$PROJECT_ROOT/src/world/fog_biology.cpp"; then
+	pass "r_fogBiology defaults to 0 (opt-in bioaerosol ecology)"
+else
+	fail "r_fogBiology default not 0 in fog_biology.cpp"
+fi
+
+if [ -f "$PROJECT_ROOT/src/world/genetic_gan.cpp" ] && \
+   grep -q 'cl_geneticGan' "$PROJECT_ROOT/src/world/genetic_gan.cpp" && \
+   grep -q '"cl_geneticGan", "0"' "$PROJECT_ROOT/src/world/genetic_gan.cpp"; then
+	pass "cl_geneticGan defaults to 0 (opt-in procedural genome API)"
+else
+	fail "cl_geneticGan default not 0 in genetic_gan.cpp"
+fi
+
 if grep -qE 'r_vegWind[[:space:]]*=[[:space:]]*ri\.Cvar_Get\([[:space:]]*"r_vegWind"[[:space:]]*,[[:space:]]*"0"' \
 	"$PROJECT_ROOT/src/renderers/vulkan/vk_postfx.c"; then
 	pass "r_vegWind defaults to 0 (classic maps unchanged unless enabled)"

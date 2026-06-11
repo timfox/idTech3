@@ -27,7 +27,7 @@ Build artifacts go to `build-vk-Release/` and are copied to `release/`.
 ### Gotchas
 
 - **C++ linker dependency**: The build requires `libstdc++-14-dev` because Clang 18 (the default `c++` on Ubuntu 24.04) selects the GCC 14 installation but only GCC 13 dev files are installed by default. The update script installs this.
-- **C++20 engine modules**: First-party `.cpp` (ECS, nav, physics, world layer, ImGui inspector, FreeUSD) build with **`CMAKE_CXX_STANDARD 20`**; core engine remains **C23**. C++23-only features deferred until CI-stable.
+- **C++20 engine modules**: First-party `.cpp` (ECS, nav, physics, **`src/world/*`**, **`cluster_graph.cpp`**, ImGui inspector, FreeUSD) build with **`CMAKE_CXX_STANDARD 20`**; public headers keep **`extern "C"`** ABI. Core engine remains **C23**. Revert guard: **`tests/scripts/test_cpp20_sources.sh`** (`ctest -R test_cpp20_sources`, also in **`smoke_test.sh`**).
 - **No game data**: The engine repo does not include Quake III Arena game data (`.pk3` files). The dedicated server will print "No game data" and exit cleanly - this is expected. `SKIP_IDPAK_CHECK=ON` is set by default in `compile_engine.sh`.
 - **Test suite**: Run `make test` or `ctest` from the build directory to execute the smoke test (binary checks, server startup, shader validation). Full validation is via build matrix (`.github/workflows/build.yml`) and manual testing.
 - **Headless environment**: The client executable (`idtech3`) requires a display server (X11/SDL2) and GPU. In headless Cloud Agent VMs, only the dedicated server (`idtech3_server`) can run. The client binary can still be verified via `file` and `ldd` checks.

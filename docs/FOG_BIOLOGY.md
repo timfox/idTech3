@@ -65,7 +65,7 @@ Startup when enabled: `[fog_biology] enabled site=… coast_km=… auto=…`
 | `r_fogBiologySyncGramNeg` | Gram-negative fraction |
 | `r_fogBiologySyncRhodo` | Rhodospirillales proxy |
 
-Used by the Vulkan **Bioaerosol Ecology** ImGui panel without linking `fog_biology.c` into the renderer.
+Used by the Vulkan **Bioaerosol Ecology** ImGui panel without linking `fog_biology.cpp` into the renderer.
 
 ## Integration
 
