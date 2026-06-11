@@ -44,4 +44,4 @@ make test-sector-stream
 - **Script regression**: `test_botlib_bounded_strings`, renderer guards, temporal (`test_temporal_motion_policy`), vector font mode 2, etc.
 - **GPU golden (Tier A)**: `gpu_golden_compare` — `./scripts/gpu_golden_capture.sh --compare`
 - **i18n / assets / crash hooks**: `test_check_loc`, `test_validate_assets`, `test_crash_report`
-- **Validation**: `smoke_test`, `renderer_regression_check`, `check_artifacts`, … — see `docs/RENDERER_CONFIDENCE.md`
+- **Validation**: `smoke_test`, `renderer_regression_check`, `check_artifacts`, **`test_cpp20_sources`** (C→C++20 world layer revert guard), … — see `docs/RENDERER_CONFIDENCE.md`

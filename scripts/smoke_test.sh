@@ -206,6 +206,20 @@ fi
 
 echo ""
 
+# --- C++20 world/open-world migration guard (static; no build required) ---
+echo "C++20 migration checks:"
+if [ -x "$PROJECT_ROOT/tests/scripts/test_cpp20_sources.sh" ]; then
+  if "$PROJECT_ROOT/tests/scripts/test_cpp20_sources.sh"; then
+    pass "test_cpp20_sources.sh"
+  else
+    fail "test_cpp20_sources.sh"
+  fi
+else
+  warn "test_cpp20_sources.sh not executable"
+fi
+
+echo ""
+
 # --- Shader validation ---
 echo "Shader checks:"
 if command -v glslangValidator &>/dev/null; then

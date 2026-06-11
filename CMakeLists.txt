@@ -1255,8 +1255,8 @@ list(APPEND QCOMMON_SRCS src/world/world_district.cpp)
 list(APPEND QCOMMON_SRCS src/world/world_open.cpp)
 list(APPEND QCOMMON_SRCS src/world/world_residency.cpp)
 list(APPEND QCOMMON_SRCS src/world/sector_graph.cpp)
-list(APPEND QCOMMON_SRCS src/world/fog_biology.c)
-list(APPEND QCOMMON_SRCS src/world/genetic_gan.c)
+list(APPEND QCOMMON_SRCS src/world/fog_biology.cpp)
+list(APPEND QCOMMON_SRCS src/world/genetic_gan.cpp)
 list(APPEND QCOMMON_SRCS src/qcommon/cluster_graph.cpp)
 list(APPEND QCOMMON_SRCS src/world/world_proc.cpp)
 list(APPEND QCOMMON_SRCS src/qcommon/cm_stream_merge.c)
@@ -3041,6 +3041,12 @@ set_tests_properties(test_client_modular PROPERTIES
 	LABELS "scripts;client"
 	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_client_modular.sh;${CMAKE_SOURCE_DIR}/src/client/cl_main.c;${CMAKE_SOURCE_DIR}/src/client/cl_lifecycle.c;${CMAKE_SOURCE_DIR}/src/client/cl_frame.c;${CMAKE_SOURCE_DIR}/src/client/cl_cvars.c")
 
+add_test(NAME test_cpp20_sources
+	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_cpp20_sources.sh)
+set_tests_properties(test_cpp20_sources PROPERTIES
+	LABELS "scripts;validation"
+	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_cpp20_sources.sh;${CMAKE_SOURCE_DIR}/CMakeLists.txt;${CMAKE_SOURCE_DIR}/src/world/world_open.cpp;${CMAKE_SOURCE_DIR}/src/qcommon/cluster_graph.cpp")
+
 add_test(NAME test_vector_font_mode2
 	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_vector_font_mode2.sh ${CMAKE_SOURCE_DIR})
 set_tests_properties(test_vector_font_mode2 PROPERTIES
@@ -3097,7 +3103,7 @@ add_test(NAME test_fog_biology
 	WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
 set_tests_properties(test_fog_biology PROPERTIES
 	LABELS "scripts;validation"
-	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_fog_biology.sh;${CMAKE_SOURCE_DIR}/src/world/fog_biology.c;${CMAKE_SOURCE_DIR}/src/world/fog_biology.h")
+	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_fog_biology.sh;${CMAKE_SOURCE_DIR}/src/world/fog_biology.cpp;${CMAKE_SOURCE_DIR}/src/world/fog_biology.h")
 
 add_test(NAME test_init_optional_submodules
 	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_init_optional_submodules.sh
@@ -3580,7 +3586,7 @@ if(BUILD_UNIT_TESTS)
 		tests/unit/test_fog_biology.c
 		tests/stub_qcommon_min.c
 		tests/stub_fog_biology_deps.c
-		src/world/fog_biology.c
+		src/world/fog_biology.cpp
 		src/qcommon/q_shared.c
 		src/qcommon/q_math.c)
 	target_compile_definitions(unit_fog_biology PRIVATE FOG_BIOLOGY_UNIT_TEST)
@@ -3595,7 +3601,7 @@ if(BUILD_UNIT_TESTS)
 		tests/unit/test_genetic_gan.c
 		tests/stub_qcommon_min.c
 		tests/stub_genetic_gan_deps.c
-		src/world/genetic_gan.c
+		src/world/genetic_gan.cpp
 		src/qcommon/q_shared.c
 		src/qcommon/q_math.c)
 	target_compile_definitions(unit_genetic_gan PRIVATE GENETIC_GAN_UNIT_TEST)
@@ -3625,7 +3631,7 @@ if(BUILD_UNIT_TESTS)
 		WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
 	set_tests_properties(test_genetic_gan PROPERTIES
 		LABELS "validation"
-		REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_genetic_gan.sh;${CMAKE_SOURCE_DIR}/src/world/genetic_gan.c;${CMAKE_SOURCE_DIR}/src/world/genetic_gan.h")
+		REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_genetic_gan.sh;${CMAKE_SOURCE_DIR}/src/world/genetic_gan.cpp;${CMAKE_SOURCE_DIR}/src/world/genetic_gan.h")
 endif()
 
 # Example mod pack (config-only .pk3); optional - see examples/demo_game/README.md

@@ -8,9 +8,10 @@ BUILD="${1:-$ROOT/build-vk-Release}"
 fail() { echo "FAIL: $*" >&2; exit 1; }
 ok() { echo "OK: $*"; }
 
-[ -f "$ROOT/src/world/genetic_gan.c" ] || fail "missing genetic_gan.c"
+[ -f "$ROOT/src/world/genetic_gan.cpp" ] || fail "missing genetic_gan.cpp"
 [ -f "$ROOT/src/world/genetic_gan.h" ] || fail "missing genetic_gan.h"
 [ -f "$ROOT/scripts/genetic_gan_decode.py" ] || fail "missing genetic_gan_decode.py"
+rg -q 'genetic_gan.cpp' "$ROOT/CMakeLists.txt"
 
 if [ -x "$BUILD/unit_genetic_gan" ] || [ -f "$BUILD/unit_genetic_gan" ]; then
 	"$BUILD/unit_genetic_gan" || fail "unit_genetic_gan failed"

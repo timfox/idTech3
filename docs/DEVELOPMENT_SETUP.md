@@ -17,7 +17,7 @@ sudo apt-get install cmake ninja-build pkg-config \
 ### Compiler Requirements
 - **Clang 18+** (recommended) or **GCC 15+**
 - C23 support required (falls back to C17 if unavailable)
-- **C++20** for engine-owned `.cpp` modules (ECS, navigation, physics, world layer, ImGui inspector, FreeUSD bridges)
+- **C++20** for engine-owned `.cpp` modules (ECS, navigation, physics, world layer, ImGui inspector, FreeUSD bridges). Migrated world/open-world sources are listed in **`tests/scripts/test_cpp20_sources.sh`**; run **`ctest -R test_cpp20_sources`** after touching those files.
 - C++23-only language features are deferred until the C++20 baseline is stable on all CI targets
 - Third-party C++ dependencies (opus, flac, cflux2, ImGui, Bullet, EnTT) use their upstream standards
 
