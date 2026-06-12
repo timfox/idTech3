@@ -42,13 +42,6 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 #define MAX_TEXTURE_SIZE	32768
 
-#ifdef USE_VBO
-#define USE_VBO_GRID		/* put SF_GRID to VBO */
-#endif
-
-//#define USE_TESS_NEEDS_NORMAL
-//#define USE_TESS_NEEDS_ST2
-
 #define SH_COEFF_COUNT 9
 
 #include "../../qcommon/q_shared.h"
@@ -2047,9 +2040,7 @@ image_t *vk_create_pbr_albedo_srgb( const char *albedoMapName, imgFlags_t flags 
 //
 // tr_surface.c
 //
-#ifdef USE_VBO_GRID
-void		RB_SurfaceGridEstimate( srfGridMesh_t *cv, int *numVertexes, int *numIndexes ); 
-#endif
+void		RB_SurfaceGridEstimate( srfGridMesh_t *cv, int *numVertexes, int *numIndexes );
 
 /*
 ====================================================================
@@ -2112,14 +2103,6 @@ typedef struct shaderCommands_s
 	int		gltfGpuMorphCount;
 	float		gltfGpuMorphWeights[IQM_MORPH_TOP_K];
 #endif
-#endif
-
-	// info extracted from current shader
-#ifdef USE_TESS_NEEDS_NORMAL
-	int			needsNormal;
-#endif
-#ifdef USE_TESS_NEEDS_ST2
-	int			needsST2;
 #endif
 
 	int			numPasses;

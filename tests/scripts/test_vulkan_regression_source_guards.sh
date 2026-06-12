@@ -43,6 +43,9 @@ VK_HEADER="$PROJECT_ROOT/src/renderers/vulkan/vk.h"
 TR_INIT="$PROJECT_ROOT/src/renderers/vulkan/tr_init.c"
 TR_SHADE="$PROJECT_ROOT/src/renderers/vulkan/tr_shade.c"
 VK_FRAME_SUBMIT="$PROJECT_ROOT/src/renderers/vulkan/vk_frame_submit.c"
+VK_SHADER_MODULES="$PROJECT_ROOT/src/renderers/vulkan/vk_shader_modules.c"
+TR_LOCAL="$PROJECT_ROOT/src/renderers/vulkan/tr_local.h"
+CL_MAIN="$PROJECT_ROOT/src/client/cl_main.c"
 COMPILE_SHADERS="$PROJECT_ROOT/scripts/compile_shaders.sh"
 
 assert_file_exists "$VK_INSTANCE"
@@ -54,7 +57,18 @@ assert_file_exists "$VK_HEADER"
 assert_file_exists "$TR_INIT"
 assert_file_exists "$TR_SHADE"
 assert_file_exists "$VK_FRAME_SUBMIT"
+assert_file_exists "$VK_SHADER_MODULES"
+assert_file_exists "$TR_LOCAL"
+assert_file_exists "$CL_MAIN"
 assert_file_exists "$COMPILE_SHADERS"
+
+# Compile-time rollout flags removed from Vulkan renderer (always-on paths inlined).
+assert_not_matches_regex "$TR_LOCAL" "USE_VBO_GRID|USE_TESS_NEEDS" "stale VBO grid / tess needs compile flags removed"
+assert_not_matches_regex "$VK_SHADER_MODULES" "#ifndef USE_VK_PBR|#else" "non-PBR shader module fallback removed"
+if grep -Fq 'r_allowSoftwareGL = Cvar_Get' "$CL_MAIN" && \
+	! awk '/#ifdef USE_OPENGL_API/{o=1} /#endif/{if(o){o=0; exit 0}} /r_allowSoftwareGL = Cvar_Get/{if(!o) exit 1}' "$CL_MAIN"; then
+	fail "r_allowSoftwareGL must register only under USE_OPENGL_API"
+fi
 
 # Mesh shader extension must stay explicitly gated (support + cvar + extension list capacity).
 assert_contains_literal "$VK_INSTANCE" "const char *device_extension_list[40];" "mesh shader extension-list headroom"
