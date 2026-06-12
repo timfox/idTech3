@@ -2652,6 +2652,12 @@ if(BUILD_UNIT_TESTS)
 	target_include_directories(unit_vm_native_module PRIVATE ${CMAKE_SOURCE_DIR}/src)
 	add_test(NAME unit_vm_native_module COMMAND unit_vm_native_module)
 	set_tests_properties(unit_vm_native_module PROPERTIES LABELS "unit;validation")
+
+	add_executable(unit_ecs tests/unit/test_ecs.cpp)
+	target_include_directories(unit_ecs PRIVATE ${CMAKE_SOURCE_DIR}/src)
+	target_link_libraries(unit_ecs PRIVATE ecs_module)
+	add_test(NAME unit_ecs COMMAND unit_ecs)
+	set_tests_properties(unit_ecs PROPERTIES LABELS "unit;validation")
 endif()
 
 # Example mod pack (config-only .pk3); optional - see examples/demo_game/README.md
