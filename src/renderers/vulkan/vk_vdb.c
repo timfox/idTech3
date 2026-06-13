@@ -7,7 +7,7 @@ OpenVDB / NanoVDB integration implementation.
 Loading pipeline:
   1. FS_ReadFile loads the .vdb/.nvdb from game filesystem
   2. For NanoVDB: parse the flat buffer header directly (no dependencies)
-  3. For OpenVDB: use the library if USE_OPENVDB is defined
+  3. NanoVDB is the supported on-disk format
   4. Grid data stored in a linear float array for CPU sampling
   5. VDB_UploadToGPU creates a 3D texture for shader access
   6. VDB_BindAsFogDensity connects to the volumetric fog system
@@ -439,11 +439,7 @@ void VDB_Init( void ) {
 	ri.Cvar_SetDescription( r_vdbMajorantBrick,
 		"Brick size for OpenVDB majorant macrocells (delta-tracking segment bounds; arXiv:2211.09997)." );
 
-#ifdef USE_OPENVDB
-	ri.Printf( PRINT_ALL, "VDB: initialized (OpenVDB + NanoVDB)\n" );
-#else
-	ri.Printf( PRINT_ALL, "VDB: initialized (NanoVDB only, compile with USE_OPENVDB for full support)\n" );
-#endif
+	ri.Printf( PRINT_ALL, "VDB: initialized (NanoVDB)\n" );
 	VDB_RegisterConsoleCommands();
 }
 
@@ -608,9 +604,6 @@ vdbHandle_t VDB_Load( const char *filename, const char *gridName ) {
 
 		if ( !VDB_NanoVDB_ResolveGrid( fileBuf, len, gridName, &gridPtr ) ) {
 			ri.Printf( PRINT_WARNING, "VDB: %s is not a valid NanoVDB file (or unsupported grid type)\n", filename );
-#ifdef USE_OPENVDB
-			ri.Printf( PRINT_ALL, "VDB: attempting OpenVDB load...\n" );
-#endif
 			grids[slot].active = qfalse;
 			numGrids--;
 			ri.FS_FreeFile( buf );

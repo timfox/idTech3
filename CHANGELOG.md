@@ -52,6 +52,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Vulkan PBR: **anisotropic visibility** for direct light; optional **IBL roughness stretch** from the anisotropy map (`r_pbr_iblAnisoStretch`); **clearcoat** base attenuation and **Charlie sheen** with optional fourth `sheenScale` roughness token.
 
 ### Removed
+- Ghost CMake flag **`USE_STB_TRUETYPE`**: passed from `compile_engine.sh` and CI but never read by `CMakeLists.txt`.
+- Dead **`USE_BANS`** server preprocessor blocks: ban commands and file-backed ban list were never compiled (macro never defined); auth-server **`banUser`/`banClient`** paths removed with the unused local ban system.
+- Dead **`USE_TESS_NEEDS_NORMAL`** / **`USE_TESS_NEEDS_ST2`** renderer gates: defines were commented out so the conditional branches were already inactive; tessellation now always follows the active (always-on) copy path.
+- Dead **`USE_OPENVDB`** VDB init messaging: OpenVDB was never wired at build time; startup log now reports NanoVDB only.
+- Deprecated ROM cvar **`cg_stereoSeparation`**: no remaining consumers; registration removed from client init.
 - Legacy `r_vfog*` engine cvars and `vk_vfog.c`/`vk_vfog.h`: volumetric fog is configured only via `r_volumetricFog*` (and map/`r_fog*` as documented). Editor `worldspawn` keys `vfog_*` remain separate map data, not console cvars.
 
 ### Security

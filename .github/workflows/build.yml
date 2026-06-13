@@ -95,9 +95,7 @@ jobs:
           mkdir -p build-vk-${{ matrix.btype }}
           cmake -S . -B build-vk-${{ matrix.btype }} -G Ninja \
             -DCMAKE_BUILD_TYPE=${{ matrix.btype }} \
-            -DCI_BUILD=OFF \
-            -DUSE_STB_TRUETYPE=ON \
-            -DBUILD_FREETYPE=ON \
+            -DCI_BUILD=OFF \            -DBUILD_FREETYPE=ON \
             -DENABLE_FORTIFY_SOURCE=OFF \
             -DENABLE_ASAN=OFF \
             -DBUILD_SERVER=ON \
@@ -120,9 +118,7 @@ jobs:
           mkdir -p build-gl-${{ matrix.btype }}
           cmake -S . -B build-gl-${{ matrix.btype }} -G Ninja \
             -DCMAKE_BUILD_TYPE=${{ matrix.btype }} \
-            -DCI_BUILD=OFF \
-            -DUSE_STB_TRUETYPE=ON \
-            -DBUILD_FREETYPE=ON \
+            -DCI_BUILD=OFF \            -DBUILD_FREETYPE=ON \
             -DENABLE_FORTIFY_SOURCE=OFF \
             -DENABLE_ASAN=OFF \
             -DBUILD_SERVER=ON \
@@ -494,9 +490,7 @@ jobs:
             -DCMAKE_C_COMPILER_LAUNCHER=ccache \
             -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
             -DCMAKE_BUILD_TYPE=${{ matrix.btype }} \
-            -DCI_BUILD=${{ (matrix.cc == 'gcc' && matrix.btype == 'Release') && 'ON' || 'OFF' }} \
-            -DUSE_STB_TRUETYPE=ON \
-            -DBUILD_FREETYPE=ON \
+            -DCI_BUILD=${{ (matrix.cc == 'gcc' && matrix.btype == 'Release') && 'ON' || 'OFF' }} \            -DBUILD_FREETYPE=ON \
             -DENABLE_FORTIFY_SOURCE=ON \
             -DENABLE_ASAN=OFF \
             -DBUILD_SERVER=ON \
@@ -524,9 +518,7 @@ jobs:
             -DCMAKE_C_COMPILER_LAUNCHER=ccache \
             -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
             -DCMAKE_BUILD_TYPE=${{ matrix.btype }} \
-            -DCI_BUILD=OFF \
-            -DUSE_STB_TRUETYPE=ON \
-            -DBUILD_FREETYPE=ON \
+            -DCI_BUILD=OFF \            -DBUILD_FREETYPE=ON \
             -DENABLE_FORTIFY_SOURCE=ON \
             -DENABLE_ASAN=OFF \
             -DBUILD_SERVER=ON \
@@ -578,9 +570,7 @@ jobs:
           mkdir -p build-vk-asan
           cmake -S . -B build-vk-asan \
             -DCMAKE_BUILD_TYPE=Debug \
-            -DCI_BUILD=OFF \
-            -DUSE_STB_TRUETYPE=ON \
-            -DBUILD_FREETYPE=ON \
+            -DCI_BUILD=OFF \            -DBUILD_FREETYPE=ON \
             -DENABLE_FORTIFY_SOURCE=OFF \
             -DENABLE_ASAN=ON \
             -DBUILD_SERVER=ON \
@@ -618,9 +608,7 @@ jobs:
           mkdir -p build-asan
           cmake -S . -B build-asan -G Ninja \
             -DCMAKE_BUILD_TYPE=Debug \
-            -DCI_BUILD=OFF \
-            -DUSE_STB_TRUETYPE=ON \
-            -DBUILD_FREETYPE=ON \
+            -DCI_BUILD=OFF \            -DBUILD_FREETYPE=ON \
             -DENABLE_FORTIFY_SOURCE=OFF \
             -DENABLE_ASAN=ON \
             -DBUILD_SERVER=ON \
@@ -670,9 +658,7 @@ jobs:
             -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
             -DCMAKE_BUILD_TYPE=Release \
             -DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
-            -DCI_BUILD=OFF \
-            -DUSE_STB_TRUETYPE=ON \
-            -DBUILD_FREETYPE=ON \
+            -DCI_BUILD=OFF \            -DBUILD_FREETYPE=ON \
             -DBUILD_SERVER=ON \
             -DUSE_VULKAN=ON \
             -DRENDERER_DEFAULT=vulkan \
@@ -739,9 +725,7 @@ jobs:
             mkdir -p build-vk-${{ matrix.btype }}
             cmake -S . -B build-vk-${{ matrix.btype }} \
               -DCMAKE_BUILD_TYPE=${{ matrix.btype }} \
-              -DCI_BUILD=OFF \
-              -DUSE_STB_TRUETYPE=ON \
-              -DBUILD_FREETYPE=ON \
+              -DCI_BUILD=OFF \              -DBUILD_FREETYPE=ON \
               -DENABLE_FORTIFY_SOURCE=OFF \
               -DENABLE_ASAN=OFF \
               -DBUILD_SERVER=ON \
@@ -757,9 +741,7 @@ jobs:
             mkdir -p build-gl-${{ matrix.btype }}
             cmake -S . -B build-gl-${{ matrix.btype }} \
               -DCMAKE_BUILD_TYPE=${{ matrix.btype }} \
-              -DCI_BUILD=OFF \
-              -DUSE_STB_TRUETYPE=ON \
-              -DBUILD_FREETYPE=ON \
+              -DCI_BUILD=OFF \              -DBUILD_FREETYPE=ON \
               -DENABLE_FORTIFY_SOURCE=OFF \
               -DENABLE_ASAN=OFF \
               -DBUILD_SERVER=ON \
@@ -836,9 +818,7 @@ jobs:
             -DSDL2_INCLUDE_DIR="${SDL2_PREFIX}/include" \
             -DSDL2_LIBRARY="${SDL2_PREFIX}/lib/libSDL2.dylib" \
             -DOPENAL_INCLUDE_DIR="${OPENAL_PREFIX}/include" \
-            -DOPENAL_LIBRARY="${OPENAL_PREFIX}/lib/libopenal.dylib" \
-            -DUSE_STB_TRUETYPE=ON \
-            -DBUILD_FREETYPE=ON \
+            -DOPENAL_LIBRARY="${OPENAL_PREFIX}/lib/libopenal.dylib" \            -DBUILD_FREETYPE=ON \
             -DENABLE_FORTIFY_SOURCE=OFF \
             -DENABLE_ASAN=OFF \
             -DBUILD_SERVER=ON \
@@ -878,9 +858,7 @@ jobs:
             -DSDL2_INCLUDE_DIR="${SDL2_PREFIX}/include" \
             -DSDL2_LIBRARY="${SDL2_PREFIX}/lib/libSDL2.dylib" \
             -DOPENAL_INCLUDE_DIR="${OPENAL_PREFIX}/include" \
-            -DOPENAL_LIBRARY="${OPENAL_PREFIX}/lib/libopenal.dylib" \
-            -DUSE_STB_TRUETYPE=ON \
-            -DBUILD_FREETYPE=ON \
+            -DOPENAL_LIBRARY="${OPENAL_PREFIX}/lib/libopenal.dylib" \            -DBUILD_FREETYPE=ON \
             -DENABLE_FORTIFY_SOURCE=OFF \
             -DENABLE_ASAN=OFF \
             -DBUILD_SERVER=ON \

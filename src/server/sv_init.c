@@ -831,10 +831,6 @@ void SV_Init( void )
 	sv_lanForceRate = Cvar_Get( "sv_lanForceRate", "1", CVAR_ARCHIVE_ND );
 	Cvar_SetDescription( sv_lanForceRate, "Forces LAN clients to the maximum rate instead of accepting client setting." );
 
-#ifdef USE_BANS
-	sv_banFile = Cvar_Get("sv_banFile", "serverbans.dat", CVAR_ARCHIVE);
-	Cvar_SetDescription( sv_banFile, "Name of the file that is used for storing the server bans." );
-#endif
 
 	sv_levelTimeReset = Cvar_Get( "sv_levelTimeReset", "0", CVAR_ARCHIVE_ND );
 	Cvar_SetDescription( sv_levelTimeReset, "Whether or not to reset leveltime after new map loads." );
@@ -852,10 +848,6 @@ void SV_Init( void )
 	// init the botlib here because we need the pre-compiler in the UI
 	SV_BotInitBotLib();
 
-#ifdef USE_BANS
-	// Load saved bans
-	Cbuf_AddText("rehashbans\n");
-#endif
 
 	// track group cvar changes
 	Cvar_SetGroup( sv_lanForceRate, CVG_SERVER );
