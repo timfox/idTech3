@@ -2516,6 +2516,15 @@ add_test(NAME test_vulkan_regression_source_guards
 set_tests_properties(test_vulkan_regression_source_guards PROPERTIES
 	LABELS "unit;scripts;validation;renderer")
 
+if(Python3_Interpreter_FOUND)
+	add_test(NAME test_renderer_frame_wrap_guards
+		COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tests/scripts/test_renderer_frame_wrap_guards.py ${CMAKE_SOURCE_DIR}
+		WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+	set_tests_properties(test_renderer_frame_wrap_guards PROPERTIES
+		LABELS "unit;scripts;validation;renderer"
+		REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_renderer_frame_wrap_guards.py")
+endif()
+
 add_test(NAME test_gltf_opengl_regressions
 	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_gltf_opengl_regressions.sh
 	WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
