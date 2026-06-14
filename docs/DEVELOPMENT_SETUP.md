@@ -294,6 +294,13 @@ cd build-vk-Release && ctest -C Release --output-on-failure
 ctest --preset test-vulkan-release
 ```
 
+Open-world / residency / sector-graph unit and script tests (no GPU or game data required for unit targets):
+
+```bash
+cd build-vk-Release
+ctest -R 'unit_world_residency|unit_sector_graph|test_openworld|test_graph_compute' -V
+```
+
 ## IDE Setup
 
 ### VS Code / Cursor

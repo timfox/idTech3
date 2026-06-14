@@ -40,6 +40,28 @@ Inspired by the consistent submodular optimization framework (Dütting et al., 2
 
 Startup log when enabled: `[world_residency] enabled epsilon=… k_col=… max_swaps=… matroid=…`
 
+## Quick start
+
+After hub map load and `openworld_start` (see [OPEN_WORLD.md](OPEN_WORLD.md)):
+
+```text
+set r_openWorldResidency 1
+set r_openWorldLoadRadius 12288
+set r_openWorldUnloadRadius 14336
+set r_openWorldMaxSectors 64
+set r_openWorldMaxNavSectors 32
+set r_openWorldMaxSpriteSectors 64
+set r_openWorldResidencyMaxSwaps 4
+
+// Optional: k-hop reachability pre-filter
+set r_graphStreamReach 1
+set r_graphStreamHops 8
+
+openworld_status
+```
+
+Demo mod ships commented defaults in `demo_openworld.cfg` (`exec demo_openworld.cfg`). For MP, also set **`sv_openWorldResidency 1`** on the dedicated server.
+
 ## Multiplayer rules
 
 - **Server collision is authoritative.** `SV_OpenWorld_Frame` with `sv_openWorldResidency 1` plans collision from the union of active player origins, then publishes via `CS_ENGINE_OPENWORLD_SECTORS`.

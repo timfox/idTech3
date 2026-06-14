@@ -88,6 +88,8 @@ Shipped in `idtech3_demo.pk3` when built with `demo`: `exec demo_districts.cfg` 
 
 When **`r_openWorld 1`**, `district_load_full` calls **`WorldOpen_LoadSector`** for each cell in the district grid (collision + nav + scatter per cvars). When **`r_openWorld 0`**, full district load uses legacy **`CM_Stream_LoadSector`** (collision prefetch only). See [OPEN_WORLD.md](OPEN_WORLD.md#limitations).
 
+With **`r_openWorldResidency 1`**, `WorldDistrict_StreamSectors` sets a district candidate filter and plans residency at the district centroid instead of brute-force loading every cell in the grid. Optional **`r_graphStreamReach 1`** further constrains candidates to k-hop reachable sectors. See [WORLD_RESIDENCY.md](WORLD_RESIDENCY.md) and [GRAPH_COMPUTE.md](GRAPH_COMPUTE.md).
+
 ## Related docs
 
 - [OPEN_WORLD.md](OPEN_WORLD.md) — view-driven sector streaming (BSP prefetch, per-chunk nav, billboard scatter)

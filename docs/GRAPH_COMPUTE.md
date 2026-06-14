@@ -54,6 +54,18 @@ Player origin(s) → SectorGraph_UpdateReachability (CPU BFS)
                  → WorldOpen load/unload
 ```
 
+## Troubleshooting
+
+| Symptom | Cause / fix |
+|---------|-------------|
+| `[GraphBfs] pipeline not ready` | Set **`r_graphCompute 1`**, then **`vid_restart`** so `vk_graph_bfs.c` registers the GPU reach fn |
+| Residency ignores graph filter | **`r_graphStreamReach`** must be **1**; filter applies only when `WorldResidency` is active (`r_openWorldResidency 1`) |
+| Cells unexpectedly unreachable | Window is centered on view cell with radius from **`r_openWorldUnloadRadius`**; cells outside the 64×64 window fail `SectorGraph_IsReachable` |
+| Edges through unloaded sectors | Enable **`r_graphBlockUnloaded 1`** to cut adjacency into sectors not resident in `WorldOpen` |
+| CPU/GPU mismatch warnings | **`r_graphStreamVerify 1`** compares bitsets; disable verify in shipping, fix shader or CSR upload if mismatches persist |
+
+**`r_graphCompute 1`** alone does not change which sectors load — it only runs the GPU BFS path (and enables verify-friendly cache bypass). Pair with **`r_graphStreamReach 1`** for streaming behavior.
+
 ## Phase 1 follow-ons (not implemented)
 
 - Nav influence heatmaps from sector reachability

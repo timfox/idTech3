@@ -27,6 +27,7 @@ Modern id Tech 3: **Vulkan renderer with PBR**, validation and smoke-tested buil
 **Audio**:
 * OpenAL backend with HRTF for 3D positional audio
 * Real-time reverb and occlusion effects via OpenAL EFX (heuristic environmental acoustics)
+* Wwise-inspired runtime mixer (buses, RTPCs, state groups, sound events) — [docs/AUDIO_WWISE_PARITY.md](docs/AUDIO_WWISE_PARITY.md)
 * Audio codec support: mp3, ogg, wav, flac, webm, opus
 
 **Video**:
@@ -61,7 +62,14 @@ Modern id Tech 3: **Vulkan renderer with PBR**, validation and smoke-tested buil
 * Optional TLS-secured remote console (off by default)
 * Console/logging for connection diagnostics and real-time network statistics
 
+**World streaming** (engine-original open worlds):
+* View-driven sector residency — collision merge, per-chunk nav tiles, billboard scatter — [docs/OPEN_WORLD.md](docs/OPEN_WORLD.md)
+* Optional consistent cardinality planner (`r_openWorldResidency`) — [docs/WORLD_RESIDENCY.md](docs/WORLD_RESIDENCY.md)
+* Sector graph k-hop reachability filter + optional Vulkan compute BFS — [docs/GRAPH_COMPUTE.md](docs/GRAPH_COMPUTE.md)
+* USD world districts + proxy meshes — [docs/DISTRICTS.md](docs/DISTRICTS.md)
+
 **Systems** (game and engine extensions):
+* Animgraph JSON state machine for glTF/IQM clip selection — [docs/ANIMGRAPH.md](docs/ANIMGRAPH.md)
 * AIML 2.1-oriented chatbot scripting (see `g_aiml.c` / Lua `Engine.AIML`)
 * GOAP (AI planning)
 * Flocking and boids (crowd AI)

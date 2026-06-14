@@ -86,7 +86,14 @@ src/
 ├── qcommon/             Shared engine (VM, filesystem, network)
 │   ├── vm.c / vm_local.h         VM create, native load, QVM path
 │   ├── vm_native_module.c/h      Native `.so`/`.dll` filename candidates
+│   ├── cm_stream.c               Sector pk3 prefetch + collision merge overlay
 │   └── files.c                   FS_LoadLibrary search (modules/vm/gamedir)
+├── world/               Open-world streaming + districts
+│   ├── world_open.c/h            Sector residency (collision, nav, scatter)
+│   ├── world_residency.c/h       Value-aware cardinality planner (optional)
+│   ├── sector_graph.c/h          k-hop reachability pre-filter (CPU + optional GPU BFS)
+│   ├── world_district.c/h        USD district manifest + proxy residency
+│   └── world_proc.c/h            Procedural sector typing (Voronoi/grid/hex/…)
 ├── server/              Dedicated server
 ├── botlib/              Bot AI (Q3 AAS pathfinding)
 └── external/            Vendored libraries
@@ -145,6 +152,31 @@ The shipping Vulkan renderer is **forward-only** with a layered HDR/post-process
 For goals and longer notes, see [RENDERER_2026_ARCHITECTURE_PASS.md](RENDERER_2026_ARCHITECTURE_PASS.md) and [RENDERERS.md](RENDERERS.md#vulkan-forward-scaffolding).
 
 **Bootstrap game data** (minimal `base/` layout that still satisfies the filesystem): [MINIMAL_GAME_SHELL.md](MINIMAL_GAME_SHELL.md).
+
+## Open-world streaming
+
+View-driven **sector residency** lives in `src/world/` and is ticked from `CL_OpenWorld_Frame` / `SV_OpenWorld_Frame`:
+
+```
+View / player origin(s)
+    └── WorldOpen_UpdateView
+            ├── r_openWorldResidency 0 → radius disk (r_openWorldRadius)
+            └── r_openWorldResidency 1 → WorldResidency (budget + bounded delta)
+                    ├── optional SectorGraph k-hop filter (r_graphStreamReach)
+                    ├── cm_stream merge → collision overlay
+                    ├── nav/sector_X_Y.nav → Detour addTile
+                    └── sprites/sector_X_Y.ents → billboard scatter
+```
+
+| Module | Role |
+|--------|------|
+| `world_open.c` | Layer load/unload, `openworld_*` console, MP configstring sync |
+| `world_residency.c` | Consistent submodular sector selection (collision/nav/sprite budgets) |
+| `sector_graph.c` | Grid CSR + multi-source BFS; optional `vk_graph_bfs.c` compute path |
+| `world_district.c` | USD districts; integrates with WorldOpen when `r_openWorld 1` |
+| `world_proc.c` | Deterministic region/palette typing for scatter and matroid mode |
+
+Docs: [OPEN_WORLD.md](OPEN_WORLD.md), [WORLD_RESIDENCY.md](WORLD_RESIDENCY.md), [GRAPH_COMPUTE.md](GRAPH_COMPUTE.md), [DISTRICTS.md](DISTRICTS.md), [PROC_PATTERNS.md](PROC_PATTERNS.md).
 
 ## Native game modules (VM)
 
