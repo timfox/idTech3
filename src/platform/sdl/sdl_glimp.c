@@ -412,6 +412,7 @@ static int GLW_SetMode( int mode, const char *modeFS, qboolean fullscreen, qbool
 		else
 			perChannelColorBits = 4;
 
+#ifdef USE_OPENGL_API
 #ifdef USE_VULKAN_API
 		if ( !vulkan )
 #endif
@@ -450,6 +451,7 @@ static int GLW_SetMode( int mode, const char *modeFS, qboolean fullscreen, qbool
 			if ( !r_allowSoftwareGL->integer )
 				SDL_GL_SetAttribute( SDL_GL_ACCELERATED_VISUAL, 1 );
 		}
+#endif /* USE_OPENGL_API */
 
 		if ( ( SDL_window = SDL_CreateWindow( cl_title, x, y, config->vidWidth, config->vidHeight, flags ) ) == NULL )
 		{
@@ -691,8 +693,6 @@ void GLimp_Init( glconfig_t *config )
 
 	in_nograb = Cvar_Get( "in_nograb", "0", 0 );
 	Cvar_SetDescription( in_nograb, "Do not capture mouse in game, may be useful during online streaming." );
-
-	r_allowSoftwareGL = Cvar_Get( "r_allowSoftwareGL", "0", CVAR_LATCH );
 
 	r_swapInterval = Cvar_Get( "r_swapInterval", "0", CVAR_ARCHIVE | CVAR_LATCH );
 	r_stereoEnabled = Cvar_Get( "r_stereoEnabled", "0", CVAR_ARCHIVE | CVAR_LATCH );

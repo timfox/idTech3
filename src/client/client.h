@@ -428,9 +428,11 @@ extern	cvar_t	*vid_xpos;
 extern	cvar_t	*vid_ypos;
 extern	cvar_t	*r_noborder;
 
+#ifdef USE_OPENGL_API
 extern	cvar_t	*r_allowSoftwareGL;
-extern	cvar_t	*r_swapInterval;
 extern	cvar_t	*r_glDriver;
+#endif
+extern	cvar_t	*r_swapInterval;
 
 extern	cvar_t	*r_displayRefresh;
 extern	cvar_t	*r_fullscreen;
