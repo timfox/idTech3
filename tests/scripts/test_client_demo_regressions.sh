@@ -217,7 +217,7 @@ assert_contains(callback_body, 'Q_stricmpn( filename + length - ( ext_len + num_
 assert_contains(callback_body, "if ( version == com_protocol->integer )", "demo completion current protocol")
 assert_contains(callback_body, "if ( version < 66 || version > NEW_PROTOCOL_VERSION )", "demo completion protocol range")
 
-play_body = strip_preprocessor_else_branches(find_function_body(demo_text, "CL_PlayDemo_f"))
+play_body = find_function_body(strip_preprocessor_else_branches(demo_text), "CL_PlayDemo_f")
 assert_contains(play_body, "if ( Cmd_Argc() != 2 )", "demo argc guard")
 assert_contains(play_body, "ext_test = strrchr( arg, '.' );", "explicit extension parsing")
 assert_contains(play_body, "protocol = atoi( ext_test + ARRAY_LEN( DEMOEXT ) );", "explicit protocol parse")
