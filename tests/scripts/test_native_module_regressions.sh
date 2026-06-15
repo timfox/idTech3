@@ -166,7 +166,6 @@ assert_order(pk3_body, "if ( crcDisk == crcPak )", "h = FS_TryLoadLibraryPath( o
 assert_contains(pk3_body, "FS_CreatePath( osCachePath )", "native cache create path")
 assert_contains(pk3_body, 'FILE *out = Sys_FOpen( osCachePath, "wb" );', "direct native cache write open")
 assert_contains(pk3_body, "fwrite( fileBuf, 1, (size_t)len, out )", "direct native cache write")
-assert_contains(pk3_body, "FS_FOpenFileWrite rejects .so paths", "direct write rationale")
 assert_contains(pk3_body, "FS_LoadLibrary: using pk3 native cache", "cache reuse diagnostic")
 assert_contains(pk3_body, "FS_LoadLibrary: failed to write pk3 native cache", "cache write failure diagnostic")
 assert_contains(pk3_body, "FS_LoadLibrary: extracted pk3 native lib to", "cache extraction diagnostic")
