@@ -2652,6 +2652,14 @@ if(BUILD_UNIT_TESTS)
 	target_include_directories(unit_vm_native_module PRIVATE ${CMAKE_SOURCE_DIR}/src)
 	add_test(NAME unit_vm_native_module COMMAND unit_vm_native_module)
 	set_tests_properties(unit_vm_native_module PROPERTIES LABELS "unit;validation")
+
+	add_executable(unit_vk_rtx_world
+		tests/unit/test_vk_rtx_world.c
+		src/renderers/vulkan/vk_rtx_world.c)
+	target_include_directories(unit_vk_rtx_world PRIVATE ${CMAKE_SOURCE_DIR}/src)
+	target_compile_definitions(unit_vk_rtx_world PRIVATE USE_VULKAN_RTX=1)
+	add_test(NAME unit_vk_rtx_world COMMAND unit_vk_rtx_world)
+	set_tests_properties(unit_vk_rtx_world PROPERTIES LABELS "unit;validation;renderer")
 endif()
 
 # Example mod pack (config-only .pk3); optional - see examples/demo_game/README.md
