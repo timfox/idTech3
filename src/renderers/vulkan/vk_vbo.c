@@ -595,7 +595,6 @@ void R_BuildWorldVBO( msurface_t *surf, int surfCount )
 	srfSurfaceFace_t *face;
 	srfTriangles_t *tris;
 	srfGridMesh_t *grid;
-#endif
 	msurface_t *sf;
 	int ibo_size;
 	int vbo_size;
@@ -744,14 +743,12 @@ void R_BuildWorldVBO( msurface_t *surf, int surfCount )
 		face = (srfSurfaceFace_t *) sf->data;
 		tris = (srfTriangles_t *) sf->data;
 		grid = (srfGridMesh_t *) sf->data;
-#endif
 		if ( face->surfaceType == SF_FACE )
 			face->vboItemIndex = i + 1;
 		else if (tris->surfaceType == SF_TRIANGLES) {
 			tris->vboItemIndex = i + 1;
 		} else if (grid->surfaceType == SF_GRID) {
 			grid->vboItemIndex = i + 1;
-#endif
 		} else {
 			ri.Error( ERR_DROP, "Unexpected surface type" );
 		}
