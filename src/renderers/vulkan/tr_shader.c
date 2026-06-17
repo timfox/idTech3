@@ -3888,64 +3888,6 @@ static void InitShader( const char *name, int lightmapIndex ) {
 }
 
 
-static void DetectNeeds( void )
-{
-	int i, n;
-
-	for ( i = 0; i < MAX_SHADER_STAGES; i++ )
-	{
-		if ( !stages[i].active )
-			break;
-
-		for ( n = 0; n < NUM_TEXTURE_BUNDLES; n++ ) {
-			const texCoordGen_t t = stages[i].bundle[n].tcGen;
-			if ( t == TCGEN_LIGHTMAP )
-			{
-				shader.needsST2 = qtrue;
-			}
-			if ( t == TCGEN_ENVIRONMENT_MAPPED || t == TCGEN_ENVIRONMENT_MAPPED_FP )
-			{
-				shader.needsNormal = qtrue;
-			}
-			if ( stages[i].bundle[n].alphaGen == AGEN_LIGHTING_SPECULAR || stages[i].bundle[n].rgbGen == CGEN_LIGHTING_DIFFUSE )
-			{
-				shader.needsNormal = qtrue;
-			}
-		}
-#if 0
-		t1 = stages[i].bundle[0].tcGen;
-		t2 = stages[i].bundle[1].tcGen;
-
-		if ( t1 == TCGEN_LIGHTMAP || t2 == TCGEN_LIGHTMAP )
-		{
-			shader.needsST2 = qtrue;
-		}
-		if ( t1 == TCGEN_ENVIRONMENT_MAPPED || t1 == TCGEN_ENVIRONMENT_MAPPED_FP )
-		{
-			shader.needsNormal = qtrue;
-		}
-		if ( t2 == TCGEN_ENVIRONMENT_MAPPED || t2 == TCGEN_ENVIRONMENT_MAPPED_FP )
-		{
-			shader.needsNormal = qtrue;
-		}
-		if ( stages[i].bundle[0].alphaGen == AGEN_LIGHTING_SPECULAR || stages[i].bundle[0].rgbGen == CGEN_LIGHTING_DIFFUSE )
-		{
-			shader.needsNormal = qtrue;
-		}
-#endif
-	}
-	for ( i = 0; i < shader.numDeforms; i++ )
-	{
-		if ( shader.deforms[i].deformation == DEFORM_WAVE || shader.deforms[i].deformation == DEFORM_NORMALS || shader.deforms[i].deformation == DEFORM_BULGE ) {
-			shader.needsNormal = qtrue;
-		}
-		if ( shader.deforms[i].deformation >= DEFORM_TEXT0 && shader.deforms[i].deformation <= DEFORM_TEXT7 ) {
-			shader.needsNormal = qtrue;
-		}
-	}
-}
-
-
 /*
 =========================
 FinishShader
@@ -4103,8 +4045,6 @@ static shader_t *FinishShader( void ) {
 			shader.sort = SS_OPAQUE;
 		}
 	}
-
-	DetectNeeds();
 
 	// fix alphaGen flags to avoid redundant comparisons in R_ComputeColors()
 	for ( i = 0; i < MAX_SHADER_STAGES; i++ ) {
