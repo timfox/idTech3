@@ -46,9 +46,6 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #define USE_VBO_GRID		/* put SF_GRID to VBO */
 #endif
 
-//#define USE_TESS_NEEDS_NORMAL
-//#define USE_TESS_NEEDS_ST2
-
 #define SH_COEFF_COUNT 9
 
 #include "../../qcommon/q_shared.h"
@@ -545,11 +542,6 @@ typedef struct shader_s {
 	unsigned	noVLcollapse:1;			// ignore vertexlight mode
 
 	fogPass_t	fogPass;				// draw a blended pass, possibly with depth test equals
-
-	qboolean	needsNormal;			// not all shaders will need all data to be gathered
-	//qboolean	needsST1;
-	qboolean	needsST2;
-	//qboolean	needsColor;
 
 	int			numDeforms;
 	deformStage_t	deforms[MAX_SHADER_DEFORMS];
@@ -2047,9 +2039,7 @@ image_t *vk_create_pbr_albedo_srgb( const char *albedoMapName, imgFlags_t flags 
 //
 // tr_surface.c
 //
-#ifdef USE_VBO_GRID
 void		RB_SurfaceGridEstimate( srfGridMesh_t *cv, int *numVertexes, int *numIndexes ); 
-#endif
 
 /*
 ====================================================================
@@ -2115,13 +2105,6 @@ typedef struct shaderCommands_s
 #endif
 
 	// info extracted from current shader
-#ifdef USE_TESS_NEEDS_NORMAL
-	int			needsNormal;
-#endif
-#ifdef USE_TESS_NEEDS_ST2
-	int			needsST2;
-#endif
-
 	int			numPasses;
 	shaderStage_t **xstages;
 
