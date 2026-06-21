@@ -141,7 +141,7 @@ With **`sv_openWorldResidency 1`**, the server uses consistent cardinality selec
 
 ### Graph reachability filter
 
-With **`r_graphStreamReach 1`**, residency candidates must lie within **k** hops on the sector grid from player origin(s) (`r_graphStreamHops`, default 8). Optional GPU path: **`r_graphCompute 1`** (client). See [GRAPH_COMPUTE.md](GRAPH_COMPUTE.md).
+With **`r_graphStreamReach 1`**, residency candidates must lie within **k** hops on the sector grid from player origin(s) (`r_graphStreamHops`, default 8). Optional **`r_graphCompute 1`** runs a Vulkan BFS in parallel for bench/verify (CPU BFS drives filtering). See [GRAPH_COMPUTE.md](GRAPH_COMPUTE.md).
 
 ### Renderer visual overlay
 

@@ -4,6 +4,38 @@ Value-aware open-world sector selection under per-layer cardinality budgets, wit
 
 Inspired by the consistent submodular optimization framework (Dütting et al., 2026): ROBUST-GREEDY cardinality selection, optional partition-matroid ROBUST-SWAP, and transition spreading so residency sets change gradually.
 
+## Quick start
+
+Replace the legacy radius disk with budgeted, gradual sector swaps:
+
+```text
+set r_openWorld 1
+set r_openWorldResidency 1
+set r_openWorldResidencyEpsilon 0.05
+set r_openWorldMaxSectors 64
+set r_openWorldMaxNavSectors 32
+set r_openWorldMaxSpriteSectors 64
+set r_openWorldResidencyMaxSwaps 4
+set r_openWorldLoadRadius 12288
+set r_openWorldUnloadRadius 14336
+exec demo_openworld.cfg
+openworld_start
+```
+
+Optional graph reachability pre-filter (requires residency on): see [GRAPH_COMPUTE.md](GRAPH_COMPUTE.md).
+
+**Dedicated server (MP collision authority):**
+
+```text
+set sv_openWorld 1
+set sv_openWorldResidency 1
+set cm_stream 1
+set cm_streamMerge 1
+set cm_openWorldCollision 1
+```
+
+Confirm startup log: `[world_residency] enabled epsilon=… k_col=… max_swaps=… matroid=…`
+
 ## Problem mapping
 
 | Paper concept | Engine mapping |
@@ -54,11 +86,22 @@ When **`r_graphStreamReach 1`**, [`WorldResidency`](src/world/world_residency.c)
 
 When `WorldDistrict_StreamSectors` runs with `r_openWorldResidency 1`, it sets a district candidate filter (`WorldResidency_SetDistrictFilter`) and calls `WorldResidency_UpdateView` at the district centroid instead of brute-force loading every cell.
 
+## Troubleshooting
+
+| Symptom | Likely cause |
+|---------|----------------|
+| Sectors still load in a full disk | `r_openWorldResidency 0` — legacy `r_openWorldRadius` path active |
+| Collision differs from nav/sprites on client | MP: collision clamped to server list; nav/sprites may be local unless `cl_openWorldResidencyNavLocal 0` |
+| Churn / pop-in at sector edges | Raise `r_openWorldResidencyMaxSwaps` slightly or widen `r_openWorldUnloadRadius` vs load radius |
+| Only one sector per proc region loads | `r_openWorldResidencyMatroid 1` with `r_proc 1` — partition matroid enforces one cell per region |
+| Graph filter ignored | Requires `r_graphStreamReach 1` in addition to residency; see [GRAPH_COMPUTE.md](GRAPH_COMPUTE.md) |
+
 ## Limitations
 
 - The score function is an **approximate** submodular proxy (distance coverage + bonuses); no formal 1/2 guarantee is claimed in-engine.
 - Entity-level replication relevance is out of scope (future ECS layer).
 - Renderer `r_bspStream` face residency uses a separate budget path.
+- Hysteresis radii (`r_openWorldLoadRadius` / `r_openWorldUnloadRadius`) define the **candidate envelope** only; final selection respects per-layer budgets and swap limits.
 
 ## Testing
 

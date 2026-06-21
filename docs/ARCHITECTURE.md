@@ -86,7 +86,14 @@ src/
 ├── qcommon/             Shared engine (VM, filesystem, network)
 │   ├── vm.c / vm_local.h         VM create, native load, QVM path
 │   ├── vm_native_module.c/h      Native `.so`/`.dll` filename candidates
+│   ├── cm_stream.c/h             Sector pk3 prefetch + collision merge overlay
 │   └── files.c                   FS_LoadLibrary search (modules/vm/gamedir)
+├── world/               Open-world streaming (engine layer)
+│   ├── world_open.c/h            Sector residency: collision, nav tiles, scatter
+│   ├── world_residency.c/h       Value-aware cardinality planner (submodular proxy)
+│   ├── world_district.c/h        USD district manifest + sector streaming hooks
+│   ├── world_proc.c/h            Procedural region/palette typing per sector cell
+│   └── sector_graph.c/h          k-hop sector grid reachability (CPU + optional GPU BFS)
 ├── server/              Dedicated server
 ├── botlib/              Bot AI (Q3 AAS pathfinding)
 └── external/            Vendored libraries
@@ -145,6 +152,33 @@ The shipping Vulkan renderer is **forward-only** with a layered HDR/post-process
 For goals and longer notes, see [RENDERER_2026_ARCHITECTURE_PASS.md](RENDERER_2026_ARCHITECTURE_PASS.md) and [RENDERERS.md](RENDERERS.md#vulkan-forward-scaffolding).
 
 **Bootstrap game data** (minimal `base/` layout that still satisfies the filesystem): [MINIMAL_GAME_SHELL.md](MINIMAL_GAME_SHELL.md).
+
+## Open world and streaming
+
+View-driven **sector residency** loads collision (optional BSP merge), Detour nav tiles, and billboard scatter per grid cell. Core modules live under `src/world/` and integrate with `cm_stream` (collision overlay), Recast/Detour (`nav/sector_X_Y.nav`), and renderer BSP overlay (`r_bspStream`).
+
+```
+CL_OpenWorld_Frame / SV_OpenWorld_Frame
+    └── WorldOpen_UpdateView
+            ├── r_openWorldResidency 0 → radius disk (r_openWorldRadius)
+            └── r_openWorldResidency 1 → WorldResidency (budget + bounded swaps)
+                    ├── optional SectorGraph k-hop filter (r_graphStreamReach)
+                    ├── CM_Stream_MergeSector (cm_streamMerge)
+                    ├── Nav_LoadSectorTile
+                    └── scatter parse (sprites/sector_X_Y.ents)
+```
+
+| Layer | Guide |
+|-------|-------|
+| Streaming overview | [OPEN_WORLD.md](OPEN_WORLD.md) |
+| Value-aware budgets | [WORLD_RESIDENCY.md](WORLD_RESIDENCY.md) |
+| Sector graph BFS | [GRAPH_COMPUTE.md](GRAPH_COMPUTE.md) |
+| USD districts | [DISTRICTS.md](DISTRICTS.md) |
+| Procedural region typing | [PROC_PATTERNS.md](PROC_PATTERNS.md) |
+
+**MP:** server publishes loaded cells via `CS_ENGINE_OPENWORLD_SECTORS`; clients with `cl_openWorldSync 1` merge authoritative collision. Optional `sv_openWorldResidency 1` plans collision from the union of player origins.
+
+**Client frame hook:** `CL_OpenWorld_Frame` (client) and `SV_OpenWorld_Frame` (dedicated server) run after valid snapshots / player origins are available.
 
 ## Native game modules (VM)
 

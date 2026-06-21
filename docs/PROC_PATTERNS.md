@@ -34,6 +34,8 @@ Alias: `veroni` → `voronoi`, `check` → `checker`, `hexagon` → `hex`, `ring
 
 Align `r_procScale` with `r_openWorldSectorSize` when sampling per-sector cells.
 
+With **`r_openWorldResidencyMatroid 1`** (requires **`r_proc 1`**), the residency planner enforces at most one collision sector per procedural region id — useful for sparse region scatter without loading every cell in a Voronoi cell. See [WORLD_RESIDENCY.md](WORLD_RESIDENCY.md).
+
 ## Console
 
 ```text

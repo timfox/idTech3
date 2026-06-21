@@ -151,7 +151,7 @@ Reload: `script_reload` (requires `USE_LUA=ON`).
 
 ## Open-world streaming
 
-View-driven **sector residency** for infinite maps. Full guide: [OPEN_WORLD.md](OPEN_WORLD.md).
+View-driven **sector residency** for infinite maps. Full guide: [OPEN_WORLD.md](OPEN_WORLD.md). Value-aware budgets: [WORLD_RESIDENCY.md](WORLD_RESIDENCY.md). k-hop graph filter: [GRAPH_COMPUTE.md](GRAPH_COMPUTE.md).
 
 | Asset | Path |
 |-------|------|
@@ -173,7 +173,9 @@ openworld_start
 python3 scripts/tools/gen_sector_bsp.py maps/sector_0_0.bsp --cell-x 0 --cell-y 0 --visual
 ```
 
-**MP sync:** server publishes `CS_ENGINE_OPENWORLD_SECTORS` (`0_0,1_0,...`); clients merge/unload collision from the authoritative list when `cl_openWorldSync 1`.
+**MP sync:** server publishes `CS_ENGINE_OPENWORLD_SECTORS` (`0_0,1_0,...`); clients merge/unload collision from the authoritative list when `cl_openWorldSync 1`. With **`sv_openWorldResidency 1`**, the server plans collision from the union of player origins before publishing.
+
+**Residency + graph (optional):** `r_openWorldResidency 1` enables budgeted layer selection; pair with `r_graphStreamReach 1` to restrict candidates to k-hop reachable cells. Demo defaults keep both off — see `demo_openworld.cfg`.
 
 **Procedural typing:** [PROC_PATTERNS.md](PROC_PATTERNS.md) (`proc_pattern`, `proc_map`, scatter fallbacks).
 
