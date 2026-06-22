@@ -9,6 +9,6 @@ grep -q 'VudaCuda_BindStream' "$ROOT/src/extensions/research/vuda/vuda_cuda.c"
 grep -q 'Vuda_ConsoleInit' "$ROOT/src/qcommon/common.c"
 grep -q 'CUstream_bind' "$ROOT/docs/VUDA.md"
 test -f "$ROOT/tests/unit/test_vuda_model.c"
-test -f "$ROOT/src/renderers/vulkan/vk_vuda.c"
+test -f "$ROOT/src/renderers/vulkan/extensions/scaffold/vk_vuda.c"
 
 echo "test_vuda.sh: ok"

@@ -3,9 +3,9 @@
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 
-grep -q 'R_SQZ_Init' "$ROOT/src/renderers/vulkan/vk_squeezeme.c"
-grep -q 'SQZ_EvalLinearCorrectives' "$ROOT/src/renderers/vulkan/vk_squeezeme.c"
-grep -q 'SQZ_UpsampleGCSNearest' "$ROOT/src/renderers/vulkan/vk_squeezeme.c"
+grep -q 'R_SQZ_Init' "$ROOT/src/renderers/vulkan/extensions/splats/vk_squeezeme.c"
+grep -q 'SQZ_EvalLinearCorrectives' "$ROOT/src/renderers/vulkan/extensions/splats/vk_squeezeme.c"
+grep -q 'SQZ_UpsampleGCSNearest' "$ROOT/src/renderers/vulkan/extensions/splats/vk_squeezeme.c"
 test -f "$ROOT/docs/SQUEEZEME.md"
 test -f "$ROOT/scripts/squeezeme_distill.py"
 test -f "$ROOT/scripts/sqz_pack_demo.py"

@@ -1,0 +1,98 @@
+#version 450
+
+/*
+ * Arc Blanc — sum cascade height grids + pack normalized RGBA for height texture.
+ */
+layout( local_size_x = 8, local_size_y = 8, local_size_z = 1 ) in;
+
+layout( std430, set = 0, binding = 0 ) readonly buffer Cascade0SSBO {
+	float h0[];
+} c0;
+
+layout( std430, set = 0, binding = 1 ) readonly buffer Cascade1SSBO {
+	float h1[];
+} c1;
+
+layout( std430, set = 0, binding = 2 ) readonly buffer Cascade2SSBO {
+	float h2[];
+} c2;
+
+layout( std430, set = 0, binding = 3 ) readonly buffer DispX0SSBO {
+	float dx0[];
+} dx0Buf;
+
+layout( std430, set = 0, binding = 4 ) readonly buffer DispX1SSBO {
+	float dx1[];
+} dx1Buf;
+
+layout( std430, set = 0, binding = 5 ) readonly buffer DispX2SSBO {
+	float dx2[];
+} dx2Buf;
+
+layout( std430, set = 0, binding = 6 ) readonly buffer DispZ0SSBO {
+	float dz0[];
+} dz0Buf;
+
+layout( std430, set = 0, binding = 7 ) readonly buffer DispZ1SSBO {
+	float dz1[];
+} dz1Buf;
+
+layout( std430, set = 0, binding = 8 ) readonly buffer DispZ2SSBO {
+	float dz2[];
+} dz2Buf;
+
+layout( std430, set = 0, binding = 9 ) buffer CombinedHSSBO {
+	float combinedH[];
+} outH;
+
+layout( std430, set = 0, binding = 10 ) buffer CombinedDxSSBO {
+	float combinedDx[];
+} outDx;
+
+layout( std430, set = 0, binding = 11 ) buffer CombinedDzSSBO {
+	float combinedDz[];
+} outDz;
+
+layout( std430, set = 0, binding = 12 ) buffer RgbaSSBO {
+	uint rgba[];
+} outRgba;
+
+layout( push_constant ) uniform Push {
+	uint gridN;
+	float minHeight;
+	float maxHeight;
+	uint packRgba;
+} pc;
+
+void main() {
+	uvec2 gid = gl_GlobalInvocationID.xy;
+	uint n = pc.gridN;
+	uint i;
+	float h;
+	float range;
+	float norm;
+	uint packed;
+
+	if ( gid.x >= n || gid.y >= n ) {
+		return;
+	}
+
+	i = gid.y * n + gid.x;
+	h = c0.h0[i] + c1.h1[i] + c2.h2[i];
+	outH.combinedH[i] = h;
+	outDx.combinedDx[i] = dx0Buf.dx0[i] + dx1Buf.dx1[i] + dx2Buf.dx2[i];
+	outDz.combinedDz[i] = dz0Buf.dz0[i] + dz1Buf.dz1[i] + dz2Buf.dz2[i];
+
+	if ( pc.packRgba != 0u ) {
+		range = pc.maxHeight - pc.minHeight;
+		if ( range < 1.0e-4 ) {
+			range = 1.0;
+		}
+		norm = clamp( ( h - pc.minHeight ) / range, 0.0, 1.0 );
+		packed = uint( norm * 255.0 );
+		packed |= ( packed << 8 );
+		packed |= ( 255u << 16 );
+		packed |= ( 255u << 24 );
+		outRgba.rgba[i] = packed;
+	}
+}

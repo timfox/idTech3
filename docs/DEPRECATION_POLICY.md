@@ -8,15 +8,23 @@ When sources move under `src/extensions/` or renderer subdirs:
 4. **Optional stub** — a `README` at the old path may point to the new location for one release cycle.
 5. **Removal** — delete shims only after two weeks on `main` with no downstream references.
 
-**2026 naming aliases (symlinks, one release):**
+**2026 layout (Phase 5c — canonical physical roots):**
 
-- `samples/` → `examples/` (CMake: `BUILD_SAMPLES_DEMO_GAME`; `BUILD_EXAMPLE_DEMO_GAME` deprecated)
-- `third_party/` → `src/external/` (CMake still uses `src/external/` until Phase 5)
+- `engine/{core,platform}/` — was `src/qcommon`, `src/platform`
+- `runtime/{client,server,game}/` — was `src/client`, `src/server`, `src/game`
+- `modules/{world,navigation,physics,audio}/` — was matching `src/*`
+- `extensions/`, `renderers/`, `third_party/` — was `src/extensions`, `src/renderers`, `src/external`
+- `samples/` → `examples/` (alias unchanged)
+
+**One-release forwarding shims:** `src/qcommon` → `../engine/core`, etc. Remove after two weeks on `main` with no downstream references (target Phase 5d).
+
+CMake path variables: `cmake/IdTech3Layout.cmake` (`IDTECH3_DIR_*`). Test: `test_repository_layout_2026.sh`.
+
+**Phase 5d (MSVC):** manifest export + `scripts/msvc/sync_all_vcxproj.sh` keep `quake3e` / `quake3e-ded` / `botlib` / `vulkan` vcxproj aligned with CMake. `renderer2.vcxproj` / `opengl.vcxproj` deprecated (Vulkan-only shipping). CI: `test_msvc_manifest_drift`.
 
 **Deferred (not yet scheduled):**
 
-- Top-level `engine/`, `runtime/`, `modules/` physical roots
-- Physical `third_party/` move (drop `src/external/` path)
-- MSVC project codegen from CMake (replacing hand-maintained vcxproj lists)
+- Drop `src/*` forwarding shims (after soak on `main`)
+- Full vcxproj regeneration (replace hand-maintained lists entirely)
 
 See `docs/ENGINE_MODULE_MANIFEST.md` and `docs/ROADMAP.md`.

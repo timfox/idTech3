@@ -11,7 +11,7 @@ for f in \
 	src/world/world_residency.h \
 	src/world/world_open.cpp \
 	src/server/sv_openworld.c \
-	src/client/cl_openworld.cpp \
+	src/client/world/cl_openworld.cpp \
 	src/world/world_district.cpp
 do
 	test -f "$f" || { echo "missing $f"; exit 1; }
@@ -29,7 +29,7 @@ rg -q 'sv_openWorldResidency' src/world/world_residency.cpp
 rg -q 'r_openWorldResidencyMatroid' src/world/world_residency.cpp
 rg -q 'WorldResidency_UpdateView' src/world/world_open.cpp
 rg -q 'WorldResidency_UpdateServerOrigins' src/server/sv_openworld.c
-rg -q 'WorldResidency_SetServerCollisionAllowList' src/client/cl_openworld.cpp
+rg -q 'WorldResidency_SetServerCollisionAllowList' src/client/world/cl_openworld.cpp
 rg -q 'WorldResidency_SetDistrictFilter' src/world/world_district.cpp
 rg -q 'world_residency.cpp' CMakeLists.txt
 rg -q 'SectorGraph_IsReachable' src/world/world_residency.cpp

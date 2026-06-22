@@ -371,6 +371,12 @@ compile_shader("comp", "curast/curast_clear.comp", "curast_clear_cs", binding_ex
 compile_shader("comp", "curast/curast_stage1.comp", "curast_stage1_cs", binding_expr="vk.modules.curast_stage1_cs")
 compile_shader("comp", "curast/curast_resolve.comp", "curast_resolve_cs", binding_expr="vk.modules.curast_resolve_cs")
 compile_shader("comp", "graph/graph_bfs_expand.comp", "graph_bfs_expand_cs", binding_expr="vk.modules.graph_bfs_expand_cs")
+compile_shader("comp", "arc_blanc/arc_blanc_htilde.comp", "arc_blanc_htilde_cs", binding_expr="vk.modules.arc_blanc_htilde_cs")
+compile_shader("comp", "arc_blanc/arc_blanc_fft_1d.comp", "arc_blanc_fft_1d_cs", binding_expr="vk.modules.arc_blanc_fft_1d_cs")
+compile_shader("comp", "arc_blanc/arc_blanc_extract.comp", "arc_blanc_extract_cs", binding_expr="vk.modules.arc_blanc_extract_cs")
+compile_shader("comp", "arc_blanc/arc_blanc_combine.comp", "arc_blanc_combine_cs", binding_expr="vk.modules.arc_blanc_combine_cs")
+compile_shader("comp", "arc_blanc/arc_blanc_velocity.comp", "arc_blanc_velocity_cs", binding_expr="vk.modules.arc_blanc_velocity_cs")
+compile_shader("comp", "arc_blanc/arc_blanc_velocity_accum.comp", "arc_blanc_velocity_accum_cs", binding_expr="vk.modules.arc_blanc_velocity_accum_cs")
 compile_shader("comp", "mimir/mimir_clear.comp", "mimir_clear_cs", binding_expr="vk.modules.mimir_clear_cs")
 compile_shader("comp", "mimir/mimir_brownian.comp", "mimir_brownian_cs", binding_expr="vk.modules.mimir_brownian_cs")
 compile_shader("comp", "mimir/mimir_splat.comp", "mimir_splat_cs", binding_expr="vk.modules.mimir_splat_cs")
@@ -430,11 +436,11 @@ compile_shader("comp", "dressi/dressi_composite.comp", "dressi_composite_cs", bi
 compile_shader("comp", "dressi/dressi_inverse_uv.comp", "dressi_inverse_uv_cs", binding_expr="vk.modules.dressi_inverse_uv_cs")
 
 def write_vk_rtx_demo_spirv_inc():
-    """Emit src/renderers/vulkan/vk_rtx_demo_spirv.inc for USE_VULKAN_RTX embedded SPIR-V."""
+    """Emit src/renderers/vulkan/extensions/rtx/vk_rtx_demo_spirv.inc for USE_VULKAN_RTX embedded SPIR-V."""
     root = Path(os.environ.get("PROJECT_ROOT", "")).resolve()
     if not root or not root.is_dir():
         sys.exit("PROJECT_ROOT must be set for rtx demo SPIR-V embed")
-    out_path = root / "src/renderers/vulkan/vk_rtx_demo_spirv.inc"
+    out_path = root / "src/renderers/vulkan/extensions/rtx/vk_rtx_demo_spirv.inc"
     mapping = [
         ("rtx_demo_rgen_spv", "vk_rtx_demo_rgen_spv", "VK_RTX_DEMO_RGEN_SPV_SIZE"),
         ("rtx_demo_rmiss_spv", "vk_rtx_demo_rmiss_spv", "VK_RTX_DEMO_RMISS_SPV_SIZE"),
@@ -463,11 +469,11 @@ def write_vk_rtx_demo_spirv_inc():
 write_vk_rtx_demo_spirv_inc()
 
 def write_vk_grtx_spirv_inc():
-    """Emit src/renderers/vulkan/vk_grtx_spirv.inc for USE_VULKAN_RTX GRTX embedded SPIR-V."""
+    """Emit src/renderers/vulkan/extensions/rtx/vk_grtx_spirv.inc for USE_VULKAN_RTX GRTX embedded SPIR-V."""
     root = Path(os.environ.get("PROJECT_ROOT", "")).resolve()
     if not root or not root.is_dir():
         sys.exit("PROJECT_ROOT must be set for GRTX SPIR-V embed")
-    out_path = root / "src/renderers/vulkan/vk_grtx_spirv.inc"
+    out_path = root / "src/renderers/vulkan/extensions/rtx/vk_grtx_spirv.inc"
     mapping = [
         ("grtx_trace_rgen_spv", "vk_grtx_trace_rgen_spv", "VK_GRTX_TRACE_RGEN_SPV_SIZE"),
         ("grtx_miss_rmiss_spv", "vk_grtx_miss_rmiss_spv", "VK_GRTX_MISS_RMISS_SPV_SIZE"),
@@ -533,11 +539,11 @@ def write_vk_pathtrace_spirv_inc():
 write_vk_pathtrace_spirv_inc()
 
 def write_vk_hybrid1_spirv_inc():
-    """Emit src/renderers/vulkan/vk_hybrid1_spirv.inc for USE_VULKAN_RTX Hybrid Rendering 1."""
+    """Emit src/renderers/vulkan/extensions/rtx/vk_hybrid1_spirv.inc for USE_VULKAN_RTX Hybrid Rendering 1."""
     root = Path(os.environ.get("PROJECT_ROOT", "")).resolve()
     if not root or not root.is_dir():
         sys.exit("PROJECT_ROOT must be set for hybrid1 SPIR-V embed")
-    out_path = root / "src/renderers/vulkan/vk_hybrid1_spirv.inc"
+    out_path = root / "src/renderers/vulkan/extensions/rtx/vk_hybrid1_spirv.inc"
     mapping = [
         ("hybrid1_shadow_rgen_spv", "vk_hybrid1_shadow_rgen_spv", "VK_HYBRID1_SHADOW_RGEN_SPV_SIZE"),
         ("hybrid1_shadow_rmiss_spv", "vk_hybrid1_shadow_rmiss_spv", "VK_HYBRID1_SHADOW_RMISS_SPV_SIZE"),

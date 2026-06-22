@@ -3,8 +3,8 @@
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 
-grep -q 'vk_raygun_record_pass' "$ROOT/src/renderers/vulkan/vk_raygun.c"
-grep -q 'r_raygun_fxaa' "$ROOT/src/renderers/vulkan/vk_raygun.c"
+grep -q 'vk_raygun_record_pass' "$ROOT/src/renderers/vulkan/extensions/rtx/vk_raygun.c"
+grep -q 'r_raygun_fxaa' "$ROOT/src/renderers/vulkan/extensions/rtx/vk_raygun.c"
 grep -q 'raygun/raygun.rgen' "$ROOT/scripts/compile_shaders.sh"
 test -f "$ROOT/docs/RAYGUN.md"
 test -f "$ROOT/src/renderers/vulkan/shaders/glsl/raygun/raygun.rchit"

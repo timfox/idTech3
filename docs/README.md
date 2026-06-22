@@ -43,6 +43,10 @@ Documentation is grouped by **tier**. Most files remain at their historical path
 - [MOD_SDK.md](MOD_SDK.md)
 - [RADIANT.md](RADIANT.md)
 
+## Repository layout (2026)
+
+Top-level symlinks (`engine/`, `runtime/`, `modules/`, `extensions/`, `renderers/`) → canonical `src/*` tree. **Legacy paths under `src/` remain authoritative.** See [core/REPOSITORY_LAYOUT_2026.md](core/REPOSITORY_LAYOUT_2026.md), [core/LEGACY_AND_MODERN.md](core/LEGACY_AND_MODERN.md), and [ENGINE_REORG_PLAN.md](ENGINE_REORG_PLAN.md).
+
 ## Archive
 
-Historical FBO audits and stale roadmaps — see [docs/archive/fbo_investigation.md](archive/fbo_investigation.md); migration rollout: [ENGINE_REORG_PLAN.md](ENGINE_REORG_PLAN.md).
+Historical FBO audits and stale roadmaps — see [docs/archive/fbo_investigation.md](archive/fbo_investigation.md).

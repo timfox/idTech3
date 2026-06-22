@@ -8,8 +8,8 @@ Client-side App CRDT: intercept server commands, apply publish, event queue.
 
 #include "client.h"
 #include "cl_app_crdt.h"
-#include "../qcommon/app_crdt.h"
-#include "../qcommon/lua_debug.h"
+#include "../../qcommon/app_crdt.h"
+#include "../../qcommon/lua_debug.h"
 
 #ifdef USE_LUA
 #include "lua_compat.h"

@@ -11,8 +11,8 @@ Provides Ogg Theora video decoding via libtheora and libogg.
 ===========================================================================
 */
 
-#include "../qcommon/q_shared.h"
-#include "../qcommon/qcommon.h"
+#include "../../qcommon/q_shared.h"
+#include "../../qcommon/qcommon.h"
 #include "cl_cin_modern.h"
 
 #ifdef USE_THEORA

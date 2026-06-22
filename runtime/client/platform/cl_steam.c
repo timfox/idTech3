@@ -16,7 +16,7 @@ API, with fallback to the SteamDeck environment variable.
 #include "client.h"
 #include "cl_steam.h"
 #ifdef USE_STEAM_NETWORKING
-#include "../qcommon/net_sdr.h"
+#include "../../qcommon/net_sdr.h"
 #endif
 
 static cvar_t *in_steamDeck;

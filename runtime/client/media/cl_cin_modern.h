@@ -14,7 +14,7 @@ while maintaining full backward compatibility with ROQ.
 
 #pragma once
 
-#include "../qcommon/q_shared.h"
+#include "../../qcommon/q_shared.h"
 
 #ifdef __cplusplus
 extern "C" {

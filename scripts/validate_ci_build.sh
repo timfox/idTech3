@@ -26,6 +26,16 @@ echo "1. Verifying shader compilation..."
 ./scripts/compile_shaders.sh
 echo ""
 
+echo "1b. MSVC manifest drift (Linux; hand-maintained vcxproj vs CMake)..."
+chmod +x ./tests/scripts/test_msvc_manifest_drift.sh ./tests/scripts/test_msvc_vcxproj_paths_resolve.sh ./tests/scripts/test_msvc_layout_bridge.sh ./tests/scripts/test_msvc_solution.sh
+chmod +x ./scripts/audit_src_shim_references.sh
+./tests/scripts/test_msvc_layout_bridge.sh
+./tests/scripts/test_msvc_manifest_drift.sh
+./tests/scripts/test_msvc_vcxproj_paths_resolve.sh
+./tests/scripts/test_msvc_solution.sh
+./scripts/audit_src_shim_references.sh
+echo ""
+
 echo "2. Building Vulkan (Release)..."
 ./scripts/compile_engine.sh vulkan
 echo ""

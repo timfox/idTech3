@@ -50,9 +50,9 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "cl_download.h"
 #include "cl_demo.h"
 #include "cl_cmds.h"
-#include "../qcommon/script_emit.h"
+#include "../../qcommon/script_emit.h"
 #ifdef USE_LUA
-#include "../qcommon/lua_debug.h"
+#include "../../qcommon/lua_debug.h"
 #include "g_lua_bindings.h"
 #include "cl_app_crdt.h"
 #include "lua_compat.h"

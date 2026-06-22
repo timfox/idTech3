@@ -9,7 +9,7 @@ VoIP pipeline: microphone capture -> Opus encode -> network -> decode -> playbac
 #ifndef CL_VOIP_H
 #define CL_VOIP_H
 
-#include "../qcommon/q_shared.h"
+#include "../../qcommon/q_shared.h"
 
 #define VOIP_SAMPLE_RATE     48000
 #define VOIP_FRAME_SAMPLES   960

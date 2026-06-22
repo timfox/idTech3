@@ -9,7 +9,7 @@ Miscellaneous client console commands (info, fs lists, UI open, etc.).
 #include "client.h"
 #include "cl_cmds.h"
 #include "cl_ref.h"
-#include "../qcommon/script_emit.h"
+#include "../../qcommon/script_emit.h"
 
 #include <string.h>
 

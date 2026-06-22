@@ -351,7 +351,7 @@ elif ! grep -q 'vk_experimental_renderer_stubs.c' "$CMAKE_ROOT" 2>/dev/null; the
   fail "CMakeLists.txt missing vk_experimental_renderer_stubs.c wiring"
 elif ! grep -q 'tr_vector_font_stub.c' "$CMAKE_ROOT" 2>/dev/null; then
   fail "CMakeLists.txt missing tr_vector_font_stub.c wiring"
-elif ! grep -q 'USE_VULKAN_RTX=ON' "$PROJECT_ROOT/src/renderers/vulkan/vk_rtx.c" 2>/dev/null; then
+elif ! grep -q 'USE_VULKAN_RTX=ON' "$PROJECT_ROOT/src/renderers/vulkan/extensions/rtx/vk_rtx.c" 2>/dev/null; then
   fail "vk_rtx.c missing RTX-off stub log"
 elif ! grep -q 'BUILD_FREETYPE=ON' "$PROJECT_ROOT/src/renderers/common/tr_font_stub.c" 2>/dev/null; then
   fail "tr_font_stub.c missing FreeType-off stub log"
@@ -493,7 +493,7 @@ fi
 
 echo ""
 echo "RTX demo: invViewProj uses Vulkan projection + render-target extent:"
-RTX_C="$PROJECT_ROOT/src/renderers/vulkan/vk_rtx.c"
+RTX_C="$PROJECT_ROOT/src/renderers/vulkan/extensions/rtx/vk_rtx.c"
 if [[ ! -f "$RTX_C" ]]; then
   fail "vk_rtx.c missing"
 elif ! grep -q 'vk_get_projection_matrix_vk' "$RTX_C" 2>/dev/null; then
@@ -537,7 +537,7 @@ else
 fi
 
 echo "Hybrid Rendering 1 (Granja/Pereira): vk_hybrid1 + shaders:"
-H1_C="$PROJECT_ROOT/src/renderers/vulkan/vk_hybrid1.c"
+H1_C="$PROJECT_ROOT/src/renderers/vulkan/extensions/rtx/vk_hybrid1.c"
 H1_TEMP="$PROJECT_ROOT/src/renderers/vulkan/shaders/glsl/hybrid1/hybrid1_temporal.comp"
 H1_ATR="$PROJECT_ROOT/src/renderers/vulkan/shaders/glsl/hybrid1/hybrid1_atrous.comp"
 if [[ ! -f "$H1_C" ]]; then

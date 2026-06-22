@@ -7,7 +7,7 @@ Client cvar definitions and registration (split from cl_main.c).
 */
 #pragma once
 
-#include "../qcommon/qcommon.h"
+#include "../../qcommon/qcommon.h"
 
 #ifdef __cplusplus
 extern "C" {

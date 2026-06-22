@@ -1,23 +1,34 @@
-# Vulkan shipping core manifest (Forward+, deferred, BSP, post, fonts, volumetrics).
-# Files remain under src/renderers/vulkan/; AUX_SOURCE_DIRECTORY picks them up.
-# Extension/neural pack is listed in VulkanExtensionSources.cmake and stripped when OFF.
+# Vulkan shipping core manifest (root src/renderers/vulkan/*.c — not extensions/ or inspector/).
+# Extension/neural pack: VulkanExtensionSources.cmake. ImGui inspector: CMakeLists USE_IMGUI block.
+
+idtech3_require_layout()
 
 set(VK_CORE_RENDERER_PATTERNS
-  tr_init.c
-  tr_backend.c
-  tr_bsp.c
-  tr_shade.c
-  tr_surface.c
-  vk_deferred_gbuffer.c
-  vk_forward_plus.c
-  vk_temporal.c
-  vk_vector_font.c
-  vk_nanovdb_decode.c
-  tr_font
-  tr_vector_font
+	tr_init.c
+	tr_backend.c
+	tr_bsp.c
+	tr_shade.c
+	tr_surface.c
+	vk_deferred_gbuffer.c
+	vk_forward_plus.c
+	vk_temporal.c
+	vk_vector_font.c
+	vk_nanovdb_decode.c
+	tr_font
+	tr_vector_font
 )
 
-# Document-only; not used to filter AUX picks (would risk omitting required TU).
+macro(idtech3_init_vulkan_core_sources)
+	idtech3_glob_src_rel(RENDERER_VK_SRCS
+		"src/renderers/vulkan/*.c"
+		"src/renderers/vulkan/*.cpp"
+	)
+	list(FILTER RENDERER_VK_SRCS EXCLUDE REGEX ".*/shaders/spirv/generated/shader_data\\.c$")
+	list(FILTER RENDERER_VK_SRCS EXCLUDE REGEX ".*/shaders/spirv/generated/shader_binding\\.c$")
+	list(FILTER RENDERER_VK_SRCS EXCLUDE REGEX ".*/vk_experimental_renderer_stubs\\.c$")
+endmacro()
+
 function(idtech3_log_vulkan_core_manifest)
-  message(STATUS "Vulkan core manifest: ${VK_CORE_RENDERER_PATTERNS}")
+	list(LENGTH VK_CORE_RENDERER_PATTERNS _vk_core_n)
+	message(STATUS "Vulkan core manifest: ${_vk_core_n} documented pattern groups")
 endfunction()

@@ -8,7 +8,7 @@ Client console for procedural world patterns (Voronoi, grid, hex, ...).
 
 extern "C" {
 #include "client.h"
-#include "../world/world_proc.h"
+#include "../../world/world_proc.h"
 }
 
 static void CL_Proc_Pattern_f( void ) {

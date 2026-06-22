@@ -15,15 +15,20 @@ Ticks all gameplay subsystems each client frame:
 ===========================================================================
 */
 
-#include "../qcommon/q_shared.h"
-#include "../qcommon/qcommon.h"
-#include "../qcommon/cm_public.h"
+#include "../../qcommon/q_shared.h"
+#include "../../qcommon/qcommon.h"
+#include "../../qcommon/cm_public.h"
 #include "cl_gameframe.h"
 #include "cl_district.h"
 #include "cl_openworld.h"
 #ifdef USE_OPEN_WORLD
-#include "../world/world_open.h"
-#include "../world/fog_biology.h"
+#include "../../world/world_open.h"
+#include "../../world/fog_biology.h"
+#endif
+#ifdef USE_ARC_BLANC
+#include "../../world/arc_blanc/arc_blanc.h"
+#include "../../renderers/common/tr_public.h"
+extern refexport_t re;
 #endif
 #include "cl_particles.h"
 #include "cl_map_background.h"
@@ -31,26 +36,29 @@ Ticks all gameplay subsystems each client frame:
 #include "cl_mobilefog.h"
 #include "cl_engine_sprites.h"
 #include "cl_engine_decals.h"
-#include "../physics/phys_bullet.h"
-#include "../physics/phys_procedural_anim.h"
-#include "../physics/phys_middleware.h"
-#include "../physics/phys_cloth.h"
-#include "../navigation/nav_recast.h"
-#include "../game/g_director.h"
-#include "../game/g_response.h"
-#include "../game/g_choreography.h"
-#include "../game/g_facial.h"
-#include "../game/g_horde.h"
-#include "../game/g_dismember.h"
-#include "../game/g_goap.h"
-#include "../game/g_aiml.h"
-#include "../game/g_eda.h"
-#include "../game/g_bt.h"
-#include "../game/g_engine_systems.h"
-#include "../game/g_lua_bindings.h"
+#include "../../physics/phys_bullet.h"
+#include "../../physics/phys_procedural_anim.h"
+#include "../../physics/phys_middleware.h"
+#include "../../physics/phys_cloth.h"
+#include "../../navigation/nav_recast.h"
+#ifdef USE_GAME_AI_MIDDLEWARE
+#include "../../game/g_director.h"
+#include "../../game/g_response.h"
+#include "../../game/g_choreography.h"
+#include "../../game/g_facial.h"
+#include "../../game/g_horde.h"
+#include "../../game/g_dismember.h"
+#include "../../game/g_goap.h"
+#include "../../game/g_aiml.h"
+#include "../../game/g_eda.h"
+#include "../../game/g_bt.h"
+#endif
+#include "../../game/g_engine_systems.h"
+#include "../../game/game_middleware_stubs.h"
+#include "../../game/g_lua_bindings.h"
 #include "client.h"
-#include "../game/ecs.h"
-#include "../audio/snd_music_adaptive.h"
+#include "../../game/ecs.h"
+#include "../../audio/snd_music_adaptive.h"
 
 static qboolean gameSystemsInitialized = qfalse;
 static int activeNavMesh = -1;
@@ -200,8 +208,9 @@ void CL_InitGameSystems(void) {
 	CL_EngineSprites_Init();
 	CL_EngineDecals_Init();
 	Cloth_Init();
-	Director_Init();
 	Music_Init();
+#ifdef USE_GAME_AI_MIDDLEWARE
+	Director_Init();
 	Response_Init();
 	Face_Init();
 	Horde_Init();
@@ -209,18 +218,26 @@ void CL_InitGameSystems(void) {
 	GOAP_Init();
 	EDA_Init();
 	AIML_Init();
+#else
+	GameMiddleware_LogDisabled();
+#endif
 	EngineTelemetry_Init();
 	EngineReplay_Init();
 	EngineSave_Init();
 	EngineQuest_Init();
 	EngineDialogue_Init();
+#ifdef USE_GAME_AI_MIDDLEWARE
 	BT_Init();
+#endif
 	ECS_Init();
 	g_ecsMotion = Cvar_Get( "g_ecsMotion", "1", CVAR_ARCHIVE_ND );
 	Cvar_SetDescription( g_ecsMotion, "When 1, integrate ECS velocity into position each client frame." );
 	MobileFog_Init();
 #ifdef USE_OPEN_WORLD
 	FogBiology_Init();
+#endif
+#ifdef USE_ARC_BLANC
+	ArcBlanc_Init();
 #endif
 	BgMap_Init();
 	WinTitle_Init();
@@ -241,24 +258,31 @@ void CL_ShutdownGameSystems(void) {
 	Nav_Shutdown();
 	Particles_Clear();
 	Cloth_Shutdown();
-	Director_Shutdown();
 	Music_Shutdown();
+#ifdef USE_GAME_AI_MIDDLEWARE
+	Director_Shutdown();
 	Response_Shutdown();
 	Face_Shutdown();
 	Horde_Shutdown();
 	Dismember_Shutdown();
 	GOAP_Shutdown();
+#endif
 	EngineDialogue_Shutdown();
 	EngineQuest_Shutdown();
 	EngineSave_Shutdown();
 	EngineReplay_Shutdown();
 	EngineTelemetry_Shutdown();
+#ifdef USE_GAME_AI_MIDDLEWARE
 	AIML_Shutdown();
 	EDA_Shutdown();
 	BT_Shutdown();
+#endif
 	ECS_Shutdown();
 #ifdef USE_OPEN_WORLD
 	FogBiology_Shutdown();
+#endif
+#ifdef USE_ARC_BLANC
+	ArcBlanc_Shutdown();
 #endif
 	BgMap_Shutdown();
 
@@ -280,6 +304,18 @@ void CL_GameFrame(float frametime) {
 		Phys_DebugDraw();
 		PhysMiddleware_Frame(frametime);
 	}
+
+#ifdef USE_ARC_BLANC
+	ArcBlanc_Frame( frametime );
+	if ( ArcBlanc_Enabled() && re.ArcBlancUploadHeightMap ) {
+		static byte s_arcBlancHeightRGBA[256 * 256 * 4];
+		int abW = 0, abH = 0;
+		ArcBlanc_BuildHeightRGBA( s_arcBlancHeightRGBA, (int)sizeof( s_arcBlancHeightRGBA ), &abW, &abH );
+		if ( abW > 0 && abH > 0 ) {
+			re.ArcBlancUploadHeightMap( s_arcBlancHeightRGBA, abW, abH );
+		}
+	}
+#endif
 
 	CL_District_Frame();
 	CL_OpenWorld_Frame();
@@ -327,11 +363,11 @@ void CL_GameFrame(float frametime) {
 		Particles_Update(timeMs, frametimeMs);
 	}
 
+#ifdef USE_GAME_AI_MIDDLEWARE
 	Director_Update(frametime);
 	Music_Update(Director_GetGlobalIntensity(), frametime);
 
-	/* Director → Horde spawning bridge:
-	   When the director says to spawn, pick a type and feed to the horde system. */
+	/* Director → Horde spawning bridge */
 	{
 		int spawnType = Director_PickSpawnType();
 		if (spawnType >= 0 && Director_ShouldSpawn(spawnType)) {
@@ -341,8 +377,12 @@ void CL_GameFrame(float frametime) {
 				spawnType, Director_GetGlobalIntensity(), (int)Director_GetPhase());
 		}
 	}
+#else
+	Music_Update(0.0f, frametime);
+#endif
 
 	Cloth_SimulateAll(frametime);
+#ifdef USE_GAME_AI_MIDDLEWARE
 	Face_Update(frametime);
 	Dismember_Update(frametime);
 	GOAP_Update(frametime);
@@ -350,15 +390,10 @@ void CL_GameFrame(float frametime) {
 		BT_Update(frametime);
 	Choreo_Update(frametime);
 
-	/* Horde_Update needs actual player position -- game code should
-	   call Horde_Update directly with the real player origin.
-	   This fallback uses origin {0,0,0} which is overridden by
-	   game-side Lua calling Engine.Horde.setTarget(). */
 	if (cl_navEnabled && cl_navEnabled->integer) {
 		vec3_t hordePlayerPos = {0, 0, 0};
 		Horde_Update(frametime, hordePlayerPos);
 
-		/* Submit visible horde agents as spark particles for debug rendering */
 		{
 			int hc = Horde_GetActiveCount();
 			int hi;
@@ -372,11 +407,14 @@ void CL_GameFrame(float frametime) {
 			}
 		}
 	}
+#endif
 
 	BgMap_Frame(frametime);
 	WinTitle_Update(frametime);
 
+#ifdef USE_GAME_AI_MIDDLEWARE
 	EDA_Frame();
+#endif
 
 	{
 		vec3_t fwd = {1,0,0}, right = {0,1,0}, up = {0,0,1}, origin = {0,0,0};

@@ -20,12 +20,12 @@ from pathlib import Path
 root = Path(sys.argv[1])
 
 botlib_files = [
-    root / "src/platform/botlib/be_ai_chat.c",
-    root / "src/platform/win32/botlib/be_ai_chat.c",
+    root / "modules/botlib/be_ai_chat.c",
+    root / "engine/platform/win32/botlib/be_ai_chat.c",
 ]
 precomp_files = [
-    root / "src/platform/botlib/l_precomp.c",
-    root / "src/platform/win32/botlib/l_precomp.c",
+    root / "modules/botlib/l_precomp.c",
+    root / "engine/platform/win32/botlib/l_precomp.c",
 ]
 
 

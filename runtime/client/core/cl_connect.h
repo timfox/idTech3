@@ -8,7 +8,7 @@ Client connection: connect/disconnect, rcon, OOB packets, resend/timeout.
 
 #pragma once
 
-#include "../qcommon/qcommon.h"
+#include "../../qcommon/qcommon.h"
 
 #ifdef __cplusplus
 extern "C" {

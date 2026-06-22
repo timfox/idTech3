@@ -8,7 +8,7 @@ Client pak/map download path (UDP server list + optional cURL).
 
 #pragma once
 
-#include "../qcommon/qcommon.h"
+#include "../../qcommon/qcommon.h"
 
 #ifdef __cplusplus
 extern "C" {

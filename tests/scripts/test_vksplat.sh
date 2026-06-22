@@ -4,7 +4,7 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 
 grep -q 'VKSplat_ModelBenchmark' "$ROOT/src/extensions/research/vksplat/vksplat_model.c"
-grep -q 'vksplat_train_step' "$ROOT/src/renderers/vulkan/vk_vksplat.c"
+grep -q 'vksplat_train_step' "$ROOT/src/renderers/vulkan/extensions/splats/vk_vksplat.c"
 grep -q 'vksplat_project_fwd.comp' "$ROOT/scripts/compile_shaders.sh"
 grep -q 'Vksplat_ConsoleInit' "$ROOT/src/qcommon/common.c"
 test -f "$ROOT/docs/VKSPLAT.md"

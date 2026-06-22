@@ -2,15 +2,18 @@
 
 [![build](../../workflows/build/badge.svg)](../../actions?query=workflow%3Abuild) [![License: GPL v2](https://img.shields.io/badge/License-GPL%20v2-blue.svg)](LICENSE.md) [![Stars](https://img.shields.io/github/stars/timfox/idTech3?style=social)](https://github.com/timfox/idTech3) [![Forks](https://img.shields.io/github/forks/timfox/idTech3?style=social)](https://github.com/timfox/idTech3/forks)
 
-Modern id Tech 3: **Vulkan renderer with PBR**, validation and smoke-tested builds, and disciplined cross-platform engine work. Everything below extends that core.
+Modern id Tech 3: **Vulkan renderer with PBR**, validation and smoke-tested builds, and disciplined cross-platform engine work. **Retail Q3 / OpenArena-style QVM mods keep working** — build profiles and 2026 folder aliases are compile-time diet only; use `full` or `-DUSE_*=ON` for kitchen-sink parity. See [docs/core/LEGACY_AND_MODERN.md](docs/core/LEGACY_AND_MODERN.md).
 
 *This repository does not contain any game content from Quake III Arena.*
 
 ### Engine pillars
 
-1. **Renderer** - Vulkan 1.x path with PBR, froxel volumetrics, SSAO, MSAA/SMAA, spherical harmonics lighting, SDF HUD text.
-2. **Tooling** - GPU detection, validation layers, performance HUD, safe mode, CI matrix builds, smoke tests and shader validation in the build. **[FreeUSD](docs/FREEUSD.md)** Git submodule (`src/external/FreeUSD`, default ON) for USDA import and `usd_*` tools. Optional **[Tiled Map Editor](docs/TILED.md)** submodule (`tools/tiled`, GPL-2.0) for tile-based level design—not linked into the engine build.
-3. **Platform** - Linux, Windows, macOS, Android; IPv4/IPv6 networking, modern codecs and asset loaders.
+1. **Compatibility first** — QVM + native modules, classic `.pk3` / cvar / trap surface ([COMPATIBILITY.md](docs/COMPATIBILITY.md)); `./scripts/q3_openarena_compat_check.sh` on **`core`** builds.
+2. **Renderer** - Vulkan 1.x path with PBR, froxel volumetrics, SSAO, MSAA/SMAA, spherical harmonics lighting, SDF HUD text.
+3. **Tooling** - GPU detection, validation layers, performance HUD, safe mode, CI matrix builds, smoke tests and shader validation in the build. **[FreeUSD](docs/FREEUSD.md)** Git submodule (`src/external/FreeUSD`, default ON) for USDA import and `usd_*` tools. Optional **[Tiled Map Editor](docs/TILED.md)** submodule (`tools/tiled`, GPL-2.0) for tile-based level design—not linked into the engine build.
+4. **Platform** - Linux, Windows, macOS, Android; IPv4/IPv6 networking, modern codecs and asset loaders.
+
+**Build profiles (2026):** default **`game`** = modern SP stack with faster compiles; **`core`** = Q3/OA CI path; **`full`** = all extensions. Details: [BUILD.md](BUILD.md), [docs/core/LEGACY_AND_MODERN.md](docs/core/LEGACY_AND_MODERN.md).
 
 ### Features (by area)
 

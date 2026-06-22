@@ -22,15 +22,15 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 // cl_cgame.c  -- client system interaction with client game
 
 #include "client.h"
-#include "../physics/phys_bullet.h"
-#include "../qcommon/script_emit.h"
+#include "../../physics/phys_bullet.h"
+#include "../../qcommon/script_emit.h"
 
-#include "../botlib/botlib.h"
-#include "../game/g_entity_bridge.h"
+#include "../../botlib/botlib.h"
+#include "../../game/g_entity_bridge.h"
 #include "cl_engine_sprites.h"
 #include "cl_engine_decals.h"
 #include "cl_openworld.h"
-#include "../game/bg_public.h"
+#include "../../game/bg_public.h"
 
 extern	botlib_export_t	*botlib_export;
 

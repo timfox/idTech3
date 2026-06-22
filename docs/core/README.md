@@ -11,4 +11,5 @@ Engine foundation, build, compatibility, and repository layout.
 | [ENGINE_MODULE_MANIFEST.md](../ENGINE_MODULE_MANIFEST.md) | Source tiers + CMake gates |
 | [ENGINE_REORG_PLAN.md](../ENGINE_REORG_PLAN.md) | 2026 reorganization rollout |
 | [REPOSITORY_LAYOUT_2026.md](REPOSITORY_LAYOUT_2026.md) | Target AAA folder map |
+| [LEGACY_AND_MODERN.md](LEGACY_AND_MODERN.md) | Compatibility + performance contract |
 | [DEPRECATION_POLICY.md](../DEPRECATION_POLICY.md) | Move shims |

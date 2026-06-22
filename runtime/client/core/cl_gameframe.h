@@ -18,7 +18,7 @@ animation, navigation, and particles.
 extern "C" {
 #endif
 
-#include "../qcommon/q_shared.h"
+#include "../../qcommon/q_shared.h"
 
 void CL_InitGameSystems(void);
 void CL_ShutdownGameSystems(void);

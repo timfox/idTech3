@@ -18,12 +18,12 @@ check "$ROOT/CMakeLists.txt" 'USE_EXPERIMENTAL_RENDERERS' 'CMake USE_EXPERIMENTA
 check "$ROOT/CMakeLists.txt" 'vk_experimental_renderer_stubs.c' 'experimental stub source wiring'
 check "$ROOT/CMakeLists.txt" 'tr_vector_font_stub.c' 'vector font stub wiring'
 check "$ROOT/src/renderers/vulkan/vk_experimental_renderer_stubs.c" 'USE_EXPERIMENTAL_RENDERERS' 'experimental stub guard'
-check "$ROOT/src/renderers/vulkan/vk_rtx.c" 'USE_VULKAN_RTX=ON' 'RTX off stub log'
-check "$ROOT/src/renderers/vulkan/vk_hybrid1.c" 'USE_VULKAN_RTX=ON' 'Hybrid1 off stub log'
-check "$ROOT/src/renderers/vulkan/vk_pathtrace.c" 'USE_VULKAN_RTX=ON' 'PathTrace off stub log'
+check "$ROOT/src/renderers/vulkan/extensions/rtx/vk_rtx.c" 'USE_VULKAN_RTX=ON' 'RTX off stub log'
+check "$ROOT/src/renderers/vulkan/extensions/rtx/vk_hybrid1.c" 'USE_VULKAN_RTX=ON' 'Hybrid1 off stub log'
+check "$ROOT/src/renderers/vulkan/extensions/rtx/vk_pathtrace.c" 'USE_VULKAN_RTX=ON' 'PathTrace off stub log'
 check "$ROOT/src/renderers/common/tr_font_stub.c" 'BUILD_FREETYPE=ON' 'FreeType off font stub log'
 check "$ROOT/src/renderers/common/tr_vector_font_stub.c" 'BUILD_FREETYPE' 'vector font stub guard'
-check "$ROOT/src/client/cl_steam.c" '#else /\* !USE_STEAM \*/' 'Steam off stub branch'
+check "$ROOT/src/client/platform/cl_steam.c" '#else /\* !USE_STEAM \*/' 'Steam off stub branch'
 
 if [[ $failures -ne 0 ]]; then
   echo "$failures check(s) failed"

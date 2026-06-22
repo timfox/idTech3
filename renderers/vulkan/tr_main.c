@@ -23,6 +23,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 #include "tr_local.h"
 #include "tr_bsp_stream.h"
+#include "extensions/scaffold/vk_arc_blanc.h"
 
 #include <string.h> // memcpy
 
@@ -1765,6 +1766,7 @@ static void R_GenerateDrawSurfs( void ) {
 	R_AddWorldSurfaces ();
 
 	R_BspStream_AddSurfaces();
+	R_ArcBlanc_AddSurfaces();
 
 	R_AddPolygonSurfaces();
 

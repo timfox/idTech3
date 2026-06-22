@@ -8,7 +8,7 @@ Renderer plugin load, GLimp cvars, video mode list, and vid_restart path.
 
 #pragma once
 
-#include "../qcommon/qcommon.h"
+#include "../../qcommon/qcommon.h"
 
 #ifdef __cplusplus
 extern "C" {

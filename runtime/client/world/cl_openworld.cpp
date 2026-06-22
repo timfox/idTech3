@@ -9,14 +9,14 @@ Client open-world bridge: per-chunk nav tiles + billboard scatter residency.
 extern "C" {
 #include "client.h"
 #include "cl_engine_sprites.h"
-#include "../world/world_open.h"
-#include "../world/world_proc.h"
-#include "../world/world_residency.h"
-#include "../navigation/nav_recast.h"
-#include "../qcommon/engine_sprite_map.h"
-#include "../qcommon/cm_stream.h"
-#include "../qcommon/cm_public.h"
-#include "../qcommon/cluster_graph.h"
+#include "../../world/world_open.h"
+#include "../../world/world_proc.h"
+#include "../../world/world_residency.h"
+#include "../../navigation/nav_recast.h"
+#include "../../qcommon/engine_sprite_map.h"
+#include "../../qcommon/cm_stream.h"
+#include "../../qcommon/cm_public.h"
+#include "../../qcommon/cluster_graph.h"
 }
 
 #include <cstring>

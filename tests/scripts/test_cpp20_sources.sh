@@ -52,11 +52,13 @@ WORLD_QCOMMON=(
 	world_proc
 )
 for mod in "${WORLD_QCOMMON[@]}"; do
-	rg -q "src/world/${mod}\\.cpp" "$QC_EXT" \
-		|| fail "open-world macro must list src/world/${mod}.cpp"
+	rg -q "(${mod}\\.cpp|world/${mod}\\.cpp)" "$QC_EXT" \
+		|| fail "open-world macro must list ${mod}.cpp"
 done
-rg -q 'src/qcommon/cluster_graph\.cpp' "$QC_EXT" \
-	|| fail "open-world macro must list src/qcommon/cluster_graph.cpp"
+QC_CORE="${ROOT}/cmake/EngineQcommonSources.cmake"
+rg -q 'src/qcommon/\*\.cpp' "$QC_CORE" \
+	|| fail "EngineQcommonSources must glob src/qcommon/*.cpp (includes cluster_graph.cpp)"
+[ -f "${ROOT}/src/qcommon/cluster_graph.cpp" ] || fail "missing cluster_graph.cpp"
 ok "open-world qcommon modules are .cpp in IdTech3QcommonExtensions.cmake"
 
 echo "[test_cpp20_sources] checking migrated .cpp sources..."

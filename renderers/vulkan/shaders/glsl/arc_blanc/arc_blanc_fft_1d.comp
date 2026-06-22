@@ -1,0 +1,73 @@
+#version 450
+
+/*
+ * Arc Blanc — in-place radix-2 inverse FFT along one row or column (shared memory).
+ */
+layout( local_size_x = 256, local_size_y = 1, local_size_z = 1 ) in;
+
+layout( std430, set = 0, binding = 0 ) buffer GridSSBO {
+	vec2 grid[];
+} g;
+
+layout( push_constant ) uniform Push {
+	uint gridN;
+	uint lineIndex;
+	uint colPass;
+} pc;
+
+shared vec2 smem[256];
+
+const float PI = 3.141592653589793;
+
+vec2 cmul( vec2 a, vec2 b ) {
+	return vec2( a.x * b.x - a.y * b.y, a.x * b.y + a.y * b.x );
+}
+
+void main() {
+	uint n = pc.gridN;
+	uint t = gl_LocalInvocationID.x;
+	uint baseIdx;
+	uint L;
+	uint k;
+	float theta;
+	uint i;
+	uint j;
+	float angle;
+	vec2 wp;
+	vec2 U;
+	vec2 T;
+
+	if ( t >= n ) {
+		return;
+	}
+
+	if ( pc.colPass == 0u ) {
+		baseIdx = pc.lineIndex * n + t;
+	} else {
+		baseIdx = t * n + pc.lineIndex;
+	}
+
+	smem[t] = g.grid[baseIdx];
+	barrier();
+
+	for ( L = 2u; L <= n; L <<= 1u ) {
+		k = L >> 1u;
+		theta = 2.0 * PI / float( L );
+		if ( t < ( n >> 1u ) ) {
+			i = ( t / k ) * L + ( t % k );
+			j = i + k;
+			angle = theta * float( t % k );
+			wp = vec2( cos( angle ), sin( angle ) );
+			T = cmul( wp, smem[j] );
+			U = smem[i];
+			smem[i] = U + T;
+			smem[j] = U - T;
+		}
+		barrier();
+	}
+
+	{
+		float invN = 1.0 / float( n );
+		g.grid[baseIdx] = smem[t] * invN;
+	}
+}

@@ -35,6 +35,8 @@ ASAN=0
 LTO=0
 QUIET=0
 SKIP_SHADERS=0
+RUN_MSVC_SYNC=0
+MSVC_SYNC_ONLY=0
 MAC_APP=0
 MAC_APP_TARGET=""
 MAC_APP_ARCH=""
@@ -66,6 +68,12 @@ else
 fi
 
 RELEASE_DIR="$PROJECT_ROOT/release"
+
+# Phase 5c: cross-domain include symlinks (idempotent; safe before cmake).
+if [[ -x "${PROJECT_ROOT}/scripts/layout_forwarding_symlinks.sh" ]] \
+	&& [[ -f "${PROJECT_ROOT}/engine/core/common.c" ]]; then
+	"${PROJECT_ROOT}/scripts/layout_forwarding_symlinks.sh"
+fi
 
 IDTECH3_PROFILE="game"
 
@@ -99,6 +107,15 @@ while [[ $# -gt 0 ]]; do
       ;;
     skipshaders|skip-shaders|skip_shaders)
       SKIP_SHADERS=1
+      shift
+      ;;
+    msvc|msvc-sync|sync-msvc)
+      RUN_MSVC_SYNC=1
+      shift
+      ;;
+    msvc-only|sync-msvc-only)
+      RUN_MSVC_SYNC=1
+      MSVC_SYNC_ONLY=1
       shift
       ;;
     demo|demo-game|demo-pk3|with-demo)
@@ -243,6 +260,15 @@ done
 # Default to Vulkan if neither specified
 if [ "$VULKAN" -eq 0 ]; then
   VULKAN=1
+fi
+
+if [ "$RUN_MSVC_SYNC" -eq 1 ]; then
+  echo "Syncing MSVC vcxproj from CMake manifest..."
+  "${PROJECT_ROOT}/scripts/msvc/sync_all_vcxproj.sh"
+  if [ "$MSVC_SYNC_ONLY" -eq 1 ]; then
+    echo "MSVC sync complete (msvc-only)."
+    exit 0
+  fi
 fi
 
 BUILD_DIR="$PROJECT_ROOT/build-vk-${BUILD_TYPE}"
