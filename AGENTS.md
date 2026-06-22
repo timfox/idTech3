@@ -6,13 +6,17 @@
 
 This is an **idTech3 engine fork**
 
+### Repository layout (Phase 5c)
+
+Canonical sources: **`engine/core/`** (qcommon), **`runtime/client/`**, **`modules/world/`**, **`extensions/`**, **`renderers/`**, **`third_party/`**. One-release **`src/*` shims** forward to those roots for legacy CMake globs. Cross-domain `#include` paths need **`scripts/layout_forwarding_symlinks.sh`** (run automatically from **`cmake`** configure and **`compile_engine.sh`**). See **`docs/core/REPOSITORY_LAYOUT_2026.md`**, **`docs/ENGINE_REORG_PLAN.md`**.
+
 ### Client modularization (in progress)
 
-`cl_main.c` is slim glue (~240 LOC): globals, reliable commands, `CL_Init`. Satellite modules: `cl_lifecycle.c` (shutdown/memory/map), `cl_frame.c` (`CL_Frame`), `cl_cvars.c`, plus earlier splits `cl_connect`, `cl_cmds`, `cl_demo`, `cl_download`, `cl_ref`, `cl_gameframe`. Wiring test: `tests/scripts/test_client_modular.sh`. Renderer splits (`tr_bsp.c`, shader init) are **not** started. - a C/C++ game engine based on Quake III Arena with Vulkan 1.4 + RTX rendering, PBR, audio codecs (Opus/FLAC/WebM/MP3), Lua/Duktape/Python scripting, and ImGui debug UI (optional **Studio** session + command strips via `r_studio_tools`; see `docs/IN_ENGINE_STUDIO_TOOLS.md`). It produces a client (`idtech3`), dedicated server (`idtech3_server`), and the Vulkan renderer plugin (`idtech3_vulkan.so`).
+`runtime/client/core/cl_main.c` is slim glue (~240 LOC): globals, reliable commands, `CL_Init`. Domain folders: `core/` (frame, lifecycle, connect), `world/` (open world, districts), `media/` (demo, download), `platform/` (curl, voip). Wiring: `test_client_modular.sh`, `test_client_domains.sh`. Renderer splits (`tr_bsp.c`, shader init) are **not** started. - a C/C++ game engine based on Quake III Arena with Vulkan 1.4 + RTX rendering, PBR, audio codecs (Opus/FLAC/WebM/MP3), Lua/Duktape/Python scripting, and ImGui debug UI (optional **Studio** session + command strips via `r_studio_tools`; see `docs/IN_ENGINE_STUDIO_TOOLS.md`). It produces a client (`idtech3`), dedicated server (`idtech3_server`), and the Vulkan renderer plugin (`idtech3_vulkan.so`).
 
 ### Building
 
-See `CLAUDE.md` for canonical build commands. The primary build script is `./scripts/compile_engine.sh`. **Build profiles** (`IDTECH3_PROFILE`, default **`game`**): `core` | `game` | `full` | `research` — see **`docs/ENGINE_MODULE_MANIFEST.md`**.
+See `CLAUDE.md` for canonical build commands. The primary build script is `./scripts/compile_engine.sh`. **Build profiles** (`IDTECH3_PROFILE`, default **`game`**): `core` | `game` | `full` | `research` — see **`docs/ENGINE_MODULE_MANIFEST.md`**. **Legacy contract:** profiles compile less by default; QVM/pk3/traps unchanged — **`docs/core/LEGACY_AND_MODERN.md`**, **`tests/scripts/test_legacy_intact.sh`**, **`./scripts/q3_openarena_compat_check.sh`** on **`core`** builds.
 
 ```
 ./scripts/compile_engine.sh vulkan          # game profile (default), Release
@@ -26,7 +30,7 @@ See `CLAUDE.md` for canonical build commands. The primary build script is `./scr
 
 Build artifacts go to `build-vk-Release/` and are copied to `release/`.
 
-**Repository layout (2026):** [docs/core/REPOSITORY_LAYOUT_2026.md](docs/core/REPOSITORY_LAYOUT_2026.md) — `src/extensions/`, `samples/`, `third_party/` symlinks, profile matrix in [BUILD.md](BUILD.md). Feature docs: [docs/README.md](docs/README.md) tier hubs (not duplicated below).
+**Repository layout (2026):** [docs/core/REPOSITORY_LAYOUT_2026.md](docs/core/REPOSITORY_LAYOUT_2026.md) — physical roots `engine/`, `runtime/`, `modules/`, etc.; **`src/*` forwarding shims** until Phase 5e ([SHIM_REMOVAL_CHECKLIST.md](docs/core/SHIM_REMOVAL_CHECKLIST.md)). **Windows MSVC:** `engine/platform/win32/msvc2017/` — Vulkan-only solution; manifest sync via `./scripts/msvc/sync_all_vcxproj.sh` or `./scripts/compile_engine.sh msvc-only`; audit `./scripts/audit_src_shim_references.sh`. See [docs/MSVC_CODEGEN.md](docs/MSVC_CODEGEN.md). CMake `IDTECH3_DIR_*` in `cmake/IdTech3Layout.cmake`. Profile matrix: [BUILD.md](BUILD.md). Feature docs: [docs/README.md](docs/README.md).
 
 ### Gotchas
 
@@ -42,6 +46,7 @@ Build artifacts go to `build-vk-Release/` and are copied to `release/`.
 - **TRELLIS.2 (image-to-3D)**: Runtime pipeline mirroring FLUX: **`trellis_generate`** (async default), **`trellis_status`** / **`trellis_cancel`**, **`trellis_view`**, **`trellis_from_prompt`** (FLUX→TRELLIS chain). Set **`cl_trellis_enable` 1** and **`cl_trellis_repo`** (see **`docs/TRELLIS.md`**). Requires Linux + NVIDIA GPU (24GB+); Python/CUDA runs out-of-process like external FLUX.
 - **Genetic GAN (procedural body evolution)**: In-engine genome slots (**`genome_create`**, **`genome_breed`**, **`genome_mutate`**) + optional async GAN decode (**`genome_generate`**, **`genome_view`**) via engine **job pool** + **`Defer_Add`** main-thread import. Queue depth 8; **`cl_mlSerial`** / **`cl_mlUseJobs`**. Set **`cl_geneticGan` 1**; Lua **`Engine.Genome.*`**; see **`docs/GENETIC_GAN.md`**.
 - **VDB volumetric fog (Vulkan)**: **`r_vdb` 1** (default) loads `.nvdb` (NanoVDB leaf/blind CPU decode → GPU 3D texture); console **`vdb_load`**, **`vdb_upload`**, **`vdb_bind_fog`**, **`vdb_list`**, **`vdb_rebuild_majorant`**. Typical path: `vdb_load path/to/grid.nvdb` → `vdb_upload 0` → `vdb_bind_fog 0` → `r_volumetricFog 1` + **`r_vdbFog 1`**. **`r_volumetricFogIntegration 3`** + **`r_vdbMajorantBrick`** enable OpenVDB majorant grid + Woodcock/delta tracking (arXiv:2211.09997-style, real-time). See **`docs/VDB_WOODCOCK_VOLUMETRICS.md`**. Unit test: **`unit_nanovdb_decode`**. Lua: `VDB.load` / `bindAsFog` in game module when enabled.
+- **Arc Blanc ocean (Algis et al. 2025)**: **`r_arcBlanc` 0** (default). Tessendorf FFT + JONSWAP/Donelan-Banner cascades (`h̃₀(-k)` symmetry), depth velocity (eq. 22), ITTC density buoyancy/drag, FDM wakes with waterline mask + grid bake into **`combinedHeight`** (**`r_arcBlancWake` 1**); CPU Hermitian paired IFFTs; **`r_arcBlancDraw` 1** tessellated mesh + height texture; **`r_arcBlancGpu` 1** Vulkan FFT + readback; **`r_arcBlancGpuVelocity` 1** GPU velocity slices. Build: **`USE_ARC_BLANC=ON`** or **`IDTECH3_PROFILE=full`**. Lua **`Engine.ArcBlanc`**. Console **`arc_blanc_status`**, **`arc_blanc_sample`**. Demo: **`exec demo_arc_blanc.cfg`**. See **`docs/ARC_BLANC.md`**.
 - **Fog bioaerosol ecology (Evans et al. 2019)**: **`r_fogBiology` 0** (default). Demo **`demo_fog_biology.cfg`** (Maine ~30 m) / **`demo_fog_biology_namib.cfg`** (50 km) / **`demo_fog_biology_openworld.cfg`**; console **`fog_biology_paper`**, **`fog_biology_genera`**, **`fog_biology_poll`**, **`fog_biology_sweep`**; optional **`r_fogBiologyCoastAuto 1`**; Lua **`Engine.FogBiology.poll()`**; ImGui reads **`r_fogBiologySync*`** mirrors. SRA **SRP155760** (not reproduced in-engine). See **`docs/FOG_BIOLOGY.md`**.
 - **Physics middleware (Bullet substrate + Euphoria/DMM layers)**: **`phys_enabled` 1**, **`cl_physicsEnabled` 1**; **`phys_debugDraw` 1** → Vulkan wireframe; **`phys_status`**; event bus, gameplay materials, active ragdoll motors, ProcAnim tick in **`PhysMiddleware_Frame`**. See **`docs/PHYSICS.md`**.
 - **Neural Dynamic GI (Vulkan, experimental)**: **`r_ndgi` 1** (latched) blends temporal baked-GI states from a neural feature atlas into merged BSP lightmaps (day/night, weather); **`r_ndgi_cycle`**, manifest **`ndgi/<map>.ndgi`**, commands **`ndgi_reload`** / **`ndgi_status`**. See **`docs/NEURAL_DYNAMIC_GI.md`**.
@@ -76,7 +81,7 @@ Build artifacts go to `build-vk-Release/` and are copied to `release/`.
 - **Sector BSP fixtures**: **`python3 scripts/tools/gen_sector_bsp.py maps/sector_0_0.bsp`** — minimal collision overlay for **`cm_streamMerge`**. **`ctest -R test_cm_stream_merge`**.
 - **Nav sector bake**: **`nav_bake_sector 0 0`** / **`nav_bake_view`** — Recast tile from sector BSP → **`nav/sector_X_Y.nav`**. Server collision residency: **`sv_openWorld 1`**. **`ctest -R test_nav_bake`**.
 - **MP sector sync**: **`sv_openWorldSync` 1** → **`CS_ENGINE_OPENWORLD_SECTORS`**; client **`cl_openWorldSync` 1**. Visual overlay: **`r_bspStream` 1**. **`ctest -R test_openworld_sync`**; full stream path: **`ctest -L sector_stream`** or **`make test-sector-stream`** (from build dir).
-- **Research modules (Python + C console)**: **RadiusFPS** (`cl_radiusfps_*`, `src/extensions/research/radiusfps/`); **x3DPRA**, **GCC-FER**, **DaX** under `src/extensions/research/` — see respective docs.
+- **Research modules (Python + C console)**: **RadiusFPS** (`cl_radiusfps_*`, `src/extensions/research/radiusfps/`); **x3DPRA**, **GCC-FER**, **DaX**, **DK-QSD** (`cl_dk_qsd_enable`, bond-DP Domany–Kinzel QSD; `docs/DK_QSD.md`), **DLM** (`cl_dlm_enable`, Fink deep-layered Boolean machines; `docs/DLM.md`, `unit_dlm`, `test_dlm.sh`), **SFCA** (`cl_sfca_enable`, Shi & Huang separable-field CA; `docs/SFCA.md`, `unit_sfca`, `test_sfca.sh`) under `extensions/research/`.
 
 ### Linting / Static Analysis
 

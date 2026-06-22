@@ -266,6 +266,7 @@ jobs:
             exit /b 1
           )
 
+          set MSVC_ROOT=engine\platform\win32\msvc2017
           set MSBUILD_COMMON=/m ^
             /p:Configuration=${{ matrix.btype }} ^
             /p:Platform=${{ matrix.platform }} ^
@@ -273,63 +274,42 @@ jobs:
             /p:TreatWarningsAsErrors=false
 
           rem --- Dedicated server (TargetName is idtech3_server in vcxproj; do not pass /p:TargetName - it poisons ProjectReference builds like zlib) ---
-          msbuild src\platform\win32\msvc2017\quake3e-ded.vcxproj ^
+          msbuild %MSVC_ROOT%\quake3e-ded.vcxproj ^
             %MSBUILD_COMMON%
           if errorlevel 1 exit /b 1
-          if not exist src\platform\win32\msvc2017\output\${{ matrix.msvc_out_ded }} (
+          if not exist %MSVC_ROOT%\output\${{ matrix.msvc_out_ded }} (
             echo ERROR: missing output\${{ matrix.msvc_out_ded }} after ded build
-            dir /b src\platform\win32\msvc2017\output 2>nul
+            dir /b %MSVC_ROOT%\output 2>nul
             exit /b 1
           )
-          copy /Y src\platform\win32\msvc2017\output\${{ matrix.msvc_out_ded }} bin\idtech3_server${{ matrix.suffix }}.exe
+          copy /Y %MSVC_ROOT%\output\${{ matrix.msvc_out_ded }} bin\idtech3_server${{ matrix.suffix }}.exe
           if errorlevel 1 exit /b 1
-          msbuild src\platform\win32\msvc2017\quake3e-ded.vcxproj ^
+          msbuild %MSVC_ROOT%\quake3e-ded.vcxproj ^
             %MSBUILD_COMMON% ^
             /t:Clean
 
-          rem --- OpenGL renderer + client ---
-          msbuild src\platform\win32\msvc2017\opengl.vcxproj ^
+          rem --- Vulkan renderer + client (shipping backend; OpenGL/opengl.vcxproj removed) ---
+          msbuild %MSVC_ROOT%\vulkan.vcxproj ^
             %MSBUILD_COMMON%
           if errorlevel 1 exit /b 1
-          msbuild src\platform\win32\msvc2017\quake3e.vcxproj ^
+          msbuild %MSVC_ROOT%\quake3e.vcxproj ^
             %MSBUILD_COMMON% ^
             /p:UseWasapi=0
           if errorlevel 1 exit /b 1
-          if not exist src\platform\win32\msvc2017\output\${{ matrix.msvc_out_cli }} (
-            echo ERROR: missing output\${{ matrix.msvc_out_cli }} after OpenGL client build
-            dir /b src\platform\win32\msvc2017\output 2>nul
-            exit /b 1
-          )
-          copy /Y src\platform\win32\msvc2017\output\${{ matrix.msvc_out_cli }} bin\idtech3${{ matrix.suffix }}.exe
-          if errorlevel 1 exit /b 1
-          msbuild src\platform\win32\msvc2017\quake3e.vcxproj ^
-            %MSBUILD_COMMON% ^
-            /t:Clean ^
-            /p:UseWasapi=0
-          msbuild src\platform\win32\msvc2017\opengl.vcxproj ^
-            %MSBUILD_COMMON% ^
-            /t:Clean
-
-          rem --- Vulkan renderer + client ---
-          msbuild src\platform\win32\msvc2017\vulkan.vcxproj ^
-            %MSBUILD_COMMON%
-          if errorlevel 1 exit /b 1
-          msbuild src\platform\win32\msvc2017\quake3e.vcxproj ^
-            %MSBUILD_COMMON% ^
-            /p:UseWasapi=0
-          if errorlevel 1 exit /b 1
-          if not exist src\platform\win32\msvc2017\output\${{ matrix.msvc_out_cli }} (
+          if not exist %MSVC_ROOT%\output\${{ matrix.msvc_out_cli }} (
             echo ERROR: missing output\${{ matrix.msvc_out_cli }} after Vulkan client build
-            dir /b src\platform\win32\msvc2017\output 2>nul
+            dir /b %MSVC_ROOT%\output 2>nul
             exit /b 1
           )
-          copy /Y src\platform\win32\msvc2017\output\${{ matrix.msvc_out_cli }} bin\idtech3-vulkan${{ matrix.suffix }}.exe
+          copy /Y %MSVC_ROOT%\output\${{ matrix.msvc_out_cli }} bin\idtech3${{ matrix.suffix }}.exe
           if errorlevel 1 exit /b 1
-          msbuild src\platform\win32\msvc2017\quake3e.vcxproj ^
+          copy /Y %MSVC_ROOT%\output\${{ matrix.msvc_out_cli }} bin\idtech3-vulkan${{ matrix.suffix }}.exe
+          if errorlevel 1 exit /b 1
+          msbuild %MSVC_ROOT%\quake3e.vcxproj ^
             %MSBUILD_COMMON% ^
             /t:Clean ^
             /p:UseWasapi=0
-          msbuild src\platform\win32\msvc2017\vulkan.vcxproj ^
+          msbuild %MSVC_ROOT%\vulkan.vcxproj ^
             %MSBUILD_COMMON% ^
             /t:Clean
 
@@ -346,7 +326,7 @@ jobs:
         run: |
           $root = $env:GITHUB_WORKSPACE
           $bin = Join-Path $root 'bin'
-          $out = Join-Path $root 'src/platform/win32/msvc2017/output'
+          $out = Join-Path $root 'engine/platform/win32/msvc2017/output'
           $sfx = '${{ matrix.suffix }}'
 
           Write-Host "PWD: $(Get-Location)"
@@ -388,7 +368,7 @@ jobs:
 
           if ($missing.Count -gt 0) {
             Write-Host "`nSearch idtech3*.exe under msvc2017:"
-            Get-ChildItem -Path (Join-Path $root 'src/platform/win32/msvc2017') -Recurse -File -Filter 'idtech3*.exe' -ErrorAction SilentlyContinue |
+            Get-ChildItem -Path (Join-Path $root 'engine/platform/win32/msvc2017') -Recurse -File -Filter 'idtech3*.exe' -ErrorAction SilentlyContinue |
               ForEach-Object { $_.FullName }
             throw "Staging incomplete; missing in bin: $($missing -join ', ')"
           }
@@ -580,6 +560,10 @@ jobs:
           ./scripts/smoke_test.sh release
           ./scripts/q3_openarena_compat_check.sh release
           ./scripts/ci/audit_unconditional_sources.sh
+      - name: Layout + legacy wiring
+        run: |
+          cd build-vk-Release
+          ctest -R 'test_legacy_intact|test_repository_layout_2026|test_build_profiles|test_no_aux_core|test_msvc_layout_bridge|test_msvc_manifest_drift|test_msvc_vcxproj_paths_resolve|test_msvc_solution|test_src_shim_audit' --output-on-failure
       - name: Core unit tests
         run: |
           cd build-vk-Release && ctest -R '^unit_(macros|qmath|msg)$' --output-on-failure || ctest -R 'unit_' --output-on-failure -N | head -20
@@ -598,7 +582,7 @@ jobs:
       - name: Game profile tests
         run: |
           cd build-vk-Release
-          ctest -R 'test_build_profiles|test_engine_module_manifest|test_cpp20_sources' --output-on-failure
+          ctest -R 'test_build_profiles|test_engine_module_manifest|test_cpp20_sources|test_msvc_manifest_drift|test_msvc_vcxproj_paths_resolve|test_msvc_solution|test_src_shim_audit' --output-on-failure
           ctest -L sector_stream --output-on-failure
 
   linux-full:

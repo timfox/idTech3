@@ -15,8 +15,13 @@ echo "=== audit_unconditional_sources ==="
 
 # Allowed append locations (macros / includes handle extension sources).
 APPROVED=(
+  "cmake/EngineQcommonSources.cmake"
   "cmake/IdTech3QcommonExtensions.cmake"
   "cmake/client/ClientExtensionSources.cmake"
+  "cmake/server/ServerSources.cmake"
+  "cmake/modules/BotlibSources.cmake"
+  "cmake/modules/AudioMp3Sources.cmake"
+  "cmake/renderers/VulkanCoreSources.cmake"
   "cmake/renderers/VulkanExtensionSources.cmake"
 )
 

@@ -9,6 +9,18 @@ This repository is built and validated through **CMake**. The two supported entr
 
 Legacy `make`-first instructions are no longer the primary build path for this fork.
 
+### Legacy + modern (2026)
+
+**Nothing removed from the repo** — profiles only change what gets **compiled**. Classic QVM mods, `src/*` paths, deprecated CMake aliases, and `./scripts/q3_openarena_compat_check.sh` stay supported. Top-level `engine/`, `runtime/`, `modules/` are **symlinks** to `src/` until Phase 5b.
+
+| Goal | Command |
+|------|---------|
+| Fast Q3/OA-compatible binary | `./scripts/compile_engine.sh vulkan core` |
+| Modern default (recommended) | `./scripts/compile_engine.sh vulkan` |
+| Kitchen-sink parity | `./scripts/compile_engine.sh vulkan full` |
+
+Full contract: [docs/core/LEGACY_AND_MODERN.md](docs/core/LEGACY_AND_MODERN.md). CI: `test_legacy_intact.sh`, `q3_openarena_compat_check.sh` on **`core`**.
+
 ## Toolchain notes
 
 - CMake targets **C23** when supported by the active compiler/toolchain and falls back to **C17** otherwise.
@@ -55,6 +67,7 @@ Default profile is **`game`** (SP conversion stack). **`full`** matches the pre-
 | `USE_RESEARCH_EXTENSIONS` | OFF | OFF | ON |
 | `USE_FLUX` / `USE_TRELLIS` / `USE_GENETIC_GAN` | OFF | OFF | ON |
 | `USE_EXPERIMENTAL_RENDERERS` | OFF | OFF | ON |
+| `USE_GAME_AI_MIDDLEWARE` | OFF | ON | ON |
 
 Authoritative source list: [docs/ENGINE_MODULE_MANIFEST.md](docs/ENGINE_MODULE_MANIFEST.md). Layout target: [docs/core/REPOSITORY_LAYOUT_2026.md](docs/core/REPOSITORY_LAYOUT_2026.md).
 

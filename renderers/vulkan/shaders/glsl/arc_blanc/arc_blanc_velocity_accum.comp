@@ -1,0 +1,49 @@
+#version 450
+
+/*
+ * Arc Blanc — accumulate cascade velocity IFFT into depth slice (vx,vy,vz interleaved).
+ */
+layout( local_size_x = 8, local_size_y = 8, local_size_z = 1 ) in;
+
+layout( std430, set = 0, binding = 0 ) buffer SliceSSBO {
+	float slice[];
+} sliceBuf;
+
+layout( std430, set = 0, binding = 1 ) readonly buffer VxSSBO {
+	float vx[];
+} vxBuf;
+
+layout( std430, set = 0, binding = 2 ) readonly buffer VySSBO {
+	float vy[];
+} vyBuf;
+
+layout( std430, set = 0, binding = 3 ) readonly buffer VzSSBO {
+	float vz[];
+} vzBuf;
+
+layout( push_constant ) uniform Push {
+	uint gridN;
+	uint clearSlice;
+} pc;
+
+void main() {
+	uvec2 gid = gl_GlobalInvocationID.xy;
+	uint n = pc.gridN;
+	uint i;
+
+	if ( gid.x >= n || gid.y >= n ) {
+		return;
+	}
+
+	i = gid.y * n + gid.x;
+	if ( pc.clearSlice != 0u ) {
+		sliceBuf.slice[i * 3u + 0u] = 0.0;
+		sliceBuf.slice[i * 3u + 1u] = 0.0;
+		sliceBuf.slice[i * 3u + 2u] = 0.0;
+		return;
+	}
+
+	sliceBuf.slice[i * 3u + 0u] += vxBuf.vx[i];
+	sliceBuf.slice[i * 3u + 1u] += vyBuf.vy[i];
+	sliceBuf.slice[i * 3u + 2u] += vzBuf.vz[i];
+}

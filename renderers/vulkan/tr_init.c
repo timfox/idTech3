@@ -47,6 +47,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "vk_squeezeme.h"
 #include "vk_wsp.h"
 #include "vk_dressi.h"
+#include "extensions/scaffold/vk_arc_blanc.h"
 #include "vk_raygun.h"
 #include "vk_fluidsim.h"
 #include "vk_terrain.h"
@@ -4370,6 +4371,7 @@ void R_Init( void ) {
 	R_InitFreeType();
 
 	R_BspStream_Init();
+	R_ArcBlanc_Init();
 
 #ifndef USE_VULKAN
 	err = qglGetError();
@@ -4557,6 +4559,8 @@ refexport_t *GetRefAPI ( int apiVersion, refimport_t *rimp ) {
 	re.AddEngineSpriteToScene = RE_AddEngineSpriteToScene;
 	re.AddEngineSpriteToSceneAtTime = RE_AddEngineSpriteToSceneAtTime;
 	re.AddEngineDecalToScene = RE_AddEngineDecalToScene;
+	re.ArcBlancUploadHeightMap = RE_ArcBlancUploadHeightMap;
+	re.ArcBlancGpuOceanStep = RE_ArcBlancGpuOceanStep;
 	re.AddPolyToScene = RE_AddPolyToScene;
 	re.LightForPoint = R_LightForPoint;
 	re.AddLightToScene = RE_AddLightToScene;

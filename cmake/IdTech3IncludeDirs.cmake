@@ -1,14 +1,20 @@
 # Shared include paths for moved extension trees.
 
 function(idtech3_apply_research_include_dirs target)
+  if(NOT IDTECH3_DIR_EXTENSIONS)
+    include(${CMAKE_SOURCE_DIR}/cmake/IdTech3Layout.cmake)
+  endif()
   target_include_directories(${target} PRIVATE
-    ${CMAKE_SOURCE_DIR}/src/extensions/research
+    ${IDTECH3_DIR_EXTENSIONS}/research
   )
 endfunction()
 
 function(idtech3_apply_generative_include_dirs target)
+  if(NOT IDTECH3_DIR_EXTENSIONS)
+    include(${CMAKE_SOURCE_DIR}/cmake/IdTech3Layout.cmake)
+  endif()
   target_include_directories(${target} PRIVATE
-    ${CMAKE_SOURCE_DIR}/src/extensions/generative
+    ${IDTECH3_DIR_EXTENSIONS}/generative
   )
 endfunction()
 

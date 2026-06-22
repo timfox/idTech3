@@ -11,8 +11,8 @@ Detects file format and dispatches to the appropriate decoder backend.
 ===========================================================================
 */
 
-#include "../qcommon/q_shared.h"
-#include "../qcommon/qcommon.h"
+#include "../../qcommon/q_shared.h"
+#include "../../qcommon/qcommon.h"
 #include "cl_cin_modern.h"
 
 static qboolean cinModernInitialized = qfalse;

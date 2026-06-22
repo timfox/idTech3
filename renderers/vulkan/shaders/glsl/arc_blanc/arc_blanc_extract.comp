@@ -1,0 +1,34 @@
+#version 450
+
+/*
+ * Arc Blanc — extract real part + Tessendorf checkerboard sign.
+ */
+layout( local_size_x = 8, local_size_y = 8, local_size_z = 1 ) in;
+
+layout( std430, set = 0, binding = 0 ) readonly buffer ComplexSSBO {
+	vec2 complexData[];
+} src;
+
+layout( std430, set = 0, binding = 1 ) buffer RealSSBO {
+	float realOut[];
+} dst;
+
+layout( push_constant ) uniform Push {
+	uint gridN;
+	uint cascadeIndex;
+} pc;
+
+void main() {
+	uvec2 gid = gl_GlobalInvocationID.xy;
+	uint n = pc.gridN;
+	uint i;
+	float sign;
+
+	if ( gid.x >= n || gid.y >= n ) {
+		return;
+	}
+
+	i = gid.y * n + gid.x;
+	sign = ( ( ( gid.x + gid.y ) & 1u ) == 1u ) ? -1.0 : 1.0;
+	dst.realOut[i] = src.complexData[i].x * sign;
+}

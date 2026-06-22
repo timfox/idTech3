@@ -7,7 +7,7 @@ Client lifecycle: memory flush, map load, hunk users, shutdown.
 */
 #pragma once
 
-#include "../qcommon/qcommon.h"
+#include "../../qcommon/qcommon.h"
 
 #ifdef __cplusplus
 extern "C" {

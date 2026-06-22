@@ -31,7 +31,7 @@ rg -q 'SectorGraph_GetHopDistance' src/world/sector_graph.cpp
 rg -q 'graph_bfs_crossover' src/world/sector_graph.cpp
 rg -q 'ClusterGraph_RebuildFromMap' src/qcommon/cluster_graph.cpp
 rg -q 'r_graphClusterReach' src/qcommon/cluster_graph.cpp
-rg -q 'ClusterGraph_UpdateReachability' src/client/cl_openworld.cpp
+rg -q 'ClusterGraph_UpdateReachability' src/client/world/cl_openworld.cpp
 
 if [[ -x "${ROOT}/build-vk-Release/unit_sector_graph" ]]; then
 	echo "[test_graph_compute] running unit_sector_graph..."

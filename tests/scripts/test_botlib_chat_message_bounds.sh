@@ -4,7 +4,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
-BOTLIB_C="${1:-$PROJECT_ROOT/src/platform/botlib/be_ai_chat.c}"
+BOTLIB_C="${1:-$PROJECT_ROOT/modules/botlib/be_ai_chat.c}"
 WIN32_BOTLIB_C="${2:-$PROJECT_ROOT/src/platform/win32/botlib/be_ai_chat.c}"
 
 fail() {

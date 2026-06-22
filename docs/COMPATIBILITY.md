@@ -17,7 +17,7 @@ This document summarizes compatibility considerations, known issues, and mitigat
 
 1. **Graceful degradation**: High-quality features → lower quality or disabled when hardware or deps are missing
 2. **Graceful degradation**: Missing optional deps (codecs, etc.) disable features without crashing
-3. **Backward compatibility**: Existing mods, configs, and game data continue to work
+3. **Backward compatibility**: Existing mods, configs, and game data continue to work — see [core/LEGACY_AND_MODERN.md](core/LEGACY_AND_MODERN.md) for the 2026 profile/symlink contract.
 4. **Clear diagnostics**: Startup logs and error messages point to fixes
 
 ## Platform-Specific Notes

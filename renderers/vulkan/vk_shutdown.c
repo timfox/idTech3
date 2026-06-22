@@ -443,6 +443,12 @@ for (i = 0; i < 2; i++) {
 	VK_DESTROY_SHADER_MODULE_FIELD( vk.modules.curast_stage1_cs );
 	VK_DESTROY_SHADER_MODULE_FIELD( vk.modules.curast_resolve_cs );
 	VK_DESTROY_SHADER_MODULE_FIELD( vk.modules.graph_bfs_expand_cs );
+	VK_DESTROY_SHADER_MODULE_FIELD( vk.modules.arc_blanc_htilde_cs );
+	VK_DESTROY_SHADER_MODULE_FIELD( vk.modules.arc_blanc_fft_1d_cs );
+	VK_DESTROY_SHADER_MODULE_FIELD( vk.modules.arc_blanc_extract_cs );
+	VK_DESTROY_SHADER_MODULE_FIELD( vk.modules.arc_blanc_combine_cs );
+	VK_DESTROY_SHADER_MODULE_FIELD( vk.modules.arc_blanc_velocity_cs );
+	VK_DESTROY_SHADER_MODULE_FIELD( vk.modules.arc_blanc_velocity_accum_cs );
 	VK_DESTROY_SHADER_MODULE_FIELD( vk.modules.mimir_clear_cs );
 	VK_DESTROY_SHADER_MODULE_FIELD( vk.modules.mimir_brownian_cs );
 	VK_DESTROY_SHADER_MODULE_FIELD( vk.modules.mimir_splat_cs );

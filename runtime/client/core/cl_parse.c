@@ -26,7 +26,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "cl_app_crdt.h"
 #include "script_emit.h"
 #if defined(USE_DUKTAPE) || defined(USE_CSHARP)
-#include "../game/bg_public.h"
+#include "../../game/bg_public.h"
 #endif
 
 static const char *svc_strings[] = {

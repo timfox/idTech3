@@ -11,7 +11,7 @@ Uses Mumble's shared-memory Link protocol.
 #ifndef CL_MUMBLE_H
 #define CL_MUMBLE_H
 
-#include "../qcommon/q_shared.h"
+#include "../../qcommon/q_shared.h"
 
 qboolean CL_Mumble_Init( void );
 void     CL_Mumble_Shutdown( void );

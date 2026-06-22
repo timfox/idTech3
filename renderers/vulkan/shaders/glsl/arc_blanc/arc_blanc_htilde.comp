@@ -1,0 +1,88 @@
+#version 450
+
+/*
+ * Arc Blanc — frequency-domain ocean height + displacement (Tessendorf h̃(t)).
+ */
+layout( local_size_x = 8, local_size_y = 8, local_size_z = 1 ) in;
+
+layout( std430, set = 0, binding = 0 ) readonly buffer H0SSBO {
+	vec2 h0[];
+} h0Buf;
+
+layout( std430, set = 0, binding = 1 ) readonly buffer H0ConjSSBO {
+	vec2 h0conj[];
+} h0conjBuf;
+
+layout( std430, set = 0, binding = 2 ) readonly buffer OmegaSSBO {
+	float omega[];
+} omegaBuf;
+
+layout( std430, set = 0, binding = 3 ) readonly buffer KMagSSBO {
+	float kMag[];
+} kMagBuf;
+
+layout( std430, set = 0, binding = 4 ) buffer OutHSSBO {
+	vec2 outH[];
+} outH;
+
+layout( std430, set = 0, binding = 5 ) buffer OutDxSSBO {
+	vec2 outDx[];
+} outDx;
+
+layout( std430, set = 0, binding = 6 ) buffer OutDzSSBO {
+	vec2 outDz[];
+} outDz;
+
+layout( push_constant ) uniform Push {
+	uint gridN;
+	float time;
+	float tileLength;
+} pc;
+
+const float PI = 3.141592653589793;
+
+void main() {
+	uvec2 gid = gl_GlobalInvocationID.xy;
+	uint n = pc.gridN;
+	uint i;
+
+	if ( gid.x >= n || gid.y >= n ) {
+		return;
+	}
+
+	i = gid.y * n + gid.x;
+	{
+		int ix = int( gid.x );
+		int iz = int( gid.y );
+		int nHalf = int( n >> 1u );
+		float invL = 1.0 / pc.tileLength;
+		float kx = 2.0 * PI * float( ix - nHalf ) * invL;
+		float kz = 2.0 * PI * float( iz - nHalf ) * invL;
+		float w = omegaBuf.omega[i];
+		float kmag = kMagBuf.kMag[i];
+		float invK = ( kmag > 1.0e-8 ) ? ( 1.0 / kmag ) : 0.0;
+		float cw = cos( w * pc.time );
+		float sw = sin( w * pc.time );
+		vec2 h0v = h0Buf.h0[i];
+		vec2 h0c = h0conjBuf.h0conj[i];
+		vec2 a = vec2(
+			h0v.x * cw - h0v.y * sw,
+			h0v.x * sw + h0v.y * cw
+		);
+		vec2 b = vec2(
+			h0c.x * cw + h0c.y * sw,
+			-h0c.x * sw + h0c.y * cw
+		);
+		vec2 ht = a + b;
+
+		outH.outH[i] = ht;
+
+		if ( kmag > 1.0e-8 ) {
+			outDx.outDx[i] = vec2( -kx * invK * ht.y, kx * invK * ht.x );
+			outDz.outDz[i] = vec2( -kz * invK * ht.y, kz * invK * ht.x );
+		} else {
+			outDx.outDx[i] = vec2( 0.0 );
+			outDz.outDz[i] = vec2( 0.0 );
+		}
+	}
+}

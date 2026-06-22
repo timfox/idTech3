@@ -8,7 +8,7 @@ Client districts: FreeUSD manifest parse, console commands, view residency.
 
 extern "C" {
 #include "client.h"
-#include "../world/world_district.h"
+#include "../../world/world_district.h"
 }
 
 #ifdef USE_FREEUSD

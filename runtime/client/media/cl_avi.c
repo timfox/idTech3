@@ -21,7 +21,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 */
 
 #include "client.h"
-#include "../audio/snd_local.h"
+#include "../../audio/snd_local.h"
 
 extern dma_t dma;
 

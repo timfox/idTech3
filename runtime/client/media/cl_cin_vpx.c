@@ -12,8 +12,8 @@ with WebM containers (already supported via Nestegg).
 ===========================================================================
 */
 
-#include "../qcommon/q_shared.h"
-#include "../qcommon/qcommon.h"
+#include "../../qcommon/q_shared.h"
+#include "../../qcommon/qcommon.h"
 #include "cl_cin_modern.h"
 
 #ifdef USE_VPX

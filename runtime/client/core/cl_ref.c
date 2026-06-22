@@ -8,7 +8,10 @@ Copyright (C) 2026 Gopex LLC. All rights reserved.
 #include "cl_ref.h"
 #include "cl_district.h"
 #include "cl_vector_font.h"
-#include "../renderers/common/renderer_backend.h"
+#include "../../renderers/common/renderer_backend.h"
+#ifdef USE_ARC_BLANC
+#include "../../world/arc_blanc/arc_blanc.h"
+#endif
 
 #include <limits.h>
 #include <stdarg.h>
@@ -546,6 +549,12 @@ static void CL_InitRef( void ) {
 	rimp.VK_CreateSurface = VK_CreateSurface;
 #endif
 
+#ifdef USE_ARC_BLANC
+	rimp.ArcBlancSampleHeight = ArcBlanc_SampleHeight;
+#else
+	rimp.ArcBlancSampleHeight = NULL;
+#endif
+
 #if defined(USE_RENDERER_DLOPEN) && USE_RENDERER_DLOPEN
 	ret = getRefAPI( REF_API_VERSION, &rimp );
 #else
@@ -561,6 +570,10 @@ static void CL_InitRef( void ) {
 	re = *ret;
 	re_RenderScene = re.RenderScene;
 	re.RenderScene = CL_RenderSceneWithDistricts;
+
+#ifdef USE_ARC_BLANC
+	ArcBlanc_SetGpuStepFn( re.ArcBlancGpuOceanStep );
+#endif
 
 	// unpause so the cgame definitely gets a snapshot and renders a frame
 	Cvar_Set( "cl_paused", "0" );

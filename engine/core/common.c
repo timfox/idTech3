@@ -37,6 +37,9 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "radiusfps/radiusfps_console.h"
 #include "gccfer/gccfer_console.h"
 #include "dax/dax_console.h"
+#include "dk_qsd/dk_qsd.h"
+#include "dlm/dlm.h"
+#include "sfca/sfca.h"
 #include "x3dpra/x3dpra_console.h"
 #endif
 #ifdef USE_DUKTAPE
@@ -4231,6 +4234,9 @@ void Com_Init( char *commandLine ) {
 	Gccfer_ConsoleInit();
 	Dax_ConsoleInit();
 	X3dpra_ConsoleInit();
+	DK_Qsd_ConsoleInit();
+	DLM_ConsoleInit();
+	SFCA_ConsoleInit();
 #endif
 
 	Com_Printf( "--- Common Initialization Complete ---\n" );

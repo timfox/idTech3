@@ -35,16 +35,21 @@ Usage from Lua:
 #include <lauxlib.h>
 #include <lualib.h>
 
+#ifdef USE_GAME_AI_MIDDLEWARE
 #include "g_director.h"
 #include "g_facial.h"
 #include "g_horde.h"
 #include "g_dismember.h"
 #include "g_choreography.h"
 #include "g_response.h"
+#endif
 #include "ecs.h"
 #include "../physics/phys_bullet.h"
 #include "../world/fog_biology.h"
 #include "../world/genetic_gan.h"
+#ifdef USE_ARC_BLANC
+#include "../world/arc_blanc/arc_blanc.h"
+#endif
 #include "../physics/phys_procedural_anim.h"
 #include "../physics/phys_ik.h"
 #include "../navigation/nav_recast.h"
@@ -57,6 +62,8 @@ Usage from Lua:
 #include "../audio/snd_music_adaptive.h"
 
 extern refexport_t re;
+
+#ifdef USE_GAME_AI_MIDDLEWARE
 
 /* ========== Director bindings ========== */
 
@@ -271,6 +278,8 @@ static int l_response_trigger(lua_State *L) {
 	return 0;
 }
 
+#endif /* USE_GAME_AI_MIDDLEWARE */
+
 /* ========== VDB bindings ========== */
 
 #include "../renderers/vulkan/vk_vdb.h"
@@ -312,6 +321,68 @@ static int l_vdb_getGridCount(lua_State *L) {
 	lua_pushinteger(L, VDB_GetGridCount());
 	return 1;
 }
+
+/* ========== Arc Blanc ocean bindings (Algis et al. 2025) ========== */
+
+#ifdef USE_ARC_BLANC
+static int l_arcBlanc_enabled( lua_State *L )
+{
+	(void)L;
+	lua_pushboolean( L, ArcBlanc_Enabled() );
+	return 1;
+}
+
+static int l_arcBlanc_sampleHeight( lua_State *L )
+{
+	const float x = (float)luaL_checknumber( L, 1 );
+	const float z = (float)luaL_checknumber( L, 2 );
+	lua_pushnumber( L, ArcBlanc_SampleHeight( x, z ) );
+	return 1;
+}
+
+static int l_arcBlanc_sampleVelocity( lua_State *L )
+{
+	const float x = (float)luaL_checknumber( L, 1 );
+	const float y = (float)luaL_checknumber( L, 2 );
+	const float z = (float)luaL_checknumber( L, 3 );
+	vec3_t vel;
+	ArcBlanc_SampleVelocity( x, y, z, vel );
+	lua_pushnumber( L, vel[0] );
+	lua_pushnumber( L, vel[1] );
+	lua_pushnumber( L, vel[2] );
+	return 3;
+}
+
+static int l_arcBlanc_registerHull( lua_State *L )
+{
+	vec3_t origin, mins, maxs;
+	const int physBody = (int)luaL_checkinteger( L, 1 );
+	origin[0] = (float)luaL_checknumber( L, 2 );
+	origin[1] = (float)luaL_checknumber( L, 3 );
+	origin[2] = (float)luaL_checknumber( L, 4 );
+	mins[0] = (float)luaL_checknumber( L, 5 );
+	mins[1] = (float)luaL_checknumber( L, 6 );
+	mins[2] = (float)luaL_checknumber( L, 7 );
+	maxs[0] = (float)luaL_checknumber( L, 8 );
+	maxs[1] = (float)luaL_checknumber( L, 9 );
+	maxs[2] = (float)luaL_checknumber( L, 10 );
+	lua_pushinteger( L, ArcBlanc_RegisterBoxHull( physBody, origin, mins, maxs ) );
+	return 1;
+}
+
+static int l_arcBlanc_unregisterHull( lua_State *L )
+{
+	ArcBlanc_UnregisterHull( (int)luaL_checkinteger( L, 1 ) );
+	return 0;
+}
+
+static int l_arcBlanc_reseed( lua_State *L )
+{
+	(void)L;
+	ArcBlanc_Reseed_f();
+	return 0;
+}
+#endif
 
 /* ========== Fog bioaerosol ecology bindings (Evans et al. 2019) ========== */
 
@@ -792,11 +863,12 @@ static int l_sprite_spawnServer(lua_State *L) {
 	return 0;
 }
 
+#ifdef USE_GAME_AI_MIDDLEWARE
+
 /* ========== AIML bindings ========== */
 
 #include "g_aiml.h"
 #include "g_eda.h"
-#include "g_engine_systems.h"
 
 static int l_aiml_createBot(lua_State *L) {
 	lua_pushinteger(L, AIML_CreateBot(luaL_checkstring(L, 1)));
@@ -907,6 +979,10 @@ static int l_eda_drain( lua_State *L ) {
 	lua_pushinteger( L, (lua_Integer)n );
 	return 2;
 }
+
+#endif /* USE_GAME_AI_MIDDLEWARE */
+
+#include "g_engine_systems.h"
 
 /* ========== Telemetry / replay / save / quest / dialogue ========== */
 
@@ -1108,6 +1184,8 @@ static int l_ecs_stepMotion( lua_State *L ) {
 	ECS_StepMotion( (float)luaL_checknumber( L, 1 ) );
 	return 0;
 }
+
+#ifdef USE_GAME_AI_MIDDLEWARE
 
 /* ========== GOAP bindings ========== */
 
@@ -1393,6 +1471,8 @@ static int l_bt_debugAgent(lua_State *L) {
 	return 0;
 }
 
+#endif /* USE_GAME_AI_MIDDLEWARE */
+
 /* ========== Registration ========== */
 
 static void registerTable(lua_State *L, const char *name, const luaL_Reg *funcs) {
@@ -1411,6 +1491,7 @@ void LuaBindings_RegisterAll(void *luaState) {
 
 	lua_newtable(L);
 
+#ifdef USE_GAME_AI_MIDDLEWARE
 	static const luaL_Reg directorFuncs[] = {
 		{"init", l_director_init}, {"update", l_director_update}, {"getPhase", l_director_getPhase},
 		{"forcePhase", l_director_forcePhase}, {"getIntensity", l_director_getIntensity},
@@ -1423,6 +1504,7 @@ void LuaBindings_RegisterAll(void *luaState) {
 		{NULL, NULL}
 	};
 	registerTable(L, "Director", directorFuncs);
+#endif
 
 	static const luaL_Reg navFuncs[] = {
 		{"init", l_nav_init}, {"buildFromBSP", l_nav_buildFromBSP},
@@ -1455,6 +1537,7 @@ void LuaBindings_RegisterAll(void *luaState) {
 	};
 	registerTable(L, "Music", musicFuncs);
 
+#ifdef USE_GAME_AI_MIDDLEWARE
 	static const luaL_Reg faceFuncs[] = {
 		{"create", l_face_create}, {"destroy", l_face_destroy},
 		{"setExpression", l_face_setExpression}, {"setFlex", l_face_setFlex},
@@ -1493,7 +1576,9 @@ void LuaBindings_RegisterAll(void *luaState) {
 		{NULL, NULL}
 	};
 	registerTable(L, "Response", responseFuncs);
+#endif
 
+#ifdef USE_GAME_AI_MIDDLEWARE
 	static const luaL_Reg goapFuncs[] = {
 		/* Actions */
 		{"registerAction", l_goap_registerAction},
@@ -1560,6 +1645,7 @@ void LuaBindings_RegisterAll(void *luaState) {
 		{NULL, NULL}
 	};
 	registerTable(L, "BT", btFuncs);
+#endif
 
 	static const luaL_Reg ecsFuncs[] = {
 		{"create", l_ecs_create}, {"destroy", l_ecs_destroy},
@@ -1578,6 +1664,7 @@ void LuaBindings_RegisterAll(void *luaState) {
 	};
 	registerTable(L, "ECS", ecsFuncs);
 
+#ifdef USE_GAME_AI_MIDDLEWARE
 	static const luaL_Reg aimlFuncs[] = {
 		{"createBot", l_aiml_createBot},
 		{"destroyBot", l_aiml_destroyBot},
@@ -1604,6 +1691,7 @@ void LuaBindings_RegisterAll(void *luaState) {
 		{NULL, NULL}
 	};
 	registerTable(L, "Events", eventFuncs);
+#endif
 
 	static const luaL_Reg telemetryFuncs[] = {
 		{"record", l_telem_record},
@@ -1674,6 +1762,19 @@ void LuaBindings_RegisterAll(void *luaState) {
 		{NULL, NULL}
 	};
 	registerTable(L, "FogBiology", fogBioFuncs);
+
+#ifdef USE_ARC_BLANC
+	static const luaL_Reg arcBlancFuncs[] = {
+		{"enabled", l_arcBlanc_enabled},
+		{"sampleHeight", l_arcBlanc_sampleHeight},
+		{"sampleVelocity", l_arcBlanc_sampleVelocity},
+		{"registerHull", l_arcBlanc_registerHull},
+		{"unregisterHull", l_arcBlanc_unregisterHull},
+		{"reseed", l_arcBlanc_reseed},
+		{NULL, NULL}
+	};
+	registerTable(L, "ArcBlanc", arcBlancFuncs);
+#endif
 
 	static const luaL_Reg genomeFuncs[] = {
 		{"enabled", l_genome_enabled},

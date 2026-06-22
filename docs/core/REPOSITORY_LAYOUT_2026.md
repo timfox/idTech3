@@ -2,34 +2,41 @@
 
 Evolutionary map from today's `src/` tree to the layercake folders in [BRANCHES.md](../BRANCHES.md). **No capability is removed** — extensions stay buildable via `IDTECH3_PROFILE=full` or `-DUSE_*=ON`.
 
-## Current (shipping migration)
+## Current (Phase 5c — physical layout)
 
 ```
 idtech3/
-├── src/
-│   ├── qcommon/              # engine core (vanilla)
-│   ├── platform/             # SDL, unix, win32
-│   ├── client/               # runtime client (modularizing)
-│   ├── server/               # runtime server
-│   ├── game/                 # VM traps + native hooks
-│   ├── world/                # open-world module (USE_OPEN_WORLD)
-│   ├── navigation/           # Recast module
-│   ├── physics/              # Bullet middleware
-│   ├── audio/                # codecs + backends
-│   ├── renderers/vulkan/     # shipping + experimental (CMake manifests)
-│   ├── extensions/
-│   │   ├── generative/       # FLUX, TRELLIS, genetic GAN client
-│   │   └── research/         # RadiusFPS, DaX, GCC-FER, …
-│   └── external/             # vendored deps
-├── third_party/              # symlink → src/external/ (2026 naming)
+├── engine/
+│   ├── core/                 # was src/qcommon (vanilla)
+│   └── platform/             # SDL, unix, win32
+├── runtime/
+│   ├── client/               # core/world/media/platform
+│   ├── server/
+│   └── game/
+├── modules/
+│   ├── world/                # open-world, Arc Blanc, fog biology, …
+│   ├── navigation/
+│   ├── physics/
+│   └── audio/
+├── extensions/
+│   ├── generative/
+│   └── research/
+├── renderers/vulkan/         # core + extensions/{neural,splats,rtx,scaffold}
+├── third_party/              # was src/external
+├── samples/                  # symlink → examples
+├── src/                      # forwarding shims only (Phase 5c complete)
+│   ├── qcommon → ../engine/core
+│   ├── client → ../runtime/client
+│   ├── botlib → ../modules/botlib
+│   └── …                     # see scripts/migrate_phase_5c.sh
 ├── cmake/
+│   ├── IdTech3Layout.cmake   # IDTECH3_DIR_* path aliases
 │   ├── profiles/             # core | game | full | research
 │   ├── client/               # ClientExtensionSources.cmake
 │   ├── server/               # ServerExtensionSources.cmake
 │   ├── renderers/            # VulkanCore/Extension manifests
 │   └── IdTech3Extension.cmake
-├── examples/                 # demo_game, templates
-├── samples/                  # symlink → examples/ (2026 naming)
+├── examples/                 # demo_game, templates (also samples/)
 ├── tools/
 ├── tests/
 └── docs/                     # tiered index: docs/README.md
@@ -56,7 +63,7 @@ samples/              ← demo_game, templates
 
 ## Compatibility during migration
 
-- CMake lists use **explicit extension manifests** (not bare `AUX_SOURCE_DIRECTORY` for optional code).
+- CMake extension manifests use **`IDTECH3_DIR_*`** from [IdTech3Layout.cmake](../../cmake/IdTech3Layout.cmake); physical roots are **`engine/`**, **`runtime/`**, **`modules/`**, etc. (Phase 5c). Cross-domain `#include` paths and MSVC `vcxproj` relative paths use **`scripts/layout_forwarding_symlinks.sh`** (bridge symlinks under `engine/platform/` and `engine/`) until Phase 5d — see [MSVC_CODEGEN.md](../MSVC_CODEGEN.md).
 - Moved paths: one-release include shims — [DEPRECATION_POLICY.md](../DEPRECATION_POLICY.md).
 - Authoritative source inventory: [ENGINE_MODULE_MANIFEST.md](../ENGINE_MODULE_MANIFEST.md).
 - Rollout plan: [ENGINE_REORG_PLAN.md](../ENGINE_REORG_PLAN.md).

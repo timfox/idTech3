@@ -16,7 +16,7 @@ for f in \
 	src/extensions/generative/cl_genetic_gan.c \
 	src/extensions/generative/cl_genetic_gan.h \
 	src/extensions/generative/cl_generative.c \
-	src/client/cl_main.c \
+	src/client/core/cl_main.c \
 	scripts/genetic_gan_decode.py
 do
 	test -f "$f" || fail "missing $f"
@@ -36,7 +36,7 @@ rg -q 'genome_breed' src/world/genetic_gan.cpp
 rg -q 'cl_geneticGanSyncJob' src/world/genetic_gan.cpp
 
 echo "[test_genetic_gan] grep cross-module wiring..."
-rg -q 'CL_GeneticGan_Init' src/client/cl_main.c
+rg -q 'CL_GeneticGan_Init' src/client/core/cl_main.c
 rg -q 'CL_GeneticGan_Frame' src/extensions/generative/cl_generative.c
 rg -q 'genome_generate' src/extensions/generative/cl_genetic_gan.c
 rg -q 'GeneticGan_WriteGenomeJson' src/extensions/generative/cl_genetic_gan.c

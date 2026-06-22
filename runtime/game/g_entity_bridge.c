@@ -14,7 +14,9 @@ Reads BSP entity key/values and configures engine systems.
 #include "../qcommon/q_shared.h"
 #include "../qcommon/qcommon.h"
 #include "g_entity_bridge.h"
+#ifdef USE_GAME_AI_MIDDLEWARE
 #include "g_director.h"
+#endif
 #include "../client/cl_map_background.h"
 
 static const char *EB_ParseToken(const char **text) {
@@ -97,8 +99,10 @@ void EntityBridge_ParseEntities(const char *entityString) {
 			VectorCopy(mins, maxs);
 			maxs[0] += 256; maxs[1] += 256; maxs[2] += 128;
 
+#ifdef USE_GAME_AI_MIDDLEWARE
 			Director_AddZone(name, mins, maxs, (dirThreat_t)threat, budgetMult);
 			directorZones++;
+#endif
 		}
 
 		else if (!Q_stricmp(classname, "info_bgmap_camera")) {

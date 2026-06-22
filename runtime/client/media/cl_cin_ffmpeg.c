@@ -15,9 +15,9 @@ libavutil, libswscale, and libswresample.
 ===========================================================================
 */
 
-#include "../qcommon/q_shared.h"
-#include "../qcommon/qcommon.h"
-#include "../audio/snd_local.h"
+#include "../../qcommon/q_shared.h"
+#include "../../qcommon/qcommon.h"
+#include "../../audio/snd_local.h"
 #include "cl_cin_modern.h"
 
 #ifdef USE_FFMPEG

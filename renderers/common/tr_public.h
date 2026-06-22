@@ -31,6 +31,8 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 #define	REF_API_VERSION		10
 
+typedef struct arcBlancGpuParams_s arcBlancGpuParams_t;
+
 //
 // these are the functions exported by the refresh module
 //
@@ -161,6 +163,12 @@ typedef struct {
 	void (*VudaNotifyCudaComplete)( uint64_t timelineValue );
 #endif
 
+	/* Arc Blanc ocean height RGBA upload (NULL when disabled or stub renderer). */
+	void (*ArcBlancUploadHeightMap)( const byte *rgba, int width, int height );
+
+	/* Arc Blanc GPU FFT ocean step (NULL when disabled or stub renderer). */
+	qboolean (*ArcBlancGpuOceanStep)( const arcBlancGpuParams_t *params );
+
 } refexport_t;
 
 //
@@ -262,6 +270,9 @@ typedef struct {
 	void	(*VKimp_Shutdown)( qboolean unloadDLL );
 	void*	(*VK_GetInstanceProcAddr)( VkInstance instance, const char *name );
 	qboolean (*VK_CreateSurface)( VkInstance instance, VkSurfaceKHR *pSurface );
+
+	/* Arc Blanc ocean height sampling (NULL when module disabled). */
+	float (*ArcBlancSampleHeight)( float worldX, float worldZ );
 
 } refimport_t;
 

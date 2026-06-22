@@ -9,8 +9,8 @@ echo "[test_districts] checking sources..."
 for f in \
 	src/world/world_district.cpp \
 	src/world/world_district.h \
-	src/client/cl_district.cpp \
-	src/client/cl_district.h
+	src/client/world/cl_district.cpp \
+	src/client/world/cl_district.h
 do
 	test -f "$f" || { echo "missing $f"; exit 1; }
 done
@@ -19,14 +19,14 @@ echo "[test_districts] grep API symbols..."
 rg -q 'WorldDistrict_Init' src/world/world_district.cpp
 rg -q 'WorldDistrict_UpdateView' src/world/world_district.cpp
 rg -q 'WorldDistrict_Import' src/world/world_district.cpp
-rg -q 'CL_District_Init' src/client/cl_district.cpp
-rg -q 'CL_District_Frame' src/client/cl_district.cpp
-rg -q 'BuildEngineSceneSnapshot' src/client/cl_district.cpp
-rg -q 'CL_District_Init' src/client/cl_main.c
+rg -q 'CL_District_Init' src/client/world/cl_district.cpp
+rg -q 'CL_District_Frame' src/client/world/cl_district.cpp
+rg -q 'BuildEngineSceneSnapshot' src/client/world/cl_district.cpp
+rg -q 'CL_District_Init' src/client/core/cl_main.c
 rg -q 'CL_District_Frame' src/client/cl_gameframe.c
-rg -q 'CL_District_AddRefEntitiesToScene' src/client/cl_district.cpp
+rg -q 'CL_District_AddRefEntitiesToScene' src/client/world/cl_district.cpp
 rg -q 'CL_RenderSceneWithDistricts' src/client/cl_ref.c
-rg -q 'r_districtDraw' src/client/cl_district.cpp
+rg -q 'r_districtDraw' src/client/world/cl_district.cpp
 rg -q 'world_district.cpp' CMakeLists.txt
 rg -q 'cl_district.cpp' CMakeLists.txt
 
