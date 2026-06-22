@@ -1,12 +1,12 @@
 [submodule "src/external/src/SparseVoxelOctree"]
-	path = src/external/src/SparseVoxelOctree
+	path = third_party/src/SparseVoxelOctree
 	url = https://github.com/AdamYuan/SparseVoxelOctree
 [submodule "tools/tiled"]
 	path = tools/tiled
 	url = https://github.com/mapeditor/tiled.git
 [submodule "src/external/FreeUSD"]
-	path = src/external/FreeUSD
+	path = third_party/FreeUSD
 	url = https://github.com/gopexllc/FreeUSD.git
 [submodule "src/external/idtech3backend"]
-	path = src/external/idtech3backend
+	path = third_party/idtech3backend
 	url = https://github.com/timfox/idtech3backend.git
