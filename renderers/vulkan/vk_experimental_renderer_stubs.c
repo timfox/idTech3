@@ -19,15 +19,27 @@ with USE_EXPERIMENTAL_RENDERERS=OFF. See docs/NEURAL_RENDERER_PHASES.md.
 #include "vk_wpt.h"
 #include "vk_mgs.h"
 #include "vk_wsp.h"
+#include "extensions/scaffold/vk_arc_blanc.h"
+#include "extensions/scaffold/vk_curast.h"
+#include "extensions/scaffold/vk_dressi.h"
+#include "extensions/scaffold/vk_iris.h"
+#include "extensions/scaffold/vk_mimir.h"
+#include "extensions/scaffold/vk_vuda.h"
+#include "extensions/rtx/vk_fsa.h"
+#include "extensions/rtx/vk_grtx.h"
+#include "extensions/rtx/vk_hybrid1.h"
+#include "extensions/rtx/vk_pathtrace.h"
+#include "extensions/rtx/vk_raygun.h"
+#include "extensions/splats/vk_squeezeme.h"
 
 #ifndef USE_EXPERIMENTAL_RENDERERS
 
 static void VK_ExpStubLogOnce( const char *tag )
 {
-	static qboolean s_logged[12];
+	static qboolean s_logged[13];
 	static const char *const s_tags[] = {
 		"NIV", "NIST", "NVC", "VFGI", "NDGI", "NSLM",
-		"RenderFormer", "VkSplat", "WPT", "MGS", "WSP", NULL
+		"RenderFormer", "VkSplat", "WPT", "MGS", "WSP", "ArcBlanc", NULL
 	};
 	int i;
 
@@ -154,5 +166,119 @@ void R_WSP_Shutdown( void ) {}
 void R_WSP_OnMapLoad( const char *mapBaseName ) { (void)mapBaseName; }
 void vk_wsp_apply_after_geometry( void ) {}
 qboolean R_WSP_Active( void ) { return qfalse; }
+
+/* --- SqueezeMe (splats; full path when USE_EXPERIMENTAL_RENDERERS=ON) --- */
+void R_SQZ_Init( void ) { (void)VK_ExpStubCvar( "r_squeezeme", "0", CVAR_ARCHIVE_ND | CVAR_LATCH ); }
+void R_SQZ_Shutdown( void ) {}
+void R_SQZ_OnMapLoad( const char *mapBaseName ) { (void)mapBaseName; }
+void R_SQZ_FrameUpdate( void ) {}
+void vk_sqz_apply_after_geometry( void ) {}
+qboolean R_SQZ_Active( void ) { return qfalse; }
+qboolean R_SQZ_Enabled( void ) { return qfalse; }
+int R_SQZ_EffectiveMgsTier( void ) { return 0; }
+
+/* --- Arc Blanc (scaffold; full path when USE_EXPERIMENTAL_RENDERERS=ON) --- */
+void R_ArcBlanc_Init( void )
+{
+	VK_ExpStubLogOnce( "ArcBlanc" );
+	(void)VK_ExpStubCvar( "r_arcBlanc", "0", CVAR_ARCHIVE );
+	(void)VK_ExpStubCvar( "r_arcBlancDraw", "1", CVAR_ARCHIVE );
+}
+void R_ArcBlanc_AddSurfaces( void ) {}
+void VK_ArcBlanc_Shutdown( void ) {}
+void RE_ArcBlancUploadHeightMap( const byte *rgba, int width, int height )
+{
+	(void)rgba;
+	(void)width;
+	(void)height;
+}
+qboolean RE_ArcBlancGpuOceanStep( const arcBlancGpuParams_t *params )
+{
+	(void)params;
+	return qfalse;
+}
+
+/* --- FSA (Forget Superresolution; full path when USE_EXPERIMENTAL_RENDERERS=ON) --- */
+void R_FSA_Init( void ) { (void)VK_ExpStubCvar( "r_fsa", "0", CVAR_ARCHIVE_ND | CVAR_LATCH ); }
+void R_FSA_Shutdown( void ) {}
+void R_FSA_OnMapLoad( const char *mapBaseName ) { (void)mapBaseName; }
+qboolean R_FSA_Active( void ) { return qfalse; }
+qboolean vk_fsa_rtx_adaptive_wanted( void ) { return qfalse; }
+void vk_fsa_build_importance_after_geometry( void ) {}
+void vk_fsa_denoise_after_rtx( VkCommandBuffer cmd ) { (void)cmd; }
+VkImageView vk_fsa_get_importance_view( void ) { return VK_NULL_HANDLE; }
+void vk_fsa_patch_rtx_trace_params( float traceParams[4], uint32_t frameSeed )
+{
+	(void)frameSeed;
+	if ( traceParams ) {
+		traceParams[0] = traceParams[1] = traceParams[2] = traceParams[3] = 0.0f;
+	}
+}
+void vk_fsa_write_rtx_importance_descriptor( VkDescriptorSet rtxSet ) { (void)rtxSet; }
+
+/* --- RTX profile extensions (raygun / hybrid1 / pathtrace / grtx) --- */
+void R_Raygun_Init( void ) { (void)VK_ExpStubCvar( "r_raygun", "0", CVAR_ARCHIVE_ND | CVAR_LATCH ); }
+void R_Raygun_Shutdown( void ) {}
+void vk_raygun_init( void ) {}
+void vk_raygun_shutdown( void ) {}
+void vk_raygun_frame_begin( void ) {}
+qboolean vk_raygun_active( void ) { return qfalse; }
+void vk_raygun_record_pass( VkCommandBuffer cmd ) { (void)cmd; }
+
+void R_GRTX_Init( void ) { (void)VK_ExpStubCvar( "r_grtx", "0", CVAR_ARCHIVE_ND | CVAR_LATCH ); }
+void R_GRTX_Shutdown( void ) {}
+void vk_grtx_init( void ) {}
+void vk_grtx_shutdown( void ) {}
+void vk_grtx_frame_begin( void ) {}
+void vk_grtx_on_map_load( const char *mapBaseName ) { (void)mapBaseName; }
+void vk_grtx_record_pass( VkCommandBuffer cmd ) { (void)cmd; }
+qboolean vk_grtx_active( void ) { return qfalse; }
+
+void vk_pathtrace_init( void ) {}
+void vk_pathtrace_shutdown( void ) {}
+void vk_pathtrace_frame_begin( void ) {}
+qboolean vk_pathtrace_active( void ) { return qfalse; }
+void vk_pathtrace_record_pass( VkCommandBuffer cmd ) { (void)cmd; }
+
+void vk_hybrid1_init( void ) {}
+void vk_hybrid1_shutdown( void ) {}
+void vk_hybrid1_frame_begin( void ) {}
+qboolean vk_hybrid1_active( void ) { return qfalse; }
+void vk_hybrid1_record_pass( VkCommandBuffer cmd ) { (void)cmd; }
+
+/* --- Scaffold profile extensions --- */
+void R_CuRast_Init( void ) { (void)VK_ExpStubCvar( "r_curast", "0", CVAR_ARCHIVE_ND | CVAR_LATCH ); }
+void R_CuRast_Shutdown( void ) {}
+qboolean R_CuRast_Active( void ) { return qfalse; }
+qboolean R_CuRast_RenderFrame( void ) { return qfalse; }
+
+void R_Dressi_Init( void ) { (void)VK_ExpStubCvar( "r_dressi", "0", CVAR_ARCHIVE_ND | CVAR_LATCH ); }
+void R_Dressi_Shutdown( void ) {}
+qboolean vk_dressi_active( void ) { return qfalse; }
+void vk_dressi_record_pass( VkCommandBuffer cmd ) { (void)cmd; }
+
+void R_Iris_Init( void ) { (void)VK_ExpStubCvar( "r_iris", "0", CVAR_ARCHIVE_ND | CVAR_LATCH ); }
+void R_Iris_Shutdown( void ) {}
+qboolean R_Iris_Active( void ) { return qfalse; }
+qboolean R_Iris_PanNewFOV( void ) { return qfalse; }
+qboolean vk_iris_overlay_active( void ) { return qfalse; }
+void vk_iris_record_overlay( VkCommandBuffer cmd ) { (void)cmd; }
+
+void R_Mimir_Init( void ) { (void)VK_ExpStubCvar( "r_mimir", "0", CVAR_ARCHIVE_ND | CVAR_LATCH ); }
+void R_Mimir_Shutdown( void ) {}
+qboolean R_Mimir_Active( void ) { return qfalse; }
+qboolean R_Mimir_RunStep( void ) { return qfalse; }
+
+void R_VUDA_Init( void ) { (void)VK_ExpStubCvar( "r_vuda", "0", CVAR_ARCHIVE_ND | CVAR_LATCH ); }
+void R_VUDA_Shutdown( void ) {}
+qboolean R_VUDA_Active( void ) { return qfalse; }
+qboolean R_VUDA_InteropReady( void ) { return qfalse; }
+qboolean R_VUDA_GetExportBundle( vudaExportBundle_t *out ) { (void)out; return qfalse; }
+qboolean R_VUDA_GetSlotExport( int slot, vudaSlotExport_t *out ) { (void)slot; (void)out; return qfalse; }
+void R_VUDA_TryBuildInterop( void ) {}
+void vk_vuda_frame_begin( void ) {}
+void vk_vuda_after_queue_submit( void ) {}
+qboolean vk_vuda_consume_compute_window( void ) { return qfalse; }
+void vk_vuda_notify_cuda_complete( uint64_t value ) { (void)value; }
 
 #endif /* !USE_EXPERIMENTAL_RENDERERS */

@@ -2814,7 +2814,7 @@ add_test(NAME test_squeezeme
 	WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
 set_tests_properties(test_squeezeme PROPERTIES
 	LABELS "scripts;validation;renderer"
-	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_squeezeme.sh;${CMAKE_SOURCE_DIR}/src/renderers/vulkan/vk_squeezeme.c")
+	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_squeezeme.sh;${CMAKE_SOURCE_DIR}/renderers/vulkan/extensions/splats/vk_squeezeme.c")
 
 add_test(NAME test_hybrid1
 	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_hybrid1.sh
@@ -2828,14 +2828,14 @@ add_test(NAME test_dressi
 	WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
 set_tests_properties(test_dressi PROPERTIES
 	LABELS "scripts;validation;renderer"
-	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_dressi.sh;${CMAKE_SOURCE_DIR}/src/renderers/vulkan/vk_dressi.c")
+	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_dressi.sh;${CMAKE_SOURCE_DIR}/renderers/vulkan/extensions/scaffold/vk_dressi.c")
 
 add_test(NAME test_raygun
 	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_raygun.sh
 	WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
 set_tests_properties(test_raygun PROPERTIES
 	LABELS "scripts;validation;renderer"
-	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_raygun.sh;${CMAKE_SOURCE_DIR}/src/renderers/vulkan/vk_raygun.c")
+	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_raygun.sh;${CMAKE_SOURCE_DIR}/renderers/vulkan/extensions/rtx/vk_raygun.c")
 
 add_test(NAME test_aiwc
 	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_aiwc.sh
@@ -3022,6 +3022,12 @@ add_test(NAME test_conditional_stubs
 set_tests_properties(test_conditional_stubs PROPERTIES
 	LABELS "scripts;renderer"
 	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_conditional_stubs.sh;${CMAKE_SOURCE_DIR}/src/renderers/vulkan/vk_experimental_renderer_stubs.c;${CMAKE_SOURCE_DIR}/src/renderers/common/tr_vector_font_stub.c")
+
+add_test(NAME test_q3_stock_smoke
+	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_q3_stock_smoke.sh ${CMAKE_SOURCE_DIR}/release)
+set_tests_properties(test_q3_stock_smoke PROPERTIES
+	LABELS "scripts;qvm;validation"
+	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_q3_stock_smoke.sh;${CMAKE_SOURCE_DIR}/runtime/client/core/cl_cgame.c")
 
 add_test(NAME test_platform_renderer_stubs
 	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_platform_renderer_stubs.sh)
@@ -3263,6 +3269,15 @@ if(BUILD_UNIT_TESTS)
 	target_include_directories(unit_macros PRIVATE ${CMAKE_SOURCE_DIR}/src ${CMAKE_SOURCE_DIR}/src/extensions/research)
 	add_test(NAME unit_macros COMMAND unit_macros)
 	set_tests_properties(unit_macros PROPERTIES LABELS "unit;validation")
+
+	add_executable(unit_qvm_abi tests/unit/test_qvm_abi.c)
+	target_include_directories(unit_qvm_abi PRIVATE
+		${CMAKE_SOURCE_DIR}/src
+		${CMAKE_SOURCE_DIR}/modules/game
+		${CMAKE_SOURCE_DIR}/renderers/common
+		${CMAKE_SOURCE_DIR}/src/extensions/research)
+	add_test(NAME unit_qvm_abi COMMAND unit_qvm_abi)
+	set_tests_properties(unit_qvm_abi PROPERTIES LABELS "unit;validation;qvm")
 
 	add_executable(unit_qmath tests/unit/test_q_math.c src/qcommon/q_math.c)
 	target_include_directories(unit_qmath PRIVATE ${CMAKE_SOURCE_DIR}/src ${CMAKE_SOURCE_DIR}/src/extensions/research)

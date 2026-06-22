@@ -4,7 +4,9 @@ Copyright (C) 2026 Gopex LLC. All rights reserved.
 ===========================================================================
 */
 
+extern "C" {
 #include "../tr_local.h"
+}
 #include "vk_imgui_scene.h"
 
 int VkImgScene_RefEntityCount( void )

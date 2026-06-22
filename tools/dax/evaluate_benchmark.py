@@ -47,7 +47,8 @@ def aggregate_embeddings(embeddings: np.ndarray, method: str) -> np.ndarray:
     if method == "abmil":
         torch, ABMIL, _MeanPoolMIL = _get_mil()
         x = torch.from_numpy(embeddings)
-        return ABMIL(EMBED_DIM)(x).numpy()
+        with torch.no_grad():
+            return ABMIL(EMBED_DIM)(x).detach().cpu().numpy()
     raise ValueError(f"unknown aggregation {method}")
 
 

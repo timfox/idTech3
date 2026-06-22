@@ -1229,6 +1229,9 @@ typedef enum {
 
 #define	RESERVED_CONFIGSTRINGS	2	// game can't modify below this, only the system can
 
+/* Stock Q3/OA cgame checks this in CG_INIT (bg_public.h index 20). */
+#define	CS_GAME_VERSION			20
+
 #define	MAX_GAMESTATE_CHARS	(2*1024*1024)	// was 16000; scales with MAX_MODELS+MAX_SOUNDS
 typedef struct {
 	int			stringOffsets[MAX_CONFIGSTRINGS];

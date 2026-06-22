@@ -12,6 +12,10 @@ Compiled as C++ with -fno-operator-names (tr_local.h uses `or` as a field name).
 
 #include "../../../qcommon/q_shared.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #define VK_IMGUI_SCENE_MORPH_MAX 8
 
 typedef struct {
@@ -93,5 +97,9 @@ qboolean VkImgScene_SortedShaderSnapshot( int sortedIndex, vkImgSceneShader_t *o
 int VkImgScene_NumModels( void );
 /* index 1..numModels-1 typical; writes model path + MOD_* type */
 qboolean VkImgScene_ModelSlot( int modelIndex, vkImgSceneModelSlot_t *out );
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* VK_IMGUI_SCENE_H */

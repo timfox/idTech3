@@ -14,12 +14,77 @@ Copyright (C) 2026 Gopex LLC. All rights reserved.
 #define CM_STREAM_SECTORS (CM_STREAM_GRID * CM_STREAM_GRID)
 
 static qboolean s_sectorLoaded[CM_STREAM_SECTORS];
+static qboolean s_classicBaseMap;
 static cm_stream_prefetch_f s_prefetchHandler;
 static cvar_t *cm_stream;
 static cvar_t *sv_sectorURL;
 static cvar_t *cl_sectorPrefetch;
 
+static qboolean CM_Stream_MapNameIsSectorChunk( const char *mapBase ) {
+	if ( !mapBase || !mapBase[0] ) {
+		return qfalse;
+	}
+	return !Q_stricmpn( mapBase, "sector_", 7 );
+}
+
+static qboolean CM_Stream_SectorOverlayPermitted( void ) {
+	if ( Cvar_VariableIntegerValue( "com_openWorldSmoke" ) ) {
+		return qtrue;
+	}
+	if ( s_classicBaseMap ) {
+		if ( Cvar_VariableIntegerValue( "r_openWorld" ) ) {
+			return qtrue;
+		}
+		return qfalse;
+	}
+	if ( cm_stream && cm_stream->integer ) {
+		return qtrue;
+	}
+	if ( Cvar_VariableIntegerValue( "sv_openWorld" ) ) {
+		return qtrue;
+	}
+	return qfalse;
+}
+
+void CM_Stream_Clear( void ) {
+	Com_Memset( s_sectorLoaded, 0, sizeof( s_sectorLoaded ) );
+	CM_Stream_Merge_ClearAll();
+}
+
+void CM_Stream_OnBaseMapLoad( const char *mapPath ) {
+	const char *base;
+	char mapBase[MAX_QPATH];
+	int len;
+
+	s_classicBaseMap = qtrue;
+	if ( !mapPath || !mapPath[0] ) {
+		return;
+	}
+
+	base = mapPath;
+	if ( !Q_stricmpn( base, "maps/", 5 ) ) {
+		base += 5;
+	}
+	Q_strncpyz( mapBase, base, sizeof( mapBase ) );
+	len = (int)strlen( mapBase );
+	if ( len > 4 && !Q_stricmp( mapBase + len - 4, ".bsp" ) ) {
+		mapBase[len - 4] = '\0';
+		len -= 4;
+	}
+	if ( CM_Stream_MapNameIsSectorChunk( mapBase ) ) {
+		s_classicBaseMap = qfalse;
+		return;
+	}
+
+	if ( Cvar_VariableIntegerValue( "cm_stream" ) ||
+		Cvar_VariableIntegerValue( "cm_streamMerge" ) ||
+		Cvar_VariableIntegerValue( "cm_openWorldCollision" ) ) {
+		Com_Printf( "[cm_stream] classic map %s — sector overlays require r_openWorld 1\n", mapPath );
+	}
+}
+
 void CM_Stream_Init( void ) {
+	s_classicBaseMap = qtrue;
 	cm_stream = Cvar_Get( "cm_stream", "0", CVAR_ARCHIVE );
 	Cvar_SetDescription( cm_stream,
 		"Enable sector BSP streaming (maps/sector_X_Y.bsp). Default off." );
@@ -71,6 +136,9 @@ void CM_Stream_UpdateView( const vec3_t viewOrigin, float radius, float sectorSi
 	if ( !cm_stream || !cm_stream->integer || !viewOrigin || radius <= 0.0f ) {
 		return;
 	}
+	if ( !CM_Stream_SectorOverlayPermitted() ) {
+		return;
+	}
 
 	CM_Stream_WorldToCell( viewOrigin, sectorSize, &centerX, &centerY );
 	cellRadius = (int)ceil( radius / sectorSize );
@@ -119,6 +187,9 @@ qboolean CM_Stream_LoadSector( int cellX, int cellY ) {
 	int checksum;
 
 	if ( !cm_stream || !cm_stream->integer ) {
+		return qfalse;
+	}
+	if ( !CM_Stream_SectorOverlayPermitted() ) {
 		return qfalse;
 	}
 

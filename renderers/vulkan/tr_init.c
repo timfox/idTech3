@@ -3155,7 +3155,7 @@ static void R_Register( void )
 
 	r_post = ri.Cvar_Get( "r_post", "1", CVAR_ARCHIVE_ND );
 	ri.Cvar_CheckRange( r_post, "0", "1", CV_INTEGER );
-	ri.Cvar_SetDescription( r_post, "Toggle the HDR post-processing pipeline (1=tonemap + gamma pass, 0=pass-through)." );
+	ri.Cvar_SetDescription( r_post, "HDR grading stack after world resolve (exposure + tonemap always run for world; 1=full grade/bloom knee/local exposure/LUT, 0=minimal resolve only)." );
 	ri.Cvar_SetGroup( r_post, CVG_RENDERER );
 
 	r_post_debug = ri.Cvar_Get( "r_post_debug", "0", CVAR_TEMP );

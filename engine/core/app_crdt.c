@@ -146,7 +146,7 @@ qboolean AppCrdt_ResolveBackendOsPath( const char *qpath, char *osOut, int osLen
 
 void AppCrdt_RefreshBackendRoot( void )
 {
-	const char *candidates[4];
+	const char *candidates[6];
 	int i;
 
 	if ( !com_app_crdt_backend || !com_app_crdt_backend->integer ) {
@@ -165,16 +165,20 @@ void AppCrdt_RefreshBackendRoot( void )
 	candidates[1] = NULL;
 #endif
 	{
-		static char relFromBase[MAX_OSPATH];
+		static char relThirdParty[MAX_OSPATH];
+		static char relLegacy[MAX_OSPATH];
 		const char *base = Cvar_VariableString( "fs_basepath" );
 		if ( base && base[0] ) {
-			Com_sprintf( relFromBase, sizeof( relFromBase ), "%s/src/external/idtech3backend", base );
-			candidates[2] = relFromBase;
+			Com_sprintf( relThirdParty, sizeof( relThirdParty ), "%s/third_party/idtech3backend", base );
+			Com_sprintf( relLegacy, sizeof( relLegacy ), "%s/src/external/idtech3backend", base );
+			candidates[2] = relThirdParty;
+			candidates[3] = relLegacy;
 		} else {
 			candidates[2] = NULL;
+			candidates[3] = NULL;
 		}
 	}
-	candidates[3] = NULL;
+	candidates[4] = NULL;
 
 	for ( i = 0; candidates[i]; i++ ) {
 		if ( AppCrdt_TrySetBackendRoot( candidates[i] ) ) {
@@ -625,7 +629,7 @@ void AppCrdt_Init( void )
 		"Enable idtech3backend submodule integration for App CRDT manifests and server/lua/ scripts." );
 	com_app_crdt_backend_root = Cvar_Get( "com_app_crdt_backend_root", "", CVAR_ARCHIVE );
 	Cvar_SetDescription( com_app_crdt_backend_root,
-		"Override idtech3backend root (default: submodule or fs_basepath/src/external/idtech3backend)." );
+		"Override idtech3backend root (default: compile-time submodule path or fs_basepath/third_party/idtech3backend)." );
 
 	AppCrdt_ParseVersion( com_app_crdt_version->string, &s_localVersion );
 	AppCrdt_RefreshBackendRoot();

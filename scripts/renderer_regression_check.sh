@@ -36,6 +36,9 @@ fi
 
 cd "$PROJECT_ROOT"
 
+source "$PROJECT_ROOT/tests/scripts/idtech3_test_paths.sh"
+idtech3_test_paths_init "$PROJECT_ROOT"
+
 PASS=0
 FAIL=0
 pass() { PASS=$((PASS + 1)); echo "  ✓ $1"; }
@@ -355,7 +358,7 @@ elif ! grep -q 'USE_VULKAN_RTX=ON' "$PROJECT_ROOT/src/renderers/vulkan/extension
   fail "vk_rtx.c missing RTX-off stub log"
 elif ! grep -q 'BUILD_FREETYPE=ON' "$PROJECT_ROOT/src/renderers/common/tr_font_stub.c" 2>/dev/null; then
   fail "tr_font_stub.c missing FreeType-off stub log"
-elif ! grep -q '#else /\* !USE_STEAM \*/' "$PROJECT_ROOT/src/client/cl_steam.c" 2>/dev/null; then
+elif ! grep -q '#else /\* !USE_STEAM \*/' "$IDTECH3_CLIENT/platform/cl_steam.c" 2>/dev/null; then
   fail "cl_steam.c missing USE_STEAM off stub branch"
 else
   pass "conditional stub paths wired (RTX, FreeType, experimental, Steam)"
@@ -365,9 +368,9 @@ echo ""
 echo "Platform renderer roadmap scaffolds (Metal / DXR / WebGPU):"
 if ! grep -q 'tr_platform_renderer_stub.c' "$CMAKE_ROOT" 2>/dev/null; then
   fail "CMakeLists.txt missing tr_platform_renderer_stub.c wiring"
-elif ! grep -q 'renderer_backend.h' "$PROJECT_ROOT/src/client/cl_ref.c" 2>/dev/null; then
+elif ! grep -q 'renderer_backend.h' "$IDTECH3_CLIENT/core/cl_ref.c" 2>/dev/null; then
   fail "cl_ref.c missing renderer_backend.h include"
-elif ! grep -q 'WEBGPU_ROADMAP.md' "$PROJECT_ROOT/src/client/cl_ref.c" 2>/dev/null; then
+elif ! grep -q 'WEBGPU_ROADMAP.md' "$IDTECH3_CLIENT/core/cl_ref.c" 2>/dev/null; then
   fail "cl_ref.c missing WebGPU roadmap fallback message"
 elif ! "$PROJECT_ROOT/scripts/check_webgpu_shader_portability.sh" >/dev/null 2>&1; then
   fail "check_webgpu_shader_portability.sh failed"
@@ -407,9 +410,9 @@ elif ! grep -q 'R_SpriteProps_Init' "$TR_INIT_VK" 2>/dev/null; then
   fail "tr_init.c should call R_SpriteProps_Init"
 elif ! grep -q 'r_spriteProps = ri.Cvar_Get' "$SP_C" 2>/dev/null; then
   fail "tr_sprite_props.c missing r_spriteProps cvar"
-elif ! grep -q 'CL_EngineSprites_AddFromSnapshot' "$PROJECT_ROOT/src/client/cl_cgame.c" 2>/dev/null; then
+elif ! grep -q 'CL_EngineSprites_AddFromSnapshot' "$IDTECH3_CLIENT/core/cl_cgame.c" 2>/dev/null; then
   fail "cl_cgame.c should call CL_EngineSprites_AddFromSnapshot before RenderScene"
-elif ! grep -q 'cl_engineSprites = Cvar_Get' "$PROJECT_ROOT/src/client/cl_engine_sprites.c" 2>/dev/null; then
+elif ! grep -q 'cl_engineSprites = Cvar_Get' "$IDTECH3_CLIENT/cl_engine_sprites.c" 2>/dev/null; then
   fail "cl_engine_sprites.c missing cl_engineSprites cvar"
 elif ! grep -q 'CS_ENGINE_SPRITE_SHADERS' "$PROJECT_ROOT/src/game/bg_public.h" 2>/dev/null; then
   fail "bg_public.h missing CS_ENGINE_SPRITE_SHADERS"
@@ -429,7 +432,7 @@ elif ! grep -q 'registerTable(L, "Sprites"' "$PROJECT_ROOT/src/game/g_lua_bindin
   fail "g_lua_bindings.c missing Engine.Sprites Lua table"
 elif ! grep -q 'CG_ENGINE_SPRITE_ADD_LOCAL' "$PROJECT_ROOT/src/cgame/cg_public.h" 2>/dev/null; then
   fail "cg_public.h missing CG_ENGINE_SPRITE_ADD_LOCAL cgame trap"
-elif ! grep -q 'CL_EngineSprite_AddLocalAtTime' "$PROJECT_ROOT/src/client/cl_engine_sprites.c" 2>/dev/null; then
+elif ! grep -q 'CL_EngineSprite_AddLocalAtTime' "$IDTECH3_CLIENT/cl_engine_sprites.c" 2>/dev/null; then
   fail "cl_engine_sprites.c missing AddLocalAtTime helper for cgame trap"
 else
   pass "engine-native sprite props (map entities + RE_AddEngineSpriteToScene)"
@@ -520,10 +523,13 @@ fi
 
 echo ""
 echo "Path trace experiment (Phase C6): vk_pathtrace + shaders:"
-PT_C="$PROJECT_ROOT/src/renderers/vulkan/vk_pathtrace.c"
-PT_RGEN="$PROJECT_ROOT/src/renderers/vulkan/shaders/glsl/pt_mega.rgen"
-PT_DENOISE="$PROJECT_ROOT/src/renderers/vulkan/shaders/glsl/pt_denoise.comp"
-PT_COMP="$PROJECT_ROOT/src/renderers/vulkan/shaders/glsl/pt_composite.comp"
+PT_C="$IDTECH3_RENDERERS/vulkan/extensions/rtx/vk_pathtrace.c"
+if [[ ! -f "$PT_C" ]]; then
+  PT_C="$IDTECH3_RENDERERS/vulkan/vk_pathtrace.c"
+fi
+PT_RGEN="$IDTECH3_RENDERERS/vulkan/shaders/glsl/pt_mega.rgen"
+PT_DENOISE="$IDTECH3_RENDERERS/vulkan/shaders/glsl/pt_denoise.comp"
+PT_COMP="$IDTECH3_RENDERERS/vulkan/shaders/glsl/pt_composite.comp"
 if [[ ! -f "$PT_C" ]]; then
   fail "vk_pathtrace.c missing"
 elif ! grep -q 'pipeline_denoise' "$PT_C" 2>/dev/null; then

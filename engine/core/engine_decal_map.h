@@ -11,6 +11,10 @@ Shared parser for misc_decal map entities.
 
 #include "q_shared.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 typedef struct {
 	vec3_t		origin;
 	float		radius;
@@ -29,5 +33,9 @@ typedef struct {
 
 void EngineDecalMap_Clear( engineDecalMapList_t *list );
 void EngineDecalMap_Parse( const char *entityString, engineDecalMapList_t *list );
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* ENGINE_DECAL_MAP_H */

@@ -99,6 +99,16 @@ void CM_Stream_Merge_Init( void ) {
 	Com_Memset( s_patches, 0, sizeof( s_patches ) );
 }
 
+void CM_Stream_Merge_ClearAll( void ) {
+	int i;
+
+	for ( i = 0; i < CM_MERGE_MAX_SECTORS; i++ ) {
+		if ( s_patches[i].active ) {
+			CM_Stream_FreePatch( &s_patches[i] );
+		}
+	}
+}
+
 qboolean CM_Stream_MergeSector( int cellX, int cellY ) {
 	char mapName[MAX_QPATH];
 	void *buf;

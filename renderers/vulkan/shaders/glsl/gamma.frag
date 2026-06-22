@@ -394,14 +394,17 @@ vec3 applyPostColorAdjust( vec3 ldr, bool postActive ) {
 	return ldr;
 }
 
-vec3 samplePostLdr( vec2 uv, bool postActive ) {
-	vec3 sampleHdr = applyWhiteBalance( sanitizeHdr( textureLod( texture0, uv, 0.0 ).rgb ) );
-	if ( postActive ) {
+vec3 samplePostLdr( vec2 uv, bool hdrResolve, bool postGrade ) {
+	vec3 sampleHdr = sanitizeHdr( textureLod( texture0, uv, 0.0 ).rgb );
+	if ( hdrResolve ) {
+		sampleHdr = applyWhiteBalance( sampleHdr );
+	}
+	if ( postGrade ) {
 		sampleHdr = applyLocalExposure( uv, sampleHdr );
 	}
 	vec3 sampleExposed = sampleHdr * max( paniniPC.brightness, 0.0 );
 
-	if ( postActive ) {
+	if ( hdrResolve ) {
 		float exposureScale = exp2( postfx.colorBalance.z );
 		sampleExposed *= max( paniniPC.exposure * exposureScale, 0.01 );
 		sampleExposed *= postPreExposureScale();
@@ -409,7 +412,7 @@ vec3 samplePostLdr( vec2 uv, bool postActive ) {
 		sampleExposed = doTonemap( sampleExposed );
 	}
 
-	return applyPostColorAdjust( clamp( sampleExposed, 0.0, 1.0 ), postActive );
+	return applyPostColorAdjust( clamp( sampleExposed, 0.0, 1.0 ), postGrade );
 }
 
 /* Linear depth from depth buffer (0=near, 1=far). Assumes perspective depth. */
@@ -421,8 +424,8 @@ float linearDepthFromBuffer( float depthNdc ) {
 }
 
 /* Camera motion blur: sample along velocity vector. */
-vec3 applyMotionBlur( vec3 ldr, vec2 uv, bool postActive ) {
-	if ( !postActive || postfx.motionBlur.x < 0.5 || postfx.frameInfo.w < 0.5 )
+vec3 applyMotionBlur( vec3 ldr, vec2 uv, bool postGrade ) {
+	if ( !postGrade || postfx.motionBlur.x < 0.5 || postfx.frameInfo.w < 0.5 )
 		return ldr;
 	float depthNdc = textureLod( depthTex, uv, 0.0 ).r;
 	if ( depthNdc <= 0.0 || depthNdc >= 1.0 )
@@ -449,15 +452,15 @@ vec3 applyMotionBlur( vec3 ldr, vec2 uv, bool postActive ) {
 		if ( any( lessThan( suv, vec2( 0.0 ) ) ) || any( greaterThan( suv, vec2( 1.0 ) ) ) )
 			continue;
 		float w = 1.0 - abs( t ) * 2.0;
-		acc += samplePostLdr( suv, postActive ) * w;
+		acc += samplePostLdr( suv, true, postGrade ) * w;
 		wacc += w;
 	}
 	return acc / wacc;
 }
 
 /* Depth of field: simple separable blur weighted by circle-of-confusion. */
-vec3 applyDepthOfField( vec3 ldr, vec2 uv, bool postActive ) {
-	if ( !postActive || postfx.depthOfField.x < 0.5 )
+vec3 applyDepthOfField( vec3 ldr, vec2 uv, bool postGrade ) {
+	if ( !postGrade || postfx.depthOfField.x < 0.5 )
 		return ldr;
 	float depthNdc = textureLod( depthTex, uv, 0.0 ).r;
 	if ( depthNdc <= 0.0 || depthNdc >= 1.0 )
@@ -482,7 +485,7 @@ vec3 applyDepthOfField( vec3 ldr, vec2 uv, bool postActive ) {
 		vec2 suv = uv + offset;
 		if ( any( lessThan( suv, vec2( 0.0 ) ) ) || any( greaterThan( suv, vec2( 1.0 ) ) ) )
 			continue;
-		acc += samplePostLdr( suv, postActive );
+		acc += samplePostLdr( suv, true, postGrade );
 		wacc += 1.0;
 	}
 	return acc / wacc;
@@ -556,14 +559,17 @@ void main() {
 	}
 
 	uv = to_src_uv( uvLogical );
-	vec3 hdr = applyWhiteBalance( sanitizeHdr( textureLod( texture0, uv, 0.0 ).rgb ) );
 	bool noWorldLdr = paniniPC.paniniPad1 > 0.5;
-	bool postActive = postEnabled() && !noWorldLdr;
-	if ( postActive ) {
+	bool hdrResolveActive = !noWorldLdr;
+	bool postGradeActive = postEnabled() && hdrResolveActive;
+	vec3 hdr = hdrResolveActive ?
+		applyWhiteBalance( sanitizeHdr( textureLod( texture0, uv, 0.0 ).rgb ) ) :
+		sanitizeHdr( textureLod( texture0, uv, 0.0 ).rgb );
+	if ( postGradeActive ) {
 		hdr = applyLocalExposure( uv, hdr );
 	}
 	vec3 hdr_exposed = hdr * max( paniniPC.brightness, 0.0 );
-	if ( postActive ) {
+	if ( hdrResolveActive ) {
 		float exposureScale = exp2( postfx.colorBalance.z );
 		hdr_exposed *= max( paniniPC.exposure * exposureScale, 0.01 );
 		hdr_exposed *= postPreExposureScale();
@@ -571,12 +577,12 @@ void main() {
 	}
 
 	vec3 tonemapped = hdr_exposed;
-	if ( postActive ) {
+	if ( hdrResolveActive ) {
 		tonemapped = doTonemap( tonemapped );
 	}
 
 	vec3 ldr;
-	if ( postActive && debugMode != 0 ) {
+	if ( hdrResolveActive && postGradeActive && debugMode != 0 ) {
 		if ( debugMode == 1 ) {
 			ldr = clamp( hdr_exposed, 0.0, 10.0 ) * 0.1;
 		} else {
@@ -586,14 +592,14 @@ void main() {
 			ldr = vec3( heat, clamp( heat * 0.25, 0.0, 1.0 ), 1.0 - heat );
 		}
 	} else {
-		ldr = applyPostColorAdjust( clamp( tonemapped, 0.0, 1.0 ), postActive );
+		ldr = applyPostColorAdjust( clamp( tonemapped, 0.0, 1.0 ), postGradeActive );
 
-		if ( postActive && postSharpenStrength() > 0.0 ) {
+		if ( postGradeActive && postSharpenStrength() > 0.0 ) {
 			vec2 texel = 1.0 / vec2( textureSize( texture0, 0 ) );
-			vec3 ldrL = samplePostLdr( clamp( uv + vec2( -texel.x, 0.0 ), 0.0, 1.0 ), postActive );
-			vec3 ldrR = samplePostLdr( clamp( uv + vec2(  texel.x, 0.0 ), 0.0, 1.0 ), postActive );
-			vec3 ldrU = samplePostLdr( clamp( uv + vec2( 0.0, -texel.y ), 0.0, 1.0 ), postActive );
-			vec3 ldrD = samplePostLdr( clamp( uv + vec2( 0.0,  texel.y ), 0.0, 1.0 ), postActive );
+			vec3 ldrL = samplePostLdr( clamp( uv + vec2( -texel.x, 0.0 ), 0.0, 1.0 ), hdrResolveActive, postGradeActive );
+			vec3 ldrR = samplePostLdr( clamp( uv + vec2(  texel.x, 0.0 ), 0.0, 1.0 ), hdrResolveActive, postGradeActive );
+			vec3 ldrU = samplePostLdr( clamp( uv + vec2( 0.0, -texel.y ), 0.0, 1.0 ), hdrResolveActive, postGradeActive );
+			vec3 ldrD = samplePostLdr( clamp( uv + vec2( 0.0,  texel.y ), 0.0, 1.0 ), hdrResolveActive, postGradeActive );
 			vec3 blur = ( ldrL + ldrR + ldrU + ldrD ) * 0.25;
 			float edge = max( dot( ldr, sRGB ) - dot( blur, sRGB ), 0.0 );
 			float adaptive = smoothstep( 0.01, 0.20, edge );
@@ -606,8 +612,8 @@ void main() {
 			ldr = clamp( mix( ldr, sharpened, adaptive ), 0.0, 1.0 );
 		}
 
-		ldr = applyMotionBlur( ldr, uv, postActive );
-		ldr = applyDepthOfField( ldr, uv, postActive );
+		ldr = applyMotionBlur( ldr, uv, postGradeActive );
+		ldr = applyDepthOfField( ldr, uv, postGradeActive );
 
 		if ( postGreyscale() == 1.0 ) {
 			ldr = vec3( dot( ldr, sRGB ) );
@@ -620,7 +626,7 @@ void main() {
 		}
 	}
 
-	if ( postChromaticAberration() > 0.0 && postActive ) {
+	if ( postChromaticAberration() > 0.0 && postGradeActive ) {
 		vec2 caUV = uvLogical;
 		float exposureScale = exp2( postfx.colorBalance.z );
 		vec2 caOffset = (caUV - 0.5) * postChromaticAberration() * 0.01;
@@ -645,13 +651,13 @@ void main() {
 		ldr = clamp( caTone, 0.0, 1.0 );
 	}
 
-	if ( postOutlineStrength() > 0.0 && postActive ) {
+	if ( postOutlineStrength() > 0.0 && postGradeActive ) {
 		vec2 outlineTexel = 1.0 / vec2( textureSize( texture0, 0 ) );
-		float lumC  = dot( textureLod( texture0, uv, 0.0 ).rgb, vec3(0.299, 0.587, 0.114) );
-		float lumL  = dot( textureLod( texture0, uv + vec2(-outlineTexel.x, 0.0), 0.0 ).rgb, vec3(0.299, 0.587, 0.114) );
-		float lumR  = dot( textureLod( texture0, uv + vec2( outlineTexel.x, 0.0), 0.0 ).rgb, vec3(0.299, 0.587, 0.114) );
-		float lumU  = dot( textureLod( texture0, uv + vec2(0.0, -outlineTexel.y), 0.0 ).rgb, vec3(0.299, 0.587, 0.114) );
-		float lumD  = dot( textureLod( texture0, uv + vec2(0.0,  outlineTexel.y), 0.0 ).rgb, vec3(0.299, 0.587, 0.114) );
+		float lumC  = dot( textureLod( texture0, uv, 0.0 ).rgb, sRGB );
+		float lumL  = dot( textureLod( texture0, uv + vec2(-outlineTexel.x, 0.0), 0.0 ).rgb, sRGB );
+		float lumR  = dot( textureLod( texture0, uv + vec2( outlineTexel.x, 0.0), 0.0 ).rgb, sRGB );
+		float lumU  = dot( textureLod( texture0, uv + vec2(0.0, -outlineTexel.y), 0.0 ).rgb, sRGB );
+		float lumD  = dot( textureLod( texture0, uv + vec2(0.0,  outlineTexel.y), 0.0 ).rgb, sRGB );
 		float edgeH = abs( lumL - lumR );
 		float edgeV = abs( lumU - lumD );
 		float edge  = sqrt( edgeH * edgeH + edgeV * edgeV );
@@ -659,7 +665,7 @@ void main() {
 		ldr = mix( ldr, vec3(0.0), outlineMask * postOutlineStrength() );
 	}
 
-	if ( postVignetteIntensity() > 0.0 && postActive ) {
+	if ( postVignetteIntensity() > 0.0 && postGradeActive ) {
 		vec2 vigUV = uvLogical * 2.0 - 1.0;
 		float vigDist = length( vigUV );
 		float vig = 1.0 - smoothstep( postVignetteRadius(), postVignetteRadius() + 0.5, vigDist );
@@ -669,7 +675,7 @@ void main() {
 
 	/* Film grain: film_look = Source-style (luminance-dependent, soft-light);
 	   else film_grain = simple additive. */
-	if ( postFilmLook() != 0 && postFilmGrain() > 0.0 && postActive ) {
+	if ( postFilmLook() != 0 && postFilmGrain() > 0.0 && postGradeActive ) {
 		/* Source Engine–style film grain (DoD:S, L4D): luminance-dependent, fine-grained,
 		   soft-light blend. Grain peaks in mid-tones, fades in shadows/highlights.
 		   r_filmGrain scales intensity (0.5–1.5x) when film_look is on. */
@@ -701,7 +707,7 @@ void main() {
 			? ( 2.0 * base.b * blend.b + base.b * base.b * ( 1.0 - 2.0 * blend.b ) )
 			: ( sqrt( base.b ) * ( 2.0 * blend.b - 1.0 ) + 2.0 * base.b * ( 1.0 - blend.b ) );
 		ldr = clamp( result, 0.0, 1.0 );
-	} else if ( postFilmGrain() > 0.0 && postActive ) {
+	} else if ( postFilmGrain() > 0.0 && postGradeActive ) {
 		/* Simple additive grain when film_look is off */
 		float t = paniniPC.paniniPad0;
 		float grainSeed = fract( sin( dot( gl_FragCoord.xy + vec2( t * 173.0, t * 79.0 ), vec2( 12.9898, 78.233 ) ) ) * 43758.5453 );

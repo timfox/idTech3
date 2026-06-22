@@ -1617,8 +1617,8 @@ static image_t *R_BuildSDRSpecGlossImage(shaderStage_t *stage, const char *specI
 		currentColor[1] = ByteToFloat(specPic[i + 1]);
 		currentColor[2] = ByteToFloat(specPic[i + 2]);
 
-		float ratio = 
-			(sRGBtoRGB(currentColor[0]) + sRGBtoRGB(currentColor[1]) + sRGBtoRGB(currentColor[1])) /
+		float ratio =
+			(sRGBtoRGB(currentColor[0]) + sRGBtoRGB(currentColor[1]) + sRGBtoRGB(currentColor[2])) /
 			(currentColor[0] + currentColor[1] + currentColor[2]);
 
 		sdrSpecPic[i + 0] = FloatToByte(currentColor[0] * ratio);
