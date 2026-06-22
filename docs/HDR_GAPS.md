@@ -78,6 +78,18 @@ Both feed into linear HDR; no conflict.
 
 **Desirable**: On dark monitors or legacy maps authored for CRT gamma, raising `r_gamma` brightens both display and lights-often what users expect. **Problematic**: When using HDR + tonemap, `r_gamma` changes light intensity without changing display gamma (handled by gamma pass), so lights can look too bright or too dim relative to the tonemapped scene. Prefer `r_exposure` or `r_exposure_auto` for HDR brightness control.
 
+## 6.9 Color pipeline tiers (gamma pass)
+
+**World resolve** (menus/UI skip via `paniniPad1`): exposure (`r_exposure` / auto), pre-exposure (`r_pre_exposure_scale`), bloom knee, tonemap (`r_tonemap`), then display encode (`r_gamma` via `apply_srgb_gamma` when the swapchain is UNORM).
+
+**Grading stack** (`r_post` 1): local exposure, white balance, LUT, contrast/saturation, motion blur, DOF, chromatic aberration, vignette, film grain, outline — all gated separately from resolve so `r_post 0` still tonemaps HDR instead of hard-clipping to 1.0.
+
+**Swapchain**: `apply_srgb_gamma` is 0 for `*_SRGB` present formats (hardware encodes); linear UNORM gets shader gamma from `r_gamma`. Hardware gamma tables are bypassed when `vk.fboActive` (`s_gammatable_linear`).
+
+**Lightmaps**: `r_lightmap_srgb_decode` 1 decodes gamma-encoded BSP lightmaps in `gen_frag` when `r_hdr` is on. Albedo PBR paths use `VK_FORMAT_R8G8B8A8_SRGB` via `vk_create_pbr_albedo_srgb`.
+
+**Known legacy coupling**: `VK_SetLightParams` only applies `r_intensity`/`r_gamma` scaling when hardware gamma is off and FBO is off; HDR FBO uses raw `dl->color`.
+
 ## 6.8 TAA (`r_taa`)
 
 **Current**: Optional temporal resolve after the post-fog source (SMAA / volumetrics), before luminance and gamma. Uses `vk_temporal` reset policy (resize, map load, camera cut, missing prev matrices) and skips the pass on portals, `RDF_NOWORLDMODEL`, first-person projection toggles, and **unreliable motion** (e.g. `customShader` vertex deformation).

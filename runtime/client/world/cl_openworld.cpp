@@ -517,6 +517,18 @@ extern "C" void CL_OpenWorld_OnConfigstring( const char *sectorList ) {
 	if ( !sectorList ) {
 		sectorList = "";
 	}
+	if ( !sectorList[0] ) {
+		if ( cl_openWorldLastSync[0] ) {
+			clOpenWorldCell_t keep[1];
+			CL_OpenWorld_SyncUnloadRemoved( keep, 0 );
+			cl_openWorldLastSync[0] = '\0';
+		}
+		return;
+	}
+	if ( !Cvar_VariableIntegerValue( "r_openWorld" ) ) {
+		Com_DPrintf( "[world_open] ignoring sector sync (r_openWorld 0): %s\n", sectorList );
+		return;
+	}
 	if ( !strcmp( sectorList, cl_openWorldLastSync ) ) {
 		return;
 	}

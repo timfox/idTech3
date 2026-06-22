@@ -14,9 +14,11 @@ extern "C" {
 
 #ifdef USE_OPEN_WORLD
 void SV_OpenWorld_Init( void );
+void SV_OpenWorld_OnMapLoad( const char *mapname );
 void SV_OpenWorld_Frame( void );
 #else
 static inline void SV_OpenWorld_Init( void ) {}
+static inline void SV_OpenWorld_OnMapLoad( const char *mapname ) { (void)mapname; }
 static inline void SV_OpenWorld_Frame( void ) {}
 #endif
 

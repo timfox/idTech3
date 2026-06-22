@@ -14,6 +14,37 @@ static cvar_t *sv_openWorld;
 static cvar_t *sv_openWorldCollision;
 static cvar_t *sv_openWorldSync;
 static char sv_openWorldSectorList[256];
+static qboolean sv_openWorldClassicMap;
+
+static qboolean SV_OpenWorld_MapIsClassic( const char *mapname ) {
+	if ( !mapname || !mapname[0] ) {
+		return qtrue;
+	}
+	return Q_stricmpn( mapname, "sector_", 7 ) != 0;
+}
+
+/*
+===============
+SV_OpenWorld_OnMapLoad
+===============
+*/
+void SV_OpenWorld_OnMapLoad( const char *mapname ) {
+	sv_openWorldClassicMap = SV_OpenWorld_MapIsClassic( mapname );
+	sv_openWorldSectorList[0] = '\0';
+	SV_SetConfigstring( CS_ENGINE_OPENWORLD_SECTORS, "" );
+
+	if ( !sv_openWorldClassicMap ) {
+		return;
+	}
+
+	if ( sv_openWorld && sv_openWorld->integer &&
+		!Cvar_VariableIntegerValue( "r_openWorld" ) &&
+		!Cvar_VariableIntegerValue( "com_openWorldSmoke" ) ) {
+		Com_Printf( S_COLOR_YELLOW
+			"[sv_openworld] ignoring sv_openWorld on classic map %s (set r_openWorld 1 for sector overlays)\n",
+			mapname );
+	}
+}
 
 /*
 ===============
@@ -68,6 +99,11 @@ void SV_OpenWorld_Frame( void ) {
 	float radius;
 
 	if ( !sv_openWorld || !sv_openWorld->integer || !com_sv_running->integer ) {
+		return;
+	}
+	if ( sv_openWorldClassicMap &&
+		!Cvar_VariableIntegerValue( "r_openWorld" ) &&
+		!Cvar_VariableIntegerValue( "com_openWorldSmoke" ) ) {
 		return;
 	}
 	if ( !Cvar_VariableIntegerValue( "cm_stream" ) ) {

@@ -5,6 +5,8 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 INIT="$PROJECT_ROOT/scripts/init_optional_submodules.sh"
+source "$PROJECT_ROOT/tests/scripts/idtech3_test_paths.sh"
+idtech3_test_paths_init "$PROJECT_ROOT"
 
 fail() {
 	echo "FAIL: $*" >&2
@@ -19,12 +21,16 @@ if "$INIT" 2>/dev/null; then
 	fail "must require --tiled, --svo, --freeusd, --backend, or --all"
 fi
 
-if ! grep -qF 'path = src/external/FreeUSD' "$PROJECT_ROOT/.gitmodules"; then
-	fail ".gitmodules missing src/external/FreeUSD"
+FREEUSD_PATH="$(idtech3_submodule_path freeusd)"
+BACKEND_PATH="$(idtech3_submodule_path backend)"
+SVO_PATH="$(idtech3_submodule_path svo)"
+
+if ! grep -qF "path = $FREEUSD_PATH" "$PROJECT_ROOT/.gitmodules"; then
+	fail ".gitmodules missing $FREEUSD_PATH"
 fi
 
-if ! grep -qF 'path = src/external/idtech3backend' "$PROJECT_ROOT/.gitmodules"; then
-	fail ".gitmodules missing src/external/idtech3backend"
+if ! grep -qF "path = $BACKEND_PATH" "$PROJECT_ROOT/.gitmodules"; then
+	fail ".gitmodules missing $BACKEND_PATH"
 fi
 
 out="$("$INIT" --svo --dry-run 2>&1)" || fail "--svo --dry-run failed"

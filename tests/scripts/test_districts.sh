@@ -23,12 +23,12 @@ rg -q 'CL_District_Init' src/client/world/cl_district.cpp
 rg -q 'CL_District_Frame' src/client/world/cl_district.cpp
 rg -q 'BuildEngineSceneSnapshot' src/client/world/cl_district.cpp
 rg -q 'CL_District_Init' src/client/core/cl_main.c
-rg -q 'CL_District_Frame' src/client/cl_gameframe.c
+rg -q 'CL_District_Frame' src/client/core/cl_gameframe.c
 rg -q 'CL_District_AddRefEntitiesToScene' src/client/world/cl_district.cpp
-rg -q 'CL_RenderSceneWithDistricts' src/client/cl_ref.c
+rg -q 'CL_RenderSceneWithDistricts' src/client/core/cl_ref.c
 rg -q 'r_districtDraw' src/client/world/cl_district.cpp
-rg -q 'world_district.cpp' CMakeLists.txt
-rg -q 'cl_district.cpp' CMakeLists.txt
+rg -q 'world_district.cpp' cmake/IdTech3QcommonExtensions.cmake
+rg -q 'cl_district.cpp' cmake/client/ClientExtensionSources.cmake
 
 echo "[test_districts] USDA fixtures..."
 test -f tests/data/usd/world_playfield.usda

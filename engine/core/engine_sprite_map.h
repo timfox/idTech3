@@ -13,6 +13,10 @@ and regression tests.
 
 #include "q_shared.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 typedef enum {
 	ENGINE_SPRITE_BILLBOARD = 0,
 	ENGINE_SPRITE_FLIPBOOK,
@@ -41,5 +45,9 @@ typedef struct {
 
 void EngineSpriteMap_Clear( engineSpriteMapList_t *list );
 void EngineSpriteMap_Parse( const char *entityString, engineSpriteMapList_t *list );
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* ENGINE_SPRITE_MAP_H */

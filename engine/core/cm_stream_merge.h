@@ -13,6 +13,7 @@ without replacing CM_LoadMap (open-world walkable streaming).
 #include "q_shared.h"
 
 void     CM_Stream_Merge_Init( void );
+void     CM_Stream_Merge_ClearAll( void );
 qboolean CM_Stream_MergeSector( int cellX, int cellY );
 void     CM_Stream_UnmergeSector( int cellX, int cellY );
 qboolean CM_Stream_IsSectorMerged( int cellX, int cellY );

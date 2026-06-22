@@ -98,6 +98,7 @@ static qboolean vk_post_process_format_is_srgb( VkFormat format )
 	switch ( format ) {
 		case VK_FORMAT_R8G8B8A8_SRGB:
 		case VK_FORMAT_B8G8R8A8_SRGB:
+		case VK_FORMAT_A8B8G8R8_SRGB_PACK32:
 			return qtrue;
 		default:
 			return qfalse;

@@ -1075,6 +1075,9 @@ qboolean RE_BspStream_MergeSector( int cellX, int cellY, float sectorSize ) {
 	if ( !r_bspStream || !r_bspStream->integer ) {
 		return qfalse;
 	}
+	if ( !Cvar_VariableIntegerValue( "r_openWorld" ) ) {
+		return qfalse;
+	}
 	if ( R_BspStream_FindPatch( cellX, cellY ) >= 0 ) {
 		return qtrue;
 	}

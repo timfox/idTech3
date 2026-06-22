@@ -31,6 +31,41 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 /*
 ===============
+SV_EnsureGameVersionConfigstring
+
+Retail qagame sets CS_GAME_VERSION in worldspawn; stock cgame.qvm aborts in CG_INIT
+when it is missing. If the game VM did not publish it (trap/ABI edge cases), derive
+from gamename (stock qagame sets gamename to BASEGAME) or fall back to baseq3-1.
+===============
+*/
+void SV_EnsureGameVersionConfigstring( void ) {
+	const char *existing;
+	const char *gamename;
+	char expected[32];
+
+	existing = sv.configstrings[CS_GAME_VERSION];
+	gamename = Cvar_VariableString( "gamename" );
+	if ( !gamename || !gamename[0] ) {
+		gamename = "baseq3";
+	}
+	Com_sprintf( expected, sizeof( expected ), "%s-1", gamename );
+
+	if ( existing && !strcmp( existing, expected ) ) {
+		return;
+	}
+
+	SV_SetConfigstring( CS_GAME_VERSION, expected );
+	if ( !existing || !existing[0] ) {
+		Com_Printf( S_COLOR_YELLOW
+			"[server] CS_GAME_VERSION missing after game init; set to %s\n", expected );
+	} else {
+		Com_Printf( S_COLOR_YELLOW
+			"[server] CS_GAME_VERSION was '%s'; corrected to %s\n", existing, expected );
+	}
+}
+
+/*
+===============
 SV_SendConfigstring
 
 Creates and sends the server command necessary to update the CS index for the
@@ -538,6 +573,7 @@ void SV_SpawnServer( const char *mapname, qboolean killBots ) {
 
 	Sys_SetStatus( "Loading map %s", mapname );
 	CM_LoadMap( va( "maps/%s.bsp", mapname ), qfalse, &checksum );
+	SV_OpenWorld_OnMapLoad( mapname );
 
 	SV_EngineSprites_LoadMap( CM_EntityString() );
 	SV_EngineDecals_LoadMap( CM_EntityString() );
@@ -565,6 +601,8 @@ void SV_SpawnServer( const char *mapname, qboolean killBots ) {
 
 	// load and spawn all other entities
 	SV_InitGameProgs();
+
+	SV_EnsureGameVersionConfigstring();
 
 	SV_EngineSprites_SpawnMapEntities();
 	SV_EngineDecals_SpawnMapEntities();

@@ -14,6 +14,8 @@ Sector BSP streaming v1 (broadphase chunks per grid cell).
 typedef void ( *cm_stream_prefetch_f )( const char *localName, const char *remoteURL );
 
 void CM_Stream_Init( void );
+void CM_Stream_Clear( void );
+void CM_Stream_OnBaseMapLoad( const char *mapPath );
 void CM_Stream_SetPrefetchHandler( cm_stream_prefetch_f handler );
 void CM_Stream_WorldToCell( const vec3_t origin, float sectorSize, int *cellX, int *cellY );
 qboolean CM_Stream_LoadSector( int cellX, int cellY );

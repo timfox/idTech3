@@ -53,6 +53,22 @@ typedef struct {
 	int  dataCount;
 } legacyGameState_t;
 
+/*
+ * Retail cgame.qvm snapshot_t layout (cg_public.h). Must match the QVM struct
+ * exactly — do not grow without a new CGAME_IMPORT_API_VERSION.
+ */
+typedef struct {
+	int				snapFlags;
+	int				ping;
+	int				serverTime;
+	byte			areamask[MAX_MAP_AREA_BYTES];
+	playerState_t	ps;
+	int				numEntities;
+	entityState_t	entities[MAX_ENTITIES_IN_SNAPSHOT];
+	int				numServerCommands;
+	int				serverCommandSequence;
+} legacySnapshot_t;
+
 static void CL_GetLegacyGameState( legacyGameState_t *gs ) {
 	int i;
 
@@ -140,10 +156,14 @@ static void CL_GetCurrentSnapshotNumber( int *snapshotNumber, int *serverTime ) 
 
 /*
 ====================
-CL_GetSnapshot
+CL_FillSnapshot
+
+Shared snapshot assembly for native and QVM cgame paths.
 ====================
 */
-static qboolean CL_GetSnapshot( int snapshotNumber, snapshot_t *snapshot ) {
+static qboolean CL_FillSnapshot( int snapshotNumber, int *snapFlags, int *serverCommandSequence,
+	int *ping, int *serverTime, byte *areamask, playerState_t *ps, int *numEntities,
+	entityState_t *entities, int maxEntities ) {
 	clSnapshot_t	*clSnap;
 	int				i, count;
 
@@ -151,44 +171,55 @@ static qboolean CL_GetSnapshot( int snapshotNumber, snapshot_t *snapshot ) {
 		Com_Error( ERR_DROP, "CL_GetSnapshot: snapshotNumber (%i) > cl.snapshot.messageNum (%i)", snapshotNumber, cl.snap.messageNum );
 	}
 
-	// if the frame has fallen out of the circular buffer, we can't return it
 	if ( cl.snap.messageNum - snapshotNumber >= PACKET_BACKUP ) {
 		return qfalse;
 	}
 
-	// if the frame is not valid, we can't return it
 	clSnap = &cl.snapshots[snapshotNumber & PACKET_MASK];
 	if ( !clSnap->valid ) {
 		return qfalse;
 	}
 
-	// if the entities in the frame have fallen out of their
-	// circular buffer, we can't return it
 	if ( cl.parseEntitiesNum - clSnap->parseEntitiesNum >= MAX_PARSE_ENTITIES ) {
 		return qfalse;
 	}
 
-	// write the snapshot
-	snapshot->snapFlags = clSnap->snapFlags;
-	snapshot->serverCommandSequence = clSnap->serverCommandNum;
-	snapshot->ping = clSnap->ping;
-	snapshot->serverTime = clSnap->serverTime;
-	Com_Memcpy( snapshot->areamask, clSnap->areamask, sizeof( snapshot->areamask ) );
-	snapshot->ps = clSnap->ps;
-	count = clSnap->numEntities;
-	if ( count > MAX_ENTITIES_IN_SNAPSHOT ) {
-		Com_DPrintf( "CL_GetSnapshot: truncated %i entities to %i\n", count, MAX_ENTITIES_IN_SNAPSHOT );
-		count = MAX_ENTITIES_IN_SNAPSHOT;
-	}
-	snapshot->numEntities = count;
-	for ( i = 0 ; i < count ; i++ ) {
-		snapshot->entities[i] =
-			cl.parseEntities[ ( clSnap->parseEntitiesNum + i ) & (MAX_PARSE_ENTITIES-1) ];
-	}
+	*snapFlags = clSnap->snapFlags;
+	*serverCommandSequence = clSnap->serverCommandNum;
+	*ping = clSnap->ping;
+	*serverTime = clSnap->serverTime;
+	Com_Memcpy( areamask, clSnap->areamask, sizeof( clSnap->areamask ) );
+	*ps = clSnap->ps;
 
-	/* Note: configstring changes and server commands may need coordination. */
+	count = clSnap->numEntities;
+	if ( count > maxEntities ) {
+		Com_DPrintf( "CL_GetSnapshot: truncated %i entities to %i\n", count, maxEntities );
+		count = maxEntities;
+	}
+	*numEntities = count;
+	for ( i = 0; i < count; i++ ) {
+		entities[i] =
+			cl.parseEntities[ ( clSnap->parseEntitiesNum + i ) & (MAX_PARSE_ENTITIES - 1) ];
+	}
 
 	return qtrue;
+}
+
+static qboolean CL_GetLegacySnapshot( int snapshotNumber, legacySnapshot_t *snapshot ) {
+	return CL_FillSnapshot( snapshotNumber, &snapshot->snapFlags, &snapshot->serverCommandSequence,
+		&snapshot->ping, &snapshot->serverTime, snapshot->areamask, &snapshot->ps,
+		&snapshot->numEntities, snapshot->entities, MAX_ENTITIES_IN_SNAPSHOT );
+}
+
+/*
+====================
+CL_GetSnapshot
+====================
+*/
+static qboolean CL_GetSnapshot( int snapshotNumber, snapshot_t *snapshot ) {
+	return CL_FillSnapshot( snapshotNumber, &snapshot->snapFlags, &snapshot->serverCommandSequence,
+		&snapshot->ping, &snapshot->serverTime, snapshot->areamask, &snapshot->ps,
+		&snapshot->numEntities, snapshot->entities, MAX_ENTITIES_IN_SNAPSHOT );
 }
 
 
@@ -413,7 +444,9 @@ static void CL_CM_LoadMap( const char *mapname ) {
 	int		checksum;
 
 	CM_LoadMap( mapname, qtrue, &checksum );
-	EntityBridge_ParseEntities( CM_EntityString() );
+	if ( !cgvm || cgvm->dllHandle ) {
+		EntityBridge_ParseEntities( CM_EntityString() );
+	}
 }
 
 
@@ -611,7 +644,9 @@ static intptr_t CL_CgameSystemCalls( intptr_t *args ) {
 		return 0;
 	case CG_CM_LOADMAP:
 		CL_CM_LoadMap( VMA(1) );
-		Phys_LoadBSPCollision();
+		if ( Cvar_VariableIntegerValue( "cl_physicsEnabled" ) ) {
+			Phys_LoadBSPCollision();
+		}
 		return 0;
 	case CG_CM_NUMINLINEMODELS:
 		return CM_NumInlineModels();
@@ -626,15 +661,19 @@ static intptr_t CL_CgameSystemCalls( intptr_t *args ) {
 	case CG_CM_TRANSFORMEDPOINTCONTENTS:
 		return CM_TransformedPointContents( VMA(1), args[2], VMA(3), VMA(4) );
 	case CG_CM_BOXTRACE:
+		VM_CHECKBOUNDS( cgvm, args[1], sizeof( trace_t ) );
 		CM_BoxTrace( VMA(1), VMA(2), VMA(3), VMA(4), VMA(5), args[6], args[7], /*int capsule*/ qfalse );
 		return 0;
 	case CG_CM_CAPSULETRACE:
+		VM_CHECKBOUNDS( cgvm, args[1], sizeof( trace_t ) );
 		CM_BoxTrace( VMA(1), VMA(2), VMA(3), VMA(4), VMA(5), args[6], args[7], /*int capsule*/ qtrue );
 		return 0;
 	case CG_CM_TRANSFORMEDBOXTRACE:
+		VM_CHECKBOUNDS( cgvm, args[1], sizeof( trace_t ) );
 		CM_TransformedBoxTrace( VMA(1), VMA(2), VMA(3), VMA(4), VMA(5), args[6], args[7], VMA(8), VMA(9), /*int capsule*/ qfalse );
 		return 0;
 	case CG_CM_TRANSFORMEDCAPSULETRACE:
+		VM_CHECKBOUNDS( cgvm, args[1], sizeof( trace_t ) );
 		CM_TransformedBoxTrace( VMA(1), VMA(2), VMA(3), VMA(4), VMA(5), args[6], args[7], VMA(8), VMA(9), /*int capsule*/ qtrue );
 		return 0;
 	case CG_CM_MARKFRAGMENTS:
@@ -714,6 +753,8 @@ static intptr_t CL_CgameSystemCalls( intptr_t *args ) {
 		re.DrawStretchPic( VMF(1), VMF(2), VMF(3), VMF(4), VMF(5), VMF(6), VMF(7), VMF(8), args[9] );
 		return 0;
 	case CG_R_MODELBOUNDS:
+		VM_CHECKBOUNDS( cgvm, args[2], sizeof( vec3_t ) );
+		VM_CHECKBOUNDS( cgvm, args[3], sizeof( vec3_t ) );
 		re.ModelBounds( args[1], VMA(2), VMA(3) );
 		return 0;
 	case CG_R_LERPTAG:
@@ -723,23 +764,33 @@ static intptr_t CL_CgameSystemCalls( intptr_t *args ) {
 		CL_GetGlconfig( VMA(1) );
 		return 0;
 	case CG_GETGAMESTATE:
-		if ( cgvm->dllHandle && *FS_GetCurrentGameDir() ) {
-			CL_GetLegacyGameState( VMA(1) );
-		} else {
+		if ( cgvm->dllHandle ) {
 			VM_CHECKBOUNDS( cgvm, args[1], sizeof( gameState_t ) );
 			CL_GetGameState( VMA(1) );
+		} else {
+			/* Retail/OA cgame.qvm ships with legacy gameState_t (1024 CS, 16k data). */
+			VM_CHECKBOUNDS( cgvm, args[1], sizeof( legacyGameState_t ) );
+			CL_GetLegacyGameState( VMA(1) );
 		}
 		return 0;
 	case CG_GETCURRENTSNAPSHOTNUMBER:
+		VM_CHECKBOUNDS( cgvm, args[1], sizeof( int ) );
+		VM_CHECKBOUNDS( cgvm, args[2], sizeof( int ) );
 		CL_GetCurrentSnapshotNumber( VMA(1), VMA(2) );
 		return 0;
 	case CG_GETSNAPSHOT:
-		return CL_GetSnapshot( args[1], VMA(2) );
+		if ( cgvm->dllHandle ) {
+			VM_CHECKBOUNDS( cgvm, args[2], sizeof( snapshot_t ) );
+			return CL_GetSnapshot( args[1], VMA(2) );
+		}
+		VM_CHECKBOUNDS( cgvm, args[2], sizeof( legacySnapshot_t ) );
+		return CL_GetLegacySnapshot( args[1], VMA(2) );
 	case CG_GETSERVERCOMMAND:
 		return CL_GetServerCommand( args[1] );
 	case CG_GETCURRENTCMDNUMBER:
 		return CL_GetCurrentCmdNumber();
 	case CG_GETUSERCMD:
+		VM_CHECKBOUNDS( cgvm, args[2], sizeof( usercmd_t ) );
 		return CL_GetUserCmd( args[1], VMA(2) );
 	case CG_SETUSERCMDVALUE:
 		CL_SetUserCmdValue( args[1], VMF(2) );
@@ -991,6 +1042,49 @@ static intptr_t QDECL CL_DllSyscall( intptr_t arg, ... ) {
 
 /*
 ====================
+CL_EnsureClientGameVersionConfigstring
+
+Stock cgame.qvm compares CS_GAME_VERSION to GAME_VERSION ("baseq3-1") in CG_INIT.
+Retail qagame normally sets it in worldspawn; if the gamestate arrives without
+that configstring, derive it from serverinfo gamename (stock qagame sets gamename).
+====================
+*/
+static void CL_EnsureClientGameVersionConfigstring( void ) {
+	const char *version;
+	const char *info;
+	const char *gamename;
+	char built[32];
+	int offset;
+	size_t len;
+
+	offset = cl.gameState.stringOffsets[CS_GAME_VERSION];
+	version = ( offset > 0 ) ? ( cl.gameState.stringData + offset ) : "";
+	if ( version && version[0] ) {
+		return;
+	}
+
+	info = cl.gameState.stringData + cl.gameState.stringOffsets[CS_SERVERINFO];
+	gamename = Info_ValueForKey( info, "gamename" );
+	if ( !gamename || !gamename[0] ) {
+		gamename = "baseq3";
+	}
+	Com_sprintf( built, sizeof( built ), "%s-1", gamename );
+
+	len = strlen( built );
+	if ( len + 1 + cl.gameState.dataCount > MAX_GAMESTATE_CHARS ) {
+		Com_Error( ERR_DROP, "%s: MAX_GAMESTATE_CHARS exceeded", __func__ );
+	}
+
+	cl.gameState.stringOffsets[CS_GAME_VERSION] = cl.gameState.dataCount;
+	Com_Memcpy( cl.gameState.stringData + cl.gameState.dataCount, built, len + 1 );
+	cl.gameState.dataCount += (int)len + 1;
+
+	Com_Printf( S_COLOR_YELLOW
+		"[client] CS_GAME_VERSION missing in gamestate; using %s for stock cgame\n", built );
+}
+
+/*
+====================
 CL_InitCGame
 
 Should only be called by CL_StartHunkUsers
@@ -1033,10 +1127,17 @@ void CL_InitCGame( void ) {
 	}
 	cls.state = CA_LOADING;
 
+	CL_EnsureClientGameVersionConfigstring();
+
 	// init for this gamestate
 	// use the lastExecutedServerCommand instead of the serverCommandSequence
 	// otherwise server commands sent just before a gamestate are dropped
 	VM_Call( cgvm, 3, CG_INIT, clc.serverMessageSequence, clc.lastExecutedServerCommand, clc.clientNum );
+
+	if ( !cgvm->dllHandle && Cvar_VariableIntegerValue( "cl_physicsEnabled" ) ) {
+		Cvar_Set( "cl_physicsEnabled", "0" );
+		Com_Printf( "[client] cl_physicsEnabled 0 for cgame.qvm compatibility\n" );
+	}
 
 	// reset any CVAR_CHEAT cvars registered by cgame
 	if ( !clc.demoplaying && !cl_connectedToCheatServer )
@@ -1187,6 +1288,10 @@ static void CL_FirstSnapshot( void ) {
 		return;
 	}
 	cls.state = CA_ACTIVE;
+
+	Com_Printf( "[client] spawn origin (%.1f %.1f %.1f) map=%s\n",
+		cl.snap.ps.origin[0], cl.snap.ps.origin[1], cl.snap.ps.origin[2],
+		cl.mapname[0] ? cl.mapname : "?" );
 
 	// clear old game so we will not switch back to old mod on disconnect
 	CL_ResetOldGame();

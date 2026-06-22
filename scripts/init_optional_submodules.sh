@@ -19,9 +19,9 @@ Initialize optional Git submodules. Idempotent: safe to run twice.
 
 Options:
   --tiled     tools/tiled (Tiled Map Editor, GPL-2.0) — see docs/TILED.md
-  --svo       src/external/src/SparseVoxelOctree
-  --freeusd   src/external/FreeUSD (USDA library; default USE_FREEUSD=ON) — see docs/FREEUSD.md
-  --backend   src/external/idtech3backend (timfox/idtech3backend) — see docs/IDTECH3_BACKEND.md
+  --svo       third_party/src/SparseVoxelOctree (legacy: src/external/src/SparseVoxelOctree)
+  --freeusd   third_party/FreeUSD (legacy: src/external/FreeUSD) — see docs/FREEUSD.md
+  --backend   third_party/idtech3backend (legacy: src/external/idtech3backend) — see docs/IDTECH3_BACKEND.md
   --all       Initialize every optional submodule listed above
   --dry-run   Print commands without running git submodule
   --help      Show this help
@@ -98,13 +98,25 @@ if [ "$DO_TILED" -eq 1 ]; then
 	init_one "tools/tiled" "Tiled Map Editor"
 fi
 if [ "$DO_SVO" -eq 1 ]; then
-	init_one "src/external/src/SparseVoxelOctree" "SparseVoxelOctree"
+	if grep -qF 'path = third_party/src/SparseVoxelOctree' "$PROJECT_ROOT/.gitmodules"; then
+		init_one "third_party/src/SparseVoxelOctree" "SparseVoxelOctree"
+	else
+		init_one "src/external/src/SparseVoxelOctree" "SparseVoxelOctree"
+	fi
 fi
 if [ "$DO_FREEUSD" -eq 1 ]; then
-	init_one "src/external/FreeUSD" "FreeUSD (gopexllc/FreeUSD)"
+	if grep -qF 'path = third_party/FreeUSD' "$PROJECT_ROOT/.gitmodules"; then
+		init_one "third_party/FreeUSD" "FreeUSD (gopexllc/FreeUSD)"
+	else
+		init_one "src/external/FreeUSD" "FreeUSD (gopexllc/FreeUSD)"
+	fi
 fi
 if [ "$DO_BACKEND" -eq 1 ]; then
-	init_one "src/external/idtech3backend" "idTech3 Backend (timfox/idtech3backend)"
+	if grep -qF 'path = third_party/idtech3backend' "$PROJECT_ROOT/.gitmodules"; then
+		init_one "third_party/idtech3backend" "idTech3 Backend (timfox/idtech3backend)"
+	else
+		init_one "src/external/idtech3backend" "idTech3 Backend (timfox/idtech3backend)"
+	fi
 fi
 
 echo "optional submodules: finished"

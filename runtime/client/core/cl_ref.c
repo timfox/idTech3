@@ -23,6 +23,57 @@ static cvar_t *cl_renderer;
 static void CL_InitGLimp_Cvars( void );
 static void CL_InitRef( void );
 
+#if defined(USE_RENDERER_DLOPEN) && USE_RENDERER_DLOPEN
+/*
+=================
+CL_SanitizeRendererName
+
+Strip surrounding quotes and leading/trailing whitespace from renderer cvar values.
+=================
+*/
+static void CL_SanitizeRendererName( const char *raw, char *out, size_t outSize )
+{
+	size_t start = 0;
+	size_t end;
+	size_t len;
+
+	if ( !out || outSize == 0 ) {
+		return;
+	}
+	out[0] = '\0';
+	if ( !raw ) {
+		return;
+	}
+
+	len = strlen( raw );
+	while ( start < len && ( raw[start] == ' ' || raw[start] == '\t' ) ) {
+		start++;
+	}
+	end = len;
+	while ( end > start && ( raw[end - 1] == ' ' || raw[end - 1] == '\t' ) ) {
+		end--;
+	}
+
+	if ( end - start >= 2 ) {
+		const char q0 = raw[start];
+		const char q1 = raw[end - 1];
+		if ( ( q0 == '\"' && q1 == '\"' ) || ( q0 == '\'' && q1 == '\'' ) ) {
+			start++;
+			end--;
+		}
+	}
+
+	len = end - start;
+	if ( len >= outSize ) {
+		len = outSize - 1;
+	}
+	if ( len > 0 ) {
+		memcpy( out, raw + start, len );
+	}
+	out[len] = '\0';
+}
+#endif
+
 static void ( *re_RenderScene )( const refdef_t *fd );
 
 static void CL_RenderSceneWithDistricts( const refdef_t *fd ) {
@@ -371,14 +422,24 @@ static void CL_InitRef( void ) {
 
 #if defined(USE_RENDERER_DLOPEN) && USE_RENDERER_DLOPEN
 	/* "renderer" is an alias for cl_renderer. Vulkan is the only shipping backend. */
-	const char *rendererName = cl_renderer->string;
+	char sanitizedRenderer[64];
+	const char *rendererName;
 	rendererBackendId_t backendId;
+
+	CL_SanitizeRendererName( cl_renderer->string, sanitizedRenderer, sizeof( sanitizedRenderer ) );
+	rendererName = sanitizedRenderer;
 	{
 		const char *alt = Cvar_VariableString( "renderer" );
 		if ( alt && alt[0] ) {
-			rendererName = alt;
-			Cvar_Set( "cl_renderer", alt );
+			CL_SanitizeRendererName( alt, sanitizedRenderer, sizeof( sanitizedRenderer ) );
+			rendererName = sanitizedRenderer;
 		}
+	}
+	if ( sanitizedRenderer[0] && Q_stricmp( cl_renderer->string, sanitizedRenderer ) ) {
+		Cvar_Set( "cl_renderer", sanitizedRenderer );
+	}
+	if ( sanitizedRenderer[0] && Q_stricmp( Cvar_VariableString( "renderer" ), sanitizedRenderer ) ) {
+		Cvar_Set( "renderer", sanitizedRenderer );
 	}
 	backendId = R_BackendIdFromName( rendererName );
 	if ( backendId == RENDERER_BACKEND_WEBGPU_WASM ) {
@@ -407,18 +468,7 @@ static void CL_InitRef( void ) {
 #endif
 
 	{
-		/* sanitize renderer name: strip surrounding single/double quotes if present */
-		const char *raw = rendererName;
-		char clean[64];
-		size_t rawlen = strlen(raw);
-		if ( rawlen >= 2 && ((raw[0] == '\"' && raw[rawlen-1] == '\"') || (raw[0] == '\'' && raw[rawlen-1] == '\'')) ) {
-			size_t n = rawlen - 2;
-			if ( n >= sizeof(clean) ) n = sizeof(clean) - 1;
-			memcpy(clean, raw + 1, n);
-			clean[n] = '\0';
-		} else {
-			Q_strncpyz(clean, raw, sizeof(clean));
-		}
+		const char *clean = rendererName;
 		if ( REND_ARCH_STRING[0] != '\0' ) {
 			Com_sprintf( dllName, sizeof( dllName ), RENDERER_PREFIX "_%s_" REND_ARCH_STRING DLL_EXT, clean );
 		} else {
@@ -774,9 +824,16 @@ static void CL_InitGLimp_Cvars( void )
 	cl_renderer = Cvar_Get( "cl_renderer", XSTRING( RENDERER_DEFAULT ), CVAR_ARCHIVE | CVAR_LATCH );
 	Cvar_SetDescription( cl_renderer,
 		"Renderer backend: vulkan (shipping), metal/dxr (roadmap scaffolds when built), webgpu (Wasm only). Requires \\vid_restart." );
-	if ( R_BackendIdFromName( cl_renderer->string ) == RENDERER_BACKEND_WEBGPU_WASM ) {
-		Cvar_Set( "cl_renderer", "vulkan" );
-		Cvar_Set( "renderer", "vulkan" );
+	{
+		char sanitizedRenderer[64];
+		CL_SanitizeRendererName( cl_renderer->string, sanitizedRenderer, sizeof( sanitizedRenderer ) );
+		if ( sanitizedRenderer[0] && Q_stricmp( cl_renderer->string, sanitizedRenderer ) ) {
+			Cvar_Set( "cl_renderer", sanitizedRenderer );
+		}
+		if ( R_BackendIdFromName( sanitizedRenderer ) == RENDERER_BACKEND_WEBGPU_WASM ) {
+			Cvar_Set( "cl_renderer", "vulkan" );
+			Cvar_Set( "renderer", "vulkan" );
+		}
 	}
 #endif
 }

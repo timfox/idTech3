@@ -1187,6 +1187,8 @@ void SV_RestartGameProgs( void ) {
 
 	SV_InitGameVM( qtrue );
 
+	SV_EnsureGameVersionConfigstring();
+
 	// load userinfo filters
 	SV_LoadFilters( sv_filter->string );
 }
