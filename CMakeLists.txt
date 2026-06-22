@@ -2523,6 +2523,13 @@ set_tests_properties(test_gltf_opengl_regressions PROPERTIES
 	LABELS "unit;scripts;validation;renderer"
 	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_gltf_opengl_regressions.sh")
 
+add_test(NAME test_client_demo_regressions
+	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_client_demo_regressions.py ${CMAKE_SOURCE_DIR}
+	WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+set_tests_properties(test_client_demo_regressions PROPERTIES
+	LABELS "unit;scripts;validation;client"
+	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_client_demo_regressions.py")
+
 add_test(NAME test_botlib_bounded_strings
 	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_botlib_bounded_strings.sh
 	WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
