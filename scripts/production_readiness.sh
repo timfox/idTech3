@@ -31,9 +31,6 @@ SKIP_VALIDATE=0
 for arg in "$@"; do
   case "$arg" in
     --skip-validate) SKIP_VALIDATE=1 ;;
-    --skip-opengl)
-      echo "Note: --skip-opengl is obsolete (OpenGL renderer removed); ignored." >&2
-      ;;
     *) echo "Unknown option: $arg" >&2; exit 2 ;;
   esac
 done

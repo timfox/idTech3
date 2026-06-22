@@ -1863,8 +1863,6 @@ extern	cvar_t	*r_sdfOutline;
 extern	cvar_t	*r_sdfOutlineWidth;
 extern	cvar_t	*r_fontGamma;
 
-extern	cvar_t	*r_ignoreGLErrors;
-
 extern	cvar_t	*r_overBrightBits;
 extern	cvar_t	*r_mapOverBrightBits;
 extern	cvar_t	*r_mapGreyScale;

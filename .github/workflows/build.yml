@@ -96,7 +96,6 @@ jobs:
           cmake -S . -B build-vk-${{ matrix.btype }} -G Ninja \
             -DCMAKE_BUILD_TYPE=${{ matrix.btype }} \
             -DCI_BUILD=OFF \
-            -DUSE_STB_TRUETYPE=ON \
             -DBUILD_FREETYPE=ON \
             -DENABLE_FORTIFY_SOURCE=OFF \
             -DENABLE_ASAN=OFF \
@@ -109,32 +108,6 @@ jobs:
           cmake --build build-vk-${{ matrix.btype }} -j$(nproc)
           mkdir -p bin
           cp -f build-vk-${{ matrix.btype }}/idtech3* bin/ || true
-          bash ./scripts/stage_mingw_runtime_dlls.sh bin
-
-      - name: Build OpenGL
-        if: ${{ github.event_name != 'release' || matrix.btype != 'Debug' }}
-        env:
-          CFLAGS: "-DSKIP_IDPAK_CHECK=1"
-          CXXFLAGS: "-DSKIP_IDPAK_CHECK=1"
-        run: |
-          mkdir -p build-gl-${{ matrix.btype }}
-          cmake -S . -B build-gl-${{ matrix.btype }} -G Ninja \
-            -DCMAKE_BUILD_TYPE=${{ matrix.btype }} \
-            -DCI_BUILD=OFF \
-            -DUSE_STB_TRUETYPE=ON \
-            -DBUILD_FREETYPE=ON \
-            -DENABLE_FORTIFY_SOURCE=OFF \
-            -DENABLE_ASAN=OFF \
-            -DBUILD_SERVER=ON \
-            -DUSE_VULKAN=ON \
-            -DRENDERER_DEFAULT=opengl \
-            -DSKIP_IDPAK_CHECK=ON \
-            -DSKIP_SHADER_REGEN=ON \
-            -Wno-dev
-          cmake --build build-gl-${{ matrix.btype }} -j$(nproc)
-          cp -f build-gl-${{ matrix.btype }}/idtech3* bin/ || true
-          bash ./scripts/stage_mingw_runtime_dlls.sh bin
-
       - name: Bundle OpenAL Soft DLLs (Win64; no separate OpenAL install)
         if: ${{ matrix.arch == 'x86_64' && (github.event_name != 'release' || matrix.btype != 'Debug') }}
         shell: pwsh
@@ -495,7 +468,6 @@ jobs:
             -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
             -DCMAKE_BUILD_TYPE=${{ matrix.btype }} \
             -DCI_BUILD=${{ (matrix.cc == 'gcc' && matrix.btype == 'Release') && 'ON' || 'OFF' }} \
-            -DUSE_STB_TRUETYPE=ON \
             -DBUILD_FREETYPE=ON \
             -DENABLE_FORTIFY_SOURCE=ON \
             -DENABLE_ASAN=OFF \
@@ -508,35 +480,6 @@ jobs:
           cmake --build build-vk-${{ matrix.btype }} -j$(nproc)
           mkdir -p bin
           cp -f build-vk-${{ matrix.btype }}/idtech3* bin/ || true
-
-      - name: Build OpenGL
-        if: ${{ github.event_name != 'release' || matrix.btype != 'Debug' }}
-        env:
-          CFLAGS: "-DSKIP_IDPAK_CHECK=1"
-          CXXFLAGS: "-DSKIP_IDPAK_CHECK=1"
-        run: |
-          CMAKE_EXTRA=""
-          if [ "${{ matrix.cc }}" = "clang" ]; then
-            CMAKE_EXTRA="-DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++"
-          fi
-          mkdir -p build-gl-${{ matrix.btype }}
-          cmake -S . -B build-gl-${{ matrix.btype }} $CMAKE_EXTRA \
-            -DCMAKE_C_COMPILER_LAUNCHER=ccache \
-            -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
-            -DCMAKE_BUILD_TYPE=${{ matrix.btype }} \
-            -DCI_BUILD=OFF \
-            -DUSE_STB_TRUETYPE=ON \
-            -DBUILD_FREETYPE=ON \
-            -DENABLE_FORTIFY_SOURCE=ON \
-            -DENABLE_ASAN=OFF \
-            -DBUILD_SERVER=ON \
-            -DUSE_VULKAN=ON \
-            -DRENDERER_DEFAULT=opengl \
-            -DSKIP_IDPAK_CHECK=ON \
-            -DSKIP_SHADER_REGEN=ON \
-            -Wno-dev
-          cmake --build build-gl-${{ matrix.btype }} -j$(nproc)
-          cp -f build-gl-${{ matrix.btype }}/idtech3* bin/ || true
 
       - name: Smoke test
         if: ${{ github.event_name != 'release' || matrix.btype != 'Debug' }}
@@ -579,7 +522,6 @@ jobs:
           cmake -S . -B build-vk-asan \
             -DCMAKE_BUILD_TYPE=Debug \
             -DCI_BUILD=OFF \
-            -DUSE_STB_TRUETYPE=ON \
             -DBUILD_FREETYPE=ON \
             -DENABLE_FORTIFY_SOURCE=OFF \
             -DENABLE_ASAN=ON \
@@ -619,7 +561,6 @@ jobs:
           cmake -S . -B build-asan -G Ninja \
             -DCMAKE_BUILD_TYPE=Debug \
             -DCI_BUILD=OFF \
-            -DUSE_STB_TRUETYPE=ON \
             -DBUILD_FREETYPE=ON \
             -DENABLE_FORTIFY_SOURCE=OFF \
             -DENABLE_ASAN=ON \
@@ -671,7 +612,6 @@ jobs:
             -DCMAKE_BUILD_TYPE=Release \
             -DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
             -DCI_BUILD=OFF \
-            -DUSE_STB_TRUETYPE=ON \
             -DBUILD_FREETYPE=ON \
             -DBUILD_SERVER=ON \
             -DUSE_VULKAN=ON \
@@ -740,7 +680,6 @@ jobs:
             cmake -S . -B build-vk-${{ matrix.btype }} \
               -DCMAKE_BUILD_TYPE=${{ matrix.btype }} \
               -DCI_BUILD=OFF \
-              -DUSE_STB_TRUETYPE=ON \
               -DBUILD_FREETYPE=ON \
               -DENABLE_FORTIFY_SOURCE=OFF \
               -DENABLE_ASAN=OFF \
@@ -753,24 +692,6 @@ jobs:
             cmake --build build-vk-${{ matrix.btype }} -j"$(nproc)"
 
             find "build-vk-${{ matrix.btype }}" -maxdepth 2 -type f -name 'idtech3*' -print -exec cp -f {} "$OUTDIR/" \;
-
-            mkdir -p build-gl-${{ matrix.btype }}
-            cmake -S . -B build-gl-${{ matrix.btype }} \
-              -DCMAKE_BUILD_TYPE=${{ matrix.btype }} \
-              -DCI_BUILD=OFF \
-              -DUSE_STB_TRUETYPE=ON \
-              -DBUILD_FREETYPE=ON \
-              -DENABLE_FORTIFY_SOURCE=OFF \
-              -DENABLE_ASAN=OFF \
-              -DBUILD_SERVER=ON \
-              -DUSE_VULKAN=ON \
-              -DRENDERER_DEFAULT=opengl \
-              -DSKIP_IDPAK_CHECK=ON \
-              -DSKIP_SHADER_REGEN=ON \
-              -Wno-dev
-            cmake --build build-gl-${{ matrix.btype }} -j"$(nproc)"
-
-            find "build-gl-${{ matrix.btype }}" -maxdepth 2 -type f -name 'idtech3*' -print -exec cp -f {} "$OUTDIR/" \;
 
             test -n "$(ls -A "$OUTDIR")"
             ls -al "$OUTDIR"
@@ -837,7 +758,6 @@ jobs:
             -DSDL2_LIBRARY="${SDL2_PREFIX}/lib/libSDL2.dylib" \
             -DOPENAL_INCLUDE_DIR="${OPENAL_PREFIX}/include" \
             -DOPENAL_LIBRARY="${OPENAL_PREFIX}/lib/libopenal.dylib" \
-            -DUSE_STB_TRUETYPE=ON \
             -DBUILD_FREETYPE=ON \
             -DENABLE_FORTIFY_SOURCE=OFF \
             -DENABLE_ASAN=OFF \
@@ -858,47 +778,6 @@ jobs:
             ex="$app/Contents/MacOS/$(basename "$app" .app)"
             [ -f "$ex" ] && cp -f "$ex" bin/ || true
           done
-
-      - name: Build OpenGL
-        if: ${{ github.event_name != 'release' || matrix.btype != 'Debug' }}
-        env:
-          CFLAGS: "-DSKIP_IDPAK_CHECK=1"
-          CXXFLAGS: "-DSKIP_IDPAK_CHECK=1"
-          LIBRARY_PATH: "/opt/homebrew/lib"
-          CMAKE_PREFIX_PATH: "/opt/homebrew"
-        run: |
-          SDL2_PREFIX=$(brew --prefix sdl2)
-          OPENAL_PREFIX=$(brew --prefix openal-soft)
-          mkdir -p build-gl-${{ matrix.btype }}
-          cmake -S . -B build-gl-${{ matrix.btype }} \
-            -DCMAKE_BUILD_TYPE=${{ matrix.btype }} \
-            -DCI_BUILD=OFF \
-            -DCMAKE_OSX_ARCHITECTURES=arm64 \
-            -DSDL2_PATH="${SDL2_PREFIX}" \
-            -DSDL2_INCLUDE_DIR="${SDL2_PREFIX}/include" \
-            -DSDL2_LIBRARY="${SDL2_PREFIX}/lib/libSDL2.dylib" \
-            -DOPENAL_INCLUDE_DIR="${OPENAL_PREFIX}/include" \
-            -DOPENAL_LIBRARY="${OPENAL_PREFIX}/lib/libopenal.dylib" \
-            -DUSE_STB_TRUETYPE=ON \
-            -DBUILD_FREETYPE=ON \
-            -DENABLE_FORTIFY_SOURCE=OFF \
-            -DENABLE_ASAN=OFF \
-            -DBUILD_SERVER=ON \
-            -DUSE_VULKAN=ON \
-            -DRENDERER_DEFAULT=opengl \
-            -DSKIP_IDPAK_CHECK=ON \
-            -DSKIP_SHADER_REGEN=ON \
-            -DCMAKE_INCLUDE_PATH="${OPENAL_PREFIX}/include" \
-            -DCMAKE_LIBRARY_PATH="${OPENAL_PREFIX}/lib" \
-            -Wno-dev
-          cmake --build build-gl-${{ matrix.btype }} -j$(sysctl -n hw.logicalcpu)
-          cp -f build-gl-${{ matrix.btype }}/idtech3* bin/ || true
-          for app in build-gl-${{ matrix.btype }}/idtech3*.app; do
-            [ -d "$app" ] || continue
-            ex="$app/Contents/MacOS/$(basename "$app" .app)"
-            [ -f "$ex" ] && cp -f "$ex" bin/ || true
-          done
-
       - name: Smoke test
         if: ${{ github.event_name != 'release' && matrix.btype != 'Debug' }}
         run: |
