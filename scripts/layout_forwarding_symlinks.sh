@@ -68,6 +68,9 @@ link engine/platform/external ../../third_party
 
 # ../../../foo from msvc2017 -> engine/foo
 echo "[layout_fwd] MSVC bridge (engine/*)..."
+# platform/sdl, platform/unix, platform/win32 use ../../client (engine/client), not platform/client.
+link engine/client ../runtime/client
+link engine/server ../runtime/server
 link engine/botlib ../modules/botlib
 link engine/physics ../modules/physics
 link engine/navigation ../modules/navigation

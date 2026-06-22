@@ -84,6 +84,8 @@ check_shim runtime/qcommon engine/core
 check_shim runtime/world modules/world
 check_shim modules/qcommon engine/core
 check_shim modules/client runtime/client
+check_shim engine/client runtime/client
+check_shim engine/platform/client runtime/client
 check_shim world modules/world
 
 [ -L "${ROOT}/samples" ] || fail "samples alias symlink missing"
