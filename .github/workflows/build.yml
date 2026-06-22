@@ -251,6 +251,10 @@ jobs:
           Write-Host "OPENSSL_ROOT_DIR=$found"
           "OPENSSL_ROOT_DIR=$found" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
 
+      - name: Layout forwarding symlinks
+        shell: bash
+        run: ./scripts/layout_forwarding_symlinks.sh
+
       - name: Build
         if: ${{ github.event_name != 'release' || matrix.btype != 'Debug' }}
         shell: cmd
