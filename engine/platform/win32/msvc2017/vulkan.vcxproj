@@ -36,6 +36,7 @@
     <ZlibInclude>$(ExternalRoot)\src\zlib</ZlibInclude>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+  <Import Project="IdTech3Layout2026.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
     <UseDebugLibraries>true</UseDebugLibraries>
     <PlatformToolset>v141_xp</PlatformToolset>
@@ -342,6 +343,36 @@
     <ClInclude Include="..\..\..\renderers\vulkan\vk_fluidsim.h" />
     <ClInclude Include="..\..\..\renderers\vulkan\vk_postfx.h" />
     <ClInclude Include="..\..\..\renderers\vulkan\tr_model_gltf.h" />
+  </ItemGroup>
+
+  <ItemGroup>
+  <!-- IDTECH3_MSVC_MANIFEST_BEGIN -->
+    <ClCompile Include="..\..\..\renderers\common\tr_image_ktx2.c" />
+    <ClCompile Include="..\..\..\renderers\common\tr_model_freeusd.cpp" />
+    <ClCompile Include="..\..\..\renderers\common\tr_model_freeusd_register.c" />
+    <ClCompile Include="..\..\..\renderers\common\tr_vector_font.c" />
+    <ClCompile Include="..\..\..\renderers\common\tr_vector_font_glyphlet.c" />
+    <ClCompile Include="..\..\..\renderers\vulkan\extensions\rtx\vk_rtx.c" />
+    <ClCompile Include="..\..\..\renderers\vulkan\extensions\rtx\vk_rtx_entities.c" />
+    <ClCompile Include="..\..\..\renderers\vulkan\extensions\rtx\vk_rtx_world.c" />
+    <ClCompile Include="..\..\..\renderers\vulkan\tr_bsp_stream.c" />
+    <ClCompile Include="..\..\..\renderers\vulkan\tr_decal_props.c" />
+    <ClCompile Include="..\..\..\renderers\vulkan\tr_gltf_topo.c" />
+    <ClCompile Include="..\..\..\renderers\vulkan\tr_render_mode_vk.c" />
+    <ClCompile Include="..\..\..\renderers\vulkan\tr_sprite_props.c" />
+    <ClCompile Include="..\..\..\renderers\vulkan\vk_deferred_gbuffer.c" />
+    <ClCompile Include="..\..\..\renderers\vulkan\vk_experimental_renderer_stubs.c" />
+    <ClCompile Include="..\..\..\renderers\vulkan\vk_forward_plus.c" />
+    <ClCompile Include="..\..\..\renderers\vulkan\vk_fp64_points.c" />
+    <ClCompile Include="..\..\..\renderers\vulkan\vk_graph_bfs.c" />
+    <ClCompile Include="..\..\..\renderers\vulkan\vk_lens_flare.c" />
+    <ClCompile Include="..\..\..\renderers\vulkan\vk_pipeline_cache_disk.c" />
+    <ClCompile Include="..\..\..\renderers\vulkan\vk_post_aa.c" />
+    <ClCompile Include="..\..\..\renderers\vulkan\vk_sim_render_debug.c" />
+    <ClCompile Include="..\..\..\renderers\vulkan\vk_sim_render_profile.c" />
+    <ClCompile Include="..\..\..\renderers\vulkan\vk_upscale.c" />
+    <ClCompile Include="..\..\..\renderers\vulkan\vk_vector_font.c" />
+  <!-- IDTECH3_MSVC_MANIFEST_END -->
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
