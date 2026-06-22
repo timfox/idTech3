@@ -379,6 +379,45 @@
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|ARM64'">true</ExcludedFromBuild>
     </CustomBuild>
   </ItemGroup>
+
+  <ItemGroup>
+  <!-- IDTECH3_MSVC_MANIFEST_BEGIN -->
+    <ClCompile Include="..\..\..\world\fog_biology.cpp" />
+    <ClCompile Include="..\..\..\world\genetic_gan.cpp" />
+    <ClCompile Include="..\..\..\world\sector_graph.cpp" />
+    <ClCompile Include="..\..\..\world\world_district.cpp" />
+    <ClCompile Include="..\..\..\world\world_open.cpp" />
+    <ClCompile Include="..\..\..\world\world_proc.cpp" />
+    <ClCompile Include="..\..\..\world\world_residency.cpp" />
+    <ClCompile Include="..\..\qcommon\aiwc.c" />
+    <ClCompile Include="..\..\qcommon\aiwc_matmul.c" />
+    <ClCompile Include="..\..\qcommon\aiwc_metrics.c" />
+    <ClCompile Include="..\..\qcommon\app_crdt.c" />
+    <ClCompile Include="..\..\qcommon\cluster_graph.cpp" />
+    <ClCompile Include="..\..\qcommon\cm_stream.c" />
+    <ClCompile Include="..\..\qcommon\cm_stream_merge.c" />
+    <ClCompile Include="..\..\qcommon\com_crash.c" />
+    <ClCompile Include="..\..\qcommon\com_loc.c" />
+    <ClCompile Include="..\..\qcommon\com_openworld_smoke.c" />
+    <ClCompile Include="..\..\qcommon\com_pk3sig.c" />
+    <ClCompile Include="..\..\qcommon\csharp_debug.c" />
+    <ClCompile Include="..\..\qcommon\engine_decal_map.c" />
+    <ClCompile Include="..\..\qcommon\engine_sprite_map.c" />
+    <ClCompile Include="..\..\qcommon\lua_debug.c" />
+    <ClCompile Include="..\..\qcommon\puff.c" />
+    <ClCompile Include="..\..\qcommon\python_batch.c" />
+    <ClCompile Include="..\..\qcommon\python_debug.c" />
+    <ClCompile Include="..\..\qcommon\script_emit.c" />
+    <ClCompile Include="..\..\qcommon\ttp.c" />
+    <ClCompile Include="..\..\qcommon\ttp_model.c" />
+    <ClCompile Include="..\..\qcommon\ttp_sim.c" />
+    <ClCompile Include="..\..\server\sv_app_crdt.c" />
+    <ClCompile Include="..\..\server\sv_auth.c" />
+    <ClCompile Include="..\..\server\sv_engine_decals.c" />
+    <ClCompile Include="..\..\server\sv_engine_sprites.c" />
+    <ClCompile Include="..\..\server\sv_openworld.c" />
+  <!-- IDTECH3_MSVC_MANIFEST_END -->
+  </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>

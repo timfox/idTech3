@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <!-- Phase 5d: shared 2026 layout roots (bridge symlinks under engine/platform/). -->
+  <PropertyGroup Label="IdTech3Layout2026">
+    <IdTech3RepoRoot>$(MSBuildThisFileDirectory)..\..\..\..</IdTech3RepoRoot>
+    <IdTech3EngineCore>$(IdTech3RepoRoot)\engine\core</IdTech3EngineCore>
+    <IdTech3RuntimeClient>$(IdTech3RepoRoot)\runtime\client</IdTech3RuntimeClient>
+    <IdTech3RuntimeGame>$(IdTech3RepoRoot)\runtime\game</IdTech3RuntimeGame>
+    <IdTech3ThirdParty>$(IdTech3RepoRoot)\third_party</IdTech3ThirdParty>
+    <ExternalRoot>$(IdTech3RepoRoot)\engine\platform\external</ExternalRoot>
+  </PropertyGroup>
+  <ItemDefinitionGroup>
+    <ClCompile>
+      <AdditionalIncludeDirectories>$(IdTech3EngineCore);$(IdTech3RuntimeGame);$(ExternalRoot)\include\entt\single_include;$(ExternalRoot)\src\jpeg;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+  </ItemDefinitionGroup>
+</Project>
