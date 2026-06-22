@@ -2,7 +2,7 @@
 
 idtech3_require_layout()
 
-idtech3_legacy_src(_IDTECH3_SV_OPENWORLD "src/server/sv_openworld.c")
+file(RELATIVE_PATH _IDTECH3_SV_OPENWORLD "${CMAKE_SOURCE_DIR}" "${IDTECH3_DIR_RUNTIME_SERVER}/sv_openworld.c")
 
 set(_IDTECH3_SERVER_EXT_ALL ${_IDTECH3_SV_OPENWORLD})
 
