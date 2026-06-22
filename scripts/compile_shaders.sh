@@ -627,6 +627,18 @@ with binding_file.open("w") as f:
     f.write("}\n")
 
 print(f"Wrote {task_counter} shader binaries and {len(bindings)} bindings.")
+
+import re as _re_dup
+_data_text = data_file.read_text(encoding="utf-8")
+_shader_names = _re_dup.findall(r"const unsigned char (\w+)\[", _data_text)
+_seen_shader = set()
+_dup_shader = []
+for _n in _shader_names:
+    if _n in _seen_shader:
+        _dup_shader.append(_n)
+    _seen_shader.add(_n)
+if _dup_shader:
+    sys.exit(f"shader_data.c has duplicate symbols: {_dup_shader[:10]}")
 PY
 )
 

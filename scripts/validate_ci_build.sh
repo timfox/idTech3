@@ -37,7 +37,7 @@ chmod +x ./scripts/audit_src_shim_references.sh
 echo ""
 
 echo "2. Building Vulkan (Release)..."
-./scripts/compile_engine.sh vulkan
+./scripts/compile_engine.sh vulkan skipshaders
 echo ""
 
 echo "3. Running smoke test..."

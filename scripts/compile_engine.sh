@@ -336,6 +336,7 @@ CMAKE_FLAGS=(
   "-DENABLE_ASAN=$([ "$ASAN" -eq 1 ] && echo ON || echo OFF)"
   "-DENABLE_LTO=$([ "$LTO" -eq 1 ] && echo ON || echo OFF)"
   "-DUSE_VULKAN=ON"
+  "-DSKIP_SHADER_REGEN=ON"
   "-Wno-dev"
 )
 if [ "$CROSS_AARCH64" -eq 1 ]; then
