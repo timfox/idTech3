@@ -26,6 +26,12 @@ For a **stricter engine bar** (automated steps + optional content-backed maps), 
 
 ### CI
 - [ ] **All CI jobs pass**: Push to `main` or open a PR and verify all builds succeed (Windows MSYS, Windows MSVC, Ubuntu x86_64, Ubuntu ARM, macOS, Android)
+- [ ] **Trunk policy**: `./tests/scripts/test_trunk_policy.sh` (origin exposes only `main`; no `cursor/*` remotes; archive tags present)
+
+### Branch protection (GitHub)
+- [ ] **`main` protected**: PR required, CI status checks required, no force-push ([docs/core/BRANCH_PROTECTION.md](core/BRANCH_PROTECTION.md))
+- [ ] **Auto-delete head branches** enabled after merge
+- [ ] **Dependabot** PRs for `github-actions` reviewed or merged
 
 ## Release Artifacts
 

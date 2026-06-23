@@ -192,6 +192,20 @@ fi
 
 echo ""
 
+# --- Trunk / branch policy (static + origin fetch) ---
+echo "Trunk policy:"
+if [ -x "$PROJECT_ROOT/tests/scripts/test_trunk_policy.sh" ]; then
+  if "$PROJECT_ROOT/tests/scripts/test_trunk_policy.sh"; then
+    pass "test_trunk_policy.sh"
+  else
+    fail "test_trunk_policy.sh"
+  fi
+else
+  warn "test_trunk_policy.sh not executable"
+fi
+
+echo ""
+
 # --- Q3 / OpenArena QVM compatibility (static; no game data required) ---
 echo "Q3 / OpenArena compatibility:"
 if [ -x "$PROJECT_ROOT/scripts/q3_openarena_compat_check.sh" ]; then

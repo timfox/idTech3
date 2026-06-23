@@ -3119,6 +3119,12 @@ set_tests_properties(test_legacy_intact PROPERTIES
 	LABELS "scripts;validation;manifest"
 	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_legacy_intact.sh;${CMAKE_SOURCE_DIR}/docs/core/LEGACY_AND_MODERN.md")
 
+add_test(NAME test_trunk_policy
+	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_trunk_policy.sh)
+set_tests_properties(test_trunk_policy PROPERTIES
+	LABELS "scripts;validation;trunk"
+	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_trunk_policy.sh;${CMAKE_SOURCE_DIR}/docs/BRANCHES.md;${CMAKE_SOURCE_DIR}/.github/dependabot.yml")
+
 add_test(NAME test_build_profiles
 	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_build_profiles.sh)
 set_tests_properties(test_build_profiles PROPERTIES

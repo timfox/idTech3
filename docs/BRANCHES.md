@@ -62,6 +62,8 @@ Restore read-only inspection:
 git checkout archive/chocolate-YYYYMMDD
 ```
 
+GitHub protection checklist: [core/BRANCH_PROTECTION.md](core/BRANCH_PROTECTION.md).
+
 Scripts:
 
 - `scripts/archive_legacy_remote_branches.sh` — tag tips + delete legacy remotes

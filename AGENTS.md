@@ -30,6 +30,8 @@ See `CLAUDE.md` for canonical build commands. The primary build script is `./scr
 
 Build artifacts go to `build-vk-Release/` and are copied to `release/`.
 
+**Branch policy (2026):** single trunk **`main`** only on `origin`; use `feature/*` PRs ([docs/BRANCHES.md](docs/BRANCHES.md)). Verify: `./tests/scripts/test_trunk_policy.sh`.
+
 **Repository layout (2026):** [docs/core/REPOSITORY_LAYOUT_2026.md](docs/core/REPOSITORY_LAYOUT_2026.md) — physical roots `engine/`, `runtime/`, `modules/`, etc.; **`src/*` forwarding shims** until Phase 5e ([SHIM_REMOVAL_CHECKLIST.md](docs/core/SHIM_REMOVAL_CHECKLIST.md)). **Windows MSVC:** `engine/platform/win32/msvc2017/` — Vulkan-only solution; manifest sync via `./scripts/msvc/sync_all_vcxproj.sh` or `./scripts/compile_engine.sh msvc-only`; audit `./scripts/audit_src_shim_references.sh`. See [docs/MSVC_CODEGEN.md](docs/MSVC_CODEGEN.md). CMake `IDTECH3_DIR_*` in `cmake/IdTech3Layout.cmake`. Profile matrix: [BUILD.md](BUILD.md). Feature docs: [docs/README.md](docs/README.md).
 
 ### Gotchas
