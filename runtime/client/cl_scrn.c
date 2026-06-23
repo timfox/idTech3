@@ -44,6 +44,13 @@ static cvar_t		*r_fontSubpixel;
 static cvar_t		*r_fontSubpixelPos;
 static cvar_t		*r_fontKerning;
 static cvar_t		*r_textMode;
+static cvar_t		*cl_builtInTtfConsole;
+
+static qboolean SCR_ConsoleTtfEnabled( void ) {
+	return ( qboolean)( Cvar_VariableIntegerValue( "cl_builtInTtf" ) &&
+		cl_builtInTtfConsole && cl_builtInTtfConsole->integer &&
+		cls.builtInTtfActive );
+}
 
 static void SCR_DrawStretchPicTtf( float ax, float ay, float aw, float ah,
 		float s1, float t1, float s2, float t2, qhandle_t shader ) {
@@ -251,6 +258,8 @@ static int SCR_ComputeConsoleTtfPointSize( void ) {
 	return SCR_TtfPointSizeForPixelHeight( targetPx );
 }
 
+static int SCR_ComputeConsoleTtfCellWidth( const fontInfo_t *font, int refLinePx );
+
 /*
 ================
 CL_RefreshBuiltInTrueTypeFonts
@@ -307,6 +316,7 @@ void CL_RegisterBuiltInTrueTypeFonts( void ) {
 	cls.builtInConsoleRefLinePx = 0;
 	cls.builtInHudPointSize = 0;
 	cls.builtInConsolePointSize = 0;
+	cls.builtInConsoleCellW = 0;
 
 	if ( !re.RegisterFont ) {
 		return;
@@ -345,26 +355,50 @@ void CL_RegisterBuiltInTrueTypeFonts( void ) {
 		}
 		if ( !g->glyph || g->imageHeight <= 0 ) {
 			Com_Printf( S_COLOR_YELLOW "Client: r_consoleFont \"%s\" failed; using r_font for console\n", conPath );
-			Com_Memcpy( &cls.builtInConsoleFont, &cls.builtInHudFont, sizeof( cls.builtInConsoleFont ) );
-			cls.builtInConsoleRefLinePx = cls.builtInHudRefLinePx;
+			conPath = hudPath;
+			re.RegisterFont( conPath, conPt, &cls.builtInConsoleFont );
 		} else {
-			cls.builtInConsoleRefLinePx = g->top - g->bottom;
-			if ( cls.builtInConsoleRefLinePx <= 0 ) {
-				cls.builtInConsoleRefLinePx = g->imageHeight;
-			}
 			Com_Printf( "Client: console TrueType font \"%s\" @ %dpt (cell %dpx)\n", conPath, conPt, smallchar_height );
 		}
 	} else {
-		Com_Memcpy( &cls.builtInConsoleFont, &cls.builtInHudFont, sizeof( cls.builtInConsoleFont ) );
-		cls.builtInConsoleRefLinePx = cls.builtInHudRefLinePx;
+		conPath = hudPath;
+		re.RegisterFont( conPath, conPt, &cls.builtInConsoleFont );
+	}
+
+	g = &cls.builtInConsoleFont.glyphs[ (int)'M' & 255 ];
+	if ( !g->glyph || g->imageHeight <= 0 ) {
+		g = &cls.builtInConsoleFont.glyphs[ (int)'0' & 255 ];
+	}
+	if ( !g->glyph || g->imageHeight <= 0 ) {
+		Com_Memset( &cls.builtInConsoleFont, 0, sizeof( cls.builtInConsoleFont ) );
+		Com_Printf( S_COLOR_YELLOW "Client: console TrueType @ %dpt failed; console falls back to bitmap/SDF\n", conPt );
+	} else {
+		cls.builtInConsoleRefLinePx = g->top - g->bottom;
+		if ( cls.builtInConsoleRefLinePx <= 0 ) {
+			cls.builtInConsoleRefLinePx = g->imageHeight;
+		}
 	}
 
 	cls.builtInTtfActive = qtrue;
 	cls.builtInHudPointSize = hudPt;
 	cls.builtInConsolePointSize = conPt;
+	cls.builtInConsoleCellW = SCR_ComputeConsoleTtfCellWidth( &cls.builtInConsoleFont, cls.builtInConsoleRefLinePx );
+	if ( cls.builtInConsoleCellW > 0 && cl_builtInTtfConsole && cl_builtInTtfConsole->integer ) {
+		static int prevConsoleCellW;
+		if ( !Cvar_VariableString( "r_consoleFont" )[0] || Q_stricmp( Cvar_VariableString( "r_consoleFont" ), hudPath ) == 0 ) {
+			Com_Printf( "Client: console TrueType \"%s\" @ %dpt (cell %dx%dpx)\n",
+				conPath, conPt, cls.builtInConsoleCellW, smallchar_height );
+		}
+		if ( cls.builtInConsoleCellW != prevConsoleCellW && con_scale ) {
+			prevConsoleCellW = cls.builtInConsoleCellW;
+			con_scale->modified = qtrue;
+			Con_CheckResize();
+		}
+	} else if ( !cl_builtInTtfConsole || !cl_builtInTtfConsole->integer ) {
+		Com_Printf( "Client: console text using bitmap charset (cl_builtInTtfConsole 0)\n" );
+	}
 	Com_Printf( "Client: built-in HUD TrueType font \"%s\" @ %dpt (target ~%dpx, dpi %d)\n",
 		hudPath, hudPt, (int)( (float)BIGCHAR_HEIGHT * SCR_UiPixelScale() + 0.5f ), Cvar_VariableIntegerValue( "r_fontDpi" ) );
-	Com_Printf( "Client: console TrueType @ %dpt (cell %dpx)\n", conPt, smallchar_height );
 	if ( r_fontKerning ) {
 		Com_Printf( "Client: r_fontKerning %i (proportional xSkip + FreeType kern; Rougier HAL-05430837)\n",
 			r_fontKerning->integer );
@@ -372,6 +406,95 @@ void CL_RegisterBuiltInTrueTypeFonts( void ) {
 	if ( r_fontConsoleAlign ) {
 		Com_Printf( "Client: r_fontConsoleAlign %i (TrueType pixel console/HUD: 0=top of cell, 1=baseline in cell)\n",
 			r_fontConsoleAlign->integer );
+	}
+}
+
+
+/*
+================
+SCR_ComputeConsoleTtfCellWidth
+
+Monospace advance for TrueType console rows: at least the legacy 8px bitmap
+width, widened when 12pt+ glyphs need more than 8px at the current cell height.
+================
+*/
+static int SCR_ComputeConsoleTtfCellWidth( const fontInfo_t *font, int refLinePx ) {
+	int maxSkip = 0;
+	int w;
+	int i;
+
+	(void)refLinePx;
+
+	if ( !font ) {
+		return smallchar_width > 0 ? smallchar_width : SMALLCHAR_WIDTH;
+	}
+
+	for ( i = GLYPH_CHARSTART; i <= GLYPH_CHAREND; i++ ) {
+		const glyphInfo_t *g = &font->glyphs[i];
+		if ( g->xSkip > maxSkip ) {
+			maxSkip = g->xSkip;
+		}
+	}
+
+	w = smallchar_width > 0 ? smallchar_width : SMALLCHAR_WIDTH;
+	if ( maxSkip > 0 && maxSkip > w ) {
+		w = maxSkip;
+	}
+	if ( w < SMALLCHAR_WIDTH ) {
+		w = SMALLCHAR_WIDTH;
+	}
+	return w;
+}
+
+/*
+================
+SCR_ConsoleCharWidth
+
+Effective horizontal console cell size (bitmap 8px or wider TrueType metrics).
+================
+*/
+int SCR_ConsoleCharWidth( void ) {
+	if ( SCR_ConsoleTtfEnabled() && cls.builtInConsoleCellW > 0 ) {
+		return cls.builtInConsoleCellW;
+	}
+	return smallchar_width > 0 ? smallchar_width : SMALLCHAR_WIDTH;
+}
+
+/*
+================
+SCR_TtfConsoleGlyphRect
+
+Fit a glyph into a console cell without squashing: preserve atlas aspect ratio,
+center horizontally, baseline-align vertically when enabled.
+================
+*/
+static void SCR_TtfConsoleGlyphRect( float xx, float y, const glyphInfo_t *g, float cellW, float cellH,
+		int refLinePx, qboolean baselineAlign, float *outAx, float *outAy, float *outAw, float *outAh ) {
+	float drawW;
+	float drawH;
+
+	(void)refLinePx;
+
+	drawW = (float)g->imageWidth;
+	drawH = (float)g->imageHeight;
+	if ( drawW < 1.0f ) {
+		drawW = 1.0f;
+	}
+	if ( drawH < 1.0f ) {
+		drawH = 1.0f;
+	}
+
+	*outAw = drawW;
+	*outAh = drawH;
+	*outAx = xx + ( cellW - drawW ) * 0.5f;
+
+	if ( baselineAlign && g->height > 0 ) {
+		const float desc = Com_Clamp( 2.0f, 12.0f, cellH * 0.22f );
+		const float baselineInCell = cellH - desc;
+		const float inkTop = (float)( g->imageHeight - g->top );
+		*outAy = y + baselineInCell - ( (float)g->height - inkTop );
+	} else {
+		*outAy = y + ( cellH - drawH );
 	}
 }
 
@@ -576,63 +699,17 @@ static qboolean SCR_DrawBuiltInTtfStringExtPixels( int x, int y, const char *str
 	vec4_t color;
 	const char *s;
 	float xx;
-	const float shOff = SCR_TtfShadowOffset();
-	const float sp = SCR_TtfSubpixelBias();
-	const qboolean baselineAlign = ( r_fontConsoleAlign && r_fontConsoleAlign->integer ) ? qtrue : qfalse;
 	const float cellH = (float)smallchar_height;
-	int prevCh;
+	const float cellW = (float)SCR_ConsoleCharWidth();
+	const qboolean baselineAlign = ( r_fontConsoleAlign && r_fontConsoleAlign->integer ) ? qtrue : qfalse;
 
 	if ( !string || !string[0] || !setColor || !font ) {
 		return qfalse;
 	}
 
-	/* Match SCR_DrawSmallChar: fixed smallchar_width x smallchar_height in screen pixels. */
-	if ( shOff > 0.0f ) {
-		color[0] = color[1] = color[2] = 0.0f;
-		color[3] = setColor[3];
-		re.SetColor( color );
-		s = string;
-		xx = (float)x;
-		prevCh = -1;
-		while ( *s ) {
-			int ch;
-			const glyphInfo_t *g;
-			float ax, ay, aw, ah;
-
-			if ( !noColorEscape && Q_IsColorString( s ) ) {
-				s += 2;
-				continue;
-			}
-			if ( (unsigned char)*s >= 0x80 ) {
-				uint32_t cp = Q_UTF8_Decode( &s );
-				if ( CL_Emoji_IsEnabled() && Q_UTF8_IsEmoji( cp ) ) {
-					xx += (float)smallchar_width;
-					continue;
-				}
-				ch = ( cp < 256 ) ? (int)( cp & 0xFF ) : '?';
-			} else {
-				ch = (unsigned char)*s;
-				s++;
-			}
-			ch &= 255;
-			g = &font->glyphs[ch];
-			if ( !g->glyph || g->imageHeight <= 0 || g->imageWidth <= 0 ) {
-				xx += (float)smallchar_width;
-				continue;
-			}
-			aw = (float)smallchar_width;
-			ah = cellH;
-			ax = xx + shOff + sp;
-			ay = SCR_TtfCellAy( (float)y, g, cellH, refLinePx, baselineAlign ) + shOff + sp;
-			SCR_DrawStretchPicTtf( ax, ay, aw, ah, g->s, g->t, g->s2, g->t2, g->glyph );
-			xx += SCR_TtfGlyphAdvance( font, refLinePx, cellH, g, prevCh, ch );
-			prevCh = ch;
-		}
-	}
-
+	/* Console TrueType: 1:1 atlas pixels, no shadow/subpixel (color ghosting on notify). */
 	s = string;
 	xx = (float)x;
-	prevCh = -1;
 	Com_Memcpy( color, setColor, sizeof( color ) );
 	re.SetColor( setColor );
 	while ( *s ) {
@@ -653,10 +730,9 @@ static qboolean SCR_DrawBuiltInTtfStringExtPixels( int x, int y, const char *str
 		}
 		if ( (unsigned char)*s >= 0x80 ) {
 			uint32_t cp = Q_UTF8_Decode( &s );
-			if ( CL_Emoji_IsEnabled() && Q_UTF8_IsEmoji( cp ) && CL_Emoji_DrawChar( (int)xx, (int)y, smallchar_width, smallchar_height, cp ) ) {
+			if ( CL_Emoji_IsEnabled() && Q_UTF8_IsEmoji( cp ) && CL_Emoji_DrawChar( (int)xx, (int)y, (int)cellW, smallchar_height, cp ) ) {
 				re.SetColor( forceColor ? setColor : color );
-				xx += (float)smallchar_width;
-				prevCh = -1;
+				xx += cellW;
 				continue;
 			}
 			ch = ( cp < 256 ) ? (int)( cp & 0xFF ) : '?';
@@ -667,17 +743,12 @@ static qboolean SCR_DrawBuiltInTtfStringExtPixels( int x, int y, const char *str
 		ch &= 255;
 		g = &font->glyphs[ch];
 		if ( !g->glyph || g->imageHeight <= 0 || g->imageWidth <= 0 ) {
-			xx += (float)smallchar_width;
-			prevCh = -1;
+			xx += cellW;
 			continue;
 		}
-		aw = (float)smallchar_width;
-		ah = cellH;
-		ax = xx + sp;
-		ay = SCR_TtfCellAy( (float)y, g, cellH, refLinePx, baselineAlign ) + sp;
-		SCR_DrawStretchPicTtf( ax, ay, aw, ah, g->s, g->t, g->s2, g->t2, g->glyph );
-		xx += SCR_TtfGlyphAdvance( font, refLinePx, cellH, g, prevCh, ch );
-		prevCh = ch;
+		SCR_TtfConsoleGlyphRect( xx, (float)y, g, cellW, cellH, refLinePx, baselineAlign, &ax, &ay, &aw, &ah );
+		re.DrawStretchPic( ax, ay, aw, ah, g->s, g->t, g->s2, g->t2, g->glyph );
+		xx += cellW;
 	}
 
 	re.SetColor( NULL );
@@ -785,18 +856,7 @@ void SCR_DrawSmallString( int x, int y, const char *s, int len ) {
 		}
 	}
 
-	/* Prefer FreeType (r_font) over pre-baked SDF when both are available. */
-	if ( cls.builtInTtfActive && len > 0 && len < 1024 ) {
-		char buf[1024];
-		int n = len;
-		if ( n >= (int)sizeof( buf ) ) n = (int)sizeof( buf ) - 1;
-		Com_Memcpy( buf, s, (size_t)n );
-		buf[n] = '\0';
-		if ( SCR_DrawBuiltInTtfStringExtPixels( x, y, buf, &cls.builtInConsoleFont, cls.builtInConsoleRefLinePx, white, qtrue, qtrue ) ) {
-			return;
-		}
-	}
-
+	/* Prefer SDF, then optional FreeType console, then bitmap charset. */
 	if ( SDF_IsEnabled() && len > 0 && len < 1024 ) {
 		char buf[1024];
 		int n = len;
@@ -804,6 +864,17 @@ void SCR_DrawSmallString( int x, int y, const char *s, int len ) {
 		Com_Memcpy( buf, s, (size_t)n );
 		buf[n] = '\0';
 		if ( SDF_DrawStringExt( x, y, (float)smallchar_height, buf, white, qtrue, qtrue, SDF_COORDS_SCREEN ) ) {
+			return;
+		}
+	}
+
+	if ( SCR_ConsoleTtfEnabled() && len > 0 && len < 1024 ) {
+		char buf[1024];
+		int n = len;
+		if ( n >= (int)sizeof( buf ) ) n = (int)sizeof( buf ) - 1;
+		Com_Memcpy( buf, s, (size_t)n );
+		buf[n] = '\0';
+		if ( SCR_DrawBuiltInTtfStringExtPixels( x, y, buf, &cls.builtInConsoleFont, cls.builtInConsoleRefLinePx, white, qtrue, qtrue ) ) {
 			return;
 		}
 	}
@@ -977,13 +1048,13 @@ void SCR_DrawSmallStringExt( int x, int y, const char *string, const float *setC
 		goto bitmap_fallback;
 	}
 
-	if ( ( textMode == 0 || textMode == 1 ) && cls.builtInTtfActive &&
-			SCR_DrawBuiltInTtfStringExtPixels( x, y, string, &cls.builtInConsoleFont, cls.builtInConsoleRefLinePx, setColor, forceColor, noColorEscape ) ) {
+	if ( ( textMode == 0 || textMode == 2 ) && SDF_IsEnabled() &&
+			SDF_DrawStringExt( x, y, sdfSize, string, setColor, forceColor, noColorEscape, SDF_COORDS_SCREEN ) ) {
 		return;
 	}
 
-	if ( ( textMode == 0 || textMode == 2 ) && SDF_IsEnabled() &&
-			SDF_DrawStringExt( x, y, sdfSize, string, setColor, forceColor, noColorEscape, SDF_COORDS_SCREEN ) ) {
+	if ( ( textMode == 0 || textMode == 1 ) && SCR_ConsoleTtfEnabled() &&
+			SCR_DrawBuiltInTtfStringExtPixels( x, y, string, &cls.builtInConsoleFont, cls.builtInConsoleRefLinePx, setColor, forceColor, noColorEscape ) ) {
 		return;
 	}
 
@@ -1198,6 +1269,11 @@ void SCR_Init( void ) {
 			"When 1 (default), load r_font (FreeType) for engine HUD and console text instead of only the bitmap charset; "
 			"drawn before pre-baked SDF when both are available. Set 0 to prefer SDF (r_sdfEnable) or legacy bigchars if r_font fails. "
 			"Requires BUILD_FREETYPE and valid font files (e.g. base/fonts/Inter-Regular.ttf)." );
+
+		cl_builtInTtfConsole = Cvar_Get( "cl_builtInTtfConsole", "0", CVAR_ARCHIVE_ND );
+		Cvar_CheckRange( cl_builtInTtfConsole, "0", "1", CV_INTEGER );
+		Cvar_SetDescription( cl_builtInTtfConsole,
+			"When 1, draw console/notify with FreeType (r_font / r_consoleFont). Default 0 uses the legacy 8x16 bitmap charset for a stable grid." );
 	}
 
 	r_fontConsoleAlign = Cvar_Get( "r_fontConsoleAlign", "1", CVAR_ARCHIVE );

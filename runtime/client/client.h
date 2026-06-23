@@ -358,6 +358,7 @@ typedef struct {
 	int		builtInConsoleRefLinePx;
 	int		builtInHudPointSize;
 	int		builtInConsolePointSize;
+	int		builtInConsoleCellW;
 	qboolean	builtInTtfActive;
 
 } clientStatic_t;
@@ -487,6 +488,7 @@ qboolean CL_GetModeInfo( int *width, int *height, float *windowAspect, int mode,
 void CL_InitInput( void );
 void CL_RegisterBuiltInTrueTypeFonts( void );
 void CL_RefreshBuiltInTrueTypeFonts( void );
+int SCR_ConsoleCharWidth( void );
 void CL_ClearInput( void );
 void CL_SendCmd( void );
 void CL_WritePacket( int repeat );

@@ -139,6 +139,7 @@ static void CL_ReloadTtf_f( void ) {
 	}
 	CL_RegisterBuiltInTrueTypeFonts();
 	VectorFont_Reload();
+	Con_CheckResize();
 	Com_Printf( "reloadTtf: re-registered built-in TrueType fonts\n" );
 }
 
@@ -317,7 +318,7 @@ void CL_Ref_InitRenderer( void ) {
 
 	Con_CheckResize();
 
-	g_console_field_width = ((cls.glconfig.vidWidth / smallchar_width)) - 2;
+	g_console_field_width = ((cls.glconfig.vidWidth / SCR_ConsoleCharWidth())) - 2;
 	g_consoleField.widthInChars = g_console_field_width;
 
 	// for 640x480 virtualized screen
