@@ -80,6 +80,8 @@ void CL_MapLoading( void ) {
 		return;
 	}
 
+	CL_TryEarlyStockBaseq3Profile();
+
 	Con_Close();
 	Key_SetCatcher( 0 );
 

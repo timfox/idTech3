@@ -3143,6 +3143,12 @@ set_tests_properties(test_auto_graphics_profile PROPERTIES
 	LABELS "scripts;validation;client;compat"
 	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_auto_graphics_profile.sh;${CMAKE_SOURCE_DIR}/runtime/client/core/cl_cgame.c")
 
+add_test(NAME test_stock_baseq3
+	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_stock_baseq3.sh)
+set_tests_properties(test_stock_baseq3 PROPERTIES
+	LABELS "scripts;validation;client;compat"
+	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_stock_baseq3.sh;${CMAKE_SOURCE_DIR}/runtime/client/client.h;${CMAKE_SOURCE_DIR}/config/classic_baseq3.cfg")
+
 add_test(NAME test_console_font
 	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_console_font.sh)
 set_tests_properties(test_console_font PROPERTIES

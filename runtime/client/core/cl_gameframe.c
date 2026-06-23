@@ -294,7 +294,7 @@ void CL_ShutdownGameSystems(void) {
 void CL_GameFrame(float frametime) {
 	if (!gameSystemsInitialized) return;
 
-	if ( cl.snap.valid ) {
+	if ( cl.snap.valid && !CL_StockBaseq3Mode() ) {
 		EngineReplay_BeginFrame( cl.snap.serverTime );
 		EngineTelemetry_Record( "serverTime", (double)cl.snap.serverTime );
 	}
@@ -306,17 +306,20 @@ void CL_GameFrame(float frametime) {
 	}
 
 #ifdef USE_ARC_BLANC
-	ArcBlanc_Frame( frametime );
-	if ( ArcBlanc_Enabled() && re.ArcBlancUploadHeightMap ) {
-		static byte s_arcBlancHeightRGBA[256 * 256 * 4];
-		int abW = 0, abH = 0;
-		ArcBlanc_BuildHeightRGBA( s_arcBlancHeightRGBA, (int)sizeof( s_arcBlancHeightRGBA ), &abW, &abH );
-		if ( abW > 0 && abH > 0 ) {
-			re.ArcBlancUploadHeightMap( s_arcBlancHeightRGBA, abW, abH );
+	if ( !CL_StockBaseq3Mode() ) {
+		ArcBlanc_Frame( frametime );
+		if ( ArcBlanc_Enabled() && re.ArcBlancUploadHeightMap ) {
+			static byte s_arcBlancHeightRGBA[256 * 256 * 4];
+			int abW = 0, abH = 0;
+			ArcBlanc_BuildHeightRGBA( s_arcBlancHeightRGBA, (int)sizeof( s_arcBlancHeightRGBA ), &abW, &abH );
+			if ( abW > 0 && abH > 0 ) {
+				re.ArcBlancUploadHeightMap( s_arcBlancHeightRGBA, abW, abH );
+			}
 		}
 	}
 #endif
 
+	if ( !CL_StockBaseq3Mode() ) {
 	CL_District_Frame();
 	CL_OpenWorld_Frame();
 #ifdef USE_OPEN_WORLD
@@ -409,9 +412,6 @@ void CL_GameFrame(float frametime) {
 	}
 #endif
 
-	BgMap_Frame(frametime);
-	WinTitle_Update(frametime);
-
 #ifdef USE_GAME_AI_MIDDLEWARE
 	EDA_Frame();
 #endif
@@ -420,8 +420,14 @@ void CL_GameFrame(float frametime) {
 		vec3_t fwd = {1,0,0}, right = {0,1,0}, up = {0,0,1}, origin = {0,0,0};
 		MobileFog_Frame(origin, fwd, right, up, frametime);
 	}
+	} else {
+		Music_Update( 0.0f, frametime );
+	}
 
-	if ( cl.snap.valid ) {
+	BgMap_Frame(frametime);
+	WinTitle_Update(frametime);
+
+	if ( cl.snap.valid && !CL_StockBaseq3Mode() ) {
 		EngineReplay_EndFrame();
 	}
 }

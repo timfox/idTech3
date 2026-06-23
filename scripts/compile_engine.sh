@@ -502,6 +502,9 @@ copy_to_release() {
   for cfg in classic_baseq3.cfg modern_native.cfg modern_lighting.cfg console_ttf.cfg console_sdf.cfg; do
     if [ -f "$PROJECT_ROOT/config/$cfg" ]; then
       cp -f "$PROJECT_ROOT/config/$cfg" "$dest/base/$cfg"
+      if [ -d "$dest/baseq3" ]; then
+        cp -f "$PROJECT_ROOT/config/$cfg" "$dest/baseq3/$cfg"
+      fi
     fi
   done
 

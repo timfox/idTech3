@@ -9,7 +9,10 @@ fail() { echo "FAIL: $*" >&2; exit 1; }
 pass() { echo "PASS: $*"; }
 
 grep -q 'cl_autoGraphicsProfile' runtime/client/core/cl_cvars.c || fail 'missing cl_autoGraphicsProfile cvar'
-grep -q 'CL_ApplyGraphicsProfile' runtime/client/core/cl_cgame.c || fail 'missing CL_ApplyGraphicsProfile'
+grep -q 'CL_ApplyClassicBaseq3Cvars' runtime/client/core/cl_cgame.c || fail 'missing CL_ApplyClassicBaseq3Cvars'
+grep -q 'CL_ApplyGraphicsProfile( cgvm );' runtime/client/core/cl_cgame.c || fail 'graphics profile must run before CG_INIT'
+grep -q 'CL_SanitizeLegacySnapshotEntities' runtime/client/core/cl_cgame.c || fail 'legacy snapshot sanitize missing'
+grep -q 'sv_engineSpritesSpawn 0' config/classic_baseq3.cfg || fail 'classic cfg must disable engine sprite spawn'
 grep -q 'CL_IsBaseQ3Game' runtime/client/core/cl_cgame.c || fail 'missing CL_IsBaseQ3Game'
 grep -q 'classic_baseq3.cfg' runtime/client/core/cl_cgame.c || fail 'classic cfg reference missing'
 grep -q 'modern_native.cfg' runtime/client/core/cl_cgame.c || fail 'modern cfg reference missing'

@@ -361,6 +361,8 @@ typedef struct {
 	int		builtInConsoleCellW;
 	qboolean	builtInTtfActive;
 
+	qboolean	stockBaseq3;	/* retail baseq3 + cgame.qvm classic profile active */
+
 } clientStatic_t;
 
 extern int bigchar_width;
@@ -369,6 +371,10 @@ extern int smallchar_width;
 extern int smallchar_height;
 
 extern	clientStatic_t		cls;
+
+static ID_INLINE qboolean CL_StockBaseq3Mode( void ) {
+	return cls.stockBaseq3;
+}
 
 extern	char		cl_oldGame[MAX_QPATH];
 extern	qboolean	cl_oldGameSet;
@@ -582,6 +588,7 @@ void CIN_CloseAllVideos(void);
 //
 void CL_InitCGame( void );
 void CL_ShutdownCGame( void );
+void CL_TryEarlyStockBaseq3Profile( void );
 qboolean CL_GameCommand( void );
 void CL_CGameRendering( stereoFrame_t stereo );
 void CL_PhysDebugDrawSubmit( void );

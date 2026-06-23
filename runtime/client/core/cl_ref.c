@@ -77,7 +77,9 @@ static void CL_SanitizeRendererName( const char *raw, char *out, size_t outSize 
 static void ( *re_RenderScene )( const refdef_t *fd );
 
 static void CL_RenderSceneWithDistricts( const refdef_t *fd ) {
-	CL_District_AddRefEntitiesToScene();
+	if ( !CL_StockBaseq3Mode() ) {
+		CL_District_AddRefEntitiesToScene();
+	}
 	if ( re_RenderScene ) {
 		re_RenderScene( fd );
 	}
