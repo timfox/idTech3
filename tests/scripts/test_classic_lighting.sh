@@ -12,7 +12,8 @@ grep -q 'r_classicLighting' renderers/vulkan/tr_init.c || fail 'missing r_classi
 grep -q 'R_ClassicLightingActive' renderers/vulkan/tr_light.c || fail 'missing R_ClassicLightingActive'
 grep -q 'R_ClassicLightingActive()' renderers/vulkan/tr_shade.c || fail 'tr_shade must gate on classic lighting'
 grep -q 'R_ClassicLightingActive()' renderers/vulkan/tr_backend.c || fail 'sun shadow pass must gate on classic lighting'
-grep -q 'retail cgame.qvm' runtime/client/core/cl_cgame.c || fail 'client qvm classic lighting log missing'
+grep -q 'CL_ApplyGraphicsProfile' runtime/client/core/cl_cgame.c || fail 'client auto graphics profile missing'
+grep -q 'classic_baseq3.cfg' runtime/client/core/cl_cgame.c || fail 'classic_baseq3.cfg reference missing'
 
 grep -q '"r_classicLighting", "1"' renderers/vulkan/tr_init.c || fail 'r_classicLighting default must be 1'
 grep -q '"r_pbrSunShadow", "0"' renderers/vulkan/tr_init.c || fail 'r_pbrSunShadow default must be 0'

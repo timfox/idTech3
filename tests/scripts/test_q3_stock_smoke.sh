@@ -41,6 +41,10 @@ run_map() {
 		return 1
 	fi
 
+	if ! grep -q 'cl_autoGraphicsProfile: classic baseq3' "$log"; then
+		echo "WARN: stock map $map — classic profile log not seen (cfg may be missing from base/)"
+	fi
+
 	if ! grep -q 'spawn origin' "$log"; then
 		echo "FAIL: stock map $map — no spawn origin log (rc=$rc)"
 		tail -20 "$log"

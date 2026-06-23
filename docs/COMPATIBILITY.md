@@ -80,12 +80,13 @@ Details: [ARCHITECTURE.md](ARCHITECTURE.md#native-game-modules-vm) (`vm.c`, `vm_
 
 ### Classic vs modern lighting (Vulkan)
 
-Retail **baseq3** / QVM mods should look like stock Quake III lighting out of the box:
+Retail **baseq3** with **`cgame.qvm`** auto-loads **`classic_baseq3.cfg`** when **`cl_autoGraphicsProfile 1`** (default): classic lighting, no open-world overlays, physics middleware off.
 
-- **`r_classicLighting 1`** (default): disables SH world vertex tint, PBR sun shadow on deluxe surfaces, and Forward+ overflow PBR shade (indices 32–63).
-- **`r_classicLighting 0`**: opt-in modern stack; see **`config/modern_lighting.cfg`** and [RENDERERS.md](RENDERERS.md).
+**Native cgame** modules auto-load **`modern_native.cfg`**: PBR sun shadows, Forward+, volumetrics, TAA, SSR, open world, and related modern renderer features (followed by **`vid_restart`** for latched cvars).
 
-When **`cgame.qvm`** loads, the client logs that classic lighting is preserved if **`r_classicLighting`** is still **1**.
+Other **QVM mods** (e.g. OpenArena) keep the conservative renderer defaults (**`r_classicLighting 1`**) without forcing a cfg.
+
+Disable auto selection with **`cl_autoGraphicsProfile 0`**. Manual presets: **`config/modern_lighting.cfg`** (lighting only), **`config/modern_native.cfg`**, **`config/classic_baseq3.cfg`**.
 
 
 - [ARM_RASPBERRY_PI.md](ARM_RASPBERRY_PI.md) - Raspberry Pi setup and Vulkan

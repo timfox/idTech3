@@ -41,7 +41,7 @@ The Vulkan 1.4 renderer is the primary rendering backend, built as a shared libr
 | `r_forwardPlusDepthCull` | **0/1** (default **1**): **0** = tile cull before draws; **1** = depth prepass + reject lights behind surfaces. |
 | `r_dynamicLightScale` | **0.25–4** (default **1**): global dynamic-light multiplier (projector, Forward+, deferred, volumetric). |
 | `r_lightGammaLink` | **0/1** (default **1**): **0** decouples dynamic lights from display `r_gamma` (HDR tuning). |
-| `r_classicLighting` | **1** (default): retail/baseq3 look — disables SH world tint, PBR sun shadow, Forward+ overflow. **0** = modern features via cvars below. |
+| `r_classicLighting` | **1** (default): retail/baseq3 look — disables SH world tint, PBR sun shadow, Forward+ overflow. Auto **0** for native cgame via **`modern_native.cfg`** when **`cl_autoGraphicsProfile 1`**. |
 | `r_pbrSunShadow` | **0/1** (default **0**): PBR deluxe direct × sun shadow map; requires `r_classicLighting 0`. |
 | `r_pbrSunShadowStrength` | **0–1** (default **1**): Blend sun shadow into PBR direct lighting. |
 

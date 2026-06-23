@@ -19,6 +19,7 @@ extern cvar_t *rcon_client_password;
 extern cvar_t *rconAddress;
 extern cvar_t *cl_timeout;
 extern cvar_t *cl_autoNudge;
+extern cvar_t *cl_autoGraphicsProfile;
 extern cvar_t *cl_timeNudge;
 extern cvar_t *cl_showTimeDelta;
 extern cvar_t *cl_shownet;

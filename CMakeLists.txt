@@ -3137,6 +3137,12 @@ set_tests_properties(test_classic_lighting PROPERTIES
 	LABELS "scripts;validation;renderer;compat"
 	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_classic_lighting.sh;${CMAKE_SOURCE_DIR}/renderers/vulkan/tr_init.c")
 
+add_test(NAME test_auto_graphics_profile
+	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_auto_graphics_profile.sh)
+set_tests_properties(test_auto_graphics_profile PROPERTIES
+	LABELS "scripts;validation;client;compat"
+	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_auto_graphics_profile.sh;${CMAKE_SOURCE_DIR}/runtime/client/core/cl_cgame.c")
+
 add_test(NAME test_build_profiles
 	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_build_profiles.sh)
 set_tests_properties(test_build_profiles PROPERTIES

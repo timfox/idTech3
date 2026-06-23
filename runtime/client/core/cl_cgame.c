@@ -22,6 +22,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 // cl_cgame.c  -- client system interaction with client game
 
 #include "client.h"
+#include "cl_cvars.h"
 #include "../../physics/phys_bullet.h"
 #include "../../qcommon/script_emit.h"
 
@@ -1085,6 +1086,70 @@ static void CL_EnsureClientGameVersionConfigstring( void ) {
 
 /*
 ====================
+CL_IsBaseQ3Game
+
+True when playing retail Quake III data (not a standalone fs_game mod).
+====================
+*/
+static qboolean CL_IsBaseQ3Game( void ) {
+	const char *fs_game;
+	const char *fs_basegame;
+	const char *info;
+	const char *gamename;
+
+	fs_game = Cvar_VariableString( "fs_game" );
+	if ( fs_game && fs_game[0] ) {
+		return ( qboolean)( Q_stricmp( fs_game, "baseq3" ) == 0 );
+	}
+
+	fs_basegame = Cvar_VariableString( "fs_basegame" );
+	if ( fs_basegame && fs_basegame[0] && Q_stristr( fs_basegame, "baseq3" ) ) {
+		return qtrue;
+	}
+
+	info = cl.gameState.stringData + cl.gameState.stringOffsets[ CS_SERVERINFO ];
+	gamename = Info_ValueForKey( info, "gamename" );
+	if ( gamename && gamename[0] && !Q_stricmp( gamename, "baseq3" ) ) {
+		return qtrue;
+	}
+
+	return qfalse;
+}
+
+/*
+====================
+CL_ApplyGraphicsProfile
+
+baseq3 + cgame.qvm -> classic retail look; native cgame -> modern Vulkan stack.
+====================
+*/
+static void CL_ApplyGraphicsProfile( vm_t *vm ) {
+	const qboolean isQvm = ( vm && !vm->dllHandle );
+	const qboolean isBaseQ3 = CL_IsBaseQ3Game();
+
+	if ( !cl_autoGraphicsProfile || !cl_autoGraphicsProfile->integer ) {
+		return;
+	}
+
+	if ( isBaseQ3 && isQvm ) {
+		Com_Printf( "[client] cl_autoGraphicsProfile: classic baseq3 (cgame.qvm)\n" );
+		Cbuf_AddText( "exec classic_baseq3.cfg\n" );
+		return;
+	}
+
+	if ( !isQvm ) {
+		Com_Printf( "[client] cl_autoGraphicsProfile: modern native cgame\n" );
+		Cbuf_AddText( "exec modern_native.cfg\nvid_restart\n" );
+		return;
+	}
+
+	if ( isQvm ) {
+		Com_Printf( "[client] cl_autoGraphicsProfile: QVM mod (classic lighting default preserved)\n" );
+	}
+}
+
+/*
+====================
 CL_InitCGame
 
 Should only be called by CL_StartHunkUsers
@@ -1134,12 +1199,11 @@ void CL_InitCGame( void ) {
 	// otherwise server commands sent just before a gamestate are dropped
 	VM_Call( cgvm, 3, CG_INIT, clc.serverMessageSequence, clc.lastExecutedServerCommand, clc.clientNum );
 
+	CL_ApplyGraphicsProfile( cgvm );
+
 	if ( !cgvm->dllHandle && Cvar_VariableIntegerValue( "cl_physicsEnabled" ) ) {
 		Cvar_Set( "cl_physicsEnabled", "0" );
 		Com_Printf( "[client] cl_physicsEnabled 0 for cgame.qvm compatibility\n" );
-	}
-	if ( !cgvm->dllHandle && Cvar_VariableIntegerValue( "r_classicLighting" ) ) {
-		Com_Printf( "[client] retail cgame.qvm — classic lighting preserved (r_classicLighting 1)\n" );
 	}
 
 	// reset any CVAR_CHEAT cvars registered by cgame
