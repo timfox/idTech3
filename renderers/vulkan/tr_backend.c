@@ -1639,6 +1639,25 @@ static qboolean RB_BuildSunShadowView( const drawSurfsCommand_t *cmd, viewParms_
 	right = lightMax[0] + padding;
 	bottom = lightMin[1] - padding;
 	top = lightMax[1] + padding;
+
+	if ( r_fogShadowSnap && r_fogShadowSnap->integer && vk.sun_shadow_width > 0u && vk.sun_shadow_height > 0u ) {
+		const float texelX = ( right - left ) / (float)vk.sun_shadow_width;
+		const float texelY = ( top - bottom ) / (float)vk.sun_shadow_height;
+		const float halfW = ( right - left ) * 0.5f;
+		const float halfH = ( top - bottom ) * 0.5f;
+		float centerX = ( left + right ) * 0.5f;
+		float centerY = ( bottom + top ) * 0.5f;
+
+		if ( texelX > 1e-6f && texelY > 1e-6f ) {
+			centerX = roundf( centerX / texelX ) * texelX;
+			centerY = roundf( centerY / texelY ) * texelY;
+			left = centerX - halfW;
+			right = centerX + halfW;
+			bottom = centerY - halfH;
+			top = centerY + halfH;
+		}
+	}
+
 	zNear = -( lightMax[2] + padding );
 	zFar = -( lightMin[2] - padding );
 	if ( right <= left + 1e-3f || top <= bottom + 1e-3f || zFar <= zNear + 1e-3f ) {

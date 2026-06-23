@@ -469,6 +469,7 @@ cvar_t	*r_fogShadowBias;
 cvar_t	*r_fogShadowPcfRadius;
 cvar_t	*r_fogShadowMaxDistance;
 cvar_t	*r_fogShadowPadding;
+cvar_t	*r_fogShadowSnap;
 cvar_t	*r_fogDebug;
 cvar_t	*r_fboDebug;
 cvar_t	*r_fboCinematic;
@@ -504,6 +505,7 @@ cvar_t	*r_ambientScale;
 cvar_t	*r_directedScale;
 cvar_t	*r_shLighting;
 cvar_t	*r_shWorldLighting;
+cvar_t	*r_shWorldStrength;
 cvar_t	*r_shDebugView;
 cvar_t	*r_debugLight;
 cvar_t	*r_debugSort;
@@ -2839,7 +2841,13 @@ static void R_Register( void )
 	r_shLighting = ri.Cvar_Get( "r_shLighting", "1", CVAR_ARCHIVE_ND );
 	ri.Cvar_SetDescription( r_shLighting, "Enable spherical harmonics ambient lighting for entity models." );
 	r_shWorldLighting = ri.Cvar_Get( "r_shWorldLighting", "1", CVAR_ARCHIVE_ND );
-	ri.Cvar_SetDescription( r_shWorldLighting, "Apply spherical harmonics to world geometry (lightmapped surfaces)." );
+	ri.Cvar_SetDescription( r_shWorldLighting, "Apply spherical harmonics to world geometry (lightmapped and vertex-lit BSP surfaces)." );
+	r_shWorldStrength = ri.Cvar_Get( "r_shWorldStrength", "1", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_shWorldStrength, "0", "2", CV_FLOAT );
+	ri.Cvar_SetDescription( r_shWorldStrength,
+		"Blend light-grid SH into world vertex colors (0=identity/white, 1=full SH, >1 exaggerate). "
+		"Uses r_directedScale like entity models." );
+	ri.Cvar_SetGroup( r_shWorldStrength, CVG_RENDERER );
 	r_shDebugView = ri.Cvar_Get( "r_shDebugView", "0", CVAR_ARCHIVE_ND );
 	ri.Cvar_SetDescription( r_shDebugView, "Spherical harmonics debug view:\n 0: off\n 1: SH ambient only\n 2: SH coeff[0] grayscale\n 3: World-only solid SH override" );
 
@@ -3627,6 +3635,11 @@ static void R_Register( void )
 	ri.Cvar_CheckRange( r_fogShadowPadding, "0", "4096", CV_FLOAT );
 	ri.Cvar_SetDescription( r_fogShadowPadding, "World-space XY padding added to volumetric sun shadow cascade bounds." );
 	ri.Cvar_SetGroup( r_fogShadowPadding, CVG_RENDERER );
+	r_fogShadowSnap = ri.Cvar_Get( "r_fogShadowSnap", "1", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_fogShadowSnap, "0", "1", CV_INTEGER );
+	ri.Cvar_SetDescription( r_fogShadowSnap,
+		"When 1, snap volumetric sun shadow ortho bounds to shadow-map texels (reduces camera-move shimmer)." );
+	ri.Cvar_SetGroup( r_fogShadowSnap, CVG_RENDERER );
 
 	r_fogDebug = ri.Cvar_Get( "r_fogDebug", "0", CVAR_TEMP );
 	ri.Cvar_CheckRange( r_fogDebug, "0", "13", CV_INTEGER );

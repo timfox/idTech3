@@ -35,6 +35,79 @@ extern	cvar_t	*r_intensity;
 extern	cvar_t	*r_gamma;
 extern	cvar_t	*r_dynamicLightScale;
 extern	cvar_t	*r_lightGammaLink;
+extern	cvar_t	*r_shWorldStrength;
+
+/*
+===============
+R_EvalSH9_RGB
+===============
+*/
+void R_EvalSH9_RGB( const vec3_t shCoeffs[SH_COEFF_COUNT], const vec3_t normal, vec3_t out ) {
+	const float x = normal[0];
+	const float y = normal[1];
+	const float z = normal[2];
+	const float basis[SH_COEFF_COUNT] = {
+		1.0f,
+		y,
+		z,
+		x,
+		x * y,
+		y * z,
+		3.0f * z * z - 1.0f,
+		x * z,
+		x * x - y * y
+	};
+	int i;
+
+	VectorClear( out );
+	for ( i = 0; i < SH_COEFF_COUNT; i++ ) {
+		out[0] += shCoeffs[i][0] * basis[i];
+		out[1] += shCoeffs[i][1] * basis[i];
+		out[2] += shCoeffs[i][2] * basis[i];
+	}
+}
+
+/*
+===============
+R_WorldSHVertexColor
+
+Light-grid SH vertex color for world surfaces (matches entity directedScale).
+Optional r_shWorldStrength blends toward identity white.
+===============
+*/
+qboolean R_WorldSHVertexColor( const vec3_t position, const vec3_t normal, byte rgba[4] ) {
+	vec3_t shCoeffs[SH_COEFF_COUNT];
+	vec3_t shLight;
+	float strength;
+	float dirScale;
+	int i;
+
+	if ( !rgba || !tr.world ) {
+		return qfalse;
+	}
+
+	if ( !R_SampleLightGridSH( tr.world, position, shCoeffs ) ) {
+		rgba[0] = 255;
+		rgba[1] = 255;
+		rgba[2] = 255;
+		rgba[3] = 255;
+		return qfalse;
+	}
+
+	R_EvalSH9_RGB( shCoeffs, normal, shLight );
+	dirScale = ( r_directedScale ) ? r_directedScale->value : 1.0f;
+	VectorScale( shLight, dirScale, shLight );
+
+	strength = ( r_shWorldStrength ) ? r_shWorldStrength->value : 1.0f;
+	strength = Com_Clamp( 0.0f, 2.0f, strength );
+
+	for ( i = 0; i < 3; i++ ) {
+		const float blended = 255.0f + ( shLight[i] - 255.0f ) * strength;
+		rgba[i] = (byte)Com_Clamp( 0.0f, 255.0f, blended );
+	}
+	rgba[3] = 255;
+	return qtrue;
+}
 
 /*
 ===============

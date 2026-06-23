@@ -1800,6 +1800,7 @@ extern cvar_t	*r_fogShadowBias;
 extern cvar_t	*r_fogShadowPcfRadius;
 extern cvar_t	*r_fogShadowMaxDistance;
 extern cvar_t	*r_fogShadowPadding;
+extern cvar_t	*r_fogShadowSnap;
 extern cvar_t	*r_fogDebug;
 extern cvar_t	*r_fboDebug;
 extern cvar_t	*r_froxelDebug;
@@ -2199,6 +2200,8 @@ int R_LightForPoint( vec3_t point, vec3_t ambientLight, vec3_t directedLight, ve
 qboolean R_DynamicLightUsesLegacyScale( void );
 float R_DynamicLightIntensityScale( void );
 void R_DynamicLightColor( const dlight_t *dl, vec3_t out );
+void R_EvalSH9_RGB( const vec3_t shCoeffs[SH_COEFF_COUNT], const vec3_t normal, vec3_t out );
+qboolean R_WorldSHVertexColor( const vec3_t position, const vec3_t normal, byte rgba[4] );
 qboolean R_SampleLightGridSH( const world_t *world, const vec3_t position, vec3_t shCoeffs[SH_COEFF_COUNT] );
 #ifdef USE_VK_PBR
 int R_LightDirForPoint( vec3_t point, vec3_t lightDir, vec3_t normal, world_t *world );
