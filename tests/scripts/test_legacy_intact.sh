@@ -36,5 +36,6 @@ rg -q 'IDTECH3_DIR_RUNTIME_CLIENT|src/client' "${ROOT}/cmake/client/ClientSource
 rg -q 'src/qcommon' "${ROOT}/CMakeLists.txt" || fail "CMake must still reference src/qcommon (monolithic lists pending 5b)"
 
 [ -f "${ROOT}/docs/core/LEGACY_AND_MODERN.md" ] || fail "missing LEGACY_AND_MODERN.md"
+[ -x "${ROOT}/scripts/archive_legacy_remote_branches.sh" ] || fail "missing archive_legacy_remote_branches.sh"
 
 echo "test_legacy_intact: passed"

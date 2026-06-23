@@ -2,6 +2,8 @@
 
 <!-- What changed and why (s&box-style: scope + motivation). -->
 
+**Branch:** must target `main` from `feature/*`, `fix/*`, `docs/*`, or `chore/*` (see [docs/BRANCHES.md](docs/BRANCHES.md)). No new long-lived integration branches.
+
 ## Test plan
 
 - [ ] `./scripts/bootstrap.sh engine`
