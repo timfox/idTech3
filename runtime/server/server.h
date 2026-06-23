@@ -410,6 +410,10 @@ int SV_RemainingGameState( void );
 int	SV_NumForGentity( sharedEntity_t *ent );
 sharedEntity_t *SV_GentityNum( int num );
 int SV_AllocEngineEntityNum( void );
+
+/* Retail qagame/cgame QVM entity number translation (1024 cap vs engine 8192). */
+int SV_GameEntityNumToEngine( int entityNum );
+int SV_EngineEntityNumToGame( int entityNum );
 playerState_t *SV_GameClientNum( int num );
 svEntity_t	*SV_SvEntityForGentity( sharedEntity_t *gEnt );
 sharedEntity_t *SV_GEntityForSvEntity( svEntity_t *svEnt );

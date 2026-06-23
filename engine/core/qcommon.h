@@ -1075,6 +1075,10 @@ extern	qboolean	gw_active;
 
 extern	qboolean	com_errorEntered;
 
+/* Set during VM_Call / module syscalls for clearer VM fault messages. */
+extern const char *com_activeVmName;
+extern int com_activeVmLastSyscall;
+
 extern	fileHandle_t	com_journalDataFile;
 
 extern	char	rconPassword2[ MAX_CVAR_VALUE_STRING ];

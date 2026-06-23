@@ -38,6 +38,65 @@ static int bot_maxdebugpolys;
 extern botlib_export_t	*botlib_export;
 int	bot_enable;
 
+/*
+ * Retail qagame.qvm (1.32) allocates bot trace buffers using the original
+ * bsp_trace_t layout (no exp_dist / sidenum between plane and surface).
+ * Writing the extended botlib struct corrupts the QVM stack and later
+ * triggers "program tried to read out of data segment".
+ */
+typedef struct {
+	qboolean	allsolid;
+	qboolean	startsolid;
+	float		fraction;
+	vec3_t		endpos;
+	cplane_t	plane;
+	bsp_surface_t	surface;
+	int			contents;
+	int			ent;
+} legacy_bsp_trace_t;
+
+STATIC_ASSERT( sizeof( legacy_bsp_trace_t ) + 8 == sizeof( bsp_trace_t ), "legacy_bsp_trace_t must match retail qagame layout" );
+
+static void SV_FillLegacyBspTrace( legacy_bsp_trace_t *bsptrace, const trace_t *trace ) {
+	bsptrace->allsolid = trace->allsolid;
+	bsptrace->startsolid = trace->startsolid;
+	bsptrace->fraction = trace->fraction;
+	VectorCopy( trace->endpos, bsptrace->endpos );
+	bsptrace->plane.dist = trace->plane.dist;
+	VectorCopy( trace->plane.normal, bsptrace->plane.normal );
+	bsptrace->plane.signbits = trace->plane.signbits;
+	bsptrace->plane.type = trace->plane.type;
+	bsptrace->surface.value = 0;
+	bsptrace->surface.flags = trace->surfaceFlags;
+	bsptrace->contents = 0;
+	bsptrace->ent = SV_EngineEntityNumToGame( trace->entityNum );
+}
+
+static void SV_FillBotBspTrace( bsp_trace_t *bsptrace, const trace_t *trace ) {
+	bsptrace->allsolid = trace->allsolid;
+	bsptrace->startsolid = trace->startsolid;
+	bsptrace->fraction = trace->fraction;
+	VectorCopy( trace->endpos, bsptrace->endpos );
+	bsptrace->plane.dist = trace->plane.dist;
+	VectorCopy( trace->plane.normal, bsptrace->plane.normal );
+	bsptrace->plane.signbits = trace->plane.signbits;
+	bsptrace->plane.type = trace->plane.type;
+	bsptrace->surface.value = 0;
+	bsptrace->surface.flags = trace->surfaceFlags;
+	bsptrace->ent = SV_EngineEntityNumToGame( trace->entityNum );
+	bsptrace->exp_dist = 0;
+	bsptrace->sidenum = 0;
+	bsptrace->contents = 0;
+}
+
+static void SV_BotImportFillTrace( bsp_trace_t *bsptrace, const trace_t *trace ) {
+	if ( gvm && !gvm->dllHandle ) {
+		SV_FillLegacyBspTrace( (legacy_bsp_trace_t *)bsptrace, trace );
+	} else {
+		SV_FillBotBspTrace( bsptrace, trace );
+	}
+}
+
 
 /*
 ==================
@@ -188,22 +247,8 @@ BotImport_Trace
 static void BotImport_Trace(bsp_trace_t *bsptrace, vec3_t start, vec3_t mins, vec3_t maxs, vec3_t end, int passent, int contentmask) {
 	trace_t trace;
 
-	SV_Trace(&trace, start, mins, maxs, end, passent, contentmask, qfalse);
-	//copy the trace information
-	bsptrace->allsolid = trace.allsolid;
-	bsptrace->startsolid = trace.startsolid;
-	bsptrace->fraction = trace.fraction;
-	VectorCopy(trace.endpos, bsptrace->endpos);
-	bsptrace->plane.dist = trace.plane.dist;
-	VectorCopy(trace.plane.normal, bsptrace->plane.normal);
-	bsptrace->plane.signbits = trace.plane.signbits;
-	bsptrace->plane.type = trace.plane.type;
-	bsptrace->surface.value = 0;
-	bsptrace->surface.flags = trace.surfaceFlags;
-	bsptrace->ent = trace.entityNum;
-	bsptrace->exp_dist = 0;
-	bsptrace->sidenum = 0;
-	bsptrace->contents = 0;
+	SV_Trace( &trace, start, mins, maxs, end, SV_GameEntityNumToEngine( passent ), contentmask, qfalse );
+	SV_BotImportFillTrace( bsptrace, &trace );
 }
 
 /*
@@ -214,22 +259,8 @@ BotImport_EntityTrace
 static void BotImport_EntityTrace(bsp_trace_t *bsptrace, vec3_t start, vec3_t mins, vec3_t maxs, vec3_t end, int entnum, int contentmask) {
 	trace_t trace;
 
-	SV_ClipToEntity(&trace, start, mins, maxs, end, entnum, contentmask, qfalse);
-	//copy the trace information
-	bsptrace->allsolid = trace.allsolid;
-	bsptrace->startsolid = trace.startsolid;
-	bsptrace->fraction = trace.fraction;
-	VectorCopy(trace.endpos, bsptrace->endpos);
-	bsptrace->plane.dist = trace.plane.dist;
-	VectorCopy(trace.plane.normal, bsptrace->plane.normal);
-	bsptrace->plane.signbits = trace.plane.signbits;
-	bsptrace->plane.type = trace.plane.type;
-	bsptrace->surface.value = 0;
-	bsptrace->surface.flags = trace.surfaceFlags;
-	bsptrace->ent = trace.entityNum;
-	bsptrace->exp_dist = 0;
-	bsptrace->sidenum = 0;
-	bsptrace->contents = 0;
+	SV_ClipToEntity( &trace, start, mins, maxs, end, SV_GameEntityNumToEngine( entnum ), contentmask, qfalse );
+	SV_BotImportFillTrace( bsptrace, &trace );
 }
 
 
