@@ -32,6 +32,10 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "cl_engine_decals.h"
 #include "cl_openworld.h"
 #include "../../game/bg_public.h"
+#include "../../qcommon/cm_public.h"
+
+void CM_Stream_Merge_ClearAll( void );
+int CM_Stream_MergedCount( void );
 
 extern	botlib_export_t	*botlib_export;
 
@@ -206,10 +210,35 @@ static qboolean CL_FillSnapshot( int snapshotNumber, int *snapFlags, int *server
 	return qtrue;
 }
 
+static void CL_SanitizeLegacySnapshotEntities( legacySnapshot_t *snapshot ) {
+	int i;
+
+	if ( !snapshot ) {
+		return;
+	}
+
+	for ( i = 0; i < snapshot->numEntities; i++ ) {
+		entityState_t *es = &snapshot->entities[i];
+
+		if ( es->eFlags & ( EF_BILLBOARD | EF_FLIPBOOK | EF_IMPOSTER | EF_DECAL ) ) {
+			es->eFlags &= ~( EF_BILLBOARD | EF_FLIPBOOK | EF_IMPOSTER | EF_DECAL );
+			es->modelindex = 0;
+			es->modelindex2 = 0;
+			es->generic1 = 0;
+		}
+	}
+}
+
 static qboolean CL_GetLegacySnapshot( int snapshotNumber, legacySnapshot_t *snapshot ) {
-	return CL_FillSnapshot( snapshotNumber, &snapshot->snapFlags, &snapshot->serverCommandSequence,
+	qboolean ok;
+
+	ok = CL_FillSnapshot( snapshotNumber, &snapshot->snapFlags, &snapshot->serverCommandSequence,
 		&snapshot->ping, &snapshot->serverTime, snapshot->areamask, &snapshot->ps,
 		&snapshot->numEntities, snapshot->entities, MAX_ENTITIES_IN_SNAPSHOT );
+	if ( ok ) {
+		CL_SanitizeLegacySnapshotEntities( snapshot );
+	}
+	return ok;
 }
 
 /*
@@ -304,7 +333,7 @@ static void CL_ConfigstringModified( void ) {
 		CL_SystemInfoChanged( qfalse );
 	}
 
-	if ( index == CS_ENGINE_OPENWORLD_SECTORS ) {
+	if ( index == CS_ENGINE_OPENWORLD_SECTORS && !CL_StockBaseq3Mode() ) {
 		CL_OpenWorld_OnConfigstring( s );
 	}
 }
@@ -461,6 +490,7 @@ void CL_ShutdownCGame( void ) {
 
 	Key_SetCatcher( Key_GetCatcher( ) & ~KEYCATCH_CGAME );
 	cls.cgameStarted = qfalse;
+	cls.stockBaseq3 = qfalse;
 
 	if ( !cgvm ) {
 		return;
@@ -743,8 +773,10 @@ static intptr_t CL_CgameSystemCalls( intptr_t *args ) {
 		re.AddAdditiveLightToScene( VMA(1), VMF(2), VMF(3), VMF(4), VMF(5) );
 		return 0;
 	case CG_R_RENDERSCENE:
-		CL_EngineSprites_AddFromSnapshot();
-		CL_EngineDecals_AddFromSnapshot();
+		if ( !CL_StockBaseq3Mode() ) {
+			CL_EngineSprites_AddFromSnapshot();
+			CL_EngineDecals_AddFromSnapshot();
+		}
 		re.RenderScene( VMA(1) );
 		return 0;
 	case CG_R_SETCOLOR:
@@ -1118,6 +1150,79 @@ static qboolean CL_IsBaseQ3Game( void ) {
 
 /*
 ====================
+CL_ApplyClassicBaseq3Cvars
+
+Synchronous retail-safe defaults before cgame.qvm CG_INIT (exec classic_baseq3.cfg
+is still queued for user overrides / archived seta values).
+====================
+*/
+static void CL_ApplyClassicBaseq3Cvars( void ) {
+	cls.stockBaseq3 = qtrue;
+
+	Cvar_Set( "r_classicLighting", "1" );
+	Cvar_Set( "r_pbr", "0" );
+	Cvar_Set( "r_fbo", "0" );
+	Cvar_Set( "r_taa", "0" );
+	Cvar_Set( "r_ssr", "0" );
+	Cvar_Set( "r_pbrSunShadow", "0" );
+	Cvar_Set( "r_forwardPlusOverflowShade", "0" );
+	Cvar_Set( "r_shWorldLighting", "0" );
+	Cvar_Set( "cl_physicsEnabled", "0" );
+	Cvar_Set( "r_openWorld", "0" );
+	Cvar_Set( "cl_openWorldSync", "0" );
+	Cvar_Set( "r_bspStream", "0" );
+	Cvar_Set( "r_volumetricFog", "0" );
+	Cvar_Set( "r_district", "0" );
+	Cvar_Set( "cm_stream", "0" );
+	Cvar_Set( "cm_streamMerge", "0" );
+	Cvar_Set( "cm_openWorldCollision", "0" );
+	Cvar_Set( "cl_builtInTtfConsole", "0" );
+	Cvar_Set( "r_sdfEnable", "0" );
+	Cvar_Set( "cl_engineSprites", "0" );
+	Cvar_Set( "r_spriteProps", "0" );
+	Cvar_Set( "cl_navEnabled", "0" );
+	Cvar_Set( "cl_particlesEnabled", "0" );
+	Cvar_Set( "g_ecsMotion", "0" );
+	Cvar_Set( "sv_engineSprites", "0" );
+	Cvar_Set( "sv_engineSpritesSpawn", "0" );
+	Cvar_Set( "sv_engineDecals", "0" );
+	Cvar_Set( "sv_engineDecalsSpawn", "0" );
+	Cvar_Set( "sv_openWorld", "0" );
+	Cvar_Set( "r_imgui", "0" );
+	Cvar_Set( "r_studio_tools", "0" );
+
+	CM_Stream_Merge_ClearAll();
+
+	Com_Printf( "[client] stock baseq3 mode: modern overlays and middleware disabled\n" );
+}
+
+/*
+====================
+CL_TryEarlyStockBaseq3Profile
+
+Listen-server map loads call SCR_UpdateScreen before cgame init; disable ImGui
+and studio overlays early for retail baseq3 when auto profile is on.
+====================
+*/
+void CL_TryEarlyStockBaseq3Profile( void ) {
+	if ( !cl_autoGraphicsProfile || !cl_autoGraphicsProfile->integer ) {
+		return;
+	}
+	if ( !CL_IsBaseQ3Game() ) {
+		return;
+	}
+
+	Cvar_Set( "r_imgui", "0" );
+	Cvar_Set( "r_studio_tools", "0" );
+	Cvar_Set( "r_bspStream", "0" );
+	Cvar_Set( "cm_stream", "0" );
+	Cvar_Set( "cm_streamMerge", "0" );
+	Cvar_Set( "cm_openWorldCollision", "0" );
+	CM_Stream_Merge_ClearAll();
+}
+
+/*
+====================
 CL_ApplyGraphicsProfile
 
 baseq3 + cgame.qvm -> classic retail look; native cgame -> modern Vulkan stack.
@@ -1133,17 +1238,20 @@ static void CL_ApplyGraphicsProfile( vm_t *vm ) {
 
 	if ( isBaseQ3 && isQvm ) {
 		Com_Printf( "[client] cl_autoGraphicsProfile: classic baseq3 (cgame.qvm)\n" );
+		CL_ApplyClassicBaseq3Cvars();
 		Cbuf_AddText( "exec classic_baseq3.cfg\n" );
 		return;
 	}
 
 	if ( !isQvm ) {
 		Com_Printf( "[client] cl_autoGraphicsProfile: modern native cgame\n" );
+		cls.stockBaseq3 = qfalse;
 		Cbuf_AddText( "exec modern_native.cfg\nvid_restart\n" );
 		return;
 	}
 
 	if ( isQvm ) {
+		cls.stockBaseq3 = qfalse;
 		Com_Printf( "[client] cl_autoGraphicsProfile: QVM mod (classic lighting default preserved)\n" );
 	}
 }
@@ -1194,12 +1302,12 @@ void CL_InitCGame( void ) {
 
 	CL_EnsureClientGameVersionConfigstring();
 
+	CL_ApplyGraphicsProfile( cgvm );
+
 	// init for this gamestate
 	// use the lastExecutedServerCommand instead of the serverCommandSequence
 	// otherwise server commands sent just before a gamestate are dropped
 	VM_Call( cgvm, 3, CG_INIT, clc.serverMessageSequence, clc.lastExecutedServerCommand, clc.clientNum );
-
-	CL_ApplyGraphicsProfile( cgvm );
 
 	if ( !cgvm->dllHandle && Cvar_VariableIntegerValue( "cl_physicsEnabled" ) ) {
 		Cvar_Set( "cl_physicsEnabled", "0" );
@@ -1268,7 +1376,9 @@ void CL_CGameRendering( stereoFrame_t stereo ) {
 #ifdef DEBUG
 	VM_Debug( 0 );
 #endif
-	CL_PhysDebugDrawSubmit();
+	if ( cgvm && cgvm->dllHandle ) {
+		CL_PhysDebugDrawSubmit();
+	}
 }
 
 
@@ -1346,6 +1456,40 @@ static void CL_AdjustTimeDelta( void ) {
 
 /*
 ==================
+CL_ValidateStockSpawnOrigin
+
+After cgame loads CM, verify spawn is inside world collision and no sector overlay is active.
+==================
+*/
+static void CL_ValidateStockSpawnOrigin( void ) {
+	vec3_t mins, maxs, org;
+	int contents, merged;
+	qboolean inside;
+
+	if ( !CL_StockBaseq3Mode() ) {
+		return;
+	}
+
+	VectorCopy( cl.snap.ps.origin, org );
+	CM_ModelBounds( CM_InlineModel( 0 ), mins, maxs );
+	inside = ( qboolean )( org[0] >= mins[0] && org[0] <= maxs[0] &&
+		org[1] >= mins[1] && org[1] <= maxs[1] &&
+		org[2] >= mins[2] && org[2] <= maxs[2] );
+	contents = CM_PointContents( org, 0 );
+	merged = CM_Stream_MergedCount();
+
+	Com_Printf( "[client] spawn CM AABB [(%.0f %.0f %.0f)-(%.0f %.0f %.0f)] inside=%s contents=0x%x merged_sectors=%d\n",
+		mins[0], mins[1], mins[2], maxs[0], maxs[1], maxs[2],
+		inside ? "yes" : "NO", contents, merged );
+
+	if ( !inside || merged > 0 ) {
+		Com_Printf( S_COLOR_YELLOW
+			"WARNING: stock spawn outside map CM or sector overlay active — reset cm_stream/cm_streamMerge/r_openWorld archives\n" );
+	}
+}
+
+/*
+==================
 CL_FirstSnapshot
 ==================
 */
@@ -1359,6 +1503,8 @@ static void CL_FirstSnapshot( void ) {
 	Com_Printf( "[client] spawn origin (%.1f %.1f %.1f) map=%s\n",
 		cl.snap.ps.origin[0], cl.snap.ps.origin[1], cl.snap.ps.origin[2],
 		cl.mapname[0] ? cl.mapname : "?" );
+
+	CL_ValidateStockSpawnOrigin();
 
 	// clear old game so we will not switch back to old mod on disconnect
 	CL_ResetOldGame();

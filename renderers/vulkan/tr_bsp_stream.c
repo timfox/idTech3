@@ -890,7 +890,7 @@ static void R_BspStream_CompactLightmaps( void )
 }
 
 void R_BspStream_Init( void ) {
-	r_bspStream = ri.Cvar_Get( "r_bspStream", "1", CVAR_ARCHIVE );
+	r_bspStream = ri.Cvar_Get( "r_bspStream", "0", CVAR_ARCHIVE );
 	ri.Cvar_SetDescription( r_bspStream,
 		"Merge sector BSP brush tops as visual overlay (open-world renderer streaming)." );
 	r_bspStreamResident = ri.Cvar_Get( "r_bspStreamResident", "1", CVAR_ARCHIVE );

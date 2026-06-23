@@ -29,6 +29,36 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "sv_app_crdt.h"
 
 
+static qboolean SV_IsBaseQ3Game( void ) {
+	const char *fs_game;
+	const char *fs_basegame;
+
+	fs_game = Cvar_VariableString( "fs_game" );
+	if ( fs_game && fs_game[0] ) {
+		return ( qboolean )( Q_stricmp( fs_game, "baseq3" ) == 0 );
+	}
+
+	fs_basegame = Cvar_VariableString( "fs_basegame" );
+	if ( fs_basegame && fs_basegame[0] && Q_stristr( fs_basegame, "baseq3" ) ) {
+		return qtrue;
+	}
+
+	return qfalse;
+}
+
+
+static void SV_ApplyClassicBaseq3ServerCvars( void ) {
+	Cvar_Set( "sv_engineSprites", "0" );
+	Cvar_Set( "sv_engineSpritesSpawn", "0" );
+	Cvar_Set( "sv_engineDecals", "0" );
+	Cvar_Set( "sv_engineDecalsSpawn", "0" );
+	Cvar_Set( "sv_openWorld", "0" );
+	Cvar_Set( "sv_openWorldSync", "0" );
+	Cvar_Set( "cm_stream", "0" );
+	Cvar_Set( "cm_streamMerge", "0" );
+}
+
+
 /*
 ===============
 SV_EnsureGameVersionConfigstring
@@ -574,6 +604,11 @@ void SV_SpawnServer( const char *mapname, qboolean killBots ) {
 	Sys_SetStatus( "Loading map %s", mapname );
 	CM_LoadMap( va( "maps/%s.bsp", mapname ), qfalse, &checksum );
 	SV_OpenWorld_OnMapLoad( mapname );
+
+	if ( SV_IsBaseQ3Game() ) {
+		SV_ApplyClassicBaseq3ServerCvars();
+		Com_Printf( "[server] classic baseq3: engine sprite/decal spawn disabled for qagame.qvm\n" );
+	}
 
 	SV_EngineSprites_LoadMap( CM_EntityString() );
 	SV_EngineDecals_LoadMap( CM_EntityString() );

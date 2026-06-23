@@ -8,6 +8,7 @@ Copyright (C) 2026 Gopex LLC. All rights reserved.
 #include "qcommon.h"
 #include "cm_public.h"
 #include "cm_stream_merge.h"
+#include "cm_stream.h"
 #include "cm_local.h"
 
 #define CM_MERGE_MAX_SECTORS 64
@@ -123,6 +124,9 @@ qboolean CM_Stream_MergeSector( int cellX, int cellY ) {
 	lump_t *l;
 
 	if ( !cm_streamMerge || !cm_streamMerge->integer ) {
+		return qfalse;
+	}
+	if ( !CM_Stream_SectorOverlayPermitted() ) {
 		return qfalse;
 	}
 	if ( CM_Stream_FindPatch( cellX, cellY ) >= 0 ) {

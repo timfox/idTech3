@@ -27,7 +27,7 @@ static qboolean CM_Stream_MapNameIsSectorChunk( const char *mapBase ) {
 	return !Q_stricmpn( mapBase, "sector_", 7 );
 }
 
-static qboolean CM_Stream_SectorOverlayPermitted( void ) {
+qboolean CM_Stream_SectorOverlayPermitted( void ) {
 	if ( Cvar_VariableIntegerValue( "com_openWorldSmoke" ) ) {
 		return qtrue;
 	}
