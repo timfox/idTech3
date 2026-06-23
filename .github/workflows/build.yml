@@ -15,13 +15,6 @@ on:
   push:
     branches:
       - main
-      - next-gen
-      - next-gen-2
-      - next-gen-3
-      - next-gen-4
-      - next-gen-5
-      - proximity-voice-chat
-      - 'cursor/**'
     paths-ignore:
       - '**/*.md'
       - '**/LICENSE*'

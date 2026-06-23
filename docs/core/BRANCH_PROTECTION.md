@@ -4,15 +4,25 @@
 
 ## Required settings
 
-| Setting | Recommendation |
-|---------|----------------|
-| **Require a pull request before merging** | On (1 approval if team > 1) |
-| **Require status checks to pass** | On — require `build` (or your primary workflow job name from `.github/workflows/build.yml`) |
-| **Require branches to be up to date** | On (optional but recommended for AAA) |
-| **Do not allow bypassing** | On for production orgs |
-| **Restrict pushes** | Maintainers only |
-| **Allow force pushes** | Off |
-| **Allow deletions** | Off |
+| Setting | Recommendation | Repo state (2026-06-22) |
+|---------|----------------|-------------------------|
+| **Require a pull request before merging** | On (1 approval if team > 1) | On (0 approvals; solo maintainer) |
+| **Require status checks to pass** | On — add primary jobs after first green `main` run (e.g. `linux-game`) | Off (enable when check names are stable) |
+| **Require branches to be up to date** | On (optional but recommended for AAA) | Off |
+| **Do not allow bypassing** | On for production orgs | Off |
+| **Restrict pushes** | Maintainers only | Off |
+| **Allow force pushes** | Off | Off |
+| **Allow deletions** | Off | Off |
+
+**Auto-delete head branches:** enabled (`delete_branch_on_merge`).
+
+Re-apply or tighten via API:
+
+```bash
+gh api --method PUT repos/timfox/idTech3/branches/main/protection --input .github/branch-protection-main.json
+```
+
+(See `.github/branch-protection-main.json` in this repo.)
 
 ## Repository settings (General)
 
