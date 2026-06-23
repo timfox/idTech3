@@ -15,7 +15,8 @@ grep -q 'CL_StockBaseq3Mode()' runtime/client/core/cl_gameframe.c || fail 'gamef
 grep -q 'CL_StockBaseq3Mode()' runtime/client/core/cl_cgame.c || fail 'renderscene stock guard missing'
 grep -q 'SV_ApplyClassicBaseq3ServerCvars' runtime/server/sv_init.c || fail 'server classic cvars missing'
 grep -q 'cl_engineSprites 0' config/classic_baseq3.cfg || fail 'classic cfg must disable cl_engineSprites'
-grep -q 'CL_TryEarlyStockBaseq3Profile' runtime/client/core/cl_lifecycle.c || fail 'early stock profile hook missing'
+grep -q 'retail entity number mapping active' runtime/server/sv_game.c || fail 'qvm entity num mapping missing'
+grep -q 'SV_UseLegacyNativeEntityNums' runtime/server/sv_game.c || fail 'entity num mapping helper missing'
 grep -q 'cm_streamMerge 0' config/classic_baseq3.cfg || fail 'classic cfg must disable cm_streamMerge'
 
 pass "stock baseq3 contract"

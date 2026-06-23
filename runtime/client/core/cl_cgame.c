@@ -58,6 +58,74 @@ typedef struct {
 	int  dataCount;
 } legacyGameState_t;
 
+#define RETAIL_QVM_MAX_GENTITIES	1024
+
+/* Retail cgame.qvm refEntity_t ends at shaderTime (no radius/rotation fields). */
+typedef struct {
+	refEntityType_t	reType;
+	int				renderfx;
+	qhandle_t		hModel;
+	vec3_t			lightingOrigin;
+	float			shadowPlane;
+	vec3_t			axis[3];
+	qboolean		nonNormalizedAxes;
+	float			origin[3];
+	int				frame;
+	float			oldorigin[3];
+	int				oldframe;
+	float			backlerp;
+	int				skinNum;
+	qhandle_t		customSkin;
+	qhandle_t		customShader;
+	color4ub_t		shader;
+	float			shaderTexCoord[2];
+	floatint_t		shaderTime;
+} retailRefEntity_t;
+
+static int CL_GameEntityNumToEngine( int entityNum ) {
+	if ( !cgvm || cgvm->dllHandle ) {
+		return entityNum;
+	}
+
+	if ( entityNum == RETAIL_QVM_MAX_GENTITIES - 1 ) {
+		return ENTITYNUM_NONE;
+	}
+
+	if ( entityNum == RETAIL_QVM_MAX_GENTITIES - 2 ) {
+		return ENTITYNUM_WORLD;
+	}
+
+	return entityNum;
+}
+
+static int CL_EngineEntityNumToGame( int entityNum ) {
+	if ( !cgvm || cgvm->dllHandle ) {
+		return entityNum;
+	}
+
+	if ( entityNum == ENTITYNUM_NONE ) {
+		return RETAIL_QVM_MAX_GENTITIES - 1;
+	}
+
+	if ( entityNum == ENTITYNUM_WORLD ) {
+		return RETAIL_QVM_MAX_GENTITIES - 2;
+	}
+
+	if ( entityNum < 0 || entityNum >= RETAIL_QVM_MAX_GENTITIES ) {
+		return RETAIL_QVM_MAX_GENTITIES - 1;
+	}
+
+	return entityNum;
+}
+
+static void CL_AddRetailRefEntityToScene( const retailRefEntity_t *src, qboolean intShaderTime ) {
+	refEntity_t ent;
+
+	Com_Memset( &ent, 0, sizeof( ent ) );
+	Com_Memcpy( &ent, src, sizeof( *src ) );
+	re.AddRefEntityToScene( &ent, intShaderTime );
+}
+
 /*
  * Retail cgame.qvm snapshot_t layout (cg_public.h). Must match the QVM struct
  * exactly — do not grow without a new CGAME_IMPORT_API_VERSION.
@@ -612,9 +680,11 @@ static intptr_t CL_CgameSystemCalls( intptr_t *args ) {
 	case CG_MILLISECONDS:
 		return Sys_Milliseconds();
 	case CG_CVAR_REGISTER:
+		VM_CHECKBOUNDS( cgvm, args[1], sizeof( vmCvar_t ) );
 		Cvar_Register( VMA(1), VMA(2), VMA(3), args[4], cgvm->privateFlag );
 		return 0;
 	case CG_CVAR_UPDATE:
+		VM_CHECKBOUNDS( cgvm, args[1], sizeof( vmCvar_t ) );
 		Cvar_Update( VMA(1), cgvm->privateFlag );
 		return 0;
 	case CG_CVAR_SET:
@@ -688,24 +758,44 @@ static intptr_t CL_CgameSystemCalls( intptr_t *args ) {
 	case CG_CM_TEMPCAPSULEMODEL:
 		return CM_TempBoxModel( VMA(1), VMA(2), /*int capsule*/ qtrue );
 	case CG_CM_POINTCONTENTS:
-		return CM_PointContents( VMA(1), args[2] );
+		return CM_PointContents( VMA(1), CL_GameEntityNumToEngine( args[2] ) );
 	case CG_CM_TRANSFORMEDPOINTCONTENTS:
-		return CM_TransformedPointContents( VMA(1), args[2], VMA(3), VMA(4) );
+		return CM_TransformedPointContents( VMA(1), CL_GameEntityNumToEngine( args[2] ), VMA(3), VMA(4) );
 	case CG_CM_BOXTRACE:
 		VM_CHECKBOUNDS( cgvm, args[1], sizeof( trace_t ) );
-		CM_BoxTrace( VMA(1), VMA(2), VMA(3), VMA(4), VMA(5), args[6], args[7], /*int capsule*/ qfalse );
+		CM_BoxTrace( VMA(1), VMA(2), VMA(3), VMA(4), VMA(5),
+			CL_GameEntityNumToEngine( args[6] ), args[7], /*int capsule*/ qfalse );
+		if ( cgvm && !cgvm->dllHandle ) {
+			trace_t *tr = VMA(1);
+			tr->entityNum = CL_EngineEntityNumToGame( tr->entityNum );
+		}
 		return 0;
 	case CG_CM_CAPSULETRACE:
 		VM_CHECKBOUNDS( cgvm, args[1], sizeof( trace_t ) );
-		CM_BoxTrace( VMA(1), VMA(2), VMA(3), VMA(4), VMA(5), args[6], args[7], /*int capsule*/ qtrue );
+		CM_BoxTrace( VMA(1), VMA(2), VMA(3), VMA(4), VMA(5),
+			CL_GameEntityNumToEngine( args[6] ), args[7], /*int capsule*/ qtrue );
+		if ( cgvm && !cgvm->dllHandle ) {
+			trace_t *tr = VMA(1);
+			tr->entityNum = CL_EngineEntityNumToGame( tr->entityNum );
+		}
 		return 0;
 	case CG_CM_TRANSFORMEDBOXTRACE:
 		VM_CHECKBOUNDS( cgvm, args[1], sizeof( trace_t ) );
-		CM_TransformedBoxTrace( VMA(1), VMA(2), VMA(3), VMA(4), VMA(5), args[6], args[7], VMA(8), VMA(9), /*int capsule*/ qfalse );
+		CM_TransformedBoxTrace( VMA(1), VMA(2), VMA(3), VMA(4), VMA(5),
+			CL_GameEntityNumToEngine( args[6] ), args[7], VMA(8), VMA(9), /*int capsule*/ qfalse );
+		if ( cgvm && !cgvm->dllHandle ) {
+			trace_t *tr = VMA(1);
+			tr->entityNum = CL_EngineEntityNumToGame( tr->entityNum );
+		}
 		return 0;
 	case CG_CM_TRANSFORMEDCAPSULETRACE:
 		VM_CHECKBOUNDS( cgvm, args[1], sizeof( trace_t ) );
-		CM_TransformedBoxTrace( VMA(1), VMA(2), VMA(3), VMA(4), VMA(5), args[6], args[7], VMA(8), VMA(9), /*int capsule*/ qtrue );
+		CM_TransformedBoxTrace( VMA(1), VMA(2), VMA(3), VMA(4), VMA(5),
+			CL_GameEntityNumToEngine( args[6] ), args[7], VMA(8), VMA(9), /*int capsule*/ qtrue );
+		if ( cgvm && !cgvm->dllHandle ) {
+			trace_t *tr = VMA(1);
+			tr->entityNum = CL_EngineEntityNumToGame( tr->entityNum );
+		}
 		return 0;
 	case CG_CM_MARKFRAGMENTS:
 		return re.MarkFragments( args[1], VMA(2), VMA(3), args[4], VMA(5), args[6], VMA(7) );
@@ -756,7 +846,13 @@ static intptr_t CL_CgameSystemCalls( intptr_t *args ) {
 		re.ClearScene();
 		return 0;
 	case CG_R_ADDREFENTITYTOSCENE:
-		re.AddRefEntityToScene( VMA(1), qfalse );
+		if ( cgvm && !cgvm->dllHandle ) {
+			VM_CHECKBOUNDS( cgvm, args[1], sizeof( retailRefEntity_t ) );
+			CL_AddRetailRefEntityToScene( VMA(1), qfalse );
+		} else {
+			VM_CHECKBOUNDS( cgvm, args[1], sizeof( refEntity_t ) );
+			re.AddRefEntityToScene( VMA(1), qfalse );
+		}
 		return 0;
 	case CG_R_ADDPOLYTOSCENE:
 		re.AddPolyToScene( args[1], args[2], VMA(3), 1 );
@@ -765,6 +861,9 @@ static intptr_t CL_CgameSystemCalls( intptr_t *args ) {
 		re.AddPolyToScene( args[1], args[2], VMA(3), args[4] );
 		return 0;
 	case CG_R_LIGHTFORPOINT:
+		VM_CHECKBOUNDS( cgvm, args[2], sizeof( vec3_t ) );
+		VM_CHECKBOUNDS( cgvm, args[3], sizeof( vec3_t ) );
+		VM_CHECKBOUNDS( cgvm, args[4], sizeof( vec3_t ) );
 		return re.LightForPoint( VMA(1), VMA(2), VMA(3), VMA(4) );
 	case CG_R_ADDLIGHTTOSCENE:
 		re.AddLightToScene( VMA(1), VMF(2), VMF(3), VMF(4), VMF(5) );
@@ -777,6 +876,7 @@ static intptr_t CL_CgameSystemCalls( intptr_t *args ) {
 			CL_EngineSprites_AddFromSnapshot();
 			CL_EngineDecals_AddFromSnapshot();
 		}
+		VM_CHECKBOUNDS( cgvm, args[1], sizeof( refdef_t ) );
 		re.RenderScene( VMA(1) );
 		return 0;
 	case CG_R_SETCOLOR:
@@ -791,6 +891,7 @@ static intptr_t CL_CgameSystemCalls( intptr_t *args ) {
 		re.ModelBounds( args[1], VMA(2), VMA(3) );
 		return 0;
 	case CG_R_LERPTAG:
+		VM_CHECKBOUNDS( cgvm, args[1], sizeof( orientation_t ) );
 		return re.LerpTag( VMA(1), args[2], args[3], args[4], VMF(5), VMA(6) );
 	case CG_GETGLCONFIG:
 		VM_CHECKBOUNDS( cgvm, args[1], sizeof( glconfig_t ) );
@@ -881,6 +982,7 @@ static intptr_t CL_CgameSystemCalls( intptr_t *args ) {
 	case CG_PC_FREE_SOURCE:
 		return botlib_export->PC_FreeSourceHandle( args[1] );
 	case CG_PC_READ_TOKEN:
+		VM_CHECKBOUNDS( cgvm, args[2], sizeof( pc_token_t ) );
 		return botlib_export->PC_ReadTokenHandle( args[1], VMA(2) );
 	case CG_PC_SOURCE_FILE_AND_LINE:
 		return botlib_export->PC_SourceFileAndLine( args[1], VMA(2), VMA(3) );
@@ -936,7 +1038,13 @@ static intptr_t CL_CgameSystemCalls( intptr_t *args ) {
 
 	// engine extensions
 	case CG_R_ADDREFENTITYTOSCENE2:
-		re.AddRefEntityToScene( VMA(1), qtrue );
+		if ( cgvm && !cgvm->dllHandle ) {
+			VM_CHECKBOUNDS( cgvm, args[1], sizeof( retailRefEntity_t ) );
+			CL_AddRetailRefEntityToScene( VMA(1), qtrue );
+		} else {
+			VM_CHECKBOUNDS( cgvm, args[1], sizeof( refEntity_t ) );
+			re.AddRefEntityToScene( VMA(1), qtrue );
+		}
 		return 0;
 
 	case CG_R_ADDLINEARLIGHTTOSCENE:

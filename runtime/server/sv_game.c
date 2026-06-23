@@ -255,6 +255,49 @@ static void SV_GetServerinfo( char *buffer, int bufferSize ) {
 }
 
 
+#define RETAIL_QVM_MAX_GENTITIES	1024
+
+static int sv_qvmGameEntCap;
+static qboolean sv_qvmEntityMappingLogged;
+
+static qboolean SV_UseLegacyNativeEntityNums( void );
+
+/*
+===============
+SV_AllocEngineEntityNum
+
+Engine sprites/decals must not bump sv.num_entities (qagame array cap from
+G_LOCATE_GAME_DATA). Scan upward from MAX_CLIENTS for a free slot.
+===============
+*/
+int SV_AllocEngineEntityNum( void ) {
+	int cap;
+	int num;
+
+	if ( !sv.gentities || sv.gentitySize <= 0 ) {
+		return -1;
+	}
+
+	cap = sv_qvmGameEntCap > 0 ? sv_qvmGameEntCap : sv.num_entities;
+	if ( cap <= 0 ) {
+		cap = RETAIL_QVM_MAX_GENTITIES;
+	}
+	if ( cap > MAX_GENTITIES - 2 ) {
+		cap = MAX_GENTITIES - 2;
+	}
+
+	for ( num = cap - 3; num >= MAX_CLIENTS; num-- ) {
+		sharedEntity_t *ent = SV_GentityNum( num );
+
+		if ( !ent->r.linked ) {
+			return num;
+		}
+	}
+
+	Com_Printf( S_COLOR_YELLOW "WARNING: no free gentity slot for engine overlay ent (cap=%d)\n", cap );
+	return -1;
+}
+
 /*
 ===============
 SV_LocateGameData
@@ -287,6 +330,19 @@ static void SV_LocateGameData( sharedEntity_t *gEnts, int numGEntities, int size
 
 	sv.gameClients = clients;
 	sv.gameClientSize = sizeofGameClient;
+
+	if ( gvm && !gvm->entryPoint ) {
+		if ( sv_qvmGameEntCap <= 0 ) {
+			/* Retail qagame.qvm arrays are always 1024; some builds pass a live count. */
+			sv_qvmGameEntCap = numGEntities >= RETAIL_QVM_MAX_GENTITIES
+				? numGEntities : RETAIL_QVM_MAX_GENTITIES;
+		}
+		if ( SV_UseLegacyNativeEntityNums() && !sv_qvmEntityMappingLogged ) {
+			Com_Printf( "[server] retail entity number mapping active (cap=%d, trap_numGEntities=%d, sizeofGEntity=%d)\n",
+				sv_qvmGameEntCap, numGEntities, sizeofGEntity_t );
+			sv_qvmEntityMappingLogged = qtrue;
+		}
+	}
 }
 
 
@@ -303,16 +359,21 @@ static void SV_GetUsercmd( int clientNum, usercmd_t *cmd ) {
 	}
 }
 
+/*
+ * Retail qagame/cgame QVMs are compiled with MAX_GENTITIES 1024 (ENTITYNUM_WORLD 1022,
+ * ENTITYNUM_NONE 1023). Engine uses MAX_GENTITIES 8192 — translate trap trace/passEntity
+ * constants without requiring gvm->entryPoint (native DLL).
+ */
 static qboolean SV_UseLegacyNativeEntityNums( void ) {
-	return gvm && gvm->entryPoint && sv.num_entities > 0 && sv.num_entities <= 1024;
+	return gvm && !gvm->entryPoint;
 }
 
 static int SV_LegacyEntityNumNone( void ) {
-	return sv.num_entities - 1;
+	return RETAIL_QVM_MAX_GENTITIES - 1;
 }
 
 static int SV_LegacyEntityNumWorld( void ) {
-	return sv.num_entities - 2;
+	return RETAIL_QVM_MAX_GENTITIES - 2;
 }
 
 static int SV_GameEntityNumToEngine( int entityNum ) {
@@ -344,7 +405,7 @@ static int SV_EngineEntityNumToGame( int entityNum ) {
 		return SV_LegacyEntityNumWorld();
 	}
 
-	if ( entityNum < 0 || entityNum >= sv.num_entities ) {
+	if ( entityNum < 0 || entityNum >= RETAIL_QVM_MAX_GENTITIES ) {
 		return SV_LegacyEntityNumNone();
 	}
 
@@ -508,6 +569,7 @@ static intptr_t SV_GameSystemCalls( intptr_t *args ) {
 		{
 			trace_t trace;
 
+			VM_CHECKBOUNDS( gvm, args[1], sizeof( trace_t ) );
 			SV_Trace( &trace, VMA(2), VMA(3), VMA(4), VMA(5),
 				SV_GameEntityNumToEngine( args[6] ), args[7], /*int capsule*/ qfalse );
 			trace.entityNum = SV_EngineEntityNumToGame( trace.entityNum );
@@ -518,6 +580,7 @@ static intptr_t SV_GameSystemCalls( intptr_t *args ) {
 		{
 			trace_t trace;
 
+			VM_CHECKBOUNDS( gvm, args[1], sizeof( trace_t ) );
 			SV_Trace( &trace, VMA(2), VMA(3), VMA(4), VMA(5),
 				SV_GameEntityNumToEngine( args[6] ), args[7], /*int capsule*/ qtrue );
 			trace.entityNum = SV_EngineEntityNumToGame( trace.entityNum );
@@ -565,6 +628,7 @@ static intptr_t SV_GameSystemCalls( intptr_t *args ) {
 		return 0;
 
 	case G_GET_USERCMD:
+		VM_CHECKBOUNDS( gvm, args[2], sizeof( usercmd_t ) );
 		SV_GetUsercmd( args[1], VMA(2) );
 		return 0;
 	case G_GET_ENTITY_TOKEN:
@@ -1129,6 +1193,8 @@ Called every time a map changes
 ===============
 */
 void SV_ShutdownGameProgs( void ) {
+	sv_qvmGameEntCap = 0;
+	sv_qvmEntityMappingLogged = qfalse;
 	if ( !gvm ) {
 		return;
 	}
