@@ -32,6 +32,8 @@ grep -q 'R_StageUsesWorldSH' renderers/vulkan/tr_shade.c || fail 'world SH stage
 
 grep -q 'pbrSunShadowVisibility' renderers/vulkan/shaders/glsl/gen_frag.tmpl || fail 'gen_frag PBR sun shadow'
 grep -q 'r_pbrSunShadow' renderers/vulkan/tr_init.c || fail 'missing r_pbrSunShadow cvar'
+grep -q 'r_classicLighting' renderers/vulkan/tr_init.c || fail 'missing r_classicLighting cvar'
+grep -q 'R_ClassicLightingActive()' renderers/vulkan/tr_shade.c || fail 'tr_shade must gate modern lighting on classic'
 grep -q 'vk_forward_plus_update_sun_shadow_descriptor' renderers/vulkan/vk_forward_plus.c || fail 'sun shadow descriptor update missing'
 grep -q 'VK_FillPbrSunShadowUniform' renderers/vulkan/tr_shade.c || fail 'PBR sun shadow uniform fill missing'
 

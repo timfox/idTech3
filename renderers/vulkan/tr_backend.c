@@ -1504,7 +1504,7 @@ static const float s_shadow_flipMatrix[16] = {
 
 static qboolean RB_ShouldRenderSunShadowMap( const drawSurfsCommand_t *cmd )
 {
-	const qboolean pbrSun = ( r_pbrSunShadow && r_pbrSunShadow->integer );
+	const qboolean pbrSun = ( r_pbrSunShadow && r_pbrSunShadow->integer && !R_ClassicLightingActive() );
 	const qboolean fogSun = ( r_fog_shadows && r_fog_shadows->integer &&
 		r_volumetricFog && r_volumetricFog->integer );
 

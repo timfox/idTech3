@@ -3131,6 +3131,12 @@ set_tests_properties(test_dynamic_light_scale PROPERTIES
 	LABELS "scripts;validation;renderer"
 	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_dynamic_light_scale.sh;${CMAKE_SOURCE_DIR}/renderers/vulkan/tr_light.c")
 
+add_test(NAME test_classic_lighting
+	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_classic_lighting.sh)
+set_tests_properties(test_classic_lighting PROPERTIES
+	LABELS "scripts;validation;renderer;compat"
+	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_classic_lighting.sh;${CMAKE_SOURCE_DIR}/renderers/vulkan/tr_init.c")
+
 add_test(NAME test_build_profiles
 	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_build_profiles.sh)
 set_tests_properties(test_build_profiles PROPERTIES

@@ -508,6 +508,7 @@ cvar_t	*r_directedScale;
 cvar_t	*r_shLighting;
 cvar_t	*r_shWorldLighting;
 cvar_t	*r_shWorldStrength;
+cvar_t	*r_classicLighting;
 cvar_t	*r_shDebugView;
 cvar_t	*r_debugLight;
 cvar_t	*r_debugSort;
@@ -2842,6 +2843,15 @@ static void R_Register( void )
 	ri.Cvar_SetDescription( r_directedScale, "Light grid direct light scaling on entity models." );
 	r_shLighting = ri.Cvar_Get( "r_shLighting", "1", CVAR_ARCHIVE_ND );
 	ri.Cvar_SetDescription( r_shLighting, "Enable spherical harmonics ambient lighting for entity models." );
+	r_classicLighting = ri.Cvar_Get( "r_classicLighting", "1", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_classicLighting, "0", "1", CV_INTEGER );
+	ri.Cvar_SetDescription( r_classicLighting,
+		"When 1 (default), preserve retail Q3 / classic mod look: no SH world vertex tint, PBR sun shadow, "
+		"or Forward+ overflow shade. Set 0 to enable those features via their cvars (modern / full conversions)." );
+	ri.Cvar_SetGroup( r_classicLighting, CVG_RENDERER );
+	if ( r_classicLighting && r_classicLighting->integer ) {
+		ri.Printf( PRINT_ALL, "[VK][lighting] r_classicLighting=1 (retail/baseq3-compatible lighting)\n" );
+	}
 	r_shWorldLighting = ri.Cvar_Get( "r_shWorldLighting", "1", CVAR_ARCHIVE_ND );
 	ri.Cvar_SetDescription( r_shWorldLighting, "Apply spherical harmonics to world geometry (lightmapped and vertex-lit BSP surfaces)." );
 	r_shWorldStrength = ri.Cvar_Get( "r_shWorldStrength", "1", CVAR_ARCHIVE_ND );
@@ -3642,13 +3652,13 @@ static void R_Register( void )
 	ri.Cvar_SetDescription( r_fogShadowSnap,
 		"When 1, snap volumetric sun shadow ortho bounds to shadow-map texels (reduces camera-move shimmer)." );
 	ri.Cvar_SetGroup( r_fogShadowSnap, CVG_RENDERER );
-	r_pbrSunShadow = ri.Cvar_Get( "r_pbrSunShadow", "1", CVAR_ARCHIVE_ND );
+	r_pbrSunShadow = ri.Cvar_Get( "r_pbrSunShadow", "0", CVAR_ARCHIVE_ND );
 	ri.Cvar_CheckRange( r_pbrSunShadow, "0", "1", CV_INTEGER );
 	ri.Cvar_SetDescription( r_pbrSunShadow,
 		"PBR direct sun shadows on opaque surfaces (deluxe/lightmap directional). Uses the same sun shadow map as "
 		"volumetric fog; requires r_fbo 1. vid_restart after first enable if Forward+ layout was created before this build." );
 	ri.Cvar_SetGroup( r_pbrSunShadow, CVG_RENDERER );
-	if ( r_pbrSunShadow && r_pbrSunShadow->integer ) {
+	if ( r_pbrSunShadow && r_pbrSunShadow->integer && r_classicLighting && !r_classicLighting->integer ) {
 		ri.Printf( PRINT_ALL, "[VK][lighting] r_pbrSunShadow=1 (PBR deluxe direct x sun shadow map)\n" );
 	}
 	r_pbrSunShadowStrength = ri.Cvar_Get( "r_pbrSunShadowStrength", "1", CVAR_ARCHIVE_ND );
@@ -4220,13 +4230,15 @@ static void R_Register( void )
 	ri.Cvar_CheckRange( r_forwardPlusShade, "0", "4", CV_FLOAT );
 	ri.Cvar_SetDescription( r_forwardPlusShade, "PBR Forward+ diffuse+spec from tile-culled dynamic lights (0=off). Skips packed indices in \\r_forwardPlus tess.dlightBits mask (first 32). Primary direct is softly scaled vs Forward+ energy. Works with deluxe/lightmap; rebuilds pipelines when changed. Requires \\r_forwardPlus 1." );
 	ri.Cvar_SetGroup( r_forwardPlusShade, CVG_RENDERER );
-	r_forwardPlusOverflowShade = ri.Cvar_Get( "r_forwardPlusOverflowShade", "0.5", CVAR_ARCHIVE_ND );
+	r_forwardPlusOverflowShade = ri.Cvar_Get( "r_forwardPlusOverflowShade", "0", CVAR_ARCHIVE_ND );
 	ri.Cvar_CheckRange( r_forwardPlusOverflowShade, "0", "4", CV_FLOAT );
 	ri.Cvar_SetDescription( r_forwardPlusOverflowShade,
 		"PBR Forward+ shade for dlight indices 32..63 (beyond classic tess.dlightBits). "
-		"No pipeline rebuild; passed per draw via pbrForwardPlus.x. 0=off. Default 0.5 fills GPU-only lights on PBR surfaces." );
+		"No pipeline rebuild; passed per draw via pbrForwardPlus.x. Requires r_classicLighting 0. "
+		"Try 0.5 when r_forwardPlusOverflowShade is enabled with modern lighting." );
 	ri.Cvar_SetGroup( r_forwardPlusOverflowShade, CVG_RENDERER );
-	if ( r_forwardPlusOverflowShade && r_forwardPlusOverflowShade->value > 0.0f && r_forwardPlus && r_forwardPlus->integer ) {
+	if ( r_forwardPlusOverflowShade && r_forwardPlusOverflowShade->value > 0.0f && r_forwardPlus && r_forwardPlus->integer &&
+		r_classicLighting && !r_classicLighting->integer ) {
 		ri.Printf( PRINT_ALL, "[VK][Forward+] r_forwardPlusOverflowShade=%.2f (lights 32..%d)\n",
 			r_forwardPlusOverflowShade->value, VK_FP_MAX_GPU_LIGHTS - 1 );
 	}

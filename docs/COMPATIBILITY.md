@@ -76,8 +76,17 @@ Details: [ARCHITECTURE.md](ARCHITECTURE.md#native-game-modules-vm) (`vm.c`, `vm_
 | Vulkan init fails on Pi | System SDL without Vulkan | `./scripts/build_sdl_vulkan_rpi.sh`; `run_vulkan.sh` or `LD_LIBRARY_PATH=/usr/local/lib:$LD_LIBRARY_PATH` |
 | "VM_Create on UI failed" | Missing ui.qvm / native UI | Ensure game provides `ui.qvm` or `ui.aarch64.so` in base/ |
 | Black screen / wrong colors | FBO/HDR issue | `r_fbo 0` or `r_exposure_auto 0` `r_volumetricFog 0`; `vid_restart` |
+| Lighting looks “modern” on baseq3 | Modern renderer features enabled | Default **`r_classicLighting 1`** preserves retail look; **`exec modern_lighting.cfg`** for PBR sun shadow + SH world tint |
 
-## Related Documents
+### Classic vs modern lighting (Vulkan)
+
+Retail **baseq3** / QVM mods should look like stock Quake III lighting out of the box:
+
+- **`r_classicLighting 1`** (default): disables SH world vertex tint, PBR sun shadow on deluxe surfaces, and Forward+ overflow PBR shade (indices 32–63).
+- **`r_classicLighting 0`**: opt-in modern stack; see **`config/modern_lighting.cfg`** and [RENDERERS.md](RENDERERS.md).
+
+When **`cgame.qvm`** loads, the client logs that classic lighting is preserved if **`r_classicLighting`** is still **1**.
+
 
 - [ARM_RASPBERRY_PI.md](ARM_RASPBERRY_PI.md) - Raspberry Pi setup and Vulkan
 - [QUICKSTART.md](QUICKSTART.md) - End-user quick start

@@ -35,13 +35,14 @@ The Vulkan 1.4 renderer is the primary rendering backend, built as a shared libr
 | `r_forwardPlusMaxPerTile` | **4–8** lights indexed per **16×16** tile (**latched**; `vid_restart`). Lowers GPU work vs default **8**; tile SSBO keeps **8** `uint32` slots either way. |
 | `r_forwardPlusDebug` | **0–1** float: PBR heatmap overlay (lights per tile + borders). |
 | `r_forwardPlusShade` | **0–4** float: PBR shade for dlight indices **0–31** (not in `tess.dlightBits`); pipeline rebuild on change. |
-| `r_forwardPlusOverflowShade` | **0–4** float (default **0.5**): PBR shade for indices **32–63** (GPU-only; no classic projector). No pipeline rebuild. |
+| `r_forwardPlusOverflowShade` | **0–4** (default **0**): PBR shade for indices **32–63**; requires `r_classicLighting 0`. Try **0.5** with modern lighting. |
 | `r_forwardPlusLuminanceSort` | **0/1** (default **1**): when a tile is overloaded, keep brightest lights by RGB sum. |
 | `r_forwardPlusDistanceSort` | **0/1** (default **0**): when overloaded, prefer nearest lights to the camera (`vieworg`). |
 | `r_forwardPlusDepthCull` | **0/1** (default **1**): **0** = tile cull before draws; **1** = depth prepass + reject lights behind surfaces. |
 | `r_dynamicLightScale` | **0.25–4** (default **1**): global dynamic-light multiplier (projector, Forward+, deferred, volumetric). |
 | `r_lightGammaLink` | **0/1** (default **1**): **0** decouples dynamic lights from display `r_gamma` (HDR tuning). |
-| `r_pbrSunShadow` | **0/1** (default **1**): PBR deluxe direct × sun shadow map (shared with volumetric fog cascade). |
+| `r_classicLighting` | **1** (default): retail/baseq3 look — disables SH world tint, PBR sun shadow, Forward+ overflow. **0** = modern features via cvars below. |
+| `r_pbrSunShadow` | **0/1** (default **0**): PBR deluxe direct × sun shadow map; requires `r_classicLighting 0`. |
 | `r_pbrSunShadowStrength` | **0–1** (default **1**): Blend sun shadow into PBR direct lighting. |
 
 **Caps:** up to **`VK_FP_MAX_GPU_LIGHTS` (64)** on GPU; **`tess.dlightBits`** skip still applies to indices **0–31** only (classic projector remains **32** lights).
