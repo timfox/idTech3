@@ -306,7 +306,7 @@ SV_LocateGameData
 */
 static void SV_LocateGameData( sharedEntity_t *gEnts, int numGEntities, int sizeofGEntity_t, playerState_t *clients, int sizeofGameClient ) {
 
-	if ( !gvm->entryPoint ) {
+	if ( !gvm->dllHandle ) {
 		if ( numGEntities > MAX_GENTITIES ) {
 			Com_Error( ERR_DROP, "%s: bad entity count %i", __func__, numGEntities );
 		} else {
@@ -331,7 +331,7 @@ static void SV_LocateGameData( sharedEntity_t *gEnts, int numGEntities, int size
 	sv.gameClients = clients;
 	sv.gameClientSize = sizeofGameClient;
 
-	if ( gvm && !gvm->entryPoint ) {
+	if ( gvm && !gvm->dllHandle ) {
 		if ( sv_qvmGameEntCap <= 0 ) {
 			/* Retail qagame.qvm arrays are always 1024; some builds pass a live count. */
 			sv_qvmGameEntCap = numGEntities >= RETAIL_QVM_MAX_GENTITIES
@@ -362,10 +362,10 @@ static void SV_GetUsercmd( int clientNum, usercmd_t *cmd ) {
 /*
  * Retail qagame/cgame QVMs are compiled with MAX_GENTITIES 1024 (ENTITYNUM_WORLD 1022,
  * ENTITYNUM_NONE 1023). Engine uses MAX_GENTITIES 8192 — translate trap trace/passEntity
- * constants without requiring gvm->entryPoint (native DLL).
+ * constants for QVM modules (!dllHandle), not native game DLLs.
  */
 static qboolean SV_UseLegacyNativeEntityNums( void ) {
-	return gvm && !gvm->entryPoint;
+	return gvm && !gvm->dllHandle;
 }
 
 static int SV_LegacyEntityNumNone( void ) {
@@ -376,7 +376,7 @@ static int SV_LegacyEntityNumWorld( void ) {
 	return RETAIL_QVM_MAX_GENTITIES - 2;
 }
 
-static int SV_GameEntityNumToEngine( int entityNum ) {
+int SV_GameEntityNumToEngine( int entityNum ) {
 	if ( !SV_UseLegacyNativeEntityNums() ) {
 		return entityNum;
 	}
@@ -392,7 +392,7 @@ static int SV_GameEntityNumToEngine( int entityNum ) {
 	return entityNum;
 }
 
-static int SV_EngineEntityNumToGame( int entityNum ) {
+int SV_EngineEntityNumToGame( int entityNum ) {
 	if ( !SV_UseLegacyNativeEntityNums() ) {
 		return entityNum;
 	}
@@ -487,6 +487,7 @@ static intptr_t SV_GameSystemCalls( intptr_t *args ) {
 		Com_Error( ERR_DROP, "game VM syscall overflow - Loss of control in VM" );
 	}
 	++gvm->syscallCount;
+	com_activeVmLastSyscall = (int)args[0];
 
 	switch( args[0] ) {
 	case G_PRINT:
@@ -559,8 +560,26 @@ static intptr_t SV_GameSystemCalls( intptr_t *args ) {
 		SV_UnlinkEntity( VMA(1) );
 		return 0;
 	case G_ENTITIES_IN_BOX:
-		VM_CHECKBOUNDS( gvm, args[3], args[4] * sizeof( int ) );
-		return SV_AreaEntities( VMA(1), VMA(2), VMA(3), args[4] );
+		{
+			int count;
+			int *list;
+			int i;
+			int out;
+
+			VM_CHECKBOUNDS( gvm, args[3], args[4] * sizeof( int ) );
+			count = SV_AreaEntities( VMA(1), VMA(2), VMA(3), args[4] );
+			if ( !SV_UseLegacyNativeEntityNums() || count <= 0 ) {
+				return count;
+			}
+			list = (int *)VMA(3);
+			out = 0;
+			for ( i = 0; i < count; i++ ) {
+				if ( list[i] >= 0 && list[i] < RETAIL_QVM_MAX_GENTITIES ) {
+					list[out++] = list[i];
+				}
+			}
+			return out;
+		}
 	case G_ENTITY_CONTACT:
 		return SV_EntityContact( VMA(1), VMA(2), VMA(3), /*int capsule*/ qfalse );
 	case G_ENTITY_CONTACTCAPSULE:

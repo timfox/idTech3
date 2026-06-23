@@ -215,6 +215,9 @@ static int forced_unload;
 
 static struct vm_s vmTable[ VM_COUNT ];
 
+const char	*com_activeVmName;
+int			com_activeVmLastSyscall = -1;
+
 static const char *vmName[ VM_COUNT ] = {
 	"qagame",
 	"cgame",
@@ -2057,6 +2060,11 @@ intptr_t QDECL VM_Call( vm_t *vm, int nargs, int callnum, ... )
 		Com_Error( ERR_FATAL, "VM_Call with NULL vm" );
 	}
 
+	com_activeVmName = vm->name;
+	if ( vm->callLevel == 0 ) {
+		com_activeVmLastSyscall = -1;
+	}
+
 #ifdef DEBUG
 	if ( vm_debugLevel ) {
 	  Com_Printf( "VM_Call( %d )\n", callnum );
@@ -2277,3 +2285,4 @@ void VM_LogSyscalls( int *args ) {
 		args[0], args[1], args[2], args[3], args[4] );
 #endif
 }
+

@@ -17,6 +17,9 @@ grep -q 'SV_ApplyClassicBaseq3ServerCvars' runtime/server/sv_init.c || fail 'ser
 grep -q 'cl_engineSprites 0' config/classic_baseq3.cfg || fail 'classic cfg must disable cl_engineSprites'
 grep -q 'retail entity number mapping active' runtime/server/sv_game.c || fail 'qvm entity num mapping missing'
 grep -q 'SV_UseLegacyNativeEntityNums' runtime/server/sv_game.c || fail 'entity num mapping helper missing'
+grep -q '!gvm->dllHandle' runtime/server/sv_game.c || fail 'qvm entity mapping must use dllHandle'
+grep -q 'SV_EngineEntityNumToGame' runtime/server/sv_bot.c || fail 'botlib trace entity mapping missing'
+grep -q 'legacy_bsp_trace_t' runtime/server/sv_bot.c || fail 'retail botlib bsp_trace layout missing'
 grep -q 'cm_streamMerge 0' config/classic_baseq3.cfg || fail 'classic cfg must disable cm_streamMerge'
 
 pass "stock baseq3 contract"

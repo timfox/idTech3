@@ -278,6 +278,26 @@ static qboolean CL_FillSnapshot( int snapshotNumber, int *snapFlags, int *server
 	return qtrue;
 }
 
+static int CL_SanitizeLegacyEntityNum( int entityNum ) {
+	if ( !cgvm || cgvm->dllHandle ) {
+		return entityNum;
+	}
+
+	if ( entityNum == ENTITYNUM_NONE ) {
+		return RETAIL_QVM_MAX_GENTITIES - 1;
+	}
+
+	if ( entityNum == ENTITYNUM_WORLD ) {
+		return RETAIL_QVM_MAX_GENTITIES - 2;
+	}
+
+	if ( entityNum < 0 || entityNum >= RETAIL_QVM_MAX_GENTITIES ) {
+		return RETAIL_QVM_MAX_GENTITIES - 1;
+	}
+
+	return entityNum;
+}
+
 static void CL_SanitizeLegacySnapshotEntities( legacySnapshot_t *snapshot ) {
 	int i;
 
@@ -285,8 +305,14 @@ static void CL_SanitizeLegacySnapshotEntities( legacySnapshot_t *snapshot ) {
 		return;
 	}
 
+	snapshot->ps.groundEntityNum = CL_SanitizeLegacyEntityNum( snapshot->ps.groundEntityNum );
+
 	for ( i = 0; i < snapshot->numEntities; i++ ) {
 		entityState_t *es = &snapshot->entities[i];
+
+		es->groundEntityNum = CL_SanitizeLegacyEntityNum( es->groundEntityNum );
+		es->otherEntityNum = CL_SanitizeLegacyEntityNum( es->otherEntityNum );
+		es->otherEntityNum2 = CL_SanitizeLegacyEntityNum( es->otherEntityNum2 );
 
 		if ( es->eFlags & ( EF_BILLBOARD | EF_FLIPBOOK | EF_IMPOSTER | EF_DECAL ) ) {
 			es->eFlags &= ~( EF_BILLBOARD | EF_FLIPBOOK | EF_IMPOSTER | EF_DECAL );
@@ -670,6 +696,7 @@ The cgame module is making a system call
 ====================
 */
 static intptr_t CL_CgameSystemCalls( intptr_t *args ) {
+	com_activeVmLastSyscall = (int)args[0];
 	switch( args[0] ) {
 	case CG_PRINT:
 		Com_Printf( "%s", (const char*)VMA(1) );

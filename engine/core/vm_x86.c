@@ -2815,6 +2815,13 @@ static void BadOpStack( void )
 
 static void BadDataRead( void )
 {
+	if ( com_activeVmName && com_activeVmLastSyscall >= 0 ) {
+		Com_Error( ERR_DROP, "%s VM: program tried to read out of data segment (trap %i)",
+			com_activeVmName, com_activeVmLastSyscall );
+	}
+	if ( com_activeVmName ) {
+		Com_Error( ERR_DROP, "%s VM: program tried to read out of data segment", com_activeVmName );
+	}
 	Com_Error( ERR_DROP, "program tried to read out of data segment" );
 }
 
