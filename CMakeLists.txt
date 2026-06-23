@@ -3143,6 +3143,12 @@ set_tests_properties(test_auto_graphics_profile PROPERTIES
 	LABELS "scripts;validation;client;compat"
 	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_auto_graphics_profile.sh;${CMAKE_SOURCE_DIR}/runtime/client/core/cl_cgame.c")
 
+add_test(NAME test_console_font
+	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_console_font.sh)
+set_tests_properties(test_console_font PROPERTIES
+	LABELS "scripts;validation;client;renderer"
+	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_console_font.sh;${CMAKE_SOURCE_DIR}/runtime/client/cl_scrn.c")
+
 add_test(NAME test_build_profiles
 	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_build_profiles.sh)
 set_tests_properties(test_build_profiles PROPERTIES

@@ -21,7 +21,25 @@ This directory and `base/fonts/` hold TrueType fonts used by the renderer when `
 
 Place `.ttf` files in `base/fonts/` so the game can find them. The compile script copies `base/fonts/*.ttf` to the release directory.
 
-Engine **console** and **small HUD** text use the same FreeType registration when **`cl_builtInTtf`** is **1** (default) and **`r_font`** resolves: that path is preferred over pre-baked SDF when both are enabled. **`r_fontConsoleAlign`** (**1** default) vertically aligns glyphs to a row baseline inside each cell (pixel and 640×480 virtual); set **0** for legacy top alignment. **`r_fontShadow`** (**0–8**, default **2**) controls the TrueType drop shadow (**0** = off); **`r_fontSubpixel`** **1** applies a small fractional nudge after projection (try on fuzzy LCDs). Empirical work on LCD subpixel preference and individual differences: **`docs/research/bias2009-subpixel-preference.md`** (Bias et al., JASIST 2009). GPU/print RIP perspective on keeping outline rasterization off the parallel GPU stage: **`docs/research/recker2009-gpu-rip-fonts.md`** (Recker et al., HP Labs HPL-2009-181).
+## Console vs HUD
+
+Engine **HUD** text uses FreeType when **`cl_builtInTtf`** is **1** (default) and **`r_font`** resolves.
+
+**Console and notify** text defaults to the legacy **8×16 bitmap charset** (`cl_builtInTtfConsole` **0**, default) for a stable monospace grid. Optional paths:
+
+| Mode | Cvars | Config preset |
+|------|-------|---------------|
+| Bitmap (stock-like) | `cl_builtInTtfConsole 0`, `r_sdfEnable 0` | `classic_baseq3.cfg` |
+| FreeType console | `cl_builtInTtfConsole 1`, `r_fontShadow 0` | `exec console_ttf.cfg` |
+| SDF console | `cl_builtInTtfConsole 0`, `r_sdfEnable 1`, valid `r_sdfFont` | `exec console_sdf.cfg` |
+
+Draw order for console/notify: vector (if enabled) → SDF → optional FreeType (`cl_builtInTtfConsole 1`) → bitmap.
+
+After changing font cvars, run **`reloadTtf`** or toggle **`cl_builtInTtfConsole`** (triggers console reflow) or **`vid_restart`**.
+
+- **r_fontConsoleAlign** (**1** default) vertically aligns TrueType glyphs to a row baseline inside each cell; set **0** for legacy top alignment.
+- **r_fontShadow** (**0–8**, default **2**) controls the TrueType drop shadow for HUD bigchars; console FreeType omits shadow. Use **`r_fontShadow 0`** with `console_ttf.cfg`.
+- **r_fontSubpixel** **1** applies a small fractional nudge after projection (try on fuzzy LCDs). Empirical work on LCD subpixel preference: **`docs/research/bias2009-subpixel-preference.md`** (Bias et al., JASIST 2009). GPU/print RIP perspective: **`docs/research/recker2009-gpu-rip-fonts.md`** (Recker et al., HP Labs HPL-2009-181).
 
 ## SDF fonts (HUD)
 

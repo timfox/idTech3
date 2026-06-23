@@ -342,8 +342,15 @@ void Con_CheckResize( void )
 	int		i, j, width, oldwidth, oldtotallines, oldcurrent, numlines, numchars;
 	short	tbuf[CON_TEXTSIZE], *src, *dst;
 	static int old_width, old_vispage;
+	static int latchedConsoleTtf = -1;
 	int		vispage;
 	float	scale;
+	const int consoleTtf = Cvar_VariableIntegerValue( "cl_builtInTtfConsole" );
+
+	if ( latchedConsoleTtf >= 0 && consoleTtf != latchedConsoleTtf ) {
+		con_scale->modified = qtrue;
+	}
+	latchedConsoleTtf = consoleTtf;
 
 	if ( con.viswidth == cls.glconfig.vidWidth && !con_scale->modified ) {
 		return;
@@ -374,7 +381,7 @@ void Con_CheckResize( void )
 	}
 	else
 	{
-		width = ((cls.glconfig.vidWidth / smallchar_width) - 2);
+		width = ((cls.glconfig.vidWidth / SCR_ConsoleCharWidth()) - 2);
 
 		g_console_field_width = width;
 		g_consoleField.widthInChars = g_console_field_width;
@@ -719,11 +726,11 @@ static void Con_DrawInput( void ) {
 
 	re.SetColor( con.color );
 
-	SCR_DrawSmallStringExt( con.xadjust + smallchar_width, y, "]",
+	SCR_DrawSmallStringExt( con.xadjust + SCR_ConsoleCharWidth(), y, "]",
 		g_color_table[ ColorIndex( COLOR_WHITE ) ], qtrue, qtrue );
 
-	Field_Draw( &g_consoleField, con.xadjust + 2 * smallchar_width, y,
-		SCREEN_WIDTH - 3 * smallchar_width, qtrue, qtrue );
+	Field_Draw( &g_consoleField, con.xadjust + 2 * SCR_ConsoleCharWidth(), y,
+		SCREEN_WIDTH - 3 * SCR_ConsoleCharWidth(), qtrue, qtrue );
 }
 
 
@@ -764,7 +771,7 @@ static void Con_DrawNotify( void )
 
 		Con_LineToString( text, con.linewidth, lineBuf, sizeof( lineBuf ) );
 		if ( lineBuf[0] ) {
-			SCR_DrawSmallStringExt( cl_conXOffset->integer + con.xadjust + smallchar_width, v,
+			SCR_DrawSmallStringExt( cl_conXOffset->integer + con.xadjust + SCR_ConsoleCharWidth(), v,
 				lineBuf, g_color_table[ ColorIndex( COLOR_WHITE ) ], qfalse, qfalse );
 		}
 
@@ -884,7 +891,7 @@ static void Con_DrawSolidConsole( float frac ) {
 	{
 		// draw arrows to show the buffer is backscrolled
 		for ( x = 0 ; x < con.linewidth ; x += 4 ) {
-			SCR_DrawSmallStringExt( con.xadjust + ( x + 1 ) * smallchar_width, y, "^",
+			SCR_DrawSmallStringExt( con.xadjust + ( x + 1 ) * SCR_ConsoleCharWidth(), y, "^",
 				g_color_table[ ColorIndex( COLOR_RED ) ], qtrue, qtrue );
 		}
 		y -= smallchar_height;
@@ -894,7 +901,7 @@ static void Con_DrawSolidConsole( float frac ) {
 #ifdef USE_CURL
 	if ( download.progress[ 0 ] ) 
 	{
-		SCR_DrawSmallStringExt( smallchar_width, lines - smallchar_height,
+		SCR_DrawSmallStringExt( SCR_ConsoleCharWidth(), lines - smallchar_height,
 			download.progress, g_color_table[ ColorIndex( COLOR_CYAN ) ], qtrue, qtrue );
 	}
 #endif
@@ -914,7 +921,7 @@ static void Con_DrawSolidConsole( float frac ) {
 		text = con.text + (row % con.totallines) * con.linewidth;
 		Con_LineToString( text, con.linewidth, lineBuf, sizeof( lineBuf ) );
 		if ( lineBuf[0] ) {
-			SCR_DrawSmallStringExt( con.xadjust + smallchar_width, y, lineBuf,
+			SCR_DrawSmallStringExt( con.xadjust + SCR_ConsoleCharWidth(), y, lineBuf,
 				g_color_table[ ColorIndex( COLOR_WHITE ) ], qfalse, qfalse );
 		}
 	}
@@ -927,7 +934,7 @@ static void Con_DrawSolidConsole( float frac ) {
 	if ( con_showVersion->integer && com_version && com_version->string[0] )
 	{
 		re.SetColor( g_color_table[ ColorIndex( COLOR_WHITE ) ] );
-		SCR_DrawSmallString( con.xadjust + smallchar_width, lines - smallchar_height,
+		SCR_DrawSmallString( con.xadjust + SCR_ConsoleCharWidth(), lines - smallchar_height,
 			com_version->string, (int)strlen( com_version->string ) );
 	}
 

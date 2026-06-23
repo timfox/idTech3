@@ -547,68 +547,11 @@ qboolean SDF_DrawStringExt( int x, int y, float size, const char *string,
 	scale = SDF_LineScale( f, clampedSize );
 	fallbackGlyph = SDF_FindGlyph( f, (uint32_t)'?' );
 
-	/* Console: fixed cell (smallchar_width x smallchar_height), monospace advance — matches bitmap path. */
-	if ( coordSpace == SDF_COORDS_SCREEN && smallchar_width > 0 && smallchar_height > 0 ) {
-		const float cellW = (float)smallchar_width;
+	/* Console: fixed cell (SCR_ConsoleCharWidth x smallchar_height), no shadow — matches bitmap/TTF path. */
+	if ( coordSpace == SDF_COORDS_SCREEN && smallchar_height > 0 ) {
+		const float cellW = (float)SCR_ConsoleCharWidth();
 		const float cellH = (float)smallchar_height;
 		const float lineStep = cellH;
-
-		/* drop shadow pass */
-		color[0] = color[1] = color[2] = 0.0f;
-		color[3] = setColor[3];
-		re.SetColor( color );
-		s = string;
-		xx = (float)x;
-		yy = (float)y;
-		prevCp = 0;
-		while ( *s ) {
-			const char *prevPtr = s;
-			uint32_t cp;
-			const sdfGlyph_t *g;
-
-			if ( !noColorEscape && Q_IsColorString( s ) ) {
-				s += 2;
-				continue;
-			}
-
-			cp = Q_UTF8_Decode( &s );
-			if ( cp == '\n' ) {
-				xx = (float)x;
-				yy += lineStep;
-				prevCp = 0;
-				continue;
-			}
-
-			if ( CL_Emoji_IsEnabled() && ( (unsigned char)prevPtr[0] >= 0x80 ) && Q_UTF8_IsEmoji( cp ) ) {
-				xx += cellW;
-				prevCp = cp;
-				continue;
-			}
-
-			g = SDF_FindGlyph( f, cp );
-			if ( !g ) {
-				g = fallbackGlyph;
-			}
-			if ( !g ) {
-				xx += cellW;
-				prevCp = cp;
-				continue;
-			}
-
-			if ( g->w > 0.0f && g->h > 0.0f ) {
-				const float sh = ( cellH > 4.0f ) ? 1.0f : 0.0f;
-				float drawX = xx + sh + g->xoffset * scale;
-				float drawY = yy + sh + g->yoffset * scale;
-				float ax = drawX;
-				float ay = drawY;
-				float aw = cellW;
-				float ah = cellH;
-				SDF_AtlasStretchPic( ax, ay, aw, ah, g->s0, g->t0, g->s1, g->t1, f->atlasShader );
-			}
-
-			xx += cellW;
-			prevCp = cp;
-		}
 
 		/* color pass */
 		s = string;

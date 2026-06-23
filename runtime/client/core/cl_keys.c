@@ -113,7 +113,7 @@ static void Field_VariableSizeDraw( field_t *edit, int x, int y, int width, int 
 	}
 
 	// draw it
-	if ( size == smallchar_width ) {
+	if ( size == SCR_ConsoleCharWidth() ) {
 		SCR_DrawSmallStringExt( x, y, str, g_color_table[ ColorIndexFromChar( curColor ) ],
 			qfalse, noColorEscape );
 		if ( len > drawLen + prestep ) {
@@ -144,7 +144,7 @@ static void Field_VariableSizeDraw( field_t *edit, int x, int y, int width, int 
 
 		i = drawLen - strlen( str );
 
-		if ( size == smallchar_width ) {
+		if ( size == SCR_ConsoleCharWidth() ) {
 			SCR_DrawSmallChar( x + ( edit->cursor - prestep - i ) * size, y, cursorChar );
 		} else {
 			str[0] = cursorChar;
@@ -157,7 +157,7 @@ static void Field_VariableSizeDraw( field_t *edit, int x, int y, int width, int 
 
 void Field_Draw( field_t *edit, int x, int y, int width, qboolean showCursor, qboolean noColorEscape )
 {
-	Field_VariableSizeDraw( edit, x, y, width, smallchar_width, showCursor, noColorEscape );
+	Field_VariableSizeDraw( edit, x, y, width, SCR_ConsoleCharWidth(), showCursor, noColorEscape );
 }
 
 
