@@ -13,6 +13,7 @@ cvar_t	*rcon_client_password;
 cvar_t	*rconAddress;
 cvar_t	*cl_timeout;
 cvar_t	*cl_autoNudge;
+cvar_t	*cl_autoGraphicsProfile;
 cvar_t	*cl_timeNudge;
 cvar_t	*cl_showTimeDelta;
 cvar_t	*cl_shownet;
@@ -41,6 +42,12 @@ void CL_InitCvars( void )
 	cl_autoNudge = Cvar_Get( "cl_autoNudge", "0", CVAR_TEMP );
 	Cvar_CheckRange( cl_autoNudge, "0", "1", CV_FLOAT );
 	Cvar_SetDescription( cl_autoNudge, "Automatic time nudge that uses your average ping as the time nudge, values:\n  0 - use fixed \\cl_timeNudge\n (0..1] - factor of median average ping to use as timenudge\n" );
+
+	cl_autoGraphicsProfile = Cvar_Get( "cl_autoGraphicsProfile", "1", CVAR_ARCHIVE_ND );
+	Cvar_CheckRange( cl_autoGraphicsProfile, "0", "1", CV_INTEGER );
+	Cvar_SetDescription( cl_autoGraphicsProfile,
+		"Auto graphics profile on cgame load: baseq3+cgame.qvm -> classic_baseq3.cfg; "
+		"native cgame -> modern_native.cfg." );
 	cl_timeNudge = Cvar_Get( "cl_timeNudge", "0", CVAR_TEMP );
 	Cvar_CheckRange( cl_timeNudge, "-30", "30", CV_INTEGER );
 	Cvar_SetDescription( cl_timeNudge, "Allows more or less latency to be added in the interest of better smoothness or better responsiveness." );

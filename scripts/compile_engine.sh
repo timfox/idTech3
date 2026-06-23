@@ -499,6 +499,11 @@ copy_to_release() {
   if [ -f "$PROJECT_ROOT/config/steamdeck.cfg" ]; then
     cp -f "$PROJECT_ROOT/config/steamdeck.cfg" "$dest/base/steamdeck.cfg"
   fi
+  for cfg in classic_baseq3.cfg modern_native.cfg modern_lighting.cfg; do
+    if [ -f "$PROJECT_ROOT/config/$cfg" ]; then
+      cp -f "$PROJECT_ROOT/config/$cfg" "$dest/base/$cfg"
+    fi
+  done
 
   # Client
   if [ -f "$BUILD_DIR/idtech3.x86_64" ]; then

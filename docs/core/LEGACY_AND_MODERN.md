@@ -40,8 +40,8 @@ CI wiring: `test_legacy_intact.sh`, `test_repository_layout_2026.sh`, profile ma
 
 ## For mod authors
 
-- **Classic QVM mod:** build or download **`core`** or **`game`**; drop `.pk3` in `base/` as always. No manifest required. Vulkan defaults **`r_classicLighting 1`** so retail lighting matches baseq3.
-- **Full conversion:** default **`game`** profile; use native modules + optional `game.idproj` ([MOD_MANIFEST.md](../MOD_MANIFEST.md)). Set **`r_classicLighting 0`** and **`exec modern_lighting.cfg`** when you want PBR sun shadows and SH world tint.
+- **Classic QVM mod:** build or download **`core`** or **`game`**; drop `.pk3` in `base/` as always. **`cl_autoGraphicsProfile 1`** (default) loads **`classic_baseq3.cfg`** for retail baseq3 + **`cgame.qvm`**.
+- **Full conversion:** default **`game`** profile; native cgame auto-loads **`modern_native.cfg`** when **`cl_autoGraphicsProfile 1`**. Override with **`cl_autoGraphicsProfile 0`** or manual cfgs.
 - **Research / ML / neural renderer:** `./scripts/compile_engine.sh vulkan full` or explicit `-DUSE_*=ON`.
 
 ## Related docs
