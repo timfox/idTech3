@@ -31,6 +31,78 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 extern	cvar_t	*r_ambientScale;
 extern	cvar_t	*r_directedScale;
+extern	cvar_t	*r_intensity;
+extern	cvar_t	*r_gamma;
+extern	cvar_t	*r_dynamicLightScale;
+extern	cvar_t	*r_lightGammaLink;
+
+/*
+===============
+R_DynamicLightUsesLegacyScale
+===============
+*/
+qboolean R_DynamicLightUsesLegacyScale( void ) {
+#ifdef USE_VULKAN
+	if ( glConfig.deviceSupportsGamma || vk.fboActive ) {
+		return qfalse;
+	}
+#else
+	if ( glConfig.deviceSupportsGamma ) {
+		return qfalse;
+	}
+#endif
+	return qtrue;
+}
+
+/*
+===============
+R_DynamicLightExtraScale
+===============
+*/
+static float R_DynamicLightExtraScale( void ) {
+	if ( !r_dynamicLightScale ) {
+		return 1.0f;
+	}
+	return Com_Clamp( 0.25f, 4.0f, r_dynamicLightScale->value );
+}
+
+/*
+===============
+R_DynamicLightIntensityScale
+===============
+*/
+float R_DynamicLightIntensityScale( void ) {
+	float scale = R_DynamicLightExtraScale();
+
+	if ( r_lightGammaLink && !r_lightGammaLink->integer ) {
+		scale *= 2.0f * ( r_intensity ? r_intensity->value : 1.0f );
+	} else {
+		const float intensity = r_intensity ? r_intensity->value : 1.0f;
+		const float gamma = r_gamma ? r_gamma->value : 1.0f;
+		scale *= 2.0f * powf( intensity, gamma );
+	}
+	return scale;
+}
+
+/*
+===============
+R_DynamicLightColor
+===============
+*/
+void R_DynamicLightColor( const dlight_t *dl, vec3_t out ) {
+	VectorCopy( dl->color, out );
+	if ( R_DynamicLightUsesLegacyScale() ) {
+		VectorScale( out, R_DynamicLightIntensityScale(), out );
+	} else {
+		float scale = R_DynamicLightExtraScale();
+		if ( r_lightGammaLink && !r_lightGammaLink->integer ) {
+			scale *= 2.0f * ( r_intensity ? r_intensity->value : 1.0f );
+		}
+		if ( scale != 1.0f ) {
+			VectorScale( out, scale, out );
+		}
+	}
+}
 
 static void R_ClearSHCoeffs( vec3_t shCoeffs[SH_COEFF_COUNT] ) {
 	int i;

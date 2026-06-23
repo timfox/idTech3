@@ -875,9 +875,13 @@ void vk_forward_plus_update_for_refdef( void )
 		rec[2] = L->origin[2];
 		rec[3] = L->radius;
 
-		rec[4] = MAX( L->color[0], 0.0f );
-		rec[5] = MAX( L->color[1], 0.0f );
-		rec[6] = MAX( L->color[2], 0.0f );
+		{
+			vec3_t scaledColor;
+			R_DynamicLightColor( L, scaledColor );
+			rec[4] = MAX( scaledColor[0], 0.0f );
+			rec[5] = MAX( scaledColor[1], 0.0f );
+			rec[6] = MAX( scaledColor[2], 0.0f );
+		}
 		rec[7] = L->linear ? 1.0f : 0.0f;
 
 		if ( L->linear ) {

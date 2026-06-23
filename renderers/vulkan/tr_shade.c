@@ -1331,6 +1331,9 @@ static void RB_IterateStagesGeneric( const shaderCommands_t *input )
 		uniform.pbrForwardPlus[2] = 0.0f;
 		uniform.pbrForwardPlus[3] = 0.0f;
 		if ( r_forwardPlus && r_forwardPlus->integer ) {
+			if ( r_forwardPlusOverflowShade && r_forwardPlusOverflowShade->value > 0.0f ) {
+				uniform.pbrForwardPlus[0] = Com_Clamp( 0.0f, 4.0f, r_forwardPlusOverflowShade->value );
+			}
 			const uint32_t bits = (uint32_t)tess.dlightBits;
 			if ( bits != 0u ) {
 				float maskF;
@@ -1782,14 +1785,7 @@ void VK_SetFogParams( vkUniform_t *ubo, int *fogStage )
 static void VK_SetLightParams( vkUniform_t *ubo, const dlight_t *dl ) {
 	float radius;
 
-#ifdef USE_VULKAN
-	if ( !glConfig.deviceSupportsGamma && !vk.fboActive )
-#else
-	if ( !glConfig.deviceSupportsGamma )
-#endif
-		VectorScale( dl->color, 2 * powf( r_intensity->value, r_gamma->value ), ubo->light.color);
-	else
-		VectorCopy( dl->color, ubo->light.color );
+	R_DynamicLightColor( dl, ubo->light.color );
 
 	radius = dl->radius;
 	if ( radius < 0.001f )

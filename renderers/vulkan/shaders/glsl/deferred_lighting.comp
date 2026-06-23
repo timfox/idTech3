@@ -10,6 +10,7 @@ layout(local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
 
 #define MAX_PER_TILE 8u
 #define REC_VEC4S 4u
+const float DEF_PI = 3.14159265;
 
 layout(std430, set = 0, binding = 0) readonly buffer LightSSBO {
 	vec4 data[];
@@ -50,6 +51,19 @@ vec3 reconstructViewPos( vec2 uv, float depth ) {
 
 vec3 toViewDir( vec3 worldDir ) {
 	return normalize( ( pc.viewMatrix * vec4( worldDir, 0.0 ) ).xyz );
+}
+
+float D_GGX( float NH, float alpha ) {
+	float alphaSq = alpha * alpha;
+	float d = ( NH * alphaSq - NH ) * NH + 1.0;
+	return alphaSq / ( DEF_PI * d * d );
+}
+
+float CalcVisibility( float NL, float NE, float alpha ) {
+	float alphaSq = alpha * alpha;
+	float lambdaE = NL * sqrt( ( -NE * alphaSq + NE ) * NE + alphaSq );
+	float lambdaL = NE * sqrt( ( -NL * alphaSq + NL ) * NL + alphaSq );
+	return 0.5 / max( lambdaE + lambdaL, 1e-7 );
 }
 
 float evalPointLight( vec3 lView, vec3 viewPos, vec3 N, float rad, out vec3 L ) {
@@ -130,7 +144,6 @@ void main() {
 
 	vec3 irradiance = vec3( 0.0 );
 	vec3 specularAcc = vec3( 0.0 );
-	float specPow = mix( 96.0, 4.0, roughness );
 
 	for ( uint k = 0u; k < maxPer; k++ ) {
 		uint li = tiles.cells[ tbase + k ];
@@ -163,8 +176,15 @@ void main() {
 		irradiance += lc.rgb * addBoost * nlAtt;
 		if ( pc.specular != 0u ) {
 			vec3 H = normalize( L + V );
-			float specTerm = pow( max( dot( N, H ), 0.0 ), specPow );
-			specularAcc += lc.rgb * addBoost * specTerm * nlAtt * F0 * 0.65;
+			float NH = max( dot( N, H ), 0.0 );
+			float NL = max( dot( N, L ), 0.0 );
+			float NE = max( dot( N, V ), 0.0 );
+			float VH = max( dot( V, H ), 0.0 );
+			float alpha = max( roughness * roughness, 0.04 );
+			vec3 F = F0 + ( 1.0 - F0 ) * pow( 1.0 - VH, 5.0 );
+			float D = D_GGX( NH, alpha );
+			float Vis = CalcVisibility( NL, NE, alpha );
+			specularAcc += lc.rgb * addBoost * ( D * Vis * F * NL );
 		}
 	}
 
