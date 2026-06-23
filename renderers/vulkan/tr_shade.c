@@ -58,6 +58,34 @@ extern cvar_t *r_shLighting;
 extern cvar_t *r_shWorldLighting;
 extern cvar_t *r_shDebugView;
 
+static void VK_FillPbrSunShadowUniform( vkUniform_t *ubo ) {
+	int i;
+
+	if ( !ubo ) {
+		return;
+	}
+
+	for ( i = 0; i < 4; i++ ) {
+		Vector4Set( ubo->pbrSunShadowRows[i], 0.0f, 0.0f, 0.0f, 0.0f );
+	}
+	Vector4Set( ubo->pbrSunShadowParams, 0.0f, 0.0f, 0.0f, 0.0f );
+
+	if ( !r_pbrSunShadow || !r_pbrSunShadow->integer || !vk.sun_shadow_valid ) {
+		return;
+	}
+
+	for ( i = 0; i < 4; i++ ) {
+		ubo->pbrSunShadowRows[i][0] = vk.sun_shadow_matrix0[i * 4 + 0];
+		ubo->pbrSunShadowRows[i][1] = vk.sun_shadow_matrix0[i * 4 + 1];
+		ubo->pbrSunShadowRows[i][2] = vk.sun_shadow_matrix0[i * 4 + 2];
+		ubo->pbrSunShadowRows[i][3] = vk.sun_shadow_matrix0[i * 4 + 3];
+	}
+	ubo->pbrSunShadowParams[0] = ( r_fogShadowBias ) ? r_fogShadowBias->value : 0.001f;
+	ubo->pbrSunShadowParams[1] = ( r_fogShadowPcfRadius ) ? r_fogShadowPcfRadius->value : 1.0f;
+	ubo->pbrSunShadowParams[2] = 1.0f;
+	ubo->pbrSunShadowParams[3] = ( r_pbrSunShadowStrength ) ? Com_Clamp( 0.0f, 1.0f, r_pbrSunShadowStrength->value ) : 1.0f;
+}
+
 static qboolean R_StageHasLightmap( const shaderStage_t *pStage ) {
 	return ( pStage->bundle[0].lightmap != LIGHTMAP_INDEX_NONE || pStage->bundle[1].lightmap != LIGHTMAP_INDEX_NONE );
 }
@@ -1297,6 +1325,8 @@ static void RB_IterateStagesGeneric( const shaderCommands_t *input )
 
 		pushUniform = qtrue;
 
+		VK_FillPbrSunShadowUniform( &uniform );
+
 		uniform.pbrForwardPlus[0] = -1.0f;
 		uniform.pbrForwardPlus[1] = 0.0f;
 		uniform.pbrForwardPlus[2] = 0.0f;
@@ -1313,6 +1343,7 @@ static void RB_IterateStagesGeneric( const shaderCommands_t *input )
 			}
 		}
 	} else {
+		VK_FillPbrSunShadowUniform( &uniform );
 		uniform.pbrForwardPlus[0] = -1.0f;
 		uniform.pbrForwardPlus[1] = 0.0f;
 		uniform.pbrForwardPlus[2] = 0.0f;

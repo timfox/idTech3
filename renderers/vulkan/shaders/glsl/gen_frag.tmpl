@@ -44,7 +44,9 @@ layout(set = 0, binding = 0) uniform UBO {
 	vec4 pbrDebugMode; // x: debug mode selector
 	vec4 pbrShCoeffs[9];
 	vec4 pbrParallaxParams; // x=scale, y=shadow str, z=shadow steps (float), w=unused (reserved)
-	vec4 pbrForwardPlus; // x: overflow shade (lights index >= 32); y: skip mask (tess.dlightBits)
+	vec4 pbrForwardPlus; // x: overflow shade; y: skip mask (tess.dlightBits)
+	vec4 pbrSunShadowRows[4]; // light clip matrix (column-major columns)
+	vec4 pbrSunShadowParams; // x: bias, y: PCF radius (texels), z: valid, w: strength
 #endif
 //#endif
 };
@@ -177,7 +179,47 @@ layout(std430, set = 18, binding = 2) readonly buffer FpParamSSBO {
 	mat4 fp_clip_from_world;
 	uvec4 fp_tiles_xy_viewport;
 } fp_params;
+layout(set = 18, binding = 4) uniform sampler2D fp_sun_shadow_map;
 #endif
+
+float pbrSunShadowVisibility( vec3 worldPos ) {
+	if ( pbrSunShadowParams.z < 0.5 ) {
+		return 1.0;
+	}
+	mat4 shadowMat = mat4(
+		pbrSunShadowRows[0],
+		pbrSunShadowRows[1],
+		pbrSunShadowRows[2],
+		pbrSunShadowRows[3]
+	);
+	vec4 lightClip = shadowMat * vec4( worldPos, 1.0 );
+	if ( abs( lightClip.w ) <= 1e-6 ) {
+		return 1.0;
+	}
+	vec3 ndc = lightClip.xyz / lightClip.w;
+	vec2 uv = ndc.xy * 0.5 + 0.5;
+	float depth = ndc.z * 0.5 + 0.5;
+	if ( any( lessThan( uv, vec2( 0.0 ) ) ) || any( greaterThan( uv, vec2( 1.0 ) ) ) || depth <= 0.0 || depth >= 1.0 ) {
+		return 1.0;
+	}
+	float compareDepth = depth - max( pbrSunShadowParams.x, 0.0 );
+	vec2 invSize = vec2( 1.0 / max( textureSize( fp_sun_shadow_map, 0 ).x, 1.0 ),
+		1.0 / max( textureSize( fp_sun_shadow_map, 0 ).y, 1.0 ) );
+	vec2 texelStep = invSize * max( pbrSunShadowParams.y, 0.0 );
+	if ( texelStep.x <= 0.0 || texelStep.y <= 0.0 ) {
+		float sampleDepth = texture( fp_sun_shadow_map, uv ).r;
+		return ( compareDepth <= sampleDepth ) ? 1.0 : 0.0;
+	}
+	float lit = 0.0;
+	for ( int y = -1; y <= 1; ++y ) {
+		for ( int x = -1; x <= 1; ++x ) {
+			vec2 pcfUV = uv + vec2( float( x ), float( y ) ) * texelStep;
+			float sampleDepth = texture( fp_sun_shadow_map, pcfUV ).r;
+			lit += ( compareDepth <= sampleDepth ) ? 1.0 : 0.0;
+		}
+	}
+	return lit * ( 1.0 / 9.0 );
+}
 
 // prob use ubo for specularScale & normalScale ..
 layout (constant_id = 11) const float specularScale_x = 1.0;
@@ -1354,6 +1396,12 @@ void main() {
 		fpRenorm = clamp( 1.0 - ( fL / ( pL + 1e-3 ) ) * 0.45, 0.35, 1.0 );
 	}
 	vec3 directLighting = primaryDirect * fpRenorm + fpAdd;
+#if defined( USE_FORWARD_PLUS_FRAG ) && defined( USE_FORWARD_PLUS_WORLD_POS )
+	if ( pbrSunShadowParams.z > 0.5 && deluxe_mapping >= 0 ) {
+		float sunVis = mix( 1.0, pbrSunShadowVisibility( var_WorldPos ), clamp( pbrSunShadowParams.w, 0.0, 1.0 ) );
+		directLighting *= sunVis;
+	}
+#endif
 	vec3 ambientContribution = ambientColor * diffuse.rgb * kD;
 	vec3 diffuseIrradiance = vec3( 0.0 );
 	if ( irradiance_texture_set >= 0 ) {

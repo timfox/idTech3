@@ -470,6 +470,8 @@ cvar_t	*r_fogShadowPcfRadius;
 cvar_t	*r_fogShadowMaxDistance;
 cvar_t	*r_fogShadowPadding;
 cvar_t	*r_fogShadowSnap;
+cvar_t	*r_pbrSunShadow;
+cvar_t	*r_pbrSunShadowStrength;
 cvar_t	*r_fogDebug;
 cvar_t	*r_fboDebug;
 cvar_t	*r_fboCinematic;
@@ -3640,6 +3642,19 @@ static void R_Register( void )
 	ri.Cvar_SetDescription( r_fogShadowSnap,
 		"When 1, snap volumetric sun shadow ortho bounds to shadow-map texels (reduces camera-move shimmer)." );
 	ri.Cvar_SetGroup( r_fogShadowSnap, CVG_RENDERER );
+	r_pbrSunShadow = ri.Cvar_Get( "r_pbrSunShadow", "1", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_pbrSunShadow, "0", "1", CV_INTEGER );
+	ri.Cvar_SetDescription( r_pbrSunShadow,
+		"PBR direct sun shadows on opaque surfaces (deluxe/lightmap directional). Uses the same sun shadow map as "
+		"volumetric fog; requires r_fbo 1. vid_restart after first enable if Forward+ layout was created before this build." );
+	ri.Cvar_SetGroup( r_pbrSunShadow, CVG_RENDERER );
+	if ( r_pbrSunShadow && r_pbrSunShadow->integer ) {
+		ri.Printf( PRINT_ALL, "[VK][lighting] r_pbrSunShadow=1 (PBR deluxe direct x sun shadow map)\n" );
+	}
+	r_pbrSunShadowStrength = ri.Cvar_Get( "r_pbrSunShadowStrength", "1", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_pbrSunShadowStrength, "0", "1", CV_FLOAT );
+	ri.Cvar_SetDescription( r_pbrSunShadowStrength, "Blend PBR sun shadow into deluxe direct lighting (0=off, 1=full)." );
+	ri.Cvar_SetGroup( r_pbrSunShadowStrength, CVG_RENDERER );
 
 	r_fogDebug = ri.Cvar_Get( "r_fogDebug", "0", CVAR_TEMP );
 	ri.Cvar_CheckRange( r_fogDebug, "0", "13", CV_INTEGER );

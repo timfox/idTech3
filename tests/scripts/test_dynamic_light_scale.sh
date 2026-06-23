@@ -30,4 +30,9 @@ grep -q 'r_shWorldStrength' renderers/vulkan/tr_init.c || fail 'missing r_shWorl
 grep -q 'r_fogShadowSnap' renderers/vulkan/tr_backend.c || fail 'sun shadow texel snap missing in tr_backend.c'
 grep -q 'R_StageUsesWorldSH' renderers/vulkan/tr_shade.c || fail 'world SH stage guard missing'
 
+grep -q 'pbrSunShadowVisibility' renderers/vulkan/shaders/glsl/gen_frag.tmpl || fail 'gen_frag PBR sun shadow'
+grep -q 'r_pbrSunShadow' renderers/vulkan/tr_init.c || fail 'missing r_pbrSunShadow cvar'
+grep -q 'vk_forward_plus_update_sun_shadow_descriptor' renderers/vulkan/vk_forward_plus.c || fail 'sun shadow descriptor update missing'
+grep -q 'VK_FillPbrSunShadowUniform' renderers/vulkan/tr_shade.c || fail 'PBR sun shadow uniform fill missing'
+
 pass "dynamic light scale + Forward+ overflow wiring"

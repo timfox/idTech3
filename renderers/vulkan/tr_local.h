@@ -1795,6 +1795,8 @@ extern cvar_t	*r_volumetricFogTemporalStability;
 extern cvar_t	*r_volumetricFogShadowContrast;
 extern cvar_t	*r_volumetricFogShowcase;
 extern cvar_t	*r_fog_shadows;
+extern cvar_t	*r_pbrSunShadow;
+extern cvar_t	*r_pbrSunShadowStrength;
 extern cvar_t	*r_fogShadowMapSize;
 extern cvar_t	*r_fogShadowBias;
 extern cvar_t	*r_fogShadowPcfRadius;

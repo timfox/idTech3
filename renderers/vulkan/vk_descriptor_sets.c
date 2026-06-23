@@ -22,6 +22,7 @@ void vk_update_attachment_descriptors( void ) {
 	uint32_t i;
 
 	vk_forward_plus_update_depth_descriptor();
+	vk_forward_plus_update_sun_shadow_descriptor();
 
 	if ( vk.color_image_view )
 	{
