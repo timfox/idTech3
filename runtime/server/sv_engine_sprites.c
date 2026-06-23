@@ -78,7 +78,10 @@ static int SV_EngineSprite_LinkFromDef( const engineSpriteMapDef_t *def, int sha
 		return -1;
 	}
 
-	entNum = sv.num_entities++;
+	entNum = SV_AllocEngineEntityNum();
+	if ( entNum < 0 ) {
+		return -1;
+	}
 	ent = SV_GentityNum( entNum );
 	Com_Memset( ent, 0, sv.gentitySize );
 

@@ -29,6 +29,27 @@ typedef struct {
 	int serverCommandSequence;
 } legacySnapshot_t;
 
+typedef struct {
+	refEntityType_t reType;
+	int renderfx;
+	qhandle_t hModel;
+	vec3_t lightingOrigin;
+	float shadowPlane;
+	vec3_t axis[3];
+	qboolean nonNormalizedAxes;
+	float origin[3];
+	int frame;
+	float oldorigin[3];
+	int oldframe;
+	float backlerp;
+	int skinNum;
+	qhandle_t customSkin;
+	qhandle_t customShader;
+	color4ub_t shader;
+	float shaderTexCoord[2];
+	floatint_t shaderTime;
+} retailRefEntity_t;
+
 #define ASSERT_EQ(actual, expected, msg) do { \
 	if ( (size_t)(actual) != (size_t)(expected) ) { \
 		fprintf(stderr, "FAIL: %s (got %zu expected %zu)\n", msg, (size_t)(actual), (size_t)(expected) ); \
@@ -53,6 +74,7 @@ int main(void)
 	ASSERT_EQ( sizeof( glconfig_t ), 11324, "glconfig_t retail size" );
 	ASSERT_EQ( sizeof( legacyGameState_t ), 20100, "legacyGameState_t retail size" );
 	ASSERT_EQ( sizeof( legacySnapshot_t ), 53772, "legacySnapshot_t retail size" );
+	ASSERT_EQ( sizeof( retailRefEntity_t ), sizeof( refEntity_t ) - 8, "retailRefEntity_t size" );
 	ASSERT_LE( MAX_CONFIGSTRINGS, 32768, "MAX_CONFIGSTRINGS engine ceiling" );
 
 	printf("PASS: QVM ABI sizes match retail anchors\n");
