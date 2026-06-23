@@ -9,4 +9,4 @@
 	url = https://github.com/gopexllc/FreeUSD.git
 [submodule "src/external/idtech3backend"]
 	path = third_party/idtech3backend
-	url = https://github.com/timfox/idtech3backend.git
+	url = https://github.com/timfox/idTech3Backend.git
