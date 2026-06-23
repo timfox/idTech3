@@ -20,6 +20,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 ===========================================================================
 */
 #include "client.h"
+#include "cl_emulator.h"
 #include "../../qcommon/script_emit.h"
 
 /*
@@ -601,6 +602,10 @@ static void CL_KeyDownEvent( int key, unsigned time )
 		anykeydown++;
 	}
 
+	if ( CL_Emulator_KeyEvent( key, qtrue ) ) {
+		return;
+	}
+
 #ifndef _WIN32
 	if ( keys[K_ALT].down && key == K_ENTER )
 	{
@@ -739,6 +744,10 @@ static void CL_KeyUpEvent( int key, unsigned time )
 		anykeydown = 0;
 	}
 
+	if ( CL_Emulator_KeyEvent( key, qfalse ) ) {
+		return;
+	}
+
 	// don't process key-up events for the console key
 	if ( key == K_CONSOLE || ( key == K_ESCAPE && keys[K_SHIFT].down ) ) {
 		return;
@@ -806,6 +815,10 @@ void CL_CharEvent( int key )
 	// otherwise handled by Field_KeyDownEvent
 	if ( key == 127 )
 		return;
+
+	if ( CL_Emulator_CharEvent( key ) ) {
+		return;
+	}
 
 	// distribute the key down event to the appropriate handler
 	if ( Key_GetCatcher( ) & KEYCATCH_CONSOLE )

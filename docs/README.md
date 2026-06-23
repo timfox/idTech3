@@ -37,6 +37,11 @@ Documentation is grouped by **tier**. Most files remain at their historical path
 - [RADIUSFPS.md](RADIUSFPS.md), [DAX.md](DAX.md), [GCCFER.md](GCCFER.md), [X3DPRA.md](X3DPRA.md)
 - [VUDA.md](VUDA.md), [VKSPLAT.md](VKSPLAT.md), [CURAST.md](CURAST.md), [MIMIR.md](MIMIR.md), [IRIS.md](IRIS.md)
 
+### Optional submodules (external trees)
+
+- [IDTECH3_BACKEND.md](IDTECH3_BACKEND.md) — game/backend + App CRDT
+- [IDTECH3_EMULATOR.md](IDTECH3_EMULATOR.md) — QEMU fork for in-world OS sandbox (render texture path planned)
+
 ## Guides
 
 - [QUICKSTART.md](QUICKSTART.md)

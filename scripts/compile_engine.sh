@@ -21,6 +21,7 @@ CSHARP=0
 FREEUSD=1
 VULKAN_RTX=0
 VUDA=0
+EMULATOR=0
 MIMIR=0
 PYTHON=0
 CROSS_AARCH64=0
@@ -170,6 +171,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     vuda|cuda-vulkan)
       VUDA=1
+      shift
+      ;;
+    emulator|qemu)
+      EMULATOR=1
       shift
       ;;
     mimir|mimir-cuda)
@@ -409,6 +414,17 @@ if [ "$VUDA" -eq 1 ]; then
   echo "CMake: USE_VUDA=ON (CUDA-Vulkan interop; set r_vuda 1 + cl_vuda 1 + vid_restart)"
 else
   CMAKE_FLAGS+=("-DUSE_VUDA=OFF")
+fi
+
+if [ "$EMULATOR" -eq 1 ]; then
+  CMAKE_FLAGS+=("-DUSE_IDTECH3_EMULATOR=ON")
+  echo "CMake: USE_IDTECH3_EMULATOR=ON (QEMU guest bridge; cl_emulator 1 + r_emulatorScreen 1)"
+  if [ ! -f "$PROJECT_ROOT/third_party/idtech3-emulator/README.rst" ]; then
+    echo "Initializing idTech3-Emulator submodule..."
+    git -C "$PROJECT_ROOT" submodule update --init third_party/idtech3-emulator || true
+  fi
+else
+  CMAKE_FLAGS+=("-DUSE_IDTECH3_EMULATOR=OFF")
 fi
 
 if [ "$MIMIR" -eq 1 ]; then

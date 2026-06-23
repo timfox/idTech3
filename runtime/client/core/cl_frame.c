@@ -19,6 +19,7 @@ Copyright (C) 2026 Gopex LLC. All rights reserved.
 #include "cl_trellis.h"
 #include "cl_generative.h"
 #include "cl_vuda.h"
+#include "cl_emulator.h"
 #include "lua_debug.h"
 #include "cl_app_crdt.h"
 
@@ -78,6 +79,7 @@ void CL_Frame( int msec, int realMsec ) {
 #ifdef USE_VUDA
 	CL_VUDA_Frame();
 #endif
+	CL_Emulator_Frame();
 
 	cls.realFrametime = realMsec;
 

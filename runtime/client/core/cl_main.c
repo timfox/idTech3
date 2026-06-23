@@ -44,6 +44,8 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "cl_flux.h"
 #include "cl_trellis.h"
 #include "cl_generative.h"
+#include "cl_vuda.h"
+#include "cl_emulator.h"
 #include "cl_serverbrowser.h"
 #include "cl_ref.h"
 #include "cl_connect.h"
@@ -239,6 +241,7 @@ void CL_Init( void ) {
 #ifdef USE_VUDA
 	CL_VUDA_Init();
 #endif
+	CL_Emulator_Init();
 
 #ifdef USE_LUA
 	LuaDebug_SetEngineRegisterCallback( CL_LuaRegisterAll );
