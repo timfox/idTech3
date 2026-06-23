@@ -36,6 +36,20 @@ extern	cvar_t	*r_gamma;
 extern	cvar_t	*r_dynamicLightScale;
 extern	cvar_t	*r_lightGammaLink;
 extern	cvar_t	*r_shWorldStrength;
+extern	cvar_t	*r_classicLighting;
+
+/*
+===============
+R_ClassicLightingActive
+
+When true (default), preserve retail Q3 / classic mod lighting: disable chocolate-layer
+overrides (SH world tint, PBR sun shadow, Forward+ overflow shade). Set r_classicLighting 0
+for modern lighting features controlled by their individual cvars.
+===============
+*/
+qboolean R_ClassicLightingActive( void ) {
+	return ( r_classicLighting && r_classicLighting->integer );
+}
 
 /*
 ===============
@@ -83,6 +97,14 @@ qboolean R_WorldSHVertexColor( const vec3_t position, const vec3_t normal, byte 
 	int i;
 
 	if ( !rgba || !tr.world ) {
+		return qfalse;
+	}
+
+	if ( R_ClassicLightingActive() ) {
+		rgba[0] = 255;
+		rgba[1] = 255;
+		rgba[2] = 255;
+		rgba[3] = 255;
 		return qfalse;
 	}
 

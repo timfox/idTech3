@@ -70,7 +70,7 @@ static void VK_FillPbrSunShadowUniform( vkUniform_t *ubo ) {
 	}
 	Vector4Set( ubo->pbrSunShadowParams, 0.0f, 0.0f, 0.0f, 0.0f );
 
-	if ( !r_pbrSunShadow || !r_pbrSunShadow->integer || !vk.sun_shadow_valid ) {
+	if ( !r_pbrSunShadow || !r_pbrSunShadow->integer || !vk.sun_shadow_valid || R_ClassicLightingActive() ) {
 		return;
 	}
 
@@ -375,7 +375,7 @@ void RB_BeginSurface( shader_t *shader, int fogNum ) {
 
 	if ( backEnd.currentEntity == &tr.worldEntity &&
 		( ( r_shWorldLighting && r_shWorldLighting->integer ) ||
-		( r_shDebugView && r_shDebugView->integer ) ) ) {
+		( r_shDebugView && r_shDebugView->integer ) ) && !R_ClassicLightingActive() ) {
 		tess.allowVBO = qfalse;
 	}
 
@@ -393,7 +393,8 @@ void RB_BeginSurface( shader_t *shader, int fogNum ) {
 	tess.needsNormal = state->needsNormal || tess.dlightPass || r_shownormals->integer ||
 		( backEnd.currentEntity == &tr.worldEntity &&
 		( ( r_shDebugView && r_shDebugView->integer ) ||
-		( r_shWorldLighting && r_shWorldLighting->integer && r_shLighting && r_shLighting->integer ) ) );
+		( r_shWorldLighting && r_shWorldLighting->integer && r_shLighting && r_shLighting->integer &&
+			!R_ClassicLightingActive() ) ) );
 #endif
 
 #ifdef USE_TESS_NEEDS_ST2
@@ -777,6 +778,7 @@ void R_ComputeColors( const int b, color4ub_t *dest, const shaderStage_t *pStage
 		return;
 
 	if ( backEnd.currentEntity == &tr.worldEntity && R_StageUsesWorldSH( pStage ) &&
+		!R_ClassicLightingActive() &&
 		( ( r_shDebugView && r_shDebugView->integer ) ||
 		( r_shWorldLighting && r_shWorldLighting->integer && r_shLighting && r_shLighting->integer ) ) ) {
 		int v;
@@ -1331,7 +1333,7 @@ static void RB_IterateStagesGeneric( const shaderCommands_t *input )
 		uniform.pbrForwardPlus[1] = 0.0f;
 		uniform.pbrForwardPlus[2] = 0.0f;
 		uniform.pbrForwardPlus[3] = 0.0f;
-		if ( r_forwardPlus && r_forwardPlus->integer ) {
+		if ( r_forwardPlus && r_forwardPlus->integer && !R_ClassicLightingActive() ) {
 			if ( r_forwardPlusOverflowShade && r_forwardPlusOverflowShade->value > 0.0f ) {
 				uniform.pbrForwardPlus[0] = Com_Clamp( 0.0f, 4.0f, r_forwardPlusOverflowShade->value );
 			}

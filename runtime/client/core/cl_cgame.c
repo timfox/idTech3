@@ -1138,6 +1138,9 @@ void CL_InitCGame( void ) {
 		Cvar_Set( "cl_physicsEnabled", "0" );
 		Com_Printf( "[client] cl_physicsEnabled 0 for cgame.qvm compatibility\n" );
 	}
+	if ( !cgvm->dllHandle && Cvar_VariableIntegerValue( "r_classicLighting" ) ) {
+		Com_Printf( "[client] retail cgame.qvm — classic lighting preserved (r_classicLighting 1)\n" );
+	}
 
 	// reset any CVAR_CHEAT cvars registered by cgame
 	if ( !clc.demoplaying && !cl_connectedToCheatServer )

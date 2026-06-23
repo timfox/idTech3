@@ -2202,6 +2202,7 @@ int R_LightForPoint( vec3_t point, vec3_t ambientLight, vec3_t directedLight, ve
 qboolean R_DynamicLightUsesLegacyScale( void );
 float R_DynamicLightIntensityScale( void );
 void R_DynamicLightColor( const dlight_t *dl, vec3_t out );
+qboolean R_ClassicLightingActive( void );
 void R_EvalSH9_RGB( const vec3_t shCoeffs[SH_COEFF_COUNT], const vec3_t normal, vec3_t out );
 qboolean R_WorldSHVertexColor( const vec3_t position, const vec3_t normal, byte rgba[4] );
 qboolean R_SampleLightGridSH( const world_t *world, const vec3_t position, vec3_t shCoeffs[SH_COEFF_COUNT] );
