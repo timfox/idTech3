@@ -59,6 +59,7 @@ if(BUILD_EXAMPLE_DEMO_GAME AND NOT BUILD_SAMPLES_DEMO_GAME)
 endif()
 option(USE_FREEUSD "Link FreeUSD for USDA mesh import and USD scene tools (GPL-2.0-or-later)" ON)
 option(USE_IDTECH3_BACKEND "Require idtech3backend submodule (timfox/idtech3backend); wiring TBD" OFF)
+option(USE_IDTECH3_EMULATOR "Require idTech3-Emulator submodule (QEMU fork); in-engine bridge TBD" OFF)
 
 set(IDTECH3_PROFILE "game" CACHE STRING "Build profile: core|game|full|research")
 set_property(CACHE IDTECH3_PROFILE PROPERTY STRINGS core game full research)
@@ -68,6 +69,7 @@ option(USE_ARC_BLANC "Arc Blanc real-time ocean (Tessendorf FFT + solid-fluid co
 option(USE_GAME_AI_MIDDLEWARE "Director/GOAP/Horde/BT gameplay middleware (g_director, g_goap, …)" ON)
 
 include(${CMAKE_SOURCE_DIR}/cmake/IdTech3Backend.cmake)
+include(${CMAKE_SOURCE_DIR}/cmake/IdTech3Emulator.cmake)
 
 if(C_STANDARD_STRICT)
   if(MSVC)
@@ -2011,6 +2013,11 @@ IF(USE_RENDERER_DLOPEN)
 	  target_compile_definitions(${RENDERER_PREFIX}_vulkan${RENDEXT} PRIVATE USE_MIMIR_CUDA=1)
 	  message(STATUS "Mímir: CUDA interop enabled (r_mimir 1 + r_mimir_cuda 1 + vid_restart)")
 	endif()
+	if(USE_IDTECH3_EMULATOR)
+	  idtech3_emulator_apply_compile_defs(${RENDERER_PREFIX}_vulkan${RENDEXT})
+	  target_compile_definitions(${RENDERER_PREFIX}_vulkan${RENDEXT} PRIVATE USE_IDTECH3_EMULATOR=1)
+	  message(STATUS "idTech3-Emulator: *emulator_screen texture path (r_emulatorScreen 1)")
+	endif()
 	add_dependencies(${RENDERER_PREFIX}_vulkan${RENDEXT} vk_shaders_autogen)
 	IF(BUILD_FREETYPE)
 		target_link_libraries(${RENDERER_PREFIX}_vulkan${RENDEXT} PRIVATE idtech3_freetype)
@@ -2086,6 +2093,10 @@ ELSE()
 	endif()
 	if(USE_MIMIR_CUDA)
 	  target_compile_definitions(${RENDERER_PREFIX}_vulkan PRIVATE USE_MIMIR_CUDA=1)
+	endif()
+	if(USE_IDTECH3_EMULATOR)
+	  idtech3_emulator_apply_compile_defs(${RENDERER_PREFIX}_vulkan)
+	  target_compile_definitions(${RENDERER_PREFIX}_vulkan PRIVATE USE_IDTECH3_EMULATOR=1)
 	endif()
 	add_dependencies(${RENDERER_PREFIX}_vulkan vk_shaders_autogen)
 	IF(BUILD_FREETYPE)
@@ -2402,6 +2413,13 @@ if(USE_VUDA)
     target_link_libraries(client PRIVATE ${CMAKE_DL_LIBS})
   endif()
   message(STATUS "VUDA client: cl_vuda + vuda_cuda (dlopen libcudart)")
+endif()
+
+if(USE_IDTECH3_EMULATOR)
+  idtech3_emulator_apply_compile_defs(client)
+  target_compile_definitions(client PRIVATE USE_IDTECH3_EMULATOR=1)
+  target_include_directories(client PRIVATE ${CMAKE_SOURCE_DIR}/src/extensions/emulator)
+  message(STATUS "idTech3-Emulator client: cl_emulator + QEMU guest bridge (cl_emulator 1 + r_emulatorScreen 1)")
 endif()
 
 if(USE_IMGUI AND NOT APPLE)
@@ -2934,6 +2952,17 @@ add_test(NAME test_app_crdt
 set_tests_properties(test_app_crdt PROPERTIES
 	LABELS "scripts;validation"
 	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_app_crdt.sh;${CMAKE_SOURCE_DIR}/src/qcommon/app_crdt.c")
+
+add_test(NAME test_idtech3_emulator
+	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_idtech3_emulator.sh
+	WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+set_tests_properties(test_idtech3_emulator PROPERTIES
+	LABELS "scripts;validation"
+	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_idtech3_emulator.sh;${CMAKE_SOURCE_DIR}/cmake/IdTech3Emulator.cmake;${CMAKE_SOURCE_DIR}/docs/IDTECH3_EMULATOR.md")
+
+add_executable(unit_emulator_contract tests/unit/test_emulator_contract.c)
+add_test(NAME unit_emulator_contract COMMAND unit_emulator_contract)
+set_tests_properties(unit_emulator_contract PROPERTIES LABELS "unit;validation")
 
 add_test(NAME test_mimir
 	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_mimir.sh

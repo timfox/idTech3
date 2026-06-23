@@ -20,6 +20,7 @@ Copyright (C) 2026 Gopex LLC. All rights reserved.
 #include "cl_genetic_gan.h"
 #include "cl_ml_worker.h"
 #include "cl_vuda.h"
+#include "cl_emulator.h"
 #ifdef USE_CURL
 #include "cl_curl.h"
 #endif
@@ -184,6 +185,7 @@ void CL_Shutdown( const char *finalmsg, qboolean quit ) {
 #ifdef USE_VUDA
 	CL_VUDA_Shutdown();
 #endif
+	CL_Emulator_Shutdown();
 
 	S_DisableSounds();
 

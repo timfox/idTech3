@@ -53,6 +53,9 @@ The default engine build only **auto-inits** the **FreeUSD** submodule (`compile
 # Game/backend tree (timfox/idtech3backend — not linked into CMake by default)
 ./scripts/init_optional_submodules.sh --backend
 
+# QEMU fork for in-game OS sandbox (timfox/idTech3-Emulator — build inside submodule)
+./scripts/init_optional_submodules.sh --emulator
+
 # Tiled Map Editor (GPL-2.0, level design — not linked into idtech3)
 ./scripts/init_optional_submodules.sh --tiled
 
@@ -63,7 +66,7 @@ The default engine build only **auto-inits** the **FreeUSD** submodule (`compile
 ./scripts/init_optional_submodules.sh --all
 ```
 
-See [FREEUSD.md](FREEUSD.md), [IDTECH3_BACKEND.md](IDTECH3_BACKEND.md), [TILED.md](TILED.md), and [tools/README.md](../tools/README.md).
+See [FREEUSD.md](FREEUSD.md), [IDTECH3_BACKEND.md](IDTECH3_BACKEND.md), [IDTECH3_EMULATOR.md](IDTECH3_EMULATOR.md), [TILED.md](TILED.md), and [tools/README.md](../tools/README.md).
 
 ### C# scripting (optional, Mono)
 

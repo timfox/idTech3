@@ -113,5 +113,6 @@ Build artifacts go to `build-vk-Release/` and are copied to `release/`.
 ### Optional submodules
 
 - **FreeUSD** (`src/external/FreeUSD`): default build; see `docs/FREEUSD.md`.
-- **idTech3 Backend** (`src/external/idtech3backend`, [timfox/idtech3backend](https://github.com/timfox/idtech3backend)): `./scripts/init_optional_submodules.sh --backend` — optional game/backend tree; not linked into engine CMake by default; see `docs/IDTECH3_BACKEND.md`.
+- **idTech3 Backend** (`third_party/idtech3backend`, [timfox/idtech3backend](https://github.com/timfox/idtech3backend)): `./scripts/init_optional_submodules.sh --backend` — optional game/backend tree; not linked into engine CMake by default; see `docs/IDTECH3_BACKEND.md`.
+- **idTech3 Emulator** (`third_party/idtech3-emulator`, [timfox/idTech3-Emulator](https://github.com/timfox/idTech3-Emulator)): `./scripts/init_optional_submodules.sh --emulator` or `./scripts/compile_engine.sh vulkan emulator` — optional QEMU fork for in-game OS sandbox / `*emulator_screen` render texture (`cl_emulator`, `r_emulatorScreen`); see `docs/IDTECH3_EMULATOR.md`.
 - **Tiled Map Editor** (`tools/tiled`, GPL-2.0): `./scripts/init_optional_submodules.sh --tiled` — not built by `compile_engine.sh`; see `docs/TILED.md`.

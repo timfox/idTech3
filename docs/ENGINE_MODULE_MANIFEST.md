@@ -142,8 +142,10 @@ CMake: [`cmake/client/ClientExtensionSources.cmake`](../cmake/client/ClientExten
 | `src/client/world/cl_district.cpp` | module | `USE_OPEN_WORLD` | `test_districts.sh` |
 | `src/client/world/cl_openworld.cpp` | module | `USE_OPEN_WORLD` | `test_openworld*.sh` |
 | `src/client/world/cl_proc.cpp` | module | `USE_OPEN_WORLD` | `test_proc.sh` |
+| `src/extensions/emulator/emulator_*.c` | extension | `USE_IDTECH3_EMULATOR` | `test_idtech3_emulator.sh`, `unit_emulator_contract` |
+| `src/renderers/vulkan/extensions/scaffold/vk_emulator_screen.c` | extension | always linked; active when `r_emulatorScreen 1` + `USE_IDTECH3_EMULATOR` build | same |
 
-Headers: `src/extensions/generative/*.h`, `src/client/cl_flux.h`, `src/client/cl_trellis.h`.
+Headers: `src/extensions/generative/*.h`, `src/client/cl_flux.h`, `src/client/cl_trellis.h`, `extensions/emulator/emulator_types.h`.
 
 ---
 

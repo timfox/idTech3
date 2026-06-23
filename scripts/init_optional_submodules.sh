@@ -9,6 +9,7 @@ DO_TILED=0
 DO_SVO=0
 DO_FREEUSD=0
 DO_BACKEND=0
+DO_EMULATOR=0
 DRY_RUN=0
 
 usage() {
@@ -22,6 +23,7 @@ Options:
   --svo       third_party/src/SparseVoxelOctree (legacy: src/external/src/SparseVoxelOctree)
   --freeusd   third_party/FreeUSD (legacy: src/external/FreeUSD) — see docs/FREEUSD.md
   --backend   third_party/idtech3backend (legacy: src/external/idtech3backend) — see docs/IDTECH3_BACKEND.md
+  --emulator  third_party/idtech3-emulator (timfox/idTech3-Emulator QEMU fork) — see docs/IDTECH3_EMULATOR.md
   --all       Initialize every optional submodule listed above
   --dry-run   Print commands without running git submodule
   --help      Show this help
@@ -31,7 +33,7 @@ Examples:
   ./scripts/init_optional_submodules.sh --all
   ./scripts/init_optional_submodules.sh --tiled --dry-run
 
-Error: pass at least one of --tiled, --svo, --freeusd, --backend, or --all.
+Error: pass at least one of --tiled, --svo, --freeusd, --backend, --emulator, or --all.
 EOF
 }
 
@@ -41,7 +43,8 @@ while [ $# -gt 0 ]; do
 		--svo) DO_SVO=1 ;;
 		--freeusd) DO_FREEUSD=1 ;;
 		--backend|--idtech3backend) DO_BACKEND=1 ;;
-		--all) DO_TILED=1; DO_SVO=1; DO_FREEUSD=1; DO_BACKEND=1 ;;
+		--emulator|--idtech3-emulator) DO_EMULATOR=1 ;;
+		--all) DO_TILED=1; DO_SVO=1; DO_FREEUSD=1; DO_BACKEND=1; DO_EMULATOR=1 ;;
 		--dry-run) DRY_RUN=1 ;;
 		-h|--help)
 			usage
@@ -56,8 +59,8 @@ while [ $# -gt 0 ]; do
 	shift
 done
 
-if [ "$DO_TILED" -eq 0 ] && [ "$DO_SVO" -eq 0 ] && [ "$DO_FREEUSD" -eq 0 ] && [ "$DO_BACKEND" -eq 0 ]; then
-	echo "Error: pass at least one of --tiled, --svo, --freeusd, --backend, or --all." >&2
+if [ "$DO_TILED" -eq 0 ] && [ "$DO_SVO" -eq 0 ] && [ "$DO_FREEUSD" -eq 0 ] && [ "$DO_BACKEND" -eq 0 ] && [ "$DO_EMULATOR" -eq 0 ]; then
+	echo "Error: pass at least one of --tiled, --svo, --freeusd, --backend, --emulator, or --all." >&2
 	usage >&2
 	exit 2
 fi
@@ -116,6 +119,13 @@ if [ "$DO_BACKEND" -eq 1 ]; then
 		init_one "third_party/idtech3backend" "idTech3 Backend (timfox/idtech3backend)"
 	else
 		init_one "src/external/idtech3backend" "idTech3 Backend (timfox/idtech3backend)"
+	fi
+fi
+if [ "$DO_EMULATOR" -eq 1 ]; then
+	if grep -qF 'path = third_party/idtech3-emulator' "$PROJECT_ROOT/.gitmodules"; then
+		init_one "third_party/idtech3-emulator" "idTech3 Emulator (timfox/idTech3-Emulator)"
+	else
+		init_one "src/external/idtech3-emulator" "idTech3 Emulator (timfox/idTech3-Emulator)"
 	fi
 fi
 

@@ -169,6 +169,9 @@ typedef struct {
 	/* Arc Blanc GPU FFT ocean step (NULL when disabled or stub renderer). */
 	qboolean (*ArcBlancGpuOceanStep)( const arcBlancGpuParams_t *params );
 
+	/* In-engine OS sandbox guest display (QEMU + *emulator_screen texture). */
+	void (*EmulatorUploadFrame)( const byte *rgba, int width, int height );
+
 } refexport_t;
 
 //
