@@ -1,55 +1,87 @@
-# Branch Strategy
+# Branch Strategy (2026 trunk)
 
-## Active Branches
+## Production trunk
 
-### `main`
-Production-ready code. Always buildable, tested, and release-candidate quality. No experimental features. All merges require CI validation.
+### `main` (only active integration branch)
 
-### `next-gen`
-Active development branch for next-generation renderer features. Contains:
-- Vulkan 1.4 renderer with PBR, volumetric fog, fluid simulation
-- SMAA anti-aliasing, shadow mapping (CSM + spot atlas + point cubemaps)
-- Bloom, SSAO, HDR tonemapping pipeline
-- GLSL shader compilation pipeline
+- **Single source of truth** for releases, CI, and agent work.
+- Must stay buildable: `./scripts/compile_engine.sh vulkan` + `./scripts/smoke_test.sh release`.
+- **No long-lived `cursor/*` agent branches** — work lands via short-lived `feature/*` PRs into `main`.
+- Protected on GitHub: changes via PR + CI green (see `.github/workflows/build.yml`).
 
-### `next-gen-2`
-Integration branch built on top of `next-gen`. Adds:
-- Modern video codec system (FFmpeg, dav1d, libvpx, Theora)
-- Modularized volumetric fog and fluid simulation modules
-- Documentation, automation, and CI improvements
+### Release tags
 
-This branch will be merged into `next-gen` when all features are validated, then `next-gen` merges into `main` for release.
+- Ship from **`main`** only: `vMAJOR.MINOR.PATCH` (see [RELEASE_CHECKLIST.md](RELEASE_CHECKLIST.md)).
+- Optional stabilization: `release/vX.Y` cut from a tagged `main` commit; hotfixes merge to `release/vX.Y` then back to `main`.
 
-## Layer Branches
+## Short-lived development branches
 
-### `vanilla`
-Core engine changes that touch the original id Tech 3 foundation. Changes here must maintain 100% backward compatibility.
+| Pattern | Use |
+|---------|-----|
+| `feature/<name>` | New capability (Vulkan, mods, tooling) |
+| `fix/<name>` | Bugfix |
+| `docs/<name>` | Documentation-only |
+| `chore/<name>` | CI, scripts, non-product code |
 
-### `chocolate`
-Enhancement features that improve performance or quality without breaking changes. Features can be disabled completely.
+**Rules**
 
-### `layercake`
-Architectural changes and modern system additions. Clean separation of concerns, extensible design.
+1. Branch from latest `main`; rebase or merge `main` before opening PR.
+2. Delete the branch after merge (GitHub “delete branch” or `git push origin --delete feature/...`).
+3. Do **not** open parallel integration branches (`next-gen-2`, `cursor/*`, etc.) — they diverge from trunk and cannot be merged safely.
 
-## Historical / Feature Branches
+## Layer concepts (not separate long-lived remotes)
 
-| Branch | Purpose |
-|--------|---------|
-| `bloom-fix-pr` | Bloom pipeline fixes |
-| `duktape` | Duktape JavaScript scripting integration |
-| `lua` | Lua scripting integration |
-| `glints` | Specular glint rendering |
-| `archive` | Archived experimental work |
+The constitution still describes **vanilla / chocolate / layercake** as *change classification*, not separate git remotes:
 
-## Merge Flow
+| Layer | Meaning |
+|-------|---------|
+| Vanilla | Core Q3 compatibility — must not break retail QVM/pk3 |
+| Chocolate | Opt-in enhancements with fallbacks |
+| Layercake | Modern modules (Vulkan, open world, research) behind CMake/profile gates |
 
+Tag PRs and commits with layer intent in the description; all layers integrate into **`main`**.
+
+## Archived legacy remotes
+
+Historical branches (`chocolate`, `cherry`, `archive`, `overbaked`, `glints`, …) were **tagged and removed** from `origin` during trunk consolidation. Tags follow:
+
+```text
+archive/<branch-name>-YYYYMMDD
 ```
-feature branches → next-gen-2 → next-gen → main
-                                    ↑
-                    layer branches ──┘
+
+List tags:
+
+```bash
+git fetch --tags origin
+git tag -l 'archive/*'
 ```
 
-1. Feature work happens on topic branches
-2. Validated features merge into `next-gen-2` or `next-gen`
-3. `next-gen` merges into `main` for releases
-4. Layer branches (`vanilla`, `chocolate`, `layercake`) merge into the appropriate integration branch
+Restore read-only inspection:
+
+```bash
+git checkout archive/chocolate-YYYYMMDD
+```
+
+Scripts:
+
+- `scripts/archive_legacy_remote_branches.sh` — tag tips + delete legacy remotes
+- `scripts/cleanup_remote_cursor_branches.sh` — remove stale `cursor/*` remotes
+- `scripts/integrate_cursor_branches.sh` — optional cherry-pick from agent branches (prefer PRs instead)
+
+## Merge flow
+
+```text
+feature/fix branch → PR → CI → main → release tag
+```
+
+## CI expectations (every PR to `main`)
+
+- Ubuntu + Windows matrix in `.github/workflows/build.yml`
+- Smoke test on release artifacts where configured
+- `./scripts/q3_openarena_compat_check.sh` for QVM/OA regressions
+- `ctest -R unit` for fast unit gates when CMake test target exists locally
+
+## Agent / automation policy
+
+- Cloud agents and Cursor tasks: **commit to `feature/*`, open PR to `main`** — do not push `cursor/*` remotes.
+- Run `./scripts/pr_ready_summary.sh` before requesting review.
