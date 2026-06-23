@@ -58,33 +58,18 @@ extern cvar_t *r_shLighting;
 extern cvar_t *r_shWorldLighting;
 extern cvar_t *r_shDebugView;
 
-static void R_EvalSH9Color( const vec3_t shCoeffs[SH_COEFF_COUNT], const vec3_t normal, vec3_t out ) {
-	const float x = normal[0];
-	const float y = normal[1];
-	const float z = normal[2];
-	const float basis[SH_COEFF_COUNT] = {
-		1.0f,
-		y,
-		z,
-		x,
-		x * y,
-		y * z,
-		3.0f * z * z - 1.0f,
-		x * z,
-		x * x - y * y
-	};
-	int i;
-
-	VectorClear( out );
-	for ( i = 0; i < SH_COEFF_COUNT; i++ ) {
-		out[0] += shCoeffs[i][0] * basis[i];
-		out[1] += shCoeffs[i][1] * basis[i];
-		out[2] += shCoeffs[i][2] * basis[i];
-	}
-}
-
 static qboolean R_StageHasLightmap( const shaderStage_t *pStage ) {
 	return ( pStage->bundle[0].lightmap != LIGHTMAP_INDEX_NONE || pStage->bundle[1].lightmap != LIGHTMAP_INDEX_NONE );
+}
+
+static qboolean R_StageUsesWorldSH( const shaderStage_t *pStage ) {
+	if ( R_StageHasLightmap( pStage ) ) {
+		return qtrue;
+	}
+	if ( pStage->bundle[0].rgbGen == CGEN_LIGHTING_DIFFUSE || pStage->bundle[0].rgbGen == CGEN_IDENTITY_LIGHTING ) {
+		return qtrue;
+	}
+	return qfalse;
 }
 
 static void RB_DrawWorldSHDebugOverride( void ) {
@@ -99,21 +84,7 @@ static void RB_DrawWorldSHDebugOverride( void ) {
 	{
 		int v;
 		for ( v = 0; v < tess.numVertexes; v++ ) {
-			vec3_t shCoeffs[SH_COEFF_COUNT];
-			vec3_t shLight;
-			qboolean hasSH = R_SampleLightGridSH( tr.world, tess.xyz[v], shCoeffs );
-
-			if ( hasSH ) {
-				R_EvalSH9Color( shCoeffs, tess.normal[v], shLight );
-				tess.svars.colors[0][v].rgba[0] = (byte)Com_Clamp( 0.0f, 255.0f, shLight[0] );
-				tess.svars.colors[0][v].rgba[1] = (byte)Com_Clamp( 0.0f, 255.0f, shLight[1] );
-				tess.svars.colors[0][v].rgba[2] = (byte)Com_Clamp( 0.0f, 255.0f, shLight[2] );
-			} else {
-				tess.svars.colors[0][v].rgba[0] = 255;
-				tess.svars.colors[0][v].rgba[1] = 0;
-				tess.svars.colors[0][v].rgba[2] = 255;
-			}
-			tess.svars.colors[0][v].rgba[3] = 255;
+			(void)R_WorldSHVertexColor( tess.xyz[v], tess.normal[v], tess.svars.colors[0][v].rgba );
 		}
 	}
 
@@ -777,51 +748,51 @@ void R_ComputeColors( const int b, color4ub_t *dest, const shaderStage_t *pStage
 	if ( tess.numVertexes == 0 )
 		return;
 
-	if ( backEnd.currentEntity == &tr.worldEntity && R_StageHasLightmap( pStage ) &&
+	if ( backEnd.currentEntity == &tr.worldEntity && R_StageUsesWorldSH( pStage ) &&
 		( ( r_shDebugView && r_shDebugView->integer ) ||
 		( r_shWorldLighting && r_shWorldLighting->integer && r_shLighting && r_shLighting->integer ) ) ) {
 		int v;
 		for ( v = 0; v < tess.numVertexes; v++ ) {
 			vec3_t shCoeffs[SH_COEFF_COUNT];
-			vec3_t shLight;
-			qboolean hasSH = R_SampleLightGridSH( tr.world, tess.xyz[v], shCoeffs );
 
-			if ( r_shDebugView && r_shDebugView->integer ) {
+			if ( r_shDebugView && r_shDebugView->integer == 2 ) {
+				qboolean hasSH = R_SampleLightGridSH( tr.world, tess.xyz[v], shCoeffs );
 				if ( hasSH ) {
-					if ( r_shDebugView->integer == 2 ) {
-						float value = shCoeffs[0][0];
-						if ( value < 0.0f ) {
-							value = 0.0f;
-						} else if ( value > 255.0f ) {
-							value = 255.0f;
-						}
-						dest[v].rgba[0] = myftol( value );
-						dest[v].rgba[1] = dest[v].rgba[0];
-						dest[v].rgba[2] = dest[v].rgba[0];
-					} else {
-						R_EvalSH9Color( shCoeffs, tess.normal[v], shLight );
-						dest[v].rgba[0] = (byte)Com_Clamp( 0.0f, 255.0f, shLight[0] );
-						dest[v].rgba[1] = (byte)Com_Clamp( 0.0f, 255.0f, shLight[1] );
-						dest[v].rgba[2] = (byte)Com_Clamp( 0.0f, 255.0f, shLight[2] );
+					float value = shCoeffs[0][0];
+					if ( value < 0.0f ) {
+						value = 0.0f;
+					} else if ( value > 255.0f ) {
+						value = 255.0f;
 					}
+					dest[v].rgba[0] = myftol( value );
+					dest[v].rgba[1] = dest[v].rgba[0];
+					dest[v].rgba[2] = dest[v].rgba[0];
 				} else {
 					dest[v].rgba[0] = 255;
 					dest[v].rgba[1] = 0;
 					dest[v].rgba[2] = 255;
 				}
 				dest[v].rgba[3] = 255;
-			} else if ( hasSH ) {
-				R_EvalSH9Color( shCoeffs, tess.normal[v], shLight );
-				dest[v].rgba[0] = (byte)Com_Clamp( 0.0f, 255.0f, shLight[0] );
-				dest[v].rgba[1] = (byte)Com_Clamp( 0.0f, 255.0f, shLight[1] );
-				dest[v].rgba[2] = (byte)Com_Clamp( 0.0f, 255.0f, shLight[2] );
-				dest[v].rgba[3] = 255;
-			} else {
-				dest[v].rgba[0] = 255;
-				dest[v].rgba[1] = 255;
-				dest[v].rgba[2] = 255;
-				dest[v].rgba[3] = 255;
+				continue;
 			}
+
+			if ( r_shDebugView && r_shDebugView->integer == 1 ) {
+				vec3_t shLight;
+				if ( R_SampleLightGridSH( tr.world, tess.xyz[v], shCoeffs ) ) {
+					R_EvalSH9_RGB( shCoeffs, tess.normal[v], shLight );
+					dest[v].rgba[0] = (byte)Com_Clamp( 0.0f, 255.0f, shLight[0] );
+					dest[v].rgba[1] = (byte)Com_Clamp( 0.0f, 255.0f, shLight[1] );
+					dest[v].rgba[2] = (byte)Com_Clamp( 0.0f, 255.0f, shLight[2] );
+				} else {
+					dest[v].rgba[0] = 255;
+					dest[v].rgba[1] = 0;
+					dest[v].rgba[2] = 255;
+				}
+				dest[v].rgba[3] = 255;
+				continue;
+			}
+
+			(void)R_WorldSHVertexColor( tess.xyz[v], tess.normal[v], dest[v].rgba );
 		}
 		return;
 	}

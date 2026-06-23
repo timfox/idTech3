@@ -24,4 +24,10 @@ grep -q 'r_forwardPlusOverflowShade' renderers/vulkan/tr_init.c || fail 'missing
 grep -q 'pbrForwardPlus.x' renderers/vulkan/shaders/glsl/gen_frag.tmpl || fail 'gen_frag must use pbrForwardPlus.x overflow shade'
 grep -q 'li >= 32u' renderers/vulkan/shaders/glsl/gen_frag.tmpl || fail 'gen_frag overflow light index guard'
 
+grep -q 'R_WorldSHVertexColor' renderers/vulkan/tr_light.c || fail 'missing R_WorldSHVertexColor'
+grep -q 'r_fogShadowSnap' renderers/vulkan/tr_init.c || fail 'missing r_fogShadowSnap cvar'
+grep -q 'r_shWorldStrength' renderers/vulkan/tr_init.c || fail 'missing r_shWorldStrength cvar'
+grep -q 'r_fogShadowSnap' renderers/vulkan/tr_backend.c || fail 'sun shadow texel snap missing in tr_backend.c'
+grep -q 'R_StageUsesWorldSH' renderers/vulkan/tr_shade.c || fail 'world SH stage guard missing'
+
 pass "dynamic light scale + Forward+ overflow wiring"

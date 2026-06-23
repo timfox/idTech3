@@ -44,7 +44,7 @@ The Vulkan 1.4 renderer is the primary rendering backend, built as a shared libr
 
 **Caps:** up to **`VK_FP_MAX_GPU_LIGHTS` (64)** on GPU; **`tess.dlightBits`** skip still applies to indices **0–31** only (classic projector remains **32** lights).
 
-**Resolution:** tile grid uses **`vk_get_render_target_width/height`** (FBO / internal scale). The tile SSBO **reallocates when that size changes**; toggling Forward+ itself still needs **`vid_restart`**.
+**SH world lighting** (`r_shWorldLighting` 1, default): light-grid SH tints world vertex colors on lightmapped and vertex-lit BSP (`R_WorldSHVertexColor`). Tune with `r_shWorldStrength` (0–2) and `r_directedScale`. Volumetric sun shadows use `r_fogShadowSnap` 1 (default) for texel-stable cascades.
 
 Code: `src/renderers/vulkan/vk_forward_plus.c`, `VK_FP_*` constants; cvar registration `src/renderers/vulkan/tr_init.c`.
 
