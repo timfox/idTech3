@@ -44,7 +44,7 @@ layout(set = 0, binding = 0) uniform UBO {
 	vec4 pbrDebugMode; // x: debug mode selector
 	vec4 pbrShCoeffs[9];
 	vec4 pbrParallaxParams; // x=scale, y=shadow str, z=shadow steps (float), w=unused (reserved)
-	vec4 pbrForwardPlus; // y: uint bits(floatBitsToUint) — skip Forward+ lights whose index is in tess.dlightBits
+	vec4 pbrForwardPlus; // x: overflow shade (lights index >= 32); y: skip mask (tess.dlightBits)
 #endif
 //#endif
 };
@@ -1228,7 +1228,7 @@ void main() {
 	vec3 fpAdd = vec3( 0.0 );
 #ifdef USE_FORWARD_PLUS_FRAG
 #if defined(USE_FORWARD_PLUS_WORLD_POS)
-	if ( forward_plus_shade_strength > 1e-6 ) {
+	if ( forward_plus_shade_strength > 1e-6 || pbrForwardPlus.x > 1e-6 ) {
 		uint tilesX = uint( fp_lights.fp_light_data[1].x + 0.5 );
 		uint tilesY = uint( fp_lights.fp_light_data[1].y + 0.5 );
 		float vw = fp_lights.fp_light_data[1].z;
@@ -1261,6 +1261,18 @@ void main() {
 						}
 						if ( skipMask != 0u && li < 32u && ( skipMask & ( 1u << li ) ) != 0u ) {
 							continue;
+						}
+						float shadeStr;
+						if ( li >= 32u ) {
+							if ( pbrForwardPlus.x <= 1e-6 ) {
+								continue;
+							}
+							shadeStr = pbrForwardPlus.x;
+						} else {
+							if ( forward_plus_shade_strength <= 1e-6 ) {
+								continue;
+							}
+							shadeStr = forward_plus_shade_strength;
 						}
 						uint b0 = 2u + li * 4u;
 						vec3 lpos = fp_lights.fp_light_data[ b0 ].xyz;
@@ -1321,8 +1333,8 @@ void main() {
 						float VHfp = clamp( dot( E, Hfp ), 0.0, 1.0 );
 						float specMul = ( deluxe_mapping > 0 ) ? deluxe_specular_scale : 1.0;
 						vec3 Fsfp = CalcSpecular( specular.rgb, Hfp, NHfp, NLfp, NE, LHfp, VHfp, roughness, baseUV, shadingFrame, anisoAmount, Lfp, E ) * specMul;
-						fpAdd += lc.rgb * addBoost * ( Fd * ( att * NLfp * forward_plus_shade_strength )
-							+ Fsfp * ( att * forward_plus_shade_strength * 0.65 ) );
+						fpAdd += lc.rgb * addBoost * ( Fd * ( att * NLfp * shadeStr )
+							+ Fsfp * ( att * shadeStr * 0.65 ) );
 					}
 				}
 			}
@@ -1336,7 +1348,7 @@ void main() {
 		primaryDirect = vec3( 0.0 );
 	}
 	float fpRenorm = 1.0;
-	if ( forward_plus_shade_strength > 1e-6 ) {
+	if ( forward_plus_shade_strength > 1e-6 || pbrForwardPlus.x > 1e-6 ) {
 		float pL = length( primaryDirect );
 		float fL = length( fpAdd );
 		fpRenorm = clamp( 1.0 - ( fL / ( pL + 1e-3 ) ) * 0.45, 0.35, 1.0 );

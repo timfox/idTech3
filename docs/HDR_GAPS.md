@@ -74,9 +74,20 @@ Both feed into linear HDR; no conflict.
 
 ## 6.7 Dynamic Light Intensity
 
-**Current**: `VectorScale(dl->color, 2 * powf(r_intensity->value, r_gamma->value), ...)`. `r_gamma` affects light intensity; intentional for legacy look. Consider separating display gamma from light intensity if needed.
+**Current**: All GPU light consumers (`projector`, Forward+, deferred, volumetric) share `R_DynamicLightColor()` in `tr_light.c`.
 
-**Desirable**: On dark monitors or legacy maps authored for CRT gamma, raising `r_gamma` brightens both display and lights-often what users expect. **Problematic**: When using HDR + tonemap, `r_gamma` changes light intensity without changing display gamma (handled by gamma pass), so lights can look too bright or too dim relative to the tonemapped scene. Prefer `r_exposure` or `r_exposure_auto` for HDR brightness control.
+| Cvar | Default | Role |
+|------|---------|------|
+| `r_dynamicLightScale` | 1 | Global multiplier (0.25–4); use with HDR + `r_exposure` instead of `r_gamma`. |
+| `r_lightGammaLink` | 1 | When 0, drop `pow(r_intensity,r_gamma)`; use `2*r_intensity` (+ scale) only. |
+
+**Legacy path** (no hardware gamma, no FBO): `2 * pow(r_intensity, r_gamma) * r_dynamicLightScale`.
+
+**HDR FBO path**: Raw `dl->color` unless `r_dynamicLightScale` ≠ 1 or `r_lightGammaLink` 0 (then `2*r_intensity` applies).
+
+**Forward+ fix (2026)**: Tile SSBO packing now uses the same scale as projector dlights (was raw `dl->color` on legacy paths).
+
+**Tuning**: Prefer `r_exposure` / `r_exposure_auto` for scene brightness; `r_dynamicLightScale` for muzzle flashes and explosions; `r_lightGammaLink 0` when `r_gamma` should affect display only.
 
 ## 6.9 Color pipeline tiers (gamma pass)
 

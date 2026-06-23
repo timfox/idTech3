@@ -34,10 +34,13 @@ The Vulkan 1.4 renderer is the primary rendering backend, built as a shared libr
 | `r_forwardPlus` | **1** (default) on; **0** off (**latched**; `vid_restart`). Packs up to **64** refdef dlights on GPU. |
 | `r_forwardPlusMaxPerTile` | **4–8** lights indexed per **16×16** tile (**latched**; `vid_restart`). Lowers GPU work vs default **8**; tile SSBO keeps **8** `uint32` slots either way. |
 | `r_forwardPlusDebug` | **0–1** float: PBR heatmap overlay (lights per tile + borders). |
-| `r_forwardPlusShade` | **0–4** float: experimental **additive** PBR from tile-culled dynamics; skips indices already in the Forward+ `tess.dlightBits` mask (first 32); changing it **invalidates graphics pipelines** (logged). |
+| `r_forwardPlusShade` | **0–4** float: PBR shade for dlight indices **0–31** (not in `tess.dlightBits`); pipeline rebuild on change. |
+| `r_forwardPlusOverflowShade` | **0–4** float (default **0.5**): PBR shade for indices **32–63** (GPU-only; no classic projector). No pipeline rebuild. |
 | `r_forwardPlusLuminanceSort` | **0/1** (default **1**): when a tile is overloaded, keep brightest lights by RGB sum. |
 | `r_forwardPlusDistanceSort` | **0/1** (default **0**): when overloaded, prefer nearest lights to the camera (`vieworg`). |
-| `r_forwardPlusDepthCull` | **0/1** (default **0**): **0** = tile cull before draws; **1** = cull after opaque, reject lights behind depth at each light’s screen center (reversed-Z). |
+| `r_forwardPlusDepthCull` | **0/1** (default **1**): **0** = tile cull before draws; **1** = depth prepass + reject lights behind surfaces. |
+| `r_dynamicLightScale` | **0.25–4** (default **1**): global dynamic-light multiplier (projector, Forward+, deferred, volumetric). |
+| `r_lightGammaLink` | **0/1** (default **1**): **0** decouples dynamic lights from display `r_gamma` (HDR tuning). |
 
 **Caps:** up to **`VK_FP_MAX_GPU_LIGHTS` (64)** on GPU; **`tess.dlightBits`** skip still applies to indices **0–31** only (classic projector remains **32** lights).
 

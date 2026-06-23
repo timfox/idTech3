@@ -300,6 +300,7 @@ cvar_t	*r_forwardPlus;
 cvar_t	*r_forwardPlusMaxPerTile;
 cvar_t	*r_forwardPlusDebug;
 cvar_t	*r_forwardPlusShade;
+cvar_t	*r_forwardPlusOverflowShade;
 cvar_t	*r_forwardPlusLuminanceSort;
 cvar_t	*r_forwardPlusDistanceSort;
 cvar_t	*r_forwardPlusDepthCull;
@@ -474,6 +475,8 @@ cvar_t	*r_fboCinematic;
 cvar_t	*r_froxelDebug;
 cvar_t	*r_vk_swapchain_srgb;
 cvar_t	*r_intensity;
+cvar_t	*r_dynamicLightScale;
+cvar_t	*r_lightGammaLink;
 cvar_t	*r_lockpvs;
 cvar_t	*r_noportals;
 cvar_t	*r_portalOnly;
@@ -2396,6 +2399,24 @@ static void R_Register( void )
 	r_intensity = ri.Cvar_Get( "r_intensity", "1", CVAR_ARCHIVE_ND | CVAR_LATCH );
 	ri.Cvar_CheckRange( r_intensity, "1", "255", CV_FLOAT );
 	ri.Cvar_SetDescription( r_intensity, "Global texture lighting scale." );
+	r_dynamicLightScale = ri.Cvar_Get( "r_dynamicLightScale", "1", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_dynamicLightScale, "0.25", "4", CV_FLOAT );
+	ri.Cvar_SetDescription( r_dynamicLightScale,
+		"Multiplier for dynamic light color on projector, Forward+, deferred, and volumetric paths. "
+		"With HDR (r_fbo 1), tune brightness here or via r_exposure instead of r_gamma." );
+	ri.Cvar_SetGroup( r_dynamicLightScale, CVG_RENDERER );
+	if ( r_dynamicLightScale && r_dynamicLightScale->value != 1.0f ) {
+		ri.Printf( PRINT_ALL, "[VK][lighting] r_dynamicLightScale=%.2f\n", r_dynamicLightScale->value );
+	}
+	r_lightGammaLink = ri.Cvar_Get( "r_lightGammaLink", "1", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_lightGammaLink, "0", "1", CV_INTEGER );
+	ri.Cvar_SetDescription( r_lightGammaLink,
+		"When 1 (default), dynamic light intensity uses 2*pow(r_intensity,r_gamma) on legacy gamma-off paths. "
+		"When 0, uses 2*r_intensity only (decouples lights from display r_gamma; pair with r_dynamicLightScale / r_exposure)." );
+	ri.Cvar_SetGroup( r_lightGammaLink, CVG_RENDERER );
+	if ( r_lightGammaLink && !r_lightGammaLink->integer ) {
+		ri.Printf( PRINT_ALL, "[VK][lighting] r_lightGammaLink=0 (dynamic lights decoupled from r_gamma)\n" );
+	}
 	r_singleShader = ri.Cvar_Get( "r_singleShader", "0", CVAR_CHEAT | CVAR_LATCH );
 	ri.Cvar_SetDescription( r_singleShader, "Debugging tool that only uses the default shader for all rendering." );
 	r_defaultImage = ri.Cvar_Get( "r_defaultImage", "", CVAR_ARCHIVE_ND | CVAR_LATCH );
@@ -4171,6 +4192,16 @@ static void R_Register( void )
 	ri.Cvar_CheckRange( r_forwardPlusShade, "0", "4", CV_FLOAT );
 	ri.Cvar_SetDescription( r_forwardPlusShade, "PBR Forward+ diffuse+spec from tile-culled dynamic lights (0=off). Skips packed indices in \\r_forwardPlus tess.dlightBits mask (first 32). Primary direct is softly scaled vs Forward+ energy. Works with deluxe/lightmap; rebuilds pipelines when changed. Requires \\r_forwardPlus 1." );
 	ri.Cvar_SetGroup( r_forwardPlusShade, CVG_RENDERER );
+	r_forwardPlusOverflowShade = ri.Cvar_Get( "r_forwardPlusOverflowShade", "0.5", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_forwardPlusOverflowShade, "0", "4", CV_FLOAT );
+	ri.Cvar_SetDescription( r_forwardPlusOverflowShade,
+		"PBR Forward+ shade for dlight indices 32..63 (beyond classic tess.dlightBits). "
+		"No pipeline rebuild; passed per draw via pbrForwardPlus.x. 0=off. Default 0.5 fills GPU-only lights on PBR surfaces." );
+	ri.Cvar_SetGroup( r_forwardPlusOverflowShade, CVG_RENDERER );
+	if ( r_forwardPlusOverflowShade && r_forwardPlusOverflowShade->value > 0.0f && r_forwardPlus && r_forwardPlus->integer ) {
+		ri.Printf( PRINT_ALL, "[VK][Forward+] r_forwardPlusOverflowShade=%.2f (lights 32..%d)\n",
+			r_forwardPlusOverflowShade->value, VK_FP_MAX_GPU_LIGHTS - 1 );
+	}
 	r_forwardPlusLuminanceSort = ri.Cvar_Get( "r_forwardPlusLuminanceSort", "1", CVAR_ARCHIVE_ND );
 	ri.Cvar_CheckRange( r_forwardPlusLuminanceSort, "0", "1", CV_INTEGER );
 	ri.Cvar_SetDescription( r_forwardPlusLuminanceSort,
@@ -4181,7 +4212,7 @@ static void R_Register( void )
 	ri.Cvar_SetDescription( r_forwardPlusDistanceSort,
 		"When 1 and a tile is overloaded, the compute pass prefers lights nearest the camera (vieworg). When 0, overload order follows \\r_forwardPlusLuminanceSort / index order. Requires \\r_forwardPlus 1 (no vid_restart)." );
 	ri.Cvar_SetGroup( r_forwardPlusDistanceSort, CVG_RENDERER );
-	r_forwardPlusDepthCull = ri.Cvar_Get( "r_forwardPlusDepthCull", "0", CVAR_ARCHIVE_ND );
+	r_forwardPlusDepthCull = ri.Cvar_Get( "r_forwardPlusDepthCull", "1", CVAR_ARCHIVE_ND );
 	ri.Cvar_CheckRange( r_forwardPlusDepthCull, "0", "1", CV_INTEGER );
 	ri.Cvar_SetDescription( r_forwardPlusDepthCull,
 		"When 1, a depth prepass fills the depth buffer, then tile cull rejects lights behind surfaces at each light's screen center, then opaque color draws. When 0, cull runs at view start without depth (legacy). Requires \\r_forwardPlus 1 (no vid_restart)." );

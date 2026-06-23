@@ -1618,6 +1618,7 @@ extern cvar_t	*r_forwardPlus;
 extern cvar_t	*r_forwardPlusMaxPerTile;
 extern cvar_t	*r_forwardPlusDebug;
 extern cvar_t	*r_forwardPlusShade;
+extern cvar_t	*r_forwardPlusOverflowShade;
 extern cvar_t	*r_forwardPlusLuminanceSort;
 extern cvar_t	*r_forwardPlusDistanceSort;
 extern cvar_t	*r_forwardPlusDepthCull;
@@ -2195,6 +2196,9 @@ void R_DlightBmodel( bmodel_t *bmodel );
 void R_SetupEntityLighting( const trRefdef_t *refdef, trRefEntity_t *ent );
 void R_TransformDlights( int count, dlight_t *dl, orientationr_t *or );
 int R_LightForPoint( vec3_t point, vec3_t ambientLight, vec3_t directedLight, vec3_t lightDir );
+qboolean R_DynamicLightUsesLegacyScale( void );
+float R_DynamicLightIntensityScale( void );
+void R_DynamicLightColor( const dlight_t *dl, vec3_t out );
 qboolean R_SampleLightGridSH( const world_t *world, const vec3_t position, vec3_t shCoeffs[SH_COEFF_COUNT] );
 #ifdef USE_VK_PBR
 int R_LightDirForPoint( vec3_t point, vec3_t lightDir, vec3_t normal, world_t *world );

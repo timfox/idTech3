@@ -635,9 +635,13 @@ void vk_update_volumetric_params( void )
 		params.lightPosRadius[local_light_count][1] = dl->origin[1];
 		params.lightPosRadius[local_light_count][2] = dl->origin[2];
 		params.lightPosRadius[local_light_count][3] = radius;
-		params.lightColorType[local_light_count][0] = MAX( dl->color[0], 0.0f );
-		params.lightColorType[local_light_count][1] = MAX( dl->color[1], 0.0f );
-		params.lightColorType[local_light_count][2] = MAX( dl->color[2], 0.0f );
+		{
+			vec3_t scaledColor;
+			R_DynamicLightColor( dl, scaledColor );
+			params.lightColorType[local_light_count][0] = MAX( scaledColor[0], 0.0f );
+			params.lightColorType[local_light_count][1] = MAX( scaledColor[1], 0.0f );
+			params.lightColorType[local_light_count][2] = MAX( scaledColor[2], 0.0f );
+		}
 		params.lightColorType[local_light_count][3] = dl->linear ? 1.0f : 0.0f;
 		params.lightExtra[local_light_count][2] = ( r_fog_shadows && r_fog_shadows->integer ) ? ( dl->linear ? 1.0f : 2.0f ) : 0.0f;
 

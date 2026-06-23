@@ -3125,6 +3125,12 @@ set_tests_properties(test_trunk_policy PROPERTIES
 	LABELS "scripts;validation;trunk"
 	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_trunk_policy.sh;${CMAKE_SOURCE_DIR}/docs/BRANCHES.md;${CMAKE_SOURCE_DIR}/.github/dependabot.yml")
 
+add_test(NAME test_dynamic_light_scale
+	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_dynamic_light_scale.sh)
+set_tests_properties(test_dynamic_light_scale PROPERTIES
+	LABELS "scripts;validation;renderer"
+	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_dynamic_light_scale.sh;${CMAKE_SOURCE_DIR}/renderers/vulkan/tr_light.c")
+
 add_test(NAME test_build_profiles
 	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_build_profiles.sh)
 set_tests_properties(test_build_profiles PROPERTIES
