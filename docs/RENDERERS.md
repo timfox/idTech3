@@ -41,10 +41,12 @@ The Vulkan 1.4 renderer is the primary rendering backend, built as a shared libr
 | `r_forwardPlusDepthCull` | **0/1** (default **1**): **0** = tile cull before draws; **1** = depth prepass + reject lights behind surfaces. |
 | `r_dynamicLightScale` | **0.25–4** (default **1**): global dynamic-light multiplier (projector, Forward+, deferred, volumetric). |
 | `r_lightGammaLink` | **0/1** (default **1**): **0** decouples dynamic lights from display `r_gamma` (HDR tuning). |
+| `r_pbrSunShadow` | **0/1** (default **1**): PBR deluxe direct × sun shadow map (shared with volumetric fog cascade). |
+| `r_pbrSunShadowStrength` | **0–1** (default **1**): Blend sun shadow into PBR direct lighting. |
 
 **Caps:** up to **`VK_FP_MAX_GPU_LIGHTS` (64)** on GPU; **`tess.dlightBits`** skip still applies to indices **0–31** only (classic projector remains **32** lights).
 
-**SH world lighting** (`r_shWorldLighting` 1, default): light-grid SH tints world vertex colors on lightmapped and vertex-lit BSP (`R_WorldSHVertexColor`). Tune with `r_shWorldStrength` (0–2) and `r_directedScale`. Volumetric sun shadows use `r_fogShadowSnap` 1 (default) for texel-stable cascades.
+**SH world lighting** (`r_shWorldLighting` 1, default): light-grid SH tints world vertex colors on lightmapped and vertex-lit BSP (`R_WorldSHVertexColor`). Tune with `r_shWorldStrength` (0–2) and `r_directedScale`. Sun shadow map: `r_pbrSunShadow` for PBR direct, `r_fog_shadows` for volumetric; `r_fogShadowSnap` 1 (default) stabilizes cascades.
 
 Code: `src/renderers/vulkan/vk_forward_plus.c`, `VK_FP_*` constants; cvar registration `src/renderers/vulkan/tr_init.c`.
 

@@ -1504,10 +1504,14 @@ static const float s_shadow_flipMatrix[16] = {
 
 static qboolean RB_ShouldRenderSunShadowMap( const drawSurfsCommand_t *cmd )
 {
-	if ( !vk.fboActive || !r_fog_shadows || !r_fog_shadows->integer ) {
+	const qboolean pbrSun = ( r_pbrSunShadow && r_pbrSunShadow->integer );
+	const qboolean fogSun = ( r_fog_shadows && r_fog_shadows->integer &&
+		r_volumetricFog && r_volumetricFog->integer );
+
+	if ( !vk.fboActive ) {
 		return qfalse;
 	}
-	if ( !r_volumetricFog || !r_volumetricFog->integer ) {
+	if ( !pbrSun && !fogSun ) {
 		return qfalse;
 	}
 	if ( !cmd || cmd->numDrawSurfs <= 0 ) {
@@ -1758,6 +1762,7 @@ static void RB_RenderSunShadowMap( const drawSurfsCommand_t *cmd )
 	RB_EndSurface();
 	backEnd.viewParms = savedViewParms;
 	vk_end_sun_shadow_render_pass();
+	vk_forward_plus_update_sun_shadow_descriptor();
 	SetViewportAndScissor();
 }
 

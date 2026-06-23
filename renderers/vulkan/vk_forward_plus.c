@@ -293,7 +293,7 @@ static void vk_fp_write_graphics_descriptor( VkBuffer light_buf, VkBuffer tile_b
 
 void vk_forward_plus_create_set_layout( void )
 {
-	VkDescriptorSetLayoutBinding binds[4];
+	VkDescriptorSetLayoutBinding binds[5];
 	VkDescriptorSetLayoutCreateInfo layout_ci;
 
 #ifdef USE_VK_PBR
@@ -318,11 +318,15 @@ void vk_forward_plus_create_set_layout( void )
 	binds[3].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
 	binds[3].descriptorCount = 1;
 	binds[3].stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+	binds[4].binding = 4;
+	binds[4].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+	binds[4].descriptorCount = 1;
+	binds[4].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
 
 	layout_ci.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
 	layout_ci.pNext = NULL;
 	layout_ci.flags = 0;
-	layout_ci.bindingCount = 4;
+	layout_ci.bindingCount = 5;
 	layout_ci.pBindings = binds;
 	VK_CHECK( qvkCreateDescriptorSetLayout( vk.device, &layout_ci, NULL, &vk.set_layout_forward_plus ) );
 	SET_OBJECT_NAME( vk.set_layout_forward_plus, "descriptor set layout - forward+", VK_DEBUG_REPORT_OBJECT_TYPE_DESCRIPTOR_SET_LAYOUT_EXT );
@@ -763,6 +767,51 @@ void vk_forward_plus_update_depth_descriptor( void )
 	write.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
 	write.pImageInfo = &depth_info;
 	qvkUpdateDescriptorSets( vk.device, 1, &write, 0, NULL );
+}
+
+void vk_forward_plus_update_sun_shadow_descriptor( void )
+{
+	VkDescriptorImageInfo shadow_info;
+	VkWriteDescriptorSet write;
+	VkImageView shadow_view;
+
+#ifdef USE_VK_PBR
+	shadow_view = vk.sun_shadow_sample_view;
+	if ( vk_fp_graphics_descriptor == VK_NULL_HANDLE || shadow_view == VK_NULL_HANDLE ) {
+		shadow_view = vk.depth_image_view_sample ? vk.depth_image_view_sample : vk.depth_image_view;
+		if ( vk_fp_graphics_descriptor == VK_NULL_HANDLE || shadow_view == VK_NULL_HANDLE ) {
+			return;
+		}
+	}
+
+	if ( vk.sun_shadow_sampler == VK_NULL_HANDLE ) {
+		Vk_Sampler_Def shadow_sd;
+		Com_Memset( &shadow_sd, 0, sizeof( shadow_sd ) );
+		shadow_sd.gl_mag_filter = shadow_sd.gl_min_filter = GL_NEAREST;
+		shadow_sd.address_mode = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+		shadow_sd.noAnisotropy = qtrue;
+		vk.sun_shadow_sampler = vk_find_sampler( &shadow_sd );
+	}
+
+	Com_Memset( &shadow_info, 0, sizeof( shadow_info ) );
+	shadow_info.sampler = vk.sun_shadow_sampler;
+	shadow_info.imageView = shadow_view;
+	shadow_info.imageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
+
+	Com_Memset( &write, 0, sizeof( write ) );
+	write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+	write.dstSet = vk_fp_graphics_descriptor;
+	write.dstBinding = 4;
+	write.descriptorCount = 1;
+	write.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+	write.pImageInfo = &shadow_info;
+	qvkUpdateDescriptorSets( vk.device, 1, &write, 0, NULL );
+
+	if ( vk.forward_plus.descriptor != VK_NULL_HANDLE && vk.forward_plus.descriptor != vk_fp_graphics_descriptor ) {
+		write.dstSet = vk.forward_plus.descriptor;
+		qvkUpdateDescriptorSets( vk.device, 1, &write, 0, NULL );
+	}
+#endif
 }
 
 void vk_forward_plus_init( void )
