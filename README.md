@@ -2,7 +2,7 @@
 
 [![build](../../workflows/build/badge.svg)](../../actions?query=workflow%3Abuild) [![License: GPL v2](https://img.shields.io/badge/License-GPL%20v2-blue.svg)](LICENSE.md) [![Stars](https://img.shields.io/github/stars/timfox/idTech3?style=social)](https://github.com/timfox/idTech3) [![Forks](https://img.shields.io/github/forks/timfox/idTech3?style=social)](https://github.com/timfox/idTech3/forks)
 
-Modern id Tech 3: **Vulkan renderer with PBR**, validation and smoke-tested builds, and disciplined cross-platform engine work. **Retail Q3 / OpenArena-style QVM mods keep working** — build profiles and 2026 folder aliases are compile-time diet only; use `full` or `-DUSE_*=ON` for kitchen-sink parity. See [docs/core/LEGACY_AND_MODERN.md](docs/core/LEGACY_AND_MODERN.md).
+Modernized id Tech 3: **Vulkan renderer with PBR**, validation and smoke-tested builds, and disciplined cross-platform engine work.
 
 *This repository does not contain any game content from Quake III Arena.*
 
@@ -13,9 +13,7 @@ Modern id Tech 3: **Vulkan renderer with PBR**, validation and smoke-tested buil
 3. **Tooling** - GPU detection, validation layers, performance HUD, safe mode, CI matrix builds, smoke tests and shader validation in the build. **[FreeUSD](docs/FREEUSD.md)** Git submodule (`src/external/FreeUSD`, default ON) for USDA import and `usd_*` tools. Optional **[Tiled Map Editor](docs/TILED.md)** submodule (`tools/tiled`, GPL-2.0) for tile-based level design—not linked into the engine build.
 4. **Platform** - Linux, Windows, macOS, Android; IPv4/IPv6 networking, modern codecs and asset loaders.
 
-**Build profiles (2026):** default **`game`** = modern SP stack with faster compiles; **`core`** = Q3/OA CI path; **`full`** = all extensions. Details: [BUILD.md](BUILD.md), [docs/core/LEGACY_AND_MODERN.md](docs/core/LEGACY_AND_MODERN.md).
-
-### Features (by area)
+### Features
 
 **Rendering**:
 * Vulkan renderer
@@ -65,10 +63,10 @@ Modern id Tech 3: **Vulkan renderer with PBR**, validation and smoke-tested buil
 * Console/logging for connection diagnostics and real-time network statistics
 
 **Systems** (game and engine extensions):
-* AIML 2.1-oriented chatbot scripting (see `g_aiml.c` / Lua `Engine.AIML`)
-* GOAP (AI planning)
+* AIML 3.0 chatbot scripting (see `g_aiml.c` / Lua `Engine.AIML`)
+* Goal Oriented Action Planner (AI planning)
 * Flocking and boids (crowd AI)
-* Finite State Machines (FSM) and Behavior Trees
+* hierarchical State Machines (HSM), Finite State Machines (FSM), and Behavior Trees
 * Navigation Mesh (NavMesh) pathfinding (A*, Dijkstra)
 * Event scripting (Lua, JavaScript)
 * Physics and collision (with optional Bullet Physics)
@@ -90,7 +88,7 @@ Modern id Tech 3: **Vulkan renderer with PBR**, validation and smoke-tested buil
 
 ### Standards
 
-* The engine aims to be C23-compatible, and modernization is ongoing where it improves safety and portability.
+* The engine aims to be C++23 and C23-compatible with modernization where it improves safety and portability.
 * Native C `bool` is preferred in new or modernized code, but `qboolean` remains in use where needed for backward compatibility.
 
 ### Build
@@ -112,9 +110,12 @@ ctest --preset test-vulkan-release
 
 Artifacts land under `release/` and `build-vk-Release/`. The helper script is the canonical developer path because it stages `release/` automatically; presets are the preferred direct-CMake / IDE path.
 
-**Examples** (copy-paste workflows): [examples/README.md](examples/README.md) - local validation, `GAME_BASE` templates, mod launch lines, pointers to `docs/samples/`. **Demo mod pack** (optional CMake): `-DBUILD_EXAMPLE_DEMO_GAME=ON` then build target `demo_game_pk3` -> `idtech3_demo.pk3` ([examples/demo_game/README.md](examples/demo_game/README.md)). **Run demo** from a source tree: `./scripts/run_demo.sh` - see [examples/demo_skeleton/README.md](examples/demo_skeleton/README.md).
+### Long-term Feature Plans
 
-Renderer discipline: [docs/RENDERER_CONFIDENCE.md](docs/RENDERER_CONFIDENCE.md), headless `./scripts/renderer_regression_check.sh`, visual pack specs under [docs/samples/renderer_regression/](docs/samples/renderer_regression/).
+* Ray tracing
+* Path tracing
+* Voxels
+* P2P networking
 
 ### Links
 
