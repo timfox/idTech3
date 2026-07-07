@@ -1859,6 +1859,8 @@ vm_t *VM_Create( vmIndex_t index, syscall_t systemCalls, dllSyscall_t dllSyscall
 	const char	*name;
 	vmHeader_t	*header;
 	vm_t		*vm;
+	char		qvmPath[MAX_QPATH];
+	qboolean	preferQvm;
 
 	if ( !systemCalls ) {
 		Com_Error( ERR_FATAL, "VM_Create: bad parms" );
@@ -1890,9 +1892,20 @@ vm_t *VM_Create( vmIndex_t index, syscall_t systemCalls, dllSyscall_t dllSyscall
 	vm->privateFlag = CVAR_PRIVATE;
 	vm->silentQVM = qfalse;
 
-	// Always try native DLLs first, regardless of interpret setting
-	// (unless fs_restrict is set, which disables native DLLs for demos)
-	if ( !Cvar_VariableIntegerValue( "fs_restrict" ) ) {
+	Com_sprintf( qvmPath, sizeof( qvmPath ), "modules/%s.qvm", name );
+	preferQvm = FS_SV_FileExists( qvmPath ) || FS_FileIsInPAK( qvmPath, NULL, NULL );
+	if ( !preferQvm ) {
+		Com_sprintf( qvmPath, sizeof( qvmPath ), "vm/%s.qvm", name );
+		preferQvm = FS_SV_FileExists( qvmPath ) || FS_FileIsInPAK( qvmPath, NULL, NULL );
+	}
+
+	/*
+	 * Respect shipped QVM content when it exists. This keeps Quake 3 / OpenArena-
+	 * style gamedirs on their packaged bytecode VMs instead of accidentally
+	 * overriding them with loose native modules dropped into the game directory.
+	 * Native loading remains the fallback for native-only mods and explicit vm_* 0.
+	 */
+	if ( !preferQvm && !Cvar_VariableIntegerValue( "fs_restrict" ) ) {
 		Com_Printf( "Loading native %s.\n", name );
 		vm->dllHandle = loadNative( name, &vm->entryPoint, dllSyscalls );
 		if ( vm->dllHandle ) {
@@ -1906,6 +1919,8 @@ vm_t *VM_Create( vmIndex_t index, syscall_t systemCalls, dllSyscall_t dllSyscall
 		// Native DLL failed, fall back to QVM
 		Com_Printf( "Native %s not found (tried modules/ and vm/), trying %s.qvm...\n", name, name );
 		vm->silentQVM = qtrue; // Flag to suppress redundant QVM loading messages
+	} else if ( preferQvm ) {
+		Com_Printf( "VM_Create: found %s.qvm in search paths, preferring QVM over loose native module.\n", name );
 	}
 
 	// never allow dll loading with a demo
@@ -2285,4 +2300,3 @@ void VM_LogSyscalls( int *args ) {
 		args[0], args[1], args[2], args[3], args[4] );
 #endif
 }
-
