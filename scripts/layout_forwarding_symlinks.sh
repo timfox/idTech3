@@ -8,6 +8,9 @@ cd "$ROOT"
 
 link() {
 	local path="$1" target="$2"
+	if [ -e "$path" ] || [ -L "$path" ]; then
+		rm -rf "$path"
+	fi
 	ln -sfn "$target" "$path"
 }
 

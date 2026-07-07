@@ -14,8 +14,8 @@ Coordinates with src/platform/android/android_main.c via pthread cond.
 #include "tr_local.h"
 #include "vk.h"
 #include "vk_instance.h"
-#include "../../platform/android/android_surface_glue.h"
-#include "../../qcommon/qcommon.h"
+#include "platform/android/android_surface_glue.h"
+#include "qcommon/qcommon.h"
 
 void vk_Android_OnNativeWindowGoingAway( void )
 {
