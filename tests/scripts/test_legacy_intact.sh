@@ -5,6 +5,16 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 fail() { echo "FAIL: $*" >&2; exit 1; }
 
+if command -v rg >/dev/null 2>&1; then
+	search_q() {
+		rg -q "$1" "$2"
+	}
+else
+	search_q() {
+		grep -Eq "$1" "$2"
+	}
+fi
+
 echo "[test_legacy_intact] canonical src tree..."
 
 for d in qcommon client server game platform renderers world botlib cgame ui asm; do
@@ -20,20 +30,20 @@ done
 echo "[test_legacy_intact] QVM + compat scripts..."
 
 [ -f "${ROOT}/src/qcommon/vm.c" ] || fail "missing vm.c"
-rg -q 'Q3_VM' "${ROOT}/docs/COMPATIBILITY.md" || fail "COMPATIBILITY.md QVM section"
-rg -q 'vm\.c' "${ROOT}/docs/COMPATIBILITY.md" || fail "COMPATIBILITY.md vm.c reference"
+search_q 'Q3_VM' "${ROOT}/docs/COMPATIBILITY.md" || fail "COMPATIBILITY.md QVM section"
+search_q 'vm\.c' "${ROOT}/docs/COMPATIBILITY.md" || fail "COMPATIBILITY.md vm.c reference"
 [ -x "${ROOT}/scripts/q3_openarena_compat_check.sh" ] || fail "missing q3_openarena_compat_check.sh"
 
 echo "[test_legacy_intact] deprecated CMake aliases..."
 
-rg -q 'BUILD_EXAMPLE_DEMO_GAME' "${ROOT}/CMakeLists.txt" || fail "BUILD_EXAMPLE_DEMO_GAME shim removed"
-rg -q 'BUILD_SAMPLES_DEMO_GAME' "${ROOT}/CMakeLists.txt" || fail "BUILD_SAMPLES_DEMO_GAME missing"
+search_q 'BUILD_EXAMPLE_DEMO_GAME' "${ROOT}/CMakeLists.txt" || fail "BUILD_EXAMPLE_DEMO_GAME shim removed"
+search_q 'BUILD_SAMPLES_DEMO_GAME' "${ROOT}/CMakeLists.txt" || fail "BUILD_SAMPLES_DEMO_GAME missing"
 
 echo "[test_legacy_intact] legacy path references in build..."
 
-rg -q 'IDTECH3_DIR_RUNTIME_CLIENT|src/client' "${ROOT}/cmake/client/ClientSources.cmake" \
+search_q 'IDTECH3_DIR_RUNTIME_CLIENT|src/client' "${ROOT}/cmake/client/ClientSources.cmake" \
 	|| fail "client manifest must use IDTECH3_DIR_RUNTIME_CLIENT or src/client"
-rg -q 'src/qcommon' "${ROOT}/CMakeLists.txt" || fail "CMake must still reference src/qcommon (monolithic lists pending 5b)"
+search_q 'src/qcommon' "${ROOT}/CMakeLists.txt" || fail "CMake must still reference src/qcommon (monolithic lists pending 5b)"
 
 [ -f "${ROOT}/docs/core/LEGACY_AND_MODERN.md" ] || fail "missing LEGACY_AND_MODERN.md"
 [ -x "${ROOT}/scripts/archive_legacy_remote_branches.sh" ] || fail "missing archive_legacy_remote_branches.sh"

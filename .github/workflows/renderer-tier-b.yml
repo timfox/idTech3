@@ -58,6 +58,8 @@ jobs:
       GAME_BASE: ${{ vars.IDTECH3_GAME_BASE_PATH != '' && vars.IDTECH3_GAME_BASE_PATH || secrets.IDTECH3_GAME_BASE_PATH }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          submodules: recursive
 
       - name: Verify GAME_BASE
         run: |

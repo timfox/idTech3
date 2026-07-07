@@ -3,10 +3,23 @@
 # Parent CMakeLists.txt must set USE_FREEUSD=ON before including this file.
 #
 # Source order:
-#   1. Git submodule  src/external/FreeUSD  (preferred; pin in parent commit)
-#   2. FetchContent   when submodule is not initialized (offline-friendly fallback)
+#   1. Git submodule  third_party/FreeUSD   (preferred; pin in parent commit)
+#   2. Legacy shim    src/external/FreeUSD  (forwarding symlink when present)
+#   3. FetchContent   when submodule is not initialized (offline-friendly fallback)
 
-set(FREEUSD_SUBMODULE_DIR "${CMAKE_SOURCE_DIR}/src/external/FreeUSD")
+set(FREEUSD_SUBMODULE_CANDIDATES
+  "${CMAKE_SOURCE_DIR}/third_party/FreeUSD"
+  "${CMAKE_SOURCE_DIR}/src/external/FreeUSD")
+set(FREEUSD_SUBMODULE_DIR "")
+foreach(_freeusd_candidate IN LISTS FREEUSD_SUBMODULE_CANDIDATES)
+  if(EXISTS "${_freeusd_candidate}/CMakeLists.txt")
+    set(FREEUSD_SUBMODULE_DIR "${_freeusd_candidate}")
+    break()
+  endif()
+endforeach()
+if(FREEUSD_SUBMODULE_DIR STREQUAL "")
+  list(GET FREEUSD_SUBMODULE_CANDIDATES 0 FREEUSD_SUBMODULE_DIR)
+endif()
 
 set(FREEUSD_BUILD_PYTHON OFF CACHE BOOL "FreeUSD: Python extension (off for engine embed)" FORCE)
 set(FREEUSD_BUILD_TESTS OFF CACHE BOOL "FreeUSD: C++ tests (off for engine embed)" FORCE)
@@ -36,7 +49,7 @@ function(_idtech3_freeusd_stage_submodule_copy out_root)
   set(_dst "${CMAKE_BINARY_DIR}/_deps/freeusd-src")
   set(_stamp "${_dst}/.idtech3_freeusd_copy_stamp")
   if(NOT EXISTS "${_src}/CMakeLists.txt")
-    message(FATAL_ERROR "FreeUSD submodule missing: ${_src} (run: git submodule update --init src/external/FreeUSD)")
+    message(FATAL_ERROR "FreeUSD submodule missing: ${_src} (run: git submodule update --init third_party/FreeUSD)")
   endif()
   if(NOT EXISTS "${_stamp}" OR "${_src}/CMakeLists.txt" IS_NEWER_THAN "${_stamp}")
     file(REMOVE_RECURSE "${_dst}")
@@ -50,7 +63,7 @@ endfunction()
 
 if(NOT TARGET freeusd::runtime)
   if(EXISTS "${FREEUSD_SUBMODULE_DIR}/CMakeLists.txt")
-    message(STATUS "FreeUSD: using Git submodule at src/external/FreeUSD")
+    message(STATUS "FreeUSD: using Git submodule at ${FREEUSD_SUBMODULE_DIR}")
     _idtech3_freeusd_stage_submodule_copy(_freeusd_root)
     _idtech3_freeusd_add_from_source("${_freeusd_root}")
   else()
@@ -62,7 +75,7 @@ if(NOT TARGET freeusd::runtime)
       GIT_SHALLOW    TRUE
     )
     message(STATUS "FreeUSD: submodule missing; FetchContent from gopexllc/FreeUSD")
-    message(STATUS "FreeUSD: run: git submodule update --init src/external/FreeUSD")
+    message(STATUS "FreeUSD: run: git submodule update --init third_party/FreeUSD")
     FetchContent_GetProperties(freeusd)
     if(NOT freeusd_POPULATED)
       FetchContent_Populate(freeusd)

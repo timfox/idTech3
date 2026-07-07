@@ -36,7 +36,7 @@ Extracted from vk.c for incremental modularization.
 #include "vk_vuda.h"
 
 #ifdef __ANDROID__
-#include "../../platform/android/android_surface_glue.h"
+#include "platform/android/android_surface_glue.h"
 #endif
 
 #ifndef UINT64_MAX

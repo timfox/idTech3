@@ -78,6 +78,10 @@ jobs:
           exit 1
 
       - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+        with:
+          submodules: recursive
 
       - name: Build Vulkan
         if: ${{ github.event_name != 'release' || matrix.btype != 'Debug' }}
@@ -207,6 +211,10 @@ jobs:
     steps:
       - uses: microsoft/setup-msbuild@v2
       - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+        with:
+          submodules: recursive
 
       - name: Install OpenSSL (Win64) for DTLS
         shell: pwsh
@@ -444,6 +452,8 @@ jobs:
           sudo apt-get -o Acquire::Retries=5 -y install libcurl4-openssl-dev libssl-dev mesa-common-dev libxxf86dga-dev libxrandr-dev libxxf86vm-dev libasound-dev libsdl2-dev libopenal-dev libfreetype6-dev lua5.4 liblua5.4-dev libbullet-dev pkg-config glslang-tools python3
 
       - uses: actions/checkout@v4
+        with:
+          submodules: recursive
 
       - name: Cache ccache
         uses: actions/cache@v4
@@ -549,6 +559,8 @@ jobs:
           sudo apt-get -o Acquire::Retries=5 -qq update
           sudo apt-get -o Acquire::Retries=5 -y install cmake ninja-build g++ libstdc++-14-dev libcurl4-openssl-dev libssl-dev mesa-common-dev libxxf86dga-dev libxrandr-dev libxxf86vm-dev libasound-dev libsdl2-dev libopenal-dev libfreetype6-dev lua5.4 liblua5.4-dev libbullet-dev pkg-config glslang-tools python3
       - uses: actions/checkout@v4
+        with:
+          submodules: recursive
       - name: Build core profile
         run: |
           ./scripts/compile_engine.sh vulkan core Release skipshaders
@@ -577,6 +589,8 @@ jobs:
           sudo apt-get -o Acquire::Retries=5 -qq update
           sudo apt-get -o Acquire::Retries=5 -y install cmake ninja-build g++ libstdc++-14-dev libcurl4-openssl-dev libssl-dev mesa-common-dev libxxf86dga-dev libxrandr-dev libxxf86vm-dev libasound-dev libsdl2-dev libopenal-dev libfreetype6-dev lua5.4 liblua5.4-dev libbullet-dev pkg-config glslang-tools python3
       - uses: actions/checkout@v4
+        with:
+          submodules: recursive
       - name: Build game profile
         run: ./scripts/compile_engine.sh vulkan game Release skipshaders
       - name: Game profile tests
@@ -594,6 +608,8 @@ jobs:
           sudo apt-get -o Acquire::Retries=5 -qq update
           sudo apt-get -o Acquire::Retries=5 -y install cmake ninja-build g++ libstdc++-14-dev libcurl4-openssl-dev libssl-dev mesa-common-dev libxxf86dga-dev libxrandr-dev libxxf86vm-dev libasound-dev libsdl2-dev libopenal-dev libfreetype6-dev lua5.4 liblua5.4-dev libbullet-dev pkg-config glslang-tools python3
       - uses: actions/checkout@v4
+        with:
+          submodules: recursive
       - name: Build full profile
         run: ./scripts/compile_engine.sh vulkan full Release skipshaders
       - name: Full ctest
@@ -610,6 +626,8 @@ jobs:
           sudo apt-get -o Acquire::Retries=5 -y install cmake ninja-build g++ libstdc++-14-dev libcurl4-openssl-dev libssl-dev mesa-common-dev libxxf86dga-dev libxrandr-dev libxxf86vm-dev libasound-dev libsdl2-dev libopenal-dev libfreetype6-dev lua5.4 liblua5.4-dev libbullet-dev pkg-config glslang-tools python3
 
       - uses: actions/checkout@v4
+        with:
+          submodules: recursive
 
       - name: Build Vulkan (ASAN)
         env:
@@ -649,6 +667,8 @@ jobs:
           sudo apt-get -o Acquire::Retries=5 -y install cmake ninja-build g++ libstdc++-14-dev libcurl4-openssl-dev libssl-dev mesa-common-dev libxxf86dga-dev libxrandr-dev libxxf86vm-dev libasound-dev libsdl2-dev libopenal-dev libfreetype6-dev lua5.4 liblua5.4-dev libbullet-dev pkg-config glslang-tools python3
 
       - uses: actions/checkout@v4
+        with:
+          submodules: recursive
 
       - name: Build with ASAN
         env:
@@ -691,6 +711,8 @@ jobs:
           sudo apt-get -o Acquire::Retries=5 -y install libcurl4-openssl-dev libssl-dev mesa-common-dev libxxf86dga-dev libxrandr-dev libxxf86vm-dev libasound-dev libsdl2-dev libopenal-dev libfreetype6-dev lua5.4 liblua5.4-dev libbullet-dev pkg-config glslang-tools python3
 
       - uses: actions/checkout@v4
+        with:
+          submodules: recursive
 
       - name: Cache ccache
         uses: actions/cache@v4
@@ -749,6 +771,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          submodules: recursive
 
       - name: Build ${{ matrix.arch }}
         if: ${{ github.event_name != 'release' || matrix.btype != 'Debug' }}
@@ -857,6 +881,8 @@ jobs:
           exit 1
 
       - uses: actions/checkout@v4
+        with:
+          submodules: recursive
 
       - name: Build Vulkan
         if: ${{ github.event_name != 'release' || matrix.btype != 'Debug' }}

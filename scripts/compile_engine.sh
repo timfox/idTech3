@@ -458,9 +458,9 @@ if [ "$LTO" -eq 1 ]; then
 fi
 
 if [ "$FREEUSD" -eq 1 ] && [ -f "$PROJECT_ROOT/.gitmodules" ]; then
-  if [ ! -f "$PROJECT_ROOT/src/external/FreeUSD/CMakeLists.txt" ]; then
-    echo "Initializing FreeUSD submodule (src/external/FreeUSD)..."
-    if ! git -C "$PROJECT_ROOT" submodule update --init src/external/FreeUSD; then
+  if [ ! -f "$PROJECT_ROOT/third_party/FreeUSD/CMakeLists.txt" ] && [ ! -f "$PROJECT_ROOT/src/external/FreeUSD/CMakeLists.txt" ]; then
+    echo "Initializing FreeUSD submodule (third_party/FreeUSD)..."
+    if ! git -C "$PROJECT_ROOT" submodule update --init third_party/FreeUSD; then
       echo "Warning: FreeUSD submodule init failed; CMake may use FetchContent fallback." >&2
     fi
   fi
