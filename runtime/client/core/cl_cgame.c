@@ -83,6 +83,23 @@ typedef struct {
 	floatint_t		shaderTime;
 } retailRefEntity_t;
 
+/*
+ * Retail cgame.qvm keeps enum-backed qboolean, so trace_t is wider there than
+ * in the native client build. CM trace syscalls must marshal into that layout.
+ */
+typedef struct {
+	int			allsolid;
+	int			startsolid;
+	float		fraction;
+	vec3_t		endpos;
+	cplane_t	plane;
+	int			surfaceFlags;
+	int			contents;
+	int			entityNum;
+} legacy_trace_t;
+
+STATIC_ASSERT( sizeof( legacy_trace_t ) == sizeof( trace_t ) + 4, "legacy_trace_t must match retail cgame trace layout" );
+
 static int CL_GameEntityNumToEngine( int entityNum ) {
 	if ( !cgvm || cgvm->dllHandle ) {
 		return entityNum;
@@ -125,6 +142,17 @@ static void CL_AddRetailRefEntityToScene( const retailRefEntity_t *src, qboolean
 	Com_Memset( &ent, 0, sizeof( ent ) );
 	Com_Memcpy( &ent, src, sizeof( *src ) );
 	re.AddRefEntityToScene( &ent, intShaderTime );
+}
+
+static void CL_FillLegacyTrace( legacy_trace_t *out, const trace_t *in ) {
+	out->allsolid = in->allsolid ? 1 : 0;
+	out->startsolid = in->startsolid ? 1 : 0;
+	out->fraction = in->fraction;
+	VectorCopy( in->endpos, out->endpos );
+	out->plane = in->plane;
+	out->surfaceFlags = in->surfaceFlags;
+	out->contents = in->contents;
+	out->entityNum = CL_EngineEntityNumToGame( in->entityNum );
 }
 
 /*
@@ -814,39 +842,59 @@ static intptr_t CL_CgameSystemCalls( intptr_t *args ) {
 	case CG_CM_TRANSFORMEDPOINTCONTENTS:
 		return CM_TransformedPointContents( VMA(1), CL_GameEntityNumToEngine( args[2] ), VMA(3), VMA(4) );
 	case CG_CM_BOXTRACE:
-		VM_CHECKBOUNDS( cgvm, args[1], sizeof( trace_t ) );
-		CM_BoxTrace( VMA(1), VMA(2), VMA(3), VMA(4), VMA(5),
-			CL_GameEntityNumToEngine( args[6] ), args[7], /*int capsule*/ qfalse );
 		if ( cgvm && !cgvm->dllHandle ) {
-			trace_t *tr = VMA(1);
-			tr->entityNum = CL_EngineEntityNumToGame( tr->entityNum );
+			trace_t trace;
+
+			VM_CHECKBOUNDS( cgvm, args[1], sizeof( legacy_trace_t ) );
+			CM_BoxTrace( &trace, VMA(2), VMA(3), VMA(4), VMA(5),
+				CL_GameEntityNumToEngine( args[6] ), args[7], /*int capsule*/ qfalse );
+			CL_FillLegacyTrace( (legacy_trace_t *)VMA(1), &trace );
+		} else {
+			VM_CHECKBOUNDS( cgvm, args[1], sizeof( trace_t ) );
+			CM_BoxTrace( VMA(1), VMA(2), VMA(3), VMA(4), VMA(5),
+				CL_GameEntityNumToEngine( args[6] ), args[7], /*int capsule*/ qfalse );
 		}
 		return 0;
 	case CG_CM_CAPSULETRACE:
-		VM_CHECKBOUNDS( cgvm, args[1], sizeof( trace_t ) );
-		CM_BoxTrace( VMA(1), VMA(2), VMA(3), VMA(4), VMA(5),
-			CL_GameEntityNumToEngine( args[6] ), args[7], /*int capsule*/ qtrue );
 		if ( cgvm && !cgvm->dllHandle ) {
-			trace_t *tr = VMA(1);
-			tr->entityNum = CL_EngineEntityNumToGame( tr->entityNum );
+			trace_t trace;
+
+			VM_CHECKBOUNDS( cgvm, args[1], sizeof( legacy_trace_t ) );
+			CM_BoxTrace( &trace, VMA(2), VMA(3), VMA(4), VMA(5),
+				CL_GameEntityNumToEngine( args[6] ), args[7], /*int capsule*/ qtrue );
+			CL_FillLegacyTrace( (legacy_trace_t *)VMA(1), &trace );
+		} else {
+			VM_CHECKBOUNDS( cgvm, args[1], sizeof( trace_t ) );
+			CM_BoxTrace( VMA(1), VMA(2), VMA(3), VMA(4), VMA(5),
+				CL_GameEntityNumToEngine( args[6] ), args[7], /*int capsule*/ qtrue );
 		}
 		return 0;
 	case CG_CM_TRANSFORMEDBOXTRACE:
-		VM_CHECKBOUNDS( cgvm, args[1], sizeof( trace_t ) );
-		CM_TransformedBoxTrace( VMA(1), VMA(2), VMA(3), VMA(4), VMA(5),
-			CL_GameEntityNumToEngine( args[6] ), args[7], VMA(8), VMA(9), /*int capsule*/ qfalse );
 		if ( cgvm && !cgvm->dllHandle ) {
-			trace_t *tr = VMA(1);
-			tr->entityNum = CL_EngineEntityNumToGame( tr->entityNum );
+			trace_t trace;
+
+			VM_CHECKBOUNDS( cgvm, args[1], sizeof( legacy_trace_t ) );
+			CM_TransformedBoxTrace( &trace, VMA(2), VMA(3), VMA(4), VMA(5),
+				CL_GameEntityNumToEngine( args[6] ), args[7], VMA(8), VMA(9), /*int capsule*/ qfalse );
+			CL_FillLegacyTrace( (legacy_trace_t *)VMA(1), &trace );
+		} else {
+			VM_CHECKBOUNDS( cgvm, args[1], sizeof( trace_t ) );
+			CM_TransformedBoxTrace( VMA(1), VMA(2), VMA(3), VMA(4), VMA(5),
+				CL_GameEntityNumToEngine( args[6] ), args[7], VMA(8), VMA(9), /*int capsule*/ qfalse );
 		}
 		return 0;
 	case CG_CM_TRANSFORMEDCAPSULETRACE:
-		VM_CHECKBOUNDS( cgvm, args[1], sizeof( trace_t ) );
-		CM_TransformedBoxTrace( VMA(1), VMA(2), VMA(3), VMA(4), VMA(5),
-			CL_GameEntityNumToEngine( args[6] ), args[7], VMA(8), VMA(9), /*int capsule*/ qtrue );
 		if ( cgvm && !cgvm->dllHandle ) {
-			trace_t *tr = VMA(1);
-			tr->entityNum = CL_EngineEntityNumToGame( tr->entityNum );
+			trace_t trace;
+
+			VM_CHECKBOUNDS( cgvm, args[1], sizeof( legacy_trace_t ) );
+			CM_TransformedBoxTrace( &trace, VMA(2), VMA(3), VMA(4), VMA(5),
+				CL_GameEntityNumToEngine( args[6] ), args[7], VMA(8), VMA(9), /*int capsule*/ qtrue );
+			CL_FillLegacyTrace( (legacy_trace_t *)VMA(1), &trace );
+		} else {
+			VM_CHECKBOUNDS( cgvm, args[1], sizeof( trace_t ) );
+			CM_TransformedBoxTrace( VMA(1), VMA(2), VMA(3), VMA(4), VMA(5),
+				CL_GameEntityNumToEngine( args[6] ), args[7], VMA(8), VMA(9), /*int capsule*/ qtrue );
 		}
 		return 0;
 	case CG_CM_MARKFRAGMENTS:

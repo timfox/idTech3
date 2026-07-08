@@ -263,6 +263,35 @@ static qboolean sv_qvmEntityMappingLogged;
 static qboolean SV_UseLegacyNativeEntityNums( void );
 
 /*
+ * Retail qagame.qvm uses the original enum-backed qboolean, so trace_t is
+ * larger there than in the native engine build where qboolean is bool.
+ * Trace syscalls for QVMs must marshal into the legacy layout explicitly.
+ */
+typedef struct {
+	int			allsolid;
+	int			startsolid;
+	float		fraction;
+	vec3_t		endpos;
+	cplane_t	plane;
+	int			surfaceFlags;
+	int			contents;
+	int			entityNum;
+} legacy_trace_t;
+
+STATIC_ASSERT( sizeof( legacy_trace_t ) == sizeof( trace_t ) + 4, "legacy_trace_t must match retail qagame trace layout" );
+
+static void SV_FillLegacyTrace( legacy_trace_t *out, const trace_t *in ) {
+	out->allsolid = in->allsolid ? 1 : 0;
+	out->startsolid = in->startsolid ? 1 : 0;
+	out->fraction = in->fraction;
+	VectorCopy( in->endpos, out->endpos );
+	out->plane = in->plane;
+	out->surfaceFlags = in->surfaceFlags;
+	out->contents = in->contents;
+	out->entityNum = SV_EngineEntityNumToGame( in->entityNum );
+}
+
+/*
 ===============
 SV_AllocEngineEntityNum
 
@@ -630,22 +659,32 @@ static intptr_t SV_GameSystemCalls( intptr_t *args ) {
 		{
 			trace_t trace;
 
-			VM_CHECKBOUNDS( gvm, args[1], sizeof( trace_t ) );
 			SV_Trace( &trace, VMA(2), VMA(3), VMA(4), VMA(5),
 				SV_GameEntityNumToEngine( args[6] ), args[7], /*int capsule*/ qfalse );
-			trace.entityNum = SV_EngineEntityNumToGame( trace.entityNum );
-			*(trace_t *)VMA(1) = trace;
+			if ( SV_UseLegacyNativeEntityNums() ) {
+				VM_CHECKBOUNDS( gvm, args[1], sizeof( legacy_trace_t ) );
+				SV_FillLegacyTrace( (legacy_trace_t *)VMA(1), &trace );
+			} else {
+				VM_CHECKBOUNDS( gvm, args[1], sizeof( trace_t ) );
+				trace.entityNum = SV_EngineEntityNumToGame( trace.entityNum );
+				*(trace_t *)VMA(1) = trace;
+			}
 		}
 		return 0;
 	case G_TRACECAPSULE:
 		{
 			trace_t trace;
 
-			VM_CHECKBOUNDS( gvm, args[1], sizeof( trace_t ) );
 			SV_Trace( &trace, VMA(2), VMA(3), VMA(4), VMA(5),
 				SV_GameEntityNumToEngine( args[6] ), args[7], /*int capsule*/ qtrue );
-			trace.entityNum = SV_EngineEntityNumToGame( trace.entityNum );
-			*(trace_t *)VMA(1) = trace;
+			if ( SV_UseLegacyNativeEntityNums() ) {
+				VM_CHECKBOUNDS( gvm, args[1], sizeof( legacy_trace_t ) );
+				SV_FillLegacyTrace( (legacy_trace_t *)VMA(1), &trace );
+			} else {
+				VM_CHECKBOUNDS( gvm, args[1], sizeof( trace_t ) );
+				trace.entityNum = SV_EngineEntityNumToGame( trace.entityNum );
+				*(trace_t *)VMA(1) = trace;
+			}
 		}
 		return 0;
 	case G_POINT_CONTENTS:
