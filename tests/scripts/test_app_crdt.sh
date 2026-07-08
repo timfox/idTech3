@@ -17,6 +17,10 @@ grep -q 'Engine.AppCrdt' "$ROOT/src/server/sv_app_crdt.c"
 grep -q 'LuaDebug_SetScriptFallbackRoot' "$ROOT/src/qcommon/lua_debug.c"
 BACKEND_ROOT="$ROOT/third_party/idtech3backend"
 [ -d "$BACKEND_ROOT" ] || BACKEND_ROOT="$ROOT/src/external/idtech3backend"
+if [ ! -f "$BACKEND_ROOT/app_crdt/manifest.json" ]; then
+	echo "SKIP: idtech3backend submodule not initialized (optional)"
+	exit 0
+fi
 test -f "$BACKEND_ROOT/app_crdt/manifest.json"
 test -f "$BACKEND_ROOT/server/lua/backend_app.lua"
 test -f "$ROOT/docs/APP_CRDT.md"

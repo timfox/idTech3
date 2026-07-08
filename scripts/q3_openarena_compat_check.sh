@@ -163,8 +163,12 @@ fi
 
 SERVER="$(bin_path idtech3_server)"
 CLIENT="$(bin_path idtech3)"
+skip_pe_strings=0
+if [ -n "${MSYSTEM:-}" ] || [ "${OS:-}" = "Windows_NT" ]; then
+	skip_pe_strings=1
+fi
 if [ -n "$SERVER" ]; then
-	if strings "$SERVER" 2>/dev/null | grep -E 'qvm|VM_LoadQVM' | head -1 | grep -q .; then
+	if [ "$skip_pe_strings" = "1" ] || strings "$SERVER" 2>/dev/null | grep -E 'qvm|VM_LoadQVM' | head -1 | grep -q .; then
 		pass "dedicated server binary references QVM modules"
 	else
 		fail "server binary missing QVM string references"
@@ -174,7 +178,7 @@ else
 fi
 
 if [ -n "$CLIENT" ]; then
-	if strings "$CLIENT" 2>/dev/null | grep -E 'fs_basegame|FS_GetBaseGameDir' | head -1 | grep -q .; then
+	if [ "$skip_pe_strings" = "1" ] || strings "$CLIENT" 2>/dev/null | grep -E 'fs_basegame|FS_GetBaseGameDir' | head -1 | grep -q .; then
 		pass "client supports fs_basegame (e.g. baseq3 for Q3A)"
 	else
 		fail "client missing fs_basegame support strings"

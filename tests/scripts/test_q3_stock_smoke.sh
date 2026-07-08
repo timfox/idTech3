@@ -21,6 +21,11 @@ fi
 BASEGAME="${Q3_STOCK_BASEGAME:-baseq3}"
 MAP="${Q3_STOCK_MAP:-q3dm1}"
 
+if ! find "$BASEPATH" -maxdepth 3 \( -name 'pak*.pk3' -o -name '*.pk3' \) 2>/dev/null | head -1 | grep -q .; then
+	echo "SKIP: no retail pk3 data under $BASEPATH (set Q3_STOCK_BASEPATH or install baseq3)"
+	exit 0
+fi
+
 run_map() {
 	local map="$1"
 	local log
