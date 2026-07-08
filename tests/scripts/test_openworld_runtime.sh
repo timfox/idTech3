@@ -24,9 +24,10 @@ python3 "$GEN_HUB" "$BASE/maps/open_void.bsp"
 python3 "$GEN_SECTOR" "$BASE/maps/sector_0_0.bsp" --cell-x 0 --cell-y 0 --visual
 cp -f "$DATA/openworld_smoke.cfg" "$BASE/openworld_smoke.cfg"
 
-if [[ ! -f "$BOOT_PK3" ]]; then
+if [[ ! -s "$BOOT_PK3" ]]; then
 	echo "[test_openworld_runtime] create bootstrap pk3..."
-	( cd "$BASE" && zip -9 -q "$BOOT_PK3" default.cfg )
+	rm -f "$BOOT_PK3"
+	( cd "$BASE" && zip -9 -q "$(basename "$BOOT_PK3")" default.cfg )
 fi
 
 if [[ -x "$BUILD/unit_openworld_nav" ]] || [[ -f "$BUILD/build.ninja" ]] || [[ -f "$BUILD/Makefile" ]]; then

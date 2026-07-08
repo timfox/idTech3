@@ -64,6 +64,8 @@ link engine/platform/client ../../runtime/client
 link engine/platform/server ../../runtime/server
 link engine/platform/game ../../runtime/game
 link engine/platform/ui ../../runtime/ui
+link engine/platform/audio ../../modules/audio
+link engine/platform/world ../../modules/world
 link engine/platform/qcommon ../core
 link engine/platform/audio ../../modules/audio
 link engine/platform/renderers ../../renderers
@@ -72,6 +74,8 @@ link engine/platform/external ../../third_party
 # ../../../foo from msvc2017 -> engine/foo (AdditionalIncludeDirectories)
 echo "[layout_fwd] MSVC bridge (engine/*)..."
 link engine/qcommon core
+link engine/audio ../modules/audio
+link engine/world ../modules/world
 # platform/sdl, platform/unix, platform/win32 use ../../client (engine/client), not platform/client.
 link engine/client ../runtime/client
 link engine/server ../runtime/server

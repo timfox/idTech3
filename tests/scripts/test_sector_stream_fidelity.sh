@@ -23,8 +23,9 @@ python3 "$GEN_SECTOR" "$BASE/maps/sector_0_0.bsp" --cell-x 0 --cell-y 0 --visual
 python3 "$GEN_SECTOR" "$BASE/maps/sector_1_0.bsp" --cell-x 1 --cell-y 0 --visual
 cp -f "$DATA/openworld_smoke_fidelity.cfg" "$BASE/openworld_smoke_fidelity.cfg"
 
-if [[ ! -f "$BOOT_PK3" ]]; then
-	( cd "$BASE" && zip -9 -q "$BOOT_PK3" default.cfg )
+if [[ ! -s "$BOOT_PK3" ]]; then
+	rm -f "$BOOT_PK3"
+	( cd "$BASE" && zip -9 -q "$(basename "$BOOT_PK3")" default.cfg )
 fi
 
 echo "[test_sector_stream_fidelity] nav bake + walkable probe..."

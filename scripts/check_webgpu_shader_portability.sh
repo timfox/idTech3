@@ -17,12 +17,12 @@ mkdir -p "$(dirname "$MANIFEST")"
   echo ""
   echo "[wsp]"
   if [[ -d "$WSP_DIR" ]]; then
-    find "$WSP_DIR" -maxdepth 1 -name '*.comp' -printf '%f\n' | sort
+    find "$WSP_DIR" -maxdepth 1 -name '*.comp' -exec basename {} \; | sort
   fi
   echo ""
   echo "[mgs]"
   if [[ -d "$MGS_DIR" ]]; then
-    find "$MGS_DIR" -maxdepth 1 -name '*.comp' -printf '%f\n' | sort
+    find "$MGS_DIR" -maxdepth 1 -name '*.comp' -exec basename {} \; | sort
   fi
 } > "$MANIFEST"
 
