@@ -300,6 +300,7 @@
   <ItemGroup>
     <ClCompile Include="..\..\client\media\cl_avi.c" />
     <ClCompile Include="..\..\client\core\cl_cgame.c" />
+    <ClCompile Include="..\..\client\core\cl_compat_math.c" />
     <ClCompile Include="..\..\client\media\cl_cin.c" />
     <ClCompile Include="..\..\client\media\cl_cin_modern.c" />
     <ClCompile Include="..\..\client\cl_console.c" />
@@ -311,6 +312,7 @@
     <ClCompile Include="..\..\client\core\cl_keys.c" />
     <ClCompile Include="..\..\client\core\cl_main.c" />
     <ClCompile Include="..\..\client\cl_emoji.c" />
+    <ClCompile Include="..\..\client\cl_emulator.c" />
     <ClCompile Include="..\..\client\cl_osp.c" />
     <ClCompile Include="..\..\client\platform\cl_voip.c" />
     <ClCompile Include="..\..\client\platform\cl_websocket.c" />
