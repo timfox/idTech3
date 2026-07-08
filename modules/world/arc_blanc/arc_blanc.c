@@ -34,6 +34,8 @@ static abHull_t s_hulls[AB_MAX_HULLS];
 static qboolean s_loggedEnable = qfalse;
 static arcBlancHeightExport_t s_heightExport;
 
+const abOceanState_t *ArcBlanc_GetOceanForTest( void );
+
 static void ab_log_enable_once( void )
 {
 	if ( s_loggedEnable ) {
@@ -95,6 +97,8 @@ static void ab_hull_sync_physics( abHull_t *hull )
 		VectorCopy( tr.position, hull->origin );
 		VectorCopy( tr.linearVelocity, hull->velocity );
 	}
+#else
+	(void)hull;
 #endif
 }
 

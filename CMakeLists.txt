@@ -3178,6 +3178,12 @@ set_tests_properties(test_stock_baseq3 PROPERTIES
 	LABELS "scripts;validation;client;compat"
 	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_stock_baseq3.sh;${CMAKE_SOURCE_DIR}/runtime/client/client.h;${CMAKE_SOURCE_DIR}/config/classic_baseq3.cfg")
 
+add_test(NAME test_trap_getvalue_aliases
+	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_trap_getvalue_aliases.sh)
+set_tests_properties(test_trap_getvalue_aliases PROPERTIES
+	LABELS "scripts;validation;client;server;compat"
+	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_trap_getvalue_aliases.sh;${CMAKE_SOURCE_DIR}/runtime/client/core/cl_cgame.c;${CMAKE_SOURCE_DIR}/runtime/server/sv_game.c")
+
 add_test(NAME test_console_font
 	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_console_font.sh)
 set_tests_properties(test_console_font PROPERTIES
