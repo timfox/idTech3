@@ -649,6 +649,10 @@ static qboolean CL_GetValue( char* value, int valueSize, const char* key ) {
 		Com_sprintf( value, valueSize, "%i", CG_PHYS_DESTROYBODY );
 		return qtrue;
 	}
+	if ( !Q_stricmp( key, "trap_Phys_ApplyForceBody" ) ) {
+		Com_sprintf( value, valueSize, "%i", CG_PHYS_APPLYFORCEBODY );
+		return qtrue;
+	}
 	if ( !Q_stricmp( key, "trap_Phys_ApplyImpulse" ) ) {
 		Com_sprintf( value, valueSize, "%i", CG_PHYS_APPLYIMPULSE );
 		return qtrue;
@@ -657,8 +661,24 @@ static qboolean CL_GetValue( char* value, int valueSize, const char* key ) {
 		Com_sprintf( value, valueSize, "%i", CG_PHYS_GETBODYTRANSFORM );
 		return qtrue;
 	}
+	if ( !Q_stricmp( key, "trap_Phys_SetBodyTransform" ) ) {
+		Com_sprintf( value, valueSize, "%i", CG_PHYS_SETBODYTRANSFORM );
+		return qtrue;
+	}
+	if ( !Q_stricmp( key, "trap_Phys_SetBodyVelocity" ) ) {
+		Com_sprintf( value, valueSize, "%i", CG_PHYS_SETBODYVELOCITY );
+		return qtrue;
+	}
+	if ( !Q_stricmp( key, "trap_Phys_StepSimulation" ) ) {
+		Com_sprintf( value, valueSize, "%i", CG_PHYS_STEPSIMULATION );
+		return qtrue;
+	}
 	if ( !Q_stricmp( key, "trap_Phys_RayCast" ) ) {
 		Com_sprintf( value, valueSize, "%i", CG_PHYS_RAYCAST );
+		return qtrue;
+	}
+	if ( !Q_stricmp( key, "trap_Phys_LoadBSPCollision" ) ) {
+		Com_sprintf( value, valueSize, "%i", CG_PHYS_LOADBSPCOLLISION );
 		return qtrue;
 	}
 	if ( !Q_stricmp( key, "trap_EmitJSEvent" ) ) {
@@ -667,6 +687,10 @@ static qboolean CL_GetValue( char* value, int valueSize, const char* key ) {
 	}
 	if ( !Q_stricmp( key, "trap_EngineSpriteAddLocal" ) ) {
 		Com_sprintf( value, valueSize, "%i", CG_ENGINE_SPRITE_ADD_LOCAL );
+		return qtrue;
+	}
+	if ( !Q_stricmp( key, "trap_EngineDecalAddLocal" ) ) {
+		Com_sprintf( value, valueSize, "%i", CG_ENGINE_DECAL_ADD_LOCAL );
 		return qtrue;
 	}
 

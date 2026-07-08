@@ -410,7 +410,7 @@ static void SV_SaveSequences( void ) {
 
 static void SV_InjectLocation( const char *tld, const char *country ) {
 	const char *cmd;
-	char *str;
+	const char *str;
 	int i, n;
 	for ( i = 0; i < sv.maxclients; i++ ) {
 		if ( seqs[i] != svs.clients[i].reliableSequence ) {

@@ -466,6 +466,48 @@ static qboolean SV_GetValue( char* value, int valueSize, const char* key )
 		return qtrue;
 	}
 
+	if ( !Q_stricmp( key, "trap_EngineSpriteShaderIndex" ) )
+	{
+		Com_sprintf( value, valueSize, "%i", G_ENGINE_SPRITE_SHADER_INDEX );
+		return qtrue;
+	}
+
+	if ( !Q_stricmp( key, "trap_EngineSpriteSpawn" ) )
+	{
+		Com_sprintf( value, valueSize, "%i", G_ENGINE_SPRITE_SPAWN );
+		return qtrue;
+	}
+
+	if ( !Q_stricmp( key, "trap_EngineDecalShaderIndex" ) )
+	{
+		Com_sprintf( value, valueSize, "%i", G_ENGINE_DECAL_SHADER_INDEX );
+		return qtrue;
+	}
+
+	if ( !Q_stricmp( key, "trap_EngineDecalSpawn" ) )
+	{
+		Com_sprintf( value, valueSize, "%i", G_ENGINE_DECAL_SPAWN );
+		return qtrue;
+	}
+
+	if ( !Q_stricmp( key, "trap_Phys_CharacterCreate" ) )
+	{
+		Com_sprintf( value, valueSize, "%i", G_PHYS_CHARACTER_CREATE );
+		return qtrue;
+	}
+
+	if ( !Q_stricmp( key, "trap_Phys_CharacterMove" ) )
+	{
+		Com_sprintf( value, valueSize, "%i", G_PHYS_CHARACTER_MOVE );
+		return qtrue;
+	}
+
+	if ( !Q_stricmp( key, "trap_Loc_Lookup" ) )
+	{
+		Com_sprintf( value, valueSize, "%i", G_LOC_LOOKUP );
+		return qtrue;
+	}
+
 	return qfalse;
 }
 

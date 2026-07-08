@@ -141,6 +141,7 @@ static float ab_qdb_xi( float rOmega, float swell )
 float AB_Spectrum_Directional( float omega, float theta, float windDir, float swell, float directional )
 {
 	float omegaP, rOmega, dNeutral, dDir, qXi;
+	(void)windDir;
 
 	if ( omega < 1e-6f ) {
 		return 1.0f / ( 2.0f * (float)M_PI );

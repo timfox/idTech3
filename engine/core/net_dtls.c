@@ -119,6 +119,8 @@ qboolean NET_DTLS_IsEnabled( void )
  */
 int NET_DTLS_Encrypt( const netadr_t *to, const byte *data, int len, byte *out, int outMax )
 {
+	(void)to;
+
 	if ( !NET_DTLS_IsEnabled() || len <= 0 || outMax < len + DTLS_OVERHEAD )
 		return -1;
 
@@ -200,6 +202,8 @@ int NET_DTLS_Encrypt( const netadr_t *to, const byte *data, int len, byte *out, 
  */
 int NET_DTLS_Decrypt( const netadr_t *from, const byte *data, int len, byte *out, int outMax )
 {
+	(void)from;
+
 	if ( !NET_DTLS_IsEnabled() || len <= DTLS_OVERHEAD || outMax < len - DTLS_OVERHEAD )
 		return -1;
 
