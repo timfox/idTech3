@@ -157,6 +157,13 @@ extern "C" void VkImgui_Shutdown(void) {
 
 extern "C" void VkImgui_BeginFrame(void) {
 	if (!vkImguiState.active) return;
+	if ( !vkImgBackendReady ) {
+		if ( r_imgui && r_imgui->integer ) {
+			ri.Printf( PRINT_WARNING, "ImGui: renderer backend unavailable, disabling r_imgui to avoid invalid font-atlas state\n" );
+			ri.Cvar_Set( "r_imgui", "0" );
+		}
+		return;
+	}
 	VkImgui_SetCurrentContext();
 	VkImgui_PrepareIO();
 	if ( r_imguiTheme ) {
@@ -167,15 +174,14 @@ extern "C" void VkImgui_BeginFrame(void) {
 		}
 	}
 #ifdef USE_VULKAN
-	if ( vkImgBackendReady ) {
-		VkImgui_NewFrameVulkan();
-	}
+	VkImgui_NewFrameVulkan();
 #endif
 	ImGui::NewFrame();
 }
 
 extern "C" void VkImgui_Draw(void) {
 	if (!vkImguiState.active) return;
+	if ( !vkImgBackendReady ) return;
 	VkImgui_SetCurrentContext();
 
 	ImGuiWindowFlags dockFlags = ImGuiWindowFlags_NoDocking | ImGuiWindowFlags_NoTitleBar |
