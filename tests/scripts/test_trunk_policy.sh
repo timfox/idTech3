@@ -8,10 +8,7 @@ cd "$ROOT"
 fail() { echo "FAIL: $*" >&2; exit 1; }
 pass() { echo "PASS: $*"; }
 
-if [ "${GITHUB_ACTIONS:-}" = "true" ]; then
-	skip_fetch=1
-fi
-if [ "${SKIP_TRUNK_FETCH:-0}" != "1" ] && [ "${skip_fetch:-0}" != "1" ]; then
+if [ "${SKIP_TRUNK_FETCH:-0}" != "1" ]; then
 	git fetch origin --prune --tags 2>/dev/null || fail "git fetch origin failed (set SKIP_TRUNK_FETCH=1 to skip)"
 fi
 
@@ -63,10 +60,13 @@ fi
 
 # --- archive tags (legacy consolidation) ---
 archive_count="$(git tag -l 'archive/*' 2>/dev/null | wc -l | tr -d ' ')"
-if [ "${REQUIRE_ARCHIVE_TAGS:-1}" = "1" ] && [ "$archive_count" -lt 1 ]; then
+if [ "${SKIP_TRUNK_FETCH:-0}" = "1" ]; then
+	pass "skipping archive/* tag check (SKIP_TRUNK_FETCH)"
+elif [ "${REQUIRE_ARCHIVE_TAGS:-1}" = "1" ] && [ "$archive_count" -lt 1 ]; then
 	fail "expected archive/* tags (run scripts/archive_legacy_remote_branches.sh once)"
+else
+	pass "archive/* tags present ($archive_count)"
 fi
-pass "archive/* tags present ($archive_count)"
 
 # --- local integration scripts wired in tests ---
 [ -x "${ROOT}/tests/scripts/test_legacy_intact.sh" ] || fail "missing test_legacy_intact.sh"

@@ -67,6 +67,11 @@ link engine/platform/ui ../../runtime/ui
 link engine/platform/audio ../../modules/audio
 link engine/platform/world ../../modules/world
 link engine/platform/qcommon ../core
+link engine/platform/physics ../../modules/physics
+link engine/platform/botlib ../../modules/botlib
+link engine/platform/renderers ../../renderers
+link engine/platform/navigation ../../modules/navigation
+link engine/platform/cgame ../../runtime/cgame
 link engine/platform/audio ../../modules/audio
 link engine/platform/renderers ../../renderers
 link engine/platform/external ../../third_party
