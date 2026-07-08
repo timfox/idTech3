@@ -84,6 +84,10 @@ jobs:
         shell: msys2 {0}
         run: ./scripts/layout_forwarding_symlinks.sh
 
+      - name: Layout forwarding Windows junctions
+        shell: pwsh
+        run: ./scripts/layout_forwarding_windows.ps1
+
       - name: Init required submodules
         run: ./scripts/init_optional_submodules.sh --freeusd
 
@@ -236,6 +240,10 @@ jobs:
       - name: Layout forwarding symlinks
         shell: bash
         run: ./scripts/layout_forwarding_symlinks.sh
+
+      - name: Layout forwarding Windows junctions
+        shell: pwsh
+        run: ./scripts/layout_forwarding_windows.ps1
 
       - name: Build
         if: ${{ github.event_name != 'release' || matrix.btype != 'Debug' }}
