@@ -8,7 +8,10 @@ cd "$ROOT"
 fail() { echo "FAIL: $*" >&2; exit 1; }
 pass() { echo "PASS: $*"; }
 
-if [ "${SKIP_TRUNK_FETCH:-0}" != "1" ]; then
+if [ "${GITHUB_ACTIONS:-}" = "true" ]; then
+	skip_fetch=1
+fi
+if [ "${SKIP_TRUNK_FETCH:-0}" != "1" ] && [ "${skip_fetch:-0}" != "1" ]; then
 	git fetch origin --prune --tags 2>/dev/null || fail "git fetch origin failed (set SKIP_TRUNK_FETCH=1 to skip)"
 fi
 
