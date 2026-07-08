@@ -13,6 +13,7 @@ i18n string tables: loc/<language>.loc (key=value lines).
 
 void Com_Loc_Init( void );
 void Com_Loc_Reload( void );
+void Com_Loc_Clear( void );
 int Com_Loc_Lookup( const char *key, char *out, int outSize );
 
 #endif /* COM_LOC_H */

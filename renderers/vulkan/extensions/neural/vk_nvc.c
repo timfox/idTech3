@@ -195,7 +195,6 @@ static void NVC_ClearGpu( void )
 static void NVC_BuildDefaultWeights( void )
 {
 	int h = nvc.man.hiddenDim;
-	int f = nvc.man.featureDim;
 	int i;
 
 	Com_Memset( nvc.W1, 0, sizeof( nvc.W1 ) );

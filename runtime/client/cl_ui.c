@@ -1254,6 +1254,27 @@ CL_InitUI
 */
 #define UI_OLD_API_VERSION	4
 
+static qboolean CL_UI_IsOpenArenaGame( void ) {
+	const char *fs_game;
+	const char *fs_basegame;
+
+	fs_game = Cvar_VariableString( "fs_game" );
+	if ( fs_game && fs_game[0] ) {
+		if ( !Q_stricmp( fs_game, "openarena" ) || !Q_stricmp( fs_game, "baseoa" ) ) {
+			return qtrue;
+		}
+	}
+
+	fs_basegame = Cvar_VariableString( "fs_basegame" );
+	if ( fs_basegame && fs_basegame[0] ) {
+		if ( Q_stristr( fs_basegame, "openarena" ) || Q_stristr( fs_basegame, "baseoa" ) ) {
+			return qtrue;
+		}
+	}
+
+	return qfalse;
+}
+
 void CL_InitUI( void ) {
 	int		v;
 	vmInterpret_t		interpret;
@@ -1263,6 +1284,14 @@ void CL_InitUI( void ) {
 
 	// load the dll or bytecode
 	interpret = Cvar_VariableIntegerValue( "vm_ui" );
+	if ( CL_UI_IsOpenArenaGame() ) {
+		if ( FS_FileIsInPAK( "vm/ui.qvm", NULL, NULL ) ) {
+			Com_Printf( "[client] CL_InitUI: OpenArena ui.qvm detected, preferring QVM UI\n" );
+			interpret = VMI_COMPILED;
+		} else if ( interpret == VMI_NATIVE ) {
+			Com_Printf( "[client] CL_InitUI: OpenArena running native UI (no ui.qvm detected)\n" );
+		}
+	}
 	if ( cl_connectedToPureServer )
 	{
 		// if sv_pure is set we only allow qvms to be loaded

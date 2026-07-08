@@ -155,7 +155,6 @@ static void NIST_ClearGpu( void )
 static void NIST_BuildDefaultWeights( void )
 {
 	int h = nist.man.hiddenDim;
-	int f = nist.man.featureDim;
 	int i;
 
 	Com_Memset( nist.W1, 0, sizeof( nist.W1 ) );

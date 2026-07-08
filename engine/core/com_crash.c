@@ -48,10 +48,13 @@ static void Com_Crash_WriteReport( const char *reason, const char *tag )
 	Com_Printf( "[crash] report written: %s\n", path );
 
 	if ( com_crashReportURL && com_crashReportURL->string[0] ) {
+		int uploadRc;
+
 		Com_sprintf( line, sizeof( line ),
 			"curl -sS -X POST -F 'file=@%s' '%s' >/dev/null 2>&1 &",
 			path, com_crashReportURL->string );
-		system( line );
+		uploadRc = system( line );
+		(void)uploadRc;
 		Com_Printf( "[crash] upload queued to com_crashReportURL (opt-in)\n" );
 	}
 }

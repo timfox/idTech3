@@ -18,6 +18,7 @@ set(IDTECH3_CLIENT_CORE_SRCS
 	${_IDTECH3_CLIENT}/core/cl_parse.c
 	${_IDTECH3_CLIENT}/core/cl_net_chan.c
 	${_IDTECH3_CLIENT}/core/cl_cgame.c
+	${_IDTECH3_CLIENT}/core/cl_compat_math.c
 	${_IDTECH3_CLIENT}/core/cl_input.c
 	${_IDTECH3_CLIENT}/core/cl_keys.c
 	${_IDTECH3_CLIENT}/core/cl_serverbrowser.c

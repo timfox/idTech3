@@ -1286,10 +1286,32 @@ SV_InitGameProgs
 Called on a normal map change, not on a map_restart
 ===============
 */
+static qboolean SV_IsOpenArenaGame( void ) {
+	const char *fs_game;
+	const char *fs_basegame;
+
+	fs_game = Cvar_VariableString( "fs_game" );
+	if ( fs_game && fs_game[0] ) {
+		if ( !Q_stricmp( fs_game, "openarena" ) || !Q_stricmp( fs_game, "baseoa" ) ) {
+			return qtrue;
+		}
+	}
+
+	fs_basegame = Cvar_VariableString( "fs_basegame" );
+	if ( fs_basegame && fs_basegame[0] ) {
+		if ( Q_stristr( fs_basegame, "openarena" ) || Q_stristr( fs_basegame, "baseoa" ) ) {
+			return qtrue;
+		}
+	}
+
+	return qfalse;
+}
+
 void SV_InitGameProgs( void ) {
 	cvar_t	*var;
 	/* Temporary: bots will run in VM. */
 	extern int	bot_enable;
+	int interpret;
 
 	var = Cvar_Get( "bot_enable", "1", CVAR_LATCH );
 	if ( var ) {
@@ -1300,7 +1322,11 @@ void SV_InitGameProgs( void ) {
 	}
 
 	// load the dll or bytecode
-	gvm = VM_Create( VM_GAME, SV_GameSystemCalls, SV_DllSyscall, Cvar_VariableIntegerValue( "vm_game" ) );
+	interpret = Cvar_VariableIntegerValue( "vm_game" );
+	if ( SV_IsOpenArenaGame() ) {
+		interpret = VMI_NATIVE;
+	}
+	gvm = VM_Create( VM_GAME, SV_GameSystemCalls, SV_DllSyscall, interpret );
 	if ( !gvm ) {
 		Com_Error( ERR_DROP, "VM_Create on game failed" );
 	}

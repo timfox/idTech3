@@ -4253,7 +4253,7 @@ static void R_Register( void )
 	ri.Cvar_SetDescription( r_forwardPlusDistanceSort,
 		"When 1 and a tile is overloaded, the compute pass prefers lights nearest the camera (vieworg). When 0, overload order follows \\r_forwardPlusLuminanceSort / index order. Requires \\r_forwardPlus 1 (no vid_restart)." );
 	ri.Cvar_SetGroup( r_forwardPlusDistanceSort, CVG_RENDERER );
-	r_forwardPlusDepthCull = ri.Cvar_Get( "r_forwardPlusDepthCull", "1", CVAR_ARCHIVE_ND );
+	r_forwardPlusDepthCull = ri.Cvar_Get( "r_forwardPlusDepthCull", "0", CVAR_ARCHIVE_ND );
 	ri.Cvar_CheckRange( r_forwardPlusDepthCull, "0", "1", CV_INTEGER );
 	ri.Cvar_SetDescription( r_forwardPlusDepthCull,
 		"When 1, a depth prepass fills the depth buffer, then tile cull rejects lights behind surfaces at each light's screen center, then opaque color draws. When 0, cull runs at view start without depth (legacy). Requires \\r_forwardPlus 1 (no vid_restart)." );

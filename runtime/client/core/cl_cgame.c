@@ -28,6 +28,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 #include "../../botlib/botlib.h"
 #include "../../game/g_entity_bridge.h"
+#include "cl_compat_math.h"
 #include "cl_engine_sprites.h"
 #include "cl_engine_decals.h"
 #include "cl_openworld.h"
@@ -1233,12 +1234,7 @@ static void CL_EnsureClientGameVersionConfigstring( void ) {
 
 	info = cl.gameState.stringData + cl.gameState.stringOffsets[CS_SERVERINFO];
 	gamename = Info_ValueForKey( info, "gamename" );
-	if ( !gamename || !gamename[0] ) {
-		gamename = "baseq3";
-	}
-	Com_sprintf( built, sizeof( built ), "%s-1", gamename );
-
-	len = strlen( built );
+	len = CL_BuildFallbackGameVersion( gamename, "baseq3", built, sizeof( built ) );
 	if ( len + 1 + cl.gameState.dataCount > MAX_GAMESTATE_CHARS ) {
 		Com_Error( ERR_DROP, "%s: MAX_GAMESTATE_CHARS exceeded", __func__ );
 	}
@@ -1278,6 +1274,45 @@ static qboolean CL_IsBaseQ3Game( void ) {
 	gamename = Info_ValueForKey( info, "gamename" );
 	if ( gamename && gamename[0] && !Q_stricmp( gamename, "baseq3" ) ) {
 		return qtrue;
+	}
+
+	return qfalse;
+}
+
+/*
+====================
+CL_IsOpenArenaGame
+
+Detect OpenArena-native content so we can avoid the modern full-conversion
+profile, which enables engine systems OA was not authored against.
+====================
+*/
+static qboolean CL_IsOpenArenaGame( void ) {
+	const char *fs_game;
+	const char *fs_basegame;
+	const char *info;
+	const char *gamename;
+
+	fs_game = Cvar_VariableString( "fs_game" );
+	if ( fs_game && fs_game[0] ) {
+		if ( !Q_stricmp( fs_game, "openarena" ) || !Q_stricmp( fs_game, "baseoa" ) ) {
+			return qtrue;
+		}
+	}
+
+	fs_basegame = Cvar_VariableString( "fs_basegame" );
+	if ( fs_basegame && fs_basegame[0] ) {
+		if ( Q_stristr( fs_basegame, "openarena" ) || Q_stristr( fs_basegame, "baseoa" ) ) {
+			return qtrue;
+		}
+	}
+
+	info = cl.gameState.stringData + cl.gameState.stringOffsets[ CS_SERVERINFO ];
+	gamename = Info_ValueForKey( info, "gamename" );
+	if ( gamename && gamename[0] ) {
+		if ( !Q_stricmp( gamename, "openarena" ) || !Q_stricmp( gamename, "baseoa" ) ) {
+			return qtrue;
+		}
 	}
 
 	return qfalse;
@@ -1343,7 +1378,7 @@ void CL_TryEarlyStockBaseq3Profile( void ) {
 	if ( !cl_autoGraphicsProfile || !cl_autoGraphicsProfile->integer ) {
 		return;
 	}
-	if ( !CL_IsBaseQ3Game() ) {
+	if ( !CL_IsBaseQ3Game() && !CL_IsOpenArenaGame() ) {
 		return;
 	}
 
@@ -1366,6 +1401,7 @@ baseq3 + cgame.qvm -> classic retail look; native cgame -> modern Vulkan stack.
 static void CL_ApplyGraphicsProfile( vm_t *vm ) {
 	const qboolean isQvm = ( vm && !vm->dllHandle );
 	const qboolean isBaseQ3 = CL_IsBaseQ3Game();
+	const qboolean isOpenArena = CL_IsOpenArenaGame();
 
 	if ( !cl_autoGraphicsProfile || !cl_autoGraphicsProfile->integer ) {
 		return;
@@ -1375,6 +1411,14 @@ static void CL_ApplyGraphicsProfile( vm_t *vm ) {
 		Com_Printf( "[client] cl_autoGraphicsProfile: classic baseq3 (cgame.qvm)\n" );
 		CL_ApplyClassicBaseq3Cvars();
 		Cbuf_AddText( "exec classic_baseq3.cfg\n" );
+		return;
+	}
+
+	if ( isOpenArena && !isQvm ) {
+		Com_Printf( "[client] cl_autoGraphicsProfile: classic native OpenArena\n" );
+		CL_ApplyClassicBaseq3Cvars();
+		cls.stockBaseq3 = qfalse;
+		Cbuf_AddText( "exec classic_openarena_native.cfg\n" );
 		return;
 	}
 
@@ -1422,6 +1466,9 @@ void CL_InitCGame( void ) {
 
 	// load the dll or bytecode
 	interpret = Cvar_VariableIntegerValue( "vm_cgame" );
+	if ( CL_IsOpenArenaGame() ) {
+		interpret = VMI_NATIVE;
+	}
 	if ( cl_connectedToPureServer )
 	{
 		// if sv_pure is set we only allow qvms to be loaded
@@ -1607,9 +1654,7 @@ static void CL_ValidateStockSpawnOrigin( void ) {
 
 	VectorCopy( cl.snap.ps.origin, org );
 	CM_ModelBounds( CM_InlineModel( 0 ), mins, maxs );
-	inside = ( qboolean )( org[0] >= mins[0] && org[0] <= maxs[0] &&
-		org[1] >= mins[1] && org[1] <= maxs[1] &&
-		org[2] >= mins[2] && org[2] <= maxs[2] );
+	inside = CL_PointInsideAABB( org, mins, maxs );
 	contents = CM_PointContents( org, 0 );
 	merged = CM_Stream_MergedCount();
 
