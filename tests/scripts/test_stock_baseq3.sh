@@ -20,6 +20,10 @@ grep -q 'SV_UseLegacyNativeEntityNums' runtime/server/sv_game.c || fail 'entity 
 grep -q '!gvm->dllHandle' runtime/server/sv_game.c || fail 'qvm entity mapping must use dllHandle'
 grep -q 'SV_EngineEntityNumToGame' runtime/server/sv_bot.c || fail 'botlib trace entity mapping missing'
 grep -q 'legacy_bsp_trace_t' runtime/server/sv_bot.c || fail 'retail botlib bsp_trace layout missing'
+grep -q 'legacy_trace_t' runtime/server/sv_game.c || fail 'server retail trace layout missing'
+grep -q 'SV_FillLegacyTrace' runtime/server/sv_game.c || fail 'server retail trace marshal missing'
+grep -q 'legacy_trace_t' runtime/client/core/cl_cgame.c || fail 'client retail trace layout missing'
+grep -q 'CL_FillLegacyTrace' runtime/client/core/cl_cgame.c || fail 'client retail trace marshal missing'
 grep -q 'cm_streamMerge 0' config/classic_baseq3.cfg || fail 'classic cfg must disable cm_streamMerge'
 
 pass "stock baseq3 contract"
