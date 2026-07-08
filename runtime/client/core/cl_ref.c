@@ -740,6 +740,10 @@ static void CL_ToggleImgui_f( void )
 	if ( com_dedicated && com_dedicated->integer ) {
 		return;
 	}
+	if ( CL_StockBaseq3Mode() ) {
+		Com_Printf( "ImGui inspector disabled in stock baseq3 mode\n" );
+		return;
+	}
 
 	cv = Cvar_Get( "r_imgui", "1", CVAR_ARCHIVE_ND );
 	on = cv->integer ? 0 : 1;

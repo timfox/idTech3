@@ -25,5 +25,7 @@ grep -q 'SV_FillLegacyTrace' runtime/server/sv_game.c || fail 'server retail tra
 grep -q 'legacy_trace_t' runtime/client/core/cl_cgame.c || fail 'client retail trace layout missing'
 grep -q 'CL_FillLegacyTrace' runtime/client/core/cl_cgame.c || fail 'client retail trace marshal missing'
 grep -q 'cm_streamMerge 0' config/classic_baseq3.cfg || fail 'classic cfg must disable cm_streamMerge'
+grep -q 'r_firstPersonFovEnabled 0' config/classic_baseq3.cfg || fail 'classic cfg must disable custom first-person FOV'
+grep -q 'r_firstPersonScaleEnabled 0' config/classic_baseq3.cfg || fail 'classic cfg must disable custom first-person scale'
 
 pass "stock baseq3 contract"

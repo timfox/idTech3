@@ -1432,6 +1432,8 @@ static void CL_ApplyClassicBaseq3Cvars( void ) {
 	Cvar_Set( "sv_openWorld", "0" );
 	Cvar_Set( "r_imgui", "0" );
 	Cvar_Set( "r_studio_tools", "0" );
+	Cvar_Set( "r_firstPersonFovEnabled", "0" );
+	Cvar_Set( "r_firstPersonScaleEnabled", "0" );
 
 	CM_Stream_Merge_ClearAll();
 
