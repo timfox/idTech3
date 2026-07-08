@@ -9,6 +9,16 @@ CMAKE="$ROOT/CMakeLists.txt"
 fail() { echo "[test_cpp20_sources] FAIL: $*" >&2; exit 1; }
 ok() { echo "[test_cpp20_sources] ok: $*"; }
 
+if command -v rg >/dev/null 2>&1; then
+	search_q() {
+		rg -q "$1" "$2"
+	}
+else
+	search_q() {
+		grep -Eq "$1" "$2"
+	}
+fi
+
 MIGRATED_CPP=(
 	src/world/world_open.cpp
 	src/world/world_district.cpp
@@ -34,9 +44,9 @@ REVERTED_C=(
 )
 
 echo "[test_cpp20_sources] checking CMake C++20 standard..."
-rg -q 'set\(IDTECH3_CXX_STANDARD 20\)' "$CMAKE" \
+search_q 'set\(IDTECH3_CXX_STANDARD 20\)' "$CMAKE" \
 	|| fail "CMakeLists.txt must set IDTECH3_CXX_STANDARD 20"
-rg -q 'CMAKE_CXX_STANDARD \$\{IDTECH3_CXX_STANDARD\}' "$CMAKE" \
+search_q 'CMAKE_CXX_STANDARD \$\{IDTECH3_CXX_STANDARD\}' "$CMAKE" \
 	|| fail "CMakeLists.txt must wire CMAKE_CXX_STANDARD to IDTECH3_CXX_STANDARD"
 ok "IDTECH3_CXX_STANDARD 20 wired in CMake"
 
@@ -52,11 +62,11 @@ WORLD_QCOMMON=(
 	world_proc
 )
 for mod in "${WORLD_QCOMMON[@]}"; do
-	rg -q "(${mod}\\.cpp|world/${mod}\\.cpp)" "$QC_EXT" \
+	search_q "(${mod}\\.cpp|world/${mod}\\.cpp)" "$QC_EXT" \
 		|| fail "open-world macro must list ${mod}.cpp"
 done
 QC_CORE="${ROOT}/cmake/EngineQcommonSources.cmake"
-rg -q 'src/qcommon/\*\.cpp' "$QC_CORE" \
+search_q 'src/qcommon/\*\.cpp' "$QC_CORE" \
 	|| fail "EngineQcommonSources must glob src/qcommon/*.cpp (includes cluster_graph.cpp)"
 [ -f "${ROOT}/src/qcommon/cluster_graph.cpp" ] || fail "missing cluster_graph.cpp"
 ok "open-world qcommon modules are .cpp in IdTech3QcommonExtensions.cmake"
@@ -65,9 +75,9 @@ echo "[test_cpp20_sources] checking migrated .cpp sources..."
 for rel in "${MIGRATED_CPP[@]}"; do
 	path="$ROOT/$rel"
 	[ -f "$path" ] || fail "missing $rel"
-	rg -q "$(basename "$rel")" "$CMAKE" \
+	search_q "$(basename "$rel")" "$CMAKE" \
 		|| fail "$(basename "$rel") not referenced in CMakeLists.txt"
-	if ! rg -q 'extern "C"' "$path"; then
+	if ! search_q 'extern "C"' "$path"; then
 		fail "$rel missing extern \"C\" API boundary"
 	fi
 done
@@ -78,7 +88,7 @@ for rel in "${REVERTED_C[@]}"; do
 	[ ! -f "$ROOT/$rel" ] || fail "reverted C source still present: $rel"
 done
 for rel in "${REVERTED_C[@]}"; do
-	if rg -q "${rel}([\" ;)]|$)" "$CMAKE" 2>/dev/null; then
+	if search_q "${rel}([\" ;)]|$)" "$CMAKE" 2>/dev/null; then
 		fail "CMakeLists.txt still references reverted $rel"
 	fi
 done

@@ -239,7 +239,6 @@ static qboolean VFGI_ParseManifest( const char *text, vfgiManifest_t *man )
 static void VFGI_BuildDefaultWeights( void )
 {
 	int h = vfgi.man.hiddenDim;
-	int f = vfgi.man.featureDim;
 	int i, c;
 
 	Com_Memset( vfgi.W1, 0, sizeof( vfgi.W1 ) );

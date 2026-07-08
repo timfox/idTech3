@@ -503,16 +503,6 @@ void SNDDMA_BeginPainting( void ) {}
 int  SNDDMA_GetDMAPos( void ) { return audioDmaPos; }
 void SNDDMA_Submit( void ) {}
 
-/* ---- Navigation stubs ---- */
-
-void Nav_Init( void ) {}
-void Nav_Shutdown( void ) {}
-int  Nav_BuildFromBSP( const char *m, void *p ) { (void)m; (void)p; return -1; }
-void Nav_UpdateCrowd( int h, float dt ) { (void)h; (void)dt; }
-void Nav_BSP_ClearGeometry( void ) {}
-int  Nav_BSP_AddVertex( float x, float y, float z ) { (void)x; (void)y; (void)z; return 0; }
-void Nav_BSP_AddTriangle( int a, int b, int c ) { (void)a; (void)b; (void)c; }
-
 /* ---- Input handling ---- */
 
 static int32_t onInputEvent( ANativeActivity *activity, AInputEvent *event ) {

@@ -339,7 +339,9 @@ void ClusterGraph_UpdateReachability( int sourceCluster, int maxHops )
 	if ( s_reachValid && s_lastSourceCluster == sourceCluster && s_lastMaxHops == maxHops ) {
 		return;
 	}
-	CG_RunBfs( sourceCluster, maxHops );
+	if ( !CG_RunBfs( sourceCluster, maxHops ) ) {
+		CG_ClearReach();
+	}
 }
 
 qboolean ClusterGraph_IsReachable( int cluster )
@@ -411,7 +413,10 @@ void ClusterGraph_ReachTest_f( void )
 		hops = atoi( Cmd_Argv( 2 ) );
 	}
 
-	CG_RunBfs( src, hops );
+	if ( !CG_RunBfs( src, hops ) ) {
+		Com_Printf( "[cluster_graph] reachability build failed for source=%d hops=%d\n", src, hops );
+		return;
+	}
 	for ( c = 0; c < s_csr.numClusters; c++ ) {
 		if ( s_hopDist[c] >= 0 ) {
 			reachable++;

@@ -103,13 +103,12 @@ static void VFGI_EmitFace( vfgiWorldData_t *wd, vfgiHashEntry_t *hash, uint32_t 
 	idxSrc = (const unsigned *)( (const char *)face + face->ofsIndices );
 	for ( t = 0u; t < (uint32_t)face->numIndices / 3u; t++ ) {
 		float n[3];
-		const float *p0, *p1, *p2;
+		const float *p0, *p1;
+		p0 = face->points[idxSrc[t * 3u + 0]];
+		p1 = face->points[idxSrc[t * 3u + 1]];
 		for ( vi = 0; vi < 3; vi++ ) {
 			unsigned vidx = idxSrc[t * 3u + (unsigned)vi];
 			const float *p = face->points[vidx];
-			p0 = face->points[idxSrc[t * 3u + 0]];
-			p1 = face->points[idxSrc[t * 3u + 1]];
-			p2 = face->points[idxSrc[t * 3u + 2]];
 			CrossProduct( p1, p0, n );
 			{
 				float len = VectorLength( n );
@@ -137,10 +136,9 @@ static void VFGI_EmitTris( vfgiWorldData_t *wd, vfgiHashEntry_t *hash, uint32_t 
 	}
 	for ( t = 0u; t < (uint32_t)surf->numIndexes / 3u; t++ ) {
 		float n[3];
-		const float *p0, *p1, *p2;
+		const float *p0, *p1;
 		p0 = surf->verts[surf->indexes[(int)( t * 3u ) + 0]].xyz;
 		p1 = surf->verts[surf->indexes[(int)( t * 3u ) + 1]].xyz;
-		p2 = surf->verts[surf->indexes[(int)( t * 3u ) + 2]].xyz;
 		CrossProduct( p1, p0, n );
 		{
 			float len = VectorLength( n );

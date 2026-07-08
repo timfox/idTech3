@@ -105,7 +105,7 @@ static void DLM_Cmd_Sample_f( void )
 		samples = atoi( Cmd_Argv( 3 ) );
 	}
 
-	s = DLM_SampleWeightHistogram( k, depth, samples, 0xF1NKu, counts,
+	s = DLM_SampleWeightHistogram( k, depth, samples, 0xF1u, counts,
 		(int)( sizeof( counts ) / sizeof( counts[0] ) ) );
 	if ( s <= 0 ) {
 		Com_Printf( S_COLOR_RED "[DLM] sampling failed\n" );

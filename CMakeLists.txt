@@ -3444,6 +3444,19 @@ if(BUILD_UNIT_TESTS)
 	add_test(NAME unit_cm_bounds COMMAND unit_cm_bounds)
 	set_tests_properties(unit_cm_bounds PROPERTIES LABELS "unit;validation")
 
+	add_executable(unit_cl_compat_math
+		tests/unit/test_cl_compat_math.c
+		runtime/client/core/cl_compat_math.c)
+	target_include_directories(unit_cl_compat_math PRIVATE
+		${CMAKE_SOURCE_DIR}/src
+		${CMAKE_SOURCE_DIR}/src/extensions/research
+		${CMAKE_SOURCE_DIR}/runtime/client/core)
+	if(NOT MSVC)
+		target_link_libraries(unit_cl_compat_math PRIVATE m)
+	endif()
+	add_test(NAME unit_cl_compat_math COMMAND unit_cl_compat_math)
+	set_tests_properties(unit_cl_compat_math PROPERTIES LABELS "unit;validation;client")
+
 	add_executable(unit_parse
 		tests/unit/test_parse.c
 		tests/stub_qcommon_min.c

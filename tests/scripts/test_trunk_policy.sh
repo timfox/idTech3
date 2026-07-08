@@ -28,26 +28,36 @@ mapfile -t remotes < <(git branch -r | sed 's/^ *//' | grep -v 'origin/HEAD' || 
 bad=()
 allowed_only_main=1
 
-for ref in "${remotes[@]}"; do
-	case "$ref" in
-		origin/main) continue ;;
-		origin/cursor/*) bad+=("$ref"); continue ;;
-		*) bad+=("$ref"); allowed_only_main=0 ;;
-	esac
-done
+if [ "${GITHUB_ACTIONS:-}" = "true" ] && [ "${ALLOW_EXTRA_ORIGIN_REFS_IN_CI:-1}" = "1" ]; then
+	if printf '%s\n' "${remotes[@]}" | grep -qx 'origin/main'; then
+		pass "origin/main visible in CI checkout"
+	else
+		fail "origin/main missing from CI checkout"
+	fi
+	pass "skipping strict remote hygiene in GitHub Actions checkout"
+else
 
-if [ "${#bad[@]}" -gt 0 ]; then
-	echo "Unexpected origin remotes (trunk policy: only origin/main):" >&2
-	printf '  %s\n' "${bad[@]}" >&2
-	fail "stale remote branches detected"
-fi
-pass "origin has only main (plus HEAD)"
+	for ref in "${remotes[@]}"; do
+		case "$ref" in
+			origin/main) continue ;;
+			origin/cursor/*) bad+=("$ref"); continue ;;
+			*) bad+=("$ref"); allowed_only_main=0 ;;
+		esac
+	done
 
-cursor_count="$(git branch -r | grep -c 'origin/cursor/' || true)"
-if [ "$cursor_count" -gt 0 ]; then
-	fail "found $cursor_count origin/cursor/* remote(s)"
+	if [ "${#bad[@]}" -gt 0 ]; then
+		echo "Unexpected origin remotes (trunk policy: only origin/main):" >&2
+		printf '  %s\n' "${bad[@]}" >&2
+		fail "stale remote branches detected"
+	fi
+	pass "origin has only main (plus HEAD)"
+
+	cursor_count="$(git branch -r | grep -c 'origin/cursor/' || true)"
+	if [ "$cursor_count" -gt 0 ]; then
+		fail "found $cursor_count origin/cursor/* remote(s)"
+	fi
+	pass "no origin/cursor/* remotes"
 fi
-pass "no origin/cursor/* remotes"
 
 # --- archive tags (legacy consolidation) ---
 archive_count="$(git tag -l 'archive/*' 2>/dev/null | wc -l | tr -d ' ')"

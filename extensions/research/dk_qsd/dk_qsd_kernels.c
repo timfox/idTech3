@@ -14,7 +14,6 @@ void DK_Kernels_Fill( float p, float W[2][2][2], float V[2][2] )
 	const float p2 = p * ( 2.0f - p );
 	int s0;
 	int s1;
-	int sout;
 	int s;
 
 	for ( s0 = 0; s0 < 2; s0++ ) {

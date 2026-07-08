@@ -706,8 +706,11 @@ void Com_StartupVariable( const char *match ) {
 
 		name = Cmd_Argv( 1 );
 		if ( !match || Q_stricmp( name, match ) == 0 ) {
-			if ( Cvar_Flags( name ) == CVAR_NONEXISTENT )
+			int flags = Cvar_Flags( name );
+			if ( flags == (int)CVAR_NONEXISTENT )
 				Cvar_Get( name, Cmd_ArgsFrom( 2 ), CVAR_USER_CREATED );
+			else if ( !match && ( flags & CVAR_INIT ) )
+				continue;
 			else
 				Cvar_Set2( name, Cmd_ArgsFrom( 2 ), qfalse );
 		}

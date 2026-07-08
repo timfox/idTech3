@@ -224,6 +224,31 @@ static const char *vmName[ VM_COUNT ] = {
 	"ui"
 };
 
+static qboolean VM_ShouldForceOpenArenaNative( const char *name ) {
+	const char *fs_game;
+	const char *fs_basegame;
+
+	if ( Q_stricmp( name, "qagame" ) && Q_stricmp( name, "cgame" ) && Q_stricmp( name, "ui" ) ) {
+		return qfalse;
+	}
+
+	fs_game = Cvar_VariableString( "fs_game" );
+	if ( fs_game && fs_game[0] ) {
+		if ( !Q_stricmp( fs_game, "openarena" ) || !Q_stricmp( fs_game, "baseoa" ) ) {
+			return qtrue;
+		}
+	}
+
+	fs_basegame = Cvar_VariableString( "fs_basegame" );
+	if ( fs_basegame && fs_basegame[0] ) {
+		if ( Q_stristr( fs_basegame, "openarena" ) || Q_stristr( fs_basegame, "baseoa" ) ) {
+			return qtrue;
+		}
+	}
+
+	return qfalse;
+}
+
 static void VM_VmInfo_f( void );
 static void VM_VmProfile_f( void );
 
@@ -1859,8 +1884,7 @@ vm_t *VM_Create( vmIndex_t index, syscall_t systemCalls, dllSyscall_t dllSyscall
 	const char	*name;
 	vmHeader_t	*header;
 	vm_t		*vm;
-	char		qvmPath[MAX_QPATH];
-	qboolean	preferQvm;
+	qboolean	canTryNative;
 
 	if ( !systemCalls ) {
 		Com_Error( ERR_FATAL, "VM_Create: bad parms" );
@@ -1884,6 +1908,9 @@ vm_t *VM_Create( vmIndex_t index, syscall_t systemCalls, dllSyscall_t dllSyscall
 	}
 
 	name = vmName[ index ];
+	if ( VM_ShouldForceOpenArenaNative( name ) ) {
+		interpret = VMI_NATIVE;
+	}
 
 	vm->name = name;
 	vm->index = index;
@@ -1891,21 +1918,17 @@ vm_t *VM_Create( vmIndex_t index, syscall_t systemCalls, dllSyscall_t dllSyscall
 	vm->dllSyscall = dllSyscalls;
 	vm->privateFlag = CVAR_PRIVATE;
 	vm->silentQVM = qfalse;
-
-	Com_sprintf( qvmPath, sizeof( qvmPath ), "modules/%s.qvm", name );
-	preferQvm = FS_SV_FileExists( qvmPath ) || FS_FileIsInPAK( qvmPath, NULL, NULL );
-	if ( !preferQvm ) {
-		Com_sprintf( qvmPath, sizeof( qvmPath ), "vm/%s.qvm", name );
-		preferQvm = FS_SV_FileExists( qvmPath ) || FS_FileIsInPAK( qvmPath, NULL, NULL );
-	}
+	canTryNative = ( Cvar_VariableIntegerValue( "fs_restrict" ) == 0 ) ? qtrue : qfalse;
 
 	/*
-	 * Respect shipped QVM content when it exists. This keeps Quake 3 / OpenArena-
-	 * style gamedirs on their packaged bytecode VMs instead of accidentally
-	 * overriding them with loose native modules dropped into the game directory.
-	 * Native loading remains the fallback for native-only mods and explicit vm_* 0.
+	 * Respect the requested VM mode:
+	 *   vm_* = 0 -> native first, then QVM fallback
+	 *   vm_* >= 1 -> QVM first, then native fallback for native-only mods
+	 *
+	 * This keeps Quake 3 / OpenArena-style pk3 stacks on their packaged QVMs
+	 * instead of accidentally overriding them with loose native modules.
 	 */
-	if ( !preferQvm && !Cvar_VariableIntegerValue( "fs_restrict" ) ) {
+	if ( interpret == VMI_NATIVE && canTryNative ) {
 		Com_Printf( "Loading native %s.\n", name );
 		vm->dllHandle = loadNative( name, &vm->entryPoint, dllSyscalls );
 		if ( vm->dllHandle ) {
@@ -1919,8 +1942,6 @@ vm_t *VM_Create( vmIndex_t index, syscall_t systemCalls, dllSyscall_t dllSyscall
 		// Native DLL failed, fall back to QVM
 		Com_Printf( "Native %s not found (tried modules/ and vm/), trying %s.qvm...\n", name, name );
 		vm->silentQVM = qtrue; // Flag to suppress redundant QVM loading messages
-	} else if ( preferQvm ) {
-		Com_Printf( "VM_Create: found %s.qvm in search paths, preferring QVM over loose native module.\n", name );
 	}
 
 	// never allow dll loading with a demo
@@ -1932,6 +1953,17 @@ vm_t *VM_Create( vmIndex_t index, syscall_t systemCalls, dllSyscall_t dllSyscall
 
 	// load the image
 	if( ( header = VM_LoadQVM( vm, qtrue ) ) == NULL ) {
+		if ( interpret != VMI_NATIVE && canTryNative ) {
+			Com_Printf( S_COLOR_YELLOW "VM_Create: %s.qvm unavailable, falling back to native %s.\n", name, name );
+			vm->dllHandle = loadNative( name, &vm->entryPoint, dllSyscalls );
+			if ( vm->dllHandle ) {
+				vm->privateFlag = 0;
+				vm->dataAlloc = ~0U;
+				vm->dataMask = ~0U;
+				vm->dataBase = 0;
+				return vm;
+			}
+		}
 		return NULL;
 	}
 
