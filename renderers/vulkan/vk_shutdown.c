@@ -36,11 +36,7 @@ void vk_release_vbo( void );
 
 void vk_shutdown( refShutdownCode_t code )
 {
-#ifdef USE_VK_PBR
 	int i, j, k, l, m;
-#else
-	int i, j, k, l;
-#endif
 
 	if ( qvkQueuePresentKHR == NULL ) { /* not fully initialized */
 		goto __cleanup;
