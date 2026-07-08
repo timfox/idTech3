@@ -31,6 +31,11 @@ function New-RepoJunction {
 }
 
 Write-Host '[layout_fwd_win] MSVC/MinGW junction bridge...'
+New-RepoJunction 'engine\platform\physics' 'modules\physics'
+New-RepoJunction 'engine\platform\botlib' 'modules\botlib'
+New-RepoJunction 'engine\platform\renderers' 'renderers'
+New-RepoJunction 'engine\platform\navigation' 'modules\navigation'
+New-RepoJunction 'engine\platform\cgame' 'runtime\cgame'
 New-RepoJunction 'engine\qcommon' 'engine\core'
 New-RepoJunction 'engine\platform\qcommon' 'engine\core'
 New-RepoJunction 'engine\platform\client' 'runtime\client'
