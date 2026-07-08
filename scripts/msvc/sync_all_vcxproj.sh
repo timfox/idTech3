@@ -6,7 +6,7 @@ ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 BUILD="${1:-${ROOT}/build-msvc-sync}"
 MSVC_PY="${ROOT}/scripts/msvc"
 
-MANIFEST="$("${ROOT}/scripts/generate_msvc_source_manifest.sh" "${BUILD}")"
+MANIFEST="$("${ROOT}/scripts/generate_msvc_source_manifest.sh" "${BUILD}" | tail -1)"
 export PYTHONPATH="${MSVC_PY}"
 
 for project in quake3e quake3e-ded botlib vulkan; do
