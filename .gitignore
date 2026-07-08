@@ -49,6 +49,14 @@ android/local.properties
 !/examples/demo_skeleton/base/README.txt
 !/examples/demo_skeleton/base/z_minimal_bootstrap.pk3
 
+# Open-world runtime test bootstrap (ignored by `base/` above)
+!/tests/data/openworld/base/
+/tests/data/openworld/base/*
+!/tests/data/openworld/base/default.cfg
+!/tests/data/openworld/base/openworld_smoke.cfg
+!/tests/data/openworld/base/openworld_smoke_fidelity.cfg
+!/tests/data/openworld/base/z_openworld_smoke.pk3
+
 # demo mod pk3: default build output is ignored; ship a tracked bootstrap pack for turnkey skeleton (rebuild: demo_game_pk3)
 /examples/demo_skeleton/idtech3_demo/*
 !/examples/demo_skeleton/idtech3_demo/README.txt

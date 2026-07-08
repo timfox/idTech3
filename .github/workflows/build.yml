@@ -80,6 +80,10 @@ jobs:
 
       - uses: actions/checkout@v4
 
+      - name: Layout forwarding symlinks
+        shell: msys2 {0}
+        run: ./scripts/layout_forwarding_symlinks.sh
+
       - name: Init required submodules
         run: ./scripts/init_optional_submodules.sh --freeusd
 
