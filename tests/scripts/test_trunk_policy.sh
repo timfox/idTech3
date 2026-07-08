@@ -24,18 +24,17 @@ fi
 pass "trunk governance files present"
 
 # --- remote branch hygiene ---
-mapfile -t remotes < <(git branch -r | sed 's/^ *//' | grep -v 'origin/HEAD' || true)
-bad=()
-allowed_only_main=1
-
 if [ "${GITHUB_ACTIONS:-}" = "true" ] && [ "${ALLOW_EXTRA_ORIGIN_REFS_IN_CI:-1}" = "1" ]; then
-	if printf '%s\n' "${remotes[@]}" | grep -qx 'origin/main'; then
+	if git branch -r | sed 's/^ *//' | grep -qx 'origin/main'; then
 		pass "origin/main visible in CI checkout"
 	else
 		fail "origin/main missing from CI checkout"
 	fi
 	pass "skipping strict remote hygiene in GitHub Actions checkout"
 else
+	mapfile -t remotes < <(git branch -r | sed 's/^ *//' | grep -v 'origin/HEAD' || true)
+	bad=()
+	allowed_only_main=1
 
 	for ref in "${remotes[@]}"; do
 		case "$ref" in
