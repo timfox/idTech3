@@ -73,7 +73,7 @@
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
   <ItemDefinitionGroup>
     <ClCompile>
-      <AdditionalIncludeDirectories>$(AudioIncludeDirectories);$(LibCurlInclude);$(LibJpegInclude);..\..\..\qcommon;..\..\qcommon;..\..\..\game;..\..\..\external\include\entt\single_include;..\..\..\external\src\jpeg;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(AudioIncludeDirectories);$(LibCurlInclude);$(LibJpegInclude);..\..\..;..\..\..\game;..\..\..\external\include\entt\single_include;..\..\..\external\src\jpeg;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
   </ItemDefinitionGroup>
   <ImportGroup Label="ExtensionSettings">
@@ -143,7 +143,7 @@
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
-      <AdditionalIncludeDirectories>$(OpenSslRoot)\include;$(AudioIncludeDirectories);$(LibCurlInclude);$(LibJpegInclude);..\..\..\qcommon;..\..\qcommon;..\..\..\game;..\..\..\external\include\entt\single_include;..\..\..\external\src\jpeg;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(OpenSslRoot)\include;$(AudioIncludeDirectories);$(LibCurlInclude);$(LibJpegInclude);..\..\..;..\..\..\game;..\..\..\external\include\entt\single_include;..\..\..\external\src\jpeg;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>WIN32;_DEBUG;_WINDOWS;_CRT_SECURE_NO_DEPRECATE;_WINSOCK_DEPRECATED_NO_WARNINGS;USE_CURL;CURL_STATICLIB;USE_VULKAN_API;USE_OGG_VORBIS;USE_WIN32_ASM;USE_DTLS=1;USE_OPEN_WORLD=1;$(UseWASAPI);%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <BasicRuntimeChecks>EnableFastChecks</BasicRuntimeChecks>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
@@ -171,7 +171,7 @@
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>
       <Optimization>Disabled</Optimization>
-      <AdditionalIncludeDirectories>$(OpenSslRoot)\include;$(AudioIncludeDirectories);$(LibCurlInclude);$(LibJpegInclude);..\..\..\qcommon;..\..\qcommon;..\..\..\game;..\..\..\external\include\entt\single_include;..\..\..\external\src\jpeg;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(OpenSslRoot)\include;$(AudioIncludeDirectories);$(LibCurlInclude);$(LibJpegInclude);..\..\..;..\..\..\game;..\..\..\external\include\entt\single_include;..\..\..\external\src\jpeg;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>WIN32;_DEBUG;_WINDOWS;_CRT_SECURE_NO_DEPRECATE;_WINSOCK_DEPRECATED_NO_WARNINGS;USE_CURL;CURL_STATICLIB;USE_VULKAN_API;USE_OGG_VORBIS;USE_WIN32_ASM;USE_DTLS=1;USE_OPEN_WORLD=1;$(UseWASAPI);%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <BasicRuntimeChecks>EnableFastChecks</BasicRuntimeChecks>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
@@ -195,7 +195,7 @@
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|ARM64'">
     <ClCompile>
       <Optimization>Disabled</Optimization>
-      <AdditionalIncludeDirectories>$(AudioIncludeDirectories);$(LibCurlInclude);$(LibJpegInclude);..\..\..\qcommon;..\..\qcommon;..\..\..\game;..\..\..\external\include\entt\single_include;..\..\..\external\src\jpeg;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(AudioIncludeDirectories);$(LibCurlInclude);$(LibJpegInclude);..\..\..;..\..\..\game;..\..\..\external\include\entt\single_include;..\..\..\external\src\jpeg;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>WIN32;_DEBUG;_WINDOWS;_CRT_SECURE_NO_DEPRECATE;_WINSOCK_DEPRECATED_NO_WARNINGS;USE_VULKAN_API;USE_OGG_VORBIS;USE_OPEN_WORLD=1;$(UseWASAPI);%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <BasicRuntimeChecks>EnableFastChecks</BasicRuntimeChecks>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
@@ -220,7 +220,7 @@
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <ClCompile>
-      <AdditionalIncludeDirectories>$(OpenSslRoot)\include;$(AudioIncludeDirectories);$(LibCurlInclude);$(LibJpegInclude);..\..\..\qcommon;..\..\qcommon;..\..\..\game;..\..\..\external\include\entt\single_include;..\..\..\external\src\jpeg;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(OpenSslRoot)\include;$(AudioIncludeDirectories);$(LibCurlInclude);$(LibJpegInclude);..\..\..;..\..\..\game;..\..\..\external\include\entt\single_include;..\..\..\external\src\jpeg;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>WIN32;_WIN32;NDEBUG;_WINDOWS;_CRT_SECURE_NO_DEPRECATE;_WINSOCK_DEPRECATED_NO_WARNINGS;USE_CURL;CURL_STATICLIB;USE_VULKAN_API;USE_OGG_VORBIS;USE_WIN32_ASM;USE_DTLS=1;USE_OPEN_WORLD=1;$(UseWASAPI);%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <WarningLevel>Level4</WarningLevel>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
@@ -247,7 +247,7 @@
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <ClCompile>
-      <AdditionalIncludeDirectories>$(OpenSslRoot)\include;$(AudioIncludeDirectories);$(LibCurlInclude);$(LibJpegInclude);..\..\..\qcommon;..\..\qcommon;..\..\..\game;..\..\..\external\include\entt\single_include;..\..\..\external\src\jpeg;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(OpenSslRoot)\include;$(AudioIncludeDirectories);$(LibCurlInclude);$(LibJpegInclude);..\..\..;..\..\..\game;..\..\..\external\include\entt\single_include;..\..\..\external\src\jpeg;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>WIN32;_WIN32;NDEBUG;_WINDOWS;_CRT_SECURE_NO_DEPRECATE;_WINSOCK_DEPRECATED_NO_WARNINGS;USE_CURL;CURL_STATICLIB;USE_VULKAN_API;USE_OGG_VORBIS;USE_WIN32_ASM;USE_DTLS=1;USE_OPEN_WORLD=1;$(UseWASAPI);%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <WarningLevel>Level4</WarningLevel>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
@@ -274,7 +274,7 @@
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|ARM64'">
     <ClCompile>
-      <AdditionalIncludeDirectories>$(AudioIncludeDirectories);$(LibCurlInclude);$(LibJpegInclude);..\..\..\qcommon;..\..\qcommon;..\..\..\game;..\..\..\external\include\entt\single_include;..\..\..\external\src\jpeg;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(AudioIncludeDirectories);$(LibCurlInclude);$(LibJpegInclude);..\..\..;..\..\..\game;..\..\..\external\include\entt\single_include;..\..\..\external\src\jpeg;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>WIN32;_WIN32;NDEBUG;_WINDOWS;_CRT_SECURE_NO_DEPRECATE;_WINSOCK_DEPRECATED_NO_WARNINGS;USE_VULKAN_API;USE_OGG_VORBIS;USE_OPEN_WORLD=1;$(UseWASAPI);%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <WarningLevel>Level4</WarningLevel>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>

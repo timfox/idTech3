@@ -786,7 +786,7 @@ jobs:
             mkdir -p release
             cp -f "$OUTDIR"/idtech3* release/ || true
             chmod +x scripts/smoke_test.sh
-            ./scripts/smoke_test.sh release
+            SKIP_TRUNK_FETCH=1 GITHUB_ACTIONS=true ./scripts/smoke_test.sh release
 
             chmod +x scripts/renderer_regression_check.sh
             ./scripts/renderer_regression_check.sh
