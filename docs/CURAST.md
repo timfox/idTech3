@@ -58,6 +58,7 @@ curast_stages [scene]
 ```
 curast_status
 curast_render [N]
+curast_partition
 curast_reset
 ```
 
@@ -68,6 +69,15 @@ curast_reset
 3. **Resolve** — decode triangle id, write RGBA8 color buffer
 
 Runs on a one-shot command buffer; output is not composited into the main frame yet.
+
+`curast_partition` performs a paper-style routing analysis on the current procedural mesh and reports how many triangles would go to:
+
+- **Stage 1**: small triangles (`<128` pixel bbox area)
+- **Stage 2**: medium triangles (`<4096` pixel bbox area)
+- **Stage 3**: large triangles
+- **nearPlane**: triangles that would require special handling before screen-space stage routing
+
+This does not execute stages 2 and 3 yet, but it makes the paper’s 3-stage split visible in the runtime scaffold instead of treating every triangle as stage 1 by default.
 
 ## Benchmark model
 

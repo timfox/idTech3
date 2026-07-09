@@ -23,6 +23,8 @@ void VudaCuda_ReleaseImports( void );
 
 qboolean VudaCuda_RunJob( const vudaCudaJob_t *job, int maxMs, uint64_t waitTimeline,
 	uint64_t *outSignalTimeline );
+qboolean VudaCuda_WaitRenderTimeline( uint64_t waitTimeline );
+void VudaCuda_SignalCompleteTimeline( uint64_t signalTimeline );
 
 qboolean VudaCuda_BindStream( int streamSlot );
 qboolean VudaCuda_UnbindStream( int streamSlot );

@@ -5,6 +5,8 @@ ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 
 grep -q 'CuRast_ModelBenchmark' "$ROOT/src/extensions/research/curast/curast_model.c"
 grep -q 'curast_render' "$ROOT/src/renderers/vulkan/extensions/scaffold/vk_curast.c"
+grep -q 'curast_partition' "$ROOT/src/renderers/vulkan/extensions/scaffold/vk_curast.c"
+grep -q 'CuRast_AnalyzeStageRouting' "$ROOT/src/renderers/vulkan/extensions/scaffold/vk_curast.c"
 grep -q 'curast_stage1.comp' "$ROOT/scripts/compile_shaders.sh"
 grep -q 'Curast_ConsoleInit' "$ROOT/src/qcommon/common.c"
 test -f "$ROOT/docs/CURAST.md"

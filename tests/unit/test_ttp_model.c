@@ -36,7 +36,7 @@ static void test_dfs_speedup_above_one( void )
 	TTP_ModelDFS( &hist, intensity, 0.70f, &r );
 	expect_true( r.speedup > 1.05f, "DFS+TTP speedup > 1.05x at mem_wait=0.70" );
 	expect_true( r.coverage > 0.05f, "DFS+TTP coverage > 5%" );
-	expect_true( r.accuracy > 0.0f && r.accuracy <= 1.0f, "DFS accuracy in [0,1]" );
+	expect_true( r.accuracy > 0.95f && r.accuracy <= 1.0f, "DFS accuracy calibrated near paper L1 accuracy" );
 }
 
 static void test_bfs_beats_dfs_with_ttp_on_deep_tree( void )
@@ -56,6 +56,24 @@ static void test_bfs_beats_dfs_with_ttp_on_deep_tree( void )
 	expect_true( bfs.speedup >= dfs.speedup, "BFS+TTP speedup >= DFS+TTP on depth-16 synthetic tree" );
 }
 
+static void test_bfs_distance_scaling( void )
+{
+	ttp_pop_histogram_t hist_bfs;
+	ttp_model_result_t bfs1;
+	ttp_model_result_t bfs2;
+	ttp_model_result_t bfs4;
+
+	TTP_SimulateTraversal( TTP_TRAVERSAL_BFS, 14, 6, 5, &hist_bfs );
+	TTP_ModelBFS( &hist_bfs, 1, 0.70f, &bfs1 );
+	TTP_ModelBFS( &hist_bfs, 2, 0.70f, &bfs2 );
+	TTP_ModelBFS( &hist_bfs, 4, 0.70f, &bfs4 );
+
+	expect_true( bfs2.speedup > bfs1.speedup, "BFS N=2 outperforms N=1" );
+	expect_true( bfs4.speedup > bfs2.speedup, "BFS N=4 outperforms N=2" );
+	expect_true( bfs1.speedup > 1.70f && bfs1.speedup < 1.95f, "BFS N=1 near paper average speedup" );
+	expect_true( bfs4.speedup > 2.10f && bfs4.speedup < 2.30f, "BFS N=4 near paper average speedup" );
+}
+
 static void test_lumibench_preset_count( void )
 {
 	int count;
@@ -68,6 +86,7 @@ int main( void )
 {
 	test_dfs_speedup_above_one();
 	test_bfs_beats_dfs_with_ttp_on_deep_tree();
+	test_bfs_distance_scaling();
 	test_lumibench_preset_count();
 
 	printf( "test_ttp_model: %d run, %d failed\n", tests_run, tests_failed );

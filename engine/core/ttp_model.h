@@ -31,3 +31,4 @@ void TTP_ModelBFS( const ttp_pop_histogram_t *hist, int prefetch_distance, float
 	ttp_model_result_t *out );
 
 void TTP_DefaultPrefetchIntensity( int out_intensity[3] );
+float TTP_BFSCoverageForDistance( int prefetch_distance );

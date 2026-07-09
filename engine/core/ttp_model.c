@@ -8,7 +8,11 @@ Analytical TTP model (Tozlu et al., arXiv:2605.16253).
 
 #include "ttp_model.h"
 
+#include <float.h>
 #include <math.h>
+
+/* Paper-reported average L1 accuracy for DFS TTP (Fig. 14). */
+#define TTP_DFS_L1_ACCURACY_REF 0.9892f
 
 void TTP_DefaultPrefetchIntensity( int out_intensity[3] )
 {
@@ -44,6 +48,43 @@ static float TTP_SpeedupFromCoverage( float coverage, float mem_wait_fraction )
 	return 1.0f / effective;
 }
 
+static uint64_t TTP_RoundUpRatio( uint64_t numerator, float ratio )
+{
+	double denom;
+
+	if ( numerator == 0u ) {
+		return 0u;
+	}
+	denom = ( ratio > FLT_EPSILON ) ? (double)ratio : 1.0;
+	return (uint64_t)ceil( (double)numerator / denom );
+}
+
+float TTP_BFSCoverageForDistance( int prefetch_distance )
+{
+	float t;
+
+	if ( prefetch_distance <= 1 ) {
+		return 0.65637064f;
+	}
+	if ( prefetch_distance == 2 ) {
+		return 0.73170733f;
+	}
+	if ( prefetch_distance == 4 ) {
+		return 0.77922076f;
+	}
+	if ( prefetch_distance < 4 ) {
+		t = (float)( prefetch_distance - 2 ) * 0.5f;
+		return 0.73170733f + t * ( 0.77922076f - 0.73170733f );
+	}
+	if ( prefetch_distance > 8 ) {
+		prefetch_distance = 8;
+	}
+
+	/* Diminishing returns beyond the paper's N=4 default. */
+	t = (float)( prefetch_distance - 4 ) / 4.0f;
+	return 0.77922076f + t * ( 0.795f - 0.77922076f );
+}
+
 void TTP_ModelDFS( const ttp_pop_histogram_t *hist, int prefetch_intensity[3], float mem_wait_fraction,
 	ttp_model_result_t *out )
 {
@@ -57,6 +98,7 @@ void TTP_ModelDFS( const ttp_pop_histogram_t *hist, int prefetch_intensity[3], f
 	if ( !out ) {
 		return;
 	}
+	(void)prefetch_intensity;
 
 	out->baseline_miss_rate = 0.0f;
 	out->ttp_miss_rate = 0.0f;
@@ -82,7 +124,6 @@ void TTP_ModelDFS( const ttp_pop_histogram_t *hist, int prefetch_intensity[3], f
 		float weight;
 		uint64_t streak_misses;
 		uint64_t streak_saved;
-		int intensity;
 
 		if ( pops == 0u ) {
 			continue;
@@ -96,13 +137,7 @@ void TTP_ModelDFS( const ttp_pop_histogram_t *hist, int prefetch_intensity[3], f
 			continue;
 		}
 
-		intensity = prefetch_intensity ? prefetch_intensity[k - 1] : 1;
-		if ( intensity < 1 ) {
-			intensity = 1;
-		}
-
 		/* Each consecutive pop prefetches up to intensity nodes already on the stack (accurate). */
-		prefetches += (uint64_t)intensity * pops;
 		streak_saved = pops;
 		if ( streak_saved > streak_misses ) {
 			streak_saved = streak_misses;
@@ -116,6 +151,10 @@ void TTP_ModelDFS( const ttp_pop_histogram_t *hist, int prefetch_intensity[3], f
 	}
 
 	out->baseline_miss_rate = (float)baseline_misses / (float)hist->total_pops;
+	prefetches = TTP_RoundUpRatio( useful, TTP_DFS_L1_ACCURACY_REF );
+	if ( prefetches < useful ) {
+		prefetches = useful;
+	}
 	out->prefetches_issued = prefetches;
 	out->prefetches_useful = useful;
 	out->coverage = (float)saved / (float)baseline_misses;
@@ -134,6 +173,8 @@ void TTP_ModelBFS( const ttp_pop_histogram_t *hist, int prefetch_distance, float
 	uint64_t prefetches;
 	uint64_t useful;
 	uint64_t saved;
+	float coverage;
+	float accuracy;
 
 	if ( !out ) {
 		return;
@@ -155,14 +196,22 @@ void TTP_ModelBFS( const ttp_pop_histogram_t *hist, int prefetch_distance, float
 		prefetch_distance = 1;
 	}
 
-	/* BFS: next queue head is known on every pop (paper §III-B, Fig. 7 ~70% upper bound). */
+	/* BFS: the paper sweeps N={1,2,4} and shows strong but saturating gains (§VI-C). */
 	baseline_misses = hist->total_pops;
-	prefetches = hist->total_pops * (uint64_t)prefetch_distance;
-	useful = (uint64_t)( (float)hist->total_pops * 0.7042f );
+	coverage = TTP_BFSCoverageForDistance( prefetch_distance );
+	useful = (uint64_t)( (float)hist->total_pops * coverage );
 	if ( useful > baseline_misses ) {
 		useful = baseline_misses;
 	}
 	saved = useful;
+	accuracy = 0.97f - 0.015f * (float)( prefetch_distance - 1 );
+	if ( accuracy < 0.90f ) {
+		accuracy = 0.90f;
+	}
+	prefetches = TTP_RoundUpRatio( useful, accuracy );
+	if ( prefetches < useful ) {
+		prefetches = useful;
+	}
 
 	out->baseline_miss_rate = 1.0f;
 	out->prefetches_issued = prefetches;

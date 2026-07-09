@@ -24,6 +24,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "q_shared.h"
 #include "qcommon.h"
 #include "aiwc.h"
+#include "bubblesh.h"
 #include "ttp.h"
 #include "jobs.h"
 #include "defer.h"
@@ -4230,6 +4231,7 @@ void Com_Init( char *commandLine ) {
 	Defer_Init();
 	Jobs_Init();
 	AIWC_Init();
+	BubbleSH_Init();
 	TTP_Init();
 #ifdef USE_RESEARCH_EXTENSIONS
 	Vuda_ConsoleInit();
