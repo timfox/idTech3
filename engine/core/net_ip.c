@@ -1956,6 +1956,10 @@ static void NET_Event( const fd_set *fdr )
 					continue; // drop this packet
 			}
 
+			if ( NET_P2P_TryHandleNatPacket( &from, netmsg.data, netmsg.cursize ) ) {
+				continue;
+			}
+
 #ifdef DEDICATED
 			Com_RunAndTimeServerPacket( &from, &netmsg );
 #else

@@ -922,6 +922,10 @@ static void SV_ConnectionlessPacket( const netadr_t *from, msg_t *msg ) {
 		return;
 	}
 
+	if ( NET_P2P_TryHandleBrowseOob( from, c, msg ) ) {
+		return;
+	}
+
 	if ( com_developer->integer ) {
 		Com_Printf( "SV packet %s : %s\n", NET_AdrToString( from ), c );
 	}

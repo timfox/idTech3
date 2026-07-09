@@ -667,6 +667,10 @@ static qboolean CL_ConnectionlessPacket( const netadr_t *from, msg_t *msg ) {
 		return qfalse;
 	}
 
+	if ( NET_P2P_TryHandleBrowseOob( from, c, msg ) ) {
+		return qfalse;
+	}
+
 	if ( com_developer->integer ) {
 		Com_Printf( "CL packet %s: %s\n", NET_AdrToStringwPort( from ), s );
 	}
