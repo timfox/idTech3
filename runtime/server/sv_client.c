@@ -26,6 +26,94 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "sv_app_crdt.h"
 #include "../qcommon/script_emit.h"
 
+#define SV_P2P_GRACE_MAX 32
+
+static int SV_CreateChallenge( int timestamp, const netadr_t *from );
+
+typedef struct {
+	qboolean active;
+	char sessionId[64];
+	netadr_t adr;
+	int qport;
+	int clientNum;
+	int disconnectTime;
+} sv_p2p_grace_slot_t;
+
+static sv_p2p_grace_slot_t sv_p2pGraceSlots[SV_P2P_GRACE_MAX];
+
+static void SV_P2P_SaveGraceSlot( const client_t *drop )
+{
+	int i;
+	sv_p2p_grace_slot_t *slot;
+	const char *sessionId;
+
+	if ( !drop || drop->netchan.remoteAddress.type == NA_BOT ) {
+		return;
+	}
+
+	if ( !sv_p2pReconnectWindow || sv_p2pReconnectWindow->integer <= 0 ) {
+		return;
+	}
+
+	sessionId = ( sv_p2pSessionId && sv_p2pSessionId->string[0] &&
+	              Q_stricmp( sv_p2pSessionId->string, "auto" ) != 0 )
+	            ? sv_p2pSessionId->string : NULL;
+	if ( !sessionId ) {
+		return;
+	}
+
+	slot = NULL;
+	for ( i = 0; i < SV_P2P_GRACE_MAX; i++ ) {
+		if ( !sv_p2pGraceSlots[i].active ) {
+			slot = &sv_p2pGraceSlots[i];
+			break;
+		}
+	}
+	if ( !slot ) {
+		slot = &sv_p2pGraceSlots[0];
+	}
+
+	Com_Memset( slot, 0, sizeof( *slot ) );
+	slot->active = qtrue;
+	Q_strncpyz( slot->sessionId, sessionId, sizeof( slot->sessionId ) );
+	slot->adr = drop->netchan.remoteAddress;
+	slot->qport = drop->netchan.qport;
+	slot->clientNum = (int)( drop - svs.clients );
+	slot->disconnectTime = svs.time;
+}
+
+qboolean SV_P2P_AllowReconnectGrace( const netadr_t *from, const char *sessionId )
+{
+	int i;
+	int windowMs;
+
+	if ( !from || !sessionId || !sessionId[0] || !sv_p2pReconnectWindow ) {
+		return qfalse;
+	}
+
+	windowMs = sv_p2pReconnectWindow->integer * 1000;
+	for ( i = 0; i < SV_P2P_GRACE_MAX; i++ ) {
+		sv_p2p_grace_slot_t *slot = &sv_p2pGraceSlots[i];
+
+		if ( !slot->active ) {
+			continue;
+		}
+		if ( Q_stricmp( slot->sessionId, sessionId ) != 0 ) {
+			continue;
+		}
+		if ( !NET_CompareAdr( from, &slot->adr ) ) {
+			continue;
+		}
+		if ( svs.time - slot->disconnectTime > windowMs ) {
+			slot->active = qfalse;
+			return qfalse;
+		}
+		return qtrue;
+	}
+
+	return qfalse;
+}
+
 static void SV_CloseDownload( client_t *cl );
 
 /*
@@ -53,6 +141,26 @@ qboolean SV_Auth_CheckClient( client_t *cl )
 //
 
 #define TS_SHIFT 14 // ~16 seconds to reply to the challenge
+
+void SV_P2P_HandleReconnectRequest( const netadr_t *from )
+{
+	const char *sessionId;
+	int challenge;
+
+	if ( !from || !com_sv_running->integer ) {
+		return;
+	}
+
+	sessionId = Cmd_Argv( 1 );
+	if ( !SV_P2P_AllowReconnectGrace( from, sessionId ) ) {
+		return;
+	}
+
+	challenge = SV_CreateChallenge( svs.time >> TS_SHIFT, from );
+	NET_OutOfBandPrint( NS_SERVER, from, "challengeResponse %i", challenge );
+	Com_Printf( "P2P reconnect: fast challenge for session %s from %s\n",
+		sessionId, NET_AdrToString( from ) );
+}
 
 /*
 =================
@@ -669,7 +777,11 @@ void SV_DirectConnect( const netadr_t *from ) {
 	for ( i = 0, cl = svs.clients; i < sv.maxclients; i++, cl++ ) {
 		if ( NET_CompareAdr( from, &cl->netchan.remoteAddress ) ) {
 			int elapsed = svs.time - cl->lastConnectTime;
-			if ( elapsed < ( sv_reconnectlimit->integer * 1000 ) && elapsed >= 0 ) {
+			const char *sessionId = Cmd_Argv( 2 );
+			qboolean p2pGrace = ( sessionId && sessionId[0] &&
+				SV_P2P_AllowReconnectGrace( from, sessionId ) );
+
+			if ( !p2pGrace && elapsed < ( sv_reconnectlimit->integer * 1000 ) && elapsed >= 0 ) {
 				int remains = ( ( sv_reconnectlimit->integer * 1000 ) - elapsed + 999 ) / 1000;
 				if ( com_developer->integer ) {
 					Com_Printf( "%s:reconnect rejected : too soon\n", NET_AdrToString( from ) );
@@ -929,6 +1041,8 @@ void SV_DropClient( client_t *drop, const char *reason ) {
 	drop->justConnected = qfalse;
 
 	drop->lastDisconnectTime = svs.time;
+
+	SV_P2P_SaveGraceSlot( drop );
 
 	if ( isBot ) {
 		// bots shouldn't go zombie, as there's no real net connection.

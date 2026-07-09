@@ -19,6 +19,7 @@ void NET_P2P_BeginPunchForAddress( const char *address );
 void NET_P2P_PrintPunchStatus( void );
 void NET_P2P_PrintIceCandidates( void );
 void NET_P2P_BeginMasterList( const char *masterAddress );
+qboolean NET_P2P_BeginConnectPath( const char *peerAddress );
 qboolean NET_P2P_TryHandleNatPacket( const netadr_t *from, const byte *data, int len );
 qboolean NET_P2P_TryHandleBrowseOob( const netadr_t *from, const char *cmd, msg_t *msg );
 qboolean NET_P2P_HandleOobPacket( const netadr_t *from, const char *cmd );

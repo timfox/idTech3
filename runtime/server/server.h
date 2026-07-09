@@ -367,6 +367,8 @@ int SV_Strlen( const char *str );
 // sv_client.c
 //
 void SV_GetChallenge( const netadr_t *from );
+void SV_P2P_HandleReconnectRequest( const netadr_t *from );
+qboolean SV_P2P_AllowReconnectGrace( const netadr_t *from, const char *sessionId );
 void SV_InitChallenger( void );
 
 void SV_DirectConnect( const netadr_t *from );

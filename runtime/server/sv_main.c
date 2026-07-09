@@ -983,6 +983,11 @@ static void SV_ConnectionlessPacket( const netadr_t *from, msg_t *msg ) {
 		return;
 	}
 
+	if ( !Q_stricmp( c, "p2pReconnect" ) ) {
+		SV_P2P_HandleReconnectRequest( from );
+		return;
+	}
+
 	if ( !com_sv_running->integer ) {
 		return;
 	}

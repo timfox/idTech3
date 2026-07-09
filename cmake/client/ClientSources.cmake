@@ -11,6 +11,7 @@ set(IDTECH3_CLIENT_CORE_SRCS
 	${_IDTECH3_CLIENT}/core/cl_lifecycle.c
 	${_IDTECH3_CLIENT}/core/cl_cvars.c
 	${_IDTECH3_CLIENT}/core/cl_connect.c
+	${_IDTECH3_CLIENT}/core/cl_p2p_session.c
 	${_IDTECH3_CLIENT}/core/cl_cmds.c
 	${_IDTECH3_CLIENT}/core/cl_ref.c
 	${_IDTECH3_CLIENT}/core/cl_pipeline.c

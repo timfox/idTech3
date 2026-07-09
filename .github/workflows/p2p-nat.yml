@@ -1,0 +1,75 @@
+name: p2p-nat
+
+permissions:
+  contents: read
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+concurrency:
+  group: p2p-nat-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  p2p_nat_gate:
+    name: P2P NAT gate (config check)
+    runs-on: ubuntu-24.04
+    outputs:
+      enabled: ${{ steps.check.outputs.enabled }}
+    steps:
+      - id: check
+        env:
+          P2P_VAR: ${{ vars.IDTECH3_P2P_NAT_TEST }}
+          P2P_SECRET: ${{ secrets.IDTECH3_P2P_NAT_TEST }}
+        run: |
+          if [ -n "$P2P_VAR" ] || [ -n "$P2P_SECRET" ]; then
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+            echo "P2P NAT live: enabled"
+          else
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+            echo "P2P NAT live: disabled (set IDTECH3_P2P_NAT_TEST)"
+          fi
+
+  p2p_nat_host:
+    name: P2P NAT host
+    needs: p2p_nat_gate
+    if: needs.p2p_nat_gate.outputs.enabled == 'true'
+    runs-on: [self-hosted, idtech3-p2p-host]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build Vulkan (Release)
+        run: ./scripts/compile_engine.sh vulkan skipshaders
+      - name: Host role
+        env:
+          IDTECH3_P2P_NAT_LIVE: "1"
+          P2P_NAT_HOST_IP: ${{ vars.P2P_NAT_HOST_IP }}
+        run: |
+          chmod +x tests/scripts/test_p2p_nat_live.sh
+          ./tests/scripts/test_p2p_nat_live.sh host
+      - uses: actions/upload-artifact@v4
+        with:
+          name: p2p-nat-host
+          path: build-vk-Release/p2p-nat-artifact/p2p-nat-host.json
+
+  p2p_nat_client:
+    name: P2P NAT client
+    needs: p2p_nat_host
+    if: needs.p2p_nat_gate.outputs.enabled == 'true'
+    runs-on: [self-hosted, idtech3-p2p-client]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: p2p-nat-host
+          path: build-vk-Release/p2p-nat-artifact
+      - name: Build Vulkan (Release)
+        run: ./scripts/compile_engine.sh vulkan skipshaders
+      - name: Client role
+        env:
+          IDTECH3_P2P_NAT_LIVE: "1"
+        run: |
+          chmod +x tests/scripts/test_p2p_nat_live.sh
+          ./tests/scripts/test_p2p_nat_live.sh client
