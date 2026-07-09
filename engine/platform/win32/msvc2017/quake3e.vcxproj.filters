@@ -211,9 +211,6 @@
     <ClCompile Include="..\win_glimp.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\win_qgl.c">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="..\win_qvk.c">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -225,7 +222,7 @@
     <ClInclude Include="..\..\cgame\cg_public.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\client\cl_curl.h">
+    <ClInclude Include="..\..\client\platform\cl_curl.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="..\..\client\client.h">

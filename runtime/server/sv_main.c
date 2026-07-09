@@ -918,6 +918,10 @@ static void SV_ConnectionlessPacket( const netadr_t *from, msg_t *msg ) {
 
 	c = Cmd_Argv(0);
 
+	if ( NET_P2P_HandleOobPacket( from, c ) ) {
+		return;
+	}
+
 	if ( com_developer->integer ) {
 		Com_Printf( "SV packet %s : %s\n", NET_AdrToString( from ), c );
 	}

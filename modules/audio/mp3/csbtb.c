@@ -294,6 +294,7 @@ void sbtB8_dual_right(float *sample, unsigned char *pcm, int n)
 #endif	// #ifdef COMPILE_ME
 
 #ifndef COMPILE_ME
+#include "small_header.h"
 // Dummy function to suppress empty translation unit warning
-static void __attribute__((unused)) csbtb_dummy(void) {}
+static void MP3_ATTRIBUTE_UNUSED csbtb_dummy( void ) {}
 #endif

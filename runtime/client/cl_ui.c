@@ -256,7 +256,7 @@ static int LAN_AddServer(int source, const char *name, const char *address) {
 			servers[*count].adr = adr;
 			Q_strncpyz(servers[*count].hostName, name, sizeof(servers[*count].hostName));
 			Q_strncpyz( servers[*count].p2pAddr, address, sizeof( servers[*count].p2pAddr ) );
-			servers[*count].p2pAvailable = ( qboolean )( !Q_stricmpn( address, "steam:", 6 ) );
+			servers[*count].p2pAvailable = NET_P2P_IsAddressString( address );
 			if ( !servers[*count].p2pAvailable ) {
 				servers[*count].p2pAddr[0] = '\0';
 				LAN_CopyKnownServerMetadata( &servers[*count], &adr );

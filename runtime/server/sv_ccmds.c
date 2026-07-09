@@ -25,6 +25,8 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 static void SV_P2PStatus_f( void );
 static void SV_P2PAddress_f( void );
+static void SV_P2PPunch_f( void );
+static void SV_P2PPunchStatus_f( void );
 
 /*
 ===============================================================================
@@ -1623,6 +1625,8 @@ void SV_AddDedicatedCommands( void )
 	Cmd_AddCommand( "locations", SV_Locations_f );
 	Cmd_AddCommand( "p2p_status", SV_P2PStatus_f );
 	Cmd_AddCommand( "p2p_address", SV_P2PAddress_f );
+	Cmd_AddCommand( "p2p_punch", SV_P2PPunch_f );
+	Cmd_AddCommand( "p2p_punch_status", SV_P2PPunchStatus_f );
 }
 
 
@@ -1635,6 +1639,8 @@ void SV_RemoveDedicatedCommands( void )
 	Cmd_RemoveCommand( "locations" );
 	Cmd_RemoveCommand( "p2p_status" );
 	Cmd_RemoveCommand( "p2p_address" );
+	Cmd_RemoveCommand( "p2p_punch" );
+	Cmd_RemoveCommand( "p2p_punch_status" );
 }
 static void SV_P2PStatus_f( void ) {
 	char address[MAX_STRING_CHARS];
@@ -1660,9 +1666,30 @@ static void SV_P2PAddress_f( void ) {
 	}
 
 	if ( !NET_P2P_GetLocalAddressString( address, sizeof( address ) ) ) {
-		Com_Printf( "P2P address unavailable; make sure Steam is running and net_p2p is enabled\n" );
+		Com_Printf( "P2P address unavailable; make sure net_p2p is enabled and configure Steam or net_p2pAdvertiseAddress for direct_udp\n" );
 		return;
 	}
 
 	Com_Printf( "%s\n", address );
+}
+
+static void SV_P2PPunch_f( void ) {
+	char address[MAX_STRING_CHARS];
+
+	if ( Cmd_Argc() != 2 ) {
+		Com_Printf( "usage: p2p_punch <host:port|udp:host:port>\n" );
+		return;
+	}
+
+	if ( !NET_P2P_NormalizeAddressString( Cmd_Argv( 1 ), address, sizeof( address ) ) ||
+	     Q_stricmpn( address, "udp:", 4 ) != 0 ) {
+		Com_Printf( "p2p_punch: expected host:port or udp:host:port\n" );
+		return;
+	}
+
+	NET_P2P_BeginPunchForAddress( address );
+}
+
+static void SV_P2PPunchStatus_f( void ) {
+	NET_P2P_PrintPunchStatus();
 }

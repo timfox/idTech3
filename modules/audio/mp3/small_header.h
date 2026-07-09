@@ -7,6 +7,11 @@
 #ifndef SMALL_HEADER_H
 #define SMALL_HEADER_H
 
+#if defined( _MSC_VER )
+#define MP3_ATTRIBUTE_UNUSED
+#else
+#define MP3_ATTRIBUTE_UNUSED __attribute__( ( unused ) )
+#endif
 
 typedef union
 {

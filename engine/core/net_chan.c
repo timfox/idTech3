@@ -822,6 +822,10 @@ int NET_StringToAdr( const char *s, netadr_t *a, netadrtype_t family )
 	}
 #endif
 
+	if ( !Q_stricmpn( s, "udp:", 4 ) ) {
+		s += 4;
+	}
+
 	Q_strncpyz( base, s, sizeof( base ) );
 	
 	if(*base == '[' || Q_CountChar(base, ':') > 1)

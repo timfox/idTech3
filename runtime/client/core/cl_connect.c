@@ -10,6 +10,7 @@ Client connection: connect/disconnect, rcon, OOB packets, resend/timeout.
 #include "cl_connect.h"
 #include "cl_serverbrowser.h"
 #include "cl_demo.h"
+#include "../../qcommon/net_p2p.h"
 
 #include <string.h>
 
@@ -661,6 +662,10 @@ static qboolean CL_ConnectionlessPacket( const netadr_t *from, msg_t *msg ) {
 	Cmd_TokenizeString( s );
 
 	c = Cmd_Argv(0);
+
+	if ( NET_P2P_HandleOobPacket( from, c ) ) {
+		return qfalse;
+	}
 
 	if ( com_developer->integer ) {
 		Com_Printf( "CL packet %s: %s\n", NET_AdrToStringwPort( from ), s );
