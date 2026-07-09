@@ -424,6 +424,7 @@
     <ClCompile Include="..\..\server\sv_engine_decals.c" />
     <ClCompile Include="..\..\server\sv_engine_sprites.c" />
     <ClCompile Include="..\..\server\sv_openworld.c" />
+    <ClCompile Include="..\..\..\physics\phys_character.c" />
   <!-- IDTECH3_MSVC_MANIFEST_END -->
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
