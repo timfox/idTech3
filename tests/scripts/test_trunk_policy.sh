@@ -66,13 +66,15 @@ else
 fi
 
 # --- archive tags (legacy consolidation) ---
-archive_count="$(git tag -l 'archive/*' 2>/dev/null | wc -l | tr -d ' ')"
 if [ "${SKIP_TRUNK_FETCH:-0}" = "1" ]; then
 	pass "skipping archive/* tag check (SKIP_TRUNK_FETCH)"
-elif [ "${REQUIRE_ARCHIVE_TAGS:-1}" = "1" ] && [ "$archive_count" -lt 1 ]; then
-	fail "expected archive/* tags (run scripts/archive_legacy_remote_branches.sh once)"
 else
-	pass "archive/* tags present ($archive_count)"
+	archive_count="$(git tag -l 'archive/*' 2>/dev/null | wc -l | tr -d ' ')"
+	if [ "${REQUIRE_ARCHIVE_TAGS:-1}" = "1" ] && [ "$archive_count" -lt 1 ]; then
+		fail "expected archive/* tags (run scripts/archive_legacy_remote_branches.sh once)"
+	else
+		pass "archive/* tags present ($archive_count)"
+	fi
 fi
 
 # --- local integration scripts wired in tests ---
