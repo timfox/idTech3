@@ -60,6 +60,10 @@ cvar_t	*sv_interestPriority;
 cvar_t	*sv_sectorURL;
 cvar_t	*sv_floodProtect;
 cvar_t	*sv_lanForceRate; // dedicated 1 (LAN) server forces local client rates to 99999 (bug #491)
+cvar_t	*sv_p2pHostMigration;
+cvar_t	*sv_p2pReconnectWindow;
+cvar_t	*sv_p2pFailover;
+cvar_t	*sv_p2pSessionId;
 
 cvar_t *sv_levelTimeReset;
 cvar_t *sv_filter;
@@ -71,20 +75,70 @@ serverBan_t serverBans[SERVER_MAXBANS];
 int serverBansCount = 0;
 #endif
 
-void SV_BuildServerInfoString( char *buffer, int bufferSize )
+static const char *SV_P2PAntiCheatMode( void )
+{
+	if ( sv_pureSigned && sv_pureSigned->integer ) {
+		return "pure_signed";
+	}
+	if ( sv_pure && sv_pure->integer ) {
+		return "pure";
+	}
+	return "none";
+}
+
+static void SV_BuildP2PSessionId( char *buffer, int bufferSize )
+{
+	if ( !buffer || bufferSize <= 0 ) {
+		return;
+	}
+
+	if ( sv_p2pSessionId && sv_p2pSessionId->string[0] &&
+	     Q_stricmp( sv_p2pSessionId->string, "auto" ) != 0 ) {
+		Q_strncpyz( buffer, sv_p2pSessionId->string, bufferSize );
+		return;
+	}
+
+	Com_sprintf(
+		buffer,
+		bufferSize,
+		"%s-%i-%s",
+		Cvar_VariableString( "fs_game" )[0] ? Cvar_VariableString( "fs_game" ) : "base",
+		sv_serverid ? sv_serverid->integer : 0,
+		sv_mapname ? sv_mapname->string : "nomap"
+	);
+}
+
+static void SV_AddP2PServerInfo( char *buffer, int bufferSize )
 {
 	char p2pAddress[MAX_STRING_CHARS];
+	char sessionId[128];
 
+	Info_SetValueForKey_s( buffer, bufferSize, "p2p", NET_P2P_IsReady() ? "1" : "0" );
+	Info_SetValueForKey_s( buffer, bufferSize, "p2pmigrate",
+		( sv_p2pHostMigration && sv_p2pHostMigration->integer ) ? "1" : "0" );
+	Info_SetValueForKey_s( buffer, bufferSize, "p2preconn",
+		va( "%i", sv_p2pReconnectWindow ? sv_p2pReconnectWindow->integer : 0 ) );
+	Info_SetValueForKey_s( buffer, bufferSize, "p2pfail",
+		( sv_p2pFailover && sv_p2pFailover->string[0] ) ? sv_p2pFailover->string : "reconnect" );
+	Info_SetValueForKey_s( buffer, bufferSize, "p2psecure", SV_P2PAntiCheatMode() );
+	Info_SetValueForKey_s( buffer, bufferSize, "p2pproto", va( "%i", com_protocol->integer ) );
+
+	SV_BuildP2PSessionId( sessionId, sizeof( sessionId ) );
+	Info_SetValueForKey_s( buffer, bufferSize, "p2psession", sessionId );
+
+	if ( NET_P2P_GetLocalAddressString( p2pAddress, sizeof( p2pAddress ) ) ) {
+		Info_SetValueForKey_s( buffer, bufferSize, "p2paddr", p2pAddress );
+	}
+}
+
+void SV_BuildServerInfoString( char *buffer, int bufferSize )
+{
 	if ( bufferSize < 1 ) {
 		Com_Error( ERR_DROP, "SV_BuildServerInfoString: bufferSize == %i", bufferSize );
 	}
 
 	Q_strncpyz( buffer, Cvar_InfoString( CVAR_SERVERINFO, NULL ), bufferSize );
-	Info_SetValueForKey_s( buffer, bufferSize, "p2p", NET_P2P_IsReady() ? "1" : "0" );
-
-	if ( NET_P2P_GetLocalAddressString( p2pAddress, sizeof( p2pAddress ) ) ) {
-		Info_SetValueForKey_s( buffer, bufferSize, "p2paddr", p2pAddress );
-	}
+	SV_AddP2PServerInfo( buffer, bufferSize );
 }
 
 /*
@@ -773,17 +827,11 @@ static void SVC_Info( const netadr_t *from ) {
 	Info_SetValueForKey( infostring, "gametype", va( "%i", sv_gametype->integer ) );
 	Info_SetValueForKey( infostring, "pure", va( "%i", sv.pure ) );
 	Info_SetValueForKey( infostring, "g_needpass", va( "%d", Cvar_VariableIntegerValue( "g_needpass" ) ) );
-	Info_SetValueForKey( infostring, "p2p", NET_P2P_IsReady() ? "1" : "0" );
 	gamedir = Cvar_VariableString( "fs_game" );
 	if ( *gamedir != '\0' ) {
 		Info_SetValueForKey( infostring, "game", gamedir );
 	}
-	{
-		char p2pAddress[MAX_STRING_CHARS];
-		if ( NET_P2P_GetLocalAddressString( p2pAddress, sizeof( p2pAddress ) ) ) {
-			Info_SetValueForKey( infostring, "p2paddr", p2pAddress );
-		}
-	}
+	SV_AddP2PServerInfo( infostring, sizeof( infostring ) );
 
 	NET_OutOfBandPrint( NS_SERVER, from, "infoResponse\n%s", infostring );
 }

@@ -66,9 +66,15 @@ typedef struct {
 	qboolean active;
 	netadr_t adr;
 	char p2pAddr[MAX_STRING_CHARS];
+	char sessionId[64];
+	char antiCheat[32];
+	char failover[32];
 	char hostName[MAX_NAME_LENGTH];
 	char mapName[MAX_NAME_LENGTH];
 	int clients;
+	int protocol;
+	int reconnectWindow;
+	qboolean hostMigration;
 	qboolean queried;
 	qboolean haveInfo;
 } p2p_browse_entry_t;
@@ -542,6 +548,15 @@ static void NET_P2P_NatFinishBrowse( void )
 			entry->p2pAddr[0] ? entry->p2pAddr : "<unavailable>",
 			NET_AdrToStringwPort( &entry->adr )
 		);
+		Com_Printf(
+			"           session:%s  proto:%d  reconnect:%ds  migrate:%s  secure:%s  failover:%s\n",
+			entry->sessionId[0] ? entry->sessionId : "<auto>",
+			entry->protocol,
+			entry->reconnectWindow,
+			entry->hostMigration ? "yes" : "no",
+			entry->antiCheat[0] ? entry->antiCheat : "unknown",
+			entry->failover[0] ? entry->failover : "unknown"
+		);
 		matches++;
 	}
 
@@ -773,10 +788,16 @@ qboolean NET_P2P_NatTryHandleConnectionless( const netadr_t *from, const char *c
 	}
 
 	entry->haveInfo = qtrue;
+	entry->protocol = prot;
 	entry->clients = atoi( Info_ValueForKey( infoString, "clients" ) );
 	Q_strncpyz( entry->hostName, Info_ValueForKey( infoString, "hostname" ), sizeof( entry->hostName ) );
 	Q_strncpyz( entry->mapName, Info_ValueForKey( infoString, "mapname" ), sizeof( entry->mapName ) );
 	Q_strncpyz( entry->p2pAddr, Info_ValueForKey( infoString, "p2paddr" ), sizeof( entry->p2pAddr ) );
+	Q_strncpyz( entry->sessionId, Info_ValueForKey( infoString, "p2psession" ), sizeof( entry->sessionId ) );
+	Q_strncpyz( entry->antiCheat, Info_ValueForKey( infoString, "p2psecure" ), sizeof( entry->antiCheat ) );
+	Q_strncpyz( entry->failover, Info_ValueForKey( infoString, "p2pfail" ), sizeof( entry->failover ) );
+	entry->reconnectWindow = atoi( Info_ValueForKey( infoString, "p2preconn" ) );
+	entry->hostMigration = atoi( Info_ValueForKey( infoString, "p2pmigrate" ) ) ? qtrue : qfalse;
 	if ( net_p2pBrowseInfoPending > 0 ) {
 		net_p2pBrowseInfoPending--;
 	}

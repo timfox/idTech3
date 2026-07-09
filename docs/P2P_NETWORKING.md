@@ -26,6 +26,7 @@
 - `p2p_punch_status`
 - `p2p_candidates`
 - `p2p_list [local|global|favorites|master]`
+- `p2p_sessioninfo <local|global|favorites> <index>`
 - `p2p_connect_browser <local|global|favorites> <index>`
 
 `p2p_address` prints the current shareable P2P address: `steam:STEAMID64` for Steam SDR or `udp:host:port` for direct UDP when `net_p2pAdvertiseAddress` is configured or ICE auto-advertise resolves a candidate.
@@ -34,6 +35,7 @@
 `p2p_punch_status` prints active punch peers, attempts, and whether a peer has acknowledged the punchthrough flow.
 `p2p_candidates` prints gathered ICE candidates (`host`, `srflx`, `relay`).
 `p2p_list` prints cached browser entries that advertise P2P support, including their browser source, index, Steam address, and current UDP endpoint. Use `p2p_list master` to query the configured master server directly.
+`p2p_sessioninfo` prints the advertised session contract for one cached browser entry: session id, protocol, reconnect window, host migration support, anti-cheat posture, and failover policy.
 `p2p_connect_browser` uses the browser cache and prefers an advertised `p2paddr` when one is available.
 When `net_p2p 1` is enabled, legacy UI/browser joins also prefer the advertised `p2paddr` automatically.
 
@@ -102,9 +104,31 @@ For non-Steam or offline/manual hosting:
 ## Discovery
 
 Servers now advertise `p2p=1` and `p2paddr=<backend-address>` in their info responses when the P2P backend is ready.
+They also advertise a compact session contract:
+
+- `p2psession` — stable session identifier for browser caching and reconnect UX
+- `p2preconn` — reconnect recovery window in seconds
+- `p2pmigrate` — whether the host advertises migration support
+- `p2psecure` — anti-cheat posture (`none`, `pure`, `pure_signed`)
+- `p2pfail` — failure recovery policy (`reconnect`, `migrate`, or `none`)
+- `p2pproto` — protocol compatibility identifier
+
 That metadata is stored in the client browser cache and exposed through `LAN_GetServerInfo`, so UI scripts or terminal users can connect with `p2p_connect_browser`.
 Browser entries also match on `p2paddr`, so if a server's UDP endpoint changes but its advertised P2P identity stays the same, the cached entry is refreshed instead of treated as a different server.
 Favorites preserve the same identity too: adding or removing `steam:...` or `udp:...` entries works directly, and favorites copied from browser listings retain the advertised `p2paddr` for later joins.
+
+## Supported session model
+
+The engine's current supported multiplayer model is:
+
+- **Transport**: `steam_sdr` or `direct_udp`
+- **NAT traversal**: host/STUN/TURN candidate gathering plus symmetric UDP punch helpers
+- **Reconnect**: explicit reconnect window advertised by the server and reusable `cl_reconnectArgs`
+- **Versioning**: browser-visible protocol plus game/mod identity
+- **Anti-cheat posture**: browser-visible `sv_pure` / `sv_pureSigned` summary
+- **Failure recovery**: browser-visible policy so clients know whether to expect reconnect-only or future host-migration flows
+
+This does not implement automatic host migration yet, but it finally gives the transport and browser layers a stable contract for reconnect, matchmaking/session UX, version compatibility, anti-cheat posture, and recovery behavior.
 
 ## Dedicated server status
 

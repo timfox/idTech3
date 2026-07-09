@@ -384,6 +384,15 @@ static void CL_P2PListSource( const char *source, serverInfo_t *servers, int cou
 			servers[i].p2pAddr[0] ? servers[i].p2pAddr : "<unavailable>",
 			NET_AdrToStringwPort( &servers[i].adr )
 		);
+		Com_Printf(
+			"           session:%s  proto:%d  reconnect:%ds  migrate:%s  secure:%s  failover:%s\n",
+			servers[i].p2pSessionId[0] ? servers[i].p2pSessionId : "<auto>",
+			servers[i].protocol,
+			servers[i].p2pReconnectWindow,
+			servers[i].p2pHostMigration ? "yes" : "no",
+			servers[i].p2pAntiCheat[0] ? servers[i].p2pAntiCheat : "unknown",
+			servers[i].p2pFailover[0] ? servers[i].p2pFailover : "unknown"
+		);
 		matches++;
 	}
 
@@ -430,6 +439,37 @@ static void CL_P2PList_f( void ) {
 	}
 
 	Com_Printf( "p2p_list: unknown source '%s'\n", source );
+}
+
+static void CL_P2PSessionInfo_f( void ) {
+	serverInfo_t *server;
+	int index;
+	int count;
+	const char *source;
+
+	if ( Cmd_Argc() != 3 ) {
+		Com_Printf( "usage: p2p_sessioninfo <local|global|favorites> <index>\n" );
+		return;
+	}
+
+	source = Cmd_Argv( 1 );
+	index = atoi( Cmd_Argv( 2 ) );
+	server = CL_P2PBrowserServer( source, index, &count );
+	if ( !server || index < 0 || index >= count ) {
+		Com_Printf( "p2p_sessioninfo: no server at %s %d\n", source, index );
+		return;
+	}
+
+	Com_Printf( "P2P session %s %d\n", source, index );
+	Com_Printf( "  host: %s\n", server->hostName[0] ? server->hostName : "<unnamed>" );
+	Com_Printf( "  map: %s\n", server->mapName[0] ? server->mapName : "<unknown>" );
+	Com_Printf( "  p2p address: %s\n", server->p2pAddr[0] ? server->p2pAddr : "<unavailable>" );
+	Com_Printf( "  session id: %s\n", server->p2pSessionId[0] ? server->p2pSessionId : "<auto>" );
+	Com_Printf( "  protocol: %d\n", server->protocol );
+	Com_Printf( "  reconnect window: %d seconds\n", server->p2pReconnectWindow );
+	Com_Printf( "  host migration: %s\n", server->p2pHostMigration ? "supported" : "not advertised" );
+	Com_Printf( "  anti-cheat posture: %s\n", server->p2pAntiCheat[0] ? server->p2pAntiCheat : "unknown" );
+	Com_Printf( "  failure recovery: %s\n", server->p2pFailover[0] ? server->p2pFailover : "unknown" );
 }
 
 static void CL_P2PConnectBrowser_f( void ) {
@@ -488,6 +528,7 @@ void CL_Cmds_Init( void ) {
 	Cmd_AddCommand( "p2p_punch_status", CL_P2PPunchStatus_f );
 	Cmd_AddCommand( "p2p_candidates", CL_P2PCandidates_f );
 	Cmd_AddCommand( "p2p_list", CL_P2PList_f );
+	Cmd_AddCommand( "p2p_sessioninfo", CL_P2PSessionInfo_f );
 	Cmd_AddCommand( "p2p_connect_browser", CL_P2PConnectBrowser_f );
 }
 
@@ -512,5 +553,6 @@ void CL_Cmds_Shutdown( void ) {
 	Cmd_RemoveCommand( "p2p_punch_status" );
 	Cmd_RemoveCommand( "p2p_candidates" );
 	Cmd_RemoveCommand( "p2p_list" );
+	Cmd_RemoveCommand( "p2p_sessioninfo" );
 	Cmd_RemoveCommand( "p2p_connect_browser" );
 }
