@@ -396,18 +396,6 @@ void RB_BeginSurface( shader_t *shader, int fogNum ) {
 		tess.dlightUpdateParams = qtrue;
 	}
 
-#ifdef USE_TESS_NEEDS_NORMAL
-	tess.needsNormal = state->needsNormal || tess.dlightPass || r_shownormals->integer ||
-		( backEnd.currentEntity == &tr.worldEntity &&
-		( ( r_shDebugView && r_shDebugView->integer ) ||
-		( r_shWorldLighting && r_shWorldLighting->integer && r_shLighting && r_shLighting->integer &&
-			!R_ClassicLightingActive() ) ) );
-#endif
-
-#ifdef USE_TESS_NEEDS_ST2
-	tess.needsST2 = state->needsST2;
-#endif
-
 	tess.numIndexes = 0;
 	tess.numVertexes = 0;
 	tess.sdfUiEdge = -1.0f;
