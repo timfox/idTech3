@@ -395,6 +395,7 @@
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|ARM64'">true</ExcludedFromBuild>
     </ClCompile>
     <ClCompile Include="..\..\qcommon\net_p2p.c" />
+    <ClCompile Include="..\..\qcommon\net_p2p_nat.c" />
     <ClCompile Include="..\..\qcommon\steam_shared.c" />
     <ClCompile Include="..\..\qcommon\puff.c" />
     <ClCompile Include="..\..\qcommon\q_math.c" />

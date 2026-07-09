@@ -9,6 +9,7 @@ Optional peer-to-peer networking facade.
 #include "q_shared.h"
 #include "qcommon.h"
 #include "net_p2p.h"
+#include "net_p2p_nat.h"
 #include "net_sdr.h"
 
 #define P2P_PUNCH_MAX_PEERS 8
@@ -161,13 +162,46 @@ qboolean NET_P2P_UsesSteamSdrBackend( void )
 	return NET_P2P_SteamSupported();
 }
 
+static void NET_P2P_EnsurePunchPeer( const netadr_t *adr, const char *addressString, int nonce, qboolean resetAttempts )
+{
+	p2p_punch_peer_t *peer;
+	int now;
+
+	if ( !adr || !addressString || !addressString[0] ) {
+		return;
+	}
+
+	peer = NET_P2P_FindPunchPeerByAddress( adr );
+	if ( !peer ) {
+		peer = NET_P2P_AllocPunchPeer();
+		Com_Memset( peer, 0, sizeof( *peer ) );
+		peer->active = qtrue;
+		peer->adr = *adr;
+		peer->startTime = Sys_Milliseconds();
+		Q_strncpyz( peer->addressString, addressString, sizeof( peer->addressString ) );
+	}
+
+	now = Sys_Milliseconds();
+	if ( nonce ) {
+		peer->nonce = nonce;
+	}
+	peer->lastResponseTime = now;
+	if ( resetAttempts ) {
+		peer->attempts = 0;
+		peer->acknowledged = qfalse;
+		peer->lastSendTime = 0;
+	}
+}
+
 void NET_P2P_Init( void )
 {
 	NET_P2P_RegisterCvars();
+	NET_P2P_NatInit();
 }
 
 void NET_P2P_Shutdown( void )
 {
+	NET_P2P_NatShutdown();
 	Com_Memset( net_p2pPunchPeers, 0, sizeof( net_p2pPunchPeers ) );
 }
 
@@ -177,6 +211,7 @@ void NET_P2P_Frame( void )
 	int now;
 
 	NET_P2P_RegisterCvars();
+	NET_P2P_NatFrame();
 
 	if ( !NET_P2P_IsEnabled() || !NET_P2P_UsingDirectUdp() || !net_p2pPunch || !net_p2pPunch->integer ) {
 		return;
@@ -288,6 +323,9 @@ qboolean NET_P2P_GetLocalAddressString( char *buffer, int bufferSize )
 	}
 
 	if ( !net_p2pAdvertiseAddress || !net_p2pAdvertiseAddress->string[0] ) {
+		if ( NET_P2P_NatGetAdvertiseAddress( buffer, bufferSize ) ) {
+			return qtrue;
+		}
 		return qfalse;
 	}
 
@@ -362,7 +400,6 @@ qboolean NET_P2P_NormalizeAddressString( const char *address, char *buffer, int 
 
 void NET_P2P_BeginPunchForAddress( const char *address )
 {
-	p2p_punch_peer_t *peer;
 	char normalized[MAX_OSPATH];
 	netadr_t adr;
 
@@ -388,19 +425,8 @@ void NET_P2P_BeginPunchForAddress( const char *address )
 		return;
 	}
 
-	peer = NET_P2P_FindPunchPeerByAddress( &adr );
-	if ( !peer ) {
-		peer = NET_P2P_AllocPunchPeer();
-	}
-
-	Com_Memset( peer, 0, sizeof( *peer ) );
-	peer->active = qtrue;
-	peer->adr = adr;
-	peer->nonce = rand() ^ Sys_Milliseconds();
-	peer->startTime = Sys_Milliseconds();
-	Q_strncpyz( peer->addressString, normalized, sizeof( peer->addressString ) );
-
-	Com_Printf( "P2P direct_udp: punching %s\n", peer->addressString );
+	NET_P2P_EnsurePunchPeer( &adr, normalized, rand() ^ Sys_Milliseconds(), qtrue );
+	Com_Printf( "P2P direct_udp: punching %s\n", normalized );
 }
 
 void NET_P2P_PrintPunchStatus( void )
@@ -450,7 +476,12 @@ qboolean NET_P2P_HandleOobPacket( const netadr_t *from, const char *cmd )
 	nonce = atoi( Cmd_Argv( 1 ) );
 
 	if ( !Q_stricmp( cmd, "p2pPunch" ) ) {
+		char addressString[MAX_OSPATH];
+
 		NET_P2P_SendPunchPacket( from, "p2pPong", nonce );
+		Com_sprintf( addressString, sizeof( addressString ), "udp:%s", NET_AdrToStringwPort( from ) );
+		NET_P2P_EnsurePunchPeer( from, addressString, nonce, qtrue );
+		Com_Printf( "P2P direct_udp: inbound punch from %s, starting symmetric session\n", addressString );
 		return qtrue;
 	}
 
@@ -473,4 +504,24 @@ qboolean NET_P2P_HandleOobPacket( const netadr_t *from, const char *cmd )
 	}
 
 	return qfalse;
+}
+
+void NET_P2P_PrintIceCandidates( void )
+{
+	NET_P2P_NatPrintCandidates();
+}
+
+void NET_P2P_BeginMasterList( const char *masterAddress )
+{
+	NET_P2P_NatBeginMasterList( masterAddress );
+}
+
+qboolean NET_P2P_TryHandleNatPacket( const netadr_t *from, const byte *data, int len )
+{
+	return NET_P2P_NatTryHandlePacket( from, data, len );
+}
+
+qboolean NET_P2P_TryHandleBrowseOob( const netadr_t *from, const char *cmd, msg_t *msg )
+{
+	return NET_P2P_NatTryHandleConnectionless( from, cmd, msg );
 }

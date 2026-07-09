@@ -322,6 +322,10 @@ static void CL_P2PPunchStatus_f( void ) {
 	NET_P2P_PrintPunchStatus();
 }
 
+static void CL_P2PCandidates_f( void ) {
+	NET_P2P_PrintIceCandidates();
+}
+
 static serverInfo_t *CL_P2PBrowserServer( const char *source, int index, int *count ) {
 	if ( count ) {
 		*count = 0;
@@ -392,7 +396,7 @@ static void CL_P2PList_f( void ) {
 	const char *source;
 
 	if ( Cmd_Argc() > 2 ) {
-		Com_Printf( "usage: p2p_list [local|global|favorites]\n" );
+		Com_Printf( "usage: p2p_list [local|global|favorites|master]\n" );
 		return;
 	}
 
@@ -417,6 +421,11 @@ static void CL_P2PList_f( void ) {
 
 	if ( !Q_stricmp( source, "favorites" ) ) {
 		CL_P2PListSource( source, cls.favoriteServers, cls.numfavoriteservers );
+		return;
+	}
+
+	if ( !Q_stricmp( source, "master" ) ) {
+		NET_P2P_BeginMasterList( NULL );
 		return;
 	}
 
@@ -477,6 +486,7 @@ void CL_Cmds_Init( void ) {
 	Cmd_AddCommand( "p2p_connect", CL_P2PConnect_f );
 	Cmd_AddCommand( "p2p_punch", CL_P2PPunch_f );
 	Cmd_AddCommand( "p2p_punch_status", CL_P2PPunchStatus_f );
+	Cmd_AddCommand( "p2p_candidates", CL_P2PCandidates_f );
 	Cmd_AddCommand( "p2p_list", CL_P2PList_f );
 	Cmd_AddCommand( "p2p_connect_browser", CL_P2PConnectBrowser_f );
 }
@@ -500,6 +510,7 @@ void CL_Cmds_Shutdown( void ) {
 	Cmd_RemoveCommand( "p2p_connect" );
 	Cmd_RemoveCommand( "p2p_punch" );
 	Cmd_RemoveCommand( "p2p_punch_status" );
+	Cmd_RemoveCommand( "p2p_candidates" );
 	Cmd_RemoveCommand( "p2p_list" );
 	Cmd_RemoveCommand( "p2p_connect_browser" );
 }

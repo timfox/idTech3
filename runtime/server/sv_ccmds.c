@@ -25,8 +25,11 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 static void SV_P2PStatus_f( void );
 static void SV_P2PAddress_f( void );
+static void SV_P2PConnect_f( void );
 static void SV_P2PPunch_f( void );
 static void SV_P2PPunchStatus_f( void );
+static void SV_P2PList_f( void );
+static void SV_P2PCandidates_f( void );
 
 /*
 ===============================================================================
@@ -1625,8 +1628,11 @@ void SV_AddDedicatedCommands( void )
 	Cmd_AddCommand( "locations", SV_Locations_f );
 	Cmd_AddCommand( "p2p_status", SV_P2PStatus_f );
 	Cmd_AddCommand( "p2p_address", SV_P2PAddress_f );
+	Cmd_AddCommand( "p2p_connect", SV_P2PConnect_f );
 	Cmd_AddCommand( "p2p_punch", SV_P2PPunch_f );
 	Cmd_AddCommand( "p2p_punch_status", SV_P2PPunchStatus_f );
+	Cmd_AddCommand( "p2p_list", SV_P2PList_f );
+	Cmd_AddCommand( "p2p_candidates", SV_P2PCandidates_f );
 }
 
 
@@ -1639,8 +1645,11 @@ void SV_RemoveDedicatedCommands( void )
 	Cmd_RemoveCommand( "locations" );
 	Cmd_RemoveCommand( "p2p_status" );
 	Cmd_RemoveCommand( "p2p_address" );
+	Cmd_RemoveCommand( "p2p_connect" );
 	Cmd_RemoveCommand( "p2p_punch" );
 	Cmd_RemoveCommand( "p2p_punch_status" );
+	Cmd_RemoveCommand( "p2p_list" );
+	Cmd_RemoveCommand( "p2p_candidates" );
 }
 static void SV_P2PStatus_f( void ) {
 	char address[MAX_STRING_CHARS];
@@ -1692,4 +1701,74 @@ static void SV_P2PPunch_f( void ) {
 
 static void SV_P2PPunchStatus_f( void ) {
 	NET_P2P_PrintPunchStatus();
+}
+
+static void SV_P2PCandidates_f( void ) {
+	NET_P2P_PrintIceCandidates();
+}
+
+static void SV_P2PConnect_f( void ) {
+	char address[MAX_STRING_CHARS];
+	char localAddress[MAX_STRING_CHARS];
+	const char *peer;
+
+	if ( Cmd_Argc() != 2 ) {
+		Com_Printf( "usage: p2p_connect <steamid|steam:steamid|host:port|udp:host:port>\n" );
+		return;
+	}
+
+	if ( !NET_P2P_IsSupported() ) {
+		Com_Printf( "P2P is not compiled in\n" );
+		return;
+	}
+
+	if ( !NET_P2P_IsEnabled() ) {
+		Com_Printf( "P2P is disabled; set net_p2p 1\n" );
+		return;
+	}
+
+	peer = Cmd_Argv( 1 );
+	if ( !NET_P2P_NormalizeAddressString( peer, address, sizeof( address ) ) ) {
+		Com_Printf( "p2p_connect: expected a SteamID64, steam:SteamID64, host:port, or udp:host:port\n" );
+		return;
+	}
+
+	NET_P2P_BeginPunchForAddress( address );
+	if ( NET_P2P_GetLocalAddressString( localAddress, sizeof( localAddress ) ) ) {
+		Com_Printf( "P2P direct_udp: punch started toward %s; clients should connect to %s\n", address, localAddress );
+	} else {
+		Com_Printf( "P2P direct_udp: punch started toward %s\n", address );
+	}
+}
+
+static void SV_P2PList_f( void ) {
+	const char *source;
+	int i;
+	client_t *cl;
+
+	if ( Cmd_Argc() > 2 ) {
+		Com_Printf( "usage: p2p_list [local|master]\n" );
+		return;
+	}
+
+	source = ( Cmd_Argc() == 2 ) ? Cmd_Argv( 1 ) : "local";
+
+	if ( !Q_stricmp( source, "master" ) ) {
+		NET_P2P_BeginMasterList( NULL );
+		return;
+	}
+
+	if ( Q_stricmp( source, "local" ) ) {
+		Com_Printf( "p2p_list: unknown source '%s'\n", source );
+		return;
+	}
+
+	SV_P2PStatus_f();
+	Com_Printf( "connected clients:\n" );
+	for ( i = 0, cl = svs.clients; i < sv.maxclients; i++, cl++ ) {
+		if ( cl->state < CS_CONNECTED ) {
+			continue;
+		}
+		Com_Printf( "  client %3d  %s\n", i, NET_AdrToStringwPort( &cl->netchan.remoteAddress ) );
+	}
 }
