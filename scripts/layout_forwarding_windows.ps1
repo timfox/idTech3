@@ -31,6 +31,8 @@ function New-RepoJunction {
 }
 
 Write-Host '[layout_fwd_win] MSVC/MinGW junction bridge...'
+New-RepoJunction 'src\external' 'third_party'
+New-RepoJunction 'engine\external' 'third_party'
 New-RepoJunction 'engine\platform\physics' 'modules\physics'
 New-RepoJunction 'engine\platform\botlib' 'modules\botlib'
 New-RepoJunction 'engine\platform\renderers' 'renderers'
