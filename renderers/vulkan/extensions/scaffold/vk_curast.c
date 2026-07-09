@@ -33,6 +33,10 @@ typedef struct {
 	uint32_t height;
 	uint32_t tri_count;
 	uint32_t frames;
+	uint32_t stage1_tris;
+	uint32_t stage2_tris;
+	uint32_t stage3_tris;
+	uint32_t near_plane_tris;
 	qboolean ready;
 } curastState_t;
 
@@ -61,6 +65,108 @@ static void CuRast_DestroyGpu( void );
 static void CuRast_EnsurePipelines( void );
 static qboolean CuRast_EnsureBuffers( void );
 static qboolean CuRast_SeedMesh( void );
+static void CuRast_AnalyzeStageRouting( void );
+
+static qboolean CuRast_ProjectVertex( const vec4_t in, vec2_t out )
+{
+	float f;
+	float aspect;
+	float clipX;
+	float clipY;
+	float clipW;
+	float ndcX;
+	float ndcY;
+
+	if ( in[2] <= 0.01f ) {
+		return qfalse;
+	}
+
+	f = 1.0f / tanf( 45.0f * 0.5f * (float)M_PI / 180.0f );
+	aspect = (float)curast.width / (float)curast.height;
+	clipX = ( f / aspect ) * in[0];
+	clipY = f * in[1];
+	clipW = in[2];
+	if ( fabsf( clipW ) < 1e-6f ) {
+		return qfalse;
+	}
+
+	ndcX = clipX / clipW;
+	ndcY = clipY / clipW;
+
+	out[0] = ( ndcX * 0.5f + 0.5f ) * (float)curast.width;
+	out[1] = ( -ndcY * 0.5f + 0.5f ) * (float)curast.height;
+	return qtrue;
+}
+
+static void CuRast_ClassifyTriangle( const curastTriangle_t *tri )
+{
+	vec2_t p0, p1, p2;
+	float minX, minY, maxX, maxY;
+	float bboxArea;
+
+	if ( !tri ) {
+		return;
+	}
+
+	if ( !CuRast_ProjectVertex( tri->v0, p0 ) ||
+	     !CuRast_ProjectVertex( tri->v1, p1 ) ||
+	     !CuRast_ProjectVertex( tri->v2, p2 ) ) {
+		curast.near_plane_tris++;
+		return;
+	}
+
+	minX = p0[0];
+	maxX = p0[0];
+	minY = p0[1];
+	maxY = p0[1];
+
+	if ( p1[0] < minX ) minX = p1[0];
+	if ( p1[0] > maxX ) maxX = p1[0];
+	if ( p1[1] < minY ) minY = p1[1];
+	if ( p1[1] > maxY ) maxY = p1[1];
+	if ( p2[0] < minX ) minX = p2[0];
+	if ( p2[0] > maxX ) maxX = p2[0];
+	if ( p2[1] < minY ) minY = p2[1];
+	if ( p2[1] > maxY ) maxY = p2[1];
+
+	bboxArea = ( maxX - minX ) * ( maxY - minY );
+	if ( bboxArea < (float)CURAST_MAX_SMALL_PX ) {
+		curast.stage1_tris++;
+	} else if ( bboxArea < 4096.0f ) {
+		curast.stage2_tris++;
+	} else {
+		curast.stage3_tris++;
+	}
+}
+
+static void CuRast_AnalyzeStageRouting( void )
+{
+	curastTriangle_t *host;
+	uint32_t i;
+	void *mapped;
+	VkDeviceSize size;
+
+	curast.stage1_tris = 0;
+	curast.stage2_tris = 0;
+	curast.stage3_tris = 0;
+	curast.near_plane_tris = 0;
+
+	if ( vk.curast.tri_memory == VK_NULL_HANDLE || curast.tri_count == 0 ) {
+		return;
+	}
+
+	size = (VkDeviceSize)curast.tri_count * sizeof( curastTriangle_t );
+	if ( qvkMapMemory( vk.device, vk.curast.tri_memory, 0, size, 0, &mapped ) != VK_SUCCESS ) {
+		return;
+	}
+
+	host = (curastTriangle_t *)mapped;
+	for ( i = 0; i < curast.tri_count; i++ ) {
+		CuRast_ClassifyTriangle( &host[i] );
+	}
+
+	qvkUnmapMemory( vk.device, vk.curast.tri_memory );
+}
 
 static void CuRast_DestroyPipeline( curastPipeline_t *p )
 {
@@ -434,6 +540,7 @@ static qboolean CuRast_SeedMesh( void )
 	Com_Memcpy( mapped, host, (size_t)size );
 	qvkUnmapMemory( vk.device, vk.curast.tri_memory );
 	ri.Hunk_FreeTempMemory( host );
+	CuRast_AnalyzeStageRouting();
 	return qtrue;
 }
 
@@ -638,6 +745,24 @@ static void CuRast_Cmd_Status( void )
 	ri.Printf( PRINT_ALL,
 		"[CuRast] Stage1 small-tri threshold=%d px (paper 128); stages 2/3 not wired in v1\n",
 		CURAST_MAX_SMALL_PX );
+	ri.Printf( PRINT_ALL,
+		"[CuRast] Routing estimate: stage1=%u stage2=%u stage3=%u nearPlane=%u\n",
+		curast.stage1_tris, curast.stage2_tris, curast.stage3_tris, curast.near_plane_tris );
+}
+
+static void CuRast_Cmd_Partition( void )
+{
+	uint32_t total;
+
+	CuRast_AnalyzeStageRouting();
+	total = curast.stage1_tris + curast.stage2_tris + curast.stage3_tris + curast.near_plane_tris;
+
+	ri.Printf( PRINT_ALL,
+		"[CuRast] Partitioned %u triangles with paper thresholds (<128 px, <4096 px, large)\n",
+		total );
+	ri.Printf( PRINT_ALL,
+		"[CuRast] stage1=%u  stage2=%u  stage3=%u  nearPlane=%u\n",
+		curast.stage1_tris, curast.stage2_tris, curast.stage3_tris, curast.near_plane_tris );
 }
 
 static void CuRast_Cmd_Render( void )
@@ -692,6 +817,7 @@ void R_CuRast_Init( void )
 
 	ri.Cmd_AddCommand( "curast_status", CuRast_Cmd_Status );
 	ri.Cmd_AddCommand( "curast_render", CuRast_Cmd_Render );
+	ri.Cmd_AddCommand( "curast_partition", CuRast_Cmd_Partition );
 	ri.Cmd_AddCommand( "curast_reset", CuRast_Cmd_Reset );
 
 	if ( r_curast->integer ) {
@@ -703,6 +829,7 @@ void R_CuRast_Shutdown( void )
 {
 	ri.Cmd_RemoveCommand( "curast_status" );
 	ri.Cmd_RemoveCommand( "curast_render" );
+	ri.Cmd_RemoveCommand( "curast_partition" );
 	ri.Cmd_RemoveCommand( "curast_reset" );
 	CuRast_DestroyPipeline( &curast_clear );
 	CuRast_DestroyPipeline( &curast_stage1 );

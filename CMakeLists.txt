@@ -2876,6 +2876,13 @@ set_tests_properties(test_ttp PROPERTIES
 	LABELS "scripts;validation"
 	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_ttp.sh;${CMAKE_SOURCE_DIR}/src/qcommon/ttp_model.c")
 
+add_test(NAME test_bubblesh
+	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_bubblesh.sh
+	WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+set_tests_properties(test_bubblesh PROPERTIES
+	LABELS "scripts;validation"
+	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_bubblesh.sh;${CMAKE_SOURCE_DIR}/src/qcommon/bubblesh_model.c")
+
 add_test(NAME test_vuda
 	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_vuda.sh
 	WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
@@ -3535,6 +3542,16 @@ if(BUILD_UNIT_TESTS)
 	endif()
 	add_test(NAME unit_ttp COMMAND unit_ttp)
 	set_tests_properties(unit_ttp PROPERTIES LABELS "unit;validation")
+
+	add_executable(unit_bubblesh
+		tests/unit/test_bubblesh_model.c
+		src/qcommon/bubblesh_model.c)
+	target_include_directories(unit_bubblesh PRIVATE ${CMAKE_SOURCE_DIR}/src ${CMAKE_SOURCE_DIR}/src/extensions/research)
+	if(NOT MSVC)
+		target_link_libraries(unit_bubblesh PRIVATE m)
+	endif()
+	add_test(NAME unit_bubblesh COMMAND unit_bubblesh)
+	set_tests_properties(unit_bubblesh PROPERTIES LABELS "unit;validation")
 
 	add_executable(unit_vuda_model
 		tests/unit/test_vuda_model.c

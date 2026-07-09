@@ -21,8 +21,9 @@ Full channel redirection and page-table grafting require proprietary NVIDIA driv
 |-----------|----------------|
 | `CUstream_bind(s)` | `vuda_bind_stream <0\|1\|2>` (physics / neural / inference) |
 | `CUstream_unbind(s)` | `vuda_unbind_stream <slot>` |
-| `step_async()` / `wait_step()` | `CL_VUDA_Frame` + timeline semaphores (compute window) |
-| `render_async()` / `wait_render()` | Vulkan submit + `cudaWaitExternalSemaphoresAsync` on render timeline |
+| `step_async()` | `vuda_step_async [heartbeat\|physics\|neural\|inference] [bytes]` |
+| `wait_step()` | `vuda_wait_step` |
+| `render_async()` / `wait_render()` | Vulkan submit + `vuda_wait_render` (`cudaWaitExternalSemaphoresAsync` on render timeline) |
 
 ## When to use
 
@@ -80,6 +81,11 @@ vuda_maniskill [batch]
 - `vuda_reload` — Re-import Vulkan FDs into CUDA
 - `vuda_run` — One-shot heartbeat job
 - `vuda_bind_stream` / `vuda_unbind_stream` — Paper `CUstream_bind` / `unbind`
+- `vuda_step_async [kind] [bytes]` — Queue a paper-style async CUDA step using the imported render timeline
+- `vuda_wait_step` — Notify Vulkan that the queued CUDA step has completed
+- `vuda_wait_render` — Wait on the current render timeline before launching CUDA work
+
+These commands are a scaffold-level mapping of the paper API. The current CUDA job path still uses the engine's placeholder kernels and timeline synchronization instead of the paper's driver-level channel redirection.
 
 ## Pipeline
 

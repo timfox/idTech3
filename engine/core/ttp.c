@@ -180,13 +180,41 @@ static void TTP_Compare_f( void )
 	Com_Printf( "[TTP] Paper: BFS alone slower than DFS; with TTP, BFS can win on cache-friendly scenes\n" );
 }
 
+static void TTP_BFSSweep_f( void )
+{
+	ttp_pop_histogram_t hist_bfs;
+	ttp_model_result_t bfs1;
+	ttp_model_result_t bfs2;
+	ttp_model_result_t bfs4;
+	float mem_wait;
+	int depth;
+	int arity;
+	int seed;
+
+	depth = ( Cmd_Argc() >= 2 ) ? atoi( Cmd_Argv( 1 ) ) : 14;
+	arity = ( Cmd_Argc() >= 3 ) ? atoi( Cmd_Argv( 2 ) ) : 6;
+	seed = ( Cmd_Argc() >= 4 ) ? atoi( Cmd_Argv( 3 ) ) : 7;
+	mem_wait = cl_ttp_mem_wait ? cl_ttp_mem_wait->value : 0.70f;
+
+	TTP_SimulateTraversal( TTP_TRAVERSAL_BFS, depth, arity, seed, &hist_bfs );
+	TTP_ModelBFS( &hist_bfs, 1, mem_wait, &bfs1 );
+	TTP_ModelBFS( &hist_bfs, 2, mem_wait, &bfs2 );
+	TTP_ModelBFS( &hist_bfs, 4, mem_wait, &bfs4 );
+
+	Com_Printf( "[TTP] BFS distance sweep (depth=%d arity=%d seed=%d)\n", depth, arity, seed );
+	Com_Printf( "[TTP] Paper refs at mem_wait~0.70: N=1 -> ~1.85x, N=2 -> ~2.05x, N=4 -> ~2.20x\n" );
+	TTP_PrintResult( "BFS N=1", &bfs1 );
+	TTP_PrintResult( "BFS N=2", &bfs2 );
+	TTP_PrintResult( "BFS N=4", &bfs4 );
+}
+
 static void TTP_Status_f( void )
 {
 	Com_Printf( "[TTP] cl_ttp=%d cl_ttp_mem_wait=%.2f cl_ttp_bfs_distance=%d\n",
 		cl_ttp ? cl_ttp->integer : 0,
 		cl_ttp_mem_wait ? cl_ttp_mem_wait->value : 0.70f,
 		cl_ttp_bfs_distance ? cl_ttp_bfs_distance->integer : 4 );
-	Com_Printf( "[TTP] Commands: ttp_status, ttp_sim, ttp_lumibench, ttp_compare\n" );
+	Com_Printf( "[TTP] Commands: ttp_status, ttp_sim, ttp_lumibench, ttp_compare, ttp_bfs_sweep\n" );
 	Com_Printf( "[TTP] Hardware RT-unit prefetch (stack pop streaks); see docs/TTP.md\n" );
 }
 
@@ -213,6 +241,7 @@ void TTP_Init( void )
 		Cmd_AddCommand( "ttp_sim", TTP_Sim_f );
 		Cmd_AddCommand( "ttp_lumibench", TTP_Lumibench_f );
 		Cmd_AddCommand( "ttp_compare", TTP_Compare_f );
+		Cmd_AddCommand( "ttp_bfs_sweep", TTP_BFSSweep_f );
 		ttp_cmds_registered = qtrue;
 	}
 

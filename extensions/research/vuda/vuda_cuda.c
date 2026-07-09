@@ -555,6 +555,16 @@ qboolean VudaCuda_RunJob( const vudaCudaJob_t *job, int maxMs, uint64_t waitTime
 	return qtrue;
 }
 
+qboolean VudaCuda_WaitRenderTimeline( uint64_t waitTimeline )
+{
+	return VudaCuda_WaitRender( waitTimeline, NULL );
+}
+
+void VudaCuda_SignalCompleteTimeline( uint64_t signalTimeline )
+{
+	VudaCuda_SignalComplete( signalTimeline, NULL );
+}
+
 #else /* !USE_VUDA */
 
 qboolean VudaCuda_Init( void ) { return qfalse; }
@@ -563,6 +573,8 @@ qboolean VudaCuda_Available( void ) { return qfalse; }
 qboolean VudaCuda_ImportExports( const vudaExportBundle_t *exp ) { (void)exp; return qfalse; }
 void VudaCuda_ReleaseImports( void ) {}
 qboolean VudaCuda_RunJob( const vudaCudaJob_t *job, int maxMs, uint64_t waitTimeline, uint64_t *outSignalTimeline ) { (void)job; (void)maxMs; (void)waitTimeline; (void)outSignalTimeline; return qfalse; }
+qboolean VudaCuda_WaitRenderTimeline( uint64_t waitTimeline ) { (void)waitTimeline; return qfalse; }
+void VudaCuda_SignalCompleteTimeline( uint64_t signalTimeline ) { (void)signalTimeline; }
 void VudaCuda_SignalComplete( uint64_t signalTimeline, cudaStream_t stream ) { (void)signalTimeline; (void)stream; }
 qboolean VudaCuda_WaitRender( uint64_t waitTimeline, cudaStream_t stream ) { (void)waitTimeline; (void)stream; return qfalse; }
 qboolean VudaCuda_BindStream( int streamSlot ) { (void)streamSlot; return qfalse; }

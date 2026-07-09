@@ -149,7 +149,8 @@ static void Vuda_Cmd_Api_f( void )
 	Com_Printf( "  wait_step()          — block until simulation completes\n" );
 	Com_Printf( "  render_async()       — async Vulkan rendering\n" );
 	Com_Printf( "  wait_render()        — block until rendering completes\n" );
-	Com_Printf( "[VUDA] Engine mapping: r_vuda + cl_vuda + coStreamMask; build with vuda flag\n" );
+	Com_Printf( "[VUDA] Engine mapping: vuda_bind_stream, vuda_step_async, vuda_wait_step, vuda_wait_render\n" );
+	Com_Printf( "[VUDA] Runtime setup: r_vuda 1, cl_vuda 1, r_vuda_coStreamMask, build with vuda flag\n" );
 	Com_Printf( "[VUDA] Driver channel redirection / page-table graft: see docs/VUDA.md\n" );
 }
 
@@ -160,6 +161,7 @@ static void Vuda_Cmd_ModelStatus_f( void )
 		cl_vuda_overlap ? cl_vuda_overlap->value : 0.85f );
 	Com_Printf( "[VUDA] Commands: vuda_api, vuda_model_datagen, vuda_model_rl, vuda_model_graft, vuda_maniskill\n" );
 	Com_Printf( "[VUDA] Runtime (USE_VUDA build): vuda_status, vuda_reload, vuda_run, vuda_bind_stream\n" );
+	Com_Printf( "[VUDA] Paper-style runtime: vuda_step_async, vuda_wait_step, vuda_wait_render, vuda_unbind_stream\n" );
 }
 
 void Vuda_ConsoleInit( void )

@@ -19,6 +19,25 @@ static cvar_t *cl_vuda_auto_job;
 
 static qboolean cl_vuda_ready;
 static int cl_vuda_last_import_frame;
+static qboolean cl_vuda_step_pending;
+static uint64_t cl_vuda_pending_signal_timeline;
+
+static int CL_VUDA_ParseJobKind( const char *name )
+{
+	if ( !name || !name[0] || !Q_stricmp( name, "neural" ) ) {
+		return VUDA_JOB_NEURAL_STAGE;
+	}
+	if ( !Q_stricmp( name, "heartbeat" ) ) {
+		return VUDA_JOB_HEARTBEAT;
+	}
+	if ( !Q_stricmp( name, "physics" ) ) {
+		return VUDA_JOB_PHYSICS_TICK;
+	}
+	if ( !Q_stricmp( name, "inference" ) ) {
+		return VUDA_JOB_INFERENCE;
+	}
+	return VUDA_JOB_NEURAL_STAGE;
+}
 
 static void CL_VUDA_Cmd_Status( void )
 {
@@ -100,6 +119,85 @@ static void CL_VUDA_Cmd_Run( void )
 	}
 }
 
+static void CL_VUDA_Cmd_StepAsync( void )
+{
+	vudaCudaJob_t job;
+	vudaExportBundle_t exp;
+	int maxMs;
+
+	if ( !cl_vuda_ready ) {
+		CL_VUDA_Cmd_Reload();
+		if ( !cl_vuda_ready ) {
+			return;
+		}
+	}
+
+	if ( !re.VudaGetExportBundle || !re.VudaGetExportBundle( &exp ) ) {
+		Com_Printf( S_COLOR_YELLOW "[VUDA] Export bundle unavailable\n" );
+		return;
+	}
+
+	Com_Memset( &job, 0, sizeof( job ) );
+	job.kind = ( Cmd_Argc() >= 2 ) ? CL_VUDA_ParseJobKind( Cmd_Argv( 1 ) ) : VUDA_JOB_NEURAL_STAGE;
+	job.streamMask = (uint32_t)Cvar_VariableIntegerValue( "r_vuda_coStreamMask" );
+	job.bytes = ( Cmd_Argc() >= 3 ) ? (uint32_t)atoi( Cmd_Argv( 2 ) ) : 2048u;
+	maxMs = Cvar_VariableIntegerValue( "r_vuda_computeMs" );
+	if ( maxMs < 1 ) {
+		maxMs = 2;
+	}
+
+	if ( !VudaCuda_RunJob( &job, maxMs, exp.renderTimeline, &cl_vuda_pending_signal_timeline ) ) {
+		Com_Printf( S_COLOR_YELLOW "[VUDA] step_async failed\n" );
+		cl_vuda_step_pending = qfalse;
+		return;
+	}
+
+	cl_vuda_step_pending = qtrue;
+	Com_Printf( "[VUDA] step_async queued kind=%d render=%llu signal=%llu\n",
+		job.kind,
+		(unsigned long long)exp.renderTimeline,
+		(unsigned long long)cl_vuda_pending_signal_timeline );
+}
+
+static void CL_VUDA_Cmd_WaitStep( void )
+{
+	if ( !cl_vuda_step_pending ) {
+		Com_Printf( "[VUDA] wait_step: no pending CUDA step\n" );
+		return;
+	}
+
+	if ( re.VudaNotifyCudaComplete ) {
+		re.VudaNotifyCudaComplete( cl_vuda_pending_signal_timeline );
+	}
+	Com_Printf( "[VUDA] wait_step completed (cuda timeline=%llu)\n",
+		(unsigned long long)cl_vuda_pending_signal_timeline );
+	cl_vuda_step_pending = qfalse;
+}
+
+static void CL_VUDA_Cmd_WaitRender( void )
+{
+	vudaExportBundle_t exp;
+
+	if ( !cl_vuda_ready ) {
+		CL_VUDA_Cmd_Reload();
+		if ( !cl_vuda_ready ) {
+			return;
+		}
+	}
+
+	if ( !re.VudaGetExportBundle || !re.VudaGetExportBundle( &exp ) ) {
+		Com_Printf( S_COLOR_YELLOW "[VUDA] Export bundle unavailable\n" );
+		return;
+	}
+
+	if ( VudaCuda_WaitRenderTimeline( exp.renderTimeline ) ) {
+		Com_Printf( "[VUDA] wait_render completed (render timeline=%llu)\n",
+			(unsigned long long)exp.renderTimeline );
+	} else {
+		Com_Printf( S_COLOR_YELLOW "[VUDA] wait_render failed\n" );
+	}
+}
+
 static void CL_VUDA_Cmd_BindStream_f( void )
 {
 	int slot;
@@ -133,6 +231,9 @@ void CL_VUDA_Init( void )
 	Cmd_AddCommand( "vuda_status", CL_VUDA_Cmd_Status );
 	Cmd_AddCommand( "vuda_reload", CL_VUDA_Cmd_Reload );
 	Cmd_AddCommand( "vuda_run", CL_VUDA_Cmd_Run );
+	Cmd_AddCommand( "vuda_step_async", CL_VUDA_Cmd_StepAsync );
+	Cmd_AddCommand( "vuda_wait_step", CL_VUDA_Cmd_WaitStep );
+	Cmd_AddCommand( "vuda_wait_render", CL_VUDA_Cmd_WaitRender );
 	Cmd_AddCommand( "vuda_bind_stream", CL_VUDA_Cmd_BindStream_f );
 	Cmd_AddCommand( "vuda_unbind_stream", CL_VUDA_Cmd_UnbindStream_f );
 
@@ -150,10 +251,14 @@ void CL_VUDA_Shutdown( void )
 	Cmd_RemoveCommand( "vuda_status" );
 	Cmd_RemoveCommand( "vuda_reload" );
 	Cmd_RemoveCommand( "vuda_run" );
+	Cmd_RemoveCommand( "vuda_step_async" );
+	Cmd_RemoveCommand( "vuda_wait_step" );
+	Cmd_RemoveCommand( "vuda_wait_render" );
 	Cmd_RemoveCommand( "vuda_bind_stream" );
 	Cmd_RemoveCommand( "vuda_unbind_stream" );
 	VudaCuda_Shutdown();
 	cl_vuda_ready = qfalse;
+	cl_vuda_step_pending = qfalse;
 }
 
 void CL_VUDA_Frame( void )
@@ -208,6 +313,7 @@ void CL_VUDA_Frame( void )
 		if ( re.VudaNotifyCudaComplete ) {
 			re.VudaNotifyCudaComplete( signalTimeline );
 		}
+		cl_vuda_step_pending = qfalse;
 	}
 }
 

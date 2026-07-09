@@ -56,7 +56,7 @@ static void Curast_Cmd_ModelStatus_f( void )
 {
 	Com_Printf( "[CuRast] cl_curast_model=%d\n", cl_curast_model ? cl_curast_model->integer : 0 );
 	Com_Printf( "[CuRast] Commands: curast_api, curast_model, curast_stages\n" );
-	Com_Printf( "[CuRast] Runtime (renderer): curast_status, curast_render, curast_reset\n" );
+	Com_Printf( "[CuRast] Runtime (renderer): curast_status, curast_render, curast_partition, curast_reset\n" );
 	Com_Printf( "[CuRast] See docs/CURAST.md — upstream https://github.com/m-schuetz/CuRast\n" );
 }
 
@@ -67,7 +67,7 @@ static void Curast_Cmd_Api_f( void )
 	Com_Printf( "  Stage 2: 32 threads/triangle for medium tris (<4096 px) + near-plane queue\n" );
 	Com_Printf( "  Stage 3: 64 threads per 64x64 tile for large triangles (world-space ray hit)\n" );
 	Com_Printf( "  Resolve: deferred shading from 28-bit depth + 36-bit global triangle index\n" );
-	Com_Printf( "[CuRast] Engine: r_curast 1 + vid_restart; curast_render\n" );
+	Com_Printf( "[CuRast] Engine: r_curast 1 + vid_restart; curast_render and curast_partition\n" );
 }
 
 static void Curast_Cmd_Model_f( void )

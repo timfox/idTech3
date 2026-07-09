@@ -21,6 +21,7 @@ ttp_sim dfs 12 6 42
 ttp_sim bfs 14 6 1
 ttp_lumibench
 ttp_compare 14
+ttp_bfs_sweep 14 6 7
 ```
 
 ## Cvars
@@ -29,7 +30,7 @@ ttp_compare 14
 |------|---------|---------|
 | `cl_ttp` | `1` | Register TTP commands; startup log when enabled |
 | `cl_ttp_mem_wait` | `0.70` | Fraction of RT cycles waiting on BVH memory (paper Fig. 1) for speedup model |
-| `cl_ttp_bfs_distance` | `4` | BFS prefetch distance *N* (paper §VI-C) |
+| `cl_ttp_bfs_distance` | `4` | BFS prefetch distance *N* (paper §VI-C; `N=4` is the paper default) |
 
 ## Speedup model
 
@@ -39,7 +40,13 @@ Given estimated **miss coverage** *c* (fraction of baseline RT L1 misses turned 
 \text{speedup} = \frac{1}{(1 - m) + m(1 - c)}
 \]
 
-Coverage and accuracy come from pop-streak histograms produced by `ttp_sim` / `ttp_lumibench`, with DFS FSM intensities **1 / 2 / 16** as in the paper.
+Coverage comes from pop-streak histograms produced by `ttp_sim` / `ttp_lumibench`, with DFS FSM intensities **1 / 2 / 16** as in the paper. The software model is calibrated so DFS accuracy tracks the paper's reported **~98.9% L1 accuracy**, and BFS distance scaling follows the paper's **N=1 / 2 / 4** sweep.
+
+## Calibration notes
+
+- DFS mode preserves the synthetic traversal-derived coverage trend and calibrates issued-prefetch count to the paper's reported average L1 accuracy (**98.92%**).
+- BFS mode uses the paper's reported average speedups for `N=1`, `N=2`, and `N=4` as anchor points, then interpolates or gently saturates beyond them.
+- `ttp_bfs_sweep` is the quickest way to inspect those paper-aligned BFS distance tradeoffs in-engine.
 
 ## Limitations
 
