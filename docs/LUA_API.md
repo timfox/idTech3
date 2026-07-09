@@ -155,7 +155,7 @@ CHOREO_EVT_SOUND = 7
 
 ## Engine.Save (disk v1)
 
-Persists under `save/engine_slot_<N>.json` with `protocolVersion`, `modVersion`, `label`, and `checksum`.
+Persists under SQLite when available (`save/engine_profile.db`, table `save_slots`) and still writes the legacy JSON fallback `save/engine_slot_<N>.json` with `protocolVersion`, `modVersion`, `label`, and `checksum`.
 
 ```lua
 Engine.Save.write(slot, "checkpoint_name")   -- returns boolean
@@ -166,6 +166,20 @@ local last = Engine.Save.lastSlot()          -- returns integer
 Protocol version: `1` (see [g_engine_systems.h](../src/game/g_engine_systems.h)). Legacy `save/engine_slot_*.txt` still reads.
 
 Console (client, no Lua): `engine_save_write <slot> <label>`, `engine_save_read <slot>`, `engine_save_info`.
+
+## Engine.DB
+
+SQLite-backed engine profile/gameplay data service.
+
+```lua
+local ok = Engine.DB.available()
+local path = Engine.DB.path()
+Engine.DB.exec("CREATE TABLE IF NOT EXISTS notes(id INTEGER PRIMARY KEY, body TEXT)")
+local first = Engine.DB.queryOne("SELECT body FROM notes ORDER BY id LIMIT 1")
+Engine.DB.profileSet("player_name", "Ranger")
+local name = Engine.DB.profileGet("player_name")
+Engine.DB.profileDelete("player_name")
+```
 
 ## Engine.Telemetry
 

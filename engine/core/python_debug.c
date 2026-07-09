@@ -8,6 +8,7 @@ Embedded Python scripting — Infernux-inspired batch bridge (arXiv:2604.10263).
 
 #include "q_shared.h"
 #include "qcommon.h"
+#include "qcommon/engine_db.h"
 #include "python_debug.h"
 #include "python_batch.h"
 
@@ -181,6 +182,96 @@ static PyObject *py_id3_engine_info( PyObject *self, PyObject *unused )
 	return PyUnicode_FromString( info );
 }
 
+static PyObject *py_id3_db_available( PyObject *self, PyObject *unused )
+{
+	(void)self;
+	(void)unused;
+	if ( EngineDB_IsAvailable() ) {
+		Py_RETURN_TRUE;
+	}
+	Py_RETURN_FALSE;
+}
+
+static PyObject *py_id3_db_path( PyObject *self, PyObject *unused )
+{
+	(void)self;
+	(void)unused;
+	return PyUnicode_FromString( EngineDB_GetPath() ? EngineDB_GetPath() : "" );
+}
+
+static PyObject *py_id3_db_exec( PyObject *self, PyObject *args )
+{
+	const char *sql;
+
+	(void)self;
+	if ( !PyArg_ParseTuple( args, "s", &sql ) ) {
+		return NULL;
+	}
+	if ( EngineDB_Exec( sql ) ) {
+		Py_RETURN_TRUE;
+	}
+	Py_RETURN_FALSE;
+}
+
+static PyObject *py_id3_db_query_one( PyObject *self, PyObject *args )
+{
+	const char *sql;
+	char value[1024];
+
+	(void)self;
+	if ( !PyArg_ParseTuple( args, "s", &sql ) ) {
+		return NULL;
+	}
+	if ( EngineDB_QueryOne( sql, value, sizeof( value ) ) ) {
+		return PyUnicode_FromString( value );
+	}
+	Py_RETURN_NONE;
+}
+
+static PyObject *py_id3_profile_set( PyObject *self, PyObject *args )
+{
+	const char *key;
+	const char *value;
+
+	(void)self;
+	if ( !PyArg_ParseTuple( args, "ss", &key, &value ) ) {
+		return NULL;
+	}
+	if ( EngineDB_ProfileSet( key, value ) ) {
+		Py_RETURN_TRUE;
+	}
+	Py_RETURN_FALSE;
+}
+
+static PyObject *py_id3_profile_get( PyObject *self, PyObject *args )
+{
+	const char *key;
+	char value[1024];
+
+	(void)self;
+	if ( !PyArg_ParseTuple( args, "s", &key ) ) {
+		return NULL;
+	}
+	if ( EngineDB_ProfileGet( key, value, sizeof( value ) ) ) {
+		return PyUnicode_FromString( value );
+	}
+	Py_RETURN_NONE;
+}
+
+static PyObject *py_id3_profile_delete( PyObject *self, PyObject *args )
+{
+	const char *key;
+
+	(void)self;
+	if ( !PyArg_ParseTuple( args, "s", &key ) ) {
+		return NULL;
+	}
+	if ( EngineDB_ProfileDelete( key ) ) {
+		Py_RETURN_TRUE;
+	}
+	Py_RETURN_FALSE;
+}
+
 static PyObject *py_id3_on_frame( PyObject *self, PyObject *args )
 {
 	PyObject *callback;
@@ -258,6 +349,13 @@ static PyMethodDef s_pyIdtech3Methods[] = {
 	{ "exec", py_id3_exec, METH_VARARGS, "Append console command." },
 	{ "milliseconds", py_id3_milliseconds, METH_NOARGS, "Sys_Milliseconds()." },
 	{ "engine_info", py_id3_engine_info, METH_NOARGS, "Engine + Python version string." },
+	{ "db_available", py_id3_db_available, METH_NOARGS, "Return True when SQLite DB service is available." },
+	{ "db_path", py_id3_db_path, METH_NOARGS, "Return engine profile DB path." },
+	{ "db_exec", py_id3_db_exec, METH_VARARGS, "Execute SQL against the engine profile DB." },
+	{ "db_query_one", py_id3_db_query_one, METH_VARARGS, "Return first column of first row for SQL query." },
+	{ "profile_set", py_id3_profile_set, METH_VARARGS, "Set profile key/value." },
+	{ "profile_get", py_id3_profile_get, METH_VARARGS, "Get profile value for key." },
+	{ "profile_delete", py_id3_profile_delete, METH_VARARGS, "Delete profile key." },
 	{ "on_frame", py_id3_on_frame, METH_VARARGS, "Register per-frame callback(msec, realMsec)." },
 	{ "on_event", py_id3_on_event, METH_VARARGS, "Register event callback(s0, s1, i0, i1)." },
 	{ "batch_read", PyBatch_Read, METH_VARARGS, "Batch-read SoA field for handle list." },

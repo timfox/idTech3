@@ -283,6 +283,9 @@ endif()
 if(NOT DEFINED USE_PYTHON)
   option(USE_PYTHON "Enable embedded CPython scripting (Infernux-style batch bridge)" OFF)
 endif()
+if(NOT DEFINED USE_SQLITE)
+  option(USE_SQLITE "Enable native SQLite gameplay/profile database support" ON)
+endif()
 
 set(LUA_FOUND FALSE)
 set(LUA_LINK_LIBRARIES "")
@@ -298,6 +301,7 @@ set(CSHARP_INCLUDE_DIRS "")
 set(PYTHON_FOUND FALSE)
 set(PYTHON_LINK_LIBRARIES "")
 set(PYTHON_INCLUDE_DIRS "")
+set(SQLITE_FOUND FALSE)
 
 if(USE_LUA)
 if(NOT ANDROID)
@@ -455,6 +459,15 @@ if(NOT ANDROID)
     if(LUA_EXTRA_LIBRARIES)
       list(APPEND LUA_LINK_LIBRARIES ${LUA_EXTRA_LIBRARIES})
     endif()
+  endif()
+endif()
+
+if(USE_SQLITE)
+  find_package(SQLite3 QUIET)
+  if(SQLite3_FOUND)
+    set(SQLITE_FOUND TRUE)
+  else()
+    message(WARNING "USE_SQLITE=ON but SQLite3 not found; database service disabled.")
   endif()
 endif()
 endif()
@@ -1522,6 +1535,10 @@ if(USE_PYTHON AND PYTHON_FOUND)
   target_compile_definitions(qcommon PRIVATE USE_PYTHON)
   target_include_directories(qcommon PRIVATE ${PYTHON_INCLUDE_DIRS})
 endif()
+if(USE_SQLITE AND SQLITE_FOUND)
+  target_compile_definitions(qcommon PRIVATE USE_SQLITE)
+  target_link_libraries(qcommon PRIVATE SQLite::SQLite3)
+endif()
 if(USE_DTLS_FOUND)
   target_compile_definitions(qcommon PRIVATE USE_DTLS=1)
   target_include_directories(qcommon PRIVATE ${OPENSSL_INCLUDE_DIR})
@@ -1581,6 +1598,10 @@ endif()
 if(USE_PYTHON AND PYTHON_FOUND)
   target_compile_definitions(qcommon_ded PRIVATE USE_PYTHON)
   target_include_directories(qcommon_ded PRIVATE ${PYTHON_INCLUDE_DIRS})
+endif()
+if(USE_SQLITE AND SQLITE_FOUND)
+  target_compile_definitions(qcommon_ded PRIVATE USE_SQLITE)
+  target_link_libraries(qcommon_ded PRIVATE SQLite::SQLite3)
 endif()
 if(USE_DTLS_FOUND)
   target_compile_definitions(qcommon_ded PRIVATE USE_DTLS=1)
@@ -2833,6 +2854,13 @@ add_test(NAME test_game_starter_template
 set_tests_properties(test_game_starter_template PROPERTIES
 	LABELS "scripts;validation;templates"
 	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_game_starter_template.sh;${CMAKE_SOURCE_DIR}/scripts/create_starter_game.sh;${CMAKE_SOURCE_DIR}/examples/templates/game.starter/game.idproj")
+
+add_test(NAME test_sqlite_service
+	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_sqlite_service.sh
+	WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+set_tests_properties(test_sqlite_service PROPERTIES
+	LABELS "scripts;validation;database"
+	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_sqlite_service.sh;${CMAKE_SOURCE_DIR}/src/qcommon/engine_db.c;${CMAKE_SOURCE_DIR}/src/qcommon/csharp/IdTech3.Engine.cs")
 
 add_test(NAME test_crash_report
 	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_crash_report.sh

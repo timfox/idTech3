@@ -38,6 +38,34 @@ class Engine:
         return _native.engine_info()
 
     @staticmethod
+    def db_available() -> bool:
+        return bool(_native.db_available())
+
+    @staticmethod
+    def db_path() -> str:
+        return str(_native.db_path())
+
+    @staticmethod
+    def db_exec(sql: str) -> bool:
+        return bool(_native.db_exec(str(sql)))
+
+    @staticmethod
+    def db_query_one(sql: str):
+        return _native.db_query_one(str(sql))
+
+    @staticmethod
+    def profile_set(key: str, value: str) -> bool:
+        return bool(_native.profile_set(str(key), str(value)))
+
+    @staticmethod
+    def profile_get(key: str):
+        return _native.profile_get(str(key))
+
+    @staticmethod
+    def profile_delete(key: str) -> bool:
+        return bool(_native.profile_delete(str(key)))
+
+    @staticmethod
     def on(event: str, callback: Callable[..., None]) -> None:
         if event == "frame":
             _native.on_frame(callback)

@@ -25,6 +25,14 @@ qboolean EngineSave_ReadSlot( int slot, char *labelOut, int labelLen );
 int     EngineSave_LastSlot( void );
 int     EngineSave_ProtocolVersion( void );
 
+qboolean EngineProfile_Set( const char *key, const char *value );
+qboolean EngineProfile_Get( const char *key, char *out, int outSize );
+qboolean EngineProfile_Delete( const char *key );
+qboolean EngineDatabase_IsAvailable( void );
+const char *EngineDatabase_GetPath( void );
+qboolean EngineDatabase_Exec( const char *sql );
+qboolean EngineDatabase_QueryOne( const char *sql, char *out, int outSize );
+
 void    EngineQuest_Init( void );
 void    EngineQuest_Shutdown( void );
 int     EngineQuest_Add( const char *id, const char *title, const char *stage );
