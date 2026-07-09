@@ -5,7 +5,7 @@ set -euo pipefail
 
 if [[ $# -lt 3 ]]; then
   echo "Usage: $0 <template> <ident> <output_dir>" >&2
-  echo "  template: game.minimal | addon.minimal" >&2
+  echo "  template: game.minimal | game.starter | addon.minimal" >&2
   echo "  ident:    mod folder name (e.g. mygame)" >&2
   exit 1
 fi

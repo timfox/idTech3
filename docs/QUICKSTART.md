@@ -73,6 +73,19 @@ If you **build the engine from this repository**, you can use the **`idtech3_dem
 
 Full walkthrough, **`baseq3`** layouts, and troubleshooting: [examples/demo_skeleton/README.md](../examples/demo_skeleton/README.md).
 
+### Starter game shell
+
+If you want to build your own game shell instead of just running the demo:
+
+```bash
+./scripts/create_starter_game.sh mygame ./release/mygame
+cd ./release/mygame
+./pack_game.sh --skip-shaders
+./run_dev.sh
+```
+
+That flow gives you a branded shell, `game.idproj`, live Lua bootstrap, localization table, and a predictable packaging path. See [CONTENT_IDENTITY.md](CONTENT_IDENTITY.md).
+
 ## 4. Renderer
 
 The engine uses the **Vulkan** renderer. Ensure a working Vulkan driver and loader (Mesa/NVIDIA/AMD) on Linux.

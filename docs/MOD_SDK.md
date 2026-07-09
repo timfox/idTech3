@@ -10,8 +10,9 @@ See also [API_STABILITY.md](API_STABILITY.md) for layer cake and semver rules.
 
 1. Build engine: `./scripts/compile_engine.sh vulkan`
 2. Minimal mod shell: [MINIMAL_GAME_SHELL.md](MINIMAL_GAME_SHELL.md)
-3. Example mod: [examples/demo_game/README.md](../examples/demo_game/README.md)
-4. Run: `idtech3 +set fs_game yourmod +map yourmap`
+3. Opinionated starter project: `./scripts/create_starter_game.sh mygame ./release/mygame`
+4. Example mod: [examples/demo_game/README.md](../examples/demo_game/README.md)
+5. Run: `idtech3 +set fs_game yourmod +map yourmap`
 
 ---
 

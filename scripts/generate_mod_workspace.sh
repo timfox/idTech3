@@ -12,6 +12,7 @@ python3 - "$MOD_ABS" "$ENGINE" "$ROOT" <<'PY'
 import json, pathlib, sys
 mod, engine, root = sys.argv[1:4]
 mod_path = pathlib.Path(mod)
+base_path = mod_path.parent
 ident = mod_path.name
 startup = ""
 scripts = []
@@ -22,7 +23,7 @@ if proj.is_file():
     startup = d.get("Metadata", {}).get("StartupMap", "")
     scripts = d.get("Scripts", [])
 
-launch_args = ["+set", "fs_basepath", mod, "+set", "fs_game", ident, "+set", "com_scriptWatch", "1"]
+launch_args = ["+set", "fs_basepath", str(base_path), "+set", "fs_game", ident, "+set", "com_scriptWatch", "1"]
 if startup:
     launch_args += ["+map", startup]
 

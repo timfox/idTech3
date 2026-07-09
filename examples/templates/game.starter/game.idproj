@@ -1,0 +1,28 @@
+{
+  "Schema": 1,
+  "Type": "game",
+  "Org": "local",
+  "Ident": "game.starter",
+  "Title": "Starter Game",
+  "HasCode": true,
+  "CodePath": "scripts/lua/",
+  "Scripts": [
+    "scripts/lua/main.lua"
+  ],
+  "EditorScripts": [
+    "Editor/bridge_tools.py"
+  ],
+  "Radiant": {
+    "EntityDef": "scripts/entities_idtech3_bridge.def",
+    "MapSrcDir": "mapsrc",
+    "MapsDir": "maps"
+  },
+  "Metadata": {
+    "StartupMap": "",
+    "TickRate": 60,
+    "ProjectTemplate": {
+      "Description": "Opinionated starter shell with launch, pack, loc, and live Lua workflows",
+      "Order": -5
+    }
+  }
+}

@@ -2827,6 +2827,13 @@ set_tests_properties(test_asset_pipeline PROPERTIES
 	LABELS "scripts;validation;assets"
 	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_asset_pipeline.sh;${CMAKE_SOURCE_DIR}/scripts/asset_pipeline.sh;${CMAKE_SOURCE_DIR}/examples/demo_game/asset_pipeline.conf")
 
+add_test(NAME test_game_starter_template
+	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_game_starter_template.sh
+	WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+set_tests_properties(test_game_starter_template PROPERTIES
+	LABELS "scripts;validation;templates"
+	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_game_starter_template.sh;${CMAKE_SOURCE_DIR}/scripts/create_starter_game.sh;${CMAKE_SOURCE_DIR}/examples/templates/game.starter/game.idproj")
+
 add_test(NAME test_crash_report
 	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_crash_report.sh
 	WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
