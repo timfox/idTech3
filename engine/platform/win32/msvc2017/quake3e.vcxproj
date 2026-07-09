@@ -435,6 +435,11 @@
     <ClCompile Include="..\win_qgl.c" />
     <ClCompile Include="..\..\..\physics\phys_bullet.c" />
     <ClCompile Include="..\..\..\physics\phys_character.c" />
+    <ClCompile Include="..\..\..\physics\phys_events.c" />
+    <ClCompile Include="..\..\..\physics\phys_materials.c" />
+    <ClCompile Include="..\..\..\physics\phys_motor.c" />
+    <ClCompile Include="..\..\..\physics\phys_middleware.c" />
+    <ClCompile Include="..\..\..\physics\phys_debugdraw.c" />
     <!-- recast_nav (matches CMake USE_RECAST_NAV) -->
     <ClCompile Include="..\..\..\external\src\recast\Recast\Source\RecastAlloc.cpp">
       <AdditionalIncludeDirectories>..\..\..\external\src\recast\Recast\Include;..\..\..\external\src\recast\Detour\Include;..\..\..\external\src\recast\DetourCrowd\Include;..\..\..\external\src\recast\DetourTileCache\Include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
