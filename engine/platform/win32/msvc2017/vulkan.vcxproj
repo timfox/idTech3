@@ -90,7 +90,7 @@
   </ImportGroup>
   <ItemDefinitionGroup>
     <ClCompile>
-      <AdditionalIncludeDirectories>$(LibPngInclude);$(ZlibInclude);..\..\..\renderers\vulkan;..\..\..\renderers\vulkan\extensions\neural;..\..\..\renderers\vulkan\extensions\splats;..\..\..\renderers\vulkan\extensions\rtx;..\..\..\renderers\vulkan\extensions\scaffold;..\..\..\renderers\common;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(LibPngInclude);$(ZlibInclude);..\..\..\renderers\vulkan;..\..\..\renderers\vulkan\extensions\neural;..\..\..\renderers\vulkan\extensions\splats;..\..\..\renderers\vulkan\extensions\rtx;..\..\..\renderers\vulkan\extensions\scaffold;..\..\..\renderers\common;..\..\..\..\extensions\research;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
   </ItemDefinitionGroup>
   <PropertyGroup Label="UserMacros" />
