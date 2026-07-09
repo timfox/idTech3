@@ -22,6 +22,7 @@ The current P2P backend is Steam Datagram Relay (SDR) through Steam Networking S
 `p2p_address` prints the local `steam:STEAMID64` address to share with another player.
 `p2p_connect` normalizes the input and forwards to `connect steam:STEAMID64`.
 `p2p_connect_browser` uses the browser cache and prefers an advertised `p2paddr` when one is available.
+When `net_p2p 1` is enabled, legacy UI/browser joins also prefer the advertised `p2paddr` automatically.
 
 ## Listen server flow
 
@@ -36,6 +37,8 @@ The current P2P backend is Steam Datagram Relay (SDR) through Steam Networking S
 
 Servers now advertise `p2p=1` and `p2paddr=steam:...` in their info responses when the P2P backend is ready.
 That metadata is stored in the client browser cache and exposed through `LAN_GetServerInfo`, so UI scripts or terminal users can connect with `p2p_connect_browser`.
+Browser entries also match on `p2paddr`, so if a server's UDP endpoint changes but its advertised P2P identity stays the same, the cached entry is refreshed instead of treated as a different server.
+Favorites preserve the same identity too: adding or removing `steam:STEAMID64` entries works directly, and favorites copied from browser listings retain the advertised `p2paddr` for later joins.
 
 ## Dedicated server status
 

@@ -21,6 +21,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 */
 
 #include "client.h"
+#include "../qcommon/net_p2p.h"
 
 #include "../botlib/botlib.h"
 
@@ -102,6 +103,86 @@ static void LAN_SaveServersToCache( void ) {
 	FS_FCloseFile(fileOut);
 }
 
+static serverInfo_t *LAN_GetServerList( int source, int *count, int *max ) {
+	if ( count ) {
+		*count = 0;
+	}
+	if ( max ) {
+		*max = 0;
+	}
+
+	switch ( source ) {
+		case AS_LOCAL:
+			if ( count ) {
+				*count = cls.numlocalservers;
+			}
+			if ( max ) {
+				*max = MAX_OTHER_SERVERS;
+			}
+			return &cls.localServers[0];
+		case AS_MPLAYER:
+		case AS_GLOBAL:
+			if ( count ) {
+				*count = cls.numglobalservers;
+			}
+			if ( max ) {
+				*max = MAX_GLOBAL_SERVERS;
+			}
+			return &cls.globalServers[0];
+		case AS_FAVORITES:
+			if ( count ) {
+				*count = cls.numfavoriteservers;
+			}
+			if ( max ) {
+				*max = MAX_OTHER_SERVERS;
+			}
+			return &cls.favoriteServers[0];
+		default:
+			return NULL;
+	}
+}
+
+static qboolean LAN_ServerMatchesP2PIdentity( const serverInfo_t *server, const char *address ) {
+	if ( !server || !address || !address[0] || !server->p2pAddr[0] ) {
+		return qfalse;
+	}
+
+	return ( qboolean )( !Q_stricmp( server->p2pAddr, address ) );
+}
+
+static void LAN_CopyKnownServerMetadata( serverInfo_t *dest, const netadr_t *adr ) {
+	int sourceCount;
+	int sourceMax;
+	int i;
+	serverInfo_t *sources[2];
+
+	if ( !dest || !adr ) {
+		return;
+	}
+
+	sources[0] = LAN_GetServerList( AS_LOCAL, &sourceCount, &sourceMax );
+	if ( sources[0] ) {
+		for ( i = 0; i < sourceCount && i < sourceMax; i++ ) {
+			if ( NET_CompareAdr( &sources[0][i].adr, adr ) ) {
+				Q_strncpyz( dest->p2pAddr, sources[0][i].p2pAddr, sizeof( dest->p2pAddr ) );
+				dest->p2pAvailable = sources[0][i].p2pAvailable;
+				return;
+			}
+		}
+	}
+
+	sources[1] = LAN_GetServerList( AS_GLOBAL, &sourceCount, &sourceMax );
+	if ( sources[1] ) {
+		for ( i = 0; i < sourceCount && i < sourceMax; i++ ) {
+			if ( NET_CompareAdr( &sources[1][i].adr, adr ) ) {
+				Q_strncpyz( dest->p2pAddr, sources[1][i].p2pAddr, sizeof( dest->p2pAddr ) );
+				dest->p2pAvailable = sources[1][i].p2pAvailable;
+				return;
+			}
+		}
+	}
+}
+
 
 /*
 ====================
@@ -167,13 +248,19 @@ static int LAN_AddServer(int source, const char *name, const char *address) {
 	if (servers && *count < max) {
 		NET_StringToAdr( address, &adr, NA_UNSPEC );
 		for ( i = 0; i < *count; i++ ) {
-			if (NET_CompareAdr(&servers[i].adr, &adr)) {
+			if ( NET_CompareAdr( &servers[i].adr, &adr ) || LAN_ServerMatchesP2PIdentity( &servers[i], address ) ) {
 				break;
 			}
 		}
 		if (i >= *count) {
 			servers[*count].adr = adr;
 			Q_strncpyz(servers[*count].hostName, name, sizeof(servers[*count].hostName));
+			Q_strncpyz( servers[*count].p2pAddr, address, sizeof( servers[*count].p2pAddr ) );
+			servers[*count].p2pAvailable = ( qboolean )( !Q_stricmpn( address, "steam:", 6 ) );
+			if ( !servers[*count].p2pAvailable ) {
+				servers[*count].p2pAddr[0] = '\0';
+				LAN_CopyKnownServerMetadata( &servers[*count], &adr );
+			}
 			servers[*count].visible = qtrue;
 			(*count)++;
 			return 1;
@@ -212,7 +299,7 @@ static void LAN_RemoveServer(int source, const char *addr) {
 		netadr_t comp;
 		NET_StringToAdr( addr, &comp, NA_UNSPEC );
 		for (i = 0; i < *count; i++) {
-			if (NET_CompareAdr( &comp, &servers[i].adr)) {
+			if ( NET_CompareAdr( &comp, &servers[i].adr ) || LAN_ServerMatchesP2PIdentity( &servers[i], addr ) ) {
 				int j = i;
 				while (j < *count - 1) {
 					Com_Memcpy(&servers[j], &servers[j+1], sizeof(servers[j]));
@@ -254,27 +341,41 @@ LAN_GetLocalServerAddressString
 ====================
 */
 static void LAN_GetServerAddressString( int source, int n, char *buf, int buflen ) {
+	serverInfo_t *server = NULL;
+
+	if ( buflen < 1 ) {
+		return;
+	}
+
 	switch (source) {
 		case AS_LOCAL :
 			if (n >= 0 && n < MAX_OTHER_SERVERS) {
-				Q_strncpyz(buf, NET_AdrToStringwPort( &cls.localServers[n].adr) , buflen );
-				return;
+				server = &cls.localServers[n];
 			}
 			break;
 		case AS_MPLAYER:
 		case AS_GLOBAL :
 			if (n >= 0 && n < MAX_GLOBAL_SERVERS) {
-				Q_strncpyz(buf, NET_AdrToStringwPort( &cls.globalServers[n].adr) , buflen );
-				return;
+				server = &cls.globalServers[n];
 			}
 			break;
 		case AS_FAVORITES :
 			if (n >= 0 && n < MAX_OTHER_SERVERS) {
-				Q_strncpyz(buf, NET_AdrToStringwPort( &cls.favoriteServers[n].adr) , buflen );
-				return;
+				server = &cls.favoriteServers[n];
 			}
 			break;
 	}
+
+	if ( server ) {
+		if ( NET_P2P_IsEnabled() && server->p2pAddr[0] ) {
+			Q_strncpyz( buf, server->p2pAddr, buflen );
+			return;
+		}
+
+		Q_strncpyz( buf, NET_AdrToStringwPort( &server->adr ), buflen );
+		return;
+	}
+
 	buf[0] = '\0';
 }
 
@@ -316,6 +417,7 @@ static void LAN_GetServerInfo( int source, int n, char *buf, int buflen ) {
 		Info_SetValueForKey( info, "minping", va("%i",server->minPing));
 		Info_SetValueForKey( info, "maxping", va("%i",server->maxPing));
 		Info_SetValueForKey( info, "game", server->game);
+		Info_SetValueForKey( info, "p2p", server->p2pAvailable ? "1" : "0" );
 		Info_SetValueForKey( info, "p2paddr", server->p2pAddr );
 		Info_SetValueForKey( info, "gametype", va("%i",server->gameType));
 		Info_SetValueForKey( info, "nettype", va("%i",server->netType));
