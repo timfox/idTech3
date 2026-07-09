@@ -42,7 +42,13 @@ static void CL_InitServerInfo( serverInfo_t *server, const netadr_t *address ) {
 	server->ping = -1;
 	server->game[0] = '\0';
 	server->p2pAddr[0] = '\0';
+	server->p2pSessionId[0] = '\0';
+	server->p2pAntiCheat[0] = '\0';
+	server->p2pFailover[0] = '\0';
 	server->p2pAvailable = qfalse;
+	server->p2pHostMigration = qfalse;
+	server->protocol = 0;
+	server->p2pReconnectWindow = 0;
 	server->gameType = 0;
 	server->netType = 0;
 	server->punkbuster = 0;
@@ -251,7 +257,13 @@ static void CL_SetServerInfo(serverInfo_t *server, const char *info, int ping) {
 			server->maxClients = atoi(Info_ValueForKey(info, "sv_maxclients"));
 			Q_strncpyz(server->game,Info_ValueForKey(info, "game"), MAX_NAME_LENGTH);
 			Q_strncpyz(server->p2pAddr, Info_ValueForKey(info, "p2paddr"), sizeof(server->p2pAddr));
+			Q_strncpyz(server->p2pSessionId, Info_ValueForKey(info, "p2psession"), sizeof(server->p2pSessionId));
+			Q_strncpyz(server->p2pAntiCheat, Info_ValueForKey(info, "p2psecure"), sizeof(server->p2pAntiCheat));
+			Q_strncpyz(server->p2pFailover, Info_ValueForKey(info, "p2pfail"), sizeof(server->p2pFailover));
 			server->p2pAvailable = atoi( Info_ValueForKey( info, "p2p" ) ) ? qtrue : qfalse;
+			server->p2pHostMigration = atoi( Info_ValueForKey( info, "p2pmigrate" ) ) ? qtrue : qfalse;
+			server->protocol = atoi( Info_ValueForKey( info, "protocol" ) );
+			server->p2pReconnectWindow = atoi( Info_ValueForKey( info, "p2preconn" ) );
 			server->gameType = atoi(Info_ValueForKey(info, "gametype"));
 			server->netType = atoi(Info_ValueForKey(info, "nettype"));
 			server->minPing = atoi(Info_ValueForKey(info, "minping"));

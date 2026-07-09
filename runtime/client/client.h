@@ -277,7 +277,13 @@ typedef struct {
 	char	  	mapName[MAX_NAME_LENGTH];
 	char	  	game[MAX_NAME_LENGTH];
 	char		p2pAddr[MAX_OSPATH];
+	char		p2pSessionId[64];
+	char		p2pAntiCheat[32];
+	char		p2pFailover[32];
 	qboolean	p2pAvailable;
+	qboolean	p2pHostMigration;
+	int			protocol;
+	int			p2pReconnectWindow;
 	int			netType;
 	int			gameType;
 	int		  	clients;

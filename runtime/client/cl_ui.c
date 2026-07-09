@@ -165,7 +165,13 @@ static void LAN_CopyKnownServerMetadata( serverInfo_t *dest, const netadr_t *adr
 		for ( i = 0; i < sourceCount && i < sourceMax; i++ ) {
 			if ( NET_CompareAdr( &sources[0][i].adr, adr ) ) {
 				Q_strncpyz( dest->p2pAddr, sources[0][i].p2pAddr, sizeof( dest->p2pAddr ) );
+				Q_strncpyz( dest->p2pSessionId, sources[0][i].p2pSessionId, sizeof( dest->p2pSessionId ) );
+				Q_strncpyz( dest->p2pAntiCheat, sources[0][i].p2pAntiCheat, sizeof( dest->p2pAntiCheat ) );
+				Q_strncpyz( dest->p2pFailover, sources[0][i].p2pFailover, sizeof( dest->p2pFailover ) );
 				dest->p2pAvailable = sources[0][i].p2pAvailable;
+				dest->p2pHostMigration = sources[0][i].p2pHostMigration;
+				dest->protocol = sources[0][i].protocol;
+				dest->p2pReconnectWindow = sources[0][i].p2pReconnectWindow;
 				return;
 			}
 		}
@@ -176,7 +182,13 @@ static void LAN_CopyKnownServerMetadata( serverInfo_t *dest, const netadr_t *adr
 		for ( i = 0; i < sourceCount && i < sourceMax; i++ ) {
 			if ( NET_CompareAdr( &sources[1][i].adr, adr ) ) {
 				Q_strncpyz( dest->p2pAddr, sources[1][i].p2pAddr, sizeof( dest->p2pAddr ) );
+				Q_strncpyz( dest->p2pSessionId, sources[1][i].p2pSessionId, sizeof( dest->p2pSessionId ) );
+				Q_strncpyz( dest->p2pAntiCheat, sources[1][i].p2pAntiCheat, sizeof( dest->p2pAntiCheat ) );
+				Q_strncpyz( dest->p2pFailover, sources[1][i].p2pFailover, sizeof( dest->p2pFailover ) );
 				dest->p2pAvailable = sources[1][i].p2pAvailable;
+				dest->p2pHostMigration = sources[1][i].p2pHostMigration;
+				dest->protocol = sources[1][i].protocol;
+				dest->p2pReconnectWindow = sources[1][i].p2pReconnectWindow;
 				return;
 			}
 		}
@@ -419,6 +431,12 @@ static void LAN_GetServerInfo( int source, int n, char *buf, int buflen ) {
 		Info_SetValueForKey( info, "game", server->game);
 		Info_SetValueForKey( info, "p2p", server->p2pAvailable ? "1" : "0" );
 		Info_SetValueForKey( info, "p2paddr", server->p2pAddr );
+		Info_SetValueForKey( info, "p2psession", server->p2pSessionId );
+		Info_SetValueForKey( info, "p2psecure", server->p2pAntiCheat );
+		Info_SetValueForKey( info, "p2pfail", server->p2pFailover );
+		Info_SetValueForKey( info, "p2pmigrate", server->p2pHostMigration ? "1" : "0" );
+		Info_SetValueForKey( info, "p2preconn", va("%i", server->p2pReconnectWindow) );
+		Info_SetValueForKey( info, "protocol", va("%i", server->protocol) );
 		Info_SetValueForKey( info, "gametype", va("%i",server->gameType));
 		Info_SetValueForKey( info, "nettype", va("%i",server->netType));
 		Info_SetValueForKey( info, "addr", NET_AdrToStringwPort(&server->adr));
