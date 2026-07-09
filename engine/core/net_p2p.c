@@ -143,7 +143,7 @@ static qboolean NET_P2P_UsingDirectUdp( void )
 	return (qboolean)!NET_P2P_SteamSupported();
 }
 
-static qboolean NET_P2P_UsingSteamSdr( void )
+qboolean NET_P2P_UsesSteamSdrBackend( void )
 {
 	const char *backend;
 
@@ -236,11 +236,16 @@ qboolean NET_P2P_IsReady( void )
 		return qfalse;
 	}
 
-	if ( NET_P2P_UsingSteamSdr() ) {
+	if ( NET_P2P_UsesSteamSdrBackend() ) {
 		return NET_SDR_IsReady();
 	}
 
-	return NET_P2P_UsingDirectUdp();
+	if ( NET_P2P_UsingDirectUdp() ) {
+		char address[MAX_STRING_CHARS];
+		return NET_P2P_GetLocalAddressString( address, sizeof( address ) );
+	}
+
+	return qfalse;
 }
 
 const char *NET_P2P_BackendName( void )
@@ -249,7 +254,7 @@ const char *NET_P2P_BackendName( void )
 		return "disabled";
 	}
 
-	if ( NET_P2P_UsingSteamSdr() ) {
+	if ( NET_P2P_UsesSteamSdrBackend() ) {
 		return "steam_sdr";
 	}
 
@@ -273,7 +278,7 @@ qboolean NET_P2P_GetLocalAddressString( char *buffer, int bufferSize )
 
 	NET_P2P_RegisterCvars();
 
-	if ( NET_P2P_UsingSteamSdr() ) {
+	if ( NET_P2P_UsesSteamSdrBackend() ) {
 		if ( !NET_SDR_GetLocalSteamID( &steamid ) ) {
 			return qfalse;
 		}
@@ -320,11 +325,27 @@ qboolean NET_P2P_NormalizeAddressString( const char *address, char *buffer, int 
 
 	if ( !Q_stricmpn( address, "steam:", 6 ) ) {
 		address += 6;
+		if ( sscanf( address, "%llu", &steamid ) == 1 && steamid != 0 ) {
+			Com_sprintf( buffer, bufferSize, "steam:%llu", steamid );
+			return qtrue;
+		}
+		return qfalse;
 	}
 
-	if ( sscanf( address, "%llu", &steamid ) == 1 && steamid != 0 ) {
-		Com_sprintf( buffer, bufferSize, "steam:%llu", steamid );
-		return qtrue;
+	if ( address[0] >= '0' && address[0] <= '9' ) {
+		const char *p = address;
+		int digits = 0;
+
+		while ( *p >= '0' && *p <= '9' ) {
+			digits++;
+			p++;
+		}
+
+		/* Bare SteamID64 only; reject host:port fragments like "192.168...". */
+		if ( digits >= 15 && *p == '\0' && sscanf( address, "%llu", &steamid ) == 1 && steamid != 0 ) {
+			Com_sprintf( buffer, bufferSize, "steam:%llu", steamid );
+			return qtrue;
+		}
 	}
 
 	if ( !Q_stricmpn( address, "udp:", 4 ) ) {

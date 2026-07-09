@@ -1900,6 +1900,7 @@ void NET_Init( void ) {
 	NET_Config( qtrue );
 
 	NET_DTLS_Init();
+	NET_P2P_Init();
 	NET_SDR_Init();
 
 	Cmd_AddCommand( "net_restart", NET_Restart_f );
@@ -1916,6 +1917,7 @@ void NET_Shutdown( void ) {
 		return;
 	}
 
+	NET_P2P_Shutdown();
 	NET_SDR_Shutdown();
 	NET_DTLS_Shutdown();
 

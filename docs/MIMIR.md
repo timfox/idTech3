@@ -37,6 +37,13 @@ mimir_step 60
 mimir_status
 ```
 
+Paper-aligned aliases:
+
+```
+mimir_display 60
+mimir_display_async 60
+```
+
 Optional explicit sync (paper Listing 2):
 
 ```
@@ -73,10 +80,15 @@ mimir_sync
 ```
 mimir_status
 mimir_step [N]
+mimir_display [N]
+mimir_display_async [N]
 mimir_reset
 mimir_prepare
 mimir_update
 ```
+
+`mimir_display` wraps the paper-style synchronized `prepareViews` → work → `updateViews` flow.
+`mimir_display_async` runs the same workload without requiring the explicit sync gate, mapping more directly to the upstream `displayAsync` idea.
 
 ## Paper benchmarks (model)
 
