@@ -426,6 +426,16 @@
     <ClCompile Include="..\..\server\sv_openworld.c" />
     <ClCompile Include="..\..\..\physics\phys_bullet.c" />
     <ClCompile Include="..\..\..\physics\phys_character.c" />
+    <ClCompile Include="..\..\..\physics\phys_procedural_anim.c" />
+    <ClCompile Include="..\..\..\physics\phys_dmm.c" />
+    <ClCompile Include="..\..\..\physics\phys_ik.c" />
+    <ClCompile Include="..\..\..\physics\phys_dmm_materials.c" />
+    <ClCompile Include="..\..\..\physics\phys_cloth.c" />
+    <ClCompile Include="..\..\..\physics\phys_events.c" />
+    <ClCompile Include="..\..\..\physics\phys_materials.c" />
+    <ClCompile Include="..\..\..\physics\phys_motor.c" />
+    <ClCompile Include="..\..\..\physics\phys_middleware.c" />
+    <ClCompile Include="..\..\..\physics\phys_debugdraw.c" />
   <!-- IDTECH3_MSVC_MANIFEST_END -->
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
