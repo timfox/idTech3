@@ -34,6 +34,7 @@ IGNORE_MANIFEST_MISSING_PREFIXES = (
     "engine/core/vm_armv7l.c",
     "engine/core/vm_powerpc.c",
     "modules/audio/backends/snd_backend_sdl.c",
+    "modules/audio/backends/snd_backend_openal.c",
     "src/qcommon/net_dtls.c",
     "src/qcommon/net_sdr.c",
     "src/qcommon/vm_aarch64.c",
