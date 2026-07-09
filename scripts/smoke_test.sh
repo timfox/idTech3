@@ -22,6 +22,9 @@ PASS=0
 FAIL=0
 WARN=0
 
+# shellcheck source=release_bin_path.sh
+. "$SCRIPT_DIR/release_bin_path.sh"
+
 pass() { PASS=$((PASS + 1)); echo "  ✓ $1"; }
 fail() { FAIL=$((FAIL + 1)); echo "  ✗ $1" >&2; }
 warn() { WARN=$((WARN + 1)); echo "  ⚠ $1"; }
@@ -31,26 +34,9 @@ echo "Release dir: $RELEASE_DIR"
 echo ""
 
 # --- Binary existence checks ---
-# Resolve binary path (handle Windows .exe and arch suffixes: .x64, .x86_64, .aarch64)
+# Resolve binary path (handle Windows .exe and arch suffixes: .x64, .x86_64, .aarch64, .arm)
 bin_path() {
-  local bin="$1"
-  local base="$RELEASE_DIR/$bin"
-  # Try: plain name, .exe, arch suffixes (Windows/Linux), macOS .app bundle executable
-  for candidate in \
-    "$base" "$base.exe" \
-    "$base.x64" "$base.x64.exe" "$base.x86_64" "$base.x86_64.exe" \
-    "$base.aarch64" "$base.arm" "$base.armv7l" \
-    "$base.aarch64.app/Contents/MacOS/$bin.aarch64" \
-    "$base.aarch64.app/Contents/MacOS/$bin" \
-    "$base.arm.app/Contents/MacOS/$bin.arm" \
-    "$base.arm.app/Contents/MacOS/$bin" \
-    "$base.app/Contents/MacOS/$bin"; do
-    if [ -f "$candidate" ]; then
-      echo "$candidate"
-      return
-    fi
-  done
-  echo ""
+	release_bin_path "$RELEASE_DIR" "$1" || true
 }
 
 echo "Binary checks:"
@@ -206,6 +192,20 @@ if [ -x "$PROJECT_ROOT/tests/scripts/test_trunk_policy.sh" ]; then
   fi
 else
   warn "test_trunk_policy.sh not executable"
+fi
+
+echo ""
+
+# --- Release binary path resolution (ARM .arm suffix, etc.) ---
+echo "Release path resolution:"
+if [ -x "$PROJECT_ROOT/tests/scripts/test_release_bin_path.sh" ]; then
+  if "$PROJECT_ROOT/tests/scripts/test_release_bin_path.sh"; then
+    pass "test_release_bin_path.sh"
+  else
+    fail "test_release_bin_path.sh"
+  fi
+else
+  warn "test_release_bin_path.sh not executable"
 fi
 
 echo ""
