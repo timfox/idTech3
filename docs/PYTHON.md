@@ -69,11 +69,15 @@ Allowed load paths: `scripts/python/`, `gameplay/`, `server/`, `client/`
 Loaded automatically when the runtime starts:
 
 - `print`, `cvar_get`, `cvar_set`, `exec`, `milliseconds`, `engine_info`
+- `db_available`, `db_path`, `db_exec`, `db_query_one`
+- `profile_set`, `profile_get`, `profile_delete`
 - `on_frame(callback)`, `on_event(name, callback)`
 - `batch_read(handles, field)`, `batch_write(handles, field, values)`
 - `batch_info()`, `spawn_demo_grid(side, spacing)`
 
 Fields: `position` / `pos`, `velocity` / `vel`
+
+Database helpers target the engine profile DB (`save/engine_profile.db`) when SQLite support is compiled in.
 
 ## Example (batch + frame hook)
 

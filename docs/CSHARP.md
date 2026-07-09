@@ -31,6 +31,7 @@ Startup log when enabled: `C# scripting: USE_CSHARP enabled (cs_reload, scripts/
 - Entry: `namespace Game { public static class Script { public static void Init(); public static void Frame(int msec, int realMsec); } }`
 - Events: `IdTech3.Engine.On("event", (s0,s1,i0,i1) => { ... });`
 - Console: `IdTech3.Engine.Exec("set r_fullscreen 0");` (when `cs_allowExec` 1)
+- Database: `IdTech3.Engine.DbAvailable()`, `DbExec(sql)`, `DbQueryOne(sql)`, `ProfileSet/Get/Delete`
 - Allowed paths: `scripts/csharp/`, `gameplay/`, `client/`, `ui/`
 
 Compiled DLL cache: `<fs_home>/vm/csharp_cache/`

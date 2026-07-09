@@ -1,5 +1,6 @@
 #include "q_shared.h"
 #include "qcommon.h"
+#include "qcommon/engine_db.h"
 #include "csharp_debug.h"
 
 #ifdef USE_CSHARP
@@ -171,6 +172,102 @@ static void id3_cs_exec( MonoString *command ) {
 	}
 }
 
+static int id3_cs_db_available( void ) {
+	return EngineDB_IsAvailable() ? 1 : 0;
+}
+
+static MonoString *id3_cs_db_path( void ) {
+	return mono_string_new( mono_domain_get(), EngineDB_GetPath() ? EngineDB_GetPath() : "" );
+}
+
+static int id3_cs_db_exec( MonoString *sql ) {
+	char *utf8;
+	int result = 0;
+
+	if ( !sql ) {
+		return 0;
+	}
+	utf8 = mono_string_to_utf8( sql );
+	if ( utf8 ) {
+		result = EngineDB_Exec( utf8 ) ? 1 : 0;
+		mono_free( utf8 );
+	}
+	return result;
+}
+
+static MonoString *id3_cs_db_query_one( MonoString *sql ) {
+	char *utf8;
+	char value[1024];
+	MonoString *result = NULL;
+
+	if ( !sql ) {
+		return NULL;
+	}
+	utf8 = mono_string_to_utf8( sql );
+	if ( utf8 && EngineDB_QueryOne( utf8, value, sizeof( value ) ) ) {
+		result = mono_string_new( mono_domain_get(), value );
+	}
+	if ( utf8 ) {
+		mono_free( utf8 );
+	}
+	return result;
+}
+
+static int id3_cs_profile_set( MonoString *key, MonoString *value ) {
+	char *keyUtf8;
+	char *valueUtf8;
+	int result = 0;
+
+	if ( !key || !value ) {
+		return 0;
+	}
+	keyUtf8 = mono_string_to_utf8( key );
+	valueUtf8 = mono_string_to_utf8( value );
+	if ( keyUtf8 && valueUtf8 ) {
+		result = EngineDB_ProfileSet( keyUtf8, valueUtf8 ) ? 1 : 0;
+	}
+	if ( keyUtf8 ) {
+		mono_free( keyUtf8 );
+	}
+	if ( valueUtf8 ) {
+		mono_free( valueUtf8 );
+	}
+	return result;
+}
+
+static MonoString *id3_cs_profile_get( MonoString *key ) {
+	char *keyUtf8;
+	char value[1024];
+	MonoString *result = NULL;
+
+	if ( !key ) {
+		return NULL;
+	}
+	keyUtf8 = mono_string_to_utf8( key );
+	if ( keyUtf8 && EngineDB_ProfileGet( keyUtf8, value, sizeof( value ) ) ) {
+		result = mono_string_new( mono_domain_get(), value );
+	}
+	if ( keyUtf8 ) {
+		mono_free( keyUtf8 );
+	}
+	return result;
+}
+
+static int id3_cs_profile_delete( MonoString *key ) {
+	char *keyUtf8;
+	int result = 0;
+
+	if ( !key ) {
+		return 0;
+	}
+	keyUtf8 = mono_string_to_utf8( key );
+	if ( keyUtf8 ) {
+		result = EngineDB_ProfileDelete( keyUtf8 ) ? 1 : 0;
+		mono_free( keyUtf8 );
+	}
+	return result;
+}
+
 static void CsDebug_RegisterInternalCalls( void ) {
 	mono_add_internal_call( "IdTech3.Engine::Print", id3_cs_print );
 	mono_add_internal_call( "IdTech3.Engine::CvarGet", id3_cs_cvar_get );
@@ -178,6 +275,13 @@ static void CsDebug_RegisterInternalCalls( void ) {
 	mono_add_internal_call( "IdTech3.Engine::GetMilliseconds", id3_cs_get_milliseconds );
 	mono_add_internal_call( "IdTech3.Engine::GetEngineInfo", id3_cs_get_engine_info );
 	mono_add_internal_call( "IdTech3.Engine::Exec", id3_cs_exec );
+	mono_add_internal_call( "IdTech3.Engine::DbAvailable", id3_cs_db_available );
+	mono_add_internal_call( "IdTech3.Engine::DbPath", id3_cs_db_path );
+	mono_add_internal_call( "IdTech3.Engine::DbExec", id3_cs_db_exec );
+	mono_add_internal_call( "IdTech3.Engine::DbQueryOne", id3_cs_db_query_one );
+	mono_add_internal_call( "IdTech3.Engine::ProfileSet", id3_cs_profile_set );
+	mono_add_internal_call( "IdTech3.Engine::ProfileGet", id3_cs_profile_get );
+	mono_add_internal_call( "IdTech3.Engine::ProfileDelete", id3_cs_profile_delete );
 }
 
 static qboolean CsDebug_StageVfsFileToHome( const char *vfsPath, char *diskPath, int diskPathSize );

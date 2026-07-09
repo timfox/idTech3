@@ -1027,6 +1027,45 @@ static int l_save_lastSlot(lua_State *L ) {
 	return 1;
 }
 
+static int l_db_available(lua_State *L ) {
+	lua_pushboolean( L, EngineDatabase_IsAvailable() );
+	return 1;
+}
+static int l_db_path(lua_State *L ) {
+	lua_pushstring( L, EngineDatabase_GetPath() );
+	return 1;
+}
+static int l_db_exec(lua_State *L ) {
+	lua_pushboolean( L, EngineDatabase_Exec( luaL_checkstring( L, 1 ) ) );
+	return 1;
+}
+static int l_db_queryOne(lua_State *L ) {
+	char buf[1024];
+	if ( EngineDatabase_QueryOne( luaL_checkstring( L, 1 ), buf, sizeof( buf ) ) ) {
+		lua_pushstring( L, buf );
+	} else {
+		lua_pushnil( L );
+	}
+	return 1;
+}
+static int l_db_profileSet(lua_State *L ) {
+	lua_pushboolean( L, EngineProfile_Set( luaL_checkstring( L, 1 ), luaL_checkstring( L, 2 ) ) );
+	return 1;
+}
+static int l_db_profileGet(lua_State *L ) {
+	char buf[1024];
+	if ( EngineProfile_Get( luaL_checkstring( L, 1 ), buf, sizeof( buf ) ) ) {
+		lua_pushstring( L, buf );
+	} else {
+		lua_pushnil( L );
+	}
+	return 1;
+}
+static int l_db_profileDelete(lua_State *L ) {
+	lua_pushboolean( L, EngineProfile_Delete( luaL_checkstring( L, 1 ) ) );
+	return 1;
+}
+
 static int l_quest_add(lua_State *L ) {
 	lua_pushinteger( L, EngineQuest_Add( luaL_checkstring( L, 1 ), luaL_checkstring( L, 2 ), luaL_checkstring( L, 3 ) ) );
 	return 1;
@@ -1717,6 +1756,18 @@ void LuaBindings_RegisterAll(void *luaState) {
 		{NULL, NULL}
 	};
 	registerTable(L, "Save", saveFuncs);
+
+	static const luaL_Reg dbFuncs[] = {
+		{"available", l_db_available},
+		{"path", l_db_path},
+		{"exec", l_db_exec},
+		{"queryOne", l_db_queryOne},
+		{"profileSet", l_db_profileSet},
+		{"profileGet", l_db_profileGet},
+		{"profileDelete", l_db_profileDelete},
+		{NULL, NULL}
+	};
+	registerTable(L, "DB", dbFuncs);
 
 	static const luaL_Reg questFuncs[] = {
 		{"add", l_quest_add},

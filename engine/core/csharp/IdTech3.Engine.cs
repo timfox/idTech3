@@ -25,6 +25,27 @@ namespace IdTech3
 		[MethodImpl( MethodImplOptions.InternalCall )]
 		public static extern void Exec( string command );
 
+		[MethodImpl( MethodImplOptions.InternalCall )]
+		public static extern bool DbAvailable();
+
+		[MethodImpl( MethodImplOptions.InternalCall )]
+		public static extern string DbPath();
+
+		[MethodImpl( MethodImplOptions.InternalCall )]
+		public static extern bool DbExec( string sql );
+
+		[MethodImpl( MethodImplOptions.InternalCall )]
+		public static extern string DbQueryOne( string sql );
+
+		[MethodImpl( MethodImplOptions.InternalCall )]
+		public static extern bool ProfileSet( string key, string value );
+
+		[MethodImpl( MethodImplOptions.InternalCall )]
+		public static extern string ProfileGet( string key );
+
+		[MethodImpl( MethodImplOptions.InternalCall )]
+		public static extern bool ProfileDelete( string key );
+
 		static readonly Dictionary<string, List<Action<string, string, int, int>>> s_handlers =
 			new Dictionary<string, List<Action<string, string, int, int>>>( StringComparer.OrdinalIgnoreCase );
 

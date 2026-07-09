@@ -7,6 +7,7 @@ lines for Lua/script integration (client-side game systems).
 
 #include "../qcommon/q_shared.h"
 #include "../qcommon/qcommon.h"
+#include "../qcommon/engine_db.h"
 #include "g_engine_systems.h"
 #include <string.h>
 
@@ -207,6 +208,7 @@ int EngineSave_ProtocolVersion( void ) {
 void EngineSave_Init( void ) {
 	Com_Memset( s_saves, 0, sizeof( s_saves ) );
 	s_lastSaveSlot = -1;
+	EngineDB_Init();
 	Com_Printf( "EngineSave: %d slots, protocol v%d (save/engine_slot_*.json)\n",
 		SAVE_SLOTS, ENGINE_SAVE_PROTOCOL_VERSION );
 }
@@ -214,6 +216,7 @@ void EngineSave_Init( void ) {
 void EngineSave_Shutdown( void ) {
 	Com_Memset( s_saves, 0, sizeof( s_saves ) );
 	s_lastSaveSlot = -1;
+	EngineDB_Shutdown();
 }
 
 qboolean EngineSave_WriteSlot( int slot, const char *label ) {
@@ -236,6 +239,7 @@ qboolean EngineSave_WriteSlot( int slot, const char *label ) {
 	s_lastSaveSlot = slot;
 
 	checksum = EngineSave_ChecksumLabel( label );
+	EngineDB_SaveWriteSlot( slot, label, ENGINE_SAVE_PROTOCOL_VERSION, ENGINE_SAVE_MOD_VERSION, checksum );
 	Com_sprintf( body, sizeof( body ),
 		"{\n  \"protocolVersion\": %d,\n  \"modVersion\": \"%s\",\n  \"label\": \"%s\",\n  \"checksum\": %u\n}\n",
 		ENGINE_SAVE_PROTOCOL_VERSION, ENGINE_SAVE_MOD_VERSION, escaped, checksum );
@@ -300,6 +304,16 @@ qboolean EngineSave_ReadSlot( int slot, char *labelOut, int labelLen ) {
 	}
 	labelOut[0] = '\0';
 
+	if ( EngineDB_SaveReadSlot( slot, labelOut, labelLen, &proto ) ) {
+		if ( proto != 0 && proto != ENGINE_SAVE_PROTOCOL_VERSION ) {
+			Com_Printf( S_COLOR_YELLOW "EngineSave: sqlite protocol %d != engine %d\n",
+				proto, ENGINE_SAVE_PROTOCOL_VERSION );
+		}
+		Q_strncpyz( s_saves[slot].label, labelOut, sizeof( s_saves[0].label ) );
+		s_saves[slot].used = qtrue;
+		return qtrue;
+	}
+
 	Com_sprintf( path, sizeof( path ), "save/engine_slot_%d.json", slot );
 	len = FS_ReadFile( path, (void **)&buf );
 	if ( len > 0 && buf ) {
@@ -342,6 +356,34 @@ qboolean EngineSave_ReadSlot( int slot, char *labelOut, int labelLen ) {
 
 int EngineSave_LastSlot( void ) {
 	return s_lastSaveSlot;
+}
+
+qboolean EngineProfile_Set( const char *key, const char *value ) {
+	return EngineDB_ProfileSet( key, value );
+}
+
+qboolean EngineProfile_Get( const char *key, char *out, int outSize ) {
+	return EngineDB_ProfileGet( key, out, outSize );
+}
+
+qboolean EngineProfile_Delete( const char *key ) {
+	return EngineDB_ProfileDelete( key );
+}
+
+qboolean EngineDatabase_IsAvailable( void ) {
+	return EngineDB_IsAvailable();
+}
+
+const char *EngineDatabase_GetPath( void ) {
+	return EngineDB_GetPath();
+}
+
+qboolean EngineDatabase_Exec( const char *sql ) {
+	return EngineDB_Exec( sql );
+}
+
+qboolean EngineDatabase_QueryOne( const char *sql, char *out, int outSize ) {
+	return EngineDB_QueryOne( sql, out, outSize );
 }
 
 /* ---- Quests ---- */
