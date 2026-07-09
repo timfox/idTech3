@@ -626,7 +626,6 @@
     <ClCompile Include="..\..\..\world\world_proc.cpp" />
     <ClCompile Include="..\..\..\world\world_residency.cpp" />
     <ClCompile Include="..\..\audio\backends\snd_backend_null.c" />
-    <ClCompile Include="..\..\audio\backends\snd_backend_openal.c" />
     <ClCompile Include="..\..\audio\codecs\snd_codec_flac.c" />
     <ClCompile Include="..\..\audio\codecs\snd_codec_mp3.c" />
     <ClCompile Include="..\..\audio\codecs\snd_codec_opus.c" />
