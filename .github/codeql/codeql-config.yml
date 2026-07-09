@@ -1,0 +1,8 @@
+# CodeQL scope: first-party engine sources only.
+# Vendored trees under third_party/ and src/external/ are upstream libraries
+# (tests, demos, and codec internals); track CVEs via dependency updates, not
+# local forks of vendor sources.
+name: "idTech3 CodeQL"
+paths-ignore:
+  - third_party
+  - src/external
