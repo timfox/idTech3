@@ -296,22 +296,105 @@ static void CL_P2PConnect_f( void ) {
 	Cbuf_AddText( va( "connect %s\n", address ) );
 }
 
-static serverInfo_t *CL_P2PBrowserServer( const char *source, int index ) {
+static serverInfo_t *CL_P2PBrowserServer( const char *source, int index, int *count ) {
+	if ( count ) {
+		*count = 0;
+	}
+
 	if ( !Q_stricmp( source, "local" ) ) {
-		if ( index >= 0 && index < MAX_OTHER_SERVERS ) {
+		if ( count ) {
+			*count = cls.numlocalservers;
+		}
+		if ( index >= 0 && index < cls.numlocalservers ) {
 			return &cls.localServers[index];
 		}
 	} else if ( !Q_stricmp( source, "global" ) ) {
-		if ( index >= 0 && index < MAX_GLOBAL_SERVERS ) {
+		if ( count ) {
+			*count = cls.numglobalservers;
+		}
+		if ( index >= 0 && index < cls.numglobalservers ) {
 			return &cls.globalServers[index];
 		}
 	} else if ( !Q_stricmp( source, "favorites" ) ) {
-		if ( index >= 0 && index < MAX_OTHER_SERVERS ) {
+		if ( count ) {
+			*count = cls.numfavoriteservers;
+		}
+		if ( index >= 0 && index < cls.numfavoriteservers ) {
 			return &cls.favoriteServers[index];
 		}
 	}
 
 	return NULL;
+}
+
+static void CL_P2PListSource( const char *source, serverInfo_t *servers, int count ) {
+	int i;
+	int matches;
+
+	matches = 0;
+
+	for ( i = 0; i < count; i++ ) {
+		if ( !servers[i].adr.port && !servers[i].p2pAddr[0] ) {
+			continue;
+		}
+		if ( !servers[i].p2pAvailable && !servers[i].p2pAddr[0] ) {
+			continue;
+		}
+
+		Com_Printf(
+			"%-9s %3d  ping:%4d  map:%-16s  host:%s\n",
+			source,
+			i,
+			servers[i].ping,
+			servers[i].mapName[0] ? servers[i].mapName : "<unknown>",
+			servers[i].hostName[0] ? servers[i].hostName : "<unnamed>"
+		);
+		Com_Printf(
+			"           p2p:%s  udp:%s\n",
+			servers[i].p2pAddr[0] ? servers[i].p2pAddr : "<unavailable>",
+			NET_AdrToStringwPort( &servers[i].adr )
+		);
+		matches++;
+	}
+
+	if ( !matches ) {
+		Com_Printf( "%-9s no P2P-capable cached servers\n", source );
+	}
+}
+
+static void CL_P2PList_f( void ) {
+	const char *source;
+
+	if ( Cmd_Argc() > 2 ) {
+		Com_Printf( "usage: p2p_list [local|global|favorites]\n" );
+		return;
+	}
+
+	source = ( Cmd_Argc() == 2 ) ? Cmd_Argv( 1 ) : "all";
+
+	if ( !Q_stricmp( source, "all" ) ) {
+		CL_P2PListSource( "local", cls.localServers, cls.numlocalservers );
+		CL_P2PListSource( "global", cls.globalServers, cls.numglobalservers );
+		CL_P2PListSource( "favorites", cls.favoriteServers, cls.numfavoriteservers );
+		return;
+	}
+
+	if ( !Q_stricmp( source, "local" ) ) {
+		CL_P2PListSource( source, cls.localServers, cls.numlocalservers );
+		return;
+	}
+
+	if ( !Q_stricmp( source, "global" ) ) {
+		CL_P2PListSource( source, cls.globalServers, cls.numglobalservers );
+		return;
+	}
+
+	if ( !Q_stricmp( source, "favorites" ) ) {
+		CL_P2PListSource( source, cls.favoriteServers, cls.numfavoriteservers );
+		return;
+	}
+
+	Com_Printf( "p2p_list: unknown source '%s'\n", source );
 }
 
 static void CL_P2PConnectBrowser_f( void ) {
@@ -326,7 +409,7 @@ static void CL_P2PConnectBrowser_f( void ) {
 
 	source = Cmd_Argv( 1 );
 	index = atoi( Cmd_Argv( 2 ) );
-	server = CL_P2PBrowserServer( source, index );
+	server = CL_P2PBrowserServer( source, index, NULL );
 	if ( !server || server->adr.port == 0 ) {
 		Com_Printf( "p2p_connect_browser: no server at %s %d\n", source, index );
 		return;
@@ -359,6 +442,7 @@ void CL_Cmds_Init( void ) {
 	Cmd_AddCommand( "p2p_status", CL_P2PStatus_f );
 	Cmd_AddCommand( "p2p_address", CL_P2PAddress_f );
 	Cmd_AddCommand( "p2p_connect", CL_P2PConnect_f );
+	Cmd_AddCommand( "p2p_list", CL_P2PList_f );
 	Cmd_AddCommand( "p2p_connect_browser", CL_P2PConnectBrowser_f );
 }
 
@@ -379,5 +463,6 @@ void CL_Cmds_Shutdown( void ) {
 	Cmd_RemoveCommand( "p2p_status" );
 	Cmd_RemoveCommand( "p2p_address" );
 	Cmd_RemoveCommand( "p2p_connect" );
+	Cmd_RemoveCommand( "p2p_list" );
 	Cmd_RemoveCommand( "p2p_connect_browser" );
 }
