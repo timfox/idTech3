@@ -2820,6 +2820,13 @@ set_tests_properties(test_validate_assets PROPERTIES
 	LABELS "scripts;validation;assets"
 	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_validate_assets.sh;${CMAKE_SOURCE_DIR}/scripts/validate_assets.sh")
 
+add_test(NAME test_asset_pipeline
+	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_asset_pipeline.sh
+	WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+set_tests_properties(test_asset_pipeline PROPERTIES
+	LABELS "scripts;validation;assets"
+	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_asset_pipeline.sh;${CMAKE_SOURCE_DIR}/scripts/asset_pipeline.sh;${CMAKE_SOURCE_DIR}/examples/demo_game/asset_pipeline.conf")
+
 add_test(NAME test_crash_report
 	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_crash_report.sh
 	WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
