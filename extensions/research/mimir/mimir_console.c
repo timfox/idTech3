@@ -33,7 +33,7 @@ static void Mimir_Cmd_ModelStatus_f( void )
 {
 	Com_Printf( "[Mímir] cl_mimir_model=%d\n", cl_mimir_model ? cl_mimir_model->integer : 0 );
 	Com_Printf( "[Mímir] Commands: mimir_api, mimir_model, mimir_interop, mimir_sync\n" );
-	Com_Printf( "[Mímir] Runtime (renderer): mimir_status, mimir_step, mimir_reset, mimir_prepare, mimir_update\n" );
+	Com_Printf( "[Mímir] Runtime (renderer): mimir_status, mimir_step, mimir_display, mimir_display_async, mimir_reset, mimir_prepare, mimir_update\n" );
 	Com_Printf( "[Mímir] See docs/MIMIR.md — paper https://arxiv.org/abs/2504.20937\n" );
 }
 
@@ -43,7 +43,7 @@ static void Mimir_Cmd_Api_f( void )
 	Com_Printf( "  allocLinear → shared VRAM; createView (Markers/Lines/Voxels)\n" );
 	Com_Printf( "  display / displayAsync + prepareViews / updateViews sync\n" );
 	Com_Printf( "  Slang → SPIR-V shaders; zero-copy read of simulation state\n" );
-	Com_Printf( "[Mímir] Engine scaffold: r_mimir 1 + vid_restart; mimir_step N\n" );
+	Com_Printf( "[Mímir] Engine scaffold: r_mimir 1 + vid_restart; mimir_display N or mimir_display_async N\n" );
 	Com_Printf( "[Mímir] Brownian point cloud on Vulkan compute (CUDA import when USE_MIMIR_CUDA)\n" );
 }
 

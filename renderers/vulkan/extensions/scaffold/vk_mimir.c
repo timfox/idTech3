@@ -31,6 +31,7 @@ typedef struct {
 	uint32_t frames;
 	qboolean ready;
 	qboolean compute_section;
+	qboolean force_async;
 } mimirState_t;
 
 static mimirState_t mimir;
@@ -505,7 +506,7 @@ static qboolean Mimir_RunOneStep( void )
 	}
 
 	/* prepareViews — optional sync gate (paper §3.4) */
-	if ( r_mimir_sync && r_mimir_sync->integer && !mimir.compute_section ) {
+	if ( r_mimir_sync && r_mimir_sync->integer && !mimir.compute_section && !mimir.force_async ) {
 		ri.Printf( PRINT_DEVELOPER, "[Mímir] prepareViews blocked — call mimir_prepare first\n" );
 		vk_end_command_buffer( cmd, "Mimir_RunOneStep_blocked" );
 		return qfalse;
@@ -687,6 +688,48 @@ static void Mimir_Cmd_Step( void )
 	}
 }
 
+static void Mimir_Cmd_Display( void )
+{
+	int n;
+	int i;
+
+	if ( !R_Mimir_Active() ) {
+		ri.Printf( PRINT_WARNING, "[Mímir] Enable r_mimir 1 + vid_restart\n" );
+		return;
+	}
+
+	n = ( ri.Cmd_Argc() >= 2 ) ? atoi( ri.Cmd_Argv( 1 ) ) : 1;
+	mimir.compute_section = qtrue;
+	for ( i = 0; i < n; i++ ) {
+		if ( !Mimir_RunOneStep() ) {
+			ri.Printf( PRINT_WARNING, "[Mímir] display failed at iteration %d\n", i );
+			break;
+		}
+	}
+	mimir.compute_section = qfalse;
+}
+
+static void Mimir_Cmd_DisplayAsync( void )
+{
+	int n;
+	int i;
+
+	if ( !R_Mimir_Active() ) {
+		ri.Printf( PRINT_WARNING, "[Mímir] Enable r_mimir 1 + vid_restart\n" );
+		return;
+	}
+
+	n = ( ri.Cmd_Argc() >= 2 ) ? atoi( ri.Cmd_Argv( 1 ) ) : 1;
+	mimir.force_async = qtrue;
+	for ( i = 0; i < n; i++ ) {
+		if ( !Mimir_RunOneStep() ) {
+			ri.Printf( PRINT_WARNING, "[Mímir] displayAsync failed at iteration %d\n", i );
+			break;
+		}
+	}
+	mimir.force_async = qfalse;
+}
+
 static void Mimir_Cmd_Reset( void )
 {
 	mimir.frames = 0;
@@ -733,6 +776,8 @@ void R_Mimir_Init( void )
 
 	ri.Cmd_AddCommand( "mimir_status", Mimir_Cmd_Status );
 	ri.Cmd_AddCommand( "mimir_step", Mimir_Cmd_Step );
+	ri.Cmd_AddCommand( "mimir_display", Mimir_Cmd_Display );
+	ri.Cmd_AddCommand( "mimir_display_async", Mimir_Cmd_DisplayAsync );
 	ri.Cmd_AddCommand( "mimir_reset", Mimir_Cmd_Reset );
 	ri.Cmd_AddCommand( "mimir_prepare", Mimir_Cmd_Prepare );
 	ri.Cmd_AddCommand( "mimir_update", Mimir_Cmd_Update );
@@ -746,6 +791,8 @@ void R_Mimir_Shutdown( void )
 {
 	ri.Cmd_RemoveCommand( "mimir_status" );
 	ri.Cmd_RemoveCommand( "mimir_step" );
+	ri.Cmd_RemoveCommand( "mimir_display" );
+	ri.Cmd_RemoveCommand( "mimir_display_async" );
 	ri.Cmd_RemoveCommand( "mimir_reset" );
 	ri.Cmd_RemoveCommand( "mimir_prepare" );
 	ri.Cmd_RemoveCommand( "mimir_update" );

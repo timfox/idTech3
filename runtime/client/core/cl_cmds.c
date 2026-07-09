@@ -281,6 +281,11 @@ static void CL_P2PConnect_f( void ) {
 		return;
 	}
 
+	if ( !NET_P2P_IsEnabled() ) {
+		Com_Printf( "P2P is disabled; set net_p2p 1\n" );
+		return;
+	}
+
 	peer = Cmd_Argv( 1 );
 	if ( !NET_P2P_NormalizeAddressString( peer, address, sizeof( address ) ) ) {
 		Com_Printf( "p2p_connect: expected a SteamID64, steam:SteamID64, host:port, or udp:host:port\n" );
@@ -296,6 +301,11 @@ static void CL_P2PPunch_f( void ) {
 
 	if ( Cmd_Argc() != 2 ) {
 		Com_Printf( "usage: p2p_punch <host:port|udp:host:port>\n" );
+		return;
+	}
+
+	if ( !NET_P2P_IsEnabled() ) {
+		Com_Printf( "P2P is disabled; set net_p2p 1\n" );
 		return;
 	}
 
@@ -423,10 +433,15 @@ static void CL_P2PConnectBrowser_f( void ) {
 		return;
 	}
 
+	if ( !NET_P2P_IsEnabled() ) {
+		Com_Printf( "P2P is disabled; set net_p2p 1\n" );
+		return;
+	}
+
 	source = Cmd_Argv( 1 );
 	index = atoi( Cmd_Argv( 2 ) );
 	server = CL_P2PBrowserServer( source, index, NULL );
-	if ( !server || server->adr.port == 0 ) {
+	if ( !server || ( server->adr.port == 0 && !server->p2pAddr[0] ) ) {
 		Com_Printf( "p2p_connect_browser: no server at %s %d\n", source, index );
 		return;
 	}

@@ -16,6 +16,7 @@ ISteamNetworkingSockets for NAT traversal, relay, and encryption.
 #include "q_shared.h"
 #include "qcommon.h"
 #include "net_sdr.h"
+#include "net_p2p.h"
 
 #if STEAMWORKS_AVAILABLE
 #include <steam/steam_api.h>
@@ -236,7 +237,7 @@ void NET_SDR_Frame( void )
 
 	NET_SDR_SyncCvars();
 
-	if ( !sdr_initialized || !net_sdr || !net_sdr->integer )
+	if ( !sdr_initialized || !NET_SDR_IsActive() )
 		return;
 
 	sockets = SteamNetSockets();
@@ -341,7 +342,7 @@ qboolean NET_SDR_SendPacket( netsrc_t sock, int length, const void *data, const 
 
 	NET_SDR_SyncCvars();
 
-	if ( !sdr_initialized || !net_sdr || !net_sdr->integer )
+	if ( !NET_SDR_IsActive() )
 		return qfalse;
 
 	if ( to->type != NA_STEAMID )
@@ -377,7 +378,7 @@ qboolean NET_SDR_SendPacket( netsrc_t sock, int length, const void *data, const 
 qboolean NET_SDR_IsActive( void )
 {
 	NET_SDR_SyncCvars();
-	return sdr_initialized && net_sdr && net_sdr->integer;
+	return sdr_initialized && net_sdr && net_sdr->integer && NET_P2P_UsesSteamSdrBackend();
 }
 
 qboolean NET_SDR_UseForAddress( const netadr_t *adr )

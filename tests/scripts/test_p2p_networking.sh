@@ -41,5 +41,11 @@ grep -Fq 'usage: p2p_list [local|global|favorites]' runtime/client/core/cl_cmds.
 grep -Fq 'usage: p2p_connect <steamid|steam:steamid|host:port|udp:host:port>' runtime/client/core/cl_cmds.c || fail "missing generic p2p_connect usage text"
 grep -Fq 'usage: p2p_punch <host:port|udp:host:port>' runtime/client/core/cl_cmds.c || fail "missing p2p_punch usage text"
 grep -q 'p2p_connect_browser <local|global|favorites> <index>' docs/P2P_NETWORKING.md || fail "missing P2P browser docs"
+grep -q 'NET_P2P_Init' engine/core/net_ip.c || fail "missing NET_P2P_Init in NET_Init"
+grep -q 'NET_P2P_Shutdown' engine/core/net_ip.c || fail "missing NET_P2P_Shutdown in NET_Shutdown"
+grep -q 'NET_P2P_UsesSteamSdrBackend' engine/core/net_p2p.h || fail "missing steam backend selector export"
+grep -q 'NET_P2P_UsesSteamSdrBackend' engine/core/net_sdr.c || fail "missing SDR backend gate"
+grep -q 'digits >= 15' engine/core/net_p2p.c || fail "missing bare SteamID64 guard in address normalizer"
+grep -q 'server->adr.port == 0 && !server->p2pAddr' runtime/client/core/cl_cmds.c || fail "missing p2p-only browser join guard"
 
 pass "optional P2P networking wrapper, commands, and docs are present"

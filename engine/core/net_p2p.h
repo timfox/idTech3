@@ -10,6 +10,7 @@ void NET_P2P_Frame( void );
 qboolean NET_P2P_IsSupported( void );
 qboolean NET_P2P_IsEnabled( void );
 qboolean NET_P2P_IsReady( void );
+qboolean NET_P2P_UsesSteamSdrBackend( void );
 const char *NET_P2P_BackendName( void );
 qboolean NET_P2P_GetLocalAddressString( char *buffer, int bufferSize );
 qboolean NET_P2P_IsAddressString( const char *address );
