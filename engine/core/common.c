@@ -438,6 +438,9 @@ void NORETURN FORMAT_PRINTF(2, 3) QDECL Com_Error( errorParm_t code, const char 
 		SV_Shutdown( "Server disconnected" );
 		Com_EndRedirect();
 #ifndef DEDICATED
+		if ( code == ERR_SERVERDISCONNECT ) {
+			CL_P2P_SessionPrepareDisconnect( qtrue );
+		}
 		CL_Disconnect( qfalse );
 		CL_FlushMemory();
 #endif

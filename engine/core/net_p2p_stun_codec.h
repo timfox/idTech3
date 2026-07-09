@@ -77,6 +77,7 @@ int NET_P2P_StunBuildBindingRequest( byte *out, int outSize, const byte *transac
 int NET_P2P_StunBuildAllocateAttrs( byte *out, int outSize, const char *username, const char *realm, const char *nonce );
 int NET_P2P_StunBuildCreatePermissionAttrs( byte *out, int outSize, const netadr_t *peer, const char *username, const char *realm, const char *nonce );
 int NET_P2P_StunBuildRefreshAttrs( byte *out, int outSize, uint32_t lifetimeSec, const char *username, const char *realm, const char *nonce );
+int NET_P2P_StunBuildChannelBindAttrs( byte *out, int outSize, uint16_t channelNumber, const netadr_t *peer, const char *username, const char *realm, const char *nonce );
 
 qboolean NET_P2P_StunParseMappedAddress( const byte *value, int valueLen, netadr_t *out, qboolean xored, const byte *transactionId );
 qboolean NET_P2P_StunParseMessage( const byte *data, int len, const byte *expectedTransactionId, p2p_stun_parse_result_t *result );

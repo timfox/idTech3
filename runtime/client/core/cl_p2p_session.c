@@ -33,6 +33,7 @@ static cvar_t *cl_p2pReconnectLog;
 static cvar_t *cl_p2pBackupHost;
 
 static cl_p2p_session_t cl_p2pSession;
+static qboolean cl_p2pDisconnectServerInitiated;
 
 static void CL_P2P_SessionRegisterCvars( void )
 {
@@ -98,6 +99,46 @@ void CL_P2P_SessionOnConnect( const char *sessionId, const char *p2pAddr, const 
 	cl_p2pSession.reconnectWindowSec = reconnectWindowSec > 0 ? reconnectWindowSec : 0;
 }
 
+void CL_P2P_SessionOnConnectFromServerInfo( const char *serverInfo )
+{
+	const char *p2pFlag;
+	const char *sessionId;
+	const char *p2pAddr;
+	const char *failover;
+	int reconnectWindow;
+
+	if ( !serverInfo || !NET_P2P_IsEnabled() ) {
+		return;
+	}
+
+	p2pFlag = Info_ValueForKey( serverInfo, "p2p" );
+	if ( !p2pFlag || !p2pFlag[0] || !atoi( p2pFlag ) ) {
+		return;
+	}
+
+	sessionId = Info_ValueForKey( serverInfo, "p2psession" );
+	p2pAddr = Info_ValueForKey( serverInfo, "p2paddr" );
+	failover = Info_ValueForKey( serverInfo, "p2pfail" );
+	reconnectWindow = atoi( Info_ValueForKey( serverInfo, "p2preconn" ) );
+
+	if ( !p2pAddr || !p2pAddr[0] ) {
+		p2pAddr = cls.servername;
+	}
+
+	CL_P2P_SessionOnConnect( sessionId, p2pAddr, failover, reconnectWindow );
+}
+
+void CL_P2P_SessionPrepareDisconnect( qboolean serverInitiated )
+{
+	cl_p2pDisconnectServerInitiated = serverInitiated;
+}
+
+void CL_P2P_SessionNotifyDisconnect( void )
+{
+	CL_P2P_SessionOnDisconnect( cl_p2pDisconnectServerInitiated );
+	cl_p2pDisconnectServerInitiated = qfalse;
+}
+
 static void CL_P2P_SessionBroadcastMigrate( const char *newAddr )
 {
 	char address[MAX_STRING_CHARS];
@@ -150,8 +191,12 @@ void CL_P2P_SessionOnDisconnect( qboolean serverInitiated )
 {
 	int now;
 
-	(void)serverInitiated;
 	CL_P2P_SessionRegisterCvars();
+
+	if ( !serverInitiated ) {
+		Com_Memset( &cl_p2pSession, 0, sizeof( cl_p2pSession ) );
+		return;
+	}
 
 	if ( !cl_p2pSession.active || !NET_P2P_IsEnabled() ) {
 		Com_Memset( &cl_p2pSession, 0, sizeof( cl_p2pSession ) );

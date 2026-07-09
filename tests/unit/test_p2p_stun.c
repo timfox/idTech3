@@ -111,12 +111,31 @@ static int test_candidate_priority(void) {
 	return 0;
 }
 
+static int test_channel_bind_attrs_shape(void) {
+	byte attrs[256];
+	netadr_t peer;
+	int len;
+
+	Com_Memset( &peer, 0, sizeof( peer ) );
+	peer.type = NA_IP;
+	peer.ipv._4[0] = 127;
+	peer.ipv._4[3] = 1;
+	peer.port = 27960;
+
+	len = NET_P2P_StunBuildChannelBindAttrs( attrs, sizeof( attrs ), 0x4001, &peer, "user", "realm", "nonce" );
+	ASSERT( len > 12, "channel bind attrs length" );
+	ASSERT( NET_P2P_StunRead16( attrs + 0 ) == P2P_STUN_ATTR_CHANNEL_NUMBER, "channel number attr" );
+	ASSERT( NET_P2P_StunRead16( attrs + 8 ) == P2P_STUN_ATTR_XOR_PEER_ADDRESS, "xor peer attr" );
+	return 0;
+}
+
 int main(void) {
 	if ( test_build_binding_request() ) return 1;
 	if ( test_parse_xor_mapped_address() ) return 1;
 	if ( test_parse_error_realm_nonce() ) return 1;
 	if ( test_allocate_attrs_shape() ) return 1;
 	if ( test_candidate_priority() ) return 1;
+	if ( test_channel_bind_attrs_shape() ) return 1;
 	printf("unit_p2p_stun: ok\n");
 	return 0;
 }

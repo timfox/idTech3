@@ -23,6 +23,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 #include "client.h"
 #include "cl_voip.h"
+#include "cl_p2p_session.h"
 #include "cl_app_crdt.h"
 #include "script_emit.h"
 #if defined(USE_DUKTAPE) || defined(USE_CSHARP)
@@ -646,6 +647,8 @@ static void CL_ParseGamestate( msg_t *msg ) {
 
 	// parse useful values out of CS_SERVERINFO
 	CL_ParseServerInfo();
+	CL_P2P_SessionOnConnectFromServerInfo(
+		cl.gameState.stringData + cl.gameState.stringOffsets[ CS_SERVERINFO ] );
 
 	// parse serverId and other cvars
 	CL_SystemInfoChanged( qtrue );
@@ -878,6 +881,7 @@ static void CL_ParseCommandString( msg_t *msg ) {
 			text = ( Cmd_Argc() > 1 ) ? va( "Server disconnected: %s", Cmd_Argv( 1 ) ) : "Server disconnected.";
 			Cvar_Set( "com_errorMessage", text );
 			Com_Printf( "%s\n", text );
+			CL_P2P_SessionPrepareDisconnect( qtrue );
 			if ( !CL_Disconnect( qtrue ) ) { // restart client if not done already
 				CL_FlushMemory();
 			}

@@ -3258,6 +3258,12 @@ set_tests_properties(test_p2p_nat_live PROPERTIES
 	LABELS "p2p;live"
 	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_p2p_nat_live.sh;${CMAKE_SOURCE_DIR}/docs/P2P_NAT_TESTING.md")
 
+add_test(NAME test_p2p_reconnect
+	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_p2p_reconnect.sh)
+set_tests_properties(test_p2p_reconnect PROPERTIES
+	LABELS "p2p;scripts"
+	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_p2p_reconnect.sh;${CMAKE_SOURCE_DIR}/runtime/client/core/cl_p2p_session.c;${CMAKE_SOURCE_DIR}/runtime/server/sv_client.c")
+
 add_test(NAME test_console_font
 	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_console_font.sh)
 set_tests_properties(test_console_font PROPERTIES

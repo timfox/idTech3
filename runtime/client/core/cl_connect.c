@@ -129,7 +129,7 @@ qboolean CL_Disconnect( qboolean showMainMenu ) {
 
 	cls.state = CA_DISCONNECTED;
 
-	CL_P2P_SessionOnDisconnect( qtrue );
+	CL_P2P_SessionNotifyDisconnect();
 
 	// allow cheats locally
 	Cvar_Set( "sv_cheats", "1" );
@@ -928,6 +928,7 @@ static void CL_CheckTimeout( void ) {
 		if ( ++cl.timeoutcount > 5 ) { // timeoutcount saves debugger
 			Com_Printf( "\nServer connection timed out.\n" );
 			Cvar_Set( "com_errorMessage", "Server connection timed out." );
+			CL_P2P_SessionPrepareDisconnect( qtrue );
 			if ( !CL_Disconnect( qfalse ) ) { // restart client if not done already
 				CL_FlushMemory();
 			}
