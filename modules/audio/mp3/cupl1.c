@@ -324,6 +324,7 @@ int L1audio_decode_init(MPEG_HEAD * h, int framebytes_arg,
 #endif	// #ifdef COMPILE_ME
 
 #ifndef COMPILE_ME
+#include "small_header.h"
 // Dummy function to suppress empty translation unit warning
-static void __attribute__((unused)) cupl1_dummy(void) {}
+static void MP3_ATTRIBUTE_UNUSED cupl1_dummy( void ) {}
 #endif

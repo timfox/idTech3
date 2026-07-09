@@ -321,6 +321,7 @@ void sbtB8_dual_L3(float *sample, unsigned char *pcm, int ch)
 #endif	// #ifdef COMPILE_ME
 
 #ifndef COMPILE_ME
+#include "small_header.h"
 // Dummy function to suppress empty translation unit warning
-static void __attribute__((unused)) csbtl3_dummy(void) {}
+static void MP3_ATTRIBUTE_UNUSED csbtl3_dummy( void ) {}
 #endif

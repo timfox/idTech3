@@ -247,7 +247,7 @@ static void CL_P2PStatus_f( void ) {
 	}
 
 	if ( NET_P2P_IsSupported() ) {
-		Com_Printf( "P2P notes: enable with net_p2p 1 (alias: net_sdr 1); dedicated Steam hosting is not wired yet\n" );
+		Com_Printf( "P2P notes: enable with net_p2p 1; use net_p2pBackend auto|steam_sdr|direct_udp. direct_udp can advertise via net_p2pAdvertiseAddress.\n" );
 	}
 }
 
@@ -260,7 +260,7 @@ static void CL_P2PAddress_f( void ) {
 	}
 
 	if ( !NET_P2P_GetLocalAddressString( address, sizeof( address ) ) ) {
-		Com_Printf( "P2P address unavailable; make sure Steam is running and net_p2p is enabled\n" );
+		Com_Printf( "P2P address unavailable; make sure net_p2p is enabled and configure Steam or net_p2pAdvertiseAddress for direct_udp\n" );
 		return;
 	}
 
@@ -269,11 +269,10 @@ static void CL_P2PAddress_f( void ) {
 
 static void CL_P2PConnect_f( void ) {
 	const char *peer;
-	unsigned long long steamid;
 	char address[MAX_STRING_CHARS];
 
 	if ( Cmd_Argc() != 2 ) {
-		Com_Printf( "usage: p2p_connect <steamid|steam:steamid>\n" );
+		Com_Printf( "usage: p2p_connect <steamid|steam:steamid|host:port|udp:host:port>\n" );
 		return;
 	}
 
@@ -283,17 +282,34 @@ static void CL_P2PConnect_f( void ) {
 	}
 
 	peer = Cmd_Argv( 1 );
-	if ( !Q_stricmpn( peer, "steam:", 6 ) ) {
-		peer += 6;
-	}
-
-	if ( sscanf( peer, "%llu", &steamid ) != 1 || steamid == 0 ) {
-		Com_Printf( "p2p_connect: expected a SteamID64 or steam:SteamID64\n" );
+	if ( !NET_P2P_NormalizeAddressString( peer, address, sizeof( address ) ) ) {
+		Com_Printf( "p2p_connect: expected a SteamID64, steam:SteamID64, host:port, or udp:host:port\n" );
 		return;
 	}
 
-	Com_sprintf( address, sizeof( address ), "steam:%llu", steamid );
+	NET_P2P_BeginPunchForAddress( address );
 	Cbuf_AddText( va( "connect %s\n", address ) );
+}
+
+static void CL_P2PPunch_f( void ) {
+	char address[MAX_STRING_CHARS];
+
+	if ( Cmd_Argc() != 2 ) {
+		Com_Printf( "usage: p2p_punch <host:port|udp:host:port>\n" );
+		return;
+	}
+
+	if ( !NET_P2P_NormalizeAddressString( Cmd_Argv( 1 ), address, sizeof( address ) ) ||
+	     Q_stricmpn( address, "udp:", 4 ) != 0 ) {
+		Com_Printf( "p2p_punch: expected host:port or udp:host:port\n" );
+		return;
+	}
+
+	NET_P2P_BeginPunchForAddress( address );
+}
+
+static void CL_P2PPunchStatus_f( void ) {
+	NET_P2P_PrintPunchStatus();
 }
 
 static serverInfo_t *CL_P2PBrowserServer( const char *source, int index, int *count ) {
@@ -416,10 +432,12 @@ static void CL_P2PConnectBrowser_f( void ) {
 	}
 
 	if ( server->p2pAddr[0] ) {
+		NET_P2P_BeginPunchForAddress( server->p2pAddr );
 		Cbuf_AddText( va( "connect %s\n", server->p2pAddr ) );
 		return;
 	}
 
+	NET_P2P_BeginPunchForAddress( NET_AdrToStringwPort( &server->adr ) );
 	Cbuf_AddText( va( "connect %s\n", NET_AdrToStringwPort( &server->adr ) ) );
 }
 
@@ -442,6 +460,8 @@ void CL_Cmds_Init( void ) {
 	Cmd_AddCommand( "p2p_status", CL_P2PStatus_f );
 	Cmd_AddCommand( "p2p_address", CL_P2PAddress_f );
 	Cmd_AddCommand( "p2p_connect", CL_P2PConnect_f );
+	Cmd_AddCommand( "p2p_punch", CL_P2PPunch_f );
+	Cmd_AddCommand( "p2p_punch_status", CL_P2PPunchStatus_f );
 	Cmd_AddCommand( "p2p_list", CL_P2PList_f );
 	Cmd_AddCommand( "p2p_connect_browser", CL_P2PConnectBrowser_f );
 }
@@ -463,6 +483,8 @@ void CL_Cmds_Shutdown( void ) {
 	Cmd_RemoveCommand( "p2p_status" );
 	Cmd_RemoveCommand( "p2p_address" );
 	Cmd_RemoveCommand( "p2p_connect" );
+	Cmd_RemoveCommand( "p2p_punch" );
+	Cmd_RemoveCommand( "p2p_punch_status" );
 	Cmd_RemoveCommand( "p2p_list" );
 	Cmd_RemoveCommand( "p2p_connect_browser" );
 }

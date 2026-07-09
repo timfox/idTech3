@@ -476,6 +476,7 @@ void window8_dual(float *vbuf, int vb_ptr, short *pcm)
 #endif	// #ifdef COMPILE_ME
 
 #ifndef COMPILE_ME
+#include "small_header.h"
 // Dummy function to suppress empty translation unit warning
-static void __attribute__((unused)) cwin_dummy(void) {}
+static void MP3_ATTRIBUTE_UNUSED cwin_dummy( void ) {}
 #endif

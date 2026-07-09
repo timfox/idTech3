@@ -29,6 +29,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 #include "../qcommon/q_shared.h"
 #include "../qcommon/qcommon.h"
+#include "../qcommon/net_p2p.h"
 #include "net_dtls.h"
 #include "net_sdr.h"
 
@@ -1996,6 +1997,7 @@ qboolean NET_Sleep( int timeout )
 		return qfalse;
 	}
 #endif
+	NET_P2P_Frame();
 
 	if ( ip_socket != INVALID_SOCKET )
 	{

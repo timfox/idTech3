@@ -393,4 +393,5 @@ void decode_table_init()
 #endif	// #ifdef COMPILE_ME
 
 /* Dummy statement to avoid empty translation unit warning */
-static void *dummy_cupini __attribute__((unused)) = (void *)0;
+#include "small_header.h"
+static void *dummy_cupini MP3_ATTRIBUTE_UNUSED = (void *)0;

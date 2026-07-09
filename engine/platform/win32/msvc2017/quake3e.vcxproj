@@ -434,7 +434,6 @@
     <ClCompile Include="..\win_wndproc.c" />
     <ClCompile Include="..\win_gamma.c" />
     <ClCompile Include="..\win_glimp.c" />
-    <ClCompile Include="..\win_qgl.c" />
     <ClCompile Include="..\..\..\physics\phys_bullet.c" />
     <ClCompile Include="..\..\..\physics\phys_character.c" />
     <ClCompile Include="..\..\..\physics\phys_events.c" />
@@ -545,7 +544,7 @@
   <ItemGroup>
     <ClInclude Include="..\..\cgame\cg_public.h" />
     <ClInclude Include="..\..\client\client.h" />
-    <ClInclude Include="..\..\client\cl_curl.h" />
+    <ClInclude Include="..\..\client\platform\cl_curl.h" />
     <ClInclude Include="..\..\client\keycodes.h" />
     <ClInclude Include="..\..\client\keys.h" />
     <ClInclude Include="..\..\audio\snd_local.h" />
@@ -628,7 +627,6 @@
     <ClCompile Include="..\..\..\world\world_residency.cpp" />
     <ClCompile Include="..\..\audio\backends\snd_backend_null.c" />
     <ClCompile Include="..\..\audio\backends\snd_backend_openal.c" />
-    <ClCompile Include="..\..\audio\backends\snd_backend_sdl.c" />
     <ClCompile Include="..\..\audio\codecs\snd_codec_flac.c" />
     <ClCompile Include="..\..\audio\codecs\snd_codec_mp3.c" />
     <ClCompile Include="..\..\audio\codecs\snd_codec_opus.c" />
