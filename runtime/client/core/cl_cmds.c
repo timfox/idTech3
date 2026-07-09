@@ -296,6 +296,50 @@ static void CL_P2PConnect_f( void ) {
 	Cbuf_AddText( va( "connect %s\n", address ) );
 }
 
+static serverInfo_t *CL_P2PBrowserServer( const char *source, int index ) {
+	if ( !Q_stricmp( source, "local" ) ) {
+		if ( index >= 0 && index < MAX_OTHER_SERVERS ) {
+			return &cls.localServers[index];
+		}
+	} else if ( !Q_stricmp( source, "global" ) ) {
+		if ( index >= 0 && index < MAX_GLOBAL_SERVERS ) {
+			return &cls.globalServers[index];
+		}
+	} else if ( !Q_stricmp( source, "favorites" ) ) {
+		if ( index >= 0 && index < MAX_OTHER_SERVERS ) {
+			return &cls.favoriteServers[index];
+		}
+	}
+
+	return NULL;
+}
+
+static void CL_P2PConnectBrowser_f( void ) {
+	serverInfo_t *server;
+	int index;
+	const char *source;
+
+	if ( Cmd_Argc() != 3 ) {
+		Com_Printf( "usage: p2p_connect_browser <local|global|favorites> <index>\n" );
+		return;
+	}
+
+	source = Cmd_Argv( 1 );
+	index = atoi( Cmd_Argv( 2 ) );
+	server = CL_P2PBrowserServer( source, index );
+	if ( !server || server->adr.port == 0 ) {
+		Com_Printf( "p2p_connect_browser: no server at %s %d\n", source, index );
+		return;
+	}
+
+	if ( server->p2pAddr[0] ) {
+		Cbuf_AddText( va( "connect %s\n", server->p2pAddr ) );
+		return;
+	}
+
+	Cbuf_AddText( va( "connect %s\n", NET_AdrToStringwPort( &server->adr ) ) );
+}
+
 
 void CL_Cmds_Init( void ) {
 	Cmd_AddCommand( "configstrings", CL_Configstrings_f );
@@ -315,6 +359,7 @@ void CL_Cmds_Init( void ) {
 	Cmd_AddCommand( "p2p_status", CL_P2PStatus_f );
 	Cmd_AddCommand( "p2p_address", CL_P2PAddress_f );
 	Cmd_AddCommand( "p2p_connect", CL_P2PConnect_f );
+	Cmd_AddCommand( "p2p_connect_browser", CL_P2PConnectBrowser_f );
 }
 
 void CL_Cmds_Shutdown( void ) {
@@ -334,4 +379,5 @@ void CL_Cmds_Shutdown( void ) {
 	Cmd_RemoveCommand( "p2p_status" );
 	Cmd_RemoveCommand( "p2p_address" );
 	Cmd_RemoveCommand( "p2p_connect" );
+	Cmd_RemoveCommand( "p2p_connect_browser" );
 }

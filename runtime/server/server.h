@@ -336,6 +336,7 @@ void SV_RemoveOperatorCommands( void );
 
 void SV_MasterShutdown( void );
 int SV_RateMsec( const client_t *client );
+void SV_BuildServerInfoString( char *buffer, int bufferSize );
 
 
 //

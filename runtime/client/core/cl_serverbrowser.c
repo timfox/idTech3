@@ -41,6 +41,7 @@ static void CL_InitServerInfo( serverInfo_t *server, const netadr_t *address ) {
 	server->minPing = 0;
 	server->ping = -1;
 	server->game[0] = '\0';
+	server->p2pAddr[0] = '\0';
 	server->gameType = 0;
 	server->netType = 0;
 	server->punkbuster = 0;
@@ -248,6 +249,7 @@ static void CL_SetServerInfo(serverInfo_t *server, const char *info, int ping) {
 			Q_strncpyz(server->mapName, Info_ValueForKey(info, "mapname"), MAX_NAME_LENGTH);
 			server->maxClients = atoi(Info_ValueForKey(info, "sv_maxclients"));
 			Q_strncpyz(server->game,Info_ValueForKey(info, "game"), MAX_NAME_LENGTH);
+			Q_strncpyz(server->p2pAddr, Info_ValueForKey(info, "p2paddr"), sizeof(server->p2pAddr));
 			server->gameType = atoi(Info_ValueForKey(info, "gametype"));
 			server->netType = atoi(Info_ValueForKey(info, "nettype"));
 			server->minPing = atoi(Info_ValueForKey(info, "minping"));

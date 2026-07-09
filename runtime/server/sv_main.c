@@ -23,6 +23,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "server.h"
 #include "sv_enhanced.h"
 #include "sv_openworld.h"
+#include "../../qcommon/net_p2p.h"
 
 serverStatic_t	svs;				// persistant server info
 server_t		sv;					// local server
@@ -69,6 +70,22 @@ cvar_t	*sv_banFile;
 serverBan_t serverBans[SERVER_MAXBANS];
 int serverBansCount = 0;
 #endif
+
+void SV_BuildServerInfoString( char *buffer, int bufferSize )
+{
+	char p2pAddress[MAX_STRING_CHARS];
+
+	if ( bufferSize < 1 ) {
+		Com_Error( ERR_DROP, "SV_BuildServerInfoString: bufferSize == %i", bufferSize );
+	}
+
+	Q_strncpyz( buffer, Cvar_InfoString( CVAR_SERVERINFO, NULL ), bufferSize );
+	Info_SetValueForKey_s( buffer, bufferSize, "p2p", NET_P2P_IsReady() ? "1" : "0" );
+
+	if ( NET_P2P_GetLocalAddressString( p2pAddress, sizeof( p2pAddress ) ) ) {
+		Info_SetValueForKey_s( buffer, bufferSize, "p2paddr", p2pAddress );
+	}
+}
 
 /*
 =============================================================================
@@ -756,9 +773,16 @@ static void SVC_Info( const netadr_t *from ) {
 	Info_SetValueForKey( infostring, "gametype", va( "%i", sv_gametype->integer ) );
 	Info_SetValueForKey( infostring, "pure", va( "%i", sv.pure ) );
 	Info_SetValueForKey( infostring, "g_needpass", va( "%d", Cvar_VariableIntegerValue( "g_needpass" ) ) );
+	Info_SetValueForKey( infostring, "p2p", NET_P2P_IsReady() ? "1" : "0" );
 	gamedir = Cvar_VariableString( "fs_game" );
 	if ( *gamedir != '\0' ) {
 		Info_SetValueForKey( infostring, "game", gamedir );
+	}
+	{
+		char p2pAddress[MAX_STRING_CHARS];
+		if ( NET_P2P_GetLocalAddressString( p2pAddress, sizeof( p2pAddress ) ) ) {
+			Info_SetValueForKey( infostring, "p2paddr", p2pAddress );
+		}
 	}
 
 	NET_OutOfBandPrint( NS_SERVER, from, "infoResponse\n%s", infostring );
@@ -1330,7 +1354,9 @@ void SV_Frame( int msec ) {
 
 	// update infostrings if anything has been changed
 	if ( cvar_modifiedFlags & CVAR_SERVERINFO ) {
-		SV_SetConfigstring( CS_SERVERINFO, Cvar_InfoString( CVAR_SERVERINFO, NULL ) );
+		char serverInfo[MAX_INFO_STRING];
+		SV_BuildServerInfoString( serverInfo, sizeof( serverInfo ) );
+		SV_SetConfigstring( CS_SERVERINFO, serverInfo );
 		cvar_modifiedFlags &= ~CVAR_SERVERINFO;
 	}
 	if ( cvar_modifiedFlags & CVAR_SYSTEMINFO ) {
