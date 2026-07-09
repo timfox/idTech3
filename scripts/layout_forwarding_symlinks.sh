@@ -47,6 +47,7 @@ link modules/external ../third_party
 link modules/renderers ../renderers
 
 echo "[layout_fwd] repo-root links (deep renderer includes)..."
+mkdir -p src
 link world modules/world
 link src/external ../third_party
 link external third_party
