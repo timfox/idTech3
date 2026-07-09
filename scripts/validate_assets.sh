@@ -23,6 +23,11 @@ done
 fail() { echo "validate_assets: $*" >&2; status=1; }
 
 [[ -d "$MOD" ]] || fail "mod dir missing: $MOD"
+[[ -f "$MOD/default.cfg" || -f "$MOD/autoexec.cfg" ]] || fail "missing default.cfg or autoexec.cfg"
+
+if [[ -f "$MOD/gameinfo.txt" ]]; then
+  grep -q '^title "' "$MOD/gameinfo.txt" || fail "gameinfo.txt missing title"
+fi
 
 if [[ -f "$MOD/sound/soundevents.txt" ]]; then
   while read -r _ bus _ path _; do
@@ -34,11 +39,13 @@ if [[ -f "$MOD/sound/soundevents.txt" ]]; then
   done < <(grep -v '^[[:space:]]*#' "$MOD/sound/soundevents.txt" || true)
 fi
 
-for shader in demo_bootstrap.shader demo_sprites.shader; do
-  [[ -f "$MOD/scripts/$shader" ]] || fail "missing scripts/$shader"
-done
+if [[ -f "$MOD/readme_demo.txt" ]]; then
+  for shader in demo_bootstrap.shader demo_sprites.shader; do
+    [[ -f "$MOD/scripts/$shader" ]] || fail "missing scripts/$shader"
+  done
 
-[[ -f "$MOD/animgraph/idle_run.txt" ]] || fail "missing animgraph/idle_run.txt"
+  [[ -f "$MOD/animgraph/idle_run.txt" ]] || fail "missing animgraph/idle_run.txt"
+fi
 
 if [[ -n "$LOC_DIR" && -f "$LOC_DIR/en.loc" ]]; then
   "$ROOT/scripts/check_loc_keys.sh" "$LOC_DIR" || status=1
