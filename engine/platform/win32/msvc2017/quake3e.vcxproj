@@ -159,7 +159,7 @@
     <ResourceCompile />
     <Link>
       <AdditionalDependencies>libssl.lib;libcrypto.lib;comctl32.lib;winmm.lib;wsock32.lib;ws2_32.lib;crypt32.lib;$(OutDir)$(ConfigurationName)-$(PlatformName)-renderer.lib;libpng16.lib;zlib.lib;$(LibCurlVS2017)\lib32\libcurl_a_debug.lib;%(AdditionalDependencies)</AdditionalDependencies>
-      <AdditionalLibraryDirectories>$(OpenSslRoot)\lib\VC\x86\MT;$(OpenSslRoot)\lib;$(OutDir);$(ProjectDir)..\..\..\..\src\external\src\libpng\projects\vstudio\libpng\$(Platform)\$(Configuration);$(ProjectDir)..\..\..\..\src\external\src\libpng\projects\vstudio\zlib\$(Platform)\$(Configuration);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>$(OpenSslRoot)\lib\VC\x86\MT;$(OpenSslRoot)\lib;$(OutDir);$(ExternalRoot)\src\libpng\projects\vstudio\libpng\$(Platform)\$(Configuration);$(ExternalRoot)\src\libpng\projects\vstudio\zlib\$(Platform)\$(Configuration);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <OutputFile>$(OutDir)$(TargetName)$(TargetExt)</OutputFile>
       <ProgramDatabaseFile>$(IntDir)idtech3-debug.pdb</ProgramDatabaseFile>
       <GenerateMapFile>true</GenerateMapFile>
@@ -185,7 +185,7 @@
     <ResourceCompile />
     <Link>
       <AdditionalDependencies>libssl.lib;libcrypto.lib;comctl32.lib;winmm.lib;wsock32.lib;ws2_32.lib;crypt32.lib;$(OutDir)$(ConfigurationName)-$(PlatformName)-renderer.lib;libpng16.lib;zlib.lib;$(LibCurlVS2017)\lib64\libcurl_a_debug.lib;%(AdditionalDependencies)</AdditionalDependencies>
-      <AdditionalLibraryDirectories>$(OpenSslRoot)\lib\VC\x64\MT;$(OpenSslRoot)\lib;$(OutDir);$(ProjectDir)..\..\..\..\src\external\src\libpng\projects\vstudio\libpng\$(Platform)\$(Configuration);$(ProjectDir)..\..\..\..\src\external\src\libpng\projects\vstudio\zlib\$(Platform)\$(Configuration);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>$(OpenSslRoot)\lib\VC\x64\MT;$(OpenSslRoot)\lib;$(OutDir);$(ExternalRoot)\src\libpng\projects\vstudio\libpng\$(Platform)\$(Configuration);$(ExternalRoot)\src\libpng\projects\vstudio\zlib\$(Platform)\$(Configuration);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <OutputFile>$(OutDir)$(TargetName)$(TargetExt)</OutputFile>
       <ProgramDatabaseFile>$(IntDir)idtech3-debug.pdb</ProgramDatabaseFile>
       <GenerateMapFile>true</GenerateMapFile>
@@ -211,7 +211,7 @@
     <ResourceCompile />
     <Link>
       <AdditionalDependencies>advapi32.lib;comctl32.lib;gdi32.lib;ole32.lib;winmm.lib;wsock32.lib;ws2_32.lib;$(OutDir)$(ConfigurationName)-$(PlatformName)-renderer.lib;libpng16.lib;zlib.lib;%(AdditionalDependencies)</AdditionalDependencies>
-      <AdditionalLibraryDirectories>$(OutDir);$(ProjectDir)..\..\..\..\src\external\src\libpng\projects\vstudio\libpng\$(Platform)\$(Configuration);$(ProjectDir)..\..\..\..\src\external\src\libpng\projects\vstudio\zlib\$(Platform)\$(Configuration);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>$(OutDir);$(ExternalRoot)\src\libpng\projects\vstudio\libpng\$(Platform)\$(Configuration);$(ExternalRoot)\src\libpng\projects\vstudio\zlib\$(Platform)\$(Configuration);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <OutputFile>$(OutDir)$(TargetName)$(TargetExt)</OutputFile>
       <ProgramDatabaseFile>$(IntDir)idtech3-debug.pdb</ProgramDatabaseFile>
       <GenerateMapFile>true</GenerateMapFile>
@@ -233,7 +233,7 @@
     </ClCompile>
     <Link>
       <AdditionalDependencies>libssl.lib;libcrypto.lib;comctl32.lib;winmm.lib;wsock32.lib;ws2_32.lib;crypt32.lib;$(OutDir)$(ConfigurationName)-$(PlatformName)-renderer.lib;libpng16.lib;zlib.lib;$(LibCurlVS2017)\lib32\libcurl_a.lib;%(AdditionalDependencies)</AdditionalDependencies>
-      <AdditionalLibraryDirectories>$(OpenSslRoot)\lib\VC\x86\MT;$(OpenSslRoot)\lib;$(OutDir);$(ProjectDir)..\..\..\..\src\external\src\libpng\projects\vstudio\libpng\$(Platform)\$(Configuration);$(ProjectDir)..\..\..\..\src\external\src\libpng\projects\vstudio\zlib\$(Platform)\$(Configuration);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>$(OpenSslRoot)\lib\VC\x86\MT;$(OpenSslRoot)\lib;$(OutDir);$(ExternalRoot)\src\libpng\projects\vstudio\libpng\$(Platform)\$(Configuration);$(ExternalRoot)\src\libpng\projects\vstudio\zlib\$(Platform)\$(Configuration);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <OutputFile>$(OutDir)$(TargetName)$(TargetExt)</OutputFile>
       <GenerateMapFile>true</GenerateMapFile>
       <MapFileName>$(IntDir)idtech3.map</MapFileName>
@@ -262,7 +262,7 @@
     <Link>
       <AdditionalOptions>/DYNAMICBASE %(AdditionalOptions)</AdditionalOptions>
       <AdditionalDependencies>libssl.lib;libcrypto.lib;comctl32.lib;winmm.lib;wsock32.lib;ws2_32.lib;crypt32.lib;$(OutDir)$(ConfigurationName)-$(PlatformName)-renderer.lib;libpng16.lib;zlib.lib;$(LibCurlVS2017)\lib64\libcurl_a.lib;%(AdditionalDependencies)</AdditionalDependencies>
-      <AdditionalLibraryDirectories>$(OpenSslRoot)\lib\VC\x64\MT;$(OpenSslRoot)\lib;$(OutDir);$(ProjectDir)..\..\..\..\src\external\src\libpng\projects\vstudio\libpng\$(Platform)\$(Configuration);$(ProjectDir)..\..\..\..\src\external\src\libpng\projects\vstudio\zlib\$(Platform)\$(Configuration);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>$(OpenSslRoot)\lib\VC\x64\MT;$(OpenSslRoot)\lib;$(OutDir);$(ExternalRoot)\src\libpng\projects\vstudio\libpng\$(Platform)\$(Configuration);$(ExternalRoot)\src\libpng\projects\vstudio\zlib\$(Platform)\$(Configuration);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <OutputFile>$(OutDir)$(TargetName)$(TargetExt)</OutputFile>
       <GenerateMapFile>true</GenerateMapFile>
       <MapFileName>$(IntDir)idtech3.map</MapFileName>
@@ -289,7 +289,7 @@
     <Link>
       <AdditionalOptions>/DYNAMICBASE %(AdditionalOptions)</AdditionalOptions>
       <AdditionalDependencies>advapi32.lib;comctl32.lib;gdi32.lib;ole32.lib;winmm.lib;wsock32.lib;ws2_32.lib;$(OutDir)$(ConfigurationName)-$(PlatformName)-renderer.lib;libpng16.lib;zlib.lib;%(AdditionalDependencies)</AdditionalDependencies>
-      <AdditionalLibraryDirectories>$(OutDir);$(ProjectDir)..\..\..\..\src\external\src\libpng\projects\vstudio\libpng\$(Platform)\$(Configuration);$(ProjectDir)..\..\..\..\src\external\src\libpng\projects\vstudio\zlib\$(Platform)\$(Configuration);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>$(OutDir);$(ExternalRoot)\src\libpng\projects\vstudio\libpng\$(Platform)\$(Configuration);$(ExternalRoot)\src\libpng\projects\vstudio\zlib\$(Platform)\$(Configuration);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <OutputFile>$(OutDir)$(TargetName)$(TargetExt)</OutputFile>
       <GenerateMapFile>true</GenerateMapFile>
       <MapFileName>$(IntDir)idtech3.map</MapFileName>

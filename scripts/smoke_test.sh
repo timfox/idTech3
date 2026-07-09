@@ -104,7 +104,11 @@ echo "Server startup test:"
 SERVER_PATH="$(bin_path "idtech3_server")"
 if [ -n "$SERVER_PATH" ]; then
   # Parallel ctest (-j) can starve the server + duplicate glslang work; allow enough wall time.
-  output="$(timeout 25 "$SERVER_PATH" +set dedicated 1 +set com_hunkMegs 64 +quit 2>&1 || true)"
+  server_timeout=25
+  case "$(uname -m 2>/dev/null)" in
+    aarch64|arm*|armv7l) server_timeout=90 ;;
+  esac
+  output="$(timeout "$server_timeout" "$SERVER_PATH" +set dedicated 1 +set com_hunkMegs 64 +quit 2>&1 || true)"
 
   if echo "$output" | grep -q "id Tech 3"; then
     pass "Server identifies as id Tech 3"

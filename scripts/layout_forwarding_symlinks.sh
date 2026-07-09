@@ -48,6 +48,7 @@ link modules/renderers ../renderers
 
 echo "[layout_fwd] repo-root links (deep renderer includes)..."
 link world modules/world
+link src/external ../third_party
 link external third_party
 link vuda extensions/research/vuda
 link qcommon engine/core

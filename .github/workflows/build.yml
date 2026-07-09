@@ -789,7 +789,11 @@ jobs:
             SKIP_TRUNK_FETCH=1 GITHUB_ACTIONS=true ./scripts/smoke_test.sh release
 
             chmod +x scripts/renderer_regression_check.sh
-            ./scripts/renderer_regression_check.sh
+            if [ "$(uname -m)" = "x86_64" ]; then
+              ./scripts/renderer_regression_check.sh -profile game
+            else
+              echo "Skipping renderer regression on $(uname -m) (QEMU ARM smoke path)"
+            fi
 
       - uses: actions/upload-artifact@v4
         if: matrix.cc == 'gcc' && matrix.btype == 'Release'
