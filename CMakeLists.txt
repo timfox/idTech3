@@ -1538,6 +1538,10 @@ if(USE_STEAM_NETWORKING)
     target_include_directories(qcommon PRIVATE ${STEAMWORKS_INCLUDE_DIR})
   endif()
 endif()
+if(USE_STEAM AND STEAMWORKS_FOUND)
+  target_compile_definitions(qcommon PRIVATE USE_STEAM=1 STEAMWORKS_AVAILABLE=${STEAMWORKS_AVAILABLE})
+  target_include_directories(qcommon PRIVATE ${STEAMWORKS_INCLUDE_DIR})
+endif()
 
 # dedicated server
 ADD_LIBRARY(qcommon_ded OBJECT ${QCOMMON_SRCS} ${SERVER_SRCS})
@@ -1589,7 +1593,10 @@ if(USE_DTLS_FOUND)
   endif()
 endif()
 if(USE_STEAM_NETWORKING)
-  target_compile_definitions(qcommon_ded PRIVATE USE_STEAM_NETWORKING=1)
+  target_compile_definitions(qcommon_ded PRIVATE USE_STEAM_NETWORKING=1 STEAMWORKS_AVAILABLE=${STEAMWORKS_AVAILABLE})
+  if(STEAMWORKS_FOUND)
+    target_include_directories(qcommon_ded PRIVATE ${STEAMWORKS_INCLUDE_DIR})
+  endif()
 endif()
 if(USE_STEAM_NETWORKING AND STEAMWORKS_FOUND)
   target_compile_definitions(client PRIVATE USE_STEAM_NETWORKING=1 USE_STEAM=1)
@@ -3183,6 +3190,12 @@ add_test(NAME test_trap_getvalue_aliases
 set_tests_properties(test_trap_getvalue_aliases PROPERTIES
 	LABELS "scripts;validation;client;server;compat"
 	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_trap_getvalue_aliases.sh;${CMAKE_SOURCE_DIR}/runtime/client/core/cl_cgame.c;${CMAKE_SOURCE_DIR}/runtime/server/sv_game.c")
+
+add_test(NAME test_p2p_networking
+	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_p2p_networking.sh)
+set_tests_properties(test_p2p_networking PROPERTIES
+	LABELS "scripts;validation;networking"
+	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_p2p_networking.sh;${CMAKE_SOURCE_DIR}/runtime/client/core/cl_cmds.c;${CMAKE_SOURCE_DIR}/engine/core/net_p2p.c;${CMAKE_SOURCE_DIR}/docs/P2P_NETWORKING.md")
 
 add_test(NAME test_console_font
 	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_console_font.sh)

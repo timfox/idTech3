@@ -9,6 +9,7 @@ Miscellaneous client console commands (info, fs lists, UI open, etc.).
 #include "client.h"
 #include "cl_cmds.h"
 #include "cl_ref.h"
+#include "../../qcommon/net_p2p.h"
 #include "../../qcommon/script_emit.h"
 
 #include <string.h>
@@ -231,6 +232,70 @@ static void CL_ShowIP_f( void ) {
 	Sys_ShowIP();
 }
 
+static void CL_P2PStatus_f( void ) {
+	char address[MAX_STRING_CHARS];
+
+	Com_Printf( "P2P backend: %s\n", NET_P2P_BackendName() );
+	Com_Printf( "P2P supported: %s\n", NET_P2P_IsSupported() ? "yes" : "no" );
+	Com_Printf( "P2P enabled: %s\n", NET_P2P_IsEnabled() ? "yes" : "no" );
+	Com_Printf( "P2P ready: %s\n", NET_P2P_IsReady() ? "yes" : "no" );
+
+	if ( NET_P2P_GetLocalAddressString( address, sizeof( address ) ) ) {
+		Com_Printf( "P2P address: %s\n", address );
+	} else {
+		Com_Printf( "P2P address: unavailable\n" );
+	}
+
+	if ( NET_P2P_IsSupported() ) {
+		Com_Printf( "P2P notes: enable with net_p2p 1 (alias: net_sdr 1); dedicated Steam hosting is not wired yet\n" );
+	}
+}
+
+static void CL_P2PAddress_f( void ) {
+	char address[MAX_STRING_CHARS];
+
+	if ( !NET_P2P_IsSupported() ) {
+		Com_Printf( "P2P is not compiled in\n" );
+		return;
+	}
+
+	if ( !NET_P2P_GetLocalAddressString( address, sizeof( address ) ) ) {
+		Com_Printf( "P2P address unavailable; make sure Steam is running and net_p2p is enabled\n" );
+		return;
+	}
+
+	Com_Printf( "%s\n", address );
+}
+
+static void CL_P2PConnect_f( void ) {
+	const char *peer;
+	unsigned long long steamid;
+	char address[MAX_STRING_CHARS];
+
+	if ( Cmd_Argc() != 2 ) {
+		Com_Printf( "usage: p2p_connect <steamid|steam:steamid>\n" );
+		return;
+	}
+
+	if ( !NET_P2P_IsSupported() ) {
+		Com_Printf( "P2P is not compiled in\n" );
+		return;
+	}
+
+	peer = Cmd_Argv( 1 );
+	if ( !Q_stricmpn( peer, "steam:", 6 ) ) {
+		peer += 6;
+	}
+
+	if ( sscanf( peer, "%llu", &steamid ) != 1 || steamid == 0 ) {
+		Com_Printf( "p2p_connect: expected a SteamID64 or steam:SteamID64\n" );
+		return;
+	}
+
+	Com_sprintf( address, sizeof( address ), "steam:%llu", steamid );
+	Cbuf_AddText( va( "connect %s\n", address ) );
+}
+
 
 void CL_Cmds_Init( void ) {
 	Cmd_AddCommand( "configstrings", CL_Configstrings_f );
@@ -247,6 +312,9 @@ void CL_Cmds_Init( void ) {
 	Cmd_AddCommand( "playername", CL_SetPlayerName_f );
 	Cmd_AddCommand( "setname", CL_SetPlayerName_f );
 	Cmd_AddCommand( "open", CL_Open_f );
+	Cmd_AddCommand( "p2p_status", CL_P2PStatus_f );
+	Cmd_AddCommand( "p2p_address", CL_P2PAddress_f );
+	Cmd_AddCommand( "p2p_connect", CL_P2PConnect_f );
 }
 
 void CL_Cmds_Shutdown( void ) {
@@ -263,4 +331,7 @@ void CL_Cmds_Shutdown( void ) {
 	Cmd_RemoveCommand( "serverinfo" );
 	Cmd_RemoveCommand( "systeminfo" );
 	Cmd_RemoveCommand( "open" );
+	Cmd_RemoveCommand( "p2p_status" );
+	Cmd_RemoveCommand( "p2p_address" );
+	Cmd_RemoveCommand( "p2p_connect" );
 }

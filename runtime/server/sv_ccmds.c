@@ -21,6 +21,10 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 */
 
 #include "server.h"
+#include "../../qcommon/net_p2p.h"
+
+static void SV_P2PStatus_f( void );
+static void SV_P2PAddress_f( void );
 
 /*
 ===============================================================================
@@ -1617,6 +1621,8 @@ void SV_AddDedicatedCommands( void )
 	Cmd_AddCommand( "tell", SV_ConTell_f );
 	Cmd_AddCommand( "say", SV_ConSay_f );
 	Cmd_AddCommand( "locations", SV_Locations_f );
+	Cmd_AddCommand( "p2p_status", SV_P2PStatus_f );
+	Cmd_AddCommand( "p2p_address", SV_P2PAddress_f );
 }
 
 
@@ -1627,4 +1633,36 @@ void SV_RemoveDedicatedCommands( void )
 	Cmd_RemoveCommand( "tell" );
 	Cmd_RemoveCommand( "say" );
 	Cmd_RemoveCommand( "locations" );
+	Cmd_RemoveCommand( "p2p_status" );
+	Cmd_RemoveCommand( "p2p_address" );
+}
+static void SV_P2PStatus_f( void ) {
+	char address[MAX_STRING_CHARS];
+
+	Com_Printf( "P2P backend: %s\n", NET_P2P_BackendName() );
+	Com_Printf( "P2P supported: %s\n", NET_P2P_IsSupported() ? "yes" : "no" );
+	Com_Printf( "P2P enabled: %s\n", NET_P2P_IsEnabled() ? "yes" : "no" );
+	Com_Printf( "P2P ready: %s\n", NET_P2P_IsReady() ? "yes" : "no" );
+
+	if ( NET_P2P_GetLocalAddressString( address, sizeof( address ) ) ) {
+		Com_Printf( "P2P address: %s\n", address );
+	} else {
+		Com_Printf( "P2P address: unavailable\n" );
+	}
+}
+
+static void SV_P2PAddress_f( void ) {
+	char address[MAX_STRING_CHARS];
+
+	if ( !NET_P2P_IsSupported() ) {
+		Com_Printf( "P2P is not compiled in\n" );
+		return;
+	}
+
+	if ( !NET_P2P_GetLocalAddressString( address, sizeof( address ) ) ) {
+		Com_Printf( "P2P address unavailable; make sure Steam is running and net_p2p is enabled\n" );
+		return;
+	}
+
+	Com_Printf( "%s\n", address );
 }
