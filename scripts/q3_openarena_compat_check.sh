@@ -7,6 +7,9 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 RELEASE_DIR="${1:-$PROJECT_ROOT/release}"
 
+# shellcheck source=release_bin_path.sh
+. "$SCRIPT_DIR/release_bin_path.sh"
+
 PASS=0
 FAIL=0
 
@@ -14,15 +17,7 @@ pass() { PASS=$((PASS + 1)); echo "  ✓ $1"; }
 fail() { FAIL=$((FAIL + 1)); echo "  ✗ $1" >&2; }
 
 bin_path() {
-	local bin="$1"
-	local base="$RELEASE_DIR/$bin"
-	for candidate in "$base" "$base.x64" "$base.x86_64" "$base.aarch64"; do
-		if [ -f "$candidate" ]; then
-			echo "$candidate"
-			return
-		fi
-	done
-	echo ""
+	release_bin_path "$RELEASE_DIR" "$1" || true
 }
 
 echo "=== Q3 / OpenArena compatibility checks ==="
