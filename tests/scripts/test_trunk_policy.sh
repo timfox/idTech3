@@ -9,6 +9,9 @@ fail() { echo "FAIL: $*" >&2; exit 1; }
 pass() { echo "PASS: $*"; }
 
 if [ "${SKIP_TRUNK_FETCH:-0}" != "1" ]; then
+	if ! command -v git >/dev/null 2>&1; then
+		fail "git not in PATH (set SKIP_TRUNK_FETCH=1 to skip)"
+	fi
 	git fetch origin --prune --tags 2>/dev/null || fail "git fetch origin failed (set SKIP_TRUNK_FETCH=1 to skip)"
 fi
 
@@ -25,7 +28,9 @@ pass "trunk governance files present"
 
 # --- remote branch hygiene ---
 if [ "${GITHUB_ACTIONS:-}" = "true" ] && [ "${ALLOW_EXTRA_ORIGIN_REFS_IN_CI:-1}" = "1" ]; then
-	if git branch -r | sed 's/^ *//' | grep -qx 'origin/main'; then
+	if ! command -v git >/dev/null 2>&1; then
+		pass "skipping origin/main check (git not in PATH)"
+	elif git branch -r | sed 's/^ *//' | grep -qx 'origin/main'; then
 		pass "origin/main visible in CI checkout"
 	else
 		fail "origin/main missing from CI checkout"
