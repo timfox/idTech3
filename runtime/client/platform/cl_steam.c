@@ -15,6 +15,7 @@ API, with fallback to the SteamDeck environment variable.
 
 #include "client.h"
 #include "cl_steam.h"
+#include "../../qcommon/steam_shared.h"
 #ifdef USE_STEAM_NETWORKING
 #include "../../qcommon/net_sdr.h"
 #endif
@@ -22,7 +23,6 @@ API, with fallback to the SteamDeck environment variable.
 static cvar_t *in_steamDeck;
 static cvar_t *cl_steamOverlay;
 static cvar_t *cl_steamRichPresence;
-static qboolean steamInitialized UNUSED_VAR = qfalse;
 static qboolean steamDeckDetected = qfalse;
 
 #ifdef USE_STEAM
@@ -33,15 +33,9 @@ void Steam_Init( void ) {
 	cl_steamOverlay = Cvar_Get( "cl_steamOverlay", "1", CVAR_ARCHIVE );
 	cl_steamRichPresence = Cvar_Get( "cl_steamRichPresence", "1", CVAR_ARCHIVE );
 
-	if ( !SteamAPI_Init() ) {
-		Com_Printf( "Steam: SteamAPI_Init failed (running without Steam)\n" );
+	if ( !SteamShared_Init() ) {
 		return;
 	}
-
-	steamInitialized = qtrue;
-#ifdef USE_STEAM_NETWORKING
-	NET_SDR_OnSteamReady();
-#endif
 
 	steamDeckDetected = SteamUtils()->IsSteamRunningOnSteamDeck();
 	if ( steamDeckDetected ) {
@@ -56,40 +50,34 @@ void Steam_Init( void ) {
 }
 
 void Steam_Shutdown( void ) {
-	if ( steamInitialized ) {
-		SteamAPI_Shutdown();
-		steamInitialized = qfalse;
-	}
 }
 
 void Steam_Frame( void ) {
-	if ( !steamInitialized ) return;
-	SteamAPI_RunCallbacks();
 }
 
-qboolean Steam_IsInitialized( void ) { return steamInitialized; }
+qboolean Steam_IsInitialized( void ) { return SteamShared_IsInitialized(); }
 qboolean Steam_IsSteamDeck( void ) { return steamDeckDetected; }
 
 qboolean Steam_IsOverlayActive( void ) {
-	return steamInitialized ? SteamUtils()->IsOverlayEnabled() : qfalse;
+	return SteamShared_IsInitialized() ? SteamUtils()->IsOverlayEnabled() : qfalse;
 }
 
 uint64_t Steam_GetSteamID( void ) {
-	return steamInitialized ? SteamUser()->GetSteamID().ConvertToUint64() : 0;
+	return SteamShared_GetSteamID();
 }
 
 const char *Steam_GetPersonaName( void ) {
-	return steamInitialized ? SteamFriends()->GetPersonaName() : "";
+	return SteamShared_GetPersonaName();
 }
 
 void Steam_SetAchievement( const char *name ) {
-	if ( !steamInitialized || !name ) return;
+	if ( !SteamShared_IsInitialized() || !name ) return;
 	SteamUserStats()->SetAchievement( name );
 	SteamUserStats()->StoreStats();
 }
 
 void Steam_SetRichPresence( const char *key, const char *value ) {
-	if ( !steamInitialized || !cl_steamRichPresence || !cl_steamRichPresence->integer ) return;
+	if ( !SteamShared_IsInitialized() || !cl_steamRichPresence || !cl_steamRichPresence->integer ) return;
 	SteamFriends()->SetRichPresence( key, value );
 }
 

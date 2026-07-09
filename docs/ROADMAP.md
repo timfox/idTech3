@@ -113,7 +113,7 @@ Priorities that keep **CI green** and **README/build truth** aligned:
 - [x] Texture compression (BC7/KTX2)
 - [x] Optional USD format for entities and shaders (com_usdEntities, com_usdShaders; GPLv2 parser)
 - [x] DTLS network encryption (USE_DTLS=ON, net_dtls/net_dtls_key cvars; AES-256-GCM)
-- [x] Steam SDR (USE_STEAM_NETWORKING=ON, Steamworks SDK; net_sdr 1, connect steam:STEAMID)
+- [x] Steam SDR / optional P2P transport (USE_STEAM_NETWORKING=ON, Steamworks SDK; net_p2p/net_sdr, p2p_connect, connect steam:STEAMID)
 - [x] Steam API + Steam Deck (USE_STEAM=ON; achievements, overlay, rich presence, Deck auto-detect, steamdeck.cfg)
 - [x] clang-tidy / cppcheck static analysis (CI job, continue-on-error)
 

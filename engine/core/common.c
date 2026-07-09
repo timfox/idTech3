@@ -27,6 +27,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "ttp.h"
 #include "jobs.h"
 #include "defer.h"
+#include "steam_shared.h"
 #ifdef USE_RESEARCH_EXTENSIONS
 #include "vuda/vuda_console.h"
 #include "vksplat/vksplat_console.h"
@@ -4144,6 +4145,10 @@ void Com_Init( char *commandLine ) {
 
 	Sys_Init();
 
+#ifdef DEDICATED
+	SteamShared_Init();
+#endif
+
 	// CPU detection
 	Cvar_Get( "sys_cpustring", "detect", CVAR_PROTECTED | CVAR_ROM | CVAR_NORESTART );
 	if ( !Q_stricmp( Cvar_VariableString( "sys_cpustring" ), "detect" ) ) {
@@ -4474,6 +4479,10 @@ void Com_Frame( qboolean noDelay ) {
 	/* Run deferred callbacks from job workers / AI before frame logic */
 	Defer_Flush();
 
+#ifdef DEDICATED
+	SteamShared_Frame();
+#endif
+
 	Jobs_Pump( Cvar_VariableIntegerValue( "jobs_mainPump" ) );
 
 	minMsec = 0; // silent compiler warning
@@ -4712,6 +4721,7 @@ static void Com_Shutdown( void ) {
 	Defer_Flush();
 	Jobs_Shutdown();
 	Defer_Shutdown();
+	SteamShared_Shutdown();
 
 	if ( logfile != FS_INVALID_HANDLE ) {
 		FS_FCloseFile( logfile );

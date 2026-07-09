@@ -225,7 +225,7 @@ cmake .. -DUSE_STEAM_NETWORKING=ON -DSTEAMWORKS_SDK=/path/to/steamworks_sdk ...
 Requires Steamworks SDK with `steam_api.h` (and `isteamnetworkingsockets.h` for SDR). Set `STEAMWORKS_SDK` to the SDK root.
 
 - **USE_STEAM**: Achievements, overlay, rich presence, Steam Deck auto-detection. When Deck is detected, `base/steamdeck.cfg` is auto-exec'd.
-- **USE_STEAM_NETWORKING**: SDR transport. Use `net_sdr 1` at runtime. Connect via `connect steam:STEAMID` when server advertises its SteamID.
+- **USE_STEAM_NETWORKING**: SDR transport. Use `net_p2p 1` at runtime (`net_sdr` remains an alias). Client-hosted sessions can use `p2p_address` and `p2p_connect`; see `docs/P2P_NETWORKING.md`.
 - **USE_VULKAN_RTX** (default OFF): KHR ray tracing (`r_rtx`, Hybrid1, path trace, GRTX, Raygun). Without it, `#else` stubs log at init and cvars remain inert.
 - **USE_EXPERIMENTAL_RENDERERS** (default ON): Neural/scaffold paths (`r_niv`, `r_renderformer`, `r_vksplat`, `r_mgs`, `r_wpt`, etc.). Set OFF for lean renderer builds; `vk_experimental_renderer_stubs.c` supplies no-op symbols.
 - **BUILD_FREETYPE** (default ON): TTF rasterization + GPU vector font load. OFF uses `tr_font_stub.c` / `tr_vector_font_stub.c` (cached `.dat` fonts only).

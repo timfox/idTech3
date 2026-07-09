@@ -53,6 +53,8 @@ qboolean NET_SDR_SendPacket( netsrc_t sock, int length, const void *data, const 
 /* Check if SDR is active and we should use it for this address. */
 qboolean NET_SDR_IsActive( void );
 qboolean NET_SDR_UseForAddress( const netadr_t *adr );
+qboolean NET_SDR_IsReady( void );
+qboolean NET_SDR_GetLocalSteamID( uint64_t *steamid );
 
 #else
 
@@ -65,6 +67,8 @@ qboolean NET_SDR_UseForAddress( const netadr_t *adr );
 #define NET_SDR_SendPacket(a,b,c,d)   (qfalse)
 #define NET_SDR_IsActive()         (qfalse)
 #define NET_SDR_UseForAddress(a)    (qfalse)
+#define NET_SDR_IsReady()            (qfalse)
+#define NET_SDR_GetLocalSteamID(a)   (qfalse)
 
 #endif /* USE_STEAM_NETWORKING */
 

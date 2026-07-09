@@ -28,10 +28,13 @@ ISteamNetworkingSockets for NAT traversal, relay, and encryption.
 #if !STEAMWORKS_AVAILABLE
 /* Stub when Steamworks SDK not found: SDR is no-op, falls through to UDP */
 static cvar_t *net_sdr_stub;
+static cvar_t *net_p2p_stub;
 void NET_SDR_OnSteamReady( void ) {}
 void NET_SDR_Init( void ) {
 	net_sdr_stub = Cvar_Get( "net_sdr", "0", CVAR_ARCHIVE_ND | CVAR_LATCH );
-	Cvar_SetDescription( net_sdr_stub, "Use Steam Datagram Relay (0=off, 1=on). Requires Steamworks SDK at build time." );
+	net_p2p_stub = Cvar_Get( "net_p2p", "0", CVAR_ARCHIVE_ND | CVAR_LATCH );
+	Cvar_SetDescription( net_sdr_stub, "Use Steam Datagram Relay (0=off, 1=on). Alias: net_p2p. Requires Steamworks SDK at build time." );
+	Cvar_SetDescription( net_p2p_stub, "Enable optional peer-to-peer transport (0=off, 1=on). Currently backed by Steam SDR when available." );
 	Com_Printf( "Steam SDR: stub (Steamworks SDK not found at build; set STEAMWORKS_SDK)\n" );
 }
 void NET_SDR_Shutdown( void ) {}
@@ -41,6 +44,8 @@ qboolean NET_SDR_HasPacket( void ) { return qfalse; }
 qboolean NET_SDR_SendPacket( netsrc_t sock, int length, const void *data, const netadr_t *to ) { (void)sock; (void)length; (void)data; (void)to; return qfalse; }
 qboolean NET_SDR_IsActive( void ) { return qfalse; }
 qboolean NET_SDR_UseForAddress( const netadr_t *adr ) { (void)adr; return qfalse; }
+qboolean NET_SDR_IsReady( void ) { return qfalse; }
+qboolean NET_SDR_GetLocalSteamID( uint64_t *steamid ) { (void)steamid; return qfalse; }
 #else
 
 #define SDR_CONN_MAP_MAX 64
@@ -58,6 +63,7 @@ typedef struct {
 } sdr_conn_map_t;
 
 static cvar_t *net_sdr;
+static cvar_t *net_p2p;
 static qboolean sdr_initialized = qfalse;
 static qboolean steam_ready = qfalse;
 static HSteamListenSocket sdr_listen_socket = k_HSteamListenSocket_Invalid;
@@ -72,6 +78,28 @@ static sdr_conn_map_t sdr_conn_map[SDR_CONN_MAP_MAX];
 
 static HSteamNetConnection sdr_pending_accept[SDR_CONN_MAP_MAX];
 static int sdr_pending_count;
+static int net_sdr_modification_count;
+static int net_p2p_modification_count;
+
+static void NET_SDR_SyncCvars( void )
+{
+	if ( !net_sdr || !net_p2p ) {
+		return;
+	}
+
+	if ( net_p2p->modificationCount != net_p2p_modification_count ) {
+		if ( strcmp( net_sdr->string, net_p2p->string ) != 0 ) {
+			Cvar_Set( "net_sdr", net_p2p->string );
+		}
+	} else if ( net_sdr->modificationCount != net_sdr_modification_count ) {
+		if ( strcmp( net_p2p->string, net_sdr->string ) != 0 ) {
+			Cvar_Set( "net_p2p", net_sdr->string );
+		}
+	}
+
+	net_sdr_modification_count = net_sdr->modificationCount;
+	net_p2p_modification_count = net_p2p->modificationCount;
+}
 
 static void STEAM_CALLBACK sdr_connection_status_changed( SteamNetConnectionStatusChangedCallback_t *pInfo )
 {
@@ -153,7 +181,10 @@ void NET_SDR_OnSteamReady( void )
 void NET_SDR_Init( void )
 {
 	net_sdr = Cvar_Get( "net_sdr", "0", CVAR_ARCHIVE_ND | CVAR_LATCH );
-	Cvar_SetDescription( net_sdr, "Use Steam Datagram Relay for game traffic (0=off, 1=on). Requires Steamworks SDK and Steam running." );
+	net_p2p = Cvar_Get( "net_p2p", "0", CVAR_ARCHIVE_ND | CVAR_LATCH );
+	Cvar_SetDescription( net_sdr, "Use Steam Datagram Relay for game traffic (0=off, 1=on). Alias: net_p2p. Requires Steamworks SDK and Steam running." );
+	Cvar_SetDescription( net_p2p, "Enable optional peer-to-peer transport (0=off, 1=on). Currently backed by Steam SDR." );
+	NET_SDR_SyncCvars();
 
 	Com_Memset( sdr_conn_map, 0, sizeof( sdr_conn_map ) );
 	sdr_recv_head = sdr_recv_tail = sdr_recv_count = 0;
@@ -202,6 +233,8 @@ void NET_SDR_Frame( void )
 	ISteamNetworkingSockets *sockets;
 	SteamNetworkingMessage_t *msgs[SDR_RECV_QUEUE_MAX];
 	int n;
+
+	NET_SDR_SyncCvars();
 
 	if ( !sdr_initialized || !net_sdr || !net_sdr->integer )
 		return;
@@ -306,6 +339,8 @@ qboolean NET_SDR_SendPacket( netsrc_t sock, int length, const void *data, const 
 	HSteamNetConnection conn;
 	int64 *outMsgNum;
 
+	NET_SDR_SyncCvars();
+
 	if ( !sdr_initialized || !net_sdr || !net_sdr->integer )
 		return qfalse;
 
@@ -341,6 +376,7 @@ qboolean NET_SDR_SendPacket( netsrc_t sock, int length, const void *data, const 
 
 qboolean NET_SDR_IsActive( void )
 {
+	NET_SDR_SyncCvars();
 	return sdr_initialized && net_sdr && net_sdr->integer;
 }
 
@@ -349,6 +385,27 @@ qboolean NET_SDR_UseForAddress( const netadr_t *adr )
 	if ( !NET_SDR_IsActive() )
 		return qfalse;
 	return adr->type == NA_STEAMID;
+}
+
+qboolean NET_SDR_IsReady( void )
+{
+	uint64_t steamid;
+
+	return NET_SDR_GetLocalSteamID( &steamid );
+}
+
+qboolean NET_SDR_GetLocalSteamID( uint64_t *steamid )
+{
+	if ( !steamid || !NET_SDR_IsActive() || !steam_ready ) {
+		return qfalse;
+	}
+
+	if ( !SteamAPI_IsSteamRunning() || !SteamUser() ) {
+		return qfalse;
+	}
+
+	*steamid = SteamUser()->GetSteamID().ConvertToUint64();
+	return *steamid != 0 ? qtrue : qfalse;
 }
 
 #endif /* STEAMWORKS_AVAILABLE */
