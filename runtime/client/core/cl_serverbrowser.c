@@ -42,6 +42,7 @@ static void CL_InitServerInfo( serverInfo_t *server, const netadr_t *address ) {
 	server->ping = -1;
 	server->game[0] = '\0';
 	server->p2pAddr[0] = '\0';
+	server->p2pAvailable = qfalse;
 	server->gameType = 0;
 	server->netType = 0;
 	server->punkbuster = 0;
@@ -250,6 +251,7 @@ static void CL_SetServerInfo(serverInfo_t *server, const char *info, int ping) {
 			server->maxClients = atoi(Info_ValueForKey(info, "sv_maxclients"));
 			Q_strncpyz(server->game,Info_ValueForKey(info, "game"), MAX_NAME_LENGTH);
 			Q_strncpyz(server->p2pAddr, Info_ValueForKey(info, "p2paddr"), sizeof(server->p2pAddr));
+			server->p2pAvailable = atoi( Info_ValueForKey( info, "p2p" ) ) ? qtrue : qfalse;
 			server->gameType = atoi(Info_ValueForKey(info, "gametype"));
 			server->netType = atoi(Info_ValueForKey(info, "nettype"));
 			server->minPing = atoi(Info_ValueForKey(info, "minping"));
@@ -262,25 +264,68 @@ static void CL_SetServerInfo(serverInfo_t *server, const char *info, int ping) {
 	}
 }
 
+static qboolean CL_ServerMatchesP2PIdentity( const serverInfo_t *server, const char *p2pAddr ) {
+	if ( !server || !p2pAddr || !p2pAddr[0] || !server->p2pAddr[0] ) {
+		return qfalse;
+	}
+
+	return ( qboolean )( Q_stricmp( server->p2pAddr, p2pAddr ) == 0 );
+}
 
 static void CL_SetServerInfoByAddress(const netadr_t *from, const char *info, int ping) {
 	int i;
+	const char *p2pAddr = info ? Info_ValueForKey( info, "p2paddr" ) : "";
+	qboolean matched = qfalse;
 
 	for (i = 0; i < MAX_OTHER_SERVERS; i++) {
 		if (NET_CompareAdr(from, &cls.localServers[i].adr) ) {
 			CL_SetServerInfo(&cls.localServers[i], info, ping);
+			cls.localServers[i].adr = *from;
+			matched = qtrue;
 		}
 	}
 
 	for (i = 0; i < MAX_GLOBAL_SERVERS; i++) {
 		if (NET_CompareAdr(from, &cls.globalServers[i].adr)) {
 			CL_SetServerInfo(&cls.globalServers[i], info, ping);
+			cls.globalServers[i].adr = *from;
+			matched = qtrue;
 		}
 	}
 
 	for (i = 0; i < MAX_OTHER_SERVERS; i++) {
 		if (NET_CompareAdr(from, &cls.favoriteServers[i].adr)) {
 			CL_SetServerInfo(&cls.favoriteServers[i], info, ping);
+			cls.favoriteServers[i].adr = *from;
+			matched = qtrue;
+		}
+	}
+
+	if ( matched || !p2pAddr[0] ) {
+		return;
+	}
+
+	for (i = 0; i < MAX_OTHER_SERVERS; i++) {
+		if ( CL_ServerMatchesP2PIdentity( &cls.localServers[i], p2pAddr ) ) {
+			CL_SetServerInfo( &cls.localServers[i], info, ping );
+			cls.localServers[i].adr = *from;
+			matched = qtrue;
+		}
+	}
+
+	for (i = 0; i < MAX_GLOBAL_SERVERS; i++) {
+		if ( CL_ServerMatchesP2PIdentity( &cls.globalServers[i], p2pAddr ) ) {
+			CL_SetServerInfo( &cls.globalServers[i], info, ping );
+			cls.globalServers[i].adr = *from;
+			matched = qtrue;
+		}
+	}
+
+	for (i = 0; i < MAX_OTHER_SERVERS; i++) {
+		if ( CL_ServerMatchesP2PIdentity( &cls.favoriteServers[i], p2pAddr ) ) {
+			CL_SetServerInfo( &cls.favoriteServers[i], info, ping );
+			cls.favoriteServers[i].adr = *from;
+			matched = qtrue;
 		}
 	}
 }

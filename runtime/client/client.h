@@ -277,6 +277,7 @@ typedef struct {
 	char	  	mapName[MAX_NAME_LENGTH];
 	char	  	game[MAX_NAME_LENGTH];
 	char		p2pAddr[MAX_OSPATH];
+	qboolean	p2pAvailable;
 	int			netType;
 	int			gameType;
 	int		  	clients;
