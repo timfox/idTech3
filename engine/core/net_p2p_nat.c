@@ -10,37 +10,13 @@ and dedicated-server master browsing.
 #include "q_shared.h"
 #include "qcommon.h"
 #include "net_p2p_nat.h"
+#include "net_p2p_stun_codec.h"
+#include "net_p2p_turn_auth.h"
 
 #include <string.h>
 
-#ifdef USE_DTLS
-#include <openssl/evp.h>
-#include <openssl/hmac.h>
-#endif
-
-#define P2P_STUN_MAGIC_COOKIE 0x2112A442u
-#define P2P_STUN_BINDING_REQUEST  0x0001u
-#define P2P_STUN_BINDING_RESPONSE 0x0101u
-#define P2P_STUN_ALLOCATE_REQUEST 0x0003u
-#define P2P_STUN_ALLOCATE_SUCCESS 0x0103u
-#define P2P_STUN_ATTR_MAPPED_ADDRESS      0x0001u
-#define P2P_STUN_ATTR_XOR_MAPPED_ADDRESS  0x0020u
-#define P2P_STUN_ATTR_REALM               0x0014u
-#define P2P_STUN_ATTR_NONCE               0x0015u
-#define P2P_STUN_ATTR_USERNAME            0x0006u
-#define P2P_STUN_ATTR_MESSAGE_INTEGRITY   0x0008u
-#define P2P_STUN_ATTR_XOR_RELAYED_ADDRESS 0x0016u
-#define P2P_STUN_ATTR_REQUESTED_TRANSPORT 0x0019u
-
 #define P2P_BROWSE_MAX_SERVERS 256
 #define P2P_BROWSE_INFO_TIMEOUT_MS 30000
-
-typedef enum {
-	P2P_CAND_HOST = 0,
-	P2P_CAND_SRFLX,
-	P2P_CAND_RELAY,
-	P2P_CAND_COUNT
-} p2p_candidate_type_t;
 
 typedef struct {
 	qboolean valid;
@@ -60,6 +36,10 @@ typedef struct {
 	char realm[64];
 	char nonce[128];
 	int turnPhase;
+	uint32_t allocationLifetime;
+	int nextRefreshTime;
+	qboolean permissionSent;
+	netadr_t permissionPeer;
 } p2p_stun_state_t;
 
 typedef struct {
@@ -88,6 +68,8 @@ static cvar_t *net_p2pTurnServer;
 static cvar_t *net_p2pTurnUser;
 static cvar_t *net_p2pTurnPass;
 static cvar_t *net_p2pHostAdvertise;
+static cvar_t *net_p2pTurnRefresh;
+static cvar_t *net_p2pTurnChannels;
 
 static p2p_candidate_t net_p2pCandidates[P2P_CAND_COUNT];
 static p2p_stun_state_t net_p2pStunState;
@@ -105,7 +87,8 @@ static void NET_P2P_NatRegisterCvars( void )
 {
 	if ( net_p2pStun && net_p2pStunServer && net_p2pStunAutoAdvertise &&
 	     net_p2pStunInterval && net_p2pTurn && net_p2pTurnServer &&
-	     net_p2pTurnUser && net_p2pTurnPass && net_p2pHostAdvertise ) {
+	     net_p2pTurnUser && net_p2pTurnPass && net_p2pHostAdvertise &&
+	     net_p2pTurnRefresh && net_p2pTurnChannels ) {
 		return;
 	}
 
@@ -118,6 +101,8 @@ static void NET_P2P_NatRegisterCvars( void )
 	net_p2pTurnUser = Cvar_Get( "net_p2pTurnUser", "", CVAR_ARCHIVE_ND );
 	net_p2pTurnPass = Cvar_Get( "net_p2pTurnPass", "", CVAR_ARCHIVE_ND );
 	net_p2pHostAdvertise = Cvar_Get( "net_p2pHostAdvertise", "0", CVAR_ARCHIVE_ND );
+	net_p2pTurnRefresh = Cvar_Get( "net_p2pTurnRefresh", "60", CVAR_ARCHIVE_ND );
+	net_p2pTurnChannels = Cvar_Get( "net_p2pTurnChannels", "0", CVAR_ARCHIVE_ND );
 
 	Cvar_SetDescription( net_p2pStun, "Enable STUN binding for ICE server-reflexive candidates (0=off, 1=on)." );
 	Cvar_SetDescription( net_p2pStunServer, "STUN server host:port for NAT discovery." );
@@ -128,6 +113,8 @@ static void NET_P2P_NatRegisterCvars( void )
 	Cvar_SetDescription( net_p2pTurnUser, "TURN long-term credential username." );
 	Cvar_SetDescription( net_p2pTurnPass, "TURN long-term credential password." );
 	Cvar_SetDescription( net_p2pHostAdvertise, "Allow advertising local host candidate when no STUN/TURN candidate is available (0=off, 1=on)." );
+	Cvar_SetDescription( net_p2pTurnRefresh, "Seconds before TURN allocation expiry to send Refresh." );
+	Cvar_SetDescription( net_p2pTurnChannels, "Enable TURN ChannelBind data relay scaffold (0=off, 1=on)." );
 }
 
 static void NET_P2P_NatRandomBytes( byte *out, int len )
@@ -137,35 +124,6 @@ static void NET_P2P_NatRandomBytes( byte *out, int len )
 	for ( i = 0; i < len; i++ ) {
 		out[i] = (byte)( rand() & 0xff );
 	}
-}
-
-static uint16_t NET_P2P_NatRead16( const byte *p )
-{
-	return (uint16_t)( ( p[0] << 8 ) | p[1] );
-}
-
-static uint32_t NET_P2P_NatRead32( const byte *p )
-{
-	return (uint32_t)( ( p[0] << 24 ) | ( p[1] << 16 ) | ( p[2] << 8 ) | p[3] );
-}
-
-static void NET_P2P_NatWrite16( byte *p, uint16_t v )
-{
-	p[0] = (byte)( ( v >> 8 ) & 0xff );
-	p[1] = (byte)( v & 0xff );
-}
-
-static void NET_P2P_NatWrite32( byte *p, uint32_t v )
-{
-	p[0] = (byte)( ( v >> 24 ) & 0xff );
-	p[1] = (byte)( ( v >> 16 ) & 0xff );
-	p[2] = (byte)( ( v >> 8 ) & 0xff );
-	p[3] = (byte)( v & 0xff );
-}
-
-static int NET_P2P_NatPad4( int len )
-{
-	return ( len + 3 ) & ~3;
 }
 
 static void NET_P2P_NatSetCandidate( p2p_candidate_type_t type, const netadr_t *adr )
@@ -211,15 +169,7 @@ static void NET_P2P_NatRefreshHostCandidate( void )
 
 static int NET_P2P_NatBuildBindingRequest( byte *out, int outSize, const byte *transactionId )
 {
-	if ( outSize < 20 ) {
-		return 0;
-	}
-
-	NET_P2P_NatWrite16( out + 0, P2P_STUN_BINDING_REQUEST );
-	NET_P2P_NatWrite16( out + 2, 0 );
-	NET_P2P_NatWrite32( out + 4, P2P_STUN_MAGIC_COOKIE );
-	Com_Memcpy( out + 8, transactionId, 12 );
-	return 20;
+	return NET_P2P_StunBuildBindingRequest( out, outSize, transactionId );
 }
 
 static void NET_P2P_NatSendStun( p2p_stun_state_t *state, uint16_t msgType, const byte *extra, int extraLen, qboolean withIntegrity )
@@ -232,8 +182,8 @@ static void NET_P2P_NatSendStun( p2p_stun_state_t *state, uint16_t msgType, cons
 	}
 
 	len = 20;
-	NET_P2P_NatWrite16( packet + 0, msgType );
-	NET_P2P_NatWrite32( packet + 4, P2P_STUN_MAGIC_COOKIE );
+	NET_P2P_StunWrite16( packet + 0, msgType );
+	NET_P2P_StunWrite32( packet + 4, P2P_STUN_MAGIC_COOKIE );
 	Com_Memcpy( packet + 8, state->transactionId, 12 );
 
 	if ( extra && extraLen > 0 ) {
@@ -244,41 +194,16 @@ static void NET_P2P_NatSendStun( p2p_stun_state_t *state, uint16_t msgType, cons
 		len += extraLen;
 	}
 
-#ifdef USE_DTLS
-	if ( withIntegrity && net_p2pTurnUser && net_p2pTurnUser->string[0] &&
+	if ( withIntegrity && NET_P2P_TurnAuthAvailable() && net_p2pTurnUser && net_p2pTurnUser->string[0] &&
 	     net_p2pTurnPass && net_p2pTurnPass->string[0] && state->realm[0] && state->nonce[0] ) {
-		unsigned char key[16];
-		unsigned char hmac[20];
-		unsigned int hmacLen = 0;
-		EVP_MD_CTX *mdctx;
-		const EVP_MD *md5 = EVP_md5();
-		int miPos;
-
-		mdctx = EVP_MD_CTX_new();
-		if ( mdctx && md5 &&
-		     EVP_DigestInit_ex( mdctx, md5, NULL ) == 1 &&
-		     EVP_DigestUpdate( mdctx, net_p2pTurnUser->string, strlen( net_p2pTurnUser->string ) ) == 1 &&
-		     EVP_DigestUpdate( mdctx, ":", 1 ) == 1 &&
-		     EVP_DigestUpdate( mdctx, state->realm, strlen( state->realm ) ) == 1 &&
-		     EVP_DigestUpdate( mdctx, ":", 1 ) == 1 &&
-		     EVP_DigestUpdate( mdctx, net_p2pTurnPass->string, strlen( net_p2pTurnPass->string ) ) == 1 &&
-		     EVP_DigestFinal_ex( mdctx, key, NULL ) == 1 ) {
-			NET_P2P_NatWrite16( packet + 2, (uint16_t)( len - 20 ) );
-			HMAC( EVP_sha1(), key, sizeof( key ), packet, (size_t)len, hmac, &hmacLen );
-			miPos = len;
-			NET_P2P_NatWrite16( packet + miPos + 0, P2P_STUN_ATTR_MESSAGE_INTEGRITY );
-			NET_P2P_NatWrite16( packet + miPos + 2, 20 );
-			Com_Memcpy( packet + miPos + 4, hmac, 20 );
-			len = miPos + 24;
-			NET_P2P_NatWrite16( packet + 2, (uint16_t)( len - 20 ) );
+		len = NET_P2P_TurnAppendMessageIntegrity(
+			packet, len, (int)sizeof( packet ),
+			net_p2pTurnUser->string, net_p2pTurnPass->string, state->realm, state->nonce );
+		if ( len <= 0 ) {
+			return;
 		}
-		if ( mdctx ) {
-			EVP_MD_CTX_free( mdctx );
-		}
-	} else
-#endif
-	{
-		NET_P2P_NatWrite16( packet + 2, (uint16_t)( len - 20 ) );
+	} else {
+		NET_P2P_StunWrite16( packet + 2, (uint16_t)( len - 20 ) );
 	}
 	NET_SendPacket( NS_SERVER, len, packet, &state->serverAdr );
 	NET_SendPacket( NS_CLIENT, len, packet, &state->serverAdr );
@@ -303,138 +228,66 @@ static void NET_P2P_NatBeginStun( p2p_stun_state_t *state, const char *server, q
 	state->nextRequestTime = state->lastRequestTime;
 }
 
-static qboolean NET_P2P_NatParseMappedAddress( const byte *value, int valueLen, netadr_t *out, qboolean xored, const byte *transactionId )
-{
-	uint16_t port;
-	uint32_t ipv4;
-	byte ipBytes[4];
-
-	if ( !out || valueLen < 8 || value[1] != 0x01 ) {
-		return qfalse;
-	}
-
-	port = NET_P2P_NatRead16( value + 2 );
-	ipv4 = NET_P2P_NatRead32( value + 4 );
-
-	if ( xored ) {
-		port ^= (uint16_t)( P2P_STUN_MAGIC_COOKIE >> 16 );
-		ipv4 ^= P2P_STUN_MAGIC_COOKIE;
-		ipv4 ^= NET_P2P_NatRead32( transactionId );
-	}
-
-	ipBytes[0] = (byte)( ( ipv4 >> 24 ) & 0xff );
-	ipBytes[1] = (byte)( ( ipv4 >> 16 ) & 0xff );
-	ipBytes[2] = (byte)( ( ipv4 >> 8 ) & 0xff );
-	ipBytes[3] = (byte)( ipv4 & 0xff );
-
-	Com_Memset( out, 0, sizeof( *out ) );
-	out->type = NA_IP;
-	Com_Memcpy( out->ipv._4, ipBytes, 4 );
-	out->port = port;
-	return qtrue;
-}
-
 static qboolean NET_P2P_NatParseStunResponse( p2p_stun_state_t *state, const byte *data, int len, qboolean turn )
 {
-	const byte *p;
-	const byte *end;
-	uint16_t msgType;
-	uint16_t msgLen;
-	netadr_t mapped;
+	p2p_stun_parse_result_t result;
+	byte attrs[256];
+	int attrLen;
 
 	if ( !state || !state->pending || len < 20 ) {
 		return qfalse;
 	}
 
-	msgType = NET_P2P_NatRead16( data + 0 );
-	msgLen = NET_P2P_NatRead16( data + 2 );
-	if ( NET_P2P_NatRead32( data + 4 ) != P2P_STUN_MAGIC_COOKIE ) {
-		return qfalse;
-	}
-	if ( memcmp( data + 8, state->transactionId, 12 ) != 0 ) {
-		return qfalse;
-	}
-	if ( 20 + msgLen > len ) {
+	if ( !NET_P2P_StunParseMessage( data, len, state->transactionId, &result ) ) {
 		return qfalse;
 	}
 
 	if ( turn ) {
-		if ( msgType == 0x0111u ) {
-			/* Error response: collect REALM/NONCE for authenticated Allocate retry. */
-		} else if ( msgType != P2P_STUN_ALLOCATE_SUCCESS ) {
+		if ( result.msgType == P2P_STUN_ERROR_RESPONSE ) {
+			if ( result.errorCode >= 0 ) {
+				Com_Printf( "P2P ICE: TURN error %d %s\n", result.errorCode,
+					result.errorReason[0] ? result.errorReason : "" );
+			}
+		} else if ( result.msgType != P2P_STUN_ALLOCATE_SUCCESS &&
+		            result.msgType != P2P_STUN_REFRESH_SUCCESS &&
+		            result.msgType != P2P_STUN_CREATE_PERMISSION_SUCCESS &&
+		            result.msgType != P2P_STUN_CHANNEL_BIND_SUCCESS ) {
 			return qfalse;
 		}
-	} else if ( msgType != P2P_STUN_BINDING_RESPONSE ) {
+	} else if ( result.msgType != P2P_STUN_BINDING_RESPONSE ) {
 		return qfalse;
 	}
 
-	p = data + 20;
-	end = p + msgLen;
-	while ( p + 4 <= end ) {
-		uint16_t attrType = NET_P2P_NatRead16( p + 0 );
-		uint16_t attrLen = NET_P2P_NatRead16( p + 2 );
-		const byte *value = p + 4;
+	if ( result.realm[0] ) {
+		Q_strncpyz( state->realm, result.realm, sizeof( state->realm ) );
+	}
+	if ( result.nonce[0] ) {
+		Q_strncpyz( state->nonce, result.nonce, sizeof( state->nonce ) );
+	}
 
-		if ( p + 4 + attrLen > end ) {
-			break;
-		}
-
-		if ( attrType == P2P_STUN_ATTR_REALM && attrLen < sizeof( state->realm ) ) {
-			Com_Memcpy( state->realm, value, attrLen );
-			state->realm[attrLen] = '\0';
-		} else if ( attrType == P2P_STUN_ATTR_NONCE && attrLen < sizeof( state->nonce ) ) {
-			Com_Memcpy( state->nonce, value, attrLen );
-			state->nonce[attrLen] = '\0';
-		} else if ( attrType == P2P_STUN_ATTR_XOR_MAPPED_ADDRESS || attrType == P2P_STUN_ATTR_MAPPED_ADDRESS ) {
-			if ( NET_P2P_NatParseMappedAddress( value, attrLen, &mapped, (qboolean)( attrType == P2P_STUN_ATTR_XOR_MAPPED_ADDRESS ), data + 8 ) ) {
-				state->mappedAdr = mapped;
-				state->mappedValid = qtrue;
-			}
-		} else if ( turn && attrType == P2P_STUN_ATTR_XOR_RELAYED_ADDRESS ) {
-			if ( NET_P2P_NatParseMappedAddress( value, attrLen, &mapped, qtrue, data + 8 ) ) {
-				state->mappedAdr = mapped;
-				state->mappedValid = qtrue;
-			}
-		}
-
-		p += 4 + NET_P2P_NatPad4( attrLen );
+	if ( result.haveMapped ) {
+		state->mappedAdr = result.mappedAdr;
+		state->mappedValid = qtrue;
+	}
+	if ( turn && result.haveRelayed ) {
+		state->mappedAdr = result.relayedAdr;
+		state->mappedValid = qtrue;
+	}
+	if ( turn && result.lifetime > 0 ) {
+		state->allocationLifetime = result.lifetime;
+		state->nextRefreshTime = Sys_Milliseconds() +
+			(int)( ( result.lifetime - (uint32_t)net_p2pTurnRefresh->integer ) * 1000 );
 	}
 
 	if ( turn && !state->mappedValid && state->realm[0] && state->nonce[0] && state->turnPhase == 1 ) {
-		byte attrs[256];
-		int attrPos = 0;
-		int ulen;
-		int nlen;
-		int tlen;
-
-		NET_P2P_NatWrite16( attrs + attrPos + 0, P2P_STUN_ATTR_REQUESTED_TRANSPORT );
-		NET_P2P_NatWrite16( attrs + attrPos + 2, 4 );
-		attrs[attrPos + 4] = 0;
-		attrs[attrPos + 5] = 0;
-		attrs[attrPos + 6] = 0;
-		attrs[attrPos + 7] = 17;
-		attrPos += 8;
-
-		ulen = (int)strlen( net_p2pTurnUser->string );
-		NET_P2P_NatWrite16( attrs + attrPos + 0, P2P_STUN_ATTR_USERNAME );
-		NET_P2P_NatWrite16( attrs + attrPos + 2, (uint16_t)ulen );
-		Com_Memcpy( attrs + attrPos + 4, net_p2pTurnUser->string, ulen );
-		attrPos += 4 + NET_P2P_NatPad4( ulen );
-
-		nlen = (int)strlen( state->nonce );
-		NET_P2P_NatWrite16( attrs + attrPos + 0, P2P_STUN_ATTR_NONCE );
-		NET_P2P_NatWrite16( attrs + attrPos + 2, (uint16_t)nlen );
-		Com_Memcpy( attrs + attrPos + 4, state->nonce, nlen );
-		attrPos += 4 + NET_P2P_NatPad4( nlen );
-
-		tlen = (int)strlen( state->realm );
-		NET_P2P_NatWrite16( attrs + attrPos + 0, P2P_STUN_ATTR_REALM );
-		NET_P2P_NatWrite16( attrs + attrPos + 2, (uint16_t)tlen );
-		Com_Memcpy( attrs + attrPos + 4, state->realm, tlen );
-		attrPos += 4 + NET_P2P_NatPad4( tlen );
-
+		attrLen = NET_P2P_StunBuildAllocateAttrs(
+			attrs, sizeof( attrs ),
+			net_p2pTurnUser->string, state->realm, state->nonce );
+		if ( attrLen <= 0 ) {
+			return qfalse;
+		}
 		state->turnPhase = 2;
-		NET_P2P_NatSendStun( state, P2P_STUN_ALLOCATE_REQUEST, attrs, attrPos, qtrue );
+		NET_P2P_NatSendStun( state, P2P_STUN_ALLOCATE_REQUEST, attrs, attrLen, qtrue );
 		return qfalse;
 	}
 
@@ -451,6 +304,55 @@ static qboolean NET_P2P_NatParseStunResponse( p2p_stun_state_t *state, const byt
 	}
 
 	return qfalse;
+}
+
+static void NET_P2P_NatSendTurnPermission( p2p_stun_state_t *state, const netadr_t *peer )
+{
+	byte attrs[256];
+	int attrLen;
+
+	if ( !state || !peer || !NET_P2P_TurnAuthAvailable() ) {
+		return;
+	}
+
+	attrLen = NET_P2P_StunBuildCreatePermissionAttrs(
+		attrs, sizeof( attrs ), peer,
+		net_p2pTurnUser->string, state->realm, state->nonce );
+	if ( attrLen <= 0 ) {
+		return;
+	}
+
+	state->permissionPeer = *peer;
+	state->permissionSent = qtrue;
+	NET_P2P_NatSendStun( state, P2P_STUN_CREATE_PERMISSION_REQUEST, attrs, attrLen, qtrue );
+	Com_Printf( "P2P ICE: TURN CreatePermission for %s\n", NET_AdrToString( peer ) );
+}
+
+static void NET_P2P_NatMaybeRefreshTurn( p2p_stun_state_t *state )
+{
+	byte attrs[256];
+	int attrLen;
+	int now;
+
+	if ( !state || !state->active || !state->allocationLifetime ) {
+		return;
+	}
+
+	now = Sys_Milliseconds();
+	if ( state->nextRefreshTime > now ) {
+		return;
+	}
+
+	attrLen = NET_P2P_StunBuildRefreshAttrs(
+		attrs, sizeof( attrs ), state->allocationLifetime,
+		net_p2pTurnUser->string, state->realm, state->nonce );
+	if ( attrLen <= 0 ) {
+		return;
+	}
+
+	NET_P2P_NatSendStun( state, P2P_STUN_REFRESH_REQUEST, attrs, attrLen, qtrue );
+	state->nextRefreshTime = now + ( net_p2pTurnRefresh->integer * 1000 );
+	Com_Printf( "P2P ICE: TURN Refresh (lifetime %u)\n", state->allocationLifetime );
 }
 
 static void NET_P2P_NatScheduleStunRefresh( p2p_stun_state_t *state, int intervalMs )
@@ -577,11 +479,11 @@ void NET_P2P_NatInit( void )
 		Com_Printf( "P2P ICE: STUN enabled (%s)\n", net_p2pStunServer->string );
 	}
 	if ( net_p2pTurn && net_p2pTurn->integer ) {
-#ifndef USE_DTLS
-		Com_Printf( "P2P ICE: TURN requested but requires OpenSSL/USE_DTLS build; relay disabled\n" );
-#else
-		Com_Printf( "P2P ICE: TURN enabled (%s)\n", net_p2pTurnServer->string );
-#endif
+		if ( !NET_P2P_TurnAuthAvailable() ) {
+			Com_Printf( "P2P ICE: TURN requested but OpenSSL not available; relay disabled\n" );
+		} else {
+			Com_Printf( "P2P ICE: TURN enabled (%s)\n", net_p2pTurnServer->string );
+		}
 	}
 }
 
@@ -614,9 +516,11 @@ void NET_P2P_NatFrame( void )
 	}
 
 #ifdef USE_DTLS
-	if ( net_p2pTurn && net_p2pTurn->integer && net_p2pTurnServer && net_p2pTurnServer->string[0] &&
+	if ( net_p2pTurn && net_p2pTurn->integer && NET_P2P_TurnAuthAvailable() &&
+	     net_p2pTurnServer && net_p2pTurnServer->string[0] &&
 	     net_p2pTurnUser && net_p2pTurnUser->string[0] && net_p2pTurnPass && net_p2pTurnPass->string[0] ) {
 		NET_P2P_NatTickStun( &net_p2pTurnState, net_p2pTurnServer->string, net_p2pStunInterval->integer, qtrue );
+		NET_P2P_NatMaybeRefreshTurn( &net_p2pTurnState );
 	}
 #endif
 
@@ -647,7 +551,7 @@ qboolean NET_P2P_NatTryHandlePacket( const netadr_t *from, const byte *data, int
 		return qfalse;
 	}
 
-	if ( NET_P2P_NatRead32( data + 4 ) != P2P_STUN_MAGIC_COOKIE ) {
+	if ( NET_P2P_StunRead32( data + 4 ) != P2P_STUN_MAGIC_COOKIE ) {
 		return qfalse;
 	}
 
@@ -889,6 +793,33 @@ qboolean NET_P2P_NatGetAdvertiseAddress( char *buffer, int bufferSize )
 	}
 
 	return qfalse;
+}
+
+qboolean NET_P2P_NatGetCandidateText( p2p_candidate_type_t type, char *buffer, int bufferSize )
+{
+	if ( type < 0 || type >= P2P_CAND_COUNT || !buffer || bufferSize <= 0 ) {
+		return qfalse;
+	}
+
+	if ( !net_p2pCandidates[type].valid ) {
+		return qfalse;
+	}
+
+	Q_strncpyz( buffer, net_p2pCandidates[type].text, bufferSize );
+	return qtrue;
+}
+
+void NET_P2P_NatGrantTurnPermission( const netadr_t *peer )
+{
+	if ( !peer || !net_p2pTurn || !net_p2pTurn->integer ) {
+		return;
+	}
+
+	if ( net_p2pTurnState.permissionSent && NET_CompareAdr( peer, &net_p2pTurnState.permissionPeer ) ) {
+		return;
+	}
+
+	NET_P2P_NatSendTurnPermission( &net_p2pTurnState, peer );
 }
 
 void NET_P2P_NatPrintCandidates( void )

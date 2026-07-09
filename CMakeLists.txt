@@ -3246,6 +3246,18 @@ set_tests_properties(test_p2p_networking PROPERTIES
 	LABELS "scripts;validation;networking"
 	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_p2p_networking.sh;${CMAKE_SOURCE_DIR}/runtime/client/core/cl_cmds.c;${CMAKE_SOURCE_DIR}/engine/core/net_p2p.c;${CMAKE_SOURCE_DIR}/docs/P2P_NETWORKING.md")
 
+add_test(NAME test_p2p_nat_sim
+	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_p2p_nat_sim.sh)
+set_tests_properties(test_p2p_nat_sim PROPERTIES
+	LABELS "scripts;p2p;validation"
+	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_p2p_nat_sim.sh;${CMAKE_SOURCE_DIR}/engine/core/net_p2p_stun_codec.c;${CMAKE_SOURCE_DIR}/tests/unit/test_p2p_stun.c")
+
+add_test(NAME test_p2p_nat_live
+	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_p2p_nat_live.sh host)
+set_tests_properties(test_p2p_nat_live PROPERTIES
+	LABELS "p2p;live"
+	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_p2p_nat_live.sh;${CMAKE_SOURCE_DIR}/docs/P2P_NAT_TESTING.md")
+
 add_test(NAME test_console_font
 	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_console_font.sh)
 set_tests_properties(test_console_font PROPERTIES
@@ -3524,6 +3536,23 @@ if(BUILD_UNIT_TESTS)
 	endif()
 	add_test(NAME unit_cl_compat_math COMMAND unit_cl_compat_math)
 	set_tests_properties(unit_cl_compat_math PROPERTIES LABELS "unit;validation;client")
+
+	add_executable(unit_p2p_stun
+		tests/unit/test_p2p_stun.c
+		tests/stub_qcommon_min.c
+		engine/core/net_p2p_stun_codec.c
+		src/qcommon/q_shared.c
+		src/qcommon/q_math.c)
+	target_include_directories(unit_p2p_stun PRIVATE
+		${CMAKE_SOURCE_DIR}/src
+		${CMAKE_SOURCE_DIR}/engine/core
+		${CMAKE_SOURCE_DIR}/src/extensions/research)
+	target_compile_definitions(unit_p2p_stun PRIVATE NET_P2P_STUN_CODEC_STANDALONE=1)
+	if(NOT MSVC)
+		target_link_libraries(unit_p2p_stun PRIVATE m)
+	endif()
+	add_test(NAME unit_p2p_stun COMMAND unit_p2p_stun)
+	set_tests_properties(unit_p2p_stun PROPERTIES LABELS "unit;p2p;validation")
 
 	add_executable(unit_parse
 		tests/unit/test_parse.c

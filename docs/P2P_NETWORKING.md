@@ -83,6 +83,29 @@ The `direct_udp` backend includes a symmetric connectionless helper path built o
 
 This is ICE-lite rather than a full interactive ICE agent, but it covers host + STUN reflexive + optional TURN relay discovery and active symmetric UDP punching.
 
+### ICE connectivity checks (`direct_udp`)
+
+When `net_p2pIceChecks 1` (default) and backend is `direct_udp`, `p2p_connect` runs ICE-lite checks before `connect`:
+
+| OOB packet | Purpose |
+|------------|---------|
+| `p2pCand` / `p2pCandRequest` | Exchange gathered candidate lists |
+| `p2pCheck` / `p2pCheckAck` | Nominate first working peer path |
+
+Cvars: `net_p2pIceChecks`, `net_p2pIceTimeout` (default 3000 ms).
+
+With `net_p2pBackend auto` and Steam SDR ready, ICE is skipped (`P2P: using steam_sdr (ICE skipped)`).
+
+### TURN hardening
+
+| Feature | Cvar |
+|---------|------|
+| Allocation refresh | `net_p2pTurnRefresh` (seconds before expiry) |
+| CreatePermission for peer | automatic before relay ICE checks |
+| ChannelBind scaffold | `net_p2pTurnChannels` (default 0) |
+
+TURN auth uses OpenSSL when available (`net_p2p_turn_auth.c`), not tied to game DTLS.
+
 ## Listen server flow
 
 1. Build with `USE_STEAM_NETWORKING=ON`.
@@ -122,13 +145,13 @@ Favorites preserve the same identity too: adding or removing `steam:...` or `udp
 The engine's current supported multiplayer model is:
 
 - **Transport**: `steam_sdr` or `direct_udp`
-- **NAT traversal**: host/STUN/TURN candidate gathering plus symmetric UDP punch helpers
-- **Reconnect**: explicit reconnect window advertised by the server and reusable `cl_reconnectArgs`
+- **NAT traversal**: host/STUN/TURN candidate gathering, ICE-lite connectivity checks, symmetric UDP punch helpers
+- **Reconnect**: `cl_p2pAutoReconnect 1` replays `connect` within advertised `p2preconn` window; server accepts `p2pReconnect <session>` fast-path
 - **Versioning**: browser-visible protocol plus game/mod identity
 - **Anti-cheat posture**: browser-visible `sv_pure` / `sv_pureSigned` summary
-- **Failure recovery**: browser-visible policy so clients know whether to expect reconnect-only or future host-migration flows
+- **Failure recovery**: `p2pfail=reconnect` auto-rejoin; `p2pfail=migrate` promotes `cl_p2pBackupHost 1` client and broadcasts `p2pMigrate`
 
-This does not implement automatic host migration yet, but it finally gives the transport and browser layers a stable contract for reconnect, matchmaking/session UX, version compatibility, anti-cheat posture, and recovery behavior.
+Listen-host migration v1 re-hosts via `listen` + fresh map load (no full gamestate handoff). See `docs/P2P_NAT_TESTING.md` for CI validation tiers.
 
 ## Dedicated server status
 

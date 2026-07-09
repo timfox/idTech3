@@ -9,6 +9,7 @@ Miscellaneous client console commands (info, fs lists, UI open, etc.).
 #include "client.h"
 #include "cl_cmds.h"
 #include "cl_ref.h"
+#include "cl_p2p_session.h"
 #include "../../qcommon/net_p2p.h"
 #include "../../qcommon/script_emit.h"
 
@@ -292,7 +293,7 @@ static void CL_P2PConnect_f( void ) {
 		return;
 	}
 
-	NET_P2P_BeginPunchForAddress( address );
+	NET_P2P_BeginConnectPath( address );
 	Cbuf_AddText( va( "connect %s\n", address ) );
 }
 
@@ -496,12 +497,22 @@ static void CL_P2PConnectBrowser_f( void ) {
 	}
 
 	if ( server->p2pAddr[0] ) {
-		NET_P2P_BeginPunchForAddress( server->p2pAddr );
+		CL_P2P_SessionOnConnect(
+			server->p2pSessionId,
+			server->p2pAddr,
+			server->p2pFailover,
+			server->p2pReconnectWindow );
+		NET_P2P_BeginConnectPath( server->p2pAddr );
 		Cbuf_AddText( va( "connect %s\n", server->p2pAddr ) );
 		return;
 	}
 
-	NET_P2P_BeginPunchForAddress( NET_AdrToStringwPort( &server->adr ) );
+	CL_P2P_SessionOnConnect(
+		server->p2pSessionId,
+		NET_AdrToStringwPort( &server->adr ),
+		server->p2pFailover,
+		server->p2pReconnectWindow );
+	NET_P2P_BeginConnectPath( NET_AdrToStringwPort( &server->adr ) );
 	Cbuf_AddText( va( "connect %s\n", NET_AdrToStringwPort( &server->adr ) ) );
 }
 

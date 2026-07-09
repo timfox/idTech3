@@ -8,6 +8,7 @@ Client connection: connect/disconnect, rcon, OOB packets, resend/timeout.
 
 #include "client.h"
 #include "cl_connect.h"
+#include "cl_p2p_session.h"
 #include "cl_serverbrowser.h"
 #include "cl_demo.h"
 #include "../../qcommon/net_p2p.h"
@@ -127,6 +128,8 @@ qboolean CL_Disconnect( qboolean showMainMenu ) {
 	Com_Memset( &clc, 0, sizeof( clc ) );
 
 	cls.state = CA_DISCONNECTED;
+
+	CL_P2P_SessionOnDisconnect( qtrue );
 
 	// allow cheats locally
 	Cvar_Set( "sv_cheats", "1" );
@@ -667,6 +670,10 @@ static qboolean CL_ConnectionlessPacket( const netadr_t *from, msg_t *msg ) {
 		return qfalse;
 	}
 
+	if ( CL_P2P_SessionHandleOobPacket( from, c ) ) {
+		return qfalse;
+	}
+
 	if ( NET_P2P_TryHandleBrowseOob( from, c, msg ) ) {
 		return qfalse;
 	}
@@ -989,6 +996,7 @@ void CL_Connect_SetShutdownQuit( qboolean quit ) {
 }
 
 void CL_Connect_Init( void ) {
+	CL_P2P_SessionInit();
 	Cmd_AddCommand( "cmd", CL_ForwardToServer_f );
 	Cmd_AddCommand( "disconnect", CL_Disconnect_f );
 	Cmd_AddCommand( "connect", CL_Connect_f );

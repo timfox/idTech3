@@ -10,6 +10,7 @@ Optional peer-to-peer networking facade.
 #include "qcommon.h"
 #include "net_p2p.h"
 #include "net_p2p_nat.h"
+#include "net_p2p_ice.h"
 #include "net_sdr.h"
 
 #define P2P_PUNCH_MAX_PEERS 8
@@ -197,10 +198,12 @@ void NET_P2P_Init( void )
 {
 	NET_P2P_RegisterCvars();
 	NET_P2P_NatInit();
+	NET_P2P_IceInit();
 }
 
 void NET_P2P_Shutdown( void )
 {
+	NET_P2P_IceShutdown();
 	NET_P2P_NatShutdown();
 	Com_Memset( net_p2pPunchPeers, 0, sizeof( net_p2pPunchPeers ) );
 }
@@ -212,6 +215,7 @@ void NET_P2P_Frame( void )
 
 	NET_P2P_RegisterCvars();
 	NET_P2P_NatFrame();
+	NET_P2P_IceFrame();
 
 	if ( !NET_P2P_IsEnabled() || !NET_P2P_UsingDirectUdp() || !net_p2pPunch || !net_p2pPunch->integer ) {
 		return;
@@ -469,6 +473,22 @@ qboolean NET_P2P_HandleOobPacket( const netadr_t *from, const char *cmd )
 
 	if ( Q_stricmp( cmd, "p2pPunch" ) != 0 &&
 	     Q_stricmp( cmd, "p2pPong" ) != 0 &&
+	     Q_stricmp( cmd, "p2pKeepalive" ) != 0 &&
+	     Q_stricmp( cmd, "p2pCand" ) != 0 &&
+	     Q_stricmp( cmd, "p2pCandRequest" ) != 0 &&
+	     Q_stricmp( cmd, "p2pCheck" ) != 0 &&
+	     Q_stricmp( cmd, "p2pCheckAck" ) != 0 &&
+	     Q_stricmp( cmd, "p2pMigrate" ) != 0 &&
+	     Q_stricmp( cmd, "p2pReconnect" ) != 0 ) {
+		return qfalse;
+	}
+
+	if ( NET_P2P_IceHandleOobPacket( from, cmd ) ) {
+		return qtrue;
+	}
+
+	if ( Q_stricmp( cmd, "p2pPunch" ) != 0 &&
+	     Q_stricmp( cmd, "p2pPong" ) != 0 &&
 	     Q_stricmp( cmd, "p2pKeepalive" ) != 0 ) {
 		return qfalse;
 	}
@@ -524,4 +544,14 @@ qboolean NET_P2P_TryHandleNatPacket( const netadr_t *from, const byte *data, int
 qboolean NET_P2P_TryHandleBrowseOob( const netadr_t *from, const char *cmd, msg_t *msg )
 {
 	return NET_P2P_NatTryHandleConnectionless( from, cmd, msg );
+}
+
+qboolean NET_P2P_BeginConnectPath( const char *peerAddress )
+{
+	if ( NET_P2P_UsesSteamSdrBackend() ) {
+		Com_Printf( "P2P: using steam_sdr (ICE skipped)\n" );
+		return qfalse;
+	}
+
+	return NET_P2P_IceBeginConnectPath( peerAddress );
 }
