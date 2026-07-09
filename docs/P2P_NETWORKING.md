@@ -17,9 +17,11 @@ The current P2P backend is Steam Datagram Relay (SDR) through Steam Networking S
 - `p2p_status`
 - `p2p_address`
 - `p2p_connect <steamid|steam:steamid>`
+- `p2p_connect_browser <local|global|favorites> <index>`
 
 `p2p_address` prints the local `steam:STEAMID64` address to share with another player.
 `p2p_connect` normalizes the input and forwards to `connect steam:STEAMID64`.
+`p2p_connect_browser` uses the browser cache and prefers an advertised `p2paddr` when one is available.
 
 ## Listen server flow
 
@@ -29,6 +31,11 @@ The current P2P backend is Steam Datagram Relay (SDR) through Steam Networking S
 4. Start or host a local game from the client.
 5. Run `p2p_address` and share the printed address.
 6. The remote player runs `net_p2p 1` and `p2p_connect <that-steamid>`.
+
+## Discovery
+
+Servers now advertise `p2p=1` and `p2paddr=steam:...` in their info responses when the P2P backend is ready.
+That metadata is stored in the client browser cache and exposed through `LAN_GetServerInfo`, so UI scripts or terminal users can connect with `p2p_connect_browser`.
 
 ## Dedicated server status
 

@@ -989,7 +989,11 @@ int SV_RemainingGameState( void )
 		if ( start == CS_SERVERINFO ) {
 			MSG_WriteByte( &msg, svc_configstring );
 			MSG_WriteShort( &msg, start );
-			MSG_WriteBigString( &msg, Cvar_InfoString( CVAR_SERVERINFO, NULL ) );
+			{
+				char serverInfo[MAX_INFO_STRING];
+				SV_BuildServerInfoString( serverInfo, sizeof( serverInfo ) );
+				MSG_WriteBigString( &msg, serverInfo );
+			}
 			continue;
 		}
 		if ( start == CS_SYSTEMINFO ) {

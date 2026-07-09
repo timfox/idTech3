@@ -763,7 +763,11 @@ void SV_SpawnServer( const char *mapname, qboolean killBots ) {
 	SV_SetConfigstring( CS_SYSTEMINFO, Cvar_InfoString_Big( CVAR_SYSTEMINFO, NULL ) );
 	cvar_modifiedFlags &= ~CVAR_SYSTEMINFO;
 
-	SV_SetConfigstring( CS_SERVERINFO, Cvar_InfoString( CVAR_SERVERINFO, NULL ) );
+	{
+		char serverInfo[MAX_INFO_STRING];
+		SV_BuildServerInfoString( serverInfo, sizeof( serverInfo ) );
+		SV_SetConfigstring( CS_SERVERINFO, serverInfo );
+	}
 	cvar_modifiedFlags &= ~CVAR_SERVERINFO;
 
 	// any media configstring setting now should issue a warning
