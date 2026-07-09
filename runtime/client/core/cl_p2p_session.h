@@ -8,6 +8,9 @@ void CL_P2P_SessionShutdown( void );
 void CL_P2P_SessionFrame( void );
 
 void CL_P2P_SessionOnConnect( const char *sessionId, const char *p2pAddr, const char *failover, int reconnectWindowSec );
+void CL_P2P_SessionOnConnectFromServerInfo( const char *serverInfo );
+void CL_P2P_SessionPrepareDisconnect( qboolean serverInitiated );
+void CL_P2P_SessionNotifyDisconnect( void );
 void CL_P2P_SessionOnDisconnect( qboolean serverInitiated );
 void CL_P2P_SessionOnMigrate( const char *sessionId, const char *newP2pAddr );
 qboolean CL_P2P_SessionHandleOobPacket( const netadr_t *from, const char *cmd );

@@ -294,6 +294,7 @@ static void CL_P2PConnect_f( void ) {
 	}
 
 	NET_P2P_BeginConnectPath( address );
+	CL_P2P_SessionOnConnect( "", address, "reconnect", 45 );
 	Cbuf_AddText( va( "connect %s\n", address ) );
 }
 

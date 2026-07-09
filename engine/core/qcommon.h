@@ -1172,6 +1172,7 @@ void BotDrawDebugPolygons(void (*drawPoly)(int color, int numPoints, float *poin
 int			CL_ScaledMilliseconds( void );
 void CL_Init( void );
 qboolean CL_Disconnect( qboolean showMainMenu );
+void CL_P2P_SessionPrepareDisconnect( qboolean serverInitiated );
 void CL_ResetOldGame( void );
 void CL_Shutdown( const char *finalmsg, qboolean quit );
 void CL_Frame( int msec, int realMsec );

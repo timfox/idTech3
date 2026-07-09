@@ -39,6 +39,9 @@ typedef struct {
 	uint32_t allocationLifetime;
 	int nextRefreshTime;
 	qboolean permissionSent;
+	qboolean permissionGranted;
+	qboolean channelBound;
+	uint16_t channelNumber;
 	netadr_t permissionPeer;
 } p2p_stun_state_t;
 
@@ -228,6 +231,8 @@ static void NET_P2P_NatBeginStun( p2p_stun_state_t *state, const char *server, q
 	state->nextRequestTime = state->lastRequestTime;
 }
 
+static void NET_P2P_NatMaybeChannelBind( p2p_stun_state_t *state );
+
 static qboolean NET_P2P_NatParseStunResponse( p2p_stun_state_t *state, const byte *data, int len, qboolean turn )
 {
 	p2p_stun_parse_result_t result;
@@ -248,10 +253,19 @@ static qboolean NET_P2P_NatParseStunResponse( p2p_stun_state_t *state, const byt
 				Com_Printf( "P2P ICE: TURN error %d %s\n", result.errorCode,
 					result.errorReason[0] ? result.errorReason : "" );
 			}
+		} else if ( result.msgType == P2P_STUN_CHANNEL_BIND_SUCCESS ) {
+			state->channelBound = qtrue;
+			Com_Printf( "P2P ICE: TURN ChannelBind ok ch=%u\n",
+				(unsigned)state->channelNumber );
+			state->pending = qfalse;
+			return qtrue;
+		} else if ( result.msgType == P2P_STUN_CREATE_PERMISSION_SUCCESS ) {
+			state->permissionGranted = qtrue;
+			NET_P2P_NatMaybeChannelBind( state );
+			state->pending = qfalse;
+			return qtrue;
 		} else if ( result.msgType != P2P_STUN_ALLOCATE_SUCCESS &&
-		            result.msgType != P2P_STUN_REFRESH_SUCCESS &&
-		            result.msgType != P2P_STUN_CREATE_PERMISSION_SUCCESS &&
-		            result.msgType != P2P_STUN_CHANNEL_BIND_SUCCESS ) {
+		            result.msgType != P2P_STUN_REFRESH_SUCCESS ) {
 			return qfalse;
 		}
 	} else if ( result.msgType != P2P_STUN_BINDING_RESPONSE ) {
@@ -326,6 +340,67 @@ static void NET_P2P_NatSendTurnPermission( p2p_stun_state_t *state, const netadr
 	state->permissionSent = qtrue;
 	NET_P2P_NatSendStun( state, P2P_STUN_CREATE_PERMISSION_REQUEST, attrs, attrLen, qtrue );
 	Com_Printf( "P2P ICE: TURN CreatePermission for %s\n", NET_AdrToString( peer ) );
+}
+
+static uint16_t NET_P2P_NatPickChannelNumber( const netadr_t *peer )
+{
+	uint16_t channel;
+
+	if ( !peer ) {
+		return 0x4000;
+	}
+
+	channel = (uint16_t)( 0x4000 + ( peer->port & 0x0FFF ) );
+	if ( channel < 0x4000 ) {
+		channel = 0x4000;
+	}
+	return channel;
+}
+
+static void NET_P2P_NatSendTurnChannelBind( p2p_stun_state_t *state, const netadr_t *peer )
+{
+	byte attrs[256];
+	int attrLen;
+
+	if ( !state || !peer || !NET_P2P_TurnAuthAvailable() || state->channelBound ) {
+		return;
+	}
+
+	if ( !net_p2pTurnChannels || !net_p2pTurnChannels->integer ) {
+		return;
+	}
+
+	if ( !state->realm[0] || !state->nonce[0] ) {
+		return;
+	}
+
+	if ( !state->channelNumber ) {
+		state->channelNumber = NET_P2P_NatPickChannelNumber( peer );
+	}
+
+	attrLen = NET_P2P_StunBuildChannelBindAttrs(
+		attrs, sizeof( attrs ), state->channelNumber, peer,
+		net_p2pTurnUser->string, state->realm, state->nonce );
+	if ( attrLen <= 0 ) {
+		return;
+	}
+
+	NET_P2P_NatSendStun( state, P2P_STUN_CHANNEL_BIND_REQUEST, attrs, attrLen, qtrue );
+	Com_Printf( "P2P ICE: TURN ChannelBind ch=%u peer %s\n",
+		(unsigned)state->channelNumber, NET_AdrToString( peer ) );
+}
+
+static void NET_P2P_NatMaybeChannelBind( p2p_stun_state_t *state )
+{
+	if ( !state || !state->permissionGranted || state->channelBound ) {
+		return;
+	}
+
+	if ( !state->permissionPeer.type ) {
+		return;
+	}
+
+	NET_P2P_NatSendTurnChannelBind( state, &state->permissionPeer );
 }
 
 static void NET_P2P_NatMaybeRefreshTurn( p2p_stun_state_t *state )
@@ -515,14 +590,13 @@ void NET_P2P_NatFrame( void )
 		NET_P2P_NatTickStun( &net_p2pStunState, net_p2pStunServer->string, net_p2pStunInterval->integer, qfalse );
 	}
 
-#ifdef USE_DTLS
 	if ( net_p2pTurn && net_p2pTurn->integer && NET_P2P_TurnAuthAvailable() &&
 	     net_p2pTurnServer && net_p2pTurnServer->string[0] &&
 	     net_p2pTurnUser && net_p2pTurnUser->string[0] && net_p2pTurnPass && net_p2pTurnPass->string[0] ) {
 		NET_P2P_NatTickStun( &net_p2pTurnState, net_p2pTurnServer->string, net_p2pStunInterval->integer, qtrue );
 		NET_P2P_NatMaybeRefreshTurn( &net_p2pTurnState );
+		NET_P2P_NatMaybeChannelBind( &net_p2pTurnState );
 	}
-#endif
 
 	if ( !net_p2pBrowseActive ) {
 		return;
@@ -561,13 +635,11 @@ qboolean NET_P2P_NatTryHandlePacket( const netadr_t *from, const byte *data, int
 		return qtrue;
 	}
 
-#ifdef USE_DTLS
 	if ( net_p2pTurnState.active &&
 	     NET_CompareAdr( from, &net_p2pTurnState.serverAdr ) &&
 	     NET_P2P_NatParseStunResponse( &net_p2pTurnState, data, len, qtrue ) ) {
 		return qtrue;
 	}
-#endif
 
 	return qfalse;
 }

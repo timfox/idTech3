@@ -237,6 +237,60 @@ int NET_P2P_StunBuildRefreshAttrs( byte *out, int outSize, uint32_t lifetimeSec,
 	return pos;
 }
 
+static int NET_P2P_StunAppendChannelNumberAttr( byte *out, int outSize, int pos, uint16_t channelNumber )
+{
+	if ( pos + 8 > outSize ) {
+		return -1;
+	}
+
+	NET_P2P_StunWrite16( out + pos + 0, P2P_STUN_ATTR_CHANNEL_NUMBER );
+	NET_P2P_StunWrite16( out + pos + 2, 4 );
+	NET_P2P_StunWrite16( out + pos + 4, 0 );
+	NET_P2P_StunWrite16( out + pos + 6, channelNumber );
+	return pos + 8;
+}
+
+int NET_P2P_StunBuildChannelBindAttrs( byte *out, int outSize, uint16_t channelNumber, const netadr_t *peer, const char *username, const char *realm, const char *nonce )
+{
+	int pos = 0;
+	byte transactionId[12] = { 0 };
+
+	if ( !out || !peer || channelNumber < 0x4000 ) {
+		return 0;
+	}
+
+	pos = NET_P2P_StunAppendChannelNumberAttr( out, outSize, pos, channelNumber );
+	if ( pos < 0 ) {
+		return 0;
+	}
+
+	pos = NET_P2P_StunAppendXorPeerAddress( out, outSize, pos, peer, transactionId );
+	if ( pos < 0 ) {
+		return 0;
+	}
+
+	if ( username && username[0] ) {
+		pos = NET_P2P_StunAppendStringAttr( out, outSize, pos, P2P_STUN_ATTR_USERNAME, username );
+		if ( pos < 0 ) {
+			return 0;
+		}
+	}
+	if ( nonce && nonce[0] ) {
+		pos = NET_P2P_StunAppendStringAttr( out, outSize, pos, P2P_STUN_ATTR_NONCE, nonce );
+		if ( pos < 0 ) {
+			return 0;
+		}
+	}
+	if ( realm && realm[0] ) {
+		pos = NET_P2P_StunAppendStringAttr( out, outSize, pos, P2P_STUN_ATTR_REALM, realm );
+		if ( pos < 0 ) {
+			return 0;
+		}
+	}
+
+	return pos;
+}
+
 qboolean NET_P2P_StunParseMappedAddress( const byte *value, int valueLen, netadr_t *out, qboolean xored, const byte *transactionId )
 {
 	uint16_t port;

@@ -72,6 +72,8 @@ grep -q 'SV_P2P_HandleReconnectRequest' runtime/server/sv_client.c || fail "miss
 grep -q 'p2pMigrate' runtime/client/core/cl_p2p_session.c || fail "missing host migration handler"
 grep -q 'NET_P2P_TurnAppendMessageIntegrity' engine/core/net_p2p_turn_auth.c || fail "missing TURN auth module"
 grep -q 'test_p2p_nat_sim' CMakeLists.txt || fail "missing NAT sim ctest registration"
+grep -q 'test_p2p_reconnect' CMakeLists.txt || fail "missing reconnect ctest registration"
+test -f tests/scripts/test_p2p_reconnect.sh || fail "missing reconnect test script"
 test -f .github/workflows/p2p-nat.yml || fail "missing P2P NAT workflow"
 test -f docs/P2P_NAT_TESTING.md || fail "missing NAT testing docs"
 

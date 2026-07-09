@@ -78,6 +78,25 @@ client)
 		+set net_p2p 1 +set net_p2pBackend direct_udp +set com_hunkMegs 64 >"$LOG" 2>&1 || true
 
 	rg -q "ack:yes|punch acknowledged" "$LOG" || fail "client punch not acknowledged"
+
+	# Verify host advertises P2P via getinfo OOB
+	HOST_IP="${P2P_NAT_HOST_IP:-127.0.0.1}"
+	python3 - "$HOST_IP" "$PORT" <<'PY' || fail "getinfo p2p check failed"
+import socket, sys, re
+
+host = sys.argv[1]
+port = int(sys.argv[2])
+
+sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+sock.settimeout(5.0)
+sock.sendto(b"\xff\xff\xff\xffgetinfo xxx", (host, port))
+data, _ = sock.recvfrom(4096)
+info = data[4:].decode("latin1", errors="replace")
+if not re.search(r"\\p2p\\1", info):
+    raise SystemExit(f"p2p=1 not in getinfo response: {info[:200]!r}")
+print("getinfo p2p=1 ok")
+PY
+
 	pass "client punch acknowledged for $ADVERTISE"
 	;;
 *)
