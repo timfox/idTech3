@@ -41,6 +41,14 @@ Or use the wrapper:
 ./examples/demo_game/build_demo_pack.sh
 ```
 
+Or use the broader asset pipeline wrapper when you want a stable cooked stage, validation logs, hot-reload cfg, and shipping package in one run:
+
+```bash
+./scripts/asset_pipeline.sh examples/demo_game/mod --skip-shaders
+```
+
+That writes cooked outputs to `build/asset-pipeline/idtech3_demo/`. See [docs/ASSET_PIPELINE.md](../../docs/ASSET_PIPELINE.md).
+
 CI / pre-push: `test_demo_game_pk3` stages the same tree (configs + `cc`-built `vm/ui*.so` when available). Run `ctest -R test_demo_game_pk3` or `./tests/scripts/test_demo_game_pk3.sh`.
 
 ## Install and run

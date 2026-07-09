@@ -5,6 +5,21 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 MOD="${1:-$ROOT/examples/demo_game/mod}"
 status=0
 
+if [[ "$MOD" != /* ]]; then
+  MOD="$ROOT/$MOD"
+fi
+
+LOC_DIR=""
+for candidate in \
+  "$MOD/loc" \
+  "$(cd "$MOD/.." 2>/dev/null && pwd)/loc" \
+  "$ROOT/examples/demo_game/loc"; do
+  if [[ -d "$candidate" ]]; then
+    LOC_DIR="$candidate"
+    break
+  fi
+done
+
 fail() { echo "validate_assets: $*" >&2; status=1; }
 
 [[ -d "$MOD" ]] || fail "mod dir missing: $MOD"
@@ -25,8 +40,8 @@ done
 
 [[ -f "$MOD/animgraph/idle_run.txt" ]] || fail "missing animgraph/idle_run.txt"
 
-if [[ -f "$ROOT/examples/demo_game/loc/en.loc" ]]; then
-  "$ROOT/scripts/check_loc_keys.sh" "$ROOT/examples/demo_game/loc" || status=1
+if [[ -n "$LOC_DIR" && -f "$LOC_DIR/en.loc" ]]; then
+  "$ROOT/scripts/check_loc_keys.sh" "$LOC_DIR" || status=1
 fi
 
 echo "validate_assets: OK ($MOD)"
