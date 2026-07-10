@@ -6,7 +6,10 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
-FILES_C="$PROJECT_ROOT/src/qcommon/files.c"
+# shellcheck source=idtech3_test_paths.sh
+source "$SCRIPT_DIR/idtech3_test_paths.sh"
+idtech3_test_paths_init "$PROJECT_ROOT"
+FILES_C="$(idtech3_require_file engine/core/files.c src/qcommon/files.c)"
 
 fail() {
 	echo "FAIL: $*" >&2

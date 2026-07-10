@@ -6,13 +6,16 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+# shellcheck source=idtech3_test_paths.sh
+source "$SCRIPT_DIR/idtech3_test_paths.sh"
+idtech3_test_paths_init "$PROJECT_ROOT"
 
-TR_SHADE="$PROJECT_ROOT/src/renderers/vulkan/tr_shade.c"
-VK_FRAME="$PROJECT_ROOT/src/renderers/vulkan/vk_frame_submit.c"
-VK_INSTANCE="$PROJECT_ROOT/src/renderers/vulkan/vk_instance.c"
-TR_INIT="$PROJECT_ROOT/src/renderers/vulkan/tr_init.c"
-TR_LOCAL="$PROJECT_ROOT/src/renderers/vulkan/tr_local.h"
-VK_H="$PROJECT_ROOT/src/renderers/vulkan/vk.h"
+TR_SHADE="$(idtech3_file renderers/vulkan/tr_shade.c src/renderers/vulkan/tr_shade.c)"
+VK_FRAME="$(idtech3_file renderers/vulkan/vk_frame_submit.c src/renderers/vulkan/vk_frame_submit.c)"
+VK_INSTANCE="$(idtech3_file renderers/vulkan/vk_instance.c src/renderers/vulkan/vk_instance.c)"
+TR_INIT="$(idtech3_file renderers/vulkan/tr_init.c src/renderers/vulkan/tr_init.c)"
+TR_LOCAL="$(idtech3_file renderers/vulkan/tr_local.h src/renderers/vulkan/tr_local.h)"
+VK_H="$(idtech3_file renderers/vulkan/vk.h src/renderers/vulkan/vk.h)"
 
 fail() {
 	echo "FAIL: $*" >&2

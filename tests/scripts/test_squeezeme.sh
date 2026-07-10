@@ -2,10 +2,15 @@
 # SqueezeMe scaffolding checks
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
+# shellcheck source=idtech3_test_paths.sh
+source "$(dirname "$0")/idtech3_test_paths.sh"
+idtech3_test_paths_init "$ROOT"
 
-grep -q 'R_SQZ_Init' "$ROOT/src/renderers/vulkan/extensions/splats/vk_squeezeme.c"
-grep -q 'SQZ_EvalLinearCorrectives' "$ROOT/src/renderers/vulkan/extensions/splats/vk_squeezeme.c"
-grep -q 'SQZ_UpsampleGCSNearest' "$ROOT/src/renderers/vulkan/extensions/splats/vk_squeezeme.c"
+VK_SQUEEZEME="$(idtech3_file renderers/vulkan/extensions/splats/vk_squeezeme.c src/renderers/vulkan/extensions/splats/vk_squeezeme.c)"
+
+grep -q 'R_SQZ_Init' "$VK_SQUEEZEME"
+grep -q 'SQZ_EvalLinearCorrectives' "$VK_SQUEEZEME"
+grep -q 'SQZ_UpsampleGCSNearest' "$VK_SQUEEZEME"
 test -f "$ROOT/docs/SQUEEZEME.md"
 test -f "$ROOT/scripts/squeezeme_distill.py"
 test -f "$ROOT/scripts/sqz_pack_demo.py"

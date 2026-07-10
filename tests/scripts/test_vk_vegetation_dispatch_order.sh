@@ -4,8 +4,14 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
-TR_SHADE_FILE="${1:-$PROJECT_ROOT/src/renderers/vulkan/tr_shade.c}"
-FRAME_SUBMIT_FILE="${2:-$PROJECT_ROOT/src/renderers/vulkan/vk_frame_submit.c}"
+# shellcheck source=idtech3_test_paths.sh
+source "$SCRIPT_DIR/idtech3_test_paths.sh"
+idtech3_test_paths_init "$PROJECT_ROOT"
+
+TR_SHADE_DEFAULT="$(idtech3_file renderers/vulkan/tr_shade.c src/renderers/vulkan/tr_shade.c)"
+FRAME_SUBMIT_DEFAULT="$(idtech3_file renderers/vulkan/vk_frame_submit.c src/renderers/vulkan/vk_frame_submit.c)"
+TR_SHADE_FILE="${1:-$TR_SHADE_DEFAULT}"
+FRAME_SUBMIT_FILE="${2:-$FRAME_SUBMIT_DEFAULT}"
 
 fail() {
 	echo "FAIL: $*" >&2

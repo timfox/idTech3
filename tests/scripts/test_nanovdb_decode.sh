@@ -2,11 +2,13 @@
 # Smoke check: NanoVDB CPU decode sources present and wired into vk_vdb load path.
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
-DECODE_C="$ROOT/src/renderers/vulkan/vk_nanovdb_decode.c"
-VDB_C="$ROOT/src/renderers/vulkan/vk_vdb.c"
+# shellcheck source=idtech3_test_paths.sh
+source "$(dirname "$0")/idtech3_test_paths.sh"
+idtech3_test_paths_init "$ROOT"
 
-test -f "$DECODE_C"
-test -f "$VDB_C"
+DECODE_C="$(idtech3_require_file renderers/vulkan/vk_nanovdb_decode.c src/renderers/vulkan/vk_nanovdb_decode.c)"
+VDB_C="$(idtech3_require_file renderers/vulkan/vk_vdb.c src/renderers/vulkan/vk_vdb.c)"
+
 grep -q 'VDB_NanoVDB_DecodeToDense' "$DECODE_C"
 grep -q 'VDB_NanoVDB_GetIndexDims' "$DECODE_C"
 grep -q 'VDB_NanoVDB_ResolveGrid' "$DECODE_C"

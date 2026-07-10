@@ -23,21 +23,22 @@ Shared helper: [tests/scripts/idtech3_test_paths.sh](../../tests/scripts/idtech3
 | A — open world / districts / proc / nav | `test_openworld`, `test_openworld_sync`, `test_openworld_residency`, `test_districts`, `test_proc`, `test_nav_bake`, `test_cm_stream_merge` | Done |
 | B — renderer feature wiring | `test_hybrid1`, `test_vulkan_rtx`, `test_raygun`, `test_vuda`, `test_dressi`, `test_vulkan_regression_source_guards` | Done |
 | C — engine / scripting | `test_csharp_scripting`, `test_app_crdt`, `test_genetic_gan`, `test_no_aux_core` | Done |
+| D — remaining wiring tests | arc_blanc, fog_biology, graph_compute; iris/mimir/curast/vksplat/squeezeme; deferred/temporal/vector font; vulkan guards/regressions/mesh/veg; bsp_stream; ttp/bubblesh/aiwc/physics/nanovdb; conditional_stubs, crash_report, pk3 cache, python, sqlite; engine_module_manifest, game_ai, vulkan_extensions_layout | Done |
 
-**Still remaining before drop:** ~20 lower-priority shim-only scripts (fog biology, arc blanc, graph compute, etc.) plus two-week soak.
+**Still remaining before drop:** intentional shim assertions in `test_repository_layout_2026` / `test_legacy_intact` (must keep until Phase 5e proper); leftover `src/` strings used only as shim fallbacks in helpers; two-week soak.
 
 Verify anytime:
 
 ```bash
 ./scripts/audit_src_shim_references.sh --strict
 ./tests/scripts/test_msvc_manifest_drift.sh
-ctest -R 'test_repository_layout_2026|test_legacy_intact|test_msvc_|test_client_modular|test_cpp20|test_openworld|test_hybrid1|test_no_aux'
+ctest -R 'test_repository_layout_2026|test_legacy_intact|test_msvc_|test_client_modular|test_cpp20|test_openworld|test_hybrid1|test_no_aux|test_arc_blanc|test_fog_biology|test_graph_compute'
 ```
 
 ## Before removing shims (remaining blockers)
 
-1. Run `./scripts/audit_src_shim_references.sh` — CMake shim lines should stay under the strict budget; some tests still hardcode `src/*` (batches A–C migrated; others pending).
-2. Finish migrating **remaining** lower-priority test scripts that hardcode `src/...` only (required before drop).
+1. Run `./scripts/audit_src_shim_references.sh` — CMake shim lines should stay under the strict budget; wiring tests prefer canonical paths (batches A–D).
+2. ~~Finish migrating remaining lower-priority test scripts~~ — Done (batch D). Update layout/legacy tests only when shims are actually dropped.
 3. Confirm **MSVC** uses `engine/platform/win32/msvc2017/` (not `src/platform/`) in CI and docs — already the case; do **not** run sync with `--dedupe-realpath` casually.
 4. `ctest -R 'test_repository_layout_2026|test_legacy_intact|test_msvc_'` — all green.
 5. Two-week soak on `main` per [DEPRECATION_POLICY.md](../DEPRECATION_POLICY.md).

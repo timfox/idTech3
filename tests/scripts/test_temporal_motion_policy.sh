@@ -3,6 +3,9 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
+# shellcheck source=idtech3_test_paths.sh
+source "$(dirname "$0")/idtech3_test_paths.sh"
+idtech3_test_paths_init "$ROOT"
 failures=0
 
 check() {
@@ -14,13 +17,18 @@ check() {
   fi
 }
 
-check "$ROOT/src/renderers/vulkan/tr_local.h" 'r_temporalCpuSkinPrev' 'r_temporalCpuSkinPrev extern'
-check "$ROOT/src/renderers/vulkan/vk_view_state.c" 'vk_entity_poison_global_motion' 'global vs local motion split'
-check "$ROOT/src/renderers/vulkan/vk_view_state.c" 'vk_entity_has_gpu_deform_motion' 'GPU deform motion detect'
-check "$ROOT/src/renderers/vulkan/vk_postfx_params.c" 'unreliableMotionThisFrame' 'postfx TAA confidence gate'
-check "$ROOT/src/renderers/vulkan/vk_frame_end.c" 'allow_taa' 'TAA allow path present'
+TR_LOCAL="$(idtech3_file renderers/vulkan/tr_local.h src/renderers/vulkan/tr_local.h)"
+VK_VIEW_STATE="$(idtech3_file renderers/vulkan/vk_view_state.c src/renderers/vulkan/vk_view_state.c)"
+VK_POSTFX_PARAMS="$(idtech3_file renderers/vulkan/vk_postfx_params.c src/renderers/vulkan/vk_postfx_params.c)"
+VK_FRAME_END="$(idtech3_file renderers/vulkan/vk_frame_end.c src/renderers/vulkan/vk_frame_end.c)"
 
-if grep -q '!vk.temporal.unreliableMotionThisFrame' "$ROOT/src/renderers/vulkan/vk_frame_end.c" 2>/dev/null; then
+check "$TR_LOCAL" 'r_temporalCpuSkinPrev' 'r_temporalCpuSkinPrev extern'
+check "$VK_VIEW_STATE" 'vk_entity_poison_global_motion' 'global vs local motion split'
+check "$VK_VIEW_STATE" 'vk_entity_has_gpu_deform_motion' 'GPU deform motion detect'
+check "$VK_POSTFX_PARAMS" 'unreliableMotionThisFrame' 'postfx TAA confidence gate'
+check "$VK_FRAME_END" 'allow_taa' 'TAA allow path present'
+
+if grep -q '!vk.temporal.unreliableMotionThisFrame' "$VK_FRAME_END" 2>/dev/null; then
   echo "FAIL: vk_frame_end must not skip TAA on unreliableMotionThisFrame"
   failures=$((failures + 1))
 else

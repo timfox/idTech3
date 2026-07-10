@@ -3,14 +3,18 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
+# shellcheck source=idtech3_test_paths.sh
+source "$(dirname "$0")/idtech3_test_paths.sh"
+idtech3_test_paths_init "$ROOT"
 cd "$ROOT"
 
-STREAM="src/renderers/vulkan/tr_bsp_stream.c"
-BSP="src/renderers/vulkan/tr_bsp.c"
-VBO="src/renderers/vulkan/vk_vbo.c"
+STREAM="$(idtech3_file renderers/vulkan/tr_bsp_stream.c src/renderers/vulkan/tr_bsp_stream.c)"
+BSP="$(idtech3_file renderers/vulkan/tr_bsp.c src/renderers/vulkan/tr_bsp.c)"
+VBO="$(idtech3_file renderers/vulkan/vk_vbo.c src/renderers/vulkan/vk_vbo.c)"
+TR_MAIN="$(idtech3_file renderers/vulkan/tr_main.c src/renderers/vulkan/tr_main.c)"
 
 echo "[test_bsp_stream_vbo] checking sources..."
-for f in "$STREAM" "$BSP" "$VBO" src/renderers/vulkan/tr_main.c; do
+for f in "$STREAM" "$BSP" "$VBO" "$TR_MAIN"; do
 	test -f "$f" || { echo "missing $f"; exit 1; }
 done
 
@@ -48,7 +52,7 @@ if rg -q 'VBO deferred' "$STREAM"; then
 fi
 
 echo "[test_bsp_stream_vbo] draw path..."
-rg -q 'R_BspStream_AddSurfaces' src/renderers/vulkan/tr_main.c
+rg -q 'R_BspStream_AddSurfaces' "$TR_MAIN"
 rg -q 'R_AddDrawSurf' "$STREAM"
 
 echo "[test_bsp_stream_vbo] ok"

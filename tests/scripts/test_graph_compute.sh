@@ -3,35 +3,37 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
+# shellcheck source=idtech3_test_paths.sh
+source "$(dirname "$0")/idtech3_test_paths.sh"
+idtech3_test_paths_init "$ROOT"
 cd "$ROOT"
 
 echo "[test_graph_compute] checking sources..."
-for f in \
-	src/world/sector_graph.cpp \
-	src/world/sector_graph.h \
-	src/renderers/vulkan/vk_graph_bfs.c \
-	src/renderers/vulkan/shaders/glsl/graph/graph_bfs_expand.comp \
-	src/world/world_residency.cpp
-do
-	test -f "$f" || { echo "missing $f"; exit 1; }
-done
+SG="$(idtech3_require_file modules/world/sector_graph.cpp src/world/sector_graph.cpp)"
+idtech3_require_file modules/world/sector_graph.h src/world/sector_graph.h >/dev/null
+BFS="$(idtech3_require_file renderers/vulkan/vk_graph_bfs.c src/renderers/vulkan/vk_graph_bfs.c)"
+idtech3_require_file renderers/vulkan/shaders/glsl/graph/graph_bfs_expand.comp src/renderers/vulkan/shaders/glsl/graph/graph_bfs_expand.comp >/dev/null
+RES="$(idtech3_require_file modules/world/world_residency.cpp src/world/world_residency.cpp)"
+VK_H="$(idtech3_file renderers/vulkan/vk.h src/renderers/vulkan/vk.h)"
+CG="$(idtech3_file engine/core/cluster_graph.cpp src/qcommon/cluster_graph.cpp)"
+CL_OW="$(idtech3_file runtime/client/world/cl_openworld.cpp src/client/world/cl_openworld.cpp)"
 
 echo "[test_graph_compute] grep API symbols..."
-rg -q 'SectorGraph_Init' src/world/sector_graph.cpp
-rg -q 'SectorGraph_UpdateReachability' src/world/sector_graph.cpp
-rg -q 'SectorGraph_IsReachable' src/world/sector_graph.cpp
-rg -q 'SectorGraph_StreamReachEnabled' src/world/world_residency.cpp
-rg -q 'r_graphStreamReach' src/world/sector_graph.cpp
-rg -q 'r_graphCompute' src/world/sector_graph.cpp
-rg -q 'R_GraphBfs_Init' src/renderers/vulkan/vk_graph_bfs.c
+rg -q 'SectorGraph_Init' "$SG"
+rg -q 'SectorGraph_UpdateReachability' "$SG"
+rg -q 'SectorGraph_IsReachable' "$SG"
+rg -q 'SectorGraph_StreamReachEnabled' "$RES"
+rg -q 'r_graphStreamReach' "$SG"
+rg -q 'r_graphCompute' "$SG"
+rg -q 'R_GraphBfs_Init' "$BFS"
 rg -q 'graph_bfs_expand_cs' scripts/compile_shaders.sh
-rg -q 'graph_bfs_expand_cs' src/renderers/vulkan/vk.h
-rg -q 'graph_reach_test' src/world/sector_graph.cpp
-rg -q 'SectorGraph_GetHopDistance' src/world/sector_graph.cpp
-rg -q 'graph_bfs_crossover' src/world/sector_graph.cpp
-rg -q 'ClusterGraph_RebuildFromMap' src/qcommon/cluster_graph.cpp
-rg -q 'r_graphClusterReach' src/qcommon/cluster_graph.cpp
-rg -q 'ClusterGraph_UpdateReachability' src/client/world/cl_openworld.cpp
+rg -q 'graph_bfs_expand_cs' "$VK_H"
+rg -q 'graph_reach_test' "$SG"
+rg -q 'SectorGraph_GetHopDistance' "$SG"
+rg -q 'graph_bfs_crossover' "$SG"
+rg -q 'ClusterGraph_RebuildFromMap' "$CG"
+rg -q 'r_graphClusterReach' "$CG"
+rg -q 'ClusterGraph_UpdateReachability' "$CL_OW"
 
 if [[ -x "${ROOT}/build-vk-Release/unit_sector_graph" ]]; then
 	echo "[test_graph_compute] running unit_sector_graph..."

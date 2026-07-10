@@ -3,38 +3,38 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
+# shellcheck source=idtech3_test_paths.sh
+source "$(dirname "$0")/idtech3_test_paths.sh"
+idtech3_test_paths_init "$ROOT"
 cd "$ROOT"
 
 echo "[test_fog_biology] checking sources..."
-for f in \
-	src/world/fog_biology.cpp \
-	src/world/fog_biology.h \
-	src/client/core/cl_gameframe.c
-do
-	test -f "$f" || { echo "missing $f"; exit 1; }
-done
+FB="$(idtech3_require_file modules/world/fog_biology.cpp src/world/fog_biology.cpp)"
+idtech3_require_file modules/world/fog_biology.h src/world/fog_biology.h >/dev/null
+CL_GF="$(idtech3_require_file runtime/client/core/cl_gameframe.c src/client/core/cl_gameframe.c)"
+LUA_B="$(idtech3_file runtime/game/g_lua_bindings.c src/game/g_lua_bindings.c)"
 
 rg -q 'fog_biology.cpp' CMakeLists.txt
 
 echo "[test_fog_biology] grep API symbols..."
-rg -q 'FogBiology_Init' src/world/fog_biology.cpp
-rg -q 'FogBiology_Frame' src/world/fog_biology.cpp
-rg -q 'FogBiology_GetMarineInfluence' src/world/fog_biology.cpp
-rg -q 'r_fogBiology' src/world/fog_biology.cpp
-rg -q 'FogBiology_Init' src/client/core/cl_gameframe.c
-rg -q 'FogBiology_Frame' src/client/core/cl_gameframe.c
-rg -q 'fog_biology_status' src/world/fog_biology.cpp
-rg -q 'fog_biology_paper' src/world/fog_biology.cpp
-rg -q 'gramNegativeFraction' src/world/fog_biology.cpp
-rg -q 'fog_bio_ocean_otu' src/client/core/cl_gameframe.c
-rg -q 'FogBiology_SetPlayerOrigin' src/client/core/cl_gameframe.c
-rg -q 'fog_bio_phase' src/client/core/cl_gameframe.c
-rg -q 'r_fogBiologySyncCoastKm' src/world/fog_biology.cpp
-rg -q 'l_fogBio_getCoastKm' src/game/g_lua_bindings.c
+rg -q 'FogBiology_Init' "$FB"
+rg -q 'FogBiology_Frame' "$FB"
+rg -q 'FogBiology_GetMarineInfluence' "$FB"
+rg -q 'r_fogBiology' "$FB"
+rg -q 'FogBiology_Init' "$CL_GF"
+rg -q 'FogBiology_Frame' "$CL_GF"
+rg -q 'fog_biology_status' "$FB"
+rg -q 'fog_biology_paper' "$FB"
+rg -q 'gramNegativeFraction' "$FB"
+rg -q 'fog_bio_ocean_otu' "$CL_GF"
+rg -q 'FogBiology_SetPlayerOrigin' "$CL_GF"
+rg -q 'fog_bio_phase' "$CL_GF"
+rg -q 'r_fogBiologySyncCoastKm' "$FB"
+rg -q 'l_fogBio_getCoastKm' "$LUA_B"
 test -f examples/demo_game/mod/demo_fog_biology_openworld.cfg || { echo "missing demo_fog_biology_openworld.cfg"; exit 1; }
-rg -q 'l_fogBio_getCommunity' src/game/g_lua_bindings.c
-rg -q 'l_fogBio_poll' src/game/g_lua_bindings.c
-rg -q 'fog_bio_pathogen_risk' src/client/core/cl_gameframe.c
+rg -q 'l_fogBio_getCommunity' "$LUA_B"
+rg -q 'l_fogBio_poll' "$LUA_B"
+rg -q 'fog_bio_pathogen_risk' "$CL_GF"
 test -f examples/demo_game/mod/demo_fog_biology.cfg || { echo "missing demo_fog_biology.cfg"; exit 1; }
 test -f examples/demo_game/mod/demo_fog_biology_namib.cfg || { echo "missing demo_fog_biology_namib.cfg"; exit 1; }
 
