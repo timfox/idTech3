@@ -12,7 +12,6 @@ Called from tr_init.c after pipeline creation.
 
 void vk_validate_pbr_ibl_resources( void )
 {
-#ifdef USE_VK_PBR
 	if ( !vk.pbrActive ) {
 		return;
 	}
@@ -43,5 +42,4 @@ void vk_validate_pbr_ibl_resources( void )
 			ri.Printf( PRINT_WARNING, "PBR IBL: empty cubemap fallback is missing\n" );
 		}
 	}
-#endif
 }
