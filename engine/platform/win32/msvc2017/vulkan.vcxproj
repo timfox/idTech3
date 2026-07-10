@@ -355,6 +355,7 @@
     <ClCompile Include="..\..\..\renderers\vulkan\extensions\rtx\vk_rtx.c" />
     <ClCompile Include="..\..\..\renderers\vulkan\extensions\rtx\vk_rtx_entities.c" />
     <ClCompile Include="..\..\..\renderers\vulkan\extensions\rtx\vk_rtx_world.c" />
+    <ClCompile Include="..\..\..\renderers\vulkan\extensions\scaffold\vk_emulator_screen.c" />
     <ClCompile Include="..\..\..\renderers\vulkan\tr_bsp_stream.c" />
     <ClCompile Include="..\..\..\renderers\vulkan\tr_decal_props.c" />
     <ClCompile Include="..\..\..\renderers\vulkan\tr_gltf_topo.c" />
