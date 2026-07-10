@@ -404,6 +404,8 @@
     <ClCompile Include="..\..\qcommon\aiwc_matmul.c" />
     <ClCompile Include="..\..\qcommon\aiwc_metrics.c" />
     <ClCompile Include="..\..\qcommon\app_crdt.c" />
+    <ClCompile Include="..\..\qcommon\bubblesh.c" />
+    <ClCompile Include="..\..\qcommon\bubblesh_model.c" />
     <ClCompile Include="..\..\qcommon\cluster_graph.cpp" />
     <ClCompile Include="..\..\qcommon\cm_stream.c" />
     <ClCompile Include="..\..\qcommon\cm_stream_merge.c" />
@@ -412,9 +414,13 @@
     <ClCompile Include="..\..\qcommon\com_openworld_smoke.c" />
     <ClCompile Include="..\..\qcommon\com_pk3sig.c" />
     <ClCompile Include="..\..\qcommon\csharp_debug.c" />
+    <ClCompile Include="..\..\qcommon\engine_db.c" />
     <ClCompile Include="..\..\qcommon\engine_decal_map.c" />
     <ClCompile Include="..\..\qcommon\engine_sprite_map.c" />
     <ClCompile Include="..\..\qcommon\lua_debug.c" />
+    <ClCompile Include="..\..\qcommon\net_p2p_ice.c" />
+    <ClCompile Include="..\..\qcommon\net_p2p_stun_codec.c" />
+    <ClCompile Include="..\..\qcommon\net_p2p_turn_auth.c" />
     <ClCompile Include="..\..\qcommon\puff.c" />
     <ClCompile Include="..\..\qcommon\python_batch.c" />
     <ClCompile Include="..\..\qcommon\python_debug.c" />
