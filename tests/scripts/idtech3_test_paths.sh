@@ -3,46 +3,53 @@
 idtech3_test_paths_init() {
 	local root="${1:?root required}"
 	IDTECH3_TEST_ROOT="$root"
-	if [ -d "$root/runtime/client" ] && [ ! -L "$root/runtime/client" ]; then
-		IDTECH3_CLIENT_REL="runtime/client"
-	elif [ -d "$root/src/client" ]; then
-		IDTECH3_CLIENT_REL="src/client"
-	else
-		IDTECH3_CLIENT_REL="src/client"
-	fi
+
+	_idtech3_pick_root() {
+		local canon_rel="$1"
+		local shim_rel="$2"
+		if [ -d "$root/$canon_rel" ] && [ ! -L "$root/$canon_rel" ]; then
+			echo "$canon_rel"
+		else
+			echo "$shim_rel"
+		fi
+	}
+
+	IDTECH3_CLIENT_REL="$(_idtech3_pick_root runtime/client src/client)"
 	IDTECH3_CLIENT="$root/$IDTECH3_CLIENT_REL"
 
-	if [ -d "$root/engine/core" ] && [ ! -L "$root/engine/core" ]; then
-		IDTECH3_QCOMMON_REL="engine/core"
-	else
-		IDTECH3_QCOMMON_REL="src/qcommon"
-	fi
+	IDTECH3_QCOMMON_REL="$(_idtech3_pick_root engine/core src/qcommon)"
 	IDTECH3_QCOMMON="$root/$IDTECH3_QCOMMON_REL"
 
-	if [ -d "$root/runtime/server" ] && [ ! -L "$root/runtime/server" ]; then
-		IDTECH3_SERVER_REL="runtime/server"
-	else
-		IDTECH3_SERVER_REL="src/server"
-	fi
+	IDTECH3_SERVER_REL="$(_idtech3_pick_root runtime/server src/server)"
 	IDTECH3_SERVER="$root/$IDTECH3_SERVER_REL"
 
-	if [ -d "$root/modules/world" ] && [ ! -L "$root/modules/world" ]; then
-		IDTECH3_WORLD_REL="modules/world"
-	else
-		IDTECH3_WORLD_REL="src/world"
-	fi
+	IDTECH3_GAME_REL="$(_idtech3_pick_root runtime/game src/game)"
+	IDTECH3_GAME="$root/$IDTECH3_GAME_REL"
+
+	IDTECH3_WORLD_REL="$(_idtech3_pick_root modules/world src/world)"
 	IDTECH3_WORLD="$root/$IDTECH3_WORLD_REL"
 
+	IDTECH3_NAV_REL="$(_idtech3_pick_root modules/navigation src/navigation)"
+	IDTECH3_NAV="$root/$IDTECH3_NAV_REL"
+
+	IDTECH3_AUDIO_REL="$(_idtech3_pick_root modules/audio src/audio)"
+	IDTECH3_AUDIO="$root/$IDTECH3_AUDIO_REL"
+
+	IDTECH3_BOTLIB_REL="$(_idtech3_pick_root modules/botlib src/botlib)"
+	IDTECH3_BOTLIB="$root/$IDTECH3_BOTLIB_REL"
+
+	IDTECH3_EXTENSIONS_REL="$(_idtech3_pick_root extensions src/extensions)"
+	IDTECH3_EXTENSIONS="$root/$IDTECH3_EXTENSIONS_REL"
+
 	if [ -d "$root/renderers" ] && [ ! -L "$root/renderers" ]; then
-		IDTECH3_RENDERERS="$root/renderers"
 		IDTECH3_RENDERERS_REL="renderers"
 	else
-		IDTECH3_RENDERERS="$root/src/renderers"
 		IDTECH3_RENDERERS_REL="src/renderers"
 	fi
+	IDTECH3_RENDERERS="$root/$IDTECH3_RENDERERS_REL"
 }
 
-# Prefer canonical path; fall back to src/* shim.
+# Prefer canonical path; fall back to src/* shim. Args are repo-relative.
 idtech3_resolve_file() {
 	local canon="$1"
 	local shim="$2"
@@ -53,6 +60,25 @@ idtech3_resolve_file() {
 	else
 		echo "${IDTECH3_TEST_ROOT}/${canon}"
 	fi
+}
+
+# Alias used by migrated wiring tests: idtech3_file canon shim
+idtech3_file() {
+	idtech3_resolve_file "$@"
+}
+
+# Require that at least one of canon/shim exists; print the resolved path.
+idtech3_require_file() {
+	local canon="$1"
+	local shim="$2"
+	local label="${3:-$canon}"
+	local path
+	path="$(idtech3_resolve_file "$canon" "$shim")"
+	if [ ! -f "$path" ]; then
+		echo "FAIL: missing $label (tried $canon and $shim)" >&2
+		return 1
+	fi
+	echo "$path"
 }
 
 idtech3_submodule_path() {

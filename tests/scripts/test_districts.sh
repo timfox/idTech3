@@ -3,30 +3,32 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
+# shellcheck source=idtech3_test_paths.sh
+source "$(dirname "$0")/idtech3_test_paths.sh"
+idtech3_test_paths_init "$ROOT"
 cd "$ROOT"
 
 echo "[test_districts] checking sources..."
-for f in \
-	src/world/world_district.cpp \
-	src/world/world_district.h \
-	src/client/world/cl_district.cpp \
-	src/client/world/cl_district.h
-do
-	test -f "$f" || { echo "missing $f"; exit 1; }
-done
+WD="$(idtech3_require_file modules/world/world_district.cpp src/world/world_district.cpp)"
+idtech3_require_file modules/world/world_district.h src/world/world_district.h >/dev/null
+CL_D="$(idtech3_require_file runtime/client/world/cl_district.cpp src/client/world/cl_district.cpp)"
+idtech3_require_file runtime/client/world/cl_district.h src/client/world/cl_district.h >/dev/null
+CL_MAIN="$(idtech3_require_file runtime/client/core/cl_main.c src/client/core/cl_main.c)"
+CL_GF="$(idtech3_require_file runtime/client/core/cl_gameframe.c src/client/core/cl_gameframe.c)"
+CL_REF="$(idtech3_require_file runtime/client/core/cl_ref.c src/client/core/cl_ref.c)"
 
 echo "[test_districts] grep API symbols..."
-rg -q 'WorldDistrict_Init' src/world/world_district.cpp
-rg -q 'WorldDistrict_UpdateView' src/world/world_district.cpp
-rg -q 'WorldDistrict_Import' src/world/world_district.cpp
-rg -q 'CL_District_Init' src/client/world/cl_district.cpp
-rg -q 'CL_District_Frame' src/client/world/cl_district.cpp
-rg -q 'BuildEngineSceneSnapshot' src/client/world/cl_district.cpp
-rg -q 'CL_District_Init' src/client/core/cl_main.c
-rg -q 'CL_District_Frame' src/client/core/cl_gameframe.c
-rg -q 'CL_District_AddRefEntitiesToScene' src/client/world/cl_district.cpp
-rg -q 'CL_RenderSceneWithDistricts' src/client/core/cl_ref.c
-rg -q 'r_districtDraw' src/client/world/cl_district.cpp
+rg -q 'WorldDistrict_Init' "$WD"
+rg -q 'WorldDistrict_UpdateView' "$WD"
+rg -q 'WorldDistrict_Import' "$WD"
+rg -q 'CL_District_Init' "$CL_D"
+rg -q 'CL_District_Frame' "$CL_D"
+rg -q 'BuildEngineSceneSnapshot' "$CL_D"
+rg -q 'CL_District_Init' "$CL_MAIN"
+rg -q 'CL_District_Frame' "$CL_GF"
+rg -q 'CL_District_AddRefEntitiesToScene' "$CL_D"
+rg -q 'CL_RenderSceneWithDistricts' "$CL_REF"
+rg -q 'r_districtDraw' "$CL_D"
 rg -q 'world_district.cpp' cmake/IdTech3QcommonExtensions.cmake
 rg -q 'cl_district.cpp' cmake/client/ClientExtensionSources.cmake
 

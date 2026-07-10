@@ -34,15 +34,19 @@ assert_not_matches_regex() {
 	fi
 }
 
-VK_INSTANCE="$PROJECT_ROOT/src/renderers/vulkan/vk_instance.c"
-VK_INIT_DEVICE="$PROJECT_ROOT/src/renderers/vulkan/vk_init_device.c"
-VK_PROCS="$PROJECT_ROOT/src/renderers/vulkan/vk_procs.h"
-VK_SHUTDOWN="$PROJECT_ROOT/src/renderers/vulkan/vk_shutdown.c"
-VK_FRAME_END="$PROJECT_ROOT/src/renderers/vulkan/vk_frame_end.c"
-VK_HEADER="$PROJECT_ROOT/src/renderers/vulkan/vk.h"
-TR_INIT="$PROJECT_ROOT/src/renderers/vulkan/tr_init.c"
-TR_SHADE="$PROJECT_ROOT/src/renderers/vulkan/tr_shade.c"
-VK_FRAME_SUBMIT="$PROJECT_ROOT/src/renderers/vulkan/vk_frame_submit.c"
+# shellcheck source=idtech3_test_paths.sh
+source "$SCRIPT_DIR/idtech3_test_paths.sh"
+idtech3_test_paths_init "$PROJECT_ROOT"
+
+VK_INSTANCE="$(idtech3_file renderers/vulkan/vk_instance.c src/renderers/vulkan/vk_instance.c)"
+VK_INIT_DEVICE="$(idtech3_file renderers/vulkan/vk_init_device.c src/renderers/vulkan/vk_init_device.c)"
+VK_PROCS="$(idtech3_file renderers/vulkan/vk_procs.h src/renderers/vulkan/vk_procs.h)"
+VK_SHUTDOWN="$(idtech3_file renderers/vulkan/vk_shutdown.c src/renderers/vulkan/vk_shutdown.c)"
+VK_FRAME_END="$(idtech3_file renderers/vulkan/vk_frame_end.c src/renderers/vulkan/vk_frame_end.c)"
+VK_HEADER="$(idtech3_file renderers/vulkan/vk.h src/renderers/vulkan/vk.h)"
+TR_INIT="$(idtech3_file renderers/vulkan/tr_init.c src/renderers/vulkan/tr_init.c)"
+TR_SHADE="$(idtech3_file renderers/vulkan/tr_shade.c src/renderers/vulkan/tr_shade.c)"
+VK_FRAME_SUBMIT="$(idtech3_file renderers/vulkan/vk_frame_submit.c src/renderers/vulkan/vk_frame_submit.c)"
 COMPILE_SHADERS="$PROJECT_ROOT/scripts/compile_shaders.sh"
 
 assert_file_exists "$VK_INSTANCE"
