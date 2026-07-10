@@ -2,19 +2,27 @@
 # App CRDT distributed Lua update wiring checks
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
+# shellcheck source=idtech3_test_paths.sh
+source "$(dirname "$0")/idtech3_test_paths.sh"
+idtech3_test_paths_init "$ROOT"
 
-grep -q 'AppCrdt_MergeLWW' "$ROOT/src/qcommon/app_crdt.c"
-grep -q 'AppCrdt_QueueDispatch' "$ROOT/src/qcommon/app_crdt.c"
-grep -q 'com_app_crdt' "$ROOT/src/qcommon/app_crdt.c"
-grep -q 'SV_AppCrdt_Publish_f' "$ROOT/src/server/sv_app_crdt.c"
-grep -q 'CL_AppCrdt_TryServerCommand' "$ROOT/src/client/core/cl_app_crdt.c"
-grep -q 'on_app_crdt_message' "$ROOT/src/qcommon/lua_debug.c"
-grep -q 'lua_setglobal( L, "AppCrdt" )' "$ROOT/src/client/core/cl_app_crdt.c"
-grep -q 'SV_AppCrdt_OnMapReady' "$ROOT/src/server/sv_app_crdt.c"
-grep -q 'AppCrdt_RefreshBackendRoot' "$ROOT/src/qcommon/app_crdt.c"
+APP_CRDT="$(idtech3_file engine/core/app_crdt.c src/qcommon/app_crdt.c)"
+SV_CRDT="$(idtech3_file runtime/server/sv_app_crdt.c src/server/sv_app_crdt.c)"
+CL_CRDT="$(idtech3_file runtime/client/core/cl_app_crdt.c src/client/core/cl_app_crdt.c)"
+LUA_DBG="$(idtech3_file engine/core/lua_debug.c src/qcommon/lua_debug.c)"
+
+grep -q 'AppCrdt_MergeLWW' "$APP_CRDT"
+grep -q 'AppCrdt_QueueDispatch' "$APP_CRDT"
+grep -q 'com_app_crdt' "$APP_CRDT"
+grep -q 'SV_AppCrdt_Publish_f' "$SV_CRDT"
+grep -q 'CL_AppCrdt_TryServerCommand' "$CL_CRDT"
+grep -q 'on_app_crdt_message' "$LUA_DBG"
+grep -q 'lua_setglobal( L, "AppCrdt" )' "$CL_CRDT"
+grep -q 'SV_AppCrdt_OnMapReady' "$SV_CRDT"
+grep -q 'AppCrdt_RefreshBackendRoot' "$APP_CRDT"
 grep -q 'third_party/idtech3backend' "$ROOT/cmake/IdTech3Backend.cmake"
-grep -q 'Engine.AppCrdt' "$ROOT/src/server/sv_app_crdt.c"
-grep -q 'LuaDebug_SetScriptFallbackRoot' "$ROOT/src/qcommon/lua_debug.c"
+grep -q 'Engine.AppCrdt' "$SV_CRDT"
+grep -q 'LuaDebug_SetScriptFallbackRoot' "$LUA_DBG"
 BACKEND_ROOT="$ROOT/third_party/idtech3backend"
 [ -d "$BACKEND_ROOT" ] || BACKEND_ROOT="$ROOT/src/external/idtech3backend"
 if [ ! -f "$BACKEND_ROOT/app_crdt/manifest.json" ]; then

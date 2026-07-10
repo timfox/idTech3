@@ -9,12 +9,18 @@ CM="${ROOT}/CMakeLists.txt"
 
 echo "[test_no_aux_core] checking CMakeLists.txt..."
 
+# Reject AUX on both legacy shim paths and canonical roots.
 for aux in \
 	'src/qcommon' \
 	'src/server' \
 	'src/renderers/vulkan' \
 	'src/botlib' \
-	'src/audio/mp3'; do
+	'src/audio/mp3' \
+	'engine/core' \
+	'runtime/server' \
+	'renderers/vulkan' \
+	'modules/botlib' \
+	'modules/audio/mp3'; do
 	if rg -q "AUX_SOURCE_DIRECTORY\\(${aux}" "$CM"; then
 		fail "CMakeLists still AUX_SOURCE_DIRECTORY ${aux}"
 	fi

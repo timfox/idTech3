@@ -3,6 +3,9 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
+# shellcheck source=idtech3_test_paths.sh
+source "$(dirname "$0")/idtech3_test_paths.sh"
+idtech3_test_paths_init "$ROOT"
 cd "$ROOT"
 
 GEN="$ROOT/scripts/tools/gen_sector_bsp.py"
@@ -10,19 +13,17 @@ FIXTURE_DIR="$ROOT/tests/data/openworld/maps"
 FIXTURE="$FIXTURE_DIR/sector_0_0.bsp"
 
 echo "[test_cm_stream_merge] checking sources..."
-for f in \
-	src/qcommon/cm_stream_merge.c \
-	src/qcommon/cm_stream_merge.h \
-	src/qcommon/cm_stream.c \
-	scripts/tools/gen_sector_bsp.py
-do
-	test -f "$f" || { echo "missing $f"; exit 1; }
-done
+CM_MERGE="$(idtech3_require_file engine/core/cm_stream_merge.c src/qcommon/cm_stream_merge.c)"
+idtech3_require_file engine/core/cm_stream_merge.h src/qcommon/cm_stream_merge.h >/dev/null
+idtech3_require_file engine/core/cm_stream.c src/qcommon/cm_stream.c >/dev/null
+test -f scripts/tools/gen_sector_bsp.py || { echo "missing gen_sector_bsp.py"; exit 1; }
+WP="$(idtech3_require_file modules/world/world_proc.cpp src/world/world_proc.cpp)"
+CL_OW="$(idtech3_require_file runtime/client/world/cl_openworld.cpp src/client/world/cl_openworld.cpp)"
 
 echo "[test_cm_stream_merge] grep API symbols..."
-rg -q 'CM_Stream_MergeSector' src/qcommon/cm_stream_merge.c
-rg -q 'CM_Stream_TraceMerged' src/qcommon/cm_stream_merge.c
-rg -q 'CM_Stream_PointContentsMerged' src/qcommon/cm_stream_merge.c
+rg -q 'CM_Stream_MergeSector' "$CM_MERGE"
+rg -q 'CM_Stream_TraceMerged' "$CM_MERGE"
+rg -q 'CM_Stream_PointContentsMerged' "$CM_MERGE"
 rg -q 'cm_stream_merge.c' CMakeLists.txt
 
 echo "[test_cm_stream_merge] generate sector BSP fixture..."
@@ -56,8 +57,8 @@ PY
 
 echo "[test_cm_stream_merge] demo + proc scatter wiring..."
 test -f examples/demo_game/mod/maps/sector_0_0.bsp
-rg -q 'WorldProc_FormatScatterRegionPath' src/world/world_proc.cpp
-rg -q 'r_procScatterRegion' src/world/world_proc.cpp
-rg -q 'WorldProc_FormatScatterRegionPath' src/client/world/cl_openworld.cpp
+rg -q 'WorldProc_FormatScatterRegionPath' "$WP"
+rg -q 'r_procScatterRegion' "$WP"
+rg -q 'WorldProc_FormatScatterRegionPath' "$CL_OW"
 
 echo "[test_cm_stream_merge] ok"
