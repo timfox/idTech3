@@ -37,7 +37,9 @@ PYTHONPATH=scripts/msvc python3 scripts/msvc/sync_vcxproj_sources.py \
   --manifest build-msvc-manifest/msvc_source_manifest.json --project quake3e
 ```
 
-Opt-in sync relocates stale flat `client/*.c` paths to modular `client/core|media|platform/`, dedupes by realpath, then appends a marked manifest block:
+Opt-in sync relocates stale flat `client/*.c` paths to modular `client/core|media|platform/`, then **appends** missing manifest sources into the `IDTECH3_MSVC_MANIFEST_*` block. It refuses to shrink the ClCompile count on write.
+
+**Do not enable realpath ClCompile dedupe casually.** Layout bridges make shim and canonical paths share a realpath; `--dedupe-realpath` previously deleted legitimate entries. Default sync leaves existing ClCompile rows alone; only pass `--dedupe-realpath` when you intentionally want that behavior and have reviewed the dry-run diff.
 
 ```bash
 PYTHONPATH=scripts/msvc python3 scripts/msvc/sync_vcxproj_sources.py \

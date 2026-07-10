@@ -1288,7 +1288,7 @@ set(OPENSSL_ANDROID_INTERFACE_TARGET "")
 if(USE_DTLS)
   find_package(OpenSSL QUIET)
   if(OpenSSL_FOUND)
-    list(APPEND QCOMMON_SRCS src/qcommon/net_dtls.c)
+    list(APPEND QCOMMON_SRCS engine/core/net_dtls.c)
     set(USE_DTLS_FOUND TRUE)
     message(STATUS "DTLS: enabled (OpenSSL ${OPENSSL_VERSION})")
   elseif(ANDROID)
@@ -1383,7 +1383,7 @@ if(USE_DTLS)
           "${_OSSL_PREFIX}/lib/libcrypto.a"
           dl)
         add_dependencies(openssl_android_iface openssl_android_ep)
-        list(APPEND QCOMMON_SRCS src/qcommon/net_dtls.c)
+        list(APPEND QCOMMON_SRCS engine/core/net_dtls.c)
         set(USE_DTLS_FOUND TRUE)
         set(USE_DTLS_ANDROID_BUILT TRUE)
         set(OPENSSL_ANDROID_INTERFACE_TARGET openssl_android_iface)
@@ -1402,7 +1402,7 @@ endif()
 set(STEAMWORKS_FOUND FALSE)
 if(USE_STEAM OR USE_STEAM_NETWORKING)
   if(USE_STEAM_NETWORKING)
-    list(APPEND QCOMMON_SRCS src/qcommon/net_sdr.c)
+    list(APPEND QCOMMON_SRCS engine/core/net_sdr.c)
   endif()
   find_path(STEAMWORKS_INCLUDE_DIR steam/steam_api.h
     HINTS $ENV{STEAMWORKS_SDK} $ENV{STEAMWORKS_SDK}/public
@@ -1445,17 +1445,17 @@ if(CMAKE_SYSTEM_PROCESSOR MATCHES AMD64|x86|i*86)
 		#set(BINEXT .x86)
 		set(RENDEXT _x86)
 	endif()
-	list(APPEND QCOMMON_SRCS src/qcommon/vm_x86.c)
+	list(APPEND QCOMMON_SRCS engine/core/vm_x86.c)
 	set(NO_VM_COMPILED OFF)
 elseif(CMAKE_SYSTEM_PROCESSOR MATCHES aarch64|arm64)
 	set(BINEXT .aarch64)
 	set(RENDEXT _aarch64)
-	list(APPEND QCOMMON_SRCS src/qcommon/vm_aarch64.c)
+	list(APPEND QCOMMON_SRCS engine/core/vm_aarch64.c)
 	set(NO_VM_COMPILED OFF)
 elseif(CMAKE_SYSTEM_PROCESSOR MATCHES arm*)
 	set(BINEXT .arm)
 	set(RENDEXT _arm)
-	list(APPEND QCOMMON_SRCS src/qcommon/vm_armv7l.c)
+	list(APPEND QCOMMON_SRCS engine/core/vm_armv7l.c)
 	set(NO_VM_COMPILED OFF)
 elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "ppc64le|ppc64")
 	if(CMAKE_SYSTEM_PROCESSOR MATCHES "ppc64le")
@@ -1465,7 +1465,7 @@ elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "ppc64le|ppc64")
 		set(BINEXT .ppc64)
 		set(RENDEXT _ppc64)
 	endif()
-	list(APPEND QCOMMON_SRCS src/qcommon/vm_powerpc.c)
+	list(APPEND QCOMMON_SRCS engine/core/vm_powerpc.c)
 	set(NO_VM_COMPILED OFF)
 endif()
 
@@ -1507,7 +1507,7 @@ target_include_directories(qcommon PRIVATE
   ${CMAKE_SOURCE_DIR}/src/platform
   ${CMAKE_SOURCE_DIR}/src/platform/win32
   ${CMAKE_SOURCE_DIR}/src/platform/platform/win32
-  ${CMAKE_SOURCE_DIR}/src/client
+  ${IDTECH3_DIR_RUNTIME_CLIENT}
   ${CMAKE_SOURCE_DIR}/src/audio
 )
 idtech3_apply_research_include_dirs(qcommon)
@@ -1528,7 +1528,7 @@ if(USE_RADIUSFPS_CUDA)
   target_compile_definitions(qcommon PRIVATE RADIUSFPS_HAVE_CUDA=1)
 endif()
 if(USE_CSHARP AND CSHARP_FOUND)
-  target_compile_definitions(qcommon PRIVATE USE_CSHARP IDTECH3_CSHARP_API_PATH="${CMAKE_SOURCE_DIR}/src/qcommon/csharp/IdTech3.Engine.cs")
+  target_compile_definitions(qcommon PRIVATE USE_CSHARP IDTECH3_CSHARP_API_PATH="${CMAKE_SOURCE_DIR}/engine/core/csharp/IdTech3.Engine.cs")
   target_include_directories(qcommon PRIVATE ${CSHARP_INCLUDE_DIRS})
 endif()
 if(USE_PYTHON AND PYTHON_FOUND)
@@ -1571,7 +1571,7 @@ target_include_directories(qcommon_ded PRIVATE
   ${CMAKE_SOURCE_DIR}/src/platform
   ${CMAKE_SOURCE_DIR}/src/platform/win32
   ${CMAKE_SOURCE_DIR}/src/platform/platform/win32
-  ${CMAKE_SOURCE_DIR}/src/client
+  ${IDTECH3_DIR_RUNTIME_CLIENT}
   ${CMAKE_SOURCE_DIR}/src/audio
 )
 idtech3_apply_research_include_dirs(qcommon_ded)
@@ -1592,7 +1592,7 @@ if(USE_RADIUSFPS_CUDA)
   target_compile_definitions(qcommon_ded PRIVATE RADIUSFPS_HAVE_CUDA=1)
 endif()
 if(USE_CSHARP AND CSHARP_FOUND)
-  target_compile_definitions(qcommon_ded PRIVATE USE_CSHARP IDTECH3_CSHARP_API_PATH="${CMAKE_SOURCE_DIR}/src/qcommon/csharp/IdTech3.Engine.cs")
+  target_compile_definitions(qcommon_ded PRIVATE USE_CSHARP IDTECH3_CSHARP_API_PATH="${CMAKE_SOURCE_DIR}/engine/core/csharp/IdTech3.Engine.cs")
   target_include_directories(qcommon_ded PRIVATE ${CSHARP_INCLUDE_DIRS})
 endif()
 if(USE_PYTHON AND PYTHON_FOUND)
@@ -1647,45 +1647,45 @@ idtech3_backend_apply_compile_defs(qcommon_ded)
 include(${CMAKE_SOURCE_DIR}/cmake/client/ClientSources.cmake)
 idtech3_init_client_sources()
 list(APPEND CLIENT_SRCS
-  src/audio/snd_main.c
-  src/audio/mix/snd_dma.c
-  src/audio/mix/snd_mem.c
-  src/audio/mix/snd_mix.c
-  src/audio/mix/snd_mix_fallback.c
-  src/audio/mix/snd_wavelet.c
-  src/audio/mix/snd_adpcm.c
-  src/audio/codecs/snd_codec.c
-  src/audio/codecs/snd_codec_mp3.c
-  src/audio/codecs/snd_codec_ogg.c
-  src/audio/codecs/snd_codec_wav.c
-  src/audio/codecs/snd_codec_opus.c
-  src/audio/codecs/snd_codec_flac.c
-  src/audio/codecs/snd_codec_webm.c
-  src/audio/backends/snd_backend_null.c
+  modules/audio/snd_main.c
+  modules/audio/mix/snd_dma.c
+  modules/audio/mix/snd_mem.c
+  modules/audio/mix/snd_mix.c
+  modules/audio/mix/snd_mix_fallback.c
+  modules/audio/mix/snd_wavelet.c
+  modules/audio/mix/snd_adpcm.c
+  modules/audio/codecs/snd_codec.c
+  modules/audio/codecs/snd_codec_mp3.c
+  modules/audio/codecs/snd_codec_ogg.c
+  modules/audio/codecs/snd_codec_wav.c
+  modules/audio/codecs/snd_codec_opus.c
+  modules/audio/codecs/snd_codec_flac.c
+  modules/audio/codecs/snd_codec_webm.c
+  modules/audio/backends/snd_backend_null.c
 )
 if(USE_OPENAL)
-  list(APPEND CLIENT_SRCS src/audio/backends/snd_backend_openal.c)
-  list(APPEND CLIENT_SRCS src/audio/effects/snd_efx.c)
+  list(APPEND CLIENT_SRCS modules/audio/backends/snd_backend_openal.c)
+  list(APPEND CLIENT_SRCS modules/audio/effects/snd_efx.c)
 endif()
 if(USE_SDL)
-  list(APPEND CLIENT_SRCS src/audio/backends/snd_backend_sdl.c)
+  list(APPEND CLIENT_SRCS modules/audio/backends/snd_backend_sdl.c)
 endif()
 list(APPEND CLIENT_SRCS
-  src/audio/mixer/snd_mixer.c
-  src/audio/snd_music_adaptive.c
-  src/game/g_director.c
-  src/game/g_response.c
-  src/game/g_choreography.c
-  src/game/g_dismember.c
-  src/game/g_facial.c
-  src/game/g_horde.c
-  src/game/g_goap.c
-  src/game/g_aiml.c
-  src/game/g_eda.c
-  src/game/g_engine_systems.c
-  src/game/g_bt.c
-  src/game/g_entity_bridge.c
-  src/game/g_lua_bindings.c
+  modules/audio/mixer/snd_mixer.c
+  modules/audio/snd_music_adaptive.c
+  runtime/game/g_director.c
+  runtime/game/g_response.c
+  runtime/game/g_choreography.c
+  runtime/game/g_dismember.c
+  runtime/game/g_facial.c
+  runtime/game/g_horde.c
+  runtime/game/g_goap.c
+  runtime/game/g_aiml.c
+  runtime/game/g_eda.c
+  runtime/game/g_engine_systems.c
+  runtime/game/g_bt.c
+  runtime/game/g_entity_bridge.c
+  runtime/game/g_lua_bindings.c
 )
 include(${CMAKE_SOURCE_DIR}/cmake/modules/ClientGameAiSources.cmake)
 idtech3_strip_game_ai_middleware_sources()
@@ -1706,27 +1706,27 @@ if(ASM_SRCS)
 	add_compile_definitions(USE_ASM)
 endif()
 IF(NOT USE_CURL OR NOT CURL_FOUND)
-	list(REMOVE_ITEM CLIENT_SRCS src/client/platform/cl_curl.c)
+	list(REMOVE_ITEM CLIENT_SRCS runtime/client/platform/cl_curl.c)
 ENDIF()
 IF(USE_CURL AND NOT CURL_FOUND)
 	message(WARNING "USE_CURL is ON but libcurl was not found; cl_curl disabled.")
 ENDIF()
 IF(NOT USE_MP3)
-	list(REMOVE_ITEM CLIENT_SRCS src/client/snd_codec_mp3.c)
-	list(REMOVE_ITEM CLIENT_SRCS src/audio/codecs/snd_codec_mp3.c)
+	list(REMOVE_ITEM CLIENT_SRCS runtime/client/snd_codec_mp3.c)
+	list(REMOVE_ITEM CLIENT_SRCS modules/audio/codecs/snd_codec_mp3.c)
 ENDIF()
 include(${CMAKE_SOURCE_DIR}/cmake/modules/AudioMp3Sources.cmake)
 idtech3_append_mp3_client_sources()
 
 # Opus/FLAC sources already listed above; remove if not found.
 if(NOT USE_OPUS OR NOT OPUS_FOUND)
-  list(REMOVE_ITEM CLIENT_SRCS src/audio/codecs/snd_codec_opus.c)
+  list(REMOVE_ITEM CLIENT_SRCS modules/audio/codecs/snd_codec_opus.c)
 endif()
 if(NOT USE_FLAC OR NOT FLAC_FOUND)
-  list(REMOVE_ITEM CLIENT_SRCS src/audio/codecs/snd_codec_flac.c)
+  list(REMOVE_ITEM CLIENT_SRCS modules/audio/codecs/snd_codec_flac.c)
 endif()
 if(NOT USE_WEBM OR NOT WEBM_FOUND)
-  list(REMOVE_ITEM CLIENT_SRCS src/audio/codecs/snd_codec_webm.c)
+  list(REMOVE_ITEM CLIENT_SRCS modules/audio/codecs/snd_codec_webm.c)
 endif()
 
 # --- Modern video codec support ---
@@ -1751,10 +1751,10 @@ if(USE_FFMPEG)
   endif()
   if(NOT FFMPEG_FOUND)
     message(WARNING "FFmpeg requested but pkg-config could not find libavcodec/libavformat/libavutil/libswscale/libswresample; FFmpeg codec disabled.")
-    list(REMOVE_ITEM CLIENT_SRCS src/client/media/cl_cin_ffmpeg.c)
+    list(REMOVE_ITEM CLIENT_SRCS runtime/client/media/cl_cin_ffmpeg.c)
   endif()
 else()
-  list(REMOVE_ITEM CLIENT_SRCS src/client/media/cl_cin_ffmpeg.c)
+  list(REMOVE_ITEM CLIENT_SRCS runtime/client/media/cl_cin_ffmpeg.c)
 endif()
 
 if(USE_DAV1D)
@@ -1768,10 +1768,10 @@ if(USE_DAV1D)
   endif()
   if(NOT DAV1D_FOUND)
     message(WARNING "dav1d requested but not found; AV1 codec disabled.")
-    list(REMOVE_ITEM CLIENT_SRCS src/client/media/cl_cin_dav1d.c)
+    list(REMOVE_ITEM CLIENT_SRCS runtime/client/media/cl_cin_dav1d.c)
   endif()
 else()
-  list(REMOVE_ITEM CLIENT_SRCS src/client/media/cl_cin_dav1d.c)
+  list(REMOVE_ITEM CLIENT_SRCS runtime/client/media/cl_cin_dav1d.c)
 endif()
 
 if(USE_VPX)
@@ -1785,10 +1785,10 @@ if(USE_VPX)
   endif()
   if(NOT VPX_FOUND)
     message(WARNING "libvpx requested but not found; VP8/VP9 codec disabled.")
-    list(REMOVE_ITEM CLIENT_SRCS src/client/media/cl_cin_vpx.c)
+    list(REMOVE_ITEM CLIENT_SRCS runtime/client/media/cl_cin_vpx.c)
   endif()
 else()
-  list(REMOVE_ITEM CLIENT_SRCS src/client/media/cl_cin_vpx.c)
+  list(REMOVE_ITEM CLIENT_SRCS runtime/client/media/cl_cin_vpx.c)
 endif()
 
 if(USE_THEORA)
@@ -1802,10 +1802,10 @@ if(USE_THEORA)
   endif()
   if(NOT THEORA_FOUND)
     message(WARNING "Theora requested but libtheoradec not found; Theora codec disabled.")
-    list(REMOVE_ITEM CLIENT_SRCS src/client/media/cl_cin_theora.c)
+    list(REMOVE_ITEM CLIENT_SRCS runtime/client/media/cl_cin_theora.c)
   endif()
 else()
-  list(REMOVE_ITEM CLIENT_SRCS src/client/media/cl_cin_theora.c)
+  list(REMOVE_ITEM CLIENT_SRCS runtime/client/media/cl_cin_theora.c)
 endif()
 
 # pkg-config resolves *host* FFmpeg/dav1d/vpx/Theora; never use those include paths for NDK targets.
@@ -1814,17 +1814,17 @@ if(ANDROID)
   set(DAV1D_FOUND FALSE)
   set(VPX_FOUND FALSE)
   set(THEORA_FOUND FALSE)
-  list(REMOVE_ITEM CLIENT_SRCS src/client/media/cl_cin_ffmpeg.c)
-  list(REMOVE_ITEM CLIENT_SRCS src/client/media/cl_cin_dav1d.c)
-  list(REMOVE_ITEM CLIENT_SRCS src/client/media/cl_cin_vpx.c)
-  list(REMOVE_ITEM CLIENT_SRCS src/client/media/cl_cin_theora.c)
+  list(REMOVE_ITEM CLIENT_SRCS runtime/client/media/cl_cin_ffmpeg.c)
+  list(REMOVE_ITEM CLIENT_SRCS runtime/client/media/cl_cin_dav1d.c)
+  list(REMOVE_ITEM CLIENT_SRCS runtime/client/media/cl_cin_vpx.c)
+  list(REMOVE_ITEM CLIENT_SRCS runtime/client/media/cl_cin_theora.c)
   message(STATUS "Android: host pkg-config video codecs disabled (FFmpeg/dav1d/vpx/Theora); use vendor/NDK builds to re-enable")
 endif()
 # --- End modern video codec support ---
 
 if(USE_VUDA AND USE_RESEARCH_EXTENSIONS)
   list(APPEND CLIENT_SRCS
-    src/client/cl_vuda.c
+    runtime/client/cl_vuda.c
     src/extensions/research/vuda/vuda_cuda.c
   )
 endif()
@@ -1855,14 +1855,14 @@ ELSE()
 	#TARGET_LINK_LIBRARIES(client jpeg)
 	ADD_LIBRARY(client OBJECT ${CLIENT_SRCS} ${JPEG_SRCS})
 	# Ensure client can find qcommon headers needed by some client-side modules (eg. mp3)
-	target_include_directories(client PRIVATE ${CMAKE_SOURCE_DIR}/src/qcommon ${EXTERNAL_JPEG_SRC_DIR})
+	target_include_directories(client PRIVATE ${IDTECH3_DIR_ENGINE_CORE} ${EXTERNAL_JPEG_SRC_DIR})
 	# ECS (EnTT) - alternative to gentity
 	target_include_directories(client PRIVATE ${CMAKE_SOURCE_DIR}/src/game)
 	# Audio module headers (moved from client/)
 	target_include_directories(client PRIVATE
 		${CMAKE_SOURCE_DIR}/src/audio
-		${CMAKE_SOURCE_DIR}/src/audio/codecs
-		${CMAKE_SOURCE_DIR}/src/client
+		${CMAKE_SOURCE_DIR}/modules/audio/codecs
+		${IDTECH3_DIR_RUNTIME_CLIENT}
 		${CMAKE_SOURCE_DIR}/src/extensions/generative
 	)
 	if(USE_OPUS)
@@ -1906,42 +1906,42 @@ endif()
 
 # renderers
 set(RENDERER_COMMON_SRCS
-	src/renderers/common/tr_font_stub.c  # placeholder, will be replaced below
-	src/renderers/common/tr_image_bmp.c
-	src/renderers/common/tr_image_jpg.c
-	src/renderers/common/tr_image_pcx.c
-	src/renderers/common/tr_image_png.c
-	src/renderers/common/tr_image_tga.c
-	src/renderers/common/tr_image_hdr.c
-	src/renderers/common/tr_image_qoi.c
-	src/renderers/common/tr_image_dds.c
-	src/renderers/common/tr_image_svg.c
-	src/renderers/common/tr_model_mesh_import.c
-	src/renderers/common/tr_model_freeusd_register.c
-	src/renderers/vulkan/tr_model_gltf.c
-	src/renderers/vulkan/tr_gltf_topo.c
-	src/renderers/vulkan/tr_model_obj.c
-	src/renderers/vulkan/tr_model_md5.c
-	src/renderers/common/tr_image_ktx2.c
-	src/renderers/common/tr_noise.c
+	renderers/common/tr_font_stub.c  # placeholder, will be replaced below
+	renderers/common/tr_image_bmp.c
+	renderers/common/tr_image_jpg.c
+	renderers/common/tr_image_pcx.c
+	renderers/common/tr_image_png.c
+	renderers/common/tr_image_tga.c
+	renderers/common/tr_image_hdr.c
+	renderers/common/tr_image_qoi.c
+	renderers/common/tr_image_dds.c
+	renderers/common/tr_image_svg.c
+	renderers/common/tr_model_mesh_import.c
+	renderers/common/tr_model_freeusd_register.c
+	renderers/vulkan/tr_model_gltf.c
+	renderers/vulkan/tr_gltf_topo.c
+	renderers/vulkan/tr_model_obj.c
+	renderers/vulkan/tr_model_md5.c
+	renderers/common/tr_image_ktx2.c
+	renderers/common/tr_noise.c
 )
 IF(BUILD_FREETYPE)
-	list(REMOVE_ITEM RENDERER_COMMON_SRCS src/renderers/common/tr_font_stub.c)
-	list(REMOVE_ITEM RENDERER_COMMON_SRCS src/renderers/common/tr_vector_font_stub.c)
-	list(REMOVE_ITEM RENDERER_COMMON_SRCS src/renderers/common/tr_vector_font_glyphlet_stub.c)
-	list(APPEND RENDERER_COMMON_SRCS src/renderers/common/tr_font.c)
-	list(APPEND RENDERER_COMMON_SRCS src/renderers/common/tr_vector_font.c)
-	list(APPEND RENDERER_COMMON_SRCS src/renderers/common/tr_vector_font_glyphlet.c)
+	list(REMOVE_ITEM RENDERER_COMMON_SRCS renderers/common/tr_font_stub.c)
+	list(REMOVE_ITEM RENDERER_COMMON_SRCS renderers/common/tr_vector_font_stub.c)
+	list(REMOVE_ITEM RENDERER_COMMON_SRCS renderers/common/tr_vector_font_glyphlet_stub.c)
+	list(APPEND RENDERER_COMMON_SRCS renderers/common/tr_font.c)
+	list(APPEND RENDERER_COMMON_SRCS renderers/common/tr_vector_font.c)
+	list(APPEND RENDERER_COMMON_SRCS renderers/common/tr_vector_font_glyphlet.c)
 ELSE()
-	list(REMOVE_ITEM RENDERER_COMMON_SRCS src/renderers/common/tr_vector_font.c)
-	list(REMOVE_ITEM RENDERER_COMMON_SRCS src/renderers/common/tr_vector_font_glyphlet.c)
-	list(APPEND RENDERER_COMMON_SRCS src/renderers/common/tr_vector_font_stub.c)
-	list(APPEND RENDERER_COMMON_SRCS src/renderers/common/tr_vector_font_glyphlet_stub.c)
+	list(REMOVE_ITEM RENDERER_COMMON_SRCS renderers/common/tr_vector_font.c)
+	list(REMOVE_ITEM RENDERER_COMMON_SRCS renderers/common/tr_vector_font_glyphlet.c)
+	list(APPEND RENDERER_COMMON_SRCS renderers/common/tr_vector_font_stub.c)
+	list(APPEND RENDERER_COMMON_SRCS renderers/common/tr_vector_font_glyphlet_stub.c)
 ENDIF()
 
 if(USE_FREEUSD)
 	include(${CMAKE_SOURCE_DIR}/cmake/FreeUSD.cmake)
-	list(APPEND RENDERER_COMMON_SRCS src/renderers/common/tr_model_freeusd.cpp)
+	list(APPEND RENDERER_COMMON_SRCS renderers/common/tr_model_freeusd.cpp)
 	target_compile_definitions(client PRIVATE USE_FREEUSD=1)
 	target_link_libraries(client PRIVATE idtech3_freeusd freeusd::c)
 	message(STATUS "FreeUSD: client tools (usd_info, usd_assess, usd_entities, usd_shaders, usd_load)")
@@ -1955,9 +1955,9 @@ idtech3_log_vulkan_core_manifest()
 include(${CMAKE_SOURCE_DIR}/cmake/renderers/VulkanExtensionSources.cmake)
 idtech3_apply_vulkan_extension_sources()
 list(APPEND RENDERER_VK_SRCS
-    src/renderers/vulkan/utils/mikktspace/mikktspace.c
+    renderers/vulkan/utils/mikktspace/mikktspace.c
 )
-set(VK_SHADER_DIR "${CMAKE_SOURCE_DIR}/src/renderers/vulkan/shaders")
+set(VK_SHADER_DIR "${CMAKE_SOURCE_DIR}/renderers/vulkan/shaders")
 set(VK_SPIRV_DIR "${VK_SHADER_DIR}/spirv")
 set(VK_GEN_DIR "${VK_SPIRV_DIR}/generated")
 
@@ -2002,11 +2002,11 @@ else()
 endif()
 # Suppress shadow warnings for MikkTSpace third-party code
 if(MSVC)
-    set_source_files_properties(src/renderers/vulkan/utils/mikktspace/mikktspace.c PROPERTIES
+    set_source_files_properties(renderers/vulkan/utils/mikktspace/mikktspace.c PROPERTIES
         COMPILE_OPTIONS "/wd4456;/wd4457;/wd4458;/wd4459"
     )
 else()
-    set_source_files_properties(src/renderers/vulkan/utils/mikktspace/mikktspace.c PROPERTIES
+    set_source_files_properties(renderers/vulkan/utils/mikktspace/mikktspace.c PROPERTIES
         COMPILE_OPTIONS "-Wno-shadow;-Wno-unused-but-set-variable"
     )
 endif()
@@ -2014,10 +2014,10 @@ endif()
 SET(AUX_SRCS)
 if(NOT USE_RENDERER_DLOPEN)
 	list(APPEND AUX_SRCS
-		src/qcommon/q_shared.c
-		src/qcommon/q_math.c)
+		engine/core/q_shared.c
+		engine/core/q_math.c)
 	if(NOT USE_LIBPNG)
-		list(APPEND AUX_SRCS src/qcommon/puff.c)
+		list(APPEND AUX_SRCS engine/core/puff.c)
 	endif()
 endif()
 IF(USE_RENDERER_DLOPEN)
@@ -2084,7 +2084,7 @@ IF(USE_RENDERER_DLOPEN)
 	# Roadmap-only renderer plugins (Metal / DXR scaffolds — not shippable).
 	function(idtech3_add_platform_renderer_stub STUB_SHORT STUB_DEFINE)
 		set(_stub_target "${RENDERER_PREFIX}_${STUB_SHORT}${RENDEXT}")
-		add_library(${_stub_target} SHARED src/renderers/common/tr_platform_renderer_stub.c)
+		add_library(${_stub_target} SHARED renderers/common/tr_platform_renderer_stub.c)
 		target_compile_definitions(${_stub_target} PRIVATE USE_RENDERER_DLOPEN ${STUB_DEFINE}=1)
 		target_include_directories(${_stub_target} PRIVATE ${CMAKE_SOURCE_DIR}/src)
 		if(WIN32)
@@ -2177,7 +2177,7 @@ endif()
 # EXR image loading via tinyexr -- built as separate static lib to avoid
 # duplicate TINYEXR_IMPLEMENTATION symbols when both renderers are loaded
 enable_language(CXX)
-add_library(exr_loader STATIC src/renderers/common/tr_image_exr.cpp)
+add_library(exr_loader STATIC renderers/common/tr_image_exr.cpp)
 target_include_directories(exr_loader PRIVATE ${EXTERNAL_INCLUDE}/tinyexr ${CMAKE_SOURCE_DIR}/src)
 target_include_directories(exr_loader PRIVATE ${EXTERNAL_ZLIB_SRC})
 set_property(TARGET exr_loader PROPERTY POSITION_INDEPENDENT_CODE ON)
@@ -2208,18 +2208,18 @@ option(USE_IMGUI "Enable ImGui inspector overlay" ON)
 if(USE_IMGUI AND NOT APPLE)
   enable_language(CXX)
   set(IMGUI_SRCS
-    src/renderers/vulkan/inspector/vk_imgui.cpp
-    src/renderers/vulkan/inspector/vk_imgui_chrome_panels.cpp
-    src/renderers/vulkan/inspector/vk_imgui_helpers.cpp
-    src/renderers/vulkan/inspector/vk_imgui_fonts.cpp
-    src/renderers/vulkan/inspector/vk_imgui_studio_panels.cpp
-    src/renderers/vulkan/inspector/vk_imgui_postfx_panels.cpp
-    src/renderers/vulkan/inspector/vk_imgui_physics_panels.cpp
-    src/renderers/vulkan/inspector/vk_imgui_volumetrics_panels.cpp
-    src/renderers/vulkan/inspector/vk_imgui_sim_render_panels.cpp
-    src/renderers/vulkan/inspector/vk_imgui_scene_panels.cpp
-    src/renderers/vulkan/inspector/vk_imgui_scene.cpp
-    src/renderers/vulkan/inspector/vk_imgui_vulkan.cpp
+    renderers/vulkan/inspector/vk_imgui.cpp
+    renderers/vulkan/inspector/vk_imgui_chrome_panels.cpp
+    renderers/vulkan/inspector/vk_imgui_helpers.cpp
+    renderers/vulkan/inspector/vk_imgui_fonts.cpp
+    renderers/vulkan/inspector/vk_imgui_studio_panels.cpp
+    renderers/vulkan/inspector/vk_imgui_postfx_panels.cpp
+    renderers/vulkan/inspector/vk_imgui_physics_panels.cpp
+    renderers/vulkan/inspector/vk_imgui_volumetrics_panels.cpp
+    renderers/vulkan/inspector/vk_imgui_sim_render_panels.cpp
+    renderers/vulkan/inspector/vk_imgui_scene_panels.cpp
+    renderers/vulkan/inspector/vk_imgui_scene.cpp
+    renderers/vulkan/inspector/vk_imgui_vulkan.cpp
     ${EXTERNAL_SRC}/cimgui/imgui/imgui.cpp
     ${EXTERNAL_SRC}/cimgui/imgui/imgui_draw.cpp
     ${EXTERNAL_SRC}/cimgui/imgui/imgui_tables.cpp
@@ -2232,7 +2232,7 @@ if(USE_IMGUI AND NOT APPLE)
     ${EXTERNAL_SRC}/cimgui/imgui
     ${EXTERNAL_SRC}/cimgui/imgui/backends
     ${EXTERNAL_SRC}/cimgui
-    ${CMAKE_SOURCE_DIR}/src/renderers/common
+    ${IDTECH3_DIR_RENDERERS}/common
   )
   if(USE_RENDERER_DLOPEN)
     target_sources(${RENDERER_PREFIX}_vulkan${RENDEXT} PRIVATE ${IMGUI_SRCS})
@@ -2254,7 +2254,7 @@ if(USE_IMGUI AND NOT APPLE)
   message(STATUS "ImGui Inspector: enabled")
   if(NOT MSVC)
     set_source_files_properties(
-      src/renderers/vulkan/inspector/vk_imgui_scene.cpp
+      renderers/vulkan/inspector/vk_imgui_scene.cpp
       PROPERTIES COMPILE_OPTIONS "-fno-operator-names")
   endif()
 endif()
@@ -2522,14 +2522,14 @@ if(USE_RECAST_NAV)
   message(STATUS "Recast Navigation: enabled")
 else()
   ADD_LIBRARY(recast_nav STATIC src/navigation/nav_recast_stub.c)
-  target_include_directories(recast_nav PRIVATE ${CMAKE_SOURCE_DIR}/src/navigation ${CMAKE_SOURCE_DIR}/src/qcommon)
+  target_include_directories(recast_nav PRIVATE ${CMAKE_SOURCE_DIR}/src/navigation ${IDTECH3_DIR_ENGINE_CORE})
   set_property(TARGET recast_nav PROPERTY POSITION_INDEPENDENT_CODE ON)
   message(STATUS "Recast Navigation: stub (USE_RECAST_NAV=OFF)")
 endif()
 
 # --- ECS (EnTT) module - alternative to gentity ---
 enable_language(CXX)
-ADD_LIBRARY(ecs_module STATIC src/game/ecs.cpp)
+ADD_LIBRARY(ecs_module STATIC runtime/game/ecs.cpp)
 set_target_properties(ecs_module PROPERTIES
   CXX_STANDARD ${IDTECH3_CXX_STANDARD}
   CXX_STANDARD_REQUIRED ON
@@ -2537,7 +2537,7 @@ set_target_properties(ecs_module PROPERTIES
 target_include_directories(ecs_module PRIVATE
   ${EXTERNAL_INCLUDE}/entt/single_include
   ${CMAKE_SOURCE_DIR}/src/game
-  ${CMAKE_SOURCE_DIR}/src/qcommon
+  ${IDTECH3_DIR_ENGINE_CORE}
 )
 if(NOT MSVC)
   target_compile_options(ecs_module PRIVATE -Wno-unused-parameter)
@@ -2860,7 +2860,7 @@ add_test(NAME test_sqlite_service
 	WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
 set_tests_properties(test_sqlite_service PROPERTIES
 	LABELS "scripts;validation;database"
-	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_sqlite_service.sh;${CMAKE_SOURCE_DIR}/src/qcommon/engine_db.c;${CMAKE_SOURCE_DIR}/src/qcommon/csharp/IdTech3.Engine.cs")
+	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_sqlite_service.sh;${IDTECH3_DIR_ENGINE_CORE}/engine_db.c;${CMAKE_SOURCE_DIR}/engine/core/csharp/IdTech3.Engine.cs")
 
 add_test(NAME test_crash_report
 	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_crash_report.sh
@@ -2874,7 +2874,7 @@ add_test(NAME test_engine_save
 	WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
 set_tests_properties(test_engine_save PROPERTIES
 	LABELS "scripts;validation;engine"
-	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_engine_save.sh;${CMAKE_SOURCE_DIR}/src/game/g_engine_systems.c")
+	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_engine_save.sh;${CMAKE_SOURCE_DIR}/runtime/game/g_engine_systems.c")
 
 add_test(NAME test_squeezeme
 	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_squeezeme.sh
@@ -2888,7 +2888,7 @@ add_test(NAME test_hybrid1
 	WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
 set_tests_properties(test_hybrid1 PROPERTIES
 	LABELS "scripts;validation;renderer;rtx"
-	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_hybrid1.sh;${CMAKE_SOURCE_DIR}/src/renderers/vulkan/extensions/rtx/vk_hybrid1.c")
+	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_hybrid1.sh;${CMAKE_SOURCE_DIR}/renderers/vulkan/extensions/rtx/vk_hybrid1.c")
 
 add_test(NAME test_dressi
 	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_dressi.sh
@@ -2909,21 +2909,21 @@ add_test(NAME test_aiwc
 	WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
 set_tests_properties(test_aiwc PROPERTIES
 	LABELS "scripts;validation"
-	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_aiwc.sh;${CMAKE_SOURCE_DIR}/src/qcommon/aiwc_metrics.c")
+	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_aiwc.sh;${IDTECH3_DIR_ENGINE_CORE}/aiwc_metrics.c")
 
 add_test(NAME test_ttp
 	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_ttp.sh
 	WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
 set_tests_properties(test_ttp PROPERTIES
 	LABELS "scripts;validation"
-	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_ttp.sh;${CMAKE_SOURCE_DIR}/src/qcommon/ttp_model.c")
+	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_ttp.sh;${IDTECH3_DIR_ENGINE_CORE}/ttp_model.c")
 
 add_test(NAME test_bubblesh
 	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_bubblesh.sh
 	WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
 set_tests_properties(test_bubblesh PROPERTIES
 	LABELS "scripts;validation"
-	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_bubblesh.sh;${CMAKE_SOURCE_DIR}/src/qcommon/bubblesh_model.c")
+	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_bubblesh.sh;${IDTECH3_DIR_ENGINE_CORE}/bubblesh_model.c")
 
 add_test(NAME test_vuda
 	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_vuda.sh
@@ -3000,14 +3000,14 @@ add_test(NAME test_python
 	WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
 set_tests_properties(test_python PROPERTIES
 	LABELS "scripts;validation"
-	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_python.sh;${CMAKE_SOURCE_DIR}/src/qcommon/python_debug.c")
+	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_python.sh;${IDTECH3_DIR_ENGINE_CORE}/python_debug.c")
 
 add_test(NAME test_app_crdt
 	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_app_crdt.sh
 	WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
 set_tests_properties(test_app_crdt PROPERTIES
 	LABELS "scripts;validation"
-	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_app_crdt.sh;${CMAKE_SOURCE_DIR}/src/qcommon/app_crdt.c")
+	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_app_crdt.sh;${IDTECH3_DIR_ENGINE_CORE}/app_crdt.c")
 
 add_test(NAME test_idtech3_emulator
 	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_idtech3_emulator.sh
@@ -3046,28 +3046,28 @@ add_test(NAME test_districts
 	WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
 set_tests_properties(test_districts PROPERTIES
 	LABELS "scripts;validation"
-	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_districts.sh;${CMAKE_SOURCE_DIR}/src/world/world_district.cpp;${CMAKE_SOURCE_DIR}/tests/data/usd/world_playfield.usda")
+	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_districts.sh;${CMAKE_SOURCE_DIR}/modules/world/world_district.cpp;${CMAKE_SOURCE_DIR}/tests/data/usd/world_playfield.usda")
 
 add_test(NAME test_openworld
 	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_openworld.sh
 	WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
 set_tests_properties(test_openworld PROPERTIES
 	LABELS "scripts;validation;openworld;sector_stream"
-	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_openworld.sh;${CMAKE_SOURCE_DIR}/src/world/world_open.cpp;${CMAKE_SOURCE_DIR}/tests/data/openworld/sprites/sector_0_0.ents")
+	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_openworld.sh;${CMAKE_SOURCE_DIR}/modules/world/world_open.cpp;${CMAKE_SOURCE_DIR}/tests/data/openworld/sprites/sector_0_0.ents")
 
 add_test(NAME test_proc
 	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_proc.sh
 	WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
 set_tests_properties(test_proc PROPERTIES
 	LABELS "scripts;validation;openworld;sector_stream"
-	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_proc.sh;${CMAKE_SOURCE_DIR}/src/world/world_proc.cpp;${CMAKE_SOURCE_DIR}/src/client/world/cl_proc.cpp")
+	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_proc.sh;${CMAKE_SOURCE_DIR}/modules/world/world_proc.cpp;${IDTECH3_DIR_RUNTIME_CLIENT}/world/cl_proc.cpp")
 
 add_test(NAME test_cm_stream_merge
 	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_cm_stream_merge.sh
 	WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
 set_tests_properties(test_cm_stream_merge PROPERTIES
 	LABELS "scripts;validation;openworld;sector_stream"
-	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_cm_stream_merge.sh;${CMAKE_SOURCE_DIR}/scripts/tools/gen_sector_bsp.py;${CMAKE_SOURCE_DIR}/src/qcommon/cm_stream_merge.c")
+	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_cm_stream_merge.sh;${CMAKE_SOURCE_DIR}/scripts/tools/gen_sector_bsp.py;${IDTECH3_DIR_ENGINE_CORE}/cm_stream_merge.c")
 
 add_test(NAME test_nav_bake
 	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_nav_bake.sh
@@ -3081,32 +3081,32 @@ add_test(NAME test_openworld_sync
 	WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
 set_tests_properties(test_openworld_sync PROPERTIES
 	LABELS "scripts;validation;openworld;sector_stream"
-	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_openworld_sync.sh;${CMAKE_SOURCE_DIR}/src/renderers/vulkan/tr_bsp_stream.c;${CMAKE_SOURCE_DIR}/src/server/sv_openworld.c")
+	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_openworld_sync.sh;${CMAKE_SOURCE_DIR}/renderers/vulkan/tr_bsp_stream.c;${CMAKE_SOURCE_DIR}/runtime/server/sv_openworld.c")
 
 add_test(NAME test_bsp_stream_vbo
 	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_bsp_stream_vbo.sh
 	WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
 set_tests_properties(test_bsp_stream_vbo PROPERTIES
 	LABELS "scripts;validation;openworld;sector_stream;renderer"
-	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_bsp_stream_vbo.sh;${CMAKE_SOURCE_DIR}/src/renderers/vulkan/tr_bsp_stream.c;${CMAKE_SOURCE_DIR}/src/renderers/vulkan/tr_bsp.c;${CMAKE_SOURCE_DIR}/src/renderers/vulkan/vk_vbo.c")
+	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_bsp_stream_vbo.sh;${CMAKE_SOURCE_DIR}/renderers/vulkan/tr_bsp_stream.c;${CMAKE_SOURCE_DIR}/renderers/vulkan/tr_bsp.c;${CMAKE_SOURCE_DIR}/renderers/vulkan/vk_vbo.c")
 
 add_test(NAME test_temporal_motion_policy
 	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_temporal_motion_policy.sh)
 set_tests_properties(test_temporal_motion_policy PROPERTIES
 	LABELS "scripts;renderer"
-	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_temporal_motion_policy.sh;${CMAKE_SOURCE_DIR}/src/renderers/vulkan/vk_view_state.c;${CMAKE_SOURCE_DIR}/src/renderers/vulkan/vk_postfx_params.c")
+	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_temporal_motion_policy.sh;${CMAKE_SOURCE_DIR}/renderers/vulkan/vk_view_state.c;${CMAKE_SOURCE_DIR}/renderers/vulkan/vk_postfx_params.c")
 
 add_test(NAME test_deferred_lighting
 	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_deferred_lighting.sh)
 set_tests_properties(test_deferred_lighting PROPERTIES
 	LABELS "scripts;renderer"
-	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_deferred_lighting.sh;${CMAKE_SOURCE_DIR}/src/renderers/vulkan/vk_deferred_gbuffer.c;${CMAKE_SOURCE_DIR}/src/renderers/vulkan/shaders/glsl/deferred_lighting.comp")
+	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_deferred_lighting.sh;${CMAKE_SOURCE_DIR}/renderers/vulkan/vk_deferred_gbuffer.c;${CMAKE_SOURCE_DIR}/renderers/vulkan/shaders/glsl/deferred_lighting.comp")
 
 add_test(NAME test_conditional_stubs
 	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_conditional_stubs.sh)
 set_tests_properties(test_conditional_stubs PROPERTIES
 	LABELS "scripts;renderer"
-	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_conditional_stubs.sh;${CMAKE_SOURCE_DIR}/src/renderers/vulkan/vk_experimental_renderer_stubs.c;${CMAKE_SOURCE_DIR}/src/renderers/common/tr_vector_font_stub.c")
+	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_conditional_stubs.sh;${CMAKE_SOURCE_DIR}/renderers/vulkan/vk_experimental_renderer_stubs.c;${CMAKE_SOURCE_DIR}/renderers/common/tr_vector_font_stub.c")
 
 add_test(NAME test_q3_stock_smoke
 	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_q3_stock_smoke.sh ${CMAKE_SOURCE_DIR}/release)
@@ -3118,13 +3118,13 @@ add_test(NAME test_platform_renderer_stubs
 	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_platform_renderer_stubs.sh)
 set_tests_properties(test_platform_renderer_stubs PROPERTIES
 	LABELS "scripts;renderer"
-	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_platform_renderer_stubs.sh;${CMAKE_SOURCE_DIR}/src/renderers/common/tr_platform_renderer_stub.c;${CMAKE_SOURCE_DIR}/src/renderers/common/renderer_backend.h")
+	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_platform_renderer_stubs.sh;${CMAKE_SOURCE_DIR}/renderers/common/tr_platform_renderer_stub.c;${CMAKE_SOURCE_DIR}/renderers/common/renderer_backend.h")
 
 add_test(NAME test_vulkan_rtx
 	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_vulkan_rtx.sh)
 set_tests_properties(test_vulkan_rtx PROPERTIES
 	LABELS "scripts;renderer"
-	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_vulkan_rtx.sh;${CMAKE_SOURCE_DIR}/src/renderers/vulkan/extensions/rtx/vk_rtx.c;${CMAKE_SOURCE_DIR}/src/renderers/vulkan/extensions/rtx/vk_rtx_world.c")
+	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_vulkan_rtx.sh;${CMAKE_SOURCE_DIR}/renderers/vulkan/extensions/rtx/vk_rtx.c;${CMAKE_SOURCE_DIR}/renderers/vulkan/extensions/rtx/vk_rtx_world.c")
 
 add_test(NAME test_vulkan_extensions_layout
 	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_vulkan_extensions_layout.sh)
@@ -3136,7 +3136,7 @@ add_test(NAME test_client_modular
 	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_client_modular.sh)
 set_tests_properties(test_client_modular PROPERTIES
 	LABELS "scripts;client"
-	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_client_modular.sh;${CMAKE_SOURCE_DIR}/src/client/core/cl_main.c;${CMAKE_SOURCE_DIR}/src/client/core/cl_lifecycle.c;${CMAKE_SOURCE_DIR}/src/client/core/cl_frame.c;${CMAKE_SOURCE_DIR}/src/client/core/cl_cvars.c")
+	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_client_modular.sh;${IDTECH3_DIR_RUNTIME_CLIENT}/core/cl_main.c;${IDTECH3_DIR_RUNTIME_CLIENT}/core/cl_lifecycle.c;${IDTECH3_DIR_RUNTIME_CLIENT}/core/cl_frame.c;${IDTECH3_DIR_RUNTIME_CLIENT}/core/cl_cvars.c")
 
 add_test(NAME test_client_domains
 	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_client_domains.sh)
@@ -3154,7 +3154,7 @@ add_test(NAME test_cpp20_sources
 	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_cpp20_sources.sh)
 set_tests_properties(test_cpp20_sources PROPERTIES
 	LABELS "scripts;validation"
-	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_cpp20_sources.sh;${CMAKE_SOURCE_DIR}/CMakeLists.txt;${CMAKE_SOURCE_DIR}/src/world/world_open.cpp;${CMAKE_SOURCE_DIR}/src/qcommon/cluster_graph.cpp")
+	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_cpp20_sources.sh;${CMAKE_SOURCE_DIR}/CMakeLists.txt;${CMAKE_SOURCE_DIR}/modules/world/world_open.cpp;${IDTECH3_DIR_ENGINE_CORE}/cluster_graph.cpp")
 
 add_test(NAME test_engine_module_manifest
 	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_engine_module_manifest.sh)
@@ -3286,21 +3286,21 @@ add_test(NAME test_vector_font_mode2
 	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_vector_font_mode2.sh ${CMAKE_SOURCE_DIR})
 set_tests_properties(test_vector_font_mode2 PROPERTIES
 	LABELS "scripts;renderer"
-	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_vector_font_mode2.sh;${CMAKE_SOURCE_DIR}/src/renderers/vulkan/vk_vector_font.c;${CMAKE_SOURCE_DIR}/src/renderers/common/tr_vector_font_glyphlet.c")
+	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_vector_font_mode2.sh;${CMAKE_SOURCE_DIR}/renderers/vulkan/vk_vector_font.c;${CMAKE_SOURCE_DIR}/renderers/common/tr_vector_font_glyphlet.c")
 
 add_test(NAME test_openworld_runtime
 	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_openworld_runtime.sh
 	WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
 set_tests_properties(test_openworld_runtime PROPERTIES
 	LABELS "scripts;validation;openworld;sector_stream"
-	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_openworld_runtime.sh;${CMAKE_SOURCE_DIR}/scripts/tools/gen_hub_bsp.py;${CMAKE_SOURCE_DIR}/scripts/tools/gen_sector_bsp.py;${CMAKE_SOURCE_DIR}/src/qcommon/com_openworld_smoke.c")
+	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_openworld_runtime.sh;${CMAKE_SOURCE_DIR}/scripts/tools/gen_hub_bsp.py;${CMAKE_SOURCE_DIR}/scripts/tools/gen_sector_bsp.py;${IDTECH3_DIR_ENGINE_CORE}/com_openworld_smoke.c")
 
 add_test(NAME test_sector_stream_fidelity
 	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_sector_stream_fidelity.sh
 	WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
 set_tests_properties(test_sector_stream_fidelity PROPERTIES
 	LABELS "scripts;validation;openworld;sector_stream"
-	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_sector_stream_fidelity.sh;${CMAKE_SOURCE_DIR}/tests/data/openworld/openworld_smoke_fidelity.cfg;${CMAKE_SOURCE_DIR}/src/qcommon/com_openworld_smoke.c;${CMAKE_SOURCE_DIR}/src/navigation/nav_recast.cpp")
+	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_sector_stream_fidelity.sh;${CMAKE_SOURCE_DIR}/tests/data/openworld/openworld_smoke_fidelity.cfg;${IDTECH3_DIR_ENGINE_CORE}/com_openworld_smoke.c;${CMAKE_SOURCE_DIR}/src/navigation/nav_recast.cpp")
 
 add_test(NAME sector_stream_matrix
 	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_sector_stream_matrix.sh
@@ -3324,28 +3324,28 @@ add_test(NAME test_openworld_residency
 	WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
 set_tests_properties(test_openworld_residency PROPERTIES
 	LABELS "scripts;validation;openworld;sector_stream"
-	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_openworld_residency.sh;${CMAKE_SOURCE_DIR}/src/world/world_residency.cpp;${CMAKE_SOURCE_DIR}/src/world/world_residency.h")
+	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_openworld_residency.sh;${CMAKE_SOURCE_DIR}/modules/world/world_residency.cpp;${CMAKE_SOURCE_DIR}/modules/world/world_residency.h")
 
 add_test(NAME test_graph_compute
 	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_graph_compute.sh
 	WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
 set_tests_properties(test_graph_compute PROPERTIES
 	LABELS "scripts;validation;openworld;sector_stream"
-	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_graph_compute.sh;${CMAKE_SOURCE_DIR}/src/world/sector_graph.cpp;${CMAKE_SOURCE_DIR}/src/qcommon/cluster_graph.cpp;${CMAKE_SOURCE_DIR}/src/renderers/vulkan/vk_graph_bfs.c")
+	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_graph_compute.sh;${CMAKE_SOURCE_DIR}/modules/world/sector_graph.cpp;${IDTECH3_DIR_ENGINE_CORE}/cluster_graph.cpp;${CMAKE_SOURCE_DIR}/renderers/vulkan/vk_graph_bfs.c")
 
 add_test(NAME test_fog_biology
 	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_fog_biology.sh
 	WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
 set_tests_properties(test_fog_biology PROPERTIES
 	LABELS "scripts;validation"
-	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_fog_biology.sh;${CMAKE_SOURCE_DIR}/src/world/fog_biology.cpp;${CMAKE_SOURCE_DIR}/src/world/fog_biology.h")
+	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_fog_biology.sh;${CMAKE_SOURCE_DIR}/modules/world/fog_biology.cpp;${CMAKE_SOURCE_DIR}/modules/world/fog_biology.h")
 
 add_test(NAME test_arc_blanc
 	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_arc_blanc.sh
 	WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
 set_tests_properties(test_arc_blanc PROPERTIES
 	LABELS "scripts;validation"
-	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_arc_blanc.sh;${CMAKE_SOURCE_DIR}/src/world/arc_blanc/arc_blanc.c;${CMAKE_SOURCE_DIR}/docs/ARC_BLANC.md")
+	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_arc_blanc.sh;${CMAKE_SOURCE_DIR}/modules/world/arc_blanc/arc_blanc.c;${CMAKE_SOURCE_DIR}/docs/ARC_BLANC.md")
 
 add_test(NAME test_init_optional_submodules
 	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_init_optional_submodules.sh
@@ -3370,8 +3370,8 @@ set_tests_properties(test_compile_engine_lto PROPERTIES
 
 add_test(NAME test_vk_vegetation_dispatch_order
 	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_vk_vegetation_dispatch_order.sh
-		${CMAKE_SOURCE_DIR}/src/renderers/vulkan/tr_shade.c
-		${CMAKE_SOURCE_DIR}/src/renderers/vulkan/vk_frame_submit.c
+		${CMAKE_SOURCE_DIR}/renderers/vulkan/tr_shade.c
+		${CMAKE_SOURCE_DIR}/renderers/vulkan/vk_frame_submit.c
 	WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
 set_tests_properties(test_vk_vegetation_dispatch_order PROPERTIES
 	LABELS "unit;scripts;validation")
@@ -3437,7 +3437,7 @@ if(BUILD_UNIT_TESTS)
 	add_test(NAME unit_qvm_abi COMMAND unit_qvm_abi)
 	set_tests_properties(unit_qvm_abi PROPERTIES LABELS "unit;validation;qvm")
 
-	add_executable(unit_qmath tests/unit/test_q_math.c src/qcommon/q_math.c)
+	add_executable(unit_qmath tests/unit/test_q_math.c engine/core/q_math.c)
 	target_include_directories(unit_qmath PRIVATE ${CMAKE_SOURCE_DIR}/src ${CMAKE_SOURCE_DIR}/src/extensions/research)
 	if(NOT MSVC)
 		target_link_libraries(unit_qmath PRIVATE m)
@@ -3453,8 +3453,8 @@ if(BUILD_UNIT_TESTS)
 	add_executable(unit_qhelpers
 		tests/unit/test_q_helpers.c
 		tests/stub_qcommon_min.c
-		src/qcommon/q_shared.c
-		src/qcommon/q_math.c)
+		engine/core/q_shared.c
+		engine/core/q_math.c)
 	target_include_directories(unit_qhelpers PRIVATE ${CMAKE_SOURCE_DIR}/src ${CMAKE_SOURCE_DIR}/src/extensions/research)
 	if(NOT MSVC)
 		target_link_libraries(unit_qhelpers PRIVATE m)
@@ -3465,8 +3465,8 @@ if(BUILD_UNIT_TESTS)
 	add_executable(unit_crc
 		tests/unit/test_crc.c
 		tests/stub_qcommon_min.c
-		src/qcommon/q_shared.c
-		src/qcommon/q_math.c)
+		engine/core/q_shared.c
+		engine/core/q_math.c)
 	target_include_directories(unit_crc PRIVATE ${CMAKE_SOURCE_DIR}/src ${CMAKE_SOURCE_DIR}/src/extensions/research)
 	if(NOT MSVC)
 		target_link_libraries(unit_crc PRIVATE m)
@@ -3477,8 +3477,8 @@ if(BUILD_UNIT_TESTS)
 	add_executable(unit_pathutil
 		tests/unit/test_pathutil.c
 		tests/stub_qcommon_min.c
-		src/qcommon/q_shared.c
-		src/qcommon/q_math.c)
+		engine/core/q_shared.c
+		engine/core/q_math.c)
 	target_include_directories(unit_pathutil PRIVATE ${CMAKE_SOURCE_DIR}/src ${CMAKE_SOURCE_DIR}/src/extensions/research)
 	if(NOT MSVC)
 		target_link_libraries(unit_pathutil PRIVATE m)
@@ -3490,8 +3490,8 @@ if(BUILD_UNIT_TESTS)
 		tests/unit/test_msg.c
 		tests/stub_qcommon_min.c
 		tests/stub_msg_cvar.c
-		src/qcommon/msg.c
-		src/qcommon/huffman_static.c)
+		engine/core/msg.c
+		engine/core/huffman_static.c)
 	target_include_directories(unit_msg PRIVATE ${CMAKE_SOURCE_DIR}/src ${CMAKE_SOURCE_DIR}/src/extensions/research)
 	target_compile_definitions(unit_msg PRIVATE DEDICATED)
 	if(NOT MSVC)
@@ -3502,7 +3502,7 @@ if(BUILD_UNIT_TESTS)
 
 	add_executable(unit_huffman_adaptive
 		tests/unit/test_huffman_adaptive.c
-		src/qcommon/huffman.c)
+		engine/core/huffman.c)
 	target_include_directories(unit_huffman_adaptive PRIVATE ${CMAKE_SOURCE_DIR}/src)
 	add_test(NAME unit_huffman_adaptive COMMAND unit_huffman_adaptive)
 	set_tests_properties(unit_huffman_adaptive PROPERTIES LABELS "unit;validation;network")
@@ -3510,8 +3510,8 @@ if(BUILD_UNIT_TESTS)
 	add_executable(unit_info
 		tests/unit/test_info.c
 		tests/stub_qcommon_min.c
-		src/qcommon/q_shared.c
-		src/qcommon/q_math.c)
+		engine/core/q_shared.c
+		engine/core/q_math.c)
 	target_include_directories(unit_info PRIVATE ${CMAKE_SOURCE_DIR}/src ${CMAKE_SOURCE_DIR}/src/extensions/research)
 	if(NOT MSVC)
 		target_link_libraries(unit_info PRIVATE m)
@@ -3521,8 +3521,8 @@ if(BUILD_UNIT_TESTS)
 
 	add_executable(unit_cm_bounds
 		tests/unit/test_cm_bounds.c
-		src/qcommon/cm_bounds.c
-		src/qcommon/q_math.c)
+		engine/core/cm_bounds.c
+		engine/core/q_math.c)
 	target_include_directories(unit_cm_bounds PRIVATE ${CMAKE_SOURCE_DIR}/src ${CMAKE_SOURCE_DIR}/src/extensions/research)
 	if(NOT MSVC)
 		target_link_libraries(unit_cm_bounds PRIVATE m)
@@ -3547,8 +3547,8 @@ if(BUILD_UNIT_TESTS)
 		tests/unit/test_p2p_stun.c
 		tests/stub_qcommon_min.c
 		engine/core/net_p2p_stun_codec.c
-		src/qcommon/q_shared.c
-		src/qcommon/q_math.c)
+		engine/core/q_shared.c
+		engine/core/q_math.c)
 	target_include_directories(unit_p2p_stun PRIVATE
 		${CMAKE_SOURCE_DIR}/src
 		${CMAKE_SOURCE_DIR}/engine/core
@@ -3563,8 +3563,8 @@ if(BUILD_UNIT_TESTS)
 	add_executable(unit_parse
 		tests/unit/test_parse.c
 		tests/stub_qcommon_min.c
-		src/qcommon/q_shared.c
-		src/qcommon/q_math.c)
+		engine/core/q_shared.c
+		engine/core/q_math.c)
 	target_include_directories(unit_parse PRIVATE ${CMAKE_SOURCE_DIR}/src ${CMAKE_SOURCE_DIR}/src/extensions/research)
 	if(NOT MSVC)
 		target_link_libraries(unit_parse PRIVATE m)
@@ -3575,9 +3575,9 @@ if(BUILD_UNIT_TESTS)
 	add_executable(unit_engine_sprite_map
 		tests/unit/test_engine_sprite_map.c
 		tests/stub_qcommon_min.c
-		src/qcommon/q_shared.c
-		src/qcommon/q_math.c
-		src/qcommon/engine_sprite_map.c)
+		engine/core/q_shared.c
+		engine/core/q_math.c
+		engine/core/engine_sprite_map.c)
 	target_include_directories(unit_engine_sprite_map PRIVATE ${CMAKE_SOURCE_DIR}/src ${CMAKE_SOURCE_DIR}/src/extensions/research)
 	if(NOT MSVC)
 		target_link_libraries(unit_engine_sprite_map PRIVATE m)
@@ -3588,9 +3588,9 @@ if(BUILD_UNIT_TESTS)
 	add_executable(unit_engine_decal_map
 		tests/unit/test_engine_decal_map.c
 		tests/stub_qcommon_min.c
-		src/qcommon/q_shared.c
-		src/qcommon/q_math.c
-		src/qcommon/engine_decal_map.c)
+		engine/core/q_shared.c
+		engine/core/q_math.c
+		engine/core/engine_decal_map.c)
 	target_include_directories(unit_engine_decal_map PRIVATE ${CMAKE_SOURCE_DIR}/src ${CMAKE_SOURCE_DIR}/src/extensions/research)
 	if(UNIX)
 		target_link_libraries(unit_engine_decal_map PRIVATE m)
@@ -3600,8 +3600,8 @@ if(BUILD_UNIT_TESTS)
 
 	add_executable(unit_aiwc
 		tests/unit/test_aiwc_metrics.c
-		src/qcommon/aiwc_metrics.c
-		src/qcommon/aiwc_matmul.c)
+		engine/core/aiwc_metrics.c
+		engine/core/aiwc_matmul.c)
 	target_include_directories(unit_aiwc PRIVATE ${CMAKE_SOURCE_DIR}/src ${CMAKE_SOURCE_DIR}/src/extensions/research)
 	if(NOT MSVC)
 		target_link_libraries(unit_aiwc PRIVATE m)
@@ -3611,8 +3611,8 @@ if(BUILD_UNIT_TESTS)
 
 	add_executable(unit_ttp
 		tests/unit/test_ttp_model.c
-		src/qcommon/ttp_model.c
-		src/qcommon/ttp_sim.c)
+		engine/core/ttp_model.c
+		engine/core/ttp_sim.c)
 	target_include_directories(unit_ttp PRIVATE ${CMAKE_SOURCE_DIR}/src ${CMAKE_SOURCE_DIR}/src/extensions/research)
 	if(NOT MSVC)
 		target_link_libraries(unit_ttp PRIVATE m)
@@ -3622,7 +3622,7 @@ if(BUILD_UNIT_TESTS)
 
 	add_executable(unit_bubblesh
 		tests/unit/test_bubblesh_model.c
-		src/qcommon/bubblesh_model.c)
+		engine/core/bubblesh_model.c)
 	target_include_directories(unit_bubblesh PRIVATE ${CMAKE_SOURCE_DIR}/src ${CMAKE_SOURCE_DIR}/src/extensions/research)
 	if(NOT MSVC)
 		target_link_libraries(unit_bubblesh PRIVATE m)
@@ -3673,9 +3673,9 @@ if(BUILD_UNIT_TESTS)
 	add_executable(unit_app_crdt
 		tests/unit/test_app_crdt.c
 		tests/unit/app_crdt_linkstub.c
-		src/qcommon/app_crdt.c
-		src/qcommon/q_shared.c
-		src/qcommon/q_math.c)
+		engine/core/app_crdt.c
+		engine/core/q_shared.c
+		engine/core/q_math.c)
 	target_include_directories(unit_app_crdt PRIVATE ${CMAKE_SOURCE_DIR}/src ${CMAKE_SOURCE_DIR}/src/extensions/research)
 	target_compile_definitions(unit_app_crdt PRIVATE APP_CRDT_UNIT_TEST)
 	if(NOT MSVC)
@@ -3801,8 +3801,8 @@ if(BUILD_UNIT_TESTS)
 		tests/unit/test_iris_io.c
 		src/extensions/research/iris/iris_io.c
 		tests/stub_qcommon_min.c
-		src/qcommon/q_shared.c
-		src/qcommon/q_math.c)
+		engine/core/q_shared.c
+		engine/core/q_math.c)
 	target_include_directories(unit_iris_io PRIVATE ${CMAKE_SOURCE_DIR}/src ${CMAKE_SOURCE_DIR}/src/extensions/research)
 	if(NOT MSVC)
 		target_link_libraries(unit_iris_io PRIVATE m)
@@ -3813,8 +3813,8 @@ if(BUILD_UNIT_TESTS)
 	add_executable(unit_endian
 		tests/unit/test_endian.c
 		tests/stub_qcommon_min.c
-		src/qcommon/q_shared.c
-		src/qcommon/q_math.c)
+		engine/core/q_shared.c
+		engine/core/q_math.c)
 	target_include_directories(unit_endian PRIVATE ${CMAKE_SOURCE_DIR}/src ${CMAKE_SOURCE_DIR}/src/extensions/research)
 	if(NOT MSVC)
 		target_link_libraries(unit_endian PRIVATE m)
@@ -3824,7 +3824,7 @@ if(BUILD_UNIT_TESTS)
 
 	add_executable(unit_vm_native_module
 		tests/unit/test_vm_native_module.c
-		src/qcommon/vm_native_module.c)
+		engine/core/vm_native_module.c)
 	target_include_directories(unit_vm_native_module PRIVATE ${CMAKE_SOURCE_DIR}/src ${CMAKE_SOURCE_DIR}/src/extensions/research)
 	add_test(NAME unit_vm_native_module COMMAND unit_vm_native_module)
 	set_tests_properties(unit_vm_native_module PROPERTIES LABELS "unit;validation")
@@ -3833,13 +3833,13 @@ if(BUILD_UNIT_TESTS)
 		tests/unit/test_nanovdb_decode.c
 		tests/stub_qcommon_min.c
 		tests/stub_jobs_deps.c
-		src/renderers/vulkan/vk_nanovdb_decode.c
-		src/qcommon/jobs.c
-		src/qcommon/q_shared.c
-		src/qcommon/q_math.c)
+		renderers/vulkan/vk_nanovdb_decode.c
+		engine/core/jobs.c
+		engine/core/q_shared.c
+		engine/core/q_math.c)
 	target_include_directories(unit_nanovdb_decode PRIVATE
 		${CMAKE_SOURCE_DIR}/src
-		${CMAKE_SOURCE_DIR}/src/renderers/vulkan)
+		${IDTECH3_DIR_RENDERERS}/vulkan)
 	target_compile_definitions(unit_nanovdb_decode PRIVATE
 		TEST_DATA_DIR="${CMAKE_SOURCE_DIR}/tests/data")
 	if(NOT MSVC)
@@ -3856,8 +3856,8 @@ if(BUILD_UNIT_TESTS)
 			tests/unit/test_openworld_nav.c
 			tests/stub_qcommon_min.c
 			tests/stub_openworld_nav.c
-			src/qcommon/q_shared.c
-			src/qcommon/q_math.c)
+			engine/core/q_shared.c
+			engine/core/q_math.c)
 		target_include_directories(unit_openworld_nav PRIVATE ${CMAKE_SOURCE_DIR}/src ${CMAKE_SOURCE_DIR}/src/extensions/research)
 		target_link_libraries(unit_openworld_nav PRIVATE recast_nav)
 		if(NOT MSVC)
@@ -3874,9 +3874,9 @@ if(BUILD_UNIT_TESTS)
 		tests/unit/test_world_residency.c
 		tests/stub_qcommon_min.c
 		tests/stub_world_residency_deps.c
-		src/world/world_residency.cpp
-		src/qcommon/q_shared.c
-		src/qcommon/q_math.c)
+		modules/world/world_residency.cpp
+		engine/core/q_shared.c
+		engine/core/q_math.c)
 	target_compile_definitions(unit_world_residency PRIVATE WORLD_RESIDENCY_UNIT_TEST)
 	target_include_directories(unit_world_residency PRIVATE ${CMAKE_SOURCE_DIR}/src ${CMAKE_SOURCE_DIR}/src/extensions/research)
 	if(NOT MSVC)
@@ -3889,9 +3889,9 @@ if(BUILD_UNIT_TESTS)
 		tests/unit/test_sector_graph.c
 		tests/stub_qcommon_min.c
 		tests/stub_sector_graph_deps.c
-		src/world/sector_graph.cpp
-		src/qcommon/q_shared.c
-		src/qcommon/q_math.c)
+		modules/world/sector_graph.cpp
+		engine/core/q_shared.c
+		engine/core/q_math.c)
 	target_compile_definitions(unit_sector_graph PRIVATE SECTOR_GRAPH_UNIT_TEST)
 	target_include_directories(unit_sector_graph PRIVATE ${CMAKE_SOURCE_DIR}/src ${CMAKE_SOURCE_DIR}/src/extensions/research)
 	if(NOT MSVC)
@@ -3904,9 +3904,9 @@ if(BUILD_UNIT_TESTS)
 		tests/unit/test_cluster_graph.c
 		tests/stub_qcommon_min.c
 		tests/stub_cluster_graph_deps.c
-		src/qcommon/cluster_graph.cpp
-		src/qcommon/q_shared.c
-		src/qcommon/q_math.c)
+		engine/core/cluster_graph.cpp
+		engine/core/q_shared.c
+		engine/core/q_math.c)
 	target_compile_definitions(unit_cluster_graph PRIVATE CLUSTER_GRAPH_UNIT_TEST)
 	target_include_directories(unit_cluster_graph PRIVATE ${CMAKE_SOURCE_DIR}/src ${CMAKE_SOURCE_DIR}/src/extensions/research)
 	if(NOT MSVC)
@@ -3919,10 +3919,10 @@ if(BUILD_UNIT_TESTS)
 		tests/unit/test_sv_auth.c
 		tests/stub_qcommon_min.c
 		tests/stub_sv_auth_deps.c
-		src/server/sv_auth.c
-		src/qcommon/md5.c
-		src/qcommon/q_shared.c
-		src/qcommon/q_math.c)
+		runtime/server/sv_auth.c
+		engine/core/md5.c
+		engine/core/q_shared.c
+		engine/core/q_math.c)
 	target_include_directories(unit_sv_auth PRIVATE ${CMAKE_SOURCE_DIR}/src ${CMAKE_SOURCE_DIR}/src/extensions/research)
 	if(NOT MSVC)
 		target_link_libraries(unit_sv_auth PRIVATE m)
@@ -3934,9 +3934,9 @@ if(BUILD_UNIT_TESTS)
 		tests/unit/test_fog_biology.c
 		tests/stub_qcommon_min.c
 		tests/stub_fog_biology_deps.c
-		src/world/fog_biology.cpp
-		src/qcommon/q_shared.c
-		src/qcommon/q_math.c)
+		modules/world/fog_biology.cpp
+		engine/core/q_shared.c
+		engine/core/q_math.c)
 	target_compile_definitions(unit_fog_biology PRIVATE FOG_BIOLOGY_UNIT_TEST)
 	target_include_directories(unit_fog_biology PRIVATE ${CMAKE_SOURCE_DIR}/src ${CMAKE_SOURCE_DIR}/src/extensions/research)
 	if(NOT MSVC)
@@ -3950,14 +3950,14 @@ if(BUILD_UNIT_TESTS)
 			tests/unit/test_arc_blanc.c
 			tests/stub_qcommon_min.c
 			tests/stub_arc_blanc_deps.c
-			src/world/arc_blanc/arc_blanc.c
-			src/world/arc_blanc/arc_blanc_fft.c
-			src/world/arc_blanc/arc_blanc_spectrum.c
-			src/world/arc_blanc/arc_blanc_ocean.c
-			src/world/arc_blanc/arc_blanc_velocity.c
-			src/world/arc_blanc/arc_blanc_coupling.c
-			src/qcommon/q_shared.c
-			src/qcommon/q_math.c)
+			modules/world/arc_blanc/arc_blanc.c
+			modules/world/arc_blanc/arc_blanc_fft.c
+			modules/world/arc_blanc/arc_blanc_spectrum.c
+			modules/world/arc_blanc/arc_blanc_ocean.c
+			modules/world/arc_blanc/arc_blanc_velocity.c
+			modules/world/arc_blanc/arc_blanc_coupling.c
+			engine/core/q_shared.c
+			engine/core/q_math.c)
 		target_compile_definitions(unit_arc_blanc PRIVATE ARC_BLANC_UNIT_TEST)
 		target_include_directories(unit_arc_blanc PRIVATE ${CMAKE_SOURCE_DIR}/src)
 		if(NOT MSVC)
@@ -3971,9 +3971,9 @@ if(BUILD_UNIT_TESTS)
 		tests/unit/test_genetic_gan.c
 		tests/stub_qcommon_min.c
 		tests/stub_genetic_gan_deps.c
-		src/world/genetic_gan.cpp
-		src/qcommon/q_shared.c
-		src/qcommon/q_math.c)
+		modules/world/genetic_gan.cpp
+		engine/core/q_shared.c
+		engine/core/q_math.c)
 	target_compile_definitions(unit_genetic_gan PRIVATE GENETIC_GAN_UNIT_TEST)
 	target_include_directories(unit_genetic_gan PRIVATE ${CMAKE_SOURCE_DIR}/src ${CMAKE_SOURCE_DIR}/src/extensions/research)
 	if(NOT MSVC)
@@ -3986,9 +3986,9 @@ if(BUILD_UNIT_TESTS)
 		tests/unit/test_jobs.c
 		tests/stub_qcommon_min.c
 		tests/stub_jobs_deps.c
-		src/qcommon/jobs.c
-		src/qcommon/q_shared.c
-		src/qcommon/q_math.c)
+		engine/core/jobs.c
+		engine/core/q_shared.c
+		engine/core/q_math.c)
 	target_include_directories(unit_jobs PRIVATE ${CMAKE_SOURCE_DIR}/src ${CMAKE_SOURCE_DIR}/src/extensions/research)
 	if(NOT MSVC)
 		target_link_libraries(unit_jobs PRIVATE m)
@@ -4004,7 +4004,7 @@ if(BUILD_UNIT_TESTS)
 		WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
 	set_tests_properties(test_genetic_gan PROPERTIES
 		LABELS "validation"
-		REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_genetic_gan.sh;${CMAKE_SOURCE_DIR}/src/world/genetic_gan.cpp;${CMAKE_SOURCE_DIR}/src/world/genetic_gan.h")
+		REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_genetic_gan.sh;${CMAKE_SOURCE_DIR}/modules/world/genetic_gan.cpp;${CMAKE_SOURCE_DIR}/modules/world/genetic_gan.h")
 endif()
 
 # Demo mod pack (config-only .pk3); optional - see samples/demo_game/README.md

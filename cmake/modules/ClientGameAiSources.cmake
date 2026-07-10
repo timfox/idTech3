@@ -1,18 +1,19 @@
 # Game AI middleware (Director, GOAP, Horde, BT, …) — chocolate layer, OFF in core profile.
+# Paths are CMAKE_SOURCE_DIR-relative canonical layout (Phase 5e prep).
 
 idtech3_require_layout()
 
-idtech3_legacy_src(_g_dir "src/game/g_director.c")
-idtech3_legacy_src(_g_resp "src/game/g_response.c")
-idtech3_legacy_src(_g_cho "src/game/g_choreography.c")
-idtech3_legacy_src(_g_dis "src/game/g_dismember.c")
-idtech3_legacy_src(_g_fac "src/game/g_facial.c")
-idtech3_legacy_src(_g_hor "src/game/g_horde.c")
-idtech3_legacy_src(_g_goap "src/game/g_goap.c")
-idtech3_legacy_src(_g_aim "src/game/g_aiml.c")
-idtech3_legacy_src(_g_eda "src/game/g_eda.c")
-idtech3_legacy_src(_g_bt "src/game/g_bt.c")
-idtech3_legacy_src(_g_stub "src/game/game_middleware_stubs.c")
+file(RELATIVE_PATH _g_dir "${CMAKE_SOURCE_DIR}" "${IDTECH3_DIR_RUNTIME_GAME}/g_director.c")
+file(RELATIVE_PATH _g_resp "${CMAKE_SOURCE_DIR}" "${IDTECH3_DIR_RUNTIME_GAME}/g_response.c")
+file(RELATIVE_PATH _g_cho "${CMAKE_SOURCE_DIR}" "${IDTECH3_DIR_RUNTIME_GAME}/g_choreography.c")
+file(RELATIVE_PATH _g_dis "${CMAKE_SOURCE_DIR}" "${IDTECH3_DIR_RUNTIME_GAME}/g_dismember.c")
+file(RELATIVE_PATH _g_fac "${CMAKE_SOURCE_DIR}" "${IDTECH3_DIR_RUNTIME_GAME}/g_facial.c")
+file(RELATIVE_PATH _g_hor "${CMAKE_SOURCE_DIR}" "${IDTECH3_DIR_RUNTIME_GAME}/g_horde.c")
+file(RELATIVE_PATH _g_goap "${CMAKE_SOURCE_DIR}" "${IDTECH3_DIR_RUNTIME_GAME}/g_goap.c")
+file(RELATIVE_PATH _g_aim "${CMAKE_SOURCE_DIR}" "${IDTECH3_DIR_RUNTIME_GAME}/g_aiml.c")
+file(RELATIVE_PATH _g_eda "${CMAKE_SOURCE_DIR}" "${IDTECH3_DIR_RUNTIME_GAME}/g_eda.c")
+file(RELATIVE_PATH _g_bt "${CMAKE_SOURCE_DIR}" "${IDTECH3_DIR_RUNTIME_GAME}/g_bt.c")
+file(RELATIVE_PATH _g_stub "${CMAKE_SOURCE_DIR}" "${IDTECH3_DIR_RUNTIME_GAME}/game_middleware_stubs.c")
 
 set(IDTECH3_GAME_AI_MIDDLEWARE_SRCS
 	${_g_dir} ${_g_resp} ${_g_cho} ${_g_dis} ${_g_fac} ${_g_hor}

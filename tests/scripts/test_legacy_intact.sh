@@ -41,9 +41,12 @@ search_q 'BUILD_SAMPLES_DEMO_GAME' "${ROOT}/CMakeLists.txt" || fail "BUILD_SAMPL
 
 echo "[test_legacy_intact] legacy path references in build..."
 
-search_q 'IDTECH3_DIR_RUNTIME_CLIENT|src/client' "${ROOT}/cmake/client/ClientSources.cmake" \
-	|| fail "client manifest must use IDTECH3_DIR_RUNTIME_CLIENT or src/client"
-search_q 'src/qcommon' "${ROOT}/CMakeLists.txt" || fail "CMake must still reference src/qcommon (monolithic lists pending 5b)"
+search_q 'IDTECH3_DIR_RUNTIME_CLIENT|runtime/client|src/client' "${ROOT}/cmake/client/ClientSources.cmake" \
+	|| fail "client manifest must use IDTECH3_DIR_RUNTIME_CLIENT, runtime/client, or src/client"
+search_q 'IDTECH3_DIR_ENGINE_CORE|engine/core|src/qcommon' "${ROOT}/CMakeLists.txt" \
+	|| fail "CMake must reference engine/core or src/qcommon"
+search_q 'engine/core|src/qcommon' "${ROOT}/cmake/EngineQcommonSources.cmake" \
+	|| fail "qcommon manifest must use engine/core or src/qcommon"
 
 [ -f "${ROOT}/docs/core/LEGACY_AND_MODERN.md" ] || fail "missing LEGACY_AND_MODERN.md"
 [ -x "${ROOT}/scripts/archive_legacy_remote_branches.sh" ] || fail "missing archive_legacy_remote_branches.sh"

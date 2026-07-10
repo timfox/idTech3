@@ -8,8 +8,11 @@ fail() { echo "FAIL: $*" >&2; exit 1; }
 VE="${ROOT}/cmake/renderers/VulkanExtensionSources.cmake"
 [ -f "$VE" ] || fail "missing VulkanExtensionSources.cmake"
 
+VK_ROOT="${ROOT}/renderers/vulkan"
+[ -d "$VK_ROOT" ] || VK_ROOT="${ROOT}/src/renderers/vulkan"
+
 for d in neural splats rtx scaffold; do
-  [ -d "${ROOT}/src/renderers/vulkan/extensions/$d" ] || fail "missing extensions/$d"
+  [ -d "$VK_ROOT/extensions/$d" ] || fail "missing extensions/$d"
 done
 
 rg -q 'neural/vk_niv.c' "$VE" || fail "neural manifest path"
@@ -21,9 +24,9 @@ rg -q 'VK_RTX_CORE_SRCS' "$VE" || fail "VK_RTX_CORE_SRCS missing"
 
 # Root must not retain moved extension TU
 for f in vk_niv.c vk_hybrid1.c vk_mgs.c vk_vuda.c; do
-  [ ! -f "${ROOT}/src/renderers/vulkan/$f" ] || fail "stale root file $f (should be under extensions/)"
+  [ ! -f "$VK_ROOT/$f" ] || fail "stale root file $f (should be under extensions/)"
 done
 
-[ -f "${ROOT}/src/renderers/vulkan/vk_experimental_renderer_stubs.c" ] || fail "stubs must stay at vulkan root"
+[ -f "$VK_ROOT/vk_experimental_renderer_stubs.c" ] || fail "stubs must stay at vulkan root"
 
 echo "test_vulkan_extensions_layout: passed"

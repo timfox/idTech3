@@ -1,6 +1,9 @@
 build/
 build*/
 output/
+__pycache__/
+*.pyc
+*.pyo
 .vs/
 .vscode/
 *.user
