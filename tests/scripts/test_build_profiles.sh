@@ -38,7 +38,8 @@ grep -q 'generative/cl_flux.c' "$CE" || fail "client flux path missing (Phase 5b
 grep -q 'idtech3_strip_client_extension_sources' "$CE" || fail "client strip macro missing"
 grep -q 'idtech3_legacy_src' "${ROOT}/cmake/IdTech3Layout.cmake" || fail "IdTech3Layout missing idtech3_legacy_src"
 grep -q 'IDTECH3_DIR_RUNTIME_CLIENT' "${ROOT}/cmake/client/ClientSources.cmake" || fail "ClientSources must use IDTECH3_DIR_RUNTIME_CLIENT (Phase 5b)"
-grep -q 'idtech3_legacy_src' "${ROOT}/cmake/client/ClientExtensionSources.cmake" || fail "ClientExtensionSources must use idtech3_legacy_src (AUX-safe)"
+grep -qE 'IDTECH3_DIR_(EXTENSIONS|RUNTIME_CLIENT)' "${ROOT}/cmake/client/ClientExtensionSources.cmake" \
+	|| fail "ClientExtensionSources must use IDTECH3_DIR_* canonical paths (Phase 5e prep)"
 grep -q 'IDTECH3_DIR_RENDERERS' "${ROOT}/cmake/renderers/VulkanExtensionSources.cmake" || fail "VulkanExtensionSources must use IDTECH3_DIR_RENDERERS for includes"
 grep -q 'idtech3_require_layout' "${ROOT}/cmake/IdTech3Layout.cmake" || fail "IdTech3Layout missing idtech3_require_layout"
 grep -q 'idtech3_strip_game_ai_middleware_sources' "${ROOT}/cmake/modules/ClientGameAiSources.cmake" || fail "game AI middleware cmake missing"

@@ -1,4 +1,4 @@
-# Vulkan shipping core manifest (root src/renderers/vulkan/*.c — not extensions/ or inspector/).
+# Vulkan shipping core manifest (root renderers/vulkan/*.c — not extensions/ or inspector/).
 # Extension/neural pack: VulkanExtensionSources.cmake. ImGui inspector: CMakeLists USE_IMGUI block.
 
 idtech3_require_layout()
@@ -20,8 +20,8 @@ set(VK_CORE_RENDERER_PATTERNS
 
 macro(idtech3_init_vulkan_core_sources)
 	idtech3_glob_src_rel(RENDERER_VK_SRCS
-		"src/renderers/vulkan/*.c"
-		"src/renderers/vulkan/*.cpp"
+		"renderers/vulkan/*.c"
+		"renderers/vulkan/*.cpp"
 	)
 	list(FILTER RENDERER_VK_SRCS EXCLUDE REGEX ".*/shaders/spirv/generated/shader_data\\.c$")
 	list(FILTER RENDERER_VK_SRCS EXCLUDE REGEX ".*/shaders/spirv/generated/shader_binding\\.c$")

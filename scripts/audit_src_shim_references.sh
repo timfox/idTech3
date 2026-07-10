@@ -43,6 +43,17 @@ printf '  server:   src=%s  runtime/server=%s\n' "$SHIM_SERVER" "$CANON_SERVER"
 printf '  world:    src=%s  modules/world=%s\n' "$SHIM_WORLD" "$CANON_WORLD"
 printf '  renderers src=%s  renderers/=%s\n' "$SHIM_RENDERERS" "$CANON_RENDERERS"
 
+TOTAL_SHIM=$((SHIM_QCOMMON + SHIM_CLIENT + SHIM_SERVER + SHIM_WORLD + SHIM_RENDERERS))
+TOTAL_CANON=$((CANON_QCOMMON + CANON_CLIENT + CANON_SERVER + CANON_WORLD + CANON_RENDERERS))
+if [[ "$TOTAL_CANON" -gt 0 ]]; then
+	# Integer percent: canonical share of (shim + canonical) CMake line refs.
+	MIG_PCT=$((TOTAL_CANON * 100 / (TOTAL_SHIM + TOTAL_CANON)))
+else
+	MIG_PCT=0
+fi
+printf '  migration progress: cmake canonical=%s%% (shim_lines=%s canon_lines=%s)\n' \
+	"$MIG_PCT" "$TOTAL_SHIM" "$TOTAL_CANON"
+
 # Tests/scripts may legitimately use src/* until shims drop (paths resolve via symlink).
 TEST_SHIM=$(count_lines 'src/(qcommon|client|server|world|renderers)' "${ROOT}/tests")
 printf '  tests/scripts src/* refs: %s lines\n' "$TEST_SHIM"
@@ -52,9 +63,8 @@ echo "[shim_audit] physical layout..."
 [ -L "${ROOT}/src/qcommon" ] || { echo "FAIL: src/qcommon shim missing" >&2; exit 1; }
 
 if [[ "$STRICT" -eq 1 ]]; then
-	# Gate for Phase 5e: CMake manifests should prefer canonical paths (heuristic).
-	MAX_SHIM_CMAKE=500
-	TOTAL_SHIM=$((SHIM_QCOMMON + SHIM_CLIENT + SHIM_SERVER + SHIM_WORLD + SHIM_RENDERERS))
+	# Post Phase 5e-prep: CMake manifests use canonical roots; residual src/* is rare.
+	MAX_SHIM_CMAKE=50
 	if [[ "$TOTAL_SHIM" -gt "$MAX_SHIM_CMAKE" ]]; then
 		echo "FAIL: CMake src/* refs ($TOTAL_SHIM) exceed strict budget ($MAX_SHIM_CMAKE)" >&2
 		echo "       Migrate cmake manifests to engine/runtime/modules paths before dropping shims." >&2

@@ -12,7 +12,7 @@ CS="${ROOT}/cmake/client/ClientSources.cmake"
 
 rg -q 'IDTECH3_CLIENT_CORE_SRCS' "$CS" || fail "core manifest missing"
 rg -q 'core/cl_main.c' "$CS" || fail "cl_main not in core manifest"
-rg -q '(src/client/world/|runtime/client/world/)' "${ROOT}/cmake/client/ClientExtensionSources.cmake" \
+rg -q '(src/client/world/|runtime/client/world/|IDTECH3_DIR_RUNTIME_CLIENT)' "${ROOT}/cmake/client/ClientExtensionSources.cmake" \
 	|| fail "world paths in extension cmake"
 
 for d in core world media platform; do

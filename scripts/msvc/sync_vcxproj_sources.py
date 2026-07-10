@@ -126,7 +126,12 @@ def _dedupe_clcompile_matches(
 
 
 def dedupe_clcompile(text: str, root: Path) -> tuple[str, int]:
-    """Remove duplicate ClCompile entries that resolve to the same file."""
+    """Remove duplicate ClCompile entries that resolve to the same file.
+
+    Unsafe with layout_forwarding_symlinks: bridge paths and hand-maintained
+    entries often share a realpath, so this can delete legitimate ClCompile
+    rows. Only run when --dedupe-realpath is explicitly requested.
+    """
     seen: set[Path] = set()
     removed = 0
     text, n = _dedupe_clcompile_matches(text, root, MULTILINE_CLCOMPILE_RE, seen)
@@ -134,6 +139,10 @@ def dedupe_clcompile(text: str, root: Path) -> tuple[str, int]:
     text, n = _dedupe_clcompile_matches(text, root, SIMPLE_CLCOMPILE_RE, seen)
     removed += n
     return text, removed
+
+
+def count_clcompile(text: str) -> int:
+    return len(re.findall(r'<ClCompile Include="[^"]+"', text))
 
 
 def collect_expected(root: Path, manifest: dict, project: str) -> list[str]:
@@ -211,15 +220,21 @@ def main() -> int:
     ap.add_argument("--manifest", type=Path, required=True)
     ap.add_argument("--project", choices=sorted(PROJECT_GROUPS), default="quake3e")
     ap.add_argument("--write", action="store_true")
+    ap.add_argument(
+        "--dedupe-realpath",
+        action="store_true",
+        help="Remove ClCompile rows that share a realpath (unsafe with layout bridges; off by default)",
+    )
     args = ap.parse_args()
 
     root = args.root.resolve()
     manifest = json.loads(args.manifest.read_text(encoding="utf-8"))
     vcxproj = root / MSVC_DIR_REL / f"{args.project}.vcxproj"
     text = vcxproj.read_text(encoding="utf-8")
+    before_count = count_clcompile(text)
 
     if args.write:
-        # Relocate stale paths before dedupe / manifest merge.
+        # Relocate stale paths before optional dedupe / manifest merge.
         text, fixes = fix_all_clcompile_includes(text, root)
         if fixes:
             print(f"relocated {len(fixes)} stale ClCompile paths")
@@ -227,9 +242,12 @@ def main() -> int:
                 print(f"  {old} -> {new}")
             if len(fixes) > 20:
                 print(f"  ... and {len(fixes) - 20} more")
-        text, pruned = dedupe_clcompile(text, root)
-        if pruned:
-            print(f"deduped {pruned} duplicate ClCompile entries")
+        if args.dedupe_realpath:
+            text, pruned = dedupe_clcompile(text, root)
+            if pruned:
+                print(f"deduped {pruned} duplicate ClCompile entries (--dedupe-realpath)")
+        else:
+            print("skipping realpath ClCompile dedupe (pass --dedupe-realpath to enable)")
 
     existing = parse_clcompile_text(text)
     missing = collect_missing(root, manifest, args.project, existing)
@@ -250,8 +268,15 @@ def main() -> int:
         "\n",
         text,
     )
+    after_count = count_clcompile(text)
+    if after_count < before_count:
+        print(
+            f"FAIL: {args.project} ClCompile count would shrink {before_count} -> {after_count}",
+            file=sys.stderr,
+        )
+        return 1
     vcxproj.write_text(text, encoding="utf-8", newline="\r\n")
-    print(f"wrote {vcxproj}")
+    print(f"wrote {vcxproj} (ClCompile {before_count} -> {after_count})")
     return 0
 
 

@@ -66,26 +66,40 @@ for mod in "${WORLD_QCOMMON[@]}"; do
 		|| fail "open-world macro must list ${mod}.cpp"
 done
 QC_CORE="${ROOT}/cmake/EngineQcommonSources.cmake"
-search_q 'src/qcommon/\*\.cpp' "$QC_CORE" \
-	|| fail "EngineQcommonSources must glob src/qcommon/*.cpp (includes cluster_graph.cpp)"
-[ -f "${ROOT}/src/qcommon/cluster_graph.cpp" ] || fail "missing cluster_graph.cpp"
+search_q '(engine/core/\*\.cpp|src/qcommon/\*\.cpp)' "$QC_CORE" \
+	|| fail "EngineQcommonSources must glob engine/core/*.cpp or src/qcommon/*.cpp"
+[ -f "${ROOT}/engine/core/cluster_graph.cpp" ] || [ -f "${ROOT}/src/qcommon/cluster_graph.cpp" ] \
+	|| fail "missing cluster_graph.cpp"
 ok "open-world qcommon modules are .cpp in IdTech3QcommonExtensions.cmake"
 
 echo "[test_cpp20_sources] checking migrated .cpp sources..."
 for rel in "${MIGRATED_CPP[@]}"; do
-	path="$ROOT/$rel"
-	[ -f "$path" ] || fail "missing $rel"
+	canon="${rel/src\/world/modules\/world}"
+	canon="${canon/src\/qcommon/engine\/core}"
+	canon="${canon/src\/navigation/modules\/navigation}"
+	path=""
+	if [ -f "$ROOT/$canon" ]; then
+		path="$ROOT/$canon"
+	elif [ -f "$ROOT/$rel" ]; then
+		path="$ROOT/$rel"
+	else
+		fail "missing $rel (also tried $canon)"
+	fi
 	search_q "$(basename "$rel")" "$CMAKE" \
 		|| fail "$(basename "$rel") not referenced in CMakeLists.txt"
 	if ! search_q 'extern "C"' "$path"; then
-		fail "$rel missing extern \"C\" API boundary"
+		fail "$path missing extern \"C\" API boundary"
 	fi
 done
 ok "${#MIGRATED_CPP[@]} migrated .cpp files present and wired"
 
 echo "[test_cpp20_sources] checking no .c reverts..."
 for rel in "${REVERTED_C[@]}"; do
+	canon="${rel/src\/world/modules\/world}"
+	canon="${canon/src\/qcommon/engine\/core}"
+	canon="${canon/src\/navigation/modules\/navigation}"
 	[ ! -f "$ROOT/$rel" ] || fail "reverted C source still present: $rel"
+	[ ! -f "$ROOT/$canon" ] || fail "reverted C source still present: $canon"
 done
 for rel in "${REVERTED_C[@]}"; do
 	if search_q "${rel}([\" ;)]|$)" "$CMAKE" 2>/dev/null; then

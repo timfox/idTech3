@@ -1,20 +1,21 @@
 # Client extension sources (generative ML + open-world client hooks).
+# Paths are CMAKE_SOURCE_DIR-relative canonical layout (Phase 5e prep).
 
 idtech3_require_layout()
 
-idtech3_legacy_src(_flux "src/extensions/generative/cl_flux.c")
-idtech3_legacy_src(_trellis "src/extensions/generative/cl_trellis.c")
-idtech3_legacy_src(_ggan "src/extensions/generative/cl_genetic_gan.c")
-idtech3_legacy_src(_mlw "src/extensions/generative/cl_ml_worker.c")
-idtech3_legacy_src(_gen "src/extensions/generative/cl_generative.c")
-idtech3_legacy_src(_dist "src/client/world/cl_district.cpp")
-idtech3_legacy_src(_ow "src/client/world/cl_openworld.cpp")
-idtech3_legacy_src(_proc "src/client/world/cl_proc.cpp")
-idtech3_legacy_src(_usd "src/client/cl_usd.cpp")
-idtech3_legacy_src(_emu_proc "src/extensions/emulator/emulator_process.c")
-idtech3_legacy_src(_emu_frame "src/extensions/emulator/emulator_frame.c")
-idtech3_legacy_src(_emu_console "src/extensions/emulator/emulator_console.c")
-idtech3_legacy_src(_emu_input "src/extensions/emulator/emulator_input.c")
+file(RELATIVE_PATH _flux "${CMAKE_SOURCE_DIR}" "${IDTECH3_DIR_EXTENSIONS}/generative/cl_flux.c")
+file(RELATIVE_PATH _trellis "${CMAKE_SOURCE_DIR}" "${IDTECH3_DIR_EXTENSIONS}/generative/cl_trellis.c")
+file(RELATIVE_PATH _ggan "${CMAKE_SOURCE_DIR}" "${IDTECH3_DIR_EXTENSIONS}/generative/cl_genetic_gan.c")
+file(RELATIVE_PATH _mlw "${CMAKE_SOURCE_DIR}" "${IDTECH3_DIR_EXTENSIONS}/generative/cl_ml_worker.c")
+file(RELATIVE_PATH _gen "${CMAKE_SOURCE_DIR}" "${IDTECH3_DIR_EXTENSIONS}/generative/cl_generative.c")
+file(RELATIVE_PATH _dist "${CMAKE_SOURCE_DIR}" "${IDTECH3_DIR_RUNTIME_CLIENT}/world/cl_district.cpp")
+file(RELATIVE_PATH _ow "${CMAKE_SOURCE_DIR}" "${IDTECH3_DIR_RUNTIME_CLIENT}/world/cl_openworld.cpp")
+file(RELATIVE_PATH _proc "${CMAKE_SOURCE_DIR}" "${IDTECH3_DIR_RUNTIME_CLIENT}/world/cl_proc.cpp")
+file(RELATIVE_PATH _usd "${CMAKE_SOURCE_DIR}" "${IDTECH3_DIR_RUNTIME_CLIENT}/cl_usd.cpp")
+file(RELATIVE_PATH _emu_proc "${CMAKE_SOURCE_DIR}" "${IDTECH3_DIR_EXTENSIONS}/emulator/emulator_process.c")
+file(RELATIVE_PATH _emu_frame "${CMAKE_SOURCE_DIR}" "${IDTECH3_DIR_EXTENSIONS}/emulator/emulator_frame.c")
+file(RELATIVE_PATH _emu_console "${CMAKE_SOURCE_DIR}" "${IDTECH3_DIR_EXTENSIONS}/emulator/emulator_console.c")
+file(RELATIVE_PATH _emu_input "${CMAKE_SOURCE_DIR}" "${IDTECH3_DIR_EXTENSIONS}/emulator/emulator_input.c")
 
 set(_IDTECH3_CLIENT_EXT_ALL
 	${_flux} ${_trellis} ${_ggan} ${_mlw} ${_gen}
