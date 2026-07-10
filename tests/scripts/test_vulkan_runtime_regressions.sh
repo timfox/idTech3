@@ -6,6 +6,9 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="${1:-$(cd "$SCRIPT_DIR/../.." && pwd)}"
+# shellcheck source=idtech3_test_paths.sh
+source "$SCRIPT_DIR/idtech3_test_paths.sh"
+idtech3_test_paths_init "$PROJECT_ROOT"
 
 fail() {
 	echo "FAIL: $*" >&2
@@ -35,12 +38,12 @@ assert_not_contains() {
 	fi
 }
 
-TR_INIT="$PROJECT_ROOT/src/renderers/vulkan/tr_init.c"
-TR_LOCAL="$PROJECT_ROOT/src/renderers/vulkan/tr_local.h"
-TR_SHADE="$PROJECT_ROOT/src/renderers/vulkan/tr_shade.c"
-VK_H="$PROJECT_ROOT/src/renderers/vulkan/vk.h"
-VK_INSTANCE="$PROJECT_ROOT/src/renderers/vulkan/vk_instance.c"
-VK_FRAME_SUBMIT="$PROJECT_ROOT/src/renderers/vulkan/vk_frame_submit.c"
+TR_INIT="$(idtech3_file renderers/vulkan/tr_init.c src/renderers/vulkan/tr_init.c)"
+TR_LOCAL="$(idtech3_file renderers/vulkan/tr_local.h src/renderers/vulkan/tr_local.h)"
+TR_SHADE="$(idtech3_file renderers/vulkan/tr_shade.c src/renderers/vulkan/tr_shade.c)"
+VK_H="$(idtech3_file renderers/vulkan/vk.h src/renderers/vulkan/vk.h)"
+VK_INSTANCE="$(idtech3_file renderers/vulkan/vk_instance.c src/renderers/vulkan/vk_instance.c)"
+VK_FRAME_SUBMIT="$(idtech3_file renderers/vulkan/vk_frame_submit.c src/renderers/vulkan/vk_frame_submit.c)"
 
 assert_file_exists "$TR_INIT"
 assert_file_exists "$TR_LOCAL"

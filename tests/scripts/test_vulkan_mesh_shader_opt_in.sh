@@ -7,10 +7,14 @@ if [ "$#" -ne 1 ]; then
 fi
 
 PROJECT_ROOT="$1"
-VK_INSTANCE="$PROJECT_ROOT/src/renderers/vulkan/vk_instance.c"
-VK_INIT="$PROJECT_ROOT/src/renderers/vulkan/tr_init.c"
-VK_H="$PROJECT_ROOT/src/renderers/vulkan/vk.h"
-VK_LOCAL="$PROJECT_ROOT/src/renderers/vulkan/tr_local.h"
+# shellcheck source=idtech3_test_paths.sh
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/idtech3_test_paths.sh"
+idtech3_test_paths_init "$PROJECT_ROOT"
+
+VK_INSTANCE="$(idtech3_file renderers/vulkan/vk_instance.c src/renderers/vulkan/vk_instance.c)"
+VK_INIT="$(idtech3_file renderers/vulkan/tr_init.c src/renderers/vulkan/tr_init.c)"
+VK_H="$(idtech3_file renderers/vulkan/vk.h src/renderers/vulkan/vk.h)"
+VK_LOCAL="$(idtech3_file renderers/vulkan/tr_local.h src/renderers/vulkan/tr_local.h)"
 
 fail() {
   echo "FAIL: $*" >&2

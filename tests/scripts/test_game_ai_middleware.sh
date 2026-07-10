@@ -3,10 +3,15 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+# shellcheck source=idtech3_test_paths.sh
+source "$(dirname "$0")/idtech3_test_paths.sh"
+idtech3_test_paths_init "$ROOT"
 fail() { echo "FAIL: $*" >&2; exit 1; }
 
 GM="${ROOT}/cmake/modules/ClientGameAiSources.cmake"
 [ -f "$GM" ] || fail "missing ClientGameAiSources.cmake"
+
+CL_GAMEFRAME="$(idtech3_file runtime/client/core/cl_gameframe.c src/client/core/cl_gameframe.c)"
 
 rg -q 'USE_GAME_AI_MIDDLEWARE OFF' "${ROOT}/cmake/IdTech3Profile.cmake" || fail "core profile must disable middleware"
 rg -q 'idtech3_strip_game_ai_middleware_sources' "$GM" || fail "strip macro missing"
@@ -18,11 +23,7 @@ if rg -q 'list\(APPEND CLIENT_SRCS.*g_director\.c' "${ROOT}/CMakeLists.txt"; the
 	fail "g_director.c must not be unconditional in CMakeLists"
 fi
 
-rg -q 'USE_GAME_AI_MIDDLEWARE' "${ROOT}/runtime/client/core/cl_gameframe.c" \
-	|| rg -q 'USE_GAME_AI_MIDDLEWARE' "${ROOT}/src/client/core/cl_gameframe.c" \
-	|| fail "cl_gameframe guard missing"
-rg -q 'GameMiddleware_LogDisabled' "${ROOT}/runtime/client/core/cl_gameframe.c" \
-	|| rg -q 'GameMiddleware_LogDisabled' "${ROOT}/src/client/core/cl_gameframe.c" \
-	|| fail "middleware disabled log hook"
+rg -q 'USE_GAME_AI_MIDDLEWARE' "$CL_GAMEFRAME" || fail "cl_gameframe guard missing"
+rg -q 'GameMiddleware_LogDisabled' "$CL_GAMEFRAME" || fail "middleware disabled log hook"
 
 echo "test_game_ai_middleware: passed"
