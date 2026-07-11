@@ -12,6 +12,10 @@ extern "C" {
 }
 #include "cl_usd.h"
 
+static cvar_t *com_freeusd;
+static cvar_t *com_usdEntities;
+static cvar_t *com_usdShaders;
+
 #ifdef USE_FREEUSD
 
 #include "cl_freeusd_util.hpp"
@@ -40,10 +44,6 @@ static int CL_USD_CountMeshTris( const freeusd::usdGeom::Mesh &mesh, double time
 }
 
 }  // namespace
-
-static cvar_t *com_freeusd;
-static cvar_t *com_usdEntities;
-static cvar_t *com_usdShaders;
 
 static std::shared_ptr<freeusd::usd::Stage> CL_USD_OpenArg( void ) {
 	if ( Cmd_Argc() < 2 ) {
