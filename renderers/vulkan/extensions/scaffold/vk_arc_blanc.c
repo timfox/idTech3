@@ -6,6 +6,11 @@
 #include "../../tr_common.h"
 #include "vk_arc_blanc.h"
 #include "vk_arc_blanc_gpu.h"
+#include <stdio.h>
+
+#ifndef M_PI
+#define M_PI 3.14159265358979323846
+#endif
 
 #ifdef USE_ARC_BLANC
 
@@ -15,10 +20,86 @@ static cvar_t *r_arcBlancDraw;
 static cvar_t *r_arcBlancMeshDiv;
 static cvar_t *r_arcBlancTile;
 static cvar_t *r_arcBlancSeaLevel;
+static cvar_t *r_arcBlancTileRadius;
+static cvar_t *r_arcBlancFollowCamera;
+static cvar_t *r_arcBlancNormalStrength;
+static cvar_t *r_arcBlancFoam;
+static cvar_t *r_arcBlancFoamIntensity;
+static cvar_t *r_arcBlancFoamThreshold;
+static cvar_t *r_arcBlancFoamSoftness;
+static cvar_t *r_arcBlancTileBreak;
+static cvar_t *r_arcBlancTileBreakOffset;
+static cvar_t *r_arcBlancTileBreakBlend;
+static cvar_t *r_arcBlancTileBreakCell;
+static cvar_t *r_arcBlancLakeMode;
+static cvar_t *r_arcBlancLakeCenter;
+static cvar_t *r_arcBlancLakeExtents;
+static cvar_t *r_arcBlancLakeAngle;
 static shader_t *s_arcBlancShader = NULL;
 static qboolean s_arcBlancLogged = qfalse;
 
 #define AB_OCEAN_MAX_DIV 128
+
+static float ab_clampf01( float v )
+{
+	if ( v < 0.0f ) {
+		return 0.0f;
+	}
+	if ( v > 1.0f ) {
+		return 1.0f;
+	}
+	return v;
+}
+
+static float ab_smoothstep( float edge0, float edge1, float x )
+{
+	float t;
+	if ( edge1 <= edge0 ) {
+		return x >= edge1 ? 1.0f : 0.0f;
+	}
+	t = ab_clampf01( ( x - edge0 ) / ( edge1 - edge0 ) );
+	return t * t * ( 3.0f - 2.0f * t );
+}
+
+static float ab_hash2i( int x, int z )
+{
+	float s = sinf( (float)x * 127.1f + (float)z * 311.7f ) * 43758.5453f;
+	return s - floorf( s );
+}
+
+static float ab_value_noise2( float x, float z )
+{
+	int ix = (int)floorf( x );
+	int iz = (int)floorf( z );
+	float fx = x - (float)ix;
+	float fz = z - (float)iz;
+	float n00 = ab_hash2i( ix, iz );
+	float n10 = ab_hash2i( ix + 1, iz );
+	float n01 = ab_hash2i( ix, iz + 1 );
+	float n11 = ab_hash2i( ix + 1, iz + 1 );
+	float sx = fx * fx * ( 3.0f - 2.0f * fx );
+	float sz = fz * fz * ( 3.0f - 2.0f * fz );
+	float nx0 = n00 + ( n10 - n00 ) * sx;
+	float nx1 = n01 + ( n11 - n01 ) * sx;
+	return nx0 + ( nx1 - nx0 ) * sz;
+}
+
+static qboolean ab_parse_vec3( const char *s, vec3_t out )
+{
+	float x, y, z;
+	if ( !s || sscanf( s, "%f %f %f", &x, &y, &z ) != 3 ) {
+		return qfalse;
+	}
+	out[0] = x;
+	out[1] = y;
+	out[2] = z;
+	return qtrue;
+}
+
+static qboolean ab_parse_vec2( const char *s, float *x, float *z )
+{
+	return s && x && z && sscanf( s, "%f %f", x, z ) == 2;
+}
 
 static void R_ArcBlanc_EnsureShader( void )
 {
@@ -46,6 +127,37 @@ void R_ArcBlanc_Init( void )
 	ri.Cvar_SetDescription( r_arcBlancTile, "Ocean tile size for renderer mesh snapping." );
 	r_arcBlancSeaLevel = ri.Cvar_Get( "r_arcBlancSeaLevel", "0", CVAR_ARCHIVE );
 	ri.Cvar_SetDescription( r_arcBlancSeaLevel, "Base sea level offset added to sampled heights." );
+	r_arcBlancTileRadius = ri.Cvar_Get( "r_arcBlancTileRadius", "1", CVAR_ARCHIVE );
+	ri.Cvar_CheckRange( r_arcBlancTileRadius, "0", "6", CV_INTEGER );
+	ri.Cvar_SetDescription( r_arcBlancTileRadius, "How many tiles around the camera the renderer draws." );
+	r_arcBlancFollowCamera = ri.Cvar_Get( "r_arcBlancFollowCamera", "1", CVAR_ARCHIVE );
+	ri.Cvar_SetDescription( r_arcBlancFollowCamera, "View-follow ocean placement. Disable to anchor the draw grid in world space." );
+	r_arcBlancNormalStrength = ri.Cvar_Get( "r_arcBlancNormalStrength", "1", CVAR_ARCHIVE );
+	ri.Cvar_SetDescription( r_arcBlancNormalStrength, "Renderer normal exaggeration for Arc Blanc shading." );
+	r_arcBlancFoam = ri.Cvar_Get( "r_arcBlancFoam", "1", CVAR_ARCHIVE );
+	ri.Cvar_SetDescription( r_arcBlancFoam, "Enable crest foam shading based on wave steepness." );
+	r_arcBlancFoamIntensity = ri.Cvar_Get( "r_arcBlancFoamIntensity", "0.35", CVAR_ARCHIVE );
+	ri.Cvar_SetDescription( r_arcBlancFoamIntensity, "Foam visibility multiplier." );
+	r_arcBlancFoamThreshold = ri.Cvar_Get( "r_arcBlancFoamThreshold", "0.28", CVAR_ARCHIVE );
+	ri.Cvar_SetDescription( r_arcBlancFoamThreshold, "Steepness threshold before crest foam appears." );
+	r_arcBlancFoamSoftness = ri.Cvar_Get( "r_arcBlancFoamSoftness", "1.5", CVAR_ARCHIVE );
+	ri.Cvar_SetDescription( r_arcBlancFoamSoftness, "Foam edge shaping. Higher values soften and spread the foam." );
+	r_arcBlancTileBreak = ri.Cvar_Get( "r_arcBlancTileBreak", "1", CVAR_ARCHIVE );
+	ri.Cvar_SetDescription( r_arcBlancTileBreak, "Blend a second offset sample to reduce obvious ocean tiling." );
+	r_arcBlancTileBreakOffset = ri.Cvar_Get( "r_arcBlancTileBreakOffset", "-500", CVAR_ARCHIVE );
+	ri.Cvar_SetDescription( r_arcBlancTileBreakOffset, "World-space offset for secondary tile-break height sampling." );
+	r_arcBlancTileBreakBlend = ri.Cvar_Get( "r_arcBlancTileBreakBlend", "0.45", CVAR_ARCHIVE );
+	ri.Cvar_SetDescription( r_arcBlancTileBreakBlend, "Blend strength for tile-break sampling." );
+	r_arcBlancTileBreakCell = ri.Cvar_Get( "r_arcBlancTileBreakCell", "768", CVAR_ARCHIVE );
+	ri.Cvar_SetDescription( r_arcBlancTileBreakCell, "Cell size for tile-break noise variation." );
+	r_arcBlancLakeMode = ri.Cvar_Get( "r_arcBlancLakeMode", "0", CVAR_ARCHIVE );
+	ri.Cvar_SetDescription( r_arcBlancLakeMode, "Clamp Arc Blanc rendering to a finite rotated lake footprint." );
+	r_arcBlancLakeCenter = ri.Cvar_Get( "r_arcBlancLakeCenter", "0 0 0", CVAR_ARCHIVE );
+	ri.Cvar_SetDescription( r_arcBlancLakeCenter, "Lake center (x y z) when r_arcBlancLakeMode 1 or follow-camera is disabled." );
+	r_arcBlancLakeExtents = ri.Cvar_Get( "r_arcBlancLakeExtents", "1024 1024", CVAR_ARCHIVE );
+	ri.Cvar_SetDescription( r_arcBlancLakeExtents, "Lake half extents in world units (x z)." );
+	r_arcBlancLakeAngle = ri.Cvar_Get( "r_arcBlancLakeAngle", "0", CVAR_ARCHIVE );
+	ri.Cvar_SetDescription( r_arcBlancLakeAngle, "Lake rotation angle in degrees." );
 	ri.Printf( PRINT_ALL, "[VK][ArcBlanc] chocolate path ready (r_arcBlanc 0; USE_ARC_BLANC=ON)\n" );
 	VK_ArcBlancGpu_Init();
 }
@@ -80,15 +192,35 @@ static float R_ArcBlanc_SampleHeight( float x, float z )
 	return r_arcBlancSeaLevel ? r_arcBlancSeaLevel->value : 0.0f;
 }
 
+static float R_ArcBlanc_SampleHeightArtDirected( float x, float z )
+{
+	float base = R_ArcBlanc_SampleHeight( x, z );
+
+	if ( r_arcBlancTileBreak && r_arcBlancTileBreak->integer ) {
+		float cellSize = r_arcBlancTileBreakCell ? r_arcBlancTileBreakCell->value : 768.0f;
+		float offset = r_arcBlancTileBreakOffset ? r_arcBlancTileBreakOffset->value : -500.0f;
+		float blend = r_arcBlancTileBreakBlend ? r_arcBlancTileBreakBlend->value : 0.45f;
+		if ( cellSize > 8.0f && fabsf( offset ) > 1e-3f && blend > 0.0f ) {
+			float noise = ab_value_noise2( x / cellSize, z / cellSize );
+			float weight = ab_smoothstep( 0.2f, 0.8f, noise ) * ab_clampf01( blend );
+			float alt = R_ArcBlanc_SampleHeight( x + offset, z - offset );
+			base = base + ( alt - base ) * weight;
+		}
+	}
+
+	return base;
+}
+
 static void R_ArcBlanc_ComputeNormal( float x, float z, float eps, vec3_t out )
 {
-	const float hL = R_ArcBlanc_SampleHeight( x - eps, z );
-	const float hR = R_ArcBlanc_SampleHeight( x + eps, z );
-	const float hD = R_ArcBlanc_SampleHeight( x, z - eps );
-	const float hU = R_ArcBlanc_SampleHeight( x, z + eps );
-	out[0] = hL - hR;
+	float normalStrength = r_arcBlancNormalStrength ? r_arcBlancNormalStrength->value : 1.0f;
+	const float hL = R_ArcBlanc_SampleHeightArtDirected( x - eps, z );
+	const float hR = R_ArcBlanc_SampleHeightArtDirected( x + eps, z );
+	const float hD = R_ArcBlanc_SampleHeightArtDirected( x, z - eps );
+	const float hU = R_ArcBlanc_SampleHeightArtDirected( x, z + eps );
+	out[0] = ( hL - hR ) * normalStrength;
 	out[1] = 2.0f * eps;
-	out[2] = hD - hU;
+	out[2] = ( hD - hU ) * normalStrength;
 	VectorNormalize( out );
 }
 
@@ -126,8 +258,9 @@ static surfaceType_t *R_ArcBlanc_BuildPatch( int div, float tileSize, float orig
 			srfVert_t *vert = &tri->verts[i];
 			const float x = originX + (float)w * step;
 			const float z = originZ + (float)h * step;
-			const float y = R_ArcBlanc_SampleHeight( x, z );
+			const float y = R_ArcBlanc_SampleHeightArtDirected( x, z );
 			byte depthColor;
+			float foamAmount = 0.0f;
 
 			vert->xyz[0] = x;
 			vert->xyz[1] = y;
@@ -137,10 +270,17 @@ static surfaceType_t *R_ArcBlanc_BuildPatch( int div, float tileSize, float orig
 			vert->lightmap[0] = 0.0f;
 			vert->lightmap[1] = 0.0f;
 			R_ArcBlanc_ComputeNormal( x, z, eps, vert->normal );
+			if ( r_arcBlancFoam && r_arcBlancFoam->integer ) {
+				float threshold = r_arcBlancFoamThreshold ? r_arcBlancFoamThreshold->value : 0.28f;
+				float intensity = r_arcBlancFoamIntensity ? r_arcBlancFoamIntensity->value : 0.35f;
+				float softness = r_arcBlancFoamSoftness ? r_arcBlancFoamSoftness->value : 1.5f;
+				float steepness = 1.0f - vert->normal[1];
+				foamAmount = ab_clampf01( ( steepness - threshold ) / softness ) * intensity;
+			}
 			depthColor = (byte)Com_Clamp( 0, 255, 140 + (int)( y * 4.0f ) );
-			vert->color.rgba[0] = 20;
-			vert->color.rgba[1] = 90;
-			vert->color.rgba[2] = depthColor;
+			vert->color.rgba[0] = (byte)Com_Clamp( 0, 255, 20 + (int)( foamAmount * 235.0f ) );
+			vert->color.rgba[1] = (byte)Com_Clamp( 0, 255, 90 + (int)( foamAmount * 165.0f ) );
+			vert->color.rgba[2] = (byte)Com_Clamp( 0, 255, depthColor + (int)( foamAmount * 80.0f ) );
 			vert->color.rgba[3] = 220;
 			AddPointToBounds( vert->xyz, tri->bounds[0], tri->bounds[1] );
 			i++;
@@ -172,9 +312,18 @@ void R_ArcBlanc_AddSurfaces( void )
 	float tileSize;
 	int div;
 	float originX, originZ;
+	float anchorX, anchorZ;
 	surfaceType_t *surf;
 	int tiles = 1;
 	int tx, tz;
+	qboolean lakeMode = qfalse;
+	vec3_t lakeCenter = { 0.0f, 0.0f, 0.0f };
+	float lakeExtentX = 0.0f;
+	float lakeExtentZ = 0.0f;
+	float lakeAngleDeg = 0.0f;
+	float lakeAngleRad = 0.0f;
+	float lakeCos = 1.0f;
+	float lakeSin = 0.0f;
 
 	if ( !r_arcBlanc || !r_arcBlanc->integer ) {
 		return;
@@ -206,9 +355,39 @@ void R_ArcBlanc_AddSurfaces( void )
 	if ( div > AB_OCEAN_MAX_DIV ) {
 		div = AB_OCEAN_MAX_DIV;
 	}
+	tiles = r_arcBlancTileRadius ? r_arcBlancTileRadius->integer : 1;
+	if ( tiles < 0 ) {
+		tiles = 0;
+	}
 
-	originX = floorf( tr.viewParms.or.origin[0] / tileSize ) * tileSize;
-	originZ = floorf( tr.viewParms.or.origin[2] / tileSize ) * tileSize;
+	lakeMode = ( r_arcBlancLakeMode && r_arcBlancLakeMode->integer != 0 ) ? qtrue : qfalse;
+	if ( ab_parse_vec3( r_arcBlancLakeCenter ? r_arcBlancLakeCenter->string : NULL, lakeCenter ) ) {
+		anchorX = lakeCenter[0];
+		anchorZ = lakeCenter[2];
+	} else {
+		anchorX = tr.viewParms.or.origin[0];
+		anchorZ = tr.viewParms.or.origin[2];
+	}
+	if ( r_arcBlancFollowCamera && r_arcBlancFollowCamera->integer ) {
+		anchorX = tr.viewParms.or.origin[0];
+		anchorZ = tr.viewParms.or.origin[2];
+	}
+	if ( lakeMode ) {
+		ab_parse_vec2( r_arcBlancLakeExtents ? r_arcBlancLakeExtents->string : NULL, &lakeExtentX, &lakeExtentZ );
+		if ( lakeExtentX < tileSize ) {
+			lakeExtentX = tileSize;
+		}
+		if ( lakeExtentZ < tileSize ) {
+			lakeExtentZ = tileSize;
+		}
+		lakeAngleDeg = r_arcBlancLakeAngle ? r_arcBlancLakeAngle->value : 0.0f;
+		lakeAngleRad = lakeAngleDeg * (float)M_PI / 180.0f;
+		lakeCos = cosf( lakeAngleRad );
+		lakeSin = sinf( lakeAngleRad );
+	}
+
+	originX = floorf( anchorX / tileSize ) * tileSize;
+	originZ = floorf( anchorZ / tileSize ) * tileSize;
 
 	tr.currentEntityNum = REFENTITYNUM_WORLD;
 	tr.shiftedEntityNum = tr.currentEntityNum << QSORT_REFENTITYNUM_SHIFT;
@@ -217,7 +396,19 @@ void R_ArcBlanc_AddSurfaces( void )
 		for ( tx = -tiles; tx <= tiles; tx++ ) {
 			const float ox = originX + (float)tx * tileSize;
 			const float oz = originZ + (float)tz * tileSize;
+			const float cx = ox + tileSize * 0.5f;
+			const float cz = oz + tileSize * 0.5f;
 			vec3_t bounds[2];
+
+			if ( lakeMode ) {
+				float dx = cx - lakeCenter[0];
+				float dz = cz - lakeCenter[2];
+				float lx = lakeCos * dx + lakeSin * dz;
+				float lz = -lakeSin * dx + lakeCos * dz;
+				if ( fabsf( lx ) > lakeExtentX || fabsf( lz ) > lakeExtentZ ) {
+					continue;
+				}
+			}
 
 			VectorSet( bounds[0], ox, -4096.0f, oz );
 			VectorSet( bounds[1], ox + tileSize, 4096.0f, oz + tileSize );

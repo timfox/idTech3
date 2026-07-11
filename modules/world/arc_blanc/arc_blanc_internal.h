@@ -53,6 +53,13 @@ typedef struct abOceanState_s {
 	float windDirRad;
 	float swell;
 	float directional;
+	float amplitudeScale;
+	float heightScale;
+	float chopScale;
+	float waveSpeed;
+	float spread;
+	float gustStrength;
+	float gustSpeed;
 	abCascadeParams_t cascades[AB_CASCADE_COUNT];
 	abCascadeField_t fields[AB_CASCADE_COUNT];
 	float combinedHeight[AB_MAX_GRID_N * AB_MAX_GRID_N];
@@ -117,10 +124,11 @@ void     AB_Spectrum_TimeVelocityDrive( const abSpectrumState_t *spec, int n, fl
 
 void     AB_Spectrum_Seed( unsigned int seed );
 float    AB_Spectrum_JONSWAP( float omega, float windSpeed, float fetch );
-float    AB_Spectrum_Directional( float omega, float theta, float windDir, float swell, float directional );
+float    AB_Spectrum_Directional( float omega, float theta, float windDir, float swell, float directional,
+	float spread );
 void     AB_Spectrum_GenerateH0( abSpectrumState_t *spec, int n, float tileLength,
 	float windSpeed, float fetch, float windDirRad, float swell, float directional,
-	float kMin, float kMax );
+	float spread, float kMin, float kMax );
 int      AB_Spectrum_NegKIndex( int n, int ix, int iz );
 float    AB_Spectrum_WaterDensity( float depthY );
 

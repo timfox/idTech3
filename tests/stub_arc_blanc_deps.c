@@ -48,6 +48,12 @@ void Cvar_SetDescription( cvar_t *cv, const char *desc )
 	(void)desc;
 }
 
+void Cvar_Set( const char *var_name, const char *value )
+{
+	(void)var_name;
+	(void)value;
+}
+
 void *Z_Malloc( int size )
 {
 	return malloc( (size_t)size );

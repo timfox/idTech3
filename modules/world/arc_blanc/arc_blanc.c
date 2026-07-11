@@ -19,10 +19,17 @@ static cvar_t *r_arcBlancWind;
 static cvar_t *r_arcBlancFetch;
 static cvar_t *r_arcBlancSwell;
 static cvar_t *r_arcBlancDirectional;
+static cvar_t *r_arcBlancSpread;
 static cvar_t *r_arcBlancGrid;
 static cvar_t *r_arcBlancTile;
 static cvar_t *r_arcBlancWindDir;
 static cvar_t *r_arcBlancSeaLevel;
+static cvar_t *r_arcBlancAmplitude;
+static cvar_t *r_arcBlancHeightScale;
+static cvar_t *r_arcBlancChoppiness;
+static cvar_t *r_arcBlancWaveSpeed;
+static cvar_t *r_arcBlancGustStrength;
+static cvar_t *r_arcBlancGustSpeed;
 static cvar_t *r_arcBlancGpu;
 static cvar_t *r_arcBlancWake;
 static cvar_t *r_arcBlancGpuVelocity;
@@ -55,6 +62,13 @@ static void ab_sync_ocean_params( void )
 	s_ocean.fetch = r_arcBlancFetch ? r_arcBlancFetch->value : 1000.0f;
 	s_ocean.swell = r_arcBlancSwell ? r_arcBlancSwell->value : 0.5f;
 	s_ocean.directional = r_arcBlancDirectional ? r_arcBlancDirectional->value : 1.0f;
+	s_ocean.spread = r_arcBlancSpread ? r_arcBlancSpread->value : 0.0f;
+	s_ocean.amplitudeScale = r_arcBlancAmplitude ? r_arcBlancAmplitude->value : 1.0f;
+	s_ocean.heightScale = r_arcBlancHeightScale ? r_arcBlancHeightScale->value : 1.0f;
+	s_ocean.chopScale = r_arcBlancChoppiness ? r_arcBlancChoppiness->value : 1.0f;
+	s_ocean.waveSpeed = r_arcBlancWaveSpeed ? r_arcBlancWaveSpeed->value : 1.0f;
+	s_ocean.gustStrength = r_arcBlancGustStrength ? r_arcBlancGustStrength->value : 0.0f;
+	s_ocean.gustSpeed = r_arcBlancGustSpeed ? r_arcBlancGustSpeed->value : 0.5f;
 	s_ocean.windDirRad = ( r_arcBlancWindDir ? r_arcBlancWindDir->value : 0.0f ) * (float)M_PI / 180.0f;
 	if ( r_arcBlancGrid && r_arcBlancGrid->integer != s_ocean.gridN ) {
 		int n = r_arcBlancGrid->integer;
@@ -156,6 +170,9 @@ void ArcBlanc_Init( void )
 	Cvar_SetDescription( r_arcBlancSwell, "Swell parameter 0-1 (Horvath directional swell)." );
 	r_arcBlancDirectional = Cvar_Get( "r_arcBlancDirectional", "1", CVAR_ARCHIVE );
 	Cvar_SetDescription( r_arcBlancDirectional, "Directional spectrum blend 0=neutral 1=Donelan-Banner." );
+	r_arcBlancSpread = Cvar_Get( "r_arcBlancSpread", "0", CVAR_ARCHIVE );
+	Cvar_SetDescription( r_arcBlancSpread,
+		"Directional wave spread shaping. Higher values narrow the wave cone around wind direction." );
 	r_arcBlancGrid = Cvar_Get( "r_arcBlancGrid", "128", CVAR_ARCHIVE );
 	Cvar_SetDescription( r_arcBlancGrid, "FFT grid resolution (power of two, max 256)." );
 	r_arcBlancTile = Cvar_Get( "r_arcBlancTile", "256", CVAR_ARCHIVE );
@@ -164,6 +181,22 @@ void ArcBlanc_Init( void )
 	Cvar_SetDescription( r_arcBlancWindDir, "Wind direction in degrees." );
 	r_arcBlancSeaLevel = Cvar_Get( "r_arcBlancSeaLevel", "0", CVAR_ARCHIVE );
 	Cvar_SetDescription( r_arcBlancSeaLevel, "Base sea level offset (world units)." );
+	r_arcBlancAmplitude = Cvar_Get( "r_arcBlancAmplitude", "1", CVAR_ARCHIVE );
+	Cvar_SetDescription( r_arcBlancAmplitude,
+		"Master wave amplitude scale. Affects both vertical height and horizontal displacement." );
+	r_arcBlancHeightScale = Cvar_Get( "r_arcBlancHeightScale", "1", CVAR_ARCHIVE );
+	Cvar_SetDescription( r_arcBlancHeightScale,
+		"Additional vertical-only wave scale layered on top of r_arcBlancAmplitude." );
+	r_arcBlancChoppiness = Cvar_Get( "r_arcBlancChoppiness", "1", CVAR_ARCHIVE );
+	Cvar_SetDescription( r_arcBlancChoppiness,
+		"Horizontal displacement scale. Higher values sharpen crests and make waves feel choppier." );
+	r_arcBlancWaveSpeed = Cvar_Get( "r_arcBlancWaveSpeed", "1", CVAR_ARCHIVE );
+	Cvar_SetDescription( r_arcBlancWaveSpeed, "Scales how quickly the ocean simulation advances over time." );
+	r_arcBlancGustStrength = Cvar_Get( "r_arcBlancGustStrength", "0", CVAR_ARCHIVE );
+	Cvar_SetDescription( r_arcBlancGustStrength,
+		"Wind gust amplitude added as a time-varying multiplier to wave height and chop." );
+	r_arcBlancGustSpeed = Cvar_Get( "r_arcBlancGustSpeed", "0.5", CVAR_ARCHIVE );
+	Cvar_SetDescription( r_arcBlancGustSpeed, "Wind gust animation speed." );
 	r_arcBlancGpu = Cvar_Get( "r_arcBlancGpu", "0", CVAR_ARCHIVE );
 	Cvar_SetDescription( r_arcBlancGpu,
 		"Arc Blanc GPU FFT ocean: 0=CPU, 1=GPU compute + readback for physics." );
@@ -190,6 +223,7 @@ void ArcBlanc_Init( void )
 	Cmd_AddCommand( "arc_blanc_status", ArcBlanc_Status_f );
 	Cmd_AddCommand( "arc_blanc_reseed", ArcBlanc_Reseed_f );
 	Cmd_AddCommand( "arc_blanc_sample", ArcBlanc_Sample_f );
+	Cmd_AddCommand( "arc_blanc_preset", ArcBlanc_Preset_f );
 }
 
 void ArcBlanc_Shutdown( void )
@@ -198,6 +232,7 @@ void ArcBlanc_Shutdown( void )
 	Cmd_RemoveCommand( "arc_blanc_status" );
 	Cmd_RemoveCommand( "arc_blanc_reseed" );
 	Cmd_RemoveCommand( "arc_blanc_sample" );
+	Cmd_RemoveCommand( "arc_blanc_preset" );
 	for ( i = 0; i < AB_MAX_HULLS; i++ ) {
 		if ( s_hulls[i].triangles ) {
 			Z_Free( s_hulls[i].triangles );
@@ -491,11 +526,12 @@ const abOceanState_t *ArcBlanc_GetOceanForTest( void )
 
 void ArcBlanc_Status_f( void )
 {
-	Com_Printf( "Arc Blanc: %s gpu=%s wind=%.1f fetch=%.0f swell=%.2f dir=%.2f grid=%d time=%.2f\n",
+	Com_Printf( "Arc Blanc: %s gpu=%s wind=%.1f fetch=%.0f swell=%.2f dir=%.2f spread=%.2f amp=%.2f height=%.2f chop=%.2f speed=%.2f gust=%.2f grid=%d tile=%.0f time=%.2f\n",
 		ArcBlanc_Enabled() ? "ON" : "OFF",
 		( ArcBlanc_GpuWanted() && s_gpuOceanActive ) ? "ON" : "OFF",
 		s_ocean.windSpeed, s_ocean.fetch, s_ocean.swell, s_ocean.directional,
-		s_ocean.gridN, s_ocean.time );
+		s_ocean.spread, s_ocean.amplitudeScale, s_ocean.heightScale, s_ocean.chopScale,
+		s_ocean.waveSpeed, s_ocean.gustStrength, s_ocean.gridN, s_ocean.tileSize, s_ocean.time );
 }
 
 void ArcBlanc_Reseed_f( void )
@@ -523,4 +559,82 @@ void ArcBlanc_Sample_f( void )
 	h = ArcBlanc_SampleHeight( x, z );
 	ArcBlanc_SampleVelocity( x, h, z, vel );
 	Com_Printf( "height=%.3f vel=(%.3f, %.3f, %.3f)\n", h, vel[0], vel[1], vel[2] );
+}
+
+void ArcBlanc_Preset_f( void )
+{
+	if ( Cmd_Argc() < 2 ) {
+		Com_Printf( "usage: arc_blanc_preset <calm|lake|ocean|storm|cinematic>\n" );
+		return;
+	}
+
+	if ( !Q_stricmp( Cmd_Argv( 1 ), "calm" ) ) {
+		Cvar_Set( "r_arcBlancWind", "8" );
+		Cvar_Set( "r_arcBlancFetch", "400" );
+		Cvar_Set( "r_arcBlancSwell", "0.15" );
+		Cvar_Set( "r_arcBlancDirectional", "0.8" );
+		Cvar_Set( "r_arcBlancSpread", "0.15" );
+		Cvar_Set( "r_arcBlancAmplitude", "0.55" );
+		Cvar_Set( "r_arcBlancHeightScale", "0.75" );
+		Cvar_Set( "r_arcBlancChoppiness", "0.55" );
+		Cvar_Set( "r_arcBlancWaveSpeed", "0.75" );
+		Cvar_Set( "r_arcBlancGustStrength", "0.0" );
+	} else if ( !Q_stricmp( Cmd_Argv( 1 ), "lake" ) ) {
+		Cvar_Set( "r_arcBlancWind", "6" );
+		Cvar_Set( "r_arcBlancFetch", "180" );
+		Cvar_Set( "r_arcBlancSwell", "0.05" );
+		Cvar_Set( "r_arcBlancDirectional", "0.45" );
+		Cvar_Set( "r_arcBlancSpread", "0.0" );
+		Cvar_Set( "r_arcBlancAmplitude", "0.35" );
+		Cvar_Set( "r_arcBlancHeightScale", "0.55" );
+		Cvar_Set( "r_arcBlancChoppiness", "0.35" );
+		Cvar_Set( "r_arcBlancWaveSpeed", "0.6" );
+		Cvar_Set( "r_arcBlancGustStrength", "0.0" );
+		Cvar_Set( "r_arcBlancLakeMode", "1" );
+	} else if ( !Q_stricmp( Cmd_Argv( 1 ), "ocean" ) ) {
+		Cvar_Set( "r_arcBlancWind", "20" );
+		Cvar_Set( "r_arcBlancFetch", "1000" );
+		Cvar_Set( "r_arcBlancSwell", "0.5" );
+		Cvar_Set( "r_arcBlancDirectional", "1.0" );
+		Cvar_Set( "r_arcBlancSpread", "0.4" );
+		Cvar_Set( "r_arcBlancAmplitude", "1.0" );
+		Cvar_Set( "r_arcBlancHeightScale", "1.0" );
+		Cvar_Set( "r_arcBlancChoppiness", "1.0" );
+		Cvar_Set( "r_arcBlancWaveSpeed", "1.0" );
+		Cvar_Set( "r_arcBlancGustStrength", "0.15" );
+		Cvar_Set( "r_arcBlancLakeMode", "0" );
+	} else if ( !Q_stricmp( Cmd_Argv( 1 ), "storm" ) ) {
+		Cvar_Set( "r_arcBlancWind", "32" );
+		Cvar_Set( "r_arcBlancFetch", "2400" );
+		Cvar_Set( "r_arcBlancSwell", "0.9" );
+		Cvar_Set( "r_arcBlancDirectional", "1.0" );
+		Cvar_Set( "r_arcBlancSpread", "0.8" );
+		Cvar_Set( "r_arcBlancAmplitude", "1.7" );
+		Cvar_Set( "r_arcBlancHeightScale", "1.25" );
+		Cvar_Set( "r_arcBlancChoppiness", "1.6" );
+		Cvar_Set( "r_arcBlancWaveSpeed", "1.35" );
+		Cvar_Set( "r_arcBlancGustStrength", "0.35" );
+		Cvar_Set( "r_arcBlancLakeMode", "0" );
+	} else if ( !Q_stricmp( Cmd_Argv( 1 ), "cinematic" ) ) {
+		Cvar_Set( "r_arcBlancWind", "18" );
+		Cvar_Set( "r_arcBlancFetch", "1400" );
+		Cvar_Set( "r_arcBlancSwell", "0.65" );
+		Cvar_Set( "r_arcBlancDirectional", "1.0" );
+		Cvar_Set( "r_arcBlancSpread", "0.65" );
+		Cvar_Set( "r_arcBlancAmplitude", "1.2" );
+		Cvar_Set( "r_arcBlancHeightScale", "1.1" );
+		Cvar_Set( "r_arcBlancChoppiness", "1.15" );
+		Cvar_Set( "r_arcBlancWaveSpeed", "0.9" );
+		Cvar_Set( "r_arcBlancGustStrength", "0.2" );
+		Cvar_Set( "r_arcBlancMeshDiv", "80" );
+		Cvar_Set( "r_arcBlancTileRadius", "2" );
+		Cvar_Set( "r_arcBlancLakeMode", "0" );
+	} else {
+		Com_Printf( S_COLOR_YELLOW "arc_blanc: unknown preset '%s'\n", Cmd_Argv( 1 ) );
+		return;
+	}
+
+	s_ocean.spectrumDirty = qtrue;
+	ab_sync_ocean_params();
+	Com_Printf( "Arc Blanc preset applied: %s\n", Cmd_Argv( 1 ) );
 }

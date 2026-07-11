@@ -136,7 +136,7 @@ static int test_spectrum_negk_symmetry( void )
 	int ix, iz;
 
 	AB_Spectrum_Seed( 0xABCDu );
-	AB_Spectrum_GenerateH0( &spec, n, 256.0f, 20.0f, 1000.0f, 0.0f, 0.5f, 1.0f, 0.0f, 1.0e6f );
+	AB_Spectrum_GenerateH0( &spec, n, 256.0f, 20.0f, 1000.0f, 0.0f, 0.5f, 1.0f, 0.0f, 0.0f, 1.0e6f );
 
 	for ( iz = 0; iz < n; iz++ ) {
 		for ( ix = 0; ix < n; ix++ ) {
@@ -178,6 +178,37 @@ static int test_velocity_drive_sign( void )
 	return 0;
 }
 
+static int test_directional_spread_tightens_off_axis_energy( void )
+{
+	float loose = AB_Spectrum_Directional( 2.0f, 0.65f, 0.0f, 0.5f, 1.0f, 0.0f );
+	float tight = AB_Spectrum_Directional( 2.0f, 0.65f, 0.0f, 0.5f, 1.0f, 0.8f );
+	ASSERT( tight < loose, "spread narrows off-axis directional energy" );
+	return 0;
+}
+
+static int test_combine_respects_art_direction_scales( void )
+{
+	const abOceanState_t *base;
+	abOceanState_t tuned;
+	float sumH, sumDx, sumDz;
+
+	ArcBlanc_ResetForTest();
+	base = ArcBlanc_GetOceanForTest();
+	tuned = *base;
+	tuned.amplitudeScale = 1.5f;
+	tuned.heightScale = 0.8f;
+	tuned.chopScale = 1.2f;
+	tuned.gustStrength = 0.0f;
+	sumH = tuned.fields[0].height[0] + tuned.fields[1].height[0] + tuned.fields[2].height[0];
+	sumDx = tuned.fields[0].dispX[0] + tuned.fields[1].dispX[0] + tuned.fields[2].dispX[0];
+	sumDz = tuned.fields[0].dispZ[0] + tuned.fields[1].dispZ[0] + tuned.fields[2].dispZ[0];
+	AB_Ocean_CombineCascades( &tuned );
+	ASSERT( fabsf( tuned.combinedHeight[0] - sumH * 1.2f ) < 1e-4f, "height scale applied during combine" );
+	ASSERT( fabsf( tuned.combinedDispX[0] - sumDx * 1.8f ) < 1e-4f, "chop scale applied to dispX" );
+	ASSERT( fabsf( tuned.combinedDispZ[0] - sumDz * 1.8f ) < 1e-4f, "chop scale applied to dispZ" );
+	return 0;
+}
+
 int main( void )
 {
 	if ( test_jonswap_peak() ) return 1;
@@ -186,6 +217,8 @@ int main( void )
 	if ( test_spectrum_negk_symmetry() ) return 1;
 	if ( test_ittc_water_density() ) return 1;
 	if ( test_velocity_drive_sign() ) return 1;
+	if ( test_directional_spread_tightens_off_axis_energy() ) return 1;
+	if ( test_combine_respects_art_direction_scales() ) return 1;
 	if ( test_hermitian_height_parity() ) return 1;
 	if ( test_ocean_height_deterministic() ) return 1;
 	if ( test_ocean_height_finite() ) return 1;

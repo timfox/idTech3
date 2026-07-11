@@ -76,5 +76,6 @@ void     ArcBlanc_BuildHeightRGBA( byte *rgba, int maxBytes, int *width, int *he
 void     ArcBlanc_Status_f( void );
 void     ArcBlanc_Reseed_f( void );
 void     ArcBlanc_Sample_f( void );
+void     ArcBlanc_Preset_f( void );
 
 void     ArcBlanc_ResetForTest( void );

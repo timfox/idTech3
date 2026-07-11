@@ -147,6 +147,13 @@ void AB_Ocean_InitDefaults( abOceanState_t *ocean, int gridN, float tileSize )
 	ocean->windDirRad = 0.0f;
 	ocean->swell = 0.5f;
 	ocean->directional = 1.0f;
+	ocean->amplitudeScale = 1.0f;
+	ocean->heightScale = 1.0f;
+	ocean->chopScale = 1.0f;
+	ocean->waveSpeed = 1.0f;
+	ocean->spread = 0.0f;
+	ocean->gustStrength = 0.0f;
+	ocean->gustSpeed = 0.5f;
 	for ( c = 0; c < AB_CASCADE_COUNT; c++ ) {
 		ocean->cascades[c] = defaults[c];
 	}
@@ -163,7 +170,7 @@ void AB_Ocean_UpdateSpectrum( abOceanState_t *ocean )
 	for ( c = 0; c < AB_CASCADE_COUNT; c++ ) {
 		AB_Spectrum_GenerateH0( &ocean->fields[c].spec, ocean->gridN,
 			ocean->cascades[c].length, ocean->windSpeed, ocean->fetch,
-			ocean->windDirRad, ocean->swell, ocean->directional,
+			ocean->windDirRad, ocean->swell, ocean->directional, ocean->spread,
 			ocean->cascades[c].kMin, ocean->cascades[c].kMax );
 	}
 	ocean->spectrumDirty = qfalse;
@@ -178,7 +185,7 @@ void AB_Ocean_UpdateTime( abOceanState_t *ocean, float dt )
 	if ( ocean->spectrumDirty ) {
 		AB_Ocean_UpdateSpectrum( ocean );
 	}
-	ocean->time += dt;
+	ocean->time += dt * ocean->waveSpeed;
 	for ( c = 0; c < AB_CASCADE_COUNT; c++ ) {
 		ab_update_cascade_field( &ocean->fields[c], ocean->gridN, ocean->cascades[c].length, ocean->time );
 	}
@@ -189,17 +196,30 @@ void AB_Ocean_UpdateTime( abOceanState_t *ocean, float dt )
 void AB_Ocean_CombineCascades( abOceanState_t *ocean )
 {
 	int i, n2;
+	float gust = 1.0f;
+	float heightScale;
+	float chopScale;
 	if ( !ocean ) {
 		return;
 	}
+	if ( ocean->gustStrength > 0.0f ) {
+		gust += ocean->gustStrength *
+			( 0.6f * sinf( ocean->time * ocean->gustSpeed ) +
+			  0.4f * sinf( ocean->time * ocean->gustSpeed * 2.37f + 0.7f ) );
+		if ( gust < 0.2f ) {
+			gust = 0.2f;
+		}
+	}
+	heightScale = ocean->amplitudeScale * ocean->heightScale * gust;
+	chopScale = ocean->amplitudeScale * ocean->chopScale * gust;
 	n2 = ocean->gridN * ocean->gridN;
 	for ( i = 0; i < n2; i++ ) {
 		ocean->combinedHeight[i] =
-			ocean->fields[0].height[i] + ocean->fields[1].height[i] + ocean->fields[2].height[i];
+			( ocean->fields[0].height[i] + ocean->fields[1].height[i] + ocean->fields[2].height[i] ) * heightScale;
 		ocean->combinedDispX[i] =
-			ocean->fields[0].dispX[i] + ocean->fields[1].dispX[i] + ocean->fields[2].dispX[i];
+			( ocean->fields[0].dispX[i] + ocean->fields[1].dispX[i] + ocean->fields[2].dispX[i] ) * chopScale;
 		ocean->combinedDispZ[i] =
-			ocean->fields[0].dispZ[i] + ocean->fields[1].dispZ[i] + ocean->fields[2].dispZ[i];
+			( ocean->fields[0].dispZ[i] + ocean->fields[1].dispZ[i] + ocean->fields[2].dispZ[i] ) * chopScale;
 	}
 }
 

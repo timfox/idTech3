@@ -21,17 +21,48 @@ CMake: **`USE_ARC_BLANC`** (default OFF; ON in **`full`** profile).
 | `r_arcBlancFetch` | 1000 | Fetch (m) |
 | `r_arcBlancSwell` | 0.5 | Swell 0–1 |
 | `r_arcBlancDirectional` | 1 | Directional blend 0–1 |
+| `r_arcBlancSpread` | 0 | Extra directional spread shaping; higher values narrow waves around wind direction |
 | `r_arcBlancGrid` | 128 | FFT resolution (power of two, ≤256) |
 | `r_arcBlancTile` | 256 | Tile size (world units) |
 | `r_arcBlancWindDir` | 0 | Wind direction (degrees) |
 | `r_arcBlancSeaLevel` | 0 | Base sea level offset |
+| `r_arcBlancAmplitude` | 1 | Master amplitude scale affecting vertical and horizontal motion |
+| `r_arcBlancHeightScale` | 1 | Additional vertical-only scale |
+| `r_arcBlancChoppiness` | 1 | Horizontal displacement scale for sharper crests |
+| `r_arcBlancWaveSpeed` | 1 | Simulation playback speed |
+| `r_arcBlancGustStrength` | 0 | Time-varying gust amplitude |
+| `r_arcBlancGustSpeed` | 0.5 | Gust animation speed |
 | `r_arcBlancDraw` | 1 | Tessellated ocean mesh in world pass |
 | `r_arcBlancMeshDiv` | 48 | Subdivisions per tile edge (8–128) |
+| `r_arcBlancTileRadius` | 1 | Tiles around the anchor point to render |
+| `r_arcBlancFollowCamera` | 1 | Keep the ocean snapped under the camera |
+| `r_arcBlancTileBreak` | 1 | Renderer-side tile breakup blend |
+| `r_arcBlancTileBreakOffset` | -500 | Secondary sample offset for tile breakup |
+| `r_arcBlancTileBreakBlend` | 0.45 | Tile breakup blend strength |
+| `r_arcBlancTileBreakCell` | 768 | Tile breakup noise cell size |
+| `r_arcBlancNormalStrength` | 1 | Normal exaggeration for shading |
+| `r_arcBlancFoam` | 1 | Crest foam shading toggle |
+| `r_arcBlancFoamIntensity` | 0.35 | Foam brightness |
+| `r_arcBlancFoamThreshold` | 0.28 | Steepness threshold before foam appears |
+| `r_arcBlancFoamSoftness` | 1.5 | Foam spread/softness |
+| `r_arcBlancLakeMode` | 0 | Clamp rendering to a rotated finite lake footprint |
+| `r_arcBlancLakeCenter` | `0 0 0` | Lake center / world anchor |
+| `r_arcBlancLakeExtents` | `1024 1024` | Lake half extents `(x z)` |
+| `r_arcBlancLakeAngle` | 0 | Lake rotation in degrees |
 | `r_arcBlancGpu` | 0 | GPU FFT ocean: 0=CPU, 1=Vulkan compute + CPU readback for physics |
 | `r_arcBlancGpuVelocity` | 1 | GPU depth velocity slices when `r_arcBlancGpu` 1 (0=CPU IFFT) |
 | `r_arcBlancWake` | 1 | Interactive FDM wake scale added to height sampling |
 
-Console: **`arc_blanc_status`**, **`arc_blanc_reseed`**, **`arc_blanc_sample <x> <z>`**.
+Console: **`arc_blanc_status`**, **`arc_blanc_reseed`**, **`arc_blanc_sample <x> <z>`**, **`arc_blanc_preset <calm|lake|ocean|storm|cinematic>`**.
+
+## Transcript-inspired workflow
+
+- Start with `arc_blanc_preset ocean` or `arc_blanc_preset calm`.
+- Use `r_arcBlancWind`, `r_arcBlancFetch`, `r_arcBlancAmplitude`, `r_arcBlancHeightScale`, and `r_arcBlancChoppiness` as the main art-direction dials.
+- Use `r_arcBlancDirectional` plus `r_arcBlancSpread` for longer, straighter wind-driven waves.
+- Use `r_arcBlancTileBreak*` to reduce obvious repetition on broad water planes.
+- Use `r_arcBlancFoam*` to tune crest foam visibility from subtle caps to stormier whitewater.
+- For non-infinite bodies of water, set `r_arcBlancLakeMode 1` and tune `r_arcBlancLakeCenter`, `r_arcBlancLakeExtents`, and `r_arcBlancLakeAngle`.
 
 ### GPU path (`r_arcBlancGpu 1`)
 

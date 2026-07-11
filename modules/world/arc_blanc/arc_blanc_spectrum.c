@@ -138,7 +138,8 @@ static float ab_qdb_xi( float rOmega, float swell )
 	return qdb / swellNorm;
 }
 
-float AB_Spectrum_Directional( float omega, float theta, float windDir, float swell, float directional )
+float AB_Spectrum_Directional( float omega, float theta, float windDir, float swell, float directional,
+	float spread )
 {
 	float omegaP, rOmega, dNeutral, dDir, qXi;
 	(void)windDir;
@@ -153,12 +154,16 @@ float AB_Spectrum_Directional( float omega, float theta, float windDir, float sw
 	dDir = ab_ddb( omega, theta, omegaP ) * ab_d_swell( theta, rOmega, swell );
 	qXi = ab_qdb_xi( rOmega, swell );
 	dDir *= qXi;
+	if ( spread > 0.0f ) {
+		const float c = fabsf( cosf( theta * 0.5f ) );
+		dDir *= powf( c, spread * 24.0f );
+	}
 	return ( 1.0f - directional ) * dNeutral + directional * dDir;
 }
 
 void AB_Spectrum_GenerateH0( abSpectrumState_t *spec, int n, float tileLength,
 	float windSpeed, float fetch, float windDirRad, float swell, float directional,
-	float kMin, float kMax )
+	float spread, float kMin, float kMax )
 {
 	int ix, iz, half;
 	float invL = 1.0f / tileLength;
@@ -201,7 +206,7 @@ void AB_Spectrum_GenerateH0( abSpectrumState_t *spec, int n, float tileLength,
 				const float omega = sqrtf( AB_GRAVITY * kmag );
 				const float theta = atan2f( kz, kx ) - windDirRad;
 				const float sOmega = AB_Spectrum_JONSWAP( omega, windSpeed, fetch );
-				const float dOmega = AB_Spectrum_Directional( omega, theta, windDirRad, swell, directional );
+				const float dOmega = AB_Spectrum_Directional( omega, theta, windDirRad, swell, directional, spread );
 				const float dwdk = sqrtf( AB_GRAVITY / ( 4.0f * kmag ) );
 				const float amp = sqrtf( fmaxf( 0.0f,
 					4.0f * (float)M_PI / ( tileLength * tileLength * kmag ) * sOmega * dOmega * dwdk ) );
