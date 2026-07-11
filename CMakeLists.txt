@@ -3423,22 +3423,29 @@ set_tests_properties(test_pk3_native_library_cache PROPERTIES
 # --- Unit tests ---
 option(BUILD_UNIT_TESTS "Build unit tests" ON)
 if(BUILD_UNIT_TESTS)
+	# Phase 5e: former src/* shims provided navigation/, server/, qcommon/ under one include root.
+	# Prefer modules/ + runtime/ (+ repo-root qcommon bridge) so #include "navigation/..." still works.
+	set(IDTECH3_UNIT_INCLUDE_DIRS
+		${CMAKE_SOURCE_DIR}
+		${CMAKE_SOURCE_DIR}/modules
+		${CMAKE_SOURCE_DIR}/runtime
+		${CMAKE_SOURCE_DIR}/extensions/research
+	)
 	add_executable(unit_macros tests/unit/test_macros.c)
-	target_include_directories(unit_macros PRIVATE ${CMAKE_SOURCE_DIR} ${CMAKE_SOURCE_DIR}/extensions/research)
+	target_include_directories(unit_macros PRIVATE ${IDTECH3_UNIT_INCLUDE_DIRS})
 	add_test(NAME unit_macros COMMAND unit_macros)
 	set_tests_properties(unit_macros PROPERTIES LABELS "unit;validation")
 
 	add_executable(unit_qvm_abi tests/unit/test_qvm_abi.c)
 	target_include_directories(unit_qvm_abi PRIVATE
-		${CMAKE_SOURCE_DIR}
+		${IDTECH3_UNIT_INCLUDE_DIRS}
 		${CMAKE_SOURCE_DIR}/modules/game
-		${CMAKE_SOURCE_DIR}/renderers/common
-		${CMAKE_SOURCE_DIR}/extensions/research)
+		${CMAKE_SOURCE_DIR}/renderers/common)
 	add_test(NAME unit_qvm_abi COMMAND unit_qvm_abi)
 	set_tests_properties(unit_qvm_abi PROPERTIES LABELS "unit;validation;qvm")
 
 	add_executable(unit_qmath tests/unit/test_q_math.c engine/core/q_math.c)
-	target_include_directories(unit_qmath PRIVATE ${CMAKE_SOURCE_DIR} ${CMAKE_SOURCE_DIR}/extensions/research)
+	target_include_directories(unit_qmath PRIVATE ${IDTECH3_UNIT_INCLUDE_DIRS})
 	if(NOT MSVC)
 		target_link_libraries(unit_qmath PRIVATE m)
 	endif()
@@ -3446,7 +3453,7 @@ if(BUILD_UNIT_TESTS)
 	set_tests_properties(unit_qmath PROPERTIES LABELS "unit;validation")
 
 	add_executable(unit_surfaceflags tests/unit/test_surfaceflags.c)
-	target_include_directories(unit_surfaceflags PRIVATE ${CMAKE_SOURCE_DIR} ${CMAKE_SOURCE_DIR}/extensions/research)
+	target_include_directories(unit_surfaceflags PRIVATE ${IDTECH3_UNIT_INCLUDE_DIRS})
 	add_test(NAME unit_surfaceflags COMMAND unit_surfaceflags)
 	set_tests_properties(unit_surfaceflags PROPERTIES LABELS "unit;validation")
 
@@ -3455,7 +3462,7 @@ if(BUILD_UNIT_TESTS)
 		tests/stub_qcommon_min.c
 		engine/core/q_shared.c
 		engine/core/q_math.c)
-	target_include_directories(unit_qhelpers PRIVATE ${CMAKE_SOURCE_DIR} ${CMAKE_SOURCE_DIR}/extensions/research)
+	target_include_directories(unit_qhelpers PRIVATE ${IDTECH3_UNIT_INCLUDE_DIRS})
 	if(NOT MSVC)
 		target_link_libraries(unit_qhelpers PRIVATE m)
 	endif()
@@ -3467,7 +3474,7 @@ if(BUILD_UNIT_TESTS)
 		tests/stub_qcommon_min.c
 		engine/core/q_shared.c
 		engine/core/q_math.c)
-	target_include_directories(unit_crc PRIVATE ${CMAKE_SOURCE_DIR} ${CMAKE_SOURCE_DIR}/extensions/research)
+	target_include_directories(unit_crc PRIVATE ${IDTECH3_UNIT_INCLUDE_DIRS})
 	if(NOT MSVC)
 		target_link_libraries(unit_crc PRIVATE m)
 	endif()
@@ -3479,7 +3486,7 @@ if(BUILD_UNIT_TESTS)
 		tests/stub_qcommon_min.c
 		engine/core/q_shared.c
 		engine/core/q_math.c)
-	target_include_directories(unit_pathutil PRIVATE ${CMAKE_SOURCE_DIR} ${CMAKE_SOURCE_DIR}/extensions/research)
+	target_include_directories(unit_pathutil PRIVATE ${IDTECH3_UNIT_INCLUDE_DIRS})
 	if(NOT MSVC)
 		target_link_libraries(unit_pathutil PRIVATE m)
 	endif()
@@ -3492,7 +3499,7 @@ if(BUILD_UNIT_TESTS)
 		tests/stub_msg_cvar.c
 		engine/core/msg.c
 		engine/core/huffman_static.c)
-	target_include_directories(unit_msg PRIVATE ${CMAKE_SOURCE_DIR} ${CMAKE_SOURCE_DIR}/extensions/research)
+	target_include_directories(unit_msg PRIVATE ${IDTECH3_UNIT_INCLUDE_DIRS})
 	target_compile_definitions(unit_msg PRIVATE DEDICATED)
 	if(NOT MSVC)
 		target_link_libraries(unit_msg PRIVATE m)
@@ -3503,7 +3510,7 @@ if(BUILD_UNIT_TESTS)
 	add_executable(unit_huffman_adaptive
 		tests/unit/test_huffman_adaptive.c
 		engine/core/huffman.c)
-	target_include_directories(unit_huffman_adaptive PRIVATE ${CMAKE_SOURCE_DIR})
+	target_include_directories(unit_huffman_adaptive PRIVATE ${IDTECH3_UNIT_INCLUDE_DIRS})
 	add_test(NAME unit_huffman_adaptive COMMAND unit_huffman_adaptive)
 	set_tests_properties(unit_huffman_adaptive PROPERTIES LABELS "unit;validation;network")
 
@@ -3512,7 +3519,7 @@ if(BUILD_UNIT_TESTS)
 		tests/stub_qcommon_min.c
 		engine/core/q_shared.c
 		engine/core/q_math.c)
-	target_include_directories(unit_info PRIVATE ${CMAKE_SOURCE_DIR} ${CMAKE_SOURCE_DIR}/extensions/research)
+	target_include_directories(unit_info PRIVATE ${IDTECH3_UNIT_INCLUDE_DIRS})
 	if(NOT MSVC)
 		target_link_libraries(unit_info PRIVATE m)
 	endif()
@@ -3523,7 +3530,7 @@ if(BUILD_UNIT_TESTS)
 		tests/unit/test_cm_bounds.c
 		engine/core/cm_bounds.c
 		engine/core/q_math.c)
-	target_include_directories(unit_cm_bounds PRIVATE ${CMAKE_SOURCE_DIR} ${CMAKE_SOURCE_DIR}/extensions/research)
+	target_include_directories(unit_cm_bounds PRIVATE ${IDTECH3_UNIT_INCLUDE_DIRS})
 	if(NOT MSVC)
 		target_link_libraries(unit_cm_bounds PRIVATE m)
 	endif()
@@ -3565,7 +3572,7 @@ if(BUILD_UNIT_TESTS)
 		tests/stub_qcommon_min.c
 		engine/core/q_shared.c
 		engine/core/q_math.c)
-	target_include_directories(unit_parse PRIVATE ${CMAKE_SOURCE_DIR} ${CMAKE_SOURCE_DIR}/extensions/research)
+	target_include_directories(unit_parse PRIVATE ${IDTECH3_UNIT_INCLUDE_DIRS})
 	if(NOT MSVC)
 		target_link_libraries(unit_parse PRIVATE m)
 	endif()
@@ -3578,7 +3585,7 @@ if(BUILD_UNIT_TESTS)
 		engine/core/q_shared.c
 		engine/core/q_math.c
 		engine/core/engine_sprite_map.c)
-	target_include_directories(unit_engine_sprite_map PRIVATE ${CMAKE_SOURCE_DIR} ${CMAKE_SOURCE_DIR}/extensions/research)
+	target_include_directories(unit_engine_sprite_map PRIVATE ${IDTECH3_UNIT_INCLUDE_DIRS})
 	if(NOT MSVC)
 		target_link_libraries(unit_engine_sprite_map PRIVATE m)
 	endif()
@@ -3591,7 +3598,7 @@ if(BUILD_UNIT_TESTS)
 		engine/core/q_shared.c
 		engine/core/q_math.c
 		engine/core/engine_decal_map.c)
-	target_include_directories(unit_engine_decal_map PRIVATE ${CMAKE_SOURCE_DIR} ${CMAKE_SOURCE_DIR}/extensions/research)
+	target_include_directories(unit_engine_decal_map PRIVATE ${IDTECH3_UNIT_INCLUDE_DIRS})
 	if(UNIX)
 		target_link_libraries(unit_engine_decal_map PRIVATE m)
 	endif()
@@ -3602,7 +3609,7 @@ if(BUILD_UNIT_TESTS)
 		tests/unit/test_aiwc_metrics.c
 		engine/core/aiwc_metrics.c
 		engine/core/aiwc_matmul.c)
-	target_include_directories(unit_aiwc PRIVATE ${CMAKE_SOURCE_DIR} ${CMAKE_SOURCE_DIR}/extensions/research)
+	target_include_directories(unit_aiwc PRIVATE ${IDTECH3_UNIT_INCLUDE_DIRS})
 	if(NOT MSVC)
 		target_link_libraries(unit_aiwc PRIVATE m)
 	endif()
@@ -3613,7 +3620,7 @@ if(BUILD_UNIT_TESTS)
 		tests/unit/test_ttp_model.c
 		engine/core/ttp_model.c
 		engine/core/ttp_sim.c)
-	target_include_directories(unit_ttp PRIVATE ${CMAKE_SOURCE_DIR} ${CMAKE_SOURCE_DIR}/extensions/research)
+	target_include_directories(unit_ttp PRIVATE ${IDTECH3_UNIT_INCLUDE_DIRS})
 	if(NOT MSVC)
 		target_link_libraries(unit_ttp PRIVATE m)
 	endif()
@@ -3623,7 +3630,7 @@ if(BUILD_UNIT_TESTS)
 	add_executable(unit_bubblesh
 		tests/unit/test_bubblesh_model.c
 		engine/core/bubblesh_model.c)
-	target_include_directories(unit_bubblesh PRIVATE ${CMAKE_SOURCE_DIR} ${CMAKE_SOURCE_DIR}/extensions/research)
+	target_include_directories(unit_bubblesh PRIVATE ${IDTECH3_UNIT_INCLUDE_DIRS})
 	if(NOT MSVC)
 		target_link_libraries(unit_bubblesh PRIVATE m)
 	endif()
@@ -3633,7 +3640,7 @@ if(BUILD_UNIT_TESTS)
 	add_executable(unit_vuda_model
 		tests/unit/test_vuda_model.c
 		extensions/research/vuda/vuda_model.c)
-	target_include_directories(unit_vuda_model PRIVATE ${CMAKE_SOURCE_DIR} ${CMAKE_SOURCE_DIR}/extensions/research)
+	target_include_directories(unit_vuda_model PRIVATE ${IDTECH3_UNIT_INCLUDE_DIRS})
 	if(NOT MSVC)
 		target_link_libraries(unit_vuda_model PRIVATE m)
 	endif()
@@ -3643,7 +3650,7 @@ if(BUILD_UNIT_TESTS)
 	add_executable(unit_vksplat_model
 		tests/unit/test_vksplat_model.c
 		extensions/research/vksplat/vksplat_model.c)
-	target_include_directories(unit_vksplat_model PRIVATE ${CMAKE_SOURCE_DIR} ${CMAKE_SOURCE_DIR}/extensions/research)
+	target_include_directories(unit_vksplat_model PRIVATE ${IDTECH3_UNIT_INCLUDE_DIRS})
 	if(NOT MSVC)
 		target_link_libraries(unit_vksplat_model PRIVATE m)
 	endif()
@@ -3653,7 +3660,7 @@ if(BUILD_UNIT_TESTS)
 	add_executable(unit_curast_model
 		tests/unit/test_curast_model.c
 		extensions/research/curast/curast_model.c)
-	target_include_directories(unit_curast_model PRIVATE ${CMAKE_SOURCE_DIR} ${CMAKE_SOURCE_DIR}/extensions/research)
+	target_include_directories(unit_curast_model PRIVATE ${IDTECH3_UNIT_INCLUDE_DIRS})
 	if(NOT MSVC)
 		target_link_libraries(unit_curast_model PRIVATE m)
 	endif()
@@ -3663,7 +3670,7 @@ if(BUILD_UNIT_TESTS)
 	add_executable(unit_infernux_model
 		tests/unit/test_infernux_model.c
 		extensions/research/infernux/infernux_model.c)
-	target_include_directories(unit_infernux_model PRIVATE ${CMAKE_SOURCE_DIR} ${CMAKE_SOURCE_DIR}/extensions/research)
+	target_include_directories(unit_infernux_model PRIVATE ${IDTECH3_UNIT_INCLUDE_DIRS})
 	if(NOT MSVC)
 		target_link_libraries(unit_infernux_model PRIVATE m)
 	endif()
@@ -3676,7 +3683,7 @@ if(BUILD_UNIT_TESTS)
 		engine/core/app_crdt.c
 		engine/core/q_shared.c
 		engine/core/q_math.c)
-	target_include_directories(unit_app_crdt PRIVATE ${CMAKE_SOURCE_DIR} ${CMAKE_SOURCE_DIR}/extensions/research)
+	target_include_directories(unit_app_crdt PRIVATE ${IDTECH3_UNIT_INCLUDE_DIRS})
 	target_compile_definitions(unit_app_crdt PRIVATE APP_CRDT_UNIT_TEST)
 	if(NOT MSVC)
 		target_link_libraries(unit_app_crdt PRIVATE m)
@@ -3687,7 +3694,7 @@ if(BUILD_UNIT_TESTS)
 	add_executable(unit_mimir_model
 		tests/unit/test_mimir_model.c
 		extensions/research/mimir/mimir_model.c)
-	target_include_directories(unit_mimir_model PRIVATE ${CMAKE_SOURCE_DIR} ${CMAKE_SOURCE_DIR}/extensions/research)
+	target_include_directories(unit_mimir_model PRIVATE ${IDTECH3_UNIT_INCLUDE_DIRS})
 	if(NOT MSVC)
 		target_link_libraries(unit_mimir_model PRIVATE m)
 	endif()
@@ -3697,7 +3704,7 @@ if(BUILD_UNIT_TESTS)
 	add_executable(unit_iris_model
 		tests/unit/test_iris_model.c
 		extensions/research/iris/iris_model.c)
-	target_include_directories(unit_iris_model PRIVATE ${CMAKE_SOURCE_DIR} ${CMAKE_SOURCE_DIR}/extensions/research)
+	target_include_directories(unit_iris_model PRIVATE ${IDTECH3_UNIT_INCLUDE_DIRS})
 	if(NOT MSVC)
 		target_link_libraries(unit_iris_model PRIVATE m)
 	endif()
@@ -3707,7 +3714,7 @@ if(BUILD_UNIT_TESTS)
 	add_executable(unit_radiusfps
 		tests/unit/test_radiusfps.c
 		extensions/research/radiusfps/radiusfps_cpu.c)
-	target_include_directories(unit_radiusfps PRIVATE ${CMAKE_SOURCE_DIR} ${CMAKE_SOURCE_DIR}/extensions/research)
+	target_include_directories(unit_radiusfps PRIVATE ${IDTECH3_UNIT_INCLUDE_DIRS})
 	if(NOT MSVC)
 		target_link_libraries(unit_radiusfps PRIVATE m)
 	endif()
@@ -3725,7 +3732,7 @@ if(BUILD_UNIT_TESTS)
 		extensions/research/gccfer/gccfer_dataset.c
 		extensions/research/gccfer/gccfer_cafer.c
 		extensions/research/gccfer/gccfer_model.c)
-	target_include_directories(unit_gccfer PRIVATE ${CMAKE_SOURCE_DIR} ${CMAKE_SOURCE_DIR}/extensions/research)
+	target_include_directories(unit_gccfer PRIVATE ${IDTECH3_UNIT_INCLUDE_DIRS})
 	if(NOT MSVC)
 		target_link_libraries(unit_gccfer PRIVATE m)
 	endif()
@@ -3737,7 +3744,7 @@ if(BUILD_UNIT_TESTS)
 		extensions/research/dax/dax_benchmark.c
 		extensions/research/dax/dax_model.c
 		extensions/research/dax/dax_eval.c)
-	target_include_directories(unit_dax PRIVATE ${CMAKE_SOURCE_DIR} ${CMAKE_SOURCE_DIR}/extensions/research)
+	target_include_directories(unit_dax PRIVATE ${IDTECH3_UNIT_INCLUDE_DIRS})
 	if(UNIX AND NOT APPLE)
 		target_link_libraries(unit_dax PRIVATE m)
 	endif()
@@ -3752,7 +3759,7 @@ if(BUILD_UNIT_TESTS)
 		extensions/research/dk_qsd/dk_qsd_dense.c
 		extensions/research/dk_qsd/dk_qsd_mps.c
 		extensions/research/dk_qsd/dk_qsd_observables.c)
-	target_include_directories(unit_dk_qsd PRIVATE ${CMAKE_SOURCE_DIR} ${CMAKE_SOURCE_DIR}/extensions/research)
+	target_include_directories(unit_dk_qsd PRIVATE ${IDTECH3_UNIT_INCLUDE_DIRS})
 	if(UNIX AND NOT APPLE)
 		target_link_libraries(unit_dk_qsd PRIVATE m)
 	endif()
@@ -3764,7 +3771,7 @@ if(BUILD_UNIT_TESTS)
 		tests/stub_dlm_deps.c
 		extensions/research/dlm/dlm_matrix.c
 		extensions/research/dlm/dlm_eval.c)
-	target_include_directories(unit_dlm PRIVATE ${CMAKE_SOURCE_DIR} ${CMAKE_SOURCE_DIR}/extensions/research)
+	target_include_directories(unit_dlm PRIVATE ${IDTECH3_UNIT_INCLUDE_DIRS})
 	if(UNIX AND NOT APPLE)
 		target_link_libraries(unit_dlm PRIVATE m)
 	endif()
@@ -3777,7 +3784,7 @@ if(BUILD_UNIT_TESTS)
 		extensions/research/sfca/sfca_core.c
 		extensions/research/sfca/sfca_run.c
 		extensions/research/sfca/sfca_scan.c)
-	target_include_directories(unit_sfca PRIVATE ${CMAKE_SOURCE_DIR} ${CMAKE_SOURCE_DIR}/extensions/research)
+	target_include_directories(unit_sfca PRIVATE ${IDTECH3_UNIT_INCLUDE_DIRS})
 	if(UNIX AND NOT APPLE)
 		target_link_libraries(unit_sfca PRIVATE m)
 	endif()
@@ -3790,7 +3797,7 @@ if(BUILD_UNIT_TESTS)
 		extensions/research/x3dpra/x3dpra_scene.c
 		extensions/research/x3dpra/x3dpra_opt.c
 		extensions/research/x3dpra/x3dpra_forward.c)
-	target_include_directories(unit_x3dpra PRIVATE ${CMAKE_SOURCE_DIR} ${CMAKE_SOURCE_DIR}/extensions/research)
+	target_include_directories(unit_x3dpra PRIVATE ${IDTECH3_UNIT_INCLUDE_DIRS})
 	if(UNIX AND NOT APPLE)
 		target_link_libraries(unit_x3dpra PRIVATE m)
 	endif()
@@ -3803,7 +3810,7 @@ if(BUILD_UNIT_TESTS)
 		tests/stub_qcommon_min.c
 		engine/core/q_shared.c
 		engine/core/q_math.c)
-	target_include_directories(unit_iris_io PRIVATE ${CMAKE_SOURCE_DIR} ${CMAKE_SOURCE_DIR}/extensions/research)
+	target_include_directories(unit_iris_io PRIVATE ${IDTECH3_UNIT_INCLUDE_DIRS})
 	if(NOT MSVC)
 		target_link_libraries(unit_iris_io PRIVATE m)
 	endif()
@@ -3815,7 +3822,7 @@ if(BUILD_UNIT_TESTS)
 		tests/stub_qcommon_min.c
 		engine/core/q_shared.c
 		engine/core/q_math.c)
-	target_include_directories(unit_endian PRIVATE ${CMAKE_SOURCE_DIR} ${CMAKE_SOURCE_DIR}/extensions/research)
+	target_include_directories(unit_endian PRIVATE ${IDTECH3_UNIT_INCLUDE_DIRS})
 	if(NOT MSVC)
 		target_link_libraries(unit_endian PRIVATE m)
 	endif()
@@ -3825,7 +3832,7 @@ if(BUILD_UNIT_TESTS)
 	add_executable(unit_vm_native_module
 		tests/unit/test_vm_native_module.c
 		engine/core/vm_native_module.c)
-	target_include_directories(unit_vm_native_module PRIVATE ${CMAKE_SOURCE_DIR} ${CMAKE_SOURCE_DIR}/extensions/research)
+	target_include_directories(unit_vm_native_module PRIVATE ${IDTECH3_UNIT_INCLUDE_DIRS})
 	add_test(NAME unit_vm_native_module COMMAND unit_vm_native_module)
 	set_tests_properties(unit_vm_native_module PROPERTIES LABELS "unit;validation")
 
@@ -3858,7 +3865,7 @@ if(BUILD_UNIT_TESTS)
 			tests/stub_openworld_nav.c
 			engine/core/q_shared.c
 			engine/core/q_math.c)
-		target_include_directories(unit_openworld_nav PRIVATE ${CMAKE_SOURCE_DIR} ${CMAKE_SOURCE_DIR}/extensions/research)
+		target_include_directories(unit_openworld_nav PRIVATE ${IDTECH3_UNIT_INCLUDE_DIRS})
 		target_link_libraries(unit_openworld_nav PRIVATE recast_nav)
 		if(NOT MSVC)
 			target_link_libraries(unit_openworld_nav PRIVATE m)
@@ -3878,7 +3885,7 @@ if(BUILD_UNIT_TESTS)
 		engine/core/q_shared.c
 		engine/core/q_math.c)
 	target_compile_definitions(unit_world_residency PRIVATE WORLD_RESIDENCY_UNIT_TEST)
-	target_include_directories(unit_world_residency PRIVATE ${CMAKE_SOURCE_DIR} ${CMAKE_SOURCE_DIR}/extensions/research)
+	target_include_directories(unit_world_residency PRIVATE ${IDTECH3_UNIT_INCLUDE_DIRS})
 	if(NOT MSVC)
 		target_link_libraries(unit_world_residency PRIVATE m)
 	endif()
@@ -3893,7 +3900,7 @@ if(BUILD_UNIT_TESTS)
 		engine/core/q_shared.c
 		engine/core/q_math.c)
 	target_compile_definitions(unit_sector_graph PRIVATE SECTOR_GRAPH_UNIT_TEST)
-	target_include_directories(unit_sector_graph PRIVATE ${CMAKE_SOURCE_DIR} ${CMAKE_SOURCE_DIR}/extensions/research)
+	target_include_directories(unit_sector_graph PRIVATE ${IDTECH3_UNIT_INCLUDE_DIRS})
 	if(NOT MSVC)
 		target_link_libraries(unit_sector_graph PRIVATE m)
 	endif()
@@ -3908,7 +3915,7 @@ if(BUILD_UNIT_TESTS)
 		engine/core/q_shared.c
 		engine/core/q_math.c)
 	target_compile_definitions(unit_cluster_graph PRIVATE CLUSTER_GRAPH_UNIT_TEST)
-	target_include_directories(unit_cluster_graph PRIVATE ${CMAKE_SOURCE_DIR} ${CMAKE_SOURCE_DIR}/extensions/research)
+	target_include_directories(unit_cluster_graph PRIVATE ${IDTECH3_UNIT_INCLUDE_DIRS})
 	if(NOT MSVC)
 		target_link_libraries(unit_cluster_graph PRIVATE m)
 	endif()
@@ -3923,7 +3930,7 @@ if(BUILD_UNIT_TESTS)
 		engine/core/md5.c
 		engine/core/q_shared.c
 		engine/core/q_math.c)
-	target_include_directories(unit_sv_auth PRIVATE ${CMAKE_SOURCE_DIR} ${CMAKE_SOURCE_DIR}/extensions/research)
+	target_include_directories(unit_sv_auth PRIVATE ${IDTECH3_UNIT_INCLUDE_DIRS})
 	if(NOT MSVC)
 		target_link_libraries(unit_sv_auth PRIVATE m)
 	endif()
@@ -3938,7 +3945,7 @@ if(BUILD_UNIT_TESTS)
 		engine/core/q_shared.c
 		engine/core/q_math.c)
 	target_compile_definitions(unit_fog_biology PRIVATE FOG_BIOLOGY_UNIT_TEST)
-	target_include_directories(unit_fog_biology PRIVATE ${CMAKE_SOURCE_DIR} ${CMAKE_SOURCE_DIR}/extensions/research)
+	target_include_directories(unit_fog_biology PRIVATE ${IDTECH3_UNIT_INCLUDE_DIRS})
 	if(NOT MSVC)
 		target_link_libraries(unit_fog_biology PRIVATE m)
 	endif()
@@ -3959,7 +3966,7 @@ if(BUILD_UNIT_TESTS)
 			engine/core/q_shared.c
 			engine/core/q_math.c)
 		target_compile_definitions(unit_arc_blanc PRIVATE ARC_BLANC_UNIT_TEST)
-		target_include_directories(unit_arc_blanc PRIVATE ${CMAKE_SOURCE_DIR})
+		target_include_directories(unit_arc_blanc PRIVATE ${IDTECH3_UNIT_INCLUDE_DIRS})
 		if(NOT MSVC)
 			target_link_libraries(unit_arc_blanc PRIVATE m)
 		endif()
@@ -3975,7 +3982,7 @@ if(BUILD_UNIT_TESTS)
 		engine/core/q_shared.c
 		engine/core/q_math.c)
 	target_compile_definitions(unit_genetic_gan PRIVATE GENETIC_GAN_UNIT_TEST)
-	target_include_directories(unit_genetic_gan PRIVATE ${CMAKE_SOURCE_DIR} ${CMAKE_SOURCE_DIR}/extensions/research)
+	target_include_directories(unit_genetic_gan PRIVATE ${IDTECH3_UNIT_INCLUDE_DIRS})
 	if(NOT MSVC)
 		target_link_libraries(unit_genetic_gan PRIVATE m)
 	endif()
@@ -3989,7 +3996,7 @@ if(BUILD_UNIT_TESTS)
 		engine/core/jobs.c
 		engine/core/q_shared.c
 		engine/core/q_math.c)
-	target_include_directories(unit_jobs PRIVATE ${CMAKE_SOURCE_DIR} ${CMAKE_SOURCE_DIR}/extensions/research)
+	target_include_directories(unit_jobs PRIVATE ${IDTECH3_UNIT_INCLUDE_DIRS})
 	if(NOT MSVC)
 		target_link_libraries(unit_jobs PRIVATE m)
 	endif()
