@@ -43,9 +43,9 @@ macro(idtech3_append_client_extension_sources)
 	if(USE_OPEN_WORLD)
 		list(APPEND CLIENT_SRCS ${_dist} ${_ow} ${_proc})
 	endif()
-	if(USE_FREEUSD)
-		list(APPEND CLIENT_SRCS ${_usd})
-	endif()
+	# Always compile cl_usd.cpp — CL_USD_Init is called from cl_main; USE_FREEUSD
+	# only enables real FreeUSD commands inside the TU.
+	list(APPEND CLIENT_SRCS ${_usd})
 	if(USE_IDTECH3_EMULATOR)
 		list(APPEND CLIENT_SRCS ${_emu_proc} ${_emu_frame} ${_emu_console} ${_emu_input})
 	endif()
