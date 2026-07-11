@@ -202,6 +202,50 @@ static int l_face_setExpression(lua_State *L) {
 static int l_face_setFlex(lua_State *L) { Face_SetFlex((int)luaL_checkinteger(L,1),(flexControllerId_t)luaL_checkinteger(L,2),(float)luaL_checknumber(L,3)); return 0; }
 static int l_face_setPhoneme(lua_State *L) { Face_SetPhoneme((int)luaL_checkinteger(L,1),(phonemeId_t)luaL_checkinteger(L,2),(float)luaL_optnumber(L,3,1.0)); return 0; }
 static int l_face_setBlinkRate(lua_State *L) { Face_SetBlinkRate((int)luaL_checkinteger(L,1),(float)luaL_checknumber(L,2)); return 0; }
+static int l_face_setAU(lua_State *L) {
+	facsActionUnit_t au;
+	if (lua_type(L, 2) == LUA_TSTRING) {
+		au = Face_AUFromName(luaL_checkstring(L, 2));
+	} else {
+		au = (facsActionUnit_t)luaL_checkinteger(L, 2);
+	}
+	if (au >= FACS_AU_COUNT) {
+		return luaL_error(L, "unknown FACS AU");
+	}
+	Face_SetAU((int)luaL_checkinteger(L, 1), au, (float)luaL_checknumber(L, 3));
+	return 0;
+}
+static int l_face_setAUSide(lua_State *L) {
+	facsActionUnit_t au;
+	facsSide_t side;
+	if (lua_type(L, 2) == LUA_TSTRING) {
+		au = Face_AUFromName(luaL_checkstring(L, 2));
+	} else {
+		au = (facsActionUnit_t)luaL_checkinteger(L, 2);
+	}
+	if (au >= FACS_AU_COUNT) {
+		return luaL_error(L, "unknown FACS AU");
+	}
+	side = (facsSide_t)luaL_checkinteger(L, 3);
+	Face_SetAUSide((int)luaL_checkinteger(L, 1), au, side, (float)luaL_checknumber(L, 4));
+	return 0;
+}
+static int l_face_getAU(lua_State *L) {
+	facsActionUnit_t au;
+	if (lua_type(L, 2) == LUA_TSTRING) {
+		au = Face_AUFromName(luaL_checkstring(L, 2));
+	} else {
+		au = (facsActionUnit_t)luaL_checkinteger(L, 2);
+	}
+	lua_pushnumber(L, Face_GetAU((int)luaL_checkinteger(L, 1), au));
+	return 1;
+}
+static int l_face_clearAUs(lua_State *L) { Face_ClearAUs((int)luaL_checkinteger(L,1)); return 0; }
+static int l_face_auName(lua_State *L) {
+	facsActionUnit_t au = (facsActionUnit_t)luaL_checkinteger(L, 1);
+	lua_pushstring(L, Face_AUName(au));
+	return 1;
+}
 
 /* ========== Horde bindings ========== */
 
@@ -1581,9 +1625,26 @@ void LuaBindings_RegisterAll(void *luaState) {
 		{"create", l_face_create}, {"destroy", l_face_destroy},
 		{"setExpression", l_face_setExpression}, {"setFlex", l_face_setFlex},
 		{"setPhoneme", l_face_setPhoneme}, {"setBlinkRate", l_face_setBlinkRate},
+		{"setAU", l_face_setAU}, {"setAUSide", l_face_setAUSide},
+		{"getAU", l_face_getAU}, {"clearAUs", l_face_clearAUs},
+		{"auName", l_face_auName},
 		{NULL, NULL}
 	};
 	registerTable(L, "Face", faceFuncs);
+	/* FACS AU enum constants on Engine.Face (AU12 = index, etc.) */
+	lua_getglobal(L, "Engine");
+	lua_getfield(L, -1, "Face");
+	{
+		int ai;
+		for (ai = 0; ai < FACS_AU_COUNT; ai++) {
+			lua_pushinteger(L, ai);
+			lua_setfield(L, -2, Face_AUName((facsActionUnit_t)ai));
+		}
+		lua_pushinteger(L, FACS_SIDE_BOTH); lua_setfield(L, -2, "SIDE_BOTH");
+		lua_pushinteger(L, FACS_SIDE_LEFT); lua_setfield(L, -2, "SIDE_LEFT");
+		lua_pushinteger(L, FACS_SIDE_RIGHT); lua_setfield(L, -2, "SIDE_RIGHT");
+	}
+	lua_pop(L, 2);
 
 	static const luaL_Reg hordeFuncs[] = {
 		{"init", l_horde_init}, {"spawn", l_horde_spawn}, {"kill", l_horde_kill},

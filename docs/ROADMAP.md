@@ -44,7 +44,8 @@ Priorities that keep **CI green** and **README/build truth** aligned:
 - [x] Horde/swarm AI (512 agents, 4-tier LOD, flocking)
 - [x] Response rules (14 criteria, weighted responses)
 - [x] Choreography (timeline scenes)
-- [x] Facial animation (33 flex, 25 phonemes, 11 expressions)
+- [x] Facial animation (33 flex, 22 FACS AUs, 25 phonemes, 11 expressions)
+
 - [x] Dismemberment + extended gibs (16 limbs, physics gibs)
 - [x] Navigation mesh (Recast/Detour, crowd simulation)
 - [x] Particle system (8192 pool, billboard rendering)

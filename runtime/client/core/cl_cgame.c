@@ -34,6 +34,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "cl_openworld.h"
 #include "cl_voip.h"
 #include "../../game/bg_public.h"
+#include "../../game/g_facial.h"
 #include "../../qcommon/cm_public.h"
 
 void CM_Stream_Merge_ClearAll( void );
@@ -137,12 +138,70 @@ static int CL_EngineEntityNumToGame( int entityNum ) {
 	return entityNum;
 }
 
+static void CL_Face_MorphApply( void *ent, const char *name, float weight ) {
+	if ( !ent || !name || !re.SetEntityMorphWeight ) {
+		return;
+	}
+	re.SetEntityMorphWeight( (const refEntity_t *)ent, name, weight );
+}
+
+/*
+===============
+CL_Face_ApplyMorphs
+
+Drive IQM/glTF morphs from FACS/flex face instances near this refEntity.
+===============
+*/
+static void CL_Face_ApplyMorphs( refEntity_t *ent ) {
+	int i;
+	float matchDistSq = 80.0f * 80.0f;
+
+	if ( !ent || ent->reType != RT_MODEL ) {
+		return;
+	}
+	if ( !re.SetEntityMorphWeight || cls.state != CA_ACTIVE || !cl.snap.valid ) {
+		return;
+	}
+
+	for ( i = 0; i < cl.snap.numEntities; i++ ) {
+		const entityState_t *es = &cl.parseEntities[
+			( cl.snap.parseEntitiesNum + i ) & ( MAX_PARSE_ENTITIES - 1 ) ];
+		vec3_t head;
+		float dx, dy, dz, dBody, dHead;
+		int entityNum;
+
+		if ( es->eType != ET_PLAYER ) {
+			continue;
+		}
+
+		entityNum = es->number;
+		if ( Face_FindByEntityNum( entityNum ) < 0 ) {
+			continue;
+		}
+
+		dx = ent->origin[0] - es->origin[0];
+		dy = ent->origin[1] - es->origin[1];
+		dz = ent->origin[2] - es->origin[2];
+		dBody = dx * dx + dy * dy + dz * dz;
+		VectorCopy( es->origin, head );
+		head[2] += 48.0f;
+		dx = ent->origin[0] - head[0];
+		dy = ent->origin[1] - head[1];
+		dz = ent->origin[2] - head[2];
+		dHead = dx * dx + dy * dy + dz * dz;
+		if ( dBody < matchDistSq || dHead < matchDistSq ) {
+			Face_ApplyMorphsToEntity( entityNum, ent, CL_Face_MorphApply );
+		}
+	}
+}
+
 static void CL_AddRetailRefEntityToScene( const retailRefEntity_t *src, qboolean intShaderTime ) {
 	refEntity_t ent;
 
 	Com_Memset( &ent, 0, sizeof( ent ) );
 	Com_Memcpy( &ent, src, sizeof( *src ) );
 	CL_VoIP_ApplyLipFlap( &ent );
+	CL_Face_ApplyMorphs( &ent );
 	re.AddRefEntityToScene( &ent, intShaderTime );
 }
 
@@ -954,6 +1013,7 @@ static intptr_t CL_CgameSystemCalls( intptr_t *args ) {
 		} else {
 			VM_CHECKBOUNDS( cgvm, args[1], sizeof( refEntity_t ) );
 			CL_VoIP_ApplyLipFlap( VMA(1) );
+			CL_Face_ApplyMorphs( VMA(1) );
 			re.AddRefEntityToScene( VMA(1), qfalse );
 		}
 		return 0;
@@ -1147,6 +1207,7 @@ static intptr_t CL_CgameSystemCalls( intptr_t *args ) {
 		} else {
 			VM_CHECKBOUNDS( cgvm, args[1], sizeof( refEntity_t ) );
 			CL_VoIP_ApplyLipFlap( VMA(1) );
+			CL_Face_ApplyMorphs( VMA(1) );
 			re.AddRefEntityToScene( VMA(1), qtrue );
 		}
 		return 0;

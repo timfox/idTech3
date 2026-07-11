@@ -48,6 +48,7 @@ Documentation is grouped by **tier**. Most files remain at their historical path
 - [MOD_SDK.md](MOD_SDK.md)
 - [RADIANT.md](RADIANT.md)
 - [VOIP.md](VOIP.md) — Opus voice chat + head lip flap
+- [FACS.md](FACS.md) — Facial Action Coding System Action Units
 
 ## Repository layout (2026)
 
