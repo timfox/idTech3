@@ -621,7 +621,7 @@ static qboolean ParseStage( shaderStage_t *stage, const char **text )
 	stage->blendSharpness = 8.0f;
 	stage->materialLayerCount = 1;
 	stage->materialHeightMask = 0;
-	for ( i = 0; i < 3; i++ ) {
+	for ( i = 0; i < 7; i++ ) {
 		stage->layerAlbedo[i] = NULL;
 		stage->layerNormal[i] = NULL;
 		stage->layerPhysical[i] = NULL;
@@ -948,12 +948,33 @@ static qboolean ParseStage( shaderStage_t *stage, const char **text )
 		else if ( !Q_stricmp( token, "materialBlend" ) )
 		{
 			token = COM_ParseExt( text, qfalse );
-			if ( !token[0] || Q_stricmp( token, "vertex" ) ) {
-				ri.Printf( PRINT_WARNING, "WARNING: materialBlend expects 'vertex' in shader '%s'\n", shader.name );
+			if ( !token[0] ) {
+				ri.Printf( PRINT_WARNING, "WARNING: materialBlend expects 'vertex' or 'splat' in shader '%s'\n", shader.name );
 				return qfalse;
 			}
+			if ( !Q_stricmp( token, "vertex" ) || !Q_stricmp( token, "splat" ) ) {
+				stage->materialBlend = qtrue;
+				stage->vk_pbr_flags |= PBR_HAS_MATERIAL_BLEND;
+				if ( !Q_stricmp( token, "splat" ) ) {
+					/* Splat control map uses same weight path; mark via blendSharpness sign unused — use layerCount. */
+					ri.Printf( PRINT_DEVELOPER, "materialBlend splat on '%s'\n", shader.name );
+				}
+			} else {
+				ri.Printf( PRINT_WARNING, "WARNING: materialBlend expects 'vertex' or 'splat' in shader '%s'\n", shader.name );
+				return qfalse;
+			}
+		}
+		else if ( !Q_stricmp( token, "splatMap" ) )
+		{
+			token = COM_ParseExt( text, qfalse );
+			if ( !token[0] ) {
+				ri.Printf( PRINT_WARNING, "WARNING: missing parameter for 'splatMap' in shader '%s'\n", shader.name );
+				return qfalse;
+			}
+			/* Reuse detailMap slot as splat control when materialBlend splat. */
+			Q_strncpyz( bufferDetailTextureName, token, sizeof( bufferDetailTextureName ) );
 			stage->materialBlend = qtrue;
-			stage->vk_pbr_flags |= PBR_HAS_MATERIAL_BLEND;
+			stage->vk_pbr_flags |= PBR_HAS_MATERIAL_BLEND | PBR_HAS_DETAILMAP;
 		}
 		else if ( !Q_stricmp( token, "blendSharpness" ) )
 		{
@@ -977,8 +998,8 @@ static qboolean ParseStage( shaderStage_t *stage, const char **text )
 			}
 			layerIdx = atoi( token );
 			token = COM_ParseExt( text, qfalse );
-			if ( !token[0] || layerIdx < 1 || layerIdx > 3 ) {
-				ri.Printf( PRINT_WARNING, "WARNING: layerMap expects <1-3> <path> in shader '%s'\n", shader.name );
+			if ( !token[0] || layerIdx < 1 || layerIdx > 7 ) {
+				ri.Printf( PRINT_WARNING, "WARNING: layerMap expects <1-7> <path> in shader '%s'\n", shader.name );
 				return qfalse;
 			}
 			if ( !Q_stricmp( token, "$whiteimage" ) ) {
@@ -1007,8 +1028,8 @@ static qboolean ParseStage( shaderStage_t *stage, const char **text )
 			}
 			layerIdx = atoi( token );
 			token = COM_ParseExt( text, qfalse );
-			if ( !token[0] || layerIdx < 1 || layerIdx > 3 ) {
-				ri.Printf( PRINT_WARNING, "WARNING: layerNormal(Height)Map expects <1-3> <path> in shader '%s'\n", shader.name );
+			if ( !token[0] || layerIdx < 1 || layerIdx > 7 ) {
+				ri.Printf( PRINT_WARNING, "WARNING: layerNormal(Height)Map expects <1-7> <path> in shader '%s'\n", shader.name );
 				return qfalse;
 			}
 			stage->layerNormalType[layerIdx - 1] = isHeight ? PHYS_NORMALHEIGHT : PHYS_NORMAL;
@@ -1041,8 +1062,8 @@ static qboolean ParseStage( shaderStage_t *stage, const char **text )
 			}
 			layerIdx = atoi( token );
 			token = COM_ParseExt( text, qfalse );
-			if ( !token[0] || layerIdx < 1 || layerIdx > 3 ) {
-				ri.Printf( PRINT_WARNING, "WARNING: layerOrmMap expects <1-3> <path> in shader '%s'\n", shader.name );
+			if ( !token[0] || layerIdx < 1 || layerIdx > 7 ) {
+				ri.Printf( PRINT_WARNING, "WARNING: layerOrmMap expects <1-7> <path> in shader '%s'\n", shader.name );
 				return qfalse;
 			}
 			stage->layerPhysicalType[layerIdx - 1] = isOrms ? PHYS_ORMS : PHYS_ORM;

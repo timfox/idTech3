@@ -22,6 +22,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "tr_local.h"
 #include "../common/tr_vector_font.h"
 #ifdef USE_VULKAN
+#include "vk_terrain.h"
 #include "vk_temporal.h"
 #include "vk_forward_plus.h"
 #include "vk_deferred_gbuffer.h"
@@ -1866,6 +1867,9 @@ static const void *RB_DrawSurfs( const void *data ) {
 	RB_RenderDrawSurfList( cmd->drawSurfs, cmd->numDrawSurfs );
 
 #ifdef USE_VULKAN
+	if ( CBTerrain_IsEnabled() ) {
+		CBTerrain_Frame();
+	}
 	vk_deferred_gbuffer_capture_after_geometry();
 	vk_deferred_lighting_apply_after_geometry();
 	vk_niv_apply_after_geometry();

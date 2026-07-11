@@ -48,11 +48,19 @@ Layer 0 reuses existing `map` / `normalMap`|`normalHeightMap` / `ormMap`.
 
 ## Surfaces (v1)
 
-Supported where vertex colors already exist: **BSP**, **glTF**, **IQM**. **MD3** has no color channel.
+Supported where vertex colors already exist: **BSP**, **glTF**, **IQM**. **MD3** uses optional `.md3.paint` sidecar (bind-pose).
+
+## Studio paint authoring
+
+- **`r_materialPaint` 1** + **`r_studio_tools` 1**: Studio / Paint panel.
+- Brush cvars: **`r_materialPaintRadius`**, **`r_materialPaintStrength`**, **`r_materialPaintChannels`** (bitmask).
+- Sidecar: **`maps/<map>.paint`** (magic `ID3P`, version 2; optional second RGBA stream for layers 4–7).
+- Commands: **`paint_save`**, **`paint_load`**, **`paint_clear`**, **`paint_status`**.
+- Sidecar is source of truth for blend weights (q3map2 vertex light can clobber BSP colors).
 
 ## Implementation notes
 
-Descriptor slots for layers 1–3 reuse unused advanced-lobe / detail / deluxe bindings (no new descriptor sets). Layer-3 ORM uses a neutral constant `(1, 0.5, 0, 1)` when no dedicated slot remains. POM is disabled on blend pipelines.
+Descriptor slots for layers 1–3 reuse unused advanced-lobe / detail / deluxe bindings (no new descriptor sets). Layer-3 ORM uses a neutral constant `(1, 0.5, 0, 1)` when no dedicated slot remains. POM is disabled on blend pipelines. Texture arrays / layers 5–8: see phase-2 notes below when enabled.
 
 See also [PBR_TEXTURES.md](PBR_TEXTURES.md), [MATERIAL_PERMUTATIONS.md](MATERIAL_PERMUTATIONS.md).
 

@@ -3273,6 +3273,12 @@ set_tests_properties(test_material_blend PROPERTIES
 	LABELS "scripts;validation;renderer;pbr"
 	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_material_blend.sh;${CMAKE_SOURCE_DIR}/docs/MATERIAL_BLEND.md;${CMAKE_SOURCE_DIR}/renderers/vulkan/shaders/glsl/gen_frag.tmpl")
 
+add_test(NAME test_material_paint
+	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_material_paint.sh)
+set_tests_properties(test_material_paint PROPERTIES
+	LABELS "scripts;validation;renderer;pbr"
+	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_material_paint.sh;${CMAKE_SOURCE_DIR}/renderers/vulkan/tr_material_paint.c;${CMAKE_SOURCE_DIR}/docs/MATERIAL_BLEND.md")
+
 add_test(NAME test_p2p_networking
 	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_p2p_networking.sh)
 set_tests_properties(test_p2p_networking PROPERTIES

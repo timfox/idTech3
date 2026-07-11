@@ -18,6 +18,7 @@ id Studio-style session + command strip (C++: std::vector command history).
 #include "../../../qcommon/engine_sprite_map.h"
 #include "../../../qcommon/engine_decal_map.h"
 #include "../tr_sprite_props.h"
+#include "../tr_material_paint.h"
 
 namespace {
 
@@ -287,6 +288,82 @@ extern "C" void VkImgui_DrawStudioAnimationPanel( void )
 		Com_sprintf( cmd, sizeof( cmd ), "echo load animgraph: %s\n", g_input.data() );
 		ri.Cmd_ExecuteText( EXEC_APPEND, cmd );
 	}
+	ImGui::End();
+}
+
+extern "C" void VkImgui_DrawStudioPaintPanel( void )
+{
+	static float brushNdcX = 0.0f;
+	static float brushNdcY = 0.0f;
+	static int targetR = 255, targetG = 0, targetB = 0, targetA = 0;
+	static int channelMask = 15;
+
+	if ( !r_studio_tools || !r_studio_tools->integer ) {
+		return;
+	}
+	if ( !vkWindows.studioPaint.open ) {
+		return;
+	}
+
+	ImGui::Begin( "Studio / Paint", (bool *)&vkWindows.studioPaint.open );
+	ImGui::TextDisabled( "(?)" );
+	if ( ImGui::IsItemHovered() ) {
+		ImGui::SetTooltip(
+			"Paint vertex RGBA weights for materialBlend shaders. "
+			"Saves to maps/<map>.paint (sidecar; source of truth vs q3map2 vertex light)." );
+	}
+
+	{
+		bool paintOn = r_materialPaint && r_materialPaint->integer != 0;
+		if ( ImGui::Checkbox( "r_materialPaint", &paintOn ) ) {
+			ri.Cvar_SetValue( "r_materialPaint", paintOn ? 1.0f : 0.0f );
+		}
+	}
+
+	float radius = r_materialPaintRadius ? r_materialPaintRadius->value : 64.0f;
+	float strength = r_materialPaintStrength ? r_materialPaintStrength->value : 0.35f;
+	if ( ImGui::SliderFloat( "Radius", &radius, 1.0f, 512.0f ) ) {
+		ri.Cvar_SetValue( "r_materialPaintRadius", radius );
+	}
+	if ( ImGui::SliderFloat( "Strength", &strength, 0.01f, 1.0f ) ) {
+		ri.Cvar_SetValue( "r_materialPaintStrength", strength );
+	}
+
+	ImGui::SliderInt( "Channel mask", &channelMask, 1, 255 );
+	ri.Cvar_SetValue( "r_materialPaintChannels", (float)channelMask );
+	ImGui::TextWrapped( "Bits 0-3 = layers 0-3 (RGBA); bits 4-7 = stream2 layers 4-7." );
+
+	ImGui::SliderInt( "Target R", &targetR, 0, 255 );
+	ImGui::SliderInt( "Target G", &targetG, 0, 255 );
+	ImGui::SliderInt( "Target B", &targetB, 0, 255 );
+	ImGui::SliderInt( "Target A", &targetA, 0, 255 );
+
+	ImGui::SliderFloat( "Brush NDC X", &brushNdcX, -1.0f, 1.0f );
+	ImGui::SliderFloat( "Brush NDC Y", &brushNdcY, -1.0f, 1.0f );
+
+	ImGui::Text( "Paint verts: %d%s", R_MaterialPaint_NumVerts(),
+		R_MaterialPaint_HasStream2() ? " +stream2" : "" );
+
+	if ( ImGui::Button( "Stroke at NDC" ) ) {
+		byte rgba[4] = { (byte)targetR, (byte)targetG, (byte)targetB, (byte)targetA };
+		if ( !R_MaterialPaint_BrushFromScreen( brushNdcX, brushNdcY, radius, strength,
+				(uint32_t)channelMask, rgba ) ) {
+			ImGui::TextColored( ImVec4( 1, 0.6f, 0.2f, 1 ), "No nearby verts" );
+		}
+	}
+	ImGui::SameLine();
+	if ( ImGui::Button( "paint_save" ) ) {
+		ri.Cmd_ExecuteText( EXEC_APPEND, "paint_save\n" );
+	}
+	ImGui::SameLine();
+	if ( ImGui::Button( "paint_load" ) ) {
+		ri.Cmd_ExecuteText( EXEC_APPEND, "paint_load\n" );
+	}
+	ImGui::SameLine();
+	if ( ImGui::Button( "paint_status" ) ) {
+		ri.Cmd_ExecuteText( EXEC_APPEND, "paint_status\n" );
+	}
+
 	ImGui::End();
 }
 

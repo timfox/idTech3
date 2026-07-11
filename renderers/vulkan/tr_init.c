@@ -26,6 +26,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "../common/tr_vector_font.h"
 #include "tr_sprite_props.h"
 #include "tr_decal_props.h"
+#include "tr_material_paint.h"
 #include "vk_upscale.h"
 #include "vk_ndgi.h"
 #include "vk_niv.h"
@@ -2599,6 +2600,9 @@ static void R_Register( void )
 
 	ri.Printf( PRINT_ALL, "Material blend: %s (vertex + height)\n",
 		( r_materialBlend && r_materialBlend->integer ) ? "ON" : "OFF" );
+
+	R_MaterialPaint_RegisterCvars();
+	R_MaterialPaint_RegisterCommands();
 
 	ri.Printf( PRINT_ALL, "POM: r_pom %s (steps %d, scale %.3f, shadow %.2f)\n",
 		( r_pom && r_pom->integer ) ? "on" : "off",
