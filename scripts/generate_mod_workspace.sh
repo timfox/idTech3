@@ -52,7 +52,11 @@ vscode.mkdir(parents=True, exist_ok=True)
 
 (vscode / "settings.json").write_text(json.dumps({
     "files.associations": {"*.idproj": "json"},
-    "C_Cpp.default.includePath": [f"{root}/src", f"{root}/src/renderers/vulkan/shaders/glsl"],
+    "C_Cpp.default.includePath": [
+        f"{root}/engine/core",
+        f"{root}/runtime/client",
+        f"{root}/renderers/vulkan/shaders/glsl",
+    ],
 }, indent=2) + "\n")
 
 print(f"[workspace] wrote .vscode under {mod}")

@@ -50,7 +50,7 @@ cppcheck \
   --suppress=unmatchedSuppression \
   --inline-suppr \
   -I"$PROJECT_ROOT/src" \
-  -I"$PROJECT_ROOT/src/renderers/common" \
+  -I"$PROJECT_ROOT/renderers/common" \
   -DUSE_VULKAN=1 \
   -q \
   "${PATHS[@]}" 2>&1 || true

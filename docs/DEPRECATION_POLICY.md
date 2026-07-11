@@ -24,7 +24,9 @@ CMake path variables: `cmake/IdTech3Layout.cmake` (`IDTECH3_DIR_*`). Test: `test
 
 **Deferred (not yet scheduled):**
 
-- Drop `src/*` forwarding shims (after soak on `main`)
+- Drop remaining **layout bridge** symlinks (`runtime/qcommon`, `engine/platform/client`, …) after relative `#include` rewrite
 - Full vcxproj regeneration (replace hand-maintained lists entirely)
+
+**Completed:** Phase 5e dropped `src/*` one-release forwarding shims (`migrate_phase_5e_drop_shims.sh`).
 
 See `docs/ENGINE_MODULE_MANIFEST.md` and `docs/ROADMAP.md`.
