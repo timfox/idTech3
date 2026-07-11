@@ -53,6 +53,8 @@ link world modules/world
 link external third_party
 link vuda extensions/research/vuda
 link qcommon engine/core
+# #include "platform/android/..." with CMAKE_SOURCE_DIR on the include path
+link platform engine/platform
 
 echo "[layout_fwd] engine/platform stale duplicates -> canonical..."
 replace_stale_platform_dir botlib ../../modules/botlib

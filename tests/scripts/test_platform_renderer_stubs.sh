@@ -20,8 +20,10 @@ check "$ROOT/CMakeLists.txt" 'tr_platform_renderer_stub.c' 'platform renderer st
 check "$ROOT/CMakeLists.txt" 'idtech3_add_platform_renderer_stub' 'CMake platform stub helper'
 check "$ROOT/CMakeLists.txt" 'RENDERER_PLATFORM_STUB_METAL' 'Metal stub define wiring'
 check "$ROOT/CMakeLists.txt" 'RENDERER_PLATFORM_STUB_DXR' 'DXR stub define wiring'
-check "$ROOT/src/renderers/common/tr_platform_renderer_stub.c" 'GetRefAPI' 'platform stub GetRefAPI'
-check "$ROOT/src/renderers/common/renderer_backend.h" 'RENDERER_BACKEND_METAL' 'renderer backend header'
+STUB="$(idtech3_require_file renderers/common/tr_platform_renderer_stub.c src/renderers/common/tr_platform_renderer_stub.c)"
+BACKEND="$(idtech3_require_file renderers/common/renderer_backend.h src/renderers/common/renderer_backend.h)"
+check "$STUB" 'GetRefAPI' 'platform stub GetRefAPI'
+check "$BACKEND" 'RENDERER_BACKEND_METAL' 'renderer backend header'
 check "$IDTECH3_CLIENT/core/cl_ref.c" 'renderer_backend.h' 'client backend header include'
 check "$IDTECH3_CLIENT/core/cl_ref.c" 'WEBGPU_ROADMAP.md' 'WebGPU fallback message'
 check "$ROOT/docs/DXR_RENDERER.md" 'idtech3_dxr' 'DXR renderer doc'

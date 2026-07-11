@@ -74,9 +74,9 @@ ok "open-world qcommon modules are .cpp in IdTech3QcommonExtensions.cmake"
 
 echo "[test_cpp20_sources] checking migrated .cpp sources..."
 for rel in "${MIGRATED_CPP[@]}"; do
-	canon="${rel/src\/world/modules\/world}"
-	canon="${canon/src\/qcommon/engine\/core}"
-	canon="${canon/src\/navigation/modules\/navigation}"
+	canon="${rel/src\/world/modules/world}"
+	canon="${canon/src\/qcommon/engine/core}"
+	canon="${canon/src\/navigation/modules/navigation}"
 	path=""
 	if [ -f "$ROOT/$canon" ]; then
 		path="$ROOT/$canon"
@@ -95,9 +95,9 @@ ok "${#MIGRATED_CPP[@]} migrated .cpp files present and wired"
 
 echo "[test_cpp20_sources] checking no .c reverts..."
 for rel in "${REVERTED_C[@]}"; do
-	canon="${rel/src\/world/modules\/world}"
-	canon="${canon/src\/qcommon/engine\/core}"
-	canon="${canon/src\/navigation/modules\/navigation}"
+	canon="${rel/src\/world/modules/world}"
+	canon="${canon/src\/qcommon/engine/core}"
+	canon="${canon/src\/navigation/modules/navigation}"
 	[ ! -f "$ROOT/$rel" ] || fail "reverted C source still present: $rel"
 	[ ! -f "$ROOT/$canon" ] || fail "reverted C source still present: $canon"
 done

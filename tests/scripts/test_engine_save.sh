@@ -2,7 +2,9 @@
 # Validates Engine.Save JSON scaffolding in g_engine_systems.c
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
-SRC="$ROOT/src/game/g_engine_systems.c"
+source "$ROOT/tests/scripts/idtech3_test_paths.sh"
+idtech3_test_paths_init "$ROOT"
+SRC="$(idtech3_require_file runtime/game/g_engine_systems.c src/game/g_engine_systems.c)"
 
 grep -q 'EngineSave_JsonEscapeLabel' "$SRC" || {
   echo "missing EngineSave_JsonEscapeLabel in g_engine_systems.c" >&2
@@ -13,13 +15,12 @@ grep -q 'JSON_ObjectGetNamedValue' "$SRC" || {
   exit 1
 }
 
-export ROOT
+export ROOT SRC
 python3 - <<'PY'
 import json
 import os
 
-root = os.environ["ROOT"]
-src = open(os.path.join(root, "src/game/g_engine_systems.c")).read()
+src = open(os.environ["SRC"]).read()
 assert "ENGINE_SAVE_PROTOCOL_VERSION" in src
 
 def escape_label(s: str) -> str:
