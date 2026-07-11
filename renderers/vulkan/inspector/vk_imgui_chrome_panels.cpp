@@ -128,6 +128,7 @@ void VkImgui_ResetInspectorWorkspaceLayout( void )
 	vkWindows.profiler.open = qtrue;
 	vkWindows.physics.open = qtrue;
 	vkWindows.volumetrics.open = qtrue;
+	vkWindows.ocean.open = qtrue;
 	if ( r_studio_tools && r_studio_tools->integer ) {
 		vkWindows.studioMap.open = qtrue;
 		vkWindows.studioConsole.open = qtrue;
@@ -144,6 +145,7 @@ void VkImgui_ResetInspectorWorkspaceLayout( void )
 	ImGui::DockBuilderDockWindow( "GPU Profiler", id_bottom );
 	ImGui::DockBuilderDockWindow( "Physics", id_bottom );
 	ImGui::DockBuilderDockWindow( "Volumetrics", id_bottom );
+	ImGui::DockBuilderDockWindow( "Water", id_bottom );
 	ImGui::DockBuilderDockWindow( "Studio / Session", id_bottom );
 	ImGui::DockBuilderDockWindow( "Studio / Console", id_bottom );
 	ImGui::DockBuilderDockWindow( "Studio / Entities", id_bottom );
@@ -338,6 +340,7 @@ static void VkImgui_DrawMenuBar( void )
 			ImGui::MenuItem( "PostFX", nullptr, (bool *)&vkWindows.postfx.open );
 			ImGui::MenuItem( "Physics", nullptr, (bool *)&vkWindows.physics.open );
 			ImGui::MenuItem( "Volumetrics", nullptr, (bool *)&vkWindows.volumetrics.open );
+			ImGui::MenuItem( "Water", nullptr, (bool *)&vkWindows.ocean.open );
 			ImGui::MenuItem( "Objects", nullptr, (bool *)&vkWindows.objects.open );
 			ImGui::MenuItem( "Inspector", nullptr, (bool *)&vkWindows.inspector.open );
 			if ( r_studio_tools && r_studio_tools->integer ) {

@@ -120,6 +120,10 @@ typedef struct {
 
 	struct {
 		qboolean    open;
+	} ocean;
+
+	struct {
+		qboolean    open;
 	} objects;
 
 	struct {
@@ -172,6 +176,7 @@ void VkImgui_DrawShaderEditor(void);
 void VkImgui_DrawPostFXPanel(void);
 void VkImgui_DrawPhysicsPanel(void);
 void VkImgui_DrawVolumetricsPanel(void);
+void VkImgui_DrawOceanPanel(void);
 void VkImgui_DrawStudioMapPanel(void);
 void VkImgui_DrawStudioConsolePanel(void);
 void VkImgui_DrawStudioEntitiesPanel(void);

@@ -32,6 +32,8 @@ CMake: **`USE_ARC_BLANC`** (default OFF; ON in **`full`** profile).
 | `r_arcBlancWaveSpeed` | 1 | Simulation playback speed |
 | `r_arcBlancGustStrength` | 0 | Time-varying gust amplitude |
 | `r_arcBlancGustSpeed` | 0.5 | Gust animation speed |
+| `r_arcBlancUpdateHz` | 0 | Fixed simulation update rate. `0` updates every rendered frame |
+| `r_arcBlancMaxSubsteps` | 4 | Max fixed ocean steps per rendered frame when `r_arcBlancUpdateHz` is enabled |
 | `r_arcBlancDraw` | 1 | Tessellated ocean mesh in world pass |
 | `r_arcBlancMeshDiv` | 48 | Subdivisions per tile edge (8–128) |
 | `r_arcBlancTileRadius` | 1 | Tiles around the anchor point to render |
@@ -62,7 +64,9 @@ Console: **`arc_blanc_status`**, **`arc_blanc_reseed`**, **`arc_blanc_sample <x>
 - Use `r_arcBlancDirectional` plus `r_arcBlancSpread` for longer, straighter wind-driven waves.
 - Use `r_arcBlancTileBreak*` to reduce obvious repetition on broad water planes.
 - Use `r_arcBlancFoam*` to tune crest foam visibility from subtle caps to stormier whitewater.
+- Use `r_arcBlancUpdateHz` as the main performance/cinematic tick-rate dial. Lower values reduce cost; higher values help motion blur and close-up shots.
 - For non-infinite bodies of water, set `r_arcBlancLakeMode 1` and tune `r_arcBlancLakeCenter`, `r_arcBlancLakeExtents`, and `r_arcBlancLakeAngle`.
+- In the Vulkan ImGui overlay, the `Water` panel groups these controls into one workflow surface and includes quick underwater fog looks.
 
 ### GPU path (`r_arcBlancGpu 1`)
 

@@ -2225,6 +2225,7 @@ if(USE_IMGUI AND NOT APPLE)
     renderers/vulkan/inspector/vk_imgui_postfx_panels.cpp
     renderers/vulkan/inspector/vk_imgui_physics_panels.cpp
     renderers/vulkan/inspector/vk_imgui_volumetrics_panels.cpp
+    renderers/vulkan/inspector/vk_imgui_ocean_panels.cpp
     renderers/vulkan/inspector/vk_imgui_sim_render_panels.cpp
     renderers/vulkan/inspector/vk_imgui_scene_panels.cpp
     renderers/vulkan/inspector/vk_imgui_scene.cpp

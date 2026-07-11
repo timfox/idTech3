@@ -106,6 +106,7 @@ extern "C" void VkImgui_Initialize(void) {
 	vkWindows.viewport.open = qtrue;
 	vkWindows.postfx.open = qtrue;
 	vkWindows.volumetrics.open = qtrue;
+	vkWindows.ocean.open = qtrue;
 	if ( r_studio_tools && r_studio_tools->integer ) {
 		vkWindows.studioMap.open = qtrue;
 		vkWindows.studioConsole.open = qtrue;
@@ -213,6 +214,7 @@ extern "C" void VkImgui_Draw(void) {
 	VkImgui_DrawPostFXPanel();
 	VkImgui_DrawPhysicsPanel();
 	VkImgui_DrawVolumetricsPanel();
+	VkImgui_DrawOceanPanel();
 	VkImgui_DrawProfiler();
 	VkImgui_DrawSimRenderDebugHud();
 	VkImgui_DrawStudioMapPanel();
