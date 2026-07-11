@@ -17,11 +17,14 @@ Proximity voice chat uses Opus (`USE_OPUS`) when **`cl_voip 1`**.
 | `cl_voipLipFlapMatch` | `80` | Max world-unit distance to match a model to a player |
 | `cl_voipLipFlapMorph` | `jaw,mouthOpen,mouth_open,jaw_open` | Morph target names (IQM/glTF) |
 | `cl_voipLipFlapRate` | `12` | Flap oscillation rate (Hz) while talking |
+| `cl_voipLipFlapFacs` | `1` | Drive FACS **AU25** (lips part) + **AU26** (jaw drop) from RMS |
 | `sv_voipProximity` | `1024` | Server relay range (`0` = global) |
 
 ## Lip flap
 
 When a client is sending or receiving VoIP, the engine tracks per-client RMS power and, on each `AddRefEntityToScene`, applies morph weights to models near that player (body or approximate head height).
+
+With **`cl_voipLipFlapFacs 1`**, the same RMS also updates FACS AU25/AU26 on a per-client face instance (auto-created), so AU-named morphs (`AU26`) and flex morphs via `CL_Face_ApplyMorphs` track speech. See [FACS.md](FACS.md).
 
 **Requirements:**
 

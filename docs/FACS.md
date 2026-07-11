@@ -66,4 +66,4 @@ Emotion presets (`setExpression`) remain available; they are authored to match c
 
 ## VoIP
 
-Voice lip flap (`cl_voipLipFlap`) drives jaw/mouth morphs independently. Combine with `Face_SetAU(h, FACS_AU26, …)` for scripted jaw when not on VoIP.
+Voice lip flap (`cl_voipLipFlap`) drives jaw/mouth morphs directly. With **`cl_voipLipFlapFacs 1`** (default), VoIP RMS also sets **AU25** / **AU26** on auto-created face instances so FACS-named morphs track speech. See [VOIP.md](VOIP.md).
