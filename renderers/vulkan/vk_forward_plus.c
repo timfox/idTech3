@@ -1020,11 +1020,7 @@ void vk_forward_plus_upload_refdef( void )
 
 VkDescriptorSet vk_forward_plus_get_graphics_descriptor_set( void )
 {
-#ifdef USE_VK_PBR
 	return vk_fp_graphics_descriptor;
-#else
-	return VK_NULL_HANDLE;
-#endif
 }
 
 static void vk_forward_plus_dispatch_tile_cull_internal( qboolean use_depth_cull )
