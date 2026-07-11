@@ -183,21 +183,14 @@ static void vk_alloc_attachments( void )
 }
 
 
-static qboolean vk_add_attachment_desc_soft( VkImage desc, VkImageView *image_view, VkImageUsageFlags usage, VkMemoryRequirements *reqs, VkFormat image_format, VkImageAspectFlags aspect_flags, VkImageLayout image_layout
-#ifdef USE_VK_PBR
-	, VkImageViewType view_type )
-#endif
+static qboolean vk_add_attachment_desc_soft( VkImage desc, VkImageView *image_view, VkImageUsageFlags usage, VkMemoryRequirements *reqs, VkFormat image_format, VkImageAspectFlags aspect_flags, VkImageLayout image_layout, VkImageViewType view_type )
 {
 	if ( num_attachments >= ARRAY_LEN( attachments ) ) {
 		return qfalse;
 	}
 	attachments[ num_attachments ].descriptor = desc;
 	attachments[ num_attachments ].image_view = image_view;
-#ifdef USE_VK_PBR
 	attachments[ num_attachments ].viewType = view_type;
-#else
-	attachments[ num_attachments ].viewType = VK_IMAGE_VIEW_TYPE_2D;
-#endif
 	attachments[ num_attachments ].usage = usage;
 	attachments[ num_attachments ].reqs = *reqs;
 	attachments[ num_attachments ].aspect_flags = aspect_flags;
@@ -208,16 +201,9 @@ static qboolean vk_add_attachment_desc_soft( VkImage desc, VkImageView *image_vi
 	return qtrue;
 }
 
-static void vk_add_attachment_desc( VkImage desc, VkImageView *image_view, VkImageUsageFlags usage, VkMemoryRequirements *reqs, VkFormat image_format, VkImageAspectFlags aspect_flags, VkImageLayout image_layout
-#ifdef USE_VK_PBR
-	, VkImageViewType view_type )
-#endif
+static void vk_add_attachment_desc( VkImage desc, VkImageView *image_view, VkImageUsageFlags usage, VkMemoryRequirements *reqs, VkFormat image_format, VkImageAspectFlags aspect_flags, VkImageLayout image_layout, VkImageViewType view_type )
 {
-	if ( !vk_add_attachment_desc_soft( desc, image_view, usage, reqs, image_format, aspect_flags, image_layout
-#ifdef USE_VK_PBR
-			, view_type
-#endif
-			) ) {
+	if ( !vk_add_attachment_desc_soft( desc, image_view, usage, reqs, image_format, aspect_flags, image_layout, view_type ) ) {
 		ri.Error( ERR_FATAL, "Attachments array overflow (%u/%u)",
 				(unsigned)num_attachments, (unsigned)ARRAY_LEN( attachments ) );
 	}
@@ -286,15 +272,11 @@ static void create_color_attachment(
 
 	vk_get_image_memory_erquirements( *image, &memory_requirements );
 
-#ifdef USE_VK_PBR
     VkImageViewType view_type = VK_IMAGE_VIEW_TYPE_2D;
 
 	if ( flags & VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT )
 		view_type = VK_IMAGE_VIEW_TYPE_CUBE;
 	vk_add_attachment_desc( *image, image_view, usage, &memory_requirements, format, VK_IMAGE_ASPECT_COLOR_BIT, image_layout, view_type );
-#else
-	vk_add_attachment_desc( *image, image_view, usage, &memory_requirements, format, VK_IMAGE_ASPECT_COLOR_BIT, image_layout );
-#endif
 }
 
 /*
@@ -344,7 +326,6 @@ static qboolean create_color_attachment_soft(
 
 	vk_get_image_memory_erquirements( *image, &memory_requirements );
 
-#ifdef USE_VK_PBR
 	{
 		VkImageViewType view_type = VK_IMAGE_VIEW_TYPE_2D;
 		if ( flags & VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT )
@@ -358,16 +339,6 @@ static qboolean create_color_attachment_soft(
 			return qfalse;
 		}
 	}
-#else
-	if ( !vk_add_attachment_desc_soft( *image, image_view, usage, &memory_requirements, format, VK_IMAGE_ASPECT_COLOR_BIT, image_layout ) ) {
-		qvkDestroyImage( vk.device, *image, NULL );
-		*image = VK_NULL_HANDLE;
-		ri.Printf( PRINT_WARNING, S_COLOR_YELLOW
-			"[VK][deferred] attachment pool full (%ux%u) — soft-fail\n" S_COLOR_WHITE,
-			width, height );
-		return qfalse;
-	}
-#endif
 	return qtrue;
 }
 
@@ -442,11 +413,7 @@ static void create_depth_attachment( uint32_t width, uint32_t height, VkSampleCo
 
 	vk_get_image_memory_erquirements( *image, &memory_requirements );
 
-#ifdef USE_VK_PBR
 	vk_add_attachment_desc( *image, image_view, create_desc.usage, &memory_requirements, vk.depth_format, image_aspect_flags, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL, VK_IMAGE_VIEW_TYPE_2D );
-#else
-	vk_add_attachment_desc( *image, image_view, create_desc.usage, &memory_requirements, vk.depth_format, image_aspect_flags, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL );
-#endif
 }
 
 /*
