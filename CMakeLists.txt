@@ -3246,6 +3246,12 @@ set_tests_properties(test_voip_lip_flap PROPERTIES
 	LABELS "scripts;validation;client;voip"
 	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_voip_lip_flap.sh;${CMAKE_SOURCE_DIR}/runtime/client/platform/cl_voip.c;${CMAKE_SOURCE_DIR}/docs/VOIP.md")
 
+add_test(NAME test_facs_facial
+	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_facs_facial.sh)
+set_tests_properties(test_facs_facial PROPERTIES
+	LABELS "scripts;validation;client;facs"
+	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_facs_facial.sh;${CMAKE_SOURCE_DIR}/runtime/game/g_facial.c;${CMAKE_SOURCE_DIR}/docs/FACS.md")
+
 add_test(NAME test_p2p_networking
 	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_p2p_networking.sh)
 set_tests_properties(test_p2p_networking PROPERTIES
