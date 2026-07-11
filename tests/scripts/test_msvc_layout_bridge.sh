@@ -9,6 +9,14 @@ fail() { echo "FAIL: $*" >&2; exit 1; }
 
 "${ROOT}/scripts/layout_forwarding_symlinks.sh" >/dev/null
 
+# Windows MSVC link needs a real junction for platform/external (see layout_forwarding_windows.ps1)
+# and ExternalRoot must point at third_party so libpng16.lib is found after ProjectReference builds.
+rg -q "engine\\\\platform\\\\external" "${ROOT}/scripts/layout_forwarding_windows.ps1" \
+	|| fail "layout_forwarding_windows.ps1 must junction engine/platform/external"
+rg -q 'ExternalRoot>\$\(IdTech3ThirdParty\)' \
+	"${ROOT}/engine/platform/win32/msvc2017/IdTech3Layout2026.props" \
+	|| fail "IdTech3Layout2026.props ExternalRoot must be IdTech3ThirdParty (MSVC libpng link)"
+
 python3 - "$ROOT" "$MSVC_DIR" <<'PY'
 import re
 import sys

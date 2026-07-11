@@ -14,7 +14,10 @@
     <IdTech3ThirdParty>$(IdTech3RepoRoot)\third_party</IdTech3ThirdParty>
     <IdTech3ExtensionsResearch>$(IdTech3RepoRoot)\extensions\research</IdTech3ExtensionsResearch>
     <IdTech3ExtensionsGenerative>$(IdTech3RepoRoot)\extensions\generative</IdTech3ExtensionsGenerative>
-    <ExternalRoot>$(IdTech3RepoRoot)\engine\platform\external</ExternalRoot>
+    <!-- Prefer canonical third_party (not the platform/external bridge): Windows link.exe
+         does not reliably follow Unix symlinks, and layout_forwarding_windows.ps1 historically
+         only junctioned engine\external. -->
+    <ExternalRoot>$(IdTech3ThirdParty)</ExternalRoot>
   </PropertyGroup>
   <ItemDefinitionGroup>
     <ClCompile>
