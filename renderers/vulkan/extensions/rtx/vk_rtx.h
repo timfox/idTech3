@@ -12,6 +12,8 @@ qboolean vk_rtx_scene_ready( void );
 void vk_rtx_scene_prepare( void );
 void vk_rtx_scene_extent( uint32_t *w, uint32_t *h );
 void vk_rtx_bind_tlas_descriptor( VkDescriptorSet set );
+void vk_rtx_bind_world_albedo_ssbo( VkDescriptorSet set, uint32_t binding );
+uint32_t vk_rtx_world_albedo_count( void );
 
 #else
 
@@ -23,5 +25,7 @@ qboolean vk_rtx_scene_ready( void );
 void vk_rtx_scene_prepare( void );
 void vk_rtx_scene_extent( uint32_t *w, uint32_t *h );
 void vk_rtx_bind_tlas_descriptor( VkDescriptorSet set );
+void vk_rtx_bind_world_albedo_ssbo( VkDescriptorSet set, uint32_t binding );
+uint32_t vk_rtx_world_albedo_count( void );
 
 #endif

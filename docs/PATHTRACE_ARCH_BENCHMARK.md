@@ -18,7 +18,7 @@ r_pathtrace_samples 1
 vid_restart
 ```
 
-`r_pathtrace` shares the **same world BLAS/TLAS** as the RTX demo (`vk_rtx.c`). `r_rtxDemo 0` skips demo pipeline init and leaves no TLAS for pathtrace.
+`r_pathtrace` shares the **same world BLAS/TLAS** as the RTX demo (`vk_rtx.c`), including **SF_GRID** patches and the **per-primitive albedo SSBO** sampled by `pt_hit.rchit`. `r_rtxDemo 0` skips demo pipeline init and leaves no TLAS for pathtrace.
 
 ## Cvars
 

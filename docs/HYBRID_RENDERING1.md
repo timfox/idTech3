@@ -13,7 +13,7 @@ Implementation of the thesis **Hybrid-Rendering Techniques in GPU** (IST, July 2
 7. **Composite** — modulate raster HDR by denoised shadow; add denoised specular; add denoised diffuse × albedo.
 8. **TAA** (optional) — post-process `r_taa` or auto via `r_hybrid1_taa 1` after composite.
 
-RT **closest-hit** shaders reproject hit points into the deferred **G-buffer albedo** (when `r_deferredGBufferFill 1`) instead of flat placeholder colors.
+RT closest-hit shaders prefer a **per-primitive world albedo SSBO** (vertex/face colors packed with the world BLAS, including **SF_GRID** patches) when `gl_InstanceCustomIndexEXT == 0`. If that miss, they reproject hit points into the deferred **G-buffer albedo** (when `r_deferredGBufferFill 1`) instead of flat placeholder colors.
 
 ## Enable (RTX build)
 

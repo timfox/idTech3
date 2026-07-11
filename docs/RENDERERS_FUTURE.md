@@ -11,7 +11,7 @@ This document outlines the architecture and implementation plan for three render
 | **WebSplatter** | Chocolate | **`r_wsp` 1–3** (latched): tile-binned compute splats. Always linked. See **`docs/WEB_SPLATTER.md`**. |
 | **Mobile-GS** | Chocolate | **`r_mgs` 1–3** (latched): tiered Vulkan compute splatting. Always linked. See **`docs/MOBILE_GAUSSIAN_SPLATTING.md`**. |
 | **GRTX (Gaussian RT)** | Scaffold | With `USE_VULKAN_RTX=ON` + **`USE_EXPERIMENTAL_RENDERERS`**: **`r_grtx`**. See **`docs/GAUSSIAN_RAY_TRACING_GRTX.md`**. |
-| **Vulkan RTX** | Chocolate RT foundation | `USE_VULKAN_RTX=ON` + `r_rtx` / `r_rtxDemo`. World BLAS; **entity BLAS** packs MD3 LOD0 mesh (`r_rtxEntities 1`) with AABB fallback. Hybrid1/Raygun take priority. |
+| **Vulkan RTX** | Chocolate RT foundation | `USE_VULKAN_RTX=ON` + `r_rtx` / `r_rtxDemo`. World BLAS packs faces + trisoups + **SF_GRID**; **entity BLAS** packs MD3 LOD0 mesh (`r_rtxEntities 1`) with AABB fallback. Per-primitive albedo SSBO for Hybrid1/pathtrace hits. Hybrid1/Raygun take priority. |
 | **Path trace (C6)** | Scaffold | **`r_pathtrace`** — requires experimental + RTX. See **`docs/PATHTRACE_ARCH_BENCHMARK.md`**. |
 | **Hybrid Rendering 1** | Chocolate RT tier | **`r_hybrid1` 1** — always linked; real path with `USE_VULKAN_RTX`. Supported hybrid lighting demo (`demo_hybrid1.cfg`). See **`docs/HYBRID_RENDERING1.md`**. |
 | **TTP (RT prefetch model)** | 🔶 Characterization | **`cl_ttp` 1**: software model of Tozlu et al. (arXiv:2605.16253) **Tree Traversal Prefetcher** — pop-streak simulation, Lumibench sweep, DFS vs BFS. Not hardware prefetch (Vulkan has no traversal stack). See **`docs/TTP.md`**. |
@@ -43,7 +43,8 @@ This document outlines the architecture and implementation plan for three render
    - Load `vkCreateRayTracingPipelinesKHR`, `vkCmdTraceRaysKHR`, etc.
 
 2. **Acceleration structures**
-   - **BLAS**: World BSP faces + trisoups; **entity BLAS** from MD3 LOD0 frame-lerped mesh (`r_rtxEntities`, `r_rtxEntityTriCap`) with AABB proxy fallback for non-MD3
+   - **BLAS**: World BSP faces + trisoups + **SF_GRID** (LOD via `r_lodCurveError`); **entity BLAS** from MD3 LOD0 frame-lerped mesh (`r_rtxEntities`, `r_rtxEntityTriCap`) with AABB proxy fallback for non-MD3
+   - **Per-primitive albedo SSBO**: RGB from vertex/face colors, bound for Hybrid1 + pathtrace closest-hit
    - **TLAS**: World + optional entity instance, UPDATE when count stable (`r_rtxTlasUpdate`)
    - Use `VkAccelerationStructureBuildGeometryInfoKHR` + `vkCmdBuildAccelerationStructuresKHR`
 

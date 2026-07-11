@@ -32,7 +32,12 @@ check "$VK_RTX" 'rtx_status' 'rtx_status console command'
 check "$VK_RTX" 'vk_rtx_rebuild_entity_tlas' 'entity TLAS refresh path'
 check "$VK_RTX" 'r_rtxEntityTriCap' 'entity triangle budget cvar use'
 check "$VK_RTX" 'entity_mesh_count' 'rtx_status mesh/proxy counts'
+check "$VK_RTX" 'vk_rtx_bind_world_albedo_ssbo' 'world albedo SSBO bind API'
+check "$VK_RTX" 'albedo_buffer' 'world albedo buffer storage'
 check "$VK_RTX_WORLD" 'vk_rtx_world_pack' 'world BLAS pack'
+check "$VK_RTX_WORLD" 'SF_GRID' 'SF_GRID patch packing'
+check "$VK_RTX_WORLD" 'rtx_emit_grid_tris' 'grid triangle emit'
+check "$VK_RTX_WORLD" 'albedoRgb' 'per-primitive albedo pack'
 check "$VK_RTX_ENT" 'vk_rtx_pack_md3' 'MD3 entity mesh pack'
 check "$VK_RTX_ENT" 'vk_rtx_pack_aabb' 'AABB proxy fallback'
 check "$VK_RTX_ENT_H" 'vkRtxEntityPackStats_t' 'entity pack stats API'
@@ -40,6 +45,11 @@ check "$VK_RP" 'vk_hybrid1_active' 'hybrid frame path priority'
 check "$RCHIT" 'gl_InstanceCustomIndexEXT' 'instance-aware closest-hit'
 check "$TR_INIT" 'r_rtxTlasUpdate' 'r_rtxTlasUpdate cvar registration'
 check "$TR_INIT" 'r_rtxEntityTriCap' 'r_rtxEntityTriCap cvar registration'
+
+HIT_GLSL="$(idtech3_file renderers/vulkan/shaders/glsl/hybrid1/hybrid1_hit.glsl src/renderers/vulkan/shaders/glsl/hybrid1/hybrid1_hit.glsl)"
+PT_HIT="$(idtech3_file renderers/vulkan/shaders/glsl/pt_hit.rchit src/renderers/vulkan/shaders/glsl/pt_hit.rchit)"
+check "$HIT_GLSL" 'WorldAlbedoSSBO' 'Hybrid1 hit world albedo SSBO'
+check "$PT_HIT" 'WorldAlbedoSSBO' 'pathtrace hit world albedo SSBO'
 
 if [[ $failures -ne 0 ]]; then
   echo "$failures check(s) failed"

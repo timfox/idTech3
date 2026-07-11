@@ -569,7 +569,7 @@ void vk_pathtrace_init( void )
 {
 	VkPhysicalDeviceRayTracingPipelinePropertiesKHR rtProps;
 	VkPhysicalDeviceProperties2 props2;
-	VkDescriptorSetLayoutBinding bindings[6];
+	VkDescriptorSetLayoutBinding bindings[7];
 	VkDescriptorSetLayoutCreateInfo dslci;
 	VkDescriptorPoolSize poolSizes[7];
 	VkDescriptorPoolCreateInfo pci;
@@ -657,10 +657,14 @@ void vk_pathtrace_init( void )
 	bindings[5].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
 	bindings[5].descriptorCount = 1;
 	bindings[5].stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+	bindings[6].binding = 6;
+	bindings[6].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+	bindings[6].descriptorCount = 1;
+	bindings[6].stageFlags = VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR;
 
 	Com_Memset( &dslci, 0, sizeof( dslci ) );
 	dslci.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-	dslci.bindingCount = 6;
+	dslci.bindingCount = 7;
 	dslci.pBindings = bindings;
 	VK_CHECK( qvkCreateDescriptorSetLayout( vk.device, &dslci, NULL, &pathtrace.dsl ) );
 
@@ -673,7 +677,7 @@ void vk_pathtrace_init( void )
 	poolSizes[3].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
 	poolSizes[3].descriptorCount = 2;
 	poolSizes[4].type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-	poolSizes[4].descriptorCount = 2;
+	poolSizes[4].descriptorCount = 3;
 	poolSizes[5].type = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
 	poolSizes[5].descriptorCount = 1;
 	{
@@ -727,6 +731,7 @@ void vk_pathtrace_init( void )
 
 	vk_pathtrace_create_rt_output( w, h );
 	vk_rtx_bind_tlas_descriptor( pathtrace.descriptor_set );
+	vk_rtx_bind_world_albedo_ssbo( pathtrace.descriptor_set, 6 );
 
 	uboAllocSize = (VkDeviceSize)PAD( (uint32_t)sizeof( VkPtFrameUBO_t ), (uint32_t)vk.uniform_alignment );
 	Com_Memset( &uboBi, 0, sizeof( uboBi ) );
@@ -854,6 +859,7 @@ void vk_pathtrace_frame_begin( void )
 	}
 	vk_pathtrace_create_rt_output( w, h );
 	vk_rtx_bind_tlas_descriptor( pathtrace.descriptor_set );
+	vk_rtx_bind_world_albedo_ssbo( pathtrace.descriptor_set, 6 );
 	vk_pathtrace_update_post_descriptors();
 	{
 		VkDescriptorBufferInfo queueInfo;
@@ -893,6 +899,7 @@ static void vk_pathtrace_trace_dispatch( VkCommandBuffer cmd, VkPipeline pipelin
 
 	vk_rtx_scene_prepare();
 	vk_rtx_bind_tlas_descriptor( pathtrace.descriptor_set );
+	vk_rtx_bind_world_albedo_ssbo( pathtrace.descriptor_set, 6 );
 
 	const float *view = backEnd.viewParms.world.modelViewMatrix;
 	const float *projection = backEnd.useFirstPersonProjection ?

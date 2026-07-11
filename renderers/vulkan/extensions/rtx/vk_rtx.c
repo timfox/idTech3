@@ -74,6 +74,10 @@ static struct {
 	VkDeviceMemory		vertex_memory;
 	VkBuffer		index_buffer;
 	VkDeviceMemory		index_memory;
+	VkBuffer		albedo_buffer;
+	VkDeviceMemory		albedo_memory;
+	uint32_t		world_vertex_count;
+	uint32_t		world_albedo_count;
 	VkImage			rt_image;
 	VkDeviceMemory		rt_image_memory;
 	VkImageView		rt_image_view;
@@ -113,8 +117,9 @@ static void RTX_Status_f( void )
 		( r_rtxDemo && r_rtxDemo->integer ) ? 1 : 0,
 		( r_hybrid1 && r_hybrid1->integer ) ? 1 : 0,
 		( r_raygun && r_raygun->integer ) ? 1 : 0 );
-	ri.Printf( PRINT_ALL, "[VK][RTX] world=%s blas_tris=%u entity_ents=%u entity_tris=%u entity_verts=%u mesh=%u proxy=%u tlas_instances=%u tlas_update=%d\n",
-		wn, rtx.world_primitive_count, rtx.entity_packed_count, rtx.entity_primitive_count,
+	ri.Printf( PRINT_ALL, "[VK][RTX] world=%s blas_tris=%u world_verts=%u albedo_prims=%u entity_ents=%u entity_tris=%u entity_verts=%u mesh=%u proxy=%u tlas_instances=%u tlas_update=%d\n",
+		wn, rtx.world_primitive_count, rtx.world_vertex_count, rtx.world_albedo_count,
+		rtx.entity_packed_count, rtx.entity_primitive_count,
 		rtx.entity_vertex_count, rtx.entity_mesh_count, rtx.entity_proxy_count, rtx.tlas_instance_count,
 		( r_rtxTlasUpdate && r_rtxTlasUpdate->integer ) ? 1 : 0 );
 	ri.Printf( PRINT_ALL, "[VK][RTX] trace_extent=%ux%u r_rtx=%d composite=%.2f samples=%d\n",
@@ -381,6 +386,7 @@ static void vk_rtx_rebuild_world_blas( void )
 	vk_rtx_destroy_buffer( &rtx.entity_blas_buffer, &rtx.entity_blas_memory );
 	vk_rtx_destroy_buffer( &rtx.vertex_buffer, &rtx.vertex_memory );
 	vk_rtx_destroy_buffer( &rtx.index_buffer, &rtx.index_memory );
+	vk_rtx_destroy_buffer( &rtx.albedo_buffer, &rtx.albedo_memory );
 	vk_rtx_destroy_buffer( &rtx.entity_vertex_buffer, &rtx.entity_vertex_memory );
 	vk_rtx_destroy_buffer( &rtx.entity_index_buffer, &rtx.entity_index_memory );
 	vk_rtx_destroy_buffer( &rtx.scratch_buffer, &rtx.scratch_memory );
@@ -389,13 +395,18 @@ static void vk_rtx_rebuild_world_blas( void )
 	rtx.entity_vertex_count = 0u;
 	rtx.entity_mesh_count = 0u;
 	rtx.entity_proxy_count = 0u;
+	rtx.world_vertex_count = 0u;
+	rtx.world_albedo_count = 0u;
 
 	maxPrimBLAS = 1u;
 	if ( useWorld ) {
 		VkDeviceSize vbSize = (VkDeviceSize)worldPrim * 9u * sizeof( float );
 		VkDeviceSize ibSize = (VkDeviceSize)worldPrim * 3u * sizeof( uint32_t );
+		VkDeviceSize abSize = (VkDeviceSize)worldPrim * 3u * sizeof( float );
 		float *posHost;
 		uint32_t *idxHost;
+		float *albedoHost;
+		uint32_t packedVerts = 0u;
 
 		vk_rtx_alloc_buffer( vbSize,
 			VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT | VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR,
@@ -405,22 +416,42 @@ static void vk_rtx_rebuild_world_blas( void )
 			VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT | VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR,
 			VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
 			&rtx.index_buffer, &rtx.index_memory, &ibAddr );
+		vk_rtx_alloc_buffer( abSize,
+			VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+			VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+			&rtx.albedo_buffer, &rtx.albedo_memory, NULL );
 		VK_CHECK( qvkMapMemory( vk.device, rtx.vertex_memory, 0, vbSize, 0, (void **)&posHost ) );
 		VK_CHECK( qvkMapMemory( vk.device, rtx.index_memory, 0, ibSize, 0, (void **)&idxHost ) );
-		packedPrim = vk_rtx_world_pack( tr.world, worldPrim, posHost, idxHost );
+		VK_CHECK( qvkMapMemory( vk.device, rtx.albedo_memory, 0, abSize, 0, (void **)&albedoHost ) );
+		{
+			uint32_t ai;
+			for ( ai = 0u; ai < worldPrim; ai++ ) {
+				albedoHost[ai * 3u + 0u] = 0.72f;
+				albedoHost[ai * 3u + 1u] = 0.70f;
+				albedoHost[ai * 3u + 2u] = 0.66f;
+			}
+		}
+		packedPrim = vk_rtx_world_pack( tr.world, worldPrim, posHost, idxHost, albedoHost, &packedVerts );
 		qvkUnmapMemory( vk.device, rtx.vertex_memory );
 		qvkUnmapMemory( vk.device, rtx.index_memory );
+		qvkUnmapMemory( vk.device, rtx.albedo_memory );
 		if ( packedPrim == 0u ) {
 			useWorld = qfalse;
 			vk_rtx_destroy_buffer( &rtx.vertex_buffer, &rtx.vertex_memory );
 			vk_rtx_destroy_buffer( &rtx.index_buffer, &rtx.index_memory );
+			vk_rtx_destroy_buffer( &rtx.albedo_buffer, &rtx.albedo_memory );
 		} else {
 			maxPrimBLAS = packedPrim;
 			rtx.world_primitive_count = packedPrim;
+			rtx.world_vertex_count = packedVerts;
+			rtx.world_albedo_count = packedPrim;
 		}
 	}
 
 	if ( !useWorld ) {
+		float fallbackAlbedo[3] = { 0.72f, 0.70f, 0.66f };
+		float *albedoHost;
+
 		triVerts[0] = -1.0f; triVerts[1] = -1.0f; triVerts[2] = 0.0f;
 		triVerts[3] =  1.0f; triVerts[4] = -1.0f; triVerts[5] = 0.0f;
 		triVerts[6] =  0.0f; triVerts[7] =  1.0f; triVerts[8] = 0.0f;
@@ -439,8 +470,17 @@ static void vk_rtx_rebuild_world_blas( void )
 		VK_CHECK( qvkMapMemory( vk.device, rtx.index_memory, 0, sizeof( triIdx ), 0, (void **)&idxMap ) );
 		Com_Memcpy( idxMap, triIdx, sizeof( triIdx ) );
 		qvkUnmapMemory( vk.device, rtx.index_memory );
+		vk_rtx_alloc_buffer( sizeof( fallbackAlbedo ),
+			VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+			VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+			&rtx.albedo_buffer, &rtx.albedo_memory, NULL );
+		VK_CHECK( qvkMapMemory( vk.device, rtx.albedo_memory, 0, sizeof( fallbackAlbedo ), 0, (void **)&albedoHost ) );
+		Com_Memcpy( albedoHost, fallbackAlbedo, sizeof( fallbackAlbedo ) );
+		qvkUnmapMemory( vk.device, rtx.albedo_memory );
 		maxPrimBLAS = 1u;
 		rtx.world_primitive_count = 0u;
+		rtx.world_vertex_count = 3u;
+		rtx.world_albedo_count = 0u;
 	}
 
 	Com_Memset( &triangles, 0, sizeof( triangles ) );
@@ -448,7 +488,11 @@ static void vk_rtx_rebuild_world_blas( void )
 	triangles.vertexFormat = VK_FORMAT_R32G32B32_SFLOAT;
 	triangles.vertexData.deviceAddress = vbAddr;
 	triangles.vertexStride = sizeof( float ) * 3u;
-	triangles.maxVertex = ( maxPrimBLAS > 0u ) ? ( maxPrimBLAS * 3u - 1u ) : 0u;
+	if ( useWorld && rtx.world_vertex_count > 0u ) {
+		triangles.maxVertex = rtx.world_vertex_count - 1u;
+	} else {
+		triangles.maxVertex = ( maxPrimBLAS > 0u ) ? ( maxPrimBLAS * 3u - 1u ) : 0u;
+	}
 	triangles.indexType = useWorld ? VK_INDEX_TYPE_UINT32 : VK_INDEX_TYPE_UINT16;
 	triangles.indexData.deviceAddress = ibAddr;
 
@@ -608,7 +652,7 @@ static void vk_rtx_rebuild_world_blas( void )
 
 	if ( useWorld && wn[0] != '\0' ) {
 		int subm = ( tr.world->numBModels > 0 ) ? tr.world->numBModels : 1;
-		ri.Printf( PRINT_DEVELOPER, "[VK][RTX] BLAS rebuilt: %u tris from %s (%d brush submodels, cap %u)\n",
+		ri.Printf( PRINT_DEVELOPER, "[VK][RTX] BLAS rebuilt: %u tris from %s (%d brush submodels, faces+trisoups+grids, cap %u)\n",
 			maxPrimBLAS, wn, subm, capPrim );
 	} else if ( wn[0] != '\0' ) {
 		ri.Printf( PRINT_DEVELOPER, "[VK][RTX] BLAS fallback triangle (no packable world tris for %s)\n", wn );
@@ -1011,6 +1055,7 @@ void vk_rtx_shutdown( void )
 	vk_rtx_destroy_buffer( &rtx.blas_buffer, &rtx.blas_memory );
 	vk_rtx_destroy_buffer( &rtx.vertex_buffer, &rtx.vertex_memory );
 	vk_rtx_destroy_buffer( &rtx.index_buffer, &rtx.index_memory );
+	vk_rtx_destroy_buffer( &rtx.albedo_buffer, &rtx.albedo_memory );
 	vk_rtx_destroy_buffer( &rtx.scratch_buffer, &rtx.scratch_memory );
 	vk_rtx_destroy_buffer( &rtx.sbt_buffer, &rtx.sbt_memory );
 
@@ -1572,6 +1617,41 @@ void vk_rtx_bind_tlas_descriptor( VkDescriptorSet set )
 	vk_rtx_write_tlas_descriptor( set );
 }
 
+void vk_rtx_bind_world_albedo_ssbo( VkDescriptorSet set, uint32_t binding )
+{
+	VkDescriptorBufferInfo info;
+	VkWriteDescriptorSet write;
+	VkDeviceSize rangeBytes;
+
+	if ( set == VK_NULL_HANDLE || rtx.albedo_buffer == VK_NULL_HANDLE ) {
+		return;
+	}
+
+	rangeBytes = (VkDeviceSize)rtx.world_albedo_count * 3u * sizeof( float );
+	if ( rangeBytes < 3u * sizeof( float ) ) {
+		rangeBytes = 3u * sizeof( float );
+	}
+
+	Com_Memset( &info, 0, sizeof( info ) );
+	info.buffer = rtx.albedo_buffer;
+	info.offset = 0;
+	info.range = rangeBytes;
+
+	Com_Memset( &write, 0, sizeof( write ) );
+	write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+	write.dstSet = set;
+	write.dstBinding = binding;
+	write.descriptorCount = 1;
+	write.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+	write.pBufferInfo = &info;
+	qvkUpdateDescriptorSets( vk.device, 1, &write, 0, NULL );
+}
+
+uint32_t vk_rtx_world_albedo_count( void )
+{
+	return rtx.world_albedo_count;
+}
+
 #else /* !USE_VULKAN_RTX */
 
 void vk_rtx_init( void )
@@ -1590,5 +1670,7 @@ qboolean vk_rtx_scene_ready( void ) { return qfalse; }
 void vk_rtx_scene_prepare( void ) {}
 void vk_rtx_scene_extent( uint32_t *w, uint32_t *h ) { if ( w ) { *w = 1u; } if ( h ) { *h = 1u; } }
 void vk_rtx_bind_tlas_descriptor( VkDescriptorSet set ) { (void)set; }
+void vk_rtx_bind_world_albedo_ssbo( VkDescriptorSet set, uint32_t binding ) { (void)set; (void)binding; }
+uint32_t vk_rtx_world_albedo_count( void ) { return 0u; }
 
 #endif /* USE_VULKAN_RTX */
