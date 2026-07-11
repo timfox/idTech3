@@ -900,6 +900,8 @@ static void InitOpenGL( void )
 
 		if ( r_fbo->integer )
 		{
+			R_Upscale_ApplyRenderScaleDefaults();
+
 			if ( r_renderScale->integer )
 			{
 				glConfig.vidWidth = r_renderWidth->integer;

@@ -3,6 +3,7 @@
 #include "vk_postfx.h"
 #include "vk_postfx_params.h"
 #include "vk_temporal.h"
+#include "vk_upscale.h"
 #include "vk_util.h"
 #include "vk_view_state.h"
 #include <math.h>
@@ -140,6 +141,16 @@ void vk_update_postfx_params( uint32_t cmd_index )
 	params.taaParams[1] = Com_Clamp( 0.0f, 0.99f, r_taa_feedbackStationary ? r_taa_feedbackStationary->value : 0.92f );
 	params.taaParams[2] = Com_Clamp( 0.0f, 0.99f, r_taa_feedbackMotion ? r_taa_feedbackMotion->value : 0.72f );
 	params.taaParams[3] = Com_Clamp( 0.0f, 1.0f, r_taa_sharpen ? r_taa_sharpen->value : 0.12f );
+	if ( R_Upscale_WantTemporal() ) {
+		float sharp = params.taaParams[3] + R_Upscale_GetSharpness();
+		params.taaParams[3] = Com_Clamp( 0.0f, 1.0f, sharp );
+	}
+	{
+		float jx = 0.0f, jy = 0.0f;
+		R_Upscale_GetJitter( &jx, &jy );
+		params.lutParams[2] = jx;
+		params.lutParams[3] = jy;
+	}
 
 	if ( backEnd.projection2D || !tr.world || backEnd.viewParms.portalView != PV_NONE || backEnd.useFirstPersonProjection ) {
 		Com_Memcpy( vk.postfx_params_ptr[cmd_index], &params, sizeof( params ) );

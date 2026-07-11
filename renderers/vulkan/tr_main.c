@@ -24,6 +24,9 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "tr_local.h"
 #include "tr_bsp_stream.h"
 #include "extensions/scaffold/vk_arc_blanc.h"
+#ifdef USE_VULKAN
+#include "vk_upscale.h"
+#endif
 
 #include <string.h> // memcpy
 
@@ -1814,6 +1817,9 @@ void R_RenderView( const viewParms_t *parms ) {
 	R_RotateForViewer();
 
 	R_SetupProjection( &tr.viewParms, r_zproj->value, qtrue );
+#ifdef USE_VULKAN
+	R_Upscale_ApplyProjectionJitter( tr.viewParms.projectionMatrix );
+#endif
 
 	R_GenerateDrawSurfs();
 

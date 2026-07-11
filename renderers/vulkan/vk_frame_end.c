@@ -10,6 +10,7 @@
 #include "vk_scene_pass.h"
 #include "vk_temporal.h"
 #include "vk_hybrid1.h"
+#include "vk_upscale.h"
 #include "vk_volumetric_pass.h"
 #ifdef USE_IMGUI
 #include "inspector/vk_imgui.h"
@@ -150,6 +151,9 @@ void vk_end_frame_record_taa_pass( VkImageView *post_fog_src, VkImageView *lumin
 			VK_TEMPORAL_RESET_CLIENT_STATE_CHANGE );
 	taa_wanted = ( r_taa && r_taa->integer ) ? qtrue : qfalse;
 	if ( !taa_wanted && r_hybrid1_taa && r_hybrid1_taa->integer && vk_hybrid1_active() ) {
+		taa_wanted = qtrue;
+	}
+	if ( !taa_wanted && R_Upscale_WantTemporal() ) {
 		taa_wanted = qtrue;
 	}
 

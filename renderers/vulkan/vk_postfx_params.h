@@ -23,7 +23,7 @@ typedef struct {
 	float lensEffects0[4];     /* vignette, vignetteRadius, chromaticAberration, filmGrain */
 	float lensEffects1[4];     /* outlineStrength, outlineThreshold, filmLook, sharpen */
 	float runtimeFlags[4];     /* greyscale, dither, postDebug, postEnabled */
-	float lutParams[4];        /* lutIntensity, lutEnabled, lutStripDim, reserved */
+	float lutParams[4];        /* lutIntensity, lutEnabled, jitterX (pixels), jitterY (pixels) */
 	float autoExposureParams[4]; /* avgLogLum, targetLum, minExposure, maxExposure */
 	float localExposureParams[4]; /* enabled, strength, shadowClampEV, highlightClampEV */
 	float taaParams[4];        /* validHistory, stationaryFeedback, motionFeedback, sharpen */

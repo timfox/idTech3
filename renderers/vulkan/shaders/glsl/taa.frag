@@ -87,8 +87,11 @@ vec3 applyResolveSharpen( vec2 uv, vec3 resolved ) {
 
 void main() {
 	vec2 uv = frag_tex_coord;
-	vec3 current = sampleCurrent( uv );
-	float depthNdc = textureLod( depthTex, uv, 0.0 ).r;
+	/* Unjitter sample UV when temporal upscale Halton offset is active (lutParams.zw in pixels). */
+	vec2 texel = texelSize();
+	vec2 sampleUV = uv - postfx.lutParams.zw * texel;
+	vec3 current = sampleCurrent( sampleUV );
+	float depthNdc = textureLod( depthTex, sampleUV, 0.0 ).r;
 
 	if ( postfx.taaParams.x < 0.5 || postfx.frameInfo.w < 0.5 || depthNdc <= 0.0 || depthNdc >= 1.0 ) {
 		out_color = vec4( current, 1.0 );
@@ -97,10 +100,10 @@ void main() {
 
 	vec2 historyUV;
 	if ( postfx.depthParams.z > 0.5 ) {
-		vec2 motion = textureLod( motionTex, uv, 0.0 ).rg;
-		historyUV = uv - motion;
+		vec2 motion = textureLod( motionTex, sampleUV, 0.0 ).rg;
+		historyUV = sampleUV - motion;
 	} else {
-		historyUV = reprojectHistoryUV( uv, depthNdc );
+		historyUV = reprojectHistoryUV( sampleUV, depthNdc );
 	}
 	if ( any( lessThan( historyUV, vec2( 0.0 ) ) ) || any( greaterThan( historyUV, vec2( 1.0 ) ) ) ) {
 		out_color = vec4( current, 1.0 );
@@ -109,9 +112,9 @@ void main() {
 
 	vec3 history = textureLod( historyColor, historyUV, 0.0 ).rgb;
 	vec3 mn, mx, avg;
-	neighborhoodMinMax( uv, mn, mx, avg );
+	neighborhoodMinMax( sampleUV, mn, mx, avg );
 	vec2 texSize = vec2( textureSize( currentColor, 0 ) );
-	vec2 velocity = ( uv - historyUV ) * texSize;
+	vec2 velocity = ( sampleUV - historyUV ) * texSize;
 	float motion = length( velocity );
 	float motionFactor = smoothstep( 0.2, 8.0, motion );
 	float feedback = mix( clamp( postfx.taaParams.y, 0.0, 0.99 ),
@@ -128,5 +131,7 @@ void main() {
 		history = clamp( history, expandedMin, expandedMax );
 	}
 
-	out_color = vec4( applyResolveSharpen( uv, mix( current, history, feedback ) ), 1.0 );
+	vec3 resolved = mix( current, history, feedback );
+	resolved = applyResolveSharpen( sampleUV, resolved );
+	out_color = vec4( resolved, 1.0 );
 }
