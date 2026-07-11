@@ -109,27 +109,23 @@ typedef enum {
 #define VK_DESC_TEXTURE2     3
 #define VK_DESC_FOG_COLLAPSE 4
 
-#ifdef USE_VK_PBR
-	typedef float mat4_t[16];
-	#define VK_DESC_PBR_BRDFLUT				5
-	#define VK_DESC_PBR_NORMAL				6
-	#define VK_DESC_PBR_PHYSICAL			7
-	#define VK_DESC_PBR_CUBEMAP				8
-	#define VK_DESC_PBR_DELUXE				9
-	#define VK_DESC_PBR_IRRADIANCE			10
-	#define VK_DESC_PBR_EMISSIVE			11
-	#define VK_DESC_PBR_CLEARCOAT			12
-	#define VK_DESC_PBR_SHEEN				13
-	#define VK_DESC_PBR_ANISOTROPY			14
-	#define VK_DESC_PBR_TRANSMISSION		15
-	#define VK_DESC_PBR_SUBSURFACE			16
-	#define VK_DESC_PBR_DETAIL				17
-	#define VK_DESC_FORWARD_PLUS			18 /* SSBO set: light + tile lists (PBR fragment) */
-	#define VK_DESC_PBR_BLEND_LAYERS		19 /* array samplers: albedo/normal/orm × 8 */
-	#define VK_DESC_COUNT	20
-#else
-	#define VK_DESC_COUNT   5
-#endif
+typedef float mat4_t[16];
+#define VK_DESC_PBR_BRDFLUT				5
+#define VK_DESC_PBR_NORMAL				6
+#define VK_DESC_PBR_PHYSICAL			7
+#define VK_DESC_PBR_CUBEMAP				8
+#define VK_DESC_PBR_DELUXE				9
+#define VK_DESC_PBR_IRRADIANCE			10
+#define VK_DESC_PBR_EMISSIVE			11
+#define VK_DESC_PBR_CLEARCOAT			12
+#define VK_DESC_PBR_SHEEN				13
+#define VK_DESC_PBR_ANISOTROPY			14
+#define VK_DESC_PBR_TRANSMISSION		15
+#define VK_DESC_PBR_SUBSURFACE			16
+#define VK_DESC_PBR_DETAIL				17
+#define VK_DESC_FORWARD_PLUS			18 /* SSBO set: light + tile lists (PBR fragment) */
+#define VK_DESC_PBR_BLEND_LAYERS		19 /* array samplers: albedo/normal/orm × 8 */
+#define VK_DESC_COUNT	20
 
 #include "vk_procs.h"
 
@@ -615,14 +611,9 @@ typedef struct vk_tess_s {
 	uint32_t		iqm_skin_offset;
 	uint32_t		iqm_morph_offset;
 	uint32_t		gltf_topo_offset;
-#ifdef USE_VK_PBR
 	uint32_t			camera_ubo_offset;
 	VkDeviceSize		buf_offset[10];
 	VkDeviceSize		vbo_offset[10];
-#else
-	VkDeviceSize		buf_offset[8];
-	VkDeviceSize		vbo_offset[8];
-#endif
 
 	VkBuffer		curr_index_buffer;
 	uint32_t		curr_index_offset;
@@ -1660,17 +1651,11 @@ typedef struct {
 	//
 	struct {
 		struct {
-#ifdef USE_VK_PBR
 			VkShaderModule gen[2][3][2][2][2]; // pbr[0,1], tx[0,1,2], cl[0,1] env0[0,1] fog[0,1]
 			/* +USE_GLTF_GPU_SKIN; last dim: 0=bind T, 1=Gram–Schmidt, 2=topology+MikkT-inspired average */
 			VkShaderModule gen_gltf_gpu[2][3][2][2][2][3];
 			VkShaderModule ident1[2][2][2][2]; // pbr[0,1], tx[0,1], env0[0,1] fog[0,1]
 			VkShaderModule fixed[2][2][2][2];  // pbr[0,1], tx[0,1], env0[0,1] fog[0,1]
-#else
-			VkShaderModule gen[3][2][2][2]; // tx[0,1,2], cl[0,1] env0[0,1] fog[0,1]
-			VkShaderModule ident1[2][2][2]; // tx[0,1], env0[0,1] fog[0,1]
-			VkShaderModule fixed[2][2][2];  // tx[0,1], env0[0,1] fog[0,1]
-#endif			
 			VkShaderModule light[2];        // fog[0,1]
 		} vert;
 		struct {
@@ -1681,7 +1666,6 @@ typedef struct {
 			VkShaderModule ui_vector_glyphlet_frag;
 			VkShaderModule ui_subpixel_text;
 			VkShaderModule flowmap[2];      // fog[0,1] - water flowmap
-#ifdef USE_VK_PBR
 			VkShaderModule gen[2][3][2][2]; // pbr[0,1], tx[0,1,2] cl[0,1] fog[0,1]
 			VkShaderModule gbuf_gen[3][2][2]; // tx[0,1,2] cl[0,1] fog[0,1], PBR deferred export
 			VkShaderModule ident1[2][2][2]; // pbr[0,1], tx[0,1], fog[0,1]
@@ -1690,25 +1674,12 @@ typedef struct {
 			VkShaderModule gbuf_fixed[2][2]; // tx[0,1], fog[0,1], PBR deferred export
 			VkShaderModule ent[2][1][2];    // pbr[0,1], tx[0], fog[0,1]
 			VkShaderModule gbuf_ent[1][2];   // tx[0], fog[0,1], PBR deferred export
-#else
-			VkShaderModule gen[3][2][2]; // tx[0,1,2] cl[0,1] fog[0,1]
-			VkShaderModule ident1[2][2]; // tx[0,1], fog[0,1]
-			VkShaderModule fixed[2][2];  // tx[0,1], fog[0,1]
-			VkShaderModule ent[1][2];    // tx[0], fog[0,1]
-#endif
 			VkShaderModule light[2][2];  // linear[0,1] fog[0,1]
 			/* r_hdr 3 (64-bit) variants; used when color_format is RGBA64F */
-#ifdef USE_VK_PBR
 			VkShaderModule gen_hdr64[2][3][2][2];
 			VkShaderModule ident1_hdr64[2][2][2];
 			VkShaderModule fixed_hdr64[2][2][2];
 			VkShaderModule ent_hdr64[2][1][2];
-#else
-			VkShaderModule gen_hdr64[3][2][2];
-			VkShaderModule ident1_hdr64[2][2];
-			VkShaderModule fixed_hdr64[2][2];
-			VkShaderModule ent_hdr64[1][2];
-#endif
 			VkShaderModule light_hdr64[2][2];
 			VkShaderModule flowmap_hdr64[2];
 		} frag;
@@ -2127,9 +2098,7 @@ typedef struct {
 	qboolean smaaActive;
 	qboolean fxaaActive;
 	qboolean lensFlareActive;
-#ifdef USE_VK_PBR
 	qboolean pbrActive;
-#endif
 #ifdef VK_CUBEMAP
 	qboolean cubemapActive;
 #endif
