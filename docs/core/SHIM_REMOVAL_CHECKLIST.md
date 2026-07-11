@@ -2,57 +2,47 @@
 
 **Prerequisite:** Phase 5c (physical move) and Phase 5d (MSVC manifest sync) complete.
 
-## Prep completed (keep shims)
-
-These items are done on trunk; **`src/*` forwarding shims and layout bridges remain** until Phase 5e proper.
+## Phase 5e status
 
 | Item | Status |
 |------|--------|
-| CMake manifests prefer `engine/` / `runtime/` / `modules/` / `renderers/` (and `IDTECH3_DIR_*`) | Done — see `cmake/EngineQcommonSources.cmake`, `cmake/server/`, `cmake/client/`, `cmake/renderers/`, `CMakeLists.txt` |
-| High-traffic tests accept canonical paths with shim fallback | Done — `idtech3_test_paths.sh`, client modular/domains, cpp20, legacy intact, vulkan extensions layout |
-| MSVC sync: realpath ClCompile dedupe **off** by default; non-shrink guard | Done — `scripts/msvc/sync_vcxproj_sources.py` (`--dedupe-realpath` opt-in only) |
-| `__pycache__/` / `*.pyc` ignored | Done — `.gitignore` |
-| Shim audit `--strict` CMake budget | Done — `MAX_SHIM_CMAKE=50` (was 500); prints migration progress % |
+| Drop `src/*` forwarding shims | **Done** — `./scripts/migrate_phase_5e_drop_shims.sh --apply` |
+| Keep layout bridges (`runtime/qcommon`, `engine/platform/*`, …) | **Kept** — relative `#include` + MSVC still need them |
+| `src/README.md` points at canonical roots | Done |
+| Layout / legacy / audit tests updated for post-shim world | Done |
 
-### Test migration batches (canonical + shim fallback)
+### Prep (completed earlier)
 
-Shared helper: [tests/scripts/idtech3_test_paths.sh](../../tests/scripts/idtech3_test_paths.sh) (`idtech3_file` / `idtech3_require_file`; roots for client/qcommon/server/game/world/nav/audio/botlib/extensions/renderers).
+| Item | Status |
+|------|--------|
+| CMake manifests prefer canonical / `IDTECH3_DIR_*` | Done |
+| Wiring tests prefer canonical paths with shim fallback | Done (batches A–D) |
+| MSVC sync: realpath ClCompile dedupe off by default | Done |
+| `__pycache__/` ignored; shim audit budget 50 | Done |
 
-| Batch | Scripts | Status |
-|-------|---------|--------|
-| A — open world / districts / proc / nav | `test_openworld`, `test_openworld_sync`, `test_openworld_residency`, `test_districts`, `test_proc`, `test_nav_bake`, `test_cm_stream_merge` | Done |
-| B — renderer feature wiring | `test_hybrid1`, `test_vulkan_rtx`, `test_raygun`, `test_vuda`, `test_dressi`, `test_vulkan_regression_source_guards` | Done |
-| C — engine / scripting | `test_csharp_scripting`, `test_app_crdt`, `test_genetic_gan`, `test_no_aux_core` | Done |
-| D — remaining wiring tests | arc_blanc, fog_biology, graph_compute; iris/mimir/curast/vksplat/squeezeme; deferred/temporal/vector font; vulkan guards/regressions/mesh/veg; bsp_stream; ttp/bubblesh/aiwc/physics/nanovdb; conditional_stubs, crash_report, pk3 cache, python, sqlite; engine_module_manifest, game_ai, vulkan_extensions_layout | Done |
-
-**Still remaining before drop:** intentional shim assertions in `test_repository_layout_2026` / `test_legacy_intact` (must keep until Phase 5e proper); leftover `src/` strings used only as shim fallbacks in helpers; two-week soak.
-
-Verify anytime:
+Verify:
 
 ```bash
+./scripts/layout_forwarding_symlinks.sh
 ./scripts/audit_src_shim_references.sh --strict
-./tests/scripts/test_msvc_manifest_drift.sh
-ctest -R 'test_repository_layout_2026|test_legacy_intact|test_msvc_|test_client_modular|test_cpp20|test_openworld|test_hybrid1|test_no_aux|test_arc_blanc|test_fog_biology|test_graph_compute'
+ctest -R 'test_repository_layout_2026|test_legacy_intact|test_msvc_|test_client_modular|test_cpp20|test_openworld|test_no_aux' --output-on-failure
 ```
 
-## Before removing shims (remaining blockers)
+## Remaining (not Phase 5e)
 
-1. Run `./scripts/audit_src_shim_references.sh` — CMake shim lines should stay under the strict budget; wiring tests prefer canonical paths (batches A–D).
-2. ~~Finish migrating remaining lower-priority test scripts~~ — Done (batch D). Update layout/legacy tests only when shims are actually dropped.
-3. Confirm **MSVC** uses `engine/platform/win32/msvc2017/` (not `src/platform/`) in CI and docs — already the case; do **not** run sync with `--dedupe-realpath` casually.
-4. `ctest -R 'test_repository_layout_2026|test_legacy_intact|test_msvc_'` — all green.
-5. Two-week soak on `main` per [DEPRECATION_POLICY.md](../DEPRECATION_POLICY.md).
+- Rewrite relative `#include "../../qcommon/..."` to absolute-from-root or `IDTECH3_DIR_*` includes, then drop **layout bridges**.
+- Two-week soak was waived for this drop after prep + test migration on `main`; watch CI / downstream forks.
 
-## Removal steps
+## Removal command
 
 ```bash
-# After manifests/tests migrated:
-./scripts/migrate_phase_5e_drop_shims.sh   # (future) remove src/* symlinks + layout bridge symlinks
+./scripts/migrate_phase_5e_drop_shims.sh --dry-run
+./scripts/migrate_phase_5e_drop_shims.sh --apply
 ```
 
-## Keep until mod ecosystem catches up
+## Keep for mod ecosystem
 
 - QVM / pk3 mod paths are unchanged (game data, not engine `src/` tree).
-- Downstream forks may still document `src/qcommon`; point them at `engine/core/`.
+- Downstream forks documenting `src/qcommon` should switch to `engine/core/` (see `src/README.md`).
 
 See [REPOSITORY_LAYOUT_2026.md](REPOSITORY_LAYOUT_2026.md), [ENGINE_REORG_PLAN.md](../ENGINE_REORG_PLAN.md).

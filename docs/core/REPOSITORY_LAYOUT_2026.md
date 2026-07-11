@@ -2,7 +2,7 @@
 
 Evolutionary map from today's `src/` tree to the layercake folders in [BRANCHES.md](../BRANCHES.md). **No capability is removed** — extensions stay buildable via `IDTECH3_PROFILE=full` or `-DUSE_*=ON`.
 
-## Current (Phase 5c — physical layout)
+## Current (Phase 5e — physical layout; `src/*` shims dropped)
 
 ```
 idtech3/
@@ -24,11 +24,7 @@ idtech3/
 ├── renderers/vulkan/         # core + extensions/{neural,splats,rtx,scaffold}
 ├── third_party/              # was src/external
 ├── samples/                  # symlink → examples
-├── src/                      # forwarding shims only (Phase 5c complete)
-│   ├── qcommon → ../engine/core
-│   ├── client → ../runtime/client
-│   ├── botlib → ../modules/botlib
-│   └── …                     # see scripts/migrate_phase_5c.sh
+├── src/                      # README only (Phase 5e dropped forwarding shims)
 ├── cmake/
 │   ├── IdTech3Layout.cmake   # IDTECH3_DIR_* path aliases
 │   ├── profiles/             # core | game | full | research
