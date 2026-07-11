@@ -182,10 +182,7 @@ static void vk_alloc_attachments( void )
 }
 
 
-static void vk_add_attachment_desc( VkImage desc, VkImageView *image_view, VkImageUsageFlags usage, VkMemoryRequirements *reqs, VkFormat image_format, VkImageAspectFlags aspect_flags, VkImageLayout image_layout
-#ifdef USE_VK_PBR
-	, VkImageViewType view_type )
-#endif
+static void vk_add_attachment_desc( VkImage desc, VkImageView *image_view, VkImageUsageFlags usage, VkMemoryRequirements *reqs, VkFormat image_format, VkImageAspectFlags aspect_flags, VkImageLayout image_layout, VkImageViewType view_type )
 {
 	if ( num_attachments >= ARRAY_LEN( attachments ) ) {
 		ri.Error( ERR_FATAL, "Attachments array overflow" );
@@ -266,15 +263,11 @@ static void create_color_attachment(
 
 	vk_get_image_memory_erquirements( *image, &memory_requirements );
 
-#ifdef USE_VK_PBR
     VkImageViewType view_type = VK_IMAGE_VIEW_TYPE_2D;
 
 	if ( flags & VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT )
 		view_type = VK_IMAGE_VIEW_TYPE_CUBE;
 	vk_add_attachment_desc( *image, image_view, usage, &memory_requirements, format, VK_IMAGE_ASPECT_COLOR_BIT, image_layout, view_type );
-#else
-	vk_add_attachment_desc( *image, image_view, usage, &memory_requirements, format, VK_IMAGE_ASPECT_COLOR_BIT, image_layout );
-#endif
 }
 
 /*
@@ -408,11 +401,7 @@ static void create_depth_attachment( uint32_t width, uint32_t height, VkSampleCo
 
 	vk_get_image_memory_erquirements( *image, &memory_requirements );
 
-#ifdef USE_VK_PBR
 	vk_add_attachment_desc( *image, image_view, create_desc.usage, &memory_requirements, vk.depth_format, image_aspect_flags, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL, VK_IMAGE_VIEW_TYPE_2D );
-#else
-	vk_add_attachment_desc( *image, image_view, create_desc.usage, &memory_requirements, vk.depth_format, image_aspect_flags, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL );
-#endif
 }
 
 /*
