@@ -465,6 +465,17 @@ typedef struct {
 	uint32_t		transmissionMapType;
 	uint32_t		subsurfaceMapType;
 
+	/* Multi-material vertex paint (TLOU-style height-blend). Layer 0 = map/normal/orm. */
+	qboolean		materialBlend;
+	float			blendSharpness;
+	int				materialLayerCount;	/* 1..4 */
+	uint32_t		materialHeightMask;	/* bit i => layer i has normalHeightMap */
+	image_t			*layerAlbedo[3];	/* layers 1..3 */
+	image_t			*layerNormal[3];
+	image_t			*layerPhysical[3];
+	uint32_t		layerNormalType[3];
+	uint32_t		layerPhysicalType[3];
+
 	vec4_t normalScale;
 	vec4_t specularScale;
 	vec4_t emissiveScale;
@@ -1527,6 +1538,8 @@ extern cvar_t	*r_pomSteps;
 extern cvar_t	*r_pomScale;
 extern cvar_t	*r_pomShadow;
 extern cvar_t	*r_pomShadowSteps;
+extern cvar_t	*r_materialBlend;
+extern cvar_t	*r_materialBlendSharpness;
 #endif
 extern cvar_t	*r_baseNormalX;
 extern cvar_t	*r_baseNormalY;

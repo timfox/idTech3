@@ -3267,6 +3267,12 @@ set_tests_properties(test_freeusd_wiring PROPERTIES
 	LABELS "scripts;validation;freeusd"
 	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_freeusd_wiring.sh;${CMAKE_SOURCE_DIR}/cmake/FreeUSD.cmake;${CMAKE_SOURCE_DIR}/docs/FREEUSD.md")
 
+add_test(NAME test_material_blend
+	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_material_blend.sh)
+set_tests_properties(test_material_blend PROPERTIES
+	LABELS "scripts;validation;renderer;pbr"
+	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_material_blend.sh;${CMAKE_SOURCE_DIR}/docs/MATERIAL_BLEND.md;${CMAKE_SOURCE_DIR}/renderers/vulkan/shaders/glsl/gen_frag.tmpl")
+
 add_test(NAME test_p2p_networking
 	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_p2p_networking.sh)
 set_tests_properties(test_p2p_networking PROPERTIES

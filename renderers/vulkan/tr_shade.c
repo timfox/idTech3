@@ -91,6 +91,11 @@ static qboolean R_StageHasLightmap( const shaderStage_t *pStage ) {
 }
 
 static qboolean R_StageUsesWorldSH( const shaderStage_t *pStage ) {
+#ifdef USE_VK_PBR
+	if ( pStage->materialBlend || ( pStage->vk_pbr_flags & PBR_HAS_MATERIAL_BLEND ) ) {
+		return qfalse;
+	}
+#endif
 	if ( R_StageHasLightmap( pStage ) ) {
 		return qtrue;
 	}
@@ -693,6 +698,7 @@ typedef struct vkPbrUniformBlock_s {
 	vec4_t glintFlags;
 	vec4_t shCoeffs[9];
 	vec4_t parallaxParams;
+	vec4_t materialBlend;
 } vkPbrUniformBlock_t;
 #endif
 
@@ -1493,6 +1499,14 @@ static void RB_IterateStagesGeneric( const shaderCommands_t *input )
 				0.0f );
 
 			{
+				float sharpness = pStage->blendSharpness > 0.0f ? pStage->blendSharpness : 8.0f;
+				if ( r_materialBlendSharpness && r_materialBlendSharpness->value > 0.0f ) {
+					sharpness = r_materialBlendSharpness->value;
+				}
+				Vector4Set( block.materialBlend, sharpness, 0.0f, 0.0f, 0.0f );
+			}
+
+			{
 				const VkDescriptorSet fallback2D = ( tr.whiteImage ) ? tr.whiteImage->descriptor : VK_NULL_HANDLE;
 				const VkDescriptorSet fallbackCube = ( tr.emptyCubemap ) ? tr.emptyCubemap->descriptor : VK_NULL_HANDLE;
 				VkDescriptorSet brdfDescriptor = vk.brdflut_image_descriptor ? vk.brdflut_image_descriptor : fallback2D;
@@ -1615,6 +1629,42 @@ static void RB_IterateStagesGeneric( const shaderCommands_t *input )
 
 			if ( pStage->vk_pbr_flags & PBR_HAS_DETAILMAP )
 				vk_update_descriptor_if_changed_with_image( VK_DESC_PBR_DETAIL, pStage->detailMap->descriptor, pStage->detailMap );
+
+			/* Multi-material blend: remap advanced-lobe / detail / deluxe slots to layers 1..3. */
+			if ( ( pStage->vk_pbr_flags & PBR_HAS_MATERIAL_BLEND ) && pStage->materialBlend &&
+				pStage->materialLayerCount >= 2 &&
+				( !r_materialBlend || r_materialBlend->integer ) ) {
+				image_t *white = tr.whiteImage;
+				image_t *a1 = pStage->layerAlbedo[0] ? pStage->layerAlbedo[0] : white;
+				image_t *n1 = pStage->layerNormal[0] ? pStage->layerNormal[0] : white;
+				image_t *o1 = pStage->layerPhysical[0] ? pStage->layerPhysical[0] : white;
+				image_t *a2 = pStage->layerAlbedo[1] ? pStage->layerAlbedo[1] : white;
+				image_t *n2 = pStage->layerNormal[1] ? pStage->layerNormal[1] : white;
+				image_t *o2 = pStage->layerPhysical[1] ? pStage->layerPhysical[1] : white;
+				image_t *a3 = pStage->layerAlbedo[2] ? pStage->layerAlbedo[2] : white;
+				image_t *n3 = pStage->layerNormal[2] ? pStage->layerNormal[2] : white;
+
+				if ( a1 && a1->descriptor )
+					vk_update_descriptor_if_changed_with_image( VK_DESC_PBR_DETAIL, a1->descriptor, a1 );
+				if ( n1 && n1->descriptor )
+					vk_update_descriptor_if_changed_with_image( VK_DESC_PBR_CLEARCOAT, n1->descriptor, n1 );
+				if ( o1 && o1->descriptor )
+					vk_update_descriptor_if_changed_with_image( VK_DESC_PBR_TRANSMISSION, o1->descriptor, o1 );
+				if ( pStage->materialLayerCount > 2 ) {
+					if ( a2 && a2->descriptor )
+						vk_update_descriptor_if_changed_with_image( VK_DESC_PBR_SHEEN, a2->descriptor, a2 );
+					if ( n2 && n2->descriptor )
+						vk_update_descriptor_if_changed_with_image( VK_DESC_PBR_ANISOTROPY, n2->descriptor, n2 );
+					if ( o2 && o2->descriptor )
+						vk_update_descriptor( VK_DESC_PBR_DELUXE, o2->descriptor );
+				}
+				if ( pStage->materialLayerCount > 3 ) {
+					if ( a3 && a3->descriptor )
+						vk_update_descriptor_if_changed_with_image( VK_DESC_PBR_EMISSIVE, a3->descriptor, a3 );
+					if ( n3 && n3->descriptor )
+						vk_update_descriptor_if_changed_with_image( VK_DESC_PBR_SUBSURFACE, n3->descriptor, n3 );
+				}
+			}
 			
 			// Commented out descriptor updates for removed PBR features
 			// if ( pStage->vk_pbr_flags & PBR_HAS_EMISSIVE )
@@ -1657,20 +1707,23 @@ static void RB_IterateStagesGeneric( const shaderCommands_t *input )
 				Vector4Copy( block.glintFlags, uniform.pbrGlintFlags );
 				Com_Memcpy( uniform.pbrShCoeffs, block.shCoeffs, sizeof( uniform.pbrShCoeffs ) );
 				Vector4Copy( block.parallaxParams, uniform.pbrParallaxParams );
+				Vector4Copy( block.materialBlend, uniform.pbrMaterialBlend );
 
 				vk_push_uniform_cached( &uniform );
 			}
 
 			// aparently lightmap is not always in bundle 1 ..
 			// should probably fix this in collapseMuklitexture
-			if ( def.vk_pbr_flags & PBR_HAS_DELUXEMAP0 )
-				vk_update_descriptor(  VK_DESC_PBR_DELUXE, pStage->bundle[0].deluxeMap->descriptor );
+			if ( !( ( pStage->vk_pbr_flags & PBR_HAS_MATERIAL_BLEND ) && pStage->materialLayerCount > 2 ) ) {
+				if ( def.vk_pbr_flags & PBR_HAS_DELUXEMAP0 )
+					vk_update_descriptor(  VK_DESC_PBR_DELUXE, pStage->bundle[0].deluxeMap->descriptor );
 
-			if ( def.vk_pbr_flags & PBR_HAS_DELUXEMAP1 )
-				vk_update_descriptor(  VK_DESC_PBR_DELUXE, pStage->bundle[1].deluxeMap->descriptor );
+				if ( def.vk_pbr_flags & PBR_HAS_DELUXEMAP1 )
+					vk_update_descriptor(  VK_DESC_PBR_DELUXE, pStage->bundle[1].deluxeMap->descriptor );
 
-			else if ( !(def.vk_pbr_flags & PBR_HAS_DELUXEMAP0) && tr.whiteImage )
-				vk_update_descriptor(  VK_DESC_PBR_DELUXE, tr.whiteImage->descriptor );
+				else if ( !(def.vk_pbr_flags & PBR_HAS_DELUXEMAP0) && tr.whiteImage )
+					vk_update_descriptor(  VK_DESC_PBR_DELUXE, tr.whiteImage->descriptor );
+			}
 		}
 #endif
 

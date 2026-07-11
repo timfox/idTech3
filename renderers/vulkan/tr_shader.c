@@ -617,6 +617,18 @@ static qboolean ParseStage( shaderStage_t *stage, const char **text )
 	stage->subsurfaceMap = NULL;
 	stage->detailMap = NULL;
 
+	stage->materialBlend = qfalse;
+	stage->blendSharpness = 8.0f;
+	stage->materialLayerCount = 1;
+	stage->materialHeightMask = 0;
+	for ( i = 0; i < 3; i++ ) {
+		stage->layerAlbedo[i] = NULL;
+		stage->layerNormal[i] = NULL;
+		stage->layerPhysical[i] = NULL;
+		stage->layerNormalType[i] = PHYS_NONE;
+		stage->layerPhysicalType[i] = PHYS_NONE;
+	}
+
 	Vector4Set( stage->emissiveScale, 1.0f, 1.0f, 1.0f, 1.0f );
 	Vector4Set( stage->clearcoatScale, 1.0f, 1.0f, 1.0f, 1.0f );
 	Vector4Set( stage->sheenScale, 1.0f, 1.0f, 1.0f, 1.0f );
@@ -932,6 +944,122 @@ static qboolean ParseStage( shaderStage_t *stage, const char **text )
 				continue;
 			}
 			Q_strncpyz( bufferDetailTextureName, token, sizeof(bufferDetailTextureName) );
+		}
+		else if ( !Q_stricmp( token, "materialBlend" ) )
+		{
+			token = COM_ParseExt( text, qfalse );
+			if ( !token[0] || Q_stricmp( token, "vertex" ) ) {
+				ri.Printf( PRINT_WARNING, "WARNING: materialBlend expects 'vertex' in shader '%s'\n", shader.name );
+				return qfalse;
+			}
+			stage->materialBlend = qtrue;
+			stage->vk_pbr_flags |= PBR_HAS_MATERIAL_BLEND;
+		}
+		else if ( !Q_stricmp( token, "blendSharpness" ) )
+		{
+			token = COM_ParseExt( text, qfalse );
+			if ( !token[0] ) {
+				ri.Printf( PRINT_WARNING, "WARNING: missing parameter for 'blendSharpness' in shader '%s'\n", shader.name );
+				return qfalse;
+			}
+			stage->blendSharpness = Q_atof( token );
+			if ( stage->blendSharpness < 0.1f ) {
+				stage->blendSharpness = 0.1f;
+			}
+		}
+		else if ( !Q_stricmp( token, "layerMap" ) )
+		{
+			int layerIdx;
+			token = COM_ParseExt( text, qfalse );
+			if ( !token[0] ) {
+				ri.Printf( PRINT_WARNING, "WARNING: missing layer index for 'layerMap' in shader '%s'\n", shader.name );
+				return qfalse;
+			}
+			layerIdx = atoi( token );
+			token = COM_ParseExt( text, qfalse );
+			if ( !token[0] || layerIdx < 1 || layerIdx > 3 ) {
+				ri.Printf( PRINT_WARNING, "WARNING: layerMap expects <1-3> <path> in shader '%s'\n", shader.name );
+				return qfalse;
+			}
+			if ( !Q_stricmp( token, "$whiteimage" ) ) {
+				stage->layerAlbedo[layerIdx - 1] = tr.whiteImage;
+			} else {
+				stage->layerAlbedo[layerIdx - 1] = R_FindImageFile( token, IMGFLAG_NONE, 0 );
+				if ( !stage->layerAlbedo[layerIdx - 1] ) {
+					ri.Printf( PRINT_WARNING, "WARNING: could not find layerMap image '%s' in shader '%s'\n", token, shader.name );
+					stage->layerAlbedo[layerIdx - 1] = tr.defaultImage;
+				}
+			}
+			if ( stage->materialLayerCount < layerIdx + 1 ) {
+				stage->materialLayerCount = layerIdx + 1;
+			}
+			stage->materialBlend = qtrue;
+			stage->vk_pbr_flags |= PBR_HAS_MATERIAL_BLEND;
+		}
+		else if ( !Q_stricmp( token, "layerNormalMap" ) || !Q_stricmp( token, "layerNormalHeightMap" ) )
+		{
+			int layerIdx;
+			const qboolean isHeight = !Q_stricmp( token, "layerNormalHeightMap" );
+			token = COM_ParseExt( text, qfalse );
+			if ( !token[0] ) {
+				ri.Printf( PRINT_WARNING, "WARNING: missing layer index for layer normal map in shader '%s'\n", shader.name );
+				return qfalse;
+			}
+			layerIdx = atoi( token );
+			token = COM_ParseExt( text, qfalse );
+			if ( !token[0] || layerIdx < 1 || layerIdx > 3 ) {
+				ri.Printf( PRINT_WARNING, "WARNING: layerNormal(Height)Map expects <1-3> <path> in shader '%s'\n", shader.name );
+				return qfalse;
+			}
+			stage->layerNormalType[layerIdx - 1] = isHeight ? PHYS_NORMALHEIGHT : PHYS_NORMAL;
+			if ( !Q_stricmp( token, "$whiteimage" ) ) {
+				stage->layerNormal[layerIdx - 1] = tr.whiteImage;
+			} else {
+				stage->layerNormal[layerIdx - 1] = R_FindImageFile( token, IMGFLAG_NONE, 0 );
+				if ( !stage->layerNormal[layerIdx - 1] ) {
+					ri.Printf( PRINT_WARNING, "WARNING: could not find layer normal image '%s' in shader '%s'\n", token, shader.name );
+					stage->layerNormal[layerIdx - 1] = tr.defaultImage;
+				}
+			}
+			if ( isHeight ) {
+				stage->materialHeightMask |= ( 1u << layerIdx );
+			}
+			if ( stage->materialLayerCount < layerIdx + 1 ) {
+				stage->materialLayerCount = layerIdx + 1;
+			}
+			stage->materialBlend = qtrue;
+			stage->vk_pbr_flags |= PBR_HAS_MATERIAL_BLEND;
+		}
+		else if ( !Q_stricmp( token, "layerOrmMap" ) || !Q_stricmp( token, "layerOrmsMap" ) )
+		{
+			int layerIdx;
+			const qboolean isOrms = !Q_stricmp( token, "layerOrmsMap" );
+			token = COM_ParseExt( text, qfalse );
+			if ( !token[0] ) {
+				ri.Printf( PRINT_WARNING, "WARNING: missing layer index for layerOrmMap in shader '%s'\n", shader.name );
+				return qfalse;
+			}
+			layerIdx = atoi( token );
+			token = COM_ParseExt( text, qfalse );
+			if ( !token[0] || layerIdx < 1 || layerIdx > 3 ) {
+				ri.Printf( PRINT_WARNING, "WARNING: layerOrmMap expects <1-3> <path> in shader '%s'\n", shader.name );
+				return qfalse;
+			}
+			stage->layerPhysicalType[layerIdx - 1] = isOrms ? PHYS_ORMS : PHYS_ORM;
+			if ( !Q_stricmp( token, "$whiteimage" ) ) {
+				stage->layerPhysical[layerIdx - 1] = tr.whiteImage;
+			} else {
+				stage->layerPhysical[layerIdx - 1] = R_FindImageFile( token, IMGFLAG_NONE, 0 );
+				if ( !stage->layerPhysical[layerIdx - 1] ) {
+					ri.Printf( PRINT_WARNING, "WARNING: could not find layerOrmMap image '%s' in shader '%s'\n", token, shader.name );
+					stage->layerPhysical[layerIdx - 1] = tr.whiteImage;
+				}
+			}
+			if ( stage->materialLayerCount < layerIdx + 1 ) {
+				stage->materialLayerCount = layerIdx + 1;
+			}
+			stage->materialBlend = qtrue;
+			stage->vk_pbr_flags |= PBR_HAS_MATERIAL_BLEND;
 		}
 #endif
 		//
@@ -1945,6 +2073,45 @@ static qboolean ParseStage( shaderStage_t *stage, const char **text )
 			image_t *srgbAlbedo = vk_create_pbr_albedo_srgb( physicalAlbedoName, flags );
 			if ( srgbAlbedo != NULL ) {
 				stage->bundle[0].image[0] = srgbAlbedo;
+			}
+		}
+
+		/* Multi-material height-blend: finalize layer count, height mask, vertex weights. */
+		if ( stage->materialBlend ) {
+			int li;
+			if ( stage->normalMapType == PHYS_NORMALHEIGHT ) {
+				stage->materialHeightMask |= 1u;
+			}
+			for ( li = 0; li < 3; li++ ) {
+				if ( stage->layerAlbedo[li] || stage->layerNormal[li] || stage->layerPhysical[li] ) {
+					if ( stage->materialLayerCount < li + 2 ) {
+						stage->materialLayerCount = li + 2;
+					}
+				}
+				if ( !stage->layerAlbedo[li] ) {
+					stage->layerAlbedo[li] = stage->bundle[0].image[0] ? stage->bundle[0].image[0] : tr.defaultImage;
+				}
+				if ( !stage->layerNormal[li] ) {
+					stage->layerNormal[li] = stage->normalMap ? stage->normalMap : tr.whiteImage;
+					if ( stage->layerNormalType[li] == PHYS_NONE ) {
+						stage->layerNormalType[li] = PHYS_NORMAL;
+					}
+				}
+				if ( !stage->layerPhysical[li] ) {
+					stage->layerPhysical[li] = stage->physicalMap ? stage->physicalMap : tr.whiteImage;
+					if ( stage->layerPhysicalType[li] == PHYS_NONE ) {
+						stage->layerPhysicalType[li] = PHYS_ORM;
+					}
+				}
+			}
+			stage->bundle[0].rgbGen = CGEN_EXACT_VERTEX;
+			/* Remapped descriptor slots reuse advanced-lobe / detail bindings. */
+			stage->vk_pbr_flags &= ~( PBR_HAS_EMISSIVE | PBR_HAS_CLEARCOAT | PBR_HAS_SHEEN |
+				PBR_HAS_ANISOTROPY | PBR_HAS_TRANSMISSION | PBR_HAS_SUBSURFACE | PBR_HAS_DETAILMAP );
+			stage->vk_pbr_flags |= PBR_HAS_MATERIAL_BLEND;
+			if ( stage->materialLayerCount < 2 ) {
+				ri.Printf( PRINT_WARNING, "WARNING: materialBlend on '%s' has no layerMap 1..3; treating as single-layer\n",
+					shader.name );
 			}
 		}
 	}
@@ -3183,12 +3350,24 @@ static int CollapseMultitexture( unsigned int st0bits, shaderStage_t *st0, shade
 
 #ifdef USE_VK_PBR
 	if( st1->vk_pbr_flags ) {
+		int li;
 		st0->vk_pbr_flags = st1->vk_pbr_flags;
 		st0->normalMap = st1->normalMap;
 		st0->physicalMap = st1->physicalMap;
 		st0->detailMap = st1->detailMap;
 		Vector4Copy( st1->specularScale, st0->specularScale );
 		Vector4Copy( st1->normalScale, st0->normalScale );
+		st0->materialBlend = st1->materialBlend;
+		st0->blendSharpness = st1->blendSharpness;
+		st0->materialLayerCount = st1->materialLayerCount;
+		st0->materialHeightMask = st1->materialHeightMask;
+		for ( li = 0; li < 3; li++ ) {
+			st0->layerAlbedo[li] = st1->layerAlbedo[li];
+			st0->layerNormal[li] = st1->layerNormal[li];
+			st0->layerPhysical[li] = st1->layerPhysical[li];
+			st0->layerNormalType[li] = st1->layerNormalType[li];
+			st0->layerPhysicalType[li] = st1->layerPhysicalType[li];
+		}
 	}
 #endif
 
@@ -4487,6 +4666,25 @@ static shader_t *FinishShader( void ) {
 				Vector4Copy( pStage->normalScale, def.normalScale );
 				def.parallaxBias = pStage->parallaxBias;
 				def.pom_height_source = ( pStage->normalMapType == PHYS_NORMALHEIGHT ) ? 1 : 0;
+				def.material_blend_layers = 0;
+				def.material_height_mask = 0;
+				def.material_blend_sharpness = 8.0f;
+				if ( ( def.vk_pbr_flags & PBR_HAS_MATERIAL_BLEND ) && pStage->materialBlend &&
+					pStage->materialLayerCount >= 2 &&
+					( !r_materialBlend || r_materialBlend->integer ) ) {
+					int layers = pStage->materialLayerCount;
+					if ( layers > 4 ) {
+						layers = 4;
+					}
+					def.material_blend_layers = (uint8_t)layers;
+					def.material_height_mask = (uint8_t)( pStage->materialHeightMask & 0xFu );
+					def.material_blend_sharpness = pStage->blendSharpness > 0.0f ? pStage->blendSharpness : 8.0f;
+					/* Remapped slots: do not enable advanced-lobe / detail specializations. */
+					def.vk_pbr_flags &= ~( PBR_HAS_EMISSIVE | PBR_HAS_CLEARCOAT | PBR_HAS_SHEEN |
+						PBR_HAS_ANISOTROPY | PBR_HAS_TRANSMISSION | PBR_HAS_SUBSURFACE | PBR_HAS_DETAILMAP );
+				} else {
+					def.vk_pbr_flags &= ~PBR_HAS_MATERIAL_BLEND;
+				}
 			#endif
 			}
 
