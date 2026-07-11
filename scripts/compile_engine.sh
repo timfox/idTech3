@@ -404,7 +404,7 @@ fi
 
 if [ "$VULKAN_RTX" -eq 1 ]; then
   CMAKE_FLAGS+=("-DUSE_VULKAN_RTX=ON")
-  echo "CMake: USE_VULKAN_RTX=ON (KHR ray tracing demo; set r_rtx 1 + vid_restart)"
+  echo "CMake: USE_VULKAN_RTX=ON (chocolate RT tier: Hybrid1/Raygun + r_rtx demo; exec demo_hybrid1.cfg)"
 else
   CMAKE_FLAGS+=("-DUSE_VULKAN_RTX=OFF")
 fi

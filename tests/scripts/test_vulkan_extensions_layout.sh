@@ -21,8 +21,12 @@ rg -q 'neural/vk_niv.c' "$VE" || fail "neural manifest path"
 rg -q 'rtx/vk_rtx.c' "$VE" || fail "rtx core manifest path"
 rg -q 'idtech3_vulkan_extension_include_dirs' "$VE" || fail "extension include macro missing"
 
-# RTX core always appended (self-stubs); experimental pack gated
+# RTX core always appended (self-stubs); chocolate always linked; experimental pack gated
 rg -q 'VK_RTX_CORE_SRCS' "$VE" || fail "VK_RTX_CORE_SRCS missing"
+rg -q 'VK_CHOCOLATE_SPLAT_SRCS' "$VE" || fail "VK_CHOCOLATE_SPLAT_SRCS missing"
+rg -q 'VK_CHOCOLATE_RTX_SRCS' "$VE" || fail "VK_CHOCOLATE_RTX_SRCS missing"
+rg -q 'VK_ARC_BLANC_VK_SRCS' "$VE" || fail "VK_ARC_BLANC_VK_SRCS missing"
+rg -q 'VK_EXPERIMENTAL_RENDERER_SRCS' "$VE" || fail "VK_EXPERIMENTAL_RENDERER_SRCS missing"
 
 # Root must not retain moved extension TU
 for f in vk_niv.c vk_hybrid1.c vk_mgs.c vk_vuda.c; do

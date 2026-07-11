@@ -4146,7 +4146,7 @@ static void R_Register( void )
 	r_hybrid1 = ri.Cvar_Get( "r_hybrid1", "0", CVAR_ARCHIVE_ND | CVAR_LATCH );
 	ri.Cvar_CheckRange( r_hybrid1, "0", "1", CV_INTEGER );
 	ri.Cvar_SetDescription( r_hybrid1,
-		"Granja/Pereira Hybrid Rendering 1 (USE_VULKAN_RTX): 1-SPP shadow/spec/diffuse RT, SVGF temporal, A-trous, IBL, composite. Requires r_hybrid1 or r_rtx latched, r_rtxDemo 1, r_fbo 1, vid_restart. See docs/HYBRID_RENDERING1.md." );
+		"Chocolate RT tier — Granja/Pereira Hybrid Rendering 1 (USE_VULKAN_RTX): 1-SPP shadow/spec/diffuse RT, SVGF, A-trous, IBL, composite. Requires r_rtxDemo 1, r_fbo 1, vid_restart. See docs/HYBRID_RENDERING1.md." );
 	ri.Cvar_SetGroup( r_hybrid1, CVG_RENDERER );
 	r_hybrid1_shadow = ri.Cvar_Get( "r_hybrid1_shadow", "1", CVAR_ARCHIVE_ND );
 	ri.Cvar_CheckRange( r_hybrid1_shadow, "0", "1", CV_INTEGER );

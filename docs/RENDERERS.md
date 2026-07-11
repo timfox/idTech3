@@ -7,7 +7,7 @@ For a **build + manual validation checklist** (CI parity, shader coverage, GPU p
 | Backend | Status | Notes |
 |---------|--------|-------|
 | **Vulkan** | **Shipping** | Only production renderer (`idtech3_vulkan.so` / static on Windows) |
-| **Vulkan RTX** | Experimental | `-DUSE_VULKAN_RTX=ON` / `./scripts/compile_engine.sh vulkan rtx` |
+| **Vulkan RTX** | Chocolate RT tier | `-DUSE_VULKAN_RTX=ON` / `./scripts/compile_engine.sh vulkan rtx` — Hybrid1/Raygun supported demos; neural scaffolds still experimental |
 | **DXR** | Roadmap scaffold | Windows plugin stub (`USE_DXR_RENDERER`); see [DXR_RENDERER.md](DXR_RENDERER.md) |
 | **WebGPU** | Roadmap | Browser/Wasm target; portable compute shaders validated on Vulkan today — [WEBGPU_ROADMAP.md](WEBGPU_ROADMAP.md) |
 | **OpenGL** | **Removed** | No `idtech3_opengl` target, no fallback; `cl_renderer opengl` maps to Vulkan with a warning |
@@ -57,7 +57,7 @@ Code: `src/renderers/vulkan/vk_forward_plus.c`, `VK_FP_*` constants; cvar regist
 - **Compute:** already central to Vulkan (volumetric fog stages, vegetation wind, fluid sim, terrain CBT, etc.).
 - **Mesh shaders (NVIDIA):** optional device extension **`VK_NV_mesh_shader`** when **`r_vk_meshShaderNV 1`** (default **0**, **latched**, `vid_restart`). Enables `meshShader` in `VkPhysicalDeviceMeshShaderFeaturesNV` for future pipelines; **no mesh-shader draw path** is wired yet - safe on `main`.
 - **DLSS / NGX:** **not** linked in this repository (proprietary NVIDIA SDK). Use **`r_renderScale`** / internal resolution, **TAA** (`r_taa`), **SMAA/FXAA/MSAA**, or **driver-level** scaling (e.g. NVIDIA NIS/DLSS in control panel) where applicable. Startup logs state that DLSS is not in-engine.
-- **SP upscale preset:** `r_upscale 1` with `r_renderScale 0.75` (internal 75% res, spatial upscale). `r_upscale 2` is FSR2 experimental (falls back to spatial until SDK wired). See `demo_sp_slice.cfg` in idtech3_demo pk3.
+- **SP upscale preset:** `r_upscale 1` with `r_renderScale 0.75` (internal 75% res, spatial upscale). `r_upscale 2` is FSR2 experimental (falls back to spatial until SDK wired). Full look stack: `exec demo_idtech8_look.cfg` (Forward+ + TAA). See `demo_sp_slice.cfg` / [NEURAL_RENDERER_PHASES.md](NEURAL_RENDERER_PHASES.md) chocolate table.
 - **Simulation profile (AMBF-Vulkan):** `sim_render_profile 1` then `vid_restart` — MSAA + FXAA, Reinhard tonemap, lightweight post. See [SIM_RENDER_PROFILE.md](SIM_RENDER_PROFILE.md).
 
 ### Physically Based Rendering (PBR)

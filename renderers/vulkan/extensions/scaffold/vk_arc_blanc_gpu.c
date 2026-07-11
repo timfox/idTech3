@@ -1,5 +1,6 @@
 /*
  * Arc Blanc GPU ocean — Tessendorf FFT cascade update on compute queue.
+ * Chocolate layer: always linked; real path requires USE_ARC_BLANC=ON.
  */
 #include "../../tr_local.h"
 #include "../../tr_common.h"
@@ -11,7 +12,6 @@
 
 #ifdef USE_ARC_BLANC
 #include "../../../../world/arc_blanc/arc_blanc.h"
-#endif
 
 #define AB_GPU_MAX_N        256u
 #define AB_GPU_CASCADE_COUNT 3u
@@ -775,7 +775,6 @@ void VK_ArcBlancGpu_Shutdown( void )
 
 qboolean RE_ArcBlancGpuOceanStep( const arcBlancGpuParams_t *params )
 {
-#ifdef USE_ARC_BLANC
 	VkCommandBuffer cmd;
 	uint32_t gridN;
 	uint32_t c;
@@ -884,8 +883,22 @@ qboolean RE_ArcBlancGpuOceanStep( const arcBlancGpuParams_t *params )
 	}
 
 	return qtrue;
-#else
+}
+
+#else /* !USE_ARC_BLANC */
+
+void VK_ArcBlancGpu_Init( void )
+{
+}
+
+void VK_ArcBlancGpu_Shutdown( void )
+{
+}
+
+qboolean RE_ArcBlancGpuOceanStep( const arcBlancGpuParams_t *params )
+{
 	(void)params;
 	return qfalse;
-#endif
 }
+
+#endif /* USE_ARC_BLANC */

@@ -56,4 +56,6 @@ function(idtech3_apply_build_profile profile)
 endfunction()
 
 idtech3_apply_build_profile("${IDTECH3_PROFILE}")
-message(STATUS "IdTech3 build profile: ${IDTECH3_PROFILE} (OPEN_WORLD=${USE_OPEN_WORLD} RESEARCH=${USE_RESEARCH_EXTENSIONS} FLUX=${USE_FLUX} EXPERIMENTAL_RENDERERS=${USE_EXPERIMENTAL_RENDERERS})")
+message(STATUS "IdTech3 build profile: ${IDTECH3_PROFILE} (OPEN_WORLD=${USE_OPEN_WORLD} RESEARCH=${USE_RESEARCH_EXTENSIONS} FLUX=${USE_FLUX} EXPERIMENTAL_RENDERERS=${USE_EXPERIMENTAL_RENDERERS} ARC_BLANC=${USE_ARC_BLANC})")
+# Chocolate Vulkan paths (MGS/WSP/SqueezeMe, Hybrid1/Raygun, ArcBlanc sources) are always
+# linked; Arc Blanc needs USE_ARC_BLANC, Hybrid1/Raygun need USE_VULKAN_RTX for real RT.

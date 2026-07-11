@@ -729,6 +729,7 @@ void R_MGS_Init( void )
 
 	ri.Cmd_AddCommand( "mgs_status", MGS_Cmd_Status );
 
+	ri.Printf( PRINT_ALL, "[VK][MGS] chocolate path ready (r_mgs 0; Mobile-GS tiers 1-3)\n" );
 	if ( r_mgs->integer > 0 ) {
 		ri.Printf( PRINT_ALL,
 			"[MGS] Mobile-GS enabled (tier %d). See docs/MOBILE_GAUSSIAN_SPLATTING.md\n",

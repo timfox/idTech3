@@ -1,5 +1,6 @@
 # Vulkan renderer extension manifest (2026 layout under extensions/{neural,splats,rtx,scaffold}/).
-# Strip/append uses canonical renderers/ paths (Phase 5e prep).
+# Chocolate paths (splats, Hybrid1/Raygun, Arc Blanc) are gated separately from
+# USE_EXPERIMENTAL_RENDERERS (neural + paper scaffolds). See docs/NEURAL_RENDERER_PHASES.md.
 
 idtech3_require_layout()
 
@@ -19,11 +20,23 @@ set(VK_NEURAL_EXTENSION_SRCS
 	${_VK_EXT}/neural/vk_neural_io.c
 )
 
-set(VK_SPLATS_EXTENSION_SRCS
-	${_VK_EXT}/splats/vk_vksplat.c
+# Chocolate: always linked; cvars default off.
+set(VK_CHOCOLATE_SPLAT_SRCS
 	${_VK_EXT}/splats/vk_mgs.c
 	${_VK_EXT}/splats/vk_wsp.c
 	${_VK_EXT}/splats/vk_squeezeme.c
+)
+
+# Chocolate RT demos: always linked; real path when USE_VULKAN_RTX (internal #else stubs).
+set(VK_CHOCOLATE_RTX_SRCS
+	${_VK_EXT}/rtx/vk_hybrid1.c
+	${_VK_EXT}/rtx/vk_raygun.c
+)
+
+# Chocolate ocean: always linked; real path when USE_ARC_BLANC (internal #else stubs).
+set(VK_ARC_BLANC_VK_SRCS
+	${_VK_EXT}/scaffold/vk_arc_blanc.c
+	${_VK_EXT}/scaffold/vk_arc_blanc_gpu.c
 )
 
 set(VK_RTX_CORE_SRCS
@@ -32,37 +45,53 @@ set(VK_RTX_CORE_SRCS
 	${_VK_EXT}/rtx/vk_rtx_entities.c
 )
 
-set(VK_RTX_EXPERIMENTAL_SRCS
-	${_VK_EXT}/rtx/vk_hybrid1.c
+# Research-only RTX extras (still behind USE_EXPERIMENTAL_RENDERERS).
+set(VK_RTX_RESEARCH_SRCS
 	${_VK_EXT}/rtx/vk_pathtrace.c
 	${_VK_EXT}/rtx/vk_grtx.c
-	${_VK_EXT}/rtx/vk_raygun.c
 	${_VK_EXT}/rtx/vk_fsa.c
 )
 
-set(VK_SCAFFOLD_EXTENSION_SRCS
+# Paper / scaffold research (still behind USE_EXPERIMENTAL_RENDERERS).
+set(VK_SCAFFOLD_RESEARCH_SRCS
+	${_VK_EXT}/splats/vk_vksplat.c
 	${_VK_EXT}/scaffold/vk_curast.c
 	${_VK_EXT}/scaffold/vk_mimir.c
 	${_VK_EXT}/scaffold/vk_iris.c
 	${_VK_EXT}/scaffold/vk_vuda.c
 	${_VK_EXT}/scaffold/vk_dressi.c
-	${_VK_EXT}/scaffold/vk_arc_blanc.c
-	${_VK_EXT}/scaffold/vk_arc_blanc_gpu.c
 )
 
 set(VK_EXPERIMENTAL_RENDERER_SRCS
 	${VK_NEURAL_EXTENSION_SRCS}
-	${VK_SPLATS_EXTENSION_SRCS}
+	${VK_RTX_RESEARCH_SRCS}
+	${VK_SCAFFOLD_RESEARCH_SRCS}
 )
 
+# Everything that may be stripped from the default glob before selective re-append.
+set(VK_ALL_EXTENSION_SRCS
+	${VK_CHOCOLATE_SPLAT_SRCS}
+	${VK_CHOCOLATE_RTX_SRCS}
+	${VK_ARC_BLANC_VK_SRCS}
+	${VK_EXPERIMENTAL_RENDERER_SRCS}
+)
+
+# Legacy aliases used by docs/tests.
+set(VK_SPLATS_EXTENSION_SRCS
+	${VK_CHOCOLATE_SPLAT_SRCS}
+	${_VK_EXT}/splats/vk_vksplat.c
+)
+set(VK_RTX_EXPERIMENTAL_SRCS
+	${VK_CHOCOLATE_RTX_SRCS}
+	${VK_RTX_RESEARCH_SRCS}
+)
+set(VK_SCAFFOLD_EXTENSION_SRCS
+	${VK_ARC_BLANC_VK_SRCS}
+	${VK_SCAFFOLD_RESEARCH_SRCS}
+)
 set(VK_PROFILE_EXTENSION_SRCS
 	${VK_RTX_EXPERIMENTAL_SRCS}
 	${VK_SCAFFOLD_EXTENSION_SRCS}
-)
-
-set(VK_ALL_EXTENSION_SRCS
-	${VK_EXPERIMENTAL_RENDERER_SRCS}
-	${VK_PROFILE_EXTENSION_SRCS}
 )
 
 macro(idtech3_vulkan_extension_include_dirs target)
@@ -80,10 +109,14 @@ macro(idtech3_apply_vulkan_extension_sources)
 	list(REMOVE_ITEM RENDERER_VK_SRCS ${VK_RTX_CORE_SRCS})
 
 	list(APPEND RENDERER_VK_SRCS ${VK_RTX_CORE_SRCS})
+	list(APPEND RENDERER_VK_SRCS ${VK_CHOCOLATE_SPLAT_SRCS})
+	list(APPEND RENDERER_VK_SRCS ${VK_CHOCOLATE_RTX_SRCS})
+	list(APPEND RENDERER_VK_SRCS ${VK_ARC_BLANC_VK_SRCS})
+	message(STATUS "Chocolate renderers: MGS/WSP/SqueezeMe + Hybrid1/Raygun + ArcBlanc (cvars off; ArcBlanc needs USE_ARC_BLANC, RT demos need USE_VULKAN_RTX)")
 
 	if(USE_EXPERIMENTAL_RENDERERS)
-		list(APPEND RENDERER_VK_SRCS ${VK_ALL_EXTENSION_SRCS})
-		message(STATUS "Experimental renderers: ON (neural/splats/rtx/scaffold extensions/)")
+		list(APPEND RENDERER_VK_SRCS ${VK_EXPERIMENTAL_RENDERER_SRCS})
+		message(STATUS "Experimental renderers: ON (neural + research scaffolds)")
 	else()
 		set(_vk_stub "renderers/vulkan/vk_experimental_renderer_stubs.c")
 		if(NOT "${_vk_stub}" IN_LIST RENDERER_VK_SRCS)

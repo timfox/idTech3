@@ -1,10 +1,13 @@
 /*
  * Arc Blanc Vulkan path: height texture upload + tessellated ocean draw.
+ * Chocolate layer: always linked; real path requires USE_ARC_BLANC=ON.
  */
 #include "../../tr_local.h"
 #include "../../tr_common.h"
 #include "vk_arc_blanc.h"
 #include "vk_arc_blanc_gpu.h"
+
+#ifdef USE_ARC_BLANC
 
 static image_t *s_arcBlancImage = NULL;
 static cvar_t *r_arcBlanc;
@@ -31,6 +34,8 @@ static void R_ArcBlanc_EnsureShader( void )
 void R_ArcBlanc_Init( void )
 {
 	r_arcBlanc = ri.Cvar_Get( "r_arcBlanc", "0", CVAR_ARCHIVE );
+	ri.Cvar_SetDescription( r_arcBlanc,
+		"Arc Blanc ocean (chocolate; requires USE_ARC_BLANC build). 0=off, 1=on." );
 	r_arcBlancDraw = ri.Cvar_Get( "r_arcBlancDraw", "1", CVAR_ARCHIVE );
 	ri.Cvar_SetDescription( r_arcBlancDraw,
 		"Draw tessellated Arc Blanc ocean mesh (requires r_arcBlanc 1)." );
@@ -41,6 +46,7 @@ void R_ArcBlanc_Init( void )
 	ri.Cvar_SetDescription( r_arcBlancTile, "Ocean tile size for renderer mesh snapping." );
 	r_arcBlancSeaLevel = ri.Cvar_Get( "r_arcBlancSeaLevel", "0", CVAR_ARCHIVE );
 	ri.Cvar_SetDescription( r_arcBlancSeaLevel, "Base sea level offset added to sampled heights." );
+	ri.Printf( PRINT_ALL, "[VK][ArcBlanc] chocolate path ready (r_arcBlanc 0; USE_ARC_BLANC=ON)\n" );
 	VK_ArcBlancGpu_Init();
 }
 
@@ -226,3 +232,34 @@ void R_ArcBlanc_AddSurfaces( void )
 		}
 	}
 }
+
+#else /* !USE_ARC_BLANC */
+
+void R_ArcBlanc_Init( void )
+{
+	static qboolean s_logged;
+
+	(void)ri.Cvar_Get( "r_arcBlanc", "0", CVAR_ARCHIVE );
+	(void)ri.Cvar_Get( "r_arcBlancDraw", "1", CVAR_ARCHIVE );
+	if ( !s_logged ) {
+		ri.Printf( PRINT_ALL, "[VK][ArcBlanc] stub (build with -DUSE_ARC_BLANC=ON)\n" );
+		s_logged = qtrue;
+	}
+	VK_ArcBlancGpu_Init();
+}
+
+void R_ArcBlanc_AddSurfaces( void ) {}
+
+void VK_ArcBlanc_Shutdown( void )
+{
+	VK_ArcBlancGpu_Shutdown();
+}
+
+void RE_ArcBlancUploadHeightMap( const byte *rgba, int width, int height )
+{
+	(void)rgba;
+	(void)width;
+	(void)height;
+}
+
+#endif /* USE_ARC_BLANC */

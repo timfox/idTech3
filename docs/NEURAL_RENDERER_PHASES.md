@@ -1,12 +1,31 @@
 # Neural renderer phases (roadmap hub)
 
-Living map of **experimental Vulkan neural / RT modules** in this fork. Status: **Scaffold** = wired end-to-end with procedural defaults; **Done** = production-oriented path exists.
+Living map of Vulkan **chocolate** (shipping-available, cvars off by default) vs **scaffold** (research) modules.
 
-See also [RENDERERS.md](RENDERERS.md), [PRODUCTION_GAP_PLAN.md](PRODUCTION_GAP_PLAN.md), [RENDERERS_FUTURE.md](RENDERERS_FUTURE.md).
+| Tier | Meaning | Build |
+|------|---------|--------|
+| **Chocolate** | Always linked (or flag-gated product module); cvars default **0** | Default `game` profile; no `USE_EXPERIMENTAL_RENDERERS` |
+| **Scaffold** | Research / paper path | `USE_EXPERIMENTAL_RENDERERS=ON` (`full` / `research`) |
+| **Done** | Production-oriented default path | — |
+
+See also [RENDERERS.md](RENDERERS.md), [PRODUCTION_GAP_PLAN.md](PRODUCTION_GAP_PLAN.md), [RENDERERS_FUTURE.md](RENDERERS_FUTURE.md), [RENDERER_2026_ARCHITECTURE_PASS.md](RENDERER_2026_ARCHITECTURE_PASS.md).
 
 ---
 
-## Phase 1 — Practical wins
+## Chocolate (graduated)
+
+| Feature | Status | Gate | Cvars | Docs |
+|---------|--------|------|-------|------|
+| **Forward+ + TAA look** | Chocolate | always | `r_renderMode 2`, `r_taa`, `r_taaMotionVectors` | [demo_idtech8_look.cfg](../examples/demo_game/mod/demo_idtech8_look.cfg) |
+| **Mobile-GS / WebSplatter / SqueezeMe** | Chocolate | always linked | `r_mgs`, `r_wsp`, `r_squeezeme` | [MOBILE_GAUSSIAN_SPLATTING.md](MOBILE_GAUSSIAN_SPLATTING.md), [WEB_SPLATTER.md](WEB_SPLATTER.md), [SQUEEZEME.md](SQUEEZEME.md) |
+| **Hybrid1 + Raygun** | Chocolate RT tier | `USE_VULKAN_RTX` | `r_hybrid1`, `r_raygun`, `r_rtxDemo` | [HYBRID_RENDERING1.md](HYBRID_RENDERING1.md), [RAYGUN.md](RAYGUN.md) |
+| **Arc Blanc ocean** | Chocolate | `USE_ARC_BLANC` | `r_arcBlanc` | [ARC_BLANC.md](ARC_BLANC.md) |
+
+CMake: [`cmake/renderers/VulkanExtensionSources.cmake`](../cmake/renderers/VulkanExtensionSources.cmake) — chocolate lists vs `VK_EXPERIMENTAL_RENDERER_SRCS`.
+
+---
+
+## Phase 1 — Practical wins (scaffold)
 
 | Feature | Status | Cvars / commands | Docs |
 |---------|--------|------------------|------|
@@ -30,7 +49,7 @@ See also [RENDERERS.md](RENDERERS.md), [PRODUCTION_GAP_PLAN.md](PRODUCTION_GAP_P
 
 ---
 
-## Phase 2 — Signature renderer tech
+## Phase 2 — Signature renderer tech (scaffold)
 
 | Feature | Status | Cvars | Docs |
 |---------|--------|-------|------|
@@ -49,10 +68,8 @@ Static textures: **BC7/KTX2** via `tr_image_ktx2.c` (not neural).
 
 | Feature | Status | Cvars | Docs |
 |---------|--------|-------|------|
-| **SqueezeMe avatars** | Demo | `r_squeezeme` 1 | [SQUEEZEME.md](SQUEEZEME.md) (arXiv:2412.15171) |
-| **Mobile-GS splatting** | Demo | `r_mgs` 1–3 | [MOBILE_GAUSSIAN_SPLATTING.md](MOBILE_GAUSSIAN_SPLATTING.md) |
-| **Gaussian ray tracing (GRTX)** | Demo (RTX) | `r_grtx`, `r_grtxDemo` | [GAUSSIAN_RAY_TRACING_GRTX.md](GAUSSIAN_RAY_TRACING_GRTX.md) |
-| **WebSplatter** | Demo | `r_wsp` (overrides MGS) | [WEB_SPLATTER.md](WEB_SPLATTER.md) |
+| **SqueezeMe / MGS / WSP** | **Chocolate** (see table above) | `r_squeezeme`, `r_mgs`, `r_wsp` | graduated out of experimental stub blob |
+| **Gaussian ray tracing (GRTX)** | Scaffold (RTX + experimental) | `r_grtx`, `r_grtxDemo` | [GAUSSIAN_RAY_TRACING_GRTX.md](GAUSSIAN_RAY_TRACING_GRTX.md) |
 | **VUDA CUDA–Vulkan** | Scaffold | `r_vuda`, `cl_vuda` (build `vuda`) | [VUDA.md](VUDA.md) |
 | **RenderFormer preview** | Scaffold | `r_renderformer`, `renderformer_*` | [RENDERFORMER.md](RENDERFORMER.md) |
 
@@ -60,33 +77,17 @@ Static textures: **BC7/KTX2** via `tr_image_ktx2.c` (not neural).
 
 ## Suggested demo presets
 
-In `examples/demo_game/mod/demo_sp_slice.cfg` (comment blocks):
+Shipping look (no experimental):
 
 ```cfg
-// Phase 1 — GI + volumetrics + WPT
-// set r_fbo 1
-// set r_niv 1
-// set r_nslm 1
-// set r_volumetricFog 1
-// set r_ndgi 1
-// set r_wpt 1
-// set r_fsa 1
-// set r_fsa_budget 0.25
+exec demo_idtech8_look.cfg
+```
 
-// Phase 2 — screen + lights + vertices
-// set r_nist 1
-// set r_forwardPlus 1
-// set r_nvc 1
-// set r_vfgi 1
-// set r_deferredGBuffer 1
-// set r_deferredGBufferFill 1
+Research comment blocks remain in `examples/demo_game/mod/demo_sp_slice.cfg`. Chocolate RT:
 
-// Phase 3 — splats / interop / mesh neural
-// set r_mgs 2
-// set r_renderformer 1
-// ./scripts/compile_engine.sh vulkan vuda
-// set r_vuda 1
-// set cl_vuda 1
+```bash
+./scripts/compile_engine.sh vulkan rtx
+# then: exec demo_hybrid1.cfg
 ```
 
 Latched cvars need `vid_restart` or map reload where noted in per-feature docs.
@@ -98,11 +99,11 @@ Latched cvars need `vid_restart` or map reload where noted in per-feature docs.
 After opaque geometry (`tr_backend.c`):
 
 1. Deferred G-buffer + lighting  
-2. NIV → NIST → NVC → VFGI → RenderFormer  
-3. **WPT** (wavefront queue)  
-4. FSA importance  
-5. WSP or MGS  
-6. Later: RTX demo / GRTX, FSA denoise  
+2. NIV → NIST → NVC → VFGI → RenderFormer (scaffold)  
+3. **WPT** (scaffold)  
+4. FSA importance (scaffold)  
+5. WSP or MGS (chocolate)  
+6. Hybrid1 / Raygun / RTX demo (chocolate when `USE_VULKAN_RTX`)  
 
 NDGI updates BSP lightmaps in `R_NDGI_FrameUpdate()` (not in this chain).
 
@@ -114,7 +115,8 @@ NDGI updates BSP lightmaps in `R_NDGI_FrameUpdate()` (not in this chain).
 |--------|---------|
 | Shared I/O | `vk_neural_io.c`, `vk_neural_io.h` |
 | WPT | `vk_wpt.c`, `shaders/glsl/wpt/*` |
-| NIV / NSLM / NDGI / NIST / NVC / VFGI / FSA / RF | `vk_*.c` under `src/renderers/vulkan/` |
+| NIV / NSLM / NDGI / NIST / NVC / VFGI / FSA / RF | `renderers/vulkan/extensions/neural/` |
+| Chocolate splats / RT / ocean | `extensions/splats/`, `extensions/rtx/vk_hybrid1.c`, `vk_raygun.c`, `extensions/scaffold/vk_arc_blanc*.c` |
 
 Build shaders after GLSL edits:
 

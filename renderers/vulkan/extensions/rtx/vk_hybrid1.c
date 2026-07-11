@@ -1786,7 +1786,7 @@ void vk_hybrid1_init( void )
 	static qboolean s_logged;
 
 	if ( !s_logged ) {
-		ri.Printf( PRINT_ALL, "[VK][Hybrid1] stub (build with -DUSE_VULKAN_RTX=ON)\n" );
+		ri.Printf( PRINT_ALL, "[VK][Hybrid1] chocolate RT tier stub (build with -DUSE_VULKAN_RTX=ON)\n" );
 		s_logged = qtrue;
 	}
 }
