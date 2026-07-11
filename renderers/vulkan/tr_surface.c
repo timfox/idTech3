@@ -24,6 +24,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "tr_model_gltf.h"
 #include "tr_gltf_topo.h"
 #include "vk_draw_state.h"
+#include "tr_material_paint.h"
 #include <math.h>
 
 #ifdef USE_VBO
@@ -480,6 +481,9 @@ static void RB_SurfaceTriangles( const srfTriangles_t *srf ) {
 	}
 	for ( i = 0 ; i < srf->numVerts ; i++ ) {
 		tess.vertexDlightBits[ tess.numVertexes + i] = dlightBits;
+	}
+	if ( R_MaterialPaint_HasStream2() ) {
+		R_MaterialPaint_FillStream2FromSurfaceData( srf, tess.numVertexes, srf->numVerts );
 	}
 	tess.numVertexes += srf->numVerts;
 }
@@ -960,6 +964,18 @@ static void RB_SurfaceMesh(md3Surface_t *surface) {
 		/* lightmapST could be filled for completeness. */
 	}
 
+	/* Optional .md3.paint bind-pose vertex colors for materialBlend. */
+	if ( tr.currentModel && tr.currentModel->md3PaintColors &&
+		tr.currentModel->md3PaintNumVerts >= numVerts ) {
+		const byte *pc = tr.currentModel->md3PaintColors;
+		for ( j = 0; j < numVerts; j++ ) {
+			tess.vertexColors[Doug + j].rgba[0] = pc[j * 4 + 0];
+			tess.vertexColors[Doug + j].rgba[1] = pc[j * 4 + 1];
+			tess.vertexColors[Doug + j].rgba[2] = pc[j * 4 + 2];
+			tess.vertexColors[Doug + j].rgba[3] = pc[j * 4 + 3];
+		}
+	}
+
 	tess.numVertexes += surface->numVerts;
 
 }
@@ -1070,6 +1086,10 @@ static void RB_SurfaceFace( const srfSurfaceFace_t *surf ) {
 #endif
 
 		tess.vertexDlightBits[ndx] = dlightBits;
+	}
+
+	if ( R_MaterialPaint_HasStream2() ) {
+		R_MaterialPaint_FillStream2FromSurfaceData( surf, tess.numVertexes, numPoints );
 	}
 
 	tess.numVertexes += surf->numPoints;

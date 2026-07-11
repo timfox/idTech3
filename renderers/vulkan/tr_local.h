@@ -465,6 +465,17 @@ typedef struct {
 	uint32_t		transmissionMapType;
 	uint32_t		subsurfaceMapType;
 
+	/* Multi-material vertex paint (TLOU-style height-blend). Layer 0 = map/normal/orm. */
+	qboolean		materialBlend;
+	float			blendSharpness;
+	int				materialLayerCount;	/* 1..8 */
+	uint32_t		materialHeightMask;	/* bit i => layer i has normalHeightMap */
+	image_t			*layerAlbedo[7];	/* layers 1..7 */
+	image_t			*layerNormal[7];
+	image_t			*layerPhysical[7];
+	uint32_t		layerNormalType[7];
+	uint32_t		layerPhysicalType[7];
+
 	vec4_t normalScale;
 	vec4_t specularScale;
 	vec4_t emissiveScale;
@@ -1126,6 +1137,8 @@ typedef struct model_s {
 	bmodel_t	*bmodel;		// only if type == MOD_BRUSH
 	md3Header_t	*md3[MD3_MAX_LODS];	// only if type == MOD_MESH
 	void	*modelData;			// only if type == (MOD_MDR | MOD_IQM | MOD_GLTF)
+	byte		*md3PaintColors;	/* optional .md3.paint bind-pose RGBA */
+	int			md3PaintNumVerts;
 
 	int			 numLods;
 } model_t;
@@ -1527,6 +1540,8 @@ extern cvar_t	*r_pomSteps;
 extern cvar_t	*r_pomScale;
 extern cvar_t	*r_pomShadow;
 extern cvar_t	*r_pomShadowSteps;
+extern cvar_t	*r_materialBlend;
+extern cvar_t	*r_materialBlendSharpness;
 #endif
 extern cvar_t	*r_baseNormalX;
 extern cvar_t	*r_baseNormalY;
@@ -2086,6 +2101,7 @@ typedef struct shaderCommands_s
 	vec2_t		texCoords[2][SHADER_MAX_VERTEXES] QALIGN(16);
 	vec2_t		texCoords00[SHADER_MAX_VERTEXES] QALIGN(16);
 	color4ub_t	vertexColors[SHADER_MAX_VERTEXES] QALIGN(16);
+	color4ub_t	vertexColors1[SHADER_MAX_VERTEXES] QALIGN(16); /* materialBlend stream2 (layers 4..7) */
 	int			vertexDlightBits[SHADER_MAX_VERTEXES] QALIGN(16);
 	stageVars_t	svars QALIGN(16);
 

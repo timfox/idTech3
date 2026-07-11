@@ -341,6 +341,7 @@
     <ClCompile Include="..\..\game\g_choreography.c" />
     <ClCompile Include="..\..\game\g_dismember.c" />
     <ClCompile Include="..\..\game\g_facial.c" />
+    <ClCompile Include="..\..\game\game_middleware_stubs.c" />
     <ClCompile Include="..\..\game\g_horde.c" />
     <ClCompile Include="..\..\game\g_goap.c" />
     <ClCompile Include="..\..\game\g_aiml.c" />

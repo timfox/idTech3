@@ -108,12 +108,51 @@ def import_studio_export(cfg_path: pathlib.Path | None = None) -> str:
     return text + "\n"
 
 
+def paint_sidecar_path(map_name: str | None = None) -> pathlib.Path:
+    """Path to maps/<map>.paint next to the mod (material-blend weight sidecar)."""
+    game = _game_path()
+    m = map_name or startup_map() or "unknown"
+    m = m.replace(".bsp", "").replace(".map", "")
+    if "/" in m:
+        m = m.split("/")[-1]
+    return game / "maps" / f"{m}.paint"
+
+
+def export_paint_sidecar(dest: pathlib.Path | None = None, map_name: str | None = None) -> pathlib.Path | None:
+    """
+    Copy maps/<map>.paint from the mod into dest (default: alongside current .map).
+    Engine Studio paint_save writes the sidecar; Radiant only relocates/archives it.
+    """
+    src = paint_sidecar_path(map_name)
+    if not src.is_file():
+        print(f"[bridge] paint sidecar not found: {src}", file=sys.stderr)
+        return None
+    out = dest or (src.parent / (src.stem + "_export.paint"))
+    out.write_bytes(src.read_bytes())
+    print(f"[bridge] exported paint: {src} -> {out}")
+    return out
+
+
+def import_paint_sidecar(src: pathlib.Path, map_name: str | None = None) -> pathlib.Path | None:
+    """Install a .paint file as maps/<map>.paint for the engine to load on map start."""
+    if not src.is_file():
+        print(f"[bridge] import source missing: {src}", file=sys.stderr)
+        return None
+    dest = paint_sidecar_path(map_name)
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    dest.write_bytes(src.read_bytes())
+    print(f"[bridge] imported paint: {src} -> {dest}")
+    print("[bridge] note: q3map2 vertex light can clobber BSP colors; .paint is source of truth for materialBlend weights")
+    return dest
+
+
 def main() -> int:
     print("=== idTech3 Radiant bridge (Source-2 EditorScripts pattern) ===")
     print("  game_path:", _game_path())
     print("  ident:", idproj_ident())
     print("  startup_map:", startup_map() or "(unset)")
     print("  engine:", engine_binary())
+    print("  paint_sidecar:", paint_sidecar_path())
     proj = load_idproj()
     if proj:
         scripts = proj.get("EditorScripts") or []
@@ -122,6 +161,10 @@ def main() -> int:
     if snippet.startswith("{"):
         print("\n--- studio_exportents.cfg (paste into Radiant) ---")
         print(snippet)
+    if len(sys.argv) > 1 and sys.argv[1] == "export-paint":
+        export_paint_sidecar(pathlib.Path(sys.argv[2]) if len(sys.argv) > 2 else None)
+    elif len(sys.argv) > 2 and sys.argv[1] == "import-paint":
+        import_paint_sidecar(pathlib.Path(sys.argv[2]))
     return 0
 
 

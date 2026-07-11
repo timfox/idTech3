@@ -151,3 +151,19 @@ Parser: [engine_sprite_map.c](../src/qcommon/engine_sprite_map.c). Network: [MOD
 | `fade` | int | Optional fade duration (ticks) |
 
 Parser: [engine_decal_map.c](../src/qcommon/engine_decal_map.c).
+
+## Material-blend vertex paint (`.paint` sidecar)
+
+In-engine Studio / Paint (`r_materialPaint` + `r_studio_tools`) writes **`maps/<map>.paint`**.
+That file is the **source of truth** for multi-material vertex weights. q3map2 vertex lighting
+can overwrite BSP `drawVert` colors; keep the sidecar next to the map.
+
+Radiant helpers in [`examples/radiant/Editor/bridge_tools.py`](../examples/radiant/Editor/bridge_tools.py):
+
+```bash
+python3 Editor/bridge_tools.py                  # status + paint path
+python3 Editor/bridge_tools.py export-paint [out.paint]
+python3 Editor/bridge_tools.py import-paint path/to/weights.paint
+```
+
+See [MATERIAL_BLEND.md](MATERIAL_BLEND.md).

@@ -45,7 +45,6 @@ extern refexport_t re;
 #include "../../game/g_director.h"
 #include "../../game/g_response.h"
 #include "../../game/g_choreography.h"
-#include "../../game/g_facial.h"
 #include "../../game/g_horde.h"
 #include "../../game/g_dismember.h"
 #include "../../game/g_goap.h"
@@ -53,6 +52,7 @@ extern refexport_t re;
 #include "../../game/g_eda.h"
 #include "../../game/g_bt.h"
 #endif
+#include "../../game/g_facial.h"
 #include "../../game/g_engine_systems.h"
 #include "../../game/game_middleware_stubs.h"
 #include "../../game/g_lua_bindings.h"
@@ -209,10 +209,10 @@ void CL_InitGameSystems(void) {
 	CL_EngineDecals_Init();
 	Cloth_Init();
 	Music_Init();
+	Face_Init();
 #ifdef USE_GAME_AI_MIDDLEWARE
 	Director_Init();
 	Response_Init();
-	Face_Init();
 	Horde_Init();
 	Dismember_Init();
 	GOAP_Init();

@@ -26,6 +26,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "../common/tr_vector_font.h"
 #include "tr_sprite_props.h"
 #include "tr_decal_props.h"
+#include "tr_material_paint.h"
 #include "vk_upscale.h"
 #include "vk_ndgi.h"
 #include "vk_niv.h"
@@ -153,6 +154,8 @@ cvar_t	*r_pomSteps;
 cvar_t	*r_pomScale;
 cvar_t	*r_pomShadow;
 cvar_t	*r_pomShadowSteps;
+cvar_t	*r_materialBlend;
+cvar_t	*r_materialBlendSharpness;
 cvar_t	*r_glint;
 cvar_t	*r_glintMode;
 cvar_t	*r_glintDensity;
@@ -2584,6 +2587,22 @@ static void R_Register( void )
 	r_pomShadowSteps = ri.Cvar_Get( "r_pomShadowSteps", "6", CVAR_ARCHIVE_ND );
 	ri.Cvar_CheckRange( r_pomShadowSteps, "2", "16", CV_INTEGER );
 	ri.Cvar_SetDescription( r_pomShadowSteps, "POM self-shadow march steps along light direction in tangent space." );
+
+	r_materialBlend = ri.Cvar_Get( "r_materialBlend", "1", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_materialBlend, "0", "1", CV_INTEGER );
+	ri.Cvar_SetDescription( r_materialBlend,
+		"Vulkan PBR multi-material blend: vertex RGBA weights + optional height-blend from normalHeightMap alpha. 0 = force layer0 only." );
+
+	r_materialBlendSharpness = ri.Cvar_Get( "r_materialBlendSharpness", "8", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_materialBlendSharpness, "0", "64", CV_FLOAT );
+	ri.Cvar_SetDescription( r_materialBlendSharpness,
+		"Global height-blend sharpness override when > 0; otherwise use shader blendSharpness. Soft normalize when no layer has height." );
+
+	ri.Printf( PRINT_ALL, "Material blend: %s (vertex + height)\n",
+		( r_materialBlend && r_materialBlend->integer ) ? "ON" : "OFF" );
+
+	R_MaterialPaint_RegisterCvars();
+	R_MaterialPaint_RegisterCommands();
 
 	ri.Printf( PRINT_ALL, "POM: r_pom %s (steps %d, scale %.3f, shadow %.2f)\n",
 		( r_pom && r_pom->integer ) ? "on" : "off",

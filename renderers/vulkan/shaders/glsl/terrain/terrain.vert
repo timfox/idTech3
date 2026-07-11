@@ -3,8 +3,10 @@
  * Terrain vertex shader - displacement from heightmap.
  */
 layout(location = 0) in vec2 inPosition;  /* x,z in [0,1] */
+layout(location = 1) in vec4 inColor;
 
 layout(location = 0) out vec2 outTexCoord;
+layout(location = 1) out vec4 outWeights;
 
 layout(std140, binding = 0) uniform TerrainUBO {
     mat4 mvp;
@@ -19,4 +21,5 @@ void main() {
     vec3 worldPos = vec3(inPosition.x * ubo.scale.x, h, inPosition.y * ubo.scale.z);
     gl_Position = ubo.mvp * vec4(worldPos, 1.0);
     outTexCoord = uv;
+    outWeights = inColor;
 }

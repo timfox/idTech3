@@ -98,7 +98,8 @@ typedef enum {
 	#define VK_DESC_PBR_SUBSURFACE			16
 	#define VK_DESC_PBR_DETAIL				17
 	#define VK_DESC_FORWARD_PLUS			18 /* SSBO set: light + tile lists (PBR fragment) */
-	#define VK_DESC_COUNT	19
+	#define VK_DESC_PBR_BLEND_LAYERS		19 /* array samplers: albedo/normal/orm × 8 */
+	#define VK_DESC_COUNT	20
 #else
 	#define VK_DESC_COUNT   5
 #endif
@@ -267,9 +268,12 @@ typedef struct {
 	uint8_t					pbr_vert_mode; /* 0=default gen_vert, 1=glTF GPU skin+morph variant */
 	uint8_t					gltf_gpu_tangent_mode; /* 0=bind T, 1=Gram–Schmidt, 2=topology-weighted (r_gltfGpuTangentFix 0–2, latched) */
 	uint8_t					pom_height_source; /* 0=ORM R (physical map), 1=normal map alpha (normalHeightMap) */
+	uint8_t					material_blend_layers; /* 0=off, 2..8 */
+	uint8_t					material_height_mask;  /* bit i => layer i has height (8 bits) */
 	vec4_t					specularScale;
 	vec4_t					normalScale;
 	float					parallaxBias;
+	float					material_blend_sharpness;
 #endif
 	unsigned int			hasFlowmap : 1;	// water flowmap: flow vectors offset texture UVs
 	int acff; // none, rgb, rgba, alpha
@@ -325,6 +329,8 @@ typedef struct vkUniform_s {
 	vec4_t pbrShCoeffs[9];
 	/* Parallax occlusion (POM): x=height scale, y=self-shadow strength, z=shadow ray steps (float bits as int), w=unused */
 	vec4_t pbrParallaxParams;
+	/* Material blend: x=sharpness, yzw unused */
+	vec4_t pbrMaterialBlend;
 	/* Forward+: x overflow shade; y skip mask (tess.dlightBits) */
 	vec4_t pbrForwardPlus;
 	/* Sun shadow (PBR direct): rows 0-3 = light clip matrix columns; params x=bias y=pcf z=valid w=strength */
@@ -371,6 +377,7 @@ typedef struct vkUniformCamera_s {
 #define PBR_HAS_SUBSURFACE		( 2048 )
 	#define PBR_HAS_IRRADIANCE		( 4096 )
 	#define PBR_HAS_DETAILMAP		( 8192 )
+	#define PBR_HAS_MATERIAL_BLEND	( 16384 )
 
 #define PHYS_NONE				( 1 )
 #define PHYS_RMO				( 2 )
@@ -714,6 +721,18 @@ typedef struct {
 	VkDescriptorSetLayout cbt_terrain_layout;
 	VkPipelineLayout cbt_terrain_compute_layout;
 	VkPipeline cbt_terrain_compute_pipeline;
+	VkBuffer cbt_draw_commands_buffer;
+	VkDeviceMemory cbt_draw_commands_memory;
+	VkBuffer cbt_params_buffer;
+	VkDeviceMemory cbt_params_memory;
+	VkImage cbt_patch_counter_image;
+	VkDeviceMemory cbt_patch_counter_memory;
+	VkImageView cbt_patch_counter_view;
+	VkDescriptorSet cbt_terrain_descriptor;
+	VkDeviceSize cbt_draw_commands_size;
+
+	VkDescriptorSetLayout set_layout_blend_layers; /* set 19: 3×8 combined image samplers */
+	VkDescriptorSet blend_layers_descriptor;
 
 	VkDescriptorSetLayout vegwind_layout;
 	VkPipelineLayout pipeline_layout_vegwind;

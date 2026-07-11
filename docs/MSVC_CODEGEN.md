@@ -11,6 +11,10 @@ Hand-maintained Visual Studio projects live under **`engine/platform/win32/msvc2
 
 Validation: **`ctest -R test_msvc_layout_bridge`**.
 
+## FreeUSD
+
+Hand MSVC does **not** define `USE_FREEUSD` or link FreeUSD. Client `cl_usd.cpp` / renderer FreeUSD register sources compile the **stub** path (`usd_*` → “not built”). For real USDA import and `usd_*` tools on Windows, use **CMake** (`./scripts/compile_engine.sh vulkan` / MinGW or VS generator) with submodule **`third_party/FreeUSD`**. See [FREEUSD.md](FREEUSD.md).
+
 ## Source manifest
 
 CMake exports logical source groups at configure time:

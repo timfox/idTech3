@@ -27,6 +27,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "tr_bsp_stream.h"
 #include "tr_sprite_props.h"
 #include "tr_decal_props.h"
+#include "tr_material_paint.h"
 #include "vk_ndgi.h"
 #include "vk_niv.h"
 #include "vk_nslm.h"
@@ -3064,6 +3065,14 @@ void RE_LoadWorldMap( const char *name ) {
 
 	R_SpriteProps_ParseFromEntityString( s_worldData.entityString );
 	R_DecalProps_ParseFromEntityString( s_worldData.entityString );
+
+	R_MaterialPaint_OnMapLoad( s_worldData.baseName );
+#ifdef USE_VBO
+	/* Rebuild VBO after paint sidecar mutates drawvert colors. */
+	if ( R_MaterialPaint_NumVerts() > 0 ) {
+		R_BuildWorldVBO( s_worldData.surfaces, s_worldData.numsurfaces );
+	}
+#endif
 
 	R_NDGI_OnMapLoad( s_worldData.baseName );
 	R_NIV_OnMapLoad( s_worldData.baseName );

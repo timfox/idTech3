@@ -913,6 +913,9 @@ jobs:
       - name: Init required submodules
         run: ./scripts/init_optional_submodules.sh --freeusd
 
+      - name: Layout forwarding symlinks
+        run: ./scripts/layout_forwarding_symlinks.sh
+
       - name: Set up JDK 17
         uses: actions/setup-java@v4
         with:
@@ -992,6 +995,7 @@ jobs:
               -DUSE_BULLET_PHYSICS=ON \
               -DBUILD_FREETYPE=ON \
               -DUSE_DTLS=ON \
+              -DUSE_FREEUSD=OFF \
               -DENABLE_FORTIFY_SOURCE=OFF \
               -DENABLE_ASAN=OFF \
               -DCI_BUILD=OFF \
@@ -1048,6 +1052,9 @@ jobs:
 
       - name: Init required submodules
         run: ./scripts/init_optional_submodules.sh --freeusd
+
+      - name: Layout forwarding symlinks
+        run: ./scripts/layout_forwarding_symlinks.sh
 
       - name: Set up JDK 17
         uses: actions/setup-java@v4
