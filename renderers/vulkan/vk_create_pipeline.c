@@ -66,9 +66,9 @@ VkPipeline vk_create_pipeline( const Vk_Pipeline_Def *def, renderPass_t renderPa
     struct Vk_Pipeline_FragSpecData frag_spec_data;
 
 #ifdef USE_VK_PBR
-	/* ADD_FRAG_SPEC: 11 base (0..10) + 31 PBR (constant_id 11..41) = 42 entries. */
+	/* ADD_FRAG_SPEC: 11 base (0..10) + 33 PBR (constant_id 11..43) = 44 entries. */
 	VkSpecializationMapEntry spec_entries[48];
-	_Static_assert( sizeof( spec_entries ) / sizeof( spec_entries[0] ) >= 42u,
+	_Static_assert( sizeof( spec_entries ) / sizeof( spec_entries[0] ) >= 44u,
 		"vk_create_pipeline: spec_entries[] too small for PBR fragment specialization map" );
 #else
 	VkSpecializationMapEntry spec_entries[12];
@@ -743,6 +743,8 @@ VkPipeline vk_create_pipeline( const Vk_Pipeline_Def *def, renderPass_t renderPa
 	ADD_FRAG_SPEC( 39, parallax_bias_shader );
 	ADD_FRAG_SPEC( 40, forward_plus_shade_strength );
 	ADD_FRAG_SPEC( 41, deferred_unlit_base_strength );
+	ADD_FRAG_SPEC( 42, material_blend_layers );
+	ADD_FRAG_SPEC( 43, material_height_mask );
 
 	// only use w value, specgloss maps are not supported
 	frag_spec_data.specularScale_x = def->specularScale[0];
@@ -778,6 +780,8 @@ VkPipeline vk_create_pipeline( const Vk_Pipeline_Def *def, renderPass_t renderPa
 	frag_spec_data.deferred_unlit_base_strength = ( r_renderMode && r_renderMode->integer == 1 &&
 		r_deferredLighting && r_deferredLighting->integer &&
 		r_deferredUnlitBase && r_deferredUnlitBase->integer ) ? 1.0f : 0.0f;
+	frag_spec_data.material_blend_layers = 0;
+	frag_spec_data.material_height_mask = 0;
 
 	if ( def->vk_pbr_flags & PBR_HAS_NORMALMAP )
 		frag_spec_data.normal_texture_set = 0;
@@ -793,7 +797,19 @@ VkPipeline vk_create_pipeline( const Vk_Pipeline_Def *def, renderPass_t renderPa
 	if ( def->vk_pbr_flags & PBR_HAS_LIGHTMAP )
 		frag_spec_data.lightmap_texture_set = def->lightmap_bundle;
 
-	if ( ( def->vk_pbr_flags & PBR_HAS_NORMALMAP ) && r_pom && r_pom->integer ) {
+	if ( ( def->vk_pbr_flags & PBR_HAS_MATERIAL_BLEND ) && def->material_blend_layers >= 2 ) {
+		frag_spec_data.material_blend_layers = (int32_t)def->material_blend_layers;
+		frag_spec_data.material_height_mask = (int32_t)def->material_height_mask;
+		/* Height-blend owns remapped advanced-lobe / detail slots; skip POM. */
+		frag_spec_data.pom_enabled = 0;
+		frag_spec_data.detail_texture_set = -1;
+		frag_spec_data.emissive_texture_set = -1;
+		frag_spec_data.clearcoat_texture_set = -1;
+		frag_spec_data.sheen_texture_set = -1;
+		frag_spec_data.anisotropy_texture_set = -1;
+		frag_spec_data.transmission_texture_set = -1;
+		frag_spec_data.subsurface_texture_set = -1;
+	} else if ( ( def->vk_pbr_flags & PBR_HAS_NORMALMAP ) && r_pom && r_pom->integer ) {
 		const qboolean heightFromOrm = ( ( def->vk_pbr_flags & PBR_HAS_PHYSICALMAP ) != 0 ) &&
 			( frag_spec_data.physical_texture_set == 0 );
 		const qboolean heightFromNormal = ( def->pom_height_source == 1 );
@@ -808,26 +824,28 @@ VkPipeline vk_create_pipeline( const Vk_Pipeline_Def *def, renderPass_t renderPa
 	if ( def->vk_pbr_flags & PBR_HAS_IRRADIANCE )
 		frag_spec_data.irradiance_texture_set = 0;
 
-	if ( def->vk_pbr_flags & PBR_HAS_EMISSIVE )
-		frag_spec_data.emissive_texture_set = 0;
+	if ( frag_spec_data.material_blend_layers < 2 ) {
+		if ( def->vk_pbr_flags & PBR_HAS_EMISSIVE )
+			frag_spec_data.emissive_texture_set = 0;
 
-	if ( def->vk_pbr_flags & PBR_HAS_CLEARCOAT )
-		frag_spec_data.clearcoat_texture_set = 0;
+		if ( def->vk_pbr_flags & PBR_HAS_CLEARCOAT )
+			frag_spec_data.clearcoat_texture_set = 0;
 
-	if ( def->vk_pbr_flags & PBR_HAS_SHEEN )
-		frag_spec_data.sheen_texture_set = 0;
+		if ( def->vk_pbr_flags & PBR_HAS_SHEEN )
+			frag_spec_data.sheen_texture_set = 0;
 
-	if ( def->vk_pbr_flags & PBR_HAS_ANISOTROPY )
-		frag_spec_data.anisotropy_texture_set = 0;
+		if ( def->vk_pbr_flags & PBR_HAS_ANISOTROPY )
+			frag_spec_data.anisotropy_texture_set = 0;
 
-	if ( def->vk_pbr_flags & PBR_HAS_TRANSMISSION )
-		frag_spec_data.transmission_texture_set = 0;
+		if ( def->vk_pbr_flags & PBR_HAS_TRANSMISSION )
+			frag_spec_data.transmission_texture_set = 0;
 
-	if ( def->vk_pbr_flags & PBR_HAS_SUBSURFACE )
-		frag_spec_data.subsurface_texture_set = 0;
+		if ( def->vk_pbr_flags & PBR_HAS_SUBSURFACE )
+			frag_spec_data.subsurface_texture_set = 0;
 
-	if ( def->vk_pbr_flags & PBR_HAS_DETAILMAP )
-		frag_spec_data.detail_texture_set = 0;
+		if ( def->vk_pbr_flags & PBR_HAS_DETAILMAP )
+			frag_spec_data.detail_texture_set = 0;
+	}
 	if ( r_deluxeMapping->integer )
 	{
 		// deluxe_texture_set = 0: use approx + scale
@@ -837,6 +855,10 @@ VkPipeline vk_create_pipeline( const Vk_Pipeline_Def *def, renderPass_t renderPa
 		// enabled+: use deluxe map
 		if ( def->vk_pbr_flags & (PBR_HAS_DELUXEMAP0 | PBR_HAS_DELUXEMAP1) )
 			frag_spec_data.deluxe_mapping = 1;
+		/* Material blend reuses deluxe slot for layer-2 ORM when layers >= 3. */
+		if ( frag_spec_data.material_blend_layers >= 3 ) {
+			frag_spec_data.deluxe_mapping = 0;
+		}
 	}
 	else
 	{
@@ -844,6 +866,9 @@ VkPipeline vk_create_pipeline( const Vk_Pipeline_Def *def, renderPass_t renderPa
 		// perhaps when r_specularMapping = 0 set scale to 0 to disable it?
 		frag_spec_data.deluxe_mapping = -1;
 		frag_spec_data.deluxe_specular_scale = 1.0f;
+		if ( frag_spec_data.material_blend_layers >= 3 ) {
+			frag_spec_data.deluxe_mapping = 0;
+		}
 	}
 #endif
 

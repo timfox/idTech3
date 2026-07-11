@@ -23,6 +23,14 @@ set(DEMO_BOOTSTRAP_FONTS
 	"${DEMO_BOOTSTRAP_DIR}/fonts/demo_console_sdf.png"
 	"${DEMO_BOOTSTRAP_DIR}/fonts/demo_console_sdf.fnt"
 )
+set(DEMO_BLEND_TEXTURES
+	"${DEMO_BOOTSTRAP_DIR}/textures/demo/dirt.png"
+	"${DEMO_BOOTSTRAP_DIR}/textures/demo/rock.png"
+	"${DEMO_BOOTSTRAP_DIR}/textures/demo/dirt_nh.png"
+	"${DEMO_BOOTSTRAP_DIR}/textures/demo/rock_nh.png"
+	"${DEMO_BOOTSTRAP_DIR}/textures/demo/dirt_orm.png"
+	"${DEMO_BOOTSTRAP_DIR}/textures/demo/rock_orm.png"
+)
 
 if(NOT EXISTS "${DEMO_INTER_PACK_FONT}")
 	message(FATAL_ERROR "Missing demo UI TTF: ${DEMO_INTER_PACK_FONT}\n  The idtech3_demo pack ships this file as fonts/Inter_28pt-Regular.ttf.\n  SDF console atlas: python3 examples/demo_game/tools/gen_demo_console_sdf.py \"${DEMO_INTER_PACK_FONT}\" examples/demo_game/bootstrap_media/fonts")
@@ -51,6 +59,7 @@ set(DEMO_MOD_FILES
 	"${DEMO_MOD_DIR}/demo_physics.cfg"
 	"${DEMO_MOD_DIR}/sprites/sector_0_0.ents"
 	"${DEMO_MOD_DIR}/demo_sprites.cfg"
+	"${DEMO_MOD_DIR}/demo_material_blend.cfg"
 	"${DEMO_MOD_DIR}/demo_audio.cfg"
 	"${DEMO_MOD_DIR}/demo_sp_slice.cfg"
 	"${DEMO_MOD_DIR}/world/playfield.usda"
@@ -84,6 +93,7 @@ set(DEMO_MOD_FILES
 	"${DEMO_MOD_DIR}/scripts/csharp/demo_hooks.cs"
 	"${DEMO_MOD_DIR}/scripts/demo_bootstrap.shader"
 	"${DEMO_MOD_DIR}/scripts/demo_sprites.shader"
+	"${DEMO_MOD_DIR}/scripts/demo_material_blend.shader"
 )
 
 # Minimal native UI for skeleton playfields (loads from pk3 vm/ before ui.qvm).
@@ -136,6 +146,7 @@ add_custom_command(
 	COMMAND ${CMAKE_COMMAND} -E make_directory "${DEMO_PACK_STAGING}/vm"
 	COMMAND ${CMAKE_COMMAND} -E make_directory "${DEMO_PACK_STAGING}/gfx/2d"
 	COMMAND ${CMAKE_COMMAND} -E make_directory "${DEMO_PACK_STAGING}/gfx/demo"
+	COMMAND ${CMAKE_COMMAND} -E make_directory "${DEMO_PACK_STAGING}/textures/demo"
 	COMMAND ${CMAKE_COMMAND} -E make_directory "${DEMO_PACK_STAGING}/fonts"
 	COMMAND ${CMAKE_COMMAND} -E make_directory "${DEMO_PACK_STAGING}/models"
 	COMMAND ${CMAKE_COMMAND} -E make_directory "${DEMO_PACK_STAGING}/world/proxies"
@@ -200,6 +211,8 @@ add_custom_command(
 	COMMAND ${CMAKE_COMMAND} -E copy_if_different
 		"${DEMO_MOD_DIR}/demo_sprites.cfg" "${DEMO_PACK_STAGING}/demo_sprites.cfg"
 	COMMAND ${CMAKE_COMMAND} -E copy_if_different
+		"${DEMO_MOD_DIR}/demo_material_blend.cfg" "${DEMO_PACK_STAGING}/demo_material_blend.cfg"
+	COMMAND ${CMAKE_COMMAND} -E copy_if_different
 		"${DEMO_MOD_DIR}/demo_audio.cfg" "${DEMO_PACK_STAGING}/demo_audio.cfg"
 	COMMAND ${CMAKE_COMMAND} -E copy_if_different
 		"${DEMO_MOD_DIR}/demo_sp_slice.cfg" "${DEMO_PACK_STAGING}/demo_sp_slice.cfg"
@@ -258,6 +271,20 @@ add_custom_command(
 	COMMAND ${CMAKE_COMMAND} -E copy_if_different
 		"${DEMO_MOD_DIR}/scripts/demo_sprites.shader" "${DEMO_PACK_STAGING}/scripts/demo_sprites.shader"
 	COMMAND ${CMAKE_COMMAND} -E copy_if_different
+		"${DEMO_MOD_DIR}/scripts/demo_material_blend.shader" "${DEMO_PACK_STAGING}/scripts/demo_material_blend.shader"
+	COMMAND ${CMAKE_COMMAND} -E copy_if_different
+		"${DEMO_BOOTSTRAP_DIR}/textures/demo/dirt.png" "${DEMO_PACK_STAGING}/textures/demo/dirt.png"
+	COMMAND ${CMAKE_COMMAND} -E copy_if_different
+		"${DEMO_BOOTSTRAP_DIR}/textures/demo/rock.png" "${DEMO_PACK_STAGING}/textures/demo/rock.png"
+	COMMAND ${CMAKE_COMMAND} -E copy_if_different
+		"${DEMO_BOOTSTRAP_DIR}/textures/demo/dirt_nh.png" "${DEMO_PACK_STAGING}/textures/demo/dirt_nh.png"
+	COMMAND ${CMAKE_COMMAND} -E copy_if_different
+		"${DEMO_BOOTSTRAP_DIR}/textures/demo/rock_nh.png" "${DEMO_PACK_STAGING}/textures/demo/rock_nh.png"
+	COMMAND ${CMAKE_COMMAND} -E copy_if_different
+		"${DEMO_BOOTSTRAP_DIR}/textures/demo/dirt_orm.png" "${DEMO_PACK_STAGING}/textures/demo/dirt_orm.png"
+	COMMAND ${CMAKE_COMMAND} -E copy_if_different
+		"${DEMO_BOOTSTRAP_DIR}/textures/demo/rock_orm.png" "${DEMO_PACK_STAGING}/textures/demo/rock_orm.png"
+	COMMAND ${CMAKE_COMMAND} -E copy_if_different
 		"${DEMO_MOD_DIR}/models/parity_geom_mesh.usda" "${DEMO_PACK_STAGING}/models/parity_geom_mesh.usda"
 	COMMAND ${CMAKE_COMMAND} -E copy_if_different
 		"${DEMO_MOD_DIR}/models/parity_shade_preview.usda" "${DEMO_PACK_STAGING}/models/parity_shade_preview.usda"
@@ -301,12 +328,12 @@ add_custom_command(
 		"$<TARGET_FILE:demo_ui_skeleton>" "${DEMO_PACK_STAGING}/${DEMO_UI_DOT_ZIP}"
 	COMMAND ${CMAKE_COMMAND} -E chdir "${DEMO_PACK_STAGING}"
 		${CMAKE_COMMAND} -E tar cf "${DEMO_PK3}" --format=zip
-		autoexec.cfg gameinfo.txt demo_features.cfg demo_js.cfg demo_lua.cfg demo_csharp.cfg demo_gameplay.cfg demo_usd.cfg demo_districts.cfg demo_openworld.cfg demo_fog_biology.cfg demo_fog_biology_namib.cfg demo_fog_biology_openworld.cfg demo_physics.cfg demo_sprites.cfg demo_audio.cfg demo_sp_slice.cfg gpu_golden_capture.cfg readme_demo.txt
+		autoexec.cfg gameinfo.txt demo_features.cfg demo_js.cfg demo_lua.cfg demo_csharp.cfg demo_gameplay.cfg demo_usd.cfg demo_districts.cfg demo_openworld.cfg demo_fog_biology.cfg demo_fog_biology_namib.cfg demo_fog_biology_openworld.cfg demo_physics.cfg demo_sprites.cfg demo_material_blend.cfg demo_audio.cfg demo_sp_slice.cfg gpu_golden_capture.cfg readme_demo.txt
 		sound/soundevents.txt animgraph/idle_run.txt ndgi/demo.ndgi niv/demo.niv nslm/demo.nslm nist/demo.nist nvc/demo.nvc fsa/demo.fsa vfgi/demo.vfgi renderformer/demo.rfm vuda/demo.vuda grtx/demo.grtx mgs/demo.mgs wsp/demo.wsp sqz/demo.sqz loc/en.loc
 		scripts/js/demo_hooks.js scripts/js/README.txt
 		scripts/lua/demo_hooks.lua
 		scripts/csharp/IdTech3.Engine.cs scripts/csharp/demo_hooks.cs
-		scripts/demo_bootstrap.shader scripts/demo_sprites.shader
+		scripts/demo_bootstrap.shader scripts/demo_sprites.shader scripts/demo_material_blend.shader
 		models/parity_geom_mesh.usda models/parity_shade_preview.usda
 		world/playfield.usda world/proxies/north_proxy.usda world/proxies/south_proxy.usda
 		world/districts/north.usda world/districts/south.usda
@@ -321,13 +348,16 @@ add_custom_command(
 		gfx/demo/demo_sprite_billboard.png
 		gfx/demo/demo_sprite_flipbook.png
 		gfx/demo/demo_sprite_imposter.png
+		textures/demo/dirt.png textures/demo/rock.png
+		textures/demo/dirt_nh.png textures/demo/rock_nh.png
+		textures/demo/dirt_orm.png textures/demo/rock_orm.png
 		fonts/Inter_28pt-Regular.ttf
 		fonts/LICENSE.txt
 		fonts/demo_console_sdf.png
 		fonts/demo_console_sdf.fnt
 		"${DEMO_UI_IN_ZIP}"
 		"${DEMO_UI_DOT_ZIP}"
-	DEPENDS ${DEMO_MOD_FILES} demo_ui_skeleton "${DEMO_SQZ_OUT}"
+	DEPENDS ${DEMO_MOD_FILES} ${DEMO_BLEND_TEXTURES} demo_ui_skeleton "${DEMO_SQZ_OUT}"
 	COMMENT "Packaging idtech3_demo.pk3 (configs + native UI stub)"
 	VERBATIM
 	COMMAND_EXPAND_LISTS

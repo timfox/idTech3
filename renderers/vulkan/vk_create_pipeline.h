@@ -56,6 +56,8 @@ struct Vk_Pipeline_FragSpecData {
 	float   parallax_bias_shader;
 	float   forward_plus_shade_strength;
 	float   deferred_unlit_base_strength;
+	int32_t material_blend_layers;
+	int32_t material_height_mask;
 #endif
 };
 
