@@ -16,6 +16,7 @@ Lip flap:
 
 #include "client.h"
 #include "cl_voip.h"
+#include "../../game/g_facial.h"
 
 #include <math.h>
 
@@ -36,6 +37,7 @@ static cvar_t *cl_voipLipFlapDecay;
 static cvar_t *cl_voipLipFlapMatch;
 static cvar_t *cl_voipLipFlapMorph;
 static cvar_t *cl_voipLipFlapRate;
+static cvar_t *cl_voipLipFlapFacs;
 
 static qboolean voipInitialized = qfalse;
 static qboolean voipCapturing = qfalse;
@@ -284,6 +286,62 @@ void CL_VoIP_ApplyLipFlap( refEntity_t *ent ) {
 	CL_VoIP_ApplyMorphNames( ent, weight );
 }
 
+/*
+===============
+CL_VoIP_SyncFacs
+
+Drive FACS AU25/AU26 from per-client VoIP RMS so Face morphs track speech.
+Auto-creates a face instance per talking client when needed.
+===============
+*/
+static void CL_VoIP_SyncFacs( void ) {
+	int i;
+	float scale;
+	float thresh;
+
+	if ( !cl_voipLipFlapFacs || !cl_voipLipFlapFacs->integer ) {
+		return;
+	}
+	if ( !cl_voipLipFlap || !cl_voipLipFlap->integer ) {
+		return;
+	}
+
+	scale = cl_voipLipFlapScale ? cl_voipLipFlapScale->value : 4.0f;
+	thresh = cl_voipLipFlapThresh ? cl_voipLipFlapThresh->value : 0.02f;
+
+	for ( i = 0; i < VOIP_MAX_CLIENTS; i++ ) {
+		faceHandle_t h;
+		float power = voipClientPower[i];
+		float weight = 0.0f;
+
+		if ( power >= thresh ) {
+			weight = power * scale;
+			if ( weight > 1.0f ) {
+				weight = 1.0f;
+			}
+		}
+
+		h = Face_FindByEntityNum( i );
+		if ( weight <= 0.0f ) {
+			if ( h >= 0 ) {
+				Face_SetAU( h, FACS_AU26, 0.0f );
+				Face_SetAU( h, FACS_AU25, 0.0f );
+			}
+			continue;
+		}
+
+		if ( h < 0 ) {
+			h = Face_Create( i );
+		}
+		if ( h < 0 ) {
+			continue;
+		}
+
+		Face_SetAU( h, FACS_AU26, weight );
+		Face_SetAU( h, FACS_AU25, weight * 0.4f );
+	}
+}
+
 static void CL_VoIP_Transmit_f( void ) {
 	CL_VoIP_Transmit( 0 );
 }
@@ -306,6 +364,7 @@ void CL_VoIP_Init( void ) {
 	cl_voipLipFlapMatch = Cvar_Get( "cl_voipLipFlapMatch", "80", CVAR_ARCHIVE );
 	cl_voipLipFlapMorph = Cvar_Get( "cl_voipLipFlapMorph", "jaw,mouthOpen,mouth_open,jaw_open", CVAR_ARCHIVE );
 	cl_voipLipFlapRate = Cvar_Get( "cl_voipLipFlapRate", "12", CVAR_ARCHIVE );
+	cl_voipLipFlapFacs = Cvar_Get( "cl_voipLipFlapFacs", "1", CVAR_ARCHIVE );
 
 	Cvar_SetDescription( cl_voip, "Enable VoIP proximity voice chat (0 = off, 1 = on)." );
 	Cvar_SetDescription( cl_voipLipFlap, "Drive head-model jaw/mouth morphs from VoIP voice power." );
@@ -315,6 +374,7 @@ void CL_VoIP_Init( void ) {
 	Cvar_SetDescription( cl_voipLipFlapMatch, "Max distance (world units) to match a refEntity to a talking player." );
 	Cvar_SetDescription( cl_voipLipFlapMorph, "Comma-separated morph target names to drive (IQM/glTF)." );
 	Cvar_SetDescription( cl_voipLipFlapRate, "Lip flap oscillation rate in Hz while talking." );
+	Cvar_SetDescription( cl_voipLipFlapFacs, "Drive FACS AU25/AU26 from VoIP RMS (see docs/FACS.md)." );
 
 	Cmd_AddCommand( "+voip", CL_VoIP_Transmit_f );
 	Cmd_AddCommand( "-voip", CL_VoIP_StopTransmit_f );
@@ -322,9 +382,10 @@ void CL_VoIP_Init( void ) {
 	Com_Memset( voipClientPower, 0, sizeof( voipClientPower ) );
 	Com_Memset( voipClientLastTalk, 0, sizeof( voipClientLastTalk ) );
 
-	Com_Printf( "VoIP lip flap: %s (morph %s)\n",
+	Com_Printf( "VoIP lip flap: %s (morph %s, FACS %s)\n",
 		cl_voipLipFlap->integer ? "enabled" : "disabled",
-		cl_voipLipFlapMorph->string );
+		cl_voipLipFlapMorph->string,
+		cl_voipLipFlapFacs->integer ? "AU25/AU26" : "off" );
 
 	if ( !cl_voip->integer ) {
 		Com_Printf( "VoIP: disabled (cl_voip 0)\n" );
@@ -423,6 +484,7 @@ int CL_VoIP_GetShowMeter( void ) {
 
 void CL_VoIP_Frame( void ) {
 	CL_VoIP_DecayClientPower();
+	CL_VoIP_SyncFacs();
 
 	if ( !voipInitialized || !voipCapturing ) return;
 
