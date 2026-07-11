@@ -314,7 +314,7 @@ See [HDR_GAPS.md](HDR_GAPS.md) for HDR pipeline gaps, risks, and render order.
 
 See [RENDERERS_FUTURE.md](RENDERERS_FUTURE.md) for architecture and implementation plans:
 
-- **Vulkan RTX**: demo path with `USE_VULKAN_RTX=ON`, `r_rtx` / `r_rtxDemo`, world BLAS; optional **`r_rtxEntities`** proxy entity boxes in TLAS. See [RENDERERS_FUTURE.md](RENDERERS_FUTURE.md).
+- **Vulkan RTX**: demo path with `USE_VULKAN_RTX=ON`, `r_rtx` / `r_rtxDemo`, world BLAS; optional **`r_rtxEntities`** packs MD3 LOD0 mesh (AABB fallback) into the entity BLAS. See [RENDERERS_FUTURE.md](RENDERERS_FUTURE.md).
 - **GRTX (Gaussian RT)**: `r_grtx` / `r_grtxDemo` over procedural 3D Gaussian AABB proxies (separate from BSP `r_rtx` demo). See [GAUSSIAN_RAY_TRACING_GRTX.md](GAUSSIAN_RAY_TRACING_GRTX.md).
 - **Path trace experiment (C6)**: `r_pathtrace` + `r_pathtrace_arch` (`megakernel` / `wavefront`) over shared RTX world TLAS — requires `r_rtx 1`, `r_rtxDemo 1`, `USE_VULKAN_RTX`. Not SP ship lighting. See [PATHTRACE_ARCH_BENCHMARK.md](PATHTRACE_ARCH_BENCHMARK.md).
 - **Mobile-GS**: `r_mgs` tiered compute splatting (Android-friendly; no RTX). See [MOBILE_GAUSSIAN_SPLATTING.md](MOBILE_GAUSSIAN_SPLATTING.md).

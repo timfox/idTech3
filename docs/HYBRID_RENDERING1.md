@@ -39,7 +39,11 @@ Optional:
 r_hybrid1_diffuse 1       // indirect diffuse GI channel
 r_hybrid1_ibl 1           // cubemap on RT miss / secondary hit (needs skybox or PBR cubemap)
 r_hybrid1_taa 1           // TAA after hybrid composite (default on)
+r_rtxEntities 1           // MD3 LOD0 mesh BLAS (+ AABB fallback); shared with Hybrid1 TLAS
+r_rtxEntityTriCap 65536   // entity BLAS triangle budget (latched)
 ```
+
+`demo_hybrid1.cfg` sets `r_rtxEntities 1`. Console **`rtx_status`** reports `entity_ents` / `entity_tris` / `mesh` / `proxy` counts.
 
 `r_rtx 1` **or** `r_hybrid1 1` before `vid_restart` enables KHR ray tracing device features.
 

@@ -1639,6 +1639,7 @@ extern cvar_t	*r_forwardPlusDistanceSort;
 extern cvar_t	*r_forwardPlusDepthCull;
 extern cvar_t	*r_rtxEntities;
 extern cvar_t	*r_rtxEntityCap;
+extern cvar_t	*r_rtxEntityTriCap;
 extern cvar_t	*r_rtxTlasUpdate;
 extern cvar_t	*r_pathtrace;
 extern cvar_t	*r_pathtrace_arch;

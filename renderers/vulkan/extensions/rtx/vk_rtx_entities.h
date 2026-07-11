@@ -5,9 +5,36 @@
 
 #include "tr_types.h"
 
-/* Pack RT_MODEL refEntity proxy AABBs (12 tris each) into world-space vertex/index buffers. */
+typedef struct {
+	uint32_t entityCount;
+	uint32_t vertexCount;
+	uint32_t primitiveCount;
+	uint32_t meshEntityCount;
+	uint32_t proxyEntityCount;
+} vkRtxEntityPackStats_t;
+
+/*
+ * Pack RT_MODEL entities into world-space vertex/index buffers for a single entity BLAS.
+ * Prefers MD3 LOD0 frame-lerped mesh; falls back to AABB proxy boxes for other model types.
+ * Returns number of entities packed (0 if none). Fills *stats when non-NULL.
+ */
 uint32_t vk_rtx_entities_pack( const trRefdef_t *refdef, const viewParms_t *viewParms,
-	uint32_t maxEntities, float *positions, uint32_t *indices );
+	uint32_t maxEntities, float *positions, uint32_t maxVerts,
+	uint32_t *indices, uint32_t maxIndices, vkRtxEntityPackStats_t *stats );
+
+#else /* !USE_VULKAN_RTX */
+
+typedef struct {
+	uint32_t entityCount;
+	uint32_t vertexCount;
+	uint32_t primitiveCount;
+	uint32_t meshEntityCount;
+	uint32_t proxyEntityCount;
+} vkRtxEntityPackStats_t;
+
+uint32_t vk_rtx_entities_pack( const trRefdef_t *refdef, const viewParms_t *viewParms,
+	uint32_t maxEntities, float *positions, uint32_t maxVerts,
+	uint32_t *indices, uint32_t maxIndices, vkRtxEntityPackStats_t *stats );
 
 #endif /* USE_VULKAN_RTX */
 

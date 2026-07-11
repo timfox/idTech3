@@ -86,6 +86,9 @@ static struct {
 	uint32_t		world_primitive_count;
 	uint32_t		entity_primitive_count;
 	uint32_t		entity_packed_count;
+	uint32_t		entity_vertex_count;
+	uint32_t		entity_mesh_count;
+	uint32_t		entity_proxy_count;
 	VkBuffer		entity_vertex_buffer;
 	VkDeviceMemory	entity_vertex_memory;
 	VkBuffer		entity_index_buffer;
@@ -110,8 +113,9 @@ static void RTX_Status_f( void )
 		( r_rtxDemo && r_rtxDemo->integer ) ? 1 : 0,
 		( r_hybrid1 && r_hybrid1->integer ) ? 1 : 0,
 		( r_raygun && r_raygun->integer ) ? 1 : 0 );
-	ri.Printf( PRINT_ALL, "[VK][RTX] world=%s blas_tris=%u entity_proxies=%u tlas_instances=%u tlas_update=%d\n",
-		wn, rtx.world_primitive_count, rtx.entity_packed_count, rtx.tlas_instance_count,
+	ri.Printf( PRINT_ALL, "[VK][RTX] world=%s blas_tris=%u entity_ents=%u entity_tris=%u entity_verts=%u mesh=%u proxy=%u tlas_instances=%u tlas_update=%d\n",
+		wn, rtx.world_primitive_count, rtx.entity_packed_count, rtx.entity_primitive_count,
+		rtx.entity_vertex_count, rtx.entity_mesh_count, rtx.entity_proxy_count, rtx.tlas_instance_count,
 		( r_rtxTlasUpdate && r_rtxTlasUpdate->integer ) ? 1 : 0 );
 	ri.Printf( PRINT_ALL, "[VK][RTX] trace_extent=%ux%u r_rtx=%d composite=%.2f samples=%d\n",
 		rtx.width, rtx.height,
@@ -382,6 +386,9 @@ static void vk_rtx_rebuild_world_blas( void )
 	vk_rtx_destroy_buffer( &rtx.scratch_buffer, &rtx.scratch_memory );
 	rtx.entity_primitive_count = 0u;
 	rtx.entity_packed_count = 0u;
+	rtx.entity_vertex_count = 0u;
+	rtx.entity_mesh_count = 0u;
+	rtx.entity_proxy_count = 0u;
 
 	maxPrimBLAS = 1u;
 	if ( useWorld ) {
@@ -618,6 +625,9 @@ static void vk_rtx_destroy_entity_blas( void )
 	vk_rtx_destroy_buffer( &rtx.entity_index_buffer, &rtx.entity_index_memory );
 	rtx.entity_primitive_count = 0u;
 	rtx.entity_packed_count = 0u;
+	rtx.entity_vertex_count = 0u;
+	rtx.entity_mesh_count = 0u;
+	rtx.entity_proxy_count = 0u;
 }
 
 static void vk_rtx_rebuild_entity_tlas( void )
@@ -680,10 +690,34 @@ static void vk_rtx_rebuild_entity_tlas( void )
 	maxPrimEntity = 0u;
 	packedEnt = 0u;
 	if ( backEnd.refdef.num_entities > 0 ) {
-		VkDeviceSize vbSize = (VkDeviceSize)capEnt * 8u * 3u * sizeof( float );
-		VkDeviceSize ibSize = (VkDeviceSize)capEnt * 36u * sizeof( uint32_t );
+		uint32_t triCap = ( r_rtxEntityTriCap && r_rtxEntityTriCap->integer > 0 )
+			? (uint32_t)r_rtxEntityTriCap->integer : 65536u;
+		uint32_t maxVerts;
+		uint32_t maxIndices;
+		VkDeviceSize vbSize;
+		VkDeviceSize ibSize;
 		float *posHost;
 		uint32_t *idxHost;
+		vkRtxEntityPackStats_t packStats;
+
+		if ( triCap < 12u ) {
+			triCap = 12u;
+		}
+		if ( triCap > 1048576u ) {
+			triCap = 1048576u;
+		}
+		/* Worst case: one unique vert per triangle corner, plus AABB cubes (8 verts / 12 tris). */
+		maxVerts = triCap * 3u;
+		if ( maxVerts < capEnt * 8u ) {
+			maxVerts = capEnt * 8u;
+		}
+		maxIndices = triCap * 3u;
+		if ( maxIndices < capEnt * 36u ) {
+			maxIndices = capEnt * 36u;
+		}
+
+		vbSize = (VkDeviceSize)maxVerts * 3u * sizeof( float );
+		ibSize = (VkDeviceSize)maxIndices * sizeof( uint32_t );
 
 		vk_rtx_alloc_buffer( vbSize,
 			VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT | VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR,
@@ -695,22 +729,27 @@ static void vk_rtx_rebuild_entity_tlas( void )
 			&rtx.entity_index_buffer, &rtx.entity_index_memory, &ibAddr );
 		VK_CHECK( qvkMapMemory( vk.device, rtx.entity_vertex_memory, 0, vbSize, 0, (void **)&posHost ) );
 		VK_CHECK( qvkMapMemory( vk.device, rtx.entity_index_memory, 0, ibSize, 0, (void **)&idxHost ) );
-		packedEnt = vk_rtx_entities_pack( &backEnd.refdef, &backEnd.viewParms, capEnt, posHost, idxHost );
+		Com_Memset( &packStats, 0, sizeof( packStats ) );
+		packedEnt = vk_rtx_entities_pack( &backEnd.refdef, &backEnd.viewParms, capEnt,
+			posHost, maxVerts, idxHost, maxIndices, &packStats );
 		qvkUnmapMemory( vk.device, rtx.entity_vertex_memory );
 		qvkUnmapMemory( vk.device, rtx.entity_index_memory );
-		if ( packedEnt == 0u ) {
+		if ( packedEnt == 0u || packStats.primitiveCount == 0u ) {
 			vk_rtx_destroy_entity_blas();
 		} else {
-			maxPrimEntity = packedEnt * 12u;
+			maxPrimEntity = packStats.primitiveCount;
 			rtx.entity_packed_count = packedEnt;
 			rtx.entity_primitive_count = maxPrimEntity;
+			rtx.entity_vertex_count = packStats.vertexCount;
+			rtx.entity_mesh_count = packStats.meshEntityCount;
+			rtx.entity_proxy_count = packStats.proxyEntityCount;
 
 			Com_Memset( &triangles, 0, sizeof( triangles ) );
 			triangles.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_TRIANGLES_DATA_KHR;
 			triangles.vertexFormat = VK_FORMAT_R32G32B32_SFLOAT;
 			triangles.vertexData.deviceAddress = vbAddr;
 			triangles.vertexStride = sizeof( float ) * 3u;
-			triangles.maxVertex = packedEnt * 8u - 1u;
+			triangles.maxVertex = ( packStats.vertexCount > 0u ) ? ( packStats.vertexCount - 1u ) : 0u;
 			triangles.indexType = VK_INDEX_TYPE_UINT32;
 			triangles.indexData.deviceAddress = ibAddr;
 			triangles.transformData.deviceAddress = 0;
@@ -907,7 +946,8 @@ static void vk_rtx_rebuild_entity_tlas( void )
 	if ( packedEnt > 0u ) {
 		static qboolean entity_tlas_logged;
 		if ( !entity_tlas_logged ) {
-			ri.Printf( PRINT_ALL, "[VK][RTX] r_rtxEntities=1: entity proxy BLAS + TLAS (cap %u entities)\n", capEnt );
+			ri.Printf( PRINT_ALL, "[VK][RTX] r_rtxEntities=1: entity mesh/AABB BLAS + TLAS (cap %u ents, mesh=%u proxy=%u tris=%u)\n",
+				capEnt, rtx.entity_mesh_count, rtx.entity_proxy_count, rtx.entity_primitive_count );
 			entity_tlas_logged = qtrue;
 		}
 	}

@@ -272,6 +272,7 @@ cvar_t	*r_rtxComposite;
 cvar_t	*r_rtxSamples;
 cvar_t	*r_rtxEntities;
 cvar_t	*r_rtxEntityCap;
+cvar_t	*r_rtxEntityTriCap;
 cvar_t	*r_rtxTlasUpdate;
 cvar_t	*r_pathtrace;
 cvar_t	*r_pathtrace_arch;
@@ -4102,12 +4103,17 @@ static void R_Register( void )
 	r_rtxEntities = ri.Cvar_Get( "r_rtxEntities", "0", CVAR_ARCHIVE_ND | CVAR_LATCH );
 	ri.Cvar_CheckRange( r_rtxEntities, "0", "1", CV_INTEGER );
 	ri.Cvar_SetDescription( r_rtxEntities,
-		"When USE_VULKAN_RTX and \\r_rtxDemo 1: add refEntity model bounds as a second BLAS in the TLAS (proxy boxes). Default 0." );
+		"When USE_VULKAN_RTX: pack RT_MODEL entities into a second BLAS (MD3 LOD0 mesh, AABB fallback). Default 0 (latched)." );
 	ri.Cvar_SetGroup( r_rtxEntities, CVG_RENDERER );
 	r_rtxEntityCap = ri.Cvar_Get( "r_rtxEntityCap", "128", CVAR_ARCHIVE_ND | CVAR_LATCH );
 	ri.Cvar_CheckRange( r_rtxEntityCap, "0", "1024", CV_INTEGER );
 	ri.Cvar_SetDescription( r_rtxEntityCap, "Max RT_MODEL entities packed into the entity BLAS when \\r_rtxEntities 1 (latched)." );
 	ri.Cvar_SetGroup( r_rtxEntityCap, CVG_RENDERER );
+	r_rtxEntityTriCap = ri.Cvar_Get( "r_rtxEntityTriCap", "65536", CVAR_ARCHIVE_ND | CVAR_LATCH );
+	ri.Cvar_CheckRange( r_rtxEntityTriCap, "12", "1048576", CV_INTEGER );
+	ri.Cvar_SetDescription( r_rtxEntityTriCap,
+		"Max triangles in the entity BLAS when \\r_rtxEntities 1 (MD3 mesh + AABB proxies; latched)." );
+	ri.Cvar_SetGroup( r_rtxEntityTriCap, CVG_RENDERER );
 	r_rtxTlasUpdate = ri.Cvar_Get( "r_rtxTlasUpdate", "1", CVAR_ARCHIVE_ND );
 	ri.Cvar_CheckRange( r_rtxTlasUpdate, "0", "1", CV_INTEGER );
 	ri.Cvar_SetDescription( r_rtxTlasUpdate,
