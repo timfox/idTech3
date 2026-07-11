@@ -41,7 +41,7 @@ See [BUILD.md](../BUILD.md) profile matrix and [ENGINE_MODULE_MANIFEST.md](ENGIN
 | 5b | CMake manifests + no AUX on qcommon/server/vulkan/client/botlib/mp3 | Done (vendored JPEG `EXTERNAL_JPEG_SRC_DIR` remains on AUX) |
 | 5c | Physical move off `src/`; `src/*` forwarding-only shims; botlib/cgame/ui/asm relocated | Done |
 | 5d | MSVC bridge + manifest sync (quake3e/ded/botlib/vulkan); CI drift tests | Done |
-| 5e | Drop `src/*` shims + layout bridge symlinks | Planned |
+| 5e | Drop `src/*` shims (layout bridges kept for includes/MSVC) | Done |
 
 ## Next high-value PRs (structure-first)
 
@@ -53,7 +53,7 @@ See [BUILD.md](../BUILD.md) profile matrix and [ENGINE_MODULE_MANIFEST.md](ENGIN
 6. ~~**Phase 5b**~~ — explicit manifests for client, qcommon, server, vulkan core (no AUX).
 7. ~~**Phase 5c**~~ — physical move to `engine/`, `runtime/`, `modules/`, `extensions/`, `renderers/`, `third_party/`; `src/*` shims for one release. Script: `scripts/migrate_phase_5c.sh`.
 8. ~~**Phase 5d**~~ — MSVC manifest sync + CI (`scripts/msvc/sync_all_vcxproj.sh`). See **`docs/MSVC_CODEGEN.md`**.
-9. **Phase 5e** — drop `src/*` shims after CMake manifest migration + soak. See **`docs/core/SHIM_REMOVAL_CHECKLIST.md`**, **`scripts/audit_src_shim_references.sh`**.
+9. **Phase 5e** — drop `src/*` shims after CMake manifest migration. Layout bridges remain until include rewrite. See **`docs/core/SHIM_REMOVAL_CHECKLIST.md`**, **`scripts/migrate_phase_5e_drop_shims.sh`**.
 
 ## Validation (every phase)
 

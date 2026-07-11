@@ -94,7 +94,7 @@ fi
 echo ""
 echo "GLSL stage files (glslangValidator -V):"
 if command -v glslangValidator &>/dev/null; then
-  shader_dir="$PROJECT_ROOT/src/renderers/vulkan/shaders/glsl"
+  shader_dir="$PROJECT_ROOT/renderers/vulkan/shaders/glsl"
   shader_errors=0
   shader_count=0
   while IFS= read -r -d '' shader; do
@@ -117,9 +117,9 @@ fi
 
 echo ""
 echo "GPU morph SSBO: IQM_MORPH_TOP_K (C vs GLSL must match):"
-TR_LOCAL="$PROJECT_ROOT/src/renderers/vulkan/tr_local.h"
-GEN_VERT="$PROJECT_ROOT/src/renderers/vulkan/shaders/glsl/gen_vert.tmpl"
-LIGHT_VERT="$PROJECT_ROOT/src/renderers/vulkan/shaders/glsl/light_vert.tmpl"
+TR_LOCAL="$PROJECT_ROOT/renderers/vulkan/tr_local.h"
+GEN_VERT="$PROJECT_ROOT/renderers/vulkan/shaders/glsl/gen_vert.tmpl"
+LIGHT_VERT="$PROJECT_ROOT/renderers/vulkan/shaders/glsl/light_vert.tmpl"
 k_c="$(sed -n 's/^#define IQM_MORPH_TOP_K[[:space:]]*\([0-9][0-9]*\).*$/\1/p' "$TR_LOCAL" | head -1)"
 k_g="$(sed -n 's/^[[:space:]]*const int IQM_MORPH_TOP_K[[:space:]]*=[[:space:]]*\([0-9][0-9]*\).*;$/\1/p' "$GEN_VERT" | head -1)"
 k_l="$(sed -n 's/^[[:space:]]*const int IQM_MORPH_TOP_K[[:space:]]*=[[:space:]]*\([0-9][0-9]*\).*;$/\1/p' "$LIGHT_VERT" | head -1)"
@@ -133,7 +133,7 @@ fi
 
 echo ""
 echo "glTF morph cap: GLTF_MAX_MORPH_TARGETS vs IQM_MORPH_TOP_K (GPU SSBO packing):"
-GLTF_H="$PROJECT_ROOT/src/renderers/vulkan/tr_model_gltf.h"
+GLTF_H="$PROJECT_ROOT/renderers/vulkan/tr_model_gltf.h"
 gltf_k="$(sed -n 's/^#define GLTF_MAX_MORPH_TARGETS[[:space:]]*\([0-9][0-9]*\).*$/\1/p' "$GLTF_H" | head -1)"
 if [[ -z "$gltf_k" || -z "$k_c" ]]; then
   fail "could not parse GLTF_MAX_MORPH_TARGETS from tr_model_gltf.h or IQM_MORPH_TOP_K from tr_local.h"
@@ -145,7 +145,7 @@ fi
 
 echo ""
 echo "glTF joint cap: GLTF_MAX_JOINTS vs IQM_MAX_JOINTS (skin matrix layout):"
-IQM_H="$PROJECT_ROOT/src/renderers/vulkan/iqm.h"
+IQM_H="$PROJECT_ROOT/renderers/vulkan/iqm.h"
 iqm_j="$(sed -n 's/^#define[[:space:]]*IQM_MAX_JOINTS[[:space:]]*\([0-9][0-9]*\).*$/\1/p' "$IQM_H" | head -1)"
 gltf_j="$(sed -n 's/^#define GLTF_MAX_JOINTS[[:space:]]*\([0-9][0-9]*\).*$/\1/p' "$GLTF_H" | head -1)"
 if [[ -z "$gltf_j" || -z "$iqm_j" ]]; then
@@ -158,8 +158,8 @@ fi
 
 echo ""
 echo "glTF GPU tangent topo: GLTF_GPU_ADJ_TRIS_MAX (C vs gen_vert.tmpl):"
-TOPO_H="$PROJECT_ROOT/src/renderers/vulkan/tr_gltf_topo.h"
-GEN_VERT="$PROJECT_ROOT/src/renderers/vulkan/shaders/glsl/gen_vert.tmpl"
+TOPO_H="$PROJECT_ROOT/renderers/vulkan/tr_gltf_topo.h"
+GEN_VERT="$PROJECT_ROOT/renderers/vulkan/shaders/glsl/gen_vert.tmpl"
 adj_c="$(sed -n 's/^#define GLTF_GPU_ADJ_TRIS_MAX[[:space:]]*\([0-9][0-9]*\).*$/\1/p' "$TOPO_H" | head -1)"
 adj_glsl="$(grep -E 'const uint GLTF_GPU_ADJ_TRIS_MAX' "$GEN_VERT" | head -1 | sed -n 's/.*GLTF_GPU_ADJ_TRIS_MAX = \([0-9][0-9]*\)u.*/\1/p')"
 if [[ -z "$adj_c" || -z "$adj_glsl" ]]; then
@@ -202,8 +202,8 @@ fi
 
 echo ""
 echo "Forward+ tile cull: MAX_LIGHTS vs VK_FP_MAX_GPU_LIGHTS (GPU light record cap):"
-FP_H="$PROJECT_ROOT/src/renderers/vulkan/vk_forward_plus.h"
-FP_COMP="$PROJECT_ROOT/src/renderers/vulkan/shaders/glsl/forward_plus_tile_cull.comp"
+FP_H="$PROJECT_ROOT/renderers/vulkan/vk_forward_plus.h"
+FP_COMP="$PROJECT_ROOT/renderers/vulkan/shaders/glsl/forward_plus_tile_cull.comp"
 max_gpu="$(sed -n 's/^#define VK_FP_MAX_GPU_LIGHTS[[:space:]]*\([0-9][0-9]*\).*$/\1/p' "$FP_H" | head -1)"
 max_sh="$(sed -n 's/^#define MAX_LIGHTS[[:space:]]*\([0-9][0-9]*\).*$/\1/p' "$FP_COMP" | head -1)"
 if [[ -z "$max_gpu" || -z "$max_sh" ]]; then
@@ -216,8 +216,8 @@ fi
 
 echo ""
 echo "Forward+ refdef: tr_world must not clamp tr.refdef.num_dlights (GPU pack uses full count):"
-TR_WORLD="$PROJECT_ROOT/src/renderers/vulkan/tr_world.c"
-TR_LOCAL="$PROJECT_ROOT/src/renderers/vulkan/tr_local.h"
+TR_WORLD="$PROJECT_ROOT/renderers/vulkan/tr_world.c"
+TR_LOCAL="$PROJECT_ROOT/renderers/vulkan/tr_local.h"
 if grep -q 'tr\.refdef\.num_dlights = MAX_DLIGHTS' "$TR_WORLD" 2>/dev/null; then
   fail "tr_world.c clamps tr.refdef.num_dlights to MAX_DLIGHTS (breaks Forward+ lights 33-64)"
 elif ! grep -q 'R_SurfaceDlightBitsMask' "$TR_WORLD" 2>/dev/null; then
@@ -230,7 +230,7 @@ fi
 
 echo ""
 echo "TAA shader: neighborhoodMinMax must run before history clamp:"
-TAA_FRAG="$PROJECT_ROOT/src/renderers/vulkan/shaders/glsl/taa.frag"
+TAA_FRAG="$PROJECT_ROOT/renderers/vulkan/shaders/glsl/taa.frag"
 if ! grep -q 'neighborhoodMinMax( uv, mn, mx, avg )' "$TAA_FRAG" 2>/dev/null; then
   fail "taa.frag missing neighborhoodMinMax() call (history AABB clamp would be undefined)"
 else
@@ -239,15 +239,15 @@ fi
 
 echo ""
 echo "r_renderMode latch (tr_render_mode_vk.c):"
-TR_INIT_VK="$PROJECT_ROOT/src/renderers/vulkan/tr_init.c"
-RENDER_MODE_C="$PROJECT_ROOT/src/renderers/vulkan/tr_render_mode_vk.c"
+TR_INIT_VK="$PROJECT_ROOT/renderers/vulkan/tr_init.c"
+RENDER_MODE_C="$PROJECT_ROOT/renderers/vulkan/tr_render_mode_vk.c"
 if [[ ! -f "$RENDER_MODE_C" ]]; then
   fail "missing tr_render_mode_vk.c (R_ApplyRenderModeLatch)"
 elif ! grep -q 'void R_ApplyRenderModeLatch' "$RENDER_MODE_C" 2>/dev/null; then
   fail "tr_render_mode_vk.c missing R_ApplyRenderModeLatch"
 elif ! grep -q 'R_ApplyRenderModeLatch();' "$TR_INIT_VK" 2>/dev/null; then
   fail "tr_init.c should call R_ApplyRenderModeLatch() after R_Register"
-elif ! grep -q 'R_ApplyRenderModeLatch();' "$PROJECT_ROOT/src/renderers/vulkan/vk_forward_plus.c" 2>/dev/null; then
+elif ! grep -q 'R_ApplyRenderModeLatch();' "$PROJECT_ROOT/renderers/vulkan/vk_forward_plus.c" 2>/dev/null; then
   fail "vk_forward_plus.c should call R_ApplyRenderModeLatch() during Forward+ init"
 elif ! grep -q 'r_deferredLighting' "$RENDER_MODE_C" 2>/dev/null; then
   fail "tr_render_mode_vk.c should latch deferred lighting (r_forwardPlusShade 0)"
@@ -257,8 +257,8 @@ fi
 
 echo ""
 echo "TAA frame gating (history confidence, motion barrier):"
-VK_FRAME_END="$PROJECT_ROOT/src/renderers/vulkan/vk_frame_end.c"
-VK_POSTFX="$PROJECT_ROOT/src/renderers/vulkan/vk_postfx_params.c"
+VK_FRAME_END="$PROJECT_ROOT/renderers/vulkan/vk_frame_end.c"
+VK_POSTFX="$PROJECT_ROOT/renderers/vulkan/vk_postfx_params.c"
 if ! grep -q 'taaParams\[0\]' "$VK_POSTFX" 2>/dev/null || \
    ! awk '/taaParams\[0\]/,0' "$VK_POSTFX" | grep -q 'unreliableMotionThisFrame'; then
   fail "vk_postfx_params.c must gate TAA history confidence (taaParams[0]) on unreliableMotionThisFrame"
@@ -266,7 +266,7 @@ elif grep -q '!vk.temporal.unreliableMotionThisFrame' "$VK_FRAME_END" 2>/dev/nul
   fail "vk_frame_end.c must not skip the whole TAA pass on unreliableMotionThisFrame (use taaParams confidence)"
 elif ! grep -q 'vk_barrier_motion_vector_for_sampling' "$VK_FRAME_END" 2>/dev/null; then
   fail "vk_frame_end.c missing motion-vector barrier before TAA"
-elif ! grep -q 'vk_entity_note_motion_reliability' "$PROJECT_ROOT/src/renderers/vulkan/vk_view_state.c" 2>/dev/null; then
+elif ! grep -q 'vk_entity_note_motion_reliability' "$PROJECT_ROOT/renderers/vulkan/vk_view_state.c" 2>/dev/null; then
   fail "vk_view_state.c missing per-entity motion reliability notes"
 else
   pass "TAA uses per-frame history confidence; per-entity motion policy wired"
@@ -274,14 +274,14 @@ fi
 
 echo ""
 echo "Deferred G-buffer fill (r_deferredGBufferFill + compute capture):"
-DGB_C="$PROJECT_ROOT/src/renderers/vulkan/vk_deferred_gbuffer.c"
-DGB_COMP="$PROJECT_ROOT/src/renderers/vulkan/shaders/glsl/deferred_gbuffer_fill.comp"
-VK_ATTACH="$PROJECT_ROOT/src/renderers/vulkan/vk_attachments.c"
+DGB_C="$PROJECT_ROOT/renderers/vulkan/vk_deferred_gbuffer.c"
+DGB_COMP="$PROJECT_ROOT/renderers/vulkan/shaders/glsl/deferred_gbuffer_fill.comp"
+VK_ATTACH="$PROJECT_ROOT/renderers/vulkan/vk_attachments.c"
 if [[ ! -f "$DGB_C" ]]; then
   fail "missing vk_deferred_gbuffer.c"
 elif ! grep -q 'r_deferredGBufferFill = ri.Cvar_Get' "$TR_INIT_VK" 2>/dev/null; then
   fail "tr_init.c missing r_deferredGBufferFill cvar"
-elif ! grep -q 'vk_deferred_gbuffer_capture_after_geometry' "$PROJECT_ROOT/src/renderers/vulkan/tr_backend.c" 2>/dev/null; then
+elif ! grep -q 'vk_deferred_gbuffer_capture_after_geometry' "$PROJECT_ROOT/renderers/vulkan/tr_backend.c" 2>/dev/null; then
   fail "tr_backend.c should call vk_deferred_gbuffer_capture_after_geometry after geometry"
 elif ! grep -q 'deferred_gbuffer_fill_cs' "$PROJECT_ROOT/scripts/compile_shaders.sh" 2>/dev/null; then
   fail "compile_shaders.sh missing deferred_gbuffer_fill_cs"
@@ -301,11 +301,11 @@ echo ""
 echo "Deferred lighting (r_deferredLighting + Forward+ tile diffuse):"
 if ! grep -q 'r_deferredLighting = ri.Cvar_Get' "$TR_INIT_VK" 2>/dev/null; then
   fail "tr_init.c missing r_deferredLighting cvar"
-elif ! grep -q 'vk_deferred_lighting_apply_after_geometry' "$PROJECT_ROOT/src/renderers/vulkan/tr_backend.c" 2>/dev/null; then
+elif ! grep -q 'vk_deferred_lighting_apply_after_geometry' "$PROJECT_ROOT/renderers/vulkan/tr_backend.c" 2>/dev/null; then
   fail "tr_backend.c should call vk_deferred_lighting_apply_after_geometry after G-buffer capture"
 elif ! grep -q 'deferred_lighting_cs' "$PROJECT_ROOT/scripts/compile_shaders.sh" 2>/dev/null; then
   fail "compile_shaders.sh missing deferred_lighting_cs"
-elif [[ ! -f "$PROJECT_ROOT/src/renderers/vulkan/shaders/glsl/deferred_lighting.comp" ]]; then
+elif [[ ! -f "$PROJECT_ROOT/renderers/vulkan/shaders/glsl/deferred_lighting.comp" ]]; then
   fail "missing deferred_lighting.comp"
 elif ! grep -q 'deferred_lighting_image' "$VK_ATTACH" 2>/dev/null; then
   fail "vk_attachments.c missing deferred_lighting_image alloc"
@@ -313,21 +313,21 @@ elif ! grep -q 'r_deferredUnlitBase = ri.Cvar_Get' "$TR_INIT_VK" 2>/dev/null; th
   fail "tr_init.c missing r_deferredUnlitBase cvar"
 elif ! grep -q 'vk_deferred_unlit_base_wanted' "$DGB_C" 2>/dev/null; then
   fail "vk_deferred_gbuffer.c missing vk_deferred_unlit_base_wanted"
-elif ! grep -q 'pc.additive' "$PROJECT_ROOT/src/renderers/vulkan/shaders/glsl/deferred_lighting.comp" 2>/dev/null; then
+elif ! grep -q 'pc.additive' "$PROJECT_ROOT/renderers/vulkan/shaders/glsl/deferred_lighting.comp" 2>/dev/null; then
   fail "deferred_lighting.comp missing additive composite path"
 elif ! grep -q 'r_deferredLightingStrength = ri.Cvar_Get' "$TR_INIT_VK" 2>/dev/null; then
   fail "tr_init.c missing r_deferredLightingStrength cvar"
-elif ! grep -q 'vk_deferred_unlit_base_wanted' "$PROJECT_ROOT/src/renderers/vulkan/tr_shade.c" 2>/dev/null; then
+elif ! grep -q 'vk_deferred_unlit_base_wanted' "$PROJECT_ROOT/renderers/vulkan/tr_shade.c" 2>/dev/null; then
   fail "tr_shade.c should skip ProjectDlightTexture when deferred unlit base active"
-elif ! grep -q 'deferred_unlit_base_strength' "$PROJECT_ROOT/src/renderers/vulkan/shaders/glsl/gen_frag.tmpl" 2>/dev/null; then
+elif ! grep -q 'deferred_unlit_base_strength' "$PROJECT_ROOT/renderers/vulkan/shaders/glsl/gen_frag.tmpl" 2>/dev/null; then
   fail "gen_frag.tmpl missing deferred_unlit_base_strength fragment spec constant"
-elif ! grep -q 'deferred_unlit_base_strength' "$PROJECT_ROOT/src/renderers/vulkan/vk_create_pipeline.c" 2>/dev/null; then
+elif ! grep -q 'deferred_unlit_base_strength' "$PROJECT_ROOT/renderers/vulkan/vk_create_pipeline.c" 2>/dev/null; then
   fail "vk_create_pipeline.c missing deferred_unlit_base_strength specialization"
 elif ! grep -q 'r_deferredSpecular = ri.Cvar_Get' "$TR_INIT_VK" 2>/dev/null; then
   fail "tr_init.c missing r_deferredSpecular cvar"
-elif ! grep -q 'sceneBaseTex' "$PROJECT_ROOT/src/renderers/vulkan/shaders/glsl/deferred_lighting_composite.frag" 2>/dev/null; then
+elif ! grep -q 'sceneBaseTex' "$PROJECT_ROOT/renderers/vulkan/shaders/glsl/deferred_lighting_composite.frag" 2>/dev/null; then
   fail "deferred_lighting_composite.frag missing sceneBaseTex additive blend"
-elif ! grep -q 'pc.specular' "$PROJECT_ROOT/src/renderers/vulkan/shaders/glsl/deferred_lighting.comp" 2>/dev/null; then
+elif ! grep -q 'pc.specular' "$PROJECT_ROOT/renderers/vulkan/shaders/glsl/deferred_lighting.comp" 2>/dev/null; then
   fail "deferred_lighting.comp missing specular toggle"
 else
   pass "deferred lighting compute + composite wired"
@@ -354,9 +354,9 @@ elif ! grep -q 'vk_experimental_renderer_stubs.c' "$CMAKE_ROOT" 2>/dev/null; the
   fail "CMakeLists.txt missing vk_experimental_renderer_stubs.c wiring"
 elif ! grep -q 'tr_vector_font_stub.c' "$CMAKE_ROOT" 2>/dev/null; then
   fail "CMakeLists.txt missing tr_vector_font_stub.c wiring"
-elif ! grep -q 'USE_VULKAN_RTX=ON' "$PROJECT_ROOT/src/renderers/vulkan/extensions/rtx/vk_rtx.c" 2>/dev/null; then
+elif ! grep -q 'USE_VULKAN_RTX=ON' "$PROJECT_ROOT/renderers/vulkan/extensions/rtx/vk_rtx.c" 2>/dev/null; then
   fail "vk_rtx.c missing RTX-off stub log"
-elif ! grep -q 'BUILD_FREETYPE=ON' "$PROJECT_ROOT/src/renderers/common/tr_font_stub.c" 2>/dev/null; then
+elif ! grep -q 'BUILD_FREETYPE=ON' "$PROJECT_ROOT/renderers/common/tr_font_stub.c" 2>/dev/null; then
   fail "tr_font_stub.c missing FreeType-off stub log"
 elif ! grep -q '#else /\* !USE_STEAM \*/' "$IDTECH3_CLIENT/platform/cl_steam.c" 2>/dev/null; then
   fail "cl_steam.c missing USE_STEAM off stub branch"
@@ -388,23 +388,23 @@ fi
 
 echo ""
 echo "Engine-native sprite props (misc_billboard / misc_flipbook / misc_imposter):"
-SP_C="$PROJECT_ROOT/src/renderers/vulkan/tr_sprite_props.c"
-TR_TYPES="$PROJECT_ROOT/src/renderers/common/tr_types.h"
+SP_C="$PROJECT_ROOT/renderers/vulkan/tr_sprite_props.c"
+TR_TYPES="$PROJECT_ROOT/renderers/common/tr_types.h"
 if ! grep -q 'misc_billboard' "$SP_C" 2>/dev/null; then
   fail "tr_sprite_props.c missing misc_billboard parse"
 elif ! grep -q 'misc_flipbook' "$SP_C" 2>/dev/null; then
   fail "tr_sprite_props.c missing misc_flipbook parse"
 elif ! grep -q 'misc_imposter' "$SP_C" 2>/dev/null; then
   fail "tr_sprite_props.c missing misc_imposter parse"
-elif ! grep -q 'R_SpriteProps_ParseFromEntityString' "$PROJECT_ROOT/src/renderers/vulkan/tr_bsp.c" 2>/dev/null; then
+elif ! grep -q 'R_SpriteProps_ParseFromEntityString' "$PROJECT_ROOT/renderers/vulkan/tr_bsp.c" 2>/dev/null; then
   fail "tr_bsp.c should parse sprite props on RE_LoadWorldMap"
 elif ! grep -q 'RF_SPRITE_YAWLOCK' "$TR_TYPES" 2>/dev/null; then
   fail "tr_types.h missing RF_SPRITE_YAWLOCK"
 elif ! grep -q 'RF_SPRITE_FLIPBOOK' "$TR_TYPES" 2>/dev/null; then
   fail "tr_types.h missing RF_SPRITE_FLIPBOOK"
-elif ! grep -q 'EF_BILLBOARD' "$PROJECT_ROOT/src/qcommon/q_shared.h" 2>/dev/null; then
+elif ! grep -q 'EF_BILLBOARD' "${PROJECT_ROOT}/engine/core/q_shared.h" 2>/dev/null; then
   fail "q_shared.h missing EF_BILLBOARD engine flag"
-elif ! grep -q 'AddEngineSpriteToScene' "$PROJECT_ROOT/src/renderers/common/tr_public.h" 2>/dev/null; then
+elif ! grep -q 'AddEngineSpriteToScene' "$PROJECT_ROOT/renderers/common/tr_public.h" 2>/dev/null; then
   fail "tr_public.h missing AddEngineSpriteToScene export"
 elif ! grep -q 'R_SpriteProps_Init' "$TR_INIT_VK" 2>/dev/null; then
   fail "tr_init.c should call R_SpriteProps_Init"
@@ -414,23 +414,23 @@ elif ! grep -q 'CL_EngineSprites_AddFromSnapshot' "$IDTECH3_CLIENT/core/cl_cgame
   fail "cl_cgame.c should call CL_EngineSprites_AddFromSnapshot before RenderScene"
 elif ! grep -q 'cl_engineSprites = Cvar_Get' "$IDTECH3_CLIENT/cl_engine_sprites.c" 2>/dev/null; then
   fail "cl_engine_sprites.c missing cl_engineSprites cvar"
-elif ! grep -q 'CS_ENGINE_SPRITE_SHADERS' "$PROJECT_ROOT/src/game/bg_public.h" 2>/dev/null; then
+elif ! grep -q 'CS_ENGINE_SPRITE_SHADERS' "$PROJECT_ROOT/runtime/game/bg_public.h" 2>/dev/null; then
   fail "bg_public.h missing CS_ENGINE_SPRITE_SHADERS"
-elif ! grep -q 'EngineSpriteMap_Parse' "$PROJECT_ROOT/src/qcommon/engine_sprite_map.c" 2>/dev/null; then
+elif ! grep -q 'EngineSpriteMap_Parse' "${PROJECT_ROOT}/engine/core/engine_sprite_map.c" 2>/dev/null; then
   fail "engine_sprite_map.c missing shared map parser"
-elif ! grep -q 'SV_EngineSprites_LoadMap' "$PROJECT_ROOT/src/server/sv_init.c" 2>/dev/null; then
+elif ! grep -q 'SV_EngineSprites_LoadMap' "$PROJECT_ROOT/runtime/server/sv_init.c" 2>/dev/null; then
   fail "sv_init.c should load map sprite shaders on CM_LoadMap"
-elif ! grep -q 'SV_EngineSprites_SpawnMapEntities' "$PROJECT_ROOT/src/server/sv_init.c" 2>/dev/null; then
+elif ! grep -q 'SV_EngineSprites_SpawnMapEntities' "$PROJECT_ROOT/runtime/server/sv_init.c" 2>/dev/null; then
   fail "sv_init.c should spawn map sprite snapshot ents after game init"
-elif ! grep -q 'CS_ENGINE_SPRITE_META' "$PROJECT_ROOT/src/game/bg_public.h" 2>/dev/null; then
+elif ! grep -q 'CS_ENGINE_SPRITE_META' "$PROJECT_ROOT/runtime/game/bg_public.h" 2>/dev/null; then
   fail "bg_public.h missing CS_ENGINE_SPRITE_META"
-elif ! grep -q 'G_ENGINE_SPRITE_SPAWN' "$PROJECT_ROOT/src/game/g_public.h" 2>/dev/null; then
+elif ! grep -q 'G_ENGINE_SPRITE_SPAWN' "$PROJECT_ROOT/runtime/game/g_public.h" 2>/dev/null; then
   fail "g_public.h missing G_ENGINE_SPRITE_SPAWN game trap"
-elif ! grep -q 'SV_EngineSprite_SpawnFromDef' "$PROJECT_ROOT/src/server/sv_engine_sprites.c" 2>/dev/null; then
+elif ! grep -q 'SV_EngineSprite_SpawnFromDef' "$PROJECT_ROOT/runtime/server/sv_engine_sprites.c" 2>/dev/null; then
   fail "sv_engine_sprites.c missing runtime spawn helper"
-elif ! grep -q 'registerTable(L, "Sprites"' "$PROJECT_ROOT/src/game/g_lua_bindings.c" 2>/dev/null; then
+elif ! grep -q 'registerTable(L, "Sprites"' "$PROJECT_ROOT/runtime/game/g_lua_bindings.c" 2>/dev/null; then
   fail "g_lua_bindings.c missing Engine.Sprites Lua table"
-elif ! grep -q 'CG_ENGINE_SPRITE_ADD_LOCAL' "$PROJECT_ROOT/src/cgame/cg_public.h" 2>/dev/null; then
+elif ! grep -q 'CG_ENGINE_SPRITE_ADD_LOCAL' "$PROJECT_ROOT/runtime/cgame/cg_public.h" 2>/dev/null; then
   fail "cg_public.h missing CG_ENGINE_SPRITE_ADD_LOCAL cgame trap"
 elif ! grep -q 'CL_EngineSprite_AddLocalAtTime' "$IDTECH3_CLIENT/cl_engine_sprites.c" 2>/dev/null; then
   fail "cl_engine_sprites.c missing AddLocalAtTime helper for cgame trap"
@@ -440,16 +440,16 @@ fi
 
 echo ""
 echo "Engine-native decals (misc_decal):"
-DC_C="$PROJECT_ROOT/src/renderers/vulkan/tr_decal_props.c"
-if ! grep -q 'misc_decal' "$PROJECT_ROOT/src/qcommon/engine_decal_map.c" 2>/dev/null; then
+DC_C="$PROJECT_ROOT/renderers/vulkan/tr_decal_props.c"
+if ! grep -q 'misc_decal' "${PROJECT_ROOT}/engine/core/engine_decal_map.c" 2>/dev/null; then
   fail "engine_decal_map.c missing misc_decal parse"
-elif ! grep -q 'EF_DECAL' "$PROJECT_ROOT/src/qcommon/q_shared.h" 2>/dev/null; then
+elif ! grep -q 'EF_DECAL' "${PROJECT_ROOT}/engine/core/q_shared.h" 2>/dev/null; then
   fail "q_shared.h missing EF_DECAL"
-elif ! grep -q 'CS_ENGINE_DECAL_SHADERS' "$PROJECT_ROOT/src/game/bg_public.h" 2>/dev/null; then
+elif ! grep -q 'CS_ENGINE_DECAL_SHADERS' "$PROJECT_ROOT/runtime/game/bg_public.h" 2>/dev/null; then
   fail "bg_public.h missing CS_ENGINE_DECAL_SHADERS"
-elif ! grep -q 'AddEngineDecalToScene' "$PROJECT_ROOT/src/renderers/common/tr_public.h" 2>/dev/null; then
+elif ! grep -q 'AddEngineDecalToScene' "$PROJECT_ROOT/renderers/common/tr_public.h" 2>/dev/null; then
   fail "tr_public.h missing AddEngineDecalToScene"
-elif ! grep -q 'registerTable(L, "Decals"' "$PROJECT_ROOT/src/game/g_lua_bindings.c" 2>/dev/null; then
+elif ! grep -q 'registerTable(L, "Decals"' "$PROJECT_ROOT/runtime/game/g_lua_bindings.c" 2>/dev/null; then
   fail "g_lua_bindings.c missing Engine.Decals Lua table"
 else
   pass "engine-native decals (CS + EF_DECAL + renderer bridge)"
@@ -457,7 +457,7 @@ fi
 
 echo ""
 echo "Network eFlags wire width (engine flags bits 20-23):"
-if ! grep -q '{ NETF(eFlags), 24 }' "$PROJECT_ROOT/src/qcommon/msg.c" 2>/dev/null; then
+if ! grep -q '{ NETF(eFlags), 24 }' "${PROJECT_ROOT}/engine/core/msg.c" 2>/dev/null; then
   fail "msg.c eFlags must be 24 bits for EF_BILLBOARD..EF_DECAL"
 else
   pass "msg.c NETF(eFlags) 24-bit (protocol 72+)"
@@ -465,9 +465,9 @@ fi
 
 echo ""
 echo "Billboard sprites (EF_BILLBOARD + RT_SPRITE renderer path):"
-Q_SHARED="$PROJECT_ROOT/src/qcommon/q_shared.h"
-TR_TYPES="$PROJECT_ROOT/src/renderers/common/tr_types.h"
-TR_SURF="$PROJECT_ROOT/src/renderers/vulkan/tr_surface.c"
+Q_SHARED="${PROJECT_ROOT}/engine/core/q_shared.h"
+TR_TYPES="$PROJECT_ROOT/renderers/common/tr_types.h"
+TR_SURF="$PROJECT_ROOT/renderers/vulkan/tr_surface.c"
 if ! grep -q 'EF_BILLBOARD' "$Q_SHARED" 2>/dev/null; then
   fail "q_shared.h missing EF_BILLBOARD"
 elif ! grep -q 'RT_SPRITE' "$TR_TYPES" 2>/dev/null; then
@@ -476,7 +476,7 @@ elif ! grep -q 'RB_SurfaceSprite' "$TR_SURF" 2>/dev/null; then
   fail "tr_surface.c missing RB_SurfaceSprite"
 elif ! grep -q 'RF_SPRITE_FLIPBOOK' "$TR_SURF" 2>/dev/null; then
   fail "tr_surface.c missing flipbook UV path in RB_SurfaceSprite"
-elif ! grep -q 'case RT_SPRITE:' "$PROJECT_ROOT/src/renderers/vulkan/tr_main.c" 2>/dev/null; then
+elif ! grep -q 'case RT_SPRITE:' "$PROJECT_ROOT/renderers/vulkan/tr_main.c" 2>/dev/null; then
   fail "tr_main.c missing RT_SPRITE draw surf path"
 else
   pass "EF_BILLBOARD + RT_SPRITE backend (engine map props + RB_SurfaceSprite)"
@@ -488,7 +488,7 @@ if ! grep -q 'layout(set = 4, binding = 0) uniform sampler2D motionTex' "$TAA_FR
   fail "taa.frag missing motionTex binding (set 4)"
 elif ! grep -q 'postfx.depthParams.z' "$TAA_FRAG" 2>/dev/null; then
   fail "taa.frag missing postfx.depthParams.z motion-vector gate"
-elif ! grep -q 'pipeline_layout_taa' "$PROJECT_ROOT/src/renderers/vulkan/vk_init_device.c" 2>/dev/null; then
+elif ! grep -q 'pipeline_layout_taa' "$PROJECT_ROOT/renderers/vulkan/vk_init_device.c" 2>/dev/null; then
   fail "vk_init_device.c missing pipeline_layout_taa"
 else
   pass "TAA motion-vector shader + pipeline_layout_taa present"
@@ -496,7 +496,7 @@ fi
 
 echo ""
 echo "RTX demo: invViewProj uses Vulkan projection + render-target extent:"
-RTX_C="$PROJECT_ROOT/src/renderers/vulkan/extensions/rtx/vk_rtx.c"
+RTX_C="$PROJECT_ROOT/renderers/vulkan/extensions/rtx/vk_rtx.c"
 if [[ ! -f "$RTX_C" ]]; then
   fail "vk_rtx.c missing"
 elif ! grep -q 'vk_get_projection_matrix_vk' "$RTX_C" 2>/dev/null; then
@@ -515,7 +515,7 @@ elif ! grep -q 'VK_BUILD_ACCELERATION_STRUCTURE_MODE_UPDATE_KHR' "$RTX_C" 2>/dev
   fail "vk_rtx.c missing TLAS UPDATE build mode"
 elif ! grep -q 'rtx_status' "$RTX_C" 2>/dev/null; then
   fail "vk_rtx.c missing rtx_status command"
-elif ! grep -q 'gl_InstanceCustomIndexEXT' "$PROJECT_ROOT/src/renderers/vulkan/shaders/glsl/rtx_demo.rchit" 2>/dev/null; then
+elif ! grep -q 'gl_InstanceCustomIndexEXT' "$PROJECT_ROOT/renderers/vulkan/shaders/glsl/rtx_demo.rchit" 2>/dev/null; then
   fail "rtx_demo.rchit missing instance-aware closest-hit"
 else
   pass "RTX world/entity BLAS + TLAS update + hybrid hit tint wired"
@@ -543,9 +543,9 @@ else
 fi
 
 echo "Hybrid Rendering 1 (Granja/Pereira): vk_hybrid1 + shaders:"
-H1_C="$PROJECT_ROOT/src/renderers/vulkan/extensions/rtx/vk_hybrid1.c"
-H1_TEMP="$PROJECT_ROOT/src/renderers/vulkan/shaders/glsl/hybrid1/hybrid1_temporal.comp"
-H1_ATR="$PROJECT_ROOT/src/renderers/vulkan/shaders/glsl/hybrid1/hybrid1_atrous.comp"
+H1_C="$PROJECT_ROOT/renderers/vulkan/extensions/rtx/vk_hybrid1.c"
+H1_TEMP="$PROJECT_ROOT/renderers/vulkan/shaders/glsl/hybrid1/hybrid1_temporal.comp"
+H1_ATR="$PROJECT_ROOT/renderers/vulkan/shaders/glsl/hybrid1/hybrid1_atrous.comp"
 if [[ ! -f "$H1_C" ]]; then
   fail "vk_hybrid1.c missing"
 elif ! grep -q 'r_hybrid1_historyClamp' "$H1_C" 2>/dev/null; then
@@ -560,7 +560,7 @@ elif ! grep -q 'r_hybrid1_motion' "$H1_C" 2>/dev/null; then
   fail "vk_hybrid1.c missing motion-vector temporal path"
 elif [[ ! -f "$H1_TEMP" || ! -f "$H1_ATR" ]]; then
   fail "hybrid1 temporal/atrous shaders missing"
-elif [[ ! -f "$PROJECT_ROOT/src/renderers/vulkan/shaders/glsl/hybrid1/hybrid1_diffuse.rgen" ]]; then
+elif [[ ! -f "$PROJECT_ROOT/renderers/vulkan/shaders/glsl/hybrid1/hybrid1_diffuse.rgen" ]]; then
   fail "hybrid1 diffuse RT shaders missing"
 else
   pass "hybrid1 SVGF shadow/spec/diffuse + IBL + separable atrous wired"
@@ -568,7 +568,7 @@ fi
 
 echo ""
 echo "Forward+ tile cull: MAX_PER_TILE vs VK_FP_MAX_PER_TILE (tile SSBO stride):"
-FP_C="$PROJECT_ROOT/src/renderers/vulkan/vk_forward_plus.c"
+FP_C="$PROJECT_ROOT/renderers/vulkan/vk_forward_plus.c"
 max_tile_sh="$(sed -n 's/^#define MAX_PER_TILE[[:space:]]*\([0-9][0-9]*\).*$/\1/p' "$FP_COMP" | head -1)"
 max_tile_c="$(sed -n 's/^#define VK_FP_MAX_PER_TILE[[:space:]]*\([0-9][0-9]*\).*$/\1/p' "$FP_C" | head -1)"
 if [[ -z "$max_tile_sh" || -z "$max_tile_c" ]]; then
@@ -591,7 +591,7 @@ else
 fi
 
 echo ""
-TR_INIT_VK="$PROJECT_ROOT/src/renderers/vulkan/tr_init.c"
+TR_INIT_VK="$PROJECT_ROOT/renderers/vulkan/tr_init.c"
 if ! grep -q 'vk_forward_plus_get_min_per_tile_cap' "$TR_INIT_VK" || ! grep -q 'vk_forward_plus_get_max_per_tile_cap' "$TR_INIT_VK"; then
   fail "vulkan/tr_init.c should use vk_forward_plus_get_*_per_tile_cap for r_forwardPlusMaxPerTile CheckRange"
 else
@@ -600,8 +600,8 @@ fi
 
 echo ""
 echo "PBR fragment spec: Forward+ shade constant_id vs vk_create_pipeline.c:"
-GEN_FRAG="$PROJECT_ROOT/src/renderers/vulkan/shaders/glsl/gen_frag.tmpl"
-VK_PIPE="$PROJECT_ROOT/src/renderers/vulkan/vk_create_pipeline.c"
+GEN_FRAG="$PROJECT_ROOT/renderers/vulkan/shaders/glsl/gen_frag.tmpl"
+VK_PIPE="$PROJECT_ROOT/renderers/vulkan/vk_create_pipeline.c"
 fp_cid="$(grep -F 'forward_plus_shade_strength' "$GEN_FRAG" | grep 'constant_id' | sed -n 's/.*constant_id[[:space:]]*=[[:space:]]*\([0-9][0-9]*\).*/\1/p' | head -1)"
 fp_add="$(grep 'forward_plus_shade_strength' "$VK_PIPE" | grep 'ADD_FRAG_SPEC' | sed -n 's/.*ADD_FRAG_SPEC([[:space:]]*\([0-9][0-9]*\)[[:space:]]*,[[:space:]]*forward_plus_shade_strength.*/\1/p' | head -1)"
 if [[ -z "$fp_cid" || -z "$fp_add" ]]; then
@@ -680,10 +680,10 @@ fi
 
 echo ""
 echo "Volumetric fog compute: VDB bindings 17-18 + params (host vs volumetric_fog.comp):"
-VF_COMP="$PROJECT_ROOT/src/renderers/vulkan/shaders/glsl/volumetric/volumetric_fog.comp"
-VF_FRAG="$PROJECT_ROOT/src/renderers/vulkan/shaders/glsl/volumetric/volumetric_fog.frag"
-VK_INIT="$PROJECT_ROOT/src/renderers/vulkan/vk_init_device.c"
-VK_VOL_P="$PROJECT_ROOT/src/renderers/vulkan/vk_volumetric_params.h"
+VF_COMP="$PROJECT_ROOT/renderers/vulkan/shaders/glsl/volumetric/volumetric_fog.comp"
+VF_FRAG="$PROJECT_ROOT/renderers/vulkan/shaders/glsl/volumetric/volumetric_fog.frag"
+VK_INIT="$PROJECT_ROOT/renderers/vulkan/vk_init_device.c"
+VK_VOL_P="$PROJECT_ROOT/renderers/vulkan/vk_volumetric_params.h"
 if [[ ! -f "$VF_COMP" ]]; then
   fail "missing volumetric_fog.comp"
 elif ! grep -q 'binding = 17' "$VF_COMP" 2>/dev/null || ! grep -q 'vdbFogDensity' "$VF_COMP" 2>/dev/null; then
@@ -696,8 +696,8 @@ elif ! grep -q 'vdbParams\[4\]' "$VK_VOL_P" 2>/dev/null || ! grep -q 'vdbWorldMi
   fail "volumetric_params_t must include vdbParams / vdbWorldMin / vdbWorldMax for r_vdbFog"
 elif [[ ! -f "$VF_FRAG" ]] || ! grep -q 'integrateVdbWoodcockFog' "$VF_FRAG" 2>/dev/null; then
   fail "volumetric_fog.frag must implement integrateVdbWoodcockFog for integration mode 3"
-elif [[ ! -f "$PROJECT_ROOT/src/renderers/vulkan/vk_nanovdb_decode.c" ]] || \
-     ! grep -q 'VDB_NanoVDB_DecodeToDense' "$PROJECT_ROOT/src/renderers/vulkan/vk_nanovdb_decode.c" 2>/dev/null; then
+elif [[ ! -f "$PROJECT_ROOT/renderers/vulkan/vk_nanovdb_decode.c" ]] || \
+     ! grep -q 'VDB_NanoVDB_DecodeToDense' "$PROJECT_ROOT/renderers/vulkan/vk_nanovdb_decode.c" 2>/dev/null; then
   fail "vk_nanovdb_decode.c must implement VDB_NanoVDB_DecodeToDense for .nvdb voxel fill"
 else
   pass "VDB volumetric fog: bindings 17-18 + Woodcock + NanoVDB decode present"
@@ -705,7 +705,7 @@ fi
 
 echo ""
 echo "VDB console workflow (vdb_load / upload / bind_fog):"
-VK_VDB_C="$PROJECT_ROOT/src/renderers/vulkan/vk_vdb.c"
+VK_VDB_C="$PROJECT_ROOT/renderers/vulkan/vk_vdb.c"
 if [[ ! -f "$VK_VDB_C" ]]; then
   fail "missing vk_vdb.c"
 elif ! grep -q 'ri\.Cmd_AddCommand( "vdb_load"' "$VK_VDB_C" || \
@@ -745,8 +745,8 @@ fi
 
 echo ""
 echo "Vulkan temporal: reset bitmask vs reason_string / log table:"
-VK_TEMP_H="$PROJECT_ROOT/src/renderers/vulkan/vk_temporal.h"
-VK_TEMP_C="$PROJECT_ROOT/src/renderers/vulkan/vk_temporal.c"
+VK_TEMP_H="$PROJECT_ROOT/renderers/vulkan/vk_temporal.h"
+VK_TEMP_C="$PROJECT_ROOT/renderers/vulkan/vk_temporal.c"
 # One line per 1u<<N reset flag in the public enum (excludes VK_TEMPORAL_RESET_NONE = 0).
 n_enum="$(grep -E '^[[:space:]]*VK_TEMPORAL_RESET_[A-Z0-9_]+[[:space:]]*=[[:space:]]*1u[[:space:]]*<<' "$VK_TEMP_H" 2>/dev/null | wc -l | tr -d ' ')"
 n_case="$(grep -E '^[[:space:]]*case VK_TEMPORAL_RESET_' "$VK_TEMP_C" 2>/dev/null | wc -l | tr -d ' ')"
@@ -763,8 +763,8 @@ fi
 
 echo ""
 echo "Vegetation wind dispatch ordering (staging must be populated before compute):"
-TR_SHADE="$PROJECT_ROOT/src/renderers/vulkan/tr_shade.c"
-VK_FRAME_SUBMIT="$PROJECT_ROOT/src/renderers/vulkan/vk_frame_submit.c"
+TR_SHADE="$PROJECT_ROOT/renderers/vulkan/tr_shade.c"
+VK_FRAME_SUBMIT="$PROJECT_ROOT/renderers/vulkan/vk_frame_submit.c"
 if awk '
   /PostFX_VegWind_IsEnabled\(\) && tess\.shader && \( tess\.shader->surfaceFlags & SURF_VEGETATION \)/ { guard=1 }
   /vk_vegetation_wind_prepare_draw\(\);/ { prepare=1 }
@@ -782,8 +782,8 @@ fi
 
 echo ""
 echo "Vulkan mesh-shader extension gating (startup safety):"
-TR_INIT_VK="$PROJECT_ROOT/src/renderers/vulkan/tr_init.c"
-VK_INSTANCE="$PROJECT_ROOT/src/renderers/vulkan/vk_instance.c"
+TR_INIT_VK="$PROJECT_ROOT/renderers/vulkan/tr_init.c"
+VK_INSTANCE="$PROJECT_ROOT/renderers/vulkan/vk_instance.c"
 if grep -Fq 'r_vk_meshShaderNV = ri.Cvar_Get( "r_vk_meshShaderNV", "0"' "$TR_INIT_VK"; then
   pass "r_vk_meshShaderNV cvar registered with default 0"
 else
@@ -817,7 +817,7 @@ fi
 
 echo ""
 echo "glTF topo: GLTF_GPU_TOPO_WORDS_PER_VERT macro (tr_gltf_topo.h vs gen_vert.tmpl formula):"
-TOPO_H="$PROJECT_ROOT/src/renderers/vulkan/tr_gltf_topo.h"
+TOPO_H="$PROJECT_ROOT/renderers/vulkan/tr_gltf_topo.h"
 if ! grep 'GLTF_GPU_TOPO_WORDS_PER_VERT' "$TOPO_H" | grep -q '1.*+.*GLTF_GPU_ADJ_TRIS_MAX'; then
   fail "tr_gltf_topo.h: GLTF_GPU_TOPO_WORDS_PER_VERT must expand to (1 + GLTF_GPU_ADJ_TRIS_MAX)"
 elif ! grep -q 'const uint GLTF_GPU_TOPO_WORDS_PER_VERT = 1u + GLTF_GPU_ADJ_TRIS_MAX' "$GEN_VERT"; then

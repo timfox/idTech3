@@ -14,7 +14,7 @@ else
   exit 1
 fi
 
-SHADER_DIR="$PROJECT_ROOT/src/renderers/vulkan/shaders"
+SHADER_DIR="$PROJECT_ROOT/renderers/vulkan/shaders"
 SPIRV_DIR="$SHADER_DIR/spirv"
 TOOLS_DIR="$SHADER_DIR/tools"
 
@@ -436,11 +436,11 @@ compile_shader("comp", "dressi/dressi_composite.comp", "dressi_composite_cs", bi
 compile_shader("comp", "dressi/dressi_inverse_uv.comp", "dressi_inverse_uv_cs", binding_expr="vk.modules.dressi_inverse_uv_cs")
 
 def write_vk_rtx_demo_spirv_inc():
-    """Emit src/renderers/vulkan/extensions/rtx/vk_rtx_demo_spirv.inc for USE_VULKAN_RTX embedded SPIR-V."""
+    """Emit renderers/vulkan/extensions/rtx/vk_rtx_demo_spirv.inc for USE_VULKAN_RTX embedded SPIR-V."""
     root = Path(os.environ.get("PROJECT_ROOT", "")).resolve()
     if not root or not root.is_dir():
         sys.exit("PROJECT_ROOT must be set for rtx demo SPIR-V embed")
-    out_path = root / "src/renderers/vulkan/extensions/rtx/vk_rtx_demo_spirv.inc"
+    out_path = root / "renderers/vulkan/extensions/rtx/vk_rtx_demo_spirv.inc"
     mapping = [
         ("rtx_demo_rgen_spv", "vk_rtx_demo_rgen_spv", "VK_RTX_DEMO_RGEN_SPV_SIZE"),
         ("rtx_demo_rmiss_spv", "vk_rtx_demo_rmiss_spv", "VK_RTX_DEMO_RMISS_SPV_SIZE"),
@@ -469,11 +469,11 @@ def write_vk_rtx_demo_spirv_inc():
 write_vk_rtx_demo_spirv_inc()
 
 def write_vk_grtx_spirv_inc():
-    """Emit src/renderers/vulkan/extensions/rtx/vk_grtx_spirv.inc for USE_VULKAN_RTX GRTX embedded SPIR-V."""
+    """Emit renderers/vulkan/extensions/rtx/vk_grtx_spirv.inc for USE_VULKAN_RTX GRTX embedded SPIR-V."""
     root = Path(os.environ.get("PROJECT_ROOT", "")).resolve()
     if not root or not root.is_dir():
         sys.exit("PROJECT_ROOT must be set for GRTX SPIR-V embed")
-    out_path = root / "src/renderers/vulkan/extensions/rtx/vk_grtx_spirv.inc"
+    out_path = root / "renderers/vulkan/extensions/rtx/vk_grtx_spirv.inc"
     mapping = [
         ("grtx_trace_rgen_spv", "vk_grtx_trace_rgen_spv", "VK_GRTX_TRACE_RGEN_SPV_SIZE"),
         ("grtx_miss_rmiss_spv", "vk_grtx_miss_rmiss_spv", "VK_GRTX_MISS_RMISS_SPV_SIZE"),
@@ -502,11 +502,11 @@ def write_vk_grtx_spirv_inc():
 write_vk_grtx_spirv_inc()
 
 def write_vk_pathtrace_spirv_inc():
-    """Emit src/renderers/vulkan/vk_pathtrace_spirv.inc for USE_VULKAN_RTX path trace experiment."""
+    """Emit renderers/vulkan/vk_pathtrace_spirv.inc for USE_VULKAN_RTX path trace experiment."""
     root = Path(os.environ.get("PROJECT_ROOT", "")).resolve()
     if not root or not root.is_dir():
         sys.exit("PROJECT_ROOT must be set for pathtrace SPIR-V embed")
-    out_path = root / "src/renderers/vulkan/vk_pathtrace_spirv.inc"
+    out_path = root / "renderers/vulkan/vk_pathtrace_spirv.inc"
     mapping = [
         ("pt_mega_rgen_spv", "vk_pt_mega_rgen_spv", "VK_PT_MEGA_RGEN_SPV_SIZE"),
         ("pt_wave_rgen_spv", "vk_pt_wave_rgen_spv", "VK_PT_WAVE_RGEN_SPV_SIZE"),
@@ -539,11 +539,11 @@ def write_vk_pathtrace_spirv_inc():
 write_vk_pathtrace_spirv_inc()
 
 def write_vk_hybrid1_spirv_inc():
-    """Emit src/renderers/vulkan/extensions/rtx/vk_hybrid1_spirv.inc for USE_VULKAN_RTX Hybrid Rendering 1."""
+    """Emit renderers/vulkan/extensions/rtx/vk_hybrid1_spirv.inc for USE_VULKAN_RTX Hybrid Rendering 1."""
     root = Path(os.environ.get("PROJECT_ROOT", "")).resolve()
     if not root or not root.is_dir():
         sys.exit("PROJECT_ROOT must be set for hybrid1 SPIR-V embed")
-    out_path = root / "src/renderers/vulkan/extensions/rtx/vk_hybrid1_spirv.inc"
+    out_path = root / "renderers/vulkan/extensions/rtx/vk_hybrid1_spirv.inc"
     mapping = [
         ("hybrid1_shadow_rgen_spv", "vk_hybrid1_shadow_rgen_spv", "VK_HYBRID1_SHADOW_RGEN_SPV_SIZE"),
         ("hybrid1_shadow_rmiss_spv", "vk_hybrid1_shadow_rmiss_spv", "VK_HYBRID1_SHADOW_RMISS_SPV_SIZE"),
@@ -581,11 +581,11 @@ def write_vk_hybrid1_spirv_inc():
 write_vk_hybrid1_spirv_inc()
 
 def write_vk_raygun_spirv_inc():
-    """Emit src/renderers/vulkan/vk_raygun_spirv.inc for Raygun RT demo (arXiv:2001.09792)."""
+    """Emit renderers/vulkan/vk_raygun_spirv.inc for Raygun RT demo (arXiv:2001.09792)."""
     root = Path(os.environ.get("PROJECT_ROOT", "")).resolve()
     if not root or not root.is_dir():
         sys.exit("PROJECT_ROOT must be set for raygun SPIR-V embed")
-    out_path = root / "src/renderers/vulkan/vk_raygun_spirv.inc"
+    out_path = root / "renderers/vulkan/vk_raygun_spirv.inc"
     mapping = [
         ("raygun_rgen_spv", "vk_raygun_rgen_spv", "VK_RAYGUN_RGEN_SPV_SIZE"),
         ("raygun_rmiss_spv", "vk_raygun_rmiss_spv", "VK_RAYGUN_RMISS_SPV_SIZE"),

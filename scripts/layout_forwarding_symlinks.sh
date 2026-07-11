@@ -47,12 +47,14 @@ link modules/external ../third_party
 link modules/renderers ../renderers
 
 echo "[layout_fwd] repo-root links (deep renderer includes)..."
-mkdir -p src
+# Note: src/* one-release shims were removed in Phase 5e (migrate_phase_5e_drop_shims.sh).
+# Do not recreate src/qcommon etc. here.
 link world modules/world
-link src/external ../third_party
 link external third_party
 link vuda extensions/research/vuda
 link qcommon engine/core
+# #include "platform/android/..." with CMAKE_SOURCE_DIR on the include path
+link platform engine/platform
 
 echo "[layout_fwd] engine/platform stale duplicates -> canonical..."
 replace_stale_platform_dir botlib ../../modules/botlib
