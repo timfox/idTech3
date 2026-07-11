@@ -32,6 +32,11 @@ static const cinExtMap_t cinExtensionMap[] = {
 	{ ".ogv",  CODEC_THEORA },
 	{ ".ogg",  CODEC_THEORA },
 	{ ".av1",  CODEC_DAV1D },
+	{ ".av2",  CODEC_DAV2D },
+	{ ".obu",  CODEC_DAV2D },
+	{ ".vvc",  CODEC_VVDEC },
+	{ ".266",  CODEC_VVDEC },
+	{ ".h266", CODEC_VVDEC },
 	{ NULL,    CODEC_NONE }
 };
 
@@ -40,6 +45,8 @@ static const char *codecNames[] = {
 	"ROQ",
 	"FFmpeg",
 	"dav1d (AV1)",
+	"dav2d (AV2)",
+	"vvdec (VVC)",
 	"libvpx (VP8/VP9)",
 	"Theora",
 };
@@ -121,6 +128,18 @@ qboolean CIN_Modern_Init(void) {
 	Com_Printf("  dav1d (AV1) codec: disabled\n");
 #endif
 
+#ifdef USE_DAV2D
+	Com_Printf("  dav2d (AV2) codec: enabled\n");
+#else
+	Com_Printf("  dav2d (AV2) codec: disabled\n");
+#endif
+
+#ifdef USE_VVDEC
+	Com_Printf("  vvdec (VVC) codec: enabled\n");
+#else
+	Com_Printf("  vvdec (VVC) codec: disabled\n");
+#endif
+
 #ifdef USE_VPX
 	Com_Printf("  libvpx (VP8/VP9) codec: enabled\n");
 #else
@@ -192,6 +211,16 @@ cinModernDecoder_t *CIN_Modern_Open(const char *filename, cinCodecType_t preferr
 #ifdef USE_DAV1D
 		case CODEC_DAV1D:
 			created = CIN_Dav1d_CreateDecoder(dec);
+			break;
+#endif
+#ifdef USE_DAV2D
+		case CODEC_DAV2D:
+			created = CIN_Dav2d_CreateDecoder(dec);
+			break;
+#endif
+#ifdef USE_VVDEC
+		case CODEC_VVDEC:
+			created = CIN_Vvdec_CreateDecoder(dec);
 			break;
 #endif
 #ifdef USE_VPX
@@ -299,6 +328,12 @@ void CIN_FFmpeg_Cmd(void) {
 #endif
 #ifdef USE_DAV1D
 		Com_Printf("  dav1d (AV1)\n");
+#endif
+#ifdef USE_DAV2D
+		Com_Printf("  dav2d (AV2 elementary streams)\n");
+#endif
+#ifdef USE_VVDEC
+		Com_Printf("  vvdec (VVC/H.266 elementary streams)\n");
 #endif
 #ifdef USE_VPX
 		Com_Printf("  libvpx (VP8, VP9)\n");

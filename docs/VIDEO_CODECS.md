@@ -12,6 +12,8 @@
 | MOV | `.mov` | Various | FFmpeg | LGPL/GPL | Optional (`USE_FFMPEG`) |
 | Ogg Theora | `.ogv` | Theora | libtheora | BSD | Optional (`USE_THEORA`) |
 | AV1 | `.av1` | AV1 | dav1d | BSD | Optional (`USE_DAV1D`) |
+| AV2 | `.av2`, `.obu` | AV2 | dav2d | BSD | Optional (`USE_DAV2D`) |
+| VVC | `.vvc`, `.266`, `.h266` | H.266 / VVC | vvdec | BSD-3-Clause-Clear | Optional (`USE_VVDEC`) |
 
 ## Architecture
 
@@ -20,6 +22,8 @@ cl_cin.c           -- Legacy ROQ decoder + modern codec dispatcher
 cl_cin_modern.c/h  -- Format detection, codec selection, fallback chain
 cl_cin_ffmpeg.c    -- FFmpeg backend
 cl_cin_dav1d.c     -- dav1d AV1 backend
+cl_cin_dav2d.c     -- dav2d AV2 backend
+cl_cin_vvdec.c     -- vvdec VVC backend
 cl_cin_vpx.c       -- libvpx VP8/VP9 backend
 cl_cin_theora.c    -- Theora backend
 ```
@@ -36,7 +40,7 @@ cl_cin_theora.c    -- Theora backend
 ## Enabling Codecs
 
 ```bash
-cmake -DUSE_FFMPEG=ON -DUSE_DAV1D=ON -DUSE_VPX=ON -DUSE_THEORA=ON ..
+cmake -DUSE_FFMPEG=ON -DUSE_DAV1D=ON -DUSE_DAV2D=ON -DUSE_VVDEC=ON -DUSE_VPX=ON -DUSE_THEORA=ON ..
 ```
 
 Each codec is detected via pkg-config. Missing libraries produce warnings, not errors.

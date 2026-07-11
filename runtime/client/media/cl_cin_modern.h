@@ -7,7 +7,8 @@ existing id Tech 3 / ioquake3 code.
 The engine framework is based on id Tech 3 (GPLv2).
 
 Modern video codec support for id Tech 3 engine.
-Provides FFmpeg, dav1d (AV1), libvpx (VP8/VP9), and Theora backends
+Provides FFmpeg, dav1d (AV1), dav2d (AV2), vvdec (VVC),
+libvpx (VP8/VP9), and Theora backends
 while maintaining full backward compatibility with ROQ.
 ===========================================================================
 */
@@ -25,6 +26,8 @@ typedef enum {
 	CODEC_ROQ,
 	CODEC_FFMPEG,
 	CODEC_DAV1D,
+	CODEC_DAV2D,
+	CODEC_VVDEC,
 	CODEC_VPX,
 	CODEC_THEORA,
 	CODEC_COUNT
@@ -88,6 +91,14 @@ qboolean CIN_FFmpeg_CreateDecoder(cinModernDecoder_t *dec);
 
 #ifdef USE_DAV1D
 qboolean CIN_Dav1d_CreateDecoder(cinModernDecoder_t *dec);
+#endif
+
+#ifdef USE_DAV2D
+qboolean CIN_Dav2d_CreateDecoder(cinModernDecoder_t *dec);
+#endif
+
+#ifdef USE_VVDEC
+qboolean CIN_Vvdec_CreateDecoder(cinModernDecoder_t *dec);
 #endif
 
 #ifdef USE_VPX
