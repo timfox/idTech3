@@ -41,12 +41,12 @@ void main()
 
 	vec3 V = normalize( h1.viewOrigin.xyz - worldPos );
 	vec3 R = reflect( -V, N );
-	if ( roughness >= 0.98 ) {
+	if ( roughness >= h1.params2.w ) {
 		imageStore( specOut, ivec2( gl_LaunchIDEXT.xy ), vec4( 0.0, 0.0, 0.0, roughness ) );
 		return;
 	}
 
-	vec3 ro = worldPos + N * 0.02;
+	vec3 ro = worldPos + N * max( h1.params2.x, 0.0 );
 	vec3 rd = R;
 	if ( roughness > 0.05 ) {
 		float r0 = fract( sin( dot( uv * h1.params0.w, vec2( 12.9898, 78.233 ) ) ) * 43758.5453 );
@@ -57,7 +57,7 @@ void main()
 
 	specRadiance = vec4( 0.0 );
 	specRadiance.w = roughness;
-	traceRayEXT( topLevelAS, gl_RayFlagsOpaqueEXT, 0xFFu, 0u, 0u, 0u, ro, 0.01, rd, 1.0e5, 0 );
+	traceRayEXT( topLevelAS, gl_RayFlagsOpaqueEXT, 0xFFu, 0u, 0u, 0u, ro, max( h1.params2.y, 1e-4 ), rd, 1.0e5, 0 );
 
 	vec3 outRgb = specRadiance.rgb;
 	float reinhardMul = max( h1.params0.z, 0.0 );

@@ -51,10 +51,10 @@ void main()
 	}
 
 	vec3 wi = hybrid1_cosineDirection( N, uv, h1.params0.w );
-	vec3 ro = worldPos + N * 0.02;
+	vec3 ro = worldPos + N * max( h1.params2.x, 0.0 );
 
 	diffuseRadiance = vec3( 0.0 );
-	traceRayEXT( topLevelAS, gl_RayFlagsOpaqueEXT, 0xFFu, 0u, 0u, 0u, ro, 0.01, wi, 1.0e5, 0 );
+	traceRayEXT( topLevelAS, gl_RayFlagsOpaqueEXT, 0xFFu, 0u, 0u, 0u, ro, max( h1.params2.y, 1e-4 ), wi, 1.0e5, 0 );
 
 	imageStore( diffuseOut, ivec2( gl_LaunchIDEXT.xy ), vec4( diffuseRadiance, 1.0 ) );
 }

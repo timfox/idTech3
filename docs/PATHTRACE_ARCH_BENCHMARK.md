@@ -29,8 +29,12 @@ vid_restart
 | `r_pathtrace_bounces` | `4` | 1–8 path depth |
 | `r_pathtrace_samples` | `1` | 1–64 (megakernel averages; wavefront primary path) |
 | `r_pathtrace_denoise` | `0` | Depth-guided 3×3 blur on trace buffer (`pt_denoise.comp`); not OIDN/ReSTIR |
+| `r_pathtrace_denoiseStrength` | `0.65` | Denoise neighbor blend strength when denoise is on |
+| `r_pathtrace_denoiseDepthTol` | `0.02` | Denoise depth edge stop |
 | `r_pathtrace_debug` | `0` | `1`=bounce heatmap, `2`=wave alive count (developer) |
 | `r_pathtrace_composite` | `1` | Blit trace target to HDR color |
+
+Console: `pathtrace_status` prints active/ready, arch, bounce/sample/denoise knobs, and composite blend.
 
 Startup logs: `[VK][PathTrace] Ready arch=...` when init succeeds.
 

@@ -24,6 +24,7 @@ layout( push_constant ) uniform Hybrid1AtrousPush {
 	uint adaptiveBlur;
 	uint separableBlur;
 	uint reinhard;
+	vec4 edge; /* x=depthTol, y=normalDot, z=adaptiveAngle, w=adaptiveRough */
 } pc;
 
 const float kKernel[5] = float[]( 1.0, 4.0, 6.0, 4.0, 1.0 );
@@ -50,12 +51,12 @@ void main()
 	if ( pc.adaptiveBlur != 0u ) {
 		if ( pc.params.z < 0.5 ) {
 			float shadowAngle = texture( rawGuideTex, uv ).g;
-			if ( shadowAngle > 6.0 && iter == 0 ) {
+			if ( shadowAngle > pc.edge.z && iter == 0 ) {
 				iter = 1;
 			}
 		} else if ( pc.params.z < 1.5 ) {
 			float roughness = texture( rawGuideTex, uv ).a;
-			if ( roughness > 0.2 && iter == 0 ) {
+			if ( roughness > pc.edge.w && iter == 0 ) {
 				iter = 1;
 			}
 		}
@@ -81,11 +82,11 @@ void main()
 		}
 		vec2 offUv = uv + vec2( off ) * texel;
 		float dN = texture( depthTex, offUv ).r;
-		if ( abs( dN - depth ) > 0.002 ) {
+		if ( abs( dN - depth ) > pc.edge.x ) {
 			continue;
 		}
 		vec3 nN = hybrid1_decodeNormal( normalTex, offUv, pc.hasGBuffer );
-		if ( dot( N, nN ) < 0.92 ) {
+		if ( dot( N, nN ) < pc.edge.y ) {
 			continue;
 		}
 		vec4 s = texture( inputTex, offUv );

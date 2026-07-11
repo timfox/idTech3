@@ -78,7 +78,39 @@ static struct {
 	VkDeviceMemory		pt_ubo_memory;
 	void			*pt_ubo_ptr;
 	qboolean		rt_image_traced;
+	qboolean		cmds_registered;
 } pathtrace;
+
+static void PATHTRACE_Status_f( void )
+{
+	ri.Printf( PRINT_ALL,
+		"[VK][PathTrace] active=%d ready=%d arch=%s %ux%u\n"
+		"  bounces=%d samples=%d denoise=%d strength=%.2f depthTol=%.3f\n"
+		"  composite=%.2f debug=%d rtx=%d fbo=%d demo=%d\n",
+		( pathtrace.ready && r_pathtrace && r_pathtrace->integer > 0 ) ? 1 : 0,
+		pathtrace.ready ? 1 : 0,
+		( r_pathtrace_arch && r_pathtrace_arch->string[0] ) ? r_pathtrace_arch->string : "megakernel",
+		pathtrace.width, pathtrace.height,
+		r_pathtrace_bounces ? r_pathtrace_bounces->integer : 4,
+		r_pathtrace_samples ? r_pathtrace_samples->integer : 1,
+		r_pathtrace_denoise ? r_pathtrace_denoise->integer : 0,
+		r_pathtrace_denoiseStrength ? r_pathtrace_denoiseStrength->value : 0.65f,
+		r_pathtrace_denoiseDepthTol ? r_pathtrace_denoiseDepthTol->value : 0.02f,
+		r_pathtrace_composite ? r_pathtrace_composite->value : 1.0f,
+		r_pathtrace_debug ? r_pathtrace_debug->integer : 0,
+		vk.rtxAvailable ? 1 : 0,
+		vk.fboActive ? 1 : 0,
+		( r_rtxDemo && r_rtxDemo->integer ) ? 1 : 0 );
+}
+
+static void PATHTRACE_RegisterCommands( void )
+{
+	if ( pathtrace.cmds_registered ) {
+		return;
+	}
+	ri.Cmd_AddCommand( "pathtrace_status", PATHTRACE_Status_f );
+	pathtrace.cmds_registered = qtrue;
+}
 
 static VkShaderModule vk_pathtrace_shader_module( const uint8_t *code, uint32_t codeSize, const char *name )
 {
@@ -392,8 +424,8 @@ static void vk_pathtrace_record_denoise( VkCommandBuffer cmd, VkImageLayout colo
 	push.extent[1] = (float)pathtrace.height;
 	push.extent[2] = 0.0f;
 	push.extent[3] = 0.0f;
-	push.strength = 0.65f;
-	push.depthTol = 0.02f;
+	push.strength = r_pathtrace_denoiseStrength ? r_pathtrace_denoiseStrength->value : 0.65f;
+	push.depthTol = r_pathtrace_denoiseDepthTol ? r_pathtrace_denoiseDepthTol->value : 0.02f;
 
 	gx = ( pathtrace.width + 7u ) / 8u;
 	gy = ( pathtrace.height + 7u ) / 8u;
@@ -557,7 +589,11 @@ void vk_pathtrace_shutdown( void )
 	vk_pathtrace_destroy_buffer( &pathtrace.queue_buffer, &pathtrace.queue_memory );
 	vk_pathtrace_destroy_buffer( &pathtrace.counter_buffer, &pathtrace.counter_memory );
 	vk_pathtrace_destroy_buffer( &pathtrace.pt_ubo, &pathtrace.pt_ubo_memory );
-	Com_Memset( &pathtrace, 0, sizeof( pathtrace ) );
+	{
+		qboolean cmds = pathtrace.cmds_registered;
+		Com_Memset( &pathtrace, 0, sizeof( pathtrace ) );
+		pathtrace.cmds_registered = cmds;
+	}
 }
 
 qboolean vk_pathtrace_active( void )
@@ -592,6 +628,8 @@ void vk_pathtrace_init( void )
 	const char *archName;
 
 	vk_pathtrace_shutdown();
+
+	PATHTRACE_RegisterCommands();
 
 	if ( !vk.rtxAvailable || !r_pathtrace || r_pathtrace->integer <= 0 ) {
 		return;
@@ -837,11 +875,13 @@ void vk_pathtrace_init( void )
 
 	pathtrace.ready = qtrue;
 	ri.Printf( PRINT_ALL,
-		"[VK][PathTrace] Ready arch=%s bounces=%d samples=%d denoise=%d composite blend=%.2f debug=%d (experimental; shares RTX TLAS)\n",
+		"[VK][PathTrace] Ready arch=%s bounces=%d samples=%d denoise=%d strength=%.2f depthTol=%.3f composite blend=%.2f debug=%d (experimental; shares RTX TLAS)\n",
 		archName,
 		r_pathtrace_bounces ? r_pathtrace_bounces->integer : 4,
 		r_pathtrace_samples ? r_pathtrace_samples->integer : 1,
 		r_pathtrace_denoise ? r_pathtrace_denoise->integer : 0,
+		r_pathtrace_denoiseStrength ? r_pathtrace_denoiseStrength->value : 0.65f,
+		r_pathtrace_denoiseDepthTol ? r_pathtrace_denoiseDepthTol->value : 0.02f,
 		r_pathtrace_composite ? r_pathtrace_composite->value : 1.0f,
 		r_pathtrace_debug ? r_pathtrace_debug->integer : 0 );
 }

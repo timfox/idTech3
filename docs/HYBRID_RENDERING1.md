@@ -65,6 +65,14 @@ r_rtxEntityTriCap 65536   // entity BLAS triangle budget (latched)
 | `r_hybrid1_separableBlur` | 1 | Horizontal + vertical passes |
 | `r_hybrid1_reinhard` | 1 | Specular Reinhard pre/post denoise |
 | `r_hybrid1_atrousIters` | 4 | Spatial filter iterations (0–4) |
+| `r_hybrid1_phiColor` | 0.35 | A-trous luminance/color edge weight |
+| `r_hybrid1_rayBias` | 0.02 | Normal offset for RT origins |
+| `r_hybrid1_tMin` | 0.01 | Ray tMin for shadow/spec/diffuse |
+| `r_hybrid1_depthTol` | 0.002 | A-trous depth edge stop |
+| `r_hybrid1_normalDot` | 0.92 | A-trous minimum normal similarity |
+| `r_hybrid1_adaptiveAngle` | 6 | Adaptive blur: shadow angle threshold (deg) |
+| `r_hybrid1_adaptiveRough` | 0.2 | Adaptive blur: roughness threshold |
+| `r_hybrid1_specRoughMax` | 0.98 | Skip specular RT at/above this roughness |
 | `r_hybrid1_shadowStrength` | 0.85 | Composite shadow weight |
 | `r_hybrid1_specStrength` | 1.0 | Composite specular weight |
 | `r_hybrid1_diffuseStrength` | 1.0 | Composite diffuse × albedo weight |

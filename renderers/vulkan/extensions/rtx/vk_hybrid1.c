@@ -35,6 +35,7 @@ typedef struct {
 	float outputSize[4];
 	float params0[4];
 	float params1[4];
+	float params2[4];
 } VkHybrid1FrameUBO_t;
 
 typedef struct {
@@ -127,6 +128,8 @@ static void HYBRID1_Status_f( void )
 		"[VK][Hybrid1] active=%d ready=%d rtx=%d fbo=%d demo=%d %ux%u frame=%u\n"
 		"  channels shadow=%d spec=%d diffuse=%d ibl=%d motion=%d taa=%d debug=%d\n"
 		"  denoise clamp=%d gamma=%.2f alpha=%.2f atrous=%d separable=%d adaptive=%d reinhard=%d\n"
+		"  phiColor=%.2f depthTol=%.4f normalDot=%.2f adaptAngle=%.1f adaptRough=%.2f\n"
+		"  rayBias=%.3f tMin=%.3f specRoughMax=%.2f\n"
 		"  composite shadowStr=%.2f specStr=%.2f diffuseStr=%.2f deferredGBuffer=%d\n",
 		vk_hybrid1_active() ? 1 : 0,
 		hybrid1.ready ? 1 : 0,
@@ -149,6 +152,14 @@ static void HYBRID1_Status_f( void )
 		r_hybrid1_separableBlur ? r_hybrid1_separableBlur->integer : 1,
 		r_hybrid1_adaptiveBlur ? r_hybrid1_adaptiveBlur->integer : 1,
 		r_hybrid1_reinhard ? r_hybrid1_reinhard->integer : 1,
+		r_hybrid1_phiColor ? r_hybrid1_phiColor->value : 0.35f,
+		r_hybrid1_depthTol ? r_hybrid1_depthTol->value : 0.002f,
+		r_hybrid1_normalDot ? r_hybrid1_normalDot->value : 0.92f,
+		r_hybrid1_adaptiveAngle ? r_hybrid1_adaptiveAngle->value : 6.0f,
+		r_hybrid1_adaptiveRough ? r_hybrid1_adaptiveRough->value : 0.2f,
+		r_hybrid1_rayBias ? r_hybrid1_rayBias->value : 0.02f,
+		r_hybrid1_tMin ? r_hybrid1_tMin->value : 0.01f,
+		r_hybrid1_specRoughMax ? r_hybrid1_specRoughMax->value : 0.98f,
 		r_hybrid1_shadowStrength ? r_hybrid1_shadowStrength->value : 0.85f,
 		r_hybrid1_specStrength ? r_hybrid1_specStrength->value : 1.0f,
 		r_hybrid1_diffuseStrength ? r_hybrid1_diffuseStrength->value : 1.0f,
@@ -189,6 +200,14 @@ static qboolean HYBRID1_ConsumeCvarResets( void )
 		r_hybrid1_separableBlur,
 		r_hybrid1_reinhard,
 		r_hybrid1_atrousIters,
+		r_hybrid1_phiColor,
+		r_hybrid1_depthTol,
+		r_hybrid1_normalDot,
+		r_hybrid1_adaptiveAngle,
+		r_hybrid1_adaptiveRough,
+		r_hybrid1_rayBias,
+		r_hybrid1_tMin,
+		r_hybrid1_specRoughMax,
 		r_hybrid1_ibl,
 		r_hybrid1_motion,
 		NULL
@@ -793,6 +812,10 @@ static void HYBRID1_FillFrameUbo( VkHybrid1FrameUBO_t *ubo )
 	ubo->params1[1] = r_hybrid1_specStrength ? r_hybrid1_specStrength->value : 1.0f;
 	ubo->params1[2] = vk_deferred_gbuffer_fill_wanted() ? 1.0f : 0.0f;
 	ubo->params1[3] = ( r_hybrid1_ibl && r_hybrid1_ibl->integer ) ? 1.0f : 0.0f;
+	ubo->params2[0] = r_hybrid1_rayBias ? r_hybrid1_rayBias->value : 0.02f;
+	ubo->params2[1] = r_hybrid1_tMin ? r_hybrid1_tMin->value : 0.01f;
+	ubo->params2[2] = 0.0f;
+	ubo->params2[3] = r_hybrid1_specRoughMax ? r_hybrid1_specRoughMax->value : 0.98f;
 }
 
 qboolean vk_hybrid1_active( void )
@@ -1210,7 +1233,7 @@ void vk_hybrid1_init( void )
 	dslci.bindingCount = 7;
 	dslci.pBindings = atrousBindings;
 	VK_CHECK( qvkCreateDescriptorSetLayout( vk.device, &dslci, NULL, &hybrid1.atrous_dsl ) );
-	pcRange.size = 48;
+	pcRange.size = 64;
 	plci.pSetLayouts = &hybrid1.atrous_dsl;
 	VK_CHECK( qvkCreatePipelineLayout( vk.device, &plci, NULL, &hybrid1.atrous_pl ) );
 	dpci.maxSets = 3;
@@ -1411,6 +1434,7 @@ static hybrid1_image_t *HYBRID1_RecordAtrous( VkCommandBuffer cmd, VkDescriptorS
 		uint32_t adaptiveBlur;
 		uint32_t separableBlur;
 		uint32_t reinhard;
+		float edge[4];
 	} push;
 	VkSampler nearest = HYBRID1_NearestSampler();
 	VkDescriptorImageInfo infos[7];
@@ -1478,13 +1502,17 @@ static hybrid1_image_t *HYBRID1_RecordAtrous( VkCommandBuffer cmd, VkDescriptorS
 			push.extent[0] = (float)hybrid1.width;
 			push.extent[1] = (float)hybrid1.height;
 			push.params[0] = (float)iter;
-			push.params[1] = 0.35f;
+			push.params[1] = r_hybrid1_phiColor ? r_hybrid1_phiColor->value : 0.35f;
 			push.params[2] = channel;
 			push.params[3] = ( r_hybrid1_separableBlur && r_hybrid1_separableBlur->integer ) ? (float)axis : 0.0f;
 			push.hasGBuffer = vk_deferred_gbuffer_fill_wanted() ? 1u : 0u;
 			push.adaptiveBlur = ( r_hybrid1_adaptiveBlur && r_hybrid1_adaptiveBlur->integer ) ? 1u : 0u;
 			push.separableBlur = ( r_hybrid1_separableBlur && r_hybrid1_separableBlur->integer ) ? 1u : 0u;
 			push.reinhard = ( channel < 1.5f && r_hybrid1_reinhard && r_hybrid1_reinhard->integer ) ? 1u : 0u;
+			push.edge[0] = r_hybrid1_depthTol ? r_hybrid1_depthTol->value : 0.002f;
+			push.edge[1] = r_hybrid1_normalDot ? r_hybrid1_normalDot->value : 0.92f;
+			push.edge[2] = r_hybrid1_adaptiveAngle ? r_hybrid1_adaptiveAngle->value : 6.0f;
+			push.edge[3] = r_hybrid1_adaptiveRough ? r_hybrid1_adaptiveRough->value : 0.2f;
 
 			qvkCmdBindPipeline( cmd, VK_PIPELINE_BIND_POINT_COMPUTE, hybrid1.atrous_pipeline );
 			qvkCmdBindDescriptorSets( cmd, VK_PIPELINE_BIND_POINT_COMPUTE, hybrid1.atrous_pl, 0, 1, &set, 0, NULL );
