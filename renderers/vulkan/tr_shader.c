@@ -2103,7 +2103,7 @@ static qboolean ParseStage( shaderStage_t *stage, const char **text )
 			if ( stage->normalMapType == PHYS_NORMALHEIGHT ) {
 				stage->materialHeightMask |= 1u;
 			}
-			for ( li = 0; li < 3; li++ ) {
+			for ( li = 0; li < 7; li++ ) {
 				if ( stage->layerAlbedo[li] || stage->layerNormal[li] || stage->layerPhysical[li] ) {
 					if ( stage->materialLayerCount < li + 2 ) {
 						stage->materialLayerCount = li + 2;
@@ -2126,12 +2126,15 @@ static qboolean ParseStage( shaderStage_t *stage, const char **text )
 				}
 			}
 			stage->bundle[0].rgbGen = CGEN_EXACT_VERTEX;
+			if ( stage->materialLayerCount > 4 ) {
+				stage->bundle[1].rgbGen = CGEN_EXACT_VERTEX;
+			}
 			/* Remapped descriptor slots reuse advanced-lobe / detail bindings. */
 			stage->vk_pbr_flags &= ~( PBR_HAS_EMISSIVE | PBR_HAS_CLEARCOAT | PBR_HAS_SHEEN |
 				PBR_HAS_ANISOTROPY | PBR_HAS_TRANSMISSION | PBR_HAS_SUBSURFACE | PBR_HAS_DETAILMAP );
 			stage->vk_pbr_flags |= PBR_HAS_MATERIAL_BLEND;
 			if ( stage->materialLayerCount < 2 ) {
-				ri.Printf( PRINT_WARNING, "WARNING: materialBlend on '%s' has no layerMap 1..3; treating as single-layer\n",
+				ri.Printf( PRINT_WARNING, "WARNING: materialBlend on '%s' has no layerMap 1..7; treating as single-layer\n",
 					shader.name );
 			}
 		}
@@ -3382,7 +3385,7 @@ static int CollapseMultitexture( unsigned int st0bits, shaderStage_t *st0, shade
 		st0->blendSharpness = st1->blendSharpness;
 		st0->materialLayerCount = st1->materialLayerCount;
 		st0->materialHeightMask = st1->materialHeightMask;
-		for ( li = 0; li < 3; li++ ) {
+		for ( li = 0; li < 7; li++ ) {
 			st0->layerAlbedo[li] = st1->layerAlbedo[li];
 			st0->layerNormal[li] = st1->layerNormal[li];
 			st0->layerPhysical[li] = st1->layerPhysical[li];
@@ -4694,15 +4697,18 @@ static shader_t *FinishShader( void ) {
 					pStage->materialLayerCount >= 2 &&
 					( !r_materialBlend || r_materialBlend->integer ) ) {
 					int layers = pStage->materialLayerCount;
-					if ( layers > 4 ) {
-						layers = 4;
+					if ( layers > 8 ) {
+						layers = 8;
 					}
 					def.material_blend_layers = (uint8_t)layers;
-					def.material_height_mask = (uint8_t)( pStage->materialHeightMask & 0xFu );
+					def.material_height_mask = (uint8_t)( pStage->materialHeightMask & 0xFFu );
 					def.material_blend_sharpness = pStage->blendSharpness > 0.0f ? pStage->blendSharpness : 8.0f;
 					/* Remapped slots: do not enable advanced-lobe / detail specializations. */
 					def.vk_pbr_flags &= ~( PBR_HAS_EMISSIVE | PBR_HAS_CLEARCOAT | PBR_HAS_SHEEN |
 						PBR_HAS_ANISOTROPY | PBR_HAS_TRANSMISSION | PBR_HAS_SUBSURFACE | PBR_HAS_DETAILMAP );
+					if ( layers > 4 ) {
+						pStage->tessFlags |= TESS_RGBA1;
+					}
 				} else {
 					def.vk_pbr_flags &= ~PBR_HAS_MATERIAL_BLEND;
 				}

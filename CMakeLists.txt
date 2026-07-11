@@ -3279,6 +3279,18 @@ set_tests_properties(test_material_paint PROPERTIES
 	LABELS "scripts;validation;renderer;pbr"
 	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_material_paint.sh;${CMAKE_SOURCE_DIR}/renderers/vulkan/tr_material_paint.c;${CMAKE_SOURCE_DIR}/docs/MATERIAL_BLEND.md")
 
+add_test(NAME test_cbt_terrain
+	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_cbt_terrain.sh)
+set_tests_properties(test_cbt_terrain PROPERTIES
+	LABELS "scripts;validation;renderer"
+	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_cbt_terrain.sh;${CMAKE_SOURCE_DIR}/renderers/vulkan/vk_terrain.c;${CMAKE_SOURCE_DIR}/docs/CBT_TERRAIN.md")
+
+add_test(NAME test_md3_paint
+	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_md3_paint.sh)
+set_tests_properties(test_md3_paint PROPERTIES
+	LABELS "scripts;validation;renderer;pbr"
+	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_md3_paint.sh;${CMAKE_SOURCE_DIR}/renderers/vulkan/tr_material_paint.c;${CMAKE_SOURCE_DIR}/docs/MATERIAL_BLEND.md")
+
 add_test(NAME test_p2p_networking
 	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_p2p_networking.sh)
 set_tests_properties(test_p2p_networking PROPERTIES

@@ -6,6 +6,7 @@ Material-blend vertex weight paint: .paint sidecar + brush.
 ===========================================================================
 */
 
+#include "tr_local.h"
 #include "tr_material_paint.h"
 
 cvar_t *r_materialPaint;
@@ -196,6 +197,65 @@ int R_MaterialPaint_NumVerts( void ) {
 
 qboolean R_MaterialPaint_HasStream2( void ) {
 	return ( s_paintFlags & MATERIAL_PAINT_FLAG_STREAM2 ) ? qtrue : qfalse;
+}
+
+qboolean R_MaterialPaint_GetStream2( uint32_t surfIndex, uint32_t vertIndex, byte rgba2[4] ) {
+	int i;
+	if ( !rgba2 ) {
+		return qfalse;
+	}
+	rgba2[0] = rgba2[1] = rgba2[2] = rgba2[3] = 0;
+	for ( i = 0; i < s_paintNumVerts; i++ ) {
+		if ( s_paintVerts[i].surfIndex == surfIndex && s_paintVerts[i].vertIndex == vertIndex ) {
+			rgba2[0] = s_paintVerts[i].rgba2[0];
+			rgba2[1] = s_paintVerts[i].rgba2[1];
+			rgba2[2] = s_paintVerts[i].rgba2[2];
+			rgba2[3] = s_paintVerts[i].rgba2[3];
+			return qtrue;
+		}
+	}
+	return qfalse;
+}
+
+void R_MaterialPaint_FillStream2ForSurface( int surfIndex, int firstVert, int numVerts ) {
+	int v;
+	if ( surfIndex < 0 || numVerts <= 0 || !( s_paintFlags & MATERIAL_PAINT_FLAG_STREAM2 ) ) {
+		return;
+	}
+	for ( v = 0; v < numVerts; v++ ) {
+		byte rgba2[4];
+		if ( R_MaterialPaint_GetStream2( (uint32_t)surfIndex, (uint32_t)v, rgba2 ) ) {
+			tess.vertexColors1[firstVert + v].rgba[0] = rgba2[0];
+			tess.vertexColors1[firstVert + v].rgba[1] = rgba2[1];
+			tess.vertexColors1[firstVert + v].rgba[2] = rgba2[2];
+			tess.vertexColors1[firstVert + v].rgba[3] = rgba2[3];
+		} else {
+			tess.vertexColors1[firstVert + v].rgba[0] = 0;
+			tess.vertexColors1[firstVert + v].rgba[1] = 0;
+			tess.vertexColors1[firstVert + v].rgba[2] = 0;
+			tess.vertexColors1[firstVert + v].rgba[3] = 0;
+		}
+	}
+}
+
+static int MP_SurfIndexFromData( const void *data ) {
+	int i;
+	if ( !tr.world || !data ) {
+		return -1;
+	}
+	for ( i = 0; i < tr.world->numsurfaces; i++ ) {
+		if ( tr.world->surfaces[i].data == data ) {
+			return i;
+		}
+	}
+	return -1;
+}
+
+void R_MaterialPaint_FillStream2FromSurfaceData( const void *surfData, int firstVert, int numVerts ) {
+	int idx = MP_SurfIndexFromData( surfData );
+	if ( idx >= 0 ) {
+		R_MaterialPaint_FillStream2ForSurface( idx, firstVert, numVerts );
+	}
 }
 
 void R_MaterialPaint_InvalidateWorldVBO( void ) {
