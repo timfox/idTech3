@@ -12,6 +12,22 @@ layout( set = 0, binding = 3 ) uniform sampler2D depthTex;
 layout( set = 0, binding = 4 ) uniform sampler2D normalTex;
 layout( set = 0, binding = 5 ) uniform sampler2D materialTex;
 
+vec3 hybrid1_softSunDir( vec3 L, vec2 uv, float frameSeed, float radiusDeg )
+{
+	if ( radiusDeg <= 1e-4 ) {
+		return L;
+	}
+	float r0 = fract( sin( dot( uv * frameSeed, vec2( 12.9898, 78.233 ) ) ) * 43758.5453 );
+	float r1 = fract( sin( dot( uv * ( frameSeed + 19.0 ), vec2( 39.346, 11.135 ) ) ) * 22578.1459 );
+	vec3 up = abs( L.z ) < 0.999 ? vec3( 0.0, 0.0, 1.0 ) : vec3( 1.0, 0.0, 0.0 );
+	vec3 T = normalize( cross( up, L ) );
+	vec3 B = cross( L, T );
+	float ang = radians( radiusDeg );
+	float r = sqrt( r0 ) * tan( ang );
+	float phi = 6.2831853 * r1;
+	return normalize( L + T * ( cos( phi ) * r ) + B * ( sin( phi ) * r ) );
+}
+
 void main()
 {
 	vec2 extent = max( h1.outputSize.xy, vec2( 1.0 ) );
@@ -39,12 +55,28 @@ void main()
 
 	vec3 L = normalize( h1.sunDirection.xyz );
 	float shadowAngle = degrees( acos( clamp( dot( N, L ), -1.0, 1.0 ) ) );
+	float radiusDeg = max( h1.sunDirection.w, 0.0 );
+	if ( h1.params2.z > 0.5 && radiusDeg > 0.0 ) {
+		/* Contact harden: shrink penumbra when nearly facing the sun */
+		float ndl = clamp( dot( N, L ), 0.0, 1.0 );
+		radiusDeg *= mix( 1.0, 0.25, ndl );
+	}
+	vec3 rd = hybrid1_softSunDir( L, uv, h1.params0.w, radiusDeg );
 
 	vec3 ro = worldPos + N * max( h1.params2.x, 0.0 );
-	vec3 rd = L;
 
+	float sunVis = 1.0;
 	shadowVis = 1.0;
 	traceRayEXT( topLevelAS, gl_RayFlagsOpaqueEXT, 0xFFu, 0u, 0u, 0u, ro, max( h1.params2.y, 1e-4 ), rd, 1.0e5, 0 );
+	sunVis = shadowVis;
 
-	imageStore( shadowOut, ivec2( gl_LaunchIDEXT.xy ), vec4( shadowVis, shadowAngle, 0.0, 1.0 ) );
+	float outVis = sunVis;
+	if ( h1.outputSize.w > 0.5 && h1.dlightDir.w > 0.01 ) {
+		vec3 dRd = normalize( h1.dlightDir.xyz - worldPos );
+		shadowVis = 1.0;
+		traceRayEXT( topLevelAS, gl_RayFlagsOpaqueEXT, 0xFFu, 0u, 0u, 0u, ro, max( h1.params2.y, 1e-4 ), dRd, 1.0e5, 0 );
+		outVis = min( sunVis, mix( 1.0, shadowVis, clamp( h1.dlightDir.w, 0.0, 1.0 ) ) );
+	}
+
+	imageStore( shadowOut, ivec2( gl_LaunchIDEXT.xy ), vec4( outVis, shadowAngle, radiusDeg, 1.0 ) );
 }

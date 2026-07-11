@@ -2899,6 +2899,27 @@ set_tests_properties(test_hybrid1 PROPERTIES
 	LABELS "scripts;validation;renderer;rtx"
 	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_hybrid1.sh;${CMAKE_SOURCE_DIR}/renderers/vulkan/extensions/rtx/vk_hybrid1.c")
 
+add_test(NAME test_upscale
+	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_upscale.sh
+	WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+set_tests_properties(test_upscale PROPERTIES
+	LABELS "scripts;validation;renderer"
+	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_upscale.sh;${CMAKE_SOURCE_DIR}/renderers/vulkan/vk_upscale.c")
+
+add_test(NAME test_vt
+	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_vt.sh
+	WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+set_tests_properties(test_vt PROPERTIES
+	LABELS "scripts;validation;renderer"
+	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_vt.sh;${CMAKE_SOURCE_DIR}/renderers/vulkan/vk_vt.c")
+
+add_test(NAME test_meshlets
+	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_meshlets.sh
+	WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+set_tests_properties(test_meshlets PROPERTIES
+	LABELS "scripts;validation;renderer"
+	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_meshlets.sh;${CMAKE_SOURCE_DIR}/renderers/vulkan/vk_meshlets.c")
+
 add_test(NAME test_dressi
 	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_dressi.sh
 	WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})

@@ -22,6 +22,63 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 // tr_mesh.c: triangle model functions
 
 #include "tr_local.h"
+#include "vk_meshlets.h"
+
+/*
+=============
+R_CullMD3SurfaceMeshlets
+
+When r_meshlets 1, bake meshlets from MD3 surface triangles and frustum-cull.
+Returns qtrue if the surface should be drawn. Caps size to avoid huge stacks.
+=============
+*/
+#define MESHLET_MD3_MAX_VERTS 512
+#define MESHLET_MD3_MAX_TRIS  1024
+
+static qboolean R_CullMD3SurfaceMeshlets( md3Surface_t *surface, int frame, const float entityAxis[3][3], const vec3_t entityOrigin )
+{
+	md3XyzNormal_t *xyz;
+	md3Triangle_t *tri;
+	vec3_t positions[MESHLET_MD3_MAX_VERTS];
+	int indexes[MESHLET_MD3_MAX_TRIS * 3];
+	meshlet_t meshlets[MESHLET_MAX_PER_SURFACE];
+	int visible[MESHLET_MAX_PER_SURFACE];
+	int numVerts, i, mcount, vcount;
+
+	if ( !R_Meshlets_Active() || !surface || surface->numVerts <= 0 || surface->numTriangles <= 0 ) {
+		return qtrue;
+	}
+	if ( surface->numVerts > MESHLET_MD3_MAX_VERTS || surface->numTriangles > MESHLET_MD3_MAX_TRIS ) {
+		return qtrue;
+	}
+
+	xyz = (md3XyzNormal_t *)( (byte *)surface + surface->ofsXyzNormals ) + frame * surface->numVerts;
+	tri = (md3Triangle_t *)( (byte *)surface + surface->ofsTriangles );
+	numVerts = surface->numVerts;
+
+	for ( i = 0; i < numVerts; i++ ) {
+		vec3_t local, world;
+		local[0] = xyz[i].xyz[0] * MD3_XYZ_SCALE;
+		local[1] = xyz[i].xyz[1] * MD3_XYZ_SCALE;
+		local[2] = xyz[i].xyz[2] * MD3_XYZ_SCALE;
+		VectorRotate( local, (const vec3_t *)entityAxis, world );
+		VectorAdd( world, entityOrigin, positions[i] );
+	}
+	for ( i = 0; i < surface->numTriangles; i++ ) {
+		indexes[i * 3 + 0] = LittleLong( tri[i].indexes[0] );
+		indexes[i * 3 + 1] = LittleLong( tri[i].indexes[1] );
+		indexes[i * 3 + 2] = LittleLong( tri[i].indexes[2] );
+	}
+
+	mcount = R_Meshlets_Bake( (const vec3_t *)positions, numVerts, indexes, surface->numTriangles * 3,
+		meshlets, MESHLET_MAX_PER_SURFACE );
+	if ( mcount <= 0 ) {
+		return qtrue;
+	}
+
+	vcount = R_Meshlets_CullViewFrustum( meshlets, mcount, visible, MESHLET_MAX_PER_SURFACE );
+	return ( vcount > 0 ) ? qtrue : qfalse;
+}
 
 static float ProjectRadius( float r, vec3_t location )
 {
@@ -422,8 +479,10 @@ void R_AddMD3Surfaces( trRefEntity_t *ent ) {
 
 		// don't add third_person objects if not viewing through a portal
 		if ( !personalModel ) {
-			R_AddDrawSurf( (void *)surface, shader, fogNum, 0 );
-			tr.needScreenMap |= shader->hasScreenMap;
+			if ( R_CullMD3SurfaceMeshlets( surface, ent->e.frame, ent->e.axis, ent->e.origin ) ) {
+				R_AddDrawSurf( (void *)surface, shader, fogNum, 0 );
+				tr.needScreenMap |= shader->hasScreenMap;
+			}
 		}
 
 		if ( numDlights && shader->lightingStage >= 0 ) {

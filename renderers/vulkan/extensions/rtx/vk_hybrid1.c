@@ -36,6 +36,8 @@ typedef struct {
 	float params0[4];
 	float params1[4];
 	float params2[4];
+	float params3[4];
+	float dlightDir[4];
 } VkHybrid1FrameUBO_t;
 
 typedef struct {
@@ -129,7 +131,8 @@ static void HYBRID1_Status_f( void )
 		"  channels shadow=%d spec=%d diffuse=%d ibl=%d motion=%d taa=%d debug=%d\n"
 		"  denoise clamp=%d gamma=%.2f alpha=%.2f atrous=%d separable=%d adaptive=%d reinhard=%d\n"
 		"  phiColor=%.2f depthTol=%.4f normalDot=%.2f adaptAngle=%.1f adaptRough=%.2f\n"
-		"  rayBias=%.3f tMin=%.3f specRoughMax=%.2f\n"
+		"  rayBias=%.3f tMin=%.3f specRoughMax=%.2f sunRadius=%.2f contact=%d\n"
+		"  ggx=%d iblMode=%d diffuseDirect=%d dlightShadows=%d\n"
 		"  composite shadowStr=%.2f specStr=%.2f diffuseStr=%.2f deferredGBuffer=%d\n",
 		vk_hybrid1_active() ? 1 : 0,
 		hybrid1.ready ? 1 : 0,
@@ -160,6 +163,12 @@ static void HYBRID1_Status_f( void )
 		r_hybrid1_rayBias ? r_hybrid1_rayBias->value : 0.02f,
 		r_hybrid1_tMin ? r_hybrid1_tMin->value : 0.01f,
 		r_hybrid1_specRoughMax ? r_hybrid1_specRoughMax->value : 0.98f,
+		r_hybrid1_sunRadius ? r_hybrid1_sunRadius->value : 0.0f,
+		( r_hybrid1_contactHarden && r_hybrid1_contactHarden->integer ) ? 1 : 0,
+		( r_hybrid1_ggx && r_hybrid1_ggx->integer ) ? 1 : 0,
+		r_hybrid1_iblMode ? r_hybrid1_iblMode->integer : 1,
+		( r_hybrid1_diffuseDirect && r_hybrid1_diffuseDirect->integer ) ? 1 : 0,
+		r_hybrid1_dlightShadows ? r_hybrid1_dlightShadows->integer : 0,
 		r_hybrid1_shadowStrength ? r_hybrid1_shadowStrength->value : 0.85f,
 		r_hybrid1_specStrength ? r_hybrid1_specStrength->value : 1.0f,
 		r_hybrid1_diffuseStrength ? r_hybrid1_diffuseStrength->value : 1.0f,
@@ -208,6 +217,12 @@ static qboolean HYBRID1_ConsumeCvarResets( void )
 		r_hybrid1_rayBias,
 		r_hybrid1_tMin,
 		r_hybrid1_specRoughMax,
+		r_hybrid1_sunRadius,
+		r_hybrid1_contactHarden,
+		r_hybrid1_ggx,
+		r_hybrid1_iblMode,
+		r_hybrid1_diffuseDirect,
+		r_hybrid1_dlightShadows,
 		r_hybrid1_ibl,
 		r_hybrid1_motion,
 		NULL
@@ -799,11 +814,14 @@ static void HYBRID1_FillFrameUbo( VkHybrid1FrameUBO_t *ubo )
 	ubo->sunDirection[0] = tr.sunDirection[0];
 	ubo->sunDirection[1] = tr.sunDirection[1];
 	ubo->sunDirection[2] = tr.sunDirection[2];
-	ubo->sunDirection[3] = 0.0f;
+	ubo->sunDirection[3] = r_hybrid1_sunRadius ? r_hybrid1_sunRadius->value : 0.0f;
 	ubo->outputSize[0] = (float)hybrid1.width;
 	ubo->outputSize[1] = (float)hybrid1.height;
-	ubo->outputSize[2] = 0.0f;
-	ubo->outputSize[3] = 0.0f;
+	ubo->outputSize[2] = ( tr.sunLight[0] + tr.sunLight[1] + tr.sunLight[2] ) * ( 1.0f / 3.0f );
+	if ( ubo->outputSize[2] < 0.01f ) {
+		ubo->outputSize[2] = 1.0f;
+	}
+	ubo->outputSize[3] = r_hybrid1_dlightShadows ? (float)r_hybrid1_dlightShadows->integer : 0.0f;
 	ubo->params0[0] = r_hybrid1_historyGamma ? r_hybrid1_historyGamma->value : 1.25f;
 	ubo->params0[1] = r_hybrid1_temporalAlpha ? r_hybrid1_temporalAlpha->value : 0.1f;
 	ubo->params0[2] = ( r_hybrid1_reinhard && r_hybrid1_reinhard->integer ) ? 1.0f : 0.0f;
@@ -814,8 +832,22 @@ static void HYBRID1_FillFrameUbo( VkHybrid1FrameUBO_t *ubo )
 	ubo->params1[3] = ( r_hybrid1_ibl && r_hybrid1_ibl->integer ) ? 1.0f : 0.0f;
 	ubo->params2[0] = r_hybrid1_rayBias ? r_hybrid1_rayBias->value : 0.02f;
 	ubo->params2[1] = r_hybrid1_tMin ? r_hybrid1_tMin->value : 0.01f;
-	ubo->params2[2] = 0.0f;
+	ubo->params2[2] = ( r_hybrid1_contactHarden && r_hybrid1_contactHarden->integer ) ? 1.0f : 0.0f;
 	ubo->params2[3] = r_hybrid1_specRoughMax ? r_hybrid1_specRoughMax->value : 0.98f;
+	ubo->params3[0] = ( r_hybrid1_ggx && r_hybrid1_ggx->integer ) ? 1.0f : 0.0f;
+	ubo->params3[1] = r_hybrid1_iblMode ? (float)r_hybrid1_iblMode->integer : 1.0f;
+	ubo->params3[2] = ( r_hybrid1_diffuseDirect && r_hybrid1_diffuseDirect->integer ) ? 1.0f : 0.0f;
+	ubo->params3[3] = 0.0f;
+	ubo->dlightDir[0] = ubo->dlightDir[1] = ubo->dlightDir[2] = 0.0f;
+	ubo->dlightDir[3] = 0.0f;
+	if ( r_hybrid1_dlightShadows && r_hybrid1_dlightShadows->integer > 0 &&
+		backEnd.refdef.num_dlights > 0 ) {
+		const dlight_t *dl = &backEnd.refdef.dlights[0];
+		ubo->dlightDir[0] = dl->origin[0];
+		ubo->dlightDir[1] = dl->origin[1];
+		ubo->dlightDir[2] = dl->origin[2];
+		ubo->dlightDir[3] = 0.65f;
+	}
 }
 
 qboolean vk_hybrid1_active( void )

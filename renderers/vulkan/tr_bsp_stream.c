@@ -56,6 +56,7 @@ static cvar_t *r_bspStreamResident;
 static cvar_t *r_bspStreamBake;
 static cvar_t *r_bspStreamVbo;
 static cvar_t *r_bspStreamLightmaps;
+static cvar_t *r_bspStreamLod;
 
 static const uint32_t BSP_STREAM_HASH_MUL_X = 73856093u;
 static const uint32_t BSP_STREAM_HASH_MUL_Y = 19349663u;
@@ -808,6 +809,29 @@ static int R_BspStream_LoadSurfaceLumps( bspStreamPatch_t *patch, dheader_t *hea
 			loaded++;
 		}
 	}
+
+	/* Distance LOD: far sectors keep fewer faces (id Tech 8-style stream fidelity). */
+	if ( r_bspStreamLod && r_bspStreamLod->integer > 0 && patch->numFaces > 1 ) {
+		vec3_t center;
+		float dist;
+		float sectorSize = patch->sectorSize > 1.0f ? patch->sectorSize : 4096.0f;
+		float nearDist = sectorSize * 1.5f;
+		float farDist = sectorSize * 3.5f;
+
+		center[0] = 0.5f * ( patch->bounds[0][0] + patch->bounds[1][0] );
+		center[1] = 0.5f * ( patch->bounds[0][1] + patch->bounds[1][1] );
+		center[2] = 0.5f * ( patch->bounds[0][2] + patch->bounds[1][2] );
+		dist = Distance( tr.refdef.vieworg, center );
+		if ( dist > farDist ) {
+			patch->numFaces = ( r_bspStreamLod->integer >= 2 ) ? 1 : ( patch->numFaces > 2 ? 2 : 1 );
+			ri.Printf( PRINT_DEVELOPER, "[bsp_stream] lod far %d,%d faces=%d dist=%.0f\n",
+				patch->cellX, patch->cellY, patch->numFaces, dist );
+		} else if ( dist > nearDist && r_bspStreamLod->integer >= 1 && patch->numFaces > 4 ) {
+			patch->numFaces = 4;
+			ri.Printf( PRINT_DEVELOPER, "[bsp_stream] lod mid %d,%d faces=%d dist=%.0f\n",
+				patch->cellX, patch->cellY, patch->numFaces, dist );
+		}
+	}
 	return loaded;
 }
 
@@ -905,11 +929,16 @@ void R_BspStream_Init( void ) {
 	r_bspStreamLightmaps = ri.Cvar_Get( "r_bspStreamLightmaps", "1", CVAR_ARCHIVE );
 	ri.Cvar_SetDescription( r_bspStreamLightmaps,
 		"When 1, upload sector BSP LUMP_LIGHTMAPS (RGB + deluxe pairs when worldDeluxeMapping) into a stream atlas; tiles compact on unmerge." );
+	r_bspStreamLod = ri.Cvar_Get( "r_bspStreamLod", "0", CVAR_ARCHIVE );
+	ri.Cvar_CheckRange( r_bspStreamLod, "0", "2", CV_INTEGER );
+	ri.Cvar_SetDescription( r_bspStreamLod,
+		"Sector visual LOD: 0=full faces, 1=distance (far sectors keep 1 face), 2=aggressive (far=brush-top only)." );
 	Com_Memset( &s_stream, 0, sizeof( s_stream ) );
-	ri.Printf( PRINT_ALL, "[bsp_stream] visual sector overlay initialized (r_bspStream 1, bake %s, stream VBO %s, lightmaps %s)\n",
+	ri.Printf( PRINT_ALL, "[bsp_stream] visual sector overlay initialized (r_bspStream 1, bake %s, stream VBO %s, lightmaps %s, lod %d)\n",
 		( r_bspStreamBake && r_bspStreamBake->integer ) ? "on" : "off",
 		( r_bspStreamVbo && r_bspStreamVbo->integer ) ? "on" : "off",
-		( r_bspStreamLightmaps && r_bspStreamLightmaps->integer ) ? "on" : "off" );
+		( r_bspStreamLightmaps && r_bspStreamLightmaps->integer ) ? "on" : "off",
+		r_bspStreamLod ? r_bspStreamLod->integer : 0 );
 }
 
 void RE_BspStream_ClearAll( void ) {
@@ -940,6 +969,37 @@ static void R_BspStream_SetSurfaceVboIndex( surfaceType_t *surface, int vboItemI
 	}
 }
 
+
+static void R_BspStream_UploadPatchVbo( bspStreamPatch_t *patch )
+{
+	int f, uploaded;
+
+	if ( !patch || !patch->active ) {
+		return;
+	}
+	if ( !r_bspStreamVbo || !r_bspStreamVbo->integer || !r_vbo || !r_vbo->integer || !tr.world ) {
+		return;
+	}
+
+	uploaded = 0;
+	for ( f = 0; f < patch->numFaces; f++ ) {
+		int vboItem = 0;
+		surfaceType_t *surface = patch->faces[f].surface;
+		shader_t *shader = patch->faces[f].shader;
+
+		if ( !surface || !shader ) {
+			continue;
+		}
+		if ( VBO_StreamUploadSurface( surface, shader, &vboItem ) ) {
+			R_BspStream_SetSurfaceVboIndex( surface, vboItem );
+			uploaded++;
+		}
+	}
+	if ( uploaded > 0 && VBO_StreamFlushGpu() ) {
+		ri.Printf( PRINT_DEVELOPER, "[bsp_stream] incremental VBO +%d surfaces for %d,%d\n",
+			uploaded, patch->cellX, patch->cellY );
+	}
+}
 
 static void R_BspStream_RebuildVbo( void )
 {
@@ -1136,7 +1196,7 @@ qboolean RE_BspStream_MergeSector( int cellX, int cellY, float sectorSize ) {
 
 	if ( R_BspStream_LoadSurfaceLumps( patch, &header, base, worldOrigin ) > 0 ) {
 		ri.FS_FreeFile( buf );
-		R_BspStream_RebuildVbo();
+		R_BspStream_UploadPatchVbo( patch );
 		R_BspStream_LogResidency( cellX, cellY, mapName, "surfaces", patch );
 		ri.Printf( PRINT_ALL, "[bsp_stream] merged visual sector %d,%d (%s, %d surfaces)\n",
 			cellX, cellY, mapName, patch->numFaces );
@@ -1186,7 +1246,7 @@ qboolean RE_BspStream_MergeSector( int cellX, int cellY, float sectorSize ) {
 		return qfalse;
 	}
 
-	R_BspStream_RebuildVbo();
+	R_BspStream_UploadPatchVbo( patch );
 	R_BspStream_LogResidency( cellX, cellY, mapName, "brush-top", patch );
 	ri.Printf( PRINT_ALL, "[bsp_stream] merged visual sector %d,%d (%s, brush-top)\n", cellX, cellY, mapName );
 	return qtrue;

@@ -1,0 +1,18 @@
+#ifndef VK_VT_H
+#define VK_VT_H
+
+#include "tr_local.h"
+
+void R_VT_Init( void );
+void R_VT_Shutdown( void );
+qboolean R_VT_Active( void );
+
+/* Load a page from raw RGBA8 (pageSize x pageSize) into physical atlas slot. Returns page index or -1. */
+int R_VT_LoadPageRGBA( const byte *rgba, int width, int height, const char *name );
+
+/* Map virtual page id -> physical slot (-1 if missing). */
+int R_VT_Lookup( int virtualPage );
+
+image_t *R_VT_AtlasImage( void );
+
+#endif

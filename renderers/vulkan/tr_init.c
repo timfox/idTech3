@@ -28,6 +28,8 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "tr_decal_props.h"
 #include "tr_material_paint.h"
 #include "vk_upscale.h"
+#include "vk_vt.h"
+#include "vk_meshlets.h"
 #include "vk_ndgi.h"
 #include "vk_niv.h"
 #include "vk_nslm.h"
@@ -301,6 +303,12 @@ cvar_t	*r_hybrid1_normalDot;
 cvar_t	*r_hybrid1_adaptiveAngle;
 cvar_t	*r_hybrid1_adaptiveRough;
 cvar_t	*r_hybrid1_specRoughMax;
+cvar_t	*r_hybrid1_sunRadius;
+cvar_t	*r_hybrid1_contactHarden;
+cvar_t	*r_hybrid1_ggx;
+cvar_t	*r_hybrid1_iblMode;
+cvar_t	*r_hybrid1_diffuseDirect;
+cvar_t	*r_hybrid1_dlightShadows;
 cvar_t	*r_hybrid1_shadowStrength;
 cvar_t	*r_hybrid1_specStrength;
 cvar_t	*r_hybrid1_debug;
@@ -4242,6 +4250,30 @@ static void R_Register( void )
 	ri.Cvar_CheckRange( r_hybrid1_specRoughMax, "0.5", "1", CV_FLOAT );
 	ri.Cvar_SetDescription( r_hybrid1_specRoughMax, "Hybrid1: skip specular RT when G-buffer roughness is at or above this threshold." );
 	ri.Cvar_SetGroup( r_hybrid1_specRoughMax, CVG_RENDERER );
+	r_hybrid1_sunRadius = ri.Cvar_Get( "r_hybrid1_sunRadius", "0", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_hybrid1_sunRadius, "0", "5", CV_FLOAT );
+	ri.Cvar_SetDescription( r_hybrid1_sunRadius, "Hybrid1: sun angular radius in degrees for soft / penumbra shadows (0=hard)." );
+	ri.Cvar_SetGroup( r_hybrid1_sunRadius, CVG_RENDERER );
+	r_hybrid1_contactHarden = ri.Cvar_Get( "r_hybrid1_contactHarden", "1", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_hybrid1_contactHarden, "0", "1", CV_INTEGER );
+	ri.Cvar_SetDescription( r_hybrid1_contactHarden, "Hybrid1: shrink soft-sun penumbra when N·L is high (contact hardening)." );
+	ri.Cvar_SetGroup( r_hybrid1_contactHarden, CVG_RENDERER );
+	r_hybrid1_ggx = ri.Cvar_Get( "r_hybrid1_ggx", "1", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_hybrid1_ggx, "0", "1", CV_INTEGER );
+	ri.Cvar_SetDescription( r_hybrid1_ggx, "Hybrid1: GGX/VNDF specular sampling + Fresnel metalness weight." );
+	ri.Cvar_SetGroup( r_hybrid1_ggx, CVG_RENDERER );
+	r_hybrid1_iblMode = ri.Cvar_Get( "r_hybrid1_iblMode", "1", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_hybrid1_iblMode, "0", "2", CV_INTEGER );
+	ri.Cvar_SetDescription( r_hybrid1_iblMode, "Hybrid1 IBL: 0=off path, 1=prefilter*(1-rough), 2=split-sum style weight." );
+	ri.Cvar_SetGroup( r_hybrid1_iblMode, CVG_RENDERER );
+	r_hybrid1_diffuseDirect = ri.Cvar_Get( "r_hybrid1_diffuseDirect", "1", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_hybrid1_diffuseDirect, "0", "1", CV_INTEGER );
+	ri.Cvar_SetDescription( r_hybrid1_diffuseDirect, "Hybrid1: light diffuse secondary hits with sun + irradiance (needs r_hybrid1_diffuse 1)." );
+	ri.Cvar_SetGroup( r_hybrid1_diffuseDirect, CVG_RENDERER );
+	r_hybrid1_dlightShadows = ri.Cvar_Get( "r_hybrid1_dlightShadows", "0", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_hybrid1_dlightShadows, "0", "4", CV_INTEGER );
+	ri.Cvar_SetDescription( r_hybrid1_dlightShadows, "Hybrid1: RT shadow toward first refdef dlight (0=off)." );
+	ri.Cvar_SetGroup( r_hybrid1_dlightShadows, CVG_RENDERER );
 	r_hybrid1_shadowStrength = ri.Cvar_Get( "r_hybrid1_shadowStrength", "0.85", CVAR_ARCHIVE_ND );
 	ri.Cvar_CheckRange( r_hybrid1_shadowStrength, "0", "1", CV_FLOAT );
 	ri.Cvar_SetDescription( r_hybrid1_shadowStrength, "Hybrid1 composite: shadow visibility blend (1=full RT shadow)." );
@@ -4444,6 +4476,8 @@ void R_Init( void ) {
 	R_SpriteProps_Init();
 	R_DecalProps_Init();
 	R_Upscale_Init();
+	R_VT_Init();
+	R_Meshlets_Init();
 #ifdef USE_VULKAN
 	R_NDGI_Init();
 	R_NIV_Init();

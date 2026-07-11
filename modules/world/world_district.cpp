@@ -342,13 +342,35 @@ qboolean WorldDistrict_LoadFull( int index ) {
 }
 
 void WorldDistrict_Unload( int index ) {
+	worldDistrict_t *d;
+	int x, y;
+
 	if ( index < 0 || index >= districtCount || !districts[index].active ) {
 		return;
 	}
-	districts[index].state = WD_STATE_UNLOADED;
-	districts[index].proxyModel = 0;
-	districts[index].fullModel = 0;
-	Com_Printf( "[world_district] unloaded %s\n", districts[index].name );
+	d = &districts[index];
+
+	if ( cm_districtStream && cm_districtStream->integer ) {
+		if ( WorldOpen_IsEnabled() ) {
+			for ( y = d->sectorY0; y <= d->sectorY1; y++ ) {
+				for ( x = d->sectorX0; x <= d->sectorX1; x++ ) {
+					WorldOpen_UnloadSector( x, y );
+				}
+			}
+		} else {
+			for ( y = d->sectorY0; y <= d->sectorY1; y++ ) {
+				for ( x = d->sectorX0; x <= d->sectorX1; x++ ) {
+					CM_Stream_UnloadSector( x, y );
+				}
+			}
+		}
+	}
+
+	d->state = WD_STATE_UNLOADED;
+	d->proxyModel = 0;
+	d->fullModel = 0;
+	Com_Printf( "[world_district] unloaded %s (sectors %d,%d..%d,%d cleared)\n",
+		d->name, d->sectorX0, d->sectorY0, d->sectorX1, d->sectorY1 );
 }
 
 void WorldDistrict_UpdateView( const vec3_t viewOrigin, float loadRadius ) {
