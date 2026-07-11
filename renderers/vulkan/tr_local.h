@@ -468,13 +468,13 @@ typedef struct {
 	/* Multi-material vertex paint (TLOU-style height-blend). Layer 0 = map/normal/orm. */
 	qboolean		materialBlend;
 	float			blendSharpness;
-	int				materialLayerCount;	/* 1..4 */
+	int				materialLayerCount;	/* 1..8 */
 	uint32_t		materialHeightMask;	/* bit i => layer i has normalHeightMap */
-	image_t			*layerAlbedo[3];	/* layers 1..3 */
-	image_t			*layerNormal[3];
-	image_t			*layerPhysical[3];
-	uint32_t		layerNormalType[3];
-	uint32_t		layerPhysicalType[3];
+	image_t			*layerAlbedo[7];	/* layers 1..7 */
+	image_t			*layerNormal[7];
+	image_t			*layerPhysical[7];
+	uint32_t		layerNormalType[7];
+	uint32_t		layerPhysicalType[7];
 
 	vec4_t normalScale;
 	vec4_t specularScale;

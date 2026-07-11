@@ -110,6 +110,7 @@ extern "C" void VkImgui_Initialize(void) {
 		vkWindows.studioMap.open = qtrue;
 		vkWindows.studioConsole.open = qtrue;
 		vkWindows.studioEntities.open = qtrue;
+		vkWindows.studioPaint.open = qtrue;
 	}
 
 	vkImguiState.active = qtrue;
@@ -216,6 +217,7 @@ extern "C" void VkImgui_Draw(void) {
 	VkImgui_DrawStudioMapPanel();
 	VkImgui_DrawStudioConsolePanel();
 	VkImgui_DrawStudioEntitiesPanel();
+	VkImgui_DrawStudioPaintPanel();
 	VkImgui_DrawStudioAnimationPanel();
 
 	ImGui::End();
