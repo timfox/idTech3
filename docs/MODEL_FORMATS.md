@@ -75,8 +75,10 @@ All values are little-endian.
 - `r_morphLodEnd`: end distance (morph weight reaches 0)
 - `r_morphDebug` (0/1): debug coloring by morph strength
 - `r_morphBreath` (0/1), `r_morphBreathAmp`, `r_morphBreathFreq`: optional procedural demo drive for target name `breath`
+- **VoIP lip flap** (client): `cl_voipLipFlap` drives jaw/mouth morphs from voice RMS — see [VOIP.md](VOIP.md)
 
 ### Renderer API
 - `re.SetEntityMorphWeight(const refEntity_t *ent, const char *name, float weight)`
 - Queues per-entity morph weights for the current scene submission.
 - Weights are deduplicated by channel hash and clamped.
+- Client VoIP calls this from `CL_VoIP_ApplyLipFlap` when adding player models near talking clients.

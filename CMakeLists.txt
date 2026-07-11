@@ -3240,6 +3240,12 @@ set_tests_properties(test_trap_getvalue_aliases PROPERTIES
 	LABELS "scripts;validation;client;server;compat"
 	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_trap_getvalue_aliases.sh;${CMAKE_SOURCE_DIR}/runtime/client/core/cl_cgame.c;${CMAKE_SOURCE_DIR}/runtime/server/sv_game.c")
 
+add_test(NAME test_voip_lip_flap
+	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_voip_lip_flap.sh)
+set_tests_properties(test_voip_lip_flap PROPERTIES
+	LABELS "scripts;validation;client;voip"
+	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_voip_lip_flap.sh;${CMAKE_SOURCE_DIR}/runtime/client/platform/cl_voip.c;${CMAKE_SOURCE_DIR}/docs/VOIP.md")
+
 add_test(NAME test_p2p_networking
 	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_p2p_networking.sh)
 set_tests_properties(test_p2p_networking PROPERTIES

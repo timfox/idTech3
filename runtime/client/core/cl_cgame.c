@@ -32,6 +32,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "cl_engine_sprites.h"
 #include "cl_engine_decals.h"
 #include "cl_openworld.h"
+#include "cl_voip.h"
 #include "../../game/bg_public.h"
 #include "../../qcommon/cm_public.h"
 
@@ -141,6 +142,7 @@ static void CL_AddRetailRefEntityToScene( const retailRefEntity_t *src, qboolean
 
 	Com_Memset( &ent, 0, sizeof( ent ) );
 	Com_Memcpy( &ent, src, sizeof( *src ) );
+	CL_VoIP_ApplyLipFlap( &ent );
 	re.AddRefEntityToScene( &ent, intShaderTime );
 }
 
@@ -951,6 +953,7 @@ static intptr_t CL_CgameSystemCalls( intptr_t *args ) {
 			CL_AddRetailRefEntityToScene( VMA(1), qfalse );
 		} else {
 			VM_CHECKBOUNDS( cgvm, args[1], sizeof( refEntity_t ) );
+			CL_VoIP_ApplyLipFlap( VMA(1) );
 			re.AddRefEntityToScene( VMA(1), qfalse );
 		}
 		return 0;
@@ -1143,6 +1146,7 @@ static intptr_t CL_CgameSystemCalls( intptr_t *args ) {
 			CL_AddRetailRefEntityToScene( VMA(1), qtrue );
 		} else {
 			VM_CHECKBOUNDS( cgvm, args[1], sizeof( refEntity_t ) );
+			CL_VoIP_ApplyLipFlap( VMA(1) );
 			re.AddRefEntityToScene( VMA(1), qtrue );
 		}
 		return 0;
