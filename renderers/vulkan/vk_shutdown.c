@@ -138,6 +138,11 @@ void vk_shutdown( refShutdownCode_t code )
 		qvkDestroyDescriptorSetLayout( vk.device, vk.cbt_terrain_layout, NULL );
 		vk.cbt_terrain_layout = VK_NULL_HANDLE;
 	}
+	if ( vk.set_layout_blend_layers != VK_NULL_HANDLE ) {
+		qvkDestroyDescriptorSetLayout( vk.device, vk.set_layout_blend_layers, NULL );
+		vk.set_layout_blend_layers = VK_NULL_HANDLE;
+	}
+	vk.blend_layers_descriptor = VK_NULL_HANDLE;
 
 	if ( vk.pipeline_layout != VK_NULL_HANDLE && qvkDestroyPipelineLayout != NULL ) {
 		qvkDestroyPipelineLayout( vk.device, vk.pipeline_layout, NULL );

@@ -1137,6 +1137,8 @@ typedef struct model_s {
 	bmodel_t	*bmodel;		// only if type == MOD_BRUSH
 	md3Header_t	*md3[MD3_MAX_LODS];	// only if type == MOD_MESH
 	void	*modelData;			// only if type == (MOD_MDR | MOD_IQM | MOD_GLTF)
+	byte		*md3PaintColors;	/* optional .md3.paint bind-pose RGBA */
+	int			md3PaintNumVerts;
 
 	int			 numLods;
 } model_t;
@@ -2099,6 +2101,7 @@ typedef struct shaderCommands_s
 	vec2_t		texCoords[2][SHADER_MAX_VERTEXES] QALIGN(16);
 	vec2_t		texCoords00[SHADER_MAX_VERTEXES] QALIGN(16);
 	color4ub_t	vertexColors[SHADER_MAX_VERTEXES] QALIGN(16);
+	color4ub_t	vertexColors1[SHADER_MAX_VERTEXES] QALIGN(16); /* materialBlend stream2 (layers 4..7) */
 	int			vertexDlightBits[SHADER_MAX_VERTEXES] QALIGN(16);
 	stageVars_t	svars QALIGN(16);
 

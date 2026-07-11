@@ -23,6 +23,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 #include "tr_local.h"
 #include "vk_util.h"
+#include "tr_material_paint.h"
 #ifdef USE_VULKAN
 #include "vk_deferred_gbuffer.h"
 #endif
@@ -849,7 +850,11 @@ void R_ComputeColors( const int b, color4ub_t *dest, const shaderStage_t *pStage
 			RB_CalcDiffuseColor( ( unsigned char * ) dest );
 			break;
 		case CGEN_EXACT_VERTEX:
-			Com_Memcpy( dest, tess.vertexColors, tess.numVertexes * sizeof( tess.vertexColors[0] ) );
+			if ( b == 1 && R_MaterialPaint_HasStream2() ) {
+				Com_Memcpy( dest, tess.vertexColors1, tess.numVertexes * sizeof( tess.vertexColors1[0] ) );
+			} else {
+				Com_Memcpy( dest, tess.vertexColors, tess.numVertexes * sizeof( tess.vertexColors[0] ) );
+			}
 			break;
 		case CGEN_CONST:
 			for ( i = 0; i < tess.numVertexes; i++ ) {
@@ -1630,39 +1635,73 @@ static void RB_IterateStagesGeneric( const shaderCommands_t *input )
 			if ( pStage->vk_pbr_flags & PBR_HAS_DETAILMAP )
 				vk_update_descriptor_if_changed_with_image( VK_DESC_PBR_DETAIL, pStage->detailMap->descriptor, pStage->detailMap );
 
-			/* Multi-material blend: remap advanced-lobe / detail / deluxe slots to layers 1..3. */
-			if ( ( pStage->vk_pbr_flags & PBR_HAS_MATERIAL_BLEND ) && pStage->materialBlend &&
-				pStage->materialLayerCount >= 2 &&
-				( !r_materialBlend || r_materialBlend->integer ) ) {
+			/* Multi-material blend: bind unique layer arrays on set 19. */
+			if ( vk.set_layout_blend_layers != VK_NULL_HANDLE ) {
+				static qboolean blendDescReady;
 				image_t *white = tr.whiteImage;
-				image_t *a1 = pStage->layerAlbedo[0] ? pStage->layerAlbedo[0] : white;
-				image_t *n1 = pStage->layerNormal[0] ? pStage->layerNormal[0] : white;
-				image_t *o1 = pStage->layerPhysical[0] ? pStage->layerPhysical[0] : white;
-				image_t *a2 = pStage->layerAlbedo[1] ? pStage->layerAlbedo[1] : white;
-				image_t *n2 = pStage->layerNormal[1] ? pStage->layerNormal[1] : white;
-				image_t *o2 = pStage->layerPhysical[1] ? pStage->layerPhysical[1] : white;
-				image_t *a3 = pStage->layerAlbedo[2] ? pStage->layerAlbedo[2] : white;
-				image_t *n3 = pStage->layerNormal[2] ? pStage->layerNormal[2] : white;
+				image_t *albedos[8];
+				image_t *normals[8];
+				image_t *orms[8];
+				VkDescriptorImageInfo imgInfos[24];
+				VkWriteDescriptorSet writes[3];
+				int li;
 
-				if ( a1 && a1->descriptor )
-					vk_update_descriptor_if_changed_with_image( VK_DESC_PBR_DETAIL, a1->descriptor, a1 );
-				if ( n1 && n1->descriptor )
-					vk_update_descriptor_if_changed_with_image( VK_DESC_PBR_CLEARCOAT, n1->descriptor, n1 );
-				if ( o1 && o1->descriptor )
-					vk_update_descriptor_if_changed_with_image( VK_DESC_PBR_TRANSMISSION, o1->descriptor, o1 );
-				if ( pStage->materialLayerCount > 2 ) {
-					if ( a2 && a2->descriptor )
-						vk_update_descriptor_if_changed_with_image( VK_DESC_PBR_SHEEN, a2->descriptor, a2 );
-					if ( n2 && n2->descriptor )
-						vk_update_descriptor_if_changed_with_image( VK_DESC_PBR_ANISOTROPY, n2->descriptor, n2 );
-					if ( o2 && o2->descriptor )
-						vk_update_descriptor( VK_DESC_PBR_DELUXE, o2->descriptor );
+				if ( !blendDescReady && vk.descriptor_pool != VK_NULL_HANDLE ) {
+					VkDescriptorSetAllocateInfo alloc;
+					Com_Memset( &alloc, 0, sizeof( alloc ) );
+					alloc.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+					alloc.descriptorPool = vk.descriptor_pool;
+					alloc.descriptorSetCount = 1;
+					alloc.pSetLayouts = &vk.set_layout_blend_layers;
+					if ( qvkAllocateDescriptorSets( vk.device, &alloc, &vk.blend_layers_descriptor ) == VK_SUCCESS ) {
+						blendDescReady = qtrue;
+					}
 				}
-				if ( pStage->materialLayerCount > 3 ) {
-					if ( a3 && a3->descriptor )
-						vk_update_descriptor_if_changed_with_image( VK_DESC_PBR_EMISSIVE, a3->descriptor, a3 );
-					if ( n3 && n3->descriptor )
-						vk_update_descriptor_if_changed_with_image( VK_DESC_PBR_SUBSURFACE, n3->descriptor, n3 );
+
+				albedos[0] = ( pStage->bundle[0].image[0] ) ? pStage->bundle[0].image[0] : white;
+				normals[0] = pStage->normalMap ? pStage->normalMap : white;
+				orms[0] = pStage->physicalMap ? pStage->physicalMap : white;
+				for ( li = 0; li < 7; li++ ) {
+					albedos[li + 1] = pStage->layerAlbedo[li] ? pStage->layerAlbedo[li] : albedos[0];
+					normals[li + 1] = pStage->layerNormal[li] ? pStage->layerNormal[li] : normals[0];
+					orms[li + 1] = pStage->layerPhysical[li] ? pStage->layerPhysical[li] : orms[0];
+				}
+				if ( !( ( pStage->vk_pbr_flags & PBR_HAS_MATERIAL_BLEND ) && pStage->materialBlend &&
+					pStage->materialLayerCount >= 2 &&
+					( !r_materialBlend || r_materialBlend->integer ) ) ) {
+					for ( li = 0; li < 8; li++ ) {
+						albedos[li] = white;
+						normals[li] = white;
+						orms[li] = white;
+					}
+				}
+				if ( blendDescReady && vk.blend_layers_descriptor != VK_NULL_HANDLE && white && white->view ) {
+					for ( li = 0; li < 8; li++ ) {
+						image_t *img = albedos[li] && albedos[li]->view ? albedos[li] : white;
+						imgInfos[li].sampler = img->vk_sampler ? img->vk_sampler : white->vk_sampler;
+						imgInfos[li].imageView = img->view;
+						imgInfos[li].imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+						img = normals[li] && normals[li]->view ? normals[li] : white;
+						imgInfos[8 + li].sampler = img->vk_sampler ? img->vk_sampler : white->vk_sampler;
+						imgInfos[8 + li].imageView = img->view;
+						imgInfos[8 + li].imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+						img = orms[li] && orms[li]->view ? orms[li] : white;
+						imgInfos[16 + li].sampler = img->vk_sampler ? img->vk_sampler : white->vk_sampler;
+						imgInfos[16 + li].imageView = img->view;
+						imgInfos[16 + li].imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+					}
+					for ( li = 0; li < 3; li++ ) {
+						Com_Memset( &writes[li], 0, sizeof( writes[li] ) );
+						writes[li].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+						writes[li].dstSet = vk.blend_layers_descriptor;
+						writes[li].dstBinding = (uint32_t)li;
+						writes[li].dstArrayElement = 0;
+						writes[li].descriptorCount = 8;
+						writes[li].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+						writes[li].pImageInfo = &imgInfos[li * 8];
+					}
+					qvkUpdateDescriptorSets( vk.device, 3, writes, 0, NULL );
+					vk_update_descriptor( VK_DESC_PBR_BLEND_LAYERS, vk.blend_layers_descriptor );
 				}
 			}
 			

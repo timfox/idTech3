@@ -23,6 +23,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 #include "tr_local.h"
 #include "../common/tr_model_freeusd.h"
+#include "tr_material_paint.h"
 
 #define	LL(x) x=LittleLong(x)
 
@@ -628,6 +629,19 @@ static qboolean R_LoadMD3( model_t *mod, int lod, void *buffer, int fileSize, co
 
 		// find the next surface
 		surf = (md3Surface_t *)( (byte *)surf + surf->ofsEnd );
+	}
+
+	/* Bind-pose .md3.paint sidecar (lod 0 only); does not alter MD3 on disk. */
+	if ( lod == 0 ) {
+		byte *paintColors = NULL;
+		int paintVerts = 0;
+		if ( R_MaterialPaint_LoadMD3( mod_name, &paintColors, &paintVerts ) && paintColors && paintVerts > 0 ) {
+			mod->md3PaintColors = ri.Hunk_Alloc( paintVerts * 4, h_low );
+			Com_Memcpy( mod->md3PaintColors, paintColors, (size_t)paintVerts * 4 );
+			mod->md3PaintNumVerts = paintVerts;
+			R_MaterialPaint_FreeMD3( paintColors );
+			ri.Printf( PRINT_DEVELOPER, "MD3 paint: %s (%d verts)\n", mod_name, paintVerts );
+		}
 	}
 
 	return qtrue;

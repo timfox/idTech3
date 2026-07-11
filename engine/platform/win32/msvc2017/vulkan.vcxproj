@@ -225,6 +225,7 @@
     <ClCompile Include="..\..\..\renderers\vulkan\tr_animation.c" />
     <ClCompile Include="..\..\..\renderers\vulkan\tr_backend.c" />
     <ClCompile Include="..\..\..\renderers\vulkan\tr_bsp.c" />
+    <ClCompile Include="..\..\..\renderers\vulkan\tr_material_paint.c" />
     <ClCompile Include="..\..\..\renderers\vulkan\tr_cmds.c" />
     <ClCompile Include="..\..\..\renderers\vulkan\tr_curve.c" />
     <ClCompile Include="..\..\..\renderers\vulkan\tr_image.c" />

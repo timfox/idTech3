@@ -9,7 +9,11 @@ Material-blend vertex weight paint sidecar (maps/<map>.paint) and brush API.
 #ifndef TR_MATERIAL_PAINT_H
 #define TR_MATERIAL_PAINT_H
 
-#include "tr_local.h"
+#include "../../qcommon/q_shared.h"
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 #define MATERIAL_PAINT_MAGIC		0x50334449u /* 'ID3P' little-endian */
 #define MATERIAL_PAINT_VERSION		2
@@ -51,8 +55,19 @@ void R_MaterialPaint_InvalidateWorldVBO( void );
 int R_MaterialPaint_NumVerts( void );
 qboolean R_MaterialPaint_HasStream2( void );
 
+/* Fill tess.vertexColors1 from sidecar stream2 for a world surface (surfIndex). */
+void R_MaterialPaint_FillStream2ForSurface( int surfIndex, int firstVert, int numVerts );
+void R_MaterialPaint_FillStream2FromSurfaceData( const void *surfData, int firstVert, int numVerts );
+
+/* Lookup stream2 RGBA for one vert; returns qfalse if missing. */
+qboolean R_MaterialPaint_GetStream2( uint32_t surfIndex, uint32_t vertIndex, byte rgba2[4] );
+
 /* MD3 bind-pose paint overlay */
 qboolean R_MaterialPaint_LoadMD3( const char *modelName, byte **outColors, int *outNumVerts );
 void R_MaterialPaint_FreeMD3( byte *colors );
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif

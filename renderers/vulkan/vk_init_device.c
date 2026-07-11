@@ -582,7 +582,7 @@ void vk_initialize( void )
 			pool_size[0].descriptorCount = MAX_DRAWIMAGES + NUM_COMMAND_BUFFERS + NUM_COMMAND_BUFFERS + NUM_COMMAND_BUFFERS + 3 + 6 + VK_NUM_BLOOM_PASSES * 2 + 32; // color[N], post_color[N], depth[N], screenmap, ssao, volumetric, bloom, SMAA, TAA
 #ifdef USE_VK_PBR
         if ( vk.pbrActive )
-            pool_size[0].descriptorCount += 2 + ( MAX_DRAWIMAGES * 9 ); // brdf-lut + irradiance | MAX_DRAWIMAGES * (physical, normal, emissive, clearcoat, sheen, anisotropy, transmission, subsurface, detail)
+            pool_size[0].descriptorCount += 2 + ( MAX_DRAWIMAGES * 9 ) + 24; // brdf-lut + irradiance | PBR maps | blend layer arrays (3×8)
 #endif
 
 		pool_size[1].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
@@ -601,7 +601,7 @@ void vk_initialize( void )
 		pool_size[4].descriptorCount = 8 + NUM_COMMAND_BUFFERS;
 
 		pool_size[5].type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-		pool_size[5].descriptorCount = 10; /* forward+: compute (3 SSBO) + PBR graphics (3 SSBO) */
+		pool_size[5].descriptorCount = 12; /* forward+ + CBT draw commands SSBO */
 
 		for ( j = 0, maxSets = 0; j < ARRAY_LEN( pool_size ); j++ ) {
 			maxSets += pool_size[j].descriptorCount;
@@ -628,6 +628,27 @@ void vk_initialize( void )
 	//vk_create_layout_binding( 0, VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, VK_SHADER_STAGE_FRAGMENT_BIT, &vk.set_layout_input );
 
 	vk_forward_plus_create_set_layout();
+
+#ifdef USE_VK_PBR
+	/* Material-blend layer arrays: set 19, bindings 0..2 with descriptorCount 8 each. */
+	{
+		VkDescriptorSetLayoutBinding blend_bindings[3];
+		VkDescriptorSetLayoutCreateInfo blend_layout_desc;
+		int bi;
+		for ( bi = 0; bi < 3; bi++ ) {
+			Com_Memset( &blend_bindings[bi], 0, sizeof( blend_bindings[bi] ) );
+			blend_bindings[bi].binding = (uint32_t)bi;
+			blend_bindings[bi].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+			blend_bindings[bi].descriptorCount = 8;
+			blend_bindings[bi].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+		}
+		Com_Memset( &blend_layout_desc, 0, sizeof( blend_layout_desc ) );
+		blend_layout_desc.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+		blend_layout_desc.bindingCount = 3;
+		blend_layout_desc.pBindings = blend_bindings;
+		VK_CHECK( qvkCreateDescriptorSetLayout( vk.device, &blend_layout_desc, NULL, &vk.set_layout_blend_layers ) );
+	}
+#endif
 
 		{
 			VkDescriptorSetLayoutBinding compute_bindings[19];
@@ -1016,6 +1037,7 @@ void vk_initialize( void )
 		set_layouts[16] = vk.set_layout_sampler; // subsurface
 		set_layouts[17] = vk.set_layout_sampler; // detail
 		set_layouts[18] = vk.set_layout_forward_plus;
+		set_layouts[19] = vk.set_layout_blend_layers;
 #endif
 		desc.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
 		desc.pNext = NULL;

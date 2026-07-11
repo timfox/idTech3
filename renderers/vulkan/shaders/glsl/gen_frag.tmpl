@@ -183,6 +183,11 @@ layout(std430, set = 18, binding = 2) readonly buffer FpParamSSBO {
 layout(set = 18, binding = 4) uniform sampler2D fp_sun_shadow_map;
 #endif
 
+/* Dedicated material-blend layer arrays (set 19): unique textures for layers 0..7. */
+layout(set = 19, binding = 0) uniform sampler2D blend_albedo[8];
+layout(set = 19, binding = 1) uniform sampler2D blend_normal[8];
+layout(set = 19, binding = 2) uniform sampler2D blend_orm[8];
+
 float pbrSunShadowVisibility( vec3 worldPos ) {
 	if ( pbrSunShadowParams.z < 0.5 ) {
 		return 1.0;
@@ -257,83 +262,104 @@ layout (constant_id = 38) const int pom_max_steps = 16;
 layout (constant_id = 39) const float parallax_bias_shader = 0.0;
 layout (constant_id = 40) const float forward_plus_shade_strength = 0.0;
 layout (constant_id = 41) const float deferred_unlit_base_strength = 0.0;
-layout (constant_id = 42) const int material_blend_layers = 0; // 0=off, 2..4
+layout (constant_id = 42) const int material_blend_layers = 0; // 0=off, 2..8
 layout (constant_id = 43) const int material_height_mask = 0;  // bit i => layer i has height
 
 /* Remapped layer slots when material_blend_layers >= 2:
- * L0: texture0 / normal_texture / physical_texture
- * L1: detail_texture / clearcoat_texture / transmission_texture
- * L2: sheen_texture / anisotropy_texture / deluxe_texture (as ORM)
- * L3: emissive_texture / subsurface_texture / white ORM constant
+ * Prefer set-19 blend_* arrays (unique layers 0..7).
+ * Fallback bank (if arrays unbound): L0 texture0/normal/physical; L1 detail/clearcoat/transmission; etc.
  */
 vec4 materialBlendSampleAlbedo( int layer, vec2 uv ) {
-	if ( layer == 1 ) return texture( detail_texture, uv );
-	if ( layer == 2 ) return texture( sheen_texture, uv );
-	if ( layer == 3 ) return texture( emissive_texture, uv );
-	return texture( texture0, uv );
+	int li = clamp( layer, 0, 7 );
+	return texture( blend_albedo[li], uv );
 }
 
 vec4 materialBlendSampleNormal( int layer, vec2 uv ) {
-	if ( layer == 1 ) return texture( clearcoat_texture, uv );
-	if ( layer == 2 ) return texture( anisotropy_texture, uv );
-	if ( layer == 3 ) return texture( subsurface_texture, uv );
-	return texture( normal_texture, uv );
+	int li = clamp( layer, 0, 7 );
+	return texture( blend_normal[li], uv );
 }
 
 vec4 materialBlendSampleOrm( int layer, vec2 uv ) {
-	if ( layer == 1 ) return texture( transmission_texture, uv );
-	if ( layer == 2 ) return texture( deluxe_texture, uv );
-	if ( layer == 3 ) return vec4( 1.0, 0.5, 0.0, 1.0 );
-	return texture( physical_texture, uv );
+	int li = clamp( layer, 0, 7 );
+	return texture( blend_orm[li], uv );
 }
 
 vec4 materialBlendWeights( vec2 uv ) {
 #if defined(USE_CLX_IDENT) || defined(USE_FIXED_COLOR)
-	vec4 w = vec4( 1.0, 0.0, 0.0, 0.0 );
+	vec4 w0 = vec4( 1.0, 0.0, 0.0, 0.0 );
+	vec4 w1 = vec4( 0.0 );
 #elif defined(USE_ENT_COLOR)
-	vec4 w = max( ent_color0, vec4( 0.0 ) );
+	vec4 w0 = max( ent_color0, vec4( 0.0 ) );
+	vec4 w1 = max( ent_color1, vec4( 0.0 ) );
 #else
-	vec4 w = max( frag_color0, vec4( 0.0 ) );
+	vec4 w0 = max( frag_color0, vec4( 0.0 ) );
+#if defined(USE_CL1)
+	vec4 w1 = max( frag_color1, vec4( 0.0 ) );
+#else
+	vec4 w1 = vec4( 0.0 );
 #endif
-	int layers = clamp( material_blend_layers, 1, 4 );
-	if ( layers < 4 ) w.a = 0.0;
-	if ( layers < 3 ) w.b = 0.0;
-	if ( layers < 2 ) w.g = 0.0;
+#endif
+	int layers = clamp( material_blend_layers, 1, 8 );
+	if ( layers < 8 ) w1.a = 0.0;
+	if ( layers < 7 ) w1.b = 0.0;
+	if ( layers < 6 ) w1.g = 0.0;
+	if ( layers < 5 ) w1.r = 0.0;
+	if ( layers < 4 ) w0.a = 0.0;
+	if ( layers < 3 ) w0.b = 0.0;
+	if ( layers < 2 ) w0.g = 0.0;
 
 	float sharpness = max( pbrMaterialBlend.x, 0.1 );
 	int hasHeight = 0;
-	float h0 = 1.0, h1 = 1.0, h2 = 1.0, h3 = 1.0;
-	if ( ( material_height_mask & 1 ) != 0 ) {
-		h0 = clamp( materialBlendSampleNormal( 0, uv ).a, 0.0, 1.0 );
-		hasHeight = 1;
-	}
-	if ( layers > 1 && ( material_height_mask & 2 ) != 0 ) {
-		h1 = clamp( materialBlendSampleNormal( 1, uv ).a, 0.0, 1.0 );
-		hasHeight = 1;
-	}
-	if ( layers > 2 && ( material_height_mask & 4 ) != 0 ) {
-		h2 = clamp( materialBlendSampleNormal( 2, uv ).a, 0.0, 1.0 );
-		hasHeight = 1;
-	}
-	if ( layers > 3 && ( material_height_mask & 8 ) != 0 ) {
-		h3 = clamp( materialBlendSampleNormal( 3, uv ).a, 0.0, 1.0 );
-		hasHeight = 1;
+	float h[8];
+	int i;
+	for ( i = 0; i < 8; i++ ) h[i] = 1.0;
+	for ( i = 0; i < layers; i++ ) {
+		if ( ( material_height_mask & ( 1 << i ) ) != 0 ) {
+			h[i] = clamp( materialBlendSampleNormal( i, uv ).a, 0.0, 1.0 );
+			hasHeight = 1;
+		}
 	}
 
+	float ww[8];
+	ww[0] = w0.r; ww[1] = w0.g; ww[2] = w0.b; ww[3] = w0.a;
+	ww[4] = w1.r; ww[5] = w1.g; ww[6] = w1.b; ww[7] = w1.a;
+
 	if ( hasHeight != 0 ) {
-		float m = max( max( w.r + h0, w.g + h1 ), max( w.b + h2, w.a + h3 ) );
-		/* Keep a blend band so the max layer is not zeroed (ma - 1/sharpness). */
+		float m = ww[0] + h[0];
+		for ( i = 1; i < layers; i++ ) m = max( m, ww[i] + h[i] );
 		float band = max( 1.0 / sharpness, 1e-3 );
-		w = vec4(
-			max( 0.0, ( w.r + h0 ) - m + band ),
-			max( 0.0, ( w.g + h1 ) - m + band ),
-			max( 0.0, ( w.b + h2 ) - m + band ),
-			max( 0.0, ( w.a + h3 ) - m + band )
-		);
-		w = pow( w + vec4( 1e-4 ), vec4( sharpness ) );
+		for ( i = 0; i < 8; i++ ) {
+			if ( i < layers ) {
+				ww[i] = max( 0.0, ( ww[i] + h[i] ) - m + band );
+				ww[i] = pow( ww[i] + 1e-4, sharpness );
+			} else {
+				ww[i] = 0.0;
+			}
+		}
 	}
-	float sum = max( w.r + w.g + w.b + w.a, 1e-4 );
-	return w / sum;
+	float sum = 1e-4;
+	for ( i = 0; i < layers; i++ ) sum += ww[i];
+	/* Pack first four into return; caller blends 0..3 then 4..7 via second call path. */
+	return vec4( ww[0], ww[1], ww[2], ww[3] ) / sum;
+}
+
+vec4 materialBlendWeightsHi( vec2 uv ) {
+	/* Second stream weights (layers 4..7), same normalize as materialBlendWeights. */
+#if defined(USE_CL1) && !defined(USE_CLX_IDENT) && !defined(USE_FIXED_COLOR)
+	vec4 w1 = max( frag_color1, vec4( 0.0 ) );
+#elif defined(USE_ENT_COLOR)
+	vec4 w1 = max( ent_color1, vec4( 0.0 ) );
+#else
+	vec4 w1 = vec4( 0.0 );
+#endif
+	int layers = clamp( material_blend_layers, 1, 8 );
+	if ( layers < 8 ) w1.a = 0.0;
+	if ( layers < 7 ) w1.b = 0.0;
+	if ( layers < 6 ) w1.g = 0.0;
+	if ( layers < 5 ) w1.r = 0.0;
+	float sum = max( w1.r + w1.g + w1.b + w1.a, 1e-4 );
+	/* Soft path for hi stream; height applied in combined path when both used. */
+	return w1 / sum;
 }
 
 vec3 lightmapDecode( vec3 c ) {
@@ -1236,11 +1262,20 @@ void main() {
 	vec4 blendW = vec4( 1.0, 0.0, 0.0, 0.0 );
 	if ( material_blend_layers >= 2 ) {
 		blendW = materialBlendWeights( pbrSurfUV );
+		vec4 blendHi = ( material_blend_layers > 4 ) ? materialBlendWeightsHi( pbrSurfUV ) : vec4( 0.0 );
+		float wsum = max( blendW.r + blendW.g + blendW.b + blendW.a + blendHi.r + blendHi.g + blendHi.b + blendHi.a, 1e-4 );
+		blendW /= wsum;
+		blendHi /= wsum;
 		vec4 a0 = materialBlendSampleAlbedo( 0, pbrSurfUV );
 		vec4 a1 = materialBlendSampleAlbedo( 1, pbrSurfUV );
 		vec4 a2 = ( material_blend_layers > 2 ) ? materialBlendSampleAlbedo( 2, pbrSurfUV ) : a0;
 		vec4 a3 = ( material_blend_layers > 3 ) ? materialBlendSampleAlbedo( 3, pbrSurfUV ) : a0;
-		diffuse = a0 * blendW.r + a1 * blendW.g + a2 * blendW.b + a3 * blendW.a;
+		vec4 a4 = ( material_blend_layers > 4 ) ? materialBlendSampleAlbedo( 4, pbrSurfUV ) : a0;
+		vec4 a5 = ( material_blend_layers > 5 ) ? materialBlendSampleAlbedo( 5, pbrSurfUV ) : a0;
+		vec4 a6 = ( material_blend_layers > 6 ) ? materialBlendSampleAlbedo( 6, pbrSurfUV ) : a0;
+		vec4 a7 = ( material_blend_layers > 7 ) ? materialBlendSampleAlbedo( 7, pbrSurfUV ) : a0;
+		diffuse = a0 * blendW.r + a1 * blendW.g + a2 * blendW.b + a3 * blendW.a
+			+ a4 * blendHi.r + a5 * blendHi.g + a6 * blendHi.b + a7 * blendHi.a;
 		color0 = diffuse;
 		base = diffuse;
 	}

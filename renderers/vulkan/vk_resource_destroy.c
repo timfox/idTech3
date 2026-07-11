@@ -358,6 +358,35 @@ void vk_destroy_pipelines( qboolean resetCounter )
 		qvkDestroyPipelineLayout( vk.device, vk.cbt_terrain_compute_layout, NULL );
 		vk.cbt_terrain_compute_layout = VK_NULL_HANDLE;
 	}
+	if ( vk.cbt_patch_counter_view != VK_NULL_HANDLE ) {
+		qvkDestroyImageView( vk.device, vk.cbt_patch_counter_view, NULL );
+		vk.cbt_patch_counter_view = VK_NULL_HANDLE;
+	}
+	if ( vk.cbt_patch_counter_image != VK_NULL_HANDLE ) {
+		qvkDestroyImage( vk.device, vk.cbt_patch_counter_image, NULL );
+		vk.cbt_patch_counter_image = VK_NULL_HANDLE;
+	}
+	if ( vk.cbt_patch_counter_memory != VK_NULL_HANDLE ) {
+		qvkFreeMemory( vk.device, vk.cbt_patch_counter_memory, NULL );
+		vk.cbt_patch_counter_memory = VK_NULL_HANDLE;
+	}
+	if ( vk.cbt_draw_commands_buffer != VK_NULL_HANDLE ) {
+		qvkDestroyBuffer( vk.device, vk.cbt_draw_commands_buffer, NULL );
+		vk.cbt_draw_commands_buffer = VK_NULL_HANDLE;
+	}
+	if ( vk.cbt_draw_commands_memory != VK_NULL_HANDLE ) {
+		qvkFreeMemory( vk.device, vk.cbt_draw_commands_memory, NULL );
+		vk.cbt_draw_commands_memory = VK_NULL_HANDLE;
+	}
+	if ( vk.cbt_params_buffer != VK_NULL_HANDLE ) {
+		qvkDestroyBuffer( vk.device, vk.cbt_params_buffer, NULL );
+		vk.cbt_params_buffer = VK_NULL_HANDLE;
+	}
+	if ( vk.cbt_params_memory != VK_NULL_HANDLE ) {
+		qvkFreeMemory( vk.device, vk.cbt_params_memory, NULL );
+		vk.cbt_params_memory = VK_NULL_HANDLE;
+	}
+	vk.cbt_terrain_descriptor = VK_NULL_HANDLE;
 	if ( vk.vegwind_pipeline != VK_NULL_HANDLE ) {
 		qvkDestroyPipeline( vk.device, vk.vegwind_pipeline, NULL );
 		vk.vegwind_pipeline = VK_NULL_HANDLE;
