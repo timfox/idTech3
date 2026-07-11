@@ -23,5 +23,8 @@ rg -q 'cl_voipLipFlap' "$VOIP" || fail "cl_voipLipFlap cvar missing"
 rg -q 'CL_VoIP_ApplyLipFlap' "$CGAME" || fail "cgame not calling ApplyLipFlap"
 rg -q '\+voip' "$VOIP" || fail "+voip command missing"
 rg -q 'SetEntityMorphWeight' "$VOIP" || fail "morph weight drive missing"
+rg -q 'CL_VoIP_SyncFacs|FACS_AU26' "$VOIP" || fail "VoIP→FACS AU26 sync missing"
+rg -q 'cl_voipLipFlapFacs' "$VOIP" || fail "cl_voipLipFlapFacs cvar missing"
+rg -q 'g_facial.h' "$VOIP" || fail "VoIP must include g_facial.h for FACS"
 
 echo "test_voip_lip_flap: passed"
