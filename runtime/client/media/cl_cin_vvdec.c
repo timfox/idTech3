@@ -24,12 +24,12 @@ typedef struct {
 	vvdecParams      params;
 
 	int              fileSize;
-	int              fileOffset;
 	byte            *fileData;
 
 	byte            *frameBuffer;
 	int              frameBufferSize;
 
+	qboolean         bitstreamSent;
 	qboolean         sentDrain;
 	qboolean         eof;
 	int              width;
@@ -57,50 +57,6 @@ static int cin_vvdec_clip_byte(int value) {
 		return 255;
 	}
 	return value;
-}
-
-static qboolean cin_vvdec_is_start_code3(const byte *buf) {
-	return buf[0] == 0 && buf[1] == 0 && buf[2] == 1;
-}
-
-static qboolean cin_vvdec_is_start_code4(const byte *buf) {
-	return buf[0] == 0 && buf[1] == 0 && buf[2] == 0 && buf[3] == 1;
-}
-
-static int cin_vvdec_next_nal(const vvdecContext_t *ctx, int offset, const byte **nalData, int *nalSize) {
-	int pos;
-	int start = -1;
-	int next = -1;
-
-	if (!ctx || !nalData || !nalSize || offset >= ctx->fileSize) {
-		return -1;
-	}
-
-	for (pos = offset; pos + 3 < ctx->fileSize; pos++) {
-		if (cin_vvdec_is_start_code4(ctx->fileData + pos) || cin_vvdec_is_start_code3(ctx->fileData + pos)) {
-			start = pos;
-			break;
-		}
-	}
-
-	if (start < 0) {
-		return -1;
-	}
-
-	for (pos = start + 3; pos + 3 < ctx->fileSize; pos++) {
-		if (cin_vvdec_is_start_code4(ctx->fileData + pos) || cin_vvdec_is_start_code3(ctx->fileData + pos)) {
-			next = pos;
-			break;
-		}
-	}
-
-	if (next < 0) {
-		next = ctx->fileSize;
-	}
-
-	*nalData = ctx->fileData + start;
-	*nalSize = next - start;
-	return next;
 }
 
 static unsigned cin_vvdec_plane_sample(const vvdecPlane *plane, int x, int y) {
@@ -226,28 +182,17 @@ static qboolean cin_vvdec_decodeFrame(cinModernDecoder_t *dec, cinFrame_t *frame
 		vvdecFrame *decodedFrame = NULL;
 		int ret;
 
-		if (ctx->fileOffset < ctx->fileSize) {
-			const byte *nalData = NULL;
-			int nalSize = 0;
-			int nextOffset = cin_vvdec_next_nal(ctx, ctx->fileOffset, &nalData, &nalSize);
+		if (!ctx->bitstreamSent) {
+			vvdecAccessUnit accessUnit;
 
-			if (nextOffset < 0 || !nalData || nalSize <= 0) {
-				ctx->fileOffset = ctx->fileSize;
-				continue;
-			}
+			vvdec_accessUnit_default(&accessUnit);
+			accessUnit.payload = (unsigned char *)ctx->fileData;
+			accessUnit.payloadSize = ctx->fileSize;
+			accessUnit.payloadUsedSize = ctx->fileSize;
 
-			ctx->fileOffset = nextOffset;
-
-			{
-				vvdecAccessUnit accessUnit;
-
-				vvdec_accessUnit_default(&accessUnit);
-				accessUnit.payload = (unsigned char *)nalData;
-				accessUnit.payloadSize = nalSize;
-				accessUnit.payloadUsedSize = nalSize;
-
-				ret = vvdec_decode(ctx->vvdecCtx, &accessUnit, &decodedFrame);
-			}
+			/* Feed the full in-memory Annex B stream once, then drain pictures. */
+			ret = vvdec_decode(ctx->vvdecCtx, &accessUnit, &decodedFrame);
+			ctx->bitstreamSent = qtrue;
 		} else if (!ctx->sentDrain) {
 			ret = vvdec_flush(ctx->vvdecCtx, &decodedFrame);
 			ctx->sentDrain = qtrue;
@@ -316,7 +261,7 @@ static void cin_vvdec_seek(cinModernDecoder_t *dec, int timeMs) {
 		ctx->vvdecCtx = vvdec_decoder_open(&ctx->params);
 	}
 
-	ctx->fileOffset = 0;
+	ctx->bitstreamSent = qfalse;
 	ctx->sentDrain = qfalse;
 	ctx->eof = qfalse;
 }

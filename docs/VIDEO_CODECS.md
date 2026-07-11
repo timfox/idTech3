@@ -45,6 +45,9 @@ cmake -DUSE_FFMPEG=ON -DUSE_DAV1D=ON -DUSE_DAV2D=ON -DUSE_VVDEC=ON -DUSE_VPX=ON 
 
 Each codec is detected via pkg-config. Missing libraries produce warnings, not errors.
 
+Native `dav1d`, `dav2d`, and `vvdec` paths are aimed at raw elementary streams.
+Containerized media such as `.mp4` and `.mkv` still routes through FFmpeg demuxing.
+
 ## Console Commands
 
 ```

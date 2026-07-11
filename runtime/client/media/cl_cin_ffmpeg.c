@@ -7,7 +7,7 @@ existing id Tech 3 / ioquake3 code.
 The engine framework is based on id Tech 3 (GPLv2).
 
 FFmpeg video decoder backend for id Tech 3 engine.
-Provides H.264, H.265, VP8, VP9, AV1, Theora, and all FFmpeg-supported
+Provides H.264, H.265, VVC, VP8, VP9, AV1, AV2, Theora, and all FFmpeg-supported
 video codecs through libavcodec/libavformat/libswscale.
 
 Compile with USE_FFMPEG=ON and link against libavcodec, libavformat,
