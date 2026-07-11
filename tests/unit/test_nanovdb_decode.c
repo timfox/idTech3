@@ -5,7 +5,7 @@
 #include <string.h>
 
 #include "qcommon/q_shared.h"
-#include "../../src/renderers/vulkan/vk_nanovdb_decode.h"
+#include "../../renderers/vulkan/vk_nanovdb_decode.h"
 
 #ifndef TEST_DATA_DIR
 #define TEST_DATA_DIR "tests/data"

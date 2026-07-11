@@ -7,7 +7,7 @@ count=0
 while IFS= read -r f; do
   n=$(grep -c '#if' "$f" 2>/dev/null || true)
   count=$((count + n))
-done < <(find "$ROOT/src/renderers/vulkan" -name '*.c' -o -name '*.frag' -o -name '*.vert' 2>/dev/null)
+done < <(find "$ROOT/renderers/vulkan" -name '*.c' -o -name '*.frag' -o -name '*.vert' 2>/dev/null)
 echo "Material permutation ifdef count: $count (threshold $THRESH)"
 if (( count > THRESH )); then
   echo "WARN: exceeds budget — see docs/MATERIAL_PERMUTATIONS.md"

@@ -4,9 +4,9 @@
  *
  * API: id Tech 3 UI VM / native bridge (vmMain + dllEntry).
  */
-#include "../../../src/qcommon/q_shared.h"
-#include "../../../src/qcommon/qcommon.h"
-#include "../../../src/ui/ui_public.h"
+#include "../../../engine/core/q_shared.h"
+#include "../../../engine/core/qcommon.h"
+#include "../../../runtime/ui/ui_public.h"
 
 #include <stddef.h>
 

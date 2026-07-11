@@ -6,8 +6,8 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 MANIFEST="$ROOT/docs/webgpu_shader_manifest.txt"
 failures=0
 
-WSP_DIR="$ROOT/src/renderers/vulkan/shaders/glsl/wsp"
-MGS_DIR="$ROOT/src/renderers/vulkan/shaders/glsl/mgs"
+WSP_DIR="$ROOT/renderers/vulkan/shaders/glsl/wsp"
+MGS_DIR="$ROOT/renderers/vulkan/shaders/glsl/mgs"
 
 mkdir -p "$(dirname "$MANIFEST")"
 
