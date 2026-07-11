@@ -36,8 +36,12 @@ static void MenuVideo_SetVideoPath( const char *path )
 	char normalized[MAX_QPATH];
 
 	if ( !path || !path[0] ) {
-		Cvar_Set( "cl_menuBackgroundVideo", "" );
-		Cvar_Set( "r_menuVideo", "" );
+		if ( cl_menuBackgroundVideo && cl_menuBackgroundVideo->string[0] ) {
+			Cvar_Set( "cl_menuBackgroundVideo", "" );
+		}
+		if ( r_menuVideo && r_menuVideo->string[0] ) {
+			Cvar_Set( "r_menuVideo", "" );
+		}
 		return;
 	}
 
@@ -47,14 +51,24 @@ static void MenuVideo_SetVideoPath( const char *path )
 		Com_sprintf( normalized, sizeof( normalized ), "video/%s", path );
 	}
 
-	Cvar_Set( "cl_menuBackgroundVideo", normalized );
-	Cvar_Set( "r_menuVideo", normalized );
+	if ( !cl_menuBackgroundVideo || Q_stricmp( cl_menuBackgroundVideo->string, normalized ) != 0 ) {
+		Cvar_Set( "cl_menuBackgroundVideo", normalized );
+	}
+	if ( !r_menuVideo || Q_stricmp( r_menuVideo->string, normalized ) != 0 ) {
+		Cvar_Set( "r_menuVideo", normalized );
+	}
 }
 
 static void MenuVideo_SyncLoopValue( int enabled )
 {
-	Cvar_Set( "cl_menuBackgroundVideoLoop", enabled ? "1" : "0" );
-	Cvar_Set( "r_menuVideoLoop", enabled ? "1" : "0" );
+	const char *value = enabled ? "1" : "0";
+
+	if ( !cl_menuBackgroundVideoLoop || cl_menuBackgroundVideoLoop->integer != enabled ) {
+		Cvar_Set( "cl_menuBackgroundVideoLoop", value );
+	}
+	if ( !r_menuVideoLoop || r_menuVideoLoop->integer != enabled ) {
+		Cvar_Set( "r_menuVideoLoop", value );
+	}
 }
 
 static void MenuVideo_Set_f( void )

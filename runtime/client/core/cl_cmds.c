@@ -359,48 +359,109 @@ static serverInfo_t *CL_P2PBrowserServer( const char *source, int index, int *co
 	return NULL;
 }
 
-static void CL_P2PListSource( const char *source, serverInfo_t *servers, int count ) {
-	int i;
-	int matches;
+static qboolean CL_P2PServerMatches( const serverInfo_t *server ) {
+	if ( !server ) {
+		return qfalse;
+	}
+	if ( !server->adr.port && !server->p2pAddr[0] ) {
+		return qfalse;
+	}
+	if ( !server->p2pAvailable && !server->p2pAddr[0] ) {
+		return qfalse;
+	}
+	return qtrue;
+}
 
-	matches = 0;
+static int CL_P2PServerSortPing( const serverInfo_t *server ) {
+	if ( !server ) {
+		return 999999;
+	}
+	if ( server->ping <= 0 ) {
+		return 999999;
+	}
+	return server->ping;
+}
+
+static int CL_P2PServerBestIndex( serverInfo_t *servers, int count, qboolean *used ) {
+	int bestIndex;
+	int i;
+
+	bestIndex = -1;
 
 	for ( i = 0; i < count; i++ ) {
-		if ( !servers[i].adr.port && !servers[i].p2pAddr[0] ) {
+		if ( used[i] || !CL_P2PServerMatches( &servers[i] ) ) {
 			continue;
 		}
-		if ( !servers[i].p2pAvailable && !servers[i].p2pAddr[0] ) {
+
+		if ( bestIndex < 0 ) {
+			bestIndex = i;
 			continue;
 		}
+
+		if ( CL_P2PServerSortPing( &servers[i] ) < CL_P2PServerSortPing( &servers[bestIndex] ) ) {
+			bestIndex = i;
+			continue;
+		}
+
+		if ( CL_P2PServerSortPing( &servers[i] ) == CL_P2PServerSortPing( &servers[bestIndex] ) &&
+			Q_stricmp( servers[i].hostName, servers[bestIndex].hostName ) < 0 ) {
+			bestIndex = i;
+		}
+	}
+
+	return bestIndex;
+}
+
+static void CL_P2PListSource( const char *source, serverInfo_t *servers, int count ) {
+	qboolean *used;
+	int bestIndex;
+	int matches;
+
+	if ( !servers || count <= 0 ) {
+		Com_Printf( "%-9s no P2P-capable cached servers\n", source );
+		return;
+	}
+
+	used = (qboolean *)Z_Malloc( count * sizeof( *used ) );
+	matches = 0;
+
+	while ( ( bestIndex = CL_P2PServerBestIndex( servers, count, used ) ) >= 0 ) {
+		serverInfo_t *server = &servers[bestIndex];
+		used[bestIndex] = qtrue;
 
 		Com_Printf(
 			"%-9s %3d  ping:%4d  map:%-16s  host:%s\n",
 			source,
-			i,
-			servers[i].ping,
-			servers[i].mapName[0] ? servers[i].mapName : "<unknown>",
-			servers[i].hostName[0] ? servers[i].hostName : "<unnamed>"
+			bestIndex,
+			server->ping,
+			server->mapName[0] ? server->mapName : "<unknown>",
+			server->hostName[0] ? server->hostName : "<unnamed>"
 		);
 		Com_Printf(
 			"           p2p:%s  udp:%s\n",
-			servers[i].p2pAddr[0] ? servers[i].p2pAddr : "<unavailable>",
-			NET_AdrToStringwPort( &servers[i].adr )
+			server->p2pAddr[0] ? server->p2pAddr : "<unavailable>",
+			NET_AdrToStringwPort( &server->adr )
 		);
 		Com_Printf(
 			"           session:%s  proto:%d  reconnect:%ds  migrate:%s  secure:%s  failover:%s\n",
-			servers[i].p2pSessionId[0] ? servers[i].p2pSessionId : "<auto>",
-			servers[i].protocol,
-			servers[i].p2pReconnectWindow,
-			servers[i].p2pHostMigration ? "yes" : "no",
-			servers[i].p2pAntiCheat[0] ? servers[i].p2pAntiCheat : "unknown",
-			servers[i].p2pFailover[0] ? servers[i].p2pFailover : "unknown"
+			server->p2pSessionId[0] ? server->p2pSessionId : "<auto>",
+			server->protocol,
+			server->p2pReconnectWindow,
+			server->p2pHostMigration ? "yes" : "no",
+			server->p2pAntiCheat[0] ? server->p2pAntiCheat : "unknown",
+			server->p2pFailover[0] ? server->p2pFailover : "unknown"
 		);
 		matches++;
 	}
 
 	if ( !matches ) {
 		Com_Printf( "%-9s no P2P-capable cached servers\n", source );
+	} else {
+		Com_Printf( "%-9s listed %d P2P-capable cached server%s (sorted by ping)\n",
+			source, matches, matches == 1 ? "" : "s" );
 	}
+
+	Z_Free( used );
 }
 
 static void CL_P2PList_f( void ) {

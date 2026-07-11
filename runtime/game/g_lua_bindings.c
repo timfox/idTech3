@@ -785,6 +785,24 @@ static int l_cvars_getInteger( lua_State *L )
 	return 1;
 }
 
+static int l_cvars_getBoolean( lua_State *L )
+{
+	lua_pushboolean( L, Cvar_VariableIntegerValue( luaL_checkstring( L, 1 ) ) ? qtrue : qfalse );
+	return 1;
+}
+
+static int l_cvars_exists( lua_State *L )
+{
+	lua_pushboolean( L, Cvar_Flags( luaL_checkstring( L, 1 ) ) != CVAR_NONEXISTENT );
+	return 1;
+}
+
+static int l_cvars_flags( lua_State *L )
+{
+	lua_pushinteger( L, (lua_Integer)Cvar_Flags( luaL_checkstring( L, 1 ) ) );
+	return 1;
+}
+
 static int l_cvars_set( lua_State *L )
 {
 	Cvar_Set( luaL_checkstring( L, 1 ), luaL_checkstring( L, 2 ) );
@@ -812,6 +830,12 @@ static int l_cvars_setInteger( lua_State *L )
 static int l_cvars_setBoolean( lua_State *L )
 {
 	Cvar_Set( luaL_checkstring( L, 1 ), lua_toboolean( L, 2 ) ? "1" : "0" );
+	return 0;
+}
+
+static int l_cvars_reset( lua_State *L )
+{
+	Cvar_Reset( luaL_checkstring( L, 1 ) );
 	return 0;
 }
 
@@ -1914,10 +1938,14 @@ void LuaBindings_RegisterAll(void *luaState) {
 		{"getString", l_cvars_getString},
 		{"getNumber", l_cvars_getNumber},
 		{"getInteger", l_cvars_getInteger},
+		{"getBoolean", l_cvars_getBoolean},
+		{"exists", l_cvars_exists},
+		{"flags", l_cvars_flags},
 		{"set", l_cvars_set},
 		{"setNumber", l_cvars_setNumber},
 		{"setInteger", l_cvars_setInteger},
 		{"setBoolean", l_cvars_setBoolean},
+		{"reset", l_cvars_reset},
 		{NULL, NULL}
 	};
 	registerTable(L, "Cvars", cvarFuncs);

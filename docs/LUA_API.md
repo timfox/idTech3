@@ -187,6 +187,22 @@ local name = Engine.DB.profileGet("player_name")
 Engine.DB.profileDelete("player_name")
 ```
 
+## Engine.Cvars
+
+```lua
+local name = Engine.Cvars.getString("name")
+local speed = Engine.Cvars.getNumber("g_speed")
+local maxClients = Engine.Cvars.getInteger("sv_maxclients")
+local enabled = Engine.Cvars.getBoolean("net_p2p")
+local exists = Engine.Cvars.exists("sv_hostname")
+local flags = Engine.Cvars.flags("sv_hostname")
+Engine.Cvars.set("sv_hostname", "Arena")
+Engine.Cvars.setNumber("timescale", 1.0)
+Engine.Cvars.setInteger("sv_maxclients", 16)
+Engine.Cvars.setBoolean("g_allowVote", true)
+Engine.Cvars.reset("sv_hostname")
+```
+
 ## Engine.Telemetry
 
 ```lua
