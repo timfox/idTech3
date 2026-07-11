@@ -63,7 +63,7 @@ Engine.Music.addStinger(track, trigger, cooldown, oneShot)
 Engine.Music.fadeToSilence(fadeTime)
 ```
 
-## Engine.Face (6 functions)
+## Engine.Face (11 functions)
 
 ```lua
 Engine.Face.create(entityNum)                 -- returns faceHandle
@@ -72,6 +72,12 @@ Engine.Face.setExpression(handle, exprId, weight, blendTime)
 Engine.Face.setFlex(handle, flexId, value)
 Engine.Face.setPhoneme(handle, phonemeId, weight)
 Engine.Face.setBlinkRate(handle, blinksPerMinute)
+Engine.Face.setAU(handle, au|name, intensity) -- FACS Action Unit (see docs/FACS.md)
+Engine.Face.setAUSide(handle, au|name, side, intensity)
+Engine.Face.getAU(handle, au|name)            -- returns intensity
+Engine.Face.clearAUs(handle)
+Engine.Face.auName(auIndex)                   -- returns "AU12", etc.
+-- Constants: Engine.Face.AU1 .. AU43, SIDE_BOTH, SIDE_LEFT, SIDE_RIGHT
 ```
 
 ## Engine.Horde (7 functions)
