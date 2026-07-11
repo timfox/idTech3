@@ -1198,7 +1198,7 @@ image_t *R_CreateImage( const char *name, const char *name2, byte *pic, int widt
 	}
 
 	if ( tr.numImages == MAX_DRAWIMAGES ) {
-		ri.Error( ERR_DROP, "R_CreateImage: MAX_DRAWIMAGES hit" );
+		ri.Error( ERR_DROP, "R_CreateImage: MAX_DRAWIMAGES hit (name='%s' shaders=%d)", name, tr.numShaders );
 	}
 
 	image = ri.Hunk_Alloc( sizeof( *image ) + namelen + namelen2, h_low );

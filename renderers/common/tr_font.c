@@ -355,7 +355,11 @@ static FT_Bitmap *R_RenderGlyph( FT_GlyphSlot glyph, glyphInfo_t *glyphOut, qboo
 		}
 		bit2 = &glyph->bitmap;
 		glyphOut->height = bit2->rows;
-		glyphOut->pitch = bit2->width;
+		/* FT LCD bitmaps are 3× wide (RGB subpixels). Pack/UV use logical pixels. */
+		glyphOut->pitch = bit2->width / 3;
+		if ( glyphOut->pitch < 1 && bit2->width > 0 ) {
+			glyphOut->pitch = 1;
+		}
 		glyphOut->top = ( glyph->metrics.horiBearingY >> 6 ) + 1;
 		glyphOut->bottom = _TRUNC( _FLOOR( glyph->metrics.horiBearingY - glyph->metrics.height ) );
 		return bit2;
@@ -494,6 +498,16 @@ static glyphInfo_t *RE_ConstructGlyphInfo( unsigned char *imageOut, int *xOut, i
 		scaled_width = glyph.pitch;
 		scaled_height = glyph.height;
 
+		/* Glyph larger than the atlas cell cannot be packed — skip without
+		 * signaling a page flush, or RegisterFont will create pages forever. */
+		if ( scaled_width >= 255 || *maxHeight >= 255 ) {
+			if ( ownedBitmap ) {
+				ri.Free( bitmap->buffer );
+				ri.Free( bitmap );
+			}
+			return &glyph;
+		}
+
 		// we need to make sure we fit
 		if (*xOut + scaled_width + 1 >= 255) {
 			*xOut = 0;
@@ -501,15 +515,14 @@ static glyphInfo_t *RE_ConstructGlyphInfo( unsigned char *imageOut, int *xOut, i
 		}
 
 		if (*yOut + *maxHeight + 1 >= 255) {
-			*yOut = -1;
-			*xOut = -1;
-			ri.Free(bitmap->buffer);
-			ri.Free(bitmap);
-			return &glyph;
-		}
-
-
-		if (*yOut + *maxHeight + 1 >= 255) {
+			/* Empty page still too small: skip glyph (do not request another page). */
+			if ( *xOut == 0 && *yOut == 0 ) {
+				if ( ownedBitmap ) {
+					ri.Free( bitmap->buffer );
+					ri.Free( bitmap );
+				}
+				return &glyph;
+			}
 			*yOut = -1;
 			*xOut = -1;
 			if ( ownedBitmap ) {
@@ -526,6 +539,7 @@ static glyphInfo_t *RE_ConstructGlyphInfo( unsigned char *imageOut, int *xOut, i
 			for ( i = 0; i < glyph.height; i++ ) {
 				unsigned char *rowSrc = src + i * bitmap->pitch;
 				unsigned char *rowDst = dst + i * ( 256 * 4 );
+				/* glyph.pitch is logical pixels; FT LCD row is 3 bytes each. */
 				for ( j = 0; j < glyph.pitch; j++ ) {
 					unsigned char r = rowSrc[j * 3 + 0];
 					unsigned char g = rowSrc[j * 3 + 1];
@@ -548,7 +562,6 @@ static glyphInfo_t *RE_ConstructGlyphInfo( unsigned char *imageOut, int *xOut, i
 
 			if (bitmap->pixel_mode == ft_pixel_mode_mono) {
 				for (i = 0; i < glyph.height; i++) {
-					int j;
 					unsigned char *_src = src;
 					unsigned char *_dst = dst;
 					unsigned char mask = 0x80;
@@ -873,6 +886,14 @@ try_freetype:
 		}
 
 		if (xOut == -1 || yOut == -1) {
+			/* Safety: LCD/dpi packing bugs used to create pages forever. */
+			if ( imageNumber >= 64 ) {
+				ri.Printf( PRINT_WARNING, "RE_RegisterFont: aborting atlas for '%s' @ %dpt after %d pages\n",
+					resolvedFontName, pointSize, imageNumber );
+				ri.Free( out );
+				R_FontReleaseSlotFace( regSlot );
+				return;
+			}
 			scaledSize = 256 * 256;
 			newSize = scaledSize * 4;
 			imageBuff = ri.Malloc(newSize);

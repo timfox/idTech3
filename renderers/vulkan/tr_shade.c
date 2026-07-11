@@ -1638,6 +1638,7 @@ static void RB_IterateStagesGeneric( const shaderCommands_t *input )
 			/* Multi-material blend: bind unique layer arrays on set 19. */
 			if ( vk.set_layout_blend_layers != VK_NULL_HANDLE ) {
 				static qboolean blendDescReady;
+				static VkDescriptorPool blendDescPool;
 				image_t *white = tr.whiteImage;
 				image_t *albedos[8];
 				image_t *normals[8];
@@ -1645,6 +1646,12 @@ static void RB_IterateStagesGeneric( const shaderCommands_t *input )
 				VkDescriptorImageInfo imgInfos[24];
 				VkWriteDescriptorSet writes[3];
 				int li;
+
+				/* Descriptor pool is recreated on vid_restart / ERR_DROP recovery. */
+				if ( blendDescReady && blendDescPool != vk.descriptor_pool ) {
+					blendDescReady = qfalse;
+					vk.blend_layers_descriptor = VK_NULL_HANDLE;
+				}
 
 				if ( !blendDescReady && vk.descriptor_pool != VK_NULL_HANDLE ) {
 					VkDescriptorSetAllocateInfo alloc;
@@ -1655,6 +1662,7 @@ static void RB_IterateStagesGeneric( const shaderCommands_t *input )
 					alloc.pSetLayouts = &vk.set_layout_blend_layers;
 					if ( qvkAllocateDescriptorSets( vk.device, &alloc, &vk.blend_layers_descriptor ) == VK_SUCCESS ) {
 						blendDescReady = qtrue;
+						blendDescPool = vk.descriptor_pool;
 					}
 				}
 
