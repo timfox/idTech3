@@ -229,6 +229,7 @@
     <ClCompile Include="..\..\..\renderers\vulkan\tr_curve.c" />
     <ClCompile Include="..\..\..\renderers\vulkan\tr_image.c" />
     <ClCompile Include="..\..\..\renderers\common\tr_font.c" />
+    <ClCompile Include="..\..\..\renderers\common\tr_font_stub.c" />
     <ClCompile Include="..\..\..\renderers\common\tr_image_bmp.c" />
     <ClCompile Include="..\..\..\renderers\common\tr_image_jpg.c" />
     <ClCompile Include="..\..\..\renderers\common\tr_image_pcx.c" />
@@ -352,6 +353,7 @@
     <ClCompile Include="..\..\..\renderers\common\tr_model_freeusd_register.c" />
     <ClCompile Include="..\..\..\renderers\common\tr_vector_font.c" />
     <ClCompile Include="..\..\..\renderers\common\tr_vector_font_glyphlet.c" />
+    <ClCompile Include="..\..\..\renderers\common\tr_vector_font_glyphlet_stub.c" />
     <ClCompile Include="..\..\..\renderers\vulkan\extensions\rtx\vk_rtx.c" />
     <ClCompile Include="..\..\..\renderers\vulkan\extensions\rtx\vk_rtx_entities.c" />
     <ClCompile Include="..\..\..\renderers\vulkan\extensions\rtx\vk_rtx_world.c" />

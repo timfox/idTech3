@@ -16,15 +16,18 @@ file(RELATIVE_PATH _g_bt "${CMAKE_SOURCE_DIR}" "${IDTECH3_DIR_RUNTIME_GAME}/g_bt
 file(RELATIVE_PATH _g_stub "${CMAKE_SOURCE_DIR}" "${IDTECH3_DIR_RUNTIME_GAME}/game_middleware_stubs.c")
 
 set(IDTECH3_GAME_AI_MIDDLEWARE_SRCS
-	${_g_dir} ${_g_resp} ${_g_cho} ${_g_dis} ${_g_fac} ${_g_hor}
+	${_g_dir} ${_g_resp} ${_g_cho} ${_g_dis} ${_g_hor}
 	${_g_goap} ${_g_aim} ${_g_eda} ${_g_bt}
 )
 
 macro(idtech3_strip_game_ai_middleware_sources)
 	list(REMOVE_ITEM CLIENT_SRCS ${IDTECH3_GAME_AI_MIDDLEWARE_SRCS})
+	list(REMOVE_ITEM CLIENT_SRCS ${_g_fac})
 endmacro()
 
 macro(idtech3_append_game_ai_middleware_sources)
+	# FACS facial animation is used by client VoIP/morph paths — always link.
+	list(APPEND CLIENT_SRCS ${_g_fac})
 	if(USE_GAME_AI_MIDDLEWARE)
 		list(APPEND CLIENT_SRCS ${IDTECH3_GAME_AI_MIDDLEWARE_SRCS})
 	else()
