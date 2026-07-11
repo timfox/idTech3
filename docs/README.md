@@ -47,6 +47,7 @@ Documentation is grouped by **tier**. Most files remain at their historical path
 - [QUICKSTART.md](QUICKSTART.md)
 - [MOD_SDK.md](MOD_SDK.md)
 - [RADIANT.md](RADIANT.md)
+- [VOIP.md](VOIP.md) — Opus voice chat + head lip flap
 
 ## Repository layout (2026)
 

@@ -7,11 +7,17 @@ VoIP implementation using Opus codec.
 Pipeline:
   Capture (SDL/OpenAL) -> Opus encode -> MSG_Write -> Network
   -> MSG_Read -> Opus decode -> S_VoipSamples playback
+
+Lip flap:
+  Per-client RMS power (local capture + remote decode) drives jaw/mouth
+  morph targets on nearby player head models via RE_SetEntityMorphWeight.
 ===========================================================================
 */
 
 #include "client.h"
 #include "cl_voip.h"
+
+#include <math.h>
 
 #ifdef USE_OPUS
 #include <opus.h>
@@ -23,10 +29,19 @@ static cvar_t *cl_voip;
 static cvar_t *cl_voipSend;
 static cvar_t *cl_voipGainDuringCapture;
 static cvar_t *cl_voipShowMeter;
+static cvar_t *cl_voipLipFlap;
+static cvar_t *cl_voipLipFlapScale;
+static cvar_t *cl_voipLipFlapThresh;
+static cvar_t *cl_voipLipFlapDecay;
+static cvar_t *cl_voipLipFlapMatch;
+static cvar_t *cl_voipLipFlapMorph;
+static cvar_t *cl_voipLipFlapRate;
 
 static qboolean voipInitialized = qfalse;
 static qboolean voipCapturing = qfalse;
 static float    voipPower = 0.0f;
+static float    voipClientPower[VOIP_MAX_CLIENTS];
+static int      voipClientLastTalk[VOIP_MAX_CLIENTS];
 static uint32_t voipOutSequence = 0;
 static uint32_t voipInSequence[VOIP_MAX_CLIENTS];
 
@@ -47,6 +62,236 @@ void SNDDMA_Capture( int samples, byte *data ) { (void)samples; (void)data; }
 void SNDDMA_StopCapture( void ) {}
 #endif
 
+static float CL_VoIP_DistSquared( const vec3_t a, const vec3_t b ) {
+	float dx = a[0] - b[0];
+	float dy = a[1] - b[1];
+	float dz = a[2] - b[2];
+	return dx * dx + dy * dy + dz * dz;
+}
+
+static void CL_VoIP_SetClientPower( int clientNum, float rms ) {
+	if ( clientNum < 0 || clientNum >= VOIP_MAX_CLIENTS ) {
+		return;
+	}
+	if ( rms < 0.0f ) {
+		rms = 0.0f;
+	}
+	if ( rms > voipClientPower[clientNum] ) {
+		voipClientPower[clientNum] = rms;
+	} else {
+		voipClientPower[clientNum] = voipClientPower[clientNum] * 0.55f + rms * 0.45f;
+	}
+	voipClientLastTalk[clientNum] = cls.realtime;
+}
+
+static void CL_VoIP_DecayClientPower( void ) {
+	int i;
+	float decay;
+
+	if ( !cl_voipLipFlap || !cl_voipLipFlap->integer ) {
+		return;
+	}
+
+	decay = cl_voipLipFlapDecay ? cl_voipLipFlapDecay->value : 0.85f;
+	if ( decay < 0.1f ) {
+		decay = 0.1f;
+	} else if ( decay > 0.99f ) {
+		decay = 0.99f;
+	}
+
+	for ( i = 0; i < VOIP_MAX_CLIENTS; i++ ) {
+		if ( voipClientPower[i] <= 0.0f ) {
+			continue;
+		}
+		if ( cls.realtime - voipClientLastTalk[i] < 40 ) {
+			continue;
+		}
+		voipClientPower[i] *= decay;
+		if ( voipClientPower[i] < 0.001f ) {
+			voipClientPower[i] = 0.0f;
+		}
+	}
+}
+
+/*
+===============
+CL_VoIP_MatchClientNearOrigin
+
+Find the player client whose body/head is closest to a refEntity origin.
+===============
+*/
+static int CL_VoIP_MatchClientNearOrigin( const vec3_t origin ) {
+	int i;
+	int bestClient = -1;
+	float matchDist;
+	float bestDist;
+	float headZ;
+
+	if ( cls.state != CA_ACTIVE || !cl.snap.valid ) {
+		return -1;
+	}
+
+	matchDist = cl_voipLipFlapMatch ? cl_voipLipFlapMatch->value : 80.0f;
+	if ( matchDist < 16.0f ) {
+		matchDist = 16.0f;
+	}
+	bestDist = matchDist * matchDist;
+	headZ = 48.0f;
+
+	for ( i = 0; i < cl.snap.numEntities; i++ ) {
+		const entityState_t *es = &cl.parseEntities[
+			( cl.snap.parseEntitiesNum + i ) & ( MAX_PARSE_ENTITIES - 1 ) ];
+		vec3_t head;
+		float dBody;
+		float dHead;
+		float d;
+		int clientNum;
+
+		if ( es->eType != ET_PLAYER ) {
+			continue;
+		}
+
+		clientNum = es->clientNum;
+		if ( clientNum < 0 || clientNum >= VOIP_MAX_CLIENTS ) {
+			clientNum = es->number;
+		}
+		if ( clientNum < 0 || clientNum >= VOIP_MAX_CLIENTS ) {
+			continue;
+		}
+
+		dBody = CL_VoIP_DistSquared( origin, es->origin );
+		VectorCopy( es->origin, head );
+		head[2] += headZ;
+		dHead = CL_VoIP_DistSquared( origin, head );
+		d = dBody < dHead ? dBody : dHead;
+
+		if ( d < bestDist ) {
+			bestDist = d;
+			bestClient = clientNum;
+		}
+	}
+
+	/* Predicted local player may be absent from the entity list in first person. */
+	if ( cl.snap.ps.clientNum >= 0 && cl.snap.ps.clientNum < VOIP_MAX_CLIENTS ) {
+		vec3_t head;
+		float dBody;
+		float dHead;
+		float d;
+
+		dBody = CL_VoIP_DistSquared( origin, cl.snap.ps.origin );
+		VectorCopy( cl.snap.ps.origin, head );
+		head[2] += cl.snap.ps.viewheight > 0 ? (float)cl.snap.ps.viewheight : headZ;
+		dHead = CL_VoIP_DistSquared( origin, head );
+		d = dBody < dHead ? dBody : dHead;
+		if ( d < bestDist ) {
+			bestClient = cl.snap.ps.clientNum;
+		}
+	}
+
+	return bestClient;
+}
+
+static void CL_VoIP_ApplyMorphNames( refEntity_t *ent, float weight ) {
+	char morphList[MAX_CVAR_VALUE_STRING];
+	char *p;
+	char *start;
+
+	if ( !re.SetEntityMorphWeight ) {
+		return;
+	}
+
+	if ( !cl_voipLipFlapMorph || !cl_voipLipFlapMorph->string[0] ) {
+		re.SetEntityMorphWeight( ent, "jaw", weight );
+		re.SetEntityMorphWeight( ent, "mouthOpen", weight );
+		return;
+	}
+
+	Q_strncpyz( morphList, cl_voipLipFlapMorph->string, sizeof( morphList ) );
+	p = morphList;
+	while ( *p ) {
+		while ( *p == ',' || *p == ';' || *p == ' ' || *p == '\t' ) {
+			p++;
+		}
+		if ( !*p ) {
+			break;
+		}
+		start = p;
+		while ( *p && *p != ',' && *p != ';' && *p != ' ' && *p != '\t' ) {
+			p++;
+		}
+		if ( *p ) {
+			*p++ = '\0';
+		}
+		if ( start[0] ) {
+			re.SetEntityMorphWeight( ent, start, weight );
+		}
+	}
+}
+
+void CL_VoIP_ApplyLipFlap( refEntity_t *ent ) {
+	int clientNum;
+	int i;
+	float power;
+	float scale;
+	float thresh;
+	float weight;
+	float rate;
+	float flap;
+	qboolean anyTalking = qfalse;
+
+	if ( !ent || ent->reType != RT_MODEL ) {
+		return;
+	}
+	if ( !cl_voipLipFlap || !cl_voipLipFlap->integer ) {
+		return;
+	}
+	if ( !re.SetEntityMorphWeight ) {
+		return;
+	}
+
+	for ( i = 0; i < VOIP_MAX_CLIENTS; i++ ) {
+		if ( voipClientPower[i] > 0.0f ) {
+			anyTalking = qtrue;
+			break;
+		}
+	}
+	if ( !anyTalking ) {
+		return;
+	}
+
+	clientNum = CL_VoIP_MatchClientNearOrigin( ent->origin );
+	if ( clientNum < 0 ) {
+		return;
+	}
+
+	power = voipClientPower[clientNum];
+	thresh = cl_voipLipFlapThresh ? cl_voipLipFlapThresh->value : 0.02f;
+	if ( power < thresh ) {
+		return;
+	}
+
+	scale = cl_voipLipFlapScale ? cl_voipLipFlapScale->value : 4.0f;
+	weight = power * scale;
+	if ( weight > 1.0f ) {
+		weight = 1.0f;
+	}
+
+	/* Light oscillation so sustained speech reads as lip motion, not a static open jaw. */
+	rate = cl_voipLipFlapRate ? cl_voipLipFlapRate->value : 12.0f;
+	flap = 0.62f + 0.38f * sinf( (float)cls.realtime * 0.001f * rate + (float)clientNum * 1.7f );
+	weight *= flap;
+
+	CL_VoIP_ApplyMorphNames( ent, weight );
+}
+
+static void CL_VoIP_Transmit_f( void ) {
+	CL_VoIP_Transmit( 0 );
+}
+
+static void CL_VoIP_StopTransmit_f( void ) {
+	CL_VoIP_StopTransmit();
+}
+
 void CL_VoIP_Init( void ) {
 	int err;
 
@@ -54,8 +299,32 @@ void CL_VoIP_Init( void ) {
 	cl_voipSend = Cvar_Get( "cl_voipSend", "0", 0 );
 	cl_voipGainDuringCapture = Cvar_Get( "cl_voipGainDuringCapture", "0.2", CVAR_ARCHIVE );
 	cl_voipShowMeter = Cvar_Get( "cl_voipShowMeter", "1", CVAR_ARCHIVE );
+	cl_voipLipFlap = Cvar_Get( "cl_voipLipFlap", "1", CVAR_ARCHIVE );
+	cl_voipLipFlapScale = Cvar_Get( "cl_voipLipFlapScale", "4.0", CVAR_ARCHIVE );
+	cl_voipLipFlapThresh = Cvar_Get( "cl_voipLipFlapThresh", "0.02", CVAR_ARCHIVE );
+	cl_voipLipFlapDecay = Cvar_Get( "cl_voipLipFlapDecay", "0.85", CVAR_ARCHIVE );
+	cl_voipLipFlapMatch = Cvar_Get( "cl_voipLipFlapMatch", "80", CVAR_ARCHIVE );
+	cl_voipLipFlapMorph = Cvar_Get( "cl_voipLipFlapMorph", "jaw,mouthOpen,mouth_open,jaw_open", CVAR_ARCHIVE );
+	cl_voipLipFlapRate = Cvar_Get( "cl_voipLipFlapRate", "12", CVAR_ARCHIVE );
 
 	Cvar_SetDescription( cl_voip, "Enable VoIP proximity voice chat (0 = off, 1 = on)." );
+	Cvar_SetDescription( cl_voipLipFlap, "Drive head-model jaw/mouth morphs from VoIP voice power." );
+	Cvar_SetDescription( cl_voipLipFlapScale, "Multiply VoIP RMS into morph weight (clamped to 1)." );
+	Cvar_SetDescription( cl_voipLipFlapThresh, "Minimum VoIP RMS before lip flap applies." );
+	Cvar_SetDescription( cl_voipLipFlapDecay, "Per-frame power decay after speech stops (0.1-0.99)." );
+	Cvar_SetDescription( cl_voipLipFlapMatch, "Max distance (world units) to match a refEntity to a talking player." );
+	Cvar_SetDescription( cl_voipLipFlapMorph, "Comma-separated morph target names to drive (IQM/glTF)." );
+	Cvar_SetDescription( cl_voipLipFlapRate, "Lip flap oscillation rate in Hz while talking." );
+
+	Cmd_AddCommand( "+voip", CL_VoIP_Transmit_f );
+	Cmd_AddCommand( "-voip", CL_VoIP_StopTransmit_f );
+
+	Com_Memset( voipClientPower, 0, sizeof( voipClientPower ) );
+	Com_Memset( voipClientLastTalk, 0, sizeof( voipClientLastTalk ) );
+
+	Com_Printf( "VoIP lip flap: %s (morph %s)\n",
+		cl_voipLipFlap->integer ? "enabled" : "disabled",
+		cl_voipLipFlapMorph->string );
 
 	if ( !cl_voip->integer ) {
 		Com_Printf( "VoIP: disabled (cl_voip 0)\n" );
@@ -81,6 +350,9 @@ void CL_VoIP_Init( void ) {
 void CL_VoIP_Shutdown( void ) {
 	int i;
 
+	Cmd_RemoveCommand( "+voip" );
+	Cmd_RemoveCommand( "-voip" );
+
 	if ( voipCapturing ) {
 		SNDDMA_StopCapture();
 		voipCapturing = qfalse;
@@ -99,6 +371,7 @@ void CL_VoIP_Shutdown( void ) {
 	}
 
 	voipInitialized = qfalse;
+	Com_Memset( voipClientPower, 0, sizeof( voipClientPower ) );
 }
 
 void CL_VoIP_Transmit( int mode ) {
@@ -129,6 +402,13 @@ float CL_VoIP_GetPower( void ) {
 	return voipInitialized ? voipPower : 0.0f;
 }
 
+float CL_VoIP_GetClientPower( int clientNum ) {
+	if ( clientNum < 0 || clientNum >= VOIP_MAX_CLIENTS ) {
+		return 0.0f;
+	}
+	return voipClientPower[clientNum];
+}
+
 int CL_VoIP_IsEnabled( void ) {
 	return cl_voip && cl_voip->integer;
 }
@@ -142,6 +422,8 @@ int CL_VoIP_GetShowMeter( void ) {
 }
 
 void CL_VoIP_Frame( void ) {
+	CL_VoIP_DecayClientPower();
+
 	if ( !voipInitialized || !voipCapturing ) return;
 
 	while ( SNDDMA_AvailableCaptureSamples() >= VOIP_FRAME_SAMPLES ) {
@@ -156,6 +438,10 @@ void CL_VoIP_Frame( void ) {
 			rms += s * s;
 		}
 		voipPower = sqrtf( rms / VOIP_FRAME_SAMPLES );
+
+		if ( cl_voipSend && cl_voipSend->integer && clc.clientNum >= 0 && clc.clientNum < VOIP_MAX_CLIENTS ) {
+			CL_VoIP_SetClientPower( clc.clientNum, voipPower );
+		}
 
 		encodedLen = opus_encode( voipEncoder, captureBuffer, VOIP_FRAME_SAMPLES,
 			encodedBuffer, VOIP_MAX_PACKET );
@@ -211,6 +497,13 @@ void CL_VoIP_ParsePacket( int sender, const byte *data, int len ) {
 		vec3_t origin;
 		int i;
 		qboolean haveOrigin = qfalse;
+		float rms = 0.0f;
+
+		for ( i = 0; i < decodedSamples; i++ ) {
+			float s = (float)pcmBuffer[i] / 32768.0f;
+			rms += s * s;
+		}
+		CL_VoIP_SetClientPower( sender, sqrtf( rms / (float)decodedSamples ) );
 
 		VectorClear( origin );
 		if ( cls.state == CA_ACTIVE && cl.snap.valid ) {
@@ -231,15 +524,33 @@ void CL_VoIP_ParsePacket( int sender, const byte *data, int len ) {
 
 #else /* !USE_OPUS */
 
-void CL_VoIP_Init( void ) { Com_Printf( "VoIP: not available (compiled without USE_OPUS)\n" ); }
-void CL_VoIP_Shutdown( void ) {}
+static void CL_VoIP_Transmit_f( void ) {
+	CL_VoIP_Transmit( 0 );
+}
+
+static void CL_VoIP_StopTransmit_f( void ) {
+	CL_VoIP_StopTransmit();
+}
+
+void CL_VoIP_Init( void ) {
+	Cvar_Get( "cl_voipLipFlap", "0", CVAR_ARCHIVE );
+	Cmd_AddCommand( "+voip", CL_VoIP_Transmit_f );
+	Cmd_AddCommand( "-voip", CL_VoIP_StopTransmit_f );
+	Com_Printf( "VoIP: not available (compiled without USE_OPUS)\n" );
+}
+void CL_VoIP_Shutdown( void ) {
+	Cmd_RemoveCommand( "+voip" );
+	Cmd_RemoveCommand( "-voip" );
+}
 void CL_VoIP_Frame( void ) {}
 void CL_VoIP_Transmit( int mode ) { (void)mode; }
 void CL_VoIP_ParsePacket( int sender, const byte *data, int len ) { (void)sender; (void)data; (void)len; }
 void CL_VoIP_StopTransmit( void ) {}
 float CL_VoIP_GetPower( void ) { return 0.0f; }
+float CL_VoIP_GetClientPower( int clientNum ) { (void)clientNum; return 0.0f; }
 int CL_VoIP_IsEnabled( void ) { return 0; }
 int CL_VoIP_IsSending( void ) { return 0; }
 int CL_VoIP_GetShowMeter( void ) { return 0; }
+void CL_VoIP_ApplyLipFlap( refEntity_t *ent ) { (void)ent; }
 
 #endif /* USE_OPUS */

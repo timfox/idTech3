@@ -3,6 +3,7 @@
 Copyright (C) 2026 Gopex LLC. All rights reserved.
 
 VoIP pipeline: microphone capture -> Opus encode -> network -> decode -> playback.
+Optional head-model lip flap driven by per-client voice power.
 ===========================================================================
 */
 
@@ -10,6 +11,7 @@ VoIP pipeline: microphone capture -> Opus encode -> network -> decode -> playbac
 #define CL_VOIP_H
 
 #include "../../qcommon/q_shared.h"
+#include "../../../renderers/common/tr_types.h"
 
 #define VOIP_SAMPLE_RATE     48000
 #define VOIP_FRAME_SAMPLES   960
@@ -23,8 +25,12 @@ void    CL_VoIP_Transmit( int mode );
 void    CL_VoIP_ParsePacket( int sender, const byte *data, int len );
 void    CL_VoIP_StopTransmit( void );
 float   CL_VoIP_GetPower( void );
+float   CL_VoIP_GetClientPower( int clientNum );
 int     CL_VoIP_IsEnabled( void );
 int     CL_VoIP_IsSending( void );
 int     CL_VoIP_GetShowMeter( void );
+
+/* Drive jaw/mouth morph weights on player head models near talking clients. */
+void    CL_VoIP_ApplyLipFlap( refEntity_t *ent );
 
 #endif /* CL_VOIP_H */
