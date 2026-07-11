@@ -9,15 +9,9 @@ Split from vk.c.
 
 #include "tr_local.h"
 
-#ifdef USE_VK_PBR
 #include "vk_forward_plus.h"
-#endif
 
-#ifdef USE_VK_PBR
 static VkBuffer shade_bufs[10];
-#else
-static VkBuffer shade_bufs[8];
-#endif
 static int bind_base;
 static int bind_count;
 
@@ -192,10 +186,8 @@ void vk_bind_geometry( uint32_t flags )
 
 			shade_bufs[0] = shade_bufs[1] = shade_bufs[2] = shade_bufs[3] = shade_bufs[4] =
 				shade_bufs[5] = shade_bufs[6] = shade_bufs[7] = vk.vbo.stream_vertex_buffer;
-#ifdef USE_VK_PBR
 			shade_bufs[8] = vk.vbo.stream_vertex_buffer;
 			shade_bufs[9] = vk.vbo.stream_vertex_buffer;
-#endif
 
 			if ( flags & TESS_XYZ ) {
 				vk.cmd->vbo_offset[0] = item->vboOffset;
@@ -229,7 +221,6 @@ void vk_bind_geometry( uint32_t flags )
 				vk.cmd->vbo_offset[7] = stage->rgb_offset[2];
 				vk_bind_index_attr( 7 );
 			}
-#ifdef USE_VK_PBR
 			if ( flags & TESS_PBR ) {
 				vk.cmd->vbo_offset[5] = item->normalOffset;
 				vk_bind_index_attr( 5 );
@@ -238,17 +229,14 @@ void vk_bind_geometry( uint32_t flags )
 				vk.cmd->vbo_offset[9] = item->lightdirOffset;
 				vk_bind_index_attr( 9 );
 			}
-#endif
 
 			qvkCmdBindVertexBuffers( vk.cmd->command_buffer, bind_base, bind_count, shade_bufs, vk.cmd->vbo_offset + bind_base );
 			return;
 		}
 
 		shade_bufs[0] = shade_bufs[1] = shade_bufs[2] = shade_bufs[3] = shade_bufs[4] = shade_bufs[5] = shade_bufs[6] = shade_bufs[7] = vk.vbo.vertex_buffer;
-#ifdef USE_VK_PBR
 		shade_bufs[8] = vk.vbo.vertex_buffer;
 		shade_bufs[9] = vk.vbo.vertex_buffer;
-#endif
 
 		if ( flags & TESS_XYZ ) {  // 0
 			vk.cmd->vbo_offset[0] = tess.shader->vboOffset + 0;
@@ -289,7 +277,6 @@ void vk_bind_geometry( uint32_t flags )
 			vk.cmd->vbo_offset[7] = tess.shader->stages[ tess.vboStage ]->rgb_offset[2];
 			vk_bind_index_attr( 7 );
 		}
-#ifdef USE_VK_PBR
 		if (flags & TESS_PBR) {
 			vk.cmd->vbo_offset[5] = tess.shader->normalOffset;
 			vk_bind_index_attr( 5 );
@@ -300,7 +287,6 @@ void vk_bind_geometry( uint32_t flags )
 			vk.cmd->vbo_offset[9] = tess.shader->lightdirOffset;
 			vk_bind_index_attr(9);
 		}
-#endif
 
 		qvkCmdBindVertexBuffers( vk.cmd->command_buffer, bind_base, bind_count, shade_bufs, vk.cmd->vbo_offset + bind_base );
 
@@ -308,10 +294,8 @@ void vk_bind_geometry( uint32_t flags )
 #endif // USE_VBO
 	{
 		shade_bufs[0] = shade_bufs[1] = shade_bufs[2] = shade_bufs[3] = shade_bufs[4] = shade_bufs[5] = shade_bufs[6] = shade_bufs[7] = vk.cmd->vertex_buffer;
-#ifdef USE_VK_PBR
 		shade_bufs[8] = vk.cmd->vertex_buffer;
 		shade_bufs[9] = vk.cmd->vertex_buffer;
-#endif
 
 		if ( flags & TESS_XYZ ) {
 			vk_bind_attr(0, sizeof(tess.xyz[0]), &tess.xyz[0]);
@@ -344,13 +328,11 @@ void vk_bind_geometry( uint32_t flags )
 		if ( flags & TESS_RGBA2 ) {
 			vk_bind_attr(7, sizeof( color4ub_t ), tess.svars.colors[2][0].rgba);
 		}
-#ifdef USE_VK_PBR
 		if (flags & TESS_PBR) {
 			vk_bind_attr(5, sizeof(tess.normal[0]), tess.normal);
 			vk_bind_attr(8, sizeof(tess.qtangent[0]), tess.qtangent);
 			vk_bind_attr(9, sizeof(tess.lightdir[0]), tess.lightdir);
 		}
-#endif
 
 		qvkCmdBindVertexBuffers( vk.cmd->command_buffer, bind_base, bind_count, shade_bufs, vk.cmd->buf_offset + bind_base );
 	}
@@ -449,14 +431,12 @@ void vk_bind_descriptor_sets( void )
 
 	count = end - start + 1;
 
-#ifdef USE_VK_PBR
 	if ( vk.maxBoundDescriptorSets >= VK_DESC_COUNT ) {
 		VkDescriptorSet fp_set = vk_forward_plus_get_graphics_descriptor_set();
 		if ( fp_set != VK_NULL_HANDLE ) {
 			vk.cmd->descriptor_set.current[VK_DESC_FORWARD_PLUS] = fp_set;
 		}
 	}
-#endif
 
 	// fill NULL descriptor gaps
 	if ( tr.whiteImage ) {
@@ -468,7 +448,6 @@ void vk_bind_descriptor_sets( void )
 		}
 	}
 
-#ifdef USE_VK_PBR
 	if ( r_vk_pipeline_debug && r_vk_pipeline_debug->integer && vk.cmd ) {
 		struct {
 			int index;
@@ -501,7 +480,6 @@ void vk_bind_descriptor_sets( void )
 				source );
 		}
 	}
-#endif
 
 	if ( backEnd.oitAccumPass && vk.pipeline_layout_oit_accum != VK_NULL_HANDLE ) {
 		/* OIT accum set 0 = tex0; set 1 = opaque depth for MSAA/manual rejection. */
