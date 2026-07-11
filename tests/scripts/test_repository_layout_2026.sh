@@ -73,6 +73,9 @@ check_bridge modules/client runtime/client
 check_bridge engine/client runtime/client
 check_bridge engine/platform/client runtime/client
 check_bridge world modules/world
+check_bridge platform engine/platform
+check_bridge external third_party
+check_bridge qcommon engine/core
 
 [ -L "${ROOT}/samples" ] || fail "samples alias symlink missing"
 samples_target="$(resolve "${ROOT}/samples")"

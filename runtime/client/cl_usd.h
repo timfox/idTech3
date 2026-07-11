@@ -13,11 +13,8 @@ Client USD scene tools (FreeUSD). See docs/FREEUSD.md.
 extern "C" {
 #endif
 
-#ifdef USE_FREEUSD
+/* Always declared; cl_usd.cpp provides the body (USE_FREEUSD gates commands only). */
 void CL_USD_Init( void );
-#else
-static inline void CL_USD_Init( void ) {}
-#endif
 
 #ifdef __cplusplus
 }
