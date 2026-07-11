@@ -57,7 +57,13 @@ if(BUILD_EXAMPLE_DEMO_GAME AND NOT BUILD_SAMPLES_DEMO_GAME)
   set(BUILD_SAMPLES_DEMO_GAME ON CACHE BOOL "Build samples/demo_game (idtech3_demo.pk3 + helper)" FORCE)
   message(WARNING "BUILD_EXAMPLE_DEMO_GAME is deprecated; use BUILD_SAMPLES_DEMO_GAME (samples/ → examples/ symlink)")
 endif()
-option(USE_FREEUSD "Link FreeUSD for USDA mesh import and USD scene tools (GPL-2.0-or-later)" ON)
+# FreeUSD is desktop-oriented (CMake Linux/macOS/MinGW). Default OFF on Android NDK.
+if(ANDROID)
+	set(_IDTECH3_FREEUSD_DEFAULT OFF)
+else()
+	set(_IDTECH3_FREEUSD_DEFAULT ON)
+endif()
+option(USE_FREEUSD "Link FreeUSD for USDA mesh import and USD scene tools (GPL-2.0-or-later)" ${_IDTECH3_FREEUSD_DEFAULT})
 option(USE_IDTECH3_BACKEND "Require idtech3backend submodule (timfox/idtech3backend); wiring TBD" OFF)
 option(USE_IDTECH3_EMULATOR "Require idTech3-Emulator submodule (QEMU fork); in-engine bridge TBD" OFF)
 
@@ -2051,6 +2057,8 @@ IF(USE_RENDERER_DLOPEN)
 		target_link_libraries(${RENDERER_PREFIX}_vulkan${RENDEXT} PRIVATE idtech3_freetype)
 	ENDIF()
 	target_include_directories(${RENDERER_PREFIX}_vulkan${RENDEXT} PRIVATE ${CMAKE_SOURCE_DIR})
+	# engine/ so #include "platform/android/..." resolves without relying only on the repo-root platform symlink
+	target_include_directories(${RENDERER_PREFIX}_vulkan${RENDEXT} PRIVATE ${CMAKE_SOURCE_DIR}/engine)
 	idtech3_vulkan_extension_include_dirs(${RENDERER_PREFIX}_vulkan${RENDEXT})
 	idtech3_apply_research_include_dirs(${RENDERER_PREFIX}_vulkan${RENDEXT})
 	if(USE_FREEUSD)
@@ -2131,6 +2139,7 @@ ELSE()
 		target_link_libraries(${RENDERER_PREFIX}_vulkan PRIVATE idtech3_freetype)
 	ENDIF()
 	target_include_directories(${RENDERER_PREFIX}_vulkan PRIVATE ${CMAKE_SOURCE_DIR})
+	target_include_directories(${RENDERER_PREFIX}_vulkan PRIVATE ${CMAKE_SOURCE_DIR}/engine)
 	idtech3_vulkan_extension_include_dirs(${RENDERER_PREFIX}_vulkan)
 	idtech3_apply_research_include_dirs(${RENDERER_PREFIX}_vulkan)
 	if(USE_FREEUSD)
@@ -3251,6 +3260,12 @@ add_test(NAME test_facs_facial
 set_tests_properties(test_facs_facial PROPERTIES
 	LABELS "scripts;validation;client;facs"
 	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_facs_facial.sh;${CMAKE_SOURCE_DIR}/runtime/game/g_facial.c;${CMAKE_SOURCE_DIR}/docs/FACS.md")
+
+add_test(NAME test_freeusd_wiring
+	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_freeusd_wiring.sh)
+set_tests_properties(test_freeusd_wiring PROPERTIES
+	LABELS "scripts;validation;freeusd"
+	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_freeusd_wiring.sh;${CMAKE_SOURCE_DIR}/cmake/FreeUSD.cmake;${CMAKE_SOURCE_DIR}/docs/FREEUSD.md")
 
 add_test(NAME test_p2p_networking
 	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_p2p_networking.sh)

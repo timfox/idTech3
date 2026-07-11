@@ -47,6 +47,7 @@ android {
                     "-DUSE_BULLET_PHYSICS=ON",
                     "-DBUILD_FREETYPE=ON",
                     "-DUSE_DTLS=ON",
+                    "-DUSE_FREEUSD=OFF",
                     "-DENABLE_FORTIFY_SOURCE=OFF",
                     "-DENABLE_ASAN=OFF",
                     "-DCI_BUILD=OFF"

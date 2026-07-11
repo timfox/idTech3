@@ -7,17 +7,30 @@ This is **not** a full OpenUSD / Hydra / USD Imaging stack. Scope matches FreeUS
 ## Build
 
 ```bash
-git submodule update --init src/external/FreeUSD   # preferred library source
+git submodule update --init third_party/FreeUSD   # preferred library source
 ./scripts/compile_engine.sh vulkan               # USE_FREEUSD=ON by default; auto-inits submodule
 cmake -DUSE_FREEUSD=OFF ...                        # disable (smaller link; no usd_* tools)
+./scripts/compile_engine.sh vulkan nofreeusd       # same via compile script
 ```
 
 **Library source** (`cmake/FreeUSD.cmake`):
 
-1. **Git submodule** at `src/external/FreeUSD` → [gopexllc/FreeUSD](https://github.com/gopexllc/FreeUSD) (pinned commit in parent repo).
-2. **FetchContent** fallback if the submodule is not initialized (network on first configure).
+1. **Git submodule** at `third_party/FreeUSD` → [gopexllc/FreeUSD](https://github.com/gopexllc/FreeUSD) (pinned commit in parent repo).
+2. Legacy fallback path `src/external/FreeUSD` if present.
+3. **FetchContent** fallback if the submodule is not initialized (network on first configure).
 
 `./scripts/init_optional_submodules.sh --freeusd` (or `--all`) initializes the submodule without building.
+
+### Platform matrix
+
+| Platform | FreeUSD |
+|----------|---------|
+| Linux / macOS CMake | **ON** by default (`game`/`full`/`research` profiles) |
+| Windows MinGW (CMake) | **ON** by default |
+| Android NDK | **OFF** by default (desktop-oriented; CI passes `-DUSE_FREEUSD=OFF`) |
+| Hand MSVC (`engine/platform/win32/msvc2017`) | **Stub only** — no `USE_FREEUSD`; `usd_*` prints “not built”. Use CMake/`compile_engine.sh` on Windows for real FreeUSD. |
+
+`core` profile sets `USE_FREEUSD=OFF` for a faster Q3/OA path.
 
 ## Mesh models (renderer)
 
@@ -78,8 +91,8 @@ FreeUSD `BuildEngineSceneSnapshot` also feeds the **district manifest** parser (
 | `examples/demo_game/mod/models/*.usda` | Shipped in `idtech3_demo.pk3`; `demo_usd.cfg` prints console hints |
 | `examples/demo_game/mod/world/*.usda` | District demo tree; `demo_districts.cfg` |
 
-`ctest -R test_freeusd_smoke` checks renderer/client symbols and that these USDA files exist. `ctest -R test_districts` validates the district layer wiring.
+Wiring: `tests/scripts/test_freeusd_wiring.sh` / `ctest -R test_freeusd`.
 
-## License note
+## License
 
 FreeUSD is **GPL-2.0-or-later**. With `USE_FREEUSD=ON`, the Vulkan renderer plugin and client link FreeUSD static libraries; distribution must comply with GPL obligations for those binaries.
