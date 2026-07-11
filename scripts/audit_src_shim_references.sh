@@ -60,10 +60,14 @@ printf '  tests/scripts src/* refs: %s lines\n' "$TEST_SHIM"
 
 echo "[shim_audit] physical layout..."
 [ -d "${ROOT}/engine/core" ] && [ ! -L "${ROOT}/engine/core" ] || { echo "FAIL: engine/core not physical" >&2; exit 1; }
-[ -L "${ROOT}/src/qcommon" ] || { echo "FAIL: src/qcommon shim missing" >&2; exit 1; }
+if [[ -L "${ROOT}/src/qcommon" ]]; then
+	echo "FAIL: src/qcommon shim still present (Phase 5e should have removed it)" >&2
+	exit 1
+fi
+[ -f "${ROOT}/src/README.md" ] || { echo "FAIL: src/README.md missing after Phase 5e" >&2; exit 1; }
 
 if [[ "$STRICT" -eq 1 ]]; then
-	# Post Phase 5e-prep: CMake manifests use canonical roots; residual src/* is rare.
+	# Post Phase 5e: CMake manifests use canonical roots; residual src/* is rare.
 	MAX_SHIM_CMAKE=50
 	if [[ "$TOTAL_SHIM" -gt "$MAX_SHIM_CMAKE" ]]; then
 		echo "FAIL: CMake src/* refs ($TOTAL_SHIM) exceed strict budget ($MAX_SHIM_CMAKE)" >&2

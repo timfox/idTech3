@@ -25,14 +25,17 @@ echo "Release dir: $RELEASE_DIR"
 echo ""
 
 # QVM loader must remain in the engine.
-if grep -q 'VM_LoadQVM' "$PROJECT_ROOT/src/qcommon/vm.c"; then
+VM_C="$PROJECT_ROOT/engine/core/vm.c"
+[ -f "$VM_C" ] || VM_C="$PROJECT_ROOT/engine/core/vm.c"
+if grep -q 'VM_LoadQVM' "$VM_C"; then
 	pass "QVM loader (VM_LoadQVM) present in vm.c"
 else
 	fail "VM_LoadQVM missing from vm.c"
 fi
 
-if grep -q 'vm_native_module' "$PROJECT_ROOT/src/qcommon/vm.c" || \
-   [ -f "$PROJECT_ROOT/src/qcommon/vm_native_module.c" ]; then
+if grep -q 'vm_native_module' "$VM_C" || \
+   [ -f "$PROJECT_ROOT/engine/core/vm_native_module.c" ] || \
+   [ -f "$PROJECT_ROOT/engine/core/vm_native_module.c" ]; then
 	pass "native game module path present (native before QVM fallback)"
 else
 	fail "native module loading path not found"
@@ -49,8 +52,8 @@ fi
 # Optional generative hooks must default off (no impact on classic play).
 _trellis_default_ok=0
 for _trellis_src in \
-	"$PROJECT_ROOT/src/extensions/generative/cl_trellis.c" \
-	"$PROJECT_ROOT/src/client/core/cl_main.c"; do
+	"$PROJECT_ROOT/extensions/generative/cl_trellis.c" \
+	"$PROJECT_ROOT/runtime/client/core/cl_main.c"; do
 	if [ -f "$_trellis_src" ] && \
 	   grep -q 'cl_trellis_enable' "$_trellis_src" && \
 	   grep -q '"cl_trellis_enable", "0"' "$_trellis_src"; then
@@ -64,66 +67,66 @@ else
 	fail "cl_trellis_enable default not 0"
 fi
 
-if [ -f "$PROJECT_ROOT/src/world/fog_biology.cpp" ] && \
-   grep -q 'r_fogBiology' "$PROJECT_ROOT/src/world/fog_biology.cpp" && \
-   grep -q '"r_fogBiology", "0"' "$PROJECT_ROOT/src/world/fog_biology.cpp"; then
+if [ -f "$PROJECT_ROOT/modules/world/fog_biology.cpp" ] && \
+   grep -q 'r_fogBiology' "$PROJECT_ROOT/modules/world/fog_biology.cpp" && \
+   grep -q '"r_fogBiology", "0"' "$PROJECT_ROOT/modules/world/fog_biology.cpp"; then
 	pass "r_fogBiology defaults to 0 (opt-in bioaerosol ecology)"
 else
 	fail "r_fogBiology default not 0 in fog_biology.cpp"
 fi
 
-if [ -f "$PROJECT_ROOT/src/world/genetic_gan.cpp" ] && \
-   grep -q 'cl_geneticGan' "$PROJECT_ROOT/src/world/genetic_gan.cpp" && \
-   grep -q '"cl_geneticGan", "0"' "$PROJECT_ROOT/src/world/genetic_gan.cpp"; then
+if [ -f "$PROJECT_ROOT/modules/world/genetic_gan.cpp" ] && \
+   grep -q 'cl_geneticGan' "$PROJECT_ROOT/modules/world/genetic_gan.cpp" && \
+   grep -q '"cl_geneticGan", "0"' "$PROJECT_ROOT/modules/world/genetic_gan.cpp"; then
 	pass "cl_geneticGan defaults to 0 (opt-in procedural genome API)"
 else
 	fail "cl_geneticGan default not 0 in genetic_gan.cpp"
 fi
 
 if grep -qE 'r_vegWind[[:space:]]*=[[:space:]]*ri\.Cvar_Get\([[:space:]]*"r_vegWind"[[:space:]]*,[[:space:]]*"0"' \
-	"$PROJECT_ROOT/src/renderers/vulkan/vk_postfx.c"; then
+	"$PROJECT_ROOT/renderers/vulkan/vk_postfx.c"; then
 	pass "r_vegWind defaults to 0 (classic maps unchanged unless enabled)"
 else
 	fail "r_vegWind default not 0 in Vulkan postfx"
 fi
 
 if grep -qE 'r_forwardPlusDistanceSort[[:space:]]*=[[:space:]]*ri\.Cvar_Get\([[:space:]]*"r_forwardPlusDistanceSort"[[:space:]]*,[[:space:]]*"0"' \
-	"$PROJECT_ROOT/src/renderers/vulkan/tr_init.c"; then
+	"$PROJECT_ROOT/renderers/vulkan/tr_init.c"; then
 	pass "r_forwardPlusDistanceSort defaults to 0 (classic Forward+ overload order preserved)"
 else
 	fail "r_forwardPlusDistanceSort default not 0"
 fi
 
 if grep -qE 'r_forwardPlusDepthCull[[:space:]]*=[[:space:]]*ri\.Cvar_Get\([[:space:]]*"r_forwardPlusDepthCull"[[:space:]]*,[[:space:]]*"0"' \
-	"$PROJECT_ROOT/src/renderers/vulkan/tr_init.c"; then
+	"$PROJECT_ROOT/renderers/vulkan/tr_init.c"; then
 	pass "r_forwardPlusDepthCull defaults to 0 (classic Forward+ tile cull timing preserved)"
 else
 	fail "r_forwardPlusDepthCull default not 0"
 fi
 
 if grep -qE 'r_rtxEntities[[:space:]]*=[[:space:]]*ri\.Cvar_Get\([[:space:]]*"r_rtxEntities"[[:space:]]*,[[:space:]]*"0"' \
-	"$PROJECT_ROOT/src/renderers/vulkan/tr_init.c"; then
+	"$PROJECT_ROOT/renderers/vulkan/tr_init.c"; then
 	pass "r_rtxEntities defaults to 0 (RTX demo unchanged unless enabled)"
 else
 	fail "r_rtxEntities default not 0"
 fi
 
 if grep -qE 'r_vdbFog[[:space:]]*=[[:space:]]*ri\.Cvar_Get\([[:space:]]*"r_vdbFog"[[:space:]]*,[[:space:]]*"0"' \
-	"$PROJECT_ROOT/src/renderers/vulkan/tr_init.c"; then
+	"$PROJECT_ROOT/renderers/vulkan/tr_init.c"; then
 	pass "r_vdbFog defaults to 0 (VDB volumetric blend off unless enabled)"
 else
 	fail "r_vdbFog default not 0"
 fi
 
 if grep -qE 'cs_autoInit[[:space:]]*=[[:space:]]*Cvar_Get\([[:space:]]*"cs_autoInit"[[:space:]]*,[[:space:]]*"0"' \
-	"$PROJECT_ROOT/src/qcommon/csharp_debug.c"; then
+	"$PROJECT_ROOT/engine/core/csharp_debug.c"; then
 	pass "cs_autoInit defaults to 0 (C# runtime manual until cs_reload)"
 else
 	fail "cs_autoInit default not 0 in csharp_debug.c"
 fi
 
-if grep -q 'ri\.Cmd_AddCommand( "vdb_load"' "$PROJECT_ROOT/src/renderers/vulkan/vk_vdb.c" && \
-   grep -q 'ri\.Cmd_AddCommand( "vdb_bind_fog"' "$PROJECT_ROOT/src/renderers/vulkan/vk_vdb.c"; then
+if grep -q 'ri\.Cmd_AddCommand( "vdb_load"' "$PROJECT_ROOT/renderers/vulkan/vk_vdb.c" && \
+   grep -q 'ri\.Cmd_AddCommand( "vdb_bind_fog"' "$PROJECT_ROOT/renderers/vulkan/vk_vdb.c"; then
 	pass "VDB console commands vdb_load / vdb_bind_fog registered"
 else
 	fail "VDB console commands missing from vk_vdb.c"

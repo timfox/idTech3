@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Wiring test: 2026 layout — Phase 5c physical roots + src/* forwarding shims.
+# Wiring test: 2026 layout — Phase 5c physical roots; Phase 5e dropped src/* shims.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
@@ -9,16 +9,16 @@ resolve() {
 	readlink -f "$1" 2>/dev/null || realpath "$1"
 }
 
-# Phase 5c: canonical tree is physical; src/* shims forward to layout roots.
 check_physical() {
 	local path="$1"
 	[ -d "${ROOT}/${path}" ] || fail "missing physical dir ${path}"
 	[ ! -L "${ROOT}/${path}" ] || fail "${path} must be a directory, not a symlink"
 }
 
-check_shim() {
+# Layout bridges remain after Phase 5e (relative includes + MSVC).
+check_bridge() {
 	local shim="$1" expected_suffix="$2"
-	[ -L "${ROOT}/${shim}" ] || fail "${shim} must be a forwarding symlink (Phase 5c)"
+	[ -L "${ROOT}/${shim}" ] || fail "${shim} must be a layout bridge symlink"
 	local target
 	target="$(resolve "${ROOT}/${shim}")"
 	case "$target" in
@@ -29,8 +29,10 @@ check_shim() {
 
 LAYOUT="${ROOT}/cmake/IdTech3Layout.cmake"
 FWD="${ROOT}/scripts/layout_forwarding_symlinks.sh"
+DROP="${ROOT}/scripts/migrate_phase_5e_drop_shims.sh"
 [ -f "$LAYOUT" ] || fail "missing IdTech3Layout.cmake"
 [ -x "$FWD" ] || fail "missing layout_forwarding_symlinks.sh"
+[ -x "$DROP" ] || fail "missing migrate_phase_5e_drop_shims.sh"
 "$FWD"
 rg -q 'IDTECH3_DIR_ENGINE_CORE' "$LAYOUT" || fail "layout cmake missing engine core var"
 rg -q 'IDTECH3_DIR_RUNTIME_CLIENT' "$LAYOUT" || fail "layout cmake missing runtime client var"
@@ -54,39 +56,23 @@ check_physical extensions
 check_physical renderers
 check_physical third_party
 
-check_shim src/qcommon engine/core
-check_shim src/platform engine/platform
-check_shim src/client runtime/client
-check_shim src/server runtime/server
-check_shim src/game runtime/game
-check_shim src/world modules/world
-check_shim src/navigation modules/navigation
-check_shim src/physics modules/physics
-check_shim src/audio modules/audio
-check_shim src/extensions extensions
-check_shim src/renderers renderers
-check_shim src/external third_party
-check_shim src/botlib modules/botlib
-check_shim src/cgame runtime/cgame
-check_shim src/ui runtime/ui
-check_shim src/asm engine/asm
+# Phase 5e: src/* forwarding shims must be gone.
+for d in qcommon client server game platform world navigation physics audio botlib \
+	cgame ui asm extensions renderers external; do
+	[ ! -e "${ROOT}/src/${d}" ] || fail "src/${d} shim must be removed (Phase 5e)"
+done
+shim_count=$(find "${ROOT}/src" -maxdepth 1 -type l 2>/dev/null | wc -l)
+[ "$shim_count" -eq 0 ] || fail "src/ must have no forwarding shims after Phase 5e (found ${shim_count})"
+[ -f "${ROOT}/src/README.md" ] || fail "src/README.md missing after Phase 5e"
 
-# src/ is forwarding-only after Phase 5c completion
-shim_count=$(find "${ROOT}/src" -maxdepth 1 -type l | wc -l)
-file_count=$(find "${ROOT}/src" -maxdepth 1 -type f | wc -l)
-dir_count=$(find "${ROOT}/src" -maxdepth 1 -mindepth 1 -type d | wc -l)
-[ "$file_count" -eq 0 ] || fail "src/ must not contain loose files (found ${file_count})"
-[ "$dir_count" -eq 0 ] || fail "src/ must not contain physical subdirs (found ${dir_count})"
-[ "$shim_count" -ge 14 ] || fail "expected >=14 src/* forwarding shims (found ${shim_count})"
-
-# Cross-domain includes (runtime/client/../../qcommon, renderers/.../world, …)
-check_shim runtime/qcommon engine/core
-check_shim runtime/world modules/world
-check_shim modules/qcommon engine/core
-check_shim modules/client runtime/client
-check_shim engine/client runtime/client
-check_shim engine/platform/client runtime/client
-check_shim world modules/world
+# Cross-domain layout bridges (kept)
+check_bridge runtime/qcommon engine/core
+check_bridge runtime/world modules/world
+check_bridge modules/qcommon engine/core
+check_bridge modules/client runtime/client
+check_bridge engine/client runtime/client
+check_bridge engine/platform/client runtime/client
+check_bridge world modules/world
 
 [ -L "${ROOT}/samples" ] || fail "samples alias symlink missing"
 samples_target="$(resolve "${ROOT}/samples")"
