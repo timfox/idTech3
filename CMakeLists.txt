@@ -3279,6 +3279,12 @@ set_tests_properties(test_material_paint PROPERTIES
 	LABELS "scripts;validation;renderer;pbr"
 	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_material_paint.sh;${CMAKE_SOURCE_DIR}/renderers/vulkan/tr_material_paint.c;${CMAKE_SOURCE_DIR}/docs/MATERIAL_BLEND.md")
 
+add_test(NAME test_studio_chrome
+	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_studio_chrome.sh)
+set_tests_properties(test_studio_chrome PROPERTIES
+	LABELS "scripts;validation;renderer;imgui"
+	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_studio_chrome.sh;${CMAKE_SOURCE_DIR}/renderers/vulkan/inspector/vk_imgui_chrome_panels.cpp;${CMAKE_SOURCE_DIR}/docs/IN_ENGINE_STUDIO_TOOLS.md")
+
 add_test(NAME test_cbt_terrain
 	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_cbt_terrain.sh)
 set_tests_properties(test_cbt_terrain PROPERTIES

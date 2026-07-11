@@ -1,6 +1,6 @@
 # idTech3Radiant (hybrid editor)
 
-Maps and BSP remain authored in **idTech3Radiant** (or compatible GtkRadiant fork). In-engine **Studio** tools (`r_studio_tools`) handle session, entity preview, and Radiant snippet export—not full BSP editing.
+Maps and BSP remain authored in **idTech3Radiant** (or compatible GtkRadiant fork). In-engine **Studio** tools (`r_studio_tools`) handle session, console, entity preview/export, material paint, and a thin animation strip—not full BSP editing. See [IN_ENGINE_STUDIO_TOOLS.md](IN_ENGINE_STUDIO_TOOLS.md).
 
 Patterns backported from [s&box / Source-2](https://github.com/timfox/Source-2): staged bootstrap, `game.idproj` manifest, `Editor/` Python scripts, VS Code workspace generation, and a file-bridge for Studio entity export.
 

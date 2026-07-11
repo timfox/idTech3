@@ -111,6 +111,7 @@ extern "C" void VkImgui_Initialize(void) {
 		vkWindows.studioConsole.open = qtrue;
 		vkWindows.studioEntities.open = qtrue;
 		vkWindows.studioPaint.open = qtrue;
+		vkWindows.studioAnimation.open = qtrue;
 	}
 
 	vkImguiState.active = qtrue;

@@ -130,7 +130,7 @@ Reload: `script_reload` (requires `USE_LUA=ON`).
 | Tool | Role |
 |------|------|
 | [idTech3Radiant](RADIANT.md) | BSP, entities, lighting (primary map editor) |
-| In-engine Studio (`r_studio_tools`) | Session, console, **Entities** panel, **Animation** panel |
+| In-engine Studio (`r_studio_tools`) | Session, Console, Entities, Paint, Animation (see [IN_ENGINE_STUDIO_TOOLS.md](IN_ENGINE_STUDIO_TOOLS.md)) |
 | [EDITOR_BRIDGE.md](EDITOR_BRIDGE.md) | Shared entity keys (Radiant ↔ engine) |
 | [TILED.md](TILED.md) | Zone metadata (optional) |
 

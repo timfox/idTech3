@@ -39,7 +39,8 @@ static void VkImgui_DrawAboutInspectorPopup( void )
 		ImGui::TextWrapped(
 			"Toggle overlay input with F11 or \\toggle_imgui; set \\r_imgui 0 to hide CPU/UI work. "
 			"PostFX and related panels drive renderer cvars. "
-			"Set \\r_studio_tools 1 for id Studio-style session + command strip (see docs/IN_ENGINE_STUDIO_TOOLS.md)." );
+			"Set \\r_studio_tools 1 for id Studio-style panels "
+			"(Session, Console, Entities, Paint, Animation — see docs/IN_ENGINE_STUDIO_TOOLS.md)." );
 		ImGui::Spacing();
 		if ( ImGui::Button( "OK", ImVec2( 120.0f, 0.0f ) ) ) {
 			ImGui::CloseCurrentPopup();
@@ -60,6 +61,7 @@ static void VkImgui_DrawShortcutsPopup( void )
 		ImGui::BulletText( "Window: show/hide docked panels; reset workspace layout" );
 		ImGui::BulletText( "Render Mode: \\r_pbr_debug modes (0-8 active)" );
 		ImGui::BulletText( "Developer: \\r_speeds, \\r_showtris, \\r_imgui, \\r_studio_tools" );
+		ImGui::BulletText( "Studio (r_studio_tools): Session, Console, Entities, Paint, Animation" );
 		ImGui::Spacing();
 		if ( ImGui::Button( "Close", ImVec2( 120.0f, 0.0f ) ) ) {
 			ImGui::CloseCurrentPopup();
@@ -129,6 +131,9 @@ void VkImgui_ResetInspectorWorkspaceLayout( void )
 	if ( r_studio_tools && r_studio_tools->integer ) {
 		vkWindows.studioMap.open = qtrue;
 		vkWindows.studioConsole.open = qtrue;
+		vkWindows.studioEntities.open = qtrue;
+		vkWindows.studioPaint.open = qtrue;
+		vkWindows.studioAnimation.open = qtrue;
 	}
 
 	ImGui::DockBuilderDockWindow( "Viewport", id_main );
@@ -141,6 +146,9 @@ void VkImgui_ResetInspectorWorkspaceLayout( void )
 	ImGui::DockBuilderDockWindow( "Volumetrics", id_bottom );
 	ImGui::DockBuilderDockWindow( "Studio / Session", id_bottom );
 	ImGui::DockBuilderDockWindow( "Studio / Console", id_bottom );
+	ImGui::DockBuilderDockWindow( "Studio / Entities", id_bottom );
+	ImGui::DockBuilderDockWindow( "Studio / Paint", id_bottom );
+	ImGui::DockBuilderDockWindow( "Studio / Animation", id_bottom );
 
 	ImGui::DockBuilderFinish( dockspace_id );
 	ri.Printf( PRINT_DEVELOPER, "[VK][imgui] workspace layout reset (editor default dock)\n" );
@@ -258,6 +266,7 @@ static void VkImgui_DrawMenuBar( void )
 				ImGui::MenuItem( "Command strip", nullptr, (bool *)&vkWindows.studioConsole.open );
 				ImGui::MenuItem( "Entities (misc_*)", nullptr, (bool *)&vkWindows.studioEntities.open );
 				ImGui::MenuItem( "Material paint", nullptr, (bool *)&vkWindows.studioPaint.open );
+				ImGui::MenuItem( "Animation", nullptr, (bool *)&vkWindows.studioAnimation.open );
 				ImGui::Separator();
 				ImGui::TextDisabled( "Entity key reference: docs/EDITOR_BRIDGE.md" );
 				ImGui::EndMenu();
@@ -281,12 +290,15 @@ static void VkImgui_DrawMenuBar( void )
 					if ( stOn ) {
 						vkWindows.studioMap.open = qtrue;
 						vkWindows.studioConsole.open = qtrue;
+						vkWindows.studioEntities.open = qtrue;
+						vkWindows.studioPaint.open = qtrue;
+						vkWindows.studioAnimation.open = qtrue;
 					}
 				}
 				if ( ImGui::IsItemHovered() ) {
 					ImGui::SetTooltip(
-						"Adds id Studio-style Session + Console docked panels and a Studio menu. "
-						"Requires r_imgui 1. See docs/IN_ENGINE_STUDIO_TOOLS.md." );
+						"Adds id Studio-style Session, Console, Entities, Paint, and Animation panels "
+						"plus a Studio menu. Requires r_imgui 1. See docs/IN_ENGINE_STUDIO_TOOLS.md." );
 				}
 			}
 			{
@@ -332,6 +344,9 @@ static void VkImgui_DrawMenuBar( void )
 				ImGui::Separator();
 				ImGui::MenuItem( "Studio / Session", nullptr, (bool *)&vkWindows.studioMap.open );
 				ImGui::MenuItem( "Studio / Console", nullptr, (bool *)&vkWindows.studioConsole.open );
+				ImGui::MenuItem( "Studio / Entities", nullptr, (bool *)&vkWindows.studioEntities.open );
+				ImGui::MenuItem( "Studio / Paint", nullptr, (bool *)&vkWindows.studioPaint.open );
+				ImGui::MenuItem( "Studio / Animation", nullptr, (bool *)&vkWindows.studioAnimation.open );
 			}
 			ImGui::Separator();
 			if ( ImGui::MenuItem( "Reset workspace layout" ) ) {

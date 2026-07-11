@@ -3038,8 +3038,8 @@ static void R_Register( void )
 	r_studio_tools = ri.Cvar_Get( "r_studio_tools", "0", CVAR_ARCHIVE_ND );
 	ri.Cvar_CheckRange( r_studio_tools, "0", "1", CV_INTEGER );
 	ri.Cvar_SetDescription( r_studio_tools,
-		"When 1 (with r_imgui 1): id Studio-style in-engine panels: session/map strip and Studio console (command history + exec)." );
-	ri.Printf( PRINT_ALL, "[VK][studio] r_studio_tools=%d (0=inspector only, 1=add Studio map + console panels)\n",
+		"When 1 (with r_imgui 1): id Studio-style panels — Session, Console, Entities, Paint, Animation (see docs/IN_ENGINE_STUDIO_TOOLS.md)." );
+	ri.Printf( PRINT_ALL, "[VK][studio] r_studio_tools=%d (0=inspector only, 1=Studio Session/Console/Entities/Paint/Animation)\n",
 		r_studio_tools->integer );
 #endif
 

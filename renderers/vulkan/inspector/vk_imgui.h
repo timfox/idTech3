@@ -142,6 +142,10 @@ typedef struct {
 	struct {
 		qboolean    open;
 	} studioPaint;
+
+	struct {
+		qboolean    open;
+	} studioAnimation;
 } vkImguiWindows_t;
 
 typedef struct {

@@ -275,9 +275,19 @@ extern "C" void VkImgui_DrawStudioAnimationPanel( void )
 	if ( !r_studio_tools || !r_studio_tools->integer ) {
 		return;
 	}
+	if ( !vkWindows.studioAnimation.open ) {
+		return;
+	}
 
-	ImGui::Begin( "Studio / Animation", nullptr, ImGuiWindowFlags_AlwaysAutoResize );
-	ImGui::TextDisabled( "animgraph/*.json — see docs/ANIMGRAPH.md" );
+	ImGui::Begin( "Studio / Animation", (bool *)&vkWindows.studioAnimation.open );
+	ImGui::TextDisabled( "(?)" );
+	if ( ImGui::IsItemHovered() ) {
+		ImGui::SetTooltip(
+			"Animgraph cvar/path strip stub — see docs/ANIMGRAPH.md. "
+			"Full G_AnimGraph load/status wiring is a later Studio pass." );
+	}
+	ImGui::Separator();
+	ImGui::TextDisabled( "animgraph/*.json" );
 	if ( ImGui::Button( "g_animgraph 1" ) ) {
 		ri.Cmd_ExecuteText( EXEC_APPEND, "set g_animgraph 1\n" );
 	}
