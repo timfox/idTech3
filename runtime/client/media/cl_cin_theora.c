@@ -14,6 +14,7 @@ Provides Ogg Theora video decoding via libtheora and libogg.
 #include "../../qcommon/q_shared.h"
 #include "../../qcommon/qcommon.h"
 #include "cl_cin_modern.h"
+#include "cl_cin_colors.h"
 
 #ifdef USE_THEORA
 
@@ -45,8 +46,6 @@ static qboolean theora_decodeFrame(cinModernDecoder_t *dec, cinFrame_t *frame, c
 static void     theora_seek(cinModernDecoder_t *dec, int timeMs);
 static void     theora_close(cinModernDecoder_t *dec);
 static qboolean theora_isEof(cinModernDecoder_t *dec);
-
-static void theora_ycbcr_to_rgba(th_ycbcr_buffer ycbcr, byte *rgba, int width, int height);
 
 /*
 ===============
@@ -180,43 +179,6 @@ static qboolean theora_open(cinModernDecoder_t *dec, const char *filename, fileH
 
 /*
 ===============
-theora_ycbcr_to_rgba
-===============
-*/
-static void theora_ycbcr_to_rgba(th_ycbcr_buffer ycbcr, byte *rgba, int width, int height) {
-	const unsigned char *yPlane = ycbcr[0].data;
-	const unsigned char *cbPlane = ycbcr[1].data;
-	const unsigned char *crPlane = ycbcr[2].data;
-	int yStride = ycbcr[0].stride;
-	int cbStride = ycbcr[1].stride;
-	int crStride = ycbcr[2].stride;
-	int x, y;
-
-	for (y = 0; y < height; y++) {
-		for (x = 0; x < width; x++) {
-			int yVal = yPlane[y * yStride + x];
-			int cbVal = cbPlane[(y >> 1) * cbStride + (x >> 1)];
-			int crVal = crPlane[(y >> 1) * crStride + (x >> 1)];
-
-			int c = yVal - 16;
-			int d = cbVal - 128;
-			int e = crVal - 128;
-
-			int r = (298 * c + 409 * e + 128) >> 8;
-			int g = (298 * c - 100 * d - 208 * e + 128) >> 8;
-			int b = (298 * c + 516 * d + 128) >> 8;
-
-			int idx = (y * width + x) * 4;
-			rgba[idx + 0] = (byte)(r < 0 ? 0 : (r > 255 ? 255 : r));
-			rgba[idx + 1] = (byte)(g < 0 ? 0 : (g > 255 ? 255 : g));
-			rgba[idx + 2] = (byte)(b < 0 ? 0 : (b > 255 ? 255 : b));
-			rgba[idx + 3] = 255;
-		}
-	}
-}
-
-/*
-===============
 theora_decodeFrame
 ===============
 */
@@ -252,7 +214,11 @@ static qboolean theora_decodeFrame(cinModernDecoder_t *dec, cinFrame_t *frame, c
 						ctx->frameBuffer = (byte *)Z_Malloc(ctx->frameBufferSize);
 					}
 
-					theora_ycbcr_to_rgba(ycbcr, ctx->frameBuffer, w, h);
+						CIN_ConvertYUV420Planar8ToRGBA(
+							ycbcr[0].data, ycbcr[0].stride,
+							ycbcr[1].data, ycbcr[1].stride,
+							ycbcr[2].data, ycbcr[2].stride,
+							ctx->frameBuffer, w, h );
 
 					if (frame) {
 						frame->data = ctx->frameBuffer;

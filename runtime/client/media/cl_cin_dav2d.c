@@ -14,6 +14,7 @@ Provides native AV2 elementary stream decoding via the dav2d library.
 #include "../../qcommon/q_shared.h"
 #include "../../qcommon/qcommon.h"
 #include "cl_cin_modern.h"
+#include "cl_cin_colors.h"
 
 #ifdef USE_DAV2D
 
@@ -42,88 +43,38 @@ static void     cin_dav2d_seek(cinModernDecoder_t *dec, int timeMs);
 static void     cin_dav2d_close(cinModernDecoder_t *dec);
 static qboolean cin_dav2d_isEof(cinModernDecoder_t *dec);
 
-static byte cin_dav2d_rescale_sample(unsigned sample, unsigned maxValue) {
-	if (maxValue == 0) {
-		return 0;
-	}
-	return (byte)((sample * 255u + (maxValue / 2u)) / maxValue);
-}
-
-static int cin_dav2d_clip_byte(int value) {
-	if (value < 0) {
-		return 0;
-	}
-	if (value > 255) {
-		return 255;
-	}
-	return value;
-}
-
-static unsigned cin_dav2d_plane_sample(const Dav2dPicture *pic, int plane, int x, int y) {
-	const int bytesPerSample = pic->p.bpc > 8 ? 2 : 1;
-	const int stride = (int)pic->stride[plane == 0 ? 0 : 1];
-	const byte *row = (const byte *)pic->data[plane] + (y * stride);
-
-	if (bytesPerSample == 1) {
-		return row[x];
-	}
-
-	return ((const uint16_t *)row)[x];
-}
-
 static void cin_dav2d_to_rgba(const Dav2dPicture *pic, byte *rgba) {
-	const int width = pic->p.w;
-	const int height = pic->p.h;
-	const unsigned maxValue = (1u << pic->p.bpc) - 1u;
-	int x, y;
+	int chromaShiftX = 0;
+	int chromaShiftY = 0;
 
-	for (y = 0; y < height; y++) {
-		for (x = 0; x < width; x++) {
-			unsigned yRaw = cin_dav2d_plane_sample(pic, 0, x, y);
-			unsigned uRaw = maxValue / 2u;
-			unsigned vRaw = maxValue / 2u;
-			int uvx = x;
-			int uvy = y;
-			byte yVal, uVal, vVal;
-			int c, d, e;
-			int idx;
-
-			switch (pic->p.layout) {
-				case DAV2D_PIXEL_LAYOUT_I420:
-					uvx >>= 1;
-					uvy >>= 1;
-					uRaw = cin_dav2d_plane_sample(pic, 1, uvx, uvy);
-					vRaw = cin_dav2d_plane_sample(pic, 2, uvx, uvy);
-					break;
-				case DAV2D_PIXEL_LAYOUT_I422:
-					uvx >>= 1;
-					uRaw = cin_dav2d_plane_sample(pic, 1, uvx, uvy);
-					vRaw = cin_dav2d_plane_sample(pic, 2, uvx, uvy);
-					break;
-				case DAV2D_PIXEL_LAYOUT_I444:
-					uRaw = cin_dav2d_plane_sample(pic, 1, uvx, uvy);
-					vRaw = cin_dav2d_plane_sample(pic, 2, uvx, uvy);
-					break;
-				case DAV2D_PIXEL_LAYOUT_I400:
-				default:
-					break;
-			}
-
-			yVal = cin_dav2d_rescale_sample(yRaw, maxValue);
-			uVal = cin_dav2d_rescale_sample(uRaw, maxValue);
-			vVal = cin_dav2d_rescale_sample(vRaw, maxValue);
-
-			c = (int)yVal - 16;
-			d = (int)uVal - 128;
-			e = (int)vVal - 128;
-
-			idx = (y * width + x) * 4;
-			rgba[idx + 0] = (byte)cin_dav2d_clip_byte((298 * c + 409 * e + 128) >> 8);
-			rgba[idx + 1] = (byte)cin_dav2d_clip_byte((298 * c - 100 * d - 208 * e + 128) >> 8);
-			rgba[idx + 2] = (byte)cin_dav2d_clip_byte((298 * c + 516 * d + 128) >> 8);
-			rgba[idx + 3] = 255;
-		}
+	switch (pic->p.layout) {
+		case DAV2D_PIXEL_LAYOUT_I420:
+			chromaShiftX = 1;
+			chromaShiftY = 1;
+			break;
+		case DAV2D_PIXEL_LAYOUT_I422:
+			chromaShiftX = 1;
+			break;
+		case DAV2D_PIXEL_LAYOUT_I444:
+		case DAV2D_PIXEL_LAYOUT_I400:
+		default:
+			break;
 	}
+
+	if (pic->p.bpc <= 8) {
+		CIN_ConvertPlanarYUV8ToRGBA(
+			(const byte *)pic->data[0], (int)pic->stride[0],
+			pic->p.layout == DAV2D_PIXEL_LAYOUT_I400 ? NULL : (const byte *)pic->data[1], (int)pic->stride[1],
+			pic->p.layout == DAV2D_PIXEL_LAYOUT_I400 ? NULL : (const byte *)pic->data[2], (int)pic->stride[1],
+			chromaShiftX, chromaShiftY, rgba, pic->p.w, pic->p.h );
+		return;
+	}
+
+	CIN_ConvertPlanarYUV16ToRGBA(
+		(const uint16_t *)pic->data[0], (int)pic->stride[0],
+		pic->p.layout == DAV2D_PIXEL_LAYOUT_I400 ? NULL : (const uint16_t *)pic->data[1], (int)pic->stride[1],
+		pic->p.layout == DAV2D_PIXEL_LAYOUT_I400 ? NULL : (const uint16_t *)pic->data[2], (int)pic->stride[1],
+		chromaShiftX, chromaShiftY, (1u << pic->p.bpc) - 1u, rgba, pic->p.w, pic->p.h );
 }
 
 qboolean CIN_Dav2d_CreateDecoder(cinModernDecoder_t *dec) {

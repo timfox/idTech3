@@ -15,6 +15,7 @@ with WebM containers (already supported via Nestegg).
 #include "../../qcommon/q_shared.h"
 #include "../../qcommon/qcommon.h"
 #include "cl_cin_modern.h"
+#include "cl_cin_colors.h"
 
 #ifdef USE_VPX
 
@@ -48,8 +49,6 @@ static qboolean vpx_decodeFrame(cinModernDecoder_t *dec, cinFrame_t *frame, cinA
 static void     vpx_seek(cinModernDecoder_t *dec, int timeMs);
 static void     vpx_close(cinModernDecoder_t *dec);
 static qboolean vpx_isEof(cinModernDecoder_t *dec);
-
-static void vpx_yuv_to_rgba(vpx_image_t *img, byte *rgba, int width, int height);
 
 static int nestegg_io_read(void *buffer, size_t length, void *userdata);
 static int nestegg_io_seek(int64_t offset, int whence, void *userdata);
@@ -209,37 +208,6 @@ static qboolean vpx_open(cinModernDecoder_t *dec, const char *filename, fileHand
 
 /*
 ===============
-vpx_yuv_to_rgba
-===============
-*/
-static void vpx_yuv_to_rgba(vpx_image_t *img, byte *rgba, int width, int height) {
-	int x, y;
-
-	for (y = 0; y < height; y++) {
-		for (x = 0; x < width; x++) {
-			int yVal = img->planes[VPX_PLANE_Y][y * img->stride[VPX_PLANE_Y] + x];
-			int uVal = img->planes[VPX_PLANE_U][(y >> 1) * img->stride[VPX_PLANE_U] + (x >> 1)];
-			int vVal = img->planes[VPX_PLANE_V][(y >> 1) * img->stride[VPX_PLANE_V] + (x >> 1)];
-
-			int c = yVal - 16;
-			int d = uVal - 128;
-			int e = vVal - 128;
-
-			int r = (298 * c + 409 * e + 128) >> 8;
-			int g = (298 * c - 100 * d - 208 * e + 128) >> 8;
-			int b = (298 * c + 516 * d + 128) >> 8;
-
-			int idx = (y * width + x) * 4;
-			rgba[idx + 0] = (byte)(r < 0 ? 0 : (r > 255 ? 255 : r));
-			rgba[idx + 1] = (byte)(g < 0 ? 0 : (g > 255 ? 255 : g));
-			rgba[idx + 2] = (byte)(b < 0 ? 0 : (b > 255 ? 255 : b));
-			rgba[idx + 3] = 255;
-		}
-	}
-}
-
-/*
-===============
 vpx_decodeFrame
 ===============
 */
@@ -299,7 +267,11 @@ static qboolean vpx_decodeFrame(cinModernDecoder_t *dec, cinFrame_t *frame, cinA
 						ctx->frameBuffer = (byte *)Z_Malloc(ctx->frameBufferSize);
 					}
 
-					vpx_yuv_to_rgba(img, ctx->frameBuffer, w, h);
+					CIN_ConvertYUV420Planar8ToRGBA(
+						img->planes[VPX_PLANE_Y], img->stride[VPX_PLANE_Y],
+						img->planes[VPX_PLANE_U], img->stride[VPX_PLANE_U],
+						img->planes[VPX_PLANE_V], img->stride[VPX_PLANE_V],
+						ctx->frameBuffer, w, h );
 
 					if (frame) {
 						frame->data = ctx->frameBuffer;

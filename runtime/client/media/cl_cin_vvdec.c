@@ -14,6 +14,7 @@ Provides native H.266/VVC elementary stream decoding via the vvdec library.
 #include "../../qcommon/q_shared.h"
 #include "../../qcommon/qcommon.h"
 #include "cl_cin_modern.h"
+#include "cl_cin_colors.h"
 
 #ifdef USE_VVDEC
 
@@ -42,84 +43,38 @@ static void     cin_vvdec_seek(cinModernDecoder_t *dec, int timeMs);
 static void     cin_vvdec_close(cinModernDecoder_t *dec);
 static qboolean cin_vvdec_isEof(cinModernDecoder_t *dec);
 
-static byte cin_vvdec_rescale_sample(unsigned sample, unsigned maxValue) {
-	if (maxValue == 0) {
-		return 0;
-	}
-	return (byte)((sample * 255u + (maxValue / 2u)) / maxValue);
-}
-
-static int cin_vvdec_clip_byte(int value) {
-	if (value < 0) {
-		return 0;
-	}
-	if (value > 255) {
-		return 255;
-	}
-	return value;
-}
-
-static unsigned cin_vvdec_plane_sample(const vvdecPlane *plane, int x, int y) {
-	const byte *row = plane->ptr + (y * plane->stride);
-
-	if (plane->bytesPerSample <= 1) {
-		return row[x];
-	}
-
-	return ((const uint16_t *)row)[x];
-}
-
 static void cin_vvdec_to_rgba(const vvdecFrame *src, byte *rgba) {
-	const unsigned maxValue = (1u << src->bitDepth) - 1u;
-	int x, y;
+	int chromaShiftX = 0;
+	int chromaShiftY = 0;
 
-	for (y = 0; y < (int)src->height; y++) {
-		for (x = 0; x < (int)src->width; x++) {
-			unsigned yRaw = cin_vvdec_plane_sample(&src->planes[0], x, y);
-			unsigned uRaw = maxValue / 2u;
-			unsigned vRaw = maxValue / 2u;
-			int uvx = x;
-			int uvy = y;
-			byte yVal, uVal, vVal;
-			int c, d, e;
-			int idx;
-
-			switch (src->colorFormat) {
-				case VVDEC_CF_YUV420_PLANAR:
-					uvx >>= 1;
-					uvy >>= 1;
-					uRaw = cin_vvdec_plane_sample(&src->planes[1], uvx, uvy);
-					vRaw = cin_vvdec_plane_sample(&src->planes[2], uvx, uvy);
-					break;
-				case VVDEC_CF_YUV422_PLANAR:
-					uvx >>= 1;
-					uRaw = cin_vvdec_plane_sample(&src->planes[1], uvx, uvy);
-					vRaw = cin_vvdec_plane_sample(&src->planes[2], uvx, uvy);
-					break;
-				case VVDEC_CF_YUV444_PLANAR:
-					uRaw = cin_vvdec_plane_sample(&src->planes[1], uvx, uvy);
-					vRaw = cin_vvdec_plane_sample(&src->planes[2], uvx, uvy);
-					break;
-				case VVDEC_CF_YUV400_PLANAR:
-				default:
-					break;
-			}
-
-			yVal = cin_vvdec_rescale_sample(yRaw, maxValue);
-			uVal = cin_vvdec_rescale_sample(uRaw, maxValue);
-			vVal = cin_vvdec_rescale_sample(vRaw, maxValue);
-
-			c = (int)yVal - 16;
-			d = (int)uVal - 128;
-			e = (int)vVal - 128;
-
-			idx = (y * (int)src->width + x) * 4;
-			rgba[idx + 0] = (byte)cin_vvdec_clip_byte((298 * c + 409 * e + 128) >> 8);
-			rgba[idx + 1] = (byte)cin_vvdec_clip_byte((298 * c - 100 * d - 208 * e + 128) >> 8);
-			rgba[idx + 2] = (byte)cin_vvdec_clip_byte((298 * c + 516 * d + 128) >> 8);
-			rgba[idx + 3] = 255;
-		}
+	switch (src->colorFormat) {
+		case VVDEC_CF_YUV420_PLANAR:
+			chromaShiftX = 1;
+			chromaShiftY = 1;
+			break;
+		case VVDEC_CF_YUV422_PLANAR:
+			chromaShiftX = 1;
+			break;
+		case VVDEC_CF_YUV444_PLANAR:
+		case VVDEC_CF_YUV400_PLANAR:
+		default:
+			break;
 	}
+
+	if (src->bitDepth <= 8) {
+		CIN_ConvertPlanarYUV8ToRGBA(
+			src->planes[0].ptr, (int)src->planes[0].stride,
+			src->colorFormat == VVDEC_CF_YUV400_PLANAR ? NULL : src->planes[1].ptr, (int)src->planes[1].stride,
+			src->colorFormat == VVDEC_CF_YUV400_PLANAR ? NULL : src->planes[2].ptr, (int)src->planes[2].stride,
+			chromaShiftX, chromaShiftY, rgba, (int)src->width, (int)src->height );
+		return;
+	}
+
+	CIN_ConvertPlanarYUV16ToRGBA(
+		(const uint16_t *)src->planes[0].ptr, (int)src->planes[0].stride,
+		src->colorFormat == VVDEC_CF_YUV400_PLANAR ? NULL : (const uint16_t *)src->planes[1].ptr, (int)src->planes[1].stride,
+		src->colorFormat == VVDEC_CF_YUV400_PLANAR ? NULL : (const uint16_t *)src->planes[2].ptr, (int)src->planes[2].stride,
+		chromaShiftX, chromaShiftY, (1u << src->bitDepth) - 1u, rgba, (int)src->width, (int)src->height );
 }
 
 qboolean CIN_Vvdec_CreateDecoder(cinModernDecoder_t *dec) {

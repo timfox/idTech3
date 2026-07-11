@@ -14,6 +14,7 @@ Provides high-performance AV1 video decoding via the dav1d library.
 #include "../../qcommon/q_shared.h"
 #include "../../qcommon/qcommon.h"
 #include "cl_cin_modern.h"
+#include "cl_cin_colors.h"
 
 #ifdef USE_DAV1D
 
@@ -43,8 +44,6 @@ static void     cin_dav1d_seek(cinModernDecoder_t *dec, int timeMs);
 static void     cin_dav1d_close(cinModernDecoder_t *dec);
 static qboolean cin_dav1d_isEof(cinModernDecoder_t *dec);
 
-static void dav1d_yuv420_to_rgba(const Dav1dPicture *pic, byte *rgba, int width, int height);
-
 /*
 ===============
 CIN_Dav1d_CreateDecoder
@@ -70,6 +69,7 @@ static qboolean cin_dav1d_open(cinModernDecoder_t *dec, const char *filename, fi
 	int ret;
 
 	(void)file;
+	(void)fileSize;
 
 	ctx = (dav1dContext_t *)Z_Malloc(sizeof(dav1dContext_t));
 	Com_Memset(ctx, 0, sizeof(*ctx));
@@ -101,44 +101,6 @@ static qboolean cin_dav1d_open(cinModernDecoder_t *dec, const char *filename, fi
 
 	Com_Printf("dav1d: Opened AV1 file %s (%d bytes)\n", filename, ctx->fileSize);
 	return qtrue;
-}
-
-/*
-===============
-dav1d_yuv420_to_rgba
-
-Convert YUV420 planar to RGBA.
-===============
-*/
-static void dav1d_yuv420_to_rgba(const Dav1dPicture *pic, byte *rgba, int width, int height) {
-	const uint8_t *yPlane = (const uint8_t *)pic->data[0];
-	const uint8_t *uPlane = (const uint8_t *)pic->data[1];
-	const uint8_t *vPlane = (const uint8_t *)pic->data[2];
-	int yStride = (int)pic->stride[0];
-	int uvStride = (int)pic->stride[1];
-	int x, y;
-
-	for (y = 0; y < height; y++) {
-		for (x = 0; x < width; x++) {
-			int yVal = yPlane[y * yStride + x];
-			int uVal = uPlane[(y >> 1) * uvStride + (x >> 1)];
-			int vVal = vPlane[(y >> 1) * uvStride + (x >> 1)];
-
-			int c = yVal - 16;
-			int d = uVal - 128;
-			int e = vVal - 128;
-
-			int r = (298 * c + 409 * e + 128) >> 8;
-			int g = (298 * c - 100 * d - 208 * e + 128) >> 8;
-			int b = (298 * c + 516 * d + 128) >> 8;
-
-			int idx = (y * width + x) * 4;
-			rgba[idx + 0] = (byte)(r < 0 ? 0 : (r > 255 ? 255 : r));
-			rgba[idx + 1] = (byte)(g < 0 ? 0 : (g > 255 ? 255 : g));
-			rgba[idx + 2] = (byte)(b < 0 ? 0 : (b > 255 ? 255 : b));
-			rgba[idx + 3] = 255;
-		}
-	}
 }
 
 /*
@@ -204,7 +166,11 @@ static qboolean cin_dav1d_decodeFrame(cinModernDecoder_t *dec, cinFrame_t *frame
 		ctx->frameBuffer = (byte *)Z_Malloc(ctx->frameBufferSize);
 	}
 
-	dav1d_yuv420_to_rgba(&pic, ctx->frameBuffer, pic.p.w, pic.p.h);
+	CIN_ConvertYUV420Planar8ToRGBA(
+		(const byte *)pic.data[0], (int)pic.stride[0],
+		(const byte *)pic.data[1], (int)pic.stride[1],
+		(const byte *)pic.data[2], (int)pic.stride[1],
+		ctx->frameBuffer, pic.p.w, pic.p.h );
 
 	if (frame) {
 		frame->data = ctx->frameBuffer;

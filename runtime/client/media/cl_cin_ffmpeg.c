@@ -167,20 +167,12 @@ static qboolean ffmpeg_decode_video_frame(ffmpegContext_t *ctx, cinModernDecoder
 		0, ctx->videoCodecCtx->height,
 		ctx->rgbaFrame->data, ctx->rgbaFrame->linesize );
 
-	{
-		int copySize = dec->width * dec->height * 4;
-		if ( copySize > ctx->frameBufferSize ) {
-			copySize = ctx->frameBufferSize;
-		}
-		Com_Memcpy( ctx->frameBuffer, ctx->rgbaFrame->data[0], copySize );
-
-		frame->data = ctx->frameBuffer;
-		frame->width = dec->width;
-		frame->height = dec->height;
-		frame->stride = dec->width * 4;
-		frame->format = CIN_FRAME_RGBA;
-		frame->valid = qtrue;
-	}
+	frame->data = ctx->frameBuffer;
+	frame->width = dec->width;
+	frame->height = dec->height;
+	frame->stride = ctx->rgbaFrame->linesize[0];
+	frame->format = CIN_FRAME_RGBA;
+	frame->valid = qtrue;
 
 	return qtrue;
 }
@@ -489,7 +481,7 @@ static qboolean ffmpeg_open(cinModernDecoder_t *dec, const char *filename, fileH
 		goto fail;
 	}
 
-	ctx->frameBufferSize = dec->width * dec->height * 4;
+	ctx->frameBufferSize = av_image_get_buffer_size( AV_PIX_FMT_RGBA, dec->width, dec->height, 1 );
 	ctx->frameBuffer = (byte *)Z_Malloc(ctx->frameBufferSize);
 	if (!ctx->frameBuffer) {
 		Com_Printf(S_COLOR_RED "FFmpeg: Could not allocate frame buffer for %s\n", filename);
@@ -499,10 +491,12 @@ static qboolean ffmpeg_open(cinModernDecoder_t *dec, const char *filename, fileH
 	ctx->rgbaFrame->format = AV_PIX_FMT_RGBA;
 	ctx->rgbaFrame->width = dec->width;
 	ctx->rgbaFrame->height = dec->height;
-	ret = av_image_alloc(ctx->rgbaFrame->data, ctx->rgbaFrame->linesize,
-		dec->width, dec->height, AV_PIX_FMT_RGBA, 32);
+	ret = av_image_fill_arrays(
+		ctx->rgbaFrame->data, ctx->rgbaFrame->linesize,
+		ctx->frameBuffer, AV_PIX_FMT_RGBA,
+		dec->width, dec->height, 1);
 	if (ret < 0) {
-		Com_Printf(S_COLOR_RED "FFmpeg: Could not allocate RGBA image for %s\n", filename);
+		Com_Printf(S_COLOR_RED "FFmpeg: Could not map RGBA frame buffer for %s\n", filename);
 		goto fail;
 	}
 
@@ -530,9 +524,6 @@ fail:
 		sws_freeContext(ctx->swsCtx);
 	}
 	if (ctx->rgbaFrame) {
-		if (ctx->rgbaFrame->data[0]) {
-			av_freep(&ctx->rgbaFrame->data[0]);
-		}
 		av_frame_free(&ctx->rgbaFrame);
 	}
 	if (ctx->frame) {
@@ -711,9 +702,6 @@ static void ffmpeg_close(cinModernDecoder_t *dec) {
 		sws_freeContext(ctx->swsCtx);
 	}
 	if (ctx->rgbaFrame) {
-		if (ctx->rgbaFrame->data[0]) {
-			av_freep(&ctx->rgbaFrame->data[0]);
-		}
 		av_frame_free(&ctx->rgbaFrame);
 	}
 	if (ctx->frame) {

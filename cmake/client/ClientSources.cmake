@@ -32,6 +32,7 @@ set(IDTECH3_CLIENT_MEDIA_SRCS
 	${_IDTECH3_CLIENT_REL}/media/cl_download.c
 	${_IDTECH3_CLIENT_REL}/media/cl_cin.c
 	${_IDTECH3_CLIENT_REL}/media/cl_cin_modern.c
+	${_IDTECH3_CLIENT_REL}/media/cl_cin_colors.c
 	${_IDTECH3_CLIENT_REL}/media/cl_cin_ffmpeg.c
 	${_IDTECH3_CLIENT_REL}/media/cl_cin_dav1d.c
 	${_IDTECH3_CLIENT_REL}/media/cl_cin_dav2d.c
