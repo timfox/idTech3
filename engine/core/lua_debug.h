@@ -13,6 +13,7 @@ qboolean LuaDebug_BeginHotloadReload( void );
 void LuaDebug_FinishHotloadReload( void );
 void LuaDebug_SetScriptFallbackRoot( const char *root );
 void LuaDebug_CallAppCrdtMessage( int msgMajor, const char *payload );
+void LuaDebug_EmitEvent( const char *eventName, const char *s0, const char *s1, int i0, int i1 );
 
 void Cmd_ScriptReload_f( void );
 void Cmd_ScriptList_f( void );

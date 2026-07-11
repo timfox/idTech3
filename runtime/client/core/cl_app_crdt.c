@@ -10,6 +10,7 @@ Client-side App CRDT: intercept server commands, apply publish, event queue.
 #include "cl_app_crdt.h"
 #include "../../qcommon/app_crdt.h"
 #include "../../qcommon/lua_debug.h"
+#include "../../qcommon/script_emit.h"
 
 #ifdef USE_LUA
 #include "lua_compat.h"
@@ -67,6 +68,9 @@ static void CL_AppCrdt_OnPublish( const char *verText, const char *manifestPath 
 		Com_Printf( "[AppCRDT] synced version %s (no manifest scripts)\n", verText );
 	}
 
+	Com_ScriptEmitEvent( "app_crdt_publish", verText,
+		manifestPath ? manifestPath : "", spec.scriptCount, AppCrdt_GetLocalMajor() );
+
 	AppCrdt_QueueFlushUpToMajor( &s_eventQueue, AppCrdt_GetLocalMajor() );
 }
 
@@ -75,6 +79,7 @@ static void CL_AppCrdt_OnEvent( int msgMajor, const char *payload )
 	if ( !payload ) {
 		return;
 	}
+	Com_ScriptEmitEvent( "app_crdt_event", payload, NULL, msgMajor, AppCrdt_GetLocalMajor() );
 	AppCrdt_QueueDispatch( &s_eventQueue, AppCrdt_GetLocalMajor(), msgMajor, payload );
 }
 
@@ -82,6 +87,7 @@ static void CL_AppCrdt_Flush_f( void )
 {
 	int n = AppCrdt_QueueFlushUpToMajor( &s_eventQueue, AppCrdt_GetLocalMajor() );
 	Com_Printf( "[AppCRDT] flushed %d queued event(s)\n", n );
+	Com_ScriptEmitEvent( "app_crdt_flush", NULL, NULL, n, AppCrdt_GetLocalMajor() );
 }
 
 static int CL_AppCrdt_LuaEmit( lua_State *L )
@@ -100,11 +106,55 @@ static int CL_AppCrdt_LuaEmit( lua_State *L )
 	return 0;
 }
 
+static int CL_AppCrdt_LuaGetVersion( lua_State *L )
+{
+	char verBuf[32];
+
+	AppCrdt_FormatVersion( AppCrdt_GetLocalVersion(), verBuf, sizeof( verBuf ) );
+	lua_pushstring( L, verBuf );
+	return 1;
+}
+
+static int CL_AppCrdt_LuaIsEnabled( lua_State *L )
+{
+	lua_pushboolean( L, AppCrdt_IsEnabled() );
+	return 1;
+}
+
+static int CL_AppCrdt_LuaGetStatus( lua_State *L )
+{
+	char verBuf[32];
+
+	AppCrdt_FormatVersion( AppCrdt_GetLocalVersion(), verBuf, sizeof( verBuf ) );
+	lua_newtable( L );
+	lua_pushboolean( L, AppCrdt_IsEnabled() );
+	lua_setfield( L, -2, "enabled" );
+	lua_pushstring( L, verBuf );
+	lua_setfield( L, -2, "localVersion" );
+	lua_pushinteger( L, AppCrdt_GetLocalMajor() );
+	lua_setfield( L, -2, "localMajor" );
+	lua_pushinteger( L, AppCrdt_GetQueueMax() );
+	lua_setfield( L, -2, "queueMax" );
+	lua_pushinteger( L, s_eventQueue.count );
+	lua_setfield( L, -2, "queuedEvents" );
+	lua_pushboolean( L, AppCrdt_BackendAvailable() );
+	lua_setfield( L, -2, "backendAvailable" );
+	lua_pushstring( L, AppCrdt_GetBackendRoot() ? AppCrdt_GetBackendRoot() : "" );
+	lua_setfield( L, -2, "backendRoot" );
+	return 1;
+}
+
 void CL_AppCrdt_RegisterLua( lua_State *L )
 {
 	lua_newtable( L );
 	lua_pushcfunction( L, CL_AppCrdt_LuaEmit );
 	lua_setfield( L, -2, "emit" );
+	lua_pushcfunction( L, CL_AppCrdt_LuaGetVersion );
+	lua_setfield( L, -2, "getVersion" );
+	lua_pushcfunction( L, CL_AppCrdt_LuaIsEnabled );
+	lua_setfield( L, -2, "isEnabled" );
+	lua_pushcfunction( L, CL_AppCrdt_LuaGetStatus );
+	lua_setfield( L, -2, "getStatus" );
 	lua_setglobal( L, "AppCrdt" );
 
 	lua_getglobal( L, "Engine" );

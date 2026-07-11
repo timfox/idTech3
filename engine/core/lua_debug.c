@@ -341,6 +341,28 @@ void LuaDebug_CallAppCrdtMessage( int msgMajor, const char *payload )
 	}
 }
 
+void LuaDebug_EmitEvent( const char *eventName, const char *s0, const char *s1, int i0, int i1 )
+{
+	if ( !s_luaState || !eventName || !eventName[0] ) {
+		return;
+	}
+
+	lua_getglobal( s_luaState, "on_event" );
+	if ( !lua_isfunction( s_luaState, -1 ) ) {
+		lua_pop( s_luaState, 1 );
+		return;
+	}
+
+	lua_pushstring( s_luaState, eventName );
+	lua_pushstring( s_luaState, s0 ? s0 : "" );
+	lua_pushstring( s_luaState, s1 ? s1 : "" );
+	lua_pushinteger( s_luaState, i0 );
+	lua_pushinteger( s_luaState, i1 );
+	if ( lua_pcall( s_luaState, 5, 0, 0 ) != LUA_OK ) {
+		LuaDebug_PrintLuaError( "on_event" );
+	}
+}
+
 void Cmd_ScriptReload_f( void ) {
 	int argc = Cmd_Argc();
 	int i;
@@ -479,6 +501,15 @@ void LuaDebug_CallAppCrdtMessage( int msgMajor, const char *payload )
 {
 	(void)msgMajor;
 	(void)payload;
+}
+
+void LuaDebug_EmitEvent( const char *eventName, const char *s0, const char *s1, int i0, int i1 )
+{
+	(void)eventName;
+	(void)s0;
+	(void)s1;
+	(void)i0;
+	(void)i1;
 }
 
 #endif

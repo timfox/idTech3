@@ -9,6 +9,7 @@ Client P2P session reconnect and listen-host migration orchestration.
 #include "client.h"
 #include "cl_p2p_session.h"
 #include "../../qcommon/net_p2p.h"
+#include "../../qcommon/script_emit.h"
 
 #include <string.h>
 
@@ -97,6 +98,9 @@ void CL_P2P_SessionOnConnect( const char *sessionId, const char *p2pAddr, const 
 		Q_strncpyz( cl_p2pSession.failover, failover, sizeof( cl_p2pSession.failover ) );
 	}
 	cl_p2pSession.reconnectWindowSec = reconnectWindowSec > 0 ? reconnectWindowSec : 0;
+	Com_ScriptEmitEvent( "p2p_session_connect",
+		cl_p2pSession.p2pAddr, cl_p2pSession.sessionId,
+		cl_p2pSession.reconnectWindowSec, 0 );
 }
 
 void CL_P2P_SessionOnConnectFromServerInfo( const char *serverInfo )
@@ -190,10 +194,15 @@ static void CL_P2P_SessionTryPromoteBackupHost( void )
 void CL_P2P_SessionOnDisconnect( qboolean serverInitiated )
 {
 	int now;
+	qboolean hadActive = cl_p2pSession.active;
 
 	CL_P2P_SessionRegisterCvars();
 
 	if ( !serverInitiated ) {
+		if ( hadActive ) {
+			Com_ScriptEmitEvent( "p2p_session_disconnect",
+				cl_p2pSession.p2pAddr, cl_p2pSession.sessionId, 0, 0 );
+		}
 		Com_Memset( &cl_p2pSession, 0, sizeof( cl_p2pSession ) );
 		return;
 	}
@@ -218,6 +227,11 @@ void CL_P2P_SessionOnDisconnect( qboolean serverInitiated )
 	cl_p2pSession.pending = qtrue;
 	cl_p2pSession.nextAttemptTime = now + CL_P2P_SessionBackoffMs( 0 );
 	cl_p2pSession.attemptCount = 0;
+	Com_ScriptEmitEvent( "p2p_session_disconnect",
+		cl_p2pSession.p2pAddr, cl_p2pSession.sessionId, 1, 0 );
+	Com_ScriptEmitEvent( "p2p_reconnect_scheduled",
+		cl_p2pSession.p2pAddr, cl_p2pSession.failover,
+		cl_p2pSession.reconnectWindowSec, 0 );
 
 	if ( cl_p2pReconnectLog && cl_p2pReconnectLog->integer ) {
 		Com_Printf( "P2P reconnect: scheduled within %ds window (policy %s)\n",
@@ -246,6 +260,8 @@ void CL_P2P_SessionOnMigrate( const char *sessionId, const char *newP2pAddr )
 	cl_p2pSession.disconnectTime = Sys_Milliseconds();
 	cl_p2pSession.nextAttemptTime = cl_p2pSession.disconnectTime + 500;
 	cl_p2pSession.attemptCount = 0;
+	Com_ScriptEmitEvent( "p2p_session_migrate",
+		cl_p2pSession.migrateAddr, sessionId, 1, 0 );
 
 	if ( cl_p2pReconnectLog && cl_p2pReconnectLog->integer ) {
 		Com_Printf( "P2P migrate: new host %s for session %s\n", newP2pAddr, sessionId );
@@ -276,6 +292,9 @@ void CL_P2P_SessionFrame( void )
 		if ( cl_p2pReconnectLog && cl_p2pReconnectLog->integer ) {
 			Com_Printf( "P2P reconnect: window expired\n" );
 		}
+		Com_ScriptEmitEvent( "p2p_reconnect_expired",
+			cl_p2pSession.p2pAddr, cl_p2pSession.sessionId,
+			cl_p2pSession.attemptCount, 0 );
 		CL_P2P_SessionShutdown();
 		return;
 	}
@@ -300,6 +319,9 @@ void CL_P2P_SessionFrame( void )
 		Com_Printf( "P2P reconnect: attempt %d, window %ds remaining -> %s\n",
 			cl_p2pSession.attemptCount, remainsSec, connectTarget );
 	}
+	Com_ScriptEmitEvent( "p2p_reconnect_attempt",
+		connectTarget, cl_p2pSession.sessionId,
+		cl_p2pSession.attemptCount, remainsSec );
 
 	NET_P2P_BeginConnectPath( connectTarget );
 	Cbuf_AddText( va( "connect %s\n", connectTarget ) );

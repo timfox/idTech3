@@ -146,13 +146,17 @@ void SV_P2P_HandleReconnectRequest( const netadr_t *from )
 {
 	const char *sessionId;
 	int challenge;
+	qboolean allowed;
 
 	if ( !from || !com_sv_running->integer ) {
 		return;
 	}
 
 	sessionId = Cmd_Argv( 1 );
-	if ( !SV_P2P_AllowReconnectGrace( from, sessionId ) ) {
+	allowed = SV_P2P_AllowReconnectGrace( from, sessionId );
+	Com_ScriptEmitEvent( "p2p_reconnect_request",
+		NET_AdrToString( from ), sessionId ? sessionId : "", allowed ? 1 : 0, 0 );
+	if ( !allowed ) {
 		return;
 	}
 
@@ -1003,16 +1007,22 @@ or crashing -- SV_FinalMessage() will handle that
 */
 void SV_DropClient( client_t *drop, const char *reason ) {
 	char	name[ sizeof( drop->name ) ];
+	char	address[MAX_STRING_CHARS];
 	qboolean isBot;
 	int		i;
+	int clientNum;
 
 	if ( drop->state == CS_ZOMBIE ) {
 		return;		// already dropped
 	}
 
 	isBot = drop->netchan.remoteAddress.type == NA_BOT;
+	clientNum = (int)( drop - svs.clients );
+	Q_strncpyz( address, NET_AdrToStringwPort( &drop->netchan.remoteAddress ), sizeof( address ) );
 
 	Q_strncpyz( name, drop->name, sizeof( name ) );	// for further DPrintf() because drop->name will be nuked in SV_SetUserinfo()
+	Com_ScriptEmitEvent( "client_disconnect", reason ? reason : "", name, clientNum, isBot ? 1 : 0 );
+	Com_ScriptEmitEvent( "client_disconnect_addr", address, name, clientNum, isBot ? 1 : 0 );
 
 	// Free all allocated data on the client structure
 	SV_FreeClient( drop );
@@ -1024,7 +1034,7 @@ void SV_DropClient( client_t *drop, const char *reason ) {
 
 	// call the prog function for removing a client
 	// this will remove the body, among other things
-	VM_Call( gvm, 1, GAME_CLIENT_DISCONNECT, drop - svs.clients );
+	VM_Call( gvm, 1, GAME_CLIENT_DISCONNECT, clientNum );
 
 	// add the disconnect command
 	if ( reason ) {
@@ -1032,11 +1042,11 @@ void SV_DropClient( client_t *drop, const char *reason ) {
 	}
 
 	if ( isBot ) {
-		SV_BotFreeClient( drop - svs.clients );
+		SV_BotFreeClient( clientNum );
 	}
 
 	// nuke user info
-	SV_SetUserinfo( drop - svs.clients, "" );
+	SV_SetUserinfo( clientNum, "" );
 
 	drop->justConnected = qfalse;
 
@@ -1290,6 +1300,7 @@ void SV_ClientEnterWorld( client_t *client ) {
 	sharedEntity_t *ent;
 	qboolean isBot;
 	int clientNum;
+	char address[MAX_STRING_CHARS];
 
 	isBot = client->netchan.remoteAddress.type == NA_BOT;
 
@@ -1312,6 +1323,7 @@ void SV_ClientEnterWorld( client_t *client ) {
 
 	// set up the entity for the client
 	clientNum = client - svs.clients;
+	Q_strncpyz( address, NET_AdrToStringwPort( &client->netchan.remoteAddress ), sizeof( address ) );
 	ent = SV_GentityNum( clientNum );
 	ent->s.number = clientNum;
 	client->gentity = ent;
@@ -1321,6 +1333,7 @@ void SV_ClientEnterWorld( client_t *client ) {
 
 	// call the game begin function
 	VM_Call( gvm, 1, GAME_CLIENT_BEGIN, clientNum );
+	Com_ScriptEmitEvent( "client_begin", address, client->name, clientNum, isBot ? 1 : 0 );
 
 #ifdef USE_LUA
 	SV_AppCrdt_ClientEnterWorld( client );

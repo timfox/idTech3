@@ -9,6 +9,7 @@ idtech3backend integration: auto-bootstrap + Engine.AppCrdt on dedicated server.
 
 #include "../qcommon/q_shared.h"
 #include "../qcommon/qcommon.h"
+#include "../qcommon/net_p2p.h"
 #include "server.h"
 #include "../qcommon/app_crdt.h"
 #include "../qcommon/lua_debug.h"
@@ -20,6 +21,28 @@ idtech3backend integration: auto-bootstrap + Engine.AppCrdt on dedicated server.
 static appCrdtVersion_t s_authoritativeVersion;
 static appCrdtSpec_t s_authoritativeSpec;
 static qboolean s_backendBootstrapped;
+
+static void SV_AppCrdt_FormatLocalVersion( char *buf, int buflen )
+{
+	AppCrdt_FormatVersion( AppCrdt_GetLocalVersion(), buf, buflen );
+}
+
+static void SV_AppCrdt_FormatAuthoritativeVersion( char *buf, int buflen )
+{
+	AppCrdt_FormatVersion( &s_authoritativeVersion, buf, buflen );
+}
+
+static const char *SV_AppCrdt_ClientStateName( clientState_t state )
+{
+	switch ( state ) {
+	case CS_FREE: return "free";
+	case CS_ZOMBIE: return "zombie";
+	case CS_CONNECTED: return "connected";
+	case CS_PRIMED: return "primed";
+	case CS_ACTIVE: return "active";
+	default: return "unknown";
+	}
+}
 
 static void SV_AppCrdt_SetAuthoritativeVersion( const appCrdtVersion_t *ver )
 {
@@ -155,6 +178,268 @@ static int SV_AppCrdt_LuaIsEnabled( lua_State *L )
 	return 1;
 }
 
+static int SV_AppCrdt_LuaGetStatus( lua_State *L )
+{
+	char localVer[32];
+	char authoritativeVer[32];
+
+	SV_AppCrdt_FormatLocalVersion( localVer, sizeof( localVer ) );
+	SV_AppCrdt_FormatAuthoritativeVersion( authoritativeVer, sizeof( authoritativeVer ) );
+
+	lua_newtable( L );
+	lua_pushboolean( L, AppCrdt_IsEnabled() );
+	lua_setfield( L, -2, "enabled" );
+	lua_pushstring( L, localVer );
+	lua_setfield( L, -2, "localVersion" );
+	lua_pushstring( L, authoritativeVer );
+	lua_setfield( L, -2, "authoritativeVersion" );
+	lua_pushinteger( L, AppCrdt_GetQueueMax() );
+	lua_setfield( L, -2, "queueMax" );
+	lua_pushboolean( L, AppCrdt_BackendAvailable() );
+	lua_setfield( L, -2, "backendAvailable" );
+	lua_pushstring( L, AppCrdt_GetBackendRoot() ? AppCrdt_GetBackendRoot() : "" );
+	lua_setfield( L, -2, "backendRoot" );
+	lua_pushboolean( L, s_backendBootstrapped );
+	lua_setfield( L, -2, "backendBootstrapped" );
+	lua_pushstring( L, s_authoritativeSpec.manifestPath );
+	lua_setfield( L, -2, "manifestPath" );
+	lua_pushinteger( L, s_authoritativeSpec.scriptCount );
+	lua_setfield( L, -2, "scriptCount" );
+	return 1;
+}
+
+static int SV_LuaCvars_GetString( lua_State *L )
+{
+	char value[MAX_CVAR_VALUE_STRING];
+
+	Cvar_VariableStringBuffer( luaL_checkstring( L, 1 ), value, sizeof( value ) );
+	lua_pushstring( L, value );
+	return 1;
+}
+
+static int SV_LuaCvars_GetNumber( lua_State *L )
+{
+	lua_pushnumber( L, Cvar_VariableValue( luaL_checkstring( L, 1 ) ) );
+	return 1;
+}
+
+static int SV_LuaCvars_GetInteger( lua_State *L )
+{
+	lua_pushinteger( L, Cvar_VariableIntegerValue( luaL_checkstring( L, 1 ) ) );
+	return 1;
+}
+
+static int SV_LuaCvars_Set( lua_State *L )
+{
+	Cvar_Set( luaL_checkstring( L, 1 ), luaL_checkstring( L, 2 ) );
+	return 0;
+}
+
+static int SV_LuaCvars_SetNumber( lua_State *L )
+{
+	char value[64];
+
+	Com_sprintf( value, sizeof( value ), "%g", luaL_checknumber( L, 2 ) );
+	Cvar_Set( luaL_checkstring( L, 1 ), value );
+	return 0;
+}
+
+static int SV_LuaCvars_SetInteger( lua_State *L )
+{
+	char value[32];
+
+	Com_sprintf( value, sizeof( value ), "%d", (int)luaL_checkinteger( L, 2 ) );
+	Cvar_Set( luaL_checkstring( L, 1 ), value );
+	return 0;
+}
+
+static int SV_LuaCvars_SetBoolean( lua_State *L )
+{
+	Cvar_Set( luaL_checkstring( L, 1 ), lua_toboolean( L, 2 ) ? "1" : "0" );
+	return 0;
+}
+
+static int SV_LuaConsole_Exec( lua_State *L )
+{
+	const char *text = luaL_checkstring( L, 1 );
+	const char *mode = luaL_optstring( L, 2, "append" );
+	cbufExec_t when = EXEC_APPEND;
+
+	if ( !Q_stricmp( mode, "insert" ) ) {
+		when = EXEC_INSERT;
+	} else if ( !Q_stricmp( mode, "now" ) ) {
+		when = EXEC_NOW;
+	}
+
+	Cbuf_ExecuteText( when, text );
+	return 0;
+}
+
+static int SV_LuaConsole_AddText( lua_State *L )
+{
+	Cbuf_AddText( luaL_checkstring( L, 1 ) );
+	return 0;
+}
+
+static int SV_LuaServer_GetInfo( lua_State *L )
+{
+	lua_newtable( L );
+	lua_pushstring( L, sv_hostname ? sv_hostname->string : "" );
+	lua_setfield( L, -2, "hostname" );
+	lua_pushstring( L, sv_mapname ? sv_mapname->string : "" );
+	lua_setfield( L, -2, "mapname" );
+	lua_pushinteger( L, sv_gametype ? sv_gametype->integer : 0 );
+	lua_setfield( L, -2, "gametype" );
+	lua_pushinteger( L, sv.maxclients );
+	lua_setfield( L, -2, "maxclients" );
+	lua_pushinteger( L, sv_privateClients ? sv_privateClients->integer : 0 );
+	lua_setfield( L, -2, "privateClients" );
+	lua_pushinteger( L, sv.time );
+	lua_setfield( L, -2, "time" );
+	lua_pushinteger( L, com_dedicated ? com_dedicated->integer : 0 );
+	lua_setfield( L, -2, "dedicated" );
+	return 1;
+}
+
+static int SV_LuaServer_GetClientCount( lua_State *L )
+{
+	int count = 0;
+	int activeOnly = lua_toboolean( L, 1 );
+	int i;
+
+	for ( i = 0; i < sv.maxclients; i++ ) {
+		client_t *cl = &svs.clients[i];
+		if ( activeOnly ) {
+			if ( cl->state == CS_ACTIVE ) {
+				count++;
+			}
+		} else if ( cl->state >= CS_CONNECTED ) {
+			count++;
+		}
+	}
+
+	lua_pushinteger( L, count );
+	return 1;
+}
+
+static int SV_LuaServer_GetClientInfo( lua_State *L )
+{
+	int clientNum = (int)luaL_checkinteger( L, 1 );
+	client_t *cl;
+
+	if ( clientNum < 0 || clientNum >= sv.maxclients ) {
+		return luaL_error( L, "client index out of range" );
+	}
+
+	cl = &svs.clients[clientNum];
+	if ( cl->state < CS_CONNECTED ) {
+		lua_pushnil( L );
+		return 1;
+	}
+
+	lua_newtable( L );
+	lua_pushinteger( L, clientNum );
+	lua_setfield( L, -2, "clientNum" );
+	lua_pushstring( L, cl->name );
+	lua_setfield( L, -2, "name" );
+	lua_pushstring( L, SV_AppCrdt_ClientStateName( cl->state ) );
+	lua_setfield( L, -2, "state" );
+	lua_pushinteger( L, cl->ping );
+	lua_setfield( L, -2, "ping" );
+	lua_pushboolean( L, cl->netchan.remoteAddress.type == NA_BOT );
+	lua_setfield( L, -2, "isBot" );
+	lua_pushstring( L, NET_AdrToStringwPort( &cl->netchan.remoteAddress ) );
+	lua_setfield( L, -2, "address" );
+	lua_pushstring( L, cl->country ? cl->country : "" );
+	lua_setfield( L, -2, "country" );
+	lua_pushstring( L, cl->tld );
+	lua_setfield( L, -2, "tld" );
+	return 1;
+}
+
+static int SV_LuaServer_SendCommand( lua_State *L )
+{
+	int clientNum = (int)luaL_checkinteger( L, 1 );
+	const char *cmd = luaL_checkstring( L, 2 );
+	client_t *cl;
+
+	if ( clientNum < 0 || clientNum >= sv.maxclients ) {
+		return luaL_error( L, "client index out of range" );
+	}
+
+	cl = &svs.clients[clientNum];
+	if ( cl->state < CS_CONNECTED ) {
+		return luaL_error( L, "client not connected" );
+	}
+
+	SV_AddServerCommand( cl, cmd );
+	return 0;
+}
+
+static int SV_LuaServer_BroadcastCommand( lua_State *L )
+{
+	SV_AppCrdt_Broadcast( luaL_checkstring( L, 1 ) );
+	return 0;
+}
+
+static int SV_LuaServer_DropClient( lua_State *L )
+{
+	int clientNum = (int)luaL_checkinteger( L, 1 );
+	const char *reason = luaL_optstring( L, 2, "Disconnected" );
+	client_t *cl;
+
+	if ( clientNum < 0 || clientNum >= sv.maxclients ) {
+		return luaL_error( L, "client index out of range" );
+	}
+
+	cl = &svs.clients[clientNum];
+	if ( cl->state < CS_CONNECTED ) {
+		return luaL_error( L, "client not connected" );
+	}
+
+	SV_DropClient( cl, reason );
+	return 0;
+}
+
+static int SV_LuaP2P_GetStatus( lua_State *L )
+{
+	char address[MAX_STRING_CHARS];
+	char sessionId[MAX_STRING_CHARS];
+
+	address[0] = '\0';
+	sessionId[0] = '\0';
+
+	if ( sv_p2pSessionId && sv_p2pSessionId->string[0] &&
+		Q_stricmp( sv_p2pSessionId->string, "auto" ) != 0 ) {
+		Q_strncpyz( sessionId, sv_p2pSessionId->string, sizeof( sessionId ) );
+	}
+	if ( !sessionId[0] ) {
+		Com_sprintf( sessionId, sizeof( sessionId ), "%s-%i-%s",
+			FS_GetCurrentGameDir(), sv.serverId, sv_mapname ? sv_mapname->string : "nomap" );
+	}
+
+	lua_newtable( L );
+	lua_pushstring( L, NET_P2P_BackendName() );
+	lua_setfield( L, -2, "backend" );
+	lua_pushboolean( L, NET_P2P_IsSupported() );
+	lua_setfield( L, -2, "supported" );
+	lua_pushboolean( L, NET_P2P_IsEnabled() );
+	lua_setfield( L, -2, "enabled" );
+	lua_pushboolean( L, NET_P2P_IsReady() );
+	lua_setfield( L, -2, "ready" );
+	lua_pushstring( L, NET_P2P_GetLocalAddressString( address, sizeof( address ) ) ? address : "" );
+	lua_setfield( L, -2, "address" );
+	lua_pushboolean( L, sv_p2pHostMigration && sv_p2pHostMigration->integer );
+	lua_setfield( L, -2, "hostMigration" );
+	lua_pushinteger( L, sv_p2pReconnectWindow ? sv_p2pReconnectWindow->integer : 0 );
+	lua_setfield( L, -2, "reconnectWindowSec" );
+	lua_pushstring( L, ( sv_p2pFailover && sv_p2pFailover->string[0] ) ? sv_p2pFailover->string : "reconnect" );
+	lua_setfield( L, -2, "failover" );
+	lua_pushstring( L, sessionId );
+	lua_setfield( L, -2, "sessionId" );
+	return 1;
+}
+
 static void SV_AppCrdt_RegisterServerLua( void *luaState )
 {
 	lua_State *L = (lua_State *)luaState;
@@ -176,7 +461,54 @@ static void SV_AppCrdt_RegisterServerLua( void *luaState )
 	lua_setfield( L, -2, "getVersion" );
 	lua_pushcfunction( L, SV_AppCrdt_LuaIsEnabled );
 	lua_setfield( L, -2, "isEnabled" );
+	lua_pushcfunction( L, SV_AppCrdt_LuaGetStatus );
+	lua_setfield( L, -2, "getStatus" );
 	lua_setfield( L, -2, "AppCrdt" );
+
+	lua_newtable( L );
+	lua_pushcfunction( L, SV_LuaCvars_GetString );
+	lua_setfield( L, -2, "getString" );
+	lua_pushcfunction( L, SV_LuaCvars_GetNumber );
+	lua_setfield( L, -2, "getNumber" );
+	lua_pushcfunction( L, SV_LuaCvars_GetInteger );
+	lua_setfield( L, -2, "getInteger" );
+	lua_pushcfunction( L, SV_LuaCvars_Set );
+	lua_setfield( L, -2, "set" );
+	lua_pushcfunction( L, SV_LuaCvars_SetNumber );
+	lua_setfield( L, -2, "setNumber" );
+	lua_pushcfunction( L, SV_LuaCvars_SetInteger );
+	lua_setfield( L, -2, "setInteger" );
+	lua_pushcfunction( L, SV_LuaCvars_SetBoolean );
+	lua_setfield( L, -2, "setBoolean" );
+	lua_setfield( L, -2, "Cvars" );
+
+	lua_newtable( L );
+	lua_pushcfunction( L, SV_LuaConsole_Exec );
+	lua_setfield( L, -2, "exec" );
+	lua_pushcfunction( L, SV_LuaConsole_AddText );
+	lua_setfield( L, -2, "addText" );
+	lua_setfield( L, -2, "Console" );
+
+	lua_newtable( L );
+	lua_pushcfunction( L, SV_LuaServer_GetInfo );
+	lua_setfield( L, -2, "getInfo" );
+	lua_pushcfunction( L, SV_LuaServer_GetClientCount );
+	lua_setfield( L, -2, "getClientCount" );
+	lua_pushcfunction( L, SV_LuaServer_GetClientInfo );
+	lua_setfield( L, -2, "getClientInfo" );
+	lua_pushcfunction( L, SV_LuaServer_SendCommand );
+	lua_setfield( L, -2, "sendCommand" );
+	lua_pushcfunction( L, SV_LuaServer_BroadcastCommand );
+	lua_setfield( L, -2, "broadcastCommand" );
+	lua_pushcfunction( L, SV_LuaServer_DropClient );
+	lua_setfield( L, -2, "dropClient" );
+	lua_setfield( L, -2, "Server" );
+
+	lua_newtable( L );
+	lua_pushcfunction( L, SV_LuaP2P_GetStatus );
+	lua_setfield( L, -2, "getStatus" );
+	lua_setfield( L, -2, "P2P" );
+
 	lua_pop( L, 1 );
 }
 
