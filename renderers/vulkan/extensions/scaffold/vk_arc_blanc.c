@@ -22,6 +22,10 @@ static cvar_t *r_arcBlancTile;
 static cvar_t *r_arcBlancSeaLevel;
 static cvar_t *r_arcBlancTileRadius;
 static cvar_t *r_arcBlancFollowCamera;
+static cvar_t *r_arcBlancAdaptiveMesh;
+static cvar_t *r_arcBlancMeshDivFar;
+static cvar_t *r_arcBlancAdaptiveHeightStart;
+static cvar_t *r_arcBlancAdaptiveHeightEnd;
 static cvar_t *r_arcBlancNormalStrength;
 static cvar_t *r_arcBlancFoam;
 static cvar_t *r_arcBlancFoamIntensity;
@@ -101,6 +105,42 @@ static qboolean ab_parse_vec2( const char *s, float *x, float *z )
 	return s && x && z && sscanf( s, "%f %f", x, z ) == 2;
 }
 
+static int R_ArcBlanc_AdaptiveDiv( int baseDiv, int farDiv, int tx, int tz, int tileRadius, float seaLevel )
+{
+	float ringT = 0.0f;
+	float heightT = 0.0f;
+	int ring = abs( tx ) > abs( tz ) ? abs( tx ) : abs( tz );
+	float heightAboveSea = fabsf( tr.viewParms.or.origin[1] - seaLevel );
+	float startHeight = r_arcBlancAdaptiveHeightStart ? r_arcBlancAdaptiveHeightStart->value : 512.0f;
+	float endHeight = r_arcBlancAdaptiveHeightEnd ? r_arcBlancAdaptiveHeightEnd->value : 4096.0f;
+	float t;
+
+	if ( tileRadius > 0 ) {
+		ringT = (float)ring / (float)tileRadius;
+		if ( ringT > 1.0f ) {
+			ringT = 1.0f;
+		}
+	}
+	if ( endHeight > startHeight && heightAboveSea > startHeight ) {
+		heightT = ( heightAboveSea - startHeight ) / ( endHeight - startHeight );
+		if ( heightT > 1.0f ) {
+			heightT = 1.0f;
+		}
+	}
+	t = ringT + ( 1.0f - ringT ) * heightT * 0.6f;
+	if ( t > 1.0f ) {
+		t = 1.0f;
+	}
+	baseDiv = (int)floorf( (float)baseDiv + (float)( farDiv - baseDiv ) * t + 0.5f );
+	if ( baseDiv < 8 ) {
+		baseDiv = 8;
+	}
+	if ( baseDiv > AB_OCEAN_MAX_DIV ) {
+		baseDiv = AB_OCEAN_MAX_DIV;
+	}
+	return baseDiv;
+}
+
 static void R_ArcBlanc_EnsureShader( void )
 {
 	if ( s_arcBlancShader ) {
@@ -132,6 +172,15 @@ void R_ArcBlanc_Init( void )
 	ri.Cvar_SetDescription( r_arcBlancTileRadius, "How many tiles around the camera the renderer draws." );
 	r_arcBlancFollowCamera = ri.Cvar_Get( "r_arcBlancFollowCamera", "1", CVAR_ARCHIVE );
 	ri.Cvar_SetDescription( r_arcBlancFollowCamera, "View-follow ocean placement. Disable to anchor the draw grid in world space." );
+	r_arcBlancAdaptiveMesh = ri.Cvar_Get( "r_arcBlancAdaptiveMesh", "1", CVAR_ARCHIVE );
+	ri.Cvar_SetDescription( r_arcBlancAdaptiveMesh, "Use ring- and height-based adaptive mesh density for Arc Blanc patches." );
+	r_arcBlancMeshDivFar = ri.Cvar_Get( "r_arcBlancMeshDivFar", "20", CVAR_ARCHIVE );
+	ri.Cvar_CheckRange( r_arcBlancMeshDivFar, "8", "128", CV_INTEGER );
+	ri.Cvar_SetDescription( r_arcBlancMeshDivFar, "Outer-ring patch subdivisions when adaptive mesh is enabled." );
+	r_arcBlancAdaptiveHeightStart = ri.Cvar_Get( "r_arcBlancAdaptiveHeightStart", "512", CVAR_ARCHIVE );
+	ri.Cvar_SetDescription( r_arcBlancAdaptiveHeightStart, "Camera height above sea level where adaptive mesh starts reducing detail." );
+	r_arcBlancAdaptiveHeightEnd = ri.Cvar_Get( "r_arcBlancAdaptiveHeightEnd", "4096", CVAR_ARCHIVE );
+	ri.Cvar_SetDescription( r_arcBlancAdaptiveHeightEnd, "Camera height above sea level where adaptive mesh reaches its full reduction." );
 	r_arcBlancNormalStrength = ri.Cvar_Get( "r_arcBlancNormalStrength", "1", CVAR_ARCHIVE );
 	ri.Cvar_SetDescription( r_arcBlancNormalStrength, "Renderer normal exaggeration for Arc Blanc shading." );
 	r_arcBlancFoam = ri.Cvar_Get( "r_arcBlancFoam", "1", CVAR_ARCHIVE );
@@ -313,6 +362,7 @@ void R_ArcBlanc_AddSurfaces( void )
 	int div;
 	float originX, originZ;
 	float anchorX, anchorZ;
+	float seaLevel;
 	surfaceType_t *surf;
 	int tiles = 1;
 	int tx, tz;
@@ -355,6 +405,7 @@ void R_ArcBlanc_AddSurfaces( void )
 	if ( div > AB_OCEAN_MAX_DIV ) {
 		div = AB_OCEAN_MAX_DIV;
 	}
+	seaLevel = r_arcBlancSeaLevel ? r_arcBlancSeaLevel->value : 0.0f;
 	tiles = r_arcBlancTileRadius ? r_arcBlancTileRadius->integer : 1;
 	if ( tiles < 0 ) {
 		tiles = 0;
@@ -416,7 +467,17 @@ void R_ArcBlanc_AddSurfaces( void )
 				continue;
 			}
 
-			surf = R_ArcBlanc_BuildPatch( div, tileSize, ox, oz );
+			{
+				int patchDiv = div;
+				if ( r_arcBlancAdaptiveMesh && r_arcBlancAdaptiveMesh->integer ) {
+					int farDiv = r_arcBlancMeshDivFar ? r_arcBlancMeshDivFar->integer : 20;
+					if ( farDiv > patchDiv ) {
+						farDiv = patchDiv;
+					}
+					patchDiv = R_ArcBlanc_AdaptiveDiv( patchDiv, farDiv, tx, tz, tiles, seaLevel );
+				}
+				surf = R_ArcBlanc_BuildPatch( patchDiv, tileSize, ox, oz );
+			}
 			if ( surf ) {
 				R_AddDrawSurf( surf, s_arcBlancShader, 0, 0 );
 			}

@@ -333,3 +333,38 @@ const char *CL_P2P_SessionId( void )
 {
 	return cl_p2pSession.sessionId;
 }
+
+const char *CL_P2P_SessionAddress( void )
+{
+	return cl_p2pSession.p2pAddr;
+}
+
+const char *CL_P2P_SessionFailoverPolicy( void )
+{
+	return cl_p2pSession.failover;
+}
+
+int CL_P2P_SessionReconnectWindowSec( void )
+{
+	return cl_p2pSession.reconnectWindowSec;
+}
+
+int CL_P2P_SessionAttemptCount( void )
+{
+	return cl_p2pSession.attemptCount;
+}
+
+qboolean CL_P2P_SessionPending( void )
+{
+	return cl_p2pSession.pending;
+}
+
+qboolean CL_P2P_SessionMigratePending( void )
+{
+	return cl_p2pSession.migratePending;
+}
+
+const char *CL_P2P_SessionMigrateAddress( void )
+{
+	return cl_p2pSession.migrateAddr;
+}

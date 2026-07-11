@@ -56,6 +56,7 @@ Usage from Lua:
 #include "../client/cl_particles.h"
 #include "../client/cl_engine_sprites.h"
 #include "../client/cl_engine_decals.h"
+#include "../client/core/cl_p2p_session.h"
 #include "../physics/phys_character.h"
 #include "g_animgraph.h"
 #include "../renderers/common/tr_public.h"
@@ -758,6 +759,114 @@ static int l_genome_decode( lua_State *L )
 	cmd = va( "genome_generate %d\n", slot );
 	Cbuf_AddText( cmd );
 	lua_pushboolean( L, qtrue );
+	return 1;
+}
+
+/* ========== Generic script control bindings ========== */
+
+static int l_cvars_getString( lua_State *L )
+{
+	char value[MAX_CVAR_VALUE_STRING];
+
+	Cvar_VariableStringBuffer( luaL_checkstring( L, 1 ), value, sizeof( value ) );
+	lua_pushstring( L, value );
+	return 1;
+}
+
+static int l_cvars_getNumber( lua_State *L )
+{
+	lua_pushnumber( L, Cvar_VariableValue( luaL_checkstring( L, 1 ) ) );
+	return 1;
+}
+
+static int l_cvars_getInteger( lua_State *L )
+{
+	lua_pushinteger( L, Cvar_VariableIntegerValue( luaL_checkstring( L, 1 ) ) );
+	return 1;
+}
+
+static int l_cvars_set( lua_State *L )
+{
+	Cvar_Set( luaL_checkstring( L, 1 ), luaL_checkstring( L, 2 ) );
+	return 0;
+}
+
+static int l_cvars_setNumber( lua_State *L )
+{
+	char value[64];
+
+	Com_sprintf( value, sizeof( value ), "%g", luaL_checknumber( L, 2 ) );
+	Cvar_Set( luaL_checkstring( L, 1 ), value );
+	return 0;
+}
+
+static int l_cvars_setInteger( lua_State *L )
+{
+	char value[32];
+
+	Com_sprintf( value, sizeof( value ), "%d", (int)luaL_checkinteger( L, 2 ) );
+	Cvar_Set( luaL_checkstring( L, 1 ), value );
+	return 0;
+}
+
+static int l_cvars_setBoolean( lua_State *L )
+{
+	Cvar_Set( luaL_checkstring( L, 1 ), lua_toboolean( L, 2 ) ? "1" : "0" );
+	return 0;
+}
+
+static int l_console_exec( lua_State *L )
+{
+	const char *text = luaL_checkstring( L, 1 );
+	const char *mode = luaL_optstring( L, 2, "append" );
+	cbufExec_t when = EXEC_APPEND;
+
+	if ( !Q_stricmp( mode, "insert" ) ) {
+		when = EXEC_INSERT;
+	} else if ( !Q_stricmp( mode, "now" ) ) {
+		when = EXEC_NOW;
+	}
+
+	Cbuf_ExecuteText( when, text );
+	return 0;
+}
+
+static int l_console_addText( lua_State *L )
+{
+	Cbuf_AddText( luaL_checkstring( L, 1 ) );
+	return 0;
+}
+
+static int l_p2p_getSession( lua_State *L )
+{
+	lua_newtable( L );
+
+	lua_pushstring( L, CL_P2P_SessionId() );
+	lua_setfield( L, -2, "id" );
+	lua_pushstring( L, CL_P2P_SessionAddress() );
+	lua_setfield( L, -2, "address" );
+	lua_pushstring( L, CL_P2P_SessionFailoverPolicy() );
+	lua_setfield( L, -2, "failover" );
+	lua_pushinteger( L, CL_P2P_SessionReconnectWindowSec() );
+	lua_setfield( L, -2, "reconnectWindowSec" );
+	lua_pushinteger( L, CL_P2P_SessionAttemptCount() );
+	lua_setfield( L, -2, "attemptCount" );
+	lua_pushboolean( L, CL_P2P_SessionPending() );
+	lua_setfield( L, -2, "pending" );
+	lua_pushboolean( L, CL_P2P_SessionMigratePending() );
+	lua_setfield( L, -2, "migratePending" );
+	lua_pushstring( L, CL_P2P_SessionMigrateAddress() );
+	lua_setfield( L, -2, "migrateAddress" );
+	lua_pushboolean( L, CL_P2P_SessionIsBackupHostEligible() );
+	lua_setfield( L, -2, "backupHostEligible" );
+
+	return 1;
+}
+
+static int l_p2p_isBackupHostEligible( lua_State *L )
+{
+	(void)L;
+	lua_pushboolean( L, CL_P2P_SessionIsBackupHostEligible() );
 	return 1;
 }
 
@@ -1801,6 +1910,32 @@ void LuaBindings_RegisterAll(void *luaState) {
 	};
 	registerTable(L, "Telemetry", telemetryFuncs);
 
+	static const luaL_Reg cvarFuncs[] = {
+		{"getString", l_cvars_getString},
+		{"getNumber", l_cvars_getNumber},
+		{"getInteger", l_cvars_getInteger},
+		{"set", l_cvars_set},
+		{"setNumber", l_cvars_setNumber},
+		{"setInteger", l_cvars_setInteger},
+		{"setBoolean", l_cvars_setBoolean},
+		{NULL, NULL}
+	};
+	registerTable(L, "Cvars", cvarFuncs);
+
+	static const luaL_Reg consoleFuncs[] = {
+		{"exec", l_console_exec},
+		{"addText", l_console_addText},
+		{NULL, NULL}
+	};
+	registerTable(L, "Console", consoleFuncs);
+
+	static const luaL_Reg p2pFuncs[] = {
+		{"getSession", l_p2p_getSession},
+		{"isBackupHostEligible", l_p2p_isBackupHostEligible},
+		{NULL, NULL}
+	};
+	registerTable(L, "P2P", p2pFuncs);
+
 	static const luaL_Reg replayFuncs[] = {
 		{"frameIndex", l_replay_frame},
 		{"baseTime", l_replay_baseTime},
@@ -1938,7 +2073,7 @@ void LuaBindings_RegisterAll(void *luaState) {
 	registerTable(L, "AnimGraph", animFuncs);
 
 	lua_setglobal(L, "Engine");
-	Com_Printf("Lua bindings registered: Engine.{...,Sprites,Decals,Character,AnimGraph}\n");
+	Com_Printf("Lua bindings registered: Engine.{...,Cvars,Console,P2P,Sprites,Decals,Character,AnimGraph}\n");
 }
 
 #else /* !USE_LUA */

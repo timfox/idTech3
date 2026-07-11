@@ -68,10 +68,103 @@ static cvar_t *cl_navEnabled;
 static cvar_t *cl_particlesEnabled;
 static cvar_t *cl_btEnabled;
 static cvar_t *g_ecsMotion;
+#ifdef USE_ARC_BLANC
+static cvar_t *cl_arcBlancUnderwaterAuto;
+static cvar_t *cl_arcBlancUnderwaterDepthBias;
+static cvar_t *cl_arcBlancUnderwaterDensity;
+static cvar_t *cl_arcBlancUnderwaterHeightFalloff;
+static cvar_t *cl_arcBlancUnderwaterIntensity;
+static cvar_t *cl_arcBlancUnderwaterAmbient;
+static cvar_t *cl_arcBlancUnderwaterSun;
+static cvar_t *cl_arcBlancUnderwaterNoise;
+static cvar_t *cl_arcBlancUnderwaterTint;
+static cvar_t *r_arcBlancUnderwater;
+#endif
 
 extern void Nav_BSP_ClearGeometry(void);
 extern int  Nav_BSP_AddVertex(float x, float y, float z);
 extern void Nav_BSP_AddTriangle(int v0, int v1, int v2);
+
+#ifdef USE_ARC_BLANC
+typedef struct {
+	qboolean active;
+	char volumetricFog[16];
+	char colorMode[16];
+	char tint[64];
+	char density[32];
+	char heightFalloff[32];
+	char intensity[32];
+	char ambient[32];
+	char sun[32];
+	char noise[32];
+} arcBlancUnderwaterState_t;
+
+static arcBlancUnderwaterState_t s_arcBlancUnderwaterState;
+
+static void CL_ArcBlancUnderwaterRestore( void )
+{
+#ifdef USE_ARC_BLANC
+	if ( !s_arcBlancUnderwaterState.active ) {
+		return;
+	}
+	Cvar_Set( "r_volumetricFog", s_arcBlancUnderwaterState.volumetricFog );
+	Cvar_Set( "r_volumetricFogColorMode", s_arcBlancUnderwaterState.colorMode );
+	Cvar_Set( "r_volumetricFogTint", s_arcBlancUnderwaterState.tint );
+	Cvar_Set( "r_volumetricFogDensity", s_arcBlancUnderwaterState.density );
+	Cvar_Set( "r_volumetricFogHeightFalloff", s_arcBlancUnderwaterState.heightFalloff );
+	Cvar_Set( "r_volumetricFogIntensity", s_arcBlancUnderwaterState.intensity );
+	Cvar_Set( "r_volumetricFogAmbientIntensity", s_arcBlancUnderwaterState.ambient );
+	Cvar_Set( "r_volumetricFogSunIntensity", s_arcBlancUnderwaterState.sun );
+	Cvar_Set( "r_volumetricFogNoiseStrength", s_arcBlancUnderwaterState.noise );
+	s_arcBlancUnderwaterState.active = qfalse;
+	Cvar_Set( "r_arcBlancUnderwater", "0" );
+#endif
+}
+
+static void CL_ArcBlancUnderwaterApply( void )
+{
+#ifdef USE_ARC_BLANC
+	if ( !s_arcBlancUnderwaterState.active ) {
+		Q_strncpyz( s_arcBlancUnderwaterState.volumetricFog, Cvar_VariableString( "r_volumetricFog" ),
+			sizeof( s_arcBlancUnderwaterState.volumetricFog ) );
+		Q_strncpyz( s_arcBlancUnderwaterState.colorMode, Cvar_VariableString( "r_volumetricFogColorMode" ),
+			sizeof( s_arcBlancUnderwaterState.colorMode ) );
+		Q_strncpyz( s_arcBlancUnderwaterState.tint, Cvar_VariableString( "r_volumetricFogTint" ),
+			sizeof( s_arcBlancUnderwaterState.tint ) );
+		Q_strncpyz( s_arcBlancUnderwaterState.density, Cvar_VariableString( "r_volumetricFogDensity" ),
+			sizeof( s_arcBlancUnderwaterState.density ) );
+		Q_strncpyz( s_arcBlancUnderwaterState.heightFalloff, Cvar_VariableString( "r_volumetricFogHeightFalloff" ),
+			sizeof( s_arcBlancUnderwaterState.heightFalloff ) );
+		Q_strncpyz( s_arcBlancUnderwaterState.intensity, Cvar_VariableString( "r_volumetricFogIntensity" ),
+			sizeof( s_arcBlancUnderwaterState.intensity ) );
+		Q_strncpyz( s_arcBlancUnderwaterState.ambient, Cvar_VariableString( "r_volumetricFogAmbientIntensity" ),
+			sizeof( s_arcBlancUnderwaterState.ambient ) );
+		Q_strncpyz( s_arcBlancUnderwaterState.sun, Cvar_VariableString( "r_volumetricFogSunIntensity" ),
+			sizeof( s_arcBlancUnderwaterState.sun ) );
+		Q_strncpyz( s_arcBlancUnderwaterState.noise, Cvar_VariableString( "r_volumetricFogNoiseStrength" ),
+			sizeof( s_arcBlancUnderwaterState.noise ) );
+		s_arcBlancUnderwaterState.active = qtrue;
+	}
+	Cvar_Set( "r_volumetricFog", "1" );
+	Cvar_Set( "r_volumetricFogColorMode", "1" );
+	Cvar_Set( "r_volumetricFogTint",
+		cl_arcBlancUnderwaterTint ? cl_arcBlancUnderwaterTint->string : "0.12 0.32 0.42" );
+	Cvar_SetValue( "r_volumetricFogDensity",
+		cl_arcBlancUnderwaterDensity ? cl_arcBlancUnderwaterDensity->value : 1.6f );
+	Cvar_SetValue( "r_volumetricFogHeightFalloff",
+		cl_arcBlancUnderwaterHeightFalloff ? cl_arcBlancUnderwaterHeightFalloff->value : 0.02f );
+	Cvar_SetValue( "r_volumetricFogIntensity",
+		cl_arcBlancUnderwaterIntensity ? cl_arcBlancUnderwaterIntensity->value : 2.4f );
+	Cvar_SetValue( "r_volumetricFogAmbientIntensity",
+		cl_arcBlancUnderwaterAmbient ? cl_arcBlancUnderwaterAmbient->value : 0.5f );
+	Cvar_SetValue( "r_volumetricFogSunIntensity",
+		cl_arcBlancUnderwaterSun ? cl_arcBlancUnderwaterSun->value : 0.2f );
+	Cvar_SetValue( "r_volumetricFogNoiseStrength",
+		cl_arcBlancUnderwaterNoise ? cl_arcBlancUnderwaterNoise->value : 0.6f );
+	Cvar_Set( "r_arcBlancUnderwater", "1" );
+#endif
+}
+#endif
 
 static void CL_EngineSaveWrite_f( void ) {
 	int slot;
@@ -199,6 +292,28 @@ void CL_InitGameSystems(void) {
 	cl_navEnabled      = Cvar_Get("cl_navEnabled",      "1", CVAR_ARCHIVE);
 	cl_particlesEnabled = Cvar_Get("cl_particlesEnabled","1", CVAR_ARCHIVE);
 	cl_btEnabled       = Cvar_Get("cl_btEnabled",       "1", CVAR_ARCHIVE);
+	cl_arcBlancUnderwaterAuto = Cvar_Get( "cl_arcBlancUnderwaterAuto", "1", CVAR_ARCHIVE );
+	Cvar_SetDescription( cl_arcBlancUnderwaterAuto,
+		"Automatically apply a submerged volumetric look when the camera goes below the Arc Blanc surface." );
+	cl_arcBlancUnderwaterDepthBias = Cvar_Get( "cl_arcBlancUnderwaterDepthBias", "8", CVAR_ARCHIVE );
+	Cvar_SetDescription( cl_arcBlancUnderwaterDepthBias,
+		"Extra world-space depth bias before Arc Blanc underwater auto engages." );
+	cl_arcBlancUnderwaterDensity = Cvar_Get( "cl_arcBlancUnderwaterDensity", "1.6", CVAR_ARCHIVE );
+	Cvar_SetDescription( cl_arcBlancUnderwaterDensity, "Underwater auto volumetric density." );
+	cl_arcBlancUnderwaterHeightFalloff = Cvar_Get( "cl_arcBlancUnderwaterHeightFalloff", "0.02", CVAR_ARCHIVE );
+	Cvar_SetDescription( cl_arcBlancUnderwaterHeightFalloff, "Underwater auto fog height falloff." );
+	cl_arcBlancUnderwaterIntensity = Cvar_Get( "cl_arcBlancUnderwaterIntensity", "2.4", CVAR_ARCHIVE );
+	Cvar_SetDescription( cl_arcBlancUnderwaterIntensity, "Underwater auto fog scattering intensity." );
+	cl_arcBlancUnderwaterAmbient = Cvar_Get( "cl_arcBlancUnderwaterAmbient", "0.5", CVAR_ARCHIVE );
+	Cvar_SetDescription( cl_arcBlancUnderwaterAmbient, "Underwater auto ambient scattering intensity." );
+	cl_arcBlancUnderwaterSun = Cvar_Get( "cl_arcBlancUnderwaterSun", "0.2", CVAR_ARCHIVE );
+	Cvar_SetDescription( cl_arcBlancUnderwaterSun, "Underwater auto directional scattering intensity." );
+	cl_arcBlancUnderwaterNoise = Cvar_Get( "cl_arcBlancUnderwaterNoise", "0.6", CVAR_ARCHIVE );
+	Cvar_SetDescription( cl_arcBlancUnderwaterNoise, "Underwater auto volumetric noise strength." );
+	cl_arcBlancUnderwaterTint = Cvar_Get( "cl_arcBlancUnderwaterTint", "0.12 0.32 0.42", CVAR_ARCHIVE );
+	Cvar_SetDescription( cl_arcBlancUnderwaterTint, "Underwater auto fog tint (r g b)." );
+	r_arcBlancUnderwater = Cvar_Get( "r_arcBlancUnderwater", "0", CVAR_TEMP );
+	Cvar_SetDescription( r_arcBlancUnderwater, "Informational mirror for Arc Blanc underwater auto state." );
 
 	if (!Phys_Init()) {
 		Com_Printf(S_COLOR_YELLOW "Warning: Physics not available, physics-dependent systems will be limited\n");
@@ -283,6 +398,7 @@ void CL_ShutdownGameSystems(void) {
 #endif
 #ifdef USE_ARC_BLANC
 	ArcBlanc_Shutdown();
+	CL_ArcBlancUnderwaterRestore();
 #endif
 	BgMap_Shutdown();
 
@@ -308,6 +424,20 @@ void CL_GameFrame(float frametime) {
 #ifdef USE_ARC_BLANC
 	if ( !CL_StockBaseq3Mode() ) {
 		ArcBlanc_Frame( frametime );
+		if ( cl_arcBlancUnderwaterAuto && cl_arcBlancUnderwaterAuto->integer && cl.snap.valid ) {
+			const float waterHeight = ArcBlanc_SampleHeight( cl.snap.ps.origin[0], cl.snap.ps.origin[2] );
+			const int contents = CM_PointContents( cl.snap.ps.origin, 0 );
+			const float bias = cl_arcBlancUnderwaterDepthBias ? cl_arcBlancUnderwaterDepthBias->value : 8.0f;
+			const qboolean underwater = ( cl.snap.ps.origin[2] < waterHeight + bias ) ||
+				( contents & CONTENTS_WATER ) ? qtrue : qfalse;
+			if ( underwater ) {
+				CL_ArcBlancUnderwaterApply();
+			} else {
+				CL_ArcBlancUnderwaterRestore();
+			}
+		} else {
+			CL_ArcBlancUnderwaterRestore();
+		}
 		if ( ArcBlanc_Enabled() && re.ArcBlancUploadHeightMap ) {
 			static byte s_arcBlancHeightRGBA[256 * 256 * 4];
 			int abW = 0, abH = 0;
@@ -316,6 +446,8 @@ void CL_GameFrame(float frametime) {
 				re.ArcBlancUploadHeightMap( s_arcBlancHeightRGBA, abW, abH );
 			}
 		}
+	} else {
+		CL_ArcBlancUnderwaterRestore();
 	}
 #endif
 

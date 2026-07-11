@@ -16,5 +16,12 @@ void CL_P2P_SessionOnMigrate( const char *sessionId, const char *newP2pAddr );
 qboolean CL_P2P_SessionHandleOobPacket( const netadr_t *from, const char *cmd );
 qboolean CL_P2P_SessionIsBackupHostEligible( void );
 const char *CL_P2P_SessionId( void );
+const char *CL_P2P_SessionAddress( void );
+const char *CL_P2P_SessionFailoverPolicy( void );
+int CL_P2P_SessionReconnectWindowSec( void );
+int CL_P2P_SessionAttemptCount( void );
+qboolean CL_P2P_SessionPending( void );
+qboolean CL_P2P_SessionMigratePending( void );
+const char *CL_P2P_SessionMigrateAddress( void );
 
 #endif /* CL_P2P_SESSION_H */

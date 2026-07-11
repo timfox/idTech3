@@ -38,6 +38,10 @@ CMake: **`USE_ARC_BLANC`** (default OFF; ON in **`full`** profile).
 | `r_arcBlancMeshDiv` | 48 | Subdivisions per tile edge (8–128) |
 | `r_arcBlancTileRadius` | 1 | Tiles around the anchor point to render |
 | `r_arcBlancFollowCamera` | 1 | Keep the ocean snapped under the camera |
+| `r_arcBlancAdaptiveMesh` | 1 | Automatically reduce patch density for outer rings / high camera altitudes |
+| `r_arcBlancMeshDivFar` | 20 | Outer-ring mesh divisions when adaptive mesh is enabled |
+| `r_arcBlancAdaptiveHeightStart` | 512 | Camera height where adaptive reduction starts |
+| `r_arcBlancAdaptiveHeightEnd` | 4096 | Camera height where adaptive reduction reaches full effect |
 | `r_arcBlancTileBreak` | 1 | Renderer-side tile breakup blend |
 | `r_arcBlancTileBreakOffset` | -500 | Secondary sample offset for tile breakup |
 | `r_arcBlancTileBreakBlend` | 0.45 | Tile breakup blend strength |
@@ -54,6 +58,8 @@ CMake: **`USE_ARC_BLANC`** (default OFF; ON in **`full`** profile).
 | `r_arcBlancGpu` | 0 | GPU FFT ocean: 0=CPU, 1=Vulkan compute + CPU readback for physics |
 | `r_arcBlancGpuVelocity` | 1 | GPU depth velocity slices when `r_arcBlancGpu` 1 (0=CPU IFFT) |
 | `r_arcBlancWake` | 1 | Interactive FDM wake scale added to height sampling |
+| `cl_arcBlancUnderwaterAuto` | 1 | Auto-apply a submerged volumetric look when the camera goes below the surface |
+| `cl_arcBlancUnderwater*` | varies | Underwater profile parameters (`DepthBias`, `Density`, `Tint`, `Intensity`, etc.) |
 
 Console: **`arc_blanc_status`**, **`arc_blanc_reseed`**, **`arc_blanc_sample <x> <z>`**, **`arc_blanc_preset <calm|lake|ocean|storm|cinematic>`**.
 
@@ -65,8 +71,9 @@ Console: **`arc_blanc_status`**, **`arc_blanc_reseed`**, **`arc_blanc_sample <x>
 - Use `r_arcBlancTileBreak*` to reduce obvious repetition on broad water planes.
 - Use `r_arcBlancFoam*` to tune crest foam visibility from subtle caps to stormier whitewater.
 - Use `r_arcBlancUpdateHz` as the main performance/cinematic tick-rate dial. Lower values reduce cost; higher values help motion blur and close-up shots.
+- Leave `r_arcBlancAdaptiveMesh 1` on for gameplay scenes so outer rings and high-altitude cameras automatically get cheaper ocean geometry.
 - For non-infinite bodies of water, set `r_arcBlancLakeMode 1` and tune `r_arcBlancLakeCenter`, `r_arcBlancLakeExtents`, and `r_arcBlancLakeAngle`.
-- In the Vulkan ImGui overlay, the `Water` panel groups these controls into one workflow surface and includes quick underwater fog looks.
+- In the Vulkan ImGui overlay, the `Water` panel groups these controls into one workflow surface and includes quick underwater fog looks plus automatic underwater-state tuning.
 
 ### GPU path (`r_arcBlancGpu 1`)
 

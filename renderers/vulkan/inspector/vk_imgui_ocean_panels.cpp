@@ -33,6 +33,10 @@ static void VkImgui_ResetOceanDefaults( void )
 	ri.Cvar_Set( "r_arcBlancMeshDiv", "48" );
 	ri.Cvar_Set( "r_arcBlancTileRadius", "1" );
 	ri.Cvar_Set( "r_arcBlancFollowCamera", "1" );
+	ri.Cvar_Set( "r_arcBlancAdaptiveMesh", "1" );
+	ri.Cvar_Set( "r_arcBlancMeshDivFar", "20" );
+	ri.Cvar_Set( "r_arcBlancAdaptiveHeightStart", "512" );
+	ri.Cvar_Set( "r_arcBlancAdaptiveHeightEnd", "4096" );
 	ri.Cvar_Set( "r_arcBlancNormalStrength", "1" );
 	ri.Cvar_Set( "r_arcBlancFoam", "1" );
 	ri.Cvar_Set( "r_arcBlancFoamIntensity", "0.35" );
@@ -187,7 +191,7 @@ extern "C" void VkImgui_DrawOceanPanel( void )
 		VkImgui_OceanSlider( "Gust Speed", "r_arcBlancGustSpeed", 0.0f, 4.0f, "%.2f" );
 	}
 
-	if ( ImGui::CollapsingHeader( "Tiling And Layout", ImGuiTreeNodeFlags_DefaultOpen ) ) {
+		if ( ImGui::CollapsingHeader( "Tiling And Layout", ImGuiTreeNodeFlags_DefaultOpen ) ) {
 		int tileBreakEnabled = ri.Cvar_VariableIntegerValue( "r_arcBlancTileBreak" );
 		bool tileBreakOn = ( tileBreakEnabled != 0 );
 		if ( ImGui::Checkbox( "Tile Break", &tileBreakOn ) ) {
@@ -203,8 +207,20 @@ extern "C" void VkImgui_DrawOceanPanel( void )
 		VkImgui_OceanSlider( "Tile Break Offset", "r_arcBlancTileBreakOffset", -4096.0f, 4096.0f, "%.0f" );
 		VkImgui_OceanSlider( "Tile Break Blend", "r_arcBlancTileBreakBlend", 0.0f, 1.0f, "%.2f" );
 		VkImgui_OceanSlider( "Tile Break Cell", "r_arcBlancTileBreakCell", 64.0f, 4096.0f, "%.0f" );
-		VkImgui_OceanSlider( "Tile Radius", "r_arcBlancTileRadius", 0.0f, 6.0f, "%.0f" );
-	}
+			VkImgui_OceanSlider( "Tile Radius", "r_arcBlancTileRadius", 0.0f, 6.0f, "%.0f" );
+		}
+
+		if ( ImGui::CollapsingHeader( "Adaptive Rendering", ImGuiTreeNodeFlags_DefaultOpen ) ) {
+			int adaptiveEnabled = ri.Cvar_VariableIntegerValue( "r_arcBlancAdaptiveMesh" );
+			bool adaptiveOn = ( adaptiveEnabled != 0 );
+			if ( ImGui::Checkbox( "Adaptive Mesh", &adaptiveOn ) ) {
+				ri.Cvar_Set( "r_arcBlancAdaptiveMesh", adaptiveOn ? "1" : "0" );
+			}
+			VkImgui_OceanSliderInt( "Outer Mesh Divisions", "r_arcBlancMeshDivFar", 8, 128 );
+			VkImgui_OceanSlider( "Height LOD Start", "r_arcBlancAdaptiveHeightStart", 0.0f, 8192.0f, "%.0f" );
+			VkImgui_OceanSlider( "Height LOD End", "r_arcBlancAdaptiveHeightEnd", 128.0f, 16384.0f, "%.0f" );
+			ImGui::TextDisabled( "Outer rings and high camera altitudes automatically use cheaper ocean patches." );
+		}
 
 	if ( ImGui::CollapsingHeader( "Lake Mode" ) ) {
 		int lakeEnabled = ri.Cvar_VariableIntegerValue( "r_arcBlancLakeMode" );
@@ -227,7 +243,7 @@ extern "C" void VkImgui_DrawOceanPanel( void )
 		VkImgui_OceanSlider( "Lake Angle", "r_arcBlancLakeAngle", -180.0f, 180.0f, "%.0f" );
 	}
 
-	if ( ImGui::CollapsingHeader( "Performance", ImGuiTreeNodeFlags_DefaultOpen ) ) {
+		if ( ImGui::CollapsingHeader( "Performance", ImGuiTreeNodeFlags_DefaultOpen ) ) {
 		int gpuEnabled = ri.Cvar_VariableIntegerValue( "r_arcBlancGpu" );
 		bool gpuOn = ( gpuEnabled != 0 );
 		if ( ImGui::Checkbox( "GPU FFT", &gpuOn ) ) {
@@ -259,10 +275,34 @@ extern "C" void VkImgui_DrawOceanPanel( void )
 		}
 		VkImgui_OceanSliderInt( "Mesh Divisions", "r_arcBlancMeshDiv", 8, 128 );
 		VkImgui_OceanSlider( "Wake Scale", "r_arcBlancWake", 0.0f, 4.0f, "%.2f" );
-		ImGui::TextDisabled( "Use lower Update Hz and Mesh Divisions for gameplay, higher values for close shots." );
-	}
+			ImGui::TextDisabled( "Use lower Update Hz and Mesh Divisions for gameplay, higher values for close shots." );
+		}
 
-	ImGui::EndChild();
+		if ( ImGui::CollapsingHeader( "Underwater", ImGuiTreeNodeFlags_DefaultOpen ) ) {
+			int autoEnabled = ri.Cvar_VariableIntegerValue( "cl_arcBlancUnderwaterAuto" );
+			bool autoOn = ( autoEnabled != 0 );
+			if ( ImGui::Checkbox( "Automatic Underwater State", &autoOn ) ) {
+				ri.Cvar_Set( "cl_arcBlancUnderwaterAuto", autoOn ? "1" : "0" );
+			}
+			ImGui::SameLine();
+			ImGui::Text( "Live: %s", ri.Cvar_VariableIntegerValue( "r_arcBlancUnderwater" ) ? "underwater" : "surface" );
+			VkImgui_OceanSlider( "Depth Bias", "cl_arcBlancUnderwaterDepthBias", -64.0f, 128.0f, "%.1f" );
+			VkImgui_OceanSlider( "Fog Density", "cl_arcBlancUnderwaterDensity", 0.0f, 4.0f, "%.2f" );
+			VkImgui_OceanSlider( "Height Falloff", "cl_arcBlancUnderwaterHeightFalloff", 0.0f, 0.2f, "%.3f" );
+			VkImgui_OceanSlider( "Scatter Intensity", "cl_arcBlancUnderwaterIntensity", 0.0f, 8.0f, "%.2f" );
+			VkImgui_OceanSlider( "Ambient", "cl_arcBlancUnderwaterAmbient", 0.0f, 4.0f, "%.2f" );
+			VkImgui_OceanSlider( "Sun", "cl_arcBlancUnderwaterSun", 0.0f, 4.0f, "%.2f" );
+			VkImgui_OceanSlider( "Noise", "cl_arcBlancUnderwaterNoise", 0.0f, 1.0f, "%.2f" );
+			{
+				char tintBuf[64];
+				Q_strncpyz( tintBuf, ri.Cvar_VariableString( "cl_arcBlancUnderwaterTint" ), sizeof( tintBuf ) );
+				if ( ImGui::InputText( "Tint (r g b)", tintBuf, sizeof( tintBuf ) ) ) {
+					ri.Cvar_Set( "cl_arcBlancUnderwaterTint", tintBuf );
+				}
+			}
+		}
+
+		ImGui::EndChild();
 	ImGui::End();
 }
 
