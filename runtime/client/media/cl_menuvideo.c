@@ -24,10 +24,65 @@ modern cinematic system (AV1, WebM, Theora, FFmpeg).
 
 static cvar_t *r_menuVideo;
 static cvar_t *r_menuVideoLoop;
+static cvar_t *cl_menuBackgroundVideo;
+static cvar_t *cl_menuBackgroundVideoLoop;
 static int menuVideoHandle = -1;
 static qboolean menuVideoInited = qfalse;
 static qboolean menuVideoLooping = qfalse;
 static char currentVideoFile[MAX_QPATH];
+
+static void MenuVideo_SetVideoPath( const char *path )
+{
+	char normalized[MAX_QPATH];
+
+	if ( !path || !path[0] ) {
+		Cvar_Set( "cl_menuBackgroundVideo", "" );
+		Cvar_Set( "r_menuVideo", "" );
+		return;
+	}
+
+	if ( strchr( path, '/' ) || strchr( path, '\\' ) ) {
+		Q_strncpyz( normalized, path, sizeof( normalized ) );
+	} else {
+		Com_sprintf( normalized, sizeof( normalized ), "video/%s", path );
+	}
+
+	Cvar_Set( "cl_menuBackgroundVideo", normalized );
+	Cvar_Set( "r_menuVideo", normalized );
+}
+
+static void MenuVideo_SyncLoopValue( int enabled )
+{
+	Cvar_Set( "cl_menuBackgroundVideoLoop", enabled ? "1" : "0" );
+	Cvar_Set( "r_menuVideoLoop", enabled ? "1" : "0" );
+}
+
+static void MenuVideo_Set_f( void )
+{
+	if ( Cmd_Argc() < 2 ) {
+		Com_Printf( "Usage: menuvideo_set <path>\n" );
+		Com_Printf( "Example: menuvideo_set video/menu_bg.webm\n" );
+		return;
+	}
+
+	MenuVideo_SetVideoPath( Cmd_Argv( 1 ) );
+}
+
+static void MenuVideo_Clear_f( void )
+{
+	MenuVideo_SetVideoPath( "" );
+}
+
+static void MenuVideo_Status_f( void )
+{
+	Com_Printf( "Menu video path: %s\n",
+		r_menuVideo && r_menuVideo->string[0] ? r_menuVideo->string : "(disabled)" );
+	Com_Printf( "Menu video loop: %s\n",
+		( r_menuVideoLoop && r_menuVideoLoop->integer ) ? "on" : "off" );
+	Com_Printf( "Menu video active: %s\n", menuVideoHandle >= 0 ? "yes" : "no" );
+	Com_Printf( "Friendly cvar: %s\n",
+		cl_menuBackgroundVideo && cl_menuBackgroundVideo->string[0] ? cl_menuBackgroundVideo->string : "(empty)" );
+}
 
 void MenuVideo_Init( void ) {
 	r_menuVideo = Cvar_Get( "r_menuVideo", "", CVAR_ARCHIVE );
@@ -36,12 +91,37 @@ void MenuVideo_Init( void ) {
 	r_menuVideoLoop = Cvar_Get( "r_menuVideoLoop", "1", CVAR_ARCHIVE );
 	Cvar_SetDescription( r_menuVideoLoop, "Loop the menu background video (0 = play once, 1 = loop)." );
 
+	cl_menuBackgroundVideo = Cvar_Get( "cl_menuBackgroundVideo", "", CVAR_ARCHIVE );
+	Cvar_SetDescription( cl_menuBackgroundVideo,
+		"Friendly alias for the main menu background video path. "
+		"Example: video/menu_bg.webm. Empty = no video." );
+
+	cl_menuBackgroundVideoLoop = Cvar_Get( "cl_menuBackgroundVideoLoop", "1", CVAR_ARCHIVE );
+	Cvar_SetDescription( cl_menuBackgroundVideoLoop,
+		"Friendly alias for menu background video looping (0 = once, 1 = loop)." );
+
 	menuVideoHandle = -1;
 	menuVideoLooping = qfalse;
 	currentVideoFile[0] = '\0';
 	menuVideoInited = qtrue;
 	r_menuVideo->modified = qfalse;
 	r_menuVideoLoop->modified = qfalse;
+	cl_menuBackgroundVideo->modified = qfalse;
+	cl_menuBackgroundVideoLoop->modified = qfalse;
+
+	if ( cl_menuBackgroundVideo->string[0] && !r_menuVideo->string[0] ) {
+		Cvar_Set( "r_menuVideo", cl_menuBackgroundVideo->string );
+	} else if ( r_menuVideo->string[0] && !cl_menuBackgroundVideo->string[0] ) {
+		Cvar_Set( "cl_menuBackgroundVideo", r_menuVideo->string );
+	}
+
+	if ( cl_menuBackgroundVideoLoop->integer != r_menuVideoLoop->integer ) {
+		MenuVideo_SyncLoopValue( cl_menuBackgroundVideoLoop->integer );
+	}
+
+	Cmd_AddCommand( "menuvideo_set", MenuVideo_Set_f );
+	Cmd_AddCommand( "menuvideo_clear", MenuVideo_Clear_f );
+	Cmd_AddCommand( "menuvideo_status", MenuVideo_Status_f );
 
 	Com_Printf( "Menu video: %s\n", r_menuVideo->string[0] ? r_menuVideo->string : "disabled (r_menuVideo empty)" );
 }
@@ -54,6 +134,9 @@ void MenuVideo_Shutdown( void ) {
 	menuVideoLooping = qfalse;
 	currentVideoFile[0] = '\0';
 	menuVideoInited = qfalse;
+	Cmd_RemoveCommand( "menuvideo_set" );
+	Cmd_RemoveCommand( "menuvideo_clear" );
+	Cmd_RemoveCommand( "menuvideo_status" );
 }
 
 static void MenuVideo_Start( void ) {
@@ -96,6 +179,24 @@ void MenuVideo_Frame( void ) {
 
 	if ( !menuVideoInited ) return;
 	requestedLoop = ( r_menuVideoLoop && r_menuVideoLoop->integer ) ? qtrue : qfalse;
+
+	if ( cl_menuBackgroundVideo && cl_menuBackgroundVideo->modified ) {
+		cl_menuBackgroundVideo->modified = qfalse;
+		Cvar_Set( "r_menuVideo", cl_menuBackgroundVideo->string );
+		r_menuVideo->modified = qtrue;
+	} else if ( r_menuVideo && r_menuVideo->modified &&
+		( !cl_menuBackgroundVideo || Q_stricmp( cl_menuBackgroundVideo->string, r_menuVideo->string ) != 0 ) ) {
+		Cvar_Set( "cl_menuBackgroundVideo", r_menuVideo->string );
+	}
+
+	if ( cl_menuBackgroundVideoLoop && cl_menuBackgroundVideoLoop->modified ) {
+		cl_menuBackgroundVideoLoop->modified = qfalse;
+		MenuVideo_SyncLoopValue( cl_menuBackgroundVideoLoop->integer );
+		requestedLoop = ( r_menuVideoLoop && r_menuVideoLoop->integer ) ? qtrue : qfalse;
+	} else if ( r_menuVideoLoop && r_menuVideoLoop->modified &&
+		cl_menuBackgroundVideoLoop && cl_menuBackgroundVideoLoop->integer != r_menuVideoLoop->integer ) {
+		Cvar_Set( "cl_menuBackgroundVideoLoop", r_menuVideoLoop->integer ? "1" : "0" );
+	}
 
 	/* Stop video if we're in a game */
 	if ( cls.state >= CA_LOADING ) {

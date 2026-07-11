@@ -86,13 +86,6 @@ static float VecCurve_MaxX( const vecCurveSeg_t *c ) {
 	return m;
 }
 
-static float VecCurve_MaxY( const vecCurveSeg_t *c ) {
-	float m = c->p1.y;
-	if ( c->p2.y > m ) m = c->p2.y;
-	if ( c->p3.y > m ) m = c->p3.y;
-	return m;
-}
-
 static void VecOutline_SortCurves( vecOutlineBuilder_t *b ) {
 	int i;
 	int j;

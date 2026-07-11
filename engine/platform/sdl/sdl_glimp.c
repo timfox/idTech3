@@ -223,7 +223,6 @@ GLimp_SetMode
 static int GLW_SetMode( int mode, const char *modeFS, qboolean fullscreen )
 {
 	glconfig_t *config = glw_state.config;
-	int perChannelColorBits;
 	int colorBits, depthBits, stencilBits;
 	int i;
 	SDL_DisplayMode desktopMode;
@@ -383,11 +382,6 @@ static int GLW_SetMode( int mode, const char *modeFS, qboolean fullscreen )
 			if (testStencilBits == 8)
 				testStencilBits = 0;
 		}
-
-		if ( testColorBits == 24 )
-			perChannelColorBits = 8;
-		else
-			perChannelColorBits = 4;
 
 		if ( ( SDL_window = SDL_CreateWindow( cl_title, x, y, config->vidWidth, config->vidHeight, flags ) ) == NULL )
 		{

@@ -87,7 +87,7 @@ extern "C" bool VkImgui_InitVulkanBackend( ImGui_ImplVulkan_InitInfo *outInfo, c
 		return false;
 	}
 
-	Com_Memset( &info, 0, sizeof( info ) );
+	info = ImGui_ImplVulkan_InitInfo{};
 #ifdef VK_API_VERSION_1_4
 	info.ApiVersion = VK_API_VERSION_1_4;
 #elif defined( VK_API_VERSION_1_3 )

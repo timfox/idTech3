@@ -4,9 +4,12 @@ Copyright (C) 2026 Gopex LLC. All rights reserved.
 ===========================================================================
 */
 
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wpedantic"
 extern "C" {
 #include "../tr_local.h"
 }
+#pragma GCC diagnostic pop
 #include "vk_imgui_scene.h"
 
 int VkImgScene_RefEntityCount( void )

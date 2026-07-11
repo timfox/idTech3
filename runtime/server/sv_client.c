@@ -522,13 +522,15 @@ static void SV_SaveSequences( void ) {
 
 static void SV_InjectLocation( const char *tld, const char *country ) {
 	const char *cmd;
-	const char *str;
+	char *mutableCmd;
+	char *str;
 	int i, n;
 	for ( i = 0; i < sv.maxclients; i++ ) {
 		if ( seqs[i] != svs.clients[i].reliableSequence ) {
 			for ( n = seqs[i]; n != svs.clients[i].reliableSequence + 1; n++ ) {
-				cmd = svs.clients[i].reliableCommands[n & (MAX_RELIABLE_COMMANDS-1)];
-				str = strstr( cmd, "connected\n\"" );
+				mutableCmd = svs.clients[i].reliableCommands[n & (MAX_RELIABLE_COMMANDS-1)];
+				cmd = mutableCmd;
+				str = strstr( mutableCmd, "connected\n\"" );
 				if ( str && str[11] == '\0' && str < cmd + 512 ) {
 					const int rem = (int)( (const char *)cmd + MAX_STRING_CHARS - str );
 					if ( *tld == '\0' )

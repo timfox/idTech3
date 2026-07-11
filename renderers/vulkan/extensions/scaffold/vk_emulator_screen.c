@@ -5,11 +5,11 @@
 #include "../../tr_common.h"
 #include "vk_emulator_screen.h"
 
+#ifdef USE_IDTECH3_EMULATOR
+
 static image_t *s_emulatorImage = NULL;
 static cvar_t *r_emulatorScreen;
 static qboolean s_logged;
-
-#ifdef USE_IDTECH3_EMULATOR
 
 void R_Emulator_Init( void )
 {

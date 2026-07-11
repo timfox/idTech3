@@ -292,6 +292,7 @@ void CL_InitGameSystems(void) {
 	cl_navEnabled      = Cvar_Get("cl_navEnabled",      "1", CVAR_ARCHIVE);
 	cl_particlesEnabled = Cvar_Get("cl_particlesEnabled","1", CVAR_ARCHIVE);
 	cl_btEnabled       = Cvar_Get("cl_btEnabled",       "1", CVAR_ARCHIVE);
+#ifdef USE_ARC_BLANC
 	cl_arcBlancUnderwaterAuto = Cvar_Get( "cl_arcBlancUnderwaterAuto", "1", CVAR_ARCHIVE );
 	Cvar_SetDescription( cl_arcBlancUnderwaterAuto,
 		"Automatically apply a submerged volumetric look when the camera goes below the Arc Blanc surface." );
@@ -314,6 +315,7 @@ void CL_InitGameSystems(void) {
 	Cvar_SetDescription( cl_arcBlancUnderwaterTint, "Underwater auto fog tint (r g b)." );
 	r_arcBlancUnderwater = Cvar_Get( "r_arcBlancUnderwater", "0", CVAR_TEMP );
 	Cvar_SetDescription( r_arcBlancUnderwater, "Informational mirror for Arc Blanc underwater auto state." );
+#endif
 
 	if (!Phys_Init()) {
 		Com_Printf(S_COLOR_YELLOW "Warning: Physics not available, physics-dependent systems will be limited\n");

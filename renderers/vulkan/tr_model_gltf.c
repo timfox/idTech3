@@ -150,6 +150,10 @@ static void gltf_sample_channel_scalar(const float *times, const float *values, 
 	float time, float *outVal, int compOffset, int compCount) {
 	int k;
 
+	for (k = 0; k < compCount; k++) {
+		outVal[k] = 0.0f;
+	}
+
 	if (!times || !values || numKeys < 1 || compOffset + compCount > compsPerKey) {
 		return;
 	}
@@ -186,6 +190,13 @@ static void gltf_sample_channel_scalar(const float *times, const float *values, 
 				}
 			}
 			return;
+		}
+	}
+
+	{
+		int base = ( numKeys - 1 ) * compsPerKey + compOffset;
+		for ( k = 0; k < compCount; k++ ) {
+			outVal[k] = values[base + k];
 		}
 	}
 }
@@ -955,7 +966,7 @@ qboolean R_SampleGLTFMeshMorphWeights(const gltfModel_t *model, int animIndex, f
 		}
 		touched = qtrue;
 		for (ti = 0; ti < numTargets && ti < ch->componentsPerKeyframe; ti++) {
-			float w;
+			float w = 0.0f;
 			gltf_sample_channel_scalar(ch->times, ch->values, ch->numKeyframes, ch->componentsPerKeyframe,
 				t, &w, ti, 1);
 			outWeights[ti] += w;

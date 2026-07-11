@@ -269,7 +269,7 @@ static surfaceType_t *R_BspStream_BakeGridToTris( srfGridMesh_t *grid )
 	int numVerts, numIndexes;
 	srfTriangles_t *tri;
 	srfVert_t *dv;
-	int i, j, w, h;
+	int i, w, h;
 	int allocSize;
 
 	if ( !grid || grid->surfaceType != SF_GRID ) {

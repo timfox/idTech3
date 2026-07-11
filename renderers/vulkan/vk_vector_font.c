@@ -104,19 +104,6 @@ static void VF_DestroyBuffer( VkBuffer *buf, VkDeviceMemory *mem ) {
 	}
 }
 
-static VkShaderModule VF_ModuleFromSpv( const uint8_t *bytes, int count ) {
-	VkShaderModuleCreateInfo desc;
-	VkShaderModule module;
-
-	desc.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
-	desc.pNext = NULL;
-	desc.flags = 0;
-	desc.codeSize = (size_t)count;
-	desc.pCode = (const uint32_t *)bytes;
-	VK_CHECK( qvkCreateShaderModule( vk.device, &desc, NULL, &module ) );
-	return module;
-}
-
 static void VF_DestroyPipeline( VkPipeline *pipe ) {
 	if ( *pipe != VK_NULL_HANDLE ) {
 		qvkDestroyPipeline( vk.device, *pipe, NULL );

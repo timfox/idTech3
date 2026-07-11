@@ -510,7 +510,7 @@ static void parseFloat3(float *x, float *y, float *z, const char **token) {
 }
 
 static size_t my_strnlen(const char *s, size_t n) {
-    const char *p = (char *)memchr(s, 0, n);
+    const char *p = (const char *)memchr(s, 0, n);
     return p ? (size_t)(p - s) : n;
 }
 

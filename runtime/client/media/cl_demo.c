@@ -727,10 +727,10 @@ static void CL_CompleteDemoName( const char *args, int argNum ) {
 	}
 }
 
-static void CL_PlayDemo_f( void ) {
+	static void CL_PlayDemo_f( void ) {
 	char name[MAX_OSPATH];
 	const char *arg;
-	char *ext_test;
+	const char *ext_test;
 	int protocol, i;
 	char retry[MAX_OSPATH];
 	const char *shortname, *slash;

@@ -265,7 +265,9 @@ static qboolean R_LoadSTL( model_t *mod, int lod, const char *name, const byte *
 	} else {
 		const char *p = (const char *)data;
 		const char *end = p + size;
-		float v0[3], v1[3], v2[3];
+		float v0[3] = { 0.0f, 0.0f, 0.0f };
+		float v1[3] = { 0.0f, 0.0f, 0.0f };
+		float v2[3] = { 0.0f, 0.0f, 0.0f };
 		int state = 0;
 
 		while ( p < end ) {
