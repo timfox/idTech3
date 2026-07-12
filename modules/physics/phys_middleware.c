@@ -80,13 +80,32 @@ static void PhysMiddleware_ClearAllDemoRagdolls( void ) {
 }
 
 static void PhysMiddleware_LogImpact( const phys_event_t *ev, void *userData ) {
+	physMotorHandle_t motor;
+	procAnimHandle_t anim;
+	vec3_t impulse;
+
 	(void)userData;
 	if ( !ev ) {
 		return;
 	}
 	if ( ev->type == PHYS_EVENT_IMPACT && ev->magnitude > 50.0f ) {
-		Com_DPrintf( "PhysEvent impact: mag=%.1f matA=%d matB=%d\n",
-			ev->magnitude, ev->matA, ev->matB );
+		Com_DPrintf( "PhysEvent impact: mag=%.1f matA=%d matB=%d ragdoll=%d bone=%d\n",
+			ev->magnitude, ev->matA, ev->matB, ev->ragdoll, ev->bone );
+	}
+	/* Soft Step bone hits → Euphoria motor / ProcAnim */
+	if ( ev->type == PHYS_EVENT_IMPACT && ev->ragdoll >= 0 && ev->magnitude >= 25.0f ) {
+		motor = PhysMotor_FindByRagdoll( ev->ragdoll );
+		anim = ProcAnim_FindByRagdoll( ev->ragdoll );
+		if ( motor >= 0 || anim >= 0 ) {
+			VectorCopy( ev->impulse, impulse );
+			if ( VectorLength( impulse ) < 1.0f && ev->magnitude > 0.0f ) {
+				impulse[0] = ev->normal[0] * ev->magnitude;
+				impulse[1] = ev->normal[1] * ev->magnitude;
+				impulse[2] = ev->normal[2] * ev->magnitude;
+			}
+			PhysMiddleware_DispatchHit( ev->entityNum, anim, motor, ev->bone >= 0 ? ev->bone : 0,
+				0, ev->point, impulse );
+		}
 	}
 }
 
@@ -1064,6 +1083,8 @@ void PhysMiddleware_DispatchHit( int entityNum, procAnimHandle_t anim, physMotor
 	Com_Memset( &ev, 0, sizeof( ev ) );
 	ev.type = PHYS_EVENT_IMPACT;
 	ev.entityNum = entityNum;
+	ev.ragdoll = -1;
+	ev.bone = -1;
 	ev.hit = hit;
 	VectorCopy( point, ev.point );
 	VectorCopy( impulse, ev.impulse );

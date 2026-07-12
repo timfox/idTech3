@@ -118,7 +118,7 @@ static void PhysMotor_RunBalance( physMotorSlot_t *m, procAnimState_t state, flo
 	}
 
 	/* Drive Soft Step balance toward support polygon, not COM */
-	Phys_RagdollSetBalance( m->ragdoll, qtrue, status.centerOfMass );
+	Phys_RagdollSetBalance( m->ragdoll, qtrue, status.supportCenter );
 }
 
 static void PhysMotor_RunGetup( physMotorSlot_t *m, procAnimState_t state ) {
@@ -356,4 +356,18 @@ int PhysMotor_GetActiveCount( void ) {
 		}
 	}
 	return n;
+}
+
+physMotorHandle_t PhysMotor_FindByRagdoll( physRagdollHandle_t ragdoll ) {
+	int i;
+
+	if ( !motorInitialized || ragdoll < 0 ) {
+		return -1;
+	}
+	for ( i = 0; i < PHYS_MOTOR_MAX; i++ ) {
+		if ( motors[i].active && motors[i].ragdoll == ragdoll ) {
+			return i;
+		}
+	}
+	return -1;
 }

@@ -96,6 +96,7 @@ typedef struct procAnimState_s {
 	float           painLevel;
 	float           consciousness;
 	vec3_t          centerOfMass;
+	vec3_t          supportCenter; /* feet midpoint (Z-up ground plant) */
 	vec3_t          velocity;
 	float           stateTime;
 	float           muscleStiffness;
@@ -118,6 +119,7 @@ void ProcAnim_SetPainLevel(procAnimHandle_t handle, float pain);
 void ProcAnim_Kill(procAnimHandle_t handle);
 void ProcAnim_UpdateAll(float dt);
 int  ProcAnim_GetActiveCount(void);
+procAnimHandle_t ProcAnim_FindByRagdoll(physRagdollHandle_t ragdoll);
 
 void ProcAnim_DefaultConfig(procAnimConfig_t *config);
 

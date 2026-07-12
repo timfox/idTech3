@@ -492,6 +492,7 @@ void ProcAnim_GetStatus(procAnimHandle_t handle, procAnimStatus_t *status) {
 	status->painLevel = ctrl->painLevel;
 	status->consciousness = ctrl->consciousness;
 	VectorCopy(ctrl->lastCOM, status->centerOfMass);
+	VectorCopy(ctrl->supportCenter, status->supportCenter);
 	VectorCopy(ctrl->comVelocity, status->velocity);
 	status->stateTime = ctrl->stateTimer;
 	status->muscleStiffness = ctrl->muscleStiffness;
@@ -584,4 +585,17 @@ int ProcAnim_GetActiveCount(void) {
 		if (controllers[i].active) n++;
 	}
 	return n;
+}
+
+procAnimHandle_t ProcAnim_FindByRagdoll(physRagdollHandle_t ragdoll) {
+	int i;
+	if (ragdoll < 0) {
+		return -1;
+	}
+	for (i = 0; i < controllerCount; i++) {
+		if (controllers[i].active && controllers[i].ragdoll == ragdoll) {
+			return i;
+		}
+	}
+	return -1;
 }

@@ -62,6 +62,9 @@ Usage from Lua:
 #include "../client/core/cl_p2p_session.h"
 #include "../physics/phys_character.h"
 #include "../physics/phys_ragdoll_bind.h"
+#include "../physics/phys_character.h"
+#include "../physics/phys_dmm.h"
+#include "../physics/phys_middleware.h"
 #include "g_animgraph.h"
 #include "../renderers/common/tr_public.h"
 #include "../audio/snd_music_adaptive.h"
@@ -483,15 +486,87 @@ static int l_phys_pollEvent(lua_State *L) {
 		lua_pushnil( L );
 		return 1;
 	}
-	lua_createtable( L, 0, 8 );
+	lua_createtable( L, 0, 10 );
 	lua_pushinteger( L, (int)ev.type ); lua_setfield( L, -2, "type" );
 	lua_pushinteger( L, ev.bodyA ); lua_setfield( L, -2, "bodyA" );
 	lua_pushinteger( L, ev.bodyB ); lua_setfield( L, -2, "bodyB" );
+	lua_pushinteger( L, ev.ragdoll ); lua_setfield( L, -2, "ragdoll" );
+	lua_pushinteger( L, ev.bone ); lua_setfield( L, -2, "bone" );
 	lua_pushnumber( L, ev.point[0] ); lua_setfield( L, -2, "x" );
 	lua_pushnumber( L, ev.point[1] ); lua_setfield( L, -2, "y" );
 	lua_pushnumber( L, ev.point[2] ); lua_setfield( L, -2, "z" );
 	lua_pushnumber( L, ev.magnitude ); lua_setfield( L, -2, "magnitude" );
 	return 1;
+}
+static int l_phys_forceAnimState(lua_State *L) {
+	ProcAnim_ForceState( (procAnimHandle_t)luaL_checkinteger( L, 1 ),
+		(procAnimState_t)luaL_checkinteger( L, 2 ) );
+	return 0;
+}
+static int l_phys_hitRagdoll(lua_State *L) {
+	vec3_t point, impulse;
+	procAnimHandle_t anim = (procAnimHandle_t)luaL_checkinteger( L, 1 );
+	physMotorHandle_t motor = (physMotorHandle_t)luaL_optinteger( L, 2, -1 );
+	int bone = (int)luaL_optinteger( L, 3, PROCANIM_BONE_SPINE );
+	impulse[0] = (float)luaL_optnumber( L, 4, 200 );
+	impulse[1] = (float)luaL_optnumber( L, 5, 0 );
+	impulse[2] = (float)luaL_optnumber( L, 6, 100 );
+	point[0] = (float)luaL_optnumber( L, 7, 0 );
+	point[1] = (float)luaL_optnumber( L, 8, 0 );
+	point[2] = (float)luaL_optnumber( L, 9, 0 );
+	PhysMiddleware_DispatchHit( -1, anim, motor, bone, 0, point, impulse );
+	return 0;
+}
+static int l_phys_createDmm(lua_State *L) {
+	dmmObjectDef_t def;
+	dmmFracturePattern_t pattern;
+	dmmObjectHandle_t h;
+	float edge;
+	Com_Memset( &def, 0, sizeof( def ) );
+	def.position[0] = (float)luaL_checknumber( L, 1 );
+	def.position[1] = (float)luaL_checknumber( L, 2 );
+	def.position[2] = (float)luaL_checknumber( L, 3 );
+	edge = (float)luaL_optnumber( L, 4, 48 );
+	VectorSet( def.dimensions, edge, edge, edge );
+	def.material = DMM_CONCRETE;
+	def.density = (float)luaL_optnumber( L, 5, 2.4 );
+	def.gridResolution = (int)luaL_optinteger( L, 6, 6 );
+	def.deformability = 1.0f;
+	Dmm_GenerateVoronoiPattern( def.position, edge * 0.5f, 8, &pattern );
+	h = Dmm_CreateEnhanced( &def, &pattern );
+	lua_pushinteger( L, h );
+	return 1;
+}
+static int l_phys_fractureDmm(lua_State *L) {
+	vec3_t point;
+	int n;
+	point[0] = (float)luaL_optnumber( L, 2, 0 );
+	point[1] = (float)luaL_optnumber( L, 3, 0 );
+	point[2] = (float)luaL_optnumber( L, 4, 0 );
+	n = Dmm_Fracture( (dmmObjectHandle_t)luaL_checkinteger( L, 1 ), point,
+		(float)luaL_optnumber( L, 5, 800 ) );
+	lua_pushinteger( L, n );
+	return 1;
+}
+static int l_phys_dmmStatus(lua_State *L) {
+	lua_pushinteger( L, Dmm_GetActiveCount() );
+	return 1;
+}
+static int l_phys_spawnBoundAlive(lua_State *L) {
+	physBoundRagdoll_t bound;
+	vec3_t origin;
+	const char *path = luaL_optstring( L, 1, NULL );
+	origin[0] = (float)luaL_optnumber( L, 2, 0 );
+	origin[1] = (float)luaL_optnumber( L, 3, 0 );
+	origin[2] = (float)luaL_optnumber( L, 4, 64 );
+	if ( !Phys_RagdollSpawnBoundEx( path, origin, &bound, qfalse ) ) {
+		lua_pushinteger( L, -1 );
+		return 1;
+	}
+	lua_pushinteger( L, bound.ragdoll );
+	lua_pushinteger( L, bound.anim );
+	lua_pushinteger( L, bound.motor );
+	return 3;
 }
 
 /* ========== Particles bindings ========== */
@@ -2086,6 +2161,9 @@ void LuaBindings_RegisterAll(void *luaState) {
 		{"getContacts", l_phys_getContacts}, {"setConstraintSpring", l_phys_setConstraintSpring},
 		{"setSphericalLimits", l_phys_setSphericalLimits}, {"setWheelSteering", l_phys_setWheelSteering},
 		{"pollEvent", l_phys_pollEvent},
+		{"forceAnimState", l_phys_forceAnimState}, {"hitRagdoll", l_phys_hitRagdoll},
+		{"createDmm", l_phys_createDmm}, {"fractureDmm", l_phys_fractureDmm},
+		{"dmmStatus", l_phys_dmmStatus}, {"spawnBoundAlive", l_phys_spawnBoundAlive},
 		{NULL, NULL}
 	};
 	registerTable(L, "Physics", physicsFuncs);

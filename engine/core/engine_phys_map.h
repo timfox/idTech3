@@ -22,7 +22,8 @@ typedef enum {
 	ENGINE_PHYS_STATIC,
 	ENGINE_PHYS_SENSOR,
 	ENGINE_PHYS_SLIDER,
-	ENGINE_PHYS_RAGDOLL
+	ENGINE_PHYS_RAGDOLL,
+	ENGINE_PHYS_DMM
 } enginePhysMapType_t;
 
 typedef struct enginePhysMapDef_s {
@@ -37,6 +38,8 @@ typedef struct enginePhysMapDef_s {
 	float               sliderLower;
 	float               sliderUpper;
 	char                targetname[64];
+	char                model[MAX_QPATH]; /* misc_phys_ragdoll optional .rag / model */
+	qboolean            ragdollDead;      /* 1 = ProcAnim_Kill on spawn (death pose) */
 } enginePhysMapDef_t;
 
 typedef struct enginePhysMapList_s {

@@ -204,7 +204,8 @@ qboolean Phys_RagdollApplyMd3Frame( physRagdollHandle_t handle, const physRagdol
 	return applied > 0 ? qtrue : qfalse;
 }
 
-qboolean Phys_RagdollSpawnBound( const char *modelOrRag, const vec3_t origin, physBoundRagdoll_t *out ) {
+qboolean Phys_RagdollSpawnBoundEx( const char *modelOrRag, const vec3_t origin, physBoundRagdoll_t *out,
+	qboolean startDead ) {
 	physRagdollDef_t def;
 	procAnimConfig_t cfg;
 	qboolean loaded;
@@ -235,7 +236,9 @@ qboolean Phys_RagdollSpawnBound( const char *modelOrRag, const vec3_t origin, ph
 	out->anim = ProcAnim_Create( out->ragdoll, &cfg );
 	if ( out->anim >= 0 ) {
 		out->motor = PhysMotor_Create( out->anim, out->ragdoll );
-		ProcAnim_Kill( out->anim ); /* death → Soft Step ragdoll drive */
+		if ( startDead ) {
+			ProcAnim_Kill( out->anim ); /* death → Soft Step ragdoll drive */
+		}
 	}
 
 	/* If an MD3 exists next to the bind, seed pose from frame 0 tags. */
@@ -258,8 +261,12 @@ qboolean Phys_RagdollSpawnBound( const char *modelOrRag, const vec3_t origin, ph
 		Phys_RagdollApplyMd3Frame( out->ragdoll, &def, md3Path, 0 );
 	}
 
-	Com_Printf( "[physics] bound ragdoll=%d anim=%d motor=%d at (%.0f %.0f %.0f) bind=%s\n",
+	Com_Printf( "[physics] bound ragdoll=%d anim=%d motor=%d at (%.0f %.0f %.0f) bind=%s dead=%d\n",
 		out->ragdoll, out->anim, out->motor, origin[0], origin[1], origin[2],
-		loaded ? "yes" : "procedural" );
+		loaded ? "yes" : "procedural", startDead ? 1 : 0 );
 	return qtrue;
+}
+
+qboolean Phys_RagdollSpawnBound( const char *modelOrRag, const vec3_t origin, physBoundRagdoll_t *out ) {
+	return Phys_RagdollSpawnBoundEx( modelOrRag, origin, out, qtrue );
 }

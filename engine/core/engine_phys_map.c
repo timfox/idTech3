@@ -89,6 +89,10 @@ void EnginePhysMap_Parse( const char *entityString, enginePhysMapList_t *list ) 
 				def.angles[1] = EnginePhysMap_Float( value, 0.0f );
 			} else if ( !Q_stricmp( key, "targetname" ) ) {
 				Q_strncpyz( def.targetname, value, sizeof( def.targetname ) );
+			} else if ( !Q_stricmp( key, "model" ) || !Q_stricmp( key, "rag" ) ) {
+				Q_strncpyz( def.model, value, sizeof( def.model ) );
+			} else if ( !Q_stricmp( key, "dead" ) || !Q_stricmp( key, "startDead" ) ) {
+				def.ragdollDead = atoi( value ) ? qtrue : qfalse;
 			}
 		}
 
@@ -104,6 +108,9 @@ void EnginePhysMap_Parse( const char *entityString, enginePhysMapList_t *list ) 
 			def.type = ENGINE_PHYS_SLIDER;
 		} else if ( !Q_stricmp( classname, "misc_phys_ragdoll" ) ) {
 			def.type = ENGINE_PHYS_RAGDOLL;
+		} else if ( !Q_stricmp( classname, "misc_phys_dmm" )
+			|| !Q_stricmp( classname, "func_destructible" ) ) {
+			def.type = ENGINE_PHYS_DMM;
 		} else {
 			continue;
 		}

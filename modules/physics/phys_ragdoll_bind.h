@@ -30,7 +30,10 @@ typedef struct physBoundRagdoll_s {
 	physMotorHandle_t   motor;
 } physBoundRagdoll_t;
 
-/* Death / spawn helper: load .rag (optional), create Soft Step ragdoll + ProcAnim + motor. */
+/* Death / spawn helper: load .rag (optional), create Soft Step ragdoll + ProcAnim + motor.
+   startDead=qtrue calls ProcAnim_Kill (classic death path). Map Euphoria uses qfalse. */
+qboolean Phys_RagdollSpawnBoundEx( const char *modelOrRag, const vec3_t origin, physBoundRagdoll_t *out,
+	qboolean startDead );
 qboolean Phys_RagdollSpawnBound( const char *modelOrRag, const vec3_t origin, physBoundRagdoll_t *out );
 
 #ifdef __cplusplus

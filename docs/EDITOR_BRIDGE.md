@@ -163,7 +163,8 @@ Map-placed Box3D Soft Step bodies (server spawn when `sv_physSpawn 1`).
 | `misc_phys_static` | Static box collider |
 | `misc_phys_sensor` | Trigger volume (`isSensor`) |
 | `misc_phys_slider` | Prismatic joint (static base + sliding box) |
-| `misc_phys_ragdoll` | Procedural Soft Step ragdoll |
+| `misc_phys_ragdoll` | Euphoria-like Soft Step ragdoll (ProcAnim + motor) |
+| `misc_phys_dmm` / `func_destructible` | DMM-like Soft Step fracture proxy |
 
 | Key | Type | Description |
 |-----|------|-------------|
@@ -173,6 +174,8 @@ Map-placed Box3D Soft Step bodies (server spawn when `sv_physSpawn 1`).
 | `material` | int | `PHYS_MAT_*` id |
 | `lip` / `height` | float | Slider upper travel (default 96) |
 | `targetname` | string | Optional name |
+| `model` / `rag` | string | Optional `.rag` / model for `misc_phys_ragdoll` |
+| `dead` | int | `1` = death pose (`ProcAnim_Kill`); default live Euphoria |
 
 Parser: [engine_phys_map.c](../engine/core/engine_phys_map.c). Server: `SV_Physics_SpawnMapEntities`. See [PHYSICS.md](PHYSICS.md).
 

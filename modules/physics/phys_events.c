@@ -172,6 +172,8 @@ void PhysEvent_PostImpact( int entityNum, int bodyA, int bodyB,
 	ev.entityNum = entityNum;
 	ev.bodyA = bodyA;
 	ev.bodyB = bodyB;
+	ev.ragdoll = -1;
+	ev.bone = -1;
 	ev.matA = matA;
 	ev.matB = matB;
 	VectorCopy( point, ev.point );

@@ -33,6 +33,37 @@ share one substrate with props, volumes, and motors.
 #define VALID_CON(h)  ((h) >= 0 && (h) < bx.constraintCount && bx.constraints[(h)].active)
 #define VALID_RAG(h)  ((h) >= 0 && (h) < bx.ragdollCount && bx.ragdolls[(h)].active)
 #define VALID_DMM(h)  ((h) >= 0 && (h) < bx.dmmCount && bx.dmmObjects[(h)].active)
+/* Soft Step userData: normal body = index+1; ragdoll bone = flag | (rag<<8) | bone */
+#define BOX_UD_RAG_FLAG ((uintptr_t)1u << 30)
+#define BOX_UD_PACK_RAG(r,b) ((void *)(uintptr_t)(BOX_UD_RAG_FLAG | (((uintptr_t)(r) & 0x3FFu) << 8) | ((uintptr_t)(b) & 0xFFu)))
+
+static void box_decode_userdata( void *ud, int *bodyOut, int *ragOut, int *boneOut ) {
+	uintptr_t v = (uintptr_t)(intptr_t)ud;
+	if ( bodyOut ) {
+		*bodyOut = -1;
+	}
+	if ( ragOut ) {
+		*ragOut = -1;
+	}
+	if ( boneOut ) {
+		*boneOut = -1;
+	}
+	if ( !v ) {
+		return;
+	}
+	if ( v & BOX_UD_RAG_FLAG ) {
+		if ( ragOut ) {
+			*ragOut = (int)( ( v >> 8 ) & 0x3FFu );
+		}
+		if ( boneOut ) {
+			*boneOut = (int)( v & 0xFFu );
+		}
+		return;
+	}
+	if ( bodyOut ) {
+		*bodyOut = (int)v - 1;
+	}
+}
 
 typedef struct {
 	b3BodyId           bodyId;
@@ -70,7 +101,10 @@ typedef struct {
 	int        numJoints;
 	float      muscleStiffness;
 	float      muscleDamping;
+	float      muscleStrength;
 	float      balanceForce;
+	float      reachForce;
+	float      impactResponse;
 	qboolean   balanceEnabled;
 	b3Vec3     balanceTarget;
 	float      animBlend;
@@ -552,16 +586,19 @@ void Phys_StepSimulation_Impl( float dt ) {
 
 	for ( r = 0; r < bx.ragdollCount; r++ ) {
 		BoxRagdoll *rag = &bx.ragdolls[r];
+		float muscle;
 		if ( !rag->active || !rag->balanceEnabled ) {
 			continue;
 		}
-		for ( b = 0; b < rag->numBones; b++ ) {
-			b3Vec3 pos = b3Body_GetPosition( rag->bones[b].bodyId );
+		/* Pelvis-only balance (Z-up horizontal plant) — not every bone */
+		muscle = rag->muscleStiffness * ( rag->muscleStrength > 0.0f ? rag->muscleStrength : 1.0f );
+		{
+			b3Vec3 pos = b3Body_GetPosition( rag->bones[0].bodyId );
 			b3Vec3 toTarget = b3Sub( rag->balanceTarget, pos );
 			toTarget.z = 0.0f;
 			if ( b3Length( toTarget ) > 0.1f ) {
-				b3Vec3 force = b3MulSV( rag->balanceForce * rag->muscleStiffness, b3Normalize( toTarget ) );
-				b3Body_ApplyForceToCenter( rag->bones[b].bodyId, force, true );
+				b3Vec3 force = b3MulSV( rag->balanceForce * muscle, b3Normalize( toTarget ) );
+				b3Body_ApplyForceToCenter( rag->bones[0].bodyId, force, true );
 			}
 		}
 	}
@@ -574,25 +611,28 @@ void Phys_StepSimulation_Impl( float dt ) {
 			continue;
 		}
 		blend = rag->animBlend;
-		for ( b = 0; b < rag->numBones; b++ ) {
-			b3Vec3 pos, delta, force;
-			b3Quat q, qErr;
-			b3Vec3 torqueAxis;
-			float angle;
-			if ( !rag->animTargetValid[b] ) {
-				continue;
-			}
-			pos = b3Body_GetPosition( rag->bones[b].bodyId );
-			delta = b3Sub( rag->animTargetPos[b], pos );
-			force = b3MulSV( blend * rag->muscleStiffness * 40.0f, delta );
-			b3Body_ApplyForceToCenter( rag->bones[b].bodyId, force, true );
+		{
+			float muscle = rag->muscleStiffness * ( rag->muscleStrength > 0.0f ? rag->muscleStrength : 1.0f );
+			for ( b = 0; b < rag->numBones; b++ ) {
+				b3Vec3 pos, delta, force;
+				b3Quat q, qErr;
+				b3Vec3 torqueAxis;
+				float angle;
+				if ( !rag->animTargetValid[b] ) {
+					continue;
+				}
+				pos = b3Body_GetPosition( rag->bones[b].bodyId );
+				delta = b3Sub( rag->animTargetPos[b], pos );
+				force = b3MulSV( blend * muscle * 40.0f, delta );
+				b3Body_ApplyForceToCenter( rag->bones[b].bodyId, force, true );
 
-			q = b3Body_GetRotation( rag->bones[b].bodyId );
-			qErr = b3MulQuat( rag->animTargetRot[b], b3Conjugate( q ) );
-			torqueAxis = b3GetAxisAngle( &angle, qErr );
-			if ( angle > 0.001f || angle < -0.001f ) {
-				b3Body_ApplyTorque( rag->bones[b].bodyId,
-					b3MulSV( blend * rag->muscleStiffness * 80.0f * angle, torqueAxis ), true );
+				q = b3Body_GetRotation( rag->bones[b].bodyId );
+				qErr = b3MulQuat( rag->animTargetRot[b], b3Conjugate( q ) );
+				torqueAxis = b3GetAxisAngle( &angle, qErr );
+				if ( angle > 0.001f || angle < -0.001f ) {
+					b3Body_ApplyTorque( rag->bones[b].bodyId,
+						b3MulSV( blend * muscle * 80.0f * angle, torqueAxis ), true );
+				}
 			}
 		}
 	}
@@ -1290,7 +1330,10 @@ physRagdollHandle_t Phys_CreateRagdoll_Impl( const physRagdollDef_t *def ) {
 	memset( rag, 0, sizeof( *rag ) );
 	rag->muscleStiffness = def->jointStiffness > 0 ? def->jointStiffness : 0.8f;
 	rag->muscleDamping = def->jointDamping > 0 ? def->jointDamping : 0.4f;
+	rag->muscleStrength = def->muscleStrength > 0 ? def->muscleStrength : 1.0f;
 	rag->balanceForce = def->balanceForce > 0 ? def->balanceForce : 100.0f;
+	rag->reachForce = def->reachForce > 0 ? def->reachForce : 1.0f;
+	rag->impactResponse = def->impactResponse > 0 ? def->impactResponse : 1.0f;
 	rag->active = qtrue;
 
 	scale = def->scale > 0 ? def->scale : 1.0f;
@@ -1331,6 +1374,7 @@ physRagdollHandle_t Phys_CreateRagdoll_Impl( const physRagdollDef_t *def ) {
 		bd.angularDamping = 0.35f;
 		bd.enableSleep = false;
 		rag->bones[b].bodyId = b3CreateBody( bx.worldId, &bd );
+		b3Body_SetUserData( rag->bones[b].bodyId, BOX_UD_PACK_RAG( idx, b ) );
 
 		cap.center1 = v3( 0.0f, 0.0f, -0.5f * h );
 		cap.center2 = v3( 0.0f, 0.0f, 0.5f * h );
@@ -1408,20 +1452,22 @@ void Phys_DestroyRagdoll_Impl( physRagdollHandle_t h ) {
 
 void Phys_RagdollApplyImpact_Impl( physRagdollHandle_t h, const vec3_t pt, const vec3_t imp, float radius ) {
 	int b;
+	float response;
 
 	if ( !VALID_RAG( h ) ) {
 		return;
 	}
+	response = bx.ragdolls[h].impactResponse > 0.0f ? bx.ragdolls[h].impactResponse : 1.0f;
 	for ( b = 0; b < bx.ragdolls[h].numBones; b++ ) {
 		b3Vec3 pos = b3Body_GetPosition( bx.ragdolls[h].bones[b].bodyId );
 		b3Vec3 d = b3Sub( pos, from_vec3( pt ) );
 		float dist = b3Length( d );
-		float scale = 1.0f;
+		float scale = response;
 		if ( radius > 0.0f && dist > radius ) {
 			continue;
 		}
 		if ( radius > 0.0f ) {
-			scale = 1.0f - dist / radius;
+			scale = response * ( 1.0f - dist / radius );
 		}
 		b3Body_ApplyLinearImpulseToCenter( bx.ragdolls[h].bones[b].bodyId,
 			v3( imp[0] * scale, imp[1] * scale, imp[2] * scale ), true );
@@ -1440,15 +1486,18 @@ void Phys_RagdollSetBalance_Impl( physRagdollHandle_t h, qboolean en, const vec3
 
 void Phys_RagdollReach_Impl( physRagdollHandle_t h, int limb, const vec3_t tgt, float str ) {
 	b3Vec3 pos, dir;
+	float strength;
 
 	if ( !VALID_RAG( h ) || limb < 0 || limb >= bx.ragdolls[h].numBones ) {
 		return;
 	}
+	strength = str * ( bx.ragdolls[h].reachForce > 0.0f ? bx.ragdolls[h].reachForce : 1.0f );
+	strength *= ( bx.ragdolls[h].muscleStrength > 0.0f ? bx.ragdolls[h].muscleStrength : 1.0f );
 	pos = b3Body_GetPosition( bx.ragdolls[h].bones[limb].bodyId );
 	dir = b3Sub( from_vec3( tgt ), pos );
 	if ( b3Length( dir ) > 0.1f ) {
 		b3Body_ApplyForceToCenter( bx.ragdolls[h].bones[limb].bodyId,
-			b3MulSV( str, b3Normalize( dir ) ), true );
+			b3MulSV( strength, b3Normalize( dir ) ), true );
 	}
 }
 
@@ -2193,17 +2242,15 @@ void Phys_ProcessContactEvents_Impl( void ) {
 		b3ContactHitEvent *hit = &events.hitEvents[i];
 		vec3_t point, normal, impulse;
 		int bodyA = -1, bodyB = -1;
+		int ragA = -1, boneA = -1, ragB = -1, boneB = -1;
 		void *ud;
 		float mag;
+		phys_event_t pe;
 
 		ud = b3Body_GetUserData( b3Shape_GetBody( hit->shapeIdA ) );
-		if ( ud ) {
-			bodyA = (int)(intptr_t)ud - 1;
-		}
+		box_decode_userdata( ud, &bodyA, &ragA, &boneA );
 		ud = b3Body_GetUserData( b3Shape_GetBody( hit->shapeIdB ) );
-		if ( ud ) {
-			bodyB = (int)(intptr_t)ud - 1;
-		}
+		box_decode_userdata( ud, &bodyB, &ragB, &boneB );
 		to_vec3( hit->point, point );
 		to_vec3( hit->normal, normal );
 		mag = hit->approachSpeed;
@@ -2213,10 +2260,23 @@ void Phys_ProcessContactEvents_Impl( void ) {
 		impulse[0] = normal[0] * mag;
 		impulse[1] = normal[1] * mag;
 		impulse[2] = normal[2] * mag;
-		PhysEvent_PostImpact( -1, bodyA, bodyB,
-			bodyA >= 0 ? bx.bodies[bodyA].materialId : 0,
-			bodyB >= 0 ? bx.bodies[bodyB].materialId : 0,
-			point, normal, impulse, mag );
+		Com_Memset( &pe, 0, sizeof( pe ) );
+		pe.type = PHYS_EVENT_IMPACT;
+		pe.entityNum = -1;
+		pe.bodyA = bodyA;
+		pe.bodyB = bodyB;
+		pe.ragdoll = ragA >= 0 ? ragA : ragB;
+		pe.bone = ragA >= 0 ? boneA : boneB;
+		pe.matA = bodyA >= 0 ? bx.bodies[bodyA].materialId : 0;
+		pe.matB = bodyB >= 0 ? bx.bodies[bodyB].materialId : 0;
+		VectorCopy( point, pe.point );
+		VectorCopy( normal, pe.normal );
+		VectorCopy( impulse, pe.impulse );
+		pe.magnitude = mag;
+		if ( pe.ragdoll >= 0 ) {
+			PhysEvent_BuildHitFromImpulse( &pe.hit, pe.bone, 0, point, impulse, 1.0f );
+		}
+		PhysEvent_Post( &pe );
 	}
 
 	/* Soft Step contact begin/end (non-sensor rigid contacts) */
@@ -2225,22 +2285,21 @@ void Phys_ProcessContactEvents_Impl( void ) {
 		phys_event_t pe;
 		physContact_t contact;
 		int bodyA = -1, bodyB = -1;
+		int ragA = -1, boneA = -1, ragB = -1, boneB = -1;
 		void *ud;
 		if ( !b3Shape_IsValid( ev->shapeIdA ) || !b3Shape_IsValid( ev->shapeIdB ) ) {
 			continue;
 		}
 		ud = b3Body_GetUserData( b3Shape_GetBody( ev->shapeIdA ) );
-		if ( ud ) {
-			bodyA = (int)(intptr_t)ud - 1;
-		}
+		box_decode_userdata( ud, &bodyA, &ragA, &boneA );
 		ud = b3Body_GetUserData( b3Shape_GetBody( ev->shapeIdB ) );
-		if ( ud ) {
-			bodyB = (int)(intptr_t)ud - 1;
-		}
+		box_decode_userdata( ud, &bodyB, &ragB, &boneB );
 		Com_Memset( &pe, 0, sizeof( pe ) );
 		pe.type = PHYS_EVENT_CONTACT_BEGIN;
 		pe.bodyA = bodyA;
 		pe.bodyB = bodyB;
+		pe.ragdoll = ragA >= 0 ? ragA : ragB;
+		pe.bone = ragA >= 0 ? boneA : boneB;
 		if ( bodyA >= 0 ) {
 			pe.matA = bx.bodies[bodyA].materialId;
 		}
@@ -2267,22 +2326,21 @@ void Phys_ProcessContactEvents_Impl( void ) {
 		b3ContactEndTouchEvent *ev = &events.endEvents[i];
 		phys_event_t pe;
 		int bodyA = -1, bodyB = -1;
+		int ragA = -1, boneA = -1, ragB = -1, boneB = -1;
 		void *ud;
 		if ( !b3Shape_IsValid( ev->shapeIdA ) || !b3Shape_IsValid( ev->shapeIdB ) ) {
 			continue;
 		}
 		ud = b3Body_GetUserData( b3Shape_GetBody( ev->shapeIdA ) );
-		if ( ud ) {
-			bodyA = (int)(intptr_t)ud - 1;
-		}
+		box_decode_userdata( ud, &bodyA, &ragA, &boneA );
 		ud = b3Body_GetUserData( b3Shape_GetBody( ev->shapeIdB ) );
-		if ( ud ) {
-			bodyB = (int)(intptr_t)ud - 1;
-		}
+		box_decode_userdata( ud, &bodyB, &ragB, &boneB );
 		Com_Memset( &pe, 0, sizeof( pe ) );
 		pe.type = PHYS_EVENT_CONTACT_END;
 		pe.bodyA = bodyA;
 		pe.bodyB = bodyB;
+		pe.ragdoll = ragA >= 0 ? ragA : ragB;
+		pe.bone = ragA >= 0 ? boneA : boneB;
 		PhysEvent_Post( &pe );
 	}
 

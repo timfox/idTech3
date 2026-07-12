@@ -103,12 +103,17 @@ phys_status
 
 ## Map entities
 
-See [EDITOR_BRIDGE.md](EDITOR_BRIDGE.md) — `misc_phys_box|sphere|static|sensor|slider|ragdoll`.
+See [EDITOR_BRIDGE.md](EDITOR_BRIDGE.md) — `misc_phys_box|sphere|static|sensor|slider|ragdoll|dmm`, plus `func_destructible`.
+
+- `misc_phys_ragdoll` → Soft Step + ProcAnim + motor (live Euphoria; `dead 1` for death pose; optional `model` `.rag`)
+- `misc_phys_dmm` / `func_destructible` → Soft Step DMM proxy + Voronoi fracture pattern
 
 ## Scripting
 
 - **QVM traps:** `G_PHYS_CREATEBODY` … `G_PHYS_RAYCAST`, `G_PHYS_PMOVE_CORRECT`, character traps
-- **Lua `Engine.Physics`:** bodies, sensors, constraints (incl. filter/parallel/cone), rayCast(+filter), convexSweep, overlapSphere, getContacts, attachShape, setFilter, joint spring/limits/steering, pollEvent, setFriction / setRestitution, validateReplay
+- **Lua `Engine.Physics`:** bodies, sensors, constraints (incl. filter/parallel/cone), rayCast(+filter), convexSweep, overlapSphere, getContacts, attachShape, setFilter, joint spring/limits/steering, pollEvent (incl. `ragdoll`/`bone`), setFriction / setRestitution, validateReplay
+- **Euphoria Lua:** `createRagdoll` (death), `spawnBoundAlive`, `forceAnimState`, `hitRagdoll`
+- **DMM Lua:** `createDmm`, `fractureDmm`, `dmmStatus`
 
 ## Ragdoll bind
 

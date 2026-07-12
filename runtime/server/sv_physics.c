@@ -11,6 +11,8 @@ Copyright (C) 2026 Gopex LLC. All rights reserved.
 #include "../physics/phys_props.h"
 #include "../physics/phys_middleware.h"
 #include "../physics/phys_character.h"
+#include "../physics/phys_ragdoll_bind.h"
+#include "../physics/phys_dmm.h"
 
 static cvar_t *sv_physSpawn;
 static cvar_t *sv_physEnabled;
@@ -103,15 +105,45 @@ static physBodyHandle_t SV_Physics_SpawnDef( const enginePhysMapDef_t *def ) {
 		break;
 	}
 	case ENGINE_PHYS_RAGDOLL: {
-		physRagdollDef_t rd;
-		Com_Memset( &rd, 0, sizeof( rd ) );
-		VectorCopy( def->origin, rd.rootPosition );
-		rd.scale = 1.0f;
-		rd.limbMass = 5.0f;
-		rd.jointStiffness = 0.8f;
-		rd.jointDamping = 0.4f;
-		rd.balanceForce = 100.0f;
-		Phys_CreateRagdoll( &rd );
+		physBoundRagdoll_t bound;
+		const char *model = def->model[0] ? def->model : NULL;
+		if ( !Phys_RagdollSpawnBoundEx( model, def->origin, &bound, def->ragdollDead ) ) {
+			return -1;
+		}
+		Com_Printf( "[physics] map misc_phys_ragdoll ragdoll=%d anim=%d motor=%d dead=%d\n",
+			bound.ragdoll, bound.anim, bound.motor, def->ragdollDead ? 1 : 0 );
+		body = 0;
+		break;
+	}
+	case ENGINE_PHYS_DMM: {
+		dmmObjectDef_t dd;
+		dmmFracturePattern_t pattern;
+		dmmObjectHandle_t h;
+		float edge;
+
+		Com_Memset( &dd, 0, sizeof( dd ) );
+		VectorCopy( def->origin, dd.position );
+		edge = def->halfExtents[0] * 2.0f;
+		if ( edge < 8.0f ) {
+			edge = 32.0f;
+		}
+		VectorSet( dd.dimensions, edge, edge, edge );
+		if ( def->halfExtents[0] > 0.0f && def->halfExtents[1] > 0.0f && def->halfExtents[2] > 0.0f ) {
+			dd.dimensions[0] = def->halfExtents[0] * 2.0f;
+			dd.dimensions[1] = def->halfExtents[1] * 2.0f;
+			dd.dimensions[2] = def->halfExtents[2] * 2.0f;
+		}
+		dd.material = DMM_CONCRETE;
+		dd.density = def->mass > 0.0f ? def->mass * 0.05f : 2.4f;
+		dd.gridResolution = 6;
+		dd.deformability = 1.0f;
+		dd.entityNum = -1;
+		Dmm_GenerateVoronoiPattern( def->origin, edge * 0.5f, 8, &pattern );
+		h = Dmm_CreateEnhanced( &dd, &pattern );
+		if ( h < 0 ) {
+			return -1;
+		}
+		Com_Printf( "[physics] map func_destructible/misc_phys_dmm handle=%d\n", h );
 		body = 0;
 		break;
 	}
@@ -179,8 +211,7 @@ void SV_Physics_SpawnMapEntities( void ) {
 	}
 
 	for ( i = 0; i < sv_physMapList.count; i++ ) {
-		if ( SV_Physics_SpawnDef( &sv_physMapList.defs[i] ) >= 0
-			|| sv_physMapList.defs[i].type == ENGINE_PHYS_RAGDOLL ) {
+		if ( SV_Physics_SpawnDef( &sv_physMapList.defs[i] ) >= 0 ) {
 			sv_physSpawnCount++;
 		}
 	}

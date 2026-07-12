@@ -59,6 +59,7 @@ void            PhysMotor_ApplyHit( physMotorHandle_t handle, const phys_hit_eve
 void            PhysMotor_GetStatus( physMotorHandle_t handle, phys_motor_status_t *out );
 void            PhysMotor_SetBonePhysicsWeight( physMotorHandle_t handle, int bone, float weight );
 int             PhysMotor_GetActiveCount( void );
+physMotorHandle_t PhysMotor_FindByRagdoll( physRagdollHandle_t ragdoll );
 
 #ifdef __cplusplus
 }

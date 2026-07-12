@@ -52,6 +52,8 @@ typedef struct phys_event_s {
 	int                 entityNum;
 	int                 bodyA;
 	int                 bodyB;
+	int                 ragdoll; /* Soft Step ragdoll handle when a bone was hit; -1 else */
+	int                 bone;    /* ragdoll bone index when ragdoll >= 0 */
 	physMaterialId_t    matA;
 	physMaterialId_t    matB;
 	vec3_t              point;

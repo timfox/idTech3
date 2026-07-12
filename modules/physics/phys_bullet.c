@@ -755,7 +755,8 @@ physRagdollHandle_t Phys_CreateRagdoll(const physRagdollDef_t *def) {
 		physRagdollHandle_t h = Phys_CreateRagdoll_Impl( &local );
 		if ( h >= 0 && phys_ragdoll_balance && phys_ragdoll_balance->integer ) {
 			vec3_t up;
-			VectorSet( up, local.rootPosition[0], local.rootPosition[1] + 48.0f, local.rootPosition[2] );
+			/* Quake Z-up: stand target above root */
+			VectorSet( up, local.rootPosition[0], local.rootPosition[1], local.rootPosition[2] + 48.0f );
 			Phys_RagdollSetBalance( h, qtrue, up );
 		}
 		return h;

@@ -175,8 +175,26 @@ Soft Step prismatic slider (motorized).
 */
 
 /*QUAKED misc_phys_ragdoll (0.8 0.3 0.3) (-16 -16 -16) (16 16 16)
-Soft Step procedural ragdoll at origin.
+Soft Step Euphoria-like ragdoll (ProcAnim + motor) at origin.
 -------- KEYS --------
 "origin" : root position
 "mass" : limb mass hint
+"model" : optional models/<name>.rag bind
+"dead" : 1 = death pose (default 0 = live balance)
+*/
+
+/*QUAKED misc_phys_dmm (0.7 0.5 0.2) (-24 -24 -24) (24 24 24)
+Soft Step DMM-like destructible proxy (stress + debris fracture).
+-------- KEYS --------
+"origin" : center
+"_size" : edge length (default 32)
+"mass" : density hint
+*/
+
+/*QUAKED func_destructible (0.7 0.5 0.2) (-24 -24 -24) (24 24 24)
+Alias for misc_phys_dmm (Soft Step rigid fracture companion).
+-------- KEYS --------
+"origin" : center
+"_size" : edge length
+"mass" : density hint
 */

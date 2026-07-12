@@ -159,12 +159,23 @@ rg -q 'Dmm_SpawnFragments' modules/physics/phys_bullet.h
 rg -q 'phys_spawn_dmm' modules/physics/phys_middleware.c
 rg -q 'd\.name, "dmm"' modules/physics/phys_solvers.c
 rg -q 'Dmm_UpdateAll' modules/physics/phys_dmm.c
+rg -q 'Phys_RagdollSpawnBoundEx' modules/physics/phys_ragdoll_bind.c
+rg -q 'ENGINE_PHYS_DMM' engine/core/engine_phys_map.h
+rg -q 'func_destructible' engine/core/engine_phys_map.c
+rg -q 'PhysMotor_FindByRagdoll' modules/physics/phys_motor.c
+rg -q 'ProcAnim_FindByRagdoll' modules/physics/phys_procedural_anim.c
+rg -q 'BOX_UD_RAG_FLAG' modules/physics/phys_box3d_impl.c
+rg -q 'spawnBoundAlive' runtime/game/g_lua_bindings.c
+rg -q 'createDmm' runtime/game/g_lua_bindings.c
+rg -q 'supportCenter' modules/physics/phys_procedural_anim.h
 rg -q 'phys_bspGridStep' modules/physics/phys_bullet.c
 rg -q 'misc_phys_box' docs/PHYSICS.md
 rg -q 'Euphoria' docs/PHYSICS.md
 rg -q 'DMM-like' docs/PHYSICS.md
-rg -q 'misc_phys_box' docs/EDITOR_BRIDGE.md
+rg -q 'misc_phys_dmm' docs/EDITOR_BRIDGE.md
+rg -q 'func_destructible' docs/EDITOR_BRIDGE.md
 rg -q 'misc_phys_box' examples/radiant/scripts/entities_idtech3_bridge.def
+rg -q 'misc_phys_dmm' examples/radiant/scripts/entities_idtech3_bridge.def
 
 echo "[test_physics] docs omit third-party physics product names..."
 if rg -i 'vphysics|havok|ipion|rubikon' docs/PHYSICS.md; then
