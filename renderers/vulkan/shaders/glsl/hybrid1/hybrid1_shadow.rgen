@@ -12,6 +12,11 @@ layout( set = 0, binding = 3 ) uniform sampler2D depthTex;
 layout( set = 0, binding = 4 ) uniform sampler2D normalTex;
 layout( set = 0, binding = 5 ) uniform sampler2D materialTex;
 
+/* Forward+ light SSBO (header + records); dummy zeros when Forward+ off. */
+layout( set = 0, binding = 11, std430 ) readonly buffer Hybrid1FpLights {
+	vec4 fp_light_data[];
+};
+
 vec3 hybrid1_softSunDir( vec3 L, vec2 uv, float frameSeed, float radiusDeg )
 {
 	if ( radiusDeg <= 1e-4 ) {
@@ -71,11 +76,35 @@ void main()
 	sunVis = shadowVis;
 
 	float outVis = sunVis;
-	if ( h1.outputSize.w > 0.5 && h1.dlightDir.w > 0.01 ) {
-		vec3 dRd = normalize( h1.dlightDir.xyz - worldPos );
-		shadowVis = 1.0;
-		traceRayEXT( topLevelAS, gl_RayFlagsOpaqueEXT, 0xFFu, 0u, 0u, 0u, ro, max( h1.params2.y, 1e-4 ), dRd, 1.0e5, 0 );
-		outVis = min( sunVis, mix( 1.0, shadowVis, clamp( h1.dlightDir.w, 0.0, 1.0 ) ) );
+	float dlightBudget = h1.outputSize.w;
+	if ( dlightBudget > 0.5 ) {
+		uint want = uint( clamp( dlightBudget, 1.0, 4.0 ) + 0.5 );
+		uint packed = uint( max( fp_light_data[0].x, 0.0 ) );
+		uint n = min( want, min( packed, 4u ) );
+		if ( n > 0u ) {
+			float dlVis = 1.0;
+			for ( uint i = 0u; i < n; i++ ) {
+				uint b0 = 2u + i * 4u;
+				vec3 lpos = fp_light_data[b0].xyz;
+				float rad = max( fp_light_data[b0].w, 1.0 );
+				vec3 toL = lpos - worldPos;
+				float dist = length( toL );
+				if ( dist < 1e-3 || dist > rad ) {
+					continue;
+				}
+				vec3 dRd = toL / dist;
+				shadowVis = 1.0;
+				traceRayEXT( topLevelAS, gl_RayFlagsOpaqueEXT, 0xFFu, 0u, 0u, 0u, ro, max( h1.params2.y, 1e-4 ), dRd, dist, 0 );
+				dlVis = min( dlVis, shadowVis );
+			}
+			outVis = min( sunVis, mix( 1.0, dlVis, 0.65 ) );
+		} else if ( h1.dlightDir.w > 0.01 ) {
+			/* Fallback: first refdef dlight packed into UBO when FP SSBO empty */
+			vec3 dRd = normalize( h1.dlightDir.xyz - worldPos );
+			shadowVis = 1.0;
+			traceRayEXT( topLevelAS, gl_RayFlagsOpaqueEXT, 0xFFu, 0u, 0u, 0u, ro, max( h1.params2.y, 1e-4 ), dRd, 1.0e5, 0 );
+			outVis = min( sunVis, mix( 1.0, shadowVis, clamp( h1.dlightDir.w, 0.0, 1.0 ) ) );
+		}
 	}
 
 	imageStore( shadowOut, ivec2( gl_LaunchIDEXT.xy ), vec4( outVis, shadowAngle, radiusDeg, 1.0 ) );

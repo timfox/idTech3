@@ -4264,7 +4264,7 @@ static void R_Register( void )
 	ri.Cvar_SetGroup( r_hybrid1_ggx, CVG_RENDERER );
 	r_hybrid1_iblMode = ri.Cvar_Get( "r_hybrid1_iblMode", "1", CVAR_ARCHIVE_ND );
 	ri.Cvar_CheckRange( r_hybrid1_iblMode, "0", "2", CV_INTEGER );
-	ri.Cvar_SetDescription( r_hybrid1_iblMode, "Hybrid1 IBL: 0=off path, 1=prefilter*(1-rough), 2=split-sum style weight." );
+	ri.Cvar_SetDescription( r_hybrid1_iblMode, "Hybrid1 IBL: 0=off path, 1=prefilter*(1-rough), 2=split-sum EnvBRDF LUT." );
 	ri.Cvar_SetGroup( r_hybrid1_iblMode, CVG_RENDERER );
 	r_hybrid1_diffuseDirect = ri.Cvar_Get( "r_hybrid1_diffuseDirect", "1", CVAR_ARCHIVE_ND );
 	ri.Cvar_CheckRange( r_hybrid1_diffuseDirect, "0", "1", CV_INTEGER );
@@ -4272,7 +4272,7 @@ static void R_Register( void )
 	ri.Cvar_SetGroup( r_hybrid1_diffuseDirect, CVG_RENDERER );
 	r_hybrid1_dlightShadows = ri.Cvar_Get( "r_hybrid1_dlightShadows", "0", CVAR_ARCHIVE_ND );
 	ri.Cvar_CheckRange( r_hybrid1_dlightShadows, "0", "4", CV_INTEGER );
-	ri.Cvar_SetDescription( r_hybrid1_dlightShadows, "Hybrid1: RT shadow toward first refdef dlight (0=off)." );
+	ri.Cvar_SetDescription( r_hybrid1_dlightShadows, "Hybrid1: RT shadows for top-N Forward+ dlights (0=off, 1-4). Falls back to first refdef dlight if FP SSBO empty." );
 	ri.Cvar_SetGroup( r_hybrid1_dlightShadows, CVG_RENDERER );
 	r_hybrid1_shadowStrength = ri.Cvar_Get( "r_hybrid1_shadowStrength", "0.85", CVAR_ARCHIVE_ND );
 	ri.Cvar_CheckRange( r_hybrid1_shadowStrength, "0", "1", CV_FLOAT );

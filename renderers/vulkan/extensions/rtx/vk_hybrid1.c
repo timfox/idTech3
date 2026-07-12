@@ -83,6 +83,8 @@ static struct {
 	VkBuffer            ubo;
 	VkDeviceMemory      ubo_memory;
 	void                *ubo_ptr;
+	VkBuffer            fp_dummy_ssbo;
+	VkDeviceMemory      fp_dummy_memory;
 	VkDescriptorSetLayout temporal_dsl;
 	VkPipelineLayout    temporal_pl;
 	VkPipeline          temporal_pipeline;
@@ -460,6 +462,59 @@ static void HYBRID1_WriteUboBinding( VkDescriptorSet set, uint32_t binding )
 	qvkUpdateDescriptorSets( vk.device, 1, &write, 0, NULL );
 }
 
+static void HYBRID1_EnsureFpDummySsbo( void )
+{
+	VkBufferCreateInfo bi;
+	VkMemoryRequirements req;
+	VkMemoryAllocateInfo ai;
+	float zeros[8];
+
+	if ( hybrid1.fp_dummy_ssbo != VK_NULL_HANDLE ) {
+		return;
+	}
+
+	Com_Memset( zeros, 0, sizeof( zeros ) );
+	Com_Memset( &bi, 0, sizeof( bi ) );
+	bi.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+	bi.size = sizeof( zeros );
+	bi.usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
+	VK_CHECK( qvkCreateBuffer( vk.device, &bi, NULL, &hybrid1.fp_dummy_ssbo ) );
+	qvkGetBufferMemoryRequirements( vk.device, hybrid1.fp_dummy_ssbo, &req );
+	Com_Memset( &ai, 0, sizeof( ai ) );
+	ai.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+	ai.allocationSize = req.size;
+	ai.memoryTypeIndex = vk_find_memory_type( vk.physical_device, req.memoryTypeBits,
+		VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT );
+	VK_CHECK( qvkAllocateMemory( vk.device, &ai, NULL, &hybrid1.fp_dummy_memory ) );
+	VK_CHECK( qvkBindBufferMemory( vk.device, hybrid1.fp_dummy_ssbo, hybrid1.fp_dummy_memory, 0 ) );
+	{
+		void *ptr = NULL;
+		VK_CHECK( qvkMapMemory( vk.device, hybrid1.fp_dummy_memory, 0, sizeof( zeros ), 0, &ptr ) );
+		Com_Memcpy( ptr, zeros, sizeof( zeros ) );
+		qvkUnmapMemory( vk.device, hybrid1.fp_dummy_memory );
+	}
+}
+
+static void HYBRID1_WriteSsboBinding( VkDescriptorSet set, uint32_t binding, VkBuffer buffer, VkDeviceSize range )
+{
+	VkDescriptorBufferInfo info;
+	VkWriteDescriptorSet write;
+
+	Com_Memset( &info, 0, sizeof( info ) );
+	info.buffer = buffer;
+	info.offset = 0;
+	info.range = range;
+
+	Com_Memset( &write, 0, sizeof( write ) );
+	write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+	write.dstSet = set;
+	write.dstBinding = binding;
+	write.descriptorCount = 1;
+	write.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+	write.pBufferInfo = &info;
+	qvkUpdateDescriptorSets( vk.device, 1, &write, 0, NULL );
+}
+
 static void HYBRID1_UpdateRtDescriptors( VkDescriptorSet set, VkImageView outputView )
 {
 	VkDescriptorImageInfo depthInfo;
@@ -468,11 +523,15 @@ static void HYBRID1_UpdateRtDescriptors( VkDescriptorSet set, VkImageView output
 	VkDescriptorImageInfo prefilterInfo;
 	VkDescriptorImageInfo irradianceInfo;
 	VkDescriptorImageInfo albedoInfo;
-	VkWriteDescriptorSet writes[6];
+	VkDescriptorImageInfo brdfInfo;
+	VkWriteDescriptorSet writes[7];
 	VkSampler nearest;
 	VkSampler linear;
 	VkImageView prefilterView;
 	VkImageView irradianceView;
+	VkImageView brdfView;
+	VkBuffer fpBuf;
+	VkDeviceSize fpRange;
 
 	nearest = HYBRID1_NearestSampler();
 	linear = HYBRID1_LinearSampler();
@@ -482,6 +541,11 @@ static void HYBRID1_UpdateRtDescriptors( VkDescriptorSet set, VkImageView output
 	}
 	if ( irradianceView == VK_NULL_HANDLE && tr.emptyCubemap ) {
 		irradianceView = tr.emptyCubemap->view;
+	}
+
+	brdfView = vk.brdflut_image_view;
+	if ( brdfView == VK_NULL_HANDLE && tr.whiteImage ) {
+		brdfView = tr.whiteImage->view;
 	}
 
 	Com_Memset( &depthInfo, 0, sizeof( depthInfo ) );
@@ -515,10 +579,22 @@ static void HYBRID1_UpdateRtDescriptors( VkDescriptorSet set, VkImageView output
 		( vk.deferred_gbuffer_material_view ? vk.deferred_gbuffer_material_view : depthInfo.imageView );
 	albedoInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 
+	Com_Memset( &brdfInfo, 0, sizeof( brdfInfo ) );
+	brdfInfo.sampler = linear;
+	brdfInfo.imageView = brdfView ? brdfView : depthInfo.imageView;
+	brdfInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+
 	vk_rtx_bind_tlas_descriptor( set );
 	vk_rtx_bind_world_albedo_ssbo( set, 9 );
 	HYBRID1_WriteImageBinding( set, 1, outputView, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, VK_IMAGE_LAYOUT_GENERAL );
 	HYBRID1_WriteUboBinding( set, 2 );
+
+	HYBRID1_EnsureFpDummySsbo();
+	fpBuf = ( vk.forward_plus.buffer != VK_NULL_HANDLE ) ? vk.forward_plus.buffer : hybrid1.fp_dummy_ssbo;
+	fpRange = ( vk.forward_plus.buffer != VK_NULL_HANDLE && vk.forward_plus.capacity_bytes > 0 )
+		? (VkDeviceSize)vk.forward_plus.capacity_bytes
+		: (VkDeviceSize)( sizeof( float ) * 8 );
+	HYBRID1_WriteSsboBinding( set, 11, fpBuf, fpRange );
 
 	Com_Memset( writes, 0, sizeof( writes ) );
 	writes[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
@@ -557,7 +633,13 @@ static void HYBRID1_UpdateRtDescriptors( VkDescriptorSet set, VkImageView output
 	writes[5].descriptorCount = 1;
 	writes[5].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
 	writes[5].pImageInfo = &albedoInfo;
-	qvkUpdateDescriptorSets( vk.device, 6, writes, 0, NULL );
+	writes[6].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+	writes[6].dstSet = set;
+	writes[6].dstBinding = 10;
+	writes[6].descriptorCount = 1;
+	writes[6].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+	writes[6].pImageInfo = &brdfInfo;
+	qvkUpdateDescriptorSets( vk.device, 7, writes, 0, NULL );
 }
 
 static void HYBRID1_RefreshRtDescriptors( void )
@@ -980,6 +1062,12 @@ void vk_hybrid1_shutdown( void )
 	if ( hybrid1.ubo_memory != VK_NULL_HANDLE ) {
 		qvkFreeMemory( vk.device, hybrid1.ubo_memory, NULL );
 	}
+	if ( hybrid1.fp_dummy_ssbo != VK_NULL_HANDLE ) {
+		qvkDestroyBuffer( vk.device, hybrid1.fp_dummy_ssbo, NULL );
+	}
+	if ( hybrid1.fp_dummy_memory != VK_NULL_HANDLE ) {
+		qvkFreeMemory( vk.device, hybrid1.fp_dummy_memory, NULL );
+	}
 	HYBRID1_DestroyAllImages();
 	HYBRID1_UnregisterCommands();
 	Com_Memset( &hybrid1, 0, sizeof( hybrid1 ) );
@@ -989,7 +1077,7 @@ void vk_hybrid1_init( void )
 {
 	VkPhysicalDeviceRayTracingPipelinePropertiesKHR rtProps;
 	VkPhysicalDeviceProperties2 props2;
-	VkDescriptorSetLayoutBinding rtBindings[10];
+	VkDescriptorSetLayoutBinding rtBindings[12];
 	VkDescriptorSetLayoutBinding temporalBindings[9];
 	VkDescriptorSetLayoutBinding atrousBindings[7];
 	VkDescriptorSetLayoutBinding compositeBindings[6];
@@ -1113,9 +1201,19 @@ void vk_hybrid1_init( void )
 	rtBindings[9].descriptorCount = 1;
 	rtBindings[9].stageFlags = VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR;
 
+	rtBindings[10].binding = 10;
+	rtBindings[10].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+	rtBindings[10].descriptorCount = 1;
+	rtBindings[10].stageFlags = VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR | VK_SHADER_STAGE_MISS_BIT_KHR;
+
+	rtBindings[11].binding = 11;
+	rtBindings[11].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+	rtBindings[11].descriptorCount = 1;
+	rtBindings[11].stageFlags = VK_SHADER_STAGE_RAYGEN_BIT_KHR;
+
 	Com_Memset( &dslci, 0, sizeof( dslci ) );
 	dslci.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-	dslci.bindingCount = 10;
+	dslci.bindingCount = 12;
 	dslci.pBindings = rtBindings;
 	VK_CHECK( qvkCreateDescriptorSetLayout( vk.device, &dslci, NULL, &hybrid1.rt_dsl ) );
 
@@ -1127,9 +1225,9 @@ void vk_hybrid1_init( void )
 	poolSizes[2].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
 	poolSizes[2].descriptorCount = 3;
 	poolSizes[3].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-	poolSizes[3].descriptorCount = 18;
+	poolSizes[3].descriptorCount = 21;
 	poolSizes[4].type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-	poolSizes[4].descriptorCount = 3;
+	poolSizes[4].descriptorCount = 6;
 	Com_Memset( &dpci, 0, sizeof( dpci ) );
 	dpci.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
 	dpci.maxSets = 3;

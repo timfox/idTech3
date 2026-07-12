@@ -76,9 +76,9 @@ r_rtxEntityTriCap 65536   // entity BLAS triangle budget (latched)
 | `r_hybrid1_sunRadius` | 0 | Soft sun angular radius (degrees; 0=hard) |
 | `r_hybrid1_contactHarden` | 1 | Shrink penumbra when N·L is high |
 | `r_hybrid1_ggx` | 1 | GGX/VNDF specular + Fresnel |
-| `r_hybrid1_iblMode` | 1 | 0=minimal, 1=prefilter, 2=split-sum style |
+| `r_hybrid1_iblMode` | 1 | 0=minimal, 1=prefilter, 2=split-sum EnvBRDF (`vk.brdflut`) |
 | `r_hybrid1_diffuseDirect` | 1 | Sun+irradiance on diffuse secondary hits |
-| `r_hybrid1_dlightShadows` | 0 | RT shadow toward first refdef dlight |
+| `r_hybrid1_dlightShadows` | 0 | Top-N Forward+ dlight RT shadows (1–4); UBO fallback if FP off |
 | `r_hybrid1_shadowStrength` | 0.85 | Composite shadow weight |
 | `r_hybrid1_specStrength` | 1.0 | Composite specular weight |
 | `r_hybrid1_diffuseStrength` | 1.0 | Composite diffuse × albedo weight |

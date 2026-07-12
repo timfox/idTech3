@@ -12,3 +12,9 @@ vec3 hybrid1_sampleIrradiance( samplerCube irradianceTex, vec3 dir )
 {
 	return texture( irradianceTex, normalize( dir ) ).rgb;
 }
+
+/* Split-sum EnvBRDF from engine BRDF LUT (NdotV, roughness). */
+vec2 hybrid1_sampleEnvBRDF( sampler2D brdfLut, float NdotV, float roughness )
+{
+	return texture( brdfLut, vec2( clamp( NdotV, 0.0, 1.0 ), clamp( 1.0 - roughness, 0.0, 1.0 ) ) ).rg;
+}

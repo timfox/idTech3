@@ -57,6 +57,39 @@ static cvar_t *r_bspStreamBake;
 static cvar_t *r_bspStreamVbo;
 static cvar_t *r_bspStreamLightmaps;
 static cvar_t *r_bspStreamLod;
+static qboolean s_cmds;
+
+static void BspStream_Status_f( void )
+{
+	int i;
+	int active = 0;
+	int faces = 0;
+	int lightmaps = 0;
+
+	for ( i = 0; i < BSP_STREAM_MAX_PATCHES; i++ ) {
+		if ( !s_stream.patches[i].active ) {
+			continue;
+		}
+		active++;
+		faces += s_stream.patches[i].numFaces;
+		lightmaps += s_stream.patches[i].numSectorLightmaps;
+	}
+	ri.Printf( PRINT_ALL,
+		"[bsp_stream] active=%d patches=%d/%d faces=%d lightmaps=%d lod=%d bake=%d vbo=%d\n",
+		( r_bspStream && r_bspStream->integer ) ? 1 : 0,
+		active, BSP_STREAM_MAX_PATCHES, faces, lightmaps,
+		r_bspStreamLod ? r_bspStreamLod->integer : 0,
+		( r_bspStreamBake && r_bspStreamBake->integer ) ? 1 : 0,
+		( r_bspStreamVbo && r_bspStreamVbo->integer ) ? 1 : 0 );
+	for ( i = 0; i < BSP_STREAM_MAX_PATCHES; i++ ) {
+		if ( !s_stream.patches[i].active ) {
+			continue;
+		}
+		ri.Printf( PRINT_ALL, "  sector %d,%d faces=%d lm=%d\n",
+			s_stream.patches[i].cellX, s_stream.patches[i].cellY,
+			s_stream.patches[i].numFaces, s_stream.patches[i].numSectorLightmaps );
+	}
+}
 
 static const uint32_t BSP_STREAM_HASH_MUL_X = 73856093u;
 static const uint32_t BSP_STREAM_HASH_MUL_Y = 19349663u;
@@ -934,6 +967,10 @@ void R_BspStream_Init( void ) {
 	ri.Cvar_SetDescription( r_bspStreamLod,
 		"Sector visual LOD: 0=full faces, 1=distance (far sectors keep 1 face), 2=aggressive (far=brush-top only)." );
 	Com_Memset( &s_stream, 0, sizeof( s_stream ) );
+	if ( !s_cmds ) {
+		ri.Cmd_AddCommand( "bsp_stream_status", BspStream_Status_f );
+		s_cmds = qtrue;
+	}
 	ri.Printf( PRINT_ALL, "[bsp_stream] visual sector overlay initialized (r_bspStream 1, bake %s, stream VBO %s, lightmaps %s, lod %d)\n",
 		( r_bspStreamBake && r_bspStreamBake->integer ) ? "on" : "off",
 		( r_bspStreamVbo && r_bspStreamVbo->integer ) ? "on" : "off",

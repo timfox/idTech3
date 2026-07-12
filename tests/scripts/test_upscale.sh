@@ -20,5 +20,7 @@ grep -q 'R_Upscale_ApplyRenderScaleDefaults' "$TR_INIT"
 grep -q 'R_Upscale_WantTemporal' "$FRAME_END"
 grep -q 'lutParams.zw' "$TAA"
 grep -q 'Halton' "$UPSCALE"
+test -f "$ROOT/examples/demo_game/mod/demo_upscale.cfg"
+grep -q 'r_upscale' "$ROOT/examples/demo_game/mod/demo_upscale.cfg"
 
 echo "test_upscale.sh: ok"

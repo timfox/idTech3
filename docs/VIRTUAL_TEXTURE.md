@@ -7,10 +7,13 @@ Chocolate **MegaTexture-class lite**: physical page atlas + CPU page table. Not 
 ```
 set r_vt 1
 vid_restart
+exec demo_vt.cfg   // loads vt/page0..2.png + dirt into the atlas
 vt_status
 vt_load textures/demo/dirt.png   // or any path; missing files get a procedural page
 vt_flush
 ```
+
+Demo pages ship under `examples/demo_game/bootstrap_media/vt/` (`page0.png` … `page2.png`) and pack into `idtech3_demo.pk3` when built with `demo`.
 
 ## Cvars / commands
 

@@ -47,5 +47,10 @@ rg -q 'openworld_smoke' "$SMOKE"
 echo "[test_openworld] demo cfg..."
 test -f examples/demo_game/mod/demo_openworld.cfg
 test -f examples/demo_game/mod/sprites/sector_0_0.ents
+rg -q 'bsp_stream_status' examples/demo_game/mod/demo_openworld.cfg
+rg -q 'r_bspStreamLod' examples/demo_game/mod/demo_openworld.cfg
+STREAM="$(idtech3_require_file renderers/vulkan/tr_bsp_stream.c src/renderers/vulkan/tr_bsp_stream.c)"
+rg -q 'bsp_stream_status' "$STREAM"
+rg -q 'BspStream_Status_f' "$STREAM"
 
 echo "[test_openworld] ok"

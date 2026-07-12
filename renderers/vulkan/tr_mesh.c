@@ -28,8 +28,8 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 =============
 R_CullMD3SurfaceMeshlets
 
-When r_meshlets 1, bake meshlets from MD3 surface triangles and frustum-cull.
-Returns qtrue if the surface should be drawn. Caps size to avoid huge stacks.
+When r_meshlets 1, use bake-at-load local meshlets (or bake on miss) and frustum-cull
+in world space. Returns qtrue if the surface should be drawn.
 =============
 */
 #define MESHLET_MD3_MAX_VERTS 512
@@ -41,7 +41,7 @@ static qboolean R_CullMD3SurfaceMeshlets( md3Surface_t *surface, int frame, cons
 	md3Triangle_t *tri;
 	vec3_t positions[MESHLET_MD3_MAX_VERTS];
 	int indexes[MESHLET_MD3_MAX_TRIS * 3];
-	meshlet_t meshlets[MESHLET_MAX_PER_SURFACE];
+	const meshlet_t *meshlets = NULL;
 	int visible[MESHLET_MAX_PER_SURFACE];
 	int numVerts, i, mcount, vcount;
 
@@ -52,31 +52,33 @@ static qboolean R_CullMD3SurfaceMeshlets( md3Surface_t *surface, int frame, cons
 		return qtrue;
 	}
 
-	xyz = (md3XyzNormal_t *)( (byte *)surface + surface->ofsXyzNormals ) + frame * surface->numVerts;
-	tri = (md3Triangle_t *)( (byte *)surface + surface->ofsTriangles );
-	numVerts = surface->numVerts;
-
-	for ( i = 0; i < numVerts; i++ ) {
-		vec3_t local, world;
-		local[0] = xyz[i].xyz[0] * MD3_XYZ_SCALE;
-		local[1] = xyz[i].xyz[1] * MD3_XYZ_SCALE;
-		local[2] = xyz[i].xyz[2] * MD3_XYZ_SCALE;
-		VectorRotate( local, (const vec3_t *)entityAxis, world );
-		VectorAdd( world, entityOrigin, positions[i] );
+	mcount = R_Meshlets_Lookup( surface, &meshlets );
+	if ( mcount <= 0 || !meshlets ) {
+		/* Miss: bake local (frame 0 bind pose) into cache */
+		xyz = (md3XyzNormal_t *)( (byte *)surface + surface->ofsXyzNormals );
+		tri = (md3Triangle_t *)( (byte *)surface + surface->ofsTriangles );
+		numVerts = surface->numVerts;
+		for ( i = 0; i < numVerts; i++ ) {
+			positions[i][0] = xyz[i].xyz[0] * MD3_XYZ_SCALE;
+			positions[i][1] = xyz[i].xyz[1] * MD3_XYZ_SCALE;
+			positions[i][2] = xyz[i].xyz[2] * MD3_XYZ_SCALE;
+		}
+		for ( i = 0; i < surface->numTriangles; i++ ) {
+			indexes[i * 3 + 0] = tri[i].indexes[0];
+			indexes[i * 3 + 1] = tri[i].indexes[1];
+			indexes[i * 3 + 2] = tri[i].indexes[2];
+		}
+		mcount = R_Meshlets_CacheLocal( surface, (const vec3_t *)positions, numVerts,
+			indexes, surface->numTriangles * 3 );
+		mcount = R_Meshlets_Lookup( surface, &meshlets );
+		if ( mcount <= 0 || !meshlets ) {
+			return qtrue;
+		}
 	}
-	for ( i = 0; i < surface->numTriangles; i++ ) {
-		indexes[i * 3 + 0] = LittleLong( tri[i].indexes[0] );
-		indexes[i * 3 + 1] = LittleLong( tri[i].indexes[1] );
-		indexes[i * 3 + 2] = LittleLong( tri[i].indexes[2] );
-	}
 
-	mcount = R_Meshlets_Bake( (const vec3_t *)positions, numVerts, indexes, surface->numTriangles * 3,
-		meshlets, MESHLET_MAX_PER_SURFACE );
-	if ( mcount <= 0 ) {
-		return qtrue;
-	}
-
-	vcount = R_Meshlets_CullViewFrustum( meshlets, mcount, visible, MESHLET_MAX_PER_SURFACE );
+	(void)frame;
+	vcount = R_Meshlets_CullViewFrustumXform( meshlets, mcount, entityAxis, entityOrigin,
+		visible, MESHLET_MAX_PER_SURFACE );
 	return ( vcount > 0 ) ? qtrue : qfalse;
 }
 

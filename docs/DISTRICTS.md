@@ -89,8 +89,12 @@ Shipped in `idtech3_demo.pk3` when built with `demo`: `exec demo_districts.cfg` 
 
 When **`r_openWorld 1`**, `district_load_full` calls **`WorldOpen_LoadSector`** for each cell in the district grid (collision + nav + scatter per cvars). When **`r_openWorld 0`**, full district load uses legacy **`CM_Stream_LoadSector`** (collision prefetch only). See [OPEN_WORLD.md](OPEN_WORLD.md#limitations).
 
+### Visual LOD + stream status
+
+With **`r_bspStream 1`**, district/open-world sector merges draw planar faces, patches, or brush-top quads. **`r_bspStreamLod 1|2`** distance-clamps face counts for far sectors (0 = full). Console **`bsp_stream_status`** reports active patches, face totals, lightmap tiles, and LOD mode. District unload clears WorldOpen/CM sector residency for that district’s grid.
+
 ## Related docs
 
-- [OPEN_WORLD.md](OPEN_WORLD.md) — view-driven sector streaming (BSP prefetch, per-chunk nav, billboard scatter)
+- [OPEN_WORLD.md](OPEN_WORLD.md) — view-driven sector streaming (BSP prefetch, per-chunk nav, billboard scatter; `r_bspStreamLod`, `bsp_stream_status`)
 - [FREEUSD.md](FREEUSD.md) — mesh import and `usd_*` tools
 - [COMPATIBILITY.md](COMPATIBILITY.md) — retail mod loading (unchanged)

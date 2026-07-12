@@ -24,6 +24,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "tr_local.h"
 #include "../common/tr_model_freeusd.h"
 #include "tr_material_paint.h"
+#include "vk_meshlets.h"
 
 #define	LL(x) x=LittleLong(x)
 
@@ -625,6 +626,28 @@ static qboolean R_LoadMD3( model_t *mod, int lod, void *buffer, int fileSize, co
 			xyz->xyz[2] = LittleShort( xyz->xyz[2] );
 
 			xyz->normal = LittleShort( xyz->normal );
+		}
+
+		/* Bake local meshlets at load for CPU cull cache (r_meshlets). */
+		if ( R_Meshlets_Active() && surf->numVerts > 0 && surf->numVerts <= 512 &&
+			surf->numTriangles > 0 && surf->numTriangles <= 1024 ) {
+			vec3_t positions[512];
+			int indexes[1024 * 3];
+			md3XyzNormal_t *xyz0 = (md3XyzNormal_t *)( (byte *)surf + surf->ofsXyzNormals );
+			md3Triangle_t *tri0 = (md3Triangle_t *)( (byte *)surf + surf->ofsTriangles );
+			int vi, ti;
+			for ( vi = 0; vi < surf->numVerts; vi++ ) {
+				positions[vi][0] = xyz0[vi].xyz[0] * MD3_XYZ_SCALE;
+				positions[vi][1] = xyz0[vi].xyz[1] * MD3_XYZ_SCALE;
+				positions[vi][2] = xyz0[vi].xyz[2] * MD3_XYZ_SCALE;
+			}
+			for ( ti = 0; ti < surf->numTriangles; ti++ ) {
+				indexes[ti * 3 + 0] = tri0[ti].indexes[0];
+				indexes[ti * 3 + 1] = tri0[ti].indexes[1];
+				indexes[ti * 3 + 2] = tri0[ti].indexes[2];
+			}
+			R_Meshlets_CacheLocal( surf, (const vec3_t *)positions, surf->numVerts,
+				indexes, surf->numTriangles * 3 );
 		}
 
 		// find the next surface
