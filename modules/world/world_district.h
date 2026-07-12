@@ -47,10 +47,12 @@ typedef struct worldDistrict_s {
 } worldDistrict_t;
 
 typedef qhandle_t ( *worldDistrictRegisterModel_f )( const char *path );
+typedef void ( *worldDistrictOnUnload_f )( int index, const worldDistrict_t *d );
 
 void     WorldDistrict_Init( void );
 void     WorldDistrict_Shutdown( void );
 void     WorldDistrict_SetRegisterModel( worldDistrictRegisterModel_f fn );
+void     WorldDistrict_SetOnUnload( worldDistrictOnUnload_f fn );
 
 qboolean WorldDistrict_LoadManifest( const char *usdaPath );
 void     WorldDistrict_Import( int count, const worldDistrict_t *src, const char *path );

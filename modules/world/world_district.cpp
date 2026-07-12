@@ -17,6 +17,7 @@ static worldDistrict_t districts[WORLD_DISTRICT_MAX];
 static int districtCount;
 static char manifestPath[WORLD_DISTRICT_PATH_MAX];
 static worldDistrictRegisterModel_f registerModelFn;
+static worldDistrictOnUnload_f onUnloadFn;
 
 static cvar_t *r_district;
 static cvar_t *r_districtProxy;
@@ -74,6 +75,7 @@ void WorldDistrict_Init( void ) {
 	districtCount = 0;
 	manifestPath[0] = '\0';
 	registerModelFn = NULL;
+	onUnloadFn = NULL;
 	Com_Memset( districts, 0, sizeof( districts ) );
 	Com_Printf( "[world_district] districts + proxy mesh layer initialized\n" );
 }
@@ -84,6 +86,10 @@ void WorldDistrict_Shutdown( void ) {
 
 void WorldDistrict_SetRegisterModel( worldDistrictRegisterModel_f fn ) {
 	registerModelFn = fn;
+}
+
+void WorldDistrict_SetOnUnload( worldDistrictOnUnload_f fn ) {
+	onUnloadFn = fn;
 }
 
 void WorldDistrict_Clear( void ) {
@@ -371,6 +377,9 @@ void WorldDistrict_Unload( int index ) {
 	d->fullModel = 0;
 	Com_Printf( "[world_district] unloaded %s (sectors %d,%d..%d,%d cleared)\n",
 		d->name, d->sectorX0, d->sectorY0, d->sectorX1, d->sectorY1 );
+	if ( onUnloadFn ) {
+		onUnloadFn( index, d );
+	}
 }
 
 void WorldDistrict_UpdateView( const vec3_t viewOrigin, float loadRadius ) {

@@ -91,7 +91,7 @@ When **`r_openWorld 1`**, `district_load_full` calls **`WorldOpen_LoadSector`** 
 
 ### Visual LOD + stream status
 
-With **`r_bspStream 1`**, district/open-world sector merges draw planar faces, patches, or brush-top quads. **`r_bspStreamLod 1|2`** distance-clamps face counts for far sectors (0 = full). Console **`bsp_stream_status`** reports active patches, face totals, lightmap tiles, and LOD mode. District unload clears WorldOpen/CM sector residency for that district’s grid.
+With **`r_bspStream 1`**, district/open-world sector merges draw planar faces, patches, or brush-top quads. **`r_bspStreamLod 1|2`** distance-clamps face counts for far sectors (0 = full). Console **`bsp_stream_status`** reports active patches, face totals, lightmap tiles, and LOD mode. District unload clears WorldOpen/CM sector residency for that district’s grid and immediately **unmerges** matching visual BSP stream sectors via `BspStreamUnmergeSector`.
 
 ## Related docs
 

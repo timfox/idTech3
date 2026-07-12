@@ -172,6 +172,20 @@ static qhandle_t CL_District_RegisterModel( const char *path ) {
 	return re.RegisterModel( path );
 }
 
+static void CL_District_OnUnload( int index, const worldDistrict_t *d ) {
+	int x, y;
+
+	(void)index;
+	if ( !d || !re.BspStreamUnmergeSector ) {
+		return;
+	}
+	for ( y = d->sectorY0; y <= d->sectorY1; y++ ) {
+		for ( x = d->sectorX0; x <= d->sectorX1; x++ ) {
+			re.BspStreamUnmergeSector( x, y );
+		}
+	}
+}
+
 static void CL_District_LoadManifest_f( void ) {
 	worldDistrict_t parsed[WORLD_DISTRICT_MAX];
 	int count = 0;
@@ -256,6 +270,7 @@ static void CL_District_Unload_f( void ) {
 extern "C" void CL_District_Init( void ) {
 	WorldDistrict_Init();
 	WorldDistrict_SetRegisterModel( CL_District_RegisterModel );
+	WorldDistrict_SetOnUnload( CL_District_OnUnload );
 
 	Cmd_AddCommand( "district_load", CL_District_LoadManifest_f );
 	Cmd_AddCommand( "district_list", CL_District_List_f );
