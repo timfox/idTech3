@@ -251,6 +251,21 @@ static qboolean R_FontLcdEnabled( void ) {
 	return ri.Cvar_VariableIntegerValue( "r_fontLcd" ) > 0 ? qtrue : qfalse;
 }
 
+static int R_FontAtlasSize( void ) {
+	int requested = ri.Cvar_VariableIntegerValue( "r_fontAtlasSize" );
+
+	if ( requested <= 256 ) {
+		return 256;
+	}
+	if ( requested <= 512 ) {
+		return 512;
+	}
+	if ( requested <= 1024 ) {
+		return 1024;
+	}
+	return 2048;
+}
+
 static void R_FontSetupFaceSize( FT_Face face, int pointSize ) {
 	int dpi = R_FontDeviceDpi();
 
@@ -302,6 +317,7 @@ static imgFlags_t R_FontAtlasFlags( void ) {
 static void R_FontRuntimeRegKey( char *dst, int dstSize, const char *ttfPath, int pointSize ) {
 	unsigned long h = Com_GenerateHashValue( ttfPath, 256 );
 	int dpi = R_FontDeviceDpi();
+	int atlasSize = R_FontAtlasSize();
 	int hint = ri.Cvar_VariableIntegerValue( "r_fontHint" );
 	int mip = ri.Cvar_VariableIntegerValue( "r_fontMipmap" ) > 0 ? 1 : 0;
 	int vhint = R_FontVerticalHintEnabled() ? 1 : 0;
@@ -312,12 +328,14 @@ static void R_FontRuntimeRegKey( char *dst, int dstSize, const char *ttfPath, in
 	if ( hint > 2 ) {
 		hint = 2;
 	}
-	Com_sprintf( dst, dstSize, "fonts/_ftr_%lu_%i_d%i_h%i_m%i_v%i_l%i", h, pointSize, dpi, hint, mip, vhint, lcd );
+	Com_sprintf( dst, dstSize, "fonts/_ftr_%lu_%i_d%i_a%i_h%i_m%i_v%i_l%i",
+		h, pointSize, dpi, atlasSize, hint, mip, vhint, lcd );
 }
 
 static void R_FontAtlasImageName( char *dst, int dstSize, const char *ttfPath, int pageIndex, int pointSize ) {
 	unsigned long h = Com_GenerateHashValue( ttfPath, 256 );
 	int dpi = R_FontDeviceDpi();
+	int atlasSize = R_FontAtlasSize();
 	int hint = ri.Cvar_VariableIntegerValue( "r_fontHint" );
 	int mip = ri.Cvar_VariableIntegerValue( "r_fontMipmap" ) > 0 ? 1 : 0;
 	int vhint = R_FontVerticalHintEnabled() ? 1 : 0;
@@ -328,7 +346,8 @@ static void R_FontAtlasImageName( char *dst, int dstSize, const char *ttfPath, i
 	if ( hint > 2 ) {
 		hint = 2;
 	}
-	Com_sprintf( dst, dstSize, "fonts/_ftg_%lu_%i_%i_d%i_h%i_m%i_v%i_l%i.tga", h, pointSize, pageIndex, dpi, hint, mip, vhint, lcd );
+	Com_sprintf( dst, dstSize, "fonts/_ftg_%lu_%i_%i_d%i_a%i_h%i_m%i_v%i_l%i.tga",
+		h, pointSize, pageIndex, dpi, atlasSize, hint, mip, vhint, lcd );
 }
 
 static void R_GetGlyphInfo(FT_GlyphSlot glyph, int *left, int *right, int *width, int *top, int *bottom, int *height, int *pitch) {
@@ -449,6 +468,8 @@ static void WriteTGA (const char *filename, byte *data, int width, int height) {
 static glyphInfo_t *RE_ConstructGlyphInfo( unsigned char *imageOut, int *xOut, int *yOut, int *maxHeight, FT_Face face, const unsigned char c, qboolean calcHeight, qboolean lcdAtlas ) {
 	int i, j;
 	static glyphInfo_t glyph;
+	const int atlasSize = R_FontAtlasSize();
+	const int atlasEdge = atlasSize - 1;
 	unsigned char *src, *dst;
 	float scaled_width, scaled_height;
 	FT_Bitmap *bitmap = NULL;
@@ -500,7 +521,7 @@ static glyphInfo_t *RE_ConstructGlyphInfo( unsigned char *imageOut, int *xOut, i
 
 		/* Glyph larger than the atlas cell cannot be packed — skip without
 		 * signaling a page flush, or RegisterFont will create pages forever. */
-		if ( scaled_width >= 255 || *maxHeight >= 255 ) {
+		if ( scaled_width >= atlasEdge || *maxHeight >= atlasEdge ) {
 			if ( ownedBitmap ) {
 				ri.Free( bitmap->buffer );
 				ri.Free( bitmap );
@@ -509,12 +530,12 @@ static glyphInfo_t *RE_ConstructGlyphInfo( unsigned char *imageOut, int *xOut, i
 		}
 
 		// we need to make sure we fit
-		if (*xOut + scaled_width + 1 >= 255) {
+		if (*xOut + scaled_width + 1 >= atlasEdge) {
 			*xOut = 0;
 			*yOut += *maxHeight + 1;
 		}
 
-		if (*yOut + *maxHeight + 1 >= 255) {
+		if (*yOut + *maxHeight + 1 >= atlasEdge) {
 			/* Empty page still too small: skip glyph (do not request another page). */
 			if ( *xOut == 0 && *yOut == 0 ) {
 				if ( ownedBitmap ) {
@@ -535,10 +556,10 @@ static glyphInfo_t *RE_ConstructGlyphInfo( unsigned char *imageOut, int *xOut, i
 
 		src = bitmap->buffer;
 		if ( lcdAtlas && bitmap->pixel_mode == FT_PIXEL_MODE_LCD ) {
-			dst = imageOut + ( ( *yOut * 256 ) + *xOut ) * 4;
+			dst = imageOut + ( ( *yOut * atlasSize ) + *xOut ) * 4;
 			for ( i = 0; i < glyph.height; i++ ) {
 				unsigned char *rowSrc = src + i * bitmap->pitch;
-				unsigned char *rowDst = dst + i * ( 256 * 4 );
+				unsigned char *rowDst = dst + i * ( atlasSize * 4 );
 				/* glyph.pitch is logical pixels; FT LCD row is 3 bytes each. */
 				for ( j = 0; j < glyph.pitch; j++ ) {
 					unsigned char r = rowSrc[j * 3 + 0];
@@ -558,7 +579,7 @@ static glyphInfo_t *RE_ConstructGlyphInfo( unsigned char *imageOut, int *xOut, i
 				}
 			}
 		} else {
-			dst = imageOut + ( *yOut * 256 ) + *xOut;
+			dst = imageOut + ( *yOut * atlasSize ) + *xOut;
 
 			if (bitmap->pixel_mode == ft_pixel_mode_mono) {
 				for (i = 0; i < glyph.height; i++) {
@@ -582,13 +603,13 @@ static glyphInfo_t *RE_ConstructGlyphInfo( unsigned char *imageOut, int *xOut, i
 					}
 
 					src += glyph.pitch;
-					dst += 256;
+					dst += atlasSize;
 				}
 			} else {
 				for (i = 0; i < glyph.height; i++) {
 					Com_Memcpy(dst, src, glyph.pitch);
 					src += glyph.pitch;
-					dst += 256;
+					dst += atlasSize;
 				}
 			}
 		}
@@ -598,10 +619,10 @@ static glyphInfo_t *RE_ConstructGlyphInfo( unsigned char *imageOut, int *xOut, i
 
 		glyph.imageHeight = scaled_height;
 		glyph.imageWidth = scaled_width;
-		glyph.s = (float)*xOut / 256;
-		glyph.t = (float)*yOut / 256;
-		glyph.s2 = glyph.s + (float)scaled_width / 256;
-		glyph.t2 = glyph.t + (float)scaled_height / 256;
+		glyph.s = (float)*xOut / (float)atlasSize;
+		glyph.t = (float)*yOut / (float)atlasSize;
+		glyph.s2 = glyph.s + (float)scaled_width / (float)atlasSize;
+		glyph.t2 = glyph.t + (float)scaled_height / (float)atlasSize;
 
 		*xOut += scaled_width + 1;
 
@@ -857,7 +878,8 @@ try_freetype:
 
 	{
 		const qboolean lcdAtlas = R_FontLcdEnabled();
-		const int atlasBytes = lcdAtlas ? ( 256 * 256 * 4 ) : ( 256 * 256 );
+		const int atlasSize = R_FontAtlasSize();
+		const int atlasBytes = lcdAtlas ? ( atlasSize * atlasSize * 4 ) : ( atlasSize * atlasSize );
 
 		out = ri.Malloc( atlasBytes );
 		if ( out == NULL ) {
@@ -868,6 +890,8 @@ try_freetype:
 		Com_Memset(out, 0, atlasBytes);
 
 	maxHeight = 0;
+	xOut = 0;
+	yOut = 0;
 	for (i = GLYPH_START; i <= GLYPH_END; i++) {
 		RE_ConstructGlyphInfo(out, &xOut, &yOut, &maxHeight, face, (unsigned char)i, qtrue, lcdAtlas);
 	}
@@ -894,7 +918,7 @@ try_freetype:
 				R_FontReleaseSlotFace( regSlot );
 				return;
 			}
-			scaledSize = 256 * 256;
+			scaledSize = atlasSize * atlasSize;
 			newSize = scaledSize * 4;
 			imageBuff = ri.Malloc(newSize);
 			if ( lcdAtlas ) {
@@ -923,13 +947,13 @@ try_freetype:
 			R_FontAtlasImageName( name, sizeof( name ), resolvedFontName, imageNumber, pointSize );
 			imageNumber++;
 			if (r_saveFontData->integer) {
-				WriteTGA(name, imageBuff, 256, 256);
+				WriteTGA(name, imageBuff, atlasSize, atlasSize);
 			}
 
 	#if defined(RENDERER_VULKAN)
-		image = R_CreateImage(name, NULL, imageBuff, 256, 256, R_FontAtlasFlags(), 0, 0);
+		image = R_CreateImage(name, NULL, imageBuff, atlasSize, atlasSize, R_FontAtlasFlags(), 0, 0);
 	#else
-		image = R_CreateImage(name, NULL, imageBuff, 256, 256, R_FontAtlasFlags());
+		image = R_CreateImage(name, NULL, imageBuff, atlasSize, atlasSize, R_FontAtlasFlags());
 	#endif
 			h = RE_RegisterShaderFromImage(name, LIGHTMAP_2D, image, qfalse);
 			for (j = lastStart; j < i; j++) {
@@ -993,8 +1017,9 @@ void R_InitFreeType(void) {
 #ifdef FT_LCD_FILTER_H
 		FT_Library_SetLcdFilter( ftLibrary, FT_LCD_FILTER_DEFAULT );
 #endif
-		ri.Printf( PRINT_ALL, "FreeType: TrueType raster dpi=%i (r_fontDpi), hint=%i (r_fontHint), atlas mipmaps=%s (r_fontMipmap), verticalHint=%i (r_fontVerticalHint), lcd=%i (r_fontLcd); Rougier HAL-00821839 / HAL-05430837 (kerning); apply with reloadTtf or vid_restart\n",
+		ri.Printf( PRINT_ALL, "FreeType: TrueType raster dpi=%i (r_fontDpi), hint=%i (r_fontHint), atlas=%ix%i (r_fontAtlasSize), atlas mipmaps=%s (r_fontMipmap), verticalHint=%i (r_fontVerticalHint), lcd=%i (r_fontLcd); Rougier HAL-00821839 / HAL-05430837 (kerning); apply with reloadTtf or vid_restart\n",
 			R_FontDeviceDpi(), ri.Cvar_VariableIntegerValue( "r_fontHint" ),
+			R_FontAtlasSize(), R_FontAtlasSize(),
 			ri.Cvar_VariableIntegerValue( "r_fontMipmap" ) > 0 ? "on" : "off",
 			ri.Cvar_VariableIntegerValue( "r_fontVerticalHint" ),
 			ri.Cvar_VariableIntegerValue( "r_fontLcd" ) );

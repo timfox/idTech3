@@ -28,6 +28,7 @@ Usage from Lua:
 
 #include "q_shared.h"
 #include "qcommon.h"
+#include "lua_compat.h"
 #include "g_lua_bindings.h"
 
 #ifdef USE_LUA
@@ -148,7 +149,7 @@ static qboolean Lua_GetVec3Field( lua_State *L, int index, const char *field, ve
 		return qfalse;
 	}
 
-	absIndex = lua_absindex( L, index );
+	absIndex = ID3_LUA_ABSINDEX( L, index );
 	lua_getfield( L, absIndex, field );
 	if ( !lua_istable( L, -1 ) ) {
 		lua_pop( L, 1 );
@@ -172,7 +173,7 @@ static qboolean Lua_GetVec3Field( lua_State *L, int index, const char *field, ve
 static float Lua_GetNumberField( lua_State *L, int index, const char *field, float defaultValue )
 {
 	float value;
-	int absIndex = lua_absindex( L, index );
+	int absIndex = ID3_LUA_ABSINDEX( L, index );
 
 	lua_getfield( L, absIndex, field );
 	value = (float)luaL_optnumber( L, -1, defaultValue );
@@ -183,7 +184,7 @@ static float Lua_GetNumberField( lua_State *L, int index, const char *field, flo
 static int Lua_GetIntegerField( lua_State *L, int index, const char *field, int defaultValue )
 {
 	int value;
-	int absIndex = lua_absindex( L, index );
+	int absIndex = ID3_LUA_ABSINDEX( L, index );
 
 	lua_getfield( L, absIndex, field );
 	value = (int)luaL_optinteger( L, -1, defaultValue );
@@ -194,7 +195,7 @@ static int Lua_GetIntegerField( lua_State *L, int index, const char *field, int 
 static qboolean Lua_GetBooleanField( lua_State *L, int index, const char *field, qboolean defaultValue )
 {
 	qboolean value = defaultValue;
-	int absIndex = lua_absindex( L, index );
+	int absIndex = ID3_LUA_ABSINDEX( L, index );
 
 	lua_getfield( L, absIndex, field );
 	if ( !lua_isnoneornil( L, -1 ) ) {
@@ -245,7 +246,7 @@ static void Lua_ParsePhysBodyDefTable( lua_State *L, int index, physBodyDef_t *d
 	const char *typeName;
 	int absIndex;
 
-	absIndex = lua_absindex( L, index );
+	absIndex = ID3_LUA_ABSINDEX( L, index );
 	shapeName = NULL;
 	typeName = NULL;
 
@@ -317,7 +318,7 @@ static void Lua_ParsePhysBodyDefTable( lua_State *L, int index, physBodyDef_t *d
 
 	lua_getfield( L, absIndex, "hullPoints" );
 	if ( lua_istable( L, -1 ) ) {
-		size_t rawCount = lua_rawlen( L, -1 );
+		size_t rawCount = ID3_LUA_RAWLEN( L, -1 );
 		int floatCount = (int)rawCount;
 		int pointCount = floatCount / 3;
 		float *pts;

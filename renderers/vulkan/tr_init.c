@@ -2957,6 +2957,12 @@ static void R_Register( void )
 	ri.Cvar_Get( "r_fontSize", "16", CVAR_ARCHIVE );
 	ri.Cvar_SetDescription( ri.Cvar_Get( "r_fontSize", "16", CVAR_ARCHIVE ), "Point size for custom fonts loaded via r_font / r_consoleFont." );
 	{
+		cvar_t *fa = ri.Cvar_Get( "r_fontAtlasSize", "512", CVAR_ARCHIVE );
+		ri.Cvar_CheckRange( fa, "256", "2048", CV_INTEGER );
+		ri.Cvar_SetDescription( fa,
+			"FreeType atlas page size for TrueType glyphs. Larger pages reduce fragmentation for high-DPI and LCD glyphs. Values snap to 256, 512, 1024, or 2048. Apply with reloadTtf or vid_restart." );
+	}
+	{
 		cvar_t *fd = ri.Cvar_Get( "r_fontDpi", "96", CVAR_ARCHIVE );
 		ri.Cvar_CheckRange( fd, "72", "144", CV_INTEGER );
 		ri.Cvar_SetDescription( fd,
@@ -2972,7 +2978,7 @@ static void R_Register( void )
 		cvar_t *fm = ri.Cvar_Get( "r_fontMipmap", "1", CVAR_ARCHIVE );
 		ri.Cvar_CheckRange( fm, "0", "1", CV_INTEGER );
 		ri.Cvar_SetDescription( fm,
-			"Build mipmaps for FreeType TrueType atlas pages (256x256). Helps minified UI text; 0 = single mip (legacy). Apply with reloadTtf or vid_restart." );
+			"Build mipmaps for FreeType TrueType atlas pages. Helps minified UI text; 0 = single mip (legacy). Apply with reloadTtf or vid_restart." );
 	}
 	{
 		cvar_t *fv = ri.Cvar_Get( "r_fontVerticalHint", "0", CVAR_ARCHIVE );

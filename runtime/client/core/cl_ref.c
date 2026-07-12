@@ -124,7 +124,7 @@ static void	*rendererLib;
 =================
 CL_ReloadTtf_f
 
-Rebuild FreeType HUD/console atlases after r_fontDpi / r_fontHint / r_fontMipmap
+Rebuild FreeType HUD/console atlases after r_fontAtlasSize / r_fontDpi / r_fontHint / r_fontMipmap
 (or r_font / r_fontSize) changes without a full client restart. Safer than relying
 on renderer registration cache alone; use vid_restart if anything looks stale.
 =================
