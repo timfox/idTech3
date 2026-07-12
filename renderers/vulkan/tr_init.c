@@ -122,6 +122,7 @@ cvar_t	*r_sdfScreenAa;
 cvar_t	*r_sdfOutline;
 cvar_t	*r_sdfOutlineWidth;
 cvar_t	*r_fontGamma;
+cvar_t	*r_fontLcdWeight;
 
 static cvar_t *r_ignorehwgamma;
 
@@ -2991,6 +2992,12 @@ static void R_Register( void )
 		ri.Cvar_CheckRange( fl, "0", "1", CV_INTEGER );
 		ri.Cvar_SetDescription( fl,
 			"Rougier HAL-00821839 LCD/subpixel FreeType atlas (FT_RENDER_MODE_LCD). Best with r_fontSubpixelPos 1. Apply with reloadTtf." );
+	}
+	{
+		r_fontLcdWeight = ri.Cvar_Get( "r_fontLcdWeight", "0.35", CVAR_ARCHIVE );
+		ri.Cvar_CheckRange( r_fontLcdWeight, "0.0", "1.0", CV_FLOAT );
+		ri.Cvar_SetDescription( r_fontLcdWeight,
+			"Blend strength for RGB LCD glyph coverage in the Vulkan subpixel text shader. 0 = monochrome alpha, 1 = full per-channel LCD coverage. Best when r_fontLcd 1 and r_fontSubpixelPos 1." );
 	}
 	{
 		cvar_t *fp = ri.Cvar_Get( "r_fontSubpixelPos", "0", CVAR_ARCHIVE );

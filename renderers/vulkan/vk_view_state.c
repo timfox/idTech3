@@ -488,7 +488,11 @@ void vk_update_mvp( const float *m )
 		} else {
 			push_constants.reserved[2] = 1.0f;
 		}
-		push_constants.reserved[3] = 0.0f;
+		if ( r_fontLcdWeight ) {
+			push_constants.reserved[3] = Com_Clamp( 0.0f, 1.0f, r_fontLcdWeight->value );
+		} else {
+			push_constants.reserved[3] = 0.35f;
+		}
 	} else if ( tess.sdfUiEdge >= 0.0f ) {
 		if ( r_sdfOutline ) {
 			push_constants.reserved[2] = (float)r_sdfOutline->integer;

@@ -1901,6 +1901,7 @@ extern	cvar_t	*r_sdfScreenAa;
 extern	cvar_t	*r_sdfOutline;
 extern	cvar_t	*r_sdfOutlineWidth;
 extern	cvar_t	*r_fontGamma;
+extern	cvar_t	*r_fontLcdWeight;
 
 extern	cvar_t	*r_ignoreGLErrors;
 

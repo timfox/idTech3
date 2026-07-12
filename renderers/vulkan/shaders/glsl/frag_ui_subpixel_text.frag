@@ -20,6 +20,7 @@ layout(push_constant) uniform Transform {
 	float subpixelShift;
 	float invTexWidth;
 	float fontGamma;
+	float lcdWeight;
 	float _pad[7];
 } pc;
 
@@ -62,6 +63,11 @@ float mixSubpixelAlpha( float current, float previous, float shift ) {
 }
 
 void main() {
+	vec3 coverageRgb;
+	float monoCov;
+	float coverageAlpha;
+	float lcdWeight;
+
 	out_motion = vec2( 0.0 );
 	if ( abs( var_CurrentClip.w ) > 1e-6 && abs( var_PrevClip.w ) > 1e-6 ) {
 		vec2 currUV = var_CurrentClip.xy / var_CurrentClip.w * 0.5 + 0.5;
@@ -77,13 +83,24 @@ void main() {
 
 	vec3 rgb = mixSubpixelRgb( current.rgb, previous.rgb, shift );
 	float alpha = mixSubpixelAlpha( current.a, previous.a, shift );
-	float lcdCov = max( max( rgb.r, rgb.g ), rgb.b );
-	float cov = ( max( abs( rgb.r - rgb.g ), abs( rgb.g - rgb.b ) ) > 0.02 ) ? lcdCov : alpha;
+	float chromaDelta = max( abs( rgb.r - rgb.g ), abs( rgb.g - rgb.b ) );
+
+	coverageRgb = clamp( rgb, 0.0, 1.0 );
+	monoCov = clamp( alpha, 0.0, 1.0 );
 
 	if ( abs(pc.fontGamma - 1.0) > 1e-3 ) {
 		float invGamma = 1.0 / max(pc.fontGamma, 0.001);
-		cov = pow(clamp(cov, 0.0, 1.0), invGamma);
+		coverageRgb = pow( coverageRgb, vec3( invGamma ) );
+		monoCov = pow( monoCov, invGamma );
 	}
 
-	out_color = vec4( frag_color0.rgb, frag_color0.a * cov );
+	lcdWeight = clamp( pc.lcdWeight, 0.0, 1.0 );
+	if ( chromaDelta <= 0.02 ) {
+		lcdWeight = 0.0;
+	}
+
+	coverageRgb = mix( vec3( monoCov ), coverageRgb, lcdWeight );
+	coverageAlpha = max( max( coverageRgb.r, coverageRgb.g ), coverageRgb.b );
+
+	out_color = vec4( frag_color0.rgb * coverageRgb, frag_color0.a * coverageAlpha );
 }
