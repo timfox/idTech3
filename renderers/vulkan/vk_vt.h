@@ -14,6 +14,8 @@ int R_VT_LoadPageRGBA( const byte *rgba, int width, int height, const char *name
 int R_VT_Lookup( int virtualPage );
 
 image_t *R_VT_AtlasImage( void );
+qhandle_t R_VT_AtlasShader( void );
+qboolean R_VT_WantSample( void );
 
 /* PiP atlas overlay when r_vtDebug 1 (2D pass). */
 void R_VT_DebugDraw( void );

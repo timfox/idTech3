@@ -21,6 +21,7 @@ typedef struct {
 
 static cvar_t *r_meshlets;
 static cvar_t *r_meshletsMdi;
+static cvar_t *r_meshletsCompact;
 static qboolean s_cmds;
 static int s_bakeCount;
 static int s_cacheHits;
@@ -29,6 +30,8 @@ static int s_cullVisible;
 static int s_cullTotal;
 static int s_mdiCount;
 static int s_mdiTris;
+static int s_compactIndexes;
+static int s_compactSurfaces;
 static meshlet_cache_entry_t s_cache[MESHLET_CACHE_SLOTS];
 static meshlet_draw_cmd_t s_mdiCmds[MESHLET_MAX_PER_SURFACE];
 
@@ -44,11 +47,14 @@ static void Meshlets_Status_f( void )
 	}
 	ri.Printf( PRINT_ALL,
 		"[VK][meshlets] active=%d bakeCalls=%d cache hits=%d misses=%d slots=%d/%d\n"
-		"  lastCull visible=%d / total=%d mdi=%d cmds=%d tris=%d\n",
+		"  lastCull visible=%d / total=%d mdi=%d cmds=%d tris=%d\n"
+		"  compact=%d lastIndexes=%d surfaces=%d\n",
 		R_Meshlets_Active() ? 1 : 0, s_bakeCount, s_cacheHits, s_cacheMisses,
 		used, MESHLET_CACHE_SLOTS, s_cullVisible, s_cullTotal,
 		( r_meshletsMdi && r_meshletsMdi->integer ) ? 1 : 0,
-		s_mdiCount, s_mdiTris );
+		s_mdiCount, s_mdiTris,
+		( r_meshletsCompact && r_meshletsCompact->integer ) ? 1 : 0,
+		s_compactIndexes, s_compactSurfaces );
 }
 
 void R_Meshlets_Init( void )
@@ -62,21 +68,29 @@ void R_Meshlets_Init( void )
 	r_meshletsMdi = ri.Cvar_Get( "r_meshletsMdi", "0", CVAR_ARCHIVE_ND );
 	ri.Cvar_CheckRange( r_meshletsMdi, "0", "1", CV_INTEGER );
 	ri.Cvar_SetDescription( r_meshletsMdi,
-		"Pack VkDrawIndexedIndirectCommand list from visible meshlets (MDI scaffold; draw still all-or-nothing until GPU path)." );
+		"Pack VkDrawIndexedIndirectCommand list from visible meshlets (metrics/scaffold)." );
 	ri.Cvar_SetGroup( r_meshletsMdi, CVG_RENDERER );
+
+	r_meshletsCompact = ri.Cvar_Get( "r_meshletsCompact", "1", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_meshletsCompact, "0", "1", CV_INTEGER );
+	ri.Cvar_SetDescription( r_meshletsCompact,
+		"When r_meshlets 1: emit only visible meshlet triangles into tess (partial draw). Default 1." );
+	ri.Cvar_SetGroup( r_meshletsCompact, CVG_RENDERER );
 
 	Com_Memset( s_cache, 0, sizeof( s_cache ) );
 	s_bakeCount = s_cacheHits = s_cacheMisses = 0;
 	s_cullVisible = s_cullTotal = 0;
 	s_mdiCount = s_mdiTris = 0;
+	s_compactIndexes = s_compactSurfaces = 0;
 
 	if ( !s_cmds ) {
 		ri.Cmd_AddCommand( "meshlet_status", Meshlets_Status_f );
 		s_cmds = qtrue;
 	}
 	if ( r_meshlets->integer ) {
-		ri.Printf( PRINT_ALL, "[VK][meshlets] r_meshlets=1 (bake-at-load cache + CPU frustum cull%s)\n",
-			( r_meshletsMdi && r_meshletsMdi->integer ) ? "; MDI pack on" : "" );
+		ri.Printf( PRINT_ALL, "[VK][meshlets] r_meshlets=1 (bake-at-load + CPU cull%s%s)\n",
+			( r_meshletsCompact && r_meshletsCompact->integer ) ? "; compact draw" : "",
+			( r_meshletsMdi && r_meshletsMdi->integer ) ? "; MDI pack" : "" );
 	}
 }
 
@@ -339,4 +353,69 @@ int R_Meshlets_PackIndirect( const meshlet_t *meshlets, const int *visible, int 
 qboolean R_Meshlets_WantMdi( void )
 {
 	return ( R_Meshlets_Active() && r_meshletsMdi && r_meshletsMdi->integer ) ? qtrue : qfalse;
+}
+
+qboolean R_Meshlets_WantCompact( void )
+{
+	return ( R_Meshlets_Active() && r_meshletsCompact && r_meshletsCompact->integer ) ? qtrue : qfalse;
+}
+
+int R_Meshlets_AppendVisibleIndexes( md3Surface_t *surface, int vertexBase,
+	const float entityAxis[3][3], const vec3_t entityOrigin )
+{
+	const meshlet_t *meshlets = NULL;
+	const int *tri;
+	int visible[MESHLET_MAX_PER_SURFACE];
+	int mcount, vcount, i, k, written;
+	int Bob;
+
+	s_compactIndexes = 0;
+	if ( !surface || !R_Meshlets_WantCompact() ) {
+		return -1;
+	}
+	if ( surface->numVerts > 512 || surface->numTriangles > 1024 || surface->numTriangles < 1 ) {
+		return -1;
+	}
+
+	mcount = R_Meshlets_Lookup( surface, &meshlets );
+	if ( mcount <= 0 || !meshlets ) {
+		return -1;
+	}
+
+	vcount = R_Meshlets_CullViewFrustumXform( meshlets, mcount, entityAxis, entityOrigin,
+		visible, MESHLET_MAX_PER_SURFACE );
+	if ( vcount <= 0 ) {
+		s_compactSurfaces++;
+		return 0;
+	}
+
+	if ( R_Meshlets_WantMdi() ) {
+		meshlet_draw_cmd_t cmds[MESHLET_MAX_PER_SURFACE];
+		R_Meshlets_PackIndirect( meshlets, visible, vcount, cmds, MESHLET_MAX_PER_SURFACE );
+	}
+
+	tri = (const int *)( (const byte *)surface + surface->ofsTriangles );
+	Bob = tess.numIndexes;
+	written = 0;
+	for ( i = 0; i < vcount; i++ ) {
+		const meshlet_t *m = &meshlets[visible[i]];
+		int first = (int)m->firstIndex;
+		int count = (int)m->indexCount;
+
+		if ( first < 0 || count < 3 || first + count > surface->numTriangles * 3 ) {
+			continue;
+		}
+		if ( Bob + written + count > SHADER_MAX_INDEXES ) {
+			break;
+		}
+		for ( k = 0; k < count; k++ ) {
+			tess.indexes[Bob + written + k] = vertexBase + tri[first + k];
+		}
+		written += count;
+	}
+
+	tess.numIndexes += written;
+	s_compactIndexes = written;
+	s_compactSurfaces++;
+	return written;
 }

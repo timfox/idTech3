@@ -244,16 +244,22 @@ void vk_create_framebuffers( void )
 		VK_CHECK( qvkCreateFramebuffer( vk.device, &desc, NULL, &vk.framebuffers.smaa_compose ) );
 		SET_OBJECT_NAME( vk.framebuffers.smaa_compose, vk.smaaActive ? "framebuffer - smaa compose" : "framebuffer - fxaa",
 			VK_DEBUG_REPORT_OBJECT_TYPE_FRAMEBUFFER_EXT );
+	}
 
-		if ( vk.smaaActive ) {
-			desc.renderPass = vk.render_pass.taa;
-			framebuffer_attachments[0] = vk.taa_history_image_view[0];
-			VK_CHECK( qvkCreateFramebuffer( vk.device, &desc, NULL, &vk.framebuffers.taa[0] ) );
-			SET_OBJECT_NAME( vk.framebuffers.taa[0], "framebuffer - taa history 0", VK_DEBUG_REPORT_OBJECT_TYPE_FRAMEBUFFER_EXT );
-			framebuffer_attachments[0] = vk.taa_history_image_view[1];
-			VK_CHECK( qvkCreateFramebuffer( vk.device, &desc, NULL, &vk.framebuffers.taa[1] ) );
-			SET_OBJECT_NAME( vk.framebuffers.taa[1], "framebuffer - taa history 1", VK_DEBUG_REPORT_OBJECT_TYPE_FRAMEBUFFER_EXT );
-		}
+	/* TAA history FBs: independent of SMAA so r_taa / r_upscale 2 work without r_ext_smaa. */
+	if ( vk.render_pass.taa != VK_NULL_HANDLE &&
+		vk.taa_history_image_view[0] != VK_NULL_HANDLE &&
+		vk.taa_history_image_view[1] != VK_NULL_HANDLE ) {
+		desc.width = glConfig.vidWidth;
+		desc.height = glConfig.vidHeight;
+		desc.attachmentCount = 1;
+		desc.renderPass = vk.render_pass.taa;
+		framebuffer_attachments[0] = vk.taa_history_image_view[0];
+		VK_CHECK( qvkCreateFramebuffer( vk.device, &desc, NULL, &vk.framebuffers.taa[0] ) );
+		SET_OBJECT_NAME( vk.framebuffers.taa[0], "framebuffer - taa history 0", VK_DEBUG_REPORT_OBJECT_TYPE_FRAMEBUFFER_EXT );
+		framebuffer_attachments[0] = vk.taa_history_image_view[1];
+		VK_CHECK( qvkCreateFramebuffer( vk.device, &desc, NULL, &vk.framebuffers.taa[1] ) );
+		SET_OBJECT_NAME( vk.framebuffers.taa[1], "framebuffer - taa history 1", VK_DEBUG_REPORT_OBJECT_TYPE_FRAMEBUFFER_EXT );
 	}
 
 	if ( r_bloom->integer )

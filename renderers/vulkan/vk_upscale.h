@@ -23,4 +23,7 @@ void R_Upscale_ApplyRenderScaleDefaults( void );
 
 float R_Upscale_GetSharpness( void );
 
+/* True when r_upscale 2 and r_upscaleDisplayHistory 1. */
+qboolean R_Upscale_WantDisplayHistory( void );
+
 #endif

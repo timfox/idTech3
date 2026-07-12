@@ -51,4 +51,10 @@ int R_Meshlets_CullViewFrustumXform( const meshlet_t *meshlets, int count,
 int R_Meshlets_PackIndirect( const meshlet_t *meshlets, const int *visible, int visibleCount,
 	meshlet_draw_cmd_t *outCmds, int maxCmds );
 
+/* Append remapped indexes for visible meshlets into tess (compact draw). Returns index count added. */
+int R_Meshlets_AppendVisibleIndexes( md3Surface_t *surface, int vertexBase,
+	const float entityAxis[3][3], const vec3_t entityOrigin );
+
+qboolean R_Meshlets_WantCompact( void );
+
 #endif

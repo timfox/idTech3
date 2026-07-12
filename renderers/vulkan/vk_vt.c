@@ -28,6 +28,7 @@ typedef struct {
 
 static cvar_t *r_vt;
 static cvar_t *r_vtDebug;
+static cvar_t *r_vtSample;
 static image_t *s_atlas;
 static qhandle_t s_atlasShader;
 static vtPageSlot_t s_slots[VT_MAX_PAGES];
@@ -50,12 +51,13 @@ static void VT_Status_f( void )
 	}
 	ri.Printf( PRINT_ALL,
 		"[VK][VT] active=%d atlas=%dx%d page=%d slots=%d/%d hits=%d misses=%d\n"
-		"  loads real=%d procedural=%d debug=%d shader=%d\n",
+		"  loads real=%d procedural=%d debug=%d sample=%d shader=%d\n",
 		R_VT_Active() ? 1 : 0,
 		VT_ATLAS_W, VT_ATLAS_H, VT_PAGE_SIZE,
 		used, VT_MAX_PAGES, s_pageHits, s_pageMisses,
 		s_realLoads, s_procLoads,
 		( r_vtDebug && r_vtDebug->integer ) ? 1 : 0,
+		( r_vtSample && r_vtSample->integer ) ? 1 : 0,
 		s_atlasShader );
 	for ( i = 0; i < VT_MAX_PAGES; i++ ) {
 		if ( s_slots[i].used && s_slots[i].name[0] ) {
@@ -147,6 +149,12 @@ void R_VT_Init( void )
 	ri.Cvar_SetDescription( r_vtDebug, "Draw VT atlas PiP overlay when r_vt 1 (debug consumer)." );
 	ri.Cvar_SetGroup( r_vtDebug, CVG_RENDERER );
 
+	r_vtSample = ri.Cvar_Get( "r_vtSample", "0", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_vtSample, "0", "1", CV_INTEGER );
+	ri.Cvar_SetDescription( r_vtSample,
+		"When r_vt 1: use VT atlas shader on bsp_stream brush-top fallback faces (demo sample consumer)." );
+	ri.Cvar_SetGroup( r_vtSample, CVG_RENDERER );
+
 	Com_Memset( s_slots, 0, sizeof( s_slots ) );
 	s_nextSlot = 0;
 	s_atlas = NULL;
@@ -194,6 +202,16 @@ qboolean R_VT_Active( void )
 image_t *R_VT_AtlasImage( void )
 {
 	return s_atlas;
+}
+
+qhandle_t R_VT_AtlasShader( void )
+{
+	return s_atlasShader;
+}
+
+qboolean R_VT_WantSample( void )
+{
+	return ( R_VT_Active() && r_vtSample && r_vtSample->integer && s_atlasShader ) ? qtrue : qfalse;
 }
 
 void R_VT_DebugDraw( void )

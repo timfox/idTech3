@@ -25,6 +25,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "tr_gltf_topo.h"
 #include "vk_draw_state.h"
 #include "tr_material_paint.h"
+#include "vk_meshlets.h"
 #include <math.h>
 
 #ifdef USE_VBO
@@ -950,10 +951,25 @@ static void RB_SurfaceMesh(md3Surface_t *surface) {
 	indexes = surface->numTriangles * 3;
 	Bob = tess.numIndexes;
 	Doug = tess.numVertexes;
-	for (j = 0 ; j < indexes ; j++) {
-		tess.indexes[Bob + j] = Doug + triangles[j];
+
+	/* Compact draw: only visible meshlet triangles when r_meshlets + r_meshletsCompact. */
+	if ( R_Meshlets_WantCompact() && backEnd.currentEntity ) {
+		int written = R_Meshlets_AppendVisibleIndexes( surface, Doug,
+			backEnd.currentEntity->e.axis, backEnd.currentEntity->e.origin );
+		if ( written < 0 ) {
+			/* Fallback: full index copy */
+			for ( j = 0 ; j < indexes ; j++ ) {
+				tess.indexes[Bob + j] = Doug + triangles[j];
+			}
+			tess.numIndexes += indexes;
+		}
+		/* written == 0: culled (should be rare if front-end gated); leave no indexes */
+	} else {
+		for ( j = 0 ; j < indexes ; j++ ) {
+			tess.indexes[Bob + j] = Doug + triangles[j];
+		}
+		tess.numIndexes += indexes;
 	}
-	tess.numIndexes += indexes;
 
 	texCoords = (float *) ((byte *)surface + surface->ofsSt);
 

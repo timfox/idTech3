@@ -67,8 +67,8 @@ static void Upscale_Status_f( void )
 		rw, rh, gls.windowWidth, gls.windowHeight, scaleX, scaleY,
 		s_jitterX, s_jitterY, s_prevJitterX, s_prevJitterY, s_jitterFrame,
 		R_Upscale_WantTemporal()
-			? ( ( r_upscaleDisplayHistory && r_upscaleDisplayHistory->integer )
-				? "temporal@internal + spatial blit (display ping-pong requested)"
+			? ( R_Upscale_WantDisplayHistory()
+				? "temporal@internal + gamma upsample (TAA FBs always; displayHistory sharpen)"
 				: "temporal@internal + spatial blit" )
 			: ( R_Upscale_WantSpatial() ? "spatial blit only" : "off" ) );
 }
@@ -89,7 +89,7 @@ void R_Upscale_Init( void )
 	r_upscaleDisplayHistory = ri.Cvar_Get( "r_upscaleDisplayHistory", "0", CVAR_ARCHIVE_ND );
 	ri.Cvar_CheckRange( r_upscaleDisplayHistory, "0", "1", CV_INTEGER );
 	ri.Cvar_SetDescription( r_upscaleDisplayHistory,
-		"Request display-sized temporal history for r_upscale 2 (v1: status + sharpen path; ping-pong RT deferred)." );
+		"With r_upscale 2: prefer window-sized temporal presentation (TAA FBs without SMAA; gamma 1:1 when internal==window)." );
 	ri.Cvar_SetGroup( r_upscaleDisplayHistory, CVG_RENDERER );
 
 	s_jitterX = s_jitterY = 0.0f;
@@ -106,7 +106,8 @@ void R_Upscale_Init( void )
 			"[VK][upscale] r_upscale=1 spatial — uses r_renderWidth/Height + r_renderScale blit\n" );
 	} else if ( r_upscale->integer == 2 ) {
 		ri.Printf( PRINT_ALL,
-			"[VK][upscale] r_upscale=2 temporal — Halton jitter + TAA at internal res, spatial blit to window\n" );
+			"[VK][upscale] r_upscale=2 temporal — Halton jitter + TAA at internal res, spatial blit to window%s\n",
+			( r_upscaleDisplayHistory && r_upscaleDisplayHistory->integer ) ? " (displayHistory)" : "" );
 	}
 }
 
@@ -128,9 +129,20 @@ qboolean R_Upscale_WantTemporal( void )
 	return ( r_upscale && r_upscale->integer == 2 ) ? qtrue : qfalse;
 }
 
+qboolean R_Upscale_WantDisplayHistory( void )
+{
+	return ( R_Upscale_WantTemporal() && r_upscaleDisplayHistory && r_upscaleDisplayHistory->integer )
+		? qtrue : qfalse;
+}
+
 float R_Upscale_GetSharpness( void )
 {
-	return r_upscaleSharpness ? r_upscaleSharpness->value : 0.2f;
+	float s = r_upscaleSharpness ? r_upscaleSharpness->value : 0.2f;
+	/* Display-history request: slightly stronger resolve sharpen at gamma upsample. */
+	if ( R_Upscale_WantDisplayHistory() ) {
+		s = Com_Clamp( 0.0f, 1.0f, s + 0.08f );
+	}
+	return s;
 }
 
 void R_Upscale_ApplyRenderScaleDefaults( void )

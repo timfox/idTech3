@@ -6,6 +6,7 @@ Copyright (C) 2026 Gopex LLC. All rights reserved.
 
 #include "tr_local.h"
 #include "tr_bsp_stream.h"
+#include "vk_vt.h"
 #include "../../qcommon/qfiles.h"
 
 #define BSP_STREAM_MAX_PATCHES 64
@@ -1270,7 +1271,12 @@ qboolean RE_BspStream_MergeSector( int cellX, int cellY, float sectorSize ) {
 		quadMaxs[1] = patch->bounds[1][1];
 		quadMaxs[2] = patch->bounds[1][2];
 		patch->faces[0].surface = (surfaceType_t *)R_BspStream_AllocTopFace( quadMins, quadMaxs );
-		patch->faces[0].shader = tr.defaultShader;
+		if ( R_VT_WantSample() ) {
+			shader_t *vtSh = R_GetShaderByHandle( R_VT_AtlasShader() );
+			patch->faces[0].shader = vtSh ? vtSh : tr.defaultShader;
+		} else {
+			patch->faces[0].shader = tr.defaultShader;
+		}
 		patch->faces[0].surfaceLightmapNum = -1;
 		patch->numFaces = patch->faces[0].surface ? 1 : 0;
 		if ( patch->numFaces > 0 ) {

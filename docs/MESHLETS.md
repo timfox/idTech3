@@ -1,36 +1,37 @@
-# Meshlets (CPU cull)
+# Meshlets (CPU cull + compact draw)
 
-Chocolate **Nanite-lite**: bake triangle clusters (meshlets) at **model load** into a local-space cache, then frustum-cull on CPU each frame (entity-pose AABB transform). Does **not** require `VK_NV_mesh_shader` / mesh pipelines.
+Chocolate **Nanite-lite**: bake triangle clusters (meshlets) at **model load** into a local-space cache, frustum-cull on CPU, then **emit only visible triangles** into tess (`r_meshletsCompact`, default 1). Does **not** require mesh shaders.
 
 ## Enable
 
 ```
 set r_meshlets 1
-set r_meshletsMdi 1   // pack VkDrawIndexedIndirectCommand list (scaffold)
+set r_meshletsCompact 1
+set r_meshletsMdi 1   // optional: pack indirect cmd metrics
 exec demo_meshlets.cfg
 meshlet_status
 ```
 
-When enabled, MD3 surfaces (≤512 verts / ≤1024 tris) bake meshlets at load (and on first miss) and skip draw if all clusters are outside the view frustum. With `r_meshletsMdi 1`, visible clusters also pack an MDI command list (GPU multi-draw still deferred).
+When enabled, MD3 surfaces (≤512 verts / ≤1024 tris) bake at load, skip add if fully culled, and compact draw when partially visible.
 
 ## Cvars / commands
 
 | | |
 |--|--|
 | `r_meshlets` | Default 0 |
-| `r_meshletsMdi` | Pack indirect draw cmds from visible meshlets (default 0) |
-| `meshlet_status` | Bake calls, cache hits/misses, cull + MDI counts |
+| `r_meshletsCompact` | Partial triangle draw from visible meshlets (default 1) |
+| `r_meshletsMdi` | Pack `VkDrawIndexedIndirectCommand` metrics (default 0) |
+| `meshlet_status` | Bake/cache/cull/compact/MDI counts |
 
 ## API
 
-- `R_Meshlets_Bake` — cluster triangles into AABB meshlets
-- `R_Meshlets_CacheLocal` / `R_Meshlets_Lookup` — bake-at-load cache keyed by surface pointer
-- `R_Meshlets_CullViewFrustum` / `R_Meshlets_CullViewFrustumXform` — cull against `tr.viewParms.frustum`
-- `R_Meshlets_PackIndirect` — host `VkDrawIndexedIndirectCommand` packing
+- `R_Meshlets_Bake` / `CacheLocal` / `Lookup`
+- `R_Meshlets_CullViewFrustumXform`
+- `R_Meshlets_AppendVisibleIndexes` — used by `RB_SurfaceMesh`
+- `R_Meshlets_PackIndirect` — host MDI scaffold
 
 ## Deferred
 
-- GPU `vkCmdDrawIndexedIndirect` / multi-draw path
+- GPU `vkCmdDrawIndexedIndirect`
 - `VK_EXT_mesh_shader` task/mesh pipelines
-- BSP world meshlets / streaming
-- Skinned / morph meshlets
+- BSP world / skinned meshlets
