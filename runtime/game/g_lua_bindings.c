@@ -46,6 +46,7 @@ Usage from Lua:
 #include "ecs.h"
 #include "../physics/phys_bullet.h"
 #include "../physics/phys_events.h"
+#include "../physics/phys_materials.h"
 #include "../physics/phys_props.h"
 #include "../physics/phys_volumes.h"
 #include "../world/fog_biology.h"
@@ -139,15 +140,240 @@ static int l_nav_addAgent(lua_State *L) {
 
 /* ========== Physics bindings ========== */
 
+static qboolean Lua_GetVec3Field( lua_State *L, int index, const char *field, vec3_t out )
+{
+	int absIndex;
+
+	if ( !lua_istable( L, index ) ) {
+		return qfalse;
+	}
+
+	absIndex = lua_absindex( L, index );
+	lua_getfield( L, absIndex, field );
+	if ( !lua_istable( L, -1 ) ) {
+		lua_pop( L, 1 );
+		return qfalse;
+	}
+
+	lua_rawgeti( L, -1, 1 );
+	out[0] = (float)luaL_optnumber( L, -1, 0.0 );
+	lua_pop( L, 1 );
+	lua_rawgeti( L, -1, 2 );
+	out[1] = (float)luaL_optnumber( L, -1, 0.0 );
+	lua_pop( L, 1 );
+	lua_rawgeti( L, -1, 3 );
+	out[2] = (float)luaL_optnumber( L, -1, 0.0 );
+	lua_pop( L, 1 );
+
+	lua_pop( L, 1 );
+	return qtrue;
+}
+
+static float Lua_GetNumberField( lua_State *L, int index, const char *field, float defaultValue )
+{
+	float value;
+	int absIndex = lua_absindex( L, index );
+
+	lua_getfield( L, absIndex, field );
+	value = (float)luaL_optnumber( L, -1, defaultValue );
+	lua_pop( L, 1 );
+	return value;
+}
+
+static int Lua_GetIntegerField( lua_State *L, int index, const char *field, int defaultValue )
+{
+	int value;
+	int absIndex = lua_absindex( L, index );
+
+	lua_getfield( L, absIndex, field );
+	value = (int)luaL_optinteger( L, -1, defaultValue );
+	lua_pop( L, 1 );
+	return value;
+}
+
+static qboolean Lua_GetBooleanField( lua_State *L, int index, const char *field, qboolean defaultValue )
+{
+	qboolean value = defaultValue;
+	int absIndex = lua_absindex( L, index );
+
+	lua_getfield( L, absIndex, field );
+	if ( !lua_isnoneornil( L, -1 ) ) {
+		value = lua_toboolean( L, -1 ) ? qtrue : qfalse;
+	}
+	lua_pop( L, 1 );
+	return value;
+}
+
+static physShape_t Lua_ParsePhysShape( const char *shapeName )
+{
+	if ( !shapeName || !shapeName[0] || !Q_stricmp( shapeName, "box" ) ) {
+		return PHYS_SHAPE_BOX;
+	}
+	if ( !Q_stricmp( shapeName, "sphere" ) ) {
+		return PHYS_SHAPE_SPHERE;
+	}
+	if ( !Q_stricmp( shapeName, "capsule" ) ) {
+		return PHYS_SHAPE_CAPSULE;
+	}
+	if ( !Q_stricmp( shapeName, "cylinder" ) ) {
+		return PHYS_SHAPE_CYLINDER;
+	}
+	if ( !Q_stricmp( shapeName, "hull" ) || !Q_stricmp( shapeName, "convexHull" ) || !Q_stricmp( shapeName, "convex_hull" ) ) {
+		return PHYS_SHAPE_CONVEX_HULL;
+	}
+	return PHYS_SHAPE_BOX;
+}
+
+static physBodyType_t Lua_ParsePhysBodyType( const char *typeName )
+{
+	if ( !typeName || !typeName[0] || !Q_stricmp( typeName, "dynamic" ) ) {
+		return PHYS_BODY_DYNAMIC;
+	}
+	if ( !Q_stricmp( typeName, "static" ) ) {
+		return PHYS_BODY_STATIC;
+	}
+	if ( !Q_stricmp( typeName, "kinematic" ) ) {
+		return PHYS_BODY_KINEMATIC;
+	}
+	return PHYS_BODY_DYNAMIC;
+}
+
+static void Lua_ParsePhysBodyDefTable( lua_State *L, int index, physBodyDef_t *def, float **tempHullPointsOut )
+{
+	vec3_t v;
+	const char *shapeName;
+	const char *typeName;
+	int absIndex;
+
+	absIndex = lua_absindex( L, index );
+	shapeName = NULL;
+	typeName = NULL;
+
+	if ( tempHullPointsOut ) {
+		*tempHullPointsOut = NULL;
+	}
+
+	lua_getfield( L, absIndex, "shape" );
+	shapeName = lua_isstring( L, -1 ) ? lua_tostring( L, -1 ) : NULL;
+	def->shape = Lua_ParsePhysShape( shapeName );
+	lua_pop( L, 1 );
+
+	lua_getfield( L, absIndex, "type" );
+	typeName = lua_isstring( L, -1 ) ? lua_tostring( L, -1 ) : NULL;
+	def->type = Lua_ParsePhysBodyType( typeName );
+	lua_pop( L, 1 );
+
+	if ( Lua_GetVec3Field( L, absIndex, "position", v ) ) {
+		VectorCopy( v, def->position );
+	} else {
+		def->position[0] = Lua_GetNumberField( L, absIndex, "x", 0.0f );
+		def->position[1] = Lua_GetNumberField( L, absIndex, "y", 0.0f );
+		def->position[2] = Lua_GetNumberField( L, absIndex, "z", 0.0f );
+	}
+
+	if ( Lua_GetVec3Field( L, absIndex, "rotation", v ) || Lua_GetVec3Field( L, absIndex, "angles", v ) ) {
+		VectorCopy( v, def->rotation );
+	} else {
+		def->rotation[0] = Lua_GetNumberField( L, absIndex, "pitch", 0.0f );
+		def->rotation[1] = Lua_GetNumberField( L, absIndex, "yaw", 0.0f );
+		def->rotation[2] = Lua_GetNumberField( L, absIndex, "roll", 0.0f );
+	}
+
+	if ( Lua_GetVec3Field( L, absIndex, "halfExtents", v ) || Lua_GetVec3Field( L, absIndex, "extents", v ) ) {
+		VectorCopy( v, def->halfExtents );
+	} else {
+		float size = Lua_GetNumberField( L, absIndex, "size", 8.0f );
+		def->halfExtents[0] = Lua_GetNumberField( L, absIndex, "hx", size );
+		def->halfExtents[1] = Lua_GetNumberField( L, absIndex, "hy", size );
+		def->halfExtents[2] = Lua_GetNumberField( L, absIndex, "hz", size );
+	}
+
+	def->radius = Lua_GetNumberField( L, absIndex, "radius", 8.0f );
+	def->height = Lua_GetNumberField( L, absIndex, "height", 32.0f );
+	def->mass = Lua_GetNumberField( L, absIndex, "mass", def->type == PHYS_BODY_DYNAMIC ? 10.0f : 0.0f );
+	def->friction = Lua_GetNumberField( L, absIndex, "friction", 0.5f );
+	def->restitution = Lua_GetNumberField( L, absIndex, "restitution", 0.3f );
+	def->linearDamping = Lua_GetNumberField( L, absIndex, "linearDamping", 0.0f );
+	def->angularDamping = Lua_GetNumberField( L, absIndex, "angularDamping", 0.0f );
+	def->gravityScale = Lua_GetNumberField( L, absIndex, "gravityScale", 1.0f );
+	def->motionLocks = Lua_GetIntegerField( L, absIndex, "motionLocks", 0 );
+	def->isSensor = Lua_GetBooleanField( L, absIndex, "isSensor",
+		Lua_GetBooleanField( L, absIndex, "sensor", qfalse ) );
+	def->collisionGroup = Lua_GetIntegerField( L, absIndex, "collisionGroup", 1 );
+	def->collisionMask = Lua_GetIntegerField( L, absIndex, "collisionMask", -1 );
+	def->materialId = Lua_GetIntegerField( L, absIndex, "materialId", PHYS_MAT_DEFAULT );
+
+	lua_getfield( L, absIndex, "material" );
+	if ( lua_isstring( L, -1 ) ) {
+		def->materialId = PhysMat_FindByName( lua_tostring( L, -1 ) );
+	} else if ( lua_isnumber( L, -1 ) ) {
+		def->materialId = (int)lua_tointeger( L, -1 );
+	}
+	lua_pop( L, 1 );
+
+	if ( def->materialId >= 0 && def->materialId < PHYS_MAT_COUNT ) {
+		PhysMat_ApplyToBodyDef( def, def->materialId );
+	}
+
+	lua_getfield( L, absIndex, "hullPoints" );
+	if ( lua_istable( L, -1 ) ) {
+		size_t rawCount = lua_rawlen( L, -1 );
+		int floatCount = (int)rawCount;
+		int pointCount = floatCount / 3;
+		float *pts;
+		int i;
+
+		if ( pointCount >= 4 && floatCount == pointCount * 3 ) {
+			pts = (float *)Z_Malloc( (size_t)floatCount * sizeof( float ) );
+			for ( i = 0; i < floatCount; i++ ) {
+				lua_rawgeti( L, -1, i + 1 );
+				pts[i] = (float)luaL_optnumber( L, -1, 0.0 );
+				lua_pop( L, 1 );
+			}
+			def->shape = PHYS_SHAPE_CONVEX_HULL;
+			def->hullPoints = pts;
+			def->hullPointCount = pointCount;
+			if ( tempHullPointsOut ) {
+				*tempHullPointsOut = pts;
+			}
+		}
+	}
+	lua_pop( L, 1 );
+}
+
 static int l_phys_init(lua_State *L) { lua_pushboolean(L, Phys_Init()); return 1; }
 static int l_phys_step(lua_State *L) { Phys_StepSimulation((float)luaL_checknumber(L,1)); return 0; }
 static int l_phys_createBody(lua_State *L) {
-	physBodyDef_t def; Com_Memset(&def,0,sizeof(def));
-	def.shape = PHYS_SHAPE_BOX; def.type = PHYS_BODY_DYNAMIC;
-	def.position[0]=(float)luaL_checknumber(L,1); def.position[1]=(float)luaL_checknumber(L,2); def.position[2]=(float)luaL_checknumber(L,3);
-	def.mass=(float)luaL_optnumber(L,4,10); def.halfExtents[0]=def.halfExtents[1]=def.halfExtents[2]=(float)luaL_optnumber(L,5,8);
-	def.friction=0.5f; def.restitution=0.3f; def.collisionGroup=1; def.collisionMask=-1;
-	lua_pushinteger(L, Phys_CreateBody(&def));
+	physBodyDef_t def;
+	physBodyHandle_t handle;
+	float *tempHullPoints = NULL;
+
+	Com_Memset( &def, 0, sizeof( def ) );
+	def.shape = PHYS_SHAPE_BOX;
+	def.type = PHYS_BODY_DYNAMIC;
+	def.mass = 10.0f;
+	def.radius = 8.0f;
+	def.height = 32.0f;
+	def.gravityScale = 1.0f;
+	def.halfExtents[0] = def.halfExtents[1] = def.halfExtents[2] = 8.0f;
+	def.friction = 0.5f;
+	def.restitution = 0.3f;
+	def.collisionGroup = 1;
+	def.collisionMask = -1;
+	def.materialId = PHYS_MAT_DEFAULT;
+
+	if ( lua_istable( L, 1 ) ) {
+		Lua_ParsePhysBodyDefTable( L, 1, &def, &tempHullPoints );
+	} else {
+		def.position[0]=(float)luaL_checknumber(L,1); def.position[1]=(float)luaL_checknumber(L,2); def.position[2]=(float)luaL_checknumber(L,3);
+		def.mass=(float)luaL_optnumber(L,4,10); def.halfExtents[0]=def.halfExtents[1]=def.halfExtents[2]=(float)luaL_optnumber(L,5,8);
+	}
+
+	handle = Phys_CreateBody( &def );
+	if ( tempHullPoints ) {
+		Z_Free( tempHullPoints );
+	}
+	lua_pushinteger( L, handle );
 	return 1;
 }
 static int l_phys_destroyBody(lua_State *L) { Phys_DestroyBody((int)luaL_checkinteger(L,1)); return 0; }
@@ -220,6 +446,14 @@ static int l_phys_getTransform(lua_State *L) {
 	lua_pushnumber(L,t.position[0]); lua_pushnumber(L,t.position[1]); lua_pushnumber(L,t.position[2]);
 	lua_pushnumber(L,t.rotation[0]); lua_pushnumber(L,t.rotation[1]); lua_pushnumber(L,t.rotation[2]);
 	return 6;
+}
+static int l_phys_setGravity(lua_State *L) {
+	vec3_t gravity;
+	gravity[0] = (float)luaL_checknumber( L, 1 );
+	gravity[1] = (float)luaL_checknumber( L, 2 );
+	gravity[2] = (float)luaL_checknumber( L, 3 );
+	Phys_SetGravity( gravity );
+	return 0;
 }
 static int l_phys_setTransform(lua_State *L) {
 	vec3_t pos, rot;
@@ -448,6 +682,20 @@ static int l_phys_overlapSphere(lua_State *L) {
 	}
 	return 1;
 }
+static int l_phys_overlapBox(lua_State *L) {
+	vec3_t center, halfExtents;
+	physBodyHandle_t hits[32];
+	int n, i;
+	center[0]=(float)luaL_checknumber(L,1); center[1]=(float)luaL_checknumber(L,2); center[2]=(float)luaL_checknumber(L,3);
+	halfExtents[0]=(float)luaL_optnumber(L,4,32); halfExtents[1]=(float)luaL_optnumber(L,5,32); halfExtents[2]=(float)luaL_optnumber(L,6,32);
+	n = Phys_OverlapBox( center, halfExtents, hits, 32 );
+	lua_createtable( L, n, 0 );
+	for ( i = 0; i < n; i++ ) {
+		lua_pushinteger( L, hits[i] );
+		lua_rawseti( L, -2, i + 1 );
+	}
+	return 1;
+}
 static int l_phys_getContacts(lua_State *L) {
 	physContact_t contacts[16];
 	int n, i;
@@ -607,6 +855,10 @@ static int l_phys_setSleepEnabled(lua_State *L) {
 	Phys_SetBodySleepEnabled( (physBodyHandle_t)luaL_checkinteger( L, 1 ), lua_toboolean( L, 2 ) ? qtrue : qfalse );
 	return 0;
 }
+static int l_phys_setSleepThreshold(lua_State *L) {
+	Phys_SetBodySleepThreshold( (physBodyHandle_t)luaL_checkinteger( L, 1 ), (float)luaL_checknumber( L, 2 ) );
+	return 0;
+}
 static int l_phys_setHingeTarget(lua_State *L) {
 	Phys_SetHingeTargetAngle( (physConstraintHandle_t)luaL_checkinteger( L, 1 ), (float)luaL_checknumber( L, 2 ) );
 	return 0;
@@ -623,6 +875,31 @@ static int l_phys_rebuildTree(lua_State *L) {
 	(void)L;
 	Phys_RebuildStaticTree();
 	return 0;
+}
+static int l_phys_setContactTuning(lua_State *L) {
+	Phys_SetContactTuning( (float)luaL_checknumber( L, 1 ), (float)luaL_optnumber( L, 2, 0.7f ),
+		(float)luaL_optnumber( L, 3, 0.0f ) );
+	return 0;
+}
+static int l_phys_setMaxLinearSpeed(lua_State *L) {
+	Phys_SetMaxLinearSpeed( (float)luaL_checknumber( L, 1 ) );
+	return 0;
+}
+static int l_phys_enableSpeculative(lua_State *L) {
+	Phys_EnableSpeculative( lua_toboolean( L, 1 ) ? qtrue : qfalse );
+	return 0;
+}
+static int l_phys_setDebugDrawFlags(lua_State *L) {
+	Phys_SetDebugDrawFlags( (unsigned)luaL_checkinteger( L, 1 ) );
+	return 0;
+}
+static int l_phys_stats(lua_State *L) {
+	lua_createtable( L, 0, 4 );
+	lua_pushstring( L, Phys_GetBackendName() ); lua_setfield( L, -2, "backend" );
+	lua_pushinteger( L, Phys_GetWorkerCount() ); lua_setfield( L, -2, "workers" );
+	lua_pushinteger( L, Phys_GetBodyCount() ); lua_setfield( L, -2, "bodies" );
+	lua_pushinteger( L, Phys_GetConstraintCount() ); lua_setfield( L, -2, "constraints" );
+	return 1;
 }
 static int l_phys_replayOpen(lua_State *L) {
 	lua_pushboolean( L, Phys_ReplayOpen( luaL_optstring( L, 1, "phys_recording.bin" ) ) );
@@ -2220,37 +2497,43 @@ void LuaBindings_RegisterAll(void *luaState) {
 	};
 	registerTable(L, "Nav", navFuncs);
 
-	static const luaL_Reg physicsFuncs[] = {
-		{"init", l_phys_init}, {"step", l_phys_step}, {"createBody", l_phys_createBody},
-		{"destroyBody", l_phys_destroyBody}, {"applyImpulse", l_phys_applyImpulse},
-		{"applyImpulseRadius", l_phys_applyImpulseRadius},
-		{"createBox", l_phys_createBox}, {"createSphere", l_phys_createSphere},
-		{"createStatic", l_phys_createStatic}, {"createShadow", l_phys_createShadow},
-		{"setShadowPose", l_phys_setShadowPose}, {"createBuoyancy", l_phys_createBuoyancy},
-		{"getTransform", l_phys_getTransform}, {"setTransform", l_phys_setTransform},
-		{"rayCast", l_phys_rayCast}, {"createSensor", l_phys_createSensor},
-		{"createConstraint", l_phys_createConstraint}, {"moverStep", l_phys_moverStep},
-		{"pmoveCorrect", l_phys_pmoveCorrect}, {"addHeightField", l_phys_addHeightField},
-		{"backend", l_phys_backend}, {"createRagdoll", l_phys_createRagdoll},
-		{"loadRagdoll", l_phys_loadRagdoll}, {"setBoneAnimTarget", l_phys_setBoneAnimTarget},
+		static const luaL_Reg physicsFuncs[] = {
+			{"init", l_phys_init}, {"step", l_phys_step}, {"createBody", l_phys_createBody},
+			{"destroyBody", l_phys_destroyBody}, {"applyImpulse", l_phys_applyImpulse},
+			{"applyImpulseRadius", l_phys_applyImpulseRadius},
+			{"createBox", l_phys_createBox}, {"createSphere", l_phys_createSphere},
+			{"createStatic", l_phys_createStatic}, {"createShadow", l_phys_createShadow},
+			{"setShadowPose", l_phys_setShadowPose}, {"createBuoyancy", l_phys_createBuoyancy},
+			{"getTransform", l_phys_getTransform}, {"setTransform", l_phys_setTransform},
+			{"setGravity", l_phys_setGravity},
+			{"rayCast", l_phys_rayCast}, {"createSensor", l_phys_createSensor},
+			{"createConstraint", l_phys_createConstraint}, {"moverStep", l_phys_moverStep},
+			{"pmoveCorrect", l_phys_pmoveCorrect}, {"addHeightField", l_phys_addHeightField},
+			{"backend", l_phys_backend}, {"createRagdoll", l_phys_createRagdoll},
+			{"loadRagdoll", l_phys_loadRagdoll}, {"setBoneAnimTarget", l_phys_setBoneAnimTarget},
 		{"subscribe", l_phys_subscribe},
 		{"setFriction", l_phys_setFriction}, {"setRestitution", l_phys_setRestitution},
 		{"validateReplay", l_phys_validateReplay},
-		{"setFilter", l_phys_setFilter}, {"attachShape", l_phys_attachShape},
-		{"convexSweep", l_phys_convexSweep}, {"overlapSphere", l_phys_overlapSphere},
-		{"getContacts", l_phys_getContacts}, {"setConstraintSpring", l_phys_setConstraintSpring},
-		{"setSphericalLimits", l_phys_setSphericalLimits}, {"setWheelSteering", l_phys_setWheelSteering},
-		{"pollEvent", l_phys_pollEvent},
-		{"forceAnimState", l_phys_forceAnimState}, {"hitRagdoll", l_phys_hitRagdoll},
-		{"createDmm", l_phys_createDmm}, {"fractureDmm", l_phys_fractureDmm},
-		{"dmmStatus", l_phys_dmmStatus}, {"spawnBoundAlive", l_phys_spawnBoundAlive},
-		{"getClosestPoint", l_phys_getClosestPoint}, {"sphereTOI", l_phys_sphereTOI},
-		{"setContinuous", l_phys_setContinuous}, {"setSleepEnabled", l_phys_setSleepEnabled},
-		{"setHingeTarget", l_phys_setHingeTarget}, {"setSliderTarget", l_phys_setSliderTarget},
-		{"setDistanceLength", l_phys_setDistanceLength}, {"rebuildTree", l_phys_rebuildTree},
-		{"replayOpen", l_phys_replayOpen}, {"replayStep", l_phys_replayStep},
-		{"replaySeek", l_phys_replaySeek}, {"replayClose", l_phys_replayClose},
-		{"replayStatus", l_phys_replayStatus},
+			{"setFilter", l_phys_setFilter}, {"attachShape", l_phys_attachShape},
+			{"convexSweep", l_phys_convexSweep}, {"overlapSphere", l_phys_overlapSphere},
+			{"overlapBox", l_phys_overlapBox},
+			{"getContacts", l_phys_getContacts}, {"setConstraintSpring", l_phys_setConstraintSpring},
+			{"setSphericalLimits", l_phys_setSphericalLimits}, {"setWheelSteering", l_phys_setWheelSteering},
+			{"pollEvent", l_phys_pollEvent},
+			{"forceAnimState", l_phys_forceAnimState}, {"hitRagdoll", l_phys_hitRagdoll},
+			{"createDmm", l_phys_createDmm}, {"fractureDmm", l_phys_fractureDmm},
+			{"dmmStatus", l_phys_dmmStatus}, {"spawnBoundAlive", l_phys_spawnBoundAlive},
+			{"getClosestPoint", l_phys_getClosestPoint}, {"sphereTOI", l_phys_sphereTOI},
+			{"setContinuous", l_phys_setContinuous}, {"setSleepEnabled", l_phys_setSleepEnabled},
+			{"setSleepThreshold", l_phys_setSleepThreshold},
+			{"setHingeTarget", l_phys_setHingeTarget}, {"setSliderTarget", l_phys_setSliderTarget},
+			{"setDistanceLength", l_phys_setDistanceLength}, {"rebuildTree", l_phys_rebuildTree},
+			{"setContactTuning", l_phys_setContactTuning}, {"setMaxLinearSpeed", l_phys_setMaxLinearSpeed},
+			{"enableSpeculative", l_phys_enableSpeculative}, {"setDebugDrawFlags", l_phys_setDebugDrawFlags},
+			{"stats", l_phys_stats},
+			{"replayOpen", l_phys_replayOpen}, {"replayStep", l_phys_replayStep},
+			{"replaySeek", l_phys_replaySeek}, {"replayClose", l_phys_replayClose},
+			{"replayStatus", l_phys_replayStatus},
 		{NULL, NULL}
 	};
 	registerTable(L, "Physics", physicsFuncs);

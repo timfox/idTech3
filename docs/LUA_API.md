@@ -32,21 +32,46 @@ Engine.Nav.findPath(mesh, sX, sY, sZ, eX, eY, eZ) -- returns {{x,y,z},...} or ni
 Engine.Nav.addAgent(x, y, z)                  -- returns agentHandle
 ```
 
-## Engine.Physics (6 functions)
+## Engine.Physics
 
 ```lua
 Engine.Physics.init()                         -- returns boolean
 Engine.Physics.step(dt)
-Engine.Physics.createBody(x, y, z, mass, size) -- returns bodyHandle
+Engine.Physics.createBody(x, y, z, mass, size) -- legacy shorthand
+Engine.Physics.createBody({
+  shape = "box"|"sphere"|"capsule"|"cylinder"|"hull",
+  type = "dynamic"|"static"|"kinematic",
+  position = {x, y, z},
+  rotation = {pitch, yaw, roll},
+  halfExtents = {hx, hy, hz},
+  radius = 8,
+  height = 32,
+  mass = 10,
+  friction = 0.5,
+  restitution = 0.3,
+  gravityScale = 1.0,
+  motionLocks = 0,
+  material = "wood"|3,
+  collisionGroup = 1,
+  collisionMask = -1,
+  isSensor = false,
+  hullPoints = {x1,y1,z1, x2,y2,z2, ...}
+})                                          -- returns bodyHandle
 Engine.Physics.destroyBody(handle)
 Engine.Physics.applyImpulse(handle, ix, iy, iz, px, py, pz)
+Engine.Physics.applyImpulseRadius(x, y, z, radius, magnitude [, falloff])
 Engine.Physics.getTransform(handle)           -- returns x, y, z, rx, ry, rz
+Engine.Physics.setTransform(handle, x, y, z [, pitch, yaw, roll])
+Engine.Physics.setGravity(x, y, z)
 Engine.Physics.setFriction(handle, friction)
 Engine.Physics.setRestitution(handle, restitution)
 Engine.Physics.validateReplay(path)           -- Soft Step recording QA
+Engine.Physics.backend()                      -- "box3d" | "bullet" | "none"
+Engine.Physics.stats()                        -- { backend, workers, bodies, constraints }
 Engine.Physics.rayCast(x1,y1,z1, x2,y2,z2 [, cat, mask])
 Engine.Physics.convexSweep(x1,y1,z1, x2,y2,z2 [, radius])
 Engine.Physics.overlapSphere(x,y,z [, radius]) -- body handle table
+Engine.Physics.overlapBox(x,y,z [, hx,hy,hz])  -- body handle table
 Engine.Physics.getContacts(handle)            -- manifold table
 Engine.Physics.setFilter(handle, cat, mask [, group])
 Engine.Physics.attachShape(handle [, hx,hy,hz])
@@ -55,6 +80,24 @@ Engine.Physics.setSphericalLimits(c, cone [, twistLo, twistHi])
 Engine.Physics.setWheelSteering(c, angleRad [, maxTorque])
 Engine.Physics.pollEvent()                    -- Soft Step bus event or nil
 Engine.Physics.createConstraint(type, a, b, ...) -- filter|parallel|cone|…
+Engine.Physics.getClosestPoint(body, x, y, z)
+Engine.Physics.sphereTOI(x1,y1,z1, x2,y2,z2 [, radius, againstBody])
+Engine.Physics.setContinuous(body, enable)
+Engine.Physics.setSleepEnabled(body, enable)
+Engine.Physics.setSleepThreshold(body, linearThreshold)
+Engine.Physics.setHingeTarget(joint, angleRad)
+Engine.Physics.setSliderTarget(joint, translation)
+Engine.Physics.setDistanceLength(joint, length)
+Engine.Physics.setContactTuning(hertz [, damping, contactSpeed])
+Engine.Physics.setMaxLinearSpeed(maxSpeed)
+Engine.Physics.enableSpeculative(enable)
+Engine.Physics.setDebugDrawFlags(flags)
+Engine.Physics.rebuildTree()
+Engine.Physics.replayOpen([path])
+Engine.Physics.replayStep()
+Engine.Physics.replaySeek(frame)
+Engine.Physics.replayClose()
+Engine.Physics.replayStatus()                 -- open, frame, frameCount, diverged
 ```
 
 ## Engine.Particles (5 functions)

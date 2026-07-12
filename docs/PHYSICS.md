@@ -119,10 +119,10 @@ See [EDITOR_BRIDGE.md](EDITOR_BRIDGE.md) — `misc_phys_box|sphere|static|sensor
 ## Scripting
 
 - **QVM traps:** `G_PHYS_CREATEBODY` … `G_PHYS_RAYCAST`, `G_PHYS_PMOVE_CORRECT`, character traps
-- **Lua `Engine.Physics`:** bodies, sensors, constraints (incl. filter/parallel/cone), rayCast(+filter), convexSweep, overlapSphere, getContacts, attachShape, setFilter, joint spring/limits/steering, pollEvent (incl. `ragdoll`/`bone`), setFriction / setRestitution, validateReplay
+- **Lua `Engine.Physics`:** table-driven `createBody({...})` or shorthand bodies, sensors, constraints (incl. filter/parallel/cone), rayCast(+filter), convexSweep, overlapSphere/overlapBox, getContacts, attachShape, setFilter, joint spring/limits/steering/targets, pollEvent (incl. `ragdoll`/`bone`), setFriction / setRestitution / setGravity, validateReplay, stats, and Box3D tuning (`setSleepThreshold`, `setContactTuning`, `setMaxLinearSpeed`, `enableSpeculative`, `setDebugDrawFlags`)
 - **Euphoria Lua:** `createRagdoll` (death), `spawnBoundAlive`, `forceAnimState`, `hitRagdoll`
 - **DMM Lua:** `createDmm`, `fractureDmm`, `dmmStatus`
-- **Soft Step AAA Lua:** `getClosestPoint`, `sphereTOI`, `setContinuous`, `setSleepEnabled`, `setHingeTarget`, `setSliderTarget`, `setDistanceLength`, `rebuildTree`, `replayOpen`/`replayStep`/`replaySeek`/`replayClose`/`replayStatus`
+- **Soft Step AAA Lua:** `getClosestPoint`, `sphereTOI`, `setContinuous`, `setSleepEnabled`, `setSleepThreshold`, `setHingeTarget`, `setSliderTarget`, `setDistanceLength`, `rebuildTree`, `replayOpen`/`replayStep`/`replaySeek`/`replayClose`/`replayStatus`
 
 ## Ragdoll bind
 
