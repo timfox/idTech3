@@ -151,7 +151,7 @@ static struct {
 	int            ragdollCount;
 	BoxDmmObject   dmmObjects[PHYS_MAX_DMM_OBJECTS];
 	int            dmmCount;
-	b3MeshData    *meshes[64];
+	b3MeshData    *meshes[256];
 	int            meshCount;
 	b3CompoundData *compounds[64];
 	int            compoundCount;
@@ -160,7 +160,14 @@ static struct {
 	qboolean       initialized;
 	int            workerCount;
 	b3Recording   *recording;
+	b3Recording   *replayRec;
+	b3RecPlayer   *replayPlayer;
 	physSoftStepProfile_t lastProfile;
+	unsigned       debugDrawFlags; /* bit0 shapes bit1 joints bit2 contacts bit3 bounds */
+	PhysCustomFilterFn customFilterFn;
+	void          *customFilterCtx;
+	PhysPreSolveFn preSolveFn;
+	void          *preSolveCtx;
 } bx;
 
 static void box_destroy_mesh( b3MeshData *mesh ) {
@@ -372,6 +379,8 @@ static void attach_shape( b3BodyId bodyId, const physBodyDef_t *def, float densi
 	sd.enableSensorEvents = def->isSensor ? true : false;
 	sd.enableHitEvents = !def->isSensor;
 	sd.enableContactEvents = !def->isSensor;
+	sd.enableCustomFiltering = true;
+	sd.enablePreSolveEvents = true;
 	if ( def->collisionGroup ) {
 		sd.filter.categoryBits = (uint64_t)(unsigned)def->collisionGroup;
 	}
@@ -495,13 +504,29 @@ qboolean Phys_Init_Impl( void ) {
 		return qfalse;
 	}
 	bx.initialized = qtrue;
+	bx.debugDrawFlags = 0x3; /* shapes + joints */
 	{
 		cvar_t *hitCv = Cvar_Get( "phys_hitThreshold", "25", CVAR_ARCHIVE );
+		cvar_t *maxSpd = Cvar_Get( "phys_maxLinearSpeed", "0", CVAR_ARCHIVE );
+		cvar_t *specCv = Cvar_Get( "phys_speculative", "1", CVAR_ARCHIVE );
+		cvar_t *tuneH = Cvar_Get( "phys_contactHertz", "0", CVAR_ARCHIVE );
 		if ( hitCv ) {
 			b3World_SetHitEventThreshold( bx.worldId, hitCv->value );
 		}
+		if ( maxSpd && maxSpd->value > 0.0f ) {
+			b3World_SetMaximumLinearSpeed( bx.worldId, maxSpd->value );
+		}
+		if ( specCv ) {
+			b3World_EnableSpeculative( bx.worldId, specCv->integer != 0 );
+		}
+		if ( tuneH && tuneH->value > 0.0f ) {
+			cvar_t *tuneD = Cvar_Get( "phys_contactDamping", "0.7", CVAR_ARCHIVE );
+			cvar_t *tuneS = Cvar_Get( "phys_contactSpeed", "0", CVAR_ARCHIVE );
+			b3World_SetContactTuning( bx.worldId, tuneH->value,
+				tuneD ? tuneD->value : 0.7f, tuneS ? tuneS->value : 0.0f );
+		}
 	}
-	Com_Printf( "Box3D: world created (Z-up, Soft Step, workers=%d, sleep=%d, ccd=%d)\n",
+	Com_Printf( "Box3D: world created (Z-up, Soft Step AAA, workers=%d, sleep=%d, ccd=%d)\n",
 		bx.workerCount, worldDef.enableSleep ? 1 : 0, worldDef.enableContinuous ? 1 : 0 );
 	return qtrue;
 }
@@ -516,6 +541,14 @@ void Phys_Shutdown_Impl( void ) {
 		b3World_StopRecording( bx.worldId );
 		b3DestroyRecording( bx.recording );
 		bx.recording = NULL;
+	}
+	if ( bx.replayPlayer ) {
+		b3RecPlayer_Destroy( bx.replayPlayer );
+		bx.replayPlayer = NULL;
+	}
+	if ( bx.replayRec ) {
+		b3DestroyRecording( bx.replayRec );
+		bx.replayRec = NULL;
 	}
 	for ( i = 0; i < bx.dmmCount; i++ ) {
 		if ( bx.dmmObjects[i].elements ) {
@@ -2208,21 +2241,50 @@ static void box_draw_box( b3Vec3 extents, b3WorldTransform transform, b3HexColor
 	}
 }
 
+static void box_draw_point( b3Pos p, float size, b3HexColor color, void *context ) {
+	vec3_t c, a, b;
+	float rgb[3];
+	float s = size > 0.0f ? size : 2.0f;
+	(void)context;
+	box_hex_to_rgb( color, rgb );
+	to_vec3( p, c );
+	VectorSet( a, c[0] - s, c[1], c[2] );
+	VectorSet( b, c[0] + s, c[1], c[2] );
+	PhysDebug_AddLine( a, b, rgb );
+	VectorSet( a, c[0], c[1] - s, c[2] );
+	VectorSet( b, c[0], c[1] + s, c[2] );
+	PhysDebug_AddLine( a, b, rgb );
+	VectorSet( a, c[0], c[1], c[2] - s );
+	VectorSet( b, c[0], c[1], c[2] + s );
+	PhysDebug_AddLine( a, b, rgb );
+}
+
 void Phys_DebugDraw_Impl( void ) {
 	b3DebugDraw draw;
 	b3AABB bounds;
+	unsigned flags;
 
 	if ( !bx.initialized ) {
 		return;
+	}
+	flags = bx.debugDrawFlags ? bx.debugDrawFlags : 0x3u;
+	{
+		cvar_t *cv = Cvar_Get( "phys_debugContacts", "0", CVAR_ARCHIVE );
+		if ( cv && cv->integer ) {
+			flags |= 0x4u;
+		}
 	}
 	draw = b3DefaultDebugDraw();
 	draw.DrawSegmentFcn = box_draw_segment;
 	draw.DrawBoundsFcn = box_draw_bounds;
 	draw.DrawBoxFcn = box_draw_box;
-	draw.drawShapes = true;
-	draw.drawJoints = true;
-	draw.drawBounds = false;
-	draw.drawContacts = false;
+	draw.DrawPointFcn = box_draw_point;
+	draw.drawShapes = ( flags & 0x1u ) != 0;
+	draw.drawJoints = ( flags & 0x2u ) != 0;
+	draw.drawContacts = ( flags & 0x4u ) != 0;
+	draw.drawBounds = ( flags & 0x8u ) != 0;
+	draw.drawMass = ( flags & 0x10u ) != 0;
+	draw.drawSleep = ( flags & 0x20u ) != 0;
 	bounds = b3World_GetBounds( bx.worldId );
 	draw.drawingBounds = bounds;
 	b3World_Draw( bx.worldId, &draw, B3_DEFAULT_MASK_BITS );
@@ -2584,6 +2646,8 @@ physBodyHandle_t Phys_AddStaticTriMesh_Impl( const float *verts, int numVerts, c
 	sd.baseMaterial.restitution = 0.2f;
 	sd.enableHitEvents = true;
 	sd.enableContactEvents = true;
+	sd.enableCustomFiltering = true;
+	sd.enablePreSolveEvents = true;
 	pb->shapeId = b3CreateMeshShape( pb->bodyId, &sd, mesh, b3Vec3_one );
 	pb->meshData = mesh;
 	bx.meshes[bx.meshCount++] = mesh;
@@ -3117,6 +3181,300 @@ void Phys_DumpWorld_Impl( void ) {
 	}
 	b3World_DumpMemoryStats( bx.worldId );
 	Com_Printf( "[physics] Soft Step DumpMemoryStats (see stdout)\n" );
+}
+
+/* ========== Soft Step AAA surfaces ========== */
+
+static bool box_custom_filter_cb( b3ShapeId shapeIdA, b3ShapeId shapeIdB, void *context ) {
+	int bodyA = -1, bodyB = -1, ragA = -1, boneA = -1, ragB = -1, boneB = -1;
+	(void)context;
+	if ( !bx.customFilterFn ) {
+		return true;
+	}
+	box_decode_userdata( b3Body_GetUserData( b3Shape_GetBody( shapeIdA ) ), &bodyA, &ragA, &boneA );
+	box_decode_userdata( b3Body_GetUserData( b3Shape_GetBody( shapeIdB ) ), &bodyB, &ragB, &boneB );
+	return bx.customFilterFn( bodyA, bodyB, bx.customFilterCtx ) ? true : false;
+}
+
+static bool box_presolve_cb( b3ShapeId shapeIdA, b3ShapeId shapeIdB, b3Pos point, b3Vec3 normal, void *context ) {
+	int bodyA = -1, bodyB = -1, ragA = -1, boneA = -1, ragB = -1, boneB = -1;
+	vec3_t pt, nrm;
+	(void)context;
+	if ( !bx.preSolveFn ) {
+		return true;
+	}
+	box_decode_userdata( b3Body_GetUserData( b3Shape_GetBody( shapeIdA ) ), &bodyA, &ragA, &boneA );
+	box_decode_userdata( b3Body_GetUserData( b3Shape_GetBody( shapeIdB ) ), &bodyB, &ragB, &boneB );
+	to_vec3( point, pt );
+	to_vec3( normal, nrm );
+	return bx.preSolveFn( bodyA, bodyB, pt, nrm, bx.preSolveCtx ) ? true : false;
+}
+
+qboolean Phys_GetClosestPoint_Impl( physBodyHandle_t body, const vec3_t target, vec3_t closestOut, float *distanceOut ) {
+	b3Vec3 closest;
+	float dist;
+
+	if ( closestOut ) {
+		VectorClear( closestOut );
+	}
+	if ( distanceOut ) {
+		*distanceOut = 0.0f;
+	}
+	if ( !VALID_BODY( body ) || !target ) {
+		return qfalse;
+	}
+	dist = b3Body_GetClosestPoint( bx.bodies[body].bodyId, &closest, from_vec3( target ) );
+	if ( closestOut ) {
+		to_vec3( closest, closestOut );
+	}
+	if ( distanceOut ) {
+		*distanceOut = dist;
+	}
+	return qtrue;
+}
+
+qboolean Phys_SphereTimeOfImpact_Impl( const vec3_t from, const vec3_t to, float radius,
+	physBodyHandle_t againstBody, physRayResult_t *result ) {
+	physBodyDef_t def;
+	qboolean hit;
+
+	Com_Memset( &def, 0, sizeof( def ) );
+	def.shape = PHYS_SHAPE_SPHERE;
+	def.radius = radius > 0.0f ? radius : 8.0f;
+	hit = Phys_ConvexSweepFiltered_Impl( &def, from, to, NULL, result, NULL );
+	if ( hit && againstBody >= 0 && result && result->body != againstBody ) {
+		/* Soft Step world cast hit something else — treat as miss for targeted TOI */
+		Com_Memset( result, 0, sizeof( *result ) );
+		result->body = -1;
+		return qfalse;
+	}
+	return hit;
+}
+
+void Phys_SetCustomFilterCallback_Impl( PhysCustomFilterFn fn, void *userData ) {
+	if ( !bx.initialized ) {
+		return;
+	}
+	bx.customFilterFn = fn;
+	bx.customFilterCtx = userData;
+	b3World_SetCustomFilterCallback( bx.worldId, fn ? box_custom_filter_cb : NULL, NULL );
+	Com_Printf( "[physics] Soft Step custom filter callback %s\n", fn ? "set" : "cleared" );
+}
+
+void Phys_SetPreSolveCallback_Impl( PhysPreSolveFn fn, void *userData ) {
+	if ( !bx.initialized ) {
+		return;
+	}
+	bx.preSolveFn = fn;
+	bx.preSolveCtx = userData;
+	b3World_SetPreSolveCallback( bx.worldId, fn ? box_presolve_cb : NULL, NULL );
+	Com_Printf( "[physics] Soft Step pre-solve callback %s\n", fn ? "set" : "cleared" );
+}
+
+void Phys_SetBodyContinuous_Impl( physBodyHandle_t body, qboolean enable ) {
+	if ( !VALID_BODY( body ) ) {
+		return;
+	}
+	b3Body_SetBullet( bx.bodies[body].bodyId, enable ? true : false );
+}
+
+void Phys_SetBodySleepEnabled_Impl( physBodyHandle_t body, qboolean enable ) {
+	if ( !VALID_BODY( body ) ) {
+		return;
+	}
+	b3Body_EnableSleep( bx.bodies[body].bodyId, enable ? true : false );
+}
+
+void Phys_SetBodySleepThreshold_Impl( physBodyHandle_t body, float linearThreshold ) {
+	if ( !VALID_BODY( body ) ) {
+		return;
+	}
+	b3Body_SetSleepThreshold( bx.bodies[body].bodyId, linearThreshold );
+}
+
+void Phys_SetContactTuning_Impl( float hertz, float dampingRatio, float contactSpeed ) {
+	if ( !bx.initialized ) {
+		return;
+	}
+	b3World_SetContactTuning( bx.worldId, hertz, dampingRatio, contactSpeed );
+}
+
+void Phys_SetMaxLinearSpeed_Impl( float maxSpeed ) {
+	if ( !bx.initialized ) {
+		return;
+	}
+	b3World_SetMaximumLinearSpeed( bx.worldId, maxSpeed );
+}
+
+void Phys_EnableSpeculative_Impl( qboolean enable ) {
+	if ( !bx.initialized ) {
+		return;
+	}
+	b3World_EnableSpeculative( bx.worldId, enable ? true : false );
+}
+
+void Phys_SetDebugDrawFlags_Impl( unsigned flags ) {
+	bx.debugDrawFlags = flags;
+}
+
+qboolean Phys_UpdateStaticTriMesh_Impl( physBodyHandle_t body, const float *verts, int numVerts,
+	const int *indices, int numIndices ) {
+	b3MeshDef meshDef;
+	b3MeshData *mesh;
+	b3MeshData *old;
+	b3Vec3 *bverts = NULL;
+	int32_t *bindices = NULL;
+	int triCount, i;
+
+	if ( !VALID_BODY( body ) || !bx.bodies[body].meshData || !b3Shape_IsValid( bx.bodies[body].shapeId ) ) {
+		return qfalse;
+	}
+	if ( !verts || numVerts < 3 || !indices || numIndices < 3 ) {
+		return qfalse;
+	}
+	triCount = numIndices / 3;
+	if ( triCount < 1 ) {
+		return qfalse;
+	}
+	if ( bx.meshCount >= (int)( sizeof( bx.meshes ) / sizeof( bx.meshes[0] ) ) ) {
+		return qfalse;
+	}
+
+	bverts = (b3Vec3 *)malloc( (size_t)numVerts * sizeof( b3Vec3 ) );
+	bindices = (int32_t *)malloc( (size_t)triCount * 3 * sizeof( int32_t ) );
+	if ( !bverts || !bindices ) {
+		free( bverts );
+		free( bindices );
+		return qfalse;
+	}
+	for ( i = 0; i < numVerts; i++ ) {
+		bverts[i] = v3( verts[i * 3 + 0], verts[i * 3 + 1], verts[i * 3 + 2] );
+	}
+	for ( i = 0; i < triCount * 3; i++ ) {
+		bindices[i] = (int32_t)indices[i];
+	}
+	memset( &meshDef, 0, sizeof( meshDef ) );
+	meshDef.vertices = bverts;
+	meshDef.vertexCount = numVerts;
+	meshDef.indices = bindices;
+	meshDef.triangleCount = triCount;
+	meshDef.weldVertices = true;
+	meshDef.identifyEdges = true;
+	meshDef.useMedianSplit = true;
+	mesh = b3CreateMesh( &meshDef, NULL, 0 );
+	free( bverts );
+	free( bindices );
+	if ( !mesh ) {
+		return qfalse;
+	}
+
+	old = bx.bodies[body].meshData;
+	b3Shape_SetMesh( bx.bodies[body].shapeId, mesh, b3Vec3_one );
+	bx.bodies[body].meshData = mesh;
+	bx.meshes[bx.meshCount++] = mesh;
+	if ( old ) {
+		box_destroy_mesh( old );
+	}
+	b3World_RebuildStaticTree( bx.worldId );
+	return qtrue;
+}
+
+void Phys_RebuildStaticTree_Impl( void ) {
+	if ( !bx.initialized ) {
+		return;
+	}
+	b3World_RebuildStaticTree( bx.worldId );
+}
+
+qboolean Phys_ReplayOpen_Impl( const char *path ) {
+	const uint8_t *data;
+	int size;
+	int workers;
+
+	Phys_ReplayClose_Impl();
+	if ( !path || !path[0] ) {
+		return qfalse;
+	}
+	bx.replayRec = b3LoadRecordingFromFile( path );
+	if ( !bx.replayRec ) {
+		Com_Printf( S_COLOR_YELLOW "phys_replay_open: failed to load %s\n", path );
+		return qfalse;
+	}
+	data = b3Recording_GetData( bx.replayRec );
+	size = b3Recording_GetSize( bx.replayRec );
+	workers = bx.workerCount > 0 ? bx.workerCount : 1;
+	bx.replayPlayer = b3RecPlayer_Create( data, size, workers );
+	if ( !bx.replayPlayer ) {
+		b3DestroyRecording( bx.replayRec );
+		bx.replayRec = NULL;
+		Com_Printf( S_COLOR_YELLOW "phys_replay_open: RecPlayer create failed\n" );
+		return qfalse;
+	}
+	Com_Printf( "[physics] Soft Step RecPlayer open %s frames=%d\n",
+		path, b3RecPlayer_GetFrameCount( bx.replayPlayer ) );
+	return qtrue;
+}
+
+void Phys_ReplayClose_Impl( void ) {
+	if ( bx.replayPlayer ) {
+		b3RecPlayer_Destroy( bx.replayPlayer );
+		bx.replayPlayer = NULL;
+	}
+	if ( bx.replayRec ) {
+		b3DestroyRecording( bx.replayRec );
+		bx.replayRec = NULL;
+	}
+}
+
+qboolean Phys_ReplayStep_Impl( void ) {
+	if ( !bx.replayPlayer ) {
+		return qfalse;
+	}
+	return b3RecPlayer_StepFrame( bx.replayPlayer ) ? qtrue : qfalse;
+}
+
+void Phys_ReplaySeek_Impl( int frame ) {
+	if ( !bx.replayPlayer ) {
+		return;
+	}
+	b3RecPlayer_SeekFrame( bx.replayPlayer, frame );
+}
+
+int Phys_ReplayGetFrame_Impl( void ) {
+	return bx.replayPlayer ? b3RecPlayer_GetFrame( bx.replayPlayer ) : -1;
+}
+
+int Phys_ReplayGetFrameCount_Impl( void ) {
+	return bx.replayPlayer ? b3RecPlayer_GetFrameCount( bx.replayPlayer ) : 0;
+}
+
+qboolean Phys_ReplayHasDiverged_Impl( void ) {
+	return ( bx.replayPlayer && b3RecPlayer_HasDiverged( bx.replayPlayer ) ) ? qtrue : qfalse;
+}
+
+qboolean Phys_ReplayIsOpen_Impl( void ) {
+	return bx.replayPlayer ? qtrue : qfalse;
+}
+
+void Phys_SetHingeTargetAngle_Impl( physConstraintHandle_t handle, float targetRadians ) {
+	if ( !VALID_CON( handle ) || bx.constraints[handle].type != PHYS_CONSTRAINT_HINGE ) {
+		return;
+	}
+	b3RevoluteJoint_SetTargetAngle( bx.constraints[handle].jointId, targetRadians );
+}
+
+void Phys_SetSliderTarget_Impl( physConstraintHandle_t handle, float targetTranslation ) {
+	if ( !VALID_CON( handle ) || bx.constraints[handle].type != PHYS_CONSTRAINT_SLIDER ) {
+		return;
+	}
+	b3PrismaticJoint_SetTargetTranslation( bx.constraints[handle].jointId, targetTranslation );
+}
+
+void Phys_SetDistanceLength_Impl( physConstraintHandle_t handle, float length ) {
+	if ( !VALID_CON( handle ) || bx.constraints[handle].type != PHYS_CONSTRAINT_DISTANCE ) {
+		return;
+	}
+	b3DistanceJoint_SetLength( bx.constraints[handle].jointId, length );
 }
 
 #endif /* USE_BOX3D_PHYSICS_IMPL */

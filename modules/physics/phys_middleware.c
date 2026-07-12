@@ -910,6 +910,100 @@ static void PhysMiddleware_Replay_f( void ) {
 	Phys_ValidateReplay( path );
 }
 
+static void PhysMiddleware_ReplayOpen_f( void ) {
+	const char *path = "phys_recording.bin";
+	if ( Cmd_Argc() >= 2 ) {
+		path = Cmd_Argv( 1 );
+	}
+	if ( Phys_ReplayOpen( path ) ) {
+		Com_Printf( "phys_replay_open: frame %d / %d\n", Phys_ReplayGetFrame(), Phys_ReplayGetFrameCount() );
+	}
+}
+
+static void PhysMiddleware_ReplayStep_f( void ) {
+	int n = 1, i;
+	if ( !Phys_ReplayIsOpen() ) {
+		Com_Printf( "phys_replay_step: open a recording first (phys_replay_open)\n" );
+		return;
+	}
+	if ( Cmd_Argc() >= 2 ) {
+		n = atoi( Cmd_Argv( 1 ) );
+	}
+	if ( n < 1 ) {
+		n = 1;
+	}
+	for ( i = 0; i < n; i++ ) {
+		if ( !Phys_ReplayStep() ) {
+			break;
+		}
+	}
+	Com_Printf( "phys_replay_step: frame %d / %d diverged=%d\n",
+		Phys_ReplayGetFrame(), Phys_ReplayGetFrameCount(), Phys_ReplayHasDiverged() ? 1 : 0 );
+}
+
+static void PhysMiddleware_ReplaySeek_f( void ) {
+	int frame;
+	if ( !Phys_ReplayIsOpen() ) {
+		Com_Printf( "phys_replay_seek: open a recording first\n" );
+		return;
+	}
+	if ( Cmd_Argc() < 2 ) {
+		Com_Printf( "usage: phys_replay_seek <frame>\n" );
+		return;
+	}
+	frame = atoi( Cmd_Argv( 1 ) );
+	Phys_ReplaySeek( frame );
+	Com_Printf( "phys_replay_seek: frame %d / %d\n", Phys_ReplayGetFrame(), Phys_ReplayGetFrameCount() );
+}
+
+static void PhysMiddleware_ReplayClose_f( void ) {
+	Phys_ReplayClose();
+	Com_Printf( "phys_replay_close\n" );
+}
+
+static void PhysMiddleware_Closest_f( void ) {
+	physBodyHandle_t body;
+	vec3_t target, closest;
+	float dist;
+	if ( Cmd_Argc() < 5 ) {
+		Com_Printf( "usage: phys_closest <body> <x> <y> <z>\n" );
+		return;
+	}
+	body = atoi( Cmd_Argv( 1 ) );
+	target[0] = (float)atof( Cmd_Argv( 2 ) );
+	target[1] = (float)atof( Cmd_Argv( 3 ) );
+	target[2] = (float)atof( Cmd_Argv( 4 ) );
+	if ( !Phys_GetClosestPoint( body, target, closest, &dist ) ) {
+		Com_Printf( "phys_closest: failed (body %d)\n", body );
+		return;
+	}
+	Com_Printf( "phys_closest: body=%d point (%.1f %.1f %.1f) dist=%.2f\n",
+		body, closest[0], closest[1], closest[2], dist );
+}
+
+static void PhysMiddleware_SetContinuous_f( void ) {
+	if ( Cmd_Argc() < 3 ) {
+		Com_Printf( "usage: phys_set_continuous <body> <0|1>\n" );
+		return;
+	}
+	Phys_SetBodyContinuous( atoi( Cmd_Argv( 1 ) ), atoi( Cmd_Argv( 2 ) ) ? qtrue : qfalse );
+}
+
+static void PhysMiddleware_DebugFlags_f( void ) {
+	unsigned flags = 0x3;
+	if ( Cmd_Argc() >= 2 ) {
+		flags = (unsigned)atoi( Cmd_Argv( 1 ) );
+	}
+	Phys_SetDebugDrawFlags( flags );
+	Cvar_Set( "phys_debugDraw", "1" );
+	Com_Printf( "phys_debug_flags: 0x%x (bit0 shapes bit1 joints bit2 contacts bit3 bounds)\n", flags );
+}
+
+static void PhysMiddleware_RebuildTree_f( void ) {
+	Phys_RebuildStaticTree();
+	Com_Printf( "phys_rebuild_tree: Soft Step static broadphase rebuilt\n" );
+}
+
 static void PhysMiddleware_SetFriction_f( void ) {
 	physBodyHandle_t body;
 	float friction;
@@ -985,6 +1079,14 @@ void PhysMiddleware_RegisterCommands( void ) {
 	Cmd_AddCommand( "phys_record_start", PhysMiddleware_RecordStart_f );
 	Cmd_AddCommand( "phys_record_stop", PhysMiddleware_RecordStop_f );
 	Cmd_AddCommand( "phys_replay", PhysMiddleware_Replay_f );
+	Cmd_AddCommand( "phys_replay_open", PhysMiddleware_ReplayOpen_f );
+	Cmd_AddCommand( "phys_replay_step", PhysMiddleware_ReplayStep_f );
+	Cmd_AddCommand( "phys_replay_seek", PhysMiddleware_ReplaySeek_f );
+	Cmd_AddCommand( "phys_replay_close", PhysMiddleware_ReplayClose_f );
+	Cmd_AddCommand( "phys_closest", PhysMiddleware_Closest_f );
+	Cmd_AddCommand( "phys_set_continuous", PhysMiddleware_SetContinuous_f );
+	Cmd_AddCommand( "phys_debug_flags", PhysMiddleware_DebugFlags_f );
+	Cmd_AddCommand( "phys_rebuild_tree", PhysMiddleware_RebuildTree_f );
 	Cmd_AddCommand( "phys_set_friction", PhysMiddleware_SetFriction_f );
 	Cmd_AddCommand( "phys_set_restitution", PhysMiddleware_SetRestitution_f );
 	Cmd_AddCommand( "phys_set_filter", PhysMiddleware_SetFilter_f );
@@ -1054,6 +1156,14 @@ void PhysMiddleware_Shutdown( void ) {
 	Cmd_RemoveCommand( "phys_record_start" );
 	Cmd_RemoveCommand( "phys_record_stop" );
 	Cmd_RemoveCommand( "phys_replay" );
+	Cmd_RemoveCommand( "phys_replay_open" );
+	Cmd_RemoveCommand( "phys_replay_step" );
+	Cmd_RemoveCommand( "phys_replay_seek" );
+	Cmd_RemoveCommand( "phys_replay_close" );
+	Cmd_RemoveCommand( "phys_closest" );
+	Cmd_RemoveCommand( "phys_set_continuous" );
+	Cmd_RemoveCommand( "phys_debug_flags" );
+	Cmd_RemoveCommand( "phys_rebuild_tree" );
 	Cmd_RemoveCommand( "phys_set_friction" );
 	Cmd_RemoveCommand( "phys_set_restitution" );
 	Cmd_RemoveCommand( "phys_set_filter" );

@@ -568,6 +568,86 @@ static int l_phys_spawnBoundAlive(lua_State *L) {
 	lua_pushinteger( L, bound.motor );
 	return 3;
 }
+static int l_phys_getClosestPoint(lua_State *L) {
+	vec3_t target, closest;
+	float dist;
+	target[0] = (float)luaL_checknumber( L, 2 );
+	target[1] = (float)luaL_checknumber( L, 3 );
+	target[2] = (float)luaL_checknumber( L, 4 );
+	if ( !Phys_GetClosestPoint( (physBodyHandle_t)luaL_checkinteger( L, 1 ), target, closest, &dist ) ) {
+		lua_pushboolean( L, 0 );
+		return 1;
+	}
+	lua_pushboolean( L, 1 );
+	lua_pushnumber( L, closest[0] ); lua_pushnumber( L, closest[1] ); lua_pushnumber( L, closest[2] );
+	lua_pushnumber( L, dist );
+	return 5;
+}
+static int l_phys_sphereTOI(lua_State *L) {
+	vec3_t from, to;
+	physRayResult_t hit;
+	from[0]=(float)luaL_checknumber(L,1); from[1]=(float)luaL_checknumber(L,2); from[2]=(float)luaL_checknumber(L,3);
+	to[0]=(float)luaL_checknumber(L,4); to[1]=(float)luaL_checknumber(L,5); to[2]=(float)luaL_checknumber(L,6);
+	if ( !Phys_SphereTimeOfImpact( from, to, (float)luaL_optnumber( L, 7, 8 ),
+			(physBodyHandle_t)luaL_optinteger( L, 8, -1 ), &hit ) || !hit.hit ) {
+		lua_pushboolean( L, 0 );
+		return 1;
+	}
+	lua_pushboolean( L, 1 );
+	lua_pushnumber( L, hit.fraction );
+	lua_pushinteger( L, hit.body );
+	lua_pushnumber( L, hit.hitPoint[0] ); lua_pushnumber( L, hit.hitPoint[1] ); lua_pushnumber( L, hit.hitPoint[2] );
+	return 6;
+}
+static int l_phys_setContinuous(lua_State *L) {
+	Phys_SetBodyContinuous( (physBodyHandle_t)luaL_checkinteger( L, 1 ), lua_toboolean( L, 2 ) ? qtrue : qfalse );
+	return 0;
+}
+static int l_phys_setSleepEnabled(lua_State *L) {
+	Phys_SetBodySleepEnabled( (physBodyHandle_t)luaL_checkinteger( L, 1 ), lua_toboolean( L, 2 ) ? qtrue : qfalse );
+	return 0;
+}
+static int l_phys_setHingeTarget(lua_State *L) {
+	Phys_SetHingeTargetAngle( (physConstraintHandle_t)luaL_checkinteger( L, 1 ), (float)luaL_checknumber( L, 2 ) );
+	return 0;
+}
+static int l_phys_setSliderTarget(lua_State *L) {
+	Phys_SetSliderTarget( (physConstraintHandle_t)luaL_checkinteger( L, 1 ), (float)luaL_checknumber( L, 2 ) );
+	return 0;
+}
+static int l_phys_setDistanceLength(lua_State *L) {
+	Phys_SetDistanceLength( (physConstraintHandle_t)luaL_checkinteger( L, 1 ), (float)luaL_checknumber( L, 2 ) );
+	return 0;
+}
+static int l_phys_rebuildTree(lua_State *L) {
+	(void)L;
+	Phys_RebuildStaticTree();
+	return 0;
+}
+static int l_phys_replayOpen(lua_State *L) {
+	lua_pushboolean( L, Phys_ReplayOpen( luaL_optstring( L, 1, "phys_recording.bin" ) ) );
+	return 1;
+}
+static int l_phys_replayStep(lua_State *L) {
+	lua_pushboolean( L, Phys_ReplayStep() );
+	return 1;
+}
+static int l_phys_replaySeek(lua_State *L) {
+	Phys_ReplaySeek( (int)luaL_checkinteger( L, 1 ) );
+	return 0;
+}
+static int l_phys_replayClose(lua_State *L) {
+	(void)L;
+	Phys_ReplayClose();
+	return 0;
+}
+static int l_phys_replayStatus(lua_State *L) {
+	lua_pushboolean( L, Phys_ReplayIsOpen() );
+	lua_pushinteger( L, Phys_ReplayGetFrame() );
+	lua_pushinteger( L, Phys_ReplayGetFrameCount() );
+	lua_pushboolean( L, Phys_ReplayHasDiverged() );
+	return 4;
+}
 
 /* ========== Particles bindings ========== */
 
@@ -2164,6 +2244,13 @@ void LuaBindings_RegisterAll(void *luaState) {
 		{"forceAnimState", l_phys_forceAnimState}, {"hitRagdoll", l_phys_hitRagdoll},
 		{"createDmm", l_phys_createDmm}, {"fractureDmm", l_phys_fractureDmm},
 		{"dmmStatus", l_phys_dmmStatus}, {"spawnBoundAlive", l_phys_spawnBoundAlive},
+		{"getClosestPoint", l_phys_getClosestPoint}, {"sphereTOI", l_phys_sphereTOI},
+		{"setContinuous", l_phys_setContinuous}, {"setSleepEnabled", l_phys_setSleepEnabled},
+		{"setHingeTarget", l_phys_setHingeTarget}, {"setSliderTarget", l_phys_setSliderTarget},
+		{"setDistanceLength", l_phys_setDistanceLength}, {"rebuildTree", l_phys_rebuildTree},
+		{"replayOpen", l_phys_replayOpen}, {"replayStep", l_phys_replayStep},
+		{"replaySeek", l_phys_replaySeek}, {"replayClose", l_phys_replayClose},
+		{"replayStatus", l_phys_replayStatus},
 		{NULL, NULL}
 	};
 	registerTable(L, "Physics", physicsFuncs);

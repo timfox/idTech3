@@ -1015,6 +1015,198 @@ void Phys_DumpWorld(void) {
 	Com_Printf( "phys_dump: physics not initialized\n" );
 }
 
+qboolean Phys_GetClosestPoint(physBodyHandle_t body, const vec3_t target, vec3_t closestOut, float *distanceOut) {
+#ifdef PHYS_HAS_IMPL
+	if (physInitialized) return Phys_GetClosestPoint_Impl(body, target, closestOut, distanceOut);
+#endif
+	(void)body; (void)target;
+	if (closestOut) VectorClear(closestOut);
+	if (distanceOut) *distanceOut = 0.0f;
+	return qfalse;
+}
+
+qboolean Phys_SphereTimeOfImpact(const vec3_t from, const vec3_t to, float radius,
+	physBodyHandle_t againstBody, physRayResult_t *result) {
+#ifdef PHYS_HAS_IMPL
+	if (physInitialized) return Phys_SphereTimeOfImpact_Impl(from, to, radius, againstBody, result);
+#endif
+	(void)from; (void)to; (void)radius; (void)againstBody;
+	if (result) Com_Memset(result, 0, sizeof(*result));
+	return qfalse;
+}
+
+void Phys_SetCustomFilterCallback(PhysCustomFilterFn fn, void *userData) {
+#ifdef PHYS_HAS_IMPL
+	if (physInitialized) { Phys_SetCustomFilterCallback_Impl(fn, userData); return; }
+#endif
+	(void)fn; (void)userData;
+}
+
+void Phys_SetPreSolveCallback(PhysPreSolveFn fn, void *userData) {
+#ifdef PHYS_HAS_IMPL
+	if (physInitialized) { Phys_SetPreSolveCallback_Impl(fn, userData); return; }
+#endif
+	(void)fn; (void)userData;
+}
+
+void Phys_SetBodyContinuous(physBodyHandle_t body, qboolean enable) {
+#ifdef PHYS_HAS_IMPL
+	if (physInitialized) Phys_SetBodyContinuous_Impl(body, enable);
+#else
+	(void)body; (void)enable;
+#endif
+}
+
+void Phys_SetBodySleepEnabled(physBodyHandle_t body, qboolean enable) {
+#ifdef PHYS_HAS_IMPL
+	if (physInitialized) Phys_SetBodySleepEnabled_Impl(body, enable);
+#else
+	(void)body; (void)enable;
+#endif
+}
+
+void Phys_SetBodySleepThreshold(physBodyHandle_t body, float linearThreshold) {
+#ifdef PHYS_HAS_IMPL
+	if (physInitialized) Phys_SetBodySleepThreshold_Impl(body, linearThreshold);
+#else
+	(void)body; (void)linearThreshold;
+#endif
+}
+
+void Phys_SetContactTuning(float hertz, float dampingRatio, float contactSpeed) {
+#ifdef PHYS_HAS_IMPL
+	if (physInitialized) Phys_SetContactTuning_Impl(hertz, dampingRatio, contactSpeed);
+#else
+	(void)hertz; (void)dampingRatio; (void)contactSpeed;
+#endif
+}
+
+void Phys_SetMaxLinearSpeed(float maxSpeed) {
+#ifdef PHYS_HAS_IMPL
+	if (physInitialized) Phys_SetMaxLinearSpeed_Impl(maxSpeed);
+#else
+	(void)maxSpeed;
+#endif
+}
+
+void Phys_EnableSpeculative(qboolean enable) {
+#ifdef PHYS_HAS_IMPL
+	if (physInitialized) Phys_EnableSpeculative_Impl(enable);
+#else
+	(void)enable;
+#endif
+}
+
+void Phys_SetDebugDrawFlags(unsigned flags) {
+#ifdef PHYS_HAS_IMPL
+	Phys_SetDebugDrawFlags_Impl(flags);
+#else
+	(void)flags;
+#endif
+}
+
+qboolean Phys_UpdateStaticTriMesh(physBodyHandle_t body, const float *verts, int numVerts,
+	const int *indices, int numIndices) {
+#ifdef PHYS_HAS_IMPL
+	if (physInitialized) return Phys_UpdateStaticTriMesh_Impl(body, verts, numVerts, indices, numIndices);
+#endif
+	(void)body; (void)verts; (void)numVerts; (void)indices; (void)numIndices;
+	return qfalse;
+}
+
+void Phys_RebuildStaticTree(void) {
+#ifdef PHYS_HAS_IMPL
+	if (physInitialized) Phys_RebuildStaticTree_Impl();
+#endif
+}
+
+qboolean Phys_ReplayOpen(const char *path) {
+#ifdef PHYS_HAS_IMPL
+	return Phys_ReplayOpen_Impl(path);
+#else
+	(void)path;
+	return qfalse;
+#endif
+}
+
+void Phys_ReplayClose(void) {
+#ifdef PHYS_HAS_IMPL
+	Phys_ReplayClose_Impl();
+#endif
+}
+
+qboolean Phys_ReplayStep(void) {
+#ifdef PHYS_HAS_IMPL
+	return Phys_ReplayStep_Impl();
+#else
+	return qfalse;
+#endif
+}
+
+void Phys_ReplaySeek(int frame) {
+#ifdef PHYS_HAS_IMPL
+	Phys_ReplaySeek_Impl(frame);
+#else
+	(void)frame;
+#endif
+}
+
+int Phys_ReplayGetFrame(void) {
+#ifdef PHYS_HAS_IMPL
+	return Phys_ReplayGetFrame_Impl();
+#else
+	return -1;
+#endif
+}
+
+int Phys_ReplayGetFrameCount(void) {
+#ifdef PHYS_HAS_IMPL
+	return Phys_ReplayGetFrameCount_Impl();
+#else
+	return 0;
+#endif
+}
+
+qboolean Phys_ReplayHasDiverged(void) {
+#ifdef PHYS_HAS_IMPL
+	return Phys_ReplayHasDiverged_Impl();
+#else
+	return qfalse;
+#endif
+}
+
+qboolean Phys_ReplayIsOpen(void) {
+#ifdef PHYS_HAS_IMPL
+	return Phys_ReplayIsOpen_Impl();
+#else
+	return qfalse;
+#endif
+}
+
+void Phys_SetHingeTargetAngle(physConstraintHandle_t handle, float targetRadians) {
+#ifdef PHYS_HAS_IMPL
+	if (physInitialized) Phys_SetHingeTargetAngle_Impl(handle, targetRadians);
+#else
+	(void)handle; (void)targetRadians;
+#endif
+}
+
+void Phys_SetSliderTarget(physConstraintHandle_t handle, float targetTranslation) {
+#ifdef PHYS_HAS_IMPL
+	if (physInitialized) Phys_SetSliderTarget_Impl(handle, targetTranslation);
+#else
+	(void)handle; (void)targetTranslation;
+#endif
+}
+
+void Phys_SetDistanceLength(physConstraintHandle_t handle, float length) {
+#ifdef PHYS_HAS_IMPL
+	if (physInitialized) Phys_SetDistanceLength_Impl(handle, length);
+#else
+	(void)handle; (void)length;
+#endif
+}
+
 void Phys_DebugDraw(void) {
 #ifdef PHYS_HAS_IMPL
 	if (physInitialized && phys_debugDraw && phys_debugDraw->integer) {

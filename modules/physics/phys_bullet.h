@@ -368,6 +368,52 @@ void     Phys_StopRecording(const char *path);
 qboolean  Phys_ValidateReplay(const char *path);
 void      Phys_DumpWorld(void);
 
+/* Soft Step AAA: closest-point / sphere TOI against a body */
+qboolean Phys_GetClosestPoint(physBodyHandle_t body, const vec3_t target, vec3_t closestOut, float *distanceOut);
+/* Sphere swept from→to (TOI fraction); Soft Step b3TimeOfImpact vs body proxy when possible, else convex sweep. */
+qboolean Phys_SphereTimeOfImpact(const vec3_t from, const vec3_t to, float radius,
+	physBodyHandle_t againstBody, physRayResult_t *result);
+
+/* Soft Step custom filter / pre-solve (optional gameplay hooks) */
+typedef qboolean (*PhysCustomFilterFn)(physBodyHandle_t bodyA, physBodyHandle_t bodyB, void *userData);
+typedef qboolean (*PhysPreSolveFn)(physBodyHandle_t bodyA, physBodyHandle_t bodyB,
+	const vec3_t point, const vec3_t normal, void *userData);
+void Phys_SetCustomFilterCallback(PhysCustomFilterFn fn, void *userData);
+void Phys_SetPreSolveCallback(PhysPreSolveFn fn, void *userData);
+
+/* Per-body Soft Step continuous (bullet) + sleep */
+void Phys_SetBodyContinuous(physBodyHandle_t body, qboolean enable);
+void Phys_SetBodySleepEnabled(physBodyHandle_t body, qboolean enable);
+void Phys_SetBodySleepThreshold(physBodyHandle_t body, float linearThreshold);
+
+/* World Soft Step tuning */
+void Phys_SetContactTuning(float hertz, float dampingRatio, float contactSpeed);
+void Phys_SetMaxLinearSpeed(float maxSpeed);
+void Phys_EnableSpeculative(qboolean enable);
+
+/* Debug draw flags: bit0 shapes, bit1 joints, bit2 contacts, bit3 bounds, bit4 mass, bit5 sleep */
+void Phys_SetDebugDrawFlags(unsigned flags);
+
+/* Static mesh stream: update geometry in place + rebuild broadphase tree */
+qboolean Phys_UpdateStaticTriMesh(physBodyHandle_t body, const float *verts, int numVerts,
+	const int *indices, int numIndices);
+void     Phys_RebuildStaticTree(void);
+
+/* Interactive Soft Step RecPlayer (seek/step; separate from hash validate) */
+qboolean Phys_ReplayOpen(const char *path);
+void     Phys_ReplayClose(void);
+qboolean Phys_ReplayStep(void);
+void     Phys_ReplaySeek(int frame);
+int      Phys_ReplayGetFrame(void);
+int      Phys_ReplayGetFrameCount(void);
+qboolean Phys_ReplayHasDiverged(void);
+qboolean Phys_ReplayIsOpen(void);
+
+/* Joint servo / length runtime (Soft Step) */
+void Phys_SetHingeTargetAngle(physConstraintHandle_t handle, float targetRadians);
+void Phys_SetSliderTarget(physConstraintHandle_t handle, float targetTranslation);
+void Phys_SetDistanceLength(physConstraintHandle_t handle, float length);
+
 /* debug */
 void Phys_DebugDraw(void);
 int  Phys_GetBodyCount(void);

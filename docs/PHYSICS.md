@@ -56,16 +56,24 @@ Classic Q3/OA Pmove stays default (`phys_pmove 0`). Set `phys_pmove 1` for CastM
 | Joint springs / spherical limits / reaction | Done |
 | Script event poll | Done (`PhysEvent_Poll` / Lua `pollEvent`) |
 | Hit threshold + world dump | Done (`phys_hitThreshold` / `phys_dump`) |
+| Closest-point query | Done (`Phys_GetClosestPoint` / `phys_closest`) |
+| Sphere TOI / shape cast | Done (`Phys_SphereTimeOfImpact` / Soft Step CastShape) |
+| Custom filter + pre-solve callbacks | Done (`Phys_SetCustomFilterCallback` / `Phys_SetPreSolveCallback`) |
+| Interactive RecPlayer seek/step | Done (`phys_replay_open|step|seek|close`) |
+| Static mesh update + tree rebuild | Done (`Phys_UpdateStaticTriMesh` / `Phys_RebuildStaticTree`, 256 mesh slots) |
+| Per-body CCD (bullet) + sleep | Done (`Phys_SetBodyContinuous` / `Phys_SetBodySleepEnabled`) |
+| World contact / speed / speculative tuning | Done (`phys_contactHertz`, `phys_maxLinearSpeed`, `phys_speculative`) |
+| Debug draw contacts / flags | Done (`phys_debug_flags` / `phys_debugContacts`) |
+| Joint servo targets (hinge/slider/distance) | Done (`Phys_SetHingeTargetAngle` / `SetSliderTarget` / `SetDistanceLength`) |
 
 ### Optional / MED–LOW (not blockers)
 
 | API | Notes |
 |-----|-------|
-| Custom filter / pre-solve callbacks | Soft Step callbacks not wired yet |
 | Full FEM soft bodies | Not in Box3D — keep XPBD/DMM companions ([timfox/idTech3-box3d](https://github.com/timfox/idTech3-box3d) Soft Step is rigid) |
-| Interactive RecPlayer seek/step | Hash validate only today |
-| Open-world sector mesh stream | Follow-on to BSP grid bake |
-| Distance / TOI queries | Soft Step available; not exposed yet |
+| Open-world sector mesh stream | `UpdateStaticTriMesh` + `RebuildStaticTree` ready; sector residency hookup follow-on |
+| Multi-hit ray callbacks | Closest-hit + overlaps cover gameplay; callback CastRay optional |
+| Friction/restitution material callbacks | Soft Step supports; use filter/pre-solve for gameplay overrides |
 
 ## Multi-solver companions
 
@@ -114,6 +122,7 @@ See [EDITOR_BRIDGE.md](EDITOR_BRIDGE.md) — `misc_phys_box|sphere|static|sensor
 - **Lua `Engine.Physics`:** bodies, sensors, constraints (incl. filter/parallel/cone), rayCast(+filter), convexSweep, overlapSphere, getContacts, attachShape, setFilter, joint spring/limits/steering, pollEvent (incl. `ragdoll`/`bone`), setFriction / setRestitution, validateReplay
 - **Euphoria Lua:** `createRagdoll` (death), `spawnBoundAlive`, `forceAnimState`, `hitRagdoll`
 - **DMM Lua:** `createDmm`, `fractureDmm`, `dmmStatus`
+- **Soft Step AAA Lua:** `getClosestPoint`, `sphereTOI`, `setContinuous`, `setSleepEnabled`, `setHingeTarget`, `setSliderTarget`, `setDistanceLength`, `rebuildTree`, `replayOpen`/`replayStep`/`replaySeek`/`replayClose`/`replayStatus`
 
 ## Ragdoll bind
 
@@ -151,5 +160,10 @@ Then drive poses with `Phys_RagdollSetBoneAnimTarget` / `Phys_RagdollApplyMd3Fra
 | `phys_dmm_resolution` | 8 | DMM stress grid resolution |
 | `phys_dmm_fracture` | 1 | Spawn Soft Step debris on break |
 | `phys_debugDraw` | 0 | Wireframe |
+| `phys_debugContacts` | 0 | Draw Soft Step contacts when debug on |
+| `phys_contactHertz` | 0 | Soft Step contact tuning (0 = default) |
+| `phys_contactDamping` | 0.7 | With `phys_contactHertz` |
+| `phys_maxLinearSpeed` | 0 | Soft Step max linear speed clamp (0 = off) |
+| `phys_speculative` | 1 | Soft Step speculative contacts |
 
-Console: `phys_spawn_ragdoll`, `phys_hit_ragdoll`, `phys_spawn_dmm`, `phys_hit_dmm`, `phys_record_*`, `phys_replay`, `phys_set_friction`, `phys_set_restitution`, `phys_set_filter`, `phys_dump`.
+Console: `phys_spawn_ragdoll`, `phys_hit_ragdoll`, `phys_spawn_dmm`, `phys_hit_dmm`, `phys_record_*`, `phys_replay` (hash), `phys_replay_open|step|seek|close`, `phys_closest`, `phys_set_continuous`, `phys_debug_flags`, `phys_rebuild_tree`, `phys_set_friction`, `phys_set_restitution`, `phys_set_filter`, `phys_dump`.

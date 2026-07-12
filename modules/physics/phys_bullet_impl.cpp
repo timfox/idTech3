@@ -1099,4 +1099,51 @@ extern "C" void Phys_DumpWorld_Impl(void) {
 	Com_Printf( "phys_dump: Soft Step only\n" );
 }
 
+extern "C" qboolean Phys_GetClosestPoint_Impl(physBodyHandle_t body, const vec3_t target, vec3_t closestOut, float *distanceOut) {
+	(void)body; (void)target;
+	if (closestOut) { closestOut[0]=closestOut[1]=closestOut[2]=0; }
+	if (distanceOut) *distanceOut = 0.0f;
+	return qfalse;
+}
+extern "C" qboolean Phys_SphereTimeOfImpact_Impl(const vec3_t from, const vec3_t to, float radius,
+	physBodyHandle_t againstBody, physRayResult_t *result) {
+	(void)from; (void)to; (void)radius; (void)againstBody;
+	if (result) memset(result, 0, sizeof(*result));
+	return qfalse;
+}
+extern "C" void Phys_SetCustomFilterCallback_Impl(PhysCustomFilterFn fn, void *userData) { (void)fn; (void)userData; }
+extern "C" void Phys_SetPreSolveCallback_Impl(PhysPreSolveFn fn, void *userData) { (void)fn; (void)userData; }
+extern "C" void Phys_SetBodyContinuous_Impl(physBodyHandle_t body, qboolean enable) { (void)body; (void)enable; }
+extern "C" void Phys_SetBodySleepEnabled_Impl(physBodyHandle_t body, qboolean enable) { (void)body; (void)enable; }
+extern "C" void Phys_SetBodySleepThreshold_Impl(physBodyHandle_t body, float linearThreshold) { (void)body; (void)linearThreshold; }
+extern "C" void Phys_SetContactTuning_Impl(float hertz, float dampingRatio, float contactSpeed) {
+	(void)hertz; (void)dampingRatio; (void)contactSpeed;
+}
+extern "C" void Phys_SetMaxLinearSpeed_Impl(float maxSpeed) { (void)maxSpeed; }
+extern "C" void Phys_EnableSpeculative_Impl(qboolean enable) { (void)enable; }
+extern "C" void Phys_SetDebugDrawFlags_Impl(unsigned flags) { (void)flags; }
+extern "C" qboolean Phys_UpdateStaticTriMesh_Impl(physBodyHandle_t body, const float *verts, int numVerts,
+	const int *indices, int numIndices) {
+	(void)body; (void)verts; (void)numVerts; (void)indices; (void)numIndices;
+	return qfalse;
+}
+extern "C" void Phys_RebuildStaticTree_Impl(void) {}
+extern "C" qboolean Phys_ReplayOpen_Impl(const char *path) { (void)path; return qfalse; }
+extern "C" void Phys_ReplayClose_Impl(void) {}
+extern "C" qboolean Phys_ReplayStep_Impl(void) { return qfalse; }
+extern "C" void Phys_ReplaySeek_Impl(int frame) { (void)frame; }
+extern "C" int Phys_ReplayGetFrame_Impl(void) { return -1; }
+extern "C" int Phys_ReplayGetFrameCount_Impl(void) { return 0; }
+extern "C" qboolean Phys_ReplayHasDiverged_Impl(void) { return qfalse; }
+extern "C" qboolean Phys_ReplayIsOpen_Impl(void) { return qfalse; }
+extern "C" void Phys_SetHingeTargetAngle_Impl(physConstraintHandle_t handle, float targetRadians) {
+	(void)handle; (void)targetRadians;
+}
+extern "C" void Phys_SetSliderTarget_Impl(physConstraintHandle_t handle, float targetTranslation) {
+	(void)handle; (void)targetTranslation;
+}
+extern "C" void Phys_SetDistanceLength_Impl(physConstraintHandle_t handle, float length) {
+	(void)handle; (void)length;
+}
+
 #endif /* USE_BULLET_PHYSICS_IMPL */

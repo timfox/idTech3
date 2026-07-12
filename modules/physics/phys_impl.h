@@ -116,6 +116,34 @@ void                 Phys_StopRecording_Impl(const char *path);
 qboolean             Phys_ValidateReplay_Impl(const char *path);
 void                 Phys_DumpWorld_Impl(void);
 
+qboolean             Phys_GetClosestPoint_Impl(physBodyHandle_t body, const vec3_t target,
+	vec3_t closestOut, float *distanceOut);
+qboolean             Phys_SphereTimeOfImpact_Impl(const vec3_t from, const vec3_t to, float radius,
+	physBodyHandle_t againstBody, physRayResult_t *result);
+void                 Phys_SetCustomFilterCallback_Impl(PhysCustomFilterFn fn, void *userData);
+void                 Phys_SetPreSolveCallback_Impl(PhysPreSolveFn fn, void *userData);
+void                 Phys_SetBodyContinuous_Impl(physBodyHandle_t body, qboolean enable);
+void                 Phys_SetBodySleepEnabled_Impl(physBodyHandle_t body, qboolean enable);
+void                 Phys_SetBodySleepThreshold_Impl(physBodyHandle_t body, float linearThreshold);
+void                 Phys_SetContactTuning_Impl(float hertz, float dampingRatio, float contactSpeed);
+void                 Phys_SetMaxLinearSpeed_Impl(float maxSpeed);
+void                 Phys_EnableSpeculative_Impl(qboolean enable);
+void                 Phys_SetDebugDrawFlags_Impl(unsigned flags);
+qboolean             Phys_UpdateStaticTriMesh_Impl(physBodyHandle_t body, const float *verts, int numVerts,
+	const int *indices, int numIndices);
+void                 Phys_RebuildStaticTree_Impl(void);
+qboolean             Phys_ReplayOpen_Impl(const char *path);
+void                 Phys_ReplayClose_Impl(void);
+qboolean             Phys_ReplayStep_Impl(void);
+void                 Phys_ReplaySeek_Impl(int frame);
+int                  Phys_ReplayGetFrame_Impl(void);
+int                  Phys_ReplayGetFrameCount_Impl(void);
+qboolean             Phys_ReplayHasDiverged_Impl(void);
+qboolean             Phys_ReplayIsOpen_Impl(void);
+void                 Phys_SetHingeTargetAngle_Impl(physConstraintHandle_t handle, float targetRadians);
+void                 Phys_SetSliderTarget_Impl(physConstraintHandle_t handle, float targetTranslation);
+void                 Phys_SetDistanceLength_Impl(physConstraintHandle_t handle, float length);
+
 #ifdef __cplusplus
 }
 #endif
