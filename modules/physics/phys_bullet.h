@@ -54,7 +54,9 @@ typedef enum {
 	PHYS_CONSTRAINT_FIXED,
 	PHYS_CONSTRAINT_DISTANCE, /* soft spring / rope (Box3D distance joint) */
 	PHYS_CONSTRAINT_WHEEL,    /* Box3D wheel (chassis A, wheel B) */
-	PHYS_CONSTRAINT_MOTOR     /* Box3D motor joint (relative vel / pose) */
+	PHYS_CONSTRAINT_MOTOR,    /* Box3D motor joint (relative vel / pose) */
+	PHYS_CONSTRAINT_FILTER,   /* Soft Step: disable collision between body pair */
+	PHYS_CONSTRAINT_PARALLEL  /* Soft Step: keep axes parallel (upright spring) */
 } physConstraintType_t;
 
 /* Bitmask for Phys_SetBodyMotionLocks / physBodyDef_t.motionLocks */
@@ -130,6 +132,14 @@ typedef struct physConstraintDef_s {
 	float                maxMotorForce;
 	float                breakForce;   /* Soft Step joint force threshold (0 = none) */
 	float                breakTorque;  /* Soft Step joint torque threshold (0 = none) */
+	/* Soft Step spherical / cone-twist (radians; 0 cone = default 0.5) */
+	float                coneAngle;
+	float                twistLower;
+	float                twistUpper;
+	/* Soft Step spring override (0 hertz = softness mapping / joint default) */
+	float                springHertz;
+	float                springDamping;
+	float                maxSpringTorque; /* parallel joint */
 } physConstraintDef_t;
 
 #define PHYS_RAGDOLL_MAX_BONES 32
@@ -170,6 +180,9 @@ typedef struct physSoftStepProfile_s {
 	int   bodyCount;
 	int   constraintCount;
 	int   contactHitCount;
+	int   contactCount;   /* Soft Step awake/graph contacts */
+	int   shapeCount;
+	int   islandCount;
 } physSoftStepProfile_t;
 
 typedef struct dmmObjectDef_s {
@@ -260,11 +273,18 @@ void                   Phys_SetConstraintMotor(physConstraintHandle_t handle, qb
 	float speed, float maxForce);
 void                   Phys_SetConstraintBreakForce(physConstraintHandle_t handle, float force, float torque);
 void                   Phys_SetWheelSteering(physConstraintHandle_t handle, float angleRadians, float maxTorque);
+void                   Phys_SetConstraintSpring(physConstraintHandle_t handle, qboolean enable,
+	float hertz, float dampingRatio);
+void                   Phys_SetSphericalLimits(physConstraintHandle_t handle, float coneAngleRadians,
+	float twistLowerRadians, float twistUpperRadians);
+void                   Phys_GetConstraintReaction(physConstraintHandle_t handle, vec3_t forceOut, vec3_t torqueOut);
 
 /* Multi-shape / filters (Box3D Soft Step; Bullet best-effort) */
 int              Phys_AttachShape(physBodyHandle_t body, const physBodyDef_t *shapeDef);
 void             Phys_DestroyAttachedShape(physBodyHandle_t body, int shapeIndex);
 void             Phys_SetBodyFilter(physBodyHandle_t body, int categoryBits, int maskBits);
+/* groupIndex: Soft Step same negative index = no self-collide; 0 clears to default */
+void             Phys_SetBodyFilterEx(physBodyHandle_t body, int categoryBits, int maskBits, int groupIndex);
 
 /* ragdoll / Procedural animation */
 physRagdollHandle_t Phys_CreateRagdoll(const physRagdollDef_t *def);
@@ -290,6 +310,8 @@ void              Dmm_GetState(dmmObjectHandle_t handle, dmmState_t *out);
 qboolean          Dmm_IsFractured(dmmObjectHandle_t handle);
 int               Dmm_GetFragments(dmmObjectHandle_t handle, physBodyHandle_t *fragments, int maxFragments);
 void              Dmm_SetMaterialParams(dmmObjectHandle_t handle, float stiffness, float yield, float fracture);
+/* Soft Step: destroy proxy body and spawn rigid debris chunks. */
+int               Dmm_SpawnFragments(dmmObjectHandle_t handle, const vec3_t impactPoint, float energy);
 
 /* ray cast / queries */
 typedef struct physRayResult_s {
@@ -298,15 +320,40 @@ typedef struct physRayResult_s {
 	vec3_t          hitNormal;
 	float           fraction;
 	physBodyHandle_t body;
+	unsigned        userMaterialId; /* Soft Step mesh/child material */
+	int             triangleIndex;
+	int             childIndex;
 } physRayResult_t;
 
+/* Soft Step query filter; category/mask 0 = Box3D default (accept all) */
+typedef struct physQueryFilter_s {
+	unsigned categoryBits;
+	unsigned maskBits;
+} physQueryFilter_t;
+
+typedef struct physContact_s {
+	physBodyHandle_t otherBody;
+	vec3_t           point;
+	vec3_t           normal;
+	float            normalImpulse;
+	float            separation;
+} physContact_t;
+
 qboolean Phys_RayCast(const vec3_t from, const vec3_t to, physRayResult_t *result);
+qboolean Phys_RayCastFiltered(const vec3_t from, const vec3_t to, physRayResult_t *result,
+	const physQueryFilter_t *filter);
 qboolean Phys_ConvexSweep(const physBodyDef_t *shapeDef, const vec3_t from, const vec3_t to,
 	const vec3_t rotation, physRayResult_t *result);
+qboolean Phys_ConvexSweepFiltered(const physBodyDef_t *shapeDef, const vec3_t from, const vec3_t to,
+	const vec3_t rotation, physRayResult_t *result, const physQueryFilter_t *filter);
 int      Phys_OverlapSphere(const vec3_t center, float radius, physBodyHandle_t *results, int maxResults);
 int      Phys_OverlapBox(const vec3_t center, const vec3_t halfExtents, physBodyHandle_t *results, int maxResults);
 /* Soft Step OverlapShape (sphere proxy); falls back to OverlapSphere. */
 int      Phys_OverlapShape(const vec3_t center, float radius, physBodyHandle_t *results, int maxResults);
+int      Phys_OverlapShapeFiltered(const vec3_t center, float radius, physBodyHandle_t *results, int maxResults,
+	const physQueryFilter_t *filter);
+int      Phys_GetBodyContacts(physBodyHandle_t body, physContact_t *out, int maxOut);
+void     Phys_SetHitEventThreshold(float approachSpeed);
 
 void     Phys_SetBodyMaterial(physBodyHandle_t handle, int materialId);
 int      Phys_GetBodyMaterial(physBodyHandle_t handle);
@@ -319,6 +366,7 @@ void     Phys_StartRecording(void);
 void     Phys_StopRecording(const char *path);
 /* Validate a saved Soft Step recording reproduces StateHash (QA). */
 qboolean  Phys_ValidateReplay(const char *path);
+void      Phys_DumpWorld(void);
 
 /* debug */
 void Phys_DebugDraw(void);

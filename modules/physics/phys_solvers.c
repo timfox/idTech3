@@ -17,6 +17,7 @@ Copyright (C) 2026 Gopex LLC. All rights reserved.
 #include "phys_volumes.h"
 #include "phys_motor.h"
 #include "phys_procedural_anim.h"
+#include "phys_dmm.h"
 
 #include <string.h>
 
@@ -221,6 +222,16 @@ void PhysSolvers_RegisterBuiltins( void ) {
 	d.enabled = qtrue;
 	d.Step = PhysMotor_UpdateAll;
 	d.GetActiveCount = PhysMotor_GetActiveCount;
+	PhysSolvers_Register( &d );
+
+	Com_Memset( &d, 0, sizeof( d ) );
+	Q_strncpyz( d.name, "dmm", sizeof( d.name ) );
+	d.phase = PHYS_SOLVER_PHASE_POST_STEP;
+	d.enabled = qtrue;
+	d.Init = Dmm_Init;
+	d.Shutdown = Dmm_Shutdown;
+	d.Step = Dmm_UpdateAll;
+	d.GetActiveCount = Dmm_GetActiveCount;
 	PhysSolvers_Register( &d );
 
 	/* --- Soft Step primary (marker only; integrator is Phys_StepSimulation_Impl) --- */

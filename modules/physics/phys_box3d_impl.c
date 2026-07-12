@@ -96,6 +96,14 @@ typedef struct {
 	qboolean          fractured;
 	BoxDmmElement    *elements;
 	int               numElements;
+	/* Soft Step rigid proxy + debris (DMM-like fracture companion) */
+	physBodyHandle_t  body;
+	physBodyHandle_t  fragments[32];
+	int               numFragments;
+	vec3_t            position;
+	vec3_t            halfExtents;
+	float             density;
+	int               entityNum;
 	qboolean          active;
 } BoxDmmObject;
 
@@ -453,6 +461,12 @@ qboolean Phys_Init_Impl( void ) {
 		return qfalse;
 	}
 	bx.initialized = qtrue;
+	{
+		cvar_t *hitCv = Cvar_Get( "phys_hitThreshold", "25", CVAR_ARCHIVE );
+		if ( hitCv ) {
+			b3World_SetHitEventThreshold( bx.worldId, hitCv->value );
+		}
+	}
 	Com_Printf( "Box3D: world created (Z-up, Soft Step, workers=%d, sleep=%d, ccd=%d)\n",
 		bx.workerCount, worldDef.enableSleep ? 1 : 0, worldDef.enableContinuous ? 1 : 0 );
 	return qtrue;
@@ -520,12 +534,20 @@ void Phys_StepSimulation_Impl( float dt ) {
 
 	{
 		b3Profile prof = b3World_GetProfile( bx.worldId );
+		b3Counters counters = b3World_GetCounters( bx.worldId );
+		cvar_t *hitCv = Cvar_Get( "phys_hitThreshold", "25", CVAR_ARCHIVE );
 		bx.lastProfile.stepMs = prof.step;
 		bx.lastProfile.collideMs = prof.collide;
 		bx.lastProfile.solveMs = prof.solve;
 		bx.lastProfile.jointEventsMs = prof.jointEvents;
 		bx.lastProfile.bodyCount = Phys_GetBodyCount_Impl();
 		bx.lastProfile.constraintCount = Phys_GetConstraintCount_Impl();
+		bx.lastProfile.contactCount = counters.contactCount;
+		bx.lastProfile.shapeCount = counters.shapeCount;
+		bx.lastProfile.islandCount = counters.islandCount;
+		if ( hitCv ) {
+			b3World_SetHitEventThreshold( bx.worldId, hitCv->value );
+		}
 	}
 
 	for ( r = 0; r < bx.ragdollCount; r++ ) {
@@ -579,8 +601,25 @@ void Phys_StepSimulation_Impl( float dt ) {
 		BoxDmmObject *dmm = &bx.dmmObjects[r];
 		float maxStrain = 0.0f;
 		int e;
+		cvar_t *dmmEn = Cvar_Get( "phys_dmm_enabled", "1", CVAR_ARCHIVE );
+		if ( dmmEn && !dmmEn->integer ) {
+			continue;
+		}
 		if ( !dmm->active || dmm->fractured || !dmm->elements ) {
 			continue;
+		}
+		/* Accumulate Soft Step contact energy into stress grid */
+		if ( dmm->body >= 0 && VALID_BODY( dmm->body ) ) {
+			physContact_t contacts[16];
+			int n = Phys_GetBodyContacts_Impl( dmm->body, contacts, 16 );
+			int c;
+			for ( c = 0; c < n; c++ ) {
+				float energy = contacts[c].normalImpulse;
+				float s = energy * ( 0.02f / ( dmm->deformability > 0.0f ? dmm->deformability : 1.0f ) );
+				for ( e = 0; e < dmm->numElements; e++ ) {
+					dmm->elements[e].strain += s * ( 0.15f + (float)( e % 7 ) * 0.01f );
+				}
+			}
 		}
 		for ( e = 0; e < dmm->numElements; e++ ) {
 			if ( dmm->elements[e].strain > maxStrain ) {
@@ -594,6 +633,7 @@ void Phys_StepSimulation_Impl( float dt ) {
 		if ( dmm->integrity <= 0.0f ) {
 			dmm->fractured = qtrue;
 			dmm->integrity = 0.0f;
+			Com_Printf( "[physics] Soft Step DMM object %d fractured (spawn debris via Dmm_Fracture)\n", r );
 		}
 	}
 }
@@ -971,6 +1011,33 @@ physConstraintHandle_t Phys_CreateConstraint_Impl( const physConstraintDef_t *de
 		pc->jointId = b3CreateWeldJoint( bx.worldId, &jd );
 		break;
 	}
+	case PHYS_CONSTRAINT_FILTER: {
+		b3FilterJointDef jd = b3DefaultFilterJointDef();
+		jd.base.bodyIdA = bx.bodies[def->bodyA].bodyId;
+		jd.base.bodyIdB = bx.bodies[def->bodyB].bodyId;
+		jd.base.collideConnected = false;
+		pc->jointId = b3CreateFilterJoint( bx.worldId, &jd );
+		break;
+	}
+	case PHYS_CONSTRAINT_PARALLEL: {
+		b3ParallelJointDef jd = b3DefaultParallelJointDef();
+		jd.base.bodyIdA = bx.bodies[def->bodyA].bodyId;
+		jd.base.bodyIdB = bx.bodies[def->bodyB].bodyId;
+		jd.base.localFrameA = frameA;
+		jd.base.localFrameB = frameB;
+		jd.base.collideConnected = !def->disableCollision;
+		if ( def->springHertz > 0.0f ) {
+			jd.hertz = def->springHertz;
+		}
+		if ( def->springDamping > 0.0f ) {
+			jd.dampingRatio = def->springDamping;
+		}
+		if ( def->maxSpringTorque > 0.0f ) {
+			jd.maxTorque = def->maxSpringTorque;
+		}
+		pc->jointId = b3CreateParallelJoint( bx.worldId, &jd );
+		break;
+	}
 	case PHYS_CONSTRAINT_POINT:
 	case PHYS_CONSTRAINT_CONE_TWIST:
 	default: {
@@ -981,7 +1048,17 @@ physConstraintHandle_t Phys_CreateConstraint_Impl( const physConstraintDef_t *de
 		jd.base.localFrameB = frameB;
 		jd.base.collideConnected = !def->disableCollision;
 		jd.enableConeLimit = true;
-		jd.coneAngle = 0.5f;
+		jd.coneAngle = def->coneAngle > 0.0f ? def->coneAngle : 0.5f;
+		if ( def->twistLower != 0.0f || def->twistUpper != 0.0f ) {
+			jd.enableTwistLimit = true;
+			jd.lowerTwistAngle = def->twistLower;
+			jd.upperTwistAngle = def->twistUpper;
+		}
+		if ( def->springHertz > 0.0f ) {
+			jd.enableSpring = true;
+			jd.hertz = def->springHertz;
+			jd.dampingRatio = def->springDamping > 0.0f ? def->springDamping : 0.7f;
+		}
 		pc->jointId = b3CreateSphericalJoint( bx.worldId, &jd );
 		break;
 	}
@@ -1086,6 +1163,104 @@ void Phys_SetWheelSteering_Impl( physConstraintHandle_t h, float angleRadians, f
 	b3WheelJoint_SetTargetSteeringAngle( bx.constraints[h].jointId, angleRadians );
 	if ( maxTorque > 0.0f ) {
 		b3WheelJoint_SetMaxSteeringTorque( bx.constraints[h].jointId, maxTorque );
+	}
+}
+
+void Phys_SetConstraintSpring_Impl( physConstraintHandle_t h, qboolean enable, float hertz, float dampingRatio ) {
+	b3JointId jid;
+	if ( !VALID_CON( h ) ) {
+		return;
+	}
+	jid = bx.constraints[h].jointId;
+	switch ( bx.constraints[h].type ) {
+	case PHYS_CONSTRAINT_HINGE:
+		b3RevoluteJoint_EnableSpring( jid, enable ? true : false );
+		if ( hertz > 0.0f ) {
+			b3RevoluteJoint_SetSpringHertz( jid, hertz );
+		}
+		if ( dampingRatio > 0.0f ) {
+			b3RevoluteJoint_SetSpringDampingRatio( jid, dampingRatio );
+		}
+		break;
+	case PHYS_CONSTRAINT_SLIDER:
+		b3PrismaticJoint_EnableSpring( jid, enable ? true : false );
+		if ( hertz > 0.0f ) {
+			b3PrismaticJoint_SetSpringHertz( jid, hertz );
+		}
+		if ( dampingRatio > 0.0f ) {
+			b3PrismaticJoint_SetSpringDampingRatio( jid, dampingRatio );
+		}
+		break;
+	case PHYS_CONSTRAINT_DISTANCE:
+		b3DistanceJoint_EnableSpring( jid, enable ? true : false );
+		if ( hertz > 0.0f ) {
+			b3DistanceJoint_SetSpringHertz( jid, hertz );
+		}
+		if ( dampingRatio > 0.0f ) {
+			b3DistanceJoint_SetSpringDampingRatio( jid, dampingRatio );
+		}
+		break;
+	case PHYS_CONSTRAINT_POINT:
+	case PHYS_CONSTRAINT_CONE_TWIST:
+		b3SphericalJoint_EnableSpring( jid, enable ? true : false );
+		if ( hertz > 0.0f ) {
+			b3SphericalJoint_SetSpringHertz( jid, hertz );
+		}
+		if ( dampingRatio > 0.0f ) {
+			b3SphericalJoint_SetSpringDampingRatio( jid, dampingRatio );
+		}
+		break;
+	case PHYS_CONSTRAINT_PARALLEL:
+		if ( hertz > 0.0f ) {
+			b3ParallelJoint_SetSpringHertz( jid, hertz );
+		}
+		if ( dampingRatio > 0.0f ) {
+			b3ParallelJoint_SetSpringDampingRatio( jid, dampingRatio );
+		}
+		(void)enable;
+		break;
+	default:
+		break;
+	}
+}
+
+void Phys_SetSphericalLimits_Impl( physConstraintHandle_t h, float coneAngleRadians,
+	float twistLowerRadians, float twistUpperRadians ) {
+	b3JointId jid;
+	if ( !VALID_CON( h ) ) {
+		return;
+	}
+	if ( bx.constraints[h].type != PHYS_CONSTRAINT_POINT
+		&& bx.constraints[h].type != PHYS_CONSTRAINT_CONE_TWIST ) {
+		return;
+	}
+	jid = bx.constraints[h].jointId;
+	if ( coneAngleRadians > 0.0f ) {
+		b3SphericalJoint_EnableConeLimit( jid, true );
+		b3SphericalJoint_SetConeLimit( jid, coneAngleRadians );
+	}
+	b3SphericalJoint_EnableTwistLimit( jid, true );
+	b3SphericalJoint_SetTwistLimits( jid, twistLowerRadians, twistUpperRadians );
+}
+
+void Phys_GetConstraintReaction_Impl( physConstraintHandle_t h, vec3_t forceOut, vec3_t torqueOut ) {
+	b3Vec3 f, t;
+	if ( forceOut ) {
+		VectorClear( forceOut );
+	}
+	if ( torqueOut ) {
+		VectorClear( torqueOut );
+	}
+	if ( !VALID_CON( h ) ) {
+		return;
+	}
+	f = b3Joint_GetConstraintForce( bx.constraints[h].jointId );
+	t = b3Joint_GetConstraintTorque( bx.constraints[h].jointId );
+	if ( forceOut ) {
+		to_vec3( f, forceOut );
+	}
+	if ( torqueOut ) {
+		to_vec3( t, torqueOut );
 	}
 }
 
@@ -1359,15 +1534,23 @@ int Phys_GetRagdollCount_Impl( void ) {
 	return n;
 }
 
-/* ========== DMM stress grid (no soft-body dependency) ========== */
+/* Phys_GetBodyContacts_Impl declared in phys_impl.h */
 
 dmmObjectHandle_t Dmm_CreateObject_Impl( const dmmObjectDef_t *def ) {
 	BoxDmmObject *dmm;
+	physBodyDef_t bodyDef;
 	int idx;
 	int res;
 	float stiff, yield, frac;
+	cvar_t *resCv;
+	cvar_t *dmmEn;
 
 	if ( !bx.initialized || !def || bx.dmmCount >= PHYS_MAX_DMM_OBJECTS ) {
+		return -1;
+	}
+	dmmEn = Cvar_Get( "phys_dmm_enabled", "1", CVAR_ARCHIVE );
+	if ( dmmEn && !dmmEn->integer ) {
+		Com_Printf( "[physics] DMM disabled (phys_dmm_enabled 0)\n" );
 		return -1;
 	}
 	idx = bx.dmmCount++;
@@ -1375,6 +1558,14 @@ dmmObjectHandle_t Dmm_CreateObject_Impl( const dmmObjectDef_t *def ) {
 	memset( dmm, 0, sizeof( *dmm ) );
 	dmm->material = def->material;
 	dmm->deformability = def->deformability > 0 ? def->deformability : 1.0f;
+	dmm->body = -1;
+	dmm->numFragments = 0;
+	dmm->entityNum = def->entityNum;
+	VectorCopy( def->position, dmm->position );
+	dmm->halfExtents[0] = def->dimensions[0] > 0.0f ? def->dimensions[0] * 0.5f : 16.0f;
+	dmm->halfExtents[1] = def->dimensions[1] > 0.0f ? def->dimensions[1] * 0.5f : 16.0f;
+	dmm->halfExtents[2] = def->dimensions[2] > 0.0f ? def->dimensions[2] * 0.5f : 16.0f;
+	dmm->density = def->density > 0.0f ? def->density : 1.0f;
 	if ( def->stiffness > 0 ) {
 		stiff = def->stiffness;
 		yield = def->yieldStrength;
@@ -1386,42 +1577,88 @@ dmmObjectHandle_t Dmm_CreateObject_Impl( const dmmObjectDef_t *def ) {
 	dmm->yieldStrength = yield;
 	dmm->fractureStrength = frac;
 	dmm->integrity = 1.0f;
-	res = def->gridResolution > 0 ? def->gridResolution : 8;
+	resCv = Cvar_Get( "phys_dmm_resolution", "8", CVAR_ARCHIVE );
+	res = def->gridResolution > 0 ? def->gridResolution : ( resCv ? resCv->integer : 8 );
+	if ( res < 2 ) {
+		res = 2;
+	}
+	if ( res > 16 ) {
+		res = 16;
+	}
 	dmm->numElements = res * res * res;
 	dmm->elements = (BoxDmmElement *)calloc( (size_t)dmm->numElements, sizeof( BoxDmmElement ) );
+
+	/* Soft Step rigid proxy — DMM-like continuum is stress on this body */
+	memset( &bodyDef, 0, sizeof( bodyDef ) );
+	bodyDef.shape = PHYS_SHAPE_BOX;
+	bodyDef.type = PHYS_BODY_DYNAMIC;
+	VectorCopy( def->position, bodyDef.position );
+	VectorCopy( def->rotation, bodyDef.rotation );
+	VectorCopy( dmm->halfExtents, bodyDef.halfExtents );
+	bodyDef.mass = dmm->halfExtents[0] * dmm->halfExtents[1] * dmm->halfExtents[2] * dmm->density * 0.001f;
+	if ( bodyDef.mass < 1.0f ) {
+		bodyDef.mass = 40.0f;
+	}
+	bodyDef.friction = 0.7f;
+	bodyDef.restitution = 0.05f;
+	bodyDef.linearDamping = 0.05f;
+	bodyDef.angularDamping = 0.1f;
+	bodyDef.materialId = (int)def->material;
+	dmm->body = Phys_CreateBody_Impl( &bodyDef );
 	dmm->active = qtrue;
+	Com_Printf( "[physics] Soft Step DMM object %d body=%d mat=%d (stress grid %d)\n",
+		idx, dmm->body, (int)def->material, dmm->numElements );
 	return idx;
 }
 
 void Dmm_DestroyObject_Impl( dmmObjectHandle_t h ) {
+	int i;
 	if ( !VALID_DMM( h ) ) {
 		return;
+	}
+	if ( bx.dmmObjects[h].body >= 0 ) {
+		Phys_DestroyBody_Impl( bx.dmmObjects[h].body );
+	}
+	for ( i = 0; i < bx.dmmObjects[h].numFragments; i++ ) {
+		if ( bx.dmmObjects[h].fragments[i] >= 0 ) {
+			Phys_DestroyBody_Impl( bx.dmmObjects[h].fragments[i] );
+		}
 	}
 	free( bx.dmmObjects[h].elements );
 	memset( &bx.dmmObjects[h], 0, sizeof( bx.dmmObjects[h] ) );
 }
 
 void Dmm_ApplyForce_Impl( dmmObjectHandle_t h, const vec3_t force, const vec3_t point ) {
-	(void)h;
-	(void)force;
-	(void)point;
+	if ( !VALID_DMM( h ) || bx.dmmObjects[h].body < 0 ) {
+		return;
+	}
+	Phys_ApplyForce_Impl( bx.dmmObjects[h].body, force, point );
 }
 
 void Dmm_ApplyImpact_Impl( dmmObjectHandle_t h, const vec3_t point, const vec3_t direction, float energy ) {
 	BoxDmmObject *dmm;
 	float stress;
 	int i;
+	vec3_t impulse, dir;
 
-	(void)point;
-	(void)direction;
 	if ( !VALID_DMM( h ) || bx.dmmObjects[h].fractured ) {
 		return;
 	}
 	dmm = &bx.dmmObjects[h];
-	stress = energy / dmm->deformability;
+	stress = energy / ( dmm->deformability > 0.0f ? dmm->deformability : 1.0f );
 	for ( i = 0; i < dmm->numElements; i++ ) {
 		dmm->elements[i].strain += stress * 0.5f;
 		dmm->elements[i].stress = dmm->elements[i].strain * ( 1.0f - dmm->elements[i].plasticity );
+	}
+	if ( dmm->body >= 0 ) {
+		VectorCopy( direction, dir );
+		if ( VectorLength( dir ) < 0.001f ) {
+			VectorSet( dir, 0.0f, 0.0f, 1.0f );
+		} else {
+			VectorNormalize( dir );
+		}
+		VectorScale( dir, energy * 0.15f, impulse );
+		Phys_ApplyImpulse_Impl( dmm->body, impulse, point );
 	}
 }
 
@@ -1448,7 +1685,7 @@ void Dmm_GetState_Impl( dmmObjectHandle_t h, dmmState_t *out ) {
 	out->deformation = 1.0f - dmm->integrity;
 	out->integrity = dmm->integrity;
 	out->fractured = dmm->fractured;
-	out->numFragments = 0;
+	out->numFragments = dmm->numFragments;
 }
 
 qboolean Dmm_IsFractured_Impl( dmmObjectHandle_t h ) {
@@ -1456,10 +1693,18 @@ qboolean Dmm_IsFractured_Impl( dmmObjectHandle_t h ) {
 }
 
 int Dmm_GetFragments_Impl( dmmObjectHandle_t h, physBodyHandle_t *fragments, int maxFragments ) {
-	(void)h;
-	(void)fragments;
-	(void)maxFragments;
-	return 0;
+	BoxDmmObject *dmm;
+	int n, i;
+
+	if ( !VALID_DMM( h ) || !fragments || maxFragments <= 0 ) {
+		return 0;
+	}
+	dmm = &bx.dmmObjects[h];
+	n = dmm->numFragments < maxFragments ? dmm->numFragments : maxFragments;
+	for ( i = 0; i < n; i++ ) {
+		fragments[i] = dmm->fragments[i];
+	}
+	return n;
 }
 
 void Dmm_SetMaterialParams_Impl( dmmObjectHandle_t h, float stiffness, float yield, float fracture ) {
@@ -1471,6 +1716,73 @@ void Dmm_SetMaterialParams_Impl( dmmObjectHandle_t h, float stiffness, float yie
 	bx.dmmObjects[h].fractureStrength = fracture;
 }
 
+/*
+===============
+Dmm_SpawnFragments_Impl
+Internal Soft Step debris spawn used by enhanced Dmm_Fracture path.
+===============
+*/
+int Dmm_SpawnFragments_Impl( dmmObjectHandle_t h, const vec3_t impactPoint, float energy ) {
+	BoxDmmObject *dmm;
+	cvar_t *fracCv;
+	int f, count;
+	float hx, hy, hz;
+
+	if ( !VALID_DMM( h ) ) {
+		return 0;
+	}
+	fracCv = Cvar_Get( "phys_dmm_fracture", "1", CVAR_ARCHIVE );
+	if ( fracCv && !fracCv->integer ) {
+		bx.dmmObjects[h].fractured = qtrue;
+		return 0;
+	}
+	dmm = &bx.dmmObjects[h];
+	dmm->fractured = qtrue;
+	if ( dmm->body >= 0 ) {
+		Phys_DestroyBody_Impl( dmm->body );
+		dmm->body = -1;
+	}
+	hx = dmm->halfExtents[0];
+	hy = dmm->halfExtents[1];
+	hz = dmm->halfExtents[2];
+	count = 8;
+	if ( count > (int)( sizeof( dmm->fragments ) / sizeof( dmm->fragments[0] ) ) ) {
+		count = (int)( sizeof( dmm->fragments ) / sizeof( dmm->fragments[0] ) );
+	}
+	for ( f = 0; f < count; f++ ) {
+		physBodyDef_t fragDef;
+		vec3_t offset, impulse, zero;
+		float sx = ( f & 1 ) ? 0.5f : -0.5f;
+		float sy = ( f & 2 ) ? 0.5f : -0.5f;
+		float sz = ( f & 4 ) ? 0.5f : -0.5f;
+
+		memset( &fragDef, 0, sizeof( fragDef ) );
+		fragDef.shape = PHYS_SHAPE_BOX;
+		fragDef.type = PHYS_BODY_DYNAMIC;
+		fragDef.position[0] = dmm->position[0] + sx * hx * 0.5f;
+		fragDef.position[1] = dmm->position[1] + sy * hy * 0.5f;
+		fragDef.position[2] = dmm->position[2] + sz * hz * 0.5f;
+		fragDef.halfExtents[0] = hx * 0.45f;
+		fragDef.halfExtents[1] = hy * 0.45f;
+		fragDef.halfExtents[2] = hz * 0.45f;
+		fragDef.mass = 8.0f + (float)f;
+		fragDef.friction = 0.6f;
+		fragDef.restitution = 0.15f;
+		dmm->fragments[f] = Phys_CreateBody_Impl( &fragDef );
+		if ( dmm->fragments[f] >= 0 ) {
+			VectorSet( offset, sx, sy, sz );
+			VectorNormalize( offset );
+			VectorScale( offset, energy * 0.08f * ( 0.5f + 0.1f * (float)f ), impulse );
+			VectorClear( zero );
+			Phys_ApplyImpulse_Impl( dmm->fragments[f], impulse, zero );
+			(void)impactPoint;
+		}
+	}
+	dmm->numFragments = count;
+	Com_Printf( "[physics] Soft Step DMM %d → %d debris bodies\n", h, count );
+	return count;
+}
+
 /* ========== queries ========== */
 
 typedef struct {
@@ -1479,6 +1791,19 @@ typedef struct {
 	qboolean         hit;
 } boxRayCtx;
 
+static b3QueryFilter box_make_query_filter( const physQueryFilter_t *filter ) {
+	b3QueryFilter f = b3DefaultQueryFilter();
+	if ( filter ) {
+		if ( filter->categoryBits ) {
+			f.categoryBits = (uint64_t)filter->categoryBits;
+		}
+		if ( filter->maskBits ) {
+			f.maskBits = (uint64_t)filter->maskBits;
+		}
+	}
+	return f;
+}
+
 static float box_ray_cb( b3ShapeId shapeId, b3Pos point, b3Vec3 normal, float fraction, uint64_t userMaterialId,
 	int triangleIndex, int childIndex, void *context ) {
 	boxRayCtx *ctx = (boxRayCtx *)context;
@@ -1486,15 +1811,15 @@ static float box_ray_cb( b3ShapeId shapeId, b3Pos point, b3Vec3 normal, float fr
 	void *ud;
 	int handle;
 
-	(void)triangleIndex;
-	(void)childIndex;
-	(void)userMaterialId;
 	if ( fraction < ctx->closest ) {
 		ctx->closest = fraction;
 		ctx->hit = qtrue;
 		to_vec3( point, ctx->result->hitPoint );
 		to_vec3( normal, ctx->result->hitNormal );
 		ctx->result->fraction = fraction;
+		ctx->result->userMaterialId = (unsigned)userMaterialId;
+		ctx->result->triangleIndex = triangleIndex;
+		ctx->result->childIndex = childIndex;
 		bodyId = b3Shape_GetBody( shapeId );
 		ud = b3Body_GetUserData( bodyId );
 		handle = (int)(intptr_t)ud - 1;
@@ -1504,9 +1829,10 @@ static float box_ray_cb( b3ShapeId shapeId, b3Pos point, b3Vec3 normal, float fr
 	return fraction;
 }
 
-qboolean Phys_RayCast_Impl( const vec3_t from, const vec3_t to, physRayResult_t *result ) {
+qboolean Phys_RayCastFiltered_Impl( const vec3_t from, const vec3_t to, physRayResult_t *result,
+	const physQueryFilter_t *filter ) {
 	b3Vec3 origin, translation;
-	b3QueryFilter filter;
+	b3QueryFilter qf;
 	b3RayResult hit;
 
 	if ( !result ) {
@@ -1514,13 +1840,15 @@ qboolean Phys_RayCast_Impl( const vec3_t from, const vec3_t to, physRayResult_t 
 	}
 	memset( result, 0, sizeof( *result ) );
 	result->body = -1;
+	result->triangleIndex = -1;
+	result->childIndex = -1;
 	if ( !bx.initialized ) {
 		return qfalse;
 	}
 	origin = from_vec3( from );
 	translation = b3Sub( from_vec3( to ), origin );
-	filter = b3DefaultQueryFilter();
-	hit = b3World_CastRayClosest( bx.worldId, origin, translation, filter );
+	qf = box_make_query_filter( filter );
+	hit = b3World_CastRayClosest( bx.worldId, origin, translation, qf );
 	if ( !hit.hit ) {
 		return qfalse;
 	}
@@ -1528,6 +1856,9 @@ qboolean Phys_RayCast_Impl( const vec3_t from, const vec3_t to, physRayResult_t 
 	to_vec3( hit.normal, result->hitNormal );
 	result->fraction = hit.fraction;
 	result->hit = qtrue;
+	result->userMaterialId = (unsigned)hit.userMaterialId;
+	result->triangleIndex = hit.triangleIndex;
+	result->childIndex = hit.childIndex;
 	if ( b3Shape_IsValid( hit.shapeId ) ) {
 		void *ud = b3Body_GetUserData( b3Shape_GetBody( hit.shapeId ) );
 		if ( ud ) {
@@ -1537,12 +1868,16 @@ qboolean Phys_RayCast_Impl( const vec3_t from, const vec3_t to, physRayResult_t 
 	return qtrue;
 }
 
-qboolean Phys_ConvexSweep_Impl( const physBodyDef_t *shapeDef, const vec3_t from, const vec3_t to,
-	const vec3_t rotation, physRayResult_t *result ) {
+qboolean Phys_RayCast_Impl( const vec3_t from, const vec3_t to, physRayResult_t *result ) {
+	return Phys_RayCastFiltered_Impl( from, to, result, NULL );
+}
+
+qboolean Phys_ConvexSweepFiltered_Impl( const physBodyDef_t *shapeDef, const vec3_t from, const vec3_t to,
+	const vec3_t rotation, physRayResult_t *result, const physQueryFilter_t *filter ) {
 	b3Vec3 points[B3_MAX_SHAPE_CAST_POINTS];
 	b3ShapeProxy proxy;
 	b3Vec3 origin, translation;
-	b3QueryFilter filter;
+	b3QueryFilter qf;
 	b3Quat q;
 	boxRayCtx ctx;
 	int i;
@@ -1553,6 +1888,8 @@ qboolean Phys_ConvexSweep_Impl( const physBodyDef_t *shapeDef, const vec3_t from
 	}
 	memset( result, 0, sizeof( *result ) );
 	result->body = -1;
+	result->triangleIndex = -1;
+	result->childIndex = -1;
 	if ( !bx.initialized || !shapeDef ) {
 		return qfalse;
 	}
@@ -1601,12 +1938,17 @@ qboolean Phys_ConvexSweep_Impl( const physBodyDef_t *shapeDef, const vec3_t from
 
 	origin = from_vec3( from );
 	translation = b3Sub( from_vec3( to ), origin );
-	filter = b3DefaultQueryFilter();
+	qf = box_make_query_filter( filter );
 	ctx.result = result;
 	ctx.closest = 1.0f;
 	ctx.hit = qfalse;
-	b3World_CastShape( bx.worldId, origin, &proxy, translation, filter, box_ray_cb, &ctx );
+	b3World_CastShape( bx.worldId, origin, &proxy, translation, qf, box_ray_cb, &ctx );
 	return ctx.hit;
+}
+
+qboolean Phys_ConvexSweep_Impl( const physBodyDef_t *shapeDef, const vec3_t from, const vec3_t to,
+	const vec3_t rotation, physRayResult_t *result ) {
+	return Phys_ConvexSweepFiltered_Impl( shapeDef, from, to, rotation, result, NULL );
 }
 
 typedef struct {
@@ -1634,22 +1976,35 @@ static bool box_overlap_cb( b3ShapeId shapeId, void *context ) {
 	return ctx->count < ctx->maxResults;
 }
 
-int Phys_OverlapSphere_Impl( const vec3_t center, float radius, physBodyHandle_t *results, int maxResults ) {
-	b3AABB aabb;
-	b3QueryFilter filter;
+int Phys_OverlapShapeFiltered_Impl( const vec3_t center, float radius, physBodyHandle_t *results, int maxResults,
+	const physQueryFilter_t *filter ) {
+	b3Vec3 points[1];
+	b3ShapeProxy proxy;
+	b3QueryFilter qf;
 	boxOverlapCtx ctx;
 
 	if ( !bx.initialized || !results || maxResults <= 0 ) {
 		return 0;
 	}
-	aabb.lowerBound = v3( center[0] - radius, center[1] - radius, center[2] - radius );
-	aabb.upperBound = v3( center[0] + radius, center[1] + radius, center[2] + radius );
-	filter = b3DefaultQueryFilter();
+	points[0] = b3Vec3_zero;
+	proxy.points = points;
+	proxy.count = 1;
+	proxy.radius = radius > 0.0f ? radius : 8.0f;
+	qf = box_make_query_filter( filter );
 	ctx.results = results;
 	ctx.maxResults = maxResults;
 	ctx.count = 0;
-	b3World_OverlapAABB( bx.worldId, aabb, filter, box_overlap_cb, &ctx );
+	b3World_OverlapShape( bx.worldId, from_vec3( center ), &proxy, qf, box_overlap_cb, &ctx );
 	return ctx.count;
+}
+
+int Phys_OverlapShape_Impl( const vec3_t center, float radius, physBodyHandle_t *results, int maxResults ) {
+	return Phys_OverlapShapeFiltered_Impl( center, radius, results, maxResults, NULL );
+}
+
+int Phys_OverlapSphere_Impl( const vec3_t center, float radius, physBodyHandle_t *results, int maxResults ) {
+	/* Exact Soft Step sphere overlap (not AABB broadphase). */
+	return Phys_OverlapShapeFiltered_Impl( center, radius, results, maxResults, NULL );
 }
 
 int Phys_OverlapBox_Impl( const vec3_t center, const vec3_t halfExtents, physBodyHandle_t *results, int maxResults ) {
@@ -1670,25 +2025,71 @@ int Phys_OverlapBox_Impl( const vec3_t center, const vec3_t halfExtents, physBod
 	return ctx.count;
 }
 
-int Phys_OverlapShape_Impl( const vec3_t center, float radius, physBodyHandle_t *results, int maxResults ) {
-	b3Vec3 points[1];
-	b3ShapeProxy proxy;
-	b3QueryFilter filter;
-	boxOverlapCtx ctx;
+static qboolean box_fill_contact_point( b3ContactId contactId, physBodyHandle_t selfBody,
+	physContact_t *out ) {
+	b3ContactData data;
+	const b3Manifold *m;
+	b3ManifoldPoint mp;
+	b3BodyId bodyA, bodyB;
+	void *ud;
+	int other = -1;
+	b3Pos pos;
 
-	if ( !bx.initialized || !results || maxResults <= 0 ) {
+	if ( !out || !b3Contact_IsValid( contactId ) ) {
+		return qfalse;
+	}
+	data = b3Contact_GetData( contactId );
+	if ( !data.manifolds || data.manifoldCount <= 0 || data.manifolds[0].pointCount <= 0 ) {
+		return qfalse;
+	}
+	m = &data.manifolds[0];
+	mp = m->points[0];
+	bodyA = b3Shape_GetBody( data.shapeIdA );
+	bodyB = b3Shape_GetBody( data.shapeIdB );
+	ud = b3Body_GetUserData( bodyA );
+	if ( ud && ( (int)(intptr_t)ud - 1 ) == selfBody ) {
+		ud = b3Body_GetUserData( bodyB );
+		other = ud ? (int)(intptr_t)ud - 1 : -1;
+		pos = b3Add( b3Body_GetPosition( bodyA ), mp.anchorA );
+	} else {
+		ud = b3Body_GetUserData( bodyA );
+		other = ud ? (int)(intptr_t)ud - 1 : -1;
+		pos = b3Add( b3Body_GetPosition( bodyB ), mp.anchorB );
+	}
+	Com_Memset( out, 0, sizeof( *out ) );
+	out->otherBody = other;
+	to_vec3( pos, out->point );
+	to_vec3( m->normal, out->normal );
+	out->normalImpulse = mp.totalNormalImpulse;
+	out->separation = mp.separation;
+	return qtrue;
+}
+
+int Phys_GetBodyContacts_Impl( physBodyHandle_t body, physContact_t *out, int maxOut ) {
+	b3ContactData contacts[32];
+	int n, i, written = 0;
+
+	if ( !VALID_BODY( body ) || !out || maxOut <= 0 ) {
 		return 0;
 	}
-	points[0] = b3Vec3_zero;
-	proxy.points = points;
-	proxy.count = 1;
-	proxy.radius = radius > 0.0f ? radius : 8.0f;
-	filter = b3DefaultQueryFilter();
-	ctx.results = results;
-	ctx.maxResults = maxResults;
-	ctx.count = 0;
-	b3World_OverlapShape( bx.worldId, from_vec3( center ), &proxy, filter, box_overlap_cb, &ctx );
-	return ctx.count;
+	n = b3Body_GetContactData( bx.bodies[body].bodyId, contacts, 32 );
+	for ( i = 0; i < n && written < maxOut; i++ ) {
+		if ( box_fill_contact_point( contacts[i].contactId, body, &out[written] ) ) {
+			written++;
+		}
+	}
+	return written;
+}
+
+void Phys_SetHitEventThreshold_Impl( float approachSpeed ) {
+	if ( !bx.initialized ) {
+		return;
+	}
+	if ( approachSpeed < 0.0f ) {
+		approachSpeed = 0.0f;
+	}
+	b3World_SetHitEventThreshold( bx.worldId, approachSpeed );
+	Com_Printf( "[physics] Soft Step hit threshold=%.1f\n", approachSpeed );
 }
 
 static void box_hex_to_rgb( b3HexColor color, vec3_t out ) {
@@ -1822,6 +2223,7 @@ void Phys_ProcessContactEvents_Impl( void ) {
 	for ( i = 0; i < events.beginCount; i++ ) {
 		b3ContactBeginTouchEvent *ev = &events.beginEvents[i];
 		phys_event_t pe;
+		physContact_t contact;
 		int bodyA = -1, bodyB = -1;
 		void *ud;
 		if ( !b3Shape_IsValid( ev->shapeIdA ) || !b3Shape_IsValid( ev->shapeIdB ) ) {
@@ -1844,6 +2246,20 @@ void Phys_ProcessContactEvents_Impl( void ) {
 		}
 		if ( bodyB >= 0 ) {
 			pe.matB = bx.bodies[bodyB].materialId;
+		}
+		if ( bodyA >= 0 && box_fill_contact_point( ev->contactId, bodyA, &contact ) ) {
+			VectorCopy( contact.point, pe.point );
+			VectorCopy( contact.normal, pe.normal );
+			pe.magnitude = contact.normalImpulse;
+		} else if ( b3Contact_IsValid( ev->contactId ) ) {
+			b3ContactData data = b3Contact_GetData( ev->contactId );
+			if ( data.manifolds && data.manifoldCount > 0 && data.manifolds[0].pointCount > 0 ) {
+				b3Pos pos = b3Add( b3Body_GetPosition( b3Shape_GetBody( data.shapeIdA ) ),
+					data.manifolds[0].points[0].anchorA );
+				to_vec3( pos, pe.point );
+				to_vec3( data.manifolds[0].normal, pe.normal );
+				pe.magnitude = data.manifolds[0].points[0].totalNormalImpulse;
+			}
 		}
 		PhysEvent_Post( &pe );
 	}
@@ -2530,6 +2946,10 @@ void Phys_DestroyAttachedShape_Impl( physBodyHandle_t body, int shapeIndex ) {
 }
 
 void Phys_SetBodyFilter_Impl( physBodyHandle_t body, int categoryBits, int maskBits ) {
+	Phys_SetBodyFilterEx_Impl( body, categoryBits, maskBits, 0 );
+}
+
+void Phys_SetBodyFilterEx_Impl( physBodyHandle_t body, int categoryBits, int maskBits, int groupIndex ) {
 	BoxBody *pb;
 	b3Filter filter;
 	int i;
@@ -2545,6 +2965,7 @@ void Phys_SetBodyFilter_Impl( physBodyHandle_t body, int categoryBits, int maskB
 	if ( maskBits ) {
 		filter.maskBits = (uint64_t)(unsigned)maskBits;
 	}
+	filter.groupIndex = groupIndex;
 	for ( i = 0; i < pb->shapeCount; i++ ) {
 		if ( b3Shape_IsValid( pb->shapes[i] ) ) {
 			b3Shape_SetFilter( pb->shapes[i], filter, true );
@@ -2629,6 +3050,15 @@ qboolean Phys_ValidateReplay_Impl( const char *path ) {
 	Com_Printf( "[physics] Soft Step replay %s: %s (workers=%d, bytes=%d)\n",
 		path, ok ? "PASS" : "FAIL", workers, size );
 	return ok ? qtrue : qfalse;
+}
+
+void Phys_DumpWorld_Impl( void ) {
+	if ( !bx.initialized ) {
+		Com_Printf( "phys_dump: Soft Step world not initialized\n" );
+		return;
+	}
+	b3World_DumpMemoryStats( bx.worldId );
+	Com_Printf( "[physics] Soft Step DumpMemoryStats (see stdout)\n" );
 }
 
 #endif /* USE_BOX3D_PHYSICS_IMPL */

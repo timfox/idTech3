@@ -21,6 +21,11 @@ static physEventHandlerEntry_t  handlers[PHYS_EVENT_MAX_HANDLERS];
 static int                      handlerCount;
 static qboolean                 eventInitialized;
 
+/* Script poll ring — independent of C handler dispatch */
+static phys_event_t             pollRing[PHYS_EVENT_MAX_QUEUE];
+static int                      pollHead;
+static int                      pollTail;
+
 static cvar_t *phys_events;
 
 void PhysEvent_RegisterCvars( void ) {
@@ -33,6 +38,7 @@ void PhysEvent_Init( void ) {
 	}
 	PhysEvent_RegisterCvars();
 	queueHead = queueTail = 0;
+	pollHead = pollTail = 0;
 	handlerCount = 0;
 	eventInitialized = qtrue;
 	Com_Printf( "PhysEvent: event bus initialized\n" );
@@ -40,6 +46,7 @@ void PhysEvent_Init( void ) {
 
 void PhysEvent_Shutdown( void ) {
 	queueHead = queueTail = 0;
+	pollHead = pollTail = 0;
 	handlerCount = 0;
 	eventInitialized = qfalse;
 }
@@ -83,6 +90,16 @@ void PhysEvent_Post( const phys_event_t *ev ) {
 
 	eventQueue[queueTail] = *ev;
 	queueTail = next;
+
+	/* Mirror into script poll ring (drop oldest on overflow). */
+	{
+		int pnext = ( pollTail + 1 ) % PHYS_EVENT_MAX_QUEUE;
+		if ( pnext == pollHead ) {
+			pollHead = ( pollHead + 1 ) % PHYS_EVENT_MAX_QUEUE;
+		}
+		pollRing[pollTail] = *ev;
+		pollTail = pnext;
+	}
 }
 
 void PhysEvent_DispatchQueued( void ) {
@@ -97,6 +114,26 @@ int PhysEvent_QueueDepth( void ) {
 		return queueTail - queueHead;
 	}
 	return PHYS_EVENT_MAX_QUEUE - queueHead + queueTail;
+}
+
+qboolean PhysEvent_Poll( phys_event_t *out ) {
+	if ( !out || pollHead == pollTail ) {
+		return qfalse;
+	}
+	*out = pollRing[pollHead];
+	pollHead = ( pollHead + 1 ) % PHYS_EVENT_MAX_QUEUE;
+	return qtrue;
+}
+
+void PhysEvent_ClearPoll( void ) {
+	pollHead = pollTail = 0;
+}
+
+int PhysEvent_PollDepth( void ) {
+	if ( pollTail >= pollHead ) {
+		return pollTail - pollHead;
+	}
+	return PHYS_EVENT_MAX_QUEUE - pollHead + pollTail;
 }
 
 void PhysEvent_BuildHitFromImpulse( phys_hit_event_t *out, int bone, int damageType,

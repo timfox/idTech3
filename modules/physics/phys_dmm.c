@@ -16,6 +16,7 @@ fatigue damage, and deformed mesh readback.
 #include "qcommon.h"
 #include "phys_bullet.h"
 #include "phys_dmm.h"
+#include "phys_events.h"
 #include <math.h>
 
 typedef struct dmmEnhancedData_s {
@@ -243,58 +244,89 @@ void Dmm_StepFatigue(dmmObjectHandle_t handle, float dt) {
 }
 
 int Dmm_Fracture(dmmObjectHandle_t handle, const vec3_t impactPoint, float energy) {
-	int i, f;
+	int i, n;
+	vec3_t dir;
+
+	Dmm_ApplyImpact(handle, impactPoint, impactPoint, energy);
+
 	for (i = 0; i < dmmEnhancedCount; i++) {
 		if (!dmmEnhanced[i].active || dmmEnhanced[i].baseHandle != handle) continue;
 		dmmEnhancedData_t *enh = &dmmEnhanced[i];
 
-		Dmm_ApplyImpact(handle, impactPoint, impactPoint, energy);
+		enh->damageParameter += energy * 0.001f;
+		if (enh->damageParameter > 1.0f) {
+			enh->damageParameter = 1.0f;
+		}
+
+		/* Prefer Soft Step substrate debris (8 octants); fall back to Voronoi boxes */
+		n = Dmm_SpawnFragments(handle, impactPoint, energy);
+		if (n > 0) {
+			enh->numFragments = n;
+			Dmm_GetFragments(handle, enh->fragments, DMM_MAX_FRAGMENTS);
+			{
+				phys_event_t ev;
+				Com_Memset(&ev, 0, sizeof(ev));
+				ev.type = PHYS_EVENT_BREAK;
+				VectorCopy(impactPoint, ev.point);
+				ev.magnitude = energy;
+				PhysEvent_Post(&ev);
+			}
+			return n;
+		}
 
 		if (!Dmm_IsFractured(handle) && enh->damageParameter < 0.8f) {
 			return 0;
 		}
 
-		int numFrags = enh->pattern.numPoints;
-		if (numFrags > DMM_MAX_FRAGMENTS) numFrags = DMM_MAX_FRAGMENTS;
+		{
+			int numFrags = enh->pattern.numPoints;
+			int f;
+			if (numFrags > DMM_MAX_FRAGMENTS) numFrags = DMM_MAX_FRAGMENTS;
 
-		for (f = 0; f < numFrags; f++) {
-			physBodyDef_t fragDef;
-			Com_Memset(&fragDef, 0, sizeof(fragDef));
-			fragDef.shape = PHYS_SHAPE_BOX;
-			fragDef.type = PHYS_BODY_DYNAMIC;
+			for (f = 0; f < numFrags; f++) {
+				physBodyDef_t fragDef;
+				Com_Memset(&fragDef, 0, sizeof(fragDef));
+				fragDef.shape = PHYS_SHAPE_BOX;
+				fragDef.type = PHYS_BODY_DYNAMIC;
 
-			VectorCopy(enh->pattern.points[f], fragDef.position);
-			VectorAdd(fragDef.position, impactPoint, fragDef.position);
+				VectorCopy(enh->pattern.points[f], fragDef.position);
+				VectorAdd(fragDef.position, impactPoint, fragDef.position);
 
-			float fragSize = enh->pattern.minFragmentSize + randf() * enh->pattern.minFragmentSize;
-			VectorSet(fragDef.halfExtents, fragSize, fragSize, fragSize);
+				float fragSize = enh->pattern.minFragmentSize + randf() * enh->pattern.minFragmentSize;
+				VectorSet(fragDef.halfExtents, fragSize, fragSize, fragSize);
 
-			fragDef.mass = fragSize * fragSize * fragSize * 100.0f;
-			fragDef.friction = 0.6f;
-			fragDef.restitution = 0.2f;
-			fragDef.linearDamping = 0.1f;
-			fragDef.angularDamping = 0.2f;
-			fragDef.collisionGroup = 1;
-			fragDef.collisionMask = -1;
+				fragDef.mass = fragSize * fragSize * fragSize * 100.0f;
+				fragDef.friction = 0.6f;
+				fragDef.restitution = 0.2f;
+				fragDef.linearDamping = 0.1f;
+				fragDef.angularDamping = 0.2f;
 
-			enh->fragments[f] = Phys_CreateBody(&fragDef);
+				enh->fragments[f] = Phys_CreateBody(&fragDef);
 
-			if (enh->fragments[f] >= 0) {
-				vec3_t fragImpulse;
-				VectorSubtract(enh->pattern.points[f], impactPoint, fragImpulse);
-				VectorNormalize(fragImpulse);
-				VectorScale(fragImpulse, energy * 0.1f * (0.5f + randf() * 0.5f), fragImpulse);
-
-				vec3_t zero;
-				VectorClear(zero);
-				Phys_ApplyImpulse(enh->fragments[f], fragImpulse, zero);
+				if (enh->fragments[f] >= 0) {
+					vec3_t fragImpulse;
+					vec3_t zero;
+					VectorSubtract(enh->pattern.points[f], impactPoint, fragImpulse);
+					if (VectorLength(fragImpulse) < 0.001f) {
+						VectorSet(fragImpulse, 0, 0, 1);
+					} else {
+						VectorNormalize(fragImpulse);
+					}
+					VectorScale(fragImpulse, energy * 0.1f * (0.5f + randf() * 0.5f), fragImpulse);
+					VectorClear(zero);
+					Phys_ApplyImpulse(enh->fragments[f], fragImpulse, zero);
+				}
 			}
-		}
 
-		enh->numFragments = numFrags;
-		return numFrags;
+			enh->numFragments = numFrags;
+			VectorSet(dir, 0, 0, 1);
+			(void)dir;
+			return numFrags;
+		}
 	}
-	return 0;
+
+	/* No enhanced slot — still Soft Step spawn from base object */
+	return Dmm_SpawnFragments(handle, impactPoint, energy);
 }
 
 void Dmm_GenerateVoronoiPattern(const vec3_t center, float radius, int numCells, dmmFracturePattern_t *pattern) {
@@ -309,12 +341,71 @@ void Dmm_GenerateVoronoiPattern(const vec3_t center, float radius, int numCells,
 		float phi = acosf(1.0f - 2.0f * randf());
 		float r = radius * cbrtf(randf());
 
-		pattern->points[i][0] = r * sinf(phi) * cosf(theta);
-		pattern->points[i][1] = r * sinf(phi) * sinf(theta);
-		pattern->points[i][2] = r * cosf(phi);
+		pattern->points[i][0] = center[0] + r * sinf(phi) * cosf(theta);
+		pattern->points[i][1] = center[1] + r * sinf(phi) * sinf(theta);
+		pattern->points[i][2] = center[2] + r * cosf(phi);
 	}
 
 	pattern->numPoints = numCells;
 	pattern->randomness = 0.5f;
 	pattern->minFragmentSize = radius * 0.1f;
+}
+
+static int dmmActiveCount;
+
+void Dmm_Init(void) {
+	dmmActiveCount = 0;
+	Com_Printf("[physics] Soft Step DMM companion ready (phys_dmm_enabled / phys_spawn_dmm)\n");
+}
+
+void Dmm_Shutdown(void) {
+	int i;
+	for (i = 0; i < dmmEnhancedCount; i++) {
+		if (!dmmEnhanced[i].active) continue;
+		if (dmmEnhanced[i].deformVerts) {
+			Z_Free(dmmEnhanced[i].deformVerts);
+			dmmEnhanced[i].deformVerts = NULL;
+		}
+		if (dmmEnhanced[i].deformIndices) {
+			Z_Free(dmmEnhanced[i].deformIndices);
+			dmmEnhanced[i].deformIndices = NULL;
+		}
+		dmmEnhanced[i].active = qfalse;
+	}
+	dmmEnhancedCount = 0;
+	dmmActiveCount = 0;
+}
+
+void Dmm_UpdateAll(float dt) {
+	int i;
+	cvar_t *en = Cvar_Get("phys_dmm_enabled", "1", CVAR_ARCHIVE);
+
+	if (en && !en->integer) {
+		return;
+	}
+
+	dmmActiveCount = 0;
+	for (i = 0; i < dmmEnhancedCount; i++) {
+		dmmEnhancedData_t *enh;
+		dmmState_t st;
+		if (!dmmEnhanced[i].active) {
+			continue;
+		}
+		enh = &dmmEnhanced[i];
+		dmmActiveCount++;
+		Dmm_StepFatigue(enh->baseHandle, dt);
+		Dmm_GetState(enh->baseHandle, &st);
+		enh->vonMisesStress = st.stress;
+		enh->elasticStrain = st.strain;
+		enh->plasticStrain = st.deformation;
+		if (st.fractured && enh->numFragments == 0) {
+			vec3_t origin;
+			VectorClear(origin);
+			Dmm_Fracture(enh->baseHandle, origin, st.stress * 100.0f + 500.0f);
+		}
+	}
+}
+
+int Dmm_GetActiveCount(void) {
+	return dmmActiveCount;
 }

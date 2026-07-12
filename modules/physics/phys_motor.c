@@ -49,7 +49,7 @@ void PhysMotor_Init( void ) {
 	motorCount = 0;
 	Com_Memset( motors, 0, sizeof( motors ) );
 	motorInitialized = qtrue;
-	Com_Printf( "PhysMotor: active ragdoll motor layer initialized\n" );
+	Com_Printf( "PhysMotor: Euphoria-like Soft Step motor layer initialized (phys_motor)\n" );
 }
 
 void PhysMotor_Shutdown( void ) {
@@ -112,11 +112,44 @@ static void PhysMotor_RunBalance( physMotorSlot_t *m, procAnimState_t state, flo
 		m->boneCmd[i].stiffness = stiff;
 		m->boneCmd[i].damping = 0.35f + ( 1.0f - balance ) * 0.25f;
 		m->boneCmd[i].targetAngularVelocity[0] = 0.0f;
-		m->boneCmd[i].targetAngularVelocity[1] = ( 1.0f - balance ) * 2.0f * dt;
-		m->boneCmd[i].targetAngularVelocity[2] = 0.0f;
+		m->boneCmd[i].targetAngularVelocity[1] = 0.0f;
+		/* yaw correction about Z when leaning (Z-up) */
+		m->boneCmd[i].targetAngularVelocity[2] = ( 1.0f - balance ) * 1.5f * dt;
 	}
 
+	/* Drive Soft Step balance toward support polygon, not COM */
 	Phys_RagdollSetBalance( m->ragdoll, qtrue, status.centerOfMass );
+}
+
+static void PhysMotor_RunGetup( physMotorSlot_t *m, procAnimState_t state ) {
+	if ( state != PROCANIM_STATE_GETUP ) {
+		return;
+	}
+	m->physicsWeight[PROCANIM_BONE_PELVIS] = 0.7f;
+	m->physicsWeight[PROCANIM_BONE_SPINE] = 0.65f;
+	m->physicsWeight[PROCANIM_BONE_UPPER_LEG_L] = 0.55f;
+	m->physicsWeight[PROCANIM_BONE_UPPER_LEG_R] = 0.55f;
+	m->boneCmd[PROCANIM_BONE_PELVIS].stiffness = 0.7f;
+	m->boneCmd[PROCANIM_BONE_SPINE].stiffness = 0.6f;
+}
+
+static void PhysMotor_RunLimp( physMotorSlot_t *m, float consciousness ) {
+	int i;
+	float w;
+	if ( consciousness > 0.45f ) {
+		return;
+	}
+	for ( i = 0; i < PHYS_MOTOR_MAX_BONES; i++ ) {
+		m->boneCmd[i].stiffness *= 0.35f + consciousness;
+		w = m->physicsWeight[i] + 0.2f;
+		if ( w < 0.1f ) {
+			w = 0.1f;
+		}
+		if ( w > 0.9f ) {
+			w = 0.9f;
+		}
+		m->physicsWeight[i] = w;
+	}
 }
 
 static void PhysMotor_RunProtectHead( physMotorSlot_t *m, float pain ) {
@@ -228,6 +261,8 @@ void PhysMotor_UpdateAll( float dt ) {
 		PhysMotor_RunProtectHead( m, status.painLevel );
 		PhysMotor_RunBrace( m, status.state );
 		PhysMotor_RunStumble( m, status.state, status.balance );
+		PhysMotor_RunGetup( m, status.state );
+		PhysMotor_RunLimp( m, status.consciousness );
 		PhysMotor_RunPain( m, status.painLevel );
 
 		if ( status.balance < 0.15f && status.state != PROCANIM_STATE_RAGDOLL ) {

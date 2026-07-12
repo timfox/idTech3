@@ -62,6 +62,8 @@ void Phys_RegisterCvars(void) {
 	phys_workers          = Cvar_Get("phys_workers",          "0",     CVAR_ARCHIVE);
 	phys_sleep            = Cvar_Get("phys_sleep",            "1",     CVAR_ARCHIVE);
 	phys_ccd              = Cvar_Get("phys_ccd",              "1",     CVAR_ARCHIVE);
+	Cvar_Get("phys_hitThreshold", "25", CVAR_ARCHIVE);
+	Cvar_Get("phys_record", "0", CVAR_ARCHIVE);
 	phys_ragdoll_stiffness= Cvar_Get("phys_ragdoll_stiffness","0.8",   CVAR_ARCHIVE);
 	phys_ragdoll_damping  = Cvar_Get("phys_ragdoll_damping",  "0.4",   CVAR_ARCHIVE);
 	phys_ragdoll_muscles  = Cvar_Get("phys_ragdoll_muscles",  "1.0",   CVAR_ARCHIVE);
@@ -72,6 +74,8 @@ void Phys_RegisterCvars(void) {
 	Cvar_SetDescription(phys_workers, "Box3D Soft Step worker threads (0=auto up to 8). Requires vid_restart/phys reinit.");
 	Cvar_SetDescription(phys_sleep, "Enable island sleep for idle bodies (Box3D).");
 	Cvar_SetDescription(phys_ccd, "Enable continuous collision for fast bodies (Box3D).");
+	Cvar_SetDescription(Cvar_Get("phys_hitThreshold", "25", CVAR_ARCHIVE),
+		"Soft Step contact hit event approach-speed threshold (qu/s).");
 	Phys_CharacterInit();
 }
 
@@ -667,6 +671,40 @@ void Phys_SetWheelSteering(physConstraintHandle_t handle, float angleRadians, fl
 	(void)handle; (void)angleRadians; (void)maxTorque;
 }
 
+void Phys_SetConstraintSpring(physConstraintHandle_t handle, qboolean enable,
+	float hertz, float dampingRatio) {
+#ifdef PHYS_HAS_IMPL
+	if (physInitialized) {
+		Phys_SetConstraintSpring_Impl(handle, enable, hertz, dampingRatio);
+		return;
+	}
+#endif
+	(void)handle; (void)enable; (void)hertz; (void)dampingRatio;
+}
+
+void Phys_SetSphericalLimits(physConstraintHandle_t handle, float coneAngleRadians,
+	float twistLowerRadians, float twistUpperRadians) {
+#ifdef PHYS_HAS_IMPL
+	if (physInitialized) {
+		Phys_SetSphericalLimits_Impl(handle, coneAngleRadians, twistLowerRadians, twistUpperRadians);
+		return;
+	}
+#endif
+	(void)handle; (void)coneAngleRadians; (void)twistLowerRadians; (void)twistUpperRadians;
+}
+
+void Phys_GetConstraintReaction(physConstraintHandle_t handle, vec3_t forceOut, vec3_t torqueOut) {
+#ifdef PHYS_HAS_IMPL
+	if (physInitialized) {
+		Phys_GetConstraintReaction_Impl(handle, forceOut, torqueOut);
+		return;
+	}
+#endif
+	if (forceOut) VectorClear(forceOut);
+	if (torqueOut) VectorClear(torqueOut);
+	(void)handle;
+}
+
 int Phys_AttachShape(physBodyHandle_t body, const physBodyDef_t *shapeDef) {
 #ifdef PHYS_HAS_IMPL
 	if (physInitialized) return Phys_AttachShape_Impl(body, shapeDef);
@@ -683,10 +721,17 @@ void Phys_DestroyAttachedShape(physBodyHandle_t body, int shapeIndex) {
 }
 
 void Phys_SetBodyFilter(physBodyHandle_t body, int categoryBits, int maskBits) {
+	Phys_SetBodyFilterEx(body, categoryBits, maskBits, 0);
+}
+
+void Phys_SetBodyFilterEx(physBodyHandle_t body, int categoryBits, int maskBits, int groupIndex) {
 #ifdef PHYS_HAS_IMPL
-	if (physInitialized) { Phys_SetBodyFilter_Impl(body, categoryBits, maskBits); return; }
+	if (physInitialized) {
+		Phys_SetBodyFilterEx_Impl(body, categoryBits, maskBits, groupIndex);
+		return;
+	}
 #endif
-	(void)body; (void)categoryBits; (void)maskBits;
+	(void)body; (void)categoryBits; (void)maskBits; (void)groupIndex;
 }
 
 physRagdollHandle_t Phys_CreateRagdoll(const physRagdollDef_t *def) {
@@ -867,11 +912,24 @@ void Dmm_SetMaterialParams(dmmObjectHandle_t handle, float stiffness, float yiel
 	(void)handle; (void)stiffness; (void)yield; (void)fracture;
 }
 
-qboolean Phys_RayCast(const vec3_t from, const vec3_t to, physRayResult_t *result) {
+int Dmm_SpawnFragments(dmmObjectHandle_t handle, const vec3_t impactPoint, float energy) {
 #ifdef PHYS_HAS_IMPL
-	if (physInitialized) return Phys_RayCast_Impl(from, to, result);
+	if (physInitialized) return Dmm_SpawnFragments_Impl(handle, impactPoint, energy);
 #endif
-	(void)from; (void)to;
+	(void)handle; (void)impactPoint; (void)energy;
+	return 0;
+}
+
+qboolean Phys_RayCast(const vec3_t from, const vec3_t to, physRayResult_t *result) {
+	return Phys_RayCastFiltered(from, to, result, NULL);
+}
+
+qboolean Phys_RayCastFiltered(const vec3_t from, const vec3_t to, physRayResult_t *result,
+	const physQueryFilter_t *filter) {
+#ifdef PHYS_HAS_IMPL
+	if (physInitialized) return Phys_RayCastFiltered_Impl(from, to, result, filter);
+#endif
+	(void)from; (void)to; (void)filter;
 	if (result) Com_Memset(result, 0, sizeof(*result));
 	return qfalse;
 }
@@ -893,10 +951,31 @@ int Phys_OverlapBox(const vec3_t center, const vec3_t halfExtents, physBodyHandl
 }
 
 int Phys_OverlapShape(const vec3_t center, float radius, physBodyHandle_t *results, int maxResults) {
+	return Phys_OverlapShapeFiltered(center, radius, results, maxResults, NULL);
+}
+
+int Phys_OverlapShapeFiltered(const vec3_t center, float radius, physBodyHandle_t *results, int maxResults,
+	const physQueryFilter_t *filter) {
 #ifdef PHYS_HAS_IMPL
-	if (physInitialized) return Phys_OverlapShape_Impl(center, radius, results, maxResults);
+	if (physInitialized) return Phys_OverlapShapeFiltered_Impl(center, radius, results, maxResults, filter);
 #endif
+	(void)filter;
 	return Phys_OverlapSphere(center, radius, results, maxResults);
+}
+
+int Phys_GetBodyContacts(physBodyHandle_t body, physContact_t *out, int maxOut) {
+#ifdef PHYS_HAS_IMPL
+	if (physInitialized) return Phys_GetBodyContacts_Impl(body, out, maxOut);
+#endif
+	(void)body; (void)out; (void)maxOut;
+	return 0;
+}
+
+void Phys_SetHitEventThreshold(float approachSpeed) {
+#ifdef PHYS_HAS_IMPL
+	if (physInitialized) { Phys_SetHitEventThreshold_Impl(approachSpeed); return; }
+#endif
+	(void)approachSpeed;
 }
 
 void Phys_GetSoftStepProfile(physSoftStepProfile_t *out) {
@@ -928,6 +1007,13 @@ qboolean Phys_ValidateReplay(const char *path) {
 #endif
 }
 
+void Phys_DumpWorld(void) {
+#ifdef PHYS_HAS_IMPL
+	if (physInitialized) { Phys_DumpWorld_Impl(); return; }
+#endif
+	Com_Printf( "phys_dump: physics not initialized\n" );
+}
+
 void Phys_DebugDraw(void) {
 #ifdef PHYS_HAS_IMPL
 	if (physInitialized && phys_debugDraw && phys_debugDraw->integer) {
@@ -940,10 +1026,15 @@ void Phys_DebugDraw(void) {
 
 qboolean Phys_ConvexSweep(const physBodyDef_t *shapeDef, const vec3_t from, const vec3_t to,
 	const vec3_t rotation, physRayResult_t *result) {
+	return Phys_ConvexSweepFiltered(shapeDef, from, to, rotation, result, NULL);
+}
+
+qboolean Phys_ConvexSweepFiltered(const physBodyDef_t *shapeDef, const vec3_t from, const vec3_t to,
+	const vec3_t rotation, physRayResult_t *result, const physQueryFilter_t *filter) {
 #ifdef PHYS_HAS_IMPL
-	if (physInitialized) return Phys_ConvexSweep_Impl(shapeDef, from, to, rotation, result);
+	if (physInitialized) return Phys_ConvexSweepFiltered_Impl(shapeDef, from, to, rotation, result, filter);
 #endif
-	(void)shapeDef; (void)from; (void)to; (void)rotation;
+	(void)shapeDef; (void)from; (void)to; (void)rotation; (void)filter;
 	if (result) Com_Memset(result, 0, sizeof(*result));
 	return qfalse;
 }

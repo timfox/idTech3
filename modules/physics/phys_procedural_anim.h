@@ -7,15 +7,15 @@ existing id Tech 3 / ioquake3 code.
 The engine framework is based on id Tech 3 (GPLv2).
 
 Procedural animation controller.
-Layered on top of Bullet Physics ragdolls to provide:
-- Active balance with center-of-mass tracking
+Layered on Soft Step ragdolls (Box3D) for Euphoria-like behaviors:
+- Active balance with center-of-mass vs support plant
 - Protective reactions (brace for impact, catch self)
-- Stumble/stagger with recovery
+- Stumble/stagger with foot-placement IK recovery
 - Limb IK targeting (reach, grab, brace)
 - Impact response blending (physics ↔ animation)
 - Muscle tone simulation (stiffness varies by state)
 - Look-at / head tracking
-- Getup behaviors from prone/supine
+- Getup behaviors from prone/supine (Z-up)
 ===========================================================================
 */
 

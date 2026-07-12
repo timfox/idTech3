@@ -139,8 +139,30 @@ rg -q 'b3Shape_SetFriction' modules/physics/phys_box3d_impl.c
 rg -q 'phys_set_friction' modules/physics/phys_middleware.c
 rg -q 'setFriction' runtime/game/g_lua_bindings.c
 rg -q 'validateReplay' runtime/game/g_lua_bindings.c
+rg -q 'pollEvent' runtime/game/g_lua_bindings.c
+rg -q 'PhysEvent_Poll' modules/physics/phys_events.c
+rg -q 'Phys_RayCastFiltered' modules/physics/phys_bullet.h
+rg -q 'Phys_GetBodyContacts' modules/physics/phys_bullet.h
+rg -q 'PHYS_CONSTRAINT_FILTER' modules/physics/phys_bullet.h
+rg -q 'PHYS_CONSTRAINT_PARALLEL' modules/physics/phys_bullet.h
+rg -q 'b3CreateFilterJoint' modules/physics/phys_box3d_impl.c
+rg -q 'b3CreateParallelJoint' modules/physics/phys_box3d_impl.c
+rg -q 'b3Body_GetContactData' modules/physics/phys_box3d_impl.c
+rg -q 'b3World_SetHitEventThreshold' modules/physics/phys_box3d_impl.c
+rg -q 'Phys_SetConstraintSpring' modules/physics/phys_bullet.h
+rg -q 'phys_set_filter' modules/physics/phys_middleware.c
+rg -q 'phys_dump' modules/physics/phys_middleware.c
+rg -q 'phys_hitThreshold' modules/physics/phys_bullet.c
+rg -q 'ProcAnim_UpdateGround|IK_SolveFootPlacement|Euphoria' modules/physics/phys_procedural_anim.c
+rg -q 'PhysMotor_RunGetup' modules/physics/phys_motor.c
+rg -q 'Dmm_SpawnFragments' modules/physics/phys_bullet.h
+rg -q 'phys_spawn_dmm' modules/physics/phys_middleware.c
+rg -q 'd\.name, "dmm"' modules/physics/phys_solvers.c
+rg -q 'Dmm_UpdateAll' modules/physics/phys_dmm.c
 rg -q 'phys_bspGridStep' modules/physics/phys_bullet.c
 rg -q 'misc_phys_box' docs/PHYSICS.md
+rg -q 'Euphoria' docs/PHYSICS.md
+rg -q 'DMM-like' docs/PHYSICS.md
 rg -q 'misc_phys_box' docs/EDITOR_BRIDGE.md
 rg -q 'misc_phys_box' examples/radiant/scripts/entities_idtech3_bridge.def
 

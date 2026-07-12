@@ -6,14 +6,15 @@ This file is original work by Gopex LLC and is not derived from
 existing id Tech 3 / ioquake3 code.
 The engine framework is based on id Tech 3 (GPLv2).
 
-Digital Molecular Matter (DMM) enhanced deformation engine.
+Digital Molecular Matter (DMM) enhanced deformation companion.
+Soft Step rigid substrate (no FEM): stress grid + proxy body + debris.
 Extends the base DMM API in phys_bullet.h with:
-- Finite Element Method (FEM) tetrahedral mesh simulation
-- Voronoi-based fracture pattern generation
+- Soft Step contact/impact stress accumulation
+- Voronoi / octant fracture pattern generation
 - Material fatigue and progressive damage
-- Heat-affected deformation (metal softening, ice melting)
-- Fragment generation with proper mass/inertia
-- Deformation mesh readback for rendering
+- Heat-affected softening (yield/fracture scale)
+- Fragment generation as Soft Step dynamic boxes
+- Deformation mesh readback for optional rendering
 ===========================================================================
 */
 
@@ -91,6 +92,11 @@ void              Dmm_GetDeformMesh(dmmObjectHandle_t handle, dmmDeformMesh_t *m
 void              Dmm_StepFatigue(dmmObjectHandle_t handle, float dt);
 int               Dmm_Fracture(dmmObjectHandle_t handle, const vec3_t impactPoint, float energy);
 void              Dmm_GenerateVoronoiPattern(const vec3_t center, float radius, int numCells, dmmFracturePattern_t *pattern);
+/* Soft Step companion tick: fatigue + auto-fracture debris */
+void              Dmm_UpdateAll(float dt);
+int               Dmm_GetActiveCount(void);
+void              Dmm_Init(void);
+void              Dmm_Shutdown(void);
 
 #ifdef __cplusplus
 }

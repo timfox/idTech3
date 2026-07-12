@@ -71,6 +71,10 @@ void        PhysEvent_UnsubscribeAll( void );
 void        PhysEvent_Post( const phys_event_t *ev );
 void        PhysEvent_DispatchQueued( void );
 int         PhysEvent_QueueDepth( void );
+/* Script-facing ring: copies of posted events (survives DispatchQueued). */
+qboolean    PhysEvent_Poll( phys_event_t *out );
+void        PhysEvent_ClearPoll( void );
+int         PhysEvent_PollDepth( void );
 
 void        PhysEvent_PostImpact( int entityNum, int bodyA, int bodyB,
 	physMaterialId_t matA, physMaterialId_t matB,

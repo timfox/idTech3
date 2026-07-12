@@ -43,10 +43,16 @@ void                 Phys_SetConstraintMotor_Impl(physConstraintHandle_t handle,
 	float speed, float maxForce);
 void                 Phys_SetConstraintBreakForce_Impl(physConstraintHandle_t handle, float force, float torque);
 void                 Phys_SetWheelSteering_Impl(physConstraintHandle_t handle, float angleRadians, float maxTorque);
+void                 Phys_SetConstraintSpring_Impl(physConstraintHandle_t handle, qboolean enable,
+	float hertz, float dampingRatio);
+void                 Phys_SetSphericalLimits_Impl(physConstraintHandle_t handle, float coneAngleRadians,
+	float twistLowerRadians, float twistUpperRadians);
+void                 Phys_GetConstraintReaction_Impl(physConstraintHandle_t handle, vec3_t forceOut, vec3_t torqueOut);
 
 int                  Phys_AttachShape_Impl(physBodyHandle_t body, const physBodyDef_t *shapeDef);
 void                 Phys_DestroyAttachedShape_Impl(physBodyHandle_t body, int shapeIndex);
 void                 Phys_SetBodyFilter_Impl(physBodyHandle_t body, int categoryBits, int maskBits);
+void                 Phys_SetBodyFilterEx_Impl(physBodyHandle_t body, int categoryBits, int maskBits, int groupIndex);
 
 physRagdollHandle_t  Phys_CreateRagdoll_Impl(const physRagdollDef_t *def);
 void                 Phys_DestroyRagdoll_Impl(physRagdollHandle_t handle);
@@ -70,13 +76,22 @@ void                 Dmm_GetState_Impl(dmmObjectHandle_t handle, dmmState_t *out
 qboolean             Dmm_IsFractured_Impl(dmmObjectHandle_t handle);
 int                  Dmm_GetFragments_Impl(dmmObjectHandle_t handle, physBodyHandle_t *fragments, int maxFragments);
 void                 Dmm_SetMaterialParams_Impl(dmmObjectHandle_t handle, float stiffness, float yield, float fracture);
+int                  Dmm_SpawnFragments_Impl(dmmObjectHandle_t handle, const vec3_t impactPoint, float energy);
 
 qboolean             Phys_RayCast_Impl(const vec3_t from, const vec3_t to, physRayResult_t *result);
+qboolean             Phys_RayCastFiltered_Impl(const vec3_t from, const vec3_t to, physRayResult_t *result,
+	const physQueryFilter_t *filter);
 qboolean             Phys_ConvexSweep_Impl(const physBodyDef_t *shapeDef, const vec3_t from, const vec3_t to,
 	const vec3_t rotation, physRayResult_t *result);
+qboolean             Phys_ConvexSweepFiltered_Impl(const physBodyDef_t *shapeDef, const vec3_t from, const vec3_t to,
+	const vec3_t rotation, physRayResult_t *result, const physQueryFilter_t *filter);
 int                  Phys_OverlapSphere_Impl(const vec3_t center, float radius, physBodyHandle_t *results, int maxResults);
 int                  Phys_OverlapBox_Impl(const vec3_t center, const vec3_t halfExtents, physBodyHandle_t *results, int maxResults);
 int                  Phys_OverlapShape_Impl(const vec3_t center, float radius, physBodyHandle_t *results, int maxResults);
+int                  Phys_OverlapShapeFiltered_Impl(const vec3_t center, float radius, physBodyHandle_t *results, int maxResults,
+	const physQueryFilter_t *filter);
+int                  Phys_GetBodyContacts_Impl(physBodyHandle_t body, physContact_t *out, int maxOut);
+void                 Phys_SetHitEventThreshold_Impl(float approachSpeed);
 void                 Phys_DebugDraw_Impl(void);
 void                 Phys_ProcessContactEvents_Impl(void);
 void                 Phys_SetBodyMaterial_Impl(physBodyHandle_t handle, int materialId);
@@ -99,6 +114,7 @@ void                 Phys_GetSoftStepProfile_Impl(physSoftStepProfile_t *out);
 void                 Phys_StartRecording_Impl(void);
 void                 Phys_StopRecording_Impl(const char *path);
 qboolean             Phys_ValidateReplay_Impl(const char *path);
+void                 Phys_DumpWorld_Impl(void);
 
 #ifdef __cplusplus
 }

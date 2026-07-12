@@ -43,29 +43,56 @@ Classic Q3/OA Pmove stays default (`phys_pmove 0`). Set `phys_pmove 1` for CastM
 | Gravity scale / motion locks | Done |
 | Explode / debug draw / hit events | Done |
 | MD3 / `.rag` ragdoll bind + anim blend | Done |
+| Euphoria-like active ragdoll (ProcAnim + motors) | Done (ground plant, stumble IK, Z-up getup) |
+| DMM-like Soft Step fracture companion | Done (proxy body, stress, debris) |
 | Profile counters (`phys_status`) | Done |
-| Contact begin/end (non-sensor) | Done (`PHYS_EVENT_CONTACT_*`) |
+| Contact begin/end (non-sensor) | Done (`PHYS_EVENT_CONTACT_*` + manifold point) |
 | Body sleep events | Done (`PHYS_EVENT_BODY_SLEEP`) |
 | Recording + replay validate | Done (`phys_record_*` / `phys_replay`) |
 | Runtime friction / restitution | Done (`phys_set_friction` / `Phys_SetBodyFriction`) |
+| Query filter masks | Done (`Phys_*Filtered` / Lua filter args) |
+| Contact manifolds poll | Done (`Phys_GetBodyContacts` / Lua `getContacts`) |
+| Filter + parallel joints | Done |
+| Joint springs / spherical limits / reaction | Done |
+| Script event poll | Done (`PhysEvent_Poll` / Lua `pollEvent`) |
+| Hit threshold + world dump | Done (`phys_hitThreshold` / `phys_dump`) |
 
 ### Optional / MED–LOW (not blockers)
 
 | API | Notes |
 |-----|-------|
-| Custom query filter callbacks | Default filter only today |
+| Custom filter / pre-solve callbacks | Soft Step callbacks not wired yet |
 | Full FEM soft bodies | Not in Box3D — keep XPBD/DMM companions ([timfox/idTech3-box3d](https://github.com/timfox/idTech3-box3d) Soft Step is rigid) |
+| Interactive RecPlayer seek/step | Hash validate only today |
 | Open-world sector mesh stream | Follow-on to BSP grid bake |
+| Distance / TOI queries | Soft Step available; not exposed yet |
 
 ## Multi-solver companions
 
 | Name | Phase | Console |
 |------|-------|---------|
-| `shadows` / `volumes` / `procanim` / `motors` | PRE | shadow / buoyancy / ragdoll |
+| `shadows` / `volumes` / `procanim` / `motors` | PRE | Euphoria-like: `phys_spawn_ragdoll`, `phys_hit_ragdoll` |
+| `dmm` | POST | DMM-like: `phys_spawn_dmm`, `phys_hit_dmm` |
 | `xpbd_cloth` / `particles` / `softblob` / `fluid` | POST | `phys_spawn_*` |
 
 ```bash
 phys_solvers
+phys_spawn_ragdoll 0 0 64
+phys_hit_ragdoll 0 500
+phys_spawn_dmm 0 0 48
+phys_hit_dmm 1200
+phys_status
+```
+
+### Euphoria-like (active ragdoll)
+
+Soft Step capsules + spherical joints driven by **ProcAnim** (balance / stumble / brace / getup) and **PhysMotor** (per-bone PD torques). Foot raycasts set `onGround`; stumble uses foot-placement IK → `Phys_RagdollReach`. Toggle: `phys_motor`.
+
+### DMM-like (destructible props)
+
+Not FEM. Soft Step **rigid proxy** + stress grid; contacts / impacts accumulate strain; on fracture `Dmm_SpawnFragments` replaces the proxy with debris boxes. Cvars: `phys_dmm_enabled`, `phys_dmm_resolution`, `phys_dmm_fracture`. Soft materials still use `xpbd_cloth` / `softblob`.
+
+```bash
 phys_spawn_sensor 0 0 32
 phys_spawn_slider 0 0 64
 phys_spawn_heightfield 0 0 0
@@ -81,7 +108,7 @@ See [EDITOR_BRIDGE.md](EDITOR_BRIDGE.md) — `misc_phys_box|sphere|static|sensor
 ## Scripting
 
 - **QVM traps:** `G_PHYS_CREATEBODY` … `G_PHYS_RAYCAST`, `G_PHYS_PMOVE_CORRECT`, character traps
-- **Lua `Engine.Physics`:** bodies, sensors, constraints, rayCast, moverStep, pmoveCorrect, heightfield, backend, setFriction / setRestitution, validateReplay
+- **Lua `Engine.Physics`:** bodies, sensors, constraints (incl. filter/parallel/cone), rayCast(+filter), convexSweep, overlapSphere, getContacts, attachShape, setFilter, joint spring/limits/steering, pollEvent, setFriction / setRestitution, validateReplay
 
 ## Ragdoll bind
 
@@ -113,6 +140,11 @@ Then drive poses with `Phys_RagdollSetBoneAnimTarget` / `Phys_RagdollApplyMd3Fra
 | `phys_stepHeight` | 18 | CastMover stair step (Soft Step) |
 | `phys_bspGridStep` | 24 | BSP height-grid denseness |
 | `phys_record` | 0 | Allow Soft Step recording |
+| `phys_hitThreshold` | 25 | Soft Step hit-event approach speed |
+| `phys_motor` | 1 | Euphoria-like motor layer |
+| `phys_dmm_enabled` | 1 | Soft Step DMM companion |
+| `phys_dmm_resolution` | 8 | DMM stress grid resolution |
+| `phys_dmm_fracture` | 1 | Spawn Soft Step debris on break |
 | `phys_debugDraw` | 0 | Wireframe |
 
-Console: `phys_record_start`, `phys_record_stop [path]`, `phys_replay [path]`, `phys_set_friction`, `phys_set_restitution`.
+Console: `phys_spawn_ragdoll`, `phys_hit_ragdoll`, `phys_spawn_dmm`, `phys_hit_dmm`, `phys_record_*`, `phys_replay`, `phys_set_friction`, `phys_set_restitution`, `phys_set_filter`, `phys_dump`.

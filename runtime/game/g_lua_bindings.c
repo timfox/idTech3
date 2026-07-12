@@ -45,6 +45,7 @@ Usage from Lua:
 #endif
 #include "ecs.h"
 #include "../physics/phys_bullet.h"
+#include "../physics/phys_events.h"
 #include "../physics/phys_props.h"
 #include "../physics/phys_volumes.h"
 #include "../world/fog_biology.h"
@@ -227,9 +228,16 @@ static int l_phys_setTransform(lua_State *L) {
 static int l_phys_rayCast(lua_State *L) {
 	vec3_t from, to;
 	physRayResult_t hit;
+	physQueryFilter_t filter;
+	const physQueryFilter_t *filterPtr = NULL;
 	from[0]=(float)luaL_checknumber(L,1); from[1]=(float)luaL_checknumber(L,2); from[2]=(float)luaL_checknumber(L,3);
 	to[0]=(float)luaL_checknumber(L,4); to[1]=(float)luaL_checknumber(L,5); to[2]=(float)luaL_checknumber(L,6);
-	if ( !Phys_RayCast( from, to, &hit ) || !hit.hit ) {
+	if ( lua_gettop( L ) >= 8 ) {
+		filter.categoryBits = (unsigned)luaL_checkinteger( L, 7 );
+		filter.maskBits = (unsigned)luaL_checkinteger( L, 8 );
+		filterPtr = &filter;
+	}
+	if ( !Phys_RayCastFiltered( from, to, &hit, filterPtr ) || !hit.hit ) {
 		lua_pushboolean(L, 0);
 		return 1;
 	}
@@ -237,7 +245,9 @@ static int l_phys_rayCast(lua_State *L) {
 	lua_pushnumber(L, hit.hitPoint[0]); lua_pushnumber(L, hit.hitPoint[1]); lua_pushnumber(L, hit.hitPoint[2]);
 	lua_pushnumber(L, hit.fraction);
 	lua_pushinteger(L, hit.body);
-	return 5;
+	lua_pushinteger(L, (lua_Integer)hit.userMaterialId);
+	lua_pushinteger(L, hit.triangleIndex);
+	return 7;
 }
 static int l_phys_createSensor(lua_State *L) {
 	physBodyDef_t def;
@@ -267,6 +277,12 @@ static int l_phys_createConstraint(lua_State *L) {
 		def.type = PHYS_CONSTRAINT_MOTOR;
 	} else if ( !Q_stricmp( typeName, "fixed" ) ) {
 		def.type = PHYS_CONSTRAINT_FIXED;
+	} else if ( !Q_stricmp( typeName, "filter" ) ) {
+		def.type = PHYS_CONSTRAINT_FILTER;
+	} else if ( !Q_stricmp( typeName, "parallel" ) ) {
+		def.type = PHYS_CONSTRAINT_PARALLEL;
+	} else if ( !Q_stricmp( typeName, "cone" ) || !Q_stricmp( typeName, "spherical" ) ) {
+		def.type = PHYS_CONSTRAINT_CONE_TWIST;
 	} else {
 		def.type = PHYS_CONSTRAINT_POINT;
 	}
@@ -274,6 +290,9 @@ static int l_phys_createConstraint(lua_State *L) {
 	def.bodyB = (physBodyHandle_t)luaL_checkinteger(L, 3);
 	def.lowerLimit = (float)luaL_optnumber(L, 4, 0);
 	def.upperLimit = (float)luaL_optnumber(L, 5, 0);
+	def.coneAngle = (float)luaL_optnumber(L, 6, 0);
+	def.springHertz = (float)luaL_optnumber(L, 7, 0);
+	def.springDamping = (float)luaL_optnumber(L, 8, 0);
 	def.axisA[2] = 1.0f;
 	def.disableCollision = qtrue;
 	lua_pushinteger(L, Phys_CreateConstraint(&def));
@@ -357,10 +376,8 @@ static int l_phys_setBoneAnimTarget(lua_State *L) {
 	return 0;
 }
 static int l_phys_subscribe(lua_State *L) {
-	/* Stub: register interest in Soft Step events (IMPACT/BREAK/MOTION_*/CONTACT_*/BODY_SLEEP).
-	   Full Lua callbacks need a main-thread marshal; for now log + return true. */
 	const char *typeName = luaL_optstring(L, 1, "impact");
-	Com_Printf( "[physics] Engine.Physics.subscribe(%s) registered (stub)\n", typeName );
+	Com_Printf( "[physics] Engine.Physics.subscribe(%s) — use pollEvent() for Soft Step bus\n", typeName );
 	lua_pushboolean(L, 1);
 	return 1;
 }
@@ -374,6 +391,106 @@ static int l_phys_setRestitution(lua_State *L) {
 }
 static int l_phys_validateReplay(lua_State *L) {
 	lua_pushboolean( L, Phys_ValidateReplay( luaL_optstring( L, 1, "phys_recording.bin" ) ) );
+	return 1;
+}
+static int l_phys_setFilter(lua_State *L) {
+	Phys_SetBodyFilterEx( (physBodyHandle_t)luaL_checkinteger( L, 1 ),
+		(int)luaL_checkinteger( L, 2 ), (int)luaL_checkinteger( L, 3 ),
+		(int)luaL_optinteger( L, 4, 0 ) );
+	return 0;
+}
+static int l_phys_attachShape(lua_State *L) {
+	physBodyDef_t def;
+	Com_Memset( &def, 0, sizeof( def ) );
+	def.shape = PHYS_SHAPE_BOX;
+	def.halfExtents[0] = def.halfExtents[1] = def.halfExtents[2] = (float)luaL_optnumber( L, 2, 8 );
+	if ( lua_gettop( L ) >= 4 ) {
+		def.halfExtents[0] = (float)luaL_checknumber( L, 2 );
+		def.halfExtents[1] = (float)luaL_checknumber( L, 3 );
+		def.halfExtents[2] = (float)luaL_checknumber( L, 4 );
+	}
+	lua_pushinteger( L, Phys_AttachShape( (physBodyHandle_t)luaL_checkinteger( L, 1 ), &def ) );
+	return 1;
+}
+static int l_phys_convexSweep(lua_State *L) {
+	physBodyDef_t def;
+	physRayResult_t hit;
+	vec3_t from, to, rot;
+	Com_Memset( &def, 0, sizeof( def ) );
+	def.shape = PHYS_SHAPE_SPHERE;
+	def.radius = (float)luaL_optnumber( L, 7, 8 );
+	from[0]=(float)luaL_checknumber(L,1); from[1]=(float)luaL_checknumber(L,2); from[2]=(float)luaL_checknumber(L,3);
+	to[0]=(float)luaL_checknumber(L,4); to[1]=(float)luaL_checknumber(L,5); to[2]=(float)luaL_checknumber(L,6);
+	VectorClear( rot );
+	if ( !Phys_ConvexSweep( &def, from, to, rot, &hit ) || !hit.hit ) {
+		lua_pushboolean( L, 0 );
+		return 1;
+	}
+	lua_pushboolean( L, 1 );
+	lua_pushnumber( L, hit.fraction );
+	lua_pushinteger( L, hit.body );
+	lua_pushnumber( L, hit.hitPoint[0] ); lua_pushnumber( L, hit.hitPoint[1] ); lua_pushnumber( L, hit.hitPoint[2] );
+	return 6;
+}
+static int l_phys_overlapSphere(lua_State *L) {
+	vec3_t center;
+	physBodyHandle_t hits[32];
+	int n, i;
+	center[0]=(float)luaL_checknumber(L,1); center[1]=(float)luaL_checknumber(L,2); center[2]=(float)luaL_checknumber(L,3);
+	n = Phys_OverlapSphere( center, (float)luaL_optnumber( L, 4, 32 ), hits, 32 );
+	lua_createtable( L, n, 0 );
+	for ( i = 0; i < n; i++ ) {
+		lua_pushinteger( L, hits[i] );
+		lua_rawseti( L, -2, i + 1 );
+	}
+	return 1;
+}
+static int l_phys_getContacts(lua_State *L) {
+	physContact_t contacts[16];
+	int n, i;
+	n = Phys_GetBodyContacts( (physBodyHandle_t)luaL_checkinteger( L, 1 ), contacts, 16 );
+	lua_createtable( L, n, 0 );
+	for ( i = 0; i < n; i++ ) {
+		lua_createtable( L, 0, 5 );
+		lua_pushinteger( L, contacts[i].otherBody ); lua_setfield( L, -2, "other" );
+		lua_pushnumber( L, contacts[i].point[0] ); lua_setfield( L, -2, "x" );
+		lua_pushnumber( L, contacts[i].point[1] ); lua_setfield( L, -2, "y" );
+		lua_pushnumber( L, contacts[i].point[2] ); lua_setfield( L, -2, "z" );
+		lua_pushnumber( L, contacts[i].normalImpulse ); lua_setfield( L, -2, "impulse" );
+		lua_rawseti( L, -2, i + 1 );
+	}
+	return 1;
+}
+static int l_phys_setConstraintSpring(lua_State *L) {
+	Phys_SetConstraintSpring( (physConstraintHandle_t)luaL_checkinteger( L, 1 ),
+		lua_toboolean( L, 2 ) ? qtrue : qfalse,
+		(float)luaL_optnumber( L, 3, 8 ), (float)luaL_optnumber( L, 4, 0.7 ) );
+	return 0;
+}
+static int l_phys_setSphericalLimits(lua_State *L) {
+	Phys_SetSphericalLimits( (physConstraintHandle_t)luaL_checkinteger( L, 1 ),
+		(float)luaL_checknumber( L, 2 ), (float)luaL_optnumber( L, 3, -1 ), (float)luaL_optnumber( L, 4, 1 ) );
+	return 0;
+}
+static int l_phys_setWheelSteering(lua_State *L) {
+	Phys_SetWheelSteering( (physConstraintHandle_t)luaL_checkinteger( L, 1 ),
+		(float)luaL_checknumber( L, 2 ), (float)luaL_optnumber( L, 3, 500 ) );
+	return 0;
+}
+static int l_phys_pollEvent(lua_State *L) {
+	phys_event_t ev;
+	if ( !PhysEvent_Poll( &ev ) ) {
+		lua_pushnil( L );
+		return 1;
+	}
+	lua_createtable( L, 0, 8 );
+	lua_pushinteger( L, (int)ev.type ); lua_setfield( L, -2, "type" );
+	lua_pushinteger( L, ev.bodyA ); lua_setfield( L, -2, "bodyA" );
+	lua_pushinteger( L, ev.bodyB ); lua_setfield( L, -2, "bodyB" );
+	lua_pushnumber( L, ev.point[0] ); lua_setfield( L, -2, "x" );
+	lua_pushnumber( L, ev.point[1] ); lua_setfield( L, -2, "y" );
+	lua_pushnumber( L, ev.point[2] ); lua_setfield( L, -2, "z" );
+	lua_pushnumber( L, ev.magnitude ); lua_setfield( L, -2, "magnitude" );
 	return 1;
 }
 
@@ -1964,6 +2081,11 @@ void LuaBindings_RegisterAll(void *luaState) {
 		{"subscribe", l_phys_subscribe},
 		{"setFriction", l_phys_setFriction}, {"setRestitution", l_phys_setRestitution},
 		{"validateReplay", l_phys_validateReplay},
+		{"setFilter", l_phys_setFilter}, {"attachShape", l_phys_attachShape},
+		{"convexSweep", l_phys_convexSweep}, {"overlapSphere", l_phys_overlapSphere},
+		{"getContacts", l_phys_getContacts}, {"setConstraintSpring", l_phys_setConstraintSpring},
+		{"setSphericalLimits", l_phys_setSphericalLimits}, {"setWheelSteering", l_phys_setWheelSteering},
+		{"pollEvent", l_phys_pollEvent},
 		{NULL, NULL}
 	};
 	registerTable(L, "Physics", physicsFuncs);

@@ -3,8 +3,8 @@
 Copyright (C) 2026 Gopex LLC. All rights reserved.
 
 Active ragdoll motor layer (Euphoria-like) — PD joint targets from
-balance, protect-head, brace, reach, stumble, and pain controllers.
-Runs above Bullet constraints; ProcAnim drives high-level state.
+balance, protect-head, brace, reach, stumble, getup, limp, and pain.
+Runs above Soft Step constraints; ProcAnim drives high-level state.
 ===========================================================================
 */
 

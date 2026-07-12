@@ -18,6 +18,7 @@ Copyright (C) 2026 Gopex LLC. All rights reserved.
 #include "phys_particles.h"
 #include "phys_softblob.h"
 #include "phys_fluid.h"
+#include "phys_dmm.h"
 #include "phys_middleware.h"
 #include "phys_ragdoll_bind.h"
 
@@ -26,6 +27,7 @@ Copyright (C) 2026 Gopex LLC. All rights reserved.
 #define PHYS_DEMO_VOLUME_MAX  16
 #define PHYS_DEMO_CLOTH_MAX   8
 #define PHYS_DEMO_ROPE_MAX    8
+#define PHYS_DEMO_DMM_MAX     8
 
 typedef struct physDemoRagdoll_s {
 	qboolean            active;
@@ -39,6 +41,8 @@ static physDemoRagdoll_t demoRagdolls[PHYS_DEMO_RAGDOLL_MAX];
 static int demoRagdollLast = -1;
 static physBodyHandle_t demoProps[PHYS_DEMO_PROP_MAX];
 static int demoPropCount;
+static dmmObjectHandle_t demoDmm[PHYS_DEMO_DMM_MAX];
+static int demoDmmCount;
 static physVolumeHandle_t demoVolumes[PHYS_DEMO_VOLUME_MAX];
 static int demoVolumeCount;
 static physShadowHandle_t demoShadow = -1;
@@ -110,6 +114,7 @@ static void PhysMiddleware_Status_f( void ) {
 	Com_Printf( "  particles:    %d active\n", PhysParticles_GetActiveCount() );
 	Com_Printf( "  softblobs:    %d active\n", SoftBlob_GetActiveCount() );
 	Com_Printf( "  fluid:        %d particles\n", PhysFluid_GetActiveCount() );
+	Com_Printf( "  dmm:          %d active (Soft Step rigid fracture)\n", Dmm_GetActiveCount() );
 	Com_Printf( "  solvers:\n" );
 	{
 		int s;
@@ -124,12 +129,14 @@ static void PhysMiddleware_Status_f( void ) {
 	Com_Printf( "  demo props:   %d\n", demoPropCount );
 	Com_Printf( "  demo cloth:   %d\n", demoClothCount );
 	Com_Printf( "  demo ropes:   %d\n", demoRopeCount );
-	Com_Printf( "  event queue:  %d pending\n", PhysEvent_QueueDepth() );
+	Com_Printf( "  event queue:  %d pending (poll=%d)\n", PhysEvent_QueueDepth(), PhysEvent_PollDepth() );
 	{
 		physSoftStepProfile_t prof;
 		Phys_GetSoftStepProfile( &prof );
 		Com_Printf( "  soft step:    step=%.3fms collide=%.3fms solve=%.3fms joints=%.3fms\n",
 			prof.stepMs, prof.collideMs, prof.solveMs, prof.jointEventsMs );
+		Com_Printf( "  soft counts:  bodies=%d shapes=%d contacts=%d hits=%d islands=%d\n",
+			prof.bodyCount, prof.shapeCount, prof.contactCount, prof.contactHitCount, prof.islandCount );
 	}
 }
 
@@ -424,7 +431,7 @@ static void PhysMiddleware_ClearProps_f( void ) {
 /*
 ===============
 phys_spawn_ragdoll [x y z]
-Creates Bullet ragdoll + ProcAnim + motor for console demos.
+Creates Soft Step ragdoll + Euphoria-like ProcAnim + motor for console demos.
 ===============
 */
 static void PhysMiddleware_SpawnRagdoll_f( void ) {
@@ -494,9 +501,72 @@ static void PhysMiddleware_SpawnRagdoll_f( void ) {
 	}
 
 	slot->active = qtrue;
-	Com_Printf( "phys_spawn_ragdoll: slot %d ragdoll=%d anim=%d motor=%d at (%.0f %.0f %.0f)\n",
+	Com_Printf( "phys_spawn_ragdoll: slot %d ragdoll=%d anim=%d motor=%d at (%.0f %.0f %.0f) (Euphoria-like Soft Step)\n",
 		demoRagdollLast, slot->ragdoll, slot->anim, slot->motor,
 		origin[0], origin[1], origin[2] );
+}
+
+static void PhysMiddleware_SpawnDmm_f( void ) {
+	dmmObjectDef_t def;
+	dmmFracturePattern_t pattern;
+	dmmObjectHandle_t h;
+	vec3_t origin;
+
+	if ( !middlewareReady ) {
+		Com_Printf( "PhysMiddleware not ready (phys_enabled?)\n" );
+		return;
+	}
+	if ( demoDmmCount >= PHYS_DEMO_DMM_MAX ) {
+		Com_Printf( S_COLOR_YELLOW "phys_spawn_dmm: demo slots full\n" );
+		return;
+	}
+	VectorSet( origin, 0.0f, 0.0f, 48.0f );
+	if ( Cmd_Argc() >= 4 ) {
+		origin[0] = (float)atof( Cmd_Argv( 1 ) );
+		origin[1] = (float)atof( Cmd_Argv( 2 ) );
+		origin[2] = (float)atof( Cmd_Argv( 3 ) );
+	}
+	Com_Memset( &def, 0, sizeof( def ) );
+	VectorCopy( origin, def.position );
+	VectorSet( def.dimensions, 48.0f, 48.0f, 48.0f );
+	def.material = DMM_CONCRETE;
+	def.density = 2.4f;
+	def.gridResolution = 6;
+	def.deformability = 1.0f;
+	Dmm_GenerateVoronoiPattern( origin, 32.0f, 8, &pattern );
+	h = Dmm_CreateEnhanced( &def, &pattern );
+	if ( h < 0 ) {
+		Com_Printf( S_COLOR_YELLOW "phys_spawn_dmm: create failed (phys_dmm_enabled?)\n" );
+		return;
+	}
+	demoDmm[demoDmmCount++] = h;
+	Com_Printf( "phys_spawn_dmm: handle=%d Soft Step proxy at (%.0f %.0f %.0f) — hit with phys_hit_dmm\n",
+		h, origin[0], origin[1], origin[2] );
+}
+
+static void PhysMiddleware_HitDmm_f( void ) {
+	dmmObjectHandle_t h;
+	vec3_t point;
+	float energy;
+	int n;
+
+	if ( demoDmmCount <= 0 ) {
+		Com_Printf( "phys_hit_dmm: spawn one with phys_spawn_dmm first\n" );
+		return;
+	}
+	h = demoDmm[demoDmmCount - 1];
+	energy = 800.0f;
+	VectorClear( point );
+	if ( Cmd_Argc() >= 2 ) {
+		energy = (float)atof( Cmd_Argv( 1 ) );
+	}
+	if ( Cmd_Argc() >= 5 ) {
+		point[0] = (float)atof( Cmd_Argv( 2 ) );
+		point[1] = (float)atof( Cmd_Argv( 3 ) );
+		point[2] = (float)atof( Cmd_Argv( 4 ) );
+	}
+	n = Dmm_Fracture( h, point, energy );
+	Com_Printf( "phys_hit_dmm: handle=%d energy=%.0f fragments=%d\n", h, energy, n );
 }
 
 /*
@@ -847,10 +917,31 @@ static void PhysMiddleware_SetRestitution_f( void ) {
 	Com_Printf( "phys_set_restitution: body=%d restitution=%.3f\n", body, rest );
 }
 
+static void PhysMiddleware_SetFilter_f( void ) {
+	physBodyHandle_t body;
+	int category, mask, group;
+	if ( Cmd_Argc() < 4 ) {
+		Com_Printf( "usage: phys_set_filter <body> <categoryBits> <maskBits> [groupIndex]\n" );
+		return;
+	}
+	body = atoi( Cmd_Argv( 1 ) );
+	category = atoi( Cmd_Argv( 2 ) );
+	mask = atoi( Cmd_Argv( 3 ) );
+	group = Cmd_Argc() >= 5 ? atoi( Cmd_Argv( 4 ) ) : 0;
+	Phys_SetBodyFilterEx( body, category, mask, group );
+	Com_Printf( "phys_set_filter: body=%d cat=%d mask=%d group=%d\n", body, category, mask, group );
+}
+
+static void PhysMiddleware_Dump_f( void ) {
+	Phys_DumpWorld();
+}
+
 void PhysMiddleware_RegisterCommands( void ) {
 	Cmd_AddCommand( "phys_status", PhysMiddleware_Status_f );
 	Cmd_AddCommand( "phys_spawn_ragdoll", PhysMiddleware_SpawnRagdoll_f );
 	Cmd_AddCommand( "phys_spawn_ragdoll_bind", PhysMiddleware_SpawnRagdollBind_f );
+	Cmd_AddCommand( "phys_spawn_dmm", PhysMiddleware_SpawnDmm_f );
+	Cmd_AddCommand( "phys_hit_dmm", PhysMiddleware_HitDmm_f );
 	Cmd_AddCommand( "phys_hit_ragdoll", PhysMiddleware_HitRagdoll_f );
 	Cmd_AddCommand( "phys_clear_ragdolls", PhysMiddleware_ClearRagdolls_f );
 	Cmd_AddCommand( "phys_spawn_box", PhysMiddleware_SpawnBox_f );
@@ -877,6 +968,8 @@ void PhysMiddleware_RegisterCommands( void ) {
 	Cmd_AddCommand( "phys_replay", PhysMiddleware_Replay_f );
 	Cmd_AddCommand( "phys_set_friction", PhysMiddleware_SetFriction_f );
 	Cmd_AddCommand( "phys_set_restitution", PhysMiddleware_SetRestitution_f );
+	Cmd_AddCommand( "phys_set_filter", PhysMiddleware_SetFilter_f );
+	Cmd_AddCommand( "phys_dump", PhysMiddleware_Dump_f );
 }
 
 void PhysMiddleware_Init( void ) {
@@ -916,6 +1009,8 @@ void PhysMiddleware_Shutdown( void ) {
 	Cmd_RemoveCommand( "phys_status" );
 	Cmd_RemoveCommand( "phys_spawn_ragdoll" );
 	Cmd_RemoveCommand( "phys_spawn_ragdoll_bind" );
+	Cmd_RemoveCommand( "phys_spawn_dmm" );
+	Cmd_RemoveCommand( "phys_hit_dmm" );
 	Cmd_RemoveCommand( "phys_hit_ragdoll" );
 	Cmd_RemoveCommand( "phys_clear_ragdolls" );
 	Cmd_RemoveCommand( "phys_spawn_box" );
@@ -942,6 +1037,8 @@ void PhysMiddleware_Shutdown( void ) {
 	Cmd_RemoveCommand( "phys_replay" );
 	Cmd_RemoveCommand( "phys_set_friction" );
 	Cmd_RemoveCommand( "phys_set_restitution" );
+	Cmd_RemoveCommand( "phys_set_filter" );
+	Cmd_RemoveCommand( "phys_dump" );
 	PhysEvent_UnsubscribeAll();
 	PhysVolume_Shutdown();
 	PhysProp_Shutdown();

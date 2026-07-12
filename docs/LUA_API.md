@@ -44,6 +44,17 @@ Engine.Physics.getTransform(handle)           -- returns x, y, z, rx, ry, rz
 Engine.Physics.setFriction(handle, friction)
 Engine.Physics.setRestitution(handle, restitution)
 Engine.Physics.validateReplay(path)           -- Soft Step recording QA
+Engine.Physics.rayCast(x1,y1,z1, x2,y2,z2 [, cat, mask])
+Engine.Physics.convexSweep(x1,y1,z1, x2,y2,z2 [, radius])
+Engine.Physics.overlapSphere(x,y,z [, radius]) -- body handle table
+Engine.Physics.getContacts(handle)            -- manifold table
+Engine.Physics.setFilter(handle, cat, mask [, group])
+Engine.Physics.attachShape(handle [, hx,hy,hz])
+Engine.Physics.setConstraintSpring(c, enable [, hz, damp])
+Engine.Physics.setSphericalLimits(c, cone [, twistLo, twistHi])
+Engine.Physics.setWheelSteering(c, angleRad [, maxTorque])
+Engine.Physics.pollEvent()                    -- Soft Step bus event or nil
+Engine.Physics.createConstraint(type, a, b, ...) -- filter|parallel|cone|…
 ```
 
 ## Engine.Particles (5 functions)

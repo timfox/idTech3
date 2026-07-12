@@ -16,6 +16,7 @@ bones with corrective forces for balance, reactions, and recovery.
 #include "qcommon.h"
 #include "phys_bullet.h"
 #include "phys_procedural_anim.h"
+#include "phys_ik.h"
 
 typedef struct procAnimController_s {
 	qboolean            active;
@@ -33,10 +34,12 @@ typedef struct procAnimController_s {
 	float               animBlend;
 	vec3_t              lastCOM;
 	vec3_t              comVelocity;
+	vec3_t              supportCenter; /* feet midpoint (Z-up ground plane) */
 	qboolean            onGround;
 	float               groundTimer;
 	float               impactAccum;
 	float               recoveryTimer;
+	int                 stumbleFoot; /* 0=L 1=R alternating */
 } procAnimController_t;
 
 static procAnimController_t controllers[PROCANIM_MAX_CONTROLLERS];
@@ -94,9 +97,11 @@ static float ProcAnim_ComputeBalance(procAnimController_t *ctrl) {
 	Phys_RagdollGetBoneTransform(ctrl->ragdoll, PROCANIM_BONE_LOWER_LEG_L, &lfoot);
 	Phys_RagdollGetBoneTransform(ctrl->ragdoll, PROCANIM_BONE_LOWER_LEG_R, &rfoot);
 
+	/* Quake Z-up: support polygon on XY */
 	supportCenter[0] = (lfoot.position[0] + rfoot.position[0]) * 0.5f;
 	supportCenter[1] = (lfoot.position[1] + rfoot.position[1]) * 0.5f;
 	supportCenter[2] = (lfoot.position[2] + rfoot.position[2]) * 0.5f;
+	VectorCopy(supportCenter, ctrl->supportCenter);
 
 	dx = ctrl->lastCOM[0] - supportCenter[0];
 	dy = ctrl->lastCOM[1] - supportCenter[1];
@@ -110,33 +115,73 @@ static float ProcAnim_ComputeBalance(procAnimController_t *ctrl) {
 	return balance;
 }
 
-static void ProcAnim_ApplyBalanceForces(procAnimController_t *ctrl, float dt) {
-	physTransform_t pelvis, lfoot, rfoot;
-	vec3_t supportCenter, corrective, damping;
-	float stiffness, dampCoeff;
+/*
+===============
+ProcAnim_UpdateGround
+Soft Step foot raycasts → onGround (Euphoria-like plant detection).
+===============
+*/
+static void ProcAnim_UpdateGround(procAnimController_t *ctrl, float dt) {
+	physTransform_t lfoot, rfoot;
+	physRayResult_t hitL, hitR;
+	vec3_t from, to;
+	float groundDist = 24.0f;
+	qboolean planted = qfalse;
 
-	Phys_RagdollGetBoneTransform(ctrl->ragdoll, PROCANIM_BONE_PELVIS, &pelvis);
 	Phys_RagdollGetBoneTransform(ctrl->ragdoll, PROCANIM_BONE_LOWER_LEG_L, &lfoot);
 	Phys_RagdollGetBoneTransform(ctrl->ragdoll, PROCANIM_BONE_LOWER_LEG_R, &rfoot);
 
-	supportCenter[0] = (lfoot.position[0] + rfoot.position[0]) * 0.5f;
-	supportCenter[1] = (lfoot.position[1] + rfoot.position[1]) * 0.5f;
-	supportCenter[2] = (lfoot.position[2] + rfoot.position[2]) * 0.5f;
+	VectorCopy(lfoot.position, from);
+	from[2] += 4.0f;
+	VectorCopy(from, to);
+	to[2] -= groundDist;
+	if (Phys_RayCast(from, to, &hitL) && hitL.hit && hitL.fraction < 1.0f) {
+		planted = qtrue;
+	}
+
+	VectorCopy(rfoot.position, from);
+	from[2] += 4.0f;
+	VectorCopy(from, to);
+	to[2] -= groundDist;
+	if (Phys_RayCast(from, to, &hitR) && hitR.hit && hitR.fraction < 1.0f) {
+		planted = qtrue;
+	}
+
+	if (planted) {
+		ctrl->groundTimer += dt;
+		if (ctrl->groundTimer > 0.05f) {
+			ctrl->onGround = qtrue;
+		}
+	} else {
+		ctrl->groundTimer = 0.0f;
+		ctrl->onGround = qfalse;
+	}
+}
+
+static void ProcAnim_ApplyBalanceForces(procAnimController_t *ctrl, float dt) {
+	physTransform_t pelvis;
+	vec3_t corrective, damping;
+	float stiffness, dampCoeff;
+
+	Phys_RagdollGetBoneTransform(ctrl->ragdoll, PROCANIM_BONE_PELVIS, &pelvis);
 
 	stiffness = ctrl->config.balanceStiffness * ctrl->muscleStiffness;
 	dampCoeff = ctrl->config.balanceDamping * ctrl->muscleStiffness;
 
-	corrective[0] = (supportCenter[0] - ctrl->lastCOM[0]) * stiffness * dt;
-	corrective[1] = 0;
-	corrective[2] = (supportCenter[2] - ctrl->lastCOM[2]) * stiffness * dt;
+	/* Horizontal only (Z-up): pull COM above support center */
+	corrective[0] = (ctrl->supportCenter[0] - ctrl->lastCOM[0]) * stiffness * dt;
+	corrective[1] = (ctrl->supportCenter[1] - ctrl->lastCOM[1]) * stiffness * dt;
+	corrective[2] = 0.0f;
 
 	damping[0] = -ctrl->comVelocity[0] * dampCoeff;
-	damping[1] = 0;
-	damping[2] = -ctrl->comVelocity[2] * dampCoeff;
+	damping[1] = -ctrl->comVelocity[1] * dampCoeff;
+	damping[2] = 0.0f;
 
 	VectorAdd(corrective, damping, corrective);
 
 	Phys_RagdollApplyImpact(ctrl->ragdoll, pelvis.position, corrective, 50.0f);
+	/* Soft Step substrate balance pulls toward support (not COM) */
+	Phys_RagdollSetBalance(ctrl->ragdoll, qtrue, ctrl->supportCenter);
 }
 
 static void ProcAnim_ApplyBraceReaction(procAnimController_t *ctrl, float dt) {
@@ -152,11 +197,62 @@ static void ProcAnim_ApplyBraceReaction(procAnimController_t *ctrl, float dt) {
 
 	VectorCopy(ctrl->lastCOM, braceTarget);
 	braceTarget[0] += ctrl->comVelocity[0] * extension * 50.0f;
-	braceTarget[2] += ctrl->comVelocity[2] * extension * 50.0f;
-	braceTarget[1] -= 20.0f;
+	braceTarget[1] += ctrl->comVelocity[1] * extension * 50.0f;
+	braceTarget[2] -= 20.0f; /* reach toward ground (Z-up) */
 
 	Phys_RagdollReach(ctrl->ragdoll, PROCANIM_BONE_LOWER_ARM_L, braceTarget, ctrl->config.grabStrength * 0.5f);
 	Phys_RagdollReach(ctrl->ragdoll, PROCANIM_BONE_LOWER_ARM_R, braceTarget, ctrl->config.grabStrength * 0.5f);
+}
+
+/*
+===============
+ProcAnim_ApplyStumbleStep
+Euphoria-like recovery step: plant a foot under projected COM via Soft Step reach.
+===============
+*/
+static void ProcAnim_ApplyStumbleStep(procAnimController_t *ctrl, float dt) {
+	physTransform_t hipL, hipR, footL, footR;
+	ikFootPlacement_t foot;
+	vec3_t stepTarget;
+	int hipBone, footBone;
+	float force;
+
+	(void)dt;
+	Phys_RagdollGetBoneTransform(ctrl->ragdoll, PROCANIM_BONE_UPPER_LEG_L, &hipL);
+	Phys_RagdollGetBoneTransform(ctrl->ragdoll, PROCANIM_BONE_UPPER_LEG_R, &hipR);
+	Phys_RagdollGetBoneTransform(ctrl->ragdoll, PROCANIM_BONE_LOWER_LEG_L, &footL);
+	Phys_RagdollGetBoneTransform(ctrl->ragdoll, PROCANIM_BONE_LOWER_LEG_R, &footR);
+
+	if (ctrl->stumbleFoot == 0) {
+		hipBone = PROCANIM_BONE_UPPER_LEG_L;
+		footBone = PROCANIM_BONE_LOWER_LEG_L;
+		VectorCopy(hipL.position, foot.hipPosition);
+	} else {
+		hipBone = PROCANIM_BONE_UPPER_LEG_R;
+		footBone = PROCANIM_BONE_LOWER_LEG_R;
+		VectorCopy(hipR.position, foot.hipPosition);
+	}
+
+	/* Step toward where COM is falling */
+	stepTarget[0] = ctrl->lastCOM[0] + ctrl->comVelocity[0] * 8.0f;
+	stepTarget[1] = ctrl->lastCOM[1] + ctrl->comVelocity[1] * 8.0f;
+	stepTarget[2] = ctrl->supportCenter[2] - 8.0f;
+	VectorCopy(stepTarget, foot.footTarget);
+	VectorSet(foot.kneeHint, 0.0f, 0.0f, 1.0f);
+	foot.upperLegLen = 18.0f;
+	foot.lowerLegLen = 18.0f;
+	foot.groundOffset = 0.0f;
+
+	if (IK_SolveFootPlacement(&foot)) {
+		force = ctrl->config.grabStrength * (0.4f + (1.0f - ctrl->balance) * 0.8f);
+		Phys_RagdollReach(ctrl->ragdoll, footBone, foot.resultFoot, force);
+		Phys_RagdollReach(ctrl->ragdoll, hipBone, foot.resultKnee, force * 0.5f);
+	}
+
+	if (ctrl->stateTimer > 0.25f) {
+		ctrl->stumbleFoot ^= 1;
+		ctrl->stateTimer = 0.0f;
+	}
 }
 
 static void ProcAnim_ApplyHeadTracking(procAnimController_t *ctrl, float dt) {
@@ -250,7 +346,7 @@ procAnimHandle_t ProcAnim_Create(physRagdollHandle_t ragdoll, const procAnimConf
 
 	Phys_RagdollSetBalance(ragdoll, qtrue, ctrl->lastCOM);
 
-	Com_Printf("Procedural Animation: created controller %d for ragdoll %d\n", idx, ragdoll);
+	Com_Printf("Procedural Animation: Euphoria-like controller %d for Soft Step ragdoll %d\n", idx, ragdoll);
 	return idx;
 }
 
@@ -271,6 +367,7 @@ void ProcAnim_Update(procAnimHandle_t handle, float dt) {
 
 	ProcAnim_ComputeCOM(ctrl);
 	ctrl->balance = ProcAnim_ComputeBalance(ctrl);
+	ProcAnim_UpdateGround(ctrl, dt);
 
 	if (ctrl->painLevel > 0) {
 		ctrl->painLevel -= dt * 0.5f;
@@ -289,17 +386,20 @@ void ProcAnim_Update(procAnimHandle_t handle, float dt) {
 			ProcAnim_ApplyHeadTracking(ctrl, dt);
 			ProcAnim_ApplyIKTargets(ctrl, dt);
 
-			if (ctrl->balance < ctrl->config.stumbleThreshold) {
+			if (!ctrl->onGround && ctrl->comVelocity[2] < -40.0f) {
+				ProcAnim_TransitionState(ctrl, PROCANIM_STATE_FALLING);
+			} else if (ctrl->balance < ctrl->config.stumbleThreshold) {
 				ProcAnim_TransitionState(ctrl, PROCANIM_STATE_STUMBLE);
 			}
 			break;
 
 		case PROCANIM_STATE_STUMBLE:
 			ProcAnim_ApplyBalanceForces(ctrl, dt);
+			ProcAnim_ApplyStumbleStep(ctrl, dt);
 
-			if (ctrl->balance > ctrl->config.stumbleThreshold + 0.1f) {
+			if (ctrl->balance > ctrl->config.stumbleThreshold + 0.1f && ctrl->onGround) {
 				ProcAnim_TransitionState(ctrl, PROCANIM_STATE_BALANCE);
-			} else if (ctrl->balance < ctrl->config.fallThreshold) {
+			} else if (ctrl->balance < ctrl->config.fallThreshold || !ctrl->onGround) {
 				ProcAnim_TransitionState(ctrl, PROCANIM_STATE_FALLING);
 			}
 			break;
@@ -325,13 +425,14 @@ void ProcAnim_Update(procAnimHandle_t handle, float dt) {
 			break;
 
 		case PROCANIM_STATE_RAGDOLL:
-			if (ctrl->consciousness > 0.5f && ctrl->onGround) {
+			if (ctrl->consciousness > 0.5f && ctrl->onGround && ctrl->stateTimer > 0.8f) {
 				ProcAnim_TransitionState(ctrl, PROCANIM_STATE_GETUP);
 			}
 			break;
 
 		case PROCANIM_STATE_IMPACT:
 			ctrl->recoveryTimer -= dt;
+			ProcAnim_ApplyBalanceForces(ctrl, dt);
 			if (ctrl->recoveryTimer <= 0) {
 				if (ctrl->balance > ctrl->config.stumbleThreshold) {
 					ProcAnim_TransitionState(ctrl, PROCANIM_STATE_BALANCE);
@@ -347,8 +448,13 @@ void ProcAnim_Update(procAnimHandle_t handle, float dt) {
 
 			Phys_RagdollGetBoneTransform(ctrl->ragdoll, PROCANIM_BONE_PELVIS, &pelvis);
 
-			VectorSet(upForce, 0, ctrl->config.getupSpeed * 200.0f * dt, 0);
+			/* Quake Z-up getup impulse + horizontal center over support */
+			VectorSet(upForce,
+				(ctrl->supportCenter[0] - pelvis.position[0]) * 8.0f * dt,
+				(ctrl->supportCenter[1] - pelvis.position[1]) * 8.0f * dt,
+				ctrl->config.getupSpeed * 280.0f * dt);
 			Phys_RagdollApplyImpact(ctrl->ragdoll, pelvis.position, upForce, 30.0f);
+			ProcAnim_ApplyStumbleStep(ctrl, dt);
 
 			ctrl->muscleStiffness += dt * ctrl->config.balanceRecoverySpeed;
 			if (ctrl->muscleStiffness > ctrl->config.muscleStiffnessMax) {
@@ -356,11 +462,17 @@ void ProcAnim_Update(procAnimHandle_t handle, float dt) {
 			}
 			Phys_RagdollSetMuscleStiffness(ctrl->ragdoll, ctrl->muscleStiffness);
 
-			if (ctrl->stateTimer > 2.0f / ctrl->config.getupSpeed) {
+			if (ctrl->stateTimer > 2.0f / ctrl->config.getupSpeed
+				&& ctrl->onGround && ctrl->balance > ctrl->config.stumbleThreshold) {
 				ProcAnim_TransitionState(ctrl, PROCANIM_STATE_BALANCE);
 			}
 			break;
 		}
+
+		case PROCANIM_STATE_REACHING:
+			ProcAnim_ApplyIKTargets(ctrl, dt);
+			ProcAnim_ApplyBalanceForces(ctrl, dt);
+			break;
 
 		default:
 			break;

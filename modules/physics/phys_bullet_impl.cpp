@@ -469,6 +469,22 @@ extern "C" void Phys_SetWheelSteering_Impl(physConstraintHandle_t h, float angle
 	(void)h; (void)angleRadians; (void)maxTorque;
 }
 
+extern "C" void Phys_SetConstraintSpring_Impl(physConstraintHandle_t h, qboolean enable,
+	float hertz, float dampingRatio) {
+	(void)h; (void)enable; (void)hertz; (void)dampingRatio;
+}
+
+extern "C" void Phys_SetSphericalLimits_Impl(physConstraintHandle_t h, float coneAngleRadians,
+	float twistLowerRadians, float twistUpperRadians) {
+	(void)h; (void)coneAngleRadians; (void)twistLowerRadians; (void)twistUpperRadians;
+}
+
+extern "C" void Phys_GetConstraintReaction_Impl(physConstraintHandle_t h, vec3_t forceOut, vec3_t torqueOut) {
+	if (forceOut) { forceOut[0] = forceOut[1] = forceOut[2] = 0.0f; }
+	if (torqueOut) { torqueOut[0] = torqueOut[1] = torqueOut[2] = 0.0f; }
+	(void)h;
+}
+
 extern "C" int Phys_AttachShape_Impl(physBodyHandle_t body, const physBodyDef_t *shapeDef) {
 	(void)body; (void)shapeDef;
 	return -1;
@@ -479,7 +495,11 @@ extern "C" void Phys_DestroyAttachedShape_Impl(physBodyHandle_t body, int shapeI
 }
 
 extern "C" void Phys_SetBodyFilter_Impl(physBodyHandle_t body, int categoryBits, int maskBits) {
-	(void)body; (void)categoryBits; (void)maskBits;
+	Phys_SetBodyFilterEx_Impl(body, categoryBits, maskBits, 0);
+}
+
+extern "C" void Phys_SetBodyFilterEx_Impl(physBodyHandle_t body, int categoryBits, int maskBits, int groupIndex) {
+	(void)body; (void)categoryBits; (void)maskBits; (void)groupIndex;
 }
 
 /* ========== ragdoll ========== */
@@ -722,6 +742,11 @@ extern "C" int Dmm_GetFragments_Impl(dmmObjectHandle_t h, physBodyHandle_t *frag
 	return 0;
 }
 
+extern "C" int Dmm_SpawnFragments_Impl(dmmObjectHandle_t h, const vec3_t impactPoint, float energy) {
+	(void)h; (void)impactPoint; (void)energy;
+	return 0;
+}
+
 extern "C" void Dmm_SetMaterialParams_Impl(dmmObjectHandle_t h, float stiff, float yield, float frac) {
 	if (!VALID_DMM(h)) return;
 	bs.dmmObjects[h].yieldStrength = yield;
@@ -778,6 +803,27 @@ extern "C" int Phys_OverlapBox_Impl(const vec3_t c, const vec3_t he, physBodyHan
 
 extern "C" int Phys_OverlapShape_Impl(const vec3_t center, float radius, physBodyHandle_t *results, int maxResults) {
 	return Phys_OverlapSphere_Impl(center, radius, results, maxResults);
+}
+
+extern "C" qboolean Phys_RayCastFiltered_Impl(const vec3_t from, const vec3_t to, physRayResult_t *result,
+	const physQueryFilter_t *filter) {
+	(void)filter;
+	return Phys_RayCast_Impl(from, to, result);
+}
+
+extern "C" int Phys_OverlapShapeFiltered_Impl(const vec3_t center, float radius, physBodyHandle_t *results, int maxResults,
+	const physQueryFilter_t *filter) {
+	(void)filter;
+	return Phys_OverlapShape_Impl(center, radius, results, maxResults);
+}
+
+extern "C" int Phys_GetBodyContacts_Impl(physBodyHandle_t body, physContact_t *out, int maxOut) {
+	(void)body; (void)out; (void)maxOut;
+	return 0;
+}
+
+extern "C" void Phys_SetHitEventThreshold_Impl(float approachSpeed) {
+	(void)approachSpeed;
 }
 
 extern "C" void Phys_DebugDraw_Impl(void) {
@@ -849,6 +895,12 @@ extern "C" qboolean Phys_ConvexSweep_Impl( const physBodyDef_t *shapeDef, const 
 
 	result->hit = qfalse;
 	return qfalse;
+}
+
+extern "C" qboolean Phys_ConvexSweepFiltered_Impl( const physBodyDef_t *shapeDef, const vec3_t from, const vec3_t to,
+	const vec3_t rotation, physRayResult_t *result, const physQueryFilter_t *filter ) {
+	(void)filter;
+	return Phys_ConvexSweep_Impl( shapeDef, from, to, rotation, result );
 }
 
 extern "C" void Phys_ProcessContactEvents_Impl( void ) {
@@ -1041,6 +1093,10 @@ extern "C" void Phys_StopRecording_Impl(const char *path) {
 extern "C" qboolean Phys_ValidateReplay_Impl(const char *path) {
 	(void)path;
 	return qfalse;
+}
+
+extern "C" void Phys_DumpWorld_Impl(void) {
+	Com_Printf( "phys_dump: Soft Step only\n" );
 }
 
 #endif /* USE_BULLET_PHYSICS_IMPL */
