@@ -12,8 +12,8 @@ contextual stingers for combat/danger events.
 ===========================================================================
 */
 
-#include "../qcommon/q_shared.h"
-#include "../qcommon/qcommon.h"
+#include "q_shared.h"
+#include "qcommon.h"
 #include "snd_music_adaptive.h"
 
 extern void S_StartBackgroundTrack(const char *intro, const char *loop);

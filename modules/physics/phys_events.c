@@ -4,8 +4,8 @@ Copyright (C) 2026 Gopex LLC. All rights reserved.
 ===========================================================================
 */
 
-#include "../qcommon/q_shared.h"
-#include "../qcommon/qcommon.h"
+#include "q_shared.h"
+#include "qcommon.h"
 #include "phys_events.h"
 
 typedef struct {

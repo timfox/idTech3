@@ -17,6 +17,8 @@ Full AMR ExaBrick traversal, ratio tracking, and multi-bounce global illuminatio
 
 ## Setup
 
+Quick path (demo pack): `exec demo_vdb_woodcock.cfg` — loads shipped `vdb/fog_2cubed.nvdb` and enables mode 3.
+
 ```text
 set r_volumetricFog 1
 set r_vdbFog 1

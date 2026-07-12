@@ -4,6 +4,16 @@ Value-aware open-world sector selection under per-layer cardinality budgets, wit
 
 Inspired by the consistent submodular optimization framework (Dütting et al., 2026): ROBUST-GREEDY cardinality selection, optional partition-matroid ROBUST-SWAP, and transition spreading so residency sets change gradually.
 
+## Quick start
+
+```text
+exec demo_world_residency.cfg
+openworld_start
+world_residency_status
+```
+
+Or enable on top of the open-world demo: `set r_openWorldResidency 1` after `exec demo_openworld.cfg`.
+
 ## Problem mapping
 
 | Paper concept | Engine mapping |
@@ -40,15 +50,17 @@ Inspired by the consistent submodular optimization framework (Dütting et al., 2
 
 Startup log when enabled: `[world_residency] enabled epsilon=… k_col=… max_swaps=… matroid=…`
 
+Console: **`world_residency_status`** — per-layer current/target/pending counts and budgets.
+
 ## Multiplayer rules
 
 - **Server collision is authoritative.** `SV_OpenWorld_Frame` with `sv_openWorldResidency 1` plans collision from the union of active player origins, then publishes via `CS_ENGINE_OPENWORLD_SECTORS`.
 - **Clients clamp collision** to the server allow list (`WorldResidency_SetServerCollisionAllowList` from configstring parse).
-- **Nav:** when residency is on and `cl_openWorldResidencyNavLocal 0`, nav tiles load only from the server sector list. Sprites remain view-driven locally.
+- **Nav:** when residency is on and `cl_openWorldResidencyNavLocal 0`, nav candidates are also clamped to the server sector allow list (planned by WorldResidency). Set **`cl_openWorldResidencyNavLocal 1`** for view-driven nav beyond that list. Sprites remain view-driven locally.
 
 ## Graph reachability pre-filter
 
-When **`r_graphStreamReach 1`**, [`WorldResidency`](src/world/world_residency.cpp) intersects candidates with the sector graph k-hop mask from [`SectorGraph_UpdateReachability`](src/world/sector_graph.cpp). MP server path uses the union of all active player origins as BFS sources. See [GRAPH_COMPUTE.md](GRAPH_COMPUTE.md).
+When **`r_graphStreamReach 1`**, [`WorldResidency`](../modules/world/world_residency.cpp) intersects candidates with the sector graph k-hop mask from [`SectorGraph_UpdateReachability`](../modules/world/sector_graph.cpp). MP server path uses the union of all active player origins as BFS sources. See [GRAPH_COMPUTE.md](GRAPH_COMPUTE.md).
 
 ## District integration
 

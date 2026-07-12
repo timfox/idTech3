@@ -2,7 +2,7 @@
  * Fluid-solid and solid-fluid coupling (Arc Blanc §4–5).
  */
 #include "arc_blanc_internal.h"
-#include "../../qcommon/qcommon.h"
+#include "qcommon.h"
 #include <math.h>
 #include <string.h>
 

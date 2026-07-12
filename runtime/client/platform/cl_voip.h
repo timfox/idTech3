@@ -10,7 +10,7 @@ Optional head-model lip flap driven by per-client voice power.
 #ifndef CL_VOIP_H
 #define CL_VOIP_H
 
-#include "../../qcommon/q_shared.h"
+#include "q_shared.h"
 #include "../../../renderers/common/tr_types.h"
 
 #define VOIP_SAMPLE_RATE     48000

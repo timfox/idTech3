@@ -12,7 +12,7 @@ Compiled only when USE_STEAM is defined and steam_api is available.
 #ifndef CL_STEAM_H
 #define CL_STEAM_H
 
-#include "../../qcommon/q_shared.h"
+#include "q_shared.h"
 
 void        Steam_Init( void );
 void        Steam_Shutdown( void );

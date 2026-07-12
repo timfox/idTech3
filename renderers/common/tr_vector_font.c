@@ -7,9 +7,9 @@ Lengyel (JCGT 2017) GPU vector font path.
 ===========================================================================
 */
 
-#include "../../qcommon/q_shared.h"
-#include "../../qcommon/qcommon.h"
-#include "../../qcommon/q_utf8.h"
+#include "q_shared.h"
+#include "qcommon.h"
+#include "q_utf8.h"
 #include "tr_public.h"
 #include "tr_vector_font.h"
 #include "tr_vector_font_glyphlet.h"

@@ -4,7 +4,7 @@ Copyright (C) 2026 Gopex LLC. All rights reserved.
 ===========================================================================
 */
 
-#include "../qcommon/q_shared.h"
+#include "q_shared.h"
 #include "phys_debugdraw.h"
 
 static phys_debug_line_t lines[PHYS_DEBUG_MAX_LINES];

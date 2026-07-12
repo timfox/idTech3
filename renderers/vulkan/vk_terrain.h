@@ -9,7 +9,7 @@ CBT-inspired GPU-driven terrain tessellation.
 #ifndef VK_TERRAIN_H
 #define VK_TERRAIN_H
 
-#include "../../qcommon/q_shared.h"
+#include "q_shared.h"
 
 void CBTerrain_RegisterCvars( void );
 qboolean CBTerrain_IsEnabled( void );

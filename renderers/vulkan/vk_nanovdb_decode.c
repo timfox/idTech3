@@ -7,7 +7,7 @@ NanoVDB → dense float grid for Vulkan 3D fog textures (real-time path).
 */
 
 #include "vk_nanovdb_decode.h"
-#include "../../qcommon/jobs.h"
+#include "jobs.h"
 #include <string.h>
 #include <math.h>
 

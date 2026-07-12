@@ -1,7 +1,7 @@
 #ifndef CL_COMPAT_MATH_H
 #define CL_COMPAT_MATH_H
 
-#include "../../qcommon/q_shared.h"
+#include "q_shared.h"
 
 size_t CL_BuildFallbackGameVersion( const char *gamename, const char *defaultGamename,
 	char *out, size_t outSize );

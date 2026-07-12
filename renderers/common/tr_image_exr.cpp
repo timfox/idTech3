@@ -19,8 +19,8 @@ to engine-native RGBA8 or RGBA16F formats.
 #include "../../external/include/tinyexr/tinyexr.h"
 
 extern "C" {
-#include "../../qcommon/q_shared.h"
-#include "../../qcommon/qcommon.h"
+#include "q_shared.h"
+#include "qcommon.h"
 #include "tr_image_loaders.h"
 }
 

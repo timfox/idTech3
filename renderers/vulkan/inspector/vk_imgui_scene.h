@@ -10,7 +10,7 @@ Compiled as C++ with -fno-operator-names (tr_local.h uses `or` as a field name).
 #ifndef VK_IMGUI_SCENE_H
 #define VK_IMGUI_SCENE_H
 
-#include "../../../qcommon/q_shared.h"
+#include "q_shared.h"
 
 #ifdef __cplusplus
 extern "C" {

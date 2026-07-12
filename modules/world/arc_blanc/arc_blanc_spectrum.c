@@ -2,7 +2,7 @@
  * Arc Blanc ocean spectra — JONSWAP + Donelan-Banner / swell (Algis et al. 2025).
  */
 #include "arc_blanc_internal.h"
-#include "../../qcommon/qcommon.h"
+#include "qcommon.h"
 #include <math.h>
 #include <stdlib.h>
 #include <string.h>

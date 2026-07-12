@@ -10,8 +10,8 @@ Horde AI with LOD and flocking implementation.
 ===========================================================================
 */
 
-#include "../qcommon/q_shared.h"
-#include "../qcommon/qcommon.h"
+#include "q_shared.h"
+#include "qcommon.h"
 #include "g_horde.h"
 
 static hordeAgent_t agents[HORDE_MAX_AGENTS];

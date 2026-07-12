@@ -13,8 +13,8 @@ Pure C implementation, no external dependencies.
 ===========================================================================
 */
 
-#include "../../qcommon/q_shared.h"
-#include "../../qcommon/qcommon.h"
+#include "q_shared.h"
+#include "qcommon.h"
 
 #define DDS_MAGIC        0x20534444  /* "DDS " */
 #define DDPF_FOURCC      0x4

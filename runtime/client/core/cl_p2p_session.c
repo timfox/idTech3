@@ -8,8 +8,8 @@ Client P2P session reconnect and listen-host migration orchestration.
 
 #include "client.h"
 #include "cl_p2p_session.h"
-#include "../../qcommon/net_p2p.h"
-#include "../../qcommon/script_emit.h"
+#include "net_p2p.h"
+#include "script_emit.h"
 
 #include <string.h>
 

@@ -11,7 +11,7 @@ file(RELATIVE_PATH _gen "${CMAKE_SOURCE_DIR}" "${IDTECH3_DIR_EXTENSIONS}/generat
 file(RELATIVE_PATH _dist "${CMAKE_SOURCE_DIR}" "${IDTECH3_DIR_RUNTIME_CLIENT}/world/cl_district.cpp")
 file(RELATIVE_PATH _ow "${CMAKE_SOURCE_DIR}" "${IDTECH3_DIR_RUNTIME_CLIENT}/world/cl_openworld.cpp")
 file(RELATIVE_PATH _proc "${CMAKE_SOURCE_DIR}" "${IDTECH3_DIR_RUNTIME_CLIENT}/world/cl_proc.cpp")
-file(RELATIVE_PATH _usd "${CMAKE_SOURCE_DIR}" "${IDTECH3_DIR_RUNTIME_CLIENT}/cl_usd.cpp")
+file(RELATIVE_PATH _usd "${CMAKE_SOURCE_DIR}" "${IDTECH3_DIR_RUNTIME_CLIENT}/shell/cl_usd.cpp")
 file(RELATIVE_PATH _emu_proc "${CMAKE_SOURCE_DIR}" "${IDTECH3_DIR_EXTENSIONS}/emulator/emulator_process.c")
 file(RELATIVE_PATH _emu_frame "${CMAKE_SOURCE_DIR}" "${IDTECH3_DIR_EXTENSIONS}/emulator/emulator_frame.c")
 file(RELATIVE_PATH _emu_console "${CMAKE_SOURCE_DIR}" "${IDTECH3_DIR_EXTENSIONS}/emulator/emulator_console.c")

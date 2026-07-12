@@ -1657,6 +1657,9 @@ typedef struct {
 	qboolean debugMarkers;
 	qboolean colorWriteMaskDynamic;
 	qboolean meshShaderNV; /* VK_NV_mesh_shader enabled at device create (r_vk_meshShaderNV); no mesh pipelines yet */
+	qboolean sparseBinding; /* VkPhysicalDeviceFeatures.sparseBinding enabled */
+	qboolean sparseResidencyImage2D; /* sparseResidencyImage2D + queue SPARSE_BINDING */
+	qboolean sparseResidencyNonResidentStrict;
 #ifdef USE_VULKAN_RTX
 	qboolean rtxAvailable; /* KHR RT pipeline + AS + BDA; demo trace (r_rtxDemo) when r_rtx>0 — not production hybrid lighting */
 #endif

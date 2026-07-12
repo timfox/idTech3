@@ -13,7 +13,7 @@ sound sharpness, particle dustiness, and impact response routing.
 extern "C" {
 #endif
 
-#include "../qcommon/q_shared.h"
+#include "q_shared.h"
 #include "phys_bullet.h"
 
 typedef int physMaterialId_t;

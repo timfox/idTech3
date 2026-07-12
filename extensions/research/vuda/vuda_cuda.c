@@ -7,7 +7,7 @@ CUDA runtime interop for VUDA (dynamic libcudart). See docs/VUDA.md.
 */
 
 #include "vuda_cuda.h"
-#include "../../../qcommon/qcommon.h"
+#include "qcommon.h"
 
 #ifdef USE_VUDA
 

@@ -11,7 +11,7 @@ Lua is served by Engine.Events in g_lua_bindings.c.
 #ifndef G_EDA_H
 #define G_EDA_H
 
-#include "../qcommon/q_shared.h"
+#include "q_shared.h"
 
 #define EDA_MAX_CHANNELS   32
 #define EDA_MAX_QUEUE      256

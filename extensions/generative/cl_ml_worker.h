@@ -10,8 +10,8 @@ use Defer_Add for main-thread finalization.
 
 #pragma once
 
-#include "../../qcommon/q_shared.h"
-#include "../../qcommon/jobs.h"
+#include "q_shared.h"
+#include "jobs.h"
 
 #ifdef __cplusplus
 extern "C" {

@@ -9,7 +9,7 @@ SqueezeMe asset layout (arXiv:2412.15171v4 — mobile Gaussian avatars).
 #ifndef SQZ_FORMAT_H
 #define SQZ_FORMAT_H
 
-#include "../../qcommon/q_shared.h"
+#include "q_shared.h"
 
 #define SQZ_MAGIC           "SQZ1"
 #define SQZ_VERSION         1

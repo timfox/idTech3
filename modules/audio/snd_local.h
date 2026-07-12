@@ -25,8 +25,8 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 // snd_local.h -- private sound definitions
 
 
-#include "../qcommon/q_shared.h"
-#include "../qcommon/qcommon.h"
+#include "q_shared.h"
+#include "qcommon.h"
 #include "snd_public.h"
 
 #define	PAINTBUFFER_SIZE		4096					// this is in samples

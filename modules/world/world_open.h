@@ -13,7 +13,7 @@ and billboard scatter residency (id Tech 8-style infinite walkable worlds).
 extern "C" {
 #endif
 
-#include "../qcommon/q_shared.h"
+#include "q_shared.h"
 
 #define WORLD_OPEN_SECTOR_MAX 1024
 

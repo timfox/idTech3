@@ -270,6 +270,11 @@ sudo apt-get install cmake clang-18 gcc-15 ninja-build
 # copies idtech3_demo.pk3 to release/demo_game/ when the pack builds successfully
 ./scripts/compile_engine.sh vulkan demo
 
+# Physics substrate (default Box3D via third_party/box3d; optional Bullet)
+./scripts/compile_engine.sh vulkan          # IDTECH3_PHYSICS_BACKEND=box3d
+./scripts/compile_engine.sh vulkan bullet   # Bullet (libbullet-dev)
+./scripts/compile_engine.sh vulkan no-physics
+
 # Debug build
 ./scripts/compile_engine.sh vulkan debug
 

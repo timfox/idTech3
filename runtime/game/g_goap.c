@@ -12,8 +12,8 @@ that transitions world state to goal state.
 ===========================================================================
 */
 
-#include "../qcommon/q_shared.h"
-#include "../qcommon/qcommon.h"
+#include "q_shared.h"
+#include "qcommon.h"
 #include "g_goap.h"
 #include <string.h>
 

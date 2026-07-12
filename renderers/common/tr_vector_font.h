@@ -16,7 +16,7 @@ See docs/VECTOR_FONT.md and docs/research/amd-gpuopen-loop-blinn-mesh-fonts.md
 #ifndef TR_VECTOR_FONT_H
 #define TR_VECTOR_FONT_H
 
-#include "../../qcommon/q_shared.h"
+#include "q_shared.h"
 
 #define VECTOR_CURVE_TEX_WIDTH 4096
 #define VECTOR_TEXELS_PER_CURVE 2

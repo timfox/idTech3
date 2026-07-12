@@ -7,8 +7,8 @@ Signed format: <unix_time>.<32_hex_md5> where md5 = MD5( secret:time:clientNum )
 ===========================================================================
 */
 
-#include "../qcommon/q_shared.h"
-#include "../qcommon/qcommon.h"
+#include "q_shared.h"
+#include "qcommon.h"
 #include "sv_auth.h"
 
 #include <string.h>

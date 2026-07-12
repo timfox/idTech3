@@ -26,7 +26,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #define USE_VULKAN
 #endif
 
-#include "../../qcommon/q_shared.h"
+#include "q_shared.h"
 #include "../common/tr_public.h"
 
 #define MAX_TEXTURE_UNITS 8
@@ -45,6 +45,7 @@ typedef enum
 	IMGFLAG_NOSCALE        = 0x0100,
 	IMGFLAG_RGB            = 0x0200,
 	IMGFLAG_COLORSHIFT     = 0x0400,
+	IMGFLAG_SPARSE         = 0x0800, /* sparse VkImage; memory owned outside image chunks */
 } imgFlags_t;
 
 typedef enum {
@@ -99,6 +100,8 @@ void  R_NoiseInit( void );
 image_t *R_FindImageFile( const char *name, imgFlags_t flags, uint32_t type );
 image_t *R_CreateImage( const char *name, const char *name2, byte *pic, int width, int height, imgFlags_t flags, int format, uint32_t type );
 image_t *R_CreateImageRGBA32F( const char *name, const float *rgba, int width, int height, imgFlags_t flags );
+/* Allocate image_t + hash entry without creating/binding VkImage (caller fills GPU resources). */
+image_t *R_CreateImageShell( const char *name, int width, int height, imgFlags_t flags, int format );
 void R_UploadSubImage( byte *data, int x, int y, int width, int height, image_t *image );
 
 qhandle_t RE_RegisterShaderLightMap( const char *name, int lightmapIndex );

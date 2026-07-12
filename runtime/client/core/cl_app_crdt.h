@@ -1,7 +1,7 @@
 #ifndef CL_APP_CRDT_H
 #define CL_APP_CRDT_H
 
-#include "../../qcommon/q_shared.h"
+#include "q_shared.h"
 
 struct lua_State;
 

@@ -9,7 +9,7 @@ Map misc_* entities register shader paths; clients resolve modelindex -> CS path
 
 #pragma once
 
-#include "../qcommon/engine_sprite_map.h"
+#include "engine_sprite_map.h"
 
 #ifdef __cplusplus
 extern "C" {

@@ -2230,6 +2230,7 @@ static const void *RB_SwapBuffers( const void *data ) {
 	tr.needScreenMap = 0;
 
 #ifdef USE_VULKAN
+	R_VT_Feedback_EndFrame();
 	vk_end_frame();
 
 	if ( backEnd.doneSurfaces && !glState.finishCalled ) {

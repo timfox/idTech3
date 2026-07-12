@@ -13,7 +13,7 @@ DMM stress into one per-frame update path for gameplay/animation systems.
 extern "C" {
 #endif
 
-#include "../qcommon/q_shared.h"
+#include "q_shared.h"
 #include "phys_events.h"
 #include "phys_procedural_anim.h"
 #include "phys_motor.h"

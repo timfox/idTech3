@@ -12,8 +12,8 @@ fatigue damage, and deformed mesh readback.
 ===========================================================================
 */
 
-#include "../qcommon/q_shared.h"
-#include "../qcommon/qcommon.h"
+#include "q_shared.h"
+#include "qcommon.h"
 #include "phys_bullet.h"
 #include "phys_dmm.h"
 #include <math.h>

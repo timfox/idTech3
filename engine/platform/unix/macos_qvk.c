@@ -14,8 +14,8 @@ https://github.com/KhronosGroup/MoltenVK/releases)
 
 #if defined(__APPLE__)
 
-#include "../../qcommon/q_shared.h"
-#include "../../qcommon/qcommon.h"
+#include "q_shared.h"
+#include "qcommon.h"
 #include "linux_local.h"
 #include <dlfcn.h>
 

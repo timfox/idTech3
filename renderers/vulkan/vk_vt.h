@@ -6,8 +6,9 @@
 void R_VT_Init( void );
 void R_VT_Shutdown( void );
 qboolean R_VT_Active( void );
+qboolean R_VT_IsSparse( void );
 
-/* Load a page from raw RGBA8 (pageSize x pageSize) into physical atlas slot. Returns page index or -1. */
+/* Load a page from raw RGBA8 into physical atlas / sparse bind. Returns slot or -1. */
 int R_VT_LoadPageRGBA( const byte *rgba, int width, int height, const char *name );
 
 /* Map virtual page id -> physical slot (-1 if missing). */
@@ -19,5 +20,11 @@ qboolean R_VT_WantSample( void );
 
 /* PiP atlas overlay when r_vtDebug 1 (2D pass). */
 void R_VT_DebugDraw( void );
+
+/* Feedback-driven residency (r_vtFeedback). */
+void R_VT_Feedback_BeginFrame( void );
+void R_VT_Feedback_RequestPage( int virtualPage );
+void R_VT_Feedback_RequestUV( float u, float v );
+void R_VT_Feedback_EndFrame( void );
 
 #endif

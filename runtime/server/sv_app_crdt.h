@@ -1,7 +1,7 @@
 #ifndef SV_APP_CRDT_H
 #define SV_APP_CRDT_H
 
-#include "../qcommon/q_shared.h"
+#include "q_shared.h"
 
 typedef struct client_s client_t;
 

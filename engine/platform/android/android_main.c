@@ -9,8 +9,8 @@ Vulkan surface, input, file system, and JNI bridge.
 
 #ifdef __ANDROID__
 
-#include "../../qcommon/q_shared.h"
-#include "../../qcommon/qcommon.h"
+#include "q_shared.h"
+#include "qcommon.h"
 #include "../../renderers/common/tr_types.h"
 #include "android_surface_glue.h"
 #include "android_asset_bootstrap.h"
@@ -18,7 +18,7 @@ Vulkan surface, input, file system, and JNI bridge.
 #include "../../renderers/vulkan/vk_android_surface.h"
 #ifndef DEDICATED
 #include "../../client/keycodes.h"
-#include "../../qcommon/qcommon.h"
+#include "qcommon.h"
 #endif
 #define Com_QueueEvent Sys_QueEvent
 #include <android/log.h>

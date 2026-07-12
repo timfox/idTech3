@@ -7,8 +7,8 @@ drain in EDA_Frame (or EDA_Pop) for decoupled systems (AIML, ECS, Lua).
 ===========================================================================
 */
 
-#include "../qcommon/q_shared.h"
-#include "../qcommon/qcommon.h"
+#include "q_shared.h"
+#include "qcommon.h"
 #include "g_eda.h"
 #include "g_engine_systems.h"
 #include <string.h>

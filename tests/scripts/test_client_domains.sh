@@ -15,11 +15,14 @@ rg -q 'core/cl_main.c' "$CS" || fail "cl_main not in core manifest"
 rg -q '(src/client/world/|runtime/client/world/|IDTECH3_DIR_RUNTIME_CLIENT)' "${ROOT}/cmake/client/ClientExtensionSources.cmake" \
 	|| fail "world paths in extension cmake"
 
-for d in core world media platform; do
+for d in core world media platform shell; do
 	[ -d "${IDTECH3_CLIENT}/$d" ] || fail "missing ${IDTECH3_CLIENT_REL}/$d"
 done
 
 [ -f "${IDTECH3_CLIENT}/README.md" ] || fail "missing ${IDTECH3_CLIENT_REL}/README.md"
+[ -f "${IDTECH3_CLIENT}/client.h" ] || fail "missing ${IDTECH3_CLIENT_REL}/client.h at root"
+[ -f "${IDTECH3_CLIENT}/shell/cl_scrn.c" ] || fail "missing shell/cl_scrn.c"
+rg -q 'shell/\*\.c|shell/cl_|CLIENT_SHELL' "$CS" || fail "shell sources not wired in ClientSources.cmake"
 
 # CMake must not use bare AUX on src/client
 if rg -q 'AUX_SOURCE_DIRECTORY\(src/client' "${ROOT}/CMakeLists.txt"; then

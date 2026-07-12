@@ -19,6 +19,7 @@ DUKTAPE=1
 SYSTEM_DUKTAPE=0
 CSHARP=0
 FREEUSD=1
+PHYSICS_BACKEND="box3d"
 VULKAN_RTX=0
 VUDA=0
 EMULATOR=0
@@ -183,6 +184,18 @@ while [[ $# -gt 0 ]]; do
       ;;
     nofreeusd|no-freeusd|nofree-usd)
       FREEUSD=0
+      shift
+      ;;
+    box3d|physics-box3d)
+      PHYSICS_BACKEND="box3d"
+      shift
+      ;;
+    bullet|physics-bullet)
+      PHYSICS_BACKEND="bullet"
+      shift
+      ;;
+    no-physics|nophysics|physics-none)
+      PHYSICS_BACKEND="none"
       shift
       ;;
     no-duktape|noduktape|nojs)
@@ -436,7 +449,9 @@ fi
 
 CMAKE_FLAGS+=("-DRENDERER_DEFAULT=vulkan")
 CMAKE_FLAGS+=("-DIDTECH3_PROFILE=${IDTECH3_PROFILE}")
+CMAKE_FLAGS+=("-DIDTECH3_PHYSICS_BACKEND=${PHYSICS_BACKEND}")
 echo "CMake: IDTECH3_PROFILE=${IDTECH3_PROFILE}"
+echo "CMake: IDTECH3_PHYSICS_BACKEND=${PHYSICS_BACKEND}"
 
 if [ "$SKIP_IDPAK" -eq 1 ]; then
   CMAKE_FLAGS+=("-DSKIP_IDPAK_CHECK=ON")
@@ -462,6 +477,15 @@ if [ "$FREEUSD" -eq 1 ] && [ -f "$PROJECT_ROOT/.gitmodules" ]; then
     echo "Initializing FreeUSD submodule (third_party/FreeUSD)..."
     if ! git -C "$PROJECT_ROOT" submodule update --init third_party/FreeUSD; then
       echo "Warning: FreeUSD submodule init failed; CMake may use FetchContent fallback." >&2
+    fi
+  fi
+fi
+
+if [ "$PHYSICS_BACKEND" = "box3d" ] && [ -f "$PROJECT_ROOT/.gitmodules" ]; then
+  if [ ! -f "$PROJECT_ROOT/third_party/box3d/CMakeLists.txt" ]; then
+    echo "Initializing Box3D submodule (third_party/box3d)..."
+    if ! git -C "$PROJECT_ROOT" submodule update --init third_party/box3d; then
+      echo "Warning: Box3D submodule init failed; physics backend may fall back to none." >&2
     fi
   fi
 fi

@@ -13,7 +13,7 @@ Deterministic from seed + scale; used for open-world sector typing and scatter.
 extern "C" {
 #endif
 
-#include "../qcommon/q_shared.h"
+#include "q_shared.h"
 
 typedef enum {
 	WPROC_GRID = 0,

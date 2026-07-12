@@ -5,8 +5,8 @@ Uses lookup tables for the 8-bit fast path to reduce per-pixel multiplies.
 ===========================================================================
 */
 
-#include "../../qcommon/q_shared.h"
-#include "../../qcommon/qcommon.h"
+#include "q_shared.h"
+#include "qcommon.h"
 #include "cl_cin_colors.h"
 
 static qboolean cinColorTablesInited = qfalse;

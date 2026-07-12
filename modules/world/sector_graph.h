@@ -12,7 +12,7 @@ Open-world sector graph — grid CSR + multi-source k-hop reachability (CPU + op
 extern "C" {
 #endif
 
-#include "../qcommon/q_shared.h"
+#include "q_shared.h"
 
 #define SECTOR_GRAPH_WINDOW_MAX   64
 #define SECTOR_GRAPH_MAX_NODES    ( SECTOR_GRAPH_WINDOW_MAX * SECTOR_GRAPH_WINDOW_MAX )

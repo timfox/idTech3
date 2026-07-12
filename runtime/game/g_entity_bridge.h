@@ -19,7 +19,7 @@ cloth, skybox, navmesh, etc.) at map load time.
 extern "C" {
 #endif
 
-#include "../qcommon/q_shared.h"
+#include "q_shared.h"
 
 void EntityBridge_ParseEntities(const char *entityString);
 void EntityBridge_Clear(void);

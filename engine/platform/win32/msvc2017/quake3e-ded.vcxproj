@@ -440,10 +440,17 @@
     <ClCompile Include="..\..\..\physics\phys_ik.c" />
     <ClCompile Include="..\..\..\physics\phys_dmm_materials.c" />
     <ClCompile Include="..\..\..\physics\phys_cloth.c" />
+    <ClCompile Include="..\..\..\physics\phys_solvers.c" />
+    <ClCompile Include="..\..\..\physics\phys_particles.c" />
+    <ClCompile Include="..\..\..\physics\phys_softblob.c" />
+    <ClCompile Include="..\..\..\physics\phys_fluid.c" />
     <ClCompile Include="..\..\..\physics\phys_events.c" />
     <ClCompile Include="..\..\..\physics\phys_materials.c" />
     <ClCompile Include="..\..\..\physics\phys_motor.c" />
     <ClCompile Include="..\..\..\physics\phys_middleware.c" />
+    <ClCompile Include="..\..\..\physics\phys_props.c" />
+    <ClCompile Include="..\..\..\physics\phys_volumes.c" />
+    <ClCompile Include="..\..\..\physics\phys_box3d_impl.c" />
     <ClCompile Include="..\..\..\physics\phys_debugdraw.c" />
   <!-- IDTECH3_MSVC_MANIFEST_END -->
   </ItemGroup>

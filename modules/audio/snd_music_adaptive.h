@@ -18,7 +18,7 @@ to crossfade between musical layers and trigger stingers.
 extern "C" {
 #endif
 
-#include "../qcommon/q_shared.h"
+#include "q_shared.h"
 
 #define MUSIC_MAX_LAYERS    8
 #define MUSIC_MAX_STINGERS  16

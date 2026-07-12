@@ -12,8 +12,8 @@ phase-based encounter design, and weighted spawn selection.
 ===========================================================================
 */
 
-#include "../qcommon/q_shared.h"
-#include "../qcommon/qcommon.h"
+#include "q_shared.h"
+#include "qcommon.h"
 #include "g_director.h"
 #include <math.h>
 

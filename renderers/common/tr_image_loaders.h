@@ -10,7 +10,7 @@ Image loader prototypes for all formats (built-in and custom).
 extern "C" {
 #endif
 
-#include "../../qcommon/q_shared.h"
+#include "q_shared.h"
 
 /* Built-in formats */
 void R_LoadBMP(const char *filename, byte **pic, int *width, int *height);

@@ -18,7 +18,7 @@ face meshes for speech, emotion, and reactive expressions.
 extern "C" {
 #endif
 
-#include "../qcommon/q_shared.h"
+#include "q_shared.h"
 
 #define FACE_MAX_FLEX_CONTROLLERS 48
 #define FACE_MAX_PHONEMES         16

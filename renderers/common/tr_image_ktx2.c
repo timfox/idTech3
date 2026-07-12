@@ -9,8 +9,8 @@ Supports non-supercompressed BC7 only. No external dependencies.
 
 #include "tr_image_loaders.h"
 #include <string.h>
-#include "../../qcommon/q_shared.h"
-#include "../../qcommon/qcommon.h"
+#include "q_shared.h"
+#include "qcommon.h"
 
 /* KTX2 identifier */
 static const byte KTX2_ID[12] = {

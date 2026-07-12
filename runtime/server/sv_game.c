@@ -25,7 +25,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "sv_engine_sprites.h"
 #include "sv_engine_decals.h"
 #include "../physics/phys_character.h"
-#include "../qcommon/com_loc.h"
+#include "com_loc.h"
 
 #include "../botlib/botlib.h"
 

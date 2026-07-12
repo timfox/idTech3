@@ -23,6 +23,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "vk_postfx.h"
 #include "vk_sim_render_debug.h"
 #include "vk_skybox_hdr.h"
+#include "vk_vt.h"
 #ifdef USE_IMGUI
 extern cvar_t *r_imgui;
 void VkImgui_Initialize( void );
@@ -468,6 +469,7 @@ void RE_BeginFrame( stereoFrame_t stereoFrame ) {
 #ifdef USE_VULKAN
 	if ( stereoFrame == STEREO_CENTER ) {
 		SkyboxHDR_UpdateRuntime();
+		R_VT_Feedback_BeginFrame();
 	}
 #endif
 

@@ -12,9 +12,9 @@ How to test (console):
 ===========================================================================
 */
 
-#include "../../qcommon/q_shared.h"
-#include "../../qcommon/qcommon.h"
-#include "../../qcommon/cm_public.h"
+#include "q_shared.h"
+#include "qcommon.h"
+#include "cm_public.h"
 #include "../../game/bg_public.h"
 #include "../snd_local.h"
 

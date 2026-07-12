@@ -20,7 +20,7 @@ Provides engine-level competitive and quality-of-life improvements:
 #ifndef SV_ENHANCED_H
 #define SV_ENHANCED_H
 
-#include "../qcommon/q_shared.h"
+#include "q_shared.h"
 
 #define UNLAGGED_HISTORY_SIZE   64
 #define UNLAGGED_MAX_REWIND     1000

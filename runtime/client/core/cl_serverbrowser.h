@@ -8,7 +8,7 @@ Server browser: local/global scan, ping queue, server status queries.
 
 #pragma once
 
-#include "../../qcommon/qcommon.h"
+#include "qcommon.h"
 
 #ifdef __cplusplus
 extern "C" {

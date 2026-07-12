@@ -14,8 +14,8 @@ texture use, or provides float4 for HDR skybox/IBL.
 ===========================================================================
 */
 
-#include "../../qcommon/q_shared.h"
-#include "../../qcommon/qcommon.h"
+#include "q_shared.h"
+#include "qcommon.h"
 #include <math.h>
 
 static void RGBE_to_float(unsigned char r, unsigned char g, unsigned char b, unsigned char e, float *out) {

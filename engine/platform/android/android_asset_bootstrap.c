@@ -9,7 +9,7 @@ writable app data directory so FS can find base/ without manual sideloading.
 
 #ifdef __ANDROID__
 
-#include "../../qcommon/q_shared.h"
+#include "q_shared.h"
 #include <android/asset_manager.h>
 #include <android/log.h>
 #include <stdio.h>

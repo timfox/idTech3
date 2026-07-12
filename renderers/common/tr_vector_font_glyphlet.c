@@ -6,8 +6,8 @@ CPU Loop & Blinn glyphlet builder: ear-clipped solid fill + curve triangles.
 ===========================================================================
 */
 
-#include "../../qcommon/q_shared.h"
-#include "../../qcommon/qcommon.h"
+#include "q_shared.h"
+#include "qcommon.h"
 #include "tr_vector_font_glyphlet.h"
 
 #ifdef BUILD_FREETYPE

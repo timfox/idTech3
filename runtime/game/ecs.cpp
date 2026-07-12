@@ -13,7 +13,7 @@ ECS implementation using EnTT. Alternative to gentity; coexists with it.
 #include "ecs.h"
 
 extern "C" {
-#include "../qcommon/q_shared.h"
+#include "q_shared.h"
 }
 
 #include <cctype>

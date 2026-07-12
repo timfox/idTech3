@@ -4600,6 +4600,9 @@ static void RE_Shutdown( refShutdownCode_t code ) {
 
 	//if ( tr.registered ) {
 		//R_IssuePendingRenderCommands();
+#ifdef USE_VULKAN
+	R_VT_Shutdown();
+#endif
 		R_DeleteTextures();
 	//}
 

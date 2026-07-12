@@ -18,7 +18,7 @@ Evaluates game state criteria to select appropriate voice lines
 extern "C" {
 #endif
 
-#include "../qcommon/q_shared.h"
+#include "q_shared.h"
 
 #define RESPONSE_MAX_RULES       256
 #define RESPONSE_MAX_CRITERIA     8

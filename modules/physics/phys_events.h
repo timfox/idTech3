@@ -14,7 +14,7 @@ audio, particles, AI, renderer decals, and save-game persistence.
 extern "C" {
 #endif
 
-#include "../qcommon/q_shared.h"
+#include "q_shared.h"
 #include "phys_materials.h"
 
 #define PHYS_EVENT_MAX_QUEUE   256
@@ -29,7 +29,9 @@ typedef enum {
 	PHYS_EVENT_BALANCE_LOST,
 	PHYS_EVENT_RAGDOLL_SLEEP,
 	PHYS_EVENT_GRAB,
-	PHYS_EVENT_TEAR
+	PHYS_EVENT_TEAR,
+	PHYS_EVENT_MOTION_ENTER,
+	PHYS_EVENT_MOTION_EXIT
 } phys_event_type_t;
 
 typedef struct phys_hit_event_s {

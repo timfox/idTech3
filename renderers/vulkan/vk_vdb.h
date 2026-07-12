@@ -17,7 +17,7 @@ Supports:
 #ifndef VK_VDB_H
 #define VK_VDB_H
 
-#include "../../qcommon/q_shared.h"
+#include "q_shared.h"
 
 #ifdef USE_VULKAN
 #include "vk.h"

@@ -25,7 +25,7 @@ Layered on top of Bullet Physics ragdolls to provide:
 extern "C" {
 #endif
 
-#include "../qcommon/q_shared.h"
+#include "q_shared.h"
 #include "phys_bullet.h"
 
 #define PROCANIM_MAX_CONTROLLERS  64

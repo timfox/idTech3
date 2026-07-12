@@ -20,7 +20,7 @@ horde AI, and NPC behavior systems.
 extern "C" {
 #endif
 
-#include "../qcommon/q_shared.h"
+#include "q_shared.h"
 
 #define GOAP_MAX_STATE_PROPS   32
 #define GOAP_MAX_ACTIONS       64

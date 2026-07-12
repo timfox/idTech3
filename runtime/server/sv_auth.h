@@ -1,7 +1,7 @@
 #ifndef SV_AUTH_H
 #define SV_AUTH_H
 
-#include "../qcommon/q_shared.h"
+#include "q_shared.h"
 
 struct client_s;
 

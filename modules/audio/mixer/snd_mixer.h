@@ -7,7 +7,7 @@ Wwise-inspired runtime mixer (buses, RTPCs, states, events, replay)
 #ifndef SND_MIXER_H
 #define SND_MIXER_H
 
-#include "../../qcommon/q_shared.h"
+#include "q_shared.h"
 
 typedef enum {
 	SND_BUS_MASTER = 0,

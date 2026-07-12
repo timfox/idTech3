@@ -21,7 +21,7 @@ Bullet Physics is licensed under the zlib license.
 extern "C" {
 #endif
 
-#include "../qcommon/q_shared.h"
+#include "q_shared.h"
 
 #define PHYS_MAX_RIGID_BODIES    4096
 #define PHYS_MAX_RAGDOLLS        64
@@ -51,7 +51,8 @@ typedef enum {
 	PHYS_CONSTRAINT_SLIDER,
 	PHYS_CONSTRAINT_CONE_TWIST,
 	PHYS_CONSTRAINT_GENERIC_6DOF,
-	PHYS_CONSTRAINT_FIXED
+	PHYS_CONSTRAINT_FIXED,
+	PHYS_CONSTRAINT_DISTANCE /* soft spring / rope segment (Box3D distance joint) */
 } physConstraintType_t;
 
 typedef enum {
@@ -164,6 +165,23 @@ void        Phys_SetGravity(const vec3_t gravity);
 void        Phys_ClearWorld(void);
 qboolean    Phys_LoadBSPCollision(void);
 physBodyHandle_t Phys_AddStaticTriMesh(const float *verts, int numVerts, const int *indices, int numIndices);
+/* One static body with N child boxes (Box3D compound; Bullet = separate boxes / AABB). */
+physBodyHandle_t Phys_AddStaticCompoundBoxes(const float *centersXYZ, const float *halfExtentsXYZ, int count);
+
+/* Capsule character step: Box3D CastMover/CollideMover/SolvePlanes; else returns qfalse. */
+qboolean Phys_MoverStep(vec3_t origin, vec3_t velocity, float radius, float height,
+	const vec3_t wishDir, float wishSpeed, float dt, qboolean jump, qboolean *groundedOut);
+
+int Phys_GetWorkerCount(void);
+
+typedef enum {
+	PHYS_BACKEND_NONE = 0,
+	PHYS_BACKEND_BOX3D,
+	PHYS_BACKEND_BULLET
+} physBackendKind_t;
+
+physBackendKind_t Phys_GetBackend(void);
+const char       *Phys_GetBackendName(void);
 
 /* rigid bodies */
 physBodyHandle_t Phys_CreateBody(const physBodyDef_t *def);
@@ -175,6 +193,9 @@ void             Phys_ApplyImpulse(physBodyHandle_t handle, const vec3_t impulse
 void             Phys_ApplyTorque(physBodyHandle_t handle, const vec3_t torque);
 void             Phys_SetBodyVelocity(physBodyHandle_t handle, const vec3_t linear, const vec3_t angular);
 void             Phys_SetBodyActive(physBodyHandle_t handle, qboolean active);
+physBodyType_t   Phys_GetBodyType(physBodyHandle_t handle);
+qboolean         Phys_IsBodyDynamic(physBodyHandle_t handle);
+int              Phys_ApplyImpulseRadius(const vec3_t center, float radius, float magnitude, float falloff);
 
 /* constraints */
 physConstraintHandle_t Phys_CreateConstraint(const physConstraintDef_t *def);
@@ -190,6 +211,8 @@ void                Phys_RagdollReach(physRagdollHandle_t handle, int limbIndex,
 void                Phys_RagdollGetBoneTransform(physRagdollHandle_t handle, int boneIndex, physTransform_t *out);
 void                Phys_RagdollSetMuscleStiffness(physRagdollHandle_t handle, float stiffness);
 void                Phys_RagdollBlendToAnimation(physRagdollHandle_t handle, float blend);
+void                Phys_RagdollApplyBoneTorque(physRagdollHandle_t handle, int boneIndex, const vec3_t torque);
+int                 Phys_GetRagdollCount(void);
 
 /* Digital Molecular Matter (DMM) */
 dmmObjectHandle_t Dmm_CreateObject(const dmmObjectDef_t *def);

@@ -14,8 +14,8 @@ g_aiml3, g_aimlJson, g_aimlMaps, g_aimlDebug cvars.
 ===========================================================================
 */
 
-#include "../qcommon/q_shared.h"
-#include "../qcommon/qcommon.h"
+#include "q_shared.h"
+#include "qcommon.h"
 #include "g_aiml.h"
 #include "g_eda.h"
 #include <ctype.h>

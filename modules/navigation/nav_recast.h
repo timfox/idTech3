@@ -18,7 +18,7 @@ crowd simulation, and dynamic obstacle support.
 extern "C" {
 #endif
 
-#include "../qcommon/q_shared.h"
+#include "q_shared.h"
 
 #define NAV_MAX_PATH_NODES   256
 #define NAV_MAX_AGENTS       128

@@ -9,7 +9,7 @@ Vulkan Loop & Blinn glyphlet draw path (r_vectorFontMode 2).
 #ifndef VK_VECTOR_FONT_H
 #define VK_VECTOR_FONT_H
 
-#include "../../qcommon/q_shared.h"
+#include "q_shared.h"
 #include "../common/tr_vector_font.h"
 
 #include "../common/tr_vector_font_glyphlet.h"

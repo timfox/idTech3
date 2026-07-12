@@ -21,7 +21,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 */
 
 #include "server.h"
-#include "../../qcommon/net_p2p.h"
+#include "net_p2p.h"
 
 static void SV_P2PStatus_f( void );
 static void SV_P2PAddress_f( void );

@@ -7,7 +7,7 @@ Client per-frame loop (split from cl_main.c).
 */
 #pragma once
 
-#include "../../qcommon/qcommon.h"
+#include "qcommon.h"
 
 #ifdef __cplusplus
 extern "C" {

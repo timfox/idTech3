@@ -17,11 +17,11 @@ grep -q 'emulator_process.c' cmake/client/ClientExtensionSources.cmake || fail '
 grep -q 'vk_emulator_screen.c' cmake/renderers/VulkanExtensionSources.cmake || fail 'vk_emulator_screen missing from renderer manifest'
 
 grep -q '\-\-emulator' scripts/init_optional_submodules.sh || fail 'init script missing --emulator'
-grep -q 'cl_emulator' runtime/client/cl_emulator.c || fail 'cl_emulator.c missing'
+grep -q 'cl_emulator' runtime/client/shell/cl_emulator.c || fail 'cl_emulator.c missing'
 grep -q 'emulator_input.c' cmake/client/ClientExtensionSources.cmake || fail 'client extension manifest missing emulator_input'
 grep -q 'emulator_capture' extensions/emulator/emulator_console.c || fail 'emulator_capture command missing'
 grep -q 'EMULATOR_INPUT_SHM_NAME' extensions/emulator/emulator_types.h || fail 'input shm contract missing'
-grep -q 'CL_Emulator_KeyEvent' runtime/client/cl_emulator.c || fail 'keyboard capture hook missing'
+grep -q 'CL_Emulator_KeyEvent' runtime/client/shell/cl_emulator.c || fail 'keyboard capture hook missing'
 test -f examples/demo_game/mod/demo_emulator.cfg || fail 'demo_emulator.cfg missing'
 grep -q 'EmulatorUploadFrame' renderers/common/tr_public.h || fail 'tr_public missing EmulatorUploadFrame'
 

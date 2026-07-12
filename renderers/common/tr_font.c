@@ -70,8 +70,8 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 // uncheck the exclude from build check box in the FreeType2 area of the Renderer project. 
 
 
-#include "../../qcommon/q_shared.h"
-#include "../../qcommon/qcommon.h"
+#include "q_shared.h"
+#include "qcommon.h"
 #include "tr_public.h"
 
 #if defined(RENDERER_VULKAN)

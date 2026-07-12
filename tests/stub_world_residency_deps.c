@@ -64,6 +64,17 @@ void Cvar_SetDescription( cvar_t *var, const char *description )
 	(void)description;
 }
 
+void Cmd_AddCommand( const char *cmd_name, xcommand_t function )
+{
+	(void)cmd_name;
+	(void)function;
+}
+
+void Cmd_RemoveCommand( const char *cmd_name )
+{
+	(void)cmd_name;
+}
+
 float Cvar_VariableValue( const char *var_name )
 {
 	int i;

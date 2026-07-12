@@ -9,8 +9,8 @@ Falls back to the bitmap charset for uncached fonts.
 ===========================================================================
 */
 
-#include "../../qcommon/q_shared.h"
-#include "../../qcommon/qcommon.h"
+#include "q_shared.h"
+#include "qcommon.h"
 #include "tr_public.h"
 
 #if !defined(BUILD_FREETYPE)

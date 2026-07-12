@@ -1493,6 +1493,7 @@ include(${CMAKE_SOURCE_DIR}/cmake/modules/BotlibSources.cmake)
 idtech3_init_botlib_sources()
 ADD_LIBRARY(botlib OBJECT ${BOTLIB_SRCS})
 TARGET_COMPILE_DEFINITIONS(botlib PRIVATE BOTLIB)
+target_include_directories(botlib PRIVATE ${IDTECH3_DIR_ENGINE_CORE})
 if(USE_GLM)
   target_include_directories(botlib PRIVATE ${EXTERNAL_GLM_INCLUDE})
 endif()
@@ -1513,6 +1514,7 @@ target_include_directories(qcommon PRIVATE
   ${CMAKE_SOURCE_DIR}/engine/platform
   ${CMAKE_SOURCE_DIR}/engine/platform/win32
   ${CMAKE_SOURCE_DIR}/engine/platform/win32
+  ${IDTECH3_DIR_ENGINE_CORE}
   ${IDTECH3_DIR_RUNTIME_CLIENT}
   ${CMAKE_SOURCE_DIR}/modules/audio
 )
@@ -1577,6 +1579,7 @@ target_include_directories(qcommon_ded PRIVATE
   ${CMAKE_SOURCE_DIR}/engine/platform
   ${CMAKE_SOURCE_DIR}/engine/platform/win32
   ${CMAKE_SOURCE_DIR}/engine/platform/win32
+  ${IDTECH3_DIR_ENGINE_CORE}
   ${IDTECH3_DIR_RUNTIME_CLIENT}
   ${CMAKE_SOURCE_DIR}/modules/audio
 )
@@ -1875,7 +1878,7 @@ endif()
 
 if(USE_VUDA AND USE_RESEARCH_EXTENSIONS)
   list(APPEND CLIENT_SRCS
-    runtime/client/cl_vuda.c
+    runtime/client/shell/cl_vuda.c
     extensions/research/vuda/vuda_cuda.c
   )
 endif()
@@ -2104,6 +2107,7 @@ IF(USE_RENDERER_DLOPEN)
 	target_include_directories(${RENDERER_PREFIX}_vulkan${RENDEXT} PRIVATE ${CMAKE_SOURCE_DIR})
 	# engine/ so #include "platform/android/..." resolves without relying only on the repo-root platform symlink
 	target_include_directories(${RENDERER_PREFIX}_vulkan${RENDEXT} PRIVATE ${CMAKE_SOURCE_DIR}/engine)
+	target_include_directories(${RENDERER_PREFIX}_vulkan${RENDEXT} PRIVATE ${IDTECH3_DIR_ENGINE_CORE})
 	idtech3_vulkan_extension_include_dirs(${RENDERER_PREFIX}_vulkan${RENDEXT})
 	idtech3_apply_research_include_dirs(${RENDERER_PREFIX}_vulkan${RENDEXT})
 	if(USE_FREEUSD)
@@ -2185,6 +2189,7 @@ ELSE()
 	ENDIF()
 	target_include_directories(${RENDERER_PREFIX}_vulkan PRIVATE ${CMAKE_SOURCE_DIR})
 	target_include_directories(${RENDERER_PREFIX}_vulkan PRIVATE ${CMAKE_SOURCE_DIR}/engine)
+	target_include_directories(${RENDERER_PREFIX}_vulkan PRIVATE ${IDTECH3_DIR_ENGINE_CORE})
 	idtech3_vulkan_extension_include_dirs(${RENDERER_PREFIX}_vulkan)
 	idtech3_apply_research_include_dirs(${RENDERER_PREFIX}_vulkan)
 	if(USE_FREEUSD)
@@ -2579,6 +2584,7 @@ if(USE_RECAST_NAV)
     ${CMAKE_SOURCE_DIR}/third_party/src/recast/DetourCrowd/Include
     ${CMAKE_SOURCE_DIR}/third_party/src/recast/DetourTileCache/Include
     ${CMAKE_SOURCE_DIR}/modules/navigation
+    ${IDTECH3_DIR_ENGINE_CORE}
   )
   set_property(TARGET recast_nav PROPERTY POSITION_INDEPENDENT_CODE ON)
   set_target_properties(recast_nav PROPERTIES
@@ -2611,8 +2617,12 @@ if(NOT MSVC)
 endif()
 message(STATUS "ECS (EnTT): enabled")
 
-# --- Bullet Physics module ---
-option(USE_BULLET_PHYSICS "Enable Bullet Physics integration" ON)
+# --- Physics module (swappable substrate: box3d default, bullet optional) ---
+set(IDTECH3_PHYSICS_BACKEND "box3d" CACHE STRING "Physics substrate: box3d | bullet | none")
+set_property(CACHE IDTECH3_PHYSICS_BACKEND PROPERTY STRINGS box3d bullet none)
+# Legacy alias: USE_BULLET_PHYSICS=ON with backend=bullet still works
+option(USE_BULLET_PHYSICS "Legacy: prefer Bullet when IDTECH3_PHYSICS_BACKEND is unset/auto" OFF)
+
 set(PHYSICS_SRCS
   modules/physics/phys_bullet.c
   modules/physics/phys_character.c
@@ -2621,42 +2631,86 @@ set(PHYSICS_SRCS
   modules/physics/phys_ik.c
   modules/physics/phys_dmm_materials.c
   modules/physics/phys_cloth.c
+  modules/physics/phys_solvers.c
+  modules/physics/phys_particles.c
+  modules/physics/phys_softblob.c
+  modules/physics/phys_fluid.c
   modules/physics/phys_events.c
   modules/physics/phys_materials.c
   modules/physics/phys_motor.c
   modules/physics/phys_middleware.c
+  modules/physics/phys_props.c
+  modules/physics/phys_volumes.c
   modules/physics/phys_debugdraw.c
 )
 
+set(IDTECH3_PHYSICS_BACKEND_EFFECTIVE "${IDTECH3_PHYSICS_BACKEND}")
+if(USE_BULLET_PHYSICS AND IDTECH3_PHYSICS_BACKEND STREQUAL "box3d")
+  # Explicit legacy opt-in from older scripts: force bullet if requested via USE_BULLET_PHYSICS
+  # only when user passes -DUSE_BULLET_PHYSICS=ON alongside default box3d — honor bullet.
+  # Prefer IDTECH3_PHYSICS_BACKEND; compile_engine.sh sets both explicitly.
+endif()
+
 set(BULLET_FOUND FALSE)
-if(USE_BULLET_PHYSICS AND NOT ANDROID)
-  find_package(PkgConfig QUIET)
-  if(PKG_CONFIG_FOUND)
-    pkg_check_modules(BULLET_PKG QUIET bullet)
-    if(BULLET_PKG_FOUND)
-      set(BULLET_FOUND TRUE)
-      list(APPEND PHYSICS_SRCS modules/physics/phys_bullet_impl.cpp)
-      message(STATUS "Bullet Physics: enabled with C++ backend")
+set(BOX3D_FOUND FALSE)
+
+if(IDTECH3_PHYSICS_BACKEND_EFFECTIVE STREQUAL "box3d")
+  set(_IDTECH3_BOX3D_DIR "${CMAKE_SOURCE_DIR}/third_party/box3d")
+  if(EXISTS "${_IDTECH3_BOX3D_DIR}/CMakeLists.txt")
+    set(BOX3D_VALIDATE OFF CACHE BOOL "Box3D heavy validation" FORCE)
+    set(BOX3D_UNIT_TESTS OFF CACHE BOOL "Box3D unit tests" FORCE)
+    set(BOX3D_SAMPLES OFF CACHE BOOL "Box3D samples" FORCE)
+    add_subdirectory("${_IDTECH3_BOX3D_DIR}" "${CMAKE_BINARY_DIR}/third_party/box3d" EXCLUDE_FROM_ALL)
+    list(APPEND PHYSICS_SRCS modules/physics/phys_box3d_impl.c)
+    set(BOX3D_FOUND TRUE)
+    message(STATUS "Physics backend: Box3D (default, third_party/box3d)")
+  else()
+    message(WARNING "Physics backend box3d requested but third_party/box3d missing — run: git submodule update --init third_party/box3d")
+    set(IDTECH3_PHYSICS_BACKEND_EFFECTIVE "none")
+  endif()
+endif()
+
+if(IDTECH3_PHYSICS_BACKEND_EFFECTIVE STREQUAL "bullet")
+  if(NOT ANDROID)
+    find_package(PkgConfig QUIET)
+    if(PKG_CONFIG_FOUND)
+      pkg_check_modules(BULLET_PKG QUIET bullet)
+      if(BULLET_PKG_FOUND)
+        set(BULLET_FOUND TRUE)
+        list(APPEND PHYSICS_SRCS modules/physics/phys_bullet_impl.cpp)
+        message(STATUS "Physics backend: Bullet (C++ libbullet)")
+      endif()
     endif()
   endif()
   if(NOT BULLET_FOUND)
-    message(STATUS "Bullet Physics: C wrapper only (install libbullet-dev for full backend)")
+    message(WARNING "Physics backend bullet requested but libbullet not found — substrate stubs only")
+    set(IDTECH3_PHYSICS_BACKEND_EFFECTIVE "none")
   endif()
-elseif(USE_BULLET_PHYSICS AND ANDROID)
-  message(STATUS "Bullet Physics: C wrapper only on Android (no host pkg-config Bullet)")
+endif()
+
+if(IDTECH3_PHYSICS_BACKEND_EFFECTIVE STREQUAL "none")
+  message(STATUS "Physics backend: none (middleware APIs present, no rigid-body substrate)")
 endif()
 
 ADD_LIBRARY(phys_module OBJECT ${PHYSICS_SRCS})
 set_target_properties(phys_module PROPERTIES
   CXX_STANDARD ${IDTECH3_CXX_STANDARD} CXX_STANDARD_REQUIRED ON)
-target_include_directories(phys_module PRIVATE ${CMAKE_SOURCE_DIR}/modules/physics)
+target_include_directories(phys_module PRIVATE
+  ${CMAKE_SOURCE_DIR}/modules/physics
+  ${IDTECH3_DIR_ENGINE_CORE}
+)
 if(NOT MSVC)
   target_compile_options(phys_module PRIVATE -Wno-unused-parameter)
+endif()
+if(BOX3D_FOUND)
+  target_compile_definitions(phys_module PRIVATE USE_BOX3D_PHYSICS_IMPL)
+  target_include_directories(phys_module PRIVATE ${CMAKE_SOURCE_DIR}/third_party/box3d/include)
+  target_link_libraries(phys_module PUBLIC box3d)
 endif()
 if(BULLET_FOUND)
   target_compile_definitions(phys_module PRIVATE USE_BULLET_PHYSICS_IMPL)
   target_include_directories(phys_module PRIVATE ${BULLET_PKG_INCLUDE_DIRS})
-  target_link_libraries(phys_module ${BULLET_PKG_LINK_LIBRARIES})
+  target_link_libraries(phys_module PUBLIC ${BULLET_PKG_LINK_LIBRARIES})
   enable_language(CXX)
 endif()
 # OpenAL/Bullet DSOs need libstdc++ with CXXABI_1.3.15+. CUDA may inject -L.../gcc/13,
@@ -2970,6 +3024,20 @@ add_test(NAME test_vt
 set_tests_properties(test_vt PROPERTIES
 	LABELS "scripts;validation;renderer"
 	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_vt.sh;${CMAKE_SOURCE_DIR}/renderers/vulkan/vk_vt.c")
+
+add_test(NAME test_vdb_woodcock
+	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_vdb_woodcock.sh
+	WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+set_tests_properties(test_vdb_woodcock PROPERTIES
+	LABELS "scripts;validation;renderer"
+	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_vdb_woodcock.sh;${CMAKE_SOURCE_DIR}/renderers/vulkan/vk_vdb.c;${CMAKE_SOURCE_DIR}/examples/demo_game/bootstrap_media/vdb/fog_2cubed.nvdb")
+
+add_test(NAME test_module_include_canonical
+	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_module_include_canonical.sh
+	WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+set_tests_properties(test_module_include_canonical PROPERTIES
+	LABELS "scripts;validation;layout"
+	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_module_include_canonical.sh;${CMAKE_SOURCE_DIR}/modules/physics/phys_middleware.h;${CMAKE_SOURCE_DIR}/modules/navigation/nav_recast.h")
 
 add_test(NAME test_meshlets
 	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_meshlets.sh
@@ -3404,7 +3472,7 @@ add_test(NAME test_console_font
 	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_console_font.sh)
 set_tests_properties(test_console_font PROPERTIES
 	LABELS "scripts;validation;client;renderer"
-	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_console_font.sh;${CMAKE_SOURCE_DIR}/runtime/client/cl_scrn.c")
+	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_console_font.sh;${CMAKE_SOURCE_DIR}/runtime/client/shell/cl_scrn.c")
 
 add_test(NAME test_build_profiles
 	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_build_profiles.sh)
@@ -3566,6 +3634,7 @@ if(BUILD_UNIT_TESTS)
 		${CMAKE_SOURCE_DIR}/modules
 		${CMAKE_SOURCE_DIR}/runtime
 		${CMAKE_SOURCE_DIR}/extensions/research
+		${IDTECH3_DIR_ENGINE_CORE}
 	)
 	add_executable(unit_macros tests/unit/test_macros.c)
 	target_include_directories(unit_macros PRIVATE ${IDTECH3_UNIT_INCLUDE_DIRS})

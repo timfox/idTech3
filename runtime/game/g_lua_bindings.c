@@ -26,8 +26,8 @@ Usage from Lua:
 ===========================================================================
 */
 
-#include "../qcommon/q_shared.h"
-#include "../qcommon/qcommon.h"
+#include "q_shared.h"
+#include "qcommon.h"
 #include "g_lua_bindings.h"
 
 #ifdef USE_LUA
@@ -45,6 +45,8 @@ Usage from Lua:
 #endif
 #include "ecs.h"
 #include "../physics/phys_bullet.h"
+#include "../physics/phys_props.h"
+#include "../physics/phys_volumes.h"
 #include "../world/fog_biology.h"
 #include "../world/genetic_gan.h"
 #ifdef USE_ARC_BLANC
@@ -150,6 +152,63 @@ static int l_phys_applyImpulse(lua_State *L) {
 	pt[0]=(float)luaL_optnumber(L,5,0); pt[1]=(float)luaL_optnumber(L,6,0); pt[2]=(float)luaL_optnumber(L,7,0);
 	Phys_ApplyImpulse((int)luaL_checkinteger(L,1), imp, pt);
 	return 0;
+}
+static int l_phys_applyImpulseRadius(lua_State *L) {
+	vec3_t center;
+	center[0]=(float)luaL_checknumber(L,1); center[1]=(float)luaL_checknumber(L,2); center[2]=(float)luaL_checknumber(L,3);
+	lua_pushinteger(L, Phys_ApplyImpulseRadius(center, (float)luaL_checknumber(L,4), (float)luaL_checknumber(L,5),
+		(float)luaL_optnumber(L,6,1.0)));
+	return 1;
+}
+static int l_phys_createBox(lua_State *L) {
+	vec3_t origin, half;
+	origin[0]=(float)luaL_checknumber(L,1); origin[1]=(float)luaL_checknumber(L,2); origin[2]=(float)luaL_checknumber(L,3);
+	half[0]=half[1]=half[2]=(float)luaL_optnumber(L,4,8);
+	lua_pushinteger(L, PhysProp_CreateBox(origin, half, PHYS_BODY_DYNAMIC, (float)luaL_optnumber(L,5,20), (int)luaL_optinteger(L,6,0)));
+	return 1;
+}
+static int l_phys_createSphere(lua_State *L) {
+	vec3_t origin;
+	origin[0]=(float)luaL_checknumber(L,1); origin[1]=(float)luaL_checknumber(L,2); origin[2]=(float)luaL_checknumber(L,3);
+	lua_pushinteger(L, PhysProp_CreateSphere(origin, (float)luaL_optnumber(L,4,10), PHYS_BODY_DYNAMIC,
+		(float)luaL_optnumber(L,5,15), (int)luaL_optinteger(L,6,0)));
+	return 1;
+}
+static int l_phys_createStatic(lua_State *L) {
+	vec3_t origin, half;
+	origin[0]=(float)luaL_checknumber(L,1); origin[1]=(float)luaL_checknumber(L,2); origin[2]=(float)luaL_checknumber(L,3);
+	half[0]=(float)luaL_optnumber(L,4,32); half[1]=(float)luaL_optnumber(L,5,32); half[2]=(float)luaL_optnumber(L,6,4);
+	lua_pushinteger(L, PhysProp_CreateBox(origin, half, PHYS_BODY_STATIC, 0.0f, (int)luaL_optinteger(L,7,0)));
+	return 1;
+}
+static int l_phys_createShadow(lua_State *L) {
+	physShadowDef_t def;
+	Com_Memset(&def, 0, sizeof(def));
+	def.origin[0]=(float)luaL_checknumber(L,1); def.origin[1]=(float)luaL_checknumber(L,2); def.origin[2]=(float)luaL_checknumber(L,3);
+	def.halfExtents[0]=(float)luaL_optnumber(L,4,16); def.halfExtents[1]=(float)luaL_optnumber(L,5,16); def.halfExtents[2]=(float)luaL_optnumber(L,6,32);
+	def.shape = PHYS_SHAPE_BOX;
+	def.entityNum = (int)luaL_optinteger(L,7,-1);
+	def.allowMovement = qtrue;
+	def.allowRotation = qtrue;
+	lua_pushinteger(L, PhysProp_CreateShadow(&def));
+	return 1;
+}
+static int l_phys_setShadowPose(lua_State *L) {
+	vec3_t origin, angles;
+	origin[0]=(float)luaL_checknumber(L,2); origin[1]=(float)luaL_checknumber(L,3); origin[2]=(float)luaL_checknumber(L,4);
+	angles[0]=(float)luaL_optnumber(L,5,0); angles[1]=(float)luaL_optnumber(L,6,0); angles[2]=(float)luaL_optnumber(L,7,0);
+	PhysProp_SetShadowPose((int)luaL_checkinteger(L,1), origin, angles);
+	return 0;
+}
+static int l_phys_createBuoyancy(lua_State *L) {
+	physVolumeDef_t def;
+	Com_Memset(&def, 0, sizeof(def));
+	def.type = PHYS_VOLUME_BUOYANCY;
+	def.center[0]=(float)luaL_checknumber(L,1); def.center[1]=(float)luaL_checknumber(L,2); def.center[2]=(float)luaL_checknumber(L,3);
+	def.halfExtents[0]=(float)luaL_optnumber(L,4,128); def.halfExtents[1]=(float)luaL_optnumber(L,5,128); def.halfExtents[2]=(float)luaL_optnumber(L,6,48);
+	def.density=(float)luaL_optnumber(L,7,1.0); def.linearDrag=(float)luaL_optnumber(L,8,0.4); def.angularDrag=(float)luaL_optnumber(L,9,0.2);
+	lua_pushinteger(L, PhysVolume_Create(&def));
+	return 1;
 }
 static int l_phys_getTransform(lua_State *L) {
 	physTransform_t t; Phys_GetBodyTransform((int)luaL_checkinteger(L,1), &t);
@@ -1732,6 +1791,10 @@ void LuaBindings_RegisterAll(void *luaState) {
 	static const luaL_Reg physicsFuncs[] = {
 		{"init", l_phys_init}, {"step", l_phys_step}, {"createBody", l_phys_createBody},
 		{"destroyBody", l_phys_destroyBody}, {"applyImpulse", l_phys_applyImpulse},
+		{"applyImpulseRadius", l_phys_applyImpulseRadius},
+		{"createBox", l_phys_createBox}, {"createSphere", l_phys_createSphere},
+		{"createStatic", l_phys_createStatic}, {"createShadow", l_phys_createShadow},
+		{"setShadowPose", l_phys_setShadowPose}, {"createBuoyancy", l_phys_createBuoyancy},
 		{"getTransform", l_phys_getTransform},
 		{NULL, NULL}
 	};

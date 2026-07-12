@@ -11,7 +11,7 @@ blended reverb preset and optional per-source occlusion filtering.
 #ifndef S_ACOUSTICS_H
 #define S_ACOUSTICS_H
 
-#include "../../qcommon/q_shared.h"
+#include "q_shared.h"
 
 #ifdef USE_OPENAL
 #include <AL/al.h>

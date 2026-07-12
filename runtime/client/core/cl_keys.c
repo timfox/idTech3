@@ -21,7 +21,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 */
 #include "client.h"
 #include "cl_emulator.h"
-#include "../../qcommon/script_emit.h"
+#include "script_emit.h"
 
 /*
 

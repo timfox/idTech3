@@ -14,8 +14,8 @@ USD / USDA mesh tessellation via FreeUSD (C++ only; no tr_local.h).
 #include <vector>
 
 extern "C" {
-#include "../../qcommon/q_shared.h"
-#include "../../qcommon/qfiles.h"
+#include "q_shared.h"
+#include "qfiles.h"
 #include "tr_model_freeusd.h"
 #include "tr_public.h"
 }

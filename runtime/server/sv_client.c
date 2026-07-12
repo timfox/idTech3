@@ -24,7 +24,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "server.h"
 #include "sv_auth.h"
 #include "sv_app_crdt.h"
-#include "../qcommon/script_emit.h"
+#include "script_emit.h"
 
 #define SV_P2P_GRACE_MAX 32
 

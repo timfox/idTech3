@@ -17,8 +17,8 @@ QOI (Quite OK Image) loader using phoboslab/qoi (MIT license).
 #define QOI_FREE(p)    free(p)
 #include "../../external/include/qoi/qoi.h"
 
-#include "../../qcommon/q_shared.h"
-#include "../../qcommon/qcommon.h"
+#include "q_shared.h"
+#include "qcommon.h"
 #include <stdlib.h>
 
 void R_LoadQOI(const char *filename, byte **pic, int *width, int *height) {

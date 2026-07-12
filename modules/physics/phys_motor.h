@@ -14,7 +14,7 @@ Runs above Bullet constraints; ProcAnim drives high-level state.
 extern "C" {
 #endif
 
-#include "../qcommon/q_shared.h"
+#include "q_shared.h"
 #include "phys_events.h"
 #include "phys_procedural_anim.h"
 
@@ -58,6 +58,7 @@ void            PhysMotor_UpdateAll( float dt );
 void            PhysMotor_ApplyHit( physMotorHandle_t handle, const phys_hit_event_t *hit );
 void            PhysMotor_GetStatus( physMotorHandle_t handle, phys_motor_status_t *out );
 void            PhysMotor_SetBonePhysicsWeight( physMotorHandle_t handle, int bone, float weight );
+int             PhysMotor_GetActiveCount( void );
 
 #ifdef __cplusplus
 }

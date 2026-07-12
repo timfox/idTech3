@@ -16,7 +16,7 @@ Core tier matching, JSON/XML category packs, maps (§8.7), predicates,
 #ifndef G_AIML_H
 #define G_AIML_H
 
-#include "../qcommon/q_shared.h"
+#include "q_shared.h"
 
 #ifdef __cplusplus
 extern "C" {

@@ -17,7 +17,7 @@ Shared C++ includes and symbols for Vulkan Dear ImGui inspector TUs.
 #include <imgui_internal.h>
 
 extern "C" {
-#include "../../qcommon/q_shared.h"
+#include "q_shared.h"
 #include "../../renderers/common/tr_types.h"
 #include "../../renderers/common/tr_public.h"
 

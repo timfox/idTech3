@@ -5,14 +5,14 @@ lines for Lua/script integration (client-side game systems).
 ===========================================================================
 */
 
-#include "../qcommon/q_shared.h"
-#include "../qcommon/qcommon.h"
-#include "../qcommon/engine_db.h"
+#include "q_shared.h"
+#include "qcommon.h"
+#include "engine_db.h"
 #include "g_engine_systems.h"
 #include <string.h>
 
 #define JSON_IMPLEMENTATION
-#include "../qcommon/json.h"
+#include "json.h"
 #undef JSON_IMPLEMENTATION
 
 #define TELEMETRY_MAX 64

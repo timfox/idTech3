@@ -11,7 +11,7 @@ VUDA_CON="$(idtech3_file extensions/research/vuda/vuda_console.c src/extensions/
 VUDA_CUDA="$(idtech3_file extensions/research/vuda/vuda_cuda.c src/extensions/research/vuda/vuda_cuda.c)"
 VUDA_H="$(idtech3_file extensions/research/vuda/vuda_cuda.h src/extensions/research/vuda/vuda_cuda.h)"
 COMMON="$(idtech3_file engine/core/common.c src/qcommon/common.c)"
-CL_VUDA="$(idtech3_file runtime/client/cl_vuda.c src/client/cl_vuda.c)"
+CL_VUDA="$(idtech3_file runtime/client/shell/cl_vuda.c src/client/cl_vuda.c)"
 VK_VUDA="$(idtech3_file renderers/vulkan/extensions/scaffold/vk_vuda.c src/renderers/vulkan/extensions/scaffold/vk_vuda.c)"
 
 grep -q 'VUDA_ModelDataGen' "$VUDA_MODEL"

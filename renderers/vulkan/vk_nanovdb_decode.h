@@ -10,7 +10,7 @@ No dependency on OpenVDB/NanoVDB headers — offsets match AcademySoftwareFounda
 #ifndef VK_NANOVDB_DECODE_H
 #define VK_NANOVDB_DECODE_H
 
-#include "../../qcommon/q_shared.h"
+#include "q_shared.h"
 
 #ifdef __cplusplus
 extern "C" {

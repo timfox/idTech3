@@ -3,7 +3,7 @@
  */
 #include "arc_blanc.h"
 #include "arc_blanc_internal.h"
-#include "../../qcommon/qcommon.h"
+#include "qcommon.h"
 #include <math.h>
 
 #ifndef M_PI

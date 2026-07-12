@@ -22,7 +22,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #ifndef __ASM_I386__
 #define __ASM_I386__
 
-#include "../qcommon/q_platform.h"
+#include "q_platform.h"
 
 #if defined(__MINGW32__) || defined(MACOS_X)
 #undef ELF

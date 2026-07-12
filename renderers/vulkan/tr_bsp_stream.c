@@ -7,7 +7,7 @@ Copyright (C) 2026 Gopex LLC. All rights reserved.
 #include "tr_local.h"
 #include "tr_bsp_stream.h"
 #include "vk_vt.h"
-#include "../../qcommon/qfiles.h"
+#include "qfiles.h"
 
 #define BSP_STREAM_MAX_PATCHES 64
 #define BSP_STREAM_MAX_FACES 16
@@ -1332,6 +1332,12 @@ void R_BspStream_AddSurfaces( void ) {
 		for ( f = 0; f < s_stream.patches[i].numFaces; f++ ) {
 			if ( !s_stream.patches[i].faces[f].surface || !s_stream.patches[i].faces[f].shader ) {
 				continue;
+			}
+			/* VT feedback: brush-tops sample full atlas UV space — request a few pages. */
+			if ( R_VT_WantSample() ) {
+				R_VT_Feedback_RequestUV( 0.1f, 0.1f );
+				R_VT_Feedback_RequestUV( 0.5f, 0.5f );
+				R_VT_Feedback_RequestUV( 0.9f, 0.9f );
 			}
 			R_AddDrawSurf( s_stream.patches[i].faces[f].surface,
 				s_stream.patches[i].faces[f].shader, 0, 0 );

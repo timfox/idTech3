@@ -15,8 +15,8 @@ id Studio-style session + command strip (C++: std::vector command history).
 #include <vector>
 
 #include "vk_imgui_common.hpp"
-#include "../../../qcommon/engine_sprite_map.h"
-#include "../../../qcommon/engine_decal_map.h"
+#include "engine_sprite_map.h"
+#include "engine_decal_map.h"
 #include "../tr_sprite_props.h"
 #include "../tr_material_paint.h"
 

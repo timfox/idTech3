@@ -2,7 +2,7 @@
  * Depth velocity field with logarithmic slices + exponential interpolation (Arc Blanc §3.4–3.6).
  */
 #include "arc_blanc_internal.h"
-#include "../../qcommon/qcommon.h"
+#include "qcommon.h"
 #include <math.h>
 #include <string.h>
 

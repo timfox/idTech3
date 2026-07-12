@@ -12,8 +12,8 @@ with WebM containers (already supported via Nestegg).
 ===========================================================================
 */
 
-#include "../../qcommon/q_shared.h"
-#include "../../qcommon/qcommon.h"
+#include "q_shared.h"
+#include "qcommon.h"
 #include "cl_cin_modern.h"
 #include "cl_cin_colors.h"
 

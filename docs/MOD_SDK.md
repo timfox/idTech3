@@ -85,7 +85,7 @@ Full enum: [g_public.h](../src/game/g_public.h) (before `G_TRAP_GETVALUE` = 700)
 | `r_decalProps` | 1 | Map decal BSP parse |
 | `cl_engineSprites` / `sv_engineSprites` | 1 | Snapshot / CS path |
 | `r_studio_tools` | 0 | ImGui Studio panels |
-| `r_upscale` | 0 | 0=off, 1=renderScale, 2=FSR2 (experimental) |
+| `r_upscale` | 0 | 0=off, 1=renderScale spatial blit, 2=engine temporal upsample (Halton+TAA; not FSR2/DLSS SDK) |
 | `com_crashReportURL` | "" | Opt-in crash POST (no PII) |
 | `sv_pureSigned` | 0 | Require valid `pk3.sig` sidecars |
 | `sv_interestMaxDist` | 0 | 0=off; distance cull after PVS |

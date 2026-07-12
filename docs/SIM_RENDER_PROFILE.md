@@ -76,7 +76,7 @@ Recent composite improvements (no extra cvars):
 | `sim_render_profile 1\|2` | Apply AMBF lightweight or volumetric simulation stack |
 | `sim_render_debug 0\|1\|2` | Toggle simulation render debug overlay |
 | `volumetric_accurate` | Apply accurate froxel integration cvars without full sim profile |
-| `volumetric_integration 0\|1\|2` | Froxel march, screen analytical approx, or screen ray march + sun shadows |
+| `volumetric_integration 0\|1\|2\|3` | Froxel march, screen analytical approx, screen ray march + sun shadows, or OpenVDB Woodcock |
 
 ## Screen-space integration (reference-style)
 
@@ -87,8 +87,9 @@ Inspired by screen-space volumetric shaders (Henyey–Greenstein phase, height f
 | `0` | Froxel compute + 3D texture march (default; sim profile 2) |
 | `1` | Single-sample analytical approximate (fast) |
 | `2` | Per-pixel ray march with sun shadow map; **skips froxel compute** |
+| `3` | OpenVDB Woodcock / delta tracking with majorant bricks (`r_vdbFog`, `r_vdbMajorantBrick`) — see [VDB_WOODCOCK_VOLUMETRICS.md](VDB_WOODCOCK_VOLUMETRICS.md) |
 
-Tune with `r_volumetricFogDensity`, `r_volumetricFogHeightFalloff`, `r_volumetricFogAniso`, `r_volumetricFogSteps` (mode 2).
+Tune with `r_volumetricFogDensity`, `r_volumetricFogHeightFalloff`, `r_volumetricFogAniso`, `r_volumetricFogSteps` (mode 2). Mode 3 uses authored `.nvdb` density via `vdb_load` / `vdb_bind_fog` (demo: `exec demo_vdb_woodcock.cfg`).
 
 ## RTX path trace profiling (Nsight)
 

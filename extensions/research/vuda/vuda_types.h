@@ -1,6 +1,6 @@
 #pragma once
 
-#include "../../../qcommon/q_shared.h"
+#include "q_shared.h"
 
 #define VUDA_MAX_SLOTS          3
 #define VUDA_SLOT_NEURAL        0

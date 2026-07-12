@@ -8,7 +8,7 @@ Parses misc_decal map entities and submits polygon-offset RT_SPRITE decals.
 
 #include "tr_local.h"
 #include "tr_decal_props.h"
-#include "../../qcommon/engine_decal_map.h"
+#include "engine_decal_map.h"
 
 #define MAX_DECAL_PROPS 1024
 

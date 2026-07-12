@@ -5,8 +5,8 @@ this TU exists for a single startup log line when middleware sources are strippe
 ===========================================================================
 */
 
-#include "../qcommon/q_shared.h"
-#include "../qcommon/qcommon.h"
+#include "q_shared.h"
+#include "qcommon.h"
 
 #ifndef USE_GAME_AI_MIDDLEWARE
 

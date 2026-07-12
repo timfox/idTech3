@@ -4,8 +4,8 @@ Copyright (C) 2026 Gopex LLC. All rights reserved.
 ===========================================================================
 */
 
-#include "../qcommon/q_shared.h"
-#include "../qcommon/qcommon.h"
+#include "q_shared.h"
+#include "qcommon.h"
 #include "phys_bullet.h"
 #include "phys_events.h"
 #include "phys_motor.h"
@@ -166,6 +166,7 @@ static void PhysMotor_RunPain( physMotorSlot_t *m, float pain ) {
 static void PhysMotor_ApplyMotors( physMotorSlot_t *m ) {
 	float blend;
 	procAnimStatus_t status;
+	int i;
 
 	ProcAnim_GetStatus( m->anim, &status );
 	blend = 1.0f - status.muscleStiffness;
@@ -179,6 +180,31 @@ static void PhysMotor_ApplyMotors( physMotorSlot_t *m ) {
 	Phys_RagdollSetMuscleStiffness( m->ragdoll,
 		status.muscleStiffness + m->boneCmd[PROCANIM_BONE_PELVIS].stiffness * blend * 0.5f );
 	Phys_RagdollBlendToAnimation( m->ragdoll, 1.0f - blend );
+
+	/* PD-ish bone torques from target angular velocity + per-bone physics weight */
+	for ( i = 0; i < PHYS_MOTOR_MAX_BONES; i++ ) {
+		physTransform_t xf;
+		joint_motor_cmd_t *cmd;
+		vec3_t err, torque;
+		float w;
+
+		w = m->physicsWeight[i];
+		if ( w < 0.05f ) {
+			continue;
+		}
+		cmd = &m->boneCmd[i];
+		if ( cmd->stiffness < 0.01f ) {
+			continue;
+		}
+
+		Phys_RagdollGetBoneTransform( m->ragdoll, i, &xf );
+		VectorSubtract( cmd->targetAngularVelocity, xf.angularVelocity, err );
+		VectorScale( err, cmd->stiffness * w * 80.0f, torque );
+		VectorMA( torque, -cmd->damping * w * 12.0f, xf.angularVelocity, torque );
+		if ( VectorLength( torque ) > 0.001f ) {
+			Phys_RagdollApplyBoneTorque( m->ragdoll, i, torque );
+		}
+	}
 }
 
 void PhysMotor_UpdateAll( float dt ) {
@@ -280,4 +306,19 @@ void PhysMotor_SetBonePhysicsWeight( physMotorHandle_t handle, int bone, float w
 		weight = 1.0f;
 	}
 	motors[handle].physicsWeight[bone] = weight;
+}
+
+int PhysMotor_GetActiveCount( void ) {
+	int i;
+	int n = 0;
+
+	if ( !motorInitialized ) {
+		return 0;
+	}
+	for ( i = 0; i < PHYS_MOTOR_MAX; i++ ) {
+		if ( motors[i].active ) {
+			n++;
+		}
+	}
+	return n;
 }

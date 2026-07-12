@@ -6,8 +6,8 @@ Copyright (C) 2026 Gopex LLC. All rights reserved.
 
 #include "client.h"
 #include "cl_ml_worker.h"
-#include "../qcommon/defer.h"
-#include "../qcommon/jobs.h"
+#include "defer.h"
+#include "jobs.h"
 
 #ifndef _MSC_VER
 #include <sched.h>

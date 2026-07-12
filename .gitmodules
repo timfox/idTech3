@@ -13,3 +13,6 @@
 [submodule "src/external/idtech3-emulator"]
 	path = third_party/idtech3-emulator
 	url = https://github.com/timfox/idTech3-Emulator.git
+[submodule "third_party/box3d"]
+	path = third_party/box3d
+	url = https://github.com/timfox/idTech3-box3d.git

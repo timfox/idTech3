@@ -19,7 +19,7 @@ ready-to-use destructible object prefabs.
 extern "C" {
 #endif
 
-#include "../qcommon/q_shared.h"
+#include "q_shared.h"
 #include "phys_bullet.h"
 #include "phys_dmm.h"
 

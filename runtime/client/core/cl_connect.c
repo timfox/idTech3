@@ -11,7 +11,7 @@ Client connection: connect/disconnect, rcon, OOB packets, resend/timeout.
 #include "cl_p2p_session.h"
 #include "cl_serverbrowser.h"
 #include "cl_demo.h"
-#include "../../qcommon/net_p2p.h"
+#include "net_p2p.h"
 
 #include <string.h>
 

@@ -13,7 +13,7 @@ the client via AddPolyToScene during world render.
 extern "C" {
 #endif
 
-#include "../qcommon/q_shared.h"
+#include "q_shared.h"
 
 #define PHYS_DEBUG_MAX_LINES 8192
 

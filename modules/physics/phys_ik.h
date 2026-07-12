@@ -18,7 +18,7 @@ specialized solvers for foot placement, aim, and look-at.
 extern "C" {
 #endif
 
-#include "../qcommon/q_shared.h"
+#include "q_shared.h"
 
 typedef struct ikBone_s {
 	vec3_t  position;

@@ -19,11 +19,11 @@ Every function in phys_bullet.h has a corresponding _Impl here.
 #include <BulletSoftBody/btSoftBodyRigidBodyCollisionConfiguration.h>
 
 extern "C" {
-#include "phys_bullet.h"
+#include "phys_impl.h"
 #include "phys_debugdraw.h"
 #include "phys_events.h"
-#include "../qcommon/q_shared.h"
-#include "../qcommon/qcommon.h"
+#include "q_shared.h"
+#include "qcommon.h"
 }
 
 /* ---------- internal types ---------- */
@@ -32,6 +32,7 @@ struct PhysBody {
 	btRigidBody      *rigidBody;
 	btCollisionShape *shape;
 	btMotionState    *motionState;
+	physBodyType_t    bodyType;
 	int               materialId;
 	qboolean          active;
 };
@@ -291,6 +292,7 @@ extern "C" physBodyHandle_t Phys_CreateBody_Impl(const physBodyDef_t *def) {
 	int group = def->collisionGroup ? def->collisionGroup : 1;
 	int mask  = def->collisionMask  ? def->collisionMask  : -1;
 	bs.world->addRigidBody(pb->rigidBody, group, mask);
+	pb->bodyType = def->type;
 	pb->materialId = def->materialId;
 	pb->active = qtrue;
 	return idx;
@@ -323,8 +325,12 @@ extern "C" void Phys_SetBodyTransform_Impl(physBodyHandle_t h, const vec3_t pos,
 	if (!VALID_BODY(h)) return;
 	btTransform t; t.setIdentity();
 	t.setOrigin(btVector3(pos[0], pos[1], pos[2]));
-	btQuaternion q; q.setEulerZYX(rot[2]*0.0174533f, rot[1]*0.0174533f, rot[0]*0.0174533f);
-	t.setRotation(q);
+	if (rot) {
+		btQuaternion q; q.setEulerZYX(rot[2]*0.0174533f, rot[1]*0.0174533f, rot[0]*0.0174533f);
+		t.setRotation(q);
+	} else {
+		t.setRotation(bs.bodies[h].rigidBody->getWorldTransform().getRotation());
+	}
 	bs.bodies[h].rigidBody->setWorldTransform(t);
 	bs.bodies[h].rigidBody->getMotionState()->setWorldTransform(t);
 }
@@ -350,14 +356,28 @@ extern "C" void Phys_ApplyTorque_Impl(physBodyHandle_t h, const vec3_t torque) {
 extern "C" void Phys_SetBodyVelocity_Impl(physBodyHandle_t h, const vec3_t lin, const vec3_t ang) {
 	if (!VALID_BODY(h)) return;
 	bs.bodies[h].rigidBody->activate(true);
-	bs.bodies[h].rigidBody->setLinearVelocity(btVector3(lin[0], lin[1], lin[2]));
-	bs.bodies[h].rigidBody->setAngularVelocity(btVector3(ang[0], ang[1], ang[2]));
+	if (lin) {
+		bs.bodies[h].rigidBody->setLinearVelocity(btVector3(lin[0], lin[1], lin[2]));
+	}
+	if (ang) {
+		bs.bodies[h].rigidBody->setAngularVelocity(btVector3(ang[0], ang[1], ang[2]));
+	}
 }
 
 extern "C" void Phys_SetBodyActive_Impl(physBodyHandle_t h, qboolean active) {
 	if (!VALID_BODY(h)) return;
 	if (active) bs.bodies[h].rigidBody->activate(true);
 	else bs.bodies[h].rigidBody->setActivationState(DISABLE_SIMULATION);
+}
+
+extern "C" physBodyType_t Phys_GetBodyType_Impl(physBodyHandle_t h) {
+	if (!VALID_BODY(h)) return PHYS_BODY_STATIC;
+	return bs.bodies[h].bodyType;
+}
+
+extern "C" qboolean Phys_IsBodyDynamic_Impl(physBodyHandle_t h) {
+	if (!VALID_BODY(h)) return qfalse;
+	return (bs.bodies[h].bodyType == PHYS_BODY_DYNAMIC) ? qtrue : qfalse;
 }
 
 /* ========== constraints ========== */
@@ -371,6 +391,8 @@ extern "C" physConstraintHandle_t Phys_CreateConstraint_Impl(const physConstrain
 	btTypedConstraint *c = nullptr;
 	switch (def->type) {
 		case PHYS_CONSTRAINT_POINT:
+		case PHYS_CONSTRAINT_DISTANCE:
+		case PHYS_CONSTRAINT_SLIDER:
 			c = new btPoint2PointConstraint(*a, *b, pivA, pivB); break;
 		case PHYS_CONSTRAINT_HINGE: {
 			btVector3 axA(def->axisA[0],def->axisA[1],def->axisA[2]);
@@ -561,6 +583,22 @@ extern "C" void Phys_RagdollSetMuscleStiffness_Impl(physRagdollHandle_t h, float
 extern "C" void Phys_RagdollBlendToAnimation_Impl(physRagdollHandle_t h, float blend) {
 	if (!VALID_RAG(h)) return;
 	bs.ragdolls[h].animBlend = blend < 0 ? 0 : (blend > 1 ? 1 : blend);
+}
+
+extern "C" void Phys_RagdollApplyBoneTorque_Impl(physRagdollHandle_t h, int bone, const vec3_t torque) {
+	if (!VALID_RAG(h) || bone < 0 || bone >= bs.ragdolls[h].numBones || !torque) return;
+	btRigidBody *body = bs.ragdolls[h].bones[bone].body;
+	if (!body) return;
+	body->activate(true);
+	body->applyTorque(btVector3(torque[0], torque[1], torque[2]));
+}
+
+extern "C" int Phys_GetRagdollCount_Impl(void) {
+	int n = 0;
+	for (int i = 0; i < bs.ragdollCount; i++) {
+		if (bs.ragdolls[i].active) n++;
+	}
+	return n;
 }
 
 /* ========== DMM ========== */
@@ -803,5 +841,99 @@ extern "C" void Phys_ProcessContactEvents_Impl( void ) {
 
 extern "C" int Phys_GetBodyCount_Impl(void) { return bs.bodyCount; }
 extern "C" int Phys_GetConstraintCount_Impl(void) { return bs.constraintCount; }
+
+extern "C" physBodyHandle_t Phys_AddStaticTriMesh_Impl(const float *verts, int numVerts, const int *indices, int numIndices) {
+	physBodyDef_t def;
+	int i;
+	float mn[3], mx[3];
+
+	if (!bs.initialized || !verts || numVerts < 3 || !indices || numIndices < 3) {
+		return -1;
+	}
+
+	mn[0] = mx[0] = verts[0];
+	mn[1] = mx[1] = verts[1];
+	mn[2] = mx[2] = verts[2];
+	for (i = 1; i < numVerts; i++) {
+		const float *v = verts + i * 3;
+		if (v[0] < mn[0]) mn[0] = v[0];
+		if (v[1] < mn[1]) mn[1] = v[1];
+		if (v[2] < mn[2]) mn[2] = v[2];
+		if (v[0] > mx[0]) mx[0] = v[0];
+		if (v[1] > mx[1]) mx[1] = v[1];
+		if (v[2] > mx[2]) mx[2] = v[2];
+	}
+
+	memset(&def, 0, sizeof(def));
+	def.shape = PHYS_SHAPE_BOX;
+	def.type = PHYS_BODY_STATIC;
+	def.halfExtents[0] = (mx[0] - mn[0]) * 0.5f;
+	def.halfExtents[1] = (mx[1] - mn[1]) * 0.5f;
+	def.halfExtents[2] = (mx[2] - mn[2]) * 0.5f;
+	if (def.halfExtents[0] < 1.0f) def.halfExtents[0] = 1.0f;
+	if (def.halfExtents[1] < 1.0f) def.halfExtents[1] = 1.0f;
+	if (def.halfExtents[2] < 1.0f) def.halfExtents[2] = 1.0f;
+	def.position[0] = (mn[0] + mx[0]) * 0.5f;
+	def.position[1] = (mn[1] + mx[1]) * 0.5f;
+	def.position[2] = (mn[2] + mx[2]) * 0.5f;
+	def.friction = 0.8f;
+	(void)indices;
+	(void)numIndices;
+	return Phys_CreateBody_Impl(&def);
+}
+
+extern "C" physBodyHandle_t Phys_AddStaticCompoundBoxes_Impl(const float *centersXYZ, const float *halfExtentsXYZ, int count) {
+	physBodyHandle_t first = -1;
+	int i;
+
+	if (!bs.initialized || !centersXYZ || !halfExtentsXYZ || count < 1) {
+		return -1;
+	}
+	for (i = 0; i < count; i++) {
+		physBodyDef_t def;
+		physBodyHandle_t h;
+		memset(&def, 0, sizeof(def));
+		def.shape = PHYS_SHAPE_BOX;
+		def.type = PHYS_BODY_STATIC;
+		def.position[0] = centersXYZ[i * 3 + 0];
+		def.position[1] = centersXYZ[i * 3 + 1];
+		def.position[2] = centersXYZ[i * 3 + 2];
+		def.halfExtents[0] = halfExtentsXYZ[i * 3 + 0];
+		def.halfExtents[1] = halfExtentsXYZ[i * 3 + 1];
+		def.halfExtents[2] = halfExtentsXYZ[i * 3 + 2];
+		def.friction = 0.8f;
+		h = Phys_CreateBody_Impl(&def);
+		if (first < 0) {
+			first = h;
+		}
+	}
+	return first;
+}
+
+extern "C" qboolean Phys_MoverStep_Impl(vec3_t origin, vec3_t velocity, float radius, float height,
+	const vec3_t wishDir, float wishSpeed, float dt, qboolean jump, qboolean *groundedOut) {
+	(void)origin;
+	(void)velocity;
+	(void)radius;
+	(void)height;
+	(void)wishDir;
+	(void)wishSpeed;
+	(void)dt;
+	(void)jump;
+	(void)groundedOut;
+	return qfalse;
+}
+
+extern "C" int Phys_GetWorkerCount_Impl(void) {
+	return 1;
+}
+
+extern "C" int Phys_ApplyImpulseRadius_Impl(const vec3_t center, float radius, float magnitude, float falloff) {
+	(void)center;
+	(void)radius;
+	(void)magnitude;
+	(void)falloff;
+	return -1;
+}
 
 #endif /* USE_BULLET_PHYSICS_IMPL */

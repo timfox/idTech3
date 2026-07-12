@@ -11,7 +11,7 @@ When the server spawns map sprites into snapshots, set r_spritePropsMapParse 0
 
 #include "tr_local.h"
 #include "tr_sprite_props.h"
-#include "../../qcommon/engine_sprite_map.h"
+#include "engine_sprite_map.h"
 
 #define MAX_SPRITE_PROPS 2048
 

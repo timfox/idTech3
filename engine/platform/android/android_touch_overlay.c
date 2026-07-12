@@ -9,8 +9,8 @@ RegisterNatives from GameActivity.nativeRegisterTouchOverlayJni (class loader co
 
 #ifdef __ANDROID__
 
-#include "../../qcommon/q_shared.h"
-#include "../../qcommon/qcommon.h"
+#include "q_shared.h"
+#include "qcommon.h"
 #include "android_touch_overlay.h"
 
 #include <android/log.h>

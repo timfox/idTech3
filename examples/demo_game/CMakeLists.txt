@@ -31,14 +31,17 @@ set(DEMO_BLEND_TEXTURES
 	"${DEMO_BOOTSTRAP_DIR}/textures/demo/dirt_orm.png"
 	"${DEMO_BOOTSTRAP_DIR}/textures/demo/rock_orm.png"
 )
+set(DEMO_BOOTSTRAP_VDB
+	"${DEMO_BOOTSTRAP_DIR}/vdb/fog_2cubed.nvdb"
+)
 
 if(NOT EXISTS "${DEMO_INTER_PACK_FONT}")
 	message(FATAL_ERROR "Missing demo UI TTF: ${DEMO_INTER_PACK_FONT}\n  The idtech3_demo pack ships this file as fonts/Inter_28pt-Regular.ttf.\n  SDF console atlas: python3 examples/demo_game/tools/gen_demo_console_sdf.py \"${DEMO_INTER_PACK_FONT}\" examples/demo_game/bootstrap_media/fonts")
 endif()
 
-foreach(_demo_boot_chk IN LISTS DEMO_BOOTSTRAP_GFX2D DEMO_BOOTSTRAP_GFX_DEMO DEMO_BOOTSTRAP_FONTS)
+foreach(_demo_boot_chk IN LISTS DEMO_BOOTSTRAP_GFX2D DEMO_BOOTSTRAP_GFX_DEMO DEMO_BOOTSTRAP_FONTS DEMO_BOOTSTRAP_VDB)
 	if(NOT EXISTS "${_demo_boot_chk}")
-		message(FATAL_ERROR "Missing demo bootstrap file: ${_demo_boot_chk}\n  Regenerate PNGs: python3 examples/demo_game/tools/gen_demo_bootstrap_media.py examples/demo_game/bootstrap_media\n  SDF console font: python3 examples/demo_game/tools/gen_demo_console_sdf.py \"${DEMO_INTER_PACK_FONT}\" examples/demo_game/bootstrap_media/fonts")
+		message(FATAL_ERROR "Missing demo bootstrap file: ${_demo_boot_chk}\n  Regenerate PNGs: python3 examples/demo_game/tools/gen_demo_bootstrap_media.py examples/demo_game/bootstrap_media\n  SDF console font: python3 examples/demo_game/tools/gen_demo_console_sdf.py \"${DEMO_INTER_PACK_FONT}\" examples/demo_game/bootstrap_media/fonts\n  VDB sample: copy tests/data/fog_2cubed.nvdb to examples/demo_game/bootstrap_media/vdb/")
 	endif()
 endforeach()
 
@@ -53,9 +56,11 @@ set(DEMO_MOD_FILES
 	"${DEMO_MOD_DIR}/demo_usd.cfg"
 	"${DEMO_MOD_DIR}/demo_districts.cfg"
 	"${DEMO_MOD_DIR}/demo_openworld.cfg"
+	"${DEMO_MOD_DIR}/demo_world_residency.cfg"
 	"${DEMO_MOD_DIR}/demo_fog_biology.cfg"
 	"${DEMO_MOD_DIR}/demo_fog_biology_namib.cfg"
 	"${DEMO_MOD_DIR}/demo_fog_biology_openworld.cfg"
+	"${DEMO_MOD_DIR}/demo_vdb_woodcock.cfg"
 	"${DEMO_MOD_DIR}/demo_physics.cfg"
 	"${DEMO_MOD_DIR}/sprites/sector_0_0.ents"
 	"${DEMO_MOD_DIR}/demo_sprites.cfg"
@@ -170,6 +175,7 @@ add_custom_command(
 	COMMAND ${CMAKE_COMMAND} -E make_directory "${DEMO_PACK_STAGING}/mgs"
 	COMMAND ${CMAKE_COMMAND} -E make_directory "${DEMO_PACK_STAGING}/wsp"
 	COMMAND ${CMAKE_COMMAND} -E make_directory "${DEMO_PACK_STAGING}/sqz"
+	COMMAND ${CMAKE_COMMAND} -E make_directory "${DEMO_PACK_STAGING}/vdb"
 	COMMAND ${Python3_EXECUTABLE} "${CMAKE_SOURCE_DIR}/scripts/tools/gen_hub_bsp.py"
 		"${DEMO_PACK_STAGING}/maps/open_void.bsp"
 	COMMAND ${Python3_EXECUTABLE} "${CMAKE_SOURCE_DIR}/scripts/tools/gen_sector_bsp.py"
@@ -199,13 +205,19 @@ add_custom_command(
 	COMMAND ${CMAKE_COMMAND} -E copy_if_different
 		"${DEMO_MOD_DIR}/demo_openworld.cfg" "${DEMO_PACK_STAGING}/demo_openworld.cfg"
 	COMMAND ${CMAKE_COMMAND} -E copy_if_different
+		"${DEMO_MOD_DIR}/demo_world_residency.cfg" "${DEMO_PACK_STAGING}/demo_world_residency.cfg"
+	COMMAND ${CMAKE_COMMAND} -E copy_if_different
 		"${DEMO_MOD_DIR}/demo_fog_biology.cfg" "${DEMO_PACK_STAGING}/demo_fog_biology.cfg"
 	COMMAND ${CMAKE_COMMAND} -E copy_if_different
 		"${DEMO_MOD_DIR}/demo_fog_biology_namib.cfg" "${DEMO_PACK_STAGING}/demo_fog_biology_namib.cfg"
 	COMMAND ${CMAKE_COMMAND} -E copy_if_different
 		"${DEMO_MOD_DIR}/demo_fog_biology_openworld.cfg" "${DEMO_PACK_STAGING}/demo_fog_biology_openworld.cfg"
 	COMMAND ${CMAKE_COMMAND} -E copy_if_different
+		"${DEMO_MOD_DIR}/demo_vdb_woodcock.cfg" "${DEMO_PACK_STAGING}/demo_vdb_woodcock.cfg"
+	COMMAND ${CMAKE_COMMAND} -E copy_if_different
 		"${DEMO_MOD_DIR}/demo_physics.cfg" "${DEMO_PACK_STAGING}/demo_physics.cfg"
+	COMMAND ${CMAKE_COMMAND} -E copy_if_different
+		"${DEMO_BOOTSTRAP_DIR}/vdb/fog_2cubed.nvdb" "${DEMO_PACK_STAGING}/vdb/fog_2cubed.nvdb"
 	COMMAND ${CMAKE_COMMAND} -E copy_if_different
 		"${DEMO_MOD_DIR}/sprites/sector_0_0.ents" "${DEMO_PACK_STAGING}/sprites/sector_0_0.ents"
 	COMMAND ${CMAKE_COMMAND} -E copy_if_different
@@ -328,8 +340,9 @@ add_custom_command(
 		"$<TARGET_FILE:demo_ui_skeleton>" "${DEMO_PACK_STAGING}/${DEMO_UI_DOT_ZIP}"
 	COMMAND ${CMAKE_COMMAND} -E chdir "${DEMO_PACK_STAGING}"
 		${CMAKE_COMMAND} -E tar cf "${DEMO_PK3}" --format=zip
-		autoexec.cfg gameinfo.txt demo_features.cfg demo_js.cfg demo_lua.cfg demo_csharp.cfg demo_gameplay.cfg demo_usd.cfg demo_districts.cfg demo_openworld.cfg demo_fog_biology.cfg demo_fog_biology_namib.cfg demo_fog_biology_openworld.cfg demo_physics.cfg demo_sprites.cfg demo_material_blend.cfg demo_audio.cfg demo_sp_slice.cfg gpu_golden_capture.cfg readme_demo.txt
+		autoexec.cfg gameinfo.txt demo_features.cfg demo_js.cfg demo_lua.cfg demo_csharp.cfg demo_gameplay.cfg demo_usd.cfg demo_districts.cfg demo_openworld.cfg demo_world_residency.cfg demo_fog_biology.cfg demo_fog_biology_namib.cfg demo_fog_biology_openworld.cfg demo_vdb_woodcock.cfg demo_physics.cfg demo_sprites.cfg demo_material_blend.cfg demo_audio.cfg demo_sp_slice.cfg gpu_golden_capture.cfg readme_demo.txt
 		sound/soundevents.txt animgraph/idle_run.txt ndgi/demo.ndgi niv/demo.niv nslm/demo.nslm nist/demo.nist nvc/demo.nvc fsa/demo.fsa vfgi/demo.vfgi renderformer/demo.rfm vuda/demo.vuda grtx/demo.grtx mgs/demo.mgs wsp/demo.wsp sqz/demo.sqz loc/en.loc
+		vdb/fog_2cubed.nvdb
 		scripts/js/demo_hooks.js scripts/js/README.txt
 		scripts/lua/demo_hooks.lua
 		scripts/csharp/IdTech3.Engine.cs scripts/csharp/demo_hooks.cs
@@ -357,7 +370,7 @@ add_custom_command(
 		fonts/demo_console_sdf.fnt
 		"${DEMO_UI_IN_ZIP}"
 		"${DEMO_UI_DOT_ZIP}"
-	DEPENDS ${DEMO_MOD_FILES} ${DEMO_BLEND_TEXTURES} demo_ui_skeleton "${DEMO_SQZ_OUT}"
+	DEPENDS ${DEMO_MOD_FILES} ${DEMO_BLEND_TEXTURES} ${DEMO_BOOTSTRAP_VDB} demo_ui_skeleton "${DEMO_SQZ_OUT}"
 	COMMENT "Packaging idtech3_demo.pk3 (configs + native UI stub)"
 	VERBATIM
 	COMMAND_EXPAND_LISTS

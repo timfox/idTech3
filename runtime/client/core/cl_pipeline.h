@@ -9,7 +9,7 @@ Shared shell-command template expansion for external ML pipelines
 
 #pragma once
 
-#include "../../qcommon/q_shared.h"
+#include "q_shared.h"
 
 #ifdef __cplusplus
 extern "C" {

@@ -9,8 +9,8 @@ fail() { echo "FAIL: $*" >&2; exit 1; }
 
 DOC="${ROOT}/docs/FREEUSD.md"
 CMAKE_FU="${ROOT}/cmake/FreeUSD.cmake"
-CL_USD="$(idtech3_require_file runtime/client/cl_usd.cpp src/client/cl_usd.cpp)"
-CL_USD_H="$(idtech3_require_file runtime/client/cl_usd.h src/client/cl_usd.h)"
+CL_USD="$(idtech3_require_file runtime/client/shell/cl_usd.cpp runtime/client/shell/cl_usd.cpp)"
+CL_USD_H="$(idtech3_require_file runtime/client/shell/cl_usd.h runtime/client/shell/cl_usd.h)"
 TR_REG="$(idtech3_require_file renderers/common/tr_model_freeusd_register.c src/renderers/common/tr_model_freeusd_register.c)"
 
 [ -f "$DOC" ] || fail "missing docs/FREEUSD.md"

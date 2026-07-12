@@ -13,10 +13,10 @@ extern "C" {
 #include "../../world/world_proc.h"
 #include "../../world/world_residency.h"
 #include "../../navigation/nav_recast.h"
-#include "../../qcommon/engine_sprite_map.h"
-#include "../../qcommon/cm_stream.h"
-#include "../../qcommon/cm_public.h"
-#include "../../qcommon/cluster_graph.h"
+#include "engine_sprite_map.h"
+#include "cm_stream.h"
+#include "cm_public.h"
+#include "cluster_graph.h"
 }
 
 #include <cstring>

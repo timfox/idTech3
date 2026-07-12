@@ -9,7 +9,7 @@ Shared mesh-import helpers (MD3 finalize) for ASCII/STL/DAE and FreeUSD loaders.
 #ifndef TR_MODEL_MESH_IMPORT_H
 #define TR_MODEL_MESH_IMPORT_H
 
-#include "../../qcommon/q_shared.h"
+#include "q_shared.h"
 
 struct model_s;
 typedef struct model_s model_t;

@@ -137,7 +137,7 @@ set cm_openWorldCollision 1
 
 When **`sv_openWorldSync 1`** (default), the server publishes loaded sector cells via **`CS_ENGINE_OPENWORLD_SECTORS`** (`0_0,1_0,...`). Clients with **`cl_openWorldSync 1`** merge authoritative **collision** for those cells, load **nav tiles** when **`r_openWorldNav 1`**, and **unload** layers dropped from the server list.
 
-With **`sv_openWorldResidency 1`**, the server uses consistent cardinality selection (union over player origins) before publishing. Clients with **`r_openWorldResidency 1`** clamp collision to the server list and apply local residency for nav/sprites subject to **`cl_openWorldResidencyNavLocal`**. See [WORLD_RESIDENCY.md](WORLD_RESIDENCY.md).
+With **`sv_openWorldResidency 1`**, the server uses consistent cardinality selection (union over player origins) before publishing. Clients with **`r_openWorldResidency 1`** clamp collision (and nav unless **`cl_openWorldResidencyNavLocal 1`**) to the server list; sprites stay view-driven. Demo: **`exec demo_world_residency.cfg`**. Console: **`world_residency_status`**. See [WORLD_RESIDENCY.md](WORLD_RESIDENCY.md).
 
 ### Graph reachability filter
 

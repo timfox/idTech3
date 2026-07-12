@@ -4,7 +4,7 @@ Copyright (C) 2026 Gopex LLC. All rights reserved.
 ===========================================================================
 */
 #pragma once
-#include "../../qcommon/qcommon.h"
+#include "qcommon.h"
 #ifdef __cplusplus
 extern "C" {
 #endif

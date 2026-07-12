@@ -18,7 +18,7 @@ physics-driven gib spawning, and blood trail emitters.
 extern "C" {
 #endif
 
-#include "../qcommon/q_shared.h"
+#include "q_shared.h"
 
 #define DISMEMBER_MAX_LIMBS      16
 #define DISMEMBER_MAX_GIBS       128

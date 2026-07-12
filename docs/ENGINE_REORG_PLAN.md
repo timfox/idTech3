@@ -53,7 +53,8 @@ See [BUILD.md](../BUILD.md) profile matrix and [ENGINE_MODULE_MANIFEST.md](ENGIN
 6. ~~**Phase 5b**~~ — explicit manifests for client, qcommon, server, vulkan core (no AUX).
 7. ~~**Phase 5c**~~ — physical move to `engine/`, `runtime/`, `modules/`, `extensions/`, `renderers/`, `third_party/`; `src/*` shims for one release. Script: `scripts/migrate_phase_5c.sh`.
 8. ~~**Phase 5d**~~ — MSVC manifest sync + CI (`scripts/msvc/sync_all_vcxproj.sh`). See **`docs/MSVC_CODEGEN.md`**.
-9. **Phase 5e** — drop `src/*` shims after CMake manifest migration. Layout bridges remain until include rewrite. See **`docs/core/SHIM_REMOVAL_CHECKLIST.md`**, **`scripts/migrate_phase_5e_drop_shims.sh`**.
+9. ~~**Phase 5e**~~ — drop `src/*` shims. See **`docs/core/SHIM_REMOVAL_CHECKLIST.md`**.
+10. **Layout-bridge include rewrite** — flat headers + `IDTECH3_DIR_ENGINE_CORE`. **Done** for `modules/*`, `runtime/{client,game,server}`, `engine/`, `renderers/`, `extensions/` (no remaining `#include "../qcommon/..."`). Bridges (`modules/qcommon`, `engine/platform/qcommon`, …) kept until MSVC / `"qcommon/..."` include audit. See **`docs/core/SHIM_REMOVAL_CHECKLIST.md`**.
 
 ## Validation (every phase)
 

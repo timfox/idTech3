@@ -1167,6 +1167,56 @@ static image_t *R_CreateImageCompressed( const char *name, const char *name2, by
 
 /*
 ================
+R_CreateImageShell
+
+Allocate and register an image_t without creating GPU memory. Used for sparse
+VkImage ownership outside the dense chunk allocator.
+================
+*/
+image_t *R_CreateImageShell( const char *name, int width, int height, imgFlags_t flags, int format ) {
+	image_t *image;
+	long hash;
+	int namelen;
+
+	if ( !name || width < 1 || height < 1 ) {
+		return NULL;
+	}
+	namelen = (int)strlen( name ) + 1;
+	if ( namelen > MAX_QPATH ) {
+		ri.Error( ERR_DROP, "R_CreateImageShell: \"%s\" is too long", name );
+	}
+	if ( tr.numImages == MAX_DRAWIMAGES ) {
+		ri.Error( ERR_DROP, "R_CreateImageShell: MAX_DRAWIMAGES hit" );
+	}
+
+	image = ri.Hunk_Alloc( sizeof( *image ) + namelen, h_low );
+	image->imgName = (char *)( image + 1 );
+	Q_strncpyz( image->imgName, name, namelen );
+	image->imgName2 = image->imgName;
+
+	hash = generateHashValue( name );
+	image->next = hashTable[hash];
+	hashTable[hash] = image;
+	tr.images[tr.numImages++] = image;
+
+	image->flags = flags;
+	image->width = width;
+	image->height = height;
+	image->uploadWidth = width;
+	image->uploadHeight = height;
+	image->type = 0;
+	image->layers = 1;
+	image->wrapClampMode = ( flags & IMGFLAG_CLAMPTOBORDER ) ? VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER :
+		( ( flags & IMGFLAG_CLAMPTOEDGE ) ? VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE : VK_SAMPLER_ADDRESS_MODE_REPEAT );
+	image->handle = VK_NULL_HANDLE;
+	image->view = VK_NULL_HANDLE;
+	image->descriptor = VK_NULL_HANDLE;
+	image->internalFormat = format ? format : VK_FORMAT_R8G8B8A8_UNORM;
+	return image;
+}
+
+/*
+================
 R_CreateImage
 
 This is the only way any image_t are created
@@ -2301,6 +2351,11 @@ void R_DeleteTextures( void ) {
 
 	for ( i = 0; i < tr.numImages; i++ ) {
 		image_t *img = tr.images[ i ];
+		if ( img->flags & IMGFLAG_SPARSE ) {
+			/* Sparse images free VkImage/memory in their owning module (e.g. R_VT_Shutdown). */
+			img->handle = VK_NULL_HANDLE;
+			img->view = VK_NULL_HANDLE;
+		}
 		vk_destroy_image_resources( &img->handle, &img->view );
 
 		// img->descriptor will be released with pool reset

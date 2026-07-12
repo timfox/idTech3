@@ -19,7 +19,7 @@ See also [RENDERERS.md](RENDERERS.md), [PRODUCTION_GAP_PLAN.md](PRODUCTION_GAP_P
 | **Forward+ + TAA look** | Chocolate | always | `r_renderMode 2`, `r_taa`, `r_taaMotionVectors` | [demo_idtech8_look.cfg](../examples/demo_game/mod/demo_idtech8_look.cfg) |
 | **Temporal upscale** | Chocolate | always | `r_upscale` 1\|2, `upscale_status` | [RENDERERS.md](RENDERERS.md) |
 | **Open-world stream LOD** | Chocolate | always | `r_bspStreamLod`, `bsp_stream_status` | [OPEN_WORLD.md](OPEN_WORLD.md), [DISTRICTS.md](DISTRICTS.md) |
-| **Virtual texture scaffold** | Chocolate | always | `r_vt`, `vt_*` | [VIRTUAL_TEXTURE.md](VIRTUAL_TEXTURE.md) |
+| **Virtual texture + sparse residency** | Chocolate | always | `r_vt`, `r_vtSparse`, `r_vtFeedback`, `vt_*` | [VIRTUAL_TEXTURE.md](VIRTUAL_TEXTURE.md) |
 | **Meshlets (cull + compact draw)** | Chocolate | always | `r_meshlets`, `meshlet_status` | [MESHLETS.md](MESHLETS.md) |
 | **Mobile-GS / WebSplatter / SqueezeMe** | Chocolate | always linked | `r_mgs`, `r_wsp`, `r_squeezeme` | [MOBILE_GAUSSIAN_SPLATTING.md](MOBILE_GAUSSIAN_SPLATTING.md), [WEB_SPLATTER.md](WEB_SPLATTER.md), [SQUEEZEME.md](SQUEEZEME.md) |
 | **Hybrid1 + Raygun** | Chocolate RT tier | `USE_VULKAN_RTX` | `r_hybrid1`, `r_raygun`, `r_rtxDemo` | [HYBRID_RENDERING1.md](HYBRID_RENDERING1.md), [RAYGUN.md](RAYGUN.md) |

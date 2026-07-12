@@ -84,7 +84,7 @@ typedef enum {
 	RT_MAX_REF_ENTITY_TYPE
 } refEntityType_t;
 
-#include "../../qcommon/engine_sprite_map.h"
+#include "engine_sprite_map.h"
 
 typedef struct engineSpriteDesc_s {
 	engineSpriteType_t	type;

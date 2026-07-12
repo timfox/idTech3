@@ -9,7 +9,7 @@ C ABI between FreeUSD C++ loader and renderer model registration (C).
 #ifndef TR_MODEL_FREEUSD_H
 #define TR_MODEL_FREEUSD_H
 
-#include "../../qcommon/q_shared.h"
+#include "q_shared.h"
 
 struct model_s;
 typedef struct model_s model_t;

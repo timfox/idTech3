@@ -6,9 +6,9 @@ Copyright (C) 2026 Gopex LLC. All rights reserved.
 ===========================================================================
 */
 
-#include "../qcommon/q_shared.h"
-#include "../qcommon/qcommon.h"
-#include "../qcommon/cm_stream.h"
+#include "q_shared.h"
+#include "qcommon.h"
+#include "cm_stream.h"
 #include "world_open.h"
 #include "world_proc.h"
 #include "world_residency.h"

@@ -10,7 +10,7 @@
 #include <pthread.h>
 
 #include "../audio/snd_local.h"
-#include "../qcommon/q_shared.h"
+#include "q_shared.h"
 
 #define USE_SPINLOCK
 
@@ -1111,7 +1111,7 @@ static void async_proc( snd_async_handler_t *ahandler )
 #include <stdio.h>
 
 #include "../audio/snd_local.h"
-#include "../qcommon/q_shared.h"
+#include "q_shared.h"
 
 static qboolean snd_inited = qfalse;
 static int audio_fd;

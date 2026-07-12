@@ -9,7 +9,7 @@ Kinematic character controller v1 (capsule on Bullet). Does not replace Pmove.
 #ifndef PHYS_CHARACTER_H
 #define PHYS_CHARACTER_H
 
-#include "../qcommon/q_shared.h"
+#include "q_shared.h"
 
 int Phys_CharacterCreate( float radius, float height, float stepHeight );
 int Phys_CharacterMove( int handle, const float *wishDir, float wishSpeed, qboolean jump );

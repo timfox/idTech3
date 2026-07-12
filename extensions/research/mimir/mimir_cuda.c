@@ -9,7 +9,7 @@ VK_KHR_external_memory_fd → cudaImportExternalMemory.
 */
 
 #include "mimir_cuda.h"
-#include "../../../qcommon/qcommon.h"
+#include "qcommon.h"
 
 #ifdef USE_MIMIR_CUDA
 

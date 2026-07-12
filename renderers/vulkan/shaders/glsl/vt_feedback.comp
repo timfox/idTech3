@@ -1,0 +1,42 @@
+#version 450
+
+/*
+ * VT page-request feedback: stamp virtual page bits from UV samples.
+ * Binding 0: uint bitfield (atomicOr). Binding 1: vec2 UV list.
+ */
+
+layout(local_size_x = 64, local_size_y = 1, local_size_z = 1) in;
+
+layout(std430, set = 0, binding = 0) buffer FeedbackBits {
+	uint bits[];
+} fb;
+
+layout(std430, set = 0, binding = 1) readonly buffer UvSamples {
+	vec2 uv[];
+} samples;
+
+layout(push_constant) uniform Push {
+	uint virtualPages;
+	uint sampleCount;
+	uint wordCount;
+	uint _pad;
+} pc;
+
+void main() {
+	uint id = gl_GlobalInvocationID.x;
+	if (id >= pc.sampleCount || pc.virtualPages == 0u) {
+		return;
+	}
+
+	vec2 uv = samples.uv[id];
+	float u = clamp(uv.x, 0.0, 0.999);
+	float v = clamp(uv.y, 0.0, 0.999);
+	uint px = uint(u * float(pc.virtualPages));
+	uint py = uint(v * float(pc.virtualPages));
+	uint vid = py * pc.virtualPages + px;
+	uint word = vid >> 5;
+	uint bit = 1u << (vid & 31u);
+	if (word < pc.wordCount) {
+		atomicOr(fb.bits[word], bit);
+	}
+}

@@ -2,7 +2,7 @@
  * Tessendorf FFT ocean surface + cascade combine (Arc Blanc).
  */
 #include "arc_blanc_internal.h"
-#include "../../qcommon/qcommon.h"
+#include "qcommon.h"
 #include <math.h>
 #include <string.h>
 

@@ -23,7 +23,7 @@ Gauss-Seidel constraint projection. Supports:
 extern "C" {
 #endif
 
-#include "../qcommon/q_shared.h"
+#include "q_shared.h"
 
 #define CLOTH_MAX_PARTICLES     4096
 #define CLOTH_MAX_CONSTRAINTS   16384
@@ -107,6 +107,13 @@ void Cloth_GetParticleNormals(clothHandle_t handle, float *normals, int maxParti
 void Cloth_GetParticleTexCoords(clothHandle_t handle, float *texCoords, int maxParticles);
 
 void Cloth_SetWind(clothHandle_t handle, const vec3_t direction, float strength);
+
+/* Collide free particles against Phys_* world (ray along motion). */
+void Cloth_CollideWorld(clothHandle_t handle);
+void Cloth_CollideWorldAll(void);
+/* Emit stretch edges into PhysDebug line buffer when phys_debugDraw is on. */
+void Cloth_DebugDraw(clothHandle_t handle);
+void Cloth_DebugDrawAll(void);
 
 void Cloth_Init(void);
 void Cloth_Shutdown(void);

@@ -15,7 +15,7 @@ SDL2 mouse position when the inspector wants input.
 #include <imgui_impl_vulkan.h>
 
 extern "C" {
-#include "../../qcommon/q_shared.h"
+#include "q_shared.h"
 #include "../vk_instance.h"
 #define USE_VK_PBR
 #include "../vk.h"

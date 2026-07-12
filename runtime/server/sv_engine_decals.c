@@ -12,9 +12,9 @@ Networked engine decal entityState contract:
 ===========================================================================
 */
 
-#include "../qcommon/q_shared.h"
-#include "../qcommon/qcommon.h"
-#include "../qcommon/engine_decal_map.h"
+#include "q_shared.h"
+#include "qcommon.h"
+#include "engine_decal_map.h"
 #include "../game/bg_public.h"
 #include "server.h"
 #include "sv_engine_decals.h"

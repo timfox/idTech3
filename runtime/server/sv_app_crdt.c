@@ -7,16 +7,16 @@ idtech3backend integration: auto-bootstrap + Engine.AppCrdt on dedicated server.
 ===========================================================================
 */
 
-#include "../qcommon/q_shared.h"
-#include "../qcommon/qcommon.h"
-#include "../qcommon/net_p2p.h"
+#include "q_shared.h"
+#include "qcommon.h"
+#include "net_p2p.h"
 #include "server.h"
-#include "../qcommon/app_crdt.h"
-#include "../qcommon/lua_debug.h"
+#include "app_crdt.h"
+#include "lua_debug.h"
 #include "sv_app_crdt.h"
 
 #ifdef USE_LUA
-#include "../qcommon/lua_compat.h"
+#include "lua_compat.h"
 
 static appCrdtVersion_t s_authoritativeVersion;
 static appCrdtSpec_t s_authoritativeSpec;

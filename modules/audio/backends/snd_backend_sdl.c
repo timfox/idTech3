@@ -34,7 +34,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #	endif
 #endif
 
-#include "../../qcommon/q_shared.h"
+#include "q_shared.h"
 #include "../snd_local.h"
 #include "../../client/client.h"
 #include "../../client/platform/cl_voip.h"

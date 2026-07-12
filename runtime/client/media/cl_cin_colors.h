@@ -6,7 +6,7 @@ Shared video color conversion helpers for native cinematic decoders.
 
 #pragma once
 
-#include "../../qcommon/q_shared.h"
+#include "q_shared.h"
 
 #ifdef __cplusplus
 extern "C" {

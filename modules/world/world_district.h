@@ -15,7 +15,7 @@ world partition, engine-original conventions).
 extern "C" {
 #endif
 
-#include "../qcommon/q_shared.h"
+#include "q_shared.h"
 
 #define WORLD_DISTRICT_MAX       64
 #define WORLD_DISTRICT_NAME_MAX  64

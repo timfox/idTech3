@@ -10,8 +10,8 @@ DMM material library, constraint solver, and prefab definitions.
 ===========================================================================
 */
 
-#include "../qcommon/q_shared.h"
-#include "../qcommon/qcommon.h"
+#include "q_shared.h"
+#include "qcommon.h"
 #include "phys_dmm_materials.h"
 #include <math.h>
 

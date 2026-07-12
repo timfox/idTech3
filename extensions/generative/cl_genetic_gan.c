@@ -10,7 +10,7 @@ Client-side async GAN decode jobs (genome JSON -> mesh) and model import.
 #include "cl_genetic_gan.h"
 #include "cl_ml_worker.h"
 #include "cl_pipeline.h"
-#include "../qcommon/qcommon.h"
+#include "qcommon.h"
 #include "../../world/genetic_gan.h"
 
 #include <stdio.h>

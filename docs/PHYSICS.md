@@ -2,146 +2,94 @@
 
 ## Architecture
 
-Bullet is the **collision / constraint / impulse substrate**. Gameplay-facing behavior lives in middleware above it:
+**Box3D Soft Step** ([timfox/idTech3-box3d](https://github.com/timfox/idTech3-box3d)) is the default **rigid substrate**. A **multi-solver registry** (`phys_solvers`) runs companions **before and after** Soft Step, sharing one world through `Phys_*` (ray / overlap / impulse / force). Bullet remains an optional rigid alternate.
 
 ```txt
-id Tech 3 game / cgame / Lua
-    ↓
-PhysMiddleware (hits, materials, motors, ProcAnim tick)
-    ↓
-Bullet (rigid bodies, ragdolls, soft-body DMM, queries)
-    ↓
-Vulkan debug lines (phys_debugDraw → CL_PhysDebugDrawSubmit)
+Phys_StepSimulation
+  ├─ PhysSolvers_PreStep
+  │     ├─ shadows   (kinematic sync)
+  │     ├─ volumes   (buoyancy / drag forces)
+  │     ├─ procanim  (ragdoll state)
+  │     └─ motors    (active PD torques)
+  ├─ Soft Step (Box3D)          ← primary rigid solver
+  ├─ contact events
+  └─ PhysSolvers_PostStep
+        ├─ softstep   (status → body count)
+        ├─ xpbd_cloth
+        ├─ particles
+        ├─ softblob
+        └─ fluid      (SPH-ish + rigid couple)
 ```
+
+> Box3D does **not** ship FEM soft bodies or CFD. Soft / fluid behavior comes from companion solvers that **use** Soft Step collision.
 
 | Layer | Module | Role |
 |-------|--------|------|
-| Substrate | `phys_bullet*` | Rigid bodies, constraints, ragdolls, ray/sweep queries |
-| Euphoria-like | `phys_procedural_anim`, `phys_motor` | Balance, stumble, brace, PD motors, per-bone physics blend |
-| DMM-like | `phys_dmm*`, `phys_materials` | Stress/fracture + gameplay material table |
-| XPBD secondary | `phys_cloth` | Ropes/cloth/vines beside Bullet (not inside it) |
-| Event bus | `phys_events` | Impact, break, splash, balance-lost → audio/particles/AI |
-| Orchestration | `phys_middleware` | Per-frame tick, hit routing, `phys_status` |
+| Rigid substrate | `phys_box3d_impl.c` | Soft Step bodies, joints, CastMover, mesh/compound |
+| Solver registry | `phys_solvers` | Register / enable / Pre+Post tick / debug |
+| PRE layers | props / volumes / ProcAnim / motors | Force Soft Step to see game + character control |
+| XPBD cloth | `phys_cloth` | Soft sheets via `Phys_RayCast` |
+| Particles | `phys_particles` | Debris Verlet + bounce |
+| Soft blob | `phys_softblob` | Lattice jelly |
+| Fluid | `phys_fluid` | SPH-ish blob + Soft Step couple |
+| Middleware | `phys_middleware` | Demos, console, event dispatch |
 
-## Bullet Physics (`phys_bullet.h/c` + `phys_bullet_impl.cpp`)
+## Solvers
 
-Full rigid body dynamics via Bullet3 (zlib license). Uses `btSoftRigidDynamicsWorld` (rigid + soft-body DMM).
+| Name | Phase | Cvar | Console |
+|------|-------|------|---------|
+| `shadows` | PRE | — | `phys_spawn_shadow` |
+| `volumes` | PRE | — | `phys_spawn_buoyancy` |
+| `procanim` / `motors` | PRE | `phys_motor` | `phys_spawn_ragdoll` |
+| `softstep` | (primary) | — | — |
+| `xpbd_cloth` | POST | — | `phys_spawn_cloth` |
+| `particles` | POST | `phys_particles` | `phys_spawn_particles` |
+| `softblob` | POST | `phys_softblob` | `phys_spawn_softblob` |
+| `fluid` | POST | `phys_fluid` | `phys_spawn_fluid` |
 
-**Compile:** `USE_BULLET_PHYSICS=ON` (default). Install `libbullet-dev` for C++ backend.
-
-### Rigid Bodies
-- Shapes: box, sphere, capsule, cylinder, convex hull, triangle mesh, compound, heightfield
-- Types: static, dynamic, kinematic
-- Forces, impulses, torques with contact points
-- Collision groups and masks
-- Per-body `materialId` (`PHYS_MAT_*` from `phys_materials.h`)
-
-### Constraints
-- Point-to-point, hinge (with limits), cone-twist, fixed, generic 6DOF
-- Dynamic limit adjustment
-
-### Queries
-- Ray cast with closest hit + body identification
-- **Convex sweep** (`Phys_ConvexSweep`) for capsule/box probes
-- Sphere and box overlap tests
-
-### Debug
-- `phys_debugDraw 1` — Bullet wireframe → `PhysDebug` line buffer → Vulkan polys
-
-**Cvars:** `phys_enabled`, `phys_timestep`, `phys_maxSubSteps`, `phys_gravity`, `phys_debugDraw`, `phys_events`, `phys_motor`
-
-**Commands:** `phys_status`
-
-## Gameplay Materials (`phys_materials.h/c`)
-
-Unified `phys_material_t` table (wood, glass, metal, concrete, flesh, mud, water, …) driving:
-
-- Bullet friction/restitution/density (`PhysMat_ApplyToBodyDef`)
-- Impact response (particles, sound, decals, fracture stress)
-- DMM type mapping (`PhysMat_FromDmmType`)
-
-## Physics Event Bus (`phys_events.h/c`)
-
-```c
-PhysEvent_Subscribe(PHYS_EVENT_IMPACT, handler, userData);
-PhysEvent_PostImpact(...);
-PhysEvent_PostCharacterHit(...);
-PhysEvent_DispatchQueued();  /* each frame from PhysMiddleware_Frame */
+```bash
+phys_solvers
+phys_solvers fluid off
+phys_spawn_fluid 0 0 96 96
+phys_spawn_softblob 0 0 80
+phys_debug
+phys_status
 ```
 
-Event types: `IMPACT`, `BREAK`, `DENT`, `SPLASH`, `FALL`, `BALANCE_LOST`, `RAGDOLL_SLEEP`, `GRAB`, `TEAR`.
+## Capability matrix
 
-Contact manifolds above impulse threshold auto-post `PHYS_EVENT_IMPACT` after each step.
+| Feature | Status |
+|---------|--------|
+| Rigid Soft Step + workers/sleep/CCD | Done |
+| Multi-solver Pre/Post registry | Done |
+| PRE motors / volumes / shadows | Done |
+| Cloth / particles / softblob / fluid | Done |
+| Distance-joint ropes | Done |
+| FEM volumetric soft / production CFD | Not in Box3D |
+| Map entity auto-spawn / MD3 ragdoll bind | Open |
 
-## Active Ragdoll Motors (`phys_motor.h/c`)
+## Backend switch
 
-Euphoria-like PD motor layer on ProcAnim + Bullet ragdolls:
+| Backend | CMake / script |
+|---------|----------------|
+| **Box3D (default)** | `-DIDTECH3_PHYSICS_BACKEND=box3d` / `./scripts/compile_engine.sh vulkan` |
+| Bullet | `… bullet` |
+| None | `… no-physics` |
 
-- Controllers: balance, protect-head, brace, stumble, pain
-- `joint_motor_cmd_t` per bone (stiffness, damping, target orientation)
-- Per-bone physics blend weights (head/arms/legs)
-- `PhysMotor_ApplyHit` routes `phys_hit_event_t` into ProcAnim
+## Dual motion + companions
 
-Pair with ProcAnim:
+| Mode | API |
+|------|-----|
+| Free rigid | `PhysProp_CreateDynamic` |
+| Shadow kinematic | `PhysProp_CreateShadow` |
+| Cloth / particles / softblob / fluid | `phys_spawn_*` |
+| Rope | `PHYS_CONSTRAINT_DISTANCE` / `phys_spawn_rope` |
 
-```c
-procAnimHandle_t anim = ProcAnim_Create(ragdoll, &config);
-physMotorHandle_t motor = PhysMotor_Create(anim, ragdoll);
-PhysMiddleware_DispatchHit(entityNum, anim, motor, bone, damageType, point, impulse);
-```
+**Cvars:** `phys_enabled`, `phys_workers`, `phys_sleep`, `phys_ccd`, `phys_particles`, `phys_softblob`, `phys_fluid`, `phys_debugDraw`, …
 
-## Procedural Animation (`phys_procedural_anim.h/c`)
+**Commands:** `phys_status`, `phys_solvers`, `phys_spawn_*`, `phys_debug`
 
-11-state controller layered on Bullet ragdolls: ANIMATED → BALANCE → STUMBLE → FALLING → BRACING → RAGDOLL → GETUP → DEAD + IMPACT, REACHING, GRABBED.
+## Roadmap
 
-**Features:** Center-of-mass balance, spring-damper corrective forces, brace reactions (arms extend toward fall), head tracking, 8-slot IK targeting, muscle stiffness by state, consciousness/pain system, getup behavior.
-
-**Tick:** `ProcAnim_UpdateAll(dt)` from `PhysMiddleware_Frame` (client game frame).
-
-**Config:** 16 parameters (balance stiffness/damping, stumble/fall thresholds, muscle min/max, brace timing, etc.)
-
-## IK Solver (`phys_ik.h/c`)
-
-- **Two-bone IK:** Cosine rule with pole vector (arms, legs)
-- **CCD IK:** Iterative Cyclic Coordinate Descent for chains
-- **Foot placement:** Two-bone wrapper with ground offset
-- **Aim IK:** Bone rotation toward target with max angle
-- **Look-at:** Head tracking with yaw/pitch limits
-
-Quaternion utilities: axis-angle, multiply, slerp, rotate point.
-
-## DMM Deformation (`phys_dmm.h/c` + `phys_dmm_materials.h/c`)
-
-Digital Molecular Matter — finite element deformation with fracture (DMM-like, staged above Bullet).
-
-### Materials (12 presets)
-Wood, glass, thin/thick metal, concrete, stone, ice, plastic, cloth, rubber, flesh. Each with density, Young's modulus, Poisson's ratio, yield/ultimate strength, fracture energy, thermal properties.
-
-### Fracture Modes
-Voronoi, radial, splinter (wood), shatter (glass), slice, crumble (concrete), tear (metal), peel.
-
-### Constraint Solver
-1024 nodes, 2048 constraints. Verlet integration + iterative relaxation. Auto-grid generation. Per-constraint break thresholds.
-
-### Thermal
-Temperature tracking, softening/melting points, heat conduction, cool-down.
-
-### 10 Prefabs
-WoodenDoor, GlassPane, MetalBarrel, ConcreteWall, IceBlock, WoodenCrate, MetalGrate, BrickWall, Railing, TreeTrunk.
-
-## Cloth Simulation (`phys_cloth.h/c`)
-
-XPBD position-based dynamics beside Bullet (ropes, vines, cloth straps). 4096 particles, 16384 constraints, 32 instances.
-
-**Constraints:** Stretch, shear, bend (dihedral), long-range attachment.
-**Wind:** Normal-dot-wind aerodynamics, turbulence noise, timed gusts.
-**Pinning:** Individual particles, entire edges, movable pins for character-driven cloth.
-**Sleep:** Automatic deactivation below motion threshold.
-
-## Roadmap (phased)
-
-1. **Phase 1 (done):** Bullet world, capsule character, props, ray/sweep, debug draw, materials, event bus
-2. **Phase 2 (partial):** Ragdoll + ProcAnim + motors + balance/recovery wired in game frame
-3. **Phase 3:** Prefractured meshes, stress accumulation, persistent damage
-4. **Phase 4:** Buoyancy volumes, mud drag, vine XPBD coupling
-5. **Phase 5:** Vulkan compute debris/particles, interaction zones
+1. **Done:** Soft Step + multi-solver (PRE motors/volumes, POST cloth/particles/softblob/fluid)
+2. **Open:** MD3 ragdoll bind, map entity spawn, prefracture

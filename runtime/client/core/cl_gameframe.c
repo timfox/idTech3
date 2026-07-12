@@ -15,9 +15,9 @@ Ticks all gameplay subsystems each client frame:
 ===========================================================================
 */
 
-#include "../../qcommon/q_shared.h"
-#include "../../qcommon/qcommon.h"
-#include "../../qcommon/cm_public.h"
+#include "q_shared.h"
+#include "qcommon.h"
+#include "cm_public.h"
 #include "cl_gameframe.h"
 #include "cl_district.h"
 #include "cl_openworld.h"
@@ -518,7 +518,6 @@ void CL_GameFrame(float frametime) {
 	Music_Update(0.0f, frametime);
 #endif
 
-	Cloth_SimulateAll(frametime);
 #ifdef USE_GAME_AI_MIDDLEWARE
 	Face_Update(frametime);
 	Dismember_Update(frametime);

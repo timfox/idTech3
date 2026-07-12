@@ -22,8 +22,8 @@ Console:
 ===========================================================================
 */
 
-#include "../../qcommon/q_shared.h"
-#include "../../qcommon/qcommon.h"
+#include "q_shared.h"
+#include "qcommon.h"
 #include "../snd_local.h"
 #include "../snd_public.h"
 #include "snd_mixer.h"

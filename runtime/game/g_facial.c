@@ -10,8 +10,8 @@ Facial animation implementation with FACS Action Unit layer.
 ===========================================================================
 */
 
-#include "../qcommon/q_shared.h"
-#include "../qcommon/qcommon.h"
+#include "q_shared.h"
+#include "qcommon.h"
 #include "g_facial.h"
 #include <math.h>
 #include <string.h>

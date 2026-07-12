@@ -1,7 +1,7 @@
 # TODO / FIXME Triage
 
-**Date**: 2026-04-10 (last triage pass)  
-**Scope**: Project code in `src/` (excluding `external/` third-party libraries)
+**Date**: 2026-07-11 (last triage pass)  
+**Scope**: First-party code under canonical roots — `engine/`, `runtime/`, `modules/`, `renderers/`, `extensions/` (exclude `third_party/` / `**/external/**`). Phase 5e dropped `src/*` shims; see [`ENGINE_REORG_PLAN.md`](ENGINE_REORG_PLAN.md) and [`core/SHIM_REMOVAL_CHECKLIST.md`](core/SHIM_REMOVAL_CHECKLIST.md).
 
 ---
 
@@ -9,13 +9,25 @@
 
 | Category | Count | Status |
 |----------|-------|--------|
-| `TODO` / `FIXME` in engine tree (`src/client`, `src/game`, `src/qcommon`, `src/renderers`, `src/server`, `src/botlib`, `src/navigation`, `src/physics`, `src/platform`, `src/audio`) | **0** | No literal `TODO`/`FIXME` comments (2026-04-10 grep). Track work in this doc + `docs/ROADMAP.md`. |
+| `TODO` / `FIXME` in first-party tree (`engine`, `runtime`, `modules`, `renderers`, `extensions`) | **0** | No literal `TODO`/`FIXME` comments (2026-07-11 grep). Track work in this doc + `docs/ROADMAP.md`. |
 | net_sdr.c TODOs | 7 | Resolved: full Steam SDR implementation (Steamworks SDK) |
 | be_aas_reach.c FIXME | 1 | Resolved: reworded to Legacy (dead code) |
 | False positives (XXX in names, patterns) | 4 | Documented; no action |
-| External/third-party | 150+ | Out of scope |
+| External/third-party | 150+ | Out of scope (`third_party/`, vendored `**/external/**`) |
 
-**Note**: The monolithic `src/renderers/vulkan/vk.c` was removed; Vulkan logic lives in `vk_*.c` (see `docs/ARCHITECTURE.md`). Stub/backlog rows below reference those modules, not `vk.c`.
+**Note**: The monolithic `src/renderers/vulkan/vk.c` was removed; Vulkan logic lives in `vk_*.c` (see `docs/ARCHITECTURE.md`). Stub/backlog rows below reference those modules, not `vk.c`. Historical FBO audits may still name `vk.c` (out of scope for mass edit this pass).
+
+---
+
+## Chocolate / id Tech 8 (2026-07) — DONE
+
+| Slice | Status | Notes / limits |
+|-------|--------|----------------|
+| Temporal upscale | **DONE** | `r_upscale` 1\|2, `upscale_status`; mode 2 = engine Halton+TAA temporal upsample (**not** FidelityFX/DLSS SDK) |
+| Hybrid1 deepen | **DONE** | Soft sun, contact harden, GGX, IBL mode, diffuse direct, dlight shadows — see [`HYBRID_RENDERING1.md`](HYBRID_RENDERING1.md) |
+| Open-world LOD + district unmerge | **DONE** | `r_bspStreamLod`; district unload → `BspStreamUnmergeSector` |
+| Virtual texture + sparse + GPU feedback | **DONE** | `r_vt` / `r_vtSparse` / `r_vtFeedback`; dense atlas fallback; **not** full BSP UV streaming VT |
+| Meshlets | **DONE** | Bake-at-load CPU cull + compact draw; **≠** Nanite / mesh shaders |
 
 ---
 
@@ -44,13 +56,13 @@
 | vm_armv7l.c:36 | `XXX` in pragma | Compiler warning ID (signed/unsigned mismatch) |
 | vm_aarch64.c:29 | `XXX` in pragma | Same |
 | vm_x86.c:3819 | `OP_XXX` | Opcode name in comment |
-| tr_image.c (Vulkan, OpenGL) | `lm_XXXX` | Lightmap texture naming pattern (e.g. lm_0001) |
+| tr_image.c (Vulkan) | `lm_XXXX` | Lightmap texture naming pattern (e.g. lm_0001) |
 
 ---
 
 ## External Libraries (Out of Scope)
 
-TODOs/FIXMEs in `src/external/` are from third-party code (duktape, zstd, cjson, flac, libpng, opus, etc.). These are not triaged; upstream fixes apply.
+TODOs/FIXMEs in `third_party/` and vendored `**/external/**` (duktape, zstd, cjson, flac, libpng, opus, FreeUSD, etc.) are not triaged; upstream fixes apply.
 
 ---
 
@@ -58,19 +70,32 @@ TODOs/FIXMEs in `src/external/` are from third-party code (duktape, zstd, cjson,
 
 | Item | Location | Status |
 |------|----------|--------|
-| RB_ColorMask (Vulkan) | tr_backend.c | Partial: `vk_set_color_write_mask()` exists, but the VK_EXT_extended_dynamic_state3 path is currently disabled due to validation/driver issues; Vulkan falls back to full color writes. |
-| r_renderMode 1 | tr_init.c, tr_render_mode_vk.c | **`r_deferredLighting 1`**: G-buffer fill + Forward+ tile diffuse (point+spot); **`r_deferredUnlitBase 1`** additive dynamic on static base; latches `r_forwardPlusShade` 0. |
-| r_renderMode 2 | tr_render_mode_vk.c | Latched Forward+ primary: sets `r_forwardPlus` / `r_forwardPlusShade` (GPU cap 64; classic `dlightBits` still 32). |
-| r_hdr 3 64-bit output | `vk_post_process_pipeline.c`, HDR format helpers | Infrastructure in place (vk_hdr64_active, _hdr64 modules, pipeline selection). glslangValidator rejects dvec4/f64vec4 fragment shader outputs. Falls back to RGBA32F. When glslang adds support, compile HDR64 variants and return RGBA64F from get_hdr_format. |
-| Vegetation wind draw | `vk_vegetation_wind.c` + `tr_shade.c` | **Same-frame deform:** `vk_vegetation_wind_prepare_draw()` runs before the stage iterator on `SURF_VEGETATION` batches; compute writes deformed positions back into `tess.xyz`. Staging is filled during `RB_DrawSurfs`. Optional future: bind `vegwind_vertex_buffer` as stream 0 to skip CPU readback. |
-| Vulkan RTX | CMake `USE_VULKAN_RTX`, `vk_rtx.c` / `vk_rtx_world.c` / `vk_rtx_entities.c`, `r_rtx` / `r_rtxDemo` / `r_rtxWorldPrimCap` / `r_rtxEntities` | Demo: world BSP BLAS (capped) + trace + blit when `r_rtxDemo` 1; **`r_rtxEntities` 1** adds proxy AABB entity BLAS in TLAS (not full mesh AS). Real lighting still TODO. **`USE_VULKAN_RTX` OFF**: `#else` stubs in `vk_rtx.c`, `vk_hybrid1.c`, `vk_pathtrace.c`, etc. See `docs/RENDERERS_FUTURE.md`. |
+| RB_ColorMask (Vulkan) | `tr_backend.c`, `vk_clear_attachments.c` | **PARTIAL**: `vk_set_color_write_mask()` exists; **`r_vk_colorWriteMaskDynamic`** (latched, default 0) gates `VK_EXT_extended_dynamic_state3`. Disabled by default (OIT/driver issues); falls back to full color writes. |
+| r_renderMode 1 | `tr_init.c`, `tr_render_mode_vk.c` | **`r_deferredLighting 1`**: G-buffer fill + Forward+ tile diffuse (point+spot); **`r_deferredUnlitBase 1`** additive dynamic on static base; latches `r_forwardPlusShade` 0. |
+| r_renderMode 2 | `tr_render_mode_vk.c` | Latched Forward+ primary: sets `r_forwardPlus` / `r_forwardPlusShade` (GPU cap 64; classic `dlightBits` still 32). |
+| r_hdr 3 64-bit output | `vk_post_process_pipeline.c`, HDR format helpers | **PARTIAL**: Infrastructure in place (`vk_hdr64_active`, `_hdr64` modules, pipeline selection). glslangValidator rejects `dvec4`/`f64vec4` fragment outputs → falls back to RGBA32F. |
+| Temporal CPU-skin prev-vertex | `tr_init.c`, `vk_view_state.c`, `RENDERER_2026_ARCHITECTURE_PASS.md` | **PARTIAL**: `r_temporalCpuSkinPrev` 1 (default) uses per-entity motion fallback; true CPU-skinned prev-vertex tess + richer reactive debug still open. |
+| Vegetation wind draw | `vk_vegetation_wind.c` + `tr_shade.c` | **Same-frame deform:** `vk_vegetation_wind_prepare_draw()` runs before the stage iterator on `SURF_VEGETATION` batches; compute writes deformed positions back into `tess.xyz`. Optional future: bind `vegwind_vertex_buffer` as stream 0 to skip CPU readback. |
+| Vulkan RTX entities | `vk_rtx_entities.c` | **PARTIAL**: Prefer **MD3 LOD0** frame-lerped mesh BLAS; **AABB proxy** fallback for IQM/glTF/etc. Real lighting still open. World BSP BLAS + demo blit when `r_rtxDemo` 1. **`USE_VULKAN_RTX` OFF**: `#else` stubs. See `docs/RENDERERS_FUTURE.md`. |
+| Hybrid Rendering 1 | `vk_hybrid1.c` | **SHIPPED** (experimental): soft sun / contact harden / GGX / IBL / diffuse / dlight shadows. Long-term polish remains product taste, not a stub. See [`HYBRID_RENDERING1.md`](HYBRID_RENDERING1.md). |
+| VDB Woodcock volumetrics | `volumetric_fog.frag`, `vk_vdb.c` | **DONE**: mode `3` + majorant bricks; demo `exec demo_vdb_woodcock.cfg` + shipped `vdb/fog_2cubed.nvdb`; SIM profile documents mode 3. See [`VDB_WOODCOCK_VOLUMETRICS.md`](VDB_WOODCOCK_VOLUMETRICS.md). |
 | Experimental renderers | `USE_EXPERIMENTAL_RENDERERS` (default ON) | NIV/NIST/NVC/VFGI/NDGI/NSLM/RenderFormer/VkSplat/WPT/MGS/WSP. OFF → `vk_experimental_renderer_stubs.c`. |
 | FreeType off | `BUILD_FREETYPE` OFF | `tr_font_stub.c` + `tr_vector_font_stub.c` (cached `.dat` fonts; no TTF/vector load). |
+| Layout / include rewrite | `modules/*`, `runtime/*`, `engine/`, `renderers/`, `extensions/` | **DONE** for first-party `#include "../qcommon/..."` → flat headers. Client shell → `shell/`. Layout bridges kept pending MSVC / `"qcommon/..."` audit before drop. |
+
+---
 
 ## Subsystem audit log (rolling)
 
 | Date | Scope | Notes |
 |------|--------|------|
+| 2026-07-11 | Triage follow-up | Flattened remaining `../qcommon` in `engine/` / `renderers/` / `extensions/` (65 files); Vulkan gains `IDTECH3_DIR_ENGINE_CORE`. Bridges retained for soak. Next: bridge-drop audit or RTX long-term. |
+| 2026-07-11 | Triage follow-up | Include rewrite: modules + `runtime/{client,game,server}`; client shell → `shell/`. `MOD_SDK` FSR2 wording fixed. |
+| 2026-07-11 | Triage | Retargeted this doc to canonical roots (Phase 5e); re-scan: **0** `TODO`/`FIXME` in first-party tree. |
+| 2026-07-11 | Chocolate / id Tech 8 | Temporal upscale, Hybrid1 deepen, open-world LOD + district unmerge, VT+sparse+GPU feedback, meshlets — marked **DONE** (intentional SDK/Nanite limits documented above). |
+| 2026-07-11 | VDB Woodcock | Demo cfg + bootstrap `.nvdb` + `SIM_RENDER_PROFILE` mode 3 + `test_vdb_woodcock.sh` — polish **DONE**. |
+| 2026-07-11 | Layout | Include rewrite started: navigation + physics flat includes; next audio → world → botlib → client. |
+| 2026-07-11 | Sparse VT | `vk_sparse.c` + `r_vtSparse` / GPU `vt_feedback` compute; dense atlas fallback. |
 | 2026-04-27 | Vulkan / post | `vk_post_process_pipeline.c`: named `Vk_PostProcess_FragSpecData`, `#define` map count (29), `_Static_assert` array ≥ count; avoids silent spec/map drift. |
 | 2026-04-27 | OpenGL / IQM | `R_LoadIQM` / mesh validation: cast `header->num_*` / `mesh->num_vertexes` to `int` in loop bounds; fix `ARRAY_LEN` / joint name compares for `-Wsign-compare` (Clang). |
 | 2026-04-27 | OpenGL / IQM | `tr_model_iqm.c`: const-correct `RB_IQMSurfaceAnim` surface pointer; blend loop bound `j < 4` (fixes `-Wcast-qual` / `-Wsign-compare` on `ARRAY_LEN(float[4])`). |
@@ -78,19 +103,21 @@ TODOs/FIXMEs in `src/external/` are from third-party code (duktape, zstd, cjson,
 | 2026-04-27 | Vulkan / IQM | `tr_model_iqm.c`: avoid `-Wcast-qual` on `backEnd.currentEntity` (uintptr_t bridge). Vegetation wind: same-frame prepare path documented (see triage row). |
 | 2026-05-19 | Tooling | Optional **Tiled Map Editor** submodule `tools/tiled` (GPL-2.0, pinned **v1.9.91**); see `docs/TILED.md`. |
 | 2026-04-11 | Network / downloads | `cl_curl.c`: `dl->Name` from `Content-Disposition` uses **`Q_strncpyz`** (Phase 2 P0 item remains fixed). |
-| 2026-04-11 | Botlib / preprocessor | **`src/botlib/l_precomp.c`** already bounded; duplicate **`src/platform/botlib/l_precomp.c`** and **`src/platform/win32/botlib/l_precomp.c`** aligned: `sprintf` → **`Com_sprintf(..., MAX_TOKEN, ...)`** (5 sites each). |
-| 2026-04-11 | Botlib / chat (Windows tree) | **`src/platform/win32/botlib/be_ai_chat.c`** `BotLoadChatMessage`: `sprintf`/`strcpy` → **`Com_sprintf` / `Q_strncpyz`** to match **`src/botlib/be_ai_chat.c`**; **`src/platform/botlib/be_ai_chat.c`** fixed-string append → **`Q_strncpyz`**. |
-| 2026-04-11 | Client / server / qcommon | `rg '\\b(TODO|FIXME)\\b' src/{client,server,qcommon}` - **no matches** (same triage expectation as 2026-04-10). |
-| 2026-04-11 | Renderer validation | `renderer_regression_check.sh` + manifest caps (`GLTF_MAX_*`, `IQM_*`) - CI-style parity checks on `main`. |
+| 2026-04-11 | Botlib / preprocessor | Botlib `l_precomp.c` bounded `Com_sprintf` sites (historical `src/platform` duplicates noted in older audits). |
+| 2026-04-11 | Botlib / chat (Windows tree) | Windows botlib chat load paths aligned to `Com_sprintf` / `Q_strncpyz`. |
+| 2026-04-11 | Client / server / qcommon | Historical `src/{client,server,qcommon}` triage: no `TODO`/`FIXME` matches. |
+| 2026-04-11 | Renderer validation | `renderer_regression_check.sh` + manifest caps (`GLTF_MAX_*`, `IQM_*`) — CI-style parity checks on `main`. |
 | 2026-04-11 | Build / link | Optional **`ENABLE_LTO`** (`./scripts/compile_engine.sh … lto`): CMake `CheckIPOSupported` + `CMAKE_INTERPROCEDURAL_OPTIMIZATION` for GCC/Clang Release/RelWithDebInfo; off by default. |
 | 2026-04-11 | Vulkan / future GPU | **`r_vk_meshShaderNV`** (default 0): optional **`VK_NV_mesh_shader`** + `VkPhysicalDeviceMeshShaderFeaturesNV.meshShader` for NVIDIA; no mesh pipelines yet. **DLSS:** not in-repo; startup log documents use `r_renderScale` / driver scaling. |
 
-## Recommendations
+## Recommendations (ordered)
 
-1. **net_sdr.c**: Full SDR implementation; requires `USE_STEAM_NETWORKING=ON` and Steamworks SDK.
-2. **be_aas_reach.c**: No action; dead code.
-3. **USE_VULKAN_RTX**: Build with `-DUSE_VULKAN_RTX=ON` to request ray tracing extensions on RT-capable GPUs.
-4. Re-run triage after major refactors or when adding new features.
+1. ~~Include rewrite (`modules/*` + `runtime/*` + `engine/` / `renderers/` / `extensions/`)~~ — **done 2026-07-11**.
+2. ~~Woodcock demo cfg + sample `.nvdb` + SIM mode 3~~ — **done 2026-07-11**.
+3. ~~Fix `docs/MOD_SDK.md` FSR2 wording~~ — **done 2026-07-11**.
+4. ~~Client root shelving~~ — **done 2026-07-11** (`runtime/client/shell/`).
+5. **Bridge-drop audit**: confirm no `"qcommon/..."` / MSVC bridge dependence, then remove `modules/qcommon` / platform qcommon bridges.
+6. **RTX long-term**: real lighting + non-MD3 entity acceleration structures (IQM/glTF mesh AS).
 
 ---
 
@@ -99,16 +126,17 @@ TODOs/FIXMEs in `src/external/` are from third-party code (duktape, zstd, cjson,
 From repo root:
 
 ```bash
-rg 'TODO|FIXME' src --glob '!**/external/**'
+rg '\b(TODO|FIXME)\b' engine runtime modules renderers extensions --glob '!**/third_party/**' --glob '!**/external/**'
+rg '#include\s+".*\.\./qcommon/' engine runtime modules renderers extensions --glob '*.{c,h,cpp,hpp}' --glob '!**/third_party/**' --glob '!**/external/**'
 ```
 
-Expect **no matches** in first-party code until new comments are added. Third-party hits under `src/external/` remain out of scope for this triage doc.
+Expect **no** `TODO`/`FIXME` matches and **no** `../qcommon` relative includes in first-party code until new comments/paths are added. Third-party hits under `third_party/` / vendored externals remain out of scope.
 
 ---
 
 ## Documentation (post-`vk.c` split)
 
-Vulkan audits and roadmaps should point at **`vk_*.c`** modules and **`docs/ARCHITECTURE.md`**, not removed `vk.c` line numbers. A pass in April 2026 updated the main stale references (`VULKAN_FBO_AUDIT.md`, `FBO_BREAKAGE_ANALYSIS.md`, `SIGGRAPH_FEATURES_ROADMAP.md`, volumetric docs, `CODEBASE_AUDIT_PHASE2.md`).
+Vulkan audits and roadmaps should point at **`vk_*.c`** modules and **`docs/ARCHITECTURE.md`**, not removed `vk.c` line numbers. A pass in April 2026 updated the main stale references (`VULKAN_FBO_AUDIT.md`, `FBO_BREAKAGE_ANALYSIS.md`, `SIGGRAPH_FEATURES_ROADMAP.md`, volumetric docs, `CODEBASE_AUDIT_PHASE2.md`). Historical audits may still mention `vk.c` by name — leave them unless editing those docs for other reasons.
 
 To find any stragglers:
 

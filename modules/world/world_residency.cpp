@@ -6,9 +6,9 @@ Copyright (C) 2026 Gopex LLC. All rights reserved.
 ===========================================================================
 */
 
-#include "../qcommon/q_shared.h"
-#include "../qcommon/qcommon.h"
-#include "../qcommon/cm_stream.h"
+#include "q_shared.h"
+#include "qcommon.h"
+#include "cm_stream.h"
 #include "world_open.h"
 #include "world_proc.h"
 #include "world_residency.h"
@@ -245,6 +245,17 @@ static qboolean WR_ServerAllows( const wrCellSet_t *allowSet, int cellX, int cel
 	return qfalse;
 }
 
+/* Collision always clamps to MP allow list. Nav clamps unless cl_openWorldResidencyNavLocal 1. */
+static qboolean WR_LayerUsesServerAllow( worldResidencyLayer_t layer ) {
+	if ( layer == WR_LAYER_COLLISION ) {
+		return qtrue;
+	}
+	if ( layer == WR_LAYER_NAV ) {
+		return !( cl_openWorldResidencyNavLocal && cl_openWorldResidencyNavLocal->integer );
+	}
+	return qfalse;
+}
+
 static qboolean WR_PassDistrictFilter( int cellX, int cellY ) {
 	if ( !s_districtFilterActive ) {
 		return qtrue;
@@ -270,6 +281,41 @@ static int WR_CompareCandidateDesc( const void *a, const void *b ) {
 
 static float WR_RandomUnit( void ) {
 	return (float)( rand() & 0x7fff ) / (float)0x8000;
+}
+
+static void WorldResidency_Status_f( void ) {
+	WorldResidency_Status();
+}
+
+void WorldResidency_Status( void ) {
+	static const char *layerNames[WR_LAYER_COUNT] = { "collision", "nav", "sprites" };
+	int i;
+
+	Com_Printf( "[world_residency] client=%d server=%d epsilon=%.3f max_swaps=%d matroid=%s nav_local=%s\n",
+		WorldResidency_IsEnabled() ? 1 : 0,
+		WorldResidency_ServerEnabled() ? 1 : 0,
+		WR_Epsilon(),
+		WR_MaxSwaps(),
+		( r_openWorldResidencyMatroid && r_openWorldResidencyMatroid->integer ) ? "on" : "off",
+		( cl_openWorldResidencyNavLocal && cl_openWorldResidencyNavLocal->integer ) ? "on" : "off" );
+	Com_Printf( "[world_residency] budgets k_col=%d k_nav=%d k_sprites=%d server_allow=%d district_filter=%d\n",
+		WR_BudgetForLayer( WR_LAYER_COLLISION ),
+		WR_BudgetForLayer( WR_LAYER_NAV ),
+		WR_BudgetForLayer( WR_LAYER_SPRITES ),
+		s_serverAllowCount,
+		s_districtFilterActive ? 1 : 0 );
+	for ( i = 0; i < WR_LAYER_COUNT; i++ ) {
+		const wrLayerState_t *st = &s_layers[i];
+
+		Com_Printf( "[world_residency] %s: current=%d target=%d pending_add=%d pending_rem=%d transition=%d/%d\n",
+			layerNames[i],
+			st->currentCount,
+			st->targetCount,
+			st->pendingAddCount,
+			st->pendingRemoveCount,
+			st->inTransition ? st->transitionStep : 0,
+			st->inTransition ? st->transitionTotal : 0 );
+	}
 }
 
 void WorldResidency_Init( void ) {
@@ -312,9 +358,11 @@ void WorldResidency_Init( void ) {
 	s_scheduleShift = com_frameTime & 4095;
 	s_loggedEnable = qfalse;
 	SectorGraph_Init();
+	Cmd_AddCommand( "world_residency_status", WorldResidency_Status_f );
 }
 
 void WorldResidency_Shutdown( void ) {
+	Cmd_RemoveCommand( "world_residency_status" );
 	SectorGraph_Shutdown();
 	Com_Memset( s_layers, 0, sizeof( s_layers ) );
 	s_serverAllowCount = 0;
@@ -796,7 +844,7 @@ static void WR_EnumerateCandidatesAround( const vec3_t viewOrigin, float loadRad
 			if ( !inLoad && !sticky ) {
 				continue;
 			}
-			if ( layer == WR_LAYER_COLLISION && !WR_ServerAllows( allowSet, x, y ) ) {
+			if ( WR_LayerUsesServerAllow( layer ) && !WR_ServerAllows( allowSet, x, y ) ) {
 				continue;
 			}
 			if ( SectorGraph_StreamReachEnabled() && !SectorGraph_IsReachable( x, y ) ) {
@@ -841,7 +889,7 @@ static void WR_BuildTarget( worldResidencyLayer_t layer, const vec3_t viewOrigin
 
 	WR_CellSetClear( &candidateSet );
 	WR_CellSetBuildFromCurrent( &currentSet, st );
-	if ( layer == WR_LAYER_COLLISION && s_serverAllowCount > 0 ) {
+	if ( WR_LayerUsesServerAllow( layer ) && s_serverAllowCount > 0 ) {
 		WR_CellSetBuildFromCells( &allowSet, s_serverAllow, s_serverAllowCount );
 	} else {
 		WR_CellSetClear( &allowSet );
@@ -1062,16 +1110,10 @@ void WorldResidency_UpdateView( const vec3_t viewOrigin, float radius, worldOpen
 		WR_UpdateLayer( WR_LAYER_COLLISION, viewOrigin, NULL, 0, loadRadius, unloadRadius, sectorSize,
 			WO_LAYER_MASK_COLLISION, useMatroid, qfalse );
 	}
+	/* Nav: always plan when enabled. MP allow-list clamp unless cl_openWorldResidencyNavLocal 1. */
 	if ( enabledLayers & WO_LAYER_MASK_NAV ) {
-		if ( !cl_openWorldResidencyNavLocal || !cl_openWorldResidencyNavLocal->integer ) {
-			if ( s_serverAllowCount == 0 ) {
-				WR_UpdateLayer( WR_LAYER_NAV, viewOrigin, NULL, 0, loadRadius, unloadRadius, sectorSize,
-					WO_LAYER_MASK_NAV, qfalse, qfalse );
-			}
-		} else {
-			WR_UpdateLayer( WR_LAYER_NAV, viewOrigin, NULL, 0, loadRadius, unloadRadius, sectorSize,
-				WO_LAYER_MASK_NAV, qfalse, qfalse );
-		}
+		WR_UpdateLayer( WR_LAYER_NAV, viewOrigin, NULL, 0, loadRadius, unloadRadius, sectorSize,
+			WO_LAYER_MASK_NAV, qfalse, qfalse );
 	}
 	if ( enabledLayers & WO_LAYER_MASK_SPRITES ) {
 		WR_UpdateLayer( WR_LAYER_SPRITES, viewOrigin, NULL, 0, loadRadius, unloadRadius, sectorSize,

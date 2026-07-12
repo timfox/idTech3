@@ -14,7 +14,7 @@ Uses EnTT under the hood. Coexists with gentity; does not replace it.
 #ifndef ECS_H
 #define ECS_H
 
-#include "../qcommon/q_shared.h"
+#include "q_shared.h"
 
 #ifdef __cplusplus
 extern "C" {

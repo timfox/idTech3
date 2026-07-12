@@ -23,7 +23,7 @@ Uses Recast for navmesh generation and Detour for pathfinding/crowd.
 extern "C" {
 #include "nav_recast.h"
 #include "nav_bsp_extract.h"
-#include "../qcommon/qcommon.h"
+#include "qcommon.h"
 }
 
 #include <cstdio>

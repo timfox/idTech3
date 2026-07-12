@@ -28,10 +28,29 @@ Verify:
 ctest -R 'test_repository_layout_2026|test_legacy_intact|test_msvc_|test_client_modular|test_cpp20|test_openworld|test_no_aux' --output-on-failure
 ```
 
-## Remaining (not Phase 5e)
+## Remaining (post–Phase 5e)
 
-- Rewrite relative `#include "../../qcommon/..."` to absolute-from-root or `IDTECH3_DIR_*` includes, then drop **layout bridges**.
-- Two-week soak was waived for this drop after prep + test migration on `main`; watch CI / downstream forks.
+Rewrite relative `#include "../../qcommon/..."` / `"../qcommon/..."` to flat headers resolved via `IDTECH3_DIR_ENGINE_CORE` (and peer `IDTECH3_DIR_*`), then drop **layout bridges**.
+
+### Include modernization progress
+
+| Domain | Status | Notes |
+|--------|--------|-------|
+| `modules/navigation` | **Done** | Flat `q_shared.h` / `qcommon.h` / `qfiles.h`; `recast_nav` includes `${IDTECH3_DIR_ENGINE_CORE}` |
+| `modules/physics` | **Done** | Flat includes; `phys_module` + `qcommon`/`qcommon_ded` include `${IDTECH3_DIR_ENGINE_CORE}` (server TUs include phys headers) |
+| `modules/audio` | **Done** | Flat includes; audio TUs compile into `client` (already has `${IDTECH3_DIR_ENGINE_CORE}`) |
+| `modules/world` | **Done** | Flat includes; `IDTECH3_UNIT_INCLUDE_DIRS` + `qcommon` include `${IDTECH3_DIR_ENGINE_CORE}` |
+| `modules/botlib` | **Done** | Flat includes; `botlib` OBJECT + MSVC `IdTech3Layout2026.props` (`IdTech3EngineCore`); platform/win32 botlib copies aligned |
+| `runtime/client` | **Done** | Flat includes; shell sources moved to `runtime/client/shell/`; `client.h` / `keys.h` / `keycodes.h` remain at root |
+| `runtime/game` / `runtime/server` | **Done** | Flat includes (middleware + server TUs compile into `client` / `qcommon` with `${IDTECH3_DIR_ENGINE_CORE}`) |
+| `engine/` / `renderers/` / `extensions/` | **Done** | Flat includes; Vulkan targets include `${IDTECH3_DIR_ENGINE_CORE}` |
+| Drop `modules/qcommon` bridge | Pending soak | First-party `../qcommon` includes cleared; keep bridges until MSVC/`#include "qcommon/..."` consumers audited |
+
+Wiring check: `./tests/scripts/test_module_include_canonical.sh`
+
+### Other
+
+- Two-week soak was waived for the 5e drop after prep + test migration on `main`; watch CI / downstream forks.
 
 ## Removal command
 

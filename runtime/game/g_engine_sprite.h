@@ -12,7 +12,7 @@ QVM / native qagame: use trap_EngineSpriteShaderIndex and trap_EngineSpriteSpawn
 #ifndef G_ENGINE_SPRITE_H
 #define G_ENGINE_SPRITE_H
 
-#include "../qcommon/engine_sprite_map.h"
+#include "engine_sprite_map.h"
 
 /* type argument matches engineSpriteType_t (ENGINE_SPRITE_BILLBOARD, etc.) */
 

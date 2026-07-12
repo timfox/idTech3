@@ -11,8 +11,8 @@ Criteria-based rule evaluation with weighted random response selection.
 ===========================================================================
 */
 
-#include "../qcommon/q_shared.h"
-#include "../qcommon/qcommon.h"
+#include "q_shared.h"
+#include "qcommon.h"
 #include "g_response.h"
 
 static responseRule_t rules[RESPONSE_MAX_RULES];

@@ -11,7 +11,7 @@ a static image. Supports ROQ, and modern codecs via cl_cin_modern.
 #ifndef CL_MENUVIDEO_H
 #define CL_MENUVIDEO_H
 
-#include "../../qcommon/q_shared.h"
+#include "q_shared.h"
 
 void    MenuVideo_Init( void );
 void    MenuVideo_Shutdown( void );

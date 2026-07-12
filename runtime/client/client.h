@@ -21,10 +21,10 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 */
 // client.h -- primary header for client
 
-#include "../qcommon/q_shared.h"
-#include "../qcommon/qcommon.h"
+#include "q_shared.h"
+#include "qcommon.h"
 #include "../renderers/common/tr_public.h"
-#include "../qcommon/vm_local.h"
+#include "vm_local.h"
 #include "../ui/ui_public.h"
 #include "../cgame/cg_public.h"
 #include "../game/bg_public.h"

@@ -11,8 +11,8 @@ Two-bone IK for limbs, CCD for chains, specialized foot/aim/look-at.
 ===========================================================================
 */
 
-#include "../qcommon/q_shared.h"
-#include "../qcommon/qcommon.h"
+#include "q_shared.h"
+#include "qcommon.h"
 #include "phys_ik.h"
 #include <math.h>
 

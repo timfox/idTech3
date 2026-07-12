@@ -21,7 +21,7 @@ Manages hundreds of agents with tiered update rates:
 extern "C" {
 #endif
 
-#include "../qcommon/q_shared.h"
+#include "q_shared.h"
 
 #define HORDE_MAX_AGENTS     512
 #define HORDE_MAX_GROUPS      32

@@ -24,7 +24,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "client.h"
 #include "cl_cvars.h"
 #include "../../physics/phys_bullet.h"
-#include "../../qcommon/script_emit.h"
+#include "script_emit.h"
 
 #include "../../botlib/botlib.h"
 #include "../../game/g_entity_bridge.h"
@@ -35,7 +35,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "cl_voip.h"
 #include "../../game/bg_public.h"
 #include "../../game/g_facial.h"
-#include "../../qcommon/cm_public.h"
+#include "cm_public.h"
 
 void CM_Stream_Merge_ClearAll( void );
 int CM_Stream_MergedCount( void );

@@ -6,7 +6,7 @@ Copyright (C) 2026 Gopex LLC. All rights reserved.
 
 #include "server.h"
 #include "sv_openworld.h"
-#include "../qcommon/cm_stream.h"
+#include "cm_stream.h"
 #include "../game/bg_public.h"
 #include "../world/world_residency.h"
 

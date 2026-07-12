@@ -6,22 +6,30 @@ This file is original work by Gopex LLC and is not derived from
 existing id Tech 3 / ioquake3 code.
 The engine framework is based on id Tech 3 (GPLv2).
 
-Bullet Physics C dispatch layer.
-Routes all API calls to the C++ backend (phys_bullet_impl.cpp)
-when USE_BULLET_PHYSICS_IMPL is defined. Every function has a
-real implementation path -- no stubs.
+Physics C dispatch layer (Box3D default / Bullet optional).
+Routes Phys_* calls to the compiled substrate via phys_impl.h.
+
 ===========================================================================
 */
 
-#include "../qcommon/q_shared.h"
-#include "../qcommon/qcommon.h"
-#include "../qcommon/cm_public.h"
+#include "q_shared.h"
+#include "qcommon.h"
+#include "cm_public.h"
 #include "phys_bullet.h"
 #include "phys_character.h"
 #include "phys_middleware.h"
 #include "phys_events.h"
 #include "phys_materials.h"
+#include "phys_props.h"
+#include "phys_volumes.h"
 #include "phys_debugdraw.h"
+#include "phys_solvers.h"
+
+#if defined(USE_BOX3D_PHYSICS_IMPL) || defined(USE_BULLET_PHYSICS_IMPL)
+#define PHYS_HAS_IMPL 1
+#endif
+
+#include <math.h>
 
 static qboolean physInitialized = qfalse;
 
@@ -30,6 +38,9 @@ static cvar_t *phys_timestep;
 static cvar_t *phys_maxSubSteps;
 static cvar_t *phys_gravity;
 static cvar_t *phys_debugDraw;
+static cvar_t *phys_workers;
+static cvar_t *phys_sleep;
+static cvar_t *phys_ccd;
 static cvar_t *phys_ragdoll_stiffness;
 static cvar_t *phys_ragdoll_damping;
 static cvar_t *phys_ragdoll_muscles;
@@ -38,51 +49,8 @@ static cvar_t *phys_dmm_enabled;
 static cvar_t *phys_dmm_resolution;
 static cvar_t *phys_dmm_fracture;
 
-#ifdef USE_BULLET_PHYSICS_IMPL
-extern qboolean         Phys_Init_Impl(void);
-extern void             Phys_Shutdown_Impl(void);
-extern void             Phys_StepSimulation_Impl(float dt);
-extern void             Phys_SetGravity_Impl(const vec3_t gravity);
-extern void             Phys_ClearWorld_Impl(void);
-extern physBodyHandle_t Phys_CreateBody_Impl(const physBodyDef_t *def);
-extern void             Phys_DestroyBody_Impl(physBodyHandle_t handle);
-extern void             Phys_GetBodyTransform_Impl(physBodyHandle_t handle, physTransform_t *out);
-extern void             Phys_SetBodyTransform_Impl(physBodyHandle_t handle, const vec3_t pos, const vec3_t rot);
-extern void             Phys_ApplyForce_Impl(physBodyHandle_t handle, const vec3_t force, const vec3_t point);
-extern void             Phys_ApplyImpulse_Impl(physBodyHandle_t handle, const vec3_t impulse, const vec3_t point);
-extern void             Phys_ApplyTorque_Impl(physBodyHandle_t handle, const vec3_t torque);
-extern void             Phys_SetBodyVelocity_Impl(physBodyHandle_t handle, const vec3_t linear, const vec3_t angular);
-extern void             Phys_SetBodyActive_Impl(physBodyHandle_t handle, qboolean active);
-extern physConstraintHandle_t Phys_CreateConstraint_Impl(const physConstraintDef_t *def);
-extern void             Phys_DestroyConstraint_Impl(physConstraintHandle_t handle);
-extern void             Phys_SetConstraintLimits_Impl(physConstraintHandle_t handle, float lower, float upper);
-extern physRagdollHandle_t Phys_CreateRagdoll_Impl(const physRagdollDef_t *def);
-extern void             Phys_DestroyRagdoll_Impl(physRagdollHandle_t handle);
-extern void             Phys_RagdollApplyImpact_Impl(physRagdollHandle_t handle, const vec3_t point, const vec3_t impulse, float radius);
-extern void             Phys_RagdollSetBalance_Impl(physRagdollHandle_t handle, qboolean enabled, const vec3_t target);
-extern void             Phys_RagdollReach_Impl(physRagdollHandle_t handle, int limbIndex, const vec3_t target, float strength);
-extern void             Phys_RagdollGetBoneTransform_Impl(physRagdollHandle_t handle, int boneIndex, physTransform_t *out);
-extern void             Phys_RagdollSetMuscleStiffness_Impl(physRagdollHandle_t handle, float stiffness);
-extern void             Phys_RagdollBlendToAnimation_Impl(physRagdollHandle_t handle, float blend);
-extern dmmObjectHandle_t Dmm_CreateObject_Impl(const dmmObjectDef_t *def);
-extern void             Dmm_DestroyObject_Impl(dmmObjectHandle_t handle);
-extern void             Dmm_ApplyForce_Impl(dmmObjectHandle_t handle, const vec3_t force, const vec3_t point);
-extern void             Dmm_ApplyImpact_Impl(dmmObjectHandle_t handle, const vec3_t point, const vec3_t direction, float energy);
-extern void             Dmm_GetState_Impl(dmmObjectHandle_t handle, dmmState_t *out);
-extern qboolean         Dmm_IsFractured_Impl(dmmObjectHandle_t handle);
-extern int              Dmm_GetFragments_Impl(dmmObjectHandle_t handle, physBodyHandle_t *fragments, int maxFragments);
-extern void             Dmm_SetMaterialParams_Impl(dmmObjectHandle_t handle, float stiffness, float yield, float fracture);
-extern qboolean         Phys_RayCast_Impl(const vec3_t from, const vec3_t to, physRayResult_t *result);
-extern qboolean         Phys_ConvexSweep_Impl(const physBodyDef_t *shapeDef, const vec3_t from, const vec3_t to,
-	const vec3_t rotation, physRayResult_t *result);
-extern int              Phys_OverlapSphere_Impl(const vec3_t center, float radius, physBodyHandle_t *results, int maxResults);
-extern int              Phys_OverlapBox_Impl(const vec3_t center, const vec3_t halfExtents, physBodyHandle_t *results, int maxResults);
-extern void             Phys_DebugDraw_Impl(void);
-extern void             Phys_ProcessContactEvents_Impl(void);
-extern void             Phys_SetBodyMaterial_Impl(physBodyHandle_t handle, int materialId);
-extern int              Phys_GetBodyMaterial_Impl(physBodyHandle_t handle);
-extern int              Phys_GetBodyCount_Impl(void);
-extern int              Phys_GetConstraintCount_Impl(void);
+#ifdef PHYS_HAS_IMPL
+#include "phys_impl.h"
 #endif
 
 void Phys_RegisterCvars(void) {
@@ -91,6 +59,9 @@ void Phys_RegisterCvars(void) {
 	phys_maxSubSteps      = Cvar_Get("phys_maxSubSteps",      "4",     CVAR_ARCHIVE);
 	phys_gravity          = Cvar_Get("phys_gravity",          "-800",  CVAR_ARCHIVE);
 	phys_debugDraw        = Cvar_Get("phys_debugDraw",        "0",     CVAR_ARCHIVE);
+	phys_workers          = Cvar_Get("phys_workers",          "0",     CVAR_ARCHIVE);
+	phys_sleep            = Cvar_Get("phys_sleep",            "1",     CVAR_ARCHIVE);
+	phys_ccd              = Cvar_Get("phys_ccd",              "1",     CVAR_ARCHIVE);
 	phys_ragdoll_stiffness= Cvar_Get("phys_ragdoll_stiffness","0.8",   CVAR_ARCHIVE);
 	phys_ragdoll_damping  = Cvar_Get("phys_ragdoll_damping",  "0.4",   CVAR_ARCHIVE);
 	phys_ragdoll_muscles  = Cvar_Get("phys_ragdoll_muscles",  "1.0",   CVAR_ARCHIVE);
@@ -98,7 +69,28 @@ void Phys_RegisterCvars(void) {
 	phys_dmm_enabled      = Cvar_Get("phys_dmm_enabled",      "1",     CVAR_ARCHIVE);
 	phys_dmm_resolution   = Cvar_Get("phys_dmm_resolution",   "8",     CVAR_ARCHIVE);
 	phys_dmm_fracture     = Cvar_Get("phys_dmm_fracture",     "1",     CVAR_ARCHIVE);
+	Cvar_SetDescription(phys_workers, "Box3D Soft Step worker threads (0=auto up to 8). Requires vid_restart/phys reinit.");
+	Cvar_SetDescription(phys_sleep, "Enable island sleep for idle bodies (Box3D).");
+	Cvar_SetDescription(phys_ccd, "Enable continuous collision for fast bodies (Box3D).");
 	Phys_CharacterInit();
+}
+
+physBackendKind_t Phys_GetBackend(void) {
+#ifdef USE_BOX3D_PHYSICS_IMPL
+	return PHYS_BACKEND_BOX3D;
+#elif defined(USE_BULLET_PHYSICS_IMPL)
+	return PHYS_BACKEND_BULLET;
+#else
+	return PHYS_BACKEND_NONE;
+#endif
+}
+
+const char *Phys_GetBackendName(void) {
+	switch ( Phys_GetBackend() ) {
+	case PHYS_BACKEND_BOX3D:  return "box3d";
+	case PHYS_BACKEND_BULLET: return "bullet";
+	default:                  return "none";
+	}
 }
 
 qboolean Phys_Init(void) {
@@ -107,13 +99,13 @@ qboolean Phys_Init(void) {
 	Phys_RegisterCvars();
 
 	if (!phys_enabled || !phys_enabled->integer) {
-		Com_Printf("Bullet Physics: disabled by cvar\n");
+		Com_Printf("Physics: disabled by cvar (backend=%s)\n", Phys_GetBackendName());
 		return qfalse;
 	}
 
-#ifdef USE_BULLET_PHYSICS_IMPL
+#ifdef PHYS_HAS_IMPL
 	if (!Phys_Init_Impl()) {
-		Com_Printf(S_COLOR_RED "Bullet Physics: C++ backend init failed\n");
+		Com_Printf(S_COLOR_RED "Physics: %s backend init failed\n", Phys_GetBackendName());
 		return qfalse;
 	}
 	{
@@ -122,9 +114,10 @@ qboolean Phys_Init(void) {
 		Phys_SetGravity_Impl(g);
 	}
 	PhysMiddleware_Init();
-	Com_Printf("Bullet Physics: initialized with C++ backend\n");
+	PhysSolvers_Init();
+	Com_Printf("Physics: initialized (backend=%s)\n", Phys_GetBackendName());
 #else
-	Com_Printf(S_COLOR_YELLOW "Bullet Physics: no C++ backend (compile with USE_BULLET_PHYSICS_IMPL)\n");
+	Com_Printf(S_COLOR_YELLOW "Physics: no substrate compiled (set IDTECH3_PHYSICS_BACKEND)\n");
 	return qfalse;
 #endif
 
@@ -134,16 +127,17 @@ qboolean Phys_Init(void) {
 
 void Phys_Shutdown(void) {
 	if (!physInitialized) return;
+	PhysSolvers_Shutdown();
 	PhysMiddleware_Shutdown();
-#ifdef USE_BULLET_PHYSICS_IMPL
+#ifdef PHYS_HAS_IMPL
 	Phys_Shutdown_Impl();
 #endif
 	physInitialized = qfalse;
-	Com_Printf("Bullet Physics: shut down\n");
+	Com_Printf("Physics: shut down (backend=%s)\n", Phys_GetBackendName());
 }
 
 void Phys_SetGravity(const vec3_t gravity) {
-#ifdef USE_BULLET_PHYSICS_IMPL
+#ifdef PHYS_HAS_IMPL
 	if (physInitialized) Phys_SetGravity_Impl(gravity);
 #else
 	(void)gravity;
@@ -151,27 +145,57 @@ void Phys_SetGravity(const vec3_t gravity) {
 }
 
 void Phys_ClearWorld(void) {
-#ifdef USE_BULLET_PHYSICS_IMPL
-	if (physInitialized) Phys_ClearWorld_Impl();
+#ifdef PHYS_HAS_IMPL
+	if (physInitialized) {
+		PhysProp_Clear();
+		PhysVolume_Clear();
+		Phys_ClearWorld_Impl();
+	}
 #endif
 }
 
 physBodyHandle_t Phys_AddStaticTriMesh(const float *verts, int numVerts, const int *indices, int numIndices) {
-	physBodyDef_t def;
+	if (!physInitialized || !verts || numVerts < 3 || !indices || numIndices < 3) {
+		return -1;
+	}
+#ifdef PHYS_HAS_IMPL
+	return Phys_AddStaticTriMesh_Impl(verts, numVerts, indices, numIndices);
+#else
 	(void)verts; (void)numVerts; (void)indices; (void)numIndices;
+	return -1;
+#endif
+}
 
-	if (!physInitialized) return -1;
-
-	Com_Memset(&def, 0, sizeof(def));
-	def.shape = PHYS_SHAPE_TRIANGLE_MESH;
-	def.type = PHYS_BODY_STATIC;
-	def.mass = 0;
-
-#ifdef USE_BULLET_PHYSICS_IMPL
-	return Phys_CreateBody_Impl(&def);
+physBodyHandle_t Phys_AddStaticCompoundBoxes(const float *centersXYZ, const float *halfExtentsXYZ, int count) {
+	if (!physInitialized || !centersXYZ || !halfExtentsXYZ || count < 1) {
+		return -1;
+	}
+#ifdef PHYS_HAS_IMPL
+	return Phys_AddStaticCompoundBoxes_Impl(centersXYZ, halfExtentsXYZ, count);
 #else
 	return -1;
 #endif
+}
+
+qboolean Phys_MoverStep(vec3_t origin, vec3_t velocity, float radius, float height,
+	const vec3_t wishDir, float wishSpeed, float dt, qboolean jump, qboolean *groundedOut) {
+#ifdef PHYS_HAS_IMPL
+	if (physInitialized) {
+		return Phys_MoverStep_Impl(origin, velocity, radius, height, wishDir, wishSpeed, dt, jump, groundedOut);
+	}
+#endif
+	(void)origin; (void)velocity; (void)radius; (void)height;
+	(void)wishDir; (void)wishSpeed; (void)dt; (void)jump; (void)groundedOut;
+	return qfalse;
+}
+
+int Phys_GetWorkerCount(void) {
+#ifdef PHYS_HAS_IMPL
+	if (physInitialized) {
+		return Phys_GetWorkerCount_Impl();
+	}
+#endif
+	return 0;
 }
 
 qboolean Phys_LoadBSPCollision(void) {
@@ -247,35 +271,79 @@ qboolean Phys_LoadBSPCollision(void) {
 		}
 	}
 
-	/* Create static box bodies at each traced floor cell.
-	   Each cell becomes a thin static box at the traced height. */
+	/* Prefer a single static triangle mesh (Box3D native); fall back to cell boxes. */
 	{
-		int cellCount = 0;
-		for (gy = 0; gy < gridH; gy++) {
-			for (gx = 0; gx < gridW; gx++) {
-				int idx = gy * (gridW + 1) + gx;
-				float z = verts[idx * 3 + 2];
+		physBodyHandle_t mesh = Phys_AddStaticTriMesh(verts, numVerts, indices, numIndices);
+		if (mesh >= 0) {
+			Com_Printf("Physics: created floor collision mesh (%d verts, %d tris)\n",
+				numVerts, numIndices / 3);
+		} else {
+			float *centers = NULL;
+			float *halves = NULL;
+			int cellCount = 0;
+			int maxCells = gridW * gridH;
+			int ci = 0;
 
-				if (z <= worldMins[2] + 1.0f) continue;
+			centers = (float *)Z_Malloc(maxCells * 3 * sizeof(float));
+			halves = (float *)Z_Malloc(maxCells * 3 * sizeof(float));
+			if (centers && halves) {
+				for (gy = 0; gy < gridH; gy++) {
+					for (gx = 0; gx < gridW; gx++) {
+						int idx = gy * (gridW + 1) + gx;
+						float z = verts[idx * 3 + 2];
+						if (z <= worldMins[2] + 1.0f) {
+							continue;
+						}
+						centers[ci * 3 + 0] = verts[idx * 3 + 0];
+						centers[ci * 3 + 1] = verts[idx * 3 + 1];
+						centers[ci * 3 + 2] = z - 2.0f;
+						halves[ci * 3 + 0] = step * 0.5f;
+						halves[ci * 3 + 1] = step * 0.5f;
+						halves[ci * 3 + 2] = 2.0f;
+						ci++;
+					}
+				}
+				if (ci > 0 && Phys_AddStaticCompoundBoxes(centers, halves, ci) >= 0) {
+					cellCount = ci;
+					Com_Printf("Physics: created floor compound (%d boxes in 1 body)\n", cellCount);
+				}
+			}
+			if (cellCount == 0) {
+				for (gy = 0; gy < gridH; gy++) {
+					for (gx = 0; gx < gridW; gx++) {
+						int idx = gy * (gridW + 1) + gx;
+						float z = verts[idx * 3 + 2];
+						physBodyDef_t def;
 
-				physBodyDef_t def;
-				Com_Memset(&def, 0, sizeof(def));
-				def.shape = PHYS_SHAPE_BOX;
-				def.type = PHYS_BODY_STATIC;
-				def.mass = 0;
-				def.halfExtents[0] = step * 0.5f;
-				def.halfExtents[1] = step * 0.5f;
-				def.halfExtents[2] = 2.0f;
-				def.position[0] = verts[idx * 3 + 0];
-				def.position[1] = verts[idx * 3 + 1];
-				def.position[2] = z - 2.0f;
-				def.friction = 0.8f;
-				def.restitution = 0.3f;
-				Phys_CreateBody(&def);
-				cellCount++;
+						if (z <= worldMins[2] + 1.0f) {
+							continue;
+						}
+
+						Com_Memset(&def, 0, sizeof(def));
+						def.shape = PHYS_SHAPE_BOX;
+						def.type = PHYS_BODY_STATIC;
+						def.mass = 0;
+						def.halfExtents[0] = step * 0.5f;
+						def.halfExtents[1] = step * 0.5f;
+						def.halfExtents[2] = 2.0f;
+						def.position[0] = verts[idx * 3 + 0];
+						def.position[1] = verts[idx * 3 + 1];
+						def.position[2] = z - 2.0f;
+						def.friction = 0.8f;
+						def.restitution = 0.3f;
+						Phys_CreateBody(&def);
+						cellCount++;
+					}
+				}
+				Com_Printf("Physics: created %d floor collision cells\n", cellCount);
+			}
+			if (centers) {
+				Z_Free(centers);
+			}
+			if (halves) {
+				Z_Free(halves);
 			}
 		}
-		Com_Printf("Physics: created %d floor collision cells\n", cellCount);
 	}
 
 	/* Also add 4 wall planes around the map boundary */
@@ -321,16 +389,18 @@ qboolean Phys_LoadBSPCollision(void) {
 
 void Phys_StepSimulation(float dt) {
 	if (!physInitialized) return;
-#ifdef USE_BULLET_PHYSICS_IMPL
+#ifdef PHYS_HAS_IMPL
+	PhysSolvers_PreStep(dt);
 	Phys_StepSimulation_Impl(dt);
 	Phys_ProcessContactEvents_Impl();
+	PhysSolvers_PostStep(dt);
 #else
 	(void)dt;
 #endif
 }
 
 physBodyHandle_t Phys_CreateBody(const physBodyDef_t *def) {
-#ifdef USE_BULLET_PHYSICS_IMPL
+#ifdef PHYS_HAS_IMPL
 	physBodyDef_t local;
 
 	if (physInitialized && def) {
@@ -347,7 +417,7 @@ physBodyHandle_t Phys_CreateBody(const physBodyDef_t *def) {
 }
 
 void Phys_DestroyBody(physBodyHandle_t handle) {
-#ifdef USE_BULLET_PHYSICS_IMPL
+#ifdef PHYS_HAS_IMPL
 	if (physInitialized) Phys_DestroyBody_Impl(handle);
 #else
 	(void)handle;
@@ -355,7 +425,7 @@ void Phys_DestroyBody(physBodyHandle_t handle) {
 }
 
 void Phys_GetBodyTransform(physBodyHandle_t handle, physTransform_t *out) {
-#ifdef USE_BULLET_PHYSICS_IMPL
+#ifdef PHYS_HAS_IMPL
 	if (physInitialized) { Phys_GetBodyTransform_Impl(handle, out); return; }
 #endif
 	(void)handle;
@@ -363,49 +433,137 @@ void Phys_GetBodyTransform(physBodyHandle_t handle, physTransform_t *out) {
 }
 
 void Phys_SetBodyTransform(physBodyHandle_t handle, const vec3_t pos, const vec3_t rot) {
-#ifdef USE_BULLET_PHYSICS_IMPL
+#ifdef PHYS_HAS_IMPL
 	if (physInitialized) { Phys_SetBodyTransform_Impl(handle, pos, rot); return; }
 #endif
 	(void)handle; (void)pos; (void)rot;
 }
 
 void Phys_ApplyForce(physBodyHandle_t handle, const vec3_t force, const vec3_t point) {
-#ifdef USE_BULLET_PHYSICS_IMPL
+#ifdef PHYS_HAS_IMPL
 	if (physInitialized) { Phys_ApplyForce_Impl(handle, force, point); return; }
 #endif
 	(void)handle; (void)force; (void)point;
 }
 
 void Phys_ApplyImpulse(physBodyHandle_t handle, const vec3_t impulse, const vec3_t point) {
-#ifdef USE_BULLET_PHYSICS_IMPL
+#ifdef PHYS_HAS_IMPL
 	if (physInitialized) { Phys_ApplyImpulse_Impl(handle, impulse, point); return; }
 #endif
 	(void)handle; (void)impulse; (void)point;
 }
 
 void Phys_ApplyTorque(physBodyHandle_t handle, const vec3_t torque) {
-#ifdef USE_BULLET_PHYSICS_IMPL
+#ifdef PHYS_HAS_IMPL
 	if (physInitialized) { Phys_ApplyTorque_Impl(handle, torque); return; }
 #endif
 	(void)handle; (void)torque;
 }
 
 void Phys_SetBodyVelocity(physBodyHandle_t handle, const vec3_t linear, const vec3_t angular) {
-#ifdef USE_BULLET_PHYSICS_IMPL
+#ifdef PHYS_HAS_IMPL
 	if (physInitialized) { Phys_SetBodyVelocity_Impl(handle, linear, angular); return; }
 #endif
 	(void)handle; (void)linear; (void)angular;
 }
 
 void Phys_SetBodyActive(physBodyHandle_t handle, qboolean active) {
-#ifdef USE_BULLET_PHYSICS_IMPL
+#ifdef PHYS_HAS_IMPL
 	if (physInitialized) { Phys_SetBodyActive_Impl(handle, active); return; }
 #endif
 	(void)handle; (void)active;
 }
 
+physBodyType_t Phys_GetBodyType(physBodyHandle_t handle) {
+#ifdef PHYS_HAS_IMPL
+	if (physInitialized) {
+		return Phys_GetBodyType_Impl(handle);
+	}
+#endif
+	(void)handle;
+	return PHYS_BODY_STATIC;
+}
+
+qboolean Phys_IsBodyDynamic(physBodyHandle_t handle) {
+#ifdef PHYS_HAS_IMPL
+	if (physInitialized) {
+		return Phys_IsBodyDynamic_Impl(handle);
+	}
+#endif
+	(void)handle;
+	return qfalse;
+}
+
+/*
+===============
+Phys_ApplyImpulseRadius
+Applies a radial impulse to all dynamic bodies overlapping the sphere.
+falloff 0 = flat magnitude; 1 = linear with distance; >1 = sharper falloff.
+Returns number of bodies affected.
+===============
+*/
+int Phys_ApplyImpulseRadius(const vec3_t center, float radius, float magnitude, float falloff) {
+	physBodyHandle_t hits[128];
+	int count;
+	int i;
+	int affected = 0;
+
+	if (!center || radius <= 0.0f || magnitude == 0.0f) {
+		return 0;
+	}
+	if (falloff < 0.0f) {
+		falloff = 0.0f;
+	}
+
+#ifdef PHYS_HAS_IMPL
+	if (physInitialized) {
+		int handled = Phys_ApplyImpulseRadius_Impl(center, radius, magnitude, falloff);
+		if (handled >= 0) {
+			return handled;
+		}
+	}
+#endif
+
+	count = Phys_OverlapSphere(center, radius, hits, 128);
+	for (i = 0; i < count; i++) {
+		physTransform_t xf;
+		vec3_t dir, impulse, point;
+		float dist;
+		float scale;
+
+		if (!Phys_IsBodyDynamic(hits[i])) {
+			continue;
+		}
+		Phys_GetBodyTransform(hits[i], &xf);
+		VectorSubtract(xf.position, center, dir);
+		dist = VectorNormalize(dir);
+		if (dist < 0.001f) {
+			VectorSet(dir, 0.0f, 0.0f, 1.0f);
+			dist = 0.0f;
+		}
+		if (falloff <= 0.0f) {
+			scale = 1.0f;
+		} else {
+			scale = 1.0f - (dist / radius);
+			if (scale < 0.0f) {
+				scale = 0.0f;
+			}
+			if (falloff != 1.0f) {
+				scale = powf(scale, falloff);
+			}
+		}
+		VectorScale(dir, magnitude * scale, impulse);
+		/* slight upward bias helps debris clear the ground */
+		impulse[2] += magnitude * scale * 0.15f;
+		VectorCopy(xf.position, point);
+		Phys_ApplyImpulse(hits[i], impulse, point);
+		affected++;
+	}
+	return affected;
+}
+
 physConstraintHandle_t Phys_CreateConstraint(const physConstraintDef_t *def) {
-#ifdef USE_BULLET_PHYSICS_IMPL
+#ifdef PHYS_HAS_IMPL
 	if (physInitialized) return Phys_CreateConstraint_Impl(def);
 #endif
 	(void)def;
@@ -413,7 +571,7 @@ physConstraintHandle_t Phys_CreateConstraint(const physConstraintDef_t *def) {
 }
 
 void Phys_DestroyConstraint(physConstraintHandle_t handle) {
-#ifdef USE_BULLET_PHYSICS_IMPL
+#ifdef PHYS_HAS_IMPL
 	if (physInitialized) Phys_DestroyConstraint_Impl(handle);
 #else
 	(void)handle;
@@ -421,22 +579,46 @@ void Phys_DestroyConstraint(physConstraintHandle_t handle) {
 }
 
 void Phys_SetConstraintLimits(physConstraintHandle_t handle, float lower, float upper) {
-#ifdef USE_BULLET_PHYSICS_IMPL
+#ifdef PHYS_HAS_IMPL
 	if (physInitialized) { Phys_SetConstraintLimits_Impl(handle, lower, upper); return; }
 #endif
 	(void)handle; (void)lower; (void)upper;
 }
 
 physRagdollHandle_t Phys_CreateRagdoll(const physRagdollDef_t *def) {
-#ifdef USE_BULLET_PHYSICS_IMPL
-	if (physInitialized) return Phys_CreateRagdoll_Impl(def);
-#endif
+	physRagdollDef_t local;
+
+#ifdef PHYS_HAS_IMPL
+	if ( !physInitialized || !def ) {
+		return -1;
+	}
+	local = *def;
+	if ( phys_ragdoll_stiffness && local.jointStiffness <= 0.0f ) {
+		local.jointStiffness = phys_ragdoll_stiffness->value;
+	}
+	if ( phys_ragdoll_damping && local.jointDamping <= 0.0f ) {
+		local.jointDamping = phys_ragdoll_damping->value;
+	}
+	if ( phys_ragdoll_muscles && local.muscleStrength <= 0.0f ) {
+		local.muscleStrength = phys_ragdoll_muscles->value;
+	}
+	{
+		physRagdollHandle_t h = Phys_CreateRagdoll_Impl( &local );
+		if ( h >= 0 && phys_ragdoll_balance && phys_ragdoll_balance->integer ) {
+			vec3_t up;
+			VectorSet( up, local.rootPosition[0], local.rootPosition[1] + 48.0f, local.rootPosition[2] );
+			Phys_RagdollSetBalance( h, qtrue, up );
+		}
+		return h;
+	}
+#else
 	(void)def;
 	return -1;
+#endif
 }
 
 void Phys_DestroyRagdoll(physRagdollHandle_t handle) {
-#ifdef USE_BULLET_PHYSICS_IMPL
+#ifdef PHYS_HAS_IMPL
 	if (physInitialized) Phys_DestroyRagdoll_Impl(handle);
 #else
 	(void)handle;
@@ -444,28 +626,28 @@ void Phys_DestroyRagdoll(physRagdollHandle_t handle) {
 }
 
 void Phys_RagdollApplyImpact(physRagdollHandle_t handle, const vec3_t point, const vec3_t impulse, float radius) {
-#ifdef USE_BULLET_PHYSICS_IMPL
+#ifdef PHYS_HAS_IMPL
 	if (physInitialized) { Phys_RagdollApplyImpact_Impl(handle, point, impulse, radius); return; }
 #endif
 	(void)handle; (void)point; (void)impulse; (void)radius;
 }
 
 void Phys_RagdollSetBalance(physRagdollHandle_t handle, qboolean enabled, const vec3_t target) {
-#ifdef USE_BULLET_PHYSICS_IMPL
+#ifdef PHYS_HAS_IMPL
 	if (physInitialized) { Phys_RagdollSetBalance_Impl(handle, enabled, target); return; }
 #endif
 	(void)handle; (void)enabled; (void)target;
 }
 
 void Phys_RagdollReach(physRagdollHandle_t handle, int limbIndex, const vec3_t target, float strength) {
-#ifdef USE_BULLET_PHYSICS_IMPL
+#ifdef PHYS_HAS_IMPL
 	if (physInitialized) { Phys_RagdollReach_Impl(handle, limbIndex, target, strength); return; }
 #endif
 	(void)handle; (void)limbIndex; (void)target; (void)strength;
 }
 
 void Phys_RagdollGetBoneTransform(physRagdollHandle_t handle, int boneIndex, physTransform_t *out) {
-#ifdef USE_BULLET_PHYSICS_IMPL
+#ifdef PHYS_HAS_IMPL
 	if (physInitialized) { Phys_RagdollGetBoneTransform_Impl(handle, boneIndex, out); return; }
 #endif
 	(void)handle; (void)boneIndex;
@@ -473,21 +655,37 @@ void Phys_RagdollGetBoneTransform(physRagdollHandle_t handle, int boneIndex, phy
 }
 
 void Phys_RagdollSetMuscleStiffness(physRagdollHandle_t handle, float stiffness) {
-#ifdef USE_BULLET_PHYSICS_IMPL
+#ifdef PHYS_HAS_IMPL
 	if (physInitialized) { Phys_RagdollSetMuscleStiffness_Impl(handle, stiffness); return; }
 #endif
 	(void)handle; (void)stiffness;
 }
 
 void Phys_RagdollBlendToAnimation(physRagdollHandle_t handle, float blend) {
-#ifdef USE_BULLET_PHYSICS_IMPL
+#ifdef PHYS_HAS_IMPL
 	if (physInitialized) { Phys_RagdollBlendToAnimation_Impl(handle, blend); return; }
 #endif
 	(void)handle; (void)blend;
 }
 
+void Phys_RagdollApplyBoneTorque(physRagdollHandle_t handle, int boneIndex, const vec3_t torque) {
+#ifdef PHYS_HAS_IMPL
+	if (physInitialized) { Phys_RagdollApplyBoneTorque_Impl(handle, boneIndex, torque); return; }
+#endif
+	(void)handle; (void)boneIndex; (void)torque;
+}
+
+int Phys_GetRagdollCount(void) {
+#ifdef PHYS_HAS_IMPL
+	if (physInitialized) {
+		return Phys_GetRagdollCount_Impl();
+	}
+#endif
+	return 0;
+}
+
 dmmObjectHandle_t Dmm_CreateObject(const dmmObjectDef_t *def) {
-#ifdef USE_BULLET_PHYSICS_IMPL
+#ifdef PHYS_HAS_IMPL
 	if (physInitialized) return Dmm_CreateObject_Impl(def);
 #endif
 	(void)def;
@@ -495,7 +693,7 @@ dmmObjectHandle_t Dmm_CreateObject(const dmmObjectDef_t *def) {
 }
 
 void Dmm_DestroyObject(dmmObjectHandle_t handle) {
-#ifdef USE_BULLET_PHYSICS_IMPL
+#ifdef PHYS_HAS_IMPL
 	if (physInitialized) Dmm_DestroyObject_Impl(handle);
 #else
 	(void)handle;
@@ -503,21 +701,21 @@ void Dmm_DestroyObject(dmmObjectHandle_t handle) {
 }
 
 void Dmm_ApplyForce(dmmObjectHandle_t handle, const vec3_t force, const vec3_t point) {
-#ifdef USE_BULLET_PHYSICS_IMPL
+#ifdef PHYS_HAS_IMPL
 	if (physInitialized) { Dmm_ApplyForce_Impl(handle, force, point); return; }
 #endif
 	(void)handle; (void)force; (void)point;
 }
 
 void Dmm_ApplyImpact(dmmObjectHandle_t handle, const vec3_t point, const vec3_t direction, float energy) {
-#ifdef USE_BULLET_PHYSICS_IMPL
+#ifdef PHYS_HAS_IMPL
 	if (physInitialized) { Dmm_ApplyImpact_Impl(handle, point, direction, energy); return; }
 #endif
 	(void)handle; (void)point; (void)direction; (void)energy;
 }
 
 void Dmm_GetState(dmmObjectHandle_t handle, dmmState_t *out) {
-#ifdef USE_BULLET_PHYSICS_IMPL
+#ifdef PHYS_HAS_IMPL
 	if (physInitialized) { Dmm_GetState_Impl(handle, out); return; }
 #endif
 	(void)handle;
@@ -525,7 +723,7 @@ void Dmm_GetState(dmmObjectHandle_t handle, dmmState_t *out) {
 }
 
 qboolean Dmm_IsFractured(dmmObjectHandle_t handle) {
-#ifdef USE_BULLET_PHYSICS_IMPL
+#ifdef PHYS_HAS_IMPL
 	if (physInitialized) return Dmm_IsFractured_Impl(handle);
 #endif
 	(void)handle;
@@ -533,7 +731,7 @@ qboolean Dmm_IsFractured(dmmObjectHandle_t handle) {
 }
 
 int Dmm_GetFragments(dmmObjectHandle_t handle, physBodyHandle_t *fragments, int maxFragments) {
-#ifdef USE_BULLET_PHYSICS_IMPL
+#ifdef PHYS_HAS_IMPL
 	if (physInitialized) return Dmm_GetFragments_Impl(handle, fragments, maxFragments);
 #endif
 	(void)handle; (void)fragments; (void)maxFragments;
@@ -541,14 +739,14 @@ int Dmm_GetFragments(dmmObjectHandle_t handle, physBodyHandle_t *fragments, int 
 }
 
 void Dmm_SetMaterialParams(dmmObjectHandle_t handle, float stiffness, float yield, float fracture) {
-#ifdef USE_BULLET_PHYSICS_IMPL
+#ifdef PHYS_HAS_IMPL
 	if (physInitialized) { Dmm_SetMaterialParams_Impl(handle, stiffness, yield, fracture); return; }
 #endif
 	(void)handle; (void)stiffness; (void)yield; (void)fracture;
 }
 
 qboolean Phys_RayCast(const vec3_t from, const vec3_t to, physRayResult_t *result) {
-#ifdef USE_BULLET_PHYSICS_IMPL
+#ifdef PHYS_HAS_IMPL
 	if (physInitialized) return Phys_RayCast_Impl(from, to, result);
 #endif
 	(void)from; (void)to;
@@ -557,7 +755,7 @@ qboolean Phys_RayCast(const vec3_t from, const vec3_t to, physRayResult_t *resul
 }
 
 int Phys_OverlapSphere(const vec3_t center, float radius, physBodyHandle_t *results, int maxResults) {
-#ifdef USE_BULLET_PHYSICS_IMPL
+#ifdef PHYS_HAS_IMPL
 	if (physInitialized) return Phys_OverlapSphere_Impl(center, radius, results, maxResults);
 #endif
 	(void)center; (void)radius; (void)results; (void)maxResults;
@@ -565,7 +763,7 @@ int Phys_OverlapSphere(const vec3_t center, float radius, physBodyHandle_t *resu
 }
 
 int Phys_OverlapBox(const vec3_t center, const vec3_t halfExtents, physBodyHandle_t *results, int maxResults) {
-#ifdef USE_BULLET_PHYSICS_IMPL
+#ifdef PHYS_HAS_IMPL
 	if (physInitialized) return Phys_OverlapBox_Impl(center, halfExtents, results, maxResults);
 #endif
 	(void)center; (void)halfExtents; (void)results; (void)maxResults;
@@ -573,17 +771,18 @@ int Phys_OverlapBox(const vec3_t center, const vec3_t halfExtents, physBodyHandl
 }
 
 void Phys_DebugDraw(void) {
-#ifdef USE_BULLET_PHYSICS_IMPL
+#ifdef PHYS_HAS_IMPL
 	if (physInitialized && phys_debugDraw && phys_debugDraw->integer) {
 		PhysDebug_Clear();
 		Phys_DebugDraw_Impl();
+		PhysSolvers_DebugDraw();
 	}
 #endif
 }
 
 qboolean Phys_ConvexSweep(const physBodyDef_t *shapeDef, const vec3_t from, const vec3_t to,
 	const vec3_t rotation, physRayResult_t *result) {
-#ifdef USE_BULLET_PHYSICS_IMPL
+#ifdef PHYS_HAS_IMPL
 	if (physInitialized) return Phys_ConvexSweep_Impl(shapeDef, from, to, rotation, result);
 #endif
 	(void)shapeDef; (void)from; (void)to; (void)rotation;
@@ -592,7 +791,7 @@ qboolean Phys_ConvexSweep(const physBodyDef_t *shapeDef, const vec3_t from, cons
 }
 
 void Phys_SetBodyMaterial(physBodyHandle_t handle, int materialId) {
-#ifdef USE_BULLET_PHYSICS_IMPL
+#ifdef PHYS_HAS_IMPL
 	if (physInitialized) Phys_SetBodyMaterial_Impl(handle, materialId);
 #else
 	(void)handle; (void)materialId;
@@ -600,7 +799,7 @@ void Phys_SetBodyMaterial(physBodyHandle_t handle, int materialId) {
 }
 
 int Phys_GetBodyMaterial(physBodyHandle_t handle) {
-#ifdef USE_BULLET_PHYSICS_IMPL
+#ifdef PHYS_HAS_IMPL
 	if (physInitialized) return Phys_GetBodyMaterial_Impl(handle);
 #endif
 	(void)handle;
@@ -608,14 +807,14 @@ int Phys_GetBodyMaterial(physBodyHandle_t handle) {
 }
 
 int Phys_GetBodyCount(void) {
-#ifdef USE_BULLET_PHYSICS_IMPL
+#ifdef PHYS_HAS_IMPL
 	if (physInitialized) return Phys_GetBodyCount_Impl();
 #endif
 	return 0;
 }
 
 int Phys_GetConstraintCount(void) {
-#ifdef USE_BULLET_PHYSICS_IMPL
+#ifdef PHYS_HAS_IMPL
 	if (physInitialized) return Phys_GetConstraintCount_Impl();
 #endif
 	return 0;

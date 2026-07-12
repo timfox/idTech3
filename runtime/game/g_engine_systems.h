@@ -1,7 +1,7 @@
 #ifndef G_ENGINE_SYSTEMS_H
 #define G_ENGINE_SYSTEMS_H
 
-#include "../qcommon/q_shared.h"
+#include "q_shared.h"
 
 void    EngineTelemetry_Init( void );
 void    EngineTelemetry_Shutdown( void );

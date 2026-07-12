@@ -9,7 +9,7 @@ Material-blend vertex weight paint sidecar (maps/<map>.paint) and brush API.
 #ifndef TR_MATERIAL_PAINT_H
 #define TR_MATERIAL_PAINT_H
 
-#include "../../qcommon/q_shared.h"
+#include "q_shared.h"
 
 #ifdef __cplusplus
 extern "C" {

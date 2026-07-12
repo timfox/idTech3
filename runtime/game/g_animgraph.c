@@ -7,7 +7,7 @@ Minimal animgraph JSON evaluator (states + clip indices). See docs/ANIMGRAPH.md.
 */
 
 #include "g_animgraph.h"
-#include "../qcommon/qcommon.h"
+#include "qcommon.h"
 
 #define MAX_AG_STATES 32
 

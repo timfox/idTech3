@@ -9,7 +9,7 @@ Loop & Blinn glyphlet mesh data (AMD GPUOpen / mesh-shader path).
 #ifndef TR_VECTOR_FONT_GLYPHLET_H
 #define TR_VECTOR_FONT_GLYPHLET_H
 
-#include "../../qcommon/q_shared.h"
+#include "q_shared.h"
 #include "tr_vector_font.h"
 
 #define VECTOR_GLYPHLET_ATLAS_MAX_VERTS   (65536u)

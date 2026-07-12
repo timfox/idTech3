@@ -18,7 +18,7 @@ effects) for cinematic moments and NPC interactions.
 extern "C" {
 #endif
 
-#include "../qcommon/q_shared.h"
+#include "q_shared.h"
 
 #define CHOREO_MAX_SCENES    32
 #define CHOREO_MAX_EVENTS    64

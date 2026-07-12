@@ -11,7 +11,7 @@ Supports text and binary messages, ping/pong, and clean close.
 #ifndef CL_WEBSOCKET_H
 #define CL_WEBSOCKET_H
 
-#include "../../qcommon/q_shared.h"
+#include "q_shared.h"
 
 #define WS_MAX_CONNECTIONS  4
 #define WS_MAX_FRAME_SIZE   65536

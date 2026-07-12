@@ -13,9 +13,11 @@ triangle-normal wind interaction.
 ===========================================================================
 */
 
-#include "../qcommon/q_shared.h"
-#include "../qcommon/qcommon.h"
+#include "q_shared.h"
+#include "qcommon.h"
 #include "phys_cloth.h"
+#include "phys_bullet.h"
+#include "phys_debugdraw.h"
 #include <math.h>
 
 typedef struct clothInstance_s {
@@ -41,6 +43,8 @@ static int clothCount = 0;
 
 static float randf(void) { return (float)(rand() & 0x7FFF) / (float)0x7FFF; }
 
+static void Cloth_CollideWorld_Internal( clothInstance_t *c );
+
 void Cloth_DefaultConfig(clothConfig_t *config) {
 	config->gravity = 800.0f;
 	config->damping = 0.99f;
@@ -59,13 +63,22 @@ void Cloth_DefaultConfig(clothConfig_t *config) {
 	config->sleepThreshold = 0.01f;
 }
 
+static qboolean s_clothReady;
+
 void Cloth_Init(void) {
+	if (s_clothReady) {
+		return;
+	}
 	Com_Memset(clothInstances, 0, sizeof(clothInstances));
 	clothCount = 0;
 	Com_Printf("Cloth simulation initialized\n");
+	s_clothReady = qtrue;
 }
 
-void Cloth_Shutdown(void) { clothCount = 0; }
+void Cloth_Shutdown(void) {
+	clothCount = 0;
+	s_clothReady = qfalse;
+}
 
 static void Cloth_AddConstraint(clothInstance_t *c, int p0, int p1,
                                 clothConstraintType_t type, float compliance) {
@@ -265,6 +278,8 @@ void Cloth_Simulate(clothHandle_t h, float dt) {
 		}
 	}
 
+	Cloth_CollideWorld_Internal(c);
+
 	float totalMotion = 0;
 	for (i = 0; i < c->numParticles; i++) {
 		clothParticle_t *p = &c->particles[i];
@@ -429,6 +444,83 @@ void Cloth_SetWind(clothHandle_t h, const vec3_t dir, float strength) {
 	VectorCopy(dir, clothInstances[h].config.windDirection);
 	clothInstances[h].config.windStrength = strength;
 	if (strength > 0) clothInstances[h].sleeping = 0;
+}
+
+static void Cloth_CollideWorld_Internal( clothInstance_t *c ) {
+	int i;
+	physRayResult_t hit;
+	vec3_t from, to, push;
+
+	if ( Phys_GetBackend() == PHYS_BACKEND_NONE ) {
+		return;
+	}
+
+	for ( i = 0; i < c->numParticles; i++ ) {
+		clothParticle_t *p = &c->particles[i];
+		float vn;
+		if ( p->pinned ) {
+			continue;
+		}
+		VectorCopy( p->position, from );
+		VectorCopy( p->predicted, to );
+		if ( Distance( from, to ) < 0.01f ) {
+			continue;
+		}
+		if ( !Phys_RayCast( from, to, &hit ) || !hit.hit || hit.fraction >= 1.0f ) {
+			continue;
+		}
+		VectorMA( hit.hitPoint, c->config.thickness, hit.hitNormal, push );
+		VectorCopy( push, p->predicted );
+		vn = DotProduct( p->velocity, hit.hitNormal );
+		if ( vn < 0.0f ) {
+			VectorMA( p->velocity, -vn * ( 1.0f + c->config.friction * 0.25f ), hit.hitNormal, p->velocity );
+		}
+		c->sleeping = 0;
+	}
+}
+
+void Cloth_CollideWorld( clothHandle_t h ) {
+	if ( !VALID_CLOTH( h ) ) {
+		return;
+	}
+	Cloth_CollideWorld_Internal( &clothInstances[h] );
+}
+
+void Cloth_CollideWorldAll( void ) {
+	int i;
+	for ( i = 0; i < clothCount; i++ ) {
+		if ( clothInstances[i].active ) {
+			Cloth_CollideWorld_Internal( &clothInstances[i] );
+		}
+	}
+}
+
+void Cloth_DebugDraw( clothHandle_t h ) {
+	clothInstance_t *c;
+	vec3_t color;
+	int i;
+
+	if ( !VALID_CLOTH( h ) ) {
+		return;
+	}
+	c = &clothInstances[h];
+	VectorSet( color, 0.35f, 0.85f, 1.0f );
+	for ( i = 0; i < c->numConstraints; i++ ) {
+		const clothConstraint_t *con = &c->constraints[i];
+		if ( con->type != CLOTH_CONSTRAINT_STRETCH ) {
+			continue;
+		}
+		PhysDebug_AddLine( c->particles[con->p0].position, c->particles[con->p1].position, color );
+	}
+}
+
+void Cloth_DebugDrawAll( void ) {
+	int i;
+	for ( i = 0; i < clothCount; i++ ) {
+		if ( clothInstances[i].active ) {
+			Cloth_DebugDraw( i );
+		}
+	}
 }
 
 int Cloth_GetActiveCount(void) {

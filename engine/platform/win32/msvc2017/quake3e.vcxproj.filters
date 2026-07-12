@@ -10,7 +10,7 @@
     <ClCompile Include="..\..\client\cl_cin.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\client\cl_console.c">
+    <ClCompile Include="..\..\client\shell\cl_console.c">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\..\client\cl_curl.c">
@@ -34,10 +34,10 @@
     <ClCompile Include="..\..\client\cl_parse.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\client\cl_scrn.c">
+    <ClCompile Include="..\..\client\shell\cl_scrn.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\client\cl_ui.c">
+    <ClCompile Include="..\..\client\shell\cl_ui.c">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\..\qcommon\cm_load.c">

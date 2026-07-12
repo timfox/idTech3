@@ -13,7 +13,7 @@ fitness ranking, and optional external latent-to-mesh decode hooks.
 extern "C" {
 #endif
 
-#include "../qcommon/q_shared.h"
+#include "q_shared.h"
 
 #define GENETIC_GAN_MAX_SLOTS   32
 #define GENETIC_GAN_MAX_DIM     64

@@ -16,7 +16,7 @@ Vulkan Loop & Blinn glyphlet pipelines and draw (r_vectorFontMode 2).
 #include "vk_scene_pass.h"
 #include "../common/tr_vector_font.h"
 #include "../common/tr_vector_font_glyphlet.h"
-#include "../../qcommon/q_utf8.h"
+#include "q_utf8.h"
 #include <stddef.h>
 
 #define VF_MAX_STRING_CHARS 256

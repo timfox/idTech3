@@ -6,7 +6,7 @@ Client demo record/playback and demo AVI capture.
 ===========================================================================
 */
 #pragma once
-#include "../../qcommon/qcommon.h"
+#include "qcommon.h"
 #ifdef __cplusplus
 extern "C" {
 #endif

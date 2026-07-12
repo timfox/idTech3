@@ -33,6 +33,12 @@ rg -q 'WorldResidency_SetDistrictFilter' "$DISTRICT"
 rg -q 'world_residency.cpp' CMakeLists.txt
 rg -q 'SectorGraph_IsReachable' "$RESIDENCY"
 rg -q 'sector_graph.cpp' CMakeLists.txt
+rg -q 'WR_LayerUsesServerAllow' "$RESIDENCY"
+rg -q 'world_residency_status' "$RESIDENCY"
+rg -q 'WorldResidency_Status' "$RESIDENCY"
+test -f "$ROOT/examples/demo_game/mod/demo_world_residency.cfg"
+rg -q 'r_openWorldResidency 1' "$ROOT/examples/demo_game/mod/demo_world_residency.cfg"
+rg -q 'modules/world/world_residency' "$ROOT/docs/WORLD_RESIDENCY.md"
 
 if [[ -x "${ROOT}/build-vk-Release/unit_world_residency" ]]; then
 	echo "[test_openworld_residency] running unit_world_residency..."

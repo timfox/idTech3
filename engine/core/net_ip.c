@@ -27,9 +27,9 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #	define _POSIX_C_SOURCE 200809L
 #endif
 
-#include "../qcommon/q_shared.h"
-#include "../qcommon/qcommon.h"
-#include "../qcommon/net_p2p.h"
+#include "q_shared.h"
+#include "qcommon.h"
+#include "net_p2p.h"
 #include "net_dtls.h"
 #include "net_sdr.h"
 

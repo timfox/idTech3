@@ -19,7 +19,7 @@ Exposes C API for Lua game scripts to call into.
 extern "C" {
 #endif
 
-#include "../qcommon/q_shared.h"
+#include "q_shared.h"
 
 #define DIRECTOR_MAX_PLAYERS    16
 #define DIRECTOR_MAX_SPAWN_TYPES 32

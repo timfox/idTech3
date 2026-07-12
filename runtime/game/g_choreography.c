@@ -11,8 +11,8 @@ Timeline-based scene playback with event dispatch.
 ===========================================================================
 */
 
-#include "../qcommon/q_shared.h"
-#include "../qcommon/qcommon.h"
+#include "q_shared.h"
+#include "qcommon.h"
 #include "g_choreography.h"
 
 typedef struct choreoScene_s {

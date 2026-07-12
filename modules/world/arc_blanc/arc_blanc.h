@@ -9,7 +9,7 @@ Tessendorf FFT free surface, depth velocity, fluid-solid coupling.
 
 #pragma once
 
-#include "../../qcommon/q_shared.h"
+#include "q_shared.h"
 
 #define ARC_BLANC_GPU_MAX_CASCADES 3
 #define ARC_BLANC_VELOCITY_SAMPLES 8

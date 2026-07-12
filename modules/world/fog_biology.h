@@ -13,7 +13,7 @@ marine vs soil sources, fog deposition, pre/post-fog community shifts.
 extern "C" {
 #endif
 
-#include "../qcommon/q_shared.h"
+#include "q_shared.h"
 
 typedef enum {
 	FOG_BIO_SITE_MAINE = 0,

@@ -3,7 +3,7 @@
  */
 #pragma once
 
-#include "../../qcommon/q_shared.h"
+#include "q_shared.h"
 
 #define AB_GRAVITY           9.80665f
 #define AB_CASCADE_COUNT     3

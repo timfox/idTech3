@@ -13,7 +13,7 @@ per-layer budgets with bounded symmetric-difference updates.
 extern "C" {
 #endif
 
-#include "../qcommon/q_shared.h"
+#include "q_shared.h"
 #include "world_open.h"
 
 #define WORLD_RESIDENCY_MAX_SET       128
@@ -43,6 +43,7 @@ void     WorldResidency_Init( void );
 void     WorldResidency_Shutdown( void );
 qboolean WorldResidency_IsEnabled( void );
 qboolean WorldResidency_ServerEnabled( void );
+void     WorldResidency_Status( void );
 
 void WorldResidency_SetDistrictFilter( qboolean active, int x0, int y0, int x1, int y1 );
 void WorldResidency_ClearDistrictFilter( void );

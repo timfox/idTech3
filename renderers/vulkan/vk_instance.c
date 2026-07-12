@@ -216,13 +216,31 @@ static qboolean vk_create_device( VkPhysicalDevice physical_device, int device_i
 		qvkGetPhysicalDeviceQueueFamilyProperties( physical_device, &queue_family_count, queue_families );
 
 		vk.queue_family_index = ~0U;
-		for (i = 0; i < queue_family_count; i++) {
-			VkBool32 presentation_supported;
-			VK_CHECK( qvkGetPhysicalDeviceSurfaceSupportKHR( physical_device, i, vk_surface, &presentation_supported ) );
+		vk.sparseBinding = qfalse;
+		vk.sparseResidencyImage2D = qfalse;
+		vk.sparseResidencyNonResidentStrict = qfalse;
+		{
+			uint32_t best = ~0U;
+			uint32_t bestSparse = ~0U;
 
-			if (presentation_supported && (queue_families[i].queueFlags & VK_QUEUE_GRAPHICS_BIT) != 0) {
-				vk.queue_family_index = i;
-				break;
+			for ( i = 0; i < queue_family_count; i++ ) {
+				VkBool32 presentation_supported;
+				VK_CHECK( qvkGetPhysicalDeviceSurfaceSupportKHR( physical_device, i, vk_surface, &presentation_supported ) );
+
+				if ( !presentation_supported || ( queue_families[i].queueFlags & VK_QUEUE_GRAPHICS_BIT ) == 0 ) {
+					continue;
+				}
+				if ( best == ~0U ) {
+					best = i;
+				}
+				if ( ( queue_families[i].queueFlags & VK_QUEUE_SPARSE_BINDING_BIT ) != 0 && bestSparse == ~0U ) {
+					bestSparse = i;
+				}
+			}
+			vk.queue_family_index = ( bestSparse != ~0U ) ? bestSparse : best;
+			if ( vk.queue_family_index != ~0U &&
+				( queue_families[vk.queue_family_index].queueFlags & VK_QUEUE_SPARSE_BINDING_BIT ) != 0 ) {
+				vk.sparseBinding = qtrue; /* provisional: queue supports sparse submits */
 			}
 		}
 
@@ -685,6 +703,31 @@ static qboolean vk_create_device( VkPhysicalDevice physical_device, int device_i
 			features.independentBlend = VK_TRUE;
 		}
 
+		/* Sparse residency (VT / MegaTexture-class). Requires features + queue SPARSE_BINDING. */
+		{
+			qboolean queueSparse = vk.sparseBinding;
+			VkPhysicalDeviceProperties props;
+
+			vk.sparseBinding = qfalse;
+			vk.sparseResidencyImage2D = qfalse;
+			vk.sparseResidencyNonResidentStrict = qfalse;
+			if ( queueSparse && device_features.sparseBinding && device_features.sparseResidencyImage2D ) {
+				features.sparseBinding = VK_TRUE;
+				features.sparseResidencyImage2D = VK_TRUE;
+				vk.sparseBinding = qtrue;
+				vk.sparseResidencyImage2D = qtrue;
+				qvkGetPhysicalDeviceProperties( physical_device, &props );
+				if ( props.sparseProperties.residencyNonResidentStrict ) {
+					vk.sparseResidencyNonResidentStrict = qtrue;
+				}
+				ri.Printf( PRINT_ALL, "[VK] sparseBinding + sparseResidencyImage2D enabled%s\n",
+					vk.sparseResidencyNonResidentStrict ? " (nonResidentStrict)" : "" );
+			} else {
+				ri.Printf( PRINT_ALL, "[VK] sparse residency unavailable (features=%d/%d queueSparse=%d)\n",
+					(int)device_features.sparseBinding, (int)device_features.sparseResidencyImage2D, (int)queueSparse );
+			}
+		}
+
 		device_desc.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
 		device_desc.pNext = NULL;
 		device_desc.flags = 0;
@@ -1061,11 +1104,13 @@ void vk_init_vulkan_library( void )
 	INIT_DEVICE_FUNCTION(vkGetBufferMemoryRequirements)
 	INIT_DEVICE_FUNCTION(vkGetDeviceQueue)
 	INIT_DEVICE_FUNCTION(vkGetImageMemoryRequirements)
+	INIT_DEVICE_FUNCTION(vkGetImageSparseMemoryRequirements)
 	INIT_DEVICE_FUNCTION(vkGetImageSubresourceLayout)
 	INIT_DEVICE_FUNCTION(vkGetPipelineCacheData)
 	INIT_DEVICE_FUNCTION(vkInvalidateMappedMemoryRanges)
 	INIT_DEVICE_FUNCTION(vkMapMemory)
 	INIT_DEVICE_FUNCTION(vkQueueSubmit)
+	INIT_DEVICE_FUNCTION(vkQueueBindSparse)
 	INIT_DEVICE_FUNCTION(vkQueueWaitIdle)
 	INIT_DEVICE_FUNCTION(vkResetCommandBuffer)
 	INIT_DEVICE_FUNCTION(vkResetDescriptorPool)
@@ -1238,11 +1283,13 @@ void vk_deinit_device_functions( void )
 	qvkGetBufferMemoryRequirements = NULL;
 	qvkGetDeviceQueue = NULL;
 	qvkGetImageMemoryRequirements = NULL;
+	qvkGetImageSparseMemoryRequirements = NULL;
 	qvkGetImageSubresourceLayout = NULL;
 	qvkGetPipelineCacheData = NULL;
 	qvkInvalidateMappedMemoryRanges = NULL;
 	qvkMapMemory = NULL;
 	qvkQueueSubmit = NULL;
+	qvkQueueBindSparse = NULL;
 	qvkQueueWaitIdle = NULL;
 	qvkResetCommandBuffer = NULL;
 	qvkResetDescriptorPool = NULL;

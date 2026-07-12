@@ -4,8 +4,8 @@ Copyright (C) 2026 Gopex LLC. All rights reserved.
 ===========================================================================
 */
 
-#include "../qcommon/q_shared.h"
-#include "../qcommon/qcommon.h"
+#include "q_shared.h"
+#include "qcommon.h"
 #include "phys_bullet.h"
 #include "phys_character.h"
 
@@ -28,9 +28,10 @@ static cvar_t *phys_character;
 void Phys_CharacterInit( void ) {
 	phys_character = Cvar_Get( "phys_character", "1", CVAR_ARCHIVE );
 	Cvar_SetDescription( phys_character,
-		"Enable kinematic character controller traps (G_PHYS_CHARACTER_*). Default on." );
+		"Enable kinematic character controller traps (G_PHYS_CHARACTER_*). "
+		"Box3D uses CastMover; other backends use capsule convex sweep." );
 	if ( phys_character->integer ) {
-		Com_Printf( "[physics] phys_character=1 (kinematic capsule controller)\n" );
+		Com_Printf( "[physics] phys_character=1 (CastMover when backend=box3d)\n" );
 	}
 }
 
@@ -74,13 +75,33 @@ int Phys_CharacterCreate( float radius, float height, float stepHeight ) {
 
 int Phys_CharacterMove( int handle, const float *wishDir, float wishSpeed, qboolean jump ) {
 	physCharacter_t *ch;
-	vec3_t move;
+	physBodyDef_t shape;
+	physRayResult_t hit;
+	vec3_t move, from, to, rot;
 	float speed;
+	float dt = 0.016f;
 
 	if ( handle < 0 || handle >= MAX_PHYS_CHARACTERS || !s_chars[handle].active ) {
 		return -1;
 	}
 	ch = &s_chars[handle];
+
+	/* Preferred path: Box3D CastMover + plane solver. */
+	if ( Phys_MoverStep( ch->origin, ch->velocity, ch->radius, ch->height,
+			wishDir, wishSpeed, dt, jump, &ch->grounded ) ) {
+		if ( ch->body >= 0 ) {
+			Phys_SetBodyTransform( ch->body, ch->origin, NULL );
+			Phys_SetBodyVelocity( ch->body, ch->velocity, NULL );
+		}
+		return 0;
+	}
+
+	/* Fallback: capsule convex sweep (Bullet / no-mover backends). */
+	Com_Memset( &shape, 0, sizeof( shape ) );
+	shape.shape = PHYS_SHAPE_CAPSULE;
+	shape.radius = ch->radius;
+	shape.height = ch->height;
+	VectorClear( rot );
 
 	if ( wishDir ) {
 		VectorCopy( wishDir, move );
@@ -89,23 +110,43 @@ int Phys_CharacterMove( int handle, const float *wishDir, float wishSpeed, qbool
 	}
 	speed = wishSpeed > 0.0f ? wishSpeed : 320.0f;
 	VectorNormalize( move );
-	VectorScale( move, speed * 0.016f, move );
-	VectorAdd( ch->origin, move, ch->origin );
+	VectorScale( move, speed * dt, move );
+
+	VectorCopy( ch->origin, from );
+	VectorAdd( ch->origin, move, to );
+	if ( Phys_ConvexSweep( &shape, from, to, rot, &hit ) && hit.fraction < 1.0f ) {
+		ch->origin[0] = from[0] + ( to[0] - from[0] ) * hit.fraction;
+		ch->origin[1] = from[1] + ( to[1] - from[1] ) * hit.fraction;
+		ch->origin[2] = from[2] + ( to[2] - from[2] ) * hit.fraction;
+	} else {
+		VectorCopy( to, ch->origin );
+	}
 
 	if ( jump && ch->grounded ) {
 		ch->velocity[2] = 280.0f;
 		ch->grounded = qfalse;
 	}
 
-	ch->velocity[2] -= 800.0f * 0.016f;
-	ch->origin[2] += ch->velocity[2] * 0.016f;
-	if ( ch->origin[2] < 0.0f ) {
-		ch->origin[2] = 0.0f;
-		ch->velocity[2] = 0.0f;
-		ch->grounded = qtrue;
+	ch->velocity[2] -= 800.0f * dt;
+
+	VectorCopy( ch->origin, from );
+	to[0] = ch->origin[0];
+	to[1] = ch->origin[1];
+	to[2] = ch->origin[2] + ch->velocity[2] * dt;
+	if ( Phys_ConvexSweep( &shape, from, to, rot, &hit ) && hit.fraction < 1.0f ) {
+		ch->origin[2] = from[2] + ( to[2] - from[2] ) * hit.fraction;
+		if ( ch->velocity[2] <= 0.0f ) {
+			ch->velocity[2] = 0.0f;
+			ch->grounded = qtrue;
+		} else {
+			ch->velocity[2] = 0.0f;
+		}
+	} else {
+		ch->origin[2] = to[2];
+		ch->grounded = qfalse;
 	}
 
-	if ( ch->body ) {
+	if ( ch->body >= 0 ) {
 		Phys_SetBodyTransform( ch->body, ch->origin, NULL );
 		Phys_SetBodyVelocity( ch->body, ch->velocity, NULL );
 	}
@@ -117,7 +158,7 @@ void Phys_CharacterDestroy( int handle ) {
 	if ( handle < 0 || handle >= MAX_PHYS_CHARACTERS || !s_chars[handle].active ) {
 		return;
 	}
-	if ( s_chars[handle].body ) {
+	if ( s_chars[handle].body >= 0 ) {
 		Phys_DestroyBody( s_chars[handle].body );
 	}
 	Com_Memset( &s_chars[handle], 0, sizeof( s_chars[handle] ) );

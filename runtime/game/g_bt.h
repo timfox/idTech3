@@ -18,7 +18,7 @@ decision-making. Trees are data-driven and composable.
 extern "C" {
 #endif
 
-#include "../qcommon/q_shared.h"
+#include "q_shared.h"
 
 #define BT_MAX_AGENTS        64
 #define BT_MAX_NODES         128

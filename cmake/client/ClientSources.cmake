@@ -52,7 +52,8 @@ set(IDTECH3_CLIENT_PLATFORM_SRCS
 	${_IDTECH3_CLIENT_REL}/platform/cl_voip.c
 )
 
-file(GLOB IDTECH3_CLIENT_SHELL_SRCS_ABS "${_IDTECH3_CLIENT}/*.c")
+# Shell: console / UI / HUD / engine sprites (was root *.c; now shell/).
+file(GLOB IDTECH3_CLIENT_SHELL_SRCS_ABS "${_IDTECH3_CLIENT}/shell/*.c")
 set(IDTECH3_CLIENT_SHELL_SRCS "")
 foreach(_abs ${IDTECH3_CLIENT_SHELL_SRCS_ABS})
 	file(RELATIVE_PATH _rel "${CMAKE_SOURCE_DIR}" "${_abs}")
@@ -74,6 +75,7 @@ macro(idtech3_client_include_domains target)
 		${_IDTECH3_CLIENT}/world
 		${_IDTECH3_CLIENT}/media
 		${_IDTECH3_CLIENT}/platform
+		${_IDTECH3_CLIENT}/shell
 	)
 endmacro()
 
