@@ -20,13 +20,17 @@ typedef struct {
 } meshlet_cache_entry_t;
 
 static cvar_t *r_meshlets;
+static cvar_t *r_meshletsMdi;
 static qboolean s_cmds;
 static int s_bakeCount;
 static int s_cacheHits;
 static int s_cacheMisses;
 static int s_cullVisible;
 static int s_cullTotal;
+static int s_mdiCount;
+static int s_mdiTris;
 static meshlet_cache_entry_t s_cache[MESHLET_CACHE_SLOTS];
+static meshlet_draw_cmd_t s_mdiCmds[MESHLET_MAX_PER_SURFACE];
 
 static void Meshlets_Status_f( void )
 {
@@ -40,9 +44,11 @@ static void Meshlets_Status_f( void )
 	}
 	ri.Printf( PRINT_ALL,
 		"[VK][meshlets] active=%d bakeCalls=%d cache hits=%d misses=%d slots=%d/%d\n"
-		"  lastCull visible=%d / total=%d\n",
+		"  lastCull visible=%d / total=%d mdi=%d cmds=%d tris=%d\n",
 		R_Meshlets_Active() ? 1 : 0, s_bakeCount, s_cacheHits, s_cacheMisses,
-		used, MESHLET_CACHE_SLOTS, s_cullVisible, s_cullTotal );
+		used, MESHLET_CACHE_SLOTS, s_cullVisible, s_cullTotal,
+		( r_meshletsMdi && r_meshletsMdi->integer ) ? 1 : 0,
+		s_mdiCount, s_mdiTris );
 }
 
 void R_Meshlets_Init( void )
@@ -53,16 +59,24 @@ void R_Meshlets_Init( void )
 		"Meshlet bake + CPU frustum cull for dense static meshes (Nanite-lite). Default 0." );
 	ri.Cvar_SetGroup( r_meshlets, CVG_RENDERER );
 
+	r_meshletsMdi = ri.Cvar_Get( "r_meshletsMdi", "0", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_meshletsMdi, "0", "1", CV_INTEGER );
+	ri.Cvar_SetDescription( r_meshletsMdi,
+		"Pack VkDrawIndexedIndirectCommand list from visible meshlets (MDI scaffold; draw still all-or-nothing until GPU path)." );
+	ri.Cvar_SetGroup( r_meshletsMdi, CVG_RENDERER );
+
 	Com_Memset( s_cache, 0, sizeof( s_cache ) );
 	s_bakeCount = s_cacheHits = s_cacheMisses = 0;
 	s_cullVisible = s_cullTotal = 0;
+	s_mdiCount = s_mdiTris = 0;
 
 	if ( !s_cmds ) {
 		ri.Cmd_AddCommand( "meshlet_status", Meshlets_Status_f );
 		s_cmds = qtrue;
 	}
 	if ( r_meshlets->integer ) {
-		ri.Printf( PRINT_ALL, "[VK][meshlets] r_meshlets=1 (bake-at-load cache + CPU frustum cull)\n" );
+		ri.Printf( PRINT_ALL, "[VK][meshlets] r_meshlets=1 (bake-at-load cache + CPU frustum cull%s)\n",
+			( r_meshletsMdi && r_meshletsMdi->integer ) ? "; MDI pack on" : "" );
 	}
 }
 
@@ -280,4 +294,49 @@ int R_Meshlets_CullViewFrustumXform( const meshlet_t *meshlets, int count,
 	}
 	s_cullVisible = n;
 	return n;
+}
+
+int R_Meshlets_PackIndirect( const meshlet_t *meshlets, const int *visible, int visibleCount,
+	meshlet_draw_cmd_t *outCmds, int maxCmds )
+{
+	int i;
+	int n = 0;
+	int tris = 0;
+
+	s_mdiCount = 0;
+	s_mdiTris = 0;
+	if ( !meshlets || !visible || !outCmds || maxCmds <= 0 || visibleCount <= 0 ) {
+		return 0;
+	}
+	if ( !r_meshletsMdi || !r_meshletsMdi->integer ) {
+		return 0;
+	}
+
+	for ( i = 0; i < visibleCount && n < maxCmds; i++ ) {
+		int idx = visible[i];
+		meshlet_draw_cmd_t *cmd;
+
+		if ( idx < 0 ) {
+			continue;
+		}
+		cmd = &outCmds[n];
+		cmd->indexCount = meshlets[idx].indexCount;
+		cmd->instanceCount = 1u;
+		cmd->firstIndex = meshlets[idx].firstIndex;
+		cmd->vertexOffset = 0;
+		cmd->firstInstance = 0;
+		tris += (int)( meshlets[idx].indexCount / 3u );
+		n++;
+	}
+	s_mdiCount = n;
+	s_mdiTris = tris;
+	if ( n > 0 && n <= MESHLET_MAX_PER_SURFACE ) {
+		Com_Memcpy( s_mdiCmds, outCmds, (size_t)n * sizeof( meshlet_draw_cmd_t ) );
+	}
+	return n;
+}
+
+qboolean R_Meshlets_WantMdi( void )
+{
+	return ( R_Meshlets_Active() && r_meshletsMdi && r_meshletsMdi->integer ) ? qtrue : qfalse;
 }

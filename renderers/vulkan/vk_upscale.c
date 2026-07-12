@@ -16,6 +16,7 @@ No FidelityFX/DLSS SDK — see docs/RENDERERS.md.
 
 static cvar_t *r_upscale;
 static cvar_t *r_upscaleSharpness;
+static cvar_t *r_upscaleDisplayHistory;
 
 static float s_jitterX;
 static float s_jitterY;
@@ -40,19 +41,36 @@ static float Upscale_Halton( uint32_t index, uint32_t base )
 
 static void Upscale_Status_f( void )
 {
+	float scaleX = 1.0f;
+	float scaleY = 1.0f;
+	int rw = r_renderWidth ? r_renderWidth->integer : 0;
+	int rh = r_renderHeight ? r_renderHeight->integer : 0;
+
+	if ( rw > 0 && gls.windowWidth > 0 ) {
+		scaleX = (float)gls.windowWidth / (float)rw;
+	}
+	if ( rh > 0 && gls.windowHeight > 0 ) {
+		scaleY = (float)gls.windowHeight / (float)rh;
+	}
+
 	ri.Printf( PRINT_ALL,
-		"[VK][upscale] mode=%d spatial=%d temporal=%d sharpness=%.2f\n"
-		"  renderScale=%d render=%dx%d window=%dx%d\n"
-		"  jitter=(%.4f,%.4f) prev=(%.4f,%.4f) frame=%u\n",
+		"[VK][upscale] mode=%d spatial=%d temporal=%d sharpness=%.2f displayHistory=%d\n"
+		"  renderScale=%d render=%dx%d window=%dx%d upsample=%.2fx%.2f\n"
+		"  jitter=(%.4f,%.4f) prev=(%.4f,%.4f) frame=%u\n"
+		"  resolve=%s\n",
 		r_upscale ? r_upscale->integer : 0,
 		R_Upscale_WantSpatial() ? 1 : 0,
 		R_Upscale_WantTemporal() ? 1 : 0,
 		R_Upscale_GetSharpness(),
+		( r_upscaleDisplayHistory && r_upscaleDisplayHistory->integer ) ? 1 : 0,
 		r_renderScale ? r_renderScale->integer : 0,
-		r_renderWidth ? r_renderWidth->integer : 0,
-		r_renderHeight ? r_renderHeight->integer : 0,
-		gls.windowWidth, gls.windowHeight,
-		s_jitterX, s_jitterY, s_prevJitterX, s_prevJitterY, s_jitterFrame );
+		rw, rh, gls.windowWidth, gls.windowHeight, scaleX, scaleY,
+		s_jitterX, s_jitterY, s_prevJitterX, s_prevJitterY, s_jitterFrame,
+		R_Upscale_WantTemporal()
+			? ( ( r_upscaleDisplayHistory && r_upscaleDisplayHistory->integer )
+				? "temporal@internal + spatial blit (display ping-pong requested)"
+				: "temporal@internal + spatial blit" )
+			: ( R_Upscale_WantSpatial() ? "spatial blit only" : "off" ) );
 }
 
 void R_Upscale_Init( void )
@@ -67,6 +85,12 @@ void R_Upscale_Init( void )
 	ri.Cvar_CheckRange( r_upscaleSharpness, "0", "1", CV_FLOAT );
 	ri.Cvar_SetDescription( r_upscaleSharpness, "Extra TAA sharpen when r_upscale 2 (added to r_taa_sharpen)." );
 	ri.Cvar_SetGroup( r_upscaleSharpness, CVG_RENDERER );
+
+	r_upscaleDisplayHistory = ri.Cvar_Get( "r_upscaleDisplayHistory", "0", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_upscaleDisplayHistory, "0", "1", CV_INTEGER );
+	ri.Cvar_SetDescription( r_upscaleDisplayHistory,
+		"Request display-sized temporal history for r_upscale 2 (v1: status + sharpen path; ping-pong RT deferred)." );
+	ri.Cvar_SetGroup( r_upscaleDisplayHistory, CVG_RENDERER );
 
 	s_jitterX = s_jitterY = 0.0f;
 	s_prevJitterX = s_prevJitterY = 0.0f;

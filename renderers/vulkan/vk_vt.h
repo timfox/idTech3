@@ -15,4 +15,7 @@ int R_VT_Lookup( int virtualPage );
 
 image_t *R_VT_AtlasImage( void );
 
+/* PiP atlas overlay when r_vtDebug 1 (2D pass). */
+void R_VT_DebugDraw( void );
+
 #endif

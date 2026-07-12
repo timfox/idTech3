@@ -37,6 +37,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "vk_squeezeme.h"
 #include "vk_vector_font.h"
 #include "vk_wsp.h"
+#include "vk_vt.h"
 #include "vk_fp64_points.h"
 #endif
 
@@ -2201,6 +2202,10 @@ static const void *RB_FinishBloom( const void *data )
 	if ( r_showImages->integer ) {
 		RB_ShowImages();
 	}
+
+#ifdef USE_VULKAN
+	R_VT_DebugDraw();
+#endif
 
 	backEnd.drawConsole = qtrue;
 

@@ -16,9 +16,19 @@ typedef struct {
 	uint16_t vertCount;
 } meshlet_t;
 
+/* Host-side VkDrawIndexedIndirectCommand layout (5 x uint32). */
+typedef struct {
+	uint32_t indexCount;
+	uint32_t instanceCount;
+	uint32_t firstIndex;
+	int32_t  vertexOffset;
+	uint32_t firstInstance;
+} meshlet_draw_cmd_t;
+
 void R_Meshlets_Init( void );
 void R_Meshlets_Shutdown( void );
 qboolean R_Meshlets_Active( void );
+qboolean R_Meshlets_WantMdi( void );
 void R_Meshlets_InvalidateCache( void );
 
 /* Bake meshlets from position list + triangle indexes; returns count written to out[]. */
@@ -36,5 +46,9 @@ int R_Meshlets_CullViewFrustum( const meshlet_t *meshlets, int count, int *visib
 /* Transform local AABBs by entity pose, then frustum cull. */
 int R_Meshlets_CullViewFrustumXform( const meshlet_t *meshlets, int count,
 	const float entityAxis[3][3], const vec3_t entityOrigin, int *visible, int maxVisible );
+
+/* Pack MDI draw args from visible meshlet indices (r_meshletsMdi). */
+int R_Meshlets_PackIndirect( const meshlet_t *meshlets, const int *visible, int visibleCount,
+	meshlet_draw_cmd_t *outCmds, int maxCmds );
 
 #endif
