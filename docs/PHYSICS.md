@@ -44,15 +44,17 @@ Classic Q3/OA Pmove stays default (`phys_pmove 0`). Set `phys_pmove 1` for CastM
 | Explode / debug draw / hit events | Done |
 | MD3 / `.rag` ragdoll bind + anim blend | Done |
 | Profile counters (`phys_status`) | Done |
-| Recording (`phys_record` + `Phys_StartRecording`) | Done |
+| Contact begin/end (non-sensor) | Done (`PHYS_EVENT_CONTACT_*`) |
+| Body sleep events | Done (`PHYS_EVENT_BODY_SLEEP`) |
+| Recording + replay validate | Done (`phys_record_*` / `phys_replay`) |
+| Runtime friction / restitution | Done (`phys_set_friction` / `Phys_SetBodyFriction`) |
 
 ### Optional / MED–LOW (not blockers)
 
 | API | Notes |
 |-----|-------|
 | Custom query filter callbacks | Default filter only today |
-| Contact begin/end (non-sensor) | Hit events only |
-| Full FEM soft bodies | Not in Box3D — keep XPBD/DMM companions |
+| Full FEM soft bodies | Not in Box3D — keep XPBD/DMM companions ([timfox/idTech3-box3d](https://github.com/timfox/idTech3-box3d) Soft Step is rigid) |
 | Open-world sector mesh stream | Follow-on to BSP grid bake |
 
 ## Multi-solver companions
@@ -79,7 +81,7 @@ See [EDITOR_BRIDGE.md](EDITOR_BRIDGE.md) — `misc_phys_box|sphere|static|sensor
 ## Scripting
 
 - **QVM traps:** `G_PHYS_CREATEBODY` … `G_PHYS_RAYCAST`, `G_PHYS_PMOVE_CORRECT`, character traps
-- **Lua `Engine.Physics`:** bodies, sensors, constraints, rayCast, moverStep, pmoveCorrect, heightfield, backend
+- **Lua `Engine.Physics`:** bodies, sensors, constraints, rayCast, moverStep, pmoveCorrect, heightfield, backend, setFriction / setRestitution, validateReplay
 
 ## Ragdoll bind
 
@@ -112,3 +114,5 @@ Then drive poses with `Phys_RagdollSetBoneAnimTarget` / `Phys_RagdollApplyMd3Fra
 | `phys_bspGridStep` | 24 | BSP height-grid denseness |
 | `phys_record` | 0 | Allow Soft Step recording |
 | `phys_debugDraw` | 0 | Wireframe |
+
+Console: `phys_record_start`, `phys_record_stop [path]`, `phys_replay [path]`, `phys_set_friction`, `phys_set_restitution`.

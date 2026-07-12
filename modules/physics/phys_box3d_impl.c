@@ -1818,6 +1818,58 @@ void Phys_ProcessContactEvents_Impl( void ) {
 			point, normal, impulse, mag );
 	}
 
+	/* Soft Step contact begin/end (non-sensor rigid contacts) */
+	for ( i = 0; i < events.beginCount; i++ ) {
+		b3ContactBeginTouchEvent *ev = &events.beginEvents[i];
+		phys_event_t pe;
+		int bodyA = -1, bodyB = -1;
+		void *ud;
+		if ( !b3Shape_IsValid( ev->shapeIdA ) || !b3Shape_IsValid( ev->shapeIdB ) ) {
+			continue;
+		}
+		ud = b3Body_GetUserData( b3Shape_GetBody( ev->shapeIdA ) );
+		if ( ud ) {
+			bodyA = (int)(intptr_t)ud - 1;
+		}
+		ud = b3Body_GetUserData( b3Shape_GetBody( ev->shapeIdB ) );
+		if ( ud ) {
+			bodyB = (int)(intptr_t)ud - 1;
+		}
+		Com_Memset( &pe, 0, sizeof( pe ) );
+		pe.type = PHYS_EVENT_CONTACT_BEGIN;
+		pe.bodyA = bodyA;
+		pe.bodyB = bodyB;
+		if ( bodyA >= 0 ) {
+			pe.matA = bx.bodies[bodyA].materialId;
+		}
+		if ( bodyB >= 0 ) {
+			pe.matB = bx.bodies[bodyB].materialId;
+		}
+		PhysEvent_Post( &pe );
+	}
+	for ( i = 0; i < events.endCount; i++ ) {
+		b3ContactEndTouchEvent *ev = &events.endEvents[i];
+		phys_event_t pe;
+		int bodyA = -1, bodyB = -1;
+		void *ud;
+		if ( !b3Shape_IsValid( ev->shapeIdA ) || !b3Shape_IsValid( ev->shapeIdB ) ) {
+			continue;
+		}
+		ud = b3Body_GetUserData( b3Shape_GetBody( ev->shapeIdA ) );
+		if ( ud ) {
+			bodyA = (int)(intptr_t)ud - 1;
+		}
+		ud = b3Body_GetUserData( b3Shape_GetBody( ev->shapeIdB ) );
+		if ( ud ) {
+			bodyB = (int)(intptr_t)ud - 1;
+		}
+		Com_Memset( &pe, 0, sizeof( pe ) );
+		pe.type = PHYS_EVENT_CONTACT_END;
+		pe.bodyA = bodyA;
+		pe.bodyB = bodyB;
+		PhysEvent_Post( &pe );
+	}
+
 	/* Soft Step sensors → MOTION_ENTER/EXIT (triggers / pickups / AOE) */
 	sensors = b3World_GetSensorEvents( bx.worldId );
 	for ( i = 0; i < sensors.beginCount; i++ ) {
@@ -1890,6 +1942,35 @@ void Phys_ProcessContactEvents_Impl( void ) {
 			Phys_DestroyConstraint_Impl( ch );
 		}
 	}
+
+	/* Soft Step body move / sleep notifications */
+	{
+		b3BodyEvents bodies = b3World_GetBodyEvents( bx.worldId );
+		for ( i = 0; i < bodies.moveCount; i++ ) {
+			b3BodyMoveEvent *ev = &bodies.moveEvents[i];
+			int bh = -1;
+			void *ud = ev->userData;
+			if ( !ud ) {
+				ud = b3Body_GetUserData( ev->bodyId );
+			}
+			if ( ud ) {
+				bh = (int)(intptr_t)ud - 1;
+			}
+			if ( !VALID_BODY( bh ) ) {
+				continue;
+			}
+			if ( ev->fellAsleep ) {
+				phys_event_t pe;
+				Com_Memset( &pe, 0, sizeof( pe ) );
+				pe.type = PHYS_EVENT_BODY_SLEEP;
+				pe.bodyA = bh;
+				pe.matA = bx.bodies[bh].materialId;
+				to_vec3( ev->transform.p, pe.point );
+				PhysEvent_Post( &pe );
+			}
+		}
+		bx.lastProfile.contactHitCount = events.hitCount;
+	}
 }
 
 void Phys_SetBodyMaterial_Impl( physBodyHandle_t h, int materialId ) {
@@ -1904,6 +1985,40 @@ int Phys_GetBodyMaterial_Impl( physBodyHandle_t h ) {
 		return 0;
 	}
 	return bx.bodies[h].materialId;
+}
+
+void Phys_SetBodyFriction_Impl( physBodyHandle_t h, float friction ) {
+	BoxBody *pb;
+	int i;
+	if ( !VALID_BODY( h ) ) {
+		return;
+	}
+	pb = &bx.bodies[h];
+	for ( i = 0; i < pb->shapeCount; i++ ) {
+		if ( b3Shape_IsValid( pb->shapes[i] ) ) {
+			b3Shape_SetFriction( pb->shapes[i], friction );
+		}
+	}
+	if ( pb->shapeCount == 0 && b3Shape_IsValid( pb->shapeId ) ) {
+		b3Shape_SetFriction( pb->shapeId, friction );
+	}
+}
+
+void Phys_SetBodyRestitution_Impl( physBodyHandle_t h, float restitution ) {
+	BoxBody *pb;
+	int i;
+	if ( !VALID_BODY( h ) ) {
+		return;
+	}
+	pb = &bx.bodies[h];
+	for ( i = 0; i < pb->shapeCount; i++ ) {
+		if ( b3Shape_IsValid( pb->shapes[i] ) ) {
+			b3Shape_SetRestitution( pb->shapes[i], restitution );
+		}
+	}
+	if ( pb->shapeCount == 0 && b3Shape_IsValid( pb->shapeId ) ) {
+		b3Shape_SetRestitution( pb->shapeId, restitution );
+	}
 }
 
 int Phys_GetBodyCount_Impl( void ) {
@@ -2485,6 +2600,35 @@ void Phys_StopRecording_Impl( const char *path ) {
 	}
 	b3DestroyRecording( bx.recording );
 	bx.recording = NULL;
+}
+
+qboolean Phys_ValidateReplay_Impl( const char *path ) {
+	b3Recording *rec;
+	const uint8_t *data;
+	int size;
+	int workers;
+	bool ok;
+
+	if ( !path || !path[0] ) {
+		Com_Printf( S_COLOR_YELLOW "phys_replay: need a recording path\n" );
+		return qfalse;
+	}
+	rec = b3LoadRecordingFromFile( path );
+	if ( !rec ) {
+		Com_Printf( S_COLOR_YELLOW "phys_replay: failed to load %s\n", path );
+		return qfalse;
+	}
+	data = b3Recording_GetData( rec );
+	size = b3Recording_GetSize( rec );
+	workers = bx.initialized ? bx.workerCount : 1;
+	if ( workers < 1 ) {
+		workers = 1;
+	}
+	ok = b3ValidateReplay( data, size, workers );
+	b3DestroyRecording( rec );
+	Com_Printf( "[physics] Soft Step replay %s: %s (workers=%d, bytes=%d)\n",
+		path, ok ? "PASS" : "FAIL", workers, size );
+	return ok ? qtrue : qfalse;
 }
 
 #endif /* USE_BOX3D_PHYSICS_IMPL */

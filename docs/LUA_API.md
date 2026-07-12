@@ -41,6 +41,9 @@ Engine.Physics.createBody(x, y, z, mass, size) -- returns bodyHandle
 Engine.Physics.destroyBody(handle)
 Engine.Physics.applyImpulse(handle, ix, iy, iz, px, py, pz)
 Engine.Physics.getTransform(handle)           -- returns x, y, z, rx, ry, rz
+Engine.Physics.setFriction(handle, friction)
+Engine.Physics.setRestitution(handle, restitution)
+Engine.Physics.validateReplay(path)           -- Soft Step recording QA
 ```
 
 ## Engine.Particles (5 functions)

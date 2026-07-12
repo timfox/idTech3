@@ -81,6 +81,8 @@ void                 Phys_DebugDraw_Impl(void);
 void                 Phys_ProcessContactEvents_Impl(void);
 void                 Phys_SetBodyMaterial_Impl(physBodyHandle_t handle, int materialId);
 int                  Phys_GetBodyMaterial_Impl(physBodyHandle_t handle);
+void                 Phys_SetBodyFriction_Impl(physBodyHandle_t handle, float friction);
+void                 Phys_SetBodyRestitution_Impl(physBodyHandle_t handle, float restitution);
 int                  Phys_GetBodyCount_Impl(void);
 int                  Phys_GetConstraintCount_Impl(void);
 physBodyHandle_t     Phys_AddStaticTriMesh_Impl(const float *verts, int numVerts, const int *indices, int numIndices);
@@ -96,6 +98,7 @@ int                  Phys_ApplyImpulseRadius_Impl(const vec3_t center, float rad
 void                 Phys_GetSoftStepProfile_Impl(physSoftStepProfile_t *out);
 void                 Phys_StartRecording_Impl(void);
 void                 Phys_StopRecording_Impl(const char *path);
+qboolean             Phys_ValidateReplay_Impl(const char *path);
 
 #ifdef __cplusplus
 }

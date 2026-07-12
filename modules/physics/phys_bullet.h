@@ -310,11 +310,15 @@ int      Phys_OverlapShape(const vec3_t center, float radius, physBodyHandle_t *
 
 void     Phys_SetBodyMaterial(physBodyHandle_t handle, int materialId);
 int      Phys_GetBodyMaterial(physBodyHandle_t handle);
+void     Phys_SetBodyFriction(physBodyHandle_t handle, float friction);
+void     Phys_SetBodyRestitution(physBodyHandle_t handle, float restitution);
 
 /* Soft Step profile / recording (Box3D; no-ops on Bullet) */
 void     Phys_GetSoftStepProfile(physSoftStepProfile_t *out);
 void     Phys_StartRecording(void);
 void     Phys_StopRecording(const char *path);
+/* Validate a saved Soft Step recording reproduces StateHash (QA). */
+qboolean  Phys_ValidateReplay(const char *path);
 
 /* debug */
 void Phys_DebugDraw(void);

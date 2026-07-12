@@ -357,11 +357,23 @@ static int l_phys_setBoneAnimTarget(lua_State *L) {
 	return 0;
 }
 static int l_phys_subscribe(lua_State *L) {
-	/* Stub: register interest in Soft Step events (IMPACT/BREAK/MOTION_*).
+	/* Stub: register interest in Soft Step events (IMPACT/BREAK/MOTION_*/CONTACT_*/BODY_SLEEP).
 	   Full Lua callbacks need a main-thread marshal; for now log + return true. */
 	const char *typeName = luaL_optstring(L, 1, "impact");
 	Com_Printf( "[physics] Engine.Physics.subscribe(%s) registered (stub)\n", typeName );
 	lua_pushboolean(L, 1);
+	return 1;
+}
+static int l_phys_setFriction(lua_State *L) {
+	Phys_SetBodyFriction( (physBodyHandle_t)luaL_checkinteger( L, 1 ), (float)luaL_checknumber( L, 2 ) );
+	return 0;
+}
+static int l_phys_setRestitution(lua_State *L) {
+	Phys_SetBodyRestitution( (physBodyHandle_t)luaL_checkinteger( L, 1 ), (float)luaL_checknumber( L, 2 ) );
+	return 0;
+}
+static int l_phys_validateReplay(lua_State *L) {
+	lua_pushboolean( L, Phys_ValidateReplay( luaL_optstring( L, 1, "phys_recording.bin" ) ) );
 	return 1;
 }
 
@@ -1950,6 +1962,8 @@ void LuaBindings_RegisterAll(void *luaState) {
 		{"backend", l_phys_backend}, {"createRagdoll", l_phys_createRagdoll},
 		{"loadRagdoll", l_phys_loadRagdoll}, {"setBoneAnimTarget", l_phys_setBoneAnimTarget},
 		{"subscribe", l_phys_subscribe},
+		{"setFriction", l_phys_setFriction}, {"setRestitution", l_phys_setRestitution},
+		{"validateReplay", l_phys_validateReplay},
 		{NULL, NULL}
 	};
 	registerTable(L, "Physics", physicsFuncs);

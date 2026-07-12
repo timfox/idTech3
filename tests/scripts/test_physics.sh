@@ -130,6 +130,15 @@ rg -q 'CG_PHYS_CREATERAGDOLL' runtime/cgame/cg_public.h
 rg -q 'createRagdoll' runtime/game/g_lua_bindings.c
 rg -q 'subscribe' runtime/game/g_lua_bindings.c
 rg -q 'phys_spawn_ragdoll_bind' modules/physics/phys_middleware.c
+rg -q 'PHYS_EVENT_CONTACT_BEGIN' modules/physics/phys_events.h
+rg -q 'PHYS_EVENT_BODY_SLEEP' modules/physics/phys_events.h
+rg -q 'b3World_GetBodyEvents' modules/physics/phys_box3d_impl.c
+rg -q 'events.beginCount' modules/physics/phys_box3d_impl.c
+rg -q 'b3ValidateReplay' modules/physics/phys_box3d_impl.c
+rg -q 'b3Shape_SetFriction' modules/physics/phys_box3d_impl.c
+rg -q 'phys_set_friction' modules/physics/phys_middleware.c
+rg -q 'setFriction' runtime/game/g_lua_bindings.c
+rg -q 'validateReplay' runtime/game/g_lua_bindings.c
 rg -q 'phys_bspGridStep' modules/physics/phys_bullet.c
 rg -q 'misc_phys_box' docs/PHYSICS.md
 rg -q 'misc_phys_box' docs/EDITOR_BRIDGE.md

@@ -813,6 +813,40 @@ static void PhysMiddleware_RecordStop_f( void ) {
 	Phys_StopRecording( path );
 }
 
+static void PhysMiddleware_Replay_f( void ) {
+	const char *path = "phys_recording.bin";
+	if ( Cmd_Argc() >= 2 ) {
+		path = Cmd_Argv( 1 );
+	}
+	Phys_ValidateReplay( path );
+}
+
+static void PhysMiddleware_SetFriction_f( void ) {
+	physBodyHandle_t body;
+	float friction;
+	if ( Cmd_Argc() < 3 ) {
+		Com_Printf( "usage: phys_set_friction <body> <friction>\n" );
+		return;
+	}
+	body = atoi( Cmd_Argv( 1 ) );
+	friction = (float)atof( Cmd_Argv( 2 ) );
+	Phys_SetBodyFriction( body, friction );
+	Com_Printf( "phys_set_friction: body=%d friction=%.3f\n", body, friction );
+}
+
+static void PhysMiddleware_SetRestitution_f( void ) {
+	physBodyHandle_t body;
+	float rest;
+	if ( Cmd_Argc() < 3 ) {
+		Com_Printf( "usage: phys_set_restitution <body> <restitution>\n" );
+		return;
+	}
+	body = atoi( Cmd_Argv( 1 ) );
+	rest = (float)atof( Cmd_Argv( 2 ) );
+	Phys_SetBodyRestitution( body, rest );
+	Com_Printf( "phys_set_restitution: body=%d restitution=%.3f\n", body, rest );
+}
+
 void PhysMiddleware_RegisterCommands( void ) {
 	Cmd_AddCommand( "phys_status", PhysMiddleware_Status_f );
 	Cmd_AddCommand( "phys_spawn_ragdoll", PhysMiddleware_SpawnRagdoll_f );
@@ -840,6 +874,9 @@ void PhysMiddleware_RegisterCommands( void ) {
 	Cmd_AddCommand( "phys_debug", PhysMiddleware_Debug_f );
 	Cmd_AddCommand( "phys_record_start", PhysMiddleware_RecordStart_f );
 	Cmd_AddCommand( "phys_record_stop", PhysMiddleware_RecordStop_f );
+	Cmd_AddCommand( "phys_replay", PhysMiddleware_Replay_f );
+	Cmd_AddCommand( "phys_set_friction", PhysMiddleware_SetFriction_f );
+	Cmd_AddCommand( "phys_set_restitution", PhysMiddleware_SetRestitution_f );
 }
 
 void PhysMiddleware_Init( void ) {
@@ -902,6 +939,9 @@ void PhysMiddleware_Shutdown( void ) {
 	Cmd_RemoveCommand( "phys_debug" );
 	Cmd_RemoveCommand( "phys_record_start" );
 	Cmd_RemoveCommand( "phys_record_stop" );
+	Cmd_RemoveCommand( "phys_replay" );
+	Cmd_RemoveCommand( "phys_set_friction" );
+	Cmd_RemoveCommand( "phys_set_restitution" );
 	PhysEvent_UnsubscribeAll();
 	PhysVolume_Shutdown();
 	PhysProp_Shutdown();

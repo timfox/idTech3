@@ -31,7 +31,10 @@ typedef enum {
 	PHYS_EVENT_GRAB,
 	PHYS_EVENT_TEAR,
 	PHYS_EVENT_MOTION_ENTER,
-	PHYS_EVENT_MOTION_EXIT
+	PHYS_EVENT_MOTION_EXIT,
+	PHYS_EVENT_CONTACT_BEGIN, /* Soft Step non-sensor contact begin */
+	PHYS_EVENT_CONTACT_END,
+	PHYS_EVENT_BODY_SLEEP     /* Soft Step body fell asleep this step */
 } phys_event_type_t;
 
 typedef struct phys_hit_event_s {

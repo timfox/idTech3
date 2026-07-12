@@ -919,6 +919,15 @@ void Phys_StopRecording(const char *path) {
 	(void)path;
 }
 
+qboolean Phys_ValidateReplay(const char *path) {
+#ifdef PHYS_HAS_IMPL
+	return Phys_ValidateReplay_Impl(path);
+#else
+	(void)path;
+	return qfalse;
+#endif
+}
+
 void Phys_DebugDraw(void) {
 #ifdef PHYS_HAS_IMPL
 	if (physInitialized && phys_debugDraw && phys_debugDraw->integer) {
@@ -945,6 +954,20 @@ void Phys_SetBodyMaterial(physBodyHandle_t handle, int materialId) {
 #else
 	(void)handle; (void)materialId;
 #endif
+}
+
+void Phys_SetBodyFriction(physBodyHandle_t handle, float friction) {
+#ifdef PHYS_HAS_IMPL
+	if (physInitialized) { Phys_SetBodyFriction_Impl(handle, friction); return; }
+#endif
+	(void)handle; (void)friction;
+}
+
+void Phys_SetBodyRestitution(physBodyHandle_t handle, float restitution) {
+#ifdef PHYS_HAS_IMPL
+	if (physInitialized) { Phys_SetBodyRestitution_Impl(handle, restitution); return; }
+#endif
+	(void)handle; (void)restitution;
 }
 
 int Phys_GetBodyMaterial(physBodyHandle_t handle) {

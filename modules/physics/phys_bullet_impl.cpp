@@ -793,6 +793,14 @@ extern "C" void Phys_SetBodyMaterial_Impl( physBodyHandle_t h, int materialId ) 
 	bs.bodies[h].materialId = materialId;
 }
 
+extern "C" void Phys_SetBodyFriction_Impl( physBodyHandle_t h, float friction ) {
+	(void)h; (void)friction;
+}
+
+extern "C" void Phys_SetBodyRestitution_Impl( physBodyHandle_t h, float restitution ) {
+	(void)h; (void)restitution;
+}
+
 extern "C" int Phys_GetBodyMaterial_Impl( physBodyHandle_t h ) {
 	if ( !VALID_BODY( h ) ) {
 		return 0;
@@ -1028,6 +1036,11 @@ extern "C" void Phys_StartRecording_Impl(void) {}
 
 extern "C" void Phys_StopRecording_Impl(const char *path) {
 	(void)path;
+}
+
+extern "C" qboolean Phys_ValidateReplay_Impl(const char *path) {
+	(void)path;
+	return qfalse;
 }
 
 #endif /* USE_BULLET_PHYSICS_IMPL */
