@@ -71,6 +71,7 @@ static void skip_ws_and_comments( const char **pp ) {
 
 /* Parse #hex, #rgb, rgb(r,g,b), rgba(r,g,b,a) into vec4_t. Returns qfalse on parse error. */
 static qboolean parse_color( const char *s, vec4_t out ) {
+	unsigned int hexR, hexG, hexB;
 	int r, g, b;
 	float fr, fg, fb, fa;
 	if ( !s || !s[0] ) return qfalse;
@@ -80,17 +81,17 @@ static qboolean parse_color( const char *s, vec4_t out ) {
 	if ( s[0] == '#' ) {
 		s++;
 		if ( strlen( s ) == 6 ) {
-			if ( sscanf( s, "%2x%2x%2x", &r, &g, &b ) == 3 ) {
-				out[0] = r / 255.0f;
-				out[1] = g / 255.0f;
-				out[2] = b / 255.0f;
+			if ( sscanf( s, "%2x%2x%2x", &hexR, &hexG, &hexB ) == 3 ) {
+				out[0] = (float)hexR / 255.0f;
+				out[1] = (float)hexG / 255.0f;
+				out[2] = (float)hexB / 255.0f;
 				return qtrue;
 			}
 		} else if ( strlen( s ) == 3 ) {
-			if ( sscanf( s, "%1x%1x%1x", &r, &g, &b ) == 3 ) {
-				out[0] = ( r * 17 ) / 255.0f;
-				out[1] = ( g * 17 ) / 255.0f;
-				out[2] = ( b * 17 ) / 255.0f;
+			if ( sscanf( s, "%1x%1x%1x", &hexR, &hexG, &hexB ) == 3 ) {
+				out[0] = (float)( hexR * 17u ) / 255.0f;
+				out[1] = (float)( hexG * 17u ) / 255.0f;
+				out[2] = (float)( hexB * 17u ) / 255.0f;
 				return qtrue;
 			}
 		}

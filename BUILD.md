@@ -11,7 +11,7 @@ Legacy `make`-first instructions are no longer the primary build path for this f
 
 ### Legacy + modern (2026)
 
-**Nothing removed from the repo** — profiles only change what gets **compiled**. Classic QVM mods, `src/*` paths, deprecated CMake aliases, and `./scripts/q3_openarena_compat_check.sh` stay supported. Top-level `engine/`, `runtime/`, `modules/` are **symlinks** to `src/` until Phase 5b.
+**Nothing removed from the gameplay/runtime contract** — profiles only change what gets **compiled**. Classic QVM mods, deprecated CMake aliases, and `./scripts/q3_openarena_compat_check.sh` stay supported. Physical source roots are now **`engine/`**, **`runtime/`**, **`modules/`**, **`renderers/`**, and friends; `src/` remains as a documentation/compatibility waypoint rather than the canonical source tree. See [docs/core/REPOSITORY_LAYOUT_2026.md](docs/core/REPOSITORY_LAYOUT_2026.md).
 
 | Goal | Command |
 |------|---------|

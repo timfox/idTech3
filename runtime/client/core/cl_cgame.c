@@ -57,6 +57,15 @@ static void CL_GetGameState( gameState_t *gs ) {
 	*gs = cl.gameState;
 }
 
+/*
+====================
+Legacy retail QVM ABI bridge
+
+Keep retail cgame.qvm layouts and entity-number sentinels isolated here so the
+native client/runtime paths can evolve without reintroducing ABI glue checks at
+every syscall site.
+====================
+*/
 typedef struct {
 	int  stringOffsets[1024];
 	char stringData[16000];
@@ -104,8 +113,12 @@ typedef struct {
 
 STATIC_ASSERT( sizeof( legacy_trace_t ) == sizeof( trace_t ) + 4, "legacy_trace_t must match retail cgame trace layout" );
 
+static qboolean CL_UsesLegacyQvmLayout( void ) {
+	return ( cgvm && !cgvm->dllHandle ) ? qtrue : qfalse;
+}
+
 static int CL_GameEntityNumToEngine( int entityNum ) {
-	if ( !cgvm || cgvm->dllHandle ) {
+	if ( !CL_UsesLegacyQvmLayout() ) {
 		return entityNum;
 	}
 
@@ -121,7 +134,7 @@ static int CL_GameEntityNumToEngine( int entityNum ) {
 }
 
 static int CL_EngineEntityNumToGame( int entityNum ) {
-	if ( !cgvm || cgvm->dllHandle ) {
+	if ( !CL_UsesLegacyQvmLayout() ) {
 		return entityNum;
 	}
 
@@ -371,7 +384,7 @@ static qboolean CL_FillSnapshot( int snapshotNumber, int *snapFlags, int *server
 }
 
 static int CL_SanitizeLegacyEntityNum( int entityNum ) {
-	if ( !cgvm || cgvm->dllHandle ) {
+	if ( !CL_UsesLegacyQvmLayout() ) {
 		return entityNum;
 	}
 
@@ -660,7 +673,7 @@ static void CL_CM_LoadMap( const char *mapname ) {
 	int		checksum;
 
 	CM_LoadMap( mapname, qtrue, &checksum );
-	if ( !cgvm || cgvm->dllHandle ) {
+	if ( !CL_UsesLegacyQvmLayout() ) {
 		EntityBridge_ParseEntities( CM_EntityString() );
 	}
 }

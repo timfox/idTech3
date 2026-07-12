@@ -160,6 +160,10 @@ static void vk_temporal_apply_resets( qboolean hardReset )
 
 	vk.temporal.appliedResetReasons = reasons;
 	vk.temporal.sharedCameraCut = ( reasons & VK_TEMPORAL_RESET_CAMERA_CUT ) != 0u ? qtrue : qfalse;
+	/*
+	 * Keep temporal consumers invalidated from one place so new history-based
+	 * passes hook into the shared reset policy instead of open-coding cuts.
+	 */
 	vk_reset_motion_history();
 	vk_reset_taa_history();
 	vk_reset_volumetric_history();
