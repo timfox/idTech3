@@ -231,6 +231,16 @@ static void CL_FillLegacyTrace( legacy_trace_t *out, const trace_t *in ) {
 	out->entityNum = CL_EngineEntityNumToGame( in->entityNum );
 }
 
+static void CL_WriteTraceResult( int vmDest, void *vmTrace, const trace_t *trace ) {
+	if ( CL_UsesLegacyQvmLayout() ) {
+		VM_CHECKBOUNDS( cgvm, vmDest, sizeof( legacy_trace_t ) );
+		CL_FillLegacyTrace( (legacy_trace_t *)vmTrace, trace );
+	} else {
+		VM_CHECKBOUNDS( cgvm, vmDest, sizeof( trace_t ) );
+		*(trace_t *)vmTrace = *trace;
+	}
+}
+
 /*
  * Retail cgame.qvm snapshot_t layout (cg_public.h). Must match the QVM struct
  * exactly — do not grow without a new CGAME_IMPORT_API_VERSION.
@@ -438,6 +448,42 @@ static qboolean CL_GetLegacySnapshot( int snapshotNumber, legacySnapshot_t *snap
 		CL_SanitizeLegacySnapshotEntities( snapshot );
 	}
 	return ok;
+}
+
+static qboolean CL_GetSnapshot( int snapshotNumber, snapshot_t *snapshot );
+
+static void CL_ExportGameStateToCgame( int vmDest, void *vmGameState ) {
+	if ( CL_UsesLegacyQvmLayout() ) {
+		/* Retail/OA cgame.qvm ships with 1024 configstrings / 16k stringData. */
+		VM_CHECKBOUNDS( cgvm, vmDest, sizeof( legacyGameState_t ) );
+		CL_GetLegacyGameState( (legacyGameState_t *)vmGameState );
+	} else {
+		VM_CHECKBOUNDS( cgvm, vmDest, sizeof( gameState_t ) );
+		CL_GetGameState( (gameState_t *)vmGameState );
+	}
+}
+
+static qboolean CL_ExportSnapshotToCgame( int snapshotNumber, int vmDest, void *vmSnapshot ) {
+	if ( CL_UsesLegacyQvmLayout() ) {
+		VM_CHECKBOUNDS( cgvm, vmDest, sizeof( legacySnapshot_t ) );
+		return CL_GetLegacySnapshot( snapshotNumber, (legacySnapshot_t *)vmSnapshot );
+	}
+
+	VM_CHECKBOUNDS( cgvm, vmDest, sizeof( snapshot_t ) );
+	return CL_GetSnapshot( snapshotNumber, (snapshot_t *)vmSnapshot );
+}
+
+static void CL_AddRefEntityToSceneFromCgame( int vmSrc, void *vmRefEntity, qboolean intShaderTime ) {
+	if ( CL_UsesLegacyQvmLayout() ) {
+		VM_CHECKBOUNDS( cgvm, vmSrc, sizeof( retailRefEntity_t ) );
+		CL_AddRetailRefEntityToScene( (const retailRefEntity_t *)vmRefEntity, intShaderTime );
+		return;
+	}
+
+	VM_CHECKBOUNDS( cgvm, vmSrc, sizeof( refEntity_t ) );
+	CL_VoIP_ApplyLipFlap( (refEntity_t *)vmRefEntity );
+	CL_Face_ApplyMorphs( (refEntity_t *)vmRefEntity );
+	re.AddRefEntityToScene( (refEntity_t *)vmRefEntity, intShaderTime );
 }
 
 /*
@@ -926,59 +972,39 @@ static intptr_t CL_CgameSystemCalls( intptr_t *args ) {
 	case CG_CM_TRANSFORMEDPOINTCONTENTS:
 		return CM_TransformedPointContents( VMA(1), CL_GameEntityNumToEngine( args[2] ), VMA(3), VMA(4) );
 	case CG_CM_BOXTRACE:
-		if ( cgvm && !cgvm->dllHandle ) {
+		{
 			trace_t trace;
 
-			VM_CHECKBOUNDS( cgvm, args[1], sizeof( legacy_trace_t ) );
 			CM_BoxTrace( &trace, VMA(2), VMA(3), VMA(4), VMA(5),
 				CL_GameEntityNumToEngine( args[6] ), args[7], /*int capsule*/ qfalse );
-			CL_FillLegacyTrace( (legacy_trace_t *)VMA(1), &trace );
-		} else {
-			VM_CHECKBOUNDS( cgvm, args[1], sizeof( trace_t ) );
-			CM_BoxTrace( VMA(1), VMA(2), VMA(3), VMA(4), VMA(5),
-				CL_GameEntityNumToEngine( args[6] ), args[7], /*int capsule*/ qfalse );
+			CL_WriteTraceResult( 1, VMA(1), &trace );
 		}
 		return 0;
 	case CG_CM_CAPSULETRACE:
-		if ( cgvm && !cgvm->dllHandle ) {
+		{
 			trace_t trace;
 
-			VM_CHECKBOUNDS( cgvm, args[1], sizeof( legacy_trace_t ) );
 			CM_BoxTrace( &trace, VMA(2), VMA(3), VMA(4), VMA(5),
 				CL_GameEntityNumToEngine( args[6] ), args[7], /*int capsule*/ qtrue );
-			CL_FillLegacyTrace( (legacy_trace_t *)VMA(1), &trace );
-		} else {
-			VM_CHECKBOUNDS( cgvm, args[1], sizeof( trace_t ) );
-			CM_BoxTrace( VMA(1), VMA(2), VMA(3), VMA(4), VMA(5),
-				CL_GameEntityNumToEngine( args[6] ), args[7], /*int capsule*/ qtrue );
+			CL_WriteTraceResult( 1, VMA(1), &trace );
 		}
 		return 0;
 	case CG_CM_TRANSFORMEDBOXTRACE:
-		if ( cgvm && !cgvm->dllHandle ) {
+		{
 			trace_t trace;
 
-			VM_CHECKBOUNDS( cgvm, args[1], sizeof( legacy_trace_t ) );
 			CM_TransformedBoxTrace( &trace, VMA(2), VMA(3), VMA(4), VMA(5),
 				CL_GameEntityNumToEngine( args[6] ), args[7], VMA(8), VMA(9), /*int capsule*/ qfalse );
-			CL_FillLegacyTrace( (legacy_trace_t *)VMA(1), &trace );
-		} else {
-			VM_CHECKBOUNDS( cgvm, args[1], sizeof( trace_t ) );
-			CM_TransformedBoxTrace( VMA(1), VMA(2), VMA(3), VMA(4), VMA(5),
-				CL_GameEntityNumToEngine( args[6] ), args[7], VMA(8), VMA(9), /*int capsule*/ qfalse );
+			CL_WriteTraceResult( 1, VMA(1), &trace );
 		}
 		return 0;
 	case CG_CM_TRANSFORMEDCAPSULETRACE:
-		if ( cgvm && !cgvm->dllHandle ) {
+		{
 			trace_t trace;
 
-			VM_CHECKBOUNDS( cgvm, args[1], sizeof( legacy_trace_t ) );
 			CM_TransformedBoxTrace( &trace, VMA(2), VMA(3), VMA(4), VMA(5),
 				CL_GameEntityNumToEngine( args[6] ), args[7], VMA(8), VMA(9), /*int capsule*/ qtrue );
-			CL_FillLegacyTrace( (legacy_trace_t *)VMA(1), &trace );
-		} else {
-			VM_CHECKBOUNDS( cgvm, args[1], sizeof( trace_t ) );
-			CM_TransformedBoxTrace( VMA(1), VMA(2), VMA(3), VMA(4), VMA(5),
-				CL_GameEntityNumToEngine( args[6] ), args[7], VMA(8), VMA(9), /*int capsule*/ qtrue );
+			CL_WriteTraceResult( 1, VMA(1), &trace );
 		}
 		return 0;
 	case CG_CM_MARKFRAGMENTS:
@@ -1030,15 +1056,7 @@ static intptr_t CL_CgameSystemCalls( intptr_t *args ) {
 		re.ClearScene();
 		return 0;
 	case CG_R_ADDREFENTITYTOSCENE:
-		if ( cgvm && !cgvm->dllHandle ) {
-			VM_CHECKBOUNDS( cgvm, args[1], sizeof( retailRefEntity_t ) );
-			CL_AddRetailRefEntityToScene( VMA(1), qfalse );
-		} else {
-			VM_CHECKBOUNDS( cgvm, args[1], sizeof( refEntity_t ) );
-			CL_VoIP_ApplyLipFlap( VMA(1) );
-			CL_Face_ApplyMorphs( VMA(1) );
-			re.AddRefEntityToScene( VMA(1), qfalse );
-		}
+		CL_AddRefEntityToSceneFromCgame( 1, VMA(1), qfalse );
 		return 0;
 	case CG_R_ADDPOLYTOSCENE:
 		re.AddPolyToScene( args[1], args[2], VMA(3), 1 );
@@ -1084,14 +1102,7 @@ static intptr_t CL_CgameSystemCalls( intptr_t *args ) {
 		CL_GetGlconfig( VMA(1) );
 		return 0;
 	case CG_GETGAMESTATE:
-		if ( cgvm->dllHandle ) {
-			VM_CHECKBOUNDS( cgvm, args[1], sizeof( gameState_t ) );
-			CL_GetGameState( VMA(1) );
-		} else {
-			/* Retail/OA cgame.qvm ships with legacy gameState_t (1024 CS, 16k data). */
-			VM_CHECKBOUNDS( cgvm, args[1], sizeof( legacyGameState_t ) );
-			CL_GetLegacyGameState( VMA(1) );
-		}
+		CL_ExportGameStateToCgame( 1, VMA(1) );
 		return 0;
 	case CG_GETCURRENTSNAPSHOTNUMBER:
 		VM_CHECKBOUNDS( cgvm, args[1], sizeof( int ) );
@@ -1099,12 +1110,7 @@ static intptr_t CL_CgameSystemCalls( intptr_t *args ) {
 		CL_GetCurrentSnapshotNumber( VMA(1), VMA(2) );
 		return 0;
 	case CG_GETSNAPSHOT:
-		if ( cgvm->dllHandle ) {
-			VM_CHECKBOUNDS( cgvm, args[2], sizeof( snapshot_t ) );
-			return CL_GetSnapshot( args[1], VMA(2) );
-		}
-		VM_CHECKBOUNDS( cgvm, args[2], sizeof( legacySnapshot_t ) );
-		return CL_GetLegacySnapshot( args[1], VMA(2) );
+		return CL_ExportSnapshotToCgame( args[1], 2, VMA(2) );
 	case CG_GETSERVERCOMMAND:
 		return CL_GetServerCommand( args[1] );
 	case CG_GETCURRENTCMDNUMBER:
@@ -1224,15 +1230,7 @@ static intptr_t CL_CgameSystemCalls( intptr_t *args ) {
 
 	// engine extensions
 	case CG_R_ADDREFENTITYTOSCENE2:
-		if ( cgvm && !cgvm->dllHandle ) {
-			VM_CHECKBOUNDS( cgvm, args[1], sizeof( retailRefEntity_t ) );
-			CL_AddRetailRefEntityToScene( VMA(1), qtrue );
-		} else {
-			VM_CHECKBOUNDS( cgvm, args[1], sizeof( refEntity_t ) );
-			CL_VoIP_ApplyLipFlap( VMA(1) );
-			CL_Face_ApplyMorphs( VMA(1) );
-			re.AddRefEntityToScene( VMA(1), qtrue );
-		}
+		CL_AddRefEntityToSceneFromCgame( 1, VMA(1), qtrue );
 		return 0;
 
 	case CG_R_ADDLINEARLIGHTTOSCENE:
