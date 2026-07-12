@@ -57,12 +57,6 @@ grep -q 'fog_2cubed.nvdb' "$ROOT/examples/demo_game/CMakeLists.txt"
 grep -q 'demo_vdb_woodcock.cfg' "$ROOT/examples/demo_game/CMakeLists.txt"
 grep -q 'DEMO_BOOTSTRAP_VDB\|vdb/fog_2cubed.nvdb' "$ROOT/examples/demo_game/CMakeLists.txt"
 
-# Optional: run unit_nanovdb_decode if present in a common build dir
-for _build in "$ROOT/build-vk-Release" "$ROOT/build" "$ROOT/build-vk-Debug"; do
-	if [[ -x "$_build/unit_nanovdb_decode" ]]; then
-		"$_build/unit_nanovdb_decode"
-		break
-	fi
-done
+bash "$ROOT/tests/scripts/test_nanovdb_decode.sh"
 
 echo "test_vdb_woodcock.sh: ok"

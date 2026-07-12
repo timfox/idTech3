@@ -3050,6 +3050,13 @@ set_tests_properties(test_vdb_woodcock PROPERTIES
 	LABELS "scripts;validation;renderer"
 	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_vdb_woodcock.sh;${CMAKE_SOURCE_DIR}/renderers/vulkan/vk_vdb.c;${CMAKE_SOURCE_DIR}/examples/demo_game/bootstrap_media/vdb/fog_2cubed.nvdb")
 
+add_test(NAME test_nanovdb_decode
+	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_nanovdb_decode.sh
+	WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+set_tests_properties(test_nanovdb_decode PROPERTIES
+	LABELS "scripts;validation;renderer"
+	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_nanovdb_decode.sh;${CMAKE_SOURCE_DIR}/renderers/vulkan/vk_nanovdb_decode.c;${CMAKE_SOURCE_DIR}/tests/data/fog_2cubed.nvdb")
+
 add_test(NAME test_module_include_canonical
 	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_module_include_canonical.sh
 	WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
@@ -4069,6 +4076,7 @@ if(BUILD_UNIT_TESTS)
 		engine/core/q_math.c)
 	target_include_directories(unit_nanovdb_decode PRIVATE
 		${CMAKE_SOURCE_DIR}
+		${IDTECH3_DIR_ENGINE_CORE}
 		${IDTECH3_DIR_RENDERERS}/vulkan)
 	target_compile_definitions(unit_nanovdb_decode PRIVATE
 		TEST_DATA_DIR="${CMAKE_SOURCE_DIR}/tests/data")
