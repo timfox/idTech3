@@ -122,6 +122,14 @@ rg -q 'b3World_GetProfile' modules/physics/phys_box3d_impl.c
 rg -q 'b3World_StartRecording' modules/physics/phys_box3d_impl.c
 rg -q 'Phys_RagdollSetBoneAnimTarget' modules/physics/phys_bullet.h
 rg -q 'Phys_RagdollLoadDef' modules/physics/phys_ragdoll_bind.c
+rg -q 'Phys_RagdollSpawnBound' modules/physics/phys_ragdoll_bind.c
+rg -q 'Phys_RagdollApplyMd3Frame' modules/physics/phys_ragdoll_bind.c
+rg -q 'phys_stepHeight' modules/physics/phys_box3d_impl.c
+rg -q 'G_PHYS_CREATERAGDOLL' runtime/game/g_public.h
+rg -q 'CG_PHYS_CREATERAGDOLL' runtime/cgame/cg_public.h
+rg -q 'createRagdoll' runtime/game/g_lua_bindings.c
+rg -q 'subscribe' runtime/game/g_lua_bindings.c
+rg -q 'phys_spawn_ragdoll_bind' modules/physics/phys_middleware.c
 rg -q 'phys_bspGridStep' modules/physics/phys_bullet.c
 rg -q 'misc_phys_box' docs/PHYSICS.md
 rg -q 'misc_phys_box' docs/EDITOR_BRIDGE.md

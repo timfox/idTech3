@@ -14,7 +14,18 @@ uses radius/height/offset/parent to build capsules + spherical joints.
 
 #include "q_shared.h"
 #include "qcommon.h"
+#include "qfiles.h"
 #include "phys_ragdoll_bind.h"
+
+static void Phys_RagdollAxisToEuler( const vec3_t axis[3], vec3_t outDeg ) {
+	/* Approximate yaw/pitch/roll from MD3 tag axes (forward = axis[0]). */
+	float yaw, pitch;
+	yaw = atan2f( axis[0][1], axis[0][0] ) * ( 180.0f / (float)M_PI );
+	pitch = -asinf( Com_Clamp( -1.0f, 1.0f, axis[0][2] ) ) * ( 180.0f / (float)M_PI );
+	outDeg[0] = pitch;
+	outDeg[1] = yaw;
+	outDeg[2] = 0.0f;
+}
 
 qboolean Phys_RagdollLoadDef( const char *pathOrModel, physRagdollDef_t *out ) {
 	char path[MAX_QPATH];
@@ -125,4 +136,130 @@ qboolean Phys_RagdollLoadDef( const char *pathOrModel, physRagdollDef_t *out ) {
 	Q_strncpyz( out->modelPath, path, sizeof( out->modelPath ) );
 	Com_Printf( "[physics] loaded ragdoll bind %s (%d bones)\n", path, out->numBones );
 	return out->numBones > 0 ? qtrue : qfalse;
+}
+
+qboolean Phys_RagdollApplyMd3Frame( physRagdollHandle_t handle, const physRagdollDef_t *bind,
+	const char *md3Path, int frame ) {
+	byte *data = NULL;
+	md3Header_t *hdr;
+	md3Tag_t *tags;
+	int len, t, b, numTags, numFrames;
+	int applied = 0;
+
+	if ( handle < 0 || !bind || !md3Path || !md3Path[0] || bind->numBones <= 0 ) {
+		return qfalse;
+	}
+
+	len = FS_ReadFile( md3Path, (void **)&data );
+	if ( len < (int)sizeof( md3Header_t ) || !data ) {
+		return qfalse;
+	}
+
+	hdr = (md3Header_t *)data;
+	if ( LittleLong( hdr->ident ) != MD3_IDENT || LittleLong( hdr->version ) != MD3_VERSION ) {
+		FS_FreeFile( data );
+		return qfalse;
+	}
+	numFrames = LittleLong( hdr->numFrames );
+	numTags = LittleLong( hdr->numTags );
+	if ( numFrames <= 0 || numTags <= 0 || frame < 0 || frame >= numFrames ) {
+		FS_FreeFile( data );
+		return qfalse;
+	}
+	if ( LittleLong( hdr->ofsTags ) + frame * numTags * (int)sizeof( md3Tag_t ) > len ) {
+		FS_FreeFile( data );
+		return qfalse;
+	}
+
+	tags = (md3Tag_t *)( data + LittleLong( hdr->ofsTags ) ) + frame * numTags;
+	for ( b = 0; b < bind->numBones; b++ ) {
+		const char *want = bind->bones[b].tagName;
+		vec3_t pos, rot, world;
+		if ( !want[0] ) {
+			continue;
+		}
+		for ( t = 0; t < numTags; t++ ) {
+			md3Tag_t tag = tags[t];
+			/* tag name is char[]; origins need endian swap on BE (noop on LE) */
+			if ( Q_stricmp( tag.name, want ) ) {
+				continue;
+			}
+			pos[0] = tag.origin[0];
+			pos[1] = tag.origin[1];
+			pos[2] = tag.origin[2];
+			world[0] = bind->rootPosition[0] + pos[0] * ( bind->scale > 0.0f ? bind->scale : 1.0f );
+			world[1] = bind->rootPosition[1] + pos[1] * ( bind->scale > 0.0f ? bind->scale : 1.0f );
+			world[2] = bind->rootPosition[2] + pos[2] * ( bind->scale > 0.0f ? bind->scale : 1.0f );
+			Phys_RagdollAxisToEuler( tag.axis, rot );
+			Phys_RagdollSetBoneAnimTarget( handle, b, world, rot );
+			applied++;
+			break;
+		}
+	}
+
+	FS_FreeFile( data );
+	if ( applied > 0 ) {
+		Phys_RagdollBlendToAnimation( handle, 1.0f );
+	}
+	return applied > 0 ? qtrue : qfalse;
+}
+
+qboolean Phys_RagdollSpawnBound( const char *modelOrRag, const vec3_t origin, physBoundRagdoll_t *out ) {
+	physRagdollDef_t def;
+	procAnimConfig_t cfg;
+	qboolean loaded;
+
+	if ( !out || !origin ) {
+		return qfalse;
+	}
+	Com_Memset( out, 0, sizeof( *out ) );
+	out->ragdoll = -1;
+	out->anim = -1;
+	out->motor = -1;
+
+	loaded = Phys_RagdollLoadDef( modelOrRag, &def );
+	if ( !loaded ) {
+		Com_Memset( &def, 0, sizeof( def ) );
+		def.scale = 1.0f;
+		def.limbMass = 5.0f;
+	}
+	VectorCopy( origin, def.rootPosition );
+	def.entityNum = -1;
+
+	out->ragdoll = Phys_CreateRagdoll( &def );
+	if ( out->ragdoll < 0 ) {
+		return qfalse;
+	}
+
+	ProcAnim_DefaultConfig( &cfg );
+	out->anim = ProcAnim_Create( out->ragdoll, &cfg );
+	if ( out->anim >= 0 ) {
+		out->motor = PhysMotor_Create( out->anim, out->ragdoll );
+		ProcAnim_Kill( out->anim ); /* death → Soft Step ragdoll drive */
+	}
+
+	/* If an MD3 exists next to the bind, seed pose from frame 0 tags. */
+	if ( loaded && modelOrRag && modelOrRag[0] ) {
+		char md3Path[MAX_QPATH];
+		if ( strstr( modelOrRag, ".rag" ) ) {
+			char base[MAX_QPATH];
+			char *dot;
+			Q_strncpyz( base, modelOrRag, sizeof( base ) );
+			dot = strrchr( base, '.' );
+			if ( dot ) {
+				*dot = '\0';
+			}
+			Com_sprintf( md3Path, sizeof( md3Path ), "%s.md3", base );
+		} else if ( strstr( modelOrRag, ".md3" ) ) {
+			Q_strncpyz( md3Path, modelOrRag, sizeof( md3Path ) );
+		} else {
+			Com_sprintf( md3Path, sizeof( md3Path ), "%s.md3", modelOrRag );
+		}
+		Phys_RagdollApplyMd3Frame( out->ragdoll, &def, md3Path, 0 );
+	}
+
+	Com_Printf( "[physics] bound ragdoll=%d anim=%d motor=%d at (%.0f %.0f %.0f) bind=%s\n",
+		out->ragdoll, out->anim, out->motor, origin[0], origin[1], origin[2],
+		loaded ? "yes" : "procedural" );
+	return qtrue;
 }

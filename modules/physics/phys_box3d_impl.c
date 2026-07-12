@@ -2323,6 +2323,30 @@ qboolean Phys_MoverStep_Impl( vec3_t origin, vec3_t velocity, float radius, floa
 		}
 	}
 
+	/* Opt-in stair step using phys_stepHeight (CastMover companion). */
+	{
+		cvar_t *stepCv = Cvar_Get( "phys_stepHeight", "18", CVAR_ARCHIVE );
+		float stepH = stepCv && stepCv->value > 0.0f ? stepCv->value : 0.0f;
+		float horiz = sqrtf( vel.x * vel.x + vel.y * vel.y );
+		if ( stepH > 0.0f && horiz > 1.0f ) {
+			b3Pos raised = originPos;
+			b3Vec3 forward = v3( vel.x, vel.y, 0.0f );
+			float frac;
+			raised.z += stepH;
+			if ( b3Length( forward ) > 0.001f ) {
+				forward = b3Normalize( forward );
+				forward = b3MulSV( fminf( horiz * dt, r * 2.0f ), forward );
+				frac = b3World_CastMover( bx.worldId, raised, &mover, forward, filter, NULL, NULL );
+				if ( frac > 0.01f ) {
+					b3Pos stepped = b3Add( raised, b3MulSV( frac, forward ) );
+					b3Vec3 down = v3( 0.0f, 0.0f, -stepH - 2.0f );
+					float drop = b3World_CastMover( bx.worldId, stepped, &mover, down, filter, NULL, NULL );
+					originPos = b3Add( stepped, b3MulSV( drop, down ) );
+				}
+			}
+		}
+	}
+
 	memset( &planeCtx, 0, sizeof( planeCtx ) );
 	b3World_CollideMover( bx.worldId, originPos, &mover, filter, box_mover_plane_cb, &planeCtx );
 	vel = b3ClipVector( vel, planeCtx.planes, planeCtx.count );

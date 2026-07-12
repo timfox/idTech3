@@ -416,6 +416,7 @@ typedef enum {
 	G_PHYS_RAYCAST,
 	G_PHYS_LOADBSPCOLLISION,
 	G_PHYS_PMOVE_CORRECT,	/* opt-in CastMover correction of origin/velocity */
+	G_PHYS_CREATERAGDOLL,	/* Soft Step ragdoll from .rag/MD3 bind (death path) */
 	G_LOC_LOOKUP,
 	G_TRAP_GETVALUE = COM_TRAP_GETVALUE
 

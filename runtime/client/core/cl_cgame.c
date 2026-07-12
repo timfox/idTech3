@@ -24,6 +24,8 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "client.h"
 #include "cl_cvars.h"
 #include "../../physics/phys_bullet.h"
+#include "../../physics/phys_character.h"
+#include "../../physics/phys_ragdoll_bind.h"
 #include "script_emit.h"
 
 #include "../../botlib/botlib.h"
@@ -770,6 +772,14 @@ static qboolean CL_GetValue( char* value, int valueSize, const char* key ) {
 		Com_sprintf( value, valueSize, "%i", CG_PHYS_LOADBSPCOLLISION );
 		return qtrue;
 	}
+	if ( !Q_stricmp( key, "trap_Phys_PmoveCorrect" ) ) {
+		Com_sprintf( value, valueSize, "%i", CG_PHYS_PMOVE_CORRECT );
+		return qtrue;
+	}
+	if ( !Q_stricmp( key, "trap_Phys_CreateRagdoll" ) ) {
+		Com_sprintf( value, valueSize, "%i", CG_PHYS_CREATERAGDOLL );
+		return qtrue;
+	}
 	if ( !Q_stricmp( key, "trap_EmitJSEvent" ) ) {
 		Com_sprintf( value, valueSize, "%i", CG_EMIT_JSEVENT );
 		return qtrue;
@@ -1269,6 +1279,21 @@ static intptr_t CL_CgameSystemCalls( intptr_t *args ) {
 
 	case CG_PHYS_LOADBSPCOLLISION:
 		return Phys_LoadBSPCollision();
+
+	case CG_PHYS_PMOVE_CORRECT:
+		return Phys_PmoveCorrect( (float *)VMA(1), (float *)VMA(2), VMF(3), VMF(4), VMF(5) );
+
+	case CG_PHYS_CREATERAGDOLL: {
+		physBoundRagdoll_t bound;
+		vec3_t origin;
+		origin[0] = VMF(1);
+		origin[1] = VMF(2);
+		origin[2] = VMF(3);
+		if ( !Phys_RagdollSpawnBound( (const char *)VMA(4), origin, &bound ) ) {
+			return -1;
+		}
+		return bound.ragdoll;
+	}
 
 	case CG_EMIT_JSEVENT:
 		Com_ScriptEmitEvent( (const char *)VMA(1), (const char *)VMA(2), (const char *)VMA(3), args[4], args[5] );

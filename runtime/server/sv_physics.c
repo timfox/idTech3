@@ -205,6 +205,7 @@ void SV_Physics_Frame( int frameMsec ) {
 			return;
 		}
 		sv_physWorldReady = qtrue;
+		Com_Printf( "[physics] server Soft Step world created (dedicated, phys_enabled)\n" );
 	}
 	dt = frameMsec * 0.001f;
 	if ( dt <= 0.0f || dt > 0.1f ) {

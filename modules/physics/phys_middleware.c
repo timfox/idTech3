@@ -19,6 +19,7 @@ Copyright (C) 2026 Gopex LLC. All rights reserved.
 #include "phys_softblob.h"
 #include "phys_fluid.h"
 #include "phys_middleware.h"
+#include "phys_ragdoll_bind.h"
 
 #define PHYS_DEMO_RAGDOLL_MAX 8
 #define PHYS_DEMO_PROP_MAX    64
@@ -773,6 +774,27 @@ static void PhysMiddleware_Solvers_f( void ) {
 	Com_Printf( "usage: phys_solvers <name> on|off\n" );
 }
 
+static void PhysMiddleware_SpawnRagdollBind_f( void ) {
+	physBoundRagdoll_t bound;
+	vec3_t origin;
+	const char *path = "models/demo_ragdoll";
+
+	VectorSet( origin, 0.0f, 0.0f, 64.0f );
+	if ( Cmd_Argc() >= 2 ) {
+		path = Cmd_Argv( 1 );
+	}
+	if ( Cmd_Argc() >= 5 ) {
+		origin[0] = (float)atof( Cmd_Argv( 2 ) );
+		origin[1] = (float)atof( Cmd_Argv( 3 ) );
+		origin[2] = (float)atof( Cmd_Argv( 4 ) );
+	}
+	if ( !Phys_RagdollSpawnBound( path, origin, &bound ) ) {
+		Com_Printf( S_COLOR_YELLOW "phys_spawn_ragdoll_bind: failed\n" );
+		return;
+	}
+	Com_Printf( "phys_spawn_ragdoll_bind: ragdoll=%d (MD3/.rag death path)\n", bound.ragdoll );
+}
+
 static void PhysMiddleware_ClearRagdolls_f( void ) {
 	PhysMiddleware_ClearAllDemoRagdolls();
 	Com_Printf( "phys_clear_ragdolls: demo slots cleared\n" );
@@ -794,6 +816,7 @@ static void PhysMiddleware_RecordStop_f( void ) {
 void PhysMiddleware_RegisterCommands( void ) {
 	Cmd_AddCommand( "phys_status", PhysMiddleware_Status_f );
 	Cmd_AddCommand( "phys_spawn_ragdoll", PhysMiddleware_SpawnRagdoll_f );
+	Cmd_AddCommand( "phys_spawn_ragdoll_bind", PhysMiddleware_SpawnRagdollBind_f );
 	Cmd_AddCommand( "phys_hit_ragdoll", PhysMiddleware_HitRagdoll_f );
 	Cmd_AddCommand( "phys_clear_ragdolls", PhysMiddleware_ClearRagdolls_f );
 	Cmd_AddCommand( "phys_spawn_box", PhysMiddleware_SpawnBox_f );
@@ -855,6 +878,7 @@ void PhysMiddleware_Shutdown( void ) {
 	PhysMiddleware_ClearDemoProps();
 	Cmd_RemoveCommand( "phys_status" );
 	Cmd_RemoveCommand( "phys_spawn_ragdoll" );
+	Cmd_RemoveCommand( "phys_spawn_ragdoll_bind" );
 	Cmd_RemoveCommand( "phys_hit_ragdoll" );
 	Cmd_RemoveCommand( "phys_clear_ragdolls" );
 	Cmd_RemoveCommand( "phys_spawn_box" );

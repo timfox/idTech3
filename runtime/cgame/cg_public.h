@@ -195,6 +195,8 @@ typedef enum {
 	CG_PHYS_STEPSIMULATION,
 	CG_PHYS_RAYCAST,
 	CG_PHYS_LOADBSPCOLLISION,
+	CG_PHYS_PMOVE_CORRECT,
+	CG_PHYS_CREATERAGDOLL,
 
 	CG_EMIT_JSEVENT,  /* void trap_EmitJSEvent( const char *eventName, const char *s0, const char *s1, int i0, int i1 ) */
 

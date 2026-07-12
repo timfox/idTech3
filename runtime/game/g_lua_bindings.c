@@ -60,6 +60,7 @@ Usage from Lua:
 #include "../client/cl_engine_decals.h"
 #include "../client/core/cl_p2p_session.h"
 #include "../physics/phys_character.h"
+#include "../physics/phys_ragdoll_bind.h"
 #include "g_animgraph.h"
 #include "../renderers/common/tr_public.h"
 #include "../audio/snd_music_adaptive.h"
@@ -324,6 +325,43 @@ static int l_phys_addHeightField(lua_State *L) {
 }
 static int l_phys_backend(lua_State *L) {
 	lua_pushstring(L, Phys_GetBackendName());
+	return 1;
+}
+static int l_phys_createRagdoll(lua_State *L) {
+	physBoundRagdoll_t bound;
+	vec3_t origin;
+	const char *path = luaL_optstring(L, 1, NULL);
+	origin[0] = (float)luaL_optnumber(L, 2, 0);
+	origin[1] = (float)luaL_optnumber(L, 3, 0);
+	origin[2] = (float)luaL_optnumber(L, 4, 64);
+	if ( !Phys_RagdollSpawnBound( path, origin, &bound ) ) {
+		lua_pushinteger(L, -1);
+		return 1;
+	}
+	lua_pushinteger(L, bound.ragdoll);
+	lua_pushinteger(L, bound.anim);
+	lua_pushinteger(L, bound.motor);
+	return 3;
+}
+static int l_phys_loadRagdoll(lua_State *L) {
+	physRagdollDef_t def;
+	lua_pushboolean(L, Phys_RagdollLoadDef(luaL_checkstring(L, 1), &def));
+	lua_pushinteger(L, def.numBones);
+	return 2;
+}
+static int l_phys_setBoneAnimTarget(lua_State *L) {
+	vec3_t pos, rot;
+	pos[0]=(float)luaL_checknumber(L,3); pos[1]=(float)luaL_checknumber(L,4); pos[2]=(float)luaL_checknumber(L,5);
+	rot[0]=(float)luaL_optnumber(L,6,0); rot[1]=(float)luaL_optnumber(L,7,0); rot[2]=(float)luaL_optnumber(L,8,0);
+	Phys_RagdollSetBoneAnimTarget((int)luaL_checkinteger(L,1), (int)luaL_checkinteger(L,2), pos, rot);
+	return 0;
+}
+static int l_phys_subscribe(lua_State *L) {
+	/* Stub: register interest in Soft Step events (IMPACT/BREAK/MOTION_*).
+	   Full Lua callbacks need a main-thread marshal; for now log + return true. */
+	const char *typeName = luaL_optstring(L, 1, "impact");
+	Com_Printf( "[physics] Engine.Physics.subscribe(%s) registered (stub)\n", typeName );
+	lua_pushboolean(L, 1);
 	return 1;
 }
 
@@ -1909,7 +1947,9 @@ void LuaBindings_RegisterAll(void *luaState) {
 		{"rayCast", l_phys_rayCast}, {"createSensor", l_phys_createSensor},
 		{"createConstraint", l_phys_createConstraint}, {"moverStep", l_phys_moverStep},
 		{"pmoveCorrect", l_phys_pmoveCorrect}, {"addHeightField", l_phys_addHeightField},
-		{"backend", l_phys_backend},
+		{"backend", l_phys_backend}, {"createRagdoll", l_phys_createRagdoll},
+		{"loadRagdoll", l_phys_loadRagdoll}, {"setBoneAnimTarget", l_phys_setBoneAnimTarget},
+		{"subscribe", l_phys_subscribe},
 		{NULL, NULL}
 	};
 	registerTable(L, "Physics", physicsFuncs);

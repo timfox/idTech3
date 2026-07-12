@@ -91,7 +91,7 @@ bone 0 tag_torso 8 20 0 0 0 -1
 bone 1 tag_head 5 10 0 0 28 0
 ```
 
-Then drive poses with `Phys_RagdollSetBoneAnimTarget` + `Phys_RagdollBlendToAnimation`. Without a bind, Soft Step uses the procedural 11-bone layout.
+Then drive poses with `Phys_RagdollSetBoneAnimTarget` / `Phys_RagdollApplyMd3Frame` + `Phys_RagdollBlendToAnimation`. Death path: `Phys_RagdollSpawnBound`, trap `G_PHYS_CREATERAGDOLL` / `CG_PHYS_CREATERAGDOLL`, Lua `Engine.Physics.createRagdoll`, console `phys_spawn_ragdoll_bind`. Without a bind, Soft Step uses the procedural 11-bone layout.
 
 ## Backend switch
 
@@ -108,6 +108,7 @@ Then drive poses with `Phys_RagdollSetBoneAnimTarget` + `Phys_RagdollBlendToAnim
 | `phys_enabled` | 1 | Soft Step world |
 | `sv_physSpawn` | 1 | Map `misc_phys_*` spawn |
 | `phys_pmove` | 0 | CastMover Pmove bridge |
+| `phys_stepHeight` | 18 | CastMover stair step (Soft Step) |
 | `phys_bspGridStep` | 24 | BSP height-grid denseness |
 | `phys_record` | 0 | Allow Soft Step recording |
 | `phys_debugDraw` | 0 | Wireframe |
