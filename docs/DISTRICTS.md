@@ -37,7 +37,7 @@ Auto-resolved paths (slug = lowercase name after `District_` prefix):
 
 ## Build
 
-Requires **`USE_FREEUSD=ON`** (default) for manifest parse. Core state machine lives in `src/world/world_district.cpp` (qcommon); FreeUSD parse and console commands in `src/client/cl_district.cpp`. Loaded meshes register via **`RegisterModel`** (`r_freeusd` 1) and draw each frame through **`CL_District_AddRefEntitiesToScene`** (wrapped into **`re.RenderScene`**).
+Requires **`USE_FREEUSD=ON`** (default) for manifest parse. Core state machine lives in `modules/world/world_district.cpp`; FreeUSD parse and console commands in `runtime/client/world/cl_district.cpp`. Loaded meshes register via **`RegisterModel`** (`r_freeusd` 1) and draw each frame through **`CL_District_AddRefEntitiesToScene`** (wrapped into **`re.RenderScene`**).
 
 ## Console
 

@@ -2,103 +2,63 @@
 
 ## Directory Structure
 
+Phase **5e** (2026): canonical sources live under **`engine/`**, **`runtime/`**, **`modules/`**, **`extensions/`**, **`renderers/`**, and **`third_party/`**. The old **`src/*` forwarding shims are dropped** (`src/README.md` only). Cross-domain `#include` paths may still use layout bridges until the include rewrite finishes — see [core/REPOSITORY_LAYOUT_2026.md](core/REPOSITORY_LAYOUT_2026.md).
+
 ```
-src/
-├── client/              Client systems
-│   ├── cl_main.c                 Globals, reliable cmds, init glue (~240 LOC)
-│   ├── cl_lifecycle.c/h          Shutdown, memory flush, map load, hunk users
-│   ├── cl_frame.c/h              Per-frame loop (CL_Frame)
-│   ├── cl_cvars.c/h              Client cvar registration
-│   ├── cl_connect.c/h            Connect/disconnect, timeout, rcon
-│   ├── cl_cmds.c/h               Misc client console commands
-│   ├── cl_download.c/h           Download state + pk3 fetch
-│   ├── cl_ref.c/h                Renderer dlopen + vid_restart
-│   ├── cl_gameframe.c/h          Game loop (ticks all subsystems)
-│   ├── cl_cin.c                  ROQ cinematic + modern codec dispatch
-│   ├── cl_cin_modern.c/h         Modern video codec dispatcher
-│   ├── cl_cin_ffmpeg/dav1d/vpx/theora.c  Codec backends
-│   ├── cl_particles.c/h          Particle system (8192 pool)
-│   ├── cl_demo.c/h               Demo record/playback (record, demo, stoprecord)
-│   ├── cl_map_background.c/h     Background maps for menus
-│   └── cl_window_title.c/h       Dynamic window title
-├── game/                Gameplay systems
-│   ├── g_director.c/h            AI Director (intensity, phases, spawns)
-│   ├── g_goap.c/h                Goal-Oriented Action Planning
-│   ├── g_horde.c/h               Horde AI (512 agents, LOD)
-│   ├── g_response.c/h            Response rules (dialogue)
-│   ├── g_choreography.c/h        Scripted scene system
-│   ├── g_facial.c/h              Facial animation (flex + phonemes)
-│   ├── g_dismember.c/h           Dismemberment + gibs
-│   └── g_lua_bindings.c/h        Lua API (64 functions)
-├── physics/             Physics + simulation
-│   ├── phys_bullet.c/h           Bullet Physics C API (35 functions)
-│   ├── phys_bullet_impl.cpp      Bullet C++ backend
-│   ├── phys_procedural_anim.c/h  Procedural animation controller
-│   ├── phys_ik.c/h               IK solvers
-│   ├── phys_dmm.c/h              DMM deformation engine
-│   ├── phys_dmm_materials.c/h    Material library + prefabs
-│   └── phys_cloth.c/h            XPBD cloth simulation
-├── navigation/          Pathfinding
-│   ├── nav_recast.cpp/h          Recast/Detour navmesh + crowd
-│   └── nav_bsp_extract.cpp       BSP triangle extraction
-├── audio/               Audio
-│   ├── backends/                  OpenAL, SDL, null
-│   ├── codecs/                    WAV, MP3, Opus, FLAC, WebM
-│   ├── effects/                   EFX reverb, acoustics
-│   └── snd_music_adaptive.c/h    Adaptive music layers
+idtech3/
+├── engine/
+│   ├── core/                 # qcommon — VM, FS, net, jobs, script emit
+│   │   ├── vm.c              VM create, native load, QVM path
+│   │   ├── vm_native_module.c Native `.so`/`.dll` filename candidates
+│   │   ├── files.c           FS_LoadLibrary search (modules/vm/gamedir)
+│   │   └── engine_phys_map.c Map `misc_phys_*` / `func_destructible` spawn
+│   └── platform/             # unix, win32, android, SDL
+├── runtime/
+│   ├── client/               # Modular client (core / world / media / platform / shell)
+│   │   ├── core/cl_main.c    Globals, reliable cmds, init glue (~240 LOC)
+│   │   ├── core/cl_frame.c   Per-frame loop (CL_Frame)
+│   │   ├── core/cl_gameframe.c  Game loop (ticks subsystems incl. Phys_StepSimulation)
+│   │   ├── media/cl_cin*.c   ROQ + modern codec dispatch (FFmpeg, dav1d, dav2d, vvdec, VPX, Theora)
+│   │   ├── world/cl_district.cpp  District USD residency + draw
+│   │   └── shell/cl_phys_debug.c  Client physics debug draw
+│   ├── server/               # sv_physics.c — dedicated-server Phys_StepSimulation
+│   └── game/                 # g_lua_bindings.c, g_entity_bridge.c, AI middleware
+├── modules/
+│   ├── physics/              # Box3D Soft Step (default) + companion solvers
+│   │   ├── phys_bullet.c/h   C API facade (`Phys_*`; backend-selected)
+│   │   ├── phys_box3d_impl.c Box3D Soft Step backend (default)
+│   │   ├── phys_bullet_impl.cpp  Optional Bullet backend
+│   │   ├── phys_middleware.c Console commands + frame glue
+│   │   ├── phys_solvers.c    PRE/POST registry (shadows, procanim, motors, dmm, cloth, fluid, …)
+│   │   ├── phys_procedural_anim.c/h  Euphoria-like balance / stumble / getup
+│   │   ├── phys_motor.c/h    Per-bone PD torques for active ragdolls
+│   │   ├── phys_ragdoll_bind.c/h  `.rag` sidecar + MD3 frame blend
+│   │   ├── phys_dmm.c/h      DMM-like fracture companion (rigid proxy + debris)
+│   │   ├── phys_events.c/h   Gameplay event bus + `PhysEvent_Poll`
+│   │   └── phys_cloth.c, phys_fluid.c, phys_particles.c, …
+│   ├── navigation/           # Recast/Detour + BSP extract
+│   ├── audio/                # OpenAL/SDL backends, Opus/FLAC/WebM codecs
+│   └── world/                # Open world, districts, residency, Arc Blanc, fog biology
+│       ├── world_open.cpp    Sector streaming (`r_openWorld`)
+│       ├── world_district.cpp  USD district state machine (`r_district`)
+│       └── world_residency.cpp Value-aware sector budgets
 ├── renderers/
-│   ├── vulkan/            Vulkan 1.4 renderer
-│   │   ├── vk.h                  Core Vulkan state + public API (implementation split across vk_*.c)
-│   │   ├── vk_init_device.c      vk_initialize (device bootstrap after logical device)
-│   │   ├── vk_frame_submit.c     vk_begin_frame / vk_end_frame / vk_present_frame
-│   │   ├── vk_raster_samples.c   MSAA sample counts + vk_get_msaa_min_sample_shading
-│   │   ├── vk_sun_shadow_pass.c  Sun shadow map render pass
-│   │   ├── vk_pipelines_bootstrap.c vk_create_pipelines (+ BRDF LUT pipeline helper)
-│   │   ├── vk_pbr_ibl_validate.c   vk_validate_pbr_ibl_resources (startup IBL checks)
-│   │   ├── vk_procs.c/h          `qvk*` Vulkan entry points (storage + declarations)
-│   │   ├── vk_shader_modules.c/h SPIR-V `VkShaderModule` creation + `vk_create_shader_modules`
-│   │   ├── vk_pipelines_persistent.c/h Long-lived pipelines (skybox, fog, debug tools)
-│   │   ├── vk_attachments.c/h    Render targets, pooled image memory, shadows, froxels (split from vk.c)
-│   │   ├── vk_resource_destroy.c/h VkRenderPass + long-lived pipeline teardown (split from vk.c)
-│   │   ├── vk_framebuffers.c/h       VkFramebuffer create/destroy (split from vk.c)
-│   │   ├── vk_descriptor_sets.c/h    Descriptor pool alloc + attachment/volumetric writes (split from vk.c)
-│   │   ├── vk_texture_image.c/h    Texture image create/upload + per-image descriptor (split from vk.c)
-│   │   ├── vk_pipeline_helpers.c/h Post-process pipelines: atmosphere, OIT accum, blur; vk_set_shader_stage_desc (split from vk.c)
-│   │   ├── vk_occlusion.c/h       GPU occlusion queries + entity visibility buffer (split from vk.c)
-│   │   ├── vk_create_pipeline.c/h Vk_Pipeline_Def graphics pipeline factory + pipeline table lookup (split from vk.c)
-│   │   ├── vk_draw_state.c/h      Tess upload, vertex/index/descriptor/pipeline bind, draws (split from vk.c)
-│   │   ├── vk_volumetric_pipelines.c Volumetric fog / fluid / luminance / CBT / veg-wind pipeline setup (split from vk.c)
-│   │   ├── vk_volumetric_internal.c/h MSAA depth resolve, fluid sim dispatch, volumetric perf queries (split from vk.c)
-│   │   ├── vk_volumetric_pass_compute.c Local volumetric shadows, froxel compute, composite, SMAA (split from vk.c)
-│   │   ├── vk_shutdown.c          vk_shutdown, wait-idle, release_resources (split from vk.c)
-│   │   ├── vk_postfx_passes.c     Bloom, SSAO/HBAO, OIT, SSR passes (split from vk.c)
-│   │   ├── vk_clear_attachments.c In-pass color/depth clear + dynamic color write mask (split from vk.c)
-│   │   ├── vk_cubemap_prefilter.c IBL cubemap prefilter, SH extraction, vk_generate_cubemaps, vk_begin_cubemap_render_pass, vk_create_brfdlut (split from legacy vk.c)
-│   │   ├── vk_fluidsim.c/h       Fluid simulation module
-│   │   ├── vk_postfx.c/h         PostFX cvars + `PostFX_PostPipelinesNeedUpdate` (SSR/bloom/SSAO/SMAA/OIT/FBO fmt)
-│   │   ├── vk_post_process_refresh.c  `vk_update_post_process_pipelines` — rebuild post VkPipelines when needed
-│   │   ├── vk_flashlight.c/h     Projected texture system
-│   │   ├── vk_skybox_hdr.c/h     HDR EXR skybox + IBL
-│   │   ├── tr_model_gltf.c/h     glTF 2.0 loader (Vulkan GPU path; CPU tess fallback - see docs/GLTF.md)
-│   │   ├── tr_model_obj.c        OBJ loader
-│   │   ├── tr_model_md5.c        MD5 loader
-│   │   ├── inspector/             ImGui inspector overlay
-│   │   └── shaders/glsl/          GLSL shaders
-│   └── common/              Shared (images, fonts, types)
-│       └── tr_image_exr.cpp       OpenEXR loader
-├── platform/
-│   ├── unix/            Linux/macOS
-│   ├── win32/           Windows
-│   └── sdl/             SDL2 (windowing, input, gamma)
-├── qcommon/             Shared engine (VM, filesystem, network)
-│   ├── vm.c / vm_local.h         VM create, native load, QVM path
-│   ├── vm_native_module.c/h      Native `.so`/`.dll` filename candidates
-│   └── files.c                   FS_LoadLibrary search (modules/vm/gamedir)
-├── server/              Dedicated server
-├── botlib/              Bot AI (Q3 AAS pathfinding)
-└── external/            Vendored libraries
-    └── src/recast/      Recast/Detour (zlib)
+│   └── vulkan/               # Vulkan 1.4 renderer (split across vk_*.c, tr_*.c)
+│       ├── vk_forward_plus.c Forward+ tile cull + shade
+│       ├── tr_bsp_stream.c   Visual BSP sector overlay (`r_bspStream`)
+│       ├── vk_sparse.c       Sparse virtual texture residency (`r_vtSparse`)
+│       └── shaders/glsl/     GLSL → SPIR-V at build time
+├── extensions/
+│   ├── generative/           # FLUX, TRELLIS, genetic GAN
+│   └── research/             # RadiusFPS, VUDA, Mímir, …
+├── third_party/              # box3d, FreeUSD, recast, …
+├── cmake/                    # IdTech3Layout.cmake, profile manifests
+├── examples/                 # demo_game, templates
+├── tests/                    # scripts + ctest fixtures
+└── docs/                     # Tiered index: docs/README.md
 ```
+
+**Build profiles** (`IDTECH3_PROFILE`): `core` | `game` (default) | `full` | `research` — see [ENGINE_MODULE_MANIFEST.md](ENGINE_MODULE_MANIFEST.md).
 
 ## Game Loop
 
@@ -127,6 +87,20 @@ CL_Frame(msec)
   └── Con_RunConsole()
 ```
 
+## Physics (Box3D Soft Step)
+
+Default rigid substrate is **Box3D Soft Step** (`modules/physics/phys_box3d_impl.c`, submodule `third_party/box3d`). The public C API is `Phys_*` in `phys_bullet.h` (historical name; backend selected at CMake via `IDTECH3_PHYSICS_BACKEND`).
+
+```
+Phys_StepSimulation (server: SV_Physics_Frame; listen: CL_GameFrame)
+  ├─ PhysSolvers_PreStep   shadows, volumes, procanim, motors
+  ├─ Box3D Soft Step       primary rigid solver
+  ├─ contact / sensor / joint-break → PhysEvent_Post
+  └─ PhysSolvers_PostStep  cloth, particles, softblob, fluid, dmm
+```
+
+Companion layers: **Euphoria-like** active ragdoll (`phys_procedural_anim`, `phys_motor`, `.rag` bind), **DMM-like** destructibles (`phys_dmm`), CastMover character (`phys_character`, `phys_pmove`). Full API, cvars, and console commands: [PHYSICS.md](PHYSICS.md).
+
 ## Renderer Pipeline (Vulkan)
 
 The shipping Vulkan renderer is **forward-only** with a layered HDR/post-processing pipeline.
@@ -145,7 +119,7 @@ The shipping Vulkan renderer is **forward-only** with a layered HDR/post-process
 
 **`r_renderMode`** (latched, `vid_restart`): **0** classic forward, **1** deferred scaffold with optional **`r_deferredLighting 1`** (G-buffer fill + Forward+ tile diffuse; latches `r_forwardPlus` 1, `r_forwardPlusShade` 0). **`r_deferredGBuffer 1`** allocates RTs; **`r_deferredGBufferFill 1`** captures albedo/normal/material after geometry. **2** Forward+ primary.
 
-**Vulkan Forward+** (`r_forwardPlus` default **1**): GPU light record SSBO packs up to **`VK_FP_MAX_GPU_LIGHTS` (64)** from `refdef.dlights`; **classic** surface **`dlightBits`** still only cover indices **0–31** (`MAX_DLIGHTS`). **16×16 px** tile cull compute, optional PBR tile debug / additive local-light shading. Per-tile index count is **`r_forwardPlusMaxPerTile`** (**4–8**, latched, default **8**; SSBO stride is fixed at 8 slots). Optional overload order: **`r_forwardPlusDistanceSort`** / **`r_forwardPlusLuminanceSort`**; optional **`r_forwardPlusDepthCull`** defers cull until after opaque and samples depth at light centers. Tile buffers follow **`vk_get_render_target_width/height`** (main FBO color extent when active, else `vk.render*` / window—`vk_view_state.c`) and **reallocate on resize** without `vid_restart`; toggling `r_forwardPlus` or `r_forwardPlusMaxPerTile` still needs **`vid_restart`**. Implementation: `src/renderers/vulkan/vk_forward_plus.c`, cvars in `src/renderers/vulkan/tr_init.c`. Full audit: [FORWARD_PLUS_PIPELINE_AUDIT.md](FORWARD_PLUS_PIPELINE_AUDIT.md).
+**Vulkan Forward+** (`r_forwardPlus` default **1**): GPU light record SSBO packs up to **`VK_FP_MAX_GPU_LIGHTS` (64)** from `refdef.dlights`; **classic** surface **`dlightBits`** still only cover indices **0–31** (`MAX_DLIGHTS`). **16×16 px** tile cull compute, optional PBR tile debug / additive local-light shading. Per-tile index count is **`r_forwardPlusMaxPerTile`** (**4–8**, latched, default **8**; SSBO stride is fixed at 8 slots). Optional overload order: **`r_forwardPlusDistanceSort`** / **`r_forwardPlusLuminanceSort`**; optional **`r_forwardPlusDepthCull`** defers cull until after opaque and samples depth at light centers. Tile buffers follow **`vk_get_render_target_width/height`** (main FBO color extent when active, else `vk.render*` / window—`vk_view_state.c`) and **reallocate on resize** without `vid_restart`; toggling `r_forwardPlus` or `r_forwardPlusMaxPerTile` still needs **`vid_restart`**. Implementation: `renderers/vulkan/vk_forward_plus.c`, cvars in `renderers/vulkan/tr_init.c`. Full audit: [FORWARD_PLUS_PIPELINE_AUDIT.md](FORWARD_PLUS_PIPELINE_AUDIT.md).
 
 **Temporal (TAA):** optional **`r_taa`** resolve after post-fog; **`r_taaMotionVectors 1`** samples main-pass motion when available. TAA is skipped on camera cuts, portals, and **`unreliableMotionThisFrame`**; history resets on unreliable motion (`vk_temporal_commit_frame_state`). See [HDR_GAPS.md](HDR_GAPS.md) §6.8.
 
@@ -155,11 +129,11 @@ For goals and longer notes, see [RENDERER_2026_ARCHITECTURE_PASS.md](RENDERER_20
 
 ## Native game modules (VM)
 
-When `fs_restrict` is **0** (default), `VM_Create` always tries a **native** shared library before falling back to a `.qvm` (`src/qcommon/vm.c`). Native load is disabled when `fs_restrict` is set (demo-style restriction).
+When `fs_restrict` is **0** (default), `VM_Create` always tries a **native** shared library before falling back to a `.qvm` (`engine/core/vm.c`). Native load is disabled when `fs_restrict` is set (demo-style restriction).
 
 **Exported symbols:** the library must provide `dllEntry` and `vmMain` or the engine unloads it and continues to QVM.
 
-**Filename probes** (`VM_TryLoadNativeModule` + `VM_BuildNativeModuleCandidates` in `src/qcommon/vm_native_module.c`), in order:
+**Filename probes** (`VM_TryLoadNativeModule` + `VM_BuildNativeModuleCandidates` in `engine/core/vm_native_module.c`), in order:
 
 1. `<module>.so` (Linux/macOS-style name; still the first probe on Windows builds too)
 2. `<module>.<ARCH_STRING><DLL_EXT>` (e.g. `client.x86_64.so`, `uix86_64.dll` - `ARCH_STRING` / `DLL_EXT` from `q_platform.h`)
@@ -167,7 +141,7 @@ When `fs_restrict` is **0** (default), `VM_Create` always tries a **native** sha
 
 **Alternate logical names** for the same VM slot: if those candidates fail, `loadNative` tries additional base names before the final platform-specific `name + ARCH_STRING + DLL_EXT` path. Examples: `qagame` tries `game` then `server`; `cgame` tries `client`; `ui` tries `frontend`; `server` tries `game`; `client` tries `cgame`; `frontend` tries `ui`.
 
-**Filesystem resolution** (`FS_LoadLibrary` in `src/qcommon/files.c`): for each static game directory on the search path, the engine tries `modules/<file>` then `vm/<file>`, then the file **directly in the gamedir** (legacy). If the requested name already looks like a dotted native (`ui.x86_64.dll`, `cgame.x86_64.so`, etc.), it also tries the dotted form under `modules/` and `vm/` for `ui`, `cgame`, and `qagame` prefixes.
+**Filesystem resolution** (`FS_LoadLibrary` in `engine/core/files.c`): for each static game directory on the search path, the engine tries `modules/<file>` then `vm/<file>`, then the file **directly in the gamedir** (legacy). If the requested name already looks like a dotted native (`ui.x86_64.dll`, `cgame.x86_64.so`, etc.), it also tries the dotted form under `modules/` and `vm/` for `ui`, `cgame`, and `qagame` prefixes.
 
 **Native modules stored only inside `.pk3`:** `dlopen` / `LoadLibrary` cannot load directly from zip-backed file handles. When **`com_nativeLibraryExtractPk3`** is **1** (default, archived), `FS_LoadLibrary` first looks up the requested basename via `FS_ReadFile` (virtual paths such as `vm/uix86_64.so`). If the bytes exist only in a pack, it writes them under **`<fs_homepath>/<fs_game>/vm/native_cache/<basename>`** (CRC32 match skips rewrite when the cache file already matches), then loads that OS path. Set **`com_nativeLibraryExtractPk3`** to **0** to disable extraction (fall back to loose files only). Startup prints one line when extraction is enabled.
 

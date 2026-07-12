@@ -115,6 +115,39 @@ See [EDITOR_BRIDGE.md](EDITOR_BRIDGE.md) — `misc_phys_box|sphere|static|sensor
 - **Euphoria Lua:** `createRagdoll` (death), `spawnBoundAlive`, `forceAnimState`, `hitRagdoll`
 - **DMM Lua:** `createDmm`, `fractureDmm`, `dmmStatus`
 
+## Event bus
+
+Gameplay systems (audio, particles, AI, decals) subscribe in C via `PhysEvent_Subscribe`. Scripts poll a ring buffer each tick:
+
+| API | Role |
+|-----|------|
+| `PhysEvent_Poll` | Dequeue one copy (survives `PhysEvent_DispatchQueued`) |
+| `Engine.Physics.pollEvent()` | Lua table: `type`, `bodyA`, `bodyB`, `ragdoll`, `bone`, `x/y/z`, `magnitude` |
+
+Event types (`phys_events.h`):
+
+| Value | Name | Source |
+|-------|------|--------|
+| 0 | `PHYS_EVENT_IMPACT` | Hit / impulse |
+| 1 | `PHYS_EVENT_BREAK` | Joint break |
+| 9 | `PHYS_EVENT_MOTION_ENTER` | Sensor enter |
+| 10 | `PHYS_EVENT_MOTION_EXIT` | Sensor exit |
+| 11 | `PHYS_EVENT_CONTACT_BEGIN` | Soft Step contact begin |
+| 12 | `PHYS_EVENT_CONTACT_END` | Soft Step contact end |
+| 13 | `PHYS_EVENT_BODY_SLEEP` | Body fell asleep |
+
+`Engine.Physics.subscribe(type)` logs a hint and returns `true`; use `pollEvent()` in a frame loop instead.
+
+```lua
+while true do
+  local ev = Engine.Physics.pollEvent()
+  if not ev then break end
+  if ev.type == 11 then -- CONTACT_BEGIN
+    -- react to collision at ev.x, ev.y, ev.z
+  end
+end
+```
+
 ## Ragdoll bind
 
 Optional sidecar `models/<model>.rag`:

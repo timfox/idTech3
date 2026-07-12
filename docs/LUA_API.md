@@ -32,29 +32,83 @@ Engine.Nav.findPath(mesh, sX, sY, sZ, eX, eY, eZ) -- returns {{x,y,z},...} or ni
 Engine.Nav.addAgent(x, y, z)                  -- returns agentHandle
 ```
 
-## Engine.Physics (6 functions)
+## Engine.Physics
+
+Box3D Soft Step rigid bodies, companion solvers, ragdoll bind, and the script-facing event poll. See [PHYSICS.md](PHYSICS.md) for architecture, cvars, and console commands.
+
+### Core / queries
 
 ```lua
 Engine.Physics.init()                         -- returns boolean
 Engine.Physics.step(dt)
+Engine.Physics.backend()                      -- "box3d" | "bullet" | "none"
 Engine.Physics.createBody(x, y, z, mass, size) -- returns bodyHandle
 Engine.Physics.destroyBody(handle)
 Engine.Physics.applyImpulse(handle, ix, iy, iz, px, py, pz)
-Engine.Physics.getTransform(handle)           -- returns x, y, z, rx, ry, rz
+Engine.Physics.applyImpulseRadius(x, y, z, radius, impulse)
+Engine.Physics.getTransform(handle)           -- x, y, z, rx, ry, rz
+Engine.Physics.setTransform(handle, x, y, z, rx, ry, rz)
 Engine.Physics.setFriction(handle, friction)
 Engine.Physics.setRestitution(handle, restitution)
-Engine.Physics.validateReplay(path)           -- Soft Step recording QA
-Engine.Physics.rayCast(x1,y1,z1, x2,y2,z2 [, cat, mask])
+Engine.Physics.setFilter(handle, cat, mask [, group])
+Engine.Physics.attachShape(handle [, hx, hy, hz])
+Engine.Physics.rayCast(x1,y1,z1, x2,y2,z2 [, cat, mask])  -- hit, fraction, body, px, py, pz
 Engine.Physics.convexSweep(x1,y1,z1, x2,y2,z2 [, radius])
 Engine.Physics.overlapSphere(x,y,z [, radius]) -- body handle table
 Engine.Physics.getContacts(handle)            -- manifold table
-Engine.Physics.setFilter(handle, cat, mask [, group])
-Engine.Physics.attachShape(handle [, hx,hy,hz])
+Engine.Physics.validateReplay(path)           -- Soft Step recording QA
+Engine.Physics.pmoveCorrect(pmove)            -- CastMover bridge when phys_pmove 1
+Engine.Physics.moverStep(...)                 -- character CastMover step
+```
+
+### Shapes, sensors, constraints
+
+```lua
+Engine.Physics.createBox(x, y, z [, hx, hy, hz, mass])
+Engine.Physics.createSphere(x, y, z [, radius, mass])
+Engine.Physics.createStatic(x, y, z [, hx, hy, hz])
+Engine.Physics.createSensor(x, y, z [, hx, hy, hz])
+Engine.Physics.createShadow(x, y, z [, hx, hy, hz])   -- kinematic shadow body
+Engine.Physics.setShadowPose(handle, x, y, z, rx, ry, rz)
+Engine.Physics.createBuoyancy(x, y, z, radius, density)
+Engine.Physics.addHeightField(x, y, z, w, d, heightsTable)
+Engine.Physics.createConstraint(type, a, b, ...) -- filter|parallel|cone|prismatic|wheel|…
 Engine.Physics.setConstraintSpring(c, enable [, hz, damp])
 Engine.Physics.setSphericalLimits(c, cone [, twistLo, twistHi])
 Engine.Physics.setWheelSteering(c, angleRad [, maxTorque])
-Engine.Physics.pollEvent()                    -- Soft Step bus event or nil
-Engine.Physics.createConstraint(type, a, b, ...) -- filter|parallel|cone|…
+```
+
+### Event bus
+
+Poll once per frame (or tick) from Lua. `subscribe(type)` is a no-op placeholder — events are retrieved via `pollEvent()`.
+
+```lua
+local ev = Engine.Physics.pollEvent()
+-- ev == nil when queue empty
+-- ev.type: 0=IMPACT, 5=BALANCE_LOST, 6=RAGDOLL_SLEEP, 9=MOTION_ENTER, 10=MOTION_EXIT,
+--          11=CONTACT_BEGIN, 12=CONTACT_END, 13=BODY_SLEEP (see phys_events.h)
+-- ev.bodyA, ev.bodyB, ev.ragdoll, ev.bone, ev.x, ev.y, ev.z, ev.magnitude
+```
+
+### Ragdoll (Euphoria-like)
+
+```lua
+-- Death pose (ProcAnim_Kill):
+local rag, anim, motor = Engine.Physics.createRagdoll([ragPath], x, y, z)
+-- Live Euphoria (balance + motors):
+local rag, anim, motor = Engine.Physics.spawnBoundAlive([ragPath], x, y, z)
+local ok, numBones = Engine.Physics.loadRagdoll("models/foo.rag")
+Engine.Physics.setBoneAnimTarget(rag, bone, px, py, pz [, rx, ry, rz])
+Engine.Physics.forceAnimState(anim, state)    -- procAnimState_t enum
+Engine.Physics.hitRagdoll(anim [, motor, bone, ix, iy, iz, px, py, pz])
+```
+
+### DMM-like destructibles
+
+```lua
+local dmm = Engine.Physics.createDmm(x, y, z [, edge, density, gridRes])
+local fragCount = Engine.Physics.fractureDmm(dmm [, px, py, pz, impulse])
+local active = Engine.Physics.dmmStatus()
 ```
 
 ## Engine.Particles (5 functions)
@@ -183,7 +237,7 @@ local label = Engine.Save.read(slot)         -- returns string or nil
 local last = Engine.Save.lastSlot()          -- returns integer
 ```
 
-Protocol version: `1` (see [g_engine_systems.h](../src/game/g_engine_systems.h)). Legacy `save/engine_slot_*.txt` still reads.
+Protocol version: `1` (see [g_engine_systems.h](../runtime/game/g_engine_systems.h)). Legacy `save/engine_slot_*.txt` still reads.
 
 Console (client, no Lua): `engine_save_write <slot> <label>`, `engine_save_read <slot>`, `engine_save_info`.
 
