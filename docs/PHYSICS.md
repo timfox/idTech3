@@ -2,94 +2,112 @@
 
 ## Architecture
 
-**Box3D Soft Step** ([timfox/idTech3-box3d](https://github.com/timfox/idTech3-box3d)) is the default **rigid substrate**. A **multi-solver registry** (`phys_solvers`) runs companions **before and after** Soft Step, sharing one world through `Phys_*` (ray / overlap / impulse / force). Bullet remains an optional rigid alternate.
+**Box3D Soft Step** ([timfox/idTech3-box3d](https://github.com/timfox/idTech3-box3d)) is the default **rigid substrate** (`third_party/box3d`). Companion solvers share that world through `Phys_*`. Bullet remains an optional alternate.
 
 ```txt
 Phys_StepSimulation
-  ├─ PhysSolvers_PreStep
-  │     ├─ shadows   (kinematic sync)
-  │     ├─ volumes   (buoyancy / drag forces)
-  │     ├─ procanim  (ragdoll state)
-  │     └─ motors    (active PD torques)
-  ├─ Soft Step (Box3D)          ← primary rigid solver
-  ├─ contact events
-  └─ PhysSolvers_PostStep
-        ├─ softstep   (status → body count)
-        ├─ xpbd_cloth
-        ├─ particles
-        ├─ softblob
-        └─ fluid      (SPH-ish + rigid couple)
+  ├─ PhysSolvers_PreStep (shadows / volumes / procanim / motors)
+  ├─ Soft Step (Box3D)     ← primary rigid solver
+  ├─ contact + sensor + joint-break events
+  └─ PhysSolvers_PostStep (cloth / particles / softblob / fluid)
 ```
 
-> Box3D does **not** ship FEM soft bodies or CFD. Soft / fluid behavior comes from companion solvers that **use** Soft Step collision.
+### Authority
 
-| Layer | Module | Role |
-|-------|--------|------|
-| Rigid substrate | `phys_box3d_impl.c` | Soft Step bodies, joints, CastMover, mesh/compound |
-| Solver registry | `phys_solvers` | Register / enable / Pre+Post tick / debug |
-| PRE layers | props / volumes / ProcAnim / motors | Force Soft Step to see game + character control |
-| XPBD cloth | `phys_cloth` | Soft sheets via `Phys_RayCast` |
-| Particles | `phys_particles` | Debris Verlet + bounce |
-| Soft blob | `phys_softblob` | Lattice jelly |
-| Fluid | `phys_fluid` | SPH-ish blob + Soft Step couple |
-| Middleware | `phys_middleware` | Demos, console, event dispatch |
+| Host | Soft Step tick |
+|------|----------------|
+| Dedicated server | `SV_Physics_Frame` when `phys_enabled` |
+| Listen / client | `CL_GameFrame` (listen skips server double-step) |
+| Map props | `sv_physSpawn 1` → `misc_phys_*` via `EnginePhysMap_Parse` |
 
-## Solvers
+Classic Q3/OA Pmove stays default (`phys_pmove 0`). Set `phys_pmove 1` for CastMover correction (`Phys_PmoveCorrect` / `G_PHYS_PMOVE_CORRECT` / Lua `Engine.Physics.pmoveCorrect`).
 
-| Name | Phase | Cvar | Console |
-|------|-------|------|---------|
-| `shadows` | PRE | — | `phys_spawn_shadow` |
-| `volumes` | PRE | — | `phys_spawn_buoyancy` |
-| `procanim` / `motors` | PRE | `phys_motor` | `phys_spawn_ragdoll` |
-| `softstep` | (primary) | — | — |
-| `xpbd_cloth` | POST | — | `phys_spawn_cloth` |
-| `particles` | POST | `phys_particles` | `phys_spawn_particles` |
-| `softblob` | POST | `phys_softblob` | `phys_spawn_softblob` |
-| `fluid` | POST | `phys_fluid` | `phys_spawn_fluid` |
+## Box3D substrate coverage
+
+| Feature | Status |
+|---------|--------|
+| Soft Step + workers / sleep / CCD | Done |
+| Bodies (static / dynamic / kinematic) | Done |
+| True cylinder + convex hull | Done |
+| Multi-shape attach / destroy | Done |
+| Runtime shape filters | Done |
+| Sensors (`isSensor` → `MOTION_ENTER/EXIT`) | Done |
+| Prismatic / wheel / motor / distance / revolute / weld / spherical | Done |
+| Joint break thresholds → `PHYS_EVENT_BREAK` | Done |
+| Wheel steering setters | Done |
+| Height field (Z-up via body rotation) | Done |
+| Mesh + compound static | Done |
+| CastRayClosest / OverlapShape | Done |
+| CastMover character + opt-in Pmove | Done |
+| Kinematic `SetTargetTransform` (shadows) | Done |
+| Gravity scale / motion locks | Done |
+| Explode / debug draw / hit events | Done |
+| MD3 / `.rag` ragdoll bind + anim blend | Done |
+| Profile counters (`phys_status`) | Done |
+| Recording (`phys_record` + `Phys_StartRecording`) | Done |
+
+### Optional / MED–LOW (not blockers)
+
+| API | Notes |
+|-----|-------|
+| Custom query filter callbacks | Default filter only today |
+| Contact begin/end (non-sensor) | Hit events only |
+| Full FEM soft bodies | Not in Box3D — keep XPBD/DMM companions |
+| Open-world sector mesh stream | Follow-on to BSP grid bake |
+
+## Multi-solver companions
+
+| Name | Phase | Console |
+|------|-------|---------|
+| `shadows` / `volumes` / `procanim` / `motors` | PRE | shadow / buoyancy / ragdoll |
+| `xpbd_cloth` / `particles` / `softblob` / `fluid` | POST | `phys_spawn_*` |
 
 ```bash
 phys_solvers
-phys_solvers fluid off
-phys_spawn_fluid 0 0 96 96
-phys_spawn_softblob 0 0 80
+phys_spawn_sensor 0 0 32
+phys_spawn_slider 0 0 64
+phys_spawn_heightfield 0 0 0
+phys_spawn_fluid 0 0 96 64
 phys_debug
 phys_status
 ```
 
-## Capability matrix
+## Map entities
 
-| Feature | Status |
-|---------|--------|
-| Rigid Soft Step + workers/sleep/CCD | Done |
-| Multi-solver Pre/Post registry | Done |
-| PRE motors / volumes / shadows | Done |
-| Cloth / particles / softblob / fluid | Done |
-| Distance-joint ropes | Done |
-| FEM volumetric soft / production CFD | Not in Box3D |
-| Map entity auto-spawn / MD3 ragdoll bind | Open |
+See [EDITOR_BRIDGE.md](EDITOR_BRIDGE.md) — `misc_phys_box|sphere|static|sensor|slider|ragdoll`.
+
+## Scripting
+
+- **QVM traps:** `G_PHYS_CREATEBODY` … `G_PHYS_RAYCAST`, `G_PHYS_PMOVE_CORRECT`, character traps
+- **Lua `Engine.Physics`:** bodies, sensors, constraints, rayCast, moverStep, pmoveCorrect, heightfield, backend
+
+## Ragdoll bind
+
+Optional sidecar `models/<model>.rag`:
+
+```
+scale 1.0
+bone 0 tag_torso 8 20 0 0 0 -1
+bone 1 tag_head 5 10 0 0 28 0
+```
+
+Then drive poses with `Phys_RagdollSetBoneAnimTarget` + `Phys_RagdollBlendToAnimation`. Without a bind, Soft Step uses the procedural 11-bone layout.
 
 ## Backend switch
 
 | Backend | CMake / script |
 |---------|----------------|
 | **Box3D (default)** | `-DIDTECH3_PHYSICS_BACKEND=box3d` / `./scripts/compile_engine.sh vulkan` |
-| Bullet | `… bullet` |
+| Bullet | `… bullet` (`IDTECH3_PHYSICS_BACKEND=bullet`) |
 | None | `… no-physics` |
 
-## Dual motion + companions
+## Cvars
 
-| Mode | API |
-|------|-----|
-| Free rigid | `PhysProp_CreateDynamic` |
-| Shadow kinematic | `PhysProp_CreateShadow` |
-| Cloth / particles / softblob / fluid | `phys_spawn_*` |
-| Rope | `PHYS_CONSTRAINT_DISTANCE` / `phys_spawn_rope` |
-
-**Cvars:** `phys_enabled`, `phys_workers`, `phys_sleep`, `phys_ccd`, `phys_particles`, `phys_softblob`, `phys_fluid`, `phys_debugDraw`, …
-
-**Commands:** `phys_status`, `phys_solvers`, `phys_spawn_*`, `phys_debug`
-
-## Roadmap
-
-1. **Done:** Soft Step + multi-solver (PRE motors/volumes, POST cloth/particles/softblob/fluid)
-2. **Open:** MD3 ragdoll bind, map entity spawn, prefracture
+| Cvar | Default | Role |
+|------|---------|------|
+| `phys_enabled` | 1 | Soft Step world |
+| `sv_physSpawn` | 1 | Map `misc_phys_*` spawn |
+| `phys_pmove` | 0 | CastMover Pmove bridge |
+| `phys_bspGridStep` | 24 | BSP height-grid denseness |
+| `phys_record` | 0 | Allow Soft Step recording |
+| `phys_debugDraw` | 0 | Wireframe |

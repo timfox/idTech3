@@ -23,6 +23,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "server.h"
 #include "sv_enhanced.h"
 #include "sv_openworld.h"
+#include "sv_physics.h"
 #include "net_p2p.h"
 
 serverStatic_t	svs;				// persistant server info
@@ -1444,6 +1445,8 @@ void SV_Frame( int msec ) {
 
 		// let everything in the world think and move
 		VM_Call( gvm, 1, GAME_RUN_FRAME, sv.time );
+
+		SV_Physics_Frame( frameMsec );
 
 		// record entity positions for backward reconciliation
 		SV_Unlagged_Record( sv.time );

@@ -216,6 +216,116 @@ static int l_phys_getTransform(lua_State *L) {
 	lua_pushnumber(L,t.rotation[0]); lua_pushnumber(L,t.rotation[1]); lua_pushnumber(L,t.rotation[2]);
 	return 6;
 }
+static int l_phys_setTransform(lua_State *L) {
+	vec3_t pos, rot;
+	pos[0]=(float)luaL_checknumber(L,2); pos[1]=(float)luaL_checknumber(L,3); pos[2]=(float)luaL_checknumber(L,4);
+	rot[0]=(float)luaL_optnumber(L,5,0); rot[1]=(float)luaL_optnumber(L,6,0); rot[2]=(float)luaL_optnumber(L,7,0);
+	Phys_SetBodyTransform((int)luaL_checkinteger(L,1), pos, rot);
+	return 0;
+}
+static int l_phys_rayCast(lua_State *L) {
+	vec3_t from, to;
+	physRayResult_t hit;
+	from[0]=(float)luaL_checknumber(L,1); from[1]=(float)luaL_checknumber(L,2); from[2]=(float)luaL_checknumber(L,3);
+	to[0]=(float)luaL_checknumber(L,4); to[1]=(float)luaL_checknumber(L,5); to[2]=(float)luaL_checknumber(L,6);
+	if ( !Phys_RayCast( from, to, &hit ) || !hit.hit ) {
+		lua_pushboolean(L, 0);
+		return 1;
+	}
+	lua_pushboolean(L, 1);
+	lua_pushnumber(L, hit.hitPoint[0]); lua_pushnumber(L, hit.hitPoint[1]); lua_pushnumber(L, hit.hitPoint[2]);
+	lua_pushnumber(L, hit.fraction);
+	lua_pushinteger(L, hit.body);
+	return 5;
+}
+static int l_phys_createSensor(lua_State *L) {
+	physBodyDef_t def;
+	Com_Memset(&def, 0, sizeof(def));
+	def.shape = PHYS_SHAPE_BOX;
+	def.type = PHYS_BODY_STATIC;
+	def.isSensor = qtrue;
+	def.position[0]=(float)luaL_checknumber(L,1); def.position[1]=(float)luaL_checknumber(L,2); def.position[2]=(float)luaL_checknumber(L,3);
+	def.halfExtents[0]=def.halfExtents[1]=def.halfExtents[2]=(float)luaL_optnumber(L,4,32);
+	lua_pushinteger(L, Phys_CreateBody(&def));
+	return 1;
+}
+static int l_phys_createConstraint(lua_State *L) {
+	physConstraintDef_t def;
+	const char *typeName;
+	Com_Memset(&def, 0, sizeof(def));
+	typeName = luaL_checkstring(L, 1);
+	if ( !Q_stricmp( typeName, "hinge" ) ) {
+		def.type = PHYS_CONSTRAINT_HINGE;
+	} else if ( !Q_stricmp( typeName, "slider" ) ) {
+		def.type = PHYS_CONSTRAINT_SLIDER;
+	} else if ( !Q_stricmp( typeName, "distance" ) ) {
+		def.type = PHYS_CONSTRAINT_DISTANCE;
+	} else if ( !Q_stricmp( typeName, "wheel" ) ) {
+		def.type = PHYS_CONSTRAINT_WHEEL;
+	} else if ( !Q_stricmp( typeName, "motor" ) ) {
+		def.type = PHYS_CONSTRAINT_MOTOR;
+	} else if ( !Q_stricmp( typeName, "fixed" ) ) {
+		def.type = PHYS_CONSTRAINT_FIXED;
+	} else {
+		def.type = PHYS_CONSTRAINT_POINT;
+	}
+	def.bodyA = (physBodyHandle_t)luaL_checkinteger(L, 2);
+	def.bodyB = (physBodyHandle_t)luaL_checkinteger(L, 3);
+	def.lowerLimit = (float)luaL_optnumber(L, 4, 0);
+	def.upperLimit = (float)luaL_optnumber(L, 5, 0);
+	def.axisA[2] = 1.0f;
+	def.disableCollision = qtrue;
+	lua_pushinteger(L, Phys_CreateConstraint(&def));
+	return 1;
+}
+static int l_phys_moverStep(lua_State *L) {
+	vec3_t origin, velocity, wish;
+	qboolean grounded = qfalse;
+	origin[0]=(float)luaL_checknumber(L,1); origin[1]=(float)luaL_checknumber(L,2); origin[2]=(float)luaL_checknumber(L,3);
+	velocity[0]=(float)luaL_checknumber(L,4); velocity[1]=(float)luaL_checknumber(L,5); velocity[2]=(float)luaL_checknumber(L,6);
+	wish[0]=(float)luaL_optnumber(L,7,0); wish[1]=(float)luaL_optnumber(L,8,0); wish[2]=(float)luaL_optnumber(L,9,0);
+	lua_pushboolean(L, Phys_MoverStep(origin, velocity, (float)luaL_optnumber(L,10,15), (float)luaL_optnumber(L,11,56),
+		wish, (float)luaL_optnumber(L,12,320), (float)luaL_optnumber(L,13,0.016), lua_toboolean(L,14), &grounded));
+	lua_pushnumber(L, origin[0]); lua_pushnumber(L, origin[1]); lua_pushnumber(L, origin[2]);
+	lua_pushnumber(L, velocity[0]); lua_pushnumber(L, velocity[1]); lua_pushnumber(L, velocity[2]);
+	lua_pushboolean(L, grounded);
+	return 8;
+}
+static int l_phys_pmoveCorrect(lua_State *L) {
+	vec3_t origin, velocity;
+	origin[0]=(float)luaL_checknumber(L,1); origin[1]=(float)luaL_checknumber(L,2); origin[2]=(float)luaL_checknumber(L,3);
+	velocity[0]=(float)luaL_checknumber(L,4); velocity[1]=(float)luaL_checknumber(L,5); velocity[2]=(float)luaL_checknumber(L,6);
+	lua_pushinteger(L, Phys_PmoveCorrect(origin, velocity, (float)luaL_optnumber(L,7,15),
+		(float)luaL_optnumber(L,8,56), (float)luaL_optnumber(L,9,0.016)));
+	lua_pushnumber(L, origin[0]); lua_pushnumber(L, origin[1]); lua_pushnumber(L, origin[2]);
+	lua_pushnumber(L, velocity[0]); lua_pushnumber(L, velocity[1]); lua_pushnumber(L, velocity[2]);
+	return 7;
+}
+static int l_phys_addHeightField(lua_State *L) {
+	/* Lua: heights table flat row-major, countX, countY, cellSize, origin */
+	float heights[256];
+	vec3_t origin;
+	int countX, countY, n, i;
+	countX = (int)luaL_checkinteger(L, 2);
+	countY = (int)luaL_checkinteger(L, 3);
+	n = countX * countY;
+	if ( n < 4 || n > 256 || !lua_istable(L, 1) ) {
+		lua_pushinteger(L, -1);
+		return 1;
+	}
+	for ( i = 0; i < n; i++ ) {
+		lua_rawgeti(L, 1, i + 1);
+		heights[i] = (float)luaL_optnumber(L, -1, 0);
+		lua_pop(L, 1);
+	}
+	origin[0]=(float)luaL_optnumber(L,5,0); origin[1]=(float)luaL_optnumber(L,6,0); origin[2]=(float)luaL_optnumber(L,7,0);
+	lua_pushinteger(L, Phys_AddStaticHeightField(heights, countX, countY, (float)luaL_optnumber(L,4,32), 1.0f, origin));
+	return 1;
+}
+static int l_phys_backend(lua_State *L) {
+	lua_pushstring(L, Phys_GetBackendName());
+	return 1;
+}
 
 /* ========== Particles bindings ========== */
 
@@ -1795,7 +1905,11 @@ void LuaBindings_RegisterAll(void *luaState) {
 		{"createBox", l_phys_createBox}, {"createSphere", l_phys_createSphere},
 		{"createStatic", l_phys_createStatic}, {"createShadow", l_phys_createShadow},
 		{"setShadowPose", l_phys_setShadowPose}, {"createBuoyancy", l_phys_createBuoyancy},
-		{"getTransform", l_phys_getTransform},
+		{"getTransform", l_phys_getTransform}, {"setTransform", l_phys_setTransform},
+		{"rayCast", l_phys_rayCast}, {"createSensor", l_phys_createSensor},
+		{"createConstraint", l_phys_createConstraint}, {"moverStep", l_phys_moverStep},
+		{"pmoveCorrect", l_phys_pmoveCorrect}, {"addHeightField", l_phys_addHeightField},
+		{"backend", l_phys_backend},
 		{NULL, NULL}
 	};
 	registerTable(L, "Physics", physicsFuncs);

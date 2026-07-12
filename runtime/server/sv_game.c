@@ -25,6 +25,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "sv_engine_sprites.h"
 #include "sv_engine_decals.h"
 #include "../physics/phys_character.h"
+#include "../physics/phys_bullet.h"
 #include "com_loc.h"
 
 #include "../botlib/botlib.h"
@@ -528,6 +529,57 @@ static qboolean SV_GetValue( char* value, int valueSize, const char* key )
 	if ( !Q_stricmp( key, "trap_Phys_CharacterMove" ) )
 	{
 		Com_sprintf( value, valueSize, "%i", G_PHYS_CHARACTER_MOVE );
+		return qtrue;
+	}
+
+	if ( !Q_stricmp( key, "trap_Phys_CreateBody" ) )
+	{
+		Com_sprintf( value, valueSize, "%i", G_PHYS_CREATEBODY );
+		return qtrue;
+	}
+	if ( !Q_stricmp( key, "trap_Phys_DestroyBody" ) )
+	{
+		Com_sprintf( value, valueSize, "%i", G_PHYS_DESTROYBODY );
+		return qtrue;
+	}
+	if ( !Q_stricmp( key, "trap_Phys_ApplyForce" ) )
+	{
+		Com_sprintf( value, valueSize, "%i", G_PHYS_APPLYFORCE );
+		return qtrue;
+	}
+	if ( !Q_stricmp( key, "trap_Phys_ApplyImpulse" ) )
+	{
+		Com_sprintf( value, valueSize, "%i", G_PHYS_APPLYIMPULSE );
+		return qtrue;
+	}
+	if ( !Q_stricmp( key, "trap_Phys_GetBodyTransform" ) )
+	{
+		Com_sprintf( value, valueSize, "%i", G_PHYS_GETBODYTRANSFORM );
+		return qtrue;
+	}
+	if ( !Q_stricmp( key, "trap_Phys_SetBodyTransform" ) )
+	{
+		Com_sprintf( value, valueSize, "%i", G_PHYS_SETBODYTRANSFORM );
+		return qtrue;
+	}
+	if ( !Q_stricmp( key, "trap_Phys_SetBodyVelocity" ) )
+	{
+		Com_sprintf( value, valueSize, "%i", G_PHYS_SETBODYVELOCITY );
+		return qtrue;
+	}
+	if ( !Q_stricmp( key, "trap_Phys_RayCast" ) )
+	{
+		Com_sprintf( value, valueSize, "%i", G_PHYS_RAYCAST );
+		return qtrue;
+	}
+	if ( !Q_stricmp( key, "trap_Phys_LoadBSPCollision" ) )
+	{
+		Com_sprintf( value, valueSize, "%i", G_PHYS_LOADBSPCOLLISION );
+		return qtrue;
+	}
+	if ( !Q_stricmp( key, "trap_Phys_PmoveCorrect" ) )
+	{
+		Com_sprintf( value, valueSize, "%i", G_PHYS_PMOVE_CORRECT );
 		return qtrue;
 	}
 
@@ -1250,6 +1302,42 @@ static intptr_t SV_GameSystemCalls( intptr_t *args ) {
 
 	case G_PHYS_CHARACTER_MOVE:
 		return Phys_CharacterMove( (int)args[1], VMA( 2 ), VMF( 3 ), args[4] ? qtrue : qfalse );
+
+	case G_PHYS_CREATEBODY:
+		return Phys_CreateBody( (const physBodyDef_t *)VMA( 1 ) );
+
+	case G_PHYS_DESTROYBODY:
+		Phys_DestroyBody( (physBodyHandle_t)args[1] );
+		return 0;
+
+	case G_PHYS_APPLYFORCE:
+		Phys_ApplyForce( (physBodyHandle_t)args[1], (const float *)VMA( 2 ), (const float *)VMA( 3 ) );
+		return 0;
+
+	case G_PHYS_APPLYIMPULSE:
+		Phys_ApplyImpulse( (physBodyHandle_t)args[1], (const float *)VMA( 2 ), (const float *)VMA( 3 ) );
+		return 0;
+
+	case G_PHYS_GETBODYTRANSFORM:
+		Phys_GetBodyTransform( (physBodyHandle_t)args[1], (physTransform_t *)VMA( 2 ) );
+		return 0;
+
+	case G_PHYS_SETBODYTRANSFORM:
+		Phys_SetBodyTransform( (physBodyHandle_t)args[1], (const float *)VMA( 2 ), (const float *)VMA( 3 ) );
+		return 0;
+
+	case G_PHYS_SETBODYVELOCITY:
+		Phys_SetBodyVelocity( (physBodyHandle_t)args[1], (const float *)VMA( 2 ), (const float *)VMA( 3 ) );
+		return 0;
+
+	case G_PHYS_RAYCAST:
+		return Phys_RayCast( (const float *)VMA( 1 ), (const float *)VMA( 2 ), (physRayResult_t *)VMA( 3 ) );
+
+	case G_PHYS_LOADBSPCOLLISION:
+		return Phys_LoadBSPCollision();
+
+	case G_PHYS_PMOVE_CORRECT:
+		return Phys_PmoveCorrect( (float *)VMA( 1 ), (float *)VMA( 2 ), VMF( 3 ), VMF( 4 ), VMF( 5 ) );
 
 	case G_LOC_LOOKUP:
 		return Com_Loc_Lookup( (const char *)VMA( 1 ), VMA( 2 ), (int)args[3] );

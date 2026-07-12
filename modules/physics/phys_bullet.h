@@ -48,12 +48,24 @@ typedef enum {
 typedef enum {
 	PHYS_CONSTRAINT_POINT,
 	PHYS_CONSTRAINT_HINGE,
-	PHYS_CONSTRAINT_SLIDER,
+	PHYS_CONSTRAINT_SLIDER,   /* Box3D prismatic */
 	PHYS_CONSTRAINT_CONE_TWIST,
 	PHYS_CONSTRAINT_GENERIC_6DOF,
 	PHYS_CONSTRAINT_FIXED,
-	PHYS_CONSTRAINT_DISTANCE /* soft spring / rope segment (Box3D distance joint) */
+	PHYS_CONSTRAINT_DISTANCE, /* soft spring / rope (Box3D distance joint) */
+	PHYS_CONSTRAINT_WHEEL,    /* Box3D wheel (chassis A, wheel B) */
+	PHYS_CONSTRAINT_MOTOR     /* Box3D motor joint (relative vel / pose) */
 } physConstraintType_t;
+
+/* Bitmask for Phys_SetBodyMotionLocks / physBodyDef_t.motionLocks */
+enum {
+	PHYS_LOCK_LIN_X = 1 << 0,
+	PHYS_LOCK_LIN_Y = 1 << 1,
+	PHYS_LOCK_LIN_Z = 1 << 2,
+	PHYS_LOCK_ANG_X = 1 << 3,
+	PHYS_LOCK_ANG_Y = 1 << 4,
+	PHYS_LOCK_ANG_Z = 1 << 5
+};
 
 typedef enum {
 	DMM_WOOD,
@@ -88,9 +100,15 @@ typedef struct physBodyDef_s {
 	float           restitution;
 	float           linearDamping;
 	float           angularDamping;
+	float           gravityScale;   /* 1 = default; 0 = zero-G */
+	int             motionLocks;    /* PHYS_LOCK_* bits */
+	qboolean        isSensor;       /* trigger volume (Box3D sensor shape) */
 	int             collisionGroup;
 	int             collisionMask;
 	int             materialId; /* phys_materials.h PHYS_MAT_* */
+	/* PHYS_SHAPE_CONVEX_HULL: xyz triples (count = hullPointCount) */
+	const float    *hullPoints;
+	int             hullPointCount;
 } physBodyDef_t;
 
 typedef struct physConstraintDef_s {
@@ -107,7 +125,22 @@ typedef struct physConstraintDef_s {
 	float                biasFactor;
 	float                relaxationFactor;
 	qboolean             disableCollision;
+	qboolean             enableMotor;
+	float                motorSpeed;
+	float                maxMotorForce;
+	float                breakForce;   /* Soft Step joint force threshold (0 = none) */
+	float                breakTorque;  /* Soft Step joint torque threshold (0 = none) */
 } physConstraintDef_t;
+
+#define PHYS_RAGDOLL_MAX_BONES 32
+
+typedef struct physRagdollBoneDef_s {
+	float           radius;
+	float           height;
+	int             parent;         /* -1 = root */
+	vec3_t          localOffset;    /* from root (Quake units) */
+	char            tagName[32];    /* optional MD3 tag for game bind */
+} physRagdollBoneDef_t;
 
 typedef struct physRagdollDef_s {
 	vec3_t          rootPosition;
@@ -122,7 +155,22 @@ typedef struct physRagdollDef_s {
 	float           impactResponse;
 	float           limbMass;
 	qboolean        selfCollision;
+
+	/* Optional bind: numBones > 0 uses bones[]; else procedural 11-bone layout */
+	int             numBones;
+	physRagdollBoneDef_t bones[PHYS_RAGDOLL_MAX_BONES];
+	char            modelPath[MAX_QPATH];
 } physRagdollDef_t;
+
+typedef struct physSoftStepProfile_s {
+	float stepMs;
+	float collideMs;
+	float solveMs;
+	float jointEventsMs;
+	int   bodyCount;
+	int   constraintCount;
+	int   contactHitCount;
+} physSoftStepProfile_t;
 
 typedef struct dmmObjectDef_s {
 	dmmMaterialType_t material;
@@ -165,6 +213,9 @@ void        Phys_SetGravity(const vec3_t gravity);
 void        Phys_ClearWorld(void);
 qboolean    Phys_LoadBSPCollision(void);
 physBodyHandle_t Phys_AddStaticTriMesh(const float *verts, int numVerts, const int *indices, int numIndices);
+/* Quake Z-up height samples on an X/Y grid → Box3D height field (rotated to Z-up). */
+physBodyHandle_t Phys_AddStaticHeightField(const float *heights, int countX, int countY,
+	float cellSize, float heightScale, const vec3_t origin);
 /* One static body with N child boxes (Box3D compound; Bullet = separate boxes / AABB). */
 physBodyHandle_t Phys_AddStaticCompoundBoxes(const float *centersXYZ, const float *halfExtentsXYZ, int count);
 
@@ -188,6 +239,10 @@ physBodyHandle_t Phys_CreateBody(const physBodyDef_t *def);
 void             Phys_DestroyBody(physBodyHandle_t handle);
 void             Phys_GetBodyTransform(physBodyHandle_t handle, physTransform_t *out);
 void             Phys_SetBodyTransform(physBodyHandle_t handle, const vec3_t pos, const vec3_t rot);
+/* Kinematic platforms: Soft Step interpolates to target over timeStep (Box3D SetTargetTransform). */
+void             Phys_SetBodyTargetTransform(physBodyHandle_t handle, const vec3_t pos, const vec3_t rot, float timeStep);
+void             Phys_SetBodyGravityScale(physBodyHandle_t handle, float scale);
+void             Phys_SetBodyMotionLocks(physBodyHandle_t handle, int lockBits);
 void             Phys_ApplyForce(physBodyHandle_t handle, const vec3_t force, const vec3_t point);
 void             Phys_ApplyImpulse(physBodyHandle_t handle, const vec3_t impulse, const vec3_t point);
 void             Phys_ApplyTorque(physBodyHandle_t handle, const vec3_t torque);
@@ -201,6 +256,15 @@ int              Phys_ApplyImpulseRadius(const vec3_t center, float radius, floa
 physConstraintHandle_t Phys_CreateConstraint(const physConstraintDef_t *def);
 void                   Phys_DestroyConstraint(physConstraintHandle_t handle);
 void                   Phys_SetConstraintLimits(physConstraintHandle_t handle, float lower, float upper);
+void                   Phys_SetConstraintMotor(physConstraintHandle_t handle, qboolean enable,
+	float speed, float maxForce);
+void                   Phys_SetConstraintBreakForce(physConstraintHandle_t handle, float force, float torque);
+void                   Phys_SetWheelSteering(physConstraintHandle_t handle, float angleRadians, float maxTorque);
+
+/* Multi-shape / filters (Box3D Soft Step; Bullet best-effort) */
+int              Phys_AttachShape(physBodyHandle_t body, const physBodyDef_t *shapeDef);
+void             Phys_DestroyAttachedShape(physBodyHandle_t body, int shapeIndex);
+void             Phys_SetBodyFilter(physBodyHandle_t body, int categoryBits, int maskBits);
 
 /* ragdoll / Procedural animation */
 physRagdollHandle_t Phys_CreateRagdoll(const physRagdollDef_t *def);
@@ -212,6 +276,9 @@ void                Phys_RagdollGetBoneTransform(physRagdollHandle_t handle, int
 void                Phys_RagdollSetMuscleStiffness(physRagdollHandle_t handle, float stiffness);
 void                Phys_RagdollBlendToAnimation(physRagdollHandle_t handle, float blend);
 void                Phys_RagdollApplyBoneTorque(physRagdollHandle_t handle, int boneIndex, const vec3_t torque);
+void                Phys_RagdollSetBoneAnimTarget(physRagdollHandle_t handle, int boneIndex,
+	const vec3_t position, const vec3_t rotationDeg);
+void                Phys_RagdollClearAnimTargets(physRagdollHandle_t handle);
 int                 Phys_GetRagdollCount(void);
 
 /* Digital Molecular Matter (DMM) */
@@ -238,9 +305,16 @@ qboolean Phys_ConvexSweep(const physBodyDef_t *shapeDef, const vec3_t from, cons
 	const vec3_t rotation, physRayResult_t *result);
 int      Phys_OverlapSphere(const vec3_t center, float radius, physBodyHandle_t *results, int maxResults);
 int      Phys_OverlapBox(const vec3_t center, const vec3_t halfExtents, physBodyHandle_t *results, int maxResults);
+/* Soft Step OverlapShape (sphere proxy); falls back to OverlapSphere. */
+int      Phys_OverlapShape(const vec3_t center, float radius, physBodyHandle_t *results, int maxResults);
 
 void     Phys_SetBodyMaterial(physBodyHandle_t handle, int materialId);
 int      Phys_GetBodyMaterial(physBodyHandle_t handle);
+
+/* Soft Step profile / recording (Box3D; no-ops on Bullet) */
+void     Phys_GetSoftStepProfile(physSoftStepProfile_t *out);
+void     Phys_StartRecording(void);
+void     Phys_StopRecording(const char *path);
 
 /* debug */
 void Phys_DebugDraw(void);

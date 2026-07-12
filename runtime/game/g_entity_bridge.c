@@ -17,7 +17,7 @@ Reads BSP entity key/values and configures engine systems.
 #ifdef USE_GAME_AI_MIDDLEWARE
 #include "g_director.h"
 #endif
-#include "../client/cl_map_background.h"
+#include "../client/shell/cl_map_background.h"
 
 static const char *EB_ParseToken(const char **text) {
 	return COM_Parse(text);

@@ -25,6 +25,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "sv_enhanced.h"
 #include "sv_engine_sprites.h"
 #include "sv_engine_decals.h"
+#include "sv_physics.h"
 #include "sv_auth.h"
 #include "sv_app_crdt.h"
 
@@ -612,6 +613,7 @@ void SV_SpawnServer( const char *mapname, qboolean killBots ) {
 
 	SV_EngineSprites_LoadMap( CM_EntityString() );
 	SV_EngineDecals_LoadMap( CM_EntityString() );
+	SV_Physics_LoadMap( CM_EntityString() );
 
 	// set serverinfo visible name
 	Cvar_Set( "mapname", mapname );
@@ -641,6 +643,7 @@ void SV_SpawnServer( const char *mapname, qboolean killBots ) {
 
 	SV_EngineSprites_SpawnMapEntities();
 	SV_EngineDecals_SpawnMapEntities();
+	SV_Physics_SpawnMapEntities();
 
 	// don't allow a map_restart if game is modified
 	sv_gametype->modified = qfalse;
@@ -806,6 +809,7 @@ void SV_Init( void )
 
 	SV_EngineSprites_Init();
 	SV_EngineDecals_Init();
+	SV_Physics_Init();
 	SV_Auth_Init();
 
 	SV_AddOperatorCommands();
@@ -1032,6 +1036,7 @@ void SV_Shutdown( const char *finalmsg ) {
 	SV_RemoveOperatorCommands();
 	SV_MasterShutdown();
 	SV_Auth_Shutdown();
+	SV_Physics_Shutdown();
 	SV_ShutdownGameProgs();
 	SV_InitChallenger();
 

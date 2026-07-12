@@ -2402,6 +2402,12 @@ ENDIF()
 
 IF(Q3_UI_SRCS)
 ADD_LIBRARY(q3ui OBJECT ${Q3_UI_SRCS})
+target_include_directories(q3ui PRIVATE
+	${IDTECH3_DIR_ENGINE_CORE}
+	${CMAKE_SOURCE_DIR}
+	${CMAKE_SOURCE_DIR}/engine/platform
+	${CMAKE_SOURCE_DIR}/runtime/client
+	${CMAKE_SOURCE_DIR}/modules/audio)
 ENDIF()
 
 if(USE_LOCAL_HEADERS AND NOT IDTECH3_USING_FETCHED_SDL2)
@@ -2642,6 +2648,7 @@ set(PHYSICS_SRCS
   modules/physics/phys_props.c
   modules/physics/phys_volumes.c
   modules/physics/phys_debugdraw.c
+  modules/physics/phys_ragdoll_bind.c
 )
 
 set(IDTECH3_PHYSICS_BACKEND_EFFECTIVE "${IDTECH3_PHYSICS_BACKEND}")
@@ -2751,6 +2758,12 @@ if(TARGET q3ui)
 else()
 	TARGET_LINK_LIBRARIES(${CNAME}${BINEXT} PRIVATE qcommon botlib client phys_module)
 endif()
+# Platform entry sources need engine headers (OBJECT libs keep includes PRIVATE).
+target_include_directories(${CNAME}${BINEXT} PRIVATE
+	${IDTECH3_DIR_ENGINE_CORE}
+	${CMAKE_SOURCE_DIR}
+	${CMAKE_SOURCE_DIR}/engine/platform
+	${CMAKE_SOURCE_DIR}/runtime/client)
 if(TARGET Threads::Threads)
   TARGET_LINK_LIBRARIES(${CNAME}${BINEXT} PRIVATE Threads::Threads)
 endif()
@@ -2796,6 +2809,11 @@ TARGET_LINK_LIBRARIES(${DNAME}${BINEXT} PRIVATE qcommon_ded botlib phys_module)
 if(TARGET Threads::Threads)
   TARGET_LINK_LIBRARIES(${DNAME}${BINEXT} PRIVATE Threads::Threads)
 endif()
+# Platform entry (unix_main / win_main) needs q_shared.h / qcommon.h.
+target_include_directories(${DNAME}${BINEXT} PRIVATE
+	${IDTECH3_DIR_ENGINE_CORE}
+	${CMAKE_SOURCE_DIR}
+	${CMAKE_SOURCE_DIR}/engine/platform)
 #TARGET_LINK_OPTIONS(${DNAME} PRIVATE -fno-pie) # v3.13+
 
 if(UNIX AND NOT MSVC AND NOT APPLE)

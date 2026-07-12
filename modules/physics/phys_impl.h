@@ -25,6 +25,9 @@ physBodyHandle_t     Phys_CreateBody_Impl(const physBodyDef_t *def);
 void                 Phys_DestroyBody_Impl(physBodyHandle_t handle);
 void                 Phys_GetBodyTransform_Impl(physBodyHandle_t handle, physTransform_t *out);
 void                 Phys_SetBodyTransform_Impl(physBodyHandle_t handle, const vec3_t pos, const vec3_t rot);
+void                 Phys_SetBodyTargetTransform_Impl(physBodyHandle_t handle, const vec3_t pos, const vec3_t rot, float timeStep);
+void                 Phys_SetBodyGravityScale_Impl(physBodyHandle_t handle, float scale);
+void                 Phys_SetBodyMotionLocks_Impl(physBodyHandle_t handle, int lockBits);
 void                 Phys_ApplyForce_Impl(physBodyHandle_t handle, const vec3_t force, const vec3_t point);
 void                 Phys_ApplyImpulse_Impl(physBodyHandle_t handle, const vec3_t impulse, const vec3_t point);
 void                 Phys_ApplyTorque_Impl(physBodyHandle_t handle, const vec3_t torque);
@@ -36,6 +39,14 @@ qboolean             Phys_IsBodyDynamic_Impl(physBodyHandle_t handle);
 physConstraintHandle_t Phys_CreateConstraint_Impl(const physConstraintDef_t *def);
 void                 Phys_DestroyConstraint_Impl(physConstraintHandle_t handle);
 void                 Phys_SetConstraintLimits_Impl(physConstraintHandle_t handle, float lower, float upper);
+void                 Phys_SetConstraintMotor_Impl(physConstraintHandle_t handle, qboolean enable,
+	float speed, float maxForce);
+void                 Phys_SetConstraintBreakForce_Impl(physConstraintHandle_t handle, float force, float torque);
+void                 Phys_SetWheelSteering_Impl(physConstraintHandle_t handle, float angleRadians, float maxTorque);
+
+int                  Phys_AttachShape_Impl(physBodyHandle_t body, const physBodyDef_t *shapeDef);
+void                 Phys_DestroyAttachedShape_Impl(physBodyHandle_t body, int shapeIndex);
+void                 Phys_SetBodyFilter_Impl(physBodyHandle_t body, int categoryBits, int maskBits);
 
 physRagdollHandle_t  Phys_CreateRagdoll_Impl(const physRagdollDef_t *def);
 void                 Phys_DestroyRagdoll_Impl(physRagdollHandle_t handle);
@@ -46,6 +57,9 @@ void                 Phys_RagdollGetBoneTransform_Impl(physRagdollHandle_t handl
 void                 Phys_RagdollSetMuscleStiffness_Impl(physRagdollHandle_t handle, float stiffness);
 void                 Phys_RagdollBlendToAnimation_Impl(physRagdollHandle_t handle, float blend);
 void                 Phys_RagdollApplyBoneTorque_Impl(physRagdollHandle_t handle, int boneIndex, const vec3_t torque);
+void                 Phys_RagdollSetBoneAnimTarget_Impl(physRagdollHandle_t handle, int boneIndex,
+	const vec3_t position, const vec3_t rotationDeg);
+void                 Phys_RagdollClearAnimTargets_Impl(physRagdollHandle_t handle);
 int                  Phys_GetRagdollCount_Impl(void);
 
 dmmObjectHandle_t    Dmm_CreateObject_Impl(const dmmObjectDef_t *def);
@@ -62,6 +76,7 @@ qboolean             Phys_ConvexSweep_Impl(const physBodyDef_t *shapeDef, const 
 	const vec3_t rotation, physRayResult_t *result);
 int                  Phys_OverlapSphere_Impl(const vec3_t center, float radius, physBodyHandle_t *results, int maxResults);
 int                  Phys_OverlapBox_Impl(const vec3_t center, const vec3_t halfExtents, physBodyHandle_t *results, int maxResults);
+int                  Phys_OverlapShape_Impl(const vec3_t center, float radius, physBodyHandle_t *results, int maxResults);
 void                 Phys_DebugDraw_Impl(void);
 void                 Phys_ProcessContactEvents_Impl(void);
 void                 Phys_SetBodyMaterial_Impl(physBodyHandle_t handle, int materialId);
@@ -69,6 +84,8 @@ int                  Phys_GetBodyMaterial_Impl(physBodyHandle_t handle);
 int                  Phys_GetBodyCount_Impl(void);
 int                  Phys_GetConstraintCount_Impl(void);
 physBodyHandle_t     Phys_AddStaticTriMesh_Impl(const float *verts, int numVerts, const int *indices, int numIndices);
+physBodyHandle_t     Phys_AddStaticHeightField_Impl(const float *heights, int countX, int countY,
+	float cellSize, float heightScale, const vec3_t origin);
 physBodyHandle_t     Phys_AddStaticCompoundBoxes_Impl(const float *centersXYZ, const float *halfExtentsXYZ, int count);
 /* Returns qtrue if the backend handled the step (updates origin/velocity/grounded). */
 qboolean             Phys_MoverStep_Impl(vec3_t origin, vec3_t velocity, float radius, float height,
@@ -76,6 +93,9 @@ qboolean             Phys_MoverStep_Impl(vec3_t origin, vec3_t velocity, float r
 int                  Phys_GetWorkerCount_Impl(void);
 /* Returns >=0 if handled (bodies affected); -1 to use generic overlap+impulse path. */
 int                  Phys_ApplyImpulseRadius_Impl(const vec3_t center, float radius, float magnitude, float falloff);
+void                 Phys_GetSoftStepProfile_Impl(physSoftStepProfile_t *out);
+void                 Phys_StartRecording_Impl(void);
+void                 Phys_StopRecording_Impl(const char *path);
 
 #ifdef __cplusplus
 }

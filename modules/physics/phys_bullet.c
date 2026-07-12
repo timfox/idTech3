@@ -177,6 +177,19 @@ physBodyHandle_t Phys_AddStaticCompoundBoxes(const float *centersXYZ, const floa
 #endif
 }
 
+physBodyHandle_t Phys_AddStaticHeightField(const float *heights, int countX, int countY,
+	float cellSize, float heightScale, const vec3_t origin) {
+	if (!physInitialized || !heights || countX < 2 || countY < 2) {
+		return -1;
+	}
+#ifdef PHYS_HAS_IMPL
+	return Phys_AddStaticHeightField_Impl(heights, countX, countY, cellSize, heightScale, origin);
+#else
+	(void)cellSize; (void)heightScale; (void)origin;
+	return -1;
+#endif
+}
+
 qboolean Phys_MoverStep(vec3_t origin, vec3_t velocity, float radius, float height,
 	const vec3_t wishDir, float wishSpeed, float dt, qboolean jump, qboolean *groundedOut) {
 #ifdef PHYS_HAS_IMPL
@@ -209,6 +222,7 @@ qboolean Phys_LoadBSPCollision(void) {
 	int maxVerts, maxIndices;
 	trace_t tr;
 	vec3_t start, end, mins, maxs;
+	cvar_t *stepCv;
 
 	if (!physInitialized) return qfalse;
 
@@ -217,10 +231,36 @@ qboolean Phys_LoadBSPCollision(void) {
 	VectorSet(mins, 0, 0, 0);
 	VectorSet(maxs, 0, 0, 0);
 
+	/* Prefer map AABB when available; denser grid via phys_bspGridStep. */
+	if ( CM_NumInlineModels() > 0 ) {
+		vec3_t cmMins, cmMaxs;
+		CM_ModelBounds( CM_InlineModel( 0 ), cmMins, cmMaxs );
+		if ( cmMaxs[0] > cmMins[0] && cmMaxs[1] > cmMins[1] ) {
+			VectorCopy( cmMins, worldMins );
+			VectorCopy( cmMaxs, worldMaxs );
+			/* Pad vertically so vertical traces find floors */
+			worldMins[2] -= 64.0f;
+			worldMaxs[2] += 256.0f;
+		}
+	}
+
+	stepCv = Cvar_Get( "phys_bspGridStep", "24", CVAR_ARCHIVE );
+	Cvar_SetDescription( stepCv,
+		"BSP Soft Step collision height-grid cell size (smaller = denser tri-mesh, more cost)." );
+	step = stepCv && stepCv->value > 4.0f ? stepCv->value : 24.0f;
+	if ( step < 8.0f ) {
+		step = 8.0f;
+	}
+	if ( step > 64.0f ) {
+		step = 64.0f;
+	}
+
 	gridW = (int)((worldMaxs[0] - worldMins[0]) / step);
 	gridH = (int)((worldMaxs[1] - worldMins[1]) / step);
-	if (gridW > 256) gridW = 256;
-	if (gridH > 256) gridH = 256;
+	if (gridW > 384) gridW = 384;
+	if (gridH > 384) gridH = 384;
+	if (gridW < 2) gridW = 2;
+	if (gridH < 2) gridH = 2;
 
 	maxVerts = (gridW + 1) * (gridH + 1);
 	maxIndices = gridW * gridH * 6;
@@ -439,6 +479,27 @@ void Phys_SetBodyTransform(physBodyHandle_t handle, const vec3_t pos, const vec3
 	(void)handle; (void)pos; (void)rot;
 }
 
+void Phys_SetBodyTargetTransform(physBodyHandle_t handle, const vec3_t pos, const vec3_t rot, float timeStep) {
+#ifdef PHYS_HAS_IMPL
+	if (physInitialized) { Phys_SetBodyTargetTransform_Impl(handle, pos, rot, timeStep); return; }
+#endif
+	(void)handle; (void)pos; (void)rot; (void)timeStep;
+}
+
+void Phys_SetBodyGravityScale(physBodyHandle_t handle, float scale) {
+#ifdef PHYS_HAS_IMPL
+	if (physInitialized) { Phys_SetBodyGravityScale_Impl(handle, scale); return; }
+#endif
+	(void)handle; (void)scale;
+}
+
+void Phys_SetBodyMotionLocks(physBodyHandle_t handle, int lockBits) {
+#ifdef PHYS_HAS_IMPL
+	if (physInitialized) { Phys_SetBodyMotionLocks_Impl(handle, lockBits); return; }
+#endif
+	(void)handle; (void)lockBits;
+}
+
 void Phys_ApplyForce(physBodyHandle_t handle, const vec3_t force, const vec3_t point) {
 #ifdef PHYS_HAS_IMPL
 	if (physInitialized) { Phys_ApplyForce_Impl(handle, force, point); return; }
@@ -585,6 +646,49 @@ void Phys_SetConstraintLimits(physConstraintHandle_t handle, float lower, float 
 	(void)handle; (void)lower; (void)upper;
 }
 
+void Phys_SetConstraintMotor(physConstraintHandle_t handle, qboolean enable, float speed, float maxForce) {
+#ifdef PHYS_HAS_IMPL
+	if (physInitialized) { Phys_SetConstraintMotor_Impl(handle, enable, speed, maxForce); return; }
+#endif
+	(void)handle; (void)enable; (void)speed; (void)maxForce;
+}
+
+void Phys_SetConstraintBreakForce(physConstraintHandle_t handle, float force, float torque) {
+#ifdef PHYS_HAS_IMPL
+	if (physInitialized) { Phys_SetConstraintBreakForce_Impl(handle, force, torque); return; }
+#endif
+	(void)handle; (void)force; (void)torque;
+}
+
+void Phys_SetWheelSteering(physConstraintHandle_t handle, float angleRadians, float maxTorque) {
+#ifdef PHYS_HAS_IMPL
+	if (physInitialized) { Phys_SetWheelSteering_Impl(handle, angleRadians, maxTorque); return; }
+#endif
+	(void)handle; (void)angleRadians; (void)maxTorque;
+}
+
+int Phys_AttachShape(physBodyHandle_t body, const physBodyDef_t *shapeDef) {
+#ifdef PHYS_HAS_IMPL
+	if (physInitialized) return Phys_AttachShape_Impl(body, shapeDef);
+#endif
+	(void)body; (void)shapeDef;
+	return -1;
+}
+
+void Phys_DestroyAttachedShape(physBodyHandle_t body, int shapeIndex) {
+#ifdef PHYS_HAS_IMPL
+	if (physInitialized) { Phys_DestroyAttachedShape_Impl(body, shapeIndex); return; }
+#endif
+	(void)body; (void)shapeIndex;
+}
+
+void Phys_SetBodyFilter(physBodyHandle_t body, int categoryBits, int maskBits) {
+#ifdef PHYS_HAS_IMPL
+	if (physInitialized) { Phys_SetBodyFilter_Impl(body, categoryBits, maskBits); return; }
+#endif
+	(void)body; (void)categoryBits; (void)maskBits;
+}
+
 physRagdollHandle_t Phys_CreateRagdoll(const physRagdollDef_t *def) {
 	physRagdollDef_t local;
 
@@ -666,6 +770,24 @@ void Phys_RagdollBlendToAnimation(physRagdollHandle_t handle, float blend) {
 	if (physInitialized) { Phys_RagdollBlendToAnimation_Impl(handle, blend); return; }
 #endif
 	(void)handle; (void)blend;
+}
+
+void Phys_RagdollSetBoneAnimTarget(physRagdollHandle_t handle, int boneIndex,
+	const vec3_t position, const vec3_t rotationDeg) {
+#ifdef PHYS_HAS_IMPL
+	if (physInitialized) {
+		Phys_RagdollSetBoneAnimTarget_Impl(handle, boneIndex, position, rotationDeg);
+		return;
+	}
+#endif
+	(void)handle; (void)boneIndex; (void)position; (void)rotationDeg;
+}
+
+void Phys_RagdollClearAnimTargets(physRagdollHandle_t handle) {
+#ifdef PHYS_HAS_IMPL
+	if (physInitialized) { Phys_RagdollClearAnimTargets_Impl(handle); return; }
+#endif
+	(void)handle;
 }
 
 void Phys_RagdollApplyBoneTorque(physRagdollHandle_t handle, int boneIndex, const vec3_t torque) {
@@ -768,6 +890,33 @@ int Phys_OverlapBox(const vec3_t center, const vec3_t halfExtents, physBodyHandl
 #endif
 	(void)center; (void)halfExtents; (void)results; (void)maxResults;
 	return 0;
+}
+
+int Phys_OverlapShape(const vec3_t center, float radius, physBodyHandle_t *results, int maxResults) {
+#ifdef PHYS_HAS_IMPL
+	if (physInitialized) return Phys_OverlapShape_Impl(center, radius, results, maxResults);
+#endif
+	return Phys_OverlapSphere(center, radius, results, maxResults);
+}
+
+void Phys_GetSoftStepProfile(physSoftStepProfile_t *out) {
+#ifdef PHYS_HAS_IMPL
+	if (physInitialized) { Phys_GetSoftStepProfile_Impl(out); return; }
+#endif
+	if (out) Com_Memset(out, 0, sizeof(*out));
+}
+
+void Phys_StartRecording(void) {
+#ifdef PHYS_HAS_IMPL
+	if (physInitialized) Phys_StartRecording_Impl();
+#endif
+}
+
+void Phys_StopRecording(const char *path) {
+#ifdef PHYS_HAS_IMPL
+	if (physInitialized) { Phys_StopRecording_Impl(path); return; }
+#endif
+	(void)path;
 }
 
 void Phys_DebugDraw(void) {

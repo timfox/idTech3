@@ -298,7 +298,7 @@ void PhysProp_SyncShadows( void ) {
 		if ( !shadows[i].active || shadows[i].body < 0 ) {
 			continue;
 		}
-		Phys_SetBodyTransform( shadows[i].body, shadows[i].origin, shadows[i].angles );
+		Phys_SetBodyTargetTransform( shadows[i].body, shadows[i].origin, shadows[i].angles, 1.0f / 60.0f );
 	}
 }
 

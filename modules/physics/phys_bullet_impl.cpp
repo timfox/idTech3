@@ -335,6 +335,20 @@ extern "C" void Phys_SetBodyTransform_Impl(physBodyHandle_t h, const vec3_t pos,
 	bs.bodies[h].rigidBody->getMotionState()->setWorldTransform(t);
 }
 
+extern "C" void Phys_SetBodyTargetTransform_Impl(physBodyHandle_t h, const vec3_t pos, const vec3_t rot, float timeStep) {
+	(void)timeStep;
+	Phys_SetBodyTransform_Impl(h, pos, rot);
+}
+
+extern "C" void Phys_SetBodyGravityScale_Impl(physBodyHandle_t h, float scale) {
+	if (!VALID_BODY(h)) return;
+	bs.bodies[h].rigidBody->setGravity(btVector3(0, 0, -800.0f * scale));
+}
+
+extern "C" void Phys_SetBodyMotionLocks_Impl(physBodyHandle_t h, int lockBits) {
+	(void)h; (void)lockBits;
+}
+
 extern "C" void Phys_ApplyForce_Impl(physBodyHandle_t h, const vec3_t f, const vec3_t p) {
 	if (!VALID_BODY(h)) return;
 	bs.bodies[h].rigidBody->activate(true);
@@ -441,6 +455,31 @@ extern "C" void Phys_SetConstraintLimits_Impl(physConstraintHandle_t h, float lo
 	if (!VALID_CON(h)) return;
 	btHingeConstraint *hc = dynamic_cast<btHingeConstraint*>(bs.constraints[h].constraint);
 	if (hc) hc->setLimit(lo, hi);
+}
+
+extern "C" void Phys_SetConstraintMotor_Impl(physConstraintHandle_t h, qboolean enable, float speed, float maxForce) {
+	(void)h; (void)enable; (void)speed; (void)maxForce;
+}
+
+extern "C" void Phys_SetConstraintBreakForce_Impl(physConstraintHandle_t h, float force, float torque) {
+	(void)h; (void)force; (void)torque;
+}
+
+extern "C" void Phys_SetWheelSteering_Impl(physConstraintHandle_t h, float angleRadians, float maxTorque) {
+	(void)h; (void)angleRadians; (void)maxTorque;
+}
+
+extern "C" int Phys_AttachShape_Impl(physBodyHandle_t body, const physBodyDef_t *shapeDef) {
+	(void)body; (void)shapeDef;
+	return -1;
+}
+
+extern "C" void Phys_DestroyAttachedShape_Impl(physBodyHandle_t body, int shapeIndex) {
+	(void)body; (void)shapeIndex;
+}
+
+extern "C" void Phys_SetBodyFilter_Impl(physBodyHandle_t body, int categoryBits, int maskBits) {
+	(void)body; (void)categoryBits; (void)maskBits;
 }
 
 /* ========== ragdoll ========== */
@@ -585,6 +624,15 @@ extern "C" void Phys_RagdollBlendToAnimation_Impl(physRagdollHandle_t h, float b
 	bs.ragdolls[h].animBlend = blend < 0 ? 0 : (blend > 1 ? 1 : blend);
 }
 
+extern "C" void Phys_RagdollSetBoneAnimTarget_Impl(physRagdollHandle_t h, int bone,
+	const vec3_t position, const vec3_t rotationDeg) {
+	(void)h; (void)bone; (void)position; (void)rotationDeg;
+}
+
+extern "C" void Phys_RagdollClearAnimTargets_Impl(physRagdollHandle_t h) {
+	(void)h;
+}
+
 extern "C" void Phys_RagdollApplyBoneTorque_Impl(physRagdollHandle_t h, int bone, const vec3_t torque) {
 	if (!VALID_RAG(h) || bone < 0 || bone >= bs.ragdolls[h].numBones || !torque) return;
 	btRigidBody *body = bs.ragdolls[h].bones[bone].body;
@@ -726,6 +774,10 @@ extern "C" int Phys_OverlapBox_Impl(const vec3_t c, const vec3_t he, physBodyHan
 			res[count++] = i;
 	}
 	return count;
+}
+
+extern "C" int Phys_OverlapShape_Impl(const vec3_t center, float radius, physBodyHandle_t *results, int maxResults) {
+	return Phys_OverlapSphere_Impl(center, radius, results, maxResults);
 }
 
 extern "C" void Phys_DebugDraw_Impl(void) {
@@ -882,6 +934,38 @@ extern "C" physBodyHandle_t Phys_AddStaticTriMesh_Impl(const float *verts, int n
 	return Phys_CreateBody_Impl(&def);
 }
 
+extern "C" physBodyHandle_t Phys_AddStaticHeightField_Impl(const float *heights, int countX, int countY,
+	float cellSize, float heightScale, const vec3_t origin) {
+	/* Bullet path: approximate with a static AABB from height extents. */
+	physBodyDef_t def;
+	float minH, maxH;
+	int i, n;
+	(void)cellSize;
+	(void)heightScale;
+	if (!heights || countX < 2 || countY < 2) {
+		return -1;
+	}
+	n = countX * countY;
+	minH = maxH = heights[0];
+	for (i = 1; i < n; i++) {
+		if (heights[i] < minH) minH = heights[i];
+		if (heights[i] > maxH) maxH = heights[i];
+	}
+	memset(&def, 0, sizeof(def));
+	def.shape = PHYS_SHAPE_BOX;
+	def.type = PHYS_BODY_STATIC;
+	def.halfExtents[0] = countX * (cellSize > 0 ? cellSize : 32.0f) * 0.5f;
+	def.halfExtents[1] = countY * (cellSize > 0 ? cellSize : 32.0f) * 0.5f;
+	def.halfExtents[2] = (maxH - minH) * 0.5f + 1.0f;
+	if (origin) {
+		def.position[0] = origin[0];
+		def.position[1] = origin[1];
+		def.position[2] = origin[2] + (minH + maxH) * 0.5f;
+	}
+	def.friction = 0.8f;
+	return Phys_CreateBody_Impl(&def);
+}
+
 extern "C" physBodyHandle_t Phys_AddStaticCompoundBoxes_Impl(const float *centersXYZ, const float *halfExtentsXYZ, int count) {
 	physBodyHandle_t first = -1;
 	int i;
@@ -934,6 +1018,16 @@ extern "C" int Phys_ApplyImpulseRadius_Impl(const vec3_t center, float radius, f
 	(void)magnitude;
 	(void)falloff;
 	return -1;
+}
+
+extern "C" void Phys_GetSoftStepProfile_Impl(physSoftStepProfile_t *out) {
+	if (out) memset(out, 0, sizeof(*out));
+}
+
+extern "C" void Phys_StartRecording_Impl(void) {}
+
+extern "C" void Phys_StopRecording_Impl(const char *path) {
+	(void)path;
 }
 
 #endif /* USE_BULLET_PHYSICS_IMPL */

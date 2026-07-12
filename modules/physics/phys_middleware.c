@@ -124,6 +124,12 @@ static void PhysMiddleware_Status_f( void ) {
 	Com_Printf( "  demo cloth:   %d\n", demoClothCount );
 	Com_Printf( "  demo ropes:   %d\n", demoRopeCount );
 	Com_Printf( "  event queue:  %d pending\n", PhysEvent_QueueDepth() );
+	{
+		physSoftStepProfile_t prof;
+		Phys_GetSoftStepProfile( &prof );
+		Com_Printf( "  soft step:    step=%.3fms collide=%.3fms solve=%.3fms joints=%.3fms\n",
+			prof.stepMs, prof.collideMs, prof.solveMs, prof.jointEventsMs );
+	}
 }
 
 static void PhysMiddleware_TrackProp( physBodyHandle_t body ) {
@@ -306,6 +312,100 @@ static void PhysMiddleware_SpawnBuoyancy_f( void ) {
 		demoVolumes[demoVolumeCount++] = h;
 	}
 	Com_Printf( "phys_spawn_buoyancy: volume=%d\n", h );
+}
+
+static void PhysMiddleware_SpawnSensor_f( void ) {
+	physBodyDef_t def;
+	physBodyHandle_t h;
+	vec3_t origin;
+
+	VectorSet( origin, 0.0f, 0.0f, 32.0f );
+	if ( Cmd_Argc() >= 4 ) {
+		origin[0] = (float)atof( Cmd_Argv( 1 ) );
+		origin[1] = (float)atof( Cmd_Argv( 2 ) );
+		origin[2] = (float)atof( Cmd_Argv( 3 ) );
+	}
+	Com_Memset( &def, 0, sizeof( def ) );
+	def.shape = PHYS_SHAPE_BOX;
+	def.type = PHYS_BODY_STATIC;
+	def.isSensor = qtrue;
+	VectorCopy( origin, def.position );
+	VectorSet( def.halfExtents, 32.0f, 32.0f, 32.0f );
+	def.friction = 0.0f;
+	h = Phys_CreateBody( &def );
+	PhysMiddleware_TrackProp( h );
+	Com_Printf( "phys_spawn_sensor: body=%d at (%.0f %.0f %.0f) (Box3D trigger → MOTION_ENTER/EXIT)\n",
+		h, origin[0], origin[1], origin[2] );
+}
+
+static void PhysMiddleware_SpawnSlider_f( void ) {
+	physBodyDef_t baseDef, slideDef;
+	physConstraintDef_t jd;
+	physBodyHandle_t base, slide;
+	physConstraintHandle_t c;
+	vec3_t origin;
+
+	VectorSet( origin, 0.0f, 0.0f, 64.0f );
+	if ( Cmd_Argc() >= 4 ) {
+		origin[0] = (float)atof( Cmd_Argv( 1 ) );
+		origin[1] = (float)atof( Cmd_Argv( 2 ) );
+		origin[2] = (float)atof( Cmd_Argv( 3 ) );
+	}
+	Com_Memset( &baseDef, 0, sizeof( baseDef ) );
+	baseDef.shape = PHYS_SHAPE_BOX;
+	baseDef.type = PHYS_BODY_STATIC;
+	VectorCopy( origin, baseDef.position );
+	VectorSet( baseDef.halfExtents, 8.0f, 8.0f, 8.0f );
+	baseDef.friction = 0.5f;
+	base = Phys_CreateBody( &baseDef );
+
+	Com_Memset( &slideDef, 0, sizeof( slideDef ) );
+	slideDef.shape = PHYS_SHAPE_BOX;
+	slideDef.type = PHYS_BODY_DYNAMIC;
+	slideDef.mass = 20.0f;
+	VectorSet( slideDef.position, origin[0], origin[1], origin[2] + 48.0f );
+	VectorSet( slideDef.halfExtents, 12.0f, 12.0f, 12.0f );
+	slideDef.friction = 0.4f;
+	slide = Phys_CreateBody( &slideDef );
+
+	Com_Memset( &jd, 0, sizeof( jd ) );
+	jd.type = PHYS_CONSTRAINT_SLIDER;
+	jd.bodyA = base;
+	jd.bodyB = slide;
+	VectorSet( jd.axisA, 0.0f, 0.0f, 1.0f );
+	jd.lowerLimit = 0.0f;
+	jd.upperLimit = 96.0f;
+	jd.enableMotor = qtrue;
+	jd.motorSpeed = 40.0f;
+	jd.maxMotorForce = 8000.0f;
+	jd.disableCollision = qtrue;
+	c = Phys_CreateConstraint( &jd );
+	PhysMiddleware_TrackProp( base );
+	PhysMiddleware_TrackProp( slide );
+	Com_Printf( "phys_spawn_slider: base=%d slide=%d joint=%d (Box3D prismatic + motor)\n",
+		base, slide, c );
+}
+
+static void PhysMiddleware_SpawnHeightField_f( void ) {
+	float heights[9];
+	vec3_t origin;
+	physBodyHandle_t h;
+	int x, y;
+
+	VectorSet( origin, 0.0f, 0.0f, 0.0f );
+	if ( Cmd_Argc() >= 4 ) {
+		origin[0] = (float)atof( Cmd_Argv( 1 ) );
+		origin[1] = (float)atof( Cmd_Argv( 2 ) );
+		origin[2] = (float)atof( Cmd_Argv( 3 ) );
+	}
+	for ( y = 0; y < 3; y++ ) {
+		for ( x = 0; x < 3; x++ ) {
+			heights[y * 3 + x] = (float)( ( x + y ) % 3 ) * 12.0f;
+		}
+	}
+	h = Phys_AddStaticHeightField( heights, 3, 3, 64.0f, 1.0f, origin );
+	PhysMiddleware_TrackProp( h );
+	Com_Printf( "phys_spawn_heightfield: body=%d (3x3 Box3D Soft Step terrain)\n", h );
 }
 
 static void PhysMiddleware_Debug_f( void ) {
@@ -678,6 +778,19 @@ static void PhysMiddleware_ClearRagdolls_f( void ) {
 	Com_Printf( "phys_clear_ragdolls: demo slots cleared\n" );
 }
 
+static void PhysMiddleware_RecordStart_f( void ) {
+	Cvar_Set( "phys_record", "1" );
+	Phys_StartRecording();
+}
+
+static void PhysMiddleware_RecordStop_f( void ) {
+	const char *path = "phys_recording.bin";
+	if ( Cmd_Argc() >= 2 ) {
+		path = Cmd_Argv( 1 );
+	}
+	Phys_StopRecording( path );
+}
+
 void PhysMiddleware_RegisterCommands( void ) {
 	Cmd_AddCommand( "phys_status", PhysMiddleware_Status_f );
 	Cmd_AddCommand( "phys_spawn_ragdoll", PhysMiddleware_SpawnRagdoll_f );
@@ -697,8 +810,13 @@ void PhysMiddleware_RegisterCommands( void ) {
 	Cmd_AddCommand( "phys_shadow_pose", PhysMiddleware_ShadowPose_f );
 	Cmd_AddCommand( "phys_impulse_sphere", PhysMiddleware_ImpulseSphere_f );
 	Cmd_AddCommand( "phys_spawn_buoyancy", PhysMiddleware_SpawnBuoyancy_f );
+	Cmd_AddCommand( "phys_spawn_sensor", PhysMiddleware_SpawnSensor_f );
+	Cmd_AddCommand( "phys_spawn_slider", PhysMiddleware_SpawnSlider_f );
+	Cmd_AddCommand( "phys_spawn_heightfield", PhysMiddleware_SpawnHeightField_f );
 	Cmd_AddCommand( "phys_clear_props", PhysMiddleware_ClearProps_f );
 	Cmd_AddCommand( "phys_debug", PhysMiddleware_Debug_f );
+	Cmd_AddCommand( "phys_record_start", PhysMiddleware_RecordStart_f );
+	Cmd_AddCommand( "phys_record_stop", PhysMiddleware_RecordStop_f );
 }
 
 void PhysMiddleware_Init( void ) {
@@ -753,8 +871,13 @@ void PhysMiddleware_Shutdown( void ) {
 	Cmd_RemoveCommand( "phys_shadow_pose" );
 	Cmd_RemoveCommand( "phys_impulse_sphere" );
 	Cmd_RemoveCommand( "phys_spawn_buoyancy" );
+	Cmd_RemoveCommand( "phys_spawn_sensor" );
+	Cmd_RemoveCommand( "phys_spawn_slider" );
+	Cmd_RemoveCommand( "phys_spawn_heightfield" );
 	Cmd_RemoveCommand( "phys_clear_props" );
 	Cmd_RemoveCommand( "phys_debug" );
+	Cmd_RemoveCommand( "phys_record_start" );
+	Cmd_RemoveCommand( "phys_record_stop" );
 	PhysEvent_UnsubscribeAll();
 	PhysVolume_Shutdown();
 	PhysProp_Shutdown();

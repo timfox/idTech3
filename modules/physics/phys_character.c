@@ -24,14 +24,22 @@ typedef struct {
 
 static physCharacter_t s_chars[MAX_PHYS_CHARACTERS];
 static cvar_t *phys_character;
+static cvar_t *phys_pmove;
 
 void Phys_CharacterInit( void ) {
 	phys_character = Cvar_Get( "phys_character", "1", CVAR_ARCHIVE );
 	Cvar_SetDescription( phys_character,
 		"Enable kinematic character controller traps (G_PHYS_CHARACTER_*). "
 		"Box3D uses CastMover; other backends use capsule convex sweep." );
+	phys_pmove = Cvar_Get( "phys_pmove", "0", CVAR_ARCHIVE );
+	Cvar_SetDescription( phys_pmove,
+		"When 1, Phys_PmoveCorrect applies Soft Step CastMover after classic Pmove "
+		"(default 0 preserves Q3/OA movement)." );
 	if ( phys_character->integer ) {
 		Com_Printf( "[physics] phys_character=1 (CastMover when backend=box3d)\n" );
+	}
+	if ( phys_pmove->integer ) {
+		Com_Printf( "[physics] phys_pmove=1 (CastMover Pmove bridge ON)\n" );
 	}
 }
 
@@ -177,4 +185,39 @@ void Phys_CharacterGetState( int handle, vec3_t origin, vec3_t velocity, qboolea
 	if ( grounded ) {
 		*grounded = s_chars[handle].grounded;
 	}
+}
+
+int Phys_PmoveCorrect( vec3_t origin, vec3_t velocity, float radius, float height, float dt ) {
+	vec3_t wishDir;
+	float speed;
+	qboolean grounded = qfalse;
+
+	if ( !phys_pmove || !phys_pmove->integer ) {
+		return 0;
+	}
+	if ( !origin || !velocity ) {
+		return 0;
+	}
+	if ( dt <= 0.0f || dt > 0.1f ) {
+		dt = 0.016f;
+	}
+	if ( radius <= 0.0f ) {
+		radius = 15.0f;
+	}
+	if ( height <= 0.0f ) {
+		height = 56.0f;
+	}
+
+	VectorCopy( velocity, wishDir );
+	wishDir[2] = 0.0f;
+	speed = VectorNormalize( wishDir );
+	if ( speed < 1.0f ) {
+		VectorClear( wishDir );
+		speed = 0.0f;
+	}
+
+	if ( !Phys_MoverStep( origin, velocity, radius, height, wishDir, speed, dt, qfalse, &grounded ) ) {
+		return 0;
+	}
+	return 1;
 }

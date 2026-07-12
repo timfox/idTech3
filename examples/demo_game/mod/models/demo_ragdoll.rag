@@ -1,0 +1,14 @@
+# Example Soft Step ragdoll bind (procedural tags for demos)
+# bone <index> <tag|*> <radius> <height> <ox> <oy> <oz> <parent>
+scale 1.0
+limbMass 5.0
+bone 0 tag_torso 8 20 0 0 0 -1
+bone 1 tag_head 5 10 0 0 28 0
+bone 2 tag_larm 4 14 -14 0 18 0
+bone 3 * 3 12 -14 0 4 2
+bone 4 tag_rarm 4 14 14 0 18 0
+bone 5 * 3 12 14 0 4 4
+bone 6 tag_lleg 4 16 -6 0 -12 0
+bone 7 * 3 14 -6 0 -28 6
+bone 8 tag_rleg 4 16 6 0 -12 0
+bone 9 * 3 14 6 0 -28 8

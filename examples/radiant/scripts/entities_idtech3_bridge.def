@@ -128,3 +128,55 @@ Response rule trigger volume.
 "concept" : response concept to trigger
 "zone" : zone name for context
 */
+
+/*QUAKED misc_phys_box (0.4 0.7 0.3) (-16 -16 -16) (16 16 16)
+Soft Step dynamic box. Server spawns when sv_physSpawn 1.
+-------- KEYS --------
+"origin" : world position
+"angles" : orientation (degrees)
+"_size" : edge length (default 32)
+"mass" : mass (default 20)
+"material" : PHYS_MAT id
+"targetname" : optional name
+*/
+
+/*QUAKED misc_phys_sphere (0.3 0.7 0.5) (-16 -16 -16) (16 16 16)
+Soft Step dynamic sphere.
+-------- KEYS --------
+"origin" : world position
+"_size" : diameter (default 32)
+"mass" : mass (default 15)
+"material" : PHYS_MAT id
+*/
+
+/*QUAKED misc_phys_static (0.5 0.5 0.5) (-16 -16 -16) (16 16 16)
+Soft Step static box collider.
+-------- KEYS --------
+"origin" : world position
+"angles" : orientation
+"_size" : edge length
+*/
+
+/*QUAKED misc_phys_sensor (0.9 0.6 0.2) (-16 -16 -16) (16 16 16)
+Soft Step trigger sensor (MOTION_ENTER/EXIT events).
+-------- KEYS --------
+"origin" : world position
+"_size" : box edge length
+"targetname" : optional name
+*/
+
+/*QUAKED misc_phys_slider (0.6 0.4 0.8) (-16 -16 -16) (16 16 16)
+Soft Step prismatic slider (motorized).
+-------- KEYS --------
+"origin" : base position
+"_size" : sliding box size
+"mass" : sliding mass
+"lip" : upper travel distance (default 96)
+*/
+
+/*QUAKED misc_phys_ragdoll (0.8 0.3 0.3) (-16 -16 -16) (16 16 16)
+Soft Step procedural ragdoll at origin.
+-------- KEYS --------
+"origin" : root position
+"mass" : limb mass hint
+*/

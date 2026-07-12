@@ -35,13 +35,17 @@ share one substrate with props, volumes, and motors.
 #define VALID_DMM(h)  ((h) >= 0 && (h) < bx.dmmCount && bx.dmmObjects[(h)].active)
 
 typedef struct {
-	b3BodyId         bodyId;
-	b3ShapeId        shapeId;
-	b3MeshData      *meshData;
-	b3CompoundData  *compoundData;
-	physBodyType_t   bodyType;
-	int              materialId;
-	qboolean         active;
+	b3BodyId           bodyId;
+	b3ShapeId          shapeId;
+	b3ShapeId          shapes[8];
+	int                shapeCount;
+	b3MeshData        *meshData;
+	b3CompoundData    *compoundData;
+	b3HeightFieldData *heightFieldData;
+	physBodyType_t     bodyType;
+	int                materialId;
+	qboolean           isSensor;
+	qboolean           active;
 } BoxBody;
 
 typedef struct {
@@ -49,6 +53,8 @@ typedef struct {
 	physBodyHandle_t   bodyA;
 	physBodyHandle_t   bodyB;
 	physConstraintType_t type;
+	float              breakForce;
+	float              breakTorque;
 	qboolean           active;
 } BoxConstraint;
 
@@ -58,8 +64,8 @@ typedef struct {
 } BoxRagBone;
 
 typedef struct {
-	BoxRagBone bones[32];
-	b3JointId  joints[31];
+	BoxRagBone bones[PHYS_RAGDOLL_MAX_BONES];
+	b3JointId  joints[PHYS_RAGDOLL_MAX_BONES];
 	int        numBones;
 	int        numJoints;
 	float      muscleStiffness;
@@ -68,6 +74,10 @@ typedef struct {
 	qboolean   balanceEnabled;
 	b3Vec3     balanceTarget;
 	float      animBlend;
+	qboolean   hasAnimTargets;
+	qboolean   animTargetValid[PHYS_RAGDOLL_MAX_BONES];
+	b3Vec3     animTargetPos[PHYS_RAGDOLL_MAX_BONES];
+	b3Quat     animTargetRot[PHYS_RAGDOLL_MAX_BONES];
 	qboolean   active;
 } BoxRagdoll;
 
@@ -103,8 +113,12 @@ static struct {
 	int            meshCount;
 	b3CompoundData *compounds[64];
 	int            compoundCount;
+	b3HeightFieldData *heightFields[64];
+	int            heightFieldCount;
 	qboolean       initialized;
 	int            workerCount;
+	b3Recording   *recording;
+	physSoftStepProfile_t lastProfile;
 } bx;
 
 static void box_destroy_mesh( b3MeshData *mesh ) {
@@ -161,6 +175,33 @@ static void box_destroy_all_compounds( void ) {
 	bx.compoundCount = 0;
 }
 
+static void box_destroy_heightfield( b3HeightFieldData *hf ) {
+	int i;
+	if ( !hf ) {
+		return;
+	}
+	for ( i = 0; i < bx.heightFieldCount; i++ ) {
+		if ( bx.heightFields[i] == hf ) {
+			bx.heightFields[i] = bx.heightFields[bx.heightFieldCount - 1];
+			bx.heightFields[bx.heightFieldCount - 1] = NULL;
+			bx.heightFieldCount--;
+			break;
+		}
+	}
+	b3DestroyHeightField( hf );
+}
+
+static void box_destroy_all_heightfields( void ) {
+	int i;
+	for ( i = 0; i < bx.heightFieldCount; i++ ) {
+		if ( bx.heightFields[i] ) {
+			b3DestroyHeightField( bx.heightFields[i] );
+			bx.heightFields[i] = NULL;
+		}
+	}
+	bx.heightFieldCount = 0;
+}
+
 static int box_resolve_workers( void ) {
 	cvar_t *cv;
 	int n;
@@ -215,6 +256,39 @@ static b3Quat quat_from_euler_deg( const vec3_t rotDeg ) {
 	return b3MulQuat( qz, b3MulQuat( qy, qx ) );
 }
 
+/* Align local +X with dir (prismatic / wheel slide axis). */
+static b3Quat quat_align_local_x( b3Vec3 dir ) {
+	b3Matrix3 m;
+	b3Vec3 ref, y, z;
+	float len = b3Length( dir );
+	if ( len < 1e-5f ) {
+		return b3Quat_identity;
+	}
+	dir = b3MulSV( 1.0f / len, dir );
+	ref = b3Vec3_axisZ;
+	if ( fabsf( b3Dot( dir, ref ) ) > 0.95f ) {
+		ref = b3Vec3_axisY;
+	}
+	y = b3Normalize( b3Cross( ref, dir ) );
+	z = b3Cross( dir, y );
+	m.cx = dir;
+	m.cy = y;
+	m.cz = z;
+	return b3MakeQuatFromMatrix( &m );
+}
+
+static void apply_motion_locks( b3BodyId bodyId, int lockBits ) {
+	b3MotionLocks locks;
+	memset( &locks, 0, sizeof( locks ) );
+	locks.linearX = ( lockBits & PHYS_LOCK_LIN_X ) != 0;
+	locks.linearY = ( lockBits & PHYS_LOCK_LIN_Y ) != 0;
+	locks.linearZ = ( lockBits & PHYS_LOCK_LIN_Z ) != 0;
+	locks.angularX = ( lockBits & PHYS_LOCK_ANG_X ) != 0;
+	locks.angularY = ( lockBits & PHYS_LOCK_ANG_Y ) != 0;
+	locks.angularZ = ( lockBits & PHYS_LOCK_ANG_Z ) != 0;
+	b3Body_SetMotionLocks( bodyId, locks );
+}
+
 static void euler_from_quat( b3Quat q, vec3_t outDeg ) {
 	float angle;
 	b3Vec3 axis = b3GetAxisAngle( &angle, q );
@@ -229,11 +303,13 @@ static float volume_for_def( const physBodyDef_t *def ) {
 		float r = def->radius > 0.0f ? def->radius : 8.0f;
 		return ( 4.0f / 3.0f ) * (float)M_PI * r * r * r;
 	}
-	case PHYS_SHAPE_CAPSULE: {
+	case PHYS_SHAPE_CAPSULE:
+	case PHYS_SHAPE_CYLINDER: {
 		float r = def->radius > 0.0f ? def->radius : 8.0f;
 		float h = def->height > 0.0f ? def->height : 32.0f;
 		return (float)M_PI * r * r * h + ( 4.0f / 3.0f ) * (float)M_PI * r * r * r;
 	}
+	case PHYS_SHAPE_CONVEX_HULL:
 	case PHYS_SHAPE_BOX:
 	default: {
 		float hx = def->halfExtents[0] > 0.0f ? def->halfExtents[0] : 8.0f;
@@ -250,8 +326,10 @@ static void attach_shape( b3BodyId bodyId, const physBodyDef_t *def, float densi
 	sd.baseMaterial.friction = def->friction > 0.0f ? def->friction : 0.5f;
 	sd.baseMaterial.restitution = def->restitution;
 	sd.baseMaterial.userMaterialId = (uint64_t)def->materialId;
-	sd.enableHitEvents = true;
-	sd.enableContactEvents = true;
+	sd.isSensor = def->isSensor ? true : false;
+	sd.enableSensorEvents = def->isSensor ? true : false;
+	sd.enableHitEvents = !def->isSensor;
+	sd.enableContactEvents = !def->isSensor;
 	if ( def->collisionGroup ) {
 		sd.filter.categoryBits = (uint64_t)(unsigned)def->collisionGroup;
 	}
@@ -267,8 +345,7 @@ static void attach_shape( b3BodyId bodyId, const physBodyDef_t *def, float densi
 		*outShape = b3CreateSphereShape( bodyId, &sd, &s );
 		break;
 	}
-	case PHYS_SHAPE_CAPSULE:
-	case PHYS_SHAPE_CYLINDER: {
+	case PHYS_SHAPE_CAPSULE: {
 		b3Capsule c;
 		float h = def->height > 0.0f ? def->height : 32.0f;
 		float r = def->radius > 0.0f ? def->radius : 8.0f;
@@ -276,6 +353,56 @@ static void attach_shape( b3BodyId bodyId, const physBodyDef_t *def, float densi
 		c.center2 = v3( 0.0f, 0.0f, 0.5f * h );
 		c.radius = r;
 		*outShape = b3CreateCapsuleShape( bodyId, &sd, &c );
+		break;
+	}
+	case PHYS_SHAPE_CYLINDER: {
+		/* Box3D cylinder hull is Y-up; rotate +90° pitch so height aligns with Quake Z. */
+		float h = def->height > 0.0f ? def->height : 32.0f;
+		float r = def->radius > 0.0f ? def->radius : 8.0f;
+		b3HullData *cyl = b3CreateCylinder( h, r, 0.0f, 12 );
+		b3Transform xf = b3Transform_identity;
+		vec3_t rot;
+		if ( !cyl ) {
+			b3Capsule c;
+			c.center1 = v3( 0.0f, 0.0f, -0.5f * h );
+			c.center2 = v3( 0.0f, 0.0f, 0.5f * h );
+			c.radius = r;
+			*outShape = b3CreateCapsuleShape( bodyId, &sd, &c );
+			break;
+		}
+		VectorSet( rot, 90.0f, 0.0f, 0.0f );
+		xf.q = quat_from_euler_deg( rot );
+		*outShape = b3CreateTransformedHullShape( bodyId, &sd, cyl, xf, b3Vec3_one );
+		b3DestroyHull( cyl );
+		break;
+	}
+	case PHYS_SHAPE_CONVEX_HULL: {
+		b3Vec3 pts[64];
+		int n = def->hullPointCount;
+		int i;
+		b3HullData *hull;
+		if ( !def->hullPoints || n < 4 ) {
+			float hx = def->halfExtents[0] > 0.0f ? def->halfExtents[0] : 8.0f;
+			float hy = def->halfExtents[1] > 0.0f ? def->halfExtents[1] : 8.0f;
+			float hz = def->halfExtents[2] > 0.0f ? def->halfExtents[2] : 8.0f;
+			b3BoxHull box = b3MakeBoxHull( hx, hy, hz );
+			*outShape = b3CreateHullShape( bodyId, &sd, &box.base );
+			break;
+		}
+		if ( n > 64 ) {
+			n = 64;
+		}
+		for ( i = 0; i < n; i++ ) {
+			pts[i] = v3( def->hullPoints[i * 3 + 0], def->hullPoints[i * 3 + 1], def->hullPoints[i * 3 + 2] );
+		}
+		hull = b3CreateHull( pts, n, n );
+		if ( !hull ) {
+			b3BoxHull box = b3MakeBoxHull( 8.0f, 8.0f, 8.0f );
+			*outShape = b3CreateHullShape( bodyId, &sd, &box.base );
+			break;
+		}
+		*outShape = b3CreateHullShape( bodyId, &sd, hull );
+		b3DestroyHull( hull );
 		break;
 	}
 	case PHYS_SHAPE_BOX:
@@ -337,6 +464,11 @@ void Phys_Shutdown_Impl( void ) {
 	if ( !bx.initialized ) {
 		return;
 	}
+	if ( bx.recording ) {
+		b3World_StopRecording( bx.worldId );
+		b3DestroyRecording( bx.recording );
+		bx.recording = NULL;
+	}
 	for ( i = 0; i < bx.dmmCount; i++ ) {
 		if ( bx.dmmObjects[i].elements ) {
 			free( bx.dmmObjects[i].elements );
@@ -347,6 +479,7 @@ void Phys_Shutdown_Impl( void ) {
 	b3DestroyWorld( bx.worldId );
 	box_destroy_all_meshes();
 	box_destroy_all_compounds();
+	box_destroy_all_heightfields();
 	memset( &bx, 0, sizeof( bx ) );
 }
 
@@ -385,6 +518,16 @@ void Phys_StepSimulation_Impl( float dt ) {
 
 	b3World_Step( bx.worldId, dt, subSteps );
 
+	{
+		b3Profile prof = b3World_GetProfile( bx.worldId );
+		bx.lastProfile.stepMs = prof.step;
+		bx.lastProfile.collideMs = prof.collide;
+		bx.lastProfile.solveMs = prof.solve;
+		bx.lastProfile.jointEventsMs = prof.jointEvents;
+		bx.lastProfile.bodyCount = Phys_GetBodyCount_Impl();
+		bx.lastProfile.constraintCount = Phys_GetConstraintCount_Impl();
+	}
+
 	for ( r = 0; r < bx.ragdollCount; r++ ) {
 		BoxRagdoll *rag = &bx.ragdolls[r];
 		if ( !rag->active || !rag->balanceEnabled ) {
@@ -397,6 +540,37 @@ void Phys_StepSimulation_Impl( float dt ) {
 			if ( b3Length( toTarget ) > 0.1f ) {
 				b3Vec3 force = b3MulSV( rag->balanceForce * rag->muscleStiffness, b3Normalize( toTarget ) );
 				b3Body_ApplyForceToCenter( rag->bones[b].bodyId, force, true );
+			}
+		}
+	}
+
+	/* Blend Soft Step bones toward MD3 / animation targets */
+	for ( r = 0; r < bx.ragdollCount; r++ ) {
+		BoxRagdoll *rag = &bx.ragdolls[r];
+		float blend;
+		if ( !rag->active || !rag->hasAnimTargets || rag->animBlend <= 0.0f ) {
+			continue;
+		}
+		blend = rag->animBlend;
+		for ( b = 0; b < rag->numBones; b++ ) {
+			b3Vec3 pos, delta, force;
+			b3Quat q, qErr;
+			b3Vec3 torqueAxis;
+			float angle;
+			if ( !rag->animTargetValid[b] ) {
+				continue;
+			}
+			pos = b3Body_GetPosition( rag->bones[b].bodyId );
+			delta = b3Sub( rag->animTargetPos[b], pos );
+			force = b3MulSV( blend * rag->muscleStiffness * 40.0f, delta );
+			b3Body_ApplyForceToCenter( rag->bones[b].bodyId, force, true );
+
+			q = b3Body_GetRotation( rag->bones[b].bodyId );
+			qErr = b3MulQuat( rag->animTargetRot[b], b3Conjugate( q ) );
+			torqueAxis = b3GetAxisAngle( &angle, qErr );
+			if ( angle > 0.001f || angle < -0.001f ) {
+				b3Body_ApplyTorque( rag->bones[b].bodyId,
+					b3MulSV( blend * rag->muscleStiffness * 80.0f * angle, torqueAxis ), true );
 			}
 		}
 	}
@@ -480,9 +654,20 @@ physBodyHandle_t Phys_CreateBody_Impl( const physBodyDef_t *def ) {
 	vol = volume_for_def( def );
 	density = ( mass > 0.0f && vol > 0.001f ) ? ( mass / vol ) : 0.0f;
 	attach_shape( pb->bodyId, def, density, &pb->shapeId );
+	pb->shapes[0] = pb->shapeId;
+	pb->shapeCount = 1;
+
+	/* gravityScale > 0 overrides Soft Step default; use Phys_SetBodyGravityScale(0) for zero-G */
+	if ( def->gravityScale > 0.0f ) {
+		b3Body_SetGravityScale( pb->bodyId, def->gravityScale );
+	}
+	if ( def->motionLocks ) {
+		apply_motion_locks( pb->bodyId, def->motionLocks );
+	}
 
 	pb->bodyType = def->type;
 	pb->materialId = def->materialId;
+	pb->isSensor = def->isSensor;
 	pb->active = qtrue;
 	return idx;
 }
@@ -490,11 +675,13 @@ physBodyHandle_t Phys_CreateBody_Impl( const physBodyDef_t *def ) {
 void Phys_DestroyBody_Impl( physBodyHandle_t h ) {
 	b3MeshData *mesh;
 	b3CompoundData *compound;
+	b3HeightFieldData *hf;
 	if ( !VALID_BODY( h ) ) {
 		return;
 	}
 	mesh = bx.bodies[h].meshData;
 	compound = bx.bodies[h].compoundData;
+	hf = bx.bodies[h].heightFieldData;
 	b3DestroyBody( bx.bodies[h].bodyId );
 	memset( &bx.bodies[h], 0, sizeof( bx.bodies[h] ) );
 	if ( mesh ) {
@@ -502,6 +689,9 @@ void Phys_DestroyBody_Impl( physBodyHandle_t h ) {
 	}
 	if ( compound ) {
 		box_destroy_compound( compound );
+	}
+	if ( hf ) {
+		box_destroy_heightfield( hf );
 	}
 }
 
@@ -537,6 +727,36 @@ void Phys_SetBodyTransform_Impl( physBodyHandle_t h, const vec3_t pos, const vec
 		q = b3Body_GetRotation( bx.bodies[h].bodyId );
 	}
 	b3Body_SetTransform( bx.bodies[h].bodyId, from_vec3( pos ), q );
+}
+
+void Phys_SetBodyTargetTransform_Impl( physBodyHandle_t h, const vec3_t pos, const vec3_t rot, float timeStep ) {
+	b3WorldTransform xf;
+	if ( !VALID_BODY( h ) || !pos ) {
+		return;
+	}
+	xf = b3Body_GetTransform( bx.bodies[h].bodyId );
+	xf.p = from_vec3( pos );
+	if ( rot ) {
+		xf.q = quat_from_euler_deg( rot );
+	}
+	if ( timeStep <= 0.0f ) {
+		timeStep = 1.0f / 60.0f;
+	}
+	b3Body_SetTargetTransform( bx.bodies[h].bodyId, xf, timeStep, true );
+}
+
+void Phys_SetBodyGravityScale_Impl( physBodyHandle_t h, float scale ) {
+	if ( !VALID_BODY( h ) ) {
+		return;
+	}
+	b3Body_SetGravityScale( bx.bodies[h].bodyId, scale );
+}
+
+void Phys_SetBodyMotionLocks_Impl( physBodyHandle_t h, int lockBits ) {
+	if ( !VALID_BODY( h ) ) {
+		return;
+	}
+	apply_motion_locks( bx.bodies[h].bodyId, lockBits );
 }
 
 void Phys_ApplyForce_Impl( physBodyHandle_t h, const vec3_t force, const vec3_t point ) {
@@ -619,6 +839,12 @@ physConstraintHandle_t Phys_CreateConstraint_Impl( const physConstraintDef_t *de
 	frameA.q = b3Quat_identity;
 	frameB.p = from_vec3( def->pivotB );
 	frameB.q = b3Quat_identity;
+	if ( def->axisA[0] != 0.0f || def->axisA[1] != 0.0f || def->axisA[2] != 0.0f ) {
+		frameA.q = quat_align_local_x( from_vec3( def->axisA ) );
+	}
+	if ( def->axisB[0] != 0.0f || def->axisB[1] != 0.0f || def->axisB[2] != 0.0f ) {
+		frameB.q = quat_align_local_x( from_vec3( def->axisB ) );
+	}
 
 	switch ( def->type ) {
 	case PHYS_CONSTRAINT_HINGE: {
@@ -631,11 +857,78 @@ physConstraintHandle_t Phys_CreateConstraint_Impl( const physConstraintDef_t *de
 		jd.enableLimit = true;
 		jd.lowerAngle = def->lowerLimit;
 		jd.upperAngle = def->upperLimit;
+		if ( def->enableMotor ) {
+			jd.enableMotor = true;
+			jd.motorSpeed = def->motorSpeed;
+			jd.maxMotorTorque = def->maxMotorForce > 0.0f ? def->maxMotorForce : 1000.0f;
+		}
 		pc->jointId = b3CreateRevoluteJoint( bx.worldId, &jd );
 		break;
 	}
-	case PHYS_CONSTRAINT_DISTANCE:
 	case PHYS_CONSTRAINT_SLIDER: {
+		b3PrismaticJointDef jd = b3DefaultPrismaticJointDef();
+		jd.base.bodyIdA = bx.bodies[def->bodyA].bodyId;
+		jd.base.bodyIdB = bx.bodies[def->bodyB].bodyId;
+		jd.base.localFrameA = frameA;
+		jd.base.localFrameB = frameB;
+		jd.base.collideConnected = !def->disableCollision;
+		jd.enableLimit = true;
+		jd.lowerTranslation = def->lowerLimit;
+		jd.upperTranslation = def->upperLimit;
+		if ( def->softness > 0.0f ) {
+			jd.enableSpring = true;
+			jd.hertz = 4.0f / def->softness;
+			if ( jd.hertz < 1.0f ) {
+				jd.hertz = 1.0f;
+			}
+			if ( jd.hertz > 30.0f ) {
+				jd.hertz = 30.0f;
+			}
+			jd.dampingRatio = def->biasFactor > 0.0f ? def->biasFactor : 0.7f;
+		}
+		if ( def->enableMotor ) {
+			jd.enableMotor = true;
+			jd.motorSpeed = def->motorSpeed;
+			jd.maxMotorForce = def->maxMotorForce > 0.0f ? def->maxMotorForce : 5000.0f;
+		}
+		pc->jointId = b3CreatePrismaticJoint( bx.worldId, &jd );
+		break;
+	}
+	case PHYS_CONSTRAINT_WHEEL: {
+		b3WheelJointDef jd = b3DefaultWheelJointDef();
+		jd.base.bodyIdA = bx.bodies[def->bodyA].bodyId;
+		jd.base.bodyIdB = bx.bodies[def->bodyB].bodyId;
+		jd.base.localFrameA = frameA;
+		jd.base.localFrameB = frameB;
+		jd.base.collideConnected = !def->disableCollision;
+		jd.enableSuspensionSpring = true;
+		jd.suspensionHertz = def->softness > 0.0f ? ( 4.0f / def->softness ) : 4.0f;
+		jd.suspensionDampingRatio = def->biasFactor > 0.0f ? def->biasFactor : 0.7f;
+		jd.enableSuspensionLimit = true;
+		jd.lowerSuspensionLimit = def->lowerLimit;
+		jd.upperSuspensionLimit = def->upperLimit;
+		if ( def->enableMotor ) {
+			jd.enableSpinMotor = true;
+			jd.spinSpeed = def->motorSpeed;
+			jd.maxSpinTorque = def->maxMotorForce > 0.0f ? def->maxMotorForce : 500.0f;
+		}
+		pc->jointId = b3CreateWheelJoint( bx.worldId, &jd );
+		break;
+	}
+	case PHYS_CONSTRAINT_MOTOR: {
+		b3MotorJointDef jd = b3DefaultMotorJointDef();
+		jd.base.bodyIdA = bx.bodies[def->bodyA].bodyId;
+		jd.base.bodyIdB = bx.bodies[def->bodyB].bodyId;
+		jd.base.localFrameA = frameA;
+		jd.base.localFrameB = frameB;
+		jd.base.collideConnected = !def->disableCollision;
+		jd.linearVelocity = b3MulSV( def->motorSpeed, b3Vec3_axisX );
+		jd.maxVelocityForce = def->maxMotorForce > 0.0f ? def->maxMotorForce : 1000.0f;
+		jd.maxVelocityTorque = jd.maxVelocityForce;
+		pc->jointId = b3CreateMotorJoint( bx.worldId, &jd );
+		break;
+	}
+	case PHYS_CONSTRAINT_DISTANCE: {
 		b3DistanceJointDef jd = b3DefaultDistanceJointDef();
 		b3Vec3 wa, wb, delta;
 		float len;
@@ -694,6 +987,15 @@ physConstraintHandle_t Phys_CreateConstraint_Impl( const physConstraintDef_t *de
 	}
 	}
 
+	pc->breakForce = def->breakForce;
+	pc->breakTorque = def->breakTorque;
+	b3Joint_SetUserData( pc->jointId, (void *)(intptr_t)( idx + 1 ) );
+	if ( def->breakForce > 0.0f ) {
+		b3Joint_SetForceThreshold( pc->jointId, def->breakForce );
+	}
+	if ( def->breakTorque > 0.0f ) {
+		b3Joint_SetTorqueThreshold( pc->jointId, def->breakTorque );
+	}
 	pc->active = qtrue;
 	return idx;
 }
@@ -712,6 +1014,78 @@ void Phys_SetConstraintLimits_Impl( physConstraintHandle_t h, float lo, float hi
 	}
 	if ( bx.constraints[h].type == PHYS_CONSTRAINT_HINGE ) {
 		b3RevoluteJoint_SetLimits( bx.constraints[h].jointId, lo, hi );
+	} else if ( bx.constraints[h].type == PHYS_CONSTRAINT_SLIDER ) {
+		b3PrismaticJoint_SetLimits( bx.constraints[h].jointId, lo, hi );
+	}
+}
+
+void Phys_SetConstraintMotor_Impl( physConstraintHandle_t h, qboolean enable, float speed, float maxForce ) {
+	b3JointId jid;
+	if ( !VALID_CON( h ) ) {
+		return;
+	}
+	jid = bx.constraints[h].jointId;
+	switch ( bx.constraints[h].type ) {
+	case PHYS_CONSTRAINT_HINGE:
+		b3RevoluteJoint_EnableMotor( jid, enable ? true : false );
+		b3RevoluteJoint_SetMotorSpeed( jid, speed );
+		if ( maxForce > 0.0f ) {
+			b3RevoluteJoint_SetMaxMotorTorque( jid, maxForce );
+		}
+		break;
+	case PHYS_CONSTRAINT_SLIDER:
+		b3PrismaticJoint_EnableMotor( jid, enable ? true : false );
+		b3PrismaticJoint_SetMotorSpeed( jid, speed );
+		if ( maxForce > 0.0f ) {
+			b3PrismaticJoint_SetMaxMotorForce( jid, maxForce );
+		}
+		break;
+	case PHYS_CONSTRAINT_WHEEL:
+		b3WheelJoint_EnableSpinMotor( jid, enable ? true : false );
+		b3WheelJoint_SetSpinMotorSpeed( jid, speed );
+		if ( maxForce > 0.0f ) {
+			b3WheelJoint_SetMaxSpinTorque( jid, maxForce );
+		}
+		break;
+	case PHYS_CONSTRAINT_MOTOR:
+		b3MotorJoint_SetLinearVelocity( jid, b3MulSV( speed, b3Vec3_axisX ) );
+		if ( maxForce > 0.0f ) {
+			b3MotorJoint_SetMaxVelocityForce( jid, maxForce );
+			b3MotorJoint_SetMaxVelocityTorque( jid, maxForce );
+		}
+		(void)enable;
+		break;
+	default:
+		break;
+	}
+}
+
+void Phys_SetConstraintBreakForce_Impl( physConstraintHandle_t h, float force, float torque ) {
+	if ( !VALID_CON( h ) ) {
+		return;
+	}
+	bx.constraints[h].breakForce = force;
+	bx.constraints[h].breakTorque = torque;
+	if ( force > 0.0f ) {
+		b3Joint_SetForceThreshold( bx.constraints[h].jointId, force );
+	} else {
+		b3Joint_SetForceThreshold( bx.constraints[h].jointId, FLT_MAX );
+	}
+	if ( torque > 0.0f ) {
+		b3Joint_SetTorqueThreshold( bx.constraints[h].jointId, torque );
+	} else {
+		b3Joint_SetTorqueThreshold( bx.constraints[h].jointId, FLT_MAX );
+	}
+}
+
+void Phys_SetWheelSteering_Impl( physConstraintHandle_t h, float angleRadians, float maxTorque ) {
+	if ( !VALID_CON( h ) || bx.constraints[h].type != PHYS_CONSTRAINT_WHEEL ) {
+		return;
+	}
+	b3WheelJoint_EnableSteering( bx.constraints[h].jointId, true );
+	b3WheelJoint_SetTargetSteeringAngle( bx.constraints[h].jointId, angleRadians );
+	if ( maxTorque > 0.0f ) {
+		b3WheelJoint_SetMaxSteeringTorque( bx.constraints[h].jointId, maxTorque );
 	}
 }
 
@@ -723,13 +1097,14 @@ physRagdollHandle_t Phys_CreateRagdoll_Impl( const physRagdollDef_t *def ) {
 	float scale;
 	float limbMass;
 	int b, j;
-	/* Z-up bone layout (Quake) */
+	/* Z-up bone layout (Quake) — fallback when def->numBones == 0 */
 	struct { float radius; float height; float zOff; } boneSpec[] = {
 		{ 8, 20, 0 }, { 6, 16, 28 }, { 5, 10, 48 },
 		{ 4, 14, 20 }, { 3, 12, 10 }, { 4, 14, 20 }, { 3, 12, 10 },
 		{ 4, 16, -10 }, { 3, 14, -28 }, { 4, 16, -10 }, { 3, 14, -28 },
 	};
 	int pairs[][2] = { {0,1},{1,2},{0,3},{3,4},{0,5},{5,6},{0,7},{7,8},{0,9},{9,10} };
+	int useBind;
 
 	if ( !bx.initialized || !def || bx.ragdollCount >= PHYS_MAX_RAGDOLLS ) {
 		return -1;
@@ -745,21 +1120,37 @@ physRagdollHandle_t Phys_CreateRagdoll_Impl( const physRagdollDef_t *def ) {
 
 	scale = def->scale > 0 ? def->scale : 1.0f;
 	limbMass = def->limbMass > 0 ? def->limbMass : 5.0f;
-	rag->numBones = 11;
+	useBind = ( def->numBones > 0 && def->numBones <= PHYS_RAGDOLL_MAX_BONES ) ? 1 : 0;
+	rag->numBones = useBind ? def->numBones : 11;
 
 	for ( b = 0; b < rag->numBones; b++ ) {
 		b3BodyDef bd = b3DefaultBodyDef();
 		b3ShapeDef sd = b3DefaultShapeDef();
 		b3Capsule cap;
-		float h = boneSpec[b].height * scale;
-		float r = boneSpec[b].radius * scale;
-		float vol;
+		float h, r, vol;
 		vec3_t origin;
 
 		bd.type = b3_dynamicBody;
 		origin[0] = def->rootPosition[0];
 		origin[1] = def->rootPosition[1];
-		origin[2] = def->rootPosition[2] + boneSpec[b].zOff * scale;
+		origin[2] = def->rootPosition[2];
+		if ( useBind ) {
+			h = def->bones[b].height * scale;
+			r = def->bones[b].radius * scale;
+			origin[0] += def->bones[b].localOffset[0] * scale;
+			origin[1] += def->bones[b].localOffset[1] * scale;
+			origin[2] += def->bones[b].localOffset[2] * scale;
+		} else {
+			h = boneSpec[b].height * scale;
+			r = boneSpec[b].radius * scale;
+			origin[2] += boneSpec[b].zOff * scale;
+		}
+		if ( h <= 0.0f ) {
+			h = 12.0f * scale;
+		}
+		if ( r <= 0.0f ) {
+			r = 4.0f * scale;
+		}
 		bd.position = from_vec3( origin );
 		bd.linearDamping = 0.15f;
 		bd.angularDamping = 0.35f;
@@ -778,22 +1169,47 @@ physRagdollHandle_t Phys_CreateRagdoll_Impl( const physRagdollDef_t *def ) {
 		rag->bones[b].shapeId = b3CreateCapsuleShape( rag->bones[b].bodyId, &sd, &cap );
 	}
 
-	rag->numJoints = 10;
-	for ( j = 0; j < 10; j++ ) {
-		b3SphericalJointDef jd = b3DefaultSphericalJointDef();
-		jd.base.bodyIdA = rag->bones[pairs[j][0]].bodyId;
-		jd.base.bodyIdB = rag->bones[pairs[j][1]].bodyId;
-		jd.base.localFrameA.p = b3Vec3_zero;
-		jd.base.localFrameA.q = b3Quat_identity;
-		jd.base.localFrameB.p = b3Vec3_zero;
-		jd.base.localFrameB.q = b3Quat_identity;
-		jd.base.collideConnected = false;
-		jd.enableConeLimit = true;
-		jd.coneAngle = 0.5f;
-		jd.enableSpring = true;
-		jd.hertz = 2.0f + rag->muscleStiffness * 8.0f;
-		jd.dampingRatio = rag->muscleDamping;
-		rag->joints[j] = b3CreateSphericalJoint( bx.worldId, &jd );
+	if ( useBind ) {
+		rag->numJoints = 0;
+		for ( b = 0; b < rag->numBones; b++ ) {
+			int parent = def->bones[b].parent;
+			b3SphericalJointDef jd;
+			if ( parent < 0 || parent >= rag->numBones || parent == b ) {
+				continue;
+			}
+			jd = b3DefaultSphericalJointDef();
+			jd.base.bodyIdA = rag->bones[parent].bodyId;
+			jd.base.bodyIdB = rag->bones[b].bodyId;
+			jd.base.localFrameA.p = b3Vec3_zero;
+			jd.base.localFrameA.q = b3Quat_identity;
+			jd.base.localFrameB.p = b3Vec3_zero;
+			jd.base.localFrameB.q = b3Quat_identity;
+			jd.base.collideConnected = false;
+			jd.enableConeLimit = true;
+			jd.coneAngle = 0.5f;
+			jd.enableSpring = true;
+			jd.hertz = 2.0f + rag->muscleStiffness * 8.0f;
+			jd.dampingRatio = rag->muscleDamping;
+			rag->joints[rag->numJoints++] = b3CreateSphericalJoint( bx.worldId, &jd );
+		}
+	} else {
+		rag->numJoints = 10;
+		for ( j = 0; j < 10; j++ ) {
+			b3SphericalJointDef jd = b3DefaultSphericalJointDef();
+			jd.base.bodyIdA = rag->bones[pairs[j][0]].bodyId;
+			jd.base.bodyIdB = rag->bones[pairs[j][1]].bodyId;
+			jd.base.localFrameA.p = b3Vec3_zero;
+			jd.base.localFrameA.q = b3Quat_identity;
+			jd.base.localFrameB.p = b3Vec3_zero;
+			jd.base.localFrameB.q = b3Quat_identity;
+			jd.base.collideConnected = false;
+			jd.enableConeLimit = true;
+			jd.coneAngle = 0.5f;
+			jd.enableSpring = true;
+			jd.hertz = 2.0f + rag->muscleStiffness * 8.0f;
+			jd.dampingRatio = rag->muscleDamping;
+			rag->joints[j] = b3CreateSphericalJoint( bx.worldId, &jd );
+		}
 	}
 	return idx;
 }
@@ -901,6 +1317,29 @@ void Phys_RagdollBlendToAnimation_Impl( physRagdollHandle_t h, float blend ) {
 		return;
 	}
 	bx.ragdolls[h].animBlend = blend < 0 ? 0 : ( blend > 1 ? 1 : blend );
+}
+
+void Phys_RagdollSetBoneAnimTarget_Impl( physRagdollHandle_t h, int bone,
+	const vec3_t position, const vec3_t rotationDeg ) {
+	vec3_t zeroRot = { 0, 0, 0 };
+	if ( !VALID_RAG( h ) || bone < 0 || bone >= bx.ragdolls[h].numBones || !position ) {
+		return;
+	}
+	bx.ragdolls[h].animTargetPos[bone] = from_vec3( position );
+	bx.ragdolls[h].animTargetRot[bone] = quat_from_euler_deg( rotationDeg ? rotationDeg : zeroRot );
+	bx.ragdolls[h].animTargetValid[bone] = qtrue;
+	bx.ragdolls[h].hasAnimTargets = qtrue;
+}
+
+void Phys_RagdollClearAnimTargets_Impl( physRagdollHandle_t h ) {
+	int i;
+	if ( !VALID_RAG( h ) ) {
+		return;
+	}
+	bx.ragdolls[h].hasAnimTargets = qfalse;
+	for ( i = 0; i < PHYS_RAGDOLL_MAX_BONES; i++ ) {
+		bx.ragdolls[h].animTargetValid[i] = qfalse;
+	}
 }
 
 void Phys_RagdollApplyBoneTorque_Impl( physRagdollHandle_t h, int bone, const vec3_t torque ) {
@@ -1068,7 +1507,7 @@ static float box_ray_cb( b3ShapeId shapeId, b3Pos point, b3Vec3 normal, float fr
 qboolean Phys_RayCast_Impl( const vec3_t from, const vec3_t to, physRayResult_t *result ) {
 	b3Vec3 origin, translation;
 	b3QueryFilter filter;
-	boxRayCtx ctx;
+	b3RayResult hit;
 
 	if ( !result ) {
 		return qfalse;
@@ -1081,11 +1520,21 @@ qboolean Phys_RayCast_Impl( const vec3_t from, const vec3_t to, physRayResult_t 
 	origin = from_vec3( from );
 	translation = b3Sub( from_vec3( to ), origin );
 	filter = b3DefaultQueryFilter();
-	ctx.result = result;
-	ctx.closest = 1.0f;
-	ctx.hit = qfalse;
-	b3World_CastRay( bx.worldId, origin, translation, filter, box_ray_cb, &ctx );
-	return ctx.hit;
+	hit = b3World_CastRayClosest( bx.worldId, origin, translation, filter );
+	if ( !hit.hit ) {
+		return qfalse;
+	}
+	to_vec3( hit.point, result->hitPoint );
+	to_vec3( hit.normal, result->hitNormal );
+	result->fraction = hit.fraction;
+	result->hit = qtrue;
+	if ( b3Shape_IsValid( hit.shapeId ) ) {
+		void *ud = b3Body_GetUserData( b3Shape_GetBody( hit.shapeId ) );
+		if ( ud ) {
+			result->body = (int)(intptr_t)ud - 1;
+		}
+	}
+	return qtrue;
 }
 
 qboolean Phys_ConvexSweep_Impl( const physBodyDef_t *shapeDef, const vec3_t from, const vec3_t to,
@@ -1221,6 +1670,27 @@ int Phys_OverlapBox_Impl( const vec3_t center, const vec3_t halfExtents, physBod
 	return ctx.count;
 }
 
+int Phys_OverlapShape_Impl( const vec3_t center, float radius, physBodyHandle_t *results, int maxResults ) {
+	b3Vec3 points[1];
+	b3ShapeProxy proxy;
+	b3QueryFilter filter;
+	boxOverlapCtx ctx;
+
+	if ( !bx.initialized || !results || maxResults <= 0 ) {
+		return 0;
+	}
+	points[0] = b3Vec3_zero;
+	proxy.points = points;
+	proxy.count = 1;
+	proxy.radius = radius > 0.0f ? radius : 8.0f;
+	filter = b3DefaultQueryFilter();
+	ctx.results = results;
+	ctx.maxResults = maxResults;
+	ctx.count = 0;
+	b3World_OverlapShape( bx.worldId, from_vec3( center ), &proxy, filter, box_overlap_cb, &ctx );
+	return ctx.count;
+}
+
 static void box_hex_to_rgb( b3HexColor color, vec3_t out ) {
 	unsigned rgb = (unsigned)color & 0xFFFFFFu;
 	out[0] = ( ( rgb >> 16 ) & 0xFFu ) / 255.0f;
@@ -1310,11 +1780,13 @@ void Phys_DebugDraw_Impl( void ) {
 
 void Phys_ProcessContactEvents_Impl( void ) {
 	b3ContactEvents events;
+	b3SensorEvents sensors;
 	int i;
 
 	if ( !bx.initialized ) {
 		return;
 	}
+
 	events = b3World_GetContactEvents( bx.worldId );
 	for ( i = 0; i < events.hitCount; i++ ) {
 		b3ContactHitEvent *hit = &events.hitEvents[i];
@@ -1344,6 +1816,79 @@ void Phys_ProcessContactEvents_Impl( void ) {
 			bodyA >= 0 ? bx.bodies[bodyA].materialId : 0,
 			bodyB >= 0 ? bx.bodies[bodyB].materialId : 0,
 			point, normal, impulse, mag );
+	}
+
+	/* Soft Step sensors → MOTION_ENTER/EXIT (triggers / pickups / AOE) */
+	sensors = b3World_GetSensorEvents( bx.worldId );
+	for ( i = 0; i < sensors.beginCount; i++ ) {
+		b3SensorBeginTouchEvent *ev = &sensors.beginEvents[i];
+		phys_event_t pe;
+		int sensorBody = -1, visitorBody = -1;
+		void *ud;
+		if ( !b3Shape_IsValid( ev->sensorShapeId ) || !b3Shape_IsValid( ev->visitorShapeId ) ) {
+			continue;
+		}
+		ud = b3Body_GetUserData( b3Shape_GetBody( ev->sensorShapeId ) );
+		if ( ud ) {
+			sensorBody = (int)(intptr_t)ud - 1;
+		}
+		ud = b3Body_GetUserData( b3Shape_GetBody( ev->visitorShapeId ) );
+		if ( ud ) {
+			visitorBody = (int)(intptr_t)ud - 1;
+		}
+		Com_Memset( &pe, 0, sizeof( pe ) );
+		pe.type = PHYS_EVENT_MOTION_ENTER;
+		pe.bodyA = sensorBody;
+		pe.bodyB = visitorBody;
+		PhysEvent_Post( &pe );
+	}
+	for ( i = 0; i < sensors.endCount; i++ ) {
+		b3SensorEndTouchEvent *ev = &sensors.endEvents[i];
+		phys_event_t pe;
+		int sensorBody = -1, visitorBody = -1;
+		void *ud;
+		if ( !b3Shape_IsValid( ev->sensorShapeId ) || !b3Shape_IsValid( ev->visitorShapeId ) ) {
+			continue;
+		}
+		ud = b3Body_GetUserData( b3Shape_GetBody( ev->sensorShapeId ) );
+		if ( ud ) {
+			sensorBody = (int)(intptr_t)ud - 1;
+		}
+		ud = b3Body_GetUserData( b3Shape_GetBody( ev->visitorShapeId ) );
+		if ( ud ) {
+			visitorBody = (int)(intptr_t)ud - 1;
+		}
+		Com_Memset( &pe, 0, sizeof( pe ) );
+		pe.type = PHYS_EVENT_MOTION_EXIT;
+		pe.bodyA = sensorBody;
+		pe.bodyB = visitorBody;
+		PhysEvent_Post( &pe );
+	}
+
+	/* Joint force/torque thresholds → BREAK + destroy */
+	{
+		b3JointEvents joints = b3World_GetJointEvents( bx.worldId );
+		for ( i = 0; i < joints.count; i++ ) {
+			void *ud = joints.jointEvents[i].userData;
+			int ch;
+			phys_event_t pe;
+			if ( !ud ) {
+				ud = b3Joint_GetUserData( joints.jointEvents[i].jointId );
+			}
+			if ( !ud ) {
+				continue;
+			}
+			ch = (int)(intptr_t)ud - 1;
+			if ( !VALID_CON( ch ) ) {
+				continue;
+			}
+			Com_Memset( &pe, 0, sizeof( pe ) );
+			pe.type = PHYS_EVENT_BREAK;
+			pe.bodyA = bx.constraints[ch].bodyA;
+			pe.bodyB = bx.constraints[ch].bodyB;
+			PhysEvent_Post( &pe );
+			Phys_DestroyConstraint_Impl( ch );
+		}
 	}
 }
 
@@ -1456,6 +2001,110 @@ physBodyHandle_t Phys_AddStaticTriMesh_Impl( const float *verts, int numVerts, c
 	pb->bodyType = PHYS_BODY_STATIC;
 	pb->materialId = 0;
 	pb->active = qtrue;
+	return idx;
+}
+
+physBodyHandle_t Phys_AddStaticHeightField_Impl( const float *heights, int countX, int countY,
+	float cellSize, float heightScale, const vec3_t origin ) {
+	b3HeightFieldDef hfDef;
+	b3HeightFieldData *hf;
+	b3BodyDef bd;
+	b3ShapeDef sd;
+	BoxBody *pb;
+	int idx;
+	int cellCount;
+	uint8_t *materials = NULL;
+	float *ownedHeights = NULL;
+	float minH, maxH;
+	int i;
+	vec3_t rot;
+
+	if ( !bx.initialized || !heights || countX < 2 || countY < 2 ) {
+		return -1;
+	}
+	if ( bx.bodyCount >= PHYS_MAX_RIGID_BODIES
+		|| bx.heightFieldCount >= (int)( sizeof( bx.heightFields ) / sizeof( bx.heightFields[0] ) ) ) {
+		return -1;
+	}
+	if ( cellSize <= 0.0f ) {
+		cellSize = 32.0f;
+	}
+	if ( heightScale <= 0.0f ) {
+		heightScale = 1.0f;
+	}
+
+	cellCount = ( countX - 1 ) * ( countY - 1 );
+	materials = (uint8_t *)malloc( (size_t)cellCount );
+	ownedHeights = (float *)malloc( (size_t)countX * (size_t)countY * sizeof( float ) );
+	if ( !materials || !ownedHeights ) {
+		free( materials );
+		free( ownedHeights );
+		return -1;
+	}
+	memset( materials, 0, (size_t)cellCount );
+	minH = maxH = heights[0];
+	for ( i = 0; i < countX * countY; i++ ) {
+		ownedHeights[i] = heights[i];
+		if ( heights[i] < minH ) {
+			minH = heights[i];
+		}
+		if ( heights[i] > maxH ) {
+			maxH = heights[i];
+		}
+	}
+	if ( maxH - minH < 1.0f ) {
+		maxH = minH + 1.0f;
+	}
+
+	memset( &hfDef, 0, sizeof( hfDef ) );
+	hfDef.heights = ownedHeights;
+	hfDef.materialIndices = materials;
+	/* Box3D heightfields are Y-up; Quake Z heights become local Y. */
+	hfDef.scale = v3( cellSize, heightScale, cellSize );
+	hfDef.countX = countX;
+	hfDef.countZ = countY;
+	hfDef.globalMinimumHeight = minH;
+	hfDef.globalMaximumHeight = maxH;
+	hfDef.clockwiseWinding = false;
+
+	hf = b3CreateHeightField( &hfDef );
+	free( materials );
+	free( ownedHeights );
+	if ( !hf ) {
+		Com_Printf( S_COLOR_YELLOW "Box3D: b3CreateHeightField failed (%dx%d)\n", countX, countY );
+		return -1;
+	}
+
+	idx = bx.bodyCount++;
+	pb = &bx.bodies[idx];
+	memset( pb, 0, sizeof( *pb ) );
+
+	bd = b3DefaultBodyDef();
+	bd.type = b3_staticBody;
+	if ( origin ) {
+		bd.position = from_vec3( origin );
+	}
+	/* +90° pitch: local Y (height) → world Z */
+	VectorSet( rot, 90.0f, 0.0f, 0.0f );
+	bd.rotation = quat_from_euler_deg( rot );
+
+	pb->bodyId = b3CreateBody( bx.worldId, &bd );
+	b3Body_SetUserData( pb->bodyId, (void *)(intptr_t)( idx + 1 ) );
+
+	sd = b3DefaultShapeDef();
+	sd.baseMaterial.friction = 0.8f;
+	sd.baseMaterial.restitution = 0.1f;
+	sd.enableHitEvents = true;
+	sd.enableContactEvents = true;
+	pb->shapeId = b3CreateHeightFieldShape( pb->bodyId, &sd, hf );
+	pb->heightFieldData = hf;
+	bx.heightFields[bx.heightFieldCount++] = hf;
+	pb->bodyType = PHYS_BODY_STATIC;
+	pb->materialId = 0;
+	pb->active = qtrue;
+	Com_Printf( "[physics] Box3D heightfield %dx%d cell=%.1f at (%.0f %.0f %.0f)\n",
+		countX, countY, cellSize,
+		origin ? origin[0] : 0.0f, origin ? origin[1] : 0.0f, origin ? origin[2] : 0.0f );
 	return idx;
 }
 
@@ -1692,6 +2341,126 @@ int Phys_GetWorkerCount_Impl( void ) {
 		return 0;
 	}
 	return b3World_GetWorkerCount( bx.worldId );
+}
+
+int Phys_AttachShape_Impl( physBodyHandle_t body, const physBodyDef_t *shapeDef ) {
+	BoxBody *pb;
+	b3ShapeId sid;
+	float density = 0.0f;
+
+	if ( !VALID_BODY( body ) || !shapeDef ) {
+		return -1;
+	}
+	pb = &bx.bodies[body];
+	if ( pb->shapeCount >= (int)( sizeof( pb->shapes ) / sizeof( pb->shapes[0] ) ) ) {
+		return -1;
+	}
+	if ( pb->bodyType == PHYS_BODY_DYNAMIC && shapeDef->mass > 0.0f ) {
+		float vol = volume_for_def( shapeDef );
+		density = ( vol > 0.001f ) ? ( shapeDef->mass / vol ) : 1.0f;
+	}
+	attach_shape( pb->bodyId, shapeDef, density, &sid );
+	pb->shapes[pb->shapeCount] = sid;
+	if ( pb->shapeCount == 0 ) {
+		pb->shapeId = sid;
+	}
+	pb->shapeCount++;
+	if ( pb->bodyType == PHYS_BODY_DYNAMIC ) {
+		b3Body_ApplyMassFromShapes( pb->bodyId );
+	}
+	return pb->shapeCount - 1;
+}
+
+void Phys_DestroyAttachedShape_Impl( physBodyHandle_t body, int shapeIndex ) {
+	BoxBody *pb;
+	int i;
+
+	if ( !VALID_BODY( body ) || shapeIndex < 0 ) {
+		return;
+	}
+	pb = &bx.bodies[body];
+	if ( shapeIndex >= pb->shapeCount ) {
+		return;
+	}
+	b3DestroyShape( pb->shapes[shapeIndex], true );
+	for ( i = shapeIndex; i < pb->shapeCount - 1; i++ ) {
+		pb->shapes[i] = pb->shapes[i + 1];
+	}
+	pb->shapeCount--;
+	pb->shapeId = pb->shapeCount > 0 ? pb->shapes[0] : (b3ShapeId){0};
+}
+
+void Phys_SetBodyFilter_Impl( physBodyHandle_t body, int categoryBits, int maskBits ) {
+	BoxBody *pb;
+	b3Filter filter;
+	int i;
+
+	if ( !VALID_BODY( body ) ) {
+		return;
+	}
+	pb = &bx.bodies[body];
+	filter = b3DefaultFilter();
+	if ( categoryBits ) {
+		filter.categoryBits = (uint64_t)(unsigned)categoryBits;
+	}
+	if ( maskBits ) {
+		filter.maskBits = (uint64_t)(unsigned)maskBits;
+	}
+	for ( i = 0; i < pb->shapeCount; i++ ) {
+		if ( b3Shape_IsValid( pb->shapes[i] ) ) {
+			b3Shape_SetFilter( pb->shapes[i], filter, true );
+		}
+	}
+	if ( pb->shapeCount == 0 && b3Shape_IsValid( pb->shapeId ) ) {
+		b3Shape_SetFilter( pb->shapeId, filter, true );
+	}
+}
+
+void Phys_GetSoftStepProfile_Impl( physSoftStepProfile_t *out ) {
+	if ( !out ) {
+		return;
+	}
+	*out = bx.lastProfile;
+}
+
+void Phys_StartRecording_Impl( void ) {
+	cvar_t *recCv;
+	if ( !bx.initialized ) {
+		return;
+	}
+	recCv = Cvar_Get( "phys_record", "0", CVAR_ARCHIVE );
+	if ( !recCv || !recCv->integer ) {
+		Com_Printf( "[physics] set phys_record 1 before Phys_StartRecording\n" );
+		return;
+	}
+	if ( bx.recording ) {
+		b3World_StopRecording( bx.worldId );
+		b3DestroyRecording( bx.recording );
+		bx.recording = NULL;
+	}
+	bx.recording = b3CreateRecording( 8 * 1024 * 1024 );
+	if ( !bx.recording ) {
+		Com_Printf( S_COLOR_YELLOW "Box3D: recording alloc failed\n" );
+		return;
+	}
+	b3World_StartRecording( bx.worldId, bx.recording );
+	Com_Printf( "[physics] Soft Step recording started (phys_record)\n" );
+}
+
+void Phys_StopRecording_Impl( const char *path ) {
+	if ( !bx.initialized || !bx.recording ) {
+		return;
+	}
+	b3World_StopRecording( bx.worldId );
+	if ( path && path[0] ) {
+		if ( b3SaveRecordingToFile( bx.recording, path ) ) {
+			Com_Printf( "[physics] Soft Step recording saved to %s\n", path );
+		} else {
+			Com_Printf( S_COLOR_YELLOW "Box3D: failed to save recording %s\n", path );
+		}
+	}
+	b3DestroyRecording( bx.recording );
+	bx.recording = NULL;
 }
 
 #endif /* USE_BOX3D_PHYSICS_IMPL */

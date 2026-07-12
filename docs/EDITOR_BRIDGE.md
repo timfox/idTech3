@@ -152,6 +152,30 @@ Parser: [engine_sprite_map.c](../src/qcommon/engine_sprite_map.c). Network: [MOD
 
 Parser: [engine_decal_map.c](../src/qcommon/engine_decal_map.c).
 
+### Soft Step props (`misc_phys_*`)
+
+Map-placed Box3D Soft Step bodies (server spawn when `sv_physSpawn 1`).
+
+| Class | Description |
+|-------|-------------|
+| `misc_phys_box` | Dynamic box |
+| `misc_phys_sphere` | Dynamic sphere |
+| `misc_phys_static` | Static box collider |
+| `misc_phys_sensor` | Trigger volume (`isSensor`) |
+| `misc_phys_slider` | Prismatic joint (static base + sliding box) |
+| `misc_phys_ragdoll` | Procedural Soft Step ragdoll |
+
+| Key | Type | Description |
+|-----|------|-------------|
+| `origin` / `angles` | vec3 | Placement |
+| `_size` / `size` | float | Box edge length or sphere diameter |
+| `mass` | float | Dynamic mass (default 20) |
+| `material` | int | `PHYS_MAT_*` id |
+| `lip` / `height` | float | Slider upper travel (default 96) |
+| `targetname` | string | Optional name |
+
+Parser: [engine_phys_map.c](../engine/core/engine_phys_map.c). Server: `SV_Physics_SpawnMapEntities`. See [PHYSICS.md](PHYSICS.md).
+
 ## Material-blend vertex paint (`.paint` sidecar)
 
 In-engine Studio / Paint (`r_materialPaint` + `r_studio_tools`) writes **`maps/<map>.paint`**.

@@ -76,9 +76,20 @@ rg -q 'phys_spawn_compound' modules/physics/phys_middleware.c
 rg -q 'phys_spawn_cloth' modules/physics/phys_middleware.c
 rg -q 'phys_spawn_rope' modules/physics/phys_middleware.c
 rg -q 'phys_spawn_particles' modules/physics/phys_middleware.c
-rg -q 'phys_spawn_softblob' modules/physics/phys_middleware.c
 rg -q 'phys_spawn_fluid' modules/physics/phys_middleware.c
+rg -q 'phys_spawn_sensor' modules/physics/phys_middleware.c
+rg -q 'phys_spawn_slider' modules/physics/phys_middleware.c
+rg -q 'phys_spawn_heightfield' modules/physics/phys_middleware.c
 rg -q 'PhysFluid_CreateBlob' modules/physics/phys_fluid.c
+rg -q 'b3CreatePrismaticJoint' modules/physics/phys_box3d_impl.c
+rg -q 'b3CreateWheelJoint' modules/physics/phys_box3d_impl.c
+rg -q 'b3CreateMotorJoint' modules/physics/phys_box3d_impl.c
+rg -q 'b3CreateHeightField' modules/physics/phys_box3d_impl.c
+rg -q 'b3Body_SetTargetTransform' modules/physics/phys_box3d_impl.c
+rg -q 'b3World_GetSensorEvents' modules/physics/phys_box3d_impl.c
+rg -q 'isSensor' modules/physics/phys_box3d_impl.c
+rg -q 'Phys_AddStaticHeightField' modules/physics/phys_bullet.h
+rg -q 'PHYS_CONSTRAINT_WHEEL' modules/physics/phys_bullet.h
 rg -q 'PhysSolvers_Register' modules/physics/phys_solvers.c
 rg -q 'PhysSolvers_PreStep' modules/physics/phys_bullet.c
 rg -q 'PhysSolvers_PostStep' modules/physics/phys_bullet.c
@@ -88,6 +99,33 @@ rg -q 'Cloth_CollideWorld' modules/physics/phys_cloth.c
 rg -q 'PHYS_CONSTRAINT_DISTANCE' modules/physics/phys_bullet.h
 rg -q '\"motors\"' modules/physics/phys_solvers.c
 rg -q '\"fluid\"' modules/physics/phys_solvers.c
+
+echo "[test_physics] full Box3D integration surface..."
+rg -q 'SV_Physics_Frame' runtime/server/sv_physics.c
+rg -q 'sv_physSpawn' runtime/server/sv_physics.c
+rg -q 'EnginePhysMap_Parse' engine/core/engine_phys_map.c
+rg -q 'misc_phys_box' engine/core/engine_phys_map.c
+rg -q 'G_PHYS_CREATEBODY' runtime/game/g_public.h
+rg -q 'G_PHYS_PMOVE_CORRECT' runtime/game/g_public.h
+rg -q 'Phys_PmoveCorrect' modules/physics/phys_character.c
+rg -q 'phys_pmove' modules/physics/phys_character.c
+rg -q 'pmoveCorrect' runtime/game/g_lua_bindings.c
+rg -q 'createConstraint' runtime/game/g_lua_bindings.c
+rg -q 'b3CreateCylinder' modules/physics/phys_box3d_impl.c
+rg -q 'b3CreateHull' modules/physics/phys_box3d_impl.c
+rg -q 'b3Shape_SetFilter' modules/physics/phys_box3d_impl.c
+rg -q 'b3World_CastRayClosest' modules/physics/phys_box3d_impl.c
+rg -q 'b3World_OverlapShape' modules/physics/phys_box3d_impl.c
+rg -q 'b3Joint_SetForceThreshold' modules/physics/phys_box3d_impl.c
+rg -q 'b3WheelJoint_SetTargetSteeringAngle' modules/physics/phys_box3d_impl.c
+rg -q 'b3World_GetProfile' modules/physics/phys_box3d_impl.c
+rg -q 'b3World_StartRecording' modules/physics/phys_box3d_impl.c
+rg -q 'Phys_RagdollSetBoneAnimTarget' modules/physics/phys_bullet.h
+rg -q 'Phys_RagdollLoadDef' modules/physics/phys_ragdoll_bind.c
+rg -q 'phys_bspGridStep' modules/physics/phys_bullet.c
+rg -q 'misc_phys_box' docs/PHYSICS.md
+rg -q 'misc_phys_box' docs/EDITOR_BRIDGE.md
+rg -q 'misc_phys_box' examples/radiant/scripts/entities_idtech3_bridge.def
 
 echo "[test_physics] docs omit third-party physics product names..."
 if rg -i 'vphysics|havok|ipion|rubikon' docs/PHYSICS.md; then
