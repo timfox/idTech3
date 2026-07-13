@@ -2,6 +2,7 @@
  * Unit tests: Arc Blanc ocean framework (Algis et al. 2025).
  */
 #include <stdio.h>
+#include <stdlib.h>
 #include <math.h>
 
 #include "qcommon/q_shared.h"
@@ -189,23 +190,28 @@ static int test_directional_spread_tightens_off_axis_energy( void )
 static int test_combine_respects_art_direction_scales( void )
 {
 	const abOceanState_t *base;
-	abOceanState_t tuned;
+	abOceanState_t *tuned;
 	float sumH, sumDx, sumDz;
+	int ok = 0;
 
 	ArcBlanc_ResetForTest();
 	base = ArcBlanc_GetOceanForTest();
-	tuned = *base;
-	tuned.amplitudeScale = 1.5f;
-	tuned.heightScale = 0.8f;
-	tuned.chopScale = 1.2f;
-	tuned.gustStrength = 0.0f;
-	sumH = tuned.fields[0].height[0] + tuned.fields[1].height[0] + tuned.fields[2].height[0];
-	sumDx = tuned.fields[0].dispX[0] + tuned.fields[1].dispX[0] + tuned.fields[2].dispX[0];
-	sumDz = tuned.fields[0].dispZ[0] + tuned.fields[1].dispZ[0] + tuned.fields[2].dispZ[0];
-	AB_Ocean_CombineCascades( &tuned );
-	ASSERT( fabsf( tuned.combinedHeight[0] - sumH * 1.2f ) < 1e-4f, "height scale applied during combine" );
-	ASSERT( fabsf( tuned.combinedDispX[0] - sumDx * 1.8f ) < 1e-4f, "chop scale applied to dispX" );
-	ASSERT( fabsf( tuned.combinedDispZ[0] - sumDz * 1.8f ) < 1e-4f, "chop scale applied to dispZ" );
+	tuned = (abOceanState_t *)malloc( sizeof( *tuned ) );
+	ASSERT( tuned != NULL, "tuned ocean alloc" );
+	*tuned = *base;
+	tuned->amplitudeScale = 1.5f;
+	tuned->heightScale = 0.8f;
+	tuned->chopScale = 1.2f;
+	tuned->gustStrength = 0.0f;
+	sumH = tuned->fields[0].height[0] + tuned->fields[1].height[0] + tuned->fields[2].height[0];
+	sumDx = tuned->fields[0].dispX[0] + tuned->fields[1].dispX[0] + tuned->fields[2].dispX[0];
+	sumDz = tuned->fields[0].dispZ[0] + tuned->fields[1].dispZ[0] + tuned->fields[2].dispZ[0];
+	AB_Ocean_CombineCascades( tuned );
+	ok = ( fabsf( tuned->combinedHeight[0] - sumH * 1.2f ) < 1e-4f )
+		&& ( fabsf( tuned->combinedDispX[0] - sumDx * 1.8f ) < 1e-4f )
+		&& ( fabsf( tuned->combinedDispZ[0] - sumDz * 1.8f ) < 1e-4f );
+	free( tuned );
+	ASSERT( ok, "art-direction scales applied during combine" );
 	return 0;
 }
 

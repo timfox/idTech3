@@ -309,7 +309,7 @@ for (i = 0; i < 2; i++) {
 	}
 
 	for ( i = 0; i < 2; i++ ) {
-		for ( j = 0; j < 2; j++ ) {
+		for ( j = 0; j < 1; j++ ) {
 			for ( k = 0; k < 2; k++ ) {
 				qvkDestroyShaderModule( vk.device, vk.modules.frag.ent[i][j][k], NULL );
 				vk.modules.frag.ent[i][j][k] = VK_NULL_HANDLE;
