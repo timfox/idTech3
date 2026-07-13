@@ -533,6 +533,12 @@ void NET_P2P_PrintIceCandidates( void )
 	NET_P2P_NatPrintCandidates();
 }
 
+void NET_P2P_PrintPathStatus( void )
+{
+	NET_P2P_IcePrintStatus();
+	NET_P2P_PrintPunchStatus();
+}
+
 void NET_P2P_BeginMasterList( const char *masterAddress )
 {
 	NET_P2P_NatBeginMasterList( masterAddress );

@@ -47,6 +47,15 @@ static cvar_t *net_p2pIceTimeout;
 
 static p2p_ice_connect_t net_p2pIceConnect;
 
+static qboolean NET_P2P_IceIsActivePeer( const netadr_t *from )
+{
+	if ( !from || !net_p2pIceConnect.active ) {
+		return qfalse;
+	}
+
+	return NET_CompareAdr( from, &net_p2pIceConnect.peerAdr );
+}
+
 static qboolean NET_P2P_IceUsingDirectUdp( void )
 {
 	if ( !NET_P2P_IsEnabled() ) {
@@ -235,11 +244,11 @@ static void NET_P2P_IceBeginChecks( void )
 	net_p2pIceConnect.nominatedTxn = 0;
 
 	for ( i = 0; i < P2P_ICE_MAX_CHECKS; i++ ) {
-		int remoteIdx = ( bestRemote + i ) % net_p2pIceConnect.remoteCount;
-		if ( !net_p2pIceConnect.remote[remoteIdx].valid ) {
+		int checkRemoteIdx = ( bestRemote + i ) % net_p2pIceConnect.remoteCount;
+		if ( !net_p2pIceConnect.remote[checkRemoteIdx].valid ) {
 			continue;
 		}
-		if ( net_p2pIceConnect.remote[remoteIdx].type == P2P_CAND_RELAY ) {
+		if ( net_p2pIceConnect.remote[checkRemoteIdx].type == P2P_CAND_RELAY ) {
 			NET_P2P_NatGrantTurnPermission( &net_p2pIceConnect.peerAdr );
 		}
 		net_p2pIceConnect.checkTxn++;
@@ -247,7 +256,7 @@ static void NET_P2P_IceBeginChecks( void )
 			&net_p2pIceConnect.peerAdr,
 			"p2pCheck %d %s",
 			net_p2pIceConnect.checkTxn,
-			net_p2pIceConnect.remote[remoteIdx].text );
+			net_p2pIceConnect.remote[checkRemoteIdx].text );
 		net_p2pIceConnect.checkIndex++;
 		if ( net_p2pIceConnect.checkIndex >= 3 ) {
 			break;
@@ -345,6 +354,11 @@ qboolean NET_P2P_IceHandleOobPacket( const netadr_t *from, const char *cmd )
 	}
 
 	if ( !Q_stricmp( cmd, "p2pCand" ) ) {
+		if ( net_p2pIceConnect.active && !NET_P2P_IceIsActivePeer( from ) ) {
+			Com_Printf( "P2P ICE: ignoring candidates from unexpected peer %s\n",
+				NET_AdrToString( from ) );
+			return qtrue;
+		}
 		NET_P2P_IceParseRemoteCandidates( Cmd_Argv( 1 ) );
 		if ( net_p2pIceConnect.active && !net_p2pIceConnect.complete ) {
 			NET_P2P_IceBeginChecks();
@@ -360,6 +374,11 @@ qboolean NET_P2P_IceHandleOobPacket( const netadr_t *from, const char *cmd )
 
 	if ( !Q_stricmp( cmd, "p2pCheckAck" ) ) {
 		txn = atoi( Cmd_Argv( 1 ) );
+		if ( net_p2pIceConnect.active && !NET_P2P_IceIsActivePeer( from ) ) {
+			Com_Printf( "P2P ICE: ignoring check ack from unexpected peer %s\n",
+				NET_AdrToString( from ) );
+			return qtrue;
+		}
 		if ( net_p2pIceConnect.active && !net_p2pIceConnect.success ) {
 			if ( !net_p2pIceConnect.nominatedTxn || txn == net_p2pIceConnect.checkTxn ) {
 				net_p2pIceConnect.nominatedTxn = txn;
@@ -381,8 +400,18 @@ qboolean NET_P2P_IceHandleOobPacket( const netadr_t *from, const char *cmd )
 void NET_P2P_IcePrintStatus( void )
 {
 	if ( net_p2pIceConnect.active ) {
-		Com_Printf( "P2P ICE: active peer %s remoteCands:%d\n",
-			net_p2pIceConnect.peerAddress, net_p2pIceConnect.remoteCount );
+		Com_Printf( "P2P ICE: active peer %s remoteCands:%d checks:%d timeout:%dms\n",
+			net_p2pIceConnect.peerAddress,
+			net_p2pIceConnect.remoteCount,
+			net_p2pIceConnect.checkIndex,
+			net_p2pIceTimeout ? ( net_p2pIceConnect.deadlineMs - Sys_Milliseconds() ) : 0 );
+	} else if ( net_p2pIceConnect.success && net_p2pIceConnect.nominatedAddress[0] ) {
+		Com_Printf( "P2P ICE: last result success path %s txn:%d\n",
+			net_p2pIceConnect.nominatedAddress,
+			net_p2pIceConnect.nominatedTxn );
+	} else if ( net_p2pIceConnect.complete && net_p2pIceConnect.peerAddress[0] ) {
+		Com_Printf( "P2P ICE: last result fallback peer %s\n",
+			net_p2pIceConnect.peerAddress );
 	} else if ( net_p2pIceConnect.nominatedAddress[0] ) {
 		Com_Printf( "P2P ICE: last nominated %s\n", net_p2pIceConnect.nominatedAddress );
 	} else {

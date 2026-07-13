@@ -30,6 +30,7 @@
 - `p2p_connect_browser <local|global|favorites> <index>`
 
 `p2p_address` prints the current shareable P2P address: `steam:STEAMID64` for Steam SDR or `udp:host:port` for direct UDP when `net_p2pAdvertiseAddress` is configured or ICE auto-advertise resolves a candidate.
+`p2p_status` also reports current ICE path state plus direct-UDP punch session state, which helps debug peer ownership, fallback, and keepalive behavior.
 `p2p_connect` normalizes the input and forwards to `connect` with either a `steam:` or `udp:` address. For `udp:` peers it also starts a direct-UDP punchthrough helper session first.
 `p2p_punch` explicitly starts a direct-UDP punchthrough helper session to a peer.
 `p2p_punch_status` prints active punch peers, attempts, and whether a peer has acknowledged the punchthrough flow.

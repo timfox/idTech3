@@ -1664,6 +1664,8 @@ static void SV_P2PStatus_f( void ) {
 	} else {
 		Com_Printf( "P2P address: unavailable\n" );
 	}
+
+	NET_P2P_PrintPathStatus();
 }
 
 static void SV_P2PAddress_f( void ) {

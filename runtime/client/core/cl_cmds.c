@@ -247,6 +247,8 @@ static void CL_P2PStatus_f( void ) {
 		Com_Printf( "P2P address: unavailable\n" );
 	}
 
+	NET_P2P_PrintPathStatus();
+
 	if ( NET_P2P_IsSupported() ) {
 		Com_Printf( "P2P notes: enable with net_p2p 1; use net_p2pBackend auto|steam_sdr|direct_udp. direct_udp can advertise via net_p2pAdvertiseAddress.\n" );
 	}

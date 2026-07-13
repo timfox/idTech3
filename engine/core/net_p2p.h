@@ -18,6 +18,7 @@ qboolean NET_P2P_NormalizeAddressString( const char *address, char *buffer, int 
 void NET_P2P_BeginPunchForAddress( const char *address );
 void NET_P2P_PrintPunchStatus( void );
 void NET_P2P_PrintIceCandidates( void );
+void NET_P2P_PrintPathStatus( void );
 void NET_P2P_BeginMasterList( const char *masterAddress );
 qboolean NET_P2P_BeginConnectPath( const char *peerAddress );
 qboolean NET_P2P_TryHandleNatPacket( const netadr_t *from, const byte *data, int len );
