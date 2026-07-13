@@ -61,6 +61,35 @@ rg -q 'phys_spawn_box' examples/demo_game/mod/demo_physics.cfg
 rg -q 'phys_impulse_sphere' examples/demo_game/mod/demo_physics.cfg
 rg -q 'phys_spawn_shadow' examples/demo_game/mod/demo_physics.cfg
 rg -q 'phys_spawn_buoyancy' examples/demo_game/mod/demo_physics.cfg
+rg -q 'box3d_examples/menu.cfg' examples/demo_game/mod/demo_physics.cfg
+
+echo "[test_physics] Box3D example scenes..."
+BOX3D_EXAMPLES_DIR="examples/demo_game/mod/box3d_examples"
+test -f "$BOX3D_EXAMPLES_DIR/menu.cfg"
+test -f "$BOX3D_EXAMPLES_DIR/stacking_jenga.cfg"
+test -f "$BOX3D_EXAMPLES_DIR/joints_bridge.cfg"
+test -f "$BOX3D_EXAMPLES_DIR/events_sensors.cfg"
+test -f "$BOX3D_EXAMPLES_DIR/continuous_bullets.cfg"
+test -f "$BOX3D_EXAMPLES_DIR/compound_village.cfg"
+test -f "$BOX3D_EXAMPLES_DIR/character_mover.cfg"
+test -f "$BOX3D_EXAMPLES_DIR/softbody_fluid.cfg"
+test -f "$BOX3D_EXAMPLES_DIR/replay_determinism.cfg"
+rg -q 'stacking_jenga.cfg' "$BOX3D_EXAMPLES_DIR/menu.cfg"
+rg -q 'phys_spawn_box' "$BOX3D_EXAMPLES_DIR/stacking_jenga.cfg"
+rg -q 'phys_spawn_sphere' "$BOX3D_EXAMPLES_DIR/stacking_jenga.cfg"
+rg -q 'phys_spawn_rope' "$BOX3D_EXAMPLES_DIR/joints_bridge.cfg"
+rg -q 'phys_spawn_slider' "$BOX3D_EXAMPLES_DIR/joints_bridge.cfg"
+rg -q 'phys_spawn_sensor' "$BOX3D_EXAMPLES_DIR/events_sensors.cfg"
+rg -q 'phys_hitThreshold' "$BOX3D_EXAMPLES_DIR/events_sensors.cfg"
+rg -q 'phys_ccd 1' "$BOX3D_EXAMPLES_DIR/continuous_bullets.cfg"
+rg -q 'phys_spawn_heightfield' "$BOX3D_EXAMPLES_DIR/continuous_bullets.cfg"
+rg -q 'phys_spawn_compound' "$BOX3D_EXAMPLES_DIR/compound_village.cfg"
+rg -q 'phys_pmove 1' "$BOX3D_EXAMPLES_DIR/character_mover.cfg"
+rg -q 'phys_spawn_shadow' "$BOX3D_EXAMPLES_DIR/character_mover.cfg"
+rg -q 'phys_spawn_cloth' "$BOX3D_EXAMPLES_DIR/softbody_fluid.cfg"
+rg -q 'phys_spawn_fluid' "$BOX3D_EXAMPLES_DIR/softbody_fluid.cfg"
+rg -q 'phys_record_start' "$BOX3D_EXAMPLES_DIR/replay_determinism.cfg"
+rg -q 'Box3D Example Scenes' docs/samples/box3d_examples/README.md
 
 rg -q 'b3World_CastShape' modules/physics/phys_box3d_impl.c
 rg -q 'b3CreateMeshShape' modules/physics/phys_box3d_impl.c

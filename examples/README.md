@@ -21,4 +21,5 @@ See also:
 - [docs/CONTENT_IDENTITY.md](../docs/CONTENT_IDENTITY.md) - default shell and opinionated starter workflow.
 - [docs/PRODUCTION_CERTIFICATION.md](../docs/PRODUCTION_CERTIFICATION.md) - tiered production bar.
 - [docs/samples/renderer_regression/README.md](../docs/samples/renderer_regression/README.md) - visual regression pack.
+- [docs/samples/box3d_examples/README.md](../docs/samples/box3d_examples/README.md) - Box3D sample-family scenes runnable through the demo mod.
 - [docs/TILED.md](../docs/TILED.md) - optional Tiled submodule (GPL-2.0).
