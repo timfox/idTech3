@@ -40,8 +40,10 @@ Modernized id Tech 3: **Vulkan renderer with PBR**, validation and smoke-tested 
 **Renderer (models):** OBJ, glTF/GLB, and MD5 share registration and `MOD_*` types on the Vulkan path. **glTF GPU skin/morph** (`r_gltfGpu`, SSBOs, tangent fix) is Vulkan PBR. See [docs/RENDERERS.md](docs/RENDERERS.md).
 
 **Scripting**:
-* Support for Lua scripting
-* Support for JavaScript scripting
+* Lua
+* JavaScript
+* Python
+* C#
 
 **Images**:
 * Image format support: PNG, JPEG, TGA, BMP, DDS, WebP, HDR, OpenEXR (EXR), KTX, PKM, PVR
@@ -52,6 +54,7 @@ Modernized id Tech 3: **Vulkan renderer with PBR**, validation and smoke-tested 
 **Networking**:
 * Full IPv6 and IPv4 dual-stack support (host, client, server)
 * NAT traversal (UDP hole punching with automatic fallback strategies)
+* P2P Networking: Supports peer-to-peer server/client connections, NAT traversal, and automatic fallback for robust online sessions without central relays.
 * Server discovery: LAN broadcast and master-server queries
 * Built-in rate limiting/DDoS mitigation (connection flood protection)
 * Challenge/response protocol with replay/spoof resistance enhancements
@@ -69,7 +72,7 @@ Modernized id Tech 3: **Vulkan renderer with PBR**, validation and smoke-tested 
 * hierarchical State Machines (HSM), Finite State Machines (FSM), and Behavior Trees
 * Navigation Mesh (NavMesh) pathfinding (A*, Dijkstra)
 * Event scripting (Lua, JavaScript)
-* Physics and collision (with optional Bullet Physics)
+* Physics (with optional Bullet Physics or Box3D)
 * Multithreaded scheduler/task system
 * Entity-Component System (ECS, ENTT)
 * Replay frame index tied to server snapshots (`engine_replay`; Lua `Engine.Replay`)
@@ -81,10 +84,11 @@ Modernized id Tech 3: **Vulkan renderer with PBR**, validation and smoke-tested 
 
 ### Platforms
 
-* Windows
-* Linux
+* Windows (x64)
+* Linux (x64 and arm64)
 * Android
 * MacOS
+* Web
 
 ### Standards
 
@@ -110,12 +114,32 @@ ctest --preset test-vulkan-release
 
 Artifacts land under `release/` and `build-vk-Release/`. The helper script is the canonical developer path because it stages `release/` automatically; presets are the preferred direct-CMake / IDE path.
 
+### Editor
+The engine features a built-in, cross-platform Editor designed for rapid development and prototyping. The Editor is available as a standalone application and also supports in-game editing modes.
+
+**Key Features:**
+- Visual scene and entity editor with real-time viewport rendering.
+- Drag-and-drop placement and hierarchical organization of entities and components.
+- Support for editing levels, prefabs, lights, navigation meshes, and physics volumes.
+- Property inspector for editing component properties, including materials, scripts, and AI behaviors.
+- Embedded script editor (Lua and JavaScript) with immediate feedback and live reloading.
+- Integration with the engine’s asset pipeline: hot-reload assets, manage resource dependencies, and preview changes instantly.
+- Timeline and sequencing tools for cutscenes, events, and gameplay scripting.
+- Built-in debugging overlays, profiling tools, and real-time telemetry visualization.
+- Multi-user collaborative editing support (via server-client connections).
+- Extensible via plugins—extend with custom editors or workflow integrations.
+
+**Platforms:**  
+The Editor runs on Windows, Linux, and MacOS.
+
+Refer to the documentation or `scripts/launch_editor.sh` to get started with the desktop Editor.
+
+
 ### Long-term Feature Plans
 
-* Ray tracing
+* Ray tracing (WIP)
 * Path tracing
 * Voxels
-* P2P networking
 
 ### Links
 
