@@ -3362,6 +3362,12 @@ set_tests_properties(test_modern_renderer_profile_runtime PROPERTIES
 	LABELS "scripts;renderer;validation"
 	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_modern_renderer_profile_runtime.sh;${CMAKE_SOURCE_DIR}/config/modern_vulkan.cfg;${CMAKE_SOURCE_DIR}/docs/renderer_validation/README.md")
 
+add_test(NAME renderer_tier_a_resolver
+	COMMAND ${CMAKE_SOURCE_DIR}/scripts/resolve_renderer_tiers.sh --tier A)
+set_tests_properties(renderer_tier_a_resolver PROPERTIES
+	LABELS "scripts;renderer;validation"
+	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/scripts/resolve_renderer_tiers.sh;${CMAKE_SOURCE_DIR}/scripts/renderer_regression_check.sh;${CMAKE_SOURCE_DIR}/scripts/gpu_golden_capture.sh")
+
 add_test(NAME test_conditional_stubs
 	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_conditional_stubs.sh)
 set_tests_properties(test_conditional_stubs PROPERTIES

@@ -94,7 +94,8 @@ jobs:
       - name: Modern renderer profile runtime smoke (client)
         env:
           IDTECH3_RENDERER_RUNTIME_REQUIRED: "1"
+          IDTECH3_REQUIRE_RELEASE_CFGS: "1"
           RELEASE_DIR: ${{ github.workspace }}/release
         run: |
           set -euo pipefail
-          ./tests/scripts/test_modern_renderer_profile_runtime.sh runtime
+          ./tests/scripts/test_modern_renderer_profile_runtime.sh all

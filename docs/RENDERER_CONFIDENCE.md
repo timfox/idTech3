@@ -25,6 +25,7 @@ On **`main`**, GitHub Actions **`.github/workflows/build.yml`** runs **`renderer
 | Full local CI parity | `./scripts/validate_ci_build.sh` | SPIR-V generation, Vulkan Release build, smoke test, renderer regression check. |
 | CMake smoke + artifacts | `ctest --output-on-failure` (from `build-vk-Release`) | Smoke, **renderer_regression_check**, artifacts, unit hooks, **demo_game pk3 layout** (`test_demo_game_pk3`). |
 | Standalone GLSL | `./scripts/smoke_test.sh` (or the smoke step inside `validate_ci_build.sh`) | Every `.vert`, `.frag`, `.geom`, and `.comp` under `src/renderers/vulkan/shaders/glsl/` validates with `glslangValidator` (recursive, including `volumetric/`, `terrain/`, `postfx/`). |
+| Tier resolver | `./scripts/resolve_renderer_tiers.sh --tier A` | Runs the headless renderer tier contract in one place: renderer regression, GPU golden manifest, modern renderer profile source contract, and selected CTest checks when `build-vk-Release` exists. Use `--strict` with `GAME_BASE` for release candidates after Tier B/C evidence exists. |
 
 Optional: `SKIP_IDPAK_CHECK=ON` is normal for engine-only trees; the dedicated server may exit with “no game data” after init - that is still a useful crash-free signal.
 

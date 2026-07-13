@@ -48,7 +48,7 @@ If neither variable nor secret is set, the Tier B workflow **does not run** (job
 
 - Push to `main` or run **Actions → renderer-tier-b → Run workflow**.
 - First run may take longer (full Vulkan build on the runner).
-- The workflow also runs `IDTECH3_RENDERER_RUNTIME_REQUIRED=1 ./tests/scripts/test_modern_renderer_profile_runtime.sh runtime`, which fails if the self-hosted runner cannot launch the Vulkan client.
+- The workflow also runs `IDTECH3_RENDERER_RUNTIME_REQUIRED=1 IDTECH3_REQUIRE_RELEASE_CFGS=1 ./tests/scripts/test_modern_renderer_profile_runtime.sh all`, which checks the source contract, verifies packaged renderer cfgs under `release/base`, and fails if the self-hosted runner cannot launch the Vulkan client.
 - Optional: set repository variable **`IDTECH3_MAPS_EXTRA`** to a space-separated list of extra BSP names; the workflow passes it as **`MAPS_EXTRA`** to `renderer_regression_maps.sh` (after the stock `rtest_*` maps). See `docs/samples/renderer_regression/scenes/08_tier_b_mixed_dlights.md`.
 
 ## Troubleshooting

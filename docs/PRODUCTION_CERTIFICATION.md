@@ -19,12 +19,14 @@ Use this as the **internal bar** before calling an engine release â€œproductionâ
 
 - [ ] **Full GitHub Actions matrix green** on the release commit (`build` + any required workflows).
 - [ ] **`./scripts/production_readiness.sh`** completes with exit code 0 on a clean tree (see script header for options).
+- [ ] **`./scripts/resolve_renderer_tiers.sh --tier A`** completes with exit code 0 for the headless renderer evidence contract.
 - [ ] **No known Sev-1 issues** (data loss, security, deterministic crash on dedicated startup with documented minimal args) open against the milestone.
 
 ### Tier B - Content-backed (still automated, needs `GAME_BASE`)
 
 - [ ] **`GAME_BASE`** points at a full `base/` with VM + assets + regression pack; **`./scripts/renderer_regression_maps.sh`** passes (see [RENDERER_CONFIDENCE.md](RENDERER_CONFIDENCE.md)).
 - [ ] **`./scripts/renderer_regression_check.sh`** with the same `GAME_BASE` passes optional BSP/manifest checks if enabled in `OPTIONAL_GAME_ASSETS.txt`.
+- [ ] **`GAME_BASE=/abs/path/to/base ./scripts/resolve_renderer_tiers.sh --strict --tier B`** passes on a machine that can launch the Vulkan client.
 
 ### Tier C - Manual evidence (GPU + human)
 
@@ -61,6 +63,8 @@ Tightening proof is mostly **feeding stable inputs** (same `GAME_BASE`, same reg
 | 5 | Title / AAA | Engine tiers **do not** replace platform cert: use [examples/title-repo/CERTIFICATION_CHECKLIST.md](../examples/title-repo/CERTIFICATION_CHECKLIST.md) in the **game** repo for telemetry, soak, and submission SKUs. |
 
 **Quick gap report (local):** `./scripts/evidence_status.sh` - prints what is configured vs skipped (read-only; no secrets).
+
+**One-command tier resolver:** `./scripts/resolve_renderer_tiers.sh` runs every tier it can prove on the current machine. Add `--strict` for release candidates; strict mode fails if content-backed Tier B, recorded Tier C findings, or release hygiene evidence is missing.
 
 ## How to move forward from current health
 

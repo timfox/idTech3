@@ -7,10 +7,11 @@ Evidence for **Tier B** (automated + `GAME_BASE`) and **Tier C** (manual GPU / v
 | Goal | What to do |
 |------|------------|
 | **Modern profile source contract** | `./tests/scripts/test_modern_renderer_profile_runtime.sh source` or `ctest -R test_modern_renderer_profile_runtime --output-on-failure`. This is headless-safe and verifies the Forward+ + G-buffer sidecar + PBR + HDR + TAA default plus diagnostics wiring. |
-| **Modern profile client smoke** | `IDTECH3_RENDERER_RUNTIME_REQUIRED=1 ./tests/scripts/test_modern_renderer_profile_runtime.sh runtime` on a machine with a built Vulkan client, `DISPLAY`, and working Vulkan. This executes `modern_vulkan.cfg` and checks `renderer_profile`, `renderer_status`, and `renderer_compatibility`. |
+| **Modern profile client smoke** | `IDTECH3_RENDERER_RUNTIME_REQUIRED=1 ./tests/scripts/test_modern_renderer_profile_runtime.sh runtime` on a machine with a built Vulkan client, `DISPLAY`, and working Vulkan. This executes `modern_vulkan.cfg` and checks `renderer_profile`, `renderer_status`, and `renderer_compatibility`. Use `all` instead of `runtime` to include the source/packaging contract in the same run. |
 | **Tier B locally** | `GAME_BASE=/abs/path/to/base ./scripts/renderer_regression_check.sh` then same with `renderer_regression_maps.sh`. Optional: `RELEASE_DIR` if binaries are not under `release/`. |
 | **Tier B on GitHub** | Self-hosted runner with labels `self-hosted` + `idtech3-tierb`; set `IDTECH3_GAME_BASE_PATH` as a **variable** or **secret** (see [SELF_HOSTED_TIER_B.md](SELF_HOSTED_TIER_B.md)). Workflow: `.github/workflows/renderer-tier-b.yml` (push to `main` or **Run workflow**). |
 | **Tier C (GPU notes)** | Follow the proof loop in [docs/RENDERER_CONFIDENCE.md](../RENDERER_CONFIDENCE.md); copy [TEMPLATE_TIER_C.md](TEMPLATE_TIER_C.md) or append a row to [FINDINGS.md](FINDINGS.md). |
+| **Resolve all tiers** | `./scripts/resolve_renderer_tiers.sh` for best-effort local status, or `GAME_BASE=/abs/path/to/base ./scripts/resolve_renderer_tiers.sh --strict` for a release-style gate that fails missing Tier B/C/D evidence. |
 | **Gap report** | `./scripts/evidence_status.sh` and optionally `GAME_BASE=... ./scripts/evidence_status.sh` |
 
 | Document | Purpose |

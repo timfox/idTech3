@@ -36,6 +36,9 @@ fi
 if [[ -x "$ROOT/scripts/production_readiness.sh" ]]; then
 	info "Run: ./scripts/production_readiness.sh  (full local gate; optional GAME_BASE)"
 fi
+if [[ -x "$ROOT/scripts/resolve_renderer_tiers.sh" ]]; then
+	info "Run: ./scripts/resolve_renderer_tiers.sh --tier A  (headless renderer tier resolver)"
+fi
 if [[ -x "$ROOT/scripts/validate_ci_build.sh" ]]; then
 	info "Run: ./scripts/validate_ci_build.sh  (CI-parity smoke)"
 fi
@@ -63,6 +66,9 @@ else
 	skip "GAME_BASE unset - export GAME_BASE=/abs/path/to/base for map-load scripts"
 fi
 info "GitHub Tier B: set repo variable or secret IDTECH3_GAME_BASE_PATH + self-hosted runner label idtech3-tierb (docs/renderer_validation/SELF_HOSTED_TIER_B.md)"
+if [[ -x "$ROOT/scripts/resolve_renderer_tiers.sh" ]]; then
+	info "Local Tier B resolver: GAME_BASE=\"\$GAME_BASE\" ./scripts/resolve_renderer_tiers.sh --tier B"
+fi
 echo ""
 
 echo "Tier C - Manual GPU / validation layers"
@@ -77,6 +83,9 @@ if [[ -f "$ROOT/docs/renderer_validation/FINDINGS.md" ]]; then
 	fi
 fi
 info "Follow renderer proof loop: docs/RENDERER_CONFIDENCE.md"
+if [[ -x "$ROOT/scripts/resolve_renderer_tiers.sh" ]]; then
+	info "Strict evidence gate after manual pass: ./scripts/resolve_renderer_tiers.sh --strict"
+fi
 echo ""
 
 echo "Tier D - Release hygiene"
