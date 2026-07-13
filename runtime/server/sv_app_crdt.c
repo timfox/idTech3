@@ -10,6 +10,7 @@ idtech3backend integration: auto-bootstrap + Engine.AppCrdt on dedicated server.
 #include "q_shared.h"
 #include "qcommon.h"
 #include "net_p2p.h"
+#include "net_oscar.h"
 #include "server.h"
 #include "app_crdt.h"
 #include "lua_debug.h"
@@ -440,6 +441,112 @@ static int SV_LuaP2P_GetStatus( lua_State *L )
 	return 1;
 }
 
+static int SV_LuaOscar_IsAvailable( lua_State *L )
+{
+	lua_pushboolean( L, OSCAR_IsAvailable() );
+	return 1;
+}
+
+static int SV_LuaOscar_GetState( lua_State *L )
+{
+	lua_pushstring( L, OSCAR_GetStatusString() );
+	return 1;
+}
+
+static int SV_LuaOscar_GetStatus( lua_State *L )
+{
+	lua_newtable( L );
+	lua_pushboolean( L, OSCAR_IsAvailable() );
+	lua_setfield( L, -2, "available" );
+	lua_pushstring( L, OSCAR_GetStatusString() );
+	lua_setfield( L, -2, "state" );
+	lua_pushstring( L, OSCAR_GetCurrentRoom() );
+	lua_setfield( L, -2, "room" );
+	lua_pushstring( L, OSCAR_GetLastError() );
+	lua_setfield( L, -2, "lastError" );
+	lua_pushinteger( L, OSCAR_GetReconnectAttempt() );
+	lua_setfield( L, -2, "reconnectAttempt" );
+	return 1;
+}
+
+static int SV_LuaOscar_Connect( lua_State *L )
+{
+	(void)L;
+	lua_pushboolean( L, OSCAR_Connect() );
+	return 1;
+}
+
+static int SV_LuaOscar_Disconnect( lua_State *L )
+{
+	OSCAR_Disconnect( luaL_optstring( L, 1, "lua disconnect" ) );
+	return 0;
+}
+
+static int SV_LuaOscar_SendIM( lua_State *L )
+{
+	lua_pushboolean( L, OSCAR_SendIM( luaL_checkstring( L, 1 ), luaL_checkstring( L, 2 ) ) );
+	return 1;
+}
+
+static int SV_LuaOscar_JoinRoom( lua_State *L )
+{
+	lua_pushboolean( L, OSCAR_JoinRoom( luaL_checkstring( L, 1 ) ) );
+	return 1;
+}
+
+static int SV_LuaOscar_LeaveRoom( lua_State *L )
+{
+	lua_pushboolean( L, OSCAR_LeaveRoom( luaL_optstring( L, 1, NULL ) ) );
+	return 1;
+}
+
+static int SV_LuaOscar_SendRoomMessage( lua_State *L )
+{
+	lua_pushboolean( L, OSCAR_SendRoomMessage( luaL_checkstring( L, 1 ), luaL_checkstring( L, 2 ) ) );
+	return 1;
+}
+
+static int SV_LuaOscar_SetPresence( lua_State *L )
+{
+	lua_pushboolean( L, OSCAR_SetPresence( luaL_checkstring( L, 1 ), luaL_optstring( L, 2, "" ) ) );
+	return 1;
+}
+
+static int SV_LuaOscar_PollEvent( lua_State *L )
+{
+	oscarEvent_t ev;
+
+	if ( !OSCAR_PollEvent( &ev ) ) {
+		return 0;
+	}
+
+	lua_newtable( L );
+	switch ( ev.type ) {
+	case OSCAR_EVENT_CONNECTED: lua_pushstring( L, "connected" ); break;
+	case OSCAR_EVENT_DISCONNECTED: lua_pushstring( L, "disconnected" ); break;
+	case OSCAR_EVENT_INSTANT_MESSAGE: lua_pushstring( L, "instant_message" ); break;
+	case OSCAR_EVENT_ROOM_MESSAGE: lua_pushstring( L, "room_message" ); break;
+	case OSCAR_EVENT_PRESENCE_CHANGED: lua_pushstring( L, "presence_changed" ); break;
+	case OSCAR_EVENT_REQUEST_COMPLETE: lua_pushstring( L, "request_complete" ); break;
+	case OSCAR_EVENT_ERROR: lua_pushstring( L, "error" ); break;
+	default: lua_pushstring( L, "unknown" ); break;
+	}
+	lua_setfield( L, -2, "type" );
+	lua_pushinteger( L, ev.requestId );
+	lua_setfield( L, -2, "requestId" );
+	lua_pushboolean( L, ev.ok );
+	lua_setfield( L, -2, "ok" );
+	lua_pushstring( L, ev.room );
+	lua_setfield( L, -2, "room" );
+	lua_pushstring( L, ev.screenName );
+	lua_setfield( L, -2, "screenName" );
+	lua_pushstring( L, ev.status );
+	lua_setfield( L, -2, "status" );
+	lua_pushstring( L, ev.text );
+	lua_setfield( L, -2, "text" );
+	return 1;
+}
+
 static void SV_AppCrdt_RegisterServerLua( void *luaState )
 {
 	lua_State *L = (lua_State *)luaState;
@@ -508,6 +615,31 @@ static void SV_AppCrdt_RegisterServerLua( void *luaState )
 	lua_pushcfunction( L, SV_LuaP2P_GetStatus );
 	lua_setfield( L, -2, "getStatus" );
 	lua_setfield( L, -2, "P2P" );
+
+	lua_newtable( L );
+	lua_pushcfunction( L, SV_LuaOscar_IsAvailable );
+	lua_setfield( L, -2, "IsAvailable" );
+	lua_pushcfunction( L, SV_LuaOscar_GetState );
+	lua_setfield( L, -2, "GetState" );
+	lua_pushcfunction( L, SV_LuaOscar_GetStatus );
+	lua_setfield( L, -2, "GetStatus" );
+	lua_pushcfunction( L, SV_LuaOscar_Connect );
+	lua_setfield( L, -2, "Connect" );
+	lua_pushcfunction( L, SV_LuaOscar_Disconnect );
+	lua_setfield( L, -2, "Disconnect" );
+	lua_pushcfunction( L, SV_LuaOscar_SendIM );
+	lua_setfield( L, -2, "SendIM" );
+	lua_pushcfunction( L, SV_LuaOscar_JoinRoom );
+	lua_setfield( L, -2, "JoinRoom" );
+	lua_pushcfunction( L, SV_LuaOscar_LeaveRoom );
+	lua_setfield( L, -2, "LeaveRoom" );
+	lua_pushcfunction( L, SV_LuaOscar_SendRoomMessage );
+	lua_setfield( L, -2, "SendRoomMessage" );
+	lua_pushcfunction( L, SV_LuaOscar_SetPresence );
+	lua_setfield( L, -2, "SetPresence" );
+	lua_pushcfunction( L, SV_LuaOscar_PollEvent );
+	lua_setfield( L, -2, "PollEvent" );
+	lua_setfield( L, -2, "Oscar" );
 
 	lua_pop( L, 1 );
 }

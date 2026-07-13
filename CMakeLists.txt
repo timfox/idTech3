@@ -3499,6 +3499,12 @@ set_tests_properties(test_p2p_ice_guard PROPERTIES
 	LABELS "p2p;scripts"
 	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_p2p_ice_guard.sh;${CMAKE_SOURCE_DIR}/engine/core/net_p2p_ice.c;${CMAKE_SOURCE_DIR}/runtime/server/sv_ccmds.c")
 
+add_test(NAME test_oscar_bridge
+	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_oscar_bridge.sh)
+set_tests_properties(test_oscar_bridge PROPERTIES
+	LABELS "scripts;networking;oscar"
+	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_oscar_bridge.sh;${CMAKE_SOURCE_DIR}/engine/core/net_oscar.c;${CMAKE_SOURCE_DIR}/docs/OSCAR_INTEGRATION.md")
+
 add_test(NAME test_console_font
 	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_console_font.sh)
 set_tests_properties(test_console_font PROPERTIES
@@ -3802,6 +3808,21 @@ if(BUILD_UNIT_TESTS)
 	endif()
 	add_test(NAME unit_p2p_stun COMMAND unit_p2p_stun)
 	set_tests_properties(unit_p2p_stun PROPERTIES LABELS "unit;p2p;validation")
+
+	add_executable(unit_oscar_protocol
+		tests/unit/test_oscar_protocol.c
+		tests/stub_qcommon_min.c
+		engine/core/net_oscar_protocol.c
+		engine/core/q_shared.c
+		engine/core/q_math.c)
+	target_include_directories(unit_oscar_protocol PRIVATE
+		${CMAKE_SOURCE_DIR}
+		${CMAKE_SOURCE_DIR}/engine/core)
+	if(NOT MSVC)
+		target_link_libraries(unit_oscar_protocol PRIVATE m)
+	endif()
+	add_test(NAME unit_oscar_protocol COMMAND unit_oscar_protocol)
+	set_tests_properties(unit_oscar_protocol PROPERTIES LABELS "unit;networking;oscar;validation")
 
 	add_executable(unit_parse
 		tests/unit/test_parse.c

@@ -32,6 +32,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "q_shared.h"
 #include "qcommon.h"
 #include "net_p2p.h"
+#include "net_oscar.h"
 #include "net_dtls.h"
 #include "net_sdr.h"
 
@@ -1903,6 +1904,7 @@ void NET_Init( void ) {
 
 	NET_DTLS_Init();
 	NET_P2P_Init();
+	OSCAR_Init();
 	NET_SDR_Init();
 
 	Cmd_AddCommand( "net_restart", NET_Restart_f );
@@ -1920,6 +1922,7 @@ void NET_Shutdown( void ) {
 	}
 
 	NET_P2P_Shutdown();
+	OSCAR_Shutdown();
 	NET_SDR_Shutdown();
 	NET_DTLS_Shutdown();
 
@@ -2006,6 +2009,7 @@ qboolean NET_Sleep( int timeout )
 	}
 #endif
 	NET_P2P_Frame();
+	OSCAR_Frame( Sys_Milliseconds() );
 
 	if ( ip_socket != INVALID_SOCKET )
 	{

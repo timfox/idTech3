@@ -22,6 +22,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 #include "server.h"
 #include "net_p2p.h"
+#include "net_oscar.h"
 
 static void SV_P2PStatus_f( void );
 static void SV_P2PAddress_f( void );
@@ -30,6 +31,14 @@ static void SV_P2PPunch_f( void );
 static void SV_P2PPunchStatus_f( void );
 static void SV_P2PList_f( void );
 static void SV_P2PCandidates_f( void );
+static void SV_OscarStatus_f( void );
+static void SV_OscarConnect_f( void );
+static void SV_OscarDisconnect_f( void );
+static void SV_OscarAnnounce_f( void );
+static void SV_OscarJoin_f( void );
+static void SV_OscarLeave_f( void );
+static void SV_OscarIM_f( void );
+static void SV_OscarPresence_f( void );
 
 /*
 ===============================================================================
@@ -1633,6 +1642,14 @@ void SV_AddDedicatedCommands( void )
 	Cmd_AddCommand( "p2p_punch_status", SV_P2PPunchStatus_f );
 	Cmd_AddCommand( "p2p_list", SV_P2PList_f );
 	Cmd_AddCommand( "p2p_candidates", SV_P2PCandidates_f );
+	Cmd_AddCommand( "oscar_status", SV_OscarStatus_f );
+	Cmd_AddCommand( "oscar_connect", SV_OscarConnect_f );
+	Cmd_AddCommand( "oscar_disconnect", SV_OscarDisconnect_f );
+	Cmd_AddCommand( "oscar_announce", SV_OscarAnnounce_f );
+	Cmd_AddCommand( "oscar_join", SV_OscarJoin_f );
+	Cmd_AddCommand( "oscar_leave", SV_OscarLeave_f );
+	Cmd_AddCommand( "oscar_im", SV_OscarIM_f );
+	Cmd_AddCommand( "oscar_presence", SV_OscarPresence_f );
 }
 
 
@@ -1650,6 +1667,90 @@ void SV_RemoveDedicatedCommands( void )
 	Cmd_RemoveCommand( "p2p_punch_status" );
 	Cmd_RemoveCommand( "p2p_list" );
 	Cmd_RemoveCommand( "p2p_candidates" );
+	Cmd_RemoveCommand( "oscar_status" );
+	Cmd_RemoveCommand( "oscar_connect" );
+	Cmd_RemoveCommand( "oscar_disconnect" );
+	Cmd_RemoveCommand( "oscar_announce" );
+	Cmd_RemoveCommand( "oscar_join" );
+	Cmd_RemoveCommand( "oscar_leave" );
+	Cmd_RemoveCommand( "oscar_im" );
+	Cmd_RemoveCommand( "oscar_presence" );
+}
+
+static void SV_OscarStatus_f( void )
+{
+	Com_Printf( "OSCAR available: %s\n", OSCAR_IsAvailable() ? "yes" : "no" );
+	Com_Printf( "OSCAR state: %s\n", OSCAR_GetStatusString() );
+	Com_Printf( "OSCAR room: %s\n", OSCAR_GetCurrentRoom()[0] ? OSCAR_GetCurrentRoom() : "<none>" );
+	Com_Printf( "OSCAR reconnect attempt: %d\n", OSCAR_GetReconnectAttempt() );
+	if ( OSCAR_GetLastError()[0] ) {
+		Com_Printf( "OSCAR last error: %s\n", OSCAR_GetLastError() );
+	}
+}
+
+static void SV_OscarConnect_f( void )
+{
+	if ( !OSCAR_Connect() ) {
+		Com_Printf( "OSCAR: connect request failed (%s)\n",
+			OSCAR_GetLastError()[0] ? OSCAR_GetLastError() : OSCAR_GetStatusString() );
+	}
+}
+
+static void SV_OscarDisconnect_f( void )
+{
+	OSCAR_Disconnect( "operator disconnect" );
+}
+
+static void SV_OscarAnnounce_f( void )
+{
+	const char *message = Cmd_ArgsFrom( 1 );
+
+	if ( !message[0] ) {
+		Com_Printf( "Usage: oscar_announce <message>\n" );
+		return;
+	}
+	if ( !OSCAR_SendRoomMessage( NULL, message ) ) {
+		Com_Printf( "OSCAR: announce failed (%s)\n",
+			OSCAR_GetLastError()[0] ? OSCAR_GetLastError() : OSCAR_GetStatusString() );
+	}
+}
+
+static void SV_OscarJoin_f( void )
+{
+	if ( Cmd_Argc() < 2 ) {
+		Com_Printf( "Usage: oscar_join <room>\n" );
+		return;
+	}
+	OSCAR_JoinRoom( Cmd_Argv( 1 ) );
+}
+
+static void SV_OscarLeave_f( void )
+{
+	OSCAR_LeaveRoom( Cmd_Argc() >= 2 ? Cmd_Argv( 1 ) : NULL );
+}
+
+static void SV_OscarIM_f( void )
+{
+	const char *message;
+
+	if ( Cmd_Argc() < 3 ) {
+		Com_Printf( "Usage: oscar_im <screenName> <message>\n" );
+		return;
+	}
+	message = Cmd_ArgsFrom( 2 );
+	OSCAR_SendIM( Cmd_Argv( 1 ), message );
+}
+
+static void SV_OscarPresence_f( void )
+{
+	const char *message;
+
+	if ( Cmd_Argc() < 2 ) {
+		Com_Printf( "Usage: oscar_presence <status> [message]\n" );
+		return;
+	}
+	message = Cmd_Argc() >= 3 ? Cmd_ArgsFrom( 2 ) : "";
+	OSCAR_SetPresence( Cmd_Argv( 1 ), message );
 }
 static void SV_P2PStatus_f( void ) {
 	char address[MAX_STRING_CHARS];
