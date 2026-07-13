@@ -349,6 +349,7 @@ static void vk_create_deferred_gbuffer_scaffold( void )
 		VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
 
 	vk.deferredGbufferAllocated = qfalse;
+	vk.deferredGbufferDirectExport = qfalse;
 	vk.deferred_gbuffer_albedo = VK_NULL_HANDLE;
 	vk.deferred_gbuffer_albedo_view = VK_NULL_HANDLE;
 	vk.deferred_gbuffer_normal = VK_NULL_HANDLE;
@@ -379,8 +380,10 @@ static void vk_create_deferred_gbuffer_scaffold( void )
 		&vk.deferred_lighting_image, &vk.deferred_lighting_view,
 		VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, qfalse );
 	vk.deferredGbufferAllocated = qtrue;
+	vk.deferredGbufferDirectExport = vk.msaaActive ? qfalse : qtrue;
 	ri.Printf( PRINT_ALL,
-		"[VK][deferred] G-buffer scaffold: albedo (scene color format) + normal RGBA16F + material RGBA16F + motion sidecar + lighting RGBA16F\n" );
+		"[VK][deferred] G-buffer scaffold: albedo (scene color format) + normal RGBA16F + material RGBA16F + motion sidecar + lighting RGBA16F%s\n",
+		vk.deferredGbufferDirectExport ? " (direct material export)" : " (depth fallback export)" );
 }
 
 static void vk_create_fullres_msaa_color_attachment(
@@ -2026,6 +2029,7 @@ void vk_destroy_attachments( void )
 		vk.deferred_lighting_view = VK_NULL_HANDLE;
 	}
 	vk.deferredGbufferAllocated = qfalse;
+	vk.deferredGbufferDirectExport = qfalse;
 
 	if ( vk.msaa_image ) {
 		qvkDestroyImage( vk.device, vk.msaa_image, NULL );

@@ -42,6 +42,7 @@ make test-sector-stream
 
 - **Unit** (`BUILD_UNIT_TESTS=ON`): `unit_macros`, `unit_qmath`, … — `ctest -R '^unit_'`
 - **Script regression**: `test_botlib_bounded_strings`, renderer guards, temporal (`test_temporal_motion_policy`), vector font mode 2, fixture-backed decode/runtime checks like `test_nanovdb_decode`, etc.
+- **Minimal-content runtime smokes**: `test_physics` and `test_app_crdt` call `tests/scripts/idtech3_minimal_content_smoke.sh` when `idtech3_server` is built. These load `docs/renderer_validation/devdata/rtest_base` with the tiny BSP/VM pack and exercise real dedicated-server commands; set `IDTECH3_SKIP_RUNTIME_SMOKE=1` for source-only script runs.
 - **GPU golden (Tier A)**: `gpu_golden_compare` — `./scripts/gpu_golden_capture.sh --compare`
 - **i18n / assets / crash hooks**: `test_check_loc`, `test_validate_assets`, `test_asset_pipeline`, `test_game_starter_template`, `test_sqlite_service`, `test_crash_report`
 - **Validation**: `smoke_test`, `renderer_regression_check`, `check_artifacts`, **`test_cpp20_sources`** (C→C++20 world layer revert guard), … — see `docs/RENDERER_CONFIDENCE.md`

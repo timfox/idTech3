@@ -58,6 +58,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "vk_vdb.h"
 #include "vk_postfx.h"
 #include "vk_flashlight.h"
+#include "vk_util.h"
 #include "vk_sim_render_profile.h"
 #include "vk_sim_render_debug.h"
 #include "vk_skybox_hdr.h"
@@ -1905,6 +1906,176 @@ static void VulkanInfo_f( void )
 	ri.Printf( PRINT_ALL, "==============================\n" );
 }
 
+static int R_CvarInteger( const cvar_t *cv )
+{
+	return cv ? cv->integer : 0;
+}
+
+static float R_CvarValue( const cvar_t *cv )
+{
+	return cv ? cv->value : 0.0f;
+}
+
+static const char *R_YesNo( qboolean value )
+{
+	return value ? "yes" : "no";
+}
+
+static qboolean R_RtxAvailable( void )
+{
+#ifdef USE_VULKAN_RTX
+	return vk.rtxAvailable;
+#else
+	return qfalse;
+#endif
+}
+
+static const char *R_RendererProfileName( void )
+{
+	if ( r_hybrid1 && r_hybrid1->integer ) {
+		return "hybrid1 overlay";
+	}
+	if ( r_rtx && r_rtx->integer > 0 ) {
+		return "rtx overlay";
+	}
+	if ( r_renderMode && r_renderMode->integer == 1 && r_deferredLighting && r_deferredLighting->integer ) {
+		return "deferred overlay";
+	}
+	if ( r_renderMode && r_renderMode->integer == 2 && r_forwardPlus && r_forwardPlus->integer ) {
+		return "modern vulkan";
+	}
+	if ( r_renderMode && r_renderMode->integer == 0 ) {
+		return "classic/forward";
+	}
+	return "custom";
+}
+
+static int R_RendererPrintCompatibilityWarnings( qboolean printOk )
+{
+	int warnings = 0;
+#define R_RENDERER_WARN(...) do { \
+		ri.Printf( PRINT_WARNING, S_COLOR_YELLOW "[renderer][compat] " __VA_ARGS__ ); \
+		ri.Printf( PRINT_WARNING, S_COLOR_WHITE ); \
+		warnings++; \
+	} while ( 0 )
+
+	if ( r_deferredGBuffer && r_deferredGBuffer->integer && ( !r_fbo || !r_fbo->integer ) ) {
+		R_RENDERER_WARN( "r_deferredGBuffer 1 requires r_fbo 1; G-buffer allocation will be disabled until vid_restart.\n" );
+	}
+	if ( r_deferredGBuffer && r_deferredGBuffer->integer && r_renderMode && r_renderMode->integer == 0 ) {
+		R_RENDERER_WARN( "r_deferredGBuffer 1 is ignored in r_renderMode 0; use r_renderMode 1/2 and vid_restart.\n" );
+	}
+	if ( r_deferredGBufferFill && r_deferredGBufferFill->integer && ( !r_deferredGBuffer || !r_deferredGBuffer->integer ) ) {
+		R_RENDERER_WARN( "r_deferredGBufferFill 1 needs r_deferredGBuffer 1 to create deferred targets.\n" );
+	}
+	if ( r_deferredLighting && r_deferredLighting->integer && ( !r_renderMode || r_renderMode->integer != 1 ) ) {
+		R_RENDERER_WARN( "r_deferredLighting 1 only runs in r_renderMode 1; current mode is %d.\n", R_CvarInteger( r_renderMode ) );
+	}
+	if ( r_renderMode && r_renderMode->integer == 1 ) {
+		if ( !r_forwardPlus || !r_forwardPlus->integer ) {
+			R_RENDERER_WARN( "deferred lighting mode needs r_forwardPlus 1 for tile light lists.\n" );
+		}
+		if ( r_deferredLighting && r_deferredLighting->integer &&
+			( !r_deferredGBuffer || !r_deferredGBuffer->integer || !r_deferredGBufferFill || !r_deferredGBufferFill->integer ) ) {
+			R_RENDERER_WARN( "deferred lighting needs r_deferredGBuffer 1 and r_deferredGBufferFill 1.\n" );
+		}
+	}
+	if ( r_renderMode && r_renderMode->integer == 2 ) {
+		if ( !r_forwardPlus || !r_forwardPlus->integer ) {
+			R_RENDERER_WARN( "modern profile expects r_forwardPlus 1; current mode will fall back to non-Forward+ behavior.\n" );
+		}
+		if ( !r_forwardPlusShade || r_forwardPlusShade->value <= 0.0f ) {
+			R_RENDERER_WARN( "modern profile expects r_forwardPlusShade > 0 for Forward+ primary dynamic lighting.\n" );
+		}
+		if ( !r_pbr || !r_pbr->integer ) {
+			R_RENDERER_WARN( "modern profile expects r_pbr 1 for physically based material shading.\n" );
+		}
+		if ( !r_hdr || r_hdr->integer <= 0 ) {
+			R_RENDERER_WARN( "modern profile expects HDR enabled (r_hdr 1/2/3).\n" );
+		}
+		if ( !r_taa || !r_taa->integer ) {
+			R_RENDERER_WARN( "modern profile expects r_taa 1 for temporal resolve.\n" );
+		}
+		if ( !r_taaMotionVectors || !r_taaMotionVectors->integer ) {
+			R_RENDERER_WARN( "modern profile expects r_taaMotionVectors 1 for material-pass motion vectors.\n" );
+		}
+		if ( !r_deferredGBuffer || !r_deferredGBuffer->integer || !r_deferredGBufferFill || !r_deferredGBufferFill->integer ) {
+			R_RENDERER_WARN( "modern profile expects r_deferredGBuffer 1 and r_deferredGBufferFill 1 for the sidecar G-buffer.\n" );
+		}
+	}
+	if ( vk.deferredGbufferAllocated && !vk.deferredGbufferDirectExport && vk.msaaActive ) {
+		R_RENDERER_WARN( "MSAA is active; deferred material export is using the depth-derived fallback instead of direct PBR MRT export.\n" );
+	}
+	if ( r_rtx && r_rtx->integer > 0 && !R_RtxAvailable() ) {
+		R_RENDERER_WARN( "r_rtx %d requested, but Vulkan ray tracing is not available in this build/device session.\n", r_rtx->integer );
+	}
+	if ( r_hybrid1 && r_hybrid1->integer && !R_RtxAvailable() ) {
+		R_RENDERER_WARN( "r_hybrid1 1 requested, but Vulkan ray tracing is not available in this build/device session.\n" );
+	}
+	if ( r_hybrid1 && r_hybrid1->integer && ( !r_rtxDemo || !r_rtxDemo->integer ) ) {
+		R_RENDERER_WARN( "r_hybrid1 1 requires r_rtxDemo 1 for the shared TLAS path.\n" );
+	}
+
+	if ( warnings == 0 && printOk ) {
+		ri.Printf( PRINT_ALL, "[renderer][compat] no compatibility warnings for active profile '%s'.\n", R_RendererProfileName() );
+	}
+
+#undef R_RENDERER_WARN
+	return warnings;
+}
+
+static void R_RendererProfile_f( void )
+{
+	ri.Printf( PRINT_ALL, "======== Renderer Profile ========\n" );
+	ri.Printf( PRINT_ALL, "active    : %s\n", R_RendererProfileName() );
+	ri.Printf( PRINT_ALL, "mode      : %d (0=forward, 1=deferred, 2=modern Forward+)\n", R_CvarInteger( r_renderMode ) );
+	ri.Printf( PRINT_ALL, "base      : exec modern_vulkan.cfg\n" );
+	ri.Printf( PRINT_ALL, "overlays  : exec vulkan_overlay_deferred.cfg | vulkan_overlay_rtx.cfg | vulkan_overlay_hybrid1.cfg\n" );
+	ri.Printf( PRINT_ALL, "classic   : exec classic_baseq3.cfg or classic_openarena_native.cfg\n" );
+	ri.Printf( PRINT_ALL, "warnings  : %d\n", R_RendererPrintCompatibilityWarnings( qfalse ) );
+	ri.Printf( PRINT_ALL, "==================================\n" );
+}
+
+static void R_RendererStatus_f( void )
+{
+	ri.Printf( PRINT_ALL, "======== Renderer Status ========\n" );
+	ri.Printf( PRINT_ALL, "profile   : %s\n", R_RendererProfileName() );
+	ri.Printf( PRINT_ALL, "backend   : Vulkan (%s)\n", glConfig.renderer_string );
+	ri.Printf( PRINT_ALL, "resolution: %dx%d renderTarget=%ux%u\n",
+		glConfig.vidWidth, glConfig.vidHeight, vk.renderWidth, vk.renderHeight );
+	ri.Printf( PRINT_ALL, "fbo/hdr   : r_fbo=%d active=%s r_hdr=%d colorFormat=%s\n",
+		R_CvarInteger( r_fbo ), R_YesNo( vk.fboActive ), R_CvarInteger( r_hdr ), vk_format_string( vk.color_format ) );
+	ri.Printf( PRINT_ALL, "pbr       : r_pbr=%d materialBlend=%d\n",
+		R_CvarInteger( r_pbr ), R_CvarInteger( r_materialBlend ) );
+	ri.Printf( PRINT_ALL, "mode      : r_renderMode=%d deferredLighting=%d deferredUnlitBase=%d\n",
+		R_CvarInteger( r_renderMode ), R_CvarInteger( r_deferredLighting ), R_CvarInteger( r_deferredUnlitBase ) );
+	ri.Printf( PRINT_ALL, "forward+  : enabled=%d shade=%.2f maxPerTile=%d lumSort=%d distSort=%d depthCull=%d\n",
+		R_CvarInteger( r_forwardPlus ), R_CvarValue( r_forwardPlusShade ), R_CvarInteger( r_forwardPlusMaxPerTile ),
+		R_CvarInteger( r_forwardPlusLuminanceSort ), R_CvarInteger( r_forwardPlusDistanceSort ), R_CvarInteger( r_forwardPlusDepthCull ) );
+	ri.Printf( PRINT_ALL, "gbuffer   : cvar=%d fill=%d allocated=%s directExport=%s debug=%d\n",
+		R_CvarInteger( r_deferredGBuffer ), R_CvarInteger( r_deferredGBufferFill ),
+		R_YesNo( vk.deferredGbufferAllocated ), R_YesNo( vk.deferredGbufferDirectExport ), R_CvarInteger( r_deferredGBufferDebug ) );
+	ri.Printf( PRINT_ALL, "temporal  : taa=%d motionVectors=%d temporalFrame=%u unreliableMotion=%s\n",
+		R_CvarInteger( r_taa ), R_CvarInteger( r_taaMotionVectors ), vk.temporal.frameIndex,
+		R_YesNo( vk.temporal.unreliableMotionThisFrame ) );
+	ri.Printf( PRINT_ALL, "post-aa   : smaa=%d active=%s fxaa=%d active=%s postAaAfterBloom=%d\n",
+		R_CvarInteger( r_ext_smaa ), R_YesNo( vk.smaaActive ), R_CvarInteger( r_ext_fxaa ),
+		R_YesNo( vk.fxaaActive ), R_CvarInteger( r_postAaAfterBloom ) );
+	ri.Printf( PRINT_ALL, "rtx       : available=%s r_rtx=%d r_rtxDemo=%d hybrid1=%d entities=%d tlasUpdate=%d\n",
+		R_YesNo( R_RtxAvailable() ), R_CvarInteger( r_rtx ), R_CvarInteger( r_rtxDemo ),
+		R_CvarInteger( r_hybrid1 ), R_CvarInteger( r_rtxEntities ), R_CvarInteger( r_rtxTlasUpdate ) );
+	ri.Printf( PRINT_ALL, "warnings  : %d\n", R_RendererPrintCompatibilityWarnings( qfalse ) );
+	ri.Printf( PRINT_ALL, "=================================\n" );
+}
+
+static void R_RendererCompatibility_f( void )
+{
+	ri.Printf( PRINT_ALL, "======== Renderer Compatibility ========\n" );
+	ri.Printf( PRINT_ALL, "profile: %s\n", R_RendererProfileName() );
+	ri.Printf( PRINT_ALL, "warnings: %d\n", R_RendererPrintCompatibilityWarnings( qtrue ) );
+	ri.Printf( PRINT_ALL, "========================================\n" );
+}
+
 /*
 ===============
 R_VolumetricAccurate_f
@@ -2408,6 +2579,9 @@ static void R_Register( void )
 #ifdef USE_VULKAN
 	ri.Cmd_AddCommand( "vkinfo", VkInfo_f );
 	ri.Cmd_AddCommand( "vulkaninfo", VulkanInfo_f );
+	ri.Cmd_AddCommand( "renderer_status", R_RendererStatus_f );
+	ri.Cmd_AddCommand( "renderer_profile", R_RendererProfile_f );
+	ri.Cmd_AddCommand( "renderer_compat", R_RendererCompatibility_f );
 	ri.Cmd_AddCommand( "vkVolumetricValidate", VkVolumetricValidate_f );
 	ri.Cmd_AddCommand( "r_quality", R_Quality_f );
 	ri.Cmd_AddCommand( "sim_render_profile", R_SimRenderProfile_f );
@@ -3825,7 +3999,7 @@ static void R_Register( void )
 	r_deferredGBuffer = ri.Cvar_Get( "r_deferredGBuffer", "0", CVAR_ARCHIVE_ND | CVAR_LATCH );
 	ri.Cvar_CheckRange( r_deferredGBuffer, "0", "1", CV_INTEGER );
 	ri.Cvar_SetDescription( r_deferredGBuffer,
-		"With r_renderMode 1/2: allocate full-res G-buffer images (albedo=color format, normal RGBA16F, material R16G16, lighting RGBA16F). "
+		"With r_renderMode 1/2: allocate full-res G-buffer images (albedo=color format, normal RGBA16F, material RGBA16F, lighting RGBA16F). "
 		"Mode 2 uses this as a sidecar for temporal/advanced consumers; set r_deferredLighting 1 in mode 1 for experimental diffuse. Requires r_fbo 1 and vid_restart." );
 	ri.Cvar_SetGroup( r_deferredGBuffer, CVG_RENDERER );
 	if ( r_deferredGBuffer && r_deferredGBuffer->integer ) {
@@ -3835,7 +4009,7 @@ static void R_Register( void )
 	ri.Cvar_CheckRange( r_deferredGBufferFill, "0", "1", CV_INTEGER );
 	ri.Cvar_SetDescription( r_deferredGBufferFill,
 		"With r_renderMode 1/2 and r_deferredGBuffer 1: after main geometry, copy scene color to G-buffer albedo "
-		"and fill normal/material from depth (compute). Forward+/forward lighting unchanged unless r_deferredLighting 1 in mode 1." );
+		"and export normal/material from opaque PBR shaders when possible; MSAA/legacy paths fill normal/material from depth (compute). Forward+/forward lighting unchanged unless r_deferredLighting 1 in mode 1." );
 	ri.Cvar_SetGroup( r_deferredGBufferFill, CVG_RENDERER );
 	if ( r_deferredGBufferFill && r_deferredGBufferFill->integer ) {
 		ri.Printf( PRINT_ALL, "[VK][deferred] r_deferredGBufferFill=1 (capture after geometry each frame)\n" );
@@ -4433,6 +4607,7 @@ static void R_Register( void )
 	if ( r_temporalCpuSkinPrev && !r_temporalCpuSkinPrev->integer ) {
 		ri.Printf( PRINT_ALL, "[VK][temporal] r_temporalCpuSkinPrev=0 (conservative whole-frame motion invalidation on spawning animated entities)\n" );
 	}
+	R_RendererPrintCompatibilityWarnings( qfalse );
 	#endif // USE_VULKAN
 
 	// Register modular subsystem cvars
@@ -4626,6 +4801,9 @@ static void RE_Shutdown( refShutdownCode_t code ) {
 #ifdef USE_VULKAN
 	ri.Cmd_RemoveCommand( "vkinfo" );
 	ri.Cmd_RemoveCommand( "vulkaninfo" );
+	ri.Cmd_RemoveCommand( "renderer_status" );
+	ri.Cmd_RemoveCommand( "renderer_profile" );
+	ri.Cmd_RemoveCommand( "renderer_compat" );
 	ri.Cmd_RemoveCommand( "vkVolumetricValidate" );
 	ri.Cmd_RemoveCommand( "r_aaQuality" );
 #endif

@@ -85,7 +85,7 @@ VkPipeline vk_create_pipeline( const Vk_Pipeline_Def *def, renderPass_t renderPa
 	VkPipelineDepthStencilStateCreateInfo depth_stencil_state;
 	VkPipelineColorBlendStateCreateInfo blend_state;
 	VkPipelineColorBlendAttachmentState attachment_blend_state;
-	VkPipelineColorBlendAttachmentState attachment_blend_states[2];
+	VkPipelineColorBlendAttachmentState attachment_blend_states[4];
 	VkPipelineDynamicStateCreateInfo dynamic_state;
 	VkDynamicState dynamic_state_array[3] = { VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR };
 	uint32_t main_dynamic_state_count = 2;
@@ -97,6 +97,7 @@ VkPipeline vk_create_pipeline( const Vk_Pipeline_Def *def, renderPass_t renderPa
 	VkPipelineShaderStageCreateInfo shader_stages[2];
 	VkBool32 alphaToCoverage = VK_FALSE;
 	VkBool32 main_motion_target = VK_FALSE;
+	VkBool32 main_deferred_export_target = VK_FALSE;
 	unsigned int atest_bits;
 	unsigned int state_bits = def->state_bits;
 
@@ -527,6 +528,95 @@ VkPipeline vk_create_pipeline( const Vk_Pipeline_Def *def, renderPass_t renderPa
 				break;
 		}
 	}
+
+	main_deferred_export_target = ( vk.deferredGbufferDirectExport &&
+		( renderPassIndex == RENDER_PASS_MAIN || renderPassIndex == RENDER_PASS_POST_BLOOM ) ) ? VK_TRUE : VK_FALSE;
+
+#ifdef USE_VK_PBR
+	if ( main_deferred_export_target && use_pbr && !vk_hdr64_active() ) {
+		const int fog = def->fog_stage ? 1 : 0;
+		switch ( def->shader_type ) {
+			case TYPE_SIGNLE_TEXTURE_ENT_COLOR:
+			case TYPE_SIGNLE_TEXTURE_ENT_COLOR_ENV:
+				fs_module = &vk.modules.frag.gbuf_ent[0][fog];
+				break;
+			case TYPE_SIGNLE_TEXTURE_IDENTITY:
+			case TYPE_SIGNLE_TEXTURE_IDENTITY_ENV:
+				fs_module = &vk.modules.frag.gbuf_ident1[0][fog];
+				break;
+			case TYPE_MULTI_TEXTURE_ADD2_IDENTITY:
+			case TYPE_MULTI_TEXTURE_MUL2_IDENTITY:
+			case TYPE_MULTI_TEXTURE_ADD2_IDENTITY_ENV:
+			case TYPE_MULTI_TEXTURE_MUL2_IDENTITY_ENV:
+				fs_module = &vk.modules.frag.gbuf_ident1[1][fog];
+				break;
+			case TYPE_SIGNLE_TEXTURE_FIXED_COLOR:
+			case TYPE_SIGNLE_TEXTURE_FIXED_COLOR_ENV:
+				fs_module = &vk.modules.frag.gbuf_fixed[0][fog];
+				break;
+			case TYPE_MULTI_TEXTURE_ADD2_FIXED_COLOR:
+			case TYPE_MULTI_TEXTURE_MUL2_FIXED_COLOR:
+			case TYPE_MULTI_TEXTURE_ADD2_FIXED_COLOR_ENV:
+			case TYPE_MULTI_TEXTURE_MUL2_FIXED_COLOR_ENV:
+				fs_module = &vk.modules.frag.gbuf_fixed[1][fog];
+				break;
+			case TYPE_SIGNLE_TEXTURE:
+			case TYPE_SIGNLE_TEXTURE_ENV:
+				fs_module = &vk.modules.frag.gbuf_gen[0][0][fog];
+				break;
+			case TYPE_MULTI_TEXTURE_MUL2:
+			case TYPE_MULTI_TEXTURE_ADD2_1_1:
+			case TYPE_MULTI_TEXTURE_ADD2:
+			case TYPE_MULTI_TEXTURE_MUL2_ENV:
+			case TYPE_MULTI_TEXTURE_ADD2_1_1_ENV:
+			case TYPE_MULTI_TEXTURE_ADD2_ENV:
+				fs_module = &vk.modules.frag.gbuf_gen[1][0][fog];
+				break;
+			case TYPE_BLEND2_ADD:
+			case TYPE_BLEND2_MUL:
+			case TYPE_BLEND2_ALPHA:
+			case TYPE_BLEND2_ONE_MINUS_ALPHA:
+			case TYPE_BLEND2_MIX_ALPHA:
+			case TYPE_BLEND2_MIX_ONE_MINUS_ALPHA:
+			case TYPE_BLEND2_DST_COLOR_SRC_ALPHA:
+			case TYPE_BLEND2_ADD_ENV:
+			case TYPE_BLEND2_MUL_ENV:
+			case TYPE_BLEND2_ALPHA_ENV:
+			case TYPE_BLEND2_ONE_MINUS_ALPHA_ENV:
+			case TYPE_BLEND2_MIX_ALPHA_ENV:
+			case TYPE_BLEND2_MIX_ONE_MINUS_ALPHA_ENV:
+			case TYPE_BLEND2_DST_COLOR_SRC_ALPHA_ENV:
+				fs_module = &vk.modules.frag.gbuf_gen[1][1][fog];
+				break;
+			case TYPE_MULTI_TEXTURE_MUL3:
+			case TYPE_MULTI_TEXTURE_ADD3_1_1:
+			case TYPE_MULTI_TEXTURE_ADD3:
+			case TYPE_MULTI_TEXTURE_MUL3_ENV:
+			case TYPE_MULTI_TEXTURE_ADD3_1_1_ENV:
+			case TYPE_MULTI_TEXTURE_ADD3_ENV:
+				fs_module = &vk.modules.frag.gbuf_gen[2][0][fog];
+				break;
+			case TYPE_BLEND3_ADD:
+			case TYPE_BLEND3_MUL:
+			case TYPE_BLEND3_ALPHA:
+			case TYPE_BLEND3_ONE_MINUS_ALPHA:
+			case TYPE_BLEND3_MIX_ALPHA:
+			case TYPE_BLEND3_MIX_ONE_MINUS_ALPHA:
+			case TYPE_BLEND3_DST_COLOR_SRC_ALPHA:
+			case TYPE_BLEND3_ADD_ENV:
+			case TYPE_BLEND3_MUL_ENV:
+			case TYPE_BLEND3_ALPHA_ENV:
+			case TYPE_BLEND3_ONE_MINUS_ALPHA_ENV:
+			case TYPE_BLEND3_MIX_ALPHA_ENV:
+			case TYPE_BLEND3_MIX_ONE_MINUS_ALPHA_ENV:
+			case TYPE_BLEND3_DST_COLOR_SRC_ALPHA_ENV:
+				fs_module = &vk.modules.frag.gbuf_gen[2][1][fog];
+				break;
+			default:
+				break;
+		}
+	}
+#endif
 
 	vk_set_shader_stage_desc(shader_stages+0, VK_SHADER_STAGE_VERTEX_BIT, *vs_module, "main");
 	vk_set_shader_stage_desc(shader_stages+1, VK_SHADER_STAGE_FRAGMENT_BIT, *fs_module, "main");
@@ -1438,6 +1528,12 @@ VkPipeline vk_create_pipeline( const Vk_Pipeline_Def *def, renderPass_t renderPa
 	Com_Memset( &attachment_blend_states[1], 0, sizeof( attachment_blend_states[1] ) );
 	attachment_blend_states[1].blendEnable = VK_FALSE;
 	attachment_blend_states[1].colorWriteMask = 0;
+	Com_Memset( &attachment_blend_states[2], 0, sizeof( attachment_blend_states[2] ) );
+	attachment_blend_states[2].blendEnable = VK_FALSE;
+	attachment_blend_states[2].colorWriteMask = 0;
+	Com_Memset( &attachment_blend_states[3], 0, sizeof( attachment_blend_states[3] ) );
+	attachment_blend_states[3].blendEnable = VK_FALSE;
+	attachment_blend_states[3].colorWriteMask = 0;
 	if ( main_motion_target &&
 		def->shader_type != TYPE_DOT &&
 		def->shader_type != TYPE_SIGNLE_TEXTURE_DF &&
@@ -1449,6 +1545,20 @@ VkPipeline vk_create_pipeline( const Vk_Pipeline_Def *def, renderPass_t renderPa
 		depth_stencil_state.depthWriteEnable == VK_TRUE )
 	{
 		attachment_blend_states[1].colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT;
+	}
+	if ( main_deferred_export_target &&
+#ifdef USE_VK_PBR
+		use_pbr &&
+#endif
+		attachment_blend_state.blendEnable == VK_FALSE &&
+		def->shadow_phase == SHADOW_DISABLED &&
+		depth_stencil_state.depthTestEnable == VK_TRUE &&
+		depth_stencil_state.depthWriteEnable == VK_TRUE )
+	{
+		attachment_blend_states[2].colorWriteMask =
+			VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
+		attachment_blend_states[3].colorWriteMask =
+			VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
 	}
 
 	if ( r_vk_pipeline_debug && r_vk_pipeline_debug->integer ) {
@@ -1477,7 +1587,7 @@ VkPipeline vk_create_pipeline( const Vk_Pipeline_Def *def, renderPass_t renderPa
 	blend_state.flags = 0;
 	blend_state.logicOpEnable = VK_FALSE;
 	blend_state.logicOp = VK_LOGIC_OP_COPY;
-	blend_state.attachmentCount = main_motion_target ? 2 : 1;
+	blend_state.attachmentCount = main_deferred_export_target ? 4 : ( main_motion_target ? 2 : 1 );
 	blend_state.pAttachments = attachment_blend_states;
 	blend_state.blendConstants[0] = 0.0f;
 	blend_state.blendConstants[1] = 0.0f;

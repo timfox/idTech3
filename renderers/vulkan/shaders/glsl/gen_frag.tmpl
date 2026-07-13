@@ -102,6 +102,10 @@ layout(depth_less) out float gl_FragDepth;
 #else
 layout(location = 0) out vec4 out_color;
 layout(location = 1) out vec2 out_motion;
+#ifdef USE_DEFERRED_EXPORT
+layout(location = 2) out vec4 out_deferred_normal;
+layout(location = 3) out vec4 out_deferred_material;
+#endif
 #endif
 
 #ifdef USE_ATEST
@@ -1356,6 +1360,11 @@ void main() {
 	}
 	roughness = ApplySpecularAA( roughness, N );
 	roughness = clamp( roughness, 0.02, 1.0 );
+
+#ifdef USE_DEFERRED_EXPORT
+	out_deferred_normal = vec4( normalize( N ), 1.0 );
+	out_deferred_material = vec4( metalness, roughness, AO, 1.0 );
+#endif
 
 	if ( emissive_texture_set >= 0 ) {
 		emissive = texture( emissive_texture, pbrSurfUV ).rgb * pbrEmissiveScale.rgb;

@@ -23,6 +23,10 @@ COMP="$(idtech3_file renderers/vulkan/shaders/glsl/deferred_lighting_composite.f
 GBUF_FILL="$(idtech3_file renderers/vulkan/shaders/glsl/deferred_gbuffer_fill.comp src/renderers/vulkan/shaders/glsl/deferred_gbuffer_fill.comp)"
 GBUF_DEBUG="$(idtech3_file renderers/vulkan/shaders/glsl/deferred_gbuffer_debug.frag src/renderers/vulkan/shaders/glsl/deferred_gbuffer_debug.frag)"
 ATTACH="$(idtech3_file renderers/vulkan/vk_attachments.c src/renderers/vulkan/vk_attachments.c)"
+PIPE="$(idtech3_file renderers/vulkan/vk_create_pipeline.c src/renderers/vulkan/vk_create_pipeline.c)"
+RPASS="$(idtech3_file renderers/vulkan/vk_render_pass.c src/renderers/vulkan/vk_render_pass.c)"
+FBO="$(idtech3_file renderers/vulkan/vk_framebuffers.c src/renderers/vulkan/vk_framebuffers.c)"
+GEN_FRAG="$(idtech3_file renderers/vulkan/shaders/glsl/gen_frag.tmpl src/renderers/vulkan/shaders/glsl/gen_frag.tmpl)"
 TR_INIT="$(idtech3_file renderers/vulkan/tr_init.c src/renderers/vulkan/tr_init.c)"
 TR_BACKEND="$(idtech3_file renderers/vulkan/tr_backend.c src/renderers/vulkan/tr_backend.c)"
 DEFERRED_CFG="$ROOT/config/deferred_vulkan.cfg"
@@ -42,9 +46,21 @@ check "$DGB" 'r_renderMode->integer == 1 || r_renderMode->integer == 2' 'G-buffe
 check "$DGB" 'r_renderMode->integer == 1 && r_forwardPlus' 'deferred lighting remains mode 1 only'
 check "$DGB" 'normal confidence' 'deferred debug logs normal confidence mode'
 check "$DGB" 'vk.motion_vector_view' 'deferred debug can inspect real motion sidecar'
+check "$DGB" 'direct material/motion export' 'direct export path preserves material shader output'
 check "$DGB" 'vk_end_render_pass' 'G-buffer capture leaves render pass before compute'
 check "$DGB" 'vk_resume_current_render_pass' 'G-buffer capture resumes main render pass'
 check "$ATTACH" 'material RGBA16F' 'deferred scaffold allocates expanded material export target'
+check "$ATTACH" 'deferredGbufferDirectExport' 'deferred scaffold selects direct export when safe'
+check "$RPASS" 'colorRefs\[2\].attachment = 3' 'main render pass attaches direct normal target'
+check "$RPASS" 'colorRefs\[3\].attachment = 4' 'main render pass attaches direct material target'
+check "$FBO" 'deferred_gbuffer_normal_view' 'main framebuffer binds direct normal target'
+check "$FBO" 'deferred_gbuffer_material_view' 'main framebuffer binds direct material target'
+check "$PIPE" 'gbuf_gen' 'pipeline selects PBR G-buffer export variants'
+check "$PIPE" 'attachment_blend_states\[2\].colorWriteMask' 'pipeline enables direct normal writes'
+check "$PIPE" 'attachment_blend_states\[3\].colorWriteMask' 'pipeline enables direct material writes'
+check "$GEN_FRAG" 'out_deferred_normal' 'PBR shader exports deferred normal'
+check "$GEN_FRAG" 'out_deferred_material' 'PBR shader exports deferred material'
+check "$ROOT/scripts/compile_shaders.sh" 'USE_DEFERRED_EXPORT' 'shader compiler builds deferred export variants'
 check "$GBUF_FILL" 'layout(rgba16f, set = 0, binding = 2)' 'G-buffer material storage uses RGBA16F'
 check "$GBUF_FILL" 'sourceConfidence' 'G-buffer material stores source confidence channel'
 check "$GBUF_FILL" 'confidence' 'G-buffer normal pass stores reconstruction confidence'

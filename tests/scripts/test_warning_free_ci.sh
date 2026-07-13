@@ -14,7 +14,12 @@ grep -q 'target_compile_options(${target_name} PRIVATE /WX)' CMakeLists.txt || f
 grep -q 'idtech3_first_party_warnings_as_errors(qcommon)' CMakeLists.txt || fail "qcommon must be Werror-gated"
 grep -q 'idtech3_first_party_warnings_as_errors(qcommon_ded)' CMakeLists.txt || fail "qcommon_ded must be Werror-gated"
 grep -q 'idtech3_first_party_warnings_as_errors(botlib)' CMakeLists.txt || fail "botlib must be Werror-gated"
+grep -q 'idtech3_first_party_warnings_as_errors(client)' CMakeLists.txt || fail "client must be Werror-gated"
+grep -q 'idtech3_first_party_warnings_as_errors(q3ui)' CMakeLists.txt || fail "q3ui must be Werror-gated"
 grep -q 'idtech3_first_party_warnings_as_errors(phys_module)' CMakeLists.txt || fail "phys_module must be Werror-gated"
+grep -q 'idtech3_first_party_warnings_as_errors(${RENDERER_PREFIX}_vulkan' CMakeLists.txt || fail "Vulkan renderer must be Werror-gated"
+grep -q 'idtech3_first_party_warnings_as_errors(${CNAME}${BINEXT})' CMakeLists.txt || fail "client executable must be Werror-gated"
+grep -q 'idtech3_first_party_warnings_as_errors(${DNAME}${BINEXT})' CMakeLists.txt || fail "dedicated server executable must be Werror-gated"
 grep -q 'scripts/check_first_party_warnings.sh' .github/workflows/build.yml || fail "workflow must run warning scanner"
 grep -q 'tee build-vk-${{ matrix.btype }}.log' .github/workflows/build.yml || fail "workflow must capture build log"
 

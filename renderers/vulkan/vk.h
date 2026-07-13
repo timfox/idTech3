@@ -808,6 +808,7 @@ typedef struct {
 	VkImage deferred_lighting_image;
 	VkImageView deferred_lighting_view;
 	qboolean deferredGbufferAllocated;
+	qboolean deferredGbufferDirectExport;
 
 	/* Neural Irradiance Volume (r_niv); see vk_niv.c */
 	struct {
@@ -1407,9 +1408,13 @@ typedef struct {
 			VkShaderModule flowmap[2];      // fog[0,1] - water flowmap
 #ifdef USE_VK_PBR
 			VkShaderModule gen[2][3][2][2]; // pbr[0,1], tx[0,1,2] cl[0,1] fog[0,1]
+			VkShaderModule gbuf_gen[3][2][2]; // tx[0,1,2] cl[0,1] fog[0,1], PBR deferred export
 			VkShaderModule ident1[2][2][2]; // pbr[0,1], tx[0,1], fog[0,1]
+			VkShaderModule gbuf_ident1[2][2]; // tx[0,1], fog[0,1], PBR deferred export
 			VkShaderModule fixed[2][2][2];  // pbr[0,1], tx[0,1], fog[0,1]
+			VkShaderModule gbuf_fixed[2][2]; // tx[0,1], fog[0,1], PBR deferred export
 			VkShaderModule ent[2][1][2];    // pbr[0,1], tx[0], fog[0,1]
+			VkShaderModule gbuf_ent[1][2];   // tx[0], fog[0,1], PBR deferred export
 #else
 			VkShaderModule gen[3][2][2]; // tx[0,1,2] cl[0,1] fog[0,1]
 			VkShaderModule ident1[2][2]; // tx[0,1], fog[0,1]

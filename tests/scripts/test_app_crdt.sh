@@ -23,6 +23,13 @@ grep -q 'AppCrdt_RefreshBackendRoot' "$APP_CRDT"
 grep -q 'third_party/idtech3backend' "$ROOT/cmake/IdTech3Backend.cmake"
 grep -q 'Engine.AppCrdt' "$SV_CRDT"
 grep -q 'LuaDebug_SetScriptFallbackRoot' "$LUA_DBG"
+
+grep -q 'idtech3_minimal_app_crdt_smoke' "$ROOT/tests/scripts/idtech3_minimal_content_smoke.sh"
+if [[ "${IDTECH3_SKIP_RUNTIME_SMOKE:-0}" != "1" ]]; then
+	echo "[test_app_crdt] minimal content runtime smoke..."
+	"$ROOT/tests/scripts/idtech3_minimal_content_smoke.sh" app_crdt
+fi
+
 BACKEND_ROOT="$ROOT/third_party/idtech3backend"
 [ -d "$BACKEND_ROOT" ] || BACKEND_ROOT="$ROOT/src/external/idtech3backend"
 if [ ! -f "$BACKEND_ROOT/app_crdt/manifest.json" ]; then

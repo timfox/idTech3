@@ -196,6 +196,10 @@ def with_forward_plus_vert(defines):
         return defines + " -DUSE_FORWARD_PLUS_WORLD_POS"
     return defines
 
+def with_deferred_export_frag(defines):
+    """PBR gen_frag variants that export normal/material MRT sidecars."""
+    return with_forward_plus_frag(defines + " -DUSE_DEFERRED_EXPORT")
+
 def compile_individual_shaders():
     print("Compiling standalone GLSL stages...")
     for stage, ext in (("vert", ".vert"), ("frag", ".frag"), ("geom", ".geom")):
@@ -229,6 +233,8 @@ def compile_template_shaders():
     compile_shader("frag", "gen_frag.tmpl", "frag_tx0_ent_fog", defines="-DUSE_ENT_COLOR -DUSE_ATEST -DUSE_FOG")
     compile_shader("frag", "gen_frag.tmpl", "frag_pbr_tx0_ent", defines=with_forward_plus_frag("-DUSE_ENT_COLOR -DUSE_ATEST -DUSE_VK_PBR"))
     compile_shader("frag", "gen_frag.tmpl", "frag_pbr_tx0_ent_fog", defines=with_forward_plus_frag("-DUSE_ENT_COLOR -DUSE_ATEST -DUSE_FOG -DUSE_VK_PBR"))
+    compile_shader("frag", "gen_frag.tmpl", "frag_gbuf_pbr_tx0_ent", binding_expr="vk.modules.frag.gbuf_ent[0][0]", defines=with_deferred_export_frag("-DUSE_ENT_COLOR -DUSE_ATEST -DUSE_VK_PBR"))
+    compile_shader("frag", "gen_frag.tmpl", "frag_gbuf_pbr_tx0_ent_fog", binding_expr="vk.modules.frag.gbuf_ent[0][1]", defines=with_deferred_export_frag("-DUSE_ENT_COLOR -DUSE_ATEST -DUSE_FOG -DUSE_VK_PBR"))
 
     mode_flags = ["-DUSE_CLX_IDENT", "-DUSE_FIXED_COLOR"]
     mode_ids = ["ident1", "fixed"]
@@ -262,6 +268,11 @@ def compile_template_shaders():
                     name = f"frag_{pbr_ids[i]}{tx_ids[j]}_{mode_ids[m]}{fog_ids[k]}"
                     binding = join_indexes(f"vk.modules.frag.{mode_ids[m]}", [i, j, k])
                     compile_shader("frag", "gen_frag.tmpl", name, binding_expr=binding, defines=defines)
+                    if pbr_flags[i] == "-DUSE_VK_PBR":
+                        name_gbuf = f"frag_gbuf_{pbr_ids[i]}{tx_ids[j]}_{mode_ids[m]}{fog_ids[k]}"
+                        binding_gbuf = join_indexes(f"vk.modules.frag.gbuf_{mode_ids[m]}", [j, k])
+                        compile_shader("frag", "gen_frag.tmpl", name_gbuf, binding_expr=binding_gbuf,
+                                       defines=with_deferred_export_frag(join_flags(pbr_flags[i], tx_flags[j], mode_flags[m], fog_flags[k], extra)))
 
     for i in range(len(pbr_flags)):
         for j in range(len(tx_flags)):
@@ -322,11 +333,21 @@ def compile_template_shaders():
                 name = f"frag_{pbr_ids[i]}{tx_ids[j]}{fog_ids[k]}"
                 binding = join_indexes("vk.modules.frag.gen", [i, j, 0, k])
                 compile_shader("frag", "gen_frag.tmpl", name, binding_expr=binding, defines=defines)
+                if pbr_flags[i] == "-DUSE_VK_PBR":
+                    name_gbuf = f"frag_gbuf_{pbr_ids[i]}{tx_ids[j]}{fog_ids[k]}"
+                    binding_gbuf = join_indexes("vk.modules.frag.gbuf_gen", [j, 0, k])
+                    compile_shader("frag", "gen_frag.tmpl", name_gbuf, binding_expr=binding_gbuf,
+                                   defines=with_deferred_export_frag(join_flags(pbr_flags[i], tx_flags[j], fog_flags[k], extra)))
                 if j != 0:
                     defines_cl = with_forward_plus_frag(join_flags(pbr_flags[i], tx_flags[j], cl_flags[j], fog_flags[k]))
                     name_cl = f"frag_{pbr_ids[i]}{tx_ids[j]}_{cl_ids[j]}{fog_ids[k]}"
                     binding_cl = join_indexes("vk.modules.frag.gen", [i, j, 1, k])
                     compile_shader("frag", "gen_frag.tmpl", name_cl, binding_expr=binding_cl, defines=defines_cl)
+                    if pbr_flags[i] == "-DUSE_VK_PBR":
+                        name_gbuf_cl = f"frag_gbuf_{pbr_ids[i]}{tx_ids[j]}_{cl_ids[j]}{fog_ids[k]}"
+                        binding_gbuf_cl = join_indexes("vk.modules.frag.gbuf_gen", [j, 1, k])
+                        compile_shader("frag", "gen_frag.tmpl", name_gbuf_cl, binding_expr=binding_gbuf_cl,
+                                       defines=with_deferred_export_frag(join_flags(pbr_flags[i], tx_flags[j], cl_flags[j], fog_flags[k])))
 
 compile_individual_shaders()
 compile_template_shaders()

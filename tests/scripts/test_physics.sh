@@ -237,4 +237,10 @@ fi
 test -f examples/demo_game/DEMO_IDENTITY.md
 test -f examples/demo_game/mod/demo_physics.cfg
 
+rg -q 'idtech3_minimal_physics_smoke' tests/scripts/idtech3_minimal_content_smoke.sh
+if [[ "${IDTECH3_SKIP_RUNTIME_SMOKE:-0}" != "1" ]]; then
+	echo "[test_physics] minimal content runtime smoke..."
+	"$ROOT/tests/scripts/idtech3_minimal_content_smoke.sh" physics
+fi
+
 echo "[test_physics] ok"

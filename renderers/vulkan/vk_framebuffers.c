@@ -47,6 +47,12 @@ void vk_create_framebuffers( void )
 				framebuffer_attachments[1] = vk.depth_image_view;
 				framebuffer_attachments[2] = vk.motion_vector_view;
 				desc.attachmentCount = 3;
+				if ( vk.deferredGbufferDirectExport )
+				{
+					desc.attachmentCount = 5;
+					framebuffer_attachments[3] = vk.deferred_gbuffer_normal_view;
+					framebuffer_attachments[4] = vk.deferred_gbuffer_material_view;
+				}
 				if ( vk.msaaActive )
 				{
 					desc.attachmentCount = 5;

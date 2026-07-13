@@ -73,6 +73,18 @@ void vk_begin_render_pass_tracked( VkRenderPass renderPass, VkFramebuffer frameB
 				clear_values[2].color.float32[2] = 0.0f;
 				clear_values[2].color.float32[3] = 0.0f;
 				clear_count = vk.msaaActive ? 5 : 3;
+				if ( vk.deferredGbufferDirectExport &&
+					( vk.renderPassIndex == RENDER_PASS_MAIN || vk.renderPassIndex == RENDER_PASS_POST_BLOOM ) ) {
+					clear_values[3].color.float32[0] = 0.0f;
+					clear_values[3].color.float32[1] = 0.0f;
+					clear_values[3].color.float32[2] = 1.0f;
+					clear_values[3].color.float32[3] = 0.0f;
+					clear_values[4].color.float32[0] = 0.0f;
+					clear_values[4].color.float32[1] = 0.55f;
+					clear_values[4].color.float32[2] = 1.0f;
+					clear_values[4].color.float32[3] = 0.0f;
+					clear_count = 5;
+				}
 			} else {
 				clear_count = vk.msaaActive ? 3 : 2;
 			}
@@ -161,10 +173,10 @@ void vk_end_render_pass_tracked( void )
 void vk_create_render_passes( void )
 {
 	VkSampleCountFlagBits vkSamples = vk_get_main_rasterization_samples();
-	VkAttachmentDescription attachments[5]; // color resolve | depth | motion resolve | msaa color | msaa motion
-	VkAttachmentReference colorResolveRefs[2];
+	VkAttachmentDescription attachments[5]; // color | depth | motion | gbuf normal/msaa color | gbuf material/msaa motion
+	VkAttachmentReference colorResolveRefs[4];
 	VkAttachmentReference colorResolveRef;
-	VkAttachmentReference colorRefs[2];
+	VkAttachmentReference colorRefs[4];
 	VkAttachmentReference colorRef0;
 	VkAttachmentReference depthRef0;
 	VkSubpassDescription subpass;
@@ -224,6 +236,10 @@ void vk_create_render_passes( void )
 	colorRefs[0].layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 	colorRefs[1].attachment = VK_ATTACHMENT_UNUSED;
 	colorRefs[1].layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+	colorRefs[2].attachment = VK_ATTACHMENT_UNUSED;
+	colorRefs[2].layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+	colorRefs[3].attachment = VK_ATTACHMENT_UNUSED;
+	colorRefs[3].layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 
 	depthRef0.attachment = 1;
 	depthRef0.layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
@@ -233,6 +249,10 @@ void vk_create_render_passes( void )
 	colorResolveRefs[0].layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 	colorResolveRefs[1].attachment = VK_ATTACHMENT_UNUSED;
 	colorResolveRefs[1].layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+	colorResolveRefs[2].attachment = VK_ATTACHMENT_UNUSED;
+	colorResolveRefs[2].layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+	colorResolveRefs[3].attachment = VK_ATTACHMENT_UNUSED;
+	colorResolveRefs[3].layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 
 	if ( fboActive ) {
 		// velocity buffer used for per-pixel reprojection.
@@ -247,11 +267,28 @@ void vk_create_render_passes( void )
 		attachments[2].finalLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 
 		colorRefs[1].attachment = 2;
+
+		if ( vk.deferredGbufferDirectExport ) {
+			attachments[3].flags = 0;
+			attachments[3].format = VK_FORMAT_R16G16B16A16_SFLOAT;
+			attachments[3].samples = VK_SAMPLE_COUNT_1_BIT;
+			attachments[3].loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+			attachments[3].storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+			attachments[3].stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+			attachments[3].stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+			attachments[3].initialLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+			attachments[3].finalLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+
+			attachments[4] = attachments[3];
+
+			colorRefs[2].attachment = 3;
+			colorRefs[3].attachment = 4;
+		}
 	}
 
 	Com_Memset( &subpass, 0, sizeof( subpass ) );
 	subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
-	subpass.colorAttachmentCount = fboActive ? 2 : 1;
+	subpass.colorAttachmentCount = ( fboActive && vk.deferredGbufferDirectExport ) ? 4 : ( fboActive ? 2 : 1 );
 	subpass.pColorAttachments = colorRefs;
 	subpass.pDepthStencilAttachment = &depthRef0;
 	subpass.pResolveAttachments = NULL;
@@ -264,7 +301,7 @@ void vk_create_render_passes( void )
 	desc.pSubpasses = &subpass;
 
 	desc.subpassCount = 1;
-	desc.attachmentCount = fboActive ? 3 : 2;
+	desc.attachmentCount = ( fboActive && vk.deferredGbufferDirectExport ) ? 5 : ( fboActive ? 3 : 2 );
 
 	if ( vk.msaaActive )
 	{

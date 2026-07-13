@@ -388,16 +388,19 @@ void vk_deferred_gbuffer_capture_after_geometry( void )
 		vk_end_render_pass();
 	}
 
-	vk_dgb_create_pipeline();
-	if ( !vk.deferred_gbuffer.pipeline_ready || vk.deferred_gbuffer.pipeline == VK_NULL_HANDLE ) {
-		if ( resume_main ) {
-			vk_resume_current_render_pass();
+	if ( !vk.deferredGbufferDirectExport ) {
+		vk_dgb_create_pipeline();
+		if ( !vk.deferred_gbuffer.pipeline_ready || vk.deferred_gbuffer.pipeline == VK_NULL_HANDLE ) {
+			if ( resume_main ) {
+				vk_resume_current_render_pass();
+			}
+			return;
 		}
-		return;
 	}
 
 	if ( !vk.deferred_gbuffer.fill_logged ) {
-		ri.Printf( PRINT_ALL, "[VK][deferred] r_deferredGBufferFill=1 (albedo copy + depth normals)\n" );
+		ri.Printf( PRINT_ALL, "[VK][deferred] r_deferredGBufferFill=1 (%s)\n",
+			vk.deferredGbufferDirectExport ? "albedo copy + direct material/motion export" : "albedo copy + depth normals" );
 		vk.deferred_gbuffer.fill_logged = qtrue;
 	}
 
@@ -426,12 +429,14 @@ void vk_deferred_gbuffer_capture_after_geometry( void )
 	record_image_layout_transition( vk.cmd->command_buffer, vk.deferred_gbuffer_albedo, VK_IMAGE_ASPECT_COLOR_BIT,
 		VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
 		0, 0 );
-	record_image_layout_transition( vk.cmd->command_buffer, vk.deferred_gbuffer_normal, VK_IMAGE_ASPECT_COLOR_BIT,
-		VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_GENERAL,
-		0, 0 );
-	record_image_layout_transition( vk.cmd->command_buffer, vk.deferred_gbuffer_material, VK_IMAGE_ASPECT_COLOR_BIT,
-		VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_GENERAL,
-		0, 0 );
+	if ( !vk.deferredGbufferDirectExport ) {
+		record_image_layout_transition( vk.cmd->command_buffer, vk.deferred_gbuffer_normal, VK_IMAGE_ASPECT_COLOR_BIT,
+			VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_GENERAL,
+			0, 0 );
+		record_image_layout_transition( vk.cmd->command_buffer, vk.deferred_gbuffer_material, VK_IMAGE_ASPECT_COLOR_BIT,
+			VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_GENERAL,
+			0, 0 );
+	}
 
 	Com_Memset( &region, 0, sizeof( region ) );
 	region.srcSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
@@ -448,28 +453,30 @@ void vk_deferred_gbuffer_capture_after_geometry( void )
 		VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
 		0, 0 );
 
-	vk_dgb_update_descriptors();
+	if ( !vk.deferredGbufferDirectExport ) {
+		vk_dgb_update_descriptors();
 
-	vk_dgb_fill_proj_info( &push );
-	push.extent[0] = width;
-	push.extent[1] = height;
+		vk_dgb_fill_proj_info( &push );
+		push.extent[0] = width;
+		push.extent[1] = height;
 
-	qvkCmdBindPipeline( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, vk.deferred_gbuffer.pipeline );
-	qvkCmdBindDescriptorSets( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE,
-		vk.deferred_gbuffer.pipeline_layout, 0, 1, &vk.deferred_gbuffer.descriptor, 0, NULL );
-	qvkCmdPushConstants( vk.cmd->command_buffer, vk.deferred_gbuffer.pipeline_layout,
-		VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof( push ), &push );
+		qvkCmdBindPipeline( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, vk.deferred_gbuffer.pipeline );
+		qvkCmdBindDescriptorSets( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE,
+			vk.deferred_gbuffer.pipeline_layout, 0, 1, &vk.deferred_gbuffer.descriptor, 0, NULL );
+		qvkCmdPushConstants( vk.cmd->command_buffer, vk.deferred_gbuffer.pipeline_layout,
+			VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof( push ), &push );
 
-	gx = ( width + 7u ) / 8u;
-	gy = ( height + 7u ) / 8u;
-	qvkCmdDispatch( vk.cmd->command_buffer, gx, gy, 1 );
+		gx = ( width + 7u ) / 8u;
+		gy = ( height + 7u ) / 8u;
+		qvkCmdDispatch( vk.cmd->command_buffer, gx, gy, 1 );
 
-	record_image_layout_transition( vk.cmd->command_buffer, vk.deferred_gbuffer_normal, VK_IMAGE_ASPECT_COLOR_BIT,
-		VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-		0, 0 );
-	record_image_layout_transition( vk.cmd->command_buffer, vk.deferred_gbuffer_material, VK_IMAGE_ASPECT_COLOR_BIT,
-		VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-		0, 0 );
+		record_image_layout_transition( vk.cmd->command_buffer, vk.deferred_gbuffer_normal, VK_IMAGE_ASPECT_COLOR_BIT,
+			VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+			0, 0 );
+		record_image_layout_transition( vk.cmd->command_buffer, vk.deferred_gbuffer_material, VK_IMAGE_ASPECT_COLOR_BIT,
+			VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+			0, 0 );
+	}
 
 	record_image_layout_transition( vk.cmd->command_buffer, vk.color_image, VK_IMAGE_ASPECT_COLOR_BIT,
 		VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
