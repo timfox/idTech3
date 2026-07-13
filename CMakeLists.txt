@@ -3493,6 +3493,12 @@ set_tests_properties(test_p2p_reconnect PROPERTIES
 	LABELS "p2p;scripts"
 	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_p2p_reconnect.sh;${CMAKE_SOURCE_DIR}/runtime/client/core/cl_p2p_session.c;${CMAKE_SOURCE_DIR}/runtime/server/sv_client.c")
 
+add_test(NAME test_p2p_ice_guard
+	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_p2p_ice_guard.sh)
+set_tests_properties(test_p2p_ice_guard PROPERTIES
+	LABELS "p2p;scripts"
+	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_p2p_ice_guard.sh;${CMAKE_SOURCE_DIR}/engine/core/net_p2p_ice.c;${CMAKE_SOURCE_DIR}/runtime/server/sv_ccmds.c")
+
 add_test(NAME test_console_font
 	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_console_font.sh)
 set_tests_properties(test_console_font PROPERTIES

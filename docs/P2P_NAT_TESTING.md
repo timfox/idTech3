@@ -6,6 +6,7 @@
 |------|--------|----------------|
 | Unit | `unit_p2p_stun` | Every `ctest` via `linux-full` |
 | Simulation | `test_p2p_nat_sim.sh` | Every `ctest` (STUN probe + optional coturn) |
+| Guard | `test_p2p_ice_guard.sh` | Every `ctest` static; optional live spoof harness |
 | Live two-runner | `test_p2p_nat_live.sh` | Gated workflow `.github/workflows/p2p-nat.yml` |
 
 ## Simulation (`test_p2p_nat_sim`)
@@ -18,6 +19,17 @@ Skip flags:
 
 - `SKIP_P2P_NAT_SIM=1` — skip entire script
 - `SKIP_P2P_COTURN=1` — skip Docker coturn allocate probe
+
+## ICE guard (`test_p2p_ice_guard`)
+
+```bash
+cd build-vk-Release && ctest -R test_p2p_ice_guard --output-on-failure
+```
+
+Optional live spoof harness:
+
+- `IDTECH3_P2P_ICE_GUARD_LIVE=1` — launch a dedicated server, begin a direct-UDP ICE connect path, inject spoofed `p2pCand` / `p2pCheckAck`, and verify the active peer guard rejects them
+- `P2P_ICE_GUARD_GAME_BASE=/abs/path/to/base-parent` — optional runnable data tree for the live harness; when unset, the harness skips cleanly if the dedicated server exits with `No game data`
 
 ## Live two-runner job
 
