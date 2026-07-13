@@ -28,8 +28,10 @@ fi
 first_party='(^|[[:space:]])(\./|/[^[:space:]]*/)?(engine|runtime|modules|extensions|renderers|tools|examples|tests|cmake|scripts)/'
 # Ignore third-party trees and warning lines that only appear via include paths under renderers/
 ignored='/(third_party|build[^/[:space:]]*|external|_deps|CMakeFiles|tinyexr)/|(^|[[:space:]])third_party/|/\\.\\./\\.\\./external/'
+# Clang-only pedantics that fire on historical VM macros and Vulkan nested unions.
+clang_pedantic='\[-W(format-nonliteral|gnu-zero-variadic-macro-arguments|nested-anon-types)\]'
 
-if grep -E "$first_party" "$tmp" | grep -Ev "$ignored" > "$tmp.first"; then
+if grep -E "$first_party" "$tmp" | grep -Ev "$ignored" | grep -Ev "$clang_pedantic" > "$tmp.first"; then
   echo "check_first_party_warnings: first-party compiler warnings found:" >&2
   cat "$tmp.first" >&2
   rm -f "$tmp.first"

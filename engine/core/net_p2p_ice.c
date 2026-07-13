@@ -86,7 +86,14 @@ static void NET_P2P_IceSendOob( const netadr_t *adr, const char *fmt, ... )
 	}
 
 	va_start( ap, fmt );
+#if defined( __clang__ )
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wformat-nonliteral"
+#endif
 	Q_vsnprintf( msg, sizeof( msg ), fmt, ap );
+#if defined( __clang__ )
+#pragma clang diagnostic pop
+#endif
 	va_end( ap );
 
 	NET_OutOfBandPrint( NS_CLIENT, adr, "%s", msg );
