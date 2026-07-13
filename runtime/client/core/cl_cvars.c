@@ -47,7 +47,8 @@ void CL_InitCvars( void )
 	Cvar_CheckRange( cl_autoGraphicsProfile, "0", "1", CV_INTEGER );
 	Cvar_SetDescription( cl_autoGraphicsProfile,
 		"Auto graphics profile on cgame load: baseq3+cgame.qvm -> classic_baseq3.cfg; "
-		"native cgame -> modern_native.cfg (execs modern_vulkan.cfg)." );
+		"native cgame -> modern_native.cfg (execs modern_vulkan.cfg). "
+		"Manual Vulkan overlays: vulkan_overlay_deferred.cfg, vulkan_overlay_rtx.cfg, vulkan_overlay_hybrid1.cfg." );
 	cl_timeNudge = Cvar_Get( "cl_timeNudge", "0", CVAR_TEMP );
 	Cvar_CheckRange( cl_timeNudge, "-30", "30", CV_INTEGER );
 	Cvar_SetDescription( cl_timeNudge, "Allows more or less latency to be added in the interest of better smoothness or better responsiveness." );

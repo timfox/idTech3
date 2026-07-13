@@ -1,15 +1,16 @@
 #version 450
 
 /*
- * Deferred G-buffer scaffold: view-space normal + fallback material from depth.
+ * Deferred G-buffer scaffold: view-space normal + material contract from depth.
  * Albedo is copied separately (scene color -> deferred_gbuffer_albedo).
+ * materialOut = metalness, roughness, AO, sourceConfidence.
  */
 
 layout(local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
 
 layout(set = 0, binding = 0) uniform sampler2D depthTex;
 layout(rgba16f, set = 0, binding = 1) uniform writeonly image2D normalOut;
-layout(rg16f, set = 0, binding = 2) uniform writeonly image2D materialOut;
+layout(rgba16f, set = 0, binding = 2) uniform writeonly image2D materialOut;
 
 layout(push_constant) uniform Push {
 	vec4 projInfo; /* invProj00, invProj11, proj10, proj14 (SSAO-compatible) */
@@ -45,7 +46,7 @@ void main() {
 	vec2 uv = ( vec2( pix ) + 0.5 ) / vec2( pc.extent );
 	float depth = texture( depthTex, uv ).r;
 	vec4 fallbackMaterial = vec4( clamp( pc.materialParams.x, 0.0, 1.0 ),
-		clamp( pc.materialParams.y, 0.04, 1.0 ), 0.0, 1.0 );
+		clamp( pc.materialParams.y, 0.04, 1.0 ), 1.0, 0.0 );
 
 	if ( !validDepth( depth ) ) {
 		imageStore( normalOut, ivec2( pix ), vec4( 0.0, 0.0, 1.0, 0.0 ) );

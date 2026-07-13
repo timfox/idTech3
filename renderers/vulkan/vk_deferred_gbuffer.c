@@ -1202,8 +1202,8 @@ qboolean vk_deferred_gbuffer_draw_debug( void )
 	if ( mode < 1 ) {
 		mode = 1;
 	}
-	if ( mode > 5 ) {
-		mode = 5;
+	if ( mode > 6 ) {
+		mode = 6;
 	}
 
 	if ( mode == 1 ) {
@@ -1212,6 +1212,8 @@ qboolean vk_deferred_gbuffer_draw_debug( void )
 		src_view = vk.deferred_gbuffer_normal_view;
 	} else if ( mode == 3 ) {
 		src_view = vk.deferred_gbuffer_material_view;
+	} else if ( mode == 6 ) {
+		src_view = vk.motion_vector_view;
 	} else {
 		src_view = vk.deferred_lighting_view;
 	}
@@ -1225,7 +1227,7 @@ qboolean vk_deferred_gbuffer_draw_debug( void )
 	}
 
 	if ( !s_debug_logged ) {
-		ri.Printf( PRINT_ALL, "[VK][deferred] r_deferredGBufferDebug=%d (1=albedo 2=normal 3=material 4=lighting 5=normal confidence)\n", mode );
+		ri.Printf( PRINT_ALL, "[VK][deferred] r_deferredGBufferDebug=%d (1=albedo 2=normal 3=material 4=lighting 5=normal confidence 6=motion)\n", mode );
 		s_debug_logged = qtrue;
 	}
 

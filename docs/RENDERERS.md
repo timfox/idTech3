@@ -46,6 +46,31 @@ vid_restart
 | Temporal AA | `r_taa 1`, `r_taaMotionVectors 1`, `r_temporalCpuSkinPrev 1` |
 | Post AA safety net | `r_ext_smaa 1`, `r_postAaAfterBloom 1` |
 
+### Vulkan Overlays
+
+The renderer profile rule is: start from **one** modern base, then apply an overlay only for the experimental path you want to test. Each overlay `exec`s `modern_vulkan.cfg` first, so the baseline remains Forward+ + G-buffer sidecar + PBR + HDR + TAA.
+
+| Overlay | Use | Notes |
+|---------|-----|-------|
+| `vulkan_overlay_deferred.cfg` | Mode-1 deferred lighting development | Switches to `r_renderMode 1`, enables `r_deferredLighting 1`, and disables `r_forwardPlusShade` to avoid double dynamic lighting. |
+| `vulkan_overlay_rtx.cfg` | Plain RTX demo pass | Requires `USE_VULKAN_RTX`; keeps the modern Forward+ base and enables shared TLAS/entity BLAS. |
+| `vulkan_overlay_hybrid1.cfg` | Hybrid1 ray/raster path | Requires `USE_VULKAN_RTX`; keeps the modern Forward+ base, enables shared TLAS/entity BLAS, and enables Hybrid1 channels. |
+
+Examples:
+
+```cfg
+exec vulkan_overlay_deferred.cfg
+vid_restart
+
+exec vulkan_overlay_rtx.cfg
+vid_restart
+
+exec vulkan_overlay_hybrid1.cfg
+vid_restart
+```
+
+`deferred_vulkan.cfg` remains as a direct standalone deferred profile for older docs/scripts, but new renderer work should prefer the overlay configs so the modern base stays single-source.
+
 ### Deferred Vulkan Profile
 
 Use this when working directly on the mode-1 deferred renderer:
@@ -241,8 +266,8 @@ Code: `renderers/vulkan/vk_forward_plus.c`, `VK_FP_*` constants; cvar registrati
 | `r_pbr` | 1 | Physically Based Rendering (metalness/roughness, IBL). Requires r_fbo 1. |
 | `r_renderMode` | 0 | **0** forward, **1** deferred lighting mode, **2** Forward+ primary. `modern_vulkan.cfg` sets **2**. Latched; `vid_restart`. |
 | `r_deferredGBuffer` | 0 | With `r_renderMode` 1/2: allocate albedo/normal/material/lighting G-buffer images. `modern_vulkan.cfg` sets **1** as a sidecar. Latched; `r_fbo` 1. |
-| `r_deferredGBufferFill` | 0 | With G-buffer RTs: copy scene albedo + depth-derived normal/material after geometry. `modern_vulkan.cfg` sets **1**. |
-| `r_deferredGBufferDebug` | 0 | Before bloom: show G-buffer on scene color (1=albedo, 2=normal, 3=material, 4=lighting, 5=normal confidence). |
+| `r_deferredGBufferFill` | 0 | With G-buffer RTs: copy scene albedo + depth-derived normals/material contract after geometry. Material is RGBA16F: metalness, roughness, AO, source confidence. `modern_vulkan.cfg` sets **1**. |
+| `r_deferredGBufferDebug` | 0 | Before bloom: show G-buffer on scene color (1=albedo, 2=normal, 3=material, 4=lighting, 5=normal confidence, 6=motion vectors from the main material pass). |
 | `r_deferredLighting` | 0 | Experimental mode-1 deferred diffuse (Forward+ tiles, point+spot). Replaces scene color after geometry. Latches `r_forwardPlusShade` 0 with `vid_restart`; ignored by the mode-2 modern default. |
 | `r_deferredUnlitBase` | 1 | Additive dynamic on static-lit scene copy; skips classic lit-surf pass. **0** = legacy multiply composite. |
 | `r_deferredLightingStrength` | 1 | Scale deferred dynamic diffuse (0–4). |

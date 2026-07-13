@@ -539,7 +539,7 @@ copy_to_release() {
   if [ -f "$PROJECT_ROOT/config/steamdeck.cfg" ]; then
     cp -f "$PROJECT_ROOT/config/steamdeck.cfg" "$dest/base/steamdeck.cfg"
   fi
-  for cfg in classic_baseq3.cfg modern_vulkan.cfg deferred_vulkan.cfg modern_native.cfg modern_lighting.cfg console_ttf.cfg console_sdf.cfg; do
+  for cfg in classic_baseq3.cfg modern_vulkan.cfg deferred_vulkan.cfg vulkan_overlay_deferred.cfg vulkan_overlay_rtx.cfg vulkan_overlay_hybrid1.cfg modern_native.cfg modern_lighting.cfg console_ttf.cfg console_sdf.cfg; do
     if [ -f "$PROJECT_ROOT/config/$cfg" ]; then
       cp -f "$PROJECT_ROOT/config/$cfg" "$dest/base/$cfg"
       if [ -d "$dest/baseq3" ]; then

@@ -17,7 +17,7 @@ void main() {
 		return;
 	}
 	if ( pc.mode == 3 ) {
-		out_color = vec4( s.r, s.g, 0.0, 1.0 );
+		out_color = vec4( s.r, s.g, s.b, 1.0 );
 		return;
 	}
 	if ( pc.mode == 4 ) {
@@ -27,6 +27,13 @@ void main() {
 	if ( pc.mode == 5 ) {
 		float confidence = clamp( s.a, 0.0, 1.0 );
 		out_color = vec4( 1.0 - confidence, confidence, 0.0, 1.0 );
+		return;
+	}
+	if ( pc.mode == 6 ) {
+		vec2 motion = s.rg;
+		vec2 direction = clamp( motion * 32.0 + 0.5, 0.0, 1.0 );
+		float magnitude = clamp( length( motion ) * 64.0, 0.0, 1.0 );
+		out_color = vec4( direction, magnitude, 1.0 );
 		return;
 	}
 

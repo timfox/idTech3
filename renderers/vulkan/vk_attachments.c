@@ -370,7 +370,7 @@ static void vk_create_deferred_gbuffer_scaffold( void )
 		gbufUsage | VK_IMAGE_USAGE_STORAGE_BIT,
 		&vk.deferred_gbuffer_normal, &vk.deferred_gbuffer_normal_view,
 		VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, qfalse );
-	vk_create_fullres_color_attachment( VK_FORMAT_R16G16_SFLOAT,
+	vk_create_fullres_color_attachment( VK_FORMAT_R16G16B16A16_SFLOAT,
 		gbufUsage | VK_IMAGE_USAGE_STORAGE_BIT,
 		&vk.deferred_gbuffer_material, &vk.deferred_gbuffer_material_view,
 		VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, qfalse );
@@ -380,7 +380,7 @@ static void vk_create_deferred_gbuffer_scaffold( void )
 		VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, qfalse );
 	vk.deferredGbufferAllocated = qtrue;
 	ri.Printf( PRINT_ALL,
-		"[VK][deferred] G-buffer scaffold: albedo (scene color format) + normal RGBA16F + material R16G16 + lighting RGBA16F\n" );
+		"[VK][deferred] G-buffer scaffold: albedo (scene color format) + normal RGBA16F + material RGBA16F + motion sidecar + lighting RGBA16F\n" );
 }
 
 static void vk_create_fullres_msaa_color_attachment(

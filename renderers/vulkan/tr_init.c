@@ -3841,9 +3841,9 @@ static void R_Register( void )
 		ri.Printf( PRINT_ALL, "[VK][deferred] r_deferredGBufferFill=1 (capture after geometry each frame)\n" );
 	}
 	r_deferredGBufferDebug = ri.Cvar_Get( "r_deferredGBufferDebug", "0", CVAR_ARCHIVE_ND );
-	ri.Cvar_CheckRange( r_deferredGBufferDebug, "0", "5", CV_INTEGER );
+	ri.Cvar_CheckRange( r_deferredGBufferDebug, "0", "6", CV_INTEGER );
 	ri.Cvar_SetDescription( r_deferredGBufferDebug,
-		"Visualize deferred buffers on scene color before bloom: 0=off, 1=albedo, 2=normal (view XYZ), 3=material, 4=lighting (requires r_deferredLighting 1), 5=normal confidence. "
+		"Visualize deferred buffers on scene color before bloom: 0=off, 1=albedo, 2=normal (view XYZ), 3=material, 4=lighting (requires r_deferredLighting 1), 5=normal confidence, 6=motion vectors. "
 		"Requires r_renderMode 1/2, r_deferredGBuffer 1, r_deferredGBufferFill 1." );
 	ri.Cvar_SetGroup( r_deferredGBufferDebug, CVG_RENDERER );
 	r_deferredLighting = ri.Cvar_Get( "r_deferredLighting", "0", CVAR_ARCHIVE_ND );

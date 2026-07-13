@@ -22,6 +22,7 @@ LIT="$(idtech3_file renderers/vulkan/shaders/glsl/deferred_lighting.comp src/ren
 COMP="$(idtech3_file renderers/vulkan/shaders/glsl/deferred_lighting_composite.frag src/renderers/vulkan/shaders/glsl/deferred_lighting_composite.frag)"
 GBUF_FILL="$(idtech3_file renderers/vulkan/shaders/glsl/deferred_gbuffer_fill.comp src/renderers/vulkan/shaders/glsl/deferred_gbuffer_fill.comp)"
 GBUF_DEBUG="$(idtech3_file renderers/vulkan/shaders/glsl/deferred_gbuffer_debug.frag src/renderers/vulkan/shaders/glsl/deferred_gbuffer_debug.frag)"
+ATTACH="$(idtech3_file renderers/vulkan/vk_attachments.c src/renderers/vulkan/vk_attachments.c)"
 TR_INIT="$(idtech3_file renderers/vulkan/tr_init.c src/renderers/vulkan/tr_init.c)"
 TR_BACKEND="$(idtech3_file renderers/vulkan/tr_backend.c src/renderers/vulkan/tr_backend.c)"
 DEFERRED_CFG="$ROOT/config/deferred_vulkan.cfg"
@@ -34,16 +35,21 @@ check "$ROOT/scripts/compile_engine.sh" 'deferred_vulkan.cfg' 'release packaging
 check "$TR_INIT" 'r_deferredSpecular = ri.Cvar_Get' 'r_deferredSpecular cvar'
 check "$TR_INIT" 'r_deferredDefaultMetalness = ri.Cvar_Get' 'deferred fallback metalness cvar'
 check "$TR_INIT" 'r_deferredNormalEdgeThreshold = ri.Cvar_Get' 'deferred normal edge threshold cvar'
-check "$TR_INIT" 'r_deferredGBufferDebug, "0", "5"' 'deferred debug exposes confidence mode'
+check "$TR_INIT" 'r_deferredGBufferDebug, "0", "6"' 'deferred debug exposes confidence and motion modes'
 check "$TR_INIT" 'r_renderMode 1/2' 'G-buffer cvar documents mode 1/2 sidecar'
 check "$DGB" 'materialParams' 'G-buffer push carries material/normal params'
 check "$DGB" 'r_renderMode->integer == 1 || r_renderMode->integer == 2' 'G-buffer active in mode 1/2'
 check "$DGB" 'r_renderMode->integer == 1 && r_forwardPlus' 'deferred lighting remains mode 1 only'
 check "$DGB" 'normal confidence' 'deferred debug logs normal confidence mode'
+check "$DGB" 'vk.motion_vector_view' 'deferred debug can inspect real motion sidecar'
 check "$DGB" 'vk_end_render_pass' 'G-buffer capture leaves render pass before compute'
 check "$DGB" 'vk_resume_current_render_pass' 'G-buffer capture resumes main render pass'
+check "$ATTACH" 'material RGBA16F' 'deferred scaffold allocates expanded material export target'
+check "$GBUF_FILL" 'layout(rgba16f, set = 0, binding = 2)' 'G-buffer material storage uses RGBA16F'
+check "$GBUF_FILL" 'sourceConfidence' 'G-buffer material stores source confidence channel'
 check "$GBUF_FILL" 'confidence' 'G-buffer normal pass stores reconstruction confidence'
 check "$GBUF_DEBUG" 'pc.mode == 5' 'deferred debug shader visualizes normal confidence'
+check "$GBUF_DEBUG" 'pc.mode == 6' 'deferred debug shader visualizes motion vectors'
 check "$TR_BACKEND" 'vk_deferred_lighting_active' 'classic lit pass skipped when deferred lighting active'
 check "$DGB" 'vk_deferred_composite_push_t' 'composite push constants'
 check "$DGB" 'deferred_gbuffer_albedo_view' 'composite scene base descriptor'
