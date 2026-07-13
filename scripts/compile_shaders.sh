@@ -19,12 +19,17 @@ SPIRV_DIR="$SHADER_DIR/spirv"
 TOOLS_DIR="$SHADER_DIR/tools"
 
 APPLY=0
+CHECK=0
 GENERATED_DIR="${GENERATED_SPIRV_DIR:-$SPIRV_DIR/generated}"
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --apply|-a)
       APPLY=1
+      shift
+      ;;
+    --check|-c)
+      CHECK=1
       shift
       ;;
     --generated-dir|-o)
@@ -712,7 +717,37 @@ apply_shaders() {
   fi
 }
 
-if [[ "$APPLY" -eq 1 ]]; then
+check_shaders() {
+  local mismatches=0
+
+  for file in shader_data.c shader_binding.c; do
+    local src="$GENERATED_DIR/$file"
+    local dst="$SPIRV_DIR/$file"
+    if [[ ! -f "$src" ]]; then
+      echo "Generated shader file missing: $src" >&2
+      return 1
+    fi
+    if [[ ! -f "$dst" ]]; then
+      echo "Tracked shader file missing: $dst" >&2
+      mismatches=1
+      continue
+    fi
+    if ! cmp -s "$src" "$dst"; then
+      echo "Shader blob out of date: $dst" >&2
+      mismatches=1
+    fi
+  done
+
+  if [[ "$mismatches" -ne 0 ]]; then
+    echo "Run $0 --apply to update tracked Vulkan shader blobs." >&2
+    return 1
+  fi
+  echo "Tracked Vulkan shader blobs are up to date."
+}
+
+if [[ "$CHECK" -eq 1 ]]; then
+  check_shaders
+elif [[ "$APPLY" -eq 1 ]]; then
   apply_shaders
 else
   echo "Run $0 --apply to install the generated shaders into ${SPIRV_DIR}"

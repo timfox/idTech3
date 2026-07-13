@@ -57,6 +57,8 @@ vid_restart
 
 This profile sets `r_renderMode 1`, `r_deferredGBuffer 1`, `r_deferredGBufferFill 1`, and `r_deferredLighting 1`. It also forces `r_forwardPlusShade 0` so dynamic lights come from the deferred compute/composite path instead of being applied once by Forward+ primary shading and again by the legacy lit-surface pass. The current deferred lighting mode is still experimental; the reliable shipping/native default remains `modern_vulkan.cfg`.
 
+The current G-buffer fill is depth-derived: albedo is copied from scene color, normals are reconstructed from depth with silhouette-aware neighbor selection, and material values use fallback cvars until true material export lands. Tune with `r_deferredDefaultMetalness`, `r_deferredDefaultRoughness`, and `r_deferredNormalEdgeThreshold`.
+
 ### Vulkan Forward+ scaffolding
 
 **GPU light packing + per-tile cull** on the forward path (`r_forwardPlus` default **1**; `r_renderMode 2` / `modern_vulkan.cfg` force it on):
@@ -245,6 +247,9 @@ Code: `renderers/vulkan/vk_forward_plus.c`, `VK_FP_*` constants; cvar registrati
 | `r_deferredUnlitBase` | 1 | Additive dynamic on static-lit scene copy; skips classic lit-surf pass. **0** = legacy multiply composite. |
 | `r_deferredLightingStrength` | 1 | Scale deferred dynamic diffuse (0–4). |
 | `r_deferredSpecular` | 1 | Blinn-Phong specular on dynamic lights in deferred pass (0=diffuse only). |
+| `r_deferredDefaultMetalness` | 0 | Fallback metalness written by the depth-derived G-buffer until material export is available. |
+| `r_deferredDefaultRoughness` | 0.55 | Fallback roughness written by the depth-derived G-buffer until material export is available. |
+| `r_deferredNormalEdgeThreshold` | 0.08 | View-space depth delta used to reject silhouette-crossing neighbors during deferred normal reconstruction. |
 | `r_volumetricFog` | 0 | Volumetric fog enable (0=off, 1=on) |
 | `r_vdbFog` | 0 | Blend GPU-uploaded bound VDB density (`vdb_bind_fog`) into global volumetric density (requires `r_volumetricFog` 1 and `VDB_UploadToGPU`) |
 | `r_vdbFogBlend` | 0.5 | VDB density blend weight when `r_vdbFog` 1 |

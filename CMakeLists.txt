@@ -2950,12 +2950,12 @@ endif()
 find_package(Python3 COMPONENTS Interpreter QUIET)
 if(Python3_Interpreter_FOUND)
 	add_custom_target(vk_shader_regen
-		COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/scripts/vk_shader_tool.py regen
+		COMMAND ${CMAKE_SOURCE_DIR}/scripts/compile_shaders.sh --apply
 		WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
-		COMMENT "Regenerating Vulkan shader_data.c and shader_binding.c deterministically")
+		COMMENT "Regenerating Vulkan shader_data.c and shader_binding.c")
 
 	add_custom_target(vk_shader_check
-		COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/scripts/vk_shader_tool.py check --ref HEAD
+		COMMAND ${CMAKE_SOURCE_DIR}/scripts/compile_shaders.sh --check
 		WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
 		COMMENT "Checking Vulkan generated shader blobs are up-to-date with GLSL")
 else()

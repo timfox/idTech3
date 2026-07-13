@@ -209,6 +209,9 @@ cvar_t	*r_deferredLighting;
 cvar_t	*r_deferredUnlitBase;
 cvar_t	*r_deferredLightingStrength;
 cvar_t	*r_deferredSpecular;
+cvar_t	*r_deferredDefaultMetalness;
+cvar_t	*r_deferredDefaultRoughness;
+cvar_t	*r_deferredNormalEdgeThreshold;
 cvar_t	*r_hdr;
 cvar_t	*r_bloom;
 cvar_t	*r_bloom_threshold;
@@ -3875,6 +3878,21 @@ static void R_Register( void )
 	if ( r_deferredSpecular && r_deferredSpecular->integer && r_deferredLighting && r_deferredLighting->integer ) {
 		ri.Printf( PRINT_ALL, "[VK][deferred] r_deferredSpecular=1 (dynamic specular in deferred pass)\n" );
 	}
+	r_deferredDefaultMetalness = ri.Cvar_Get( "r_deferredDefaultMetalness", "0", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_deferredDefaultMetalness, "0", "1", CV_FLOAT );
+	ri.Cvar_SetDescription( r_deferredDefaultMetalness,
+		"Fallback metalness written by the deferred depth-derived G-buffer until true material export is available." );
+	ri.Cvar_SetGroup( r_deferredDefaultMetalness, CVG_RENDERER );
+	r_deferredDefaultRoughness = ri.Cvar_Get( "r_deferredDefaultRoughness", "0.55", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_deferredDefaultRoughness, "0.04", "1", CV_FLOAT );
+	ri.Cvar_SetDescription( r_deferredDefaultRoughness,
+		"Fallback roughness written by the deferred depth-derived G-buffer until true material export is available." );
+	ri.Cvar_SetGroup( r_deferredDefaultRoughness, CVG_RENDERER );
+	r_deferredNormalEdgeThreshold = ri.Cvar_Get( "r_deferredNormalEdgeThreshold", "0.08", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_deferredNormalEdgeThreshold, "0.001", "1", CV_FLOAT );
+	ri.Cvar_SetDescription( r_deferredNormalEdgeThreshold,
+		"View-space depth delta threshold for deferred normal reconstruction. Lower values reject silhouette-crossing neighbors more aggressively." );
+	ri.Cvar_SetGroup( r_deferredNormalEdgeThreshold, CVG_RENDERER );
 	r_hdr = ri.Cvar_Get( "r_hdr", "2", CVAR_ARCHIVE_ND | CVAR_LATCH );
 	ri.Cvar_CheckRange( r_hdr, "-1", "3", CV_INTEGER );
 	ri.Cvar_SetDescription(r_hdr, "HDR frame buffer format. Requires \\r_fbo 1.\n -1: 4-bit (B4G4R4A4), testing only\n  0: 8-bit, moderate banding\n  1: 16-bit float (RGBA16F)\n  2: 32-bit float (RGBA32F), default, fallback to 16F if unsupported\n  3: 64-bit float (RGBA64F), optional; falls back to 32F (glslang lacks dvec4 fragment output support)\n" );

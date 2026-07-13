@@ -1,7 +1,7 @@
 #version 450
 
 /*
- * Deferred G-buffer scaffold: view-space normal + default material from depth.
+ * Deferred G-buffer scaffold: view-space normal + fallback material from depth.
  * Albedo is copied separately (scene color -> deferred_gbuffer_albedo).
  */
 
@@ -13,6 +13,7 @@ layout(rg16f, set = 0, binding = 2) uniform writeonly image2D materialOut;
 
 layout(push_constant) uniform Push {
 	vec4 projInfo; /* invProj00, invProj11, proj10, proj14 (SSAO-compatible) */
+	vec4 materialParams; /* metalness, roughness, normal edge threshold, reserved */
 	uvec2 extent;
 } pc;
 
@@ -27,6 +28,14 @@ vec3 reconstructViewPos( vec2 uv, float depth ) {
 	return vec3( ndc.x * negZ * pc.projInfo.x, ndc.y * negZ * pc.projInfo.y, viewZ );
 }
 
+bool validDepth( float depth ) {
+	return depth > 0.0 && depth < 1.0;
+}
+
+vec3 neighborPos( vec2 uv, float depth, vec3 centerPos ) {
+	return validDepth( depth ) ? reconstructViewPos( uv, depth ) : centerPos;
+}
+
 void main() {
 	uvec2 pix = gl_GlobalInvocationID.xy;
 	if ( pix.x >= pc.extent.x || pix.y >= pc.extent.y ) {
@@ -35,10 +44,12 @@ void main() {
 
 	vec2 uv = ( vec2( pix ) + 0.5 ) / vec2( pc.extent );
 	float depth = texture( depthTex, uv ).r;
+	vec4 fallbackMaterial = vec4( clamp( pc.materialParams.x, 0.0, 1.0 ),
+		clamp( pc.materialParams.y, 0.04, 1.0 ), 0.0, 1.0 );
 
-	if ( depth <= 0.0 || depth >= 1.0 ) {
+	if ( !validDepth( depth ) ) {
 		imageStore( normalOut, ivec2( pix ), vec4( 0.0, 0.0, 1.0, 1.0 ) );
-		imageStore( materialOut, ivec2( pix ), vec4( 0.0, 0.5, 0.0, 1.0 ) );
+		imageStore( materialOut, ivec2( pix ), fallbackMaterial );
 		return;
 	}
 
@@ -49,14 +60,25 @@ void main() {
 	float dd = texture( depthTex, uv + vec2( 0.0, texel.y ) ).r;
 
 	vec3 pos = reconstructViewPos( uv, depth );
-	vec3 posL = reconstructViewPos( uv + vec2( -texel.x, 0.0 ), dl );
-	vec3 posR = reconstructViewPos( uv + vec2( texel.x, 0.0 ), dr );
-	vec3 posU = reconstructViewPos( uv + vec2( 0.0, -texel.y ), du );
-	vec3 posD = reconstructViewPos( uv + vec2( 0.0, texel.y ), dd );
-	vec3 dx = posR - posL;
-	vec3 dy = posD - posU;
+	vec3 posL = neighborPos( uv + vec2( -texel.x, 0.0 ), dl, pos );
+	vec3 posR = neighborPos( uv + vec2( texel.x, 0.0 ), dr, pos );
+	vec3 posU = neighborPos( uv + vec2( 0.0, -texel.y ), du, pos );
+	vec3 posD = neighborPos( uv + vec2( 0.0, texel.y ), dd, pos );
+	float threshold = max( pc.materialParams.z, 0.001 );
+	vec3 dxL = pos - posL;
+	vec3 dxR = posR - pos;
+	vec3 dyU = pos - posU;
+	vec3 dyD = posD - pos;
+	vec3 dx = ( abs( dxL.z ) < abs( dxR.z ) ) ? dxL : dxR;
+	vec3 dy = ( abs( dyU.z ) < abs( dyD.z ) ) ? dyU : dyD;
+	if ( abs( dx.z ) > threshold ) {
+		dx = vec3( texel.x, 0.0, 0.0 );
+	}
+	if ( abs( dy.z ) > threshold ) {
+		dy = vec3( 0.0, texel.y, 0.0 );
+	}
 	vec3 n = normalize( cross( dx, dy ) );
 
 	imageStore( normalOut, ivec2( pix ), vec4( n, 1.0 ) );
-	imageStore( materialOut, ivec2( pix ), vec4( 0.0, 0.5, 0.0, 1.0 ) );
+	imageStore( materialOut, ivec2( pix ), fallbackMaterial );
 }

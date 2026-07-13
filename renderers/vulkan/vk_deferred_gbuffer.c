@@ -18,6 +18,7 @@ Deferred G-buffer sidecar (r_renderMode 1/2) + experimental lighting (mode 1).
 
 typedef struct {
 	vec4_t projInfo;
+	vec4_t materialParams;
 	uint32_t extent[2];
 } vk_deferred_gbuf_push_t;
 
@@ -352,6 +353,13 @@ static void vk_dgb_fill_proj_info( vk_deferred_gbuf_push_t *push )
 	push->projInfo[1] = 1.0f / proj_vk[5];
 	push->projInfo[2] = proj_vk[10];
 	push->projInfo[3] = proj_vk[14];
+	push->materialParams[0] = r_deferredDefaultMetalness ?
+		Com_Clamp( 0.0f, 1.0f, r_deferredDefaultMetalness->value ) : 0.0f;
+	push->materialParams[1] = r_deferredDefaultRoughness ?
+		Com_Clamp( 0.04f, 1.0f, r_deferredDefaultRoughness->value ) : 0.55f;
+	push->materialParams[2] = r_deferredNormalEdgeThreshold ?
+		Com_Clamp( 0.001f, 1.0f, r_deferredNormalEdgeThreshold->value ) : 0.08f;
+	push->materialParams[3] = 0.0f;
 }
 
 void vk_deferred_gbuffer_capture_after_geometry( void )
