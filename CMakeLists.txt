@@ -3824,6 +3824,21 @@ if(BUILD_UNIT_TESTS)
 	add_test(NAME unit_oscar_protocol COMMAND unit_oscar_protocol)
 	set_tests_properties(unit_oscar_protocol PROPERTIES LABELS "unit;networking;oscar;validation")
 
+	add_executable(unit_oscar_raw
+		tests/unit/test_oscar_raw.c
+		tests/stub_qcommon_min.c
+		engine/core/net_oscar_raw.c
+		engine/core/q_shared.c
+		engine/core/q_math.c)
+	target_include_directories(unit_oscar_raw PRIVATE
+		${CMAKE_SOURCE_DIR}
+		${CMAKE_SOURCE_DIR}/engine/core)
+	if(NOT MSVC)
+		target_link_libraries(unit_oscar_raw PRIVATE m)
+	endif()
+	add_test(NAME unit_oscar_raw COMMAND unit_oscar_raw)
+	set_tests_properties(unit_oscar_raw PROPERTIES LABELS "unit;networking;oscar;validation")
+
 	add_executable(unit_parse
 		tests/unit/test_parse.c
 		tests/stub_qcommon_min.c

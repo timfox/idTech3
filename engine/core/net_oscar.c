@@ -13,6 +13,7 @@ OSCAR/TOC protocol semantics; the engine only exchanges validated JSON events.
 #include "qcommon.h"
 #include "net_oscar.h"
 #include "net_oscar_protocol.h"
+#include "net_oscar_raw.h"
 
 #include <errno.h>
 #include <string.h>
@@ -42,15 +43,36 @@ typedef int oscarSocket_t;
 #define OSCAR_EVENT_QUEUE 16
 #define OSCAR_RECV_BUFFER 8192
 
+typedef enum {
+	OSCAR_MODE_GATEWAY = 0,
+	OSCAR_MODE_DIRECT
+} oscarMode_t;
+
+typedef enum {
+	OSCAR_DIRECT_NONE = 0,
+	OSCAR_DIRECT_AUTH_WAIT_GREETING,
+	OSCAR_DIRECT_AUTH_WAIT_REPLY,
+	OSCAR_DIRECT_BOS_WAIT_GREETING,
+	OSCAR_DIRECT_BOS_WAIT_ONLINE,
+	OSCAR_DIRECT_ONLINE
+} oscarDirectPhase_t;
+
 typedef struct {
 	qboolean initialized;
 	oscarState_t state;
+	oscarMode_t mode;
+	oscarDirectPhase_t directPhase;
 	oscarSocket_t socket;
 	qboolean handshakeSent;
 	qboolean handshakeDone;
+	unsigned short flapSequence;
 	int nextRequestId;
 	int reconnectAttempt;
 	int reconnectAt;
+	char bosHost[128];
+	int bosPort;
+	byte authCookie[OSCAR_RAW_MAX_COOKIE];
+	int authCookieLen;
 	char currentRoom[MAX_QPATH];
 	char lastError[256];
 	byte recvBuffer[OSCAR_RECV_BUFFER];
@@ -63,10 +85,12 @@ typedef struct {
 static oscarClient_t oscar;
 
 static cvar_t *oscar_enable;
+static cvar_t *oscar_mode;
 static cvar_t *oscar_gateway;
 static cvar_t *oscar_gatewayPort;
 static cvar_t *oscar_account;
 static cvar_t *oscar_token;
+static cvar_t *oscar_password;
 static cvar_t *oscar_defaultRoom;
 static cvar_t *oscar_reconnect;
 static cvar_t *oscar_reconnectMaxDelay;
@@ -76,16 +100,19 @@ static cvar_t *oscar_presence;
 static void OSCAR_RegisterCvars( void )
 {
 	const char *envToken;
+	const char *envPassword;
 
 	if ( oscar_enable ) {
 		return;
 	}
 
 	oscar_enable = Cvar_Get( "oscar_enable", "0", CVAR_ARCHIVE_ND );
+	oscar_mode = Cvar_Get( "oscar_mode", "direct", CVAR_ARCHIVE_ND );
 	oscar_gateway = Cvar_Get( "oscar_gateway", "127.0.0.1", CVAR_ARCHIVE_ND );
-	oscar_gatewayPort = Cvar_Get( "oscar_gatewayPort", "5191", CVAR_ARCHIVE_ND );
+	oscar_gatewayPort = Cvar_Get( "oscar_gatewayPort", "5190", CVAR_ARCHIVE_ND );
 	oscar_account = Cvar_Get( "oscar_account", "", CVAR_ARCHIVE_ND );
 	oscar_token = Cvar_Get( "oscar_token", "", CVAR_PROTECTED | CVAR_NORESTART );
+	oscar_password = Cvar_Get( "oscar_password", "", CVAR_PROTECTED | CVAR_NORESTART );
 	oscar_defaultRoom = Cvar_Get( "oscar_defaultRoom", "", CVAR_ARCHIVE_ND );
 	oscar_reconnect = Cvar_Get( "oscar_reconnect", "1", CVAR_ARCHIVE_ND );
 	oscar_reconnectMaxDelay = Cvar_Get( "oscar_reconnectMaxDelay", "60", CVAR_ARCHIVE_ND );
@@ -96,12 +123,18 @@ static void OSCAR_RegisterCvars( void )
 	if ( envToken && envToken[0] && !oscar_token->string[0] ) {
 		Cvar_Set( "oscar_token", envToken );
 	}
+	envPassword = getenv( "IDTECH3_OSCAR_PASSWORD" );
+	if ( envPassword && envPassword[0] && !oscar_password->string[0] ) {
+		Cvar_Set( "oscar_password", envPassword );
+	}
 
-	Cvar_SetDescription( oscar_enable, "Enable Open OSCAR gateway integration (0=off, 1=on)." );
-	Cvar_SetDescription( oscar_gateway, "Open OSCAR gateway address. Use localhost or a numeric private IP to avoid DNS stalls." );
-	Cvar_SetDescription( oscar_gatewayPort, "Open OSCAR gateway WebSocket port." );
-	Cvar_SetDescription( oscar_account, "Gateway service account name. Passwords stay outside archived cvars." );
+	Cvar_SetDescription( oscar_enable, "Enable Open OSCAR integration (0=off, 1=on)." );
+	Cvar_SetDescription( oscar_mode, "Open OSCAR transport mode: direct raw FLAP/BOS client or gateway WebSocket bridge." );
+	Cvar_SetDescription( oscar_gateway, "Open OSCAR host. Use localhost or a numeric private IP to avoid DNS stalls." );
+	Cvar_SetDescription( oscar_gatewayPort, "Open OSCAR port. Direct mode usually uses 5190; gateway mode usually uses 5191." );
+	Cvar_SetDescription( oscar_account, "OSCAR screen name or gateway service account name." );
 	Cvar_SetDescription( oscar_token, "Short-lived gateway token; prefer IDTECH3_OSCAR_TOKEN." );
+	Cvar_SetDescription( oscar_password, "Raw OSCAR account password for direct mode; prefer IDTECH3_OSCAR_PASSWORD." );
 	Cvar_SetDescription( oscar_defaultRoom, "Default OSCAR room for server announcements." );
 	Cvar_SetDescription( oscar_reconnect, "Reconnect to the OSCAR gateway after disconnects (0=off, 1=on)." );
 	Cvar_SetDescription( oscar_reconnectMaxDelay, "Maximum OSCAR gateway reconnect delay in seconds." );
@@ -168,10 +201,17 @@ static int OSCAR_BackoffMs( void )
 	return delay;
 }
 
-static qboolean OSCAR_BuildGatewayAddress( struct sockaddr_storage *addr, int *addrLen, int *family )
+static oscarMode_t OSCAR_ConfiguredMode( void )
 {
-	const char *host = ( oscar_gateway && oscar_gateway->string[0] ) ? oscar_gateway->string : "127.0.0.1";
-	int port = oscar_gatewayPort ? oscar_gatewayPort->integer : 5191;
+	if ( oscar_mode && oscar_mode->string[0] && !Q_stricmp( oscar_mode->string, "gateway" ) ) {
+		return OSCAR_MODE_GATEWAY;
+	}
+	return OSCAR_MODE_DIRECT;
+}
+
+static qboolean OSCAR_BuildAddress( const char *hostIn, int port, struct sockaddr_storage *addr, int *addrLen, int *family )
+{
+	const char *host = ( hostIn && hostIn[0] ) ? hostIn : "127.0.0.1";
 	struct sockaddr_in *addr4;
 	struct sockaddr_in6 *addr6;
 
@@ -212,14 +252,14 @@ static qboolean OSCAR_BuildGatewayAddress( struct sockaddr_storage *addr, int *a
 	return qfalse;
 }
 
-static qboolean OSCAR_OpenSocket( void )
+static qboolean OSCAR_OpenSocketTo( const char *host, int port )
 {
 	struct sockaddr_storage addr;
 	int addrLen = 0;
 	int family = AF_UNSPEC;
 	int err;
 
-	if ( !OSCAR_BuildGatewayAddress( &addr, &addrLen, &family ) ) {
+	if ( !OSCAR_BuildAddress( host, port, &addr, &addrLen, &family ) ) {
 		return qfalse;
 	}
 
@@ -240,6 +280,12 @@ static qboolean OSCAR_OpenSocket( void )
 	return qtrue;
 }
 
+static qboolean OSCAR_OpenConfiguredSocket( void )
+{
+	return OSCAR_OpenSocketTo( oscar_gateway ? oscar_gateway->string : "127.0.0.1",
+		oscar_gatewayPort ? oscar_gatewayPort->integer : 5190 );
+}
+
 static qboolean OSCAR_SendRaw( const void *data, int len )
 {
 	int sent;
@@ -252,6 +298,65 @@ static qboolean OSCAR_SendRaw( const void *data, int len )
 		return qfalse;
 	}
 	return (qboolean)( sent == len );
+}
+
+static qboolean OSCAR_SendRawFrameBuffer( const byte *frame, int frameLen )
+{
+	if ( !frame || frameLen <= 0 ) {
+		OSCAR_SetError( "failed to build raw OSCAR frame" );
+		return qfalse;
+	}
+	return OSCAR_SendRaw( frame, frameLen );
+}
+
+static qboolean OSCAR_DirectSendLogin( void )
+{
+	byte frame[OSCAR_RAW_MAX_FRAME];
+	int len;
+
+	if ( !oscar_account || !oscar_account->string[0] || !oscar_password || !oscar_password->string[0] ) {
+		OSCAR_SetError( "oscar_account/oscar_password required for direct OSCAR auth" );
+		return qfalse;
+	}
+
+	len = OSCAR_RawBuildLoginSignon( oscar.flapSequence++, oscar_account->string, oscar_password->string, frame, sizeof( frame ) );
+	oscar.state = OSCAR_STATE_AUTHENTICATING;
+	oscar.directPhase = OSCAR_DIRECT_AUTH_WAIT_REPLY;
+	return OSCAR_SendRawFrameBuffer( frame, len );
+}
+
+static qboolean OSCAR_DirectSendCookie( void )
+{
+	byte frame[OSCAR_RAW_MAX_FRAME];
+	int len;
+
+	len = OSCAR_RawBuildCookieSignon( oscar.flapSequence++, oscar.authCookie, oscar.authCookieLen, frame, sizeof( frame ) );
+	oscar.directPhase = OSCAR_DIRECT_BOS_WAIT_ONLINE;
+	return OSCAR_SendRawFrameBuffer( frame, len );
+}
+
+static qboolean OSCAR_DirectSendClientOnline( void )
+{
+	byte frame[OSCAR_RAW_MAX_FRAME];
+	int len = OSCAR_RawBuildClientOnline( oscar.flapSequence++, (unsigned int)oscar.nextRequestId++, frame, sizeof( frame ) );
+	return OSCAR_SendRawFrameBuffer( frame, len );
+}
+
+static qboolean OSCAR_DirectReconnectBOS( void )
+{
+	char host[sizeof( oscar.bosHost )];
+	int port = oscar.bosPort > 0 ? oscar.bosPort : 5190;
+
+	Q_strncpyz( host, oscar.bosHost[0] ? oscar.bosHost : ( oscar_gateway ? oscar_gateway->string : "127.0.0.1" ), sizeof( host ) );
+	OSCAR_CloseSocket();
+	if ( !OSCAR_OpenSocketTo( host, port ) ) {
+		oscar.state = OSCAR_STATE_ERROR;
+		return qfalse;
+	}
+	oscar.state = OSCAR_STATE_CONNECTING;
+	oscar.directPhase = OSCAR_DIRECT_BOS_WAIT_GREETING;
+	Com_Printf( "OSCAR: connecting raw BOS session to %s:%d\n", host, port );
+	return qtrue;
 }
 
 static qboolean OSCAR_SendHandshake( void )
@@ -399,7 +504,7 @@ static void OSCAR_HandleText( const char *text )
 	}
 }
 
-static void OSCAR_ProcessFrames( void )
+static void OSCAR_ProcessWebSocketFrames( void )
 {
 	int offset = 0;
 
@@ -450,6 +555,118 @@ static void OSCAR_ProcessFrames( void )
 	}
 }
 
+static void OSCAR_HandleRawSnac( const oscarRawSnac_t *snac )
+{
+	oscarEvent_t ev;
+
+	if ( !snac ) {
+		return;
+	}
+
+	if ( snac->family == 0x0001 && snac->subtype == 0x0003 ) {
+		oscar.state = OSCAR_STATE_ONLINE;
+		oscar.directPhase = OSCAR_DIRECT_ONLINE;
+		oscar.reconnectAttempt = 0;
+		Com_Printf( "OSCAR: raw BOS session online\n" );
+		OSCAR_DirectSendClientOnline();
+		Com_Memset( &ev, 0, sizeof( ev ) );
+		ev.type = OSCAR_EVENT_CONNECTED;
+		ev.ok = qtrue;
+		OSCAR_QueueEvent( &ev );
+		return;
+	}
+
+	if ( OSCAR_RawParseIncomingIM( snac, &ev ) ) {
+		OSCAR_HandleEvent( &ev );
+	}
+}
+
+static void OSCAR_HandleRawFlap( const oscarRawFlapFrame_t *flap )
+{
+	oscarRawAuthReply_t authReply;
+	oscarRawSnac_t snac;
+	char err[128];
+
+	if ( !flap ) {
+		return;
+	}
+
+	if ( oscar_debug && oscar_debug->integer ) {
+		Com_Printf( "OSCAR raw <- channel=%d len=%d phase=%d\n", flap->channel, flap->payloadLen, oscar.directPhase );
+	}
+
+	switch ( flap->channel ) {
+	case OSCAR_RAW_FLAP_SIGNON:
+		if ( oscar.directPhase == OSCAR_DIRECT_AUTH_WAIT_GREETING ) {
+			OSCAR_DirectSendLogin();
+		} else if ( oscar.directPhase == OSCAR_DIRECT_BOS_WAIT_GREETING ) {
+			OSCAR_DirectSendCookie();
+		}
+		break;
+	case OSCAR_RAW_FLAP_SIGNOFF:
+		if ( oscar.directPhase == OSCAR_DIRECT_AUTH_WAIT_REPLY &&
+		     OSCAR_RawParseAuthReply( flap->payload, flap->payloadLen, &authReply ) ) {
+			if ( authReply.errorCode ) {
+				Com_sprintf( err, sizeof( err ), "raw OSCAR auth failed: 0x%04x", authReply.errorCode );
+				OSCAR_SetError( err );
+				OSCAR_Disconnect( err );
+				return;
+			}
+			Q_strncpyz( oscar.bosHost, authReply.bosHost, sizeof( oscar.bosHost ) );
+			oscar.bosPort = authReply.bosPort;
+			Com_Memcpy( oscar.authCookie, authReply.cookie, authReply.cookieLen );
+			oscar.authCookieLen = authReply.cookieLen;
+			OSCAR_DirectReconnectBOS();
+		} else {
+			OSCAR_Disconnect( "raw OSCAR signoff" );
+		}
+		break;
+	case OSCAR_RAW_FLAP_DATA:
+		if ( OSCAR_RawParseSnac( flap->payload, flap->payloadLen, &snac ) ) {
+			OSCAR_HandleRawSnac( &snac );
+		}
+		break;
+	case OSCAR_RAW_FLAP_ERROR:
+		OSCAR_Disconnect( "raw OSCAR FLAP error" );
+		break;
+	case OSCAR_RAW_FLAP_KEEPALIVE:
+		break;
+	default:
+		break;
+	}
+}
+
+static void OSCAR_ProcessRawFrames( void )
+{
+	int offset = 0;
+
+	while ( oscar.recvLen - offset >= 6 ) {
+		oscarRawFlapFrame_t flap;
+		int consumed = 0;
+
+		if ( !OSCAR_RawParseFlap( oscar.recvBuffer + offset, oscar.recvLen - offset, &flap, &consumed ) ) {
+			if ( consumed < 0 ) {
+				OSCAR_Disconnect( "invalid raw OSCAR frame" );
+				return;
+			}
+			break;
+		}
+
+		OSCAR_HandleRawFlap( &flap );
+		if ( oscar.socket == OSCAR_INVALID_SOCKET || oscar.recvLen == 0 ) {
+			return;
+		}
+		offset += consumed;
+	}
+
+	if ( offset > 0 ) {
+		oscar.recvLen -= offset;
+		if ( oscar.recvLen > 0 ) {
+			memmove( oscar.recvBuffer, oscar.recvBuffer + offset, (size_t)oscar.recvLen );
+		}
+	}
+}
+
 static void OSCAR_ReadSocket( void )
 {
 	int n;
@@ -478,6 +695,10 @@ static void OSCAR_ReadSocket( void )
 	}
 
 	if ( !oscar.handshakeDone ) {
+		if ( oscar.mode == OSCAR_MODE_DIRECT ) {
+			OSCAR_ProcessRawFrames();
+			return;
+		}
 		char *end = strstr( (char *)oscar.recvBuffer, "\r\n\r\n" );
 		if ( end ) {
 			if ( !strstr( (char *)oscar.recvBuffer, " 101 " ) ) {
@@ -495,7 +716,11 @@ static void OSCAR_ReadSocket( void )
 		return;
 	}
 
-	OSCAR_ProcessFrames();
+	if ( oscar.mode == OSCAR_MODE_DIRECT ) {
+		OSCAR_ProcessRawFrames();
+	} else {
+		OSCAR_ProcessWebSocketFrames();
+	}
 }
 
 void OSCAR_Init( void )
@@ -505,8 +730,10 @@ void OSCAR_Init( void )
 	oscar.initialized = qtrue;
 	oscar.socket = OSCAR_INVALID_SOCKET;
 	oscar.state = OSCAR_STATE_DISABLED;
+	oscar.mode = OSCAR_ConfiguredMode();
 	oscar.nextRequestId = 1;
-	Com_Printf( "OSCAR bridge: %s\n", oscar_enable->integer ? "enabled" : "disabled" );
+	Com_Printf( "OSCAR %s: %s\n", oscar.mode == OSCAR_MODE_DIRECT ? "direct client" : "gateway bridge",
+		oscar_enable->integer ? "enabled" : "disabled" );
 }
 
 void OSCAR_Shutdown( void )
@@ -537,16 +764,28 @@ qboolean OSCAR_Connect( void )
 	}
 
 	OSCAR_CloseSocket();
-	if ( !OSCAR_OpenSocket() ) {
+	oscar.mode = OSCAR_ConfiguredMode();
+	oscar.directPhase = OSCAR_DIRECT_NONE;
+	oscar.authCookieLen = 0;
+	oscar.bosHost[0] = '\0';
+	oscar.bosPort = 0;
+	if ( !OSCAR_OpenConfiguredSocket() ) {
 		oscar.state = OSCAR_STATE_ERROR;
 		return qfalse;
 	}
 
 	oscar.state = OSCAR_STATE_CONNECTING;
 	oscar.lastError[0] = '\0';
-	OSCAR_SendHandshake();
-	Com_Printf( "OSCAR: connecting to gateway %s:%d\n",
-		oscar_gateway->string, oscar_gatewayPort ? oscar_gatewayPort->integer : 5191 );
+	oscar.flapSequence = 0;
+	if ( oscar.mode == OSCAR_MODE_DIRECT ) {
+		oscar.directPhase = OSCAR_DIRECT_AUTH_WAIT_GREETING;
+		Com_Printf( "OSCAR: connecting raw FLAP auth to %s:%d\n",
+			oscar_gateway->string, oscar_gatewayPort ? oscar_gatewayPort->integer : 5190 );
+	} else {
+		OSCAR_SendHandshake();
+		Com_Printf( "OSCAR: connecting to gateway %s:%d\n",
+			oscar_gateway->string, oscar_gatewayPort ? oscar_gatewayPort->integer : 5191 );
+	}
 	return qtrue;
 }
 
@@ -593,7 +832,7 @@ void OSCAR_Frame( int realtime )
 	if ( oscar.state == OSCAR_STATE_RECONNECTING && Sys_Milliseconds() >= oscar.reconnectAt ) {
 		OSCAR_Connect();
 	}
-	if ( oscar.state == OSCAR_STATE_CONNECTING && !oscar.handshakeSent ) {
+	if ( oscar.mode == OSCAR_MODE_GATEWAY && oscar.state == OSCAR_STATE_CONNECTING && !oscar.handshakeSent ) {
 		OSCAR_SendHandshake();
 	}
 	if ( oscar.state == OSCAR_STATE_CONNECTING || oscar.state == OSCAR_STATE_AUTHENTICATING ||
@@ -615,9 +854,43 @@ static qboolean OSCAR_SendBuiltJson( qboolean ok, const char *json )
 	return OSCAR_SendJson( json );
 }
 
+static qboolean OSCAR_SendDirectIM( const char *screenName, const char *message )
+{
+	byte frame[OSCAR_RAW_MAX_FRAME];
+	int len;
+
+	if ( oscar.state != OSCAR_STATE_ONLINE || oscar.mode != OSCAR_MODE_DIRECT ) {
+		OSCAR_SetError( "raw OSCAR session is not online" );
+		return qfalse;
+	}
+	len = OSCAR_RawBuildIM( oscar.flapSequence++, (unsigned int)oscar.nextRequestId++, screenName, message, frame, sizeof( frame ) );
+	return OSCAR_SendRawFrameBuffer( frame, len );
+}
+
+static qboolean OSCAR_SendDirectPresence( const char *status )
+{
+	byte frame[OSCAR_RAW_MAX_FRAME];
+	int len;
+
+	if ( oscar.state != OSCAR_STATE_ONLINE || oscar.mode != OSCAR_MODE_DIRECT ) {
+		OSCAR_SetError( "raw OSCAR session is not online" );
+		return qfalse;
+	}
+	len = OSCAR_RawBuildPresence( oscar.flapSequence++, (unsigned int)oscar.nextRequestId++, status, frame, sizeof( frame ) );
+	if ( len <= 0 ) {
+		OSCAR_SetError( "unsupported raw OSCAR presence status" );
+		return qfalse;
+	}
+	return OSCAR_SendRawFrameBuffer( frame, len );
+}
+
 qboolean OSCAR_SendIM( const char *screenName, const char *message )
 {
 	char json[OSCAR_MAX_JSON_FRAME];
+
+	if ( oscar.mode == OSCAR_MODE_DIRECT ) {
+		return OSCAR_SendDirectIM( screenName, message );
+	}
 	return OSCAR_SendBuiltJson(
 		OSCAR_ProtocolBuildIM( json, sizeof( json ), oscar.nextRequestId++, screenName, message ), json );
 }
@@ -627,6 +900,10 @@ qboolean OSCAR_JoinRoom( const char *room )
 	char json[OSCAR_MAX_JSON_FRAME];
 	qboolean ok;
 
+	if ( oscar.mode == OSCAR_MODE_DIRECT ) {
+		OSCAR_SetError( "raw OSCAR room chat is not implemented; use gateway mode for rooms" );
+		return qfalse;
+	}
 	ok = OSCAR_ProtocolBuildJoinRoom( json, sizeof( json ), oscar.nextRequestId++, room );
 	if ( ok && room ) {
 		Q_strncpyz( oscar.currentRoom, room, sizeof( oscar.currentRoom ) );
@@ -638,8 +915,13 @@ qboolean OSCAR_LeaveRoom( const char *room )
 {
 	char json[OSCAR_MAX_JSON_FRAME];
 	const char *target = ( room && room[0] ) ? room : oscar.currentRoom;
-	qboolean ok = OSCAR_ProtocolBuildLeaveRoom( json, sizeof( json ), oscar.nextRequestId++, target );
+	qboolean ok;
 
+	if ( oscar.mode == OSCAR_MODE_DIRECT ) {
+		OSCAR_SetError( "raw OSCAR room chat is not implemented; use gateway mode for rooms" );
+		return qfalse;
+	}
+	ok = OSCAR_ProtocolBuildLeaveRoom( json, sizeof( json ), oscar.nextRequestId++, target );
 	if ( ok && ( !room || !room[0] || !Q_stricmp( oscar.currentRoom, room ) ) ) {
 		oscar.currentRoom[0] = '\0';
 	}
@@ -652,6 +934,10 @@ qboolean OSCAR_SendRoomMessage( const char *room, const char *message )
 	const char *target = ( room && room[0] ) ? room : oscar.currentRoom;
 	const char *sender = oscar_account && oscar_account->string[0] ? oscar_account->string : "idtech3";
 
+	if ( oscar.mode == OSCAR_MODE_DIRECT ) {
+		OSCAR_SetError( "raw OSCAR room chat is not implemented; use gateway mode for rooms" );
+		return qfalse;
+	}
 	return OSCAR_SendBuiltJson(
 		OSCAR_ProtocolBuildRoomMessage( json, sizeof( json ), oscar.nextRequestId++, target, sender, message ), json );
 }
@@ -659,6 +945,11 @@ qboolean OSCAR_SendRoomMessage( const char *room, const char *message )
 qboolean OSCAR_SetPresence( const char *status, const char *message )
 {
 	char json[OSCAR_MAX_JSON_FRAME];
+
+	if ( oscar.mode == OSCAR_MODE_DIRECT ) {
+		(void)message;
+		return OSCAR_SendDirectPresence( status );
+	}
 	return OSCAR_SendBuiltJson(
 		OSCAR_ProtocolBuildPresence( json, sizeof( json ), oscar.nextRequestId++, status, message ), json );
 }
