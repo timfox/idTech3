@@ -23,5 +23,7 @@ int CL_P2P_SessionAttemptCount( void );
 qboolean CL_P2P_SessionPending( void );
 qboolean CL_P2P_SessionMigratePending( void );
 const char *CL_P2P_SessionMigrateAddress( void );
+const char *CL_P2P_SessionCurrentTarget( void );
+const char *CL_P2P_SessionRecoveryStopReason( void );
 
 #endif /* CL_P2P_SESSION_H */

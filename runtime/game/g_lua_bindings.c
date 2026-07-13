@@ -1650,6 +1650,10 @@ static int l_p2p_getSession( lua_State *L )
 	lua_setfield( L, -2, "migratePending" );
 	lua_pushstring( L, CL_P2P_SessionMigrateAddress() );
 	lua_setfield( L, -2, "migrateAddress" );
+	lua_pushstring( L, CL_P2P_SessionCurrentTarget() );
+	lua_setfield( L, -2, "currentTarget" );
+	lua_pushstring( L, CL_P2P_SessionRecoveryStopReason() );
+	lua_setfield( L, -2, "recoveryStopReason" );
 	lua_pushboolean( L, CL_P2P_SessionIsBackupHostEligible() );
 	lua_setfield( L, -2, "backupHostEligible" );
 

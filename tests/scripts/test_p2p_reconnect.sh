@@ -22,6 +22,14 @@ grep -q 'p2pReconnect' runtime/server/sv_main.c || fail "missing p2pReconnect OO
 grep -q 'CL_P2P_SessionPrepareDisconnect' runtime/client/core/cl_p2p_session.c || fail "missing disconnect prepare"
 grep -q 'CL_P2P_SessionOnConnectFromServerInfo' runtime/client/core/cl_p2p_session.c || fail "missing serverinfo session cache"
 grep -q 'CL_P2P_SessionFrame' runtime/client/core/cl_frame.c || fail "missing session frame hook"
+grep -q 'cl_p2pReconnectMaxAttempts' runtime/client/core/cl_p2p_session.c || fail "missing reconnect attempt cap"
+grep -q 'cl_p2pReconnectJitterMs' runtime/client/core/cl_p2p_session.c || fail "missing reconnect jitter control"
+grep -q 'p2p_reconnect_stopped' runtime/client/core/cl_p2p_session.c || fail "missing reconnect stop event"
+grep -q 'CL_P2P_SessionCurrentTarget' runtime/client/core/cl_p2p_session.c || fail "missing current reconnect target tracking"
+grep -q 'CL_P2P_SessionRecoveryStopReason' runtime/client/core/cl_p2p_session.c || fail "missing reconnect stop reason tracking"
+grep -q 'currentTarget' runtime/game/g_lua_bindings.c || fail "missing Lua current reconnect target exposure"
+grep -q 'recoveryStopReason' runtime/game/g_lua_bindings.c || fail "missing Lua reconnect stop reason exposure"
+grep -q 'cl_p2pReconnectMaxAttempts' docs/P2P_NETWORKING.md || fail "missing reconnect attempt cap docs"
 
 if [ "${IDTECH3_P2P_RECONNECT_LIVE:-0}" != "1" ]; then
 	pass "test_p2p_reconnect: static checks ok (set IDTECH3_P2P_RECONNECT_LIVE=1 for live)"

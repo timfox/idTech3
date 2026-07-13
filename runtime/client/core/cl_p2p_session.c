@@ -19,35 +19,46 @@ typedef struct {
 	qboolean active;
 	char sessionId[64];
 	char p2pAddr[MAX_STRING_CHARS];
+	char currentTarget[MAX_STRING_CHARS];
 	char failover[32];
 	int reconnectWindowSec;
 	int disconnectTime;
 	int nextAttemptTime;
 	int attemptCount;
+	int lastAttemptTime;
 	qboolean pending;
 	qboolean migratePending;
 	char migrateAddr[MAX_STRING_CHARS];
+	char recoveryStopReason[32];
 } cl_p2p_session_t;
 
 static cvar_t *cl_p2pAutoReconnect;
 static cvar_t *cl_p2pReconnectLog;
 static cvar_t *cl_p2pBackupHost;
+static cvar_t *cl_p2pReconnectMaxAttempts;
+static cvar_t *cl_p2pReconnectJitterMs;
 
 static cl_p2p_session_t cl_p2pSession;
 static qboolean cl_p2pDisconnectServerInitiated;
+static char cl_p2pLastRecoveryStopReason[32];
 
 static void CL_P2P_SessionRegisterCvars( void )
 {
-	if ( cl_p2pAutoReconnect && cl_p2pReconnectLog && cl_p2pBackupHost ) {
+	if ( cl_p2pAutoReconnect && cl_p2pReconnectLog && cl_p2pBackupHost &&
+	     cl_p2pReconnectMaxAttempts && cl_p2pReconnectJitterMs ) {
 		return;
 	}
 
 	cl_p2pAutoReconnect = Cvar_Get( "cl_p2pAutoReconnect", "1", CVAR_ARCHIVE_ND );
 	cl_p2pReconnectLog = Cvar_Get( "cl_p2pReconnectLog", "1", CVAR_ARCHIVE_ND );
 	cl_p2pBackupHost = Cvar_Get( "cl_p2pBackupHost", "1", CVAR_ARCHIVE_ND );
+	cl_p2pReconnectMaxAttempts = Cvar_Get( "cl_p2pReconnectMaxAttempts", "6", CVAR_ARCHIVE_ND );
+	cl_p2pReconnectJitterMs = Cvar_Get( "cl_p2pReconnectJitterMs", "250", CVAR_ARCHIVE_ND );
 	Cvar_SetDescription( cl_p2pAutoReconnect, "Auto-reconnect within advertised P2P reconnect window (0=off, 1=on)." );
 	Cvar_SetDescription( cl_p2pReconnectLog, "Log P2P reconnect attempts (0=off, 1=on)." );
 	Cvar_SetDescription( cl_p2pBackupHost, "Eligible to promote as backup listen host on migration (0=off, 1=on)." );
+	Cvar_SetDescription( cl_p2pReconnectMaxAttempts, "Maximum reconnect attempts within a P2P recovery window (0=unbounded)." );
+	Cvar_SetDescription( cl_p2pReconnectJitterMs, "Extra random delay added to each scheduled P2P reconnect attempt in milliseconds." );
 }
 
 static qboolean CL_P2P_SessionFailoverAllowsRecovery( void )
@@ -71,9 +82,61 @@ static int CL_P2P_SessionBackoffMs( int attempt )
 	return ms;
 }
 
+static int CL_P2P_SessionScheduleDelayMs( int attempt )
+{
+	int jitterMs = 0;
+	int delayMs = CL_P2P_SessionBackoffMs( attempt );
+
+	if ( cl_p2pReconnectJitterMs && cl_p2pReconnectJitterMs->integer > 0 ) {
+		jitterMs = rand() % ( cl_p2pReconnectJitterMs->integer + 1 );
+	}
+
+	return delayMs + jitterMs;
+}
+
+static void CL_P2P_SessionSetStopReason( const char *reason )
+{
+	if ( reason && reason[0] ) {
+		Q_strncpyz( cl_p2pSession.recoveryStopReason, reason, sizeof( cl_p2pSession.recoveryStopReason ) );
+		Q_strncpyz( cl_p2pLastRecoveryStopReason, reason, sizeof( cl_p2pLastRecoveryStopReason ) );
+	} else {
+		cl_p2pSession.recoveryStopReason[0] = '\0';
+	}
+}
+
+static void CL_P2P_SessionAdoptTarget( const char *target, qboolean clearMigrate )
+{
+	if ( !target || !target[0] ) {
+		return;
+	}
+
+	Q_strncpyz( cl_p2pSession.currentTarget, target, sizeof( cl_p2pSession.currentTarget ) );
+	Q_strncpyz( cl_p2pSession.p2pAddr, target, sizeof( cl_p2pSession.p2pAddr ) );
+	if ( clearMigrate ) {
+		cl_p2pSession.migratePending = qfalse;
+		cl_p2pSession.migrateAddr[0] = '\0';
+	}
+}
+
+static qboolean CL_P2P_SessionSelectTarget( char *buffer, size_t bufferSize )
+{
+	if ( cl_p2pSession.migratePending && cl_p2pSession.migrateAddr[0] ) {
+		Q_strncpyz( buffer, cl_p2pSession.migrateAddr, bufferSize );
+		return qtrue;
+	}
+
+	if ( cl_p2pSession.p2pAddr[0] ) {
+		Q_strncpyz( buffer, cl_p2pSession.p2pAddr, bufferSize );
+		return qtrue;
+	}
+
+	return qfalse;
+}
+
 void CL_P2P_SessionInit( void )
 {
 	CL_P2P_SessionRegisterCvars();
+	cl_p2pLastRecoveryStopReason[0] = '\0';
 	Com_Printf( "P2P session: auto-reconnect %s\n",
 		( cl_p2pAutoReconnect && cl_p2pAutoReconnect->integer ) ? "enabled" : "disabled" );
 }
@@ -87,12 +150,14 @@ void CL_P2P_SessionOnConnect( const char *sessionId, const char *p2pAddr, const 
 {
 	CL_P2P_SessionRegisterCvars();
 	Com_Memset( &cl_p2pSession, 0, sizeof( cl_p2pSession ) );
+	cl_p2pLastRecoveryStopReason[0] = '\0';
 	cl_p2pSession.active = qtrue;
 	if ( sessionId && sessionId[0] ) {
 		Q_strncpyz( cl_p2pSession.sessionId, sessionId, sizeof( cl_p2pSession.sessionId ) );
 	}
 	if ( p2pAddr && p2pAddr[0] ) {
 		Q_strncpyz( cl_p2pSession.p2pAddr, p2pAddr, sizeof( cl_p2pSession.p2pAddr ) );
+		Q_strncpyz( cl_p2pSession.currentTarget, p2pAddr, sizeof( cl_p2pSession.currentTarget ) );
 	}
 	if ( failover && failover[0] ) {
 		Q_strncpyz( cl_p2pSession.failover, failover, sizeof( cl_p2pSession.failover ) );
@@ -199,6 +264,7 @@ void CL_P2P_SessionOnDisconnect( qboolean serverInitiated )
 	CL_P2P_SessionRegisterCvars();
 
 	if ( !serverInitiated ) {
+		CL_P2P_SessionSetStopReason( "client_disconnect" );
 		if ( hadActive ) {
 			Com_ScriptEmitEvent( "p2p_session_disconnect",
 				cl_p2pSession.p2pAddr, cl_p2pSession.sessionId, 0, 0 );
@@ -208,16 +274,19 @@ void CL_P2P_SessionOnDisconnect( qboolean serverInitiated )
 	}
 
 	if ( !cl_p2pSession.active || !NET_P2P_IsEnabled() ) {
+		CL_P2P_SessionSetStopReason( "transport_disabled" );
 		Com_Memset( &cl_p2pSession, 0, sizeof( cl_p2pSession ) );
 		return;
 	}
 
 	if ( !cl_p2pAutoReconnect || !cl_p2pAutoReconnect->integer ) {
+		CL_P2P_SessionSetStopReason( "auto_disabled" );
 		Com_Memset( &cl_p2pSession, 0, sizeof( cl_p2pSession ) );
 		return;
 	}
 
 	if ( !CL_P2P_SessionFailoverAllowsRecovery() || cl_p2pSession.reconnectWindowSec <= 0 ) {
+		CL_P2P_SessionSetStopReason( "policy_blocked" );
 		Com_Memset( &cl_p2pSession, 0, sizeof( cl_p2pSession ) );
 		return;
 	}
@@ -225,8 +294,10 @@ void CL_P2P_SessionOnDisconnect( qboolean serverInitiated )
 	now = Sys_Milliseconds();
 	cl_p2pSession.disconnectTime = now;
 	cl_p2pSession.pending = qtrue;
-	cl_p2pSession.nextAttemptTime = now + CL_P2P_SessionBackoffMs( 0 );
+	cl_p2pSession.nextAttemptTime = now + CL_P2P_SessionScheduleDelayMs( 0 );
 	cl_p2pSession.attemptCount = 0;
+	cl_p2pSession.lastAttemptTime = 0;
+	CL_P2P_SessionSetStopReason( "" );
 	Com_ScriptEmitEvent( "p2p_session_disconnect",
 		cl_p2pSession.p2pAddr, cl_p2pSession.sessionId, 1, 0 );
 	Com_ScriptEmitEvent( "p2p_reconnect_scheduled",
@@ -254,12 +325,24 @@ void CL_P2P_SessionOnMigrate( const char *sessionId, const char *newP2pAddr )
 		return;
 	}
 
+	if ( cl_p2pSession.migratePending && Q_stricmp( cl_p2pSession.migrateAddr, newP2pAddr ) == 0 ) {
+		return;
+	}
+
+	if ( cl_p2pSession.p2pAddr[0] && Q_stricmp( cl_p2pSession.p2pAddr, newP2pAddr ) == 0 ) {
+		cl_p2pSession.migratePending = qfalse;
+		cl_p2pSession.migrateAddr[0] = '\0';
+		return;
+	}
+
 	Q_strncpyz( cl_p2pSession.migrateAddr, newP2pAddr, sizeof( cl_p2pSession.migrateAddr ) );
 	cl_p2pSession.migratePending = qtrue;
 	cl_p2pSession.pending = qtrue;
 	cl_p2pSession.disconnectTime = Sys_Milliseconds();
 	cl_p2pSession.nextAttemptTime = cl_p2pSession.disconnectTime + 500;
 	cl_p2pSession.attemptCount = 0;
+	cl_p2pSession.lastAttemptTime = 0;
+	CL_P2P_SessionSetStopReason( "" );
 	Com_ScriptEmitEvent( "p2p_session_migrate",
 		cl_p2pSession.migrateAddr, sessionId, 1, 0 );
 
@@ -295,25 +378,40 @@ void CL_P2P_SessionFrame( void )
 		Com_ScriptEmitEvent( "p2p_reconnect_expired",
 			cl_p2pSession.p2pAddr, cl_p2pSession.sessionId,
 			cl_p2pSession.attemptCount, 0 );
+		CL_P2P_SessionSetStopReason( "window_expired" );
 		CL_P2P_SessionShutdown();
 		return;
 	}
 
 	if ( cls.state != CA_DISCONNECTED && cls.state != CA_CONNECTING ) {
+		CL_P2P_SessionSetStopReason( "client_state_changed" );
 		cl_p2pSession.pending = qfalse;
 		return;
 	}
 
-	cl_p2pSession.attemptCount++;
-
-	if ( cl_p2pSession.migratePending && cl_p2pSession.migrateAddr[0] ) {
-		Q_strncpyz( connectTarget, cl_p2pSession.migrateAddr, sizeof( connectTarget ) );
-	} else if ( cl_p2pSession.p2pAddr[0] ) {
-		Q_strncpyz( connectTarget, cl_p2pSession.p2pAddr, sizeof( connectTarget ) );
-	} else {
+	if ( cl_p2pReconnectMaxAttempts && cl_p2pReconnectMaxAttempts->integer > 0 &&
+	     cl_p2pSession.attemptCount >= cl_p2pReconnectMaxAttempts->integer ) {
+		if ( cl_p2pReconnectLog && cl_p2pReconnectLog->integer ) {
+			Com_Printf( "P2P reconnect: stopping after %d attempts\n",
+				cl_p2pSession.attemptCount );
+		}
+		Com_ScriptEmitEvent( "p2p_reconnect_stopped",
+			cl_p2pSession.p2pAddr, cl_p2pSession.sessionId,
+			cl_p2pSession.attemptCount, remainsSec );
+		CL_P2P_SessionSetStopReason( "attempt_limit" );
 		CL_P2P_SessionShutdown();
 		return;
 	}
+
+	if ( !CL_P2P_SessionSelectTarget( connectTarget, sizeof( connectTarget ) ) ) {
+		CL_P2P_SessionSetStopReason( "no_target" );
+		CL_P2P_SessionShutdown();
+		return;
+	}
+
+	cl_p2pSession.attemptCount++;
+	cl_p2pSession.lastAttemptTime = now;
+	Q_strncpyz( cl_p2pSession.currentTarget, connectTarget, sizeof( cl_p2pSession.currentTarget ) );
 
 	if ( cl_p2pReconnectLog && cl_p2pReconnectLog->integer ) {
 		Com_Printf( "P2P reconnect: attempt %d, window %ds remaining -> %s\n",
@@ -323,9 +421,13 @@ void CL_P2P_SessionFrame( void )
 		connectTarget, cl_p2pSession.sessionId,
 		cl_p2pSession.attemptCount, remainsSec );
 
+	if ( cl_p2pSession.migratePending && cl_p2pSession.migrateAddr[0] ) {
+		CL_P2P_SessionAdoptTarget( cl_p2pSession.migrateAddr, qtrue );
+	}
+
 	NET_P2P_BeginConnectPath( connectTarget );
 	Cbuf_AddText( va( "connect %s\n", connectTarget ) );
-	cl_p2pSession.nextAttemptTime = now + CL_P2P_SessionBackoffMs( cl_p2pSession.attemptCount );
+	cl_p2pSession.nextAttemptTime = now + CL_P2P_SessionScheduleDelayMs( cl_p2pSession.attemptCount );
 }
 
 qboolean CL_P2P_SessionHandleOobPacket( const netadr_t *from, const char *cmd )
@@ -389,4 +491,17 @@ qboolean CL_P2P_SessionMigratePending( void )
 const char *CL_P2P_SessionMigrateAddress( void )
 {
 	return cl_p2pSession.migrateAddr;
+}
+
+const char *CL_P2P_SessionCurrentTarget( void )
+{
+	return cl_p2pSession.currentTarget;
+}
+
+const char *CL_P2P_SessionRecoveryStopReason( void )
+{
+	if ( cl_p2pSession.recoveryStopReason[0] ) {
+		return cl_p2pSession.recoveryStopReason;
+	}
+	return cl_p2pLastRecoveryStopReason;
 }

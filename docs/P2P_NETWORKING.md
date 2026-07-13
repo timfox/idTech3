@@ -147,6 +147,7 @@ The engine's current supported multiplayer model is:
 - **Transport**: `steam_sdr` or `direct_udp`
 - **NAT traversal**: host/STUN/TURN candidate gathering, ICE-lite connectivity checks, symmetric UDP punch helpers
 - **Reconnect**: `cl_p2pAutoReconnect 1` replays `connect` within advertised `p2preconn` window; server accepts `p2pReconnect <session>` fast-path
+- **Recovery policy controls**: `cl_p2pReconnectMaxAttempts` caps reconnect storms, `cl_p2pReconnectJitterMs` staggers retries, and `Engine.P2P.getSession()` now exposes `currentTarget` plus `recoveryStopReason`
 - **Versioning**: browser-visible protocol plus game/mod identity
 - **Anti-cheat posture**: browser-visible `sv_pure` / `sv_pureSigned` summary
 - **Failure recovery**: `p2pfail=reconnect` auto-rejoin; `p2pfail=migrate` promotes `cl_p2pBackupHost 1` client and broadcasts `p2pMigrate`
