@@ -11,7 +11,7 @@ Evidence for **Tier B** (automated + `GAME_BASE`) and **Tier C** (manual GPU / v
 | **Tier B locally** | `GAME_BASE=/abs/path/to/base ./scripts/renderer_regression_check.sh` then same with `renderer_regression_maps.sh`. Optional: `RELEASE_DIR` if binaries are not under `release/`. |
 | **Tier B on GitHub** | Self-hosted runner with labels `self-hosted` + `idtech3-tierb`; set `IDTECH3_GAME_BASE_PATH` as a **variable** or **secret** (see [SELF_HOSTED_TIER_B.md](SELF_HOSTED_TIER_B.md)). Workflow: `.github/workflows/renderer-tier-b.yml` (push to `main` or **Run workflow**). |
 | **Tier C (GPU notes)** | Follow the proof loop in [docs/RENDERER_CONFIDENCE.md](../RENDERER_CONFIDENCE.md); copy [TEMPLATE_TIER_C.md](TEMPLATE_TIER_C.md) or append a row to [FINDINGS.md](FINDINGS.md). |
-| **Resolve all tiers** | `./scripts/resolve_renderer_tiers.sh` for best-effort local status, or `GAME_BASE=/abs/path/to/base ./scripts/resolve_renderer_tiers.sh --strict` for a release-style gate that fails missing Tier B/C/D evidence. |
+| **Resolve all tiers** | `./scripts/resolve_renderer_tiers.sh` for best-effort local status, or `GAME_BASE=/abs/path/to/base ./scripts/resolve_renderer_tiers.sh --strict` for a release-style gate that fails missing Tier B/C/D evidence. Add `--summary-file build/renderer_tiers.json` when CI should archive machine-readable evidence. |
 | **Gap report** | `./scripts/evidence_status.sh` and optionally `GAME_BASE=... ./scripts/evidence_status.sh` |
 
 | Document | Purpose |

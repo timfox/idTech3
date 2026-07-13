@@ -507,6 +507,14 @@ jobs:
           cd build-vk-${{ matrix.btype }} && ctest -C ${{ matrix.btype }} --output-on-failure -V
 
       - uses: actions/upload-artifact@v4
+        if: always() && (github.event_name != 'release' || matrix.btype != 'Debug')
+        with:
+          name: renderer-tier-a-${{ matrix.cc }}-${{ matrix.btype }}
+          path: build-vk-${{ matrix.btype }}/renderer_tier_a_summary.json
+          if-no-files-found: ignore
+          retention-days: 5
+
+      - uses: actions/upload-artifact@v4
         if: matrix.cc == 'gcc' && matrix.btype == 'Release'
         with:
           name: linux-x86_64
