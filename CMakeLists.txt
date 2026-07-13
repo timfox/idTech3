@@ -3866,8 +3866,7 @@ if(BUILD_UNIT_TESTS)
 		tests/unit/test_cl_compat_math.c
 		runtime/client/core/cl_compat_math.c)
 	target_include_directories(unit_cl_compat_math PRIVATE
-		${CMAKE_SOURCE_DIR}
-		${CMAKE_SOURCE_DIR}/extensions/research
+		${IDTECH3_UNIT_INCLUDE_DIRS}
 		${CMAKE_SOURCE_DIR}/runtime/client/core)
 	if(NOT MSVC)
 		target_link_libraries(unit_cl_compat_math PRIVATE m)
