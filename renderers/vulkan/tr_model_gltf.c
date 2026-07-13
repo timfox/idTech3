@@ -267,20 +267,20 @@ static void gltf_apply_animation_to_pose(const gltfModel_t *model, int animIndex
 		}
 		switch (ch->type) {
 			case (int)cgltf_animation_path_type_translation: {
-				vec3_t v;
+				vec3_t v = { 0, 0, 0 };
 				gltf_sample_channel_scalar(ch->times, ch->values, ch->numKeyframes, ch->componentsPerKeyframe,
 					t, v, 0, 3);
 				VectorCopy(v, pose[ji].trans);
 				break;
 			}
 			case (int)cgltf_animation_path_type_rotation: {
-				vec4_t q;
+				vec4_t q = { 0, 0, 0, 1 };
 				gltf_sample_channel_rotation(ch->times, ch->values, ch->numKeyframes, t, q);
 				Vector4Copy(q, pose[ji].rot);
 				break;
 			}
 			case (int)cgltf_animation_path_type_scale: {
-				vec3_t v;
+				vec3_t v = { 1, 1, 1 };
 				gltf_sample_channel_scalar(ch->times, ch->values, ch->numKeyframes, ch->componentsPerKeyframe,
 					t, v, 0, 3);
 				VectorCopy(v, pose[ji].scale);
