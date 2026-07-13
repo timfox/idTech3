@@ -86,7 +86,7 @@ Retail **baseq3** with **`cgame.qvm`** auto-loads **`classic_baseq3.cfg`** when 
 
 Other **QVM mods** (e.g. OpenArena) keep the conservative renderer defaults (**`r_classicLighting 1`**) without forcing a cfg.
 
-Disable auto selection with **`cl_autoGraphicsProfile 0`**. Manual presets: **`config/modern_vulkan.cfg`** (stable renderer default), **`config/modern_lighting.cfg`** (lighting only), **`config/modern_native.cfg`**, **`config/classic_baseq3.cfg`**.
+Disable auto selection with **`cl_autoGraphicsProfile 0`**. Manual presets: **`config/modern_vulkan.cfg`** (stable renderer default), **`config/deferred_vulkan.cfg`** (experimental mode-1 deferred lighting), **`config/modern_lighting.cfg`** (lighting only), **`config/modern_native.cfg`**, **`config/classic_baseq3.cfg`**.
 
 
 - [ARM_RASPBERRY_PI.md](ARM_RASPBERRY_PI.md) - Raspberry Pi setup and Vulkan

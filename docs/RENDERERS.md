@@ -46,6 +46,17 @@ vid_restart
 | Temporal AA | `r_taa 1`, `r_taaMotionVectors 1`, `r_temporalCpuSkinPrev 1` |
 | Post AA safety net | `r_ext_smaa 1`, `r_postAaAfterBloom 1` |
 
+### Deferred Vulkan Profile
+
+Use this when working directly on the mode-1 deferred renderer:
+
+```cfg
+exec deferred_vulkan.cfg
+vid_restart
+```
+
+This profile sets `r_renderMode 1`, `r_deferredGBuffer 1`, `r_deferredGBufferFill 1`, and `r_deferredLighting 1`. It also forces `r_forwardPlusShade 0` so dynamic lights come from the deferred compute/composite path instead of being applied once by Forward+ primary shading and again by the legacy lit-surface pass. The current deferred lighting mode is still experimental; the reliable shipping/native default remains `modern_vulkan.cfg`.
+
 ### Vulkan Forward+ scaffolding
 
 **GPU light packing + per-tile cull** on the forward path (`r_forwardPlus` default **1**; `r_renderMode 2` / `modern_vulkan.cfg` force it on):

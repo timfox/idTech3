@@ -22,11 +22,19 @@ LIT="$(idtech3_file renderers/vulkan/shaders/glsl/deferred_lighting.comp src/ren
 COMP="$(idtech3_file renderers/vulkan/shaders/glsl/deferred_lighting_composite.frag src/renderers/vulkan/shaders/glsl/deferred_lighting_composite.frag)"
 TR_INIT="$(idtech3_file renderers/vulkan/tr_init.c src/renderers/vulkan/tr_init.c)"
 TR_BACKEND="$(idtech3_file renderers/vulkan/tr_backend.c src/renderers/vulkan/tr_backend.c)"
+DEFERRED_CFG="$ROOT/config/deferred_vulkan.cfg"
 
+check "$DEFERRED_CFG" 'seta r_renderMode 1' 'deferred profile selects mode 1'
+check "$DEFERRED_CFG" 'seta r_deferredLighting 1' 'deferred profile enables deferred lighting'
+check "$DEFERRED_CFG" 'seta r_forwardPlusShade 0' 'deferred profile disables Forward+ primary shade'
+check "$ROOT/scripts/compile_engine.sh" 'deferred_vulkan.cfg' 'release packaging ships deferred profile'
 check "$TR_INIT" 'r_deferredSpecular = ri.Cvar_Get' 'r_deferredSpecular cvar'
 check "$TR_INIT" 'r_renderMode 1/2' 'G-buffer cvar documents mode 1/2 sidecar'
 check "$DGB" 'r_renderMode->integer == 1 || r_renderMode->integer == 2' 'G-buffer active in mode 1/2'
 check "$DGB" 'r_renderMode->integer == 1 && r_forwardPlus' 'deferred lighting remains mode 1 only'
+check "$DGB" 'vk_end_render_pass' 'G-buffer capture leaves render pass before compute'
+check "$DGB" 'vk_resume_current_render_pass' 'G-buffer capture resumes main render pass'
+check "$TR_BACKEND" 'vk_deferred_lighting_active' 'classic lit pass skipped when deferred lighting active'
 check "$DGB" 'vk_deferred_composite_push_t' 'composite push constants'
 check "$DGB" 'deferred_gbuffer_albedo_view' 'composite scene base descriptor'
 check "$COMP" 'sceneBaseTex' 'composite scene base sampler'

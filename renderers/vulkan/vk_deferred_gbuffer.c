@@ -127,6 +127,11 @@ static qboolean vk_deferred_lighting_wanted( void )
 		r_renderMode && r_renderMode->integer == 1 && r_forwardPlus && r_forwardPlus->integer ) ? qtrue : qfalse;
 }
 
+qboolean vk_deferred_lighting_active( void )
+{
+	return vk_deferred_lighting_wanted();
+}
+
 qboolean vk_deferred_unlit_base_wanted( void )
 {
 	if ( !vk_deferred_lighting_wanted() ) {
@@ -356,11 +361,12 @@ void vk_deferred_gbuffer_capture_after_geometry( void )
 	uint32_t width, height;
 	vk_deferred_gbuf_push_t push;
 	uint32_t gx, gy;
+	qboolean resume_main;
 
 	if ( !vk_deferred_gbuffer_fill_wanted() ) {
 		return;
 	}
-	if ( !vk.cmd || vk.cmd->command_buffer == VK_NULL_HANDLE || !vk.inRenderPass ) {
+	if ( !vk.cmd || vk.cmd->command_buffer == VK_NULL_HANDLE ) {
 		return;
 	}
 	if ( vk.color_image == VK_NULL_HANDLE || vk.deferred_gbuffer_albedo == VK_NULL_HANDLE ||
@@ -369,8 +375,16 @@ void vk_deferred_gbuffer_capture_after_geometry( void )
 		return;
 	}
 
+	resume_main = ( vk.inRenderPass && vk.renderPassIndex == RENDER_PASS_MAIN ) ? qtrue : qfalse;
+	if ( vk.inRenderPass ) {
+		vk_end_render_pass();
+	}
+
 	vk_dgb_create_pipeline();
 	if ( !vk.deferred_gbuffer.pipeline_ready || vk.deferred_gbuffer.pipeline == VK_NULL_HANDLE ) {
+		if ( resume_main ) {
+			vk_resume_current_render_pass();
+		}
 		return;
 	}
 
@@ -382,6 +396,9 @@ void vk_deferred_gbuffer_capture_after_geometry( void )
 	width = vk_get_render_target_width();
 	height = vk_get_render_target_height();
 	if ( width == 0 || height == 0 ) {
+		if ( resume_main ) {
+			vk_resume_current_render_pass();
+		}
 		return;
 	}
 
@@ -454,6 +471,10 @@ void vk_deferred_gbuffer_capture_after_geometry( void )
 		VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
 		VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT | VK_PIPELINE_STAGE_TRANSFER_BIT,
 		VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT );
+
+	if ( resume_main ) {
+		vk_resume_current_render_pass();
+	}
 }
 
 static void vk_dgb_create_lighting_descriptor_layout( void )

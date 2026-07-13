@@ -144,4 +144,3 @@ Refer to the documentation or `scripts/launch_editor.sh` to get started with the
 ### Links
 
 * https://idtech3.com
-* https://github.com/jksunny/quake3e
