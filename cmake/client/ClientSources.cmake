@@ -46,6 +46,7 @@ set(IDTECH3_CLIENT_MEDIA_SRCS
 
 set(IDTECH3_CLIENT_PLATFORM_SRCS
 	${_IDTECH3_CLIENT_REL}/platform/cl_curl.c
+	${_IDTECH3_CLIENT_REL}/platform/cl_torrent.cpp
 	${_IDTECH3_CLIENT_REL}/platform/cl_steam.c
 	${_IDTECH3_CLIENT_REL}/platform/cl_websocket.c
 	${_IDTECH3_CLIENT_REL}/platform/cl_mumble.c
