@@ -80,8 +80,6 @@ qboolean AppCrdt_GetDefaultBackendManifest( char *buf, int buflen );
 qboolean AppCrdt_ResolveBackendOsPath( const char *qpath, char *osOut, int osLen );
 void AppCrdt_RefreshBackendRoot( void );
 
-#ifdef USE_LUA
 qboolean AppCrdt_ApplyPublish( const appCrdtSpec_t *spec );
-#endif
 
 #endif /* APP_CRDT_H */

@@ -73,7 +73,6 @@ static int NET_P2P_StunAppendStringAttr( byte *out, int outSize, int pos, uint16
 
 static int test_parse_error_realm_nonce(void) {
 	byte response[96];
-	byte tid[12] = { 0 };
 	p2p_stun_parse_result_t result;
 	int pos = 20;
 

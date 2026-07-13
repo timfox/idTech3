@@ -229,7 +229,7 @@ void RE_ArcBlancUploadHeightMap( const byte *rgba, int width, int height )
 			IMGFLAG_CLAMPTOEDGE | IMGFLAG_NOLIGHTSCALE, 0, 0 );
 	}
 	if ( s_arcBlancImage ) {
-		R_UploadSubImage( (byte *)rgba, 0, 0, width, height, s_arcBlancImage );
+		R_UploadSubImage( (byte *)(uintptr_t)(const void *)rgba, 0, 0, width, height, s_arcBlancImage );
 	}
 }
 

@@ -26,7 +26,8 @@ if [ ! -s "$tmp" ]; then
 fi
 
 first_party='(^|[[:space:]])(\./|/[^[:space:]]*/)?(engine|runtime|modules|extensions|renderers|tools|examples|tests|cmake|scripts)/'
-ignored='/(third_party|build[^/[:space:]]*|external|_deps|CMakeFiles)/|(^|[[:space:]])third_party/'
+# Ignore third-party trees and warning lines that only appear via include paths under renderers/
+ignored='/(third_party|build[^/[:space:]]*|external|_deps|CMakeFiles|tinyexr)/|(^|[[:space:]])third_party/|/\\.\\./\\.\\./external/'
 
 if grep -E "$first_party" "$tmp" | grep -Ev "$ignored" > "$tmp.first"; then
   echo "check_first_party_warnings: first-party compiler warnings found:" >&2

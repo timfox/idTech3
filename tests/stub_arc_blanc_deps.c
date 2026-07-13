@@ -31,6 +31,7 @@ const char *Cmd_Argv( int i ) { (void)i; return ""; }
 cvar_t *Cvar_Get( const char *name, const char *value, int flags )
 {
 	(void)flags;
+	(void)value;
 	if ( !Q_stricmp( name, "r_arcBlanc" ) ) {
 		if ( !s_rArcBlanc.string ) {
 			s_rArcBlanc.string = "1";

@@ -5,6 +5,7 @@
 #include <string.h>
 #include <stdarg.h>
 #include <stdio.h>
+#include <stdint.h>
 
 #include "qcommon/q_shared.h"
 #include "qcommon/qcommon.h"
@@ -60,9 +61,9 @@ cvar_t *Cvar_Get( const char *var_name, const char *value, int flags )
 	(void)flags;
 	for ( i = 0; i < sizeof( stubCvars ) / sizeof( stubCvars[0] ); i++ ) {
 		if ( var_name && !strcmp( var_name, stubCvars[i].name ) ) {
-			stubCvars[i].cv.name = stubCvars[i].name;
-			stubCvars[i].cv.string = stubCvars[i].string;
-			stubCvars[i].cv.resetString = stubCvars[i].string;
+			stubCvars[i].cv.name = (char *)(uintptr_t)stubCvars[i].name;
+			stubCvars[i].cv.string = (char *)(uintptr_t)stubCvars[i].string;
+			stubCvars[i].cv.resetString = (char *)(uintptr_t)stubCvars[i].string;
 			stubCvars[i].cv.integer = atoi( stubCvars[i].string );
 			stubCvars[i].cv.value = (float)atof( stubCvars[i].string );
 			return &stubCvars[i].cv;

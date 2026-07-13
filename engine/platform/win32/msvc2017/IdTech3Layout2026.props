@@ -24,7 +24,7 @@
   <ItemDefinitionGroup>
     <ClCompile>
       <LanguageStandard>stdcpp20</LanguageStandard>
-      <AdditionalIncludeDirectories>$(IdTech3EngineRoot);$(IdTech3EngineCore);$(IdTech3EngineContent);$(IdTech3RuntimeClient);$(IdTech3RuntimeClientPlatform);$(IdTech3RuntimeClientCore);$(IdTech3RuntimeClientShell);$(IdTech3RuntimeClientWorld);$(IdTech3RuntimeClientMedia);$(IdTech3RuntimeGame);$(IdTech3ExtensionsResearch);$(IdTech3ExtensionsGenerative);$(ExternalRoot)\include\entt\single_include;$(ExternalRoot)\src\jpeg;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(IdTech3RepoRoot);$(IdTech3EngineRoot);$(IdTech3EngineCore);$(IdTech3EngineContent);$(IdTech3RuntimeClient);$(IdTech3RuntimeClientPlatform);$(IdTech3RuntimeClientCore);$(IdTech3RuntimeClientShell);$(IdTech3RuntimeClientWorld);$(IdTech3RuntimeClientMedia);$(IdTech3RuntimeGame);$(IdTech3ExtensionsResearch);$(IdTech3ExtensionsGenerative);$(ExternalRoot)\include\entt\single_include;$(ExternalRoot)\src\jpeg;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
   </ItemDefinitionGroup>
 </Project>

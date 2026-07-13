@@ -3,6 +3,7 @@
  */
 #include <stdlib.h>
 #include <string.h>
+#include <stdint.h>
 
 #include "qcommon/q_shared.h"
 #include "qcommon/qcommon.h"
@@ -32,7 +33,7 @@ static char s_dummyStr[64] = "0";
 static void GG_StubBindCvar( cvar_t *cv, const char *name, char *buf, size_t bufsz, const char *value )
 {
 	Q_strncpyz( buf, value ? value : "0", bufsz );
-	cv->name = (char *)name;
+	cv->name = (char *)(uintptr_t)name;
 	cv->string = buf;
 	cv->value = (float)atof( buf );
 	cv->integer = atoi( buf );

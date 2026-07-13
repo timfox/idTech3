@@ -735,9 +735,9 @@ void Phys_SetBodyFilterEx(physBodyHandle_t body, int categoryBits, int maskBits,
 }
 
 physRagdollHandle_t Phys_CreateRagdoll(const physRagdollDef_t *def) {
+#ifdef PHYS_HAS_IMPL
 	physRagdollDef_t local;
 
-#ifdef PHYS_HAS_IMPL
 	if ( !physInitialized || !def ) {
 		return -1;
 	}

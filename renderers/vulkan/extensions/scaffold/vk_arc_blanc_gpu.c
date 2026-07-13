@@ -587,7 +587,6 @@ static void ABGpu_DispatchHtilde( VkCommandBuffer cmd, abGpuCascadeBuf_t *cb, ui
 	VkWriteDescriptorSet writes[7];
 	VkDescriptorBufferInfo infos[7];
 	uint32_t groupsX = ( gridN + 7u ) / 8u;
-	int i;
 
 	push.gridN = gridN;
 	push.time = time;

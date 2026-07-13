@@ -625,9 +625,6 @@ static void DRESSI_CreateSoftPipeline( void )
 	VkPipelineDynamicStateCreateInfo dyn;
 	VkDynamicState dynStates[2];
 	VkGraphicsPipelineCreateInfo gpci;
-	VkDescriptorPoolSize ps;
-	VkDescriptorPoolCreateInfo dpci;
-	VkDescriptorSetAllocateInfo dai;
 
 	if ( dressi.soft_pipeline != VK_NULL_HANDLE ||
 		vk.modules.dressi_soft_vs == VK_NULL_HANDLE ||
@@ -733,23 +730,23 @@ static void DRESSI_CreateSoftPipeline( void )
 
 	{
 		VkDescriptorPoolSize sizes[2];
-		VkDescriptorPoolCreateInfo dpci;
-		VkDescriptorSetAllocateInfo dai;
+		VkDescriptorPoolCreateInfo softPoolCi;
+		VkDescriptorSetAllocateInfo softSetAi;
 
 		sizes[0].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
 		sizes[0].descriptorCount = 1;
 		sizes[1].type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
 		sizes[1].descriptorCount = 1;
-		dpci.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
-		dpci.maxSets = 1;
-		dpci.poolSizeCount = 2;
-		dpci.pPoolSizes = sizes;
-		VK_CHECK( qvkCreateDescriptorPool( vk.device, &dpci, NULL, &dressi.soft_pool ) );
-		dai.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
-		dai.descriptorPool = dressi.soft_pool;
-		dai.descriptorSetCount = 1;
-		dai.pSetLayouts = &dressi.soft_dsl;
-		VK_CHECK( qvkAllocateDescriptorSets( vk.device, &dai, &dressi.soft_set ) );
+		softPoolCi.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+		softPoolCi.maxSets = 1;
+		softPoolCi.poolSizeCount = 2;
+		softPoolCi.pPoolSizes = sizes;
+		VK_CHECK( qvkCreateDescriptorPool( vk.device, &softPoolCi, NULL, &dressi.soft_pool ) );
+		softSetAi.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+		softSetAi.descriptorPool = dressi.soft_pool;
+		softSetAi.descriptorSetCount = 1;
+		softSetAi.pSetLayouts = &dressi.soft_dsl;
+		VK_CHECK( qvkAllocateDescriptorSets( vk.device, &softSetAi, &dressi.soft_set ) );
 	}
 }
 

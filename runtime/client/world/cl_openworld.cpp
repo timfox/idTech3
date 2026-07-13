@@ -520,6 +520,8 @@ extern "C" void CL_OpenWorld_OnConfigstring( const char *sectorList ) {
 	if ( !sectorList[0] ) {
 		if ( cl_openWorldLastSync[0] ) {
 			clOpenWorldCell_t keep[1];
+
+			Com_Memset( keep, 0, sizeof( keep ) );
 			CL_OpenWorld_SyncUnloadRemoved( keep, 0 );
 			cl_openWorldLastSync[0] = '\0';
 		}

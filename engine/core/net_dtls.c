@@ -240,9 +240,13 @@ int NET_DTLS_Decrypt( const netadr_t *from, const byte *data, int len, byte *out
 		EVP_CIPHER_CTX_free( ctx );
 		return -1;
 	}
-	if ( EVP_CIPHER_CTX_ctrl( ctx, EVP_CTRL_GCM_SET_TAG, DTLS_TAG_LEN, (void *)( (byte *)data + 4 + DTLS_NONCE_LEN + cipherlen ) ) != 1 ) {
-		EVP_CIPHER_CTX_free( ctx );
-		return -1;
+	{
+		byte tag[DTLS_TAG_LEN];
+		Com_Memcpy( tag, ( (const byte *)data ) + 4 + DTLS_NONCE_LEN + cipherlen, DTLS_TAG_LEN );
+		if ( EVP_CIPHER_CTX_ctrl( ctx, EVP_CTRL_GCM_SET_TAG, DTLS_TAG_LEN, tag ) != 1 ) {
+			EVP_CIPHER_CTX_free( ctx );
+			return -1;
+		}
 	}
 	if ( EVP_DecryptFinal_ex( ctx, NULL, &outlen ) != 1 ) {
 		EVP_CIPHER_CTX_free( ctx );
