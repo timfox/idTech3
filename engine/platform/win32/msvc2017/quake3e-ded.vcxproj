@@ -418,6 +418,9 @@
     <ClCompile Include="..\..\qcommon\engine_decal_map.c" />
     <ClCompile Include="..\..\qcommon\engine_sprite_map.c" />
     <ClCompile Include="..\..\qcommon\lua_debug.c" />
+    <ClCompile Include="..\..\qcommon\net_oscar.c" />
+    <ClCompile Include="..\..\qcommon\net_oscar_protocol.c" />
+    <ClCompile Include="..\..\qcommon\net_oscar_raw.c" />
     <ClCompile Include="..\..\qcommon\net_p2p_ice.c" />
     <ClCompile Include="..\..\qcommon\net_p2p_stun_codec.c" />
     <ClCompile Include="..\..\qcommon\net_p2p_turn_auth.c" />
@@ -428,11 +431,13 @@
     <ClCompile Include="..\..\qcommon\ttp.c" />
     <ClCompile Include="..\..\qcommon\ttp_model.c" />
     <ClCompile Include="..\..\qcommon\ttp_sim.c" />
+    <ClCompile Include="..\..\qcommon\engine_phys_map.c" />
     <ClCompile Include="..\..\server\sv_app_crdt.c" />
     <ClCompile Include="..\..\server\sv_auth.c" />
     <ClCompile Include="..\..\server\sv_engine_decals.c" />
     <ClCompile Include="..\..\server\sv_engine_sprites.c" />
     <ClCompile Include="..\..\server\sv_openworld.c" />
+    <ClCompile Include="..\..\server\sv_physics.c" />
     <ClCompile Include="..\..\..\physics\phys_bullet.c" />
     <ClCompile Include="..\..\..\physics\phys_character.c" />
     <ClCompile Include="..\..\..\physics\phys_procedural_anim.c" />
@@ -448,6 +453,7 @@
     <ClCompile Include="..\..\..\physics\phys_materials.c" />
     <ClCompile Include="..\..\..\physics\phys_motor.c" />
     <ClCompile Include="..\..\..\physics\phys_middleware.c" />
+    <ClCompile Include="..\..\..\physics\phys_ragdoll_bind.c" />
     <ClCompile Include="..\..\..\physics\phys_props.c" />
     <ClCompile Include="..\..\..\physics\phys_volumes.c" />
     <ClCompile Include="..\..\..\physics\phys_box3d_impl.c" />

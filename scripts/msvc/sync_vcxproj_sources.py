@@ -185,13 +185,25 @@ def write_manifest_block(text: str, missing: list[str]) -> str:
             re.escape(MARKER_BEGIN) + r".*?" + re.escape(MARKER_END),
             re.S,
         )
-        if missing:
-            block = MARKER_BEGIN + "\n"
-            for p in missing:
-                block += f'    <ClCompile Include="{p}" />\n'
-            block += MARKER_END
-            return pattern.sub(lambda _m: block, text)
-        return text
+        if not missing:
+            return text
+
+        def _merge(match: re.Match[str]) -> str:
+            existing = match.group(0)
+            # Preserve prior ClCompile rows; append only entries not already listed.
+            existing_incs = {
+                normalize_vcxproj_path(m.group(1))
+                for m in re.finditer(r'<ClCompile Include="([^"]+)"', existing)
+            }
+            additions = [
+                p for p in missing if normalize_vcxproj_path(p) not in existing_incs
+            ]
+            if not additions:
+                return existing
+            insert = "".join(f'    <ClCompile Include="{p}" />\n' for p in additions)
+            return existing.replace(MARKER_END, insert + MARKER_END)
+
+        return pattern.sub(_merge, text)
 
     if not missing:
         return text

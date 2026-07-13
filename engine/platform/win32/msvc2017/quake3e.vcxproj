@@ -446,6 +446,7 @@
     <ClCompile Include="..\..\..\physics\phys_materials.c" />
     <ClCompile Include="..\..\..\physics\phys_motor.c" />
     <ClCompile Include="..\..\..\physics\phys_middleware.c" />
+    <ClCompile Include="..\..\..\physics\phys_ragdoll_bind.c" />
     <ClCompile Include="..\..\..\physics\phys_props.c" />
     <ClCompile Include="..\..\..\physics\phys_volumes.c" />
     <ClCompile Include="..\..\..\physics\phys_box3d_impl.c" />
@@ -665,7 +666,7 @@
     <ClCompile Include="..\..\client\shell\cl_engine_decals.c" />
     <ClCompile Include="..\..\client\shell\cl_engine_sprites.c" />
     <ClCompile Include="..\..\client\shell\cl_phys_debug.c" />
-    <ClCompile Include="..\..\client\cl_usd.cpp" />
+    <ClCompile Include="..\..\client\shell\cl_usd.cpp" />
     <ClCompile Include="..\..\client\shell\cl_vector_font.c" />
     <ClCompile Include="..\..\client\shell\cl_vuda.c" />
     <ClCompile Include="..\..\client\core\cl_app_crdt.c" />
@@ -678,12 +679,14 @@
     <ClCompile Include="..\..\client\core\cl_pipeline.c" />
     <ClCompile Include="..\..\client\core\cl_ref.c" />
     <ClCompile Include="..\..\client\core\cl_serverbrowser.c" />
+    <ClCompile Include="..\..\client\media\cl_cin_colors.c" />
     <ClCompile Include="..\..\client\media\cl_cin_dav1d.c" />
     <ClCompile Include="..\..\client\media\cl_cin_ffmpeg.c" />
     <ClCompile Include="..\..\client\media\cl_cin_theora.c" />
     <ClCompile Include="..\..\client\media\cl_cin_vpx.c" />
     <ClCompile Include="..\..\client\media\cl_demo.c" />
     <ClCompile Include="..\..\client\media\cl_download.c" />
+    <ClCompile Include="..\..\client\platform\cl_torrent.cpp" />
     <ClCompile Include="..\..\client\shell\ui_css.c" />
     <ClCompile Include="..\..\client\world\cl_district.cpp" />
     <ClCompile Include="..\..\client\world\cl_openworld.cpp" />
@@ -705,8 +708,12 @@
     <ClCompile Include="..\..\qcommon\csharp_debug.c" />
     <ClCompile Include="..\..\qcommon\engine_db.c" />
     <ClCompile Include="..\..\qcommon\engine_decal_map.c" />
+    <ClCompile Include="..\..\qcommon\engine_phys_map.c" />
     <ClCompile Include="..\..\qcommon\engine_sprite_map.c" />
     <ClCompile Include="..\..\qcommon\lua_debug.c" />
+    <ClCompile Include="..\..\qcommon\net_oscar.c" />
+    <ClCompile Include="..\..\qcommon\net_oscar_protocol.c" />
+    <ClCompile Include="..\..\qcommon\net_oscar_raw.c" />
     <ClCompile Include="..\..\qcommon\net_p2p_ice.c" />
     <ClCompile Include="..\..\qcommon\net_p2p_stun_codec.c" />
     <ClCompile Include="..\..\qcommon\net_p2p_turn_auth.c" />
@@ -721,6 +728,7 @@
     <ClCompile Include="..\..\server\sv_engine_decals.c" />
     <ClCompile Include="..\..\server\sv_engine_sprites.c" />
     <ClCompile Include="..\..\server\sv_openworld.c" />
+    <ClCompile Include="..\..\server\sv_physics.c" />
   <!-- IDTECH3_MSVC_MANIFEST_END -->
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

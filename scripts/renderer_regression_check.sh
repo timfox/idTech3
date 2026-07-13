@@ -231,7 +231,7 @@ fi
 echo ""
 echo "TAA shader: neighborhoodMinMax must run before history clamp:"
 TAA_FRAG="$PROJECT_ROOT/renderers/vulkan/shaders/glsl/taa.frag"
-if ! grep -q 'neighborhoodMinMax( uv, mn, mx, avg )' "$TAA_FRAG" 2>/dev/null; then
+if ! grep -Eq 'neighborhoodMinMax\( (uv|sampleUV), mn, mx, avg \)' "$TAA_FRAG" 2>/dev/null; then
   fail "taa.frag missing neighborhoodMinMax() call (history AABB clamp would be undefined)"
 else
   pass "taa.frag calls neighborhoodMinMax before history clamp"
@@ -412,7 +412,7 @@ elif ! grep -q 'r_spriteProps = ri.Cvar_Get' "$SP_C" 2>/dev/null; then
   fail "tr_sprite_props.c missing r_spriteProps cvar"
 elif ! grep -q 'CL_EngineSprites_AddFromSnapshot' "$IDTECH3_CLIENT/core/cl_cgame.c" 2>/dev/null; then
   fail "cl_cgame.c should call CL_EngineSprites_AddFromSnapshot before RenderScene"
-elif ! grep -q 'cl_engineSprites = Cvar_Get' "$IDTECH3_CLIENT/cl_engine_sprites.c" 2>/dev/null; then
+elif ! grep -q 'cl_engineSprites = Cvar_Get' "$IDTECH3_CLIENT/shell/cl_engine_sprites.c" 2>/dev/null; then
   fail "cl_engine_sprites.c missing cl_engineSprites cvar"
 elif ! grep -q 'CS_ENGINE_SPRITE_SHADERS' "$PROJECT_ROOT/runtime/game/bg_public.h" 2>/dev/null; then
   fail "bg_public.h missing CS_ENGINE_SPRITE_SHADERS"
@@ -432,7 +432,7 @@ elif ! grep -q 'registerTable(L, "Sprites"' "$PROJECT_ROOT/runtime/game/g_lua_bi
   fail "g_lua_bindings.c missing Engine.Sprites Lua table"
 elif ! grep -q 'CG_ENGINE_SPRITE_ADD_LOCAL' "$PROJECT_ROOT/runtime/cgame/cg_public.h" 2>/dev/null; then
   fail "cg_public.h missing CG_ENGINE_SPRITE_ADD_LOCAL cgame trap"
-elif ! grep -q 'CL_EngineSprite_AddLocalAtTime' "$IDTECH3_CLIENT/cl_engine_sprites.c" 2>/dev/null; then
+elif ! grep -q 'CL_EngineSprite_AddLocalAtTime' "$IDTECH3_CLIENT/shell/cl_engine_sprites.c" 2>/dev/null; then
   fail "cl_engine_sprites.c missing AddLocalAtTime helper for cgame trap"
 else
   pass "engine-native sprite props (map entities + RE_AddEngineSpriteToScene)"

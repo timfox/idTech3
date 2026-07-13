@@ -1979,6 +1979,14 @@ ENDIF()
 # client first-party warnings with scripts/check_first_party_warnings.sh.
 idtech3_client_include_domains(client)
 target_include_directories(client PRIVATE ${CMAKE_SOURCE_DIR})
+# g_lua_bindings.c / cl_main include lua_compat.h (and duktape) before feature guards;
+# headers live under versioned dirs on Linux (e.g. /usr/include/lua5.4), so wire include paths.
+if(USE_LUA AND LUA_FOUND)
+	target_include_directories(client PRIVATE ${LUA_INCLUDE_DIR})
+endif()
+if(USE_DUKTAPE AND DUKTAPE_FOUND)
+	target_include_directories(client PRIVATE ${DUKTAPE_INCLUDE_DIR})
+endif()
 if(USE_LIBTORRENT AND LIBTORRENT_FOUND)
 	target_compile_definitions(client PRIVATE USE_LIBTORRENT=1)
 	target_link_libraries(client PRIVATE ${LIBTORRENT_TARGET})
