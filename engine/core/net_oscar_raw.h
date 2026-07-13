@@ -47,10 +47,13 @@ int OSCAR_RawBuildSnac( unsigned short sequence, unsigned short family, unsigned
 int OSCAR_RawBuildClientOnline( unsigned short sequence, unsigned int requestId, byte *out, int outSize );
 int OSCAR_RawBuildIM( unsigned short sequence, unsigned int requestId, const char *screenName, const char *text, byte *out, int outSize );
 int OSCAR_RawBuildPresence( unsigned short sequence, unsigned int requestId, const char *status, byte *out, int outSize );
+int OSCAR_RawBuildBuddyAddTemp( unsigned short sequence, unsigned int requestId, const char *screenName, byte *out, int outSize );
+int OSCAR_RawBuildBuddyDelTemp( unsigned short sequence, unsigned int requestId, const char *screenName, byte *out, int outSize );
 
 qboolean OSCAR_RawParseFlap( const byte *data, int dataLen, oscarRawFlapFrame_t *frame, int *consumed );
 qboolean OSCAR_RawParseSnac( const byte *payload, int payloadLen, oscarRawSnac_t *snac );
 qboolean OSCAR_RawParseAuthReply( const byte *payload, int payloadLen, oscarRawAuthReply_t *reply );
 qboolean OSCAR_RawParseIncomingIM( const oscarRawSnac_t *snac, oscarEvent_t *eventOut );
+qboolean OSCAR_RawParsePresence( const oscarRawSnac_t *snac, oscarEvent_t *eventOut );
 
 #endif /* NET_OSCAR_RAW_H */

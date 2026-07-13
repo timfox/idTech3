@@ -512,6 +512,18 @@ static int SV_LuaOscar_SetPresence( lua_State *L )
 	return 1;
 }
 
+static int SV_LuaOscar_AddBuddy( lua_State *L )
+{
+	lua_pushboolean( L, OSCAR_AddBuddy( luaL_checkstring( L, 1 ) ) );
+	return 1;
+}
+
+static int SV_LuaOscar_RemoveBuddy( lua_State *L )
+{
+	lua_pushboolean( L, OSCAR_RemoveBuddy( luaL_checkstring( L, 1 ) ) );
+	return 1;
+}
+
 static int SV_LuaOscar_PollEvent( lua_State *L )
 {
 	oscarEvent_t ev;
@@ -637,6 +649,10 @@ static void SV_AppCrdt_RegisterServerLua( void *luaState )
 	lua_setfield( L, -2, "SendRoomMessage" );
 	lua_pushcfunction( L, SV_LuaOscar_SetPresence );
 	lua_setfield( L, -2, "SetPresence" );
+	lua_pushcfunction( L, SV_LuaOscar_AddBuddy );
+	lua_setfield( L, -2, "AddBuddy" );
+	lua_pushcfunction( L, SV_LuaOscar_RemoveBuddy );
+	lua_setfield( L, -2, "RemoveBuddy" );
 	lua_pushcfunction( L, SV_LuaOscar_PollEvent );
 	lua_setfield( L, -2, "PollEvent" );
 	lua_setfield( L, -2, "Oscar" );

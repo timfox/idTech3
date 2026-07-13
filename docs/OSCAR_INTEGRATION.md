@@ -57,6 +57,8 @@ game data.
 | `oscar_announce <message>` | Send a message to the current/default room. |
 | `oscar_im <screenName> <message>` | Send a direct message. Works in direct and gateway mode. |
 | `oscar_presence <status> [message]` | Set presence. Direct mode supports `available`, `away`, `dnd`, `out`, `busy`, `chat`, and `invisible`; gateway mode may use the optional message. |
+| `oscar_buddy_add <screenName>` | Direct mode: subscribe to a buddy for this session. |
+| `oscar_buddy_del <screenName>` | Direct mode: remove a temporary buddy subscription. |
 
 These are operator commands. Player commands must not be forwarded into account
 or gateway administration.
@@ -76,6 +78,8 @@ Engine.Oscar.JoinRoom(roomName)
 Engine.Oscar.LeaveRoom(roomName)
 Engine.Oscar.SendRoomMessage(roomName, text)
 Engine.Oscar.SetPresence(status, message)
+Engine.Oscar.AddBuddy(screenName)
+Engine.Oscar.RemoveBuddy(screenName)
 Engine.Oscar.PollEvent()
 ```
 
@@ -99,13 +103,16 @@ Start the process with `IDTECH3_OSCAR_PASSWORD` set, then run:
 
 ```text
 oscar_connect
+oscar_buddy_add SomeBuddy
 oscar_im SomeBuddy "Need one more player for CTF."
 ```
 
 Direct mode currently supports login, BOS cookie reconnect, online notification,
-basic outgoing IMs, incoming IM events, presence status publishing, disconnect,
-and reconnect. Raw OSCAR room chat still requires additional ChatNav/service
-negotiation; use gateway mode for rooms until that layer is implemented.
+basic outgoing IMs, incoming IM events, temporary buddy subscriptions, buddy
+arrival/departure/status events, presence status publishing, disconnect, and
+reconnect. Raw OSCAR room chat and persistent saved buddy lists still require
+additional ChatNav/feedbag service work; use gateway mode for rooms until that
+layer is implemented.
 
 ## Gateway Message Contract
 
@@ -137,6 +144,6 @@ translation to a sidecar.
 `unit_oscar_protocol` verifies the bounded JSON gateway contract, including
 escaping, event parsing, malformed input, and oversized frame rejection.
 `unit_oscar_raw` verifies raw FLAP/TLV/SNAC helpers for login, BOS cookie signon,
-client-online, IM receive parsing, and presence publishing. `test_oscar_bridge`
-verifies that both direct and gateway code paths stay wired without shelling out
-to external tools.
+client-online, IM receive parsing, presence publishing, temporary buddy
+subscription, and buddy presence parsing. `test_oscar_bridge` verifies that both
+direct and gateway code paths stay wired without shelling out to external tools.

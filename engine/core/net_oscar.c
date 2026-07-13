@@ -578,6 +578,10 @@ static void OSCAR_HandleRawSnac( const oscarRawSnac_t *snac )
 
 	if ( OSCAR_RawParseIncomingIM( snac, &ev ) ) {
 		OSCAR_HandleEvent( &ev );
+		return;
+	}
+	if ( OSCAR_RawParsePresence( snac, &ev ) ) {
+		OSCAR_HandleEvent( &ev );
 	}
 }
 
@@ -952,6 +956,39 @@ qboolean OSCAR_SetPresence( const char *status, const char *message )
 	}
 	return OSCAR_SendBuiltJson(
 		OSCAR_ProtocolBuildPresence( json, sizeof( json ), oscar.nextRequestId++, status, message ), json );
+}
+
+static qboolean OSCAR_SendDirectBuddySub( const char *screenName, qboolean add )
+{
+	byte frame[OSCAR_RAW_MAX_FRAME];
+	int len;
+
+	if ( oscar.state != OSCAR_STATE_ONLINE || oscar.mode != OSCAR_MODE_DIRECT ) {
+		OSCAR_SetError( "raw OSCAR session is not online" );
+		return qfalse;
+	}
+	len = add
+		? OSCAR_RawBuildBuddyAddTemp( oscar.flapSequence++, (unsigned int)oscar.nextRequestId++, screenName, frame, sizeof( frame ) )
+		: OSCAR_RawBuildBuddyDelTemp( oscar.flapSequence++, (unsigned int)oscar.nextRequestId++, screenName, frame, sizeof( frame ) );
+	return OSCAR_SendRawFrameBuffer( frame, len );
+}
+
+qboolean OSCAR_AddBuddy( const char *screenName )
+{
+	if ( oscar.mode == OSCAR_MODE_DIRECT ) {
+		return OSCAR_SendDirectBuddySub( screenName, qtrue );
+	}
+	OSCAR_SetError( "gateway buddy subscriptions are not implemented in engine bridge mode" );
+	return qfalse;
+}
+
+qboolean OSCAR_RemoveBuddy( const char *screenName )
+{
+	if ( oscar.mode == OSCAR_MODE_DIRECT ) {
+		return OSCAR_SendDirectBuddySub( screenName, qfalse );
+	}
+	OSCAR_SetError( "gateway buddy subscriptions are not implemented in engine bridge mode" );
+	return qfalse;
 }
 
 oscarState_t OSCAR_GetState( void )

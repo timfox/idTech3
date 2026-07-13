@@ -23,10 +23,17 @@ channel-1 IM.
 #define OSCAR_TLV_MULTI_CONN_FLAGS 0x004a
 
 #define OSCAR_FAMILY_OSERVICE 0x0001
+#define OSCAR_FAMILY_BUDDY 0x0003
 #define OSCAR_FAMILY_ICBM 0x0004
 #define OSCAR_OSERVICE_CLIENT_ONLINE 0x0002
+#define OSCAR_OSERVICE_USER_INFO_UPDATE 0x000f
 #define OSCAR_OSERVICE_SET_USER_INFO_FIELDS 0x001e
+#define OSCAR_OSERVICE_USER_INFO_USER_FLAGS 0x0001
 #define OSCAR_OSERVICE_USER_INFO_STATUS 0x0006
+#define OSCAR_BUDDY_ARRIVED 0x000b
+#define OSCAR_BUDDY_DEPARTED 0x000c
+#define OSCAR_BUDDY_ADD_TEMP 0x000f
+#define OSCAR_BUDDY_DEL_TEMP 0x0010
 #define OSCAR_ICBM_CHANNEL_MSG_TO_HOST 0x0006
 #define OSCAR_ICBM_CHANNEL_MSG_TO_CLIENT 0x0007
 #define OSCAR_ICBM_TLV_AOL_IM_DATA 0x0002
@@ -39,6 +46,7 @@ channel-1 IM.
 #define OSCAR_STATUS_BUSY 0x00000010u
 #define OSCAR_STATUS_CHAT 0x00000020u
 #define OSCAR_STATUS_INVISIBLE 0x00000100u
+#define OSCAR_USER_FLAG_UNAVAILABLE 0x0020u
 
 static void OSCAR_WriteU16( byte *p, unsigned int v )
 {
@@ -325,6 +333,34 @@ int OSCAR_RawBuildPresence( unsigned short sequence, unsigned int requestId, con
 		requestId, body, used, out, outSize );
 }
 
+static int OSCAR_RawBuildBuddyNameList( unsigned short sequence, unsigned int requestId, unsigned short subtype,
+                                        const char *screenName, byte *out, int outSize )
+{
+	byte body[MAX_NAME_LENGTH + 1];
+	int nameLen;
+
+	if ( !screenName || !screenName[0] ) {
+		return 0;
+	}
+	nameLen = (int)strlen( screenName );
+	if ( nameLen <= 0 || nameLen > 255 || nameLen >= (int)sizeof( body ) ) {
+		return 0;
+	}
+	body[0] = (byte)nameLen;
+	Com_Memcpy( body + 1, screenName, nameLen );
+	return OSCAR_RawBuildSnac( sequence, OSCAR_FAMILY_BUDDY, subtype, requestId, body, nameLen + 1, out, outSize );
+}
+
+int OSCAR_RawBuildBuddyAddTemp( unsigned short sequence, unsigned int requestId, const char *screenName, byte *out, int outSize )
+{
+	return OSCAR_RawBuildBuddyNameList( sequence, requestId, OSCAR_BUDDY_ADD_TEMP, screenName, out, outSize );
+}
+
+int OSCAR_RawBuildBuddyDelTemp( unsigned short sequence, unsigned int requestId, const char *screenName, byte *out, int outSize )
+{
+	return OSCAR_RawBuildBuddyNameList( sequence, requestId, OSCAR_BUDDY_DEL_TEMP, screenName, out, outSize );
+}
+
 qboolean OSCAR_RawParseFlap( const byte *data, int dataLen, oscarRawFlapFrame_t *frame, int *consumed )
 {
 	int payloadLen;
@@ -483,5 +519,103 @@ qboolean OSCAR_RawParseIncomingIM( const oscarRawSnac_t *snac, oscarEvent_t *eve
 		pos += tlvLen;
 	}
 
+	return qfalse;
+}
+
+static const char *OSCAR_RawStatusName( unsigned int flags, unsigned int mask, qboolean departed )
+{
+	if ( departed ) {
+		return "offline";
+	}
+	if ( mask & OSCAR_STATUS_INVISIBLE ) {
+		return "invisible";
+	}
+	if ( mask & OSCAR_STATUS_DND ) {
+		return "dnd";
+	}
+	if ( mask & OSCAR_STATUS_BUSY ) {
+		return "busy";
+	}
+	if ( mask & OSCAR_STATUS_CHAT ) {
+		return "chat";
+	}
+	if ( mask & OSCAR_STATUS_OUT ) {
+		return "out";
+	}
+	if ( ( flags & OSCAR_USER_FLAG_UNAVAILABLE ) || ( mask & OSCAR_STATUS_AWAY ) ) {
+		return "away";
+	}
+	return "available";
+}
+
+static qboolean OSCAR_RawParseTLVUserInfoPresence( const byte *body, int bodyLen, qboolean departed, oscarEvent_t *eventOut )
+{
+	unsigned int flags = 0;
+	unsigned int mask = OSCAR_STATUS_AVAILABLE;
+	int pos = 0;
+	int nameLen;
+	int tlvCount;
+	int i;
+
+	if ( !body || !eventOut || bodyLen < 4 ) {
+		return qfalse;
+	}
+	nameLen = body[pos++];
+	if ( nameLen <= 0 || pos + nameLen + 4 > bodyLen ) {
+		return qfalse;
+	}
+
+	Com_Memset( eventOut, 0, sizeof( *eventOut ) );
+	eventOut->type = OSCAR_EVENT_PRESENCE_CHANGED;
+	if ( nameLen >= (int)sizeof( eventOut->screenName ) ) {
+		nameLen = (int)sizeof( eventOut->screenName ) - 1;
+	}
+	Com_Memcpy( eventOut->screenName, body + pos, nameLen );
+	eventOut->screenName[nameLen] = '\0';
+	pos += (int)body[0];
+
+	pos += 2; /* warning level */
+	tlvCount = (int)OSCAR_ReadU16( body + pos );
+	pos += 2;
+	if ( tlvCount < 0 ) {
+		return qfalse;
+	}
+
+	for ( i = 0; i < tlvCount && pos + 4 <= bodyLen; i++ ) {
+		unsigned int tag = OSCAR_ReadU16( body + pos );
+		int len = (int)OSCAR_ReadU16( body + pos + 2 );
+		const byte *value = body + pos + 4;
+
+		pos += 4;
+		if ( len < 0 || pos + len > bodyLen ) {
+			return qfalse;
+		}
+		if ( tag == OSCAR_OSERVICE_USER_INFO_USER_FLAGS && len >= 2 ) {
+			flags = OSCAR_ReadU16( value );
+		} else if ( tag == OSCAR_OSERVICE_USER_INFO_STATUS && len >= 4 ) {
+			mask = OSCAR_ReadU32( value );
+		}
+		pos += len;
+	}
+
+	Q_strncpyz( eventOut->status, OSCAR_RawStatusName( flags, mask, departed ), sizeof( eventOut->status ) );
+	return qtrue;
+}
+
+qboolean OSCAR_RawParsePresence( const oscarRawSnac_t *snac, oscarEvent_t *eventOut )
+{
+	qboolean departed;
+
+	if ( !snac || !eventOut ) {
+		return qfalse;
+	}
+	departed = (qboolean)( snac->family == OSCAR_FAMILY_BUDDY && snac->subtype == OSCAR_BUDDY_DEPARTED );
+	if ( snac->family == OSCAR_FAMILY_OSERVICE && snac->subtype == OSCAR_OSERVICE_USER_INFO_UPDATE ) {
+		return OSCAR_RawParseTLVUserInfoPresence( snac->body, snac->bodyLen, qfalse, eventOut );
+	}
+	if ( snac->family == OSCAR_FAMILY_BUDDY &&
+	     ( snac->subtype == OSCAR_BUDDY_ARRIVED || snac->subtype == OSCAR_BUDDY_DEPARTED ) ) {
+		return OSCAR_RawParseTLVUserInfoPresence( snac->body, snac->bodyLen, departed, eventOut );
+	}
 	return qfalse;
 }

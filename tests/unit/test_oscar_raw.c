@@ -186,6 +186,79 @@ static void TestPresenceBuildsSetUserInfoFields( void )
 	EXPECT_EQ_INT( len, 0 );
 }
 
+static void TestBuddyTempBuilders( void )
+{
+	byte frame[1024];
+	int len;
+
+	len = OSCAR_RawBuildBuddyAddTemp( 10, 46, "Buddy", frame, sizeof( frame ) );
+	EXPECT_GT( len, 0 );
+	EXPECT_EQ_INT( frame[1], OSCAR_RAW_FLAP_DATA );
+	EXPECT_EQ_INT( frame[6], 0 );
+	EXPECT_EQ_INT( frame[7], 3 );
+	EXPECT_EQ_INT( frame[8], 0 );
+	EXPECT_EQ_INT( frame[9], 0x0f );
+	EXPECT_EQ_INT( frame[16], 5 );
+	EXPECT_EQ_INT( frame[17], 'B' );
+
+	len = OSCAR_RawBuildBuddyDelTemp( 11, 47, "Buddy", frame, sizeof( frame ) );
+	EXPECT_GT( len, 0 );
+	EXPECT_EQ_INT( frame[8], 0 );
+	EXPECT_EQ_INT( frame[9], 0x10 );
+}
+
+static int AddUserInfoTLV( byte *body, int used, const char *screenName, unsigned int flags, unsigned int status )
+{
+	byte value[4];
+	int countPos;
+
+	body[used++] = (byte)strlen( screenName );
+	memcpy( body + used, screenName, strlen( screenName ) );
+	used += (int)strlen( screenName );
+	Put16( body + used, 0 );
+	used += 2;
+	countPos = used;
+	Put16( body + used, 2 );
+	used += 2;
+	value[0] = (byte)( flags >> 8 );
+	value[1] = (byte)flags;
+	used = AddTLV( body, used, 0x0001, value, 2 );
+	Put32( value, status );
+	used = AddTLV( body, used, 0x0006, value, 4 );
+	(void)countPos;
+	return used;
+}
+
+static void TestPresenceParseBuddyArrivedAndDeparted( void )
+{
+	byte snacPayload[1024];
+	byte body[512];
+	oscarRawSnac_t snac;
+	oscarEvent_t event;
+	int bodyUsed;
+	int used;
+
+	bodyUsed = AddUserInfoTLV( body, 0, "Buddy", 0x0020, 0x00000001 );
+	Put16( snacPayload, 0x0003 );
+	Put16( snacPayload + 2, 0x000b );
+	Put16( snacPayload + 4, 0 );
+	Put32( snacPayload + 6, 100 );
+	used = 10;
+	memcpy( snacPayload + used, body, bodyUsed );
+	used += bodyUsed;
+
+	EXPECT_TRUE( OSCAR_RawParseSnac( snacPayload, used, &snac ) );
+	EXPECT_TRUE( OSCAR_RawParsePresence( &snac, &event ) );
+	EXPECT_EQ_INT( event.type, OSCAR_EVENT_PRESENCE_CHANGED );
+	EXPECT_STREQ( event.screenName, "Buddy" );
+	EXPECT_STREQ( event.status, "away" );
+
+	Put16( snacPayload + 2, 0x000c );
+	EXPECT_TRUE( OSCAR_RawParseSnac( snacPayload, used, &snac ) );
+	EXPECT_TRUE( OSCAR_RawParsePresence( &snac, &event ) );
+	EXPECT_STREQ( event.status, "offline" );
+}
+
 int main( void )
 {
 	TestLoginSignonBuildsFlapFrame();
@@ -193,6 +266,8 @@ int main( void )
 	TestCookieSignonAndClientOnline();
 	TestIncomingIMParse();
 	TestPresenceBuildsSetUserInfoFields();
+	TestBuddyTempBuilders();
+	TestPresenceParseBuddyArrivedAndDeparted();
 
 	if ( failures != 0 ) {
 		fprintf( stderr, "unit_oscar_raw: %d failure(s)\n", failures );

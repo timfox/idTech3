@@ -39,6 +39,8 @@ static void SV_OscarJoin_f( void );
 static void SV_OscarLeave_f( void );
 static void SV_OscarIM_f( void );
 static void SV_OscarPresence_f( void );
+static void SV_OscarBuddyAdd_f( void );
+static void SV_OscarBuddyDel_f( void );
 
 /*
 ===============================================================================
@@ -1650,6 +1652,8 @@ void SV_AddDedicatedCommands( void )
 	Cmd_AddCommand( "oscar_leave", SV_OscarLeave_f );
 	Cmd_AddCommand( "oscar_im", SV_OscarIM_f );
 	Cmd_AddCommand( "oscar_presence", SV_OscarPresence_f );
+	Cmd_AddCommand( "oscar_buddy_add", SV_OscarBuddyAdd_f );
+	Cmd_AddCommand( "oscar_buddy_del", SV_OscarBuddyDel_f );
 }
 
 
@@ -1675,6 +1679,8 @@ void SV_RemoveDedicatedCommands( void )
 	Cmd_RemoveCommand( "oscar_leave" );
 	Cmd_RemoveCommand( "oscar_im" );
 	Cmd_RemoveCommand( "oscar_presence" );
+	Cmd_RemoveCommand( "oscar_buddy_add" );
+	Cmd_RemoveCommand( "oscar_buddy_del" );
 }
 
 static void SV_OscarStatus_f( void )
@@ -1751,6 +1757,30 @@ static void SV_OscarPresence_f( void )
 	}
 	message = Cmd_Argc() >= 3 ? Cmd_ArgsFrom( 2 ) : "";
 	OSCAR_SetPresence( Cmd_Argv( 1 ), message );
+}
+
+static void SV_OscarBuddyAdd_f( void )
+{
+	if ( Cmd_Argc() < 2 ) {
+		Com_Printf( "Usage: oscar_buddy_add <screenName>\n" );
+		return;
+	}
+	if ( !OSCAR_AddBuddy( Cmd_Argv( 1 ) ) ) {
+		Com_Printf( "OSCAR: buddy add failed (%s)\n",
+			OSCAR_GetLastError()[0] ? OSCAR_GetLastError() : OSCAR_GetStatusString() );
+	}
+}
+
+static void SV_OscarBuddyDel_f( void )
+{
+	if ( Cmd_Argc() < 2 ) {
+		Com_Printf( "Usage: oscar_buddy_del <screenName>\n" );
+		return;
+	}
+	if ( !OSCAR_RemoveBuddy( Cmd_Argv( 1 ) ) ) {
+		Com_Printf( "OSCAR: buddy remove failed (%s)\n",
+			OSCAR_GetLastError()[0] ? OSCAR_GetLastError() : OSCAR_GetStatusString() );
+	}
 }
 static void SV_P2PStatus_f( void ) {
 	char address[MAX_STRING_CHARS];

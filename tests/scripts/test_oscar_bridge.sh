@@ -24,6 +24,8 @@ rg -q 'GET /engine HTTP/1.1' engine/core/net_oscar.c || fail "missing gateway We
 rg -q 'OSCAR_RawBuildLoginSignon' engine/core/net_oscar.c engine/core/net_oscar_raw.c || fail "missing raw OSCAR login path"
 rg -q 'OSCAR_RawBuildIM' engine/core/net_oscar.c engine/core/net_oscar_raw.c || fail "missing raw OSCAR IM path"
 rg -q 'OSCAR_RawBuildPresence' engine/core/net_oscar.c engine/core/net_oscar_raw.c || fail "missing raw OSCAR presence path"
+rg -q 'OSCAR_RawBuildBuddyAddTemp' engine/core/net_oscar.c engine/core/net_oscar_raw.c || fail "missing raw OSCAR buddy subscribe path"
+rg -q 'OSCAR_RawParsePresence' engine/core/net_oscar.c engine/core/net_oscar_raw.c || fail "missing raw OSCAR inbound presence parser"
 rg -q 'numeric IP' engine/core/net_oscar.c docs/OSCAR_INTEGRATION.md || fail "missing no-DNS gateway guidance"
 rg -q 'OSCAR_ProtocolBuildRoomMessage' engine/core/net_oscar_protocol.c || fail "missing room message builder"
 rg -q 'OSCAR_ProtocolParseEvent' engine/core/net_oscar_protocol.c || fail "missing gateway event parser"
@@ -31,7 +33,9 @@ rg -q 'OSCAR_Frame' engine/core/net_ip.c || fail "missing OSCAR network frame ho
 rg -q 'OSCAR_Init' engine/core/net_ip.c || fail "missing OSCAR network init hook"
 rg -q 'oscar_status' runtime/server/sv_ccmds.c || fail "missing dedicated OSCAR status command"
 rg -q 'oscar_announce' runtime/server/sv_ccmds.c || fail "missing dedicated OSCAR announce command"
+rg -q 'oscar_buddy_add' runtime/server/sv_ccmds.c || fail "missing dedicated OSCAR buddy add command"
 rg -q 'Engine.Oscar|\"Oscar\"' runtime/server/sv_app_crdt.c || fail "missing server Lua Engine.Oscar table"
+rg -q 'AddBuddy|RemoveBuddy' runtime/server/sv_app_crdt.c || fail "missing Lua OSCAR buddy bindings"
 rg -q 'Direct mode currently supports login' docs/OSCAR_INTEGRATION.md || fail "docs must describe direct OSCAR scope"
 
 if rg -q 'curl .*oscar|oscar_.*curl|system\(.*oscar' runtime/server engine/core; then

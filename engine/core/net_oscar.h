@@ -47,6 +47,8 @@ qboolean OSCAR_JoinRoom( const char *room );
 qboolean OSCAR_LeaveRoom( const char *room );
 qboolean OSCAR_SendRoomMessage( const char *room, const char *message );
 qboolean OSCAR_SetPresence( const char *status, const char *message );
+qboolean OSCAR_AddBuddy( const char *screenName );
+qboolean OSCAR_RemoveBuddy( const char *screenName );
 
 oscarState_t OSCAR_GetState( void );
 const char *OSCAR_GetStatusString( void );
