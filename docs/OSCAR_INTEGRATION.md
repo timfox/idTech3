@@ -27,7 +27,7 @@ deliberately avoids DNS resolution from the network frame path.
 ## Cvars
 
 | Cvar | Default | Purpose |
-|------|---------|---------|
+
 | `oscar_enable` | `0` | Enable Open OSCAR integration. |
 | `oscar_mode` | `direct` | `direct` for raw FLAP/BOS, `gateway` for JSON bridge. |
 | `oscar_gateway` | `127.0.0.1` | Open OSCAR or gateway address: `localhost` or numeric private IP. |
@@ -48,7 +48,7 @@ game data.
 ## Dedicated Commands
 
 | Command | Purpose |
-|---------|---------|
+
 | `oscar_status` | Print OSCAR state, current room, and last error. |
 | `oscar_connect` | Connect and authenticate. |
 | `oscar_disconnect` | Disconnect. |
