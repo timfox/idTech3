@@ -37,6 +37,8 @@ vid_restart
 
 `modern_native.cfg` inherits this profile automatically when `cl_autoGraphicsProfile 1` loads a native cgame. The profile deliberately keeps **deferred lighting** off because the stable default is Forward+ primary lighting; the deferred G-buffer is captured as a sidecar for TAA/advanced systems and future framegraph unification.
 
+The CI confidence target for this path is `test_modern_renderer_profile_runtime`: source-only checks run on normal hosted CI, while the self-hosted renderer Tier B workflow launches the client and exercises `renderer_profile`, `renderer_status`, and `renderer_compatibility` against the minimal renderer validation pack.
+
 | Area | Default Contract |
 |------|------------------|
 | Framebuffer/HDR | `r_fbo 1`, `r_hdr 2` |

@@ -90,3 +90,11 @@ jobs:
         run: |
           set -euo pipefail
           GAME_BASE="$GAME_BASE" ./scripts/renderer_regression_maps.sh
+
+      - name: Modern renderer profile runtime smoke (client)
+        env:
+          IDTECH3_RENDERER_RUNTIME_REQUIRED: "1"
+          RELEASE_DIR: ${{ github.workspace }}/release
+        run: |
+          set -euo pipefail
+          ./tests/scripts/test_modern_renderer_profile_runtime.sh runtime

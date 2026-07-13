@@ -3356,6 +3356,12 @@ set_tests_properties(test_modern_vulkan_default PROPERTIES
 	LABELS "scripts;renderer;validation"
 	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_modern_vulkan_default.sh;${CMAKE_SOURCE_DIR}/config/modern_vulkan.cfg;${CMAKE_SOURCE_DIR}/docs/RENDERERS.md")
 
+add_test(NAME test_modern_renderer_profile_runtime
+	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_modern_renderer_profile_runtime.sh source)
+set_tests_properties(test_modern_renderer_profile_runtime PROPERTIES
+	LABELS "scripts;renderer;validation"
+	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_modern_renderer_profile_runtime.sh;${CMAKE_SOURCE_DIR}/config/modern_vulkan.cfg;${CMAKE_SOURCE_DIR}/docs/renderer_validation/README.md")
+
 add_test(NAME test_conditional_stubs
 	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_conditional_stubs.sh)
 set_tests_properties(test_conditional_stubs PROPERTIES

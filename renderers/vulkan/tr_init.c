@@ -2582,6 +2582,7 @@ static void R_Register( void )
 	ri.Cmd_AddCommand( "renderer_status", R_RendererStatus_f );
 	ri.Cmd_AddCommand( "renderer_profile", R_RendererProfile_f );
 	ri.Cmd_AddCommand( "renderer_compat", R_RendererCompatibility_f );
+	ri.Cmd_AddCommand( "renderer_compatibility", R_RendererCompatibility_f );
 	ri.Cmd_AddCommand( "vkVolumetricValidate", VkVolumetricValidate_f );
 	ri.Cmd_AddCommand( "r_quality", R_Quality_f );
 	ri.Cmd_AddCommand( "sim_render_profile", R_SimRenderProfile_f );
@@ -4804,6 +4805,7 @@ static void RE_Shutdown( refShutdownCode_t code ) {
 	ri.Cmd_RemoveCommand( "renderer_status" );
 	ri.Cmd_RemoveCommand( "renderer_profile" );
 	ri.Cmd_RemoveCommand( "renderer_compat" );
+	ri.Cmd_RemoveCommand( "renderer_compatibility" );
 	ri.Cmd_RemoveCommand( "vkVolumetricValidate" );
 	ri.Cmd_RemoveCommand( "r_aaQuality" );
 #endif
