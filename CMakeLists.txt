@@ -105,13 +105,24 @@ endif()
 
 if(CI_BUILD)
   if(MSVC)
-    # For MSVC, treat warnings as errors but allow unused functions
+    # Keep CI diagnostics broad; first-party-only targets opt into /WX below.
     add_compile_options(/W4 /wd4100 /wd4505)
   else()
-    # For GCC/Clang, disable problematic warnings for CI
+    # Keep CI diagnostics broad; first-party-only targets opt into -Werror below.
     add_compile_options(-Wno-unused-function -Wno-shadow -Wno-cast-qual -Wno-vla)
   endif()
 endif()
+
+function(idtech3_first_party_warnings_as_errors target_name)
+  if(NOT CI_BUILD OR NOT TARGET ${target_name})
+    return()
+  endif()
+  if(MSVC)
+    target_compile_options(${target_name} PRIVATE /WX)
+  else()
+    target_compile_options(${target_name} PRIVATE -Werror)
+  endif()
+endfunction()
 
 # Security: buffer overflow protection (GCC/Clang; not MSVC)
 if(ENABLE_FORTIFY_SOURCE AND NOT MSVC)
@@ -1524,6 +1535,7 @@ idtech3_init_botlib_sources()
 ADD_LIBRARY(botlib OBJECT ${BOTLIB_SRCS})
 TARGET_COMPILE_DEFINITIONS(botlib PRIVATE BOTLIB)
 target_include_directories(botlib PRIVATE ${IDTECH3_DIR_ENGINE_CORE})
+idtech3_first_party_warnings_as_errors(botlib)
 if(USE_GLM)
   target_include_directories(botlib PRIVATE ${EXTERNAL_GLM_INCLUDE})
 endif()
@@ -1536,6 +1548,7 @@ idtech3_append_server_extension_sources()
 
 # universal binary
 ADD_LIBRARY(qcommon OBJECT ${QCOMMON_SRCS} ${SERVER_SRCS})
+idtech3_first_party_warnings_as_errors(qcommon)
 if(USE_GLM)
   target_include_directories(qcommon PRIVATE ${EXTERNAL_GLM_INCLUDE})
 endif()
@@ -1601,6 +1614,7 @@ endif()
 # dedicated server
 ADD_LIBRARY(qcommon_ded OBJECT ${QCOMMON_SRCS} ${SERVER_SRCS})
 TARGET_COMPILE_DEFINITIONS(qcommon_ded PUBLIC DEDICATED)
+idtech3_first_party_warnings_as_errors(qcommon_ded)
 if(USE_GLM)
   target_include_directories(qcommon_ded PRIVATE ${EXTERNAL_GLM_INCLUDE})
 endif()
@@ -1961,6 +1975,8 @@ ELSE()
 		target_link_libraries(client PRIVATE ${CURL_LIBRARIES})
 	endif()
 ENDIF()
+# The default client object also compiles vendored JPEG sources. CI enforces
+# client first-party warnings with scripts/check_first_party_warnings.sh.
 idtech3_client_include_domains(client)
 target_include_directories(client PRIVATE ${CMAKE_SOURCE_DIR})
 if(USE_LIBTORRENT AND LIBTORRENT_FOUND)
@@ -2114,6 +2130,7 @@ IF(USE_RENDERER_DLOPEN)
 	TARGET_COMPILE_DEFINITIONS(client PRIVATE USE_RENDERER_DLOPEN RENDERER_PREFIX="${RENDERER_PREFIX}")
 
 	ADD_LIBRARY(${RENDERER_PREFIX}_vulkan${RENDEXT} SHARED ${RENDERER_VK_SRCS} ${RENDERER_COMMON_SRCS} ${AUX_SRCS})
+	idtech3_first_party_warnings_as_errors(${RENDERER_PREFIX}_vulkan${RENDEXT})
 	TARGET_COMPILE_DEFINITIONS(${RENDERER_PREFIX}_vulkan${RENDEXT} PRIVATE USE_RENDERER_DLOPEN RENDERER_VULKAN)
 	if(USE_VULKAN_RTX)
 	  target_compile_definitions(${RENDERER_PREFIX}_vulkan${RENDEXT} PRIVATE USE_VULKAN_RTX=1)
@@ -2202,6 +2219,7 @@ IF(USE_RENDERER_DLOPEN)
 	endif()
 ELSE()
 	ADD_LIBRARY(${RENDERER_PREFIX}_vulkan OBJECT ${RENDERER_VK_SRCS} ${RENDERER_COMMON_SRCS})
+	idtech3_first_party_warnings_as_errors(${RENDERER_PREFIX}_vulkan)
 	TARGET_COMPILE_DEFINITIONS(${RENDERER_PREFIX}_vulkan PRIVATE RENDERER_VULKAN)
 	if(USE_VULKAN_RTX)
 	  target_compile_definitions(${RENDERER_PREFIX}_vulkan PRIVATE USE_VULKAN_RTX=1)
@@ -2273,7 +2291,7 @@ endif()
 # duplicate TINYEXR_IMPLEMENTATION symbols when both renderers are loaded
 enable_language(CXX)
 add_library(exr_loader STATIC renderers/common/tr_image_exr.cpp)
-target_include_directories(exr_loader PRIVATE ${EXTERNAL_INCLUDE}/tinyexr ${CMAKE_SOURCE_DIR})
+target_include_directories(exr_loader PRIVATE ${EXTERNAL_INCLUDE}/tinyexr ${CMAKE_SOURCE_DIR} ${IDTECH3_DIR_ENGINE_CORE})
 target_include_directories(exr_loader PRIVATE ${EXTERNAL_ZLIB_SRC})
 set_property(TARGET exr_loader PROPERTY POSITION_INDEPENDENT_CODE ON)
 set_target_properties(exr_loader PROPERTIES
@@ -2438,6 +2456,7 @@ ENDIF()
 
 IF(Q3_UI_SRCS)
 ADD_LIBRARY(q3ui OBJECT ${Q3_UI_SRCS})
+idtech3_first_party_warnings_as_errors(q3ui)
 target_include_directories(q3ui PRIVATE
 	${IDTECH3_DIR_ENGINE_CORE}
 	${CMAKE_SOURCE_DIR}
@@ -2736,6 +2755,7 @@ if(IDTECH3_PHYSICS_BACKEND_EFFECTIVE STREQUAL "none")
 endif()
 
 ADD_LIBRARY(phys_module OBJECT ${PHYSICS_SRCS})
+idtech3_first_party_warnings_as_errors(phys_module)
 set_target_properties(phys_module PROPERTIES
   CXX_STANDARD ${IDTECH3_CXX_STANDARD} CXX_STANDARD_REQUIRED ON)
 target_include_directories(phys_module PRIVATE
@@ -2783,6 +2803,7 @@ IF(ANDROID)
 ELSE()
 	ADD_EXECUTABLE(${CNAME}${BINEXT} ${EXE_TYPE} ${Q3_SRCS})
 ENDIF()
+idtech3_first_party_warnings_as_errors(${CNAME}${BINEXT})
 if(LUA_ANDROID_BUILT)
 	add_dependencies(${CNAME}${BINEXT} lua_android_ep)
 endif()
@@ -2841,6 +2862,7 @@ ADD_EXECUTABLE(${DNAME}${BINEXT} ${Q3_SRCS})
 ELSE()
 ADD_EXECUTABLE(${DNAME}${BINEXT} ${EXE_TYPE} ${Q3_SRCS})
 ENDIF()
+idtech3_first_party_warnings_as_errors(${DNAME}${BINEXT})
 TARGET_LINK_LIBRARIES(${DNAME}${BINEXT} PRIVATE qcommon_ded botlib phys_module)
 if(TARGET Threads::Threads)
   TARGET_LINK_LIBRARIES(${DNAME}${BINEXT} PRIVATE Threads::Threads)
@@ -3319,6 +3341,12 @@ set_tests_properties(test_deferred_lighting PROPERTIES
 	LABELS "scripts;renderer"
 	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_deferred_lighting.sh;${CMAKE_SOURCE_DIR}/renderers/vulkan/vk_deferred_gbuffer.c;${CMAKE_SOURCE_DIR}/renderers/vulkan/shaders/glsl/deferred_lighting.comp")
 
+add_test(NAME test_modern_vulkan_default
+	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_modern_vulkan_default.sh)
+set_tests_properties(test_modern_vulkan_default PROPERTIES
+	LABELS "scripts;renderer;validation"
+	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_modern_vulkan_default.sh;${CMAKE_SOURCE_DIR}/config/modern_vulkan.cfg;${CMAKE_SOURCE_DIR}/docs/RENDERERS.md")
+
 add_test(NAME test_conditional_stubs
 	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_conditional_stubs.sh)
 set_tests_properties(test_conditional_stubs PROPERTIES
@@ -3552,6 +3580,12 @@ add_test(NAME test_build_profiles
 set_tests_properties(test_build_profiles PROPERTIES
 	LABELS "scripts;validation;manifest"
   REQUIRED_FILES "${CMAKE_SOURCE_DIR}/cmake/IdTech3Extension.cmake;${CMAKE_SOURCE_DIR}/cmake/IdTech3Profile.cmake;${CMAKE_SOURCE_DIR}/cmake/IdTech3Layout.cmake")
+
+add_test(NAME test_warning_free_ci
+	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_warning_free_ci.sh)
+set_tests_properties(test_warning_free_ci PROPERTIES
+	LABELS "scripts;validation;ci"
+	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_warning_free_ci.sh;${CMAKE_SOURCE_DIR}/scripts/check_first_party_warnings.sh;${CMAKE_SOURCE_DIR}/.github/workflows/build.yml")
 
 add_test(NAME test_no_aux_core
 	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_no_aux_core.sh)

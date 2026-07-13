@@ -2,7 +2,7 @@
 ===========================================================================
 Copyright (C) 2026 Gopex LLC. All rights reserved.
 
-Deferred G-buffer scaffold + experimental lighting (r_renderMode 1).
+Deferred G-buffer sidecar (r_renderMode 1/2) + experimental lighting (mode 1).
 ===========================================================================
 */
 
@@ -111,7 +111,8 @@ static void vk_dgb_destroy_debug_gfx_pipeline( void )
 
 qboolean vk_deferred_gbuffer_active( void )
 {
-	return ( vk.deferredGbufferAllocated && r_renderMode && r_renderMode->integer == 1 &&
+	return ( vk.deferredGbufferAllocated && r_renderMode &&
+		( r_renderMode->integer == 1 || r_renderMode->integer == 2 ) &&
 		r_deferredGBuffer && r_deferredGBuffer->integer ) ? qtrue : qfalse;
 }
 
@@ -123,7 +124,7 @@ qboolean vk_deferred_gbuffer_fill_wanted( void )
 static qboolean vk_deferred_lighting_wanted( void )
 {
 	return ( vk_deferred_gbuffer_fill_wanted() && r_deferredLighting && r_deferredLighting->integer &&
-		r_forwardPlus && r_forwardPlus->integer ) ? qtrue : qfalse;
+		r_renderMode && r_renderMode->integer == 1 && r_forwardPlus && r_forwardPlus->integer ) ? qtrue : qfalse;
 }
 
 qboolean vk_deferred_unlit_base_wanted( void )

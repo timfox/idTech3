@@ -82,11 +82,11 @@ Details: [ARCHITECTURE.md](ARCHITECTURE.md#native-game-modules-vm) (`vm.c`, `vm_
 
 Retail **baseq3** with **`cgame.qvm`** auto-loads **`classic_baseq3.cfg`** when **`cl_autoGraphicsProfile 1`** (default): classic lighting, no open-world overlays, physics middleware off.
 
-**Native cgame** modules auto-load **`modern_native.cfg`**: PBR sun shadows, Forward+, volumetrics, TAA, SSR, open world, and related modern renderer features (followed by **`vid_restart`** for latched cvars).
+**Native cgame** modules auto-load **`modern_native.cfg`**, which inherits **`modern_vulkan.cfg`**: Forward+ primary lighting, HDR/PBR/material blending, TAA, deferred G-buffer sidecar, then native-game additions such as PBR sun shadows, volumetrics, SSR, and open world (followed by **`vid_restart`** for latched cvars).
 
 Other **QVM mods** (e.g. OpenArena) keep the conservative renderer defaults (**`r_classicLighting 1`**) without forcing a cfg.
 
-Disable auto selection with **`cl_autoGraphicsProfile 0`**. Manual presets: **`config/modern_lighting.cfg`** (lighting only), **`config/modern_native.cfg`**, **`config/classic_baseq3.cfg`**.
+Disable auto selection with **`cl_autoGraphicsProfile 0`**. Manual presets: **`config/modern_vulkan.cfg`** (stable renderer default), **`config/modern_lighting.cfg`** (lighting only), **`config/modern_native.cfg`**, **`config/classic_baseq3.cfg`**.
 
 
 - [ARM_RASPBERRY_PI.md](ARM_RASPBERRY_PI.md) - Raspberry Pi setup and Vulkan

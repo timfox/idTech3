@@ -18,10 +18,13 @@ grep -q 'classic_baseq3.cfg' runtime/client/core/cl_cgame.c || fail 'classic cfg
 grep -q 'modern_native.cfg' runtime/client/core/cl_cgame.c || fail 'modern cfg reference missing'
 
 [ -f config/classic_baseq3.cfg ] || fail 'config/classic_baseq3.cfg missing'
+[ -f config/modern_vulkan.cfg ] || fail 'config/modern_vulkan.cfg missing'
 [ -f config/modern_native.cfg ] || fail 'config/modern_native.cfg missing'
 grep -q 'r_classicLighting 1' config/classic_baseq3.cfg || fail 'classic cfg must set r_classicLighting 1'
+grep -q 'exec modern_vulkan.cfg' config/modern_native.cfg || fail 'modern native cfg must inherit modern_vulkan'
 grep -q 'r_classicLighting 0' config/modern_native.cfg || fail 'modern cfg must set r_classicLighting 0'
 
 grep -q 'classic_baseq3.cfg' scripts/compile_engine.sh || fail 'compile_engine must ship classic_baseq3.cfg'
+grep -q 'modern_vulkan.cfg' scripts/compile_engine.sh || fail 'compile_engine must ship modern_vulkan.cfg'
 
 pass "auto graphics profile contract"

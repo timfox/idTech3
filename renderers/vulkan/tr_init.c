@@ -3818,12 +3818,12 @@ static void R_Register( void )
 	ri.Cvar_SetGroup( r_fbo, CVG_RENDERER );
 	r_renderMode = ri.Cvar_Get( "r_renderMode", "0", CVAR_ARCHIVE_ND | CVAR_LATCH );
 	ri.Cvar_CheckRange( r_renderMode, "0", "2", CV_INTEGER );
-	ri.Cvar_SetDescription( r_renderMode, "Vulkan lighting path (latched, vid_restart).\n 0: Forward (classic projector; r_forwardPlus may still be 1)\n 1: Deferred G-buffer (r_deferredGBuffer 1; r_deferredLighting 1 latches r_forwardPlus 1, r_forwardPlusShade 0)\n 2: Forward+ primary (sets r_forwardPlus 1 and r_forwardPlusShade 1; GPU cap VK_FP_MAX_GPU_LIGHTS)" );
+	ri.Cvar_SetDescription( r_renderMode, "Vulkan lighting path (latched, vid_restart).\n 0: Forward (classic projector; r_forwardPlus may still be 1)\n 1: Deferred lighting mode (r_deferredGBuffer 1; r_deferredLighting 1 latches r_forwardPlus 1, r_forwardPlusShade 0)\n 2: Modern default Forward+ primary (sets r_forwardPlus 1 and r_forwardPlusShade 1; may use r_deferredGBuffer as sidecar)" );
 	r_deferredGBuffer = ri.Cvar_Get( "r_deferredGBuffer", "0", CVAR_ARCHIVE_ND | CVAR_LATCH );
 	ri.Cvar_CheckRange( r_deferredGBuffer, "0", "1", CV_INTEGER );
 	ri.Cvar_SetDescription( r_deferredGBuffer,
-		"With r_renderMode 1: allocate full-res G-buffer images (albedo=color format, normal RGBA16F, material R16G16, lighting RGBA16F). "
-		"Set r_deferredLighting 1 for experimental diffuse pass. Requires r_fbo 1 and vid_restart." );
+		"With r_renderMode 1/2: allocate full-res G-buffer images (albedo=color format, normal RGBA16F, material R16G16, lighting RGBA16F). "
+		"Mode 2 uses this as a sidecar for temporal/advanced consumers; set r_deferredLighting 1 in mode 1 for experimental diffuse. Requires r_fbo 1 and vid_restart." );
 	ri.Cvar_SetGroup( r_deferredGBuffer, CVG_RENDERER );
 	if ( r_deferredGBuffer && r_deferredGBuffer->integer ) {
 		ri.Printf( PRINT_ALL, "[VK][deferred] r_deferredGBuffer=1 (G-buffer RTs when r_renderMode 1)\n" );
@@ -3831,8 +3831,8 @@ static void R_Register( void )
 	r_deferredGBufferFill = ri.Cvar_Get( "r_deferredGBufferFill", "0", CVAR_ARCHIVE_ND );
 	ri.Cvar_CheckRange( r_deferredGBufferFill, "0", "1", CV_INTEGER );
 	ri.Cvar_SetDescription( r_deferredGBufferFill,
-		"With r_renderMode 1 and r_deferredGBuffer 1: after main geometry, copy scene color to G-buffer albedo "
-		"and fill normal/material from depth (compute). Forward lighting unchanged." );
+		"With r_renderMode 1/2 and r_deferredGBuffer 1: after main geometry, copy scene color to G-buffer albedo "
+		"and fill normal/material from depth (compute). Forward+/forward lighting unchanged unless r_deferredLighting 1 in mode 1." );
 	ri.Cvar_SetGroup( r_deferredGBufferFill, CVG_RENDERER );
 	if ( r_deferredGBufferFill && r_deferredGBufferFill->integer ) {
 		ri.Printf( PRINT_ALL, "[VK][deferred] r_deferredGBufferFill=1 (capture after geometry each frame)\n" );
@@ -3841,13 +3841,14 @@ static void R_Register( void )
 	ri.Cvar_CheckRange( r_deferredGBufferDebug, "0", "4", CV_INTEGER );
 	ri.Cvar_SetDescription( r_deferredGBufferDebug,
 		"Visualize deferred buffers on scene color before bloom: 0=off, 1=albedo, 2=normal (view XYZ), 3=material, 4=lighting (requires r_deferredLighting 1). "
-		"Requires r_renderMode 1, r_deferredGBuffer 1, r_deferredGBufferFill 1." );
+		"Requires r_renderMode 1/2, r_deferredGBuffer 1, r_deferredGBufferFill 1." );
 	ri.Cvar_SetGroup( r_deferredGBufferDebug, CVG_RENDERER );
 	r_deferredLighting = ri.Cvar_Get( "r_deferredLighting", "0", CVAR_ARCHIVE_ND );
 	ri.Cvar_CheckRange( r_deferredLighting, "0", "1", CV_INTEGER );
 	ri.Cvar_SetDescription( r_deferredLighting,
 		"Experimental deferred diffuse (point+spot lights via Forward+ tile lists). Requires r_renderMode 1, "
-		"r_deferredGBuffer 1, r_deferredGBufferFill 1, r_forwardPlus 1. vid_restart latches r_forwardPlusShade 0. Replaces scene color after geometry." );
+		"r_deferredGBuffer 1, r_deferredGBufferFill 1, r_forwardPlus 1. vid_restart latches r_forwardPlusShade 0. Replaces scene color after geometry. "
+		"Ignored in r_renderMode 2 modern Forward+ default." );
 	ri.Cvar_SetGroup( r_deferredLighting, CVG_RENDERER );
 	if ( r_deferredLighting && r_deferredLighting->integer ) {
 		ri.Printf( PRINT_ALL, "[VK][deferred] r_deferredLighting=1 (G-buffer diffuse + Forward+ tiles; point+spot)\n" );
@@ -4087,7 +4088,7 @@ static void R_Register( void )
 	ri.Cvar_SetDescription( r_smaa_corner_rounding, "SMAA corner rounding strength (0=off, 1=full). Attenuates edges at L-corners for smoother silhouettes." );
 	r_taa = ri.Cvar_Get( "r_taa", "0", CVAR_ARCHIVE_ND );
 	ri.Cvar_CheckRange( r_taa, "0", "1", CV_INTEGER );
-	ri.Cvar_SetDescription( r_taa, "Temporal resolve for Vulkan HDR post (after post-fog). Uses vk_temporal reset policy (resize, map load, camera cut). r_taaMotionVectors 1 uses main-pass per-pixel motion when available. Disabled by default; prefer SMAA when unstable." );
+	ri.Cvar_SetDescription( r_taa, "Temporal resolve for Vulkan HDR post (after post-fog). Uses vk_temporal reset policy (resize, map load, camera cut). r_taaMotionVectors 1 uses main-pass per-pixel motion when available. Enabled by modern_vulkan.cfg; set 0 for classic/SMAA-only presentation." );
 	ri.Cvar_SetGroup( r_taa, CVG_RENDERER );
 	r_taa_feedbackStationary = ri.Cvar_Get( "r_taa_feedbackStationary", "0.92", CVAR_ARCHIVE_ND );
 	ri.Cvar_CheckRange( r_taa_feedbackStationary, "0.0", "0.99", CV_FLOAT );

@@ -769,7 +769,7 @@ typedef struct {
 		VkImage taa_history_image[2];
 		VkImageView taa_history_image_view[2];
 
-	/* Deferred G-buffer scaffold (r_renderMode 1 + r_deferredGBuffer 1); fill via vk_deferred_gbuffer.c */
+	/* Deferred G-buffer sidecar (r_renderMode 1/2 + r_deferredGBuffer 1); fill via vk_deferred_gbuffer.c */
 	struct {
 		VkDescriptorSetLayout layout;
 		VkPipelineLayout pipeline_layout;

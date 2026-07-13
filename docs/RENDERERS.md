@@ -19,15 +19,36 @@ Build: `./scripts/compile_engine.sh vulkan` (OpenGL/`opengl` arg is rejected).
 The Vulkan 1.4 renderer is the primary rendering backend, built as a shared library (`idtech3_vulkan.so`). Requests Vulkan 1.4 when available; validation layers (Khronos, then LUNARG fallback) are enabled in debug builds on all platforms.
 
 ### Current Architecture
-- Forward renderer with a large HDR/post-processing stack
-- `r_renderMode`: **0** forward (classic projector; `r_forwardPlus` may still be 1), **1** deferred (scaffold + optional `r_deferredLighting`; **`r_deferredGBuffer 1`** allocates RTs), **2** Forward+ primary (`r_forwardPlus` 1, `r_forwardPlusShade` 1, latched via `vid_restart`)
+- **Modern Vulkan default:** `exec modern_vulkan.cfg` then `vid_restart`. This is the boring path: FBO + HDR32 + PBR/material blending + **Forward+ primary lighting** + TAA/motion vectors + a deferred G-buffer sidecar.
+- `r_renderMode`: **0** forward (classic projector; `r_forwardPlus` may still be 1), **1** deferred lighting mode (G-buffer + optional `r_deferredLighting`), **2** modern Forward+ primary (`r_forwardPlus` 1, `r_forwardPlusShade` 1, latched via `vid_restart`)
+- **Deferred G-buffer sidecar:** `r_deferredGBuffer 1` + `r_deferredGBufferFill 1` now works with `r_renderMode 1` and `2`. In mode 2 it captures albedo/normal/material for temporal, neural, RT, and debug consumers while Forward+ remains the lighting path. `r_deferredLighting` is intentionally mode-1-only.
 - Vulkan is the supported rendering backend
 - **Shared temporal reset policy** (`vk_temporal.c`): centralizes history invalidation for volumetrics, motion vectors, exposure. Resize, map load, camera cut, and missing prev-frame data trigger resets. Ready for future TAA/upscaler integration.
 - See [RENDERER_2026_ARCHITECTURE_PASS.md](RENDERER_2026_ARCHITECTURE_PASS.md) for the focused 2026 renderer direction
 
+### Modern Vulkan Default
+
+Use this for native/full-conversion games:
+
+```cfg
+exec modern_vulkan.cfg
+vid_restart
+```
+
+`modern_native.cfg` inherits this profile automatically when `cl_autoGraphicsProfile 1` loads a native cgame. The profile deliberately keeps **deferred lighting** off because the stable default is Forward+ primary lighting; the deferred G-buffer is captured as a sidecar for TAA/advanced systems and future framegraph unification.
+
+| Area | Default Contract |
+|------|------------------|
+| Framebuffer/HDR | `r_fbo 1`, `r_hdr 2` |
+| Materials | `r_pbr 1`, `r_materialBlend 1` |
+| Lighting | `r_renderMode 2`, `r_forwardPlus 1`, `r_forwardPlusShade 1`, `r_forwardPlusDepthCull 1` |
+| Deferred data | `r_deferredGBuffer 1`, `r_deferredGBufferFill 1`, `r_deferredLighting 0` |
+| Temporal AA | `r_taa 1`, `r_taaMotionVectors 1`, `r_temporalCpuSkinPrev 1` |
+| Post AA safety net | `r_ext_smaa 1`, `r_postAaAfterBloom 1` |
+
 ### Vulkan Forward+ scaffolding
 
-**GPU light packing + per-tile cull** on the forward path (`r_forwardPlus` default **1**; `r_renderMode 2` forces it on):
+**GPU light packing + per-tile cull** on the forward path (`r_forwardPlus` default **1**; `r_renderMode 2` / `modern_vulkan.cfg` force it on):
 
 | Cvar | Role |
 |------|------|
@@ -128,15 +149,16 @@ Code: `renderers/vulkan/vk_forward_plus.c`, `VK_FP_*` constants; cvar registrati
 ### Anti-Aliasing
 - **SMAA** (Sub-pixel Morphological Anti-Aliasing): edge detection, blend weight, and compose passes. Cvars: `r_ext_smaa` (enable), `r_smaa_preset` (0=Custom, 1=Low, 2=Medium, 3=High, 4=Ultra), `r_smaa_threshold` (0.01–0.5), `r_smaa_local_contrast` (1–4), `r_smaa_max_search_steps` (8–32), `r_smaa_corner_rounding` (0–1). Preset overrides manual params when non-zero. Edge detection uses max(left,right) and max(top,bottom) deltas (reference SMAA), HDR-safe luma, configurable corner rounding, and explicit LOD 0 sampling. Requires `r_fbo 1`.
 - **MSAA**: Multi-sample anti-aliasing for geometry edges. Cvar `r_ext_multisample` (0|2|4|8|16). Requires `r_fbo 1`. `r_msaa_sample_shading` enables per-sample shading for better alpha/specular quality (~2x fragment cost). `r_ext_alpha_to_coverage` improves alpha-tested surfaces (foliage, grates) when MSAA is on. MSAA and SMAA can be used together: MSAA handles geometry edges, SMAA handles alpha/transparency edges.
-- **TAA**: Optional temporal resolve for the Vulkan HDR/post path. Cvars: `r_taa`, `r_taa_feedbackStationary`, `r_taa_feedbackMotion`, `r_taa_sharpen`. Best used with world rendering plus internal-resolution rendering (`r_renderScale`) when you want a softer, more temporally stable presentation than pure SMAA/MSAA. TAA is intentionally conservative: portal views, non-world/menu/cinematic paths, missing history, and first-person projection transitions invalidate or bypass history rather than trying to blend through unstable motion.
+- **TAA**: Default in `modern_vulkan.cfg` for the Vulkan HDR/post path. Cvars: `r_taa`, `r_taa_feedbackStationary`, `r_taa_feedbackMotion`, `r_taa_sharpen`. TAA is intentionally conservative: portal views, non-world/menu/cinematic paths, missing history, and first-person projection transitions invalidate or bypass history rather than trying to blend through unstable motion. Classic profiles may still set `r_taa 0`.
 
 ### Internal Resolution / Present Scaling
 - **Internal resolution controls**: `r_renderScale`, `r_renderWidth`, and `r_renderHeight` let the renderer shade at one resolution and present at another. This is the in-engine alternative to vendor upscalers.
 - `r_renderScale 0` disables custom internal resolution.
 - `r_renderScale 1/2` use nearest filtering; `3/4` use linear filtering. Modes `2/4` preserve aspect ratio with black bars; `1/3` stretch to the window.
 - Recommended combinations:
-  - sharp/default path: `r_taa 0`, `r_ext_smaa 1`, optional MSAA
-  - softer temporal path: `r_taa 1`, `r_renderScale 3` or `4`, custom `r_renderWidth` / `r_renderHeight`
+  - modern default path: `exec modern_vulkan.cfg`
+  - sharp/classic path: `r_taa 0`, `r_ext_smaa 1`, optional MSAA
+  - softer temporal upsample path: `r_taa 1`, `r_renderScale 3` or `4`, custom `r_renderWidth` / `r_renderHeight`
 - Current renderer truth: internal-resolution presentation is supported, but some post paths are still being hardened around source-region tracking and active render-target sizing. Prefer modest scale reductions first.
 - **Effective scene render target (Vulkan):** **`vk_get_render_target_width()` / `vk_get_render_target_height()`** in `renderers/vulkan/vk_view_state.c` return **`vk.mainColorWidth` / `mainColorHeight`** when **`vk.fboActive`** and those extents are set (main HDR color attachment); otherwise **`vk.renderWidth` / `vk.renderHeight`** if nonzero; otherwise **`glConfig.vidWidth` / `vidHeight`**. Sun shadow and other passes can temporarily change **`vk.renderWidth`**; packing and screen-space work that must match the **main color** image (Forward+ SSBO viewport, tile cull, SSAO/HBAO texel pushes, SSR → color copy, temporal history invalidation on resize—see `vk_temporal.c`, `vk_forward_plus.c`, `vk_postfx_passes.c`) uses this helper so dimensions stay aligned with the attachment the player sees, not transient globals.
 
@@ -204,11 +226,11 @@ Code: `renderers/vulkan/vk_forward_plus.c`, `VK_FP_*` constants; cvar registrati
 |------|---------|-------------|
 | `r_fbo` | 1 | Framebuffer objects (required for PBR, HDR, bloom, MSAA, SMAA, SSAO). Use vid_restart after changing. |
 | `r_pbr` | 1 | Physically Based Rendering (metalness/roughness, IBL). Requires r_fbo 1. |
-| `r_renderMode` | 0 | **0** forward, **1** deferred (scaffold RTs with `r_deferredGBuffer`; optional `r_deferredLighting`), **2** Forward+ primary. Latched; `vid_restart`. |
-| `r_deferredGBuffer` | 0 | With `r_renderMode` 1: allocate albedo/normal/material/lighting G-buffer images. Latched; `r_fbo` 1. |
-| `r_deferredGBufferFill` | 0 | With scaffold RTs: copy scene albedo + depth-derived normal/material after geometry. |
+| `r_renderMode` | 0 | **0** forward, **1** deferred lighting mode, **2** Forward+ primary. `modern_vulkan.cfg` sets **2**. Latched; `vid_restart`. |
+| `r_deferredGBuffer` | 0 | With `r_renderMode` 1/2: allocate albedo/normal/material/lighting G-buffer images. `modern_vulkan.cfg` sets **1** as a sidecar. Latched; `r_fbo` 1. |
+| `r_deferredGBufferFill` | 0 | With G-buffer RTs: copy scene albedo + depth-derived normal/material after geometry. `modern_vulkan.cfg` sets **1**. |
 | `r_deferredGBufferDebug` | 0 | Before bloom: show G-buffer on scene color (1=albedo, 2=normal, 3=material, 4=lighting). |
-| `r_deferredLighting` | 0 | Experimental deferred diffuse (Forward+ tiles, point+spot). Replaces scene color after geometry. Latches `r_forwardPlusShade` 0 with `vid_restart`. |
+| `r_deferredLighting` | 0 | Experimental mode-1 deferred diffuse (Forward+ tiles, point+spot). Replaces scene color after geometry. Latches `r_forwardPlusShade` 0 with `vid_restart`; ignored by the mode-2 modern default. |
 | `r_deferredUnlitBase` | 1 | Additive dynamic on static-lit scene copy; skips classic lit-surf pass. **0** = legacy multiply composite. |
 | `r_deferredLightingStrength` | 1 | Scale deferred dynamic diffuse (0–4). |
 | `r_deferredSpecular` | 1 | Blinn-Phong specular on dynamic lights in deferred pass (0=diffuse only). |
@@ -268,7 +290,7 @@ Code: `renderers/vulkan/vk_forward_plus.c`, `VK_FP_*` constants; cvar registrati
 | `r_exposure_auto` | 0 | Eye adaptation (0=manual, 1=temporal blend toward target) |
 | `r_exposure_auto_target` | 0.5 | Target exposure for eye adaptation |
 | `r_exposure_auto_speed` | 2.0 | Adaptation speed (higher = faster) |
-| `r_taa` | 0 | Temporal resolve after post-fog, before luminance/gamma. Uses `vk_temporal` resets; skips portals, menus, unreliable motion. See [HDR_GAPS.md](HDR_GAPS.md) §6.8. |
+| `r_taa` | 0 | Temporal resolve after post-fog, before luminance/gamma. `modern_vulkan.cfg` sets **1**. Uses `vk_temporal` resets; skips portals, menus, unreliable motion. See [HDR_GAPS.md](HDR_GAPS.md) §6.8. |
 | `r_taaMotionVectors` | 1 | TAA history UV from main-pass motion attachment (1) or depth reprojection (0). |
 | `r_taa_feedbackStationary` | 0.92 | TAA history feedback for stable pixels. Higher = smoother, lower = more responsive. |
 | `r_taa_feedbackMotion` | 0.72 | TAA history feedback for moving pixels. Lower helps reduce ghosting. |

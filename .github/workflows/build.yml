@@ -463,6 +463,7 @@ jobs:
           CFLAGS: "-DSKIP_IDPAK_CHECK=1"
           CXXFLAGS: "-DSKIP_IDPAK_CHECK=1"
         run: |
+          set -o pipefail
           CMAKE_EXTRA=""
           if [ "${{ matrix.cc }}" = "clang" ]; then
             CMAKE_EXTRA="-DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++"
@@ -484,7 +485,8 @@ jobs:
             -DSKIP_SHADER_REGEN=ON \
             -DIDTECH3_PROFILE=full \
             -Wno-dev
-          cmake --build build-vk-${{ matrix.btype }} -j$(nproc)
+          cmake --build build-vk-${{ matrix.btype }} -j$(nproc) 2>&1 | tee build-vk-${{ matrix.btype }}.log
+          ./scripts/check_first_party_warnings.sh build-vk-${{ matrix.btype }}.log
           mkdir -p bin
           cp -f build-vk-${{ matrix.btype }}/idtech3* bin/ || true
 

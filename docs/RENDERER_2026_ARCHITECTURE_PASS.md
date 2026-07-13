@@ -23,7 +23,7 @@ The objective is not "add every modern rendering acronym." The objective is to m
 
 ### What still limits the architecture
 
-- The Vulkan renderer is still **forward-only**. `r_renderMode 1` is a deferred placeholder; **`r_renderMode 2`** enables clustered **Forward+** (`r_forwardPlus`, `r_forwardPlusShade`, up to **64** GPU lights via `VK_FP_MAX_GPU_LIGHTS`).
+- The Vulkan renderer now has a documented **modern default**: `modern_vulkan.cfg` uses **`r_renderMode 2`** clustered Forward+ (`r_forwardPlus`, `r_forwardPlusShade`, up to **64** GPU lights via `VK_FP_MAX_GPU_LIGHTS`) with HDR/PBR/TAA and a deferred G-buffer sidecar. Full deferred lighting remains `r_renderMode 1` / `r_deferredLighting 1` and is not the default.
 - Dynamic lighting on the **classic** path still uses **`MAX_DLIGHTS == 32`** surface **`dlightBits`**; Forward+ packs **`refdef.dlights`** separately (see [FORWARD_PLUS_PIPELINE_AUDIT.md](FORWARD_PLUS_PIPELINE_AUDIT.md)).
 - Temporal behavior is fragmented. Volumetric fog, exposure, motion vectors, occlusion visibility, and post effects each track history differently.
 - Platform strategy: **Vulkan-only shipping** (OpenGL removed); Vulkan RTX experimental; DXR/WebGPU roadmap scaffolds — see [RENDERERS.md](RENDERERS.md).
@@ -154,7 +154,7 @@ Use **Vulkan as the only shipping renderer**, invest in **DXR + WebGPU** as road
 
 ## Phase 1: Foundation
 
-- **Fix doc/code drift and make the forward-only architecture explicit** - ✅ RENDERERS.md states **forward** main pass, **`r_renderMode` 1/2** placeholders, and **optional Vulkan Forward+** (`r_forwardPlus`) as scaffolding (not a `r_renderMode` switch).
+- **Fix doc/code drift and make the modern path explicit** - ✅ RENDERERS.md states `modern_vulkan.cfg` as the stable Forward+ + HDR/PBR/TAA default, with a mode-2 deferred G-buffer sidecar and mode-1 deferred lighting kept separate.
 - **Create a shared temporal reset policy** - ✅ Implemented in `vk_temporal.c`. Central reset reasons (renderer_init, swapchain_change, world_change, camera_cut, etc.); `vk_temporal_apply_resets()` clears motion history, volumetric froxel history, occlusion visibility, and exposure. `vk_temporal_request_sticky_reset()` for subsystems to request invalidation.
 - **Audit motion-vector coverage and history consumers** - ✅ Documented. Motion vectors: main scene pass (gen_frag, light_frag, color.frag, fog.frag) via `vk_get_prev_mvp_transform`. **Incremental:** entities with **`RF_FIRST_PERSON`** skip per-entity previous model for prev-MVP (view-relative weapon; avoids bogus motion vs stale history). **GPU skin SSBO:** packs **current + previous** influence/joint blocks (same layout twice); vertex shaders use the second block for **`var_PrevClip`** position while **`prevMvp`** still carries rigid entity motion. **`vk_draw_geometry`** re-pushes MVP after skin commit when `iqm_skin_offset` is set. **glTF GPU:** previous joint matrices from the **old animation** sample when blending clips; morph SSBO packs **current + previous** top-K weights (previous from last view’s baked state + clip morph sample at `animOld`). **IQM GPU:** same dual weight row in morph SSBO, with `morphGpuWeightPrev` / `morphChannelWeightPrev` snapshotted in **`RE_EndScene`** per view. Gaps: first-frame morph motion (prev weights zero until second frame), `customShader` deformation, 2D/menus. Consumers: volumetric fog, exposure, motion blur. Occlusion culling now resets visibility on temporal reset (`vk_reset_occlusion_visibility`).
 

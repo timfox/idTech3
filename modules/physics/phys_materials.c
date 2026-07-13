@@ -119,6 +119,7 @@ void PhysMat_ComputeImpactResponse( physMaterialId_t matA, physMaterialId_t matB
 	const phys_material_t *b;
 	float hardnessMix;
 	float brittlenessMix;
+	float fractureScale;
 
 	if ( !out ) {
 		return;
@@ -128,6 +129,7 @@ void PhysMat_ComputeImpactResponse( physMaterialId_t matA, physMaterialId_t matB
 	b = PhysMat_Get( matB );
 	hardnessMix = ( a->hardness + b->hardness ) * 0.5f;
 	brittlenessMix = ( a->brittleness + b->brittleness ) * 0.5f;
+	fractureScale = 1.0f - 0.5f * Com_Clamp( 0.0f, 1.0f, brittlenessMix );
 
 	Com_Memset( out, 0, sizeof( *out ) );
 	out->damageScale = impulseMag * 0.001f * ( hardnessMix / 50.0f );
@@ -135,7 +137,7 @@ void PhysMat_ComputeImpactResponse( physMaterialId_t matA, physMaterialId_t matB
 	out->soundScale = impulseMag * 0.0003f * ( a->soundSharpness + b->soundSharpness );
 	out->decalScale = impulseMag * 0.0002f;
 	out->stressAdd = impulseMag * a->stressAccumRate * b->stressAccumRate;
-	out->shouldFracture = ( out->stressAdd > a->fractureThreshold * approachAngle ) ? qtrue : qfalse;
+	out->shouldFracture = ( out->stressAdd > a->fractureThreshold * approachAngle * fractureScale ) ? qtrue : qfalse;
 	out->shouldSplash = ( a->wetness > 0.5f || b->wetness > 0.5f ) ? qtrue : qfalse;
 }
 

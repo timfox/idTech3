@@ -339,8 +339,9 @@ static void vk_create_fullres_color_attachment(
 ===============
 vk_create_deferred_gbuffer_scaffold
 ===============
-Allocates full-res G-buffer RTs when r_renderMode 1 and r_deferredGBuffer 1.
-No deferred lighting pass writes these yet; forward path unchanged.
+Allocates full-res G-buffer RTs when r_renderMode 1/2 and r_deferredGBuffer 1.
+r_renderMode 2 uses these as a sidecar for temporal/advanced consumers while
+Forward+ remains the primary lighting path.
 */
 static void vk_create_deferred_gbuffer_scaffold( void )
 {
@@ -357,7 +358,7 @@ static void vk_create_deferred_gbuffer_scaffold( void )
 	vk.deferred_lighting_image = VK_NULL_HANDLE;
 	vk.deferred_lighting_view = VK_NULL_HANDLE;
 
-	if ( !vk.fboActive || !r_renderMode || r_renderMode->integer != 1 ||
+	if ( !vk.fboActive || !r_renderMode || ( r_renderMode->integer != 1 && r_renderMode->integer != 2 ) ||
 		!r_deferredGBuffer || !r_deferredGBuffer->integer ) {
 		return;
 	}

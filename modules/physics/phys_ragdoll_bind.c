@@ -143,7 +143,8 @@ qboolean Phys_RagdollApplyMd3Frame( physRagdollHandle_t handle, const physRagdol
 	byte *data = NULL;
 	md3Header_t *hdr;
 	md3Tag_t *tags;
-	int len, t, b, numTags, numFrames;
+	int len, t, b, numTags, numFrames, ofsTags;
+	size_t frameTagCount, frameOffset, tagOffset, tagBytes;
 	int applied = 0;
 
 	if ( handle < 0 || !bind || !md3Path || !md3Path[0] || bind->numBones <= 0 ) {
@@ -162,16 +163,33 @@ qboolean Phys_RagdollApplyMd3Frame( physRagdollHandle_t handle, const physRagdol
 	}
 	numFrames = LittleLong( hdr->numFrames );
 	numTags = LittleLong( hdr->numTags );
+	ofsTags = LittleLong( hdr->ofsTags );
 	if ( numFrames <= 0 || numTags <= 0 || frame < 0 || frame >= numFrames ) {
 		FS_FreeFile( data );
 		return qfalse;
 	}
-	if ( LittleLong( hdr->ofsTags ) + frame * numTags * (int)sizeof( md3Tag_t ) > len ) {
+	if ( ofsTags < 0 || ofsTags > len ) {
+		FS_FreeFile( data );
+		return qfalse;
+	}
+	frameTagCount = (size_t)frame * (size_t)numTags;
+	if ( frameTagCount > ( (size_t)-1 ) / sizeof( md3Tag_t ) ) {
+		FS_FreeFile( data );
+		return qfalse;
+	}
+	frameOffset = frameTagCount * sizeof( md3Tag_t );
+	if ( (size_t)ofsTags > ( (size_t)-1 ) - frameOffset ) {
+		FS_FreeFile( data );
+		return qfalse;
+	}
+	tagOffset = (size_t)ofsTags + frameOffset;
+	tagBytes = (size_t)numTags * sizeof( md3Tag_t );
+	if ( tagOffset > (size_t)len || tagBytes > (size_t)len - tagOffset ) {
 		FS_FreeFile( data );
 		return qfalse;
 	}
 
-	tags = (md3Tag_t *)( data + LittleLong( hdr->ofsTags ) ) + frame * numTags;
+	tags = (md3Tag_t *)( data + tagOffset );
 	for ( b = 0; b < bind->numBones; b++ ) {
 		const char *want = bind->bones[b].tagName;
 		vec3_t pos, rot, world;

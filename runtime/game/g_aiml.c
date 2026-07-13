@@ -595,7 +595,7 @@ static void AIML_LoadXml_maps( int h, const char *t ) {
 
 /* Scan for <category>...</category> in [p0, end) */
 static void AIML_LoadCategoryBlock( int h, const char *p0, const char *end, const char *deftopic ) {
-	const char *p, *a, *b, *nxt, *copen;
+	const char *p, *a = NULL, *b = NULL, *nxt, *copen;
 	aimlCategory_t *cat;
 
 	if ( !p0 || !end || p0 >= end ) { return; }
@@ -670,7 +670,8 @@ static void AIML_LoadCategoryBlock( int h, const char *p0, const char *end, cons
 
 static void AIML_LoadXml( int h, const char *t ) {
 	const char *e = t + strlen( t ), *p, *topen, *tclose, *in0, *na;
-	char tnm[64], *gt;
+	const char *gt;
+	char tnm[64];
 
 	p = t;
 	for ( ; ; ) {
