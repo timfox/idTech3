@@ -6,6 +6,8 @@ Optional peer-to-peer networking facade.
 ===========================================================================
 */
 
+#include <inttypes.h>
+
 #include "q_shared.h"
 #include "qcommon.h"
 #include "net_p2p.h"
@@ -356,7 +358,7 @@ qboolean NET_P2P_IsAddressString( const char *address )
 
 qboolean NET_P2P_NormalizeAddressString( const char *address, char *buffer, int bufferSize )
 {
-	unsigned long long steamid;
+	uint64_t steamid;
 	netadr_t adr;
 
 	if ( !address || !address[0] || !buffer || bufferSize <= 0 ) {
@@ -367,8 +369,8 @@ qboolean NET_P2P_NormalizeAddressString( const char *address, char *buffer, int 
 
 	if ( !Q_stricmpn( address, "steam:", 6 ) ) {
 		address += 6;
-		if ( sscanf( address, "%llu", &steamid ) == 1 && steamid != 0 ) {
-			Com_sprintf( buffer, bufferSize, "steam:%llu", steamid );
+		if ( sscanf( address, "%" SCNu64, &steamid ) == 1 && steamid != 0 ) {
+			Com_sprintf( buffer, bufferSize, "steam:%" PRIu64, steamid );
 			return qtrue;
 		}
 		return qfalse;
@@ -384,8 +386,8 @@ qboolean NET_P2P_NormalizeAddressString( const char *address, char *buffer, int 
 		}
 
 		/* Bare SteamID64 only; reject host:port fragments like "192.168...". */
-		if ( digits >= 15 && *p == '\0' && sscanf( address, "%llu", &steamid ) == 1 && steamid != 0 ) {
-			Com_sprintf( buffer, bufferSize, "steam:%llu", steamid );
+		if ( digits >= 15 && *p == '\0' && sscanf( address, "%" SCNu64, &steamid ) == 1 && steamid != 0 ) {
+			Com_sprintf( buffer, bufferSize, "steam:%" PRIu64, steamid );
 			return qtrue;
 		}
 	}

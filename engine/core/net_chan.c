@@ -20,6 +20,8 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 ===========================================================================
 */
 
+#include <inttypes.h>
+
 #include "q_shared.h"
 #include "qcommon.h"
 #include "net_sdr.h"
@@ -809,9 +811,9 @@ int NET_StringToAdr( const char *s, netadr_t *a, netadrtype_t family )
 
 #ifdef USE_STEAM_NETWORKING
 	if ( !Q_stricmpn( s, "steam:", 6 ) ) {
-		unsigned long long steamid;
+		uint64_t steamid;
 		Com_Memset( a, 0, sizeof( *a ) );
-		if ( sscanf( s + 6, "%llu", &steamid ) == 1 ) {
+		if ( sscanf( s + 6, "%" SCNu64, &steamid ) == 1 ) {
 			a->type = NA_STEAMID;
 			a->ipv.steamid = steamid;
 			a->port = 0;

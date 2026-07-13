@@ -156,7 +156,7 @@ const char *vk_present_mode_string( VkPresentModeKHR mode )
 		case VK_PRESENT_MODE_FIFO_KHR: return "FIFO";
 		case VK_PRESENT_MODE_FIFO_RELAXED_KHR: return "FIFO_RELAXED";
 		case VK_PRESENT_MODE_FIFO_LATEST_READY_EXT: return "FIFO_LATEST_READY";
-		default: Com_sprintf( buf, sizeof( buf ), "mode#%x", mode ); return buf;
+		default: Com_sprintf( buf, sizeof( buf ), "mode#%x", (unsigned int)mode ); return buf;
 	}
 }
 

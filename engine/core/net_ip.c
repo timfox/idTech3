@@ -27,6 +27,8 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #	define _POSIX_C_SOURCE 200809L
 #endif
 
+#include <inttypes.h>
+
 #include "q_shared.h"
 #include "qcommon.h"
 #include "net_p2p.h"
@@ -605,7 +607,7 @@ const char *NET_AdrToString( const netadr_t *a )
 		Q_strncpyz( s, "bot", sizeof( s ) );
 #ifdef USE_STEAM_NETWORKING
 	else if (a->type == NA_STEAMID)
-		Com_sprintf( s, sizeof( s ), "steam:%llu", (unsigned long long)a->ipv.steamid );
+		Com_sprintf( s, sizeof( s ), "steam:%" PRIu64, (uint64_t)a->ipv.steamid );
 #endif
 #ifdef USE_IPV6
 	else if (a->type == NA_IP || a->type == NA_IP6)
@@ -638,7 +640,7 @@ const char *NET_AdrToStringwPort( const netadr_t *a )
 #endif
 #ifdef USE_STEAM_NETWORKING
 	else if (a->type == NA_STEAMID)
-		Com_sprintf(s, sizeof(s), "steam:%llu", (unsigned long long)a->ipv.steamid);
+		Com_sprintf(s, sizeof(s), "steam:%" PRIu64, (uint64_t)a->ipv.steamid);
 #endif
 
 	return s;
