@@ -110,9 +110,10 @@ oscar_im SomeBuddy "Need one more player for CTF."
 Direct mode currently supports login, BOS cookie reconnect, online notification,
 basic outgoing IMs, incoming IM events, temporary buddy subscriptions, buddy
 arrival/departure/status events, presence status publishing, disconnect, and
-reconnect. Raw OSCAR room chat and persistent saved buddy lists still require
-additional ChatNav/feedbag service work; use gateway mode for rooms until that
-layer is implemented.
+reconnect. The raw codec also includes the tested OService/Chat message blocks
+needed for direct room support. Live raw room chat still requires the second
+Chat service socket and ChatNav/feedbag service work; use gateway mode for rooms
+until that layer is implemented.
 
 ## Gateway Message Contract
 
@@ -145,5 +146,6 @@ translation to a sidecar.
 escaping, event parsing, malformed input, and oversized frame rejection.
 `unit_oscar_raw` verifies raw FLAP/TLV/SNAC helpers for login, BOS cookie signon,
 client-online, IM receive parsing, presence publishing, temporary buddy
-subscription, and buddy presence parsing. `test_oscar_bridge` verifies that both
-direct and gateway code paths stay wired without shelling out to external tools.
+subscription, buddy presence parsing, service responses, and chat message
+encoding/parsing. `test_oscar_bridge` verifies that both direct and gateway code
+paths stay wired without shelling out to external tools.

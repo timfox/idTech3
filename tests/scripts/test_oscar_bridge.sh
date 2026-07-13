@@ -26,6 +26,8 @@ rg -q 'OSCAR_RawBuildIM' engine/core/net_oscar.c engine/core/net_oscar_raw.c || 
 rg -q 'OSCAR_RawBuildPresence' engine/core/net_oscar.c engine/core/net_oscar_raw.c || fail "missing raw OSCAR presence path"
 rg -q 'OSCAR_RawBuildBuddyAddTemp' engine/core/net_oscar.c engine/core/net_oscar_raw.c || fail "missing raw OSCAR buddy subscribe path"
 rg -q 'OSCAR_RawParsePresence' engine/core/net_oscar.c engine/core/net_oscar_raw.c || fail "missing raw OSCAR inbound presence parser"
+rg -q 'OSCAR_RawBuildChatMessage' engine/core/net_oscar_raw.c || fail "missing raw OSCAR chat message builder"
+rg -q 'OSCAR_RawParseServiceReply' engine/core/net_oscar_raw.c || fail "missing raw OSCAR service response parser"
 rg -q 'numeric IP' engine/core/net_oscar.c docs/OSCAR_INTEGRATION.md || fail "missing no-DNS gateway guidance"
 rg -q 'OSCAR_ProtocolBuildRoomMessage' engine/core/net_oscar_protocol.c || fail "missing room message builder"
 rg -q 'OSCAR_ProtocolParseEvent' engine/core/net_oscar_protocol.c || fail "missing gateway event parser"

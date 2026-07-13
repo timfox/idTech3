@@ -39,6 +39,15 @@ typedef struct {
 	unsigned short errorCode;
 } oscarRawAuthReply_t;
 
+typedef struct {
+	unsigned short service;
+	char host[128];
+	int port;
+	byte cookie[OSCAR_RAW_MAX_COOKIE];
+	int cookieLen;
+	unsigned short errorCode;
+} oscarRawServiceReply_t;
+
 int OSCAR_RawBuildFlap( byte channel, unsigned short sequence, const byte *payload, int payloadLen, byte *out, int outSize );
 int OSCAR_RawBuildLoginSignon( unsigned short sequence, const char *screenName, const char *password, byte *out, int outSize );
 int OSCAR_RawBuildCookieSignon( unsigned short sequence, const byte *cookie, int cookieLen, byte *out, int outSize );
@@ -49,11 +58,17 @@ int OSCAR_RawBuildIM( unsigned short sequence, unsigned int requestId, const cha
 int OSCAR_RawBuildPresence( unsigned short sequence, unsigned int requestId, const char *status, byte *out, int outSize );
 int OSCAR_RawBuildBuddyAddTemp( unsigned short sequence, unsigned int requestId, const char *screenName, byte *out, int outSize );
 int OSCAR_RawBuildBuddyDelTemp( unsigned short sequence, unsigned int requestId, const char *screenName, byte *out, int outSize );
+int OSCAR_RawBuildServiceRequest( unsigned short sequence, unsigned int requestId, unsigned short service, byte *out, int outSize );
+int OSCAR_RawBuildChatServiceRequest( unsigned short sequence, unsigned int requestId, unsigned short exchange,
+                                      const char *roomCookie, unsigned short instance, byte *out, int outSize );
+int OSCAR_RawBuildChatMessage( unsigned short sequence, unsigned int requestId, const char *text, byte *out, int outSize );
 
 qboolean OSCAR_RawParseFlap( const byte *data, int dataLen, oscarRawFlapFrame_t *frame, int *consumed );
 qboolean OSCAR_RawParseSnac( const byte *payload, int payloadLen, oscarRawSnac_t *snac );
 qboolean OSCAR_RawParseAuthReply( const byte *payload, int payloadLen, oscarRawAuthReply_t *reply );
+qboolean OSCAR_RawParseServiceReply( const oscarRawSnac_t *snac, oscarRawServiceReply_t *reply );
 qboolean OSCAR_RawParseIncomingIM( const oscarRawSnac_t *snac, oscarEvent_t *eventOut );
 qboolean OSCAR_RawParsePresence( const oscarRawSnac_t *snac, oscarEvent_t *eventOut );
+qboolean OSCAR_RawParseChatMessage( const oscarRawSnac_t *snac, const char *roomName, oscarEvent_t *eventOut );
 
 #endif /* NET_OSCAR_RAW_H */

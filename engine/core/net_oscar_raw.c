@@ -20,12 +20,19 @@ channel-1 IM.
 #define OSCAR_TLV_RECONNECT_HERE 0x0005
 #define OSCAR_TLV_AUTH_COOKIE 0x0006
 #define OSCAR_TLV_ERROR_SUBCODE 0x0008
+#define OSCAR_TLV_GROUP_ID 0x000d
+#define OSCAR_TLV_SSL_STATE 0x008e
 #define OSCAR_TLV_MULTI_CONN_FLAGS 0x004a
 
 #define OSCAR_FAMILY_OSERVICE 0x0001
 #define OSCAR_FAMILY_BUDDY 0x0003
 #define OSCAR_FAMILY_ICBM 0x0004
+#define OSCAR_FAMILY_CHAT_NAV 0x000d
+#define OSCAR_FAMILY_CHAT 0x000e
 #define OSCAR_OSERVICE_CLIENT_ONLINE 0x0002
+#define OSCAR_OSERVICE_ERR 0x0001
+#define OSCAR_OSERVICE_SERVICE_REQUEST 0x0004
+#define OSCAR_OSERVICE_SERVICE_RESPONSE 0x0005
 #define OSCAR_OSERVICE_USER_INFO_UPDATE 0x000f
 #define OSCAR_OSERVICE_SET_USER_INFO_FIELDS 0x001e
 #define OSCAR_OSERVICE_USER_INFO_USER_FLAGS 0x0001
@@ -38,6 +45,15 @@ channel-1 IM.
 #define OSCAR_ICBM_CHANNEL_MSG_TO_CLIENT 0x0007
 #define OSCAR_ICBM_TLV_AOL_IM_DATA 0x0002
 #define OSCAR_ICBM_CHANNEL_IM 0x0001
+#define OSCAR_ICBM_CHANNEL_MIME 0x0003
+#define OSCAR_CHAT_CHANNEL_MSG_TO_HOST 0x0005
+#define OSCAR_CHAT_CHANNEL_MSG_TO_CLIENT 0x0006
+#define OSCAR_CHAT_TLV_SENDER_INFORMATION 0x0003
+#define OSCAR_CHAT_TLV_MESSAGE_INFO 0x0005
+#define OSCAR_CHAT_TLV_ENABLE_REFLECTION 0x0006
+#define OSCAR_CHAT_MSG_TLV_TEXT 0x0001
+#define OSCAR_CHAT_MSG_TLV_ENCODING 0x0002
+#define OSCAR_CHAT_MSG_TLV_LANG 0x0003
 
 #define OSCAR_STATUS_AVAILABLE 0x00000000u
 #define OSCAR_STATUS_AWAY 0x00000001u
@@ -129,6 +145,32 @@ static qboolean OSCAR_TLVFind( const byte *payload, int payloadLen, int offset, 
 		pos += len;
 	}
 	return qfalse;
+}
+
+static void OSCAR_CopyHostPort( const byte *value, int valueLen, char *hostOut, int hostOutSize, int *portOut )
+{
+	char hostPort[160];
+	const char *colon;
+	int copyLen;
+	int hostLen;
+
+	if ( !value || valueLen <= 0 || !hostOut || hostOutSize <= 0 || !portOut ) {
+		return;
+	}
+	copyLen = valueLen < (int)sizeof( hostPort ) - 1 ? valueLen : (int)sizeof( hostPort ) - 1;
+	Com_Memcpy( hostPort, value, copyLen );
+	hostPort[copyLen] = '\0';
+	colon = strrchr( hostPort, ':' );
+	if ( colon ) {
+		*portOut = atoi( colon + 1 );
+		hostLen = (int)( colon - hostPort );
+		if ( hostLen > 0 && hostLen < hostOutSize ) {
+			Com_Memcpy( hostOut, hostPort, hostLen );
+			hostOut[hostLen] = '\0';
+		}
+	} else {
+		Q_strncpyz( hostOut, hostPort, hostOutSize );
+	}
 }
 
 int OSCAR_RawBuildFlap( byte channel, unsigned short sequence, const byte *payload, int payloadLen, byte *out, int outSize )
@@ -408,8 +450,6 @@ qboolean OSCAR_RawParseAuthReply( const byte *payload, int payloadLen, oscarRawA
 {
 	const byte *value;
 	int valueLen;
-	const char *colon;
-	int hostLen;
 
 	if ( !payload || !reply || payloadLen < 4 ) {
 		return qfalse;
@@ -421,22 +461,7 @@ qboolean OSCAR_RawParseAuthReply( const byte *payload, int payloadLen, oscarRawA
 		reply->errorCode = valueLen >= 2 ? (unsigned short)OSCAR_ReadU16( value ) : value[0];
 	}
 	if ( OSCAR_TLVFind( payload, payloadLen, 4, OSCAR_TLV_RECONNECT_HERE, &value, &valueLen ) && valueLen > 0 ) {
-		char hostPort[sizeof( reply->bosHost ) + 16];
-		int copyLen = valueLen < (int)sizeof( hostPort ) - 1 ? valueLen : (int)sizeof( hostPort ) - 1;
-		Com_Memcpy( hostPort, value, copyLen );
-		hostPort[copyLen] = '\0';
-		colon = strrchr( hostPort, ':' );
-		if ( colon ) {
-			reply->bosPort = atoi( colon + 1 );
-			hostLen = (int)( colon - hostPort );
-			if ( hostLen <= 0 || hostLen >= (int)sizeof( reply->bosHost ) ) {
-				return qfalse;
-			}
-			Com_Memcpy( reply->bosHost, hostPort, hostLen );
-			reply->bosHost[hostLen] = '\0';
-		} else {
-			Q_strncpyz( reply->bosHost, hostPort, sizeof( reply->bosHost ) );
-		}
+		OSCAR_CopyHostPort( value, valueLen, reply->bosHost, sizeof( reply->bosHost ), &reply->bosPort );
 	}
 	if ( OSCAR_TLVFind( payload, payloadLen, 4, OSCAR_TLV_AUTH_COOKIE, &value, &valueLen ) && valueLen > 0 ) {
 		if ( valueLen > OSCAR_RAW_MAX_COOKIE ) {
@@ -446,6 +471,44 @@ qboolean OSCAR_RawParseAuthReply( const byte *payload, int payloadLen, oscarRawA
 		reply->cookieLen = valueLen;
 	}
 	return (qboolean)( reply->errorCode || ( reply->bosHost[0] && reply->cookieLen > 0 ) );
+}
+
+qboolean OSCAR_RawParseServiceReply( const oscarRawSnac_t *snac, oscarRawServiceReply_t *reply )
+{
+	const byte *value;
+	int valueLen;
+
+	if ( !snac || !reply ) {
+		return qfalse;
+	}
+	if ( snac->family != OSCAR_FAMILY_OSERVICE ||
+	     ( snac->subtype != OSCAR_OSERVICE_SERVICE_RESPONSE && snac->subtype != OSCAR_OSERVICE_ERR ) ) {
+		return qfalse;
+	}
+
+	Com_Memset( reply, 0, sizeof( *reply ) );
+	reply->port = 5190;
+	if ( snac->subtype == OSCAR_OSERVICE_ERR && snac->bodyLen >= 2 ) {
+		reply->errorCode = (unsigned short)OSCAR_ReadU16( snac->body );
+		return qtrue;
+	}
+	if ( OSCAR_TLVFind( snac->body, snac->bodyLen, 0, OSCAR_TLV_ERROR_SUBCODE, &value, &valueLen ) && valueLen >= 1 ) {
+		reply->errorCode = valueLen >= 2 ? (unsigned short)OSCAR_ReadU16( value ) : value[0];
+	}
+	if ( OSCAR_TLVFind( snac->body, snac->bodyLen, 0, OSCAR_TLV_GROUP_ID, &value, &valueLen ) && valueLen >= 2 ) {
+		reply->service = (unsigned short)OSCAR_ReadU16( value );
+	}
+	if ( OSCAR_TLVFind( snac->body, snac->bodyLen, 0, OSCAR_TLV_RECONNECT_HERE, &value, &valueLen ) && valueLen > 0 ) {
+		OSCAR_CopyHostPort( value, valueLen, reply->host, sizeof( reply->host ), &reply->port );
+	}
+	if ( OSCAR_TLVFind( snac->body, snac->bodyLen, 0, OSCAR_TLV_AUTH_COOKIE, &value, &valueLen ) && valueLen > 0 ) {
+		if ( valueLen > OSCAR_RAW_MAX_COOKIE ) {
+			return qfalse;
+		}
+		Com_Memcpy( reply->cookie, value, valueLen );
+		reply->cookieLen = valueLen;
+	}
+	return (qboolean)( reply->errorCode || ( reply->service && reply->host[0] && reply->cookieLen > 0 ) );
 }
 
 qboolean OSCAR_RawParseIncomingIM( const oscarRawSnac_t *snac, oscarEvent_t *eventOut )
@@ -616,6 +679,158 @@ qboolean OSCAR_RawParsePresence( const oscarRawSnac_t *snac, oscarEvent_t *event
 	if ( snac->family == OSCAR_FAMILY_BUDDY &&
 	     ( snac->subtype == OSCAR_BUDDY_ARRIVED || snac->subtype == OSCAR_BUDDY_DEPARTED ) ) {
 		return OSCAR_RawParseTLVUserInfoPresence( snac->body, snac->bodyLen, departed, eventOut );
+	}
+	return qfalse;
+}
+
+int OSCAR_RawBuildServiceRequest( unsigned short sequence, unsigned int requestId, unsigned short service, byte *out, int outSize )
+{
+	byte body[2];
+
+	OSCAR_WriteU16( body, service );
+	return OSCAR_RawBuildSnac( sequence, OSCAR_FAMILY_OSERVICE, OSCAR_OSERVICE_SERVICE_REQUEST, requestId, body, sizeof( body ), out, outSize );
+}
+
+int OSCAR_RawBuildChatServiceRequest( unsigned short sequence, unsigned int requestId, unsigned short exchange,
+                                      const char *roomCookie, unsigned short instance, byte *out, int outSize )
+{
+	byte body[512];
+	byte roomInfo[256];
+	int bodyUsed = 0;
+	int roomUsed = 0;
+	int cookieLen;
+
+	if ( !roomCookie || !roomCookie[0] ) {
+		return 0;
+	}
+	cookieLen = (int)strlen( roomCookie );
+	if ( cookieLen > 255 || cookieLen + 6 > (int)sizeof( roomInfo ) ) {
+		return 0;
+	}
+
+	OSCAR_WriteU16( body + bodyUsed, OSCAR_FAMILY_CHAT );
+	bodyUsed += 2;
+	OSCAR_WriteU16( roomInfo + roomUsed, exchange );
+	roomUsed += 2;
+	roomInfo[roomUsed++] = (byte)cookieLen;
+	Com_Memcpy( roomInfo + roomUsed, roomCookie, cookieLen );
+	roomUsed += cookieLen;
+	OSCAR_WriteU16( roomInfo + roomUsed, instance );
+	roomUsed += 2;
+	if ( !OSCAR_WriteTLV( body, sizeof( body ), &bodyUsed, 0x0001, roomInfo, roomUsed ) ) {
+		return 0;
+	}
+	return OSCAR_RawBuildSnac( sequence, OSCAR_FAMILY_OSERVICE, OSCAR_OSERVICE_SERVICE_REQUEST, requestId, body, bodyUsed, out, outSize );
+}
+
+int OSCAR_RawBuildChatMessage( unsigned short sequence, unsigned int requestId, const char *text, byte *out, int outSize )
+{
+	byte body[OSCAR_RAW_MAX_FRAME];
+	byte msgInfo[MAX_STRING_CHARS + 64];
+	int bodyUsed = 0;
+	int msgUsed = 0;
+	int textLen;
+	static const char enc[] = "us-ascii";
+	static const char lang[] = "en";
+
+	if ( !text || !text[0] ) {
+		return 0;
+	}
+	textLen = (int)strlen( text );
+	if ( textLen > MAX_STRING_CHARS - 1 ) {
+		return 0;
+	}
+
+	OSCAR_WriteU64( body + bodyUsed, 0, requestId );
+	bodyUsed += 8;
+	OSCAR_WriteU16( body + bodyUsed, OSCAR_ICBM_CHANNEL_MIME );
+	bodyUsed += 2;
+
+	if ( !OSCAR_WriteTLV( msgInfo, sizeof( msgInfo ), &msgUsed, OSCAR_CHAT_MSG_TLV_TEXT, text, textLen ) ||
+	     !OSCAR_WriteTLV( msgInfo, sizeof( msgInfo ), &msgUsed, OSCAR_CHAT_MSG_TLV_ENCODING, enc, (int)strlen( enc ) ) ||
+	     !OSCAR_WriteTLV( msgInfo, sizeof( msgInfo ), &msgUsed, OSCAR_CHAT_MSG_TLV_LANG, lang, (int)strlen( lang ) ) ) {
+		return 0;
+	}
+
+	if ( !OSCAR_WriteTLV( body, sizeof( body ), &bodyUsed, OSCAR_CHAT_TLV_MESSAGE_INFO, msgInfo, msgUsed ) ||
+	     !OSCAR_WriteTLV( body, sizeof( body ), &bodyUsed, OSCAR_CHAT_TLV_ENABLE_REFLECTION, "", 0 ) ) {
+		return 0;
+	}
+
+	return OSCAR_RawBuildSnac( sequence, OSCAR_FAMILY_CHAT, OSCAR_CHAT_CHANNEL_MSG_TO_HOST, requestId, body, bodyUsed, out, outSize );
+}
+
+qboolean OSCAR_RawParseChatMessage( const oscarRawSnac_t *snac, const char *roomName, oscarEvent_t *eventOut )
+{
+	const byte *body;
+	const byte *msgInfo = NULL;
+	const byte *senderInfo = NULL;
+	int bodyLen;
+	int pos = 0;
+	int msgInfoLen = 0;
+	int senderInfoLen = 0;
+
+	if ( !snac || !eventOut || snac->family != OSCAR_FAMILY_CHAT || snac->subtype != OSCAR_CHAT_CHANNEL_MSG_TO_CLIENT ) {
+		return qfalse;
+	}
+	body = snac->body;
+	bodyLen = snac->bodyLen;
+	if ( bodyLen < 10 ) {
+		return qfalse;
+	}
+	pos = 10; /* cookie + channel */
+	while ( pos + 4 <= bodyLen ) {
+		unsigned int tag = OSCAR_ReadU16( body + pos );
+		int len = (int)OSCAR_ReadU16( body + pos + 2 );
+		pos += 4;
+		if ( len < 0 || pos + len > bodyLen ) {
+			return qfalse;
+		}
+		if ( tag == OSCAR_CHAT_TLV_SENDER_INFORMATION ) {
+			senderInfo = body + pos;
+			senderInfoLen = len;
+		} else if ( tag == OSCAR_CHAT_TLV_MESSAGE_INFO ) {
+			msgInfo = body + pos;
+			msgInfoLen = len;
+		}
+		pos += len;
+	}
+	if ( !msgInfo || msgInfoLen <= 0 ) {
+		return qfalse;
+	}
+
+	Com_Memset( eventOut, 0, sizeof( *eventOut ) );
+	eventOut->type = OSCAR_EVENT_ROOM_MESSAGE;
+	Q_strncpyz( eventOut->room, roomName ? roomName : "", sizeof( eventOut->room ) );
+
+	if ( senderInfo && senderInfoLen > 0 ) {
+		int nameLen = senderInfo[0];
+		if ( nameLen > 0 && 1 + nameLen <= senderInfoLen ) {
+			if ( nameLen >= (int)sizeof( eventOut->screenName ) ) {
+				nameLen = (int)sizeof( eventOut->screenName ) - 1;
+			}
+			Com_Memcpy( eventOut->screenName, senderInfo + 1, nameLen );
+			eventOut->screenName[nameLen] = '\0';
+		}
+	}
+
+	pos = 0;
+	while ( pos + 4 <= msgInfoLen ) {
+		unsigned int tag = OSCAR_ReadU16( msgInfo + pos );
+		int len = (int)OSCAR_ReadU16( msgInfo + pos + 2 );
+		pos += 4;
+		if ( len < 0 || pos + len > msgInfoLen ) {
+			return qfalse;
+		}
+		if ( tag == OSCAR_CHAT_MSG_TLV_TEXT ) {
+			if ( len >= (int)sizeof( eventOut->text ) ) {
+				len = (int)sizeof( eventOut->text ) - 1;
+			}
+			Com_Memcpy( eventOut->text, msgInfo + pos, len );
+			eventOut->text[len] = '\0';
+			return qtrue;
+		}
+		pos += len;
 	}
 	return qfalse;
 }

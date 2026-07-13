@@ -259,6 +259,107 @@ static void TestPresenceParseBuddyArrivedAndDeparted( void )
 	EXPECT_STREQ( event.status, "offline" );
 }
 
+static void TestServiceRequestAndReply( void )
+{
+	byte frame[1024];
+	byte body[512];
+	byte value[8];
+	oscarRawSnac_t snac;
+	oscarRawServiceReply_t reply;
+	const char host[] = "127.0.0.1:5190";
+	const byte cookie[] = { 5, 4, 3, 2 };
+	int len;
+	int used = 0;
+
+	len = OSCAR_RawBuildServiceRequest( 12, 48, 0x000d, frame, sizeof( frame ) );
+	EXPECT_GT( len, 0 );
+	EXPECT_EQ_INT( frame[6], 0 );
+	EXPECT_EQ_INT( frame[7], 1 );
+	EXPECT_EQ_INT( frame[8], 0 );
+	EXPECT_EQ_INT( frame[9], 4 );
+	EXPECT_EQ_INT( frame[16], 0 );
+	EXPECT_EQ_INT( frame[17], 0x0d );
+
+	Put16( value, 0x000e );
+	used = AddTLV( body, used, 0x000d, value, 2 );
+	used = AddTLV( body, used, 0x0005, host, (int)strlen( host ) );
+	used = AddTLV( body, used, 0x0006, cookie, (int)sizeof( cookie ) );
+	Put16( frame, 0x0001 );
+	Put16( frame + 2, 0x0005 );
+	Put16( frame + 4, 0 );
+	Put32( frame + 6, 48 );
+	memcpy( frame + 10, body, used );
+
+	EXPECT_TRUE( OSCAR_RawParseSnac( frame, used + 10, &snac ) );
+	EXPECT_TRUE( OSCAR_RawParseServiceReply( &snac, &reply ) );
+	EXPECT_EQ_INT( reply.service, 0x000e );
+	EXPECT_STREQ( reply.host, "127.0.0.1" );
+	EXPECT_EQ_INT( reply.port, 5190 );
+	EXPECT_EQ_INT( reply.cookieLen, (int)sizeof( cookie ) );
+	EXPECT_EQ_INT( reply.cookie[0], 5 );
+}
+
+static void TestChatServiceRequestAndMessage( void )
+{
+	byte frame[1024];
+	int len;
+
+	len = OSCAR_RawBuildChatServiceRequest( 13, 49, 4, "room-cookie", 2, frame, sizeof( frame ) );
+	EXPECT_GT( len, 0 );
+	EXPECT_EQ_INT( frame[6], 0 );
+	EXPECT_EQ_INT( frame[7], 1 );
+	EXPECT_EQ_INT( frame[8], 0 );
+	EXPECT_EQ_INT( frame[9], 4 );
+	EXPECT_EQ_INT( frame[16], 0 );
+	EXPECT_EQ_INT( frame[17], 0x0e );
+
+	len = OSCAR_RawBuildChatMessage( 14, 50, "hello room", frame, sizeof( frame ) );
+	EXPECT_GT( len, 0 );
+	EXPECT_EQ_INT( frame[6], 0 );
+	EXPECT_EQ_INT( frame[7], 0x0e );
+	EXPECT_EQ_INT( frame[8], 0 );
+	EXPECT_EQ_INT( frame[9], 5 );
+}
+
+static void TestChatMessageParse( void )
+{
+	byte snacPayload[1024];
+	byte body[512];
+	byte sender[64];
+	byte msgInfo[128];
+	oscarRawSnac_t snac;
+	oscarEvent_t event;
+	const char text[] = "hello room";
+	int bodyUsed = 0;
+	int senderUsed = 0;
+	int msgUsed = 0;
+	int used = 0;
+
+	memset( body, 0, sizeof( body ) );
+	bodyUsed = 8;
+	Put16( body + bodyUsed, 3 );
+	bodyUsed += 2;
+	senderUsed = AddUserInfoTLV( sender, 0, "Buddy", 0, 0 );
+	msgUsed = AddTLV( msgInfo, msgUsed, 0x0001, text, (int)strlen( text ) );
+	bodyUsed = AddTLV( body, bodyUsed, 0x0003, sender, senderUsed );
+	bodyUsed = AddTLV( body, bodyUsed, 0x0005, msgInfo, msgUsed );
+
+	Put16( snacPayload, 0x000e );
+	Put16( snacPayload + 2, 0x0006 );
+	Put16( snacPayload + 4, 0 );
+	Put32( snacPayload + 6, 51 );
+	used = 10;
+	memcpy( snacPayload + used, body, bodyUsed );
+	used += bodyUsed;
+
+	EXPECT_TRUE( OSCAR_RawParseSnac( snacPayload, used, &snac ) );
+	EXPECT_TRUE( OSCAR_RawParseChatMessage( &snac, "arena", &event ) );
+	EXPECT_EQ_INT( event.type, OSCAR_EVENT_ROOM_MESSAGE );
+	EXPECT_STREQ( event.room, "arena" );
+	EXPECT_STREQ( event.screenName, "Buddy" );
+	EXPECT_STREQ( event.text, text );
+}
+
 int main( void )
 {
 	TestLoginSignonBuildsFlapFrame();
@@ -268,6 +369,9 @@ int main( void )
 	TestPresenceBuildsSetUserInfoFields();
 	TestBuddyTempBuilders();
 	TestPresenceParseBuddyArrivedAndDeparted();
+	TestServiceRequestAndReply();
+	TestChatServiceRequestAndMessage();
+	TestChatMessageParse();
 
 	if ( failures != 0 ) {
 		fprintf( stderr, "unit_oscar_raw: %d failure(s)\n", failures );
