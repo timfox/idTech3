@@ -48,6 +48,7 @@ Documentation is grouped by **tier**. Most files remain at their historical path
 - [MOD_SDK.md](MOD_SDK.md)
 - [RADIANT.md](RADIANT.md)
 - [VOIP.md](VOIP.md) — Opus voice chat + head lip flap
+- [TORRENT_CONTENT.md](TORRENT_CONTENT.md) — optional peer-assisted `.pk3` package delivery
 - [OSCAR_INTEGRATION.md](OSCAR_INTEGRATION.md) — Open OSCAR gateway bridge
 - [FACS.md](FACS.md) — Facial Action Coding System Action Units
 

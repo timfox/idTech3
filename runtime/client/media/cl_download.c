@@ -9,6 +9,7 @@ Client pak/map download path (UDP server list + optional cURL).
 #include "client.h"
 #include "cl_download.h"
 #include "cl_connect.h"
+#include "cl_torrent.h"
 
 #include <string.h>
 
@@ -155,6 +156,7 @@ void CL_NextDownload( void )
 	char *s;
 	char *remoteName, *localName;
 	qboolean useCURL = qfalse;
+	qboolean triedTorrent = qfalse;
 
 	// A download has finished, check whether this matches a referenced checksum
 	if(*clc.downloadName)
@@ -191,8 +193,21 @@ void CL_NextDownload( void )
 		else
 			s = localName + strlen(localName); // point at the null byte
 
+		if(!(cl_allowDownload->integer & DLF_NO_REDIRECT) &&
+			!(clc.sv_allowDownload & DLF_NO_REDIRECT) && *clc.sv_dlURL) {
+			const char *torrentURL = va("%s/%s", clc.sv_dlURL, remoteName);
+			if(CL_Torrent_IsPackageURL(torrentURL)) {
+				triedTorrent = qtrue;
+				useCURL = CL_Torrent_BeginPackageDownload(localName, torrentURL);
+			}
+		}
+
+#ifndef USE_CURL
+		(void)triedTorrent;
+#endif
 #ifdef USE_CURL
-		if(!(cl_allowDownload->integer & DLF_NO_REDIRECT)) {
+		if(!useCURL && !triedTorrent && !(cl_allowDownload->integer & DLF_NO_REDIRECT)) {
+			const char *redirectURL = NULL;
 			if(clc.sv_allowDownload & DLF_NO_REDIRECT) {
 				Com_Printf("WARNING: server does not "
 					"allow download redirection "
@@ -209,8 +224,8 @@ void CL_NextDownload( void )
 					"cURL library\n");
 			}
 			else {
-				CL_cURL_BeginDownload(localName, va("%s/%s",
-					clc.sv_dlURL, remoteName));
+				redirectURL = va("%s/%s", clc.sv_dlURL, remoteName);
+				CL_cURL_BeginDownload(localName, redirectURL);
 				useCURL = qtrue;
 			}
 		}
@@ -451,6 +466,7 @@ qboolean CL_Download_Frame( int msec, int realMsec ) {
 void CL_Download_Init( void ) {
 	cl_allowDownload = Cvar_Get( "cl_allowDownload", "1", CVAR_ARCHIVE_ND );
 	Cvar_SetDescription( cl_allowDownload, "Enables downloading of content needed in server. Valid bitmask flags:\n 1: Downloading enabled\n 2: Do not use HTTP/FTP downloads\n 4: Do not use UDP downloads" );
+	CL_Torrent_Init();
 #ifdef USE_CURL
 	cl_mapAutoDownload = Cvar_Get( "cl_mapAutoDownload", "0", CVAR_ARCHIVE_ND );
 	Cvar_SetDescription( cl_mapAutoDownload, "Automatic map download for play and demo playback (via automatic \\dlmap call)." );
@@ -479,6 +495,7 @@ void CL_Download_Init( void ) {
 }
 
 void CL_Download_Shutdown( void ) {
+	CL_Torrent_Shutdown();
 #ifdef USE_CURL
 	Com_DL_Cleanup( &download );
 	Cmd_RemoveCommand( "download" );

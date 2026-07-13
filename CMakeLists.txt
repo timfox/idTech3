@@ -3697,6 +3697,12 @@ add_test(NAME test_pk3_native_library_cache
 set_tests_properties(test_pk3_native_library_cache PROPERTIES
 	LABELS "unit;scripts;validation"
 	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_pk3_native_library_cache.sh")
+add_test(NAME test_libtorrent_content
+	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_libtorrent_content.sh
+	WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+set_tests_properties(test_libtorrent_content PROPERTIES
+	LABELS "unit;scripts;validation;content"
+	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_libtorrent_content.sh")
 # --- Unit tests ---
 option(BUILD_UNIT_TESTS "Build unit tests" ON)
 if(BUILD_UNIT_TESTS)
@@ -3770,6 +3776,13 @@ if(BUILD_UNIT_TESTS)
 	endif()
 	add_test(NAME unit_pathutil COMMAND unit_pathutil)
 	set_tests_properties(unit_pathutil PROPERTIES LABELS "unit;validation")
+
+	add_executable(unit_torrent_manifest
+		tests/unit/test_torrent_manifest.cpp
+		engine/content/torrent_manifest.cpp)
+	target_include_directories(unit_torrent_manifest PRIVATE ${IDTECH3_UNIT_INCLUDE_DIRS})
+	add_test(NAME unit_torrent_manifest COMMAND unit_torrent_manifest)
+	set_tests_properties(unit_torrent_manifest PROPERTIES LABELS "unit;validation;content")
 
 	add_executable(unit_msg
 		tests/unit/test_msg.c
