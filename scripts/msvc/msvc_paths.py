@@ -12,6 +12,7 @@ _BRIDGE_RULES: list[tuple[str, str]] = [
     ("runtime/cgame/", r"..\..\cgame"),
     ("runtime/ui/", r"..\..\ui"),
     ("engine/core/", r"..\..\qcommon"),
+    ("engine/content/", r"..\..\..\content"),
     ("engine/asm/", r"..\..\asm"),
     ("modules/audio/", r"..\..\audio"),
     ("modules/physics/", r"..\..\..\physics"),

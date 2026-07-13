@@ -2619,7 +2619,7 @@ void SV_ExecuteClientMessage( client_t *cl, msg_t *msg ) {
 			int sender = (int)( cl - svs.clients );
 			int i;
 			float prox = sv_voipProximity ? sv_voipProximity->value : 0.0f;
-			vec3_t senderOrigin;
+			vec3_t senderOrigin = { 0, 0, 0 };
 
 			MSG_ReadData( msg, voipData, voipLen );
 

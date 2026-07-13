@@ -28,10 +28,10 @@ Usage from Lua:
 
 #include "q_shared.h"
 #include "qcommon.h"
-#include "lua_compat.h"
 #include "g_lua_bindings.h"
 
 #ifdef USE_LUA
+#include "lua_compat.h"
 #include <lua.h>
 #include <lauxlib.h>
 #include <lualib.h>

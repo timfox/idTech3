@@ -355,10 +355,17 @@
     <ClCompile Include="..\..\..\renderers\common\tr_vector_font.c" />
     <ClCompile Include="..\..\..\renderers\common\tr_vector_font_glyphlet.c" />
     <ClCompile Include="..\..\..\renderers\common\tr_vector_font_glyphlet_stub.c" />
+    <ClCompile Include="..\..\..\renderers\vulkan\extensions\rtx\vk_hybrid1.c" />
+    <ClCompile Include="..\..\..\renderers\vulkan\extensions\rtx\vk_raygun.c" />
     <ClCompile Include="..\..\..\renderers\vulkan\extensions\rtx\vk_rtx.c" />
     <ClCompile Include="..\..\..\renderers\vulkan\extensions\rtx\vk_rtx_entities.c" />
     <ClCompile Include="..\..\..\renderers\vulkan\extensions\rtx\vk_rtx_world.c" />
+    <ClCompile Include="..\..\..\renderers\vulkan\extensions\scaffold\vk_arc_blanc.c" />
+    <ClCompile Include="..\..\..\renderers\vulkan\extensions\scaffold\vk_arc_blanc_gpu.c" />
     <ClCompile Include="..\..\..\renderers\vulkan\extensions\scaffold\vk_emulator_screen.c" />
+    <ClCompile Include="..\..\..\renderers\vulkan\extensions\splats\vk_mgs.c" />
+    <ClCompile Include="..\..\..\renderers\vulkan\extensions\splats\vk_squeezeme.c" />
+    <ClCompile Include="..\..\..\renderers\vulkan\extensions\splats\vk_wsp.c" />
     <ClCompile Include="..\..\..\renderers\vulkan\tr_bsp_stream.c" />
     <ClCompile Include="..\..\..\renderers\vulkan\tr_decal_props.c" />
     <ClCompile Include="..\..\..\renderers\vulkan\tr_gltf_topo.c" />
@@ -370,12 +377,15 @@
     <ClCompile Include="..\..\..\renderers\vulkan\vk_fp64_points.c" />
     <ClCompile Include="..\..\..\renderers\vulkan\vk_graph_bfs.c" />
     <ClCompile Include="..\..\..\renderers\vulkan\vk_lens_flare.c" />
+    <ClCompile Include="..\..\..\renderers\vulkan\vk_meshlets.c" />
     <ClCompile Include="..\..\..\renderers\vulkan\vk_pipeline_cache_disk.c" />
     <ClCompile Include="..\..\..\renderers\vulkan\vk_post_aa.c" />
     <ClCompile Include="..\..\..\renderers\vulkan\vk_sim_render_debug.c" />
     <ClCompile Include="..\..\..\renderers\vulkan\vk_sim_render_profile.c" />
+    <ClCompile Include="..\..\..\renderers\vulkan\vk_sparse.c" />
     <ClCompile Include="..\..\..\renderers\vulkan\vk_upscale.c" />
     <ClCompile Include="..\..\..\renderers\vulkan\vk_vector_font.c" />
+    <ClCompile Include="..\..\..\renderers\vulkan\vk_vt.c" />
   <!-- IDTECH3_MSVC_MANIFEST_END -->
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

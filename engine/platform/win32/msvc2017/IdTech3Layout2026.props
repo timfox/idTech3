@@ -8,9 +8,11 @@
     <IdTech3RuntimeClient>$(IdTech3RepoRoot)\runtime\client</IdTech3RuntimeClient>
     <IdTech3RuntimeClientPlatform>$(IdTech3RuntimeClient)\platform</IdTech3RuntimeClientPlatform>
     <IdTech3RuntimeClientCore>$(IdTech3RuntimeClient)\core</IdTech3RuntimeClientCore>
+    <IdTech3RuntimeClientShell>$(IdTech3RuntimeClient)\shell</IdTech3RuntimeClientShell>
     <IdTech3RuntimeClientWorld>$(IdTech3RuntimeClient)\world</IdTech3RuntimeClientWorld>
     <IdTech3RuntimeClientMedia>$(IdTech3RuntimeClient)\media</IdTech3RuntimeClientMedia>
     <IdTech3RuntimeGame>$(IdTech3RepoRoot)\runtime\game</IdTech3RuntimeGame>
+    <IdTech3EngineContent>$(IdTech3RepoRoot)\engine\content</IdTech3EngineContent>
     <IdTech3ThirdParty>$(IdTech3RepoRoot)\third_party</IdTech3ThirdParty>
     <IdTech3ExtensionsResearch>$(IdTech3RepoRoot)\extensions\research</IdTech3ExtensionsResearch>
     <IdTech3ExtensionsGenerative>$(IdTech3RepoRoot)\extensions\generative</IdTech3ExtensionsGenerative>
@@ -22,7 +24,7 @@
   <ItemDefinitionGroup>
     <ClCompile>
       <LanguageStandard>stdcpp20</LanguageStandard>
-      <AdditionalIncludeDirectories>$(IdTech3EngineRoot);$(IdTech3EngineCore);$(IdTech3RuntimeClient);$(IdTech3RuntimeClientPlatform);$(IdTech3RuntimeClientCore);$(IdTech3RuntimeClientWorld);$(IdTech3RuntimeClientMedia);$(IdTech3RuntimeGame);$(IdTech3ExtensionsResearch);$(IdTech3ExtensionsGenerative);$(ExternalRoot)\include\entt\single_include;$(ExternalRoot)\src\jpeg;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(IdTech3EngineRoot);$(IdTech3EngineCore);$(IdTech3EngineContent);$(IdTech3RuntimeClient);$(IdTech3RuntimeClientPlatform);$(IdTech3RuntimeClientCore);$(IdTech3RuntimeClientShell);$(IdTech3RuntimeClientWorld);$(IdTech3RuntimeClientMedia);$(IdTech3RuntimeGame);$(IdTech3ExtensionsResearch);$(IdTech3ExtensionsGenerative);$(ExternalRoot)\include\entt\single_include;$(ExternalRoot)\src\jpeg;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
   </ItemDefinitionGroup>
 </Project>

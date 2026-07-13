@@ -687,6 +687,7 @@
     <ClCompile Include="..\..\client\media\cl_demo.c" />
     <ClCompile Include="..\..\client\media\cl_download.c" />
     <ClCompile Include="..\..\client\platform\cl_torrent.cpp" />
+    <ClCompile Include="..\..\..\content\torrent_manifest.cpp" />
     <ClCompile Include="..\..\client\shell\ui_css.c" />
     <ClCompile Include="..\..\client\world\cl_district.cpp" />
     <ClCompile Include="..\..\client\world\cl_openworld.cpp" />
