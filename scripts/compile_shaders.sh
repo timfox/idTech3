@@ -21,6 +21,7 @@ TOOLS_DIR="$SHADER_DIR/tools"
 APPLY=0
 CHECK=0
 GENERATED_DIR="${GENERATED_SPIRV_DIR:-$SPIRV_DIR/generated}"
+GENERATED_DIR_EXPLICIT=0
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -38,6 +39,7 @@ while [[ $# -gt 0 ]]; do
         exit 1
       fi
       GENERATED_DIR="$2"
+      GENERATED_DIR_EXPLICIT=1
       shift 2
       ;;
     *)
@@ -46,6 +48,11 @@ while [[ $# -gt 0 ]]; do
       ;;
   esac
 done
+
+if [[ "$CHECK" -eq 1 && "$GENERATED_DIR_EXPLICIT" -eq 0 && -z "${GENERATED_SPIRV_DIR:-}" ]]; then
+  GENERATED_DIR="$(mktemp -d)"
+  trap 'rm -rf "$GENERATED_DIR"' EXIT
+fi
 
 # Resolve GENERATED_DIR to absolute path so Python (cwd=SHADER_DIR) writes to the correct location
 if [[ "$GENERATED_DIR" != /* ]]; then

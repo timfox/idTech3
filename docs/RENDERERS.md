@@ -242,7 +242,7 @@ Code: `renderers/vulkan/vk_forward_plus.c`, `VK_FP_*` constants; cvar registrati
 | `r_renderMode` | 0 | **0** forward, **1** deferred lighting mode, **2** Forward+ primary. `modern_vulkan.cfg` sets **2**. Latched; `vid_restart`. |
 | `r_deferredGBuffer` | 0 | With `r_renderMode` 1/2: allocate albedo/normal/material/lighting G-buffer images. `modern_vulkan.cfg` sets **1** as a sidecar. Latched; `r_fbo` 1. |
 | `r_deferredGBufferFill` | 0 | With G-buffer RTs: copy scene albedo + depth-derived normal/material after geometry. `modern_vulkan.cfg` sets **1**. |
-| `r_deferredGBufferDebug` | 0 | Before bloom: show G-buffer on scene color (1=albedo, 2=normal, 3=material, 4=lighting). |
+| `r_deferredGBufferDebug` | 0 | Before bloom: show G-buffer on scene color (1=albedo, 2=normal, 3=material, 4=lighting, 5=normal confidence). |
 | `r_deferredLighting` | 0 | Experimental mode-1 deferred diffuse (Forward+ tiles, point+spot). Replaces scene color after geometry. Latches `r_forwardPlusShade` 0 with `vid_restart`; ignored by the mode-2 modern default. |
 | `r_deferredUnlitBase` | 1 | Additive dynamic on static-lit scene copy; skips classic lit-surf pass. **0** = legacy multiply composite. |
 | `r_deferredLightingStrength` | 1 | Scale deferred dynamic diffuse (0–4). |

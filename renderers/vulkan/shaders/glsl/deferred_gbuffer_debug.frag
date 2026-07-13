@@ -24,6 +24,11 @@ void main() {
 		out_color = vec4( s.rgb, 1.0 );
 		return;
 	}
+	if ( pc.mode == 5 ) {
+		float confidence = clamp( s.a, 0.0, 1.0 );
+		out_color = vec4( 1.0 - confidence, confidence, 0.0, 1.0 );
+		return;
+	}
 
 	out_color = vec4( s.rgb, 1.0 );
 }

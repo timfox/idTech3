@@ -48,7 +48,7 @@ void main() {
 		clamp( pc.materialParams.y, 0.04, 1.0 ), 0.0, 1.0 );
 
 	if ( !validDepth( depth ) ) {
-		imageStore( normalOut, ivec2( pix ), vec4( 0.0, 0.0, 1.0, 1.0 ) );
+		imageStore( normalOut, ivec2( pix ), vec4( 0.0, 0.0, 1.0, 0.0 ) );
 		imageStore( materialOut, ivec2( pix ), fallbackMaterial );
 		return;
 	}
@@ -71,14 +71,22 @@ void main() {
 	vec3 dyD = posD - pos;
 	vec3 dx = ( abs( dxL.z ) < abs( dxR.z ) ) ? dxL : dxR;
 	vec3 dy = ( abs( dyU.z ) < abs( dyD.z ) ) ? dyU : dyD;
+	float confidence = 1.0;
 	if ( abs( dx.z ) > threshold ) {
 		dx = vec3( texel.x, 0.0, 0.0 );
+		confidence *= 0.5;
 	}
 	if ( abs( dy.z ) > threshold ) {
 		dy = vec3( 0.0, texel.y, 0.0 );
+		confidence *= 0.5;
 	}
-	vec3 n = normalize( cross( dx, dy ) );
+	vec3 crossN = cross( dx, dy );
+	float crossLen = length( crossN );
+	vec3 n = ( crossLen > 1e-6 ) ? ( crossN / crossLen ) : vec3( 0.0, 0.0, 1.0 );
+	if ( crossLen <= 1e-6 ) {
+		confidence = 0.0;
+	}
 
-	imageStore( normalOut, ivec2( pix ), vec4( n, 1.0 ) );
+	imageStore( normalOut, ivec2( pix ), vec4( n, confidence ) );
 	imageStore( materialOut, ivec2( pix ), fallbackMaterial );
 }

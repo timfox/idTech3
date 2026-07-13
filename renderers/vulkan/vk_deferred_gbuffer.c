@@ -1202,13 +1202,13 @@ qboolean vk_deferred_gbuffer_draw_debug( void )
 	if ( mode < 1 ) {
 		mode = 1;
 	}
-	if ( mode > 4 ) {
-		mode = 4;
+	if ( mode > 5 ) {
+		mode = 5;
 	}
 
 	if ( mode == 1 ) {
 		src_view = vk.deferred_gbuffer_albedo_view;
-	} else if ( mode == 2 ) {
+	} else if ( mode == 2 || mode == 5 ) {
 		src_view = vk.deferred_gbuffer_normal_view;
 	} else if ( mode == 3 ) {
 		src_view = vk.deferred_gbuffer_material_view;
@@ -1225,7 +1225,7 @@ qboolean vk_deferred_gbuffer_draw_debug( void )
 	}
 
 	if ( !s_debug_logged ) {
-		ri.Printf( PRINT_ALL, "[VK][deferred] r_deferredGBufferDebug=%d (1=albedo 2=normal 3=material 4=lighting)\n", mode );
+		ri.Printf( PRINT_ALL, "[VK][deferred] r_deferredGBufferDebug=%d (1=albedo 2=normal 3=material 4=lighting 5=normal confidence)\n", mode );
 		s_debug_logged = qtrue;
 	}
 
