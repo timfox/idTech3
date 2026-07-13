@@ -90,13 +90,15 @@ When `r_hybrid1 1`, the legacy `r_rtx` demo composite pass is **skipped** (Hybri
 
 | Command | Role |
 |---------|------|
-| `hybrid1_status` | Print active state, channel toggles, denoise settings, composite weights |
+| `hybrid1_status` | Print active state, readiness reason, shared TLAS state, channel toggles, denoise settings, composite weights |
 | `hybrid1_reset` | Clear temporal history (also auto on resize, camera cut, or denoise cvar change) |
 | `hybrid1_reload` | Rebuild Hybrid1 pipelines/images (after shader rebuild or when debugging init) |
 
+`hybrid1_status` reports concise states such as `ready`, `blocked: r_fbo 1 is required`, `blocked: r_rtxDemo 1 is required for shared TLAS`, `waiting: shared RTX TLAS not ready`, or `ready: all trace channels disabled`.
+
 ## Troubleshooting
 
-- **No RT output** — confirm RTX build (`./scripts/compile_engine.sh vulkan rtx`), `r_rtxDemo 1`, world loaded, and `[VK][Hybrid1] ... ready` in console after first frame.
+- **No RT output** — confirm RTX build (`./scripts/compile_engine.sh vulkan rtx`), `r_rtxDemo 1`, world loaded, and `hybrid1_status` reports `ready` after first frame.
 - **Flat specular / no IBL** — enable skybox or PBR cubemap; `r_hybrid1_ibl 1`; check `hybrid1_status` for `ibl=1`.
 - **Diffuse invisible** — `r_hybrid1_diffuse 1`, `r_deferredGBufferFill 1` (albedo for composite), try `r_hybrid1_debug 4`.
 - **Ghosting after tuning denoise** — history resets automatically when denoise cvars change; run `hybrid1_reset` after large camera cuts.

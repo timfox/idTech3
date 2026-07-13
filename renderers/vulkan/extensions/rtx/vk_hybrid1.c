@@ -126,18 +126,50 @@ static void HYBRID1_ResetHistory( void )
 	hybrid1.traced = qfalse;
 }
 
+static const char *HYBRID1_StateString( void )
+{
+	qboolean shadowOn = ( !r_hybrid1_shadow || r_hybrid1_shadow->integer ) ? qtrue : qfalse;
+	qboolean specOn = ( !r_hybrid1_spec || r_hybrid1_spec->integer ) ? qtrue : qfalse;
+	qboolean diffuseOn = ( r_hybrid1_diffuse && r_hybrid1_diffuse->integer ) ? qtrue : qfalse;
+
+	if ( !r_hybrid1 || r_hybrid1->integer <= 0 ) {
+		return "idle: enable r_hybrid1 before vid_restart";
+	}
+	if ( !vk.rtxAvailable ) {
+		return "blocked: Vulkan KHR ray tracing is unavailable";
+	}
+	if ( !vk.fboActive ) {
+		return "blocked: r_fbo 1 is required";
+	}
+	if ( !r_rtxDemo || !r_rtxDemo->integer ) {
+		return "blocked: r_rtxDemo 1 is required for shared TLAS";
+	}
+	if ( !vk_rtx_scene_ready() ) {
+		return "waiting: shared RTX TLAS not ready";
+	}
+	if ( !hybrid1.ready ) {
+		return "blocked: Hybrid1 pipeline is not ready";
+	}
+	if ( !shadowOn && !specOn && !diffuseOn ) {
+		return "ready: all trace channels disabled";
+	}
+	return "ready";
+}
+
 static void HYBRID1_Status_f( void )
 {
 	ri.Printf( PRINT_ALL,
-		"[VK][Hybrid1] active=%d ready=%d rtx=%d fbo=%d demo=%d %ux%u frame=%u\n"
+		"[VK][Hybrid1] state=%s active=%d ready=%d sceneReady=%d rtx=%d fbo=%d demo=%d %ux%u frame=%u\n"
 		"  channels shadow=%d spec=%d diffuse=%d ibl=%d motion=%d taa=%d debug=%d\n"
 		"  denoise clamp=%d gamma=%.2f alpha=%.2f atrous=%d separable=%d adaptive=%d reinhard=%d\n"
 		"  phiColor=%.2f depthTol=%.4f normalDot=%.2f adaptAngle=%.1f adaptRough=%.2f\n"
 		"  rayBias=%.3f tMin=%.3f specRoughMax=%.2f sunRadius=%.2f contact=%d\n"
 		"  ggx=%d iblMode=%d diffuseDirect=%d dlightShadows=%d\n"
 		"  composite shadowStr=%.2f specStr=%.2f diffuseStr=%.2f deferredGBuffer=%d\n",
+		HYBRID1_StateString(),
 		vk_hybrid1_active() ? 1 : 0,
 		hybrid1.ready ? 1 : 0,
+		vk_rtx_scene_ready() ? 1 : 0,
 		vk.rtxAvailable ? 1 : 0,
 		vk.fboActive ? 1 : 0,
 		( r_rtxDemo && r_rtxDemo->integer ) ? 1 : 0,
@@ -1093,16 +1125,23 @@ void vk_hybrid1_init( void )
 	VkDeviceSize uboSize;
 
 	vk_hybrid1_shutdown();
+	HYBRID1_RegisterCommands();
 
 	if ( !vk.rtxAvailable || !r_hybrid1 || r_hybrid1->integer <= 0 ) {
+		ri.Printf( PRINT_DEVELOPER, "[VK][Hybrid1] %s\n", HYBRID1_StateString() );
+		return;
+	}
+	if ( !vk.fboActive ) {
+		ri.Printf( PRINT_WARNING, "[VK][Hybrid1] %s\n", HYBRID1_StateString() );
 		return;
 	}
 	if ( !r_rtxDemo || !r_rtxDemo->integer ) {
-		ri.Printf( PRINT_WARNING, "[VK][Hybrid1] requires r_rtxDemo 1 (latched) for world TLAS\n" );
+		ri.Printf( PRINT_WARNING, "[VK][Hybrid1] %s\n", HYBRID1_StateString() );
 		return;
 	}
 	if ( !vk_rtx_scene_ready() ) {
-		ri.Printf( PRINT_DEVELOPER, "[VK][Hybrid1] defer init until RTX scene ready\n" );
+		ri.Printf( PRINT_DEVELOPER, "[VK][Hybrid1] %s; deferring init\n", HYBRID1_StateString() );
+		return;
 	}
 
 	Com_Memset( &rtProps, 0, sizeof( rtProps ) );
@@ -1429,7 +1468,6 @@ void vk_hybrid1_init( void )
 		r_hybrid1_ibl ? r_hybrid1_ibl->integer : 1,
 		r_hybrid1_diffuse ? r_hybrid1_diffuse->integer : 0,
 		r_hybrid1_motion ? r_hybrid1_motion->integer : 1 );
-	HYBRID1_RegisterCommands();
 }
 
 void vk_hybrid1_frame_begin( void )
@@ -1439,7 +1477,8 @@ void vk_hybrid1_frame_begin( void )
 	HYBRID1_ConsumeCvarResets();
 
 	if ( !hybrid1.ready ) {
-		if ( r_hybrid1 && r_hybrid1->integer > 0 && vk.rtxAvailable && vk_rtx_scene_ready() ) {
+		if ( r_hybrid1 && r_hybrid1->integer > 0 && vk.rtxAvailable && vk.fboActive
+			&& r_rtxDemo && r_rtxDemo->integer && vk_rtx_scene_ready() ) {
 			vk_hybrid1_init();
 		}
 		return;
