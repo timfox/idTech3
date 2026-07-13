@@ -108,10 +108,36 @@ static struct {
 
 static void vk_rtx_destroy_entity_blas( void );
 
+static const char *vk_rtx_state_string( void )
+{
+	if ( !vk.rtxAvailable ) {
+		return "blocked: Vulkan KHR ray tracing is unavailable";
+	}
+	if ( ( !r_rtx || r_rtx->integer <= 0 ) && ( !r_hybrid1 || r_hybrid1->integer <= 0 )
+		&& ( !r_raygun || r_raygun->integer <= 0 ) ) {
+		return "idle: enable r_rtx, r_hybrid1, or r_raygun before vid_restart";
+	}
+	if ( ( !r_rtxDemo || !r_rtxDemo->integer ) && ( !r_hybrid1 || r_hybrid1->integer <= 0 )
+		&& ( !r_raygun || r_raygun->integer <= 0 ) ) {
+		return "idle: no RTX consumer requested";
+	}
+	if ( !rtx.ready ) {
+		return "blocked: RTX pipeline is not ready";
+	}
+	if ( rtx.tlas == VK_NULL_HANDLE || !rtx.tlas_valid ) {
+		return "waiting: TLAS not built yet";
+	}
+	return "ready";
+}
+
 static void RTX_Status_f( void )
 {
 	const char *wn = ( tr.world && tr.world->name[0] ) ? tr.world->name : "(none)";
 
+	ri.Printf( PRINT_ALL, "[VK][RTX] state=%s sceneReady=%d worldBLAS=%d tlasValid=%d rtOutput=%d\n",
+		vk_rtx_state_string(), vk_rtx_scene_ready() ? 1 : 0,
+		rtx.world_blas_valid ? 1 : 0, rtx.tlas_valid ? 1 : 0,
+		( rtx.rt_image != VK_NULL_HANDLE && rtx.rt_image_view != VK_NULL_HANDLE ) ? 1 : 0 );
 	ri.Printf( PRINT_ALL, "[VK][RTX] ready=%d rtxAvailable=%d demo=%d hybrid=%d raygun=%d\n",
 		rtx.ready ? 1 : 0, vk.rtxAvailable ? 1 : 0,
 		( r_rtxDemo && r_rtxDemo->integer ) ? 1 : 0,
@@ -1096,18 +1122,24 @@ void vk_rtx_init( void )
 	VkResult pipeRes;
 
 	vk_rtx_shutdown();
+	if ( !rtx.cmd_registered ) {
+		ri.Cmd_AddCommand( "rtx_status", RTX_Status_f );
+		rtx.cmd_registered = qtrue;
+	}
 
 	if ( !vk.rtxAvailable ) {
+		ri.Printf( PRINT_DEVELOPER, "[VK][RTX] %s\n", vk_rtx_state_string() );
 		return;
 	}
 	if ( ( !r_rtx || r_rtx->integer <= 0 ) && ( !r_hybrid1 || r_hybrid1->integer <= 0 )
 		&& ( !r_raygun || r_raygun->integer <= 0 ) ) {
+		ri.Printf( PRINT_DEVELOPER, "[VK][RTX] %s\n", vk_rtx_state_string() );
 		return;
 	}
 
 	if ( ( !r_rtxDemo || !r_rtxDemo->integer ) && ( !r_hybrid1 || r_hybrid1->integer <= 0 )
 		&& ( !r_raygun || r_raygun->integer <= 0 ) ) {
-		ri.Printf( PRINT_DEVELOPER, "[VK][RTX] r_rtxDemo 0: skipping RT AS/pipeline init\n" );
+		ri.Printf( PRINT_DEVELOPER, "[VK][RTX] %s; skipping RT AS/pipeline init\n", vk_rtx_state_string() );
 		return;
 	}
 
@@ -1321,10 +1353,6 @@ void vk_rtx_init( void )
 	qvkUnmapMemory( vk.device, rtx.sbt_memory );
 
 	rtx.ready = qtrue;
-	if ( !rtx.cmd_registered ) {
-		ri.Cmd_AddCommand( "rtx_status", RTX_Status_f );
-		rtx.cmd_registered = qtrue;
-	}
 	sampleCount = ( r_rtxSamples && r_rtxSamples->integer > 0 ) ? r_rtxSamples->integer : 1;
 	if ( sampleCount > 8 ) {
 		sampleCount = 8;

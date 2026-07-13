@@ -155,6 +155,10 @@ This document outlines the architecture and implementation plan for three render
 | `USE_METAL_RENDERER` | OFF | Build Metal renderer (Apple only) |
 | `USE_DXR_RENDERER` | OFF | Build DXR renderer (Windows only) |
 
+### Vulkan RTX Diagnostics
+
+Use `rtx_status` in RTX builds to inspect whether the path is ready or why it did not initialize. The first line reports a concise state such as `ready`, `blocked: Vulkan KHR ray tracing is unavailable`, `idle: enable r_rtx, r_hybrid1, or r_raygun before vid_restart`, or `waiting: TLAS not built yet`, followed by BLAS/TLAS/entity counts.
+
 ---
 
 ## References

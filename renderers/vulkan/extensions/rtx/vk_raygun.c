@@ -82,16 +82,45 @@ static struct {
 	qboolean            cmds_registered;
 } raygun;
 
+static const char *RAYGUN_StateString( void )
+{
+	if ( !r_raygun || r_raygun->integer <= 0 ) {
+		return "idle: enable r_raygun before vid_restart";
+	}
+	if ( !vk.rtxAvailable ) {
+		return "blocked: Vulkan KHR ray tracing is unavailable";
+	}
+	if ( !vk.fboActive ) {
+		return "blocked: r_fbo 1 is required";
+	}
+	if ( !r_rtxDemo || !r_rtxDemo->integer ) {
+		return "blocked: r_rtxDemo 1 is required for shared TLAS";
+	}
+	if ( vk_hybrid1_active() ) {
+		return "idle: Hybrid1 has RT path priority";
+	}
+	if ( !vk_rtx_scene_ready() ) {
+		return "waiting: shared RTX TLAS not ready";
+	}
+	if ( !raygun.ready ) {
+		return "blocked: Raygun pipeline is not ready";
+	}
+	return "ready";
+}
+
 static void RAYGUN_Status_f( void )
 {
 	ri.Printf( PRINT_ALL,
-		"[VK][Raygun] active=%d ready=%d rtx=%d fbo=%d demo=%d %ux%u\n"
+		"[VK][Raygun] state=%s active=%d ready=%d sceneReady=%d rtx=%d fbo=%d demo=%d hybridPriority=%d %ux%u\n"
 		"  fxaa=%d reflection=%d refraction=%d shadow=%d ior=%.2f composite=%.2f samples=%d\n",
+		RAYGUN_StateString(),
 		vk_raygun_active() ? 1 : 0,
 		raygun.ready ? 1 : 0,
+		vk_rtx_scene_ready() ? 1 : 0,
 		vk.rtxAvailable ? 1 : 0,
 		vk.fboActive ? 1 : 0,
 		( r_rtxDemo && r_rtxDemo->integer ) ? 1 : 0,
+		vk_hybrid1_active() ? 1 : 0,
 		raygun.width, raygun.height,
 		( r_raygun_fxaa && r_raygun_fxaa->integer ) ? 1 : 0,
 		( r_raygun_reflection && r_raygun_reflection->integer ) ? 1 : 0,
@@ -839,15 +868,23 @@ void vk_raygun_init( void )
 	vk_raygun_shutdown();
 
 	if ( !vk.rtxAvailable || !r_raygun || r_raygun->integer <= 0 ) {
+		ri.Printf( PRINT_DEVELOPER, "[VK][Raygun] %s\n", RAYGUN_StateString() );
+		return;
+	}
+	if ( !vk.fboActive ) {
+		ri.Printf( PRINT_WARNING, "[VK][Raygun] %s\n", RAYGUN_StateString() );
 		return;
 	}
 	if ( !r_rtxDemo || !r_rtxDemo->integer ) {
-		ri.Printf( PRINT_WARNING, "[VK][Raygun] requires r_rtxDemo 1 (latched) for world TLAS\n" );
+		ri.Printf( PRINT_WARNING, "[VK][Raygun] %s\n", RAYGUN_StateString() );
+		return;
+	}
+	if ( vk_hybrid1_active() ) {
+		ri.Printf( PRINT_DEVELOPER, "[VK][Raygun] %s\n", RAYGUN_StateString() );
 		return;
 	}
 	if ( !vk_rtx_scene_ready() ) {
-		ri.Printf( PRINT_WARNING,
-			"[VK][Raygun] RTX scene not ready — set r_rtxDemo 1 and vid_restart (shares world TLAS)\n" );
+		ri.Printf( PRINT_WARNING, "[VK][Raygun] %s\n", RAYGUN_StateString() );
 		return;
 	}
 

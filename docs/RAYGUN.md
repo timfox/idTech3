@@ -60,7 +60,9 @@ When `r_raygun 1`, the legacy `r_rtx` demo pass is **skipped** (Raygun owns RT o
 
 | Command | Role |
 |---------|------|
-| `raygun_status` | Print active state and cvar values |
+| `raygun_status` | Print active state, readiness reason, shared TLAS state, priority conflicts, and cvar values |
+
+`raygun_status` reports a concise state such as `ready`, `blocked: r_fbo 1 is required`, `blocked: r_rtxDemo 1 is required for shared TLAS`, `waiting: shared RTX TLAS not ready`, or `idle: Hybrid1 has RT path priority`.
 
 ## Files
 

@@ -13,6 +13,9 @@ TR_LOCAL="$(idtech3_file renderers/vulkan/tr_local.h src/renderers/vulkan/tr_loc
 
 grep -q 'vk_raygun_record_pass' "$RAYGUN"
 grep -q 'r_raygun_fxaa' "$RAYGUN"
+grep -q 'RAYGUN_StateString' "$RAYGUN"
+grep -q 'waiting: shared RTX TLAS not ready' "$RAYGUN"
+grep -q 'Hybrid1 has RT path priority' "$RAYGUN"
 grep -q 'raygun/raygun.rgen' "$ROOT/scripts/compile_shaders.sh"
 test -f "$ROOT/docs/RAYGUN.md"
 test -f "$RCHIT"
