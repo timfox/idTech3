@@ -1219,7 +1219,7 @@ void HandleEvents( void )
 			case SDL_EVENT_TEXT_INPUT:
 				if( lastKeyDown != K_CONSOLE )
 				{
-					char *c = e.text.text;
+					const char *c = e.text.text;
 
 					// Quick and dirty UTF-8 to UTF-32 conversion
 					while ( *c )
