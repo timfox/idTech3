@@ -1667,6 +1667,7 @@ typedef struct {
 	qboolean sparseResidencyNonResidentStrict;
 #ifdef USE_VULKAN_RTX
 	qboolean rtxAvailable; /* KHR RT pipeline + AS + BDA; demo trace (r_rtxDemo) when r_rtx>0 — not production hybrid lighting */
+	qboolean rayQueryAvailable; /* VK_KHR_ray_query enabled with RTX path (Surfel GI / compute RT) */
 #endif
 
 	float maxAnisotropy;

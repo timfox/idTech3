@@ -1,0 +1,90 @@
+#version 460
+#extension GL_GOOGLE_include_directive : require
+layout(local_size_x = 8, local_size_y = 8) in;
+
+#include "surfel.glsl"
+
+layout(std430, set = 0, binding = 0) readonly buffer SurfelBuf {
+	Surfel surfels[];
+};
+layout(std430, set = 0, binding = 1) readonly buffer CounterBuf {
+	uint activeCount;
+	uint spawnSeed;
+	uint pad0;
+	uint pad1;
+};
+layout(set = 0, binding = 2) uniform sampler2D depthTex;
+layout(set = 0, binding = 3) uniform sampler2D normalTex;
+layout(rgba16f, set = 0, binding = 4) uniform image2D irradianceOut;
+
+layout(push_constant) uniform ResolvePush {
+	mat4 invViewProj;
+	vec4 extent;  /* xy size, z searchRadiusScale, w intensity */
+	uvec4 params; /* x=maxSurfels y=sampleCap z=skipSky w=unused */
+} pc;
+
+void main() {
+	uvec2 pix = gl_GlobalInvocationID.xy;
+	uvec2 size = uvec2(pc.extent.xy);
+	if (pix.x >= size.x || pix.y >= size.y) {
+		return;
+	}
+
+	vec2 uv = (vec2(pix) + 0.5) / vec2(size);
+	float depth = texture(depthTex, uv).r;
+	if (pc.params.z != 0u && (depth <= 0.0 || depth >= 0.9999)) {
+		imageStore(irradianceOut, ivec2(pix), vec4(0.0));
+		return;
+	}
+
+	vec3 nSample = texture(normalTex, uv).xyz;
+	vec3 normal = length(nSample) > 0.01 ? normalize(nSample * 2.0 - 1.0) : vec3(0.0, 0.0, 1.0);
+
+	vec2 ndc = uv * 2.0 - 1.0;
+	vec4 worldH = pc.invViewProj * vec4(ndc, depth, 1.0);
+	vec3 worldPos = worldH.xyz / max(worldH.w, 1e-6);
+
+	uint count = min(activeCount, pc.params.x);
+	uint cap = min(pc.params.y, 64u);
+	uint step = max(1u, count / max(cap, 1u));
+	uint base = (pix.x * 73856093u ^ pix.y * 19349663u) % max(step, 1u);
+
+	vec3 irr = vec3(0.0);
+	float wsum = 0.0;
+	float searchR = max(pc.extent.z, 0.05);
+
+	for (uint i = 0u; i < cap; i++) {
+		uint idx = base + i * step;
+		if (idx >= count) {
+			break;
+		}
+		Surfel s = surfels[idx];
+		if ((s.meta.x & SURFEL_FLAG_ACTIVE) == 0u) {
+			continue;
+		}
+		float r = max(s.posRadius.w, 0.05) * searchR;
+		vec3 d = s.posRadius.xyz - worldPos;
+		float dist = length(d);
+		if (dist > r * 4.0) {
+			continue;
+		}
+		float nd = max(0.0, dot(normal, normalize(s.normalConf.xyz)));
+		if (nd < 0.05) {
+			continue;
+		}
+		float dw = 1.0 - smoothstep(0.0, r * 4.0, dist);
+		float conf = clamp(s.normalConf.w, 0.0, 1.0);
+		float w = dw * nd * conf;
+		if (w > 1e-4) {
+			irr += s.irradianceAge.xyz * w;
+			wsum += w;
+		}
+	}
+
+	if (wsum > 1e-4) {
+		irr = (irr / wsum) * pc.extent.w;
+	} else {
+		irr = vec3(0.0);
+	}
+	imageStore(irradianceOut, ivec2(pix), vec4(irr, wsum > 1e-4 ? 1.0 : 0.0));
+}

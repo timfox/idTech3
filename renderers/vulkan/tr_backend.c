@@ -27,6 +27,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "vk_forward_plus.h"
 #include "vk_deferred_gbuffer.h"
 #include "vk_niv.h"
+#include "vk_surfel_gi.h"
 #include "vk_nist.h"
 #include "vk_nvc.h"
 #include "vk_fsa.h"
@@ -1874,6 +1875,7 @@ static const void *RB_DrawSurfs( const void *data ) {
 	vk_deferred_gbuffer_capture_after_geometry();
 	vk_deferred_lighting_apply_after_geometry();
 	vk_niv_apply_after_geometry();
+	vk_surfel_gi_apply_after_geometry();
 	vk_nist_apply_after_geometry();
 	vk_nvc_apply_after_geometry();
 	vk_vfgi_apply_after_geometry();

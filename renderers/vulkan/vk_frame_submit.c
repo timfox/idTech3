@@ -32,6 +32,7 @@ Extracted from vk.c for incremental modularization.
 #include "vk_pathtrace.h"
 #include "vk_hybrid1.h"
 #include "vk_raygun.h"
+#include "vk_surfel_gi.h"
 #include "vk_grtx.h"
 #include "vk_vuda.h"
 
@@ -153,6 +154,7 @@ void vk_begin_frame( void )
 	vk_pathtrace_frame_begin();
 	vk_hybrid1_frame_begin();
 	vk_raygun_frame_begin();
+	vk_surfel_gi_frame_begin();
 #endif
 	vk_vuda_frame_begin();
 

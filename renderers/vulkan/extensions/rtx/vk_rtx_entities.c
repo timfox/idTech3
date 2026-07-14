@@ -2,12 +2,13 @@
 ===========================================================================
 Copyright (C) 2026 Gopex LLC. All rights reserved.
 
-RTX entity BLAS: MD3 LOD0 mesh (frame-lerp, world space) with AABB proxy fallback
-for IQM/glTF/MDR and failed MD3 packs (proxy reason counts in pack stats).
+RTX entity BLAS: MD3 LOD0 mesh, bind-pose IQM (static), static glTF mesh,
+with AABB proxy fallback for skinned / MDR / pack failures.
 ===========================================================================
 */
 
 #include "tr_local.h"
+#include "tr_model_gltf.h"
 #include "vk_rtx_entities.h"
 
 #ifdef USE_VULKAN_RTX
@@ -132,7 +133,6 @@ static qboolean vk_rtx_pack_md3( const trRefEntity_t *ent, const viewParms_t *vi
 
 		if ( *ioVertCount + (uint32_t)surface->numVerts > maxVerts ||
 			*ioIndexCount + (uint32_t)surface->numTriangles * 3u > maxIndices ) {
-			/* Surface does not fit — abort mesh pack for this entity (caller may AABB). */
 			*ioVertCount = vertsBefore;
 			*ioIndexCount = indicesBefore;
 			return qfalse;
@@ -194,6 +194,178 @@ static qboolean vk_rtx_pack_md3( const trRefEntity_t *ent, const viewParms_t *vi
 	return qtrue;
 }
 
+/*
+===============
+vk_rtx_pack_iqm
+
+Bind-pose IQM only (num_joints == 0). Skinned IQM uses AABB until animated BLAS lands.
+===============
+*/
+static qboolean vk_rtx_pack_iqm( const trRefEntity_t *ent, const viewParms_t *viewParms,
+	model_t *mod, float *positions, uint32_t maxVerts, uint32_t *indices, uint32_t maxIndices,
+	uint32_t *ioVertCount, uint32_t *ioIndexCount )
+{
+	const iqmData_t *data;
+	uint32_t vertsBefore = *ioVertCount;
+	uint32_t indicesBefore = *ioIndexCount;
+	uint32_t vertBase;
+	int v, t, numTris;
+	const int *tri;
+
+	if ( !mod->modelData ) {
+		return qfalse;
+	}
+	data = (const iqmData_t *)mod->modelData;
+	if ( !data->positions || !data->triangles || data->num_vertexes < 3 || data->num_triangles < 1 ) {
+		return qfalse;
+	}
+	/* Skinned / jointed meshes stay on AABB (no CPU skin into BLAS yet). */
+	if ( data->num_joints > 0 ) {
+		return qfalse;
+	}
+
+	numTris = data->num_triangles;
+	if ( *ioVertCount + (uint32_t)data->num_vertexes > maxVerts ||
+		*ioIndexCount + (uint32_t)numTris * 3u > maxIndices ) {
+		return qfalse;
+	}
+
+	R_RotateForEntity( ent, viewParms, &backEnd.or );
+	vertBase = *ioVertCount;
+
+	for ( v = 0; v < data->num_vertexes; v++ ) {
+		vec3_t local;
+		float *dst = positions + ( vertBase + (uint32_t)v ) * 3u;
+		const float *src = data->positions + v * 3;
+
+		local[0] = src[0];
+		local[1] = src[1];
+		local[2] = src[2];
+		vk_rtx_xform_local_to_world( &backEnd.or, local, dst );
+	}
+
+	tri = data->triangles;
+	for ( t = 0; t < numTris; t++ ) {
+		int i0 = tri[t * 3 + 0];
+		int i1 = tri[t * 3 + 1];
+		int i2 = tri[t * 3 + 2];
+		uint32_t *out;
+
+		if ( i0 < 0 || i0 >= data->num_vertexes ||
+			i1 < 0 || i1 >= data->num_vertexes ||
+			i2 < 0 || i2 >= data->num_vertexes ) {
+			continue;
+		}
+		out = indices + *ioIndexCount;
+		out[0] = vertBase + (uint32_t)i0;
+		out[1] = vertBase + (uint32_t)i1;
+		out[2] = vertBase + (uint32_t)i2;
+		*ioIndexCount += 3u;
+	}
+
+	*ioVertCount += (uint32_t)data->num_vertexes;
+
+	if ( *ioIndexCount == indicesBefore ) {
+		*ioVertCount = vertsBefore;
+		*ioIndexCount = indicesBefore;
+		return qfalse;
+	}
+
+	return qtrue;
+}
+
+/*
+===============
+vk_rtx_pack_gltf_static
+
+Non-skinned glTF (no skeleton joints). Uses mesh 0 primitives only.
+===============
+*/
+static qboolean vk_rtx_pack_gltf_static( const trRefEntity_t *ent, const viewParms_t *viewParms,
+	model_t *mod, float *positions, uint32_t maxVerts, uint32_t *indices, uint32_t maxIndices,
+	uint32_t *ioVertCount, uint32_t *ioIndexCount )
+{
+	const gltfModel_t *gltf;
+	uint32_t vertsBefore = *ioVertCount;
+	uint32_t indicesBefore = *ioIndexCount;
+	int mi, pi;
+
+	gltf = R_GetGLTFModelFromModelData( mod->modelData );
+	if ( !gltf || gltf->numMeshes < 1 ) {
+		return qfalse;
+	}
+	if ( gltf->skeleton.numJoints > 0 ) {
+		return qfalse;
+	}
+
+	R_RotateForEntity( ent, viewParms, &backEnd.or );
+
+	for ( mi = 0; mi < gltf->numMeshes; mi++ ) {
+		const gltfMesh_t *mesh = &gltf->meshes[mi];
+		if ( !mesh->primitives || mesh->numPrimitives < 1 ) {
+			continue;
+		}
+		for ( pi = 0; pi < mesh->numPrimitives; pi++ ) {
+			const gltfPrimitive_t *prim = &mesh->primitives[pi];
+			uint32_t vertBase;
+			int v, t, numTris;
+			const uint32_t *idx;
+
+			if ( !prim->vertices || prim->numVertices < 3 || !prim->indices || prim->numIndices < 3 ) {
+				continue;
+			}
+			numTris = prim->numIndices / 3;
+			if ( numTris < 1 ) {
+				continue;
+			}
+			if ( *ioVertCount + (uint32_t)prim->numVertices > maxVerts ||
+				*ioIndexCount + (uint32_t)numTris * 3u > maxIndices ) {
+				*ioVertCount = vertsBefore;
+				*ioIndexCount = indicesBefore;
+				return qfalse;
+			}
+
+			vertBase = *ioVertCount;
+			for ( v = 0; v < prim->numVertices; v++ ) {
+				vec3_t local;
+				float *dst = positions + ( vertBase + (uint32_t)v ) * 3u;
+
+				VectorCopy( prim->vertices[v].position, local );
+				vk_rtx_xform_local_to_world( &backEnd.or, local, dst );
+			}
+
+			idx = prim->indices;
+			for ( t = 0; t < numTris; t++ ) {
+				uint32_t i0 = idx[t * 3 + 0];
+				uint32_t i1 = idx[t * 3 + 1];
+				uint32_t i2 = idx[t * 3 + 2];
+				uint32_t *out;
+
+				if ( i0 >= (uint32_t)prim->numVertices ||
+					i1 >= (uint32_t)prim->numVertices ||
+					i2 >= (uint32_t)prim->numVertices ) {
+					continue;
+				}
+				out = indices + *ioIndexCount;
+				out[0] = vertBase + i0;
+				out[1] = vertBase + i1;
+				out[2] = vertBase + i2;
+				*ioIndexCount += 3u;
+			}
+
+			*ioVertCount += (uint32_t)prim->numVertices;
+		}
+	}
+
+	if ( *ioVertCount == vertsBefore || *ioIndexCount == indicesBefore ) {
+		*ioVertCount = vertsBefore;
+		*ioIndexCount = indicesBefore;
+		return qfalse;
+	}
+
+	return qtrue;
+}
+
 uint32_t vk_rtx_entities_pack( const trRefdef_t *refdef, const viewParms_t *viewParms,
 	uint32_t maxEntities, float *positions, uint32_t maxVerts,
 	uint32_t *indices, uint32_t maxIndices, vkRtxEntityPackStats_t *stats )
@@ -203,9 +375,15 @@ uint32_t vk_rtx_entities_pack( const trRefdef_t *refdef, const viewParms_t *view
 	uint32_t vertCount = 0u;
 	uint32_t indexCount = 0u;
 	uint32_t meshCount = 0u;
+	uint32_t meshMd3 = 0u;
+	uint32_t meshIqm = 0u;
+	uint32_t meshGltf = 0u;
 	uint32_t proxyCount = 0u;
 	uint32_t proxyNonMesh = 0u;
+	uint32_t proxySkinned = 0u;
 	uint32_t proxyMd3Fail = 0u;
+	uint32_t proxyIqmFail = 0u;
+	uint32_t proxyGltfFail = 0u;
 
 	if ( stats ) {
 		Com_Memset( stats, 0, sizeof( *stats ) );
@@ -225,7 +403,9 @@ uint32_t vk_rtx_entities_pack( const trRefdef_t *refdef, const viewParms_t *view
 		const trRefEntity_t *ent = &refdef->entities[i];
 		model_t *mod;
 		qboolean usedMesh = qfalse;
-		qboolean triedMd3 = qfalse;
+		int meshKind = 0; /* 1=md3 2=iqm 3=gltf */
+		qboolean skinnedSkip = qfalse;
+		int triedFailKind = 0; /* 1=md3 2=iqm 3=gltf */
 
 		if ( ent->e.reType != RT_MODEL || !ent->e.hModel ) {
 			continue;
@@ -237,9 +417,39 @@ uint32_t vk_rtx_entities_pack( const trRefdef_t *refdef, const viewParms_t *view
 		}
 
 		if ( mod->type == MOD_MESH ) {
-			triedMd3 = qtrue;
 			usedMesh = vk_rtx_pack_md3( ent, viewParms, mod, positions, maxVerts, indices, maxIndices,
 				&vertCount, &indexCount );
+			if ( usedMesh ) {
+				meshKind = 1;
+			} else {
+				triedFailKind = 1;
+			}
+		} else if ( mod->type == MOD_IQM ) {
+			const iqmData_t *iqm = (const iqmData_t *)mod->modelData;
+			if ( iqm && iqm->num_joints > 0 ) {
+				skinnedSkip = qtrue;
+			} else {
+				usedMesh = vk_rtx_pack_iqm( ent, viewParms, mod, positions, maxVerts, indices, maxIndices,
+					&vertCount, &indexCount );
+				if ( usedMesh ) {
+					meshKind = 2;
+				} else {
+					triedFailKind = 2;
+				}
+			}
+		} else if ( mod->type == MOD_GLTF ) {
+			const gltfModel_t *gltf = R_GetGLTFModelFromModelData( mod->modelData );
+			if ( gltf && gltf->skeleton.numJoints > 0 ) {
+				skinnedSkip = qtrue;
+			} else {
+				usedMesh = vk_rtx_pack_gltf_static( ent, viewParms, mod, positions, maxVerts, indices, maxIndices,
+					&vertCount, &indexCount );
+				if ( usedMesh ) {
+					meshKind = 3;
+				} else {
+					triedFailKind = 3;
+				}
+			}
 		}
 
 		if ( !usedMesh ) {
@@ -248,13 +458,26 @@ uint32_t vk_rtx_entities_pack( const trRefdef_t *refdef, const viewParms_t *view
 				break;
 			}
 			proxyCount++;
-			if ( triedMd3 ) {
+			if ( skinnedSkip ) {
+				proxySkinned++;
+			} else if ( triedFailKind == 1 ) {
 				proxyMd3Fail++;
+			} else if ( triedFailKind == 2 ) {
+				proxyIqmFail++;
+			} else if ( triedFailKind == 3 ) {
+				proxyGltfFail++;
 			} else {
 				proxyNonMesh++;
 			}
 		} else {
 			meshCount++;
+			if ( meshKind == 1 ) {
+				meshMd3++;
+			} else if ( meshKind == 2 ) {
+				meshIqm++;
+			} else if ( meshKind == 3 ) {
+				meshGltf++;
+			}
 		}
 
 		packed++;
@@ -265,9 +488,15 @@ uint32_t vk_rtx_entities_pack( const trRefdef_t *refdef, const viewParms_t *view
 		stats->vertexCount = vertCount;
 		stats->primitiveCount = indexCount / 3u;
 		stats->meshEntityCount = meshCount;
+		stats->meshMd3Count = meshMd3;
+		stats->meshIqmCount = meshIqm;
+		stats->meshGltfCount = meshGltf;
 		stats->proxyEntityCount = proxyCount;
 		stats->proxyNonMeshCount = proxyNonMesh;
+		stats->proxySkinnedCount = proxySkinned;
 		stats->proxyMd3FailCount = proxyMd3Fail;
+		stats->proxyIqmFailCount = proxyIqmFail;
+		stats->proxyGltfFailCount = proxyGltfFail;
 	}
 
 	return packed;

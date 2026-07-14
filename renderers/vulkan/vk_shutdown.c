@@ -25,6 +25,7 @@ Split from vk.c.
 #include "vk_pathtrace.h"
 #include "vk_hybrid1.h"
 #include "vk_raygun.h"
+#include "vk_surfel_gi.h"
 #include "vk_dressi.h"
 #include "vk_vdb.h"
 #include "vk_pipeline_cache_disk.h"
@@ -53,6 +54,7 @@ void vk_shutdown( refShutdownCode_t code )
 	vk_pathtrace_shutdown();
 	vk_hybrid1_shutdown();
 	vk_raygun_shutdown();
+	vk_surfel_gi_shutdown();
 	R_Dressi_Shutdown();
 	/* Always run full destroy sequence for VUID-05137 compliance.
 	 * When device_lost, destroy calls may return VK_ERROR_DEVICE_LOST but we still attempt them. */

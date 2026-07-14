@@ -509,6 +509,7 @@ fi
 
 echo ""
 echo "Vulkan RTX BLAS/TLAS + hybrid frame path:"
+RTX_ENT="$PROJECT_ROOT/renderers/vulkan/extensions/rtx/vk_rtx_entities.c"
 if ! grep -q 'r_rtxTlasUpdate' "$RTX_C" 2>/dev/null; then
   fail "vk_rtx.c missing r_rtxTlasUpdate TLAS update path"
 elif ! grep -q 'VK_BUILD_ACCELERATION_STRUCTURE_MODE_UPDATE_KHR' "$RTX_C" 2>/dev/null; then
@@ -517,8 +518,37 @@ elif ! grep -q 'rtx_status' "$RTX_C" 2>/dev/null; then
   fail "vk_rtx.c missing rtx_status command"
 elif ! grep -q 'gl_InstanceCustomIndexEXT' "$PROJECT_ROOT/renderers/vulkan/shaders/glsl/rtx_demo.rchit" 2>/dev/null; then
   fail "rtx_demo.rchit missing instance-aware closest-hit"
+elif [[ ! -f "$RTX_ENT" ]]; then
+  fail "vk_rtx_entities.c missing"
+elif ! grep -q 'vk_rtx_pack_iqm' "$RTX_ENT" 2>/dev/null; then
+  fail "vk_rtx_entities.c missing bind-pose IQM pack"
+elif ! grep -q 'vk_rtx_pack_gltf_static' "$RTX_ENT" 2>/dev/null; then
+  fail "vk_rtx_entities.c missing static glTF pack"
+elif ! grep -q 'proxySkinnedCount' "$RTX_ENT" 2>/dev/null; then
+  fail "vk_rtx_entities.c missing proxySkinnedCount stats"
 else
-  pass "RTX world/entity BLAS + TLAS update + hybrid hit tint wired"
+  pass "RTX world/entity BLAS + TLAS update + hybrid hit tint + IQM/glTF pack wired"
+fi
+
+echo ""
+echo "Surfel GI (GIBS) chocolate path:"
+SGI_C="$PROJECT_ROOT/renderers/vulkan/extensions/rtx/vk_surfel_gi.c"
+SGI_SPAWN="$PROJECT_ROOT/renderers/vulkan/shaders/glsl/surfel_gi/surfel_spawn.comp"
+SGI_UPDATE="$PROJECT_ROOT/renderers/vulkan/shaders/glsl/surfel_gi/surfel_update.comp"
+if [[ ! -f "$SGI_C" ]]; then
+  fail "vk_surfel_gi.c missing"
+elif ! grep -q 'r_surfelGi' "$SGI_C" 2>/dev/null; then
+  fail "vk_surfel_gi.c missing r_surfelGi cvar"
+elif ! grep -q 'surfel_gi_status' "$SGI_C" 2>/dev/null; then
+  fail "vk_surfel_gi.c missing surfel_gi_status"
+elif [[ ! -f "$SGI_SPAWN" || ! -f "$SGI_UPDATE" ]]; then
+  fail "surfel_gi spawn/update shaders missing"
+elif ! grep -q 'GL_EXT_ray_query' "$SGI_UPDATE" 2>/dev/null; then
+  fail "surfel_update.comp missing GL_EXT_ray_query"
+elif ! grep -q 'vk_surfel_gi.c' "$PROJECT_ROOT/cmake/renderers/VulkanExtensionSources.cmake" 2>/dev/null; then
+  fail "VulkanExtensionSources.cmake missing vk_surfel_gi.c"
+else
+  pass "Surfel GI spawn/update + ray query + chocolate link wired"
 fi
 
 echo ""

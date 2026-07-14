@@ -4439,7 +4439,7 @@ static void R_Register( void )
 	r_rtxEntities = ri.Cvar_Get( "r_rtxEntities", "0", CVAR_ARCHIVE_ND | CVAR_LATCH );
 	ri.Cvar_CheckRange( r_rtxEntities, "0", "1", CV_INTEGER );
 	ri.Cvar_SetDescription( r_rtxEntities,
-		"When USE_VULKAN_RTX: pack RT_MODEL entities into a second BLAS (MD3 LOD0 mesh, AABB fallback). Default 0 (latched)." );
+		"When USE_VULKAN_RTX: pack RT_MODEL entities into a second BLAS (MD3 LOD0, bind-pose IQM, static glTF; AABB for skinned/MDR/fail). Default 0 (latched)." );
 	ri.Cvar_SetGroup( r_rtxEntities, CVG_RENDERER );
 	r_rtxEntityCap = ri.Cvar_Get( "r_rtxEntityCap", "128", CVAR_ARCHIVE_ND | CVAR_LATCH );
 	ri.Cvar_CheckRange( r_rtxEntityCap, "0", "1024", CV_INTEGER );
@@ -4448,7 +4448,7 @@ static void R_Register( void )
 	r_rtxEntityTriCap = ri.Cvar_Get( "r_rtxEntityTriCap", "65536", CVAR_ARCHIVE_ND | CVAR_LATCH );
 	ri.Cvar_CheckRange( r_rtxEntityTriCap, "12", "1048576", CV_INTEGER );
 	ri.Cvar_SetDescription( r_rtxEntityTriCap,
-		"Max triangles in the entity BLAS when \\r_rtxEntities 1 (MD3 mesh + AABB proxies; latched)." );
+		"Max triangles in the entity BLAS when \\r_rtxEntities 1 (MD3/IQM/glTF mesh + AABB proxies; latched)." );
 	ri.Cvar_SetGroup( r_rtxEntityTriCap, CVG_RENDERER );
 	r_rtxTlasUpdate = ri.Cvar_Get( "r_rtxTlasUpdate", "1", CVAR_ARCHIVE_ND );
 	ri.Cvar_CheckRange( r_rtxTlasUpdate, "0", "1", CV_INTEGER );

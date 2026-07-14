@@ -43,11 +43,11 @@ Optional:
 r_hybrid1_diffuse 1       // indirect diffuse GI channel
 r_hybrid1_ibl 1           // cubemap on RT miss / secondary hit (needs skybox or PBR cubemap)
 r_hybrid1_taa 1           // TAA after hybrid composite (default on)
-r_rtxEntities 1           // MD3 LOD0 mesh BLAS (+ AABB fallback); shared with Hybrid1 TLAS
+r_rtxEntities 1           // entity mesh BLAS: MD3 LOD0 + bind-pose IQM + static glTF (+ AABB fallback); shared with Hybrid1 TLAS
 r_rtxEntityTriCap 65536   // entity BLAS triangle budget (latched)
 ```
 
-`demo_hybrid1.cfg` sets `r_rtxEntities 1`. Console **`rtx_status`** reports `entity_ents` / `entity_tris` / `mesh` / `proxy` counts plus **proxy reason** (`nonmesh` = IQM/glTF/MDR AABB by design, `md3fail` = MD3 pack failed) and **TLAS mode** (`UPDATE` vs `REBUILD` with reason).
+`demo_hybrid1.cfg` sets `r_rtxEntities 1`. Console **`rtx_status`** reports `entity_ents` / `entity_tris` / `mesh` breakdown (`md3` / `iqm` / `gltf`) / `proxy` reasons (`nonmesh` = MDR/unknown, `skinned` = IQM/glTF with joints, `md3fail` / `iqmfail` / `gltffail` = pack failed → AABB) and **TLAS mode** (`UPDATE` vs `REBUILD` with reason).
 
 `r_rtx 1` **or** `r_hybrid1 1` before `vid_restart` enables KHR ray tracing device features.
 

@@ -31,6 +31,7 @@ set(VK_CHOCOLATE_SPLAT_SRCS
 set(VK_CHOCOLATE_RTX_SRCS
 	${_VK_EXT}/rtx/vk_hybrid1.c
 	${_VK_EXT}/rtx/vk_raygun.c
+	${_VK_EXT}/rtx/vk_surfel_gi.c
 )
 
 # Chocolate ocean: always linked; real path when USE_ARC_BLANC (internal #else stubs).

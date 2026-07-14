@@ -92,9 +92,15 @@ static struct {
 	uint32_t		entity_packed_count;
 	uint32_t		entity_vertex_count;
 	uint32_t		entity_mesh_count;
+	uint32_t		entity_mesh_md3;
+	uint32_t		entity_mesh_iqm;
+	uint32_t		entity_mesh_gltf;
 	uint32_t		entity_proxy_count;
 	uint32_t		entity_proxy_non_mesh;
+	uint32_t		entity_proxy_skinned;
 	uint32_t		entity_proxy_md3_fail;
+	uint32_t		entity_proxy_iqm_fail;
+	uint32_t		entity_proxy_gltf_fail;
 	char			tlas_build_mode[16];
 	char			tlas_rebuild_reason[48];
 	VkBuffer		entity_vertex_buffer;
@@ -147,11 +153,15 @@ static void RTX_Status_f( void )
 		( r_rtxDemo && r_rtxDemo->integer ) ? 1 : 0,
 		( r_hybrid1 && r_hybrid1->integer ) ? 1 : 0,
 		( r_raygun && r_raygun->integer ) ? 1 : 0 );
-	ri.Printf( PRINT_ALL, "[VK][RTX] world=%s blas_tris=%u world_verts=%u albedo_prims=%u entity_ents=%u entity_tris=%u entity_verts=%u mesh=%u proxy=%u (nonmesh=%u md3fail=%u) tlas_instances=%u tlas_mode=%s reason=%s\n",
+	ri.Printf( PRINT_ALL, "[VK][RTX] world=%s blas_tris=%u world_verts=%u albedo_prims=%u entity_ents=%u entity_tris=%u entity_verts=%u mesh=%u (md3=%u iqm=%u gltf=%u) proxy=%u (nonmesh=%u skinned=%u md3fail=%u iqmfail=%u gltffail=%u) tlas_instances=%u tlas_mode=%s reason=%s\n",
 		wn, rtx.world_primitive_count, rtx.world_vertex_count, rtx.world_albedo_count,
 		rtx.entity_packed_count, rtx.entity_primitive_count,
-		rtx.entity_vertex_count, rtx.entity_mesh_count, rtx.entity_proxy_count,
-		rtx.entity_proxy_non_mesh, rtx.entity_proxy_md3_fail, rtx.tlas_instance_count,
+		rtx.entity_vertex_count, rtx.entity_mesh_count,
+		rtx.entity_mesh_md3, rtx.entity_mesh_iqm, rtx.entity_mesh_gltf,
+		rtx.entity_proxy_count,
+		rtx.entity_proxy_non_mesh, rtx.entity_proxy_skinned,
+		rtx.entity_proxy_md3_fail, rtx.entity_proxy_iqm_fail, rtx.entity_proxy_gltf_fail,
+		rtx.tlas_instance_count,
 		rtx.tlas_build_mode[0] ? rtx.tlas_build_mode : "n/a",
 		rtx.tlas_rebuild_reason[0] ? rtx.tlas_rebuild_reason : "n/a" );
 	ri.Printf( PRINT_ALL, "[VK][RTX] note: Hybrid1 is the production RT lighting path; r_rtx demo overlay is diagnostic unless modes gain real rays\n" );
@@ -427,9 +437,15 @@ static void vk_rtx_rebuild_world_blas( void )
 	rtx.entity_packed_count = 0u;
 	rtx.entity_vertex_count = 0u;
 	rtx.entity_mesh_count = 0u;
+	rtx.entity_mesh_md3 = 0u;
+	rtx.entity_mesh_iqm = 0u;
+	rtx.entity_mesh_gltf = 0u;
 	rtx.entity_proxy_count = 0u;
 	rtx.entity_proxy_non_mesh = 0u;
+	rtx.entity_proxy_skinned = 0u;
 	rtx.entity_proxy_md3_fail = 0u;
+	rtx.entity_proxy_iqm_fail = 0u;
+	rtx.entity_proxy_gltf_fail = 0u;
 	rtx.world_vertex_count = 0u;
 	rtx.world_albedo_count = 0u;
 
@@ -706,9 +722,15 @@ static void vk_rtx_destroy_entity_blas( void )
 	rtx.entity_packed_count = 0u;
 	rtx.entity_vertex_count = 0u;
 	rtx.entity_mesh_count = 0u;
+	rtx.entity_mesh_md3 = 0u;
+	rtx.entity_mesh_iqm = 0u;
+	rtx.entity_mesh_gltf = 0u;
 	rtx.entity_proxy_count = 0u;
 	rtx.entity_proxy_non_mesh = 0u;
+	rtx.entity_proxy_skinned = 0u;
 	rtx.entity_proxy_md3_fail = 0u;
+	rtx.entity_proxy_iqm_fail = 0u;
+	rtx.entity_proxy_gltf_fail = 0u;
 }
 
 static void vk_rtx_rebuild_entity_tlas( void )
@@ -823,9 +845,15 @@ static void vk_rtx_rebuild_entity_tlas( void )
 			rtx.entity_primitive_count = maxPrimEntity;
 			rtx.entity_vertex_count = packStats.vertexCount;
 			rtx.entity_mesh_count = packStats.meshEntityCount;
+			rtx.entity_mesh_md3 = packStats.meshMd3Count;
+			rtx.entity_mesh_iqm = packStats.meshIqmCount;
+			rtx.entity_mesh_gltf = packStats.meshGltfCount;
 			rtx.entity_proxy_count = packStats.proxyEntityCount;
 			rtx.entity_proxy_non_mesh = packStats.proxyNonMeshCount;
+			rtx.entity_proxy_skinned = packStats.proxySkinnedCount;
 			rtx.entity_proxy_md3_fail = packStats.proxyMd3FailCount;
+			rtx.entity_proxy_iqm_fail = packStats.proxyIqmFailCount;
+			rtx.entity_proxy_gltf_fail = packStats.proxyGltfFailCount;
 
 			Com_Memset( &triangles, 0, sizeof( triangles ) );
 			triangles.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_TRIANGLES_DATA_KHR;

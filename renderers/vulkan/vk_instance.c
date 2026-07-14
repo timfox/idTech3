@@ -268,6 +268,7 @@ static qboolean vk_create_device( VkPhysicalDevice physical_device, int device_i
 		VkPhysicalDeviceVulkan12Features rtx_vulkan12_features;
 		VkPhysicalDeviceAccelerationStructureFeaturesKHR rtx_accel_features;
 		VkPhysicalDeviceRayTracingPipelineFeaturesKHR rtx_pipeline_features;
+		VkPhysicalDeviceRayQueryFeaturesKHR rtx_ray_query_features;
 #endif
 		VkResult res;
 		qboolean swapchainSupported = qfalse;
@@ -314,6 +315,7 @@ static qboolean vk_create_device( VkPhysicalDevice physical_device, int device_i
 		qboolean rtxPipeline = qfalse;
 		qboolean rtxDeferredHostOps = qfalse;
 		qboolean rtxBufferDeviceAddress = qfalse;
+		qboolean rtxRayQuery = qfalse;
 #endif
 #ifdef _DEBUG
 		qboolean timelineSemaphore = qfalse;
@@ -428,6 +430,8 @@ static qboolean vk_create_device( VkPhysicalDevice physical_device, int device_i
 				rtxDeferredHostOps = qtrue;
 			} else if ( strcmp( ext, VK_KHR_BUFFER_DEVICE_ADDRESS_EXTENSION_NAME ) == 0 ) {
 				rtxBufferDeviceAddress = qtrue;
+			} else if ( strcmp( ext, VK_KHR_RAY_QUERY_EXTENSION_NAME ) == 0 ) {
+				rtxRayQuery = qtrue;
 			}
 #endif
 			if ( i != 0 ) {
@@ -598,21 +602,25 @@ static qboolean vk_create_device( VkPhysicalDevice physical_device, int device_i
 		(void)surfaceMaintenance1;
 #ifdef USE_VULKAN_RTX
 		vk.rtxAvailable = qfalse;
+		vk.rayQueryAvailable = qfalse;
 		if ( rtxAccelStruct && rtxPipeline && rtxDeferredHostOps && rtxBufferDeviceAddress && memoryRequirements2 ) {
 			cvar_t *r_rtx_cvar = ri.Cvar_Get( "r_rtx", "0", CVAR_ARCHIVE_ND | CVAR_LATCH );
 			cvar_t *r_hybrid1_cvar = ri.Cvar_Get( "r_hybrid1", "0", CVAR_ARCHIVE_ND | CVAR_LATCH );
 			cvar_t *r_raygun_cvar = ri.Cvar_Get( "r_raygun", "0", CVAR_ARCHIVE_ND | CVAR_LATCH );
+			cvar_t *r_surfelGi_cvar = ri.Cvar_Get( "r_surfelGi", "0", CVAR_ARCHIVE_ND | CVAR_LATCH );
 			if ( ( r_rtx_cvar && r_rtx_cvar->integer > 0 ) || ( r_hybrid1_cvar && r_hybrid1_cvar->integer > 0 )
-				|| ( r_raygun_cvar && r_raygun_cvar->integer > 0 ) ) {
+				|| ( r_raygun_cvar && r_raygun_cvar->integer > 0 )
+				|| ( r_surfelGi_cvar && r_surfelGi_cvar->integer > 0 ) ) {
 				if ( qvkGetPhysicalDeviceFeatures2 == NULL ) {
 					ri.Printf( PRINT_WARNING, "[VK] Ray tracing: vkGetPhysicalDeviceFeatures2 unavailable; cannot verify RT features\n" );
-				} else if ( device_extension_count + 4 > ARRAY_LEN( device_extension_list ) ) {
+				} else if ( device_extension_count + 5 > ARRAY_LEN( device_extension_list ) ) {
 					ri.Printf( PRINT_WARNING, "[VK] Ray tracing: device extension list full; skipping RT\n" );
 				} else {
 					Com_Memset( &rtx_features2, 0, sizeof( rtx_features2 ) );
 					Com_Memset( &rtx_vulkan12_features, 0, sizeof( rtx_vulkan12_features ) );
 					Com_Memset( &rtx_accel_features, 0, sizeof( rtx_accel_features ) );
 					Com_Memset( &rtx_pipeline_features, 0, sizeof( rtx_pipeline_features ) );
+					Com_Memset( &rtx_ray_query_features, 0, sizeof( rtx_ray_query_features ) );
 					rtx_features2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
 					rtx_features2.pNext = &rtx_vulkan12_features;
 					rtx_vulkan12_features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES;
@@ -620,7 +628,9 @@ static qboolean vk_create_device( VkPhysicalDevice physical_device, int device_i
 					rtx_accel_features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ACCELERATION_STRUCTURE_FEATURES_KHR;
 					rtx_accel_features.pNext = &rtx_pipeline_features;
 					rtx_pipeline_features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_TRACING_PIPELINE_FEATURES_KHR;
-					rtx_pipeline_features.pNext = NULL;
+					rtx_pipeline_features.pNext = &rtx_ray_query_features;
+					rtx_ray_query_features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_QUERY_FEATURES_KHR;
+					rtx_ray_query_features.pNext = NULL;
 					qvkGetPhysicalDeviceFeatures2( physical_device, &rtx_features2 );
 					if ( rtx_vulkan12_features.bufferDeviceAddress && rtx_accel_features.accelerationStructure
 						&& rtx_pipeline_features.rayTracingPipeline ) {
@@ -642,13 +652,21 @@ static qboolean vk_create_device( VkPhysicalDevice physical_device, int device_i
 						rtx_pipeline_features.rayTracingPipelineShaderGroupHandleCaptureReplayMixed = VK_FALSE;
 						rtx_pipeline_features.rayTracingPipelineTraceRaysIndirect = VK_FALSE;
 						rtx_pipeline_features.rayTraversalPrimitiveCulling = VK_FALSE;
-						ri.Printf( PRINT_ALL, "[VK] Ray tracing: KHR AS + RT pipeline + buffer device address enabled (rtx_status; r_rtxDemo / Hybrid1 / Raygun)\n" );
+						if ( rtxRayQuery && rtx_ray_query_features.rayQuery ) {
+							device_extension_list[ device_extension_count++ ] = VK_KHR_RAY_QUERY_EXTENSION_NAME;
+							rtx_ray_query_features.rayQuery = VK_TRUE;
+							vk.rayQueryAvailable = qtrue;
+							ri.Printf( PRINT_ALL, "[VK] Ray tracing: KHR AS + RT pipeline + ray query + BDA enabled (rtx_status; Hybrid1 / Raygun / SurfelGI)\n" );
+						} else {
+							rtx_pipeline_features.pNext = NULL;
+							ri.Printf( PRINT_ALL, "[VK] Ray tracing: KHR AS + RT pipeline + BDA enabled (no ray query; Surfel GI unavailable)\n" );
+						}
 					} else {
 						ri.Printf( PRINT_WARNING, "[VK] Ray tracing: extensions present but required features unsupported on this device; skipping\n" );
 					}
 				}
 			} else {
-				ri.Printf( PRINT_ALL, "[VK][RTX] chocolate path ready (GPU has KHR RT; set r_rtx 1 or r_hybrid1 1 / r_raygun 1 + vid_restart)\n" );
+				ri.Printf( PRINT_ALL, "[VK][RTX] chocolate path ready (GPU has KHR RT; set r_rtx / r_hybrid1 / r_raygun / r_surfelGi 1 + vid_restart)\n" );
 			}
 		}
 #endif

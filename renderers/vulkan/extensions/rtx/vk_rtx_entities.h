@@ -10,15 +10,21 @@ typedef struct {
 	uint32_t vertexCount;
 	uint32_t primitiveCount;
 	uint32_t meshEntityCount;
+	uint32_t meshMd3Count;
+	uint32_t meshIqmCount;
+	uint32_t meshGltfCount;
 	uint32_t proxyEntityCount;
-	uint32_t proxyNonMeshCount;   /* IQM/glTF/MDR/brush → intentional AABB */
-	uint32_t proxyMd3FailCount;   /* MOD_MESH but pack_md3 failed → AABB */
+	uint32_t proxyNonMeshCount;    /* MDR/brush/unknown → AABB */
+	uint32_t proxySkinnedCount;    /* IQM/glTF with joints → AABB (no animated BLAS yet) */
+	uint32_t proxyMd3FailCount;    /* MOD_MESH but pack_md3 failed → AABB */
+	uint32_t proxyIqmFailCount;
+	uint32_t proxyGltfFailCount;
 } vkRtxEntityPackStats_t;
 
 /*
  * Pack RT_MODEL entities into world-space vertex/index buffers for a single entity BLAS.
- * Prefers MD3 LOD0 frame-lerped mesh; falls back to AABB proxy boxes for other model types
- * (IQM/glTF/MDR) and for MD3 pack failures. Returns number of entities packed (0 if none).
+ * Prefers MD3 LOD0, then bind-pose IQM (no joints), then static (non-skinned) glTF.
+ * AABB proxy for skinned IQM/glTF, MDR, and pack failures.
  */
 uint32_t vk_rtx_entities_pack( const trRefdef_t *refdef, const viewParms_t *viewParms,
 	uint32_t maxEntities, float *positions, uint32_t maxVerts,
@@ -31,9 +37,15 @@ typedef struct {
 	uint32_t vertexCount;
 	uint32_t primitiveCount;
 	uint32_t meshEntityCount;
+	uint32_t meshMd3Count;
+	uint32_t meshIqmCount;
+	uint32_t meshGltfCount;
 	uint32_t proxyEntityCount;
 	uint32_t proxyNonMeshCount;
+	uint32_t proxySkinnedCount;
 	uint32_t proxyMd3FailCount;
+	uint32_t proxyIqmFailCount;
+	uint32_t proxyGltfFailCount;
 } vkRtxEntityPackStats_t;
 
 uint32_t vk_rtx_entities_pack( const trRefdef_t *refdef, const viewParms_t *viewParms,
