@@ -2,28 +2,71 @@
 ===========================================================================
 World BSP geometry extraction for Vulkan RTX BLAS
 (all brush submodels: faces + triangle soups + SF_GRID patches).
-Optional per-primitive albedo RGB for Hybrid1 / pathtrace closest-hit.
+Optional per-primitive albedo RGB + geometric normals for Hybrid1 / pathtrace / Surfel GI.
 ===========================================================================
 */
 
 #include "tr_local.h"
 #include "vk_rtx_world.h"
+#include <math.h>
 
 #ifdef USE_VULKAN_RTX
 
 static const float s_defaultAlbedo[3] = { 0.72f, 0.70f, 0.66f };
 
-static void rtx_store_albedo( float *albedoRgb, uint32_t primIndex, float r, float g, float b )
+static void rtx_store_vec3( float *dstBase, uint32_t primIndex, float x, float y, float z )
 {
 	float *dst;
 
-	if ( !albedoRgb ) {
+	if ( !dstBase ) {
 		return;
 	}
-	dst = albedoRgb + primIndex * 3u;
-	dst[0] = r;
-	dst[1] = g;
-	dst[2] = b;
+	dst = dstBase + primIndex * 3u;
+	dst[0] = x;
+	dst[1] = y;
+	dst[2] = z;
+}
+
+static void rtx_store_albedo( float *albedoRgb, uint32_t primIndex, float r, float g, float b )
+{
+	rtx_store_vec3( albedoRgb, primIndex, r, g, b );
+}
+
+static void rtx_normalize3( float *v )
+{
+	float len;
+
+	len = (float)sqrt( (double)( v[0] * v[0] + v[1] * v[1] + v[2] * v[2] ) );
+	if ( len < 1e-8f ) {
+		v[0] = 0.0f;
+		v[1] = 0.0f;
+		v[2] = 1.0f;
+		return;
+	}
+	v[0] /= len;
+	v[1] /= len;
+	v[2] /= len;
+}
+
+static void rtx_geo_normal( const float *a, const float *b, const float *c, float *out )
+{
+	float e1[3], e2[3];
+
+	e1[0] = b[0] - a[0];
+	e1[1] = b[1] - a[1];
+	e1[2] = b[2] - a[2];
+	e2[0] = c[0] - a[0];
+	e2[1] = c[1] - a[1];
+	e2[2] = c[2] - a[2];
+	out[0] = e1[1] * e2[2] - e1[2] * e2[1];
+	out[1] = e1[2] * e2[0] - e1[0] * e2[2];
+	out[2] = e1[0] * e2[1] - e1[1] * e2[0];
+	rtx_normalize3( out );
+}
+
+static void rtx_store_normal( float *normalRgb, uint32_t primIndex, const float n[3] )
+{
+	rtx_store_vec3( normalRgb, primIndex, n[0], n[1], n[2] );
 }
 
 static void rtx_albedo_from_bytes( const byte *c, float *outRgb )
@@ -194,7 +237,7 @@ uint32_t vk_rtx_world_count_primitives( const world_t *w, uint32_t maxPrimitives
 }
 
 static void rtx_emit_face_tris( const srfSurfaceFace_t *face, float *positions, uint32_t *indices,
-	float *albedoRgb, uint32_t *outVert, uint32_t *outIdx, uint32_t maxPrimitives, uint32_t *primCount )
+	float *albedoRgb, float *normalRgb, uint32_t *outVert, uint32_t *outIdx, uint32_t maxPrimitives, uint32_t *primCount )
 {
 	const unsigned *idxSrc;
 	uint32_t t, baseV, baseI;
@@ -232,6 +275,8 @@ static void rtx_emit_face_tris( const srfSurfaceFace_t *face, float *positions, 
 		rtx_albedo_from_face_vert( face, i2, cc );
 		rtx_avg3_albedo( ca, cb, cc, avg );
 		rtx_store_albedo( albedoRgb, *primCount, avg[0], avg[1], avg[2] );
+		/* Planar faces: BSP plane normal is authoritative. */
+		rtx_store_normal( normalRgb, *primCount, face->plane.normal );
 		baseV += 3u;
 		baseI += 3u;
 		( *primCount )++;
@@ -241,7 +286,7 @@ static void rtx_emit_face_tris( const srfSurfaceFace_t *face, float *positions, 
 }
 
 static void rtx_emit_triangles_tris( const srfTriangles_t *surf, float *positions, uint32_t *indices,
-	float *albedoRgb, uint32_t *outVert, uint32_t *outIdx, uint32_t maxPrimitives, uint32_t *primCount )
+	float *albedoRgb, float *normalRgb, uint32_t *outVert, uint32_t *outIdx, uint32_t maxPrimitives, uint32_t *primCount )
 {
 	uint32_t t, baseV, baseI;
 	int vi;
@@ -277,6 +322,23 @@ static void rtx_emit_triangles_tris( const srfTriangles_t *surf, float *position
 		rtx_albedo_from_srfvert( &surf->verts[i2], cc );
 		rtx_avg3_albedo( ca, cb, cc, avg );
 		rtx_store_albedo( albedoRgb, *primCount, avg[0], avg[1], avg[2] );
+		{
+			float n[3];
+			const float *na = surf->verts[i0].normal;
+			const float *nb = surf->verts[i1].normal;
+			const float *nc = surf->verts[i2].normal;
+			n[0] = na[0] + nb[0] + nc[0];
+			n[1] = na[1] + nb[1] + nc[1];
+			n[2] = na[2] + nb[2] + nc[2];
+			if ( n[0] * n[0] + n[1] * n[1] + n[2] * n[2] < 1e-6f ) {
+				rtx_geo_normal( &positions[( baseV + 0u ) * 3u],
+					&positions[( baseV + 1u ) * 3u],
+					&positions[( baseV + 2u ) * 3u], n );
+			} else {
+				rtx_normalize3( n );
+			}
+			rtx_store_normal( normalRgb, *primCount, n );
+		}
 		baseV += 3u;
 		baseI += 3u;
 		( *primCount )++;
@@ -286,7 +348,7 @@ static void rtx_emit_triangles_tris( const srfTriangles_t *surf, float *position
 }
 
 static void rtx_emit_grid_tris( const srfGridMesh_t *grid, float *positions, uint32_t *indices,
-	float *albedoRgb, uint32_t *outVert, uint32_t *outIdx, uint32_t maxPrimitives, uint32_t *primCount )
+	float *albedoRgb, float *normalRgb, uint32_t *outVert, uint32_t *outIdx, uint32_t maxPrimitives, uint32_t *primCount )
 {
 	int widthTable[MAX_GRID_SIZE];
 	int heightTable[MAX_GRID_SIZE];
@@ -341,6 +403,20 @@ static void rtx_emit_grid_tris( const srfGridMesh_t *grid, float *positions, uin
 			rtx_albedo_from_srfvert( dvC, cc );
 			rtx_avg3_albedo( ca, cb, cc, avg );
 			rtx_store_albedo( albedoRgb, *primCount, avg[0], avg[1], avg[2] );
+			{
+				float n[3];
+				n[0] = dvA->normal[0] + dvB->normal[0] + dvC->normal[0];
+				n[1] = dvA->normal[1] + dvB->normal[1] + dvC->normal[1];
+				n[2] = dvA->normal[2] + dvB->normal[2] + dvC->normal[2];
+				if ( n[0] * n[0] + n[1] * n[1] + n[2] * n[2] < 1e-6f ) {
+					rtx_geo_normal( positions + ( vertBase + (uint32_t)v2 ) * 3u,
+						positions + ( vertBase + (uint32_t)v3 ) * 3u,
+						positions + ( vertBase + (uint32_t)v1 ) * 3u, n );
+				} else {
+					rtx_normalize3( n );
+				}
+				rtx_store_normal( normalRgb, *primCount, n );
+			}
 			baseI += 3u;
 			( *primCount )++;
 
@@ -361,6 +437,20 @@ static void rtx_emit_grid_tris( const srfGridMesh_t *grid, float *positions, uin
 			rtx_albedo_from_srfvert( dvC, cc );
 			rtx_avg3_albedo( ca, cb, cc, avg );
 			rtx_store_albedo( albedoRgb, *primCount, avg[0], avg[1], avg[2] );
+			{
+				float n[3];
+				n[0] = dvA->normal[0] + dvB->normal[0] + dvC->normal[0];
+				n[1] = dvA->normal[1] + dvB->normal[1] + dvC->normal[1];
+				n[2] = dvA->normal[2] + dvB->normal[2] + dvC->normal[2];
+				if ( n[0] * n[0] + n[1] * n[1] + n[2] * n[2] < 1e-6f ) {
+					rtx_geo_normal( positions + ( vertBase + (uint32_t)v1 ) * 3u,
+						positions + ( vertBase + (uint32_t)v3 ) * 3u,
+						positions + ( vertBase + (uint32_t)v4 ) * 3u, n );
+				} else {
+					rtx_normalize3( n );
+				}
+				rtx_store_normal( normalRgb, *primCount, n );
+			}
 			baseI += 3u;
 			( *primCount )++;
 		}
@@ -371,7 +461,7 @@ static void rtx_emit_grid_tris( const srfGridMesh_t *grid, float *positions, uin
 }
 
 uint32_t vk_rtx_world_pack( const world_t *w, uint32_t maxPrimitives,
-	float *positions, uint32_t *indices, float *albedoRgb, uint32_t *outVertCount )
+	float *positions, uint32_t *indices, float *albedoRgb, float *normalRgb, uint32_t *outVertCount )
 {
 	uint32_t i, bi, primCount, vertPos, idxPos, gridPrims;
 	int bmCount;
@@ -408,13 +498,13 @@ uint32_t vk_rtx_world_pack( const world_t *w, uint32_t maxPrimitives,
 			}
 			st = sf->data;
 			if ( *st == SF_FACE ) {
-				rtx_emit_face_tris( (const srfSurfaceFace_t *)st, positions, indices, albedoRgb,
+				rtx_emit_face_tris( (const srfSurfaceFace_t *)st, positions, indices, albedoRgb, normalRgb,
 					&vertPos, &idxPos, maxPrimitives, &primCount );
 			} else if ( *st == SF_TRIANGLES ) {
-				rtx_emit_triangles_tris( (const srfTriangles_t *)st, positions, indices, albedoRgb,
+				rtx_emit_triangles_tris( (const srfTriangles_t *)st, positions, indices, albedoRgb, normalRgb,
 					&vertPos, &idxPos, maxPrimitives, &primCount );
 			} else if ( *st == SF_GRID ) {
-				rtx_emit_grid_tris( (const srfGridMesh_t *)st, positions, indices, albedoRgb,
+				rtx_emit_grid_tris( (const srfGridMesh_t *)st, positions, indices, albedoRgb, normalRgb,
 					&vertPos, &idxPos, maxPrimitives, &primCount );
 				gridPrims += ( primCount - before );
 			}
@@ -449,13 +539,14 @@ uint32_t vk_rtx_world_count_primitives( const world_t *w, uint32_t maxPrimitives
 }
 
 uint32_t vk_rtx_world_pack( const world_t *w, uint32_t maxPrimitives,
-	float *positions, uint32_t *indices, float *albedoRgb, uint32_t *outVertCount )
+	float *positions, uint32_t *indices, float *albedoRgb, float *normalRgb, uint32_t *outVertCount )
 {
 	(void)w;
 	(void)maxPrimitives;
 	(void)positions;
 	(void)indices;
 	(void)albedoRgb;
+	(void)normalRgb;
 	if ( outVertCount ) {
 		*outVertCount = 0u;
 	}

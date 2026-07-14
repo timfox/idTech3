@@ -484,6 +484,7 @@ compile_shader("comp", "raygun/raygun_fxaa.comp", "raygun_fxaa_cs", raygun_colle
 
 compile_shader("comp", "surfel_gi/surfel_spawn.comp", "surfel_spawn_cs", surfel_collect=True)
 compile_shader("comp", "surfel_gi/surfel_update.comp", "surfel_update_cs", surfel_collect=True)
+compile_shader("comp", "surfel_gi/surfel_hash.comp", "surfel_hash_cs", surfel_collect=True)
 compile_shader("comp", "surfel_gi/surfel_resolve.comp", "surfel_resolve_cs", surfel_collect=True)
 compile_shader("comp", "surfel_gi/surfel_composite.comp", "surfel_composite_cs", surfel_collect=True)
 
@@ -682,6 +683,7 @@ def write_vk_surfel_gi_spirv_inc():
     mapping = [
         ("surfel_spawn_cs", "vk_surfel_spawn_cs_spv", "VK_SURFEL_SPAWN_CS_SPV_SIZE"),
         ("surfel_update_cs", "vk_surfel_update_cs_spv", "VK_SURFEL_UPDATE_CS_SPV_SIZE"),
+        ("surfel_hash_cs", "vk_surfel_hash_cs_spv", "VK_SURFEL_HASH_CS_SPV_SIZE"),
         ("surfel_resolve_cs", "vk_surfel_resolve_cs_spv", "VK_SURFEL_RESOLVE_CS_SPV_SIZE"),
         ("surfel_composite_cs", "vk_surfel_composite_cs_spv", "VK_SURFEL_COMPOSITE_CS_SPV_SIZE"),
     ]

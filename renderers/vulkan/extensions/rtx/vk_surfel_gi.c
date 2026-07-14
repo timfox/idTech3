@@ -55,31 +55,39 @@ typedef struct {
 
 	sgi_buffer_t surfels;
 	sgi_buffer_t counters;
+	sgi_buffer_t hash_grid;
+	sgi_buffer_t dummy_albedo;
+	sgi_buffer_t dummy_normal;
 	sgi_image_t irradiance;
 
 	VkShaderModule spawn_cs;
 	VkShaderModule update_cs;
+	VkShaderModule hash_cs;
 	VkShaderModule resolve_cs;
 	VkShaderModule composite_cs;
 
 	VkDescriptorSetLayout spawn_layout;
 	VkDescriptorSetLayout update_layout;
+	VkDescriptorSetLayout hash_layout;
 	VkDescriptorSetLayout resolve_layout;
 	VkDescriptorSetLayout composite_layout;
 
 	VkPipelineLayout spawn_pl;
 	VkPipelineLayout update_pl;
+	VkPipelineLayout hash_pl;
 	VkPipelineLayout resolve_pl;
 	VkPipelineLayout composite_pl;
 
 	VkPipeline spawn_pipe;
 	VkPipeline update_pipe;
+	VkPipeline hash_pipe;
 	VkPipeline resolve_pipe;
 	VkPipeline composite_pipe;
 
 	VkDescriptorPool pool;
 	VkDescriptorSet spawn_set;
 	VkDescriptorSet update_set;
+	VkDescriptorSet hash_set;
 	VkDescriptorSet resolve_set;
 	VkDescriptorSet composite_set;
 } sgi_state_t;
@@ -98,6 +106,12 @@ static cvar_t *r_surfelGi_blend;
 static cvar_t *r_surfelGi_rayDist;
 static cvar_t *r_surfelGi_debug;
 static cvar_t *r_surfelGi_skipSky;
+static cvar_t *r_surfelGi_maxAge;
+static cvar_t *r_surfelGi_hash;
+static cvar_t *r_surfelGi_cellSize;
+
+#define SURFEL_HASH_CELLS  4096u
+#define SURFEL_HASH_BUCKET 8u
 
 static VkSampler SGI_Nearest( void )
 {
@@ -235,27 +249,31 @@ static void SGI_DestroyPipelines( void )
 {
 	if ( sgi.spawn_pipe ) { qvkDestroyPipeline( vk.device, sgi.spawn_pipe, NULL ); sgi.spawn_pipe = VK_NULL_HANDLE; }
 	if ( sgi.update_pipe ) { qvkDestroyPipeline( vk.device, sgi.update_pipe, NULL ); sgi.update_pipe = VK_NULL_HANDLE; }
+	if ( sgi.hash_pipe ) { qvkDestroyPipeline( vk.device, sgi.hash_pipe, NULL ); sgi.hash_pipe = VK_NULL_HANDLE; }
 	if ( sgi.resolve_pipe ) { qvkDestroyPipeline( vk.device, sgi.resolve_pipe, NULL ); sgi.resolve_pipe = VK_NULL_HANDLE; }
 	if ( sgi.composite_pipe ) { qvkDestroyPipeline( vk.device, sgi.composite_pipe, NULL ); sgi.composite_pipe = VK_NULL_HANDLE; }
 	if ( sgi.spawn_pl ) { qvkDestroyPipelineLayout( vk.device, sgi.spawn_pl, NULL ); sgi.spawn_pl = VK_NULL_HANDLE; }
 	if ( sgi.update_pl ) { qvkDestroyPipelineLayout( vk.device, sgi.update_pl, NULL ); sgi.update_pl = VK_NULL_HANDLE; }
+	if ( sgi.hash_pl ) { qvkDestroyPipelineLayout( vk.device, sgi.hash_pl, NULL ); sgi.hash_pl = VK_NULL_HANDLE; }
 	if ( sgi.resolve_pl ) { qvkDestroyPipelineLayout( vk.device, sgi.resolve_pl, NULL ); sgi.resolve_pl = VK_NULL_HANDLE; }
 	if ( sgi.composite_pl ) { qvkDestroyPipelineLayout( vk.device, sgi.composite_pl, NULL ); sgi.composite_pl = VK_NULL_HANDLE; }
 	if ( sgi.spawn_layout ) { qvkDestroyDescriptorSetLayout( vk.device, sgi.spawn_layout, NULL ); sgi.spawn_layout = VK_NULL_HANDLE; }
 	if ( sgi.update_layout ) { qvkDestroyDescriptorSetLayout( vk.device, sgi.update_layout, NULL ); sgi.update_layout = VK_NULL_HANDLE; }
+	if ( sgi.hash_layout ) { qvkDestroyDescriptorSetLayout( vk.device, sgi.hash_layout, NULL ); sgi.hash_layout = VK_NULL_HANDLE; }
 	if ( sgi.resolve_layout ) { qvkDestroyDescriptorSetLayout( vk.device, sgi.resolve_layout, NULL ); sgi.resolve_layout = VK_NULL_HANDLE; }
 	if ( sgi.composite_layout ) { qvkDestroyDescriptorSetLayout( vk.device, sgi.composite_layout, NULL ); sgi.composite_layout = VK_NULL_HANDLE; }
 	if ( sgi.pool ) { qvkDestroyDescriptorPool( vk.device, sgi.pool, NULL ); sgi.pool = VK_NULL_HANDLE; }
-	sgi.spawn_set = sgi.update_set = sgi.resolve_set = sgi.composite_set = VK_NULL_HANDLE;
+	sgi.spawn_set = sgi.update_set = sgi.hash_set = sgi.resolve_set = sgi.composite_set = VK_NULL_HANDLE;
 	if ( sgi.spawn_cs ) { qvkDestroyShaderModule( vk.device, sgi.spawn_cs, NULL ); sgi.spawn_cs = VK_NULL_HANDLE; }
 	if ( sgi.update_cs ) { qvkDestroyShaderModule( vk.device, sgi.update_cs, NULL ); sgi.update_cs = VK_NULL_HANDLE; }
+	if ( sgi.hash_cs ) { qvkDestroyShaderModule( vk.device, sgi.hash_cs, NULL ); sgi.hash_cs = VK_NULL_HANDLE; }
 	if ( sgi.resolve_cs ) { qvkDestroyShaderModule( vk.device, sgi.resolve_cs, NULL ); sgi.resolve_cs = VK_NULL_HANDLE; }
 	if ( sgi.composite_cs ) { qvkDestroyShaderModule( vk.device, sgi.composite_cs, NULL ); sgi.composite_cs = VK_NULL_HANDLE; }
 }
 
 static qboolean SGI_CreatePipelines( void )
 {
-	VkDescriptorSetLayoutBinding binds[5];
+	VkDescriptorSetLayoutBinding binds[6];
 	VkDescriptorSetLayoutCreateInfo lci;
 	VkPushConstantRange pcr;
 	VkPipelineLayoutCreateInfo plci;
@@ -264,18 +282,17 @@ static qboolean SGI_CreatePipelines( void )
 	VkDescriptorPoolSize sizes[4];
 	VkDescriptorPoolCreateInfo poolCi;
 	VkDescriptorSetAllocateInfo alloc;
-	VkDescriptorSetLayout layouts[4];
-	uint32_t i;
+	VkDescriptorSetLayout layouts[5];
 
 	sgi.spawn_cs = SGI_Module( vk_surfel_spawn_cs_spv, VK_SURFEL_SPAWN_CS_SPV_SIZE, "surfel_spawn" );
 	sgi.update_cs = SGI_Module( vk_surfel_update_cs_spv, VK_SURFEL_UPDATE_CS_SPV_SIZE, "surfel_update" );
+	sgi.hash_cs = SGI_Module( vk_surfel_hash_cs_spv, VK_SURFEL_HASH_CS_SPV_SIZE, "surfel_hash" );
 	sgi.resolve_cs = SGI_Module( vk_surfel_resolve_cs_spv, VK_SURFEL_RESOLVE_CS_SPV_SIZE, "surfel_resolve" );
 	sgi.composite_cs = SGI_Module( vk_surfel_composite_cs_spv, VK_SURFEL_COMPOSITE_CS_SPV_SIZE, "surfel_composite" );
-	if ( !sgi.spawn_cs || !sgi.update_cs || !sgi.resolve_cs || !sgi.composite_cs ) {
+	if ( !sgi.spawn_cs || !sgi.update_cs || !sgi.hash_cs || !sgi.resolve_cs || !sgi.composite_cs ) {
 		return qfalse;
 	}
 
-	/* spawn: SSBO surfel, SSBO counter, depth, normal */
 	Com_Memset( binds, 0, sizeof( binds ) );
 	binds[0].binding = 0; binds[0].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER; binds[0].descriptorCount = 1; binds[0].stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
 	binds[1].binding = 1; binds[1].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER; binds[1].descriptorCount = 1; binds[1].stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
@@ -287,26 +304,32 @@ static qboolean SGI_CreatePipelines( void )
 	lci.pBindings = binds;
 	VK_CHECK( qvkCreateDescriptorSetLayout( vk.device, &lci, NULL, &sgi.spawn_layout ) );
 
-	/* update: AS @0, SSBO surfel @1, SSBO counter @2 */
-	binds[0].binding = 0; binds[0].descriptorType = VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR; binds[0].descriptorCount = 1; binds[0].stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
-	binds[1].binding = 1; binds[1].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER; binds[1].descriptorCount = 1; binds[1].stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
-	binds[2].binding = 2; binds[2].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER; binds[2].descriptorCount = 1; binds[2].stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
-	lci.bindingCount = 3;
-	lci.pBindings = binds;
+	/* update: AS @0, surfel @1, counter @2, world albedo @3, world normal @4 */
+	binds[0].binding = 0; binds[0].descriptorType = VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR;
+	binds[1].binding = 1; binds[1].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+	binds[2].binding = 2; binds[2].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+	binds[3].binding = 3; binds[3].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+	binds[4].binding = 4; binds[4].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER; binds[4].descriptorCount = 1; binds[4].stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+	lci.bindingCount = 5;
 	VK_CHECK( qvkCreateDescriptorSetLayout( vk.device, &lci, NULL, &sgi.update_layout ) );
 
-	/* resolve: SSBO RO, SSBO RO, depth, normal, storage image */
-	binds[0].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-	binds[1].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-	binds[2].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-	binds[3].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-	binds[3].binding = 3;
+	/* hash: surfel @0, counter @1, hash @2 */
+	binds[0].binding = 0; binds[0].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+	binds[1].binding = 1; binds[1].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+	binds[2].binding = 2; binds[2].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+	lci.bindingCount = 3;
+	VK_CHECK( qvkCreateDescriptorSetLayout( vk.device, &lci, NULL, &sgi.hash_layout ) );
+
+	/* resolve: surfel, counter, depth, normal, irradiance image, hash */
+	binds[0].binding = 0; binds[0].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+	binds[1].binding = 1; binds[1].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+	binds[2].binding = 2; binds[2].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+	binds[3].binding = 3; binds[3].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
 	binds[4].binding = 4; binds[4].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE; binds[4].descriptorCount = 1; binds[4].stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
-	lci.bindingCount = 5;
-	lci.pBindings = binds;
+	binds[5].binding = 5; binds[5].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER; binds[5].descriptorCount = 1; binds[5].stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+	lci.bindingCount = 6;
 	VK_CHECK( qvkCreateDescriptorSetLayout( vk.device, &lci, NULL, &sgi.resolve_layout ) );
 
-	/* composite: depth, albedo, irradiance, color storage */
 	binds[0].binding = 0; binds[0].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
 	binds[1].binding = 1; binds[1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
 	binds[2].binding = 2; binds[2].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
@@ -316,14 +339,13 @@ static qboolean SGI_CreatePipelines( void )
 
 	Com_Memset( &pcr, 0, sizeof( pcr ) );
 	pcr.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
-	pcr.offset = 0;
 	Com_Memset( &plci, 0, sizeof( plci ) );
 	plci.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
 	plci.setLayoutCount = 1;
 	plci.pushConstantRangeCount = 1;
 	plci.pPushConstantRanges = &pcr;
 
-	pcr.size = sizeof( float ) * 16 + sizeof( float ) * 4 + sizeof( uint32_t ) * 4; /* mat4+vec4+uvec4 */
+	pcr.size = sizeof( float ) * 16 + sizeof( float ) * 4 + sizeof( uint32_t ) * 4;
 	plci.pSetLayouts = &sgi.spawn_layout;
 	VK_CHECK( qvkCreatePipelineLayout( vk.device, &plci, NULL, &sgi.spawn_pl ) );
 
@@ -331,11 +353,15 @@ static qboolean SGI_CreatePipelines( void )
 	plci.pSetLayouts = &sgi.update_layout;
 	VK_CHECK( qvkCreatePipelineLayout( vk.device, &plci, NULL, &sgi.update_pl ) );
 
+	pcr.size = sizeof( uint32_t ) * 4 + sizeof( float ) * 4;
+	plci.pSetLayouts = &sgi.hash_layout;
+	VK_CHECK( qvkCreatePipelineLayout( vk.device, &plci, NULL, &sgi.hash_pl ) );
+
 	pcr.size = sizeof( float ) * 16 + sizeof( float ) * 4 + sizeof( uint32_t ) * 4;
 	plci.pSetLayouts = &sgi.resolve_layout;
 	VK_CHECK( qvkCreatePipelineLayout( vk.device, &plci, NULL, &sgi.resolve_pl ) );
 
-	pcr.size = sizeof( uint32_t ) * 8; /* uvec2 + float + uints padded */
+	pcr.size = sizeof( uint32_t ) * 8;
 	plci.pSetLayouts = &sgi.composite_layout;
 	VK_CHECK( qvkCreatePipelineLayout( vk.device, &plci, NULL, &sgi.composite_pl ) );
 
@@ -351,41 +377,44 @@ static qboolean SGI_CreatePipelines( void )
 	VK_CHECK( qvkCreateComputePipelines( vk.device, vk.pipelineCache, 1, &pci, NULL, &sgi.spawn_pipe ) );
 	pci.layout = sgi.update_pl; pci.stage.module = sgi.update_cs;
 	VK_CHECK( qvkCreateComputePipelines( vk.device, vk.pipelineCache, 1, &pci, NULL, &sgi.update_pipe ) );
+	pci.layout = sgi.hash_pl; pci.stage.module = sgi.hash_cs;
+	VK_CHECK( qvkCreateComputePipelines( vk.device, vk.pipelineCache, 1, &pci, NULL, &sgi.hash_pipe ) );
 	pci.layout = sgi.resolve_pl; pci.stage.module = sgi.resolve_cs;
 	VK_CHECK( qvkCreateComputePipelines( vk.device, vk.pipelineCache, 1, &pci, NULL, &sgi.resolve_pipe ) );
 	pci.layout = sgi.composite_pl; pci.stage.module = sgi.composite_cs;
 	VK_CHECK( qvkCreateComputePipelines( vk.device, vk.pipelineCache, 1, &pci, NULL, &sgi.composite_pipe ) );
 
 	Com_Memset( sizes, 0, sizeof( sizes ) );
-	sizes[0].type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER; sizes[0].descriptorCount = 8;
-	sizes[1].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER; sizes[1].descriptorCount = 12;
+	sizes[0].type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER; sizes[0].descriptorCount = 20;
+	sizes[1].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER; sizes[1].descriptorCount = 16;
 	sizes[2].type = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE; sizes[2].descriptorCount = 4;
 	sizes[3].type = VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR; sizes[3].descriptorCount = 2;
 	Com_Memset( &poolCi, 0, sizeof( poolCi ) );
 	poolCi.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
-	poolCi.maxSets = 4;
+	poolCi.maxSets = 5;
 	poolCi.poolSizeCount = 4;
 	poolCi.pPoolSizes = sizes;
 	VK_CHECK( qvkCreateDescriptorPool( vk.device, &poolCi, NULL, &sgi.pool ) );
 
 	layouts[0] = sgi.spawn_layout;
 	layouts[1] = sgi.update_layout;
-	layouts[2] = sgi.resolve_layout;
-	layouts[3] = sgi.composite_layout;
+	layouts[2] = sgi.hash_layout;
+	layouts[3] = sgi.resolve_layout;
+	layouts[4] = sgi.composite_layout;
 	Com_Memset( &alloc, 0, sizeof( alloc ) );
 	alloc.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
 	alloc.descriptorPool = sgi.pool;
-	alloc.descriptorSetCount = 4;
+	alloc.descriptorSetCount = 5;
 	alloc.pSetLayouts = layouts;
 	{
-		VkDescriptorSet sets[4];
+		VkDescriptorSet sets[5];
 		VK_CHECK( qvkAllocateDescriptorSets( vk.device, &alloc, sets ) );
 		sgi.spawn_set = sets[0];
 		sgi.update_set = sets[1];
-		sgi.resolve_set = sets[2];
-		sgi.composite_set = sets[3];
+		sgi.hash_set = sets[2];
+		sgi.resolve_set = sets[3];
+		sgi.composite_set = sets[4];
 	}
-	(void)i;
 	return qtrue;
 }
 
@@ -407,6 +436,17 @@ static void SGI_FillInvViewProj( float out[16] )
 
 static void SGI_Status_f( void )
 {
+	uint32_t counters[4] = { 0, 0, 0, 0 };
+	uint32_t albedoPrims = vk_rtx_world_albedo_count();
+	uint32_t normalPrims = vk_rtx_world_normal_count();
+
+	if ( sgi.counters.memory != VK_NULL_HANDLE ) {
+		void *mapped = NULL;
+		if ( qvkMapMemory( vk.device, sgi.counters.memory, 0, 16, 0, &mapped ) == VK_SUCCESS && mapped ) {
+			Com_Memcpy( counters, mapped, 16 );
+			qvkUnmapMemory( vk.device, sgi.counters.memory );
+		}
+	}
 	ri.Printf( PRINT_ALL, "[SurfelGI] ready=%d active=%d capacity=%u frame=%u ext=%ux%u rayQuery=%d rtx=%d\n",
 		sgi.ready ? 1 : 0,
 		vk_surfel_gi_active() ? 1 : 0,
@@ -415,21 +455,21 @@ static void SGI_Status_f( void )
 		sgi.width, sgi.height,
 		( vk.rayQueryAvailable ? 1 : 0 ),
 		( vk.rtxAvailable ? 1 : 0 ) );
+	ri.Printf( PRINT_ALL, "[SurfelGI] scan=%u recycled=%u liveSpawn=%u albedoPrims=%u normalPrims=%u hash=%d cell=%.2f\n",
+		counters[0], counters[2], counters[3], albedoPrims, normalPrims,
+		( r_surfelGi_hash && r_surfelGi_hash->integer ) ? 1 : 0,
+		r_surfelGi_cellSize ? r_surfelGi_cellSize->value : 1.0f );
 }
 
 void vk_surfel_gi_shutdown( void )
 {
-	if ( !sgi.ready && sgi.surfels.buffer == VK_NULL_HANDLE ) {
-		SGI_DestroyPipelines();
-		SGI_DestroyImage( &sgi.irradiance );
-		SGI_DestroyBuffer( &sgi.surfels );
-		SGI_DestroyBuffer( &sgi.counters );
-		return;
-	}
 	SGI_DestroyPipelines();
 	SGI_DestroyImage( &sgi.irradiance );
 	SGI_DestroyBuffer( &sgi.surfels );
 	SGI_DestroyBuffer( &sgi.counters );
+	SGI_DestroyBuffer( &sgi.hash_grid );
+	SGI_DestroyBuffer( &sgi.dummy_albedo );
+	SGI_DestroyBuffer( &sgi.dummy_normal );
 	Com_Memset( &sgi, 0, sizeof( sgi ) );
 }
 
@@ -455,12 +495,18 @@ void vk_surfel_gi_init( void )
 		r_surfelGi_rayDist = ri.Cvar_Get( "r_surfelGi_rayDist", "512", CVAR_ARCHIVE_ND );
 		r_surfelGi_debug = ri.Cvar_Get( "r_surfelGi_debug", "0", CVAR_ARCHIVE_ND );
 		r_surfelGi_skipSky = ri.Cvar_Get( "r_surfelGi_skipSky", "1", CVAR_ARCHIVE_ND );
+		r_surfelGi_maxAge = ri.Cvar_Get( "r_surfelGi_maxAge", "240", CVAR_ARCHIVE_ND );
+		r_surfelGi_hash = ri.Cvar_Get( "r_surfelGi_hash", "1", CVAR_ARCHIVE_ND );
+		r_surfelGi_cellSize = ri.Cvar_Get( "r_surfelGi_cellSize", "64", CVAR_ARCHIVE_ND );
 		ri.Cvar_CheckRange( r_surfelGi, "0", "1", CV_INTEGER );
 		ri.Cvar_CheckRange( r_surfelGi_max, "256", "262144", CV_INTEGER );
 		ri.Cvar_CheckRange( r_surfelGi_samples, "1", "16", CV_INTEGER );
 		ri.Cvar_CheckRange( r_surfelGi_debug, "0", "2", CV_INTEGER );
+		ri.Cvar_CheckRange( r_surfelGi_hash, "0", "1", CV_INTEGER );
 		ri.Cvar_SetDescription( r_surfelGi,
 			"Surfel GI (GIBS): cache indirect lighting in surfels (needs USE_VULKAN_RTX + ray query + vid_restart)." );
+		ri.Cvar_SetDescription( r_surfelGi_hash,
+			"Surfel GI: 1=fixed-bucket spatial hash for resolve gather; 0=strided scan fallback." );
 		ri.Cmd_AddCommand( "surfel_gi_status", SGI_Status_f );
 	}
 
@@ -497,13 +543,44 @@ void vk_surfel_gi_init( void )
 	Com_Memcpy( mapped, zeros, 16 );
 	qvkUnmapMemory( vk.device, sgi.counters.memory );
 
+	if ( !SGI_CreateBuffer( (VkDeviceSize)SURFEL_HASH_CELLS * SURFEL_HASH_BUCKET * sizeof( uint32_t ),
+			VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+			VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, &sgi.hash_grid ) ) {
+		vk_surfel_gi_shutdown();
+		return;
+	}
+	{
+		float gray[3] = { 0.72f, 0.70f, 0.66f };
+		float up[3] = { 0.0f, 0.0f, 1.0f };
+		void *amap = NULL;
+		if ( !SGI_CreateBuffer( sizeof( gray ),
+				VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+				VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &sgi.dummy_albedo ) ) {
+			vk_surfel_gi_shutdown();
+			return;
+		}
+		VK_CHECK( qvkMapMemory( vk.device, sgi.dummy_albedo.memory, 0, sizeof( gray ), 0, &amap ) );
+		Com_Memcpy( amap, gray, sizeof( gray ) );
+		qvkUnmapMemory( vk.device, sgi.dummy_albedo.memory );
+		if ( !SGI_CreateBuffer( sizeof( up ),
+				VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+				VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &sgi.dummy_normal ) ) {
+			vk_surfel_gi_shutdown();
+			return;
+		}
+		VK_CHECK( qvkMapMemory( vk.device, sgi.dummy_normal.memory, 0, sizeof( up ), 0, &amap ) );
+		Com_Memcpy( amap, up, sizeof( up ) );
+		qvkUnmapMemory( vk.device, sgi.dummy_normal.memory );
+	}
+
 	if ( !SGI_CreatePipelines() ) {
 		vk_surfel_gi_shutdown();
 		return;
 	}
 
 	sgi.ready = qtrue;
-	ri.Printf( PRINT_ALL, "[SurfelGI] Global Illumination Based on Surfels initialized (r_surfelGi=1, cap=%u)\n", cap );
+	ri.Printf( PRINT_ALL, "[SurfelGI] Global Illumination Based on Surfels initialized (r_surfelGi=1, cap=%u, hash=%u)\n",
+		cap, SURFEL_HASH_CELLS );
 }
 
 qboolean vk_surfel_gi_active( void )
@@ -620,24 +697,64 @@ void vk_surfel_gi_apply_after_geometry( void )
 	writes[3] = writes[2]; writes[3].dstBinding = 3; writes[3].pImageInfo = &img[1];
 	qvkUpdateDescriptorSets( vk.device, 4, writes, 0, NULL );
 
-	/* update descriptors + TLAS (binding 0) */
-	writes[0].dstSet = sgi.update_set; writes[0].dstBinding = 1; writes[0].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER; writes[0].pBufferInfo = &bSurfel;
-	writes[1].dstSet = sgi.update_set; writes[1].dstBinding = 2; writes[1].pBufferInfo = &bCounter;
-	qvkUpdateDescriptorSets( vk.device, 2, writes, 0, NULL );
-	vk_rtx_bind_tlas_descriptor( sgi.update_set );
+	/* update descriptors + TLAS (binding 0) + world albedo (3) + world normal (4) */
+	{
+		VkDescriptorBufferInfo bAlbedo;
+		VkDescriptorBufferInfo bNormal;
+		Com_Memset( &bAlbedo, 0, sizeof( bAlbedo ) );
+		bAlbedo.buffer = sgi.dummy_albedo.buffer;
+		bAlbedo.range = VK_WHOLE_SIZE;
+		Com_Memset( &bNormal, 0, sizeof( bNormal ) );
+		bNormal.buffer = sgi.dummy_normal.buffer;
+		bNormal.range = VK_WHOLE_SIZE;
+		writes[0].dstSet = sgi.update_set; writes[0].dstBinding = 1; writes[0].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER; writes[0].pBufferInfo = &bSurfel;
+		writes[1].dstSet = sgi.update_set; writes[1].dstBinding = 2; writes[1].pBufferInfo = &bCounter;
+		writes[2].dstSet = sgi.update_set; writes[2].dstBinding = 3; writes[2].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER; writes[2].pBufferInfo = &bAlbedo;
+		writes[3].dstSet = sgi.update_set; writes[3].dstBinding = 4; writes[3].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER; writes[3].pBufferInfo = &bNormal;
+		qvkUpdateDescriptorSets( vk.device, 4, writes, 0, NULL );
+		vk_rtx_bind_tlas_descriptor( sgi.update_set );
+		if ( vk_rtx_world_albedo_count() > 0u ) {
+			vk_rtx_bind_world_albedo_ssbo( sgi.update_set, 3 );
+		}
+		if ( vk_rtx_world_normal_count() > 0u ) {
+			vk_rtx_bind_world_normal_ssbo( sgi.update_set, 4 );
+		}
+	}
+
+	/* hash descriptors */
+	{
+		VkDescriptorBufferInfo bHash;
+		Com_Memset( &bHash, 0, sizeof( bHash ) );
+		bHash.buffer = sgi.hash_grid.buffer;
+		bHash.range = VK_WHOLE_SIZE;
+		writes[0].dstSet = sgi.hash_set; writes[0].dstBinding = 0; writes[0].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER; writes[0].pBufferInfo = &bSurfel;
+		writes[1].dstSet = sgi.hash_set; writes[1].dstBinding = 1; writes[1].pBufferInfo = &bCounter;
+		writes[2].dstSet = sgi.hash_set; writes[2].dstBinding = 2; writes[2].pBufferInfo = &bHash;
+		qvkUpdateDescriptorSets( vk.device, 3, writes, 0, NULL );
+	}
 
 	/* resolve */
 	img[2].imageView = sgi.irradiance.view;
 	img[2].imageLayout = VK_IMAGE_LAYOUT_GENERAL;
-	writes[0].dstSet = sgi.resolve_set; writes[0].dstBinding = 0; writes[0].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER; writes[0].pBufferInfo = &bSurfel;
-	writes[1].dstSet = sgi.resolve_set; writes[1].dstBinding = 1; writes[1].pBufferInfo = &bCounter;
-	writes[2].dstSet = sgi.resolve_set; writes[2].dstBinding = 2; writes[2].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER; writes[2].pImageInfo = &img[0];
-	writes[3].dstSet = sgi.resolve_set; writes[3].dstBinding = 3; writes[3].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER; writes[3].pImageInfo = &img[1];
-	writes[4].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-	writes[4].dstSet = sgi.resolve_set; writes[4].dstBinding = 4;
-	writes[4].descriptorCount = 1; writes[4].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
-	writes[4].pImageInfo = &img[2];
-	qvkUpdateDescriptorSets( vk.device, 5, writes, 0, NULL );
+	{
+		VkDescriptorBufferInfo bHash;
+		Com_Memset( &bHash, 0, sizeof( bHash ) );
+		bHash.buffer = sgi.hash_grid.buffer;
+		bHash.range = VK_WHOLE_SIZE;
+		writes[0].dstSet = sgi.resolve_set; writes[0].dstBinding = 0; writes[0].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER; writes[0].pBufferInfo = &bSurfel;
+		writes[1].dstSet = sgi.resolve_set; writes[1].dstBinding = 1; writes[1].pBufferInfo = &bCounter;
+		writes[2].dstSet = sgi.resolve_set; writes[2].dstBinding = 2; writes[2].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER; writes[2].pImageInfo = &img[0];
+		writes[3].dstSet = sgi.resolve_set; writes[3].dstBinding = 3; writes[3].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER; writes[3].pImageInfo = &img[1];
+		writes[4].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+		writes[4].dstSet = sgi.resolve_set; writes[4].dstBinding = 4;
+		writes[4].descriptorCount = 1; writes[4].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+		writes[4].pImageInfo = &img[2];
+		writes[5].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+		writes[5].dstSet = sgi.resolve_set; writes[5].dstBinding = 5;
+		writes[5].descriptorCount = 1; writes[5].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+		writes[5].pBufferInfo = &bHash;
+		qvkUpdateDescriptorSets( vk.device, 6, writes, 0, NULL );
+	}
 
 	/* composite */
 	img[3].sampler = nearest; img[3].imageView = albedoView;
@@ -688,7 +805,7 @@ void vk_surfel_gi_apply_after_geometry( void )
 	updatePush.ray[0] = r_surfelGi_rayDist ? r_surfelGi_rayDist->value : 512.0f;
 	updatePush.ray[1] = r_surfelGi_intensity ? r_surfelGi_intensity->value : 1.0f;
 	updatePush.ray[2] = r_surfelGi_blend ? r_surfelGi_blend->value : 0.15f;
-	updatePush.ray[3] = 0.0f;
+	updatePush.ray[3] = r_surfelGi_maxAge ? r_surfelGi_maxAge->value : 240.0f;
 
 	qvkCmdBindPipeline( cmd, VK_PIPELINE_BIND_POINT_COMPUTE, sgi.update_pipe );
 	qvkCmdBindDescriptorSets( cmd, VK_PIPELINE_BIND_POINT_COMPUTE, sgi.update_pl, 0, 1, &sgi.update_set, 0, NULL );
@@ -698,6 +815,34 @@ void vk_surfel_gi_apply_after_geometry( void )
 	qvkCmdPipelineBarrier( cmd, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
 		0, 1, &memBarrier, 0, NULL, 0, NULL );
 
+	if ( r_surfelGi_hash && r_surfelGi_hash->integer && sgi.hash_pipe != VK_NULL_HANDLE ) {
+		struct {
+			uint32_t params[4];
+			float grid[4];
+		} hashPush;
+		uint32_t hashEntries = SURFEL_HASH_CELLS * SURFEL_HASH_BUCKET;
+
+		hashPush.params[0] = sgi.capacity;
+		hashPush.params[1] = 1u; /* clear */
+		hashPush.params[2] = hashPush.params[3] = 0;
+		hashPush.grid[0] = r_surfelGi_cellSize ? r_surfelGi_cellSize->value : 64.0f;
+		hashPush.grid[1] = hashPush.grid[2] = hashPush.grid[3] = 0.0f;
+		qvkCmdBindPipeline( cmd, VK_PIPELINE_BIND_POINT_COMPUTE, sgi.hash_pipe );
+		qvkCmdBindDescriptorSets( cmd, VK_PIPELINE_BIND_POINT_COMPUTE, sgi.hash_pl, 0, 1, &sgi.hash_set, 0, NULL );
+		qvkCmdPushConstants( cmd, sgi.hash_pl, VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof( hashPush ), &hashPush );
+		qvkCmdDispatch( cmd, ( hashEntries + 63u ) / 64u, 1, 1 );
+
+		qvkCmdPipelineBarrier( cmd, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+			0, 1, &memBarrier, 0, NULL, 0, NULL );
+
+		hashPush.params[1] = 0u; /* scatter */
+		qvkCmdPushConstants( cmd, sgi.hash_pl, VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof( hashPush ), &hashPush );
+		qvkCmdDispatch( cmd, ( sgi.capacity + 63u ) / 64u, 1, 1 );
+
+		qvkCmdPipelineBarrier( cmd, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+			0, 1, &memBarrier, 0, NULL, 0, NULL );
+	}
+
 	record_image_layout_transition( cmd, sgi.irradiance.image, VK_IMAGE_ASPECT_COLOR_BIT,
 		VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL,
 		VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT );
@@ -705,10 +850,10 @@ void vk_surfel_gi_apply_after_geometry( void )
 	Com_Memcpy( resolvePush.invViewProj, invViewProj, sizeof( invViewProj ) );
 	resolvePush.extent[0] = (float)sgi.width;
 	resolvePush.extent[1] = (float)sgi.height;
-	resolvePush.extent[2] = 1.0f;
+	resolvePush.extent[2] = r_surfelGi_cellSize ? r_surfelGi_cellSize->value : 64.0f;
 	resolvePush.extent[3] = r_surfelGi_intensity ? r_surfelGi_intensity->value : 1.0f;
 	resolvePush.params[0] = sgi.capacity;
-	resolvePush.params[1] = 48u;
+	resolvePush.params[1] = ( r_surfelGi_hash && r_surfelGi_hash->integer ) ? 1u : 0u;
 	resolvePush.params[2] = ( r_surfelGi_skipSky && r_surfelGi_skipSky->integer ) ? 1u : 0u;
 	resolvePush.params[3] = 0;
 

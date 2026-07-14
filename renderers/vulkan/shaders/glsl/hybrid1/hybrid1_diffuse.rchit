@@ -13,18 +13,16 @@ layout( set = 0, binding = 8 ) uniform sampler2D albedoTex;
 void main()
 {
 	vec3 base = hybrid1_sampleHitAlbedo( albedoTex );
+	vec3 N = hybrid1_sampleHitNormal();
 	vec3 hit = base * 0.15;
 
 	if ( h1.params3.z > 0.5 ) {
-		vec3 N = normalize( gl_WorldRayDirectionEXT ); /* approximate; prefer geometric normal if available */
-		/* Use -ray direction as view from hit toward camera is wrong; use hit normal from geometry:
-		   for triangle meshes gl_ObjectToWorldEXT — keep irradiance * albedo as GI. */
 		vec3 L = normalize( h1.sunDirection.xyz );
 		float sunScale = max( h1.outputSize.z, 0.0 );
-		float ndl = max( dot( normalize( -gl_WorldRayDirectionEXT ), L ), 0.0 );
+		float ndl = max( dot( N, L ), 0.0 );
 		hit += base * sunScale * ndl * 0.35;
 		if ( h1.params1.w > 0.5 ) {
-			hit += base * hybrid1_sampleIrradiance( irradianceTex, -gl_WorldRayDirectionEXT );
+			hit += base * hybrid1_sampleIrradiance( irradianceTex, N );
 		}
 	} else {
 		hit += vec3( 0.02 );

@@ -9,17 +9,50 @@ layout(set = 0, binding = 0) uniform accelerationStructureEXT topLevelAS;
 layout(std430, set = 0, binding = 1) buffer SurfelBuf {
 	Surfel surfels[];
 };
-layout(std430, set = 0, binding = 2) readonly buffer CounterBuf {
+layout(std430, set = 0, binding = 2) buffer CounterBuf {
 	uint activeCount;
 	uint spawnSeed;
-	uint pad0;
-	uint pad1;
+	uint recycled;
+	uint liveCount;
+};
+layout(std430, set = 0, binding = 3) readonly buffer WorldAlbedoSSBO {
+	float rgb[];
+};
+layout(std430, set = 0, binding = 4) readonly buffer WorldNormalSSBO {
+	float nxyz[];
 };
 
 layout(push_constant) uniform UpdatePush {
 	uvec4 params; /* x=maxSurfels y=frame z=samplesPerSurfel w=updateStride */
-	vec4  ray;    /* x=maxRayDistance y=intensity z=blendAlpha w unused */
+	vec4  ray;    /* x=maxRayDistance y=intensity z=blendAlpha w=maxAge */
 } pc;
+
+vec3 sampleWorldAlbedo(uint instanceCustom, int primId) {
+	uint n = uint(rgb.length()) / 3u;
+	if (instanceCustom != 0u || n == 0u || primId < 0 || uint(primId) >= n) {
+		return surfel_default_albedo();
+	}
+	uint i = uint(primId) * 3u;
+	return vec3(rgb[i], rgb[i + 1u], rgb[i + 2u]);
+}
+
+vec3 sampleWorldNormal(uint instanceCustom, int primId, vec3 towardRay) {
+	uint n = uint(nxyz.length()) / 3u;
+	if (instanceCustom != 0u || n == 0u || primId < 0 || uint(primId) >= n) {
+		return towardRay;
+	}
+	uint i = uint(primId) * 3u;
+	vec3 N = vec3(nxyz[i], nxyz[i + 1u], nxyz[i + 2u]);
+	float len2 = dot(N, N);
+	if (len2 < 1e-8) {
+		return towardRay;
+	}
+	N *= inversesqrt(len2);
+	if (dot(N, towardRay) < 0.0) {
+		N = -N;
+	}
+	return N;
+}
 
 void main() {
 	uint index = gl_GlobalInvocationID.x;
@@ -52,19 +85,20 @@ void main() {
 		rayQueryInitializeEXT(rq, topLevelAS, gl_RayFlagsOpaqueEXT, 0xFFu,
 			origin, 0.01, dir, pc.ray.x);
 		while (rayQueryProceedEXT(rq)) {
-			/* commit first triangle hit */
 		}
 
 		if (rayQueryGetIntersectionTypeEXT(rq, true) == gl_RayQueryCommittedIntersectionTriangleEXT) {
 			float t = rayQueryGetIntersectionTEXT(rq, true);
-			/* Approximate shade: Lambert bounce with mid-gray albedo. */
-			vec3 hitN = -dir;
-			float ndl = max(0.0, dot(-dir, hitN));
-			vec3 bounce = vec3(0.45) * ndl * (1.0 / (1.0 + t * 0.15));
-			accum += bounce;
+			uint inst = rayQueryGetIntersectionInstanceCustomIndexEXT(rq, true);
+			int prim = rayQueryGetIntersectionPrimitiveIndexEXT(rq, true);
+			vec3 albedo = sampleWorldAlbedo(inst, prim);
+			vec3 towardRay = normalize(-dir);
+			vec3 Nhit = sampleWorldNormal(inst, prim, towardRay);
+			float cosTerm = max(dot(Nhit, towardRay), 0.0);
+			float atten = 1.0 / (1.0 + t * 0.15);
+			accum += albedo * cosTerm * 0.318309886 * atten; /* Lambert / pi */
 			weight += 1.0;
 		} else {
-			/* Miss → sky / ambient. */
 			float sky = max(0.0, dir.z) * 0.35 + 0.08;
 			accum += vec3(sky * 0.55, sky * 0.65, sky * 0.85);
 			weight += 1.0;
@@ -80,5 +114,15 @@ void main() {
 		s.normalConf.w *= 0.97;
 	}
 	s.irradianceAge.w += 1.0;
+
+	/* Recycle stale / low-confidence slots so spawn can reuse them. */
+	float maxAge = max(pc.ray.w, 32.0);
+	if (s.normalConf.w < 0.02 || s.irradianceAge.w > maxAge) {
+		s.meta.x = SURFEL_FLAG_STALE;
+		s.normalConf.w = 0.0;
+		s.irradianceAge = vec4(0.0);
+		atomicAdd(recycled, 1u);
+	}
+
 	surfels[index] = s;
 }

@@ -46,13 +46,17 @@ Console: **`surfel_gi_status`**.
 | `r_surfelGi_rayDist` | 512 | Max GI ray distance |
 | `r_surfelGi_debug` | 0 | 0=blend, 1=show irradiance, 2=confidence mask |
 | `r_surfelGi_skipSky` | 1 | Skip sky pixels in resolve/composite |
+| `r_surfelGi_maxAge` | 240 | Mark surfel stale after this many updates |
+| `r_surfelGi_hash` | 1 | Fixed-bucket spatial hash for resolve (0=strided fallback) |
+| `r_surfelGi_cellSize` | 64 | World units per hash cell |
 
 ## Pipeline
 
-1. **Spawn** — stratify screen UVs from depth + G-buffer normals → new surfels
-2. **Update** — ray-query hemisphere samples into TLAS; miss ≈ sky ambient
-3. **Resolve** — weighted gather of nearby surfels → RGBA16F irradiance
-4. **Composite** — `albedo * irradiance * strength` added to `vk.color_image`
+1. **Spawn** — stratify screen UVs from depth + G-buffer normals → new or recycled surfels
+2. **Update** — ray-query hemisphere samples into TLAS; world albedo + geometric normal SSBOs on instance 0 hits; miss ≈ sky; stale recycle
+3. **Hash** — clear + scatter active surfels into 4096×8 bucket grid
+4. **Resolve** — 3×3×3 neighboring cells → RGBA16F irradiance
+5. **Composite** — `albedo * irradiance * strength` added to `vk.color_image`
 
 Runs after geometry (with NIV-class overlays) via `vk_surfel_gi_apply_after_geometry`.
 
@@ -64,4 +68,4 @@ Runs after geometry (with NIV-class overlays) via `vk_surfel_gi_apply_after_geom
 
 ## Status
 
-v1: working spawn/update/resolve/composite scaffold. Still open: spatial hash for resolve, material/albedo hit shading, surfel recycling/culling, Hybrid1 channel fusion.
+v1: spawn/update/resolve/composite + world albedo/normal hits + stale recycle + spatial hash resolve. Still open: Hybrid1 channel fusion, denser surfel budgeting, entity (customIndex≠0) attribute SSBOs.

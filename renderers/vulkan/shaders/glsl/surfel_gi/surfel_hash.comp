@@ -1,0 +1,54 @@
+#version 460
+#extension GL_GOOGLE_include_directive : require
+layout(local_size_x = 64) in;
+
+#include "surfel.glsl"
+
+layout(std430, set = 0, binding = 0) readonly buffer SurfelBuf {
+	Surfel surfels[];
+};
+layout(std430, set = 0, binding = 1) readonly buffer CounterBuf {
+	uint activeCount;
+	uint spawnSeed;
+	uint recycled;
+	uint liveCount;
+};
+/* Packed as (index+1); 0 means empty. Size = SURFEL_HASH_CELLS * SURFEL_HASH_BUCKET */
+layout(std430, set = 0, binding = 2) buffer HashBuf {
+	uint buckets[];
+};
+
+layout(push_constant) uniform HashPush {
+	uvec4 params; /* x=maxSurfels y=clearPass(1)|scatter(0) z=unused w=unused */
+	vec4  grid;   /* x=cellSize */
+} pc;
+
+void main() {
+	uint id = gl_GlobalInvocationID.x;
+
+	if (pc.params.y != 0u) {
+		/* Clear pass: id indexes bucket entries. */
+		uint total = SURFEL_HASH_CELLS * SURFEL_HASH_BUCKET;
+		if (id < total) {
+			buckets[id] = 0u;
+		}
+		return;
+	}
+
+	if (id >= activeCount || id >= pc.params.x) {
+		return;
+	}
+	Surfel s = surfels[id];
+	if ((s.meta.x & SURFEL_FLAG_ACTIVE) == 0u || (s.meta.x & SURFEL_FLAG_STALE) != 0u) {
+		return;
+	}
+
+	uint cell = surfel_spatial_cell(s.posRadius.xyz, pc.grid.x);
+	uint base = cell * SURFEL_HASH_BUCKET;
+	uint packed = id + 1u;
+	for (uint k = 0u; k < SURFEL_HASH_BUCKET; k++) {
+		if (atomicCompSwap(buckets[base + k], 0u, packed) == 0u) {
+			break;
+		}
+	}
+}

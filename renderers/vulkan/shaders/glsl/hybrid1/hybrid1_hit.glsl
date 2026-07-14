@@ -4,6 +4,10 @@ layout( set = 0, binding = 9, std430 ) readonly buffer WorldAlbedoSSBO {
 	float rgb[];
 } worldAlbedo;
 
+layout( set = 0, binding = 12, std430 ) readonly buffer WorldNormalSSBO {
+	float nxyz[];
+} worldNormal;
+
 vec3 hybrid1_defaultAlbedo( void )
 {
 	return vec3( 0.72, 0.70, 0.66 );
@@ -20,6 +24,38 @@ vec3 hybrid1_sampleWorldAlbedoSSBO( void )
 	}
 	uint i = uint( gl_PrimitiveID ) * 3u;
 	return vec3( worldAlbedo.rgb[i], worldAlbedo.rgb[i + 1u], worldAlbedo.rgb[i + 2u] );
+}
+
+vec3 hybrid1_sampleWorldNormalSSBO( void )
+{
+	uint n = uint( worldNormal.nxyz.length() ) / 3u;
+	if ( gl_InstanceCustomIndexEXT != 0 || n == 0u ) {
+		return vec3( 0.0 );
+	}
+	if ( gl_PrimitiveID < 0 || uint( gl_PrimitiveID ) >= n ) {
+		return vec3( 0.0 );
+	}
+	uint i = uint( gl_PrimitiveID ) * 3u;
+	vec3 N = vec3( worldNormal.nxyz[i], worldNormal.nxyz[i + 1u], worldNormal.nxyz[i + 2u] );
+	float len2 = dot( N, N );
+	if ( len2 < 1e-8 ) {
+		return vec3( 0.0 );
+	}
+	return N * inversesqrt( len2 );
+}
+
+/* Geometric world normal facing the incoming ray; falls back to -rayDir. */
+vec3 hybrid1_sampleHitNormal( void )
+{
+	vec3 N = hybrid1_sampleWorldNormalSSBO();
+	vec3 towardRay = normalize( -gl_WorldRayDirectionEXT );
+	if ( dot( N, N ) < 1e-8 ) {
+		return towardRay;
+	}
+	if ( dot( N, towardRay ) < 0.0 ) {
+		N = -N;
+	}
+	return N;
 }
 
 vec3 hybrid1_sampleHitAlbedo( sampler2D albedoTex )

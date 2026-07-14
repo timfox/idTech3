@@ -10,8 +10,8 @@ layout(std430, set = 0, binding = 0) buffer SurfelBuf {
 layout(std430, set = 0, binding = 1) buffer CounterBuf {
 	uint activeCount;
 	uint spawnSeed;
-	uint pad0;
-	uint pad1;
+	uint recycled;
+	uint liveCount;
 };
 
 layout(set = 0, binding = 2) uniform sampler2D depthTex;
@@ -31,7 +31,6 @@ void main() {
 
 	uint seed = pc.params.y * 747796405u + lid * 2891336453u + spawnSeed;
 	vec2 uv = vec2(surfel_hash(seed), surfel_hash(seed + 1u));
-	/* Bias away from extreme borders. */
 	uv = clamp(uv * 0.9 + 0.05, vec2(0.001), vec2(0.999));
 
 	float depth = texture(depthTex, uv).r;
@@ -50,14 +49,28 @@ void main() {
 	}
 	vec3 worldPos = worldH.xyz / worldH.w;
 
-	uint slot = atomicAdd(activeCount, 1u);
-	if (slot >= pc.params.x) {
-		atomicMin(activeCount, pc.params.x);
-		return;
+	/* Prefer recycling an inactive/stale slot; else grow the scan range. */
+	uint probe = uint(surfel_hash(seed + 9u) * float(pc.params.x)) % pc.params.x;
+	uint slot = 0xffffffffu;
+	uint flags = surfels[probe].meta.x;
+	if ((flags & SURFEL_FLAG_ACTIVE) == 0u || (flags & SURFEL_FLAG_STALE) != 0u) {
+		slot = probe;
+		/* Ensure scan range covers recycled slots. */
+		atomicMax(activeCount, probe + 1u);
+	} else {
+		slot = atomicAdd(activeCount, 1u);
+		if (slot >= pc.params.x) {
+			atomicMin(activeCount, pc.params.x);
+			/* Last chance: overwrite a random slot. */
+			slot = probe;
+		} else {
+			/* New high-water mark. */
+		}
 	}
 
 	surfels[slot].posRadius = vec4(worldPos, pc.extent.z);
 	surfels[slot].normalConf = vec4(normal, 0.05);
 	surfels[slot].irradianceAge = vec4(0.0, 0.0, 0.0, 0.0);
 	surfels[slot].meta = uvec4(SURFEL_FLAG_ACTIVE | SURFEL_FLAG_VALID, 0u, 0u, 0u);
+	atomicAdd(liveCount, 1u);
 }

@@ -619,6 +619,7 @@ static void HYBRID1_UpdateRtDescriptors( VkDescriptorSet set, VkImageView output
 
 	vk_rtx_bind_tlas_descriptor( set );
 	vk_rtx_bind_world_albedo_ssbo( set, 9 );
+	vk_rtx_bind_world_normal_ssbo( set, 12 );
 	HYBRID1_WriteImageBinding( set, 1, outputView, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, VK_IMAGE_LAYOUT_GENERAL );
 	HYBRID1_WriteUboBinding( set, 2 );
 
@@ -1110,7 +1111,7 @@ void vk_hybrid1_init( void )
 {
 	VkPhysicalDeviceRayTracingPipelinePropertiesKHR rtProps;
 	VkPhysicalDeviceProperties2 props2;
-	VkDescriptorSetLayoutBinding rtBindings[12];
+	VkDescriptorSetLayoutBinding rtBindings[13];
 	VkDescriptorSetLayoutBinding temporalBindings[9];
 	VkDescriptorSetLayoutBinding atrousBindings[7];
 	VkDescriptorSetLayoutBinding compositeBindings[6];
@@ -1251,9 +1252,14 @@ void vk_hybrid1_init( void )
 	rtBindings[11].descriptorCount = 1;
 	rtBindings[11].stageFlags = VK_SHADER_STAGE_RAYGEN_BIT_KHR;
 
+	rtBindings[12].binding = 12;
+	rtBindings[12].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+	rtBindings[12].descriptorCount = 1;
+	rtBindings[12].stageFlags = VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR;
+
 	Com_Memset( &dslci, 0, sizeof( dslci ) );
 	dslci.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-	dslci.bindingCount = 12;
+	dslci.bindingCount = 13;
 	dslci.pBindings = rtBindings;
 	VK_CHECK( qvkCreateDescriptorSetLayout( vk.device, &dslci, NULL, &hybrid1.rt_dsl ) );
 
@@ -1267,7 +1273,7 @@ void vk_hybrid1_init( void )
 	poolSizes[3].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
 	poolSizes[3].descriptorCount = 21;
 	poolSizes[4].type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-	poolSizes[4].descriptorCount = 6;
+	poolSizes[4].descriptorCount = 9;
 	Com_Memset( &dpci, 0, sizeof( dpci ) );
 	dpci.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
 	dpci.maxSets = 3;

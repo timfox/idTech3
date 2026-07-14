@@ -545,10 +545,22 @@ elif [[ ! -f "$SGI_SPAWN" || ! -f "$SGI_UPDATE" ]]; then
   fail "surfel_gi spawn/update shaders missing"
 elif ! grep -q 'GL_EXT_ray_query' "$SGI_UPDATE" 2>/dev/null; then
   fail "surfel_update.comp missing GL_EXT_ray_query"
+elif ! grep -q 'WorldAlbedoSSBO' "$SGI_UPDATE" 2>/dev/null; then
+  fail "surfel_update.comp missing WorldAlbedoSSBO"
+elif ! grep -q 'WorldNormalSSBO' "$SGI_UPDATE" 2>/dev/null; then
+  fail "surfel_update.comp missing WorldNormalSSBO"
+elif ! grep -q 'hybrid1_sampleHitNormal' "$PROJECT_ROOT/renderers/vulkan/shaders/glsl/hybrid1/hybrid1_hit.glsl" 2>/dev/null; then
+  fail "hybrid1_hit.glsl missing hybrid1_sampleHitNormal"
+elif ! grep -q 'vk_rtx_bind_world_normal_ssbo' "$PROJECT_ROOT/renderers/vulkan/extensions/rtx/vk_rtx.c" 2>/dev/null; then
+  fail "vk_rtx.c missing world normal SSBO bind"
+elif ! grep -q 'WorldNormalSSBO' "$PROJECT_ROOT/renderers/vulkan/shaders/glsl/pt_hit.rchit" 2>/dev/null; then
+  fail "pt_hit.rchit missing WorldNormalSSBO"
+elif [[ ! -f "$PROJECT_ROOT/renderers/vulkan/shaders/glsl/surfel_gi/surfel_hash.comp" ]]; then
+  fail "surfel_hash.comp missing"
 elif ! grep -q 'vk_surfel_gi.c' "$PROJECT_ROOT/cmake/renderers/VulkanExtensionSources.cmake" 2>/dev/null; then
   fail "VulkanExtensionSources.cmake missing vk_surfel_gi.c"
 else
-  pass "Surfel GI spawn/update + ray query + chocolate link wired"
+  pass "Surfel GI + Hybrid1/pathtrace world normal SSBO + chocolate link wired"
 fi
 
 echo ""

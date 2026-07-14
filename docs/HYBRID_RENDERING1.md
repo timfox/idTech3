@@ -15,6 +15,8 @@ Implementation of the thesis **Hybrid-Rendering Techniques in GPU** (IST, July 2
 
 RT closest-hit shaders prefer a **per-primitive world albedo SSBO** (vertex/face colors packed with the world BLAS, including **SF_GRID** patches) when `gl_InstanceCustomIndexEXT == 0`. If that miss, they reproject hit points into the deferred **G-buffer albedo** (when `r_deferredGBufferFill 1`) instead of flat placeholder colors.
 
+Secondary rays also sample a packed **per-primitive world normal SSBO** (`hybrid1_sampleHitNormal`) for sun N·L, irradiance lookup, and specular IBL reflection — no ray-direction placeholders on the RTX path.
+
 ## Role vs `r_rtx` demo
 
 **Hybrid1 is the production RT lighting path** (shadow + specular + optional diffuse + SVGF). The plain **`r_rtx` / `r_rtxDemo` overlay** remains a diagnostic / tint scaffold unless modes gain real visibility or reflection shading — keep Hybrid1 enabled for look-dev.

@@ -76,8 +76,11 @@ static struct {
 	VkDeviceMemory		index_memory;
 	VkBuffer		albedo_buffer;
 	VkDeviceMemory		albedo_memory;
+	VkBuffer		normal_buffer;
+	VkDeviceMemory		normal_memory;
 	uint32_t		world_vertex_count;
 	uint32_t		world_albedo_count;
+	uint32_t		world_normal_count;
 	VkImage			rt_image;
 	VkDeviceMemory		rt_image_memory;
 	VkImageView		rt_image_view;
@@ -153,8 +156,8 @@ static void RTX_Status_f( void )
 		( r_rtxDemo && r_rtxDemo->integer ) ? 1 : 0,
 		( r_hybrid1 && r_hybrid1->integer ) ? 1 : 0,
 		( r_raygun && r_raygun->integer ) ? 1 : 0 );
-	ri.Printf( PRINT_ALL, "[VK][RTX] world=%s blas_tris=%u world_verts=%u albedo_prims=%u entity_ents=%u entity_tris=%u entity_verts=%u mesh=%u (md3=%u iqm=%u gltf=%u) proxy=%u (nonmesh=%u skinned=%u md3fail=%u iqmfail=%u gltffail=%u) tlas_instances=%u tlas_mode=%s reason=%s\n",
-		wn, rtx.world_primitive_count, rtx.world_vertex_count, rtx.world_albedo_count,
+	ri.Printf( PRINT_ALL, "[VK][RTX] world=%s blas_tris=%u world_verts=%u albedo_prims=%u normal_prims=%u entity_ents=%u entity_tris=%u entity_verts=%u mesh=%u (md3=%u iqm=%u gltf=%u) proxy=%u (nonmesh=%u skinned=%u md3fail=%u iqmfail=%u gltffail=%u) tlas_instances=%u tlas_mode=%s reason=%s\n",
+		wn, rtx.world_primitive_count, rtx.world_vertex_count, rtx.world_albedo_count, rtx.world_normal_count,
 		rtx.entity_packed_count, rtx.entity_primitive_count,
 		rtx.entity_vertex_count, rtx.entity_mesh_count,
 		rtx.entity_mesh_md3, rtx.entity_mesh_iqm, rtx.entity_mesh_gltf,
@@ -430,6 +433,7 @@ static void vk_rtx_rebuild_world_blas( void )
 	vk_rtx_destroy_buffer( &rtx.vertex_buffer, &rtx.vertex_memory );
 	vk_rtx_destroy_buffer( &rtx.index_buffer, &rtx.index_memory );
 	vk_rtx_destroy_buffer( &rtx.albedo_buffer, &rtx.albedo_memory );
+	vk_rtx_destroy_buffer( &rtx.normal_buffer, &rtx.normal_memory );
 	vk_rtx_destroy_buffer( &rtx.entity_vertex_buffer, &rtx.entity_vertex_memory );
 	vk_rtx_destroy_buffer( &rtx.entity_index_buffer, &rtx.entity_index_memory );
 	vk_rtx_destroy_buffer( &rtx.scratch_buffer, &rtx.scratch_memory );
@@ -448,6 +452,7 @@ static void vk_rtx_rebuild_world_blas( void )
 	rtx.entity_proxy_gltf_fail = 0u;
 	rtx.world_vertex_count = 0u;
 	rtx.world_albedo_count = 0u;
+	rtx.world_normal_count = 0u;
 
 	maxPrimBLAS = 1u;
 	if ( useWorld ) {
@@ -457,6 +462,7 @@ static void vk_rtx_rebuild_world_blas( void )
 		float *posHost;
 		uint32_t *idxHost;
 		float *albedoHost;
+		float *normalHost;
 		uint32_t packedVerts = 0u;
 
 		vk_rtx_alloc_buffer( vbSize,
@@ -471,37 +477,50 @@ static void vk_rtx_rebuild_world_blas( void )
 			VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 			VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
 			&rtx.albedo_buffer, &rtx.albedo_memory, NULL );
+		vk_rtx_alloc_buffer( abSize,
+			VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+			VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+			&rtx.normal_buffer, &rtx.normal_memory, NULL );
 		VK_CHECK( qvkMapMemory( vk.device, rtx.vertex_memory, 0, vbSize, 0, (void **)&posHost ) );
 		VK_CHECK( qvkMapMemory( vk.device, rtx.index_memory, 0, ibSize, 0, (void **)&idxHost ) );
 		VK_CHECK( qvkMapMemory( vk.device, rtx.albedo_memory, 0, abSize, 0, (void **)&albedoHost ) );
+		VK_CHECK( qvkMapMemory( vk.device, rtx.normal_memory, 0, abSize, 0, (void **)&normalHost ) );
 		{
 			uint32_t ai;
 			for ( ai = 0u; ai < worldPrim; ai++ ) {
 				albedoHost[ai * 3u + 0u] = 0.72f;
 				albedoHost[ai * 3u + 1u] = 0.70f;
 				albedoHost[ai * 3u + 2u] = 0.66f;
+				normalHost[ai * 3u + 0u] = 0.0f;
+				normalHost[ai * 3u + 1u] = 0.0f;
+				normalHost[ai * 3u + 2u] = 1.0f;
 			}
 		}
-		packedPrim = vk_rtx_world_pack( tr.world, worldPrim, posHost, idxHost, albedoHost, &packedVerts );
+		packedPrim = vk_rtx_world_pack( tr.world, worldPrim, posHost, idxHost, albedoHost, normalHost, &packedVerts );
 		qvkUnmapMemory( vk.device, rtx.vertex_memory );
 		qvkUnmapMemory( vk.device, rtx.index_memory );
 		qvkUnmapMemory( vk.device, rtx.albedo_memory );
+		qvkUnmapMemory( vk.device, rtx.normal_memory );
 		if ( packedPrim == 0u ) {
 			useWorld = qfalse;
 			vk_rtx_destroy_buffer( &rtx.vertex_buffer, &rtx.vertex_memory );
 			vk_rtx_destroy_buffer( &rtx.index_buffer, &rtx.index_memory );
 			vk_rtx_destroy_buffer( &rtx.albedo_buffer, &rtx.albedo_memory );
+			vk_rtx_destroy_buffer( &rtx.normal_buffer, &rtx.normal_memory );
 		} else {
 			maxPrimBLAS = packedPrim;
 			rtx.world_primitive_count = packedPrim;
 			rtx.world_vertex_count = packedVerts;
 			rtx.world_albedo_count = packedPrim;
+			rtx.world_normal_count = packedPrim;
 		}
 	}
 
 	if ( !useWorld ) {
 		float fallbackAlbedo[3] = { 0.72f, 0.70f, 0.66f };
+		float fallbackNormal[3] = { 0.0f, 0.0f, 1.0f };
 		float *albedoHost;
+		float *normalHost;
 
 		triVerts[0] = -1.0f; triVerts[1] = -1.0f; triVerts[2] = 0.0f;
 		triVerts[3] =  1.0f; triVerts[4] = -1.0f; triVerts[5] = 0.0f;
@@ -528,10 +547,18 @@ static void vk_rtx_rebuild_world_blas( void )
 		VK_CHECK( qvkMapMemory( vk.device, rtx.albedo_memory, 0, sizeof( fallbackAlbedo ), 0, (void **)&albedoHost ) );
 		Com_Memcpy( albedoHost, fallbackAlbedo, sizeof( fallbackAlbedo ) );
 		qvkUnmapMemory( vk.device, rtx.albedo_memory );
+		vk_rtx_alloc_buffer( sizeof( fallbackNormal ),
+			VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+			VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+			&rtx.normal_buffer, &rtx.normal_memory, NULL );
+		VK_CHECK( qvkMapMemory( vk.device, rtx.normal_memory, 0, sizeof( fallbackNormal ), 0, (void **)&normalHost ) );
+		Com_Memcpy( normalHost, fallbackNormal, sizeof( fallbackNormal ) );
+		qvkUnmapMemory( vk.device, rtx.normal_memory );
 		maxPrimBLAS = 1u;
 		rtx.world_primitive_count = 0u;
 		rtx.world_vertex_count = 3u;
 		rtx.world_albedo_count = 0u;
+		rtx.world_normal_count = 0u;
 	}
 
 	Com_Memset( &triangles, 0, sizeof( triangles ) );
@@ -1140,6 +1167,7 @@ void vk_rtx_shutdown( void )
 	vk_rtx_destroy_buffer( &rtx.vertex_buffer, &rtx.vertex_memory );
 	vk_rtx_destroy_buffer( &rtx.index_buffer, &rtx.index_memory );
 	vk_rtx_destroy_buffer( &rtx.albedo_buffer, &rtx.albedo_memory );
+	vk_rtx_destroy_buffer( &rtx.normal_buffer, &rtx.normal_memory );
 	vk_rtx_destroy_buffer( &rtx.scratch_buffer, &rtx.scratch_memory );
 	vk_rtx_destroy_buffer( &rtx.sbt_buffer, &rtx.sbt_memory );
 
@@ -1738,6 +1766,41 @@ uint32_t vk_rtx_world_albedo_count( void )
 	return rtx.world_albedo_count;
 }
 
+void vk_rtx_bind_world_normal_ssbo( VkDescriptorSet set, uint32_t binding )
+{
+	VkDescriptorBufferInfo info;
+	VkWriteDescriptorSet write;
+	VkDeviceSize rangeBytes;
+
+	if ( set == VK_NULL_HANDLE || rtx.normal_buffer == VK_NULL_HANDLE ) {
+		return;
+	}
+
+	rangeBytes = (VkDeviceSize)rtx.world_normal_count * 3u * sizeof( float );
+	if ( rangeBytes < 3u * sizeof( float ) ) {
+		rangeBytes = 3u * sizeof( float );
+	}
+
+	Com_Memset( &info, 0, sizeof( info ) );
+	info.buffer = rtx.normal_buffer;
+	info.offset = 0;
+	info.range = rangeBytes;
+
+	Com_Memset( &write, 0, sizeof( write ) );
+	write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+	write.dstSet = set;
+	write.dstBinding = binding;
+	write.descriptorCount = 1;
+	write.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+	write.pBufferInfo = &info;
+	qvkUpdateDescriptorSets( vk.device, 1, &write, 0, NULL );
+}
+
+uint32_t vk_rtx_world_normal_count( void )
+{
+	return rtx.world_normal_count;
+}
+
 #else /* !USE_VULKAN_RTX */
 
 void vk_rtx_init( void )
@@ -1758,5 +1821,7 @@ void vk_rtx_scene_extent( uint32_t *w, uint32_t *h ) { if ( w ) { *w = 1u; } if 
 void vk_rtx_bind_tlas_descriptor( VkDescriptorSet set ) { (void)set; }
 void vk_rtx_bind_world_albedo_ssbo( VkDescriptorSet set, uint32_t binding ) { (void)set; (void)binding; }
 uint32_t vk_rtx_world_albedo_count( void ) { return 0u; }
+void vk_rtx_bind_world_normal_ssbo( VkDescriptorSet set, uint32_t binding ) { (void)set; (void)binding; }
+uint32_t vk_rtx_world_normal_count( void ) { return 0u; }
 
 #endif /* USE_VULKAN_RTX */

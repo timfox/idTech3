@@ -15,15 +15,17 @@ layout( set = 0, binding = 10 ) uniform sampler2D brdfLut;
 void main()
 {
 	vec3 base = hybrid1_sampleHitAlbedo( albedoTex );
+	vec3 N = hybrid1_sampleHitNormal();
 	float roughness = clamp( specRadiance.w, 0.02, 1.0 );
 	vec3 hit = base;
+	vec3 V = normalize( -gl_WorldRayDirectionEXT );
 
 	float iblMode = h1.params3.y;
 	if ( h1.params1.w > 0.5 && iblMode >= 0.5 ) {
-		vec3 ibl = hybrid1_samplePrefilter( prefilterTex, gl_WorldRayDirectionEXT, roughness );
+		vec3 R = reflect( -V, N );
+		vec3 ibl = hybrid1_samplePrefilter( prefilterTex, R, roughness );
 		if ( iblMode >= 1.5 ) {
-			float NdotV = clamp( abs( dot( normalize( -gl_WorldRayDirectionEXT ), vec3( 0.0, 0.0, 1.0 ) ) ), 0.0, 1.0 );
-			/* Prefer payload.w-stored roughness with approximate NdotV from ray; primary uses G-buffer */
+			float NdotV = clamp( abs( dot( N, V ) ), 0.0, 1.0 );
 			vec2 envBrdf = hybrid1_sampleEnvBRDF( brdfLut, NdotV, roughness );
 			vec3 F0 = mix( vec3( 0.04 ), base, clamp( 1.0 - roughness, 0.0, 1.0 ) );
 			hit += ibl * ( F0 * envBrdf.x + envBrdf.y );
