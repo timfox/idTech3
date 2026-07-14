@@ -94,6 +94,7 @@ Modernized id Tech 3: **Vulkan renderer with PBR**, validation and smoke-tested 
 
 * The engine aims to be C++23 and C23-compatible with modernization where it improves safety and portability.
 * Native C `bool` is preferred in new or modernized code, but `qboolean` remains in use where needed for backward compatibility.
+* Now using SDL3 as the primary multimedia and input backend
 
 ### Build
 
