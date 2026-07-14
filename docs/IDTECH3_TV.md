@@ -43,6 +43,7 @@ Use `stream_status` to inspect configuration. Use `stream_stop` to close the eng
 | `cl_stream_fps` | `30` | Capture frame rate. |
 | `cl_stream_bitrate` | `3500k` | Video bitrate. |
 | `cl_stream_audio_bitrate` | `128k` | Audio bitrate. |
+| `cl_stream_queueMegs` | `64` | Maximum queued engine stream pipe data before chunks are dropped to protect memory. |
 | `cl_stream_autoStart` | `0` | Automatically run `stream_start` during client init. |
 
 `cl_stream_cmd` supports the shared engine template tokens: `%P` FFmpeg executable, `%U` RTMP URL, `%K` stream key, `%L` title, `%W` width, `%H` height, `%F` FPS, `%V` video bitrate, and `%Q` audio bitrate.
@@ -58,5 +59,7 @@ ffmpeg -f avi -i - -threads 0 -y -c:v libx264 -preset veryfast -tune zerolatency
 The input is not a screen grab. It is the engine's captured frame stream plus the mixed game audio buffer. This avoids compositor/window-capture fragility and keeps the stream source tied to actual rendered frames.
 
 The streaming worker is intentionally scoped to live engine publishing. Legacy `video-pipe` demo export keeps its existing synchronous behavior.
+
+If the encoder or network is slower than capture, the engine drops queued stream chunks after `cl_stream_queueMegs` instead of letting memory grow without bound. `stream_status` reports queued data, peak queue, dropped chunks, dropped bytes, and pipe failure state.
 
 The `external` backend is still useful on platforms where the renderer capture path is unavailable or when a player wants to stream overlays outside the engine window.

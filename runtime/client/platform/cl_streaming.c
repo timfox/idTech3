@@ -27,6 +27,7 @@ static cvar_t *cl_stream_height;
 static cvar_t *cl_stream_fps;
 static cvar_t *cl_stream_bitrate;
 static cvar_t *cl_stream_audio_bitrate;
+static cvar_t *cl_stream_queueMegs;
 static cvar_t *cl_stream_autoStart;
 
 typedef enum {
@@ -97,6 +98,12 @@ static qboolean CL_StreamingValidateConfig( void )
 
 static void CL_StreamingStatus_f( void )
 {
+	int queuedBytes = 0;
+	int peakQueuedBytes = 0;
+	int droppedChunks = 0;
+	int droppedBytes = 0;
+	qboolean failed = qfalse;
+
 	Com_Printf( "idTech3 TV streaming:\n" );
 	Com_Printf( "  enabled: %d active: %d\n", cl_stream_enable ? cl_stream_enable->integer : 0, stream_active );
 	Com_Printf( "  backend: %s%s\n",
@@ -111,6 +118,15 @@ static void CL_StreamingStatus_f( void )
 		cl_stream_fps ? cl_stream_fps->string : "?",
 		cl_stream_bitrate ? cl_stream_bitrate->string : "?",
 		cl_stream_audio_bitrate ? cl_stream_audio_bitrate->string : "?" );
+	if ( stream_backend_active == STREAM_BACKEND_ENGINE ) {
+		CL_GetAVIPipeStats( &queuedBytes, &peakQueuedBytes, &droppedChunks, &droppedBytes, &failed );
+		Com_Printf( "  queue:   %d KiB queued, %d KiB peak, %d chunks dropped (%d KiB), failed: %d\n",
+			queuedBytes / 1024,
+			peakQueuedBytes / 1024,
+			droppedChunks,
+			droppedBytes / 1024,
+			failed );
+	}
 	if ( stream_last_command[0] ) {
 		Com_Printf( "  last command: %s\n", stream_last_command );
 	}
@@ -150,7 +166,8 @@ static void CL_StreamingStart_f( void )
 	} else {
 		Com_Printf( "stream_start: opening engine framebuffer/audio pipe for idTech3-tv / Owncast\n" );
 		if ( !CL_OpenAVIForPipeCommand( "idtech3-tv-live", stream_last_command,
-				cl_stream_fps ? cl_stream_fps->integer : 30 ) ) {
+				cl_stream_fps ? cl_stream_fps->integer : 30,
+				( cl_stream_queueMegs ? cl_stream_queueMegs->integer : 64 ) * 1024 * 1024 ) ) {
 			stream_last_command[0] = '\0';
 			Com_Printf( S_COLOR_RED "stream_start: could not open engine streaming pipe\n" );
 			return;
@@ -219,6 +236,9 @@ void CL_Streaming_Init( void )
 	Cvar_CheckRange( cl_stream_fps, "1", "240", CV_INTEGER );
 	cl_stream_bitrate = Cvar_Get( "cl_stream_bitrate", "3500k", CVAR_ARCHIVE );
 	cl_stream_audio_bitrate = Cvar_Get( "cl_stream_audio_bitrate", "128k", CVAR_ARCHIVE );
+	cl_stream_queueMegs = Cvar_Get( "cl_stream_queueMegs", "64", CVAR_ARCHIVE );
+	Cvar_CheckRange( cl_stream_queueMegs, "4", "512", CV_INTEGER );
+	Cvar_SetDescription( cl_stream_queueMegs, "Maximum queued live-stream pipe data in MiB before capture chunks are dropped instead of growing memory." );
 	cl_stream_autoStart = Cvar_Get( "cl_stream_autoStart", "0", CVAR_ARCHIVE );
 	Cvar_CheckRange( cl_stream_autoStart, "0", "1", CV_INTEGER );
 

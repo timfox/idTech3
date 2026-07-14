@@ -96,6 +96,10 @@ typedef struct aviPipeThread_s
 	aviPipeChunk_t *head;
 	aviPipeChunk_t *tail;
 	int queuedBytes;
+	int maxQueuedBytes;
+	int peakQueuedBytes;
+	int droppedChunks;
+	int droppedBytes;
 #ifdef _WIN32
 	HANDLE thread;
 	CRITICAL_SECTION mutex;
@@ -189,6 +193,14 @@ static qboolean AVI_PipeThread_Enqueue( const void *buf, int len )
 		free( chunk );
 		return qfalse;
 	}
+	if ( aviPipeThread.maxQueuedBytes > 0 &&
+			aviPipeThread.queuedBytes + len > aviPipeThread.maxQueuedBytes ) {
+		aviPipeThread.droppedChunks++;
+		aviPipeThread.droppedBytes += len;
+		AVI_PipeThread_Unlock();
+		free( chunk );
+		return qtrue;
+	}
 	if ( aviPipeThread.tail ) {
 		aviPipeThread.tail->next = chunk;
 	} else {
@@ -196,6 +208,9 @@ static qboolean AVI_PipeThread_Enqueue( const void *buf, int len )
 	}
 	aviPipeThread.tail = chunk;
 	aviPipeThread.queuedBytes += len;
+	if ( aviPipeThread.queuedBytes > aviPipeThread.peakQueuedBytes ) {
+		aviPipeThread.peakQueuedBytes = aviPipeThread.queuedBytes;
+	}
 	AVI_PipeThread_Wake();
 	AVI_PipeThread_Unlock();
 	return qtrue;
@@ -253,11 +268,12 @@ static void *AVI_PipeThread_Main( void *data )
 }
 #endif
 
-static qboolean AVI_PipeThread_Start( fileHandle_t f )
+static qboolean AVI_PipeThread_Start( fileHandle_t f, int maxQueuedBytes )
 {
 	Com_Memset( &aviPipeThread, 0, sizeof( aviPipeThread ) );
 	aviPipeThread.f = f;
 	aviPipeThread.active = qtrue;
+	aviPipeThread.maxQueuedBytes = maxQueuedBytes;
 
 #ifdef _WIN32
 	InitializeCriticalSection( &aviPipeThread.mutex );
@@ -315,7 +331,7 @@ static ID_INLINE void SafeFS_Write( const void *buf, int len, fileHandle_t f )
 {
 	if ( afd.threadedPipe ) {
 		if ( !AVI_PipeThread_Enqueue( buf, len ) ) {
-			Com_Error( ERR_DROP, "Failed to queue avi pipe data" );
+			Com_DPrintf( S_COLOR_YELLOW "WARNING: failed to queue avi pipe data\n" );
 		}
 		return;
 	}
@@ -709,7 +725,7 @@ Opens a live pipe that receives the engine's rendered frames and mixed audio.
 The command must read AVI from stdin.
 ===============
 */
-qboolean CL_OpenAVIForPipeCommand( const char *displayName, const char *cmd, int frameRate )
+qboolean CL_OpenAVIForPipeCommand( const char *displayName, const char *cmd, int frameRate, int maxQueuedBytes )
 {
 	if ( afd.fileOpen || !cmd || !cmd[0] ) {
 		return qfalse;
@@ -719,7 +735,7 @@ qboolean CL_OpenAVIForPipeCommand( const char *displayName, const char *cmd, int
 	if ( ( afd.f = FS_PipeOpenWrite( cmd, displayName ? displayName : "stream" ) ) == FS_INVALID_HANDLE ) {
 		return qfalse;
 	}
-	if ( !AVI_PipeThread_Start( afd.f ) ) {
+	if ( !AVI_PipeThread_Start( afd.f, maxQueuedBytes ) ) {
 		FS_FCloseFile( afd.f );
 		afd.f = FS_INVALID_HANDLE;
 		return qfalse;
@@ -732,6 +748,46 @@ qboolean CL_OpenAVIForPipeCommand( const char *displayName, const char *cmd, int
 	afd.fileOpen = qtrue;
 
 	return qtrue;
+}
+
+void CL_GetAVIPipeStats( int *queuedBytes, int *peakQueuedBytes, int *droppedChunks, int *droppedBytes, qboolean *failed )
+{
+	if ( queuedBytes ) {
+		*queuedBytes = 0;
+	}
+	if ( peakQueuedBytes ) {
+		*peakQueuedBytes = 0;
+	}
+	if ( droppedChunks ) {
+		*droppedChunks = 0;
+	}
+	if ( droppedBytes ) {
+		*droppedBytes = 0;
+	}
+	if ( failed ) {
+		*failed = qfalse;
+	}
+	if ( !aviPipeThread.active ) {
+		return;
+	}
+
+	AVI_PipeThread_Lock();
+	if ( queuedBytes ) {
+		*queuedBytes = aviPipeThread.queuedBytes;
+	}
+	if ( peakQueuedBytes ) {
+		*peakQueuedBytes = aviPipeThread.peakQueuedBytes;
+	}
+	if ( droppedChunks ) {
+		*droppedChunks = aviPipeThread.droppedChunks;
+	}
+	if ( droppedBytes ) {
+		*droppedBytes = aviPipeThread.droppedBytes;
+	}
+	if ( failed ) {
+		*failed = aviPipeThread.failed;
+	}
+	AVI_PipeThread_Unlock();
 }
 
 
