@@ -4440,7 +4440,7 @@ static void R_Register( void )
 	r_rtxEntities = ri.Cvar_Get( "r_rtxEntities", "0", CVAR_ARCHIVE_ND | CVAR_LATCH );
 	ri.Cvar_CheckRange( r_rtxEntities, "0", "1", CV_INTEGER );
 	ri.Cvar_SetDescription( r_rtxEntities,
-		"When USE_VULKAN_RTX: pack RT_MODEL entities into a second BLAS (MD3 LOD0, CPU-skinned IQM, static glTF; AABB for MDR/skinned glTF/fail). Default 0 (latched)." );
+		"When USE_VULKAN_RTX: pack RT_MODEL entities into a second BLAS (MD3 LOD0, CPU-skinned IQM, static/CPU-skinned glTF; AABB for MDR/pack fail). Default 0 (latched)." );
 	ri.Cvar_SetGroup( r_rtxEntities, CVG_RENDERER );
 	r_rtxEntityCap = ri.Cvar_Get( "r_rtxEntityCap", "128", CVAR_ARCHIVE_ND | CVAR_LATCH );
 	ri.Cvar_CheckRange( r_rtxEntityCap, "0", "1024", CV_INTEGER );

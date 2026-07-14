@@ -2390,10 +2390,16 @@ qboolean R_IQMSkinPositions( iqmData_t *data, int frame, int oldframe, float bac
 	float *outPositions );
 
 /*
-=============================================================
-=============================================================
+===============
+R_GLTFComputeEntityJointMatrices / R_GLTFSkinPositions
+
+Pack-callable glTF CPU skin for RTX entity BLAS. See tr_model_gltf.h for SkinPositions.
+===============
 */
-void	R_TransformModelToClip( const vec3_t src, const float *modelViewMatrix, const float *projectionMatrix,
+qboolean R_GLTFComputeEntityJointMatrices( const gltfModel_t *model, const trRefEntity_t *ent,
+	int refdefTimeMs, float *outMatrices );
+
+void R_TransformModelToClip( const vec3_t src, const float *modelViewMatrix, const float *projectionMatrix,
 							vec4_t eye, vec4_t dst );
 void	R_TransformClipToWindow( const vec4_t clip, const viewParms_t *view, vec4_t normalized, vec4_t window );
 

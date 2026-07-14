@@ -524,8 +524,10 @@ elif ! grep -q 'vk_rtx_pack_iqm' "$RTX_ENT" 2>/dev/null; then
   fail "vk_rtx_entities.c missing IQM pack"
 elif ! grep -q 'R_IQMSkinPositions' "$RTX_ENT" 2>/dev/null; then
   fail "vk_rtx_entities.c missing CPU-skinned IQM via R_IQMSkinPositions"
-elif ! grep -q 'vk_rtx_pack_gltf_static' "$RTX_ENT" 2>/dev/null; then
-  fail "vk_rtx_entities.c missing static glTF pack"
+elif ! grep -q 'vk_rtx_pack_gltf' "$RTX_ENT" 2>/dev/null; then
+  fail "vk_rtx_entities.c missing glTF pack"
+elif ! grep -q 'R_GLTFSkinPositions' "$RTX_ENT" 2>/dev/null; then
+  fail "vk_rtx_entities.c missing CPU-skinned glTF via R_GLTFSkinPositions"
 elif ! grep -q 'proxySkinnedCount' "$RTX_ENT" 2>/dev/null; then
   fail "vk_rtx_entities.c missing proxySkinnedCount stats"
 elif ! grep -q 'r_hybrid1Quality' "$PROJECT_ROOT/renderers/vulkan/extensions/rtx/vk_hybrid1.c" 2>/dev/null; then

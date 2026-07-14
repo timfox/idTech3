@@ -46,11 +46,11 @@ seta r_hybrid1Quality 2   // 0=custom, 1=performance, 2=balanced, 3=quality (liv
 r_hybrid1_diffuse 1       // or use quality 3 instead of hand-tuning
 r_hybrid1_ibl 1
 r_hybrid1_taa 1
-r_rtxEntities 1           // entity mesh BLAS: MD3 LOD0 + CPU-skinned IQM + static glTF (+ AABB for MDR / skinned glTF / fail)
+r_rtxEntities 1           // entity mesh BLAS: MD3 LOD0 + CPU-skinned IQM + static/CPU-skinned glTF (+ AABB for MDR / pack fail)
 r_rtxEntityTriCap 65536
 ```
 
-`demo_hybrid1.cfg` sets `r_rtxEntities 1` and `r_hybrid1Quality 3`. Console **`rtx_status`** reports `entity_ents` / `entity_tris` / `mesh` breakdown (`md3` / `iqm` / `gltf`) / `proxy` reasons (`nonmesh` = MDR/unknown, `skinned` = skinned glTF, `md3fail` / `iqmfail` / `gltffail` = pack failed → AABB) and **TLAS mode** (`UPDATE` vs `REBUILD` with reason).
+`demo_hybrid1.cfg` sets `r_rtxEntities 1` and `r_hybrid1Quality 3`. Console **`rtx_status`** reports `entity_ents` / `entity_tris` / `mesh` breakdown (`md3` / `iqm` / `gltf`) / `proxy` reasons (`nonmesh` = MDR/unknown, `md3fail` / `iqmfail` / `gltffail` = pack failed → AABB; `skinned` reserved/unused when glTF skins successfully) and **TLAS mode** (`UPDATE` vs `REBUILD` with reason).
 
 `r_rtx 1` **or** `r_hybrid1 1` before `vid_restart` enables KHR ray tracing device features.
 

@@ -2,8 +2,8 @@
 ===========================================================================
 Copyright (C) 2026 Gopex LLC. All rights reserved.
 
-RTX entity BLAS: MD3 LOD0 mesh, IQM (bind-pose or CPU-skinned), static glTF
-mesh, with AABB proxy fallback for MDR / skinned glTF / pack failures.
+RTX entity BLAS: MD3 LOD0 mesh, IQM (bind-pose or CPU-skinned), glTF
+(static or CPU-skinned), with AABB proxy fallback for MDR / pack failures.
 ===========================================================================
 */
 
@@ -300,26 +300,33 @@ static qboolean vk_rtx_pack_iqm( const trRefEntity_t *ent, const viewParms_t *vi
 
 /*
 ===============
-vk_rtx_pack_gltf_static
+vk_rtx_pack_gltf
 
-Non-skinned glTF (no skeleton joints). Uses mesh 0 primitives only.
+Static glTF (no joints) or CPU-skinned glTF via R_GLTFSkinPositions.
+Returns qfalse on budget/skin failure (AABB fallback). Morph omitted.
 ===============
 */
-static qboolean vk_rtx_pack_gltf_static( const trRefEntity_t *ent, const viewParms_t *viewParms,
-	model_t *mod, float *positions, uint32_t maxVerts, uint32_t *indices, uint32_t maxIndices,
+static qboolean vk_rtx_pack_gltf( const trRefEntity_t *ent, const viewParms_t *viewParms,
+	model_t *mod, int refdefTimeMs, float *positions, uint32_t maxVerts, uint32_t *indices, uint32_t maxIndices,
 	uint32_t *ioVertCount, uint32_t *ioIndexCount )
 {
 	const gltfModel_t *gltf;
 	uint32_t vertsBefore = *ioVertCount;
 	uint32_t indicesBefore = *ioIndexCount;
 	int mi, pi;
+	float jointMats[GLTF_MAX_JOINTS * 12];
+	qboolean needSkin;
 
 	gltf = R_GetGLTFModelFromModelData( mod->modelData );
 	if ( !gltf || gltf->numMeshes < 1 ) {
 		return qfalse;
 	}
-	if ( gltf->skeleton.numJoints > 0 ) {
-		return qfalse;
+
+	needSkin = (qboolean)( gltf->skeleton.numJoints > 0 );
+	if ( needSkin ) {
+		if ( !R_GLTFComputeEntityJointMatrices( gltf, ent, refdefTimeMs, jointMats ) ) {
+			return qfalse;
+		}
 	}
 
 	R_RotateForEntity( ent, viewParms, &backEnd.or );
@@ -334,6 +341,8 @@ static qboolean vk_rtx_pack_gltf_static( const trRefEntity_t *ent, const viewPar
 			uint32_t vertBase;
 			int v, t, numTris;
 			const uint32_t *idx;
+			float *skinned = NULL;
+			const float *srcPositions = NULL;
 
 			if ( !prim->vertices || prim->numVertices < 3 || !prim->indices || prim->numIndices < 3 ) {
 				continue;
@@ -349,13 +358,39 @@ static qboolean vk_rtx_pack_gltf_static( const trRefEntity_t *ent, const viewPar
 				return qfalse;
 			}
 
+			if ( needSkin ) {
+				skinned = (float *)ri.Hunk_AllocateTempMemory( prim->numVertices * 3 * (int)sizeof( float ) );
+				if ( !skinned ) {
+					*ioVertCount = vertsBefore;
+					*ioIndexCount = indicesBefore;
+					return qfalse;
+				}
+				if ( !R_GLTFSkinPositions( gltf, prim->vertices, prim->numVertices, jointMats, skinned ) ) {
+					ri.Hunk_FreeTempMemory( skinned );
+					*ioVertCount = vertsBefore;
+					*ioIndexCount = indicesBefore;
+					return qfalse;
+				}
+				srcPositions = skinned;
+			}
+
 			vertBase = *ioVertCount;
 			for ( v = 0; v < prim->numVertices; v++ ) {
 				vec3_t local;
 				float *dst = positions + ( vertBase + (uint32_t)v ) * 3u;
 
-				VectorCopy( prim->vertices[v].position, local );
+				if ( srcPositions ) {
+					local[0] = srcPositions[v * 3 + 0];
+					local[1] = srcPositions[v * 3 + 1];
+					local[2] = srcPositions[v * 3 + 2];
+				} else {
+					VectorCopy( prim->vertices[v].position, local );
+				}
 				vk_rtx_xform_local_to_world( &backEnd.or, local, dst );
+			}
+
+			if ( skinned ) {
+				ri.Hunk_FreeTempMemory( skinned );
 			}
 
 			idx = prim->indices;
@@ -428,7 +463,6 @@ uint32_t vk_rtx_entities_pack( const trRefdef_t *refdef, const viewParms_t *view
 		model_t *mod;
 		qboolean usedMesh = qfalse;
 		int meshKind = 0; /* 1=md3 2=iqm 3=gltf */
-		qboolean skinnedSkip = qfalse;
 		int triedFailKind = 0; /* 1=md3 2=iqm 3=gltf */
 
 		if ( ent->e.reType != RT_MODEL || !ent->e.hModel ) {
@@ -457,17 +491,12 @@ uint32_t vk_rtx_entities_pack( const trRefdef_t *refdef, const viewParms_t *view
 				triedFailKind = 2;
 			}
 		} else if ( mod->type == MOD_GLTF ) {
-			const gltfModel_t *gltf = R_GetGLTFModelFromModelData( mod->modelData );
-			if ( gltf && gltf->skeleton.numJoints > 0 ) {
-				skinnedSkip = qtrue;
+			usedMesh = vk_rtx_pack_gltf( ent, viewParms, mod, refdef->time, positions, maxVerts, indices, maxIndices,
+				&vertCount, &indexCount );
+			if ( usedMesh ) {
+				meshKind = 3;
 			} else {
-				usedMesh = vk_rtx_pack_gltf_static( ent, viewParms, mod, positions, maxVerts, indices, maxIndices,
-					&vertCount, &indexCount );
-				if ( usedMesh ) {
-					meshKind = 3;
-				} else {
-					triedFailKind = 3;
-				}
+				triedFailKind = 3;
 			}
 		}
 
@@ -477,15 +506,14 @@ uint32_t vk_rtx_entities_pack( const trRefdef_t *refdef, const viewParms_t *view
 				break;
 			}
 			proxyCount++;
-			if ( skinnedSkip ) {
-				proxySkinned++;
-			} else if ( triedFailKind == 1 ) {
+			if ( triedFailKind == 1 ) {
 				proxyMd3Fail++;
 			} else if ( triedFailKind == 2 ) {
 				proxyIqmFail++;
 			} else if ( triedFailKind == 3 ) {
 				proxyGltfFail++;
 			} else {
+				/* MDR / unknown → proxyNonMesh. proxySkinned kept at 0 (skinned glTF packs as mesh). */
 				proxyNonMesh++;
 			}
 		} else {

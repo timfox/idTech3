@@ -975,6 +975,165 @@ qboolean R_SampleGLTFMeshMorphWeights(const gltfModel_t *model, int animIndex, f
 	return touched;
 }
 
+/*
+===============
+R_GLTFComputeEntityJointMatrices
+
+Same clip / shaderTime / r_gltfAnim / backlerp rules as RB_GLTFSurface.
+Fills outMatrices with numJoints * 12 floats. Returns qfalse if no joints.
+===============
+*/
+qboolean R_GLTFComputeEntityJointMatrices( const gltfModel_t *model, const trRefEntity_t *ent,
+	int refdefTimeMs, float *outMatrices )
+{
+	float speed, timeCur, timeOld, backlerp;
+	int animCur, animOld;
+
+	if ( !model || !ent || !outMatrices || model->skeleton.numJoints < 1 ) {
+		return qfalse;
+	}
+	if ( model->skeleton.numJoints > GLTF_MAX_JOINTS ) {
+		return qfalse;
+	}
+
+	speed = ( r_gltfAnim && r_gltfAnim->value > 0.0f ) ? r_gltfAnim->value : 1.0f;
+	if ( ent->intShaderTime ) {
+		timeCur = ent->e.shaderTime.i * 0.001f * speed;
+	} else {
+		timeCur = ent->e.shaderTime.f * speed;
+	}
+	if ( !timeCur && refdefTimeMs > 0 ) {
+		timeCur = refdefTimeMs * 0.001f * speed;
+	}
+	timeOld = timeCur;
+	backlerp = ent->e.backlerp;
+	if ( backlerp < 0.0f ) {
+		backlerp = 0.0f;
+	} else if ( backlerp > 1.0f ) {
+		backlerp = 1.0f;
+	}
+
+	animCur = ent->e.frame;
+	animOld = ent->e.oldframe;
+	if ( model->numAnimations > 0 ) {
+		if ( ent->e.renderfx & RF_WRAP_FRAMES ) {
+			if ( animCur < 0 ) {
+				animCur = 0;
+			} else {
+				animCur %= model->numAnimations;
+			}
+			if ( animOld < 0 ) {
+				animOld = 0;
+			} else {
+				animOld %= model->numAnimations;
+			}
+		} else {
+			if ( animCur < 0 || animCur >= model->numAnimations ) {
+				animCur = 0;
+			}
+			if ( animOld < 0 || animOld >= model->numAnimations ) {
+				animOld = animCur;
+			}
+		}
+		if ( backlerp > 0.001f && animOld >= 0 && animOld != animCur ) {
+			R_ComputeGLTFJointMatricesBlend( model, animCur, timeCur, animOld, timeOld, backlerp, outMatrices );
+		} else {
+			R_ComputeGLTFJointMatrices( model, animCur, timeCur, outMatrices );
+		}
+	} else {
+		/* No clips: ignore frame indices (avoids game entity frames as anim indices). */
+		R_ComputeGLTFJointMatrices( model, -1, 0.0f, outMatrices );
+	}
+
+	return qtrue;
+}
+
+/*
+===============
+R_GLTFSkinPositions
+===============
+*/
+qboolean R_GLTFSkinPositions( const gltfModel_t *model, const gltfVertex_t *vertices, int numVertices,
+	const float *jointMats, float *outPositions )
+{
+	int v;
+	int numJoints;
+	qboolean anyWeighted = qfalse;
+
+	if ( !model || !vertices || !outPositions || numVertices < 1 ) {
+		return qfalse;
+	}
+
+	numJoints = model->skeleton.numJoints;
+	if ( numJoints <= 0 ) {
+		for ( v = 0; v < numVertices; v++ ) {
+			outPositions[v * 3 + 0] = vertices[v].position[0];
+			outPositions[v * 3 + 1] = vertices[v].position[1];
+			outPositions[v * 3 + 2] = vertices[v].position[2];
+		}
+		return qtrue;
+	}
+
+	if ( !jointMats || numJoints > GLTF_MAX_JOINTS ) {
+		return qfalse;
+	}
+
+	for ( v = 0; v < numVertices; v++ ) {
+		const gltfVertex_t *src = &vertices[v];
+		float *dst = outPositions + v * 3;
+		float w0 = src->weights[0], w1 = src->weights[1], w2 = src->weights[2], w3 = src->weights[3];
+		int j0 = src->joints[0], j1 = src->joints[1], j2 = src->joints[2], j3 = src->joints[3];
+		float spos[3];
+		const float *pos = src->position;
+		float wsum;
+
+		wsum = w0 + w1 + w2 + w3;
+		if ( wsum <= 1e-6f ) {
+			dst[0] = pos[0];
+			dst[1] = pos[1];
+			dst[2] = pos[2];
+			continue;
+		}
+		anyWeighted = qtrue;
+
+		spos[0] = spos[1] = spos[2] = 0.0f;
+		if ( w0 > 0.0f && j0 < numJoints ) {
+			const float *m0 = &jointMats[j0 * 12];
+			spos[0] += w0 * ( m0[0] * pos[0] + m0[1] * pos[1] + m0[2] * pos[2] + m0[3] );
+			spos[1] += w0 * ( m0[4] * pos[0] + m0[5] * pos[1] + m0[6] * pos[2] + m0[7] );
+			spos[2] += w0 * ( m0[8] * pos[0] + m0[9] * pos[1] + m0[10] * pos[2] + m0[11] );
+		}
+		if ( w1 > 0.0f && j1 < numJoints ) {
+			const float *m1 = &jointMats[j1 * 12];
+			spos[0] += w1 * ( m1[0] * pos[0] + m1[1] * pos[1] + m1[2] * pos[2] + m1[3] );
+			spos[1] += w1 * ( m1[4] * pos[0] + m1[5] * pos[1] + m1[6] * pos[2] + m1[7] );
+			spos[2] += w1 * ( m1[8] * pos[0] + m1[9] * pos[1] + m1[10] * pos[2] + m1[11] );
+		}
+		if ( w2 > 0.0f && j2 < numJoints ) {
+			const float *m2 = &jointMats[j2 * 12];
+			spos[0] += w2 * ( m2[0] * pos[0] + m2[1] * pos[1] + m2[2] * pos[2] + m2[3] );
+			spos[1] += w2 * ( m2[4] * pos[0] + m2[5] * pos[1] + m2[6] * pos[2] + m2[7] );
+			spos[2] += w2 * ( m2[8] * pos[0] + m2[9] * pos[1] + m2[10] * pos[2] + m2[11] );
+		}
+		if ( w3 > 0.0f && j3 < numJoints ) {
+			const float *m3 = &jointMats[j3 * 12];
+			spos[0] += w3 * ( m3[0] * pos[0] + m3[1] * pos[1] + m3[2] * pos[2] + m3[3] );
+			spos[1] += w3 * ( m3[4] * pos[0] + m3[5] * pos[1] + m3[6] * pos[2] + m3[7] );
+			spos[2] += w3 * ( m3[8] * pos[0] + m3[9] * pos[1] + m3[10] * pos[2] + m3[11] );
+		}
+		dst[0] = spos[0];
+		dst[1] = spos[1];
+		dst[2] = spos[2];
+	}
+
+	/* Jointed without any skin weights: refuse (caller uses honest AABB). */
+	if ( !anyWeighted ) {
+		return qfalse;
+	}
+
+	return qtrue;
+}
+
 static int R_ComputeGLTFFogNum(const gltfModel_t *model, const trRefEntity_t *ent) {
 	int i, j;
 	const fog_t *fog;

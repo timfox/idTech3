@@ -147,6 +147,19 @@ void     R_ComputeGLTFJointMatricesBlend(const gltfModel_t *model, int animA, fl
 qboolean R_SampleGLTFMeshMorphWeights(const gltfModel_t *model, int animIndex, float timeSeconds,
 	int meshIndex, float *outWeights, int numTargets);
 
+/*
+===============
+R_GLTFSkinPositions
+
+CPU linear-blend skin of primitive positions into outPositions (numVertices * 3),
+model space. jointMats is numJoints * 12 (row-major 3x4). Morph omitted (RT BLAS).
+When numJoints == 0, copies bind positions. Returns qfalse if jointed but matrices
+or usable weights are missing.
+===============
+*/
+qboolean R_GLTFSkinPositions( const gltfModel_t *model, const gltfVertex_t *vertices, int numVertices,
+	const float *jointMats, float *outPositions );
+
 /* Returns gltfModel_t* from modelData when model is MOD_GLTF, else NULL */
 const gltfModel_t *R_GetGLTFModelFromModelData(const void *modelData);
 void     R_FreeGLTF(gltfModel_t *model);
