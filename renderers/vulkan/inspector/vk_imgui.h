@@ -150,6 +150,10 @@ typedef struct {
 	struct {
 		qboolean    open;
 	} studioAnimation;
+
+	struct {
+		qboolean    open;
+	} oscar;
 } vkImguiWindows_t;
 
 typedef struct {
@@ -182,6 +186,7 @@ void VkImgui_DrawStudioConsolePanel(void);
 void VkImgui_DrawStudioEntitiesPanel(void);
 void VkImgui_DrawStudioPaintPanel(void);
 void VkImgui_DrawStudioAnimationPanel(void);
+void VkImgui_DrawOscarPanel(void);
 
 void VkImgui_BindGameColorImage(void);
 

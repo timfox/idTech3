@@ -466,6 +466,10 @@ static int SV_LuaOscar_GetStatus( lua_State *L )
 	lua_setfield( L, -2, "lastError" );
 	lua_pushinteger( L, OSCAR_GetReconnectAttempt() );
 	lua_setfield( L, -2, "reconnectAttempt" );
+	lua_pushinteger( L, OSCAR_BuddyCount() );
+	lua_setfield( L, -2, "buddyCount" );
+	lua_pushinteger( L, (lua_Integer)OSCAR_GetRosterGeneration() );
+	lua_setfield( L, -2, "rosterGeneration" );
 	return 1;
 }
 
@@ -521,6 +525,32 @@ static int SV_LuaOscar_AddBuddy( lua_State *L )
 static int SV_LuaOscar_RemoveBuddy( lua_State *L )
 {
 	lua_pushboolean( L, OSCAR_RemoveBuddy( luaL_checkstring( L, 1 ) ) );
+	return 1;
+}
+
+static int SV_LuaOscar_BuddyCount( lua_State *L )
+{
+	lua_pushinteger( L, OSCAR_BuddyCount() );
+	return 1;
+}
+
+static int SV_LuaOscar_GetBuddy( lua_State *L )
+{
+	oscarBuddy_t buddy;
+	int index = (int)luaL_checkinteger( L, 1 );
+
+	if ( !OSCAR_BuddyGet( index, &buddy ) ) {
+		return 0;
+	}
+	lua_newtable( L );
+	lua_pushstring( L, buddy.screenName );
+	lua_setfield( L, -2, "screenName" );
+	lua_pushstring( L, buddy.status );
+	lua_setfield( L, -2, "status" );
+	lua_pushstring( L, buddy.awayMessage );
+	lua_setfield( L, -2, "awayMessage" );
+	lua_pushboolean( L, buddy.online );
+	lua_setfield( L, -2, "online" );
 	return 1;
 }
 
@@ -653,6 +683,10 @@ static void SV_AppCrdt_RegisterServerLua( void *luaState )
 	lua_setfield( L, -2, "AddBuddy" );
 	lua_pushcfunction( L, SV_LuaOscar_RemoveBuddy );
 	lua_setfield( L, -2, "RemoveBuddy" );
+	lua_pushcfunction( L, SV_LuaOscar_BuddyCount );
+	lua_setfield( L, -2, "BuddyCount" );
+	lua_pushcfunction( L, SV_LuaOscar_GetBuddy );
+	lua_setfield( L, -2, "GetBuddy" );
 	lua_pushcfunction( L, SV_LuaOscar_PollEvent );
 	lua_setfield( L, -2, "PollEvent" );
 	lua_setfield( L, -2, "Oscar" );

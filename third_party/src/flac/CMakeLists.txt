@@ -1,6 +1,6 @@
 # 3.10+ required (CMake deprecates compatibility with versions < 3.10).
-# 3.9 is needed in 'doc' because of doxygen_add_docs()
-cmake_minimum_required(VERSION 3.10)
+# Range opts into policies through 3.24 (matches the idTech3 root minimum).
+cmake_minimum_required(VERSION 3.10...3.24)
 
 if(NOT (CMAKE_BUILD_TYPE OR CMAKE_CONFIGURATION_TYPES OR DEFINED ENV{CFLAGS} OR DEFINED ENV{CXXFLAGS}))
     set(CMAKE_BUILD_TYPE Release CACHE STRING "Choose the type of build, options are: None Debug Release RelWithDebInfo")

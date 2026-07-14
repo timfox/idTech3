@@ -114,6 +114,9 @@ extern "C" void VkImgui_Initialize(void) {
 		vkWindows.studioPaint.open = qtrue;
 		vkWindows.studioAnimation.open = qtrue;
 	}
+	if ( ri.Cvar_VariableIntegerValue( "cl_oscarUi" ) ) {
+		vkWindows.oscar.open = qtrue;
+	}
 
 	vkImguiState.active = qtrue;
 	vkImguiState.inputState = qfalse;
@@ -222,6 +225,7 @@ extern "C" void VkImgui_Draw(void) {
 	VkImgui_DrawStudioEntitiesPanel();
 	VkImgui_DrawStudioPaintPanel();
 	VkImgui_DrawStudioAnimationPanel();
+	VkImgui_DrawOscarPanel();
 
 	ImGui::End();
 	ImGui::Render();

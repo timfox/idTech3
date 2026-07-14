@@ -2,8 +2,8 @@
 ===========================================================================
 Copyright (C) 2026 Gopex LLC. All rights reserved.
 
-RTX entity BLAS: MD3 LOD0 mesh, bind-pose IQM (static), static glTF mesh,
-with AABB proxy fallback for skinned / MDR / pack failures.
+RTX entity BLAS: MD3 LOD0 mesh, IQM (bind-pose or CPU-skinned), static glTF
+mesh, with AABB proxy fallback for MDR / skinned glTF / pack failures.
 ===========================================================================
 */
 
@@ -198,29 +198,30 @@ static qboolean vk_rtx_pack_md3( const trRefEntity_t *ent, const viewParms_t *vi
 ===============
 vk_rtx_pack_iqm
 
-Bind-pose IQM only (num_joints == 0). Skinned IQM uses AABB until animated BLAS lands.
+Bind-pose IQM when num_joints == 0 (or no poses). Jointed IQM CPU-skins via
+R_IQMSkinPositions; returns qfalse on budget/skin failure (AABB fallback).
 ===============
 */
 static qboolean vk_rtx_pack_iqm( const trRefEntity_t *ent, const viewParms_t *viewParms,
 	model_t *mod, float *positions, uint32_t maxVerts, uint32_t *indices, uint32_t maxIndices,
 	uint32_t *ioVertCount, uint32_t *ioIndexCount )
 {
-	const iqmData_t *data;
+	iqmData_t *data;
 	uint32_t vertsBefore = *ioVertCount;
 	uint32_t indicesBefore = *ioIndexCount;
 	uint32_t vertBase;
-	int v, t, numTris;
+	int v, t, numTris, frame, oldframe;
+	float backlerp;
 	const int *tri;
+	float *skinned = NULL;
+	const float *srcPositions;
+	qboolean needSkin;
 
 	if ( !mod->modelData ) {
 		return qfalse;
 	}
-	data = (const iqmData_t *)mod->modelData;
+	data = (iqmData_t *)mod->modelData;
 	if ( !data->positions || !data->triangles || data->num_vertexes < 3 || data->num_triangles < 1 ) {
-		return qfalse;
-	}
-	/* Skinned / jointed meshes stay on AABB (no CPU skin into BLAS yet). */
-	if ( data->num_joints > 0 ) {
 		return qfalse;
 	}
 
@@ -230,13 +231,32 @@ static qboolean vk_rtx_pack_iqm( const trRefEntity_t *ent, const viewParms_t *vi
 		return qfalse;
 	}
 
+	needSkin = (qboolean)( data->num_joints > 0 && data->num_poses > 0 );
+	frame = ent->e.frame;
+	oldframe = ent->e.oldframe;
+	backlerp = ent->e.backlerp;
+
+	if ( needSkin ) {
+		skinned = (float *)ri.Hunk_AllocateTempMemory( data->num_vertexes * 3 * (int)sizeof( float ) );
+		if ( !skinned ) {
+			return qfalse;
+		}
+		if ( !R_IQMSkinPositions( data, frame, oldframe, backlerp, skinned ) ) {
+			ri.Hunk_FreeTempMemory( skinned );
+			return qfalse;
+		}
+		srcPositions = skinned;
+	} else {
+		srcPositions = data->positions;
+	}
+
 	R_RotateForEntity( ent, viewParms, &backEnd.or );
 	vertBase = *ioVertCount;
 
 	for ( v = 0; v < data->num_vertexes; v++ ) {
 		vec3_t local;
 		float *dst = positions + ( vertBase + (uint32_t)v ) * 3u;
-		const float *src = data->positions + v * 3;
+		const float *src = srcPositions + v * 3;
 
 		local[0] = src[0];
 		local[1] = src[1];
@@ -264,6 +284,10 @@ static qboolean vk_rtx_pack_iqm( const trRefEntity_t *ent, const viewParms_t *vi
 	}
 
 	*ioVertCount += (uint32_t)data->num_vertexes;
+
+	if ( skinned ) {
+		ri.Hunk_FreeTempMemory( skinned );
+	}
 
 	if ( *ioIndexCount == indicesBefore ) {
 		*ioVertCount = vertsBefore;
@@ -425,17 +449,12 @@ uint32_t vk_rtx_entities_pack( const trRefdef_t *refdef, const viewParms_t *view
 				triedFailKind = 1;
 			}
 		} else if ( mod->type == MOD_IQM ) {
-			const iqmData_t *iqm = (const iqmData_t *)mod->modelData;
-			if ( iqm && iqm->num_joints > 0 ) {
-				skinnedSkip = qtrue;
+			usedMesh = vk_rtx_pack_iqm( ent, viewParms, mod, positions, maxVerts, indices, maxIndices,
+				&vertCount, &indexCount );
+			if ( usedMesh ) {
+				meshKind = 2;
 			} else {
-				usedMesh = vk_rtx_pack_iqm( ent, viewParms, mod, positions, maxVerts, indices, maxIndices,
-					&vertCount, &indexCount );
-				if ( usedMesh ) {
-					meshKind = 2;
-				} else {
-					triedFailKind = 2;
-				}
+				triedFailKind = 2;
 			}
 		} else if ( mod->type == MOD_GLTF ) {
 			const gltfModel_t *gltf = R_GetGLTFModelFromModelData( mod->modelData );

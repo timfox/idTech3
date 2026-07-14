@@ -126,6 +126,101 @@ static void HYBRID1_ResetHistory( void )
 	hybrid1.traced = qfalse;
 }
 
+static int s_hybrid1AppliedQuality = -1;
+
+/*
+===============
+HYBRID1_ApplyQualityPreset
+
+When r_hybrid1Quality is 1–3, rewrite live Hybrid1 knobs to the preset table.
+Quality 0 leaves individual cvars untouched (custom). Entity BLAS is not latched here.
+===============
+*/
+static void HYBRID1_ApplyQualityPreset( void )
+{
+	int q;
+	const char *name;
+
+	if ( !r_hybrid1Quality ) {
+		return;
+	}
+	q = r_hybrid1Quality->integer;
+	if ( q < 0 ) {
+		q = 0;
+	} else if ( q > 3 ) {
+		q = 3;
+	}
+	if ( q == 0 ) {
+		if ( s_hybrid1AppliedQuality != 0 ) {
+			s_hybrid1AppliedQuality = 0;
+			ri.Printf( PRINT_DEVELOPER, "[VK][Hybrid1] quality=custom (individual r_hybrid1_* knobs)\n" );
+		}
+		r_hybrid1Quality->modified = qfalse;
+		return;
+	}
+	if ( q == s_hybrid1AppliedQuality && !r_hybrid1Quality->modified ) {
+		return;
+	}
+
+	ri.Cvar_Set( "r_hybrid1_shadow", "1" );
+	ri.Cvar_Set( "r_hybrid1_spec", "1" );
+	ri.Cvar_Set( "r_hybrid1_ibl", "1" );
+	ri.Cvar_Set( "r_hybrid1_ggx", "1" );
+	ri.Cvar_Set( "r_hybrid1_taa", "1" );
+	ri.Cvar_Set( "r_hybrid1_motion", "1" );
+	ri.Cvar_Set( "r_hybrid1_historyClamp", "1" );
+	ri.Cvar_Set( "r_hybrid1_adaptiveBlur", "1" );
+	ri.Cvar_Set( "r_hybrid1_separableBlur", "1" );
+	ri.Cvar_Set( "r_hybrid1_reinhard", "1" );
+	ri.Cvar_Set( "r_hybrid1_contactHarden", "1" );
+	ri.Cvar_Set( "r_hybrid1_diffuseDirect", "1" );
+
+	if ( q == 1 ) {
+		name = "performance";
+		ri.Cvar_Set( "r_hybrid1_diffuse", "0" );
+		ri.Cvar_Set( "r_hybrid1_atrousIters", "2" );
+		ri.Cvar_Set( "r_hybrid1_dlightShadows", "0" );
+		ri.Cvar_Set( "r_hybrid1_sunRadius", "0" );
+		ri.Cvar_Set( "r_hybrid1_iblMode", "1" );
+		ri.Cvar_Set( "r_hybrid1_temporalAlpha", "0.15" );
+	} else if ( q == 2 ) {
+		name = "balanced";
+		ri.Cvar_Set( "r_hybrid1_diffuse", "0" );
+		ri.Cvar_Set( "r_hybrid1_atrousIters", "3" );
+		ri.Cvar_Set( "r_hybrid1_dlightShadows", "1" );
+		ri.Cvar_Set( "r_hybrid1_sunRadius", "0.25" );
+		ri.Cvar_Set( "r_hybrid1_iblMode", "1" );
+		ri.Cvar_Set( "r_hybrid1_temporalAlpha", "0.1" );
+	} else {
+		name = "quality";
+		ri.Cvar_Set( "r_hybrid1_diffuse", "1" );
+		ri.Cvar_Set( "r_hybrid1_atrousIters", "4" );
+		ri.Cvar_Set( "r_hybrid1_dlightShadows", "2" );
+		ri.Cvar_Set( "r_hybrid1_sunRadius", "0.5" );
+		ri.Cvar_Set( "r_hybrid1_iblMode", "2" );
+		ri.Cvar_Set( "r_hybrid1_temporalAlpha", "0.1" );
+	}
+
+	s_hybrid1AppliedQuality = q;
+	r_hybrid1Quality->modified = qfalse;
+	ri.Printf( PRINT_ALL, "[VK][Hybrid1] quality preset=%d (%s)\n", q, name );
+}
+
+static const char *HYBRID1_QualityName( void )
+{
+	int q = r_hybrid1Quality ? r_hybrid1Quality->integer : 0;
+	if ( q <= 0 ) {
+		return "custom";
+	}
+	if ( q == 1 ) {
+		return "performance";
+	}
+	if ( q == 2 ) {
+		return "balanced";
+	}
+	return "quality";
+}
+
 static const char *HYBRID1_StateString( void )
 {
 	qboolean shadowOn = ( !r_hybrid1_shadow || r_hybrid1_shadow->integer ) ? qtrue : qfalse;
@@ -159,14 +254,14 @@ static const char *HYBRID1_StateString( void )
 static void HYBRID1_Status_f( void )
 {
 	ri.Printf( PRINT_ALL,
-		"[VK][Hybrid1] state=%s active=%d ready=%d sceneReady=%d rtx=%d fbo=%d demo=%d %ux%u frame=%u\n"
+		"[VK][Hybrid1] state=%s active=%d ready=%d sceneReady=%d rtx=%d fbo=%d demo=%d quality=%d(%s) %ux%u frame=%u\n"
 		"  channels shadow=%d spec=%d diffuse=%d ibl=%d motion=%d taa=%d debug=%d\n"
 		"  denoise clamp=%d gamma=%.2f alpha=%.2f atrous=%d separable=%d adaptive=%d reinhard=%d\n"
 		"  phiColor=%.2f depthTol=%.4f normalDot=%.2f adaptAngle=%.1f adaptRough=%.2f\n"
 		"  rayBias=%.3f tMin=%.3f specRoughMax=%.2f sunRadius=%.2f contact=%d\n"
 		"  ggx=%d iblMode=%d diffuseDirect=%d dlightShadows=%d\n"
 		"  composite shadowStr=%.2f specStr=%.2f diffuseStr=%.2f deferredGBuffer=%d\n"
-		"  note: Hybrid1 is the production RT lighting path; run rtx_status for TLAS UPDATE/entity proxy reasons\n",
+		"  note: Hybrid1 is the production RT lighting path; seta r_hybrid1Quality 1|2|3; rtx_status for TLAS/entities\n",
 		HYBRID1_StateString(),
 		vk_hybrid1_active() ? 1 : 0,
 		hybrid1.ready ? 1 : 0,
@@ -174,6 +269,8 @@ static void HYBRID1_Status_f( void )
 		vk.rtxAvailable ? 1 : 0,
 		vk.fboActive ? 1 : 0,
 		( r_rtxDemo && r_rtxDemo->integer ) ? 1 : 0,
+		r_hybrid1Quality ? r_hybrid1Quality->integer : 0,
+		HYBRID1_QualityName(),
 		hybrid1.width, hybrid1.height,
 		hybrid1.frame_index,
 		( r_hybrid1_shadow && r_hybrid1_shadow->integer ) ? 1 : 0,
@@ -234,6 +331,7 @@ static qboolean HYBRID1_ConsumeCvarResets( void )
 {
 	qboolean reset = qfalse;
 	cvar_t *watch[] = {
+		r_hybrid1Quality,
 		r_hybrid1_shadow,
 		r_hybrid1_spec,
 		r_hybrid1_diffuse,
@@ -1481,6 +1579,7 @@ void vk_hybrid1_frame_begin( void )
 {
 	uint32_t w, h;
 
+	HYBRID1_ApplyQualityPreset();
 	HYBRID1_ConsumeCvarResets();
 
 	if ( !hybrid1.ready ) {

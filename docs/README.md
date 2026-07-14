@@ -50,7 +50,7 @@ Documentation is grouped by **tier**. Most files remain at their historical path
 - [VOIP.md](VOIP.md) — Opus voice chat + head lip flap
 - [IDTECH3_TV.md](IDTECH3_TV.md) — external idTech3-tv / Owncast live-stream publishing
 - [TORRENT_CONTENT.md](TORRENT_CONTENT.md) — optional peer-assisted `.pk3` package delivery
-- [OSCAR_INTEGRATION.md](OSCAR_INTEGRATION.md) — Open OSCAR gateway bridge
+- [OSCAR_INTEGRATION.md](OSCAR_INTEGRATION.md) — Open OSCAR hybrid AIM (direct FLAP/BOS + Chat rooms, roster, client ImGui)
 - [FACS.md](FACS.md) — Facial Action Coding System Action Units
 
 ## Repository layout (2026)

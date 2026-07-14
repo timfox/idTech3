@@ -23,6 +23,7 @@ Copyright (C) 2026 Gopex LLC. All rights reserved.
 #include "cl_emulator.h"
 #include "lua_debug.h"
 #include "cl_app_crdt.h"
+#include "cl_oscar.h"
 
 qboolean CL_CheckPaused( void )
 {
@@ -129,6 +130,7 @@ void CL_Frame( int msec, int realMsec ) {
 	LuaDebug_WatchTick( Sys_Milliseconds() );
 	CL_AppCrdt_Frame();
 #endif
+	CL_Oscar_Frame();
 
 	Con_RunConsole();
 }

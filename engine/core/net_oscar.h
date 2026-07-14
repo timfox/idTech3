@@ -3,6 +3,8 @@
 
 #include "q_shared.h"
 
+#define OSCAR_MAX_BUDDIES 64
+
 typedef enum {
 	OSCAR_STATE_DISABLED = 0,
 	OSCAR_STATE_DISCONNECTED,
@@ -34,9 +36,17 @@ typedef struct {
 	char text[MAX_STRING_CHARS];
 } oscarEvent_t;
 
+typedef struct {
+	char screenName[MAX_NAME_LENGTH];
+	char status[32];
+	char awayMessage[MAX_STRING_CHARS];
+	qboolean online;
+} oscarBuddy_t;
+
 void OSCAR_Init( void );
 void OSCAR_Shutdown( void );
 void OSCAR_Frame( int realtime );
+void OSCAR_RegisterCommands( void );
 
 qboolean OSCAR_IsAvailable( void );
 qboolean OSCAR_Connect( void );
@@ -56,5 +66,10 @@ const char *OSCAR_GetLastError( void );
 const char *OSCAR_GetCurrentRoom( void );
 int OSCAR_GetReconnectAttempt( void );
 qboolean OSCAR_PollEvent( oscarEvent_t *eventOut );
+
+int OSCAR_BuddyCount( void );
+qboolean OSCAR_BuddyGet( int index, oscarBuddy_t *out );
+void OSCAR_BuddyClear( void );
+unsigned int OSCAR_GetRosterGeneration( void );
 
 #endif /* NET_OSCAR_H */

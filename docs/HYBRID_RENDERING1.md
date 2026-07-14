@@ -42,22 +42,35 @@ vid_restart
 Optional:
 
 ```
-r_hybrid1_diffuse 1       // indirect diffuse GI channel
-r_hybrid1_ibl 1           // cubemap on RT miss / secondary hit (needs skybox or PBR cubemap)
-r_hybrid1_taa 1           // TAA after hybrid composite (default on)
-r_rtxEntities 1           // entity mesh BLAS: MD3 LOD0 + bind-pose IQM + static glTF (+ AABB fallback); shared with Hybrid1 TLAS
-r_rtxEntityTriCap 65536   // entity BLAS triangle budget (latched)
+seta r_hybrid1Quality 2   // 0=custom, 1=performance, 2=balanced, 3=quality (live)
+r_hybrid1_diffuse 1       // or use quality 3 instead of hand-tuning
+r_hybrid1_ibl 1
+r_hybrid1_taa 1
+r_rtxEntities 1           // entity mesh BLAS: MD3 LOD0 + CPU-skinned IQM + static glTF (+ AABB for MDR / skinned glTF / fail)
+r_rtxEntityTriCap 65536
 ```
 
-`demo_hybrid1.cfg` sets `r_rtxEntities 1`. Console **`rtx_status`** reports `entity_ents` / `entity_tris` / `mesh` breakdown (`md3` / `iqm` / `gltf`) / `proxy` reasons (`nonmesh` = MDR/unknown, `skinned` = IQM/glTF with joints, `md3fail` / `iqmfail` / `gltffail` = pack failed → AABB) and **TLAS mode** (`UPDATE` vs `REBUILD` with reason).
+`demo_hybrid1.cfg` sets `r_rtxEntities 1` and `r_hybrid1Quality 3`. Console **`rtx_status`** reports `entity_ents` / `entity_tris` / `mesh` breakdown (`md3` / `iqm` / `gltf`) / `proxy` reasons (`nonmesh` = MDR/unknown, `skinned` = skinned glTF, `md3fail` / `iqmfail` / `gltffail` = pack failed → AABB) and **TLAS mode** (`UPDATE` vs `REBUILD` with reason).
 
 `r_rtx 1` **or** `r_hybrid1 1` before `vid_restart` enables KHR ray tracing device features.
+
+## Quality presets (`r_hybrid1Quality`)
+
+| Value | Name | Effect (while `r_hybrid1` 1) |
+|------:|------|------------------------------|
+| 0 | custom | Leave individual `r_hybrid1_*` knobs alone |
+| 1 | performance | No diffuse RT; 2 A-trous iters; hard sun; no dlight shadows |
+| 2 | balanced | No diffuse; 3 A-trous; soft sun 0.25°; 1 dlight shadow |
+| 3 | quality | Diffuse on; 4 A-trous; soft sun 0.5°; EnvBRDF IBL; 2 dlight shadows |
+
+Live (no latch). Entity BLAS stays a separate latched companion (`r_rtxEntities` + `vid_restart`).
 
 ## Cvars
 
 | Cvar | Default | Role |
 |------|---------|------|
 | `r_hybrid1` | 0 | Master toggle (latched) |
+| `r_hybrid1Quality` | 0 | Preset tier (live; see table above) |
 | `r_hybrid1_shadow` | 1 | Shadow trace + denoise |
 | `r_hybrid1_spec` | 1 | Specular trace + denoise |
 | `r_hybrid1_diffuse` | 0 | Indirect diffuse trace + A-trous denoise |

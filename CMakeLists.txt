@@ -2243,6 +2243,7 @@ if(USE_IMGUI AND NOT APPLE)
     renderers/vulkan/inspector/vk_imgui_helpers.cpp
     renderers/vulkan/inspector/vk_imgui_fonts.cpp
     renderers/vulkan/inspector/vk_imgui_studio_panels.cpp
+    renderers/vulkan/inspector/vk_imgui_oscar_panels.cpp
     renderers/vulkan/inspector/vk_imgui_postfx_panels.cpp
     renderers/vulkan/inspector/vk_imgui_physics_panels.cpp
     renderers/vulkan/inspector/vk_imgui_volumetrics_panels.cpp

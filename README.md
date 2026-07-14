@@ -63,6 +63,7 @@ Modernized id Tech 3: **Vulkan renderer with PBR**, validation and smoke-tested 
 * Graceful automatic fallback to IPv4-only if stack or OS configuration requires
 * DTLS (Datagram TLS) for secure UDP when enabled at runtime (`net_dtls` + `net_dtls_key`; OpenSSL linked when available at build time)
 * Optional TLS-secured remote console (off by default)
+* Optional Open OSCAR / AIM bridge (`oscar_enable`): hybrid direct FLAP client with buddy roster, Chat rooms, and ImGui buddy panel — see `docs/OSCAR_INTEGRATION.md`
 * Console/logging for connection diagnostics and real-time network statistics
 
 **Systems** (game and engine extensions):

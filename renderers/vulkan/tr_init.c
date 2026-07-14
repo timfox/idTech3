@@ -293,6 +293,7 @@ cvar_t	*r_pathtrace_denoiseDepthTol;
 cvar_t	*r_pathtrace_debug;
 cvar_t	*r_pathtrace_composite;
 cvar_t	*r_hybrid1;
+cvar_t	*r_hybrid1Quality;
 cvar_t	*r_hybrid1_shadow;
 cvar_t	*r_hybrid1_spec;
 cvar_t	*r_hybrid1_historyClamp;
@@ -4439,7 +4440,7 @@ static void R_Register( void )
 	r_rtxEntities = ri.Cvar_Get( "r_rtxEntities", "0", CVAR_ARCHIVE_ND | CVAR_LATCH );
 	ri.Cvar_CheckRange( r_rtxEntities, "0", "1", CV_INTEGER );
 	ri.Cvar_SetDescription( r_rtxEntities,
-		"When USE_VULKAN_RTX: pack RT_MODEL entities into a second BLAS (MD3 LOD0, bind-pose IQM, static glTF; AABB for skinned/MDR/fail). Default 0 (latched)." );
+		"When USE_VULKAN_RTX: pack RT_MODEL entities into a second BLAS (MD3 LOD0, CPU-skinned IQM, static glTF; AABB for MDR/skinned glTF/fail). Default 0 (latched)." );
 	ri.Cvar_SetGroup( r_rtxEntities, CVG_RENDERER );
 	r_rtxEntityCap = ri.Cvar_Get( "r_rtxEntityCap", "128", CVAR_ARCHIVE_ND | CVAR_LATCH );
 	ri.Cvar_CheckRange( r_rtxEntityCap, "0", "1024", CV_INTEGER );
@@ -4496,8 +4497,13 @@ static void R_Register( void )
 	r_hybrid1 = ri.Cvar_Get( "r_hybrid1", "0", CVAR_ARCHIVE_ND | CVAR_LATCH );
 	ri.Cvar_CheckRange( r_hybrid1, "0", "1", CV_INTEGER );
 	ri.Cvar_SetDescription( r_hybrid1,
-		"Chocolate RT tier — Granja/Pereira Hybrid Rendering 1 (USE_VULKAN_RTX): 1-SPP shadow/spec/diffuse RT, SVGF, A-trous, IBL, composite. Requires r_rtxDemo 1, r_fbo 1, vid_restart. See docs/HYBRID_RENDERING1.md." );
+		"Chocolate RT tier — Granja/Pereira Hybrid Rendering 1 (USE_VULKAN_RTX): 1-SPP shadow/spec/diffuse RT, SVGF, A-trous, IBL, composite. Requires r_rtxDemo 1, r_fbo 1, vid_restart. Quality tiers: r_hybrid1Quality. See docs/HYBRID_RENDERING1.md." );
 	ri.Cvar_SetGroup( r_hybrid1, CVG_RENDERER );
+	r_hybrid1Quality = ri.Cvar_Get( "r_hybrid1Quality", "0", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_hybrid1Quality, "0", "3", CV_INTEGER );
+	ri.Cvar_SetDescription( r_hybrid1Quality,
+		"Hybrid1 quality preset when r_hybrid1 1: 0=custom (leave individual r_hybrid1_* alone), 1=performance, 2=balanced, 3=quality (≈ demo_hybrid1.cfg). Live; entity BLAS still needs r_rtxEntities + vid_restart." );
+	ri.Cvar_SetGroup( r_hybrid1Quality, CVG_RENDERER );
 	r_hybrid1_shadow = ri.Cvar_Get( "r_hybrid1_shadow", "1", CVAR_ARCHIVE_ND );
 	ri.Cvar_CheckRange( r_hybrid1_shadow, "0", "1", CV_INTEGER );
 	ri.Cvar_SetDescription( r_hybrid1_shadow, "Hybrid1: trace and denoise sun shadow visibility channel." );
@@ -4624,7 +4630,7 @@ static void R_Register( void )
 	ri.Cvar_SetGroup( r_hybrid1_motion, CVG_RENDERER );
 	if ( r_hybrid1 && r_hybrid1->integer ) {
 		ri.Printf( PRINT_ALL,
-			"[VK][Hybrid1] r_hybrid1=1 (latched; build with USE_VULKAN_RTX, set r_rtxDemo 1 + r_fbo 1, vid_restart; exec demo_hybrid1.cfg)\n" );
+			"[VK][Hybrid1] r_hybrid1=1 (latched; USE_VULKAN_RTX, r_rtxDemo 1 + r_fbo 1, vid_restart; r_hybrid1Quality 0=custom/1=perf/2=balanced/3=quality)\n" );
 	}
 	r_vdbFog = ri.Cvar_Get( "r_vdbFog", "0", CVAR_ARCHIVE_ND );
 	ri.Cvar_CheckRange( r_vdbFog, "0", "1", CV_INTEGER );

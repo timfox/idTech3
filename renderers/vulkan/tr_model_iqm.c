@@ -1737,6 +1737,132 @@ static void ComputeJointMats( iqmData_t *data, int frame, int oldframe,
 
 
 /*
+===============
+R_IQMSkinPositions
+
+Pack-callable CPU skin for RTX entity BLAS (and similar consumers).
+===============
+*/
+qboolean R_IQMSkinPositions( iqmData_t *data, int frame, int oldframe, float backlerp,
+	float *outPositions )
+{
+	float poseMats[IQM_MAX_JOINTS * 12];
+	int v;
+
+	if ( !data || !outPositions || !data->positions || data->num_vertexes < 1 ) {
+		return qfalse;
+	}
+
+	/* Unskinned / static mesh: bind positions are correct. */
+	if ( data->num_joints <= 0 || data->num_poses <= 0 ) {
+		Com_Memcpy( outPositions, data->positions, (size_t)data->num_vertexes * 3u * sizeof( float ) );
+		return qtrue;
+	}
+
+	/* Jointed without influence tables: refuse (caller uses honest AABB). */
+	if ( !data->influences || !data->influenceBlendIndexes ||
+		( !data->influenceBlendWeights.f && !data->influenceBlendWeights.b ) ) {
+		return qfalse;
+	}
+
+	if ( data->num_poses > IQM_MAX_JOINTS || data->num_joints > IQM_MAX_JOINTS ) {
+		return qfalse;
+	}
+
+	if ( data->num_frames > 0 ) {
+		frame %= data->num_frames;
+		oldframe %= data->num_frames;
+		if ( frame < 0 ) {
+			frame = 0;
+		}
+		if ( oldframe < 0 ) {
+			oldframe = 0;
+		}
+	} else {
+		frame = 0;
+		oldframe = 0;
+	}
+	if ( backlerp < 0.0f ) {
+		backlerp = 0.0f;
+	} else if ( backlerp > 1.0f ) {
+		backlerp = 1.0f;
+	}
+
+	ComputePoseMats( data, frame, oldframe, backlerp, poseMats );
+
+	for ( v = 0; v < data->num_vertexes; v++ ) {
+		int influence = data->influences[v];
+		float blendWeights[4];
+		float vtxMat[12];
+		const float *src = data->positions + v * 3;
+		float *dst = outPositions + v * 3;
+		int j;
+
+		if ( influence < 0 ) {
+			dst[0] = src[0];
+			dst[1] = src[1];
+			dst[2] = src[2];
+			continue;
+		}
+
+		if ( data->blendWeightsType == IQM_FLOAT ) {
+			blendWeights[0] = data->influenceBlendWeights.f[4 * influence + 0];
+			blendWeights[1] = data->influenceBlendWeights.f[4 * influence + 1];
+			blendWeights[2] = data->influenceBlendWeights.f[4 * influence + 2];
+			blendWeights[3] = data->influenceBlendWeights.f[4 * influence + 3];
+		} else {
+			blendWeights[0] = (float)data->influenceBlendWeights.b[4 * influence + 0] / 255.0f;
+			blendWeights[1] = (float)data->influenceBlendWeights.b[4 * influence + 1] / 255.0f;
+			blendWeights[2] = (float)data->influenceBlendWeights.b[4 * influence + 2] / 255.0f;
+			blendWeights[3] = (float)data->influenceBlendWeights.b[4 * influence + 3] / 255.0f;
+		}
+
+		if ( blendWeights[0] <= 0.0f ) {
+			Com_Memcpy( vtxMat, identityMatrix, sizeof( vtxMat ) );
+		} else {
+			int ji = data->influenceBlendIndexes[4 * influence + 0];
+			vtxMat[0] = blendWeights[0] * poseMats[12 * ji + 0];
+			vtxMat[1] = blendWeights[0] * poseMats[12 * ji + 1];
+			vtxMat[2] = blendWeights[0] * poseMats[12 * ji + 2];
+			vtxMat[3] = blendWeights[0] * poseMats[12 * ji + 3];
+			vtxMat[4] = blendWeights[0] * poseMats[12 * ji + 4];
+			vtxMat[5] = blendWeights[0] * poseMats[12 * ji + 5];
+			vtxMat[6] = blendWeights[0] * poseMats[12 * ji + 6];
+			vtxMat[7] = blendWeights[0] * poseMats[12 * ji + 7];
+			vtxMat[8] = blendWeights[0] * poseMats[12 * ji + 8];
+			vtxMat[9] = blendWeights[0] * poseMats[12 * ji + 9];
+			vtxMat[10] = blendWeights[0] * poseMats[12 * ji + 10];
+			vtxMat[11] = blendWeights[0] * poseMats[12 * ji + 11];
+			for ( j = 1; j < 4; j++ ) {
+				if ( blendWeights[j] <= 0.0f ) {
+					break;
+				}
+				ji = data->influenceBlendIndexes[4 * influence + j];
+				vtxMat[0] += blendWeights[j] * poseMats[12 * ji + 0];
+				vtxMat[1] += blendWeights[j] * poseMats[12 * ji + 1];
+				vtxMat[2] += blendWeights[j] * poseMats[12 * ji + 2];
+				vtxMat[3] += blendWeights[j] * poseMats[12 * ji + 3];
+				vtxMat[4] += blendWeights[j] * poseMats[12 * ji + 4];
+				vtxMat[5] += blendWeights[j] * poseMats[12 * ji + 5];
+				vtxMat[6] += blendWeights[j] * poseMats[12 * ji + 6];
+				vtxMat[7] += blendWeights[j] * poseMats[12 * ji + 7];
+				vtxMat[8] += blendWeights[j] * poseMats[12 * ji + 8];
+				vtxMat[9] += blendWeights[j] * poseMats[12 * ji + 9];
+				vtxMat[10] += blendWeights[j] * poseMats[12 * ji + 10];
+				vtxMat[11] += blendWeights[j] * poseMats[12 * ji + 11];
+			}
+		}
+
+		dst[0] = vtxMat[0] * src[0] + vtxMat[1] * src[1] + vtxMat[2] * src[2] + vtxMat[3];
+		dst[1] = vtxMat[4] * src[0] + vtxMat[5] * src[1] + vtxMat[6] * src[2] + vtxMat[7];
+		dst[2] = vtxMat[8] * src[0] + vtxMat[9] * src[1] + vtxMat[10] * src[2] + vtxMat[11];
+	}
+
+	return qtrue;
+}
+
+
+/*
 =================
 RB_AddIQMSurfaces
 

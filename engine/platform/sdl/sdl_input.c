@@ -51,6 +51,9 @@ static cvar_t *in_joystick;
 static cvar_t *in_joystickThreshold;
 static cvar_t *in_joystickNo;
 static cvar_t *in_joystickUseAnalog;
+static cvar_t *in_gamepadEvents;
+static cvar_t *in_gamepadMappingFile;
+static cvar_t *in_gamepadRumble;
 
 static cvar_t *j_pitch;
 static cvar_t *j_yaw;
@@ -70,6 +73,30 @@ static cvar_t *cl_consoleKeys;
 
 static int in_eventTime = 0;
 static qboolean mouse_focus;
+
+#ifdef SDL_INIT_CAMERA
+typedef struct {
+	SDL_Camera *camera;
+	SDL_CameraID id;
+	SDL_CameraSpec spec;
+	qboolean hasSpec;
+	qboolean active;
+	int permission;
+	unsigned int frameCount;
+	int lastWidth;
+	int lastHeight;
+	SDL_PixelFormat lastFormat;
+	Uint64 lastTimestampNS;
+} sdlWebcamState_t;
+
+static sdlWebcamState_t s_webcam;
+static cvar_t *cl_webcamEnable;
+static cvar_t *cl_webcamDevice;
+static cvar_t *cl_webcamWidth;
+static cvar_t *cl_webcamHeight;
+static cvar_t *cl_webcamFps;
+static cvar_t *cl_webcamPoll;
+#endif
 
 #define CTRL(a) ((a)-'a'+1)
 
@@ -610,6 +637,15 @@ static void IN_InitJoystick( void )
 		Com_DPrintf("SDL_Init(SDL_INIT_GAMEPAD) passed.\n");
 	}
 
+	SDL_SetGamepadEventsEnabled( !in_gamepadEvents || in_gamepadEvents->integer ? true : false );
+	if ( in_gamepadMappingFile && in_gamepadMappingFile->string[0] ) {
+		int added = SDL_AddGamepadMappingsFromFile( in_gamepadMappingFile->string );
+		if ( added < 0 )
+			Com_DPrintf( "SDL3 gamepad mappings '%s' failed: %s\n", in_gamepadMappingFile->string, SDL_GetError() );
+		else if ( added > 0 )
+			Com_DPrintf( "SDL3 gamepad mappings: loaded %d from %s\n", added, in_gamepadMappingFile->string );
+	}
+
 	joyIds = SDL_GetJoysticks(&total);
 	Com_DPrintf("%d possible joysticks\n", total);
 
@@ -712,6 +748,125 @@ static void IN_ShutdownJoystick( void )
 
 	SDL_QuitSubSystem(SDL_INIT_GAMEPAD);
 	SDL_QuitSubSystem(SDL_INIT_JOYSTICK);
+}
+
+static void IN_GamepadStatus_f( void )
+{
+	int total = 0;
+	SDL_JoystickID *joyIds;
+	int i;
+
+	joyIds = SDL_GetJoysticks( &total );
+	Com_Printf( "SDL3 gamepad status:\n" );
+	Com_Printf( "  in_joystick=%d selected=%d analog=%d threshold=%.3f events=%d rumble=%d\n",
+		in_joystick ? in_joystick->integer : 0,
+		in_joystickNo ? in_joystickNo->integer : 0,
+		in_joystickUseAnalog ? in_joystickUseAnalog->integer : 0,
+		in_joystickThreshold ? in_joystickThreshold->value : 0.0f,
+		in_gamepadEvents ? in_gamepadEvents->integer : 1,
+		in_gamepadRumble ? in_gamepadRumble->integer : 1 );
+	Com_Printf( "  devices=%d activeJoystick=%s activeGamepad=%s\n",
+		total, stick ? "yes" : "no", gamepad ? "yes" : "no" );
+
+	if ( gamepad ) {
+		SDL_PropertiesID props = SDL_GetGamepadProperties( gamepad );
+		Com_Printf( "  activeName=%s rumbleCap=%s triggerRumbleCap=%s\n",
+			SDL_GetGamepadName( gamepad ) ? SDL_GetGamepadName( gamepad ) : "(unknown)",
+			SDL_GetBooleanProperty( props, SDL_PROP_GAMEPAD_CAP_RUMBLE_BOOLEAN, false ) ? "yes" : "no",
+			SDL_GetBooleanProperty( props, SDL_PROP_GAMEPAD_CAP_TRIGGER_RUMBLE_BOOLEAN, false ) ? "yes" : "no" );
+	} else if ( stick ) {
+		char guid[64];
+		SDL_GUIDToString( SDL_GetJoystickGUID( stick ), guid, sizeof( guid ) );
+		Com_Printf( "  activeName=%s guid=%s axes=%d buttons=%d hats=%d\n",
+			SDL_GetJoystickName( stick ) ? SDL_GetJoystickName( stick ) : "(unknown)", guid,
+			SDL_GetNumJoystickAxes( stick ), SDL_GetNumJoystickButtons( stick ), SDL_GetNumJoystickHats( stick ) );
+	}
+
+	for ( i = 0; joyIds && i < total; i++ ) {
+		char guid[64];
+		SDL_GUIDToString( SDL_GetJoystickGUIDForID( joyIds[i] ), guid, sizeof( guid ) );
+		Com_Printf( "  [%d] %s%s guid=%s\n", i,
+			SDL_GetJoystickNameForID( joyIds[i] ) ? SDL_GetJoystickNameForID( joyIds[i] ) : "(unknown)",
+			SDL_IsGamepad( joyIds[i] ) ? " (gamepad)" : "", guid );
+	}
+
+	if ( joyIds ) {
+		SDL_free( joyIds );
+	}
+}
+
+static void IN_GamepadLoadMappings_f( void )
+{
+	const char *path;
+	int added;
+
+	if ( Cmd_Argc() > 1 ) {
+		path = Cmd_Argv( 1 );
+	} else if ( in_gamepadMappingFile && in_gamepadMappingFile->string[0] ) {
+		path = in_gamepadMappingFile->string;
+	} else {
+		Com_Printf( "usage: gamepad_load_mappings <path-to-gamecontrollerdb.txt>\n" );
+		return;
+	}
+
+	added = SDL_AddGamepadMappingsFromFile( path );
+	if ( added < 0 ) {
+		Com_Printf( "SDL3 gamepad mapping load failed for '%s': %s\n", path, SDL_GetError() );
+		return;
+	}
+
+	Com_Printf( "SDL3 gamepad mappings: loaded %d mapping(s) from %s\n", added, path );
+	IN_InitJoystick();
+}
+
+static void IN_GamepadRumble_f( void )
+{
+	int low, high, ms;
+
+	if ( !gamepad ) {
+		Com_Printf( "gamepad_rumble: no active SDL3 gamepad\n" );
+		return;
+	}
+	if ( in_gamepadRumble && !in_gamepadRumble->integer ) {
+		Com_Printf( "gamepad_rumble: disabled by in_gamepadRumble 0\n" );
+		return;
+	}
+	if ( Cmd_Argc() < 4 ) {
+		Com_Printf( "usage: gamepad_rumble <low 0-65535> <high 0-65535> <milliseconds>\n" );
+		return;
+	}
+
+	low = Com_Clamp( 0, 65535, atoi( Cmd_Argv( 1 ) ) );
+	high = Com_Clamp( 0, 65535, atoi( Cmd_Argv( 2 ) ) );
+	ms = Com_Clamp( 0, 10000, atoi( Cmd_Argv( 3 ) ) );
+	if ( !SDL_RumbleGamepad( gamepad, (Uint16)low, (Uint16)high, (Uint32)ms ) ) {
+		Com_Printf( "gamepad_rumble failed: %s\n", SDL_GetError() );
+	}
+}
+
+static void IN_GamepadTriggerRumble_f( void )
+{
+	int left, right, ms;
+
+	if ( !gamepad ) {
+		Com_Printf( "gamepad_trigger_rumble: no active SDL3 gamepad\n" );
+		return;
+	}
+	if ( in_gamepadRumble && !in_gamepadRumble->integer ) {
+		Com_Printf( "gamepad_trigger_rumble: disabled by in_gamepadRumble 0\n" );
+		return;
+	}
+	if ( Cmd_Argc() < 4 ) {
+		Com_Printf( "usage: gamepad_trigger_rumble <left 0-65535> <right 0-65535> <milliseconds>\n" );
+		return;
+	}
+
+	left = Com_Clamp( 0, 65535, atoi( Cmd_Argv( 1 ) ) );
+	right = Com_Clamp( 0, 65535, atoi( Cmd_Argv( 2 ) ) );
+	ms = Com_Clamp( 0, 10000, atoi( Cmd_Argv( 3 ) ) );
+	if ( !SDL_RumbleGamepadTriggers( gamepad, (Uint16)left, (Uint16)right, (Uint32)ms ) ) {
+		Com_Printf( "gamepad_trigger_rumble failed: %s\n", SDL_GetError() );
+	}
 }
 
 
@@ -1131,6 +1286,183 @@ static void IN_JoyMove( void )
 }
 #endif  // USE_JOYSTICK
 
+#ifdef SDL_INIT_CAMERA
+static const char *IN_WebcamPositionName( SDL_CameraPosition pos )
+{
+	switch ( pos ) {
+		case SDL_CAMERA_POSITION_FRONT_FACING: return "front";
+		case SDL_CAMERA_POSITION_BACK_FACING: return "back";
+		default: return "unknown";
+	}
+}
+
+static qboolean IN_WebcamEnsureSubsystem( void )
+{
+	if ( SDL_WasInit( SDL_INIT_CAMERA ) ) {
+		return qtrue;
+	}
+	if ( !SDL_Init( SDL_INIT_CAMERA ) ) {
+		Com_Printf( "SDL_Init(SDL_INIT_CAMERA) failed: %s\n", SDL_GetError() );
+		return qfalse;
+	}
+	return qtrue;
+}
+
+static void IN_WebcamClose( void )
+{
+	if ( s_webcam.camera ) {
+		SDL_CloseCamera( s_webcam.camera );
+	}
+	Com_Memset( &s_webcam, 0, sizeof( s_webcam ) );
+}
+
+static void IN_WebcamList_f( void )
+{
+	SDL_CameraID *ids;
+	int count = 0;
+	int i;
+
+	if ( !IN_WebcamEnsureSubsystem() ) {
+		return;
+	}
+
+	ids = SDL_GetCameras( &count );
+	Com_Printf( "SDL3 webcam devices: %d\n", count );
+	for ( i = 0; ids && i < count; i++ ) {
+		SDL_CameraSpec **formats = NULL;
+		int formatCount = 0;
+		int f;
+		Com_Printf( "  [%d] id=%u name=%s position=%s\n", i, (unsigned)ids[i],
+			SDL_GetCameraName( ids[i] ) ? SDL_GetCameraName( ids[i] ) : "(unknown)",
+			IN_WebcamPositionName( SDL_GetCameraPosition( ids[i] ) ) );
+		formats = SDL_GetCameraSupportedFormats( ids[i], &formatCount );
+		for ( f = 0; formats && f < formatCount && f < 8; f++ ) {
+			const SDL_CameraSpec *spec = formats[f];
+			Com_Printf( "      %dx%d %s %d/%d fps\n",
+				spec->width, spec->height, SDL_GetPixelFormatName( spec->format ),
+				spec->framerate_numerator, spec->framerate_denominator );
+		}
+		if ( formats && formatCount > 8 ) {
+			Com_Printf( "      ... %d more format(s)\n", formatCount - 8 );
+		}
+		if ( formats ) {
+			SDL_free( formats );
+		}
+	}
+	if ( ids ) {
+		SDL_free( ids );
+	}
+}
+
+static void IN_WebcamStatus_f( void )
+{
+	Com_Printf( "SDL3 webcam status:\n" );
+	Com_Printf( "  enabled=%d poll=%d selected=%d active=%s permission=%d frames=%u\n",
+		cl_webcamEnable ? cl_webcamEnable->integer : 0,
+		cl_webcamPoll ? cl_webcamPoll->integer : 0,
+		cl_webcamDevice ? cl_webcamDevice->integer : 0,
+		s_webcam.active ? "yes" : "no", s_webcam.permission, s_webcam.frameCount );
+	if ( s_webcam.active ) {
+		Com_Printf( "  id=%u format=%s requested=%dx%d@%d actual=%dx%d last=%dx%d timestampNS=%llu\n",
+			(unsigned)s_webcam.id,
+			s_webcam.hasSpec ? SDL_GetPixelFormatName( s_webcam.spec.format ) : "(pending)",
+			cl_webcamWidth ? cl_webcamWidth->integer : 0,
+			cl_webcamHeight ? cl_webcamHeight->integer : 0,
+			cl_webcamFps ? cl_webcamFps->integer : 0,
+			s_webcam.hasSpec ? s_webcam.spec.width : 0,
+			s_webcam.hasSpec ? s_webcam.spec.height : 0,
+			s_webcam.lastWidth, s_webcam.lastHeight,
+			(unsigned long long)s_webcam.lastTimestampNS );
+	}
+}
+
+static void IN_WebcamStart_f( void )
+{
+	SDL_CameraID *ids;
+	SDL_CameraSpec requested;
+	SDL_CameraSpec *specPtr = NULL;
+	int count = 0;
+	int index;
+
+	if ( !cl_webcamEnable || !cl_webcamEnable->integer ) {
+		Com_Printf( "webcam_start: disabled by cl_webcamEnable 0\n" );
+		return;
+	}
+	if ( !IN_WebcamEnsureSubsystem() ) {
+		return;
+	}
+
+	ids = SDL_GetCameras( &count );
+	if ( !ids || count <= 0 ) {
+		Com_Printf( "webcam_start: no SDL3 camera devices found\n" );
+		if ( ids ) {
+			SDL_free( ids );
+		}
+		return;
+	}
+
+	index = cl_webcamDevice ? cl_webcamDevice->integer : 0;
+	if ( index < 0 || index >= count ) {
+		index = 0;
+	}
+
+	IN_WebcamClose();
+	Com_Memset( &requested, 0, sizeof( requested ) );
+	if ( cl_webcamWidth && cl_webcamHeight && cl_webcamWidth->integer > 0 && cl_webcamHeight->integer > 0 ) {
+		requested.width = cl_webcamWidth->integer;
+		requested.height = cl_webcamHeight->integer;
+		requested.framerate_numerator = ( cl_webcamFps && cl_webcamFps->integer > 0 ) ? cl_webcamFps->integer : 30;
+		requested.framerate_denominator = 1;
+		specPtr = &requested;
+	}
+
+	s_webcam.camera = SDL_OpenCamera( ids[index], specPtr );
+	if ( !s_webcam.camera ) {
+		Com_Printf( "webcam_start: SDL_OpenCamera failed for [%d] %s: %s\n",
+			index, SDL_GetCameraName( ids[index] ) ? SDL_GetCameraName( ids[index] ) : "(unknown)", SDL_GetError() );
+		SDL_free( ids );
+		return;
+	}
+
+	s_webcam.id = ids[index];
+	s_webcam.active = qtrue;
+	s_webcam.permission = SDL_GetCameraPermissionState( s_webcam.camera );
+	s_webcam.hasSpec = SDL_GetCameraFormat( s_webcam.camera, &s_webcam.spec ) ? qtrue : qfalse;
+	Com_Printf( "webcam_start: opened [%d] %s permission=%d\n",
+		index, SDL_GetCameraName( ids[index] ) ? SDL_GetCameraName( ids[index] ) : "(unknown)", s_webcam.permission );
+	SDL_free( ids );
+}
+
+static void IN_WebcamStop_f( void )
+{
+	IN_WebcamClose();
+	Com_Printf( "webcam_stop: closed SDL3 camera\n" );
+}
+
+static void IN_WebcamFrame( void )
+{
+	SDL_Surface *frame;
+	Uint64 timestampNS = 0;
+
+	if ( !s_webcam.active || !s_webcam.camera || !cl_webcamPoll || !cl_webcamPoll->integer ) {
+		return;
+	}
+
+	s_webcam.permission = SDL_GetCameraPermissionState( s_webcam.camera );
+	frame = SDL_AcquireCameraFrame( s_webcam.camera, &timestampNS );
+	if ( !frame ) {
+		return;
+	}
+
+	s_webcam.frameCount++;
+	s_webcam.lastWidth = frame->w;
+	s_webcam.lastHeight = frame->h;
+	s_webcam.lastFormat = frame->format;
+	s_webcam.lastTimestampNS = timestampNS;
+	SDL_ReleaseCameraFrame( s_webcam.camera, frame );
+}
+#endif
+
 
 
 #ifdef DEBUG_EVENTS
@@ -1330,6 +1662,25 @@ void HandleEvents( void )
 				break;
 #endif
 
+#ifdef SDL_INIT_CAMERA
+			case SDL_EVENT_CAMERA_DEVICE_ADDED:
+			case SDL_EVENT_CAMERA_DEVICE_REMOVED:
+				if ( cl_webcamEnable && cl_webcamEnable->integer )
+					Com_Printf( "SDL3 webcam device %s: id=%u\n",
+						e.type == SDL_EVENT_CAMERA_DEVICE_ADDED ? "added" : "removed",
+						(unsigned)e.cdevice.which );
+				break;
+			case SDL_EVENT_CAMERA_DEVICE_APPROVED:
+			case SDL_EVENT_CAMERA_DEVICE_DENIED:
+				if ( s_webcam.active && s_webcam.id == e.cdevice.which ) {
+					s_webcam.permission = ( e.type == SDL_EVENT_CAMERA_DEVICE_APPROVED ) ? 1 : -1;
+				}
+				Com_Printf( "SDL3 webcam permission %s: id=%u\n",
+					e.type == SDL_EVENT_CAMERA_DEVICE_APPROVED ? "approved" : "denied",
+					(unsigned)e.cdevice.which );
+				break;
+#endif
+
 			case SDL_EVENT_QUIT:
 				Cbuf_ExecuteText( EXEC_NOW, "quit Closed window\n" );
 				break;
@@ -1397,6 +1748,9 @@ void IN_Frame( void )
 {
 #ifdef USE_JOYSTICK
 	IN_JoyMove();
+#endif
+#ifdef SDL_INIT_CAMERA
+	IN_WebcamFrame();
 #endif
 
 	if ( Key_GetCatcher() & ( KEYCATCH_CONSOLE | KEYCATCH_UI ) ) {
@@ -1474,6 +1828,14 @@ void IN_Init( void )
 	Cvar_SetDescription( in_joystick, "Whether or not joystick support is on." );
 	in_joystickThreshold = Cvar_Get( "joy_threshold", "0.15", CVAR_ARCHIVE );
 	Cvar_SetDescription( in_joystickThreshold, "Threshold of joystick moving distance." );
+	in_gamepadEvents = Cvar_Get( "in_gamepadEvents", "1", CVAR_ARCHIVE_ND );
+	Cvar_CheckRange( in_gamepadEvents, "0", "1", CV_INTEGER );
+	Cvar_SetDescription( in_gamepadEvents, "Enable SDL3 gamepad hotplug/button/axis events. State polling still runs when joystick support is active." );
+	in_gamepadMappingFile = Cvar_Get( "in_gamepadMappingFile", "", CVAR_ARCHIVE_ND );
+	Cvar_SetDescription( in_gamepadMappingFile, "Optional SDL3 gamepad mapping database path loaded at joystick init (for example gamecontrollerdb.txt)." );
+	in_gamepadRumble = Cvar_Get( "in_gamepadRumble", "1", CVAR_ARCHIVE_ND );
+	Cvar_CheckRange( in_gamepadRumble, "0", "1", CV_INTEGER );
+	Cvar_SetDescription( in_gamepadRumble, "Allow gamepad_rumble and gamepad_trigger_rumble commands." );
 
 	j_pitch =        Cvar_Get( "j_pitch",        "0.022", CVAR_ARCHIVE_ND );
 	Cvar_SetDescription( j_pitch, "Joystick pitch rotation speed/direction." );
@@ -1503,6 +1865,27 @@ void IN_Init( void )
 	Cvar_SetDescription( j_up_axis, "Selects which joystick axis controls up/down." );
 #endif
 
+#ifdef SDL_INIT_CAMERA
+	cl_webcamEnable = Cvar_Get( "cl_webcamEnable", "0", CVAR_ARCHIVE_ND );
+	Cvar_CheckRange( cl_webcamEnable, "0", "1", CV_INTEGER );
+	Cvar_SetDescription( cl_webcamEnable, "Allow SDL3 webcam/camera device access. Use webcam_start after enabling." );
+	cl_webcamDevice = Cvar_Get( "cl_webcamDevice", "0", CVAR_ARCHIVE_ND );
+	Cvar_CheckRange( cl_webcamDevice, "0", "32", CV_INTEGER );
+	Cvar_SetDescription( cl_webcamDevice, "SDL3 webcam device index selected by webcam_start." );
+	cl_webcamWidth = Cvar_Get( "cl_webcamWidth", "0", CVAR_ARCHIVE_ND );
+	Cvar_CheckRange( cl_webcamWidth, "0", "7680", CV_INTEGER );
+	Cvar_SetDescription( cl_webcamWidth, "Requested webcam width. 0 lets SDL choose the camera default." );
+	cl_webcamHeight = Cvar_Get( "cl_webcamHeight", "0", CVAR_ARCHIVE_ND );
+	Cvar_CheckRange( cl_webcamHeight, "0", "4320", CV_INTEGER );
+	Cvar_SetDescription( cl_webcamHeight, "Requested webcam height. 0 lets SDL choose the camera default." );
+	cl_webcamFps = Cvar_Get( "cl_webcamFps", "30", CVAR_ARCHIVE_ND );
+	Cvar_CheckRange( cl_webcamFps, "1", "240", CV_INTEGER );
+	Cvar_SetDescription( cl_webcamFps, "Requested webcam frame rate when width/height are set." );
+	cl_webcamPoll = Cvar_Get( "cl_webcamPoll", "1", CVAR_ARCHIVE_ND );
+	Cvar_CheckRange( cl_webcamPoll, "0", "1", CV_INTEGER );
+	Cvar_SetDescription( cl_webcamPoll, "Poll and immediately release SDL3 webcam frames, updating webcam_status counters." );
+#endif
+
 	// ~ and `, as keys and characters
 	cl_consoleKeys = Cvar_Get( "cl_consoleKeys", "~ ` 0x7e 0x60", CVAR_ARCHIVE );
 	Cvar_SetDescription( cl_consoleKeys, "Space delimited list of key names or characters that toggle the console." );
@@ -1519,6 +1902,21 @@ void IN_Init( void )
 
 	Cmd_AddCommand( "minimize", IN_Minimize );
 	Cmd_AddCommand( "in_restart", IN_Restart );
+#ifdef USE_JOYSTICK
+	Cmd_AddCommand( "gamepad_status", IN_GamepadStatus_f );
+	Cmd_AddCommand( "gamepad_load_mappings", IN_GamepadLoadMappings_f );
+	Cmd_AddCommand( "gamepad_rumble", IN_GamepadRumble_f );
+	Cmd_AddCommand( "gamepad_trigger_rumble", IN_GamepadTriggerRumble_f );
+#endif
+#ifdef SDL_INIT_CAMERA
+	Cmd_AddCommand( "webcam_list", IN_WebcamList_f );
+	Cmd_AddCommand( "webcam_status", IN_WebcamStatus_f );
+	Cmd_AddCommand( "webcam_start", IN_WebcamStart_f );
+	Cmd_AddCommand( "webcam_stop", IN_WebcamStop_f );
+	if ( cl_webcamEnable->integer ) {
+		IN_WebcamStart_f();
+	}
+#endif
 
 	Com_DPrintf( "------------------------------------\n" );
 }
@@ -1540,7 +1938,25 @@ void IN_Shutdown( void )
 #ifdef USE_JOYSTICK
 	IN_ShutdownJoystick();
 #endif
+#ifdef SDL_INIT_CAMERA
+	IN_WebcamClose();
+	if ( SDL_WasInit( SDL_INIT_CAMERA ) ) {
+		SDL_QuitSubSystem( SDL_INIT_CAMERA );
+	}
+#endif
 
 	Cmd_RemoveCommand( "minimize" );
 	Cmd_RemoveCommand( "in_restart" );
+#ifdef USE_JOYSTICK
+	Cmd_RemoveCommand( "gamepad_status" );
+	Cmd_RemoveCommand( "gamepad_load_mappings" );
+	Cmd_RemoveCommand( "gamepad_rumble" );
+	Cmd_RemoveCommand( "gamepad_trigger_rumble" );
+#endif
+#ifdef SDL_INIT_CAMERA
+	Cmd_RemoveCommand( "webcam_list" );
+	Cmd_RemoveCommand( "webcam_status" );
+	Cmd_RemoveCommand( "webcam_start" );
+	Cmd_RemoveCommand( "webcam_stop" );
+#endif
 }

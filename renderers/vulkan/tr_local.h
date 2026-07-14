@@ -1658,6 +1658,7 @@ extern cvar_t	*r_pathtrace_denoiseDepthTol;
 extern cvar_t	*r_pathtrace_debug;
 extern cvar_t	*r_pathtrace_composite;
 extern cvar_t	*r_hybrid1;
+extern cvar_t	*r_hybrid1Quality;
 extern cvar_t	*r_hybrid1_shadow;
 extern cvar_t	*r_hybrid1_spec;
 extern cvar_t	*r_hybrid1_historyClamp;
@@ -2374,6 +2375,19 @@ void R_IQMCommitSurfaceBatch( void );
 int R_IQMLerpTag( orientation_t *tag, iqmData_t *data,
 		  int startFrame, int endFrame,
 		  float frac, const char *tagName );
+
+/*
+===============
+R_IQMSkinPositions
+
+CPU-skin all IQM vertex positions for the given pose lerp into outPositions
+(num_vertexes * 3 floats, model space). Returns qfalse if inputs are invalid
+or influence/pose data is missing for a jointed model (caller should AABB).
+Morph targets are ignored (RT BLAS uses skeletal pose only).
+===============
+*/
+qboolean R_IQMSkinPositions( iqmData_t *data, int frame, int oldframe, float backlerp,
+	float *outPositions );
 
 /*
 =============================================================

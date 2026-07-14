@@ -521,13 +521,17 @@ elif ! grep -q 'gl_InstanceCustomIndexEXT' "$PROJECT_ROOT/renderers/vulkan/shade
 elif [[ ! -f "$RTX_ENT" ]]; then
   fail "vk_rtx_entities.c missing"
 elif ! grep -q 'vk_rtx_pack_iqm' "$RTX_ENT" 2>/dev/null; then
-  fail "vk_rtx_entities.c missing bind-pose IQM pack"
+  fail "vk_rtx_entities.c missing IQM pack"
+elif ! grep -q 'R_IQMSkinPositions' "$RTX_ENT" 2>/dev/null; then
+  fail "vk_rtx_entities.c missing CPU-skinned IQM via R_IQMSkinPositions"
 elif ! grep -q 'vk_rtx_pack_gltf_static' "$RTX_ENT" 2>/dev/null; then
   fail "vk_rtx_entities.c missing static glTF pack"
 elif ! grep -q 'proxySkinnedCount' "$RTX_ENT" 2>/dev/null; then
   fail "vk_rtx_entities.c missing proxySkinnedCount stats"
+elif ! grep -q 'r_hybrid1Quality' "$PROJECT_ROOT/renderers/vulkan/extensions/rtx/vk_hybrid1.c" 2>/dev/null; then
+  fail "vk_hybrid1.c missing r_hybrid1Quality presets"
 else
-  pass "RTX world/entity BLAS + TLAS update + hybrid hit tint + IQM/glTF pack wired"
+  pass "RTX world/entity BLAS + TLAS update + hybrid hit tint + skinned IQM/glTF pack + Hybrid1 quality wired"
 fi
 
 echo ""

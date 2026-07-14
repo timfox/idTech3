@@ -54,6 +54,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "cl_demo.h"
 #include "cl_cmds.h"
 #include "script_emit.h"
+#include "cl_oscar.h"
 #ifdef USE_LUA
 #include "lua_debug.h"
 #include "g_lua_bindings.h"
@@ -64,6 +65,7 @@ static void CL_LuaRegisterAll( void *luaState )
 {
 	LuaBindings_RegisterAll( luaState );
 	CL_AppCrdt_RegisterLua( (lua_State *)luaState );
+	CL_Oscar_RegisterLua( (lua_State *)luaState );
 }
 #endif
 
@@ -249,6 +251,7 @@ void CL_Init( void ) {
 	LuaDebug_SetEngineRegisterCallback( CL_LuaRegisterAll );
 	CL_AppCrdt_Init();
 #endif
+	CL_Oscar_Init();
 
 	Com_Printf( "----- Client Initialization Complete -----\n" );
 }

@@ -343,6 +343,7 @@ static void VkImgui_DrawMenuBar( void )
 			ImGui::MenuItem( "Water", nullptr, (bool *)&vkWindows.ocean.open );
 			ImGui::MenuItem( "Objects", nullptr, (bool *)&vkWindows.objects.open );
 			ImGui::MenuItem( "Inspector", nullptr, (bool *)&vkWindows.inspector.open );
+			ImGui::MenuItem( "OSCAR / AIM", nullptr, (bool *)&vkWindows.oscar.open );
 			if ( r_studio_tools && r_studio_tools->integer ) {
 				ImGui::Separator();
 				ImGui::MenuItem( "Studio / Session", nullptr, (bool *)&vkWindows.studioMap.open );

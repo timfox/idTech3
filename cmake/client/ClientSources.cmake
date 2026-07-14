@@ -25,6 +25,7 @@ set(IDTECH3_CLIENT_CORE_SRCS
 	${_IDTECH3_CLIENT_REL}/core/cl_keys.c
 	${_IDTECH3_CLIENT_REL}/core/cl_serverbrowser.c
 	${_IDTECH3_CLIENT_REL}/core/cl_app_crdt.c
+	${_IDTECH3_CLIENT_REL}/core/cl_oscar.c
 )
 
 set(IDTECH3_CLIENT_MEDIA_SRCS
