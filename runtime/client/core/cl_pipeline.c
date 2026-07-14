@@ -166,6 +166,62 @@ qboolean CL_PipelineExpandTemplate( char *out, size_t maxlen, const char *tmpl,
 			p += 2;
 			continue;
 		}
+		if ( p[0] == '%' && p[1] == 'U' ) {
+			if ( !CL_PipelineAppendEscaped( out, &o, maxlen, ex->url ) ) {
+				return qfalse;
+			}
+			p += 2;
+			continue;
+		}
+		if ( p[0] == '%' && p[1] == 'K' ) {
+			if ( !CL_PipelineAppendEscaped( out, &o, maxlen, ex->key ) ) {
+				return qfalse;
+			}
+			p += 2;
+			continue;
+		}
+		if ( p[0] == '%' && p[1] == 'L' ) {
+			if ( !CL_PipelineAppendEscaped( out, &o, maxlen, ex->title ) ) {
+				return qfalse;
+			}
+			p += 2;
+			continue;
+		}
+		if ( p[0] == '%' && p[1] == 'W' ) {
+			if ( !CL_PipelineAppendEscaped( out, &o, maxlen, ex->width ) ) {
+				return qfalse;
+			}
+			p += 2;
+			continue;
+		}
+		if ( p[0] == '%' && p[1] == 'H' ) {
+			if ( !CL_PipelineAppendEscaped( out, &o, maxlen, ex->height ) ) {
+				return qfalse;
+			}
+			p += 2;
+			continue;
+		}
+		if ( p[0] == '%' && p[1] == 'F' ) {
+			if ( !CL_PipelineAppendEscaped( out, &o, maxlen, ex->fps ) ) {
+				return qfalse;
+			}
+			p += 2;
+			continue;
+		}
+		if ( p[0] == '%' && p[1] == 'V' ) {
+			if ( !CL_PipelineAppendEscaped( out, &o, maxlen, ex->bitrate ) ) {
+				return qfalse;
+			}
+			p += 2;
+			continue;
+		}
+		if ( p[0] == '%' && p[1] == 'Q' ) {
+			if ( !CL_PipelineAppendEscaped( out, &o, maxlen, ex->audio_bitrate ) ) {
+				return qfalse;
+			}
+			p += 2;
+			continue;
+		}
 		out[o++] = *p++;
 	}
 	out[o] = '\0';

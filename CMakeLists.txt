@@ -3362,6 +3362,12 @@ set_tests_properties(test_modern_renderer_profile_runtime PROPERTIES
 	LABELS "scripts;renderer;validation"
 	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_modern_renderer_profile_runtime.sh;${CMAKE_SOURCE_DIR}/config/modern_vulkan.cfg;${CMAKE_SOURCE_DIR}/docs/renderer_validation/README.md")
 
+add_test(NAME test_idtech3_tv_streaming
+	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_idtech3_tv_streaming.sh)
+set_tests_properties(test_idtech3_tv_streaming PROPERTIES
+	LABELS "scripts;validation;streaming"
+	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_idtech3_tv_streaming.sh;${CMAKE_SOURCE_DIR}/runtime/client/platform/cl_streaming.c;${CMAKE_SOURCE_DIR}/docs/IDTECH3_TV.md")
+
 add_test(NAME renderer_tier_a_resolver
 	COMMAND ${CMAKE_SOURCE_DIR}/scripts/resolve_renderer_tiers.sh --tier A --summary-file ${CMAKE_BINARY_DIR}/renderer_tier_a_summary.json)
 set_tests_properties(renderer_tier_a_resolver PROPERTIES

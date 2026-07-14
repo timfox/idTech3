@@ -29,6 +29,14 @@ typedef struct {
 	const char *args;
 	const char *genome;
 	const char *slot;
+	const char *url;
+	const char *key;
+	const char *title;
+	const char *width;
+	const char *height;
+	const char *fps;
+	const char *bitrate;
+	const char *audio_bitrate;
 } cl_pipeline_expand_t;
 
 qboolean CL_ShellEscapeArg( const char *in, char *out, size_t out_size );

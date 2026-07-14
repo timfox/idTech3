@@ -15,6 +15,7 @@ Copyright (C) 2026 Gopex LLC. All rights reserved.
 #include "cl_superhud.h"
 #include "cl_menuvideo.h"
 #include "cl_serverbrowser.h"
+#include "cl_streaming.h"
 #include "cl_flux.h"
 #include "cl_trellis.h"
 #include "cl_genetic_gan.h"
@@ -179,6 +180,7 @@ void CL_Shutdown( const char *finalmsg, qboolean quit ) {
 
 	CL_Connect_SetShutdownQuit( quit );
 	CL_Disconnect( qfalse );
+	CL_Streaming_Shutdown();
 	SDF_Shutdown();
 	SHUD_Shutdown();
 	MenuVideo_Shutdown();

@@ -63,7 +63,12 @@ if [[ -n "${GAME_BASE:-}" ]]; then
 		warn "GAME_BASE set but not a directory: $GAME_BASE"
 	fi
 else
-	skip "GAME_BASE unset - export GAME_BASE=/abs/path/to/base for map-load scripts"
+	if [[ -d "$ROOT/docs/renderer_validation/devdata/rtest_base" ]]; then
+		pass "GAME_BASE unset, but renderer devdata is available for automated Tier B subset"
+		info "Run: ./scripts/resolve_renderer_tiers.sh --tier B"
+	else
+		skip "GAME_BASE unset - export GAME_BASE=/abs/path/to/base for map-load scripts"
+	fi
 fi
 info "GitHub Tier B: set repo variable or secret IDTECH3_GAME_BASE_PATH + self-hosted runner label idtech3-tierb (docs/renderer_validation/SELF_HOSTED_TIER_B.md)"
 if [[ -x "$ROOT/scripts/resolve_renderer_tiers.sh" ]]; then

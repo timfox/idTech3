@@ -29,6 +29,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "cl_osp.h"
 #include "cl_voip.h"
 #include "cl_mumble.h"
+#include "cl_streaming.h"
 #include "cl_superhud.h"
 #include "cl_websocket.h"
 #include "cl_steam.h"
@@ -213,6 +214,7 @@ void CL_Init( void ) {
 	CL_OSP_Init();
 	CL_VoIP_Init();
 	CL_Mumble_Init();
+	CL_Streaming_Init();
 	SHUD_Init();
 	WS_Init();
 	Steam_Init();

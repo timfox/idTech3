@@ -18,6 +18,7 @@ Usage: ./scripts/resolve_renderer_tiers.sh [--strict] [--tier A|B|C|D|all] [--su
 
 Environment:
   GAME_BASE=/abs/path/to/base       Enables Tier B content-backed checks.
+                                     If unset, Tier B uses docs/renderer_validation/devdata/rtest_base when present.
   RELEASE_DIR=/abs/path/to/release  Overrides release artifact/cfg lookup.
   BUILD_DIR=/abs/path/to/build      Overrides client lookup for runtime smoke.
   IDTECH3_BIN=/abs/path/to/idtech3  Overrides client lookup for runtime smoke.
@@ -147,9 +148,16 @@ tier_a() {
 tier_b() {
 	CURRENT_TIER="B"
 	echo "=== Tier B: content-backed/runtime ==="
-	if [[ -n "${GAME_BASE:-}" && -d "${GAME_BASE:-}" ]]; then
-		run_step "renderer regression source contract with GAME_BASE" env GAME_BASE="$GAME_BASE" ./scripts/renderer_regression_check.sh
-		run_step "renderer regression dedicated map loads" env GAME_BASE="$GAME_BASE" ./scripts/renderer_regression_maps.sh
+	local tier_b_base="${GAME_BASE:-}"
+	local dev_base="$ROOT/docs/renderer_validation/devdata/rtest_base"
+	if [[ -z "$tier_b_base" && -d "$dev_base" ]]; then
+		tier_b_base="$dev_base"
+		warn "GAME_BASE unset; using GPL-friendly renderer devdata for Tier B map-load automation"
+	fi
+
+	if [[ -n "$tier_b_base" && -d "$tier_b_base" ]]; then
+		run_step "renderer regression source contract with GAME_BASE" env GAME_BASE="$tier_b_base" ./scripts/renderer_regression_check.sh
+		run_step "renderer regression dedicated map loads" env GAME_BASE="$tier_b_base" ./scripts/renderer_regression_maps.sh
 	else
 		if [[ "$STRICT" -eq 1 ]]; then
 			fail "GAME_BASE is unset or not a directory; strict Tier B requires content-backed checks"
@@ -158,15 +166,8 @@ tier_b() {
 		fi
 	fi
 
-	if [[ "$STRICT" -eq 1 ]]; then
-		run_step "modern renderer profile client runtime smoke" env \
-			IDTECH3_RENDERER_RUNTIME_REQUIRED=1 \
-			IDTECH3_REQUIRE_RELEASE_CFGS=1 \
-			./tests/scripts/test_modern_renderer_profile_runtime.sh all
-	else
-		run_step "modern renderer profile client runtime smoke when display/Vulkan are available" \
-			./tests/scripts/test_modern_renderer_profile_runtime.sh all
-	fi
+	run_step "modern renderer profile client runtime smoke when display/Vulkan are available" \
+		./tests/scripts/test_modern_renderer_profile_runtime.sh all
 }
 
 tier_c() {

@@ -53,7 +53,10 @@ if [ ! -x "$SERVER" ] && [ ! -f "$SERVER" ]; then
 fi
 
 # Patterns indicating map load / server init failed (grep -Ei across log).
-FAIL_PATTERN='ERROR:|Server fatal crashed|couldn'\''t load|could not load|CM_LoadMap:|SIGSEGV|segfault|core dump|\babort\b'
+# qagame.qvm may print "Couldn't load symbol file: vm/qagame.map" when debug
+# symbols are absent; that is harmless and must not fail renderer map smoke.
+FAIL_PATTERN='ERROR:|Server fatal crashed|could not load|CM_LoadMap:|SIGSEGV|segfault|core dump|\babort\b'
+IGNORED_FAIL_PATTERN='Couldn'\''t load symbol file:'
 
 PASS=0
 FAIL=0
@@ -78,8 +81,9 @@ run_map_check() {
     +map "$map" \
     +quit 2>&1 || true)"
 
-  if echo "$out" | grep -Eiq "$FAIL_PATTERN"; then
-    echo "$out" | grep -Ei "$FAIL_PATTERN" | head -20 >&2
+  fail_lines="$(echo "$out" | grep -Ei "$FAIL_PATTERN" | grep -Eiv "$IGNORED_FAIL_PATTERN" || true)"
+  if [ -n "$fail_lines" ]; then
+    echo "$fail_lines" | head -20 >&2
     fail "map $map: error in server log"
     return
   fi

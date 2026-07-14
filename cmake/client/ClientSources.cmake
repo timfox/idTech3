@@ -51,6 +51,7 @@ set(IDTECH3_CLIENT_PLATFORM_SRCS
 	${_IDTECH3_CLIENT_REL}/platform/cl_websocket.c
 	${_IDTECH3_CLIENT_REL}/platform/cl_mumble.c
 	${_IDTECH3_CLIENT_REL}/platform/cl_voip.c
+	${_IDTECH3_CLIENT_REL}/platform/cl_streaming.c
 )
 
 # Shell: console / UI / HUD / engine sprites (was root *.c; now shell/).
