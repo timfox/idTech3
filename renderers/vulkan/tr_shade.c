@@ -1342,8 +1342,8 @@ static void RB_IterateStagesGeneric( const shaderCommands_t *input )
 
 		uniform.pbrForwardPlus[0] = -1.0f;
 		uniform.pbrForwardPlus[1] = 0.0f;
-		uniform.pbrForwardPlus[2] = 0.0f;
-		uniform.pbrForwardPlus[3] = 0.0f;
+		uniform.pbrForwardPlus[2] = 0.65f;
+		uniform.pbrForwardPlus[3] = 0.45f;
 		if ( r_forwardPlus && r_forwardPlus->integer && !R_ClassicLightingActive() ) {
 			if ( r_forwardPlusOverflowShade && r_forwardPlusOverflowShade->value > 0.0f ) {
 				uniform.pbrForwardPlus[0] = Com_Clamp( 0.0f, 4.0f, r_forwardPlusOverflowShade->value );
@@ -1354,13 +1354,19 @@ static void RB_IterateStagesGeneric( const shaderCommands_t *input )
 				Com_Memcpy( &maskF, &bits, sizeof( maskF ) );
 				uniform.pbrForwardPlus[1] = maskF;
 			}
+			if ( r_forwardPlusSpecularStrength ) {
+				uniform.pbrForwardPlus[2] = Com_Clamp( 0.0f, 4.0f, r_forwardPlusSpecularStrength->value );
+			}
+			if ( r_forwardPlusEnergyRenorm ) {
+				uniform.pbrForwardPlus[3] = Com_Clamp( 0.0f, 2.0f, r_forwardPlusEnergyRenorm->value );
+			}
 		}
 	} else {
 		VK_FillPbrSunShadowUniform( &uniform );
 		uniform.pbrForwardPlus[0] = -1.0f;
 		uniform.pbrForwardPlus[1] = 0.0f;
-		uniform.pbrForwardPlus[2] = 0.0f;
-		uniform.pbrForwardPlus[3] = 0.0f;
+		uniform.pbrForwardPlus[2] = 0.65f;
+		uniform.pbrForwardPlus[3] = 0.45f;
 	}
 #endif
 #endif // USE_VULKAN

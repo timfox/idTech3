@@ -1133,7 +1133,7 @@ static void vk_forward_plus_dispatch_tile_cull_internal( qboolean use_depth_cull
 	if ( push.depth_cull ) {
 		static qboolean depth_cull_logged;
 		if ( !depth_cull_logged ) {
-			ri.Printf( PRINT_ALL, "[VK][Forward+] r_forwardPlusDepthCull=1 (depth prepass + tile cull before opaque color; depth rejection at light center)\n" );
+			ri.Printf( PRINT_ALL, "[VK][Forward+] r_forwardPlusDepthCull=1 (depth prepass + tile cull before opaque color; nearest-of-5 depth probes)\n" );
 			depth_cull_logged = qtrue;
 		}
 	}

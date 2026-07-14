@@ -679,6 +679,29 @@ else
 fi
 
 echo ""
+echo "Forward+ specular / energy renorm + HDR/AgX honesty:"
+GEN_FRAG_TMPL="$PROJECT_ROOT/renderers/vulkan/shaders/glsl/gen_frag.tmpl"
+GAMMA_FRAG="$PROJECT_ROOT/renderers/vulkan/shaders/glsl/gamma.frag"
+VK_DEVICE="$PROJECT_ROOT/renderers/vulkan/vk_device.c"
+if ! grep -q 'r_forwardPlusSpecularStrength' "$TR_INIT_VK" 2>/dev/null; then
+  fail "tr_init.c missing r_forwardPlusSpecularStrength cvar"
+elif ! grep -q 'r_forwardPlusEnergyRenorm' "$TR_INIT_VK" 2>/dev/null; then
+  fail "tr_init.c missing r_forwardPlusEnergyRenorm cvar"
+elif ! grep -q 'pbrForwardPlus\[2\]' "$PROJECT_ROOT/renderers/vulkan/tr_shade.c" 2>/dev/null; then
+  fail "tr_shade.c must push specular strength via pbrForwardPlus[2]"
+elif ! grep -q 'sceneNearest' "$FP_COMP" 2>/dev/null; then
+  fail "forward_plus_tile_cull.comp should use multi-probe sceneNearest depth cull"
+elif ! grep -q 'aliases to 32-bit HDR' "$VK_DEVICE" 2>/dev/null; then
+  fail "vk_device.c must honestly alias r_hdr 3 to 32-bit HDR"
+elif ! grep -q 'toneMapParams0' "$GAMMA_FRAG" 2>/dev/null || ! grep -q 'Tonemap_AgX' "$GAMMA_FRAG" 2>/dev/null; then
+  fail "gamma.frag Tonemap_AgX must use toneMapParams grade knobs"
+elif ! grep -q 'agxStrength\|invWhite\|highlightDesat' "$GAMMA_FRAG" 2>/dev/null; then
+  fail "gamma.frag Tonemap_AgX should consume toe/shoulder/whitePoint/desat"
+else
+  pass "Forward+ specular/renorm cvars + tile probes + r_hdr 3 alias + AgX grade knobs"
+fi
+
+echo ""
 echo "Volumetric fog compute: VDB bindings 17-18 + params (host vs volumetric_fog.comp):"
 VF_COMP="$PROJECT_ROOT/renderers/vulkan/shaders/glsl/volumetric/volumetric_fog.comp"
 VF_FRAG="$PROJECT_ROOT/renderers/vulkan/shaders/glsl/volumetric/volumetric_fog.frag"

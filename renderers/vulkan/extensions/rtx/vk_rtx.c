@@ -93,6 +93,10 @@ static struct {
 	uint32_t		entity_vertex_count;
 	uint32_t		entity_mesh_count;
 	uint32_t		entity_proxy_count;
+	uint32_t		entity_proxy_non_mesh;
+	uint32_t		entity_proxy_md3_fail;
+	char			tlas_build_mode[16];
+	char			tlas_rebuild_reason[48];
 	VkBuffer		entity_vertex_buffer;
 	VkDeviceMemory	entity_vertex_memory;
 	VkBuffer		entity_index_buffer;
@@ -143,11 +147,14 @@ static void RTX_Status_f( void )
 		( r_rtxDemo && r_rtxDemo->integer ) ? 1 : 0,
 		( r_hybrid1 && r_hybrid1->integer ) ? 1 : 0,
 		( r_raygun && r_raygun->integer ) ? 1 : 0 );
-	ri.Printf( PRINT_ALL, "[VK][RTX] world=%s blas_tris=%u world_verts=%u albedo_prims=%u entity_ents=%u entity_tris=%u entity_verts=%u mesh=%u proxy=%u tlas_instances=%u tlas_update=%d\n",
+	ri.Printf( PRINT_ALL, "[VK][RTX] world=%s blas_tris=%u world_verts=%u albedo_prims=%u entity_ents=%u entity_tris=%u entity_verts=%u mesh=%u proxy=%u (nonmesh=%u md3fail=%u) tlas_instances=%u tlas_mode=%s reason=%s\n",
 		wn, rtx.world_primitive_count, rtx.world_vertex_count, rtx.world_albedo_count,
 		rtx.entity_packed_count, rtx.entity_primitive_count,
-		rtx.entity_vertex_count, rtx.entity_mesh_count, rtx.entity_proxy_count, rtx.tlas_instance_count,
-		( r_rtxTlasUpdate && r_rtxTlasUpdate->integer ) ? 1 : 0 );
+		rtx.entity_vertex_count, rtx.entity_mesh_count, rtx.entity_proxy_count,
+		rtx.entity_proxy_non_mesh, rtx.entity_proxy_md3_fail, rtx.tlas_instance_count,
+		rtx.tlas_build_mode[0] ? rtx.tlas_build_mode : "n/a",
+		rtx.tlas_rebuild_reason[0] ? rtx.tlas_rebuild_reason : "n/a" );
+	ri.Printf( PRINT_ALL, "[VK][RTX] note: Hybrid1 is the production RT lighting path; r_rtx demo overlay is diagnostic unless modes gain real rays\n" );
 	ri.Printf( PRINT_ALL, "[VK][RTX] trace_extent=%ux%u r_rtx=%d composite=%.2f samples=%d\n",
 		rtx.width, rtx.height,
 		( r_rtx && r_rtx->integer > 0 ) ? r_rtx->integer : 0,
@@ -421,6 +428,8 @@ static void vk_rtx_rebuild_world_blas( void )
 	rtx.entity_vertex_count = 0u;
 	rtx.entity_mesh_count = 0u;
 	rtx.entity_proxy_count = 0u;
+	rtx.entity_proxy_non_mesh = 0u;
+	rtx.entity_proxy_md3_fail = 0u;
 	rtx.world_vertex_count = 0u;
 	rtx.world_albedo_count = 0u;
 
@@ -698,6 +707,8 @@ static void vk_rtx_destroy_entity_blas( void )
 	rtx.entity_vertex_count = 0u;
 	rtx.entity_mesh_count = 0u;
 	rtx.entity_proxy_count = 0u;
+	rtx.entity_proxy_non_mesh = 0u;
+	rtx.entity_proxy_md3_fail = 0u;
 }
 
 static void vk_rtx_rebuild_entity_tlas( void )
@@ -813,6 +824,8 @@ static void vk_rtx_rebuild_entity_tlas( void )
 			rtx.entity_vertex_count = packStats.vertexCount;
 			rtx.entity_mesh_count = packStats.meshEntityCount;
 			rtx.entity_proxy_count = packStats.proxyEntityCount;
+			rtx.entity_proxy_non_mesh = packStats.proxyNonMeshCount;
+			rtx.entity_proxy_md3_fail = packStats.proxyMd3FailCount;
 
 			Com_Memset( &triangles, 0, sizeof( triangles ) );
 			triangles.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_TRIANGLES_DATA_KHR;
@@ -942,6 +955,21 @@ static void vk_rtx_rebuild_entity_tlas( void )
 	tlasCanUpdate = rtx.tlas_valid && rtx.tlas != VK_NULL_HANDLE
 		&& rtx.tlas_instance_count == maxInstTLAS;
 	tlasUpdate = tlasCanUpdate && r_rtxTlasUpdate && r_rtxTlasUpdate->integer;
+	if ( tlasUpdate ) {
+		Q_strncpyz( rtx.tlas_build_mode, "UPDATE", sizeof( rtx.tlas_build_mode ) );
+		Q_strncpyz( rtx.tlas_rebuild_reason, "stable_instance_count", sizeof( rtx.tlas_rebuild_reason ) );
+	} else {
+		Q_strncpyz( rtx.tlas_build_mode, "REBUILD", sizeof( rtx.tlas_build_mode ) );
+		if ( !rtx.tlas_valid || rtx.tlas == VK_NULL_HANDLE ) {
+			Q_strncpyz( rtx.tlas_rebuild_reason, "no_prior_tlas", sizeof( rtx.tlas_rebuild_reason ) );
+		} else if ( rtx.tlas_instance_count != maxInstTLAS ) {
+			Q_strncpyz( rtx.tlas_rebuild_reason, "instance_count_changed", sizeof( rtx.tlas_rebuild_reason ) );
+		} else if ( !r_rtxTlasUpdate || !r_rtxTlasUpdate->integer ) {
+			Q_strncpyz( rtx.tlas_rebuild_reason, "r_rtxTlasUpdate=0", sizeof( rtx.tlas_rebuild_reason ) );
+		} else {
+			Q_strncpyz( rtx.tlas_rebuild_reason, "unknown", sizeof( rtx.tlas_rebuild_reason ) );
+		}
+	}
 
 	if ( sizeInfoTLAS.buildScratchSize > scratchSize ) {
 		scratchSize = sizeInfoTLAS.buildScratchSize;
@@ -994,9 +1022,11 @@ static void vk_rtx_rebuild_entity_tlas( void )
 	if ( tlasUpdate ) {
 		static qboolean tlas_update_logged;
 		if ( !tlas_update_logged ) {
-			ri.Printf( PRINT_DEVELOPER, "[VK][RTX] TLAS UPDATE path active (r_rtxTlasUpdate 1)\n" );
+			ri.Printf( PRINT_DEVELOPER, "[VK][RTX] TLAS UPDATE path active (r_rtxTlasUpdate 1, stable instance count)\n" );
 			tlas_update_logged = qtrue;
 		}
+	} else {
+		ri.Printf( PRINT_DEVELOPER, "[VK][RTX] TLAS REBUILD (%s)\n", rtx.tlas_rebuild_reason );
 	}
 
 	Com_Memset( &asWrite, 0, sizeof( asWrite ) );

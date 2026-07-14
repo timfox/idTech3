@@ -165,7 +165,8 @@ static void HYBRID1_Status_f( void )
 		"  phiColor=%.2f depthTol=%.4f normalDot=%.2f adaptAngle=%.1f adaptRough=%.2f\n"
 		"  rayBias=%.3f tMin=%.3f specRoughMax=%.2f sunRadius=%.2f contact=%d\n"
 		"  ggx=%d iblMode=%d diffuseDirect=%d dlightShadows=%d\n"
-		"  composite shadowStr=%.2f specStr=%.2f diffuseStr=%.2f deferredGBuffer=%d\n",
+		"  composite shadowStr=%.2f specStr=%.2f diffuseStr=%.2f deferredGBuffer=%d\n"
+		"  note: Hybrid1 is the production RT lighting path; run rtx_status for TLAS UPDATE/entity proxy reasons\n",
 		HYBRID1_StateString(),
 		vk_hybrid1_active() ? 1 : 0,
 		hybrid1.ready ? 1 : 0,

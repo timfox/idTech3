@@ -15,7 +15,7 @@ This document is a **technical audit** of the current **Forward+ scaffolding** i
 | **Fragment / `gen_frag.tmpl`** (PBR) | Optional **debug heatmap** (`r_forwardPlusDebug`), optional **additive experimental shade** (`r_forwardPlusShade` → specialization **`forward_plus_shade_strength`**). Uses **`fp_params.fp_clip_from_world`** and SSBO light + tile data. |
 | **Uniform bridge / `tr_shade.c`** | When Forward+ is on, **`pbrForwardPlus.y`** carries **`floatBitsToUint(tess.dlightBits)`** so the fragment path can **skip** culled lights that the surface already received via the classic packed path (first **32** indices). |
 
-**Cvars** (see `tr_init.c`): `r_forwardPlus`, `r_forwardPlusMaxPerTile` (latched **4–8**), `r_forwardPlusDebug`, `r_forwardPlusShade` (pipeline invalidation on change in `vk_frame_submit.c`), `r_forwardPlusLuminanceSort` (**0/1**, default **1** — tile overload picks brightest lights by RGB sum), `r_forwardPlusDistanceSort` (**0/1**, default **0** — nearest lights when overloaded), `r_forwardPlusDepthCull` (**0/1**, default **0** — defer tile cull until after opaque + depth rejection at light centers).
+**Cvars** (see `tr_init.c`): `r_forwardPlus`, `r_forwardPlusMaxPerTile` (latched **4–8**), `r_forwardPlusDebug`, `r_forwardPlusShade` (pipeline invalidation on change in `vk_frame_submit.c`), `r_forwardPlusSpecularStrength` (default **0.65**), `r_forwardPlusEnergyRenorm` (default **0.45** — soft primary vs Forward+ mix), `r_forwardPlusLuminanceSort` (**0/1**, default **1** — tile overload picks brightest lights by RGB sum), `r_forwardPlusDistanceSort` (**0/1**, default **0** — nearest lights when overloaded), `r_forwardPlusDepthCull` (**0/1**, default **0** in code; **`modern_vulkan.cfg` sets 1** — post-opaque tile cull with 5 depth probes per tile).
 
 ---
 
@@ -83,7 +83,7 @@ Linear array: **`total_tiles × MAX_PER_TILE`** **`uint32`** indices. Unused slo
 - Else **`r_forwardPlusLuminanceSort` 1** (default) — partial selection by **RGB sum** (brightest lights win).
 - Else — first **`maxPerTile`** candidates in index order (legacy).
 
-**Depth cull (`depthCull` push, `r_forwardPlusDepthCull` 1):** after screen overlap, sample **`depthTexture`** (binding **3**) at the light’s screen center. **Reversed-Z:** reject when **`lightZ01 < sceneZ - ε`** (light farther than stored depth). Requires dispatch **after** opaque draws (§2).
+**Depth cull (`depthCull` push, `r_forwardPlusDepthCull` 1):** after screen overlap, sample **`depthTexture`** (binding **3**) at the tile **corners + center** (5 probes) and take the **nearest** reversed-Z depth. Reject when **`lightZ01 < sceneNearest - ε`**. Requires dispatch **after** opaque draws (§2).
 
 ---
 
@@ -148,15 +148,15 @@ Linear array: **`total_tiles × MAX_PER_TILE`** **`uint32`** indices. Unused slo
 | Item | Severity | Note |
 |------|-----------|------|
 | **Tile overload ordering** | Low–Medium (quality) | **`r_forwardPlusDistanceSort`** (nearest) or **`r_forwardPlusLuminanceSort`** (brightest, default when distance off) when a tile exceeds **`maxPerTile`**; else index order. |
-| **Depth cull at light center only** | Low–Medium (quality) | **`r_forwardPlusDepthCull` 1** rejects lights behind the surface at the **center** pixel only (not full light volume vs depth). |
+| **Depth cull probes** | Low–Medium (quality) | **`r_forwardPlusDepthCull` 1** rejects lights behind the **nearest** of 5 tile probes (corners+center). Still open: full light-volume vs Hi-Z. |
+| **Primary + Forward+ energy** | Medium (art) | Tunable via **`r_forwardPlusEnergyRenorm`** / **`r_forwardPlusSpecularStrength`** (defaults preserve prior 0.45 / 0.65 heuristics). |
 | **Sphere screen approximation** | Low–Medium | Conservative enough for prototyping; not a tight spotlight frustum test. |
 | **`dlightBits` 32-bit** | Low | Matches **`MAX_DLIGHTS`** today; document if caps change. |
 | **Compute inside render pass** | Low (portability) | Valid now; revisit with subpass graphs or render graph. |
-| **Primary + Forward+ energy** | Medium (art) | Renormalization is heuristic; tune per title if shade is enabled. Point radial falloff matches classic dlight projection; specular scalar `0.65` remains an art knob vs `light_frag.tmpl`. |
 
 ### Suggested next steps (roadmap)
 
-1. **Depth-aware culling** — **partial:** **`r_forwardPlusDepthCull`** (center-pixel, post-opaque). Still open: per-tile min-depth / Hi-Z, light-volume vs depth.
+1. **Depth-aware culling** — **partial:** **`r_forwardPlusDepthCull`** (5 probes / nearest reverse-Z, post-opaque). Still open: Hi-Z / light-volume vs depth.
 2. **Sort or priority** — **done for overload:** **`r_forwardPlusDistanceSort`** and **`r_forwardPlusLuminanceSort`** (see §4).
 3. **Decouple** Forward+ light ceiling from **`MAX_DLIGHTS`** only if the **game protocol** and **`tess.dlightBits`** story are redesigned together.
 4. **Tier B** map with mixed point + spot lights to validate heatmap vs ground truth.

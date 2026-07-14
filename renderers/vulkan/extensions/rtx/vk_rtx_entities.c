@@ -2,7 +2,8 @@
 ===========================================================================
 Copyright (C) 2026 Gopex LLC. All rights reserved.
 
-RTX entity BLAS: MD3 LOD0 mesh (frame-lerp, world space) with AABB proxy fallback.
+RTX entity BLAS: MD3 LOD0 mesh (frame-lerp, world space) with AABB proxy fallback
+for IQM/glTF/MDR and failed MD3 packs (proxy reason counts in pack stats).
 ===========================================================================
 */
 
@@ -203,6 +204,8 @@ uint32_t vk_rtx_entities_pack( const trRefdef_t *refdef, const viewParms_t *view
 	uint32_t indexCount = 0u;
 	uint32_t meshCount = 0u;
 	uint32_t proxyCount = 0u;
+	uint32_t proxyNonMesh = 0u;
+	uint32_t proxyMd3Fail = 0u;
 
 	if ( stats ) {
 		Com_Memset( stats, 0, sizeof( *stats ) );
@@ -222,6 +225,7 @@ uint32_t vk_rtx_entities_pack( const trRefdef_t *refdef, const viewParms_t *view
 		const trRefEntity_t *ent = &refdef->entities[i];
 		model_t *mod;
 		qboolean usedMesh = qfalse;
+		qboolean triedMd3 = qfalse;
 
 		if ( ent->e.reType != RT_MODEL || !ent->e.hModel ) {
 			continue;
@@ -233,6 +237,7 @@ uint32_t vk_rtx_entities_pack( const trRefdef_t *refdef, const viewParms_t *view
 		}
 
 		if ( mod->type == MOD_MESH ) {
+			triedMd3 = qtrue;
 			usedMesh = vk_rtx_pack_md3( ent, viewParms, mod, positions, maxVerts, indices, maxIndices,
 				&vertCount, &indexCount );
 		}
@@ -243,6 +248,11 @@ uint32_t vk_rtx_entities_pack( const trRefdef_t *refdef, const viewParms_t *view
 				break;
 			}
 			proxyCount++;
+			if ( triedMd3 ) {
+				proxyMd3Fail++;
+			} else {
+				proxyNonMesh++;
+			}
 		} else {
 			meshCount++;
 		}
@@ -256,6 +266,8 @@ uint32_t vk_rtx_entities_pack( const trRefdef_t *refdef, const viewParms_t *view
 		stats->primitiveCount = indexCount / 3u;
 		stats->meshEntityCount = meshCount;
 		stats->proxyEntityCount = proxyCount;
+		stats->proxyNonMeshCount = proxyNonMesh;
+		stats->proxyMd3FailCount = proxyMd3Fail;
 	}
 
 	return packed;

@@ -1,10 +1,11 @@
 # Optional: paths relative to game base/ (e.g. .../base or your mod folder).
-# Uncomment lines after you ship z_renderer_regression.pk3 (or per-map pk3s).
-# Then run: GAME_BASE=/path/to/base ./scripts/renderer_regression_check.sh
+# Stub BSPs ship under docs/renderer_validation/devdata/rtest_base/maps/.
+# Point GAME_BASE at a tree that includes those maps (or copy into your base/), then:
+#   GAME_BASE=/path/to/base ./scripts/renderer_regression_check.sh
 #
-# maps/rtest_tangent.bsp
-# maps/rtest_pbr.bsp
-# maps/rtest_emissive.bsp
-# maps/rtest_volumetric.bsp
-# maps/rtest_postfx.bsp
-# maps/rtest_parity.bsp
+maps/rtest_tangent.bsp
+maps/rtest_pbr.bsp
+maps/rtest_emissive.bsp
+maps/rtest_volumetric.bsp
+maps/rtest_postfx.bsp
+maps/rtest_parity.bsp

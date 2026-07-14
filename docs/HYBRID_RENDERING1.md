@@ -15,6 +15,10 @@ Implementation of the thesis **Hybrid-Rendering Techniques in GPU** (IST, July 2
 
 RT closest-hit shaders prefer a **per-primitive world albedo SSBO** (vertex/face colors packed with the world BLAS, including **SF_GRID** patches) when `gl_InstanceCustomIndexEXT == 0`. If that miss, they reproject hit points into the deferred **G-buffer albedo** (when `r_deferredGBufferFill 1`) instead of flat placeholder colors.
 
+## Role vs `r_rtx` demo
+
+**Hybrid1 is the production RT lighting path** (shadow + specular + optional diffuse + SVGF). The plain **`r_rtx` / `r_rtxDemo` overlay** remains a diagnostic / tint scaffold unless modes gain real visibility or reflection shading — keep Hybrid1 enabled for look-dev.
+
 ## Enable (RTX build)
 
 ```bash
@@ -43,7 +47,7 @@ r_rtxEntities 1           // MD3 LOD0 mesh BLAS (+ AABB fallback); shared with H
 r_rtxEntityTriCap 65536   // entity BLAS triangle budget (latched)
 ```
 
-`demo_hybrid1.cfg` sets `r_rtxEntities 1`. Console **`rtx_status`** reports `entity_ents` / `entity_tris` / `mesh` / `proxy` counts.
+`demo_hybrid1.cfg` sets `r_rtxEntities 1`. Console **`rtx_status`** reports `entity_ents` / `entity_tris` / `mesh` / `proxy` counts plus **proxy reason** (`nonmesh` = IQM/glTF/MDR AABB by design, `md3fail` = MD3 pack failed) and **TLAS mode** (`UPDATE` vs `REBUILD` with reason).
 
 `r_rtx 1` **or** `r_hybrid1 1` before `vid_restart` enables KHR ray tracing device features.
 
@@ -108,10 +112,12 @@ Demo cfg: `exec demo_hybrid1.cfg` (enables diffuse, IBL, motion, TAA).
 
 ## Source layout
 
-- Host: `src/renderers/vulkan/vk_hybrid1.c`
-- Shaders: `src/renderers/vulkan/shaders/glsl/hybrid1/`
+- Host: `renderers/vulkan/extensions/rtx/vk_hybrid1.c`
+- Shared TLAS/BLAS: `renderers/vulkan/extensions/rtx/vk_rtx.c`, `vk_rtx_entities.c`
+- Shaders: `renderers/vulkan/shaders/glsl/hybrid1/`
 - SPIR-V embed: `vk_hybrid1_spirv.inc` (via `compile_shaders.sh`)
 - Demo cfg: `examples/demo_game/mod/demo_hybrid1.cfg`
+- Overlay: `config/vulkan_overlay_hybrid1.cfg`
 
 ## References
 

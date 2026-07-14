@@ -6,9 +6,10 @@ Tier A (`gpu_golden_compare` ctest) validates manifest + placeholders without a 
 
 Requirements:
 
-- Display + Vulkan RTX/GL capable GPU
+- Display + Vulkan capable GPU
 - Game data in `GAME_BASE` (compatible retail install or minimal bootstrap + demo pk3)
 - Built client: `release/idtech3`
+- Optional stub maps: `docs/renderer_validation/devdata/rtest_base/` (see [OPTIONAL_GAME_ASSETS.txt](samples/renderer_regression/OPTIONAL_GAME_ASSETS.txt))
 
 ### Capture
 
@@ -17,7 +18,9 @@ export GAME_BASE=/path/to/base
 ./scripts/gpu_golden_capture.sh --capture
 ```
 
-Uses `+exec gpu_golden_capture.cfg` then compares PNGs under `tests/data/golden/`.
+Uses `+exec gpu_golden_capture.cfg` (pins `r_filmGrain 0` / `r_chromaticAberration 0` / `r_hdr 2`) then compares PNGs under `tests/data/golden/`.
+
+**Headless CI**: leave placeholders under `tests/data/golden/placeholder/`; operators with a display commit real PNGs when intentional.
 
 ### SP slice preset (hero TAA)
 
@@ -28,6 +31,8 @@ set r_taa 1
 set r_taaMotionVectors 1
 set r_temporalCpuSkinPrev 1
 set r_temporalCustomShaderMotion 1
+set r_filmGrain 0
+set r_chromaticAberration 0
 ```
 
 Capture after loading a map with glTF hero + `misc_decal` props.

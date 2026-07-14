@@ -74,7 +74,6 @@ static VkFormat get_hdr_format( VkPhysicalDevice physical_device, VkFormat base_
 	const int hdr_mode = r_hdr ? r_hdr->integer : 0;
 	const VkFormat hdr16 = VK_FORMAT_R16G16B16A16_SFLOAT;
 	const VkFormat hdr32 = VK_FORMAT_R32G32B32A32_SFLOAT;
-	const VkFormat hdr64 = VK_FORMAT_R64G64B64A64_SFLOAT;
 
 	if ( r_fbo->integer == 0 ) {
 		return base_format;
@@ -114,34 +113,19 @@ static VkFormat get_hdr_format( VkPhysicalDevice physical_device, VkFormat base_
 			return base_format;
 		}
 		case 3: {
-			VkPhysicalDeviceFeatures feat;
-			qboolean shader64_supported;
-			qboolean format64_supported;
-
-			qvkGetPhysicalDeviceFeatures( physical_device, &feat );
-			shader64_supported = feat.shaderFloat64 ? qtrue : qfalse;
-			format64_supported = vk_hdr_format_supported( physical_device, hdr64 );
-
-			if ( shader64_supported && format64_supported ) {
-				ri.Printf( PRINT_WARNING, "[VK][fbo] r_hdr 3: %s is supported, but shader toolchain lacks dvec4 fragment output; falling back\n",
-					vk_format_string( hdr64 ) );
-			}
-			else if ( !shader64_supported || !format64_supported ) {
-				ri.Printf( PRINT_WARNING, "[VK][fbo] r_hdr 3 unavailable (shaderFloat64=%s format=%s); falling back\n",
-					shader64_supported ? "yes" : "no",
-					format64_supported ? "yes" : "no" );
-			}
-
+			/* Honest alias: true RGBA64F color RTs are not wired (no dvec4 fragment path). */
+			ri.Printf( PRINT_WARNING,
+				"[VK][fbo] r_hdr 3 aliases to 32-bit HDR (r_hdr 2); RGBA64F color output is not implemented\n" );
 			if ( vk_hdr_format_supported( physical_device, hdr32 ) ) {
 				return hdr32;
 			}
 			if ( vk_hdr_format_supported( physical_device, hdr16 ) ) {
-				ri.Printf( PRINT_WARNING, "[VK][fbo] r_hdr 3 fallback %s unsupported; using %s\n",
+				ri.Printf( PRINT_WARNING, "[VK][fbo] r_hdr 3→2 fallback %s unsupported; using %s\n",
 					vk_format_string( hdr32 ),
 					vk_format_string( hdr16 ) );
 				return hdr16;
 			}
-			ri.Printf( PRINT_WARNING, "[VK][fbo] r_hdr 3 fallback %s/%s unsupported; using %s\n",
+			ri.Printf( PRINT_WARNING, "[VK][fbo] r_hdr 3→2 fallback %s/%s unsupported; using %s\n",
 				vk_format_string( hdr32 ),
 				vk_format_string( hdr16 ),
 				vk_format_string( base_format ) );

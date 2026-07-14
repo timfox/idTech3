@@ -157,15 +157,22 @@ vec3 Tonemap_Filmic( vec3 x ) {
 	return mix( mapped, vec3( dot( mapped, sRGB ) ), desat );
 }
 
-/* AgX-inspired tonemap - punchy, saturated, modern look.
-   Attempt to preserve chrominance through the curve. */
+/* AgX-inspired tonemap — uses shared grade knobs (toe/shoulder/whitePoint/desat)
+   so look-dev with r_grade_* is not Filmic-only. */
 vec3 Tonemap_AgX( vec3 x ) {
-	/* Per-channel curve with luminance-guided saturation recovery */
-	float lum = dot( x, vec3( 0.2126, 0.7152, 0.0722 ) );
-	vec3 mapped = x / ( x + vec3( 0.7 ) );
-	float lumMapped = lum / ( lum + 0.7 );
-	/* Recover saturation lost by per-channel mapping */
-	vec3 satRecovered = lumMapped + 1.2 * ( mapped - lumMapped );
+	float toe = clamp( postfx.toneMapParams0.x, 0.0, 1.0 );
+	float shoulder = clamp( postfx.toneMapParams0.y, 0.0, 1.0 );
+	float whitePoint = max( postfx.toneMapParams0.z, 0.5 );
+	float highlightDesat = clamp( postfx.toneMapParams1.x, 0.0, 1.0 );
+	/* Map filmic toe/shoulder into AgX shoulder strength around the legacy 0.7 pivot. */
+	float agxStrength = clamp( 0.35 + 0.55 * shoulder + 0.25 * toe, 0.25, 1.35 );
+	float invWhite = 1.0 / max( whitePoint * 0.15 + agxStrength, 1e-3 );
+	float lum = max( dot( x, vec3( 0.2126, 0.7152, 0.0722 ) ), 1e-6 );
+	vec3 mapped = x * invWhite / ( x * invWhite + vec3( 1.0 ) );
+	float lumMapped = ( lum * invWhite ) / ( lum * invWhite + 1.0 );
+	/* Recover saturation lost by per-channel mapping; scale by inverse highlightDesat. */
+	float satBoost = mix( 1.35, 0.85, highlightDesat );
+	vec3 satRecovered = lumMapped + satBoost * ( mapped - lumMapped );
 	return clamp( satRecovered, 0.0, 1.0 );
 }
 

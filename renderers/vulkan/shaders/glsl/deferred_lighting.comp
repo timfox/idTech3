@@ -195,9 +195,11 @@ void main() {
 	}
 
 	float roughMod = mix( 1.0, 0.85, roughness );
+	vec3 diffuseTerm = albedo * ( 1.0 - metalness ) * irradiance;
 	vec3 lit;
 	if ( pc.additive != 0u ) {
-		vec3 dynamic = ( irradiance + specularAcc ) * roughMod * pc.strength;
+		/* Match Forward+ Fd*irradiance + Fs (additive over unlit base). */
+		vec3 dynamic = ( diffuseTerm + specularAcc ) * roughMod * pc.strength;
 		lit = dynamic;
 	} else {
 		lit = albedo * ( vec3( 0.04 ) + irradiance ) * roughMod * pc.strength;

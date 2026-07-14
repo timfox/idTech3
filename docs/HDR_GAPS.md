@@ -14,11 +14,9 @@ This document tracks known gaps, risks, and mitigations in the Vulkan HDR render
 
 ## 6.1b Double-Precision (64-bit) Render Targets
 
-**Option**: `r_hdr 3` requests RGBA64F (VK_FORMAT_R64G64B64A64_SFLOAT).
+**Option**: Historical `r_hdr 3` requested RGBA64F.
 
-**Gating**: Requires `VkPhysicalDeviceFeatures::shaderFloat64` and format support for COLOR_ATTACHMENT, SAMPLED_IMAGE, SAMPLED_IMAGE_FILTER_LINEAR. Almost no consumer GPUs expose this for color render targets.
-
-**Current**: Falls back to RGBA32F. 64-bit fragment shader output (dvec4) not yet implemented; would require separate pipeline/shaders. **In practice, `r_hdr 3` behaves like 32-bit HDR** because of this fallback; use `r_hdr 2` explicitly if you want to avoid the 64-bit request path.
+**Current**: **`r_hdr 3` aliases to 32-bit HDR (`r_hdr 2`)** with a startup warning. True RGBA64F color output / `dvec4` fragment paths are **not implemented** and are not advertised. Prefer `r_hdr 2` explicitly.
 
 ## 6.2 No True 32-bit HDR Lightmaps
 
@@ -92,6 +90,8 @@ Both feed into linear HDR; no conflict.
 ## 6.9 Color pipeline tiers (gamma pass)
 
 **World resolve** (menus/UI skip via `paniniPad1`): exposure (`r_exposure` / auto), pre-exposure (`r_pre_exposure_scale`), bloom knee, tonemap (`r_tonemap`), then display encode (`r_gamma` via `apply_srgb_gamma` when the swapchain is UNORM).
+
+**Tonemap + grade**: Filmic and **AgX** (`r_tonemap` 3) both read `toneMapParams0/1` (toe / shoulder / whitePoint / highlightDesat from `r_grade_*`). AgX is no longer a fixed curve.
 
 **Grading stack** (`r_post` 1): local exposure, white balance, LUT, contrast/saturation, motion blur, DOF, chromatic aberration, vignette, film grain, outline — all gated separately from resolve so `r_post 0` still tonemaps HDR instead of hard-clipping to 1.0.
 

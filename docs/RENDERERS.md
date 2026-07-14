@@ -82,9 +82,9 @@ exec deferred_vulkan.cfg
 vid_restart
 ```
 
-This profile sets `r_renderMode 1`, `r_deferredGBuffer 1`, `r_deferredGBufferFill 1`, and `r_deferredLighting 1`. It also forces `r_forwardPlusShade 0` so dynamic lights come from the deferred compute/composite path instead of being applied once by Forward+ primary shading and again by the legacy lit-surface pass. Deferred dynamic lights can be attenuated by the material AO channel with `r_deferredAOCoupling`, and highlights can be tuned separately with `r_deferredSpecularStrength`. The current deferred lighting mode is still experimental; the reliable shipping/native default remains `modern_vulkan.cfg`.
+This profile sets `r_renderMode 1`, `r_deferredGBuffer 1`, `r_deferredGBufferFill 1`, and `r_deferredLighting 1`. It also forces `r_forwardPlusShade 0` so dynamic lights come from the deferred compute/composite path instead of being applied once by Forward+ primary shading and again by the legacy lit-surface pass. Deferred dynamic lights can be attenuated by the **material AO** channel with `r_deferredAOCoupling` (not screen-space SSAO), and highlights use **GGX** specular scaled by `r_deferredSpecularStrength`. Additive deferred diffuse is albedo×(1−metalness)×irradiance to match Forward+ `Fd`. The deferred lighting mode is still experimental; the reliable shipping/native default remains `modern_vulkan.cfg`.
 
-The current G-buffer fill is depth-derived: albedo is copied from scene color, normals are reconstructed from depth with silhouette-aware neighbor selection, and material values use fallback cvars until true material export lands. Tune with `r_deferredDefaultMetalness`, `r_deferredDefaultRoughness`, and `r_deferredNormalEdgeThreshold`.
+The G-buffer fill copies scene albedo. On **non-MSAA** FBO frames, opaque PBR shaders **directly export** normals and material (metalness/roughness/AO). **MSAA** forces the depth-derived fallback (default metal/rough/AO=1). Prefer `r_ext_multisample 0` with `modern_vulkan.cfg` for true material export. Fallback defaults: `r_deferredDefaultMetalness`, `r_deferredDefaultRoughness`, `r_deferredNormalEdgeThreshold`.
 
 ### Vulkan Forward+ scaffolding
 
@@ -97,6 +97,9 @@ The current G-buffer fill is depth-derived: albedo is copied from scene color, n
 | `r_forwardPlusDebug` | **0–1** float: PBR heatmap overlay (lights per tile + borders). |
 | `r_forwardPlusShade` | **0–4** float: PBR shade for dlight indices **0–31** (not in `tess.dlightBits`); pipeline rebuild on change. |
 | `r_forwardPlusOverflowShade` | **0–4** (default **0**): PBR shade for indices **32–63**; requires `r_classicLighting 0`. Try **0.5** with modern lighting. |
+| `r_forwardPlusSpecularStrength` | **0–4** (default **0.65**): Forward+ dynamic specular scale (`modern_vulkan.cfg`). |
+| `r_forwardPlusEnergyRenorm` | **0–2** (default **0.45**): Soft primary-direct renorm vs Forward+ add. |
+| `r_forwardPlusDepthCull` | **0/1** (code default **0**; **`modern_vulkan.cfg` 1**): post-opaque tile cull with 5 depth probes. |
 | `r_forwardPlusLuminanceSort` | **0/1** (default **1**): when a tile is overloaded, keep brightest lights by RGB sum. |
 | `r_forwardPlusDistanceSort` | **0/1** (default **0**): when overloaded, prefer nearest lights to the camera (`vieworg`). |
 | `r_forwardPlusDepthCull` | **0/1** (default **1**): **0** = tile cull before draws; **1** = depth prepass + reject lights behind surfaces. |
@@ -273,11 +276,15 @@ Code: `renderers/vulkan/vk_forward_plus.c`, `VK_FP_*` constants; cvar registrati
 | `r_deferredLighting` | 0 | Experimental mode-1 deferred diffuse (Forward+ tiles, point+spot). Replaces scene color after geometry. Latches `r_forwardPlusShade` 0 with `vid_restart`; ignored by the mode-2 modern default. |
 | `r_deferredUnlitBase` | 1 | Additive dynamic on static-lit scene copy; skips classic lit-surf pass. **0** = legacy multiply composite. |
 | `r_deferredLightingStrength` | 1 | Scale deferred dynamic diffuse (0–4). |
-| `r_deferredSpecular` | 1 | Blinn-Phong specular on dynamic lights in deferred pass (0=diffuse only). |
+| `r_deferredSpecular` | 1 | GGX + Smith + Fresnel specular on deferred dynamic lights (0=diffuse only). |
+| `r_deferredSpecularStrength` | 1 | Scale deferred dynamic specular (0–4). |
+| `r_deferredAOCoupling` | 0.65 | Attenuate deferred dynamic light by the G-buffer **material** AO channel (0=off, 1=full). Does not sample SSAO. |
+| `r_deferredDefaultMetalness` | 0 | Fallback metalness for MSAA/depth-derived G-buffer export. |
+| `r_deferredDefaultRoughness` | 0.55 | Fallback roughness for MSAA/depth-derived G-buffer export. |
 | `r_deferredSpecularStrength` | 1 | Scale deferred dynamic specular highlights when `r_deferredSpecular 1` (0–4). |
-| `r_deferredAOCoupling` | 0.65 | Attenuate deferred dynamic light by the G-buffer material AO channel (0=off, 1=full). |
-| `r_deferredDefaultMetalness` | 0 | Fallback metalness written by the depth-derived G-buffer until material export is available. |
-| `r_deferredDefaultRoughness` | 0.55 | Fallback roughness written by the depth-derived G-buffer until material export is available. |
+| `r_deferredAOCoupling` | 0.65 | Attenuate deferred dynamic light by the G-buffer **material** AO channel (0=off, 1=full). Does not sample SSAO. |
+| `r_deferredDefaultMetalness` | 0 | Fallback metalness for MSAA/depth-derived G-buffer export. |
+| `r_deferredDefaultRoughness` | 0.55 | Fallback roughness for MSAA/depth-derived G-buffer export. |
 | `r_deferredNormalEdgeThreshold` | 0.08 | View-space depth delta used to reject silhouette-crossing neighbors during deferred normal reconstruction. |
 | `r_volumetricFog` | 0 | Volumetric fog enable (0=off, 1=on) |
 | `r_vdbFog` | 0 | Blend GPU-uploaded bound VDB density (`vdb_bind_fog`) into global volumetric density (requires `r_volumetricFog` 1 and `VDB_UploadToGPU`) |

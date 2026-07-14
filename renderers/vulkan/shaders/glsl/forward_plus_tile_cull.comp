@@ -109,11 +109,30 @@ void main() {
 		}
 
 		if (pc.depthCull != 0u) {
-			vec2 depthUv = vec2(centerPx.x / max(vw, 1.0), centerPx.y / max(vh, 1.0));
-			float sceneZ = texture(depthTexture, depthUv).r;
+			/*
+			 * Sample tile corners + center (min-depth style probes).
+			 * Reversed-Z: nearer surfaces have larger depth. Use the nearest
+			 * surface in the tile (max sceneZ) so lights fully behind local
+			 * occluders drop even when the light's sphere center is empty sky.
+			 */
+			float minX = float(tileX) * tilePxX;
+			float minY = float(tileY) * tilePxY;
+			float maxX = minX + tilePxX;
+			float maxY = minY + tilePxY;
+			vec2 probes[5];
+			probes[0] = vec2((minX + maxX) * 0.5, (minY + maxY) * 0.5);
+			probes[1] = vec2(minX + 0.5, minY + 0.5);
+			probes[2] = vec2(maxX - 0.5, minY + 0.5);
+			probes[3] = vec2(minX + 0.5, maxY - 0.5);
+			probes[4] = vec2(maxX - 0.5, maxY - 0.5);
+			float sceneNearest = 0.0;
+			for (uint pi = 0u; pi < 5u; pi++) {
+				vec2 depthUv = vec2(probes[pi].x / max(vw, 1.0), probes[pi].y / max(vh, 1.0));
+				depthUv = clamp(depthUv, vec2(0.0), vec2(1.0));
+				sceneNearest = max(sceneNearest, texture(depthTexture, depthUv).r);
+			}
 			float lightZ = ndc.z * 0.5 + 0.5;
-			/* Reversed-Z: nearer surfaces have larger depth; reject lights behind the surface. */
-			if (lightZ < sceneZ - 1e-4) {
+			if (lightZ < sceneNearest - 1e-4) {
 				continue;
 			}
 		}

@@ -1884,7 +1884,12 @@ void RB_GLTFSurface( const surfaceType_t *surface ) {
 			morphActive++;
 		}
 
-		morphFloats = (size_t)( 2 + 2u * (size_t)IQM_MORPH_TOP_K ) + (size_t)surf->numVertices * (size_t)IQM_MORPH_TOP_K * 6u;
+		/* Skin-only glTF meshes still bind the shared morph SSBO layout, but they only need
+		a zeroed header so the shader sees morphCount/activeCount == 0 and skips delta reads. */
+		morphFloats = (size_t)( 2 + 2u * (size_t)IQM_MORPH_TOP_K );
+		if ( morphActive > 0 ) {
+			morphFloats += (size_t)surf->numVertices * (size_t)IQM_MORPH_TOP_K * 6u;
+		}
 		morphBytes = morphFloats * sizeof( float );
 		morphPayload = gpuOk ? (float *)vk_alloc_storage( morphBytes, &morphOff ) : NULL;
 		if ( gpuOk && !morphPayload ) {
@@ -1897,24 +1902,26 @@ void RB_GLTFSurface( const surfaceType_t *surface ) {
 				morphPayload[2 + mk] = ( mk < morphActive ) ? topMorphW[mk] : 0.0f;
 				morphPayload[2 + IQM_MORPH_TOP_K + mk] = ( mk < morphActive ) ? topMorphWPrev[mk] : 0.0f;
 			}
-			for ( i = 0; i < surf->numVertices; i++ ) {
-				const size_t morphBase = (size_t)( 2 + 2u * (size_t)IQM_MORPH_TOP_K );
-				for ( mk = 0; mk < morphActive; mk++ ) {
-					int tgt = topMorphIdx[mk];
-					size_t dst = (size_t)i * (size_t)IQM_MORPH_TOP_K * 6u + (size_t)mk * 6u;
-					const gltfMorphTarget_t *mt = &surf->morphTargets[tgt];
-					const float *dp = mt->deltaPosition ? ( mt->deltaPosition + i * 3 ) : NULL;
-					const float *dn = mt->deltaNormal ? ( mt->deltaNormal + i * 3 ) : NULL;
-					morphPayload[morphBase + dst + 0] = dp ? dp[0] : 0.0f;
-					morphPayload[morphBase + dst + 1] = dp ? dp[1] : 0.0f;
-					morphPayload[morphBase + dst + 2] = dp ? dp[2] : 0.0f;
-					morphPayload[morphBase + dst + 3] = dn ? dn[0] : 0.0f;
-					morphPayload[morphBase + dst + 4] = dn ? dn[1] : 0.0f;
-					morphPayload[morphBase + dst + 5] = dn ? dn[2] : 0.0f;
-				}
-				for ( mk = morphActive; mk < IQM_MORPH_TOP_K; mk++ ) {
-					size_t dst = (size_t)i * (size_t)IQM_MORPH_TOP_K * 6u + (size_t)mk * 6u;
-					Com_Memset( morphPayload + morphBase + dst, 0, 6u * sizeof( float ) );
+			if ( morphActive > 0 ) {
+				for ( i = 0; i < surf->numVertices; i++ ) {
+					const size_t morphBase = (size_t)( 2 + 2u * (size_t)IQM_MORPH_TOP_K );
+					for ( mk = 0; mk < morphActive; mk++ ) {
+						int tgt = topMorphIdx[mk];
+						size_t dst = (size_t)i * (size_t)IQM_MORPH_TOP_K * 6u + (size_t)mk * 6u;
+						const gltfMorphTarget_t *mt = &surf->morphTargets[tgt];
+						const float *dp = mt->deltaPosition ? ( mt->deltaPosition + i * 3 ) : NULL;
+						const float *dn = mt->deltaNormal ? ( mt->deltaNormal + i * 3 ) : NULL;
+						morphPayload[morphBase + dst + 0] = dp ? dp[0] : 0.0f;
+						morphPayload[morphBase + dst + 1] = dp ? dp[1] : 0.0f;
+						morphPayload[morphBase + dst + 2] = dp ? dp[2] : 0.0f;
+						morphPayload[morphBase + dst + 3] = dn ? dn[0] : 0.0f;
+						morphPayload[morphBase + dst + 4] = dn ? dn[1] : 0.0f;
+						morphPayload[morphBase + dst + 5] = dn ? dn[2] : 0.0f;
+					}
+					for ( mk = morphActive; mk < IQM_MORPH_TOP_K; mk++ ) {
+						size_t dst = (size_t)i * (size_t)IQM_MORPH_TOP_K * 6u + (size_t)mk * 6u;
+						Com_Memset( morphPayload + morphBase + dst, 0, 6u * sizeof( float ) );
+					}
 				}
 			}
 		}

@@ -334,6 +334,8 @@ cvar_t	*r_forwardPlusOverflowShade;
 cvar_t	*r_forwardPlusLuminanceSort;
 cvar_t	*r_forwardPlusDistanceSort;
 cvar_t	*r_forwardPlusDepthCull;
+cvar_t	*r_forwardPlusSpecularStrength;
+cvar_t	*r_forwardPlusEnergyRenorm;
 
 #endif // USE_VULKAN
 
@@ -4145,7 +4147,7 @@ static void R_Register( void )
 	r_deferredSpecular = ri.Cvar_Get( "r_deferredSpecular", "1", CVAR_ARCHIVE_ND );
 	ri.Cvar_CheckRange( r_deferredSpecular, "0", "1", CV_INTEGER );
 	ri.Cvar_SetDescription( r_deferredSpecular,
-		"With r_deferredLighting 1: Blinn-Phong specular on dynamic lights in deferred pass (0=diffuse only)." );
+		"With r_deferredLighting 1: GGX + Smith + Fresnel specular on dynamic lights in deferred pass (0=diffuse only)." );
 	ri.Cvar_SetGroup( r_deferredSpecular, CVG_RENDERER );
 	if ( r_deferredSpecular && r_deferredSpecular->integer && r_deferredLighting && r_deferredLighting->integer ) {
 		ri.Printf( PRINT_ALL, "[VK][deferred] r_deferredSpecular=1 (dynamic specular in deferred pass)\n" );
@@ -4177,7 +4179,7 @@ static void R_Register( void )
 	ri.Cvar_SetGroup( r_deferredNormalEdgeThreshold, CVG_RENDERER );
 	r_hdr = ri.Cvar_Get( "r_hdr", "2", CVAR_ARCHIVE_ND | CVAR_LATCH );
 	ri.Cvar_CheckRange( r_hdr, "-1", "3", CV_INTEGER );
-	ri.Cvar_SetDescription(r_hdr, "HDR frame buffer format. Requires \\r_fbo 1.\n -1: 4-bit (B4G4R4A4), testing only\n  0: 8-bit, moderate banding\n  1: 16-bit float (RGBA16F)\n  2: 32-bit float (RGBA32F), default, fallback to 16F if unsupported\n  3: 64-bit float (RGBA64F), optional; falls back to 32F (glslang lacks dvec4 fragment output support)\n" );
+	ri.Cvar_SetDescription(r_hdr, "HDR frame buffer format. Requires \\r_fbo 1.\n -1: 4-bit (B4G4R4A4), testing only\n  0: 8-bit, moderate banding\n  1: 16-bit float (RGBA16F)\n  2: 32-bit float (RGBA32F), default, fallback to 16F if unsupported\n  3: aliases to mode 2 (32F) — true RGBA64F color output is not implemented\n" );
 	ri.Cvar_SetGroup( r_hdr, CVG_RENDERER );
 	r_bloom = ri.Cvar_Get( "r_bloom", "0", CVAR_ARCHIVE_ND | CVAR_LATCH );
 	ri.Cvar_CheckRange( r_bloom, "0", "1", CV_INTEGER );
@@ -4679,8 +4681,18 @@ static void R_Register( void )
 	r_forwardPlusDepthCull = ri.Cvar_Get( "r_forwardPlusDepthCull", "0", CVAR_ARCHIVE_ND );
 	ri.Cvar_CheckRange( r_forwardPlusDepthCull, "0", "1", CV_INTEGER );
 	ri.Cvar_SetDescription( r_forwardPlusDepthCull,
-		"When 1, a depth prepass fills the depth buffer, then tile cull rejects lights behind surfaces at each light's screen center, then opaque color draws. When 0, cull runs at view start without depth (legacy). Requires \\r_forwardPlus 1 (no vid_restart)." );
+		"When 1, a depth prepass fills the depth buffer, then tile cull rejects lights behind the nearest surface in each tile (5 probes: corners+center), then opaque color draws. When 0, cull runs at view start without depth (legacy). Requires \\r_forwardPlus 1 (no vid_restart). modern_vulkan.cfg sets 1." );
 	ri.Cvar_SetGroup( r_forwardPlusDepthCull, CVG_RENDERER );
+	r_forwardPlusSpecularStrength = ri.Cvar_Get( "r_forwardPlusSpecularStrength", "0.65", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_forwardPlusSpecularStrength, "0", "4", CV_FLOAT );
+	ri.Cvar_SetDescription( r_forwardPlusSpecularStrength,
+		"Forward+ dynamic specular scale (default 0.65 preserves prior art balance). Mirrors r_deferredSpecularStrength for the mode-2 path. Requires r_forwardPlusShade > 0 (no vid_restart)." );
+	ri.Cvar_SetGroup( r_forwardPlusSpecularStrength, CVG_RENDERER );
+	r_forwardPlusEnergyRenorm = ri.Cvar_Get( "r_forwardPlusEnergyRenorm", "0.45", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_forwardPlusEnergyRenorm, "0", "2", CV_FLOAT );
+	ri.Cvar_SetDescription( r_forwardPlusEnergyRenorm,
+		"Soft primary-direct attenuation when Forward+ add is bright: fpRenorm = clamp(1 - (fpAdd/primary)*this, 0.35, 1). Higher = more renorm of classic projector energy. Default 0.45." );
+	ri.Cvar_SetGroup( r_forwardPlusEnergyRenorm, CVG_RENDERER );
 	r_ext_alpha_to_coverage = ri.Cvar_Get( "r_ext_alpha_to_coverage", "1", CVAR_ARCHIVE_ND | CVAR_LATCH );
 	ri.Cvar_CheckRange( r_ext_alpha_to_coverage, "0", "1", CV_INTEGER );
 	ri.Cvar_SetDescription( r_ext_alpha_to_coverage, "Alpha-to-coverage for alpha-tested surfaces (foliage, grates) when MSAA is on. Enabled by default for Vulkan MSAA paths. Requires \\r_fbo 1 and \\r_ext_multisample 2+." );

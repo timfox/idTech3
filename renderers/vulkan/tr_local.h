@@ -1642,6 +1642,8 @@ extern cvar_t	*r_forwardPlusOverflowShade;
 extern cvar_t	*r_forwardPlusLuminanceSort;
 extern cvar_t	*r_forwardPlusDistanceSort;
 extern cvar_t	*r_forwardPlusDepthCull;
+extern cvar_t	*r_forwardPlusSpecularStrength;
+extern cvar_t	*r_forwardPlusEnergyRenorm;
 extern cvar_t	*r_rtxEntities;
 extern cvar_t	*r_rtxEntityCap;
 extern cvar_t	*r_rtxEntityTriCap;
