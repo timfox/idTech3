@@ -37,6 +37,7 @@ layout(push_constant) uniform Push {
 	uint additive;
 	uint specular;
 	float aoStrength;
+	float specularStrength;
 } pc;
 
 float viewZFromDepth( float depth ) {
@@ -177,7 +178,7 @@ void main() {
 		if ( nlAtt <= 0.0 ) {
 			continue;
 		}
-			irradiance += lc.rgb * addBoost * nlAtt * aoCoupling;
+		irradiance += lc.rgb * addBoost * nlAtt * aoCoupling;
 		if ( pc.specular != 0u ) {
 			vec3 H = normalize( L + V );
 			float NH = max( dot( N, H ), 0.0 );
@@ -188,7 +189,8 @@ void main() {
 			vec3 F = F0 + ( 1.0 - F0 ) * pow( 1.0 - VH, 5.0 );
 			float D = D_GGX( NH, alpha );
 			float Vis = CalcVisibility( NL, NE, alpha );
-			specularAcc += lc.rgb * addBoost * ( D * Vis * F * NL ) * mix( 1.0, aoCoupling, 0.5 );
+			specularAcc += lc.rgb * addBoost * ( D * Vis * F * NL ) *
+				mix( 1.0, aoCoupling, 0.5 ) * pc.specularStrength;
 		}
 	}
 

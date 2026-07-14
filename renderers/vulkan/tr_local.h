@@ -1579,6 +1579,7 @@ extern cvar_t	*r_deferredLighting;
 extern cvar_t	*r_deferredUnlitBase;
 extern cvar_t	*r_deferredLightingStrength;
 extern cvar_t	*r_deferredSpecular;
+extern cvar_t	*r_deferredSpecularStrength;
 extern cvar_t	*r_deferredAOCoupling;
 extern cvar_t	*r_deferredDefaultMetalness;
 extern cvar_t	*r_deferredDefaultRoughness;

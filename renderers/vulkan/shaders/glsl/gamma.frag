@@ -14,6 +14,7 @@ layout(set = 2, binding = 0) uniform PostFXParams {
 	vec4 toneMapParams1;   /* highlightDesat, contrast, contrastPivot, legacyTonemapMode */
 	vec4 colorBalance;     /* temperature, tint, exposureBias, preExposureScale */
 	vec4 colorGrade;       /* saturation, vibrance, legacyContrast, legacySaturation */
+	vec4 colorGrade2;      /* hueDegrees, reserved */
 	vec4 shadowsLift;      /* rgb lift */
 	vec4 midsGamma;        /* rgb gamma */
 	vec4 highlightsGain;   /* rgb gain */
@@ -101,6 +102,7 @@ float postContrastPivot( void ) { return clamp( postfx.toneMapParams1.z, 0.0, 1.
 float postLegacyContrast( void ) { return max( postfx.colorGrade.z, 0.0 ); }
 float postSaturation( void ) { return max( postfx.colorGrade.x, 0.0 ) * max( postfx.colorGrade.w, 0.0 ); }
 float postVibrance( void ) { return clamp( postfx.colorGrade.y, -1.0, 1.0 ); }
+float postHueDegrees( void ) { return clamp( postfx.colorGrade2.x, -180.0, 180.0 ); }
 float postInvGamma( void ) { return max( postfx.lutParams.w, 1e-6 ); }
 float postVignetteIntensity( void ) { return max( postfx.lensEffects0.x, 0.0 ); }
 float postVignetteRadius( void ) { return max( postfx.lensEffects0.y, 0.0 ); }
@@ -266,6 +268,27 @@ vec3 applyVibrance( vec3 ldr ) {
 	return clamp( vec3( lum ) + ( 1.0 + amount ) * ( ldr - vec3( lum ) ), 0.0, 1.0 );
 }
 
+vec3 applyHueShift( vec3 ldr ) {
+	float hue = postHueDegrees();
+	if ( abs( hue ) <= 0.001 ) {
+		return ldr;
+	}
+
+	float angle = radians( hue );
+	float s = sin( angle );
+	float c = cos( angle );
+	vec3 yiq;
+	yiq.x = dot( ldr, vec3( 0.299, 0.587, 0.114 ) );
+	yiq.y = dot( ldr, vec3( 0.596, -0.274, -0.322 ) );
+	yiq.z = dot( ldr, vec3( 0.211, -0.523, 0.312 ) );
+	vec2 chroma = vec2( yiq.y * c - yiq.z * s, yiq.y * s + yiq.z * c );
+	vec3 shifted;
+	shifted.r = yiq.x + 0.956 * chroma.x + 0.621 * chroma.y;
+	shifted.g = yiq.x - 0.272 * chroma.x - 0.647 * chroma.y;
+	shifted.b = yiq.x - 1.106 * chroma.x + 1.703 * chroma.y;
+	return clamp( shifted, 0.0, 1.0 );
+}
+
 vec3 sampleLUTStrip( vec3 ldr ) {
 	float lutIntensity = clamp( postfx.lutParams.x, 0.0, 1.0 );
 	float lutEnabled = postfx.lutParams.y;
@@ -382,6 +405,7 @@ vec3 applyPostColorAdjust( vec3 ldr, bool postActive ) {
 		float pivot = postContrastPivot();
 		ldr = ( ldr - pivot ) * c + pivot;
 		ldr = clamp( ldr, 0.0, 1.0 );
+		ldr = applyHueShift( ldr );
 		ldr = applyVibrance( ldr );
 		float sat = clamp( postSaturation(), 0.0, 3.0 );
 		float lum = dot( ldr, sRGB );

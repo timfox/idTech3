@@ -82,7 +82,7 @@ exec deferred_vulkan.cfg
 vid_restart
 ```
 
-This profile sets `r_renderMode 1`, `r_deferredGBuffer 1`, `r_deferredGBufferFill 1`, and `r_deferredLighting 1`. It also forces `r_forwardPlusShade 0` so dynamic lights come from the deferred compute/composite path instead of being applied once by Forward+ primary shading and again by the legacy lit-surface pass. Deferred dynamic lights can be attenuated by the material AO channel with `r_deferredAOCoupling`, which helps contact areas avoid looking over-lit. The current deferred lighting mode is still experimental; the reliable shipping/native default remains `modern_vulkan.cfg`.
+This profile sets `r_renderMode 1`, `r_deferredGBuffer 1`, `r_deferredGBufferFill 1`, and `r_deferredLighting 1`. It also forces `r_forwardPlusShade 0` so dynamic lights come from the deferred compute/composite path instead of being applied once by Forward+ primary shading and again by the legacy lit-surface pass. Deferred dynamic lights can be attenuated by the material AO channel with `r_deferredAOCoupling`, and highlights can be tuned separately with `r_deferredSpecularStrength`. The current deferred lighting mode is still experimental; the reliable shipping/native default remains `modern_vulkan.cfg`.
 
 The current G-buffer fill is depth-derived: albedo is copied from scene color, normals are reconstructed from depth with silhouette-aware neighbor selection, and material values use fallback cvars until true material export lands. Tune with `r_deferredDefaultMetalness`, `r_deferredDefaultRoughness`, and `r_deferredNormalEdgeThreshold`.
 
@@ -274,6 +274,7 @@ Code: `renderers/vulkan/vk_forward_plus.c`, `VK_FP_*` constants; cvar registrati
 | `r_deferredUnlitBase` | 1 | Additive dynamic on static-lit scene copy; skips classic lit-surf pass. **0** = legacy multiply composite. |
 | `r_deferredLightingStrength` | 1 | Scale deferred dynamic diffuse (0–4). |
 | `r_deferredSpecular` | 1 | Blinn-Phong specular on dynamic lights in deferred pass (0=diffuse only). |
+| `r_deferredSpecularStrength` | 1 | Scale deferred dynamic specular highlights when `r_deferredSpecular 1` (0–4). |
 | `r_deferredAOCoupling` | 0.65 | Attenuate deferred dynamic light by the G-buffer material AO channel (0=off, 1=full). |
 | `r_deferredDefaultMetalness` | 0 | Fallback metalness written by the depth-derived G-buffer until material export is available. |
 | `r_deferredDefaultRoughness` | 0.55 | Fallback roughness written by the depth-derived G-buffer until material export is available. |
@@ -333,7 +334,7 @@ Code: `renderers/vulkan/vk_forward_plus.c`, `VK_FP_*` constants; cvar registrati
 | `r_wsp` | 0 | **WebSplatter** (experimental): WebGPU-aligned tile splats (`1`=mobile … `3`=high). See [WEB_SPLATTER.md](WEB_SPLATTER.md). |
 | `r_wsp_strength` | 0.85 | WebSplatter composite strength. |
 | `r_pre_exposure_scale` | 1.0 | Pre-exposure scale for bloom/tonemap pipeline |
-| `r_tonemap` | 2 | Tonemapping (0=none, 1=Reinhard, 2=ACES) |
+| `r_tonemap` | 3 | Tonemapping (0=none, 1=Reinhard, 2=ACES, 3=Filmic, 4=AgX) |
 | `r_exposure` | 1.0 | Exposure multiplier |
 | `r_exposure_auto` | 0 | Eye adaptation (0=manual, 1=temporal blend toward target) |
 | `r_exposure_auto_target` | 0.5 | Target exposure for eye adaptation |
@@ -348,6 +349,8 @@ Code: `renderers/vulkan/vk_forward_plus.c`, `VK_FP_*` constants; cvar registrati
 | `r_renderHeight` | 600 | Internal render height used when `r_renderScale > 0`. |
 | `r_post_contrast` | 1.0 | Post-tonemap contrast (1=neutral, >1=punchier, <1=flatter) |
 | `r_post_saturation` | 1.0 | Post-tonemap saturation (1=neutral, >1=vivid, <1=desaturated) |
+| `r_grade_hue` | 0.0 | Display-referred hue rotation in degrees (-180 to 180) |
+| `r_grade_vibrance` | 0.15 | Selective saturation boost for muted colors (-1 to 1) |
 | `r_atmosphere` | 0 | Procedural atmospheric sky (Rayleigh+Mie). **1** replaces grey sky when no HDR skybox; requires `r_fbo 1`. |
 | `r_atmosphere_scale` | 4.0 | HDR scale multiplier for sky brightness. Works with auto exposure; increase if sky appears dark. |
 | `r_skyboxHDR` | "" | Path to HDR skybox panorama: EXR or Radiance .hdr (empty = use atmosphere or map skybox). |

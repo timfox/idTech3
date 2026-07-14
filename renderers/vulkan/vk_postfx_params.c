@@ -79,6 +79,7 @@ void vk_update_postfx_params( uint32_t cmd_index )
 	params.colorGrade[1] = Com_Clamp( -1.0f, 1.0f, PostFX_GetGradeVibrance() );
 	params.colorGrade[2] = ( r_post_contrast && r_post_contrast->value > 0.0f ) ? r_post_contrast->value : 1.0f;
 	params.colorGrade[3] = ( r_post_saturation && r_post_saturation->value >= 0.0f ) ? r_post_saturation->value : 1.0f;
+	params.colorGrade2[0] = Com_Clamp( -180.0f, 180.0f, PostFX_GetGradeHue() );
 	PostFX_GetShadowLift( shadowLift );
 	PostFX_GetMidGamma( midGamma );
 	PostFX_GetHighlightGain( highlightGain );

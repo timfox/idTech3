@@ -14,6 +14,7 @@ layout(set = 2, binding = 0) uniform PostFXParams {
 	vec4 toneMapParams1;
 	vec4 colorBalance;
 	vec4 colorGrade;
+	vec4 colorGrade2;
 	vec4 shadowsLift;
 	vec4 midsGamma;
 	vec4 highlightsGain;

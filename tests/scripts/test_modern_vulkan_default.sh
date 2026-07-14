@@ -50,6 +50,7 @@ grep -q 'seta r_renderMode 1' "$DEFERRED_OVERLAY" || fail "deferred overlay must
 grep -q 'seta r_deferredLighting 1' "$DEFERRED_OVERLAY" || fail "deferred overlay must enable deferred lighting"
 grep -q 'seta r_forwardPlusShade 0' "$DEFERRED_OVERLAY" || fail "deferred overlay must prevent double dynamic lighting"
 grep -q 'seta r_deferredAOCoupling 0.65' "$DEFERRED_OVERLAY" || fail "deferred overlay must enable AO-coupled dynamic lighting"
+grep -q 'seta r_deferredSpecularStrength 1' "$DEFERRED_OVERLAY" || fail "deferred overlay must pin deferred specular strength"
 
 grep -q 'exec modern_vulkan.cfg' "$RTX_OVERLAY" || fail "RTX overlay must inherit modern Vulkan"
 grep -q 'seta r_rtx 1' "$RTX_OVERLAY" || fail "RTX overlay must enable r_rtx"

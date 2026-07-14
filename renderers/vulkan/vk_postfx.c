@@ -76,6 +76,7 @@ static cvar_t *r_grade_contrast;
 static cvar_t *r_grade_contrastPivot;
 static cvar_t *r_grade_saturation;
 static cvar_t *r_grade_vibrance;
+static cvar_t *r_grade_hue;
 static cvar_t *r_grade_shadowLift;
 static cvar_t *r_grade_midGamma;
 static cvar_t *r_grade_highlightGain;
@@ -199,6 +200,7 @@ void PostFX_RegisterCvars(void) {
 	r_grade_contrastPivot    = ri.Cvar_Get("r_grade_contrastPivot",    "0.38", CVAR_ARCHIVE_ND);
 	r_grade_saturation       = ri.Cvar_Get("r_grade_saturation",       "1.0",  CVAR_ARCHIVE_ND);
 	r_grade_vibrance         = ri.Cvar_Get("r_grade_vibrance",         "0.15", CVAR_ARCHIVE_ND);
+	r_grade_hue              = ri.Cvar_Get("r_grade_hue",              "0.0",  CVAR_ARCHIVE_ND);
 	r_grade_shadowLift       = ri.Cvar_Get("r_grade_shadowLift",       "0 0 0", CVAR_ARCHIVE_ND);
 	r_grade_midGamma         = ri.Cvar_Get("r_grade_midGamma",         "1 1 1", CVAR_ARCHIVE_ND);
 	r_grade_highlightGain    = ri.Cvar_Get("r_grade_highlightGain",    "1 1 1", CVAR_ARCHIVE_ND);
@@ -221,6 +223,7 @@ void PostFX_RegisterCvars(void) {
 	ri.Cvar_CheckRange( r_grade_contrastPivot, "0.1", "0.9", CV_FLOAT );
 	ri.Cvar_CheckRange( r_grade_saturation, "0.0", "3.0", CV_FLOAT );
 	ri.Cvar_CheckRange( r_grade_vibrance, "-1.0", "1.0", CV_FLOAT );
+	ri.Cvar_CheckRange( r_grade_hue, "-180.0", "180.0", CV_FLOAT );
 	ri.Cvar_CheckRange( r_grade_splitBalance, "0.0", "1.0", CV_FLOAT );
 	ri.Cvar_CheckRange( r_grade_splitStrength, "0.0", "1.0", CV_FLOAT );
 	ri.Cvar_CheckRange( r_grade_lutIntensity, "0.0", "1.0", CV_FLOAT );
@@ -252,6 +255,7 @@ void PostFX_RegisterCvars(void) {
 	ri.Cvar_SetDescription( r_grade_contrastPivot, "Contrast pivot in display-referred space." );
 	ri.Cvar_SetDescription( r_grade_saturation, "Primary post saturation multiplier." );
 	ri.Cvar_SetDescription( r_grade_vibrance, "Selective saturation boost for muted colors." );
+	ri.Cvar_SetDescription( r_grade_hue, "Display-referred hue rotation in degrees (-180 to 180)." );
 	ri.Cvar_SetDescription( r_grade_shadowLift, "Shadow lift RGB vector, formatted as 'r g b'." );
 	ri.Cvar_SetDescription( r_grade_midGamma, "Midtone gamma RGB vector, formatted as 'r g b'." );
 	ri.Cvar_SetDescription( r_grade_highlightGain, "Highlight gain RGB vector, formatted as 'r g b'." );
@@ -317,6 +321,7 @@ void PostFX_RegisterCvars(void) {
 	ri.Cvar_SetGroup( r_grade_contrastPivot, CVG_RENDERER );
 	ri.Cvar_SetGroup( r_grade_saturation, CVG_RENDERER );
 	ri.Cvar_SetGroup( r_grade_vibrance, CVG_RENDERER );
+	ri.Cvar_SetGroup( r_grade_hue, CVG_RENDERER );
 	ri.Cvar_SetGroup( r_grade_shadowLift, CVG_RENDERER );
 	ri.Cvar_SetGroup( r_grade_midGamma, CVG_RENDERER );
 	ri.Cvar_SetGroup( r_grade_highlightGain, CVG_RENDERER );
@@ -515,6 +520,7 @@ float PostFX_GetGradeContrast(void) { return r_grade_contrast ? r_grade_contrast
 float PostFX_GetGradeContrastPivot(void) { return r_grade_contrastPivot ? r_grade_contrastPivot->value : 0.38f; }
 float PostFX_GetGradeSaturation(void) { return r_grade_saturation ? r_grade_saturation->value : 1.0f; }
 float PostFX_GetGradeVibrance(void) { return r_grade_vibrance ? r_grade_vibrance->value : 0.15f; }
+float PostFX_GetGradeHue(void) { return r_grade_hue ? r_grade_hue->value : 0.0f; }
 void PostFX_GetShadowLift(float *rgb) {
 	vec3_t parsed;
 	PostFX_ParseRGBOrDefault( r_grade_shadowLift, parsed, 0.0f, 0.0f, 0.0f );

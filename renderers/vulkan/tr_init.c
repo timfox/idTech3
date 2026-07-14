@@ -210,6 +210,7 @@ cvar_t	*r_deferredLighting;
 cvar_t	*r_deferredUnlitBase;
 cvar_t	*r_deferredLightingStrength;
 cvar_t	*r_deferredSpecular;
+cvar_t	*r_deferredSpecularStrength;
 cvar_t	*r_deferredAOCoupling;
 cvar_t	*r_deferredDefaultMetalness;
 cvar_t	*r_deferredDefaultRoughness;
@@ -2088,9 +2089,10 @@ static void R_RendererStatus_f( void )
 		R_CvarInteger( r_fbo ), R_YesNo( vk.fboActive ), R_CvarInteger( r_hdr ), vk_format_string( vk.color_format ) );
 	ri.Printf( PRINT_ALL, "pbr       : r_pbr=%d materialBlend=%d\n",
 		R_CvarInteger( r_pbr ), R_CvarInteger( r_materialBlend ) );
-	ri.Printf( PRINT_ALL, "mode      : r_renderMode=%d deferredLighting=%d deferredUnlitBase=%d deferredAO=%.2f\n",
+	ri.Printf( PRINT_ALL, "mode      : r_renderMode=%d deferredLighting=%d deferredUnlitBase=%d deferredSpec=%.2f deferredAO=%.2f\n",
 		R_CvarInteger( r_renderMode ), R_CvarInteger( r_deferredLighting ),
-		R_CvarInteger( r_deferredUnlitBase ), R_CvarValue( r_deferredAOCoupling ) );
+		R_CvarInteger( r_deferredUnlitBase ), R_CvarValue( r_deferredSpecularStrength ),
+		R_CvarValue( r_deferredAOCoupling ) );
 	ri.Printf( PRINT_ALL, "forward+  : enabled=%d shade=%.2f maxPerTile=%d lumSort=%d distSort=%d depthCull=%d\n",
 		R_CvarInteger( r_forwardPlus ), R_CvarValue( r_forwardPlusShade ), R_CvarInteger( r_forwardPlusMaxPerTile ),
 		R_CvarInteger( r_forwardPlusLuminanceSort ), R_CvarInteger( r_forwardPlusDistanceSort ), R_CvarInteger( r_forwardPlusDepthCull ) );
@@ -4106,6 +4108,11 @@ static void R_Register( void )
 	if ( r_deferredSpecular && r_deferredSpecular->integer && r_deferredLighting && r_deferredLighting->integer ) {
 		ri.Printf( PRINT_ALL, "[VK][deferred] r_deferredSpecular=1 (dynamic specular in deferred pass)\n" );
 	}
+	r_deferredSpecularStrength = ri.Cvar_Get( "r_deferredSpecularStrength", "1", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_deferredSpecularStrength, "0", "4", CV_FLOAT );
+	ri.Cvar_SetDescription( r_deferredSpecularStrength,
+		"With r_deferredLighting 1 and r_deferredSpecular 1: scale deferred dynamic specular highlights (0=off, 1=default)." );
+	ri.Cvar_SetGroup( r_deferredSpecularStrength, CVG_RENDERER );
 	r_deferredAOCoupling = ri.Cvar_Get( "r_deferredAOCoupling", "0.65", CVAR_ARCHIVE_ND );
 	ri.Cvar_CheckRange( r_deferredAOCoupling, "0", "1", CV_FLOAT );
 	ri.Cvar_SetDescription( r_deferredAOCoupling,

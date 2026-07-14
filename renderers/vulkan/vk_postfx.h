@@ -81,6 +81,7 @@ float    PostFX_GetGradeContrast(void);
 float    PostFX_GetGradeContrastPivot(void);
 float    PostFX_GetGradeSaturation(void);
 float    PostFX_GetGradeVibrance(void);
+float    PostFX_GetGradeHue(void);
 void     PostFX_GetShadowLift(float *rgb);
 void     PostFX_GetMidGamma(float *rgb);
 void     PostFX_GetHighlightGain(float *rgb);

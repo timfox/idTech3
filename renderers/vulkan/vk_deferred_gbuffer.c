@@ -37,6 +37,7 @@ typedef struct {
 	uint32_t additive;
 	uint32_t specular;
 	float aoStrength;
+	float specularStrength;
 } vk_deferred_light_push_t;
 
 typedef struct {
@@ -709,6 +710,8 @@ static void vk_dgb_fill_light_push( vk_deferred_light_push_t *push, uint32_t wid
 	push->specular = ( r_deferredSpecular && r_deferredSpecular->integer ) ? 1u : 0u;
 	push->aoStrength = r_deferredAOCoupling ?
 		Com_Clamp( 0.0f, 1.0f, r_deferredAOCoupling->value ) : 0.65f;
+	push->specularStrength = r_deferredSpecularStrength ?
+		Com_Clamp( 0.0f, 4.0f, r_deferredSpecularStrength->value ) : 1.0f;
 }
 
 static void vk_dgb_dispatch_lighting_compute( uint32_t width, uint32_t height )
@@ -735,11 +738,12 @@ static void vk_dgb_dispatch_lighting_compute( uint32_t width, uint32_t height )
 
 	if ( !vk.deferred_gbuffer.lighting_logged ) {
 		ri.Printf( PRINT_ALL,
-			"[VK][deferred] r_deferredLighting=1 (%s dynamic; point+spot; strength=%.2f; specular=%s; ao=%.2f)\n",
+			"[VK][deferred] r_deferredLighting=1 (%s dynamic; point+spot; strength=%.2f; specular=%s %.2f; ao=%.2f)\n",
 			vk_deferred_unlit_base_wanted() ? "additive+sceneBase" : "multiply",
 			( r_deferredLightingStrength && r_deferredLightingStrength->value > 0.0f ) ?
 				r_deferredLightingStrength->value : 1.0f,
 			( r_deferredSpecular && r_deferredSpecular->integer ) ? "on" : "off",
+			r_deferredSpecularStrength ? r_deferredSpecularStrength->value : 1.0f,
 			r_deferredAOCoupling ? r_deferredAOCoupling->value : 0.65f );
 		vk.deferred_gbuffer.lighting_logged = qtrue;
 	}
