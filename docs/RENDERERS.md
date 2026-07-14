@@ -350,7 +350,7 @@ Code: `renderers/vulkan/vk_forward_plus.c`, `VK_FP_*` constants; cvar registrati
 | `r_post_contrast` | 1.0 | Post-tonemap contrast (1=neutral, >1=punchier, <1=flatter) |
 | `r_post_saturation` | 1.0 | Post-tonemap saturation (1=neutral, >1=vivid, <1=desaturated) |
 | `r_grade_hue` | 0.0 | Display-referred hue rotation in degrees (-180 to 180) |
-| `r_grade_vibrance` | 0.15 | Selective saturation boost for muted colors (-1 to 1) |
+| `r_grade_vibrance` | 0.0 | Selective saturation boost for muted colors (-1 to 1; 0=neutral) |
 | `r_atmosphere` | 0 | Procedural atmospheric sky (Rayleigh+Mie). **1** replaces grey sky when no HDR skybox; requires `r_fbo 1`. |
 | `r_atmosphere_scale` | 4.0 | HDR scale multiplier for sky brightness. Works with auto exposure; increase if sky appears dark. |
 | `r_skyboxHDR` | "" | Path to HDR skybox panorama: EXR or Radiance .hdr (empty = use atmosphere or map skybox). |

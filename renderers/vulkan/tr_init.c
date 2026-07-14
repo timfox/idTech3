@@ -2105,6 +2105,10 @@ static void R_RendererStatus_f( void )
 	ri.Printf( PRINT_ALL, "post-aa   : smaa=%d active=%s fxaa=%d active=%s postAaAfterBloom=%d\n",
 		R_CvarInteger( r_ext_smaa ), R_YesNo( vk.smaaActive ), R_CvarInteger( r_ext_fxaa ),
 		R_YesNo( vk.fxaaActive ), R_CvarInteger( r_postAaAfterBloom ) );
+	ri.Printf( PRINT_ALL, "color     : post=%d tonemap=%d exposure=%.2f gamma=%.2f gradeEV=%.2f temp=%.2f tint=%.2f contrast=%.2f sat=%.2f vibrance=%.2f hue=%.1f\n",
+		R_CvarInteger( r_post ), R_CvarInteger( r_tonemap ), R_CvarValue( r_exposure ), R_CvarValue( r_gamma ),
+		PostFX_GetGradeExposureBias(), PostFX_GetGradeTemperature(), PostFX_GetGradeTint(),
+		PostFX_GetGradeContrast(), PostFX_GetGradeSaturation(), PostFX_GetGradeVibrance(), PostFX_GetGradeHue() );
 	ri.Printf( PRINT_ALL, "lighting  : ssao=%d method=%d blurReady=%s volumetric=%d iblSH=%d sunShadow=%d\n",
 		R_CvarInteger( r_ssao ), R_CvarInteger( r_ssaoMethod ),
 		R_YesNo( vk.ssao_blur_image_view != VK_NULL_HANDLE ), R_CvarInteger( r_volumetricFog ),

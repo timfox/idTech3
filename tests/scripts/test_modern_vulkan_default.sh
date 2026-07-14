@@ -44,6 +44,12 @@ grep -q 'seta r_deferredGBufferFill 1' "$CFG" || fail "modern Vulkan must fill G
 grep -q 'seta r_deferredLighting 0' "$CFG" || fail "modern Vulkan default must not enable experimental deferred lighting"
 grep -q 'seta r_taa 1' "$CFG" || fail "modern Vulkan must enable TAA"
 grep -q 'seta r_taaMotionVectors 1' "$CFG" || fail "modern Vulkan must enable motion-vector TAA"
+grep -q 'seta r_tonemap 3' "$CFG" || fail "modern Vulkan must pin Filmic tonemap"
+grep -q 'seta r_post 1' "$CFG" || fail "modern Vulkan must keep the post resolve active"
+grep -q 'seta r_grade_vibrance 0' "$CFG" || fail "modern Vulkan must default to neutral vibrance"
+grep -q 'seta r_grade_hue 0' "$CFG" || fail "modern Vulkan must default to neutral hue"
+grep -q 'seta r_post_contrast 1' "$CFG" || fail "modern Vulkan must default to neutral legacy post contrast"
+grep -q 'seta r_post_saturation 1' "$CFG" || fail "modern Vulkan must default to neutral legacy post saturation"
 
 grep -q 'exec modern_vulkan.cfg' "$DEFERRED_OVERLAY" || fail "deferred overlay must inherit modern Vulkan"
 grep -q 'seta r_renderMode 1' "$DEFERRED_OVERLAY" || fail "deferred overlay must switch to mode 1"
