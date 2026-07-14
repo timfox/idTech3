@@ -8,6 +8,7 @@ Client demo record/playback: extracted from cl_main.c for modularization.
 
 #include "client.h"
 #include "cl_demo.h"
+#include "../platform/cl_streaming.h"
 #ifdef USE_CURL
 #include "cl_curl.h"
 #endif
@@ -159,11 +160,14 @@ void CL_Demo_Frame( int *msec, int *realMsec ) {
 	// if recording an avi, lock to a fixed fps
 	if ( CL_VideoRecording() && *msec ) {
 		// save the current screen
-		if ( cls.state == CA_ACTIVE || cl_forceavidemo->integer ) {
+		if ( cls.state == CA_ACTIVE || cl_forceavidemo->integer || CL_Streaming_EngineCaptureActive() ) {
 			float fps, frameDuration;
 
-			if ( com_timescale->value > 0.0001f )
+			if ( CL_Streaming_EngineCaptureActive() ) {
+				fps = (float)CL_Streaming_EngineCaptureFPS();
+			} else if ( com_timescale->value > 0.0001f ) {
 				fps = MIN( cl_aviFrameRate->value / com_timescale->value, 1000.0f );
+			}
 			else
 				fps = 1000.0f;
 

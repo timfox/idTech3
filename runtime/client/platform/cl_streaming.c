@@ -2,9 +2,10 @@
 ===========================================================================
 Optional live-streaming controls for idTech3-tv / Owncast-compatible RTMP.
 
-This module intentionally launches an external broadcaster command instead of
-embedding a streaming server in the engine. Players can run idTech3-tv/Owcast
-separately and push gameplay to its RTMP ingest endpoint.
+Players can run an external broadcast service separately and push gameplay to
+its RTMP ingest endpoint. The preferred backend captures the engine framebuffer
+and mixer through the existing AVI pipe; external desktop capture remains a
+compatibility fallback.
 ===========================================================================
 */
 
@@ -18,6 +19,7 @@ static cvar_t *cl_stream_enable;
 static cvar_t *cl_stream_url;
 static cvar_t *cl_stream_key;
 static cvar_t *cl_stream_title;
+static cvar_t *cl_stream_backend;
 static cvar_t *cl_stream_cmd;
 static cvar_t *cl_stream_ffmpeg;
 static cvar_t *cl_stream_width;
@@ -27,10 +29,17 @@ static cvar_t *cl_stream_bitrate;
 static cvar_t *cl_stream_audio_bitrate;
 static cvar_t *cl_stream_autoStart;
 
+typedef enum {
+	STREAM_BACKEND_NONE,
+	STREAM_BACKEND_ENGINE,
+	STREAM_BACKEND_EXTERNAL
+} streamBackend_t;
+
 static qboolean stream_active = qfalse;
+static streamBackend_t stream_backend_active = STREAM_BACKEND_NONE;
 static char stream_last_command[8192];
 
-static const char *CL_StreamingDefaultTemplate( void )
+static const char *CL_StreamingDefaultExternalTemplate( void )
 {
 #ifdef _WIN32
 	return "start \"idTech3 TV\" /B %P -y -f gdigrab -framerate %F -video_size %Wx%H -i desktop -f dshow -i audio=\"default\" -c:v libx264 -preset veryfast -tune zerolatency -b:v %V -pix_fmt yuv420p -c:a aac -b:a %Q -f flv \"%U/%K\"";
@@ -39,6 +48,11 @@ static const char *CL_StreamingDefaultTemplate( void )
 #else
 	return "nohup %P -y -f x11grab -framerate %F -video_size %Wx%H -i ${DISPLAY:-:0.0} -f pulse -i default -c:v libx264 -preset veryfast -tune zerolatency -b:v %V -pix_fmt yuv420p -c:a aac -b:a %Q -f flv \"%U/%K\" >/tmp/idtech3-tv-ffmpeg.log 2>&1 &";
 #endif
+}
+
+static const char *CL_StreamingDefaultEngineTemplate( void )
+{
+	return "%P -f avi -i - -threads 0 -y -c:v libx264 -preset veryfast -tune zerolatency -b:v %V -pix_fmt yuv420p -c:a aac -b:a %Q -f flv \"%U/%K\"";
 }
 
 static void CL_StreamingBuildExpand( cl_pipeline_expand_t *ex )
@@ -53,6 +67,11 @@ static void CL_StreamingBuildExpand( cl_pipeline_expand_t *ex )
 	ex->fps = cl_stream_fps ? cl_stream_fps->string : "30";
 	ex->bitrate = cl_stream_bitrate ? cl_stream_bitrate->string : "3500k";
 	ex->audio_bitrate = cl_stream_audio_bitrate ? cl_stream_audio_bitrate->string : "128k";
+}
+
+static qboolean CL_StreamingBackendIsExternal( void )
+{
+	return cl_stream_backend && !Q_stricmp( cl_stream_backend->string, "external" );
 }
 
 static qboolean CL_StreamingValidateConfig( void )
@@ -80,6 +99,10 @@ static void CL_StreamingStatus_f( void )
 {
 	Com_Printf( "idTech3 TV streaming:\n" );
 	Com_Printf( "  enabled: %d active: %d\n", cl_stream_enable ? cl_stream_enable->integer : 0, stream_active );
+	Com_Printf( "  backend: %s%s\n",
+		cl_stream_backend ? cl_stream_backend->string : "engine",
+		stream_backend_active == STREAM_BACKEND_ENGINE ? " (engine capture active)" :
+		stream_backend_active == STREAM_BACKEND_EXTERNAL ? " (external capture active)" : "" );
 	Com_Printf( "  url:     %s\n", ( cl_stream_url && cl_stream_url->string[0] ) ? cl_stream_url->string : "(unset)" );
 	Com_Printf( "  key:     %s\n", ( cl_stream_key && cl_stream_key->string[0] ) ? "(protected)" : "(unset)" );
 	Com_Printf( "  video:   %sx%s @ %s fps, %s video / %s audio\n",
@@ -107,7 +130,8 @@ static void CL_StreamingStart_f( void )
 		return;
 	}
 
-	tmpl = ( cl_stream_cmd && cl_stream_cmd->string[0] ) ? cl_stream_cmd->string : CL_StreamingDefaultTemplate();
+	tmpl = ( cl_stream_cmd && cl_stream_cmd->string[0] ) ? cl_stream_cmd->string :
+		( CL_StreamingBackendIsExternal() ? CL_StreamingDefaultExternalTemplate() : CL_StreamingDefaultEngineTemplate() );
 	CL_StreamingBuildExpand( &ex );
 	if ( !CL_PipelineExpandTemplate( stream_last_command, sizeof( stream_last_command ), tmpl, &ex ) ) {
 		stream_last_command[0] = '\0';
@@ -115,11 +139,23 @@ static void CL_StreamingStart_f( void )
 		return;
 	}
 
-	Com_Printf( "stream_start: launching external RTMP publisher for idTech3-tv / Owncast\n" );
-	rc = system( stream_last_command );
-	if ( rc != 0 ) {
-		Com_Printf( S_COLOR_RED "stream_start: command returned %d\n", rc );
-		return;
+	if ( CL_StreamingBackendIsExternal() ) {
+		Com_Printf( "stream_start: launching external RTMP publisher for idTech3-tv / Owncast\n" );
+		rc = system( stream_last_command );
+		if ( rc != 0 ) {
+			Com_Printf( S_COLOR_RED "stream_start: command returned %d\n", rc );
+			return;
+		}
+		stream_backend_active = STREAM_BACKEND_EXTERNAL;
+	} else {
+		Com_Printf( "stream_start: opening engine framebuffer/audio pipe for idTech3-tv / Owncast\n" );
+		if ( !CL_OpenAVIForPipeCommand( "idtech3-tv-live", stream_last_command,
+				cl_stream_fps ? cl_stream_fps->integer : 30 ) ) {
+			stream_last_command[0] = '\0';
+			Com_Printf( S_COLOR_RED "stream_start: could not open engine streaming pipe\n" );
+			return;
+		}
+		stream_backend_active = STREAM_BACKEND_ENGINE;
 	}
 	stream_active = qtrue;
 	Com_Printf( S_COLOR_GREEN "stream_start: broadcaster launched\n" );
@@ -127,12 +163,33 @@ static void CL_StreamingStart_f( void )
 
 static void CL_StreamingStop_f( void )
 {
+	qboolean wasExternal;
+
 	if ( !stream_active ) {
 		Com_Printf( "stream_stop: no active broadcaster tracked by engine\n" );
 		return;
 	}
+	wasExternal = ( stream_backend_active == STREAM_BACKEND_EXTERNAL ) ? qtrue : qfalse;
+	if ( stream_backend_active == STREAM_BACKEND_ENGINE ) {
+		CL_CloseAVI( qfalse );
+	}
 	stream_active = qfalse;
-	Com_Printf( "stream_stop: marked inactive. Stop the external ffmpeg process if it is still running.\n" );
+	stream_backend_active = STREAM_BACKEND_NONE;
+	Com_Printf( "stream_stop: stream capture stopped%s\n",
+		wasExternal ? ". Stop the external ffmpeg process if it is still running." : "." );
+}
+
+qboolean CL_Streaming_EngineCaptureActive( void )
+{
+	return ( stream_active && stream_backend_active == STREAM_BACKEND_ENGINE ) ? qtrue : qfalse;
+}
+
+int CL_Streaming_EngineCaptureFPS( void )
+{
+	if ( !cl_stream_fps || cl_stream_fps->integer <= 0 ) {
+		return 30;
+	}
+	return cl_stream_fps->integer;
 }
 
 void CL_Streaming_Init( void )
@@ -147,9 +204,11 @@ void CL_Streaming_Init( void )
 	Cvar_SetDescription( cl_stream_key, "Protected stream key for idTech3-tv / Owncast RTMP ingest." );
 	cl_stream_title = Cvar_Get( "cl_stream_title", "idTech3 Live", CVAR_ARCHIVE );
 	Cvar_SetDescription( cl_stream_title, "Human-readable title available to custom stream command templates as %L." );
+	cl_stream_backend = Cvar_Get( "cl_stream_backend", "engine", CVAR_ARCHIVE );
+	Cvar_SetDescription( cl_stream_backend, "Streaming capture backend: engine pipes rendered frames and mixed audio; external uses desktop/audio capture command templates." );
 	cl_stream_cmd = Cvar_Get( "cl_stream_cmd", "", CVAR_ARCHIVE );
 	Cvar_SetDescription( cl_stream_cmd,
-		"Optional shell template for stream_start. Tokens: %P ffmpeg, %U url, %K key, %L title, %W width, %H height, %F fps, %V video bitrate, %Q audio bitrate." );
+		"Optional shell template for stream_start. Engine backend command must read AVI from stdin. Tokens: %P ffmpeg, %U url, %K key, %L title, %W width, %H height, %F fps, %V video bitrate, %Q audio bitrate." );
 	cl_stream_ffmpeg = Cvar_Get( "cl_stream_ffmpeg", "ffmpeg", CVAR_ARCHIVE );
 	Cvar_SetDescription( cl_stream_ffmpeg, "FFmpeg executable used by stream_start (substituted as %P)." );
 	cl_stream_width = Cvar_Get( "cl_stream_width", "1280", CVAR_ARCHIVE );
@@ -168,6 +227,7 @@ void CL_Streaming_Init( void )
 	Cmd_AddCommand( "stream_status", CL_StreamingStatus_f );
 
 	stream_active = qfalse;
+	stream_backend_active = STREAM_BACKEND_NONE;
 	stream_last_command[0] = '\0';
 	if ( cl_stream_autoStart && cl_stream_autoStart->integer ) {
 		CL_StreamingStart_f();
@@ -176,7 +236,11 @@ void CL_Streaming_Init( void )
 
 void CL_Streaming_Shutdown( void )
 {
+	if ( stream_backend_active == STREAM_BACKEND_ENGINE ) {
+		CL_CloseAVI( qfalse );
+	}
 	stream_active = qfalse;
+	stream_backend_active = STREAM_BACKEND_NONE;
 	Cmd_RemoveCommand( "stream_start" );
 	Cmd_RemoveCommand( "stream_stop" );
 	Cmd_RemoveCommand( "stream_status" );

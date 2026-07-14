@@ -346,6 +346,46 @@ static qboolean CL_ValidatePipeFormat( const char *s )
 	return qtrue;
 }
 
+static qboolean CL_InitAVIStreamState( const char *displayName, qboolean pipe, int frameRate )
+{
+	Q_strncpyz( afd.fileName, displayName, sizeof( afd.fileName ) );
+
+	afd.frameRate = frameRate > 0 ? frameRate : cl_aviFrameRate->integer;
+	afd.framePeriod = (int)( 1000000.0 / afd.frameRate );
+
+	afd.width = cls.captureWidth;
+	afd.height = cls.captureHeight;
+
+	if ( afd.width <= 0 || afd.height <= 0 ) {
+		afd.width = cls.glconfig.vidWidth;
+		afd.height = cls.glconfig.vidHeight;
+	}
+
+	afd.motionJpeg = ( cl_aviMotionJpeg->integer && !pipe ) ? qtrue : qfalse;
+
+	if ( !afd.cBuffer ) {
+		afd.cBuffer = Z_Malloc( ( afd.width * afd.height * 4 ) + 15 );
+	}
+	if ( !afd.eBuffer ) {
+		afd.eBuffer = Z_Malloc( PAD( afd.width * 3, AVI_LINE_PADDING ) * afd.height );
+	}
+
+	afd.a.rate = dma.speed;
+	afd.a.format = dma.isfloat ? WAVE_FORMAT_IEEE_FLOAT : WAV_FORMAT_PCM;
+	afd.a.channels = dma.channels;
+	afd.a.bits = dma.samplebits;
+	afd.a.sampleSize = ( afd.a.bits * afd.a.channels ) / 8;
+	afd.audioFrameSize = ceil( (float)( afd.a.rate * afd.a.sampleSize ) / (float)afd.frameRate );
+	afd.audio = ( Cvar_VariableIntegerValue( "s_initsound" ) != 0 ) ? qtrue : qfalse;
+
+	CL_WriteAVIHeader();
+	if ( pipe ) {
+		afd.pipe = qtrue;
+	}
+
+	return qtrue;
+}
+
 
 /*
 ===============
@@ -402,51 +442,7 @@ qboolean CL_OpenAVIForWriting( const char *fileName, qboolean pipe, qboolean reo
 		}
 	}
 
-	Q_strncpyz( afd.fileName, fileName, sizeof( afd.fileName ) );
-
-	afd.frameRate = cl_aviFrameRate->integer;
-	afd.framePeriod = (int)(1000000.0 / afd.frameRate);
-
-	afd.width = cls.captureWidth;
-	afd.height = cls.captureHeight;
-
-	if ( cl_aviMotionJpeg->integer && !pipe )
-		afd.motionJpeg = qtrue;
-	else
-		afd.motionJpeg = qfalse;
-
-	if ( !reopen )
-	{
-		// Buffers only need to store RGB pixels.
-		// Allocate a bit more space for the capture buffer to account for possible
-		// padding at the end of pixel lines, and padding for alignment
-		#define MAX_PACK_LEN 16
-		//afd.cBuffer = Z_Malloc((afd.width * 3 + MAX_PACK_LEN - 1) * afd.height + MAX_PACK_LEN - 1);
-		afd.cBuffer = Z_Malloc( (afd.width * afd.height * 4) + MAX_PACK_LEN - 1 ); // allocate for RGBA storage
-		// raw avi files have pixel lines start on 4-byte boundaries
-		afd.eBuffer = Z_Malloc( PAD( afd.width * 3, AVI_LINE_PADDING ) * afd.height );
-	}
-
-	afd.a.rate = dma.speed;
-	afd.a.format = dma.isfloat ? WAVE_FORMAT_IEEE_FLOAT : WAV_FORMAT_PCM;
-	afd.a.channels = dma.channels;
-	afd.a.bits = dma.samplebits;
-	afd.a.sampleSize = (afd.a.bits * afd.a.channels) / 8;
-
-	afd.audioFrameSize = ceil( (float)(afd.a.rate * afd.a.sampleSize) / (float)afd.frameRate );
-
-	if ( Cvar_VariableIntegerValue( "s_initsound" ) == 0 )
-	{
-		afd.audio = qfalse;
-	}
-	else
-	{
-		afd.audio = qtrue;
-	}
-
-	// This doesn't write a real header, but allocates the
-	// correct amount of space at the beginning of the file
-	CL_WriteAVIHeader();
+	CL_InitAVIStreamState( fileName, pipe, cl_aviFrameRate->integer );
 
 	if ( pipe )
 	{
@@ -466,6 +462,33 @@ qboolean CL_OpenAVIForWriting( const char *fileName, qboolean pipe, qboolean reo
 		afd.moviSize = 4; // For the "movi"
 	}
 
+	afd.fileOpen = qtrue;
+
+	return qtrue;
+}
+
+/*
+===============
+CL_OpenAVIForPipeCommand
+
+Opens a live pipe that receives the engine's rendered frames and mixed audio.
+The command must read AVI from stdin.
+===============
+*/
+qboolean CL_OpenAVIForPipeCommand( const char *displayName, const char *cmd, int frameRate )
+{
+	if ( afd.fileOpen || !cmd || !cmd[0] ) {
+		return qfalse;
+	}
+
+	Com_Memset( &afd, 0, sizeof( aviFileData_t ) );
+	if ( ( afd.f = FS_PipeOpenWrite( cmd, displayName ? displayName : "stream" ) ) == FS_INVALID_HANDLE ) {
+		return qfalse;
+	}
+
+	CL_InitAVIStreamState( displayName ? displayName : "stream", qtrue, frameRate );
+	SafeFS_Write( buffer, bufIndex, afd.f );
+	bufIndex = 0;
 	afd.fileOpen = qtrue;
 
 	return qtrue;
