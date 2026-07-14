@@ -21,6 +21,12 @@ layout(std430, set = 0, binding = 3) readonly buffer WorldAlbedoSSBO {
 layout(std430, set = 0, binding = 4) readonly buffer WorldNormalSSBO {
 	float nxyz[];
 };
+layout(std430, set = 0, binding = 5) readonly buffer EntityAlbedoSSBO {
+	float entityRgb[];
+};
+layout(std430, set = 0, binding = 6) readonly buffer EntityNormalSSBO {
+	float entityNxyz[];
+};
 
 layout(push_constant) uniform UpdatePush {
 	uvec4 params; /* x=maxSurfels y=frame z=samplesPerSurfel w=updateStride */
@@ -28,6 +34,14 @@ layout(push_constant) uniform UpdatePush {
 } pc;
 
 vec3 sampleWorldAlbedo(uint instanceCustom, int primId) {
+	if (instanceCustom == 1u) {
+		uint n = uint(entityRgb.length()) / 3u;
+		if (n == 0u || primId < 0 || uint(primId) >= n) {
+			return surfel_default_albedo();
+		}
+		uint i = uint(primId) * 3u;
+		return vec3(entityRgb[i], entityRgb[i + 1u], entityRgb[i + 2u]);
+	}
 	uint n = uint(rgb.length()) / 3u;
 	if (instanceCustom != 0u || n == 0u || primId < 0 || uint(primId) >= n) {
 		return surfel_default_albedo();
@@ -37,12 +51,20 @@ vec3 sampleWorldAlbedo(uint instanceCustom, int primId) {
 }
 
 vec3 sampleWorldNormal(uint instanceCustom, int primId, vec3 towardRay) {
-	uint n = uint(nxyz.length()) / 3u;
-	if (instanceCustom != 0u || n == 0u || primId < 0 || uint(primId) >= n) {
-		return towardRay;
+	vec3 N = vec3(0.0);
+	if (instanceCustom == 1u) {
+		uint n = uint(entityNxyz.length()) / 3u;
+		if (n != 0u && primId >= 0 && uint(primId) < n) {
+			uint i = uint(primId) * 3u;
+			N = vec3(entityNxyz[i], entityNxyz[i + 1u], entityNxyz[i + 2u]);
+		}
+	} else if (instanceCustom == 0u) {
+		uint n = uint(nxyz.length()) / 3u;
+		if (n != 0u && primId >= 0 && uint(primId) < n) {
+			uint i = uint(primId) * 3u;
+			N = vec3(nxyz[i], nxyz[i + 1u], nxyz[i + 2u]);
+		}
 	}
-	uint i = uint(primId) * 3u;
-	vec3 N = vec3(nxyz[i], nxyz[i + 1u], nxyz[i + 2u]);
 	float len2 = dot(N, N);
 	if (len2 < 1e-8) {
 		return towardRay;

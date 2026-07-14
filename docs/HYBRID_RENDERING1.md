@@ -10,10 +10,10 @@ Implementation of the thesis **Hybrid-Rendering Techniques in GPU** (IST, July 2
 4. **Indirect diffuse RT** (optional) — 1-SPP cosine hemisphere bounce (`hybrid1_diffuse.rgen`), **A-trous only** (no variance/temporal, per thesis §3).
 5. **Temporal accumulation** (shadow + spec) — reprojection, variance estimate, **variance color clamping** (history rectification).
 6. **Separable A-trous** — edge-avoiding 5-tap blur guided by depth, normals, luminance, variance; **adaptive start step** for roughness > 0.2 / shadow angle > 6°.
-7. **Composite** — modulate raster HDR by denoised shadow; add denoised specular; add denoised diffuse × albedo.
+7. **Composite** — modulate raster HDR by denoised shadow; add denoised specular; add denoised diffuse × albedo (or **Surfel irradiance × albedo** when `r_surfelGi_hybrid1Fusion 1` and Surfel GI is active).
 8. **TAA** (optional) — post-process `r_taa` or auto via `r_hybrid1_taa 1` after composite.
 
-RT closest-hit shaders prefer a **per-primitive world albedo SSBO** (vertex/face colors packed with the world BLAS, including **SF_GRID** patches) when `gl_InstanceCustomIndexEXT == 0`. If that miss, they reproject hit points into the deferred **G-buffer albedo** (when `r_deferredGBufferFill 1`) instead of flat placeholder colors.
+RT closest-hit shaders prefer a **per-primitive world albedo SSBO** (vertex/face colors packed with the world BLAS, including **SF_GRID** patches) when `gl_InstanceCustomIndexEXT == 0`. Entity hits (`customIndex == 1`) use parallel **entity albedo/normal SSBOs** (geo normals + `refEntity.shader` tint or default gray). If that miss, they reproject hit points into the deferred **G-buffer albedo** (when `r_deferredGBufferFill 1`) instead of flat placeholder colors.
 
 Secondary rays also sample a packed **per-primitive world normal SSBO** (`hybrid1_sampleHitNormal`) for sun N·L, irradiance lookup, and specular IBL reflection — no ray-direction placeholders on the RTX path.
 
@@ -46,11 +46,11 @@ seta r_hybrid1Quality 2   // 0=custom, 1=performance, 2=balanced, 3=quality (liv
 r_hybrid1_diffuse 1       // or use quality 3 instead of hand-tuning
 r_hybrid1_ibl 1
 r_hybrid1_taa 1
-r_rtxEntities 1           // entity mesh BLAS: MD3 LOD0 + CPU-skinned IQM + static/CPU-skinned glTF (+ AABB for MDR / pack fail)
+r_rtxEntities 1           // entity mesh BLAS: MD3 + CPU-skinned IQM/MDR + static/CPU-skinned glTF (+ AABB on pack fail)
 r_rtxEntityTriCap 65536
 ```
 
-`demo_hybrid1.cfg` sets `r_rtxEntities 1` and `r_hybrid1Quality 3`. Console **`rtx_status`** reports `entity_ents` / `entity_tris` / `mesh` breakdown (`md3` / `iqm` / `gltf`) / `proxy` reasons (`nonmesh` = MDR/unknown, `md3fail` / `iqmfail` / `gltffail` = pack failed → AABB; `skinned` reserved/unused when glTF skins successfully) and **TLAS mode** (`UPDATE` vs `REBUILD` with reason).
+`demo_hybrid1.cfg` sets `r_rtxEntities 1` and `r_hybrid1Quality 3`. Console **`rtx_status`** reports `entity_ents` / `entity_tris` / `mesh` breakdown (`md3` / `iqm` / `gltf` / `mdr`) / `proxy` reasons (`nonmesh` = unknown, `*fail` = pack failed → AABB) and **TLAS mode** (`UPDATE` vs `REBUILD` with reason).
 
 `r_rtx 1` **or** `r_hybrid1 1` before `vid_restart` enables KHR ray tracing device features.
 
@@ -101,7 +101,11 @@ Live (no latch). Entity BLAS stays a separate latched companion (`r_rtxEntities`
 | `r_hybrid1_shadowStrength` | 0.85 | Composite shadow weight |
 | `r_hybrid1_specStrength` | 1.0 | Composite specular weight |
 | `r_hybrid1_diffuseStrength` | 1.0 | Composite diffuse × albedo weight |
-| `r_hybrid1_debug` | 0 | 1=shadow, 2=spec, 3=shadow angle, 4=diffuse |
+| `r_hybrid1_debug` | 0 | 1=shadow, 2=spec, 3=shadow angle, 4=diffuse, 5=Surfel irradiance |
+
+### Surfel GI fusion
+
+When **`r_surfelGi 1`** and **`r_surfelGi_hybrid1Fusion 1`** (default), Hybrid1 skips diffuse RT and composites Surfel screen irradiance instead — see `docs/SURFEL_GI.md`. `hybrid1_status` reports `surfelFusion=1`. Set `r_surfelGi_hybrid1Fusion 0` to restore independent Surfel scene composite (can double-add if both on).
 
 When `r_hybrid1 1`, the legacy `r_rtx` demo composite pass is **skipped** (Hybrid1 owns RT output).
 

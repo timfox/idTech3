@@ -10,6 +10,7 @@ Chocolate RTX path; spawn / ray-query update / resolve / composite.
 #include "tr_local.h"
 #include "vk.h"
 #include "vk_surfel_gi.h"
+#include "vk_hybrid1.h"
 #include "vk_rtx.h"
 #include "vk_util.h"
 #include "vk_image_layout.h"
@@ -109,6 +110,7 @@ static cvar_t *r_surfelGi_skipSky;
 static cvar_t *r_surfelGi_maxAge;
 static cvar_t *r_surfelGi_hash;
 static cvar_t *r_surfelGi_cellSize;
+static cvar_t *r_surfelGi_hybrid1Fusion;
 
 #define SURFEL_HASH_CELLS  4096u
 #define SURFEL_HASH_BUCKET 8u
@@ -273,7 +275,7 @@ static void SGI_DestroyPipelines( void )
 
 static qboolean SGI_CreatePipelines( void )
 {
-	VkDescriptorSetLayoutBinding binds[6];
+	VkDescriptorSetLayoutBinding binds[7];
 	VkDescriptorSetLayoutCreateInfo lci;
 	VkPushConstantRange pcr;
 	VkPipelineLayoutCreateInfo plci;
@@ -304,13 +306,15 @@ static qboolean SGI_CreatePipelines( void )
 	lci.pBindings = binds;
 	VK_CHECK( qvkCreateDescriptorSetLayout( vk.device, &lci, NULL, &sgi.spawn_layout ) );
 
-	/* update: AS @0, surfel @1, counter @2, world albedo @3, world normal @4 */
+	/* update: AS @0, surfel @1, counter @2, world albedo @3, world normal @4, entity albedo @5, entity normal @6 */
 	binds[0].binding = 0; binds[0].descriptorType = VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR;
 	binds[1].binding = 1; binds[1].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
 	binds[2].binding = 2; binds[2].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
 	binds[3].binding = 3; binds[3].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
 	binds[4].binding = 4; binds[4].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER; binds[4].descriptorCount = 1; binds[4].stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
-	lci.bindingCount = 5;
+	binds[5].binding = 5; binds[5].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER; binds[5].descriptorCount = 1; binds[5].stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+	binds[6].binding = 6; binds[6].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER; binds[6].descriptorCount = 1; binds[6].stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+	lci.bindingCount = 7;
 	VK_CHECK( qvkCreateDescriptorSetLayout( vk.device, &lci, NULL, &sgi.update_layout ) );
 
 	/* hash: surfel @0, counter @1, hash @2 */
@@ -385,7 +389,7 @@ static qboolean SGI_CreatePipelines( void )
 	VK_CHECK( qvkCreateComputePipelines( vk.device, vk.pipelineCache, 1, &pci, NULL, &sgi.composite_pipe ) );
 
 	Com_Memset( sizes, 0, sizeof( sizes ) );
-	sizes[0].type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER; sizes[0].descriptorCount = 20;
+	sizes[0].type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER; sizes[0].descriptorCount = 28;
 	sizes[1].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER; sizes[1].descriptorCount = 16;
 	sizes[2].type = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE; sizes[2].descriptorCount = 4;
 	sizes[3].type = VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR; sizes[3].descriptorCount = 2;
@@ -459,6 +463,9 @@ static void SGI_Status_f( void )
 		counters[0], counters[2], counters[3], albedoPrims, normalPrims,
 		( r_surfelGi_hash && r_surfelGi_hash->integer ) ? 1 : 0,
 		r_surfelGi_cellSize ? r_surfelGi_cellSize->value : 1.0f );
+	ri.Printf( PRINT_ALL, "[SurfelGI] hybrid1Fusion cvar=%d active=%d (Hybrid1 owns diffuse GI; Surfel skips scene composite)\n",
+		( r_surfelGi_hybrid1Fusion && r_surfelGi_hybrid1Fusion->integer ) ? 1 : 0,
+		vk_surfel_gi_hybrid1_fusion_active() ? 1 : 0 );
 }
 
 void vk_surfel_gi_shutdown( void )
@@ -498,16 +505,22 @@ void vk_surfel_gi_init( void )
 		r_surfelGi_maxAge = ri.Cvar_Get( "r_surfelGi_maxAge", "240", CVAR_ARCHIVE_ND );
 		r_surfelGi_hash = ri.Cvar_Get( "r_surfelGi_hash", "1", CVAR_ARCHIVE_ND );
 		r_surfelGi_cellSize = ri.Cvar_Get( "r_surfelGi_cellSize", "64", CVAR_ARCHIVE_ND );
+		r_surfelGi_hybrid1Fusion = ri.Cvar_Get( "r_surfelGi_hybrid1Fusion", "1", CVAR_ARCHIVE_ND );
 		ri.Cvar_CheckRange( r_surfelGi, "0", "1", CV_INTEGER );
 		ri.Cvar_CheckRange( r_surfelGi_max, "256", "262144", CV_INTEGER );
 		ri.Cvar_CheckRange( r_surfelGi_samples, "1", "16", CV_INTEGER );
 		ri.Cvar_CheckRange( r_surfelGi_debug, "0", "2", CV_INTEGER );
 		ri.Cvar_CheckRange( r_surfelGi_hash, "0", "1", CV_INTEGER );
+		ri.Cvar_CheckRange( r_surfelGi_hybrid1Fusion, "0", "1", CV_INTEGER );
 		ri.Cvar_SetDescription( r_surfelGi,
 			"Surfel GI (GIBS): cache indirect lighting in surfels (needs USE_VULKAN_RTX + ray query + vid_restart)." );
 		ri.Cvar_SetDescription( r_surfelGi_hash,
 			"Surfel GI: 1=fixed-bucket spatial hash for resolve gather; 0=strided scan fallback." );
+		ri.Cvar_SetDescription( r_surfelGi_hybrid1Fusion,
+			"Surfel GI: when Hybrid1 is active, skip Surfel scene composite and feed irradiance into Hybrid1 (avoids double diffuse GI)." );
 		ri.Cmd_AddCommand( "surfel_gi_status", SGI_Status_f );
+		ri.Printf( PRINT_ALL, "[SurfelGI] r_surfelGi_hybrid1Fusion=%d (Hybrid1 diffuse GI fusion when both enabled)\n",
+			r_surfelGi_hybrid1Fusion->integer );
 	}
 
 	if ( !r_surfelGi->integer ) {
@@ -586,6 +599,30 @@ void vk_surfel_gi_init( void )
 qboolean vk_surfel_gi_active( void )
 {
 	return ( r_surfelGi && r_surfelGi->integer && sgi.ready && vk.rtxAvailable && vk.rayQueryAvailable && vk.fboActive ) ? qtrue : qfalse;
+}
+
+qboolean vk_surfel_gi_hybrid1_fusion_active( void )
+{
+	if ( !r_surfelGi_hybrid1Fusion || !r_surfelGi_hybrid1Fusion->integer ) {
+		return qfalse;
+	}
+	if ( !vk_surfel_gi_active() || !vk_hybrid1_active() ) {
+		return qfalse;
+	}
+	if ( sgi.irradiance.view == VK_NULL_HANDLE ) {
+		return qfalse;
+	}
+	return qtrue;
+}
+
+VkImageView vk_surfel_gi_irradiance_view( void )
+{
+	return sgi.irradiance.view;
+}
+
+float vk_surfel_gi_fusion_strength( void )
+{
+	return r_surfelGi_strength ? r_surfelGi_strength->value : 0.85f;
 }
 
 void vk_surfel_gi_frame_begin( void )
@@ -697,7 +734,7 @@ void vk_surfel_gi_apply_after_geometry( void )
 	writes[3] = writes[2]; writes[3].dstBinding = 3; writes[3].pImageInfo = &img[1];
 	qvkUpdateDescriptorSets( vk.device, 4, writes, 0, NULL );
 
-	/* update descriptors + TLAS (binding 0) + world albedo (3) + world normal (4) */
+	/* update descriptors + TLAS (binding 0) + world albedo/normal (3/4) + entity albedo/normal (5/6) */
 	{
 		VkDescriptorBufferInfo bAlbedo;
 		VkDescriptorBufferInfo bNormal;
@@ -711,13 +748,21 @@ void vk_surfel_gi_apply_after_geometry( void )
 		writes[1].dstSet = sgi.update_set; writes[1].dstBinding = 2; writes[1].pBufferInfo = &bCounter;
 		writes[2].dstSet = sgi.update_set; writes[2].dstBinding = 3; writes[2].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER; writes[2].pBufferInfo = &bAlbedo;
 		writes[3].dstSet = sgi.update_set; writes[3].dstBinding = 4; writes[3].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER; writes[3].pBufferInfo = &bNormal;
-		qvkUpdateDescriptorSets( vk.device, 4, writes, 0, NULL );
+		writes[4].dstSet = sgi.update_set; writes[4].dstBinding = 5; writes[4].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER; writes[4].pBufferInfo = &bAlbedo;
+		writes[5].dstSet = sgi.update_set; writes[5].dstBinding = 6; writes[5].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER; writes[5].pBufferInfo = &bNormal;
+		qvkUpdateDescriptorSets( vk.device, 6, writes, 0, NULL );
 		vk_rtx_bind_tlas_descriptor( sgi.update_set );
 		if ( vk_rtx_world_albedo_count() > 0u ) {
 			vk_rtx_bind_world_albedo_ssbo( sgi.update_set, 3 );
 		}
 		if ( vk_rtx_world_normal_count() > 0u ) {
 			vk_rtx_bind_world_normal_ssbo( sgi.update_set, 4 );
+		}
+		if ( vk_rtx_entity_albedo_count() > 0u ) {
+			vk_rtx_bind_entity_albedo_ssbo( sgi.update_set, 5 );
+		}
+		if ( vk_rtx_entity_normal_count() > 0u ) {
+			vk_rtx_bind_entity_normal_ssbo( sgi.update_set, 6 );
 		}
 	}
 
@@ -868,6 +913,17 @@ void vk_surfel_gi_apply_after_geometry( void )
 		VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
 		VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT );
 
+	/* Hybrid1 fusion: keep irradiance for Hybrid1 composite; skip Surfel scene add (no double GI). */
+	if ( vk_surfel_gi_hybrid1_fusion_active() ) {
+		static qboolean fusionLogged;
+		if ( !fusionLogged ) {
+			ri.Printf( PRINT_ALL, "[SurfelGI] Hybrid1 fusion active — irradiance handed to Hybrid1 composite\n" );
+			fusionLogged = qtrue;
+		}
+		sgi.frame++;
+		return;
+	}
+
 	record_image_layout_transition( cmd, vk.color_image, VK_IMAGE_ASPECT_COLOR_BIT,
 		VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_GENERAL,
 		0, 0 );
@@ -907,5 +963,8 @@ void vk_surfel_gi_shutdown( void ) {}
 void vk_surfel_gi_frame_begin( void ) {}
 qboolean vk_surfel_gi_active( void ) { return qfalse; }
 void vk_surfel_gi_apply_after_geometry( void ) {}
+qboolean vk_surfel_gi_hybrid1_fusion_active( void ) { return qfalse; }
+VkImageView vk_surfel_gi_irradiance_view( void ) { return VK_NULL_HANDLE; }
+float vk_surfel_gi_fusion_strength( void ) { return 0.0f; }
 
 #endif /* USE_VULKAN_RTX */

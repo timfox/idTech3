@@ -12,3 +12,7 @@ void vk_surfel_gi_shutdown( void );
 void vk_surfel_gi_frame_begin( void );
 qboolean vk_surfel_gi_active( void );
 void vk_surfel_gi_apply_after_geometry( void );
+/* Hybrid1 fusion: irradiance ready for Hybrid1 composite (skip Surfel scene add). */
+qboolean vk_surfel_gi_hybrid1_fusion_active( void );
+VkImageView vk_surfel_gi_irradiance_view( void );
+float vk_surfel_gi_fusion_strength( void );

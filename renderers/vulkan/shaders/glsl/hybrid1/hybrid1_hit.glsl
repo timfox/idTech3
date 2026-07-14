@@ -8,6 +8,14 @@ layout( set = 0, binding = 12, std430 ) readonly buffer WorldNormalSSBO {
 	float nxyz[];
 } worldNormal;
 
+layout( set = 0, binding = 13, std430 ) readonly buffer EntityAlbedoSSBO {
+	float rgb[];
+} entityAlbedo;
+
+layout( set = 0, binding = 14, std430 ) readonly buffer EntityNormalSSBO {
+	float nxyz[];
+} entityNormal;
+
 vec3 hybrid1_defaultAlbedo( void )
 {
 	return vec3( 0.72, 0.70, 0.66 );
@@ -24,6 +32,19 @@ vec3 hybrid1_sampleWorldAlbedoSSBO( void )
 	}
 	uint i = uint( gl_PrimitiveID ) * 3u;
 	return vec3( worldAlbedo.rgb[i], worldAlbedo.rgb[i + 1u], worldAlbedo.rgb[i + 2u] );
+}
+
+vec3 hybrid1_sampleEntityAlbedoSSBO( void )
+{
+	uint n = uint( entityAlbedo.rgb.length() ) / 3u;
+	if ( gl_InstanceCustomIndexEXT != 1 || n == 0u ) {
+		return vec3( -1.0 );
+	}
+	if ( gl_PrimitiveID < 0 || uint( gl_PrimitiveID ) >= n ) {
+		return vec3( -1.0 );
+	}
+	uint i = uint( gl_PrimitiveID ) * 3u;
+	return vec3( entityAlbedo.rgb[i], entityAlbedo.rgb[i + 1u], entityAlbedo.rgb[i + 2u] );
 }
 
 vec3 hybrid1_sampleWorldNormalSSBO( void )
@@ -44,10 +65,31 @@ vec3 hybrid1_sampleWorldNormalSSBO( void )
 	return N * inversesqrt( len2 );
 }
 
+vec3 hybrid1_sampleEntityNormalSSBO( void )
+{
+	uint n = uint( entityNormal.nxyz.length() ) / 3u;
+	if ( gl_InstanceCustomIndexEXT != 1 || n == 0u ) {
+		return vec3( 0.0 );
+	}
+	if ( gl_PrimitiveID < 0 || uint( gl_PrimitiveID ) >= n ) {
+		return vec3( 0.0 );
+	}
+	uint i = uint( gl_PrimitiveID ) * 3u;
+	vec3 N = vec3( entityNormal.nxyz[i], entityNormal.nxyz[i + 1u], entityNormal.nxyz[i + 2u] );
+	float len2 = dot( N, N );
+	if ( len2 < 1e-8 ) {
+		return vec3( 0.0 );
+	}
+	return N * inversesqrt( len2 );
+}
+
 /* Geometric world normal facing the incoming ray; falls back to -rayDir. */
 vec3 hybrid1_sampleHitNormal( void )
 {
 	vec3 N = hybrid1_sampleWorldNormalSSBO();
+	if ( dot( N, N ) < 1e-8 ) {
+		N = hybrid1_sampleEntityNormalSSBO();
+	}
 	vec3 towardRay = normalize( -gl_WorldRayDirectionEXT );
 	if ( dot( N, N ) < 1e-8 ) {
 		return towardRay;
@@ -61,6 +103,9 @@ vec3 hybrid1_sampleHitNormal( void )
 vec3 hybrid1_sampleHitAlbedo( sampler2D albedoTex )
 {
 	vec3 ssbo = hybrid1_sampleWorldAlbedoSSBO();
+	if ( ssbo.x < 0.0 ) {
+		ssbo = hybrid1_sampleEntityAlbedoSSBO();
+	}
 	if ( ssbo.x >= 0.0 ) {
 		return ssbo;
 	}

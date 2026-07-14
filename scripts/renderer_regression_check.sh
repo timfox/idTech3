@@ -530,10 +530,16 @@ elif ! grep -q 'R_GLTFSkinPositions' "$RTX_ENT" 2>/dev/null; then
   fail "vk_rtx_entities.c missing CPU-skinned glTF via R_GLTFSkinPositions"
 elif ! grep -q 'proxySkinnedCount' "$RTX_ENT" 2>/dev/null; then
   fail "vk_rtx_entities.c missing proxySkinnedCount stats"
-elif ! grep -q 'r_hybrid1Quality' "$PROJECT_ROOT/renderers/vulkan/extensions/rtx/vk_hybrid1.c" 2>/dev/null; then
-  fail "vk_hybrid1.c missing r_hybrid1Quality presets"
+elif ! grep -q 'R_MDRSkinSurfacePositions' "$RTX_ENT" 2>/dev/null; then
+  fail "vk_rtx_entities.c missing CPU-skinned MDR via R_MDRSkinSurfacePositions"
+elif ! grep -q 'vk_rtx_pack_mdr' "$RTX_ENT" 2>/dev/null; then
+  fail "vk_rtx_entities.c missing MDR pack"
+elif ! grep -q 'vk_rtx_bind_entity_albedo_ssbo' "$RTX_C" 2>/dev/null; then
+  fail "vk_rtx.c missing entity albedo SSBO bind"
+elif ! grep -q 'EntityAlbedoSSBO' "$PROJECT_ROOT/renderers/vulkan/shaders/glsl/hybrid1/hybrid1_hit.glsl" 2>/dev/null; then
+  fail "hybrid1_hit.glsl missing EntityAlbedoSSBO"
 else
-  pass "RTX world/entity BLAS + TLAS update + hybrid hit tint + skinned IQM/glTF pack + Hybrid1 quality wired"
+  pass "RTX world/entity BLAS + TLAS update + hybrid hit tint + skinned IQM/glTF/MDR pack + entity hit attrs + Hybrid1 quality wired"
 fi
 
 echo ""

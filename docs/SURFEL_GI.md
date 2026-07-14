@@ -49,6 +49,7 @@ Console: **`surfel_gi_status`**.
 | `r_surfelGi_maxAge` | 240 | Mark surfel stale after this many updates |
 | `r_surfelGi_hash` | 1 | Fixed-bucket spatial hash for resolve (0=strided fallback) |
 | `r_surfelGi_cellSize` | 64 | World units per hash cell |
+| `r_surfelGi_hybrid1Fusion` | 1 | When Hybrid1 is active: skip Surfel scene composite; Hybrid1 adds `albedo * irradiance * strength` (avoids double diffuse GI). Set `0` for legacy double-add / Surfel-only composite testing. |
 
 ## Pipeline
 
@@ -56,9 +57,20 @@ Console: **`surfel_gi_status`**.
 2. **Update** — ray-query hemisphere samples into TLAS; world albedo + geometric normal SSBOs on instance 0 hits; miss ≈ sky; stale recycle
 3. **Hash** — clear + scatter active surfels into 4096×8 bucket grid
 4. **Resolve** — 3×3×3 neighboring cells → RGBA16F irradiance
-5. **Composite** — `albedo * irradiance * strength` added to `vk.color_image`
+5. **Composite** — `albedo * irradiance * strength` added to `vk.color_image` **unless** Hybrid1 fusion is active (then irradiance is handed to Hybrid1 composite)
 
 Runs after geometry (with NIV-class overlays) via `vk_surfel_gi_apply_after_geometry`.
+
+## Hybrid1 fusion
+
+With **`r_hybrid1 1`** + **`r_surfelGi 1`** + **`r_surfelGi_hybrid1Fusion 1`** (default):
+
+- Surfel still spawn/update/hash/resolve
+- Surfel **does not** write scene color
+- Hybrid1 keeps shadow + specular RT; skips Hybrid1 diffuse RT while fused
+- Hybrid1 composite adds Surfel irradiance × albedo (`hybrid1_status` reports `surfelFusion=1`; debug mode **5** shows irradiance)
+
+See `docs/HYBRID_RENDERING1.md`.
 
 ## Files
 
@@ -68,4 +80,4 @@ Runs after geometry (with NIV-class overlays) via `vk_surfel_gi_apply_after_geom
 
 ## Status
 
-v1: spawn/update/resolve/composite + world albedo/normal hits + stale recycle + spatial hash resolve. Still open: Hybrid1 channel fusion, denser surfel budgeting, entity (customIndex≠0) attribute SSBOs.
+v1: spawn/update/resolve/composite + world albedo/normal hits + entity (customIndex==1) albedo/normal SSBOs + stale recycle + spatial hash resolve + **Hybrid1 channel fusion** (`r_surfelGi_hybrid1Fusion`). Still open: denser surfel budgeting.

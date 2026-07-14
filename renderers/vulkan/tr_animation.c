@@ -444,6 +444,95 @@ void RB_MDRSurfaceAnim( mdrSurface_t *surface )
 }
 
 
+/*
+===============
+R_MDRSkinSurfacePositions
+
+Pack-callable CPU bone skin for one MDR surface (RTX entity BLAS).
+Positions only; ignores normals/texcoords.
+===============
+*/
+qboolean R_MDRSkinSurfacePositions( mdrSurface_t *surface, int frame, int oldframe, float backlerp,
+	float *outPositions )
+{
+	int				i, j, k;
+	float			frontlerp;
+	int				numVerts;
+	mdrVertex_t		*v;
+	mdrHeader_t		*header;
+	mdrFrame_t		*framePtr;
+	mdrFrame_t		*oldFramePtr;
+	mdrBone_t		bones[MDR_MAX_BONES], *bonePtr, *bone;
+	int				frameSize;
+
+	if ( !surface || !outPositions || surface->numVerts < 1 ) {
+		return qfalse;
+	}
+
+	header = (mdrHeader_t *)( (byte *)surface + surface->ofsHeader );
+	if ( !header || header->numBones < 1 || header->numBones > MDR_MAX_BONES || header->numFrames < 1 ) {
+		return qfalse;
+	}
+
+	if ( frame < 0 || frame >= header->numFrames ) {
+		frame = 0;
+	}
+	if ( oldframe < 0 || oldframe >= header->numFrames ) {
+		oldframe = 0;
+	}
+	if ( backlerp < 0.0f ) {
+		backlerp = 0.0f;
+	} else if ( backlerp > 1.0f ) {
+		backlerp = 1.0f;
+	}
+	if ( frame == oldframe ) {
+		backlerp = 0.0f;
+	}
+	frontlerp = 1.0f - backlerp;
+
+	frameSize = (int)(size_t)( &((mdrFrame_t *)0)->bones[ header->numBones ] );
+	framePtr = (mdrFrame_t *)( (byte *)header + header->ofsFrames + frame * frameSize );
+	oldFramePtr = (mdrFrame_t *)( (byte *)header + header->ofsFrames + oldframe * frameSize );
+
+	if ( !backlerp ) {
+		bonePtr = framePtr->bones;
+	} else {
+		bonePtr = bones;
+		for ( i = 0; i < header->numBones * 12; i++ ) {
+			( (float *)bonePtr )[i] = frontlerp * ( (float *)framePtr->bones )[i]
+				+ backlerp * ( (float *)oldFramePtr->bones )[i];
+		}
+	}
+
+	numVerts = surface->numVerts;
+	v = (mdrVertex_t *)( (byte *)surface + surface->ofsVerts );
+	for ( j = 0; j < numVerts; j++ ) {
+		vec3_t tempVert;
+		mdrWeight_t *w;
+
+		VectorClear( tempVert );
+		w = v->weights;
+		for ( k = 0; k < v->numWeights; k++, w++ ) {
+			if ( w->boneIndex < 0 || w->boneIndex >= header->numBones ) {
+				continue;
+			}
+			bone = bonePtr + w->boneIndex;
+			tempVert[0] += w->boneWeight * ( DotProduct( bone->matrix[0], w->offset ) + bone->matrix[0][3] );
+			tempVert[1] += w->boneWeight * ( DotProduct( bone->matrix[1], w->offset ) + bone->matrix[1][3] );
+			tempVert[2] += w->boneWeight * ( DotProduct( bone->matrix[2], w->offset ) + bone->matrix[2][3] );
+		}
+
+		outPositions[j * 3 + 0] = tempVert[0];
+		outPositions[j * 3 + 1] = tempVert[1];
+		outPositions[j * 3 + 2] = tempVert[2];
+
+		v = (mdrVertex_t *)&v->weights[v->numWeights];
+	}
+
+	return qtrue;
+}
+
+
 #define MC_MASK_X ((1<<(MC_BITS_X))-1)
 #define MC_MASK_Y ((1<<(MC_BITS_Y))-1)
 #define MC_MASK_Z ((1<<(MC_BITS_Z))-1)

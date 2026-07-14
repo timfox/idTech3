@@ -98,18 +98,26 @@ static struct {
 	uint32_t		entity_mesh_md3;
 	uint32_t		entity_mesh_iqm;
 	uint32_t		entity_mesh_gltf;
+	uint32_t		entity_mesh_mdr;
 	uint32_t		entity_proxy_count;
 	uint32_t		entity_proxy_non_mesh;
 	uint32_t		entity_proxy_skinned;
 	uint32_t		entity_proxy_md3_fail;
 	uint32_t		entity_proxy_iqm_fail;
 	uint32_t		entity_proxy_gltf_fail;
+	uint32_t		entity_proxy_mdr_fail;
 	char			tlas_build_mode[16];
 	char			tlas_rebuild_reason[48];
 	VkBuffer		entity_vertex_buffer;
 	VkDeviceMemory	entity_vertex_memory;
 	VkBuffer		entity_index_buffer;
 	VkDeviceMemory	entity_index_memory;
+	VkBuffer		entity_albedo_buffer;
+	VkDeviceMemory	entity_albedo_memory;
+	VkBuffer		entity_normal_buffer;
+	VkDeviceMemory	entity_normal_memory;
+	uint32_t		entity_albedo_count;
+	uint32_t		entity_normal_count;
 	VkAccelerationStructureKHR entity_blas;
 	VkBuffer		entity_blas_buffer;
 	VkDeviceMemory	entity_blas_memory;
@@ -156,14 +164,14 @@ static void RTX_Status_f( void )
 		( r_rtxDemo && r_rtxDemo->integer ) ? 1 : 0,
 		( r_hybrid1 && r_hybrid1->integer ) ? 1 : 0,
 		( r_raygun && r_raygun->integer ) ? 1 : 0 );
-	ri.Printf( PRINT_ALL, "[VK][RTX] world=%s blas_tris=%u world_verts=%u albedo_prims=%u normal_prims=%u entity_ents=%u entity_tris=%u entity_verts=%u mesh=%u (md3=%u iqm=%u gltf=%u) proxy=%u (nonmesh=%u skinned=%u md3fail=%u iqmfail=%u gltffail=%u) tlas_instances=%u tlas_mode=%s reason=%s\n",
+	ri.Printf( PRINT_ALL, "[VK][RTX] world=%s blas_tris=%u world_verts=%u albedo_prims=%u normal_prims=%u entity_ents=%u entity_tris=%u entity_verts=%u entity_albedo_prims=%u entity_normal_prims=%u mesh=%u (md3=%u iqm=%u gltf=%u mdr=%u) proxy=%u (nonmesh=%u skinned=%u md3fail=%u iqmfail=%u gltffail=%u mdrfail=%u) tlas_instances=%u tlas_mode=%s reason=%s\n",
 		wn, rtx.world_primitive_count, rtx.world_vertex_count, rtx.world_albedo_count, rtx.world_normal_count,
 		rtx.entity_packed_count, rtx.entity_primitive_count,
-		rtx.entity_vertex_count, rtx.entity_mesh_count,
-		rtx.entity_mesh_md3, rtx.entity_mesh_iqm, rtx.entity_mesh_gltf,
+		rtx.entity_vertex_count, rtx.entity_albedo_count, rtx.entity_normal_count, rtx.entity_mesh_count,
+		rtx.entity_mesh_md3, rtx.entity_mesh_iqm, rtx.entity_mesh_gltf, rtx.entity_mesh_mdr,
 		rtx.entity_proxy_count,
 		rtx.entity_proxy_non_mesh, rtx.entity_proxy_skinned,
-		rtx.entity_proxy_md3_fail, rtx.entity_proxy_iqm_fail, rtx.entity_proxy_gltf_fail,
+		rtx.entity_proxy_md3_fail, rtx.entity_proxy_iqm_fail, rtx.entity_proxy_gltf_fail, rtx.entity_proxy_mdr_fail,
 		rtx.tlas_instance_count,
 		rtx.tlas_build_mode[0] ? rtx.tlas_build_mode : "n/a",
 		rtx.tlas_rebuild_reason[0] ? rtx.tlas_rebuild_reason : "n/a" );
@@ -444,12 +452,14 @@ static void vk_rtx_rebuild_world_blas( void )
 	rtx.entity_mesh_md3 = 0u;
 	rtx.entity_mesh_iqm = 0u;
 	rtx.entity_mesh_gltf = 0u;
+	rtx.entity_mesh_mdr = 0u;
 	rtx.entity_proxy_count = 0u;
 	rtx.entity_proxy_non_mesh = 0u;
 	rtx.entity_proxy_skinned = 0u;
 	rtx.entity_proxy_md3_fail = 0u;
 	rtx.entity_proxy_iqm_fail = 0u;
 	rtx.entity_proxy_gltf_fail = 0u;
+	rtx.entity_proxy_mdr_fail = 0u;
 	rtx.world_vertex_count = 0u;
 	rtx.world_albedo_count = 0u;
 	rtx.world_normal_count = 0u;
@@ -745,6 +755,8 @@ static void vk_rtx_destroy_entity_blas( void )
 	vk_rtx_destroy_buffer( &rtx.entity_blas_buffer, &rtx.entity_blas_memory );
 	vk_rtx_destroy_buffer( &rtx.entity_vertex_buffer, &rtx.entity_vertex_memory );
 	vk_rtx_destroy_buffer( &rtx.entity_index_buffer, &rtx.entity_index_memory );
+	vk_rtx_destroy_buffer( &rtx.entity_albedo_buffer, &rtx.entity_albedo_memory );
+	vk_rtx_destroy_buffer( &rtx.entity_normal_buffer, &rtx.entity_normal_memory );
 	rtx.entity_primitive_count = 0u;
 	rtx.entity_packed_count = 0u;
 	rtx.entity_vertex_count = 0u;
@@ -752,12 +764,16 @@ static void vk_rtx_destroy_entity_blas( void )
 	rtx.entity_mesh_md3 = 0u;
 	rtx.entity_mesh_iqm = 0u;
 	rtx.entity_mesh_gltf = 0u;
+	rtx.entity_mesh_mdr = 0u;
 	rtx.entity_proxy_count = 0u;
 	rtx.entity_proxy_non_mesh = 0u;
 	rtx.entity_proxy_skinned = 0u;
 	rtx.entity_proxy_md3_fail = 0u;
 	rtx.entity_proxy_iqm_fail = 0u;
 	rtx.entity_proxy_gltf_fail = 0u;
+	rtx.entity_proxy_mdr_fail = 0u;
+	rtx.entity_albedo_count = 0u;
+	rtx.entity_normal_count = 0u;
 }
 
 static void vk_rtx_rebuild_entity_tlas( void )
@@ -826,8 +842,6 @@ static void vk_rtx_rebuild_entity_tlas( void )
 		uint32_t maxIndices;
 		VkDeviceSize vbSize;
 		VkDeviceSize ibSize;
-		float *posHost;
-		uint32_t *idxHost;
 		vkRtxEntityPackStats_t packStats;
 
 		if ( triCap < 12u ) {
@@ -857,13 +871,42 @@ static void vk_rtx_rebuild_entity_tlas( void )
 			VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT | VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR,
 			VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
 			&rtx.entity_index_buffer, &rtx.entity_index_memory, &ibAddr );
-		VK_CHECK( qvkMapMemory( vk.device, rtx.entity_vertex_memory, 0, vbSize, 0, (void **)&posHost ) );
-		VK_CHECK( qvkMapMemory( vk.device, rtx.entity_index_memory, 0, ibSize, 0, (void **)&idxHost ) );
-		Com_Memset( &packStats, 0, sizeof( packStats ) );
-		packedEnt = vk_rtx_entities_pack( &backEnd.refdef, &backEnd.viewParms, capEnt,
-			posHost, maxVerts, idxHost, maxIndices, &packStats );
-		qvkUnmapMemory( vk.device, rtx.entity_vertex_memory );
-		qvkUnmapMemory( vk.device, rtx.entity_index_memory );
+		{
+			VkDeviceSize abSize = (VkDeviceSize)( maxIndices / 3u ) * 3u * sizeof( float );
+			float *posHost;
+			uint32_t *idxHost;
+			float *albedoHost = NULL;
+			float *normalHost = NULL;
+
+			vk_rtx_alloc_buffer( abSize,
+				VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+				VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+				&rtx.entity_albedo_buffer, &rtx.entity_albedo_memory, NULL );
+			vk_rtx_alloc_buffer( abSize,
+				VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+				VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+				&rtx.entity_normal_buffer, &rtx.entity_normal_memory, NULL );
+
+			VK_CHECK( qvkMapMemory( vk.device, rtx.entity_vertex_memory, 0, vbSize, 0, (void **)&posHost ) );
+			VK_CHECK( qvkMapMemory( vk.device, rtx.entity_index_memory, 0, ibSize, 0, (void **)&idxHost ) );
+			if ( rtx.entity_albedo_memory != VK_NULL_HANDLE ) {
+				VK_CHECK( qvkMapMemory( vk.device, rtx.entity_albedo_memory, 0, abSize, 0, (void **)&albedoHost ) );
+			}
+			if ( rtx.entity_normal_memory != VK_NULL_HANDLE ) {
+				VK_CHECK( qvkMapMemory( vk.device, rtx.entity_normal_memory, 0, abSize, 0, (void **)&normalHost ) );
+			}
+			Com_Memset( &packStats, 0, sizeof( packStats ) );
+			packedEnt = vk_rtx_entities_pack( &backEnd.refdef, &backEnd.viewParms, capEnt,
+				posHost, maxVerts, idxHost, maxIndices, albedoHost, normalHost, &packStats );
+			qvkUnmapMemory( vk.device, rtx.entity_vertex_memory );
+			qvkUnmapMemory( vk.device, rtx.entity_index_memory );
+			if ( albedoHost ) {
+				qvkUnmapMemory( vk.device, rtx.entity_albedo_memory );
+			}
+			if ( normalHost ) {
+				qvkUnmapMemory( vk.device, rtx.entity_normal_memory );
+			}
+		}
 		if ( packedEnt == 0u || packStats.primitiveCount == 0u ) {
 			vk_rtx_destroy_entity_blas();
 		} else {
@@ -875,12 +918,16 @@ static void vk_rtx_rebuild_entity_tlas( void )
 			rtx.entity_mesh_md3 = packStats.meshMd3Count;
 			rtx.entity_mesh_iqm = packStats.meshIqmCount;
 			rtx.entity_mesh_gltf = packStats.meshGltfCount;
+			rtx.entity_mesh_mdr = packStats.meshMdrCount;
 			rtx.entity_proxy_count = packStats.proxyEntityCount;
 			rtx.entity_proxy_non_mesh = packStats.proxyNonMeshCount;
 			rtx.entity_proxy_skinned = packStats.proxySkinnedCount;
 			rtx.entity_proxy_md3_fail = packStats.proxyMd3FailCount;
 			rtx.entity_proxy_iqm_fail = packStats.proxyIqmFailCount;
 			rtx.entity_proxy_gltf_fail = packStats.proxyGltfFailCount;
+			rtx.entity_proxy_mdr_fail = packStats.proxyMdrFailCount;
+			rtx.entity_albedo_count = maxPrimEntity;
+			rtx.entity_normal_count = maxPrimEntity;
 
 			Com_Memset( &triangles, 0, sizeof( triangles ) );
 			triangles.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_TRIANGLES_DATA_KHR;
@@ -1801,6 +1848,76 @@ uint32_t vk_rtx_world_normal_count( void )
 	return rtx.world_normal_count;
 }
 
+void vk_rtx_bind_entity_albedo_ssbo( VkDescriptorSet set, uint32_t binding )
+{
+	VkDescriptorBufferInfo info;
+	VkWriteDescriptorSet write;
+	VkDeviceSize rangeBytes;
+
+	if ( set == VK_NULL_HANDLE || rtx.entity_albedo_buffer == VK_NULL_HANDLE ) {
+		return;
+	}
+
+	rangeBytes = (VkDeviceSize)rtx.entity_albedo_count * 3u * sizeof( float );
+	if ( rangeBytes < 3u * sizeof( float ) ) {
+		rangeBytes = 3u * sizeof( float );
+	}
+
+	Com_Memset( &info, 0, sizeof( info ) );
+	info.buffer = rtx.entity_albedo_buffer;
+	info.offset = 0;
+	info.range = rangeBytes;
+
+	Com_Memset( &write, 0, sizeof( write ) );
+	write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+	write.dstSet = set;
+	write.dstBinding = binding;
+	write.descriptorCount = 1;
+	write.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+	write.pBufferInfo = &info;
+	qvkUpdateDescriptorSets( vk.device, 1, &write, 0, NULL );
+}
+
+uint32_t vk_rtx_entity_albedo_count( void )
+{
+	return rtx.entity_albedo_count;
+}
+
+void vk_rtx_bind_entity_normal_ssbo( VkDescriptorSet set, uint32_t binding )
+{
+	VkDescriptorBufferInfo info;
+	VkWriteDescriptorSet write;
+	VkDeviceSize rangeBytes;
+
+	if ( set == VK_NULL_HANDLE || rtx.entity_normal_buffer == VK_NULL_HANDLE ) {
+		return;
+	}
+
+	rangeBytes = (VkDeviceSize)rtx.entity_normal_count * 3u * sizeof( float );
+	if ( rangeBytes < 3u * sizeof( float ) ) {
+		rangeBytes = 3u * sizeof( float );
+	}
+
+	Com_Memset( &info, 0, sizeof( info ) );
+	info.buffer = rtx.entity_normal_buffer;
+	info.offset = 0;
+	info.range = rangeBytes;
+
+	Com_Memset( &write, 0, sizeof( write ) );
+	write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+	write.dstSet = set;
+	write.dstBinding = binding;
+	write.descriptorCount = 1;
+	write.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+	write.pBufferInfo = &info;
+	qvkUpdateDescriptorSets( vk.device, 1, &write, 0, NULL );
+}
+
+uint32_t vk_rtx_entity_normal_count( void )
+{
+	return rtx.entity_normal_count;
+}
+
 #else /* !USE_VULKAN_RTX */
 
 void vk_rtx_init( void )
@@ -1823,5 +1940,9 @@ void vk_rtx_bind_world_albedo_ssbo( VkDescriptorSet set, uint32_t binding ) { (v
 uint32_t vk_rtx_world_albedo_count( void ) { return 0u; }
 void vk_rtx_bind_world_normal_ssbo( VkDescriptorSet set, uint32_t binding ) { (void)set; (void)binding; }
 uint32_t vk_rtx_world_normal_count( void ) { return 0u; }
+void vk_rtx_bind_entity_albedo_ssbo( VkDescriptorSet set, uint32_t binding ) { (void)set; (void)binding; }
+uint32_t vk_rtx_entity_albedo_count( void ) { return 0u; }
+void vk_rtx_bind_entity_normal_ssbo( VkDescriptorSet set, uint32_t binding ) { (void)set; (void)binding; }
+uint32_t vk_rtx_entity_normal_count( void ) { return 0u; }
 
 #endif /* USE_VULKAN_RTX */

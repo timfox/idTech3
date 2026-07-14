@@ -2363,6 +2363,8 @@ ANIMATED MODELS
 
 void R_MDRAddAnimSurfaces( trRefEntity_t *ent );
 void RB_MDRSurfaceAnim( mdrSurface_t *surface );
+qboolean R_MDRSkinSurfacePositions( mdrSurface_t *surface, int frame, int oldframe, float backlerp,
+	float *outPositions );
 qboolean R_LoadIQM (model_t *mod, void *buffer, int filesize, const char *name );
 void R_AddIQMSurfaces( trRefEntity_t *ent );
 void RB_IQMSurfaceAnim( const surfaceType_t *surface );

@@ -13,6 +13,7 @@ with raster direct lighting. Requires USE_VULKAN_RTX, r_hybrid1 or r_rtx 1, r_rt
 #include "vk.h"
 #include "vk_hybrid1.h"
 #include "vk_rtx.h"
+#include "vk_surfel_gi.h"
 #include "vk_util.h"
 #include "vk_view_state.h"
 #include "vk_image_layout.h"
@@ -261,6 +262,7 @@ static void HYBRID1_Status_f( void )
 		"  rayBias=%.3f tMin=%.3f specRoughMax=%.2f sunRadius=%.2f contact=%d\n"
 		"  ggx=%d iblMode=%d diffuseDirect=%d dlightShadows=%d\n"
 		"  composite shadowStr=%.2f specStr=%.2f diffuseStr=%.2f deferredGBuffer=%d\n"
+		"  surfelFusion=%d (Surfel irradiance as diffuse GI when both active)\n"
 		"  note: Hybrid1 is the production RT lighting path; seta r_hybrid1Quality 1|2|3; rtx_status for TLAS/entities\n",
 		HYBRID1_StateString(),
 		vk_hybrid1_active() ? 1 : 0,
@@ -304,7 +306,8 @@ static void HYBRID1_Status_f( void )
 		r_hybrid1_shadowStrength ? r_hybrid1_shadowStrength->value : 0.85f,
 		r_hybrid1_specStrength ? r_hybrid1_specStrength->value : 1.0f,
 		r_hybrid1_diffuseStrength ? r_hybrid1_diffuseStrength->value : 1.0f,
-		vk_deferred_gbuffer_fill_wanted() ? 1 : 0 );
+		vk_deferred_gbuffer_fill_wanted() ? 1 : 0,
+		vk_surfel_gi_hybrid1_fusion_active() ? 1 : 0 );
 }
 
 static void HYBRID1_Reset_f( void )
@@ -718,6 +721,12 @@ static void HYBRID1_UpdateRtDescriptors( VkDescriptorSet set, VkImageView output
 	vk_rtx_bind_tlas_descriptor( set );
 	vk_rtx_bind_world_albedo_ssbo( set, 9 );
 	vk_rtx_bind_world_normal_ssbo( set, 12 );
+	if ( vk_rtx_entity_albedo_count() > 0u ) {
+		vk_rtx_bind_entity_albedo_ssbo( set, 13 );
+	}
+	if ( vk_rtx_entity_normal_count() > 0u ) {
+		vk_rtx_bind_entity_normal_ssbo( set, 14 );
+	}
 	HYBRID1_WriteImageBinding( set, 1, outputView, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, VK_IMAGE_LAYOUT_GENERAL );
 	HYBRID1_WriteUboBinding( set, 2 );
 
@@ -1209,10 +1218,10 @@ void vk_hybrid1_init( void )
 {
 	VkPhysicalDeviceRayTracingPipelinePropertiesKHR rtProps;
 	VkPhysicalDeviceProperties2 props2;
-	VkDescriptorSetLayoutBinding rtBindings[13];
+	VkDescriptorSetLayoutBinding rtBindings[15];
 	VkDescriptorSetLayoutBinding temporalBindings[9];
 	VkDescriptorSetLayoutBinding atrousBindings[7];
-	VkDescriptorSetLayoutBinding compositeBindings[6];
+	VkDescriptorSetLayoutBinding compositeBindings[7];
 	VkDescriptorSetLayoutCreateInfo dslci;
 	VkPipelineLayoutCreateInfo plci;
 	VkDescriptorPoolSize poolSizes[8];
@@ -1355,9 +1364,19 @@ void vk_hybrid1_init( void )
 	rtBindings[12].descriptorCount = 1;
 	rtBindings[12].stageFlags = VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR;
 
+	rtBindings[13].binding = 13;
+	rtBindings[13].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+	rtBindings[13].descriptorCount = 1;
+	rtBindings[13].stageFlags = VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR;
+
+	rtBindings[14].binding = 14;
+	rtBindings[14].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+	rtBindings[14].descriptorCount = 1;
+	rtBindings[14].stageFlags = VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR;
+
 	Com_Memset( &dslci, 0, sizeof( dslci ) );
 	dslci.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-	dslci.bindingCount = 13;
+	dslci.bindingCount = 15;
 	dslci.pBindings = rtBindings;
 	VK_CHECK( qvkCreateDescriptorSetLayout( vk.device, &dslci, NULL, &hybrid1.rt_dsl ) );
 
@@ -1371,7 +1390,7 @@ void vk_hybrid1_init( void )
 	poolSizes[3].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
 	poolSizes[3].descriptorCount = 21;
 	poolSizes[4].type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-	poolSizes[4].descriptorCount = 9;
+	poolSizes[4].descriptorCount = 18;
 	Com_Memset( &dpci, 0, sizeof( dpci ) );
 	dpci.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
 	dpci.maxSets = 3;
@@ -1547,10 +1566,14 @@ void vk_hybrid1_init( void )
 	compositeBindings[5].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
 	compositeBindings[5].descriptorCount = 1;
 	compositeBindings[5].stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
-	dslci.bindingCount = 6;
+	compositeBindings[6].binding = 6;
+	compositeBindings[6].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+	compositeBindings[6].descriptorCount = 1;
+	compositeBindings[6].stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+	dslci.bindingCount = 7;
 	dslci.pBindings = compositeBindings;
 	VK_CHECK( qvkCreateDescriptorSetLayout( vk.device, &dslci, NULL, &hybrid1.composite_dsl ) );
-	pcRange.size = 32;
+	pcRange.size = 48;
 	plci.pSetLayouts = &hybrid1.composite_dsl;
 	VK_CHECK( qvkCreatePipelineLayout( vk.device, &plci, NULL, &hybrid1.composite_pl ) );
 	dpci.maxSets = 1;
@@ -1847,6 +1870,10 @@ void vk_hybrid1_record_pass( VkCommandBuffer cmd )
 		VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL : VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 
 	doDiffuse = ( r_hybrid1_diffuse && r_hybrid1_diffuse->integer ) ? qtrue : qfalse;
+	/* Surfel owns diffuse GI under Hybrid1 fusion — skip Hybrid1 diffuse RT. */
+	if ( vk_surfel_gi_hybrid1_fusion_active() ) {
+		doDiffuse = qfalse;
+	}
 	doShadow = ( !r_hybrid1_shadow || r_hybrid1_shadow->integer ) ? qtrue : qfalse;
 	doSpec = ( !r_hybrid1_spec || r_hybrid1_spec->integer ) ? qtrue : qfalse;
 	denoisedDiffuse = &hybrid1.filtered_diffuse;
@@ -1998,14 +2025,23 @@ void vk_hybrid1_record_pass( VkCommandBuffer cmd )
 		struct {
 			float extent[4];
 			float strengths[4];
+			float surfel[4];
 		} push;
 		VkSampler nearest = HYBRID1_NearestSampler();
-		VkDescriptorImageInfo infos[6];
-		VkWriteDescriptorSet writes[6];
+		VkDescriptorImageInfo infos[7];
+		VkWriteDescriptorSet writes[7];
 		VkImageView albedoView;
+		VkImageView surfelView;
+		qboolean surfelFusion;
 
 		albedoView = vk.deferred_gbuffer_albedo_view ? vk.deferred_gbuffer_albedo_view :
 			( vk.deferred_gbuffer_material_view ? vk.deferred_gbuffer_material_view : vk.color_image_view );
+		surfelFusion = vk_surfel_gi_hybrid1_fusion_active();
+		surfelView = surfelFusion ? vk_surfel_gi_irradiance_view() : albedoView;
+		if ( surfelView == VK_NULL_HANDLE ) {
+			surfelView = albedoView;
+			surfelFusion = qfalse;
+		}
 
 		HYBRID1_BarrierImage( cmd, vk.color_image, colorRestoreLayout, VK_IMAGE_LAYOUT_GENERAL,
 			VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT | VK_ACCESS_SHADER_READ_BIT, VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT,
@@ -2031,6 +2067,9 @@ void vk_hybrid1_record_pass( VkCommandBuffer cmd )
 		infos[4].imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 		infos[5].imageView = vk.color_image_view;
 		infos[5].imageLayout = VK_IMAGE_LAYOUT_GENERAL;
+		infos[6].sampler = nearest;
+		infos[6].imageView = surfelView;
+		infos[6].imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 		writes[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
 		writes[0].dstSet = hybrid1.composite_set;
 		writes[0].dstBinding = 0;
@@ -2067,14 +2106,24 @@ void vk_hybrid1_record_pass( VkCommandBuffer cmd )
 		writes[5].descriptorCount = 1;
 		writes[5].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
 		writes[5].pImageInfo = &infos[5];
-		qvkUpdateDescriptorSets( vk.device, 6, writes, 0, NULL );
+		writes[6].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+		writes[6].dstSet = hybrid1.composite_set;
+		writes[6].dstBinding = 6;
+		writes[6].descriptorCount = 1;
+		writes[6].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+		writes[6].pImageInfo = &infos[6];
+		qvkUpdateDescriptorSets( vk.device, 7, writes, 0, NULL );
 
 		push.extent[0] = (float)hybrid1.width;
 		push.extent[1] = (float)hybrid1.height;
+		push.extent[2] = push.extent[3] = 0.0f;
 		push.strengths[0] = doShadow ? ( r_hybrid1_shadowStrength ? r_hybrid1_shadowStrength->value : 0.85f ) : 0.0f;
 		push.strengths[1] = doSpec ? ( r_hybrid1_specStrength ? r_hybrid1_specStrength->value : 1.0f ) : 0.0f;
 		push.strengths[2] = (float)( r_hybrid1_debug ? r_hybrid1_debug->integer : 0 );
 		push.strengths[3] = doDiffuse ? ( r_hybrid1_diffuseStrength ? r_hybrid1_diffuseStrength->value : 1.0f ) : 0.0f;
+		push.surfel[0] = surfelFusion ? vk_surfel_gi_fusion_strength() : 0.0f;
+		push.surfel[1] = surfelFusion ? 1.0f : 0.0f;
+		push.surfel[2] = push.surfel[3] = 0.0f;
 
 		qvkCmdBindPipeline( cmd, VK_PIPELINE_BIND_POINT_COMPUTE, hybrid1.composite_pipeline );
 		qvkCmdBindDescriptorSets( cmd, VK_PIPELINE_BIND_POINT_COMPUTE, hybrid1.composite_pl, 0, 1, &hybrid1.composite_set, 0, NULL );

@@ -3,7 +3,8 @@
 Copyright (C) 2026 Gopex LLC. All rights reserved.
 
 RTX entity BLAS: MD3 LOD0 mesh, IQM (bind-pose or CPU-skinned), glTF
-(static or CPU-skinned), with AABB proxy fallback for MDR / pack failures.
+(static or CPU-skinned), MDR LOD0 (CPU-skinned), with AABB proxy fallback
+for unknown types / pack failures.
 ===========================================================================
 */
 
@@ -425,9 +426,192 @@ static qboolean vk_rtx_pack_gltf( const trRefEntity_t *ent, const viewParms_t *v
 	return qtrue;
 }
 
+/*
+===============
+vk_rtx_pack_mdr
+
+MDR LOD0: CPU-skin each surface via R_MDRSkinSurfacePositions.
+Returns qfalse on budget/skin failure (AABB fallback).
+===============
+*/
+static qboolean vk_rtx_pack_mdr( const trRefEntity_t *ent, const viewParms_t *viewParms,
+	model_t *mod, float *positions, uint32_t maxVerts, uint32_t *indices, uint32_t maxIndices,
+	uint32_t *ioVertCount, uint32_t *ioIndexCount )
+{
+	mdrHeader_t *header;
+	mdrLOD_t *lod;
+	mdrSurface_t *surface;
+	uint32_t vertsBefore = *ioVertCount;
+	uint32_t indicesBefore = *ioIndexCount;
+	int frame, oldframe;
+	float backlerp;
+	int s;
+	float *skinned = NULL;
+
+	if ( !mod->modelData ) {
+		return qfalse;
+	}
+	header = (mdrHeader_t *)mod->modelData;
+	if ( header->numFrames < 1 || header->numBones < 1 || header->numLODs < 1 || header->numBones > MDR_MAX_BONES ) {
+		return qfalse;
+	}
+
+	frame = ent->e.frame;
+	oldframe = ent->e.oldframe;
+	backlerp = ent->e.backlerp;
+	if ( ent->e.renderfx & RF_WRAP_FRAMES ) {
+		frame %= header->numFrames;
+		oldframe %= header->numFrames;
+	}
+	if ( frame < 0 || frame >= header->numFrames ) {
+		frame = 0;
+	}
+	if ( oldframe < 0 || oldframe >= header->numFrames ) {
+		oldframe = 0;
+	}
+	if ( backlerp < 0.0f ) {
+		backlerp = 0.0f;
+	} else if ( backlerp > 1.0f ) {
+		backlerp = 1.0f;
+	}
+
+	lod = (mdrLOD_t *)( (byte *)header + header->ofsLODs );
+	if ( lod->numSurfaces < 1 ) {
+		return qfalse;
+	}
+
+	R_RotateForEntity( ent, viewParms, &backEnd.or );
+
+	surface = (mdrSurface_t *)( (byte *)lod + lod->ofsSurfaces );
+	for ( s = 0; s < lod->numSurfaces; s++ ) {
+		uint32_t vertBase;
+		int v, t, numTris;
+		const int *tri;
+
+		if ( surface->numVerts < 3 || surface->numTriangles < 1 ) {
+			surface = (mdrSurface_t *)( (byte *)surface + surface->ofsEnd );
+			continue;
+		}
+		numTris = surface->numTriangles;
+		if ( *ioVertCount + (uint32_t)surface->numVerts > maxVerts ||
+			*ioIndexCount + (uint32_t)numTris * 3u > maxIndices ) {
+			*ioVertCount = vertsBefore;
+			*ioIndexCount = indicesBefore;
+			return qfalse;
+		}
+
+		skinned = (float *)ri.Hunk_AllocateTempMemory( surface->numVerts * 3 * (int)sizeof( float ) );
+		if ( !skinned ) {
+			*ioVertCount = vertsBefore;
+			*ioIndexCount = indicesBefore;
+			return qfalse;
+		}
+		if ( !R_MDRSkinSurfacePositions( surface, frame, oldframe, backlerp, skinned ) ) {
+			ri.Hunk_FreeTempMemory( skinned );
+			*ioVertCount = vertsBefore;
+			*ioIndexCount = indicesBefore;
+			return qfalse;
+		}
+
+		vertBase = *ioVertCount;
+		for ( v = 0; v < surface->numVerts; v++ ) {
+			vec3_t local;
+			float *dst = positions + ( vertBase + (uint32_t)v ) * 3u;
+			local[0] = skinned[v * 3 + 0];
+			local[1] = skinned[v * 3 + 1];
+			local[2] = skinned[v * 3 + 2];
+			vk_rtx_xform_local_to_world( &backEnd.or, local, dst );
+		}
+		ri.Hunk_FreeTempMemory( skinned );
+		skinned = NULL;
+
+		tri = (const int *)( (byte *)surface + surface->ofsTriangles );
+		for ( t = 0; t < numTris; t++ ) {
+			int i0 = tri[t * 3 + 0];
+			int i1 = tri[t * 3 + 1];
+			int i2 = tri[t * 3 + 2];
+			uint32_t *out;
+
+			if ( i0 < 0 || i0 >= surface->numVerts ||
+				i1 < 0 || i1 >= surface->numVerts ||
+				i2 < 0 || i2 >= surface->numVerts ) {
+				continue;
+			}
+			out = indices + *ioIndexCount;
+			out[0] = vertBase + (uint32_t)i0;
+			out[1] = vertBase + (uint32_t)i1;
+			out[2] = vertBase + (uint32_t)i2;
+			*ioIndexCount += 3u;
+		}
+
+		*ioVertCount += (uint32_t)surface->numVerts;
+		surface = (mdrSurface_t *)( (byte *)surface + surface->ofsEnd );
+	}
+
+	if ( *ioVertCount == vertsBefore || *ioIndexCount == indicesBefore ) {
+		*ioVertCount = vertsBefore;
+		*ioIndexCount = indicesBefore;
+		return qfalse;
+	}
+
+	return qtrue;
+}
+
+static void vk_rtx_entity_geo_normal( const float *a, const float *b, const float *c, float *out )
+{
+	vec3_t e1, e2, n;
+
+	VectorSubtract( b, a, e1 );
+	VectorSubtract( c, a, e2 );
+	CrossProduct( e1, e2, n );
+	if ( VectorNormalize( n ) == 0.0f ) {
+		out[0] = 0.0f;
+		out[1] = 0.0f;
+		out[2] = 1.0f;
+	} else {
+		VectorCopy( n, out );
+	}
+}
+
+static void vk_rtx_entity_fill_prim_attrs( const float *positions, const uint32_t *indices,
+	uint32_t primBegin, uint32_t primEnd, const byte *rgba,
+	float *albedoRgb, float *normalNxyz )
+{
+	uint32_t p;
+	float ar = 0.72f, ag = 0.70f, ab = 0.66f;
+
+	if ( !albedoRgb || !normalNxyz || !positions || !indices || primEnd <= primBegin ) {
+		return;
+	}
+	if ( rgba && ( rgba[0] | rgba[1] | rgba[2] ) != 0 ) {
+		ar = rgba[0] * ( 1.0f / 255.0f );
+		ag = rgba[1] * ( 1.0f / 255.0f );
+		ab = rgba[2] * ( 1.0f / 255.0f );
+	}
+
+	for ( p = primBegin; p < primEnd; p++ ) {
+		uint32_t i0 = indices[p * 3u + 0u];
+		uint32_t i1 = indices[p * 3u + 1u];
+		uint32_t i2 = indices[p * 3u + 2u];
+		const float *a = positions + i0 * 3u;
+		const float *b = positions + i1 * 3u;
+		const float *c = positions + i2 * 3u;
+		float n[3];
+
+		albedoRgb[p * 3u + 0u] = ar;
+		albedoRgb[p * 3u + 1u] = ag;
+		albedoRgb[p * 3u + 2u] = ab;
+		vk_rtx_entity_geo_normal( a, b, c, n );
+		normalNxyz[p * 3u + 0u] = n[0];
+		normalNxyz[p * 3u + 1u] = n[1];
+		normalNxyz[p * 3u + 2u] = n[2];
+	}
+}
+
 uint32_t vk_rtx_entities_pack( const trRefdef_t *refdef, const viewParms_t *viewParms,
 	uint32_t maxEntities, float *positions, uint32_t maxVerts,
-	uint32_t *indices, uint32_t maxIndices, vkRtxEntityPackStats_t *stats )
+	uint32_t *indices, uint32_t maxIndices,
+	float *albedoRgb, float *normalNxyz, vkRtxEntityPackStats_t *stats )
 {
 	int i, n;
 	uint32_t packed = 0u;
@@ -437,12 +621,14 @@ uint32_t vk_rtx_entities_pack( const trRefdef_t *refdef, const viewParms_t *view
 	uint32_t meshMd3 = 0u;
 	uint32_t meshIqm = 0u;
 	uint32_t meshGltf = 0u;
+	uint32_t meshMdr = 0u;
 	uint32_t proxyCount = 0u;
 	uint32_t proxyNonMesh = 0u;
 	uint32_t proxySkinned = 0u;
 	uint32_t proxyMd3Fail = 0u;
 	uint32_t proxyIqmFail = 0u;
 	uint32_t proxyGltfFail = 0u;
+	uint32_t proxyMdrFail = 0u;
 
 	if ( stats ) {
 		Com_Memset( stats, 0, sizeof( *stats ) );
@@ -462,8 +648,9 @@ uint32_t vk_rtx_entities_pack( const trRefdef_t *refdef, const viewParms_t *view
 		const trRefEntity_t *ent = &refdef->entities[i];
 		model_t *mod;
 		qboolean usedMesh = qfalse;
-		int meshKind = 0; /* 1=md3 2=iqm 3=gltf */
-		int triedFailKind = 0; /* 1=md3 2=iqm 3=gltf */
+		int meshKind = 0; /* 1=md3 2=iqm 3=gltf 4=mdr */
+		int triedFailKind = 0; /* 1=md3 2=iqm 3=gltf 4=mdr */
+		uint32_t indexBefore = indexCount;
 
 		if ( ent->e.reType != RT_MODEL || !ent->e.hModel ) {
 			continue;
@@ -498,6 +685,14 @@ uint32_t vk_rtx_entities_pack( const trRefdef_t *refdef, const viewParms_t *view
 			} else {
 				triedFailKind = 3;
 			}
+		} else if ( mod->type == MOD_MDR ) {
+			usedMesh = vk_rtx_pack_mdr( ent, viewParms, mod, positions, maxVerts, indices, maxIndices,
+				&vertCount, &indexCount );
+			if ( usedMesh ) {
+				meshKind = 4;
+			} else {
+				triedFailKind = 4;
+			}
 		}
 
 		if ( !usedMesh ) {
@@ -512,8 +707,9 @@ uint32_t vk_rtx_entities_pack( const trRefdef_t *refdef, const viewParms_t *view
 				proxyIqmFail++;
 			} else if ( triedFailKind == 3 ) {
 				proxyGltfFail++;
+			} else if ( triedFailKind == 4 ) {
+				proxyMdrFail++;
 			} else {
-				/* MDR / unknown → proxyNonMesh. proxySkinned kept at 0 (skinned glTF packs as mesh). */
 				proxyNonMesh++;
 			}
 		} else {
@@ -524,7 +720,15 @@ uint32_t vk_rtx_entities_pack( const trRefdef_t *refdef, const viewParms_t *view
 				meshIqm++;
 			} else if ( meshKind == 3 ) {
 				meshGltf++;
+			} else if ( meshKind == 4 ) {
+				meshMdr++;
 			}
+		}
+
+		if ( ( albedoRgb || normalNxyz ) && indexCount > indexBefore ) {
+			vk_rtx_entity_fill_prim_attrs( positions, indices,
+				indexBefore / 3u, indexCount / 3u, ent->e.shader.rgba,
+				albedoRgb, normalNxyz );
 		}
 
 		packed++;
@@ -538,12 +742,14 @@ uint32_t vk_rtx_entities_pack( const trRefdef_t *refdef, const viewParms_t *view
 		stats->meshMd3Count = meshMd3;
 		stats->meshIqmCount = meshIqm;
 		stats->meshGltfCount = meshGltf;
+		stats->meshMdrCount = meshMdr;
 		stats->proxyEntityCount = proxyCount;
 		stats->proxyNonMeshCount = proxyNonMesh;
 		stats->proxySkinnedCount = proxySkinned;
 		stats->proxyMd3FailCount = proxyMd3Fail;
 		stats->proxyIqmFailCount = proxyIqmFail;
 		stats->proxyGltfFailCount = proxyGltfFail;
+		stats->proxyMdrFailCount = proxyMdrFail;
 	}
 
 	return packed;
@@ -553,7 +759,8 @@ uint32_t vk_rtx_entities_pack( const trRefdef_t *refdef, const viewParms_t *view
 
 uint32_t vk_rtx_entities_pack( const trRefdef_t *refdef, const viewParms_t *viewParms,
 	uint32_t maxEntities, float *positions, uint32_t maxVerts,
-	uint32_t *indices, uint32_t maxIndices, vkRtxEntityPackStats_t *stats )
+	uint32_t *indices, uint32_t maxIndices,
+	float *albedoRgb, float *normalNxyz, vkRtxEntityPackStats_t *stats )
 {
 	(void)refdef;
 	(void)viewParms;
@@ -562,6 +769,8 @@ uint32_t vk_rtx_entities_pack( const trRefdef_t *refdef, const viewParms_t *view
 	(void)maxVerts;
 	(void)indices;
 	(void)maxIndices;
+	(void)albedoRgb;
+	(void)normalNxyz;
 	if ( stats ) {
 		Com_Memset( stats, 0, sizeof( *stats ) );
 	}

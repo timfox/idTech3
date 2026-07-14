@@ -1,6 +1,7 @@
 #version 450
 /*
  * Composite denoised shadow + specular + optional diffuse with raster HDR.
+ * Optional Surfel GI irradiance (binding 6) when Hybrid1↔Surfel fusion is active.
  */
 layout( local_size_x = 8, local_size_y = 8, local_size_z = 1 ) in;
 
@@ -10,10 +11,12 @@ layout( set = 0, binding = 2 ) uniform sampler2D specTex;
 layout( set = 0, binding = 3 ) uniform sampler2D diffuseTex;
 layout( set = 0, binding = 4 ) uniform sampler2D albedoTex;
 layout( rgba16f, set = 0, binding = 5 ) uniform image2D colorOut;
+layout( set = 0, binding = 6 ) uniform sampler2D surfelIrradianceTex;
 
 layout( push_constant ) uniform Hybrid1CompositePush {
 	vec4 extent;
 	vec4 strengths; /* x=shadow, y=spec, z=debug mode, w=diffuse */
+	vec4 surfel;    /* x=strength, y=useSurfel, zw=pad */
 } pc;
 
 void main()
@@ -35,10 +38,13 @@ void main()
 	vec3 specRgb = texture( specTex, uv ).rgb;
 	vec3 diffuseRgb = texture( diffuseTex, uv ).rgb;
 	vec3 albedo = texture( albedoTex, uv ).rgb;
+	vec3 surfelIrr = texture( surfelIrradianceTex, uv ).rgb;
 	float shadowStr = pc.strengths.x;
 	float specStr = pc.strengths.y;
 	int debugMode = int( pc.strengths.z + 0.5 );
 	float diffuseStr = pc.strengths.w;
+	float surfelStr = pc.surfel.x;
+	float useSurfel = pc.surfel.y;
 
 	vec3 outRgb = scene.rgb;
 
@@ -50,9 +56,14 @@ void main()
 		outRgb = vec3( texture( shadowTex, uv ).g / 90.0 );
 	} else if ( debugMode == 4 ) {
 		outRgb = diffuseRgb * albedo;
+	} else if ( debugMode == 5 ) {
+		outRgb = surfelIrr;
 	} else {
 		float shadowFactor = mix( 1.0, shadowVis, clamp( shadowStr, 0.0, 1.0 ) );
 		outRgb = scene.rgb * shadowFactor + specRgb * specStr + diffuseRgb * albedo * diffuseStr;
+		if ( useSurfel > 0.5 ) {
+			outRgb += albedo * surfelIrr * surfelStr;
+		}
 	}
 
 	imageStore( colorOut, ivec2( pix ), vec4( outRgb, scene.a ) );
