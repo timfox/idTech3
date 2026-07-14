@@ -961,7 +961,7 @@ void CL_Flux_Frame( void )
 
 void CL_Flux_Init( void )
 {
-	cl_flux_enable = Cvar_Get( "cl_flux_enable", "0", CVAR_ARCHIVE );
+	cl_flux_enable = Cvar_Get( "cl_flux_enable", "1", CVAR_ARCHIVE );
 	Cvar_CheckRange( cl_flux_enable, "0", "1", CV_INTEGER );
 	Cvar_SetDescription( cl_flux_enable, "Enable FLUX.2 image generation features. Requires model files to be present." );
 
@@ -995,7 +995,7 @@ void CL_Flux_Init( void )
 	Cvar_CheckRange( cl_flux_seed, "-1", "2147483647", CV_INTEGER );
 	Cvar_SetDescription( cl_flux_seed, "Random seed for reproducible image generation. -1 for random seed." );
 
-	cl_fonts_enable = Cvar_Get( "cl_fonts_enable", "0", CVAR_ARCHIVE );
+	cl_fonts_enable = Cvar_Get( "cl_fonts_enable", "1", CVAR_ARCHIVE );
 	Cvar_CheckRange( cl_fonts_enable, "0", "1", CV_INTEGER );
 	Cvar_SetDescription( cl_fonts_enable,
 		"Enable FonTS (ICCV 2025) external Python pipeline hook. Requires separate FonTS repo + GPU env; see docs/FONTS.md." );

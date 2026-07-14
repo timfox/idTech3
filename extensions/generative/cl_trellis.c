@@ -518,7 +518,7 @@ static void CL_TrellisFromPrompt_f( void ) {
 
 void CL_Trellis_Init( void )
 {
-	cl_trellis_enable = Cvar_Get( "cl_trellis_enable", "0", CVAR_ARCHIVE );
+	cl_trellis_enable = Cvar_Get( "cl_trellis_enable", "1", CVAR_ARCHIVE );
 	Cvar_CheckRange( cl_trellis_enable, "0", "1", CV_INTEGER );
 	Cvar_SetDescription( cl_trellis_enable,
 		"Enable Microsoft TRELLIS.2 image-to-3D runtime generation (mirrors FLUX workflow). See docs/TRELLIS.md." );

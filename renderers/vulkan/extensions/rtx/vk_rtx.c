@@ -111,7 +111,7 @@ static void vk_rtx_destroy_entity_blas( void );
 static const char *vk_rtx_state_string( void )
 {
 	if ( !vk.rtxAvailable ) {
-		return "blocked: Vulkan KHR ray tracing is unavailable";
+		return "idle: latch r_rtx/r_hybrid1/r_raygun before vid_restart (or GPU lacks KHR RT)";
 	}
 	if ( ( !r_rtx || r_rtx->integer <= 0 ) && ( !r_hybrid1 || r_hybrid1->integer <= 0 )
 		&& ( !r_raygun || r_raygun->integer <= 0 ) ) {

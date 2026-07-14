@@ -88,7 +88,7 @@ static const char *RAYGUN_StateString( void )
 		return "idle: enable r_raygun before vid_restart";
 	}
 	if ( !vk.rtxAvailable ) {
-		return "blocked: Vulkan KHR ray tracing is unavailable";
+		return "idle: latch r_rtx/r_hybrid1/r_raygun before vid_restart (or GPU lacks KHR RT)";
 	}
 	if ( !vk.fboActive ) {
 		return "blocked: r_fbo 1 is required";

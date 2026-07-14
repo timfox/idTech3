@@ -642,13 +642,13 @@ static qboolean vk_create_device( VkPhysicalDevice physical_device, int device_i
 						rtx_pipeline_features.rayTracingPipelineShaderGroupHandleCaptureReplayMixed = VK_FALSE;
 						rtx_pipeline_features.rayTracingPipelineTraceRaysIndirect = VK_FALSE;
 						rtx_pipeline_features.rayTraversalPrimitiveCulling = VK_FALSE;
-						ri.Printf( PRINT_ALL, "[VK] Ray tracing: KHR extensions and device features enabled (BLAS/TLAS/dispatch not integrated)\n" );
+						ri.Printf( PRINT_ALL, "[VK] Ray tracing: KHR AS + RT pipeline + buffer device address enabled (rtx_status; r_rtxDemo / Hybrid1 / Raygun)\n" );
 					} else {
 						ri.Printf( PRINT_WARNING, "[VK] Ray tracing: extensions present but required features unsupported on this device; skipping\n" );
 					}
 				}
 			} else {
-				ri.Printf( PRINT_DEVELOPER, "[VK] Ray tracing: GPU supports KHR RT extensions; set r_rtx 1 or r_hybrid1 1 and vid_restart to enable (USE_VULKAN_RTX build)\n" );
+				ri.Printf( PRINT_ALL, "[VK][RTX] chocolate path ready (GPU has KHR RT; set r_rtx 1 or r_hybrid1 1 / r_raygun 1 + vid_restart)\n" );
 			}
 		}
 #endif

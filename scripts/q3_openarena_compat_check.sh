@@ -49,22 +49,23 @@ else
 	fail "docs/COMPATIBILITY.md missing QVM/OpenArena guidance"
 fi
 
-# Optional generative hooks must default off (no impact on classic play).
+# Generative / research pipelines default on; classic lighting/overlays still
+# forced by CL_ApplyClassicBaseq3Cvars (r_classicLighting, r_pbr, ImGui, etc.).
 _trellis_default_ok=0
 for _trellis_src in \
 	"$PROJECT_ROOT/extensions/generative/cl_trellis.c" \
 	"$PROJECT_ROOT/runtime/client/core/cl_main.c"; do
 	if [ -f "$_trellis_src" ] && \
 	   grep -q 'cl_trellis_enable' "$_trellis_src" && \
-	   grep -q '"cl_trellis_enable", "0"' "$_trellis_src"; then
+	   grep -q '"cl_trellis_enable", "1"' "$_trellis_src"; then
 		_trellis_default_ok=1
 		break
 	fi
 done
 if [ "$_trellis_default_ok" -eq 1 ]; then
-	pass "cl_trellis_enable defaults to 0"
+	pass "cl_trellis_enable defaults to 1"
 else
-	fail "cl_trellis_enable default not 0"
+	fail "cl_trellis_enable default not 1"
 fi
 
 if [ -f "$PROJECT_ROOT/modules/world/fog_biology.cpp" ] && \
@@ -77,10 +78,10 @@ fi
 
 if [ -f "$PROJECT_ROOT/modules/world/genetic_gan.cpp" ] && \
    grep -q 'cl_geneticGan' "$PROJECT_ROOT/modules/world/genetic_gan.cpp" && \
-   grep -q '"cl_geneticGan", "0"' "$PROJECT_ROOT/modules/world/genetic_gan.cpp"; then
-	pass "cl_geneticGan defaults to 0 (opt-in procedural genome API)"
+   grep -q '"cl_geneticGan", "1"' "$PROJECT_ROOT/modules/world/genetic_gan.cpp"; then
+	pass "cl_geneticGan defaults to 1 (procedural genome API)"
 else
-	fail "cl_geneticGan default not 0 in genetic_gan.cpp"
+	fail "cl_geneticGan default not 1 in genetic_gan.cpp"
 fi
 
 if grep -qE 'r_vegWind[[:space:]]*=[[:space:]]*ri\.Cvar_Get\([[:space:]]*"r_vegWind"[[:space:]]*,[[:space:]]*"0"' \

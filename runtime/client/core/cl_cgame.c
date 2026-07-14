@@ -1511,7 +1511,7 @@ static void CL_ApplyClassicBaseq3Cvars( void ) {
 	Cvar_Set( "r_forwardPlusOverflowShade", "0" );
 	Cvar_Set( "r_shWorldLighting", "0" );
 	Cvar_Set( "cl_physicsEnabled", "0" );
-	Cvar_Set( "r_openWorld", "0" );
+	/* Keep r_openWorld / generative pipelines at their engine defaults (on). */
 	Cvar_Set( "cl_openWorldSync", "0" );
 	Cvar_Set( "r_bspStream", "0" );
 	Cvar_Set( "r_volumetricFog", "0" );

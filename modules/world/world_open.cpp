@@ -59,7 +59,7 @@ static int WorldOpen_AllocSlot( int cellX, int cellY ) {
 }
 
 void WorldOpen_Init( void ) {
-	r_openWorld = Cvar_Get( "r_openWorld", "0", CVAR_ARCHIVE );
+	r_openWorld = Cvar_Get( "r_openWorld", "1", CVAR_ARCHIVE );
 	Cvar_SetDescription( r_openWorld,
 		"Enable infinite open-world residency (BSP sectors + per-chunk nav + billboard scatter)." );
 	r_openWorldSectorSize = Cvar_Get( "r_openWorldSectorSize", "4096", CVAR_ARCHIVE );

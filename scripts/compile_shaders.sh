@@ -3,6 +3,9 @@ set -euo pipefail
 IFS=$'\n\t'
 
 # Usage: GLSLANG_VALIDATOR=/path/to/glslangValidator ./scripts/compile_shaders.sh
+#
+# Concurrent runs must not share the generated/ append stream — that used to
+# glue "…0x00const unsigned…" arrays together and break the Vulkan build.
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 if [[ -f "$SCRIPT_DIR/CMakeLists.txt" ]]; then
@@ -17,6 +20,15 @@ fi
 SHADER_DIR="$PROJECT_ROOT/renderers/vulkan/shaders"
 SPIRV_DIR="$SHADER_DIR/spirv"
 TOOLS_DIR="$SHADER_DIR/tools"
+
+# Serialize all invocations (nested cmake + manual rebuilds).
+LOCK_FILE="$SPIRV_DIR/.compile_shaders.lock"
+mkdir -p "$SPIRV_DIR"
+exec 9>"$LOCK_FILE"
+if ! flock -n 9; then
+  echo "Waiting for another compile_shaders.sh to finish (lock: $LOCK_FILE)..." >&2
+  flock 9
+fi
 
 APPLY=0
 CHECK=0
@@ -134,8 +146,11 @@ hybrid1_spv_bytes = {}
 raygun_spv_bytes = {}
 
 def append_shader_data(spv_path, array_name):
+    # Write a leading blank line before each array so a truncated prior write
+    # cannot glue bytes into "0x00const unsigned char".
     data = spv_path.read_bytes()
     with data_file.open("a", encoding="utf-8") as f:
+        f.write("\n")
         f.write(f"const unsigned char {array_name}[{len(data)}] = {{\n")
         for offset in range(0, len(data), 16):
             chunk = data[offset:offset + 16]
@@ -145,6 +160,8 @@ def append_shader_data(spv_path, array_name):
                 f.write(",")
             f.write("\n")
         f.write("};\n")
+        f.flush()
+        os.fsync(f.fileno())
 
 def compile_shader(stage, source, array_name, binding_expr=None, defines="", rtx_collect=False, grtx_collect=False, pathtrace_collect=False, hybrid1_collect=False, raygun_collect=False):
     global task_counter
@@ -663,6 +680,11 @@ print(f"Wrote {task_counter} shader binaries and {len(bindings)} bindings.")
 
 import re as _re_dup
 _data_text = data_file.read_text(encoding="utf-8")
+if _re_dup.search(r"0x[0-9A-Fa-f]{2}const ", _data_text):
+    sys.exit(
+        "shader_data.c corrupted: array bytes glued into next `const` "
+        "(concurrent compile_shaders?). Delete generated/ and retry."
+    )
 _shader_names = _re_dup.findall(r"const unsigned char (\w+)\[", _data_text)
 _seen_shader = set()
 _dup_shader = []

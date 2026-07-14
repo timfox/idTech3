@@ -977,7 +977,8 @@ static void InitOpenGL( void )
 		ri.Error( ERR_FATAL, "Recursive error during Vulkan initialization" );
 	}
 	ri.Printf( PRINT_ALL, "[VK] GPU compute: enabled (volumetric fog, vegetation wind, etc.)\n" );
-	ri.Printf( PRINT_ALL, "[VK] NVIDIA DLSS / NGX: not integrated in-engine; use \\r_renderScale and HDR post paths, or GPU-driver upscaling\n" );
+	/* Proprietary NVIDIA DLSS/NGX SDK is not vendored; in-engine temporal path is r_upscale 2. */
+	ri.Printf( PRINT_ALL, "[VK] Upscale: NVIDIA DLSS/NGX SDK not shipped; use \\r_upscale 1|2, \\r_renderScale, \\r_taa, or GPU-driver scaling\n" );
 	if ( r_volumetricFog && r_volumetricFog->integer ) {
 		ri.Printf( PRINT_ALL, "[VK][fog] r_volumetricFogCompositeMode=%d (0=standard, 1=depth-weighted in-scatter, 2=HDR clamp)\n",
 			r_volumetricFogCompositeMode ? r_volumetricFogCompositeMode->integer : 0 );
@@ -4777,6 +4778,16 @@ void R_Init( void ) {
 	R_WSP_Init();
 	R_Dressi_Init();
 	R_Raygun_Init();
+#ifdef USE_EXPERIMENTAL_RENDERERS
+	ri.Printf( PRINT_ALL,
+		"[VK] Experimental renderers linked (NDGI/NIV/NSLM/NIST/NVC/FSA/VFGI/RenderFormer/WPT/GRTX/VkSplat/...); enable r_* + vid_restart. See docs/NEURAL_RENDERER_PHASES.md\n" );
+#else
+	/* Individual stub lines come from vk_experimental_renderer_stubs.c */
+#endif
+#ifdef USE_VULKAN_RTX
+	ri.Printf( PRINT_ALL,
+		"[VK][RTX] USE_VULKAN_RTX=ON (Hybrid1/Raygun/pathtrace scaffolds linked; latch r_rtx/r_hybrid1/r_raygun before vid_restart)\n" );
+#endif
 #endif
 	R_ApplyRenderModeLatch();
 	ri.Printf( PRINT_ALL, "[VK] SH lighting: %s\n", r_shLighting && r_shLighting->integer ? "enabled" : "disabled" );

@@ -101,9 +101,12 @@ Modernized id Tech 3: **Vulkan renderer with PBR**, validation and smoke-tested 
 Primary entry point:
 
 ```bash
-./scripts/compile_engine.sh vulkan    # Vulkan + Release
+./scripts/compile_engine.sh vulkan           # Vulkan + Release (game profile)
 ./scripts/compile_engine.sh vulkan debug
+./scripts/compile_engine.sh vulkan full rtx  # experimental neural paths + KHR ray tracing (not stubbed)
 ```
+
+Default **`game`** profile stubs research neural paths and RTX (`USE_EXPERIMENTAL_RENDERERS=OFF`, `USE_VULKAN_RTX=OFF`). Use **`full rtx`** (or **`research rtx`**) when you want those integrated at link time. DLSS/NGX remains external (use `r_upscale` / `r_taa` / driver scaling).
 
 For direct CMake workflows, the repo also ships `CMakePresets.json`:
 

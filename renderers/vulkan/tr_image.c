@@ -844,6 +844,21 @@ static void upload_vk_image_compressed( image_t *image, byte *data, int width, i
 	vk_upload_compressed_image_data( image, width, height, miplevels, data, size, qfalse );
 }
 
+/*
+================
+R_UploadSubImage
+
+Vulkan path used by Arc Blanc height maps, emulator screen, etc.
+================
+*/
+void R_UploadSubImage( byte *data, int x, int y, int width, int height, image_t *image )
+{
+	if ( !image || !data || width < 1 || height < 1 ) {
+		return;
+	}
+	vk_upload_image_data( image, x, y, width, height, 1, data, width * height * 4, qtrue );
+}
+
 #else // !USE_VULKAN
 
 static GLint RawImage_GetInternalFormat( const byte *scan, int numPixels, qboolean lightMap, qboolean allowCompression )

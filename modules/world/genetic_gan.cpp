@@ -122,7 +122,7 @@ extern "C" {
 
 void GeneticGan_Init( void )
 {
-	cl_geneticGan = Cvar_Get( "cl_geneticGan", "0", CVAR_ARCHIVE );
+	cl_geneticGan = Cvar_Get( "cl_geneticGan", "1", CVAR_ARCHIVE );
 	Cvar_CheckRange( cl_geneticGan, "0", "1", CV_INTEGER );
 	Cvar_SetDescription( cl_geneticGan,
 		"Enable genetic genome + optional GAN mesh decode API for procedural body evolution." );
