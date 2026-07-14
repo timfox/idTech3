@@ -29,7 +29,8 @@ static cvar_t	*cvar_cheats;
 static cvar_t	*cvar_developer;
 int			cvar_modifiedFlags;
 
-#define	MAX_CVARS	2048
+/* Engine + Vulkan feature cvars saturate stock 2048 under modern profiles + OpenArena game load. */
+#define	MAX_CVARS	4096
 static cvar_t	cvar_indexes[MAX_CVARS];
 static int		cvar_numIndexes;
 
@@ -487,7 +488,8 @@ cvar_t *Cvar_Get( const char *var_name, const char *var_value, int flags ) {
 	if(index >= MAX_CVARS)
 	{
 		if(!com_errorEntered)
-			Com_Error(ERR_FATAL, "Error: Too many cvars, cannot create a new one!");
+			Com_Error(ERR_FATAL, "Error: Too many cvars (limit %d), cannot create '%s'!",
+				MAX_CVARS, var_name ? var_name : "(null)");
 
 		return NULL;
 	}
@@ -496,7 +498,15 @@ cvar_t *Cvar_Get( const char *var_name, const char *var_value, int flags ) {
 	
 	if(index >= cvar_numIndexes)
 		cvar_numIndexes = index + 1;
-		
+
+	if ( cvar_numIndexes == ( MAX_CVARS * 3 ) / 4 ) {
+		Com_Printf( S_COLOR_YELLOW "Warning: cvar table at 75%% (%d / %d)\n",
+			cvar_numIndexes, MAX_CVARS );
+	} else if ( cvar_numIndexes == MAX_CVARS - 32 ) {
+		Com_Printf( S_COLOR_YELLOW "Warning: cvar table nearly full (%d / %d)\n",
+			cvar_numIndexes, MAX_CVARS );
+	}
+
 	var->name = CopyString( var_name );
 	var->string = CopyString( var_value );
 	var->modified = qtrue;
@@ -2134,6 +2144,8 @@ void Cvar_Init (void)
 {
 	Com_Memset(cvar_indexes, '\0', sizeof(cvar_indexes));
 	Com_Memset(hashTable, '\0', sizeof(hashTable));
+
+	Com_Printf( "Cvar table: %d slots\n", MAX_CVARS );
 
 	cvar_cheats = Cvar_Get( "sv_cheats", "1", CVAR_ROM | CVAR_SYSTEMINFO );
 	Cvar_SetDescription( cvar_cheats, "Enable cheating commands (server side only)." );
