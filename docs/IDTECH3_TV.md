@@ -60,6 +60,6 @@ The input is not a screen grab. It is the engine's captured frame stream plus th
 
 The streaming worker is intentionally scoped to live engine publishing. Legacy `video-pipe` demo export keeps its existing synchronous behavior.
 
-If the encoder or network is slower than capture, the engine drops queued stream chunks after `cl_stream_queueMegs` instead of letting memory grow without bound. `stream_status` reports queued data, peak queue, dropped chunks, dropped bytes, and pipe failure state.
+If the encoder or network is slower than capture, the engine drops whole queued video/audio chunks after `cl_stream_queueMegs` instead of letting memory grow without bound. Drops are record-aligned so the pipe does not emit partial AVI chunks. `stream_status` reports queued data, peak queue, dropped chunks, dropped bytes, and pipe failure state.
 
 The `external` backend is still useful on platforms where the renderer capture path is unavailable or when a player wants to stream overlays outside the engine window.

@@ -168,7 +168,7 @@ static void AVI_PipeThread_FreeQueue( void )
 	aviPipeThread.queuedBytes = 0;
 }
 
-static qboolean AVI_PipeThread_Enqueue( const void *buf, int len )
+static qboolean AVI_PipeThread_Enqueue( const void *buf, int len, qboolean allowDrop )
 {
 	aviPipeChunk_t *chunk;
 
@@ -193,7 +193,7 @@ static qboolean AVI_PipeThread_Enqueue( const void *buf, int len )
 		free( chunk );
 		return qfalse;
 	}
-	if ( aviPipeThread.maxQueuedBytes > 0 &&
+	if ( allowDrop && aviPipeThread.maxQueuedBytes > 0 &&
 			aviPipeThread.queuedBytes + len > aviPipeThread.maxQueuedBytes ) {
 		aviPipeThread.droppedChunks++;
 		aviPipeThread.droppedBytes += len;
@@ -208,6 +208,67 @@ static qboolean AVI_PipeThread_Enqueue( const void *buf, int len )
 	}
 	aviPipeThread.tail = chunk;
 	aviPipeThread.queuedBytes += len;
+	if ( aviPipeThread.queuedBytes > aviPipeThread.peakQueuedBytes ) {
+		aviPipeThread.peakQueuedBytes = aviPipeThread.queuedBytes;
+	}
+	AVI_PipeThread_Wake();
+	AVI_PipeThread_Unlock();
+	return qtrue;
+}
+
+static qboolean AVI_PipeThread_EnqueueMediaChunk( const char *chunkId, const byte *payload,
+		int payloadSize, const byte *padding, int paddingSize )
+{
+	aviPipeChunk_t *chunk;
+	const int totalSize = 8 + payloadSize + paddingSize;
+
+	if ( !chunkId || !payload || payloadSize < 0 || paddingSize < 0 ) {
+		return qfalse;
+	}
+	if ( !aviPipeThread.active || totalSize <= 8 ) {
+		return qfalse;
+	}
+
+	chunk = (aviPipeChunk_t *)malloc( sizeof( *chunk ) + (size_t)totalSize - 1u );
+	if ( !chunk ) {
+		return qfalse;
+	}
+	chunk->next = NULL;
+	chunk->len = totalSize;
+	chunk->data[0] = (byte)chunkId[0];
+	chunk->data[1] = (byte)chunkId[1];
+	chunk->data[2] = (byte)chunkId[2];
+	chunk->data[3] = (byte)chunkId[3];
+	chunk->data[4] = (byte)( ( payloadSize >>  0 ) & 0xFF );
+	chunk->data[5] = (byte)( ( payloadSize >>  8 ) & 0xFF );
+	chunk->data[6] = (byte)( ( payloadSize >> 16 ) & 0xFF );
+	chunk->data[7] = (byte)( ( payloadSize >> 24 ) & 0xFF );
+	Com_Memcpy( chunk->data + 8, payload, payloadSize );
+	if ( paddingSize > 0 ) {
+		Com_Memcpy( chunk->data + 8 + payloadSize, padding, paddingSize );
+	}
+
+	AVI_PipeThread_Lock();
+	if ( aviPipeThread.stopping || aviPipeThread.failed ) {
+		AVI_PipeThread_Unlock();
+		free( chunk );
+		return qfalse;
+	}
+	if ( aviPipeThread.maxQueuedBytes > 0 &&
+			aviPipeThread.queuedBytes + totalSize > aviPipeThread.maxQueuedBytes ) {
+		aviPipeThread.droppedChunks++;
+		aviPipeThread.droppedBytes += totalSize;
+		AVI_PipeThread_Unlock();
+		free( chunk );
+		return qfalse;
+	}
+	if ( aviPipeThread.tail ) {
+		aviPipeThread.tail->next = chunk;
+	} else {
+		aviPipeThread.head = chunk;
+	}
+	aviPipeThread.tail = chunk;
+	aviPipeThread.queuedBytes += totalSize;
 	if ( aviPipeThread.queuedBytes > aviPipeThread.peakQueuedBytes ) {
 		aviPipeThread.peakQueuedBytes = aviPipeThread.queuedBytes;
 	}
@@ -330,7 +391,7 @@ SafeFS_Write
 static ID_INLINE void SafeFS_Write( const void *buf, int len, fileHandle_t f )
 {
 	if ( afd.threadedPipe ) {
-		if ( !AVI_PipeThread_Enqueue( buf, len ) ) {
+		if ( !AVI_PipeThread_Enqueue( buf, len, qfalse ) ) {
 			Com_DPrintf( S_COLOR_YELLOW "WARNING: failed to queue avi pipe data\n" );
 		}
 		return;
@@ -849,6 +910,17 @@ void CL_WriteAVIVideoFrame( const byte *imageBuffer, int size )
 	// Chunk header + contents + padding
 	CL_CheckFileSize( chunkSize + paddingSize );
 
+	if ( afd.threadedPipe ) {
+		if ( !AVI_PipeThread_EnqueueMediaChunk( "00dc", imageBuffer, size, padding, paddingSize ) ) {
+			return;
+		}
+		afd.numVideoFrames++;
+		if ( size > afd.maxRecordSize ) {
+			afd.maxRecordSize = size;
+		}
+		return;
+	}
+
 	chunkOffset = afd.fileSize - afd.moviOffset - 8;
 
 	bufIndex = 0;
@@ -901,6 +973,15 @@ static void CL_FlushCaptureBuffer( void )
 
 	if ( !bytesInBuffer )
 		return;
+
+	if ( afd.threadedPipe ) {
+		if ( AVI_PipeThread_EnqueueMediaChunk( "01wb", pcmCaptureBuffer, bytesInBuffer,
+				padding, paddingSize ) ) {
+			afd.numAudioFrames++;
+		}
+		bytesInBuffer = 0;
+		return;
+	}
 
 	bufIndex = 0;
 	WRITE_STRING( "01wb" );

@@ -43,6 +43,7 @@ check "$SRC" 'rtmp://127.0.0.1:1935/live' 'status guidance mentions Owncast-comp
 check "runtime/client/media/cl_avi.c" 'CL_OpenAVIForPipeCommand' 'AVI pipe can be opened with a streaming command'
 check "runtime/client/media/cl_avi.c" 'AVI_PipeThread_Start' 'live AVI pipe starts a streaming worker thread'
 check "runtime/client/media/cl_avi.c" 'AVI_PipeThread_Enqueue' 'live AVI pipe queues chunks for background writing'
+check "runtime/client/media/cl_avi.c" 'AVI_PipeThread_EnqueueMediaChunk' 'live AVI pipe queues video/audio records atomically'
 check "runtime/client/media/cl_avi.c" 'maxQueuedBytes' 'live AVI pipe has bounded queue backpressure'
 check "runtime/client/media/cl_avi.c" 'droppedChunks' 'live AVI pipe tracks dropped chunks'
 check "runtime/client/media/cl_avi.c" 'CL_GetAVIPipeStats' 'live AVI pipe exposes queue diagnostics'
@@ -63,5 +64,6 @@ check "$DOC" 'mixed game audio' 'docs describe engine-owned audio capture'
 check "$DOC" 'streaming worker thread' 'docs describe threaded streaming pipe I/O'
 check "$DOC" 'cl_stream_queueMegs' 'docs describe queue memory budget'
 check "$DOC" 'dropped chunks' 'docs describe dropped stream chunk diagnostics'
+check "$DOC" 'partial AVI chunks' 'docs describe record-aligned backpressure'
 
 echo "idTech3-tv streaming integration checks passed."
