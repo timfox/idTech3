@@ -12,6 +12,8 @@ sudo apt-get install cmake ninja-build pkg-config \
   libstdc++-14-dev
 ```
 
+`libsdl3-dev` is available on newer Ubuntu (e.g. 25.10+). On Ubuntu 24.04 CI images it is missing; leave it out and CMake will build SDL 3 via `USE_BUNDLED_SDL3` (FetchContent) when no system SDL3 is found.
+
 **HTTP downloads (libcurl):** the client uses libcurl for HTTPS/FTP map and pak mirrors when enabled at build time. See **[CURL_NETWORKING.md](CURL_NETWORKING.md)** for `cl_dlURL`, `sv_dlURL`, `download` / `dlmap`, and security notes.
 
 ### Compiler Requirements

@@ -321,6 +321,7 @@
     <ClCompile Include="..\..\client\shell\cl_emulator.c" />
     <ClCompile Include="..\..\client\shell\cl_osp.c" />
     <ClCompile Include="..\..\client\platform\cl_voip.c" />
+    <ClCompile Include="..\..\client\platform\cl_streaming.c" />
     <ClCompile Include="..\..\client\platform\cl_websocket.c" />
     <ClCompile Include="..\..\client\platform\cl_steam.c" />
     <ClCompile Include="..\..\client\shell\cl_superhud.c" />

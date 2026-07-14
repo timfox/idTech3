@@ -70,7 +70,7 @@ jobs:
         shell: msys2 {0}
         run: |
           set -e
-          pkgs="${{ matrix.prefix }}-SDL3 ${{ matrix.prefix }}-openal ${{ matrix.prefix }}-freetype ${{ matrix.prefix }}-lua ${{ matrix.prefix }}-openssl ${{ matrix.prefix }}-curl ${{ matrix.prefix }}-bullet ${{ matrix.prefix }}-glslang"
+          pkgs="${{ matrix.prefix }}-sdl3 ${{ matrix.prefix }}-openal ${{ matrix.prefix }}-freetype ${{ matrix.prefix }}-lua ${{ matrix.prefix }}-openssl ${{ matrix.prefix }}-curl ${{ matrix.prefix }}-bullet ${{ matrix.prefix }}-glslang"
           for attempt in 1 2 3 4 5; do
             # Refresh db + avoid spurious timeouts on congested mirrors (curl stack under pacman).
             pacman -Sy --noconfirm || true
@@ -439,7 +439,7 @@ jobs:
           sudo rm -f /etc/apt/sources.list.d/microsoft-prod.list
           sudo apt-get -o Acquire::Retries=5 -qq update
           sudo apt-get -o Acquire::Retries=5 -y install cmake ninja-build g++ libstdc++-14-dev clang ccache
-          sudo apt-get -o Acquire::Retries=5 -y install libcurl4-openssl-dev libssl-dev mesa-common-dev libxxf86dga-dev libxrandr-dev libxxf86vm-dev libasound-dev libsdl3-dev libopenal-dev libfreetype6-dev lua5.4 liblua5.4-dev libbullet-dev pkg-config glslang-tools python3 ripgrep
+          sudo apt-get -o Acquire::Retries=5 -y install libcurl4-openssl-dev libssl-dev mesa-common-dev libxxf86dga-dev libxrandr-dev libxxf86vm-dev libasound-dev libopenal-dev libfreetype6-dev lua5.4 liblua5.4-dev libbullet-dev pkg-config glslang-tools python3 ripgrep
 
       - uses: actions/checkout@v4
 
@@ -529,7 +529,7 @@ jobs:
       - name: Install tools
         run: |
           sudo apt-get -o Acquire::Retries=5 -qq update
-          sudo apt-get -o Acquire::Retries=5 -y install cmake ninja-build g++ libstdc++-14-dev libcurl4-openssl-dev libssl-dev mesa-common-dev libxxf86dga-dev libxrandr-dev libxxf86vm-dev libasound-dev libsdl3-dev libopenal-dev libfreetype6-dev lua5.4 liblua5.4-dev libbullet-dev pkg-config glslang-tools python3 ripgrep
+          sudo apt-get -o Acquire::Retries=5 -y install cmake ninja-build g++ libstdc++-14-dev libcurl4-openssl-dev libssl-dev mesa-common-dev libxxf86dga-dev libxrandr-dev libxxf86vm-dev libasound-dev libopenal-dev libfreetype6-dev lua5.4 liblua5.4-dev libbullet-dev pkg-config glslang-tools python3 ripgrep
       - uses: actions/checkout@v4
       - name: Init required submodules
         run: ./scripts/init_optional_submodules.sh --freeusd
@@ -560,7 +560,7 @@ jobs:
       - name: Install tools
         run: |
           sudo apt-get -o Acquire::Retries=5 -qq update
-          sudo apt-get -o Acquire::Retries=5 -y install cmake ninja-build g++ libstdc++-14-dev libcurl4-openssl-dev libssl-dev mesa-common-dev libxxf86dga-dev libxrandr-dev libxxf86vm-dev libasound-dev libsdl3-dev libopenal-dev libfreetype6-dev lua5.4 liblua5.4-dev libbullet-dev pkg-config glslang-tools python3 ripgrep
+          sudo apt-get -o Acquire::Retries=5 -y install cmake ninja-build g++ libstdc++-14-dev libcurl4-openssl-dev libssl-dev mesa-common-dev libxxf86dga-dev libxrandr-dev libxxf86vm-dev libasound-dev libopenal-dev libfreetype6-dev lua5.4 liblua5.4-dev libbullet-dev pkg-config glslang-tools python3 ripgrep
       - uses: actions/checkout@v4
       - name: Init required submodules
         run: ./scripts/init_optional_submodules.sh --freeusd
@@ -579,7 +579,7 @@ jobs:
       - name: Install tools
         run: |
           sudo apt-get -o Acquire::Retries=5 -qq update
-          sudo apt-get -o Acquire::Retries=5 -y install cmake ninja-build g++ libstdc++-14-dev libcurl4-openssl-dev libssl-dev mesa-common-dev libxxf86dga-dev libxrandr-dev libxxf86vm-dev libasound-dev libsdl3-dev libopenal-dev libfreetype6-dev lua5.4 liblua5.4-dev libbullet-dev pkg-config glslang-tools python3 ripgrep
+          sudo apt-get -o Acquire::Retries=5 -y install cmake ninja-build g++ libstdc++-14-dev libcurl4-openssl-dev libssl-dev mesa-common-dev libxxf86dga-dev libxrandr-dev libxxf86vm-dev libasound-dev libopenal-dev libfreetype6-dev lua5.4 liblua5.4-dev libbullet-dev pkg-config glslang-tools python3 ripgrep
       - uses: actions/checkout@v4
       - name: Init required submodules
         run: ./scripts/init_optional_submodules.sh --freeusd
@@ -596,7 +596,7 @@ jobs:
       - name: Install tools
         run: |
           sudo apt-get -o Acquire::Retries=5 -qq update
-          sudo apt-get -o Acquire::Retries=5 -y install cmake ninja-build g++ libstdc++-14-dev libcurl4-openssl-dev libssl-dev mesa-common-dev libxxf86dga-dev libxrandr-dev libxxf86vm-dev libasound-dev libsdl3-dev libopenal-dev libfreetype6-dev lua5.4 liblua5.4-dev libbullet-dev pkg-config glslang-tools python3 ripgrep
+          sudo apt-get -o Acquire::Retries=5 -y install cmake ninja-build g++ libstdc++-14-dev libcurl4-openssl-dev libssl-dev mesa-common-dev libxxf86dga-dev libxrandr-dev libxxf86vm-dev libasound-dev libopenal-dev libfreetype6-dev lua5.4 liblua5.4-dev libbullet-dev pkg-config glslang-tools python3 ripgrep
 
       - uses: actions/checkout@v4
       - name: Init required submodules
@@ -637,7 +637,7 @@ jobs:
       - name: Install tools
         run: |
           sudo apt-get -o Acquire::Retries=5 -qq update
-          sudo apt-get -o Acquire::Retries=5 -y install cmake ninja-build g++ libstdc++-14-dev libcurl4-openssl-dev libssl-dev mesa-common-dev libxxf86dga-dev libxrandr-dev libxxf86vm-dev libasound-dev libsdl3-dev libopenal-dev libfreetype6-dev lua5.4 liblua5.4-dev libbullet-dev pkg-config glslang-tools python3 ripgrep
+          sudo apt-get -o Acquire::Retries=5 -y install cmake ninja-build g++ libstdc++-14-dev libcurl4-openssl-dev libssl-dev mesa-common-dev libxxf86dga-dev libxrandr-dev libxxf86vm-dev libasound-dev libopenal-dev libfreetype6-dev lua5.4 liblua5.4-dev libbullet-dev pkg-config glslang-tools python3 ripgrep
 
       - uses: actions/checkout@v4
       - name: Init required submodules
@@ -681,7 +681,7 @@ jobs:
         run: |
           sudo apt-get -o Acquire::Retries=5 -qq update
           sudo apt-get -o Acquire::Retries=5 -y install cmake ninja-build g++ libstdc++-14-dev clang-tidy cppcheck ccache
-          sudo apt-get -o Acquire::Retries=5 -y install libcurl4-openssl-dev libssl-dev mesa-common-dev libxxf86dga-dev libxrandr-dev libxxf86vm-dev libasound-dev libsdl3-dev libopenal-dev libfreetype6-dev lua5.4 liblua5.4-dev libbullet-dev pkg-config glslang-tools python3 ripgrep
+          sudo apt-get -o Acquire::Retries=5 -y install libcurl4-openssl-dev libssl-dev mesa-common-dev libxxf86dga-dev libxrandr-dev libxxf86vm-dev libasound-dev libopenal-dev libfreetype6-dev lua5.4 liblua5.4-dev libbullet-dev pkg-config glslang-tools python3 ripgrep
 
       - uses: actions/checkout@v4
       - name: Init required submodules
@@ -769,7 +769,7 @@ jobs:
 
             apt-get -o Acquire::Retries=5 -qq update
             apt-get -o Acquire::Retries=5 install -y make gcc g++ cmake ninja-build libstdc++-14-dev git
-            apt-get -o Acquire::Retries=5 -y install libcurl4-openssl-dev libssl-dev mesa-common-dev libxxf86dga-dev libxrandr-dev libxxf86vm-dev libasound-dev libsdl3-dev libopenal-dev libfreetype6-dev lua5.4 liblua5.4-dev libbullet-dev pkg-config glslang-tools ripgrep
+            apt-get -o Acquire::Retries=5 -y install libcurl4-openssl-dev libssl-dev mesa-common-dev libxxf86dga-dev libxrandr-dev libxxf86vm-dev libasound-dev libopenal-dev libfreetype6-dev lua5.4 liblua5.4-dev libbullet-dev pkg-config glslang-tools ripgrep
 
             ./scripts/layout_forwarding_symlinks.sh
 
@@ -833,7 +833,7 @@ jobs:
         run: |
           set -e
           for attempt in 1 2 3 4; do
-            if brew install coreutils sdl2 openal-soft cmake ninja freetype lua molten-vk bullet pkgconf glslang; then
+            if brew install coreutils sdl3 openal-soft cmake ninja freetype lua molten-vk bullet pkgconf glslang; then
               exit 0
             fi
             echo "brew install attempt $attempt failed, retrying in $((attempt * 20))s..."
