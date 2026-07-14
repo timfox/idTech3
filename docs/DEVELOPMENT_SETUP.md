@@ -7,7 +7,7 @@
 ```bash
 sudo apt-get install cmake ninja-build pkg-config \
   libcurl4-openssl-dev mesa-common-dev libxxf86dga-dev libxrandr-dev \
-  libxxf86vm-dev libasound-dev libsdl2-dev libopenal-dev \
+  libxxf86vm-dev libasound-dev libsdl3-dev libopenal-dev \
   libfreetype6-dev lua5.4 liblua5.4-dev glslang-tools \
   libstdc++-14-dev
 ```
@@ -90,10 +90,10 @@ brew install coreutils sdl2 openal-soft cmake ninja freetype lua
 
 ### Windows (MSYS2)
 ```bash
-pacman -S base-devel mingw-w64-x86_64-{gcc,cmake,ninja,pkgconf,SDL2,openal,freetype,lua}
+pacman -S base-devel mingw-w64-x86_64-{gcc,cmake,ninja,pkgconf,SDL3,openal,freetype,lua}
 ```
 
-MinGW links SDL2/OpenAL/etc. dynamically. If you copy `idtech3.exe` outside MSYS2 (or ship a zip), run `./scripts/stage_mingw_runtime_dlls.sh bin` from a **MINGW64** shell after copying binaries into `bin/` so required `.dll` files sit next to the executables. For **OpenAL** without relying on MSYS2’s `openal.dll` layout, match CI: **`pwsh ./scripts/stage_openal_windows_dlls.ps1 -BinDir bin -Arch x64`** (downloads OpenAL Soft’s official `OpenAL32.dll` + `soft_oal.dll` into `bin/`).
+MinGW links SDL3/OpenAL/etc. dynamically. If you copy `idtech3.exe` outside MSYS2 (or ship a zip), run `./scripts/stage_mingw_runtime_dlls.sh bin` from a **MINGW64** shell after copying binaries into `bin/` so required `.dll` files sit next to the executables. For **OpenAL** without relying on MSYS2’s `openal.dll` layout, match CI: **`pwsh ./scripts/stage_openal_windows_dlls.ps1 -BinDir bin -Arch x64`** (downloads OpenAL Soft’s official `OpenAL32.dll` + `soft_oal.dll` into `bin/`).
 
 **Native DLL / `.so` load failures:** run with `+set com_nativeLibraryDebug 1` on the command line (before configs that matter). On filesystem startup the engine prints one cyan line confirming that mode. Every failed `FS_LoadLibrary` path then logs the **full path** and the OS loader message. On Windows, `Sys_GetLoadLibraryError` uses a **sticky** copy of `LoadLibrary` / `GetProcAddress` failures so the message is not wiped by unrelated API calls before you see it (including missing **`GetRefAPI`** on a renderer DLL). Game modules are searched under `modules/` and `vm/` for both packed names (`uix86_64.dll`) and dotted names (`ui.x86_64.dll`; same idea for `cgame` / `qagame`). For native filename probe order, logical-name aliases (`qagame` -> `game` / `server`, etc.), and `fs_restrict` behavior, see [ARCHITECTURE.md - Native game modules](ARCHITECTURE.md#native-game-modules-vm).
 
@@ -155,11 +155,11 @@ Use the helper script when you want staged artifacts in `release/` and the same 
 # Install cross-compiler
 sudo apt-get install gcc-aarch64-linux-gnu g++-aarch64-linux-gnu
 
-# Cross-compile for aarch64 (experimental; may fail without ARM sysroot for SDL2/OpenAL)
+# Cross-compile for aarch64 (experimental; may fail without ARM sysroot for SDL3/OpenAL)
 ./scripts/compile_engine.sh vulkan aarch64
 ```
 
-Outputs go to `release/` with `.aarch64` suffix (e.g. `idtech3.aarch64`, `idtech3_server.aarch64`). Cross-compilation disables FFmpeg/AV1/VPX/Theora and may fail if SDL2/OpenAL cannot be found for the target.
+Outputs go to `release/` with `.aarch64` suffix (e.g. `idtech3.aarch64`, `idtech3_server.aarch64`). Cross-compilation disables FFmpeg/AV1/VPX/Theora and may fail if SDL3/OpenAL cannot be found for the target.
 
 **Build both x86_64 and aarch64** (native + cross, if cross-compiler installed):
 ```bash

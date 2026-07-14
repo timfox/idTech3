@@ -89,7 +89,7 @@ src/
 ├── platform/
 │   ├── unix/            Linux/macOS
 │   ├── win32/           Windows
-│   └── sdl/             SDL2 (windowing, input, gamma)
+│   └── sdl/             SDL3 (windowing, input, gamma)
 ├── qcommon/             Shared engine (VM, filesystem, network)
 │   ├── vm.c / vm_local.h         VM create, native load, QVM path
 │   ├── vm_native_module.c/h      Native `.so`/`.dll` filename candidates

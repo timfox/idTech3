@@ -28,6 +28,15 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #endif
 #include "win_local.h"
 #include "resource.h"
+
+#if defined( USE_SDL ) && USE_SDL
+#ifdef SDL_MAIN_HANDLED
+#undef SDL_MAIN_HANDLED
+#endif
+#define SDL_MAIN_HANDLED
+#include <SDL3/SDL_main.h>
+#endif
+
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <errno.h>

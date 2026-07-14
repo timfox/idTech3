@@ -295,7 +295,7 @@ if [ "$CROSS_AARCH64" -eq 1 ]; then
   if ! command -v aarch64-linux-gnu-gcc &>/dev/null; then
     echo "Error: aarch64 cross-compiler not found. Install with:" >&2
     echo "  sudo apt-get install gcc-aarch64-linux-gnu g++-aarch64-linux-gnu" >&2
-    echo "  (Cross-compilation may still fail without ARM sysroot for SDL2/OpenAL.)" >&2
+    echo "  (Cross-compilation may still fail without ARM sysroot for SDL3/OpenAL.)" >&2
     exit 1
   fi
   TOOLCHAIN_FILE="$PROJECT_ROOT/cmake/toolchains/linux-aarch64.cmake"
@@ -582,6 +582,14 @@ copy_to_release() {
     base="$(basename "$sofile")"
     cp -f "$sofile" "$dest/$base"
     echo "Copied renderer -> $dest/$base"
+  done
+  shopt -u nullglob
+
+  # Bundled FetchContent SDL3 (libSDL3.so*) next to binaries for release/ runs
+  shopt -s nullglob
+  for sdlso in "$BUILD_DIR"/_deps/idtech3_sdl3-build/libSDL3.so*; do
+    cp -a "$sdlso" "$dest/"
+    echo "Copied SDL3 -> $dest/$(basename "$sdlso")"
   done
   shopt -u nullglob
 

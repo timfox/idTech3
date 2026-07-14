@@ -137,7 +137,7 @@ Primary development target:
 ```bash
 sudo apt-get install cmake ninja-build pkg-config \
   libcurl4-openssl-dev mesa-common-dev libxxf86dga-dev libxrandr-dev \
-  libxxf86vm-dev libasound-dev libsdl2-dev libopenal-dev \
+  libxxf86vm-dev libasound-dev libsdl3-dev libopenal-dev \
   libfreetype6-dev lua5.4 liblua5.4-dev glslang-tools \
   libstdc++-14-dev
 ```
@@ -159,7 +159,7 @@ pacman -S --needed \
   mingw-w64-x86_64-cmake \
   mingw-w64-x86_64-ninja \
   mingw-w64-x86_64-pkgconf \
-  mingw-w64-x86_64-SDL2 \
+  mingw-w64-x86_64-SDL3 \
   mingw-w64-x86_64-openal \
   mingw-w64-x86_64-freetype \
   mingw-w64-x86_64-lua \

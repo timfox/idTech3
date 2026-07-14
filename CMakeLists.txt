@@ -155,100 +155,15 @@ if(ENABLE_LTO)
   endif()
 endif()
 
-# --- Begin FindSDL2.cmake
-# -------------------------------------------------------------
-# Adapted FindSDL2.cmake module for CMake
-#
-# (Full CMake FindSDL2.cmake functionality inlined here for build portability)
-# This logic will try to locate an SDL2 installation, define imported targets,
-# and provide variables similar to the canonical FindSDL2.cmake
-#
-# Minimal compatibility implementation follows:
-# -------------------------------------------------------------
-#
-# Variables defined:
-#   SDL2_FOUND
-#   SDL2_INCLUDE_DIR
-#   SDL2_INCLUDE_DIRS
-#   SDL2_LIBRARY
-#   SDL2_LIBRARIES
-# Targets defined (if found):
-#   SDL2::Core
-#   SDL2::SDL2
-#   SDL2::Main
-#
-# Usage (as in this CMakeLists.txt):
-#   find_package(SDL2 REQUIRED)
-#   target_link_libraries(foo SDL2::Main)
-#
-# Only for local inline usage -- not a full drop-in for all SDL2 find modules.
-#
-# -------------------------------------------------------------
-set(_SDL2_HINT_PATHS
-  $ENV{SDL2_DIR}
-  $ENV{SDL2_PATH}
-  ${CMAKE_PREFIX_PATH}
-  ${CMAKE_INSTALL_PREFIX}
-  /usr/local
-  /usr
-  /opt/local
-  /opt
-  /sw
-)
-
-find_path(SDL2_INCLUDE_DIR
-  NAMES SDL.h SDL2/SDL.h
-  PATH_SUFFIXES SDL2 include
-  PATHS ${_SDL2_HINT_PATHS}
-)
-
-# Try SDL2::SDL2 (split main and core lib), or fallback to sdl2 for older systems
-set(_SDL2_LIB_NAMES SDL2 SDL2-2.0 SDL2d)
-find_library(SDL2_LIBRARY
-  NAMES ${_SDL2_LIB_NAMES}
-  PATH_SUFFIXES lib64 lib
-  PATHS ${_SDL2_HINT_PATHS}
-)
-
-# Common main helper (may not be present)
-find_library(SDL2_MAIN_LIBRARY
-  NAMES SDL2main
-  PATH_SUFFIXES lib64 lib
-  PATHS ${_SDL2_HINT_PATHS}
-)
-
-if(SDL2_INCLUDE_DIR AND SDL2_LIBRARY)
-  set(SDL2_FOUND TRUE)
-  set(SDL2_INCLUDE_DIRS ${SDL2_INCLUDE_DIR})
-  if(SDL2_MAIN_LIBRARY)
-    set(SDL2_LIBRARIES ${SDL2_LIBRARY} ${SDL2_MAIN_LIBRARY})
-  else()
-    set(SDL2_LIBRARIES ${SDL2_LIBRARY})
-  endif()
-
-  if(NOT TARGET SDL2::Core)
-    add_library(SDL2::Core UNKNOWN IMPORTED)
-    set_target_properties(SDL2::Core PROPERTIES
-      IMPORTED_LOCATION "${SDL2_LIBRARY}"
-      INTERFACE_INCLUDE_DIRECTORIES "${SDL2_INCLUDE_DIR}")
-  endif()
-  if(NOT TARGET SDL2::SDL2)
-    add_library(SDL2::SDL2 ALIAS SDL2::Core)
-  endif()
-  if(SDL2_MAIN_LIBRARY AND NOT TARGET SDL2::Main)
-    add_library(SDL2::Main UNKNOWN IMPORTED)
-    set_target_properties(SDL2::Main PROPERTIES
-      IMPORTED_LOCATION "${SDL2_MAIN_LIBRARY}"
-      INTERFACE_LINK_LIBRARIES SDL2::Core
-    )
-  elseif(NOT TARGET SDL2::Main)
-    add_library(SDL2::Main INTERFACE IMPORTED)
-    set_property(TARGET SDL2::Main PROPERTY INTERFACE_LINK_LIBRARIES SDL2::Core)
-  endif()
-else()
-  set(SDL2_FOUND FALSE)
+# --- Begin FindSDL3
+# Prefer official CMake package config (SDL3::SDL3). FetchContent fallback runs after USE_SDL option.
+set(SDL3_FOUND FALSE)
+find_package(SDL3 QUIET CONFIG COMPONENTS SDL3)
+if(TARGET SDL3::SDL3)
+  set(SDL3_FOUND TRUE)
+  message(STATUS "SDL3: found system/config package")
 endif()
-# --- End FindSDL2.cmake
+# --- End FindSDL3
 
 # --- Begin FindOpenAL.cmake
 find_path(OPENAL_INCLUDE_DIR
@@ -981,9 +896,8 @@ endif()
 add_compile_definitions(RENDERER_PREFIX="${RENDERER_PREFIX}" RENDERER_DEFAULT="${RENDERER_DEFAULT}")
 
 OPTION(USE_SDL "" ON)
-# When no system SDL2 is detected, download and build SDL2 from the official release tarball
-# (headers under third_party/src/sdl are not sufficient to link the client).
-option(USE_BUNDLED_SDL2 "Build SDL2 from source if system SDL2 is not found (requires network on first configure)" ON)
+# When no system SDL3 is detected, download and build SDL3 from the official release tarball.
+option(USE_BUNDLED_SDL3 "Build SDL3 from source if system SDL3 is not found (requires network on first configure)" ON)
 OPTION(USE_OPENAL "Enable OpenAL audio backend" ON)
 OPTION(USE_CURL "" ON)
 OPTION(USE_LIBTORRENT "Enable optional peer-assisted package delivery through libtorrent-rasterbar" OFF)
@@ -1093,48 +1007,34 @@ else()
   add_compile_definitions(USE_SDL=0)
 endif()
 
-# Set when FetchContent-built SDL2 is used (avoid mixing vendored snapshot headers with built lib).
-set(IDTECH3_USING_FETCHED_SDL2 OFF)
-if(USE_SDL AND NOT SDL2_FOUND AND USE_BUNDLED_SDL2 AND NOT ANDROID AND NOT MSVC)
-  set(_IDTECH3_SDL2_VER "2.30.11")
-  set(_IDTECH3_SDL2_SHA256 "8b8d4aef2038533da814965220f88f77d60dfa0f32685f80ead65e501337da7f")
+# Set when FetchContent-built SDL3 is used.
+set(IDTECH3_USING_FETCHED_SDL3 OFF)
+if(USE_SDL AND NOT SDL3_FOUND AND USE_BUNDLED_SDL3 AND NOT ANDROID AND NOT MSVC)
+  set(_IDTECH3_SDL3_VER "3.2.22")
+  set(_IDTECH3_SDL3_SHA256 "f29d00cbcee273c0a54f3f32f86bf5c595e8823a96b1d92a145aac40571ebfcc")
   include(FetchContent)
   FetchContent_Declare(
-    idtech3_sdl2
-    URL "https://github.com/libsdl-org/SDL/releases/download/release-${_IDTECH3_SDL2_VER}/SDL2-${_IDTECH3_SDL2_VER}.tar.gz"
-    URL_HASH SHA256=${_IDTECH3_SDL2_SHA256}
+    idtech3_sdl3
+    URL "https://github.com/libsdl-org/SDL/releases/download/release-${_IDTECH3_SDL3_VER}/SDL3-${_IDTECH3_SDL3_VER}.tar.gz"
+    URL_HASH SHA256=${_IDTECH3_SDL3_SHA256}
     DOWNLOAD_EXTRACT_TIMESTAMP TRUE)
-  set(SDL2_DISABLE_INSTALL ON CACHE BOOL "" FORCE)
+  set(SDL_DISABLE_INSTALL ON CACHE BOOL "" FORCE)
   set(SDL_TESTS OFF CACHE BOOL "" FORCE)
-  set(SDL_TEST OFF CACHE BOOL "" FORCE)
-  set(SDL_SHARED OFF CACHE BOOL "" FORCE)
-  set(SDL_STATIC ON CACHE BOOL "" FORCE)
-  set(SDL_STATIC_PIC ON CACHE BOOL "" FORCE)
-  message(STATUS "SDL2: system library not found; building SDL ${_IDTECH3_SDL2_VER} via FetchContent (one-time download)")
-  FetchContent_MakeAvailable(idtech3_sdl2)
-  if(NOT TARGET SDL2::SDL2)
-    message(FATAL_ERROR "SDL2 FetchContent: expected target SDL2::SDL2 after building bundled SDL2.")
+  set(SDL_TEST_LIBRARY OFF CACHE BOOL "" FORCE)
+  # Prefer shared SDL3: avoids MatrixMultiply clash with engine q_math.c and
+  # allows PIC-safe linking into idtech3_vulkan.so (renderer dlopen).
+  set(SDL_SHARED ON CACHE BOOL "" FORCE)
+  set(SDL_STATIC OFF CACHE BOOL "" FORCE)
+  set(SDL_GPU OFF CACHE BOOL "" FORCE)
+  message(STATUS "SDL3: system library not found; building SDL ${_IDTECH3_SDL3_VER} via FetchContent (one-time download)")
+  FetchContent_MakeAvailable(idtech3_sdl3)
+  if(NOT TARGET SDL3::SDL3)
+    message(FATAL_ERROR "SDL3 FetchContent: expected target SDL3::SDL3 after building bundled SDL3.")
   endif()
-  if(NOT TARGET SDL2::Core)
-    add_library(SDL2::Core INTERFACE IMPORTED)
-    set_property(TARGET SDL2::Core PROPERTY INTERFACE_LINK_LIBRARIES SDL2::SDL2)
-  endif()
-  if(NOT TARGET SDL2::Main)
-    add_library(SDL2::Main INTERFACE IMPORTED)
-    if(TARGET SDL2::SDL2main)
-      set_property(TARGET SDL2::Main PROPERTY INTERFACE_LINK_LIBRARIES SDL2::SDL2main SDL2::SDL2)
-    else()
-      set_property(TARGET SDL2::Main PROPERTY INTERFACE_LINK_LIBRARIES SDL2::SDL2)
-    endif()
-  endif()
-  FetchContent_GetProperties(idtech3_sdl2 SOURCE_DIR _idtech3_sdl2_src)
-  if(_idtech3_sdl2_src)
-    set(SDL2_INCLUDE_DIR "${_idtech3_sdl2_src}/include")
-    set(SDL2_INCLUDE_DIRS "${SDL2_INCLUDE_DIR}")
-  endif()
-  set(SDL2_FOUND TRUE)
-  set(IDTECH3_USING_FETCHED_SDL2 ON)
-  message(STATUS "SDL2: bundled build enabled (includes + libs from ${_idtech3_sdl2_src})")
+  set(SDL3_FOUND TRUE)
+  set(IDTECH3_USING_FETCHED_SDL3 ON)
+  FetchContent_GetProperties(idtech3_sdl3 SOURCE_DIR _idtech3_sdl3_src)
+  message(STATUS "SDL3: bundled build enabled (from ${_idtech3_sdl3_src})")
 endif()
 
 OPTION(SKIP_IDPAK_CHECK "Skip checking for original Quake III pak files (pak0.pk3)" ON)
@@ -1199,7 +1099,8 @@ endif()
 set(EXTERNAL_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/third_party")
 set(EXTERNAL_SRC "${EXTERNAL_ROOT}/src")
 set(EXTERNAL_INCLUDE "${EXTERNAL_ROOT}/include")
-set(EXTERNAL_SDL_INCLUDE_DIR "${EXTERNAL_SRC}/sdl/include/SDL2")
+# Legacy vendored SDL2 headers are not used with SDL3 (system or FetchContent).
+set(EXTERNAL_SDL_INCLUDE_DIR "")
 set(EXTERNAL_CURL_WINDOWS_INCLUDE_DIR "${EXTERNAL_SRC}/curl/windows/include")
 set(EXTERNAL_JPEG_SRC_DIR "${EXTERNAL_SRC}/jpeg")
 set(EXTERNAL_ZLIB_SRC "${EXTERNAL_SRC}/zlib")
@@ -2361,16 +2262,16 @@ if(USE_IMGUI AND NOT APPLE)
     target_sources(${RENDERER_PREFIX}_vulkan${RENDEXT} PRIVATE ${IMGUI_SRCS})
     target_include_directories(${RENDERER_PREFIX}_vulkan${RENDEXT} PRIVATE ${IMGUI_INCLUDE_DIRS})
     target_compile_definitions(${RENDERER_PREFIX}_vulkan${RENDEXT} PRIVATE USE_IMGUI USE_VULKAN)
-    if(USE_SDL AND TARGET SDL2::Core)
-      target_link_libraries(${RENDERER_PREFIX}_vulkan${RENDEXT} PRIVATE SDL2::Core)
+    if(USE_SDL AND TARGET SDL3::SDL3)
+      target_link_libraries(${RENDERER_PREFIX}_vulkan${RENDEXT} PRIVATE SDL3::SDL3)
     endif()
   else()
     if(USE_VULKAN)
       target_sources(${RENDERER_PREFIX}_vulkan PRIVATE ${IMGUI_SRCS})
       target_include_directories(${RENDERER_PREFIX}_vulkan PRIVATE ${IMGUI_INCLUDE_DIRS})
       target_compile_definitions(${RENDERER_PREFIX}_vulkan PRIVATE USE_IMGUI USE_VULKAN)
-      if(USE_SDL AND TARGET SDL2::Core)
-        target_link_libraries(${RENDERER_PREFIX}_vulkan PRIVATE SDL2::Core)
+      if(USE_SDL AND TARGET SDL3::SDL3)
+        target_link_libraries(${RENDERER_PREFIX}_vulkan PRIVATE SDL3::SDL3)
       endif()
     endif()
   endif()
@@ -2474,37 +2375,19 @@ target_include_directories(q3ui PRIVATE
 	${CMAKE_SOURCE_DIR}/modules/audio)
 ENDIF()
 
-if(USE_LOCAL_HEADERS AND NOT IDTECH3_USING_FETCHED_SDL2)
-	if(TARGET q3ui)
-		target_include_directories(q3ui PRIVATE ${EXTERNAL_SDL_INCLUDE_DIR})
-	endif()
-	target_include_directories(client PRIVATE ${EXTERNAL_SDL_INCLUDE_DIR})
-endif()
-IF(USE_SDL AND TARGET q3ui)
-	if(SDL2_INCLUDE_DIRS)
-		target_include_directories(q3ui PRIVATE ${SDL2_INCLUDE_DIRS})
-	elseif(SDL2_INCLUDE_DIR)
-		target_include_directories(q3ui PRIVATE ${SDL2_INCLUDE_DIR})
-	endif()
-ENDIF()
 if(USE_LOCAL_HEADERS AND WIN32)
 	target_include_directories(client PRIVATE ${EXTERNAL_CURL_WINDOWS_INCLUDE_DIR})
 endif()
 
 IF(NOT MSVC)
 	IF(USE_SDL)
-		if(NOT SDL2_FOUND)
-		  message(FATAL_ERROR "SDL2 could not be found. Install SDL2 dev packages, set SDL2_DIR/SDL2_PATH, or enable USE_BUNDLED_SDL2=ON (default) for an automatic source build.")
+		if(NOT SDL3_FOUND OR NOT TARGET SDL3::SDL3)
+		  message(FATAL_ERROR "SDL3 could not be found. Install SDL3 dev packages, set SDL3_DIR, or enable USE_BUNDLED_SDL3=ON (default) for an automatic source build.")
 		endif()
 		if(TARGET q3ui)
-			TARGET_LINK_LIBRARIES(q3ui SDL2::Main)
+			TARGET_LINK_LIBRARIES(q3ui SDL3::SDL3)
 		endif()
-		TARGET_LINK_LIBRARIES(client PRIVATE SDL2::Core)
-		if(SDL2_INCLUDE_DIRS)
-			target_include_directories(client PRIVATE ${SDL2_INCLUDE_DIRS})
-		elseif(SDL2_INCLUDE_DIR)
-			target_include_directories(client PRIVATE ${SDL2_INCLUDE_DIR})
-		endif()
+		TARGET_LINK_LIBRARIES(client PRIVATE SDL3::SDL3)
 	ELSEIF(UNIX AND NOT ANDROID)
 		find_package (X11 REQUIRED)
 		if(TARGET q3ui)
@@ -2823,6 +2706,10 @@ if(TARGET q3ui)
 	TARGET_LINK_LIBRARIES(${CNAME}${BINEXT} PRIVATE qcommon botlib client q3ui phys_module)
 else()
 	TARGET_LINK_LIBRARIES(${CNAME}${BINEXT} PRIVATE qcommon botlib client phys_module)
+endif()
+# unix_main/win_main (Q3_SRCS) include SDL_main.h; link SDL3 so includes propagate to the exe TU.
+if(USE_SDL AND TARGET SDL3::SDL3)
+	TARGET_LINK_LIBRARIES(${CNAME}${BINEXT} PRIVATE SDL3::SDL3)
 endif()
 # Platform entry sources need engine headers (OBJECT libs keep includes PRIVATE).
 target_include_directories(${CNAME}${BINEXT} PRIVATE

@@ -23,7 +23,7 @@ Raspberry Pi OS ships Mesa V3DV (Vulkan 1.3) by default on Pi 4 and 5. The engin
    set r_vid_driver x11
    vid_restart
    ```
-   Or run with: `SDL_VIDEODRIVER=x11 ./idtech3`
+   Or run with: `SDL_VIDEO_DRIVER=x11 ./idtech3`
 
 2. **r_vid_driver cvar**: The engine supports `r_vid_driver` (auto, x11, wayland, kmsdrm). On ARM with Vulkan, "auto" defaults to "x11" for compatibility. If x11 fails, the engine automatically retries with wayland. Requires `vid_restart` to take effect.
 
@@ -171,7 +171,7 @@ See [DEVELOPMENT_SETUP.md](DEVELOPMENT_SETUP.md#building-for-multiple-platforms)
 
 - **SDL video driver**: The engine prints `SDL video driver: x11` (or wayland, kmsdrm) at startup.
 - **Vulkan load**: If Vulkan fails, the engine prints `SDL_GetError()` output.
-- **Environment**: Use `SDL_DEBUG=1 SDL_VIDEODRIVER=x11 ./idtech3` for verbose SDL output.
+- **Environment**: Use `SDL_DEBUG=1 SDL_VIDEO_DRIVER=x11 ./idtech3` for verbose SDL output.
 
 ## Platform Notes
 

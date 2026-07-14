@@ -3,7 +3,7 @@
 Copyright (C) 2026 Gopex LLC. All rights reserved.
 
 Bridge Dear ImGui to the engine's Vulkan loader (qvk* via ImGui_ImplVulkan_LoadFunctions).
-SDL2 mouse position when the inspector wants input.
+SDL3 mouse position when the inspector wants input.
 ===========================================================================
 */
 
@@ -23,11 +23,7 @@ extern "C" {
 }
 
 #if defined( USE_SDL ) && !defined( ANDROID )
-#	if defined( USE_LOCAL_HEADERS )
-#		include "SDL.h"
-#	else
-#		include <SDL2/SDL.h>
-#	endif
+#	include <SDL3/SDL.h>
 extern "C" struct SDL_Window *SDL_window;
 #endif
 
@@ -150,11 +146,11 @@ extern "C" void VkImgui_UpdateMouseFromSDL( ImGuiIO *io, qboolean inspectorWants
 		return;
 	}
 	{
-		int mx = 0;
-		int my = 0;
-		const Uint32 buttons = SDL_GetMouseState( &mx, &my );
-		float ix = (float)mx;
-		float iy = (float)my;
+		float mx = 0.0f;
+		float my = 0.0f;
+		const SDL_MouseButtonFlags buttons = SDL_GetMouseState( &mx, &my );
+		float ix = mx;
+		float iy = my;
 		{
 			int winW = 0;
 			int winH = 0;
@@ -166,9 +162,9 @@ extern "C" void VkImgui_UpdateMouseFromSDL( ImGuiIO *io, qboolean inspectorWants
 			}
 		}
 		io->MousePos = ImVec2( ix, iy );
-		io->MouseDown[0] = ( buttons & SDL_BUTTON( SDL_BUTTON_LEFT ) ) != 0;
-		io->MouseDown[1] = ( buttons & SDL_BUTTON( SDL_BUTTON_RIGHT ) ) != 0;
-		io->MouseDown[2] = ( buttons & SDL_BUTTON( SDL_BUTTON_MIDDLE ) ) != 0;
+		io->MouseDown[0] = ( buttons & SDL_BUTTON_LMASK ) != 0;
+		io->MouseDown[1] = ( buttons & SDL_BUTTON_RMASK ) != 0;
+		io->MouseDown[2] = ( buttons & SDL_BUTTON_MMASK ) != 0;
 	}
 #else
 	(void)io;

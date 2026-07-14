@@ -72,6 +72,10 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 #include "linux_local.h" // bk001204
 
+#if defined(USE_SDL) && !defined(DEDICATED)
+#include <SDL3/SDL_main.h>
+#endif
+
 #ifndef DEDICATED
 #include "../../client/client.h"
 #endif

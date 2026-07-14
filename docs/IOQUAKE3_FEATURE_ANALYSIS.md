@@ -20,7 +20,7 @@ However, several ioquake3 engine-level improvements are either **missing entirel
 
 | Feature | Status | Files/Evidence |
 |---------|--------|----------------|
-| SDL2 backend | ✅ Enabled | `CMakeLists.txt` USE_SDL=ON, `src/platform/sdl/` |
+| SDL3 backend | ✅ Enabled | `CMakeLists.txt` USE_SDL=ON, `engine/platform/sdl/` |
 | cURL HTTP/FTP downloads | ✅ Enabled | `CMakeLists.txt` USE_CURL=ON, `src/client/cl_curl.c` |
 | OpenAL sound (surround 5.1/7.1) | ✅ Enabled | `CMakeLists.txt` USE_OPENAL=ON, `snd_backend_openal.c` |
 | OpenAL EFX reverb/occlusion | ✅ Enabled | `src/audio/effects/snd_efx.c` |

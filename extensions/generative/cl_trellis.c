@@ -16,7 +16,7 @@ Copyright (C) 2026 Gopex LLC. All rights reserved.
 #include <string.h>
 
 #if ( defined( USE_FLUX ) || defined( USE_TRELLIS ) ) && USE_SDL
-#include <SDL2/SDL_thread.h>
+#include <SDL3/SDL.h>
 #elif defined( USE_FLUX ) || defined( USE_TRELLIS )
 typedef struct SDL_Thread SDL_Thread;
 #endif

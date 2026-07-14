@@ -23,19 +23,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #ifndef __GLW_LINUX_H__
 #define __GLW_LINUX_H__
 
-#ifdef USE_LOCAL_HEADERS
-#	include "SDL.h"
-#else
-#	if defined(__has_include)
-#		if __has_include(<SDL2/SDL.h>)
-#			include <SDL2/SDL.h>
-#		else
-#			include <SDL.h>
-#		endif
-#	else
-#		include <SDL.h>
-#	endif
-#endif
+#include <SDL3/SDL.h>
 
 #define USE_JOYSTICK
 

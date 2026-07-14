@@ -14,8 +14,7 @@ Copyright (C) 2026 Gopex LLC. All rights reserved.
 #endif
 
 #if USE_SDL
-#include <SDL2/SDL_thread.h>
-#include <SDL2/SDL_atomic.h>
+#include <SDL3/SDL.h>
 #else
 typedef struct SDL_Thread SDL_Thread;
 #endif
@@ -169,14 +168,14 @@ qboolean CL_MlWorker_Submit( clMlTask_t *task )
 
 #if USE_SDL
 	if ( cl_mlSerial && cl_mlSerial->integer ) {
-		SDL_AtomicLock( &s_mlGate );
+		SDL_LockSpinlock( &s_mlGate );
 		if ( s_mlBusy ) {
-			SDL_AtomicUnlock( &s_mlGate );
+			SDL_UnlockSpinlock( &s_mlGate );
 			return qfalse;
 		}
 		s_mlBusy = qtrue;
 		Q_strncpyz( s_mlOwner, task->name, sizeof( s_mlOwner ) );
-		SDL_AtomicUnlock( &s_mlGate );
+		SDL_UnlockSpinlock( &s_mlGate );
 	} else {
 		s_mlBusy = qtrue;
 		Q_strncpyz( s_mlOwner, task->name, sizeof( s_mlOwner ) );

@@ -15,7 +15,7 @@ Copyright (C) 2026 Gopex LLC. All rights reserved.
 #ifdef USE_FLUX
 #include "flux.h"
 #if USE_SDL
-#include <SDL2/SDL_thread.h>
+#include <SDL3/SDL.h>
 #else
 typedef struct SDL_Thread SDL_Thread;
 #endif

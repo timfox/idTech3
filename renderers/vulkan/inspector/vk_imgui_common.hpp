@@ -28,11 +28,7 @@ extern cvar_t *r_studio_tools;
 }
 
 #if defined( USE_SDL ) && !defined( ANDROID )
-#	if defined( USE_LOCAL_HEADERS )
-#		include "SDL.h"
-#	else
-#		include <SDL2/SDL.h>
-#	endif
+#	include <SDL3/SDL.h>
 extern "C" struct SDL_Window *SDL_window;
 #endif
 

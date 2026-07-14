@@ -310,7 +310,7 @@ cmake --build . --config Release
 - **MSVC**: 2022+ (Windows cross-compilation)
 
 #### Dependency Management
-- **System Packages**: SDL2, Vulkan SDK, OpenEXR, etc.
+- **System Packages**: SDL3, Vulkan SDK, OpenEXR, etc.
 - **Build Dependencies**: Automatically detected
 - **Optional Features**: Gracefully disabled if dependencies missing
 

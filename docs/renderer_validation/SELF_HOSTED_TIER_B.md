@@ -13,7 +13,7 @@ Follow [GitHub Docs: Adding self-hosted runners](https://docs.github.com/en/acti
 
 On the runner machine:
 
-- Install build prerequisites from [docs/DEVELOPMENT_SETUP.md](../DEVELOPMENT_SETUP.md) (CMake, Ninja, compilers, `glslang-tools`, SDL2, etc.-mirror Ubuntu CI).
+- Install build prerequisites from [docs/DEVELOPMENT_SETUP.md](../DEVELOPMENT_SETUP.md) (CMake, Ninja, compilers, `glslang-tools`, SDL3, etc.-mirror Ubuntu CI).
 - Ensure the runner user can **read** `GAME_BASE` and execute the built `idtech3_server`.
 - Provide a working client display/Vulkan path for `tests/scripts/test_modern_renderer_profile_runtime.sh runtime`: set `DISPLAY`, install Vulkan userspace drivers/ICD for the GPU, and verify the runner user can execute the built `release/idtech3`.
 
