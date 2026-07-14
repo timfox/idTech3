@@ -71,6 +71,8 @@ grep -q 'seta r_renderMode 1' "$HYBRID_OVERLAY" && fail "Hybrid1 overlay must no
 grep -q 'r_renderMode 1/2' "$TR_INIT" || fail "cvar docs must say G-buffer works in render modes 1/2"
 grep -q 'color     : post=%d tonemap=%d' "$TR_INIT" || fail "renderer_status must expose color grading state"
 grep -q 'PostFX_GetGradeHue' "$TR_INIT" || fail "renderer_status must expose hue grading state"
+grep -q 'ri.Cmd_AddCommand( "renderer_subsystems"' "$TR_INIT" || fail "renderer_subsystems must be registered"
+grep -q 'Renderer Subsystems' "$TR_INIT" || fail "renderer_subsystems must print a subsystem health table"
 grep -q 'r_renderMode->integer == 1 || r_renderMode->integer == 2' "$DGB" || fail "G-buffer active helper must allow mode 2 sidecar"
 grep -q 'r_renderMode->integer != 1 && r_renderMode->integer != 2' "$ATTACH" || fail "G-buffer allocation must allow mode 2 sidecar"
 grep -q 'r_renderMode->integer == 1 && r_forwardPlus' "$DGB" || fail "deferred lighting must remain mode 1 only"

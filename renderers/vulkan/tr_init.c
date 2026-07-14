@@ -2136,6 +2136,42 @@ static void R_RendererCompatibility_f( void )
 	ri.Printf( PRINT_ALL, "========================================\n" );
 }
 
+static void R_RendererSubsystems_f( void )
+{
+	const int warnings = R_RendererPrintCompatibilityWarnings( qfalse );
+
+	ri.Printf( PRINT_ALL, "======== Renderer Subsystems ========\n" );
+	ri.Printf( PRINT_ALL, "profile    : %s (%s)\n", R_RendererProfileName(), warnings == 0 ? "clean" : "compat-warnings" );
+	ri.Printf( PRINT_ALL, "framegraph : fbo=%s hdr=%d color=%s renderTarget=%ux%u\n",
+		R_YesNo( vk.fboActive ), R_CvarInteger( r_hdr ), vk_format_string( vk.color_format ),
+		vk.renderWidth, vk.renderHeight );
+	ri.Printf( PRINT_ALL, "materials  : pbr=%d blend=%d gbuffer=%s fill=%d directExport=%s\n",
+		R_CvarInteger( r_pbr ), R_CvarInteger( r_materialBlend ),
+		R_YesNo( vk.deferredGbufferAllocated ), R_CvarInteger( r_deferredGBufferFill ),
+		R_YesNo( vk.deferredGbufferDirectExport ) );
+	ri.Printf( PRINT_ALL, "lighting   : mode=%d forwardPlus=%d shade=%.2f deferred=%d spec=%.2f ao=%.2f ssao=%d volumetric=%d\n",
+		R_CvarInteger( r_renderMode ), R_CvarInteger( r_forwardPlus ), R_CvarValue( r_forwardPlusShade ),
+		R_CvarInteger( r_deferredLighting ), R_CvarValue( r_deferredSpecularStrength ),
+		R_CvarValue( r_deferredAOCoupling ), R_CvarInteger( r_ssao ), R_CvarInteger( r_volumetricFog ) );
+	ri.Printf( PRINT_ALL, "temporal   : taa=%d motionVectors=%d frame=%u unreliable=%s history=%s\n",
+		R_CvarInteger( r_taa ), R_CvarInteger( r_taaMotionVectors ), vk.temporal.frameIndex,
+		R_YesNo( vk.temporal.unreliableMotionThisFrame ), R_YesNo( vk.temporal.hasValidTAAHistory ) );
+	ri.Printf( PRINT_ALL, "post       : post=%d tonemap=%d exposure=%.2f bloom=%d smaa=%d fxaa=%d aaAfterBloom=%d\n",
+		R_CvarInteger( r_post ), R_CvarInteger( r_tonemap ), R_CvarValue( r_exposure ),
+		R_CvarInteger( r_bloom ), R_CvarInteger( r_ext_smaa ), R_CvarInteger( r_ext_fxaa ),
+		R_CvarInteger( r_postAaAfterBloom ) );
+	ri.Printf( PRINT_ALL, "gi/neural  : ndgi=%d niv=%s vfgi=%s nvc=%s\n",
+		R_NamedCvarInteger( "r_ndgi" ),
+		R_YesNo( vk.niv.volume_ready && vk.niv.shade_ready && vk.niv.composite_ready ),
+		R_YesNo( vk.vfgi.buffers_ready && vk.vfgi.decode_ready && vk.vfgi.composite_ready ),
+		R_YesNo( vk.nvc.weights_ready && vk.nvc.cache_ready && vk.nvc.restir_ready && vk.nvc.composite_ready ) );
+	ri.Printf( PRINT_ALL, "ray        : available=%s rtx=%d demo=%d hybrid1=%d entities=%d\n",
+		R_YesNo( R_RtxAvailable() ), R_CvarInteger( r_rtx ), R_CvarInteger( r_rtxDemo ),
+		R_CvarInteger( r_hybrid1 ), R_CvarInteger( r_rtxEntities ) );
+	ri.Printf( PRINT_ALL, "warnings   : %d\n", warnings );
+	ri.Printf( PRINT_ALL, "=====================================\n" );
+}
+
 /*
 ===============
 R_VolumetricAccurate_f
@@ -2641,6 +2677,7 @@ static void R_Register( void )
 	ri.Cmd_AddCommand( "vulkaninfo", VulkanInfo_f );
 	ri.Cmd_AddCommand( "renderer_status", R_RendererStatus_f );
 	ri.Cmd_AddCommand( "renderer_profile", R_RendererProfile_f );
+	ri.Cmd_AddCommand( "renderer_subsystems", R_RendererSubsystems_f );
 	ri.Cmd_AddCommand( "renderer_compat", R_RendererCompatibility_f );
 	ri.Cmd_AddCommand( "renderer_compatibility", R_RendererCompatibility_f );
 	ri.Cmd_AddCommand( "vkVolumetricValidate", VkVolumetricValidate_f );
@@ -4884,6 +4921,7 @@ static void RE_Shutdown( refShutdownCode_t code ) {
 	ri.Cmd_RemoveCommand( "vulkaninfo" );
 	ri.Cmd_RemoveCommand( "renderer_status" );
 	ri.Cmd_RemoveCommand( "renderer_profile" );
+	ri.Cmd_RemoveCommand( "renderer_subsystems" );
 	ri.Cmd_RemoveCommand( "renderer_compat" );
 	ri.Cmd_RemoveCommand( "renderer_compatibility" );
 	ri.Cmd_RemoveCommand( "vkVolumetricValidate" );

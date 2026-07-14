@@ -79,6 +79,7 @@ source_checks() {
 
 	check_grep "$tr_init" 'ri.Cmd_AddCommand( "renderer_status"' "renderer_status is registered"
 	check_grep "$tr_init" 'ri.Cmd_AddCommand( "renderer_profile"' "renderer_profile is registered"
+	check_grep "$tr_init" 'ri.Cmd_AddCommand( "renderer_subsystems"' "renderer_subsystems is registered"
 	check_grep "$tr_init" 'ri.Cmd_AddCommand( "renderer_compat"' "renderer_compat is registered"
 	check_grep "$tr_init" 'ri.Cmd_AddCommand( "renderer_compatibility"' "renderer_compatibility alias is registered"
 	check_grep "$tr_init" 'R_RendererPrintCompatibilityWarnings' "compatibility warnings share one implementation"
@@ -91,6 +92,9 @@ source_checks() {
 	check_grep "$tr_init" 'warnings  : %d' "renderer diagnostics print warning count"
 	check_grep "$tr_init" 'lighting  : ssao=%d' "renderer_status reports advanced lighting state"
 	check_grep "$tr_init" 'gi/neural : ndgi=%d' "renderer_status reports neural GI state"
+	check_grep "$tr_init" 'Renderer Subsystems' "renderer_subsystems prints subsystem table"
+	check_grep "$tr_init" 'framegraph : fbo=%s' "renderer_subsystems reports framegraph state"
+	check_grep "$tr_init" 'temporal   : taa=%d' "renderer_subsystems reports temporal state"
 
 	if [[ -d "${RELEASE_DIR:-$ROOT/release}/base" ]]; then
 		local release_base="${RELEASE_DIR:-$ROOT/release}/base"
@@ -155,6 +159,7 @@ runtime_checks() {
 		+map rtest_parity \
 		+renderer_profile \
 		+renderer_status \
+		+renderer_subsystems \
 		+renderer_compatibility \
 		+quit >"$log" 2>&1
 	local rc=$?
@@ -177,6 +182,9 @@ runtime_checks() {
 	check_grep "$log" 'temporal  : taa=1 motionVectors=1' "runtime reports TAA motion-vector path"
 	check_grep "$log" 'lighting  : ssao=' "runtime reports lighting diagnostics"
 	check_grep "$log" 'gi/neural : ndgi=' "runtime reports GI diagnostics"
+	check_grep "$log" 'Renderer Subsystems' "runtime printed renderer_subsystems"
+	check_grep "$log" 'framegraph : fbo=' "runtime reports framegraph subsystem"
+	check_grep "$log" 'temporal   : taa=1' "runtime reports temporal subsystem"
 	check_grep "$log" 'Renderer Compatibility' "runtime printed renderer_compatibility"
 	check_grep "$log" 'warnings: 0' "runtime reports no modern-profile compatibility warnings"
 
