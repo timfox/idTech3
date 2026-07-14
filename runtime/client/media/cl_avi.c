@@ -23,6 +23,14 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "client.h"
 #include "../../audio/snd_local.h"
 
+#include <stdlib.h>
+
+#ifdef _WIN32
+#include <windows.h>
+#else
+#include <pthread.h>
+#endif
+
 extern dma_t dma;
 
 #define INDEX_FILE_EXTENSION ".index.dat"
@@ -44,6 +52,7 @@ typedef struct aviFileData_s
 {
   qboolean      fileOpen;
   qboolean      pipe;
+  qboolean      threadedPipe;
   fileHandle_t  f;
   char          fileName[ MAX_QPATH ];
   unsigned int  fileSize;
@@ -71,12 +80,230 @@ typedef struct aviFileData_s
   byte          *cBuffer, *eBuffer;
 } aviFileData_t;
 
+typedef struct aviPipeChunk_s
+{
+	struct aviPipeChunk_s *next;
+	int len;
+	byte data[1];
+} aviPipeChunk_t;
+
+typedef struct aviPipeThread_s
+{
+	qboolean active;
+	qboolean stopping;
+	qboolean failed;
+	fileHandle_t f;
+	aviPipeChunk_t *head;
+	aviPipeChunk_t *tail;
+	int queuedBytes;
+#ifdef _WIN32
+	HANDLE thread;
+	CRITICAL_SECTION mutex;
+	CONDITION_VARIABLE cond;
+#else
+	pthread_t thread;
+	pthread_mutex_t mutex;
+	pthread_cond_t cond;
+#endif
+} aviPipeThread_t;
+
 static aviFileData_t afd;
+static aviPipeThread_t aviPipeThread;
 
 #define MAX_AVI_BUFFER 2048
 
 static byte buffer[ MAX_AVI_BUFFER ];
 static int  bufIndex;
+
+static void AVI_PipeThread_Lock( void )
+{
+#ifdef _WIN32
+	EnterCriticalSection( &aviPipeThread.mutex );
+#else
+	pthread_mutex_lock( &aviPipeThread.mutex );
+#endif
+}
+
+static void AVI_PipeThread_Unlock( void )
+{
+#ifdef _WIN32
+	LeaveCriticalSection( &aviPipeThread.mutex );
+#else
+	pthread_mutex_unlock( &aviPipeThread.mutex );
+#endif
+}
+
+static void AVI_PipeThread_Wake( void )
+{
+#ifdef _WIN32
+	WakeConditionVariable( &aviPipeThread.cond );
+#else
+	pthread_cond_signal( &aviPipeThread.cond );
+#endif
+}
+
+static void AVI_PipeThread_Wait( void )
+{
+#ifdef _WIN32
+	SleepConditionVariableCS( &aviPipeThread.cond, &aviPipeThread.mutex, INFINITE );
+#else
+	pthread_cond_wait( &aviPipeThread.cond, &aviPipeThread.mutex );
+#endif
+}
+
+static void AVI_PipeThread_FreeQueue( void )
+{
+	aviPipeChunk_t *chunk = aviPipeThread.head;
+	while ( chunk ) {
+		aviPipeChunk_t *next = chunk->next;
+		free( chunk );
+		chunk = next;
+	}
+	aviPipeThread.head = NULL;
+	aviPipeThread.tail = NULL;
+	aviPipeThread.queuedBytes = 0;
+}
+
+static qboolean AVI_PipeThread_Enqueue( const void *buf, int len )
+{
+	aviPipeChunk_t *chunk;
+
+	if ( len <= 0 ) {
+		return qtrue;
+	}
+	if ( !buf || !aviPipeThread.active ) {
+		return qfalse;
+	}
+
+	chunk = (aviPipeChunk_t *)malloc( sizeof( *chunk ) + (size_t)len - 1u );
+	if ( !chunk ) {
+		return qfalse;
+	}
+	chunk->next = NULL;
+	chunk->len = len;
+	Com_Memcpy( chunk->data, buf, len );
+
+	AVI_PipeThread_Lock();
+	if ( aviPipeThread.stopping || aviPipeThread.failed ) {
+		AVI_PipeThread_Unlock();
+		free( chunk );
+		return qfalse;
+	}
+	if ( aviPipeThread.tail ) {
+		aviPipeThread.tail->next = chunk;
+	} else {
+		aviPipeThread.head = chunk;
+	}
+	aviPipeThread.tail = chunk;
+	aviPipeThread.queuedBytes += len;
+	AVI_PipeThread_Wake();
+	AVI_PipeThread_Unlock();
+	return qtrue;
+}
+
+static void AVI_PipeThread_RunLoop( void )
+{
+	for ( ;; ) {
+		aviPipeChunk_t *chunk;
+
+		AVI_PipeThread_Lock();
+		while ( !aviPipeThread.head && !aviPipeThread.stopping ) {
+			AVI_PipeThread_Wait();
+		}
+		chunk = aviPipeThread.head;
+		if ( chunk ) {
+			aviPipeThread.head = chunk->next;
+			if ( !aviPipeThread.head ) {
+				aviPipeThread.tail = NULL;
+			}
+			aviPipeThread.queuedBytes -= chunk->len;
+		} else if ( aviPipeThread.stopping ) {
+			AVI_PipeThread_Unlock();
+			break;
+		}
+		AVI_PipeThread_Unlock();
+
+		if ( chunk ) {
+			if ( FS_Write( chunk->data, chunk->len, aviPipeThread.f ) < chunk->len ) {
+				AVI_PipeThread_Lock();
+				aviPipeThread.failed = qtrue;
+				AVI_PipeThread_Unlock();
+			}
+			free( chunk );
+		}
+	}
+
+	FS_FCloseFile( aviPipeThread.f );
+	aviPipeThread.f = FS_INVALID_HANDLE;
+}
+
+#ifdef _WIN32
+static DWORD WINAPI AVI_PipeThread_Main( LPVOID data )
+{
+	(void)data;
+	AVI_PipeThread_RunLoop();
+	return 0;
+}
+#else
+static void *AVI_PipeThread_Main( void *data )
+{
+	(void)data;
+	AVI_PipeThread_RunLoop();
+	return NULL;
+}
+#endif
+
+static qboolean AVI_PipeThread_Start( fileHandle_t f )
+{
+	Com_Memset( &aviPipeThread, 0, sizeof( aviPipeThread ) );
+	aviPipeThread.f = f;
+	aviPipeThread.active = qtrue;
+
+#ifdef _WIN32
+	InitializeCriticalSection( &aviPipeThread.mutex );
+	InitializeConditionVariable( &aviPipeThread.cond );
+	aviPipeThread.thread = CreateThread( NULL, 0, AVI_PipeThread_Main, NULL, 0, NULL );
+	if ( !aviPipeThread.thread ) {
+		DeleteCriticalSection( &aviPipeThread.mutex );
+		Com_Memset( &aviPipeThread, 0, sizeof( aviPipeThread ) );
+		return qfalse;
+	}
+#else
+	pthread_mutex_init( &aviPipeThread.mutex, NULL );
+	pthread_cond_init( &aviPipeThread.cond, NULL );
+	if ( pthread_create( &aviPipeThread.thread, NULL, AVI_PipeThread_Main, NULL ) != 0 ) {
+		pthread_cond_destroy( &aviPipeThread.cond );
+		pthread_mutex_destroy( &aviPipeThread.mutex );
+		Com_Memset( &aviPipeThread, 0, sizeof( aviPipeThread ) );
+		return qfalse;
+	}
+#endif
+	return qtrue;
+}
+
+static void AVI_PipeThread_Stop( void )
+{
+	if ( !aviPipeThread.active ) {
+		return;
+	}
+
+	AVI_PipeThread_Lock();
+	aviPipeThread.stopping = qtrue;
+	AVI_PipeThread_Wake();
+	AVI_PipeThread_Unlock();
+
+#ifdef _WIN32
+	WaitForSingleObject( aviPipeThread.thread, INFINITE );
+	CloseHandle( aviPipeThread.thread );
+	DeleteCriticalSection( &aviPipeThread.mutex );
+#else
+	pthread_join( aviPipeThread.thread, NULL );
+	pthread_cond_destroy( &aviPipeThread.cond );
+	pthread_mutex_destroy( &aviPipeThread.mutex );
+#endif
+	AVI_PipeThread_FreeQueue();
+	Com_Memset( &aviPipeThread, 0, sizeof( aviPipeThread ) );
+}
 
 
 /*
@@ -86,6 +313,13 @@ SafeFS_Write
 */
 static ID_INLINE void SafeFS_Write( const void *buf, int len, fileHandle_t f )
 {
+	if ( afd.threadedPipe ) {
+		if ( !AVI_PipeThread_Enqueue( buf, len ) ) {
+			Com_Error( ERR_DROP, "Failed to queue avi pipe data" );
+		}
+		return;
+	}
+
   if ( FS_Write( buf, len, f ) < len )
 		Com_Error( ERR_DROP, "Failed to write avi file" );
 }
@@ -485,6 +719,12 @@ qboolean CL_OpenAVIForPipeCommand( const char *displayName, const char *cmd, int
 	if ( ( afd.f = FS_PipeOpenWrite( cmd, displayName ? displayName : "stream" ) ) == FS_INVALID_HANDLE ) {
 		return qfalse;
 	}
+	if ( !AVI_PipeThread_Start( afd.f ) ) {
+		FS_FCloseFile( afd.f );
+		afd.f = FS_INVALID_HANDLE;
+		return qfalse;
+	}
+	afd.threadedPipe = qtrue;
 
 	CL_InitAVIStreamState( displayName ? displayName : "stream", qtrue, frameRate );
 	SafeFS_Write( buffer, bufIndex, afd.f );
@@ -717,10 +957,15 @@ qboolean CL_CloseAVI( qboolean reopen )
 	if ( afd.pipe )
 	{
 		Com_Printf( "Wrote %d:%d frames to pipe:%s\n", afd.numVideoFrames, afd.numAudioFrames, afd.fileName );
-		FS_FCloseFile( afd.f );
+		if ( afd.threadedPipe ) {
+			AVI_PipeThread_Stop();
+		} else {
+			FS_FCloseFile( afd.f );
+		}
 		afd.f = FS_INVALID_HANDLE;
 		afd.fileOpen = qfalse;
 		afd.pipe = qfalse;
+		afd.threadedPipe = qfalse;
 		return qtrue;
 	}
 

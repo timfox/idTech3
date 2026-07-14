@@ -2,7 +2,7 @@
 
 `idTech3-tv` is treated as a separate Owncast-compatible service. The engine can publish gameplay to its RTMP ingest endpoint without embedding the Go server in the engine binary.
 
-The default `engine` backend captures rendered engine frames through the renderer capture path and muxes the engine audio mixer through the existing AVI pipe into FFmpeg. The older desktop/audio grab command remains available as the `external` backend for compatibility.
+The default `engine` backend captures rendered engine frames through the renderer capture path and muxes the engine audio mixer through the existing AVI pipe into FFmpeg. Pipe I/O runs on a dedicated streaming worker thread so the main client thread only enqueues capture chunks. The older desktop/audio grab command remains available as the `external` backend for compatibility.
 
 ## Quick Start
 
@@ -56,5 +56,7 @@ ffmpeg -f avi -i - -threads 0 -y -c:v libx264 -preset veryfast -tune zerolatency
 ```
 
 The input is not a screen grab. It is the engine's captured frame stream plus the mixed game audio buffer. This avoids compositor/window-capture fragility and keeps the stream source tied to actual rendered frames.
+
+The streaming worker is intentionally scoped to live engine publishing. Legacy `video-pipe` demo export keeps its existing synchronous behavior.
 
 The `external` backend is still useful on platforms where the renderer capture path is unavailable or when a player wants to stream overlays outside the engine window.

@@ -39,6 +39,9 @@ check "$SRC" 'CL_Streaming_EngineCaptureActive' 'streaming exposes live engine c
 check "$SRC" 'CL_PipelineExpandTemplate' 'stream command uses shared safe template expansion'
 check "$SRC" 'rtmp://127.0.0.1:1935/live' 'status guidance mentions Owncast-compatible RTMP default'
 check "runtime/client/media/cl_avi.c" 'CL_OpenAVIForPipeCommand' 'AVI pipe can be opened with a streaming command'
+check "runtime/client/media/cl_avi.c" 'AVI_PipeThread_Start' 'live AVI pipe starts a streaming worker thread'
+check "runtime/client/media/cl_avi.c" 'AVI_PipeThread_Enqueue' 'live AVI pipe queues chunks for background writing'
+check "runtime/client/media/cl_avi.c" 'AVI_PipeThread_Stop' 'live AVI pipe stops the streaming worker thread'
 check "runtime/client/media/cl_demo.c" 'CL_Streaming_EngineCaptureActive' 'live streaming captures frames outside demo playback'
 check "$PIPE_H" 'const char \*url;' 'pipeline template has streaming URL token field'
 check "$PIPE_H" 'const char \*key;' 'pipeline template has streaming key token field'
@@ -52,5 +55,6 @@ check "$DOC" 'stream_start' 'streaming docs mention start command'
 check "$DOC" 'cl_stream_cmd' 'streaming docs mention command template'
 check "$DOC" 'renderer capture path' 'docs describe engine-owned frame capture'
 check "$DOC" 'mixed game audio' 'docs describe engine-owned audio capture'
+check "$DOC" 'streaming worker thread' 'docs describe threaded streaming pipe I/O'
 
 echo "idTech3-tv streaming integration checks passed."
