@@ -24,6 +24,8 @@ This fork integrates NIV as an **additive indirect pass** after world geometry, 
 | `r_niv_featureDim` | `4` | Features per voxel (packed in RGBA16F 3D texture) |
 | `r_niv_hiddenDim` | `16` | MLP hidden width |
 | `r_niv_useGBuffer` | `1` | Prefer deferred normals when G-buffer fill is active |
+| `r_niv_normalAtten` | `0.6` | Normal-facing attenuation for indirect GI leak reduction (`0` off, `1` max) |
+| `r_niv_ao` | `0.75` | Couple indirect GI to SSAO/HBAO when available (`0` off, `1` full) |
 | `r_niv_skipSky` | `1` | Skip sky depth pixels on composite |
 | `r_niv_debug` | `0` | Developer logging |
 
@@ -59,7 +61,7 @@ Without a manifest, the engine uses **map light-grid bounds** (when available) a
 
 1. Opaque world geometry → depth (+ optional G-buffer fill).
 2. **`niv_shade.comp`**: per-pixel world position → trilinear 3D feature sample → tiny MLP → irradiance RT.
-3. **`niv_composite.comp`**: `scene += irradiance * albedo` (full res).
+3. **`niv_composite.comp`**: `scene += irradiance * albedo` (full res), with optional G-buffer normal attenuation and SSAO/HBAO coupling to reduce indirect-light leaks.
 4. Direct lights / emissive / volumetrics run as today.
 
 ## Memory budget (typical)

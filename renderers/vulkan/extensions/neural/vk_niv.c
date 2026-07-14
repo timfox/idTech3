@@ -87,6 +87,8 @@ static cvar_t *r_niv_hiddenDim;
 static cvar_t *r_niv_useGBuffer;
 static cvar_t *r_niv_debug;
 static cvar_t *r_niv_skipSky;
+static cvar_t *r_niv_normalAtten;
+static cvar_t *r_niv_ao;
 
 typedef struct {
 	float invViewProj[16];
@@ -105,6 +107,10 @@ typedef struct {
 	uint32_t extent[2];
 	float strength;
 	uint32_t skipSky;
+	float normalAtten;
+	float aoStrength;
+	uint32_t hasNormal;
+	uint32_t hasAO;
 } vk_niv_composite_push_t;
 
 static void NIV_ClearGpu( void )
@@ -633,7 +639,7 @@ static void NIV_CreateShadePipeline( void )
 
 static void NIV_CreateCompositePipeline( void )
 {
-	VkDescriptorSetLayoutBinding bindings[4];
+	VkDescriptorSetLayoutBinding bindings[6];
 	VkDescriptorSetLayoutCreateInfo layout_ci;
 	VkPushConstantRange push_range;
 	VkPipelineLayoutCreateInfo pl_ci;
@@ -661,13 +667,21 @@ static void NIV_CreateCompositePipeline( void )
 	bindings[2].descriptorCount = 1;
 	bindings[2].stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
 	bindings[3].binding = 3;
-	bindings[3].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+	bindings[3].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
 	bindings[3].descriptorCount = 1;
 	bindings[3].stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+	bindings[4].binding = 4;
+	bindings[4].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+	bindings[4].descriptorCount = 1;
+	bindings[4].stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+	bindings[5].binding = 5;
+	bindings[5].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+	bindings[5].descriptorCount = 1;
+	bindings[5].stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
 
 	Com_Memset( &layout_ci, 0, sizeof( layout_ci ) );
 	layout_ci.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-	layout_ci.bindingCount = 4;
+	layout_ci.bindingCount = 6;
 	layout_ci.pBindings = bindings;
 	VK_CHECK( qvkCreateDescriptorSetLayout( vk.device, &layout_ci, NULL, &vk.niv.composite_layout ) );
 
@@ -822,13 +836,21 @@ void R_NIV_Init( void )
 	r_niv_useGBuffer = ri.Cvar_Get( "r_niv_useGBuffer", "1", CVAR_ARCHIVE_ND );
 	r_niv_debug = ri.Cvar_Get( "r_niv_debug", "0", CVAR_ARCHIVE_ND );
 	r_niv_skipSky = ri.Cvar_Get( "r_niv_skipSky", "1", CVAR_ARCHIVE_ND );
+	r_niv_normalAtten = ri.Cvar_Get( "r_niv_normalAtten", "0.6", CVAR_ARCHIVE_ND );
+	r_niv_ao = ri.Cvar_Get( "r_niv_ao", "0.75", CVAR_ARCHIVE_ND );
 
 	ri.Cvar_CheckRange( r_niv, "0", "1", CV_INTEGER );
 	ri.Cvar_CheckRange( r_niv_scale, "0.25", "1", CV_FLOAT );
+	ri.Cvar_CheckRange( r_niv_normalAtten, "0", "1", CV_FLOAT );
+	ri.Cvar_CheckRange( r_niv_ao, "0", "1", CV_FLOAT );
 	ri.Cvar_SetDescription( r_niv,
 		"Neural Irradiance Volume: G-buffer GI from compact 3D neural probe field (0=off, 1=on)." );
 	ri.Cvar_SetDescription( r_niv_scale,
 		"NIV decode resolution scale (1=full, 0.5=half) for ~1080p target cost." );
+	ri.Cvar_SetDescription( r_niv_normalAtten,
+		"NIV composite normal attenuation for indirect GI leak reduction (0=off, 1=max)." );
+	ri.Cvar_SetDescription( r_niv_ao,
+		"NIV composite AO coupling: scales indirect GI by SSAO/HBAO when available (0=off, 1=full)." );
 
 	ri.Cmd_AddCommand( "niv_reload", NIV_Cmd_Reload );
 	ri.Cmd_AddCommand( "niv_status", NIV_Cmd_Status );
@@ -972,12 +994,14 @@ void vk_niv_apply_after_geometry( void )
 	uint32_t width, height;
 	VkImageView depthView;
 	VkImageView normalView;
+	VkImageView aoView;
 	VkImageAspectFlags depth_aspect;
 	vk_niv_shade_push_t shadePush;
 	vk_niv_composite_push_t compPush;
 	float scale;
 	uint32_t gx, gy;
 	qboolean useGbuf;
+	qboolean hasAO;
 	VkImageView albedoView;
 
 	if ( !R_NIV_Active() ) {
@@ -1030,6 +1054,9 @@ void vk_niv_apply_after_geometry( void )
 		( tr.whiteImage ? tr.whiteImage->view : VK_NULL_HANDLE );
 	albedoView = ( vk.deferred_gbuffer_albedo_view != VK_NULL_HANDLE && useGbuf ) ?
 		vk.deferred_gbuffer_albedo_view : vk.color_image_view;
+	hasAO = ( r_ssao && r_ssao->integer && vk.ssao_blur_image_view != VK_NULL_HANDLE ) ? qtrue : qfalse;
+	aoView = hasAO ? vk.ssao_blur_image_view :
+		( tr.whiteImage ? tr.whiteImage->view : VK_NULL_HANDLE );
 
 	NIV_UpdateShadeDescriptors( depthView, normalView );
 
@@ -1088,13 +1115,13 @@ void vk_niv_apply_after_geometry( void )
 		VkDescriptorPoolSize pool_sizes[2];
 		VkDescriptorPoolCreateInfo pool_ci;
 		VkDescriptorSetAllocateInfo alloc_ci;
-		VkDescriptorImageInfo img_infos[4];
-		VkWriteDescriptorSet writes[4];
+		VkDescriptorImageInfo img_infos[6];
+		VkWriteDescriptorSet writes[6];
 		if ( vk.niv.composite_pool != VK_NULL_HANDLE ) {
 			qvkDestroyDescriptorPool( vk.device, vk.niv.composite_pool, NULL );
 		}
 		pool_sizes[0].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-		pool_sizes[0].descriptorCount = 3;
+		pool_sizes[0].descriptorCount = 5;
 		pool_sizes[1].type = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
 		pool_sizes[1].descriptorCount = 1;
 		Com_Memset( &pool_ci, 0, sizeof( pool_ci ) );
@@ -1120,8 +1147,14 @@ void vk_niv_apply_after_geometry( void )
 		img_infos[2].sampler = NIV_LinearSampler();
 		img_infos[2].imageView = vk.niv.irradiance_view;
 		img_infos[2].imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-		img_infos[3].imageView = vk.color_image_view;
-		img_infos[3].imageLayout = VK_IMAGE_LAYOUT_GENERAL;
+		img_infos[3].sampler = NIV_LinearSampler();
+		img_infos[3].imageView = normalView;
+		img_infos[3].imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+		img_infos[4].sampler = NIV_LinearSampler();
+		img_infos[4].imageView = aoView;
+		img_infos[4].imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+		img_infos[5].imageView = vk.color_image_view;
+		img_infos[5].imageLayout = VK_IMAGE_LAYOUT_GENERAL;
 
 		Com_Memset( writes, 0, sizeof( writes ) );
 		writes[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
@@ -1136,13 +1169,19 @@ void vk_niv_apply_after_geometry( void )
 		writes[2] = writes[0];
 		writes[2].dstBinding = 2;
 		writes[2].pImageInfo = &img_infos[2];
-		writes[3].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-		writes[3].dstSet = vk.niv.composite_descriptor;
+		writes[3] = writes[0];
 		writes[3].dstBinding = 3;
-		writes[3].descriptorCount = 1;
-		writes[3].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
 		writes[3].pImageInfo = &img_infos[3];
-		qvkUpdateDescriptorSets( vk.device, 4, writes, 0, NULL );
+		writes[4] = writes[0];
+		writes[4].dstBinding = 4;
+		writes[4].pImageInfo = &img_infos[4];
+		writes[5].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+		writes[5].dstSet = vk.niv.composite_descriptor;
+		writes[5].dstBinding = 5;
+		writes[5].descriptorCount = 1;
+		writes[5].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+		writes[5].pImageInfo = &img_infos[5];
+		qvkUpdateDescriptorSets( vk.device, 6, writes, 0, NULL );
 	}
 
 	record_image_layout_transition( vk.cmd->command_buffer, vk.color_image, VK_IMAGE_ASPECT_COLOR_BIT,
@@ -1154,6 +1193,10 @@ void vk_niv_apply_after_geometry( void )
 	compPush.extent[1] = fullH;
 	compPush.strength = 1.0f;
 	compPush.skipSky = ( r_niv_skipSky && r_niv_skipSky->integer ) ? 1u : 0u;
+	compPush.normalAtten = ( useGbuf && r_niv_normalAtten ) ? r_niv_normalAtten->value : 0.0f;
+	compPush.aoStrength = ( hasAO && r_niv_ao ) ? r_niv_ao->value : 0.0f;
+	compPush.hasNormal = useGbuf ? 1u : 0u;
+	compPush.hasAO = hasAO ? 1u : 0u;
 
 	qvkCmdBindPipeline( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, vk.niv.composite_pipeline );
 	qvkCmdBindDescriptorSets( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE,

@@ -28,6 +28,8 @@ Requires **`r_fbo 1`** and a loaded world (`tr.world`). Does not replace lightma
 | `r_vfgi_quant` | `8` | World-space vertex quantize (units) for dedup |
 | `r_vfgi_gridX/Y/Z` | `48` | Spatial index resolution |
 | `r_vfgi_useGBuffer` | `1` | Prefer deferred normals when G-buffer fill is active |
+| `r_vfgi_normalAtten` | `0.6` | Normal-facing attenuation for indirect GI leak reduction (`0` off, `1` max) |
+| `r_vfgi_ao` | `0.75` | Couple indirect GI to SSAO/HBAO when available (`0` off, `1` full) |
 | `r_vfgi_skipSky` | `1` | Skip sky depth on composite |
 | `r_vfgi_debug` | `0` | Developer logging |
 
@@ -57,7 +59,7 @@ quantUnits 8
 1. **Map load**: walk `world_t` BSP face triangles → quantize/dedup vertices → 4-float features → build 3D grid index → upload SSBOs.
 2. Opaque world → HDR color + depth (+ optional G-buffer fill).
 3. **`vfgi_decode.comp`**: per-pixel depth → world pos → grid cell → nearest vertex feature → MLP → RGBA16F irradiance.
-4. **`vfgi_composite.comp`**: depth-aware additive blend into scene color (bilinear upsample if `r_vfgi_scale < 1`).
+4. **`vfgi_composite.comp`**: depth-aware additive blend into scene color (bilinear upsample if `r_vfgi_scale < 1`), with optional normal-facing attenuation and SSAO/HBAO coupling.
 
 ## Engine fit
 

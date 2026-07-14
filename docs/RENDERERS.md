@@ -293,6 +293,8 @@ Code: `renderers/vulkan/vk_forward_plus.c`, `VK_FP_*` constants; cvar registrati
 | `r_ndgi_cycle` | 0 | Auto-cycle `r_ndgi_time` over `r_ndgi_cyclePeriod` seconds. |
 | `r_niv` | 0 | **Neural Irradiance Volume** (experimental): G-buffer indirect from compact 3D neural probe field. See [NEURAL_IRRADIANCE_VOLUME.md](NEURAL_IRRADIANCE_VOLUME.md). |
 | `r_niv_scale` | 1 | NIV decode resolution scale (0.25–1). |
+| `r_niv_normalAtten` | 0.6 | NIV normal-facing attenuation to reduce indirect GI leaks. |
+| `r_niv_ao` | 0.75 | NIV SSAO/HBAO coupling for contact-aware indirect attenuation. |
 | `r_nslm` | 0 | **Neural Six-way Lightmaps** (experimental): froxel scatter modulation for fog/smoke/dust. Requires `r_volumetricFog 1`. See [NEURAL_SIXWAY_LIGHTMAPS.md](NEURAL_SIXWAY_LIGHTMAPS.md). |
 | `r_nslm_strength` | 1 | NSLM scattering scale in froxels. |
 | `r_nslm_sixWaySharpness` | 2 | Six-way axis lobe sharpness from view direction. |
@@ -309,6 +311,8 @@ Code: `renderers/vulkan/vk_forward_plus.c`, `VK_FP_*` constants; cvar registrati
 | `r_vfgi` | 0 | **Vertex Features Neural GI** (experimental): per-vertex features + spatial index decode. See [VERTEX_FEATURES_NEURAL_GI.md](VERTEX_FEATURES_NEURAL_GI.md). |
 | `r_vfgi_strength` | 1 | VFGI indirect irradiance scale. |
 | `r_vfgi_scale` | 1 | VFGI decode resolution scale (0.25–1). |
+| `r_vfgi_normalAtten` | 0.6 | VFGI normal-facing attenuation to reduce indirect GI leaks. |
+| `r_vfgi_ao` | 0.75 | VFGI SSAO/HBAO coupling for contact-aware indirect attenuation. |
 | `r_vfgi_vertCap` | `524288` | Max unique world vertices for VFGI (latched). |
 | `r_renderformer` | 0 | **RenderFormer** neural triangle preview (experimental): transport + view decode. See [RENDERFORMER.md](RENDERFORMER.md). |
 | `r_renderformer_strength` | 1 | RenderFormer transport/decode/composite scale. |

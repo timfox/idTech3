@@ -61,6 +61,8 @@ static cvar_t *r_vfgi_gridZ;
 static cvar_t *r_vfgi_useGBuffer;
 static cvar_t *r_vfgi_debug;
 static cvar_t *r_vfgi_skipSky;
+static cvar_t *r_vfgi_normalAtten;
+static cvar_t *r_vfgi_ao;
 
 typedef struct {
 	float invViewProj[16];
@@ -79,6 +81,10 @@ typedef struct {
 	uint32_t extent[2];
 	float strength;
 	uint32_t skipSky;
+	float normalAtten;
+	float aoStrength;
+	uint32_t hasNormal;
+	uint32_t hasAO;
 } vk_vfgi_composite_push_t;
 
 static VkSampler VFGI_DepthSampler( void )
@@ -507,7 +513,7 @@ static void VFGI_CreateDecodePipeline( void )
 
 static void VFGI_CreateCompositePipeline( void )
 {
-	VkDescriptorSetLayoutBinding bindings[4];
+	VkDescriptorSetLayoutBinding bindings[6];
 	VkDescriptorSetLayoutCreateInfo layout_ci;
 	VkPushConstantRange push_range;
 	VkPipelineLayoutCreateInfo pl_ci;
@@ -535,13 +541,21 @@ static void VFGI_CreateCompositePipeline( void )
 	bindings[2].descriptorCount = 1;
 	bindings[2].stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
 	bindings[3].binding = 3;
-	bindings[3].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+	bindings[3].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
 	bindings[3].descriptorCount = 1;
 	bindings[3].stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+	bindings[4].binding = 4;
+	bindings[4].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+	bindings[4].descriptorCount = 1;
+	bindings[4].stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+	bindings[5].binding = 5;
+	bindings[5].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+	bindings[5].descriptorCount = 1;
+	bindings[5].stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
 
 	Com_Memset( &layout_ci, 0, sizeof( layout_ci ) );
 	layout_ci.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-	layout_ci.bindingCount = 4;
+	layout_ci.bindingCount = 6;
 	layout_ci.pBindings = bindings;
 	VK_CHECK( qvkCreateDescriptorSetLayout( vk.device, &layout_ci, NULL, &vk.vfgi.composite_layout ) );
 
@@ -624,13 +638,21 @@ void R_VFGI_Init( void )
 	r_vfgi_useGBuffer = ri.Cvar_Get( "r_vfgi_useGBuffer", "1", CVAR_ARCHIVE_ND );
 	r_vfgi_debug = ri.Cvar_Get( "r_vfgi_debug", "0", CVAR_ARCHIVE_ND );
 	r_vfgi_skipSky = ri.Cvar_Get( "r_vfgi_skipSky", "1", CVAR_ARCHIVE_ND );
+	r_vfgi_normalAtten = ri.Cvar_Get( "r_vfgi_normalAtten", "0.6", CVAR_ARCHIVE_ND );
+	r_vfgi_ao = ri.Cvar_Get( "r_vfgi_ao", "0.75", CVAR_ARCHIVE_ND );
 
 	ri.Cvar_CheckRange( r_vfgi, "0", "1", CV_INTEGER );
 	ri.Cvar_CheckRange( r_vfgi_scale, "0.25", "1", CV_FLOAT );
+	ri.Cvar_CheckRange( r_vfgi_normalAtten, "0", "1", CV_FLOAT );
+	ri.Cvar_CheckRange( r_vfgi_ao, "0", "1", CV_FLOAT );
 	ri.Cvar_SetDescription( r_vfgi,
 		"Vertex Features Neural GI: per-vertex features on world meshes (0=off, 1=on)." );
 	ri.Cvar_SetDescription( r_vfgi_vertCap,
 		"Max unique world vertices for VFGI index (latched)." );
+	ri.Cvar_SetDescription( r_vfgi_normalAtten,
+		"VFGI composite normal attenuation for indirect GI leak reduction (0=off, 1=max)." );
+	ri.Cvar_SetDescription( r_vfgi_ao,
+		"VFGI composite AO coupling: scales indirect GI by SSAO/HBAO when available (0=off, 1=full)." );
 
 	ri.Cmd_AddCommand( "vfgi_reload", VFGI_Cmd_Reload );
 	ri.Cmd_AddCommand( "vfgi_status", VFGI_Cmd_Status );
@@ -768,13 +790,14 @@ void R_VFGI_OnMapLoad( const char *mapBaseName )
 void vk_vfgi_apply_after_geometry( void )
 {
 	uint32_t fullW, fullH, width, height;
-	VkImageView depthView, normalView, albedoView;
+	VkImageView depthView, normalView, albedoView, aoView;
 	VkImageAspectFlags depth_aspect;
 	vk_vfgi_decode_push_t decodePush;
 	vk_vfgi_composite_push_t compPush;
 	float scale;
 	uint32_t gx, gy;
 	qboolean useGbuf;
+	qboolean hasAO;
 
 	if ( !R_VFGI_Active() ) {
 		return;
@@ -826,6 +849,9 @@ void vk_vfgi_apply_after_geometry( void )
 		( tr.whiteImage ? tr.whiteImage->view : VK_NULL_HANDLE );
 	albedoView = ( vk.deferred_gbuffer_albedo_view != VK_NULL_HANDLE && useGbuf ) ?
 		vk.deferred_gbuffer_albedo_view : vk.color_image_view;
+	hasAO = ( r_ssao && r_ssao->integer && vk.ssao_blur_image_view != VK_NULL_HANDLE ) ? qtrue : qfalse;
+	aoView = hasAO ? vk.ssao_blur_image_view :
+		( tr.whiteImage ? tr.whiteImage->view : VK_NULL_HANDLE );
 
 	depth_aspect = VK_IMAGE_ASPECT_DEPTH_BIT;
 	if ( glConfig.stencilBits > 0 ) {
@@ -965,14 +991,14 @@ void vk_vfgi_apply_after_geometry( void )
 		VkDescriptorPoolSize pool_sizes[2];
 		VkDescriptorPoolCreateInfo pool_ci;
 		VkDescriptorSetAllocateInfo alloc_ci;
-		VkDescriptorImageInfo img[4];
-		VkWriteDescriptorSet writes[4];
+		VkDescriptorImageInfo img[6];
+		VkWriteDescriptorSet writes[6];
 
 		if ( vk.vfgi.composite_pool != VK_NULL_HANDLE ) {
 			qvkDestroyDescriptorPool( vk.device, vk.vfgi.composite_pool, NULL );
 		}
 		pool_sizes[0].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-		pool_sizes[0].descriptorCount = 3;
+		pool_sizes[0].descriptorCount = 5;
 		pool_sizes[1].type = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
 		pool_sizes[1].descriptorCount = 1;
 		Com_Memset( &pool_ci, 0, sizeof( pool_ci ) );
@@ -997,8 +1023,14 @@ void vk_vfgi_apply_after_geometry( void )
 		img[2].sampler = VFGI_LinearSampler();
 		img[2].imageView = vk.vfgi.irradiance_view;
 		img[2].imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-		img[3].imageView = vk.color_image_view;
-		img[3].imageLayout = VK_IMAGE_LAYOUT_GENERAL;
+		img[3].sampler = VFGI_LinearSampler();
+		img[3].imageView = normalView;
+		img[3].imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+		img[4].sampler = VFGI_LinearSampler();
+		img[4].imageView = aoView;
+		img[4].imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+		img[5].imageView = vk.color_image_view;
+		img[5].imageLayout = VK_IMAGE_LAYOUT_GENERAL;
 
 		Com_Memset( writes, 0, sizeof( writes ) );
 		writes[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
@@ -1013,13 +1045,19 @@ void vk_vfgi_apply_after_geometry( void )
 		writes[2] = writes[0];
 		writes[2].dstBinding = 2;
 		writes[2].pImageInfo = &img[2];
-		writes[3].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-		writes[3].dstSet = vk.vfgi.composite_descriptor;
+		writes[3] = writes[0];
 		writes[3].dstBinding = 3;
-		writes[3].descriptorCount = 1;
-		writes[3].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
 		writes[3].pImageInfo = &img[3];
-		qvkUpdateDescriptorSets( vk.device, 4, writes, 0, NULL );
+		writes[4] = writes[0];
+		writes[4].dstBinding = 4;
+		writes[4].pImageInfo = &img[4];
+		writes[5].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+		writes[5].dstSet = vk.vfgi.composite_descriptor;
+		writes[5].dstBinding = 5;
+		writes[5].descriptorCount = 1;
+		writes[5].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+		writes[5].pImageInfo = &img[5];
+		qvkUpdateDescriptorSets( vk.device, 6, writes, 0, NULL );
 	}
 
 	Com_Memset( &compPush, 0, sizeof( compPush ) );
@@ -1027,6 +1065,10 @@ void vk_vfgi_apply_after_geometry( void )
 	compPush.extent[1] = fullH;
 	compPush.strength = 1.0f;
 	compPush.skipSky = ( r_vfgi_skipSky && r_vfgi_skipSky->integer ) ? 1u : 0u;
+	compPush.normalAtten = ( useGbuf && r_vfgi_normalAtten ) ? r_vfgi_normalAtten->value : 0.0f;
+	compPush.aoStrength = ( hasAO && r_vfgi_ao ) ? r_vfgi_ao->value : 0.0f;
+	compPush.hasNormal = useGbuf ? 1u : 0u;
+	compPush.hasAO = hasAO ? 1u : 0u;
 
 	qvkCmdBindPipeline( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, vk.vfgi.composite_pipeline );
 	qvkCmdBindDescriptorSets( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE,
