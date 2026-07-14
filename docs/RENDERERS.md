@@ -37,7 +37,7 @@ vid_restart
 
 `modern_native.cfg` inherits this profile automatically when `cl_autoGraphicsProfile 1` loads a native cgame. The profile deliberately keeps **deferred lighting** off because the stable default is Forward+ primary lighting; the deferred G-buffer is captured as a sidecar for TAA/advanced systems and future framegraph unification.
 
-The CI confidence target for this path is `test_modern_renderer_profile_runtime`: source-only checks run on normal hosted CI, while the self-hosted renderer Tier B workflow launches the client and exercises `renderer_profile`, `renderer_status`, and `renderer_compatibility` against the minimal renderer validation pack.
+The CI confidence target for this path is `test_modern_renderer_profile_runtime`: source-only checks run on normal hosted CI, while the self-hosted renderer Tier B workflow launches the client and exercises `renderer_profile`, `renderer_status`, and `renderer_compatibility` against the minimal renderer validation pack. `renderer_status` includes dedicated `lighting` and `gi/neural` rows so Forward+/SSAO/volumetrics/IBL plus NDGI/NIV/VFGI/NVC readiness can be checked without digging through individual cvars.
 
 | Area | Default Contract |
 |------|------------------|
@@ -82,7 +82,7 @@ exec deferred_vulkan.cfg
 vid_restart
 ```
 
-This profile sets `r_renderMode 1`, `r_deferredGBuffer 1`, `r_deferredGBufferFill 1`, and `r_deferredLighting 1`. It also forces `r_forwardPlusShade 0` so dynamic lights come from the deferred compute/composite path instead of being applied once by Forward+ primary shading and again by the legacy lit-surface pass. The current deferred lighting mode is still experimental; the reliable shipping/native default remains `modern_vulkan.cfg`.
+This profile sets `r_renderMode 1`, `r_deferredGBuffer 1`, `r_deferredGBufferFill 1`, and `r_deferredLighting 1`. It also forces `r_forwardPlusShade 0` so dynamic lights come from the deferred compute/composite path instead of being applied once by Forward+ primary shading and again by the legacy lit-surface pass. Deferred dynamic lights can be attenuated by the material AO channel with `r_deferredAOCoupling`, which helps contact areas avoid looking over-lit. The current deferred lighting mode is still experimental; the reliable shipping/native default remains `modern_vulkan.cfg`.
 
 The current G-buffer fill is depth-derived: albedo is copied from scene color, normals are reconstructed from depth with silhouette-aware neighbor selection, and material values use fallback cvars until true material export lands. Tune with `r_deferredDefaultMetalness`, `r_deferredDefaultRoughness`, and `r_deferredNormalEdgeThreshold`.
 
@@ -274,6 +274,7 @@ Code: `renderers/vulkan/vk_forward_plus.c`, `VK_FP_*` constants; cvar registrati
 | `r_deferredUnlitBase` | 1 | Additive dynamic on static-lit scene copy; skips classic lit-surf pass. **0** = legacy multiply composite. |
 | `r_deferredLightingStrength` | 1 | Scale deferred dynamic diffuse (0–4). |
 | `r_deferredSpecular` | 1 | Blinn-Phong specular on dynamic lights in deferred pass (0=diffuse only). |
+| `r_deferredAOCoupling` | 0.65 | Attenuate deferred dynamic light by the G-buffer material AO channel (0=off, 1=full). |
 | `r_deferredDefaultMetalness` | 0 | Fallback metalness written by the depth-derived G-buffer until material export is available. |
 | `r_deferredDefaultRoughness` | 0.55 | Fallback roughness written by the depth-derived G-buffer until material export is available. |
 | `r_deferredNormalEdgeThreshold` | 0.08 | View-space depth delta used to reject silhouette-crossing neighbors during deferred normal reconstruction. |

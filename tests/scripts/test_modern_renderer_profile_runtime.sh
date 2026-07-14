@@ -84,7 +84,13 @@ source_checks() {
 	check_grep "$tr_init" 'R_RendererPrintCompatibilityWarnings' "compatibility warnings share one implementation"
 	check_grep "$tr_init" 'modern profile expects r_forwardPlus 1' "compatibility warns on broken Forward+ profile"
 	check_grep "$tr_init" 'modern profile expects r_deferredGBuffer 1' "compatibility warns on missing sidecar G-buffer"
+	check_grep "$tr_init" 'r_niv_useGBuffer 1 needs r_deferredGBuffer 1' "compatibility warns on NIV G-buffer mismatch"
+	check_grep "$tr_init" 'r_vfgi_useGBuffer 1 needs r_deferredGBuffer 1' "compatibility warns on VFGI G-buffer mismatch"
+	check_grep "$tr_init" 'r_nvc 1 expects r_forwardPlus 1' "compatibility warns on NVC without Forward+"
+	check_grep "$tr_init" 'r_ndgi_compute 1 is reserved' "compatibility warns on reserved NDGI compute path"
 	check_grep "$tr_init" 'warnings  : %d' "renderer diagnostics print warning count"
+	check_grep "$tr_init" 'lighting  : ssao=%d' "renderer_status reports advanced lighting state"
+	check_grep "$tr_init" 'gi/neural : ndgi=%d' "renderer_status reports neural GI state"
 
 	if [[ -d "${RELEASE_DIR:-$ROOT/release}/base" ]]; then
 		local release_base="${RELEASE_DIR:-$ROOT/release}/base"
@@ -169,6 +175,8 @@ runtime_checks() {
 	check_grep "$log" 'forward+  : enabled=1' "runtime reports Forward+ enabled"
 	check_grep "$log" 'gbuffer   : cvar=1 fill=1' "runtime reports G-buffer sidecar enabled"
 	check_grep "$log" 'temporal  : taa=1 motionVectors=1' "runtime reports TAA motion-vector path"
+	check_grep "$log" 'lighting  : ssao=' "runtime reports lighting diagnostics"
+	check_grep "$log" 'gi/neural : ndgi=' "runtime reports GI diagnostics"
 	check_grep "$log" 'Renderer Compatibility' "runtime printed renderer_compatibility"
 	check_grep "$log" 'warnings: 0' "runtime reports no modern-profile compatibility warnings"
 

@@ -210,6 +210,7 @@ cvar_t	*r_deferredLighting;
 cvar_t	*r_deferredUnlitBase;
 cvar_t	*r_deferredLightingStrength;
 cvar_t	*r_deferredSpecular;
+cvar_t	*r_deferredAOCoupling;
 cvar_t	*r_deferredDefaultMetalness;
 cvar_t	*r_deferredDefaultRoughness;
 cvar_t	*r_deferredNormalEdgeThreshold;
@@ -1916,6 +1917,16 @@ static float R_CvarValue( const cvar_t *cv )
 	return cv ? cv->value : 0.0f;
 }
 
+static int R_NamedCvarInteger( const char *name )
+{
+	return ri.Cvar_VariableIntegerValue( name );
+}
+
+static float R_NamedCvarValue( const char *name )
+{
+	return Q_atof( ri.Cvar_VariableString( name ) );
+}
+
 static const char *R_YesNo( qboolean value )
 {
 	return value ? "yes" : "no";
@@ -2015,6 +2026,36 @@ static int R_RendererPrintCompatibilityWarnings( qboolean printOk )
 	if ( r_hybrid1 && r_hybrid1->integer && ( !r_rtxDemo || !r_rtxDemo->integer ) ) {
 		R_RENDERER_WARN( "r_hybrid1 1 requires r_rtxDemo 1 for the shared TLAS path.\n" );
 	}
+	if ( R_NamedCvarInteger( "r_niv" ) && ( !r_fbo || !r_fbo->integer ) ) {
+		R_RENDERER_WARN( "r_niv 1 needs r_fbo 1 so the NIV composite can read/write the HDR scene target.\n" );
+	}
+	if ( R_NamedCvarInteger( "r_vfgi" ) && ( !r_fbo || !r_fbo->integer ) ) {
+		R_RENDERER_WARN( "r_vfgi 1 needs r_fbo 1 so the VFGI composite can read/write the HDR scene target.\n" );
+	}
+	if ( R_NamedCvarInteger( "r_niv" ) && R_NamedCvarInteger( "r_niv_useGBuffer" ) &&
+		( !r_deferredGBuffer || !r_deferredGBuffer->integer || !r_deferredGBufferFill || !r_deferredGBufferFill->integer ) ) {
+		R_RENDERER_WARN( "r_niv_useGBuffer 1 needs r_deferredGBuffer 1 and r_deferredGBufferFill 1 for normal-aware GI.\n" );
+	}
+	if ( R_NamedCvarInteger( "r_vfgi" ) && R_NamedCvarInteger( "r_vfgi_useGBuffer" ) &&
+		( !r_deferredGBuffer || !r_deferredGBuffer->integer || !r_deferredGBufferFill || !r_deferredGBufferFill->integer ) ) {
+		R_RENDERER_WARN( "r_vfgi_useGBuffer 1 needs r_deferredGBuffer 1 and r_deferredGBufferFill 1 for normal-aware GI.\n" );
+	}
+	if ( R_NamedCvarInteger( "r_nvc" ) && ( !r_forwardPlus || !r_forwardPlus->integer ) ) {
+		R_RENDERER_WARN( "r_nvc 1 expects r_forwardPlus 1 because it refines the Forward+ direct-light path.\n" );
+	}
+	if ( R_NamedCvarInteger( "r_nvc" ) && R_NamedCvarInteger( "r_nvc_useGBuffer" ) &&
+		( !r_deferredGBuffer || !r_deferredGBuffer->integer || !r_deferredGBufferFill || !r_deferredGBufferFill->integer ) ) {
+		R_RENDERER_WARN( "r_nvc_useGBuffer 1 needs the sidecar G-buffer enabled and filled.\n" );
+	}
+	if ( R_NamedCvarInteger( "r_ndgi_compute" ) ) {
+		R_RENDERER_WARN( "r_ndgi_compute 1 is reserved; NDGI still uses the CPU lightmap decode path in this build.\n" );
+	}
+	if ( R_NamedCvarInteger( "r_niv" ) && R_NamedCvarValue( "r_niv_ao" ) > 0.0f && ( !r_ssao || !r_ssao->integer ) ) {
+		R_RENDERER_WARN( "r_niv_ao is > 0 but r_ssao is 0; NIV contact-aware indirect attenuation will be inactive.\n" );
+	}
+	if ( R_NamedCvarInteger( "r_vfgi" ) && R_NamedCvarValue( "r_vfgi_ao" ) > 0.0f && ( !r_ssao || !r_ssao->integer ) ) {
+		R_RENDERER_WARN( "r_vfgi_ao is > 0 but r_ssao is 0; VFGI contact-aware indirect attenuation will be inactive.\n" );
+	}
 
 	if ( warnings == 0 && printOk ) {
 		ri.Printf( PRINT_ALL, "[renderer][compat] no compatibility warnings for active profile '%s'.\n", R_RendererProfileName() );
@@ -2047,8 +2088,9 @@ static void R_RendererStatus_f( void )
 		R_CvarInteger( r_fbo ), R_YesNo( vk.fboActive ), R_CvarInteger( r_hdr ), vk_format_string( vk.color_format ) );
 	ri.Printf( PRINT_ALL, "pbr       : r_pbr=%d materialBlend=%d\n",
 		R_CvarInteger( r_pbr ), R_CvarInteger( r_materialBlend ) );
-	ri.Printf( PRINT_ALL, "mode      : r_renderMode=%d deferredLighting=%d deferredUnlitBase=%d\n",
-		R_CvarInteger( r_renderMode ), R_CvarInteger( r_deferredLighting ), R_CvarInteger( r_deferredUnlitBase ) );
+	ri.Printf( PRINT_ALL, "mode      : r_renderMode=%d deferredLighting=%d deferredUnlitBase=%d deferredAO=%.2f\n",
+		R_CvarInteger( r_renderMode ), R_CvarInteger( r_deferredLighting ),
+		R_CvarInteger( r_deferredUnlitBase ), R_CvarValue( r_deferredAOCoupling ) );
 	ri.Printf( PRINT_ALL, "forward+  : enabled=%d shade=%.2f maxPerTile=%d lumSort=%d distSort=%d depthCull=%d\n",
 		R_CvarInteger( r_forwardPlus ), R_CvarValue( r_forwardPlusShade ), R_CvarInteger( r_forwardPlusMaxPerTile ),
 		R_CvarInteger( r_forwardPlusLuminanceSort ), R_CvarInteger( r_forwardPlusDistanceSort ), R_CvarInteger( r_forwardPlusDepthCull ) );
@@ -2061,6 +2103,17 @@ static void R_RendererStatus_f( void )
 	ri.Printf( PRINT_ALL, "post-aa   : smaa=%d active=%s fxaa=%d active=%s postAaAfterBloom=%d\n",
 		R_CvarInteger( r_ext_smaa ), R_YesNo( vk.smaaActive ), R_CvarInteger( r_ext_fxaa ),
 		R_YesNo( vk.fxaaActive ), R_CvarInteger( r_postAaAfterBloom ) );
+	ri.Printf( PRINT_ALL, "lighting  : ssao=%d method=%d blurReady=%s volumetric=%d iblSH=%d sunShadow=%d\n",
+		R_CvarInteger( r_ssao ), R_CvarInteger( r_ssaoMethod ),
+		R_YesNo( vk.ssao_blur_image_view != VK_NULL_HANDLE ), R_CvarInteger( r_volumetricFog ),
+		R_CvarInteger( r_pbr_shExtract ), R_CvarInteger( r_pbrSunShadow ) );
+	ri.Printf( PRINT_ALL, "gi/neural : ndgi=%d niv=%d ready=%s normal=%.2f ao=%.2f vfgi=%d ready=%s verts=%u normal=%.2f ao=%.2f nvc=%d ready=%s\n",
+		R_NamedCvarInteger( "r_ndgi" ),
+		R_NamedCvarInteger( "r_niv" ), R_YesNo( vk.niv.volume_ready && vk.niv.shade_ready && vk.niv.composite_ready ),
+		R_NamedCvarValue( "r_niv_normalAtten" ), R_NamedCvarValue( "r_niv_ao" ),
+		R_NamedCvarInteger( "r_vfgi" ), R_YesNo( vk.vfgi.buffers_ready && vk.vfgi.decode_ready && vk.vfgi.composite_ready ),
+		vk.vfgi.vertex_count, R_NamedCvarValue( "r_vfgi_normalAtten" ), R_NamedCvarValue( "r_vfgi_ao" ),
+		R_NamedCvarInteger( "r_nvc" ), R_YesNo( vk.nvc.weights_ready && vk.nvc.cache_ready && vk.nvc.restir_ready && vk.nvc.composite_ready ) );
 	ri.Printf( PRINT_ALL, "rtx       : available=%s r_rtx=%d r_rtxDemo=%d hybrid1=%d entities=%d tlasUpdate=%d\n",
 		R_YesNo( R_RtxAvailable() ), R_CvarInteger( r_rtx ), R_CvarInteger( r_rtxDemo ),
 		R_CvarInteger( r_hybrid1 ), R_CvarInteger( r_rtxEntities ), R_CvarInteger( r_rtxTlasUpdate ) );
@@ -4053,6 +4106,11 @@ static void R_Register( void )
 	if ( r_deferredSpecular && r_deferredSpecular->integer && r_deferredLighting && r_deferredLighting->integer ) {
 		ri.Printf( PRINT_ALL, "[VK][deferred] r_deferredSpecular=1 (dynamic specular in deferred pass)\n" );
 	}
+	r_deferredAOCoupling = ri.Cvar_Get( "r_deferredAOCoupling", "0.65", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_deferredAOCoupling, "0", "1", CV_FLOAT );
+	ri.Cvar_SetDescription( r_deferredAOCoupling,
+		"With r_deferredLighting 1: attenuate deferred dynamic light by the G-buffer material AO channel (0=off, 1=full)." );
+	ri.Cvar_SetGroup( r_deferredAOCoupling, CVG_RENDERER );
 	r_deferredDefaultMetalness = ri.Cvar_Get( "r_deferredDefaultMetalness", "0", CVAR_ARCHIVE_ND );
 	ri.Cvar_CheckRange( r_deferredDefaultMetalness, "0", "1", CV_FLOAT );
 	ri.Cvar_SetDescription( r_deferredDefaultMetalness,
