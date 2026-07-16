@@ -277,11 +277,16 @@ cvar_t	*r_taaMotionVectors;
 cvar_t	*r_rtx;
 cvar_t	*r_rtxDemo;
 cvar_t	*r_rtxWorldPrimCap;
+cvar_t	*r_rtxWorldMaterials;
+cvar_t	*r_rtxWorldUvSample;
 cvar_t	*r_rtxComposite;
 cvar_t	*r_rtxSamples;
 cvar_t	*r_rtxEntities;
 cvar_t	*r_rtxEntityCap;
 cvar_t	*r_rtxEntityTriCap;
+cvar_t	*r_rtxEntityMaterials;
+cvar_t	*r_rtxEntityUvSample;
+cvar_t	*r_rtxEntityBlasUpdate;
 cvar_t	*r_rtxTlasUpdate;
 cvar_t	*r_pathtrace;
 cvar_t	*r_pathtrace_arch;
@@ -4427,6 +4432,20 @@ static void R_Register( void )
 	r_rtxWorldPrimCap = ri.Cvar_Get( "r_rtxWorldPrimCap", "262144", CVAR_ARCHIVE_ND | CVAR_LATCH );
 	ri.Cvar_CheckRange( r_rtxWorldPrimCap, "4096", "1048576", CV_INTEGER );
 	ri.Cvar_SetDescription( r_rtxWorldPrimCap, "Max triangles packed into the RTX world BLAS (latched). Lower on huge maps if BLAS build fails." );
+	r_rtxWorldMaterials = ri.Cvar_Get( "r_rtxWorldMaterials", "1", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_rtxWorldMaterials, "0", "1", CV_INTEGER );
+	ri.Cvar_SetDescription( r_rtxWorldMaterials,
+		"Pack world RT hit albedo from diffuse shader avgColor (fallback: BSP vertex colors). Rebuild BLAS via map load / vid_restart." );
+	ri.Cvar_SetGroup( r_rtxWorldMaterials, CVG_RENDERER );
+	ri.Printf( PRINT_ALL, "[VK][RTX] r_rtxWorldMaterials=%d (world hit albedo from diffuse shaders when packed)\n",
+		r_rtxWorldMaterials->integer );
+	r_rtxWorldUvSample = ri.Cvar_Get( "r_rtxWorldUvSample", "1", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_rtxWorldUvSample, "0", "1", CV_INTEGER );
+	ri.Cvar_SetDescription( r_rtxWorldUvSample,
+		"When \\r_rtxWorldMaterials: pack world hit albedo from UV-centroid samples of diffuse thumbs (fallback to avgColor / vertex color)." );
+	ri.Cvar_SetGroup( r_rtxWorldUvSample, CVG_RENDERER );
+	ri.Printf( PRINT_ALL, "[VK][RTX] r_rtxWorldUvSample=%d (UV centroid sample into world albedo SSBO)\n",
+		r_rtxWorldUvSample->integer );
 	r_rtxComposite = ri.Cvar_Get( "r_rtxComposite", "0", CVAR_ARCHIVE_ND );
 	ri.Cvar_CheckRange( r_rtxComposite, "0", "1", CV_FLOAT );
 	ri.Cvar_SetDescription( r_rtxComposite,
@@ -4451,6 +4470,27 @@ static void R_Register( void )
 	ri.Cvar_SetDescription( r_rtxEntityTriCap,
 		"Max triangles in the entity BLAS when \\r_rtxEntities 1 (MD3/IQM/glTF mesh + AABB proxies; latched)." );
 	ri.Cvar_SetGroup( r_rtxEntityTriCap, CVG_RENDERER );
+	r_rtxEntityMaterials = ri.Cvar_Get( "r_rtxEntityMaterials", "1", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_rtxEntityMaterials, "0", "1", CV_INTEGER );
+	ri.Cvar_SetDescription( r_rtxEntityMaterials,
+		"When \\r_rtxEntities 1: pack per-surface/shader texture-average albedo into entity hit SSBOs (Hybrid1/Surfel). 0=refEntity tint/gray only." );
+	ri.Cvar_SetGroup( r_rtxEntityMaterials, CVG_RENDERER );
+	ri.Printf( PRINT_ALL, "[VK][RTX] r_rtxEntityMaterials=%d (entity hit albedo from shaders/texture averages when entities are packed)\n",
+		r_rtxEntityMaterials->integer );
+	r_rtxEntityUvSample = ri.Cvar_Get( "r_rtxEntityUvSample", "1", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_rtxEntityUvSample, "0", "1", CV_INTEGER );
+	ri.Cvar_SetDescription( r_rtxEntityUvSample,
+		"When \\r_rtxEntities + \\r_rtxEntityMaterials: pack entity hit albedo from UV centroid samples of diffuse thumbs (fallback to average)." );
+	ri.Cvar_SetGroup( r_rtxEntityUvSample, CVG_RENDERER );
+	ri.Printf( PRINT_ALL, "[VK][RTX] r_rtxEntityUvSample=%d (UV centroid sample into entity albedo SSBO)\n",
+		r_rtxEntityUvSample->integer );
+	r_rtxEntityBlasUpdate = ri.Cvar_Get( "r_rtxEntityBlasUpdate", "1", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_rtxEntityBlasUpdate, "0", "1", CV_INTEGER );
+	ri.Cvar_SetDescription( r_rtxEntityBlasUpdate,
+		"When \\r_rtxEntities 1: 1=entity BLAS UPDATE when triangle count stable (faster skinned path); 0=full BLAS rebuild each frame." );
+	ri.Cvar_SetGroup( r_rtxEntityBlasUpdate, CVG_RENDERER );
+	ri.Printf( PRINT_ALL, "[VK][RTX] r_rtxEntityBlasUpdate=%d (entity BLAS UPDATE when prim count stable)\n",
+		r_rtxEntityBlasUpdate->integer );
 	r_rtxTlasUpdate = ri.Cvar_Get( "r_rtxTlasUpdate", "1", CVAR_ARCHIVE_ND );
 	ri.Cvar_CheckRange( r_rtxTlasUpdate, "0", "1", CV_INTEGER );
 	ri.Cvar_SetDescription( r_rtxTlasUpdate,

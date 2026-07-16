@@ -1160,6 +1160,11 @@ static image_t *R_CreateImageCompressed( const char *name, const char *name2, by
 	image->width = width;
 	image->height = height;
 	image->type = vk_find_texture_type( type );
+	image->avgColor[0] = 0.72f;
+	image->avgColor[1] = 0.70f;
+	image->avgColor[2] = 0.66f;
+	image->hasThumb = qfalse;
+	Com_Memset( image->thumbRGBA, 0, sizeof( image->thumbRGBA ) );
 
 	if ( namelen > 6 && Q_stristr( image->imgName, "maps/" ) == image->imgName && Q_stristr( image->imgName + 6, "/lm_" ) != NULL ) {
 		image->flags |= IMGFLAG_NO_COMPRESSION | IMGFLAG_NOSCALE;
@@ -1221,6 +1226,11 @@ image_t *R_CreateImageShell( const char *name, int width, int height, imgFlags_t
 	image->uploadHeight = height;
 	image->type = 0;
 	image->layers = 1;
+	image->avgColor[0] = 0.72f;
+	image->avgColor[1] = 0.70f;
+	image->avgColor[2] = 0.66f;
+	image->hasThumb = qfalse;
+	Com_Memset( image->thumbRGBA, 0, sizeof( image->thumbRGBA ) );
 	image->wrapClampMode = ( flags & IMGFLAG_CLAMPTOBORDER ) ? VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER :
 		( ( flags & IMGFLAG_CLAMPTOEDGE ) ? VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE : VK_SAMPLER_ADDRESS_MODE_REPEAT );
 	image->handle = VK_NULL_HANDLE;
@@ -1286,6 +1296,76 @@ image_t *R_CreateImage( const char *name, const char *name2, byte *pic, int widt
 	image->width = width;
 	image->height = height;
 	image->type = vk_find_texture_type( type );
+	image->avgColor[0] = 0.72f;
+	image->avgColor[1] = 0.70f;
+	image->avgColor[2] = 0.66f;
+	image->hasThumb = qfalse;
+	Com_Memset( image->thumbRGBA, 0, sizeof( image->thumbRGBA ) );
+	if ( pic && width > 0 && height > 0 && !( flags & IMGFLAG_CUBEMAP ) ) {
+		uint64_t sumR = 0, sumG = 0, sumB = 0, count = 0;
+		int pixels = width * height;
+		int step = pixels > 16384 ? ( pixels / 4096 ) : 1;
+		int i, ty, tx;
+
+		if ( step < 1 ) {
+			step = 1;
+		}
+		for ( i = 0; i < pixels; i += step ) {
+			const byte *p = pic + i * 4;
+			sumR += p[0];
+			sumG += p[1];
+			sumB += p[2];
+			count++;
+		}
+		if ( count > 0 ) {
+			image->avgColor[0] = (float)sumR / ( 255.0f * (float)count );
+			image->avgColor[1] = (float)sumG / ( 255.0f * (float)count );
+			image->avgColor[2] = (float)sumB / ( 255.0f * (float)count );
+		}
+		/* Box-downsample into a fixed thumb for RTX UV centroid sampling. */
+		for ( ty = 0; ty < TR_IMAGE_THUMB_SIZE; ty++ ) {
+			for ( tx = 0; tx < TR_IMAGE_THUMB_SIZE; tx++ ) {
+				int x0 = ( tx * width ) / TR_IMAGE_THUMB_SIZE;
+				int y0 = ( ty * height ) / TR_IMAGE_THUMB_SIZE;
+				int x1 = ( ( tx + 1 ) * width ) / TR_IMAGE_THUMB_SIZE;
+				int y1 = ( ( ty + 1 ) * height ) / TR_IMAGE_THUMB_SIZE;
+				uint32_t br = 0, bg = 0, bb = 0, ba = 0, bn = 0;
+				int y, x;
+				byte *dst;
+
+				if ( x1 <= x0 ) {
+					x1 = x0 + 1;
+				}
+				if ( y1 <= y0 ) {
+					y1 = y0 + 1;
+				}
+				if ( x1 > width ) {
+					x1 = width;
+				}
+				if ( y1 > height ) {
+					y1 = height;
+				}
+				for ( y = y0; y < y1; y++ ) {
+					const byte *row = pic + ( y * width + x0 ) * 4;
+					for ( x = x0; x < x1; x++, row += 4 ) {
+						br += row[0];
+						bg += row[1];
+						bb += row[2];
+						ba += row[3];
+						bn++;
+					}
+				}
+				dst = image->thumbRGBA + ( ty * TR_IMAGE_THUMB_SIZE + tx ) * 4;
+				if ( bn > 0 ) {
+					dst[0] = (byte)( br / bn );
+					dst[1] = (byte)( bg / bn );
+					dst[2] = (byte)( bb / bn );
+					dst[3] = (byte)( ba / bn );
+				}
+			}
+		}
+		image->hasThumb = qtrue;
+	}
 
 	if ( namelen > 6 && Q_stristr( image->imgName, "maps/" ) == image->imgName && Q_stristr( image->imgName + 6, "/lm_" ) != NULL ) {
 		// external lightmap atlases stored in maps/<mapname>/lm_XXXX textures
@@ -1411,6 +1491,11 @@ image_t *R_CreateImageRGBA32F( const char *name, const float *rgba, int width, i
 	image->flags = flags;
 	image->width = width;
 	image->height = height;
+	image->avgColor[0] = 0.72f;
+	image->avgColor[1] = 0.70f;
+	image->avgColor[2] = 0.66f;
+	image->hasThumb = qfalse;
+	Com_Memset( image->thumbRGBA, 0, sizeof( image->thumbRGBA ) );
 	image->wrapClampMode = ( flags & IMGFLAG_CLAMPTOBORDER ) ? VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER :
 		( ( flags & IMGFLAG_CLAMPTOEDGE ) ? VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE : VK_SAMPLER_ADDRESS_MODE_REPEAT );
 	image->handle = VK_NULL_HANDLE;

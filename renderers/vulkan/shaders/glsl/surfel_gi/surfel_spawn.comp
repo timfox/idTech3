@@ -19,7 +19,7 @@ layout(set = 0, binding = 3) uniform sampler2D normalTex;
 
 layout(push_constant) uniform SpawnPush {
 	mat4 invViewProj;
-	vec4 extent;       /* xy = width/height, z = surfelRadius, w unused */
+	vec4 extent;       /* xy = width/height, z = surfelRadius, w = minSeparation (0=off) */
 	uvec4 params;      /* x=maxSurfels y=frameIndex z=attempts w=unused */
 } pc;
 
@@ -49,6 +49,24 @@ void main() {
 	}
 	vec3 worldPos = worldH.xyz / worldH.w;
 
+	/* Reject candidates too close to existing active surfels (budget-preserving density). */
+	float minSep = pc.extent.w;
+	if (minSep > 1e-4) {
+		uint hwm = min(activeCount, pc.params.x);
+		if (hwm > 0u) {
+			for (uint k = 0u; k < 4u; k++) {
+				uint j = uint(surfel_hash(seed + 17u + k) * float(hwm)) % hwm;
+				Surfel nbs = surfels[j];
+				if ((nbs.meta.x & SURFEL_FLAG_ACTIVE) == 0u || (nbs.meta.x & SURFEL_FLAG_STALE) != 0u) {
+					continue;
+				}
+				if (distance(nbs.posRadius.xyz, worldPos) < minSep) {
+					return;
+				}
+			}
+		}
+	}
+
 	/* Prefer recycling an inactive/stale slot; else grow the scan range. */
 	uint probe = uint(surfel_hash(seed + 9u) * float(pc.params.x)) % pc.params.x;
 	uint slot = 0xffffffffu;
@@ -57,14 +75,15 @@ void main() {
 		slot = probe;
 		/* Ensure scan range covers recycled slots. */
 		atomicMax(activeCount, probe + 1u);
+		if ((flags & SURFEL_FLAG_STALE) != 0u || (flags & SURFEL_FLAG_ACTIVE) != 0u) {
+			atomicAdd(recycled, 1u);
+		}
 	} else {
 		slot = atomicAdd(activeCount, 1u);
 		if (slot >= pc.params.x) {
 			atomicMin(activeCount, pc.params.x);
 			/* Last chance: overwrite a random slot. */
 			slot = probe;
-		} else {
-			/* New high-water mark. */
 		}
 	}
 

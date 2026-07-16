@@ -13,9 +13,9 @@ struct Surfel {
 #define SURFEL_FLAG_VALID  0x2u
 #define SURFEL_FLAG_STALE  0x4u
 
-/* Fixed-bucket spatial hash for resolve gather. */
+/* Fixed-bucket spatial hash for resolve gather (16 slots/cell for denser pools). */
 #define SURFEL_HASH_CELLS  4096u
-#define SURFEL_HASH_BUCKET 8u
+#define SURFEL_HASH_BUCKET 16u
 
 float surfel_hash(uint x) {
 	x ^= x >> 16u;

@@ -121,6 +121,13 @@ static struct {
 	VkAccelerationStructureKHR entity_blas;
 	VkBuffer		entity_blas_buffer;
 	VkDeviceMemory	entity_blas_memory;
+	uint32_t		entity_blas_built_prims;
+	uint32_t		entity_vb_capacity;
+	uint32_t		entity_ib_capacity;
+	VkDeviceSize	entity_ab_capacity;
+	qboolean		entity_blas_valid;
+	char			entity_blas_mode[16];
+	char			entity_blas_reason[48];
 	char			world_name[MAX_QPATH];
 	uint32_t		tlas_instance_count;
 	qboolean		tlas_valid;
@@ -128,6 +135,7 @@ static struct {
 } rtx;
 
 static void vk_rtx_destroy_entity_blas( void );
+static void vk_rtx_destroy_entity_as_only( void );
 
 static const char *vk_rtx_state_string( void )
 {
@@ -164,7 +172,7 @@ static void RTX_Status_f( void )
 		( r_rtxDemo && r_rtxDemo->integer ) ? 1 : 0,
 		( r_hybrid1 && r_hybrid1->integer ) ? 1 : 0,
 		( r_raygun && r_raygun->integer ) ? 1 : 0 );
-	ri.Printf( PRINT_ALL, "[VK][RTX] world=%s blas_tris=%u world_verts=%u albedo_prims=%u normal_prims=%u entity_ents=%u entity_tris=%u entity_verts=%u entity_albedo_prims=%u entity_normal_prims=%u mesh=%u (md3=%u iqm=%u gltf=%u mdr=%u) proxy=%u (nonmesh=%u skinned=%u md3fail=%u iqmfail=%u gltffail=%u mdrfail=%u) tlas_instances=%u tlas_mode=%s reason=%s\n",
+	ri.Printf( PRINT_ALL, "[VK][RTX] world=%s blas_tris=%u world_verts=%u albedo_prims=%u normal_prims=%u entity_ents=%u entity_tris=%u entity_verts=%u entity_albedo_prims=%u entity_normal_prims=%u mesh=%u (md3=%u iqm=%u gltf=%u mdr=%u) proxy=%u (nonmesh=%u skinned=%u md3fail=%u iqmfail=%u gltffail=%u mdrfail=%u) entity_blas=%s/%s tlas_instances=%u tlas_mode=%s reason=%s\n",
 		wn, rtx.world_primitive_count, rtx.world_vertex_count, rtx.world_albedo_count, rtx.world_normal_count,
 		rtx.entity_packed_count, rtx.entity_primitive_count,
 		rtx.entity_vertex_count, rtx.entity_albedo_count, rtx.entity_normal_count, rtx.entity_mesh_count,
@@ -172,9 +180,19 @@ static void RTX_Status_f( void )
 		rtx.entity_proxy_count,
 		rtx.entity_proxy_non_mesh, rtx.entity_proxy_skinned,
 		rtx.entity_proxy_md3_fail, rtx.entity_proxy_iqm_fail, rtx.entity_proxy_gltf_fail, rtx.entity_proxy_mdr_fail,
+		rtx.entity_blas_mode[0] ? rtx.entity_blas_mode : "n/a",
+		rtx.entity_blas_reason[0] ? rtx.entity_blas_reason : "n/a",
 		rtx.tlas_instance_count,
 		rtx.tlas_build_mode[0] ? rtx.tlas_build_mode : "n/a",
 		rtx.tlas_rebuild_reason[0] ? rtx.tlas_rebuild_reason : "n/a" );
+	ri.Printf( PRINT_ALL, "[VK][RTX] entity_albedo=materials:%d uv_thumb:%d (r_rtxEntityMaterials / r_rtxEntityUvSample)\n",
+		( r_rtxEntityMaterials && r_rtxEntityMaterials->integer ) ? 1 : 0,
+		( r_rtxEntityUvSample && r_rtxEntityUvSample->integer
+			&& r_rtxEntityMaterials && r_rtxEntityMaterials->integer ) ? 1 : 0 );
+	ri.Printf( PRINT_ALL, "[VK][RTX] world_albedo=materials:%d uv_thumb:%d (r_rtxWorldMaterials / r_rtxWorldUvSample)\n",
+		( r_rtxWorldMaterials && r_rtxWorldMaterials->integer ) ? 1 : 0,
+		( r_rtxWorldUvSample && r_rtxWorldUvSample->integer
+			&& r_rtxWorldMaterials && r_rtxWorldMaterials->integer ) ? 1 : 0 );
 	ri.Printf( PRINT_ALL, "[VK][RTX] note: Hybrid1 is the production RT lighting path; r_rtx demo overlay is diagnostic unless modes gain real rays\n" );
 	ri.Printf( PRINT_ALL, "[VK][RTX] trace_extent=%ux%u r_rtx=%d composite=%.2f samples=%d\n",
 		rtx.width, rtx.height,
@@ -749,14 +767,24 @@ static void vk_rtx_rebuild_world_blas( void )
 	}
 }
 
-static void vk_rtx_destroy_entity_blas( void )
+static void vk_rtx_destroy_entity_as_only( void )
 {
 	vk_rtx_destroy_as( &rtx.entity_blas );
 	vk_rtx_destroy_buffer( &rtx.entity_blas_buffer, &rtx.entity_blas_memory );
+	rtx.entity_blas_built_prims = 0u;
+	rtx.entity_blas_valid = qfalse;
+}
+
+static void vk_rtx_destroy_entity_blas( void )
+{
+	vk_rtx_destroy_entity_as_only();
 	vk_rtx_destroy_buffer( &rtx.entity_vertex_buffer, &rtx.entity_vertex_memory );
 	vk_rtx_destroy_buffer( &rtx.entity_index_buffer, &rtx.entity_index_memory );
 	vk_rtx_destroy_buffer( &rtx.entity_albedo_buffer, &rtx.entity_albedo_memory );
 	vk_rtx_destroy_buffer( &rtx.entity_normal_buffer, &rtx.entity_normal_memory );
+	rtx.entity_vb_capacity = 0u;
+	rtx.entity_ib_capacity = 0u;
+	rtx.entity_ab_capacity = 0;
 	rtx.entity_primitive_count = 0u;
 	rtx.entity_packed_count = 0u;
 	rtx.entity_vertex_count = 0u;
@@ -774,6 +802,8 @@ static void vk_rtx_destroy_entity_blas( void )
 	rtx.entity_proxy_mdr_fail = 0u;
 	rtx.entity_albedo_count = 0u;
 	rtx.entity_normal_count = 0u;
+	rtx.entity_blas_mode[0] = '\0';
+	rtx.entity_blas_reason[0] = '\0';
 }
 
 static void vk_rtx_rebuild_entity_tlas( void )
@@ -812,6 +842,8 @@ static void vk_rtx_rebuild_entity_tlas( void )
 	VkDeviceAddress ibAddr = 0;
 	qboolean tlasUpdate;
 	qboolean tlasCanUpdate;
+	qboolean entityBlasUpdate;
+	qboolean entityBlasCanUpdate;
 
 	if ( !rtx.ready || !rtx.descriptor_set || !rtx.blas || !rtx.world_blas_valid ) {
 		return;
@@ -826,8 +858,6 @@ static void vk_rtx_rebuild_entity_tlas( void )
 	addrInfo.accelerationStructure = rtx.blas;
 	worldBlasAddr = qvkGetAccelerationStructureDeviceAddressKHR( vk.device, &addrInfo );
 
-	vk_rtx_destroy_entity_blas();
-
 	capEnt = ( r_rtxEntityCap && r_rtxEntityCap->integer > 0 ) ? (uint32_t)r_rtxEntityCap->integer : 128u;
 	if ( capEnt > 1024u ) {
 		capEnt = 1024u;
@@ -835,6 +865,8 @@ static void vk_rtx_rebuild_entity_tlas( void )
 
 	maxPrimEntity = 0u;
 	packedEnt = 0u;
+	entityBlasUpdate = qfalse;
+	entityBlasCanUpdate = qfalse;
 	if ( backEnd.refdef.num_entities > 0 ) {
 		uint32_t triCap = ( r_rtxEntityTriCap && r_rtxEntityTriCap->integer > 0 )
 			? (uint32_t)r_rtxEntityTriCap->integer : 65536u;
@@ -842,7 +874,9 @@ static void vk_rtx_rebuild_entity_tlas( void )
 		uint32_t maxIndices;
 		VkDeviceSize vbSize;
 		VkDeviceSize ibSize;
+		VkDeviceSize abSize;
 		vkRtxEntityPackStats_t packStats;
+		VkBufferDeviceAddressInfo bda;
 
 		if ( triCap < 12u ) {
 			triCap = 12u;
@@ -862,22 +896,21 @@ static void vk_rtx_rebuild_entity_tlas( void )
 
 		vbSize = (VkDeviceSize)maxVerts * 3u * sizeof( float );
 		ibSize = (VkDeviceSize)maxIndices * sizeof( uint32_t );
+		abSize = (VkDeviceSize)( maxIndices / 3u ) * 3u * sizeof( float );
 
-		vk_rtx_alloc_buffer( vbSize,
-			VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT | VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR,
-			VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-			&rtx.entity_vertex_buffer, &rtx.entity_vertex_memory, &vbAddr );
-		vk_rtx_alloc_buffer( ibSize,
-			VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT | VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR,
-			VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-			&rtx.entity_index_buffer, &rtx.entity_index_memory, &ibAddr );
-		{
-			VkDeviceSize abSize = (VkDeviceSize)( maxIndices / 3u ) * 3u * sizeof( float );
-			float *posHost;
-			uint32_t *idxHost;
-			float *albedoHost = NULL;
-			float *normalHost = NULL;
-
+		if ( rtx.entity_vb_capacity < maxVerts || rtx.entity_ib_capacity < maxIndices
+			|| rtx.entity_ab_capacity < abSize
+			|| rtx.entity_vertex_buffer == VK_NULL_HANDLE
+			|| rtx.entity_index_buffer == VK_NULL_HANDLE ) {
+			vk_rtx_destroy_entity_blas();
+			vk_rtx_alloc_buffer( vbSize,
+				VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT | VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR,
+				VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+				&rtx.entity_vertex_buffer, &rtx.entity_vertex_memory, &vbAddr );
+			vk_rtx_alloc_buffer( ibSize,
+				VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT | VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR,
+				VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+				&rtx.entity_index_buffer, &rtx.entity_index_memory, &ibAddr );
 			vk_rtx_alloc_buffer( abSize,
 				VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 				VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
@@ -886,6 +919,22 @@ static void vk_rtx_rebuild_entity_tlas( void )
 				VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 				VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
 				&rtx.entity_normal_buffer, &rtx.entity_normal_memory, NULL );
+			rtx.entity_vb_capacity = maxVerts;
+			rtx.entity_ib_capacity = maxIndices;
+			rtx.entity_ab_capacity = abSize;
+		} else {
+			Com_Memset( &bda, 0, sizeof( bda ) );
+			bda.sType = VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO;
+			bda.buffer = rtx.entity_vertex_buffer;
+			vbAddr = qvkGetBufferDeviceAddress( vk.device, &bda );
+			bda.buffer = rtx.entity_index_buffer;
+			ibAddr = qvkGetBufferDeviceAddress( vk.device, &bda );
+		}
+		{
+			float *posHost;
+			uint32_t *idxHost;
+			float *albedoHost = NULL;
+			float *normalHost = NULL;
 
 			VK_CHECK( qvkMapMemory( vk.device, rtx.entity_vertex_memory, 0, vbSize, 0, (void **)&posHost ) );
 			VK_CHECK( qvkMapMemory( vk.device, rtx.entity_index_memory, 0, ibSize, 0, (void **)&idxHost ) );
@@ -908,7 +957,14 @@ static void vk_rtx_rebuild_entity_tlas( void )
 			}
 		}
 		if ( packedEnt == 0u || packStats.primitiveCount == 0u ) {
-			vk_rtx_destroy_entity_blas();
+			vk_rtx_destroy_entity_as_only();
+			rtx.entity_packed_count = 0u;
+			rtx.entity_primitive_count = 0u;
+			rtx.entity_vertex_count = 0u;
+			rtx.entity_albedo_count = 0u;
+			rtx.entity_normal_count = 0u;
+			Q_strncpyz( rtx.entity_blas_mode, "NONE", sizeof( rtx.entity_blas_mode ) );
+			Q_strncpyz( rtx.entity_blas_reason, "no_packed_prims", sizeof( rtx.entity_blas_reason ) );
 		} else {
 			maxPrimEntity = packStats.primitiveCount;
 			rtx.entity_packed_count = packedEnt;
@@ -947,7 +1003,9 @@ static void vk_rtx_rebuild_entity_tlas( void )
 			Com_Memset( &buildInfoBLAS, 0, sizeof( buildInfoBLAS ) );
 			buildInfoBLAS.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_BUILD_GEOMETRY_INFO_KHR;
 			buildInfoBLAS.type = VK_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL_KHR;
-			buildInfoBLAS.flags = VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR;
+			/* Skinned/animated verts: prefer fast build + allow REFIT/UPDATE across frames. */
+			buildInfoBLAS.flags = VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_BUILD_BIT_KHR
+				| VK_BUILD_ACCELERATION_STRUCTURE_ALLOW_UPDATE_BIT_KHR;
 			buildInfoBLAS.geometryCount = 1;
 			buildInfoBLAS.pGeometries = &geometryBLAS;
 
@@ -956,21 +1014,44 @@ static void vk_rtx_rebuild_entity_tlas( void )
 			qvkGetAccelerationStructureBuildSizesKHR( vk.device, VK_ACCELERATION_STRUCTURE_BUILD_TYPE_DEVICE_KHR,
 				&buildInfoBLAS, &maxPrimEntity, &sizeInfoBLAS );
 
-			vk_rtx_alloc_buffer( sizeInfoBLAS.accelerationStructureSize,
-				VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_STORAGE_BIT_KHR | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
-				VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, &rtx.entity_blas_buffer, &rtx.entity_blas_memory, NULL );
+			entityBlasCanUpdate = rtx.entity_blas_valid && rtx.entity_blas != VK_NULL_HANDLE
+				&& rtx.entity_blas_built_prims == maxPrimEntity;
+			entityBlasUpdate = entityBlasCanUpdate && r_rtxEntityBlasUpdate && r_rtxEntityBlasUpdate->integer;
 
-			Com_Memset( &asci, 0, sizeof( asci ) );
-			asci.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_CREATE_INFO_KHR;
-			asci.buffer = rtx.entity_blas_buffer;
-			asci.size = sizeInfoBLAS.accelerationStructureSize;
-			asci.type = VK_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL_KHR;
-			VK_CHECK( qvkCreateAccelerationStructureKHR( vk.device, &asci, NULL, &rtx.entity_blas ) );
+			if ( entityBlasUpdate ) {
+				Q_strncpyz( rtx.entity_blas_mode, "UPDATE", sizeof( rtx.entity_blas_mode ) );
+				Q_strncpyz( rtx.entity_blas_reason, "stable_prim_count", sizeof( rtx.entity_blas_reason ) );
+			} else {
+				Q_strncpyz( rtx.entity_blas_mode, "REBUILD", sizeof( rtx.entity_blas_mode ) );
+				if ( !rtx.entity_blas_valid || rtx.entity_blas == VK_NULL_HANDLE ) {
+					Q_strncpyz( rtx.entity_blas_reason, "no_prior_blas", sizeof( rtx.entity_blas_reason ) );
+				} else if ( rtx.entity_blas_built_prims != maxPrimEntity ) {
+					Q_strncpyz( rtx.entity_blas_reason, "prim_count_changed", sizeof( rtx.entity_blas_reason ) );
+				} else if ( !r_rtxEntityBlasUpdate || !r_rtxEntityBlasUpdate->integer ) {
+					Q_strncpyz( rtx.entity_blas_reason, "r_rtxEntityBlasUpdate=0", sizeof( rtx.entity_blas_reason ) );
+				} else {
+					Q_strncpyz( rtx.entity_blas_reason, "unknown", sizeof( rtx.entity_blas_reason ) );
+				}
+				vk_rtx_destroy_entity_as_only();
+				vk_rtx_alloc_buffer( sizeInfoBLAS.accelerationStructureSize,
+					VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_STORAGE_BIT_KHR | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
+					VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, &rtx.entity_blas_buffer, &rtx.entity_blas_memory, NULL );
+
+				Com_Memset( &asci, 0, sizeof( asci ) );
+				asci.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_CREATE_INFO_KHR;
+				asci.buffer = rtx.entity_blas_buffer;
+				asci.size = sizeInfoBLAS.accelerationStructureSize;
+				asci.type = VK_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL_KHR;
+				VK_CHECK( qvkCreateAccelerationStructureKHR( vk.device, &asci, NULL, &rtx.entity_blas ) );
+			}
 
 			addrInfo.accelerationStructure = rtx.entity_blas;
 			entityBlasAddr = qvkGetAccelerationStructureDeviceAddressKHR( vk.device, &addrInfo );
 
-			scratchSize = sizeInfoBLAS.buildScratchSize;
+			scratchSize = entityBlasUpdate ? sizeInfoBLAS.updateScratchSize : sizeInfoBLAS.buildScratchSize;
+			if ( scratchSize == 0u ) {
+				scratchSize = sizeInfoBLAS.buildScratchSize;
+			}
 			vk_rtx_destroy_buffer( &rtx.scratch_buffer, &rtx.scratch_memory );
 			vk_rtx_alloc_buffer( scratchSize,
 				VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
@@ -979,7 +1060,10 @@ static void vk_rtx_rebuild_entity_tlas( void )
 			Com_Memset( &rangeBLAS, 0, sizeof( rangeBLAS ) );
 			rangeBLAS.primitiveCount = maxPrimEntity;
 			pRangeBLAS = &rangeBLAS;
-			buildInfoBLAS.mode = VK_BUILD_ACCELERATION_STRUCTURE_MODE_BUILD_KHR;
+			buildInfoBLAS.mode = entityBlasUpdate
+				? VK_BUILD_ACCELERATION_STRUCTURE_MODE_UPDATE_KHR
+				: VK_BUILD_ACCELERATION_STRUCTURE_MODE_BUILD_KHR;
+			buildInfoBLAS.srcAccelerationStructure = entityBlasUpdate ? rtx.entity_blas : VK_NULL_HANDLE;
 			buildInfoBLAS.dstAccelerationStructure = rtx.entity_blas;
 			buildInfoBLAS.scratchData.deviceAddress = scratchAddr;
 
@@ -991,7 +1075,26 @@ static void vk_rtx_rebuild_entity_tlas( void )
 			qvkCmdBuildAccelerationStructuresKHR( buildCmd, 1, &buildInfoBLAS, &pRangeBLAS );
 			VK_CHECK( qvkEndCommandBuffer( buildCmd ) );
 			vk_rtx_submit_oneshot_build( buildCmd );
+
+			rtx.entity_blas_built_prims = maxPrimEntity;
+			rtx.entity_blas_valid = qtrue;
+			if ( entityBlasUpdate ) {
+				static qboolean loggedUpdate;
+				if ( !loggedUpdate ) {
+					ri.Printf( PRINT_ALL, "[VK][RTX] entity BLAS UPDATE path active (r_rtxEntityBlasUpdate 1, stable prim count)\n" );
+					loggedUpdate = qtrue;
+				}
+			}
 		}
+	} else {
+		vk_rtx_destroy_entity_as_only();
+		rtx.entity_packed_count = 0u;
+		rtx.entity_primitive_count = 0u;
+		rtx.entity_vertex_count = 0u;
+		rtx.entity_albedo_count = 0u;
+		rtx.entity_normal_count = 0u;
+		Q_strncpyz( rtx.entity_blas_mode, "NONE", sizeof( rtx.entity_blas_mode ) );
+		Q_strncpyz( rtx.entity_blas_reason, "no_entities", sizeof( rtx.entity_blas_reason ) );
 	}
 
 	maxInstTLAS = ( packedEnt > 0u && rtx.entity_blas != VK_NULL_HANDLE ) ? 2u : 1u;

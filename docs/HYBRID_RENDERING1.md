@@ -13,7 +13,7 @@ Implementation of the thesis **Hybrid-Rendering Techniques in GPU** (IST, July 2
 7. **Composite** — modulate raster HDR by denoised shadow; add denoised specular; add denoised diffuse × albedo (or **Surfel irradiance × albedo** when `r_surfelGi_hybrid1Fusion 1` and Surfel GI is active).
 8. **TAA** (optional) — post-process `r_taa` or auto via `r_hybrid1_taa 1` after composite.
 
-RT closest-hit shaders prefer a **per-primitive world albedo SSBO** (vertex/face colors packed with the world BLAS, including **SF_GRID** patches) when `gl_InstanceCustomIndexEXT == 0`. Entity hits (`customIndex == 1`) use parallel **entity albedo/normal SSBOs** (geo normals + `refEntity.shader` tint or default gray). If that miss, they reproject hit points into the deferred **G-buffer albedo** (when `r_deferredGBufferFill 1`) instead of flat placeholder colors.
+RT closest-hit shaders prefer a **per-primitive world albedo SSBO** when `gl_InstanceCustomIndexEXT == 0`. With **`r_rtxWorldMaterials 1`** (default), world pack prefers diffuse **shader avgColor**; with **`r_rtxWorldUvSample 1`** (default) it upgrades to **UV-centroid 8×8 diffuse thumbs** (fallback: avgColor → BSP vertex/face colors, including **SF_GRID**). Entity hits (`customIndex == 1`) use parallel **entity albedo/normal SSBOs** (geo normals + per-surface albedo when **`r_rtxEntityMaterials 1`** — default). With **`r_rtxEntityUvSample 1`** (default), pack-time **UV-centroid samples** of 8×8 diffuse thumbs replace flat texture averages for MD3/IQM/MDR/glTF prims; otherwise shader/texture averages (or `refEntity.shader` tint / gray when materials are off). If that miss, they reproject hit points into the deferred **G-buffer albedo** (when `r_deferredGBufferFill 1`) instead of flat placeholder colors. True hit-shader texturing remains deferred.
 
 Secondary rays also sample a packed **per-primitive world normal SSBO** (`hybrid1_sampleHitNormal`) for sun N·L, irradiance lookup, and specular IBL reflection — no ray-direction placeholders on the RTX path.
 
@@ -50,7 +50,7 @@ r_rtxEntities 1           // entity mesh BLAS: MD3 + CPU-skinned IQM/MDR + stati
 r_rtxEntityTriCap 65536
 ```
 
-`demo_hybrid1.cfg` sets `r_rtxEntities 1` and `r_hybrid1Quality 3`. Console **`rtx_status`** reports `entity_ents` / `entity_tris` / `mesh` breakdown (`md3` / `iqm` / `gltf` / `mdr`) / `proxy` reasons (`nonmesh` = unknown, `*fail` = pack failed → AABB) and **TLAS mode** (`UPDATE` vs `REBUILD` with reason).
+`demo_hybrid1.cfg` sets `r_rtxEntities 1` and `r_hybrid1Quality 3`. Console **`rtx_status`** reports `entity_ents` / `entity_tris` / `mesh` breakdown (`md3` / `iqm` / `gltf` / `mdr`) / `proxy` reasons (`nonmesh` = unknown, `*fail` = pack failed → AABB), **entity BLAS mode** (`UPDATE` vs `REBUILD`), and **TLAS mode** (`UPDATE` vs `REBUILD` with reason).
 
 `r_rtx 1` **or** `r_hybrid1 1` before `vid_restart` enables KHR ray tracing device features.
 

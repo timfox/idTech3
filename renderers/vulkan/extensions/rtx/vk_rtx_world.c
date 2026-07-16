@@ -2,7 +2,8 @@
 ===========================================================================
 World BSP geometry extraction for Vulkan RTX BLAS
 (all brush submodels: faces + triangle soups + SF_GRID patches).
-Optional per-primitive albedo RGB + geometric normals for Hybrid1 / pathtrace / Surfel GI.
+Optional per-primitive albedo RGB (shader materials / UV thumbs or vertex color)
++ geometric normals for Hybrid1 / pathtrace / Surfel GI.
 ===========================================================================
 */
 
@@ -103,6 +104,176 @@ static void rtx_avg3_albedo( const float a[3], const float b[3], const float c[3
 	outRgb[0] = ( a[0] + b[0] + c[0] ) * ( 1.0f / 3.0f );
 	outRgb[1] = ( a[1] + b[1] + c[1] ) * ( 1.0f / 3.0f );
 	outRgb[2] = ( a[2] + b[2] + c[2] ) * ( 1.0f / 3.0f );
+}
+
+static qboolean rtx_world_materials_enabled( void )
+{
+	return ( r_rtxWorldMaterials && r_rtxWorldMaterials->integer ) ? qtrue : qfalse;
+}
+
+static qboolean rtx_world_uv_enabled( void )
+{
+	return ( rtx_world_materials_enabled()
+		&& r_rtxWorldUvSample && r_rtxWorldUvSample->integer ) ? qtrue : qfalse;
+}
+
+static image_t *rtx_world_diffuse_image( const shader_t *shader )
+{
+	int i;
+
+	if ( !shader ) {
+		return NULL;
+	}
+	for ( i = 0; i < MAX_SHADER_STAGES && shader->stages[i]; i++ ) {
+		const shaderStage_t *st = shader->stages[i];
+		const textureBundle_t *bundle;
+		image_t *img;
+
+		if ( !st->active ) {
+			continue;
+		}
+		bundle = &st->bundle[0];
+		if ( bundle->lightmap != LIGHTMAP_INDEX_NONE ) {
+			continue;
+		}
+		if ( bundle->rgbGen == CGEN_CONST ) {
+			return NULL;
+		}
+		img = bundle->image[0];
+		if ( img && img != tr.defaultImage && img != tr.whiteImage && img->hasThumb ) {
+			return img;
+		}
+	}
+	return NULL;
+}
+
+static void rtx_sample_thumb_uv( const image_t *img, float u, float v, float out[3] )
+{
+	int x, y;
+	const byte *p;
+	float fu, fv;
+
+	if ( !img || !img->hasThumb || !out ) {
+		out[0] = s_defaultAlbedo[0];
+		out[1] = s_defaultAlbedo[1];
+		out[2] = s_defaultAlbedo[2];
+		return;
+	}
+	fu = u - (float)floor( u );
+	fv = v - (float)floor( v );
+	if ( fu < 0.0f ) {
+		fu += 1.0f;
+	}
+	if ( fv < 0.0f ) {
+		fv += 1.0f;
+	}
+	x = (int)( fu * (float)( TR_IMAGE_THUMB_SIZE - 1 ) + 0.5f );
+	y = (int)( fv * (float)( TR_IMAGE_THUMB_SIZE - 1 ) + 0.5f );
+	if ( x < 0 ) {
+		x = 0;
+	} else if ( x >= TR_IMAGE_THUMB_SIZE ) {
+		x = TR_IMAGE_THUMB_SIZE - 1;
+	}
+	if ( y < 0 ) {
+		y = 0;
+	} else if ( y >= TR_IMAGE_THUMB_SIZE ) {
+		y = TR_IMAGE_THUMB_SIZE - 1;
+	}
+	p = img->thumbRGBA + ( y * TR_IMAGE_THUMB_SIZE + x ) * 4;
+	out[0] = p[0] * ( 1.0f / 255.0f );
+	out[1] = p[1] * ( 1.0f / 255.0f );
+	out[2] = p[2] * ( 1.0f / 255.0f );
+}
+
+/*
+ * Diffuse avgColor / const RGB from first non-lightmap stage.
+ * Returns qfalse when no usable material color was found.
+ */
+static qboolean rtx_albedo_from_shader( const shader_t *shader, float out[3] )
+{
+	int i;
+
+	if ( !shader ) {
+		return qfalse;
+	}
+	for ( i = 0; i < MAX_SHADER_STAGES && shader->stages[i]; i++ ) {
+		const shaderStage_t *st = shader->stages[i];
+		const textureBundle_t *bundle;
+		image_t *img;
+
+		if ( !st->active ) {
+			continue;
+		}
+		bundle = &st->bundle[0];
+		if ( bundle->lightmap != LIGHTMAP_INDEX_NONE ) {
+			continue;
+		}
+		if ( bundle->rgbGen == CGEN_CONST ) {
+			out[0] = bundle->constantColor.rgba[0] * ( 1.0f / 255.0f );
+			out[1] = bundle->constantColor.rgba[1] * ( 1.0f / 255.0f );
+			out[2] = bundle->constantColor.rgba[2] * ( 1.0f / 255.0f );
+			return qtrue;
+		}
+		img = bundle->image[0];
+		if ( !img || img == tr.defaultImage ) {
+			continue;
+		}
+		if ( img == tr.whiteImage ) {
+			out[0] = out[1] = out[2] = 1.0f;
+		} else {
+			out[0] = img->avgColor[0];
+			out[1] = img->avgColor[1];
+			out[2] = img->avgColor[2];
+		}
+		if ( bundle->rgbGen == CGEN_IDENTITY_LIGHTING ) {
+			out[0] *= tr.identityLight;
+			out[1] *= tr.identityLight;
+			out[2] *= tr.identityLight;
+		}
+		return qtrue;
+	}
+	return qfalse;
+}
+
+/*
+ * Prefer UV-centroid diffuse thumb → shader avgColor → vertex color average.
+ */
+static void rtx_resolve_prim_albedo( const shader_t *shader, float u, float v,
+	const float vertAvg[3], float out[3] )
+{
+	image_t *img;
+
+	if ( !rtx_world_materials_enabled() || !shader ) {
+		out[0] = vertAvg[0];
+		out[1] = vertAvg[1];
+		out[2] = vertAvg[2];
+		return;
+	}
+	if ( rtx_world_uv_enabled() ) {
+		img = rtx_world_diffuse_image( shader );
+		if ( img ) {
+			rtx_sample_thumb_uv( img, u, v, out );
+			return;
+		}
+	}
+	if ( rtx_albedo_from_shader( shader, out ) ) {
+		return;
+	}
+	out[0] = vertAvg[0];
+	out[1] = vertAvg[1];
+	out[2] = vertAvg[2];
+}
+
+static void rtx_face_st( const srfSurfaceFace_t *face, unsigned vidx, float *u, float *v )
+{
+	const float *p = face->points[vidx];
+#ifdef USE_VK_PBR
+	*u = p[6];
+	*v = p[7];
+#else
+	*u = p[3];
+	*v = p[4];
+#endif
 }
 
 static uint32_t rtx_count_face_tris( const srfSurfaceFace_t *face )
@@ -236,8 +407,9 @@ uint32_t vk_rtx_world_count_primitives( const world_t *w, uint32_t maxPrimitives
 	return total;
 }
 
-static void rtx_emit_face_tris( const srfSurfaceFace_t *face, float *positions, uint32_t *indices,
-	float *albedoRgb, float *normalRgb, uint32_t *outVert, uint32_t *outIdx, uint32_t maxPrimitives, uint32_t *primCount )
+static void rtx_emit_face_tris( const srfSurfaceFace_t *face, const shader_t *shader,
+	float *positions, uint32_t *indices, float *albedoRgb, float *normalRgb,
+	uint32_t *outVert, uint32_t *outIdx, uint32_t maxPrimitives, uint32_t *primCount )
 {
 	const unsigned *idxSrc;
 	uint32_t t, baseV, baseI;
@@ -251,7 +423,8 @@ static void rtx_emit_face_tris( const srfSurfaceFace_t *face, float *positions, 
 	baseI = *outIdx;
 
 	for ( t = 0u; t < (uint32_t)face->numIndices / 3u; t++ ) {
-		float ca[3], cb[3], cc[3], avg[3];
+		float ca[3], cb[3], cc[3], avg[3], rgb[3];
+		float u0, v0, u1, v1, u2, v2, u, v;
 		unsigned i0, i1, i2;
 
 		if ( *primCount >= maxPrimitives ) {
@@ -274,7 +447,13 @@ static void rtx_emit_face_tris( const srfSurfaceFace_t *face, float *positions, 
 		rtx_albedo_from_face_vert( face, i1, cb );
 		rtx_albedo_from_face_vert( face, i2, cc );
 		rtx_avg3_albedo( ca, cb, cc, avg );
-		rtx_store_albedo( albedoRgb, *primCount, avg[0], avg[1], avg[2] );
+		rtx_face_st( face, i0, &u0, &v0 );
+		rtx_face_st( face, i1, &u1, &v1 );
+		rtx_face_st( face, i2, &u2, &v2 );
+		u = ( u0 + u1 + u2 ) * ( 1.0f / 3.0f );
+		v = ( v0 + v1 + v2 ) * ( 1.0f / 3.0f );
+		rtx_resolve_prim_albedo( shader, u, v, avg, rgb );
+		rtx_store_albedo( albedoRgb, *primCount, rgb[0], rgb[1], rgb[2] );
 		/* Planar faces: BSP plane normal is authoritative. */
 		rtx_store_normal( normalRgb, *primCount, face->plane.normal );
 		baseV += 3u;
@@ -285,8 +464,9 @@ static void rtx_emit_face_tris( const srfSurfaceFace_t *face, float *positions, 
 	*outIdx = baseI;
 }
 
-static void rtx_emit_triangles_tris( const srfTriangles_t *surf, float *positions, uint32_t *indices,
-	float *albedoRgb, float *normalRgb, uint32_t *outVert, uint32_t *outIdx, uint32_t maxPrimitives, uint32_t *primCount )
+static void rtx_emit_triangles_tris( const srfTriangles_t *surf, const shader_t *shader,
+	float *positions, uint32_t *indices, float *albedoRgb, float *normalRgb,
+	uint32_t *outVert, uint32_t *outIdx, uint32_t maxPrimitives, uint32_t *primCount )
 {
 	uint32_t t, baseV, baseI;
 	int vi;
@@ -298,7 +478,8 @@ static void rtx_emit_triangles_tris( const srfTriangles_t *surf, float *position
 	baseI = *outIdx;
 
 	for ( t = 0u; t < (uint32_t)surf->numIndexes / 3u; t++ ) {
-		float ca[3], cb[3], cc[3], avg[3];
+		float ca[3], cb[3], cc[3], avg[3], rgb[3];
+		float u, v;
 		int i0, i1, i2;
 
 		if ( *primCount >= maxPrimitives ) {
@@ -321,7 +502,10 @@ static void rtx_emit_triangles_tris( const srfTriangles_t *surf, float *position
 		rtx_albedo_from_srfvert( &surf->verts[i1], cb );
 		rtx_albedo_from_srfvert( &surf->verts[i2], cc );
 		rtx_avg3_albedo( ca, cb, cc, avg );
-		rtx_store_albedo( albedoRgb, *primCount, avg[0], avg[1], avg[2] );
+		u = ( surf->verts[i0].st[0] + surf->verts[i1].st[0] + surf->verts[i2].st[0] ) * ( 1.0f / 3.0f );
+		v = ( surf->verts[i0].st[1] + surf->verts[i1].st[1] + surf->verts[i2].st[1] ) * ( 1.0f / 3.0f );
+		rtx_resolve_prim_albedo( shader, u, v, avg, rgb );
+		rtx_store_albedo( albedoRgb, *primCount, rgb[0], rgb[1], rgb[2] );
 		{
 			float n[3];
 			const float *na = surf->verts[i0].normal;
@@ -347,8 +531,9 @@ static void rtx_emit_triangles_tris( const srfTriangles_t *surf, float *position
 	*outIdx = baseI;
 }
 
-static void rtx_emit_grid_tris( const srfGridMesh_t *grid, float *positions, uint32_t *indices,
-	float *albedoRgb, float *normalRgb, uint32_t *outVert, uint32_t *outIdx, uint32_t maxPrimitives, uint32_t *primCount )
+static void rtx_emit_grid_tris( const srfGridMesh_t *grid, const shader_t *shader,
+	float *positions, uint32_t *indices, float *albedoRgb, float *normalRgb,
+	uint32_t *outVert, uint32_t *outIdx, uint32_t maxPrimitives, uint32_t *primCount )
 {
 	int widthTable[MAX_GRID_SIZE];
 	int heightTable[MAX_GRID_SIZE];
@@ -383,7 +568,8 @@ static void rtx_emit_grid_tris( const srfGridMesh_t *grid, float *positions, uin
 			int v2 = v1 - 1;
 			int v3 = v2 + lodWidth;
 			int v4 = v3 + 1;
-			float ca[3], cb[3], cc[3], avg[3];
+			float ca[3], cb[3], cc[3], avg[3], rgb[3];
+			float u, v;
 			const srfVert_t *dvA, *dvB, *dvC;
 
 			/* Tri 1: v2, v3, v1 */
@@ -402,7 +588,10 @@ static void rtx_emit_grid_tris( const srfGridMesh_t *grid, float *positions, uin
 			rtx_albedo_from_srfvert( dvB, cb );
 			rtx_albedo_from_srfvert( dvC, cc );
 			rtx_avg3_albedo( ca, cb, cc, avg );
-			rtx_store_albedo( albedoRgb, *primCount, avg[0], avg[1], avg[2] );
+			u = ( dvA->st[0] + dvB->st[0] + dvC->st[0] ) * ( 1.0f / 3.0f );
+			v = ( dvA->st[1] + dvB->st[1] + dvC->st[1] ) * ( 1.0f / 3.0f );
+			rtx_resolve_prim_albedo( shader, u, v, avg, rgb );
+			rtx_store_albedo( albedoRgb, *primCount, rgb[0], rgb[1], rgb[2] );
 			{
 				float n[3];
 				n[0] = dvA->normal[0] + dvB->normal[0] + dvC->normal[0];
@@ -436,7 +625,10 @@ static void rtx_emit_grid_tris( const srfGridMesh_t *grid, float *positions, uin
 			rtx_albedo_from_srfvert( dvB, cb );
 			rtx_albedo_from_srfvert( dvC, cc );
 			rtx_avg3_albedo( ca, cb, cc, avg );
-			rtx_store_albedo( albedoRgb, *primCount, avg[0], avg[1], avg[2] );
+			u = ( dvA->st[0] + dvB->st[0] + dvC->st[0] ) * ( 1.0f / 3.0f );
+			v = ( dvA->st[1] + dvB->st[1] + dvC->st[1] ) * ( 1.0f / 3.0f );
+			rtx_resolve_prim_albedo( shader, u, v, avg, rgb );
+			rtx_store_albedo( albedoRgb, *primCount, rgb[0], rgb[1], rgb[2] );
 			{
 				float n[3];
 				n[0] = dvA->normal[0] + dvB->normal[0] + dvC->normal[0];
@@ -498,14 +690,14 @@ uint32_t vk_rtx_world_pack( const world_t *w, uint32_t maxPrimitives,
 			}
 			st = sf->data;
 			if ( *st == SF_FACE ) {
-				rtx_emit_face_tris( (const srfSurfaceFace_t *)st, positions, indices, albedoRgb, normalRgb,
-					&vertPos, &idxPos, maxPrimitives, &primCount );
+				rtx_emit_face_tris( (const srfSurfaceFace_t *)st, sf->shader, positions, indices,
+					albedoRgb, normalRgb, &vertPos, &idxPos, maxPrimitives, &primCount );
 			} else if ( *st == SF_TRIANGLES ) {
-				rtx_emit_triangles_tris( (const srfTriangles_t *)st, positions, indices, albedoRgb, normalRgb,
-					&vertPos, &idxPos, maxPrimitives, &primCount );
+				rtx_emit_triangles_tris( (const srfTriangles_t *)st, sf->shader, positions, indices,
+					albedoRgb, normalRgb, &vertPos, &idxPos, maxPrimitives, &primCount );
 			} else if ( *st == SF_GRID ) {
-				rtx_emit_grid_tris( (const srfGridMesh_t *)st, positions, indices, albedoRgb, normalRgb,
-					&vertPos, &idxPos, maxPrimitives, &primCount );
+				rtx_emit_grid_tris( (const srfGridMesh_t *)st, sf->shader, positions, indices,
+					albedoRgb, normalRgb, &vertPos, &idxPos, maxPrimitives, &primCount );
 				gridPrims += ( primCount - before );
 			}
 			if ( primCount >= maxPrimitives ) {

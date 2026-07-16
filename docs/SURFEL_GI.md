@@ -50,16 +50,29 @@ Console: **`surfel_gi_status`**.
 | `r_surfelGi_hash` | 1 | Fixed-bucket spatial hash for resolve (0=strided fallback) |
 | `r_surfelGi_cellSize` | 64 | World units per hash cell |
 | `r_surfelGi_hybrid1Fusion` | 1 | When Hybrid1 is active: skip Surfel scene composite; Hybrid1 adds `albedo * irradiance * strength` (avoids double diffuse GI). Set `0` for legacy double-add / Surfel-only composite testing. |
+| `r_surfelGiDensity` | 0 | Density preset: 0=custom, 1=sparse, 2=balanced, 3=dense (live; sets spawn/radius/cell/minSep) |
+| `r_surfelGi_adaptiveSpawn` | 1 | Scale spawn attempts by pool fill (boost when sparse, ease when near capacity) |
+| `r_surfelGi_minSep` | 0.22 | Reject new spawns within this world distance of an existing surfel (`0`=off) |
 
 ## Pipeline
 
-1. **Spawn** — stratify screen UVs from depth + G-buffer normals → new or recycled surfels
+1. **Spawn** — stratify screen UVs from depth + G-buffer normals → new or recycled surfels; optional **min-separation** + **adaptive attempt count**
 2. **Update** — ray-query hemisphere samples into TLAS; world albedo + geometric normal SSBOs on instance 0 hits; miss ≈ sky; stale recycle
-3. **Hash** — clear + scatter active surfels into 4096×8 bucket grid
+3. **Hash** — clear + scatter active surfels into 4096×**16** bucket grid
 4. **Resolve** — 3×3×3 neighboring cells → RGBA16F irradiance
 5. **Composite** — `albedo * irradiance * strength` added to `vk.color_image` **unless** Hybrid1 fusion is active (then irradiance is handed to Hybrid1 composite)
 
 Runs after geometry (with NIV-class overlays) via `vk_surfel_gi_apply_after_geometry`.
+
+## Density budgeting
+
+| Preset | spawn | radius | cell | minSep |
+|--------|-------|--------|------|--------|
+| 1 sparse | 512 | 0.55 | 96 | 0.45 |
+| 2 balanced | 1024 | 0.35 | 64 | 0.22 |
+| 3 dense | 3072 | 0.22 | 40 | 0.14 |
+
+`seta r_surfelGiDensity 3` for denser coverage without raising latched `r_surfelGi_max`. Capacity itself still needs `vid_restart` when changed.
 
 ## Hybrid1 fusion
 
@@ -80,4 +93,4 @@ See `docs/HYBRID_RENDERING1.md`.
 
 ## Status
 
-v1: spawn/update/resolve/composite + world albedo/normal hits + entity (customIndex==1) albedo/normal SSBOs + stale recycle + spatial hash resolve + **Hybrid1 channel fusion** (`r_surfelGi_hybrid1Fusion`). Still open: denser surfel budgeting.
+v1: spawn/update/resolve/composite + world albedo/normal hits + entity (customIndex==1) albedo/normal SSBOs + stale recycle + spatial hash resolve + **Hybrid1 channel fusion** (`r_surfelGi_hybrid1Fusion`) + **density budgeting** (`r_surfelGiDensity`, adaptive spawn, min-sep, 16-slot hash buckets). World/entity pack-time UV thumbs via `r_rtxWorldUvSample` / `r_rtxEntityUvSample`. Still open: UV-sampled textures in hit shaders.

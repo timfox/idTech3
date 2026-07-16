@@ -573,8 +573,8 @@ static void vk_rtx_entity_geo_normal( const float *a, const float *b, const floa
 	}
 }
 
-static void vk_rtx_entity_fill_prim_attrs( const float *positions, const uint32_t *indices,
-	uint32_t primBegin, uint32_t primEnd, const byte *rgba,
+static void vk_rtx_entity_fill_prim_attrs_rgb( const float *positions, const uint32_t *indices,
+	uint32_t primBegin, uint32_t primEnd, const float rgb[3],
 	float *albedoRgb, float *normalNxyz )
 {
 	uint32_t p;
@@ -583,10 +583,10 @@ static void vk_rtx_entity_fill_prim_attrs( const float *positions, const uint32_
 	if ( !albedoRgb || !normalNxyz || !positions || !indices || primEnd <= primBegin ) {
 		return;
 	}
-	if ( rgba && ( rgba[0] | rgba[1] | rgba[2] ) != 0 ) {
-		ar = rgba[0] * ( 1.0f / 255.0f );
-		ag = rgba[1] * ( 1.0f / 255.0f );
-		ab = rgba[2] * ( 1.0f / 255.0f );
+	if ( rgb ) {
+		ar = rgb[0];
+		ag = rgb[1];
+		ab = rgb[2];
 	}
 
 	for ( p = primBegin; p < primEnd; p++ ) {
@@ -605,6 +605,629 @@ static void vk_rtx_entity_fill_prim_attrs( const float *positions, const uint32_
 		normalNxyz[p * 3u + 0u] = n[0];
 		normalNxyz[p * 3u + 1u] = n[1];
 		normalNxyz[p * 3u + 2u] = n[2];
+	}
+}
+
+static void vk_rtx_entity_tint_rgb( const byte *rgba, float out[3] )
+{
+	out[0] = 0.72f;
+	out[1] = 0.70f;
+	out[2] = 0.66f;
+	if ( rgba && ( rgba[0] | rgba[1] | rgba[2] ) != 0 ) {
+		out[0] = rgba[0] * ( 1.0f / 255.0f );
+		out[1] = rgba[1] * ( 1.0f / 255.0f );
+		out[2] = rgba[2] * ( 1.0f / 255.0f );
+	}
+}
+
+static shader_t *vk_rtx_entity_shader_for_surface( const trRefEntity_t *ent, const char *surfName,
+	shader_t *fallback )
+{
+	if ( !ent ) {
+		return fallback ? fallback : tr.defaultShader;
+	}
+	if ( ent->e.customShader ) {
+		return R_GetShaderByHandle( ent->e.customShader );
+	}
+	if ( ent->e.customSkin > 0 && ent->e.customSkin < tr.numSkins && surfName && surfName[0] ) {
+		const skin_t *skin = R_GetSkinByHandle( ent->e.customSkin );
+		int j;
+
+		if ( skin ) {
+			for ( j = 0; j < skin->numSurfaces; j++ ) {
+				if ( !strcmp( skin->surfaces[j].name, surfName ) ) {
+					return skin->surfaces[j].shader;
+				}
+			}
+		}
+		return tr.defaultShader;
+	}
+	return fallback ? fallback : tr.defaultShader;
+}
+
+static void vk_rtx_entity_albedo_from_shader( const shader_t *shader, const byte *tintRgba,
+	qboolean useMaterials, float out[3] )
+{
+	float base[3];
+	float tint[3];
+	int i;
+
+	vk_rtx_entity_tint_rgb( tintRgba, tint );
+	base[0] = tint[0];
+	base[1] = tint[1];
+	base[2] = tint[2];
+
+	if ( useMaterials && shader ) {
+		qboolean found = qfalse;
+
+		for ( i = 0; i < MAX_SHADER_STAGES && shader->stages[i]; i++ ) {
+			const shaderStage_t *st = shader->stages[i];
+			const textureBundle_t *bundle;
+			image_t *img;
+
+			if ( !st->active ) {
+				continue;
+			}
+			bundle = &st->bundle[0];
+			if ( bundle->lightmap != LIGHTMAP_INDEX_NONE ) {
+				continue;
+			}
+			if ( bundle->rgbGen == CGEN_CONST ) {
+				base[0] = bundle->constantColor.rgba[0] * ( 1.0f / 255.0f );
+				base[1] = bundle->constantColor.rgba[1] * ( 1.0f / 255.0f );
+				base[2] = bundle->constantColor.rgba[2] * ( 1.0f / 255.0f );
+				found = qtrue;
+				break;
+			}
+			img = bundle->image[0];
+			if ( !img || img == tr.defaultImage ) {
+				continue;
+			}
+			if ( img == tr.whiteImage ) {
+				base[0] = base[1] = base[2] = 1.0f;
+			} else {
+				base[0] = img->avgColor[0];
+				base[1] = img->avgColor[1];
+				base[2] = img->avgColor[2];
+			}
+			if ( bundle->rgbGen == CGEN_IDENTITY_LIGHTING ) {
+				base[0] *= tr.identityLight;
+				base[1] *= tr.identityLight;
+				base[2] *= tr.identityLight;
+			}
+			found = qtrue;
+			break;
+		}
+
+		if ( found && tintRgba && ( tintRgba[0] | tintRgba[1] | tintRgba[2] ) != 0 ) {
+			/* Modulate material average by entity tint when the game sets one. */
+			base[0] *= tint[0];
+			base[1] *= tint[1];
+			base[2] *= tint[2];
+		} else if ( !found ) {
+			/* keep tint/default */
+		}
+	}
+
+	out[0] = base[0];
+	out[1] = base[1];
+	out[2] = base[2];
+}
+
+static image_t *vk_rtx_entity_diffuse_image( const shader_t *shader )
+{
+	int i;
+
+	if ( !shader ) {
+		return NULL;
+	}
+	for ( i = 0; i < MAX_SHADER_STAGES && shader->stages[i]; i++ ) {
+		const shaderStage_t *st = shader->stages[i];
+		const textureBundle_t *bundle;
+		image_t *img;
+
+		if ( !st->active ) {
+			continue;
+		}
+		bundle = &st->bundle[0];
+		if ( bundle->lightmap != LIGHTMAP_INDEX_NONE ) {
+			continue;
+		}
+		if ( bundle->rgbGen == CGEN_CONST ) {
+			return NULL;
+		}
+		img = bundle->image[0];
+		if ( img && img != tr.defaultImage && img != tr.whiteImage && img->hasThumb ) {
+			return img;
+		}
+	}
+	return NULL;
+}
+
+static void vk_rtx_sample_thumb_uv( const image_t *img, float u, float v, float out[3] )
+{
+	int x, y;
+	const byte *p;
+	float fu, fv;
+
+	if ( !img || !img->hasThumb || !out ) {
+		out[0] = 0.72f;
+		out[1] = 0.70f;
+		out[2] = 0.66f;
+		return;
+	}
+	fu = u - (float)floor( u );
+	fv = v - (float)floor( v );
+	if ( fu < 0.0f ) {
+		fu += 1.0f;
+	}
+	if ( fv < 0.0f ) {
+		fv += 1.0f;
+	}
+	x = (int)( fu * (float)( TR_IMAGE_THUMB_SIZE - 1 ) + 0.5f );
+	y = (int)( fv * (float)( TR_IMAGE_THUMB_SIZE - 1 ) + 0.5f );
+	if ( x < 0 ) {
+		x = 0;
+	} else if ( x >= TR_IMAGE_THUMB_SIZE ) {
+		x = TR_IMAGE_THUMB_SIZE - 1;
+	}
+	if ( y < 0 ) {
+		y = 0;
+	} else if ( y >= TR_IMAGE_THUMB_SIZE ) {
+		y = TR_IMAGE_THUMB_SIZE - 1;
+	}
+	p = img->thumbRGBA + ( y * TR_IMAGE_THUMB_SIZE + x ) * 4;
+	out[0] = p[0] * ( 1.0f / 255.0f );
+	out[1] = p[1] * ( 1.0f / 255.0f );
+	out[2] = p[2] * ( 1.0f / 255.0f );
+}
+
+static void vk_rtx_entity_write_prim( float *albedoRgb, float *normalNxyz, uint32_t prim,
+	const float *a, const float *b, const float *c, const float rgb[3] )
+{
+	float n[3];
+
+	if ( albedoRgb ) {
+		albedoRgb[prim * 3u + 0u] = rgb[0];
+		albedoRgb[prim * 3u + 1u] = rgb[1];
+		albedoRgb[prim * 3u + 2u] = rgb[2];
+	}
+	if ( normalNxyz ) {
+		vk_rtx_entity_geo_normal( a, b, c, n );
+		normalNxyz[prim * 3u + 0u] = n[0];
+		normalNxyz[prim * 3u + 1u] = n[1];
+		normalNxyz[prim * 3u + 2u] = n[2];
+	}
+}
+
+static qboolean vk_rtx_entity_uv_enabled( void )
+{
+	return ( r_rtxEntityUvSample && r_rtxEntityUvSample->integer
+		&& r_rtxEntityMaterials && r_rtxEntityMaterials->integer ) ? qtrue : qfalse;
+}
+
+static void vk_rtx_entity_prim_rgb( const shader_t *shader, const byte *tintRgba,
+	qboolean useMaterials, qboolean useUv, float u, float v, float out[3] )
+{
+	image_t *img;
+	float tint[3];
+
+	vk_rtx_entity_albedo_from_shader( shader, tintRgba, useMaterials, out );
+	if ( !useUv || !useMaterials ) {
+		return;
+	}
+	img = vk_rtx_entity_diffuse_image( shader );
+	if ( !img ) {
+		return;
+	}
+	vk_rtx_sample_thumb_uv( img, u, v, out );
+	if ( tintRgba && ( tintRgba[0] | tintRgba[1] | tintRgba[2] ) != 0 ) {
+		vk_rtx_entity_tint_rgb( tintRgba, tint );
+		out[0] *= tint[0];
+		out[1] *= tint[1];
+		out[2] *= tint[2];
+	}
+}
+
+static void vk_rtx_entity_fill_md3_materials( const trRefEntity_t *ent, model_t *mod,
+	const float *positions, const uint32_t *indices, uint32_t indexBefore, uint32_t indexAfter,
+	float *albedoRgb, float *normalNxyz, qboolean useMaterials )
+{
+	md3Header_t *header;
+	md3Surface_t *surface;
+	int frame, oldframe, s;
+	uint32_t prim = indexBefore / 3u;
+	qboolean useUv = ( useMaterials && vk_rtx_entity_uv_enabled() ) ? qtrue : qfalse;
+
+	if ( !mod->md3[0] || indexAfter <= indexBefore ) {
+		return;
+	}
+	header = mod->md3[0];
+	frame = ent->e.frame;
+	oldframe = ent->e.oldframe;
+	if ( ent->e.renderfx & RF_WRAP_FRAMES ) {
+		frame %= header->numFrames;
+		oldframe %= header->numFrames;
+	}
+	if ( frame < 0 || frame >= header->numFrames ) {
+		frame = 0;
+	}
+	(void)oldframe;
+
+	surface = (md3Surface_t *)( (byte *)header + header->ofsSurfaces );
+	for ( s = 0; s < header->numSurfaces; s++ ) {
+		const md3Triangle_t *tri;
+		const md3St_t *st;
+		shader_t *shader;
+		md3Shader_t *md3Shader;
+		float rgb[3];
+		int t;
+
+		if ( surface->numVerts < 1 || surface->numTriangles < 1 ) {
+			surface = (md3Surface_t *)( (byte *)surface + surface->ofsEnd );
+			continue;
+		}
+
+		if ( ent->e.customShader || ( ent->e.customSkin > 0 && ent->e.customSkin < tr.numSkins ) ) {
+			shader = vk_rtx_entity_shader_for_surface( ent, surface->name, tr.defaultShader );
+		} else if ( surface->numShaders <= 0 ) {
+			shader = tr.defaultShader;
+		} else {
+			md3Shader = (md3Shader_t *)( (byte *)surface + surface->ofsShaders );
+			md3Shader += ent->e.skinNum % surface->numShaders;
+			shader = tr.shaders[ md3Shader->shaderIndex ];
+		}
+
+		tri = (const md3Triangle_t *)( (byte *)surface + surface->ofsTriangles );
+		st = (const md3St_t *)( (byte *)surface + surface->ofsSt );
+		vk_rtx_entity_albedo_from_shader( shader, ent->e.shader.rgba, useMaterials, rgb );
+
+		for ( t = 0; t < surface->numTriangles; t++ ) {
+			int i0 = tri[t].indexes[0];
+			int i1 = tri[t].indexes[1];
+			int i2 = tri[t].indexes[2];
+			float u, v, primRgb[3];
+			const float *pa, *pb, *pc;
+
+			if ( i0 < 0 || i0 >= surface->numVerts ||
+				i1 < 0 || i1 >= surface->numVerts ||
+				i2 < 0 || i2 >= surface->numVerts ) {
+				continue;
+			}
+			if ( prim * 3u >= indexAfter ) {
+				break;
+			}
+			pa = positions + indices[prim * 3u + 0u] * 3u;
+			pb = positions + indices[prim * 3u + 1u] * 3u;
+			pc = positions + indices[prim * 3u + 2u] * 3u;
+			u = ( st[i0].st[0] + st[i1].st[0] + st[i2].st[0] ) * ( 1.0f / 3.0f );
+			v = ( st[i0].st[1] + st[i1].st[1] + st[i2].st[1] ) * ( 1.0f / 3.0f );
+			primRgb[0] = rgb[0];
+			primRgb[1] = rgb[1];
+			primRgb[2] = rgb[2];
+			vk_rtx_entity_prim_rgb( shader, ent->e.shader.rgba, useMaterials, useUv, u, v, primRgb );
+			vk_rtx_entity_write_prim( albedoRgb, normalNxyz, prim, pa, pb, pc, primRgb );
+			prim++;
+		}
+
+		surface = (md3Surface_t *)( (byte *)surface + surface->ofsEnd );
+	}
+}
+
+static void vk_rtx_entity_fill_iqm_materials( const trRefEntity_t *ent, model_t *mod,
+	const float *positions, const uint32_t *indices, uint32_t indexBefore, uint32_t indexAfter,
+	float *albedoRgb, float *normalNxyz, qboolean useMaterials )
+{
+	iqmData_t *data;
+	srfIQModel_t *surface;
+	int s;
+	uint32_t prim = indexBefore / 3u;
+	qboolean useUv = ( useMaterials && vk_rtx_entity_uv_enabled() ) ? qtrue : qfalse;
+
+	if ( !mod->modelData || indexAfter <= indexBefore ) {
+		return;
+	}
+	data = (iqmData_t *)mod->modelData;
+	if ( !data->surfaces || data->num_surfaces < 1 ) {
+		return;
+	}
+
+	surface = data->surfaces;
+	for ( s = 0; s < data->num_surfaces; s++, surface++ ) {
+		shader_t *shader;
+		float rgb[3];
+		int t;
+
+		shader = vk_rtx_entity_shader_for_surface( ent, surface->name, surface->shader );
+		vk_rtx_entity_albedo_from_shader( shader, ent->e.shader.rgba, useMaterials, rgb );
+
+		for ( t = 0; t < surface->num_triangles; t++ ) {
+			int tri = surface->first_triangle + t;
+			int i0, i1, i2;
+			float u = 0.5f, v = 0.5f, primRgb[3];
+			const float *pa, *pb, *pc;
+
+			if ( tri < 0 || tri >= data->num_triangles ) {
+				continue;
+			}
+			i0 = data->triangles[tri * 3 + 0];
+			i1 = data->triangles[tri * 3 + 1];
+			i2 = data->triangles[tri * 3 + 2];
+			if ( i0 < 0 || i0 >= data->num_vertexes ||
+				i1 < 0 || i1 >= data->num_vertexes ||
+				i2 < 0 || i2 >= data->num_vertexes ) {
+				continue;
+			}
+			if ( prim * 3u >= indexAfter ) {
+				break;
+			}
+			pa = positions + indices[prim * 3u + 0u] * 3u;
+			pb = positions + indices[prim * 3u + 1u] * 3u;
+			pc = positions + indices[prim * 3u + 2u] * 3u;
+			if ( data->texcoords ) {
+				u = ( data->texcoords[i0 * 2 + 0] + data->texcoords[i1 * 2 + 0] + data->texcoords[i2 * 2 + 0] ) * ( 1.0f / 3.0f );
+				v = ( data->texcoords[i0 * 2 + 1] + data->texcoords[i1 * 2 + 1] + data->texcoords[i2 * 2 + 1] ) * ( 1.0f / 3.0f );
+			}
+			primRgb[0] = rgb[0];
+			primRgb[1] = rgb[1];
+			primRgb[2] = rgb[2];
+			vk_rtx_entity_prim_rgb( shader, ent->e.shader.rgba, useMaterials, useUv, u, v, primRgb );
+			vk_rtx_entity_write_prim( albedoRgb, normalNxyz, prim, pa, pb, pc, primRgb );
+			prim++;
+		}
+	}
+}
+
+static void vk_rtx_entity_fill_mdr_materials( const trRefEntity_t *ent, model_t *mod,
+	const float *positions, const uint32_t *indices, uint32_t indexBefore, uint32_t indexAfter,
+	float *albedoRgb, float *normalNxyz, qboolean useMaterials )
+{
+	mdrHeader_t *header;
+	mdrLOD_t *lod;
+	mdrSurface_t *surface;
+	int s;
+	uint32_t prim = indexBefore / 3u;
+	qboolean useUv = ( useMaterials && vk_rtx_entity_uv_enabled() ) ? qtrue : qfalse;
+
+	if ( !mod->modelData || indexAfter <= indexBefore ) {
+		return;
+	}
+	header = (mdrHeader_t *)mod->modelData;
+	if ( header->numLODs < 1 ) {
+		return;
+	}
+	lod = (mdrLOD_t *)( (byte *)header + header->ofsLODs );
+	surface = (mdrSurface_t *)( (byte *)lod + lod->ofsSurfaces );
+
+	for ( s = 0; s < lod->numSurfaces; s++ ) {
+		shader_t *shader;
+		float rgb[3];
+		int t, numTris;
+		const int *tri;
+
+		if ( surface->numVerts < 3 || surface->numTriangles < 1 ) {
+			surface = (mdrSurface_t *)( (byte *)surface + surface->ofsEnd );
+			continue;
+		}
+		numTris = surface->numTriangles;
+		shader = vk_rtx_entity_shader_for_surface( ent, surface->name, tr.defaultShader );
+		tri = (const int *)( (byte *)surface + surface->ofsTriangles );
+		vk_rtx_entity_albedo_from_shader( shader, ent->e.shader.rgba, useMaterials, rgb );
+
+		/* Build UV table — MDR verts are variable-sized. */
+		{
+			float *uvTab = (float *)ri.Hunk_AllocateTempMemory( surface->numVerts * 2 * (int)sizeof( float ) );
+			const mdrVertex_t *v;
+			int vi;
+
+			if ( !uvTab ) {
+				surface = (mdrSurface_t *)( (byte *)surface + surface->ofsEnd );
+				continue;
+			}
+			v = (const mdrVertex_t *)( (byte *)surface + surface->ofsVerts );
+			for ( vi = 0; vi < surface->numVerts; vi++ ) {
+				uvTab[vi * 2 + 0] = v->texCoords[0];
+				uvTab[vi * 2 + 1] = v->texCoords[1];
+				v = (const mdrVertex_t *)&v->weights[v->numWeights];
+			}
+
+			for ( t = 0; t < numTris; t++ ) {
+				int i0 = tri[t * 3 + 0];
+				int i1 = tri[t * 3 + 1];
+				int i2 = tri[t * 3 + 2];
+				float u, vuv, primRgb[3];
+				const float *pa, *pb, *pc;
+
+				if ( i0 < 0 || i0 >= surface->numVerts ||
+					i1 < 0 || i1 >= surface->numVerts ||
+					i2 < 0 || i2 >= surface->numVerts ) {
+					continue;
+				}
+				if ( prim * 3u >= indexAfter ) {
+					break;
+				}
+				pa = positions + indices[prim * 3u + 0u] * 3u;
+				pb = positions + indices[prim * 3u + 1u] * 3u;
+				pc = positions + indices[prim * 3u + 2u] * 3u;
+				u = ( uvTab[i0 * 2 + 0] + uvTab[i1 * 2 + 0] + uvTab[i2 * 2 + 0] ) * ( 1.0f / 3.0f );
+				vuv = ( uvTab[i0 * 2 + 1] + uvTab[i1 * 2 + 1] + uvTab[i2 * 2 + 1] ) * ( 1.0f / 3.0f );
+				primRgb[0] = rgb[0];
+				primRgb[1] = rgb[1];
+				primRgb[2] = rgb[2];
+				vk_rtx_entity_prim_rgb( shader, ent->e.shader.rgba, useMaterials, useUv, u, vuv, primRgb );
+				vk_rtx_entity_write_prim( albedoRgb, normalNxyz, prim, pa, pb, pc, primRgb );
+				prim++;
+			}
+			ri.Hunk_FreeTempMemory( uvTab );
+		}
+		surface = (mdrSurface_t *)( (byte *)surface + surface->ofsEnd );
+	}
+}
+
+static void vk_rtx_entity_fill_gltf_materials( const trRefEntity_t *ent, model_t *mod,
+	const float *positions, const uint32_t *indices, uint32_t indexBefore, uint32_t indexAfter,
+	float *albedoRgb, float *normalNxyz, qboolean useMaterials )
+{
+	const gltfModel_t *gltf;
+	int mi, pi;
+	uint32_t prim = indexBefore / 3u;
+	shader_t *custom = NULL;
+	qboolean useUv = ( useMaterials && vk_rtx_entity_uv_enabled() ) ? qtrue : qfalse;
+
+	gltf = R_GetGLTFModelFromModelData( mod->modelData );
+	if ( !gltf || indexAfter <= indexBefore ) {
+		return;
+	}
+	if ( ent->e.customShader ) {
+		custom = R_GetShaderByHandle( ent->e.customShader );
+	}
+
+	for ( mi = 0; mi < gltf->numMeshes; mi++ ) {
+		const gltfMesh_t *mesh = &gltf->meshes[mi];
+		if ( !mesh->primitives || mesh->numPrimitives < 1 ) {
+			continue;
+		}
+		for ( pi = 0; pi < mesh->numPrimitives; pi++ ) {
+			const gltfPrimitive_t *gprim = &mesh->primitives[pi];
+			float rgb[3];
+			int t, numTris;
+			const uint32_t *idx;
+			image_t *baseImg = NULL;
+
+			if ( !gprim->vertices || gprim->numVertices < 3 || !gprim->indices || gprim->numIndices < 3 ) {
+				continue;
+			}
+			numTris = gprim->numIndices / 3;
+			idx = gprim->indices;
+
+			if ( custom ) {
+				vk_rtx_entity_albedo_from_shader( custom, ent->e.shader.rgba, useMaterials, rgb );
+			} else if ( useMaterials && gprim->materialIndex >= 0 && gprim->materialIndex < gltf->numMaterials ) {
+				const gltfMaterial_t *mat = &gltf->materials[gprim->materialIndex];
+				float tint[3];
+
+				vk_rtx_entity_tint_rgb( ent->e.shader.rgba, tint );
+				rgb[0] = mat->baseColorFactor[0];
+				rgb[1] = mat->baseColorFactor[1];
+				rgb[2] = mat->baseColorFactor[2];
+				if ( mat->baseColorTexture[0] ) {
+					baseImg = R_FindImageFile( mat->baseColorTexture,
+						IMGFLAG_CLAMPTOEDGE | IMGFLAG_NOLIGHTSCALE, 0 );
+					/* UV path samples thumbs per-prim; fall back to average when no thumb. */
+					if ( baseImg && baseImg != tr.defaultImage
+						&& !( useUv && baseImg->hasThumb ) ) {
+						rgb[0] *= baseImg->avgColor[0];
+						rgb[1] *= baseImg->avgColor[1];
+						rgb[2] *= baseImg->avgColor[2];
+					}
+				}
+				if ( ( ent->e.shader.rgba[0] | ent->e.shader.rgba[1] | ent->e.shader.rgba[2] ) != 0 ) {
+					rgb[0] *= tint[0];
+					rgb[1] *= tint[1];
+					rgb[2] *= tint[2];
+				}
+			} else {
+				vk_rtx_entity_tint_rgb( ent->e.shader.rgba, rgb );
+			}
+
+			for ( t = 0; t < numTris; t++ ) {
+				uint32_t i0 = idx[t * 3 + 0];
+				uint32_t i1 = idx[t * 3 + 1];
+				uint32_t i2 = idx[t * 3 + 2];
+				float u, v, primRgb[3];
+				const float *pa, *pb, *pc;
+
+				if ( i0 >= (uint32_t)gprim->numVertices ||
+					i1 >= (uint32_t)gprim->numVertices ||
+					i2 >= (uint32_t)gprim->numVertices ) {
+					continue;
+				}
+				if ( prim * 3u >= indexAfter ) {
+					break;
+				}
+				pa = positions + indices[prim * 3u + 0u] * 3u;
+				pb = positions + indices[prim * 3u + 1u] * 3u;
+				pc = positions + indices[prim * 3u + 2u] * 3u;
+				u = ( gprim->vertices[i0].texCoord0[0] + gprim->vertices[i1].texCoord0[0]
+					+ gprim->vertices[i2].texCoord0[0] ) * ( 1.0f / 3.0f );
+				v = ( gprim->vertices[i0].texCoord0[1] + gprim->vertices[i1].texCoord0[1]
+					+ gprim->vertices[i2].texCoord0[1] ) * ( 1.0f / 3.0f );
+				primRgb[0] = rgb[0];
+				primRgb[1] = rgb[1];
+				primRgb[2] = rgb[2];
+				if ( useUv && baseImg && baseImg->hasThumb ) {
+					float sampled[3];
+					float tint[3];
+					vk_rtx_sample_thumb_uv( baseImg, u, v, sampled );
+					primRgb[0] = sampled[0] * ( ( custom || !useMaterials ) ? 1.0f :
+						gltf->materials[gprim->materialIndex].baseColorFactor[0] );
+					primRgb[1] = sampled[1] * ( ( custom || !useMaterials ) ? 1.0f :
+						gltf->materials[gprim->materialIndex].baseColorFactor[1] );
+					primRgb[2] = sampled[2] * ( ( custom || !useMaterials ) ? 1.0f :
+						gltf->materials[gprim->materialIndex].baseColorFactor[2] );
+					if ( ( ent->e.shader.rgba[0] | ent->e.shader.rgba[1] | ent->e.shader.rgba[2] ) != 0 ) {
+						vk_rtx_entity_tint_rgb( ent->e.shader.rgba, tint );
+						primRgb[0] *= tint[0];
+						primRgb[1] *= tint[1];
+						primRgb[2] *= tint[2];
+					}
+				} else if ( custom ) {
+					vk_rtx_entity_prim_rgb( custom, ent->e.shader.rgba, useMaterials, useUv, u, v, primRgb );
+				}
+				vk_rtx_entity_write_prim( albedoRgb, normalNxyz, prim, pa, pb, pc, primRgb );
+				prim++;
+			}
+		}
+	}
+}
+
+static void vk_rtx_entity_fill_attrs( const trRefEntity_t *ent, model_t *mod, int meshKind,
+	qboolean usedMesh, const float *positions, const uint32_t *indices,
+	uint32_t indexBefore, uint32_t indexAfter, float *albedoRgb, float *normalNxyz )
+{
+	qboolean useMaterials;
+	float rgb[3];
+
+	if ( !albedoRgb || !normalNxyz || indexAfter <= indexBefore ) {
+		return;
+	}
+
+	useMaterials = ( r_rtxEntityMaterials && r_rtxEntityMaterials->integer ) ? qtrue : qfalse;
+
+	/* Baseline tint so any unpainted prims (pack/fill mismatch) stay valid. */
+	vk_rtx_entity_tint_rgb( ent->e.shader.rgba, rgb );
+	vk_rtx_entity_fill_prim_attrs_rgb( positions, indices, indexBefore / 3u, indexAfter / 3u,
+		rgb, albedoRgb, normalNxyz );
+
+	if ( usedMesh && useMaterials ) {
+		if ( meshKind == 1 ) {
+			vk_rtx_entity_fill_md3_materials( ent, mod, positions, indices, indexBefore, indexAfter,
+				albedoRgb, normalNxyz, useMaterials );
+			return;
+		}
+		if ( meshKind == 2 ) {
+			vk_rtx_entity_fill_iqm_materials( ent, mod, positions, indices, indexBefore, indexAfter,
+				albedoRgb, normalNxyz, useMaterials );
+			return;
+		}
+		if ( meshKind == 3 ) {
+			vk_rtx_entity_fill_gltf_materials( ent, mod, positions, indices, indexBefore, indexAfter,
+				albedoRgb, normalNxyz, useMaterials );
+			return;
+		}
+		if ( meshKind == 4 ) {
+			vk_rtx_entity_fill_mdr_materials( ent, mod, positions, indices, indexBefore, indexAfter,
+				albedoRgb, normalNxyz, useMaterials );
+			return;
+		}
+	}
+
+	/* AABB / materials off: prefer customShader average when enabled. */
+	if ( useMaterials && ent->e.customShader ) {
+		vk_rtx_entity_albedo_from_shader( R_GetShaderByHandle( ent->e.customShader ),
+			ent->e.shader.rgba, qtrue, rgb );
+		vk_rtx_entity_fill_prim_attrs_rgb( positions, indices, indexBefore / 3u, indexAfter / 3u,
+			rgb, albedoRgb, normalNxyz );
 	}
 }
 
@@ -726,9 +1349,8 @@ uint32_t vk_rtx_entities_pack( const trRefdef_t *refdef, const viewParms_t *view
 		}
 
 		if ( ( albedoRgb || normalNxyz ) && indexCount > indexBefore ) {
-			vk_rtx_entity_fill_prim_attrs( positions, indices,
-				indexBefore / 3u, indexCount / 3u, ent->e.shader.rgba,
-				albedoRgb, normalNxyz );
+			vk_rtx_entity_fill_attrs( ent, mod, meshKind, usedMesh, positions, indices,
+				indexBefore, indexCount, albedoRgb, normalNxyz );
 		}
 
 		packed++;

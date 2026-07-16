@@ -8,6 +8,8 @@ uint32_t vk_rtx_world_count_primitives( const world_t *w, uint32_t maxPrimitives
 /*
  * Pack world tris into positions (xyz floats) and indices.
  * If albedoRgb is non-NULL, write maxPrimitives*3 floats (RGB per primitive).
+ * Albedo prefers diffuse UV thumbs / avgColor when r_rtxWorldMaterials(+UvSample);
+ * otherwise BSP vertex colors.
  * If normalRgb is non-NULL, write maxPrimitives*3 floats (geometric/interpolated normal).
  * If outVertCount is non-NULL, writes number of vertices written (grid shares verts).
  */

@@ -22,6 +22,8 @@ Chocolate RTX path; spawn / ray-query update / resolve / composite.
 
 #define SURFEL_GI_BYTES 64u
 #define SURFEL_GI_DEFAULT_CAP 16384u
+#define SURFEL_HASH_CELLS  4096u
+#define SURFEL_HASH_BUCKET 16u
 
 typedef struct {
 	float pos[3];
@@ -111,9 +113,10 @@ static cvar_t *r_surfelGi_maxAge;
 static cvar_t *r_surfelGi_hash;
 static cvar_t *r_surfelGi_cellSize;
 static cvar_t *r_surfelGi_hybrid1Fusion;
-
-#define SURFEL_HASH_CELLS  4096u
-#define SURFEL_HASH_BUCKET 8u
+static cvar_t *r_surfelGiDensity;
+static cvar_t *r_surfelGi_adaptiveSpawn;
+static cvar_t *r_surfelGi_minSep;
+static int s_surfelAppliedDensity = -1;
 
 static VkSampler SGI_Nearest( void )
 {
@@ -123,6 +126,89 @@ static VkSampler SGI_Nearest( void )
 	sd.address_mode = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
 	sd.noAnisotropy = qtrue;
 	return vk_find_sampler( &sd );
+}
+
+/*
+===============
+SGI_ApplyDensityPreset
+
+r_surfelGiDensity 1–3 rewrites live spawn/radius/cell/sample knobs.
+0 = custom (leave individual cvars). Latched r_surfelGi_max is unchanged.
+===============
+*/
+static void SGI_ApplyDensityPreset( void )
+{
+	int d;
+	const char *name;
+
+	if ( !r_surfelGiDensity ) {
+		return;
+	}
+	d = r_surfelGiDensity->integer;
+	if ( d < 0 ) {
+		d = 0;
+	} else if ( d > 3 ) {
+		d = 3;
+	}
+	if ( d == 0 ) {
+		if ( s_surfelAppliedDensity != 0 ) {
+			s_surfelAppliedDensity = 0;
+			ri.Printf( PRINT_DEVELOPER, "[SurfelGI] density=custom (individual r_surfelGi_* knobs)\n" );
+		}
+		r_surfelGiDensity->modified = qfalse;
+		return;
+	}
+	if ( d == s_surfelAppliedDensity && !r_surfelGiDensity->modified ) {
+		return;
+	}
+
+	ri.Cvar_Set( "r_surfelGi_hash", "1" );
+	ri.Cvar_Set( "r_surfelGi_adaptiveSpawn", "1" );
+
+	if ( d == 1 ) {
+		name = "sparse";
+		ri.Cvar_Set( "r_surfelGi_spawn", "512" );
+		ri.Cvar_Set( "r_surfelGi_radius", "0.55" );
+		ri.Cvar_Set( "r_surfelGi_cellSize", "96" );
+		ri.Cvar_Set( "r_surfelGi_samples", "2" );
+		ri.Cvar_Set( "r_surfelGi_updateRate", "6" );
+		ri.Cvar_Set( "r_surfelGi_minSep", "0.45" );
+	} else if ( d == 2 ) {
+		name = "balanced";
+		ri.Cvar_Set( "r_surfelGi_spawn", "1024" );
+		ri.Cvar_Set( "r_surfelGi_radius", "0.35" );
+		ri.Cvar_Set( "r_surfelGi_cellSize", "64" );
+		ri.Cvar_Set( "r_surfelGi_samples", "4" );
+		ri.Cvar_Set( "r_surfelGi_updateRate", "4" );
+		ri.Cvar_Set( "r_surfelGi_minSep", "0.22" );
+	} else {
+		name = "dense";
+		ri.Cvar_Set( "r_surfelGi_spawn", "3072" );
+		ri.Cvar_Set( "r_surfelGi_radius", "0.22" );
+		ri.Cvar_Set( "r_surfelGi_cellSize", "40" );
+		ri.Cvar_Set( "r_surfelGi_samples", "4" );
+		ri.Cvar_Set( "r_surfelGi_updateRate", "3" );
+		ri.Cvar_Set( "r_surfelGi_minSep", "0.14" );
+	}
+
+	s_surfelAppliedDensity = d;
+	r_surfelGiDensity->modified = qfalse;
+	ri.Printf( PRINT_ALL, "[SurfelGI] density preset=%d (%s)\n", d, name );
+}
+
+static const char *SGI_DensityName( void )
+{
+	int d = r_surfelGiDensity ? r_surfelGiDensity->integer : 0;
+	if ( d <= 0 ) {
+		return "custom";
+	}
+	if ( d == 1 ) {
+		return "sparse";
+	}
+	if ( d == 2 ) {
+		return "balanced";
+	}
+	return "dense";
 }
 
 static void SGI_DestroyBuffer( sgi_buffer_t *b )
@@ -463,6 +549,12 @@ static void SGI_Status_f( void )
 		counters[0], counters[2], counters[3], albedoPrims, normalPrims,
 		( r_surfelGi_hash && r_surfelGi_hash->integer ) ? 1 : 0,
 		r_surfelGi_cellSize ? r_surfelGi_cellSize->value : 1.0f );
+	ri.Printf( PRINT_ALL, "[SurfelGI] density=%d(%s) adaptiveSpawn=%d minSep=%.2f hashBucket=%u\n",
+		r_surfelGiDensity ? r_surfelGiDensity->integer : 0,
+		SGI_DensityName(),
+		( r_surfelGi_adaptiveSpawn && r_surfelGi_adaptiveSpawn->integer ) ? 1 : 0,
+		r_surfelGi_minSep ? r_surfelGi_minSep->value : 0.0f,
+		SURFEL_HASH_BUCKET );
 	ri.Printf( PRINT_ALL, "[SurfelGI] hybrid1Fusion cvar=%d active=%d (Hybrid1 owns diffuse GI; Surfel skips scene composite)\n",
 		( r_surfelGi_hybrid1Fusion && r_surfelGi_hybrid1Fusion->integer ) ? 1 : 0,
 		vk_surfel_gi_hybrid1_fusion_active() ? 1 : 0 );
@@ -506,21 +598,36 @@ void vk_surfel_gi_init( void )
 		r_surfelGi_hash = ri.Cvar_Get( "r_surfelGi_hash", "1", CVAR_ARCHIVE_ND );
 		r_surfelGi_cellSize = ri.Cvar_Get( "r_surfelGi_cellSize", "64", CVAR_ARCHIVE_ND );
 		r_surfelGi_hybrid1Fusion = ri.Cvar_Get( "r_surfelGi_hybrid1Fusion", "1", CVAR_ARCHIVE_ND );
+		r_surfelGiDensity = ri.Cvar_Get( "r_surfelGiDensity", "0", CVAR_ARCHIVE_ND );
+		r_surfelGi_adaptiveSpawn = ri.Cvar_Get( "r_surfelGi_adaptiveSpawn", "1", CVAR_ARCHIVE_ND );
+		r_surfelGi_minSep = ri.Cvar_Get( "r_surfelGi_minSep", "0.22", CVAR_ARCHIVE_ND );
 		ri.Cvar_CheckRange( r_surfelGi, "0", "1", CV_INTEGER );
 		ri.Cvar_CheckRange( r_surfelGi_max, "256", "262144", CV_INTEGER );
 		ri.Cvar_CheckRange( r_surfelGi_samples, "1", "16", CV_INTEGER );
 		ri.Cvar_CheckRange( r_surfelGi_debug, "0", "2", CV_INTEGER );
 		ri.Cvar_CheckRange( r_surfelGi_hash, "0", "1", CV_INTEGER );
 		ri.Cvar_CheckRange( r_surfelGi_hybrid1Fusion, "0", "1", CV_INTEGER );
+		ri.Cvar_CheckRange( r_surfelGiDensity, "0", "3", CV_INTEGER );
+		ri.Cvar_CheckRange( r_surfelGi_adaptiveSpawn, "0", "1", CV_INTEGER );
 		ri.Cvar_SetDescription( r_surfelGi,
 			"Surfel GI (GIBS): cache indirect lighting in surfels (needs USE_VULKAN_RTX + ray query + vid_restart)." );
 		ri.Cvar_SetDescription( r_surfelGi_hash,
 			"Surfel GI: 1=fixed-bucket spatial hash for resolve gather; 0=strided scan fallback." );
 		ri.Cvar_SetDescription( r_surfelGi_hybrid1Fusion,
 			"Surfel GI: when Hybrid1 is active, skip Surfel scene composite and feed irradiance into Hybrid1 (avoids double diffuse GI)." );
+		ri.Cvar_SetDescription( r_surfelGiDensity,
+			"Surfel GI density preset: 0=custom, 1=sparse, 2=balanced, 3=dense (live; sets spawn/radius/cell/minSep)." );
+		ri.Cvar_SetDescription( r_surfelGi_adaptiveSpawn,
+			"Surfel GI: scale spawn attempts by pool fill (boost when sparse, ease when near capacity)." );
+		ri.Cvar_SetDescription( r_surfelGi_minSep,
+			"Surfel GI: reject new spawns within this world-unit distance of an existing surfel (0=off)." );
 		ri.Cmd_AddCommand( "surfel_gi_status", SGI_Status_f );
-		ri.Printf( PRINT_ALL, "[SurfelGI] r_surfelGi_hybrid1Fusion=%d (Hybrid1 diffuse GI fusion when both enabled)\n",
-			r_surfelGi_hybrid1Fusion->integer );
+		ri.Printf( PRINT_ALL, "[SurfelGI] r_surfelGi_hybrid1Fusion=%d density=%d adaptiveSpawn=%d minSep=%.2f hashBucket=%u\n",
+			r_surfelGi_hybrid1Fusion->integer,
+			r_surfelGiDensity->integer,
+			r_surfelGi_adaptiveSpawn->integer,
+			r_surfelGi_minSep->value,
+			SURFEL_HASH_BUCKET );
 	}
 
 	if ( !r_surfelGi->integer ) {
@@ -634,6 +741,7 @@ void vk_surfel_gi_frame_begin( void )
 	if ( !sgi.ready ) {
 		return;
 	}
+	SGI_ApplyDensityPreset();
 	vk_rtx_scene_extent( &w, &h );
 	if ( w < 1 || h < 1 ) {
 		w = glConfig.vidWidth;
@@ -821,11 +929,40 @@ void vk_surfel_gi_apply_after_geometry( void )
 	}
 
 	attempts = (uint32_t)( r_surfelGi_spawn && r_surfelGi_spawn->integer > 0 ? r_surfelGi_spawn->integer : 1024 );
+	/* Adaptive spawn: boost when pool is sparse, ease when near capacity. */
+	if ( r_surfelGi_adaptiveSpawn && r_surfelGi_adaptiveSpawn->integer && sgi.counters.memory != VK_NULL_HANDLE ) {
+		uint32_t counters[4] = { 0, 0, 0, 0 };
+		void *mapped = NULL;
+		if ( qvkMapMemory( vk.device, sgi.counters.memory, 0, 16, 0, &mapped ) == VK_SUCCESS && mapped ) {
+			Com_Memcpy( counters, mapped, 16 );
+			/* Per-frame spawn stats (activeCount high-water is preserved). */
+			counters[2] = 0u;
+			counters[3] = 0u;
+			Com_Memcpy( mapped, counters, 16 );
+			qvkUnmapMemory( vk.device, sgi.counters.memory );
+			if ( sgi.capacity > 0u ) {
+				float fill = (float)counters[0] / (float)sgi.capacity;
+				if ( fill < 0.25f ) {
+					attempts *= 2u;
+				} else if ( fill < 0.50f ) {
+					attempts = ( attempts * 3u ) / 2u;
+				} else if ( fill > 0.85f ) {
+					attempts = attempts / 2u;
+					if ( attempts < 128u ) {
+						attempts = 128u;
+					}
+				}
+			}
+		}
+	}
+	if ( attempts > sgi.capacity ) {
+		attempts = sgi.capacity;
+	}
 	Com_Memcpy( spawnPush.invViewProj, invViewProj, sizeof( invViewProj ) );
 	spawnPush.extent[0] = (float)sgi.width;
 	spawnPush.extent[1] = (float)sgi.height;
 	spawnPush.extent[2] = r_surfelGi_radius ? r_surfelGi_radius->value : 0.35f;
-	spawnPush.extent[3] = 0.0f;
+	spawnPush.extent[3] = r_surfelGi_minSep ? r_surfelGi_minSep->value : 0.0f;
 	spawnPush.params[0] = sgi.capacity;
 	spawnPush.params[1] = sgi.frame;
 	spawnPush.params[2] = attempts;

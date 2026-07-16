@@ -649,6 +649,8 @@ typedef struct {
 } trRefdef_t;
 
 
+#define TR_IMAGE_THUMB_SIZE 8
+
 typedef struct image_s {
 	char		*imgName;			// image path, including extension
 	char		*imgName2;			// image path with real file extension
@@ -658,6 +660,11 @@ typedef struct image_s {
 	int			uploadHeight;
 	imgFlags_t	flags;
 	int			frameUsed;			// for texture usage in frame statistics
+	/* Mean RGB of source pixels (0..1); used by RTX entity hit albedo. */
+	float		avgColor[3];
+	/* Tiny downsample for pack-time UV entity albedo (r_rtxEntityUvSample). */
+	byte		thumbRGBA[TR_IMAGE_THUMB_SIZE * TR_IMAGE_THUMB_SIZE * 4];
+	qboolean		hasThumb;
 
 #ifdef USE_VULKAN
 	int			internalFormat;
@@ -1632,6 +1639,8 @@ extern cvar_t	*r_taaMotionVectors;
 extern cvar_t	*r_rtx;
 extern cvar_t	*r_rtxDemo;
 extern cvar_t	*r_rtxWorldPrimCap;
+extern cvar_t	*r_rtxWorldMaterials;
+extern cvar_t	*r_rtxWorldUvSample;
 extern cvar_t	*r_rtxComposite;
 extern cvar_t	*r_rtxSamples;
 extern cvar_t	*r_forwardPlus;
@@ -1647,6 +1656,9 @@ extern cvar_t	*r_forwardPlusEnergyRenorm;
 extern cvar_t	*r_rtxEntities;
 extern cvar_t	*r_rtxEntityCap;
 extern cvar_t	*r_rtxEntityTriCap;
+extern cvar_t	*r_rtxEntityMaterials;
+extern cvar_t	*r_rtxEntityUvSample;
+extern cvar_t	*r_rtxEntityBlasUpdate;
 extern cvar_t	*r_rtxTlasUpdate;
 extern cvar_t	*r_pathtrace;
 extern cvar_t	*r_pathtrace_arch;
