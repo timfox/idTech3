@@ -1016,11 +1016,8 @@ static void ParseFace( const dsurface_t *ds, const drawVert_t *verts, msurface_t
 	for ( i = 0 ; i < numPoints ; i++ ) {
 		for ( j = 0 ; j < 3 ; j++ ) {
 			cv->points[i][j] = LittleFloat( verts[i].xyz[j] );
-#ifdef USE_VK_PBR
 			cv->points[i][3+j] = LittleFloat( verts[i].normal[j] );
-#endif
 		}
-#ifdef USE_VK_PBR
 		for ( j = 0 ; j < 2 ; j++ ) {
 			cv->points[i][6+j] = LittleFloat( verts[i].st[j] );
 			cv->points[i][8+j] = LittleFloat( verts[i].lightmap[j] );
@@ -1031,18 +1028,6 @@ static void ParseFace( const dsurface_t *ds, const drawVert_t *verts, msurface_t
 			cv->points[i][8] = cv->points[i][8] * tr.lightmapScale[0] + lightmapX;
 			cv->points[i][9] = cv->points[i][9] * tr.lightmapScale[1] + lightmapY;
 		}
-#else
-		for ( j = 0 ; j < 2 ; j++ ) {
-			cv->points[i][3+j] = LittleFloat( verts[i].st[j] );
-			cv->points[i][5+j] = LittleFloat( verts[i].lightmap[j] );
-		}
-		R_ColorShiftLightingBytes( verts[i].color.rgba, (byte *)&cv->points[i][7], qtrue );
-		if ( lightmapNum >= 0 && tr.mergeLightmaps ) {
-			// adjust lightmap coords
-			cv->points[i][5] = cv->points[i][5] * tr.lightmapScale[0] + lightmapX;
-			cv->points[i][6] = cv->points[i][6] * tr.lightmapScale[1] + lightmapY;
-		}
-#endif
 	}
 
 	indexes += LittleLong( ds->firstIndex );
