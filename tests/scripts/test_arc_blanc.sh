@@ -22,6 +22,7 @@ COUP="$(idtech3_file modules/world/arc_blanc/arc_blanc_coupling.c src/world/arc_
 TR_PUB="$(idtech3_file renderers/common/tr_public.h src/renderers/common/tr_public.h)"
 CL_REF="$(idtech3_file runtime/client/core/cl_ref.c src/client/core/cl_ref.c)"
 LUA_B="$(idtech3_file runtime/game/g_lua_bindings.c src/game/g_lua_bindings.c)"
+LUA_REG="$(idtech3_file runtime/game/g_lua_registration.inc src/game/g_lua_registration.inc)"
 
 rg -q 'USE_ARC_BLANC' CMakeLists.txt
 rg -q 'arc_blanc/arc_blanc.c' cmake/IdTech3QcommonExtensions.cmake
@@ -48,7 +49,7 @@ rg -q 'ArcBlancSampleHeight' "$TR_PUB"
 rg -q 'R_ArcBlanc_AddSurfaces' "$VK_AB"
 rg -q 'r_arcBlancDraw' "$VK_AB"
 rg -q 'ArcBlancSampleHeight' "$CL_REF"
-rg -q 'registerTable\(L, "ArcBlanc"' "$LUA_B"
+rg -q 'registerTable\(L, "ArcBlanc"' "$LUA_B" "$LUA_REG"
 rg -q 'arc_blanc_status' "$AB"
 test -f examples/demo_game/mod/demo_arc_blanc.cfg || { echo "missing demo_arc_blanc.cfg"; exit 1; }
 
