@@ -91,11 +91,7 @@ static void rtx_albedo_from_srfvert( const srfVert_t *v, float *outRgb )
 static void rtx_albedo_from_face_vert( const srfSurfaceFace_t *face, unsigned vidx, float *outRgb )
 {
 	const byte *c;
-#ifdef USE_VK_PBR
 	c = (const byte *)&face->points[vidx][10];
-#else
-	c = (const byte *)&face->points[vidx][7];
-#endif
 	rtx_albedo_from_bytes( c, outRgb );
 }
 
@@ -267,13 +263,8 @@ static void rtx_resolve_prim_albedo( const shader_t *shader, float u, float v,
 static void rtx_face_st( const srfSurfaceFace_t *face, unsigned vidx, float *u, float *v )
 {
 	const float *p = face->points[vidx];
-#ifdef USE_VK_PBR
 	*u = p[6];
 	*v = p[7];
-#else
-	*u = p[3];
-	*v = p[4];
-#endif
 }
 
 static uint32_t rtx_count_face_tris( const srfSurfaceFace_t *face )

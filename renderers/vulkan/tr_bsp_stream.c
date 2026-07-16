@@ -251,7 +251,6 @@ static srfSurfaceFace_t *R_BspStream_AllocTopFace( const vec3_t wmins, const vec
 		for ( j = 0; j < 3; j++ ) {
 			cv->points[i][j] = corners[i][j];
 		}
-#ifdef USE_VK_PBR
 		cv->points[i][3] = 0.0f;
 		cv->points[i][4] = 0.0f;
 		cv->points[i][5] = 1.0f;
@@ -260,13 +259,6 @@ static srfSurfaceFace_t *R_BspStream_AllocTopFace( const vec3_t wmins, const vec
 		cv->points[i][8] = 0.0f;
 		cv->points[i][9] = 0.0f;
 		cv->points[i][10] = 255.0f;
-#else
-		cv->points[i][3] = 0.0f;
-		cv->points[i][4] = 0.0f;
-		cv->points[i][5] = 0.0f;
-		cv->points[i][6] = 0.0f;
-		cv->points[i][7] = 255.0f;
-#endif
 	}
 
 	indexes = (int *)( (byte *)cv + cv->ofsIndices );
@@ -645,25 +637,14 @@ static qboolean R_BspStream_ParsePlanarFace( const dsurface_t *ds, const drawVer
 	for ( i = 0; i < numPoints; i++ ) {
 		for ( j = 0; j < 3; j++ ) {
 			cv->points[i][j] = LittleFloat( verts[i].xyz[j] ) + worldOrigin[j];
-#ifdef USE_VK_PBR
 			cv->points[i][3 + j] = LittleFloat( verts[i].normal[j] );
-#endif
 		}
-#ifdef USE_VK_PBR
 		for ( j = 0; j < 2; j++ ) {
 			cv->points[i][6 + j] = LittleFloat( verts[i].st[j] );
 			cv->points[i][8 + j] = LittleFloat( verts[i].lightmap[j] );
 		}
 		R_BspStream_ApplyLightmapST( &cv->points[i][8], &cv->points[i][9], lightmapX, lightmapY, mergedAtlas );
 		R_ColorShiftLightingBytes( verts[i].color.rgba, (byte *)&cv->points[i][10], qtrue );
-#else
-		for ( j = 0; j < 2; j++ ) {
-			cv->points[i][3 + j] = LittleFloat( verts[i].st[j] );
-			cv->points[i][5 + j] = LittleFloat( verts[i].lightmap[j] );
-		}
-		R_BspStream_ApplyLightmapST( &cv->points[i][5], &cv->points[i][6], lightmapX, lightmapY, mergedAtlas );
-		R_ColorShiftLightingBytes( verts[i].color.rgba, (byte *)&cv->points[i][7], qtrue );
-#endif
 		AddPointToBounds( cv->points[i], patchMins, patchMaxs );
 	}
 
