@@ -77,6 +77,6 @@ docs/renderer_validation/devdata/rtest_base/maps/rtest_emissive.bsp
 docs/renderer_validation/devdata/rtest_base/maps/rtest_volumetric.bsp
 docs/renderer_validation/devdata/rtest_base/maps/rtest_postfx.bsp
 docs/renderer_validation/devdata/rtest_base/maps/rtest_parity.bsp
-renderers/vulkan/shaders/spirv/generated/shader_data.c
-renderers/vulkan/shaders/spirv/generated/shader_binding.c
+renderers/vulkan/shaders/spirv/shader_data.c
+renderers/vulkan/shaders/spirv/shader_binding.c
 renderers/vulkan/shaders/glsl/forward_plus_tile_cull.comp

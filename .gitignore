@@ -35,6 +35,10 @@ build_log.txt
 artifacts/
 src/renderers/vulkan/shaders/spirv/generated/backups/
 renderers/vulkan/shaders/spirv/generated/backups/
+src/renderers/vulkan/shaders/spirv/generated/shader_data.c
+src/renderers/vulkan/shaders/spirv/generated/shader_binding.c
+renderers/vulkan/shaders/spirv/generated/shader_data.c
+renderers/vulkan/shaders/spirv/generated/shader_binding.c
 android/.gradle/
 android/app/.cxx/
 android/local.properties
@@ -65,7 +69,7 @@ android/local.properties
 !/examples/demo_skeleton/idtech3_demo/README.txt
 !/examples/demo_skeleton/idtech3_demo/idtech3_demo.pk3
 src/renderers/vulkan/shaders/spirv/generated/shader_build_meta.txt
-src/renderers/vulkan/shaders/spirv/generated/shader_build_meta.txt
+renderers/vulkan/shaders/spirv/generated/shader_build_meta.txt
 
 # Licensed game / mod data (never commit — keep outside the engine repo)
 mods/local/

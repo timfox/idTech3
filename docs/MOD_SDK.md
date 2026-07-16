@@ -23,7 +23,7 @@ End-to-end: **map entity → server CS + spawn → snapshot → client bridge �
 | Stage | Sprites | Decals |
 |-------|---------|--------|
 | Map class | `misc_billboard`, `misc_flipbook`, `misc_imposter` | `misc_decal` |
-| Shared parse | [engine_sprite_map.c](../src/qcommon/engine_sprite_map.c) | [engine_decal_map.c](../src/qcommon/engine_decal_map.c) |
+| Shared parse | [engine_sprite_map.c](../engine/core/engine_sprite_map.c) | [engine_decal_map.c](../engine/core/engine_decal_map.c) |
 | Server | `sv_engineSprites`, `sv_engineSpritesSpawn` | `sv_engineDecals`, `sv_engineDecalsSpawn` |
 | CS catalog | `CS_ENGINE_SPRITE_SHADERS` | `CS_ENGINE_DECAL_SHADERS` |
 | Meta CS | `CS_ENGINE_SPRITE_META` (spawn count) | `CS_ENGINE_DECAL_META` |
@@ -61,9 +61,9 @@ Discover via `trap_GetValue("trap_Name", buf, len)` when built with extension su
 | `G_ENGINE_DECAL_SPAWN` | shader, xyz, radius, pitch, yaw, fade | Networked decal ent |
 | `G_PHYS_CHARACTER_CREATE` | capsule params | Kinematic character body |
 | `G_PHYS_CHARACTER_MOVE` | handle, wishdir, jump | Character controller step |
-| `G_LOC_LOOKUP` | string key → UTF-8 text | i18n ([com_loc.c](../src/qcommon/com_loc.c)) |
+| `G_LOC_LOOKUP` | string key → UTF-8 text | i18n ([com_loc.c](../engine/core/com_loc.c)) |
 
-Full enum: [g_public.h](../src/game/g_public.h) (before `G_TRAP_GETVALUE` = 700).
+Full enum: [g_public.h](../runtime/game/g_public.h) (before `G_TRAP_GETVALUE` = 700).
 
 ---
 
@@ -203,7 +203,7 @@ ctest --output-on-failure
 | Repo | Purpose |
 |------|---------|
 | [idTech3Radiant](RADIANT.md) | Map editor |
-| [FreeUSD](../src/external/FreeUSD) | USDA mesh/scene |
+| [FreeUSD](../third_party/FreeUSD) | USDA mesh/scene |
 | [Tiled](../tools/tiled) | 2D zones |
 
 ---

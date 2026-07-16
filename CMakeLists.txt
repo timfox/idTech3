@@ -3019,6 +3019,13 @@ set_tests_properties(test_nanovdb_decode PROPERTIES
 	LABELS "scripts;validation;renderer"
 	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_nanovdb_decode.sh;${CMAKE_SOURCE_DIR}/renderers/vulkan/vk_nanovdb_decode.c;${CMAKE_SOURCE_DIR}/tests/data/fog_2cubed.nvdb")
 
+add_test(NAME test_sdl3_features
+	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_sdl3_features.sh all
+	WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+set_tests_properties(test_sdl3_features PROPERTIES
+	LABELS "scripts;validation;client;sdl"
+	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_sdl3_features.sh;${CMAKE_SOURCE_DIR}/engine/platform/sdl/sdl_input.c")
+
 add_test(NAME test_module_include_canonical
 	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_module_include_canonical.sh
 	WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
@@ -3258,10 +3265,10 @@ set_tests_properties(test_modern_renderer_profile_runtime PROPERTIES
 	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_modern_renderer_profile_runtime.sh;${CMAKE_SOURCE_DIR}/config/modern_vulkan.cfg;${CMAKE_SOURCE_DIR}/docs/renderer_validation/README.md")
 
 add_test(NAME test_idtech3_tv_streaming
-	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_idtech3_tv_streaming.sh)
+	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_idtech3_tv_streaming.sh source)
 set_tests_properties(test_idtech3_tv_streaming PROPERTIES
 	LABELS "scripts;validation;streaming"
-	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_idtech3_tv_streaming.sh;${CMAKE_SOURCE_DIR}/runtime/client/platform/cl_streaming.c;${CMAKE_SOURCE_DIR}/docs/IDTECH3_TV.md")
+	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_idtech3_tv_streaming.sh;${CMAKE_SOURCE_DIR}/tests/scripts/idtech3_client_runtime_smoke.sh;${CMAKE_SOURCE_DIR}/runtime/client/platform/cl_streaming.c;${CMAKE_SOURCE_DIR}/docs/IDTECH3_TV.md")
 
 add_test(NAME renderer_tier_a_resolver
 	COMMAND ${CMAKE_SOURCE_DIR}/scripts/resolve_renderer_tiers.sh --tier A --summary-file ${CMAKE_BINARY_DIR}/renderer_tier_a_summary.json)
@@ -3486,7 +3493,7 @@ set_tests_properties(test_p2p_ice_guard PROPERTIES
 	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_p2p_ice_guard.sh;${CMAKE_SOURCE_DIR}/engine/core/net_p2p_ice.c;${CMAKE_SOURCE_DIR}/runtime/server/sv_ccmds.c")
 
 add_test(NAME test_oscar_bridge
-	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_oscar_bridge.sh)
+	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_oscar_bridge.sh all)
 set_tests_properties(test_oscar_bridge PROPERTIES
 	LABELS "scripts;networking;oscar"
 	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_oscar_bridge.sh;${CMAKE_SOURCE_DIR}/engine/core/net_oscar.c;${CMAKE_SOURCE_DIR}/docs/OSCAR_INTEGRATION.md")
@@ -3508,6 +3515,12 @@ add_test(NAME test_warning_free_ci
 set_tests_properties(test_warning_free_ci PROPERTIES
 	LABELS "scripts;validation;ci"
 	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_warning_free_ci.sh;${CMAKE_SOURCE_DIR}/scripts/check_first_party_warnings.sh;${CMAKE_SOURCE_DIR}/.github/workflows/build.yml")
+
+add_test(NAME test_tech_debt_audit
+	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_tech_debt_audit.sh)
+set_tests_properties(test_tech_debt_audit PROPERTIES
+	LABELS "scripts;validation;debt"
+	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_tech_debt_audit.sh;${CMAKE_SOURCE_DIR}/docs/core/SHIM_REMOVAL_CHECKLIST.md;${CMAKE_SOURCE_DIR}/renderers/vulkan/shaders/spirv/shader_data.c")
 
 add_test(NAME test_no_aux_core
 	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_no_aux_core.sh)
@@ -3842,6 +3855,13 @@ if(BUILD_UNIT_TESTS)
 	endif()
 	add_test(NAME unit_oscar_raw COMMAND unit_oscar_raw)
 	set_tests_properties(unit_oscar_raw PROPERTIES LABELS "unit;networking;oscar;validation")
+
+	if(USE_SDL AND TARGET SDL3::SDL3)
+		add_executable(unit_sdl3_features tests/unit/test_sdl3_features.c)
+		target_link_libraries(unit_sdl3_features PRIVATE SDL3::SDL3)
+		add_test(NAME unit_sdl3_features COMMAND unit_sdl3_features)
+		set_tests_properties(unit_sdl3_features PROPERTIES LABELS "unit;validation;client;sdl")
+	endif()
 
 	add_executable(unit_parse
 		tests/unit/test_parse.c

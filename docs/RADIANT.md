@@ -71,7 +71,7 @@ Customize via Radiant **Build → Customize**.
 
 ## Sync with engine
 
-Shared parser: [engine_sprite_map.c](../src/qcommon/engine_sprite_map.c), [engine_decal_map.c](../src/qcommon/engine_decal_map.c).  
+Shared parser: [engine_sprite_map.c](../engine/core/engine_sprite_map.c), [engine_decal_map.c](../engine/core/engine_decal_map.c).
 Studio **Entities** panel lists parsed props and writes `studio_exportents.cfg`.
 
 Run `./scripts/sync_editor_bridge.sh` after editing [EDITOR_BRIDGE.md](EDITOR_BRIDGE.md) entity tables.

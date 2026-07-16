@@ -226,7 +226,7 @@ local label = Engine.Save.read(slot)         -- returns string or nil
 local last = Engine.Save.lastSlot()          -- returns integer
 ```
 
-Protocol version: `1` (see [g_engine_systems.h](../src/game/g_engine_systems.h)). Legacy `save/engine_slot_*.txt` still reads.
+Protocol version: `1` (see [g_engine_systems.h](../runtime/game/g_engine_systems.h)). Legacy `save/engine_slot_*.txt` still reads.
 
 Console (client, no Lua): `engine_save_write <slot> <label>`, `engine_save_read <slot>`, `engine_save_info`.
 

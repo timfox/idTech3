@@ -7,6 +7,19 @@ ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 source "$(dirname "$0")/idtech3_test_paths.sh"
 idtech3_test_paths_init "$ROOT"
 cd "$ROOT"
+mode="${1:-all}"
+
+case "$mode" in
+	source|runtime|all) ;;
+	*) echo "usage: $0 [source|runtime|all]" >&2; exit 2 ;;
+esac
+
+if [[ "$mode" == "runtime" ]]; then
+	# shellcheck source=idtech3_minimal_content_smoke.sh
+	source "$ROOT/tests/scripts/idtech3_minimal_content_smoke.sh"
+	idtech3_minimal_physics_smoke "$ROOT"
+	exit $?
+fi
 
 echo "[test_physics] checking middleware sources..."
 PHYS_EVENTS="$(idtech3_require_file modules/physics/phys_events.c src/physics/phys_events.c)"
@@ -238,7 +251,7 @@ test -f examples/demo_game/DEMO_IDENTITY.md
 test -f examples/demo_game/mod/demo_physics.cfg
 
 rg -q 'idtech3_minimal_physics_smoke' tests/scripts/idtech3_minimal_content_smoke.sh
-if [[ "${IDTECH3_SKIP_RUNTIME_SMOKE:-0}" != "1" ]]; then
+if [[ "$mode" == "all" && "${IDTECH3_SKIP_RUNTIME_SMOKE:-0}" != "1" ]]; then
 	echo "[test_physics] minimal content runtime smoke..."
 	"$ROOT/tests/scripts/idtech3_minimal_content_smoke.sh" physics
 fi

@@ -17,4 +17,4 @@ Plain text, no PII by default:
 
 Document your privacy policy on the site. Suggested endpoint: `POST /api/v1/crash` with multipart file field `file`.
 
-Implementation: [com_crash.c](../src/qcommon/com_crash.c).
+Implementation: [com_crash.c](../engine/core/com_crash.c).

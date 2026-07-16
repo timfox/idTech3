@@ -43,7 +43,7 @@ Console: `cluster_graph_status`, `cluster_graph_reach <cluster> [hops]`.
 
 ## CM_stream vs sector graph window
 
-[`cm_stream.c`](../src/qcommon/cm_stream.c) tracks loaded sectors in a **32×32 bitmap** for non-negative cell indices. The sector graph uses an independent **64×64 logical window** centered on the view and supports negative cell coordinates in BFS. Collision merge limits and graph reachability limits are therefore separate concerns.
+[`cm_stream.c`](../engine/core/cm_stream.c) tracks loaded sectors in a **32×32 bitmap** for non-negative cell indices. The sector graph uses an independent **64×64 logical window** centered on the view and supports negative cell coordinates in BFS. Collision merge limits and graph reachability limits are therefore separate concerns.
 
 | Cvar | Default | Role |
 |------|---------|------|

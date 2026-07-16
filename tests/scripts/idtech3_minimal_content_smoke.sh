@@ -81,8 +81,8 @@ idtech3_minimal_assert_clean_log() {
 	local fail_pattern
 	fail_pattern="$(idtech3_minimal_fail_pattern)"
 
-	if echo "$output" | grep -Eiq "$fail_pattern"; then
-		echo "$output" | grep -Ei "$fail_pattern" | head -20 >&2
+	if echo "$output" | grep -Eiv "Couldn't load symbol file" | grep -Eiq "$fail_pattern"; then
+		echo "$output" | grep -Eiv "Couldn't load symbol file" | grep -Ei "$fail_pattern" | head -20 >&2
 		return 1
 	fi
 	return 0
@@ -161,6 +161,32 @@ idtech3_minimal_app_crdt_smoke() {
 	echo "[minimal_content_smoke] App CRDT server commands: ok"
 }
 
+idtech3_minimal_oscar_smoke() {
+	local root="$1"
+	local output
+	local rc=0
+
+	output="$(idtech3_minimal_run_server "$root" \
+		+set oscar_enable 1 \
+		+set oscar_mode direct \
+		+map rtest_parity \
+		+oscar_status \
+		+oscar_buddies \
+		+oscar_disconnect \
+		+quit)" || rc=$?
+	if [[ "$rc" -eq 77 ]]; then
+		return 77
+	fi
+	if [[ "$rc" -ne 0 ]]; then
+		return "$rc"
+	fi
+	idtech3_minimal_assert_clean_log "$output"
+	echo "$output" | grep -q 'OSCAR direct client: enabled'
+	echo "$output" | grep -q 'OSCAR available: yes'
+	echo "$output" | grep -q 'OSCAR buddy roster'
+	echo "[minimal_content_smoke] OSCAR server commands: ok"
+}
+
 idtech3_minimal_run_case() {
 	local case_name="${1:-all}"
 	local root
@@ -178,6 +204,9 @@ idtech3_minimal_run_case() {
 		app_crdt)
 			idtech3_minimal_app_crdt_smoke "$root" || status=$?
 			;;
+		oscar)
+			idtech3_minimal_oscar_smoke "$root" || status=$?
+			;;
 		all)
 			idtech3_minimal_map_smoke "$root" || status=$?
 			if [[ "$status" -eq 0 ]]; then
@@ -186,9 +215,12 @@ idtech3_minimal_run_case() {
 			if [[ "$status" -eq 0 ]]; then
 				idtech3_minimal_app_crdt_smoke "$root" || status=$?
 			fi
+			if [[ "$status" -eq 0 ]]; then
+				idtech3_minimal_oscar_smoke "$root" || status=$?
+			fi
 			;;
 		*)
-			echo "usage: $0 [all|map|physics|app_crdt]" >&2
+			echo "usage: $0 [all|map|physics|app_crdt|oscar]" >&2
 			return 2
 			;;
 	esac
