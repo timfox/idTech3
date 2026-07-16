@@ -15,6 +15,7 @@ fi
 
 test -f runtime/client/core/cl_p2p_session.c || fail "missing cl_p2p_session.c"
 test -f runtime/server/sv_client.c || fail "missing sv_client.c"
+test -f runtime/game/g_lua_control_bindings.inc || fail "missing Lua control bindings include"
 grep -q 'SV_P2P_HandleReconnectRequest' runtime/server/sv_client.c || fail "missing reconnect handler"
 grep -q 'SV_P2P_SaveGraceSlot' runtime/server/sv_client.c || fail "missing grace slot saver"
 grep -q 'SV_P2P_AllowReconnectGrace' runtime/server/sv_client.c || fail "missing grace allow helper"
@@ -27,8 +28,8 @@ grep -q 'cl_p2pReconnectJitterMs' runtime/client/core/cl_p2p_session.c || fail "
 grep -q 'p2p_reconnect_stopped' runtime/client/core/cl_p2p_session.c || fail "missing reconnect stop event"
 grep -q 'CL_P2P_SessionCurrentTarget' runtime/client/core/cl_p2p_session.c || fail "missing current reconnect target tracking"
 grep -q 'CL_P2P_SessionRecoveryStopReason' runtime/client/core/cl_p2p_session.c || fail "missing reconnect stop reason tracking"
-grep -q 'currentTarget' runtime/game/g_lua_bindings.c || fail "missing Lua current reconnect target exposure"
-grep -q 'recoveryStopReason' runtime/game/g_lua_bindings.c || fail "missing Lua reconnect stop reason exposure"
+grep -q 'currentTarget' runtime/game/g_lua_bindings.c runtime/game/g_lua_control_bindings.inc || fail "missing Lua current reconnect target exposure"
+grep -q 'recoveryStopReason' runtime/game/g_lua_bindings.c runtime/game/g_lua_control_bindings.inc || fail "missing Lua reconnect stop reason exposure"
 grep -q 'cl_p2pReconnectMaxAttempts' docs/P2P_NETWORKING.md || fail "missing reconnect attempt cap docs"
 
 if [ "${IDTECH3_P2P_RECONNECT_LIVE:-0}" != "1" ]; then
