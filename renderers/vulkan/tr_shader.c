@@ -5134,7 +5134,6 @@ static int loadShaderBuffers( char **shaderFiles, const int numShaderFiles, char
 	for ( i = 0; i < numShaderFiles; i++ )
 	{
 
-#ifdef USE_VK_PBR
 		// look for a .mtr file first
 		if( vk.pbrActive ){
 			char *ext;
@@ -5151,9 +5150,6 @@ static int loadShaderBuffers( char **shaderFiles, const int numShaderFiles, char
 		}else{
 			Com_sprintf(filename, sizeof(filename), "scripts/%s", shaderFiles[i]);
 		}
-#else
-		Com_sprintf( filename, sizeof( filename ), "scripts/%s", shaderFiles[i] );
-#endif
 		//ri.Printf( PRINT_DEVELOPER, "...loading '%s'\n", filename );
 		summand = ri.FS_ReadFile( filename, (void **)&buffers[i] );
 
