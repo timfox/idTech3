@@ -2,7 +2,7 @@
 ===========================================================================
 Copyright (C) 2026 Gopex LLC. All rights reserved.
 
-Shared parser for misc_billboard / misc_flipbook / misc_imposter map entities.
+Shared parser for misc_billboard / misc_flipbook / misc_imposter / misc_voxel map entities.
 Used by the Vulkan renderer (client BSP), dedicated server (configstrings + spawn),
 and regression tests.
 ===========================================================================
@@ -20,7 +20,8 @@ extern "C" {
 typedef enum {
 	ENGINE_SPRITE_BILLBOARD = 0,
 	ENGINE_SPRITE_FLIPBOOK,
-	ENGINE_SPRITE_IMPOSTER
+	ENGINE_SPRITE_IMPOSTER,
+	ENGINE_SPRITE_VOXEL
 } engineSpriteType_t;
 
 typedef struct {

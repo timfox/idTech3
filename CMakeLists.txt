@@ -1933,6 +1933,7 @@ set(RENDERER_COMMON_SRCS
 	renderers/common/tr_image_dds.c
 	renderers/common/tr_image_svg.c
 	renderers/common/tr_model_mesh_import.c
+	renderers/common/tr_vox_parse.c
 	renderers/common/tr_model_freeusd_register.c
 	renderers/vulkan/tr_model_gltf.c
 	renderers/vulkan/tr_gltf_topo.c
@@ -2991,6 +2992,13 @@ set_tests_properties(test_hybrid1 PROPERTIES
 	LABELS "scripts;validation;renderer;rtx"
 	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_hybrid1.sh;${CMAKE_SOURCE_DIR}/renderers/vulkan/extensions/rtx/vk_hybrid1.c")
 
+add_test(NAME test_voxel_sprites
+	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_voxel_sprites.sh
+	WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+set_tests_properties(test_voxel_sprites PROPERTIES
+	LABELS "scripts;validation;renderer"
+	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_voxel_sprites.sh;${CMAKE_SOURCE_DIR}/renderers/vulkan/tr_model_vox.c;${CMAKE_SOURCE_DIR}/docs/VOXEL_SPRITES.md")
+
 add_test(NAME test_upscale
 	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_upscale.sh
 	WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
@@ -3887,6 +3895,21 @@ if(BUILD_UNIT_TESTS)
 	endif()
 	add_test(NAME unit_engine_sprite_map COMMAND unit_engine_sprite_map)
 	set_tests_properties(unit_engine_sprite_map PROPERTIES LABELS "unit;validation")
+
+	add_executable(unit_vox_parse
+		tests/unit/test_vox_parse.c
+		tests/stub_qcommon_min.c
+		renderers/common/tr_vox_parse.c
+		engine/core/q_shared.c
+		engine/core/q_math.c)
+	target_include_directories(unit_vox_parse PRIVATE
+		${IDTECH3_UNIT_INCLUDE_DIRS}
+		${CMAKE_SOURCE_DIR}/renderers/common)
+	if(NOT MSVC)
+		target_link_libraries(unit_vox_parse PRIVATE m)
+	endif()
+	add_test(NAME unit_vox_parse COMMAND unit_vox_parse)
+	set_tests_properties(unit_vox_parse PROPERTIES LABELS "unit;validation")
 
 	add_executable(unit_engine_decal_map
 		tests/unit/test_engine_decal_map.c

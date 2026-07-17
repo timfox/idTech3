@@ -90,6 +90,7 @@ TODOs/FIXMEs in `third_party/` and vendored `**/external/**` (duktape, zstd, cjs
 
 | Date | Scope | Notes |
 |------|--------|------|
+| 2026-07-17 | Voxel sprites | MagicaVoxel `.vox` → MD3 mesh props (`misc_voxel` / `voxel_spawn`); see `docs/VOXEL_SPRITES.md`. Networked spawn deferred. |
 | 2026-07-11 | Triage follow-up | Flattened remaining `../qcommon` in `engine/` / `renderers/` / `extensions/` (65 files); Vulkan gains `IDTECH3_DIR_ENGINE_CORE`. Bridges retained for soak. Next: bridge-drop audit or RTX long-term. |
 | 2026-07-11 | Triage follow-up | Include rewrite: modules + `runtime/{client,game,server}`; client shell → `shell/`. `MOD_SDK` FSR2 wording fixed. |
 | 2026-07-11 | Triage | Retargeted this doc to canonical roots (Phase 5e); re-scan: **0** `TODO`/`FIXME` in first-party tree. |

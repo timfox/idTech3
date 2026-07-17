@@ -22,7 +22,7 @@ End-to-end: **map entity → server CS + spawn → snapshot → client bridge �
 
 | Stage | Sprites | Decals |
 |-------|---------|--------|
-| Map class | `misc_billboard`, `misc_flipbook`, `misc_imposter` | `misc_decal` |
+| Map class | `misc_billboard`, `misc_flipbook`, `misc_imposter`, `misc_voxel` (local/map `.vox`) | `misc_decal` |
 | Shared parse | [engine_sprite_map.c](../engine/core/engine_sprite_map.c) | [engine_decal_map.c](../engine/core/engine_decal_map.c) |
 | Server | `sv_engineSprites`, `sv_engineSpritesSpawn` | `sv_engineDecals`, `sv_engineDecalsSpawn` |
 | CS catalog | `CS_ENGINE_SPRITE_SHADERS` | `CS_ENGINE_DECAL_SHADERS` |
@@ -43,9 +43,11 @@ End-to-end: **map entity → server CS + spawn → snapshot → client bridge �
 | `apos.trBase[1]` | — | yaw (degrees) |
 | `eFlags` | `EF_*` sprite flags | `EF_DECAL` |
 
-Console: `sprite_spawn`, `sv_sprite_spawn`, `decal_spawn`, `sv_decal_spawn`  
+Console: `sprite_spawn`, `sv_sprite_spawn`, `voxel_spawn` (local MagicaVoxel `.vox` → `RT_MODEL`), `decal_spawn`, `sv_decal_spawn`  
 Lua: `Engine.Sprites.*`, `Engine.Decals.*`  
-Cgame trap: `trap_EngineSpriteAddLocal`, `trap_EngineDecalAddLocal`
+Cgame trap: `trap_EngineSpriteAddLocal`, `trap_EngineDecalAddLocal`  
+
+Voxel cube-mesh props (not networked yet): **`docs/VOXEL_SPRITES.md`**, demo **`exec demo_voxel_sprites.cfg`**.
 
 ---
 

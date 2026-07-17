@@ -92,6 +92,7 @@ typedef struct engineSpriteDesc_s {
 	float				radius;
 	float				rotation;
 	qhandle_t			shader;
+	qhandle_t			hModel;		/* ENGINE_SPRITE_VOXEL: MagicaVoxel .vox model */
 	int					cols;
 	int					rows;
 	float				fps;

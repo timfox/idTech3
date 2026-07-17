@@ -46,6 +46,7 @@ Documentation is grouped by **tier**. Most files remain at their historical path
 
 - [QUICKSTART.md](QUICKSTART.md)
 - [MOD_SDK.md](MOD_SDK.md)
+- [VOXEL_SPRITES.md](VOXEL_SPRITES.md) — MagicaVoxel `.vox` cube-mesh props (`misc_voxel` / `voxel_spawn`)
 - [RADIANT.md](RADIANT.md)
 - [VOIP.md](VOIP.md) — Opus voice chat + head lip flap
 - [IDTECH3_TV.md](IDTECH3_TV.md) — external idTech3-tv / Owncast live-stream publishing

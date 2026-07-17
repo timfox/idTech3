@@ -387,15 +387,24 @@ else
 fi
 
 echo ""
-echo "Engine-native sprite props (misc_billboard / misc_flipbook / misc_imposter):"
+echo "Engine-native sprite props (misc_billboard / misc_flipbook / misc_imposter / misc_voxel):"
 SP_C="$PROJECT_ROOT/renderers/vulkan/tr_sprite_props.c"
 TR_TYPES="$PROJECT_ROOT/renderers/common/tr_types.h"
+VOX_C="$PROJECT_ROOT/renderers/vulkan/tr_model_vox.c"
 if ! grep -q 'misc_billboard' "$SP_C" 2>/dev/null; then
   fail "tr_sprite_props.c missing misc_billboard parse"
 elif ! grep -q 'misc_flipbook' "$SP_C" 2>/dev/null; then
   fail "tr_sprite_props.c missing misc_flipbook parse"
 elif ! grep -q 'misc_imposter' "$SP_C" 2>/dev/null; then
   fail "tr_sprite_props.c missing misc_imposter parse"
+elif ! grep -q 'ENGINE_SPRITE_VOXEL' "$SP_C" 2>/dev/null; then
+  fail "tr_sprite_props.c missing ENGINE_SPRITE_VOXEL / misc_voxel"
+elif ! grep -q 'misc_voxel' "$PROJECT_ROOT/engine/core/engine_sprite_map.c" 2>/dev/null; then
+  fail "engine_sprite_map.c missing misc_voxel classname"
+elif ! test -f "$VOX_C" || ! grep -q 'R_RegisterVOX' "$VOX_C" 2>/dev/null; then
+  fail "tr_model_vox.c missing R_RegisterVOX"
+elif ! grep -q 'voxel_spawn' "$IDTECH3_CLIENT/shell/cl_engine_sprites.c" 2>/dev/null; then
+  fail "cl_engine_sprites.c missing voxel_spawn"
 elif ! grep -q 'R_SpriteProps_ParseFromEntityString' "$PROJECT_ROOT/renderers/vulkan/tr_bsp.c" 2>/dev/null; then
   fail "tr_bsp.c should parse sprite props on RE_LoadWorldMap"
 elif ! grep -q 'RF_SPRITE_YAWLOCK' "$TR_TYPES" 2>/dev/null; then

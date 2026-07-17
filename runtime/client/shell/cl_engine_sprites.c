@@ -90,9 +90,11 @@ void CL_EngineSprites_Init( void ) {
 		"Draw networked EF_BILLBOARD / EF_FLIPBOOK / EF_IMPOSTER entities from snapshots. "
 		"Shader path via modelindex -> CS_ENGINE_SPRITE_SHADERS (see sv_engineSprites)." );
 	Cmd_AddCommand( "sprite_spawn", CL_SpriteSpawn_f );
+	Cmd_AddCommand( "voxel_spawn", CL_VoxelSpawn_f );
 	if ( cl_engineSprites && cl_engineSprites->integer ) {
 		Com_Printf( "[engine][sprites] cl_engineSprites=1 (snapshot billboard/flipbook/imposter bridge)\n" );
 	}
+	Com_Printf( "[engine][vox] voxel_spawn <voxpath> [scale] [x y z] [yaw] (local MagicaVoxel prop)\n" );
 	CL_EngineSprites_SyncMapParse();
 }
 
@@ -219,7 +221,14 @@ void CL_EngineSprite_AddLocal( const engineSpriteDesc_t *desc ) {
 }
 
 void CL_EngineSprite_AddLocalAtTime( const engineSpriteDesc_t *desc, int timeMs ) {
-	if ( !desc || !desc->shader ) {
+	if ( !desc ) {
+		return;
+	}
+	if ( desc->type == ENGINE_SPRITE_VOXEL ) {
+		if ( !desc->hModel ) {
+			return;
+		}
+	} else if ( !desc->shader ) {
 		return;
 	}
 	if ( re.AddEngineSpriteToSceneAtTime ) {
@@ -274,4 +283,60 @@ void CL_SpriteSpawn_f( void ) {
 	CL_EngineSprite_AddLocal( &desc );
 	Com_Printf( "sprite_spawn: %s '%s' at (%.0f %.0f %.0f)\n",
 		typeArg, shaderArg, desc.origin[0], desc.origin[1], desc.origin[2] );
+}
+
+/*
+=================
+CL_VoxelSpawn_f
+
+voxel_spawn <voxpath> [scale] [x y z] [yaw]
+Local-only MagicaVoxel prop (ENGINE_SPRITE_VOXEL / RT_MODEL).
+=================
+*/
+void CL_VoxelSpawn_f( void ) {
+	engineSpriteDesc_t desc;
+	const char *voxPath;
+	vec3_t org;
+	float scale;
+	float yaw;
+
+	if ( !re.AddEngineSpriteToScene || !re.RegisterModel ) {
+		Com_Printf( "Renderer not ready for voxel_spawn\n" );
+		return;
+	}
+
+	voxPath = Cmd_Argc() > 1 ? Cmd_Argv( 1 ) : "models/vox/demo_crate.vox";
+	scale = Cmd_Argc() > 2 ? (float)atof( Cmd_Argv( 2 ) ) : 1.0f;
+	if ( scale <= 0.0f ) {
+		scale = 1.0f;
+	}
+
+	Com_Memset( &desc, 0, sizeof( desc ) );
+	desc.type = ENGINE_SPRITE_VOXEL;
+	desc.radius = scale;
+	desc.hModel = re.RegisterModel( voxPath );
+	if ( !desc.hModel ) {
+		Com_Printf( "voxel_spawn: could not register model '%s'\n", voxPath );
+		return;
+	}
+
+	if ( Cmd_Argc() >= 6 ) {
+		org[0] = (float)atof( Cmd_Argv( 3 ) );
+		org[1] = (float)atof( Cmd_Argv( 4 ) );
+		org[2] = (float)atof( Cmd_Argv( 5 ) );
+	} else if ( cls.cgameStarted && !( cl.snap.snapFlags & SNAPFLAG_NOT_ACTIVE ) ) {
+		VectorCopy( cl.snap.ps.origin, org );
+		org[2] += 24.0f;
+	} else {
+		VectorClear( org );
+		org[2] = 64.0f;
+	}
+	VectorCopy( org, desc.origin );
+
+	yaw = Cmd_Argc() >= 7 ? (float)atof( Cmd_Argv( 6 ) ) : 0.0f;
+	desc.rotation = yaw;
+
+	CL_EngineSprite_AddLocal( &desc );
+	Com_Printf( "voxel_spawn: '%s' scale=%.2f at (%.0f %.0f %.0f) yaw=%.0f\n",
+		voxPath, scale, desc.origin[0], desc.origin[1], desc.origin[2], yaw );
 }

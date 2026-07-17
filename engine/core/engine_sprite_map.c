@@ -67,6 +67,8 @@ void EngineSpriteMap_Parse( const char *entityString, engineSpriteMapList_t *lis
 		def.swaySpeed = 1.0f;
 		classname[0] = '\0';
 		def.shader[0] = '\0';
+		{
+			qboolean scaleSet = qfalse;
 
 		while ( 1 ) {
 			token = COM_Parse( &p );
@@ -86,6 +88,7 @@ void EngineSpriteMap_Parse( const char *entityString, engineSpriteMapList_t *lis
 				Q_strncpyz( def.shader, value, sizeof( def.shader ) );
 			} else if ( !Q_stricmp( key, "scale" ) || !Q_stricmp( key, "radius" ) ) {
 				def.radius = EngineSpriteMap_Float( value, def.radius );
+				scaleSet = qtrue;
 			} else if ( !Q_stricmp( key, "rotation" ) || !Q_stricmp( key, "angle" ) ) {
 				def.rotation = EngineSpriteMap_Float( value, 0.0f );
 			} else if ( !Q_stricmp( key, "cols" ) || !Q_stricmp( key, "columns" ) ) {
@@ -127,6 +130,16 @@ void EngineSpriteMap_Parse( const char *entityString, engineSpriteMapList_t *lis
 		} else if ( !Q_stricmp( classname, "misc_imposter" ) ) {
 			def.type = ENGINE_SPRITE_IMPOSTER;
 			list->defs[list->count++] = def;
+		} else if ( !Q_stricmp( classname, "misc_voxel" ) ) {
+			def.type = ENGINE_SPRITE_VOXEL;
+			if ( !scaleSet ) {
+				def.radius = 1.0f;
+			}
+			if ( def.radius <= 0.0f ) {
+				def.radius = 1.0f;
+			}
+			list->defs[list->count++] = def;
 		}
+		} /* scaleSet scope */
 	}
 }

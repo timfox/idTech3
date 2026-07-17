@@ -209,6 +209,7 @@ extern qhandle_t R_RegisterOBJ(const char *name, model_t *mod);
 extern qhandle_t R_RegisterMD5(const char *name, model_t *mod);
 extern qboolean  R_RegisterGLTF(const char *name, model_t *mod);
 extern qhandle_t R_RegisterMeshImport( const char *name, model_t *mod );
+extern qhandle_t R_RegisterVOX( const char *name, model_t *mod );
 
 static qhandle_t R_RegisterGLTF_Wrapper(const char *name, model_t *mod) {
 	return R_RegisterGLTF(name, mod) ? mod->index : 0;
@@ -233,6 +234,7 @@ static modelExtToLoaderMap_t modelLoaders[ ] =
 	{ "glb",  R_RegisterGLTF_Wrapper },
 	{ "usda", R_RegisterUSD_Model },
 	{ "usd",  R_RegisterUSD_Model },
+	{ "vox",  R_RegisterVOX },
 	{ "obj",  R_RegisterOBJ },
 	{ "stl",  R_RegisterMeshImport },
 	{ "dae",  R_RegisterMeshImport },

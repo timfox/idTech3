@@ -2,8 +2,9 @@
 ===========================================================================
 Copyright (C) 2026 Gopex LLC. All rights reserved.
 
-Parses misc_billboard / misc_flipbook / misc_imposter map entities and submits
-RT_SPRITE refEntities each frame. Games may also call RE_AddEngineSpriteToScene.
+Parses misc_billboard / misc_flipbook / misc_imposter / misc_voxel map entities
+and submits RT_SPRITE (billboards) or RT_MODEL (voxels) each frame.
+Games may also call RE_AddEngineSpriteToScene.
 When the server spawns map sprites into snapshots, set r_spritePropsMapParse 0
 (or let cl_engineSprites sync via CS_ENGINE_SPRITE_META).
 ===========================================================================
@@ -21,6 +22,7 @@ typedef struct spriteProp_s {
 	float				radius;
 	float				rotation;
 	qhandle_t			shader;
+	qhandle_t			hModel;
 	int					cols;
 	int					rows;
 	float				fps;
@@ -56,15 +58,26 @@ static void SP_AddPropFromDef( const engineSpriteMapDef_t *def ) {
 	VectorCopy( def->origin, prop.origin );
 	prop.radius = def->radius;
 	prop.rotation = def->rotation;
-	prop.shader = SP_RegisterShader( def->shader );
 	prop.cols = def->cols;
 	prop.rows = def->rows;
 	prop.fps = def->fps;
 	prop.swayAmount = def->swayAmount;
 	prop.swaySpeed = def->swaySpeed;
 
-	if ( !prop.shader ) {
-		return;
+	if ( def->type == ENGINE_SPRITE_VOXEL ) {
+		prop.hModel = RE_RegisterModel( def->shader );
+		if ( !prop.hModel ) {
+			ri.Printf( PRINT_WARNING, "[engine][sprites] misc_voxel: failed to load '%s'\n", def->shader );
+			return;
+		}
+		if ( prop.radius <= 0.0f ) {
+			prop.radius = 1.0f;
+		}
+	} else {
+		prop.shader = SP_RegisterShader( def->shader );
+		if ( !prop.shader ) {
+			return;
+		}
 	}
 
 	spriteProps[spritePropCount++] = prop;
@@ -81,6 +94,7 @@ void R_SpriteProps_ParseFromEntityString( const char *entityString ) {
 	int parsedBillboards = 0;
 	int parsedFlipbooks = 0;
 	int parsedImposters = 0;
+	int parsedVoxels = 0;
 
 	if ( !entityString || !entityString[0] ) {
 		return;
@@ -109,23 +123,59 @@ void R_SpriteProps_ParseFromEntityString( const char *entityString ) {
 		case ENGINE_SPRITE_IMPOSTER:
 			parsedImposters++;
 			break;
+		case ENGINE_SPRITE_VOXEL:
+			parsedVoxels++;
+			break;
 		}
 	}
 
 	if ( spritePropCount > 0 ) {
 		ri.Printf( PRINT_ALL,
-			"[engine][sprites] %d map props (billboard=%d flipbook=%d imposter=%d)\n",
-			spritePropCount, parsedBillboards, parsedFlipbooks, parsedImposters );
+			"[engine][sprites] %d map props (billboard=%d flipbook=%d imposter=%d voxel=%d)\n",
+			spritePropCount, parsedBillboards, parsedFlipbooks, parsedImposters, parsedVoxels );
+	}
+}
+
+static void SP_FillVoxelRefEntity( const vec3_t origin, float scale, float yawDeg,
+	qhandle_t hModel, refEntity_t *ent )
+{
+	vec3_t angles;
+
+	Com_Memset( ent, 0, sizeof( *ent ) );
+	ent->reType = RT_MODEL;
+	ent->hModel = hModel;
+	VectorCopy( origin, ent->origin );
+	VectorCopy( origin, ent->lightingOrigin );
+	ent->shader.rgba[0] = 255;
+	ent->shader.rgba[1] = 255;
+	ent->shader.rgba[2] = 255;
+	ent->shader.rgba[3] = 255;
+
+	angles[0] = 0.0f;
+	angles[1] = yawDeg;
+	angles[2] = 0.0f;
+	AnglesToAxis( angles, ent->axis );
+	if ( scale != 1.0f && scale > 0.0f ) {
+		VectorScale( ent->axis[0], scale, ent->axis[0] );
+		VectorScale( ent->axis[1], scale, ent->axis[1] );
+		VectorScale( ent->axis[2], scale, ent->axis[2] );
+		ent->nonNormalizedAxes = qtrue;
 	}
 }
 
 static void SP_FillRefEntityFromDesc( engineSpriteType_t type, const vec3_t origin,
-	float radius, float rotation, qhandle_t shader, int cols, int rows, float fps,
+	float radius, float rotation, qhandle_t shader, qhandle_t hModel,
+	int cols, int rows, float fps,
 	float swayAmount, float swaySpeed, refEntity_t *ent, int refdefTimeMs )
 {
 	int totalFrames;
 	int frameIndex;
 	float rot;
+
+	if ( type == ENGINE_SPRITE_VOXEL ) {
+		SP_FillVoxelRefEntity( origin, radius, rotation, hModel, ent );
+		return;
+	}
 
 	Com_Memset( ent, 0, sizeof( *ent ) );
 	ent->reType = RT_SPRITE;
@@ -169,8 +219,8 @@ static void SP_FillRefEntityFromDesc( engineSpriteType_t type, const vec3_t orig
 
 static void SP_FillRefEntity( const spriteProp_t *prop, refEntity_t *ent, int refdefTimeMs ) {
 	SP_FillRefEntityFromDesc( prop->type, prop->origin, prop->radius, prop->rotation,
-		prop->shader, prop->cols, prop->rows, prop->fps, prop->swayAmount, prop->swaySpeed,
-		ent, refdefTimeMs );
+		prop->shader, prop->hModel, prop->cols, prop->rows, prop->fps,
+		prop->swayAmount, prop->swaySpeed, ent, refdefTimeMs );
 }
 
 void RE_AddEngineSpriteToScene( const engineSpriteDesc_t *desc ) {
@@ -181,13 +231,20 @@ void RE_AddEngineSpriteToScene( const engineSpriteDesc_t *desc ) {
 void RE_AddEngineSpriteToSceneAtTime( const engineSpriteDesc_t *desc, int refdefTimeMs ) {
 	refEntity_t ent;
 
-	if ( !desc || !desc->shader ) {
+	if ( !desc ) {
+		return;
+	}
+	if ( desc->type == ENGINE_SPRITE_VOXEL ) {
+		if ( !desc->hModel ) {
+			return;
+		}
+	} else if ( !desc->shader ) {
 		return;
 	}
 
 	SP_FillRefEntityFromDesc( desc->type, desc->origin, desc->radius, desc->rotation,
-		desc->shader, desc->cols, desc->rows, desc->fps, desc->swayAmount, desc->swaySpeed,
-		&ent, refdefTimeMs );
+		desc->shader, desc->hModel, desc->cols, desc->rows, desc->fps,
+		desc->swayAmount, desc->swaySpeed, &ent, refdefTimeMs );
 	RE_AddRefEntityToScene( &ent, qfalse );
 }
 
@@ -222,7 +279,7 @@ const char *R_MapProps_EntityString( void ) {
 void R_SpriteProps_Init( void ) {
 	r_spriteProps = ri.Cvar_Get( "r_spriteProps", "1", CVAR_ARCHIVE_ND );
 	ri.Cvar_SetDescription( r_spriteProps,
-		"Engine-native map sprite props (misc_billboard, misc_flipbook, misc_imposter)." );
+		"Engine-native map sprite props (misc_billboard, misc_flipbook, misc_imposter, misc_voxel)." );
 	ri.Cvar_SetGroup( r_spriteProps, CVG_RENDERER );
 
 	r_spritePropsMapParse = ri.Cvar_Get( "r_spritePropsMapParse", "1", CVAR_ARCHIVE_ND );
@@ -232,6 +289,6 @@ void R_SpriteProps_Init( void ) {
 	ri.Cvar_SetGroup( r_spritePropsMapParse, CVG_RENDERER );
 
 	if ( r_spriteProps && r_spriteProps->integer ) {
-		ri.Printf( PRINT_ALL, "[engine][sprites] r_spriteProps=1 (map billboards/flipbooks/imposters)\n" );
+		ri.Printf( PRINT_ALL, "[engine][sprites] r_spriteProps=1 (map billboards/flipbooks/imposters/voxels)\n" );
 	}
 }

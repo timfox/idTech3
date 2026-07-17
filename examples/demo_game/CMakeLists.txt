@@ -64,6 +64,8 @@ set(DEMO_MOD_FILES
 	"${DEMO_MOD_DIR}/demo_physics.cfg"
 	"${DEMO_MOD_DIR}/sprites/sector_0_0.ents"
 	"${DEMO_MOD_DIR}/demo_sprites.cfg"
+	"${DEMO_MOD_DIR}/demo_voxel_sprites.cfg"
+	"${DEMO_MOD_DIR}/models/vox/demo_crate.vox"
 	"${DEMO_MOD_DIR}/demo_material_blend.cfg"
 	"${DEMO_MOD_DIR}/demo_audio.cfg"
 	"${DEMO_MOD_DIR}/demo_sp_slice.cfg"
@@ -223,6 +225,11 @@ add_custom_command(
 	COMMAND ${CMAKE_COMMAND} -E copy_if_different
 		"${DEMO_MOD_DIR}/demo_sprites.cfg" "${DEMO_PACK_STAGING}/demo_sprites.cfg"
 	COMMAND ${CMAKE_COMMAND} -E copy_if_different
+		"${DEMO_MOD_DIR}/demo_voxel_sprites.cfg" "${DEMO_PACK_STAGING}/demo_voxel_sprites.cfg"
+	COMMAND ${CMAKE_COMMAND} -E make_directory "${DEMO_PACK_STAGING}/models/vox"
+	COMMAND ${CMAKE_COMMAND} -E copy_if_different
+		"${DEMO_MOD_DIR}/models/vox/demo_crate.vox" "${DEMO_PACK_STAGING}/models/vox/demo_crate.vox"
+	COMMAND ${CMAKE_COMMAND} -E copy_if_different
 		"${DEMO_MOD_DIR}/demo_material_blend.cfg" "${DEMO_PACK_STAGING}/demo_material_blend.cfg"
 	COMMAND ${CMAKE_COMMAND} -E copy_if_different
 		"${DEMO_MOD_DIR}/demo_audio.cfg" "${DEMO_PACK_STAGING}/demo_audio.cfg"
@@ -340,7 +347,7 @@ add_custom_command(
 		"$<TARGET_FILE:demo_ui_skeleton>" "${DEMO_PACK_STAGING}/${DEMO_UI_DOT_ZIP}"
 	COMMAND ${CMAKE_COMMAND} -E chdir "${DEMO_PACK_STAGING}"
 		${CMAKE_COMMAND} -E tar cf "${DEMO_PK3}" --format=zip
-		autoexec.cfg gameinfo.txt demo_features.cfg demo_js.cfg demo_lua.cfg demo_csharp.cfg demo_gameplay.cfg demo_usd.cfg demo_districts.cfg demo_openworld.cfg demo_world_residency.cfg demo_fog_biology.cfg demo_fog_biology_namib.cfg demo_fog_biology_openworld.cfg demo_vdb_woodcock.cfg demo_physics.cfg demo_sprites.cfg demo_material_blend.cfg demo_audio.cfg demo_sp_slice.cfg gpu_golden_capture.cfg readme_demo.txt
+		autoexec.cfg gameinfo.txt demo_features.cfg demo_js.cfg demo_lua.cfg demo_csharp.cfg demo_gameplay.cfg demo_usd.cfg demo_districts.cfg demo_openworld.cfg demo_world_residency.cfg demo_fog_biology.cfg demo_fog_biology_namib.cfg demo_fog_biology_openworld.cfg demo_vdb_woodcock.cfg demo_physics.cfg demo_sprites.cfg demo_voxel_sprites.cfg demo_material_blend.cfg demo_audio.cfg demo_sp_slice.cfg gpu_golden_capture.cfg readme_demo.txt
 		sound/soundevents.txt animgraph/idle_run.txt ndgi/demo.ndgi niv/demo.niv nslm/demo.nslm nist/demo.nist nvc/demo.nvc fsa/demo.fsa vfgi/demo.vfgi renderformer/demo.rfm vuda/demo.vuda grtx/demo.grtx mgs/demo.mgs wsp/demo.wsp sqz/demo.sqz loc/en.loc
 		vdb/fog_2cubed.nvdb
 		scripts/js/demo_hooks.js scripts/js/README.txt
@@ -348,6 +355,7 @@ add_custom_command(
 		scripts/csharp/IdTech3.Engine.cs scripts/csharp/demo_hooks.cs
 		scripts/demo_bootstrap.shader scripts/demo_sprites.shader scripts/demo_material_blend.shader
 		models/parity_geom_mesh.usda models/parity_shade_preview.usda
+		models/vox/demo_crate.vox
 		world/playfield.usda world/proxies/north_proxy.usda world/proxies/south_proxy.usda
 		world/districts/north.usda world/districts/south.usda
 		sprites/sector_0_0.ents
