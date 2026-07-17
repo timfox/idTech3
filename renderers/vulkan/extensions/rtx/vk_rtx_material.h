@@ -14,6 +14,9 @@ void vk_rtx_material_tint_rgb( const byte *rgba, float out[3] );
 /* Prefer lightingStage diffuse image with hasThumb, else first usable stage. */
 image_t *vk_rtx_material_diffuse_image( const shader_t *shader );
 
+/* Same pick as diffuse_image but does not require an 8×8 thumb (bindless Phase A.1). */
+image_t *vk_rtx_material_diffuse_image_bindless( const shader_t *shader );
+
 /* Sample thumb at wrapped UV; writes default gray if no thumb. */
 void vk_rtx_material_sample_thumb_uv( const image_t *img, float u, float v, float out[3] );
 

@@ -64,14 +64,21 @@ HIT_GLSL="$(idtech3_file renderers/vulkan/shaders/glsl/hybrid1/hybrid1_hit.glsl 
 PT_HIT="$(idtech3_file renderers/vulkan/shaders/glsl/pt_hit.rchit src/renderers/vulkan/shaders/glsl/pt_hit.rchit)"
 VK_BINDLESS="$(idtech3_file renderers/vulkan/extensions/rtx/vk_rtx_bindless.c src/renderers/vulkan/extensions/rtx/vk_rtx_bindless.c)"
 VK_HYBRID="$(idtech3_file renderers/vulkan/extensions/rtx/vk_hybrid1.c src/renderers/vulkan/extensions/rtx/vk_hybrid1.c)"
+VK_WORLD="$(idtech3_file renderers/vulkan/extensions/rtx/vk_rtx_world.c src/renderers/vulkan/extensions/rtx/vk_rtx_world.c)"
+VK_ENT="$(idtech3_file renderers/vulkan/extensions/rtx/vk_rtx_entities.c src/renderers/vulkan/extensions/rtx/vk_rtx_entities.c)"
 check "$HIT_GLSL" 'WorldAlbedoSSBO' 'Hybrid1 hit world albedo SSBO'
 check "$HIT_GLSL" 'PrimMaterialSSBO' 'Hybrid1 hit prim material SSBO'
 check "$HIT_GLSL" 'binding = 15' 'Hybrid1 hit bindless diffuse binding'
 check "$PT_HIT" 'WorldAlbedoSSBO' 'pathtrace hit world albedo SSBO'
 check "$VK_BINDLESS" 'vk_rtx_bindless_init' 'bindless module init'
 check "$VK_BINDLESS" 'bindless=textures:' 'rtx_status bindless line'
+check "$VK_BINDLESS" 'set_prim_from_shader' 'Phase A.1 prim textureIndex emit'
+check "$VK_BINDLESS" 'validPrims:' 'rtx_status valid prim count'
+check "$VK_WORLD" 'vk_rtx_bindless_set_prim_from_shader' 'world pack writes prim materials'
+check "$VK_ENT" 'vk_rtx_bindless_set_entity_prim_from' 'entity pack writes prim materials'
 check "$VK_HYBRID" 'binding = 15' 'Hybrid1 RT DSL binding 15'
 check "$VK_HYBRID" 'vk_rtx_bindless_bind_prim_material' 'Hybrid1 binds prim material SSBO'
+check "$VK_HYBRID" 'viewOrigin\[3\]' 'Hybrid1 UBO world prim count for entity offset'
 check "$TR_INIT" 'r_rtxBindless' 'r_rtxBindless cvar registration'
 check "$TR_INIT" 'r_rtxBindlessCap' 'r_rtxBindlessCap cvar registration'
 

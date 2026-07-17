@@ -10,11 +10,14 @@ Optional per-primitive albedo RGB (shader materials / UV thumbs or vertex color)
 #include "tr_local.h"
 #include "vk_rtx_world.h"
 #include "vk_rtx_material.h"
+#include "vk_rtx_bindless.h"
 #include <math.h>
 
 #ifdef USE_VULKAN_RTX
 
 static const float s_defaultAlbedo[3] = { 0.72f, 0.70f, 0.66f };
+
+static qboolean rtx_world_materials_enabled( void );
 
 static void rtx_store_vec3( float *dstBase, uint32_t primIndex, float x, float y, float z )
 {
@@ -29,9 +32,15 @@ static void rtx_store_vec3( float *dstBase, uint32_t primIndex, float x, float y
 	dst[2] = z;
 }
 
-static void rtx_store_albedo( float *albedoRgb, uint32_t primIndex, float r, float g, float b )
+static void rtx_store_albedo( float *albedoRgb, uint32_t primIndex, float r, float g, float b,
+	const shader_t *shader )
 {
 	rtx_store_vec3( albedoRgb, primIndex, r, g, b );
+	if ( rtx_world_materials_enabled() ) {
+		vk_rtx_bindless_set_prim_from_shader( primIndex, shader );
+	} else {
+		vk_rtx_bindless_set_prim_from_image( primIndex, NULL );
+	}
 }
 
 static void rtx_normalize3( float *v )
@@ -329,7 +338,7 @@ static void rtx_emit_face_tris( const srfSurfaceFace_t *face, const shader_t *sh
 		u = ( u0 + u1 + u2 ) * ( 1.0f / 3.0f );
 		v = ( v0 + v1 + v2 ) * ( 1.0f / 3.0f );
 		rtx_resolve_prim_albedo( shader, u, v, avg, rgb );
-		rtx_store_albedo( albedoRgb, *primCount, rgb[0], rgb[1], rgb[2] );
+		rtx_store_albedo( albedoRgb, *primCount, rgb[0], rgb[1], rgb[2], shader );
 		/* Planar faces: BSP plane normal is authoritative. */
 		rtx_store_normal( normalRgb, *primCount, face->plane.normal );
 		baseV += 3u;
@@ -381,7 +390,7 @@ static void rtx_emit_triangles_tris( const srfTriangles_t *surf, const shader_t 
 		u = ( surf->verts[i0].st[0] + surf->verts[i1].st[0] + surf->verts[i2].st[0] ) * ( 1.0f / 3.0f );
 		v = ( surf->verts[i0].st[1] + surf->verts[i1].st[1] + surf->verts[i2].st[1] ) * ( 1.0f / 3.0f );
 		rtx_resolve_prim_albedo( shader, u, v, avg, rgb );
-		rtx_store_albedo( albedoRgb, *primCount, rgb[0], rgb[1], rgb[2] );
+		rtx_store_albedo( albedoRgb, *primCount, rgb[0], rgb[1], rgb[2], shader );
 		{
 			float n[3];
 			const float *na = surf->verts[i0].normal;
@@ -467,7 +476,7 @@ static void rtx_emit_grid_tris( const srfGridMesh_t *grid, const shader_t *shade
 			u = ( dvA->st[0] + dvB->st[0] + dvC->st[0] ) * ( 1.0f / 3.0f );
 			v = ( dvA->st[1] + dvB->st[1] + dvC->st[1] ) * ( 1.0f / 3.0f );
 			rtx_resolve_prim_albedo( shader, u, v, avg, rgb );
-			rtx_store_albedo( albedoRgb, *primCount, rgb[0], rgb[1], rgb[2] );
+			rtx_store_albedo( albedoRgb, *primCount, rgb[0], rgb[1], rgb[2], shader );
 			{
 				float n[3];
 				n[0] = dvA->normal[0] + dvB->normal[0] + dvC->normal[0];
@@ -504,7 +513,7 @@ static void rtx_emit_grid_tris( const srfGridMesh_t *grid, const shader_t *shade
 			u = ( dvA->st[0] + dvB->st[0] + dvC->st[0] ) * ( 1.0f / 3.0f );
 			v = ( dvA->st[1] + dvB->st[1] + dvC->st[1] ) * ( 1.0f / 3.0f );
 			rtx_resolve_prim_albedo( shader, u, v, avg, rgb );
-			rtx_store_albedo( albedoRgb, *primCount, rgb[0], rgb[1], rgb[2] );
+			rtx_store_albedo( albedoRgb, *primCount, rgb[0], rgb[1], rgb[2], shader );
 			{
 				float n[3];
 				n[0] = dvA->normal[0] + dvB->normal[0] + dvC->normal[0];

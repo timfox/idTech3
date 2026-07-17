@@ -1063,7 +1063,8 @@ static void HYBRID1_FillFrameUbo( VkHybrid1FrameUBO_t *ubo )
 	ubo->viewOrigin[0] = backEnd.viewParms.or.origin[0];
 	ubo->viewOrigin[1] = backEnd.viewParms.or.origin[1];
 	ubo->viewOrigin[2] = backEnd.viewParms.or.origin[2];
-	ubo->viewOrigin[3] = 0.0f;
+	/* w = world prim count for PrimMaterialSSBO entity offset (D2 Phase A.1). */
+	ubo->viewOrigin[3] = (float)vk_rtx_world_albedo_count();
 	ubo->sunDirection[0] = tr.sunDirection[0];
 	ubo->sunDirection[1] = tr.sunDirection[1];
 	ubo->sunDirection[2] = tr.sunDirection[2];

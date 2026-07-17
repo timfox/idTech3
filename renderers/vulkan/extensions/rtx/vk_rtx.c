@@ -629,6 +629,10 @@ static void vk_rtx_rebuild_world_blas( void )
 				normalHost[ai * 3u + 2u] = 1.0f;
 			}
 		}
+		vk_rtx_bindless_reset_texture_table();
+		vk_rtx_bindless_prepare_capacity( worldPrim + rtx.entity_albedo_count );
+		vk_rtx_bindless_clear_prims( 0u, worldPrim + rtx.entity_albedo_count );
+		vk_rtx_bindless_set_entity_base( 0u );
 		packedPrim = vk_rtx_world_pack( tr.world, worldPrim, posHost, idxHost, albedoHost, normalHost, &packedVerts );
 		qvkUnmapMemory( vk.device, rtx.vertex_memory );
 		qvkUnmapMemory( vk.device, rtx.index_memory );
@@ -1106,6 +1110,9 @@ static void vk_rtx_rebuild_entity_tlas( void )
 				VK_CHECK( qvkMapMemory( vk.device, rtx.entity_normal_memory, 0, abSize, 0, (void **)&normalHost ) );
 			}
 			Com_Memset( &packStats, 0, sizeof( packStats ) );
+			vk_rtx_bindless_prepare_capacity( rtx.world_albedo_count + (uint32_t)( maxIndices / 3u ) );
+			vk_rtx_bindless_set_entity_base( rtx.world_albedo_count );
+			vk_rtx_bindless_clear_prims( rtx.world_albedo_count, (uint32_t)( maxIndices / 3u ) );
 			packedEnt = vk_rtx_entities_pack( &backEnd.refdef, &backEnd.viewParms, capEnt,
 				posHost, maxVerts, idxHost, maxIndices, albedoHost, normalHost, &packStats );
 			qvkUnmapMemory( vk.device, rtx.entity_vertex_memory );

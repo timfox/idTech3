@@ -3,7 +3,7 @@ layout( set = 0, binding = 2, std140 ) uniform Hybrid1Frame {
 	mat4 invViewProj;
 	mat4 prevViewProj;
 	mat4 viewProj;
-	vec4 viewOrigin;
+	vec4 viewOrigin; /* xyz = camera; w = world prim count (PrimMaterial entity offset) */
 	vec4 sunDirection; /* xyz = dir, w = angular radius (degrees) */
 	vec4 outputSize;   /* xy = extent, z = sunLight scale, w = dlightShadows count */
 	vec4 params0; /* x=history gamma, y=temporal alpha, z=reinhard mul, w=frame hash */

@@ -1,6 +1,6 @@
 #pragma once
 
-#include "../common/vulkan/vulkan.h"
+#include "tr_local.h"
 
 #ifdef USE_VULKAN_RTX
 
@@ -23,7 +23,21 @@ uint32_t vk_rtx_bindless_cap( void );
 int vk_rtx_bindless_mode( void );
 qboolean vk_rtx_bindless_indexing_supported( void );
 
-/* Ensure prim-material SSBO covers world+entity prim counts; fills INVALID indices. */
+/*
+ * Pack-time prim materials (Phase A.1): dense textureIndex into host staging,
+ * then sync uploads [world | entity] to PrimMaterialSSBO. Sampling still off
+ * until AS UVs + descriptor array (active() stays false).
+ */
+void vk_rtx_bindless_reset_texture_table( void );
+void vk_rtx_bindless_prepare_capacity( uint32_t totalPrims );
+void vk_rtx_bindless_clear_prims( uint32_t begin, uint32_t count );
+void vk_rtx_bindless_set_entity_base( uint32_t worldPrimCount );
+void vk_rtx_bindless_set_prim_from_image( uint32_t primIndex, image_t *img );
+void vk_rtx_bindless_set_prim_from_shader( uint32_t primIndex, const shader_t *shader );
+void vk_rtx_bindless_set_entity_prim_from_image( uint32_t entityPrimIndex, image_t *img );
+void vk_rtx_bindless_set_entity_prim_from_shader( uint32_t entityPrimIndex, const shader_t *shader );
+
+/* Upload host prim materials (world+entity); missing slots stay INVALID. */
 void vk_rtx_bindless_sync_prim_materials( uint32_t worldPrimCount, uint32_t entityPrimCount );
 
 void vk_rtx_bindless_bind_textures( VkDescriptorSet set, uint32_t binding );
@@ -40,6 +54,14 @@ uint32_t vk_rtx_bindless_texture_count( void );
 uint32_t vk_rtx_bindless_cap( void );
 int vk_rtx_bindless_mode( void );
 qboolean vk_rtx_bindless_indexing_supported( void );
+void vk_rtx_bindless_reset_texture_table( void );
+void vk_rtx_bindless_prepare_capacity( uint32_t totalPrims );
+void vk_rtx_bindless_clear_prims( uint32_t begin, uint32_t count );
+void vk_rtx_bindless_set_entity_base( uint32_t worldPrimCount );
+void vk_rtx_bindless_set_prim_from_image( uint32_t primIndex, image_t *img );
+void vk_rtx_bindless_set_prim_from_shader( uint32_t primIndex, const shader_t *shader );
+void vk_rtx_bindless_set_entity_prim_from_image( uint32_t entityPrimIndex, image_t *img );
+void vk_rtx_bindless_set_entity_prim_from_shader( uint32_t entityPrimIndex, const shader_t *shader );
 void vk_rtx_bindless_sync_prim_materials( uint32_t worldPrimCount, uint32_t entityPrimCount );
 void vk_rtx_bindless_bind_textures( VkDescriptorSet set, uint32_t binding );
 void vk_rtx_bindless_bind_prim_material( VkDescriptorSet set, uint32_t binding );

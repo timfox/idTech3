@@ -155,6 +155,30 @@ image_t *vk_rtx_material_diffuse_image( const shader_t *shader )
 	return NULL;
 }
 
+image_t *vk_rtx_material_diffuse_image_bindless( const shader_t *shader )
+{
+	int i;
+	image_t *img;
+
+	if ( !shader ) {
+		return NULL;
+	}
+	if ( shader->lightingStage >= 0 && shader->lightingStage < MAX_SHADER_STAGES ) {
+		img = vk_rtx_material_image_from_stage( shader->stages[shader->lightingStage],
+			shader->lightingBundle, qfalse );
+		if ( img ) {
+			return img;
+		}
+	}
+	for ( i = 0; i < MAX_SHADER_STAGES && shader->stages[i]; i++ ) {
+		img = vk_rtx_material_image_from_stage( shader->stages[i], 0, qfalse );
+		if ( img ) {
+			return img;
+		}
+	}
+	return NULL;
+}
+
 void vk_rtx_material_sample_thumb_uv( const image_t *img, float u, float v, float out[3] )
 {
 	int x, y;
@@ -283,6 +307,12 @@ void vk_rtx_material_tint_rgb( const byte *rgba, float out[3] )
 }
 
 image_t *vk_rtx_material_diffuse_image( const shader_t *shader )
+{
+	(void)shader;
+	return NULL;
+}
+
+image_t *vk_rtx_material_diffuse_image_bindless( const shader_t *shader )
 {
 	(void)shader;
 	return NULL;

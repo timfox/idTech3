@@ -116,16 +116,20 @@ vec3 hybrid1_sampleHitNormal( void )
 vec3 hybrid1_sampleHitAlbedo( sampler2D albedoTex )
 {
 	/*
-	 * D2 Phase A scaffold: PrimMaterialSSBO is filled with textureIndex=0xFFFFFFFF
-	 * (SSBO RGB). When bindless sampling lands, resolve UV + nonuniformEXT here.
+	 * D2 Phase A.1: PrimMaterialSSBO carries dense textureIndex from pack
+	 * (INVALID = no diffuse image). Hit UV bindless sample still deferred —
+	 * keep SSBO RGB / G-buffer fallback until AS attrs + descriptor array.
 	 */
-	if ( gl_InstanceCustomIndexEXT == 0 ) {
+	{
 		uint nMat = uint( primMat.mats.length() );
 		uint primIdx = uint( max( gl_PrimitiveID, 0 ) );
+		if ( gl_InstanceCustomIndexEXT == 1 ) {
+			primIdx += uint( max( h1.viewOrigin.w, 0.0 ) );
+		}
 		if ( nMat > 0u && primIdx < nMat ) {
 			uint texIdx = primMat.mats[primIdx].textureIndex;
 			if ( texIdx != 0xFFFFFFFFu ) {
-				/* Reserved: sample bindless array at hit UV. Keep fallback sampler live. */
+				/* Indices are live for status/debug; sampling waits on Phase A.1b. */
 				vec2 keep = vec2( textureSize( bindlessDiffuseFallback, 0 ) );
 				if ( keep.x < 0.0 ) {
 					return vec3( keep, 0.0 );

@@ -12,6 +12,7 @@ for unknown types / pack failures.
 #include "tr_model_gltf.h"
 #include "vk_rtx_entities.h"
 #include "vk_rtx_material.h"
+#include "vk_rtx_bindless.h"
 
 #ifdef USE_VULKAN_RTX
 
@@ -668,7 +669,8 @@ static void vk_rtx_entity_albedo_from_shader( const shader_t *shader, const byte
 }
 
 static void vk_rtx_entity_write_prim( float *albedoRgb, float *normalNxyz, uint32_t prim,
-	const float *a, const float *b, const float *c, const float rgb[3] )
+	const float *a, const float *b, const float *c, const float rgb[3],
+	const shader_t *shader, image_t *img )
 {
 	float n[3];
 
@@ -682,6 +684,13 @@ static void vk_rtx_entity_write_prim( float *albedoRgb, float *normalNxyz, uint3
 		normalNxyz[prim * 3u + 0u] = n[0];
 		normalNxyz[prim * 3u + 1u] = n[1];
 		normalNxyz[prim * 3u + 2u] = n[2];
+	}
+	if ( img ) {
+		vk_rtx_bindless_set_entity_prim_from_image( prim, img );
+	} else if ( shader ) {
+		vk_rtx_bindless_set_entity_prim_from_shader( prim, shader );
+	} else {
+		vk_rtx_bindless_set_entity_prim_from_image( prim, NULL );
 	}
 }
 
@@ -778,7 +787,7 @@ static void vk_rtx_entity_fill_md3_materials( const trRefEntity_t *ent, model_t 
 			primRgb[1] = rgb[1];
 			primRgb[2] = rgb[2];
 			vk_rtx_entity_prim_rgb( shader, ent->e.shader.rgba, useMaterials, useUv, u, v, primRgb );
-			vk_rtx_entity_write_prim( albedoRgb, normalNxyz, prim, pa, pb, pc, primRgb );
+			vk_rtx_entity_write_prim( albedoRgb, normalNxyz, prim, pa, pb, pc, primRgb, shader, NULL );
 			prim++;
 		}
 
@@ -844,7 +853,7 @@ static void vk_rtx_entity_fill_iqm_materials( const trRefEntity_t *ent, model_t 
 			primRgb[1] = rgb[1];
 			primRgb[2] = rgb[2];
 			vk_rtx_entity_prim_rgb( shader, ent->e.shader.rgba, useMaterials, useUv, u, v, primRgb );
-			vk_rtx_entity_write_prim( albedoRgb, normalNxyz, prim, pa, pb, pc, primRgb );
+			vk_rtx_entity_write_prim( albedoRgb, normalNxyz, prim, pa, pb, pc, primRgb, shader, NULL );
 			prim++;
 		}
 	}
@@ -927,7 +936,7 @@ static void vk_rtx_entity_fill_mdr_materials( const trRefEntity_t *ent, model_t 
 				primRgb[1] = rgb[1];
 				primRgb[2] = rgb[2];
 				vk_rtx_entity_prim_rgb( shader, ent->e.shader.rgba, useMaterials, useUv, u, vuv, primRgb );
-				vk_rtx_entity_write_prim( albedoRgb, normalNxyz, prim, pa, pb, pc, primRgb );
+				vk_rtx_entity_write_prim( albedoRgb, normalNxyz, prim, pa, pb, pc, primRgb, shader, NULL );
 				prim++;
 			}
 			ri.Hunk_FreeTempMemory( uvTab );
@@ -1049,7 +1058,7 @@ static void vk_rtx_entity_fill_gltf_materials( const trRefEntity_t *ent, model_t
 				} else if ( custom ) {
 					vk_rtx_entity_prim_rgb( custom, ent->e.shader.rgba, useMaterials, useUv, u, v, primRgb );
 				}
-				vk_rtx_entity_write_prim( albedoRgb, normalNxyz, prim, pa, pb, pc, primRgb );
+				vk_rtx_entity_write_prim( albedoRgb, normalNxyz, prim, pa, pb, pc, primRgb, custom, baseImg );
 				prim++;
 			}
 		}
