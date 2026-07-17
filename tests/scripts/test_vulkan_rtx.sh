@@ -62,8 +62,18 @@ check "$VK_MAT" 'R_EnsureImageThumb' 'material path ensures thumbs before UV sam
 
 HIT_GLSL="$(idtech3_file renderers/vulkan/shaders/glsl/hybrid1/hybrid1_hit.glsl src/renderers/vulkan/shaders/glsl/hybrid1/hybrid1_hit.glsl)"
 PT_HIT="$(idtech3_file renderers/vulkan/shaders/glsl/pt_hit.rchit src/renderers/vulkan/shaders/glsl/pt_hit.rchit)"
+VK_BINDLESS="$(idtech3_file renderers/vulkan/extensions/rtx/vk_rtx_bindless.c src/renderers/vulkan/extensions/rtx/vk_rtx_bindless.c)"
+VK_HYBRID="$(idtech3_file renderers/vulkan/extensions/rtx/vk_hybrid1.c src/renderers/vulkan/extensions/rtx/vk_hybrid1.c)"
 check "$HIT_GLSL" 'WorldAlbedoSSBO' 'Hybrid1 hit world albedo SSBO'
+check "$HIT_GLSL" 'PrimMaterialSSBO' 'Hybrid1 hit prim material SSBO'
+check "$HIT_GLSL" 'binding = 15' 'Hybrid1 hit bindless diffuse binding'
 check "$PT_HIT" 'WorldAlbedoSSBO' 'pathtrace hit world albedo SSBO'
+check "$VK_BINDLESS" 'vk_rtx_bindless_init' 'bindless module init'
+check "$VK_BINDLESS" 'bindless=textures:' 'rtx_status bindless line'
+check "$VK_HYBRID" 'binding = 15' 'Hybrid1 RT DSL binding 15'
+check "$VK_HYBRID" 'vk_rtx_bindless_bind_prim_material' 'Hybrid1 binds prim material SSBO'
+check "$TR_INIT" 'r_rtxBindless' 'r_rtxBindless cvar registration'
+check "$TR_INIT" 'r_rtxBindlessCap' 'r_rtxBindlessCap cvar registration'
 
 if [[ $failures -ne 0 ]]; then
   echo "$failures check(s) failed"

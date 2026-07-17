@@ -13,6 +13,7 @@ caps BLAS triangles (default 262144). See docs/RENDERERS_FUTURE.md.
 #include "vk_rtx.h"
 #include "vk_rtx_entities.h"
 #include "vk_rtx_world.h"
+#include "vk_rtx_bindless.h"
 #include "vk_util.h"
 #include "vk_view_state.h"
 #include "vk_image_layout.h"
@@ -257,6 +258,7 @@ static void RTX_Status_f( void )
 			rtx.blas_geo_is_world ? 1 : 0,
 			rtx.world_name[0] ? rtx.world_name : "(empty)" );
 	}
+	vk_rtx_bindless_status_line();
 }
 
 static VkShaderModule vk_rtx_shader_module( const uint8_t *code, uint32_t codeSize, const char *name )
@@ -863,6 +865,8 @@ static void vk_rtx_rebuild_world_blas( void )
 	} else {
 		ri.Printf( PRINT_DEVELOPER, "[VK][RTX] BLAS fallback triangle (no world)\n" );
 	}
+
+	vk_rtx_bindless_sync_prim_materials( rtx.world_albedo_count, rtx.entity_albedo_count );
 }
 
 static void vk_rtx_destroy_entity_as_only( void )
@@ -1400,6 +1404,8 @@ static void vk_rtx_rebuild_entity_tlas( void )
 			entity_tlas_logged = qtrue;
 		}
 	}
+
+	vk_rtx_bindless_sync_prim_materials( rtx.world_albedo_count, rtx.entity_albedo_count );
 }
 
 void vk_rtx_shutdown( void )
@@ -1408,6 +1414,8 @@ void vk_rtx_shutdown( void )
 		ri.Cmd_RemoveCommand( "rtx_status" );
 		rtx.cmd_registered = qfalse;
 	}
+
+	vk_rtx_bindless_shutdown();
 
 	if ( !rtx.ready ) {
 		return;
@@ -1741,6 +1749,7 @@ void vk_rtx_init( void )
 	qvkUnmapMemory( vk.device, rtx.sbt_memory );
 
 	rtx.ready = qtrue;
+	vk_rtx_bindless_init();
 	sampleCount = ( r_rtxSamples && r_rtxSamples->integer > 0 ) ? r_rtxSamples->integer : 1;
 	if ( sampleCount > 8 ) {
 		sampleCount = 8;

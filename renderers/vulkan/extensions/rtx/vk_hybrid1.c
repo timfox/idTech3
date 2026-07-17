@@ -13,6 +13,7 @@ with raster direct lighting. Requires USE_VULKAN_RTX, r_hybrid1 or r_rtx 1, r_rt
 #include "vk.h"
 #include "vk_hybrid1.h"
 #include "vk_rtx.h"
+#include "vk_rtx_bindless.h"
 #include "vk_surfel_gi.h"
 #include "vk_util.h"
 #include "vk_view_state.h"
@@ -756,6 +757,10 @@ static void HYBRID1_UpdateRtDescriptors( VkDescriptorSet set, VkImageView output
 	HYBRID1_WriteImageBinding( set, 1, outputView, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, VK_IMAGE_LAYOUT_GENERAL );
 	HYBRID1_WriteUboBinding( set, 2 );
 
+	/* D2 Phase A: bindless diffuse slot (1× white) + prim-material SSBO (INVALID → SSBO RGB). */
+	vk_rtx_bindless_bind_textures( set, 15 );
+	vk_rtx_bindless_bind_prim_material( set, 16 );
+
 	fpBuf = ( vk.forward_plus.buffer != VK_NULL_HANDLE ) ? vk.forward_plus.buffer : hybrid1.fp_dummy_ssbo;
 	fpRange = ( vk.forward_plus.buffer != VK_NULL_HANDLE && vk.forward_plus.capacity_bytes > 0 )
 		? (VkDeviceSize)vk.forward_plus.capacity_bytes
@@ -1261,7 +1266,7 @@ void vk_hybrid1_init( void )
 {
 	VkPhysicalDeviceRayTracingPipelinePropertiesKHR rtProps;
 	VkPhysicalDeviceProperties2 props2;
-	VkDescriptorSetLayoutBinding rtBindings[15];
+	VkDescriptorSetLayoutBinding rtBindings[17];
 	VkDescriptorSetLayoutBinding temporalBindings[9];
 	VkDescriptorSetLayoutBinding atrousBindings[7];
 	VkDescriptorSetLayoutBinding compositeBindings[7];
@@ -1417,9 +1422,20 @@ void vk_hybrid1_init( void )
 	rtBindings[14].descriptorCount = 1;
 	rtBindings[14].stageFlags = VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR;
 
+	/* D2 Phase A scaffold: single diffuse slot (expand to bindless array when indexing lands). */
+	rtBindings[15].binding = 15;
+	rtBindings[15].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+	rtBindings[15].descriptorCount = 1;
+	rtBindings[15].stageFlags = VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR | VK_SHADER_STAGE_RAYGEN_BIT_KHR;
+
+	rtBindings[16].binding = 16;
+	rtBindings[16].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+	rtBindings[16].descriptorCount = 1;
+	rtBindings[16].stageFlags = VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR;
+
 	Com_Memset( &dslci, 0, sizeof( dslci ) );
 	dslci.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-	dslci.bindingCount = 15;
+	dslci.bindingCount = 17;
 	dslci.pBindings = rtBindings;
 	VK_CHECK( qvkCreateDescriptorSetLayout( vk.device, &dslci, NULL, &hybrid1.rt_dsl ) );
 
@@ -1431,9 +1447,9 @@ void vk_hybrid1_init( void )
 	poolSizes[2].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
 	poolSizes[2].descriptorCount = 3;
 	poolSizes[3].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-	poolSizes[3].descriptorCount = 21;
+	poolSizes[3].descriptorCount = 24;
 	poolSizes[4].type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-	poolSizes[4].descriptorCount = 18;
+	poolSizes[4].descriptorCount = 21;
 	Com_Memset( &dpci, 0, sizeof( dpci ) );
 	dpci.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
 	dpci.maxSets = 3;

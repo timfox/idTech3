@@ -1,6 +1,6 @@
 # RTX hit-shader UV / bindless texturing (D2 design)
 
-**Status:** design only (Jul 2026). Pack-time albedo thumbs + SSBOs remain the shipping chocolate path.
+**Status:** Phase A scaffold landed (Jul 2026). Pack-time albedo thumbs + SSBOs remain the shipping path; hit UV sampling is not enabled yet (`r_rtxBindless` default 0, `vk_rtx_bindless_active()` always false).
 
 ## Problem
 
@@ -38,9 +38,9 @@ This is good for chocolate RT but is **not** true texturing:
 | `vk.maxBoundDescriptorSets` | Device limit (typically ≥ 8; PBR requires **≥ 10**) |
 | `MAX_DRAWIMAGES` | **32768** registered `image_t` |
 | Per-texture descriptor | Each `image_t` has `descriptor` (combined image+sampler) in the **global sampler pool** |
-| Hybrid1 RT set (binding 0) | AS + storage images + UBO + depth/normal/material + sky + BRDF LUT + **4× SSBO** (world/entity albedo+normal) — **no spare binding** for a large texture array |
+| Hybrid1 RT set (binding 0) | AS + storage images + UBO + depth/normal/material + sky + BRDF LUT + **4× SSBO** (world/entity albedo+normal) + **binding 15** (1× diffuse sampler scaffold) + **binding 16** (`PrimMaterialSSBO`) |
 
-**Implication:** we cannot bind “one descriptor per image” on the RT set. D2 needs either **bindless indexing** or a **small atlas + indirection table**.
+**Implication:** we cannot bind “one descriptor per image” on the RT set yet. Full D2 needs either **bindless indexing** (array at binding 15) or a **small atlas + indirection table**.
 
 ## Proposed architecture (phased)
 
@@ -103,12 +103,14 @@ Suggested caps (tunable cvars):
 
 ## CPU work items (implementation checklist)
 
-1. `vk_rtx_material.c` — emit `textureIndex` + UV set when packing prims (reuse `vk_rtx_material_diffuse_image`).
-2. `vk_rtx_bindless.c` (new) — build table from `tr.images`, update after map load / image registration.
-3. `vk_hybrid1.c` / `vk_surfel_gi.c` / hit `.glsl` — new bindings + `GL_EXT_nonuniform_qualifier`.
-4. AS vertex buffers — ensure UV attribute available for barycentric interpolation (world faces already have ST coords; entities have texcoord0).
-5. `rtx_status` — `bindless=textures:N cap:M mode:K`.
-6. Tests — `test_vulkan_rtx.sh` wiring + software RT off fallback.
+1. ~~`vk_rtx_bindless.c` scaffold — prim-material SSBO (all `INVALID`), 1× white sampler at binding 15, indexing feature probe, `rtx_status` line.~~
+2. ~~`vk_hybrid1.c` / `hybrid1_hit.glsl` — bindings 15/16 + SSBO fallback path unchanged.~~
+3. ~~Cvars `r_rtxBindless` / `r_rtxBindlessCap` / `r_rtxBindlessMode` (latched; default off).~~
+4. ~~Tests — `test_vulkan_rtx.sh` greps for bindless wiring.~~
+5. `vk_rtx_material.c` — emit real `textureIndex` + UV set when packing prims (reuse `vk_rtx_material_diffuse_image`).
+6. Bindless descriptor array + `GL_EXT_nonuniform_qualifier` when `r_rtxBindless 1` + indexing supported.
+7. AS vertex buffers — UV attribute for barycentric interpolation (world ST; entity texcoord0).
+8. Surfel / pathtrace descriptor parity (same bindings or shared helper).
 
 ## Risks
 
@@ -133,11 +135,13 @@ Short automated client pass on OpenArena `oa_dm1` with deferred + Hybrid1 latche
   - **Verified:** `r_rtxDemo 1` + `r_rtxEntities 0` loads `oa_dm1`, packs thousands of world tris, `rtx_status` shows `geo_is_world=1`, clean quit.
 - **Fixed (Jul 2026) Hybrid1 DEVICE_LOST:** dummy entity SSBOs (13/14); safe specular lobe (no Heitz VNDF NaNs); diffuse mild-cone sampling + `vec4` payload; A-trous first-frame layout + ping-pong barriers. **Verified:** `r_hybrid1Quality` 1 and 3 on `oa_dm1` with deferred + `r_rtxEntities 0` clean quit.
 - **Fixed (Jul 2026) entity TLAS mid-frame destroy:** once-per-frame entity rebuild; retire old TLAS/entity BLAS instead of destroying under an open CB; flush retired after queue idle (world rebuild) / next entity refresh. **Verified:** Hybrid1 quality 1/3 + `r_rtxEntities 1` on `oa_dm1` (entity BLAS UPDATE, 2 TLAS instances) clean quit.
-- **Next:** D2 Phase A (hit-shader UV / bindless) after visual Hybrid1 QA with entities.
+- **Landed (Jul 2026) D2 Phase A scaffold:** `vk_rtx_bindless.c` + Hybrid1 RT bindings 15/16; prim materials filled with `textureIndex=0xFFFFFFFF`; hit shader still samples SSBO albedo. Master latch stays off until Phase A.1 (real indices + UV attrs + nonuniform sample). **Verified:** Hybrid1 quality 1 + `r_rtxEntities 1` on `oa_dm1` — `bindless=… active:0 indexing:1 worldPrims:4096 entityPrims:6629`, clean quit.
+- **Next:** Phase A.1 — emit `textureIndex` from pack path, AS UVs, enable sampling when `r_rtxBindless 1`.
 
 ## References
 
 - Pack helpers: `renderers/vulkan/extensions/rtx/vk_rtx_material.c`
+- Bindless scaffold: `renderers/vulkan/extensions/rtx/vk_rtx_bindless.c`
 - Hit SSBOs: `renderers/vulkan/shaders/glsl/hybrid1/hybrid1_hit.glsl`
 - Glint: `renderers/vulkan/shaders/glsl/glint_ndf.glsl`, `r_hybrid1_glint`
 - Debt board: D2 in rtx-tech-debt canvas

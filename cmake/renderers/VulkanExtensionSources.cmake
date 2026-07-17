@@ -45,6 +45,7 @@ set(VK_RTX_CORE_SRCS
 	${_VK_EXT}/rtx/vk_rtx_material.c
 	${_VK_EXT}/rtx/vk_rtx_world.c
 	${_VK_EXT}/rtx/vk_rtx_entities.c
+	${_VK_EXT}/rtx/vk_rtx_bindless.c
 )
 
 # Research-only RTX extras (still behind USE_EXPERIMENTAL_RENDERERS).

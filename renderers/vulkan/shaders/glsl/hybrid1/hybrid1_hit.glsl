@@ -16,6 +16,19 @@ layout( set = 0, binding = 14, std430 ) readonly buffer EntityNormalSSBO {
 	float nxyz[];
 } entityNormal;
 
+/* D2 Phase A: per-prim material indirection (textureIndex 0xFFFFFFFF = SSBO RGB). */
+struct Hybrid1PrimMaterial {
+	uint textureIndex;
+	uint uvSetFlags; /* low 16 = uvSet, high 16 = flags */
+};
+
+layout( set = 0, binding = 16, std430 ) readonly buffer PrimMaterialSSBO {
+	Hybrid1PrimMaterial mats[];
+} primMat;
+
+/* Reserved for Phase A sampling (descriptor bound; unused until bindless latch). */
+layout( set = 0, binding = 15 ) uniform sampler2D bindlessDiffuseFallback;
+
 vec3 hybrid1_defaultAlbedo( void )
 {
 	return vec3( 0.72, 0.70, 0.66 );
@@ -102,6 +115,25 @@ vec3 hybrid1_sampleHitNormal( void )
 
 vec3 hybrid1_sampleHitAlbedo( sampler2D albedoTex )
 {
+	/*
+	 * D2 Phase A scaffold: PrimMaterialSSBO is filled with textureIndex=0xFFFFFFFF
+	 * (SSBO RGB). When bindless sampling lands, resolve UV + nonuniformEXT here.
+	 */
+	if ( gl_InstanceCustomIndexEXT == 0 ) {
+		uint nMat = uint( primMat.mats.length() );
+		uint primIdx = uint( max( gl_PrimitiveID, 0 ) );
+		if ( nMat > 0u && primIdx < nMat ) {
+			uint texIdx = primMat.mats[primIdx].textureIndex;
+			if ( texIdx != 0xFFFFFFFFu ) {
+				/* Reserved: sample bindless array at hit UV. Keep fallback sampler live. */
+				vec2 keep = vec2( textureSize( bindlessDiffuseFallback, 0 ) );
+				if ( keep.x < 0.0 ) {
+					return vec3( keep, 0.0 );
+				}
+			}
+		}
+	}
+
 	vec3 ssbo = hybrid1_sampleWorldAlbedoSSBO();
 	if ( ssbo.x < 0.0 ) {
 		ssbo = hybrid1_sampleEntityAlbedoSSBO();
