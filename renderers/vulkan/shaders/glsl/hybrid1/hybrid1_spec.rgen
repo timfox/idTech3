@@ -38,6 +38,8 @@ void main()
 		float nLen = length( N );
 		if ( nLen > 0.01 ) {
 			N /= nLen;
+		} else {
+			N = vec3( 0.0, 0.0, 1.0 );
 		}
 		vec4 mat = textureLod( materialTex, uv, 0.0 );
 		metalness = clamp( mat.r, 0.0, 1.0 );
@@ -45,7 +47,15 @@ void main()
 	}
 
 	vec3 V = normalize( h1.viewOrigin.xyz - worldPos );
+	if ( dot( V, N ) <= 1e-4 ) {
+		V = normalize( V + N * ( 1e-3 - dot( V, N ) ) );
+	}
 	vec3 R = reflect( -V, N );
+	if ( !all( equal( R, R ) ) || dot( R, R ) < 1e-8 ) {
+		R = N;
+	} else {
+		R = normalize( R );
+	}
 	if ( roughness >= h1.params2.w ) {
 		imageStore( specOut, ivec2( gl_LaunchIDEXT.xy ), vec4( 0.0, 0.0, 0.0, roughness ) );
 		return;
@@ -56,19 +66,29 @@ void main()
 	vec3 H = N;
 	float r0 = fract( sin( dot( uv * h1.params0.w, vec2( 12.9898, 78.233 ) ) ) * 43758.5453 );
 	float r1 = fract( sin( dot( uv * ( h1.params0.w + 17.0 ), vec2( 39.346, 11.135 ) ) ) * 22578.1459 );
-	if ( h1.params3.x > 0.5 ) {
-		H = hybrid1_ggxVndf( V, N, roughness, vec2( r0, r1 ) );
-		rd = normalize( reflect( -V, H ) );
-	} else if ( roughness > 0.05 ) {
-		vec3 jitter = normalize( N + roughness * vec3( r0 * 2.0 - 1.0, r1 * 2.0 - 1.0, ( r0 + r1 ) * 2.0 - 1.0 ) );
-		H = normalize( mix( N, jitter, roughness ) );
-		rd = normalize( reflect( -V, H ) );
+
+	/*
+	 * Heitz VNDF previously emitted NaN/denorm dirs → NVIDIA DEVICE_LOST.
+	 * Use roughness-scaled isotropic lobe around N, then reflect; fall back to mirror.
+	 */
+	if ( roughness > 0.05 ) {
+		float lobe = ( h1.params3.x > 0.5 ) ? roughness : roughness;
+		vec3 jitter = N + lobe * vec3( r0 * 2.0 - 1.0, r1 * 2.0 - 1.0, ( r0 + r1 ) * 2.0 - 1.0 );
+		float jLen = length( jitter );
+		if ( jLen > 1e-6 ) {
+			H = normalize( mix( N, jitter / jLen, lobe ) );
+			vec3 cand = reflect( -V, H );
+			if ( all( equal( cand, cand ) ) && dot( cand, cand ) >= 1e-8 && dot( cand, N ) > 1e-4 ) {
+				rd = normalize( cand );
+			} else {
+				H = N;
+				rd = R;
+			}
+		}
 	}
 
 	specRadiance = vec4( 0.0 );
 	specRadiance.w = roughness;
-	/* Pack metalness into payload alpha high bits via roughness channel already used;
-	   store metalness in unused payload by encoding: keep roughness in .w, metalness via params. */
 	traceRayEXT( topLevelAS, gl_RayFlagsOpaqueEXT, 0xFFu, 0u, 0u, 0u, ro, max( h1.params2.y, 1e-4 ), rd, 1.0e5, 0 );
 
 	vec3 outRgb = specRadiance.rgb;
@@ -78,7 +98,6 @@ void main()
 		outRgb *= hybrid1_fresnelSchlick( NdotV, F0 );
 	}
 
-	/* Opt-in glint NDF weight (screen-UV jacobian proxy; material UV needs D2 bindless). */
 	if ( h1.params3.w > 0.5 ) {
 		float roughLo = min( h1.params5.z, h1.params5.w );
 		float roughHi = max( h1.params5.z, h1.params5.w );
@@ -87,26 +106,32 @@ void main()
 			float glintWeight = clamp( 1.0 - smoothstep( roughLo, roughHi, roughness ), 0.0, 1.0 );
 			if ( glintWeight > 0.0 ) {
 				vec3 up = abs( N.z ) < 0.999 ? vec3( 0.0, 0.0, 1.0 ) : vec3( 1.0, 0.0, 0.0 );
-				vec3 T = normalize( cross( up, N ) );
-				vec3 B = cross( N, T );
-				mat3 shadingFrame = mat3( T, B, N );
-				vec2 pixel = 1.0 / extent;
-				mat2 uvJac = mat2( vec2( pixel.x, 0.0 ), vec2( 0.0, pixel.y ) );
-				float alpha = max( roughness * roughness, 0.001 );
-				GlintParams gp;
-				gp.density = max( h1.params4.x, 1e-3 );
-				gp.microfacetRoughness = max( h1.params4.y, 1e-4 );
-				gp.pixelFilterSize = max( h1.params4.z, 0.5 );
-				gp.sampleBudget = clamp( h1.params4.w, 0.0, 2.0 );
-				gp.maxLodClamp = max( h1.params5.x, 0.1 );
-				gp.dClamp = max( h1.params5.y, 1.0 );
-				float lambda = 0.0;
-				float comp = 0.0;
-				float Dgl = D_GLINT_GGX( shadingFrame, H, uv, uvJac, alpha, gp, lambda, comp );
-				float NdotH = max( dot( N, H ), 0.0 );
-				float Dggx = max( hybrid1_dGgx( NdotH, alpha ), 1e-4 );
-				float ratio = clamp( Dgl / Dggx, 0.0, 4.0 );
-				outRgb *= mix( 1.0, ratio, glintWeight );
+				vec3 T = cross( up, N );
+				float tLen = length( T );
+				if ( tLen > 1e-6 ) {
+					T /= tLen;
+					vec3 B = cross( N, T );
+					mat3 shadingFrame = mat3( T, B, N );
+					vec2 pixel = 1.0 / extent;
+					mat2 uvJac = mat2( vec2( pixel.x, 0.0 ), vec2( 0.0, pixel.y ) );
+					float alpha = max( roughness * roughness, 0.001 );
+					GlintParams gp;
+					gp.density = max( h1.params4.x, 1e-3 );
+					gp.microfacetRoughness = max( h1.params4.y, 1e-4 );
+					gp.pixelFilterSize = max( h1.params4.z, 0.5 );
+					gp.sampleBudget = clamp( h1.params4.w, 0.0, 2.0 );
+					gp.maxLodClamp = max( h1.params5.x, 0.1 );
+					gp.dClamp = max( h1.params5.y, 1.0 );
+					float lambda = 0.0;
+					float comp = 0.0;
+					float Dgl = D_GLINT_GGX( shadingFrame, H, uv, uvJac, alpha, gp, lambda, comp );
+					float NdotH = max( dot( N, H ), 0.0 );
+					float Dggx = max( hybrid1_dGgx( NdotH, alpha ), 1e-4 );
+					float ratio = clamp( Dgl / Dggx, 0.0, 4.0 );
+					if ( all( equal( outRgb, outRgb ) ) ) {
+						outRgb *= mix( 1.0, ratio, glintWeight );
+					}
+				}
 			}
 		}
 	}
@@ -117,5 +142,8 @@ void main()
 		outRgb /= ( 1.0 + l * reinhardMul );
 	}
 
+	if ( !all( equal( outRgb, outRgb ) ) ) {
+		outRgb = vec3( 0.0 );
+	}
 	imageStore( specOut, ivec2( gl_LaunchIDEXT.xy ), vec4( outRgb, roughness ) );
 }

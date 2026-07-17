@@ -728,19 +728,34 @@ static void HYBRID1_UpdateRtDescriptors( VkDescriptorSet set, VkImageView output
 	brdfInfo.imageView = brdfView ? brdfView : depthInfo.imageView;
 	brdfInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 
+	HYBRID1_EnsureFpDummySsbo();
+
 	vk_rtx_bind_tlas_descriptor( set );
 	vk_rtx_bind_world_albedo_ssbo( set, 9 );
 	vk_rtx_bind_world_normal_ssbo( set, 12 );
+	/*
+	 * Spec/diffuse closest-hit always declare entity albedo/normal SSBOs (bindings 13/14).
+	 * Leave them unbound when r_rtxEntities is off → NVIDIA DEVICE_LOST on TraceRays.
+	 * Surfel GI uses the same pattern: dummy first, overwrite when packed.
+	 */
+	HYBRID1_WriteSsboBinding( set, 13, hybrid1.fp_dummy_ssbo, (VkDeviceSize)( sizeof( float ) * 8 ) );
+	HYBRID1_WriteSsboBinding( set, 14, hybrid1.fp_dummy_ssbo, (VkDeviceSize)( sizeof( float ) * 8 ) );
 	if ( vk_rtx_entity_albedo_count() > 0u ) {
 		vk_rtx_bind_entity_albedo_ssbo( set, 13 );
 	}
 	if ( vk_rtx_entity_normal_count() > 0u ) {
 		vk_rtx_bind_entity_normal_ssbo( set, 14 );
 	}
+	/* World SSBO bind is a no-op if buffers are missing — keep descriptors valid. */
+	if ( vk_rtx_world_albedo_count() == 0u ) {
+		HYBRID1_WriteSsboBinding( set, 9, hybrid1.fp_dummy_ssbo, (VkDeviceSize)( sizeof( float ) * 8 ) );
+	}
+	if ( vk_rtx_world_normal_count() == 0u ) {
+		HYBRID1_WriteSsboBinding( set, 12, hybrid1.fp_dummy_ssbo, (VkDeviceSize)( sizeof( float ) * 8 ) );
+	}
 	HYBRID1_WriteImageBinding( set, 1, outputView, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, VK_IMAGE_LAYOUT_GENERAL );
 	HYBRID1_WriteUboBinding( set, 2 );
 
-	HYBRID1_EnsureFpDummySsbo();
 	fpBuf = ( vk.forward_plus.buffer != VK_NULL_HANDLE ) ? vk.forward_plus.buffer : hybrid1.fp_dummy_ssbo;
 	fpRange = ( vk.forward_plus.buffer != VK_NULL_HANDLE && vk.forward_plus.capacity_bytes > 0 )
 		? (VkDeviceSize)vk.forward_plus.capacity_bytes
@@ -1845,11 +1860,14 @@ static hybrid1_image_t *HYBRID1_RecordAtrous( VkCommandBuffer cmd, VkDescriptorS
 			qvkCmdPushConstants( cmd, hybrid1.atrous_pl, VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof( push ), &push );
 			qvkCmdDispatch( cmd, ( hybrid1.width + 7u ) / 8u, ( hybrid1.height + 7u ) / 8u, 1 );
 
+			/* pong was written as GENERAL; next pass samples it as SHADER_READ_ONLY. */
+			HYBRID1_BarrierColorRead( cmd, pong->image );
 			{
 				hybrid1_image_t *tmp = ping;
 				ping = pong;
 				pong = tmp;
 			}
+			HYBRID1_BarrierColorWrite( cmd, pong->image, qfalse );
 		}
 	}
 	return ping;
@@ -1876,6 +1894,18 @@ void vk_hybrid1_record_pass( VkCommandBuffer cmd )
 		return;
 	}
 
+	doDiffuse = ( r_hybrid1_diffuse && r_hybrid1_diffuse->integer ) ? qtrue : qfalse;
+	/* Surfel owns diffuse GI under Hybrid1 fusion — skip Hybrid1 diffuse RT. */
+	if ( vk_surfel_gi_hybrid1_fusion_active() ) {
+		doDiffuse = qfalse;
+	}
+	doShadow = ( !r_hybrid1_shadow || r_hybrid1_shadow->integer ) ? qtrue : qfalse;
+	doSpec = ( !r_hybrid1_spec || r_hybrid1_spec->integer ) ? qtrue : qfalse;
+	if ( !doShadow && !doSpec && !doDiffuse ) {
+		/* Nothing to trace or composite — skip TLAS refresh / depth barrier. */
+		return;
+	}
+
 	vk_rtx_scene_prepare();
 
 	if ( vk_temporal_has_reason( VK_TEMPORAL_RESET_CAMERA_CUT | VK_TEMPORAL_RESET_MISSING_PREV_DATA |
@@ -1896,14 +1926,6 @@ void vk_hybrid1_record_pass( VkCommandBuffer cmd )
 
 	colorRestoreLayout = ( vk.renderPassIndex == RENDER_PASS_POST_BLOOM ) ?
 		VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL : VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-
-	doDiffuse = ( r_hybrid1_diffuse && r_hybrid1_diffuse->integer ) ? qtrue : qfalse;
-	/* Surfel owns diffuse GI under Hybrid1 fusion — skip Hybrid1 diffuse RT. */
-	if ( vk_surfel_gi_hybrid1_fusion_active() ) {
-		doDiffuse = qfalse;
-	}
-	doShadow = ( !r_hybrid1_shadow || r_hybrid1_shadow->integer ) ? qtrue : qfalse;
-	doSpec = ( !r_hybrid1_spec || r_hybrid1_spec->integer ) ? qtrue : qfalse;
 	denoisedDiffuse = &hybrid1.filtered_diffuse;
 	denoisedShadow = &hybrid1.filtered_shadow;
 	denoisedSpec = &hybrid1.filtered_spec;
@@ -2019,9 +2041,12 @@ void vk_hybrid1_record_pass( VkCommandBuffer cmd )
 
 	if ( doDiffuse ) {
 		if ( r_hybrid1_atrousIters && r_hybrid1_atrousIters->integer > 0 ) {
+			qboolean firstFrame = ( hybrid1.frame_index == 0 ) ? qtrue : qfalse;
 			HYBRID1_CopyColorImage( cmd, hybrid1.raw_diffuse.image, hybrid1.filtered_diffuse.image,
-				( hybrid1.frame_index == 0 ) ? qtrue : qfalse );
-			HYBRID1_BarrierColorWrite( cmd, hybrid1.atrous_diffuse.image, qfalse );
+				firstFrame );
+			/* Diffuse has no temporal variance buffer — use a low constant via raw.a path
+			 * (channel>=1.5 ignores varianceTex). Ensure atrous target layout is valid. */
+			HYBRID1_BarrierColorWrite( cmd, hybrid1.atrous_diffuse.image, firstFrame );
 			denoisedDiffuse = HYBRID1_RecordAtrous( cmd, hybrid1.atrous_diffuse_set, &hybrid1.raw_diffuse,
 				&hybrid1.raw_diffuse, &hybrid1.filtered_diffuse, &hybrid1.atrous_diffuse, 2.0f );
 		} else {

@@ -125,7 +125,14 @@ Suggested caps (tunable cvars):
 Short automated client pass on OpenArena `oa_dm1` with deferred + Hybrid1 latched originally **SIGSEGV'd during map load** after deferred lighting pipeline init (reproduced with `r_hybrid1 0`).
 
 - **Fixed (Jul 2026):** the deferred post-bloom composite/debug graphics pipelines set `viewportCount`/`scissorCount` = 1 with NULL `pViewports`/`pScissors` and no `pDynamicState`, but the draw path sets viewport/scissor dynamically. Without validation layers the NVIDIA driver NULL-dereferenced during `vkCreateGraphicsPipelines`. Both pipelines now declare `VK_DYNAMIC_STATE_VIEWPORT` / `VK_DYNAMIC_STATE_SCISSOR` (`vk_deferred_gbuffer.c`). Deferred-only map load now completes cleanly.
-- **Still open (separate bug):** `r_rtx 1` + `r_rtxDemo 1` triggers `VK_ERROR_DEVICE_LOST` on map load (RTX PRO Blackwell), independent of deferred and Hybrid1 (`r_hybrid1 0`, `r_renderMode 0` still reproduces). Visual Hybrid1 QA remains blocked on this RTX-demo device-lost, not the deferred crash. Track separately from D2.
+- **Fixed (Jul 2026) RTX demo DEVICE_LOST (world path):** several AS lifetime bugs in `vk_rtx.c`:
+  1. `r_rtxEntities 0` destroyed the TLAS instance buffer before the build that still referenced it.
+  2. AS builds reused `vk.tess[0]` (often the active frame CB) — now dedicated `vk_begin/end_command_buffer`.
+  3. Scratch addresses were not aligned to `minAccelerationStructureScratchOffsetAlignment`.
+  4. World BLAS gated on `RDF_NOWORLDMODEL` / mid-pass rebuild, so the first post-load pack never stuck or destroyed TLAS while recording — world rebuild now runs in `vk_rtx_frame_begin` from `tr.world` name only.
+  - **Verified:** `r_rtxDemo 1` + `r_rtxEntities 0` loads `oa_dm1`, packs thousands of world tris, `rtx_status` shows `geo_is_world=1`, clean quit.
+- **Fixed (Jul 2026) Hybrid1 DEVICE_LOST:** dummy entity SSBOs (13/14); safe specular lobe (no Heitz VNDF NaNs); diffuse mild-cone sampling + `vec4` payload; A-trous first-frame layout + ping-pong barriers. **Verified:** `r_hybrid1Quality` 1 and 3 on `oa_dm1` with deferred + `r_rtxEntities 0` clean quit.
+- **Still open:** `r_rtxEntities 1` mid-frame entity TLAS destroy/rebuild remains risky (defer/double-buffer next). D2 Phase A after visual QA with entities.
 
 ## References
 

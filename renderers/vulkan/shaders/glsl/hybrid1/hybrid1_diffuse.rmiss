@@ -4,15 +4,15 @@
 #include "hybrid1_ubo.glsl"
 #include "hybrid1_ibl.glsl"
 
-layout( location = 0 ) rayPayloadInEXT vec3 diffuseRadiance;
+layout( location = 0 ) rayPayloadInEXT vec4 diffuseRadiance;
 
 layout( set = 0, binding = 7 ) uniform samplerCube irradianceTex;
 
 void main()
 {
 	if ( h1.params1.w > 0.5 ) {
-		diffuseRadiance = hybrid1_sampleIrradiance( irradianceTex, gl_WorldRayDirectionEXT );
+		diffuseRadiance = vec4( hybrid1_sampleIrradiance( irradianceTex, gl_WorldRayDirectionEXT ), 1.0 );
 	} else {
-		diffuseRadiance = vec3( 0.35, 0.42, 0.55 );
+		diffuseRadiance = vec4( 0.35, 0.42, 0.55, 1.0 );
 	}
 }

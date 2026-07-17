@@ -5,7 +5,7 @@
 #include "hybrid1_ibl.glsl"
 #include "hybrid1_hit.glsl"
 
-layout( location = 0 ) rayPayloadInEXT vec3 diffuseRadiance;
+layout( location = 0 ) rayPayloadInEXT vec4 diffuseRadiance;
 
 layout( set = 0, binding = 7 ) uniform samplerCube irradianceTex;
 layout( set = 0, binding = 8 ) uniform sampler2D albedoTex;
@@ -28,5 +28,5 @@ void main()
 		hit += vec3( 0.02 );
 	}
 
-	diffuseRadiance = hit;
+	diffuseRadiance = vec4( hit, 1.0 );
 }

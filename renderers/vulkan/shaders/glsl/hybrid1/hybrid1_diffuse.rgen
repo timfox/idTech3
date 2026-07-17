@@ -3,27 +3,13 @@
 #extension GL_GOOGLE_include_directive : enable
 #include "hybrid1_ubo.glsl"
 
-layout( location = 0 ) rayPayloadEXT vec3 diffuseRadiance;
+layout( location = 0 ) rayPayloadEXT vec4 diffuseRadiance;
 
 layout( set = 0, binding = 0 ) uniform accelerationStructureEXT topLevelAS;
 layout( rgba16f, set = 0, binding = 1 ) uniform writeonly image2D diffuseOut;
 
 layout( set = 0, binding = 3 ) uniform sampler2D depthTex;
 layout( set = 0, binding = 4 ) uniform sampler2D normalTex;
-layout( set = 0, binding = 5 ) uniform sampler2D materialTex;
-
-vec3 hybrid1_cosineDirection( vec3 N, vec2 uv, float frameSeed )
-{
-	float r0 = fract( sin( dot( uv * frameSeed, vec2( 12.9898, 78.233 ) ) ) * 43758.5453 );
-	float r1 = fract( sin( dot( uv * ( frameSeed + 31.0 ), vec2( 39.346, 11.135 ) ) ) * 22578.1459 );
-	float phi = 6.2831853 * r0;
-	float cosTheta = sqrt( max( 1.0 - r1, 0.0 ) );
-	float sinTheta = sqrt( max( r1, 0.0 ) );
-	vec3 up = abs( N.z ) < 0.999 ? vec3( 0.0, 0.0, 1.0 ) : vec3( 0.0, 1.0, 0.0 );
-	vec3 tangent = normalize( cross( up, N ) );
-	vec3 bitangent = cross( N, tangent );
-	return normalize( tangent * cos( phi ) * sinTheta + bitangent * sin( phi ) * sinTheta + N * cosTheta );
-}
 
 void main()
 {
@@ -47,14 +33,33 @@ void main()
 		float nLen = length( N );
 		if ( nLen > 0.01 ) {
 			N /= nLen;
+		} else {
+			N = vec3( 0.0, 0.0, 1.0 );
 		}
 	}
 
-	vec3 wi = hybrid1_cosineDirection( N, uv, h1.params0.w );
+	/* Face the camera so the hemisphere opens into free space. */
+	vec3 V = normalize( h1.viewOrigin.xyz - worldPos );
+	if ( dot( N, V ) < 0.0 ) {
+		N = -N;
+	}
+
+	float r0 = fract( sin( dot( uv * h1.params0.w, vec2( 12.9898, 78.233 ) ) ) * 43758.5453 );
+	float r1 = fract( sin( dot( uv * ( h1.params0.w + 31.0 ), vec2( 39.346, 11.135 ) ) ) * 22578.1459 );
+	/* Mild cone around N — avoids full orthonormal-frame cosine (DEVICE_LOST on some NVIDIA). */
+	vec3 wi = normalize( N + 0.35 * vec3( r0 * 2.0 - 1.0, r1 * 2.0 - 1.0, ( r0 - r1 ) ) );
+	if ( !all( equal( wi, wi ) ) || dot( wi, N ) <= 1e-4 ) {
+		wi = N;
+	}
+
 	vec3 ro = worldPos + N * max( h1.params2.x, 0.0 );
 
-	diffuseRadiance = vec3( 0.0 );
+	diffuseRadiance = vec4( 0.0 );
 	traceRayEXT( topLevelAS, gl_RayFlagsOpaqueEXT, 0xFFu, 0u, 0u, 0u, ro, max( h1.params2.y, 1e-4 ), wi, 1.0e5, 0 );
 
-	imageStore( diffuseOut, ivec2( gl_LaunchIDEXT.xy ), vec4( diffuseRadiance, 1.0 ) );
+	vec3 outRgb = diffuseRadiance.rgb;
+	if ( !all( equal( outRgb, outRgb ) ) ) {
+		outRgb = vec3( 0.0 );
+	}
+	imageStore( diffuseOut, ivec2( gl_LaunchIDEXT.xy ), vec4( outRgb, 1.0 ) );
 }
