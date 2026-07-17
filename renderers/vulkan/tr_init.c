@@ -320,6 +320,7 @@ cvar_t	*r_hybrid1_specRoughMax;
 cvar_t	*r_hybrid1_sunRadius;
 cvar_t	*r_hybrid1_contactHarden;
 cvar_t	*r_hybrid1_ggx;
+cvar_t	*r_hybrid1_glint;
 cvar_t	*r_hybrid1_iblMode;
 cvar_t	*r_hybrid1_diffuseDirect;
 cvar_t	*r_hybrid1_dlightShadows;
@@ -1294,7 +1295,7 @@ static void R_Register( void )
 		" 7 - show glint compensation\n"
 		" 8 - show glint weight\n" );
 
-	r_glint = ri.Cvar_Get( "r_glint", "0", CVAR_ARCHIVE_ND );
+	r_glint = ri.Cvar_Get( "r_glint", "1", CVAR_ARCHIVE_ND );
 	ri.Cvar_CheckRange( r_glint, "0", "1", CV_INTEGER );
 	ri.Cvar_SetDescription( r_glint, "Master toggle for the glint-based microfacet NDF (requires \\r_pbr 1)." );
 
@@ -3137,6 +3138,10 @@ static void R_Register( void )
 	ri.Cvar_CheckRange( r_hybrid1_ggx, "0", "1", CV_INTEGER );
 	ri.Cvar_SetDescription( r_hybrid1_ggx, "Hybrid1: GGX/VNDF specular sampling + Fresnel metalness weight." );
 	ri.Cvar_SetGroup( r_hybrid1_ggx, CVG_RENDERER );
+	r_hybrid1_glint = ri.Cvar_Get( "r_hybrid1_glint", "1", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_hybrid1_glint, "0", "1", CV_INTEGER );
+	ri.Cvar_SetDescription( r_hybrid1_glint, "Hybrid1: apply raster glint NDF weight on specular RT (also requires \\r_glint 1; screen-UV jacobian proxy)." );
+	ri.Cvar_SetGroup( r_hybrid1_glint, CVG_RENDERER );
 	r_hybrid1_iblMode = ri.Cvar_Get( "r_hybrid1_iblMode", "1", CVAR_ARCHIVE_ND );
 	ri.Cvar_CheckRange( r_hybrid1_iblMode, "0", "2", CV_INTEGER );
 	ri.Cvar_SetDescription( r_hybrid1_iblMode, "Hybrid1 IBL: 0=off path, 1=prefilter*(1-rough), 2=split-sum EnvBRDF LUT." );

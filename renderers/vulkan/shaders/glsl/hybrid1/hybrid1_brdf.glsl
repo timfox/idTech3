@@ -1,5 +1,12 @@
 /* GGX / VNDF helpers for Hybrid1 specular. */
 
+float hybrid1_dGgx( float NdotH, float alpha )
+{
+	float a2 = max( alpha * alpha, 1e-6 );
+	float d = max( ( NdotH * a2 - NdotH ) * NdotH + 1.0, 1e-6 );
+	return a2 / ( 3.14159265 * d * d );
+}
+
 vec3 hybrid1_ggxVndf( vec3 V, vec3 N, float roughness, vec2 u )
 {
 	float a = max( roughness * roughness, 0.001 );

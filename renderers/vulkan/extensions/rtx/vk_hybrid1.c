@@ -38,6 +38,8 @@ typedef struct {
 	float params1[4];
 	float params2[4];
 	float params3[4];
+	float params4[4];
+	float params5[4];
 	float dlightDir[4];
 } VkHybrid1FrameUBO_t;
 
@@ -260,7 +262,7 @@ static void HYBRID1_Status_f( void )
 		"  denoise clamp=%d gamma=%.2f alpha=%.2f atrous=%d separable=%d adaptive=%d reinhard=%d\n"
 		"  phiColor=%.2f depthTol=%.4f normalDot=%.2f adaptAngle=%.1f adaptRough=%.2f\n"
 		"  rayBias=%.3f tMin=%.3f specRoughMax=%.2f sunRadius=%.2f contact=%d\n"
-		"  ggx=%d iblMode=%d diffuseDirect=%d dlightShadows=%d\n"
+		"  ggx=%d glint=%d iblMode=%d diffuseDirect=%d dlightShadows=%d\n"
 		"  composite shadowStr=%.2f specStr=%.2f diffuseStr=%.2f deferredGBuffer=%d\n"
 		"  surfelFusion=%d (Surfel irradiance as diffuse GI when both active)\n"
 		"  note: Hybrid1 is the production RT lighting path; seta r_hybrid1Quality 1|2|3; rtx_status for TLAS/entities\n",
@@ -300,6 +302,7 @@ static void HYBRID1_Status_f( void )
 		r_hybrid1_sunRadius ? r_hybrid1_sunRadius->value : 0.0f,
 		( r_hybrid1_contactHarden && r_hybrid1_contactHarden->integer ) ? 1 : 0,
 		( r_hybrid1_ggx && r_hybrid1_ggx->integer ) ? 1 : 0,
+		( r_hybrid1_glint && r_hybrid1_glint->integer && r_glint && r_glint->integer ) ? 1 : 0,
 		r_hybrid1_iblMode ? r_hybrid1_iblMode->integer : 1,
 		( r_hybrid1_diffuseDirect && r_hybrid1_diffuseDirect->integer ) ? 1 : 0,
 		r_hybrid1_dlightShadows ? r_hybrid1_dlightShadows->integer : 0,
@@ -356,6 +359,7 @@ static qboolean HYBRID1_ConsumeCvarResets( void )
 		r_hybrid1_sunRadius,
 		r_hybrid1_contactHarden,
 		r_hybrid1_ggx,
+		r_hybrid1_glint,
 		r_hybrid1_iblMode,
 		r_hybrid1_diffuseDirect,
 		r_hybrid1_dlightShadows,
@@ -1060,7 +1064,25 @@ static void HYBRID1_FillFrameUbo( VkHybrid1FrameUBO_t *ubo )
 	ubo->params3[0] = ( r_hybrid1_ggx && r_hybrid1_ggx->integer ) ? 1.0f : 0.0f;
 	ubo->params3[1] = r_hybrid1_iblMode ? (float)r_hybrid1_iblMode->integer : 1.0f;
 	ubo->params3[2] = ( r_hybrid1_diffuseDirect && r_hybrid1_diffuseDirect->integer ) ? 1.0f : 0.0f;
-	ubo->params3[3] = 0.0f;
+	ubo->params3[3] = ( r_hybrid1_glint && r_hybrid1_glint->integer
+		&& r_glint && r_glint->integer
+		&& r_glintMode && r_glintMode->integer ) ? 1.0f : 0.0f;
+	{
+		float glintDensityExp = r_glintDensity ? Com_Clamp( -4.0f, 6.0f, r_glintDensity->value ) : 3.0f;
+		float glintLo = r_glintRoughnessLo ? Com_Clamp( 0.0f, 0.5f, r_glintRoughnessLo->value ) : 0.02f;
+		float glintHi = r_glintRoughnessHi ? Com_Clamp( 0.0f, 0.6f, r_glintRoughnessHi->value ) : 0.15f;
+		if ( glintHi < glintLo + 0.001f ) {
+			glintHi = glintLo + 0.001f;
+		}
+		ubo->params4[0] = 1000.0f * powf( 10.0f, glintDensityExp );
+		ubo->params4[1] = r_glintMicrofacetRoughness ? Com_Clamp( 0.001f, 0.1f, r_glintMicrofacetRoughness->value ) : 0.01f;
+		ubo->params4[2] = r_glintPixelFilterSize ? Com_Clamp( 0.5f, 1.2f, r_glintPixelFilterSize->value ) : 0.7f;
+		ubo->params4[3] = r_glintSampleBudget ? (float)Com_Clamp( 0, 2, r_glintSampleBudget->integer ) : 1.0f;
+		ubo->params5[0] = r_glintMaxLodClamp ? Com_Clamp( 0.0f, 16.0f, r_glintMaxLodClamp->value ) : 12.0f;
+		ubo->params5[1] = r_glintDMax ? Com_Clamp( 1.0f, 1000000.0f, r_glintDMax->value ) : 1000.0f;
+		ubo->params5[2] = glintLo;
+		ubo->params5[3] = glintHi;
+	}
 	ubo->dlightDir[0] = ubo->dlightDir[1] = ubo->dlightDir[2] = 0.0f;
 	ubo->dlightDir[3] = 0.0f;
 	if ( r_hybrid1_dlightShadows && r_hybrid1_dlightShadows->integer > 0 &&

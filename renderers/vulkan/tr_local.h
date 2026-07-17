@@ -1692,6 +1692,7 @@ extern cvar_t	*r_hybrid1_specRoughMax;
 extern cvar_t	*r_hybrid1_sunRadius;
 extern cvar_t	*r_hybrid1_contactHarden;
 extern cvar_t	*r_hybrid1_ggx;
+extern cvar_t	*r_hybrid1_glint;
 extern cvar_t	*r_hybrid1_iblMode;
 extern cvar_t	*r_hybrid1_diffuseDirect;
 extern cvar_t	*r_hybrid1_dlightShadows;

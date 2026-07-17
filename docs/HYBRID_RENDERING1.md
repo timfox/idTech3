@@ -95,6 +95,7 @@ Live (no latch). Entity BLAS stays a separate latched companion (`r_rtxEntities`
 | `r_hybrid1_sunRadius` | 0 | Soft sun angular radius (degrees; 0=hard) |
 | `r_hybrid1_contactHarden` | 1 | Shrink penumbra when N·L is high |
 | `r_hybrid1_ggx` | 1 | GGX/VNDF specular + Fresnel |
+| `r_hybrid1_glint` | 1 | Specular RT glint NDF weight (also needs `r_glint 1`; screen-UV jacobian proxy until hit-shader UV) |
 | `r_hybrid1_iblMode` | 1 | 0=minimal, 1=prefilter, 2=split-sum EnvBRDF (`vk.brdflut`) |
 | `r_hybrid1_diffuseDirect` | 1 | Sun+irradiance on diffuse secondary hits |
 | `r_hybrid1_dlightShadows` | 0 | Top-N Forward+ dlight RT shadows (1–4); UBO fallback if FP off |
