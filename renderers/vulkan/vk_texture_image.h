@@ -20,5 +20,7 @@ void vk_upload_cubemap_mip_data( image_t *image, int face_size, int miplevels, c
 void vk_upload_compressed_image_data( image_t *image, int width, int height, int miplevels, byte *pixels, int size, qboolean update );
 void vk_update_descriptor_set( image_t *image, qboolean mipmap );
 void vk_destroy_image_resources( VkImage *image, VkImageView *imageView );
+/* Blit mip0 to 8x8 and read back into image->thumbRGBA (RTX pack-time UV sampling). */
+qboolean vk_build_image_thumb_from_gpu( image_t *image );
 
 #endif

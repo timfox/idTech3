@@ -51,6 +51,9 @@ static image_t *vk_rtx_material_image_from_bundle( const textureBundle_t *bundle
 		return NULL;
 	}
 	if ( needThumb && !img->hasThumb ) {
+		R_EnsureImageThumb( img );
+	}
+	if ( needThumb && !img->hasThumb ) {
 		return NULL;
 	}
 	return img;

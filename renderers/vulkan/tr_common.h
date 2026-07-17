@@ -103,6 +103,8 @@ image_t *R_CreateImageRGBA32F( const char *name, const float *rgba, int width, i
 /* Allocate image_t + hash entry without creating/binding VkImage (caller fills GPU resources). */
 image_t *R_CreateImageShell( const char *name, int width, int height, imgFlags_t flags, int format );
 void R_UploadSubImage( byte *data, int x, int y, int width, int height, image_t *image );
+/* Build TR_IMAGE_THUMB_SIZE albedo thumb if missing (CPU upload, GPU readback, or avgColor). */
+void R_EnsureImageThumb( image_t *image );
 
 qhandle_t RE_RegisterShaderLightMap( const char *name, int lightmapIndex );
 qhandle_t RE_RegisterShader( const char *name );

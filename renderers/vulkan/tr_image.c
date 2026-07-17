@@ -844,6 +844,135 @@ static void upload_vk_image_compressed( image_t *image, byte *data, int width, i
 	vk_upload_compressed_image_data( image, width, height, miplevels, data, size, qfalse );
 }
 
+static qboolean R_ImageSkipRtThumb( const image_t *image )
+{
+	if ( !image ) {
+		return qtrue;
+	}
+	if ( image->flags & ( IMGFLAG_LIGHTMAP | IMGFLAG_CUBEMAP ) ) {
+		return qtrue;
+	}
+	if ( image == tr.defaultImage || image == tr.whiteImage ) {
+		return qtrue;
+	}
+	if ( image->imgName ) {
+		if ( Q_stristr( image->imgName, "mergedLightmap" ) != NULL
+			|| Q_stristr( image->imgName, "deluxemap" ) != NULL ) {
+			return qtrue;
+		}
+		if ( Q_stristr( image->imgName, "maps/" ) == image->imgName
+			&& Q_stristr( image->imgName + 6, "/lm_" ) != NULL ) {
+			return qtrue;
+		}
+	}
+	return qfalse;
+}
+
+static void R_BuildImageThumbFromPic( image_t *image, const byte *pic, int width, int height )
+{
+	uint64_t sumR = 0, sumG = 0, sumB = 0, count = 0;
+	int pixels = width * height;
+	int step = pixels > 16384 ? ( pixels / 4096 ) : 1;
+	int i, ty, tx;
+
+	if ( !image || !pic || width < 1 || height < 1 || ( image->flags & IMGFLAG_CUBEMAP ) ) {
+		return;
+	}
+	if ( step < 1 ) {
+		step = 1;
+	}
+	for ( i = 0; i < pixels; i += step ) {
+		const byte *p = pic + i * 4;
+		sumR += p[0];
+		sumG += p[1];
+		sumB += p[2];
+		count++;
+	}
+	if ( count > 0 ) {
+		image->avgColor[0] = (float)sumR / ( 255.0f * (float)count );
+		image->avgColor[1] = (float)sumG / ( 255.0f * (float)count );
+		image->avgColor[2] = (float)sumB / ( 255.0f * (float)count );
+	}
+	for ( ty = 0; ty < TR_IMAGE_THUMB_SIZE; ty++ ) {
+		for ( tx = 0; tx < TR_IMAGE_THUMB_SIZE; tx++ ) {
+			int x0 = ( tx * width ) / TR_IMAGE_THUMB_SIZE;
+			int y0 = ( ty * height ) / TR_IMAGE_THUMB_SIZE;
+			int x1 = ( ( tx + 1 ) * width ) / TR_IMAGE_THUMB_SIZE;
+			int y1 = ( ( ty + 1 ) * height ) / TR_IMAGE_THUMB_SIZE;
+			uint32_t br = 0, bg = 0, bb = 0, ba = 0, bn = 0;
+			int y, x;
+			byte *dst;
+
+			if ( x1 <= x0 ) {
+				x1 = x0 + 1;
+			}
+			if ( y1 <= y0 ) {
+				y1 = y0 + 1;
+			}
+			if ( x1 > width ) {
+				x1 = width;
+			}
+			if ( y1 > height ) {
+				y1 = height;
+			}
+			for ( y = y0; y < y1; y++ ) {
+				const byte *row = pic + ( y * width + x0 ) * 4;
+				for ( x = x0; x < x1; x++, row += 4 ) {
+					br += row[0];
+					bg += row[1];
+					bb += row[2];
+					ba += row[3];
+					bn++;
+				}
+			}
+			dst = image->thumbRGBA + ( ty * TR_IMAGE_THUMB_SIZE + tx ) * 4;
+			if ( bn > 0 ) {
+				dst[0] = (byte)( br / bn );
+				dst[1] = (byte)( bg / bn );
+				dst[2] = (byte)( bb / bn );
+				dst[3] = (byte)( ba / bn );
+			}
+		}
+	}
+	image->hasThumb = qtrue;
+}
+
+static void R_BuildImageThumbFromAvgColor( image_t *image )
+{
+	byte r, g, b;
+	int i;
+
+	if ( !image ) {
+		return;
+	}
+	r = (byte)( image->avgColor[0] * 255.0f + 0.5f );
+	g = (byte)( image->avgColor[1] * 255.0f + 0.5f );
+	b = (byte)( image->avgColor[2] * 255.0f + 0.5f );
+	for ( i = 0; i < TR_IMAGE_THUMB_SIZE * TR_IMAGE_THUMB_SIZE; i++ ) {
+		byte *dst = image->thumbRGBA + i * 4;
+		dst[0] = r;
+		dst[1] = g;
+		dst[2] = b;
+		dst[3] = 255;
+	}
+	image->hasThumb = qtrue;
+}
+
+void R_EnsureImageThumb( image_t *image )
+{
+	if ( !image || image->hasThumb || R_ImageSkipRtThumb( image ) ) {
+		return;
+	}
+#ifdef USE_VULKAN
+	if ( image->handle != VK_NULL_HANDLE && !vk.device_lost ) {
+		if ( vk_build_image_thumb_from_gpu( image ) ) {
+			return;
+		}
+	}
+#endif
+	R_BuildImageThumbFromAvgColor( image );
+}
+
 /*
 ================
 R_UploadSubImage
@@ -857,6 +986,13 @@ void R_UploadSubImage( byte *data, int x, int y, int width, int height, image_t 
 		return;
 	}
 	vk_upload_image_data( image, x, y, width, height, 1, data, width * height * 4, qtrue );
+	if ( !image->hasThumb && x == 0 && y == 0 && !( image->flags & IMGFLAG_LIGHTMAP ) ) {
+		int iw = image->uploadWidth > 0 ? image->uploadWidth : image->width;
+		int ih = image->uploadHeight > 0 ? image->uploadHeight : image->height;
+		if ( iw > 0 && ih > 0 && width >= iw && height >= ih ) {
+			R_BuildImageThumbFromPic( image, data, iw, ih );
+		}
+	}
 }
 
 #else // !USE_VULKAN
@@ -1302,69 +1438,7 @@ image_t *R_CreateImage( const char *name, const char *name2, byte *pic, int widt
 	image->hasThumb = qfalse;
 	Com_Memset( image->thumbRGBA, 0, sizeof( image->thumbRGBA ) );
 	if ( pic && width > 0 && height > 0 && !( flags & IMGFLAG_CUBEMAP ) ) {
-		uint64_t sumR = 0, sumG = 0, sumB = 0, count = 0;
-		int pixels = width * height;
-		int step = pixels > 16384 ? ( pixels / 4096 ) : 1;
-		int i, ty, tx;
-
-		if ( step < 1 ) {
-			step = 1;
-		}
-		for ( i = 0; i < pixels; i += step ) {
-			const byte *p = pic + i * 4;
-			sumR += p[0];
-			sumG += p[1];
-			sumB += p[2];
-			count++;
-		}
-		if ( count > 0 ) {
-			image->avgColor[0] = (float)sumR / ( 255.0f * (float)count );
-			image->avgColor[1] = (float)sumG / ( 255.0f * (float)count );
-			image->avgColor[2] = (float)sumB / ( 255.0f * (float)count );
-		}
-		/* Box-downsample into a fixed thumb for RTX UV centroid sampling. */
-		for ( ty = 0; ty < TR_IMAGE_THUMB_SIZE; ty++ ) {
-			for ( tx = 0; tx < TR_IMAGE_THUMB_SIZE; tx++ ) {
-				int x0 = ( tx * width ) / TR_IMAGE_THUMB_SIZE;
-				int y0 = ( ty * height ) / TR_IMAGE_THUMB_SIZE;
-				int x1 = ( ( tx + 1 ) * width ) / TR_IMAGE_THUMB_SIZE;
-				int y1 = ( ( ty + 1 ) * height ) / TR_IMAGE_THUMB_SIZE;
-				uint32_t br = 0, bg = 0, bb = 0, ba = 0, bn = 0;
-				int y, x;
-				byte *dst;
-
-				if ( x1 <= x0 ) {
-					x1 = x0 + 1;
-				}
-				if ( y1 <= y0 ) {
-					y1 = y0 + 1;
-				}
-				if ( x1 > width ) {
-					x1 = width;
-				}
-				if ( y1 > height ) {
-					y1 = height;
-				}
-				for ( y = y0; y < y1; y++ ) {
-					const byte *row = pic + ( y * width + x0 ) * 4;
-					for ( x = x0; x < x1; x++, row += 4 ) {
-						br += row[0];
-						bg += row[1];
-						bb += row[2];
-						ba += row[3];
-						bn++;
-					}
-				}
-				dst = image->thumbRGBA + ( ty * TR_IMAGE_THUMB_SIZE + tx ) * 4;
-				if ( bn > 0 ) {
-					dst[0] = (byte)( br / bn );
-					dst[1] = (byte)( bg / bn );
-					dst[2] = (byte)( bb / bn );
-					dst[3] = (byte)( ba / bn );
-				}
-			}
-		}
-		image->hasThumb = qtrue;
+		R_BuildImageThumbFromPic( image, pic, width, height );
 	}
 
 	if ( namelen > 6 && Q_stristr( image->imgName, "maps/" ) == image->imgName && Q_stristr( image->imgName + 6, "/lm_" ) != NULL ) {

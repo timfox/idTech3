@@ -12,6 +12,7 @@ per-texture combined image+sampler descriptor updates (split from vk.c).
 #include "vk_image_layout.h"
 #include "vk_cmd.h"
 #include "vk_staging.h"
+#include "vk_util.h"
 
 void vk_create_image( image_t *image, int width, int height, int mip_levels ) {
 
@@ -465,4 +466,163 @@ void vk_destroy_image_resources( VkImage *image, VkImageView *imageView )
 			*imageView = VK_NULL_HANDLE;
 		}
 	}
+}
+
+static void thumb_create_readback_buffer( VkDeviceSize size, VkBuffer *buffer, VkDeviceMemory *memory, void **data )
+{
+	VkBufferCreateInfo buffer_desc;
+	VkMemoryRequirements mem_reqs;
+	VkMemoryAllocateInfo alloc_info;
+
+	buffer_desc.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+	buffer_desc.pNext = NULL;
+	buffer_desc.flags = 0;
+	buffer_desc.size = size;
+	buffer_desc.usage = VK_BUFFER_USAGE_TRANSFER_DST_BIT;
+	buffer_desc.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+	buffer_desc.queueFamilyIndexCount = 0;
+	buffer_desc.pQueueFamilyIndices = NULL;
+	VK_CHECK( qvkCreateBuffer( vk.device, &buffer_desc, NULL, buffer ) );
+
+	qvkGetBufferMemoryRequirements( vk.device, *buffer, &mem_reqs );
+
+	alloc_info.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+	alloc_info.pNext = NULL;
+	alloc_info.allocationSize = mem_reqs.size;
+	alloc_info.memoryTypeIndex = vk_find_memory_type( vk.physical_device, mem_reqs.memoryTypeBits,
+		VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT );
+	VK_CHECK( qvkAllocateMemory( vk.device, &alloc_info, NULL, memory ) );
+	VK_CHECK( qvkBindBufferMemory( vk.device, *buffer, *memory, 0 ) );
+	VK_CHECK( qvkMapMemory( vk.device, *memory, 0, size, 0, data ) );
+}
+
+static void thumb_destroy_readback_buffer( VkBuffer buffer, VkDeviceMemory memory )
+{
+	qvkUnmapMemory( vk.device, memory );
+	qvkDestroyBuffer( vk.device, buffer, NULL );
+	qvkFreeMemory( vk.device, memory, NULL );
+}
+
+static void thumb_bind_temp_image_memory( VkImage image, VkDeviceMemory *memory )
+{
+	VkMemoryRequirements mem_reqs;
+	VkMemoryAllocateInfo alloc_info;
+
+	qvkGetImageMemoryRequirements( vk.device, image, &mem_reqs );
+	alloc_info.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+	alloc_info.pNext = NULL;
+	alloc_info.allocationSize = mem_reqs.size;
+	alloc_info.memoryTypeIndex = vk_find_memory_type( vk.physical_device, mem_reqs.memoryTypeBits,
+		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT );
+	VK_CHECK( qvkAllocateMemory( vk.device, &alloc_info, NULL, memory ) );
+	VK_CHECK( qvkBindImageMemory( vk.device, image, *memory, 0 ) );
+}
+
+qboolean vk_build_image_thumb_from_gpu( image_t *image )
+{
+	VkCommandBuffer command_buffer;
+	VkImage thumb_image;
+	VkDeviceMemory thumb_memory;
+	VkBuffer staging_buffer;
+	VkDeviceMemory staging_memory;
+	void *mapped;
+	VkImageBlit blit;
+	VkBufferImageCopy copy_region;
+	VkImageCreateInfo image_desc;
+	int w, h;
+	const uint32_t thumbSize = TR_IMAGE_THUMB_SIZE;
+
+	if ( !image || image->hasThumb || vk.device_lost ) {
+		return qfalse;
+	}
+	if ( image->handle == VK_NULL_HANDLE || ( image->flags & IMGFLAG_CUBEMAP ) ) {
+		return qfalse;
+	}
+
+	w = image->uploadWidth > 0 ? image->uploadWidth : image->width;
+	h = image->uploadHeight > 0 ? image->uploadHeight : image->height;
+	if ( w < 1 || h < 1 ) {
+		return qfalse;
+	}
+
+	Com_Memset( &image_desc, 0, sizeof( image_desc ) );
+	image_desc.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+	image_desc.imageType = VK_IMAGE_TYPE_2D;
+	image_desc.format = VK_FORMAT_R8G8B8A8_UNORM;
+	image_desc.extent.width = thumbSize;
+	image_desc.extent.height = thumbSize;
+	image_desc.extent.depth = 1;
+	image_desc.mipLevels = 1;
+	image_desc.arrayLayers = 1;
+	image_desc.samples = VK_SAMPLE_COUNT_1_BIT;
+	image_desc.tiling = VK_IMAGE_TILING_OPTIMAL;
+	image_desc.usage = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
+	image_desc.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+	image_desc.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+	VK_CHECK( qvkCreateImage( vk.device, &image_desc, NULL, &thumb_image ) );
+	thumb_bind_temp_image_memory( thumb_image, &thumb_memory );
+
+	thumb_create_readback_buffer( (VkDeviceSize)thumbSize * thumbSize * 4,
+		&staging_buffer, &staging_memory, &mapped );
+
+	command_buffer = vk_begin_command_buffer();
+
+	record_image_layout_transition( command_buffer, image->handle, VK_IMAGE_ASPECT_COLOR_BIT,
+		VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, 0, 0 );
+	record_image_layout_transition( command_buffer, thumb_image, VK_IMAGE_ASPECT_COLOR_BIT,
+		VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 0, 0 );
+
+	Com_Memset( &blit, 0, sizeof( blit ) );
+	blit.srcSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+	blit.srcSubresource.mipLevel = 0;
+	blit.srcSubresource.baseArrayLayer = 0;
+	blit.srcSubresource.layerCount = 1;
+	blit.srcOffsets[0].x = 0;
+	blit.srcOffsets[0].y = 0;
+	blit.srcOffsets[0].z = 0;
+	blit.srcOffsets[1].x = w;
+	blit.srcOffsets[1].y = h;
+	blit.srcOffsets[1].z = 1;
+	blit.dstSubresource = blit.srcSubresource;
+	blit.dstOffsets[0].x = 0;
+	blit.dstOffsets[0].y = 0;
+	blit.dstOffsets[0].z = 0;
+	blit.dstOffsets[1].x = (int32_t)thumbSize;
+	blit.dstOffsets[1].y = (int32_t)thumbSize;
+	blit.dstOffsets[1].z = 1;
+
+	qvkCmdBlitImage( command_buffer,
+		image->handle, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+		thumb_image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+		1, &blit, VK_FILTER_LINEAR );
+
+	record_image_layout_transition( command_buffer, thumb_image, VK_IMAGE_ASPECT_COLOR_BIT,
+		VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, 0, 0 );
+
+	Com_Memset( &copy_region, 0, sizeof( copy_region ) );
+	copy_region.bufferOffset = 0;
+	copy_region.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+	copy_region.imageSubresource.mipLevel = 0;
+	copy_region.imageSubresource.baseArrayLayer = 0;
+	copy_region.imageSubresource.layerCount = 1;
+	copy_region.imageExtent.width = thumbSize;
+	copy_region.imageExtent.height = thumbSize;
+	copy_region.imageExtent.depth = 1;
+
+	qvkCmdCopyImageToBuffer( command_buffer, thumb_image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+		staging_buffer, 1, &copy_region );
+
+	record_image_layout_transition( command_buffer, image->handle, VK_IMAGE_ASPECT_COLOR_BIT,
+		VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, 0, 0 );
+
+	vk_end_command_buffer( command_buffer, "image thumb" );
+
+	Com_Memcpy( image->thumbRGBA, mapped, thumbSize * thumbSize * 4 );
+	image->hasThumb = qtrue;
+
+	qvkDestroyImage( vk.device, thumb_image, NULL );
+	qvkFreeMemory( vk.device, thumb_memory, NULL );
+	thumb_destroy_readback_buffer( staging_buffer, staging_memory );
+
+	return qtrue;
 }

@@ -985,6 +985,9 @@ static void vk_rtx_entity_fill_gltf_materials( const trRefEntity_t *ent, model_t
 				if ( mat->baseColorTexture[0] ) {
 					baseImg = R_FindImageFile( mat->baseColorTexture,
 						IMGFLAG_CLAMPTOEDGE | IMGFLAG_NOLIGHTSCALE, 0 );
+					if ( useUv && baseImg && !baseImg->hasThumb ) {
+						R_EnsureImageThumb( baseImg );
+					}
 					/* UV path samples thumbs per-prim; fall back to average when no thumb. */
 					if ( baseImg && baseImg != tr.defaultImage
 						&& !( useUv && baseImg->hasThumb ) ) {

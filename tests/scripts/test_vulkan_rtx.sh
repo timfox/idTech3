@@ -52,6 +52,14 @@ check "$RCHIT" 'gl_InstanceCustomIndexEXT' 'instance-aware closest-hit'
 check "$TR_INIT" 'r_rtxTlasUpdate' 'r_rtxTlasUpdate cvar registration'
 check "$TR_INIT" 'r_rtxEntityTriCap' 'r_rtxEntityTriCap cvar registration'
 
+TR_IMAGE="$(idtech3_file renderers/vulkan/tr_image.c src/renderers/vulkan/tr_image.c)"
+VK_TEX="$(idtech3_file renderers/vulkan/vk_texture_image.c src/renderers/vulkan/vk_texture_image.c)"
+VK_MAT="$(idtech3_file renderers/vulkan/extensions/rtx/vk_rtx_material.c src/renderers/vulkan/extensions/rtx/vk_rtx_material.c)"
+check "$TR_IMAGE" 'R_EnsureImageThumb' 'lazy RTX image thumb ensure'
+check "$TR_IMAGE" 'R_BuildImageThumbFromPic' 'CPU thumb build from upload pixels'
+check "$VK_TEX" 'vk_build_image_thumb_from_gpu' 'GPU blit readback for image thumbs'
+check "$VK_MAT" 'R_EnsureImageThumb' 'material path ensures thumbs before UV sample'
+
 HIT_GLSL="$(idtech3_file renderers/vulkan/shaders/glsl/hybrid1/hybrid1_hit.glsl src/renderers/vulkan/shaders/glsl/hybrid1/hybrid1_hit.glsl)"
 PT_HIT="$(idtech3_file renderers/vulkan/shaders/glsl/pt_hit.rchit src/renderers/vulkan/shaders/glsl/pt_hit.rchit)"
 check "$HIT_GLSL" 'WorldAlbedoSSBO' 'Hybrid1 hit world albedo SSBO'
