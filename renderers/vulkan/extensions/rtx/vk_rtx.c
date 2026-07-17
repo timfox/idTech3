@@ -135,10 +135,22 @@ static struct {
 	uint32_t		tlas_instance_count;
 	qboolean		tlas_valid;
 	qboolean		cmd_registered;
+	/* Deferred AS destroy: mid-frame wait_idle+destroy while Hybrid1 records TraceRays
+	 * raced on NVIDIA. Retire old TLAS/entity BLAS and free them at frame_begin. */
+	VkAccelerationStructureKHR retired_tlas;
+	VkBuffer		retired_tlas_buffer;
+	VkDeviceMemory	retired_tlas_memory;
+	VkAccelerationStructureKHR retired_entity_blas;
+	VkBuffer		retired_entity_blas_buffer;
+	VkDeviceMemory	retired_entity_blas_memory;
+	int				entity_tlas_frame;
 } rtx;
 
 static void vk_rtx_destroy_entity_blas( void );
 static void vk_rtx_destroy_entity_as_only( void );
+static void vk_rtx_flush_retired_as( void );
+static void vk_rtx_retire_entity_blas( void );
+static void vk_rtx_retire_tlas( void );
 
 static const char *vk_rtx_state_string( void )
 {
@@ -535,6 +547,7 @@ static void vk_rtx_rebuild_world_blas( void )
 	/* In-flight frame CBs may still reference the current TLAS/BLAS. Wait before
 	 * destroy+rebuild or TraceRays on the next submit can DEVICE_LOST. */
 	vk_queue_wait_idle();
+	vk_rtx_flush_retired_as();
 
 	vk_rtx_destroy_as( &rtx.tlas );
 	vk_rtx_destroy_as( &rtx.blas );
@@ -860,6 +873,53 @@ static void vk_rtx_destroy_entity_as_only( void )
 	rtx.entity_blas_valid = qfalse;
 }
 
+static void vk_rtx_flush_retired_as( void )
+{
+	vk_rtx_destroy_as( &rtx.retired_tlas );
+	vk_rtx_destroy_buffer( &rtx.retired_tlas_buffer, &rtx.retired_tlas_memory );
+	vk_rtx_destroy_as( &rtx.retired_entity_blas );
+	vk_rtx_destroy_buffer( &rtx.retired_entity_blas_buffer, &rtx.retired_entity_blas_memory );
+}
+
+static void vk_rtx_retire_entity_blas( void )
+{
+	if ( rtx.entity_blas == VK_NULL_HANDLE && rtx.entity_blas_buffer == VK_NULL_HANDLE ) {
+		rtx.entity_blas_built_prims = 0u;
+		rtx.entity_blas_valid = qfalse;
+		return;
+	}
+	/* Drop any prior retired (safe after frame_begin flush / queue idle). */
+	vk_rtx_destroy_as( &rtx.retired_entity_blas );
+	vk_rtx_destroy_buffer( &rtx.retired_entity_blas_buffer, &rtx.retired_entity_blas_memory );
+	rtx.retired_entity_blas = rtx.entity_blas;
+	rtx.retired_entity_blas_buffer = rtx.entity_blas_buffer;
+	rtx.retired_entity_blas_memory = rtx.entity_blas_memory;
+	rtx.entity_blas = VK_NULL_HANDLE;
+	rtx.entity_blas_buffer = VK_NULL_HANDLE;
+	rtx.entity_blas_memory = VK_NULL_HANDLE;
+	rtx.entity_blas_built_prims = 0u;
+	rtx.entity_blas_valid = qfalse;
+}
+
+static void vk_rtx_retire_tlas( void )
+{
+	if ( rtx.tlas == VK_NULL_HANDLE && rtx.tlas_buffer == VK_NULL_HANDLE ) {
+		rtx.tlas_valid = qfalse;
+		rtx.tlas_instance_count = 0u;
+		return;
+	}
+	vk_rtx_destroy_as( &rtx.retired_tlas );
+	vk_rtx_destroy_buffer( &rtx.retired_tlas_buffer, &rtx.retired_tlas_memory );
+	rtx.retired_tlas = rtx.tlas;
+	rtx.retired_tlas_buffer = rtx.tlas_buffer;
+	rtx.retired_tlas_memory = rtx.tlas_memory;
+	rtx.tlas = VK_NULL_HANDLE;
+	rtx.tlas_buffer = VK_NULL_HANDLE;
+	rtx.tlas_memory = VK_NULL_HANDLE;
+	rtx.tlas_valid = qfalse;
+	rtx.tlas_instance_count = 0u;
+}
+
 static void vk_rtx_destroy_entity_blas( void )
 {
 	vk_rtx_destroy_entity_as_only();
@@ -938,9 +998,18 @@ static void vk_rtx_rebuild_entity_tlas( void )
 		return;
 	}
 
-	/* Prior frames may still sample the current TLAS/entity BLAS. */
-	vk_queue_wait_idle();
+	/* Hybrid1 + demo both call prepare/rebuild; only refresh once per view frame. */
+	if ( rtx.entity_tlas_frame == tr.frameCount ) {
+		return;
+	}
+	rtx.entity_tlas_frame = tr.frameCount;
 
+	/*
+	 * Do not vk_queue_wait_idle here. Previous frame TraceRays already completed
+	 * (frame fence waited before recording). Destroy of prior AS is deferred via
+	 * retire → flush here (safe) / at world rebuild / shutdown.
+	 */
+	vk_rtx_flush_retired_as();
 	Com_Memset( &addrInfo, 0, sizeof( addrInfo ) );
 	addrInfo.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_DEVICE_ADDRESS_INFO_KHR;
 	addrInfo.accelerationStructure = rtx.blas;
@@ -1045,7 +1114,7 @@ static void vk_rtx_rebuild_entity_tlas( void )
 			}
 		}
 		if ( packedEnt == 0u || packStats.primitiveCount == 0u ) {
-			vk_rtx_destroy_entity_as_only();
+			vk_rtx_retire_entity_blas();
 			rtx.entity_packed_count = 0u;
 			rtx.entity_primitive_count = 0u;
 			rtx.entity_vertex_count = 0u;
@@ -1122,7 +1191,7 @@ static void vk_rtx_rebuild_entity_tlas( void )
 				} else {
 					Q_strncpyz( rtx.entity_blas_reason, "unknown", sizeof( rtx.entity_blas_reason ) );
 				}
-				vk_rtx_destroy_entity_as_only();
+				vk_rtx_retire_entity_blas();
 				vk_rtx_alloc_buffer( sizeInfoBLAS.accelerationStructureSize,
 					VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_STORAGE_BIT_KHR | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
 					VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, &rtx.entity_blas_buffer, &rtx.entity_blas_memory, NULL );
@@ -1170,7 +1239,7 @@ static void vk_rtx_rebuild_entity_tlas( void )
 			}
 		}
 	} else {
-		vk_rtx_destroy_entity_as_only();
+		vk_rtx_retire_entity_blas();
 		rtx.entity_packed_count = 0u;
 		rtx.entity_primitive_count = 0u;
 		rtx.entity_vertex_count = 0u;
@@ -1267,8 +1336,7 @@ static void vk_rtx_rebuild_entity_tlas( void )
 	}
 
 	if ( !tlasUpdate ) {
-		vk_rtx_destroy_as( &rtx.tlas );
-		vk_rtx_destroy_buffer( &rtx.tlas_buffer, &rtx.tlas_memory );
+		vk_rtx_retire_tlas();
 
 		vk_rtx_alloc_buffer( sizeInfoTLAS.accelerationStructureSize,
 			VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_STORAGE_BIT_KHR | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
@@ -1384,6 +1452,7 @@ void vk_rtx_shutdown( void )
 	}
 	rtx.rtx_ubo_ptr = NULL;
 
+	vk_rtx_flush_retired_as();
 	vk_rtx_destroy_as( &rtx.tlas );
 	vk_rtx_destroy_as( &rtx.blas );
 	vk_rtx_destroy_entity_blas();

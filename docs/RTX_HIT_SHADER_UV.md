@@ -132,7 +132,8 @@ Short automated client pass on OpenArena `oa_dm1` with deferred + Hybrid1 latche
   4. World BLAS gated on `RDF_NOWORLDMODEL` / mid-pass rebuild, so the first post-load pack never stuck or destroyed TLAS while recording — world rebuild now runs in `vk_rtx_frame_begin` from `tr.world` name only.
   - **Verified:** `r_rtxDemo 1` + `r_rtxEntities 0` loads `oa_dm1`, packs thousands of world tris, `rtx_status` shows `geo_is_world=1`, clean quit.
 - **Fixed (Jul 2026) Hybrid1 DEVICE_LOST:** dummy entity SSBOs (13/14); safe specular lobe (no Heitz VNDF NaNs); diffuse mild-cone sampling + `vec4` payload; A-trous first-frame layout + ping-pong barriers. **Verified:** `r_hybrid1Quality` 1 and 3 on `oa_dm1` with deferred + `r_rtxEntities 0` clean quit.
-- **Still open:** `r_rtxEntities 1` mid-frame entity TLAS destroy/rebuild remains risky (defer/double-buffer next). D2 Phase A after visual QA with entities.
+- **Fixed (Jul 2026) entity TLAS mid-frame destroy:** once-per-frame entity rebuild; retire old TLAS/entity BLAS instead of destroying under an open CB; flush retired after queue idle (world rebuild) / next entity refresh. **Verified:** Hybrid1 quality 1/3 + `r_rtxEntities 1` on `oa_dm1` (entity BLAS UPDATE, 2 TLAS instances) clean quit.
+- **Next:** D2 Phase A (hit-shader UV / bindless) after visual Hybrid1 QA with entities.
 
 ## References
 

@@ -133,6 +133,7 @@ When `r_hybrid1 1`, the legacy `r_rtx` demo composite pass is **skipped** (Hybri
   - Spec GGX Heitz VNDF could emit NaN/denorm ray dirs → replaced with sanitized roughness lobe + mirror fallback.
   - Diffuse cosine orthonormal frame could DEVICE_LOST → mild cone around camera-facing normal; payload is `vec4`.
   - Diffuse A-trous used `BarrierColorWrite(..., qfalse)` on first frame (UNDEFINED→GENERAL mismatch) and lacked ping-pong layout barriers between iterations.
+  - Entity TLAS mid-frame destroy under Hybrid1 → once-per-frame rebuild + retire/flush AS (no mid-pass `wait_idle` destroy).
 
 Demo cfg: `exec demo_hybrid1.cfg` (enables diffuse, IBL, motion, TAA).
 
