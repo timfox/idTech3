@@ -78,6 +78,14 @@ void LuaBindings_RegisterAll(void *luaState) {
 			{"replayOpen", l_phys_replayOpen}, {"replayStep", l_phys_replayStep},
 			{"replaySeek", l_phys_replaySeek}, {"replayClose", l_phys_replayClose},
 			{"replayStatus", l_phys_replayStatus},
+			{"setWheelSuspension", l_phys_setWheelSuspension}, {"setWheelSpin", l_phys_setWheelSpin},
+			{"setMotorVelocities", l_phys_setMotorVelocities}, {"setSphericalTarget", l_phys_setSphericalTarget},
+			{"setBodyDamping", l_phys_setBodyDamping}, {"setBodyType", l_phys_setBodyType},
+			{"applyWind", l_phys_applyWind}, {"explode", l_phys_explode}, {"rayCastAll", l_phys_rayCastAll},
+			{"setGravityScale", l_phys_setGravityScale}, {"setMotionLocks", l_phys_setMotionLocks},
+			{"setVelocity", l_phys_setVelocity}, {"applyForce", l_phys_applyForce},
+			{"applyTorque", l_phys_applyTorque}, {"destroyConstraint", l_phys_destroyConstraint},
+			{"setTargetTransform", l_phys_setTargetTransform},
 		{NULL, NULL}
 	};
 	registerTable(L, "Physics", physicsFuncs);
@@ -433,6 +441,8 @@ void LuaBindings_RegisterAll(void *luaState) {
 	static const luaL_Reg charFuncs[] = {
 		{"create", l_char_create},
 		{"move", l_char_move},
+		{"destroy", l_char_destroy},
+		{"getState", l_char_getState},
 		{NULL, NULL}
 	};
 	registerTable(L, "Character", charFuncs);

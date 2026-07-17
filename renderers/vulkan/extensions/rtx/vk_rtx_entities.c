@@ -11,6 +11,7 @@ for unknown types / pack failures.
 #include "tr_local.h"
 #include "tr_model_gltf.h"
 #include "vk_rtx_entities.h"
+#include "vk_rtx_material.h"
 
 #ifdef USE_VULKAN_RTX
 
@@ -205,7 +206,7 @@ R_IQMSkinPositions; returns qfalse on budget/skin failure (AABB fallback).
 */
 static qboolean vk_rtx_pack_iqm( const trRefEntity_t *ent, const viewParms_t *viewParms,
 	model_t *mod, float *positions, uint32_t maxVerts, uint32_t *indices, uint32_t maxIndices,
-	uint32_t *ioVertCount, uint32_t *ioIndexCount )
+	uint32_t *ioVertCount, uint32_t *ioIndexCount, qboolean *outCpuSkinned )
 {
 	iqmData_t *data;
 	uint32_t vertsBefore = *ioVertCount;
@@ -218,6 +219,9 @@ static qboolean vk_rtx_pack_iqm( const trRefEntity_t *ent, const viewParms_t *vi
 	const float *srcPositions;
 	qboolean needSkin;
 
+	if ( outCpuSkinned ) {
+		*outCpuSkinned = qfalse;
+	}
 	if ( !mod->modelData ) {
 		return qfalse;
 	}
@@ -296,6 +300,9 @@ static qboolean vk_rtx_pack_iqm( const trRefEntity_t *ent, const viewParms_t *vi
 		return qfalse;
 	}
 
+	if ( outCpuSkinned ) {
+		*outCpuSkinned = needSkin;
+	}
 	return qtrue;
 }
 
@@ -309,7 +316,7 @@ Returns qfalse on budget/skin failure (AABB fallback). Morph omitted.
 */
 static qboolean vk_rtx_pack_gltf( const trRefEntity_t *ent, const viewParms_t *viewParms,
 	model_t *mod, int refdefTimeMs, float *positions, uint32_t maxVerts, uint32_t *indices, uint32_t maxIndices,
-	uint32_t *ioVertCount, uint32_t *ioIndexCount )
+	uint32_t *ioVertCount, uint32_t *ioIndexCount, qboolean *outCpuSkinned )
 {
 	const gltfModel_t *gltf;
 	uint32_t vertsBefore = *ioVertCount;
@@ -318,6 +325,9 @@ static qboolean vk_rtx_pack_gltf( const trRefEntity_t *ent, const viewParms_t *v
 	float jointMats[GLTF_MAX_JOINTS * 12];
 	qboolean needSkin;
 
+	if ( outCpuSkinned ) {
+		*outCpuSkinned = qfalse;
+	}
 	gltf = R_GetGLTFModelFromModelData( mod->modelData );
 	if ( !gltf || gltf->numMeshes < 1 ) {
 		return qfalse;
@@ -423,6 +433,9 @@ static qboolean vk_rtx_pack_gltf( const trRefEntity_t *ent, const viewParms_t *v
 		return qfalse;
 	}
 
+	if ( outCpuSkinned ) {
+		*outCpuSkinned = needSkin;
+	}
 	return qtrue;
 }
 
@@ -436,7 +449,7 @@ Returns qfalse on budget/skin failure (AABB fallback).
 */
 static qboolean vk_rtx_pack_mdr( const trRefEntity_t *ent, const viewParms_t *viewParms,
 	model_t *mod, float *positions, uint32_t maxVerts, uint32_t *indices, uint32_t maxIndices,
-	uint32_t *ioVertCount, uint32_t *ioIndexCount )
+	uint32_t *ioVertCount, uint32_t *ioIndexCount, qboolean *outCpuSkinned )
 {
 	mdrHeader_t *header;
 	mdrLOD_t *lod;
@@ -448,6 +461,9 @@ static qboolean vk_rtx_pack_mdr( const trRefEntity_t *ent, const viewParms_t *vi
 	int s;
 	float *skinned = NULL;
 
+	if ( outCpuSkinned ) {
+		*outCpuSkinned = qfalse;
+	}
 	if ( !mod->modelData ) {
 		return qfalse;
 	}
@@ -554,6 +570,9 @@ static qboolean vk_rtx_pack_mdr( const trRefEntity_t *ent, const viewParms_t *vi
 		return qfalse;
 	}
 
+	if ( outCpuSkinned ) {
+		*outCpuSkinned = qtrue; /* MDR path always CPU-skins LOD0 surfaces. */
+	}
 	return qtrue;
 }
 
@@ -610,14 +629,7 @@ static void vk_rtx_entity_fill_prim_attrs_rgb( const float *positions, const uin
 
 static void vk_rtx_entity_tint_rgb( const byte *rgba, float out[3] )
 {
-	out[0] = 0.72f;
-	out[1] = 0.70f;
-	out[2] = 0.66f;
-	if ( rgba && ( rgba[0] | rgba[1] | rgba[2] ) != 0 ) {
-		out[0] = rgba[0] * ( 1.0f / 255.0f );
-		out[1] = rgba[1] * ( 1.0f / 255.0f );
-		out[2] = rgba[2] * ( 1.0f / 255.0f );
-	}
+	vk_rtx_material_tint_rgb( rgba, out );
 }
 
 static shader_t *vk_rtx_entity_shader_for_surface( const trRefEntity_t *ent, const char *surfName,
@@ -648,138 +660,11 @@ static shader_t *vk_rtx_entity_shader_for_surface( const trRefEntity_t *ent, con
 static void vk_rtx_entity_albedo_from_shader( const shader_t *shader, const byte *tintRgba,
 	qboolean useMaterials, float out[3] )
 {
-	float base[3];
-	float tint[3];
-	int i;
+	float fallback[3];
 
-	vk_rtx_entity_tint_rgb( tintRgba, tint );
-	base[0] = tint[0];
-	base[1] = tint[1];
-	base[2] = tint[2];
-
-	if ( useMaterials && shader ) {
-		qboolean found = qfalse;
-
-		for ( i = 0; i < MAX_SHADER_STAGES && shader->stages[i]; i++ ) {
-			const shaderStage_t *st = shader->stages[i];
-			const textureBundle_t *bundle;
-			image_t *img;
-
-			if ( !st->active ) {
-				continue;
-			}
-			bundle = &st->bundle[0];
-			if ( bundle->lightmap != LIGHTMAP_INDEX_NONE ) {
-				continue;
-			}
-			if ( bundle->rgbGen == CGEN_CONST ) {
-				base[0] = bundle->constantColor.rgba[0] * ( 1.0f / 255.0f );
-				base[1] = bundle->constantColor.rgba[1] * ( 1.0f / 255.0f );
-				base[2] = bundle->constantColor.rgba[2] * ( 1.0f / 255.0f );
-				found = qtrue;
-				break;
-			}
-			img = bundle->image[0];
-			if ( !img || img == tr.defaultImage ) {
-				continue;
-			}
-			if ( img == tr.whiteImage ) {
-				base[0] = base[1] = base[2] = 1.0f;
-			} else {
-				base[0] = img->avgColor[0];
-				base[1] = img->avgColor[1];
-				base[2] = img->avgColor[2];
-			}
-			if ( bundle->rgbGen == CGEN_IDENTITY_LIGHTING ) {
-				base[0] *= tr.identityLight;
-				base[1] *= tr.identityLight;
-				base[2] *= tr.identityLight;
-			}
-			found = qtrue;
-			break;
-		}
-
-		if ( found && tintRgba && ( tintRgba[0] | tintRgba[1] | tintRgba[2] ) != 0 ) {
-			/* Modulate material average by entity tint when the game sets one. */
-			base[0] *= tint[0];
-			base[1] *= tint[1];
-			base[2] *= tint[2];
-		} else if ( !found ) {
-			/* keep tint/default */
-		}
-	}
-
-	out[0] = base[0];
-	out[1] = base[1];
-	out[2] = base[2];
-}
-
-static image_t *vk_rtx_entity_diffuse_image( const shader_t *shader )
-{
-	int i;
-
-	if ( !shader ) {
-		return NULL;
-	}
-	for ( i = 0; i < MAX_SHADER_STAGES && shader->stages[i]; i++ ) {
-		const shaderStage_t *st = shader->stages[i];
-		const textureBundle_t *bundle;
-		image_t *img;
-
-		if ( !st->active ) {
-			continue;
-		}
-		bundle = &st->bundle[0];
-		if ( bundle->lightmap != LIGHTMAP_INDEX_NONE ) {
-			continue;
-		}
-		if ( bundle->rgbGen == CGEN_CONST ) {
-			return NULL;
-		}
-		img = bundle->image[0];
-		if ( img && img != tr.defaultImage && img != tr.whiteImage && img->hasThumb ) {
-			return img;
-		}
-	}
-	return NULL;
-}
-
-static void vk_rtx_sample_thumb_uv( const image_t *img, float u, float v, float out[3] )
-{
-	int x, y;
-	const byte *p;
-	float fu, fv;
-
-	if ( !img || !img->hasThumb || !out ) {
-		out[0] = 0.72f;
-		out[1] = 0.70f;
-		out[2] = 0.66f;
-		return;
-	}
-	fu = u - (float)floor( u );
-	fv = v - (float)floor( v );
-	if ( fu < 0.0f ) {
-		fu += 1.0f;
-	}
-	if ( fv < 0.0f ) {
-		fv += 1.0f;
-	}
-	x = (int)( fu * (float)( TR_IMAGE_THUMB_SIZE - 1 ) + 0.5f );
-	y = (int)( fv * (float)( TR_IMAGE_THUMB_SIZE - 1 ) + 0.5f );
-	if ( x < 0 ) {
-		x = 0;
-	} else if ( x >= TR_IMAGE_THUMB_SIZE ) {
-		x = TR_IMAGE_THUMB_SIZE - 1;
-	}
-	if ( y < 0 ) {
-		y = 0;
-	} else if ( y >= TR_IMAGE_THUMB_SIZE ) {
-		y = TR_IMAGE_THUMB_SIZE - 1;
-	}
-	p = img->thumbRGBA + ( y * TR_IMAGE_THUMB_SIZE + x ) * 4;
-	out[0] = p[0] * ( 1.0f / 255.0f );
-	out[1] = p[1] * ( 1.0f / 255.0f );
-	out[2] = p[2] * ( 1.0f / 255.0f );
+	vk_rtx_material_tint_rgb( tintRgba, fallback );
+	vk_rtx_material_resolve_albedo( shader, useMaterials, qfalse, 0.0f, 0.0f,
+		fallback, tintRgba, out );
 }
 
 static void vk_rtx_entity_write_prim( float *albedoRgb, float *normalNxyz, uint32_t prim,
@@ -809,24 +694,11 @@ static qboolean vk_rtx_entity_uv_enabled( void )
 static void vk_rtx_entity_prim_rgb( const shader_t *shader, const byte *tintRgba,
 	qboolean useMaterials, qboolean useUv, float u, float v, float out[3] )
 {
-	image_t *img;
-	float tint[3];
+	float fallback[3];
 
-	vk_rtx_entity_albedo_from_shader( shader, tintRgba, useMaterials, out );
-	if ( !useUv || !useMaterials ) {
-		return;
-	}
-	img = vk_rtx_entity_diffuse_image( shader );
-	if ( !img ) {
-		return;
-	}
-	vk_rtx_sample_thumb_uv( img, u, v, out );
-	if ( tintRgba && ( tintRgba[0] | tintRgba[1] | tintRgba[2] ) != 0 ) {
-		vk_rtx_entity_tint_rgb( tintRgba, tint );
-		out[0] *= tint[0];
-		out[1] *= tint[1];
-		out[2] *= tint[2];
-	}
+	vk_rtx_material_tint_rgb( tintRgba, fallback );
+	vk_rtx_material_resolve_albedo( shader, useMaterials, useUv, u, v,
+		fallback, tintRgba, out );
 }
 
 static void vk_rtx_entity_fill_md3_materials( const trRefEntity_t *ent, model_t *mod,
@@ -1158,7 +1030,7 @@ static void vk_rtx_entity_fill_gltf_materials( const trRefEntity_t *ent, model_t
 				if ( useUv && baseImg && baseImg->hasThumb ) {
 					float sampled[3];
 					float tint[3];
-					vk_rtx_sample_thumb_uv( baseImg, u, v, sampled );
+					vk_rtx_material_sample_thumb_uv( baseImg, u, v, sampled );
 					primRgb[0] = sampled[0] * ( ( custom || !useMaterials ) ? 1.0f :
 						gltf->materials[gprim->materialIndex].baseColorFactor[0] );
 					primRgb[1] = sampled[1] * ( ( custom || !useMaterials ) ? 1.0f :
@@ -1247,11 +1119,11 @@ uint32_t vk_rtx_entities_pack( const trRefdef_t *refdef, const viewParms_t *view
 	uint32_t meshMdr = 0u;
 	uint32_t proxyCount = 0u;
 	uint32_t proxyNonMesh = 0u;
-	uint32_t proxySkinned = 0u;
 	uint32_t proxyMd3Fail = 0u;
 	uint32_t proxyIqmFail = 0u;
 	uint32_t proxyGltfFail = 0u;
 	uint32_t proxyMdrFail = 0u;
+	uint32_t meshCpuSkinned = 0u;
 
 	if ( stats ) {
 		Com_Memset( stats, 0, sizeof( *stats ) );
@@ -1271,6 +1143,7 @@ uint32_t vk_rtx_entities_pack( const trRefdef_t *refdef, const viewParms_t *view
 		const trRefEntity_t *ent = &refdef->entities[i];
 		model_t *mod;
 		qboolean usedMesh = qfalse;
+		qboolean cpuSkinned = qfalse;
 		int meshKind = 0; /* 1=md3 2=iqm 3=gltf 4=mdr */
 		int triedFailKind = 0; /* 1=md3 2=iqm 3=gltf 4=mdr */
 		uint32_t indexBefore = indexCount;
@@ -1294,7 +1167,7 @@ uint32_t vk_rtx_entities_pack( const trRefdef_t *refdef, const viewParms_t *view
 			}
 		} else if ( mod->type == MOD_IQM ) {
 			usedMesh = vk_rtx_pack_iqm( ent, viewParms, mod, positions, maxVerts, indices, maxIndices,
-				&vertCount, &indexCount );
+				&vertCount, &indexCount, &cpuSkinned );
 			if ( usedMesh ) {
 				meshKind = 2;
 			} else {
@@ -1302,7 +1175,7 @@ uint32_t vk_rtx_entities_pack( const trRefdef_t *refdef, const viewParms_t *view
 			}
 		} else if ( mod->type == MOD_GLTF ) {
 			usedMesh = vk_rtx_pack_gltf( ent, viewParms, mod, refdef->time, positions, maxVerts, indices, maxIndices,
-				&vertCount, &indexCount );
+				&vertCount, &indexCount, &cpuSkinned );
 			if ( usedMesh ) {
 				meshKind = 3;
 			} else {
@@ -1310,7 +1183,7 @@ uint32_t vk_rtx_entities_pack( const trRefdef_t *refdef, const viewParms_t *view
 			}
 		} else if ( mod->type == MOD_MDR ) {
 			usedMesh = vk_rtx_pack_mdr( ent, viewParms, mod, positions, maxVerts, indices, maxIndices,
-				&vertCount, &indexCount );
+				&vertCount, &indexCount, &cpuSkinned );
 			if ( usedMesh ) {
 				meshKind = 4;
 			} else {
@@ -1337,6 +1210,9 @@ uint32_t vk_rtx_entities_pack( const trRefdef_t *refdef, const viewParms_t *view
 			}
 		} else {
 			meshCount++;
+			if ( cpuSkinned ) {
+				meshCpuSkinned++;
+			}
 			if ( meshKind == 1 ) {
 				meshMd3++;
 			} else if ( meshKind == 2 ) {
@@ -1367,11 +1243,13 @@ uint32_t vk_rtx_entities_pack( const trRefdef_t *refdef, const viewParms_t *view
 		stats->meshMdrCount = meshMdr;
 		stats->proxyEntityCount = proxyCount;
 		stats->proxyNonMeshCount = proxyNonMesh;
-		stats->proxySkinnedCount = proxySkinned;
+		/* Rollup: skinned-format pack failures that fell back to AABB. */
+		stats->proxySkinnedCount = proxyIqmFail + proxyGltfFail + proxyMdrFail;
 		stats->proxyMd3FailCount = proxyMd3Fail;
 		stats->proxyIqmFailCount = proxyIqmFail;
 		stats->proxyGltfFailCount = proxyGltfFail;
 		stats->proxyMdrFailCount = proxyMdrFail;
+		stats->meshCpuSkinnedCount = meshCpuSkinned;
 	}
 
 	return packed;

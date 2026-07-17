@@ -1145,5 +1145,41 @@ extern "C" void Phys_SetSliderTarget_Impl(physConstraintHandle_t handle, float t
 extern "C" void Phys_SetDistanceLength_Impl(physConstraintHandle_t handle, float length) {
 	(void)handle; (void)length;
 }
+extern "C" void Phys_SetWheelSuspension_Impl(physConstraintHandle_t handle, float hertz, float dampingRatio,
+	float lower, float upper) {
+	(void)handle; (void)hertz; (void)dampingRatio; (void)lower; (void)upper;
+}
+extern "C" void Phys_SetWheelSpin_Impl(physConstraintHandle_t handle, float speed, float maxTorque) {
+	(void)handle; (void)speed; (void)maxTorque;
+}
+extern "C" void Phys_SetMotorVelocities_Impl(physConstraintHandle_t handle, const vec3_t linearVelocity,
+	const vec3_t angularVelocity, float maxForce, float maxTorque) {
+	(void)handle; (void)linearVelocity; (void)angularVelocity; (void)maxForce; (void)maxTorque;
+}
+extern "C" void Phys_SetSphericalTarget_Impl(physConstraintHandle_t handle, const vec3_t rotationDeg) {
+	(void)handle; (void)rotationDeg;
+}
+extern "C" void Phys_SetBodyDamping_Impl(physBodyHandle_t body, float linearDamping, float angularDamping) {
+	(void)body; (void)linearDamping; (void)angularDamping;
+}
+extern "C" void Phys_SetBodyType_Impl(physBodyHandle_t body, physBodyType_t type) {
+	(void)body; (void)type;
+}
+extern "C" void Phys_ApplyWind_Impl(physBodyHandle_t body, const vec3_t wind, float drag, float lift, float maxSpeed) {
+	(void)body; (void)wind; (void)drag; (void)lift; (void)maxSpeed;
+}
+extern "C" int Phys_Explode_Impl(const vec3_t center, float radius, float impulsePerArea, float falloff,
+	unsigned maskBits) {
+	(void)center; (void)radius; (void)impulsePerArea; (void)falloff; (void)maskBits;
+	return 0;
+}
+extern "C" int Phys_RayCastAll_Impl(const vec3_t from, const vec3_t to, physRayResult_t *results, int maxResults,
+	const physQueryFilter_t *filter) {
+	(void)from; (void)to; (void)filter;
+	if (results && maxResults > 0) memset(results, 0, (size_t)maxResults * sizeof(*results));
+	return 0;
+}
+extern "C" void Phys_SetFrictionCallback_Impl(PhysFrictionMixFn fn) { (void)fn; }
+extern "C" void Phys_SetRestitutionCallback_Impl(PhysRestitutionMixFn fn) { (void)fn; }
 
 #endif /* USE_BULLET_PHYSICS_IMPL */

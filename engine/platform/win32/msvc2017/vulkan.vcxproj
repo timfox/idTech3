@@ -359,6 +359,7 @@
     <ClCompile Include="..\..\..\renderers\vulkan\extensions\rtx\vk_raygun.c" />
     <ClCompile Include="..\..\..\renderers\vulkan\extensions\rtx\vk_rtx.c" />
     <ClCompile Include="..\..\..\renderers\vulkan\extensions\rtx\vk_rtx_entities.c" />
+    <ClCompile Include="..\..\..\renderers\vulkan\extensions\rtx\vk_rtx_material.c" />
     <ClCompile Include="..\..\..\renderers\vulkan\extensions\rtx\vk_rtx_world.c" />
     <ClCompile Include="..\..\..\renderers\vulkan\extensions\scaffold\vk_arc_blanc.c" />
     <ClCompile Include="..\..\..\renderers\vulkan\extensions\scaffold\vk_arc_blanc_gpu.c" />

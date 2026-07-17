@@ -9,6 +9,7 @@ Optional per-primitive albedo RGB (shader materials / UV thumbs or vertex color)
 
 #include "tr_local.h"
 #include "vk_rtx_world.h"
+#include "vk_rtx_material.h"
 #include <math.h>
 
 #ifdef USE_VULKAN_RTX
@@ -117,151 +118,26 @@ static qboolean rtx_world_uv_enabled( void )
 		&& r_rtxWorldUvSample && r_rtxWorldUvSample->integer ) ? qtrue : qfalse;
 }
 
-static image_t *rtx_world_diffuse_image( const shader_t *shader )
+/* 0=replace material/UV; 1=modulate material/UV × vertex color (keeps bake). */
+static qboolean rtx_world_albedo_modulate( void )
 {
-	int i;
-
-	if ( !shader ) {
-		return NULL;
-	}
-	for ( i = 0; i < MAX_SHADER_STAGES && shader->stages[i]; i++ ) {
-		const shaderStage_t *st = shader->stages[i];
-		const textureBundle_t *bundle;
-		image_t *img;
-
-		if ( !st->active ) {
-			continue;
-		}
-		bundle = &st->bundle[0];
-		if ( bundle->lightmap != LIGHTMAP_INDEX_NONE ) {
-			continue;
-		}
-		if ( bundle->rgbGen == CGEN_CONST ) {
-			return NULL;
-		}
-		img = bundle->image[0];
-		if ( img && img != tr.defaultImage && img != tr.whiteImage && img->hasThumb ) {
-			return img;
-		}
-	}
-	return NULL;
-}
-
-static void rtx_sample_thumb_uv( const image_t *img, float u, float v, float out[3] )
-{
-	int x, y;
-	const byte *p;
-	float fu, fv;
-
-	if ( !img || !img->hasThumb || !out ) {
-		out[0] = s_defaultAlbedo[0];
-		out[1] = s_defaultAlbedo[1];
-		out[2] = s_defaultAlbedo[2];
-		return;
-	}
-	fu = u - (float)floor( u );
-	fv = v - (float)floor( v );
-	if ( fu < 0.0f ) {
-		fu += 1.0f;
-	}
-	if ( fv < 0.0f ) {
-		fv += 1.0f;
-	}
-	x = (int)( fu * (float)( TR_IMAGE_THUMB_SIZE - 1 ) + 0.5f );
-	y = (int)( fv * (float)( TR_IMAGE_THUMB_SIZE - 1 ) + 0.5f );
-	if ( x < 0 ) {
-		x = 0;
-	} else if ( x >= TR_IMAGE_THUMB_SIZE ) {
-		x = TR_IMAGE_THUMB_SIZE - 1;
-	}
-	if ( y < 0 ) {
-		y = 0;
-	} else if ( y >= TR_IMAGE_THUMB_SIZE ) {
-		y = TR_IMAGE_THUMB_SIZE - 1;
-	}
-	p = img->thumbRGBA + ( y * TR_IMAGE_THUMB_SIZE + x ) * 4;
-	out[0] = p[0] * ( 1.0f / 255.0f );
-	out[1] = p[1] * ( 1.0f / 255.0f );
-	out[2] = p[2] * ( 1.0f / 255.0f );
-}
-
-/*
- * Diffuse avgColor / const RGB from first non-lightmap stage.
- * Returns qfalse when no usable material color was found.
- */
-static qboolean rtx_albedo_from_shader( const shader_t *shader, float out[3] )
-{
-	int i;
-
-	if ( !shader ) {
-		return qfalse;
-	}
-	for ( i = 0; i < MAX_SHADER_STAGES && shader->stages[i]; i++ ) {
-		const shaderStage_t *st = shader->stages[i];
-		const textureBundle_t *bundle;
-		image_t *img;
-
-		if ( !st->active ) {
-			continue;
-		}
-		bundle = &st->bundle[0];
-		if ( bundle->lightmap != LIGHTMAP_INDEX_NONE ) {
-			continue;
-		}
-		if ( bundle->rgbGen == CGEN_CONST ) {
-			out[0] = bundle->constantColor.rgba[0] * ( 1.0f / 255.0f );
-			out[1] = bundle->constantColor.rgba[1] * ( 1.0f / 255.0f );
-			out[2] = bundle->constantColor.rgba[2] * ( 1.0f / 255.0f );
-			return qtrue;
-		}
-		img = bundle->image[0];
-		if ( !img || img == tr.defaultImage ) {
-			continue;
-		}
-		if ( img == tr.whiteImage ) {
-			out[0] = out[1] = out[2] = 1.0f;
-		} else {
-			out[0] = img->avgColor[0];
-			out[1] = img->avgColor[1];
-			out[2] = img->avgColor[2];
-		}
-		if ( bundle->rgbGen == CGEN_IDENTITY_LIGHTING ) {
-			out[0] *= tr.identityLight;
-			out[1] *= tr.identityLight;
-			out[2] *= tr.identityLight;
-		}
-		return qtrue;
-	}
-	return qfalse;
+	return ( r_rtxWorldAlbedoMode && r_rtxWorldAlbedoMode->integer == 1 ) ? qtrue : qfalse;
 }
 
 /*
  * Prefer UV-centroid diffuse thumb → shader avgColor → vertex color average.
+ * Optional modulate with vertex colors when r_rtxWorldAlbedoMode 1.
  */
 static void rtx_resolve_prim_albedo( const shader_t *shader, float u, float v,
 	const float vertAvg[3], float out[3] )
 {
-	image_t *img;
-
-	if ( !rtx_world_materials_enabled() || !shader ) {
-		out[0] = vertAvg[0];
-		out[1] = vertAvg[1];
-		out[2] = vertAvg[2];
-		return;
+	vk_rtx_material_resolve_albedo( shader, rtx_world_materials_enabled(),
+		rtx_world_uv_enabled(), u, v, vertAvg, NULL, out );
+	if ( rtx_world_materials_enabled() && rtx_world_albedo_modulate() ) {
+		out[0] *= vertAvg[0];
+		out[1] *= vertAvg[1];
+		out[2] *= vertAvg[2];
 	}
-	if ( rtx_world_uv_enabled() ) {
-		img = rtx_world_diffuse_image( shader );
-		if ( img ) {
-			rtx_sample_thumb_uv( img, u, v, out );
-			return;
-		}
-	}
-	if ( rtx_albedo_from_shader( shader, out ) ) {
-		return;
-	}
-	out[0] = vertAvg[0];
-	out[1] = vertAvg[1];
-	out[2] = vertAvg[2];
 }
 
 static void rtx_face_st( const srfSurfaceFace_t *face, unsigned vidx, float *u, float *v )

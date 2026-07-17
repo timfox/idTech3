@@ -1004,6 +1004,67 @@ static void PhysMiddleware_RebuildTree_f( void ) {
 	Com_Printf( "phys_rebuild_tree: Soft Step static broadphase rebuilt\n" );
 }
 
+static void PhysMiddleware_Explode_f( void ) {
+	vec3_t center;
+	float radius, impulse, falloff;
+	unsigned mask;
+	if ( Cmd_Argc() < 6 ) {
+		Com_Printf( "usage: phys_explode <x> <y> <z> <radius> <impulsePerArea> [falloff] [maskBits]\n" );
+		return;
+	}
+	center[0] = (float)atof( Cmd_Argv( 1 ) );
+	center[1] = (float)atof( Cmd_Argv( 2 ) );
+	center[2] = (float)atof( Cmd_Argv( 3 ) );
+	radius = (float)atof( Cmd_Argv( 4 ) );
+	impulse = (float)atof( Cmd_Argv( 5 ) );
+	falloff = Cmd_Argc() >= 7 ? (float)atof( Cmd_Argv( 6 ) ) : 1.0f;
+	mask = Cmd_Argc() >= 8 ? (unsigned)atoi( Cmd_Argv( 7 ) ) : 0u;
+	Phys_Explode( center, radius, impulse, falloff, mask );
+	Com_Printf( "phys_explode: center (%.0f %.0f %.0f) r=%.0f impulse=%.1f\n",
+		center[0], center[1], center[2], radius, impulse );
+}
+
+static void PhysMiddleware_RayAll_f( void ) {
+	vec3_t from, to;
+	physRayResult_t hits[16];
+	int n, i;
+	if ( Cmd_Argc() < 7 ) {
+		Com_Printf( "usage: phys_ray_all <fx fy fz> <tx ty tz>\n" );
+		return;
+	}
+	from[0] = (float)atof( Cmd_Argv( 1 ) );
+	from[1] = (float)atof( Cmd_Argv( 2 ) );
+	from[2] = (float)atof( Cmd_Argv( 3 ) );
+	to[0] = (float)atof( Cmd_Argv( 4 ) );
+	to[1] = (float)atof( Cmd_Argv( 5 ) );
+	to[2] = (float)atof( Cmd_Argv( 6 ) );
+	n = Phys_RayCastAll( from, to, hits, 16, NULL );
+	Com_Printf( "phys_ray_all: %d hit(s)\n", n );
+	for ( i = 0; i < n; i++ ) {
+		Com_Printf( "  [%d] frac=%.3f body=%d at (%.1f %.1f %.1f)\n",
+			i, hits[i].fraction, hits[i].body,
+			hits[i].hitPoint[0], hits[i].hitPoint[1], hits[i].hitPoint[2] );
+	}
+}
+
+static void PhysMiddleware_Wind_f( void ) {
+	physBodyHandle_t body;
+	vec3_t wind;
+	if ( Cmd_Argc() < 5 ) {
+		Com_Printf( "usage: phys_wind <body> <wx wy wz> [drag] [lift]\n" );
+		return;
+	}
+	body = atoi( Cmd_Argv( 1 ) );
+	wind[0] = (float)atof( Cmd_Argv( 2 ) );
+	wind[1] = (float)atof( Cmd_Argv( 3 ) );
+	wind[2] = (float)atof( Cmd_Argv( 4 ) );
+	Phys_ApplyWind( body, wind,
+		Cmd_Argc() >= 6 ? (float)atof( Cmd_Argv( 5 ) ) : 0.5f,
+		Cmd_Argc() >= 7 ? (float)atof( Cmd_Argv( 6 ) ) : 0.2f,
+		400.0f );
+	Com_Printf( "phys_wind: body=%d wind (%.0f %.0f %.0f)\n", body, wind[0], wind[1], wind[2] );
+}
+
 static void PhysMiddleware_SetFriction_f( void ) {
 	physBodyHandle_t body;
 	float friction;
@@ -1087,6 +1148,9 @@ void PhysMiddleware_RegisterCommands( void ) {
 	Cmd_AddCommand( "phys_set_continuous", PhysMiddleware_SetContinuous_f );
 	Cmd_AddCommand( "phys_debug_flags", PhysMiddleware_DebugFlags_f );
 	Cmd_AddCommand( "phys_rebuild_tree", PhysMiddleware_RebuildTree_f );
+	Cmd_AddCommand( "phys_explode", PhysMiddleware_Explode_f );
+	Cmd_AddCommand( "phys_ray_all", PhysMiddleware_RayAll_f );
+	Cmd_AddCommand( "phys_wind", PhysMiddleware_Wind_f );
 	Cmd_AddCommand( "phys_set_friction", PhysMiddleware_SetFriction_f );
 	Cmd_AddCommand( "phys_set_restitution", PhysMiddleware_SetRestitution_f );
 	Cmd_AddCommand( "phys_set_filter", PhysMiddleware_SetFilter_f );
@@ -1164,6 +1228,9 @@ void PhysMiddleware_Shutdown( void ) {
 	Cmd_RemoveCommand( "phys_set_continuous" );
 	Cmd_RemoveCommand( "phys_debug_flags" );
 	Cmd_RemoveCommand( "phys_rebuild_tree" );
+	Cmd_RemoveCommand( "phys_explode" );
+	Cmd_RemoveCommand( "phys_ray_all" );
+	Cmd_RemoveCommand( "phys_wind" );
 	Cmd_RemoveCommand( "phys_set_friction" );
 	Cmd_RemoveCommand( "phys_set_restitution" );
 	Cmd_RemoveCommand( "phys_set_filter" );

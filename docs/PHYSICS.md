@@ -65,6 +65,13 @@ Classic Q3/OA Pmove stays default (`phys_pmove 0`). Set `phys_pmove 1` for CastM
 | World contact / speed / speculative tuning | Done (`phys_contactHertz`, `phys_maxLinearSpeed`, `phys_speculative`) |
 | Debug draw contacts / flags | Done (`phys_debug_flags` / `phys_debugContacts`) |
 | Joint servo targets (hinge/slider/distance) | Done (`Phys_SetHingeTargetAngle` / `SetSliderTarget` / `SetDistanceLength`) |
+| Wheel suspension / spin | Done (`Phys_SetWheelSuspension` / `Phys_SetWheelSpin`) |
+| Motor joint 3D velocities | Done (`Phys_SetMotorVelocities`) |
+| Spherical joint target orientation | Done (`Phys_SetSphericalTarget`) |
+| Body damping / type / wind | Done (`Phys_SetBodyDamping` / `SetBodyType` / `ApplyWind`) |
+| Explode with maskBits | Done (`Phys_Explode` / `phys_explode`) |
+| Multi-hit ray cast | Done (`Phys_RayCastAll` / `phys_ray_all`) |
+| Friction / restitution mix callbacks | Done (`Phys_SetFrictionCallback` / `Phys_SetRestitutionCallback`) |
 
 ### Optional / MED–LOW (not blockers)
 
@@ -72,8 +79,6 @@ Classic Q3/OA Pmove stays default (`phys_pmove 0`). Set `phys_pmove 1` for CastM
 |-----|-------|
 | Full FEM soft bodies | Not in Box3D — keep XPBD/DMM companions ([timfox/idTech3-box3d](https://github.com/timfox/idTech3-box3d) Soft Step is rigid) |
 | Open-world sector mesh stream | `UpdateStaticTriMesh` + `RebuildStaticTree` ready; sector residency hookup follow-on |
-| Multi-hit ray callbacks | Closest-hit + overlaps cover gameplay; callback CastRay optional |
-| Friction/restitution material callbacks | Soft Step supports; use filter/pre-solve for gameplay overrides |
 
 ## Multi-solver companions
 
@@ -122,7 +127,8 @@ See [EDITOR_BRIDGE.md](EDITOR_BRIDGE.md) — `misc_phys_box|sphere|static|sensor
 - **Lua `Engine.Physics`:** table-driven `createBody({...})` or shorthand bodies, sensors, constraints (incl. filter/parallel/cone), rayCast(+filter), convexSweep, overlapSphere/overlapBox, getContacts, attachShape, setFilter, joint spring/limits/steering/targets, pollEvent (incl. `ragdoll`/`bone`), setFriction / setRestitution / setGravity, validateReplay, stats, and Box3D tuning (`setSleepThreshold`, `setContactTuning`, `setMaxLinearSpeed`, `enableSpeculative`, `setDebugDrawFlags`)
 - **Euphoria Lua:** `createRagdoll` (death), `spawnBoundAlive`, `forceAnimState`, `hitRagdoll`
 - **DMM Lua:** `createDmm`, `fractureDmm`, `dmmStatus`
-- **Soft Step AAA Lua:** `getClosestPoint`, `sphereTOI`, `setContinuous`, `setSleepEnabled`, `setSleepThreshold`, `setHingeTarget`, `setSliderTarget`, `setDistanceLength`, `rebuildTree`, `replayOpen`/`replayStep`/`replaySeek`/`replayClose`/`replayStatus`
+- **Soft Step AAA Lua:** `getClosestPoint`, `sphereTOI`, `setContinuous`, `setSleepEnabled`, `setSleepThreshold`, `setHingeTarget`, `setSliderTarget`, `setDistanceLength`, `rebuildTree`, `replayOpen`/`replayStep`/`replaySeek`/`replayClose`/`replayStatus`, `setWheelSuspension`/`setWheelSpin`, `setMotorVelocities`, `setSphericalTarget`, `setBodyDamping`/`setBodyType`, `applyWind`, `explode`, `rayCastAll`, `setGravityScale`/`setMotionLocks`/`setVelocity`/`applyForce`/`applyTorque`/`destroyConstraint`/`setTargetTransform`
+- **Lua `Engine.Character`:** `create`, `move`, `destroy`, `getState` (CastMover)
 
 ## Ragdoll bind
 
@@ -166,4 +172,4 @@ Then drive poses with `Phys_RagdollSetBoneAnimTarget` / `Phys_RagdollApplyMd3Fra
 | `phys_maxLinearSpeed` | 0 | Soft Step max linear speed clamp (0 = off) |
 | `phys_speculative` | 1 | Soft Step speculative contacts |
 
-Console: `phys_spawn_ragdoll`, `phys_hit_ragdoll`, `phys_spawn_dmm`, `phys_hit_dmm`, `phys_record_*`, `phys_replay` (hash), `phys_replay_open|step|seek|close`, `phys_closest`, `phys_set_continuous`, `phys_debug_flags`, `phys_rebuild_tree`, `phys_set_friction`, `phys_set_restitution`, `phys_set_filter`, `phys_dump`.
+Console: `phys_spawn_ragdoll`, `phys_hit_ragdoll`, `phys_spawn_dmm`, `phys_hit_dmm`, `phys_record_*`, `phys_replay` (hash), `phys_replay_open|step|seek|close`, `phys_closest`, `phys_set_continuous`, `phys_debug_flags`, `phys_rebuild_tree`, `phys_explode`, `phys_ray_all`, `phys_wind`, `phys_set_friction`, `phys_set_restitution`, `phys_set_filter`, `phys_dump`.

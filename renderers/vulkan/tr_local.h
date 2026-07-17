@@ -1641,6 +1641,7 @@ extern cvar_t	*r_rtxDemo;
 extern cvar_t	*r_rtxWorldPrimCap;
 extern cvar_t	*r_rtxWorldMaterials;
 extern cvar_t	*r_rtxWorldUvSample;
+extern cvar_t	*r_rtxWorldAlbedoMode;
 extern cvar_t	*r_rtxComposite;
 extern cvar_t	*r_rtxSamples;
 extern cvar_t	*r_forwardPlus;

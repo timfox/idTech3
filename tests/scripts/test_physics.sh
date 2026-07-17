@@ -143,6 +143,8 @@ rg -q '\"motors\"' modules/physics/phys_solvers.c
 rg -q '\"fluid\"' modules/physics/phys_solvers.c
 
 echo "[test_physics] full Box3D integration surface..."
+LUA_PHYSICS="runtime/game/g_lua_physics_bindings.inc"
+test -f "$LUA_PHYSICS"
 rg -q 'SV_Physics_Frame' runtime/server/sv_physics.c
 rg -q 'sv_physSpawn' runtime/server/sv_physics.c
 rg -q 'EnginePhysMap_Parse' engine/core/engine_phys_map.c
@@ -151,8 +153,8 @@ rg -q 'G_PHYS_CREATEBODY' runtime/game/g_public.h
 rg -q 'G_PHYS_PMOVE_CORRECT' runtime/game/g_public.h
 rg -q 'Phys_PmoveCorrect' modules/physics/phys_character.c
 rg -q 'phys_pmove' modules/physics/phys_character.c
-rg -q 'pmoveCorrect' runtime/game/g_lua_bindings.c
-rg -q 'createConstraint' runtime/game/g_lua_bindings.c
+rg -q 'pmoveCorrect' runtime/game/g_lua_bindings.c "$LUA_PHYSICS"
+rg -q 'createConstraint' runtime/game/g_lua_bindings.c "$LUA_PHYSICS"
 rg -q 'b3CreateCylinder' modules/physics/phys_box3d_impl.c
 rg -q 'b3CreateHull' modules/physics/phys_box3d_impl.c
 rg -q 'b3Shape_SetFilter' modules/physics/phys_box3d_impl.c
@@ -169,8 +171,8 @@ rg -q 'Phys_RagdollApplyMd3Frame' modules/physics/phys_ragdoll_bind.c
 rg -q 'phys_stepHeight' modules/physics/phys_box3d_impl.c
 rg -q 'G_PHYS_CREATERAGDOLL' runtime/game/g_public.h
 rg -q 'CG_PHYS_CREATERAGDOLL' runtime/cgame/cg_public.h
-rg -q 'createRagdoll' runtime/game/g_lua_bindings.c
-rg -q 'subscribe' runtime/game/g_lua_bindings.c
+rg -q 'createRagdoll' runtime/game/g_lua_bindings.c "$LUA_PHYSICS"
+rg -q 'subscribe' runtime/game/g_lua_bindings.c "$LUA_PHYSICS"
 rg -q 'phys_spawn_ragdoll_bind' modules/physics/phys_middleware.c
 rg -q 'PHYS_EVENT_CONTACT_BEGIN' modules/physics/phys_events.h
 rg -q 'PHYS_EVENT_BODY_SLEEP' modules/physics/phys_events.h
@@ -179,9 +181,9 @@ rg -q 'events.beginCount' modules/physics/phys_box3d_impl.c
 rg -q 'b3ValidateReplay' modules/physics/phys_box3d_impl.c
 rg -q 'b3Shape_SetFriction' modules/physics/phys_box3d_impl.c
 rg -q 'phys_set_friction' modules/physics/phys_middleware.c
-rg -q 'setFriction' runtime/game/g_lua_bindings.c
-rg -q 'validateReplay' runtime/game/g_lua_bindings.c
-rg -q 'pollEvent' runtime/game/g_lua_bindings.c
+rg -q 'setFriction' runtime/game/g_lua_bindings.c "$LUA_PHYSICS"
+rg -q 'validateReplay' runtime/game/g_lua_bindings.c "$LUA_PHYSICS"
+rg -q 'pollEvent' runtime/game/g_lua_bindings.c "$LUA_PHYSICS"
 rg -q 'PhysEvent_Poll' modules/physics/phys_events.c
 rg -q 'Phys_RayCastFiltered' modules/physics/phys_bullet.h
 rg -q 'Phys_GetBodyContacts' modules/physics/phys_bullet.h
@@ -207,8 +209,8 @@ rg -q 'func_destructible' engine/core/engine_phys_map.c
 rg -q 'PhysMotor_FindByRagdoll' modules/physics/phys_motor.c
 rg -q 'ProcAnim_FindByRagdoll' modules/physics/phys_procedural_anim.c
 rg -q 'BOX_UD_RAG_FLAG' modules/physics/phys_box3d_impl.c
-rg -q 'spawnBoundAlive' runtime/game/g_lua_bindings.c
-rg -q 'createDmm' runtime/game/g_lua_bindings.c
+rg -q 'spawnBoundAlive' runtime/game/g_lua_bindings.c "$LUA_PHYSICS"
+rg -q 'createDmm' runtime/game/g_lua_bindings.c "$LUA_PHYSICS"
 rg -q 'supportCenter' modules/physics/phys_procedural_anim.h
 rg -q 'Phys_GetClosestPoint' modules/physics/phys_bullet.h
 rg -q 'Phys_SphereTimeOfImpact' modules/physics/phys_box3d_impl.c
@@ -220,15 +222,27 @@ rg -q 'b3World_RebuildStaticTree' modules/physics/phys_box3d_impl.c
 rg -q 'b3Body_SetBullet' modules/physics/phys_box3d_impl.c
 rg -q 'Phys_SetHingeTargetAngle' modules/physics/phys_bullet.h
 rg -q 'phys_replay_open' modules/physics/phys_middleware.c
-rg -q 'getClosestPoint' runtime/game/g_lua_bindings.c
-rg -q 'sphereTOI' runtime/game/g_lua_bindings.c
+rg -q 'getClosestPoint' runtime/game/g_lua_bindings.c "$LUA_PHYSICS"
+rg -q 'sphereTOI' runtime/game/g_lua_bindings.c "$LUA_PHYSICS"
 rg -q 'meshes\[256\]' modules/physics/phys_box3d_impl.c
+rg -q 'Phys_SetWheelSuspension' modules/physics/phys_bullet.h
+rg -q 'Phys_SetMotorVelocities' modules/physics/phys_box3d_impl.c
+rg -q 'Phys_SetSphericalTarget' modules/physics/phys_box3d_impl.c
+rg -q 'Phys_ApplyWind' modules/physics/phys_box3d_impl.c
+rg -q 'Phys_Explode' modules/physics/phys_bullet.h
+rg -q 'Phys_RayCastAll' modules/physics/phys_box3d_impl.c
+rg -q 'b3World_SetFrictionCallback' modules/physics/phys_box3d_impl.c
+rg -q 'phys_explode' modules/physics/phys_middleware.c
+rg -q 'rayCastAll' runtime/game/g_lua_registration.inc
+rg -q 'l_char_getState' runtime/game/g_lua_bindings.c
+rg -q 'setTargetTransform' runtime/game/g_lua_registration.inc
 rg -q 'phys_bspGridStep' modules/physics/phys_bullet.c
 rg -q 'misc_phys_box' docs/PHYSICS.md
 rg -q 'Euphoria' docs/PHYSICS.md
 rg -q 'DMM-like' docs/PHYSICS.md
 rg -q 'RecPlayer' docs/PHYSICS.md
 rg -q 'Closest-point' docs/PHYSICS.md
+rg -q 'Multi-hit ray' docs/PHYSICS.md
 rg -q 'misc_phys_dmm' docs/EDITOR_BRIDGE.md
 rg -q 'func_destructible' docs/EDITOR_BRIDGE.md
 rg -q 'misc_phys_box' examples/radiant/scripts/entities_idtech3_bridge.def

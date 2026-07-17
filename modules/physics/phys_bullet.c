@@ -1207,6 +1207,98 @@ void Phys_SetDistanceLength(physConstraintHandle_t handle, float length) {
 #endif
 }
 
+void Phys_SetWheelSuspension(physConstraintHandle_t handle, float hertz, float dampingRatio,
+	float lower, float upper) {
+#ifdef PHYS_HAS_IMPL
+	if (physInitialized) Phys_SetWheelSuspension_Impl(handle, hertz, dampingRatio, lower, upper);
+#else
+	(void)handle; (void)hertz; (void)dampingRatio; (void)lower; (void)upper;
+#endif
+}
+
+void Phys_SetWheelSpin(physConstraintHandle_t handle, float speed, float maxTorque) {
+#ifdef PHYS_HAS_IMPL
+	if (physInitialized) Phys_SetWheelSpin_Impl(handle, speed, maxTorque);
+#else
+	(void)handle; (void)speed; (void)maxTorque;
+#endif
+}
+
+void Phys_SetMotorVelocities(physConstraintHandle_t handle, const vec3_t linearVelocity,
+	const vec3_t angularVelocity, float maxForce, float maxTorque) {
+#ifdef PHYS_HAS_IMPL
+	if (physInitialized) Phys_SetMotorVelocities_Impl(handle, linearVelocity, angularVelocity, maxForce, maxTorque);
+#else
+	(void)handle; (void)linearVelocity; (void)angularVelocity; (void)maxForce; (void)maxTorque;
+#endif
+}
+
+void Phys_SetSphericalTarget(physConstraintHandle_t handle, const vec3_t rotationDeg) {
+#ifdef PHYS_HAS_IMPL
+	if (physInitialized) Phys_SetSphericalTarget_Impl(handle, rotationDeg);
+#else
+	(void)handle; (void)rotationDeg;
+#endif
+}
+
+void Phys_SetBodyDamping(physBodyHandle_t body, float linearDamping, float angularDamping) {
+#ifdef PHYS_HAS_IMPL
+	if (physInitialized) Phys_SetBodyDamping_Impl(body, linearDamping, angularDamping);
+#else
+	(void)body; (void)linearDamping; (void)angularDamping;
+#endif
+}
+
+void Phys_SetBodyType(physBodyHandle_t body, physBodyType_t type) {
+#ifdef PHYS_HAS_IMPL
+	if (physInitialized) Phys_SetBodyType_Impl(body, type);
+#else
+	(void)body; (void)type;
+#endif
+}
+
+void Phys_ApplyWind(physBodyHandle_t body, const vec3_t wind, float drag, float lift, float maxSpeed) {
+#ifdef PHYS_HAS_IMPL
+	if (physInitialized) Phys_ApplyWind_Impl(body, wind, drag, lift, maxSpeed);
+#else
+	(void)body; (void)wind; (void)drag; (void)lift; (void)maxSpeed;
+#endif
+}
+
+int Phys_Explode(const vec3_t center, float radius, float impulsePerArea, float falloff, unsigned maskBits) {
+#ifdef PHYS_HAS_IMPL
+	if (physInitialized) return Phys_Explode_Impl(center, radius, impulsePerArea, falloff, maskBits);
+#endif
+	(void)center; (void)radius; (void)impulsePerArea; (void)falloff; (void)maskBits;
+	return 0;
+}
+
+int Phys_RayCastAll(const vec3_t from, const vec3_t to, physRayResult_t *results, int maxResults,
+	const physQueryFilter_t *filter) {
+#ifdef PHYS_HAS_IMPL
+	if (physInitialized) return Phys_RayCastAll_Impl(from, to, results, maxResults, filter);
+#endif
+	(void)from; (void)to; (void)filter;
+	if (results && maxResults > 0) Com_Memset(results, 0, (size_t)maxResults * sizeof(*results));
+	return 0;
+}
+
+void Phys_SetFrictionCallback(PhysFrictionMixFn fn) {
+#ifdef PHYS_HAS_IMPL
+	if (physInitialized) Phys_SetFrictionCallback_Impl(fn);
+#else
+	(void)fn;
+#endif
+}
+
+void Phys_SetRestitutionCallback(PhysRestitutionMixFn fn) {
+#ifdef PHYS_HAS_IMPL
+	if (physInitialized) Phys_SetRestitutionCallback_Impl(fn);
+#else
+	(void)fn;
+#endif
+}
+
 void Phys_DebugDraw(void) {
 #ifdef PHYS_HAS_IMPL
 	if (physInitialized && phys_debugDraw && phys_debugDraw->integer) {

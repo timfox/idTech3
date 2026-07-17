@@ -143,6 +143,21 @@ qboolean             Phys_ReplayIsOpen_Impl(void);
 void                 Phys_SetHingeTargetAngle_Impl(physConstraintHandle_t handle, float targetRadians);
 void                 Phys_SetSliderTarget_Impl(physConstraintHandle_t handle, float targetTranslation);
 void                 Phys_SetDistanceLength_Impl(physConstraintHandle_t handle, float length);
+void                 Phys_SetWheelSuspension_Impl(physConstraintHandle_t handle, float hertz, float dampingRatio,
+	float lower, float upper);
+void                 Phys_SetWheelSpin_Impl(physConstraintHandle_t handle, float speed, float maxTorque);
+void                 Phys_SetMotorVelocities_Impl(physConstraintHandle_t handle, const vec3_t linearVelocity,
+	const vec3_t angularVelocity, float maxForce, float maxTorque);
+void                 Phys_SetSphericalTarget_Impl(physConstraintHandle_t handle, const vec3_t rotationDeg);
+void                 Phys_SetBodyDamping_Impl(physBodyHandle_t body, float linearDamping, float angularDamping);
+void                 Phys_SetBodyType_Impl(physBodyHandle_t body, physBodyType_t type);
+void                 Phys_ApplyWind_Impl(physBodyHandle_t body, const vec3_t wind, float drag, float lift, float maxSpeed);
+int                  Phys_Explode_Impl(const vec3_t center, float radius, float impulsePerArea, float falloff,
+	unsigned maskBits);
+int                  Phys_RayCastAll_Impl(const vec3_t from, const vec3_t to, physRayResult_t *results, int maxResults,
+	const physQueryFilter_t *filter);
+void                 Phys_SetFrictionCallback_Impl(PhysFrictionMixFn fn);
+void                 Phys_SetRestitutionCallback_Impl(PhysRestitutionMixFn fn);
 
 #ifdef __cplusplus
 }

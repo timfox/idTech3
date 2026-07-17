@@ -413,6 +413,30 @@ qboolean Phys_ReplayIsOpen(void);
 void Phys_SetHingeTargetAngle(physConstraintHandle_t handle, float targetRadians);
 void Phys_SetSliderTarget(physConstraintHandle_t handle, float targetTranslation);
 void Phys_SetDistanceLength(physConstraintHandle_t handle, float length);
+void Phys_SetWheelSuspension(physConstraintHandle_t handle, float hertz, float dampingRatio,
+	float lower, float upper);
+void Phys_SetWheelSpin(physConstraintHandle_t handle, float speed, float maxTorque);
+void Phys_SetMotorVelocities(physConstraintHandle_t handle, const vec3_t linearVelocity,
+	const vec3_t angularVelocity, float maxForce, float maxTorque);
+void Phys_SetSphericalTarget(physConstraintHandle_t handle, const vec3_t rotationDeg);
+
+/* Body Soft Step extras */
+void Phys_SetBodyDamping(physBodyHandle_t body, float linearDamping, float angularDamping);
+void Phys_SetBodyType(physBodyHandle_t body, physBodyType_t type);
+void Phys_ApplyWind(physBodyHandle_t body, const vec3_t wind, float drag, float lift, float maxSpeed);
+
+/* Explode with Soft Step maskBits (0 = default / all) */
+int Phys_Explode(const vec3_t center, float radius, float impulsePerArea, float falloff, unsigned maskBits);
+
+/* Multi-hit ray (Soft Step CastRay); returns hit count, fills results[0..n) by fraction */
+int Phys_RayCastAll(const vec3_t from, const vec3_t to, physRayResult_t *results, int maxResults,
+	const physQueryFilter_t *filter);
+
+/* Soft Step material mix callbacks (worker-thread safe; no world mutation) */
+typedef float (*PhysFrictionMixFn)(float frictionA, unsigned matA, float frictionB, unsigned matB);
+typedef float (*PhysRestitutionMixFn)(float restitutionA, unsigned matA, float restitutionB, unsigned matB);
+void Phys_SetFrictionCallback(PhysFrictionMixFn fn);
+void Phys_SetRestitutionCallback(PhysRestitutionMixFn fn);
 
 /* debug */
 void Phys_DebugDraw(void);

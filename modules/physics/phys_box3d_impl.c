@@ -168,6 +168,8 @@ static struct {
 	void          *customFilterCtx;
 	PhysPreSolveFn preSolveFn;
 	void          *preSolveCtx;
+	PhysFrictionMixFn frictionMixFn;
+	PhysRestitutionMixFn restitutionMixFn;
 } bx;
 
 static void box_destroy_mesh( b3MeshData *mesh ) {
@@ -3475,6 +3477,239 @@ void Phys_SetDistanceLength_Impl( physConstraintHandle_t handle, float length ) 
 		return;
 	}
 	b3DistanceJoint_SetLength( bx.constraints[handle].jointId, length );
+}
+
+void Phys_SetWheelSuspension_Impl( physConstraintHandle_t handle, float hertz, float dampingRatio,
+	float lower, float upper ) {
+	b3JointId jid;
+	if ( !VALID_CON( handle ) || bx.constraints[handle].type != PHYS_CONSTRAINT_WHEEL ) {
+		return;
+	}
+	jid = bx.constraints[handle].jointId;
+	if ( hertz > 0.0f ) {
+		b3WheelJoint_SetSuspensionHertz( jid, hertz );
+	}
+	if ( dampingRatio > 0.0f ) {
+		b3WheelJoint_SetSuspensionDampingRatio( jid, dampingRatio );
+	}
+	b3WheelJoint_SetSuspensionLimits( jid, lower, upper );
+}
+
+void Phys_SetWheelSpin_Impl( physConstraintHandle_t handle, float speed, float maxTorque ) {
+	b3JointId jid;
+	if ( !VALID_CON( handle ) || bx.constraints[handle].type != PHYS_CONSTRAINT_WHEEL ) {
+		return;
+	}
+	jid = bx.constraints[handle].jointId;
+	b3WheelJoint_EnableSpinMotor( jid, true );
+	b3WheelJoint_SetSpinMotorSpeed( jid, speed );
+	if ( maxTorque > 0.0f ) {
+		b3WheelJoint_SetMaxSpinTorque( jid, maxTorque );
+	}
+}
+
+void Phys_SetMotorVelocities_Impl( physConstraintHandle_t handle, const vec3_t linearVelocity,
+	const vec3_t angularVelocity, float maxForce, float maxTorque ) {
+	b3JointId jid;
+	if ( !VALID_CON( handle ) || bx.constraints[handle].type != PHYS_CONSTRAINT_MOTOR ) {
+		return;
+	}
+	jid = bx.constraints[handle].jointId;
+	if ( linearVelocity ) {
+		b3MotorJoint_SetLinearVelocity( jid, from_vec3( linearVelocity ) );
+	}
+	if ( angularVelocity ) {
+		b3MotorJoint_SetAngularVelocity( jid, from_vec3( angularVelocity ) );
+	}
+	if ( maxForce > 0.0f ) {
+		b3MotorJoint_SetMaxVelocityForce( jid, maxForce );
+	}
+	if ( maxTorque > 0.0f ) {
+		b3MotorJoint_SetMaxVelocityTorque( jid, maxTorque );
+	}
+}
+
+void Phys_SetSphericalTarget_Impl( physConstraintHandle_t handle, const vec3_t rotationDeg ) {
+	b3JointId jid;
+	b3Quat q;
+	vec3_t zero = { 0, 0, 0 };
+	if ( !VALID_CON( handle ) || bx.constraints[handle].type != PHYS_CONSTRAINT_CONE_TWIST ) {
+		return;
+	}
+	jid = bx.constraints[handle].jointId;
+	q = quat_from_euler_deg( rotationDeg ? rotationDeg : zero );
+	b3SphericalJoint_EnableMotor( jid, true );
+	b3SphericalJoint_SetTargetRotation( jid, q );
+}
+
+void Phys_SetBodyDamping_Impl( physBodyHandle_t body, float linearDamping, float angularDamping ) {
+	if ( !VALID_BODY( body ) ) {
+		return;
+	}
+	if ( linearDamping >= 0.0f ) {
+		b3Body_SetLinearDamping( bx.bodies[body].bodyId, linearDamping );
+	}
+	if ( angularDamping >= 0.0f ) {
+		b3Body_SetAngularDamping( bx.bodies[body].bodyId, angularDamping );
+	}
+}
+
+void Phys_SetBodyType_Impl( physBodyHandle_t body, physBodyType_t type ) {
+	b3BodyType bt;
+	if ( !VALID_BODY( body ) ) {
+		return;
+	}
+	switch ( type ) {
+	case PHYS_BODY_DYNAMIC:   bt = b3_dynamicBody; break;
+	case PHYS_BODY_KINEMATIC: bt = b3_kinematicBody; break;
+	case PHYS_BODY_STATIC:
+	default:                  bt = b3_staticBody; break;
+	}
+	b3Body_SetType( bx.bodies[body].bodyId, bt );
+	bx.bodies[body].bodyType = type;
+}
+
+void Phys_ApplyWind_Impl( physBodyHandle_t body, const vec3_t wind, float drag, float lift, float maxSpeed ) {
+	b3ShapeId shapes[8];
+	int n, i;
+	if ( !VALID_BODY( body ) || !wind ) {
+		return;
+	}
+	n = b3Body_GetShapes( bx.bodies[body].bodyId, shapes, 8 );
+	for ( i = 0; i < n; i++ ) {
+		b3Shape_ApplyWind( shapes[i], from_vec3( wind ), drag, lift, maxSpeed, true );
+	}
+}
+
+int Phys_Explode_Impl( const vec3_t center, float radius, float impulsePerArea, float falloff,
+	unsigned maskBits ) {
+	b3ExplosionDef def;
+	if ( !bx.initialized || !center || radius <= 0.0f || impulsePerArea == 0.0f ) {
+		return 0;
+	}
+	def = b3DefaultExplosionDef();
+	def.position = from_vec3( center );
+	def.radius = radius;
+	def.impulsePerArea = impulsePerArea;
+	if ( falloff <= 0.0f ) {
+		def.falloff = 0.0f;
+	} else {
+		def.falloff = radius / falloff;
+		if ( def.falloff < 1.0f ) {
+			def.falloff = 1.0f;
+		}
+	}
+	if ( maskBits ) {
+		def.maskBits = (uint64_t)maskBits;
+	}
+	b3World_Explode( bx.worldId, &def );
+	return 1;
+}
+
+typedef struct {
+	physRayResult_t *results;
+	int              maxResults;
+	int              count;
+} boxRayAllCtx;
+
+static float box_ray_all_cb( b3ShapeId shapeId, b3Pos point, b3Vec3 normal, float fraction,
+	uint64_t userMaterialId, int triangleIndex, int childIndex, void *context ) {
+	boxRayAllCtx *ctx = (boxRayAllCtx *)context;
+	physRayResult_t *r;
+	int body = -1, rag = -1, bone = -1;
+	int i, insert;
+
+	if ( !ctx || !ctx->results || ctx->maxResults <= 0 ) {
+		return fraction;
+	}
+	box_decode_userdata( b3Body_GetUserData( b3Shape_GetBody( shapeId ) ), &body, &rag, &bone );
+
+	/* Insert sorted by fraction (stable ascending). */
+	insert = ctx->count;
+	if ( ctx->count < ctx->maxResults ) {
+		ctx->count++;
+	} else if ( fraction >= ctx->results[ctx->count - 1].fraction ) {
+		return fraction; /* farther than worst kept hit */
+	} else {
+		insert = ctx->count - 1;
+	}
+	for ( i = 0; i < insert; i++ ) {
+		if ( fraction < ctx->results[i].fraction ) {
+			insert = i;
+			break;
+		}
+	}
+	if ( insert < ctx->count - 1 ) {
+		memmove( &ctx->results[insert + 1], &ctx->results[insert],
+			(size_t)( ctx->count - 1 - insert ) * sizeof( physRayResult_t ) );
+	}
+	r = &ctx->results[insert];
+	memset( r, 0, sizeof( *r ) );
+	r->hit = qtrue;
+	r->fraction = fraction;
+	r->body = body;
+	r->userMaterialId = (unsigned)userMaterialId;
+	r->triangleIndex = triangleIndex;
+	r->childIndex = childIndex;
+	to_vec3( point, r->hitPoint );
+	to_vec3( normal, r->hitNormal );
+	return 1.0f; /* continue collecting all hits */
+}
+
+int Phys_RayCastAll_Impl( const vec3_t from, const vec3_t to, physRayResult_t *results, int maxResults,
+	const physQueryFilter_t *filter ) {
+	b3Vec3 origin, translation;
+	b3QueryFilter qf;
+	boxRayAllCtx ctx;
+
+	if ( !results || maxResults <= 0 ) {
+		return 0;
+	}
+	memset( results, 0, (size_t)maxResults * sizeof( physRayResult_t ) );
+	if ( !bx.initialized || !from || !to ) {
+		return 0;
+	}
+	origin = from_vec3( from );
+	translation = b3Sub( from_vec3( to ), origin );
+	qf = box_make_query_filter( filter );
+	ctx.results = results;
+	ctx.maxResults = maxResults;
+	ctx.count = 0;
+	b3World_CastRay( bx.worldId, origin, translation, qf, box_ray_all_cb, &ctx );
+	return ctx.count;
+}
+
+static float box_friction_mix_cb( float frictionA, uint64_t userMaterialIdA, float frictionB, uint64_t userMaterialIdB ) {
+	if ( bx.frictionMixFn ) {
+		return bx.frictionMixFn( frictionA, (unsigned)userMaterialIdA, frictionB, (unsigned)userMaterialIdB );
+	}
+	return sqrtf( frictionA * frictionB );
+}
+
+static float box_restitution_mix_cb( float restitutionA, uint64_t userMaterialIdA, float restitutionB,
+	uint64_t userMaterialIdB ) {
+	if ( bx.restitutionMixFn ) {
+		return bx.restitutionMixFn( restitutionA, (unsigned)userMaterialIdA, restitutionB, (unsigned)userMaterialIdB );
+	}
+	return restitutionA > restitutionB ? restitutionA : restitutionB;
+}
+
+void Phys_SetFrictionCallback_Impl( PhysFrictionMixFn fn ) {
+	if ( !bx.initialized ) {
+		return;
+	}
+	bx.frictionMixFn = fn;
+	b3World_SetFrictionCallback( bx.worldId, fn ? box_friction_mix_cb : NULL );
+	Com_Printf( "[physics] Soft Step friction mix callback %s\n", fn ? "set" : "cleared" );
+}
+
+void Phys_SetRestitutionCallback_Impl( PhysRestitutionMixFn fn ) {
+	if ( !bx.initialized ) {
+		return;
+	}
+	bx.restitutionMixFn = fn;
+	b3World_SetRestitutionCallback( bx.worldId, fn ? box_restitution_mix_cb : NULL );
+	Com_Printf( "[physics] Soft Step restitution mix callback %s\n", fn ? "set" : "cleared" );
 }
 
 #endif /* USE_BOX3D_PHYSICS_IMPL */

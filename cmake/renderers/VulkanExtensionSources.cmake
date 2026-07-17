@@ -42,6 +42,7 @@ set(VK_ARC_BLANC_VK_SRCS
 
 set(VK_RTX_CORE_SRCS
 	${_VK_EXT}/rtx/vk_rtx.c
+	${_VK_EXT}/rtx/vk_rtx_material.c
 	${_VK_EXT}/rtx/vk_rtx_world.c
 	${_VK_EXT}/rtx/vk_rtx_entities.c
 )

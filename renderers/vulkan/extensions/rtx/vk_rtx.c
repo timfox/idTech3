@@ -99,6 +99,7 @@ static struct {
 	uint32_t		entity_mesh_iqm;
 	uint32_t		entity_mesh_gltf;
 	uint32_t		entity_mesh_mdr;
+	uint32_t		entity_mesh_cpu_skinned;
 	uint32_t		entity_proxy_count;
 	uint32_t		entity_proxy_non_mesh;
 	uint32_t		entity_proxy_skinned;
@@ -172,14 +173,17 @@ static void RTX_Status_f( void )
 		( r_rtxDemo && r_rtxDemo->integer ) ? 1 : 0,
 		( r_hybrid1 && r_hybrid1->integer ) ? 1 : 0,
 		( r_raygun && r_raygun->integer ) ? 1 : 0 );
-	ri.Printf( PRINT_ALL, "[VK][RTX] world=%s blas_tris=%u world_verts=%u albedo_prims=%u normal_prims=%u entity_ents=%u entity_tris=%u entity_verts=%u entity_albedo_prims=%u entity_normal_prims=%u mesh=%u (md3=%u iqm=%u gltf=%u mdr=%u) proxy=%u (nonmesh=%u skinned=%u md3fail=%u iqmfail=%u gltffail=%u mdrfail=%u) entity_blas=%s/%s tlas_instances=%u tlas_mode=%s reason=%s\n",
+	ri.Printf( PRINT_ALL, "[VK][RTX] world=%s blas_tris=%u world_verts=%u albedo_prims=%u normal_prims=%u entity_ents=%u entity_tris=%u entity_verts=%u entity_albedo_prims=%u entity_normal_prims=%u mesh=%u (md3=%u iqm=%u gltf=%u mdr=%u cpuskin=%u) proxy=%u (nonmesh=%u skinfail=%u md3fail=%u iqmfail=%u gltffail=%u mdrfail=%u) proxy_rate=%u%% entity_blas=%s/%s tlas_instances=%u tlas_mode=%s reason=%s\n",
 		wn, rtx.world_primitive_count, rtx.world_vertex_count, rtx.world_albedo_count, rtx.world_normal_count,
 		rtx.entity_packed_count, rtx.entity_primitive_count,
 		rtx.entity_vertex_count, rtx.entity_albedo_count, rtx.entity_normal_count, rtx.entity_mesh_count,
 		rtx.entity_mesh_md3, rtx.entity_mesh_iqm, rtx.entity_mesh_gltf, rtx.entity_mesh_mdr,
+		rtx.entity_mesh_cpu_skinned,
 		rtx.entity_proxy_count,
 		rtx.entity_proxy_non_mesh, rtx.entity_proxy_skinned,
 		rtx.entity_proxy_md3_fail, rtx.entity_proxy_iqm_fail, rtx.entity_proxy_gltf_fail, rtx.entity_proxy_mdr_fail,
+		( rtx.entity_packed_count > 0u )
+			? (unsigned)( ( rtx.entity_proxy_count * 100u ) / rtx.entity_packed_count ) : 0u,
 		rtx.entity_blas_mode[0] ? rtx.entity_blas_mode : "n/a",
 		rtx.entity_blas_reason[0] ? rtx.entity_blas_reason : "n/a",
 		rtx.tlas_instance_count,
@@ -189,10 +193,11 @@ static void RTX_Status_f( void )
 		( r_rtxEntityMaterials && r_rtxEntityMaterials->integer ) ? 1 : 0,
 		( r_rtxEntityUvSample && r_rtxEntityUvSample->integer
 			&& r_rtxEntityMaterials && r_rtxEntityMaterials->integer ) ? 1 : 0 );
-	ri.Printf( PRINT_ALL, "[VK][RTX] world_albedo=materials:%d uv_thumb:%d (r_rtxWorldMaterials / r_rtxWorldUvSample)\n",
+	ri.Printf( PRINT_ALL, "[VK][RTX] world_albedo=materials:%d uv_thumb:%d mode:%d (r_rtxWorldMaterials / UvSample / AlbedoMode 0=replace 1=modulate)\n",
 		( r_rtxWorldMaterials && r_rtxWorldMaterials->integer ) ? 1 : 0,
 		( r_rtxWorldUvSample && r_rtxWorldUvSample->integer
-			&& r_rtxWorldMaterials && r_rtxWorldMaterials->integer ) ? 1 : 0 );
+			&& r_rtxWorldMaterials && r_rtxWorldMaterials->integer ) ? 1 : 0,
+		( r_rtxWorldAlbedoMode ) ? r_rtxWorldAlbedoMode->integer : 0 );
 	ri.Printf( PRINT_ALL, "[VK][RTX] note: Hybrid1 is the production RT lighting path; r_rtx demo overlay is diagnostic unless modes gain real rays\n" );
 	ri.Printf( PRINT_ALL, "[VK][RTX] trace_extent=%ux%u r_rtx=%d composite=%.2f samples=%d\n",
 		rtx.width, rtx.height,
@@ -471,6 +476,7 @@ static void vk_rtx_rebuild_world_blas( void )
 	rtx.entity_mesh_iqm = 0u;
 	rtx.entity_mesh_gltf = 0u;
 	rtx.entity_mesh_mdr = 0u;
+	rtx.entity_mesh_cpu_skinned = 0u;
 	rtx.entity_proxy_count = 0u;
 	rtx.entity_proxy_non_mesh = 0u;
 	rtx.entity_proxy_skinned = 0u;
@@ -793,6 +799,7 @@ static void vk_rtx_destroy_entity_blas( void )
 	rtx.entity_mesh_iqm = 0u;
 	rtx.entity_mesh_gltf = 0u;
 	rtx.entity_mesh_mdr = 0u;
+	rtx.entity_mesh_cpu_skinned = 0u;
 	rtx.entity_proxy_count = 0u;
 	rtx.entity_proxy_non_mesh = 0u;
 	rtx.entity_proxy_skinned = 0u;
@@ -975,6 +982,7 @@ static void vk_rtx_rebuild_entity_tlas( void )
 			rtx.entity_mesh_iqm = packStats.meshIqmCount;
 			rtx.entity_mesh_gltf = packStats.meshGltfCount;
 			rtx.entity_mesh_mdr = packStats.meshMdrCount;
+			rtx.entity_mesh_cpu_skinned = packStats.meshCpuSkinnedCount;
 			rtx.entity_proxy_count = packStats.proxyEntityCount;
 			rtx.entity_proxy_non_mesh = packStats.proxyNonMeshCount;
 			rtx.entity_proxy_skinned = packStats.proxySkinnedCount;

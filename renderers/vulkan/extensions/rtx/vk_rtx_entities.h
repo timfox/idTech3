@@ -16,11 +16,12 @@ typedef struct {
 	uint32_t meshMdrCount;
 	uint32_t proxyEntityCount;
 	uint32_t proxyNonMeshCount;    /* brush/unknown → AABB */
-	uint32_t proxySkinnedCount;    /* reserved (kept for status ABI) */
+	uint32_t proxySkinnedCount;    /* IQM+MDR+glTF pack fail → AABB (rollup) */
 	uint32_t proxyMd3FailCount;    /* MOD_MESH but pack_md3 failed → AABB */
 	uint32_t proxyIqmFailCount;
 	uint32_t proxyGltfFailCount;
 	uint32_t proxyMdrFailCount;
+	uint32_t meshCpuSkinnedCount;  /* successful IQM/MDR/glTF packs that used CPU skin */
 } vkRtxEntityPackStats_t;
 
 /*
@@ -52,6 +53,7 @@ typedef struct {
 	uint32_t proxyIqmFailCount;
 	uint32_t proxyGltfFailCount;
 	uint32_t proxyMdrFailCount;
+	uint32_t meshCpuSkinnedCount;
 } vkRtxEntityPackStats_t;
 
 uint32_t vk_rtx_entities_pack( const trRefdef_t *refdef, const viewParms_t *viewParms,
