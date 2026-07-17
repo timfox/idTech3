@@ -44,7 +44,7 @@ This document outlines the architecture and implementation plan for three render
 
 2. **Acceleration structures**
    - **BLAS**: World BSP faces + trisoups + **SF_GRID** (LOD via `r_lodCurveError`); **entity BLAS** from MD3 LOD0 frame-lerped mesh, **CPU-skinned IQM** (`R_IQMSkinPositions`), **CPU-skinned MDR** (`R_MDRSkinSurfacePositions`), and **static or CPU-skinned glTF** (`R_GLTFSkinPositions`) via `r_rtxEntities` / `r_rtxEntityTriCap`; AABB proxy for pack failures; **`r_rtxEntityBlasUpdate`** UPDATEs entity BLAS when prim count stable; `rtx_status` reports mesh kind + proxy reason counts, entity BLAS UPDATE vs REBUILD, and TLAS UPDATE vs REBUILD reason
-   - **Per-primitive albedo + geometric normal SSBO**: RGB/normals from BSP faces (plane), triangle soups, and SF_GRID; world RGB prefers diffuse UV thumbs / avgColor (`r_rtxWorldMaterials` / `r_rtxWorldUvSample`) else vertex colors; bound for Hybrid1 / pathtrace / Surfel GI hits
+   - **Per-primitive albedo + geometric normal SSBO**: RGB/normals from BSP faces (plane), triangle soups, and SF_GRID; world RGB prefers diffuse UV thumbs / avgColor (`r_rtxWorldMaterials` / `r_rtxWorldUvSample`) else vertex colors; bound for Hybrid1 / pathtrace / Surfel GI hits. **D2 (design):** true hit-shader UV/bindless — see **`docs/RTX_HIT_SHADER_UV.md`**.
    - **Production lighting**: prefer **Hybrid1** (`r_hybrid1`, optional `r_hybrid1Quality` 1–3) over the plain `r_rtx` tint demo
    - **Quality presets**: constitution performance/balanced/quality for Hybrid1 via live `r_hybrid1Quality` (RT stays off by default)
    - **TLAS**: World + optional entity instance, UPDATE when count stable (`r_rtxTlasUpdate`)

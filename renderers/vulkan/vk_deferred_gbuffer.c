@@ -800,6 +800,8 @@ static void vk_dgb_create_composite_gfx_pipeline( void )
 	VkPipelineColorBlendAttachmentState blend_att;
 	VkPipelineColorBlendStateCreateInfo blend;
 	VkPipelineDepthStencilStateCreateInfo depth_stencil;
+	VkPipelineDynamicStateCreateInfo dynamic_state;
+	VkDynamicState dynamic_states[2];
 	VkGraphicsPipelineCreateInfo pipe_ci;
 	VkDescriptorPoolSize pool_size;
 	VkDescriptorPoolCreateInfo pool_ci;
@@ -889,6 +891,15 @@ static void vk_dgb_create_composite_gfx_pipeline( void )
 	depth_stencil.depthTestEnable = VK_FALSE;
 	depth_stencil.depthWriteEnable = VK_FALSE;
 
+	/* Viewport/scissor are set dynamically at draw time (vk_set_fullscreen_viewport_scissor);
+	 * declare them dynamic so pViewports/pScissors may stay NULL without a driver NULL-deref. */
+	dynamic_states[0] = VK_DYNAMIC_STATE_VIEWPORT;
+	dynamic_states[1] = VK_DYNAMIC_STATE_SCISSOR;
+	Com_Memset( &dynamic_state, 0, sizeof( dynamic_state ) );
+	dynamic_state.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;
+	dynamic_state.dynamicStateCount = 2;
+	dynamic_state.pDynamicStates = dynamic_states;
+
 	Com_Memset( &pipe_ci, 0, sizeof( pipe_ci ) );
 	pipe_ci.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
 	pipe_ci.stageCount = 2;
@@ -900,6 +911,7 @@ static void vk_dgb_create_composite_gfx_pipeline( void )
 	pipe_ci.pMultisampleState = &multisample;
 	pipe_ci.pDepthStencilState = &depth_stencil;
 	pipe_ci.pColorBlendState = &blend;
+	pipe_ci.pDynamicState = &dynamic_state;
 	pipe_ci.layout = vk.deferred_gbuffer.composite_gfx_pipeline_layout;
 	pipe_ci.renderPass = vk.render_pass.post_bloom;
 	pipe_ci.subpass = 0;
@@ -1044,6 +1056,8 @@ static void vk_dgb_create_debug_gfx_pipeline( void )
 	VkPipelineColorBlendAttachmentState blend_att;
 	VkPipelineColorBlendStateCreateInfo blend;
 	VkPipelineDepthStencilStateCreateInfo depth_stencil;
+	VkPipelineDynamicStateCreateInfo dynamic_state;
+	VkDynamicState dynamic_states[2];
 	VkGraphicsPipelineCreateInfo pipe_ci;
 	VkDescriptorPoolSize pool_size;
 	VkDescriptorPoolCreateInfo pool_ci;
@@ -1129,6 +1143,15 @@ static void vk_dgb_create_debug_gfx_pipeline( void )
 	depth_stencil.depthTestEnable = VK_FALSE;
 	depth_stencil.depthWriteEnable = VK_FALSE;
 
+	/* Viewport/scissor are set dynamically at draw time; declare them dynamic so the
+	 * NULL pViewports/pScissors here do not trip a driver NULL-deref at pipeline create. */
+	dynamic_states[0] = VK_DYNAMIC_STATE_VIEWPORT;
+	dynamic_states[1] = VK_DYNAMIC_STATE_SCISSOR;
+	Com_Memset( &dynamic_state, 0, sizeof( dynamic_state ) );
+	dynamic_state.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;
+	dynamic_state.dynamicStateCount = 2;
+	dynamic_state.pDynamicStates = dynamic_states;
+
 	Com_Memset( &pipe_ci, 0, sizeof( pipe_ci ) );
 	pipe_ci.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
 	pipe_ci.stageCount = 2;
@@ -1140,6 +1163,7 @@ static void vk_dgb_create_debug_gfx_pipeline( void )
 	pipe_ci.pMultisampleState = &multisample;
 	pipe_ci.pDepthStencilState = &depth_stencil;
 	pipe_ci.pColorBlendState = &blend;
+	pipe_ci.pDynamicState = &dynamic_state;
 	pipe_ci.layout = vk.deferred_gbuffer.debug_gfx_pipeline_layout;
 	pipe_ci.renderPass = vk.render_pass.post_bloom;
 	pipe_ci.subpass = 0;

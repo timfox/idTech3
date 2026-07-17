@@ -59,9 +59,9 @@ r_rtxEntityTriCap 65536
 | Value | Name | Effect (while `r_hybrid1` 1) |
 |------:|------|------------------------------|
 | 0 | custom | Leave individual `r_hybrid1_*` knobs alone |
-| 1 | performance | No diffuse RT; 2 A-trous iters; hard sun; no dlight shadows |
-| 2 | balanced | No diffuse; 3 A-trous; soft sun 0.25°; 1 dlight shadow |
-| 3 | quality | Diffuse on; 4 A-trous; soft sun 0.5°; EnvBRDF IBL; 2 dlight shadows |
+| 1 | performance | No diffuse RT; 2 A-trous iters; hard sun; no dlight shadows; **`r_hybrid1_glint` 0**, `r_glintSampleBudget` 0 |
+| 2 | balanced | No diffuse; 3 A-trous; soft sun 0.25°; 1 dlight shadow; **glint on**, budget 1 tap |
+| 3 | quality | Diffuse on; 4 A-trous; soft sun 0.5°; EnvBRDF IBL; 2 dlight shadows; **glint on**, budget 4 taps |
 
 Live (no latch). Entity BLAS stays a separate latched companion (`r_rtxEntities` + `vid_restart`).
 
@@ -127,6 +127,8 @@ When `r_hybrid1 1`, the legacy `r_rtx` demo composite pass is **skipped** (Hybri
 - **Diffuse invisible** — `r_hybrid1_diffuse 1`, `r_deferredGBufferFill 1` (albedo for composite), try `r_hybrid1_debug 4`.
 - **Ghosting after tuning denoise** — history resets automatically when denoise cvars change; run `hybrid1_reset` after large camera cuts.
 - **Requires deferred raster first** — Hybrid1 composites onto the HDR color buffer after deferred lighting; enable `r_deferredLighting 1` with G-buffer fill.
+- **Deferred map-load SIGSEGV (fixed Jul 2026)** — the deferred post-bloom composite/debug pipelines declared `viewportCount`/`scissorCount` = 1 with NULL viewport/scissor arrays and no dynamic state, NULL-dereferencing in the NVIDIA driver at pipeline create. Both now declare dynamic viewport/scissor (`vk_deferred_gbuffer.c`); deferred map load completes cleanly.
+- **RTX-demo device-lost (open)** — `r_rtx 1` + `r_rtxDemo 1` still hits `VK_ERROR_DEVICE_LOST` on map load (independent of Hybrid1/deferred). Because Hybrid1 needs the RTX demo path, visual Hybrid1 QA is blocked on this separate RTX bug; see **`docs/RTX_HIT_SHADER_UV.md`** playtest note.
 
 Demo cfg: `exec demo_hybrid1.cfg` (enables diffuse, IBL, motion, TAA).
 

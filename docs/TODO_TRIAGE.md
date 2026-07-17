@@ -118,7 +118,7 @@ TODOs/FIXMEs in `third_party/` and vendored `**/external/**` (duktape, zstd, cjs
 3. ~~Fix `docs/MOD_SDK.md` FSR2 wording~~ — **done 2026-07-11**.
 4. ~~Client root shelving~~ — **done 2026-07-11** (`runtime/client/shell/`).
 5. **Bridge-drop audit**: confirm no `"qcommon/..."` / MSVC bridge dependence, then remove `modules/qcommon` / platform qcommon bridges.
-6. **RTX long-term**: True hit-shader UV/bindless texturing (shared `vk_rtx_material` pack helpers + pack-time world+entity UV thumbs + MD3/IQM/glTF/MDR mesh AS + entity attrs + Hybrid1↔Surfel fusion + materials + entity BLAS UPDATE + Surfel density budgeting landed).
+6. **RTX long-term**: True hit-shader UV/bindless texturing — design: **`docs/RTX_HIT_SHADER_UV.md`** (pack-time thumbs + SSBO fallback remain until Phase A lands).
 
 ---
 

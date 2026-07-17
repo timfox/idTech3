@@ -186,6 +186,8 @@ static void HYBRID1_ApplyQualityPreset( void )
 		ri.Cvar_Set( "r_hybrid1_sunRadius", "0" );
 		ri.Cvar_Set( "r_hybrid1_iblMode", "1" );
 		ri.Cvar_Set( "r_hybrid1_temporalAlpha", "0.15" );
+		ri.Cvar_Set( "r_hybrid1_glint", "0" );
+		ri.Cvar_Set( "r_glintSampleBudget", "0" );
 	} else if ( q == 2 ) {
 		name = "balanced";
 		ri.Cvar_Set( "r_hybrid1_diffuse", "0" );
@@ -194,6 +196,8 @@ static void HYBRID1_ApplyQualityPreset( void )
 		ri.Cvar_Set( "r_hybrid1_sunRadius", "0.25" );
 		ri.Cvar_Set( "r_hybrid1_iblMode", "1" );
 		ri.Cvar_Set( "r_hybrid1_temporalAlpha", "0.1" );
+		ri.Cvar_Set( "r_hybrid1_glint", "1" );
+		ri.Cvar_Set( "r_glintSampleBudget", "1" );
 	} else {
 		name = "quality";
 		ri.Cvar_Set( "r_hybrid1_diffuse", "1" );
@@ -202,6 +206,8 @@ static void HYBRID1_ApplyQualityPreset( void )
 		ri.Cvar_Set( "r_hybrid1_sunRadius", "0.5" );
 		ri.Cvar_Set( "r_hybrid1_iblMode", "2" );
 		ri.Cvar_Set( "r_hybrid1_temporalAlpha", "0.1" );
+		ri.Cvar_Set( "r_hybrid1_glint", "1" );
+		ri.Cvar_Set( "r_glintSampleBudget", "2" );
 	}
 
 	s_hybrid1AppliedQuality = q;
