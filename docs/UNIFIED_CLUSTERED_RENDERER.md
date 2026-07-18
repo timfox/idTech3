@@ -28,6 +28,15 @@ Or demo: `exec demo_unified_clustered.cfg`.
 
 Console: `renderer_status` prints a `unified` row when mode 3 is active.
 
+For a safer debugging baseline that disables TAA/SMAA/FXAA/OIT and keeps MSAA off:
+
+```cfg
+renderer_clustered_safe
+vid_restart
+```
+
+Or use the safe overlay directly: `exec vulkan_overlay_unified_clustered_safe.cfg`.
+
 ## Frame order
 
 1. Forward+ light pack + tile cull (optional depth cull after opaque prepass)

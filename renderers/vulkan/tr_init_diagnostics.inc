@@ -296,6 +296,35 @@ static void R_RendererDeferredSafe_f( void )
 		"[VK] Deferred safe preset applied: mode 1 deferred + temporal/post AA off + MSAA off. Run vid_restart.\n" );
 }
 
+static void R_RendererClusteredSafe_f( void )
+{
+	ri.Cvar_Set( "r_renderMode", "3" );
+	ri.Cvar_Set( "r_forwardPlus", "1" );
+	ri.Cvar_Set( "r_forwardPlusShade", "1" );
+	ri.Cvar_Set( "r_forwardPlusDepthCull", "1" );
+	ri.Cvar_Set( "r_ext_multisample", "0" );
+	ri.Cvar_Set( "r_deferredGBuffer", "1" );
+	ri.Cvar_Set( "r_deferredGBufferFill", "1" );
+	ri.Cvar_Set( "r_deferredLighting", "1" );
+	ri.Cvar_Set( "r_deferredUnlitBase", "1" );
+	ri.Cvar_Set( "r_deferredLightingStrength", "1" );
+	ri.Cvar_Set( "r_deferredSpecular", "1" );
+	ri.Cvar_Set( "r_deferredSpecularStrength", "1" );
+	ri.Cvar_Set( "r_deferredAOCoupling", "0.65" );
+	ri.Cvar_Set( "r_deferredDefaultMetalness", "0" );
+	ri.Cvar_Set( "r_deferredDefaultRoughness", "0.55" );
+	ri.Cvar_Set( "r_deferredNormalEdgeThreshold", "0.08" );
+	ri.Cvar_Set( "r_deferredGBufferDebug", "0" );
+	ri.Cvar_Set( "r_oit", "0" );
+	ri.Cvar_Set( "r_taa", "0" );
+	ri.Cvar_Set( "r_taaMotionVectors", "0" );
+	ri.Cvar_Set( "r_ext_smaa", "0" );
+	ri.Cvar_Set( "r_ext_fxaa", "0" );
+	ri.Cvar_Set( "r_postAaAfterBloom", "0" );
+	ri.Printf( PRINT_ALL,
+		"[VK] Unified Clustered safe preset applied: mode 3 + temporal/post AA/OIT off + MSAA off. Run vid_restart.\n" );
+}
+
 static void R_RendererSubsystems_f( void )
 {
 	const int warnings = R_RendererPrintCompatibilityWarnings( qfalse );
