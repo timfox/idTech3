@@ -41,6 +41,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "vk_wsp.h"
 #include "vk_vt.h"
 #include "vk_fp64_points.h"
+#include "vk_scene_pass.h"
 #endif
 
 backEndData_t	*backEndData;

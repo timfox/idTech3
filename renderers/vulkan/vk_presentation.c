@@ -17,6 +17,9 @@ Extracted from vk.c for incremental modularization.
 #include "vk_render_pass.h"
 #include "vk_resource_destroy.h"
 #include "vk_post_fog.h"
+#include "vk_forward_plus.h"
+#include "vk_deferred_gbuffer.h"
+#include "vk_visibility_buffer.h"
 #include "vk_swapchain.h"
 #include "vk_sync.h"
 #include "vk_temporal.h"
@@ -102,6 +105,10 @@ void vk_restore_presentation_targets( void )
 	vk.renderScaleY = 1.0f;
 
 	vk_update_post_process_pipelines();
+	vk_validate_pbr_ibl_resources();
+	vk_forward_plus_ensure_runtime();
+	vk_deferred_gbuffer_ensure_runtime();
+	vk_visibility_buffer_ensure_runtime();
 
 #ifdef USE_IMGUI
 	VkImgui_SwapchainRestarted();
