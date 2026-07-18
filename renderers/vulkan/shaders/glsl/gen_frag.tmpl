@@ -1587,12 +1587,10 @@ void main() {
 #endif
 
 	vec3 primaryDirect = lightColor * reflectance * ( attenuation * NL ) * pomSelfShadow;
-	/* Additive deferred handoff should suppress primary direct only when a baked/static
-	 * lightmap base is already present. Unlit or vertex-lit surfaces still need their
-	 * primary direct path in the base pass or they collapse toward black. */
-	if ( deferredAdditiveHandoff && lightmap_texture_set >= 0 ) {
-		primaryDirect = vec3( 0.0 );
-	}
+	/* Additive deferred handoff (mode 1 unlit-base / mode 3 opaque): keep baked
+	 * lightmap / vertex primary as the static-lit scene base. Forward+ tile lights
+	 * are skipped above so deferred compute owns dynamics; zeroing primary here
+	 * collapses indoor lightmapped maps to near-black after albedo copy + composite. */
 	float fpRenorm = 1.0;
 	if ( !deferredAdditiveHandoff && ( forward_plus_shade_strength > 1e-6 || pbrForwardPlus.x > 1e-6 ) ) {
 		float pL = length( primaryDirect );

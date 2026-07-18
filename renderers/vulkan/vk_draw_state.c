@@ -516,12 +516,14 @@ void vk_bind_descriptor_sets( void )
 		}
 	} else if ( backEnd.oitAccumPass && r_oit && r_oit->integer == 2 &&
 		vk.pipeline_layout_oit_accum_mboit != VK_NULL_HANDLE ) {
+		/* MBOIT accum: set 0 = tex0; 1 = depth; 2 = moments; 3 = b0; 4 = Forward+ (when lit). */
 		if ( vk.cmd->descriptor_set.current[VK_DESC_TEXTURE0] != VK_NULL_HANDLE ) {
-			VkDescriptorSet sets[4] = {
+			VkDescriptorSet sets[5] = {
 				vk.cmd->descriptor_set.current[VK_DESC_TEXTURE0],
 				vk.oit_depth_descriptor,
 				vk.oit_moments_descriptor,
-				vk.oit_b0_descriptor
+				vk.oit_b0_descriptor,
+				VK_NULL_HANDLE
 			};
 			uint32_t set_count = 1u;
 			if ( vk.oit_depth_descriptor != VK_NULL_HANDLE ) {
@@ -530,6 +532,15 @@ void vk_bind_descriptor_sets( void )
 			if ( vk.oit_moments_descriptor != VK_NULL_HANDLE && vk.oit_b0_descriptor != VK_NULL_HANDLE ) {
 				set_count = 4u;
 			}
+#ifdef USE_VK_PBR
+			if ( set_count >= 4u && vk.set_layout_forward_plus != VK_NULL_HANDLE ) {
+				VkDescriptorSet fp_set = vk_forward_plus_get_graphics_descriptor_set();
+				if ( fp_set != VK_NULL_HANDLE ) {
+					sets[4] = fp_set;
+					set_count = 5u;
+				}
+			}
+#endif
 			qvkCmdBindDescriptorSets( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
 				vk.pipeline_layout_oit_accum_mboit, 0, set_count, sets, 0, NULL );
 		}

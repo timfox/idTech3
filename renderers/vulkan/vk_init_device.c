@@ -1205,13 +1205,25 @@ void vk_initialize( void )
 				VK_CHECK( qvkCreatePipelineLayout( vk.device, &desc, NULL, &vk.pipeline_layout_oit_moments ) );
 				SET_OBJECT_NAME( vk.pipeline_layout_oit_moments, "pipeline layout - oit_moments", VK_DEBUG_REPORT_OBJECT_TYPE_PIPELINE_LAYOUT_EXT );
 
-				/* MBOIT pass 2: set 0 = tex0, set 1 = depth, set 2 = moments, set 3 = b0 */
+				/* MBOIT pass 2: set 0 = tex0, set 1 = depth, set 2 = moments, set 3 = b0,
+				 * set 4 = Forward+ lights (when available). Push = mvp + prevMvp + model. */
 				set_layouts[0] = vk.set_layout_sampler;
 				set_layouts[1] = vk.set_layout_sampler;
 				set_layouts[2] = vk.set_layout_sampler;
 				set_layouts[3] = vk.set_layout_sampler;
 				desc.setLayoutCount = 4;
+				if ( vk.set_layout_forward_plus != VK_NULL_HANDLE ) {
+					set_layouts[4] = vk.set_layout_forward_plus;
+					desc.setLayoutCount = 5;
+				} else {
+					ri.Printf( PRINT_WARNING, "[VK][OIT] Forward+ set layout missing; MBOIT accum unbound set4 — enable PBR/Forward+\n" );
+				}
 				desc.pSetLayouts = set_layouts;
+				push_range.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
+				push_range.offset = 0;
+				push_range.size = 192;
+				desc.pushConstantRangeCount = 1;
+				desc.pPushConstantRanges = &push_range;
 				VK_CHECK( qvkCreatePipelineLayout( vk.device, &desc, NULL, &vk.pipeline_layout_oit_accum_mboit ) );
 				SET_OBJECT_NAME( vk.pipeline_layout_oit_accum_mboit, "pipeline layout - oit_accum_mboit", VK_DEBUG_REPORT_OBJECT_TYPE_PIPELINE_LAYOUT_EXT );
 			}

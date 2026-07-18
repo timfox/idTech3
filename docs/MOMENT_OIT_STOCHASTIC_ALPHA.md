@@ -29,14 +29,14 @@ Demo: `exec demo_mboit.cfg` (or `vulkan_overlay_mboit.cfg`).
 
 ### With Unified Clustered (`r_renderMode 3`)
 
-Pair OIT with deferred opaque. WBOIT can use Forward+ tile lights via `r_oitForwardPlus 1` (default):
+Pair OIT with deferred opaque. Both WBOIT and MBOIT accum use Forward+ tile lights via `r_oitForwardPlus 1` (default; MBOIT moments pass stays unlit):
 
 ```
 exec vulkan_overlay_oit_clustered.cfg
 vid_restart
 ```
 
-Demo: `exec demo_oit_clustered.cfg`. See [UNIFIED_CLUSTERED_RENDERER.md](UNIFIED_CLUSTERED_RENDERER.md).
+Demo: `exec demo_oit_clustered.cfg`. See [UNIFIED_CLUSTERED_RENDERER.md](UNIFIED_CLUSTERED_RENDERER.md). Set `r_oitForwardPlus 0` to restore unlit MBOIT/WBOIT accum.
 
 ## Stochastic Alpha-Clipped Materials (`r_stochasticAlpha`)
 

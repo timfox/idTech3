@@ -527,15 +527,26 @@ void vk_create_oit_accum_mboit_pipeline( void )
 	VkDynamicState dynamic_states[3] = { VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR };
 	VkPipelineDynamicStateCreateInfo dynamic_state;
 	VkGraphicsPipelineCreateInfo create_info;
-	VkSpecializationMapEntry spec_entries[1];
+	VkSpecializationMapEntry spec_entries[2];
 	VkSpecializationInfo frag_spec_info;
 	int manual_depth_test = vk.msaaActive ? 1 : 0;
+	int forward_plus_lit = 0;
+	int spec_data[2];
 	VkViewport viewport = { 0.0f, 0.0f, 1.0f, 1.0f, 0.0f, 1.0f };
 	VkRect2D scissor = { { 0, 0 }, { 1, 1 } };
 
 	if ( vk.pipeline_layout_oit_accum_mboit == VK_NULL_HANDLE || vk.render_pass.oit_accum == VK_NULL_HANDLE ||
 		vk.modules.oit_accum_vs == VK_NULL_HANDLE || vk.modules.oit_accum_mboit_fs == VK_NULL_HANDLE ) {
 		return;
+	}
+
+	if ( r_oitForwardPlus && r_oitForwardPlus->integer &&
+		vk.set_layout_forward_plus != VK_NULL_HANDLE ) {
+#ifdef USE_VK_PBR
+		if ( vk_forward_plus_get_graphics_descriptor_set() != VK_NULL_HANDLE ) {
+			forward_plus_lit = 1;
+		}
+#endif
 	}
 
 	if ( vk.oit_accum_mboit_pipeline != VK_NULL_HANDLE ) {
@@ -585,13 +596,18 @@ void vk_create_oit_accum_mboit_pipeline( void )
 	shader_stages[1].stage = VK_SHADER_STAGE_FRAGMENT_BIT;
 	shader_stages[1].module = vk.modules.oit_accum_mboit_fs;
 	shader_stages[1].pName = "main";
+	spec_data[0] = manual_depth_test;
+	spec_data[1] = forward_plus_lit;
 	spec_entries[0].constantID = 0;
 	spec_entries[0].offset = 0;
 	spec_entries[0].size = sizeof( int );
-	frag_spec_info.mapEntryCount = 1;
+	spec_entries[1].constantID = 1;
+	spec_entries[1].offset = sizeof( int );
+	spec_entries[1].size = sizeof( int );
+	frag_spec_info.mapEntryCount = 2;
 	frag_spec_info.pMapEntries = spec_entries;
-	frag_spec_info.dataSize = sizeof( int );
-	frag_spec_info.pData = &manual_depth_test;
+	frag_spec_info.dataSize = sizeof( spec_data );
+	frag_spec_info.pData = spec_data;
 	shader_stages[1].pSpecializationInfo = &frag_spec_info;
 
 	Com_Memset( &input_assembly, 0, sizeof( input_assembly ) );
@@ -684,7 +700,8 @@ void vk_create_oit_accum_mboit_pipeline( void )
 
 	if ( qvkCreateGraphicsPipelines( vk.device, vk.pipelineCache, 1, &create_info, NULL, &vk.oit_accum_mboit_pipeline ) == VK_SUCCESS ) {
 		SET_OBJECT_NAME( vk.oit_accum_mboit_pipeline, "pipeline - oit accum mboit", VK_DEBUG_REPORT_OBJECT_TYPE_PIPELINE_EXT );
-		ri.Printf( PRINT_ALL, "[VK] OIT accum MBOIT pipeline created (MBOIT pass 2)\n" );
+		ri.Printf( PRINT_ALL, "[VK] OIT accum MBOIT pipeline created (MBOIT pass 2%s)\n",
+			forward_plus_lit ? " + Forward+ lit" : "" );
 	}
 }
 

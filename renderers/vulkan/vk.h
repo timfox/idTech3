@@ -698,7 +698,7 @@ typedef struct {
 	VkPipelineLayout pipeline_layout_oit_resolve;	// oit resolve (opaque + accum + revealage)
 	VkPipelineLayout pipeline_layout_oit_accum;	// oit accum (sampler + depth + push constants)
 	VkPipelineLayout pipeline_layout_oit_moments;	// MBOIT pass 1 (tex + depth + push constants)
-	VkPipelineLayout pipeline_layout_oit_accum_mboit;	// MBOIT pass 2 (tex + depth + moments + b0 + push constants)
+	VkPipelineLayout pipeline_layout_oit_accum_mboit;	// MBOIT pass 2 (tex + depth + moments + b0 + optional Forward+)
 	VkPipelineLayout pipeline_layout_ssr;		// ssr (color + depth + push constants)
 	VkPipelineLayout pipeline_layout_atmosphere;	// atmosphere (push constants only)
 	VkPipelineLayout pipeline_layout_fp64_points;	// fp64 point cloud (push constants)

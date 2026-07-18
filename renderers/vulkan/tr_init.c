@@ -2943,13 +2943,14 @@ static void R_Register( void )
 	ri.Cvar_SetGroup( r_oit, CVG_RENDERER );
 	r_oitForwardPlus = ri.Cvar_Get( "r_oitForwardPlus", "1", CVAR_ARCHIVE_ND | CVAR_LATCH );
 	ri.Cvar_CheckRange( r_oitForwardPlus, "0", "1", CV_INTEGER );
-	ri.Cvar_SetDescription( r_oitForwardPlus, "Forward+-lit WBOIT accumulation (tile lights on transparent surfaces). Default 1. Requires \\r_oit 1, \\r_forwardPlus 1. Moments pass (\\r_oit 2) stays unlit. Mode 3: use with OIT instead of Forward+ transparent shade." );
+	ri.Cvar_SetDescription( r_oitForwardPlus, "Forward+-lit OIT accumulation (tile lights on transparent surfaces). Default 1. Applies to \\r_oit 1 (WBOIT) and \\r_oit 2 (MBOIT accum; moments pass stays unlit). Requires \\r_forwardPlus 1. Mode 3: use with OIT instead of Forward+ transparent shade." );
 	ri.Cvar_SetGroup( r_oitForwardPlus, CVG_RENDERER );
 	if ( r_oit->integer == 1 ) {
 		ri.Printf( PRINT_ALL, "[VK] OIT: WBOIT (weighted blended) enabled%s.\n",
 			( r_oitForwardPlus && r_oitForwardPlus->integer ) ? " + Forward+ lit" : "" );
 	} else if ( r_oit->integer == 2 ) {
-		ri.Printf( PRINT_ALL, "[VK] OIT: MBOIT (Moment Transparency) enabled.\n" );
+		ri.Printf( PRINT_ALL, "[VK] OIT: MBOIT (Moment Transparency) enabled%s.\n",
+			( r_oitForwardPlus && r_oitForwardPlus->integer ) ? " + Forward+ lit accum" : "" );
 	}
 	r_stochasticAlpha = ri.Cvar_Get( "r_stochasticAlpha", "0", CVAR_ARCHIVE_ND );
 	ri.Cvar_CheckRange( r_stochasticAlpha, "0", "2", CV_INTEGER );

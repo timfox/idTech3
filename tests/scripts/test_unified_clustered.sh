@@ -30,6 +30,8 @@ rg -q 'skips Forward\+ transparent' "$ROOT/renderers/vulkan/tr_backend.c" || fai
 rg -q 'r_oitForwardPlus' "$ROOT/renderers/vulkan/tr_backend.c" || fail "OIT Forward+ lit mode3 log"
 rg -q 'vulkan_overlay_oit_clustered' "$ROOT/docs/UNIFIED_CLUSTERED_RENDERER.md" || fail "OIT clustered docs missing"
 rg -q 'r_oitForwardPlus' "$ROOT/docs/UNIFIED_CLUSTERED_RENDERER.md" || fail "Forward+-lit OIT docs"
+rg -q 'MBOIT.*set 4|set 4.*MBOIT|accum samples the same tile lists on set 4' "$ROOT/docs/UNIFIED_CLUSTERED_RENDERER.md" || fail "MBOIT Forward+ set 4 docs"
+rg -q 'MBOIT accum uses Forward\+ tile lights' "$ROOT/renderers/vulkan/tr_backend.c" || fail "MBOIT Forward+ lit mode3 log"
 rg -q 'renderer_clustered_safe' "$ROOT/docs/UNIFIED_CLUSTERED_RENDERER.md" || fail "clustered safe command docs missing"
 rg -q 'RB_ValidateUnifiedClusteredTransparentHandoff' "$ROOT/renderers/vulkan/tr_backend.c" || fail "mode3 transparent handoff validator missing"
 rg -q 'RB_RepairUnifiedClusteredTransparentHandoff' "$ROOT/renderers/vulkan/tr_backend.c" || fail "mode3 transparent handoff self-heal helper missing"

@@ -40,7 +40,7 @@ Or use the safe overlay directly: `exec vulkan_overlay_unified_clustered_safe.cf
 ## Frame order
 
 1. Forward+ light pack + tile cull (optional depth cull after opaque prepass)
-2. Opaque draw (`drawSurfFilter` 1) with hybrid handoff (no Forward+ add; unlit primary)
+2. Opaque draw (`drawSurfFilter` 1) with hybrid handoff (no Forward+ add; keep lightmap/vertex primary as static-lit base)
 3. G-buffer capture + visibility fill (optional) + deferred lighting compute + composite
 4. Transparent draw (`drawSurfFilter` 2) with Forward+ shade
 5. Neural / bloom / TAA as usual
@@ -53,7 +53,7 @@ Deferred lighting transforms direct-export **world** normals to view space, and 
 
 When `r_oit` 1/2 is on with mode 3, the backend runs **`vk_oit_pass` instead of** the Forward+ transparent shade pass (`drawSurfFilter=2`). Moments/accum/resolve still composite over the deferred opaque base.
 
-**WBOIT (`r_oit 1`) + `r_oitForwardPlus 1` (default):** accumulation samples Forward+ tile lights (set 2) using world-space position from the object→world push matrix. **MBOIT (`r_oit 2`)** moments/accum stays unlit.
+**WBOIT (`r_oit 1`) + `r_oitForwardPlus 1` (default):** accumulation samples Forward+ tile lights (set 2) using world-space position from the object→world push matrix. **MBOIT (`r_oit 2`) + `r_oitForwardPlus 1`:** moments pass stays unlit; accum samples the same tile lists on set 4.
 
 ```
 exec vulkan_overlay_oit_clustered.cfg
