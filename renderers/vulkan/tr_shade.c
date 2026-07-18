@@ -1328,6 +1328,12 @@ static void RB_IterateStagesGeneric( const shaderCommands_t *input )
 	uniform.pbrDebugMode[1] = 0.0f;
 	uniform.pbrDebugMode[2] = 0.0f;
 	uniform.pbrDebugMode[3] = 0.0f;
+#ifdef USE_VULKAN
+	/* Mode 3 Unified Clustered opaque pass: hand dynamics to deferred lighting. */
+	if ( vk_unified_clustered_opaque_handoff() ) {
+		uniform.pbrDebugMode[1] = 1.0f;
+	}
+#endif
 
 	if ( is_pbr_surface ) {
 		Com_Memcpy( &uniform_camera.modelMatrix, backEnd.or.modelMatrix, sizeof(float) * 16 );

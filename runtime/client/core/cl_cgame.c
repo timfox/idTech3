@@ -581,6 +581,9 @@ static void CL_ConfigstringModified( void ) {
 	if ( index == CS_ENGINE_OPENWORLD_SECTORS && !CL_StockBaseq3Mode() ) {
 		CL_OpenWorld_OnConfigstring( s );
 	}
+	if ( index == CS_ENGINE_WORLD_CONFIG && !CL_StockBaseq3Mode() ) {
+		CL_WorldConfig_OnConfigstring( s );
+	}
 }
 
 

@@ -204,6 +204,17 @@ static qboolean vk_temporal_compute_shared_camera_cut( uint32_t *outReasons )
 	if ( worldTransition || noWorldTransition ) {
 		reasons |= VK_TEMPORAL_RESET_WORLD_CHANGE;
 	}
+	{
+		static int prevWorldConfigEpoch = -1;
+		cvar_t *epoch = ri.Cvar_Get( "r_worldConfigEpoch", "0", 0 );
+		if ( epoch && epoch->integer != prevWorldConfigEpoch ) {
+			if ( prevWorldConfigEpoch >= 0 ) {
+				reasons |= VK_TEMPORAL_RESET_WORLD_CHANGE;
+				vk_temporal_request_sticky_reset( VK_TEMPORAL_RESET_WORLD_CHANGE );
+			}
+			prevWorldConfigEpoch = epoch->integer;
+		}
+	}
 	if ( stateTransition || stableGameplayState != vk.temporal.stableGameplayState ) {
 		reasons |= VK_TEMPORAL_RESET_CLIENT_STATE_CHANGE;
 	}

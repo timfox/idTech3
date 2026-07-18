@@ -21,6 +21,8 @@ void vk_set_shader_stage_desc( VkPipelineShaderStageCreateInfo *desc, VkShaderSt
 
 void vk_create_atmosphere_pipeline( void );
 void vk_create_oit_accum_pipeline( void );
+void vk_create_oit_moments_pipeline( void );
+void vk_create_oit_accum_mboit_pipeline( void );
 void vk_create_blur_pipeline( uint32_t index, uint32_t width, uint32_t height, qboolean horizontal_pass );
 
 #ifdef __cplusplus

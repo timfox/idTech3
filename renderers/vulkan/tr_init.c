@@ -59,6 +59,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "vk_postfx.h"
 #include "vk_flashlight.h"
 #include "vk_util.h"
+#include "vk_deferred_gbuffer.h"
 #include "vk_sim_render_profile.h"
 #include "vk_sim_render_debug.h"
 #include "vk_skybox_hdr.h"
@@ -246,6 +247,7 @@ cvar_t	*r_ssaoBlurRadius;
 cvar_t	*r_hbaoDirections;
 cvar_t	*r_hbaoSteps;
 cvar_t	*r_oit;
+cvar_t	*r_stochasticAlpha;
 cvar_t	*r_ssaoDebugView;
 cvar_t	*r_renderWidth;
 cvar_t	*r_renderHeight;
@@ -2609,22 +2611,23 @@ static void R_Register( void )
 		"Use vid_restart after changing. Default 1 recommended." );
 	ri.Cvar_SetGroup( r_fbo, CVG_RENDERER );
 	r_renderMode = ri.Cvar_Get( "r_renderMode", "0", CVAR_ARCHIVE_ND | CVAR_LATCH );
-	ri.Cvar_CheckRange( r_renderMode, "0", "2", CV_INTEGER );
-	ri.Cvar_SetDescription( r_renderMode, "Vulkan lighting path (latched, vid_restart).\n 0: Forward (classic projector; r_forwardPlus may still be 1)\n 1: Deferred lighting mode (r_deferredGBuffer 1; r_deferredLighting 1 latches r_forwardPlus 1, r_forwardPlusShade 0)\n 2: Modern default Forward+ primary (sets r_forwardPlus 1 and r_forwardPlusShade 1; may use r_deferredGBuffer as sidecar)" );
+	ri.Cvar_CheckRange( r_renderMode, "0", "3", CV_INTEGER );
+	ri.Cvar_SetDescription( r_renderMode, "Vulkan lighting path (latched, vid_restart).\n 0: Forward (classic projector; r_forwardPlus may still be 1)\n 1: Deferred lighting mode (r_deferredGBuffer 1; r_deferredLighting 1 latches r_forwardPlus 1, r_forwardPlusShade 0)\n 2: Modern default Forward+ primary (sets r_forwardPlus 1 and r_forwardPlusShade 1; may use r_deferredGBuffer as sidecar)\n 3: Unified Clustered Renderer — hybrid deferred opaque + Forward+ transparent (shared tile lists)" );
 	r_deferredGBuffer = ri.Cvar_Get( "r_deferredGBuffer", "0", CVAR_ARCHIVE_ND | CVAR_LATCH );
 	ri.Cvar_CheckRange( r_deferredGBuffer, "0", "1", CV_INTEGER );
 	ri.Cvar_SetDescription( r_deferredGBuffer,
-		"With r_renderMode 1/2: allocate full-res G-buffer images (albedo=color format, normal RGBA16F, material RGBA16F, lighting RGBA16F). "
-		"Mode 2 uses this as a sidecar for temporal/advanced consumers; set r_deferredLighting 1 in mode 1 for experimental diffuse. Requires r_fbo 1 and vid_restart." );
+		"With r_renderMode 1/2/3: allocate full-res G-buffer images (albedo=color format, normal RGBA16F, material RGBA16F, lighting RGBA16F). "
+		"Mode 2 uses this as a sidecar for temporal/advanced consumers; mode 1/3 use it for deferred lighting. Requires r_fbo 1 and vid_restart." );
 	ri.Cvar_SetGroup( r_deferredGBuffer, CVG_RENDERER );
 	if ( r_deferredGBuffer && r_deferredGBuffer->integer ) {
-		ri.Printf( PRINT_ALL, "[VK][deferred] r_deferredGBuffer=1 (G-buffer RTs when r_renderMode 1)\n" );
+		ri.Printf( PRINT_ALL, "[VK][deferred] r_deferredGBuffer=1 (G-buffer RTs when r_renderMode 1/2/3)\n" );
 	}
 	r_deferredGBufferFill = ri.Cvar_Get( "r_deferredGBufferFill", "0", CVAR_ARCHIVE_ND );
 	ri.Cvar_CheckRange( r_deferredGBufferFill, "0", "1", CV_INTEGER );
 	ri.Cvar_SetDescription( r_deferredGBufferFill,
-		"With r_renderMode 1/2 and r_deferredGBuffer 1: after main geometry, copy scene color to G-buffer albedo "
-		"and export normal/material from opaque PBR shaders when possible; MSAA/legacy paths fill normal/material from depth (compute). Forward+/forward lighting unchanged unless r_deferredLighting 1 in mode 1." );
+		"With r_renderMode 1/2/3 and r_deferredGBuffer 1: after opaque (mode 3) or main geometry, copy scene color to G-buffer albedo "
+		"and export normal/material from opaque PBR shaders when possible; MSAA/legacy paths fill normal/material from depth (compute). "
+		"Mode 3 Unified Clustered captures after opaque only." );
 	ri.Cvar_SetGroup( r_deferredGBufferFill, CVG_RENDERER );
 	if ( r_deferredGBufferFill && r_deferredGBufferFill->integer ) {
 		ri.Printf( PRINT_ALL, "[VK][deferred] r_deferredGBufferFill=1 (capture after geometry each frame)\n" );
@@ -2633,13 +2636,14 @@ static void R_Register( void )
 	ri.Cvar_CheckRange( r_deferredGBufferDebug, "0", "6", CV_INTEGER );
 	ri.Cvar_SetDescription( r_deferredGBufferDebug,
 		"Visualize deferred buffers on scene color before bloom: 0=off, 1=albedo, 2=normal (view XYZ), 3=material, 4=lighting (requires r_deferredLighting 1), 5=normal confidence, 6=motion vectors. "
-		"Requires r_renderMode 1/2, r_deferredGBuffer 1, r_deferredGBufferFill 1." );
+		"Requires r_renderMode 1/2/3, r_deferredGBuffer 1, r_deferredGBufferFill 1." );
 	ri.Cvar_SetGroup( r_deferredGBufferDebug, CVG_RENDERER );
 	r_deferredLighting = ri.Cvar_Get( "r_deferredLighting", "0", CVAR_ARCHIVE_ND );
 	ri.Cvar_CheckRange( r_deferredLighting, "0", "1", CV_INTEGER );
 	ri.Cvar_SetDescription( r_deferredLighting,
-		"Experimental deferred diffuse (point+spot lights via Forward+ tile lists). Requires r_renderMode 1, "
-		"r_deferredGBuffer 1, r_deferredGBufferFill 1, r_forwardPlus 1. vid_restart latches r_forwardPlusShade 0. Replaces scene color after geometry. "
+		"Deferred diffuse (point+spot lights via Forward+ tile lists). Requires r_renderMode 1 or 3, "
+		"r_deferredGBuffer 1, r_deferredGBufferFill 1, r_forwardPlus 1. Mode 1 latches r_forwardPlusShade 0. "
+		"Mode 3 (Unified Clustered) keeps Forward+ shade for transparent surfaces. "
 		"Ignored in r_renderMode 2 modern Forward+ default." );
 	ri.Cvar_SetGroup( r_deferredLighting, CVG_RENDERER );
 	if ( r_deferredLighting && r_deferredLighting->integer ) {
@@ -2808,9 +2812,26 @@ static void R_Register( void )
 	ri.Cvar_SetDescription( r_ssaoBlurRadius, "SSAO blur radius in pixels (0 disables blur)." );
 
 	r_oit = ri.Cvar_Get( "r_oit", "0", CVAR_ARCHIVE_ND | CVAR_LATCH );
-	ri.Cvar_CheckRange( r_oit, "0", "1", CV_INTEGER );
-	ri.Cvar_SetDescription( r_oit, "Order-independent transparency (WBOIT). Correct blending of overlapping transparent surfaces. Requires \\r_fbo 1." );
+	ri.Cvar_CheckRange( r_oit, "0", "2", CV_INTEGER );
+	ri.Cvar_SetDescription( r_oit, "Order-independent transparency:\n 0 - off\n 1 - WBOIT (weighted blended OIT)\n 2 - MBOIT / Moment Transparency (glass, smoke, particles, overlapping translucent layers)\n Requires \\r_fbo 1." );
 	ri.Cvar_SetGroup( r_oit, CVG_RENDERER );
+	if ( r_oit->integer == 1 ) {
+		ri.Printf( PRINT_ALL, "[VK] OIT: WBOIT (weighted blended) enabled.\n" );
+	} else if ( r_oit->integer == 2 ) {
+		ri.Printf( PRINT_ALL, "[VK] OIT: MBOIT (Moment Transparency) enabled.\n" );
+	}
+	r_stochasticAlpha = ri.Cvar_Get( "r_stochasticAlpha", "0", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_stochasticAlpha, "0", "2", CV_INTEGER );
+	ri.Cvar_SetDescription( r_stochasticAlpha,
+		"Stochastic alpha-clipped materials (foliage, grates, hair cards, fabric holes, decals):\n"
+		" 0 - hard alphaFunc discard\n"
+		" 1 - screen-space hashed alpha\n"
+		" 2 - temporal hashed alpha (frame-seeded noise; pair with r_taa 1)\n"
+		"Applies to shader alphaFunc GT0/LT128/GE128." );
+	ri.Cvar_SetGroup( r_stochasticAlpha, CVG_RENDERER );
+	if ( r_stochasticAlpha->integer > 0 ) {
+		ri.Printf( PRINT_ALL, "[VK] Stochastic alpha-clipped materials: mode %d\n", r_stochasticAlpha->integer );
+	}
 	r_ssaoDebugView = ri.Cvar_Get( "r_ssaoDebugView", "0", CVAR_ARCHIVE_ND );
 	ri.Cvar_CheckRange( r_ssaoDebugView, "0", "2", CV_INTEGER );
 	ri.Cvar_SetDescription( r_ssaoDebugView, "SSAO debug view:\n 0: off\n 1: show AO only\n 2: show depth" );

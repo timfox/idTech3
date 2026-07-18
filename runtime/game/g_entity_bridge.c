@@ -17,6 +17,9 @@ Reads BSP entity key/values and configures engine systems.
 #ifdef USE_GAME_AI_MIDDLEWARE
 #include "g_director.h"
 #endif
+#ifdef USE_OPEN_WORLD
+#include "../world/world_config.h"
+#endif
 #include "../client/shell/cl_map_background.h"
 
 static const char *EB_ParseToken(const char **text) {
@@ -34,6 +37,9 @@ static int EB_GetInt(const char *value, int def) {
 }
 
 void EntityBridge_Clear(void) {
+#ifdef USE_OPEN_WORLD
+	WorldConfig_ClearSpawns();
+#endif
 	Com_Printf("EntityBridge: cleared\n");
 }
 
@@ -102,6 +108,41 @@ void EntityBridge_ParseEntities(const char *entityString) {
 #ifdef USE_GAME_AI_MIDDLEWARE
 			Director_AddZone(name, mins, maxs, (dirThreat_t)threat, budgetMult);
 			directorZones++;
+#endif
+		}
+
+		else if (!Q_stricmp(classname, "info_director_spawn")) {
+			vec3_t origin = {0}, angles = {0};
+			const char *spawnType = "";
+			const char *layout = "default";
+			float minIntensity = 0.0f;
+			float maxIntensity = 1.0f;
+			int i;
+
+			for (i = 0; i < numKV; i++) {
+				if (!Q_stricmp(keys[i], "origin")) sscanf(values[i], "%f %f %f", &origin[0], &origin[1], &origin[2]);
+				else if (!Q_stricmp(keys[i], "angles")) sscanf(values[i], "%f %f %f", &angles[0], &angles[1], &angles[2]);
+				else if (!Q_stricmp(keys[i], "spawn_type")) spawnType = values[i];
+				else if (!Q_stricmp(keys[i], "layout")) layout = values[i];
+				else if (!Q_stricmp(keys[i], "min_intensity")) minIntensity = EB_GetFloat(values[i], 0.0f);
+				else if (!Q_stricmp(keys[i], "max_intensity")) maxIntensity = EB_GetFloat(values[i], 1.0f);
+			}
+
+#ifdef USE_OPEN_WORLD
+			if (WorldConfig_AddSpawn(origin, angles, layout, spawnType, minIntensity, maxIntensity) >= 0) {
+				directorSpawns++;
+			}
+#else
+			(void)spawnType;
+			(void)layout;
+			(void)minIntensity;
+			(void)maxIntensity;
+			directorSpawns++;
+#endif
+#ifdef USE_GAME_AI_MIDDLEWARE
+			if (spawnType && spawnType[0]) {
+				Director_AddSpawnType(spawnType, 8, 5.0f, minIntensity, maxIntensity, 1.0f);
+			}
 #endif
 		}
 

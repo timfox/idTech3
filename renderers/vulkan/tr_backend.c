@@ -1804,6 +1804,7 @@ static const void *RB_DrawSurfs( const void *data ) {
 	backEnd.refdef = cmd->refdef;
 	backEnd.viewParms = cmd->viewParms;
 	backEnd.drawSurfFilter = 0;
+	backEnd.oitMomentsPass = qfalse;
 	backEnd.oitAccumPass = qfalse;
 
 #ifdef USE_VBO
@@ -1859,7 +1860,21 @@ static const void *RB_DrawSurfs( const void *data ) {
 #endif
 
 #ifdef USE_VULKAN
-	if ( r_oit && r_oit->integer && r_fbo && r_fbo->integer ) {
+	if ( vk_unified_clustered_active() ) {
+		/* Unified Clustered: opaque → G-buffer + deferred → transparent Forward+. */
+		backEnd.drawSurfFilter = 1; /* opaque only */
+		RB_RenderDrawSurfList( cmd->drawSurfs, cmd->numDrawSurfs );
+		vk_deferred_gbuffer_capture_after_geometry();
+		vk_deferred_lighting_apply_after_geometry();
+		backEnd.drawSurfFilter = 2; /* transparent only (Forward+ shade) */
+		if ( r_oit && r_oit->integer && r_fbo && r_fbo->integer ) {
+			/* OIT after deferred; residual risk documented in UNIFIED_CLUSTERED_RENDERER.md */
+			vk_oit_pass( cmd );
+		} else {
+			RB_RenderDrawSurfList( cmd->drawSurfs, cmd->numDrawSurfs );
+		}
+		backEnd.drawSurfFilter = 0;
+	} else if ( r_oit && r_oit->integer && r_fbo && r_fbo->integer ) {
 		backEnd.drawSurfFilter = 1; /* opaque only */
 		RB_RenderDrawSurfList( cmd->drawSurfs, cmd->numDrawSurfs );
 		backEnd.drawSurfFilter = 0;
@@ -1872,8 +1887,10 @@ static const void *RB_DrawSurfs( const void *data ) {
 	if ( CBTerrain_IsEnabled() ) {
 		CBTerrain_Frame();
 	}
-	vk_deferred_gbuffer_capture_after_geometry();
-	vk_deferred_lighting_apply_after_geometry();
+	if ( !vk_unified_clustered_active() ) {
+		vk_deferred_gbuffer_capture_after_geometry();
+		vk_deferred_lighting_apply_after_geometry();
+	}
 	vk_niv_apply_after_geometry();
 	vk_surfel_gi_apply_after_geometry();
 	vk_nist_apply_after_geometry();

@@ -14,6 +14,31 @@ Copyright (C) 2026 Gopex LLC. All rights reserved.
 #define BSP_STREAM_MAX_SECTOR_LIGHTMAPS 8
 #define BSP_STREAM_LIGHTMAP_BYTES (128 * 128 * 3)
 
+/*
+===============
+R_BspStream_FormatSectorMap
+
+Prefer config-suffixed sector BSP (r_worldConfigGeoSuffix from WorldConfig).
+===============
+*/
+static void R_BspStream_FormatSectorMap( int cellX, int cellY, char *out, int outSize ) {
+	cvar_t *suf;
+	char fallback[MAX_QPATH];
+	char preferred[MAX_QPATH];
+
+	Com_sprintf( fallback, sizeof( fallback ), "maps/sector_%d_%d.bsp", cellX, cellY );
+	suf = ri.Cvar_Get( "r_worldConfigGeoSuffix", "", 0 );
+	if ( suf && suf->string[0] ) {
+		Com_sprintf( preferred, sizeof( preferred ), "maps/sector_%d_%d%s.bsp",
+			cellX, cellY, suf->string );
+		if ( ri.FS_ReadFile( preferred, NULL ) > 0 ) {
+			Q_strncpyz( out, preferred, outSize );
+			return;
+		}
+	}
+	Q_strncpyz( out, fallback, outSize );
+}
+
 typedef struct {
 	surfaceType_t   *surface;
 	shader_t        *shader;
@@ -884,7 +909,7 @@ static qboolean R_BspStream_ReloadPatchFromDisk( bspStreamPatch_t *patch )
 		return qfalse;
 	}
 
-	Com_sprintf( mapName, sizeof( mapName ), "maps/sector_%d_%d.bsp", patch->cellX, patch->cellY );
+	R_BspStream_FormatSectorMap( patch->cellX, patch->cellY, mapName, sizeof( mapName ) );
 	length = ri.FS_ReadFile( mapName, &buf );
 	if ( length <= 0 || !buf ) {
 		return qfalse;
@@ -1191,7 +1216,7 @@ qboolean RE_BspStream_MergeSector( int cellX, int cellY, float sectorSize ) {
 	patch = &s_stream.patches[patchIdx];
 	patch->sectorSize = sectorSize;
 
-	Com_sprintf( mapName, sizeof( mapName ), "maps/sector_%d_%d.bsp", cellX, cellY );
+	R_BspStream_FormatSectorMap( cellX, cellY, mapName, sizeof( mapName ) );
 	length = ri.FS_ReadFile( mapName, &buf );
 	if ( length <= 0 || !buf ) {
 		patch->active = qfalse;

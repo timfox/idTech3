@@ -22,6 +22,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 #include "server.h"
 #include "sv_openworld.h"
+#include "sv_world_config.h"
 #include "sv_enhanced.h"
 #include "sv_engine_sprites.h"
 #include "sv_engine_decals.h"
@@ -605,6 +606,7 @@ void SV_SpawnServer( const char *mapname, qboolean killBots ) {
 	Sys_SetStatus( "Loading map %s", mapname );
 	CM_LoadMap( va( "maps/%s.bsp", mapname ), qfalse, &checksum );
 	SV_OpenWorld_OnMapLoad( mapname );
+	SV_WorldConfig_OnMapLoad( mapname );
 
 	if ( SV_IsBaseQ3Game() ) {
 		SV_ApplyClassicBaseq3ServerCvars();
@@ -968,6 +970,7 @@ void SV_Init( void )
 
 	SV_Enhanced_Init();
 	SV_OpenWorld_Init();
+	SV_WorldConfig_Init();
 
 #ifdef USE_LUA
 	SV_AppCrdt_Init();

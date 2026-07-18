@@ -808,7 +808,24 @@ extern "C" qboolean Nav_LoadSectorTile( navMeshHandle_t mesh, int cellX, int cel
 		return qtrue;
 	}
 
-	Com_sprintf( path, sizeof( path ), "nav/sector_%d_%d.nav", cellX, cellY );
+	{
+		char preferred[MAX_QPATH];
+		char fallback[MAX_QPATH];
+		cvar_t *suf = Cvar_Get( "r_worldConfigNavSuffix", "", 0 );
+
+		Com_sprintf( fallback, sizeof( fallback ), "nav/sector_%d_%d.nav", cellX, cellY );
+		if ( suf && suf->string[0] ) {
+			Com_sprintf( preferred, sizeof( preferred ), "nav/sector_%d_%d%s.nav",
+				cellX, cellY, suf->string );
+			if ( FS_ReadFile( preferred, NULL ) > 0 ) {
+				Q_strncpyz( path, preferred, sizeof( path ) );
+			} else {
+				Q_strncpyz( path, fallback, sizeof( path ) );
+			}
+		} else {
+			Q_strncpyz( path, fallback, sizeof( path ) );
+		}
+	}
 	fileSize = FS_ReadFile( path, &fileData );
 	if ( fileSize <= 0 || !fileData ) {
 		Com_DPrintf( "Nav: no tile %s\n", path );

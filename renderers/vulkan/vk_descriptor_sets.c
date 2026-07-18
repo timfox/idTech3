@@ -220,6 +220,18 @@ void vk_update_attachment_descriptors( void ) {
 					qvkUpdateDescriptorSets( vk.device, 1, &desc, 0, NULL );
 				}
 			}
+			if ( r_oit->integer == 2 ) {
+				if ( vk.oit_moments_image_view ) {
+					info.imageView = vk.oit_moments_image_view;
+					desc.dstSet = vk.oit_moments_descriptor;
+					qvkUpdateDescriptorSets( vk.device, 1, &desc, 0, NULL );
+				}
+				if ( vk.oit_b0_image_view ) {
+					info.imageView = vk.oit_b0_image_view;
+					desc.dstSet = vk.oit_b0_descriptor;
+					qvkUpdateDescriptorSets( vk.device, 1, &desc, 0, NULL );
+				}
+			}
 		}
 
 		if ( PostFX_SSR_IsEnabled() && vk.ssr_image_view )
@@ -968,6 +980,10 @@ void vk_init_descriptors( void )
 			VK_CHECK( qvkAllocateDescriptorSets( vk.device, &alloc, &vk.oit_accum_descriptor ) );
 			VK_CHECK( qvkAllocateDescriptorSets( vk.device, &alloc, &vk.oit_reveal_descriptor ) );
 			VK_CHECK( qvkAllocateDescriptorSets( vk.device, &alloc, &vk.oit_depth_descriptor ) );
+			if ( r_oit->integer == 2 ) {
+				VK_CHECK( qvkAllocateDescriptorSets( vk.device, &alloc, &vk.oit_moments_descriptor ) );
+				VK_CHECK( qvkAllocateDescriptorSets( vk.device, &alloc, &vk.oit_b0_descriptor ) );
+			}
 		}
 
 		if ( PostFX_SSR_IsEnabled() ) {

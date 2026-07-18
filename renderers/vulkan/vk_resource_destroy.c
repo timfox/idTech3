@@ -66,6 +66,10 @@ void vk_destroy_render_passes( void )
 		qvkDestroyRenderPass( vk.device, vk.render_pass.oit_accum, NULL );
 		vk.render_pass.oit_accum = VK_NULL_HANDLE;
 	}
+	if ( vk.render_pass.oit_moments != VK_NULL_HANDLE ) {
+		qvkDestroyRenderPass( vk.device, vk.render_pass.oit_moments, NULL );
+		vk.render_pass.oit_moments = VK_NULL_HANDLE;
+	}
 	if ( vk.render_pass.oit_resolve != VK_NULL_HANDLE ) {
 		qvkDestroyRenderPass( vk.device, vk.render_pass.oit_resolve, NULL );
 		vk.render_pass.oit_resolve = VK_NULL_HANDLE;
@@ -282,6 +286,14 @@ void vk_destroy_pipelines( qboolean resetCounter )
 	if ( vk.oit_accum_pipeline != VK_NULL_HANDLE ) {
 		qvkDestroyPipeline( vk.device, vk.oit_accum_pipeline, NULL );
 		vk.oit_accum_pipeline = VK_NULL_HANDLE;
+	}
+	if ( vk.oit_moments_pipeline != VK_NULL_HANDLE ) {
+		qvkDestroyPipeline( vk.device, vk.oit_moments_pipeline, NULL );
+		vk.oit_moments_pipeline = VK_NULL_HANDLE;
+	}
+	if ( vk.oit_accum_mboit_pipeline != VK_NULL_HANDLE ) {
+		qvkDestroyPipeline( vk.device, vk.oit_accum_mboit_pipeline, NULL );
+		vk.oit_accum_mboit_pipeline = VK_NULL_HANDLE;
 	}
 
 #ifdef VK_PBR_BRDFLUT

@@ -355,6 +355,18 @@ void LuaBindings_RegisterAll(void *luaState) {
 	};
 	registerTable(L, "Quest", questFuncs);
 
+#ifdef USE_OPEN_WORLD
+	static const luaL_Reg worldConfigFuncs[] = {
+		{"set", l_worldConfig_set},
+		{"get", l_worldConfig_get},
+		{"list", l_worldConfig_list},
+		{"spawnLayout", l_worldConfig_spawnLayout},
+		{"validate", l_worldConfig_validate},
+		{NULL, NULL}
+	};
+	registerTable(L, "WorldConfig", worldConfigFuncs);
+#endif
+
 	static const luaL_Reg dialogueFuncs[] = {
 		{"start", l_dialogue_start},
 		{"clear", l_dialogue_clear},

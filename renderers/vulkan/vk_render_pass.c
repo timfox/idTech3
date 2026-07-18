@@ -110,6 +110,17 @@ void vk_begin_render_pass_tracked( VkRenderPass renderPass, VkFramebuffer frameB
 			clear_values[1].color.float32[3] = 1.0f;
 			clear_count = vk.msaaActive ? 2 : 3;
 		}
+		if ( renderPass == vk.render_pass.oit_moments ) {
+			clear_values[0].color.float32[0] = 0.0f;
+			clear_values[0].color.float32[1] = 0.0f;
+			clear_values[0].color.float32[2] = 0.0f;
+			clear_values[0].color.float32[3] = 0.0f;
+			clear_values[1].color.float32[0] = 0.0f;
+			clear_values[1].color.float32[1] = 0.0f;
+			clear_values[1].color.float32[2] = 0.0f;
+			clear_values[1].color.float32[3] = 0.0f;
+			clear_count = vk.msaaActive ? 2 : 3;
+		}
 		render_pass_begin_info.clearValueCount = clear_count;
 		render_pass_begin_info.pClearValues = clear_values;
 
@@ -556,6 +567,56 @@ void vk_create_render_passes( void )
 		}
 		VK_CHECK( qvkCreateRenderPass( device, &desc, NULL, &vk.render_pass.oit_accum ) );
 		SET_OBJECT_NAME( vk.render_pass.oit_accum, "render pass - oit_accum", VK_DEBUG_REPORT_OBJECT_TYPE_RENDER_PASS_EXT );
+
+		if ( r_oit->integer == 2 ) {
+			/* MBOIT pass 1: RT0 = power moments (RGBA16F), RT1 = total optical depth b0 (R16F). */
+			desc.attachmentCount = ( vkSamples == VK_SAMPLE_COUNT_1_BIT ) ? 3 : 2;
+			colorRef0.attachment = 0;
+			colorRef0.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+			colorRefs[0] = colorRef0;
+			colorRefs[1].attachment = 1;
+			colorRefs[1].layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+			Com_Memset( &subpass, 0, sizeof( subpass ) );
+			subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
+			subpass.colorAttachmentCount = 2;
+			subpass.pColorAttachments = colorRefs;
+			attachments[0].flags = 0;
+			attachments[0].format = VK_FORMAT_R16G16B16A16_SFLOAT;
+			attachments[0].samples = VK_SAMPLE_COUNT_1_BIT;
+			attachments[0].loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+			attachments[0].storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+			attachments[0].stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+			attachments[0].stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+			attachments[0].initialLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+			attachments[0].finalLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+			attachments[1].flags = 0;
+			attachments[1].format = VK_FORMAT_R16_SFLOAT;
+			attachments[1].samples = VK_SAMPLE_COUNT_1_BIT;
+			attachments[1].loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+			attachments[1].storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+			attachments[1].stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+			attachments[1].stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+			attachments[1].initialLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+			attachments[1].finalLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+			if ( vkSamples == VK_SAMPLE_COUNT_1_BIT ) {
+				attachments[2].flags = 0;
+				attachments[2].format = depth_format;
+				attachments[2].samples = VK_SAMPLE_COUNT_1_BIT;
+				attachments[2].loadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
+				attachments[2].storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+				attachments[2].stencilLoadOp = glConfig.stencilBits ? VK_ATTACHMENT_LOAD_OP_LOAD : VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+				attachments[2].stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+				attachments[2].initialLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+				attachments[2].finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+				depthRef0.attachment = 2;
+				depthRef0.layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+				subpass.pDepthStencilAttachment = &depthRef0;
+			} else {
+				subpass.pDepthStencilAttachment = NULL;
+			}
+			VK_CHECK( qvkCreateRenderPass( device, &desc, NULL, &vk.render_pass.oit_moments ) );
+			SET_OBJECT_NAME( vk.render_pass.oit_moments, "render pass - oit_moments", VK_DEBUG_REPORT_OBJECT_TYPE_RENDER_PASS_EXT );
+		}
 
 		/* OIT resolve pass: composite opaque + accum to main color */
 		desc.attachmentCount = 1;

@@ -12,11 +12,13 @@ extern "C" {
 #include "../../world/world_open.h"
 #include "../../world/world_proc.h"
 #include "../../world/world_residency.h"
+#include "../../world/world_config.h"
 #include "../../navigation/nav_recast.h"
 #include "engine_sprite_map.h"
 #include "cm_stream.h"
 #include "cm_public.h"
 #include "cluster_graph.h"
+#include "../game/bg_public.h"
 }
 
 #include <cstring>
@@ -316,6 +318,18 @@ static qboolean CL_OpenWorld_LoadSprites( int cellX, int cellY ) {
 	}
 
 	WorldProc_FormatScatterSectorPath( cellX, cellY, path, sizeof( path ) );
+	if ( WorldConfig_IsEnabled() ) {
+		char layoutPath[MAX_QPATH];
+		char sectorFallback[MAX_QPATH];
+
+		WorldConfig_FormatScatter( cellX, cellY, layoutPath, sizeof( layoutPath ) );
+		Com_sprintf( sectorFallback, sizeof( sectorFallback ), "sprites/sector_%d_%d.ents", cellX, cellY );
+		if ( WorldConfig_ResolveReadable( layoutPath, sectorFallback, path, sizeof( path ) ) ) {
+			/* path ready */
+		} else {
+			Q_strncpyz( path, layoutPath[0] ? layoutPath : sectorFallback, sizeof( path ) );
+		}
+	}
 	if ( !CL_OpenWorld_ReadScatterFile( path, &buf, &len ) &&
 		Cvar_VariableIntegerValue( "r_proc" ) &&
 		Cvar_VariableIntegerValue( "r_procScatterRegion" ) ) {
@@ -562,12 +576,112 @@ extern "C" void CL_OpenWorld_OnConfigstring( const char *sectorList ) {
 	Com_DPrintf( "[world_open] MP sector sync: %s (residency allow=%d)\n", sectorList, newCount );
 }
 
+static char cl_worldConfigLast[128];
+
+static void CL_WorldConfig_ReloadResidentSectors( void ) {
+	int i;
+	int n;
+	worldOpenLayerMask_t mask = WO_LAYER_MASK_ALL;
+	const worldOpenSector_t *sec;
+	clOpenWorldCell_t cells[WORLD_OPEN_SECTOR_MAX];
+	int cellCount = 0;
+
+	n = WorldOpen_GetSectorCount();
+	for ( i = 0; i < n && cellCount < WORLD_OPEN_SECTOR_MAX; i++ ) {
+		sec = WorldOpen_GetSector( i );
+		if ( !sec || !sec->active ) {
+			continue;
+		}
+		cells[cellCount].cellX = sec->cellX;
+		cells[cellCount].cellY = sec->cellY;
+		cellCount++;
+	}
+	for ( i = 0; i < cellCount; i++ ) {
+		WorldOpen_UnloadSector( cells[i].cellX, cells[i].cellY );
+	}
+	for ( i = 0; i < cellCount; i++ ) {
+		WorldOpen_LoadSector( cells[i].cellX, cells[i].cellY, mask );
+	}
+	Com_Printf( "[world_config] reloaded %d resident sector(s)\n", cellCount );
+}
+
+static void CL_WorldConfig_OnApply( const char *oldName, const char *newName, int generation ) {
+	(void)oldName;
+	(void)generation;
+	Com_Printf( "[world_config] client apply '%s'\n", newName ? newName : "" );
+	CL_WorldConfig_ReloadResidentSectors();
+}
+
+extern "C" void CL_WorldConfig_OnConfigstring( const char *payload ) {
+	char name[WORLD_CONFIG_NAME_MAX];
+	int gen = 0;
+
+	if ( !payload ) {
+		return;
+	}
+	if ( !strcmp( payload, cl_worldConfigLast ) ) {
+		return;
+	}
+	Q_strncpyz( cl_worldConfigLast, payload, sizeof( cl_worldConfigLast ) );
+	name[0] = '\0';
+	sscanf( payload, "%63s %d", name, &gen );
+	if ( !name[0] ) {
+		return;
+	}
+	if ( !Cvar_VariableIntegerValue( "r_worldConfigEnable" ) &&
+		!Cvar_VariableIntegerValue( "sv_worldConfigEnable" ) ) {
+		Cvar_Set( "r_worldConfigEnable", "1" );
+	}
+	WorldConfig_SetActive( name );
+	(void)gen;
+}
+
+static void CL_WorldConfig_Set_f( void ) {
+	if ( Cmd_Argc() < 2 ) {
+		WorldConfig_Status();
+		return;
+	}
+	Cvar_Set( "r_worldConfigEnable", "1" );
+	WorldConfig_SetActive( Cmd_Argv( 1 ) );
+}
+
+static void CL_WorldConfig_List_f( void ) {
+	WorldConfig_List();
+}
+
+static void CL_WorldConfig_Validate_f( void ) {
+	char report[4096];
+	const char *name = Cmd_Argc() >= 2 ? Cmd_Argv( 1 ) : "all";
+	int fails = WorldConfig_Validate( name, report, sizeof( report ) );
+	Com_Printf( "%s", report );
+	Com_Printf( "[world_config] validate %s: %s (%d failure(s))\n",
+		name, fails ? "FAIL" : "OK", fails );
+}
+
+static void CL_WorldConfig_Load_f( void ) {
+	if ( Cmd_Argc() >= 2 ) {
+		WorldConfig_LoadManifestPath( Cmd_Argv( 1 ) );
+		return;
+	}
+	WorldConfig_LoadManifest( Cvar_VariableString( "mapname" ) );
+}
+
+static void CL_WorldConfig_SpawnLayout_f( void ) {
+	if ( Cmd_Argc() < 2 ) {
+		Com_Printf( "layout: %s\n", WorldConfig_GetSpawnLayout() );
+		return;
+	}
+	WorldConfig_SetSpawnLayout( Cmd_Argv( 1 ) );
+}
+
 extern "C" void CL_OpenWorld_Init( void ) {
 	cl_openWorldSync = Cvar_Get( "cl_openWorldSync", "1", CVAR_ARCHIVE );
 	Cvar_SetDescription( cl_openWorldSync,
 		"Apply CS_ENGINE_OPENWORLD_SECTORS from server (collision + nav when enabled)." );
 
 	WorldOpen_Init();
+	WorldConfig_Init();
+	WorldConfig_SetOnApply( CL_WorldConfig_OnApply );
 	WorldOpen_SetSectorLoad( CL_OpenWorld_SectorLoad );
 	WorldOpen_SetSectorUnload( CL_OpenWorld_SectorUnload );
 
@@ -578,8 +692,14 @@ extern "C" void CL_OpenWorld_Init( void ) {
 	Cmd_AddCommand( "openworld_sector", CL_OpenWorld_LoadSector_f );
 	Cmd_AddCommand( "nav_bake_sector", CL_OpenWorld_BakeNavSector_f );
 	Cmd_AddCommand( "nav_bake_view", CL_OpenWorld_BakeNavView_f );
+	Cmd_AddCommand( "world_config", CL_WorldConfig_Set_f );
+	Cmd_AddCommand( "world_config_list", CL_WorldConfig_List_f );
+	Cmd_AddCommand( "world_config_validate", CL_WorldConfig_Validate_f );
+	Cmd_AddCommand( "world_config_load", CL_WorldConfig_Load_f );
+	Cmd_AddCommand( "world_config_spawnlayout", CL_WorldConfig_SpawnLayout_f );
 
 	Com_Printf( "Open world: openworld_start, nav_bake_sector, openworld_sector (r_openWorld)\n" );
+	Com_Printf( "World config: world_config, world_config_validate (r_worldConfigEnable)\n" );
 }
 
 extern "C" void CL_OpenWorld_Frame( void ) {

@@ -867,6 +867,7 @@ VkPipeline vk_create_pipeline( const Vk_Pipeline_Def *def, renderPass_t renderPa
 	frag_spec_data.parallax_bias_shader = def->parallaxBias;
 	frag_spec_data.forward_plus_shade_strength = ( r_forwardPlusShade && r_forwardPlusShade->value > 0.0f )
 		? Com_Clamp( 0.0f, 4.0f, r_forwardPlusShade->value ) : 0.0f;
+	/* Mode 1: bake unlit-base into pipelines. Mode 3 uses per-draw hybrid handoff uniform instead. */
 	frag_spec_data.deferred_unlit_base_strength = ( r_renderMode && r_renderMode->integer == 1 &&
 		r_deferredLighting && r_deferredLighting->integer &&
 		r_deferredUnlitBase && r_deferredUnlitBase->integer ) ? 1.0f : 0.0f;

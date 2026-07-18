@@ -14,6 +14,7 @@ Documentation is grouped by **tier**. Most files remain at their historical path
 ## Modules (world / gameplay)
 
 - [OPEN_WORLD.md](OPEN_WORLD.md)
+- [WORLD_CONFIG.md](WORLD_CONFIG.md) — named map-state configs (geometry/nav/spawns/lighting)
 - [DISTRICTS.md](DISTRICTS.md)
 - [PHYSICS.md](PHYSICS.md)
 - [PROC_PATTERNS.md](PROC_PATTERNS.md)
@@ -47,6 +48,8 @@ Documentation is grouped by **tier**. Most files remain at their historical path
 - [QUICKSTART.md](QUICKSTART.md)
 - [MOD_SDK.md](MOD_SDK.md)
 - [VOXEL_SPRITES.md](VOXEL_SPRITES.md) — MagicaVoxel `.vox` cube-mesh props (`misc_voxel` / `voxel_spawn`)
+- [UNIFIED_CLUSTERED_RENDERER.md](UNIFIED_CLUSTERED_RENDERER.md) — `r_renderMode 3` hybrid deferred + Forward+
+- [MOMENT_OIT_STOCHASTIC_ALPHA.md](MOMENT_OIT_STOCHASTIC_ALPHA.md) — MBOIT (`r_oit 2`) + stochastic alpha clip
 - [RADIANT.md](RADIANT.md)
 - [VOIP.md](VOIP.md) — Opus voice chat + head lip flap
 - [IDTECH3_TV.md](IDTECH3_TV.md) — external idTech3-tv / Owncast live-stream publishing

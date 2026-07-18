@@ -181,6 +181,14 @@ void vk_shutdown( refShutdownCode_t code )
 		qvkDestroyPipelineLayout( vk.device, vk.pipeline_layout_oit_accum, NULL );
 		vk.pipeline_layout_oit_accum = VK_NULL_HANDLE;
 	}
+	if ( vk.pipeline_layout_oit_moments != VK_NULL_HANDLE ) {
+		qvkDestroyPipelineLayout( vk.device, vk.pipeline_layout_oit_moments, NULL );
+		vk.pipeline_layout_oit_moments = VK_NULL_HANDLE;
+	}
+	if ( vk.pipeline_layout_oit_accum_mboit != VK_NULL_HANDLE ) {
+		qvkDestroyPipelineLayout( vk.device, vk.pipeline_layout_oit_accum_mboit, NULL );
+		vk.pipeline_layout_oit_accum_mboit = VK_NULL_HANDLE;
+	}
 	qvkDestroyPipelineLayout(vk.device, vk.pipeline_layout_ssr, NULL);
 	VK_FP64_PointsShutdown();
 
@@ -386,6 +394,8 @@ for (i = 0; i < 2; i++) {
 	VK_DESTROY_SHADER_MODULE_FIELD( vk.modules.ssao_combine_fs );
 	VK_DESTROY_SHADER_MODULE_FIELD( vk.modules.oit_accum_vs );
 	VK_DESTROY_SHADER_MODULE_FIELD( vk.modules.oit_accum_fs );
+	VK_DESTROY_SHADER_MODULE_FIELD( vk.modules.oit_moments_fs );
+	VK_DESTROY_SHADER_MODULE_FIELD( vk.modules.oit_accum_mboit_fs );
 	VK_DESTROY_SHADER_MODULE_FIELD( vk.modules.oit_resolve_fs );
 	VK_DESTROY_SHADER_MODULE_FIELD( vk.modules.ssao_debug_fs );
 	VK_DESTROY_SHADER_MODULE_FIELD( vk.modules.ssao_depth_debug_fs );

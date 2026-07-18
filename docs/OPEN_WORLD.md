@@ -2,7 +2,7 @@
 
 Engine-original **infinite walkable world** scaffolding: view-driven **sector residency** with three layers — modular BSP streaming, **per-chunk Detour nav tiles**, and **billboard scatter** — aligned with id Tech 8-style open worlds (engine-original conventions, not proprietary formats).
 
-Works alongside [DISTRICTS.md](DISTRICTS.md) (USD world partition) and [cm_stream](MOD_SDK.md) sector pk3 delivery.
+Works alongside [DISTRICTS.md](DISTRICTS.md) (USD world partition), [WORLD_CONFIG.md](WORLD_CONFIG.md) (named map-state / geometry-set transitions), and [cm_stream](MOD_SDK.md) sector pk3 delivery.
 
 ## Architecture
 

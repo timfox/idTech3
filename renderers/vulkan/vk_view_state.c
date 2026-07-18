@@ -507,8 +507,21 @@ void vk_update_mvp( const float *m )
 		}
 	}
 
-	layout = ( backEnd.oitAccumPass && vk.pipeline_layout_oit_accum != VK_NULL_HANDLE ) ?
-		vk.pipeline_layout_oit_accum : vk.pipeline_layout;
+	/* Stochastic alpha-clipped materials: reserved[6]=mode, reserved[7]=frame seed. */
+	if ( r_stochasticAlpha && r_stochasticAlpha->integer > 0 ) {
+		push_constants.reserved[6] = (float)r_stochasticAlpha->integer;
+		push_constants.reserved[7] = (float)( tr.frameCount & 1023 );
+	}
+
+	layout = vk.pipeline_layout;
+	if ( backEnd.oitMomentsPass && vk.pipeline_layout_oit_moments != VK_NULL_HANDLE ) {
+		layout = vk.pipeline_layout_oit_moments;
+	} else if ( backEnd.oitAccumPass && r_oit && r_oit->integer == 2 &&
+		vk.pipeline_layout_oit_accum_mboit != VK_NULL_HANDLE ) {
+		layout = vk.pipeline_layout_oit_accum_mboit;
+	} else if ( backEnd.oitAccumPass && vk.pipeline_layout_oit_accum != VK_NULL_HANDLE ) {
+		layout = vk.pipeline_layout_oit_accum;
+	}
 	/*
 	 * Pipeline layouts declare this push range for VERTEX|FRAGMENT (vk_init_device.c).
 	 * Stages omitted from vkCmdPushConstants do not receive the update (Vulkan spec);
@@ -516,7 +529,10 @@ void vk_update_mvp( const float *m )
 	 */
 	stage_flags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
 	push_bytes = (uint32_t)sizeof( push_constants );
-	if ( layout == vk.pipeline_layout_oit_accum && vk.pipeline_layout_oit_accum != VK_NULL_HANDLE ) {
+	if ( ( layout == vk.pipeline_layout_oit_accum || layout == vk.pipeline_layout_oit_moments ||
+		layout == vk.pipeline_layout_oit_accum_mboit ) &&
+		( vk.pipeline_layout_oit_accum != VK_NULL_HANDLE || vk.pipeline_layout_oit_moments != VK_NULL_HANDLE ||
+		vk.pipeline_layout_oit_accum_mboit != VK_NULL_HANDLE ) ) {
 		/* OIT accum layout only reserves two mat4 (128 B); no reserved[] tail. */
 		push_bytes = (uint32_t)( sizeof( float ) * 32 );
 	}

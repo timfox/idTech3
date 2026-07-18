@@ -417,7 +417,7 @@ void vk_bind_descriptor_sets( void )
 	uint32_t bound_set_count = MIN( (uint32_t)VK_DESC_COUNT, vk.maxBoundDescriptorSets );
 
 	start = vk.cmd->descriptor_set.start;
-	if ( start == ~0U && !backEnd.oitAccumPass ) {
+	if ( start == ~0U && !backEnd.oitAccumPass && !backEnd.oitMomentsPass ) {
 		if ( vk.cmd->last_pipeline == VK_NULL_HANDLE ) {
 			if ( vk.cmd->descriptor_set.current[VK_DESC_UNIFORM] == VK_NULL_HANDLE &&
 				vk.cmd->uniform_descriptor != VK_NULL_HANDLE )
@@ -436,8 +436,8 @@ void vk_bind_descriptor_sets( void )
 		}
 	}
 
-	end = backEnd.oitAccumPass ? 0 : vk.cmd->descriptor_set.end;
-	if ( backEnd.oitAccumPass )
+	end = ( backEnd.oitAccumPass || backEnd.oitMomentsPass ) ? 0 : vk.cmd->descriptor_set.end;
+	if ( backEnd.oitAccumPass || backEnd.oitMomentsPass )
 		start = 0;
 
 	offset_count = 0;
@@ -503,7 +503,36 @@ void vk_bind_descriptor_sets( void )
 	}
 #endif
 
-	if ( backEnd.oitAccumPass && vk.pipeline_layout_oit_accum != VK_NULL_HANDLE ) {
+	if ( backEnd.oitMomentsPass && vk.pipeline_layout_oit_moments != VK_NULL_HANDLE ) {
+		if ( vk.cmd->descriptor_set.current[VK_DESC_TEXTURE0] != VK_NULL_HANDLE ) {
+			VkDescriptorSet sets[2] = {
+				vk.cmd->descriptor_set.current[VK_DESC_TEXTURE0],
+				vk.oit_depth_descriptor
+			};
+			uint32_t set_count = ( vk.oit_depth_descriptor != VK_NULL_HANDLE ) ? 2u : 1u;
+			qvkCmdBindDescriptorSets( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
+				vk.pipeline_layout_oit_moments, 0, set_count, sets, 0, NULL );
+		}
+	} else if ( backEnd.oitAccumPass && r_oit && r_oit->integer == 2 &&
+		vk.pipeline_layout_oit_accum_mboit != VK_NULL_HANDLE ) {
+		if ( vk.cmd->descriptor_set.current[VK_DESC_TEXTURE0] != VK_NULL_HANDLE ) {
+			VkDescriptorSet sets[4] = {
+				vk.cmd->descriptor_set.current[VK_DESC_TEXTURE0],
+				vk.oit_depth_descriptor,
+				vk.oit_moments_descriptor,
+				vk.oit_b0_descriptor
+			};
+			uint32_t set_count = 1u;
+			if ( vk.oit_depth_descriptor != VK_NULL_HANDLE ) {
+				set_count = 2u;
+			}
+			if ( vk.oit_moments_descriptor != VK_NULL_HANDLE && vk.oit_b0_descriptor != VK_NULL_HANDLE ) {
+				set_count = 4u;
+			}
+			qvkCmdBindDescriptorSets( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
+				vk.pipeline_layout_oit_accum_mboit, 0, set_count, sets, 0, NULL );
+		}
+	} else if ( backEnd.oitAccumPass && vk.pipeline_layout_oit_accum != VK_NULL_HANDLE ) {
 		/* OIT accum set 0 = tex0; set 1 = opaque depth for MSAA/manual rejection. */
 		if ( vk.cmd->descriptor_set.current[VK_DESC_TEXTURE0] != VK_NULL_HANDLE ) {
 			VkDescriptorSet sets[2] = {
@@ -526,7 +555,7 @@ static void vk_force_descriptor_rebind( void )
 {
 	uint32_t bound_set_count = MIN( (uint32_t)VK_DESC_COUNT, vk.maxBoundDescriptorSets );
 
-	if ( !vk.cmd || backEnd.oitAccumPass ) {
+	if ( !vk.cmd || backEnd.oitAccumPass || backEnd.oitMomentsPass ) {
 		return;
 	}
 
@@ -547,7 +576,11 @@ static void vk_force_descriptor_rebind( void )
 void vk_bind_pipeline( uint32_t pipeline ) {
 	VkPipeline vkpipe;
 
-	if ( backEnd.oitAccumPass && vk.oit_accum_pipeline != VK_NULL_HANDLE ) {
+	if ( backEnd.oitMomentsPass && vk.oit_moments_pipeline != VK_NULL_HANDLE ) {
+		vkpipe = vk.oit_moments_pipeline;
+	} else if ( backEnd.oitAccumPass && r_oit && r_oit->integer == 2 && vk.oit_accum_mboit_pipeline != VK_NULL_HANDLE ) {
+		vkpipe = vk.oit_accum_mboit_pipeline;
+	} else if ( backEnd.oitAccumPass && vk.oit_accum_pipeline != VK_NULL_HANDLE ) {
 		vkpipe = vk.oit_accum_pipeline;
 	} else {
 		vkpipe = vk_gen_pipeline( pipeline );
@@ -559,7 +592,7 @@ void vk_bind_pipeline( uint32_t pipeline ) {
 		vk_force_descriptor_rebind();
 	}
 
-	if ( !backEnd.oitAccumPass ) {
+	if ( !backEnd.oitAccumPass && !backEnd.oitMomentsPass ) {
 		vk_world.dirty_depth_attachment |= ( vk.pipelines[ pipeline ].def.state_bits & GLS_DEPTHMASK_TRUE );
 	}
 }

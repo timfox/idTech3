@@ -339,9 +339,10 @@ static void vk_create_fullres_color_attachment(
 ===============
 vk_create_deferred_gbuffer_scaffold
 ===============
-Allocates full-res G-buffer RTs when r_renderMode 1/2 and r_deferredGBuffer 1.
+Allocates full-res G-buffer RTs when r_renderMode 1/2/3 and r_deferredGBuffer 1.
 r_renderMode 2 uses these as a sidecar for temporal/advanced consumers while
-Forward+ remains the primary lighting path.
+Forward+ remains the primary lighting path. Mode 3 (Unified Clustered) uses
+them for deferred opaque lighting.
 */
 static void vk_create_deferred_gbuffer_scaffold( void )
 {
@@ -359,7 +360,8 @@ static void vk_create_deferred_gbuffer_scaffold( void )
 	vk.deferred_lighting_image = VK_NULL_HANDLE;
 	vk.deferred_lighting_view = VK_NULL_HANDLE;
 
-	if ( !vk.fboActive || !r_renderMode || ( r_renderMode->integer != 1 && r_renderMode->integer != 2 ) ||
+	if ( !vk.fboActive || !r_renderMode ||
+		( r_renderMode->integer != 1 && r_renderMode->integer != 2 && r_renderMode->integer != 3 ) ||
 		!r_deferredGBuffer || !r_deferredGBuffer->integer ) {
 		return;
 	}
@@ -534,6 +536,14 @@ void vk_create_attachments( void )
 			vk_create_fullres_color_attachment( VK_FORMAT_R16_SFLOAT,
 				VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
 				&vk.oit_reveal_image, &vk.oit_reveal_image_view, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, qfalse );
+			if ( r_oit->integer == 2 ) {
+				vk_create_fullres_color_attachment( VK_FORMAT_R16G16B16A16_SFLOAT,
+					VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
+					&vk.oit_moments_image, &vk.oit_moments_image_view, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, qfalse );
+				vk_create_fullres_color_attachment( VK_FORMAT_R16_SFLOAT,
+					VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
+					&vk.oit_b0_image, &vk.oit_b0_image_view, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, qfalse );
+			}
 		}
 
 		// ssr (same format as color)
@@ -1923,6 +1933,18 @@ void vk_destroy_attachments( void )
 		qvkDestroyImageView( vk.device, vk.oit_reveal_image_view, NULL );
 		vk.oit_reveal_image = VK_NULL_HANDLE;
 		vk.oit_reveal_image_view = VK_NULL_HANDLE;
+	}
+	if ( vk.oit_moments_image ) {
+		qvkDestroyImage( vk.device, vk.oit_moments_image, NULL );
+		qvkDestroyImageView( vk.device, vk.oit_moments_image_view, NULL );
+		vk.oit_moments_image = VK_NULL_HANDLE;
+		vk.oit_moments_image_view = VK_NULL_HANDLE;
+	}
+	if ( vk.oit_b0_image ) {
+		qvkDestroyImage( vk.device, vk.oit_b0_image, NULL );
+		qvkDestroyImageView( vk.device, vk.oit_b0_image_view, NULL );
+		vk.oit_b0_image = VK_NULL_HANDLE;
+		vk.oit_b0_image_view = VK_NULL_HANDLE;
 	}
 
 	if ( vk.ssr_image ) {

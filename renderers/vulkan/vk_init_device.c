@@ -1182,6 +1182,31 @@ void vk_initialize( void )
 			desc.pPushConstantRanges = &push_range;
 			VK_CHECK( qvkCreatePipelineLayout( vk.device, &desc, NULL, &vk.pipeline_layout_oit_accum ) );
 			SET_OBJECT_NAME( vk.pipeline_layout_oit_accum, "pipeline layout - oit_accum", VK_DEBUG_REPORT_OBJECT_TYPE_PIPELINE_LAYOUT_EXT );
+
+			if ( r_oit->integer == 2 ) {
+				/* MBOIT pass 1: set 0 = tex0, set 1 = opaque depth */
+				set_layouts[0] = vk.set_layout_sampler;
+				set_layouts[1] = vk.set_layout_sampler;
+				desc.setLayoutCount = 2;
+				desc.pSetLayouts = set_layouts;
+				push_range.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
+				push_range.offset = 0;
+				push_range.size = 128;
+				desc.pushConstantRangeCount = 1;
+				desc.pPushConstantRanges = &push_range;
+				VK_CHECK( qvkCreatePipelineLayout( vk.device, &desc, NULL, &vk.pipeline_layout_oit_moments ) );
+				SET_OBJECT_NAME( vk.pipeline_layout_oit_moments, "pipeline layout - oit_moments", VK_DEBUG_REPORT_OBJECT_TYPE_PIPELINE_LAYOUT_EXT );
+
+				/* MBOIT pass 2: set 0 = tex0, set 1 = depth, set 2 = moments, set 3 = b0 */
+				set_layouts[0] = vk.set_layout_sampler;
+				set_layouts[1] = vk.set_layout_sampler;
+				set_layouts[2] = vk.set_layout_sampler;
+				set_layouts[3] = vk.set_layout_sampler;
+				desc.setLayoutCount = 4;
+				desc.pSetLayouts = set_layouts;
+				VK_CHECK( qvkCreatePipelineLayout( vk.device, &desc, NULL, &vk.pipeline_layout_oit_accum_mboit ) );
+				SET_OBJECT_NAME( vk.pipeline_layout_oit_accum_mboit, "pipeline layout - oit_accum_mboit", VK_DEBUG_REPORT_OBJECT_TYPE_PIPELINE_LAYOUT_EXT );
+			}
 		}
 
 		// ssr layout (set 0: color, set 1: depth, push constants: 2 mat4 + 2 vec4 = 160 bytes)

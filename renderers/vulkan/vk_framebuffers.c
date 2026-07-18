@@ -343,6 +343,19 @@ void vk_create_framebuffers( void )
 		VK_CHECK( qvkCreateFramebuffer( vk.device, &desc, NULL, &vk.framebuffers.oit_accum ) );
 		SET_OBJECT_NAME( vk.framebuffers.oit_accum, "framebuffer - oit_accum", VK_DEBUG_REPORT_OBJECT_TYPE_FRAMEBUFFER_EXT );
 
+		if ( r_oit->integer == 2 && vk.render_pass.oit_moments != VK_NULL_HANDLE &&
+			vk.oit_moments_image_view && vk.oit_b0_image_view )
+		{
+			desc.renderPass = vk.render_pass.oit_moments;
+			desc.attachmentCount = ( vk_get_main_rasterization_samples() == VK_SAMPLE_COUNT_1_BIT && vk.depth_image_view ) ? 3 : 2;
+			framebuffer_attachments[0] = vk.oit_moments_image_view;
+			framebuffer_attachments[1] = vk.oit_b0_image_view;
+			if ( desc.attachmentCount == 3 )
+				framebuffer_attachments[2] = vk.depth_image_view;
+			VK_CHECK( qvkCreateFramebuffer( vk.device, &desc, NULL, &vk.framebuffers.oit_moments ) );
+			SET_OBJECT_NAME( vk.framebuffers.oit_moments, "framebuffer - oit_moments", VK_DEBUG_REPORT_OBJECT_TYPE_FRAMEBUFFER_EXT );
+		}
+
 		desc.renderPass = vk.render_pass.oit_resolve;
 		framebuffer_attachments[0] = vk.color_image_view;
 		VK_CHECK( qvkCreateFramebuffer( vk.device, &desc, NULL, &vk.framebuffers.oit_resolve ) );
@@ -432,6 +445,10 @@ void vk_destroy_framebuffers( void ) {
 	if ( vk.framebuffers.oit_accum != VK_NULL_HANDLE ) {
 		qvkDestroyFramebuffer( vk.device, vk.framebuffers.oit_accum, NULL );
 		vk.framebuffers.oit_accum = VK_NULL_HANDLE;
+	}
+	if ( vk.framebuffers.oit_moments != VK_NULL_HANDLE ) {
+		qvkDestroyFramebuffer( vk.device, vk.framebuffers.oit_moments, NULL );
+		vk.framebuffers.oit_moments = VK_NULL_HANDLE;
 	}
 	if ( vk.framebuffers.oit_resolve != VK_NULL_HANDLE ) {
 		qvkDestroyFramebuffer( vk.device, vk.framebuffers.oit_resolve, NULL );

@@ -69,6 +69,10 @@ void vk_update_post_process_pipelines( void )
 		if ( r_oit && r_oit->integer ) {
 			vk_create_post_process_pipeline( 20, postWidth, postHeight );
 			vk_create_oit_accum_pipeline();
+			if ( r_oit->integer == 2 ) {
+				vk_create_oit_moments_pipeline();
+				vk_create_oit_accum_mboit_pipeline();
+			}
 		}
 		if ( PostFX_SSR_IsEnabled() ) {
 			vk_create_post_process_pipeline( 13, postWidth, postHeight );

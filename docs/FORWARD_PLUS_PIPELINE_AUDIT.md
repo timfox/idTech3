@@ -42,6 +42,16 @@ Within **`RB_DrawSurfs`** (`tr_backend.c`), order is:
 
 Then PBR draws bind **descriptor set 18** when Forward+ resources are live (`vk_draw_state.c`).
 
+### Mode 3 — Unified Clustered Renderer
+
+When **`r_renderMode 3`** (`vk_unified_clustered_active()`), geometry + deferred are split:
+
+1. Opaque `drawSurfFilter=1` (hybrid handoff: skip Forward+ add; deferred owns dynamics)
+2. G-buffer capture + deferred lighting composite
+3. Transparent `drawSurfFilter=2` with Forward+ fragment shade (shared tile SSBO)
+
+See [UNIFIED_CLUSTERED_RENDERER.md](UNIFIED_CLUSTERED_RENDERER.md). Mode 2 remains the shipping Forward+ primary default.
+
 ---
 
 ## 3. Data layout (SSBOs)

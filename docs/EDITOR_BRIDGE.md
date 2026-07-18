@@ -111,6 +111,7 @@ Already supported in the editor via navmesh overlay.
 | `origin` | vec3 | Spawn position |
 | `angles` | vec3 | Spawn facing |
 | `spawn_type` | string | Director spawn type name |
+| `layout` | string | World-config spawn layout (`default`, `siege`, …) — see [WORLD_CONFIG.md](WORLD_CONFIG.md) |
 | `min_intensity` | float | Min Director intensity to use |
 | `max_intensity` | float | Max Director intensity to use |
 

@@ -235,6 +235,8 @@ void vk_create_shader_modules( void )
 	vk.modules.ssao_combine_fs = SHADER_MODULE( ssao_combine_frag_spv );
 	vk.modules.oit_accum_vs = SHADER_MODULE( oit_accum_vert_spv );
 	vk.modules.oit_accum_fs = SHADER_MODULE( oit_accum_frag_spv );
+	vk.modules.oit_moments_fs = SHADER_MODULE( oit_moments_frag_spv );
+	vk.modules.oit_accum_mboit_fs = SHADER_MODULE( oit_accum_mboit_frag_spv );
 	vk.modules.oit_resolve_fs = SHADER_MODULE( oit_resolve_frag_spv );
 	vk.modules.ssao_debug_fs = SHADER_MODULE( ssao_debug_frag_spv );
 	vk.modules.ssao_depth_debug_fs = SHADER_MODULE( ssao_depth_debug_frag_spv );

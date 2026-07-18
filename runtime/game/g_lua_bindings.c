@@ -30,6 +30,10 @@ Usage from Lua:
 #include "qcommon.h"
 #include "g_lua_bindings.h"
 
+#ifdef USE_OPEN_WORLD
+#include "../world/world_config.h"
+#endif
+
 #ifdef USE_LUA
 #include "lua_compat.h"
 #include <lua.h>
@@ -1127,6 +1131,44 @@ static int l_quest_count(lua_State *L ) {
 	lua_pushinteger( L, EngineQuest_Count() );
 	return 1;
 }
+
+#ifdef USE_OPEN_WORLD
+static int l_worldConfig_set( lua_State *L ) {
+	lua_pushboolean( L, WorldConfig_SetActive( luaL_checkstring( L, 1 ) ) );
+	return 1;
+}
+static int l_worldConfig_get( lua_State *L ) {
+	lua_pushstring( L, WorldConfig_GetActive() );
+	return 1;
+}
+static int l_worldConfig_list( lua_State *L ) {
+	int i;
+	int n = WorldConfig_GetCount();
+	lua_createtable( L, n, 0 );
+	for ( i = 0; i < n; i++ ) {
+		const worldConfigEntry_t *e = WorldConfig_GetByIndex( i );
+		lua_pushstring( L, e ? e->name : "" );
+		lua_rawseti( L, -2, i + 1 );
+	}
+	return 1;
+}
+static int l_worldConfig_spawnLayout( lua_State *L ) {
+	if ( lua_gettop( L ) >= 1 ) {
+		lua_pushboolean( L, WorldConfig_SetSpawnLayout( luaL_checkstring( L, 1 ) ) );
+		return 1;
+	}
+	lua_pushstring( L, WorldConfig_GetSpawnLayout() );
+	return 1;
+}
+static int l_worldConfig_validate( lua_State *L ) {
+	char report[2048];
+	const char *name = luaL_optstring( L, 1, "all" );
+	int fails = WorldConfig_Validate( name, report, sizeof( report ) );
+	lua_pushboolean( L, fails == 0 );
+	lua_pushstring( L, report );
+	return 2;
+}
+#endif
 
 static int l_dialogue_start(lua_State *L ) {
 	lua_pushinteger( L, EngineDialogue_Start( luaL_optstring( L, 1, "" ), luaL_checkstring( L, 2 ) ) );

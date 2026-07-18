@@ -37,6 +37,9 @@ static qboolean R_RtxAvailable( void )
 
 static const char *R_RendererProfileName( void )
 {
+	if ( r_renderMode && r_renderMode->integer == 3 ) {
+		return "unified clustered";
+	}
 	if ( r_hybrid1 && r_hybrid1->integer ) {
 		return "hybrid1 overlay";
 	}
@@ -68,13 +71,14 @@ static int R_RendererPrintCompatibilityWarnings( qboolean printOk )
 		R_RENDERER_WARN( "r_deferredGBuffer 1 requires r_fbo 1; G-buffer allocation will be disabled until vid_restart.\n" );
 	}
 	if ( r_deferredGBuffer && r_deferredGBuffer->integer && r_renderMode && r_renderMode->integer == 0 ) {
-		R_RENDERER_WARN( "r_deferredGBuffer 1 is ignored in r_renderMode 0; use r_renderMode 1/2 and vid_restart.\n" );
+		R_RENDERER_WARN( "r_deferredGBuffer 1 is ignored in r_renderMode 0; use r_renderMode 1/2/3 and vid_restart.\n" );
 	}
 	if ( r_deferredGBufferFill && r_deferredGBufferFill->integer && ( !r_deferredGBuffer || !r_deferredGBuffer->integer ) ) {
 		R_RENDERER_WARN( "r_deferredGBufferFill 1 needs r_deferredGBuffer 1 to create deferred targets.\n" );
 	}
-	if ( r_deferredLighting && r_deferredLighting->integer && ( !r_renderMode || r_renderMode->integer != 1 ) ) {
-		R_RENDERER_WARN( "r_deferredLighting 1 only runs in r_renderMode 1; current mode is %d.\n", R_CvarInteger( r_renderMode ) );
+	if ( r_deferredLighting && r_deferredLighting->integer &&
+		( !r_renderMode || ( r_renderMode->integer != 1 && r_renderMode->integer != 3 ) ) ) {
+		R_RENDERER_WARN( "r_deferredLighting 1 only runs in r_renderMode 1 or 3; current mode is %d.\n", R_CvarInteger( r_renderMode ) );
 	}
 	if ( r_renderMode && r_renderMode->integer == 1 ) {
 		if ( !r_forwardPlus || !r_forwardPlus->integer ) {
@@ -83,6 +87,23 @@ static int R_RendererPrintCompatibilityWarnings( qboolean printOk )
 		if ( r_deferredLighting && r_deferredLighting->integer &&
 			( !r_deferredGBuffer || !r_deferredGBuffer->integer || !r_deferredGBufferFill || !r_deferredGBufferFill->integer ) ) {
 			R_RENDERER_WARN( "deferred lighting needs r_deferredGBuffer 1 and r_deferredGBufferFill 1.\n" );
+		}
+	}
+	if ( r_renderMode && r_renderMode->integer == 3 ) {
+		if ( !r_forwardPlus || !r_forwardPlus->integer ) {
+			R_RENDERER_WARN( "Unified Clustered (mode 3) needs r_forwardPlus 1 for shared tile lists.\n" );
+		}
+		if ( !r_forwardPlusShade || r_forwardPlusShade->value <= 0.0f ) {
+			R_RENDERER_WARN( "Unified Clustered (mode 3) needs r_forwardPlusShade > 0 for transparent Forward+.\n" );
+		}
+		if ( !r_deferredGBuffer || !r_deferredGBuffer->integer || !r_deferredGBufferFill || !r_deferredGBufferFill->integer ) {
+			R_RENDERER_WARN( "Unified Clustered (mode 3) needs r_deferredGBuffer 1 and r_deferredGBufferFill 1.\n" );
+		}
+		if ( !r_deferredLighting || !r_deferredLighting->integer ) {
+			R_RENDERER_WARN( "Unified Clustered (mode 3) needs r_deferredLighting 1 for opaque deferred shade.\n" );
+		}
+		if ( vk.msaaActive ) {
+			R_RENDERER_WARN( "MSAA is active; Unified Clustered prefers r_ext_multisample 0 for direct G-buffer export.\n" );
 		}
 	}
 	if ( r_renderMode && r_renderMode->integer == 2 ) {
@@ -163,9 +184,9 @@ static void R_RendererProfile_f( void )
 {
 	ri.Printf( PRINT_ALL, "======== Renderer Profile ========\n" );
 	ri.Printf( PRINT_ALL, "active    : %s\n", R_RendererProfileName() );
-	ri.Printf( PRINT_ALL, "mode      : %d (0=forward, 1=deferred, 2=modern Forward+)\n", R_CvarInteger( r_renderMode ) );
+	ri.Printf( PRINT_ALL, "mode      : %d (0=forward, 1=deferred, 2=modern Forward+, 3=Unified Clustered)\n", R_CvarInteger( r_renderMode ) );
 	ri.Printf( PRINT_ALL, "base      : exec modern_vulkan.cfg\n" );
-	ri.Printf( PRINT_ALL, "overlays  : exec vulkan_overlay_deferred.cfg | vulkan_overlay_rtx.cfg | vulkan_overlay_hybrid1.cfg\n" );
+	ri.Printf( PRINT_ALL, "overlays  : exec vulkan_overlay_deferred.cfg | vulkan_overlay_unified_clustered.cfg | vulkan_overlay_rtx.cfg | vulkan_overlay_hybrid1.cfg\n" );
 	ri.Printf( PRINT_ALL, "classic   : exec classic_baseq3.cfg or classic_openarena_native.cfg\n" );
 	ri.Printf( PRINT_ALL, "warnings  : %d\n", R_RendererPrintCompatibilityWarnings( qfalse ) );
 	ri.Printf( PRINT_ALL, "==================================\n" );
@@ -186,6 +207,12 @@ static void R_RendererStatus_f( void )
 		R_CvarInteger( r_renderMode ), R_CvarInteger( r_deferredLighting ),
 		R_CvarInteger( r_deferredUnlitBase ), R_CvarValue( r_deferredSpecularStrength ),
 		R_CvarValue( r_deferredAOCoupling ) );
+	if ( r_renderMode && r_renderMode->integer == 3 ) {
+		ri.Printf( PRINT_ALL,
+			"unified   : Unified Clustered Renderer — hybrid deferred + Forward+ "
+			"(opaque=deferred transparent=Forward+ tiles=shared active=%s)\n",
+			R_YesNo( vk_unified_clustered_active() ) );
+	}
 	ri.Printf( PRINT_ALL, "forward+  : enabled=%d shade=%.2f maxPerTile=%d lumSort=%d distSort=%d depthCull=%d\n",
 		R_CvarInteger( r_forwardPlus ), R_CvarValue( r_forwardPlusShade ), R_CvarInteger( r_forwardPlusMaxPerTile ),
 		R_CvarInteger( r_forwardPlusLuminanceSort ), R_CvarInteger( r_forwardPlusDistanceSort ), R_CvarInteger( r_forwardPlusDepthCull ) );

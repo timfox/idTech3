@@ -9,6 +9,7 @@ Copyright (C) 2026 Gopex LLC. All rights reserved.
 #include "cm_public.h"
 #include "cm_stream.h"
 #include "cm_stream_merge.h"
+#include "../world/world_config.h"
 
 #define CM_STREAM_GRID 32
 #define CM_STREAM_SECTORS (CM_STREAM_GRID * CM_STREAM_GRID)
@@ -201,13 +202,19 @@ qboolean CM_Stream_LoadSector( int cellX, int cellY ) {
 		return qtrue;
 	}
 
-	Com_sprintf( mapName, sizeof( mapName ), "maps/sector_%d_%d.bsp", cellX, cellY );
-	if ( FS_ReadFile( mapName, NULL ) <= 0 ) {
-		if ( sv_sectorURL && sv_sectorURL->string[0] ) {
-			Com_Printf( "[cm_stream] sector %d,%d missing — prefetch via sv_sectorURL (see cl_sectorPrefetch)\n",
-				cellX, cellY );
+	{
+		char preferred[MAX_QPATH];
+		char fallback[MAX_QPATH];
+
+		Com_sprintf( fallback, sizeof( fallback ), "maps/sector_%d_%d.bsp", cellX, cellY );
+		WorldConfig_FormatSectorBsp( cellX, cellY, preferred, sizeof( preferred ) );
+		if ( !WorldConfig_ResolveReadable( preferred, fallback, mapName, sizeof( mapName ) ) ) {
+			if ( sv_sectorURL && sv_sectorURL->string[0] ) {
+				Com_Printf( "[cm_stream] sector %d,%d missing — prefetch via sv_sectorURL (see cl_sectorPrefetch)\n",
+					cellX, cellY );
+			}
+			return qfalse;
 		}
-		return qfalse;
 	}
 
 	if ( Cvar_VariableIntegerValue( "cm_streamMerge" ) ) {

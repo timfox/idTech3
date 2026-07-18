@@ -1913,6 +1913,7 @@ idtech3_apply_research_compile_defs(client)
 if(USE_OPEN_WORLD)
 	target_compile_definitions(qcommon PRIVATE USE_OPEN_WORLD=1)
 	target_compile_definitions(qcommon_ded PRIVATE USE_OPEN_WORLD=1)
+	target_compile_definitions(client PRIVATE USE_OPEN_WORLD=1)
 endif()
 if(USE_ARC_BLANC)
 	target_compile_definitions(qcommon PRIVATE USE_ARC_BLANC=1)
@@ -2999,6 +3000,20 @@ set_tests_properties(test_voxel_sprites PROPERTIES
 	LABELS "scripts;validation;renderer"
 	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_voxel_sprites.sh;${CMAKE_SOURCE_DIR}/renderers/vulkan/tr_model_vox.c;${CMAKE_SOURCE_DIR}/docs/VOXEL_SPRITES.md")
 
+add_test(NAME test_unified_clustered
+	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_unified_clustered.sh
+	WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+set_tests_properties(test_unified_clustered PROPERTIES
+	LABELS "scripts;validation;renderer"
+	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_unified_clustered.sh;${CMAKE_SOURCE_DIR}/renderers/vulkan/tr_render_mode_vk.c;${CMAKE_SOURCE_DIR}/docs/UNIFIED_CLUSTERED_RENDERER.md")
+
+add_test(NAME test_mboit_stochastic
+	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_mboit_stochastic.sh
+	WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+set_tests_properties(test_mboit_stochastic PROPERTIES
+	LABELS "scripts;validation;renderer"
+	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_mboit_stochastic.sh;${CMAKE_SOURCE_DIR}/renderers/vulkan/shaders/glsl/oit_moments.frag;${CMAKE_SOURCE_DIR}/docs/MOMENT_OIT_STOCHASTIC_ALPHA.md")
+
 add_test(NAME test_upscale
 	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_upscale.sh
 	WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
@@ -3212,6 +3227,13 @@ add_test(NAME test_openworld
 set_tests_properties(test_openworld PROPERTIES
 	LABELS "scripts;validation;openworld;sector_stream"
 	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_openworld.sh;${CMAKE_SOURCE_DIR}/modules/world/world_open.cpp;${CMAKE_SOURCE_DIR}/tests/data/openworld/sprites/sector_0_0.ents")
+
+add_test(NAME test_world_config
+	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_world_config.sh
+	WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+set_tests_properties(test_world_config PROPERTIES
+	LABELS "scripts;validation;openworld;sector_stream"
+	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_world_config.sh;${CMAKE_SOURCE_DIR}/modules/world/world_config.cpp;${CMAKE_SOURCE_DIR}/docs/WORLD_CONFIG.md")
 
 add_test(NAME test_proc
 	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_proc.sh

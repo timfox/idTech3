@@ -40,6 +40,23 @@ layout (constant_id = 3) const int alpha_to_coverage = 0;
 //layout (constant_id = 4) const int color_mode = 0;
 layout (constant_id = 5) const int abs_light = 0;
 
+layout(push_constant) uniform StochTransform {
+	mat4 stoch_mvp;
+	mat4 stoch_prevMvp;
+	float stoch_r0;
+	float stoch_r1;
+	float stoch_r2;
+	float stoch_r3;
+	float stoch_r4;
+	float stoch_r5;
+	float stochMode;
+	float stochSeed;
+} stochPc;
+float StochasticIGN( vec2 p )
+{
+	return fract( 52.9829189 * fract( dot( p, vec2( 0.06711056, 0.00583715 ) ) ) );
+}
+
 float CorrectAlpha(float threshold, float alpha, vec2 tc)
 {
 	ivec2 ts = textureSize(texture0, 0);
@@ -71,6 +88,19 @@ void main() {
 			base.a = CorrectAlpha(alpha_test_value, 1.0 - base.a, frag_tex_coord);
 		} else if (alpha_test_func == 3) {
 			base.a = CorrectAlpha(alpha_test_value, base.a, frag_tex_coord);
+		}
+	} else if ( stochPc.stochMode > 0.5 ) {
+		vec2 noiseUV = gl_FragCoord.xy;
+		if ( stochPc.stochMode > 1.5 ) {
+			noiseUV += vec2( 13.1, 7.7 ) * stochPc.stochSeed;
+		}
+		float noise = StochasticIGN( noiseUV );
+		if ( alpha_test_func == 1 ) {
+			if ( base.a <= noise * 0.02 ) discard;
+		} else if ( alpha_test_func == 2 ) {
+			if ( base.a >= mix( alpha_test_value, noise, 0.85 ) ) discard;
+		} else if ( alpha_test_func == 3 ) {
+			if ( base.a < noise ) discard;
 		}
 	} else
 	// specialization: alpha-test function

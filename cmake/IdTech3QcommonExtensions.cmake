@@ -66,6 +66,7 @@ macro(idtech3_append_open_world_qcommon_sources)
 		list(APPEND QCOMMON_SRCS
 			${_IDTECH3_WORLD}/world_district.cpp
 			${_IDTECH3_WORLD}/world_open.cpp
+			${_IDTECH3_WORLD}/world_config.cpp
 			${_IDTECH3_WORLD}/world_residency.cpp
 			${_IDTECH3_WORLD}/sector_graph.cpp
 			${_IDTECH3_WORLD}/fog_biology.cpp

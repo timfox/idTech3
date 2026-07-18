@@ -10,6 +10,7 @@ Copyright (C) 2026 Gopex LLC. All rights reserved.
 #include "cm_stream_merge.h"
 #include "cm_stream.h"
 #include "cm_local.h"
+#include "../world/world_config.h"
 
 #define CM_MERGE_MAX_SECTORS 64
 
@@ -140,7 +141,17 @@ qboolean CM_Stream_MergeSector( int cellX, int cellY ) {
 	}
 	patch = &s_patches[patchIdx];
 
-	Com_sprintf( mapName, sizeof( mapName ), "maps/sector_%d_%d.bsp", cellX, cellY );
+	{
+		char preferred[MAX_QPATH];
+		char fallback[MAX_QPATH];
+
+		Com_sprintf( fallback, sizeof( fallback ), "maps/sector_%d_%d.bsp", cellX, cellY );
+		WorldConfig_FormatSectorBsp( cellX, cellY, preferred, sizeof( preferred ) );
+		if ( !WorldConfig_ResolveReadable( preferred, fallback, mapName, sizeof( mapName ) ) ) {
+			patch->active = qfalse;
+			return qfalse;
+		}
+	}
 	length = FS_ReadFile( mapName, &buf );
 	if ( length <= 0 || !buf ) {
 		patch->active = qfalse;

@@ -1326,7 +1326,8 @@ typedef struct {
 
 	/* OIT: 0=draw all, 1=opaque only, 2=transparent only */
 	int drawSurfFilter;
-	qboolean oitAccumPass;		/* when set, use OIT accumulation pipeline for transparent surfaces */
+	qboolean oitMomentsPass;	/* MBOIT pass 1: accumulate optical-depth moments */
+	qboolean oitAccumPass;		/* OIT pass 2 (or WBOIT single pass): weighted color accumulation */
 
 	/* First-person rendering: custom FOV and anti-clipping scale */
 	qboolean useFirstPersonProjection;
@@ -1576,6 +1577,7 @@ extern cvar_t	*r_hbaoDirections;
 extern cvar_t	*r_hbaoSteps;
 extern cvar_t	*r_ssaoDebugView;
 extern cvar_t	*r_oit;
+extern cvar_t	*r_stochasticAlpha;
 extern cvar_t	*r_fbo;
 extern cvar_t	*r_fboCinematic;
 extern cvar_t	*r_renderMode;

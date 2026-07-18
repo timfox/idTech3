@@ -325,7 +325,7 @@ typedef struct vkUniform_s {
 	vec4_t pbrGlintParams0;
 	vec4_t pbrGlintParams1;
 	vec4_t pbrGlintFlags;
-	vec4_t pbrDebugMode; // x: debug mode selector
+	vec4_t pbrDebugMode; // x: debug mode selector; y: hybridDeferredOpaque (mode 3)
 	vec4_t pbrShCoeffs[9];
 	/* Parallax occlusion (POM): x=height scale, y=self-shadow strength, z=shadow ray steps (float bits as int), w=unused */
 	vec4_t pbrParallaxParams;
@@ -646,6 +646,7 @@ typedef struct {
 		VkRenderPass ssao_blur;
 		VkRenderPass ssao_combine;
 		VkRenderPass oit_accum;
+		VkRenderPass oit_moments;
 		VkRenderPass oit_resolve;
 		VkRenderPass ssr;
 #ifdef VK_PBR_BRDFLUT
@@ -679,6 +680,8 @@ typedef struct {
 	VkPipelineLayout pipeline_layout_ssao_combine;	// ssao combine (color + ao)
 	VkPipelineLayout pipeline_layout_oit_resolve;	// oit resolve (opaque + accum + revealage)
 	VkPipelineLayout pipeline_layout_oit_accum;	// oit accum (sampler + depth + push constants)
+	VkPipelineLayout pipeline_layout_oit_moments;	// MBOIT pass 1 (tex + depth + push constants)
+	VkPipelineLayout pipeline_layout_oit_accum_mboit;	// MBOIT pass 2 (tex + depth + moments + b0 + push constants)
 	VkPipelineLayout pipeline_layout_ssr;		// ssr (color + depth + push constants)
 	VkPipelineLayout pipeline_layout_atmosphere;	// atmosphere (push constants only)
 	VkPipelineLayout pipeline_layout_fp64_points;	// fp64 point cloud (push constants)
@@ -1189,10 +1192,16 @@ typedef struct {
 	VkImageView oit_accum_image_view;
 	VkImage oit_reveal_image;
 	VkImageView oit_reveal_image_view;
+	VkImage oit_moments_image;
+	VkImageView oit_moments_image_view;
+	VkImage oit_b0_image;
+	VkImageView oit_b0_image_view;
 	VkDescriptorSet oit_opaque_descriptor;	/* opaque copy for OIT resolve */
 	VkDescriptorSet oit_accum_descriptor;
 	VkDescriptorSet oit_reveal_descriptor;
 	VkDescriptorSet oit_depth_descriptor;
+	VkDescriptorSet oit_moments_descriptor;
+	VkDescriptorSet oit_b0_descriptor;
 	VkImage ssr_image;
 	VkImageView ssr_image_view;
 	VkDescriptorSet ssr_descriptor[2];	/* [0]=color, [1]=depth */
@@ -1256,6 +1265,7 @@ typedef struct {
 		VkFramebuffer ssao_blur;
 		VkFramebuffer ssao_combine;
 		VkFramebuffer oit_accum;
+		VkFramebuffer oit_moments;
 		VkFramebuffer oit_resolve;
 		VkFramebuffer ssr;
 		VkFramebuffer main[MAX_SWAPCHAIN_IMAGES];
@@ -1452,6 +1462,8 @@ typedef struct {
 		VkShaderModule ssao_combine_fs;
 		VkShaderModule oit_accum_vs;
 		VkShaderModule oit_accum_fs;
+		VkShaderModule oit_moments_fs;
+		VkShaderModule oit_accum_mboit_fs;
 		VkShaderModule oit_resolve_fs;
 		VkShaderModule ssao_debug_fs;
 		VkShaderModule ssao_depth_debug_fs;
@@ -1642,6 +1654,8 @@ typedef struct {
 	VkPipeline ssao_blur_pipeline;
 	VkPipeline ssao_combine_pipeline;
 	VkPipeline oit_accum_pipeline;	/* WBOIT accumulation for transparent surfaces */
+	VkPipeline oit_moments_pipeline;	/* MBOIT pass 1: moment accumulation */
+	VkPipeline oit_accum_mboit_pipeline;	/* MBOIT pass 2: moment-weighted WBOIT accum */
 	VkPipeline oit_resolve_pipeline;
 	VkPipeline ssao_debug_pipeline;
 	VkPipeline ssao_depth_debug_pipeline;

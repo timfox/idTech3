@@ -73,6 +73,7 @@ TODOs/FIXMEs in `third_party/` and vendored `**/external/**` (duktape, zstd, cjs
 | RB_ColorMask (Vulkan) | `tr_backend.c`, `vk_clear_attachments.c` | **PARTIAL**: `vk_set_color_write_mask()` exists; **`r_vk_colorWriteMaskDynamic`** (latched, default 0) gates `VK_EXT_extended_dynamic_state3`. Disabled by default (OIT/driver issues); falls back to full color writes. |
 | r_renderMode 1 | `tr_init.c`, `tr_render_mode_vk.c` | **`r_deferredLighting 1`**: G-buffer fill + Forward+ tile diffuse (point+spot); **`r_deferredUnlitBase 1`** additive dynamic on static base; latches `r_forwardPlusShade` 0. |
 | r_renderMode 2 | `tr_render_mode_vk.c` | Latched Forward+ primary: sets `r_forwardPlus` / `r_forwardPlusShade` (GPU cap 64; classic `dlightBits` still 32). |
+| r_renderMode 3 | `tr_render_mode_vk.c`, `tr_backend.c` | **Unified Clustered Renderer**: opaque → G-buffer + deferred → transparent Forward+; shared tiles. Opt-in (`vulkan_overlay_unified_clustered.cfg`). See [`UNIFIED_CLUSTERED_RENDERER.md`](UNIFIED_CLUSTERED_RENDERER.md). |
 | r_hdr 3 64-bit output | `vk_post_process_pipeline.c`, HDR format helpers | **PARTIAL**: Infrastructure in place (`vk_hdr64_active`, `_hdr64` modules, pipeline selection). glslangValidator rejects `dvec4`/`f64vec4` fragment outputs → falls back to RGBA32F. |
 | Temporal CPU-skin prev-vertex | `tr_init.c`, `vk_view_state.c`, `RENDERER_2026_ARCHITECTURE_PASS.md` | **PARTIAL**: `r_temporalCpuSkinPrev` 1 (default) uses per-entity motion fallback; true CPU-skinned prev-vertex tess + richer reactive debug still open. |
 | Vegetation wind draw | `vk_vegetation_wind.c` + `tr_shade.c` | **Same-frame deform:** `vk_vegetation_wind_prepare_draw()` runs before the stage iterator on `SURF_VEGETATION` batches; compute writes deformed positions back into `tess.xyz`. Optional future: bind `vegwind_vertex_buffer` as stream 0 to skip CPU readback. |
@@ -90,6 +91,7 @@ TODOs/FIXMEs in `third_party/` and vendored `**/external/**` (duktape, zstd, cjs
 
 | Date | Scope | Notes |
 |------|--------|------|
+| 2026-07-17 | Unified Clustered | `r_renderMode 3` hybrid deferred opaque + Forward+ transparent; see `docs/UNIFIED_CLUSTERED_RENDERER.md`. |
 | 2026-07-17 | Voxel sprites | MagicaVoxel `.vox` → MD3 mesh props (`misc_voxel` / `voxel_spawn`); see `docs/VOXEL_SPRITES.md`. Networked spawn deferred. |
 | 2026-07-11 | Triage follow-up | Flattened remaining `../qcommon` in `engine/` / `renderers/` / `extensions/` (65 files); Vulkan gains `IDTECH3_DIR_ENGINE_CORE`. Bridges retained for soak. Next: bridge-drop audit or RTX long-term. |
 | 2026-07-11 | Triage follow-up | Include rewrite: modules + `runtime/{client,game,server}`; client shell → `shell/`. `MOD_SDK` FSR2 wording fixed. |

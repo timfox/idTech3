@@ -251,8 +251,30 @@ elif ! grep -q 'R_ApplyRenderModeLatch();' "$PROJECT_ROOT/renderers/vulkan/vk_fo
   fail "vk_forward_plus.c should call R_ApplyRenderModeLatch() during Forward+ init"
 elif ! grep -q 'r_deferredLighting' "$RENDER_MODE_C" 2>/dev/null; then
   fail "tr_render_mode_vk.c should latch deferred lighting (r_forwardPlusShade 0)"
+elif ! grep -q 'Unified Clustered Renderer' "$RENDER_MODE_C" 2>/dev/null; then
+  fail "tr_render_mode_vk.c missing r_renderMode 3 Unified Clustered latch"
+elif ! grep -q 'CheckRange( r_renderMode, "0", "3"' "$TR_INIT_VK" 2>/dev/null; then
+  fail "tr_init.c r_renderMode CheckRange should allow 0-3"
 else
-  pass "R_ApplyRenderModeLatch wired (tr_render_mode_vk.c, R_Init, vk_forward_plus)"
+  pass "R_ApplyRenderModeLatch wired (tr_render_mode_vk.c, R_Init, vk_forward_plus, mode 3)"
+fi
+
+echo ""
+echo "Unified Clustered Renderer (r_renderMode 3 frame split):"
+TB_C="$PROJECT_ROOT/renderers/vulkan/tr_backend.c"
+DGB_UC="$PROJECT_ROOT/renderers/vulkan/vk_deferred_gbuffer.c"
+if ! grep -q 'vk_unified_clustered_active' "$DGB_UC" 2>/dev/null; then
+  fail "vk_deferred_gbuffer.c missing vk_unified_clustered_active"
+elif ! grep -q 'vk_unified_clustered_active' "$TB_C" 2>/dev/null; then
+  fail "tr_backend.c missing Unified Clustered opaque/transparent split"
+elif ! test -f "$PROJECT_ROOT/config/vulkan_overlay_unified_clustered.cfg"; then
+  fail "missing config/vulkan_overlay_unified_clustered.cfg"
+elif ! test -f "$PROJECT_ROOT/docs/UNIFIED_CLUSTERED_RENDERER.md"; then
+  fail "missing docs/UNIFIED_CLUSTERED_RENDERER.md"
+elif ! grep -q 'pbrDebugMode.y' "$PROJECT_ROOT/renderers/vulkan/shaders/glsl/gen_frag.tmpl" 2>/dev/null; then
+  fail "gen_frag.tmpl missing mode 3 hybrid handoff (pbrDebugMode.y)"
+else
+  pass "Unified Clustered Renderer (mode 3) wired"
 fi
 
 echo ""

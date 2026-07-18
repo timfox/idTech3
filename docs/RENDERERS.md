@@ -20,8 +20,8 @@ The Vulkan 1.4 renderer is the primary rendering backend, built as a shared libr
 
 ### Current Architecture
 - **Modern Vulkan default:** `exec modern_vulkan.cfg` then `vid_restart`. This is the boring path: FBO + HDR32 + PBR/material blending + **Forward+ primary lighting** + TAA/motion vectors + a deferred G-buffer sidecar.
-- `r_renderMode`: **0** forward (classic projector; `r_forwardPlus` may still be 1), **1** deferred lighting mode (G-buffer + optional `r_deferredLighting`), **2** modern Forward+ primary (`r_forwardPlus` 1, `r_forwardPlusShade` 1, latched via `vid_restart`)
-- **Deferred G-buffer sidecar:** `r_deferredGBuffer 1` + `r_deferredGBufferFill 1` now works with `r_renderMode 1` and `2`. In mode 2 it captures albedo/normal/material for temporal, neural, RT, and debug consumers while Forward+ remains the lighting path. `r_deferredLighting` is intentionally mode-1-only.
+- `r_renderMode`: **0** forward (classic projector; `r_forwardPlus` may still be 1), **1** deferred lighting mode (G-buffer + optional `r_deferredLighting`), **2** modern Forward+ primary (`r_forwardPlus` 1, `r_forwardPlusShade` 1, latched via `vid_restart`), **3** Unified Clustered Renderer (hybrid deferred opaque + Forward+ transparent; opt-in — see [UNIFIED_CLUSTERED_RENDERER.md](UNIFIED_CLUSTERED_RENDERER.md))
+- **Deferred G-buffer sidecar:** `r_deferredGBuffer 1` + `r_deferredGBufferFill 1` now works with `r_renderMode` 1, 2, and 3. In mode 2 it captures albedo/normal/material for temporal, neural, RT, and debug consumers while Forward+ remains the lighting path. `r_deferredLighting` runs in modes **1** and **3** (ignored in mode 2).
 - Vulkan is the supported rendering backend
 - **Shared temporal reset policy** (`vk_temporal.c`): centralizes history invalidation for volumetrics, motion vectors, exposure. Resize, map load, camera cut, and missing prev-frame data trigger resets. Ready for future TAA/upscaler integration.
 - See [RENDERER_2026_ARCHITECTURE_PASS.md](RENDERER_2026_ARCHITECTURE_PASS.md) for the focused 2026 renderer direction
@@ -55,6 +55,7 @@ The renderer profile rule is: start from **one** modern base, then apply an over
 | Overlay | Use | Notes |
 |---------|-----|-------|
 | `vulkan_overlay_deferred.cfg` | Mode-1 deferred lighting development | Switches to `r_renderMode 1`, enables `r_deferredLighting 1`, and disables `r_forwardPlusShade` to avoid double dynamic lighting. |
+| `vulkan_overlay_unified_clustered.cfg` | Unified Clustered Renderer | `r_renderMode 3`: deferred opaque + Forward+ transparent, shared tile lists. See [UNIFIED_CLUSTERED_RENDERER.md](UNIFIED_CLUSTERED_RENDERER.md). |
 | `vulkan_overlay_rtx.cfg` | Plain RTX demo pass | Requires `USE_VULKAN_RTX`; keeps the modern Forward+ base and enables shared TLAS/entity BLAS. |
 | `vulkan_overlay_hybrid1.cfg` | Hybrid1 ray/raster path | Requires `USE_VULKAN_RTX`; keeps the modern Forward+ base, enables shared TLAS/entity BLAS, and enables Hybrid1 channels. |
 
@@ -206,8 +207,9 @@ Code: `renderers/vulkan/vk_forward_plus.c`, `VK_FP_*` constants; cvar registrati
 - **Effective scene render target (Vulkan):** **`vk_get_render_target_width()` / `vk_get_render_target_height()`** in `renderers/vulkan/vk_view_state.c` return **`vk.mainColorWidth` / `mainColorHeight`** when **`vk.fboActive`** and those extents are set (main HDR color attachment); otherwise **`vk.renderWidth` / `vk.renderHeight`** if nonzero; otherwise **`glConfig.vidWidth` / `vidHeight`**. Sun shadow and other passes can temporarily change **`vk.renderWidth`**; packing and screen-space work that must match the **main color** image (Forward+ SSBO viewport, tile cull, SSAO/HBAO texel pushes, SSR → color copy, temporal history invalidation on resize—see `vk_temporal.c`, `vk_forward_plus.c`, `vk_postfx_passes.c`) uses this helper so dimensions stay aligned with the attachment the player sees, not transient globals.
 
 ### Order-Independent Transparency (OIT)
-- Weighted Blended OIT (WBOIT) for correct blending of overlapping transparent surfaces
-- Cvar `r_oit` (0=off, 1=on). Requires `r_fbo 1` and `vid_restart` after changing
+- Order-independent transparency: WBOIT (`r_oit 1`) and Moment Transparency / MBOIT (`r_oit 2`) for glass, smoke, particles, and overlapping translucent layers — see [MOMENT_OIT_STOCHASTIC_ALPHA.md](MOMENT_OIT_STOCHASTIC_ALPHA.md)
+- Stochastic alpha-clipped materials (`r_stochasticAlpha` 0–2) for foliage, grates, hair cards, fabric holes, and decals
+- Cvar `r_oit` (0=off, 1=WBOIT, 2=MBOIT). Requires `r_fbo 1` and `vid_restart` after changing
 - Opaque surfaces drawn first; transparent surfaces (alpha blend and additive) accumulated, then resolved
 - Depth testing against opaque scene when MSAA off (transparent behind walls discarded)
 - Additive blend (ONE/ONE) surfaces included for particles, sparks, etc.
@@ -269,11 +271,11 @@ Code: `renderers/vulkan/vk_forward_plus.c`, `VK_FP_*` constants; cvar registrati
 |------|---------|-------------|
 | `r_fbo` | 1 | Framebuffer objects (required for PBR, HDR, bloom, MSAA, SMAA, SSAO). Use vid_restart after changing. |
 | `r_pbr` | 1 | Physically Based Rendering (metalness/roughness, IBL). Requires r_fbo 1. |
-| `r_renderMode` | 0 | **0** forward, **1** deferred lighting mode, **2** Forward+ primary. `modern_vulkan.cfg` sets **2**. Latched; `vid_restart`. |
-| `r_deferredGBuffer` | 0 | With `r_renderMode` 1/2: allocate albedo/normal/material/lighting G-buffer images. `modern_vulkan.cfg` sets **1** as a sidecar. Latched; `r_fbo` 1. |
-| `r_deferredGBufferFill` | 0 | With G-buffer RTs: copy scene albedo after geometry. On non-MSAA FBO frames, opaque PBR material shaders directly export normals and material; MSAA/legacy paths keep the depth-derived fallback. Material is RGBA16F: metalness, roughness, AO, source confidence. `modern_vulkan.cfg` sets **1**. |
+| `r_renderMode` | 0 | **0** forward, **1** deferred lighting mode, **2** Forward+ primary, **3** Unified Clustered (hybrid deferred + Forward+). `modern_vulkan.cfg` sets **2**. Latched; `vid_restart`. |
+| `r_deferredGBuffer` | 0 | With `r_renderMode` 1/2/3: allocate albedo/normal/material/lighting G-buffer images. `modern_vulkan.cfg` sets **1** as a sidecar. Latched; `r_fbo` 1. |
+| `r_deferredGBufferFill` | 0 | With G-buffer RTs: copy scene albedo after geometry (mode 3: after opaque). On non-MSAA FBO frames, opaque PBR material shaders directly export normals and material; MSAA/legacy paths keep the depth-derived fallback. Material is RGBA16F: metalness, roughness, AO, source confidence. `modern_vulkan.cfg` sets **1**. |
 | `r_deferredGBufferDebug` | 0 | Before bloom: show G-buffer on scene color (1=albedo, 2=normal, 3=material, 4=lighting, 5=normal confidence, 6=motion vectors from the main material pass). |
-| `r_deferredLighting` | 0 | Experimental mode-1 deferred diffuse (Forward+ tiles, point+spot). Replaces scene color after geometry. Latches `r_forwardPlusShade` 0 with `vid_restart`; ignored by the mode-2 modern default. |
+| `r_deferredLighting` | 0 | Deferred diffuse (Forward+ tiles, point+spot). Modes **1** and **3**. Mode 1 latches `r_forwardPlusShade` 0; mode 3 keeps Forward+ shade for transparent. Ignored by mode-2 modern default. |
 | `r_deferredUnlitBase` | 1 | Additive dynamic on static-lit scene copy; skips classic lit-surf pass. **0** = legacy multiply composite. |
 | `r_deferredLightingStrength` | 1 | Scale deferred dynamic diffuse (0–4). |
 | `r_deferredSpecular` | 1 | GGX + Smith + Fresnel specular on deferred dynamic lights (0=diffuse only). |

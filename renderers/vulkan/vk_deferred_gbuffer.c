@@ -2,7 +2,8 @@
 ===========================================================================
 Copyright (C) 2026 Gopex LLC. All rights reserved.
 
-Deferred G-buffer sidecar (r_renderMode 1/2) + experimental lighting (mode 1).
+Deferred G-buffer sidecar (r_renderMode 1/2/3) + lighting (mode 1/3).
+Mode 3 = Unified Clustered Renderer (deferred opaque + Forward+ transparent).
 ===========================================================================
 */
 
@@ -115,7 +116,7 @@ static void vk_dgb_destroy_debug_gfx_pipeline( void )
 qboolean vk_deferred_gbuffer_active( void )
 {
 	return ( vk.deferredGbufferAllocated && r_renderMode &&
-		( r_renderMode->integer == 1 || r_renderMode->integer == 2 ) &&
+		( r_renderMode->integer == 1 || r_renderMode->integer == 2 || r_renderMode->integer == 3 ) &&
 		r_deferredGBuffer && r_deferredGBuffer->integer ) ? qtrue : qfalse;
 }
 
@@ -126,13 +127,33 @@ qboolean vk_deferred_gbuffer_fill_wanted( void )
 
 static qboolean vk_deferred_lighting_wanted( void )
 {
-	return ( vk_deferred_gbuffer_fill_wanted() && r_deferredLighting && r_deferredLighting->integer &&
-		r_renderMode && r_renderMode->integer == 1 && r_forwardPlus && r_forwardPlus->integer ) ? qtrue : qfalse;
+	int mode;
+
+	if ( !vk_deferred_gbuffer_fill_wanted() || !r_deferredLighting || !r_deferredLighting->integer ) {
+		return qfalse;
+	}
+	if ( !r_renderMode || !r_forwardPlus || !r_forwardPlus->integer ) {
+		return qfalse;
+	}
+	mode = r_renderMode->integer;
+	return ( mode == 1 || mode == 3 ) ? qtrue : qfalse;
 }
 
 qboolean vk_deferred_lighting_active( void )
 {
 	return vk_deferred_lighting_wanted();
+}
+
+qboolean vk_unified_clustered_active( void )
+{
+	return ( r_renderMode && r_renderMode->integer == 3 &&
+		vk_deferred_lighting_wanted() ) ? qtrue : qfalse;
+}
+
+qboolean vk_unified_clustered_opaque_handoff( void )
+{
+	/* Opaque pass of mode 3: drawSurfFilter == 1. */
+	return ( vk_unified_clustered_active() && backEnd.drawSurfFilter == 1 ) ? qtrue : qfalse;
 }
 
 qboolean vk_deferred_unlit_base_wanted( void )
@@ -143,6 +164,7 @@ qboolean vk_deferred_unlit_base_wanted( void )
 	if ( !r_deferredUnlitBase || !r_deferredUnlitBase->integer ) {
 		return qfalse;
 	}
+	/* Mode 3: composite still additive; per-draw handoff is via fragment uniform. */
 	return qtrue;
 }
 

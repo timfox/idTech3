@@ -149,15 +149,26 @@ void vk_oit_pass( const struct drawSurfsCommand_s *cmd )
 {
 	uint32_t fullWidth = 0;
 	uint32_t fullHeight = 0;
+	qboolean mboit = ( r_oit && r_oit->integer == 2 );
 
 	if ( !r_oit || !r_oit->integer || !r_fbo || !r_fbo->integer || !vk.fboActive ||
 		vk.render_pass.oit_accum == VK_NULL_HANDLE || vk.render_pass.oit_resolve == VK_NULL_HANDLE ||
 		vk.framebuffers.oit_accum == VK_NULL_HANDLE || vk.framebuffers.oit_resolve == VK_NULL_HANDLE ||
-		vk.oit_resolve_pipeline == VK_NULL_HANDLE || vk.oit_accum_pipeline == VK_NULL_HANDLE ||
+		vk.oit_resolve_pipeline == VK_NULL_HANDLE ||
 		vk.oit_opaque_descriptor == VK_NULL_HANDLE || vk.oit_accum_descriptor == VK_NULL_HANDLE ||
 		vk.oit_reveal_descriptor == VK_NULL_HANDLE || vk.oit_depth_descriptor == VK_NULL_HANDLE ||
 		vk.fog_scene_image_view == VK_NULL_HANDLE || vk.oit_accum_image_view == VK_NULL_HANDLE ||
 		vk.oit_reveal_image_view == VK_NULL_HANDLE )
+		return;
+
+	if ( mboit && ( vk.render_pass.oit_moments == VK_NULL_HANDLE ||
+		vk.framebuffers.oit_moments == VK_NULL_HANDLE ||
+		vk.oit_moments_pipeline == VK_NULL_HANDLE || vk.oit_accum_mboit_pipeline == VK_NULL_HANDLE ||
+		vk.oit_moments_image_view == VK_NULL_HANDLE || vk.oit_b0_image_view == VK_NULL_HANDLE ||
+		vk.oit_moments_descriptor == VK_NULL_HANDLE || vk.oit_b0_descriptor == VK_NULL_HANDLE ) )
+		return;
+
+	if ( !mboit && vk.oit_accum_pipeline == VK_NULL_HANDLE )
 		return;
 
 	vk_end_render_pass();
@@ -178,9 +189,20 @@ void vk_oit_pass( const struct drawSurfsCommand_s *cmd )
 		vk_resolve_volumetric_depth_msaa();
 	}
 
-	/* OIT accum pass: draw transparent surfaces (when oit_accum_pipeline ready) */
+	if ( mboit ) {
+		/* MBOIT pass 1: accumulate optical-depth moments. */
+		vk_begin_render_pass_tracked( vk.render_pass.oit_moments, vk.framebuffers.oit_moments, qtrue, fullWidth, fullHeight );
+		backEnd.oitMomentsPass = qtrue;
+		backEnd.drawSurfFilter = 2;
+		RB_RenderDrawSurfList( cmd->drawSurfs, cmd->numDrawSurfs );
+		backEnd.oitMomentsPass = qfalse;
+		backEnd.drawSurfFilter = 0;
+		vk_end_render_pass();
+	}
+
+	/* OIT accum pass: draw transparent surfaces. */
 	vk_begin_render_pass_tracked( vk.render_pass.oit_accum, vk.framebuffers.oit_accum, qtrue, fullWidth, fullHeight );
-	if ( vk.oit_accum_pipeline ) {
+	if ( mboit ? vk.oit_accum_mboit_pipeline : vk.oit_accum_pipeline ) {
 		backEnd.oitAccumPass = qtrue;
 		backEnd.drawSurfFilter = 2;
 		RB_RenderDrawSurfList( cmd->drawSurfs, cmd->numDrawSurfs );

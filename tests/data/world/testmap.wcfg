@@ -1,0 +1,15 @@
+config default
+config siege
+config night_raid
+
+siege.geometrySuffix _siege
+siege.navSuffix _siege
+siege.spawnLayout siege
+siege.ndgiTime 0.65
+siege.bounds mins -1024 -1024 0 maxs 1024 1024 256
+siege.sightline gate 0 0 64 B 512 0 64 clear
+
+night_raid.geometrySuffix _night
+night_raid.spawnLayout night
+night_raid.ndgiTime 0.9
+night_raid.bounds mins -1024 -1024 0 maxs 1024 1024 256
