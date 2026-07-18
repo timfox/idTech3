@@ -39,7 +39,7 @@ Optional live spoof harness:
 cd build-vk-Release && ctest -R test_p2p_reconnect --output-on-failure
 ```
 
-Static wiring always runs. Live OOB reconnect (connect → `clientkick` → `p2pReconnect`) auto-runs when `idtech3_server` and `docs/renderer_validation/devdata/rtest_base` are present. Skip live with `SKIP_P2P_RECONNECT_LIVE=1`; force-fail if missing with `IDTECH3_P2P_RECONNECT_LIVE=1`. Override pack via `P2P_RECONNECT_GAME_BASE` / `P2P_RECONNECT_GAME_DIR`.
+Static wiring always runs. Live OOB reconnect auto-runs when `idtech3_server` and `docs/renderer_validation/devdata/rtest_base` are present: `p2p_grace_prime` seeds a grace slot (Huffman `connect` is not required), then `p2pReconnect` must return `challengeResponse`. Skip live with `SKIP_P2P_RECONNECT_LIVE=1`; force-fail if missing with `IDTECH3_P2P_RECONNECT_LIVE=1`. Override pack via `P2P_RECONNECT_GAME_BASE` / `P2P_RECONNECT_GAME_DIR`.
 
 ## Migrate (`test_p2p_migrate`)
 

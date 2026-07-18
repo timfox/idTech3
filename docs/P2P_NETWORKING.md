@@ -45,8 +45,9 @@ When `net_p2p 1` is enabled, legacy UI/browser joins also prefer the advertised 
 The dedicated server exposes the same P2P tooling where applicable:
 
 - `p2p_status`, `p2p_address`, `p2p_punch`, `p2p_punch_status`, `p2p_candidates`
-- `p2p_connect <address>` — starts a punch session toward a peer and prints this server's shareable P2P address for inbound clients
+- `p2p_connect <address>` — starts ICE/punch toward a peer and prints this server's shareable P2P address for inbound clients
 - `p2p_list [local|master]` — `local` prints server P2P status plus connected client UDP endpoints; `master` queries `sv_master1` for P2P-capable listings
+- `p2p_grace_prime <host:port>` — test/dev helper that seeds a reconnect grace slot for the given endpoint (used by `test_p2p_reconnect` live smoke)
 
 ## ICE / STUN / TURN (direct_udp)
 

@@ -368,6 +368,7 @@ int SV_Strlen( const char *str );
 //
 void SV_GetChallenge( const netadr_t *from );
 void SV_P2P_HandleReconnectRequest( const netadr_t *from );
+void SV_P2P_PrimeGraceSlot( const netadr_t *from );
 qboolean SV_P2P_AllowReconnectGrace( const netadr_t *from, const char *sessionId );
 void SV_InitChallenger( void );
 

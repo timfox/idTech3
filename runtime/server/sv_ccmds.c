@@ -1633,6 +1633,7 @@ void SV_AddDedicatedCommands( void )
 	Cmd_AddCommand( "p2p_punch_status", SV_P2PPunchStatus_f );
 	Cmd_AddCommand( "p2p_list", SV_P2PList_f );
 	Cmd_AddCommand( "p2p_candidates", SV_P2PCandidates_f );
+	Cmd_AddCommand( "p2p_grace_prime", SV_P2PGracePrime_f );
 	/* oscar_* commands register from OSCAR_Init (qcommon) for client + dedicated */
 }
 
@@ -1651,6 +1652,7 @@ void SV_RemoveDedicatedCommands( void )
 	Cmd_RemoveCommand( "p2p_punch_status" );
 	Cmd_RemoveCommand( "p2p_list" );
 	Cmd_RemoveCommand( "p2p_candidates" );
+	Cmd_RemoveCommand( "p2p_grace_prime" );
 }
 
 static void SV_P2PStatus_f( void ) {
@@ -1709,6 +1711,22 @@ static void SV_P2PPunchStatus_f( void ) {
 
 static void SV_P2PCandidates_f( void ) {
 	NET_P2P_PrintIceCandidates();
+}
+
+static void SV_P2PGracePrime_f( void ) {
+	netadr_t adr;
+
+	if ( Cmd_Argc() != 2 ) {
+		Com_Printf( "usage: p2p_grace_prime <host:port>\n" );
+		return;
+	}
+
+	if ( !NET_StringToAdr( Cmd_Argv( 1 ), &adr, NA_UNSPEC ) ) {
+		Com_Printf( "p2p_grace_prime: bad address %s\n", Cmd_Argv( 1 ) );
+		return;
+	}
+
+	SV_P2P_PrimeGraceSlot( &adr );
 }
 
 static void SV_P2PConnect_f( void ) {

@@ -82,6 +82,52 @@ static void SV_P2P_SaveGraceSlot( const client_t *drop )
 	slot->disconnectTime = svs.time;
 }
 
+void SV_P2P_PrimeGraceSlot( const netadr_t *from )
+{
+	int i;
+	sv_p2p_grace_slot_t *slot;
+	const char *sessionId;
+
+	if ( !from || from->type == NA_BAD || from->type == NA_BOT ) {
+		Com_Printf( "p2p_grace_prime: invalid address\n" );
+		return;
+	}
+
+	if ( !sv_p2pReconnectWindow || sv_p2pReconnectWindow->integer <= 0 ) {
+		Com_Printf( "p2p_grace_prime: sv_p2pReconnectWindow is disabled\n" );
+		return;
+	}
+
+	sessionId = ( sv_p2pSessionId && sv_p2pSessionId->string[0] &&
+	              Q_stricmp( sv_p2pSessionId->string, "auto" ) != 0 )
+	            ? sv_p2pSessionId->string : NULL;
+	if ( !sessionId ) {
+		Com_Printf( "p2p_grace_prime: set sv_p2pSessionId to a non-auto value first\n" );
+		return;
+	}
+
+	slot = NULL;
+	for ( i = 0; i < SV_P2P_GRACE_MAX; i++ ) {
+		if ( !sv_p2pGraceSlots[i].active ) {
+			slot = &sv_p2pGraceSlots[i];
+			break;
+		}
+	}
+	if ( !slot ) {
+		slot = &sv_p2pGraceSlots[0];
+	}
+
+	Com_Memset( slot, 0, sizeof( *slot ) );
+	slot->active = qtrue;
+	Q_strncpyz( slot->sessionId, sessionId, sizeof( slot->sessionId ) );
+	slot->adr = *from;
+	slot->qport = 0;
+	slot->clientNum = -1;
+	slot->disconnectTime = svs.time;
+	Com_Printf( "P2P reconnect: primed grace for session %s from %s\n",
+		sessionId, NET_AdrToStringwPort( from ) );
+}
+
 qboolean SV_P2P_AllowReconnectGrace( const netadr_t *from, const char *sessionId )
 {
 	int i;

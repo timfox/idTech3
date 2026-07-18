@@ -21,8 +21,10 @@ test -f runtime/server/sv_client.c || fail "missing sv_client.c"
 test -f runtime/game/g_lua_control_bindings.inc || fail "missing Lua control bindings include"
 grep -q 'SV_P2P_HandleReconnectRequest' runtime/server/sv_client.c || fail "missing reconnect handler"
 grep -q 'SV_P2P_SaveGraceSlot' runtime/server/sv_client.c || fail "missing grace slot saver"
+grep -q 'SV_P2P_PrimeGraceSlot' runtime/server/sv_client.c || fail "missing grace prime helper"
 grep -q 'SV_P2P_AllowReconnectGrace' runtime/server/sv_client.c || fail "missing grace allow helper"
 grep -q 'p2pReconnect' runtime/server/sv_main.c || fail "missing p2pReconnect OOB dispatch"
+grep -q 'p2p_grace_prime' runtime/server/sv_ccmds.c || fail "missing p2p_grace_prime command"
 grep -q 'CL_P2P_SessionPrepareDisconnect' runtime/client/core/cl_p2p_session.c || fail "missing disconnect prepare"
 grep -q 'CL_P2P_SessionOnConnectFromServerInfo' runtime/client/core/cl_p2p_session.c || fail "missing serverinfo session cache"
 grep -q 'CL_P2P_SessionFrame' runtime/client/core/cl_frame.c || fail "missing session frame hook"
@@ -79,7 +81,7 @@ LOG="$(mktemp)"
 trap 'kill $(jobs -p) 2>/dev/null || true; rm -f "$LOG"' EXIT
 
 python3 - "$SERVER_BIN" "$GAME_BASE" "$GAME_DIR" "$PORT" "$SESSION_ID" "$MAP_NAME" "$LOG" <<'PY' || { cat "$LOG" >&2; fail "live reconnect flow failed"; }
-import os, random, socket, subprocess, sys, time
+import socket, subprocess, sys, time
 
 server_bin, game_base, game_dir, port_s, session_id, map_name, log_path = sys.argv[1:8]
 port = int(port_s)
@@ -87,13 +89,16 @@ host = "127.0.0.1"
 
 cmd = [
     server_bin,
-    "+set", "dedicated", "2",
+    "+set", "dedicated", "1",
+    "+set", "net_ip", host,
     "+set", "net_port", str(port),
     "+set", "fs_basepath", game_base,
     "+set", "fs_game", game_dir,
     "+set", "vm_game", "2",
     "+set", "bot_enable", "0",
     "+set", "net_p2p", "1",
+    "+set", "net_p2pStun", "0",
+    "+set", "net_p2pBackend", "direct_udp",
     "+set", "sv_p2pSessionId", session_id,
     "+set", "sv_p2pReconnectWindow", "45",
     "+set", "sv_p2pFailover", "reconnect",
@@ -105,60 +110,46 @@ cmd = [
 log_handle = open(log_path, "w", buffering=1)
 proc = subprocess.Popen(cmd, stdin=subprocess.PIPE, stdout=log_handle, stderr=subprocess.STDOUT, text=True)
 try:
-    time.sleep(5.0)
-    if proc.poll() is not None:
-        raise SystemExit(f"server exited early, see {log_path}")
-
-    def oob(msg: str) -> bytes:
-        return b"\xff\xff\xff\xff" + msg.encode("ascii")
-
-    def info_string(pairs):
-        return "".join(f"\\{k}\\{v}" for k, v in pairs)
+    for _ in range(60):
+        time.sleep(0.25)
+        with open(log_path, "r", encoding="utf-8", errors="replace") as fh:
+            if "InitGame:" in fh.read():
+                break
+        if proc.poll() is not None:
+            raise SystemExit(f"server exited early, see {log_path}")
+    else:
+        raise SystemExit(f"InitGame not seen, see {log_path}")
 
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     sock.bind((host, 0))
     sock.settimeout(5.0)
+    client_port = sock.getsockname()[1]
 
-    sock.sendto(oob("getchallenge 1 idTech3"), (host, port))
-    data, _ = sock.recvfrom(4096)
-    text = data[4:].decode("latin1", errors="replace")
-    if "challengeResponse" not in text:
-        raise SystemExit(f"no challengeResponse: {text!r}")
-    server_challenge = int(text.split()[1])
-
-    qport = random.randint(1, 0xFFFF)
-    userinfo = info_string([
-        ("name", "p2p_reconnect_bot"),
-        ("rate", "25000"),
-        ("snaps", "20"),
-        ("model", "sarge"),
-        ("headmodel", "sarge"),
-        ("challenge", str(server_challenge)),
-        ("qport", str(qport)),
-        ("protocol", "72"),
-        ("client", "idtech3-test"),
-    ])
-    sock.sendto(oob(f'connect "{userinfo}"'), (host, port))
-    time.sleep(2.0)
-
-    proc.stdin.write("clientkick 0\n")
+    # connect OOB is Huffman-compressed; prime grace for this UDP endpoint instead.
+    proc.stdin.write(f"p2p_grace_prime {host}:{client_port}\n")
     proc.stdin.flush()
-    time.sleep(1.5)
 
-    sock.sendto(oob(f"p2pReconnect {session_id}"), (host, port))
+    deadline = time.time() + 5.0
+    while time.time() < deadline:
+        with open(log_path, "r", encoding="utf-8", errors="replace") as fh:
+            if "P2P reconnect: primed grace" in fh.read():
+                break
+        time.sleep(0.1)
+    else:
+        raise SystemExit(f"grace prime missing in {log_path}")
+
+    sock.sendto(b"\xff\xff\xff\xff" + f"p2pReconnect {session_id}".encode("ascii"), (host, port))
     data, _ = sock.recvfrom(4096)
     resp = data[4:].decode("latin1", errors="replace")
     if "challengeResponse" not in resp:
-        raise SystemExit(f"post-kick reconnect failed: {resp!r}")
+        raise SystemExit(f"post-prime reconnect failed: {resp!r}")
 
-    deadline = time.time() + 8.0
-    log = ""
+    deadline = time.time() + 5.0
     while time.time() < deadline:
         with open(log_path, "r", encoding="utf-8", errors="replace") as fh:
-            log = fh.read()
-        if "P2P reconnect: fast challenge" in log:
-            break
-        time.sleep(0.25)
+            if "P2P reconnect: fast challenge" in fh.read():
+                break
+        time.sleep(0.1)
     else:
         raise SystemExit(f"server log missing fast reconnect challenge ({log_path})")
 
