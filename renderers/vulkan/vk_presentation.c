@@ -25,6 +25,20 @@ Extracted from vk.c for incremental modularization.
 #include "inspector/vk_imgui.h"
 #endif
 
+static void vk_reset_presentation_runtime_state( void )
+{
+	uint32_t i;
+
+	vk.inRenderPass = qfalse;
+	vk.uiOverlayActive = qfalse;
+	vk.renderPassIndex = RENDER_PASS_MAIN;
+
+	for ( i = 0; i < NUM_COMMAND_BUFFERS; i++ ) {
+		vk.tess[i].swapchain_image_acquired = qfalse;
+		vk.tess[i].swapchain_image_index = 0;
+	}
+}
+
 void vk_teardown_presentation_targets( void )
 {
 	uint32_t i;
@@ -50,6 +64,8 @@ void vk_teardown_presentation_targets( void )
 #ifdef VK_CUBEMAP
 	vk_destroy_cubemap_prefilter();
 #endif
+
+	vk_reset_presentation_runtime_state();
 }
 
 void vk_restore_presentation_targets( void )
@@ -77,6 +93,13 @@ void vk_restore_presentation_targets( void )
 	vk_update_volumetric_descriptors();
 	vk_reset_scene_src_rect_tracking();
 	vk_reset_post_fog_frame_state();
+	vk_reset_presentation_runtime_state();
+	vk.renderWidth = vk.mainColorWidth > 0u ? vk.mainColorWidth :
+		( vk.swapchain_extent_valid ? vk.swapchain_extent.width : ( glConfig.vidWidth > 0 ? (uint32_t)glConfig.vidWidth : 1u ) );
+	vk.renderHeight = vk.mainColorHeight > 0u ? vk.mainColorHeight :
+		( vk.swapchain_extent_valid ? vk.swapchain_extent.height : ( glConfig.vidHeight > 0 ? (uint32_t)glConfig.vidHeight : 1u ) );
+	vk.renderScaleX = 1.0f;
+	vk.renderScaleY = 1.0f;
 
 	vk_update_post_process_pipelines();
 

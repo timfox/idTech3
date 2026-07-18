@@ -1,6 +1,7 @@
 #include "tr_local.h"
 #include "vk.h"
 #include "vk_frame_end.h"
+#include "vk_descriptor_sets.h"
 #include "vk_image_layout.h"
 #include "vk_post_fog.h"
 #include "vk_post_process_push.h"
@@ -15,6 +16,8 @@
 #ifdef USE_IMGUI
 #include "inspector/vk_imgui.h"
 #endif
+
+static void vk_end_frame_update_gamma_target( void );
 
 static const char *vk_end_frame_render_pass_name( renderPass_t pass )
 {
@@ -106,6 +109,83 @@ static void vk_end_frame_bind_taa_sets( VkDescriptorSet set0, VkDescriptorSet se
 
 	qvkCmdBindDescriptorSets( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
 		vk.pipeline_layout_taa, 0, 5, sets, 0, NULL );
+}
+
+static qboolean vk_end_frame_gamma_chain_ready( void )
+{
+	if ( vk.cmd == NULL || vk.cmd->command_buffer == VK_NULL_HANDLE ||
+		vk.cmd_index >= NUM_COMMAND_BUFFERS ||
+		vk.swapchain_image_count == 0 ||
+		vk.gamma_pipeline == VK_NULL_HANDLE || vk.post_color_descriptor[vk.cmd_index] == VK_NULL_HANDLE ||
+		vk.render_pass.gamma == VK_NULL_HANDLE ||
+		vk.cmd->swapchain_image_index >= vk.swapchain_image_count ||
+		vk.cmd->swapchain_image_index >= MAX_SWAPCHAIN_IMAGES ||
+		vk.framebuffers.gamma[ vk.cmd->swapchain_image_index ] == VK_NULL_HANDLE ||
+		vk.renderWidth == 0 || vk.renderHeight == 0 ) {
+		return qfalse;
+	}
+
+	return qtrue;
+}
+
+static qboolean vk_end_frame_try_repair_gamma_chain( VkImageView *gamma_src )
+{
+	if ( !vk.fboActive || vk.cmd == NULL || vk.cmd->command_buffer == VK_NULL_HANDLE ) {
+		return qfalse;
+	}
+
+	vk_update_attachment_descriptors();
+	vk_update_post_process_pipelines();
+	vk_end_frame_update_gamma_target();
+	vk_end_frame_refresh_postfx_params_for_target( vk.renderWidth, vk.renderHeight );
+
+	if ( gamma_src && *gamma_src == VK_NULL_HANDLE ) {
+		*gamma_src = vk_get_post_fog_source();
+		if ( *gamma_src == VK_NULL_HANDLE ) {
+			*gamma_src = vk.color_image_view;
+		}
+	}
+
+	if ( gamma_src && *gamma_src != VK_NULL_HANDLE ) {
+		vk_update_post_fog_descriptors( *gamma_src );
+		vk_update_color_descriptor_image( *gamma_src );
+	}
+
+	if ( r_fboDebug && r_fboDebug->integer >= 1 && vk_post_fog_fbo_debug_throttle() ) {
+		const char *reason = "ready";
+
+		if ( vk.cmd == NULL ) {
+			reason = "no-cmd";
+		} else if ( vk.cmd->command_buffer == VK_NULL_HANDLE ) {
+			reason = "no-command-buffer";
+		} else if ( vk.cmd_index >= NUM_COMMAND_BUFFERS ) {
+			reason = "cmd-index-range";
+		} else if ( vk.swapchain_image_count == 0 ) {
+			reason = "no-swapchain-images";
+		} else if ( vk.cmd->swapchain_image_index >= vk.swapchain_image_count ) {
+			reason = "swapchain-index-range";
+		} else if ( vk.cmd->swapchain_image_index >= MAX_SWAPCHAIN_IMAGES ) {
+			reason = "framebuffer-index-range";
+		} else if ( vk.gamma_pipeline == VK_NULL_HANDLE ) {
+			reason = "no-gamma-pipeline";
+		} else if ( vk.post_color_descriptor[vk.cmd_index] == VK_NULL_HANDLE ) {
+			reason = "no-post-color-descriptor";
+		} else if ( vk.render_pass.gamma == VK_NULL_HANDLE ) {
+			reason = "no-gamma-renderpass";
+		} else if ( vk.framebuffers.gamma[ vk.cmd->swapchain_image_index ] == VK_NULL_HANDLE ) {
+			reason = "no-gamma-framebuffer";
+		} else if ( vk.renderWidth == 0 || vk.renderHeight == 0 ) {
+			reason = "zero-render-size";
+		}
+
+		ri.Printf( PRINT_DEVELOPER, S_COLOR_YELLOW
+			"[VK][fbo] gamma chain self-heal attempted: source=%s ready=%s reason=%s\n",
+			gamma_src ? vk_post_fog_source_name( *gamma_src ) : "null",
+			vk_end_frame_gamma_chain_ready() ? "yes" : "no",
+			reason );
+	}
+
+	return vk_end_frame_gamma_chain_ready();
 }
 
 static void vk_end_frame_draw_fullscreen_quad( uint32_t width, uint32_t height )
@@ -486,13 +566,19 @@ void vk_end_frame_record_gamma_pass( VkImageView post_fog_src )
 			sx, sy );
 	}
 	if ( r_fboDebug && r_fboDebug->integer >= 3 && vk_post_fog_fbo_debug_throttle() ) {
+		const unsigned int gamma_index = ( vk.cmd != NULL ) ? (unsigned int)vk.cmd->swapchain_image_index : 0u;
+		const unsigned long long gamma_fb = ( vk.cmd != NULL && vk.cmd->swapchain_image_index < MAX_SWAPCHAIN_IMAGES ) ?
+			(unsigned long long)(uintptr_t)vk.framebuffers.gamma[ vk.cmd->swapchain_image_index ] : 0ULL;
+
 		ri.Printf( PRINT_DEVELOPER,
-			"[VK][fbo] gamma pipeline=0x%llx color_desc=0x%llx layout=0x%llx rp=0x%llx fb=0x%llx\n",
+			"[VK][fbo] gamma pipeline=0x%llx color_desc=0x%llx layout=0x%llx rp=0x%llx fb=0x%llx idx=%u count=%u\n",
 			(unsigned long long)(uintptr_t)vk.gamma_pipeline,
 			(unsigned long long)(uintptr_t)vk.post_color_descriptor[vk.cmd_index],
 			(unsigned long long)(uintptr_t)vk.pipeline_layout_post_process,
 			(unsigned long long)(uintptr_t)vk.render_pass.gamma,
-			(unsigned long long)(uintptr_t)vk.framebuffers.gamma[ vk.cmd->swapchain_image_index ] );
+			gamma_fb,
+			gamma_index,
+			(unsigned int)vk.swapchain_image_count );
 	}
 
 	if ( r_fboDebug && r_fboDebug->integer >= 1 && vk_post_fog_fbo_debug_throttle() ) {
@@ -508,16 +594,21 @@ void vk_end_frame_record_gamma_pass( VkImageView post_fog_src )
 
 	vk_end_frame_validate_post_process_chain( "gamma_pass", gamma_src, vk_get_luminance_source() );
 
-	if ( vk.gamma_pipeline == VK_NULL_HANDLE || vk.post_color_descriptor[vk.cmd_index] == VK_NULL_HANDLE ||
-		vk.render_pass.gamma == VK_NULL_HANDLE ||
-		vk.cmd->swapchain_image_index >= MAX_SWAPCHAIN_IMAGES ||
-		vk.framebuffers.gamma[ vk.cmd->swapchain_image_index ] == VK_NULL_HANDLE ||
-		vk.renderWidth == 0 || vk.renderHeight == 0 ) {
-		if ( vk_post_fog_fbo_debug_throttle() ) {
-			ri.Printf( PRINT_DEVELOPER, S_COLOR_YELLOW "[VK][fbo] gamma pass skipped: missing pipeline/descriptor/renderpass/framebuffer or zero size (%dx%d)\n",
-				vk.renderWidth, vk.renderHeight );
+	if ( !vk_end_frame_gamma_chain_ready() ) {
+		if ( !vk_end_frame_try_repair_gamma_chain( &gamma_src ) ) {
+			if ( vk_post_fog_fbo_debug_throttle() ) {
+				ri.Printf( PRINT_DEVELOPER, S_COLOR_YELLOW "[VK][fbo] gamma pass skipped: missing pipeline/descriptor/renderpass/framebuffer or zero size (%dx%d)\n",
+					vk.renderWidth, vk.renderHeight );
+			}
+			return;
 		}
-		return;
+	}
+
+	if ( gamma_src == VK_NULL_HANDLE ) {
+		gamma_src = vk_get_post_fog_source();
+		if ( gamma_src == VK_NULL_HANDLE ) {
+			gamma_src = vk.color_image_view;
+		}
 	}
 
 	if ( gamma_src == VK_NULL_HANDLE ) {

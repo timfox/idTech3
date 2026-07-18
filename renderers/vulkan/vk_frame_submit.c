@@ -194,6 +194,17 @@ _retry:
 				ri.Error( ERR_FATAL, "vkAcquireNextImageKHR returned %s", vk_result_string( res ) );
 			}
 		}
+		if ( vk.cmd->swapchain_image_index >= vk.swapchain_image_count ) {
+			if ( retry == qfalse ) {
+				retry = qtrue;
+				ri.Printf( PRINT_WARNING, "vkAcquireNextImageKHR returned out-of-range image index %u (count=%u); restarting swapchain...\n",
+					(unsigned int)vk.cmd->swapchain_image_index, (unsigned int)vk.swapchain_image_count );
+				vk_restart_swapchain( __func__, VK_SUBOPTIMAL_KHR );
+				goto _retry;
+			}
+			ri.Error( ERR_FATAL, "vkAcquireNextImageKHR returned out-of-range image index %u (count=%u)",
+				(unsigned int)vk.cmd->swapchain_image_index, (unsigned int)vk.swapchain_image_count );
+		}
 		vk.cmd->swapchain_image_acquired = qtrue;
 	}
 

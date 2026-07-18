@@ -126,9 +126,11 @@ source_checks() {
 	check_grep "renderers/vulkan/vk_scene_pass.c" 'vk_scene_pass_resume_framebuffer' "scene-pass helpers self-heal safe resume targets"
 	check_grep "renderers/vulkan/vk_post_fog.c" 'vk_choose_post_fog_fallback_source' "post-fog chain self-heals null source drift"
 	check_grep "renderers/vulkan/vk_presentation.c" 'vk_reset_post_fog_frame_state();' "swapchain restore rebinds post-fog state after resize/fullscreen"
+	check_grep "renderers/vulkan/vk_presentation.c" 'vk_reset_presentation_runtime_state' "swapchain restore clears stale presentation runtime state after resize/fullscreen"
 	check_grep "renderers/vulkan/tr_shade.c" 'R_SelectReadyCubemapIndexForPBRAt' "PBR cubemap path can remap to the nearest ready probe"
 	check_grep "renderers/vulkan/tr_shade.c" 'R_HasReadyCubemapForPBR' "PBR cubemap path detects whether any local probe is actually ready"
 	check_grep "renderers/vulkan/tr_shade.c" 'no ready local cubemap found; using HDR skybox fallback until map probes are complete' "PBR cubemap path can fall back to HDR skybox when all local probes are incomplete"
+	check_grep "renderers/vulkan/vk_frame_submit.c" 'vk.cmd->swapchain_image_index >= vk.swapchain_image_count' "frame begin validates acquired swapchain image index after fullscreen restart"
 
 	if [[ -d "${RELEASE_DIR:-$ROOT/release}/base" ]]; then
 		local release_base="${RELEASE_DIR:-$ROOT/release}/base"
