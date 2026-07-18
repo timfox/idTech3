@@ -219,6 +219,10 @@ static void R_RendererStatus_f( void )
 	ri.Printf( PRINT_ALL, "gbuffer   : cvar=%d fill=%d allocated=%s directExport=%s debug=%d\n",
 		R_CvarInteger( r_deferredGBuffer ), R_CvarInteger( r_deferredGBufferFill ),
 		R_YesNo( vk.deferredGbufferAllocated ), R_YesNo( vk.deferredGbufferDirectExport ), R_CvarInteger( r_deferredGBufferDebug ) );
+	ri.Printf( PRINT_ALL, "visbuf    : cvar=%d fill=%d classify=%d allocated=%s debug=%d\n",
+		R_CvarInteger( r_visibilityBuffer ), R_CvarInteger( r_visibilityBufferFill ),
+		R_CvarInteger( r_materialClassify ), R_YesNo( vk.visibilityBufferAllocated ),
+		R_CvarInteger( r_visibilityBufferDebug ) );
 	ri.Printf( PRINT_ALL, "temporal  : taa=%d motionVectors=%d temporalFrame=%u unreliableMotion=%s\n",
 		R_CvarInteger( r_taa ), R_CvarInteger( r_taaMotionVectors ), vk.temporal.frameIndex,
 		R_YesNo( vk.temporal.unreliableMotionThisFrame ) );

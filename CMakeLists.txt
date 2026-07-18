@@ -3007,6 +3007,13 @@ set_tests_properties(test_unified_clustered PROPERTIES
 	LABELS "scripts;validation;renderer"
 	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_unified_clustered.sh;${CMAKE_SOURCE_DIR}/renderers/vulkan/tr_render_mode_vk.c;${CMAKE_SOURCE_DIR}/docs/UNIFIED_CLUSTERED_RENDERER.md")
 
+add_test(NAME test_visibility_buffer
+	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_visibility_buffer.sh
+	WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+set_tests_properties(test_visibility_buffer PROPERTIES
+	LABELS "scripts;validation;renderer"
+	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_visibility_buffer.sh;${CMAKE_SOURCE_DIR}/renderers/vulkan/vk_visibility_buffer.c;${CMAKE_SOURCE_DIR}/docs/RENDERER_2027.md")
+
 add_test(NAME test_mboit_stochastic
 	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_mboit_stochastic.sh
 	WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})

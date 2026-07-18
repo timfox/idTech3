@@ -278,6 +278,23 @@ else
 fi
 
 echo ""
+echo "2027 visibility-buffer foundation (r_visibilityBuffer):"
+VIS_C="$PROJECT_ROOT/renderers/vulkan/vk_visibility_buffer.c"
+if ! test -f "$VIS_C"; then
+  fail "missing renderers/vulkan/vk_visibility_buffer.c"
+elif ! grep -q 'r_visibilityBuffer = ri.Cvar_Get' "$TR_INIT_VK" 2>/dev/null; then
+  fail "tr_init.c missing r_visibilityBuffer cvar"
+elif ! grep -q 'vk_visibility_buffer_capture_after_geometry' "$TB_C" 2>/dev/null; then
+  fail "tr_backend.c missing visibility buffer capture"
+elif ! test -f "$PROJECT_ROOT/config/vulkan_overlay_visibility_2027.cfg"; then
+  fail "missing config/vulkan_overlay_visibility_2027.cfg"
+elif ! test -f "$PROJECT_ROOT/docs/RENDERER_2027.md"; then
+  fail "missing docs/RENDERER_2027.md"
+else
+  pass "2027 visibility-buffer foundation wired"
+fi
+
+echo ""
 echo "TAA frame gating (history confidence, motion barrier):"
 VK_FRAME_END="$PROJECT_ROOT/renderers/vulkan/vk_frame_end.c"
 VK_POSTFX="$PROJECT_ROOT/renderers/vulkan/vk_postfx_params.c"

@@ -411,6 +411,12 @@ void vk_bind_generated_shaders( void ){
     vk_set_shader_name( vk.modules.deferred_gbuffer_fill_cs, "deferred_gbuffer_fill_cs" );
     vk.modules.deferred_gbuffer_debug_fs = SHADER_MODULE( deferred_gbuffer_debug_fs );
     vk_set_shader_name( vk.modules.deferred_gbuffer_debug_fs, "deferred_gbuffer_debug_fs" );
+    vk.modules.visibility_buffer_fill_cs = SHADER_MODULE( visibility_buffer_fill_cs );
+    vk_set_shader_name( vk.modules.visibility_buffer_fill_cs, "visibility_buffer_fill_cs" );
+    vk.modules.visibility_buffer_debug_fs = SHADER_MODULE( visibility_buffer_debug_fs );
+    vk_set_shader_name( vk.modules.visibility_buffer_debug_fs, "visibility_buffer_debug_fs" );
+    vk.modules.material_classify_cs = SHADER_MODULE( material_classify_cs );
+    vk_set_shader_name( vk.modules.material_classify_cs, "material_classify_cs" );
     vk.modules.deferred_lighting_cs = SHADER_MODULE( deferred_lighting_cs );
     vk_set_shader_name( vk.modules.deferred_lighting_cs, "deferred_lighting_cs" );
     vk.modules.ndgi_decompress_cs = SHADER_MODULE( ndgi_decompress_cs );

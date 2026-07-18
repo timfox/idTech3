@@ -23,6 +23,7 @@ Extracted from vk.c for incremental modularization.
 #include "vk_temporal.h"
 #include "vk_forward_plus.h"
 #include "vk_deferred_gbuffer.h"
+#include "vk_visibility_buffer.h"
 #include "vk_view_state.h"
 #include "vk_sim_render_profile.h"
 #include "vk_fp64_points.h"
@@ -1255,6 +1256,7 @@ void vk_initialize( void )
 
 	vk_forward_plus_init();
 	vk_deferred_gbuffer_init();
+	vk_visibility_buffer_init();
 
 	vk_pipeline_cache_create( &props );
 

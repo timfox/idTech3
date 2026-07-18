@@ -1,0 +1,66 @@
+#version 450
+
+/*
+ * Compute material classification stub (Phase 1).
+ * Reads G-buffer material (metalness, roughness, AO, confidence) + depth.
+ * Writes R8UI class IDs — see vk_visibility_buffer.h VK_MATCLASS_*.
+ */
+
+layout(local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
+
+layout(set = 0, binding = 0) uniform sampler2D depthTex;
+layout(set = 0, binding = 1) uniform sampler2D materialTex;
+layout(r8ui, set = 0, binding = 2) uniform writeonly uimage2D classOut;
+
+layout(push_constant) uniform Push {
+	uvec2 extent;
+	uint hasMaterial;
+	uint reserved;
+} pc;
+
+const uint CLASS_EMPTY = 0u;
+const uint CLASS_SIMPLE_OPAQUE = 1u;
+const uint CLASS_LAYERED = 2u;
+const uint CLASS_TRANSMISSION = 3u;
+const uint CLASS_EMISSIVE = 4u;
+const uint CLASS_ALPHA_TEST = 5u;
+/* CLASS_TRANSPARENT_FWD = 6 reserved for Forward+ path (not written here). */
+
+bool validDepth( float depth ) {
+	return depth > 0.0 && depth < 1.0;
+}
+
+void main() {
+	uvec2 pix = gl_GlobalInvocationID.xy;
+	if ( pix.x >= pc.extent.x || pix.y >= pc.extent.y ) {
+		return;
+	}
+
+	ivec2 ip = ivec2( pix );
+	vec2 uv = ( vec2( pix ) + 0.5 ) / vec2( pc.extent );
+	float depth = texture( depthTex, uv ).r;
+
+	if ( !validDepth( depth ) ) {
+		imageStore( classOut, ip, uvec4( CLASS_EMPTY, 0u, 0u, 0u ) );
+		return;
+	}
+
+	uint cls = CLASS_SIMPLE_OPAQUE;
+	if ( pc.hasMaterial != 0u ) {
+		vec4 mat = texture( materialTex, uv );
+		float metal = mat.r;
+		float rough = mat.g;
+		float confidence = mat.a;
+		if ( confidence < 0.35 ) {
+			cls = CLASS_ALPHA_TEST;
+		} else if ( metal > 0.55 ) {
+			cls = CLASS_LAYERED;
+		} else if ( metal < 0.12 && rough < 0.18 ) {
+			cls = CLASS_TRANSMISSION;
+		} else if ( rough > 0.92 && metal < 0.05 ) {
+			cls = CLASS_EMISSIVE;
+		}
+	}
+
+	imageStore( classOut, ip, uvec4( cls, 0u, 0u, 0u ) );
+}

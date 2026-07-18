@@ -20,7 +20,7 @@ The Vulkan 1.4 renderer is the primary rendering backend, built as a shared libr
 
 ### Current Architecture
 - **Modern Vulkan default:** `exec modern_vulkan.cfg` then `vid_restart`. This is the boring path: FBO + HDR32 + PBR/material blending + **Forward+ primary lighting** + TAA/motion vectors + a deferred G-buffer sidecar.
-- `r_renderMode`: **0** forward (classic projector; `r_forwardPlus` may still be 1), **1** deferred lighting mode (G-buffer + optional `r_deferredLighting`), **2** modern Forward+ primary (`r_forwardPlus` 1, `r_forwardPlusShade` 1, latched via `vid_restart`), **3** Unified Clustered Renderer (hybrid deferred opaque + Forward+ transparent; opt-in — see [UNIFIED_CLUSTERED_RENDERER.md](UNIFIED_CLUSTERED_RENDERER.md))
+- `r_renderMode`: **0** forward (classic projector; `r_forwardPlus` may still be 1), **1** deferred lighting mode (G-buffer + optional `r_deferredLighting`), **2** modern Forward+ primary (`r_forwardPlus` 1, `r_forwardPlusShade` 1, latched via `vid_restart`), **3** Unified Clustered Renderer (hybrid deferred opaque + Forward+ transparent; opt-in — see [UNIFIED_CLUSTERED_RENDERER.md](UNIFIED_CLUSTERED_RENDERER.md)). North-star 2027 stack (visibility buffer + meshlets + reservoir RT + neural recon) builds on mode 3 — see [RENDERER_2027.md](RENDERER_2027.md).
 - **Deferred G-buffer sidecar:** `r_deferredGBuffer 1` + `r_deferredGBufferFill 1` now works with `r_renderMode` 1, 2, and 3. In mode 2 it captures albedo/normal/material for temporal, neural, RT, and debug consumers while Forward+ remains the lighting path. `r_deferredLighting` runs in modes **1** and **3** (ignored in mode 2).
 - Vulkan is the supported rendering backend
 - **Shared temporal reset policy** (`vk_temporal.c`): centralizes history invalidation for volumetrics, motion vectors, exposure. Resize, map load, camera cut, and missing prev-frame data trigger resets. Ready for future TAA/upscaler integration.
@@ -56,6 +56,7 @@ The renderer profile rule is: start from **one** modern base, then apply an over
 |---------|-----|-------|
 | `vulkan_overlay_deferred.cfg` | Mode-1 deferred lighting development | Switches to `r_renderMode 1`, enables `r_deferredLighting 1`, and disables `r_forwardPlusShade` to avoid double dynamic lighting. |
 | `vulkan_overlay_unified_clustered.cfg` | Unified Clustered Renderer | `r_renderMode 3`: deferred opaque + Forward+ transparent, shared tile lists. See [UNIFIED_CLUSTERED_RENDERER.md](UNIFIED_CLUSTERED_RENDERER.md). |
+| `vulkan_overlay_visibility_2027.cfg` | 2027 visibility foundation | Mode 3 + G-buffer + `r_visibilityBuffer` + material classify. See [RENDERER_2027.md](RENDERER_2027.md). |
 | `vulkan_overlay_rtx.cfg` | Plain RTX demo pass | Requires `USE_VULKAN_RTX`; keeps the modern Forward+ base and enables shared TLAS/entity BLAS. |
 | `vulkan_overlay_hybrid1.cfg` | Hybrid1 ray/raster path | Requires `USE_VULKAN_RTX`; keeps the modern Forward+ base, enables shared TLAS/entity BLAS, and enables Hybrid1 channels. |
 

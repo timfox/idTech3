@@ -8,7 +8,7 @@ Living map of Vulkan **chocolate** (shipping-available, cvars off by default) vs
 | **Scaffold** | Research / paper path | `USE_EXPERIMENTAL_RENDERERS=ON` (`full` / `research`) |
 | **Done** | Production-oriented default path | — |
 
-See also [RENDERERS.md](RENDERERS.md), [PRODUCTION_GAP_PLAN.md](PRODUCTION_GAP_PLAN.md), [RENDERERS_FUTURE.md](RENDERERS_FUTURE.md), [RENDERER_2026_ARCHITECTURE_PASS.md](RENDERER_2026_ARCHITECTURE_PASS.md).
+See also [RENDERERS.md](RENDERERS.md), [RENDERER_2027.md](RENDERER_2027.md) (hybrid visibility north-star), [PRODUCTION_GAP_PLAN.md](PRODUCTION_GAP_PLAN.md), [RENDERERS_FUTURE.md](RENDERERS_FUTURE.md), [RENDERER_2026_ARCHITECTURE_PASS.md](RENDERER_2026_ARCHITECTURE_PASS.md).
 
 ---
 
@@ -17,6 +17,7 @@ See also [RENDERERS.md](RENDERERS.md), [PRODUCTION_GAP_PLAN.md](PRODUCTION_GAP_P
 | Feature | Status | Gate | Cvars | Docs |
 |---------|--------|------|-------|------|
 | **Forward+ + TAA look** | Chocolate | always | `r_renderMode 2`, `r_taa`, `r_taaMotionVectors` | [demo_idtech8_look.cfg](../examples/demo_game/mod/demo_idtech8_look.cfg) |
+| **Unified Clustered + visibility foundation** | Chocolate | always | `r_renderMode 3`, `r_visibilityBuffer`, `r_materialClassify` | [UNIFIED_CLUSTERED_RENDERER.md](UNIFIED_CLUSTERED_RENDERER.md), [RENDERER_2027.md](RENDERER_2027.md) |
 | **Temporal upscale** | Chocolate | always | `r_upscale` 1\|2, `upscale_status` | [RENDERERS.md](RENDERERS.md) |
 | **Open-world stream LOD** | Chocolate | always | `r_bspStreamLod`, `bsp_stream_status` | [OPEN_WORLD.md](OPEN_WORLD.md), [DISTRICTS.md](DISTRICTS.md) |
 | **Virtual texture + sparse residency** | Chocolate | always | `r_vt`, `r_vtSparse`, `r_vtFeedback`, `vt_*` | [VIRTUAL_TEXTURE.md](VIRTUAL_TEXTURE.md) |

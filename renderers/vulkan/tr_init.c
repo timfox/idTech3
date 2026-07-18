@@ -60,6 +60,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "vk_flashlight.h"
 #include "vk_util.h"
 #include "vk_deferred_gbuffer.h"
+#include "vk_visibility_buffer.h"
 #include "vk_sim_render_profile.h"
 #include "vk_sim_render_debug.h"
 #include "vk_skybox_hdr.h"
@@ -207,6 +208,10 @@ cvar_t	*r_renderMode;
 cvar_t	*r_deferredGBuffer;
 cvar_t	*r_deferredGBufferFill;
 cvar_t	*r_deferredGBufferDebug;
+cvar_t	*r_visibilityBuffer;
+cvar_t	*r_visibilityBufferFill;
+cvar_t	*r_visibilityBufferDebug;
+cvar_t	*r_materialClassify;
 cvar_t	*r_deferredLighting;
 cvar_t	*r_deferredUnlitBase;
 cvar_t	*r_deferredLightingStrength;
@@ -1195,6 +1200,7 @@ static void R_Register( void )
 	ri.Cmd_AddCommand( "vkinfo", VkInfo_f );
 	ri.Cmd_AddCommand( "vulkaninfo", VulkanInfo_f );
 	ri.Cmd_AddCommand( "renderer_status", R_RendererStatus_f );
+	ri.Cmd_AddCommand( "visibility_buffer_status", vk_visibility_buffer_status_f );
 	ri.Cmd_AddCommand( "renderer_profile", R_RendererProfile_f );
 	ri.Cmd_AddCommand( "renderer_subsystems", R_RendererSubsystems_f );
 	ri.Cmd_AddCommand( "renderer_compat", R_RendererCompatibility_f );
@@ -2638,6 +2644,39 @@ static void R_Register( void )
 		"Visualize deferred buffers on scene color before bloom: 0=off, 1=albedo, 2=normal (view XYZ), 3=material, 4=lighting (requires r_deferredLighting 1), 5=normal confidence, 6=motion vectors. "
 		"Requires r_renderMode 1/2/3, r_deferredGBuffer 1, r_deferredGBufferFill 1." );
 	ri.Cvar_SetGroup( r_deferredGBufferDebug, CVG_RENDERER );
+	r_visibilityBuffer = ri.Cvar_Get( "r_visibilityBuffer", "0", CVAR_ARCHIVE_ND | CVAR_LATCH );
+	ri.Cvar_CheckRange( r_visibilityBuffer, "0", "1", CV_INTEGER );
+	ri.Cvar_SetDescription( r_visibilityBuffer,
+		"With r_renderMode 1/2/3: allocate compact visibility-buffer RTs (IDs R32G32_UINT, bary R16G16_UNORM, class R8_UINT). "
+		"2027 Phase 1 foundation; coexists with r_deferredGBuffer. Requires r_fbo 1 and vid_restart. See docs/RENDERER_2027.md." );
+	ri.Cvar_SetGroup( r_visibilityBuffer, CVG_RENDERER );
+	if ( r_visibilityBuffer && r_visibilityBuffer->integer ) {
+		ri.Printf( PRINT_ALL, "[VK][visbuf] r_visibilityBuffer=1 (visibility RTs when r_renderMode 1/2/3)\n" );
+	}
+	r_visibilityBufferFill = ri.Cvar_Get( "r_visibilityBufferFill", "0", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_visibilityBufferFill, "0", "1", CV_INTEGER );
+	ri.Cvar_SetDescription( r_visibilityBufferFill,
+		"With r_visibilityBuffer 1: after opaque (mode 3) or main geometry, fill draw/prim ID + bary proxies from depth (compute). "
+		"True gl_PrimitiveID MRT export is a follow-up." );
+	ri.Cvar_SetGroup( r_visibilityBufferFill, CVG_RENDERER );
+	if ( r_visibilityBufferFill && r_visibilityBufferFill->integer ) {
+		ri.Printf( PRINT_ALL, "[VK][visbuf] r_visibilityBufferFill=1 (capture after geometry each frame)\n" );
+	}
+	r_visibilityBufferDebug = ri.Cvar_Get( "r_visibilityBufferDebug", "0", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_visibilityBufferDebug, "0", "4", CV_INTEGER );
+	ri.Cvar_SetDescription( r_visibilityBufferDebug,
+		"Visualize visibility buffer on scene color before bloom: 0=off, 1=drawId, 2=primId, 3=bary, 4=material class. "
+		"Requires r_visibilityBuffer 1 and r_visibilityBufferFill 1." );
+	ri.Cvar_SetGroup( r_visibilityBufferDebug, CVG_RENDERER );
+	r_materialClassify = ri.Cvar_Get( "r_materialClassify", "0", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_materialClassify, "0", "1", CV_INTEGER );
+	ri.Cvar_SetDescription( r_materialClassify,
+		"With r_visibilityBufferFill 1: compute material class map (simple/layered/transmission/emissive/alpha_test) "
+		"from G-buffer material + depth. Phase 1 stub for specialized shade dispatch." );
+	ri.Cvar_SetGroup( r_materialClassify, CVG_RENDERER );
+	if ( r_materialClassify && r_materialClassify->integer ) {
+		ri.Printf( PRINT_ALL, "[VK][visbuf] r_materialClassify=1 (class map after visibility fill)\n" );
+	}
 	r_deferredLighting = ri.Cvar_Get( "r_deferredLighting", "0", CVAR_ARCHIVE_ND );
 	ri.Cvar_CheckRange( r_deferredLighting, "0", "1", CV_INTEGER );
 	ri.Cvar_SetDescription( r_deferredLighting,

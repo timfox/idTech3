@@ -20,6 +20,7 @@ Split from vk.c.
 #include "vk_skybox_hdr.h"
 #include "vk_forward_plus.h"
 #include "vk_deferred_gbuffer.h"
+#include "vk_visibility_buffer.h"
 #include "vk_rtx.h"
 #include "vk_grtx.h"
 #include "vk_pathtrace.h"
@@ -212,6 +213,7 @@ void vk_shutdown( refShutdownCode_t code )
 	VDB_Shutdown();
 	vk_forward_plus_shutdown();
 	vk_deferred_gbuffer_shutdown();
+	vk_visibility_buffer_shutdown();
 
 	vk_destroy_samplers();
 
@@ -430,6 +432,9 @@ for (i = 0; i < 2; i++) {
 	VK_DESTROY_SHADER_MODULE_FIELD( vk.modules.deferred_gbuffer_debug_fs );
 	VK_DESTROY_SHADER_MODULE_FIELD( vk.modules.deferred_lighting_cs );
 	VK_DESTROY_SHADER_MODULE_FIELD( vk.modules.deferred_lighting_composite_fs );
+	VK_DESTROY_SHADER_MODULE_FIELD( vk.modules.visibility_buffer_fill_cs );
+	VK_DESTROY_SHADER_MODULE_FIELD( vk.modules.visibility_buffer_debug_fs );
+	VK_DESTROY_SHADER_MODULE_FIELD( vk.modules.material_classify_cs );
 	VK_DESTROY_SHADER_MODULE_FIELD( vk.modules.ndgi_decompress_cs );
 	VK_DESTROY_SHADER_MODULE_FIELD( vk.modules.niv_shade_cs );
 	VK_DESTROY_SHADER_MODULE_FIELD( vk.modules.niv_composite_cs );

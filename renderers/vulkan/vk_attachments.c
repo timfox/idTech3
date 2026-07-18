@@ -388,6 +388,46 @@ static void vk_create_deferred_gbuffer_scaffold( void )
 		vk.deferredGbufferDirectExport ? " (direct material export)" : " (depth fallback export)" );
 }
 
+/*
+===============
+vk_create_visibility_buffer_scaffold
+===============
+Allocates compact visibility RTs when r_renderMode 1/2/3 and r_visibilityBuffer 1.
+IDs = R32G32_UINT (draw/prim), bary = R16G16_UNORM, class = R8_UINT.
+*/
+static void vk_create_visibility_buffer_scaffold( void )
+{
+	VkImageUsageFlags usage =
+		VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
+
+	vk.visibilityBufferAllocated = qfalse;
+	vk.visibility_buffer_ids = VK_NULL_HANDLE;
+	vk.visibility_buffer_ids_view = VK_NULL_HANDLE;
+	vk.visibility_buffer_bary = VK_NULL_HANDLE;
+	vk.visibility_buffer_bary_view = VK_NULL_HANDLE;
+	vk.visibility_buffer_class = VK_NULL_HANDLE;
+	vk.visibility_buffer_class_view = VK_NULL_HANDLE;
+
+	if ( !vk.fboActive || !r_renderMode ||
+		( r_renderMode->integer != 1 && r_renderMode->integer != 2 && r_renderMode->integer != 3 ) ||
+		!r_visibilityBuffer || !r_visibilityBuffer->integer ) {
+		return;
+	}
+
+	vk_create_fullres_color_attachment( VK_FORMAT_R32G32_UINT, usage,
+		&vk.visibility_buffer_ids, &vk.visibility_buffer_ids_view,
+		VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, qfalse );
+	vk_create_fullres_color_attachment( VK_FORMAT_R16G16_UNORM, usage,
+		&vk.visibility_buffer_bary, &vk.visibility_buffer_bary_view,
+		VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, qfalse );
+	vk_create_fullres_color_attachment( VK_FORMAT_R8_UINT, usage,
+		&vk.visibility_buffer_class, &vk.visibility_buffer_class_view,
+		VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, qfalse );
+	vk.visibilityBufferAllocated = qtrue;
+	ri.Printf( PRINT_ALL,
+		"[VK][visbuf] visibility scaffold: IDs R32G32_UINT + bary R16G16_UNORM + class R8_UINT\n" );
+}
+
 static void vk_create_fullres_msaa_color_attachment(
 	VkSampleCountFlagBits samples,
 	VkFormat format,
@@ -640,6 +680,7 @@ void vk_create_attachments( void )
 		}
 
 		vk_create_deferred_gbuffer_scaffold();
+		vk_create_visibility_buffer_scaffold();
 
 		/* Luminance 1x1 for eye adaptation (r_exposure_auto) */
 		if ( vk.luminance_layout != VK_NULL_HANDLE ) {
@@ -793,6 +834,18 @@ void vk_create_attachments( void )
 	if ( vk.deferred_lighting_image ) {
 		SET_OBJECT_NAME( vk.deferred_lighting_image, "deferred lighting", VK_DEBUG_REPORT_OBJECT_TYPE_IMAGE_EXT );
 		SET_OBJECT_NAME( vk.deferred_lighting_view, "deferred lighting view", VK_DEBUG_REPORT_OBJECT_TYPE_IMAGE_VIEW_EXT );
+	}
+	if ( vk.visibility_buffer_ids ) {
+		SET_OBJECT_NAME( vk.visibility_buffer_ids, "visibility buffer ids", VK_DEBUG_REPORT_OBJECT_TYPE_IMAGE_EXT );
+		SET_OBJECT_NAME( vk.visibility_buffer_ids_view, "visibility buffer ids view", VK_DEBUG_REPORT_OBJECT_TYPE_IMAGE_VIEW_EXT );
+	}
+	if ( vk.visibility_buffer_bary ) {
+		SET_OBJECT_NAME( vk.visibility_buffer_bary, "visibility buffer bary", VK_DEBUG_REPORT_OBJECT_TYPE_IMAGE_EXT );
+		SET_OBJECT_NAME( vk.visibility_buffer_bary_view, "visibility buffer bary view", VK_DEBUG_REPORT_OBJECT_TYPE_IMAGE_VIEW_EXT );
+	}
+	if ( vk.visibility_buffer_class ) {
+		SET_OBJECT_NAME( vk.visibility_buffer_class, "visibility buffer class", VK_DEBUG_REPORT_OBJECT_TYPE_IMAGE_EXT );
+		SET_OBJECT_NAME( vk.visibility_buffer_class_view, "visibility buffer class view", VK_DEBUG_REPORT_OBJECT_TYPE_IMAGE_VIEW_EXT );
 	}
 
 	for ( i = 0; i < ARRAY_LEN( vk.bloom_image ); i++ )
@@ -2052,6 +2105,26 @@ void vk_destroy_attachments( void )
 	}
 	vk.deferredGbufferAllocated = qfalse;
 	vk.deferredGbufferDirectExport = qfalse;
+
+	if ( vk.visibility_buffer_ids ) {
+		qvkDestroyImage( vk.device, vk.visibility_buffer_ids, NULL );
+		qvkDestroyImageView( vk.device, vk.visibility_buffer_ids_view, NULL );
+		vk.visibility_buffer_ids = VK_NULL_HANDLE;
+		vk.visibility_buffer_ids_view = VK_NULL_HANDLE;
+	}
+	if ( vk.visibility_buffer_bary ) {
+		qvkDestroyImage( vk.device, vk.visibility_buffer_bary, NULL );
+		qvkDestroyImageView( vk.device, vk.visibility_buffer_bary_view, NULL );
+		vk.visibility_buffer_bary = VK_NULL_HANDLE;
+		vk.visibility_buffer_bary_view = VK_NULL_HANDLE;
+	}
+	if ( vk.visibility_buffer_class ) {
+		qvkDestroyImage( vk.device, vk.visibility_buffer_class, NULL );
+		qvkDestroyImageView( vk.device, vk.visibility_buffer_class_view, NULL );
+		vk.visibility_buffer_class = VK_NULL_HANDLE;
+		vk.visibility_buffer_class_view = VK_NULL_HANDLE;
+	}
+	vk.visibilityBufferAllocated = qfalse;
 
 	if ( vk.msaa_image ) {
 		qvkDestroyImage( vk.device, vk.msaa_image, NULL );

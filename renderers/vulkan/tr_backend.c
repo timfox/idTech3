@@ -26,6 +26,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "vk_temporal.h"
 #include "vk_forward_plus.h"
 #include "vk_deferred_gbuffer.h"
+#include "vk_visibility_buffer.h"
 #include "vk_niv.h"
 #include "vk_surfel_gi.h"
 #include "vk_nist.h"
@@ -1865,6 +1866,7 @@ static const void *RB_DrawSurfs( const void *data ) {
 		backEnd.drawSurfFilter = 1; /* opaque only */
 		RB_RenderDrawSurfList( cmd->drawSurfs, cmd->numDrawSurfs );
 		vk_deferred_gbuffer_capture_after_geometry();
+		vk_visibility_buffer_capture_after_geometry();
 		vk_deferred_lighting_apply_after_geometry();
 		backEnd.drawSurfFilter = 2; /* transparent only (Forward+ shade) */
 		if ( r_oit && r_oit->integer && r_fbo && r_fbo->integer ) {
@@ -1889,6 +1891,7 @@ static const void *RB_DrawSurfs( const void *data ) {
 	}
 	if ( !vk_unified_clustered_active() ) {
 		vk_deferred_gbuffer_capture_after_geometry();
+		vk_visibility_buffer_capture_after_geometry();
 		vk_deferred_lighting_apply_after_geometry();
 	}
 	vk_niv_apply_after_geometry();

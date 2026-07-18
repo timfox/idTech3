@@ -31,10 +31,16 @@ renderers/vulkan/vk_temporal.c
 renderers/vulkan/tr_render_mode_vk.c
 renderers/vulkan/vk_deferred_gbuffer.c
 renderers/vulkan/vk_deferred_gbuffer.h
+renderers/vulkan/vk_visibility_buffer.c
+renderers/vulkan/vk_visibility_buffer.h
 renderers/vulkan/shaders/glsl/deferred_gbuffer_fill.comp
 renderers/vulkan/shaders/glsl/deferred_gbuffer_debug.frag
 renderers/vulkan/shaders/glsl/deferred_lighting.comp
 renderers/vulkan/shaders/glsl/deferred_lighting_composite.frag
+renderers/vulkan/shaders/glsl/visibility_buffer_fill.comp
+renderers/vulkan/shaders/glsl/visibility_buffer_debug.frag
+renderers/vulkan/shaders/glsl/material_classify.comp
+docs/RENDERER_2027.md
 docs/renderer_validation/SELF_HOSTED_TIER_B.md
 docs/samples/renderer_regression/README.md
 docs/samples/renderer_regression/OPTIONAL_GAME_ASSETS.txt

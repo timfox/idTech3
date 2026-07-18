@@ -10,6 +10,7 @@ set(VK_CORE_RENDERER_PATTERNS
 	tr_shade.c
 	tr_surface.c
 	vk_deferred_gbuffer.c
+	vk_visibility_buffer.c
 	vk_forward_plus.c
 	vk_temporal.c
 	vk_vector_font.c

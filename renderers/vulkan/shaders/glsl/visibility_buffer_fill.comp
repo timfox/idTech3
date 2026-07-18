@@ -1,0 +1,51 @@
+#version 450
+
+/*
+ * Visibility-buffer Phase 1 fill (depth-derived scaffold).
+ * visOut.xy = drawId (16x16 tile) + primId (depth bits proxy)
+ * baryOut   = intra-tile barycentric proxy (until true prim MRT)
+ * True gl_PrimitiveID / instance export is a follow-up — see docs/RENDERER_2027.md
+ */
+
+layout(local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
+
+layout(set = 0, binding = 0) uniform sampler2D depthTex;
+layout(rg32ui, set = 0, binding = 1) uniform writeonly uimage2D visOut;
+layout(rg16, set = 0, binding = 2) uniform writeonly image2D baryOut;
+
+layout(push_constant) uniform Push {
+	uvec2 extent;
+	uint tileSize;
+	uint reserved;
+} pc;
+
+bool validDepth( float depth ) {
+	return depth > 0.0 && depth < 1.0;
+}
+
+void main() {
+	uvec2 pix = gl_GlobalInvocationID.xy;
+	if ( pix.x >= pc.extent.x || pix.y >= pc.extent.y ) {
+		return;
+	}
+
+	vec2 uv = ( vec2( pix ) + 0.5 ) / vec2( pc.extent );
+	float depth = texture( depthTex, uv ).r;
+	ivec2 ip = ivec2( pix );
+
+	if ( !validDepth( depth ) ) {
+		imageStore( visOut, ip, uvec4( 0xFFFFFFFFu, 0xFFFFFFFFu, 0u, 0u ) );
+		imageStore( baryOut, ip, vec4( 0.0, 0.0, 0.0, 0.0 ) );
+		return;
+	}
+
+	uint ts = max( pc.tileSize, 1u );
+	uint tileX = pix.x / ts;
+	uint tileY = pix.y / ts;
+	uint drawId = ( tileY << 16u ) | ( tileX & 0xFFFFu );
+	uint primId = floatBitsToUint( depth );
+
+	vec2 bary = fract( vec2( pix ) / vec2( ts ) );
+	imageStore( visOut, ip, uvec4( drawId, primId, 0u, 0u ) );
+	imageStore( baryOut, ip, vec4( bary, 0.0, 1.0 ) );
+}

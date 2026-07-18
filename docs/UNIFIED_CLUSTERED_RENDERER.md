@@ -44,6 +44,7 @@ If `r_oit 1`, OIT runs **after** deferred composite. Full OIT + deferred integra
 
 ## Related
 
+- 2027 north-star (visibility buffer on this spine): [RENDERER_2027.md](RENDERER_2027.md)
 - Forward+ audit: [FORWARD_PLUS_PIPELINE_AUDIT.md](FORWARD_PLUS_PIPELINE_AUDIT.md)
 - Modes overview: [RENDERERS.md](RENDERERS.md)
 - Mode 1 deferred-only overlay: `vulkan_overlay_deferred.cfg`

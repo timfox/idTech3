@@ -813,6 +813,37 @@ typedef struct {
 	qboolean deferredGbufferAllocated;
 	qboolean deferredGbufferDirectExport;
 
+	/* Visibility-buffer sidecar (r_visibilityBuffer); see vk_visibility_buffer.c / docs/RENDERER_2027.md */
+	struct {
+		VkDescriptorSetLayout layout;
+		VkPipelineLayout pipeline_layout;
+		VkPipeline pipeline;
+		VkDescriptorPool pool;
+		VkDescriptorSet descriptor;
+		qboolean pipeline_ready;
+		qboolean fill_logged;
+		VkDescriptorSetLayout classify_layout;
+		VkPipelineLayout classify_pipeline_layout;
+		VkPipeline classify_pipeline;
+		VkDescriptorPool classify_pool;
+		VkDescriptorSet classify_descriptor;
+		qboolean classify_pipeline_ready;
+		qboolean classify_logged;
+		VkDescriptorSetLayout debug_gfx_layout;
+		VkPipelineLayout debug_gfx_pipeline_layout;
+		VkPipeline debug_gfx_pipeline;
+		VkDescriptorPool debug_gfx_pool;
+		VkDescriptorSet debug_gfx_descriptor;
+		qboolean debug_gfx_ready;
+	} visibility_buffer;
+	VkImage visibility_buffer_ids;
+	VkImageView visibility_buffer_ids_view;
+	VkImage visibility_buffer_bary;
+	VkImageView visibility_buffer_bary_view;
+	VkImage visibility_buffer_class;
+	VkImageView visibility_buffer_class_view;
+	qboolean visibilityBufferAllocated;
+
 	/* Neural Irradiance Volume (r_niv); see vk_niv.c */
 	struct {
 		VkDescriptorSetLayout shade_layout;
@@ -1514,6 +1545,9 @@ typedef struct {
 		VkShaderModule deferred_gbuffer_debug_fs;
 		VkShaderModule deferred_lighting_cs;
 		VkShaderModule deferred_lighting_composite_fs;
+		VkShaderModule visibility_buffer_fill_cs;
+		VkShaderModule visibility_buffer_debug_fs;
+		VkShaderModule material_classify_cs;
 		VkShaderModule ndgi_decompress_cs;
 		VkShaderModule niv_shade_cs;
 		VkShaderModule niv_composite_cs;
