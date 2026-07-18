@@ -564,7 +564,7 @@ void vk_visibility_buffer_capture_after_geometry( void )
 
 static void vk_visbuf_create_debug_gfx_pipeline( void )
 {
-	VkDescriptorSetLayoutBinding bindings[3];
+	VkDescriptorSetLayoutBinding bindings[4];
 	VkDescriptorSetLayoutCreateInfo layout_ci;
 	VkPushConstantRange push_range;
 	VkPipelineLayoutCreateInfo pl_ci;
@@ -596,7 +596,7 @@ static void vk_visbuf_create_debug_gfx_pipeline( void )
 	}
 
 	Com_Memset( bindings, 0, sizeof( bindings ) );
-	for ( i = 0; i < 3; i++ ) {
+	for ( i = 0; i < 4; i++ ) {
 		bindings[i].binding = (uint32_t)i;
 		bindings[i].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
 		bindings[i].descriptorCount = 1;
@@ -605,7 +605,7 @@ static void vk_visbuf_create_debug_gfx_pipeline( void )
 
 	Com_Memset( &layout_ci, 0, sizeof( layout_ci ) );
 	layout_ci.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-	layout_ci.bindingCount = 3;
+	layout_ci.bindingCount = 4;
 	layout_ci.pBindings = bindings;
 	VK_CHECK( qvkCreateDescriptorSetLayout( vk.device, &layout_ci, NULL,
 		&vk.visibility_buffer.debug_gfx_layout ) );
@@ -695,7 +695,7 @@ static void vk_visbuf_create_debug_gfx_pipeline( void )
 		VK_DEBUG_REPORT_OBJECT_TYPE_PIPELINE_EXT );
 
 	pool_sizes[0].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-	pool_sizes[0].descriptorCount = 3;
+	pool_sizes[0].descriptorCount = 4;
 	Com_Memset( &pool_ci, 0, sizeof( pool_ci ) );
 	pool_ci.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
 	pool_ci.maxSets = 1;
@@ -715,13 +715,17 @@ static void vk_visbuf_create_debug_gfx_pipeline( void )
 
 static void vk_visbuf_update_debug_descriptors( void )
 {
-	VkDescriptorImageInfo infos[3];
-	VkWriteDescriptorSet writes[3];
+	VkDescriptorImageInfo infos[4];
+	VkWriteDescriptorSet writes[4];
 	Vk_Sampler_Def sd;
 	int i;
+	VkImageView albedo_view;
 
 	Com_Memset( &sd, 0, sizeof( sd ) );
 	sd.address_mode = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+
+	albedo_view = vk.deferred_gbuffer_albedo_view != VK_NULL_HANDLE ?
+		vk.deferred_gbuffer_albedo_view : vk.color_image_view;
 
 	Com_Memset( infos, 0, sizeof( infos ) );
 	infos[0].sampler = vk_find_sampler( &sd );
@@ -734,9 +738,12 @@ static void vk_visbuf_update_debug_descriptors( void )
 	infos[2].imageView = vk.visibility_buffer_class_view != VK_NULL_HANDLE ?
 		vk.visibility_buffer_class_view : vk.visibility_buffer_ids_view;
 	infos[2].imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+	infos[3].sampler = vk_find_sampler( &sd );
+	infos[3].imageView = albedo_view != VK_NULL_HANDLE ? albedo_view : vk.visibility_buffer_bary_view;
+	infos[3].imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 
 	Com_Memset( writes, 0, sizeof( writes ) );
-	for ( i = 0; i < 3; i++ ) {
+	for ( i = 0; i < 4; i++ ) {
 		writes[i].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
 		writes[i].dstSet = vk.visibility_buffer.debug_gfx_descriptor;
 		writes[i].dstBinding = (uint32_t)i;
@@ -744,7 +751,7 @@ static void vk_visbuf_update_debug_descriptors( void )
 		writes[i].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
 		writes[i].pImageInfo = &infos[i];
 	}
-	qvkUpdateDescriptorSets( vk.device, 3, writes, 0, NULL );
+	qvkUpdateDescriptorSets( vk.device, 4, writes, 0, NULL );
 }
 
 qboolean vk_visibility_buffer_draw_debug( void )
@@ -768,8 +775,8 @@ qboolean vk_visibility_buffer_draw_debug( void )
 	if ( mode < 1 ) {
 		mode = 1;
 	}
-	if ( mode > 4 ) {
-		mode = 4;
+	if ( mode > 5 ) {
+		mode = 5;
 	}
 
 	vk_visbuf_create_debug_gfx_pipeline();
@@ -780,7 +787,7 @@ qboolean vk_visibility_buffer_draw_debug( void )
 
 	if ( !s_debug_logged ) {
 		ri.Printf( PRINT_ALL,
-			"[VK][visbuf] r_visibilityBufferDebug=%d (1=drawId 2=primId 3=bary 4=class)\n", mode );
+			"[VK][visbuf] r_visibilityBufferDebug=%d (1=drawId 2=primId 3=bary 4=class 5=lateShade)\n", mode );
 		s_debug_logged = qtrue;
 	}
 

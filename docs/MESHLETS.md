@@ -9,11 +9,13 @@ set r_meshlets 1
 set r_meshletsCompact 1
 set r_meshletsMdi 1
 set r_meshletsMdiDraw 1   // Phase 2: real vkCmdDrawIndexedIndirect
+set r_meshletsLod 1       // screen-space projected AABB cull
+set r_meshletsLodPixels 2
 exec demo_meshlets.cfg
 meshlet_status
 ```
 
-When enabled, MD3 surfaces (≤512 verts / ≤1024 tris) bake at load, skip add if fully culled, and compact draw when partially visible. With `r_meshletsMdiDraw 1`, each visible meshlet range is issued via `vkCmdDrawIndexedIndirect` against the tess index buffer (falls back to a single `vkCmdDrawIndexed` if the entry point is missing).
+When enabled, MD3 surfaces (≤512 verts / ≤1024 tris) bake at load, skip add if fully culled, and compact draw when partially visible. With `r_meshletsMdiDraw 1`, each visible meshlet range is issued via `vkCmdDrawIndexedIndirect` against the tess index buffer (falls back to a single `vkCmdDrawIndexed` if the entry point is missing). With `r_meshletsLod 1`, frustum-visible meshlets whose projected AABB diagonal is below `r_meshletsLodPixels` are dropped (distance / FOV screen-size LOD).
 
 ## Cvars / commands
 
@@ -23,7 +25,9 @@ When enabled, MD3 surfaces (≤512 verts / ≤1024 tris) bake at load, skip add 
 | `r_meshletsCompact` | Partial triangle draw from visible meshlets (default 1; also implied by MDI draw) |
 | `r_meshletsMdi` | Pack `VkDrawIndexedIndirectCommand` metrics (default 0) |
 | `r_meshletsMdiDraw` | GPU `vkCmdDrawIndexedIndirect` for tess-relative meshlet ranges (default 0) |
-| `meshlet_status` | Bake/cache/cull/compact/MDI counts |
+| `r_meshletsLod` | Screen-space projected AABB LOD cull (default 0) |
+| `r_meshletsLodPixels` | Minimum projected diagonal in pixels to keep (default 2) |
+| `meshlet_status` | Bake/cache/cull/LOD/compact/MDI counts |
 
 ## API
 
@@ -39,6 +43,6 @@ When enabled, MD3 surfaces (≤512 verts / ≤1024 tris) bake at load, skip add 
 - Persistent per-surface IBO (avoid remapping into tess)
 - `VK_EXT_mesh_shader` task/mesh pipelines
 - BSP world / skinned meshlets
-- GPU cull / meshlet selection
+- GPU cull / continuous cluster LOD streaming
 
 See also [RENDERER_2027.md](RENDERER_2027.md) Phase 2.

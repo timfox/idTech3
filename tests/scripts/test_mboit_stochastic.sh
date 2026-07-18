@@ -6,6 +6,8 @@ fail() { echo "FAIL: $*" >&2; exit 1; }
 
 test -f "$ROOT/docs/MOMENT_OIT_STOCHASTIC_ALPHA.md" || fail "docs missing"
 test -f "$ROOT/config/vulkan_overlay_mboit.cfg" || fail "overlay missing"
+test -f "$ROOT/config/vulkan_overlay_oit_clustered.cfg" || fail "oit clustered overlay missing"
+test -f "$ROOT/examples/demo_game/mod/demo_oit_clustered.cfg" || fail "oit clustered demo missing"
 test -f "$ROOT/renderers/vulkan/shaders/glsl/oit_moments.frag" || fail "oit_moments.frag missing"
 test -f "$ROOT/renderers/vulkan/shaders/glsl/oit_accum_mboit.frag" || fail "oit_accum_mboit.frag missing"
 
@@ -15,5 +17,7 @@ rg -q 'oit_moments' "$ROOT/renderers/vulkan/vk_postfx_passes.c" || fail "moments
 rg -q 'StochasticIGN|stochMode' "$ROOT/renderers/vulkan/shaders/glsl/gen_frag.tmpl" || fail "stochastic gen_frag"
 rg -q 'stochMode' "$ROOT/renderers/vulkan/shaders/glsl/light_frag.tmpl" || fail "stochastic light_frag"
 rg -q 'reserved\[6\]' "$ROOT/renderers/vulkan/vk_view_state.c" || fail "stoch push seed"
+rg -q 'r_oit 2' "$ROOT/config/vulkan_overlay_oit_clustered.cfg" || fail "clustered overlay sets MBOIT"
+rg -q 'vulkan_overlay_unified_clustered' "$ROOT/config/vulkan_overlay_oit_clustered.cfg" || fail "clustered overlay stacks mode 3"
 
 echo "OK: MBOIT + stochastic alpha smoke checks passed"

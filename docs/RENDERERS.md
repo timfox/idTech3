@@ -56,6 +56,7 @@ The renderer profile rule is: start from **one** modern base, then apply an over
 |---------|-----|-------|
 | `vulkan_overlay_deferred.cfg` | Mode-1 deferred lighting development | Switches to `r_renderMode 1`, enables `r_deferredLighting 1`, and disables `r_forwardPlusShade` to avoid double dynamic lighting. |
 | `vulkan_overlay_unified_clustered.cfg` | Unified Clustered Renderer | `r_renderMode 3`: deferred opaque + Forward+ transparent, shared tile lists. See [UNIFIED_CLUSTERED_RENDERER.md](UNIFIED_CLUSTERED_RENDERER.md). |
+| `vulkan_overlay_oit_clustered.cfg` | Mode 3 + MBOIT | Unified Clustered + `r_oit 2` (optional stochastic via demo). See [MOMENT_OIT_STOCHASTIC_ALPHA.md](MOMENT_OIT_STOCHASTIC_ALPHA.md). |
 | `vulkan_overlay_visibility_2027.cfg` | 2027 visibility foundation | Mode 3 + G-buffer + `r_visibilityBuffer` + material classify. See [RENDERER_2027.md](RENDERER_2027.md). |
 | `vulkan_overlay_rtx.cfg` | Plain RTX demo pass | Requires `USE_VULKAN_RTX`; keeps the modern Forward+ base and enables shared TLAS/entity BLAS. |
 | `vulkan_overlay_hybrid1.cfg` | Hybrid1 ray/raster path | Requires `USE_VULKAN_RTX`; keeps the modern Forward+ base, enables shared TLAS/entity BLAS, and enables Hybrid1 channels. |

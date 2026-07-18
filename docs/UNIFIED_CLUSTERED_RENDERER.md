@@ -40,12 +40,20 @@ Depth is **not** cleared between deferred composite and transparent draws.
 
 Deferred lighting transforms direct-export **world** normals to view space, and can optionally consume the material class map (`r_deferredMaterialClassify` default 0 + `r_materialClassify`) — see [RENDERER_2027.md](RENDERER_2027.md).
 
-## OIT note
+## OIT + mode 3
 
-If `r_oit 1`, OIT runs **after** deferred composite. Full OIT + deferred integration is a follow-up; residual risk remains.
+OIT (`r_oit` 1=WBOIT / 2=MBOIT) runs **after** deferred composite on the mode 3 spine (see backend: OIT after deferred when `r_fbo` 1). Transparent Forward+ draws still use the shared tile lists; moments/accum then resolve over the deferred opaque base.
+
+```
+exec vulkan_overlay_oit_clustered.cfg
+vid_restart
+```
+
+Or demo: `exec demo_oit_clustered.cfg` (adds `r_stochasticAlpha 2` + TAA). Residual risk remains for exotic MSAA / portal paths — keep `r_ext_multisample 0`.
 
 ## Related
 
+- Moment OIT / stochastic alpha: [MOMENT_OIT_STOCHASTIC_ALPHA.md](MOMENT_OIT_STOCHASTIC_ALPHA.md)
 - 2027 north-star (visibility buffer on this spine): [RENDERER_2027.md](RENDERER_2027.md)
 - Forward+ audit: [FORWARD_PLUS_PIPELINE_AUDIT.md](FORWARD_PLUS_PIPELINE_AUDIT.md)
 - Modes overview: [RENDERERS.md](RENDERERS.md)

@@ -43,9 +43,14 @@ Compact **visibility-buffer sidecar** coexisting with the classic G-buffer:
 |------|------|
 | `r_visibilityBuffer` | Latch: allocate ID + bary + class RTs (needs `r_fbo`, `r_renderMode` 1/2/3) |
 | `r_visibilityBufferFill` | After opaque (mode 3) or geometry: compute fill of packed draw/prim IDs + bary proxies |
-| `r_visibilityBufferDebug` | 0=off, 1=drawId, 2=primId, 3=bary, 4=material class |
+| `r_visibilityBufferDebug` | 0=off, 1=drawId, 2=primId, 3=bary, 4=material class, 5=late-shade scaffold (albedo×class) |
 | `r_materialClassify` | Compute class map from G-buffer material + depth (experimental stub) |
 | `r_deferredMaterialClassify` | Deferred lighting consumes class map (default **0**; manual opt-in only) |
+
+**Phase 1.5 (fill + late-shade preview):**
+
+- Fill uses Morton locality + depth buckets for more stable draw/prim proxies (still depth-derived until true prim MRT).
+- Debug mode **5** samples G-buffer albedo × class tint as a late-shade scaffold.
 
 **Deferred lighting notes (post–Phase 1):**
 
@@ -68,9 +73,10 @@ Demo: `exec demo_visibility_2027.cfg`. The overlay keeps `r_deferredMaterialClas
 | Phase | Focus |
 |-------|--------|
 | **P1** | Visibility foundation + material-class stub (this doc / cvars above) |
-| **P2** | GPU-driven meshlets — **`r_meshletsMdiDraw`** / `vkCmdDrawIndexedIndirect` landed (tess-relative); persistent IBO + mesh shaders remain follow-up ([MESHLETS.md](MESHLETS.md)) |
+| **P1.5** | Visbuf Morton/depth fill + late-shade debug mode 5 |
+| **P2** | GPU-driven meshlets — **`r_meshletsMdiDraw`** + **`r_meshletsLod`** screen LOD; persistent IBO + mesh shaders remain follow-up ([MESHLETS.md](MESHLETS.md)) |
 | **P3** | Reservoir-sampled hybrid path — ReSTIR DI on Hybrid1, NVC/FSA, [RTX_HIT_SHADER_UV.md](RTX_HIT_SHADER_UV.md) |
-| **P4** | Material-classified OIT — glass/smoke/hair/particles ([MOMENT_OIT_STOCHASTIC_ALPHA.md](MOMENT_OIT_STOCHASTIC_ALPHA.md)) |
+| **P4** | Material-classified OIT — mode 3 + MBOIT overlay (`vulkan_overlay_oit_clustered.cfg`); class-specialized paths remain follow-up ([MOMENT_OIT_STOCHASTIC_ALPHA.md](MOMENT_OIT_STOCHASTIC_ALPHA.md)) |
 | **P5** | Neural material/texture reconstruction (chocolate scaffold; no mandatory vendor SDK) |
 | **P6** | Heterogeneous resolution, sparse volumetrics, OMM, character skin/hair paths |
 
@@ -82,10 +88,10 @@ Demo: `exec demo_visibility_2027.cfg`. The overlay keeps `r_deferredMaterialClas
 | 2 | Ray reconstruction / ReSTIR | Hybrid1 + NVC scaffold | Reservoir-sampled hybrid path layer |
 | 3 | Visibility buffer | Classic G-buffer + P1 sidecar | Compact prim/bary/depth + late shade |
 | 4 | GPU-driven / Work Graphs | Meshlets CPU cull | Indirect draws → mesh shaders / WG |
-| 5 | Virtualized meshlets | MD3 meshlets + **MDI GPU draw** + sector stream | Continuous cluster LOD streaming |
+| 5 | Virtualized meshlets | MD3 meshlets + **MDI GPU draw** + **screen LOD** + sector stream | Continuous cluster LOD streaming |
 | 6 | Hybrid clustered | Mode 3 EXISTS | Spine for all layers |
 | 7 | Stochastic alpha | `r_stochasticAlpha` | Temporally stable coverage + OMM |
-| 8 | Classified OIT | Global WBOIT/MBOIT | Per-material-class paths |
+| 8 | Classified OIT | Global WBOIT/MBOIT + **mode 3 overlay** | Per-material-class paths |
 | 9 | Neural texture compression | VT / BC7 | Learned latent + decoder |
 | 10 | Multidimensional LOD | Stream LOD + scales | Geo/mat/ray/rate/appearance |
 | 11 | Material classify | Opaque/transparent split + P1 compute + **deferred consumer** | Specialized shade dispatch |

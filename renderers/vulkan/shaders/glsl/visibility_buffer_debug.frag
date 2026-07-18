@@ -2,12 +2,14 @@
 
 /*
  * Visibility-buffer / material-class debug visualization.
- * mode 1=drawId hash, 2=primId hash, 3=bary RG, 4=class colormap
+ * mode 1=drawId hash, 2=primId hash, 3=bary RG, 4=class colormap,
+ * mode 5=late-shade scaffold (albedo * class tint) — 2027 late-shade preview
  */
 
 layout(set = 0, binding = 0) uniform usampler2D visIds;
 layout(set = 0, binding = 1) uniform sampler2D baryTex;
 layout(set = 0, binding = 2) uniform usampler2D classMap;
+layout(set = 0, binding = 3) uniform sampler2D albedoTex;
 
 layout(push_constant) uniform DebugPC {
 	int mode;
@@ -37,6 +39,19 @@ vec3 classColor( uint c ) {
 void main() {
 	ivec2 pix = ivec2( textureSize( visIds, 0 ) * frag_tex_coord );
 
+	if ( pc.mode == 5 ) {
+		uvec2 ids = texelFetch( visIds, pix, 0 ).rg;
+		if ( ids.r == 0xFFFFFFFFu ) {
+			out_color = vec4( 0.02, 0.02, 0.04, 1.0 );
+			return;
+		}
+		vec3 albedo = texture( albedoTex, frag_tex_coord ).rgb;
+		uint c = texelFetch( classMap, pix, 0 ).r;
+		vec3 tint = classColor( c );
+		/* Late-shade scaffold: modulate scene albedo by material class. */
+		out_color = vec4( albedo * mix( vec3( 1.0 ), tint * 1.4, 0.55 ), 1.0 );
+		return;
+	}
 	if ( pc.mode == 3 ) {
 		vec2 b = texture( baryTex, frag_tex_coord ).rg;
 		out_color = vec4( b, 0.0, 1.0 );

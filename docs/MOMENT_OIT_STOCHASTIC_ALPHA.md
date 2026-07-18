@@ -27,6 +27,17 @@ vid_restart
 
 Demo: `exec demo_mboit.cfg` (or `vulkan_overlay_mboit.cfg`).
 
+### With Unified Clustered (`r_renderMode 3`)
+
+Pair MBOIT with deferred opaque + Forward+ transparent:
+
+```
+exec vulkan_overlay_oit_clustered.cfg
+vid_restart
+```
+
+Demo: `exec demo_oit_clustered.cfg`. See [UNIFIED_CLUSTERED_RENDERER.md](UNIFIED_CLUSTERED_RENDERER.md).
+
 ## Stochastic Alpha-Clipped Materials (`r_stochasticAlpha`)
 
 Hashed / temporal alpha clip for **foliage, grates, hair cards, fabric holes, and decals** (shader `alphaFunc`).

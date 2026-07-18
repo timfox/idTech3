@@ -30,5 +30,10 @@ rg -q 'visibility_buffer_fill_cs' "$ROOT/scripts/compile_shaders.sh" || fail "co
 rg -q 'r_visibilityBuffer 1' "$ROOT/config/vulkan_overlay_visibility_2027.cfg" || fail "overlay sets vis buffer"
 rg -q 'RENDERER_2027' "$ROOT/docs/RENDERERS.md" || fail "RENDERERS.md cross-link missing"
 rg -q 'visibility_buffer_status' "$ROOT/renderers/vulkan/tr_init.c" || fail "status command missing"
+rg -q 'CheckRange\( r_visibilityBufferDebug, "0", "5"' "$ROOT/renderers/vulkan/tr_init.c" || fail "debug mode range should be 0-5"
+rg -q 'morton2d5' "$ROOT/renderers/vulkan/shaders/glsl/visibility_buffer_fill.comp" || fail "P1.5 Morton fill missing"
+rg -q 'pc.mode == 5' "$ROOT/renderers/vulkan/shaders/glsl/visibility_buffer_debug.frag" || fail "late-shade debug mode 5 missing"
+rg -q 'albedoTex' "$ROOT/renderers/vulkan/shaders/glsl/visibility_buffer_debug.frag" || fail "albedo binding missing"
+rg -q 'deferred_gbuffer_albedo_view' "$ROOT/renderers/vulkan/vk_visibility_buffer.c" || fail "albedo descriptor wiring missing"
 
-echo "OK: visibility buffer Phase 1 smoke checks passed"
+echo "OK: visibility buffer Phase 1 / 1.5 smoke checks passed"

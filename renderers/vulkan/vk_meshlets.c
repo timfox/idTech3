@@ -26,12 +26,15 @@ static cvar_t *r_meshlets;
 static cvar_t *r_meshletsMdi;
 static cvar_t *r_meshletsMdiDraw;
 static cvar_t *r_meshletsCompact;
+static cvar_t *r_meshletsLod;
+static cvar_t *r_meshletsLodPixels;
 static qboolean s_cmds;
 static int s_bakeCount;
 static int s_cacheHits;
 static int s_cacheMisses;
 static int s_cullVisible;
 static int s_cullTotal;
+static int s_lodCulled;
 static int s_mdiCount;
 static int s_mdiTris;
 static int s_mdiDrawCalls;
@@ -58,10 +61,11 @@ static void Meshlets_Status_f( void )
 	}
 	ri.Printf( PRINT_ALL,
 		"[VK][meshlets] active=%d bakeCalls=%d cache hits=%d misses=%d slots=%d/%d\n"
-		"  lastCull visible=%d / total=%d mdi=%d cmds=%d tris=%d mdiDraw=%d gpuDraws=%d\n"
+		"  lastCull visible=%d / total=%d lodCulled=%d lod=%d mdi=%d cmds=%d tris=%d mdiDraw=%d gpuDraws=%d\n"
 		"  compact=%d lastIndexes=%d surfaces=%d\n",
 		R_Meshlets_Active() ? 1 : 0, s_bakeCount, s_cacheHits, s_cacheMisses,
-		used, MESHLET_CACHE_SLOTS, s_cullVisible, s_cullTotal,
+		used, MESHLET_CACHE_SLOTS, s_cullVisible, s_cullTotal, s_lodCulled,
+		( r_meshletsLod && r_meshletsLod->integer ) ? 1 : 0,
 		( r_meshletsMdi && r_meshletsMdi->integer ) ? 1 : 0,
 		s_mdiCount, s_mdiTris,
 		( r_meshletsMdiDraw && r_meshletsMdiDraw->integer ) ? 1 : 0,
@@ -97,9 +101,21 @@ void R_Meshlets_Init( void )
 		"When r_meshlets 1: emit only visible meshlet triangles into tess (partial draw). Default 1." );
 	ri.Cvar_SetGroup( r_meshletsCompact, CVG_RENDERER );
 
+	r_meshletsLod = ri.Cvar_Get( "r_meshletsLod", "0", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_meshletsLod, "0", "1", CV_INTEGER );
+	ri.Cvar_SetDescription( r_meshletsLod,
+		"When r_meshlets 1: cull meshlets whose projected AABB diagonal is below r_meshletsLodPixels (screen-space LOD)." );
+	ri.Cvar_SetGroup( r_meshletsLod, CVG_RENDERER );
+
+	r_meshletsLodPixels = ri.Cvar_Get( "r_meshletsLodPixels", "2", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_meshletsLodPixels, "0.25", "64", CV_FLOAT );
+	ri.Cvar_SetDescription( r_meshletsLodPixels,
+		"Minimum projected AABB diagonal in pixels to keep a meshlet when r_meshletsLod 1. Default 2." );
+	ri.Cvar_SetGroup( r_meshletsLodPixels, CVG_RENDERER );
+
 	Com_Memset( s_cache, 0, sizeof( s_cache ) );
 	s_bakeCount = s_cacheHits = s_cacheMisses = 0;
-	s_cullVisible = s_cullTotal = 0;
+	s_cullVisible = s_cullTotal = s_lodCulled = 0;
 	s_mdiCount = s_mdiTris = s_mdiDrawCalls = 0;
 	s_compactIndexes = s_compactSurfaces = 0;
 	s_frameCmdCount = 0;
@@ -110,10 +126,11 @@ void R_Meshlets_Init( void )
 		s_cmds = qtrue;
 	}
 	if ( r_meshlets->integer ) {
-		ri.Printf( PRINT_ALL, "[VK][meshlets] r_meshlets=1 (bake-at-load + CPU cull%s%s%s)\n",
+		ri.Printf( PRINT_ALL, "[VK][meshlets] r_meshlets=1 (bake-at-load + CPU cull%s%s%s%s)\n",
 			( r_meshletsCompact && r_meshletsCompact->integer ) ? "; compact draw" : "",
 			( r_meshletsMdi && r_meshletsMdi->integer ) ? "; MDI pack" : "",
-			( r_meshletsMdiDraw && r_meshletsMdiDraw->integer ) ? "; MDI GPU draw" : "" );
+			( r_meshletsMdiDraw && r_meshletsMdiDraw->integer ) ? "; MDI GPU draw" : "",
+			( r_meshletsLod && r_meshletsLod->integer ) ? "; screen LOD" : "" );
 	}
 }
 
@@ -279,6 +296,53 @@ static qboolean Meshlet_AABBInPlane( const vec3_t mins, const vec3_t maxs, const
 	return ( maxDot >= 0.0f ) ? qtrue : qfalse;
 }
 
+/*
+ * Screen-space LOD: keep meshlets whose world AABB projects to at least
+ * r_meshletsLodPixels along the diagonal (distance / fov approx).
+ */
+static qboolean Meshlet_PassesScreenLod( const vec3_t mins, const vec3_t maxs )
+{
+	vec3_t center, delta;
+	float halfDiag, dist, tanHalf, pixels;
+	float thr;
+	int vh;
+
+	if ( !r_meshletsLod || !r_meshletsLod->integer ) {
+		return qtrue;
+	}
+
+	center[0] = 0.5f * ( mins[0] + maxs[0] );
+	center[1] = 0.5f * ( mins[1] + maxs[1] );
+	center[2] = 0.5f * ( mins[2] + maxs[2] );
+	delta[0] = maxs[0] - mins[0];
+	delta[1] = maxs[1] - mins[1];
+	delta[2] = maxs[2] - mins[2];
+	halfDiag = 0.5f * (float)sqrt( (double)( delta[0] * delta[0] + delta[1] * delta[1] + delta[2] * delta[2] ) );
+
+	VectorSubtract( center, tr.viewParms.or.origin, delta );
+	dist = VectorLength( delta );
+	if ( dist < 1.0f ) {
+		dist = 1.0f;
+	}
+
+	tanHalf = (float)tan( (double)( tr.viewParms.fovY * (float)( M_PI / 360.0 ) ) );
+	if ( tanHalf < 1e-4f ) {
+		tanHalf = 1e-4f;
+	}
+	vh = tr.viewParms.viewportHeight;
+	if ( vh < 1 ) {
+		vh = glConfig.vidHeight > 0 ? glConfig.vidHeight : 720;
+	}
+	pixels = ( halfDiag / dist ) * ( (float)vh / ( 2.0f * tanHalf ) );
+	thr = ( r_meshletsLodPixels && r_meshletsLodPixels->value > 0.0f ) ?
+		r_meshletsLodPixels->value : 2.0f;
+	if ( pixels < thr ) {
+		s_lodCulled++;
+		return qfalse;
+	}
+	return qtrue;
+}
+
 int R_Meshlets_CullViewFrustum( const meshlet_t *meshlets, int count, int *visible, int maxVisible )
 {
 	int i, n = 0;
@@ -286,6 +350,7 @@ int R_Meshlets_CullViewFrustum( const meshlet_t *meshlets, int count, int *visib
 
 	s_cullTotal = count;
 	s_cullVisible = 0;
+	s_lodCulled = 0;
 	if ( !meshlets || !visible || maxVisible <= 0 ) {
 		return 0;
 	}
@@ -297,7 +362,7 @@ int R_Meshlets_CullViewFrustum( const meshlet_t *meshlets, int count, int *visib
 				break;
 			}
 		}
-		if ( inside ) {
+		if ( inside && Meshlet_PassesScreenLod( meshlets[i].mins, meshlets[i].maxs ) ) {
 			visible[n++] = i;
 		}
 	}
@@ -313,6 +378,7 @@ int R_Meshlets_CullViewFrustumXform( const meshlet_t *meshlets, int count,
 
 	s_cullTotal = count;
 	s_cullVisible = 0;
+	s_lodCulled = 0;
 	if ( !meshlets || !visible || maxVisible <= 0 ) {
 		return 0;
 	}
@@ -337,7 +403,7 @@ int R_Meshlets_CullViewFrustumXform( const meshlet_t *meshlets, int count,
 				break;
 			}
 		}
-		if ( inside ) {
+		if ( inside && Meshlet_PassesScreenLod( wmins, wmaxs ) ) {
 			visible[n++] = i;
 		}
 		(void)corners;

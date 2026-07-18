@@ -2664,10 +2664,10 @@ static void R_Register( void )
 		ri.Printf( PRINT_ALL, "[VK][visbuf] r_visibilityBufferFill=1 (capture after geometry each frame)\n" );
 	}
 	r_visibilityBufferDebug = ri.Cvar_Get( "r_visibilityBufferDebug", "0", CVAR_ARCHIVE_ND );
-	ri.Cvar_CheckRange( r_visibilityBufferDebug, "0", "4", CV_INTEGER );
+	ri.Cvar_CheckRange( r_visibilityBufferDebug, "0", "5", CV_INTEGER );
 	ri.Cvar_SetDescription( r_visibilityBufferDebug,
-		"Visualize visibility buffer on scene color before bloom: 0=off, 1=drawId, 2=primId, 3=bary, 4=material class. "
-		"Requires r_visibilityBuffer 1 and r_visibilityBufferFill 1." );
+		"Visualize visibility buffer on scene color before bloom: 0=off, 1=drawId, 2=primId, 3=bary, 4=material class, "
+		"5=late-shade scaffold (albedo*class). Requires r_visibilityBuffer 1 and r_visibilityBufferFill 1." );
 	ri.Cvar_SetGroup( r_visibilityBufferDebug, CVG_RENDERER );
 	r_materialClassify = ri.Cvar_Get( "r_materialClassify", "0", CVAR_ARCHIVE_ND );
 	ri.Cvar_CheckRange( r_materialClassify, "0", "1", CV_INTEGER );

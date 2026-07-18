@@ -1,8 +1,8 @@
 #version 450
 
 /*
- * Visibility-buffer Phase 1 fill (depth-derived scaffold).
- * visOut.xy = drawId (16x16 tile) + primId (depth bits proxy)
+ * Visibility-buffer Phase 1.5 fill (depth-derived scaffold).
+ * visOut.xy = drawId (tile + depth bucket) + primId (Morton|depthBits)
  * baryOut   = intra-tile barycentric proxy (until true prim MRT)
  * True gl_PrimitiveID / instance export is a follow-up — see docs/RENDERER_2027.md
  */
@@ -21,6 +21,19 @@ layout(push_constant) uniform Push {
 
 bool validDepth( float depth ) {
 	return depth > 0.0 && depth < 1.0;
+}
+
+/* Compact 5-bit Morton of local tile coords (0..31). */
+uint morton2d5( uint x, uint y ) {
+	uint v = 0u;
+	uint i;
+	x &= 31u;
+	y &= 31u;
+	for ( i = 0u; i < 5u; i++ ) {
+		v |= ( ( x >> i ) & 1u ) << ( 2u * i );
+		v |= ( ( y >> i ) & 1u ) << ( 2u * i + 1u );
+	}
+	return v;
 }
 
 void main() {
@@ -42,10 +55,19 @@ void main() {
 	uint ts = max( pc.tileSize, 1u );
 	uint tileX = pix.x / ts;
 	uint tileY = pix.y / ts;
-	uint drawId = ( tileY << 16u ) | ( tileX & 0xFFFFu );
-	uint primId = floatBitsToUint( depth );
+	uint localX = pix.x - tileX * ts;
+	uint localY = pix.y - tileY * ts;
 
-	vec2 bary = fract( vec2( pix ) / vec2( ts ) );
+	/* Depth bucket (10 bits) + tile coords → more stable draw clusters than raw tile alone. */
+	uint depthBucket = uint( clamp( depth, 0.0, 1.0 ) * 1023.0 );
+	uint drawId = ( ( depthBucket & 0x3FFu ) << 20u ) | ( ( tileY & 0x3FFu ) << 10u ) | ( tileX & 0x3FFu );
+
+	/* Prim proxy: Morton locality XOR depth bits (not floatBitsToUint alone). */
+	uint morton = morton2d5( localX, localY );
+	uint depthBits = floatBitsToUint( depth );
+	uint primId = ( morton << 22u ) ^ ( depthBits >> 3u ) ^ ( depthBucket << 8u );
+
+	vec2 bary = fract( vec2( localX, localY ) / vec2( float( ts ) ) );
 	imageStore( visOut, ip, uvec4( drawId, primId, 0u, 0u ) );
 	imageStore( baryOut, ip, vec4( bary, 0.0, 1.0 ) );
 }
