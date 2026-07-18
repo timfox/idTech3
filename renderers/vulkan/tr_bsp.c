@@ -2970,6 +2970,10 @@ void RE_LoadWorldMap( const char *name ) {
 
 	tr.worldMapLoaded = qtrue;
 
+#ifdef USE_VK_PBR
+	R_PBR_ResetBindLog();
+#endif
+
 	// load it
 	size = ri.FS_ReadFile( name, &buffer.v );
 	if ( !buffer.b ) {

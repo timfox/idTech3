@@ -149,6 +149,10 @@ cvar_t	*r_vbo;
 cvar_t	*r_pbr;
 cvar_t	*r_pbr_shExtract;
 cvar_t	*r_pbr_debug;
+cvar_t	*r_pbr_bindlog;
+#ifdef VK_CUBEMAP
+cvar_t	*r_ibl_forceCapture;
+#endif
 cvar_t	*r_pbr_packedPreferred;
 cvar_t	*r_pbr_multiScatter;
 cvar_t	*r_pbr_multiScatterStrength;
@@ -427,6 +431,7 @@ cvar_t	*r_panini_debug;
 cvar_t	*r_paniniBrightness;
 cvar_t	*r_paniniLensPreset;
 cvar_t	*r_paniniBarrelDistortion;
+cvar_t	*r_panini_console;
 cvar_t	*r_post;
 cvar_t	*r_post_debug;
 cvar_t	*r_exposure;
@@ -531,6 +536,9 @@ cvar_t	*r_fboDebug;
 cvar_t	*r_fboCinematic;
 cvar_t	*r_froxelDebug;
 cvar_t	*r_vk_swapchain_srgb;
+cvar_t	*r_vk_clearhdr;
+cvar_t	*r_vk_disableblend;
+cvar_t	*r_vk_bindlog;
 cvar_t	*r_intensity;
 cvar_t	*r_dynamicLightScale;
 cvar_t	*r_lightGammaLink;
@@ -1301,7 +1309,7 @@ static void R_Register( void )
 	ri.Cvar_SetDescription( r_pbr_shExtract, "Extract SH coefficients from generated irradiance cubemaps for PBR." );
 
 	r_pbr_debug = ri.Cvar_Get( "r_pbr_debug", "0", CVAR_ARCHIVE_ND );
-	ri.Cvar_CheckRange( r_pbr_debug, "0", "8", CV_INTEGER );
+	ri.Cvar_CheckRange( r_pbr_debug, "0", "19", CV_INTEGER );
 	ri.Cvar_SetDescription( r_pbr_debug,
 		"PBR debug view override (Vulkan PBR only):\n"
 		" 0 - off (standard PBR)\n"
@@ -1312,7 +1320,24 @@ static void R_Register( void )
 		" 5 - show glint D term (log)\n"
 		" 6 - show glint lambda (LOD)\n"
 		" 7 - show glint compensation\n"
-		" 8 - show glint weight\n" );
+		" 8 - show glint weight\n"
+		" 17 - irradiance resource health (red=missing view, green=finite sample)\n"
+		" 18 - glint resource health (red=off, green=procedural ready)\n"
+		" 19 - environment/prefilter resource health (red=missing view, green=finite sample)\n" );
+
+	r_pbr_bindlog = ri.Cvar_Get( "r_pbr_bindlog", "0", CVAR_TEMP );
+	ri.Cvar_CheckRange( r_pbr_bindlog, "0", "1", CV_INTEGER );
+	ri.Cvar_SetDescription( r_pbr_bindlog,
+		"Log PBR IBL/glint bind state once per map (env/irr VkImageView handles and descriptor writes)." );
+	ri.Cvar_SetGroup( r_pbr_bindlog, CVG_RENDERER );
+
+#ifdef VK_CUBEMAP
+	r_ibl_forceCapture = ri.Cvar_Get( "r_ibl_forceCapture", "0", CVAR_TEMP );
+	ri.Cvar_CheckRange( r_ibl_forceCapture, "0", "1", CV_INTEGER );
+	ri.Cvar_SetDescription( r_ibl_forceCapture,
+		"When 1, wait-idle after cubemap convolution and emit PBR IBL post logs (diagnostics)." );
+	ri.Cvar_SetGroup( r_ibl_forceCapture, CVG_RENDERER );
+#endif
 
 	r_glint = ri.Cvar_Get( "r_glint", "1", CVAR_ARCHIVE_ND );
 	ri.Cvar_CheckRange( r_glint, "0", "1", CV_INTEGER );
@@ -1677,6 +1702,14 @@ static void R_Register( void )
 	ri.Cvar_SetDescription( r_paniniBarrelDistortion, "Barrel/pincushion distortion coefficient. Positive = barrel (GoPro-like), negative = pincushion." );
 	ri.Cvar_SetGroup( r_paniniBarrelDistortion, CVG_RENDERER );
 
+	r_panini_console = ri.Cvar_Get( "r_panini_console", "0", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_panini_console, "0", "1", CV_INTEGER );
+	ri.Cvar_SetDescription( r_panini_console,
+		"Apply Panini warp to console/UI frames: 0=skip (default, keeps console edges straight), 1=warp console with the scene." );
+	ri.Cvar_SetGroup( r_panini_console, CVG_RENDERER );
+	ri.Printf( PRINT_ALL, "[VK] Panini console mask: r_panini_console=%d (0=skip warp while console/UI is drawn)\n",
+		r_panini_console->integer );
+
 	r_facePlaneCull = ri.Cvar_Get ("r_facePlaneCull", "1", CVAR_ARCHIVE_ND );
 	ri.Cvar_SetDescription( r_facePlaneCull, "Enables culling of planar surfaces with back side test." );
 
@@ -1761,8 +1794,9 @@ static void R_Register( void )
 	ri.Cvar_Get( "r_font", "fonts/Inter-Regular.ttf", CVAR_ARCHIVE );
 	ri.Cvar_SetDescription( ri.Cvar_Get( "r_font", "fonts/Inter-Regular.ttf", CVAR_ARCHIVE ),
 		"TrueType font for UI VM text and (with cl_builtInTtf 1) engine HUD / console via FreeType glyph atlases. Empty = legacy bitmap font only." );
-	ri.Cvar_Get( "r_consoleFont", "", CVAR_ARCHIVE );
-	ri.Cvar_SetDescription( ri.Cvar_Get( "r_consoleFont", "", CVAR_ARCHIVE ), "Custom TrueType font for the console (e.g. fonts/consolefont.ttf). Empty = default." );
+	ri.Cvar_Get( "r_consoleFont", "fonts/Inter-Regular.ttf", CVAR_ARCHIVE );
+	ri.Cvar_SetDescription( ri.Cvar_Get( "r_consoleFont", "fonts/Inter-Regular.ttf", CVAR_ARCHIVE ),
+		"TrueType font for the console (FreeType). Default fonts/Inter-Regular.ttf; empty uses r_font." );
 	ri.Cvar_Get( "r_fontSize", "16", CVAR_ARCHIVE );
 	ri.Cvar_SetDescription( ri.Cvar_Get( "r_fontSize", "16", CVAR_ARCHIVE ), "Point size for custom fonts loaded via r_font / r_consoleFont." );
 	{
@@ -2063,7 +2097,7 @@ static void R_Register( void )
 
 	r_post_debug = ri.Cvar_Get( "r_post_debug", "0", CVAR_TEMP );
 	ri.Cvar_CheckRange( r_post_debug, "0", "99", CV_INTEGER );
-	ri.Cvar_SetDescription( r_post_debug, "Debug view for the post-process pass: 0=final, 1=pre-tonemap HDR, 2=luminance heatmap, 97=panini logical UV, 98=panini remapped source UV, 99=panini logical OOB mask." );
+	ri.Cvar_SetDescription( r_post_debug, "Debug view for the post-process pass: 0=final, 1=pre-tonemap linear HDR (clamp/10), 2=luminance heatmap. White-floor diagnosis: if mode 1 is already white, lighting energy is too high before tonemap; if mode 1 looks sane but mode 0 is blown, tonemap/gamma is wrong. Also try r_vk_clearhdr 0 (accumulation) and r_vk_disableblend 1 (additive blend)." );
 	ri.Cvar_SetGroup( r_post_debug, CVG_RENDERER );
 
 	{
@@ -2083,17 +2117,19 @@ static void R_Register( void )
 	ri.Cvar_SetGroup( r_rpi_profile, CVG_RENDERER );
 
 	r_volumetricFog = ri.Cvar_Get( "r_volumetricFog", "0", CVAR_ARCHIVE_ND );
-	ri.Cvar_SetDescription( r_volumetricFog, "Enable the volumetric fog compute/composite passes before tonemapping. Requires r_fbo 1." );
+	ri.Cvar_SetDescription( r_volumetricFog,
+		"Enable froxel volumetric fog (compute fill + HDR composite before tonemap). "
+		"Requires r_fbo 1. Half-res RGBA16F grid (vidW/2,vidH/2,64) with height fog, HG phase, and sun lighting." );
 	ri.Cvar_SetGroup( r_volumetricFog, CVG_RENDERER );
 
 	r_volumetricFogDensity = ri.Cvar_Get( "r_volumetricFogDensity", "0.6", CVAR_ARCHIVE_ND );
 	ri.Cvar_CheckRange( r_volumetricFogDensity, "0", "5", CV_FLOAT );
-	ri.Cvar_SetDescription( r_volumetricFogDensity, "Fog density multiplier for the volumetric fog pass." );
+	ri.Cvar_SetDescription( r_volumetricFogDensity, "Fog density multiplier for the volumetric fog pass (height-fog extinction base)." );
 	ri.Cvar_SetGroup( r_volumetricFogDensity, CVG_RENDERER );
 
 	r_volumetricFogHeightFalloff = ri.Cvar_Get( "r_volumetricFogHeightFalloff", "0.015", CVAR_ARCHIVE_ND );
 	ri.Cvar_CheckRange( r_volumetricFogHeightFalloff, "0", "5", CV_FLOAT );
-	ri.Cvar_SetDescription( r_volumetricFogHeightFalloff, "Controls vertical falloff of density for the height fog component." );
+	ri.Cvar_SetDescription( r_volumetricFogHeightFalloff, "Vertical density falloff for height fog (higher = thinner aloft)." );
 	ri.Cvar_SetGroup( r_volumetricFogHeightFalloff, CVG_RENDERER );
 
 	r_volumetricFogAlbedo = ri.Cvar_Get( "r_volumetricFogAlbedo", "0.95", CVAR_ARCHIVE_ND );
@@ -2184,21 +2220,22 @@ static void R_Register( void )
 
 	r_volumetricFogAniso = ri.Cvar_Get( "r_volumetricFogAniso", "0.6", CVAR_ARCHIVE_ND );
 	ri.Cvar_CheckRange( r_volumetricFogAniso, "-0.999", "0.999", CV_FLOAT );
-	ri.Cvar_SetDescription( r_volumetricFogAniso, "Henyey-Greenstein anisotropy factor (positive = forward scattering, negative = backward)." );
+	ri.Cvar_SetDescription( r_volumetricFogAniso, "Henyey-Greenstein anisotropy (positive = forward scatter, negative = backscatter)." );
 	ri.Cvar_SetGroup( r_volumetricFogAniso, CVG_RENDERER );
 
 	r_volumetricFogSteps = ri.Cvar_Get( "r_volumetricFogSteps", "48", CVAR_ARCHIVE_ND );
 	ri.Cvar_CheckRange( r_volumetricFogSteps, "1", "256", CV_INTEGER );
-	ri.Cvar_SetDescription( r_volumetricFogSteps, "Raymarch steps per pixel when compositing volumetric fog (higher = more accurate froxel integration)." );
+	ri.Cvar_SetDescription( r_volumetricFogSteps, "Depth-limited raymarch steps when compositing froxel fog into HDR (before tonemap)." );
 	ri.Cvar_SetGroup( r_volumetricFogSteps, CVG_RENDERER );
 
 	r_volumetricFogZExponent = ri.Cvar_Get( "r_volumetricFogZExponent", "1.5", CVAR_ARCHIVE_ND );
 	ri.Cvar_CheckRange( r_volumetricFogZExponent, "1.0", "8.0", CV_FLOAT );
-	ri.Cvar_SetDescription( r_volumetricFogZExponent, "Exponent used for volumetric depth-slice distribution (higher values allocate more slices near camera)." );
+	ri.Cvar_SetDescription( r_volumetricFogZExponent, "Exponent for volumetric depth-slice distribution (paired with r_volumetricFogSliceMode)." );
 	ri.Cvar_SetGroup( r_volumetricFogZExponent, CVG_RENDERER );
-	r_volumetricFogSliceMode = ri.Cvar_Get( "r_volumetricFogSliceMode", "0", CVAR_ARCHIVE_ND );
+	r_volumetricFogSliceMode = ri.Cvar_Get( "r_volumetricFogSliceMode", "2", CVAR_ARCHIVE_ND );
 	ri.Cvar_CheckRange( r_volumetricFogSliceMode, "0", "2", CV_INTEGER );
-	ri.Cvar_SetDescription( r_volumetricFogSliceMode, "Slice distribution: 0=exponential (more near camera), 1=linear (equal spacing), 2=logarithmic (more in distance)." );
+	ri.Cvar_SetDescription( r_volumetricFogSliceMode,
+		"Froxel Z slicing: 0=exponential (more near camera), 1=linear, 2=logarithmic (default; denser far slices)." );
 	ri.Cvar_SetGroup( r_volumetricFogSliceMode, CVG_RENDERER );
 
 	r_volumetricFogMaxDistance = ri.Cvar_Get( "r_volumetricFogMaxDistance", "4096", CVAR_ARCHIVE_ND );
@@ -2208,12 +2245,13 @@ static void R_Register( void )
 
 	r_volumetricFogJitter = ri.Cvar_Get( "r_volumetricFogJitter", "1.0", CVAR_ARCHIVE_ND );
 	ri.Cvar_CheckRange( r_volumetricFogJitter, "0", "1", CV_FLOAT );
-	ri.Cvar_SetDescription( r_volumetricFogJitter, "Introduces sub-pixel jitter to the fog raymarch samples." );
+	ri.Cvar_SetDescription( r_volumetricFogJitter, "Sub-pixel jitter for froxel density / composite raymarch (stabilized by temporal)." );
 	ri.Cvar_SetGroup( r_volumetricFogJitter, CVG_RENDERER );
 
 	r_volumetricFogTemporalWeight = ri.Cvar_Get( "r_volumetricFogTemporalWeight", "0.72", CVAR_ARCHIVE_ND );
 	ri.Cvar_CheckRange( r_volumetricFogTemporalWeight, "0", "1", CV_FLOAT );
-	ri.Cvar_SetDescription( r_volumetricFogTemporalWeight, "History blend weight for temporal reprojection (0 = no history)." );
+	ri.Cvar_SetDescription( r_volumetricFogTemporalWeight,
+		"History blend weight for froxel temporal reprojection with neighborhood clamping (0 = no history)." );
 	ri.Cvar_SetGroup( r_volumetricFogTemporalWeight, CVG_RENDERER );
 
 	r_volumetricFogReprojectionThreshold = ri.Cvar_Get( "r_volumetricFogReprojectionThreshold", "0.075", CVAR_ARCHIVE_ND );
@@ -2293,9 +2331,22 @@ static void R_Register( void )
 	ri.Cvar_SetDescription( r_volumetricFogWorldMax, "World-space fog AABB maximum corner (x y z)." );
 	ri.Cvar_SetGroup( r_volumetricFogWorldMax, CVG_RENDERER );
 
-	r_volumetricFogGridDim = ri.Cvar_Get( "r_volumetricFogGridDim", "160 90 96", CVAR_ARCHIVE_ND | CVAR_LATCH );
-	ri.Cvar_SetDescription( r_volumetricFogGridDim, "World-space froxel grid dimensions (x y z). Requires vid_restart." );
+	r_volumetricFogGridDim = ri.Cvar_Get( "r_volumetricFogGridDim", "0 0 64", CVAR_ARCHIVE_ND | CVAR_LATCH );
+	ri.Cvar_SetDescription( r_volumetricFogGridDim,
+		"Froxel grid (x y z). Default \"0 0 64\" = half-res (vidWidth/2, vidHeight/2, clamped to 640x360) with 64 slices. "
+		"Explicit sizes e.g. \"160 90 96\" override the auto clamp. Requires vid_restart." );
 	ri.Cvar_SetGroup( r_volumetricFogGridDim, CVG_RENDERER );
+
+	ri.Printf( PRINT_ALL,
+		"[VK][fog] froxel path: density=%.3f heightFalloff=%.3f aniso=%.2f steps=%d jitter=%.2f temporalWeight=%.2f sliceMode=%d grid=\"%s\"\n",
+		r_volumetricFogDensity->value,
+		r_volumetricFogHeightFalloff->value,
+		r_volumetricFogAniso->value,
+		r_volumetricFogSteps->integer,
+		r_volumetricFogJitter->value,
+		r_volumetricFogTemporalWeight->value,
+		r_volumetricFogSliceMode->integer,
+		r_volumetricFogGridDim->string );
 
 	r_volumetricFogDepthMode = ri.Cvar_Get( "r_volumetricFogDepthMode", "1", CVAR_ARCHIVE_ND );
 	ri.Cvar_CheckRange( r_volumetricFogDepthMode, "0", "2", CV_INTEGER );
@@ -2557,6 +2608,24 @@ static void R_Register( void )
 
 	r_vk_swapchain_srgb = ri.Cvar_Get( "r_vk_swapchain_srgb", "0", CVAR_ROM );
 	ri.Cvar_SetDescription( r_vk_swapchain_srgb, "Read-only: 1 if the selected Vulkan swapchain format is sRGB." );
+
+	r_vk_clearhdr = ri.Cvar_Get( "r_vk_clearhdr", "1", CVAR_ARCHIVE_ND | CVAR_LATCH );
+	ri.Cvar_CheckRange( r_vk_clearhdr, "0", "1", CV_INTEGER );
+	ri.Cvar_SetDescription( r_vk_clearhdr,
+		"Clear the HDR color target at the start of the main pass (1=clear to black, 0=preserve for accumulation diagnosis). Requires vid_restart." );
+	ri.Cvar_SetGroup( r_vk_clearhdr, CVG_RENDERER );
+
+	r_vk_disableblend = ri.Cvar_Get( "r_vk_disableblend", "1", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_vk_disableblend, "0", "1", CV_INTEGER );
+	ri.Cvar_SetDescription( r_vk_disableblend,
+		"Force blendEnable=OFF for opaque main-pass pipelines (depth-write). Use to diagnose additive white glow; set 0 only if needed." );
+	ri.Cvar_SetGroup( r_vk_disableblend, CVG_RENDERER );
+
+	r_vk_bindlog = ri.Cvar_Get( "r_vk_bindlog", "0", CVAR_TEMP );
+	ri.Cvar_CheckRange( r_vk_bindlog, "0", "1", CV_INTEGER );
+	ri.Cvar_SetDescription( r_vk_bindlog,
+		"Per-frame log of HDR clear status and active post/debug mode. White-floor diagnosis: r_vk_clearhdr 0, r_vk_disableblend 1, r_post_debug 1|2." );
+	ri.Cvar_SetGroup( r_vk_bindlog, CVG_RENDERER );
 
 	r_vk_pipeline_debug = ri.Cvar_Get( "r_vk_pipeline_debug", "0", CVAR_ARCHIVE_ND );
 	ri.Cvar_SetDescription( r_vk_pipeline_debug, "Print Vulkan pipeline creation info (discard mode, shader type, fog, etc)." );
@@ -3426,6 +3495,9 @@ void R_Init( void ) {
 	Com_Memset( &backEnd, 0, sizeof( backEnd ) );
 	Com_Memset( &tess, 0, sizeof( tess ) );
 	Com_Memset( &glState, 0, sizeof( glState ) );
+#ifdef USE_VK_PBR
+	R_PBR_ResetBindLog();
+#endif
 
 	if ( sizeof( glconfig_t ) != 11324 )
 		ri.Error( ERR_FATAL, "Mod ABI incompatible: sizeof(glconfig_t) == %u != 11324", (unsigned int) sizeof( glconfig_t ) );

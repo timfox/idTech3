@@ -134,6 +134,18 @@ void vk_begin_render_pass_tracked( VkRenderPass renderPass, VkFramebuffer frameB
 	qvkCmdBeginRenderPass( vk.cmd->command_buffer, &render_pass_begin_info, VK_SUBPASS_CONTENTS_INLINE );
 	vk.inRenderPass = qtrue;
 
+	if ( vk.renderPassIndex == RENDER_PASS_MAIN && r_vk_bindlog && r_vk_bindlog->integer ) {
+		ri.Printf( PRINT_ALL,
+			"[VK][bindlog] frame clear=%d (r_vk_clearhdr=%d) post=%d post_debug=%d tonemap=%d exposure=%.3f color_fmt=%s\n",
+			clearValues ? 1 : 0,
+			r_vk_clearhdr ? r_vk_clearhdr->integer : -1,
+			r_post ? r_post->integer : 0,
+			r_post_debug ? r_post_debug->integer : 0,
+			r_tonemap ? r_tonemap->integer : 0,
+			r_exposure ? r_exposure->value : 1.0f,
+			vk_format_string( vk.color_format ) );
+	}
+
 	vk.cmd->last_pipeline = VK_NULL_HANDLE;
 	vk.cmd->depth_range = DEPTH_RANGE_COUNT;
 }
@@ -232,9 +244,11 @@ void vk_create_render_passes( void )
 		attachments[0].format = vk.color_format;
 		attachments[0].samples = VK_SAMPLE_COUNT_1_BIT;
 
-		/* Always clear FBO color to avoid solid/wrong colors from uninitialized or stale content
-		 * (fixes r_fbo 1 solid rapidly-changing color bug). */
-		attachments[0].loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+		/* Resolve/color buffer (HDR FP16/FP32 when r_hdr>0). Honor r_vk_clearhdr so
+		 * diagnosis can leave LOAD/DONT_CARE to reveal additive accumulation. */
+		attachments[0].loadOp = ( r_vk_clearhdr && r_vk_clearhdr->integer ) ?
+			VK_ATTACHMENT_LOAD_OP_CLEAR :
+			VK_ATTACHMENT_LOAD_OP_DONT_CARE;
 
 		attachments[0].storeOp = VK_ATTACHMENT_STORE_OP_STORE;   // needed for next render pass
 		attachments[0].stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;

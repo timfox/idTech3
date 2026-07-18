@@ -654,7 +654,12 @@ static void vk_end_frame_fill_gamma_push_constants( VkPostProcessPushConstants *
 	push->paniniDebugMode = r_panini_debug ? (float)r_panini_debug->integer : 0.0f;
 	push->paniniPad0 = (float)backEnd.refdef.time * 0.001f;
 	push->paniniPad1 = 0.0f;
-	push->paniniPad2 = 0.0f;
+	/* Default: apply Panini. Skip when console/UI just drew into the color buffer
+	   unless r_panini_console is enabled (1 = warp console too). */
+	push->paniniMask = 1.0f;
+	if ( backEnd.drawConsole && ( !r_panini_console || !r_panini_console->integer ) ) {
+		push->paniniMask = 0.0f;
+	}
 
 	{
 		cvar_t *r_exposure_auto_var = ri.Cvar_Get( "r_exposure_auto", "0", 0 );
@@ -672,6 +677,10 @@ static void vk_end_frame_fill_gamma_push_constants( VkPostProcessPushConstants *
 		push->brightness = 1.0f;
 		push->exposure = 1.0f;
 		push->paniniPad1 = 1.0f;
+		/* Menus / no-world UI should stay undistorted. */
+		if ( !r_panini_console || !r_panini_console->integer ) {
+			push->paniniMask = 0.0f;
+		}
 	}
 
 	if ( !vk_get_scene_src_rect( &srcRect ) ) {

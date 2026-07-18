@@ -145,7 +145,7 @@ static void VarInfo( void )
 		ri.Printf( PRINT_ALL, "PBR IBL anisotropy stretch: %.2f (r_pbr_iblAnisoStretch, default 1)\n", r_pbr_iblAnisoStretch->value );
 	}
 	if ( r_pbr_debug && r_pbr_debug->integer ) {
-		ri.Printf( PRINT_ALL, "PBR debug view: mode %d (1=direct,2=ibl spec,3=irradiance,4=env samples,5-8=glint)\n", r_pbr_debug->integer );
+		ri.Printf( PRINT_ALL, "PBR debug view: mode %d (1=direct,2=ibl spec,3=irradiance,4=env samples,5-8=glint,17-19=resource health)\n", r_pbr_debug->integer );
 	}
 #endif
 #else

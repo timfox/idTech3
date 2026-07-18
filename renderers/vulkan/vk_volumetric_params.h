@@ -5,7 +5,12 @@
 
 #define VK_FROXEL_DEFAULT_WIDTH 160
 #define VK_FROXEL_DEFAULT_HEIGHT 90
-#define VK_FROXEL_DEFAULT_SLICES 96
+#define VK_FROXEL_DEFAULT_SLICES 64
+/* Sentinel for r_volumetricFogGridDim: X/Y <= 0 => half viewport (vidW/2, vidH/2). */
+#define VK_FROXEL_HALFRES_SENTINEL 0
+/* Auto half-res clamp (VRAM); explicit GridDim values are not limited by these. */
+#define VK_FROXEL_AUTO_MAX_WIDTH 640
+#define VK_FROXEL_AUTO_MAX_HEIGHT 360
 #define VK_FLUID_DEFAULT_RESOLUTION_SCALE 0.5f
 #define VK_FLUID_MAX_PRESSURE_ITERATIONS 64
 #define VK_VOLUMETRIC_MAX_VOLUMES 24

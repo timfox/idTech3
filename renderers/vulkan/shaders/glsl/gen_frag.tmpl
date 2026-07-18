@@ -1647,6 +1647,33 @@ void main() {
 			debugColor = vec3( clamp( abs( glintDebugComp ) * 10.0, 0.0, 1.0 ) );
 		} else if ( debugMode == 8 ) {
 			debugColor = vec3( clamp( glintDebugWeight, 0.0, 1.0 ) );
+		} else if ( debugMode == 17 || debugMode == 18 || debugMode == 19 ) {
+			/* Resource-health views: flags packed in pbrDebugMode.z (hasEnv|hasIrr<<1|dictValid<<2). */
+			int bindFlags = int( pbrDebugMode.z + 0.5 );
+			bool flagHasEnv = ( bindFlags & 1 ) != 0;
+			bool flagHasIrr = ( bindFlags & 2 ) != 0;
+			bool flagDictValid = ( bindFlags & 4 ) != 0;
+			bool sampleOk = true;
+			if ( debugMode == 17 ) {
+				if ( !flagHasIrr ) {
+					debugColor = vec3( 1.0, 0.0, 0.0 );
+				} else {
+					sampleOk = all( equal( irrDebugSample, irrDebugSample ) ) &&
+						!( any( greaterThan( abs( irrDebugSample ), vec3( 1e20 ) ) ) );
+					debugColor = sampleOk ? vec3( 0.0, 1.0, 0.0 ) : vec3( 1.0, 0.0, 1.0 );
+				}
+			} else if ( debugMode == 18 ) {
+				/* Procedural glints: green when enabled, red when disabled (no GPU dictionary). */
+				debugColor = flagDictValid ? vec3( 0.0, 1.0, 0.0 ) : vec3( 1.0, 0.0, 0.0 );
+			} else {
+				if ( !flagHasEnv ) {
+					debugColor = vec3( 1.0, 0.0, 0.0 );
+				} else {
+					sampleOk = all( equal( envDebugSample, envDebugSample ) ) &&
+						!( any( greaterThan( abs( envDebugSample ), vec3( 1e20 ) ) ) );
+					debugColor = sampleOk ? vec3( 0.0, 1.0, 0.0 ) : vec3( 1.0, 0.0, 1.0 );
+				}
+			}
 		}
 		out_color = vec4( debugColor, 1.0 );
 		return;

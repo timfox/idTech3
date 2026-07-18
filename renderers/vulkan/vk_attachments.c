@@ -1627,10 +1627,30 @@ static void vk_create_froxel_images( void )
 
 	if ( r_volumetricFogGridDim && r_volumetricFogGridDim->string && r_volumetricFogGridDim->string[0] ) {
 		if ( sscanf( r_volumetricFogGridDim->string, "%d %d %d", &grid_x, &grid_y, &grid_z ) != 3 ) {
-			grid_x = VK_FROXEL_DEFAULT_WIDTH;
-			grid_y = VK_FROXEL_DEFAULT_HEIGHT;
+			/* "half" / "0" / empty-ish → viewport-relative half-res froxels. */
+			grid_x = VK_FROXEL_HALFRES_SENTINEL;
+			grid_y = VK_FROXEL_HALFRES_SENTINEL;
 			grid_z = VK_FROXEL_DEFAULT_SLICES;
 		}
+	}
+
+	/* Half-res froxel volume: (vidWidth/2, vidHeight/2, slices). X/Y <= 0 selects this.
+	   Auto mode is clamped to VK_FROXEL_AUTO_MAX_* so 4K does not allocate multi-GB volumes;
+	   set an explicit GridDim to override the auto clamp. */
+	if ( grid_x <= VK_FROXEL_HALFRES_SENTINEL ) {
+		grid_x = MAX( 1, glConfig.vidWidth / 2 );
+		if ( grid_x > VK_FROXEL_AUTO_MAX_WIDTH ) {
+			grid_x = VK_FROXEL_AUTO_MAX_WIDTH;
+		}
+	}
+	if ( grid_y <= VK_FROXEL_HALFRES_SENTINEL ) {
+		grid_y = MAX( 1, glConfig.vidHeight / 2 );
+		if ( grid_y > VK_FROXEL_AUTO_MAX_HEIGHT ) {
+			grid_y = VK_FROXEL_AUTO_MAX_HEIGHT;
+		}
+	}
+	if ( grid_z <= 0 ) {
+		grid_z = VK_FROXEL_DEFAULT_SLICES;
 	}
 
 	if ( grid_x < 1 ) grid_x = 1;
@@ -1715,6 +1735,10 @@ static void vk_create_froxel_images( void )
 			vk.froxel_width, vk.froxel_height, vk.froxel_slices, quality, resolution_scale,
 			vk.fluid_width, vk.fluid_height, fluid_quality, fluid_resolution_scale, glConfig.vidWidth, glConfig.vidHeight );
 	}
+
+	ri.Printf( PRINT_ALL,
+		"[VK][fog] froxel volume RGBA16F %ux%ux%u (log-Z via r_volumetricFogSliceMode; composite before tonemap)\n",
+		vk.froxel_width, vk.froxel_height, vk.froxel_slices );
 
 	VkImageCreateInfo create_info;
 	VkImageCreateInfo create_info_extinction;

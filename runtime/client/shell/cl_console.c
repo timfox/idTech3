@@ -513,6 +513,15 @@ void Con_Init( void )
 	con_drawInput = Cvar_Get( "con_drawInput", "1", CVAR_ARCHIVE_ND );
 	Cvar_SetDescription( con_drawInput, "Draw console input line (] prompt and cursor). Set to 0 to hide (e.g. for custom game UIs)." );
 
+	/* Ensure FreeType console glyphs are requested once the renderer is up.
+	   SCR_Init / CL_RegisterBuiltInTrueTypeFonts own the actual load; this
+	   latches con_scale so Con_CheckResize refreshes smallchar metrics. */
+	Cvar_Get( "cl_builtInTtfConsole", "1", CVAR_ARCHIVE_ND );
+	Cvar_Get( "r_consoleFont", "fonts/Inter-Regular.ttf", CVAR_ARCHIVE );
+	if ( con_scale ) {
+		con_scale->modified = qtrue;
+	}
+
 	Field_Clear( &g_consoleField );
 	g_consoleField.widthInChars = g_console_field_width;
 

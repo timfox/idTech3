@@ -270,6 +270,7 @@ void vk_begin_main_render_pass( void )
 	vk_reset_scene_src_rect_tracking();
 	vk_pass_diag_begin( "main", vk.renderWidth, vk.renderHeight );
 
+	/* Color clear is gated by r_vk_clearhdr via loadOp; depth always clears. */
 	vk_begin_render_pass_tracked( vk.render_pass.main, frameBuffer, qtrue, vk.renderWidth, vk.renderHeight );
 	vk.depth_image_layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
 }

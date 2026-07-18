@@ -705,6 +705,25 @@ typedef struct vkPbrUniformBlock_s {
 	vec4_t parallaxParams;
 	vec4_t materialBlend;
 } vkPbrUniformBlock_t;
+
+/* Once-per-map bind diagnostics (reset on world load / vid_restart). */
+static qboolean tr_pbr_bindLogPrinted = qfalse;
+
+void R_PBR_ResetBindLog( void )
+{
+	tr_pbr_bindLogPrinted = qfalse;
+}
+
+static qboolean R_PBR_ShouldLogBindings( void )
+{
+	if ( r_pbr_bindlog && r_pbr_bindlog->integer ) {
+		return qtrue;
+	}
+	if ( r_pbr_debug && r_pbr_debug->integer >= 17 ) {
+		return qtrue;
+	}
+	return qfalse;
+}
 #endif
 
 #ifdef USE_VULKAN
@@ -1769,6 +1788,71 @@ static void RB_IterateStagesGeneric( const shaderCommands_t *input )
 						vk_update_descriptor_if_changed( VK_DESC_PBR_IRRADIANCE, irradianceDescriptor );
 					} else {
 						vk_update_descriptor_if_changed_with_image( VK_DESC_PBR_IRRADIANCE, irradianceDescriptor, cube ? cube->irradiance_image : NULL );
+					}
+				}
+
+				{
+					image_t *envImage = NULL;
+					image_t *irrImage = NULL;
+					VkImageView envView = VK_NULL_HANDLE;
+					VkImageView irrView = VK_NULL_HANDLE;
+					qboolean hasEnv = qfalse;
+					qboolean hasIrr = qfalse;
+					/* Procedural glints have no GPU dictionary texture in this path. */
+					const qboolean dictValid = ( r_glint && r_glint->integer && r_glintMode && r_glintMode->integer ) ? qtrue : qfalse;
+					int bindFlags;
+
+					if ( usingHdrSkybox ) {
+						SkyboxHDR_GetCubemapViews( &envView, &irrView );
+						hasEnv = ( envView != VK_NULL_HANDLE ) ? qtrue : qfalse;
+						hasIrr = ( irrView != VK_NULL_HANDLE ) ? qtrue : qfalse;
+					} else if ( cube ) {
+						envImage = cube->prefiltered_image;
+						irrImage = cube->irradiance_image;
+						if ( envImage ) {
+							envView = envImage->view;
+						}
+						if ( irrImage ) {
+							irrView = irrImage->view;
+						}
+						hasEnv = ( envView != VK_NULL_HANDLE ) ? qtrue : qfalse;
+						hasIrr = ( irrView != VK_NULL_HANDLE ) ? qtrue : qfalse;
+					} else if ( tr.emptyCubemap ) {
+						envImage = tr.emptyCubemap;
+						irrImage = tr.emptyCubemap;
+						envView = tr.emptyCubemap->view;
+						irrView = tr.emptyCubemap->view;
+						hasEnv = ( envView != VK_NULL_HANDLE ) ? qtrue : qfalse;
+						hasIrr = ( irrView != VK_NULL_HANDLE ) ? qtrue : qfalse;
+					}
+
+					bindFlags = ( hasEnv ? 1 : 0 ) | ( hasIrr ? 2 : 0 ) | ( dictValid ? 4 : 0 );
+					uniform.pbrDebugMode[2] = (float)bindFlags;
+
+					if ( !tr_pbr_bindLogPrinted && R_PBR_ShouldLogBindings() ) {
+						tr_pbr_bindLogPrinted = qtrue;
+						ri.Printf( PRINT_ALL,
+							"PBR bind: map=%s numCubemaps=%d cubemapIndex=%d usingHdr=%d "
+							"envImg=%p envView=%p hasEnv=%d irrImg=%p irrView=%p hasIrr=%d "
+							"dictImg=%p dictView=%p dictValid=%d (procedural glints)\n",
+							( tr.world && tr.world->baseName[0] ) ? tr.world->baseName : "<none>",
+							tr.numCubemaps,
+							cubemapIndex,
+							usingHdrSkybox ? 1 : 0,
+							(void *)envImage, (void *)envView, hasEnv ? 1 : 0,
+							(void *)irrImage, (void *)irrView, hasIrr ? 1 : 0,
+							(void *)NULL, (void *)VK_NULL_HANDLE, dictValid ? 1 : 0 );
+						ri.Printf( PRINT_ALL,
+							"PBR IBL descwrite: binding=%d (env/CUBEMAP) view=%p set=%p\n",
+							VK_DESC_PBR_CUBEMAP, (void *)envView, (void *)envDescriptor );
+						ri.Printf( PRINT_ALL,
+							"PBR IBL descwrite: binding=%d (irr/IRRADIANCE) view=%p set=%p\n",
+							VK_DESC_PBR_IRRADIANCE, (void *)irrView, (void *)irradianceDescriptor );
+					}
+
+					/* Ensure debug 17-19 see current resource flags even if PBR block is unchanged. */
+					if ( pbr_debug >= 17 || ( r_pbr_bindlog && r_pbr_bindlog->integer ) ) {
+						vk_push_uniform_cached( &uniform );
 					}
 				}
 

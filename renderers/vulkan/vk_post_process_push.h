@@ -25,7 +25,7 @@ typedef struct {
 	float paniniZoom;
 	float paniniPad0;
 	float paniniPad1;
-	float paniniPad2;
+	float paniniMask; /* 1=apply panini, 0=skip (console/UI) */
 	float exposure;
 	float srcUVAlignPad[3];
 	float srcUVScaleBias[4];

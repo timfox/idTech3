@@ -263,6 +263,15 @@ qboolean vk_select_surface_format( VkPhysicalDevice physical_device, VkSurfaceKH
 		ri.Cvar_Set( "r_vk_swapchain_srgb", vk_format_is_srgb( vk.present_format.format ) ? "1" : "0" );
 	}
 
+	ri.Printf( PRINT_ALL,
+		"[VK] Swapchain format %s (%s) colorSpace=%s | Policy A: %s\n",
+		vk_format_string( vk.present_format.format ),
+		vk_format_is_srgb( vk.present_format.format ) ? "sRGB format" : "UNORM format",
+		( vk.present_format.colorSpace == VK_COLORSPACE_SRGB_NONLINEAR_KHR ) ? "SRGB_NONLINEAR" : "other",
+		vk_format_is_srgb( vk.present_format.format )
+			? "shader outputs linear (GPU converts on write)"
+			: "shader applies manual gamma in gamma.frag when apply_srgb_gamma=1" );
+
 	ri.Free( candidates );
 
 	return qtrue;
@@ -276,13 +285,23 @@ void vk_setup_surface_formats( VkPhysicalDevice physical_device )
 
 	if ( r_fbo && r_fbo->integer ) {
 		const int hdr_mode = r_hdr ? r_hdr->integer : 0;
-		if ( r_fboDebug && r_fboDebug->integer >= 1 ) {
-			ri.Printf( PRINT_DEVELOPER, "[VK][fbo] hdr select r_hdr=%d base=%s color=%s present=%s\n",
-				hdr_mode,
-				vk_format_string( vk.base_format.format ),
-				vk_format_string( vk.color_format ),
-				vk_format_string( vk.present_format.format ) );
-		}
+		ri.Printf( PRINT_ALL, "[VK][fbo] hdr select r_hdr=%d base=%s color=%s present=%s depth=%s\n",
+			hdr_mode,
+			vk_format_string( vk.base_format.format ),
+			vk_format_string( vk.color_format ),
+			vk_format_string( vk.present_format.format ),
+			vk_format_string( vk.depth_format ) );
+		ri.Printf( PRINT_ALL,
+			"[VK][post] r_post=%d r_exposure=%.3f r_tonemap=%d r_post_debug=%d r_vk_clearhdr=%d r_vk_disableblend=%d r_vk_bindlog=%d\n",
+			r_post ? r_post->integer : 0,
+			r_exposure ? r_exposure->value : 1.0f,
+			r_tonemap ? r_tonemap->integer : 0,
+			r_post_debug ? r_post_debug->integer : 0,
+			r_vk_clearhdr ? r_vk_clearhdr->integer : 1,
+			r_vk_disableblend ? r_vk_disableblend->integer : 1,
+			r_vk_bindlog ? r_vk_bindlog->integer : 0 );
+		ri.Printf( PRINT_ALL,
+			"[VK][colorspace] PBR albedo uses VK_FORMAT_*_SRGB; normal/ORM/data maps use linear UNORM. Intermediate HDR target is linear FP (not sRGB).\n" );
 		if ( hdr_mode > 0 && vk.color_format == vk.base_format.format ) {
 			ri.Printf( PRINT_WARNING, "[VK][fbo] r_hdr %d fell back to base format %s\n",
 				hdr_mode, vk_format_string( vk.base_format.format ) );

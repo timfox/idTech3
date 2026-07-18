@@ -2475,6 +2475,34 @@ static const void *RB_PrefilterEnvMap( const void *data )
 	}
 
 	vk_generate_cubemaps( cmd->cubemap );
+
+	{
+		const qboolean wantPostLog =
+			( r_pbr_bindlog && r_pbr_bindlog->integer ) ||
+			( r_ibl_forceCapture && r_ibl_forceCapture->integer ) ||
+			( r_pbr_debug && r_pbr_debug->integer >= 17 );
+		image_t *preImg = cmd->cubemap->prefiltered_image;
+		image_t *irrImg = cmd->cubemap->irradiance_image;
+		VkImageView preView = ( preImg ) ? preImg->view : VK_NULL_HANDLE;
+		VkImageView irrView = ( irrImg ) ? irrImg->view : VK_NULL_HANDLE;
+
+		if ( wantPostLog ) {
+			vk_wait_idle();
+			ri.Printf( PRINT_ALL,
+				"PBR IBL post: idx=%d preImg=%p preView=%p irrImg=%p irrView=%p name=%s\n",
+				cmd->cubemapId,
+				(void *)preImg, (void *)preView,
+				(void *)irrImg, (void *)irrView,
+				cmd->cubemap->name[0] ? cmd->cubemap->name : "<unnamed>" );
+		}
+		if ( preView == VK_NULL_HANDLE || irrView == VK_NULL_HANDLE ) {
+			ri.Printf( PRINT_WARNING,
+				"PBR IBL post: cubemap '%s' (idx=%d) has null view(s) after convolution (pre=%p irr=%p)\n",
+				cmd->cubemap->name[0] ? cmd->cubemap->name : "<unnamed>",
+				cmd->cubemapId, (void *)preView, (void *)irrView );
+		}
+	}
+
 	return (const void *)(cmd + 1);
 }
 #endif

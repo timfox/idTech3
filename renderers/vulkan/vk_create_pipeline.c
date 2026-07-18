@@ -1433,6 +1433,32 @@ VkPipeline vk_create_pipeline( const Vk_Pipeline_Def *def, renderPass_t renderPa
 	else
 		attachment_blend_state.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
 
+	{
+		qboolean forcedBlendOff = qfalse;
+		/* Opaque diagnostic: depth-write + main pass. Keeps intentional alpha blends that don't write depth. */
+		if ( r_vk_disableblend && r_vk_disableblend->integer &&
+			renderPassIndex == RENDER_PASS_MAIN &&
+			attachment_blend_state.blendEnable &&
+			( state_bits & GLS_DEPTHMASK_TRUE ) )
+		{
+			attachment_blend_state.blendEnable = VK_FALSE;
+			forcedBlendOff = qtrue;
+		}
+
+		if ( forcedBlendOff || ( renderPassIndex == RENDER_PASS_MAIN && !( state_bits & ( GLS_SRCBLEND_BITS | GLS_DSTBLEND_BITS ) ) ) ) {
+			static qboolean loggedOpaqueBlend;
+			if ( !loggedOpaqueBlend ) {
+				ri.Printf( PRINT_ALL,
+					"[VK][pipeline] main opaque blend=%s color_fmt=%s (r_vk_disableblend=%d)\n",
+					forcedBlendOff ? "forced-disabled" :
+						( attachment_blend_state.blendEnable ? "enabled" : "disabled" ),
+					vk_format_string( vk.color_format ),
+					r_vk_disableblend ? r_vk_disableblend->integer : 0 );
+				loggedOpaqueBlend = qtrue;
+			}
+		}
+	}
+
 	if (attachment_blend_state.blendEnable) {
 		switch (state_bits & GLS_SRCBLEND_BITS) {
 			case GLS_SRCBLEND_ZERO:

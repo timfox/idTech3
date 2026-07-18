@@ -56,7 +56,7 @@ layout(push_constant) uniform PaniniPC {
 	float paniniZoom;
 	float paniniPad0;
 	float paniniPad1;
-	float paniniPad2;
+	float paniniMask; /* 1=apply panini, 0=skip (console/UI) */
 	float exposure;  /* per-frame (eye adaptation or r_exposure) */
 	vec4 srcUVScaleBias; // scale.xy, bias.xy
 } paniniPC;
@@ -524,11 +524,12 @@ vec3 applyDepthOfField( vec3 ldr, vec2 uv, bool postGrade ) {
 
 void main() {
 	vec2 uv = frag_tex_coord;
-	float paniniAmount = clamp( paniniPC.paniniAmount, 0.0, 1.0 );
+	float paniniMask = clamp( paniniPC.paniniMask, 0.0, 1.0 );
+	float paniniAmount = clamp( paniniPC.paniniAmount, 0.0, 1.0 ) * paniniMask;
 	int borderMode = int( clamp( floor( paniniPC.paniniBorderMode + 0.5 ), 0.0, 1.0 ) );
 	int paniniDebug = int( clamp( floor( paniniPC.paniniDebugMode + 0.5 ), 0.0, 1.0 ) );
 	int debugMode = postDebugMode();
-	bool debugInverse = postEnabled() && ( debugMode == 97 || debugMode == 98 || debugMode == 99 );
+	bool debugInverse = postEnabled() && ( debugMode == 97 || debugMode == 98 || debugMode == 99 ) && paniniMask > 0.0001;
 	bool doPaniniPath = paniniAmount > 0.0001 || debugInverse;
 	vec2 uvLogical = uv;
 
@@ -613,15 +614,14 @@ void main() {
 	}
 
 	vec3 ldr;
-	if ( hdrResolveActive && postGradeActive && debugMode != 0 ) {
-		if ( debugMode == 1 ) {
-			ldr = clamp( hdr_exposed, 0.0, 10.0 ) * 0.1;
-		} else {
-			float lum = max( max( hdr_exposed.r, hdr_exposed.g ), hdr_exposed.b );
-			float logLum = log2( max( lum, 1e-4 ) );
-			float heat = clamp( ( logLum + 6.0 ) / 8.0, 0.0, 1.0 );
-			ldr = vec3( heat, clamp( heat * 0.25, 0.0, 1.0 ), 1.0 - heat );
-		}
+	/* Prove-it views work whenever HDR resolve is active (independent of r_post grading). */
+	if ( hdrResolveActive && debugMode == 1 ) {
+		ldr = clamp( hdr_exposed, 0.0, 10.0 ) * 0.1;
+	} else if ( hdrResolveActive && debugMode == 2 ) {
+		float lum = max( max( hdr_exposed.r, hdr_exposed.g ), hdr_exposed.b );
+		float logLum = log2( max( lum, 1e-4 ) );
+		float heat = clamp( ( logLum + 6.0 ) / 8.0, 0.0, 1.0 );
+		ldr = vec3( heat, clamp( heat * 0.25, 0.0, 1.0 ), 1.0 - heat );
 	} else {
 		ldr = applyPostColorAdjust( clamp( tonemapped, 0.0, 1.0 ), postGradeActive );
 

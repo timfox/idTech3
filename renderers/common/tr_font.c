@@ -736,6 +736,7 @@ void RE_RegisterFont(const char *fontName, int pointSize, fontInfo_t *font) {
 	int i, len;
 	char name[MAX_QPATH];
 	const char *resolvedFontName;
+	qboolean preferRuntimeTtf = qfalse;
 
 	if (!fontName) {
 		ri.Printf(PRINT_ALL, "RE_RegisterFont: called with empty name\n");
@@ -747,6 +748,11 @@ void RE_RegisterFont(const char *fontName, int pointSize, fontInfo_t *font) {
 		resolvedFontName = "fonts/Inter-Bold.ttf";
 		ri.Printf( PRINT_WARNING, "RE_RegisterFont: Falling back from '%s' to '%s'\n", fontName, resolvedFontName );
 	}
+	/* Prefer modern Inter when callers ask for Source Sans (plan fallback). */
+	if ( !Q_stricmpn( fontName, "fonts/SourceSans", 16 ) || !Q_stricmpn( fontName, "SourceSans", 10 ) ) {
+		resolvedFontName = "fonts/Inter-Regular.ttf";
+		ri.Printf( PRINT_WARNING, "RE_RegisterFont: Falling back from '%s' to '%s'\n", fontName, resolvedFontName );
+	}
 
 	if (pointSize <= 0) {
 		pointSize = 12;
@@ -755,6 +761,18 @@ void RE_RegisterFont(const char *fontName, int pointSize, fontInfo_t *font) {
 	if (registeredFontCount >= MAX_FONTS) {
 		ri.Printf(PRINT_WARNING, "RE_RegisterFont: Too many fonts registered already.\n");
 		return;
+	}
+
+	/* TrueType/OpenType paths always rasterize via FreeType so console/HUD
+	   never get stuck on stale prebaked fonts/<name>_<pt>.dat atlases. */
+	{
+		const char *ext = strrchr( resolvedFontName, '.' );
+		if ( ext && ( !Q_stricmp( ext, ".ttf" ) || !Q_stricmp( ext, ".otf" ) || !Q_stricmp( ext, ".ttc" ) ) ) {
+			preferRuntimeTtf = qtrue;
+		}
+	}
+	if ( preferRuntimeTtf ) {
+		goto try_freetype;
 	}
 
 	/* --- Try name-based cache first: fonts/<fontbase>_<pointSize>.dat --- */
@@ -861,8 +879,30 @@ try_freetype:
 
 	len = ri.FS_ReadFile(resolvedFontName, &faceData);
 	if (len <= 0) {
+		static const char *const kFontFallbacks[] = {
+			"fonts/Inter-Regular.ttf",
+			"fonts/Inter-Bold.ttf",
+			NULL
+		};
+		int fb;
+		qboolean loaded = qfalse;
+
 		ri.Printf(PRINT_WARNING, "RE_RegisterFont: Unable to read font file '%s'\n", resolvedFontName);
-		return;
+		for ( fb = 0; kFontFallbacks[fb]; fb++ ) {
+			if ( !Q_stricmp( resolvedFontName, kFontFallbacks[fb] ) ) {
+				continue;
+			}
+			len = ri.FS_ReadFile( kFontFallbacks[fb], &faceData );
+			if ( len > 0 ) {
+				ri.Printf( PRINT_WARNING, "RE_RegisterFont: Falling back to '%s'\n", kFontFallbacks[fb] );
+				resolvedFontName = kFontFallbacks[fb];
+				loaded = qtrue;
+				break;
+			}
+		}
+		if ( !loaded ) {
+			return;
+		}
 	}
 
 	if ( FT_New_Memory_Face( ftLibrary, faceData, len, 0, &face ) ) {

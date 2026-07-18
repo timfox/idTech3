@@ -718,6 +718,14 @@ void vk_generate_cubemaps( cubemap_t *cube )
 
 		record_image_layout_transition( vk.cmd->command_buffer, cubemap->handle, VK_IMAGE_ASPECT_COLOR_BIT, 
 			VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, 0, 0 );
+
+		if ( r_pbr_bindlog && r_pbr_bindlog->integer ) {
+			ri.Printf( PRINT_ALL,
+				"PBR IBL cubemap layout: target=%d img=%p view=%p layout=SHADER_READ_ONLY name=%s\n",
+				def->target,
+				(void *)cubemap, (void *)cubemap->view,
+				cube->name[0] ? cube->name : "<unnamed>" );
+		}
 	}
 
 #ifdef USE_VK_PBR
