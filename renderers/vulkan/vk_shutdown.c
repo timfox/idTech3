@@ -47,8 +47,14 @@ void vk_shutdown( refShutdownCode_t code )
 	if ( qvkQueuePresentKHR == NULL ) { /* not fully initialized */
 		goto __cleanup;
 	}
+	/* Device already lost: skip destroy trees to avoid recursive VK_CHECK/ri.Error spam.
+	 * passDiag context was already printed by vk_report_device_lost_context. */
+	if ( vk.device_lost ) {
+		ri.Printf( PRINT_ALL, "[VK][device_lost] fast shutdown: skipping resource destroy tree\n" );
+		goto __cleanup;
+	}
 	/* VUID-05137: ensure GPU finished before destroying resources */
-	if ( !vk.device_lost && qvkDeviceWaitIdle )
+	if ( qvkDeviceWaitIdle )
 		qvkDeviceWaitIdle( vk.device );
 	vk_rtx_shutdown();
 	vk_grtx_shutdown();
@@ -57,8 +63,6 @@ void vk_shutdown( refShutdownCode_t code )
 	vk_raygun_shutdown();
 	vk_surfel_gi_shutdown();
 	R_Dressi_Shutdown();
-	/* Always run full destroy sequence for VUID-05137 compliance.
-	 * When device_lost, destroy calls may return VK_ERROR_DEVICE_LOST but we still attempt them. */
 	vk_destroy_framebuffers();
 
 	vk_destroy_pipelines( qtrue ); /* reset counter */

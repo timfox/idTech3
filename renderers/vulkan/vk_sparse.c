@@ -29,6 +29,9 @@ static qboolean vk_sparse_submit_binds( vkSparsePool_t *pool, VkSparseImageMemor
 	if ( !pool || !binds || bindCount == 0 ) {
 		return qtrue;
 	}
+	if ( vk.device_lost ) {
+		return qfalse;
+	}
 
 	Com_Memset( &imageBind, 0, sizeof( imageBind ) );
 	imageBind.image = pool->owner->image;

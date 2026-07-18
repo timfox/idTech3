@@ -198,4 +198,9 @@ void vk_post_scene_aa_apply( void )
 	aa_output = ( aa_ran && vk.smaa_output_image_view ) ? vk.smaa_output_image_view : vk.color_image_view;
 	vk_set_scene_post_fog_source( aa_output );
 	vk_update_post_fog_descriptors( aa_output );
+	if ( aa_ran && aa_output == vk.smaa_output_image_view ) {
+		vk_set_post_chain_last_writer( "post_aa" );
+	} else {
+		vk_set_post_chain_last_writer( "bloom" );
+	}
 }

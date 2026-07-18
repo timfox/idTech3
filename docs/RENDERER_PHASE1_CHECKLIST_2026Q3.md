@@ -39,7 +39,7 @@ Make the shipping Vulkan path reliable enough that:
 - [x] Audit every call path that ends the main pass and later resumes it.
 - [x] Ensure every resume site goes through the shared scene-pass helpers rather than open-coded assumptions.
 - [x] Verify the post-bloom continuation path always resumes the expected framebuffer and render-pass pair.
-- [ ] Verify UI overlay and 2D transition paths cannot silently drift the active pass state.
+- [x] Verify UI overlay and 2D transition paths cannot silently drift the active pass state.
 - [x] Verify deferred and compute detours restore the main scene pass explicitly before transparent or overlay work resumes.
 
 ### Existing hooks worth extending
@@ -96,10 +96,10 @@ That makes late post/bloom work a first-class stabilization target.
 
 - [x] Log bloom path entry/exit with enough context to identify the active source image and expected destination.
 - [x] Validate that bloom extraction only runs when its source image/view/layout are valid.
-- [ ] Validate every bloom downsample and blur step against expected image dimensions and layouts.
-- [ ] Validate the post-bloom continuation pass after bloom finishes, especially when toggles are applied from config startup.
+- [x] Validate every bloom downsample and blur step against expected image dimensions and layouts.
+- [x] Validate the post-bloom continuation pass after bloom finishes, especially when toggles are applied from config startup.
 - [ ] Audit bloom threshold/intensity parameter ranges and how they are pushed or specialized through the pipeline.
-- [ ] Confirm gamma/final compose always samples the intended post-bloom source after bloom, SMAA, FXAA, and volumetric branches.
+- [x] Confirm gamma/final compose always samples the intended post-bloom source after bloom, SMAA, FXAA, and volumetric branches.
 
 ### Specific code points
 
@@ -160,7 +160,7 @@ That makes late post/bloom work a first-class stabilization target.
 - [x] Record the last completed major Vulkan stage for the frame.
 - [x] Record the last begun pass and the last ended pass.
 - [x] Report whether the loss happened near bloom/post/AA/deferred/clustered work.
-- [ ] Reduce duplicate recursive shutdown spam after `VK_ERROR_DEVICE_LOST` so the first useful error remains visible.
+- [x] Reduce duplicate recursive shutdown spam after `VK_ERROR_DEVICE_LOST` so the first useful error remains visible.
 
 ### Minimum crash-context payload
 
@@ -213,7 +213,7 @@ That makes late post/bloom work a first-class stabilization target.
 ### Cheap additions worth making
 
 - [x] A source guard that bloom/post paths still validate resume ownership before returning to continuation passes.
-- [ ] A source guard that gamma/final compose references the intended post-bloom source selection path.
+- [x] A source guard that gamma/final compose references the intended post-bloom source selection path.
 - [x] A runtime diagnostics test that the renderer status print includes current mode/profile/post toggles.
 - [x] A regression note/test for the July 18, 2026 late-bloom device-loss failure class.
 

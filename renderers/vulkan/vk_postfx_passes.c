@@ -134,13 +134,45 @@ void vk_begin_bloom_extract_render_pass( void )
 void vk_begin_blur_render_pass( uint32_t index )
 {
 	VkFramebuffer frameBuffer = vk.framebuffers.blur[ index ];
+	uint32_t width = gls.captureWidth / ( 2 << ( index / 2 ) );
+	uint32_t height = gls.captureHeight / ( 2 << ( index / 2 ) );
 
 	//vk.renderPassIndex = RENDER_PASS_BLOOM_EXTRACT; // doesn't matter, we will use dedicated pipelines
 
 	vk_begin_postfx_render_pass( vk.render_pass.blur[ index ], frameBuffer,
-		gls.captureWidth / ( 2 << ( index / 2 ) ),
-		gls.captureHeight / ( 2 << ( index / 2 ) ),
-		qfalse );
+		width, height, qfalse );
+}
+
+static qboolean vk_bloom_validate_step( const char *step, uint32_t w, uint32_t h, uint32_t mipIndex )
+{
+	uint32_t expectW;
+	uint32_t expectH;
+
+	if ( mipIndex >= ARRAY_LEN( vk.bloom_mip_extent ) ) {
+		vk_pass_diag_stage( "bloom_dim_mismatch" );
+		if ( r_fboDebug && r_fboDebug->integer >= 1 && vk_post_fog_fbo_debug_throttle() ) {
+			ri.Printf( PRINT_DEVELOPER, S_COLOR_YELLOW
+				"[VK][bloom] %s: mip index %u out of range\n",
+				step ? step : "step", mipIndex );
+		}
+		return qfalse;
+	}
+
+	expectW = vk.bloom_mip_extent[mipIndex].width;
+	expectH = vk.bloom_mip_extent[mipIndex].height;
+	if ( expectW == 0 || expectH == 0 ) {
+		return qtrue; /* extents not recorded yet; skip check */
+	}
+	if ( w != expectW || h != expectH ) {
+		vk_pass_diag_stage( "bloom_dim_mismatch" );
+		if ( r_fboDebug && r_fboDebug->integer >= 1 && vk_post_fog_fbo_debug_throttle() ) {
+			ri.Printf( PRINT_DEVELOPER, S_COLOR_YELLOW
+				"[VK][bloom] %s: dim mismatch mip%u got %ux%u expected %ux%u\n",
+				step ? step : "step", mipIndex, w, h, expectW, expectH );
+		}
+		return qfalse;
+	}
+	return qtrue;
 }
 
 
@@ -515,6 +547,14 @@ static qboolean vk_bloom_resources_ready( const char **outReason )
 		}
 		return qfalse;
 	}
+	if ( vk.bloom_capture_extent.width > 0 && vk.bloom_capture_extent.height > 0 &&
+		( (uint32_t)gls.captureWidth != vk.bloom_capture_extent.width ||
+			(uint32_t)gls.captureHeight != vk.bloom_capture_extent.height ) ) {
+		if ( outReason ) {
+			*outReason = "bloom capture extent drift vs attachments";
+		}
+		return qfalse;
+	}
 	for ( i = 0; i < 1u + VK_NUM_BLOOM_PASSES * 2u; i++ ) {
 		if ( vk.bloom_image[i] == VK_NULL_HANDLE || vk.bloom_image_view[i] == VK_NULL_HANDLE ||
 			vk.bloom_image_descriptor[i] == VK_NULL_HANDLE ) {
@@ -577,6 +617,8 @@ qboolean vk_bloom( void )
 		return qfalse;
 	}
 
+	vk_assert_ui_pass_consistency( "vk_bloom" );
+
 	vk_pass_diag_stage( "bloom_enter" );
 	if ( r_fboDebug && r_fboDebug->integer >= 1 && vk_post_fog_fbo_debug_throttle() ) {
 		ri.Printf( PRINT_DEVELOPER,
@@ -598,6 +640,13 @@ qboolean vk_bloom( void )
 	/* Ensure color_image is ready for sampling before bloom extract */
 	vk_barrier_post_fog_source_for_sampling( vk.color_image_view, "pre-bloom-extract" );
 	vk_pass_diag_stage( "bloom_extract" );
+
+	if ( !vk_bloom_validate_step( "extract", (uint32_t)gls.captureWidth, (uint32_t)gls.captureHeight, 0 ) ) {
+		/* Stay out of bloom chain; resume post-bloom for 2D/HUD continuation. */
+		vk_begin_post_bloom_render_pass();
+		backEnd.doneBloom = qtrue;
+		return qfalse;
+	}
 
 	// bloom extraction
 	vk_begin_bloom_extract_render_pass();
@@ -627,6 +676,11 @@ qboolean vk_bloom( void )
 			const uint32_t dstHeight = MAX( 1u, srcHeight / 2u );
 			VkCommandBuffer cmd = vk.cmd->command_buffer;
 
+			if ( !vk_bloom_validate_step( "blit_src", srcWidth, srcHeight, srcIndex ) ||
+				!vk_bloom_validate_step( "blit_dst", dstWidth, dstHeight, dstIndex ) ) {
+				break;
+			}
+
 			record_image_layout_transition( cmd, vk.bloom_image[srcIndex], VK_IMAGE_ASPECT_COLOR_BIT,
 				VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, 0, 0 );
 			record_image_layout_transition( cmd, vk.bloom_image[dstIndex], VK_IMAGE_ASPECT_COLOR_BIT,
@@ -652,6 +706,16 @@ qboolean vk_bloom( void )
 			record_image_layout_transition( cmd, vk.bloom_image[dstIndex], VK_IMAGE_ASPECT_COLOR_BIT,
 				VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, 0, 0 );
 
+			{
+				const uint32_t blurW = MAX( 1u, gls.captureWidth / ( 2u << ( ( i + 0 ) / 2 ) ) );
+				const uint32_t blurH = MAX( 1u, gls.captureHeight / ( 2u << ( ( i + 0 ) / 2 ) ) );
+				const uint32_t blurMip = ( i + 0 ) + 1;
+				if ( !vk_bloom_validate_step( "blur_h", blurW, blurH, blurMip ) ||
+					!vk_bloom_validate_step( "blur_v", blurW, blurH, blurMip + 1 ) ) {
+					break;
+				}
+			}
+
 			// horizontal blur: downsampled source -> ping image
 			vk_postfx_run_blur_pass( i + 0, vk.bloom_image_descriptor[dstIndex] );
 
@@ -662,6 +726,12 @@ qboolean vk_bloom( void )
 		// Fallback to legacy downsample+blur in one pass if blit features are unavailable.
 		vk_pass_diag_stage( "bloom_legacy_blur" );
 		for ( i = 0; i < VK_NUM_BLOOM_PASSES * 2; i += 2 ) {
+			const uint32_t blurW = MAX( 1u, gls.captureWidth / ( 2u << ( i / 2 ) ) );
+			const uint32_t blurH = MAX( 1u, gls.captureHeight / ( 2u << ( i / 2 ) ) );
+			if ( !vk_bloom_validate_step( "legacy_blur_h", blurW, blurH, i + 1 ) ||
+				!vk_bloom_validate_step( "legacy_blur_v", blurW, blurH, i + 2 ) ) {
+				break;
+			}
 			vk_postfx_run_blur_pass( i + 0, vk.bloom_image_descriptor[i+0] );
 			vk_postfx_run_blur_pass( i + 1, vk.bloom_image_descriptor[i+1] );
 		}
@@ -724,12 +794,16 @@ qboolean vk_bloom( void )
 		vk_barrier_post_fog_source_for_sampling( vk.color_image_view, "post-bloom refresh post-fog source" );
 		vk_set_scene_post_fog_source( vk.color_image_view );
 		vk_update_post_fog_descriptors( vk.color_image_view );
+		vk_set_post_chain_last_writer( "bloom" );
 		if ( r_postAaAfterBloom && r_postAaAfterBloom->integer && vk_post_aa_output_active() ) {
 			vk_post_scene_aa_apply();
 		}
 	}
 
 	backEnd.doneBloom = qtrue;
+	if ( Q_stricmp( vk_post_chain_last_writer_name(), "post_aa" ) ) {
+		vk_set_post_chain_last_writer( "bloom" );
+	}
 	vk_pass_diag_stage( "bloom_exit" );
 	if ( r_fboDebug && r_fboDebug->integer >= 1 && vk_post_fog_fbo_debug_throttle() ) {
 		ri.Printf( PRINT_DEVELOPER,

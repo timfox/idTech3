@@ -24,6 +24,18 @@ typedef void (VKAPI_PTR *PFN_vkCmdSetColorWriteMaskEXT)(VkCommandBuffer commandB
 	} \
 } while(0)
 
+/* Teardown-only: once device_lost is set, DEVICE_LOST results must not re-enter ri.Error. */
+#define VK_CHECK_IGNORE_LOST( function_call ) do { \
+	VkResult _res_ = (function_call); \
+	if ( _res_ < 0 ) { \
+		if ( vk.device_lost && ( _res_ == VK_ERROR_DEVICE_LOST ) ) { \
+			ri.Printf( PRINT_DEVELOPER, "Vulkan: ignoring %s during device_lost teardown\n", #function_call ); \
+		} else { \
+			ri.Error( ERR_FATAL, "Vulkan: %s returned %s", #function_call, vk_result_string( _res_ ) ); \
+		} \
+	} \
+} while(0)
+
 #define MAX_SWAPCHAIN_IMAGES 8
 #define MIN_SWAPCHAIN_IMAGES_IMM 3
 #define MIN_SWAPCHAIN_IMAGES_FIFO   3
@@ -503,6 +515,7 @@ void vk_begin_main_render_pass( void );
 void vk_resume_current_render_pass( void );
 void vk_begin_post_bloom_render_pass( void );
 void vk_begin_ui_overlay_render_pass( void );
+void vk_begin_ui_overlay_render_pass_load( void );
 void vk_begin_bloom_extract_render_pass( void );
 void vk_begin_blur_render_pass( uint32_t index );
 void vk_begin_ssao_render_pass( void );
@@ -752,6 +765,7 @@ typedef struct {
 	VkDescriptorSet overlay_color_descriptor[NUM_COMMAND_BUFFERS];	/* immutable UI overlay source */
 	VkImageView post_fog_color_source;	/* last source for gamma (color_image or smaa_output) */
 	VkImageView scene_post_fog_color_source;	/* scene-only source for luminance/exposure before HUD/console */
+	char postChainLastWriter[16];	/* scene | bloom | post_aa | taa */
 	VkDescriptorSet depth_descriptor[NUM_COMMAND_BUFFERS];	/* per-frame (VUID-03047) */
 	VkDescriptorSet taa_motion_descriptor[NUM_COMMAND_BUFFERS];
 		VkDescriptorSet postfx_params_descriptor[NUM_COMMAND_BUFFERS];
@@ -1214,6 +1228,8 @@ typedef struct {
 
 	VkImage bloom_image[1+VK_NUM_BLOOM_PASSES*2];
 	VkImageView bloom_image_view[1+VK_NUM_BLOOM_PASSES*2];
+	VkExtent2D bloom_capture_extent;
+	VkExtent2D bloom_mip_extent[1+VK_NUM_BLOOM_PASSES*2];
 
 	VkDescriptorSet bloom_image_descriptor[1+VK_NUM_BLOOM_PASSES*2];
 
@@ -1720,6 +1736,7 @@ typedef struct {
 	uint32_t frame_count;
 	qboolean active;
 	qboolean uiOverlayActive;
+	qboolean uiOverlayContentValid; /* HUD already drawn this frame; re-entry must load, not clear */
 	qboolean wideLines;
 	qboolean shaderFloat64;
 	qboolean samplerAnisotropy;

@@ -385,6 +385,7 @@ void vk_reset_post_fog_frame_state( void )
 
 	vk.post_fog_color_source = default_source;
 	vk.scene_post_fog_color_source = default_source;
+	vk_set_post_chain_last_writer( "scene" );
 
 	if ( default_source == VK_NULL_HANDLE ) {
 		return;
@@ -397,4 +398,39 @@ void vk_reset_post_fog_frame_state( void )
 	}
 
 	vk_validate_post_fog_runtime_sources( "reset_post_fog_frame_state" );
+}
+
+void vk_set_post_chain_last_writer( const char *writer )
+{
+	Q_strncpyz( vk.postChainLastWriter, writer ? writer : "scene", sizeof( vk.postChainLastWriter ) );
+}
+
+const char *vk_post_chain_last_writer_name( void )
+{
+	return vk.postChainLastWriter[0] ? vk.postChainLastWriter : "scene";
+}
+
+VkImageView vk_post_chain_expected_gamma_source( void )
+{
+	if ( !Q_stricmp( vk_post_chain_last_writer_name(), "taa" ) ) {
+		VkImageView taaView = vk.taa_history_image_view[ vk.temporal.taaHistoryIndex & 1u ];
+		if ( vk_post_fog_source_is_viable( taaView ) ) {
+			return taaView;
+		}
+	}
+	if ( !Q_stricmp( vk_post_chain_last_writer_name(), "post_aa" ) &&
+		vk_post_fog_source_is_viable( vk.smaa_output_image_view ) ) {
+		return vk.smaa_output_image_view;
+	}
+	if ( ( !Q_stricmp( vk_post_chain_last_writer_name(), "bloom" ) || backEnd.doneBloom ) &&
+		vk_post_fog_source_is_viable( vk.color_image_view ) ) {
+		return vk.color_image_view;
+	}
+	if ( vk_post_fog_source_is_viable( vk_get_post_fog_source() ) ) {
+		return vk_get_post_fog_source();
+	}
+	if ( vk_post_fog_source_is_viable( vk.color_image_view ) ) {
+		return vk.color_image_view;
+	}
+	return VK_NULL_HANDLE;
 }

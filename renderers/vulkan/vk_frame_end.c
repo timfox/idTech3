@@ -83,6 +83,21 @@ static void vk_end_frame_validate_post_process_chain( const char *stage, VkImage
 			"[VK][fbo] %s: uiOverlayActive=1 but overlay_compose render pass is null\n",
 			stage ? stage : "frame_end" );
 	}
+
+	{
+		VkImageView expected = vk_post_chain_expected_gamma_source();
+		ri.Printf( PRINT_DEVELOPER,
+			"[VK][fbo] %s: writer=%s doneBloom=%d postAaAfterBloom=%d smaa=%d fxaa=%d taaHistory=%s expected=%s actual=%s\n",
+			stage ? stage : "frame_end",
+			vk_post_chain_last_writer_name(),
+			backEnd.doneBloom ? 1 : 0,
+			r_postAaAfterBloom ? r_postAaAfterBloom->integer : 0,
+			vk.smaaActive ? 1 : 0,
+			vk.fxaaActive ? 1 : 0,
+			vk.temporal.hasValidTAAHistory ? "yes" : "no",
+			vk_post_fog_source_name( expected ),
+			vk_post_fog_source_name( post_fog_src ) );
+	}
 }
 
 static void vk_end_frame_refresh_postfx_params_for_target( uint32_t width, uint32_t height )
@@ -510,6 +525,7 @@ void vk_end_frame_record_taa_pass( VkImageView *post_fog_src, VkImageView *lumin
 	*luminance_src = resolved_view;
 	vk_set_scene_post_fog_source( resolved_view );
 	vk_update_post_fog_descriptors( resolved_view );
+	vk_set_post_chain_last_writer( "taa" );
 }
 
 void vk_end_frame_record_luminance_pass( VkImageView luminance_src )
@@ -692,9 +708,15 @@ static void vk_end_frame_fill_gamma_push_constants( VkPostProcessPushConstants *
 
 void vk_end_frame_record_gamma_pass( VkImageView post_fog_src )
 {
-	VkImageView gamma_src = vk_end_frame_choose_viable_color_source(
-		( post_fog_src != VK_NULL_HANDLE ) ? post_fog_src : vk.color_image_view,
-		"gamma_pass_start" );
+	VkImageView expected_src = vk_post_chain_expected_gamma_source();
+	VkImageView preferred = ( post_fog_src != VK_NULL_HANDLE ) ? post_fog_src : vk.color_image_view;
+	VkImageView gamma_src;
+
+	/* Prefer expected writer when viable so bloom/AA/TAA intent wins over stale handles. */
+	if ( expected_src != VK_NULL_HANDLE && vk_post_fog_source_image( expected_src ) != VK_NULL_HANDLE ) {
+		preferred = expected_src;
+	}
+	gamma_src = vk_end_frame_choose_viable_color_source( preferred, "gamma_pass_start" );
 
 	/*
 	 * Consume exposure as part of the frame-end post chain rather than the
@@ -733,13 +755,13 @@ void vk_end_frame_record_gamma_pass( VkImageView post_fog_src )
 	}
 
 	if ( r_fboDebug && r_fboDebug->integer >= 1 && vk_post_fog_fbo_debug_throttle() ) {
-		VkImageView expected = vk_get_post_fog_source();
-		if ( gamma_src != expected || gamma_src != vk.post_fog_color_source ) {
+		if ( gamma_src != expected_src || gamma_src != vk.post_fog_color_source ) {
 			ri.Printf( PRINT_DEVELOPER, S_COLOR_YELLOW
-				"[VK][fbo] gamma source mismatch: gamma_src=%s post_fog_color_source=%s expected=%s\n",
+				"[VK][fbo] gamma source mismatch: gamma_src=%s post_fog_color_source=%s expected=%s writer=%s\n",
 				vk_post_fog_source_name( gamma_src ),
 				vk_post_fog_source_name( vk.post_fog_color_source ),
-				vk_post_fog_source_name( expected ) );
+				vk_post_fog_source_name( expected_src ),
+				vk_post_chain_last_writer_name() );
 		}
 	}
 

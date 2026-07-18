@@ -555,18 +555,36 @@ void vk_create_attachments( void )
 			uint32_t height = gls.captureHeight;
 			VkImageUsageFlags bloomUsage = copyableColorUsage;
 
+			vk.bloom_capture_extent.width = width;
+			vk.bloom_capture_extent.height = height;
+			vk.bloom_mip_extent[0].width = width;
+			vk.bloom_mip_extent[0].height = height;
+
 			create_color_attachment( width, height, VK_SAMPLE_COUNT_1_BIT, vk.bloom_format,
 				bloomUsage, &vk.bloom_image[0], &vk.bloom_image_view[0], VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, qfalse, 0 );
 
 			for ( i = 1; i < ARRAY_LEN( vk.bloom_image ); i += 2 ) {
 				width /= 2;
 				height /= 2;
+				if ( width < 1 ) {
+					width = 1;
+				}
+				if ( height < 1 ) {
+					height = 1;
+				}
+				vk.bloom_mip_extent[i + 0].width = width;
+				vk.bloom_mip_extent[i + 0].height = height;
+				vk.bloom_mip_extent[i + 1].width = width;
+				vk.bloom_mip_extent[i + 1].height = height;
 				create_color_attachment( width, height, VK_SAMPLE_COUNT_1_BIT, vk.bloom_format,
 					bloomUsage, &vk.bloom_image[i+0], &vk.bloom_image_view[i+0], VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, qfalse, 0 );
 
 				create_color_attachment( width, height, VK_SAMPLE_COUNT_1_BIT, vk.bloom_format,
 					bloomUsage, &vk.bloom_image[i+1], &vk.bloom_image_view[i+1], VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, qfalse, 0 );
 			}
+		} else {
+			Com_Memset( &vk.bloom_capture_extent, 0, sizeof( vk.bloom_capture_extent ) );
+			Com_Memset( vk.bloom_mip_extent, 0, sizeof( vk.bloom_mip_extent ) );
 		}
 
 		// ssao

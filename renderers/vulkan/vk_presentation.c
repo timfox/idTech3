@@ -35,6 +35,7 @@ static void vk_reset_presentation_runtime_state( void )
 
 	vk.inRenderPass = qfalse;
 	vk.uiOverlayActive = qfalse;
+	vk.uiOverlayContentValid = qfalse;
 	vk.renderPassIndex = RENDER_PASS_MAIN;
 
 	for ( i = 0; i < NUM_COMMAND_BUFFERS; i++ ) {

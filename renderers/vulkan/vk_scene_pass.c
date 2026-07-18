@@ -3,6 +3,9 @@
 #include "vk_post_fog.h"
 #include "vk_render_pass.h"
 #include "vk_scene_pass.h"
+#include "vk_util.h"
+
+static qboolean s_device_lost_context_reported = qfalse;
 
 void vk_get_active_render_extent( uint32_t *width, uint32_t *height )
 {
@@ -100,8 +103,26 @@ void vk_pass_diag_resume( const char *targetName, qboolean selfHeal )
 	vk_pass_diag_stage( "resume" );
 }
 
+void vk_assert_ui_pass_consistency( const char *where )
+{
+	if ( !r_fboDebug || r_fboDebug->integer < 1 || !vk_post_fog_fbo_debug_throttle() ) {
+		return;
+	}
+	if ( vk.uiOverlayActive && vk.inRenderPass && vk.renderPassIndex != RENDER_PASS_UI_OVERLAY ) {
+		ri.Printf( PRINT_DEVELOPER, S_COLOR_YELLOW
+			"[VK][scene] %s: uiOverlayActive=1 while in-pass %s (expected ui_overlay)\n",
+			where ? where : "assert_ui",
+			vk_scene_pass_name( vk.renderPassIndex ) );
+	}
+}
+
 void vk_report_device_lost_context( const char *where )
 {
+	if ( s_device_lost_context_reported ) {
+		return;
+	}
+	s_device_lost_context_reported = qtrue;
+
 	ri.Printf( PRINT_ALL, S_COLOR_RED
 		"[VK][device_lost] at %s\n",
 		where ? where : "unknown" );
@@ -131,6 +152,15 @@ void vk_report_device_lost_context( const char *where )
 		vk.renderWidth, vk.renderHeight,
 		vk_scene_pass_name( vk.renderPassIndex ),
 		vk_post_fog_source_name( vk_get_post_fog_source() ) );
+}
+
+void vk_fatal_device_lost( const char *where, VkResult res )
+{
+	vk.device_lost = qtrue;
+	vk_report_device_lost_context( where );
+	ri.Error( ERR_FATAL, "Vulkan GPU lost at %s (%s)",
+		where ? where : "unknown",
+		vk_result_string( res ) );
 }
 
 static void vk_scene_pass_validate_begin( const char *op, renderPass_t targetPass, VkRenderPass renderPass, VkFramebuffer frameBuffer )
@@ -259,6 +289,13 @@ void vk_begin_post_bloom_render_pass( void )
 		return;
 	}
 
+	/* Leaving UI overlay continuation: scene draws go to color_image again. */
+	if ( vk.renderPassIndex == RENDER_PASS_UI_OVERLAY || vk.uiOverlayActive ) {
+		vk.uiOverlayActive = qfalse;
+		vk_pass_diag_stage( "leave_ui_overlay" );
+	}
+	vk_assert_ui_pass_consistency( "begin_post_bloom_render_pass" );
+
 	vk_scene_pass_validate_begin( "begin_post_bloom_render_pass", RENDER_PASS_POST_BLOOM, vk.render_pass.post_bloom, frameBuffer );
 	vk.renderPassIndex = RENDER_PASS_POST_BLOOM;
 	vk_configure_scene_pass_dimensions();
@@ -287,9 +324,42 @@ void vk_begin_ui_overlay_render_pass( void )
 	vk.renderPassIndex = RENDER_PASS_UI_OVERLAY;
 	vk_configure_scene_pass_dimensions();
 	vk.uiOverlayActive = qtrue;
+	vk.uiOverlayContentValid = qtrue;
 	vk_pass_diag_begin( "ui_overlay", vk.renderWidth, vk.renderHeight );
 
 	vk_begin_render_pass_tracked( vk.render_pass.ui_overlay, frameBuffer, qtrue, vk.renderWidth, vk.renderHeight );
+	vk.depth_image_layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+}
+
+/*
+===============
+vk_begin_ui_overlay_render_pass_load
+===============
+Resume UI overlay without clearing (preserve HUD after mid-frame bloom).
+*/
+void vk_begin_ui_overlay_render_pass_load( void )
+{
+	VkFramebuffer frameBuffer;
+
+	if ( !vk.cmd || vk.cmd->swapchain_image_index >= MAX_SWAPCHAIN_IMAGES ) {
+		return;
+	}
+
+	frameBuffer = vk.framebuffers.ui_overlay[ vk.cmd->swapchain_image_index ];
+	if ( frameBuffer == VK_NULL_HANDLE ) {
+		vk_scene_pass_validate_begin( "begin_ui_overlay_render_pass_load", RENDER_PASS_UI_OVERLAY, vk.render_pass.ui_overlay, frameBuffer );
+		return;
+	}
+
+	vk_scene_pass_validate_begin( "begin_ui_overlay_render_pass_load", RENDER_PASS_UI_OVERLAY, vk.render_pass.ui_overlay, frameBuffer );
+	vk.renderPassIndex = RENDER_PASS_UI_OVERLAY;
+	vk_configure_scene_pass_dimensions();
+	vk.uiOverlayActive = qtrue;
+	vk.uiOverlayContentValid = qtrue;
+	vk_pass_diag_begin( "ui_overlay", vk.renderWidth, vk.renderHeight );
+	vk_pass_diag_stage( "ui_overlay_load" );
+
+	vk_begin_render_pass_tracked( vk.render_pass.ui_overlay, frameBuffer, qfalse, vk.renderWidth, vk.renderHeight );
 	vk.depth_image_layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
 }
 

@@ -22,10 +22,14 @@ static qboolean vk_can_use_2d_overlay_path( void )
 	return qtrue;
 }
 
-static void vk_begin_2d_overlay_or_fallback( void )
+static void vk_begin_2d_overlay_or_fallback( qboolean preferLoad )
 {
 	if ( vk_can_use_2d_overlay_path() ) {
-		vk_begin_ui_overlay_render_pass();
+		if ( preferLoad && vk.uiOverlayContentValid ) {
+			vk_begin_ui_overlay_render_pass_load();
+		} else {
+			vk_begin_ui_overlay_render_pass();
+		}
 		return;
 	}
 
@@ -36,6 +40,21 @@ static void vk_begin_2d_overlay_or_fallback( void )
 void vk_prepare_2d( void )
 {
 	vk_prepare_frame_temporal_state();
+
+	/* Already in UI overlay and in-pass: nothing to do. */
+	if ( vk.inRenderPass && vk.renderPassIndex == RENDER_PASS_UI_OVERLAY && vk.uiOverlayActive ) {
+		return;
+	}
+
+	/* Mid-frame bloom ended overlay: resume with load to preserve HUD. */
+	if ( !vk.inRenderPass && vk.uiOverlayContentValid && vk_can_use_2d_overlay_path() &&
+		( vk.renderPassIndex == RENDER_PASS_UI_OVERLAY ||
+			vk.renderPassIndex == RENDER_PASS_POST_BLOOM ||
+			vk.renderPassIndex == RENDER_PASS_MAIN ) ) {
+		vk_pass_diag_stage( "prepare_2d_overlay_resume" );
+		vk_begin_ui_overlay_render_pass_load();
+		return;
+	}
 
 	/* Cinematic/menu-only: no world, no RC_DRAW_SURFS, so no render pass was ever started.
 	 * Start a fresh main pass here so 2D can draw on a cleared color target instead of
@@ -54,7 +73,7 @@ void vk_prepare_2d( void )
 			vk_set_scene_post_fog_source( vk.color_image_view );
 			vk_log_post_fog_rebind( "prepare_2d no-world initial scene source", vk.color_image_view );
 			vk_update_post_fog_descriptors( vk.color_image_view );
-			vk_begin_2d_overlay_or_fallback();
+			vk_begin_2d_overlay_or_fallback( qfalse );
 		}
 		return;
 	}
@@ -82,7 +101,7 @@ void vk_prepare_2d( void )
 		vk_end_render_pass();
 		vk_log_post_fog_rebind( "prepare_2d no-world scene source", vk.color_image_view );
 		vk_update_post_fog_descriptors( vk.color_image_view );
-		vk_begin_2d_overlay_or_fallback();
+		vk_begin_2d_overlay_or_fallback( vk.uiOverlayContentValid );
 		return;
 	}
 
@@ -110,5 +129,6 @@ void vk_prepare_2d( void )
 		}
 	}
 
-	vk_begin_2d_overlay_or_fallback();
+	/* First split from MAIN clears overlay; re-entry from POST_BLOOM after bloom loads. */
+	vk_begin_2d_overlay_or_fallback( vk.renderPassIndex == RENDER_PASS_POST_BLOOM && vk.uiOverlayContentValid );
 }

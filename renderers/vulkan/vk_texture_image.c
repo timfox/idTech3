@@ -454,6 +454,15 @@ void vk_destroy_image_resources( VkImage *image, VkImageView *imageView )
 	if ( vk.device == VK_NULL_HANDLE || qvkDestroyImage == NULL || qvkDestroyImageView == NULL ) {
 		return;
 	}
+	if ( vk.device_lost ) {
+		if ( image != NULL ) {
+			*image = VK_NULL_HANDLE;
+		}
+		if ( imageView != NULL ) {
+			*imageView = VK_NULL_HANDLE;
+		}
+		return;
+	}
 	if ( image != NULL ) {
 		if ( *image != VK_NULL_HANDLE ) {
 			qvkDestroyImage( vk.device, *image, NULL );

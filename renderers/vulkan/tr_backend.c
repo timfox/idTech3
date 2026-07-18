@@ -2296,7 +2296,7 @@ static const void *RB_ClearColor( const void *data )
 	const clearColorCommand_t *cmd = data;
 
 #ifdef USE_VULKAN
-	backEnd.projection2D = qtrue;
+	RB_SetGL2D();
 	vk_clear_color( colorBlack );
 	backEnd.projection2D = qfalse;
 #else
@@ -2322,6 +2322,15 @@ static const void *RB_FinishBloom( const void *data )
 	RB_EndSurface();
 
 #ifdef USE_VULKAN
+	/* Bloom owns color_image; end UI overlay ownership cleanly so later HUD can load-resume. */
+	if ( vk.uiOverlayActive ) {
+		if ( vk.inRenderPass ) {
+			vk_end_render_pass();
+		}
+		vk.uiOverlayActive = qfalse;
+		vk_pass_diag_stage( "finish_bloom_leave_ui_overlay" );
+	}
+	vk_assert_ui_pass_consistency( "RB_FinishBloom" );
 	/* SSAO before bloom so AO darkens the scene before bloom extraction. */
 	if ( r_ssao && r_ssao->integer ) {
 		vk_ssao_pass();

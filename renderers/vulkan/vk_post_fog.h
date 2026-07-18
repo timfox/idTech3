@@ -29,6 +29,9 @@ void        vk_barrier_post_fog_source_for_sampling( VkImageView color_source, c
 void        vk_barrier_motion_vector_for_sampling( const char *reason );
 void        vk_update_post_fog_descriptors( VkImageView color_source );
 void        vk_validate_post_fog_runtime_sources( const char *reason );
+void        vk_set_post_chain_last_writer( const char *writer );
+const char *vk_post_chain_last_writer_name( void );
+VkImageView vk_post_chain_expected_gamma_source( void );
 
 /* Throttle FBO debug logs to at most once per second. Internal use. */
 qboolean    vk_post_fog_fbo_debug_throttle( void );

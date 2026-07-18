@@ -2521,6 +2521,13 @@ void R_DeleteTextures( void ) {
 	}
 
 #ifdef USE_VULKAN
+	if ( vk.device_lost ) {
+		for ( i = 0; i < tr.numImages; i++ ) {
+			image_t *img = tr.images[ i ];
+			img->handle = VK_NULL_HANDLE;
+			img->view = VK_NULL_HANDLE;
+		}
+	} else {
 	vk_wait_idle();
 
 	for ( i = 0; i < tr.numImages; i++ ) {
@@ -2533,6 +2540,7 @@ void R_DeleteTextures( void ) {
 		vk_destroy_image_resources( &img->handle, &img->view );
 
 		// img->descriptor will be released with pool reset
+	}
 	}
 #else
 	for ( i = 0; i < tr.numImages; i++ ) {

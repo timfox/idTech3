@@ -189,6 +189,7 @@ void vk_begin_frame( void )
 	vk.sun_shadow_valid = qfalse;
 	vk.temporal.preparedThisFrame = qfalse;
 	vk.uiOverlayActive = qfalse;
+	vk.uiOverlayContentValid = qfalse;
 
 	vk.cmd = &vk.tess[ vk.cmd_index ];
 
@@ -207,9 +208,7 @@ void vk_begin_frame( void )
 		res = qvkWaitForFences( vk.device, 1, &vk.cmd->rendering_finished_fence, VK_FALSE, 1e10 );
 		if ( res != VK_SUCCESS ) {
 			if ( res == VK_ERROR_DEVICE_LOST ) {
-				vk.device_lost = qtrue;
-				vk_report_device_lost_context( "vkWaitForFences" );
-				ri.Error( ERR_FATAL, "Vulkan: %s returned %s (GPU lost)", "vkWaitForFences", vk_result_string( res ) );
+				vk_fatal_device_lost( "vkWaitForFences", res );
 			}
 			else {
 				ri.Error( ERR_FATAL, "Vulkan: %s returned %s", "vkWaitForFences", vk_result_string( res ) );
@@ -462,8 +461,7 @@ void vk_end_frame( void )
 		VkResult sub_res = qvkQueueSubmit( vk.queue, 1, &submit_info, vk.cmd->rendering_finished_fence );
 		if ( sub_res != VK_SUCCESS ) {
 			if ( sub_res == VK_ERROR_DEVICE_LOST ) {
-				vk.device_lost = qtrue;
-				vk_report_device_lost_context( "vkQueueSubmit" );
+				vk_fatal_device_lost( "vkQueueSubmit", sub_res );
 			}
 			ri.Error( ERR_FATAL, "Vulkan: qvkQueueSubmit returned %s", vk_result_string( sub_res ) );
 		}
@@ -542,7 +540,7 @@ void vk_present_frame( void )
 		case VK_ERROR_DEVICE_LOST:
 			vk.device_lost = qtrue;
 			vk_report_device_lost_context( "vkQueuePresentKHR" );
-			ri.Printf( PRINT_WARNING, "vkQueuePresentKHR: device lost\n" );
+			ri.Printf( PRINT_WARNING, "vkQueuePresentKHR: device lost (teardown will skip destroy spam)\n" );
 			break;
 		default:
 			ri.Error( ERR_FATAL, "vkQueuePresentKHR returned %s", vk_result_string( res ) );
