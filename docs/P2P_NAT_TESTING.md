@@ -7,6 +7,8 @@
 | Unit | `unit_p2p_stun` | Every `ctest` via `linux-full` |
 | Simulation | `test_p2p_nat_sim.sh` | Every `ctest` (STUN probe + optional coturn) |
 | Guard | `test_p2p_ice_guard.sh` | Every `ctest` static; optional live spoof harness |
+| Reconnect | `test_p2p_reconnect.sh` | Static + auto live against `rtest_base` when server/pack exist |
+| Migrate | `test_p2p_migrate.sh` | Static wiring for backup-host + `p2pMigrate` |
 | Live two-runner | `test_p2p_nat_live.sh` | Gated workflow `.github/workflows/p2p-nat.yml` |
 
 ## Simulation (`test_p2p_nat_sim`)
@@ -30,6 +32,22 @@ Optional live spoof harness:
 
 - `IDTECH3_P2P_ICE_GUARD_LIVE=1` — launch a dedicated server, begin a direct-UDP ICE connect path, inject spoofed `p2pCand` / `p2pCheckAck`, and verify the active peer guard rejects them
 - `P2P_ICE_GUARD_GAME_BASE=/abs/path/to/base-parent` — optional runnable data tree for the live harness; when unset, the harness skips cleanly if the dedicated server exits with `No game data`
+
+## Reconnect (`test_p2p_reconnect`)
+
+```bash
+cd build-vk-Release && ctest -R test_p2p_reconnect --output-on-failure
+```
+
+Static wiring always runs. Live OOB reconnect (connect → `clientkick` → `p2pReconnect`) auto-runs when `idtech3_server` and `docs/renderer_validation/devdata/rtest_base` are present. Skip live with `SKIP_P2P_RECONNECT_LIVE=1`; force-fail if missing with `IDTECH3_P2P_RECONNECT_LIVE=1`. Override pack via `P2P_RECONNECT_GAME_BASE` / `P2P_RECONNECT_GAME_DIR`.
+
+## Migrate (`test_p2p_migrate`)
+
+```bash
+cd build-vk-Release && ctest -R test_p2p_migrate --output-on-failure
+```
+
+Static checks for `cl_p2pBackupHost`, `p2pMigrate` OOB, and advertised `p2pmigrate`. Skip with `SKIP_P2P_MIGRATE=1`.
 
 ## Live two-runner job
 

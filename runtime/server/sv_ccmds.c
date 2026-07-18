@@ -1737,11 +1737,12 @@ static void SV_P2PConnect_f( void ) {
 		return;
 	}
 
-	NET_P2P_BeginPunchForAddress( address );
+	/* Dedicated: ICE/punch path only — never issues a game connect. */
+	NET_P2P_BeginConnectPath( address );
 	if ( NET_P2P_GetLocalAddressString( localAddress, sizeof( localAddress ) ) ) {
-		Com_Printf( "P2P direct_udp: punch started toward %s; clients should connect to %s\n", address, localAddress );
+		Com_Printf( "P2P: connect path started toward %s; clients should connect to %s\n", address, localAddress );
 	} else {
-		Com_Printf( "P2P direct_udp: punch started toward %s\n", address );
+		Com_Printf( "P2P: connect path started toward %s\n", address );
 	}
 }
 

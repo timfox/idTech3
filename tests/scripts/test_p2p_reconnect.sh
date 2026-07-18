@@ -1,9 +1,12 @@
 #!/usr/bin/env bash
-# P2P reconnect: static wiring checks; optional live test when game VM is available.
+# P2P reconnect: static wiring checks + auto live smoke against rtest_base when available.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 cd "$ROOT"
+
+# shellcheck source=idtech3_minimal_content_smoke.sh
+source "$ROOT/tests/scripts/idtech3_minimal_content_smoke.sh"
 
 fail() { echo "FAIL: $*" >&2; exit 1; }
 pass() { echo "PASS: $*"; }
@@ -31,95 +34,147 @@ grep -q 'CL_P2P_SessionRecoveryStopReason' runtime/client/core/cl_p2p_session.c 
 grep -q 'currentTarget' runtime/game/g_lua_bindings.c runtime/game/g_lua_control_bindings.inc || fail "missing Lua current reconnect target exposure"
 grep -q 'recoveryStopReason' runtime/game/g_lua_bindings.c runtime/game/g_lua_control_bindings.inc || fail "missing Lua reconnect stop reason exposure"
 grep -q 'cl_p2pReconnectMaxAttempts' docs/P2P_NETWORKING.md || fail "missing reconnect attempt cap docs"
+grep -q 'NET_P2P_ConsumeDeferredConnect' runtime/client/core/cl_p2p_session.c || fail "missing ICE deferred connect consume"
+grep -q 'net_p2pIceDeferConnect' engine/core/net_p2p_ice.c || fail "missing ICE defer-connect cvar"
 
-if [ "${IDTECH3_P2P_RECONNECT_LIVE:-0}" != "1" ]; then
-	pass "test_p2p_reconnect: static checks ok (set IDTECH3_P2P_RECONNECT_LIVE=1 for live)"
+pass "test_p2p_reconnect: static checks ok"
+
+if [ "${SKIP_P2P_RECONNECT_LIVE:-0}" = "1" ]; then
+	pass "test_p2p_reconnect: live skipped (SKIP_P2P_RECONNECT_LIVE=1)"
 	exit 0
 fi
 
-resolve_bin() {
-	local name="$1"
-	for p in "$ROOT/release/${name}" "$ROOT/build-vk-Release/${name}"; do
-		[ -x "$p" ] && echo "$p" && return 0
-	done
-	return 1
-}
+# Live is automatic when the minimal pack + server exist; force with IDTECH3_P2P_RECONNECT_LIVE=1.
+FORCE_LIVE="${IDTECH3_P2P_RECONNECT_LIVE:-0}"
+SERVER_BIN=""
+GAME_BASE=""
+GAME_DIR=""
 
-SERVER_BIN="$(resolve_bin idtech3_server || true)"
-[ -n "${SERVER_BIN:-}" ] || fail "missing idtech3_server for live reconnect test"
+if SERVER_BIN="$(idtech3_minimal_server "$ROOT")"; then
+	:
+else
+	SERVER_BIN=""
+fi
 
-GAME_BASE="${P2P_RECONNECT_GAME_BASE:-}"
-[ -n "$GAME_BASE" ] || fail "set P2P_RECONNECT_GAME_BASE to a runnable base/ with qagame"
+if [ -n "${P2P_RECONNECT_GAME_BASE:-}" ]; then
+	GAME_BASE="$(cd "$P2P_RECONNECT_GAME_BASE" && pwd)"
+	GAME_DIR="${P2P_RECONNECT_GAME_DIR:-base}"
+elif PACK="$(idtech3_minimal_require_pack "$ROOT")"; then
+	GAME_BASE="$(cd "$(dirname "$PACK")" && pwd)"
+	GAME_DIR="$(basename "$PACK")"
+fi
+
+if [ -z "$SERVER_BIN" ] || [ -z "$GAME_BASE" ]; then
+	if [ "$FORCE_LIVE" = "1" ]; then
+		fail "live reconnect requested but server or game pack missing (set P2P_RECONNECT_GAME_BASE or build idtech3_server)"
+	fi
+	pass "test_p2p_reconnect: live skipped (no server/pack; set IDTECH3_P2P_RECONNECT_LIVE=1 to require)"
+	exit 0
+fi
 
 PORT="${P2P_RECONNECT_PORT:-27964}"
 SESSION_ID="${P2P_RECONNECT_SESSION:-p2p-reconnect-test}"
+MAP_NAME="${P2P_RECONNECT_MAP:-rtest_parity}"
 LOG="$(mktemp)"
 trap 'kill $(jobs -p) 2>/dev/null || true; rm -f "$LOG"' EXIT
 
-"$SERVER_BIN" +set dedicated 2 +set net_port "$PORT" +set fs_basepath "$GAME_BASE" +set fs_game base \
-	+set net_p2p 1 +set sv_p2pSessionId "$SESSION_ID" +set sv_p2pReconnectWindow 45 \
-	+set sv_p2pFailover reconnect +set sv_maxclients 8 +set com_hunkMegs 128 \
-	+map "${P2P_RECONNECT_MAP:-q3dm1}" >"$LOG" 2>&1 &
-SRV_PID=$!
-sleep 6
+python3 - "$SERVER_BIN" "$GAME_BASE" "$GAME_DIR" "$PORT" "$SESSION_ID" "$MAP_NAME" "$LOG" <<'PY' || { cat "$LOG" >&2; fail "live reconnect flow failed"; }
+import os, random, socket, subprocess, sys, time
 
-kill -0 "$SRV_PID" 2>/dev/null || { cat "$LOG" >&2; fail "server exited early"; }
-
-python3 - "$PORT" "$SESSION_ID" <<'PY' || { cat "$LOG" >&2; fail "live reconnect flow failed"; }
-import socket, sys, random, time, subprocess
-
-port = int(sys.argv[1])
-session_id = sys.argv[2]
+server_bin, game_base, game_dir, port_s, session_id, map_name, log_path = sys.argv[1:8]
+port = int(port_s)
 host = "127.0.0.1"
 
-def oob(msg: str) -> bytes:
-    return b"\xff\xff\xff\xff" + msg.encode("ascii")
+cmd = [
+    server_bin,
+    "+set", "dedicated", "2",
+    "+set", "net_port", str(port),
+    "+set", "fs_basepath", game_base,
+    "+set", "fs_game", game_dir,
+    "+set", "vm_game", "2",
+    "+set", "bot_enable", "0",
+    "+set", "net_p2p", "1",
+    "+set", "sv_p2pSessionId", session_id,
+    "+set", "sv_p2pReconnectWindow", "45",
+    "+set", "sv_p2pFailover", "reconnect",
+    "+set", "sv_maxclients", "8",
+    "+set", "com_hunkMegs", "128",
+    "+map", map_name,
+]
 
-def info_string(pairs):
-    return "".join(f"\\{k}\\{v}" for k, v in pairs)
+log_handle = open(log_path, "w", buffering=1)
+proc = subprocess.Popen(cmd, stdin=subprocess.PIPE, stdout=log_handle, stderr=subprocess.STDOUT, text=True)
+try:
+    time.sleep(5.0)
+    if proc.poll() is not None:
+        raise SystemExit(f"server exited early, see {log_path}")
 
-sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-sock.bind(("127.0.0.1", 0))
-sock.settimeout(5.0)
+    def oob(msg: str) -> bytes:
+        return b"\xff\xff\xff\xff" + msg.encode("ascii")
 
-sock.sendto(oob("getchallenge 1 idTech3"), (host, port))
-data, _ = sock.recvfrom(4096)
-text = data[4:].decode("latin1", errors="replace")
-if "challengeResponse" not in text:
-    raise SystemExit(f"no challengeResponse: {text!r}")
-server_challenge = int(text.split()[1])
+    def info_string(pairs):
+        return "".join(f"\\{k}\\{v}" for k, v in pairs)
 
-qport = random.randint(1, 0xFFFF)
-userinfo = info_string([
-    ("name", "p2p_reconnect_bot"),
-    ("rate", "25000"),
-    ("snaps", "20"),
-    ("model", "sarge"),
-    ("headmodel", "sarge"),
-    ("challenge", str(server_challenge)),
-    ("qport", str(qport)),
-    ("protocol", "72"),
-    ("client", "idtech3-test"),
-])
-sock.sendto(oob(f'connect "{userinfo}"'), (host, port))
-time.sleep(1.5)
+    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    sock.bind((host, 0))
+    sock.settimeout(5.0)
 
-subprocess.run(
-    ["python3", "-c", f'import os; os.write(1, b"clientkick 0\\n")'],
-    input=b"clientkick 0\n",
-    stdout=subprocess.PIPE,
-    check=False,
-)
-time.sleep(2)
+    sock.sendto(oob("getchallenge 1 idTech3"), (host, port))
+    data, _ = sock.recvfrom(4096)
+    text = data[4:].decode("latin1", errors="replace")
+    if "challengeResponse" not in text:
+        raise SystemExit(f"no challengeResponse: {text!r}")
+    server_challenge = int(text.split()[1])
 
-sock.sendto(oob(f"p2pReconnect {session_id}"), (host, port))
-data, _ = sock.recvfrom(4096)
-resp = data[4:].decode("latin1", errors="replace")
-if "challengeResponse" not in resp:
-    raise SystemExit(f"post-kick reconnect failed: {resp!r}")
-print("live reconnect ok")
+    qport = random.randint(1, 0xFFFF)
+    userinfo = info_string([
+        ("name", "p2p_reconnect_bot"),
+        ("rate", "25000"),
+        ("snaps", "20"),
+        ("model", "sarge"),
+        ("headmodel", "sarge"),
+        ("challenge", str(server_challenge)),
+        ("qport", str(qport)),
+        ("protocol", "72"),
+        ("client", "idtech3-test"),
+    ])
+    sock.sendto(oob(f'connect "{userinfo}"'), (host, port))
+    time.sleep(2.0)
+
+    proc.stdin.write("clientkick 0\n")
+    proc.stdin.flush()
+    time.sleep(1.5)
+
+    sock.sendto(oob(f"p2pReconnect {session_id}"), (host, port))
+    data, _ = sock.recvfrom(4096)
+    resp = data[4:].decode("latin1", errors="replace")
+    if "challengeResponse" not in resp:
+        raise SystemExit(f"post-kick reconnect failed: {resp!r}")
+
+    deadline = time.time() + 8.0
+    log = ""
+    while time.time() < deadline:
+        with open(log_path, "r", encoding="utf-8", errors="replace") as fh:
+            log = fh.read()
+        if "P2P reconnect: fast challenge" in log:
+            break
+        time.sleep(0.25)
+    else:
+        raise SystemExit(f"server log missing fast reconnect challenge ({log_path})")
+
+    print("live reconnect ok")
+finally:
+    try:
+        if proc.poll() is None:
+            proc.stdin.write("quit\n")
+            proc.stdin.flush()
+            proc.wait(timeout=8.0)
+    except Exception:
+        try:
+            proc.kill()
+        except Exception:
+            pass
+    log_handle.close()
 PY
 
-rg -q "P2P reconnect: fast challenge" "$LOG" || fail "server log missing fast reconnect challenge"
-kill "$SRV_PID" 2>/dev/null || true
 pass "test_p2p_reconnect: live ok"

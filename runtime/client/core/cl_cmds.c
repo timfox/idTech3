@@ -297,6 +297,10 @@ static void CL_P2PConnect_f( void ) {
 
 	NET_P2P_BeginConnectPath( address );
 	CL_P2P_SessionOnConnect( "", address, "reconnect", 45 );
+	if ( NET_P2P_ConnectIsDeferred() ) {
+		Com_Printf( "P2P: deferring connect until ICE nominates a path or times out\n" );
+		return;
+	}
 	Cbuf_AddText( va( "connect %s\n", address ) );
 }
 
@@ -567,6 +571,10 @@ static void CL_P2PConnectBrowser_f( void ) {
 			server->p2pFailover,
 			server->p2pReconnectWindow );
 		NET_P2P_BeginConnectPath( server->p2pAddr );
+		if ( NET_P2P_ConnectIsDeferred() ) {
+			Com_Printf( "P2P: deferring browser connect until ICE nominates a path or times out\n" );
+			return;
+		}
 		Cbuf_AddText( va( "connect %s\n", server->p2pAddr ) );
 		return;
 	}
@@ -577,6 +585,10 @@ static void CL_P2PConnectBrowser_f( void ) {
 		server->p2pFailover,
 		server->p2pReconnectWindow );
 	NET_P2P_BeginConnectPath( NET_AdrToStringwPort( &server->adr ) );
+	if ( NET_P2P_ConnectIsDeferred() ) {
+		Com_Printf( "P2P: deferring browser connect until ICE nominates a path or times out\n" );
+		return;
+	}
 	Cbuf_AddText( va( "connect %s\n", NET_AdrToStringwPort( &server->adr ) ) );
 }
 

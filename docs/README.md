@@ -53,6 +53,8 @@ Documentation is grouped by **tier**. Most files remain at their historical path
 - [MOMENT_OIT_STOCHASTIC_ALPHA.md](MOMENT_OIT_STOCHASTIC_ALPHA.md) — MBOIT (`r_oit 2`) + stochastic alpha clip
 - [RADIANT.md](RADIANT.md)
 - [VOIP.md](VOIP.md) — Opus voice chat + head lip flap
+- [P2P_NETWORKING.md](P2P_NETWORKING.md) — Steam SDR / direct_udp P2P, ICE-lite, reconnect/migrate
+- [P2P_NAT_TESTING.md](P2P_NAT_TESTING.md) — P2P NAT CI tiers and live harnesses
 - [IDTECH3_TV.md](IDTECH3_TV.md) — external idTech3-tv / Owncast live-stream publishing
 - [TORRENT_CONTENT.md](TORRENT_CONTENT.md) — optional peer-assisted `.pk3` package delivery
 - [OSCAR_INTEGRATION.md](OSCAR_INTEGRATION.md) — Open OSCAR hybrid AIM (direct FLAP/BOS + Chat rooms, roster, client ImGui)

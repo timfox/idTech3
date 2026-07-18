@@ -563,3 +563,13 @@ qboolean NET_P2P_BeginConnectPath( const char *peerAddress )
 
 	return NET_P2P_IceBeginConnectPath( peerAddress );
 }
+
+qboolean NET_P2P_ConnectIsDeferred( void )
+{
+	return NET_P2P_IceConnectIsDeferred();
+}
+
+qboolean NET_P2P_ConsumeDeferredConnect( char *buffer, int bufferSize )
+{
+	return NET_P2P_IceConsumeDeferredConnect( buffer, bufferSize );
+}

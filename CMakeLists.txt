@@ -3521,7 +3521,13 @@ add_test(NAME test_p2p_reconnect
 	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_p2p_reconnect.sh)
 set_tests_properties(test_p2p_reconnect PROPERTIES
 	LABELS "p2p;scripts"
-	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_p2p_reconnect.sh;${CMAKE_SOURCE_DIR}/runtime/client/core/cl_p2p_session.c;${CMAKE_SOURCE_DIR}/runtime/server/sv_client.c")
+	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_p2p_reconnect.sh;${CMAKE_SOURCE_DIR}/tests/scripts/idtech3_minimal_content_smoke.sh;${CMAKE_SOURCE_DIR}/runtime/client/core/cl_p2p_session.c;${CMAKE_SOURCE_DIR}/runtime/server/sv_client.c")
+
+add_test(NAME test_p2p_migrate
+	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_p2p_migrate.sh)
+set_tests_properties(test_p2p_migrate PROPERTIES
+	LABELS "p2p;scripts"
+	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_p2p_migrate.sh;${CMAKE_SOURCE_DIR}/runtime/client/core/cl_p2p_session.c;${CMAKE_SOURCE_DIR}/docs/P2P_NETWORKING.md")
 
 add_test(NAME test_p2p_ice_guard
 	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_p2p_ice_guard.sh)

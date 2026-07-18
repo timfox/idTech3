@@ -40,12 +40,29 @@ typedef struct {
 	char nominatedAddress[MAX_STRING_CHARS];
 	qboolean complete;
 	qboolean success;
+	qboolean deferConnect;
+	qboolean connectReady;
 } p2p_ice_connect_t;
 
 static cvar_t *net_p2pIceChecks;
 static cvar_t *net_p2pIceTimeout;
+static cvar_t *net_p2pIceDeferConnect;
 
 static p2p_ice_connect_t net_p2pIceConnect;
+
+static void NET_P2P_IceMarkConnectReady( void )
+{
+	if ( !net_p2pIceConnect.deferConnect || net_p2pIceConnect.connectReady ) {
+		return;
+	}
+	if ( !net_p2pIceConnect.peerAddress[0] ) {
+		net_p2pIceConnect.deferConnect = qfalse;
+		return;
+	}
+	net_p2pIceConnect.connectReady = qtrue;
+	net_p2pIceConnect.deferConnect = qfalse;
+	Com_Printf( "P2P ICE: connect ready for %s\n", net_p2pIceConnect.peerAddress );
+}
 
 static qboolean NET_P2P_IceIsActivePeer( const netadr_t *from )
 {
@@ -66,14 +83,17 @@ static qboolean NET_P2P_IceUsingDirectUdp( void )
 
 static void NET_P2P_IceRegisterCvars( void )
 {
-	if ( net_p2pIceChecks && net_p2pIceTimeout ) {
+	if ( net_p2pIceChecks && net_p2pIceTimeout && net_p2pIceDeferConnect ) {
 		return;
 	}
 
 	net_p2pIceChecks = Cvar_Get( "net_p2pIceChecks", "1", CVAR_ARCHIVE_ND );
 	net_p2pIceTimeout = Cvar_Get( "net_p2pIceTimeout", "3000", CVAR_ARCHIVE_ND );
+	net_p2pIceDeferConnect = Cvar_Get( "net_p2pIceDeferConnect", "1", CVAR_ARCHIVE_ND );
 	Cvar_SetDescription( net_p2pIceChecks, "Run ICE-lite connectivity checks before direct_udp connect (0=off, 1=on)." );
 	Cvar_SetDescription( net_p2pIceTimeout, "Milliseconds to wait for ICE candidate exchange and connectivity checks." );
+	Cvar_SetDescription( net_p2pIceDeferConnect,
+		"Defer client connect until ICE nominates a path or times out (0=connect immediately, 1=wait)." );
 }
 
 static void NET_P2P_IceSendOob( const netadr_t *adr, const char *fmt, ... )
@@ -276,9 +296,10 @@ static void NET_P2P_IceBeginChecks( void )
 void NET_P2P_IceInit( void )
 {
 	NET_P2P_IceRegisterCvars();
-	Com_Printf( "P2P ICE: connectivity checks %s (timeout %dms)\n",
+	Com_Printf( "P2P ICE: connectivity checks %s (timeout %dms, deferConnect %s)\n",
 		( net_p2pIceChecks && net_p2pIceChecks->integer ) ? "enabled" : "disabled",
-		net_p2pIceTimeout ? net_p2pIceTimeout->integer : 3000 );
+		net_p2pIceTimeout ? net_p2pIceTimeout->integer : 3000,
+		( net_p2pIceDeferConnect && net_p2pIceDeferConnect->integer ) ? "on" : "off" );
 }
 
 void NET_P2P_IceShutdown( void )
@@ -299,6 +320,7 @@ void NET_P2P_IceFrame( void )
 			NET_P2P_BeginPunchForAddress( net_p2pIceConnect.peerAddress );
 		}
 		net_p2pIceConnect.active = qfalse;
+		NET_P2P_IceMarkConnectReady();
 	}
 }
 
@@ -340,10 +362,16 @@ qboolean NET_P2P_IceBeginConnectPath( const char *peerAddress )
 	net_p2pIceConnect.peerAdr = adr;
 	Q_strncpyz( net_p2pIceConnect.peerAddress, normalized, sizeof( net_p2pIceConnect.peerAddress ) );
 	net_p2pIceConnect.deadlineMs = Sys_Milliseconds() + ( net_p2pIceTimeout ? net_p2pIceTimeout->integer : 3000 );
+	/* Dedicated servers run ICE for punch/NAT only; clients defer game connect. */
+	if ( net_p2pIceDeferConnect && net_p2pIceDeferConnect->integer &&
+	     !( com_dedicated && com_dedicated->integer ) ) {
+		net_p2pIceConnect.deferConnect = qtrue;
+	}
 
 	NET_P2P_IceSendLocalCandidates( &adr );
 	NET_P2P_IceSendOob( &adr, "p2pCandRequest" );
-	Com_Printf( "P2P ICE: started connectivity checks for %s\n", normalized );
+	Com_Printf( "P2P ICE: started connectivity checks for %s%s\n", normalized,
+		net_p2pIceConnect.deferConnect ? " (connect deferred)" : "" );
 	return qtrue;
 }
 
@@ -396,12 +424,33 @@ qboolean NET_P2P_IceHandleOobPacket( const netadr_t *from, const char *cmd )
 					sizeof( net_p2pIceConnect.nominatedAddress ) );
 				Com_Printf( "P2P ICE: nominated path %s (txn %d)\n", net_p2pIceConnect.nominatedAddress, txn );
 				NET_P2P_BeginPunchForAddress( net_p2pIceConnect.nominatedAddress );
+				NET_P2P_IceMarkConnectReady();
 			}
 		}
 		return qtrue;
 	}
 
 	return qfalse;
+}
+
+qboolean NET_P2P_IceConnectIsDeferred( void )
+{
+	return (qboolean)( net_p2pIceConnect.deferConnect && !net_p2pIceConnect.connectReady );
+}
+
+qboolean NET_P2P_IceConsumeDeferredConnect( char *buffer, int bufferSize )
+{
+	if ( !buffer || bufferSize <= 0 || !net_p2pIceConnect.connectReady ) {
+		return qfalse;
+	}
+	if ( !net_p2pIceConnect.peerAddress[0] ) {
+		net_p2pIceConnect.connectReady = qfalse;
+		return qfalse;
+	}
+
+	Q_strncpyz( buffer, net_p2pIceConnect.peerAddress, bufferSize );
+	net_p2pIceConnect.connectReady = qfalse;
+	return qtrue;
 }
 
 void NET_P2P_IcePrintStatus( void )

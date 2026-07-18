@@ -10,5 +10,7 @@ void NET_P2P_IceFrame( void );
 qboolean NET_P2P_IceBeginConnectPath( const char *peerAddress );
 qboolean NET_P2P_IceHandleOobPacket( const netadr_t *from, const char *cmd );
 void NET_P2P_IcePrintStatus( void );
+qboolean NET_P2P_IceConnectIsDeferred( void );
+qboolean NET_P2P_IceConsumeDeferredConnect( char *buffer, int bufferSize );
 
 #endif /* NET_P2P_ICE_H */

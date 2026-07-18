@@ -357,8 +357,14 @@ void CL_P2P_SessionFrame( void )
 	int elapsedSec;
 	int remainsSec;
 	char connectTarget[MAX_STRING_CHARS];
+	char iceConnectTarget[MAX_STRING_CHARS];
 
 	CL_P2P_SessionRegisterCvars();
+
+	if ( NET_P2P_ConsumeDeferredConnect( iceConnectTarget, sizeof( iceConnectTarget ) ) ) {
+		Com_Printf( "P2P ICE: connecting to %s\n", iceConnectTarget );
+		Cbuf_AddText( va( "connect %s\n", iceConnectTarget ) );
+	}
 
 	if ( !cl_p2pSession.pending || !NET_P2P_IsEnabled() ) {
 		return;

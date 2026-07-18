@@ -108,6 +108,7 @@ Build artifacts go to `build-vk-Release/` and are copied to `release/`.
 
 - **Lua:** `script_reload` (default `USE_LUA=ON`); **`com_scriptWatch 1`** auto-reloads tracked scripts. Mod manifests: **`game.idproj`**, see [docs/MOD_MANIFEST.md](docs/MOD_MANIFEST.md).
 - **App CRDT (distributed Lua updates, opt-in)**: **`com_app_crdt 1`** — server **`app_crdt_publish`**, **`app_crdt_emit`**; client/server **`Engine.AppCrdt`**. **idtech3backend** submodule auto-publishes **`app_crdt/manifest.json`** on map load when **`com_app_crdt_auto 1`**. Example mod: **`examples/app_crdt/`**. Tests: **`unit_app_crdt`**, **`test_app_crdt`**. See **`docs/APP_CRDT.md`**, **`docs/IDTECH3_BACKEND.md`**.
+- **P2P networking**: **`net_p2p 1`** with **`net_p2pBackend auto|steam_sdr|direct_udp`**; ICE-lite defer connect via **`net_p2pIceDeferConnect`** (default 1); reconnect/migrate via **`cl_p2pAutoReconnect`** / **`cl_p2pBackupHost`**. Demo: **`exec demo_p2p_direct_udp.cfg`**. Tests: **`test_p2p_networking`**, **`test_p2p_reconnect`**, **`test_p2p_migrate`**, **`test_p2p_nat_sim`**. See **`docs/P2P_NETWORKING.md`**, **`docs/P2P_NAT_TESTING.md`**.
 - **idTech3Radiant:** external BSP editor; `./scripts/install_radiant_gamepack.sh <mod>` + [docs/RADIANT.md](docs/RADIANT.md) (s&box-style `Editor/` Python bridge).
 - **JavaScript (Duktape):** `js_reload` (default `USE_DUKTAPE=ON`).
 - **Python (CPython, optional):** `py_reload` — `./scripts/compile_engine.sh vulkan python`; Infernux batch bridge. See **`docs/PYTHON.md`**, **`infernux_model`**.

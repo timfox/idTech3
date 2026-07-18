@@ -31,7 +31,7 @@
 
 `p2p_address` prints the current shareable P2P address: `steam:STEAMID64` for Steam SDR or `udp:host:port` for direct UDP when `net_p2pAdvertiseAddress` is configured or ICE auto-advertise resolves a candidate.
 `p2p_status` also reports current ICE path state plus direct-UDP punch session state, which helps debug peer ownership, fallback, and keepalive behavior.
-`p2p_connect` normalizes the input and forwards to `connect` with either a `steam:` or `udp:` address. For `udp:` peers it also starts a direct-UDP punchthrough helper session first.
+`p2p_connect` normalizes the input and forwards to `connect` with either a `steam:` or `udp:` address. For `udp:` peers it starts ICE-lite (when enabled) and, with `net_p2pIceDeferConnect 1`, waits for nomination/timeout before `connect`; otherwise it punches and connects immediately.
 `p2p_punch` explicitly starts a direct-UDP punchthrough helper session to a peer.
 `p2p_punch_status` prints active punch peers, attempts, and whether a peer has acknowledged the punchthrough flow.
 `p2p_candidates` prints gathered ICE candidates (`host`, `srflx`, `relay`).
@@ -86,14 +86,16 @@ This is ICE-lite rather than a full interactive ICE agent, but it covers host + 
 
 ### ICE connectivity checks (`direct_udp`)
 
-When `net_p2pIceChecks 1` (default) and backend is `direct_udp`, `p2p_connect` runs ICE-lite checks before `connect`:
+When `net_p2pIceChecks 1` (default) and backend is `direct_udp`, `p2p_connect` runs ICE-lite checks **before** issuing `connect`:
 
 | OOB packet | Purpose |
 |------------|---------|
 | `p2pCand` / `p2pCandRequest` | Exchange gathered candidate lists |
 | `p2pCheck` / `p2pCheckAck` | Nominate first working peer path |
 
-Cvars: `net_p2pIceChecks`, `net_p2pIceTimeout` (default 3000 ms).
+Cvars: `net_p2pIceChecks`, `net_p2pIceTimeout` (default 3000 ms), `net_p2pIceDeferConnect` (default 1).
+
+With `net_p2pIceDeferConnect 1` (clients only), game `connect` is queued until ICE nominates a path or the timeout falls back to direct punch. Set `0` to restore the old race (immediate `connect` while ICE still runs). Dedicated `p2p_connect` starts the ICE/punch path only and never issues a game connect.
 
 With `net_p2pBackend auto` and Steam SDR ready, ICE is skipped (`P2P: using steam_sdr (ICE skipped)`).
 
@@ -124,6 +126,8 @@ For non-Steam or offline/manual hosting:
 4. Start or host the game.
 5. Run `p2p_address` or `p2p_candidates` and share the printed `udp:` address.
 6. The remote player runs `net_p2p 1` and `p2p_connect <that-udp-address>`.
+
+Quickstart overlay/demo: `exec vulkan_overlay_p2p_direct_udp.cfg` or `exec demo_p2p_direct_udp.cfg`.
 
 ## Discovery
 
