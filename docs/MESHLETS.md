@@ -1,37 +1,44 @@
-# Meshlets (CPU cull + compact draw)
+# Meshlets (CPU cull + compact / MDI draw)
 
-Chocolate **Nanite-lite**: bake triangle clusters (meshlets) at **model load** into a local-space cache, frustum-cull on CPU, then **emit only visible triangles** into tess (`r_meshletsCompact`, default 1). Does **not** require mesh shaders.
+Chocolate **Nanite-lite**: bake triangle clusters (meshlets) at **model load** into a local-space cache, frustum-cull on CPU, then draw only visible triangles. Does **not** require mesh shaders.
 
 ## Enable
 
 ```
 set r_meshlets 1
 set r_meshletsCompact 1
-set r_meshletsMdi 1   // optional: pack indirect cmd metrics
+set r_meshletsMdi 1
+set r_meshletsMdiDraw 1   // Phase 2: real vkCmdDrawIndexedIndirect
 exec demo_meshlets.cfg
 meshlet_status
 ```
 
-When enabled, MD3 surfaces (≤512 verts / ≤1024 tris) bake at load, skip add if fully culled, and compact draw when partially visible.
+When enabled, MD3 surfaces (≤512 verts / ≤1024 tris) bake at load, skip add if fully culled, and compact draw when partially visible. With `r_meshletsMdiDraw 1`, each visible meshlet range is issued via `vkCmdDrawIndexedIndirect` against the tess index buffer (falls back to a single `vkCmdDrawIndexed` if the entry point is missing).
 
 ## Cvars / commands
 
 | | |
 |--|--|
 | `r_meshlets` | Default 0 |
-| `r_meshletsCompact` | Partial triangle draw from visible meshlets (default 1) |
+| `r_meshletsCompact` | Partial triangle draw from visible meshlets (default 1; also implied by MDI draw) |
 | `r_meshletsMdi` | Pack `VkDrawIndexedIndirectCommand` metrics (default 0) |
+| `r_meshletsMdiDraw` | GPU `vkCmdDrawIndexedIndirect` for tess-relative meshlet ranges (default 0) |
 | `meshlet_status` | Bake/cache/cull/compact/MDI counts |
 
 ## API
 
 - `R_Meshlets_Bake` / `CacheLocal` / `Lookup`
 - `R_Meshlets_CullViewFrustumXform`
-- `R_Meshlets_AppendVisibleIndexes` — used by `RB_SurfaceMesh`
-- `R_Meshlets_PackIndirect` — host MDI scaffold
+- `R_Meshlets_AppendVisibleIndexes` — used by `RB_SurfaceMesh` (compact + optional MDI enqueue)
+- `R_Meshlets_PackIndirect` — host MDI metrics
+- `R_Meshlets_TryDrawIndirect` — flush pending cmds from `vk_draw_geometry`
+- `R_Meshlets_BeginSurface` — clear per-batch MDI queue
 
 ## Deferred
 
-- GPU `vkCmdDrawIndexedIndirect`
+- Persistent per-surface IBO (avoid remapping into tess)
 - `VK_EXT_mesh_shader` task/mesh pipelines
 - BSP world / skinned meshlets
+- GPU cull / meshlet selection
+
+See also [RENDERER_2027.md](RENDERER_2027.md) Phase 2.

@@ -8,6 +8,7 @@ Split from vk.c.
 */
 
 #include "tr_local.h"
+#include "vk_meshlets.h"
 
 #ifdef USE_VK_PBR
 #include "vk_forward_plus.h"
@@ -626,7 +627,9 @@ void vk_draw_geometry( Vk_Depth_Range depth_range, qboolean indexed ) {
 	else
 #endif
 	if ( indexed ) {
-		qvkCmdDrawIndexed( vk.cmd->command_buffer, vk.cmd->num_indexes, 1, 0, 0, 0 );
+		if ( !R_Meshlets_TryDrawIndirect() ) {
+			qvkCmdDrawIndexed( vk.cmd->command_buffer, vk.cmd->num_indexes, 1, 0, 0, 0 );
+		}
 	} else {
 		qvkCmdDraw( vk.cmd->command_buffer, tess.numVertexes, 1, 0, 0 );
 	}

@@ -54,6 +54,7 @@ PFN_vkCmdCopyImage								qvkCmdCopyImage;
 PFN_vkCmdCopyImageToBuffer						qvkCmdCopyImageToBuffer;
 PFN_vkCmdDraw									qvkCmdDraw;
 PFN_vkCmdDrawIndexed								qvkCmdDrawIndexed;
+PFN_vkCmdDrawIndexedIndirect						qvkCmdDrawIndexedIndirect;
 PFN_vkCmdDrawMeshTasksNV							qvkCmdDrawMeshTasksNV;
 PFN_vkCmdDispatch								qvkCmdDispatch;
 PFN_vkCmdEndRenderPass									qvkCmdEndRenderPass;

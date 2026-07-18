@@ -68,7 +68,7 @@ Demo: `exec demo_visibility_2027.cfg`. Console: `visibility_buffer_status`, `ren
 | Phase | Focus |
 |-------|--------|
 | **P1** | Visibility foundation + material-class stub (this doc / cvars above) |
-| **P2** | GPU-driven meshlets — real `vkCmdDrawIndexedIndirect` ([MESHLETS.md](MESHLETS.md)) |
+| **P2** | GPU-driven meshlets — **`r_meshletsMdiDraw`** / `vkCmdDrawIndexedIndirect` landed (tess-relative); persistent IBO + mesh shaders remain follow-up ([MESHLETS.md](MESHLETS.md)) |
 | **P3** | Reservoir-sampled hybrid path — ReSTIR DI on Hybrid1, NVC/FSA, [RTX_HIT_SHADER_UV.md](RTX_HIT_SHADER_UV.md) |
 | **P4** | Material-classified OIT — glass/smoke/hair/particles ([MOMENT_OIT_STOCHASTIC_ALPHA.md](MOMENT_OIT_STOCHASTIC_ALPHA.md)) |
 | **P5** | Neural material/texture reconstruction (chocolate scaffold; no mandatory vendor SDK) |
@@ -82,7 +82,7 @@ Demo: `exec demo_visibility_2027.cfg`. Console: `visibility_buffer_status`, `ren
 | 2 | Ray reconstruction / ReSTIR | Hybrid1 + NVC scaffold | Reservoir-sampled hybrid path layer |
 | 3 | Visibility buffer | Classic G-buffer + P1 sidecar | Compact prim/bary/depth + late shade |
 | 4 | GPU-driven / Work Graphs | Meshlets CPU cull | Indirect draws → mesh shaders / WG |
-| 5 | Virtualized meshlets | MD3 meshlets + sector stream | Continuous cluster LOD streaming |
+| 5 | Virtualized meshlets | MD3 meshlets + **MDI GPU draw** + sector stream | Continuous cluster LOD streaming |
 | 6 | Hybrid clustered | Mode 3 EXISTS | Spine for all layers |
 | 7 | Stochastic alpha | `r_stochasticAlpha` | Temporally stable coverage + OMM |
 | 8 | Classified OIT | Global WBOIT/MBOIT | Per-material-class paths |

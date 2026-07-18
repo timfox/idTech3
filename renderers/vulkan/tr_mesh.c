@@ -81,7 +81,7 @@ static qboolean R_CullMD3SurfaceMeshlets( md3Surface_t *surface, int frame, cons
 		visible, MESHLET_MAX_PER_SURFACE );
 	if ( vcount > 0 && R_Meshlets_WantMdi() ) {
 		meshlet_draw_cmd_t cmds[MESHLET_MAX_PER_SURFACE];
-		R_Meshlets_PackIndirect( meshlets, visible, vcount, cmds, MESHLET_MAX_PER_SURFACE );
+		R_Meshlets_PackIndirect( meshlets, visible, vcount, cmds, MESHLET_MAX_PER_SURFACE, 0 );
 	}
 	return ( vcount > 0 ) ? qtrue : qfalse;
 }

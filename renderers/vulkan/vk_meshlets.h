@@ -47,14 +47,20 @@ int R_Meshlets_CullViewFrustum( const meshlet_t *meshlets, int count, int *visib
 int R_Meshlets_CullViewFrustumXform( const meshlet_t *meshlets, int count,
 	const float entityAxis[3][3], const vec3_t entityOrigin, int *visible, int maxVisible );
 
-/* Pack MDI draw args from visible meshlet indices (r_meshletsMdi). */
+/* Pack MDI draw args from visible meshlet indices (r_meshletsMdi). vertexOffset applied to each cmd. */
 int R_Meshlets_PackIndirect( const meshlet_t *meshlets, const int *visible, int visibleCount,
-	meshlet_draw_cmd_t *outCmds, int maxCmds );
+	meshlet_draw_cmd_t *outCmds, int maxCmds, int32_t vertexOffset );
 
-/* Append remapped indexes for visible meshlets into tess (compact draw). Returns index count added. */
+/* Append remapped indexes for visible meshlets into tess (compact draw). Returns index count added.
+ * When r_meshletsMdiDraw 1, also enqueues tess-relative indirect cmds for GPU MDI flush. */
 int R_Meshlets_AppendVisibleIndexes( md3Surface_t *surface, int vertexBase,
 	const float entityAxis[3][3], const vec3_t entityOrigin );
 
 qboolean R_Meshlets_WantCompact( void );
+qboolean R_Meshlets_WantMdiDraw( void );
+/* Clear per-tess-batch MDI cmd queue (call from RB_BeginSurface). */
+void R_Meshlets_BeginSurface( void );
+/* If MDI draw pending: upload cmds + vkCmdDrawIndexedIndirect. Returns qtrue if drew. */
+qboolean R_Meshlets_TryDrawIndirect( void );
 
 #endif

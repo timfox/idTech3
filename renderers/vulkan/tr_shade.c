@@ -26,6 +26,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "tr_material_paint.h"
 #ifdef USE_VULKAN
 #include "vk_deferred_gbuffer.h"
+#include "vk_meshlets.h"
 #endif
 #include "../common/tr_vector_font.h"
 #ifdef USE_VULKAN
@@ -410,6 +411,9 @@ void RB_BeginSurface( shader_t *shader, int fogNum ) {
 	tess.numIndexes = 0;
 	tess.numVertexes = 0;
 	tess.sdfUiEdge = -1.0f;
+#ifdef USE_VULKAN
+	R_Meshlets_BeginSurface();
+#endif
 	tess.subpixelShift = -1.0f;
 	tess.subpixelInvTexWidth = 0.0f;
 	tess.vectorCurveStart = 0;

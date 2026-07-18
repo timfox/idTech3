@@ -9,9 +9,12 @@ See docs/MESHLETS.md.
 */
 
 #include "tr_local.h"
+#include "vk.h"
+#include "vk_util.h"
 #include "vk_meshlets.h"
 
 #define MESHLET_CACHE_SLOTS 256
+#define MESHLET_MDI_FRAME_MAX 2048
 
 typedef struct {
 	const void *key;
@@ -21,6 +24,7 @@ typedef struct {
 
 static cvar_t *r_meshlets;
 static cvar_t *r_meshletsMdi;
+static cvar_t *r_meshletsMdiDraw;
 static cvar_t *r_meshletsCompact;
 static qboolean s_cmds;
 static int s_bakeCount;
@@ -30,10 +34,17 @@ static int s_cullVisible;
 static int s_cullTotal;
 static int s_mdiCount;
 static int s_mdiTris;
+static int s_mdiDrawCalls;
 static int s_compactIndexes;
 static int s_compactSurfaces;
 static meshlet_cache_entry_t s_cache[MESHLET_CACHE_SLOTS];
 static meshlet_draw_cmd_t s_mdiCmds[MESHLET_MAX_PER_SURFACE];
+static meshlet_draw_cmd_t s_frameCmds[MESHLET_MDI_FRAME_MAX];
+static int s_frameCmdCount;
+static VkBuffer s_mdiBuffer;
+static VkDeviceMemory s_mdiMemory;
+static void *s_mdiMapped;
+static qboolean s_mdiDrawLogged;
 
 static void Meshlets_Status_f( void )
 {
@@ -47,12 +58,14 @@ static void Meshlets_Status_f( void )
 	}
 	ri.Printf( PRINT_ALL,
 		"[VK][meshlets] active=%d bakeCalls=%d cache hits=%d misses=%d slots=%d/%d\n"
-		"  lastCull visible=%d / total=%d mdi=%d cmds=%d tris=%d\n"
+		"  lastCull visible=%d / total=%d mdi=%d cmds=%d tris=%d mdiDraw=%d gpuDraws=%d\n"
 		"  compact=%d lastIndexes=%d surfaces=%d\n",
 		R_Meshlets_Active() ? 1 : 0, s_bakeCount, s_cacheHits, s_cacheMisses,
 		used, MESHLET_CACHE_SLOTS, s_cullVisible, s_cullTotal,
 		( r_meshletsMdi && r_meshletsMdi->integer ) ? 1 : 0,
 		s_mdiCount, s_mdiTris,
+		( r_meshletsMdiDraw && r_meshletsMdiDraw->integer ) ? 1 : 0,
+		s_mdiDrawCalls,
 		( r_meshletsCompact && r_meshletsCompact->integer ) ? 1 : 0,
 		s_compactIndexes, s_compactSurfaces );
 }
@@ -68,8 +81,15 @@ void R_Meshlets_Init( void )
 	r_meshletsMdi = ri.Cvar_Get( "r_meshletsMdi", "0", CVAR_ARCHIVE_ND );
 	ri.Cvar_CheckRange( r_meshletsMdi, "0", "1", CV_INTEGER );
 	ri.Cvar_SetDescription( r_meshletsMdi,
-		"Pack VkDrawIndexedIndirectCommand list from visible meshlets (metrics/scaffold)." );
+		"Pack VkDrawIndexedIndirectCommand list from visible meshlets (metrics). Pair with r_meshletsMdiDraw for GPU draws." );
 	ri.Cvar_SetGroup( r_meshletsMdi, CVG_RENDERER );
+
+	r_meshletsMdiDraw = ri.Cvar_Get( "r_meshletsMdiDraw", "0", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_meshletsMdiDraw, "0", "1", CV_INTEGER );
+	ri.Cvar_SetDescription( r_meshletsMdiDraw,
+		"When r_meshlets 1: issue vkCmdDrawIndexedIndirect for visible meshlet ranges in the tess index buffer (2027 P2). "
+		"Falls back to a single vkCmdDrawIndexed if the indirect entry point is missing. Implies compact index emit." );
+	ri.Cvar_SetGroup( r_meshletsMdiDraw, CVG_RENDERER );
 
 	r_meshletsCompact = ri.Cvar_Get( "r_meshletsCompact", "1", CVAR_ARCHIVE_ND );
 	ri.Cvar_CheckRange( r_meshletsCompact, "0", "1", CV_INTEGER );
@@ -80,23 +100,39 @@ void R_Meshlets_Init( void )
 	Com_Memset( s_cache, 0, sizeof( s_cache ) );
 	s_bakeCount = s_cacheHits = s_cacheMisses = 0;
 	s_cullVisible = s_cullTotal = 0;
-	s_mdiCount = s_mdiTris = 0;
+	s_mdiCount = s_mdiTris = s_mdiDrawCalls = 0;
 	s_compactIndexes = s_compactSurfaces = 0;
+	s_frameCmdCount = 0;
+	s_mdiDrawLogged = qfalse;
 
 	if ( !s_cmds ) {
 		ri.Cmd_AddCommand( "meshlet_status", Meshlets_Status_f );
 		s_cmds = qtrue;
 	}
 	if ( r_meshlets->integer ) {
-		ri.Printf( PRINT_ALL, "[VK][meshlets] r_meshlets=1 (bake-at-load + CPU cull%s%s)\n",
+		ri.Printf( PRINT_ALL, "[VK][meshlets] r_meshlets=1 (bake-at-load + CPU cull%s%s%s)\n",
 			( r_meshletsCompact && r_meshletsCompact->integer ) ? "; compact draw" : "",
-			( r_meshletsMdi && r_meshletsMdi->integer ) ? "; MDI pack" : "" );
+			( r_meshletsMdi && r_meshletsMdi->integer ) ? "; MDI pack" : "",
+			( r_meshletsMdiDraw && r_meshletsMdiDraw->integer ) ? "; MDI GPU draw" : "" );
 	}
 }
 
 void R_Meshlets_Shutdown( void )
 {
+	if ( s_mdiMapped && s_mdiMemory != VK_NULL_HANDLE ) {
+		qvkUnmapMemory( vk.device, s_mdiMemory );
+		s_mdiMapped = NULL;
+	}
+	if ( s_mdiBuffer != VK_NULL_HANDLE ) {
+		qvkDestroyBuffer( vk.device, s_mdiBuffer, NULL );
+		s_mdiBuffer = VK_NULL_HANDLE;
+	}
+	if ( s_mdiMemory != VK_NULL_HANDLE ) {
+		qvkFreeMemory( vk.device, s_mdiMemory, NULL );
+		s_mdiMemory = VK_NULL_HANDLE;
+	}
 	Com_Memset( s_cache, 0, sizeof( s_cache ) );
+	s_frameCmdCount = 0;
 }
 
 qboolean R_Meshlets_Active( void )
@@ -311,7 +347,7 @@ int R_Meshlets_CullViewFrustumXform( const meshlet_t *meshlets, int count,
 }
 
 int R_Meshlets_PackIndirect( const meshlet_t *meshlets, const int *visible, int visibleCount,
-	meshlet_draw_cmd_t *outCmds, int maxCmds )
+	meshlet_draw_cmd_t *outCmds, int maxCmds, int32_t vertexOffset )
 {
 	int i;
 	int n = 0;
@@ -337,7 +373,7 @@ int R_Meshlets_PackIndirect( const meshlet_t *meshlets, const int *visible, int 
 		cmd->indexCount = meshlets[idx].indexCount;
 		cmd->instanceCount = 1u;
 		cmd->firstIndex = meshlets[idx].firstIndex;
-		cmd->vertexOffset = 0;
+		cmd->vertexOffset = vertexOffset;
 		cmd->firstInstance = 0;
 		tris += (int)( meshlets[idx].indexCount / 3u );
 		n++;
@@ -355,9 +391,140 @@ qboolean R_Meshlets_WantMdi( void )
 	return ( R_Meshlets_Active() && r_meshletsMdi && r_meshletsMdi->integer ) ? qtrue : qfalse;
 }
 
+qboolean R_Meshlets_WantMdiDraw( void )
+{
+	return ( R_Meshlets_Active() && r_meshletsMdiDraw && r_meshletsMdiDraw->integer ) ? qtrue : qfalse;
+}
+
 qboolean R_Meshlets_WantCompact( void )
 {
+	/* MDI GPU draw reuses compact tess index emit as the IBO content. */
+	if ( R_Meshlets_WantMdiDraw() ) {
+		return qtrue;
+	}
 	return ( R_Meshlets_Active() && r_meshletsCompact && r_meshletsCompact->integer ) ? qtrue : qfalse;
+}
+
+void R_Meshlets_BeginSurface( void )
+{
+	s_frameCmdCount = 0;
+}
+
+static qboolean Meshlets_EnsureMdiBuffer( void )
+{
+	VkBufferCreateInfo bci;
+	VkMemoryRequirements mr;
+	VkMemoryAllocateInfo mai;
+	VkResult res;
+	uint32_t mem_type;
+	VkDeviceSize bytes;
+
+	if ( s_mdiBuffer != VK_NULL_HANDLE && s_mdiMapped != NULL ) {
+		return qtrue;
+	}
+	if ( !vk.device || vk.device_lost ) {
+		return qfalse;
+	}
+
+	bytes = (VkDeviceSize)MESHLET_MDI_FRAME_MAX * sizeof( meshlet_draw_cmd_t );
+	Com_Memset( &bci, 0, sizeof( bci ) );
+	bci.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+	bci.size = bytes;
+	bci.usage = VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT;
+	bci.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+	res = qvkCreateBuffer( vk.device, &bci, NULL, &s_mdiBuffer );
+	if ( res != VK_SUCCESS ) {
+		ri.Printf( PRINT_WARNING, S_COLOR_YELLOW
+			"[VK][meshlets] MDI buffer create failed (%d)\n" S_COLOR_WHITE, (int)res );
+		s_mdiBuffer = VK_NULL_HANDLE;
+		return qfalse;
+	}
+	qvkGetBufferMemoryRequirements( vk.device, s_mdiBuffer, &mr );
+	mem_type = vk_find_memory_type( vk.physical_device, mr.memoryTypeBits,
+		VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT );
+	Com_Memset( &mai, 0, sizeof( mai ) );
+	mai.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+	mai.allocationSize = mr.size;
+	mai.memoryTypeIndex = mem_type;
+	res = qvkAllocateMemory( vk.device, &mai, NULL, &s_mdiMemory );
+	if ( res != VK_SUCCESS ) {
+		qvkDestroyBuffer( vk.device, s_mdiBuffer, NULL );
+		s_mdiBuffer = VK_NULL_HANDLE;
+		ri.Printf( PRINT_WARNING, S_COLOR_YELLOW
+			"[VK][meshlets] MDI memory alloc failed (%d)\n" S_COLOR_WHITE, (int)res );
+		return qfalse;
+	}
+	res = qvkBindBufferMemory( vk.device, s_mdiBuffer, s_mdiMemory, 0 );
+	if ( res != VK_SUCCESS ) {
+		qvkFreeMemory( vk.device, s_mdiMemory, NULL );
+		qvkDestroyBuffer( vk.device, s_mdiBuffer, NULL );
+		s_mdiBuffer = VK_NULL_HANDLE;
+		s_mdiMemory = VK_NULL_HANDLE;
+		return qfalse;
+	}
+	res = qvkMapMemory( vk.device, s_mdiMemory, 0, bytes, 0, &s_mdiMapped );
+	if ( res != VK_SUCCESS || !s_mdiMapped ) {
+		qvkFreeMemory( vk.device, s_mdiMemory, NULL );
+		qvkDestroyBuffer( vk.device, s_mdiBuffer, NULL );
+		s_mdiBuffer = VK_NULL_HANDLE;
+		s_mdiMemory = VK_NULL_HANDLE;
+		s_mdiMapped = NULL;
+		return qfalse;
+	}
+	SET_OBJECT_NAME( s_mdiBuffer, "meshlet MDI commands", VK_DEBUG_REPORT_OBJECT_TYPE_BUFFER_EXT );
+	return qtrue;
+}
+
+qboolean R_Meshlets_TryDrawIndirect( void )
+{
+	VkMemoryBarrier barrier;
+	uint32_t drawCount;
+
+	if ( !R_Meshlets_WantMdiDraw() || s_frameCmdCount <= 0 ) {
+		return qfalse;
+	}
+	if ( !qvkCmdDrawIndexedIndirect ) {
+		if ( !s_mdiDrawLogged ) {
+			ri.Printf( PRINT_WARNING, S_COLOR_YELLOW
+				"[VK][meshlets] vkCmdDrawIndexedIndirect unavailable; falling back to single draw\n" S_COLOR_WHITE );
+			s_mdiDrawLogged = qtrue;
+		}
+		s_frameCmdCount = 0;
+		return qfalse;
+	}
+	if ( !vk.cmd || vk.cmd->command_buffer == VK_NULL_HANDLE || !vk.inRenderPass ) {
+		return qfalse;
+	}
+	if ( !Meshlets_EnsureMdiBuffer() ) {
+		s_frameCmdCount = 0;
+		return qfalse;
+	}
+
+	drawCount = (uint32_t)s_frameCmdCount;
+	if ( drawCount > (uint32_t)MESHLET_MDI_FRAME_MAX ) {
+		drawCount = (uint32_t)MESHLET_MDI_FRAME_MAX;
+	}
+	Com_Memcpy( s_mdiMapped, s_frameCmds, (size_t)drawCount * sizeof( meshlet_draw_cmd_t ) );
+
+	Com_Memset( &barrier, 0, sizeof( barrier ) );
+	barrier.sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER;
+	barrier.srcAccessMask = VK_ACCESS_HOST_WRITE_BIT;
+	barrier.dstAccessMask = VK_ACCESS_INDIRECT_COMMAND_READ_BIT;
+	qvkCmdPipelineBarrier( vk.cmd->command_buffer,
+		VK_PIPELINE_STAGE_HOST_BIT, VK_PIPELINE_STAGE_DRAW_INDIRECT_BIT,
+		0, 1, &barrier, 0, NULL, 0, NULL );
+
+	qvkCmdDrawIndexedIndirect( vk.cmd->command_buffer, s_mdiBuffer, 0, drawCount,
+		(uint32_t)sizeof( meshlet_draw_cmd_t ) );
+
+	s_mdiDrawCalls += (int)drawCount;
+	if ( !s_mdiDrawLogged ) {
+		ri.Printf( PRINT_ALL,
+			"[VK][meshlets] r_meshletsMdiDraw=1 (vkCmdDrawIndexedIndirect; tess-relative ranges)\n" );
+		s_mdiDrawLogged = qtrue;
+	}
+	s_frameCmdCount = 0;
+	return qtrue;
 }
 
 int R_Meshlets_AppendVisibleIndexes( md3Surface_t *surface, int vertexBase,
@@ -368,6 +535,7 @@ int R_Meshlets_AppendVisibleIndexes( md3Surface_t *surface, int vertexBase,
 	int visible[MESHLET_MAX_PER_SURFACE];
 	int mcount, vcount, i, k, written;
 	int Bob;
+	qboolean enqueueMdi;
 
 	s_compactIndexes = 0;
 	if ( !surface || !R_Meshlets_WantCompact() ) {
@@ -391,9 +559,11 @@ int R_Meshlets_AppendVisibleIndexes( md3Surface_t *surface, int vertexBase,
 
 	if ( R_Meshlets_WantMdi() ) {
 		meshlet_draw_cmd_t cmds[MESHLET_MAX_PER_SURFACE];
-		R_Meshlets_PackIndirect( meshlets, visible, vcount, cmds, MESHLET_MAX_PER_SURFACE );
+		R_Meshlets_PackIndirect( meshlets, visible, vcount, cmds, MESHLET_MAX_PER_SURFACE,
+			(int32_t)vertexBase );
 	}
 
+	enqueueMdi = R_Meshlets_WantMdiDraw();
 	tri = (const int *)( (const byte *)surface + surface->ofsTriangles );
 	Bob = tess.numIndexes;
 	written = 0;
@@ -407,6 +577,14 @@ int R_Meshlets_AppendVisibleIndexes( md3Surface_t *surface, int vertexBase,
 		}
 		if ( Bob + written + count > SHADER_MAX_INDEXES ) {
 			break;
+		}
+		if ( enqueueMdi && s_frameCmdCount < MESHLET_MDI_FRAME_MAX ) {
+			meshlet_draw_cmd_t *cmd = &s_frameCmds[s_frameCmdCount++];
+			cmd->indexCount = (uint32_t)count;
+			cmd->instanceCount = 1u;
+			cmd->firstIndex = (uint32_t)( Bob + written );
+			cmd->vertexOffset = 0; /* already remapped into tess indexes */
+			cmd->firstInstance = 0;
 		}
 		for ( k = 0; k < count; k++ ) {
 			tess.indexes[Bob + written + k] = vertexBase + tri[first + k];
