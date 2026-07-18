@@ -16,6 +16,7 @@ rg -q 'vk_unified_clustered_active' "$ROOT/renderers/vulkan/vk_deferred_gbuffer.
 rg -q 'vk_unified_clustered_active' "$ROOT/renderers/vulkan/tr_backend.c" || fail "frame split missing"
 rg -q 'drawSurfFilter = 1' "$ROOT/renderers/vulkan/tr_backend.c" || fail "opaque filter missing"
 rg -q 'vk_unified_clustered_opaque_handoff' "$ROOT/renderers/vulkan/tr_shade.c" || fail "shade handoff missing"
+rg -q 'vk.renderPassIndex = RENDER_PASS_MAIN' "$ROOT/renderers/vulkan/vk_deferred_gbuffer.c" || fail "deferred composite restores main pass before transparent resume"
 rg -q 'pbrDebugMode.y' "$ROOT/renderers/vulkan/shaders/glsl/gen_frag.tmpl" || fail "gen_frag hybrid gate missing"
 rg -q 'CheckRange\( r_renderMode, "0", "3"' "$ROOT/renderers/vulkan/tr_init.c" || fail "CheckRange 0-3 missing"
 rg -q 'r_renderMode 3' "$ROOT/config/vulkan_overlay_unified_clustered.cfg" || fail "overlay sets mode 3"

@@ -1057,6 +1057,11 @@ static void vk_dgb_composite_lit_to_color( uint32_t width, uint32_t height )
 	vk_end_render_pass();
 
 	if ( resume_main ) {
+		/* Mode-3 deferred composite temporarily switches to post_bloom for the fullscreen
+		 * add. Restore the original scene-pass identity before resuming so transparent
+		 * draws continue in the main scene pass rather than accidentally re-entering
+		 * post_bloom. */
+		vk.renderPassIndex = RENDER_PASS_MAIN;
 		vk_resume_current_render_pass();
 	} else if ( vk.color_image_view != VK_NULL_HANDLE ) {
 		vk_barrier_post_fog_source_for_sampling( vk.color_image_view, "deferred lighting composite" );
