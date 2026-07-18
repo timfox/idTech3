@@ -131,6 +131,7 @@ source_checks() {
 	check_grep "renderers/vulkan/tr_shade.c" 'R_HasReadyCubemapForPBR' "PBR cubemap path detects whether any local probe is actually ready"
 	check_grep "renderers/vulkan/tr_shade.c" 'no ready local cubemap found; using HDR skybox fallback until map probes are complete' "PBR cubemap path can fall back to HDR skybox when all local probes are incomplete"
 	check_grep "renderers/vulkan/vk_frame_submit.c" 'vk.cmd->swapchain_image_index >= vk.swapchain_image_count' "frame begin validates acquired swapchain image index after fullscreen restart"
+	check_grep "renderers/vulkan/vk_frame_end.c" 'vk_end_frame_record_emergency_present' "frame-end path can emergency-present color data when gamma/post chain is unavailable"
 
 	if [[ -d "${RELEASE_DIR:-$ROOT/release}/base" ]]; then
 		local release_base="${RELEASE_DIR:-$ROOT/release}/base"

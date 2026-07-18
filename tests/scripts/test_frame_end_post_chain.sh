@@ -21,6 +21,7 @@ FRAME_END="$(idtech3_file renderers/vulkan/vk_frame_end.c src/renderers/vulkan/v
 
 check "$FRAME_END" 'vk_end_frame_validate_post_process_chain' 'frame-end validation helper exists'
 check "$FRAME_END" 'vk_end_frame_try_repair_gamma_chain' 'frame-end path exposes gamma-chain self-heal helper'
+check "$FRAME_END" 'vk_end_frame_record_emergency_present' 'frame-end path exposes emergency present fallback'
 check "$FRAME_END" 'expected no active render pass before frame-end post chain' 'frame-end validation warns on lingering render passes'
 check "$FRAME_END" 'FBO path active but color_image_view is null' 'frame-end validation warns on missing HDR color source'
 check "$FRAME_END" 'post-fog source is null' 'frame-end validation warns on missing post-fog source'
@@ -28,6 +29,8 @@ check "$FRAME_END" 'luminance source is null' 'frame-end validation warns on mis
 check "$FRAME_END" 'uiOverlayActive=1 but ui_overlay_image_view is null' 'frame-end validation warns on missing UI overlay image'
 check "$FRAME_END" 'uiOverlayActive=1 but overlay_compose render pass is null' 'frame-end validation warns on missing overlay compose pass'
 check "$FRAME_END" 'gamma chain self-heal attempted' 'frame-end path logs gamma-chain self-heal attempts'
+check "$FRAME_END" 'emergency present fallback copied' 'frame-end path logs emergency present fallback'
+check "$FRAME_END" 'VK_IMAGE_LAYOUT_PRESENT_SRC_KHR, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL' 'emergency present fallback transitions swapchain image for transfer'
 check "$FRAME_END" 'vk_update_attachment_descriptors();' 'frame-end gamma self-heal refreshes attachment descriptors'
 check "$FRAME_END" 'vk_update_post_process_pipelines();' 'frame-end gamma self-heal refreshes post-process pipelines'
 check "$FRAME_END" 'vk_end_frame_validate_post_process_chain( "prepare_post_process"' 'prepare_post_process validates post chain'

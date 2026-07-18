@@ -128,6 +128,101 @@ static qboolean vk_end_frame_gamma_chain_ready( void )
 	return qtrue;
 }
 
+static qboolean vk_end_frame_record_emergency_present( VkImageView color_source )
+{
+	VkImage srcImage;
+	VkImage dstImage;
+	uint32_t srcWidth, srcHeight;
+	uint32_t dstWidth, dstHeight;
+
+	if ( !vk.fboActive || vk.cmd == NULL || vk.cmd->command_buffer == VK_NULL_HANDLE ||
+		vk.swapchain_image_count == 0 || vk.cmd->swapchain_image_index >= vk.swapchain_image_count ||
+		vk.cmd->swapchain_image_index >= MAX_SWAPCHAIN_IMAGES ) {
+		return qfalse;
+	}
+
+	srcImage = vk_post_fog_source_image( color_source );
+	dstImage = vk.swapchain_images[ vk.cmd->swapchain_image_index ];
+	if ( srcImage == VK_NULL_HANDLE || dstImage == VK_NULL_HANDLE ) {
+		return qfalse;
+	}
+
+	vk_get_active_render_extent( &srcWidth, &srcHeight );
+	dstWidth = vk.renderWidth > 0 ? vk.renderWidth :
+		( vk.swapchain_extent_valid ? vk.swapchain_extent.width : ( gls.windowWidth > 0 ? (uint32_t)gls.windowWidth : 0u ) );
+	dstHeight = vk.renderHeight > 0 ? vk.renderHeight :
+		( vk.swapchain_extent_valid ? vk.swapchain_extent.height : ( gls.windowHeight > 0 ? (uint32_t)gls.windowHeight : 0u ) );
+
+	if ( srcWidth == 0 || srcHeight == 0 || dstWidth == 0 || dstHeight == 0 ) {
+		return qfalse;
+	}
+
+	record_image_layout_transition( vk.cmd->command_buffer, srcImage, VK_IMAGE_ASPECT_COLOR_BIT,
+		VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, 0, 0 );
+	record_image_layout_transition( vk.cmd->command_buffer, dstImage, VK_IMAGE_ASPECT_COLOR_BIT,
+		VK_IMAGE_LAYOUT_PRESENT_SRC_KHR, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 0, 0 );
+
+	if ( vk.blitEnabled ) {
+		VkImageBlit region;
+
+		Com_Memset( &region, 0, sizeof( region ) );
+		region.srcSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+		region.srcSubresource.layerCount = 1;
+		region.srcOffsets[1].x = (int32_t)srcWidth;
+		region.srcOffsets[1].y = (int32_t)srcHeight;
+		region.srcOffsets[1].z = 1;
+		region.dstSubresource = region.srcSubresource;
+		region.dstOffsets[1].x = (int32_t)dstWidth;
+		region.dstOffsets[1].y = (int32_t)dstHeight;
+		region.dstOffsets[1].z = 1;
+
+		qvkCmdBlitImage( vk.cmd->command_buffer,
+			srcImage, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+			dstImage, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+			1, &region, VK_FILTER_LINEAR );
+	} else {
+		VkImageCopy region;
+
+		if ( srcWidth != dstWidth || srcHeight != dstHeight ) {
+			record_image_layout_transition( vk.cmd->command_buffer, srcImage, VK_IMAGE_ASPECT_COLOR_BIT,
+				VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, 0, 0 );
+			record_image_layout_transition( vk.cmd->command_buffer, dstImage, VK_IMAGE_ASPECT_COLOR_BIT,
+				VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR, 0, 0 );
+			return qfalse;
+		}
+
+		Com_Memset( &region, 0, sizeof( region ) );
+		region.srcSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+		region.srcSubresource.layerCount = 1;
+		region.dstSubresource = region.srcSubresource;
+		region.extent.width = srcWidth;
+		region.extent.height = srcHeight;
+		region.extent.depth = 1;
+
+		qvkCmdCopyImage( vk.cmd->command_buffer,
+			srcImage, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+			dstImage, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+			1, &region );
+	}
+
+	record_image_layout_transition( vk.cmd->command_buffer, srcImage, VK_IMAGE_ASPECT_COLOR_BIT,
+		VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, 0, 0 );
+	record_image_layout_transition( vk.cmd->command_buffer, dstImage, VK_IMAGE_ASPECT_COLOR_BIT,
+		VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR, 0, 0 );
+
+	if ( r_fboDebug && r_fboDebug->integer >= 1 && vk_post_fog_fbo_debug_throttle() ) {
+		ri.Printf( PRINT_WARNING,
+			"[VK][fbo] emergency present fallback copied %s to swapchain image %u (%ux%u -> %ux%u, mode=%s)\n",
+			vk_post_fog_source_name( color_source ),
+			(unsigned int)vk.cmd->swapchain_image_index,
+			(unsigned int)srcWidth, (unsigned int)srcHeight,
+			(unsigned int)dstWidth, (unsigned int)dstHeight,
+			vk.blitEnabled ? "blit" : "copy" );
+	}
+
+	return qtrue;
+}
+
 static qboolean vk_end_frame_try_repair_gamma_chain( VkImageView *gamma_src )
 {
 	if ( !vk.fboActive || vk.cmd == NULL || vk.cmd->command_buffer == VK_NULL_HANDLE ) {
@@ -596,8 +691,17 @@ void vk_end_frame_record_gamma_pass( VkImageView post_fog_src )
 
 	if ( !vk_end_frame_gamma_chain_ready() ) {
 		if ( !vk_end_frame_try_repair_gamma_chain( &gamma_src ) ) {
+			if ( gamma_src == VK_NULL_HANDLE ) {
+				gamma_src = vk_get_post_fog_source();
+				if ( gamma_src == VK_NULL_HANDLE ) {
+					gamma_src = vk.color_image_view;
+				}
+			}
+			if ( vk_end_frame_record_emergency_present( gamma_src ) ) {
+				return;
+			}
 			if ( vk_post_fog_fbo_debug_throttle() ) {
-				ri.Printf( PRINT_DEVELOPER, S_COLOR_YELLOW "[VK][fbo] gamma pass skipped: missing pipeline/descriptor/renderpass/framebuffer or zero size (%dx%d)\n",
+				ri.Printf( PRINT_DEVELOPER, S_COLOR_YELLOW "[VK][fbo] gamma pass skipped: missing pipeline/descriptor/renderpass/framebuffer or zero size (%dx%d), and emergency present fallback was unavailable\n",
 					vk.renderWidth, vk.renderHeight );
 			}
 			return;
@@ -612,8 +716,11 @@ void vk_end_frame_record_gamma_pass( VkImageView post_fog_src )
 	}
 
 	if ( gamma_src == VK_NULL_HANDLE ) {
+		if ( vk_end_frame_record_emergency_present( vk.color_image_view ) ) {
+			return;
+		}
 		if ( vk_post_fog_fbo_debug_throttle() ) {
-			ri.Printf( PRINT_DEVELOPER, S_COLOR_YELLOW "[VK][fbo] gamma pass skipped: no valid color source (post_fog or color_image)\n" );
+			ri.Printf( PRINT_DEVELOPER, S_COLOR_YELLOW "[VK][fbo] gamma pass skipped: no valid color source (post_fog or color_image), and emergency present fallback was unavailable\n" );
 		}
 		return;
 	}
