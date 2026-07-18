@@ -1038,6 +1038,46 @@ char *Sys_GetClipboardData( void ) {
 	return data;
 }
 
+qboolean Sys_SetClipboardText( const char *text ) {
+	HGLOBAL hMem;
+	char *ptr;
+	size_t len;
+
+	if ( !text ) {
+		text = "";
+	}
+
+	if ( !g_wv.hWnd || !OpenClipboard( g_wv.hWnd ) ) {
+		return qfalse;
+	}
+
+	EmptyClipboard();
+	len = strlen( text ) + 1;
+	hMem = GlobalAlloc( GMEM_MOVEABLE | GMEM_DDESHARE, len );
+	if ( !hMem ) {
+		CloseClipboard();
+		return qfalse;
+	}
+
+	ptr = (char *)GlobalLock( hMem );
+	if ( !ptr ) {
+		GlobalFree( hMem );
+		CloseClipboard();
+		return qfalse;
+	}
+
+	memcpy( ptr, text, len );
+	GlobalUnlock( hMem );
+	if ( !SetClipboardData( CF_TEXT, hMem ) ) {
+		GlobalFree( hMem );
+		CloseClipboard();
+		return qfalse;
+	}
+
+	CloseClipboard();
+	return qtrue;
+}
+
 
 /*
 ================

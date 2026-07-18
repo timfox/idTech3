@@ -453,6 +453,32 @@ static void Cmd_CompleteTxtName(const char *args, int argNum ) {
 	}
 }
 
+static void Con_ClipboardSet_f( void )
+{
+	const char *text = Cmd_Argc() > 1 ? Cmd_ArgsFrom( 1 ) : "";
+
+	if ( !Sys_SetClipboardText( text ) ) {
+		Com_Printf( "clipboard_set failed\n" );
+		return;
+	}
+
+	Com_Printf( "clipboard_set: copied %d byte(s)\n", (int)strlen( text ) );
+}
+
+static void Con_ClipboardGet_f( void )
+{
+	char *cbd = Sys_GetClipboardData();
+
+	if ( !cbd ) {
+		Com_Printf( "clipboard_get: clipboard is empty or unavailable\n" );
+		return;
+	}
+
+	Com_Printf( "%s\n", cbd );
+	Com_Printf( "clipboard_get: read %d byte(s)\n", (int)strlen( cbd ) );
+	Z_Free( cbd );
+}
+
 
 /*
 ================
@@ -498,6 +524,8 @@ void Con_Init( void )
 	Cmd_AddCommand( "messagemode2", Con_MessageMode2_f );
 	Cmd_AddCommand( "messagemode3", Con_MessageMode3_f );
 	Cmd_AddCommand( "messagemode4", Con_MessageMode4_f );
+	Cmd_AddCommand( "clipboard_set", Con_ClipboardSet_f );
+	Cmd_AddCommand( "clipboard_get", Con_ClipboardGet_f );
 }
 
 
@@ -515,6 +543,8 @@ void Con_Shutdown( void )
 	Cmd_RemoveCommand( "messagemode2" );
 	Cmd_RemoveCommand( "messagemode3" );
 	Cmd_RemoveCommand( "messagemode4" );
+	Cmd_RemoveCommand( "clipboard_set" );
+	Cmd_RemoveCommand( "clipboard_get" );
 }
 
 

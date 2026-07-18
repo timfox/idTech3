@@ -156,6 +156,7 @@ char *Sys_ConsoleInput( void ) { return NULL; }
 void Sys_Sleep( int msec ) { if ( msec > 0 ) usleep( (unsigned)msec * 1000 ); }
 void Sys_UpdateWindowTitle( const char *title ) { (void)title; }
 char *Sys_GetClipboardData( void ) { return NULL; }
+qboolean Sys_SetClipboardText( const char *text ) { (void)text; return qfalse; }
 void Sys_SetClipboardBitmap( const byte *bitmap, int length ) { (void)bitmap; (void)length; }
 
 void Sys_SendKeyEvents( void ) {

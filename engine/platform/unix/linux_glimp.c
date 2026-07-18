@@ -1801,6 +1801,12 @@ char *Sys_GetClipboardData( void )
 	return NULL;
 }
 
+qboolean Sys_SetClipboardText( const char *text )
+{
+	(void)text;
+	return qfalse;
+}
+
 
 /*
 =================

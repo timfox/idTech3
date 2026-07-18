@@ -842,6 +842,19 @@ char *Sys_GetClipboardData( void )
 #endif
 }
 
+qboolean Sys_SetClipboardText( const char *text )
+{
+#ifdef DEDICATED
+	(void)text;
+	return qfalse;
+#else
+	if ( !text ) {
+		text = "";
+	}
+	return SDL_SetClipboardText( text );
+#endif
+}
+
 
 /*
 ===============
