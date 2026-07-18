@@ -678,12 +678,12 @@ void vk_create_attachments( void )
 				VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, &vk.ui_overlay_msaa_image, &vk.ui_overlay_msaa_image_view, qtrue );
 		}
 
-		if ( r_ext_supersample->integer ) {
-			// capture buffer
-			create_color_attachment( gls.captureWidth, gls.captureHeight, VK_SAMPLE_COUNT_1_BIT, vk.capture_format,
-				VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT,
-				&vk.capture.image, &vk.capture.image_view, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, qfalse, 0 );
-		}
+		/* Screenshot / video capture target: always allocate with FBO so HDR
+		   color_image is tonemapped via capture_pipeline instead of raw FP readback.
+		   Supersample still uses the same buffer at gls.captureWidth/Height. */
+		create_color_attachment( gls.captureWidth, gls.captureHeight, VK_SAMPLE_COUNT_1_BIT, vk.capture_format,
+			VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT,
+			&vk.capture.image, &vk.capture.image_view, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, qfalse, 0 );
 
 		if ( vk.smaaActive || vk.fxaaActive ) {
 			VkImageUsageFlags smaaUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;

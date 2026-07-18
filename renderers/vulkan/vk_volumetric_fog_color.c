@@ -119,7 +119,8 @@ void vk_get_volumetric_fog_color( vec4_t out )
 	}
 	Vector4Set( out, base[0], base[1], base[2], 1.0f );
 
-	if ( !tr.world || ( tr.refdef.rdflags & RDF_NOWORLDMODEL ) ) {
+	/* Use doneWorldScene — HUD/weapon may set RDF_NOWORLDMODEL after the world view. */
+	if ( !tr.world || !backEnd.doneWorldScene ) {
 		vk_apply_optional_tint( r_volumetricFogTint, out, qfalse );
 		vk_apply_optional_tint( r_fogTint, out, qfalse );
 		vk_ensure_nonblack_fog_color( out );

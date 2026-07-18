@@ -2057,6 +2057,18 @@ static const void *RB_DrawSurfs( const void *data ) {
 
 	/* Could check rdf_noworld; q3mme uses full 3d ui. */
 	backEnd.doneSurfaces = qtrue; // for bloom
+	/*
+	 * Track a real world view for frame-end HDR resolve. Later HUD/weapon
+	 * RE_RenderScene calls use RDF_NOWORLDMODEL and overwrite tr.refdef; gamma
+	 * must not treat those as "no world" or HDR stays untone-mapped (black).
+	 */
+	if ( !( cmd->refdef.rdflags & RDF_NOWORLDMODEL )
+#ifdef VK_CUBEMAP
+		&& cmd->viewParms.targetCube == NULL
+#endif
+		) {
+		backEnd.doneWorldScene = qtrue;
+	}
 
 	return (const void *)(cmd + 1);
 }
@@ -2428,6 +2440,7 @@ static const void *RB_SwapBuffers( const void *data ) {
 
 	backEnd.projection2D = qfalse;
 	backEnd.doneSurfaces = qfalse;
+	backEnd.doneWorldScene = qfalse;
 	backEnd.drawConsole = qfalse;
 #ifdef USE_VULKAN
 	backEnd.doneBloom = qfalse;

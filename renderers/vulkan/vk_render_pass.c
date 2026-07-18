@@ -424,10 +424,33 @@ void vk_create_render_passes( void )
 	VK_CHECK( qvkCreateRenderPass( device, &desc, NULL, &vk.render_pass.main ) );
 	SET_OBJECT_NAME( vk.render_pass.main, "render pass - main", VK_DEBUG_REPORT_OBJECT_TYPE_RENDER_PASS_EXT );
 
+	/* Mid-frame MAIN resume: same attachments as main, but LOAD (not CLEAR) and
+	 * depth STORE so out-of-pass compute (G-buffer fill) can resume without wiping
+	 * the scene or discarding depth for later post. */
+	{
+		attachments[0].loadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
+		attachments[1].loadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
+		attachments[1].stencilLoadOp = glConfig.stencilBits ? VK_ATTACHMENT_LOAD_OP_LOAD : VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+		if ( fboActive ) {
+			attachments[2].loadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
+		}
+		if ( vk.msaaActive ) {
+			attachments[3].loadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
+			if ( fboActive ) {
+				attachments[4].loadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
+			}
+		} else if ( fboActive && vk.deferredGbufferDirectExport ) {
+			attachments[3].loadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
+			attachments[4].loadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
+		}
+		VK_CHECK( qvkCreateRenderPass( device, &desc, NULL, &vk.render_pass.main_resume ) );
+		SET_OBJECT_NAME( vk.render_pass.main_resume, "render pass - main_resume", VK_DEBUG_REPORT_OBJECT_TYPE_RENDER_PASS_EXT );
+	}
+
 	// Post-main continuation pass used by 3D -> 2D split (volumetric fog runs here even when bloom is off).
 	{
 
-		// post-bloom pass
+		// post-bloom pass (LOAD; depth may be discarded after final 3D continuation)
 		// color buffer
 		attachments[0].loadOp = VK_ATTACHMENT_LOAD_OP_LOAD; // load from previous pass
 		if ( fboActive ) {
@@ -447,6 +470,12 @@ void vk_create_render_passes( void )
 				attachments[4].loadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
 				attachments[4].storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
 			}
+		} else if ( fboActive && vk.deferredGbufferDirectExport ) {
+			/* Preserve direct-export normal/material MRTs across post_bloom begin. */
+			attachments[3].loadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
+			attachments[3].storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+			attachments[4].loadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
+			attachments[4].storeOp = VK_ATTACHMENT_STORE_OP_STORE;
 		}
 #ifdef USE_VULKAN_RTX
 		/* RTX demo blit leaves resolved color in COLOR_ATTACHMENT_OPTIMAL; match layouts so post_bloom is valid. */

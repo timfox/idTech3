@@ -26,7 +26,12 @@ static void vk_configure_scene_pass_dimensions( void )
 	uint32_t targetWidth = logicalWidth;
 	uint32_t targetHeight = logicalHeight;
 
-	if ( !vk.fboActive ) {
+	if ( vk.fboActive ) {
+		if ( vk.mainColorWidth > 0u && vk.mainColorHeight > 0u ) {
+			targetWidth = vk.mainColorWidth;
+			targetHeight = vk.mainColorHeight;
+		}
+	} else {
 		if ( vk.swapchain_extent_valid && vk.swapchain_extent.width > 0 && vk.swapchain_extent.height > 0 ) {
 			targetWidth = vk.swapchain_extent.width;
 			targetHeight = vk.swapchain_extent.height;
@@ -414,7 +419,13 @@ void vk_resume_current_render_pass( void )
 	case RENDER_PASS_MAIN:
 	default:
 		if ( frameBuffer != VK_NULL_HANDLE ) {
-			vk_begin_render_pass_tracked( vk.render_pass.main, frameBuffer, qfalse, vk.renderWidth, vk.renderHeight );
+			/* Main render pass uses CLEAR loadOps (r_vk_clearhdr). Mid-frame
+			 * resumes after out-of-pass compute (G-buffer fill, visbuf, etc.)
+			 * must LOAD prior color/depth via main_resume. */
+			VkRenderPass resumePass = ( vk.fboActive && vk.render_pass.main_resume != VK_NULL_HANDLE )
+				? vk.render_pass.main_resume
+				: vk.render_pass.main;
+			vk_begin_render_pass_tracked( resumePass, frameBuffer, qfalse, vk.renderWidth, vk.renderHeight );
 		}
 		break;
 	}

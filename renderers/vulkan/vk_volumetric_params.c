@@ -126,7 +126,7 @@ void vk_update_volumetric_params( void )
 	int fluid_active_height = (int)vk.fluid_height;
 	qboolean fluid_autoscale_enabled = qfalse;
 	qboolean fluid_enabled = ( r_fogFluid && r_fogFluid->integer && vk.fluid_width > 0 && vk.fluid_height > 0 ) ? qtrue : qfalse;
-	qboolean has_map_fog_volumes = ( tr.world && tr.world->fogs && tr.world->numfogs > 1 && !( tr.refdef.rdflags & RDF_NOWORLDMODEL ) ) ? qtrue : qfalse;
+	qboolean has_map_fog_volumes = ( tr.world && tr.world->fogs && tr.world->numfogs > 1 && backEnd.doneWorldScene ) ? qtrue : qfalse;
 	float delta_time = 1.0f / 60.0f;
 	qboolean camera_cut = vk.temporal.sharedCameraCut;
 	vec3_t fog_min = { -2048.0f, -2048.0f, -256.0f };
@@ -489,7 +489,7 @@ void vk_update_volumetric_params( void )
 	params.noiseScroll[2] = noise_scroll[2] + motion_dir[2];
 
 	memset( params.volumeTypeParams, 0, sizeof( params.volumeTypeParams ) );
-	if ( tr.world && tr.world->fogs && !( tr.refdef.rdflags & RDF_NOWORLDMODEL ) ) {
+	if ( tr.world && tr.world->fogs && backEnd.doneWorldScene ) {
 		for ( int i = 1; i < tr.world->numfogs && local_volume_count < VK_VOLUMETRIC_MAX_VOLUMES; i++ ) {
 			const fog_t *fog = &tr.world->fogs[i];
 			const float extent_x = fog->bounds[1][0] - fog->bounds[0][0];

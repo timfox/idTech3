@@ -58,8 +58,10 @@ void vk_prepare_2d( void )
 
 	/* Cinematic/menu-only: no world, no RC_DRAW_SURFS, so no render pass was ever started.
 	 * Start a fresh main pass here so 2D can draw on a cleared color target instead of
-	 * inheriting stale swapchain/FBO contents from a previous frame. */
-	if ( ( !tr.world || ( tr.refdef.rdflags & RDF_NOWORLDMODEL ) ) && !vk.inRenderPass ) {
+	 * inheriting stale swapchain/FBO contents from a previous frame.
+	 * Use doneWorldScene (not tr.refdef.rdflags): HUD/weapon scenes set RDF_NOWORLDMODEL
+	 * after the world view and must not clear the HDR color target. */
+	if ( ( !tr.world || !backEnd.doneWorldScene ) && !vk.inRenderPass ) {
 		if ( vk.cmd && vk.cmd->command_buffer != VK_NULL_HANDLE &&
 			vk.cmd->swapchain_image_index < MAX_SWAPCHAIN_IMAGES &&
 			vk.render_pass.main != VK_NULL_HANDLE &&
@@ -94,7 +96,8 @@ void vk_prepare_2d( void )
 		return;
 	}
 
-	if ( !tr.world || ( tr.refdef.rdflags & RDF_NOWORLDMODEL ) ) {
+	/* Menu/cinematic only — not HUD after a world view (see doneWorldScene). */
+	if ( !tr.world || !backEnd.doneWorldScene ) {
 		vk_reset_volumetric_history();
 		backEnd.doneFog = qtrue;
 		vk_set_scene_post_fog_source( vk.color_image_view );

@@ -390,7 +390,8 @@ void vk_temporal_update_auto_exposure( void )
 		qboolean luminanceValid = qfalse;
 		float avgLogLum = 0.0f;
 
-		if ( !stableGameplayState || !tr.world || ( tr.refdef.rdflags & RDF_NOWORLDMODEL ) ) {
+		/* Use doneWorldScene — HUD/weapon may set RDF_NOWORLDMODEL after the world view. */
+		if ( !stableGameplayState || !tr.world || !backEnd.doneWorldScene ) {
 			vk.temporal.hasValidLuminance = qfalse;
 			vk.temporal.filteredAvgLogLuminance = 0.0f;
 			targetExp = manualExposure;

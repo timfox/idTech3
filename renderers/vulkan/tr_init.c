@@ -2615,7 +2615,7 @@ static void R_Register( void )
 		"Clear the HDR color target at the start of the main pass (1=clear to black, 0=preserve for accumulation diagnosis). Requires vid_restart." );
 	ri.Cvar_SetGroup( r_vk_clearhdr, CVG_RENDERER );
 
-	r_vk_disableblend = ri.Cvar_Get( "r_vk_disableblend", "1", CVAR_ARCHIVE_ND );
+	r_vk_disableblend = ri.Cvar_Get( "r_vk_disableblend", "0", CVAR_ARCHIVE_ND );
 	ri.Cvar_CheckRange( r_vk_disableblend, "0", "1", CV_INTEGER );
 	ri.Cvar_SetDescription( r_vk_disableblend,
 		"Force blendEnable=OFF for opaque main-pass pipelines (depth-write). Use to diagnose additive white glow; set 0 only if needed." );

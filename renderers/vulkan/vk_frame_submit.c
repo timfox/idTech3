@@ -419,8 +419,6 @@ void vk_end_frame( void )
 			vk_ssao_pass();
 		}
 
-		vk_end_frame_record_capture_if_needed();
-
 		if ( !ri.CL_IsMinimized() )
 		{
 			VkImageView post_fog_src;
@@ -431,6 +429,9 @@ void vk_end_frame( void )
 			vk_end_frame_record_luminance_pass( luminance_src );
 			vk_end_frame_record_gamma_pass( post_fog_src );
 		}
+
+		/* After gamma/overlay have written the swapchain (LDR presentable). */
+		vk_end_frame_record_capture_if_needed();
 	}
 	else
 	{

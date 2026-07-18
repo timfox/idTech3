@@ -175,7 +175,8 @@ void vk_post_scene_aa_apply( void )
 	VkImageView aa_output;
 	qboolean aa_ran = qfalse;
 
-	if ( !tr.world || ( tr.refdef.rdflags & RDF_NOWORLDMODEL ) ) {
+	/* Use doneWorldScene — HUD/weapon may set RDF_NOWORLDMODEL after the world view. */
+	if ( !tr.world || !backEnd.doneWorldScene ) {
 		vk_set_scene_post_fog_source( vk.color_image_view );
 		vk_update_post_fog_descriptors( vk.color_image_view );
 		return;

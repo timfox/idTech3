@@ -678,9 +678,9 @@ void vk_reset_volumetric_history( void )
 
 void vk_volumetric_fog_pass( void )
 {
-	/* Atmosphere: only when we have a 3D world. Skip for menus, videos, RDF_NOWORLDMODEL
-	 * (depth is cleared to far; drawing sky over full screen would cover UI). */
-	if ( tr.world && !( tr.refdef.rdflags & RDF_NOWORLDMODEL ) ) {
+	/* Atmosphere: only when a 3D world view was drawn this frame. Skip menus/videos.
+	 * Use doneWorldScene — HUD/weapon may set RDF_NOWORLDMODEL after the world view. */
+	if ( tr.world && backEnd.doneWorldScene ) {
 		vk_atmosphere_pass();
 	}
 
@@ -693,7 +693,7 @@ void vk_volumetric_fog_pass( void )
 		cvar_t *tierCvar = ri.Cvar_Get( "r_volumetricFogTier", "0", 0 );
 		if ( tierCvar ) tier = tierCvar->integer;
 		if ( tier >= 2 || tier == 4 || !r_volumetricFog->integer || !vk.fboActive ||
-			!tr.world || ( tr.refdef.rdflags & RDF_NOWORLDMODEL ) ) {
+			!tr.world || !backEnd.doneWorldScene ) {
 			vk_volumetric_skip_cleanup( "volumetric skipped (tier/off/no-world)",
 				VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT );
 			return;

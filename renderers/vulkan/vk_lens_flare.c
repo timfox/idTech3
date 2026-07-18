@@ -68,7 +68,8 @@ qboolean vk_lens_flare( void )
 		return qfalse;
 	}
 
-	if ( !tr.world || ( tr.refdef.rdflags & RDF_NOWORLDMODEL ) ) {
+	/* Use doneWorldScene — HUD/weapon may set RDF_NOWORLDMODEL after the world view. */
+	if ( !tr.world || !backEnd.doneWorldScene ) {
 		return qfalse;
 	}
 

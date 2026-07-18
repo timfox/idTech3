@@ -647,6 +647,7 @@ typedef struct {
 
 	struct {
 		VkRenderPass main;
+		VkRenderPass main_resume; /* LOAD twin of main for mid-frame out-of-pass resume */
 		VkRenderPass screenmap;
 		VkRenderPass sun_shadow;
 		VkRenderPass local_spot_shadow;

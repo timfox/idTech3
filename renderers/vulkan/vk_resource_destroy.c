@@ -27,6 +27,11 @@ void vk_destroy_render_passes( void )
 		vk.render_pass.main = VK_NULL_HANDLE;
 	}
 
+	if ( vk.render_pass.main_resume != VK_NULL_HANDLE ) {
+		qvkDestroyRenderPass( vk.device, vk.render_pass.main_resume, NULL );
+		vk.render_pass.main_resume = VK_NULL_HANDLE;
+	}
+
 	if ( vk.render_pass.bloom_extract != VK_NULL_HANDLE ) {
 		qvkDestroyRenderPass( vk.device, vk.render_pass.bloom_extract, NULL );
 		vk.render_pass.bloom_extract = VK_NULL_HANDLE;

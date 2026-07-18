@@ -11,7 +11,8 @@ void vk_volumetric_skip_cleanup( const char *reason, uint32_t restoreDepthSrcSta
 	VkImageAspectFlags depth_aspect = VK_IMAGE_ASPECT_DEPTH_BIT;
 
 	vk_reset_volumetric_history();
-	if ( tr.world && !( tr.refdef.rdflags & RDF_NOWORLDMODEL ) && vk_post_aa_output_active() ) {
+	/* Use doneWorldScene — HUD/weapon may set RDF_NOWORLDMODEL after the world view. */
+	if ( tr.world && backEnd.doneWorldScene && vk_post_aa_output_active() ) {
 		vk_post_scene_aa_apply();
 		vk_log_post_fog_rebind( reason, vk_get_post_fog_source() );
 	} else {
@@ -20,7 +21,7 @@ void vk_volumetric_skip_cleanup( const char *reason, uint32_t restoreDepthSrcSta
 		vk_update_post_fog_descriptors( vk.color_image_view );
 	}
 
-	if ( tr.world && !( tr.refdef.rdflags & RDF_NOWORLDMODEL ) ) {
+	if ( tr.world && backEnd.doneWorldScene ) {
 		if ( glConfig.stencilBits > 0 ) {
 			depth_aspect |= VK_IMAGE_ASPECT_STENCIL_BIT;
 		}

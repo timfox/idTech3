@@ -12,12 +12,55 @@
 #include "vk_temporal.h"
 #include "vk_hybrid1.h"
 #include "vk_upscale.h"
+#include "vk_view_state.h"
 #include "vk_volumetric_pass.h"
 #ifdef USE_IMGUI
 #include "inspector/vk_imgui.h"
 #endif
 
 static void vk_end_frame_update_gamma_target( void );
+static void vk_end_frame_fill_gamma_push_constants( VkPostProcessPushConstants *push, uint32_t srcTexW, uint32_t srcTexH );
+
+static void vk_end_frame_get_color_source_extent( VkImageView color_source, uint32_t *width, uint32_t *height )
+{
+	uint32_t w = 0u;
+	uint32_t h = 0u;
+
+	if ( color_source == vk.screenMap.color_image_view ) {
+		w = vk.screenMapWidth;
+		h = vk.screenMapHeight;
+	} else if ( color_source == vk.swapchain_image_views[0] ) {
+		if ( vk.swapchain_extent_valid ) {
+			w = vk.swapchain_extent.width;
+			h = vk.swapchain_extent.height;
+		}
+	} else if ( color_source == vk.color_image_view ||
+		color_source == vk.fog_scene_image_view ||
+		color_source == vk.smaa_output_image_view ||
+		color_source == vk.taa_history_image_view[0] ||
+		color_source == vk.taa_history_image_view[1] ) {
+		w = vk.mainColorWidth;
+		h = vk.mainColorHeight;
+	}
+
+	if ( w == 0u || h == 0u ) {
+		w = vk_get_render_target_width();
+		h = vk_get_render_target_height();
+	}
+	if ( w == 0u ) {
+		w = 1u;
+	}
+	if ( h == 0u ) {
+		h = 1u;
+	}
+
+	if ( width ) {
+		*width = w;
+	}
+	if ( height ) {
+		*height = h;
+	}
+}
 
 static const char *vk_end_frame_render_pass_name( renderPass_t pass )
 {
@@ -217,7 +260,7 @@ static qboolean vk_end_frame_record_emergency_present( VkImageView color_source 
 		return qfalse;
 	}
 
-	vk_get_active_render_extent( &srcWidth, &srcHeight );
+	vk_end_frame_get_color_source_extent( color_source, &srcWidth, &srcHeight );
 	dstWidth = vk.renderWidth > 0 ? vk.renderWidth :
 		( vk.swapchain_extent_valid ? vk.swapchain_extent.width : ( gls.windowWidth > 0 ? (uint32_t)gls.windowWidth : 0u ) );
 	dstHeight = vk.renderHeight > 0 ? vk.renderHeight :
@@ -367,41 +410,70 @@ static void vk_end_frame_begin_post_process_pass( VkRenderPass renderPass, VkFra
 
 void vk_end_frame_record_capture_if_needed( void )
 {
+	VkImage srcImage;
+	uint32_t cap_w;
+	uint32_t cap_h;
+	uint32_t src_w;
+	uint32_t src_h;
+	VkImageBlit region;
+
 	if ( !backEnd.screenshotMask || !vk.capture.image ) {
 		return;
 	}
-
-	{
-		VkImageView capture_src = vk.color_image_view;
-		uint32_t cap_w = ( gls.captureWidth > 0 ) ? (uint32_t)gls.captureWidth : 1u;
-		uint32_t cap_h = ( gls.captureHeight > 0 ) ? (uint32_t)gls.captureHeight : 1u;
-
-		vk_end_render_pass();
-
-		if ( capture_src == VK_NULL_HANDLE ||
-			vk.render_pass.capture == VK_NULL_HANDLE ||
-			vk.framebuffers.capture == VK_NULL_HANDLE ) {
-			return;
-		}
-
-		vk_barrier_post_fog_source_for_sampling( capture_src, "vk_end_frame pre-capture" );
-		if ( r_fboDebug && r_fboDebug->integer >= 2 && vk_post_fog_fbo_debug_throttle() ) {
-			ri.Printf( PRINT_DEVELOPER, "[VK][fbo] capture source -> %s view=0x%llx\n",
-				vk_post_fog_source_name( capture_src ),
-				(unsigned long long)(uintptr_t)capture_src );
-		}
-
-		vk_end_frame_refresh_postfx_params_for_target( cap_w, cap_h );
-
-		vk_end_frame_begin_post_process_pass( vk.render_pass.capture, vk.framebuffers.capture,
-			cap_w, cap_h, vk.capture_pipeline );
-		vk_end_frame_bind_post_process_sets(
-			vk.color_descriptor[vk.cmd_index],
-			vk.depth_descriptor[vk.cmd_index],
-			vk.postfx_params_descriptor[vk.cmd_index],
-			PostFX_GetLUTImage()->descriptor );
-		vk_end_frame_draw_fullscreen_quad( cap_w, cap_h );
+	if ( ri.CL_IsMinimized() || vk.swapchain_image_count == 0 ) {
+		return;
 	}
+	if ( vk.cmd->swapchain_image_index >= vk.swapchain_image_count ) {
+		return;
+	}
+
+	vk_end_render_pass();
+
+	srcImage = vk.swapchain_images[ vk.cmd->swapchain_image_index ];
+	if ( srcImage == VK_NULL_HANDLE ) {
+		return;
+	}
+
+	cap_w = ( gls.captureWidth > 0 ) ? (uint32_t)gls.captureWidth : 1u;
+	cap_h = ( gls.captureHeight > 0 ) ? (uint32_t)gls.captureHeight : 1u;
+	src_w = ( vk.renderWidth > 0 ) ? vk.renderWidth : cap_w;
+	src_h = ( vk.renderHeight > 0 ) ? vk.renderHeight : cap_h;
+
+	/* Gamma (+ overlay compose) left the swapchain in PRESENT_SRC. Blit that
+	   LDR result into the capture buffer so screenshots match what was shown. */
+	record_image_layout_transition( vk.cmd->command_buffer, srcImage,
+		VK_IMAGE_ASPECT_COLOR_BIT,
+		VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
+		VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, 0, 0 );
+	record_image_layout_transition( vk.cmd->command_buffer, vk.capture.image,
+		VK_IMAGE_ASPECT_COLOR_BIT,
+		VK_IMAGE_LAYOUT_UNDEFINED,
+		VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 0, 0 );
+
+	Com_Memset( &region, 0, sizeof( region ) );
+	region.srcSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+	region.srcSubresource.layerCount = 1;
+	region.dstSubresource = region.srcSubresource;
+	region.srcOffsets[1].x = (int32_t)src_w;
+	region.srcOffsets[1].y = (int32_t)src_h;
+	region.srcOffsets[1].z = 1;
+	region.dstOffsets[1].x = (int32_t)cap_w;
+	region.dstOffsets[1].y = (int32_t)cap_h;
+	region.dstOffsets[1].z = 1;
+
+	qvkCmdBlitImage( vk.cmd->command_buffer,
+		srcImage, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+		vk.capture.image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+		1, &region, VK_FILTER_LINEAR );
+
+	record_image_layout_transition( vk.cmd->command_buffer, vk.capture.image,
+		VK_IMAGE_ASPECT_COLOR_BIT,
+		VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+		VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, 0, 0 );
+	record_image_layout_transition( vk.cmd->command_buffer, srcImage,
+		VK_IMAGE_ASPECT_COLOR_BIT,
+		VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+		VK_IMAGE_LAYOUT_PRESENT_SRC_KHR, 0, 0 );
 }
 
 void vk_end_frame_prepare_post_process( VkImageView *post_fog_src, VkImageView *luminance_src )
@@ -455,8 +527,9 @@ void vk_end_frame_record_taa_pass( VkImageView *post_fog_src, VkImageView *lumin
 	}
 
 	taa_src = ( *post_fog_src != VK_NULL_HANDLE ) ? *post_fog_src : vk.color_image_view;
+	/* Prefer doneWorldScene over the last refdef (HUD/weapon may set RDF_NOWORLDMODEL). */
 	allow_taa = ( tr.world != NULL ) &&
-		( ( backEnd.refdef.rdflags & RDF_NOWORLDMODEL ) == 0 ) &&
+		backEnd.doneWorldScene &&
 		( backEnd.viewParms.portalView == PV_NONE ) &&
 		( vk.temporal.firstPersonProjectionThisFrame == vk.temporal.firstPersonProjectionLastFrame ) &&
 		!vk_temporal_has_reason( VK_TEMPORAL_RESET_CAMERA_CUT | VK_TEMPORAL_RESET_MISSING_PREV_DATA |
@@ -667,19 +740,33 @@ static void vk_end_frame_fill_gamma_push_constants( VkPostProcessPushConstants *
 		if ( r_exposure_auto_var && r_exposure_auto_var->integer ) {
 			expVal = vk.adaptedExposure > 0.0f ? vk.adaptedExposure : expVal;
 		}
-		if ( ( !tr.world || ( tr.refdef.rdflags & RDF_NOWORLDMODEL ) ) && expVal < 1.0f ) {
+		/* Use doneWorldScene — tr.refdef may be a later HUD/weapon NOWORLDMODEL scene. */
+		if ( ( !tr.world || !backEnd.doneWorldScene ) && expVal < 1.0f ) {
 			expVal = 1.0f;
 		}
 		push->exposure = expVal;
 	}
 
-	if ( !tr.world || ( tr.refdef.rdflags & RDF_NOWORLDMODEL ) ) {
+	if ( !tr.world || !backEnd.doneWorldScene ) {
 		push->brightness = 1.0f;
 		push->exposure = 1.0f;
 		push->paniniPad1 = 1.0f;
 		/* Menus / no-world UI should stay undistorted. */
 		if ( !r_panini_console || !r_panini_console->integer ) {
 			push->paniniMask = 0.0f;
+		}
+		if ( r_fboDebug && r_fboDebug->integer >= 1 ) {
+			static int s_gammaNoWorldLog;
+			if ( s_gammaNoWorldLog++ < 3 ) {
+				ri.Printf( PRINT_ALL, "Vulkan: gamma no-world path (doneWorldScene=%d world=%p)\n",
+					(int)backEnd.doneWorldScene, (void *)tr.world );
+			}
+		}
+	} else if ( r_fboDebug && r_fboDebug->integer >= 1 ) {
+		static int s_gammaWorldLog;
+		if ( s_gammaWorldLog++ < 3 ) {
+			ri.Printf( PRINT_ALL, "Vulkan: gamma world path (doneWorldScene=1 exposure=%.3f)\n",
+				push->exposure );
 		}
 	}
 
@@ -830,7 +917,7 @@ void vk_end_frame_record_gamma_pass( VkImageView post_fog_src )
 		uint32_t srcTexW;
 		uint32_t srcTexH;
 
-		vk_get_active_render_extent( &srcTexW, &srcTexH );
+		vk_end_frame_get_color_source_extent( gamma_src, &srcTexW, &srcTexH );
 		vk_end_frame_fill_gamma_push_constants( &push, srcTexW, srcTexH );
 		qvkCmdPushConstants( vk.cmd->command_buffer, vk.pipeline_layout_post_process, VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof( push ), &push );
 	}

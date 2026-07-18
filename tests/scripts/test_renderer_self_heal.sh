@@ -30,6 +30,7 @@ BACKEND="$(idtech3_file renderers/vulkan/tr_backend.c src/renderers/vulkan/tr_ba
 ATTACHMENTS="$(idtech3_file renderers/vulkan/vk_attachments.c src/renderers/vulkan/vk_attachments.c)"
 
 check "$SCENE_PASS" 'vk_scene_pass_resume_framebuffer' 'scene-pass resume uses a shared framebuffer/self-heal helper'
+check "$SCENE_PASS" 'main_resume' 'scene-pass mid-frame MAIN resume uses LOAD twin (main_resume)'
 check "$SCENE_PASS" 'auto-restoring uiOverlayActive for UI overlay resume' 'scene-pass resume repairs UI overlay active flag drift'
 check "$SCENE_PASS" 'framebuffer missing for %s, falling back to main' 'scene-pass resume falls back to main pass when a continuation framebuffer is missing'
 check "$SCENE_PASS" 'vk_pass_diag_begin' 'scene-pass records begin ownership diagnostics'

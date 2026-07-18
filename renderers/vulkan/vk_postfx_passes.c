@@ -402,8 +402,9 @@ qboolean vk_ssao_pass( void )
 
 	if ( backEnd.doneSSAO || !r_ssao || !r_ssao->integer || !vk.fboActive || !backEnd.doneSurfaces )
 		return qfalse;
-	/* Pass culling: skip expensive SSAO for menus, cinematics, no-world */
-	if ( !tr.world || ( tr.refdef.rdflags & RDF_NOWORLDMODEL ) )
+	/* Pass culling: skip expensive SSAO for menus, cinematics, no-world.
+	 * Use doneWorldScene — HUD/weapon may set RDF_NOWORLDMODEL after the world view. */
+	if ( !tr.world || !backEnd.doneWorldScene )
 		return qfalse;
 	if ( vk.msaaActive ) {
 		if ( !warned_msaa ) {
@@ -598,8 +599,9 @@ qboolean vk_bloom( void )
 	{
 		return qfalse;
 	}
-	/* Pass culling: skip bloom for menus/cinematics (no 3D world) */
-	if ( !tr.world || ( tr.refdef.rdflags & RDF_NOWORLDMODEL ) )
+	/* Pass culling: skip bloom for menus/cinematics (no 3D world).
+	 * Use doneWorldScene — HUD/weapon may set RDF_NOWORLDMODEL after the world view. */
+	if ( !tr.world || !backEnd.doneWorldScene )
 	{
 		return qfalse;
 	}

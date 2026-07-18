@@ -1301,6 +1301,7 @@ typedef struct {
 	qboolean	projection2D;	// if qtrue, drawstretchpic doesn't need to change modes
 	color4ub_t	color2D;
 	qboolean	doneSurfaces;   // done any 3d surfaces already
+	qboolean	doneWorldScene; /* 3D world view drawn this frame (not RDF_NOWORLDMODEL / cubemap) */
 	trRefEntity_t	entity2D;	// currentEntity will point at this when doing 2D rendering
 
 	int		screenshotMask;		// tga | jpg | bmp
