@@ -128,6 +128,60 @@ static qboolean vk_end_frame_gamma_chain_ready( void )
 	return qtrue;
 }
 
+static VkImageView vk_end_frame_choose_viable_color_source( VkImageView preferred, const char *reason )
+{
+	VkImageView candidates[6];
+	uint32_t candidateCount = 0;
+	uint32_t i;
+
+	if ( preferred != VK_NULL_HANDLE ) {
+		candidates[candidateCount++] = preferred;
+	}
+	if ( vk_get_post_fog_source() != VK_NULL_HANDLE ) {
+		candidates[candidateCount++] = vk_get_post_fog_source();
+	}
+	if ( vk.scene_post_fog_color_source != VK_NULL_HANDLE ) {
+		candidates[candidateCount++] = vk.scene_post_fog_color_source;
+	}
+	if ( vk.post_fog_color_source != VK_NULL_HANDLE ) {
+		candidates[candidateCount++] = vk.post_fog_color_source;
+	}
+	if ( vk.color_image_view != VK_NULL_HANDLE ) {
+		candidates[candidateCount++] = vk.color_image_view;
+	}
+	if ( vk.temporal.hasValidTAAHistory ) {
+		VkImageView taaView = vk.taa_history_image_view[ vk.temporal.taaHistoryIndex & 1u ];
+		if ( taaView != VK_NULL_HANDLE ) {
+			candidates[candidateCount++] = taaView;
+		}
+	}
+
+	for ( i = 0; i < candidateCount; i++ ) {
+		if ( vk_post_fog_source_image( candidates[i] ) != VK_NULL_HANDLE ) {
+			if ( r_fboDebug && r_fboDebug->integer >= 1 && vk_post_fog_fbo_debug_throttle() ) {
+				ri.Printf( PRINT_DEVELOPER, S_COLOR_YELLOW
+					"[VK][fbo] viable color source (%s): %s\n",
+					reason ? reason : "unspecified",
+					vk_post_fog_source_name( candidates[i] ) );
+			}
+			return candidates[i];
+		}
+	}
+
+	if ( r_fboDebug && r_fboDebug->integer >= 1 && vk_post_fog_fbo_debug_throttle() ) {
+		ri.Printf( PRINT_DEVELOPER, S_COLOR_YELLOW
+			"[VK][fbo] viable color source lookup failed (%s): preferred=%s post=%s scene=%s color=%s taaValid=%d\n",
+			reason ? reason : "unspecified",
+			vk_post_fog_source_name( preferred ),
+			vk_post_fog_source_name( vk.post_fog_color_source ),
+			vk_post_fog_source_name( vk.scene_post_fog_color_source ),
+			vk_post_fog_source_name( vk.color_image_view ),
+			vk.temporal.hasValidTAAHistory ? 1 : 0 );
+	}
+
+	return VK_NULL_HANDLE;
+}
+
 static qboolean vk_end_frame_record_emergency_present( VkImageView color_source )
 {
 	VkImage srcImage;
@@ -141,6 +195,7 @@ static qboolean vk_end_frame_record_emergency_present( VkImageView color_source 
 		return qfalse;
 	}
 
+	color_source = vk_end_frame_choose_viable_color_source( color_source, "emergency_present" );
 	srcImage = vk_post_fog_source_image( color_source );
 	dstImage = vk.swapchain_images[ vk.cmd->swapchain_image_index ];
 	if ( srcImage == VK_NULL_HANDLE || dstImage == VK_NULL_HANDLE ) {
@@ -234,11 +289,10 @@ static qboolean vk_end_frame_try_repair_gamma_chain( VkImageView *gamma_src )
 	vk_end_frame_update_gamma_target();
 	vk_end_frame_refresh_postfx_params_for_target( vk.renderWidth, vk.renderHeight );
 
-	if ( gamma_src && *gamma_src == VK_NULL_HANDLE ) {
-		*gamma_src = vk_get_post_fog_source();
-		if ( *gamma_src == VK_NULL_HANDLE ) {
-			*gamma_src = vk.color_image_view;
-		}
+	if ( gamma_src ) {
+		*gamma_src = vk_end_frame_choose_viable_color_source(
+			*gamma_src != VK_NULL_HANDLE ? *gamma_src : vk_get_post_fog_source(),
+			"repair_gamma_chain" );
 	}
 
 	if ( gamma_src && *gamma_src != VK_NULL_HANDLE ) {
@@ -354,10 +408,10 @@ void vk_end_frame_prepare_post_process( VkImageView *post_fog_src, VkImageView *
 	}
 
 	if ( post_fog_src ) {
-		*post_fog_src = vk_get_post_fog_source();
+		*post_fog_src = vk_end_frame_choose_viable_color_source( vk_get_post_fog_source(), "prepare_post_process" );
 	}
 	if ( luminance_src ) {
-		*luminance_src = vk_get_luminance_source();
+		*luminance_src = vk_end_frame_choose_viable_color_source( vk_get_luminance_source(), "prepare_post_process_luminance" );
 	}
 
 	if ( post_fog_src && *post_fog_src != VK_NULL_HANDLE ) {
@@ -638,7 +692,9 @@ static void vk_end_frame_fill_gamma_push_constants( VkPostProcessPushConstants *
 
 void vk_end_frame_record_gamma_pass( VkImageView post_fog_src )
 {
-	VkImageView gamma_src = ( post_fog_src != VK_NULL_HANDLE ) ? post_fog_src : vk.color_image_view;
+	VkImageView gamma_src = vk_end_frame_choose_viable_color_source(
+		( post_fog_src != VK_NULL_HANDLE ) ? post_fog_src : vk.color_image_view,
+		"gamma_pass_start" );
 
 	/*
 	 * Consume exposure as part of the frame-end post chain rather than the
@@ -691,12 +747,7 @@ void vk_end_frame_record_gamma_pass( VkImageView post_fog_src )
 
 	if ( !vk_end_frame_gamma_chain_ready() ) {
 		if ( !vk_end_frame_try_repair_gamma_chain( &gamma_src ) ) {
-			if ( gamma_src == VK_NULL_HANDLE ) {
-				gamma_src = vk_get_post_fog_source();
-				if ( gamma_src == VK_NULL_HANDLE ) {
-					gamma_src = vk.color_image_view;
-				}
-			}
+			gamma_src = vk_end_frame_choose_viable_color_source( gamma_src, "gamma_pass_repair_failed" );
 			if ( vk_end_frame_record_emergency_present( gamma_src ) ) {
 				return;
 			}
@@ -709,14 +760,11 @@ void vk_end_frame_record_gamma_pass( VkImageView post_fog_src )
 	}
 
 	if ( gamma_src == VK_NULL_HANDLE ) {
-		gamma_src = vk_get_post_fog_source();
-		if ( gamma_src == VK_NULL_HANDLE ) {
-			gamma_src = vk.color_image_view;
-		}
+		gamma_src = vk_end_frame_choose_viable_color_source( vk_get_post_fog_source(), "gamma_pass_null_source" );
 	}
 
 	if ( gamma_src == VK_NULL_HANDLE ) {
-		if ( vk_end_frame_record_emergency_present( vk.color_image_view ) ) {
+		if ( vk_end_frame_record_emergency_present( vk_end_frame_choose_viable_color_source( vk.color_image_view, "gamma_pass_last_resort" ) ) ) {
 			return;
 		}
 		if ( vk_post_fog_fbo_debug_throttle() ) {
