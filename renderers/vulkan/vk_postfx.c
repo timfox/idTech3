@@ -190,7 +190,7 @@ void PostFX_RegisterCvars(void) {
 	r_sharpen                = ri.Cvar_Get("r_sharpen",                "0.0",  CVAR_ARCHIVE);
 	r_grade_toe              = ri.Cvar_Get("r_grade_toe",              "0.35", CVAR_ARCHIVE_ND);
 	r_grade_shoulder         = ri.Cvar_Get("r_grade_shoulder",         "0.22", CVAR_ARCHIVE_ND);
-	r_grade_whitePoint       = ri.Cvar_Get("r_grade_whitePoint",       "6.5",  CVAR_ARCHIVE_ND);
+	r_grade_whitePoint       = ri.Cvar_Get("r_grade_whitePoint",       "1.5",  CVAR_ARCHIVE_ND);
 	r_grade_blackClip        = ri.Cvar_Get("r_grade_blackClip",        "0.0",  CVAR_ARCHIVE_ND);
 	r_grade_highlightDesat   = ri.Cvar_Get("r_grade_highlightDesat",   "0.18", CVAR_ARCHIVE_ND);
 	r_grade_temperature      = ri.Cvar_Get("r_grade_temperature",      "0.0",  CVAR_ARCHIVE_ND);
@@ -245,7 +245,8 @@ void PostFX_RegisterCvars(void) {
 	ri.Cvar_SetDescription( r_sharpen, "Post-process sharpen strength (0=off, 0.15=subtle, 0.3+=strong). Recovers detail lost by AA/tonemap." );
 	ri.Cvar_SetDescription( r_grade_toe, "Filmic tonemap toe strength for shadow rolloff." );
 	ri.Cvar_SetDescription( r_grade_shoulder, "Filmic tonemap shoulder strength for highlight compression." );
-	ri.Cvar_SetDescription( r_grade_whitePoint, "Filmic tonemap white point in scene-linear units." );
+	ri.Cvar_SetDescription( r_grade_whitePoint,
+		"Filmic/AgX tonemap white point in scene-linear units. Default 1.5 matches classic Q3/OA lightmap energy under HDR FBO; raise (e.g. 6–11) for true HDR content with bright peaks." );
 	ri.Cvar_SetDescription( r_grade_blackClip, "Scene-linear black clip before tonemapping." );
 	ri.Cvar_SetDescription( r_grade_highlightDesat, "Highlight desaturation amount after filmic compression." );
 	ri.Cvar_SetDescription( r_grade_temperature, "White balance temperature adjustment (-1=cool, +1=warm)." );
@@ -510,7 +511,7 @@ float PostFX_DepthOfField_GetMaxBlur(void) { return r_dofMaxBlur ? r_dofMaxBlur-
 float PostFX_GetSharpen(void) { return r_sharpen ? r_sharpen->value : 0.0f; }
 float PostFX_GetGradeToe(void) { return r_grade_toe ? r_grade_toe->value : 0.35f; }
 float PostFX_GetGradeShoulder(void) { return r_grade_shoulder ? r_grade_shoulder->value : 0.22f; }
-float PostFX_GetGradeWhitePoint(void) { return r_grade_whitePoint ? r_grade_whitePoint->value : 6.5f; }
+float PostFX_GetGradeWhitePoint(void) { return r_grade_whitePoint ? r_grade_whitePoint->value : 1.5f; }
 float PostFX_GetGradeBlackClip(void) { return r_grade_blackClip ? r_grade_blackClip->value : 0.0f; }
 float PostFX_GetGradeHighlightDesat(void) { return r_grade_highlightDesat ? r_grade_highlightDesat->value : 0.18f; }
 float PostFX_GetGradeTemperature(void) { return r_grade_temperature ? r_grade_temperature->value : 0.0f; }
