@@ -52,34 +52,42 @@ void R_ApplyRenderModeLatch( void )
 
 	switch ( mode ) {
 	case 1:
+		R_LatchCvarInt( r_deferredGBuffer, "r_deferredGBuffer", 1 );
+		R_LatchCvarInt( r_deferredGBufferFill, "r_deferredGBufferFill", 1 );
+		R_LatchCvarInt( r_forwardPlus, "r_forwardPlus", 1 );
+		if ( r_forwardPlusShade && r_forwardPlusShade->value > 0.0f ) {
+			R_LatchCvarFloat( r_forwardPlusShade, "r_forwardPlusShade", 0.0f );
+		}
 		if ( r_deferredGBuffer && r_deferredGBuffer->integer &&
 			r_deferredLighting && r_deferredLighting->integer ) {
-			R_LatchCvarInt( r_forwardPlus, "r_forwardPlus", 1 );
-			if ( r_forwardPlusShade && r_forwardPlusShade->value > 0.0f ) {
-				R_LatchCvarFloat( r_forwardPlusShade, "r_forwardPlusShade", 0.0f );
-			}
 			if ( mode != s_last_logged_mode ) {
 				ri.Printf( PRINT_ALL,
 					"[VK] r_renderMode 1 + r_deferredLighting 1: deferred diffuse (r_forwardPlus=1, "
-					"r_forwardPlusShade=0, r_deferredUnlitBase additive; G-buffer fill required)\n" );
+					"r_forwardPlusShade=0, r_deferredGBuffer=1, r_deferredGBufferFill=1, "
+					"r_deferredUnlitBase additive)\n" );
 				s_last_logged_mode = mode;
 			}
 		} else if ( mode != s_last_logged_mode ) {
 			ri.Printf( PRINT_ALL,
 				"[VK] r_renderMode 1 (deferred G-buffer scaffold). "
-				"r_deferredGBuffer 1 + r_deferredGBufferFill 1 capture RTs; "
+				"forcing r_deferredGBuffer 1 + r_deferredGBufferFill 1 captures RTs; "
 				"r_deferredLighting 1 enables experimental diffuse. vid_restart after latch.\n" );
 			s_last_logged_mode = mode;
 		}
 		break;
 	case 2:
 		R_LatchCvarInt( r_forwardPlus, "r_forwardPlus", 1 );
+		R_LatchCvarInt( r_forwardPlusDepthCull, "r_forwardPlusDepthCull", 1 );
+		R_LatchCvarInt( r_deferredGBuffer, "r_deferredGBuffer", 1 );
+		R_LatchCvarInt( r_deferredGBufferFill, "r_deferredGBufferFill", 1 );
+		R_LatchCvarInt( r_deferredLighting, "r_deferredLighting", 0 );
 		if ( r_forwardPlusShade && r_forwardPlusShade->value <= 0.0f ) {
 			R_LatchCvarFloat( r_forwardPlusShade, "r_forwardPlusShade", 1.0f );
 		}
 		if ( mode != s_last_logged_mode ) {
 			ri.Printf( PRINT_ALL,
-				"[VK] r_renderMode 2: Forward+ (r_forwardPlus=1, r_forwardPlusShade=1, GPU cap %u; "
+				"[VK] r_renderMode 2: Forward+ primary (r_forwardPlus=1, r_forwardPlusShade=1, "
+				"r_forwardPlusDepthCull=1, sidecar G-buffer on, deferred lighting off; GPU cap %u; "
 				"classic projector/dlightBits still %d)\n",
 				(unsigned)VK_FP_MAX_GPU_LIGHTS, MAX_DLIGHTS );
 			s_last_logged_mode = mode;
@@ -88,6 +96,7 @@ void R_ApplyRenderModeLatch( void )
 	case 3:
 		/* Unified Clustered Renderer: deferred opaque + Forward+ transparent, shared tiles. */
 		R_LatchCvarInt( r_forwardPlus, "r_forwardPlus", 1 );
+		R_LatchCvarInt( r_forwardPlusDepthCull, "r_forwardPlusDepthCull", 1 );
 		R_LatchCvarInt( r_deferredGBuffer, "r_deferredGBuffer", 1 );
 		R_LatchCvarInt( r_deferredGBufferFill, "r_deferredGBufferFill", 1 );
 		R_LatchCvarInt( r_deferredLighting, "r_deferredLighting", 1 );

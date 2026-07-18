@@ -140,3 +140,9 @@ void vk_resume_current_render_pass( void )
 
 	vk.depth_image_layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
 }
+
+void vk_resume_main_render_pass( void )
+{
+	vk.renderPassIndex = RENDER_PASS_MAIN;
+	vk_resume_current_render_pass();
+}

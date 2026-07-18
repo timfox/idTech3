@@ -112,6 +112,15 @@ static int R_RendererPrintCompatibilityWarnings( qboolean printOk )
 		if ( !r_deferredLighting || !r_deferredLighting->integer ) {
 			R_RENDERER_WARN( "Unified Clustered (mode 3) needs r_deferredLighting 1 for opaque deferred shade.\n" );
 		}
+		if ( ( r_taa && r_taa->integer ) ||
+			( r_ext_smaa && r_ext_smaa->integer ) ||
+			( r_ext_fxaa && r_ext_fxaa->integer ) ||
+			( r_postAaAfterBloom && r_postAaAfterBloom->integer ) ) {
+			R_RENDERER_WARN( "Unified Clustered is safer with TAA/SMAA/FXAA/post-AA disabled while debugging; use renderer_clustered_safe + vid_restart.\n" );
+		}
+		if ( r_oit && r_oit->integer ) {
+			R_RENDERER_WARN( "Unified Clustered + OIT replaces the transparent Forward+ shade path; use renderer_clustered_safe when debugging opaque/deferred correctness first.\n" );
+		}
 		if ( vk.msaaActive ) {
 			R_RENDERER_WARN( "MSAA is active; Unified Clustered prefers r_ext_multisample 0 for direct G-buffer export.\n" );
 		}
@@ -122,6 +131,9 @@ static int R_RendererPrintCompatibilityWarnings( qboolean printOk )
 		}
 		if ( !r_forwardPlusShade || r_forwardPlusShade->value <= 0.0f ) {
 			R_RENDERER_WARN( "modern profile expects r_forwardPlusShade > 0 for Forward+ primary dynamic lighting.\n" );
+		}
+		if ( !r_forwardPlusDepthCull || !r_forwardPlusDepthCull->integer ) {
+			R_RENDERER_WARN( "modern profile expects r_forwardPlusDepthCull 1 so tile light cull tracks opaque depth.\n" );
 		}
 		if ( !r_pbr || !r_pbr->integer ) {
 			R_RENDERER_WARN( "modern profile expects r_pbr 1 for physically based material shading.\n" );
@@ -137,6 +149,9 @@ static int R_RendererPrintCompatibilityWarnings( qboolean printOk )
 		}
 		if ( !r_deferredGBuffer || !r_deferredGBuffer->integer || !r_deferredGBufferFill || !r_deferredGBufferFill->integer ) {
 			R_RENDERER_WARN( "modern profile expects r_deferredGBuffer 1 and r_deferredGBufferFill 1 for the sidecar G-buffer.\n" );
+		}
+		if ( r_deferredLighting && r_deferredLighting->integer ) {
+			R_RENDERER_WARN( "modern profile keeps r_deferredLighting 0; use renderer_modern_safe + vid_restart after mode-1/3 experiments.\n" );
 		}
 	}
 	if ( vk.deferredGbufferAllocated && !vk.deferredGbufferDirectExport && vk.msaaActive ) {
@@ -294,6 +309,32 @@ static void R_RendererDeferredSafe_f( void )
 	ri.Cvar_Set( "r_postAaAfterBloom", "0" );
 	ri.Printf( PRINT_ALL,
 		"[VK] Deferred safe preset applied: mode 1 deferred + temporal/post AA off + MSAA off. Run vid_restart.\n" );
+}
+
+static void R_RendererModernSafe_f( void )
+{
+	ri.Cvar_Set( "r_fbo", "1" );
+	ri.Cvar_Set( "r_hdr", "2" );
+	ri.Cvar_Set( "r_pbr", "1" );
+	ri.Cvar_Set( "r_materialBlend", "1" );
+	ri.Cvar_Set( "r_renderMode", "2" );
+	ri.Cvar_Set( "r_forwardPlus", "1" );
+	ri.Cvar_Set( "r_forwardPlusShade", "1" );
+	ri.Cvar_Set( "r_forwardPlusDepthCull", "1" );
+	ri.Cvar_Set( "r_forwardPlusSpecularStrength", "0.65" );
+	ri.Cvar_Set( "r_forwardPlusEnergyRenorm", "0.45" );
+	ri.Cvar_Set( "r_ext_multisample", "0" );
+	ri.Cvar_Set( "r_deferredGBuffer", "1" );
+	ri.Cvar_Set( "r_deferredGBufferFill", "1" );
+	ri.Cvar_Set( "r_deferredLighting", "0" );
+	ri.Cvar_Set( "r_deferredGBufferDebug", "0" );
+	ri.Cvar_Set( "r_taa", "1" );
+	ri.Cvar_Set( "r_taaMotionVectors", "1" );
+	ri.Cvar_Set( "r_ext_smaa", "1" );
+	ri.Cvar_Set( "r_ext_fxaa", "0" );
+	ri.Cvar_Set( "r_postAaAfterBloom", "1" );
+	ri.Printf( PRINT_ALL,
+		"[VK] Modern safe preset applied: mode 2 Forward+ + sidecar G-buffer + TAA/SMAA restored, deferred lighting off, MSAA off. Run vid_restart.\n" );
 }
 
 static void R_RendererClusteredSafe_f( void )
