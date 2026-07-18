@@ -1464,12 +1464,13 @@ void main() {
 
 	vec3 reflectance = Fd + Fs;
 
+	bool deferredAdditiveHandoff = ( deferred_unlit_base_strength > 1e-6 || pbrDebugMode.y > 0.5 );
 	vec3 fpAdd = vec3( 0.0 );
 #ifdef USE_FORWARD_PLUS_FRAG
 #if defined(USE_FORWARD_PLUS_WORLD_POS)
 	/* Mode 3 Unified Clustered opaque: skip Forward+ add (deferred compute owns dynamics). */
 	float hybridDeferredOpaque = pbrDebugMode.y;
-	if ( hybridDeferredOpaque <= 0.5 && ( forward_plus_shade_strength > 1e-6 || pbrForwardPlus.x > 1e-6 ) ) {
+	if ( !deferredAdditiveHandoff && ( forward_plus_shade_strength > 1e-6 || pbrForwardPlus.x > 1e-6 ) ) {
 		uint tilesX = uint( fp_lights.fp_light_data[1].x + 0.5 );
 		uint tilesY = uint( fp_lights.fp_light_data[1].y + 0.5 );
 		float vw = fp_lights.fp_light_data[1].z;
@@ -1589,11 +1590,11 @@ void main() {
 	/* Additive deferred handoff should suppress primary direct only when a baked/static
 	 * lightmap base is already present. Unlit or vertex-lit surfaces still need their
 	 * primary direct path in the base pass or they collapse toward black. */
-	if ( ( deferred_unlit_base_strength > 1e-6 || pbrDebugMode.y > 0.5 ) && lightmap_texture_set >= 0 ) {
+	if ( deferredAdditiveHandoff && lightmap_texture_set >= 0 ) {
 		primaryDirect = vec3( 0.0 );
 	}
 	float fpRenorm = 1.0;
-	if ( pbrDebugMode.y <= 0.5 && ( forward_plus_shade_strength > 1e-6 || pbrForwardPlus.x > 1e-6 ) ) {
+	if ( !deferredAdditiveHandoff && ( forward_plus_shade_strength > 1e-6 || pbrForwardPlus.x > 1e-6 ) ) {
 		float pL = length( primaryDirect );
 		float fL = length( fpAdd );
 		float renormFactor = ( pbrForwardPlus.w > 0.0 ) ? pbrForwardPlus.w : 0.45;
@@ -1661,7 +1662,7 @@ void main() {
 	}
 
 	// Clearcoat: second specular lobe on top; scale by (1 - max F0 of base) for approximate energy balance.
-	if ( clearcoat_texture_set >= 0 && deferred_unlit_base_strength <= 1e-6 && pbrDebugMode.y <= 0.5 ) {
+	if ( clearcoat_texture_set >= 0 && !deferredAdditiveHandoff ) {
 		vec4 cc = texture( clearcoat_texture, frag_tex_coord0 );
 		float ccStrength = clamp( cc.r * pbrClearcoatScale.x, 0.0, 1.0 );
 		float ccRoughness = clamp( cc.g * pbrClearcoatScale.y, 0.02, 1.0 );
@@ -1673,7 +1674,7 @@ void main() {
 	}
 
 	// Sheen: Charlie NDF + same Smith visibility form as base specular (no separate Fresnel here).
-	if ( sheen_texture_set >= 0 && deferred_unlit_base_strength <= 1e-6 && pbrDebugMode.y <= 0.5 ) {
+	if ( sheen_texture_set >= 0 && !deferredAdditiveHandoff ) {
 		vec3 sheenColor = texture( sheen_texture, frag_tex_coord0 ).rgb * pbrSheenScale.rgb;
 		float sheenRough = clamp( pbrSheenScale.w, 0.07, 1.0 );
 		float sheenWeight = clamp( max( max( sheenColor.r, sheenColor.g ), sheenColor.b ), 0.0, 1.0 );
@@ -1687,12 +1688,12 @@ void main() {
 	}
 
 	// subsurface term (Burley-style wrap approximation)
-	if ( subsurfaceStrength > 0.0 && deferred_unlit_base_strength <= 1e-6 && pbrDebugMode.y <= 0.5 ) {
+	if ( subsurfaceStrength > 0.0 && !deferredAdditiveHandoff ) {
 		out_color.rgb += lightColor * CalcBurleySubsurface( N, L, subsurfaceColor, subsurfaceStrength, subsurfaceWrap ) * attenuation;
 	}
 
 	// transmission term
-	if ( transmission_texture_set >= 0 && deferred_unlit_base_strength <= 1e-6 && pbrDebugMode.y <= 0.5 ) {
+	if ( transmission_texture_set >= 0 && !deferredAdditiveHandoff ) {
 		float transmission = texture( transmission_texture, frag_tex_coord0 ).r * pbrTransmissionScale.x;
 		float transmitFactor = transmission * ( 1.0 - roughness );
 		diffuse.rgb *= ( 1.0 - transmitFactor );
