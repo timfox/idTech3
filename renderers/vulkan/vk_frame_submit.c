@@ -44,6 +44,46 @@ Extracted from vk.c for incremental modularization.
 #define UINT64_MAX 0xFFFFFFFFFFFFFFFFULL
 #endif
 
+static qboolean vk_swapchain_extent_mismatch_detected( VkExtent2D *out_extent )
+{
+	VkExtent2D extent;
+
+	if ( vk.device_lost || vk_surface == VK_NULL_HANDLE || !vk.swapchain_extent_valid ) {
+		return qfalse;
+	}
+
+	if ( !vk_query_surface_extent( vk.physical_device, vk_surface, &extent ) ) {
+		return qfalse;
+	}
+
+	if ( out_extent ) {
+		*out_extent = extent;
+	}
+
+	return extent.width != vk.swapchain_extent.width || extent.height != vk.swapchain_extent.height;
+}
+
+static qboolean vk_restart_swapchain_if_extent_mismatch( const char *funcname, const char *stage )
+{
+	VkExtent2D new_extent;
+
+	if ( !vk_swapchain_extent_mismatch_detected( &new_extent ) ) {
+		return qfalse;
+	}
+
+	ri.Printf( PRINT_WARNING,
+		"[VK] %s: surface extent changed during %s (%ux%u -> %ux%u), rebuilding swapchain before stale attachments black-screen\n",
+		funcname ? funcname : "vk_frame_submit",
+		stage ? stage : "frame",
+		(unsigned int)vk.swapchain_extent.width,
+		(unsigned int)vk.swapchain_extent.height,
+		(unsigned int)new_extent.width,
+		(unsigned int)new_extent.height );
+	vk_log_swapchain_recreation( VK_SUBOPTIMAL_KHR, &vk.swapchain_extent, &new_extent );
+	vk_restart_swapchain( funcname ? funcname : __func__, VK_SUBOPTIMAL_KHR );
+	return qtrue;
+}
+
 static void vk_begin_screenmap_render_pass( void )
 {
 	VkFramebuffer frameBuffer = vk.framebuffers.screenmap;
@@ -103,6 +143,10 @@ void vk_begin_frame( void )
 	}
 	if ( vk.frame_count++ )
 		return;
+
+	if ( !ri.CL_IsMinimized() && vk_restart_swapchain_if_extent_mismatch( __func__, "begin_frame" ) ) {
+		return;
+	}
 
 	vk.inRenderPass = qfalse;
 
@@ -455,6 +499,11 @@ void vk_present_frame( void )
 	}
 
 	if ( !vk.cmd->waitForFence ) {
+		return;
+	}
+
+	if ( vk_restart_swapchain_if_extent_mismatch( __func__, "present" ) ) {
+		vk.cmd->swapchain_image_acquired = qfalse;
 		return;
 	}
 

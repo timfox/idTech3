@@ -10,11 +10,41 @@ Extracted from vk.c for modularization.
 #include "vk_postfx.h"
 #include "vk_framebuffers.h"
 
+static uint32_t vk_fullres_framebuffer_width( void )
+{
+	if ( vk.mainColorWidth > 0u ) {
+		return vk.mainColorWidth;
+	}
+	if ( glConfig.vidWidth > 0 ) {
+		return (uint32_t)glConfig.vidWidth;
+	}
+	if ( gls.windowWidth > 0 ) {
+		return (uint32_t)gls.windowWidth;
+	}
+	return 1u;
+}
+
+static uint32_t vk_fullres_framebuffer_height( void )
+{
+	if ( vk.mainColorHeight > 0u ) {
+		return vk.mainColorHeight;
+	}
+	if ( glConfig.vidHeight > 0 ) {
+		return (uint32_t)glConfig.vidHeight;
+	}
+	if ( gls.windowHeight > 0 ) {
+		return (uint32_t)gls.windowHeight;
+	}
+	return 1u;
+}
+
 void vk_create_framebuffers( void )
 {
 	VkImageView framebuffer_attachments[5];
 	VkFramebufferCreateInfo desc;
 	uint32_t n;
+	const uint32_t fullresWidth = vk_fullres_framebuffer_width();
+	const uint32_t fullresHeight = vk_fullres_framebuffer_height();
 
 	desc.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
 	desc.pNext = NULL;
@@ -41,8 +71,8 @@ void vk_create_framebuffers( void )
 			// same framebuffer configuration for main and post-bloom render passes
 			if ( n == 0 )
 			{
-				desc.width = glConfig.vidWidth;
-				desc.height = glConfig.vidHeight;
+				desc.width = fullresWidth;
+				desc.height = fullresHeight;
 				framebuffer_attachments[0] = vk.color_image_view;
 				framebuffer_attachments[1] = vk.depth_image_view;
 				framebuffer_attachments[2] = vk.motion_vector_view;
@@ -69,8 +99,8 @@ void vk_create_framebuffers( void )
 			if ( vk.render_pass.atmosphere != VK_NULL_HANDLE && n == 0 ) {
 				desc.renderPass = vk.render_pass.atmosphere;
 				desc.attachmentCount = 2;
-				desc.width = glConfig.vidWidth;
-				desc.height = glConfig.vidHeight;
+				desc.width = fullresWidth;
+				desc.height = fullresHeight;
 				framebuffer_attachments[0] = vk.msaaActive ? vk.msaa_image_view : vk.color_image_view;
 				framebuffer_attachments[1] = vk.depth_image_view;
 				VK_CHECK( qvkCreateFramebuffer( vk.device, &desc, NULL, &vk.framebuffers.atmosphere[0] ) );
@@ -106,8 +136,8 @@ void vk_create_framebuffers( void )
 	{
 		if ( vk.render_pass.ui_overlay != VK_NULL_HANDLE && vk.ui_overlay_image_view != VK_NULL_HANDLE ) {
 			desc.renderPass = vk.render_pass.ui_overlay;
-			desc.width = glConfig.vidWidth;
-			desc.height = glConfig.vidHeight;
+			desc.width = fullresWidth;
+			desc.height = fullresHeight;
 			desc.attachmentCount = 3;
 			framebuffer_attachments[0] = vk.ui_overlay_image_view;
 			framebuffer_attachments[1] = vk.depth_image_view;
@@ -229,8 +259,8 @@ void vk_create_framebuffers( void )
 
 	if ( vk.smaaActive || vk.fxaaActive )
 	{
-		desc.width = glConfig.vidWidth;
-		desc.height = glConfig.vidHeight;
+		desc.width = fullresWidth;
+		desc.height = fullresHeight;
 		desc.attachmentCount = 1;
 
 		if ( vk.smaaActive ) {
@@ -256,8 +286,8 @@ void vk_create_framebuffers( void )
 	if ( vk.render_pass.taa != VK_NULL_HANDLE &&
 		vk.taa_history_image_view[0] != VK_NULL_HANDLE &&
 		vk.taa_history_image_view[1] != VK_NULL_HANDLE ) {
-		desc.width = glConfig.vidWidth;
-		desc.height = glConfig.vidHeight;
+		desc.width = fullresWidth;
+		desc.height = fullresHeight;
 		desc.attachmentCount = 1;
 		desc.renderPass = vk.render_pass.taa;
 		framebuffer_attachments[0] = vk.taa_history_image_view[0];
@@ -312,8 +342,8 @@ void vk_create_framebuffers( void )
 		// ssao
 		desc.renderPass = vk.render_pass.ssao;
 		desc.attachmentCount = 1;
-		desc.width = glConfig.vidWidth;
-		desc.height = glConfig.vidHeight;
+		desc.width = fullresWidth;
+		desc.height = fullresHeight;
 		framebuffer_attachments[0] = vk.ssao_image_view;
 		VK_CHECK( qvkCreateFramebuffer( vk.device, &desc, NULL, &vk.framebuffers.ssao ) );
 		SET_OBJECT_NAME( vk.framebuffers.ssao, "framebuffer - ssao", VK_DEBUG_REPORT_OBJECT_TYPE_FRAMEBUFFER_EXT );
@@ -334,8 +364,8 @@ void vk_create_framebuffers( void )
 	{
 		desc.renderPass = vk.render_pass.oit_accum;
 		desc.attachmentCount = ( vk_get_main_rasterization_samples() == VK_SAMPLE_COUNT_1_BIT && vk.depth_image_view ) ? 3 : 2;
-		desc.width = glConfig.vidWidth;
-		desc.height = glConfig.vidHeight;
+		desc.width = fullresWidth;
+		desc.height = fullresHeight;
 		framebuffer_attachments[0] = vk.oit_accum_image_view;
 		framebuffer_attachments[1] = vk.oit_reveal_image_view;
 		if ( desc.attachmentCount == 3 )
@@ -366,8 +396,8 @@ void vk_create_framebuffers( void )
 	{
 		desc.renderPass = vk.render_pass.ssr;
 		desc.attachmentCount = 1;
-		desc.width = glConfig.vidWidth;
-		desc.height = glConfig.vidHeight;
+		desc.width = fullresWidth;
+		desc.height = fullresHeight;
 		framebuffer_attachments[0] = vk.ssr_image_view;
 		VK_CHECK( qvkCreateFramebuffer( vk.device, &desc, NULL, &vk.framebuffers.ssr ) );
 		SET_OBJECT_NAME( vk.framebuffers.ssr, "framebuffer - ssr", VK_DEBUG_REPORT_OBJECT_TYPE_FRAMEBUFFER_EXT );
@@ -376,8 +406,8 @@ void vk_create_framebuffers( void )
 	if ( vk.render_pass.volumetric != VK_NULL_HANDLE ) {
 		desc.renderPass = vk.render_pass.volumetric;
 		desc.attachmentCount = 1;
-		desc.width = glConfig.vidWidth;
-		desc.height = glConfig.vidHeight;
+		desc.width = fullresWidth;
+		desc.height = fullresHeight;
 		framebuffer_attachments[0] = vk.color_image_view;
 		VK_CHECK( qvkCreateFramebuffer( vk.device, &desc, NULL, &vk.framebuffers.volumetric[0] ) );
 		SET_OBJECT_NAME( vk.framebuffers.volumetric[0], "framebuffer - volumetric fog", VK_DEBUG_REPORT_OBJECT_TYPE_FRAMEBUFFER_EXT );
