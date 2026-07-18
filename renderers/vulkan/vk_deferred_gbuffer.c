@@ -73,6 +73,11 @@ typedef struct {
 	uint32_t additive;
 } vk_deferred_composite_push_t;
 
+static void vk_dgb_create_pipeline( void );
+static void vk_dgb_create_lighting_pipeline( void );
+static void vk_dgb_create_composite_gfx_pipeline( void );
+static void vk_dgb_create_debug_gfx_pipeline( void );
+
 static void vk_dgb_destroy_composite_gfx_pipeline( void )
 {
 	if ( vk.deferred_gbuffer.composite_gfx_pipeline != VK_NULL_HANDLE ) {
@@ -230,6 +235,40 @@ void vk_deferred_gbuffer_init( void )
 void vk_deferred_gbuffer_shutdown( void )
 {
 	vk_dgb_destroy_pipeline();
+}
+
+void vk_deferred_gbuffer_ensure_runtime( void )
+{
+	if ( !vk_deferred_gbuffer_active() || !vk.device || vk.device_lost ) {
+		return;
+	}
+
+	if ( vk.deferred_gbuffer.layout == VK_NULL_HANDLE ||
+		vk.deferred_gbuffer.pool == VK_NULL_HANDLE ||
+		vk.deferred_gbuffer.descriptor == VK_NULL_HANDLE ||
+		( !vk.deferred_gbuffer.pipeline_ready && !vk.deferredGbufferDirectExport ) ) {
+		vk_dgb_create_pipeline();
+	}
+
+	if ( vk_deferred_lighting_wanted() ) {
+		if ( !vk.deferred_gbuffer.lighting_pipeline_ready ||
+			vk.deferred_gbuffer.lighting_pipeline == VK_NULL_HANDLE ||
+			vk.deferred_gbuffer.lighting_descriptor == VK_NULL_HANDLE ) {
+			vk_dgb_create_lighting_pipeline();
+		}
+		if ( !vk.deferred_gbuffer.composite_gfx_ready ||
+			vk.deferred_gbuffer.composite_gfx_pipeline == VK_NULL_HANDLE ||
+			vk.deferred_gbuffer.composite_gfx_descriptor == VK_NULL_HANDLE ) {
+			vk_dgb_create_composite_gfx_pipeline();
+		}
+	}
+
+	if ( r_deferredGBufferDebug && r_deferredGBufferDebug->integer > 0 &&
+		( !vk.deferred_gbuffer.debug_gfx_ready ||
+		  vk.deferred_gbuffer.debug_gfx_pipeline == VK_NULL_HANDLE ||
+		  vk.deferred_gbuffer.debug_gfx_descriptor == VK_NULL_HANDLE ) ) {
+		vk_dgb_create_debug_gfx_pipeline();
+	}
 }
 
 static void vk_dgb_create_descriptor_layout( void )
@@ -426,6 +465,7 @@ void vk_deferred_gbuffer_capture_after_geometry( void )
 	if ( !vk_deferred_gbuffer_fill_wanted() ) {
 		return;
 	}
+	vk_deferred_gbuffer_ensure_runtime();
 	if ( !vk.cmd || vk.cmd->command_buffer == VK_NULL_HANDLE ) {
 		return;
 	}
@@ -801,6 +841,7 @@ static void vk_dgb_dispatch_lighting_compute( uint32_t width, uint32_t height )
 	if ( !vk_deferred_lighting_wanted() ) {
 		return;
 	}
+	vk_deferred_gbuffer_ensure_runtime();
 	if ( !vk.cmd || vk.cmd->command_buffer == VK_NULL_HANDLE ) {
 		return;
 	}

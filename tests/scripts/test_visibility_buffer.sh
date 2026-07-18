@@ -31,6 +31,7 @@ rg -q 'r_visibilityBuffer 1' "$ROOT/config/vulkan_overlay_visibility_2027.cfg" |
 rg -q 'RENDERER_2027' "$ROOT/docs/RENDERERS.md" || fail "RENDERERS.md cross-link missing"
 rg -q 'visibility_buffer_status' "$ROOT/renderers/vulkan/tr_init.c" || fail "status command missing"
 rg -q 'vk_material_classify_wanted' "$ROOT/renderers/vulkan/vk_visibility_buffer.c" || fail "classify wanted helper missing"
+rg -q 'vk_visibility_buffer_ensure_runtime' "$ROOT/renderers/vulkan/vk_visibility_buffer.c" || fail "visibility runtime ensure helper missing"
 # Classify must not require Morton fill (decoupled for deferred consumer).
 if rg -q 'vk_visibility_buffer_fill_wanted\(\) && r_materialClassify' "$ROOT/renderers/vulkan/vk_visibility_buffer.c"; then
 	fail "classify still coupled to Morton fill"

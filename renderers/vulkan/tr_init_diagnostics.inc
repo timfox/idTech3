@@ -121,6 +121,83 @@ static qboolean R_RendererModeContractClean( void )
 	}
 }
 
+static qboolean R_RendererForwardPlusRuntimeReady( void )
+{
+	if ( !r_forwardPlus || !r_forwardPlus->integer ) {
+		return qtrue;
+	}
+
+	if ( vk.forward_plus.buffer == VK_NULL_HANDLE ||
+		vk.forward_plus.staging == VK_NULL_HANDLE ||
+		vk.forward_plus.tile_buffer == VK_NULL_HANDLE ||
+		vk.forward_plus.param_buffer == VK_NULL_HANDLE ||
+		vk.forward_plus.param_mapped == NULL ||
+		vk.forward_plus.descriptor == VK_NULL_HANDLE ||
+		vk.forward_plus.pipeline_layout == VK_NULL_HANDLE ||
+		vk.forward_plus.tile_pipeline == VK_NULL_HANDLE ||
+		vk.forward_plus.tiles_x == 0u ||
+		vk.forward_plus.tiles_y == 0u ||
+		vk.forward_plus.tile_capacity_tiles == 0u ) {
+		return qfalse;
+	}
+
+	return qtrue;
+}
+
+static qboolean R_RendererDeferredRuntimeReady( void )
+{
+	const int mode = R_CvarInteger( r_renderMode );
+	const qboolean wantDeferredFill =
+		( mode == 1 || mode == 2 || mode == 3 ) &&
+		R_CvarInteger( r_deferredGBuffer ) &&
+		R_CvarInteger( r_deferredGBufferFill );
+	const qboolean wantDeferredLighting =
+		( mode == 1 || mode == 3 ) &&
+		R_CvarInteger( r_deferredLighting );
+
+	if ( !wantDeferredFill && !wantDeferredLighting ) {
+		return qtrue;
+	}
+
+	if ( !vk.deferredGbufferAllocated ||
+		vk.deferred_gbuffer_albedo_view == VK_NULL_HANDLE ||
+		vk.deferred_gbuffer_normal_view == VK_NULL_HANDLE ||
+		vk.deferred_gbuffer_material_view == VK_NULL_HANDLE ||
+		vk.deferred_lighting_view == VK_NULL_HANDLE ||
+		!vk.deferred_gbuffer.pipeline_ready ||
+		vk.deferred_gbuffer.pipeline == VK_NULL_HANDLE ||
+		vk.deferred_gbuffer.descriptor == VK_NULL_HANDLE ) {
+		return qfalse;
+	}
+
+	if ( wantDeferredLighting &&
+		( !R_RendererForwardPlusRuntimeReady() ||
+		  !vk.deferred_gbuffer.lighting_pipeline_ready ||
+		  vk.deferred_gbuffer.lighting_pipeline == VK_NULL_HANDLE ||
+		  vk.deferred_gbuffer.lighting_descriptor == VK_NULL_HANDLE ||
+		  !vk.deferred_gbuffer.composite_gfx_ready ||
+		  vk.deferred_gbuffer.composite_gfx_pipeline == VK_NULL_HANDLE ||
+		  vk.deferred_gbuffer.composite_gfx_descriptor == VK_NULL_HANDLE ) ) {
+		return qfalse;
+	}
+
+	return qtrue;
+}
+
+static qboolean R_RendererUnifiedClusteredRuntimeReady( void )
+{
+	if ( !r_renderMode || r_renderMode->integer != 3 ) {
+		return qtrue;
+	}
+
+	if ( !vk_unified_clustered_active() ) {
+		return qfalse;
+	}
+
+	return ( R_RendererForwardPlusRuntimeReady() &&
+		R_RendererDeferredRuntimeReady() ) ? qtrue : qfalse;
+}
+
 static qboolean R_RendererSceneSourceHealthy( void )
 {
 	const VkImageView postFog = vk_get_post_fog_source();
@@ -214,6 +291,11 @@ static qboolean R_RendererUsingRecoveryFallbacks( void )
 	if ( vk.pbr_ibl_using_hdr_fallback && tr.numCubemaps > 0 ) {
 		return qtrue;
 	}
+	if ( !R_RendererForwardPlusRuntimeReady() ||
+		!R_RendererDeferredRuntimeReady() ||
+		!R_RendererUnifiedClusteredRuntimeReady() ) {
+		return qtrue;
+	}
 	if ( R_RendererSwapchainRestartRecent() ) {
 		return qtrue;
 	}
@@ -222,7 +304,10 @@ static qboolean R_RendererUsingRecoveryFallbacks( void )
 
 static const char *R_RendererHealthLabel( int warnings )
 {
-	if ( !R_RendererModeContractClean() || !R_RendererSceneSourceHealthy() ) {
+	if ( !R_RendererModeContractClean() || !R_RendererSceneSourceHealthy() ||
+		!R_RendererForwardPlusRuntimeReady() ||
+		!R_RendererDeferredRuntimeReady() ||
+		!R_RendererUnifiedClusteredRuntimeReady() ) {
 		return "recover";
 	}
 	if ( R_RendererUsingRecoveryFallbacks() ) {
@@ -276,6 +361,9 @@ static int R_RendererPrintCompatibilityWarnings( qboolean printOk )
 		if ( vk.msaaActive ) {
 			R_RENDERER_WARN( "mode-1 deferred is running with MSAA; direct G-buffer material export falls back to depth-derived defaults.\n" );
 		}
+		if ( !R_RendererDeferredRuntimeReady() ) {
+			R_RENDERER_WARN( "mode-1 deferred cvars are active, but deferred runtime resources are incomplete (G-buffer/deferred pipelines or descriptors missing).\n" );
+		}
 	}
 	if ( r_renderMode && r_renderMode->integer == 3 ) {
 		if ( !r_forwardPlus || !r_forwardPlus->integer ) {
@@ -301,6 +389,9 @@ static int R_RendererPrintCompatibilityWarnings( qboolean printOk )
 		}
 		if ( vk.msaaActive ) {
 			R_RENDERER_WARN( "MSAA is active; Unified Clustered prefers r_ext_multisample 0 for direct G-buffer export.\n" );
+		}
+		if ( !R_RendererUnifiedClusteredRuntimeReady() ) {
+			R_RENDERER_WARN( "Unified Clustered cvars are active, but shared Forward+/deferred runtime resources are incomplete.\n" );
 		}
 	}
 	if ( r_renderMode && r_renderMode->integer == 2 ) {
@@ -330,6 +421,12 @@ static int R_RendererPrintCompatibilityWarnings( qboolean printOk )
 		}
 		if ( r_deferredLighting && r_deferredLighting->integer ) {
 			R_RENDERER_WARN( "modern profile keeps r_deferredLighting 0; use renderer_modern_safe + vid_restart after mode-1/3 experiments.\n" );
+		}
+		if ( !R_RendererForwardPlusRuntimeReady() ) {
+			R_RENDERER_WARN( "modern profile cvars are active, but Forward+ runtime resources are incomplete (light/tile buffers or compute pipeline missing).\n" );
+		}
+		if ( !R_RendererDeferredRuntimeReady() ) {
+			R_RENDERER_WARN( "modern profile sidecar G-buffer cvars are active, but deferred runtime resources are incomplete.\n" );
 		}
 	}
 	if ( vk.cubemapActive && tr.numCubemaps > 0 && R_RendererCountIncompleteCubemaps() > 0 ) {
@@ -453,14 +550,17 @@ static void R_RendererStatus_f( void )
 	if ( r_renderMode && r_renderMode->integer == 3 ) {
 		ri.Printf( PRINT_ALL,
 			"unified   : Unified Clustered Renderer — hybrid deferred + Forward+ "
-			"(opaque=deferred transparent=Forward+ tiles=shared active=%s)\n",
-			R_YesNo( vk_unified_clustered_active() ) );
+			"(opaque=deferred transparent=Forward+ tiles=shared active=%s ready=%s)\n",
+			R_YesNo( vk_unified_clustered_active() ),
+			R_YesNo( R_RendererUnifiedClusteredRuntimeReady() ) );
 	}
-	ri.Printf( PRINT_ALL, "forward+  : enabled=%d shade=%.2f maxPerTile=%d lumSort=%d distSort=%d depthCull=%d\n",
-		R_CvarInteger( r_forwardPlus ), R_CvarValue( r_forwardPlusShade ), R_CvarInteger( r_forwardPlusMaxPerTile ),
+	ri.Printf( PRINT_ALL, "forward+  : enabled=%d ready=%s shade=%.2f maxPerTile=%d lumSort=%d distSort=%d depthCull=%d\n",
+		R_CvarInteger( r_forwardPlus ), R_YesNo( R_RendererForwardPlusRuntimeReady() ),
+		R_CvarValue( r_forwardPlusShade ), R_CvarInteger( r_forwardPlusMaxPerTile ),
 		R_CvarInteger( r_forwardPlusLuminanceSort ), R_CvarInteger( r_forwardPlusDistanceSort ), R_CvarInteger( r_forwardPlusDepthCull ) );
-	ri.Printf( PRINT_ALL, "gbuffer   : cvar=%d fill=%d allocated=%s directExport=%s debug=%d\n",
+	ri.Printf( PRINT_ALL, "gbuffer   : cvar=%d fill=%d ready=%s allocated=%s directExport=%s debug=%d\n",
 		R_CvarInteger( r_deferredGBuffer ), R_CvarInteger( r_deferredGBufferFill ),
+		R_YesNo( R_RendererDeferredRuntimeReady() ),
 		R_YesNo( vk.deferredGbufferAllocated ), R_YesNo( vk.deferredGbufferDirectExport ), R_CvarInteger( r_deferredGBufferDebug ) );
 	ri.Printf( PRINT_ALL, "visbuf    : cvar=%d fill=%d classify=%d allocated=%s debug=%d\n",
 		R_CvarInteger( r_visibilityBuffer ), R_CvarInteger( r_visibilityBufferFill ),
@@ -556,6 +656,10 @@ static void R_RendererHealth_f( void )
 		R_RendererCountReadyCubemaps(), R_RendererCountIncompleteCubemaps(),
 		R_YesNo( vk.pbr_ibl_using_hdr_fallback ), R_YesNo( vk.pbr_ibl_has_ready_local_cubemap ),
 		r_pbr_cubemapInfo ? r_pbr_cubemapInfo->string : "" );
+	ri.Printf( PRINT_ALL, "runtime   : forward+=%s deferred=%s clustered=%s\n",
+		R_YesNo( R_RendererForwardPlusRuntimeReady() ),
+		R_YesNo( R_RendererDeferredRuntimeReady() ),
+		R_YesNo( R_RendererUnifiedClusteredRuntimeReady() ) );
 	ri.Printf( PRINT_ALL, "recovery  : activeFallbacks=%s recentSwapchain=%s\n",
 		R_YesNo( R_RendererUsingRecoveryFallbacks() ),
 		R_YesNo( R_RendererSwapchainRestartRecent() ) );
@@ -677,6 +781,10 @@ static void R_RendererSubsystems_f( void )
 		R_RendererCountReadyCubemaps(), R_RendererCountIncompleteCubemaps(),
 		R_YesNo( vk.pbr_ibl_using_hdr_fallback ), R_YesNo( vk.pbr_ibl_has_ready_local_cubemap ),
 		r_pbr_cubemapInfo ? r_pbr_cubemapInfo->string : "" );
+	ri.Printf( PRINT_ALL, "runtime    : forward+=%s deferred=%s clustered=%s\n",
+		R_YesNo( R_RendererForwardPlusRuntimeReady() ),
+		R_YesNo( R_RendererDeferredRuntimeReady() ),
+		R_YesNo( R_RendererUnifiedClusteredRuntimeReady() ) );
 	ri.Printf( PRINT_ALL, "framegraph : fbo=%s hdr=%d color=%s renderTarget=%ux%u\n",
 		R_YesNo( vk.fboActive ), R_CvarInteger( r_hdr ), vk_format_string( vk.color_format ),
 		vk.renderWidth, vk.renderHeight );

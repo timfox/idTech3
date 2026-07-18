@@ -837,8 +837,34 @@ void vk_forward_plus_init( void )
 	}
 }
 
+void vk_forward_plus_ensure_runtime( void )
+{
+	if ( !r_forwardPlus || !r_forwardPlus->integer || !vk.device || vk.device_lost ) {
+		return;
+	}
+
+	if ( vk.forward_plus.buffer == VK_NULL_HANDLE ||
+		vk.forward_plus.staging == VK_NULL_HANDLE ||
+		vk.forward_plus.tile_buffer == VK_NULL_HANDLE ||
+		vk.forward_plus.param_buffer == VK_NULL_HANDLE ||
+		vk.forward_plus.param_mapped == NULL ||
+		vk.forward_plus.descriptor == VK_NULL_HANDLE ||
+		vk.forward_plus.pipeline_layout == VK_NULL_HANDLE ||
+		vk.forward_plus.tile_pipeline == VK_NULL_HANDLE ||
+		vk.forward_plus.tiles_x == 0u ||
+		vk.forward_plus.tiles_y == 0u ||
+		vk.forward_plus.tile_capacity_tiles == 0u ) {
+		ri.Printf( PRINT_WARNING, "[VK][Forward+] runtime incomplete; rebuilding Forward+ resources in-place\n" );
+		vk_forward_plus_init();
+		return;
+	}
+
+	vk_forward_plus_init_graphics_descriptors();
+}
+
 void vk_forward_plus_ensure_render_resolution( void )
 {
+	vk_forward_plus_ensure_runtime();
 	vk_fp_ensure_tile_for_render_resolution();
 }
 
@@ -857,6 +883,7 @@ void vk_forward_plus_update_for_refdef( void )
 	if ( !r_forwardPlus || !r_forwardPlus->integer ) {
 		return;
 	}
+	vk_forward_plus_ensure_runtime();
 	if ( vk.forward_plus.buffer == VK_NULL_HANDLE || vk.forward_plus.staging_ptr == NULL ) {
 		return;
 	}
@@ -971,6 +998,7 @@ void vk_forward_plus_upload_refdef( void )
 	if ( !r_forwardPlus || !r_forwardPlus->integer ) {
 		return;
 	}
+	vk_forward_plus_ensure_runtime();
 	if ( !vk.cmd || vk.cmd->command_buffer == VK_NULL_HANDLE ) {
 		return;
 	}
@@ -1042,6 +1070,7 @@ static void vk_forward_plus_dispatch_tile_cull_internal( qboolean use_depth_cull
 	if ( !r_forwardPlus || !r_forwardPlus->integer ) {
 		return;
 	}
+	vk_forward_plus_ensure_runtime();
 	if ( vk.forward_plus.tile_pipeline == VK_NULL_HANDLE || vk.forward_plus.descriptor == VK_NULL_HANDLE ) {
 		return;
 	}

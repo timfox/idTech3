@@ -12,6 +12,7 @@ uint32_t vk_forward_plus_get_max_per_tile_cap( void );
 void vk_forward_plus_create_set_layout( void );
 void vk_forward_plus_init( void );
 void vk_forward_plus_shutdown( void );
+void vk_forward_plus_ensure_runtime( void );
 /* Packs dynamic lights from backEnd.refdef; staging buffer — call vk_forward_plus_upload_refdef after (GPU copy to device). */
 void vk_forward_plus_update_for_refdef( void );
 /* After vk_begin_frame (command buffer valid), before main pass: copy staging -> device-local light SSBO. */

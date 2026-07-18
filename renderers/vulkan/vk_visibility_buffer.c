@@ -60,6 +60,10 @@ typedef struct {
 	int mode;
 } vk_visbuf_debug_push_t;
 
+static void vk_visbuf_create_fill_pipeline( void );
+static void vk_visbuf_create_classify_pipeline( void );
+static void vk_visbuf_create_debug_gfx_pipeline( void );
+
 qboolean vk_visibility_buffer_active( void )
 {
 	return ( vk.visibilityBufferAllocated && r_renderMode &&
@@ -156,6 +160,40 @@ void vk_visibility_buffer_shutdown( void )
 	vk_visbuf_destroy_fill_pipeline();
 	vk_visbuf_destroy_classify_pipeline();
 	vk_visbuf_destroy_debug_gfx_pipeline();
+}
+
+void vk_visibility_buffer_ensure_runtime( void )
+{
+	if ( !vk_visibility_buffer_active() || !vk.device || vk.device_lost ) {
+		return;
+	}
+
+	if ( vk.visibility_buffer.layout == VK_NULL_HANDLE ||
+		vk.visibility_buffer.pool == VK_NULL_HANDLE ||
+		vk.visibility_buffer.descriptor == VK_NULL_HANDLE ||
+		!vk.visibility_buffer.pipeline_ready ||
+		vk.visibility_buffer.pipeline == VK_NULL_HANDLE ) {
+		vk_visbuf_create_fill_pipeline();
+	}
+
+	if ( vk_material_classify_wanted() ) {
+		if ( vk.visibility_buffer.classify_layout == VK_NULL_HANDLE ||
+			vk.visibility_buffer.classify_pool == VK_NULL_HANDLE ||
+			vk.visibility_buffer.classify_descriptor == VK_NULL_HANDLE ||
+			!vk.visibility_buffer.classify_pipeline_ready ||
+			vk.visibility_buffer.classify_pipeline == VK_NULL_HANDLE ) {
+			vk_visbuf_create_classify_pipeline();
+		}
+	}
+
+	if ( r_visibilityBufferDebug && r_visibilityBufferDebug->integer > 0 &&
+		( vk.visibility_buffer.debug_gfx_layout == VK_NULL_HANDLE ||
+		  vk.visibility_buffer.debug_gfx_pool == VK_NULL_HANDLE ||
+		  vk.visibility_buffer.debug_gfx_descriptor == VK_NULL_HANDLE ||
+		  !vk.visibility_buffer.debug_gfx_ready ||
+		  vk.visibility_buffer.debug_gfx_pipeline == VK_NULL_HANDLE ) ) {
+		vk_visbuf_create_debug_gfx_pipeline();
+	}
 }
 
 static void vk_visbuf_create_fill_pipeline( void )
@@ -463,6 +501,7 @@ void vk_visibility_buffer_capture_after_geometry( void )
 	if ( !vk_visibility_buffer_fill_wanted() ) {
 		return;
 	}
+	vk_visibility_buffer_ensure_runtime();
 	if ( !vk.cmd || vk.cmd->command_buffer == VK_NULL_HANDLE ) {
 		return;
 	}
@@ -791,6 +830,7 @@ qboolean vk_visibility_buffer_draw_debug( void )
 	if ( !vk_visibility_buffer_fill_wanted() ) {
 		return qfalse;
 	}
+	vk_visibility_buffer_ensure_runtime();
 	if ( !r_visibilityBufferDebug || r_visibilityBufferDebug->integer <= 0 ) {
 		return qfalse;
 	}

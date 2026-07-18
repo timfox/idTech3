@@ -1552,6 +1552,50 @@ static void RB_ValidateUnifiedClusteredTransparentHandoff( qboolean usingOit )
 	}
 }
 
+static void RB_RepairUnifiedClusteredTransparentHandoff( qboolean usingOit )
+{
+	if ( !vk_unified_clustered_active() ) {
+		return;
+	}
+
+	if ( backEnd.drawSurfFilter != 2 ) {
+		if ( r_fboDebug && r_fboDebug->integer >= 1 ) {
+			ri.Printf( PRINT_DEVELOPER, S_COLOR_YELLOW
+				"[VK][unified] transparent handoff self-heal: restoring drawSurfFilter=2 before %s path (was %d)\n",
+				usingOit ? "OIT" : "Forward+", backEnd.drawSurfFilter );
+		}
+		backEnd.drawSurfFilter = 2;
+	}
+
+	if ( usingOit ) {
+		if ( vk.inRenderPass ) {
+			if ( r_fboDebug && r_fboDebug->integer >= 1 ) {
+				ri.Printf( PRINT_DEVELOPER, S_COLOR_YELLOW
+					"[VK][unified] OIT handoff self-heal: ending lingering %s render pass before vk_oit_pass\n",
+					RB_RenderPassName( vk.renderPassIndex ) );
+			}
+			vk_end_render_pass();
+		}
+		return;
+	}
+
+	if ( !vk.inRenderPass || vk.renderPassIndex != RENDER_PASS_MAIN ) {
+		if ( vk.inRenderPass ) {
+			if ( r_fboDebug && r_fboDebug->integer >= 1 ) {
+				ri.Printf( PRINT_DEVELOPER, S_COLOR_YELLOW
+					"[VK][unified] transparent Forward+ handoff self-heal: ending %s before main-pass resume\n",
+					RB_RenderPassName( vk.renderPassIndex ) );
+			}
+			vk_end_render_pass();
+		}
+		if ( r_fboDebug && r_fboDebug->integer >= 1 ) {
+			ri.Printf( PRINT_DEVELOPER, S_COLOR_YELLOW
+				"[VK][unified] transparent Forward+ handoff self-heal: resuming main render pass before transparent shade\n" );
+		}
+		vk_resume_main_render_pass();
+	}
+}
+
 static const float s_shadow_flipMatrix[16] = {
 	0, 0, -1, 0,
 	-1, 0, 0, 0,
@@ -1936,9 +1980,11 @@ static const void *RB_DrawSurfs( const void *data ) {
 					s_oit_mode3_logged = qtrue;
 				}
 			}
+			RB_RepairUnifiedClusteredTransparentHandoff( qtrue );
 			RB_ValidateUnifiedClusteredTransparentHandoff( qtrue );
 			vk_oit_pass( cmd );
 		} else {
+			RB_RepairUnifiedClusteredTransparentHandoff( qfalse );
 			RB_ValidateUnifiedClusteredTransparentHandoff( qfalse );
 			RB_RenderDrawSurfList( cmd->drawSurfs, cmd->numDrawSurfs );
 		}

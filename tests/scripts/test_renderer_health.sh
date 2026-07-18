@@ -26,6 +26,7 @@ check "$TR_DIAG" '======== Renderer Health ========' 'renderer health banner exi
 check "$TR_DIAG" 'health    : %s' 'renderer health prints top-level status'
 check "$TR_DIAG" 'R_RendererUsingRecoveryFallbacks' 'renderer health exposes recovery-fallback helper'
 check "$TR_DIAG" 'R_RendererSwapchainRestartRecent' 'renderer health exposes recent swapchain restart helper'
+check "$TR_DIAG" 'runtime   : forward+=%s deferred=%s clustered=%s' 'renderer health prints runtime readiness summary'
 check "$TR_DIAG" 'recovery  : activeFallbacks=%s recentSwapchain=%s' 'renderer health prints active fallback state'
 check "$TR_DIAG" 'next      : %s + vid_restart' 'renderer health prints recovery action when unhealthy'
 check "$TR_INIT" 'ri.Cmd_AddCommand( "renderer_health"' 'renderer health command is registered'

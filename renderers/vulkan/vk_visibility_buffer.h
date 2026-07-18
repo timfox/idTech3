@@ -18,6 +18,7 @@ qboolean vk_visibility_buffer_fill_wanted( void );
 qboolean vk_material_classify_wanted( void );
 void vk_visibility_buffer_init( void );
 void vk_visibility_buffer_shutdown( void );
+void vk_visibility_buffer_ensure_runtime( void );
 /* After opaque (mode 3) or main geometry: fill ID/bary; optional material classify. */
 void vk_visibility_buffer_capture_after_geometry( void );
 qboolean vk_visibility_buffer_draw_debug( void );
