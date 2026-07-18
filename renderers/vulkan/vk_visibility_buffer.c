@@ -19,6 +19,31 @@ Coexists with classic G-buffer; does not replace deferred lighting consumers.
 #include "vk_view_state.h"
 #include "vk_post_fog.h"
 
+static void vk_visbuf_validate_compute_break( const char *stage, qboolean resume_main )
+{
+	if ( !r_fboDebug || r_fboDebug->integer < 1 || !vk_post_fog_fbo_debug_throttle() ) {
+		return;
+	}
+
+	if ( vk.inRenderPass ) {
+		ri.Printf( PRINT_DEVELOPER, S_COLOR_YELLOW
+			"[VK][visbuf] %s: expected out-of-pass compute window, still in render pass %d\n",
+			stage ? stage : "compute_break", (int)vk.renderPassIndex );
+	}
+
+	if ( resume_main && vk.renderPassIndex != RENDER_PASS_MAIN ) {
+		ri.Printf( PRINT_DEVELOPER, S_COLOR_YELLOW
+			"[VK][visbuf] %s: resume_main requested but renderPassIndex=%d instead of main\n",
+			stage ? stage : "compute_break", (int)vk.renderPassIndex );
+	}
+
+	if ( vk.cmd == NULL || vk.cmd->command_buffer == VK_NULL_HANDLE ) {
+		ri.Printf( PRINT_DEVELOPER, S_COLOR_YELLOW
+			"[VK][visbuf] %s: command buffer unavailable during visibility compute break\n",
+			stage ? stage : "compute_break" );
+	}
+}
+
 typedef struct {
 	uint32_t extent[2];
 	uint32_t tileSize;
@@ -450,6 +475,7 @@ void vk_visibility_buffer_capture_after_geometry( void )
 	if ( vk.inRenderPass ) {
 		vk_end_render_pass();
 	}
+	vk_visbuf_validate_compute_break( "visibility_buffer_capture_after_geometry", resume_main );
 
 	vk_visbuf_create_fill_pipeline();
 	if ( !vk.visibility_buffer.pipeline_ready || vk.visibility_buffer.pipeline == VK_NULL_HANDLE ) {

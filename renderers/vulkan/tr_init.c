@@ -60,6 +60,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "vk_postfx.h"
 #include "vk_flashlight.h"
 #include "vk_util.h"
+#include "vk_post_fog.h"
 #include "vk_deferred_gbuffer.h"
 #include "vk_visibility_buffer.h"
 #include "vk_sim_render_profile.h"
@@ -1205,6 +1206,7 @@ static void R_Register( void )
 	ri.Cmd_AddCommand( "renderer_status", R_RendererStatus_f );
 	ri.Cmd_AddCommand( "visibility_buffer_status", vk_visibility_buffer_status_f );
 	ri.Cmd_AddCommand( "renderer_profile", R_RendererProfile_f );
+	ri.Cmd_AddCommand( "renderer_health", R_RendererHealth_f );
 	ri.Cmd_AddCommand( "renderer_deferred_safe", R_RendererDeferredSafe_f );
 	ri.Cmd_AddCommand( "renderer_modern_safe", R_RendererModernSafe_f );
 	ri.Cmd_AddCommand( "renderer_clustered_safe", R_RendererClusteredSafe_f );
@@ -3599,6 +3601,7 @@ static void RE_Shutdown( refShutdownCode_t code ) {
 	ri.Cmd_RemoveCommand( "vulkaninfo" );
 	ri.Cmd_RemoveCommand( "renderer_status" );
 	ri.Cmd_RemoveCommand( "renderer_profile" );
+	ri.Cmd_RemoveCommand( "renderer_health" );
 	ri.Cmd_RemoveCommand( "renderer_deferred_safe" );
 	ri.Cmd_RemoveCommand( "renderer_modern_safe" );
 	ri.Cmd_RemoveCommand( "renderer_clustered_safe" );

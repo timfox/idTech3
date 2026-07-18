@@ -31,5 +31,7 @@ rg -q 'r_oitForwardPlus' "$ROOT/renderers/vulkan/tr_backend.c" || fail "OIT Forw
 rg -q 'vulkan_overlay_oit_clustered' "$ROOT/docs/UNIFIED_CLUSTERED_RENDERER.md" || fail "OIT clustered docs missing"
 rg -q 'r_oitForwardPlus' "$ROOT/docs/UNIFIED_CLUSTERED_RENDERER.md" || fail "Forward+-lit OIT docs"
 rg -q 'renderer_clustered_safe' "$ROOT/docs/UNIFIED_CLUSTERED_RENDERER.md" || fail "clustered safe command docs missing"
+rg -q 'RB_ValidateUnifiedClusteredTransparentHandoff' "$ROOT/renderers/vulkan/tr_backend.c" || fail "mode3 transparent handoff validator missing"
+rg -Fq 'transparent Forward+ handoff: expected active main render pass' "$ROOT/renderers/vulkan/tr_backend.c" || fail "mode3 transparent handoff warning missing"
 
 echo "OK: unified clustered smoke checks passed"

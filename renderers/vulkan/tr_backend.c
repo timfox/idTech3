@@ -1499,6 +1499,59 @@ static void RB_DebugGraphics( void ) {
 }
 
 #ifdef USE_VULKAN
+static const char *RB_RenderPassName( renderPass_t pass )
+{
+	switch ( pass ) {
+	case RENDER_PASS_MAIN:
+		return "main";
+	case RENDER_PASS_SCREENMAP:
+		return "screenmap";
+	case RENDER_PASS_SUN_SHADOW:
+		return "sun_shadow";
+	case RENDER_PASS_POST_BLOOM:
+		return "post_bloom";
+	case RENDER_PASS_UI_OVERLAY:
+		return "ui_overlay";
+	case RENDER_PASS_CUBEMAP:
+		return "cubemap";
+	default:
+		return "unknown_pass";
+	}
+}
+
+static void RB_ValidateUnifiedClusteredTransparentHandoff( qboolean usingOit )
+{
+	if ( !vk_unified_clustered_active() || !r_fboDebug || r_fboDebug->integer < 1 ) {
+		return;
+	}
+
+	if ( !vk_deferred_lighting_active() ) {
+		ri.Printf( PRINT_DEVELOPER, S_COLOR_YELLOW
+			"[VK][unified] transparent handoff: deferred lighting inactive before %s path\n",
+			usingOit ? "OIT" : "Forward+" );
+	}
+
+	if ( backEnd.drawSurfFilter != 2 ) {
+		ri.Printf( PRINT_DEVELOPER, S_COLOR_YELLOW
+			"[VK][unified] transparent handoff: expected drawSurfFilter=2 before %s path, got %d\n",
+			usingOit ? "OIT" : "Forward+", backEnd.drawSurfFilter );
+	}
+
+	if ( usingOit ) {
+		if ( vk.inRenderPass ) {
+			ri.Printf( PRINT_DEVELOPER, S_COLOR_YELLOW
+				"[VK][unified] OIT handoff: expected no active render pass before vk_oit_pass, still in %s\n",
+				RB_RenderPassName( vk.renderPassIndex ) );
+		}
+	} else {
+		if ( !vk.inRenderPass || vk.renderPassIndex != RENDER_PASS_MAIN ) {
+			ri.Printf( PRINT_DEVELOPER, S_COLOR_YELLOW
+				"[VK][unified] transparent Forward+ handoff: expected active main render pass, got inRenderPass=%d active=%s\n",
+				vk.inRenderPass ? 1 : 0, RB_RenderPassName( vk.renderPassIndex ) );
+		}
+	}
+}
+
 static const float s_shadow_flipMatrix[16] = {
 	0, 0, -1, 0,
 	-1, 0, 0, 0,
@@ -1883,8 +1936,10 @@ static const void *RB_DrawSurfs( const void *data ) {
 					s_oit_mode3_logged = qtrue;
 				}
 			}
+			RB_ValidateUnifiedClusteredTransparentHandoff( qtrue );
 			vk_oit_pass( cmd );
 		} else {
+			RB_ValidateUnifiedClusteredTransparentHandoff( qfalse );
 			RB_RenderDrawSurfList( cmd->drawSurfs, cmd->numDrawSurfs );
 		}
 		backEnd.drawSurfFilter = 0;

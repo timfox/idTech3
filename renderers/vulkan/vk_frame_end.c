@@ -16,6 +16,72 @@
 #include "inspector/vk_imgui.h"
 #endif
 
+static const char *vk_end_frame_render_pass_name( renderPass_t pass )
+{
+	switch ( pass ) {
+	case RENDER_PASS_MAIN:
+		return "main";
+	case RENDER_PASS_SCREENMAP:
+		return "screenmap";
+	case RENDER_PASS_SUN_SHADOW:
+		return "sun_shadow";
+	case RENDER_PASS_POST_BLOOM:
+		return "post_bloom";
+	case RENDER_PASS_UI_OVERLAY:
+		return "ui_overlay";
+	case RENDER_PASS_CUBEMAP:
+		return "cubemap";
+	default:
+		return "unknown_pass";
+	}
+}
+
+static void vk_end_frame_validate_post_process_chain( const char *stage, VkImageView post_fog_src, VkImageView luminance_src )
+{
+	if ( !r_fboDebug || r_fboDebug->integer < 1 || !vk_post_fog_fbo_debug_throttle() ) {
+		return;
+	}
+
+	if ( vk.inRenderPass ) {
+		ri.Printf( PRINT_DEVELOPER, S_COLOR_YELLOW
+			"[VK][fbo] %s: expected no active render pass before frame-end post chain, still in %s\n",
+			stage ? stage : "frame_end",
+			vk_end_frame_render_pass_name( vk.renderPassIndex ) );
+	}
+
+	if ( vk.fboActive && vk.color_image_view == VK_NULL_HANDLE ) {
+		ri.Printf( PRINT_DEVELOPER, S_COLOR_YELLOW
+			"[VK][fbo] %s: FBO path active but color_image_view is null\n",
+			stage ? stage : "frame_end" );
+	}
+
+	if ( post_fog_src == VK_NULL_HANDLE ) {
+		ri.Printf( PRINT_DEVELOPER, S_COLOR_YELLOW
+			"[VK][fbo] %s: post-fog source is null (expected %s)\n",
+			stage ? stage : "frame_end",
+			vk_post_fog_source_name( vk_get_post_fog_source() ) );
+	}
+
+	if ( luminance_src == VK_NULL_HANDLE ) {
+		ri.Printf( PRINT_DEVELOPER, S_COLOR_YELLOW
+			"[VK][fbo] %s: luminance source is null (scene source=%s)\n",
+			stage ? stage : "frame_end",
+			vk_post_fog_source_name( vk.scene_post_fog_color_source ) );
+	}
+
+	if ( vk.uiOverlayActive && vk.ui_overlay_image_view == VK_NULL_HANDLE ) {
+		ri.Printf( PRINT_DEVELOPER, S_COLOR_YELLOW
+			"[VK][fbo] %s: uiOverlayActive=1 but ui_overlay_image_view is null\n",
+			stage ? stage : "frame_end" );
+	}
+
+	if ( vk.uiOverlayActive && vk.render_pass.overlay_compose == VK_NULL_HANDLE ) {
+		ri.Printf( PRINT_DEVELOPER, S_COLOR_YELLOW
+			"[VK][fbo] %s: uiOverlayActive=1 but overlay_compose render pass is null\n",
+			stage ? stage : "frame_end" );
+	}
+}
+
 static void vk_end_frame_refresh_postfx_params_for_target( uint32_t width, uint32_t height )
 {
 	vk.renderWidth = width > 0 ? width : 1u;
@@ -123,6 +189,10 @@ void vk_end_frame_prepare_post_process( VkImageView *post_fog_src, VkImageView *
 		vk_update_post_fog_descriptors( *post_fog_src );
 		vk_barrier_post_fog_source_for_sampling( *post_fog_src, "vk_end_frame pre-luminance/gamma" );
 	}
+
+	vk_end_frame_validate_post_process_chain( "prepare_post_process",
+		post_fog_src ? *post_fog_src : VK_NULL_HANDLE,
+		luminance_src ? *luminance_src : VK_NULL_HANDLE );
 }
 
 void vk_end_frame_record_taa_pass( VkImageView *post_fog_src, VkImageView *luminance_src )
@@ -435,6 +505,8 @@ void vk_end_frame_record_gamma_pass( VkImageView post_fog_src )
 				vk_post_fog_source_name( expected ) );
 		}
 	}
+
+	vk_end_frame_validate_post_process_chain( "gamma_pass", gamma_src, vk_get_luminance_source() );
 
 	if ( vk.gamma_pipeline == VK_NULL_HANDLE || vk.post_color_descriptor[vk.cmd_index] == VK_NULL_HANDLE ||
 		vk.render_pass.gamma == VK_NULL_HANDLE ||

@@ -35,6 +35,26 @@ static qboolean R_RtxAvailable( void )
 #endif
 }
 
+static const char *R_RenderPassName( renderPass_t pass )
+{
+	switch ( pass ) {
+	case RENDER_PASS_MAIN:
+		return "main";
+	case RENDER_PASS_SCREENMAP:
+		return "screenmap";
+	case RENDER_PASS_SUN_SHADOW:
+		return "sun_shadow";
+	case RENDER_PASS_POST_BLOOM:
+		return "post_bloom";
+	case RENDER_PASS_UI_OVERLAY:
+		return "ui_overlay";
+	case RENDER_PASS_CUBEMAP:
+		return "cubemap";
+	default:
+		return "unknown_pass";
+	}
+}
+
 static const char *R_RendererProfileName( void )
 {
 	if ( r_renderMode && r_renderMode->integer == 3 ) {
@@ -56,6 +76,78 @@ static const char *R_RendererProfileName( void )
 		return "classic/forward";
 	}
 	return "custom";
+}
+
+static const char *R_RendererRecommendedRecoveryCommand( void )
+{
+	if ( r_renderMode && r_renderMode->integer == 3 ) {
+		return "renderer_clustered_safe";
+	}
+	if ( r_renderMode && r_renderMode->integer == 1 ) {
+		return "renderer_deferred_safe";
+	}
+	if ( r_renderMode && r_renderMode->integer == 2 ) {
+		return "renderer_modern_safe";
+	}
+	return "none";
+}
+
+static qboolean R_RendererModeContractClean( void )
+{
+	const int mode = R_CvarInteger( r_renderMode );
+
+	switch ( mode ) {
+	case 1:
+		return ( R_CvarInteger( r_forwardPlus ) &&
+			R_CvarValue( r_forwardPlusShade ) <= 0.0f &&
+			R_CvarInteger( r_deferredGBuffer ) &&
+			R_CvarInteger( r_deferredGBufferFill ) ) ? qtrue : qfalse;
+	case 2:
+		return ( R_CvarInteger( r_forwardPlus ) &&
+			R_CvarValue( r_forwardPlusShade ) > 0.0f &&
+			R_CvarInteger( r_forwardPlusDepthCull ) &&
+			R_CvarInteger( r_deferredGBuffer ) &&
+			R_CvarInteger( r_deferredGBufferFill ) &&
+			!R_CvarInteger( r_deferredLighting ) ) ? qtrue : qfalse;
+	case 3:
+		return ( R_CvarInteger( r_forwardPlus ) &&
+			R_CvarValue( r_forwardPlusShade ) > 0.0f &&
+			R_CvarInteger( r_forwardPlusDepthCull ) &&
+			R_CvarInteger( r_deferredGBuffer ) &&
+			R_CvarInteger( r_deferredGBufferFill ) &&
+			R_CvarInteger( r_deferredLighting ) ) ? qtrue : qfalse;
+	default:
+		return qtrue;
+	}
+}
+
+static qboolean R_RendererSceneSourceHealthy( void )
+{
+	const VkImageView postFog = vk_get_post_fog_source();
+	const VkImageView luminance = vk_get_luminance_source();
+
+	if ( vk.fboActive && vk.color_image_view == VK_NULL_HANDLE ) {
+		return qfalse;
+	}
+	if ( postFog == VK_NULL_HANDLE || luminance == VK_NULL_HANDLE ) {
+		return qfalse;
+	}
+	if ( vk.uiOverlayActive && vk.renderPassIndex != RENDER_PASS_UI_OVERLAY &&
+		vk.inRenderPass ) {
+		return qfalse;
+	}
+	return qtrue;
+}
+
+static const char *R_RendererHealthLabel( int warnings )
+{
+	if ( !R_RendererModeContractClean() || !R_RendererSceneSourceHealthy() ) {
+		return "recover";
+	}
+	if ( warnings > 0 ) {
+		return "warn";
+	}
+	return "ok";
 }
 
 static int R_RendererPrintCompatibilityWarnings( qboolean printOk )
@@ -84,9 +176,11 @@ static int R_RendererPrintCompatibilityWarnings( qboolean printOk )
 		if ( !r_forwardPlus || !r_forwardPlus->integer ) {
 			R_RENDERER_WARN( "deferred lighting mode needs r_forwardPlus 1 for tile light lists.\n" );
 		}
-		if ( r_deferredLighting && r_deferredLighting->integer &&
-			( !r_deferredGBuffer || !r_deferredGBuffer->integer || !r_deferredGBufferFill || !r_deferredGBufferFill->integer ) ) {
-			R_RENDERER_WARN( "deferred lighting needs r_deferredGBuffer 1 and r_deferredGBufferFill 1.\n" );
+		if ( r_forwardPlusShade && r_forwardPlusShade->value > 0.0f ) {
+			R_RENDERER_WARN( "mode-1 deferred expects r_forwardPlusShade 0 so the deferred scaffold does not double-light opaque surfaces.\n" );
+		}
+		if ( !r_deferredGBuffer || !r_deferredGBuffer->integer || !r_deferredGBufferFill || !r_deferredGBufferFill->integer ) {
+			R_RENDERER_WARN( "mode-1 deferred expects r_deferredGBuffer 1 and r_deferredGBufferFill 1 for the opaque capture path.\n" );
 		}
 		if ( r_deferredLighting && r_deferredLighting->integer &&
 			( ( r_taa && r_taa->integer ) ||
@@ -232,6 +326,15 @@ static void R_RendererStatus_f( void )
 		R_CvarInteger( r_renderMode ), R_CvarInteger( r_deferredLighting ),
 		R_CvarInteger( r_deferredUnlitBase ), R_CvarValue( r_deferredSpecularStrength ),
 		R_CvarValue( r_deferredAOCoupling ) );
+	ri.Printf( PRINT_ALL, "contract  : clean=%s recovery=%s\n",
+		R_YesNo( R_RendererModeContractClean() ), R_RendererRecommendedRecoveryCommand() );
+	ri.Printf( PRINT_ALL, "passes    : inRenderPass=%s active=%s uiOverlay=%s sourcesHealthy=%s\n",
+		R_YesNo( vk.inRenderPass ), R_RenderPassName( vk.renderPassIndex ),
+		R_YesNo( vk.uiOverlayActive ), R_YesNo( R_RendererSceneSourceHealthy() ) );
+	ri.Printf( PRINT_ALL, "sources   : postFog=%s scene=%s luminance=%s\n",
+		vk_post_fog_source_name( vk_get_post_fog_source() ),
+		vk_post_fog_source_name( vk.scene_post_fog_color_source ),
+		vk_post_fog_source_name( vk_get_luminance_source() ) );
 	if ( r_renderMode && r_renderMode->integer == 3 ) {
 		ri.Printf( PRINT_ALL,
 			"unified   : Unified Clustered Renderer — hybrid deferred + Forward+ "
@@ -280,8 +383,41 @@ static void R_RendererCompatibility_f( void )
 {
 	ri.Printf( PRINT_ALL, "======== Renderer Compatibility ========\n" );
 	ri.Printf( PRINT_ALL, "profile: %s\n", R_RendererProfileName() );
+	ri.Printf( PRINT_ALL, "contract: clean=%s recovery=%s\n",
+		R_YesNo( R_RendererModeContractClean() ), R_RendererRecommendedRecoveryCommand() );
+	ri.Printf( PRINT_ALL, "passes: inRenderPass=%s active=%s uiOverlay=%s sourcesHealthy=%s\n",
+		R_YesNo( vk.inRenderPass ), R_RenderPassName( vk.renderPassIndex ),
+		R_YesNo( vk.uiOverlayActive ), R_YesNo( R_RendererSceneSourceHealthy() ) );
+	ri.Printf( PRINT_ALL, "sources: postFog=%s scene=%s luminance=%s\n",
+		vk_post_fog_source_name( vk_get_post_fog_source() ),
+		vk_post_fog_source_name( vk.scene_post_fog_color_source ),
+		vk_post_fog_source_name( vk_get_luminance_source() ) );
 	ri.Printf( PRINT_ALL, "warnings: %d\n", R_RendererPrintCompatibilityWarnings( qtrue ) );
 	ri.Printf( PRINT_ALL, "========================================\n" );
+}
+
+static void R_RendererHealth_f( void )
+{
+	const int warnings = R_RendererPrintCompatibilityWarnings( qfalse );
+	const char *health = R_RendererHealthLabel( warnings );
+
+	ri.Printf( PRINT_ALL, "======== Renderer Health ========\n" );
+	ri.Printf( PRINT_ALL, "health    : %s\n", health );
+	ri.Printf( PRINT_ALL, "profile   : %s\n", R_RendererProfileName() );
+	ri.Printf( PRINT_ALL, "contract  : clean=%s recovery=%s\n",
+		R_YesNo( R_RendererModeContractClean() ), R_RendererRecommendedRecoveryCommand() );
+	ri.Printf( PRINT_ALL, "passes    : inRenderPass=%s active=%s uiOverlay=%s sourcesHealthy=%s\n",
+		R_YesNo( vk.inRenderPass ), R_RenderPassName( vk.renderPassIndex ),
+		R_YesNo( vk.uiOverlayActive ), R_YesNo( R_RendererSceneSourceHealthy() ) );
+	ri.Printf( PRINT_ALL, "sources   : postFog=%s scene=%s luminance=%s\n",
+		vk_post_fog_source_name( vk_get_post_fog_source() ),
+		vk_post_fog_source_name( vk.scene_post_fog_color_source ),
+		vk_post_fog_source_name( vk_get_luminance_source() ) );
+	ri.Printf( PRINT_ALL, "warnings  : %d\n", warnings );
+	if ( Q_stricmp( health, "ok" ) ) {
+		ri.Printf( PRINT_ALL, "next      : %s + vid_restart\n", R_RendererRecommendedRecoveryCommand() );
+	}
+	ri.Printf( PRINT_ALL, "=================================\n" );
 }
 
 static void R_RendererDeferredSafe_f( void )
@@ -372,6 +508,15 @@ static void R_RendererSubsystems_f( void )
 
 	ri.Printf( PRINT_ALL, "======== Renderer Subsystems ========\n" );
 	ri.Printf( PRINT_ALL, "profile    : %s (%s)\n", R_RendererProfileName(), warnings == 0 ? "clean" : "compat-warnings" );
+	ri.Printf( PRINT_ALL, "contract   : clean=%s recovery=%s\n",
+		R_YesNo( R_RendererModeContractClean() ), R_RendererRecommendedRecoveryCommand() );
+	ri.Printf( PRINT_ALL, "passes     : inRenderPass=%s active=%s uiOverlay=%s sourcesHealthy=%s\n",
+		R_YesNo( vk.inRenderPass ), R_RenderPassName( vk.renderPassIndex ),
+		R_YesNo( vk.uiOverlayActive ), R_YesNo( R_RendererSceneSourceHealthy() ) );
+	ri.Printf( PRINT_ALL, "sources    : postFog=%s scene=%s luminance=%s\n",
+		vk_post_fog_source_name( vk_get_post_fog_source() ),
+		vk_post_fog_source_name( vk.scene_post_fog_color_source ),
+		vk_post_fog_source_name( vk_get_luminance_source() ) );
 	ri.Printf( PRINT_ALL, "framegraph : fbo=%s hdr=%d color=%s renderTarget=%ux%u\n",
 		R_YesNo( vk.fboActive ), R_CvarInteger( r_hdr ), vk_format_string( vk.color_format ),
 		vk.renderWidth, vk.renderHeight );

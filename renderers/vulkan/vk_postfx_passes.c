@@ -22,6 +22,25 @@ SSAO/HBAO pass, and vk_bloom. Split from vk.c.
 #include "vk_deferred_gbuffer.h"
 #include "vk_visibility_buffer.h"
 
+static void vk_oit_validate_pass_break( const char *stage )
+{
+	if ( !r_fboDebug || r_fboDebug->integer < 1 || !vk_post_fog_fbo_debug_throttle() ) {
+		return;
+	}
+
+	if ( vk.inRenderPass ) {
+		ri.Printf( PRINT_DEVELOPER, S_COLOR_YELLOW
+			"[VK][OIT] %s: expected no active render pass before OIT side pass, still in %d\n",
+			stage ? stage : "pass_break", (int)vk.renderPassIndex );
+	}
+
+	if ( backEnd.drawSurfFilter && backEnd.drawSurfFilter != 2 ) {
+		ri.Printf( PRINT_DEVELOPER, S_COLOR_YELLOW
+			"[VK][OIT] %s: expected transparent drawSurfFilter 2 or 0, got %d\n",
+			stage ? stage : "pass_break", backEnd.drawSurfFilter );
+	}
+}
+
 static void vk_postfx_set_render_extent( uint32_t width, uint32_t height )
 {
 	vk.renderWidth = width;
@@ -173,6 +192,7 @@ void vk_oit_pass( const struct drawSurfsCommand_s *cmd )
 		return;
 
 	vk_end_render_pass();
+	vk_oit_validate_pass_break( "oit_pass_begin" );
 	vk_get_active_render_extent( &fullWidth, &fullHeight );
 
 	/* Copy opaque scene to fog_scene for resolve */

@@ -18,6 +18,31 @@ Mode 3 = Unified Clustered Renderer (deferred opaque + Forward+ transparent).
 #include "vk_util.h"
 #include "vk_view_state.h"
 
+static void vk_dgb_validate_compute_break( const char *stage, qboolean resume_main )
+{
+	if ( !r_fboDebug || r_fboDebug->integer < 1 || !vk_post_fog_fbo_debug_throttle() ) {
+		return;
+	}
+
+	if ( vk.inRenderPass ) {
+		ri.Printf( PRINT_DEVELOPER, S_COLOR_YELLOW
+			"[VK][deferred] %s: expected out-of-pass compute/transfer window, still in render pass %d\n",
+			stage ? stage : "compute_break", (int)vk.renderPassIndex );
+	}
+
+	if ( resume_main && vk.renderPassIndex != RENDER_PASS_MAIN ) {
+		ri.Printf( PRINT_DEVELOPER, S_COLOR_YELLOW
+			"[VK][deferred] %s: resume_main requested but renderPassIndex=%d instead of main\n",
+			stage ? stage : "compute_break", (int)vk.renderPassIndex );
+	}
+
+	if ( vk.cmd == NULL || vk.cmd->command_buffer == VK_NULL_HANDLE ) {
+		ri.Printf( PRINT_DEVELOPER, S_COLOR_YELLOW
+			"[VK][deferred] %s: command buffer unavailable during deferred compute break\n",
+			stage ? stage : "compute_break" );
+	}
+}
+
 typedef struct {
 	vec4_t projInfo;
 	vec4_t materialParams;
@@ -414,6 +439,7 @@ void vk_deferred_gbuffer_capture_after_geometry( void )
 	if ( vk.inRenderPass ) {
 		vk_end_render_pass();
 	}
+	vk_dgb_validate_compute_break( "gbuffer_capture_after_geometry", resume_main );
 
 	if ( !vk.deferredGbufferDirectExport ) {
 		vk_dgb_create_pipeline();
