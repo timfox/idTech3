@@ -99,6 +99,7 @@ Priorities that keep **CI green** and **README/build truth** aligned:
 - [ ] Temporal robustness (incremental in progress): shared reset policy + optional **`r_taa`** with motion-vector path; **per-entity motion policy** (`r_temporalCpuSkinPrev`, GPU deform detect) landed — CPU-skinned prev-vertex tess and reactive debug overlays still open. See `docs/RENDERER_2026_ARCHITECTURE_PASS.md`.
   - On `main`: TAA runs with per-frame history confidence (`taaParams`); portals/camera cuts still hard-skip; `r_temporalCpuSkinPrev 0` restores conservative whole-frame invalidation for spawning animated entities.
 - [ ] Platform strategy: Vulkan as the supported renderer; prioritize Metal ahead of DXR; treat RTX as a Vulkan feature tier. See `docs/RENDERER_2026_ARCHITECTURE_PASS.md`.
+- [ ] 2026 H2 modernization pass: stabilize the shipping mode-2 path first, keep mode 1 / mode 3 experimental until they stop black-screening or device-losing, then widen temporal/pass-contract/shared-G-buffer infrastructure. See `docs/RENDERER_MODERNIZATION_ROADMAP_2026H2.md`.
 
 ### Short-Term (completed)
 - [x] Connect BSP geometry extraction to map loading for automatic navmesh

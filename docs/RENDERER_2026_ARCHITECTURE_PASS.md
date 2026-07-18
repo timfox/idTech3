@@ -11,6 +11,8 @@ This document turns the current renderer state into a practical 2026 plan. It is
 
 The objective is not "add every modern rendering acronym." The objective is to make the existing Vulkan renderer scale to more lights, behave predictably across temporal effects, and converge on a platform strategy that is realistic for shipping.
 
+For the second-half execution plan that prioritizes shipping-path stabilization, temporal/pass ownership cleanup, and controlled expansion, see [RENDERER_MODERNIZATION_ROADMAP_2026H2.md](RENDERER_MODERNIZATION_ROADMAP_2026H2.md).
+
 ---
 
 ## Current Snapshot

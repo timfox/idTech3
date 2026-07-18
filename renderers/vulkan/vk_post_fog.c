@@ -254,13 +254,35 @@ void vk_set_scene_post_fog_source( VkImageView color_source )
 	vk.scene_post_fog_color_source = color_source ? color_source : vk.color_image_view;
 }
 
+static VkImageView vk_choose_post_fog_fallback_source( const char *reason )
+{
+	VkImageView fallback = VK_NULL_HANDLE;
+
+	if ( vk.scene_post_fog_color_source != VK_NULL_HANDLE ) {
+		fallback = vk.scene_post_fog_color_source;
+	} else if ( vk.post_fog_color_source != VK_NULL_HANDLE ) {
+		fallback = vk.post_fog_color_source;
+	} else {
+		fallback = vk.color_image_view;
+	}
+
+	if ( fallback != VK_NULL_HANDLE && r_fboDebug && r_fboDebug->integer >= 1 && vk_post_fog_fbo_debug_throttle() ) {
+		ri.Printf( PRINT_DEVELOPER, S_COLOR_YELLOW
+			"[VK][fbo] post-fog source fallback (%s): %s\n",
+			reason ? reason : "unspecified",
+			vk_post_fog_source_name( fallback ) );
+	}
+
+	return fallback;
+}
+
 void vk_update_post_fog_descriptors( VkImageView color_source )
 {
 	VkImageView old_source;
 	qboolean updated_luminance = qfalse;
 
 	if ( color_source == VK_NULL_HANDLE ) {
-		color_source = vk.color_image_view;
+		color_source = vk_choose_post_fog_fallback_source( "update_post_fog_descriptors" );
 	}
 
 	old_source = vk.post_fog_color_source;
@@ -290,7 +312,7 @@ VkImageView vk_get_post_fog_source( void )
 	if ( vk.post_fog_color_source != VK_NULL_HANDLE ) {
 		return vk.post_fog_color_source;
 	}
-	return vk.color_image_view;
+	return vk_choose_post_fog_fallback_source( "get_post_fog_source" );
 }
 
 VkImageView vk_get_luminance_source( void )
@@ -301,7 +323,7 @@ VkImageView vk_get_luminance_source( void )
 	if ( vk.post_fog_color_source != VK_NULL_HANDLE ) {
 		return vk.post_fog_color_source;
 	}
-	return vk.color_image_view;
+	return vk_choose_post_fog_fallback_source( "get_luminance_source" );
 }
 
 void vk_reset_post_fog_frame_state( void )

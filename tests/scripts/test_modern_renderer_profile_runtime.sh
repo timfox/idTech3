@@ -115,6 +115,8 @@ source_checks() {
 	check_grep "renderers/vulkan/vk_deferred_gbuffer.c" 'vk_dgb_validate_compute_break' "deferred path validates compute-break assumptions"
 	check_grep "renderers/vulkan/vk_visibility_buffer.c" 'vk_visbuf_validate_compute_break' "visibility path validates compute-break assumptions"
 	check_grep "renderers/vulkan/vk_postfx_passes.c" 'vk_oit_validate_pass_break' "OIT path validates pass-break assumptions"
+	check_grep "renderers/vulkan/vk_scene_pass.c" 'vk_scene_pass_resume_framebuffer' "scene-pass helpers self-heal safe resume targets"
+	check_grep "renderers/vulkan/vk_post_fog.c" 'vk_choose_post_fog_fallback_source' "post-fog chain self-heals null source drift"
 
 	if [[ -d "${RELEASE_DIR:-$ROOT/release}/base" ]]; then
 		local release_base="${RELEASE_DIR:-$ROOT/release}/base"
