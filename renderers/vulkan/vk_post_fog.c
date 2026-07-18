@@ -304,6 +304,46 @@ void vk_update_post_fog_descriptors( VkImageView color_source )
 	}
 }
 
+void vk_validate_post_fog_runtime_sources( const char *reason )
+{
+	VkImageView repairedPostFog = vk.post_fog_color_source;
+	VkImageView repairedScene = vk.scene_post_fog_color_source;
+	VkImageView defaultSource = vk.color_image_view;
+	qboolean changed = qfalse;
+
+	if ( defaultSource != VK_NULL_HANDLE && vk_post_fog_source_image( defaultSource ) == VK_NULL_HANDLE ) {
+		defaultSource = VK_NULL_HANDLE;
+	}
+
+	if ( repairedPostFog == VK_NULL_HANDLE || vk_post_fog_source_image( repairedPostFog ) == VK_NULL_HANDLE ) {
+		repairedPostFog = defaultSource;
+		changed = qtrue;
+	}
+
+	if ( repairedScene == VK_NULL_HANDLE || vk_post_fog_source_image( repairedScene ) == VK_NULL_HANDLE ) {
+		repairedScene = repairedPostFog != VK_NULL_HANDLE ? repairedPostFog : defaultSource;
+		changed = qtrue;
+	}
+
+	vk.post_fog_color_source = repairedPostFog;
+	vk.scene_post_fog_color_source = repairedScene;
+
+	if ( repairedPostFog != VK_NULL_HANDLE ) {
+		vk_update_post_fog_descriptors( repairedPostFog );
+	} else if ( defaultSource != VK_NULL_HANDLE ) {
+		vk_update_post_fog_descriptors( defaultSource );
+	}
+
+	if ( r_fboDebug && r_fboDebug->integer >= 1 && changed && vk_post_fog_fbo_debug_throttle() ) {
+		ri.Printf( PRINT_DEVELOPER, S_COLOR_YELLOW
+			"[VK][fbo] validated post-fog runtime sources (%s): post=%s scene=%s default=%s\n",
+			reason ? reason : "unspecified",
+			vk_post_fog_source_name( vk.post_fog_color_source ),
+			vk_post_fog_source_name( vk.scene_post_fog_color_source ),
+			vk_post_fog_source_name( defaultSource ) );
+	}
+}
+
 /*
  * Centralized post-fog source selection for luminance/gamma passes.
  */
@@ -342,4 +382,6 @@ void vk_reset_post_fog_frame_state( void )
 		default_source != vk.luminance_image_view ) {
 		vk_update_luminance_descriptor_image( default_source );
 	}
+
+	vk_validate_post_fog_runtime_sources( "reset_post_fog_frame_state" );
 }

@@ -28,6 +28,7 @@ void        vk_update_luminance_descriptor_image( VkImageView color_view );
 void        vk_barrier_post_fog_source_for_sampling( VkImageView color_source, const char *reason );
 void        vk_barrier_motion_vector_for_sampling( const char *reason );
 void        vk_update_post_fog_descriptors( VkImageView color_source );
+void        vk_validate_post_fog_runtime_sources( const char *reason );
 
 /* Throttle FBO debug logs to at most once per second. Internal use. */
 qboolean    vk_post_fog_fbo_debug_throttle( void );
