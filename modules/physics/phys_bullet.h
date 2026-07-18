@@ -241,7 +241,8 @@ int Phys_GetWorkerCount(void);
 typedef enum {
 	PHYS_BACKEND_NONE = 0,
 	PHYS_BACKEND_BOX3D,
-	PHYS_BACKEND_BULLET
+	PHYS_BACKEND_BULLET,
+	PHYS_BACKEND_JOLT
 } physBackendKind_t;
 
 physBackendKind_t Phys_GetBackend(void);

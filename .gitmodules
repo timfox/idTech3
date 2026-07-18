@@ -16,3 +16,6 @@
 [submodule "third_party/box3d"]
 	path = third_party/box3d
 	url = https://github.com/timfox/idTech3-box3d.git
+[submodule "third_party/JoltPhysics"]
+	path = third_party/JoltPhysics
+	url = https://github.com/jrouwe/JoltPhysics.git

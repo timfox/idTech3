@@ -59,7 +59,14 @@ rg -q 'CL_PhysDebugDrawSubmit' "$CL_PHYS_DEBUG"
 
 echo "[test_physics] backend switch + Box3D submodule..."
 test -f modules/physics/phys_box3d_impl.c
+test -f modules/physics/phys_jolt_impl.cpp
 rg -q 'IDTECH3_PHYSICS_BACKEND' CMakeLists.txt
+rg -q 'box3d | bullet | jolt | none' CMakeLists.txt
+rg -q 'third_party/JoltPhysics' CMakeLists.txt
+rg -q 'PHYS_BACKEND_JOLT' modules/physics/phys_bullet.h
+rg -q 'return "jolt"' modules/physics/phys_bullet.c
+rg -q 'physics-jolt' scripts/compile_engine.sh
+rg -q -- '--jolt' scripts/init_optional_submodules.sh
 rg -q 'USE_BOX3D_PHYSICS_IMPL' modules/physics/phys_box3d_impl.c
 rg -q 'Phys_GetBackendName' modules/physics/phys_bullet.c
 rg -q 'Phys_GetBackendName' "$PHYS_MIDDLEWARE"
@@ -67,6 +74,9 @@ if [ -f third_party/box3d/CMakeLists.txt ]; then
 	rg -q 'box3d' third_party/box3d/CMakeLists.txt
 else
 	echo "[test_physics] note: third_party/box3d not checked out (submodule)"
+fi
+if [ -f .gitmodules ]; then
+	rg -q 'third_party/JoltPhysics' .gitmodules
 fi
 
 echo "[test_physics] demo cfg documents console path..."

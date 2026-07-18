@@ -194,6 +194,10 @@ while [[ $# -gt 0 ]]; do
       PHYSICS_BACKEND="bullet"
       shift
       ;;
+    jolt|physics-jolt)
+      PHYSICS_BACKEND="jolt"
+      shift
+      ;;
     no-physics|nophysics|physics-none)
       PHYSICS_BACKEND="none"
       shift
@@ -486,6 +490,15 @@ if [ "$PHYSICS_BACKEND" = "box3d" ] && [ -f "$PROJECT_ROOT/.gitmodules" ]; then
     echo "Initializing Box3D submodule (third_party/box3d)..."
     if ! git -C "$PROJECT_ROOT" submodule update --init third_party/box3d; then
       echo "Warning: Box3D submodule init failed; physics backend may fall back to none." >&2
+    fi
+  fi
+fi
+
+if [ "$PHYSICS_BACKEND" = "jolt" ] && [ -f "$PROJECT_ROOT/.gitmodules" ]; then
+  if [ ! -f "$PROJECT_ROOT/third_party/JoltPhysics/Build/CMakeLists.txt" ]; then
+    echo "Initializing JoltPhysics submodule (third_party/JoltPhysics)..."
+    if ! git -C "$PROJECT_ROOT" submodule update --init third_party/JoltPhysics; then
+      echo "Warning: JoltPhysics submodule init failed; physics backend may fall back to none." >&2
     fi
   fi
 fi

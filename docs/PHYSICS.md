@@ -2,7 +2,7 @@
 
 ## Architecture
 
-**Box3D Soft Step** ([timfox/idTech3-box3d](https://github.com/timfox/idTech3-box3d)) is the default **rigid substrate** (`third_party/box3d`). Companion solvers share that world through `Phys_*`. Bullet remains an optional alternate.
+**Box3D Soft Step** ([timfox/idTech3-box3d](https://github.com/timfox/idTech3-box3d)) is the default **rigid substrate** (`third_party/box3d`). Companion solvers share that world through `Phys_*`. Bullet and **Jolt Physics** ([jrouwe/JoltPhysics](https://github.com/jrouwe/JoltPhysics)) are optional alternates, with Jolt currently wired as an integration scaffold while the full gameplay bridge is completed.
 
 ```txt
 Phys_StepSimulation
@@ -148,6 +148,7 @@ Then drive poses with `Phys_RagdollSetBoneAnimTarget` / `Phys_RagdollApplyMd3Fra
 |---------|----------------|
 | **Box3D (default)** | `-DIDTECH3_PHYSICS_BACKEND=box3d` / `./scripts/compile_engine.sh vulkan` |
 | Bullet | `… bullet` (`IDTECH3_PHYSICS_BACKEND=bullet`) |
+| Jolt | `… jolt` (`IDTECH3_PHYSICS_BACKEND=jolt`) |
 | None | `… no-physics` |
 
 ## Cvars

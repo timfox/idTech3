@@ -11,11 +11,12 @@ DO_FREEUSD=0
 DO_BACKEND=0
 DO_EMULATOR=0
 DO_BOX3D=0
+DO_JOLT=0
 DRY_RUN=0
 
 usage() {
 	cat <<'EOF'
-Usage: init_optional_submodules.sh [--tiled] [--svo] [--box3d] [--all] [--dry-run] [--help]
+Usage: init_optional_submodules.sh [--tiled] [--svo] [--box3d] [--jolt] [--all] [--dry-run] [--help]
 
 Initialize optional Git submodules. Idempotent: safe to run twice.
 
@@ -26,6 +27,7 @@ Options:
   --backend   third_party/idtech3backend (legacy: src/external/idtech3backend) — see docs/IDTECH3_BACKEND.md
   --emulator  third_party/idtech3-emulator (timfox/idTech3-Emulator QEMU fork) — see docs/IDTECH3_EMULATOR.md
   --box3d     third_party/box3d (default physics substrate) — see docs/PHYSICS.md
+  --jolt      third_party/JoltPhysics (optional physics substrate) — see docs/PHYSICS.md
   --all       Initialize every optional submodule listed above
   --dry-run   Print commands without running git submodule
   --help      Show this help
@@ -33,10 +35,11 @@ Options:
 Examples:
   ./scripts/init_optional_submodules.sh --tiled
   ./scripts/init_optional_submodules.sh --box3d
+  ./scripts/init_optional_submodules.sh --jolt
   ./scripts/init_optional_submodules.sh --all
   ./scripts/init_optional_submodules.sh --tiled --dry-run
 
-Error: pass at least one of --tiled, --svo, --freeusd, --backend, --emulator, --box3d, or --all.
+Error: pass at least one of --tiled, --svo, --freeusd, --backend, --emulator, --box3d, --jolt, or --all.
 EOF
 }
 
@@ -48,7 +51,8 @@ while [ $# -gt 0 ]; do
 		--backend|--idtech3backend) DO_BACKEND=1 ;;
 		--emulator|--idtech3-emulator) DO_EMULATOR=1 ;;
 		--box3d|--box3D) DO_BOX3D=1 ;;
-		--all) DO_TILED=1; DO_SVO=1; DO_FREEUSD=1; DO_BACKEND=1; DO_EMULATOR=1; DO_BOX3D=1 ;;
+		--jolt|--JoltPhysics|--joltphysics) DO_JOLT=1 ;;
+		--all) DO_TILED=1; DO_SVO=1; DO_FREEUSD=1; DO_BACKEND=1; DO_EMULATOR=1; DO_BOX3D=1; DO_JOLT=1 ;;
 		--dry-run) DRY_RUN=1 ;;
 		-h|--help)
 			usage
@@ -64,8 +68,9 @@ while [ $# -gt 0 ]; do
 done
 
 if [ "$DO_TILED" -eq 0 ] && [ "$DO_SVO" -eq 0 ] && [ "$DO_FREEUSD" -eq 0 ] \
-	&& [ "$DO_BACKEND" -eq 0 ] && [ "$DO_EMULATOR" -eq 0 ] && [ "$DO_BOX3D" -eq 0 ]; then
-	echo "Error: pass at least one of --tiled, --svo, --freeusd, --backend, --emulator, --box3d, or --all." >&2
+	&& [ "$DO_BACKEND" -eq 0 ] && [ "$DO_EMULATOR" -eq 0 ] && [ "$DO_BOX3D" -eq 0 ] \
+	&& [ "$DO_JOLT" -eq 0 ]; then
+	echo "Error: pass at least one of --tiled, --svo, --freeusd, --backend, --emulator, --box3d, --jolt, or --all." >&2
 	usage >&2
 	exit 2
 fi
@@ -135,6 +140,9 @@ if [ "$DO_EMULATOR" -eq 1 ]; then
 fi
 if [ "$DO_BOX3D" -eq 1 ]; then
 	init_one "third_party/box3d" "Box3D (timfox/idTech3-box3d)"
+fi
+if [ "$DO_JOLT" -eq 1 ]; then
+	init_one "third_party/JoltPhysics" "Jolt Physics (jrouwe/JoltPhysics)"
 fi
 
 echo "optional submodules: finished"

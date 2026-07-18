@@ -6,7 +6,7 @@ This file is original work by Gopex LLC and is not derived from
 existing id Tech 3 / ioquake3 code.
 The engine framework is based on id Tech 3 (GPLv2).
 
-Physics C dispatch layer (Box3D default / Bullet optional).
+Physics C dispatch layer (Box3D default / Bullet / Jolt optional).
 Routes Phys_* calls to the compiled substrate via phys_impl.h.
 
 ===========================================================================
@@ -25,7 +25,7 @@ Routes Phys_* calls to the compiled substrate via phys_impl.h.
 #include "phys_debugdraw.h"
 #include "phys_solvers.h"
 
-#if defined(USE_BOX3D_PHYSICS_IMPL) || defined(USE_BULLET_PHYSICS_IMPL)
+#if defined(USE_BOX3D_PHYSICS_IMPL) || defined(USE_BULLET_PHYSICS_IMPL) || defined(USE_JOLT_PHYSICS_IMPL)
 #define PHYS_HAS_IMPL 1
 #endif
 
@@ -84,6 +84,8 @@ physBackendKind_t Phys_GetBackend(void) {
 	return PHYS_BACKEND_BOX3D;
 #elif defined(USE_BULLET_PHYSICS_IMPL)
 	return PHYS_BACKEND_BULLET;
+#elif defined(USE_JOLT_PHYSICS_IMPL)
+	return PHYS_BACKEND_JOLT;
 #else
 	return PHYS_BACKEND_NONE;
 #endif
@@ -93,6 +95,7 @@ const char *Phys_GetBackendName(void) {
 	switch ( Phys_GetBackend() ) {
 	case PHYS_BACKEND_BOX3D:  return "box3d";
 	case PHYS_BACKEND_BULLET: return "bullet";
+	case PHYS_BACKEND_JOLT:   return "jolt";
 	default:                  return "none";
 	}
 }
