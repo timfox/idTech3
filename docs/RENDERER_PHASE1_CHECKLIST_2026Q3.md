@@ -36,11 +36,11 @@ Make the shipping Vulkan path reliable enough that:
 
 ### Tasks
 
-- [ ] Audit every call path that ends the main pass and later resumes it.
-- [ ] Ensure every resume site goes through the shared scene-pass helpers rather than open-coded assumptions.
-- [ ] Verify the post-bloom continuation path always resumes the expected framebuffer and render-pass pair.
+- [x] Audit every call path that ends the main pass and later resumes it.
+- [x] Ensure every resume site goes through the shared scene-pass helpers rather than open-coded assumptions.
+- [x] Verify the post-bloom continuation path always resumes the expected framebuffer and render-pass pair.
 - [ ] Verify UI overlay and 2D transition paths cannot silently drift the active pass state.
-- [ ] Verify deferred and compute detours restore the main scene pass explicitly before transparent or overlay work resumes.
+- [x] Verify deferred and compute detours restore the main scene pass explicitly before transparent or overlay work resumes.
 
 ### Existing hooks worth extending
 
@@ -49,14 +49,15 @@ Make the shipping Vulkan path reliable enough that:
 - `vk_scene_pass_resume_framebuffer`
 - `vk_resume_current_render_pass`
 - `vk_resume_main_render_pass`
+- `vk_pass_diag_*` / `vk_report_device_lost_context`
 
 ### Desired instrumentation
 
-- Last successful pass name
-- Last requested resume target
-- Current framebuffer identity
-- Whether the engine believed it was in-pass or out-of-pass
-- Whether the resume path had to self-heal/fallback
+- [x] Last successful pass name
+- [x] Last requested resume target
+- [x] Current framebuffer identity (via begin extent + pass name)
+- [x] Whether the engine believed it was in-pass or out-of-pass
+- [x] Whether the resume path had to self-heal/fallback
 
 ### Existing tests
 
@@ -93,8 +94,8 @@ That makes late post/bloom work a first-class stabilization target.
 
 ### Tasks
 
-- [ ] Log bloom path entry/exit with enough context to identify the active source image and expected destination.
-- [ ] Validate that bloom extraction only runs when its source image/view/layout are valid.
+- [x] Log bloom path entry/exit with enough context to identify the active source image and expected destination.
+- [x] Validate that bloom extraction only runs when its source image/view/layout are valid.
 - [ ] Validate every bloom downsample and blur step against expected image dimensions and layouts.
 - [ ] Validate the post-bloom continuation pass after bloom finishes, especially when toggles are applied from config startup.
 - [ ] Audit bloom threshold/intensity parameter ranges and how they are pushed or specialized through the pipeline.
@@ -155,10 +156,10 @@ That makes late post/bloom work a first-class stabilization target.
 
 ### Tasks
 
-- [ ] Improve device-loss logging so the engine reports the active renderer profile and recent render toggles before recursive shutdown noise.
-- [ ] Record the last completed major Vulkan stage for the frame.
-- [ ] Record the last begun pass and the last ended pass.
-- [ ] Report whether the loss happened near bloom/post/AA/deferred/clustered work.
+- [x] Improve device-loss logging so the engine reports the active renderer profile and recent render toggles before recursive shutdown noise.
+- [x] Record the last completed major Vulkan stage for the frame.
+- [x] Record the last begun pass and the last ended pass.
+- [x] Report whether the loss happened near bloom/post/AA/deferred/clustered work.
 - [ ] Reduce duplicate recursive shutdown spam after `VK_ERROR_DEVICE_LOST` so the first useful error remains visible.
 
 ### Minimum crash-context payload
@@ -211,10 +212,10 @@ That makes late post/bloom work a first-class stabilization target.
 
 ### Cheap additions worth making
 
-- [ ] A source guard that bloom/post paths still validate resume ownership before returning to continuation passes.
+- [x] A source guard that bloom/post paths still validate resume ownership before returning to continuation passes.
 - [ ] A source guard that gamma/final compose references the intended post-bloom source selection path.
-- [ ] A runtime diagnostics test that the renderer status print includes current mode/profile/post toggles.
-- [ ] A regression note/test for the July 18, 2026 late-bloom device-loss failure class.
+- [x] A runtime diagnostics test that the renderer status print includes current mode/profile/post toggles.
+- [x] A regression note/test for the July 18, 2026 late-bloom device-loss failure class.
 
 ---
 

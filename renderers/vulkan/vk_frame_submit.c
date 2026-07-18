@@ -208,6 +208,7 @@ void vk_begin_frame( void )
 		if ( res != VK_SUCCESS ) {
 			if ( res == VK_ERROR_DEVICE_LOST ) {
 				vk.device_lost = qtrue;
+				vk_report_device_lost_context( "vkWaitForFences" );
 				ri.Error( ERR_FATAL, "Vulkan: %s returned %s (GPU lost)", "vkWaitForFences", vk_result_string( res ) );
 			}
 			else {
@@ -462,6 +463,7 @@ void vk_end_frame( void )
 		if ( sub_res != VK_SUCCESS ) {
 			if ( sub_res == VK_ERROR_DEVICE_LOST ) {
 				vk.device_lost = qtrue;
+				vk_report_device_lost_context( "vkQueueSubmit" );
 			}
 			ri.Error( ERR_FATAL, "Vulkan: qvkQueueSubmit returned %s", vk_result_string( sub_res ) );
 		}
@@ -538,7 +540,9 @@ void vk_present_frame( void )
 			vk_restart_swapchain( __func__, res );
 			return;
 		case VK_ERROR_DEVICE_LOST:
-			ri.Printf( PRINT_DEVELOPER, "vkQueuePresentKHR: device lost\n" );
+			vk.device_lost = qtrue;
+			vk_report_device_lost_context( "vkQueuePresentKHR" );
+			ri.Printf( PRINT_WARNING, "vkQueuePresentKHR: device lost\n" );
 			break;
 		default:
 			ri.Error( ERR_FATAL, "vkQueuePresentKHR returned %s", vk_result_string( res ) );

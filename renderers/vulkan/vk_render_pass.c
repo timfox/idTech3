@@ -2,6 +2,7 @@
 #include "vk.h"
 #include "vk_postfx.h"
 #include "vk_render_pass.h"
+#include "vk_scene_pass.h"
 #include "vk_validation.h"
 #include "vk_rtx.h"
 #include "vk_fsa.h"
@@ -149,6 +150,16 @@ void vk_end_render_pass_tracked( void )
 
 	qvkCmdEndRenderPass( vk.cmd->command_buffer );
 	vk.inRenderPass = qfalse;
+	{
+		const char *ended =
+			( vk.renderPassIndex == RENDER_PASS_MAIN ) ? "main" :
+			( vk.renderPassIndex == RENDER_PASS_POST_BLOOM ) ? "post_bloom" :
+			( vk.renderPassIndex == RENDER_PASS_UI_OVERLAY ) ? "ui_overlay" :
+			( vk.renderPassIndex == RENDER_PASS_SCREENMAP ) ? "screenmap" :
+			( vk.renderPassIndex == RENDER_PASS_SUN_SHADOW ) ? "sun_shadow" :
+			( vk.renderPassIndex == RENDER_PASS_CUBEMAP ) ? "cubemap" : "tracked_pass";
+		vk_pass_diag_end( ended );
+	}
 
 #ifdef USE_VULKAN_RTX
 	if ( vk_hybrid1_active() &&

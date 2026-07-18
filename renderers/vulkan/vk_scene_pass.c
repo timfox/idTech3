@@ -59,6 +59,80 @@ static const char *vk_scene_pass_name( renderPass_t pass )
 	}
 }
 
+void vk_pass_diag_reset( void )
+{
+	vk.passDiag.lastBegunPass[0] = '\0';
+	vk.passDiag.lastEndedPass[0] = '\0';
+	vk.passDiag.lastPostStage[0] = '\0';
+	vk.passDiag.lastResumeTarget[0] = '\0';
+	vk.passDiag.lastResumeSelfHeal = qfalse;
+	vk.passDiag.inContinuationPass = qfalse;
+	vk.passDiag.lastPassWidth = 0;
+	vk.passDiag.lastPassHeight = 0;
+}
+
+void vk_pass_diag_begin( const char *passName, uint32_t width, uint32_t height )
+{
+	Q_strncpyz( vk.passDiag.lastBegunPass, passName ? passName : "unknown", sizeof( vk.passDiag.lastBegunPass ) );
+	vk.passDiag.lastPassWidth = width;
+	vk.passDiag.lastPassHeight = height;
+	if ( passName && ( !Q_stricmp( passName, "post_bloom" ) || !Q_stricmp( passName, "ui_overlay" ) ) ) {
+		vk.passDiag.inContinuationPass = qtrue;
+	} else if ( passName && !Q_stricmp( passName, "main" ) ) {
+		vk.passDiag.inContinuationPass = qfalse;
+	}
+}
+
+void vk_pass_diag_end( const char *passName )
+{
+	Q_strncpyz( vk.passDiag.lastEndedPass, passName ? passName : "unknown", sizeof( vk.passDiag.lastEndedPass ) );
+}
+
+void vk_pass_diag_stage( const char *stageName )
+{
+	Q_strncpyz( vk.passDiag.lastPostStage, stageName ? stageName : "unknown", sizeof( vk.passDiag.lastPostStage ) );
+}
+
+void vk_pass_diag_resume( const char *targetName, qboolean selfHeal )
+{
+	Q_strncpyz( vk.passDiag.lastResumeTarget, targetName ? targetName : "unknown", sizeof( vk.passDiag.lastResumeTarget ) );
+	vk.passDiag.lastResumeSelfHeal = selfHeal;
+	vk_pass_diag_stage( "resume" );
+}
+
+void vk_report_device_lost_context( const char *where )
+{
+	ri.Printf( PRINT_ALL, S_COLOR_RED
+		"[VK][device_lost] at %s\n",
+		where ? where : "unknown" );
+	ri.Printf( PRINT_ALL,
+		"[VK][device_lost] profile mode=%d fbo=%d hdr=%d bloom=%d pbr=%d forwardPlus=%d deferredGBuffer=%d smaa=%d taa=%d\n",
+		r_renderMode ? r_renderMode->integer : -1,
+		r_fbo ? r_fbo->integer : -1,
+		r_hdr ? r_hdr->integer : -1,
+		r_bloom ? r_bloom->integer : -1,
+		r_pbr ? r_pbr->integer : -1,
+		r_forwardPlus ? r_forwardPlus->integer : -1,
+		r_deferredGBuffer ? r_deferredGBuffer->integer : -1,
+		r_ext_smaa ? r_ext_smaa->integer : -1,
+		r_taa ? r_taa->integer : -1 );
+	ri.Printf( PRINT_ALL,
+		"[VK][device_lost] pass begun=%s ended=%s stage=%s resume=%s selfHeal=%s inPass=%s continuation=%s extent=%ux%u\n",
+		vk.passDiag.lastBegunPass[0] ? vk.passDiag.lastBegunPass : "(none)",
+		vk.passDiag.lastEndedPass[0] ? vk.passDiag.lastEndedPass : "(none)",
+		vk.passDiag.lastPostStage[0] ? vk.passDiag.lastPostStage : "(none)",
+		vk.passDiag.lastResumeTarget[0] ? vk.passDiag.lastResumeTarget : "(none)",
+		vk.passDiag.lastResumeSelfHeal ? "yes" : "no",
+		vk.inRenderPass ? "yes" : "no",
+		vk.passDiag.inContinuationPass ? "yes" : "no",
+		vk.passDiag.lastPassWidth, vk.passDiag.lastPassHeight );
+	ri.Printf( PRINT_ALL,
+		"[VK][device_lost] renderTarget=%ux%u activePass=%s postFog=%s\n",
+		vk.renderWidth, vk.renderHeight,
+		vk_scene_pass_name( vk.renderPassIndex ),
+		vk_post_fog_source_name( vk_get_post_fog_source() ) );
+}
+
 static void vk_scene_pass_validate_begin( const char *op, renderPass_t targetPass, VkRenderPass renderPass, VkFramebuffer frameBuffer )
 {
 	if ( !r_fboDebug || r_fboDebug->integer < 1 || !vk_post_fog_fbo_debug_throttle() ) {
@@ -164,6 +238,7 @@ void vk_begin_main_render_pass( void )
 
 	vk_configure_scene_pass_dimensions();
 	vk_reset_scene_src_rect_tracking();
+	vk_pass_diag_begin( "main", vk.renderWidth, vk.renderHeight );
 
 	vk_begin_render_pass_tracked( vk.render_pass.main, frameBuffer, qtrue, vk.renderWidth, vk.renderHeight );
 	vk.depth_image_layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
@@ -180,12 +255,15 @@ void vk_begin_post_bloom_render_pass( void )
 	frameBuffer = vk.framebuffers.main[ vk.cmd->swapchain_image_index ];
 	if ( frameBuffer == VK_NULL_HANDLE ) {
 		vk_scene_pass_validate_begin( "begin_post_bloom_render_pass", RENDER_PASS_POST_BLOOM, vk.render_pass.post_bloom, frameBuffer );
+		vk_pass_diag_stage( "post_bloom_skip_null_framebuffer" );
 		return;
 	}
 
 	vk_scene_pass_validate_begin( "begin_post_bloom_render_pass", RENDER_PASS_POST_BLOOM, vk.render_pass.post_bloom, frameBuffer );
 	vk.renderPassIndex = RENDER_PASS_POST_BLOOM;
 	vk_configure_scene_pass_dimensions();
+	vk_pass_diag_begin( "post_bloom", vk.renderWidth, vk.renderHeight );
+	vk_pass_diag_stage( "post_bloom_begin" );
 
 	vk_begin_render_pass_tracked( vk.render_pass.post_bloom, frameBuffer, qfalse, vk.renderWidth, vk.renderHeight );
 	vk.depth_image_layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
@@ -209,6 +287,7 @@ void vk_begin_ui_overlay_render_pass( void )
 	vk.renderPassIndex = RENDER_PASS_UI_OVERLAY;
 	vk_configure_scene_pass_dimensions();
 	vk.uiOverlayActive = qtrue;
+	vk_pass_diag_begin( "ui_overlay", vk.renderWidth, vk.renderHeight );
 
 	vk_begin_render_pass_tracked( vk.render_pass.ui_overlay, frameBuffer, qtrue, vk.renderWidth, vk.renderHeight );
 	vk.depth_image_layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
@@ -224,7 +303,9 @@ without clearing color/depth attachments.
 void vk_resume_current_render_pass( void )
 {
 	VkFramebuffer frameBuffer;
+	renderPass_t requestedPass;
 	renderPass_t targetPass;
+	qboolean selfHeal;
 
 	vk_scene_pass_validate_resume();
 
@@ -235,9 +316,13 @@ void vk_resume_current_render_pass( void )
 		return;
 	}
 
-	targetPass = vk.renderPassIndex;
+	requestedPass = vk.renderPassIndex;
+	targetPass = requestedPass;
 	frameBuffer = vk_scene_pass_resume_framebuffer( &targetPass );
+	selfHeal = ( targetPass != requestedPass ) ? qtrue : qfalse;
 	vk.renderPassIndex = targetPass;
+	vk_pass_diag_resume( vk_scene_pass_name( targetPass ), selfHeal );
+	vk_pass_diag_begin( vk_scene_pass_name( targetPass ), vk.renderWidth, vk.renderHeight );
 
 	switch ( targetPass ) {
 	case RENDER_PASS_SCREENMAP:

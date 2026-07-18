@@ -529,6 +529,14 @@ static void R_RendererStatus_f( void )
 	ri.Printf( PRINT_ALL, "passes    : inRenderPass=%s active=%s uiOverlay=%s sourcesHealthy=%s\n",
 		R_YesNo( vk.inRenderPass ), R_RenderPassName( vk.renderPassIndex ),
 		R_YesNo( vk.uiOverlayActive ), R_YesNo( R_RendererSceneSourceHealthy() ) );
+	ri.Printf( PRINT_ALL, "passDiag  : begun=%s ended=%s stage=%s resume=%s selfHeal=%s continuation=%s extent=%ux%u\n",
+		vk.passDiag.lastBegunPass[0] ? vk.passDiag.lastBegunPass : "(none)",
+		vk.passDiag.lastEndedPass[0] ? vk.passDiag.lastEndedPass : "(none)",
+		vk.passDiag.lastPostStage[0] ? vk.passDiag.lastPostStage : "(none)",
+		vk.passDiag.lastResumeTarget[0] ? vk.passDiag.lastResumeTarget : "(none)",
+		R_YesNo( vk.passDiag.lastResumeSelfHeal ),
+		R_YesNo( vk.passDiag.inContinuationPass ),
+		vk.passDiag.lastPassWidth, vk.passDiag.lastPassHeight );
 	ri.Printf( PRINT_ALL, "present   : swapchainHealthy=%s extent=%ux%u images=%u fullscreen=%d srgb=%d\n",
 		R_YesNo( R_RendererSwapchainHealthy() ),
 		vk.swapchain_extent_valid ? vk.swapchain_extent.width : 0u,

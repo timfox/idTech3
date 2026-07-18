@@ -1398,6 +1398,18 @@ typedef struct {
 
 	qboolean inRenderPass;
 
+	/* Pass ownership / late-post diagnostics for device-loss crash context. */
+	struct {
+		char lastBegunPass[32];
+		char lastEndedPass[32];
+		char lastPostStage[48];
+		char lastResumeTarget[32];
+		qboolean lastResumeSelfHeal;
+		qboolean inContinuationPass;
+		uint32_t lastPassWidth;
+		uint32_t lastPassHeight;
+	} passDiag;
+
 	/* Eye adaptation: exposure from luminance pass (r_exposure_auto) */
 	float adaptedExposure;
 	vec3_t prevViewOrigin;  /* for camera cut detection (snap exposure on large view jump) */

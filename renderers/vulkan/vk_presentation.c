@@ -17,6 +17,7 @@ Extracted from vk.c for incremental modularization.
 #include "vk_render_pass.h"
 #include "vk_resource_destroy.h"
 #include "vk_post_fog.h"
+#include "vk_scene_pass.h"
 #include "vk_forward_plus.h"
 #include "vk_deferred_gbuffer.h"
 #include "vk_visibility_buffer.h"
@@ -69,6 +70,7 @@ void vk_teardown_presentation_targets( void )
 #endif
 
 	vk_reset_presentation_runtime_state();
+	vk_pass_diag_reset();
 }
 
 void vk_restore_presentation_targets( void )
@@ -97,6 +99,7 @@ void vk_restore_presentation_targets( void )
 	vk_reset_scene_src_rect_tracking();
 	vk_reset_post_fog_frame_state();
 	vk_reset_presentation_runtime_state();
+	vk_pass_diag_reset();
 	vk.renderWidth = vk.mainColorWidth > 0u ? vk.mainColorWidth :
 		( vk.swapchain_extent_valid ? vk.swapchain_extent.width : ( glConfig.vidWidth > 0 ? (uint32_t)glConfig.vidWidth : 1u ) );
 	vk.renderHeight = vk.mainColorHeight > 0u ? vk.mainColorHeight :

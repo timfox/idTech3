@@ -484,9 +484,68 @@ qboolean vk_ssao_pass( void )
 }
 
 
+static qboolean vk_bloom_resources_ready( const char **outReason )
+{
+	uint32_t i;
+
+	if ( outReason ) {
+		*outReason = NULL;
+	}
+	if ( vk.color_image == VK_NULL_HANDLE || vk.color_image_view == VK_NULL_HANDLE ) {
+		if ( outReason ) {
+			*outReason = "null color source image/view";
+		}
+		return qfalse;
+	}
+	if ( vk.render_pass.bloom_extract == VK_NULL_HANDLE || vk.framebuffers.bloom_extract == VK_NULL_HANDLE ) {
+		if ( outReason ) {
+			*outReason = "missing bloom extract pass/framebuffer";
+		}
+		return qfalse;
+	}
+	if ( vk.bloom_extract_pipeline == VK_NULL_HANDLE || vk.bloom_blend_pipeline == VK_NULL_HANDLE ) {
+		if ( outReason ) {
+			*outReason = "missing bloom extract/blend pipeline";
+		}
+		return qfalse;
+	}
+	if ( gls.captureWidth < 1 || gls.captureHeight < 1 ) {
+		if ( outReason ) {
+			*outReason = "invalid bloom capture dimensions";
+		}
+		return qfalse;
+	}
+	for ( i = 0; i < 1u + VK_NUM_BLOOM_PASSES * 2u; i++ ) {
+		if ( vk.bloom_image[i] == VK_NULL_HANDLE || vk.bloom_image_view[i] == VK_NULL_HANDLE ||
+			vk.bloom_image_descriptor[i] == VK_NULL_HANDLE ) {
+			if ( outReason ) {
+				*outReason = "incomplete bloom attachment chain";
+			}
+			return qfalse;
+		}
+	}
+	for ( i = 0; i < VK_NUM_BLOOM_PASSES * 2u; i++ ) {
+		if ( vk.render_pass.blur[i] == VK_NULL_HANDLE || vk.framebuffers.blur[i] == VK_NULL_HANDLE ||
+			vk.blur_pipeline[i] == VK_NULL_HANDLE ) {
+			if ( outReason ) {
+				*outReason = "incomplete bloom blur pass chain";
+			}
+			return qfalse;
+		}
+	}
+	if ( vk.render_pass.post_bloom == VK_NULL_HANDLE ) {
+		if ( outReason ) {
+			*outReason = "missing post-bloom render pass";
+		}
+		return qfalse;
+	}
+	return qtrue;
+}
+
 qboolean vk_bloom( void )
 {
 	uint32_t i;
+	const char *skipReason = NULL;
 	const qboolean canBlitDownsample = vk_format_has_features( vk.physical_device, vk.bloom_format,
 		VK_FORMAT_FEATURE_BLIT_SRC_BIT | VK_FORMAT_FEATURE_BLIT_DST_BIT | VK_FORMAT_FEATURE_SAMPLED_IMAGE_FILTER_LINEAR_BIT );
 
@@ -505,6 +564,30 @@ qboolean vk_bloom( void )
 		return qfalse;
 	}
 
+	if ( !vk_bloom_resources_ready( &skipReason ) ) {
+		vk_pass_diag_stage( "bloom_skip_invalid" );
+		if ( r_fboDebug && r_fboDebug->integer >= 1 && vk_post_fog_fbo_debug_throttle() ) {
+			ri.Printf( PRINT_DEVELOPER, S_COLOR_YELLOW
+				"[VK][bloom] skip: %s (capture=%dx%d threshold=%.3f intensity=%.3f)\n",
+				skipReason ? skipReason : "unknown",
+				gls.captureWidth, gls.captureHeight,
+				r_bloom_threshold ? r_bloom_threshold->value : 0.0f,
+				r_bloom_intensity ? r_bloom_intensity->value : 0.0f );
+		}
+		return qfalse;
+	}
+
+	vk_pass_diag_stage( "bloom_enter" );
+	if ( r_fboDebug && r_fboDebug->integer >= 1 && vk_post_fog_fbo_debug_throttle() ) {
+		ri.Printf( PRINT_DEVELOPER,
+			"[VK][bloom] enter: source=%s capture=%dx%d render=%ux%u threshold=%.3f intensity=%.3f\n",
+			vk_post_fog_source_name( vk.color_image_view ),
+			gls.captureWidth, gls.captureHeight,
+			vk.renderWidth, vk.renderHeight,
+			r_bloom_threshold ? r_bloom_threshold->value : 0.0f,
+			r_bloom_intensity ? r_bloom_intensity->value : 0.0f );
+	}
+
 	vk_end_render_pass(); // end main/post-bloom continuation
 	vk_deferred_gbuffer_draw_debug();
 	vk_visibility_buffer_draw_debug();
@@ -514,6 +597,7 @@ qboolean vk_bloom( void )
 
 	/* Ensure color_image is ready for sampling before bloom extract */
 	vk_barrier_post_fog_source_for_sampling( vk.color_image_view, "pre-bloom-extract" );
+	vk_pass_diag_stage( "bloom_extract" );
 
 	// bloom extraction
 	vk_begin_bloom_extract_render_pass();
@@ -531,6 +615,7 @@ qboolean vk_bloom( void )
 
 	if ( canBlitDownsample ) {
 		// Split pipeline: downsample first, then blur at same resolution.
+		vk_pass_diag_stage( "bloom_downsample_blur" );
 		for ( i = 0; i < VK_NUM_BLOOM_PASSES * 2; i += 2 ) {
 			VkImageBlit region;
 			const uint32_t level = i / 2;
@@ -575,6 +660,7 @@ qboolean vk_bloom( void )
 		}
 	} else {
 		// Fallback to legacy downsample+blur in one pass if blit features are unavailable.
+		vk_pass_diag_stage( "bloom_legacy_blur" );
 		for ( i = 0; i < VK_NUM_BLOOM_PASSES * 2; i += 2 ) {
 			vk_postfx_run_blur_pass( i + 0, vk.bloom_image_descriptor[i+0] );
 			vk_postfx_run_blur_pass( i + 1, vk.bloom_image_descriptor[i+1] );
@@ -582,6 +668,7 @@ qboolean vk_bloom( void )
 	}
 
 	vk_begin_post_bloom_render_pass(); // begin post-bloom
+	vk_pass_diag_stage( "bloom_blend" );
 	{
 		VkDescriptorSet dset[VK_NUM_BLOOM_PASSES];
 
@@ -633,6 +720,7 @@ qboolean vk_bloom( void )
 
 	/* Bloom writes back to color_image; refresh post chain source and re-AA when enabled. */
 	if ( r_bloom && r_bloom->integer && vk.color_image_view != VK_NULL_HANDLE ) {
+		vk_pass_diag_stage( "bloom_refresh_post" );
 		vk_barrier_post_fog_source_for_sampling( vk.color_image_view, "post-bloom refresh post-fog source" );
 		vk_set_scene_post_fog_source( vk.color_image_view );
 		vk_update_post_fog_descriptors( vk.color_image_view );
@@ -642,6 +730,14 @@ qboolean vk_bloom( void )
 	}
 
 	backEnd.doneBloom = qtrue;
+	vk_pass_diag_stage( "bloom_exit" );
+	if ( r_fboDebug && r_fboDebug->integer >= 1 && vk_post_fog_fbo_debug_throttle() ) {
+		ri.Printf( PRINT_DEVELOPER,
+			"[VK][bloom] exit: postFog=%s activePass=%s continuation=%s\n",
+			vk_post_fog_source_name( vk_get_post_fog_source() ),
+			vk.passDiag.lastBegunPass[0] ? vk.passDiag.lastBegunPass : "(none)",
+			vk.passDiag.inContinuationPass ? "yes" : "no" );
+	}
 
 	return qtrue;
 }
