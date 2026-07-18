@@ -1704,25 +1704,34 @@ static void RB_IterateStagesGeneric( const shaderCommands_t *input )
 					}
 
 					if ( cube ) {
-						if ( cube->prefiltered_image && cube->prefiltered_image->descriptor != VK_NULL_HANDLE ) {
+						const qboolean cubeReady = R_CubemapPbrIblReady( cube );
+
+						if ( cubeReady ) {
 							envDescriptor = cube->prefiltered_image->descriptor;
-						}
-						if ( cube->irradiance_image && cube->irradiance_image->descriptor != VK_NULL_HANDLE ) {
 							irradianceDescriptor = cube->irradiance_image->descriptor;
 						}
-						if ( !R_CubemapPbrIblReady( cube ) ) {
+						if ( !cubeReady ) {
 							if ( !warnedMissingMapCubemapData ) {
 								ri.Printf( PRINT_WARNING, "PBR IBL: cubemap '%s' missing prefiltered/irradiance image, using fallback where needed\n",
 									cube->name[0] ? cube->name : "<unnamed>" );
 								warnedMissingMapCubemapData = qtrue;
 							}
+							if ( hdrSkyboxReady ) {
+								envDescriptor = hdrEnvDescriptor;
+								irradianceDescriptor = hdrIrradianceDescriptor;
+								usingHdrSkybox = qtrue;
+							}
 						}
 
 						// Prefer cubemap SH coefficients when present, otherwise fall back to stage SH.
-						if ( cube->hasSHCoeffs ) {
+						if ( cubeReady && cube->hasSHCoeffs ) {
 							Com_Memcpy( block.shCoeffs, cube->shCoeffs, sizeof( block.shCoeffs ) );
 						} else {
+							if ( usingHdrSkybox && SkyboxHDR_CopySHCoeffs( block.shCoeffs ) ) {
+								/* HDR fallback supplied SH successfully. */
+							} else {
 							Com_Memcpy( block.shCoeffs, pStage->shCoeffs, sizeof( block.shCoeffs ) );
+							}
 						}
 
 					} else {

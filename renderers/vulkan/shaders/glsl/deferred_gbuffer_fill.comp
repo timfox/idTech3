@@ -37,6 +37,12 @@ vec3 neighborPos( vec2 uv, float depth, vec3 centerPos ) {
 	return validDepth( depth ) ? reconstructViewPos( uv, depth ) : centerPos;
 }
 
+float depthGradient( float center, float a, float b ) {
+	float da = validDepth( a ) ? abs( a - center ) : 1.0;
+	float db = validDepth( b ) ? abs( b - center ) : 1.0;
+	return min( da, db );
+}
+
 void main() {
 	uvec2 pix = gl_GlobalInvocationID.xy;
 	if ( pix.x >= pc.extent.x || pix.y >= pc.extent.y ) {
@@ -88,7 +94,13 @@ void main() {
 		confidence = 0.0;
 	}
 
+	float edgeMetric = max( depthGradient( depth, dl, dr ), depthGradient( depth, du, dd ) );
+	float edgeFactor = clamp( edgeMetric / max( threshold, 1e-4 ), 0.0, 1.0 );
+	float fallbackMetalness = baseMaterial.r * ( 1.0 - 0.85 * edgeFactor );
+	float fallbackRoughness = mix( baseMaterial.g, 0.92, max( edgeFactor, 1.0 - confidence ) );
+	float fallbackAO = mix( 1.0, 0.82, edgeFactor * confidence );
+
 	imageStore( normalOut, ivec2( pix ), vec4( n, confidence ) );
 	/* material.a = sourceConfidence (same signal as normal.a) for classify. */
-	imageStore( materialOut, ivec2( pix ), vec4( baseMaterial.rgb, confidence ) );
+	imageStore( materialOut, ivec2( pix ), vec4( fallbackMetalness, fallbackRoughness, fallbackAO, confidence ) );
 }
