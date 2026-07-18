@@ -1586,7 +1586,10 @@ void main() {
 #endif
 
 	vec3 primaryDirect = lightColor * reflectance * ( attenuation * NL ) * pomSelfShadow;
-	if ( ( deferred_unlit_base_strength > 1e-6 || pbrDebugMode.y > 0.5 ) && lightmap_texture_set < 0 ) {
+	/* Additive deferred handoff should suppress primary direct only when a baked/static
+	 * lightmap base is already present. Unlit or vertex-lit surfaces still need their
+	 * primary direct path in the base pass or they collapse toward black. */
+	if ( ( deferred_unlit_base_strength > 1e-6 || pbrDebugMode.y > 0.5 ) && lightmap_texture_set >= 0 ) {
 		primaryDirect = vec3( 0.0 );
 	}
 	float fpRenorm = 1.0;

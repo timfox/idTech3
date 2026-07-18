@@ -148,7 +148,9 @@ void vk_end_frame_record_taa_pass( VkImageView *post_fog_src, VkImageView *lumin
 		!vk_temporal_has_reason( VK_TEMPORAL_RESET_CAMERA_CUT | VK_TEMPORAL_RESET_MISSING_PREV_DATA |
 			VK_TEMPORAL_RESET_RENDERER_INIT | VK_TEMPORAL_RESET_SWAPCHAIN_CHANGE |
 			VK_TEMPORAL_RESET_RENDER_SIZE_CHANGE | VK_TEMPORAL_RESET_WORLD_CHANGE |
-			VK_TEMPORAL_RESET_CLIENT_STATE_CHANGE );
+			VK_TEMPORAL_RESET_CLIENT_STATE_CHANGE ) &&
+		/* Death cam / AFK: high stationary TAA feedback smears sky/fog into streaks. */
+		!vk_temporal_near_static_streak_guard();
 	taa_wanted = ( r_taa && r_taa->integer ) ? qtrue : qfalse;
 	if ( !taa_wanted && r_hybrid1_taa && r_hybrid1_taa->integer && vk_hybrid1_active() ) {
 		taa_wanted = qtrue;

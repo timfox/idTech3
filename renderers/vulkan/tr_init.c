@@ -2446,7 +2446,7 @@ static void R_Register( void )
 
 	r_volumetricFogSkipStatic = ri.Cvar_Get( "r_volumetricFogSkipStatic", "1", CVAR_ARCHIVE_ND );
 	ri.Cvar_CheckRange( r_volumetricFogSkipStatic, "0", "1", CV_INTEGER );
-	ri.Cvar_SetDescription( r_volumetricFogSkipStatic, "Skip volumetric fog when view is nearly static (e.g. death cam). Prevents gradient/streak artifacts. 0=always run fog." );
+	ri.Cvar_SetDescription( r_volumetricFogSkipStatic, "Skip volumetric fog and disable TAA when view is nearly static for ~0.5s (e.g. death cam). Prevents gradient/streak artifacts. 0=always keep fog/TAA history." );
 	ri.Cvar_SetGroup( r_volumetricFogSkipStatic, CVG_RENDERER );
 
 	r_volumetricFogPerfTimers = ri.Cvar_Get( "r_volumetricFogPerfTimers", "0", CVAR_ARCHIVE_ND );

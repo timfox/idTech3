@@ -74,6 +74,15 @@ qboolean vk_temporal_has_reason( uint32_t reasonMask )
 	return ( vk.temporal.appliedResetReasons & reasonMask ) != 0u ? qtrue : qfalse;
 }
 
+qboolean vk_temporal_near_static_streak_guard( void )
+{
+	/* Matches volumetric SkipStatic threshold (~0.5s at 60Hz). */
+	if ( !r_volumetricFogSkipStatic || !r_volumetricFogSkipStatic->integer ) {
+		return qfalse;
+	}
+	return ( vk_near_static_view_frames >= 30 ) ? qtrue : qfalse;
+}
+
 void vk_temporal_note_first_person_projection( void )
 {
 	vk.temporal.firstPersonProjectionThisFrame = qtrue;

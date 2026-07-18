@@ -375,10 +375,39 @@ static qboolean S_AL_CaptureNameIsMonitor( const char *name ) {
 	return qfalse;
 }
 
+/* Higher score = better VoIP mic candidate. Monitors score negative. */
+static int S_AL_CaptureDeviceScore( const char *name ) {
+	int score = 0;
+
+	if ( !name || !name[0] ) {
+		return -1000;
+	}
+	if ( S_AL_CaptureNameIsMonitor( name ) ) {
+		return -100;
+	}
+
+	score = 10;
+	if ( Q_stristr( name, "Microphone" ) || Q_stristr( name, "Mic" ) ) {
+		score += 50;
+	}
+	if ( Q_stristr( name, "Analog" ) || Q_stristr( name, "USB" ) || Q_stristr( name, "Headset" ) ) {
+		score += 25;
+	}
+	if ( Q_stristr( name, " Pro" ) || Q_stristr( name, "input" ) ) {
+		score += 15;
+	}
+	if ( Q_stristr( name, "HDMI" ) || Q_stristr( name, "Display" ) ) {
+		score -= 40;
+	}
+	return score;
+}
+
 static const ALCchar *S_AL_PickCaptureDevice( void ) {
 	const ALCchar *devices;
 	const ALCchar *ptr;
+	const ALCchar *best = NULL;
 	const ALCchar *fallback = NULL;
+	int bestScore = -10000;
 
 	if ( s_openalCaptureDevice && s_openalCaptureDevice->string[0] ) {
 		return s_openalCaptureDevice->string;
@@ -388,16 +417,21 @@ static const ALCchar *S_AL_PickCaptureDevice( void ) {
 	if ( devices && devices[0] ) {
 		ptr = devices;
 		while ( ptr && *ptr ) {
-			if ( !S_AL_CaptureNameIsMonitor( ptr ) ) {
-				return ptr;
-			}
+			int score = S_AL_CaptureDeviceScore( ptr );
 			if ( !fallback ) {
 				fallback = ptr;
+			}
+			if ( score > bestScore ) {
+				bestScore = score;
+				best = ptr;
 			}
 			ptr += strlen( ptr ) + 1;
 		}
 	}
 
+	if ( best && bestScore >= 0 ) {
+		return best;
+	}
 	if ( fallback ) {
 		return fallback;
 	}
@@ -440,7 +474,8 @@ static void S_AL_ListDevices_f( void ) {
 	} else {
 		ptr = devices;
 		while ( ptr && *ptr ) {
-			Com_Printf( "  %d: %s\n", count++, ptr );
+			Com_Printf( "  %d: %s%s\n", count++, ptr,
+				S_AL_CaptureNameIsMonitor( ptr ) ? "  [loopback — skip for VoIP]" : "" );
 			ptr += strlen( ptr ) + 1;
 		}
 	}
@@ -1259,9 +1294,10 @@ static void S_AL_VoipSamples( int entityNum, const vec3_t origin, int samples, i
 	if ( !channel->source ) {
 		alGenSources( 1, &channel->source );
 		alSourcei( channel->source, AL_LOOPING, AL_FALSE );
-		alSourcef( channel->source, AL_REFERENCE_DISTANCE, 200.0f );
+		/* Street-range voice: full volume near speaker, fades out toward max distance. */
+		alSourcef( channel->source, AL_REFERENCE_DISTANCE, 256.0f );
 		alSourcef( channel->source, AL_ROLLOFF_FACTOR, s_openalRolloff ? s_openalRolloff->value : 1.0f );
-		alSourcef( channel->source, AL_MAX_DISTANCE, s_openalMaxDistance ? s_openalMaxDistance->value : 2000.0f );
+		alSourcef( channel->source, AL_MAX_DISTANCE, s_openalMaxDistance ? s_openalMaxDistance->value : 1500.0f );
 		alSourcei( channel->source, AL_SOURCE_RELATIVE, AL_FALSE );
 
 		if ( !( s_acoustics_enable && s_acoustics_enable->integer ) && alEfxAvailable && alReverbSlot ) {

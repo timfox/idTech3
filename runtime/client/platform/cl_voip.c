@@ -54,6 +54,11 @@ static byte     encodedBuffer[VOIP_MAX_PACKET];
 static byte     voipPendingData[VOIP_MAX_PACKET + 8];
 static int      voipPendingLen = 0;
 
+/* Mic self-test: capture briefly and report peak RMS without sending. */
+static int      voipTestUntil = 0;
+static float    voipTestPeak = 0.0f;
+static qboolean voipTestOwnedCapture = qfalse;
+
 /* Capture functions from the active sound backend (SDL or OpenAL).
    Weak symbols provide no-op fallback when neither backend has capture. */
 void SNDDMA_StartCapture( void ) __attribute__((weak));
@@ -354,6 +359,42 @@ static void CL_VoIP_StopTransmit_f( void ) {
 	CL_VoIP_StopTransmit();
 }
 
+static void CL_VoIP_Status_f( void ) {
+	Com_Printf( "----- VoIP status -----\n" );
+	Com_Printf( "  cl_voip: %d  initialized: %s  capturing: %s  sending: %s\n",
+		cl_voip ? cl_voip->integer : 0,
+		voipInitialized ? "yes" : "no",
+		voipCapturing ? "yes" : "no",
+		( cl_voipSend && cl_voipSend->integer ) ? "yes" : "no" );
+	Com_Printf( "  power: %.3f  pending: %d bytes  outSeq: %u\n",
+		voipPower, voipPendingLen, voipOutSequence );
+	Com_Printf( "  Hold CAPSLOCK/V (+voip) to talk. Run voiptest to check the mic.\n" );
+	Com_Printf( "  Mic devices: s_aldevices   Prefer mic: seta s_openalCaptureDevice \"name\"\n" );
+	Com_Printf( "-----------------------\n" );
+}
+
+static void CL_VoIP_Test_f( void ) {
+	if ( !cl_voip || !cl_voip->integer ) {
+		Com_Printf( "VoIP test: cl_voip is 0 — enable with seta cl_voip 1\n" );
+		return;
+	}
+	if ( !voipInitialized ) {
+		Com_Printf( "VoIP test: codec not initialized yet\n" );
+		return;
+	}
+
+	voipTestPeak = 0.0f;
+	voipTestUntil = cls.realtime + 1500;
+	if ( !voipCapturing ) {
+		SNDDMA_StartCapture();
+		voipCapturing = qtrue;
+		voipTestOwnedCapture = qtrue;
+	} else {
+		voipTestOwnedCapture = qfalse;
+	}
+	Com_Printf( "VoIP test: speak into your mic for 1.5 seconds...\n" );
+}
+
 void CL_VoIP_Init( void ) {
 	int err;
 
@@ -384,6 +425,8 @@ void CL_VoIP_Init( void ) {
 	Cmd_AddCommand( "-voip", CL_VoIP_StopTransmit_f );
 	Cmd_AddCommand( "+voiprecord", CL_VoIP_Transmit_f );
 	Cmd_AddCommand( "-voiprecord", CL_VoIP_StopTransmit_f );
+	Cmd_AddCommand( "voipstatus", CL_VoIP_Status_f );
+	Cmd_AddCommand( "voiptest", CL_VoIP_Test_f );
 
 	Com_Memset( voipClientPower, 0, sizeof( voipClientPower ) );
 	Com_Memset( voipClientLastTalk, 0, sizeof( voipClientLastTalk ) );
@@ -422,6 +465,8 @@ void CL_VoIP_Shutdown( void ) {
 	Cmd_RemoveCommand( "-voip" );
 	Cmd_RemoveCommand( "+voiprecord" );
 	Cmd_RemoveCommand( "-voiprecord" );
+	Cmd_RemoveCommand( "voipstatus" );
+	Cmd_RemoveCommand( "voiptest" );
 
 	if ( voipCapturing ) {
 		SNDDMA_StopCapture();
@@ -526,8 +571,17 @@ void CL_VoIP_Frame( void ) {
 		}
 		voipPower = sqrtf( rms / VOIP_FRAME_SAMPLES );
 
+		if ( voipTestUntil > 0 && voipPower > voipTestPeak ) {
+			voipTestPeak = voipPower;
+		}
+
 		if ( cl_voipSend && cl_voipSend->integer && clc.clientNum >= 0 && clc.clientNum < VOIP_MAX_CLIENTS ) {
 			CL_VoIP_SetClientPower( clc.clientNum, voipPower );
+		}
+
+		/* Mic self-test listens without sending. */
+		if ( voipTestUntil > 0 && !( cl_voipSend && cl_voipSend->integer ) ) {
+			continue;
 		}
 
 		/* Only encode while push-to-talk is held. */
@@ -547,6 +601,19 @@ void CL_VoIP_Frame( void ) {
 			voipPendingData[3] = (byte)( ( seq >> 24 ) & 0xff );
 			Com_Memcpy( voipPendingData + 4, encodedBuffer, encodedLen );
 			voipPendingLen = 4 + encodedLen;
+		}
+	}
+
+	if ( voipTestUntil > 0 && cls.realtime >= voipTestUntil ) {
+		Com_Printf( "VoIP test: peak level %.3f%s\n", voipTestPeak,
+			voipTestPeak < 0.005f
+				? " — almost silence (wrong device, muted, or no mic)"
+				: ( voipTestPeak < 0.02f ? " — quiet (ok if speaking softly)" : " — mic is picking up audio" ) );
+		voipTestUntil = 0;
+		if ( voipTestOwnedCapture && !( cl_voipSend && cl_voipSend->integer ) ) {
+			SNDDMA_StopCapture();
+			voipCapturing = qfalse;
+			voipTestOwnedCapture = qfalse;
 		}
 	}
 }

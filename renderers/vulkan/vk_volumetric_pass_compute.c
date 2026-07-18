@@ -748,8 +748,7 @@ void vk_volumetric_fog_pass( void )
 	vk_update_volumetric_params();
 
 	/* Skip volumetrics when view is nearly static (death cam) to avoid gradient/streak artifacts */
-	if ( r_volumetricFogSkipStatic && r_volumetricFogSkipStatic->integer &&
-		vk_near_static_view_frames >= 30 ) {
+	if ( vk_temporal_near_static_streak_guard() ) {
 		vk_volumetric_skip_cleanup( "volumetric skipped (static view, death cam)",
 			VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT | VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT );
 		return;
