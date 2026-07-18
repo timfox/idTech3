@@ -25,6 +25,7 @@ layout(set = 0, binding = 3) uniform sampler2D albedoTex;
 layout(set = 0, binding = 4) uniform sampler2D normalTex;
 layout(set = 0, binding = 5) uniform sampler2D materialTex;
 layout(rgba16f, set = 0, binding = 6) uniform writeonly image2D outLit;
+layout(set = 0, binding = 7) uniform usampler2D classMap;
 
 layout(push_constant) uniform Push {
 	mat4 viewMatrix;
@@ -38,7 +39,17 @@ layout(push_constant) uniform Push {
 	uint specular;
 	float aoStrength;
 	float specularStrength;
+	uint normalsAreWorld; /* 1 = G-buffer normals are world-space (direct MRT); 0 = view-space (depth fill) */
+	uint useMaterialClass; /* 1 = sample classMap for specialized deferred dispatch */
 } pc;
+
+/* Match vk_visibility_buffer.h VK_MATCLASS_* */
+const uint CLASS_EMPTY = 0u;
+const uint CLASS_SIMPLE_OPAQUE = 1u;
+const uint CLASS_LAYERED = 2u;
+const uint CLASS_TRANSMISSION = 3u;
+const uint CLASS_EMISSIVE = 4u;
+const uint CLASS_ALPHA_TEST = 5u;
 
 float viewZFromDepth( float depth ) {
 	return -pc.projInfo.w / max( depth + pc.projInfo.z, 1e-6 );
@@ -123,8 +134,43 @@ void main() {
 		return;
 	}
 
+	uint matClass = CLASS_SIMPLE_OPAQUE;
+	float classSpecScale = 1.0;
+	float classDiffScale = 1.0;
+	if ( pc.useMaterialClass != 0u ) {
+		matClass = texelFetch( classMap, ivec2( pix ), 0 ).r;
+		if ( matClass == CLASS_EMPTY ) {
+			imageStore( outLit, ivec2( pix ), vec4( 0.0 ) );
+			return;
+		}
+		/* Alpha-tested cutouts: skip deferred dynamics (base pass already shaded / unstable edges). */
+		if ( matClass == CLASS_ALPHA_TEST ) {
+			imageStore( outLit, ivec2( pix ), vec4( 0.0 ) );
+			return;
+		}
+		/* Emissive: dynamics already in unlit base; skip additive to avoid double-bright. */
+		if ( matClass == CLASS_EMISSIVE && pc.additive != 0u ) {
+			imageStore( outLit, ivec2( pix ), vec4( 0.0 ) );
+			return;
+		}
+		if ( matClass == CLASS_LAYERED ) {
+			classSpecScale = 1.35;
+		} else if ( matClass == CLASS_TRANSMISSION ) {
+			classSpecScale = 0.45;
+			classDiffScale = 0.65;
+		}
+	}
+
 	vec3 viewPos = reconstructViewPos( uv, depth );
-	vec3 N = normalize( texture( normalTex, uv ).xyz );
+	vec3 Nsamp = texture( normalTex, uv ).xyz;
+	vec3 N;
+	if ( pc.normalsAreWorld != 0u ) {
+		/* Direct MRT export stores world-space N (gen_frag USE_DEFERRED_EXPORT). */
+		N = normalize( ( pc.viewMatrix * vec4( Nsamp, 0.0 ) ).xyz );
+	} else {
+		/* Depth-derived fill writes view-space N. */
+		N = normalize( Nsamp );
+	}
 	vec3 albedo = texture( albedoTex, uv ).rgb;
 	vec4 material = texture( materialTex, uv );
 	float metalness = material.r;
@@ -190,19 +236,19 @@ void main() {
 			float D = D_GGX( NH, alpha );
 			float Vis = CalcVisibility( NL, NE, alpha );
 			specularAcc += lc.rgb * addBoost * ( D * Vis * F * NL ) *
-				mix( 1.0, aoCoupling, 0.5 ) * pc.specularStrength;
+				mix( 1.0, aoCoupling, 0.5 ) * pc.specularStrength * classSpecScale;
 		}
 	}
 
 	float roughMod = mix( 1.0, 0.85, roughness );
-	vec3 diffuseTerm = albedo * ( 1.0 - metalness ) * irradiance;
+	vec3 diffuseTerm = albedo * ( 1.0 - metalness ) * irradiance * classDiffScale;
 	vec3 lit;
 	if ( pc.additive != 0u ) {
 		/* Match Forward+ Fd*irradiance + Fs (additive over unlit base). */
 		vec3 dynamic = ( diffuseTerm + specularAcc ) * roughMod * pc.strength;
 		lit = dynamic;
 	} else {
-		lit = albedo * ( vec3( 0.04 ) + irradiance ) * roughMod * pc.strength;
+		lit = albedo * ( vec3( 0.04 ) + irradiance * classDiffScale ) * roughMod * pc.strength;
 		if ( pc.specular != 0u ) {
 			lit += specularAcc * roughMod * pc.strength;
 		}

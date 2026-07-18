@@ -39,6 +39,7 @@ static cvar_t		*cl_graphscale;
 static cvar_t		*cl_graphshift;
 static cvar_t		*ui_scale;
 static cvar_t		*r_fontConsoleAlign;
+static cvar_t		*r_fontConsoleProportional;
 static cvar_t		*r_fontShadow;
 static cvar_t		*r_fontSubpixel;
 static cvar_t		*r_fontSubpixelPos;
@@ -464,12 +465,13 @@ int SCR_ConsoleCharWidth( void ) {
 ================
 SCR_TtfConsoleGlyphRect
 
-Fit a glyph into a console cell without squashing: preserve atlas aspect ratio,
-center horizontally, baseline-align vertically when enabled.
+Fit a glyph into a console cell without squashing: preserve atlas aspect ratio.
+leftAlign 1 = ink at cell origin (proportional / kerning-friendly);
+0 = center in fixed monospace cell (legacy grid).
 ================
 */
 static void SCR_TtfConsoleGlyphRect( float xx, float y, const glyphInfo_t *g, float cellW, float cellH,
-		int refLinePx, qboolean baselineAlign, float *outAx, float *outAy, float *outAw, float *outAh ) {
+		int refLinePx, qboolean baselineAlign, qboolean leftAlign, float *outAx, float *outAy, float *outAw, float *outAh ) {
 	float drawW;
 	float drawH;
 
@@ -486,7 +488,11 @@ static void SCR_TtfConsoleGlyphRect( float xx, float y, const glyphInfo_t *g, fl
 
 	*outAw = drawW;
 	*outAh = drawH;
-	*outAx = xx + ( cellW - drawW ) * 0.5f;
+	if ( leftAlign ) {
+		*outAx = xx;
+	} else {
+		*outAx = xx + ( cellW - drawW ) * 0.5f;
+	}
 
 	if ( baselineAlign && g->height > 0 ) {
 		const float desc = Com_Clamp( 2.0f, 12.0f, cellH * 0.22f );
@@ -702,12 +708,14 @@ static qboolean SCR_DrawBuiltInTtfStringExtPixels( int x, int y, const char *str
 	const float cellH = (float)smallchar_height;
 	const float cellW = (float)SCR_ConsoleCharWidth();
 	const qboolean baselineAlign = ( r_fontConsoleAlign && r_fontConsoleAlign->integer ) ? qtrue : qfalse;
+	const qboolean prop = ( r_fontConsoleProportional && r_fontConsoleProportional->integer ) ? qtrue : qfalse;
+	int prevCh = -1;
 
 	if ( !string || !string[0] || !setColor || !font ) {
 		return qfalse;
 	}
 
-	/* Console TrueType: 1:1 atlas pixels, no shadow/subpixel (color ghosting on notify). */
+	/* Console TrueType: 1:1 atlas pixels. Proportional mode uses xSkip + FreeType kerning. */
 	s = string;
 	xx = (float)x;
 	Com_Memcpy( color, setColor, sizeof( color ) );
@@ -716,6 +724,7 @@ static qboolean SCR_DrawBuiltInTtfStringExtPixels( int x, int y, const char *str
 		int ch;
 		const glyphInfo_t *g;
 		float ax, ay, aw, ah;
+		float adv;
 
 		if ( Q_IsColorString( s ) ) {
 			if ( !forceColor ) {
@@ -733,6 +742,7 @@ static qboolean SCR_DrawBuiltInTtfStringExtPixels( int x, int y, const char *str
 			if ( CL_Emoji_IsEnabled() && Q_UTF8_IsEmoji( cp ) && CL_Emoji_DrawChar( (int)xx, (int)y, (int)cellW, smallchar_height, cp ) ) {
 				re.SetColor( forceColor ? setColor : color );
 				xx += cellW;
+				prevCh = -1;
 				continue;
 			}
 			ch = ( cp < 256 ) ? (int)( cp & 0xFF ) : '?';
@@ -743,12 +753,23 @@ static qboolean SCR_DrawBuiltInTtfStringExtPixels( int x, int y, const char *str
 		ch &= 255;
 		g = &font->glyphs[ch];
 		if ( !g->glyph || g->imageHeight <= 0 || g->imageWidth <= 0 ) {
-			xx += cellW;
+			xx += prop ? ( cellH * 0.5f ) : cellW;
+			prevCh = -1;
 			continue;
 		}
-		SCR_TtfConsoleGlyphRect( xx, (float)y, g, cellW, cellH, refLinePx, baselineAlign, &ax, &ay, &aw, &ah );
-		re.DrawStretchPic( ax, ay, aw, ah, g->s, g->t, g->s2, g->t2, g->glyph );
-		xx += cellW;
+		if ( prop ) {
+			adv = SCR_TtfGlyphAdvance( font, refLinePx, cellH, g, prevCh, ch );
+			SCR_TtfConsoleGlyphRect( xx, (float)y, g, adv, cellH, refLinePx, baselineAlign, qtrue,
+				&ax, &ay, &aw, &ah );
+			re.DrawStretchPic( ax, ay, aw, ah, g->s, g->t, g->s2, g->t2, g->glyph );
+			xx += adv;
+		} else {
+			SCR_TtfConsoleGlyphRect( xx, (float)y, g, cellW, cellH, refLinePx, baselineAlign, qfalse,
+				&ax, &ay, &aw, &ah );
+			re.DrawStretchPic( ax, ay, aw, ah, g->s, g->t, g->s2, g->t2, g->glyph );
+			xx += cellW;
+		}
+		prevCh = ch;
 	}
 
 	re.SetColor( NULL );
@@ -1280,6 +1301,11 @@ void SCR_Init( void ) {
 	Cvar_CheckRange( r_fontConsoleAlign, "0", "1", CV_INTEGER );
 	Cvar_SetDescription( r_fontConsoleAlign,
 		"TrueType console / pixel HUD strings: 1 = baseline-aligned inside each fixed cell (default); 0 = legacy top-aligned to cell top." );
+
+	r_fontConsoleProportional = Cvar_Get( "r_fontConsoleProportional", "1", CVAR_ARCHIVE );
+	Cvar_CheckRange( r_fontConsoleProportional, "0", "1", CV_INTEGER );
+	Cvar_SetDescription( r_fontConsoleProportional,
+		"When 1, console/notify TrueType text advances by glyph xSkip + FreeType kerning (r_fontKerning). When 0, use a fixed monospace cell grid." );
 
 	r_fontShadow = Cvar_Get( "r_fontShadow", "2", CVAR_ARCHIVE );
 	Cvar_CheckRange( r_fontShadow, "0", "8", CV_INTEGER );

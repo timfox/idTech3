@@ -1597,6 +1597,7 @@ extern cvar_t	*r_deferredAOCoupling;
 extern cvar_t	*r_deferredDefaultMetalness;
 extern cvar_t	*r_deferredDefaultRoughness;
 extern cvar_t	*r_deferredNormalEdgeThreshold;
+extern cvar_t	*r_deferredMaterialClassify;
 void R_ApplyRenderModeLatch( void );
 extern cvar_t	*r_hdr;
 extern cvar_t	*r_bloom;

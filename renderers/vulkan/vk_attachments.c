@@ -359,6 +359,8 @@ static void vk_create_deferred_gbuffer_scaffold( void )
 	vk.deferred_gbuffer_material_view = VK_NULL_HANDLE;
 	vk.deferred_lighting_image = VK_NULL_HANDLE;
 	vk.deferred_lighting_view = VK_NULL_HANDLE;
+	vk.deferred_class_stub = VK_NULL_HANDLE;
+	vk.deferred_class_stub_view = VK_NULL_HANDLE;
 
 	if ( !vk.fboActive || !r_renderMode ||
 		( r_renderMode->integer != 1 && r_renderMode->integer != 2 && r_renderMode->integer != 3 ) ||
@@ -381,10 +383,15 @@ static void vk_create_deferred_gbuffer_scaffold( void )
 		gbufUsage | VK_IMAGE_USAGE_STORAGE_BIT,
 		&vk.deferred_lighting_image, &vk.deferred_lighting_view,
 		VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, qfalse );
+	/* Stub class map for deferred lighting binding 7 when visibility classify is off. */
+	create_color_attachment( 1, 1, VK_SAMPLE_COUNT_1_BIT, VK_FORMAT_R8_UINT,
+		VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT,
+		&vk.deferred_class_stub, &vk.deferred_class_stub_view,
+		VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, qfalse, 0 );
 	vk.deferredGbufferAllocated = qtrue;
 	vk.deferredGbufferDirectExport = vk.msaaActive ? qfalse : qtrue;
 	ri.Printf( PRINT_ALL,
-		"[VK][deferred] G-buffer scaffold: albedo (scene color format) + normal RGBA16F + material RGBA16F + motion sidecar + lighting RGBA16F%s\n",
+		"[VK][deferred] G-buffer scaffold: albedo (scene color format) + normal RGBA16F + material RGBA16F + motion sidecar + lighting RGBA16F + class stub%s\n",
 		vk.deferredGbufferDirectExport ? " (direct material export)" : " (depth fallback export)" );
 }
 
@@ -834,6 +841,10 @@ void vk_create_attachments( void )
 	if ( vk.deferred_lighting_image ) {
 		SET_OBJECT_NAME( vk.deferred_lighting_image, "deferred lighting", VK_DEBUG_REPORT_OBJECT_TYPE_IMAGE_EXT );
 		SET_OBJECT_NAME( vk.deferred_lighting_view, "deferred lighting view", VK_DEBUG_REPORT_OBJECT_TYPE_IMAGE_VIEW_EXT );
+	}
+	if ( vk.deferred_class_stub ) {
+		SET_OBJECT_NAME( vk.deferred_class_stub, "deferred class stub", VK_DEBUG_REPORT_OBJECT_TYPE_IMAGE_EXT );
+		SET_OBJECT_NAME( vk.deferred_class_stub_view, "deferred class stub view", VK_DEBUG_REPORT_OBJECT_TYPE_IMAGE_VIEW_EXT );
 	}
 	if ( vk.visibility_buffer_ids ) {
 		SET_OBJECT_NAME( vk.visibility_buffer_ids, "visibility buffer ids", VK_DEBUG_REPORT_OBJECT_TYPE_IMAGE_EXT );
@@ -2102,6 +2113,12 @@ void vk_destroy_attachments( void )
 		qvkDestroyImageView( vk.device, vk.deferred_lighting_view, NULL );
 		vk.deferred_lighting_image = VK_NULL_HANDLE;
 		vk.deferred_lighting_view = VK_NULL_HANDLE;
+	}
+	if ( vk.deferred_class_stub ) {
+		qvkDestroyImage( vk.device, vk.deferred_class_stub, NULL );
+		qvkDestroyImageView( vk.device, vk.deferred_class_stub_view, NULL );
+		vk.deferred_class_stub = VK_NULL_HANDLE;
+		vk.deferred_class_stub_view = VK_NULL_HANDLE;
 	}
 	vk.deferredGbufferAllocated = qfalse;
 	vk.deferredGbufferDirectExport = qfalse;

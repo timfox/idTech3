@@ -810,6 +810,9 @@ typedef struct {
 	VkImageView deferred_gbuffer_material_view;
 	VkImage deferred_lighting_image;
 	VkImageView deferred_lighting_view;
+	/* 1x1 R8_UINT stub (value 1 = SIMPLE_OPAQUE) when material class map is unavailable. */
+	VkImage deferred_class_stub;
+	VkImageView deferred_class_stub_view;
 	qboolean deferredGbufferAllocated;
 	qboolean deferredGbufferDirectExport;
 

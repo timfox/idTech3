@@ -10,6 +10,7 @@ Mode 3 = Unified Clustered Renderer (deferred opaque + Forward+ transparent).
 #include "tr_local.h"
 #include "vk.h"
 #include "vk_deferred_gbuffer.h"
+#include "vk_visibility_buffer.h"
 #include "vk_image_layout.h"
 #include "vk_post_fog.h"
 #include "vk_render_pass.h"
@@ -39,6 +40,8 @@ typedef struct {
 	uint32_t specular;
 	float aoStrength;
 	float specularStrength;
+	uint32_t normalsAreWorld;
+	uint32_t useMaterialClass;
 } vk_deferred_light_push_t;
 
 typedef struct {
@@ -518,7 +521,7 @@ void vk_deferred_gbuffer_capture_after_geometry( void )
 
 static void vk_dgb_create_lighting_descriptor_layout( void )
 {
-	VkDescriptorSetLayoutBinding bindings[7];
+	VkDescriptorSetLayoutBinding bindings[8];
 	VkDescriptorSetLayoutCreateInfo desc;
 
 	if ( vk.deferred_gbuffer.lighting_layout != VK_NULL_HANDLE ) {
@@ -554,10 +557,14 @@ static void vk_dgb_create_lighting_descriptor_layout( void )
 	bindings[6].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
 	bindings[6].descriptorCount = 1;
 	bindings[6].stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+	bindings[7].binding = 7;
+	bindings[7].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+	bindings[7].descriptorCount = 1;
+	bindings[7].stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
 
 	Com_Memset( &desc, 0, sizeof( desc ) );
 	desc.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-	desc.bindingCount = 7;
+	desc.bindingCount = 8;
 	desc.pBindings = bindings;
 	VK_CHECK( qvkCreateDescriptorSetLayout( vk.device, &desc, NULL, &vk.deferred_gbuffer.lighting_layout ) );
 }
@@ -612,7 +619,7 @@ static void vk_dgb_create_lighting_pipeline( void )
 		pool_sizes[0].type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
 		pool_sizes[0].descriptorCount = 2;
 		pool_sizes[1].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-		pool_sizes[1].descriptorCount = 4;
+		pool_sizes[1].descriptorCount = 5;
 		pool_sizes[2].type = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
 		pool_sizes[2].descriptorCount = 1;
 
@@ -638,10 +645,11 @@ static void vk_dgb_create_lighting_pipeline( void )
 static void vk_dgb_update_lighting_descriptors( void )
 {
 	VkDescriptorBufferInfo buf_infos[2];
-	VkDescriptorImageInfo img_infos[5];
-	VkWriteDescriptorSet writes[7];
+	VkDescriptorImageInfo img_infos[6];
+	VkWriteDescriptorSet writes[8];
 	Vk_Sampler_Def sd;
 	VkImageView depth_view;
+	VkImageView class_view;
 	int i;
 
 	if ( vk.deferred_gbuffer.lighting_descriptor == VK_NULL_HANDLE ) {
@@ -662,6 +670,15 @@ static void vk_dgb_update_lighting_descriptors( void )
 	sd.address_mode = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
 	sd.noAnisotropy = qtrue;
 
+	/* Prefer material class map; fall back to stub R8UI when classify is off. */
+	class_view = vk.visibility_buffer_class_view;
+	if ( class_view == VK_NULL_HANDLE ) {
+		class_view = vk.deferred_class_stub_view;
+	}
+	if ( class_view == VK_NULL_HANDLE ) {
+		return;
+	}
+
 	Com_Memset( img_infos, 0, sizeof( img_infos ) );
 	img_infos[0].sampler = vk_find_sampler( &sd );
 	img_infos[0].imageView = depth_view;
@@ -677,6 +694,9 @@ static void vk_dgb_update_lighting_descriptors( void )
 	img_infos[3].imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 	img_infos[4].imageView = vk.deferred_lighting_view;
 	img_infos[4].imageLayout = VK_IMAGE_LAYOUT_GENERAL;
+	img_infos[5].sampler = vk_find_sampler( &sd );
+	img_infos[5].imageView = class_view != VK_NULL_HANDLE ? class_view : vk.deferred_class_stub_view;
+	img_infos[5].imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 
 	Com_Memset( writes, 0, sizeof( writes ) );
 	for ( i = 0; i < 2; i++ ) {
@@ -701,8 +721,14 @@ static void vk_dgb_update_lighting_descriptors( void )
 	writes[6].descriptorCount = 1;
 	writes[6].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
 	writes[6].pImageInfo = &img_infos[4];
+	writes[7].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+	writes[7].dstSet = vk.deferred_gbuffer.lighting_descriptor;
+	writes[7].dstBinding = 7;
+	writes[7].descriptorCount = 1;
+	writes[7].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+	writes[7].pImageInfo = &img_infos[5];
 
-	qvkUpdateDescriptorSets( vk.device, 7, writes, 0, NULL );
+	qvkUpdateDescriptorSets( vk.device, 8, writes, 0, NULL );
 }
 
 static void vk_dgb_fill_light_push( vk_deferred_light_push_t *push, uint32_t width, uint32_t height )
@@ -734,6 +760,10 @@ static void vk_dgb_fill_light_push( vk_deferred_light_push_t *push, uint32_t wid
 		Com_Clamp( 0.0f, 1.0f, r_deferredAOCoupling->value ) : 0.65f;
 	push->specularStrength = r_deferredSpecularStrength ?
 		Com_Clamp( 0.0f, 4.0f, r_deferredSpecularStrength->value ) : 1.0f;
+	/* Direct MRT export writes world-space normals; depth fill writes view-space. */
+	push->normalsAreWorld = vk.deferredGbufferDirectExport ? 1u : 0u;
+	push->useMaterialClass = ( r_deferredMaterialClassify && r_deferredMaterialClassify->integer &&
+		vk_material_classify_wanted() && vk.visibility_buffer_class_view != VK_NULL_HANDLE ) ? 1u : 0u;
 }
 
 static void vk_dgb_dispatch_lighting_compute( uint32_t width, uint32_t height )
@@ -760,13 +790,17 @@ static void vk_dgb_dispatch_lighting_compute( uint32_t width, uint32_t height )
 
 	if ( !vk.deferred_gbuffer.lighting_logged ) {
 		ri.Printf( PRINT_ALL,
-			"[VK][deferred] r_deferredLighting=1 (%s dynamic; point+spot; strength=%.2f; specular=%s %.2f; ao=%.2f)\n",
+			"[VK][deferred] r_deferredLighting=1 (%s dynamic; point+spot; strength=%.2f; specular=%s %.2f; ao=%.2f; "
+			"normals=%s; materialClassify=%s)\n",
 			vk_deferred_unlit_base_wanted() ? "additive+sceneBase" : "multiply",
 			( r_deferredLightingStrength && r_deferredLightingStrength->value > 0.0f ) ?
 				r_deferredLightingStrength->value : 1.0f,
 			( r_deferredSpecular && r_deferredSpecular->integer ) ? "on" : "off",
 			r_deferredSpecularStrength ? r_deferredSpecularStrength->value : 1.0f,
-			r_deferredAOCoupling ? r_deferredAOCoupling->value : 0.65f );
+			r_deferredAOCoupling ? r_deferredAOCoupling->value : 0.65f,
+			vk.deferredGbufferDirectExport ? "world->view" : "view",
+			( r_deferredMaterialClassify && r_deferredMaterialClassify->integer &&
+				vk_material_classify_wanted() ) ? "on" : "off" );
 		vk.deferred_gbuffer.lighting_logged = qtrue;
 	}
 

@@ -45,6 +45,12 @@ Compact **visibility-buffer sidecar** coexisting with the classic G-buffer:
 | `r_visibilityBufferFill` | After opaque (mode 3) or geometry: compute fill of packed draw/prim IDs + bary proxies |
 | `r_visibilityBufferDebug` | 0=off, 1=drawId, 2=primId, 3=bary, 4=material class |
 | `r_materialClassify` | Compute class map from G-buffer material + depth |
+| `r_deferredMaterialClassify` | Deferred lighting consumes class map (skip cutout/emissive; tune layered/transmission) |
+
+**Deferred lighting notes (post–Phase 1):**
+
+- Direct MRT normals are **world-space**; depth-fill normals are **view-space**. `deferred_lighting.comp` transforms world→view when `normalsAreWorld=1`.
+- With `r_deferredMaterialClassify 1` + classify fill, specialized opaque dispatch uses the class map.
 
 Enable:
 
@@ -82,7 +88,7 @@ Demo: `exec demo_visibility_2027.cfg`. Console: `visibility_buffer_status`, `ren
 | 8 | Classified OIT | Global WBOIT/MBOIT | Per-material-class paths |
 | 9 | Neural texture compression | VT / BC7 | Learned latent + decoder |
 | 10 | Multidimensional LOD | Stream LOD + scales | Geo/mat/ray/rate/appearance |
-| 11 | Material classify | Opaque/transparent split + P1 compute | Specialized shade dispatch |
+| 11 | Material classify | Opaque/transparent split + P1 compute + **deferred consumer** | Specialized shade dispatch |
 | 12 | Heterogeneous resolution | Per-effect scales | Unified adaptive sample budgets |
 | 13 | Sparse volumetrics | Froxel fog + VDB | Sparse hybrid volumetric lighting |
 | 14 | Digital humans | PBR slots + stochastic cards | Strand hair, SSS, tear-film |

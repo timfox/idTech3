@@ -221,6 +221,7 @@ cvar_t	*r_deferredAOCoupling;
 cvar_t	*r_deferredDefaultMetalness;
 cvar_t	*r_deferredDefaultRoughness;
 cvar_t	*r_deferredNormalEdgeThreshold;
+cvar_t	*r_deferredMaterialClassify;
 cvar_t	*r_hdr;
 cvar_t	*r_bloom;
 cvar_t	*r_bloom_threshold;
@@ -2735,6 +2736,16 @@ static void R_Register( void )
 	ri.Cvar_SetDescription( r_deferredNormalEdgeThreshold,
 		"View-space depth delta threshold for deferred normal reconstruction. Lower values reject silhouette-crossing neighbors more aggressively." );
 	ri.Cvar_SetGroup( r_deferredNormalEdgeThreshold, CVG_RENDERER );
+	r_deferredMaterialClassify = ri.Cvar_Get( "r_deferredMaterialClassify", "1", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_deferredMaterialClassify, "0", "1", CV_INTEGER );
+	ri.Cvar_SetDescription( r_deferredMaterialClassify,
+		"When r_materialClassify 1 and visibility class map is filled: deferred lighting uses class IDs "
+		"(skip EMPTY/ALPHA_TEST/emissive-additive; boost LAYERED spec; soften TRANSMISSION). "
+		"Requires r_visibilityBuffer + r_visibilityBufferFill. See docs/RENDERER_2027.md." );
+	ri.Cvar_SetGroup( r_deferredMaterialClassify, CVG_RENDERER );
+	if ( r_deferredMaterialClassify && r_deferredMaterialClassify->integer ) {
+		ri.Printf( PRINT_ALL, "[VK][deferred] r_deferredMaterialClassify=1 (class map drives deferred dispatch when classify fill is on)\n" );
+	}
 	r_hdr = ri.Cvar_Get( "r_hdr", "2", CVAR_ARCHIVE_ND | CVAR_LATCH );
 	ri.Cvar_CheckRange( r_hdr, "-1", "3", CV_INTEGER );
 	ri.Cvar_SetDescription(r_hdr, "HDR frame buffer format. Requires \\r_fbo 1.\n -1: 4-bit (B4G4R4A4), testing only\n  0: 8-bit, moderate banding\n  1: 16-bit float (RGBA16F)\n  2: 32-bit float (RGBA32F), default, fallback to 16F if unsupported\n  3: aliases to mode 2 (32F) — true RGBA64F color output is not implemented\n" );
