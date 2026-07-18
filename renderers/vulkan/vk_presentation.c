@@ -16,6 +16,7 @@ Extracted from vk.c for incremental modularization.
 #include "vk_framebuffers.h"
 #include "vk_render_pass.h"
 #include "vk_resource_destroy.h"
+#include "vk_post_fog.h"
 #include "vk_swapchain.h"
 #include "vk_sync.h"
 #include "vk_temporal.h"
@@ -74,6 +75,8 @@ void vk_restore_presentation_targets( void )
 #endif
 	vk_update_attachment_descriptors();
 	vk_update_volumetric_descriptors();
+	vk_reset_scene_src_rect_tracking();
+	vk_reset_post_fog_frame_state();
 
 	vk_update_post_process_pipelines();
 
@@ -91,6 +94,10 @@ void vk_restore_presentation_targets( void )
 void vk_restart_swapchain( const char *funcname, VkResult res )
 {
 	(void)res;
+
+	vk.swapchain_restart_count++;
+	vk.swapchain_last_restart_result = (int)res;
+	vk.swapchain_last_restart_ms = ri.Milliseconds();
 
 #ifdef _DEBUG
 	ri.Printf( PRINT_WARNING, "%s(%s): restarting swapchain...\n", funcname, vk_result_string( res ) );

@@ -28,6 +28,7 @@ For the second-half execution plan that prioritizes shipping-path stabilization,
 - The Vulkan renderer now has a documented **modern default**: `modern_vulkan.cfg` uses **`r_renderMode 2`** clustered Forward+ (`r_forwardPlus`, `r_forwardPlusShade`, up to **64** GPU lights via `VK_FP_MAX_GPU_LIGHTS`) with HDR/PBR/TAA and a deferred G-buffer sidecar. Full deferred lighting remains `r_renderMode 1` / `r_deferredLighting 1` and is not the default.
 - Dynamic lighting on the **classic** path still uses **`MAX_DLIGHTS == 32`** surface **`dlightBits`**; Forward+ packs **`refdef.dlights`** separately (see [FORWARD_PLUS_PIPELINE_AUDIT.md](FORWARD_PLUS_PIPELINE_AUDIT.md)).
 - Temporal behavior is fragmented. Volumetric fog, exposure, motion vectors, occlusion visibility, and post effects each track history differently.
+- As of **July 18, 2026**, late-frame tuning changes inside an otherwise working mode-2 stack can still reproduce black/corrupted output and **`VK_ERROR_DEVICE_LOST`**, which is a sign that pass ownership and post-stack safety are still not fully robust.
 - Platform strategy: **Vulkan-only shipping** (OpenGL removed); Vulkan RTX experimental; DXR/WebGPU roadmap scaffolds — see [RENDERERS.md](RENDERERS.md).
 
 ---

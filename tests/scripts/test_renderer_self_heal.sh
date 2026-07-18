@@ -19,6 +19,7 @@ check() {
 
 SCENE_PASS="$(idtech3_file renderers/vulkan/vk_scene_pass.c src/renderers/vulkan/vk_scene_pass.c)"
 POST_FOG="$(idtech3_file renderers/vulkan/vk_post_fog.c src/renderers/vulkan/vk_post_fog.c)"
+PRESENTATION="$(idtech3_file renderers/vulkan/vk_presentation.c src/renderers/vulkan/vk_presentation.c)"
 
 check "$SCENE_PASS" 'vk_scene_pass_resume_framebuffer' 'scene-pass resume uses a shared framebuffer/self-heal helper'
 check "$SCENE_PASS" 'auto-restoring uiOverlayActive for UI overlay resume' 'scene-pass resume repairs UI overlay active flag drift'
@@ -28,6 +29,8 @@ check "$POST_FOG" 'post-fog source fallback' 'post-fog path logs automatic fallb
 check "$POST_FOG" 'vk_choose_post_fog_fallback_source( "update_post_fog_descriptors"' 'descriptor updates self-heal null post-fog source'
 check "$POST_FOG" 'vk_choose_post_fog_fallback_source( "get_post_fog_source"' 'post-fog getter self-heals null source'
 check "$POST_FOG" 'vk_choose_post_fog_fallback_source( "get_luminance_source"' 'luminance getter self-heals null source'
+check "$PRESENTATION" 'vk_reset_scene_src_rect_tracking();' 'swapchain restore clears stale scene source rectangle tracking'
+check "$PRESENTATION" 'vk_reset_post_fog_frame_state();' 'swapchain restore rebinds post-fog state after fullscreen/resize'
 
 if [[ $failures -ne 0 ]]; then
   echo "$failures check(s) failed"

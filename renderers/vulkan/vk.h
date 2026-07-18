@@ -618,6 +618,9 @@ typedef struct {
 	uint32_t swapchain_image_count;
 	VkExtent2D swapchain_extent;
 	qboolean swapchain_extent_valid;
+	uint32_t swapchain_restart_count;
+	int swapchain_last_restart_result;
+	int swapchain_last_restart_ms;
 	qboolean device_lost;  /* VK_ERROR_DEVICE_LOST detected; skip Vulkan API calls during shutdown */
 	VkImage swapchain_images[MAX_SWAPCHAIN_IMAGES];
 	VkImageView swapchain_image_views[MAX_SWAPCHAIN_IMAGES];
@@ -1841,6 +1844,10 @@ typedef struct {
 #ifdef VK_CUBEMAP
 	qboolean cubemapActive;
 #endif
+	qboolean pbr_ibl_using_hdr_fallback;
+	qboolean pbr_ibl_has_ready_local_cubemap;
+	int pbr_ibl_ready_cubemap_count;
+	int pbr_ibl_incomplete_cubemap_count;
 	qboolean offscreenRender;
 
 	qboolean windowAdjusted;

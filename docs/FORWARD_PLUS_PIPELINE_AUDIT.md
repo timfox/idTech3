@@ -164,6 +164,10 @@ Linear array: **`total_tiles × MAX_PER_TILE`** **`uint32`** indices. Unused slo
 | **`dlightBits` 32-bit** | Low | Matches **`MAX_DLIGHTS`** today; document if caps change. |
 | **Compute inside render pass** | Low (portability) | Valid now; revisit with subpass graphs or render graph. |
 
+### Recent operational note
+
+As of **July 18, 2026**, live renderer bisecting also showed that an otherwise working modern mode-2 stack could still transition into corrupted output and eventually **`VK_ERROR_DEVICE_LOST`** after late-frame post/bloom tuning changes. That result does **not** automatically prove Forward+ tile cull is the root cause, but it does reinforce the roadmap need for stronger pass-ownership diagnostics and safer late-post toggles around the shipping Vulkan path.
+
 ### Suggested next steps (roadmap)
 
 1. **Depth-aware culling** — **partial:** **`r_forwardPlusDepthCull`** (5 probes / nearest reverse-Z, post-opaque). Still open: Hi-Z / light-volume vs depth.

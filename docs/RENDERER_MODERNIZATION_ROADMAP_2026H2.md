@@ -16,6 +16,7 @@ This roadmap aligns with:
 - [ROADMAP.md](ROADMAP.md)
 - [RENDERER_2026_ARCHITECTURE_PASS.md](RENDERER_2026_ARCHITECTURE_PASS.md)
 - [FORWARD_PLUS_PIPELINE_AUDIT.md](FORWARD_PLUS_PIPELINE_AUDIT.md)
+- [RENDERER_PHASE1_CHECKLIST_2026Q3.md](RENDERER_PHASE1_CHECKLIST_2026Q3.md)
 
 ---
 
@@ -30,6 +31,34 @@ The right modernization strategy for 2026 is:
 5. Improve material and transparency correctness before adding more effects.
 6. Use the existing G-buffer as shared infrastructure.
 7. Keep platform priorities disciplined.
+
+---
+
+## Current Known Instabilities
+
+As of **July 18, 2026**, the renderer still has concrete stability issues that should be treated as **Phase 1 blockers**, not as polish items.
+
+### Reproduced Vulkan failure class
+
+Recent live bisecting on the shipping config stack isolated a failure where the renderer could survive the broader mode-2 modern feature set, but still fall into:
+
+- black output
+- corrupted intermediate frames
+- **`VK_ERROR_DEVICE_LOST`**
+- worker/driver-thread crash during shutdown after device loss
+
+The notable part of this repro is that it did **not** require enabling an entirely new renderer mode. It was triggered by a final post/bloom tuning delta on top of an otherwise working modern stack. That strongly suggests the project still needs stronger guarantees around:
+
+- post-pass ownership and resume behavior
+- attachment/state lifetime correctness
+- feature-toggle safety inside an already-running Vulkan frame pipeline
+- device-loss handling and reporting when a pass destabilizes the driver
+
+### What this means for roadmap priority
+
+- Stability work is still the top renderer task for 2026 H2.
+- "Looks mostly fine except for one late pass" is **not** good enough for the shipping path.
+- Mode 2 should remain the product path, but only with conservative defaults until these failure classes are closed.
 
 ---
 
@@ -173,7 +202,10 @@ For 2026, the shipping renderer strategy remains:
   - AA source selection
   - clustered handoff
   - G-buffer validity
+- Add targeted validation around post/bloom tuning and other late-frame toggles that can still trigger black output or **`VK_ERROR_DEVICE_LOST`** inside an otherwise working mode-2 stack.
+- Improve device-loss diagnostics so the engine reports the active renderer profile, recent pass/toggle changes, and likely failing stage before recursive shutdown noise takes over.
 - Eliminate remaining black-scene and device-loss regressions in mode 1 and mode 3.
+- Eliminate mode-2 late-pass/device-loss regressions before widening the default high-end profile again.
 
 ### Phase 2: August-September 2026
 

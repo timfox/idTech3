@@ -139,9 +139,93 @@ static qboolean R_RendererSceneSourceHealthy( void )
 	return qtrue;
 }
 
+static qboolean R_RendererSwapchainHealthy( void )
+{
+	if ( vk.swapchain == VK_NULL_HANDLE ) {
+		return qfalse;
+	}
+	if ( !vk.swapchain_extent_valid ||
+		vk.swapchain_extent.width == 0 ||
+		vk.swapchain_extent.height == 0 ) {
+		return qfalse;
+	}
+	if ( vk.swapchain_image_count == 0 ) {
+		return qfalse;
+	}
+	return qtrue;
+}
+
+static const char *R_RendererSwapchainLastRestartName( void )
+{
+	if ( vk.swapchain_restart_count == 0 ) {
+		return "none";
+	}
+
+	return vk_result_string( (VkResult)vk.swapchain_last_restart_result );
+}
+
+static qboolean R_RendererSwapchainRestartRecent( void )
+{
+	const int restartWindowMs = 5000;
+	int now;
+
+	if ( vk.swapchain_restart_count == 0 || vk.swapchain_last_restart_ms <= 0 ) {
+		return qfalse;
+	}
+
+	now = ri.Milliseconds();
+	if ( now < vk.swapchain_last_restart_ms ) {
+		return qtrue;
+	}
+
+	return ( now - vk.swapchain_last_restart_ms ) <= restartWindowMs ? qtrue : qfalse;
+}
+
+static qboolean R_RendererCubemapIblReady( const cubemap_t *cube )
+{
+	if ( !cube || !cube->prefiltered_image || !cube->irradiance_image ) {
+		return qfalse;
+	}
+	if ( cube->prefiltered_image->handle == VK_NULL_HANDLE ||
+		cube->prefiltered_image->view == VK_NULL_HANDLE ||
+		cube->prefiltered_image->descriptor == VK_NULL_HANDLE ) {
+		return qfalse;
+	}
+	if ( cube->irradiance_image->handle == VK_NULL_HANDLE ||
+		cube->irradiance_image->view == VK_NULL_HANDLE ||
+		cube->irradiance_image->descriptor == VK_NULL_HANDLE ) {
+		return qfalse;
+	}
+	return qtrue;
+}
+
+static int R_RendererCountReadyCubemaps( void )
+{
+	return vk.pbr_ibl_ready_cubemap_count;
+}
+
+static int R_RendererCountIncompleteCubemaps( void )
+{
+	return vk.pbr_ibl_incomplete_cubemap_count;
+}
+
+static qboolean R_RendererUsingRecoveryFallbacks( void )
+{
+	if ( vk.pbr_ibl_using_hdr_fallback && tr.numCubemaps > 0 ) {
+		return qtrue;
+	}
+	if ( R_RendererSwapchainRestartRecent() ) {
+		return qtrue;
+	}
+	return qfalse;
+}
+
 static const char *R_RendererHealthLabel( int warnings )
 {
 	if ( !R_RendererModeContractClean() || !R_RendererSceneSourceHealthy() ) {
+		return "recover";
+	}
+	if ( R_RendererUsingRecoveryFallbacks() ) {
 		return "recover";
 	}
 	if ( warnings > 0 ) {
@@ -248,6 +332,23 @@ static int R_RendererPrintCompatibilityWarnings( qboolean printOk )
 			R_RENDERER_WARN( "modern profile keeps r_deferredLighting 0; use renderer_modern_safe + vid_restart after mode-1/3 experiments.\n" );
 		}
 	}
+	if ( vk.cubemapActive && tr.numCubemaps > 0 && R_RendererCountIncompleteCubemaps() > 0 ) {
+		R_RENDERER_WARN( "PBR IBL has %d incomplete cubemap(s) out of %d; probe selection may remap to the nearest ready cubemap.\n",
+			R_RendererCountIncompleteCubemaps(), tr.numCubemaps );
+	}
+	if ( vk.pbr_ibl_using_hdr_fallback && tr.numCubemaps > 0 ) {
+		R_RENDERER_WARN( "PBR IBL is actively using HDR skybox fallback because no ready local cubemap is available.\n" );
+	}
+	if ( !R_RendererSwapchainHealthy() ) {
+		R_RENDERER_WARN( "swapchain state is incomplete (extentValid=%d images=%u handle=0x%llx); fullscreen/resize recovery may need vid_restart.\n",
+			vk.swapchain_extent_valid ? 1 : 0,
+			(unsigned int)vk.swapchain_image_count,
+			(unsigned long long)(uintptr_t)vk.swapchain );
+	}
+	if ( R_RendererSwapchainRestartRecent() ) {
+		R_RENDERER_WARN( "swapchain restarted recently (%s at %d ms); verify fullscreen/resize recovery if the frame still looks wrong.\n",
+			R_RendererSwapchainLastRestartName(), vk.swapchain_last_restart_ms );
+	}
 	if ( vk.deferredGbufferAllocated && !vk.deferredGbufferDirectExport && vk.msaaActive ) {
 		R_RENDERER_WARN( "MSAA is active; deferred material export is using the depth-derived fallback instead of direct PBR MRT export.\n" );
 	}
@@ -331,10 +432,24 @@ static void R_RendererStatus_f( void )
 	ri.Printf( PRINT_ALL, "passes    : inRenderPass=%s active=%s uiOverlay=%s sourcesHealthy=%s\n",
 		R_YesNo( vk.inRenderPass ), R_RenderPassName( vk.renderPassIndex ),
 		R_YesNo( vk.uiOverlayActive ), R_YesNo( R_RendererSceneSourceHealthy() ) );
+	ri.Printf( PRINT_ALL, "present   : swapchainHealthy=%s extent=%ux%u images=%u fullscreen=%d srgb=%d\n",
+		R_YesNo( R_RendererSwapchainHealthy() ),
+		vk.swapchain_extent_valid ? vk.swapchain_extent.width : 0u,
+		vk.swapchain_extent_valid ? vk.swapchain_extent.height : 0u,
+		(unsigned int)vk.swapchain_image_count, glConfig.isFullscreen, R_CvarInteger( r_vk_swapchain_srgb ) );
+	ri.Printf( PRINT_ALL, "restart   : count=%u last=%s\n",
+		(unsigned int)vk.swapchain_restart_count, R_RendererSwapchainLastRestartName() );
+	ri.Printf( PRINT_ALL, "restartAt : recent=%s ms=%d\n",
+		R_YesNo( R_RendererSwapchainRestartRecent() ), vk.swapchain_last_restart_ms );
 	ri.Printf( PRINT_ALL, "sources   : postFog=%s scene=%s luminance=%s\n",
 		vk_post_fog_source_name( vk_get_post_fog_source() ),
 		vk_post_fog_source_name( vk.scene_post_fog_color_source ),
 		vk_post_fog_source_name( vk_get_luminance_source() ) );
+	ri.Printf( PRINT_ALL, "cubemaps  : runtime=%s total=%d ready=%d incomplete=%d hdrFallback=%s localReady=%s debug=\"%s\"\n",
+		R_YesNo( vk.cubemapActive ), tr.numCubemaps,
+		R_RendererCountReadyCubemaps(), R_RendererCountIncompleteCubemaps(),
+		R_YesNo( vk.pbr_ibl_using_hdr_fallback ), R_YesNo( vk.pbr_ibl_has_ready_local_cubemap ),
+		r_pbr_cubemapInfo ? r_pbr_cubemapInfo->string : "" );
 	if ( r_renderMode && r_renderMode->integer == 3 ) {
 		ri.Printf( PRINT_ALL,
 			"unified   : Unified Clustered Renderer — hybrid deferred + Forward+ "
@@ -388,10 +503,24 @@ static void R_RendererCompatibility_f( void )
 	ri.Printf( PRINT_ALL, "passes: inRenderPass=%s active=%s uiOverlay=%s sourcesHealthy=%s\n",
 		R_YesNo( vk.inRenderPass ), R_RenderPassName( vk.renderPassIndex ),
 		R_YesNo( vk.uiOverlayActive ), R_YesNo( R_RendererSceneSourceHealthy() ) );
+	ri.Printf( PRINT_ALL, "present: swapchainHealthy=%s extent=%ux%u images=%u fullscreen=%d srgb=%d\n",
+		R_YesNo( R_RendererSwapchainHealthy() ),
+		vk.swapchain_extent_valid ? vk.swapchain_extent.width : 0u,
+		vk.swapchain_extent_valid ? vk.swapchain_extent.height : 0u,
+		(unsigned int)vk.swapchain_image_count, glConfig.isFullscreen, R_CvarInteger( r_vk_swapchain_srgb ) );
+	ri.Printf( PRINT_ALL, "restart: count=%u last=%s\n",
+		(unsigned int)vk.swapchain_restart_count, R_RendererSwapchainLastRestartName() );
+	ri.Printf( PRINT_ALL, "restartAt: recent=%s ms=%d\n",
+		R_YesNo( R_RendererSwapchainRestartRecent() ), vk.swapchain_last_restart_ms );
 	ri.Printf( PRINT_ALL, "sources: postFog=%s scene=%s luminance=%s\n",
 		vk_post_fog_source_name( vk_get_post_fog_source() ),
 		vk_post_fog_source_name( vk.scene_post_fog_color_source ),
 		vk_post_fog_source_name( vk_get_luminance_source() ) );
+	ri.Printf( PRINT_ALL, "cubemaps: runtime=%s total=%d ready=%d incomplete=%d hdrFallback=%s localReady=%s debug=\"%s\"\n",
+		R_YesNo( vk.cubemapActive ), tr.numCubemaps,
+		R_RendererCountReadyCubemaps(), R_RendererCountIncompleteCubemaps(),
+		R_YesNo( vk.pbr_ibl_using_hdr_fallback ), R_YesNo( vk.pbr_ibl_has_ready_local_cubemap ),
+		r_pbr_cubemapInfo ? r_pbr_cubemapInfo->string : "" );
 	ri.Printf( PRINT_ALL, "warnings: %d\n", R_RendererPrintCompatibilityWarnings( qtrue ) );
 	ri.Printf( PRINT_ALL, "========================================\n" );
 }
@@ -409,10 +538,27 @@ static void R_RendererHealth_f( void )
 	ri.Printf( PRINT_ALL, "passes    : inRenderPass=%s active=%s uiOverlay=%s sourcesHealthy=%s\n",
 		R_YesNo( vk.inRenderPass ), R_RenderPassName( vk.renderPassIndex ),
 		R_YesNo( vk.uiOverlayActive ), R_YesNo( R_RendererSceneSourceHealthy() ) );
+	ri.Printf( PRINT_ALL, "present   : swapchainHealthy=%s extent=%ux%u images=%u fullscreen=%d srgb=%d\n",
+		R_YesNo( R_RendererSwapchainHealthy() ),
+		vk.swapchain_extent_valid ? vk.swapchain_extent.width : 0u,
+		vk.swapchain_extent_valid ? vk.swapchain_extent.height : 0u,
+		(unsigned int)vk.swapchain_image_count, glConfig.isFullscreen, R_CvarInteger( r_vk_swapchain_srgb ) );
+	ri.Printf( PRINT_ALL, "restart   : count=%u last=%s\n",
+		(unsigned int)vk.swapchain_restart_count, R_RendererSwapchainLastRestartName() );
+	ri.Printf( PRINT_ALL, "restartAt : recent=%s ms=%d\n",
+		R_YesNo( R_RendererSwapchainRestartRecent() ), vk.swapchain_last_restart_ms );
 	ri.Printf( PRINT_ALL, "sources   : postFog=%s scene=%s luminance=%s\n",
 		vk_post_fog_source_name( vk_get_post_fog_source() ),
 		vk_post_fog_source_name( vk.scene_post_fog_color_source ),
 		vk_post_fog_source_name( vk_get_luminance_source() ) );
+	ri.Printf( PRINT_ALL, "cubemaps  : runtime=%s total=%d ready=%d incomplete=%d hdrFallback=%s localReady=%s debug=\"%s\"\n",
+		R_YesNo( vk.cubemapActive ), tr.numCubemaps,
+		R_RendererCountReadyCubemaps(), R_RendererCountIncompleteCubemaps(),
+		R_YesNo( vk.pbr_ibl_using_hdr_fallback ), R_YesNo( vk.pbr_ibl_has_ready_local_cubemap ),
+		r_pbr_cubemapInfo ? r_pbr_cubemapInfo->string : "" );
+	ri.Printf( PRINT_ALL, "recovery  : activeFallbacks=%s recentSwapchain=%s\n",
+		R_YesNo( R_RendererUsingRecoveryFallbacks() ),
+		R_YesNo( R_RendererSwapchainRestartRecent() ) );
 	ri.Printf( PRINT_ALL, "warnings  : %d\n", warnings );
 	if ( Q_stricmp( health, "ok" ) ) {
 		ri.Printf( PRINT_ALL, "next      : %s + vid_restart\n", R_RendererRecommendedRecoveryCommand() );
@@ -513,10 +659,24 @@ static void R_RendererSubsystems_f( void )
 	ri.Printf( PRINT_ALL, "passes     : inRenderPass=%s active=%s uiOverlay=%s sourcesHealthy=%s\n",
 		R_YesNo( vk.inRenderPass ), R_RenderPassName( vk.renderPassIndex ),
 		R_YesNo( vk.uiOverlayActive ), R_YesNo( R_RendererSceneSourceHealthy() ) );
+	ri.Printf( PRINT_ALL, "present    : swapchainHealthy=%s extent=%ux%u images=%u fullscreen=%d srgb=%d\n",
+		R_YesNo( R_RendererSwapchainHealthy() ),
+		vk.swapchain_extent_valid ? vk.swapchain_extent.width : 0u,
+		vk.swapchain_extent_valid ? vk.swapchain_extent.height : 0u,
+		(unsigned int)vk.swapchain_image_count, glConfig.isFullscreen, R_CvarInteger( r_vk_swapchain_srgb ) );
+	ri.Printf( PRINT_ALL, "restart    : count=%u last=%s\n",
+		(unsigned int)vk.swapchain_restart_count, R_RendererSwapchainLastRestartName() );
+	ri.Printf( PRINT_ALL, "restartAt  : recent=%s ms=%d\n",
+		R_YesNo( R_RendererSwapchainRestartRecent() ), vk.swapchain_last_restart_ms );
 	ri.Printf( PRINT_ALL, "sources    : postFog=%s scene=%s luminance=%s\n",
 		vk_post_fog_source_name( vk_get_post_fog_source() ),
 		vk_post_fog_source_name( vk.scene_post_fog_color_source ),
 		vk_post_fog_source_name( vk_get_luminance_source() ) );
+	ri.Printf( PRINT_ALL, "cubemaps   : runtime=%s total=%d ready=%d incomplete=%d hdrFallback=%s localReady=%s debug=\"%s\"\n",
+		R_YesNo( vk.cubemapActive ), tr.numCubemaps,
+		R_RendererCountReadyCubemaps(), R_RendererCountIncompleteCubemaps(),
+		R_YesNo( vk.pbr_ibl_using_hdr_fallback ), R_YesNo( vk.pbr_ibl_has_ready_local_cubemap ),
+		r_pbr_cubemapInfo ? r_pbr_cubemapInfo->string : "" );
 	ri.Printf( PRINT_ALL, "framegraph : fbo=%s hdr=%d color=%s renderTarget=%ux%u\n",
 		R_YesNo( vk.fboActive ), R_CvarInteger( r_hdr ), vk_format_string( vk.color_format ),
 		vk.renderWidth, vk.renderHeight );

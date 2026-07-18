@@ -13,8 +13,34 @@ Called from tr_init.c after pipeline creation.
 void vk_validate_pbr_ibl_resources( void )
 {
 #ifdef USE_VK_PBR
+	int i;
+
 	if ( !vk.pbrActive ) {
 		return;
+	}
+
+	vk.pbr_ibl_using_hdr_fallback = qfalse;
+	vk.pbr_ibl_has_ready_local_cubemap = qfalse;
+	vk.pbr_ibl_ready_cubemap_count = 0;
+	vk.pbr_ibl_incomplete_cubemap_count = 0;
+
+	for ( i = 0; i < tr.numCubemaps; i++ ) {
+		const cubemap_t *cube = &tr.cubemaps[i];
+		const qboolean ready = ( cube->prefiltered_image &&
+			cube->irradiance_image &&
+			cube->prefiltered_image->handle != VK_NULL_HANDLE &&
+			cube->prefiltered_image->view != VK_NULL_HANDLE &&
+			cube->prefiltered_image->descriptor != VK_NULL_HANDLE &&
+			cube->irradiance_image->handle != VK_NULL_HANDLE &&
+			cube->irradiance_image->view != VK_NULL_HANDLE &&
+			cube->irradiance_image->descriptor != VK_NULL_HANDLE );
+
+		if ( ready ) {
+			vk.pbr_ibl_ready_cubemap_count++;
+			vk.pbr_ibl_has_ready_local_cubemap = qtrue;
+		} else {
+			vk.pbr_ibl_incomplete_cubemap_count++;
+		}
 	}
 
 	{
@@ -33,6 +59,9 @@ void vk_validate_pbr_ibl_resources( void )
 			vk.cubemapActive ? "enabled" : "disabled" );
 		if ( vk.cubemapActive && tr.numCubemaps == 0 ) {
 			ri.Printf( PRINT_ALL, "[VK] PBR IBL: no map cubemaps loaded at startup, using fallback until available\n" );
+		} else if ( vk.cubemapActive ) {
+			ri.Printf( PRINT_ALL, "[VK] PBR IBL: local cubemaps ready=%d incomplete=%d\n",
+				vk.pbr_ibl_ready_cubemap_count, vk.pbr_ibl_incomplete_cubemap_count );
 		}
 #endif
 

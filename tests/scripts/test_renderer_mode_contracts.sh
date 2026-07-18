@@ -30,6 +30,8 @@ check "$TR_DIAG" 'renderer_deferred_safe' 'deferred recovery command participate
 check "$TR_DIAG" 'renderer_clustered_safe' 'clustered recovery command participates in contract reporting'
 check "$TR_DIAG" 'mode-1 deferred expects r_forwardPlusShade 0' 'mode-1 compatibility warns on Forward+ shade drift'
 check "$TR_DIAG" 'mode-1 deferred expects r_deferredGBuffer 1 and r_deferredGBufferFill 1' 'mode-1 compatibility warns on missing G-buffer scaffold'
+check "$TR_DIAG" 'PBR IBL is actively using HDR skybox fallback because no ready local cubemap is available' 'compatibility warns when probe fallback is active'
+check "$TR_DIAG" 'swapchain restarted recently (%s at %d ms); verify fullscreen/resize recovery if the frame still looks wrong' 'compatibility warns when fullscreen recovery is recent'
 check "$TR_INIT" 'ri.Cmd_AddCommand( "renderer_status"' 'renderer status command still registered'
 check "$TR_INIT" 'ri.Cmd_AddCommand( "renderer_compatibility"' 'renderer compatibility command still registered'
 

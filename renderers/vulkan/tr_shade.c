@@ -1222,6 +1222,98 @@ static int R_SelectCubemapIndexForPBR( void ) {
 	return ( bestInRadius != -1 ) ? bestInRadius : bestIndex;
 }
 
+static qboolean R_CubemapPbrIblReady( const cubemap_t *cube )
+{
+	if ( !cube || !cube->prefiltered_image || !cube->irradiance_image ) {
+		return qfalse;
+	}
+
+	if ( cube->prefiltered_image->handle == VK_NULL_HANDLE ||
+		cube->prefiltered_image->view == VK_NULL_HANDLE ||
+		cube->prefiltered_image->descriptor == VK_NULL_HANDLE ) {
+		return qfalse;
+	}
+
+	if ( cube->irradiance_image->handle == VK_NULL_HANDLE ||
+		cube->irradiance_image->view == VK_NULL_HANDLE ||
+		cube->irradiance_image->descriptor == VK_NULL_HANDLE ) {
+		return qfalse;
+	}
+
+	return qtrue;
+}
+
+static int R_SelectReadyCubemapIndexForPBRAt( const vec3_t pos )
+{
+	int i;
+	int bestIndex = -1;
+	int bestInRadius = -1;
+	float bestDistSq = 0.0f;
+	float bestInRadiusDistSq = 0.0f;
+
+	for ( i = 0; i < tr.numCubemaps; i++ ) {
+		float distSq;
+		vec3_t delta;
+		const cubemap_t *cube = &tr.cubemaps[i];
+
+		if ( !R_CubemapPbrIblReady( cube ) ) {
+			continue;
+		}
+
+		VectorSubtract( pos, cube->origin, delta );
+		distSq = VectorLengthSquared( delta );
+
+		if ( bestIndex == -1 || distSq < bestDistSq ) {
+			bestIndex = i;
+			bestDistSq = distSq;
+		}
+
+		if ( cube->parallaxRadius > 0.0f && distSq > ( cube->parallaxRadius * cube->parallaxRadius ) ) {
+			continue;
+		}
+
+		if ( bestInRadius == -1 || distSq < bestInRadiusDistSq ) {
+			bestInRadius = i;
+			bestInRadiusDistSq = distSq;
+		}
+	}
+
+	return ( bestInRadius != -1 ) ? bestInRadius : bestIndex;
+}
+
+static qboolean R_HasReadyCubemapForPBR( void )
+{
+	int i;
+
+	for ( i = 0; i < tr.numCubemaps; i++ ) {
+		if ( R_CubemapPbrIblReady( &tr.cubemaps[i] ) ) {
+			return qtrue;
+		}
+	}
+
+	return qfalse;
+}
+
+static void R_UpdatePbrIblRuntimeState( qboolean usingHdrSkybox, qboolean hasReadyMapCubemap )
+{
+	int i;
+	int ready = 0;
+	int incomplete = 0;
+
+	for ( i = 0; i < tr.numCubemaps; i++ ) {
+		if ( R_CubemapPbrIblReady( &tr.cubemaps[i] ) ) {
+			ready++;
+		} else {
+			incomplete++;
+		}
+	}
+
+	vk.pbr_ibl_using_hdr_fallback = usingHdrSkybox;
+	vk.pbr_ibl_has_ready_local_cubemap = hasReadyMapCubemap;
+	vk.pbr_ibl_ready_cubemap_count = ready;
+	vk.pbr_ibl_incomplete_cubemap_count = incomplete;
+}
+
 static void R_UpdatePBRCubemapDebugCvar( int cubemapIndex, const vec3_t pos )
 {
 #ifdef VK_CUBEMAP
@@ -1477,6 +1569,8 @@ static void RB_IterateStagesGeneric( const shaderCommands_t *input )
 			static qboolean warnedMissingBrdfLut = qfalse;
 			static qboolean warnedMissingEmptyCubemap = qfalse;
 			static qboolean warnedMissingMapCubemapData = qfalse;
+			static qboolean warnedRemappedMapCubemap = qfalse;
+			static qboolean warnedHdrSkyboxFallbackForIncompleteMap = qfalse;
 
 			vkPbrUniformBlock_t block;
 			Vector4Copy( pStage->emissiveScale, block.emissiveScale );
@@ -1535,13 +1629,14 @@ static void RB_IterateStagesGeneric( const shaderCommands_t *input )
 				VkDescriptorSet irradianceDescriptor = fallbackCube;
 				const VkDescriptorSet hdrEnvDescriptor = SkyboxHDR_GetPrefilteredDescriptor();
 				const VkDescriptorSet hdrIrradianceDescriptor = SkyboxHDR_GetIrradianceDescriptor();
+				const qboolean hasReadyMapCubemap = R_HasReadyCubemapForPBR();
 				/*
 				 * The runtime HDR skybox is a global fallback for maps that do not provide
-				 * cubemaps. Mixing it into a map that already has local cubemaps produces
-				 * visibly inconsistent lighting/reflections, so keep it out of the map IBL
-				 * path entirely once any cubemap data exists.
+				 * usable cubemaps. Mixing it into a map that already has ready local IBL
+				 * data produces visibly inconsistent lighting/reflections, so only use it
+				 * when no local cubemap is actually ready.
 				 */
-				const qboolean hdrSkyboxReady = ( tr.numCubemaps <= 0 &&
+				const qboolean hdrSkyboxReady = ( !hasReadyMapCubemap &&
 					hdrEnvDescriptor != VK_NULL_HANDLE &&
 					hdrIrradianceDescriptor != VK_NULL_HANDLE );
 				qboolean usingHdrSkybox = qfalse;
@@ -1568,6 +1663,11 @@ static void RB_IterateStagesGeneric( const shaderCommands_t *input )
 						envDescriptor = hdrEnvDescriptor;
 						irradianceDescriptor = hdrIrradianceDescriptor;
 						usingHdrSkybox = qtrue;
+						if ( tr.numCubemaps > 0 && !warnedHdrSkyboxFallbackForIncompleteMap ) {
+							ri.Printf( PRINT_WARNING,
+								"PBR IBL: no ready local cubemap found; using HDR skybox fallback until map probes are complete\n" );
+							warnedHdrSkyboxFallbackForIncompleteMap = qtrue;
+						}
 						if ( !SkyboxHDR_CopySHCoeffs( block.shCoeffs ) ) {
 							Com_Memcpy( block.shCoeffs, pStage->shCoeffs, sizeof( block.shCoeffs ) );
 						}
@@ -1581,19 +1681,36 @@ static void RB_IterateStagesGeneric( const shaderCommands_t *input )
 					vec3_t dbgPos;
 					R_GetPBRSurfacePosition( dbgPos );
 					cubemapIndex = R_SelectCubemapIndexForPBR();
+					if ( cubemapIndex >= 0 && cubemapIndex < tr.numCubemaps ) {
+						const cubemap_t *selectedCube = &tr.cubemaps[cubemapIndex];
+						if ( !R_CubemapPbrIblReady( selectedCube ) ) {
+							int readyIndex = R_SelectReadyCubemapIndexForPBRAt( dbgPos );
+							if ( readyIndex >= 0 ) {
+								if ( !warnedRemappedMapCubemap ) {
+									ri.Printf( PRINT_WARNING,
+										"PBR IBL: cubemap '%s' is incomplete; remapping to nearest ready cubemap '%s'\n",
+										selectedCube->name[0] ? selectedCube->name : "<unnamed>",
+										tr.cubemaps[readyIndex].name[0] ? tr.cubemaps[readyIndex].name : "<unnamed>" );
+									warnedRemappedMapCubemap = qtrue;
+								}
+								cubemapIndex = readyIndex;
+							}
+						}
+					}
+
 					R_UpdatePBRCubemapDebugCvar( cubemapIndex, dbgPos );
-					if ( cubemapIndex >= 0 ) {
+					if ( cubemapIndex >= 0 && cubemapIndex < tr.numCubemaps ) {
 						cube = &tr.cubemaps[cubemapIndex];
 					}
 
 					if ( cube ) {
-						if ( cube->prefiltered_image ) {
+						if ( cube->prefiltered_image && cube->prefiltered_image->descriptor != VK_NULL_HANDLE ) {
 							envDescriptor = cube->prefiltered_image->descriptor;
 						}
-						if ( cube->irradiance_image ) {
+						if ( cube->irradiance_image && cube->irradiance_image->descriptor != VK_NULL_HANDLE ) {
 							irradianceDescriptor = cube->irradiance_image->descriptor;
 						}
-						if ( !cube->prefiltered_image || !cube->irradiance_image ) {
+						if ( !R_CubemapPbrIblReady( cube ) ) {
 							if ( !warnedMissingMapCubemapData ) {
 								ri.Printf( PRINT_WARNING, "PBR IBL: cubemap '%s' missing prefiltered/irradiance image, using fallback where needed\n",
 									cube->name[0] ? cube->name : "<unnamed>" );
@@ -1613,6 +1730,11 @@ static void RB_IterateStagesGeneric( const shaderCommands_t *input )
 							envDescriptor = hdrEnvDescriptor;
 							irradianceDescriptor = hdrIrradianceDescriptor;
 							usingHdrSkybox = qtrue;
+							if ( tr.numCubemaps > 0 && !warnedHdrSkyboxFallbackForIncompleteMap ) {
+								ri.Printf( PRINT_WARNING,
+									"PBR IBL: no ready local cubemap found; using HDR skybox fallback until map probes are complete\n" );
+								warnedHdrSkyboxFallbackForIncompleteMap = qtrue;
+							}
 							if ( !SkyboxHDR_CopySHCoeffs( block.shCoeffs ) ) {
 								Com_Memcpy( block.shCoeffs, pStage->shCoeffs, sizeof( block.shCoeffs ) );
 							}
@@ -1640,6 +1762,8 @@ static void RB_IterateStagesGeneric( const shaderCommands_t *input )
 						vk_update_descriptor_if_changed_with_image( VK_DESC_PBR_IRRADIANCE, irradianceDescriptor, cube ? cube->irradiance_image : NULL );
 					}
 				}
+
+				R_UpdatePbrIblRuntimeState( usingHdrSkybox, hasReadyMapCubemap );
 			}
 				
 			if ( pStage->vk_pbr_flags & PBR_HAS_NORMALMAP )
