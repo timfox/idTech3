@@ -54,7 +54,7 @@ The renderer profile rule is: start from **one** modern base, then apply an over
 
 | Overlay | Use | Notes |
 |---------|-----|-------|
-| `vulkan_overlay_deferred.cfg` | Mode-1 deferred lighting development | Switches to `r_renderMode 1`, enables `r_deferredLighting 1`, and disables `r_forwardPlusShade` to avoid double dynamic lighting. |
+| `vulkan_overlay_deferred.cfg` | Mode-1 deferred lighting development | Switches to `r_renderMode 1`, enables `r_deferredLighting 1`, disables `r_forwardPlusShade`, and turns TAA/SMAA/FXAA off by default so temporal/post-AA artifacts do not mask deferred lighting bugs. |
 | `vulkan_overlay_unified_clustered.cfg` | Unified Clustered Renderer | `r_renderMode 3`: deferred opaque + Forward+ transparent, shared tile lists. See [UNIFIED_CLUSTERED_RENDERER.md](UNIFIED_CLUSTERED_RENDERER.md). |
 | `vulkan_overlay_oit_clustered.cfg` | Mode 3 + MBOIT | Unified Clustered + `r_oit 2` (optional stochastic via demo). See [MOMENT_OIT_STOCHASTIC_ALPHA.md](MOMENT_OIT_STOCHASTIC_ALPHA.md). |
 | `vulkan_overlay_visibility_2027.cfg` | 2027 visibility foundation | Mode 3 + G-buffer + `r_visibilityBuffer` + material classify. See [RENDERER_2027.md](RENDERER_2027.md). |
@@ -85,7 +85,14 @@ exec deferred_vulkan.cfg
 vid_restart
 ```
 
-This profile sets `r_renderMode 1`, `r_deferredGBuffer 1`, `r_deferredGBufferFill 1`, and `r_deferredLighting 1`. It also forces `r_forwardPlusShade 0` so dynamic lights come from the deferred compute/composite path instead of being applied once by Forward+ primary shading and again by the legacy lit-surface pass. Deferred dynamic lights can be attenuated by the **material AO** channel with `r_deferredAOCoupling` (not screen-space SSAO), and highlights use **GGX** specular scaled by `r_deferredSpecularStrength`. Additive deferred diffuse is albedo×(1−metalness)×irradiance to match Forward+ `Fd`. The deferred lighting mode is still experimental; the reliable shipping/native default remains `modern_vulkan.cfg`.
+For an in-session recovery path, run:
+
+```cfg
+renderer_deferred_safe
+vid_restart
+```
+
+This profile sets `r_renderMode 1`, `r_deferredGBuffer 1`, `r_deferredGBufferFill 1`, and `r_deferredLighting 1`. It also forces `r_forwardPlusShade 0` so dynamic lights come from the deferred compute/composite path instead of being applied once by Forward+ primary shading and again by the legacy lit-surface pass. Because the mode-1 path is still experimental, the profile also disables **TAA**, **SMAA**, **FXAA**, and `r_postAaAfterBloom` by default so temporal/post-AA artifacts do not hide core lighting regressions while debugging. Deferred dynamic lights can be attenuated by the **material AO** channel with `r_deferredAOCoupling` (not screen-space SSAO), and highlights use **GGX** specular scaled by `r_deferredSpecularStrength`. Additive deferred diffuse is albedo×(1−metalness)×irradiance to match Forward+ `Fd`. The deferred lighting mode is still experimental; the reliable shipping/native default remains `modern_vulkan.cfg`.
 
 The G-buffer fill copies scene albedo. On **non-MSAA** FBO frames, opaque PBR shaders **directly export** normals and material (metalness/roughness/AO). **MSAA** forces the depth-derived fallback (default metal/rough/AO=1). Prefer `r_ext_multisample 0` with `modern_vulkan.cfg` for true material export. Fallback defaults: `r_deferredDefaultMetalness`, `r_deferredDefaultRoughness`, `r_deferredNormalEdgeThreshold`.
 

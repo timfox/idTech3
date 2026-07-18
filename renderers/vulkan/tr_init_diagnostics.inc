@@ -88,6 +88,16 @@ static int R_RendererPrintCompatibilityWarnings( qboolean printOk )
 			( !r_deferredGBuffer || !r_deferredGBuffer->integer || !r_deferredGBufferFill || !r_deferredGBufferFill->integer ) ) {
 			R_RENDERER_WARN( "deferred lighting needs r_deferredGBuffer 1 and r_deferredGBufferFill 1.\n" );
 		}
+		if ( r_deferredLighting && r_deferredLighting->integer &&
+			( ( r_taa && r_taa->integer ) ||
+			  ( r_ext_smaa && r_ext_smaa->integer ) ||
+			  ( r_ext_fxaa && r_ext_fxaa->integer ) ||
+			  ( r_postAaAfterBloom && r_postAaAfterBloom->integer ) ) ) {
+			R_RENDERER_WARN( "deferred lighting mode is safer with TAA/SMAA/FXAA/post-AA disabled while debugging; use renderer_deferred_safe + vid_restart.\n" );
+		}
+		if ( vk.msaaActive ) {
+			R_RENDERER_WARN( "mode-1 deferred is running with MSAA; direct G-buffer material export falls back to depth-derived defaults.\n" );
+		}
 	}
 	if ( r_renderMode && r_renderMode->integer == 3 ) {
 		if ( !r_forwardPlus || !r_forwardPlus->integer ) {
@@ -257,6 +267,33 @@ static void R_RendererCompatibility_f( void )
 	ri.Printf( PRINT_ALL, "profile: %s\n", R_RendererProfileName() );
 	ri.Printf( PRINT_ALL, "warnings: %d\n", R_RendererPrintCompatibilityWarnings( qtrue ) );
 	ri.Printf( PRINT_ALL, "========================================\n" );
+}
+
+static void R_RendererDeferredSafe_f( void )
+{
+	ri.Cvar_Set( "r_renderMode", "1" );
+	ri.Cvar_Set( "r_forwardPlus", "1" );
+	ri.Cvar_Set( "r_forwardPlusShade", "0" );
+	ri.Cvar_Set( "r_ext_multisample", "0" );
+	ri.Cvar_Set( "r_deferredGBuffer", "1" );
+	ri.Cvar_Set( "r_deferredGBufferFill", "1" );
+	ri.Cvar_Set( "r_deferredLighting", "1" );
+	ri.Cvar_Set( "r_deferredUnlitBase", "1" );
+	ri.Cvar_Set( "r_deferredLightingStrength", "1" );
+	ri.Cvar_Set( "r_deferredSpecular", "1" );
+	ri.Cvar_Set( "r_deferredSpecularStrength", "1" );
+	ri.Cvar_Set( "r_deferredAOCoupling", "0.65" );
+	ri.Cvar_Set( "r_deferredDefaultMetalness", "0" );
+	ri.Cvar_Set( "r_deferredDefaultRoughness", "0.55" );
+	ri.Cvar_Set( "r_deferredNormalEdgeThreshold", "0.08" );
+	ri.Cvar_Set( "r_deferredGBufferDebug", "0" );
+	ri.Cvar_Set( "r_taa", "0" );
+	ri.Cvar_Set( "r_taaMotionVectors", "0" );
+	ri.Cvar_Set( "r_ext_smaa", "0" );
+	ri.Cvar_Set( "r_ext_fxaa", "0" );
+	ri.Cvar_Set( "r_postAaAfterBloom", "0" );
+	ri.Printf( PRINT_ALL,
+		"[VK] Deferred safe preset applied: mode 1 deferred + temporal/post AA off + MSAA off. Run vid_restart.\n" );
 }
 
 static void R_RendererSubsystems_f( void )

@@ -1205,6 +1205,7 @@ static void R_Register( void )
 	ri.Cmd_AddCommand( "renderer_status", R_RendererStatus_f );
 	ri.Cmd_AddCommand( "visibility_buffer_status", vk_visibility_buffer_status_f );
 	ri.Cmd_AddCommand( "renderer_profile", R_RendererProfile_f );
+	ri.Cmd_AddCommand( "renderer_deferred_safe", R_RendererDeferredSafe_f );
 	ri.Cmd_AddCommand( "renderer_subsystems", R_RendererSubsystems_f );
 	ri.Cmd_AddCommand( "renderer_compat", R_RendererCompatibility_f );
 	ri.Cmd_AddCommand( "renderer_compatibility", R_RendererCompatibility_f );
@@ -3596,6 +3597,7 @@ static void RE_Shutdown( refShutdownCode_t code ) {
 	ri.Cmd_RemoveCommand( "vulkaninfo" );
 	ri.Cmd_RemoveCommand( "renderer_status" );
 	ri.Cmd_RemoveCommand( "renderer_profile" );
+	ri.Cmd_RemoveCommand( "renderer_deferred_safe" );
 	ri.Cmd_RemoveCommand( "renderer_subsystems" );
 	ri.Cmd_RemoveCommand( "renderer_compat" );
 	ri.Cmd_RemoveCommand( "renderer_compatibility" );
