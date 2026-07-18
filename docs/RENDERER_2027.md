@@ -75,7 +75,7 @@ Demo: `exec demo_visibility_2027.cfg`. The overlay keeps `r_deferredMaterialClas
 | **P1** | Visibility foundation + material-class stub (this doc / cvars above) |
 | **P1.5** | Visbuf Morton/depth fill + late-shade debug mode 5 |
 | **P2** | GPU-driven meshlets — **`r_meshletsMdiDraw`** + **`r_meshletsLod`** screen LOD; persistent IBO + mesh shaders remain follow-up ([MESHLETS.md](MESHLETS.md)) |
-| **P3** | Reservoir-sampled hybrid path — ReSTIR DI on Hybrid1, NVC/FSA; **bindless A.1b** centroid sample ([RTX_HIT_SHADER_UV.md](RTX_HIT_SHADER_UV.md); AS UVs follow-up) |
+| **P3** | Reservoir-sampled hybrid path — ReSTIR DI on Hybrid1, NVC/FSA; **bindless A.1c** bary UV + PrimUv ([RTX_HIT_SHADER_UV.md](RTX_HIT_SHADER_UV.md)) |
 | **P4** | Material-classified OIT — mode 3 + MBOIT overlay (`vulkan_overlay_oit_clustered.cfg`); class-specialized paths remain follow-up ([MOMENT_OIT_STOCHASTIC_ALPHA.md](MOMENT_OIT_STOCHASTIC_ALPHA.md)) |
 | **P5** | Neural material/texture reconstruction (chocolate scaffold; no mandatory vendor SDK) |
 | **P6** | Heterogeneous resolution, sparse volumetrics, OMM, character skin/hair paths |

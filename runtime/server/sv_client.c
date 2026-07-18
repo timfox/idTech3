@@ -2652,13 +2652,17 @@ void SV_ExecuteClientMessage( client_t *cl, msg_t *msg ) {
 		}
 	}
 
-	// read the usercmd_t
+	// read the usercmd_t, then optional VoIP
 	if ( c == clc_move ) {
 		SV_UserMove( cl, msg, qtrue );
+		c = MSG_ReadByte( msg );
 	} else if ( c == clc_moveNoDelta ) {
 		SV_UserMove( cl, msg, qfalse );
-	} else if ( c == clc_voipOpus || c == clc_voipSpeex ) {
-		/* VoIP relay: read encoded audio and forward to clients (proximity-filtered when sv_voipProximity > 0) */
+		c = MSG_ReadByte( msg );
+	}
+
+	if ( c == clc_voipOpus || c == clc_voipSpeex ) {
+		/* VoIP relay: opaque Opus blob (seq+payload). Proximity-filter when sv_voipProximity > 0. */
 		int voipLen = MSG_ReadShort( msg );
 		if ( voipLen > 0 && voipLen <= 4000 ) {
 			byte voipData[4000];
@@ -2686,7 +2690,6 @@ void SV_ExecuteClientMessage( client_t *cl, msg_t *msg ) {
 					if ( d > prox ) continue; /* out of range */
 				}
 
-				SV_SendServerCommand( dst, "voip %d %d %s", sender, voipLen, "" );
 				{
 					msg_t relay;
 					byte relayBuf[4096];
@@ -2699,7 +2702,10 @@ void SV_ExecuteClientMessage( client_t *cl, msg_t *msg ) {
 				}
 			}
 		}
-	} else if ( c != clc_EOF ) {
+		c = MSG_ReadByte( msg );
+	}
+
+	if ( c != clc_EOF && c != -1 ) {
 		Com_Printf( "WARNING: bad command byte %i for client %i\n", c, (int) (cl - svs.clients) );
 	}
 //	if ( msg->readcount != msg->cursize ) {

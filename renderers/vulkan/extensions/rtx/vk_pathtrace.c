@@ -11,6 +11,7 @@ Requires USE_VULKAN_RTX, r_rtx 1, r_rtxDemo 1, r_pathtrace 1 (latched) + vid_res
 #include "vk.h"
 #include "vk_pathtrace.h"
 #include "vk_rtx.h"
+#include "vk_rtx_bindless.h"
 #include "vk_util.h"
 #include "vk_view_state.h"
 #include "vk_image_layout.h"
@@ -25,6 +26,8 @@ typedef struct {
 	float viewOrigin[4];
 	float outputSize[4];
 	float traceParams[4];
+	/* x = bindless tex count (0=SSBO), y = world prim count */
+	float bindlessMeta[4];
 } VkPtFrameUBO_t;
 
 typedef struct {
@@ -57,6 +60,7 @@ static struct {
 	VkPipelineLayout	pl;
 	VkPipelineLayout	pl_compact;
 	VkPipelineLayout	pl_post;
+	uint32_t		bindless_array_count;
 	VkPipeline		pipeline_mega;
 	VkPipeline		pipeline_wave;
 	VkPipeline		pipeline_compact;
@@ -605,8 +609,10 @@ void vk_pathtrace_init( void )
 {
 	VkPhysicalDeviceRayTracingPipelinePropertiesKHR rtProps;
 	VkPhysicalDeviceProperties2 props2;
-	VkDescriptorSetLayoutBinding bindings[8];
+	VkDescriptorSetLayoutBinding bindings[11];
 	VkDescriptorSetLayoutCreateInfo dslci;
+	VkDescriptorBindingFlags bindingFlags[11];
+	VkDescriptorSetLayoutBindingFlagsCreateInfo bindingFlagsInfo;
 	VkDescriptorPoolSize poolSizes[7];
 	VkDescriptorPoolCreateInfo pci;
 	VkPipelineLayoutCreateInfo plci;
@@ -622,7 +628,7 @@ void vk_pathtrace_init( void )
 	Vk_Sampler_Def sd;
 	VkComputePipelineCreateInfo cpci;
 	VkPipelineShaderStageCreateInfo cstage;
-	uint32_t w, h, uboMemType;
+	uint32_t w, h, uboMemType, bi;
 	VkDeviceSize uboAllocSize;
 	VkDeviceSize queueBytes;
 	const char *archName;
@@ -704,9 +710,46 @@ void vk_pathtrace_init( void )
 	bindings[7].descriptorCount = 1;
 	bindings[7].stageFlags = VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR;
 
+	pathtrace.bindless_array_count = 1u;
+	if ( vk_rtx_bindless_indexing_supported() ) {
+		uint32_t cap = vk_rtx_bindless_cap();
+		if ( cap < 1u ) {
+			cap = 1u;
+		}
+		if ( cap > 4096u ) {
+			cap = 4096u;
+		}
+		pathtrace.bindless_array_count = cap;
+	}
+	bindings[8].binding = 8;
+	bindings[8].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+	bindings[8].descriptorCount = pathtrace.bindless_array_count;
+	bindings[8].stageFlags = VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR;
+	bindings[9].binding = 9;
+	bindings[9].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+	bindings[9].descriptorCount = 1;
+	bindings[9].stageFlags = VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR;
+	bindings[10].binding = 10;
+	bindings[10].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+	bindings[10].descriptorCount = 1;
+	bindings[10].stageFlags = VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR;
+
+	Com_Memset( bindingFlags, 0, sizeof( bindingFlags ) );
+	for ( bi = 0; bi < 11; bi++ ) {
+		bindingFlags[bi] = 0;
+	}
+	if ( pathtrace.bindless_array_count > 1u ) {
+		bindingFlags[8] = VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT;
+	}
+	Com_Memset( &bindingFlagsInfo, 0, sizeof( bindingFlagsInfo ) );
+	bindingFlagsInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_BINDING_FLAGS_CREATE_INFO;
+	bindingFlagsInfo.bindingCount = 11;
+	bindingFlagsInfo.pBindingFlags = bindingFlags;
+
 	Com_Memset( &dslci, 0, sizeof( dslci ) );
 	dslci.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-	dslci.bindingCount = 8;
+	dslci.pNext = ( pathtrace.bindless_array_count > 1u ) ? &bindingFlagsInfo : NULL;
+	dslci.bindingCount = 11;
 	dslci.pBindings = bindings;
 	VK_CHECK( qvkCreateDescriptorSetLayout( vk.device, &dslci, NULL, &pathtrace.dsl ) );
 
@@ -717,9 +760,9 @@ void vk_pathtrace_init( void )
 	poolSizes[2].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
 	poolSizes[2].descriptorCount = 1;
 	poolSizes[3].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-	poolSizes[3].descriptorCount = 2;
+	poolSizes[3].descriptorCount = 2u + pathtrace.bindless_array_count;
 	poolSizes[4].type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-	poolSizes[4].descriptorCount = 4;
+	poolSizes[4].descriptorCount = 8;
 	poolSizes[5].type = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
 	poolSizes[5].descriptorCount = 1;
 	{
@@ -775,6 +818,10 @@ void vk_pathtrace_init( void )
 	vk_rtx_bind_tlas_descriptor( pathtrace.descriptor_set );
 	vk_rtx_bind_world_albedo_ssbo( pathtrace.descriptor_set, 6 );
 	vk_rtx_bind_world_normal_ssbo( pathtrace.descriptor_set, 7 );
+	vk_rtx_bindless_set_descriptor_array_count( pathtrace.bindless_array_count );
+	vk_rtx_bindless_bind_textures( pathtrace.descriptor_set, 8 );
+	vk_rtx_bindless_bind_prim_material( pathtrace.descriptor_set, 9 );
+	vk_rtx_bind_prim_uv_ssbo( pathtrace.descriptor_set, 10 );
 
 	uboAllocSize = (VkDeviceSize)PAD( (uint32_t)sizeof( VkPtFrameUBO_t ), (uint32_t)vk.uniform_alignment );
 	Com_Memset( &uboBi, 0, sizeof( uboBi ) );
@@ -906,6 +953,10 @@ void vk_pathtrace_frame_begin( void )
 	vk_rtx_bind_tlas_descriptor( pathtrace.descriptor_set );
 	vk_rtx_bind_world_albedo_ssbo( pathtrace.descriptor_set, 6 );
 	vk_rtx_bind_world_normal_ssbo( pathtrace.descriptor_set, 7 );
+	vk_rtx_bindless_set_descriptor_array_count( pathtrace.bindless_array_count );
+	vk_rtx_bindless_bind_textures( pathtrace.descriptor_set, 8 );
+	vk_rtx_bindless_bind_prim_material( pathtrace.descriptor_set, 9 );
+	vk_rtx_bind_prim_uv_ssbo( pathtrace.descriptor_set, 10 );
 	vk_pathtrace_update_post_descriptors();
 	{
 		VkDescriptorBufferInfo queueInfo;
@@ -947,6 +998,10 @@ static void vk_pathtrace_trace_dispatch( VkCommandBuffer cmd, VkPipeline pipelin
 	vk_rtx_bind_tlas_descriptor( pathtrace.descriptor_set );
 	vk_rtx_bind_world_albedo_ssbo( pathtrace.descriptor_set, 6 );
 	vk_rtx_bind_world_normal_ssbo( pathtrace.descriptor_set, 7 );
+	vk_rtx_bindless_set_descriptor_array_count( pathtrace.bindless_array_count );
+	vk_rtx_bindless_bind_textures( pathtrace.descriptor_set, 8 );
+	vk_rtx_bindless_bind_prim_material( pathtrace.descriptor_set, 9 );
+	vk_rtx_bind_prim_uv_ssbo( pathtrace.descriptor_set, 10 );
 
 	const float *view = backEnd.viewParms.world.modelViewMatrix;
 	const float *projection = backEnd.useFirstPersonProjection ?
@@ -996,6 +1051,11 @@ static void vk_pathtrace_trace_dispatch( VkCommandBuffer cmd, VkPipeline pipelin
 	frameUbo.traceParams[1] = (float)samples;
 	frameUbo.traceParams[2] = (float)( tr.frameCount & 0xFFFF );
 	frameUbo.traceParams[3] = r_pathtrace_denoise ? (float)r_pathtrace_denoise->integer : 0.0f;
+	frameUbo.bindlessMeta[0] = frameUbo.bindlessMeta[1] = frameUbo.bindlessMeta[2] = frameUbo.bindlessMeta[3] = 0.0f;
+	if ( vk_rtx_bindless_active() ) {
+		frameUbo.bindlessMeta[0] = (float)vk_rtx_bindless_texture_count();
+		frameUbo.bindlessMeta[1] = (float)vk_rtx_world_albedo_count();
+	}
 	Com_Memcpy( pathtrace.pt_ubo_ptr, &frameUbo, sizeof( frameUbo ) );
 
 	vk_pathtrace_build_sbt( pipeline );

@@ -32,6 +32,20 @@ static void rtx_store_vec3( float *dstBase, uint32_t primIndex, float x, float y
 	dst[2] = z;
 }
 
+static void rtx_store_uv6( float *uvHost, uint32_t primIndex,
+	float u0, float v0, float u1, float v1, float u2, float v2 )
+{
+	float *dst;
+
+	if ( !uvHost ) {
+		return;
+	}
+	dst = uvHost + primIndex * 6u;
+	dst[0] = u0; dst[1] = v0;
+	dst[2] = u1; dst[3] = v1;
+	dst[4] = u2; dst[5] = v2;
+}
+
 static void rtx_store_albedo( float *albedoRgb, uint32_t primIndex, float r, float g, float b,
 	const shader_t *shader )
 {
@@ -293,7 +307,7 @@ uint32_t vk_rtx_world_count_primitives( const world_t *w, uint32_t maxPrimitives
 }
 
 static void rtx_emit_face_tris( const srfSurfaceFace_t *face, const shader_t *shader,
-	float *positions, uint32_t *indices, float *albedoRgb, float *normalRgb,
+	float *positions, uint32_t *indices, float *albedoRgb, float *normalRgb, float *uvHost,
 	uint32_t *outVert, uint32_t *outIdx, uint32_t maxPrimitives, uint32_t *primCount )
 {
 	const unsigned *idxSrc;
@@ -339,6 +353,7 @@ static void rtx_emit_face_tris( const srfSurfaceFace_t *face, const shader_t *sh
 		v = ( v0 + v1 + v2 ) * ( 1.0f / 3.0f );
 		rtx_resolve_prim_albedo( shader, u, v, avg, rgb );
 		rtx_store_albedo( albedoRgb, *primCount, rgb[0], rgb[1], rgb[2], shader );
+		rtx_store_uv6( uvHost, *primCount, u0, v0, u1, v1, u2, v2 );
 		/* Planar faces: BSP plane normal is authoritative. */
 		rtx_store_normal( normalRgb, *primCount, face->plane.normal );
 		baseV += 3u;
@@ -350,7 +365,7 @@ static void rtx_emit_face_tris( const srfSurfaceFace_t *face, const shader_t *sh
 }
 
 static void rtx_emit_triangles_tris( const srfTriangles_t *surf, const shader_t *shader,
-	float *positions, uint32_t *indices, float *albedoRgb, float *normalRgb,
+	float *positions, uint32_t *indices, float *albedoRgb, float *normalRgb, float *uvHost,
 	uint32_t *outVert, uint32_t *outIdx, uint32_t maxPrimitives, uint32_t *primCount )
 {
 	uint32_t t, baseV, baseI;
@@ -391,6 +406,10 @@ static void rtx_emit_triangles_tris( const srfTriangles_t *surf, const shader_t 
 		v = ( surf->verts[i0].st[1] + surf->verts[i1].st[1] + surf->verts[i2].st[1] ) * ( 1.0f / 3.0f );
 		rtx_resolve_prim_albedo( shader, u, v, avg, rgb );
 		rtx_store_albedo( albedoRgb, *primCount, rgb[0], rgb[1], rgb[2], shader );
+		rtx_store_uv6( uvHost, *primCount,
+			surf->verts[i0].st[0], surf->verts[i0].st[1],
+			surf->verts[i1].st[0], surf->verts[i1].st[1],
+			surf->verts[i2].st[0], surf->verts[i2].st[1] );
 		{
 			float n[3];
 			const float *na = surf->verts[i0].normal;
@@ -417,7 +436,7 @@ static void rtx_emit_triangles_tris( const srfTriangles_t *surf, const shader_t 
 }
 
 static void rtx_emit_grid_tris( const srfGridMesh_t *grid, const shader_t *shader,
-	float *positions, uint32_t *indices, float *albedoRgb, float *normalRgb,
+	float *positions, uint32_t *indices, float *albedoRgb, float *normalRgb, float *uvHost,
 	uint32_t *outVert, uint32_t *outIdx, uint32_t maxPrimitives, uint32_t *primCount )
 {
 	int widthTable[MAX_GRID_SIZE];
@@ -477,6 +496,8 @@ static void rtx_emit_grid_tris( const srfGridMesh_t *grid, const shader_t *shade
 			v = ( dvA->st[1] + dvB->st[1] + dvC->st[1] ) * ( 1.0f / 3.0f );
 			rtx_resolve_prim_albedo( shader, u, v, avg, rgb );
 			rtx_store_albedo( albedoRgb, *primCount, rgb[0], rgb[1], rgb[2], shader );
+			rtx_store_uv6( uvHost, *primCount,
+				dvA->st[0], dvA->st[1], dvB->st[0], dvB->st[1], dvC->st[0], dvC->st[1] );
 			{
 				float n[3];
 				n[0] = dvA->normal[0] + dvB->normal[0] + dvC->normal[0];
@@ -514,6 +535,8 @@ static void rtx_emit_grid_tris( const srfGridMesh_t *grid, const shader_t *shade
 			v = ( dvA->st[1] + dvB->st[1] + dvC->st[1] ) * ( 1.0f / 3.0f );
 			rtx_resolve_prim_albedo( shader, u, v, avg, rgb );
 			rtx_store_albedo( albedoRgb, *primCount, rgb[0], rgb[1], rgb[2], shader );
+			rtx_store_uv6( uvHost, *primCount,
+				dvA->st[0], dvA->st[1], dvB->st[0], dvB->st[1], dvC->st[0], dvC->st[1] );
 			{
 				float n[3];
 				n[0] = dvA->normal[0] + dvB->normal[0] + dvC->normal[0];
@@ -538,7 +561,8 @@ static void rtx_emit_grid_tris( const srfGridMesh_t *grid, const shader_t *shade
 }
 
 uint32_t vk_rtx_world_pack( const world_t *w, uint32_t maxPrimitives,
-	float *positions, uint32_t *indices, float *albedoRgb, float *normalRgb, uint32_t *outVertCount )
+	float *positions, uint32_t *indices, float *albedoRgb, float *normalRgb, float *uvHost,
+	uint32_t *outVertCount )
 {
 	uint32_t i, bi, primCount, vertPos, idxPos, gridPrims;
 	int bmCount;
@@ -576,13 +600,13 @@ uint32_t vk_rtx_world_pack( const world_t *w, uint32_t maxPrimitives,
 			st = sf->data;
 			if ( *st == SF_FACE ) {
 				rtx_emit_face_tris( (const srfSurfaceFace_t *)st, sf->shader, positions, indices,
-					albedoRgb, normalRgb, &vertPos, &idxPos, maxPrimitives, &primCount );
+					albedoRgb, normalRgb, uvHost, &vertPos, &idxPos, maxPrimitives, &primCount );
 			} else if ( *st == SF_TRIANGLES ) {
 				rtx_emit_triangles_tris( (const srfTriangles_t *)st, sf->shader, positions, indices,
-					albedoRgb, normalRgb, &vertPos, &idxPos, maxPrimitives, &primCount );
+					albedoRgb, normalRgb, uvHost, &vertPos, &idxPos, maxPrimitives, &primCount );
 			} else if ( *st == SF_GRID ) {
 				rtx_emit_grid_tris( (const srfGridMesh_t *)st, sf->shader, positions, indices,
-					albedoRgb, normalRgb, &vertPos, &idxPos, maxPrimitives, &primCount );
+					albedoRgb, normalRgb, uvHost, &vertPos, &idxPos, maxPrimitives, &primCount );
 				gridPrims += ( primCount - before );
 			}
 			if ( primCount >= maxPrimitives ) {
@@ -616,7 +640,8 @@ uint32_t vk_rtx_world_count_primitives( const world_t *w, uint32_t maxPrimitives
 }
 
 uint32_t vk_rtx_world_pack( const world_t *w, uint32_t maxPrimitives,
-	float *positions, uint32_t *indices, float *albedoRgb, float *normalRgb, uint32_t *outVertCount )
+	float *positions, uint32_t *indices, float *albedoRgb, float *normalRgb, float *uvHost,
+	uint32_t *outVertCount )
 {
 	(void)w;
 	(void)maxPrimitives;
@@ -624,6 +649,7 @@ uint32_t vk_rtx_world_pack( const world_t *w, uint32_t maxPrimitives,
 	(void)indices;
 	(void)albedoRgb;
 	(void)normalRgb;
+	(void)uvHost;
 	if ( outVertCount ) {
 		*outVertCount = 0u;
 	}

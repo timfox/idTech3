@@ -1,5 +1,6 @@
 #version 460
 #extension GL_EXT_ray_query : require
+#extension GL_EXT_nonuniform_qualifier : enable
 #extension GL_GOOGLE_include_directive : require
 layout(local_size_x = 64) in;
 
@@ -28,12 +29,64 @@ layout(std430, set = 0, binding = 6) readonly buffer EntityNormalSSBO {
 	float entityNxyz[];
 };
 
+/* Phase A.1b parity with Hybrid1: bindless diffuse + PrimMaterial. */
+layout(set = 0, binding = 7) uniform sampler2D bindlessDiffuse[];
+struct SurfelPrimMaterial {
+	uint textureIndex;
+	uint uvSetFlags;
+};
+layout(std430, set = 0, binding = 8) readonly buffer PrimMaterialSSBO {
+	SurfelPrimMaterial mats[];
+};
+layout(std430, set = 0, binding = 9) readonly buffer PrimUvSSBO {
+	float uv6[];
+};
+
 layout(push_constant) uniform UpdatePush {
 	uvec4 params; /* x=maxSurfels y=frame z=samplesPerSurfel w=updateStride */
 	vec4  ray;    /* x=maxRayDistance y=intensity z=blendAlpha w=maxAge */
+	uvec4 bindless; /* x=texCount y=worldPrimCount */
 } pc;
 
-vec3 sampleWorldAlbedo(uint instanceCustom, int primId) {
+vec3 sampleBindlessAlbedo(uint instanceCustom, int primId, vec2 bary) {
+	uint texCount = pc.bindless.x;
+	if (texCount == 0u || primId < 0) {
+		return vec3(-1.0);
+	}
+	uint primIdx = uint(primId);
+	if (instanceCustom == 1u) {
+		primIdx += pc.bindless.y;
+	}
+	uint nMat = uint(mats.length());
+	if (nMat == 0u || primIdx >= nMat) {
+		return vec3(-1.0);
+	}
+	uint texIdx = mats[primIdx].textureIndex;
+	if (texIdx == 0xFFFFFFFFu || texIdx >= texCount) {
+		return vec3(-1.0);
+	}
+	vec2 uv = vec2(0.5);
+	uint nuv = uint(uv6.length());
+	if (nuv >= (primIdx + 1u) * 6u) {
+		uint base = primIdx * 6u;
+		vec2 uv0 = vec2(uv6[base + 0u], uv6[base + 1u]);
+		vec2 uv1 = vec2(uv6[base + 2u], uv6[base + 3u]);
+		vec2 uv2 = vec2(uv6[base + 4u], uv6[base + 5u]);
+		float w = max(1.0 - bary.x - bary.y, 0.0);
+		uv = uv0 * w + uv1 * bary.x + uv2 * bary.y;
+	}
+	vec3 c = texture(nonuniformEXT(bindlessDiffuse[texIdx]), uv).rgb;
+	if (dot(c, c) <= 1e-8) {
+		return vec3(-1.0);
+	}
+	return c;
+}
+
+vec3 sampleWorldAlbedo(uint instanceCustom, int primId, vec2 bary) {
+	vec3 b = sampleBindlessAlbedo(instanceCustom, primId, bary);
+	if (b.x >= 0.0) {
+		return b;
+	}
 	if (instanceCustom == 1u) {
 		uint n = uint(entityRgb.length()) / 3u;
 		if (n == 0u || primId < 0 || uint(primId) >= n) {
@@ -113,7 +166,8 @@ void main() {
 			float t = rayQueryGetIntersectionTEXT(rq, true);
 			uint inst = rayQueryGetIntersectionInstanceCustomIndexEXT(rq, true);
 			int prim = rayQueryGetIntersectionPrimitiveIndexEXT(rq, true);
-			vec3 albedo = sampleWorldAlbedo(inst, prim);
+			vec2 bary = rayQueryGetIntersectionBarycentricsEXT(rq, true);
+			vec3 albedo = sampleWorldAlbedo(inst, prim, bary);
 			vec3 towardRay = normalize(-dir);
 			vec3 Nhit = sampleWorldNormal(inst, prim, towardRay);
 			float cosTerm = max(dot(Nhit, towardRay), 0.0);

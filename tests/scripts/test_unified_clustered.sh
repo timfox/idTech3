@@ -18,6 +18,8 @@ rg -q 'pbrDebugMode.y' "$ROOT/renderers/vulkan/shaders/glsl/gen_frag.tmpl" || fa
 rg -q 'CheckRange\( r_renderMode, "0", "3"' "$ROOT/renderers/vulkan/tr_init.c" || fail "CheckRange 0-3 missing"
 rg -q 'r_renderMode 3' "$ROOT/config/vulkan_overlay_unified_clustered.cfg" || fail "overlay sets mode 3"
 rg -q 'skips Forward\+ transparent' "$ROOT/renderers/vulkan/tr_backend.c" || fail "OIT mode3 honesty log missing"
+rg -q 'r_oitForwardPlus' "$ROOT/renderers/vulkan/tr_backend.c" || fail "OIT Forward+ lit mode3 log"
 rg -q 'vulkan_overlay_oit_clustered' "$ROOT/docs/UNIFIED_CLUSTERED_RENDERER.md" || fail "OIT clustered docs missing"
+rg -q 'r_oitForwardPlus' "$ROOT/docs/UNIFIED_CLUSTERED_RENDERER.md" || fail "Forward+-lit OIT docs"
 
 echo "OK: unified clustered smoke checks passed"

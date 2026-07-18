@@ -12,6 +12,9 @@ test -f "$ROOT/renderers/vulkan/shaders/glsl/oit_moments.frag" || fail "oit_mome
 test -f "$ROOT/renderers/vulkan/shaders/glsl/oit_accum_mboit.frag" || fail "oit_accum_mboit.frag missing"
 
 rg -q 'CheckRange\( r_oit, "0", "2"' "$ROOT/renderers/vulkan/tr_init.c" || fail "r_oit range 0-2"
+rg -q 'r_oitForwardPlus' "$ROOT/renderers/vulkan/tr_init.c" || fail "r_oitForwardPlus cvar"
+rg -q 'forward_plus_lit' "$ROOT/renderers/vulkan/shaders/glsl/oit_accum.frag" || fail "Forward+-lit OIT frag"
+rg -q 'frag_world_pos' "$ROOT/renderers/vulkan/shaders/glsl/oit_accum.vert" || fail "OIT world pos VS"
 rg -q 'r_stochasticAlpha' "$ROOT/renderers/vulkan/tr_init.c" || fail "r_stochasticAlpha cvar"
 rg -q 'oit_moments' "$ROOT/renderers/vulkan/vk_postfx_passes.c" || fail "moments pass wiring"
 rg -q 'StochasticIGN|stochMode' "$ROOT/renderers/vulkan/shaders/glsl/gen_frag.tmpl" || fail "stochastic gen_frag"

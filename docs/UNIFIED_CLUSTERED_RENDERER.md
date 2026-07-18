@@ -42,14 +42,16 @@ Deferred lighting transforms direct-export **world** normals to view space, and 
 
 ## OIT + mode 3
 
-When `r_oit` 1/2 is on with mode 3, the backend runs **`vk_oit_pass` instead of** the Forward+ transparent shade pass (`drawSurfFilter=2`). Moments/accum/resolve still composite over the deferred opaque base, but OIT fragment paths do **not** currently evaluate Forward+ tile lights — glass/smoke get OIT weighting without clustered dynamic lighting.
+When `r_oit` 1/2 is on with mode 3, the backend runs **`vk_oit_pass` instead of** the Forward+ transparent shade pass (`drawSurfFilter=2`). Moments/accum/resolve still composite over the deferred opaque base.
+
+**WBOIT (`r_oit 1`) + `r_oitForwardPlus 1` (default):** accumulation samples Forward+ tile lights (set 2) using world-space position from the object→world push matrix. **MBOIT (`r_oit 2`)** moments/accum stays unlit.
 
 ```
 exec vulkan_overlay_oit_clustered.cfg
 vid_restart
 ```
 
-Or demo: `exec demo_oit_clustered.cfg` (adds `r_stochasticAlpha 2` + TAA). Keep `r_ext_multisample 0`. Forward+-lit OIT is a follow-up.
+Or demo: `exec demo_oit_clustered.cfg` (adds `r_stochasticAlpha 2` + TAA). Keep `r_ext_multisample 0`.
 
 ## Related
 

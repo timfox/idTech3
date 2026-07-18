@@ -12,6 +12,7 @@ Chocolate RTX path; spawn / ray-query update / resolve / composite.
 #include "vk_surfel_gi.h"
 #include "vk_hybrid1.h"
 #include "vk_rtx.h"
+#include "vk_rtx_bindless.h"
 #include "vk_util.h"
 #include "vk_image_layout.h"
 #include "vk_view_state.h"
@@ -361,8 +362,10 @@ static void SGI_DestroyPipelines( void )
 
 static qboolean SGI_CreatePipelines( void )
 {
-	VkDescriptorSetLayoutBinding binds[7];
+	VkDescriptorSetLayoutBinding binds[10];
 	VkDescriptorSetLayoutCreateInfo lci;
+	VkDescriptorBindingFlags bindingFlags[10];
+	VkDescriptorSetLayoutBindingFlagsCreateInfo bindingFlagsInfo;
 	VkPushConstantRange pcr;
 	VkPipelineLayoutCreateInfo plci;
 	VkComputePipelineCreateInfo pci;
@@ -371,6 +374,8 @@ static qboolean SGI_CreatePipelines( void )
 	VkDescriptorPoolCreateInfo poolCi;
 	VkDescriptorSetAllocateInfo alloc;
 	VkDescriptorSetLayout layouts[5];
+	uint32_t bindlessCap = 1u;
+	uint32_t bi;
 
 	sgi.spawn_cs = SGI_Module( vk_surfel_spawn_cs_spv, VK_SURFEL_SPAWN_CS_SPV_SIZE, "surfel_spawn" );
 	sgi.update_cs = SGI_Module( vk_surfel_update_cs_spv, VK_SURFEL_UPDATE_CS_SPV_SIZE, "surfel_update" );
@@ -379,6 +384,16 @@ static qboolean SGI_CreatePipelines( void )
 	sgi.composite_cs = SGI_Module( vk_surfel_composite_cs_spv, VK_SURFEL_COMPOSITE_CS_SPV_SIZE, "surfel_composite" );
 	if ( !sgi.spawn_cs || !sgi.update_cs || !sgi.hash_cs || !sgi.resolve_cs || !sgi.composite_cs ) {
 		return qfalse;
+	}
+
+	if ( vk_rtx_bindless_indexing_supported() ) {
+		bindlessCap = vk_rtx_bindless_cap();
+		if ( bindlessCap < 1u ) {
+			bindlessCap = 1u;
+		}
+		if ( bindlessCap > 4096u ) {
+			bindlessCap = 4096u;
+		}
 	}
 
 	Com_Memset( binds, 0, sizeof( binds ) );
@@ -392,16 +407,43 @@ static qboolean SGI_CreatePipelines( void )
 	lci.pBindings = binds;
 	VK_CHECK( qvkCreateDescriptorSetLayout( vk.device, &lci, NULL, &sgi.spawn_layout ) );
 
-	/* update: AS @0, surfel @1, counter @2, world albedo @3, world normal @4, entity albedo @5, entity normal @6 */
+	/* update: AS@0 surfel@1 counter@2 worldAlb@3 worldN@4 entAlb@5 entN@6 bindless@7 primMat@8 primUv@9 */
 	binds[0].binding = 0; binds[0].descriptorType = VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR;
+	binds[0].descriptorCount = 1; binds[0].stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
 	binds[1].binding = 1; binds[1].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+	binds[1].descriptorCount = 1; binds[1].stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
 	binds[2].binding = 2; binds[2].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+	binds[2].descriptorCount = 1; binds[2].stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
 	binds[3].binding = 3; binds[3].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-	binds[4].binding = 4; binds[4].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER; binds[4].descriptorCount = 1; binds[4].stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
-	binds[5].binding = 5; binds[5].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER; binds[5].descriptorCount = 1; binds[5].stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
-	binds[6].binding = 6; binds[6].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER; binds[6].descriptorCount = 1; binds[6].stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
-	lci.bindingCount = 7;
+	binds[3].descriptorCount = 1; binds[3].stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+	binds[4].binding = 4; binds[4].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+	binds[4].descriptorCount = 1; binds[4].stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+	binds[5].binding = 5; binds[5].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+	binds[5].descriptorCount = 1; binds[5].stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+	binds[6].binding = 6; binds[6].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+	binds[6].descriptorCount = 1; binds[6].stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+	binds[7].binding = 7; binds[7].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+	binds[7].descriptorCount = bindlessCap; binds[7].stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+	binds[8].binding = 8; binds[8].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+	binds[8].descriptorCount = 1; binds[8].stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+	binds[9].binding = 9; binds[9].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+	binds[9].descriptorCount = 1; binds[9].stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+	Com_Memset( bindingFlags, 0, sizeof( bindingFlags ) );
+	for ( bi = 0; bi < 10; bi++ ) {
+		bindingFlags[bi] = 0;
+	}
+	if ( bindlessCap > 1u ) {
+		bindingFlags[7] = VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT;
+	}
+	Com_Memset( &bindingFlagsInfo, 0, sizeof( bindingFlagsInfo ) );
+	bindingFlagsInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_BINDING_FLAGS_CREATE_INFO;
+	bindingFlagsInfo.bindingCount = 10;
+	bindingFlagsInfo.pBindingFlags = bindingFlags;
+	lci.bindingCount = 10;
+	lci.pBindings = binds;
+	lci.pNext = ( bindlessCap > 1u ) ? &bindingFlagsInfo : NULL;
 	VK_CHECK( qvkCreateDescriptorSetLayout( vk.device, &lci, NULL, &sgi.update_layout ) );
+	lci.pNext = NULL;
 
 	/* hash: surfel @0, counter @1, hash @2 */
 	binds[0].binding = 0; binds[0].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
@@ -439,7 +481,7 @@ static qboolean SGI_CreatePipelines( void )
 	plci.pSetLayouts = &sgi.spawn_layout;
 	VK_CHECK( qvkCreatePipelineLayout( vk.device, &plci, NULL, &sgi.spawn_pl ) );
 
-	pcr.size = sizeof( uint32_t ) * 4 + sizeof( float ) * 4;
+	pcr.size = sizeof( uint32_t ) * 4 + sizeof( float ) * 4 + sizeof( uint32_t ) * 4;
 	plci.pSetLayouts = &sgi.update_layout;
 	VK_CHECK( qvkCreatePipelineLayout( vk.device, &plci, NULL, &sgi.update_pl ) );
 
@@ -475,8 +517,8 @@ static qboolean SGI_CreatePipelines( void )
 	VK_CHECK( qvkCreateComputePipelines( vk.device, vk.pipelineCache, 1, &pci, NULL, &sgi.composite_pipe ) );
 
 	Com_Memset( sizes, 0, sizeof( sizes ) );
-	sizes[0].type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER; sizes[0].descriptorCount = 28;
-	sizes[1].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER; sizes[1].descriptorCount = 16;
+	sizes[0].type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER; sizes[0].descriptorCount = 32;
+	sizes[1].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER; sizes[1].descriptorCount = 16u + bindlessCap;
 	sizes[2].type = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE; sizes[2].descriptorCount = 4;
 	sizes[3].type = VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR; sizes[3].descriptorCount = 2;
 	Com_Memset( &poolCi, 0, sizeof( poolCi ) );
@@ -774,6 +816,7 @@ void vk_surfel_gi_apply_after_geometry( void )
 	struct {
 		uint32_t params[4];
 		float ray[4];
+		uint32_t bindless[4]; /* x=texCount y=worldPrimCount */
 	} updatePush;
 	struct {
 		float invViewProj[16];
@@ -872,6 +915,26 @@ void vk_surfel_gi_apply_after_geometry( void )
 		if ( vk_rtx_entity_normal_count() > 0u ) {
 			vk_rtx_bind_entity_normal_ssbo( sgi.update_set, 6 );
 		}
+		vk_rtx_bindless_set_descriptor_array_count( vk_rtx_bindless_indexing_supported() ?
+			vk_rtx_bindless_cap() : 1u );
+		vk_rtx_bindless_bind_textures( sgi.update_set, 7 );
+		vk_rtx_bindless_bind_prim_material( sgi.update_set, 8 );
+		{
+			VkDescriptorBufferInfo bUv;
+			VkWriteDescriptorSet wUv;
+			Com_Memset( &bUv, 0, sizeof( bUv ) );
+			bUv.buffer = sgi.dummy_albedo.buffer;
+			bUv.range = VK_WHOLE_SIZE;
+			Com_Memset( &wUv, 0, sizeof( wUv ) );
+			wUv.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+			wUv.dstSet = sgi.update_set;
+			wUv.dstBinding = 9;
+			wUv.descriptorCount = 1;
+			wUv.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+			wUv.pBufferInfo = &bUv;
+			qvkUpdateDescriptorSets( vk.device, 1, &wUv, 0, NULL );
+		}
+		vk_rtx_bind_prim_uv_ssbo( sgi.update_set, 9 );
 	}
 
 	/* hash descriptors */
@@ -988,6 +1051,11 @@ void vk_surfel_gi_apply_after_geometry( void )
 	updatePush.ray[1] = r_surfelGi_intensity ? r_surfelGi_intensity->value : 1.0f;
 	updatePush.ray[2] = r_surfelGi_blend ? r_surfelGi_blend->value : 0.15f;
 	updatePush.ray[3] = r_surfelGi_maxAge ? r_surfelGi_maxAge->value : 240.0f;
+	updatePush.bindless[0] = updatePush.bindless[1] = updatePush.bindless[2] = updatePush.bindless[3] = 0u;
+	if ( vk_rtx_bindless_active() ) {
+		updatePush.bindless[0] = vk_rtx_bindless_texture_count();
+		updatePush.bindless[1] = vk_rtx_world_albedo_count();
+	}
 
 	qvkCmdBindPipeline( cmd, VK_PIPELINE_BIND_POINT_COMPUTE, sgi.update_pipe );
 	qvkCmdBindDescriptorSets( cmd, VK_PIPELINE_BIND_POINT_COMPUTE, sgi.update_pl, 0, 1, &sgi.update_set, 0, NULL );

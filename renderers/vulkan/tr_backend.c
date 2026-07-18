@@ -1875,8 +1875,11 @@ static const void *RB_DrawSurfs( const void *data ) {
 				static qboolean s_oit_mode3_logged;
 				if ( !s_oit_mode3_logged ) {
 					ri.Printf( PRINT_ALL,
-						"[VK][unified] r_oit=%d: OIT pass after deferred (skips Forward+ transparent shade)\n",
-						r_oit->integer );
+						"[VK][unified] r_oit=%d: OIT pass after deferred (skips Forward+ transparent shade)%s\n",
+						r_oit->integer,
+						( r_oit->integer == 1 && r_oitForwardPlus && r_oitForwardPlus->integer )
+							? "; WBOIT uses Forward+ tile lights (r_oitForwardPlus 1)"
+							: "" );
 					s_oit_mode3_logged = qtrue;
 				}
 			}

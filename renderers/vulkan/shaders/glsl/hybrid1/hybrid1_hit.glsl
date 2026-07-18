@@ -28,8 +28,16 @@ layout( set = 0, binding = 16, std430 ) readonly buffer PrimMaterialSSBO {
 	Hybrid1PrimMaterial mats[];
 } primMat;
 
-/* Phase A.1b: bindless diffuse array (centroid UV until AS attrs land). */
+/* Phase A.1b: bindless diffuse array. */
 layout( set = 0, binding = 15 ) uniform sampler2D bindlessDiffuse[];
+
+/* Phase A.1c: PrimUvSSBO — 6 floats/prim (u0 v0 u1 v1 u2 v2); bary interpolate. */
+layout( set = 0, binding = 17, std430 ) readonly buffer PrimUvSSBO {
+	float uv6[];
+} primUv;
+
+/* Built-in triangle barycentrics: bary.x = B, bary.y = C, A = 1-B-C. */
+hitAttributeEXT vec2 baryCoord;
 
 vec3 hybrid1_defaultAlbedo( void )
 {
@@ -118,8 +126,8 @@ vec3 hybrid1_sampleHitNormal( void )
 vec3 hybrid1_sampleHitAlbedo( sampler2D albedoTex )
 {
 	/*
-	 * D2 Phase A.1b: when bindlessMeta.x > 0, sample the bindless array at
-	 * centroid UV (0.5) until AS vertex UVs land. Otherwise SSBO / G-buffer.
+	 * D2 Phase A.1c: bindless array + PrimUv barycentric UV when available;
+	 * otherwise centroid UV / SSBO / G-buffer.
 	 */
 	{
 		uint nMat = uint( primMat.mats.length() );
@@ -131,7 +139,17 @@ vec3 hybrid1_sampleHitAlbedo( sampler2D albedoTex )
 		if ( texCount > 0u && nMat > 0u && primIdx < nMat ) {
 			uint texIdx = primMat.mats[primIdx].textureIndex;
 			if ( texIdx != 0xFFFFFFFFu && texIdx < texCount ) {
-				vec3 c = texture( nonuniformEXT( bindlessDiffuse[texIdx] ), vec2( 0.5 ) ).rgb;
+				vec2 uv = vec2( 0.5 );
+				uint nuv = uint( primUv.uv6.length() );
+				if ( nuv >= ( primIdx + 1u ) * 6u ) {
+					uint base = primIdx * 6u;
+					vec2 uv0 = vec2( primUv.uv6[base + 0u], primUv.uv6[base + 1u] );
+					vec2 uv1 = vec2( primUv.uv6[base + 2u], primUv.uv6[base + 3u] );
+					vec2 uv2 = vec2( primUv.uv6[base + 4u], primUv.uv6[base + 5u] );
+					float w = max( 1.0 - baryCoord.x - baryCoord.y, 0.0 );
+					uv = uv0 * w + uv1 * baryCoord.x + uv2 * baryCoord.y;
+				}
+				vec3 c = texture( nonuniformEXT( bindlessDiffuse[texIdx] ), uv ).rgb;
 				if ( dot( c, c ) > 1e-8 ) {
 					return c;
 				}

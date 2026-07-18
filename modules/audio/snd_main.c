@@ -43,6 +43,7 @@ cvar_t *s_openalHrtf;
 cvar_t *s_openalEfx;
 cvar_t *s_openalEfxPreset;
 cvar_t *s_openalCapture;
+cvar_t *s_openalCaptureDevice;
 cvar_t *s_openalDopplerFactor;
 cvar_t *s_openalDopplerSpeed;
 cvar_t *s_openalRolloff;
@@ -536,6 +537,9 @@ Cvar_CheckRange( s_doppler, "0", "1", CV_INTEGER );
 	s_openalCapture = Cvar_Get( "s_openalCapture", "1", CVAR_ARCHIVE | CVAR_LATCH );
 	Cvar_CheckRange( s_openalCapture, "0", "1", CV_INTEGER );
 	Cvar_SetDescription( s_openalCapture, "Enable OpenAL audio capture for VOIP." );
+
+	s_openalCaptureDevice = Cvar_Get( "s_openalCaptureDevice", "", CVAR_ARCHIVE_ND | CVAR_LATCH );
+	Cvar_SetDescription( s_openalCaptureDevice, "OpenAL capture device name (empty = auto, skip Monitor loopbacks). See s_aldevices." );
 	
 	s_openalDopplerFactor = Cvar_Get( "s_openalDopplerFactor", "1.0", CVAR_ARCHIVE_ND );
 	Cvar_CheckRange( s_openalDopplerFactor, "0", "10", CV_FLOAT );

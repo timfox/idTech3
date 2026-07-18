@@ -29,7 +29,7 @@ Demo: `exec demo_mboit.cfg` (or `vulkan_overlay_mboit.cfg`).
 
 ### With Unified Clustered (`r_renderMode 3`)
 
-Pair MBOIT with deferred opaque + Forward+ transparent:
+Pair OIT with deferred opaque. WBOIT can use Forward+ tile lights via `r_oitForwardPlus 1` (default):
 
 ```
 exec vulkan_overlay_oit_clustered.cfg

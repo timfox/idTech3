@@ -33,4 +33,7 @@ int     CL_VoIP_GetShowMeter( void );
 /* Drive jaw/mouth morph weights on player head models near talking clients. */
 void    CL_VoIP_ApplyLipFlap( refEntity_t *ent );
 
+/* Append pending Opus frame to an outbound client packet (before clc_EOF). */
+void    CL_VoIP_WritePacket( msg_t *msg );
+
 #endif /* CL_VOIP_H */

@@ -50,6 +50,10 @@ static uint32_t voipInSequence[VOIP_MAX_CLIENTS];
 static int16_t  captureBuffer[VOIP_FRAME_SAMPLES * 4];
 static byte     encodedBuffer[VOIP_MAX_PACKET];
 
+/* Pending Opus frame for CL_WritePacket (sequence + payload). */
+static byte     voipPendingData[VOIP_MAX_PACKET + 8];
+static int      voipPendingLen = 0;
+
 /* Capture functions from the active sound backend (SDL or OpenAL).
    Weak symbols provide no-op fallback when neither backend has capture. */
 void SNDDMA_StartCapture( void ) __attribute__((weak));
@@ -353,7 +357,7 @@ static void CL_VoIP_StopTransmit_f( void ) {
 void CL_VoIP_Init( void ) {
 	int err;
 
-	cl_voip     = Cvar_Get( "cl_voip", "0", CVAR_ARCHIVE );
+	cl_voip     = Cvar_Get( "cl_voip", "1", CVAR_ARCHIVE );
 	cl_voipSend = Cvar_Get( "cl_voipSend", "0", 0 );
 	cl_voipGainDuringCapture = Cvar_Get( "cl_voipGainDuringCapture", "0.2", CVAR_ARCHIVE );
 	cl_voipShowMeter = Cvar_Get( "cl_voipShowMeter", "1", CVAR_ARCHIVE );
@@ -366,7 +370,7 @@ void CL_VoIP_Init( void ) {
 	cl_voipLipFlapRate = Cvar_Get( "cl_voipLipFlapRate", "12", CVAR_ARCHIVE );
 	cl_voipLipFlapFacs = Cvar_Get( "cl_voipLipFlapFacs", "1", CVAR_ARCHIVE );
 
-	Cvar_SetDescription( cl_voip, "Enable VoIP proximity voice chat (0 = off, 1 = on)." );
+	Cvar_SetDescription( cl_voip, "Enable VoIP proximity voice chat (0 = off, 1 = on). Requires OpenAL capture." );
 	Cvar_SetDescription( cl_voipLipFlap, "Drive head-model jaw/mouth morphs from VoIP voice power." );
 	Cvar_SetDescription( cl_voipLipFlapScale, "Multiply VoIP RMS into morph weight (clamped to 1)." );
 	Cvar_SetDescription( cl_voipLipFlapThresh, "Minimum VoIP RMS before lip flap applies." );
@@ -378,9 +382,12 @@ void CL_VoIP_Init( void ) {
 
 	Cmd_AddCommand( "+voip", CL_VoIP_Transmit_f );
 	Cmd_AddCommand( "-voip", CL_VoIP_StopTransmit_f );
+	Cmd_AddCommand( "+voiprecord", CL_VoIP_Transmit_f );
+	Cmd_AddCommand( "-voiprecord", CL_VoIP_StopTransmit_f );
 
 	Com_Memset( voipClientPower, 0, sizeof( voipClientPower ) );
 	Com_Memset( voipClientLastTalk, 0, sizeof( voipClientLastTalk ) );
+	voipPendingLen = 0;
 
 	Com_Printf( "VoIP lip flap: %s (morph %s, FACS %s)\n",
 		cl_voipLipFlap->integer ? "enabled" : "disabled",
@@ -405,7 +412,7 @@ void CL_VoIP_Init( void ) {
 	Com_Memset( voipDecoders, 0, sizeof( voipDecoders ) );
 
 	voipInitialized = qtrue;
-	Com_Printf( "VoIP: initialized (Opus %s, %d Hz)\n", opus_get_version_string(), VOIP_SAMPLE_RATE );
+	Com_Printf( "VoIP: initialized (Opus %s, %d Hz, proximity chat)\n", opus_get_version_string(), VOIP_SAMPLE_RATE );
 }
 
 void CL_VoIP_Shutdown( void ) {
@@ -413,6 +420,8 @@ void CL_VoIP_Shutdown( void ) {
 
 	Cmd_RemoveCommand( "+voip" );
 	Cmd_RemoveCommand( "-voip" );
+	Cmd_RemoveCommand( "+voiprecord" );
+	Cmd_RemoveCommand( "-voiprecord" );
 
 	if ( voipCapturing ) {
 		SNDDMA_StopCapture();
@@ -432,6 +441,7 @@ void CL_VoIP_Shutdown( void ) {
 	}
 
 	voipInitialized = qfalse;
+	voipPendingLen = 0;
 	Com_Memset( voipClientPower, 0, sizeof( voipClientPower ) );
 }
 
@@ -486,7 +496,22 @@ void CL_VoIP_Frame( void ) {
 	CL_VoIP_DecayClientPower();
 	CL_VoIP_SyncFacs();
 
+	/* Late-enable if cl_voip was turned on after init (e.g. autoexec). */
+	if ( !voipInitialized && cl_voip && cl_voip->integer ) {
+		int err;
+		voipEncoder = opus_encoder_create( VOIP_SAMPLE_RATE, 1, OPUS_APPLICATION_VOIP, &err );
+		if ( err == OPUS_OK && voipEncoder ) {
+			opus_encoder_ctl( voipEncoder, OPUS_SET_BITRATE( 24000 ) );
+			opus_encoder_ctl( voipEncoder, OPUS_SET_SIGNAL( OPUS_SIGNAL_VOICE ) );
+			opus_encoder_ctl( voipEncoder, OPUS_SET_COMPLEXITY( 5 ) );
+			Com_Memset( voipDecoders, 0, sizeof( voipDecoders ) );
+			voipInitialized = qtrue;
+			Com_Printf( "VoIP: late-initialized (Opus proximity chat)\n" );
+		}
+	}
+
 	if ( !voipInitialized || !voipCapturing ) return;
+	if ( !cl_voip || !cl_voip->integer ) return;
 
 	while ( SNDDMA_AvailableCaptureSamples() >= VOIP_FRAME_SAMPLES ) {
 		int encodedLen;
@@ -505,22 +530,49 @@ void CL_VoIP_Frame( void ) {
 			CL_VoIP_SetClientPower( clc.clientNum, voipPower );
 		}
 
+		/* Only encode while push-to-talk is held. */
+		if ( !cl_voipSend || !cl_voipSend->integer ) {
+			continue;
+		}
+
 		encodedLen = opus_encode( voipEncoder, captureBuffer, VOIP_FRAME_SAMPLES,
 			encodedBuffer, VOIP_MAX_PACKET );
 
 		if ( encodedLen > 0 && cls.state == CA_ACTIVE ) {
-			msg_t buf;
-			byte msgData[VOIP_MAX_PACKET + 32];
-
-			MSG_Init( &buf, msgData, sizeof( msgData ) );
-			MSG_WriteByte( &buf, clc_voipOpus );
-			MSG_WriteLong( &buf, (int)voipOutSequence++ );
-			MSG_WriteShort( &buf, (int)encodedLen );
-			MSG_WriteData( &buf, encodedBuffer, encodedLen );
-
-			CL_AddReliableCommand( (const char *)msgData, qfalse );
+			uint32_t seq = voipOutSequence++;
+			/* Opaque blob: sequence (le32) + opus payload — server relays as-is. */
+			voipPendingData[0] = (byte)( seq & 0xff );
+			voipPendingData[1] = (byte)( ( seq >> 8 ) & 0xff );
+			voipPendingData[2] = (byte)( ( seq >> 16 ) & 0xff );
+			voipPendingData[3] = (byte)( ( seq >> 24 ) & 0xff );
+			Com_Memcpy( voipPendingData + 4, encodedBuffer, encodedLen );
+			voipPendingLen = 4 + encodedLen;
 		}
 	}
+}
+
+/*
+================
+CL_VoIP_WritePacket
+Write pending Opus voice into the client->server packet (before clc_EOF).
+================
+*/
+void CL_VoIP_WritePacket( msg_t *msg ) {
+	if ( !msg || voipPendingLen <= 0 ) {
+		return;
+	}
+	if ( !voipInitialized || !cl_voip || !cl_voip->integer ) {
+		voipPendingLen = 0;
+		return;
+	}
+	if ( msg->cursize + 4 + voipPendingLen >= msg->maxsize ) {
+		return;
+	}
+
+	MSG_WriteByte( msg, clc_voipOpus );
+	MSG_WriteShort( msg, voipPendingLen );
+	MSG_WriteData( msg, voipPendingData, voipPendingLen );
+	voipPendingLen = 0;
 }
 
 void CL_VoIP_ParsePacket( int sender, const byte *data, int len ) {
@@ -579,6 +631,7 @@ void CL_VoIP_ParsePacket( int sender, const byte *data, int len ) {
 				}
 			}
 		}
+		/* Server already proximity-filtered; OpenAL spatialize when we have a world origin. */
 		S_VoipSamples( sender, origin, decodedSamples, VOIP_SAMPLE_RATE, 2, 1, (byte *)pcmBuffer, 1.0f );
 		(void)haveOrigin;
 	}
@@ -605,6 +658,7 @@ void CL_VoIP_Shutdown( void ) {
 	Cmd_RemoveCommand( "-voip" );
 }
 void CL_VoIP_Frame( void ) {}
+void CL_VoIP_WritePacket( msg_t *msg ) { (void)msg; }
 void CL_VoIP_Transmit( int mode ) { (void)mode; }
 void CL_VoIP_ParsePacket( int sender, const byte *data, int len ) { (void)sender; (void)data; (void)len; }
 void CL_VoIP_StopTransmit( void ) {}

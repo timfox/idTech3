@@ -9,6 +9,13 @@ typedef struct vkMvpPushConstants_s {
 	float reserved[8]; /* padding / future push data; size must match VkPushConstantRange in vk_init_device.c */
 } vkMvpPushConstants_t;
 
+/* OIT layouts: mvp + prevMvp + model (192 B). */
+typedef struct vkOitPushConstants_s {
+	float mvp[16];
+	float prev_mvp[16];
+	float model[16];
+} vkOitPushConstants_t;
+
 static VkRect2D vk_scene_src_rect;
 static qboolean vk_scene_src_rect_valid;
 
@@ -457,18 +464,25 @@ static void vk_get_prev_mvp_transform( float *prev_mvp )
 void vk_update_mvp( const float *m )
 {
 	vkMvpPushConstants_t push_constants;
+	vkOitPushConstants_t oit_push;
 	VkPipelineLayout layout;
 	VkShaderStageFlags stage_flags;
 	uint32_t push_bytes;
+	qboolean oit_layout = qfalse;
 
 	Com_Memset( &push_constants, 0, sizeof( push_constants ) );
+	Com_Memset( &oit_push, 0, sizeof( oit_push ) );
 
 	if ( m ) {
 		Com_Memcpy( push_constants.mvp, m, sizeof( push_constants.mvp ) );
+		Com_Memcpy( oit_push.mvp, m, sizeof( oit_push.mvp ) );
 	} else {
 		vk_get_mvp_transform( push_constants.mvp );
+		vk_get_mvp_transform( oit_push.mvp );
 	}
 	vk_get_prev_mvp_transform( push_constants.prev_mvp );
+	Com_Memcpy( oit_push.prev_mvp, push_constants.prev_mvp, sizeof( oit_push.prev_mvp ) );
+	Com_Memcpy( oit_push.model, backEnd.or.modelMatrix, sizeof( oit_push.model ) );
 	push_constants.reserved[0] = ( tess.sdfUiEdge >= 0.0f ) ? tess.sdfUiEdge : 0.0f;
 	if ( r_sdfScreenAa ) {
 		push_constants.reserved[1] = Com_Clamp( 0.0f, 8.0f, r_sdfScreenAa->value );
@@ -516,11 +530,14 @@ void vk_update_mvp( const float *m )
 	layout = vk.pipeline_layout;
 	if ( backEnd.oitMomentsPass && vk.pipeline_layout_oit_moments != VK_NULL_HANDLE ) {
 		layout = vk.pipeline_layout_oit_moments;
+		oit_layout = qtrue;
 	} else if ( backEnd.oitAccumPass && r_oit && r_oit->integer == 2 &&
 		vk.pipeline_layout_oit_accum_mboit != VK_NULL_HANDLE ) {
 		layout = vk.pipeline_layout_oit_accum_mboit;
+		oit_layout = qtrue;
 	} else if ( backEnd.oitAccumPass && vk.pipeline_layout_oit_accum != VK_NULL_HANDLE ) {
 		layout = vk.pipeline_layout_oit_accum;
+		oit_layout = qtrue;
 	}
 	/*
 	 * Pipeline layouts declare this push range for VERTEX|FRAGMENT (vk_init_device.c).
@@ -528,15 +545,13 @@ void vk_update_mvp( const float *m )
 	 * frag_ui_sdf_text.frag reads sdfEdgeSmooth (reserved[0]) and r_sdfScreenAa (reserved[1]) after the two mat4s.
 	 */
 	stage_flags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
-	push_bytes = (uint32_t)sizeof( push_constants );
-	if ( ( layout == vk.pipeline_layout_oit_accum || layout == vk.pipeline_layout_oit_moments ||
-		layout == vk.pipeline_layout_oit_accum_mboit ) &&
-		( vk.pipeline_layout_oit_accum != VK_NULL_HANDLE || vk.pipeline_layout_oit_moments != VK_NULL_HANDLE ||
-		vk.pipeline_layout_oit_accum_mboit != VK_NULL_HANDLE ) ) {
-		/* OIT accum layout only reserves two mat4 (128 B); no reserved[] tail. */
-		push_bytes = (uint32_t)( sizeof( float ) * 32 );
+	if ( oit_layout ) {
+		push_bytes = (uint32_t)sizeof( oit_push );
+		qvkCmdPushConstants( vk.cmd->command_buffer, layout, stage_flags, 0, push_bytes, &oit_push );
+	} else {
+		push_bytes = (uint32_t)sizeof( push_constants );
+		qvkCmdPushConstants( vk.cmd->command_buffer, layout, stage_flags, 0, push_bytes, &push_constants );
 	}
-	qvkCmdPushConstants( vk.cmd->command_buffer, layout, stage_flags, 0, push_bytes, &push_constants );
 
 	vk.stats.push_size += push_bytes;
 }

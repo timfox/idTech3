@@ -362,6 +362,48 @@ static void S_AL_UpdateOcclusion( ALuint source, const vec3_t sourcePos, float b
 	S_AL_ApplyDirectFilter( source, trace.fraction < 1.0f, baseGain );
 }
 
+static qboolean S_AL_CaptureNameIsMonitor( const char *name ) {
+	if ( !name || !name[0] ) {
+		return qtrue;
+	}
+	if ( Q_stristr( name, "Monitor of" ) ) {
+		return qtrue;
+	}
+	if ( Q_stristr( name, "Loopback" ) ) {
+		return qtrue;
+	}
+	return qfalse;
+}
+
+static const ALCchar *S_AL_PickCaptureDevice( void ) {
+	const ALCchar *devices;
+	const ALCchar *ptr;
+	const ALCchar *fallback = NULL;
+
+	if ( s_openalCaptureDevice && s_openalCaptureDevice->string[0] ) {
+		return s_openalCaptureDevice->string;
+	}
+
+	devices = alcGetString( NULL, ALC_CAPTURE_DEVICE_SPECIFIER );
+	if ( devices && devices[0] ) {
+		ptr = devices;
+		while ( ptr && *ptr ) {
+			if ( !S_AL_CaptureNameIsMonitor( ptr ) ) {
+				return ptr;
+			}
+			if ( !fallback ) {
+				fallback = ptr;
+			}
+			ptr += strlen( ptr ) + 1;
+		}
+	}
+
+	if ( fallback ) {
+		return fallback;
+	}
+	return alcGetString( NULL, ALC_CAPTURE_DEFAULT_DEVICE_SPECIFIER );
+}
+
 static void S_AL_ListDevices_f( void ) {
 	const ALCchar *devices;
 	const ALCchar *ptr;
@@ -376,22 +418,36 @@ static void S_AL_ListDevices_f( void ) {
 	}
 
 	if ( !devices || !devices[0] ) {
-		Com_Printf( "No devices found.\n" );
-		Com_Printf( "--------------------------\n" );
-		return;
-	}
-
-	ptr = devices;
-	while ( ptr && *ptr ) {
-		Com_Printf( "  %d: %s\n", count++, ptr );
-		ptr += strlen( ptr ) + 1;
+		Com_Printf( "No playback devices found.\n" );
+	} else {
+		ptr = devices;
+		while ( ptr && *ptr ) {
+			Com_Printf( "  %d: %s\n", count++, ptr );
+			ptr += strlen( ptr ) + 1;
+		}
 	}
 
 	if ( alDevice ) {
 		const ALCchar *currentDevice = alcGetString( alDevice, ALC_DEVICE_SPECIFIER );
-		Com_Printf( "\nCurrent device: %s\n", currentDevice ? currentDevice : "unknown" );
+		Com_Printf( "\nCurrent playback: %s\n", currentDevice ? currentDevice : "unknown" );
 	}
 
+	Com_Printf( "\n----- OpenAL Capture (VoIP mic) -----\n" );
+	devices = alcGetString( NULL, ALC_CAPTURE_DEVICE_SPECIFIER );
+	count = 0;
+	if ( !devices || !devices[0] ) {
+		Com_Printf( "No capture devices found.\n" );
+	} else {
+		ptr = devices;
+		while ( ptr && *ptr ) {
+			Com_Printf( "  %d: %s\n", count++, ptr );
+			ptr += strlen( ptr ) + 1;
+		}
+	}
+	if ( s_openalCaptureDevice && s_openalCaptureDevice->string[0] ) {
+		Com_Printf( "Preferred capture: %s\n", s_openalCaptureDevice->string );
+	}
+	Com_Printf( "Set with: seta s_openalCaptureDevice \"name\" ; snd_restart\n" );
 	Com_Printf( "--------------------------\n" );
 }
 
@@ -1203,7 +1259,7 @@ static void S_AL_VoipSamples( int entityNum, const vec3_t origin, int samples, i
 	if ( !channel->source ) {
 		alGenSources( 1, &channel->source );
 		alSourcei( channel->source, AL_LOOPING, AL_FALSE );
-		alSourcef( channel->source, AL_REFERENCE_DISTANCE, 80.0f );
+		alSourcef( channel->source, AL_REFERENCE_DISTANCE, 200.0f );
 		alSourcef( channel->source, AL_ROLLOFF_FACTOR, s_openalRolloff ? s_openalRolloff->value : 1.0f );
 		alSourcef( channel->source, AL_MAX_DISTANCE, s_openalMaxDistance ? s_openalMaxDistance->value : 2000.0f );
 		alSourcei( channel->source, AL_SOURCE_RELATIVE, AL_FALSE );
@@ -2074,13 +2130,20 @@ qboolean S_AL_Init( soundInterface_t *si ) {
 	alCaptureAvailable = qfalse;
 	alCaptureDevice = NULL;
 	if ( s_openalCapture && s_openalCapture->integer ) {
-		const ALCchar *captureDeviceName = alcGetString( NULL, ALC_CAPTURE_DEFAULT_DEVICE_SPECIFIER );
-		if ( captureDeviceName ) {
+		const ALCchar *captureDeviceName = S_AL_PickCaptureDevice();
+		if ( captureDeviceName && captureDeviceName[0] ) {
 			alCaptureDevice = alcCaptureOpenDevice( captureDeviceName, 48000, AL_FORMAT_MONO16, 4096 );
 			if ( alCaptureDevice ) {
 				alCaptureAvailable = qtrue;
-				Com_Printf( "OpenAL capture: enabled (%s)\n", captureDeviceName );
+				Com_Printf( "OpenAL capture: enabled (%s)%s\n", captureDeviceName,
+					S_AL_CaptureNameIsMonitor( captureDeviceName )
+						? " — WARNING: monitor/loopback, not a mic; set s_openalCaptureDevice"
+						: "" );
+			} else {
+				Com_Printf( S_COLOR_YELLOW "OpenAL capture: failed to open \"%s\"\n", captureDeviceName );
 			}
+		} else {
+			Com_Printf( S_COLOR_YELLOW "OpenAL capture: no capture device found\n" );
 		}
 	}
 

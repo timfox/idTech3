@@ -1,6 +1,6 @@
 # RTX hit-shader UV / bindless texturing (D2 design)
 
-**Status:** Phase A.1b landed (Jul 2026). World/entity pack writes dense `textureIndex` into `PrimMaterialSSBO`; with `r_rtxBindless 1` + `r_rtxBindlessMode 1` + descriptor indexing, Hybrid1 samples the bindless array at **centroid UV** (`vec2(0.5)`). True hit barycentric UV still needs AS vertex attributes.
+**Status:** Phase A.1c landed (Jul 2026). World pack writes per-primitive UV corners into `PrimUvSSBO` (6 floats/prim). Hybrid1 / Surfel / pathtrace sample bindless diffuse with **hit barycentrics** (`hitAttributeEXT` / `rayQueryGetIntersectionBarycentricsEXT`). Entity prims still use centroid UV (`0.5`) until entity UV pack lands. Fallback: SSBO RGB → G-buffer.
 
 ## Problem
 
@@ -38,7 +38,7 @@ This is good for chocolate RT but is **not** true texturing:
 | `vk.maxBoundDescriptorSets` | Device limit (typically ≥ 8; PBR requires **≥ 10**) |
 | `MAX_DRAWIMAGES` | **32768** registered `image_t` |
 | Per-texture descriptor | Each `image_t` has `descriptor` (combined image+sampler) in the **global sampler pool** |
-| Hybrid1 RT set (binding 0) | AS + storage images + UBO + depth/normal/material + sky + BRDF LUT + **4× SSBO** (world/entity albedo+normal) + **binding 15** (1× diffuse sampler scaffold) + **binding 16** (`PrimMaterialSSBO`) |
+| Hybrid1 RT set (binding 0) | AS + storage images + UBO + depth/normal/material + sky + BRDF LUT + **4× SSBO** (world/entity albedo+normal) + **binding 15** (bindless diffuse) + **binding 16** (`PrimMaterialSSBO`) + **binding 17** (`PrimUvSSBO`) |
 
 **Implication:** we cannot bind “one descriptor per image” on the RT set yet. Full D2 needs either **bindless indexing** (array at binding 15) or a **small atlas + indirection table**.
 
@@ -90,6 +90,7 @@ Add binding **15** (new) on RT pipeline only:
 |---------|------|--------|---------|
 | 15 | `COMBINED_IMAGE_SAMPLER` array `R_TX_BINDLESS_CAP` | closest-hit, raygen (spec) | diffuse bindless |
 | 16 | `STORAGE_BUFFER` | closest-hit | `RtxPrimMaterial` per primitive (world + entity ranges) |
+| 17 | `STORAGE_BUFFER` | closest-hit | `PrimUv` 6 floats/prim (u0 v0 u1 v1 u2 v2) |
 
 Keep bindings 9–14 SSBO albedo/normal for fallback. **Do not remove** pack-time thumbs until Phase A is stable in CI.
 
@@ -108,9 +109,10 @@ Suggested caps (tunable cvars):
 3. ~~Cvars `r_rtxBindless` / `r_rtxBindlessCap` / `r_rtxBindlessMode` (latched; default off).~~
 4. ~~Tests — `test_vulkan_rtx.sh` greps for bindless wiring.~~
 5. ~~`vk_rtx_material` / world+entity pack — emit real dense `textureIndex` (+ thumb flag) into PrimMaterialSSBO.~~
-6. Bindless descriptor array + `GL_EXT_nonuniform_qualifier` when `r_rtxBindless 1` + indexing supported.
-7. AS vertex buffers — UV attribute for barycentric interpolation (world ST; entity texcoord0).
-8. Surfel / pathtrace descriptor parity (same bindings or shared helper).
+6. ~~Bindless descriptor array + `GL_EXT_nonuniform_qualifier` when `r_rtxBindless 1` + indexing supported.~~
+7. ~~World `PrimUvSSBO` + Hybrid1/Surfel/PT barycentric sample (entity UV pack follow-up).~~
+8. ~~Surfel / pathtrace descriptor parity (PrimMaterial + PrimUv + bindless).~~
+9. Visbuf true `gl_PrimitiveID` MRT (deferred; AS UV covers bindless hit texturing).
 
 ## Risks
 

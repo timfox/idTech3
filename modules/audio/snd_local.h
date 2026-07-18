@@ -210,6 +210,7 @@ extern cvar_t *s_openalHrtf;
 extern cvar_t *s_openalEfx;
 extern cvar_t *s_openalEfxPreset;
 extern cvar_t *s_openalCapture;
+extern cvar_t *s_openalCaptureDevice;
 extern cvar_t *s_openalDopplerFactor;
 extern cvar_t *s_openalDopplerSpeed;
 extern cvar_t *s_openalRolloff;

@@ -23,6 +23,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 #include "client.h"
 #include "script_emit.h"
+#include "cl_voip.h"
 
 static unsigned frame_msec;
 static int old_com_frameTime;
@@ -835,6 +836,9 @@ void CL_WritePacket( int repeat ) {
 			oldcmd = cmd;
 		}
 	}
+
+	/* Optional proximity VoIP frame (OpenAL capture → Opus). */
+	CL_VoIP_WritePacket( &buf );
 
 	//
 	// deliver the message

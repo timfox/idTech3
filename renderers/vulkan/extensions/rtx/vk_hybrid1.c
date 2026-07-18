@@ -760,9 +760,11 @@ static void HYBRID1_UpdateRtDescriptors( VkDescriptorSet set, VkImageView output
 	HYBRID1_WriteImageBinding( set, 1, outputView, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, VK_IMAGE_LAYOUT_GENERAL );
 	HYBRID1_WriteUboBinding( set, 2 );
 
-	/* D2 Phase A: bindless diffuse slot (1× white) + prim-material SSBO (INVALID → SSBO RGB). */
+	/* D2 Phase A: bindless diffuse + PrimMaterial + PrimUv. */
 	vk_rtx_bindless_bind_textures( set, 15 );
 	vk_rtx_bindless_bind_prim_material( set, 16 );
+	HYBRID1_WriteSsboBinding( set, 17, hybrid1.fp_dummy_ssbo, (VkDeviceSize)( sizeof( float ) * 8 ) );
+	vk_rtx_bind_prim_uv_ssbo( set, 17 );
 
 	fpBuf = ( vk.forward_plus.buffer != VK_NULL_HANDLE ) ? vk.forward_plus.buffer : hybrid1.fp_dummy_ssbo;
 	fpRange = ( vk.forward_plus.buffer != VK_NULL_HANDLE && vk.forward_plus.capacity_bytes > 0 )
@@ -1275,7 +1277,7 @@ void vk_hybrid1_init( void )
 {
 	VkPhysicalDeviceRayTracingPipelinePropertiesKHR rtProps;
 	VkPhysicalDeviceProperties2 props2;
-	VkDescriptorSetLayoutBinding rtBindings[17];
+	VkDescriptorSetLayoutBinding rtBindings[18];
 	VkDescriptorSetLayoutBinding temporalBindings[9];
 	VkDescriptorSetLayoutBinding atrousBindings[7];
 	VkDescriptorSetLayoutBinding compositeBindings[7];
@@ -1432,7 +1434,7 @@ void vk_hybrid1_init( void )
 	rtBindings[14].stageFlags = VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR;
 
 	/* D2 Phase A.1b: bindless diffuse array when descriptor indexing is available.
-	 * Fixed array size (not VARIABLE_COUNT) because PrimMaterial occupies binding 16. */
+	 * Fixed array size (not VARIABLE_COUNT) because PrimMaterial/PrimUv occupy 16/17. */
 	hybrid1.bindless_array_count = 1u;
 	if ( vk_rtx_bindless_indexing_supported() ) {
 		uint32_t cap = vk_rtx_bindless_cap();
@@ -1454,13 +1456,18 @@ void vk_hybrid1_init( void )
 	rtBindings[16].descriptorCount = 1;
 	rtBindings[16].stageFlags = VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR;
 
+	rtBindings[17].binding = 17;
+	rtBindings[17].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+	rtBindings[17].descriptorCount = 1;
+	rtBindings[17].stageFlags = VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR;
+
 	{
-		VkDescriptorBindingFlags bindingFlags[17];
+		VkDescriptorBindingFlags bindingFlags[18];
 		VkDescriptorSetLayoutBindingFlagsCreateInfo bindingFlagsInfo;
 		uint32_t bi;
 
 		Com_Memset( bindingFlags, 0, sizeof( bindingFlags ) );
-		for ( bi = 0; bi < 17; bi++ ) {
+		for ( bi = 0; bi < 18; bi++ ) {
 			bindingFlags[bi] = 0;
 		}
 		if ( hybrid1.bindless_array_count > 1u ) {
@@ -1468,13 +1475,13 @@ void vk_hybrid1_init( void )
 		}
 		Com_Memset( &bindingFlagsInfo, 0, sizeof( bindingFlagsInfo ) );
 		bindingFlagsInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_BINDING_FLAGS_CREATE_INFO;
-		bindingFlagsInfo.bindingCount = 17;
+		bindingFlagsInfo.bindingCount = 18;
 		bindingFlagsInfo.pBindingFlags = bindingFlags;
 
 		Com_Memset( &dslci, 0, sizeof( dslci ) );
 		dslci.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
 		dslci.pNext = ( hybrid1.bindless_array_count > 1u ) ? &bindingFlagsInfo : NULL;
-		dslci.bindingCount = 17;
+		dslci.bindingCount = 18;
 		dslci.pBindings = rtBindings;
 		VK_CHECK( qvkCreateDescriptorSetLayout( vk.device, &dslci, NULL, &hybrid1.rt_dsl ) );
 	}
@@ -1489,7 +1496,7 @@ void vk_hybrid1_init( void )
 	poolSizes[3].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
 	poolSizes[3].descriptorCount = 24u + 3u * hybrid1.bindless_array_count;
 	poolSizes[4].type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-	poolSizes[4].descriptorCount = 21;
+	poolSizes[4].descriptorCount = 24;
 	Com_Memset( &dpci, 0, sizeof( dpci ) );
 	dpci.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
 	dpci.maxSets = 3;
