@@ -70,6 +70,15 @@ static cvar_t *j_up_axis;
 #define Com_QueueEvent Sys_QueEvent
 
 static cvar_t *cl_consoleKeys;
+static cvar_t *ui_displayScale;
+static cvar_t *r_displayScale;
+static cvar_t *ui_fileDialogResult;
+static cvar_t *ui_fileDialogStatus;
+static cvar_t *ui_fileDialogFilter;
+static cvar_t *ui_imeComposition;
+static cvar_t *ui_imeCompositionStart;
+static cvar_t *ui_imeCompositionLength;
+static cvar_t *ui_imeCandidates;
 
 static int in_eventTime = 0;
 static qboolean mouse_focus;
@@ -96,9 +105,106 @@ static cvar_t *cl_webcamWidth;
 static cvar_t *cl_webcamHeight;
 static cvar_t *cl_webcamFps;
 static cvar_t *cl_webcamPoll;
+static cvar_t *in_webcam;
 #endif
 
 #define CTRL(a) ((a)-'a'+1)
+
+static void IN_ClearImeState( void )
+{
+	if ( ui_imeComposition ) {
+		Cvar_Set( "ui_imeComposition", "" );
+	}
+	if ( ui_imeCompositionStart ) {
+		Cvar_Set( "ui_imeCompositionStart", "-1" );
+	}
+	if ( ui_imeCompositionLength ) {
+		Cvar_Set( "ui_imeCompositionLength", "-1" );
+	}
+	if ( ui_imeCandidates ) {
+		Cvar_Set( "ui_imeCandidates", "" );
+	}
+}
+
+static void IN_UpdateDisplayScaleCvars( void )
+{
+	float scale;
+
+	if ( !SDL_window ) {
+		return;
+	}
+
+	scale = SDL_GetWindowDisplayScale( SDL_window );
+	if ( scale <= 0.0f ) {
+		scale = 1.0f;
+	}
+
+	if ( r_displayScale ) {
+		Cvar_SetValue( "r_displayScale", scale );
+	}
+	if ( ui_displayScale ) {
+		Cvar_SetValue( "ui_displayScale", scale );
+	}
+}
+
+static void IN_UpdateTextInputArea( void )
+{
+	SDL_Rect rect;
+	int catcher;
+	int windowW, windowH;
+	float scaleX, scaleY;
+	int cursor;
+
+	if ( !SDL_window ) {
+		return;
+	}
+
+	SDL_GetWindowSize( SDL_window, &windowW, &windowH );
+	if ( windowW <= 0 || windowH <= 0 ) {
+		return;
+	}
+
+	scaleX = (float)windowW / 640.0f;
+	scaleY = (float)windowH / 480.0f;
+	catcher = Key_GetCatcher();
+
+	if ( catcher & KEYCATCH_CONSOLE ) {
+		rect.x = (int)( 16.0f * scaleX );
+		rect.y = (int)( ( 480.0f - 24.0f ) * scaleY );
+		rect.w = (int)( ( 640.0f - 24.0f ) * scaleX );
+		rect.h = (int)( 20.0f * scaleY );
+		cursor = (int)( g_consoleField.cursor * 8.0f * scaleX );
+		SDL_SetTextInputArea( SDL_window, &rect, cursor );
+		return;
+	}
+
+	if ( catcher & KEYCATCH_MESSAGE ) {
+		const int skip = chat_team ? 10 : 5;
+
+		rect.x = (int)( skip * 16.0f * scaleX );
+		rect.y = (int)( 8.0f * scaleY );
+		rect.w = (int)( ( 640.0f - ( skip + 1 ) * 16.0f ) * scaleX );
+		rect.h = (int)( 24.0f * scaleY );
+		cursor = (int)( chatField.cursor * 16.0f * scaleX );
+		SDL_SetTextInputArea( SDL_window, &rect, cursor );
+		return;
+	}
+
+	if ( catcher & KEYCATCH_UI ) {
+		rect.x = (int)( 32.0f * scaleX );
+		rect.y = (int)( ( 480.0f - 48.0f ) * scaleY );
+		rect.w = (int)( ( 640.0f - 64.0f ) * scaleX );
+		rect.h = (int)( 28.0f * scaleY );
+		SDL_SetTextInputArea( SDL_window, &rect, 0 );
+		return;
+	}
+
+	rect.x = 0;
+	rect.y = 0;
+	rect.w = windowW;
+	rect.h = windowH;
+	SDL_SetTextInputArea( SDL_window, &rect, 0 );
+}
 
 /*
 ===============
@@ -694,6 +800,13 @@ static void IN_InitJoystick( void )
 	if (SDL_IsGamepad(joyIds[in_joystickNo->integer]))
 		gamepad = SDL_OpenGamepad(joyIds[in_joystickNo->integer]);
 
+	if ( gamepad ) {
+		SDL_PropertiesID props = SDL_GetGamepadProperties( gamepad );
+		if ( SDL_GetBooleanProperty( props, SDL_PROP_GAMEPAD_CAP_RGB_LED_BOOLEAN, false ) ) {
+			(void)SDL_SetGamepadLED( gamepad, 32, 96, 192 );
+		}
+	}
+
 	Com_DPrintf( "Joystick %d opened\n", in_joystickNo->integer );
 	Com_DPrintf( "Name:       %s\n", SDL_GetJoystickNameForID(joyIds[in_joystickNo->integer]) );
 	Com_DPrintf( "Axes:       %d\n", SDL_GetNumJoystickAxes(stick) );
@@ -867,6 +980,124 @@ static void IN_GamepadTriggerRumble_f( void )
 	if ( !SDL_RumbleGamepadTriggers( gamepad, (Uint16)left, (Uint16)right, (Uint32)ms ) ) {
 		Com_Printf( "gamepad_trigger_rumble failed: %s\n", SDL_GetError() );
 	}
+}
+
+static void IN_GamepadLed_f( void )
+{
+	int red, green, blue;
+	SDL_PropertiesID props;
+
+	if ( !gamepad ) {
+		Com_Printf( "gamepad_led: no active SDL3 gamepad\n" );
+		return;
+	}
+	if ( Cmd_Argc() < 4 ) {
+		Com_Printf( "usage: gamepad_led <red 0-255> <green 0-255> <blue 0-255>\n" );
+		return;
+	}
+
+	props = SDL_GetGamepadProperties( gamepad );
+	if ( !SDL_GetBooleanProperty( props, SDL_PROP_GAMEPAD_CAP_RGB_LED_BOOLEAN, false ) ) {
+		Com_Printf( "gamepad_led: active gamepad has no RGB LED capability\n" );
+		return;
+	}
+
+	red = Com_Clamp( 0, 255, atoi( Cmd_Argv( 1 ) ) );
+	green = Com_Clamp( 0, 255, atoi( Cmd_Argv( 2 ) ) );
+	blue = Com_Clamp( 0, 255, atoi( Cmd_Argv( 3 ) ) );
+	if ( !SDL_SetGamepadLED( gamepad, (Uint8)red, (Uint8)green, (Uint8)blue ) ) {
+		Com_Printf( "gamepad_led failed: %s\n", SDL_GetError() );
+	}
+}
+
+typedef struct sdlDialogResult_s
+{
+	char *path;
+	int filter;
+	qboolean cancelled;
+	qboolean failed;
+} sdlDialogResult_t;
+
+static void SDLCALL IN_FileDialogApplyResult( void *userdata )
+{
+	sdlDialogResult_t *result = (sdlDialogResult_t *)userdata;
+
+	if ( ui_fileDialogResult ) {
+		Cvar_Set( "ui_fileDialogResult", result && result->path ? result->path : "" );
+	}
+	if ( ui_fileDialogFilter ) {
+		Cvar_SetValue( "ui_fileDialogFilter", result ? result->filter : -1 );
+	}
+	if ( ui_fileDialogStatus ) {
+		if ( !result ) {
+			Cvar_Set( "ui_fileDialogStatus", "error" );
+		} else if ( result->failed ) {
+			Cvar_Set( "ui_fileDialogStatus", "error" );
+		} else if ( result->cancelled ) {
+			Cvar_Set( "ui_fileDialogStatus", "cancelled" );
+		} else {
+			Cvar_Set( "ui_fileDialogStatus", "selected" );
+		}
+	}
+
+	if ( result ) {
+		if ( result->failed ) {
+			Com_Printf( "filedialog: %s\n", SDL_GetError() );
+		} else if ( result->cancelled ) {
+			Com_Printf( "filedialog: cancelled\n" );
+		} else if ( result->path ) {
+			Com_Printf( "filedialog: %s\n", result->path );
+		}
+		SDL_free( result->path );
+		SDL_free( result );
+	}
+}
+
+static void SDLCALL IN_FileDialogCallback( void *userdata, const char * const *filelist, int filter )
+{
+	sdlDialogResult_t *result = (sdlDialogResult_t *)SDL_calloc( 1, sizeof( *result ) );
+
+	(void)userdata;
+	if ( !result ) {
+		return;
+	}
+
+	result->filter = filter;
+	if ( !filelist ) {
+		result->failed = qtrue;
+	} else if ( !filelist[0] ) {
+		result->cancelled = qtrue;
+	} else {
+		result->path = SDL_strdup( filelist[0] );
+	}
+
+	SDL_RunOnMainThread( IN_FileDialogApplyResult, result, false );
+}
+
+static void IN_FileDialogOpen_f( void )
+{
+	const char *defaultLocation = Cmd_Argc() > 1 ? Cmd_ArgsFrom( 1 ) : NULL;
+	static const SDL_DialogFileFilter filters[] = {
+		{ "All Files", "*" }
+	};
+
+	if ( ui_fileDialogStatus ) {
+		Cvar_Set( "ui_fileDialogStatus", "pending" );
+	}
+	SDL_ShowOpenFileDialog( IN_FileDialogCallback, NULL, SDL_window, filters, ARRAY_LEN( filters ), defaultLocation, false );
+}
+
+static void IN_FileDialogSave_f( void )
+{
+	const char *defaultLocation = Cmd_Argc() > 1 ? Cmd_ArgsFrom( 1 ) : NULL;
+	static const SDL_DialogFileFilter filters[] = {
+		{ "All Files", "*" }
+	};
+
+	if ( ui_fileDialogStatus ) {
+		Cvar_Set( "ui_fileDialogStatus", "pending" );
+	}
+	SDL_ShowSaveFileDialog( IN_FileDialogCallback, NULL, SDL_window, filters, ARRAY_LEN( filters ), defaultLocation );
 }
 
 
@@ -1357,8 +1588,9 @@ static void IN_WebcamList_f( void )
 static void IN_WebcamStatus_f( void )
 {
 	Com_Printf( "SDL3 webcam status:\n" );
-	Com_Printf( "  enabled=%d poll=%d selected=%d active=%s permission=%d frames=%u\n",
+	Com_Printf( "  enabled=%d alias=%d poll=%d selected=%d active=%s permission=%d frames=%u\n",
 		cl_webcamEnable ? cl_webcamEnable->integer : 0,
+		in_webcam ? in_webcam->integer : 0,
 		cl_webcamPoll ? cl_webcamPoll->integer : 0,
 		cl_webcamDevice ? cl_webcamDevice->integer : 0,
 		s_webcam.active ? "yes" : "no", s_webcam.permission, s_webcam.frameCount );
@@ -1384,8 +1616,8 @@ static void IN_WebcamStart_f( void )
 	int count = 0;
 	int index;
 
-	if ( !cl_webcamEnable || !cl_webcamEnable->integer ) {
-		Com_Printf( "webcam_start: disabled by cl_webcamEnable 0\n" );
+	if ( ( !in_webcam || !in_webcam->integer ) && ( !cl_webcamEnable || !cl_webcamEnable->integer ) ) {
+		Com_Printf( "webcam_start: disabled by in_webcam 0 and cl_webcamEnable 0\n" );
 		return;
 	}
 	if ( !IN_WebcamEnsureSubsystem() ) {
@@ -1443,8 +1675,10 @@ static void IN_WebcamFrame( void )
 {
 	SDL_Surface *frame;
 	Uint64 timestampNS = 0;
+	qboolean enabled;
 
-	if ( !s_webcam.active || !s_webcam.camera || !cl_webcamPoll || !cl_webcamPoll->integer ) {
+	enabled = ( in_webcam && in_webcam->integer ) || ( cl_webcamEnable && cl_webcamEnable->integer );
+	if ( !enabled || !s_webcam.active || !s_webcam.camera || !cl_webcamPoll || !cl_webcamPoll->integer ) {
 		return;
 	}
 
@@ -1459,6 +1693,19 @@ static void IN_WebcamFrame( void )
 	s_webcam.lastHeight = frame->h;
 	s_webcam.lastFormat = frame->format;
 	s_webcam.lastTimestampNS = timestampNS;
+	if ( re.WebcamUploadFrame ) {
+		SDL_Surface *rgba = frame;
+
+		if ( frame->format != SDL_PIXELFORMAT_RGBA32 ) {
+			rgba = SDL_ConvertSurface( frame, SDL_PIXELFORMAT_RGBA32 );
+		}
+		if ( rgba ) {
+			re.WebcamUploadFrame( (const byte *)rgba->pixels, rgba->w, rgba->h );
+			if ( rgba != frame ) {
+				SDL_DestroySurface( rgba );
+			}
+		}
+	}
 	SDL_ReleaseCameraFrame( s_webcam.camera, frame );
 }
 #endif
@@ -1552,6 +1799,7 @@ void HandleEvents( void )
 				if( lastKeyDown != K_CONSOLE )
 				{
 					const char *c = e.text.text;
+					IN_ClearImeState();
 
 					// Quick and dirty UTF-8 to UTF-32 conversion
 					while ( *c )
@@ -1595,6 +1843,37 @@ void HandleEvents( void )
 								Com_QueueEvent( in_eventTime, SE_CHAR, utf32, 0, 0, NULL );
 						}
 					}
+				}
+				break;
+
+			case SDL_EVENT_TEXT_EDITING:
+				if ( ui_imeComposition ) {
+					Cvar_Set( "ui_imeComposition", e.edit.text ? e.edit.text : "" );
+				}
+				if ( ui_imeCompositionStart ) {
+					Cvar_SetValue( "ui_imeCompositionStart", e.edit.start );
+				}
+				if ( ui_imeCompositionLength ) {
+					Cvar_SetValue( "ui_imeCompositionLength", e.edit.length );
+				}
+				IN_UpdateTextInputArea();
+				break;
+
+			case SDL_EVENT_TEXT_EDITING_CANDIDATES:
+				if ( ui_imeCandidates ) {
+					char buf[MAX_CVAR_VALUE_STRING];
+					int i;
+
+					buf[0] = '\0';
+					if ( e.edit_candidates.candidates ) {
+						for ( i = 0; i < e.edit_candidates.num_candidates; i++ ) {
+							if ( i > 0 ) {
+								Q_strcat( buf, sizeof( buf ), " | " );
+							}
+							Q_strcat( buf, sizeof( buf ), e.edit_candidates.candidates[i] ? e.edit_candidates.candidates[i] : "" );
+						}
+					}
+					Cvar_Set( "ui_imeCandidates", buf );
 				}
 				break;
 
@@ -1665,7 +1944,7 @@ void HandleEvents( void )
 #ifdef SDL_INIT_CAMERA
 			case SDL_EVENT_CAMERA_DEVICE_ADDED:
 			case SDL_EVENT_CAMERA_DEVICE_REMOVED:
-				if ( cl_webcamEnable && cl_webcamEnable->integer )
+				if ( ( cl_webcamEnable && cl_webcamEnable->integer ) || ( in_webcam && in_webcam->integer ) )
 					Com_Printf( "SDL3 webcam device %s: id=%u\n",
 						e.type == SDL_EVENT_CAMERA_DEVICE_ADDED ? "added" : "removed",
 						(unsigned)e.cdevice.which );
@@ -1696,6 +1975,8 @@ void HandleEvents( void )
 				break;
 			case SDL_EVENT_WINDOW_RESIZED:
 			case SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED:
+				IN_UpdateDisplayScaleCvars();
+				IN_UpdateTextInputArea();
 				/* Keep Vulkan swapchain/FBO in sync with the SDL window. */
 				if ( !glw_state.isFullscreen && e.window.data1 > 0 && e.window.data2 > 0 ) {
 					static int s_lastW, s_lastH;
@@ -1770,6 +2051,12 @@ void IN_Frame( void )
 #ifdef SDL_INIT_CAMERA
 	IN_WebcamFrame();
 #endif
+
+	IN_UpdateDisplayScaleCvars();
+	IN_UpdateTextInputArea();
+	if ( !( Key_GetCatcher() & ( KEYCATCH_CONSOLE | KEYCATCH_UI | KEYCATCH_MESSAGE ) ) ) {
+		IN_ClearImeState();
+	}
 
 	if ( Key_GetCatcher() & ( KEYCATCH_CONSOLE | KEYCATCH_UI ) ) {
 		/* Release mouse and show cursor when console or menu is open.
@@ -1884,6 +2171,9 @@ void IN_Init( void )
 #endif
 
 #ifdef SDL_INIT_CAMERA
+	in_webcam = Cvar_Get( "in_webcam", "0", CVAR_ARCHIVE_ND );
+	Cvar_CheckRange( in_webcam, "0", "1", CV_INTEGER );
+	Cvar_SetDescription( in_webcam, "Upload SDL3 webcam frames to *webcam when enabled. Alias-friendly opt-in for RP HUD preview work." );
 	cl_webcamEnable = Cvar_Get( "cl_webcamEnable", "0", CVAR_ARCHIVE_ND );
 	Cvar_CheckRange( cl_webcamEnable, "0", "1", CV_INTEGER );
 	Cvar_SetDescription( cl_webcamEnable, "Allow SDL3 webcam/camera device access. Use webcam_start after enabling." );
@@ -1904,6 +2194,25 @@ void IN_Init( void )
 	Cvar_SetDescription( cl_webcamPoll, "Poll and immediately release SDL3 webcam frames, updating webcam_status counters." );
 #endif
 
+	r_displayScale = Cvar_Get( "r_displayScale", "1", CVAR_TEMP );
+	Cvar_SetDescription( r_displayScale, "SDL3-reported window display/content scale factor." );
+	ui_displayScale = Cvar_Get( "ui_displayScale", "1", CVAR_TEMP );
+	Cvar_SetDescription( ui_displayScale, "Copy of the SDL3 window display/content scale factor for UI/cgame consumption." );
+	ui_fileDialogResult = Cvar_Get( "ui_fileDialogResult", "", CVAR_TEMP );
+	Cvar_SetDescription( ui_fileDialogResult, "Last path returned by SDL3 filedialog_open/filedialog_save." );
+	ui_fileDialogStatus = Cvar_Get( "ui_fileDialogStatus", "", CVAR_TEMP );
+	Cvar_SetDescription( ui_fileDialogStatus, "Status for SDL3 file dialogs: pending, selected, cancelled, or error." );
+	ui_fileDialogFilter = Cvar_Get( "ui_fileDialogFilter", "-1", CVAR_TEMP );
+	Cvar_SetDescription( ui_fileDialogFilter, "Index of the selected SDL3 file dialog filter, or -1 when unavailable." );
+	ui_imeComposition = Cvar_Get( "ui_imeComposition", "", CVAR_TEMP );
+	Cvar_SetDescription( ui_imeComposition, "Current SDL3 IME composition string." );
+	ui_imeCompositionStart = Cvar_Get( "ui_imeCompositionStart", "-1", CVAR_TEMP );
+	Cvar_SetDescription( ui_imeCompositionStart, "SDL3 IME composition selection start in UTF-8 characters." );
+	ui_imeCompositionLength = Cvar_Get( "ui_imeCompositionLength", "-1", CVAR_TEMP );
+	Cvar_SetDescription( ui_imeCompositionLength, "SDL3 IME composition selection length in UTF-8 characters." );
+	ui_imeCandidates = Cvar_Get( "ui_imeCandidates", "", CVAR_TEMP );
+	Cvar_SetDescription( ui_imeCandidates, "Flattened SDL3 IME candidate list for scripting/UI consumers." );
+
 	// ~ and `, as keys and characters
 	cl_consoleKeys = Cvar_Get( "cl_consoleKeys", "~ ` 0x7e 0x60", CVAR_ARCHIVE );
 	Cvar_SetDescription( cl_consoleKeys, "Space delimited list of key names or characters that toggle the console." );
@@ -1911,6 +2220,9 @@ void IN_Init( void )
 	mouseAvailable = ( in_mouse->value != 0 ) ? qtrue : qfalse;
 
 	if ( SDL_window ) SDL_StartTextInput( SDL_window );
+	IN_UpdateDisplayScaleCvars();
+	IN_UpdateTextInputArea();
+	IN_ClearImeState();
 
 	//IN_DeactivateMouse();
 
@@ -1925,13 +2237,16 @@ void IN_Init( void )
 	Cmd_AddCommand( "gamepad_load_mappings", IN_GamepadLoadMappings_f );
 	Cmd_AddCommand( "gamepad_rumble", IN_GamepadRumble_f );
 	Cmd_AddCommand( "gamepad_trigger_rumble", IN_GamepadTriggerRumble_f );
+	Cmd_AddCommand( "gamepad_led", IN_GamepadLed_f );
 #endif
+	Cmd_AddCommand( "filedialog_open", IN_FileDialogOpen_f );
+	Cmd_AddCommand( "filedialog_save", IN_FileDialogSave_f );
 #ifdef SDL_INIT_CAMERA
 	Cmd_AddCommand( "webcam_list", IN_WebcamList_f );
 	Cmd_AddCommand( "webcam_status", IN_WebcamStatus_f );
 	Cmd_AddCommand( "webcam_start", IN_WebcamStart_f );
 	Cmd_AddCommand( "webcam_stop", IN_WebcamStop_f );
-	if ( cl_webcamEnable->integer ) {
+	if ( ( in_webcam && in_webcam->integer ) || cl_webcamEnable->integer ) {
 		IN_WebcamStart_f();
 	}
 #endif
@@ -1970,7 +2285,10 @@ void IN_Shutdown( void )
 	Cmd_RemoveCommand( "gamepad_load_mappings" );
 	Cmd_RemoveCommand( "gamepad_rumble" );
 	Cmd_RemoveCommand( "gamepad_trigger_rumble" );
+	Cmd_RemoveCommand( "gamepad_led" );
 #endif
+	Cmd_RemoveCommand( "filedialog_open" );
+	Cmd_RemoveCommand( "filedialog_save" );
 #ifdef SDL_INIT_CAMERA
 	Cmd_RemoveCommand( "webcam_list" );
 	Cmd_RemoveCommand( "webcam_status" );

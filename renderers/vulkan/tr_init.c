@@ -52,6 +52,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "vk_dressi.h"
 #include "extensions/scaffold/vk_arc_blanc.h"
 #include "extensions/scaffold/vk_emulator_screen.h"
+#include "extensions/scaffold/vk_webcam_screen.h"
 #include "vk_raygun.h"
 #include "vk_fluidsim.h"
 #include "vk_terrain.h"
@@ -3554,6 +3555,7 @@ void R_Init( void ) {
 	R_BspStream_Init();
 	R_ArcBlanc_Init();
 	R_Emulator_Init();
+	R_Webcam_Init();
 
 #ifndef USE_VULKAN
 	err = qglGetError();
@@ -3639,6 +3641,7 @@ static void RE_Shutdown( refShutdownCode_t code ) {
 	R_DoneFreeType();
 
 	R_Emulator_Shutdown();
+	R_Webcam_Shutdown();
 
 #ifdef USE_VULKAN
 	if ( r_device->modified ) {
@@ -3754,6 +3757,7 @@ refexport_t *GetRefAPI ( int apiVersion, refimport_t *rimp ) {
 	re.ArcBlancUploadHeightMap = RE_ArcBlancUploadHeightMap;
 	re.ArcBlancGpuOceanStep = RE_ArcBlancGpuOceanStep;
 	re.EmulatorUploadFrame = RE_EmulatorUploadFrame;
+	re.WebcamUploadFrame = RE_WebcamUploadFrame;
 	re.AddPolyToScene = RE_AddPolyToScene;
 	re.LightForPoint = R_LightForPoint;
 	re.AddLightToScene = RE_AddLightToScene;

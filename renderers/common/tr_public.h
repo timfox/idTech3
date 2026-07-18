@@ -172,6 +172,9 @@ typedef struct {
 	/* In-engine OS sandbox guest display (QEMU + *emulator_screen texture). */
 	void (*EmulatorUploadFrame)( const byte *rgba, int width, int height );
 
+	/* SDL3 webcam preview upload (*webcam dynamic texture). */
+	void (*WebcamUploadFrame)( const byte *rgba, int width, int height );
+
 } refexport_t;
 
 //

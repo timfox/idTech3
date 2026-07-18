@@ -512,6 +512,7 @@ void CL_WritePacket( int repeat );
 //
 extern  field_t     chatField;
 extern  field_t     g_consoleField;
+extern	qboolean	chat_team;
 
 void Field_Draw( field_t *edit, int x, int y, int width, qboolean showCursor, qboolean noColorEscape );
 void Field_BigDraw( field_t *edit, int x, int y, int width, qboolean showCursor, qboolean noColorEscape );
