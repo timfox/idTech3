@@ -3089,17 +3089,17 @@ static void R_Register( void )
 	ri.Cvar_SetDescription( r_rtxBindless,
 		"D2 Phase A: RTX hit-shader bindless diffuse table (USE_VULKAN_RTX). 0=SSBO albedo fallback only; latch + vid_restart. See docs/RTX_HIT_SHADER_UV.md." );
 	ri.Cvar_SetGroup( r_rtxBindless, CVG_RENDERER );
-	ri.Printf( PRINT_ALL, "[VK][RTX] r_rtxBindless=%d (hit UV bindless scaffold; off until Phase A sampling lands)\n",
+	ri.Printf( PRINT_ALL, "[VK][RTX] r_rtxBindless=%d (hit bindless; set 1 + r_rtxBindlessMode 1 for Phase A.1b centroid sample)\n",
 		r_rtxBindless->integer );
 	r_rtxBindlessCap = ri.Cvar_Get( "r_rtxBindlessCap", "4096", CVAR_ARCHIVE_ND | CVAR_LATCH );
 	ri.Cvar_CheckRange( r_rtxBindlessCap, "1", "16384", CV_INTEGER );
 	ri.Cvar_SetDescription( r_rtxBindlessCap,
 		"Max textures in the RTX bindless descriptor array when \\r_rtxBindless 1 (latched)." );
 	ri.Cvar_SetGroup( r_rtxBindlessCap, CVG_RENDERER );
-	r_rtxBindlessMode = ri.Cvar_Get( "r_rtxBindlessMode", "0", CVAR_ARCHIVE_ND | CVAR_LATCH );
+	r_rtxBindlessMode = ri.Cvar_Get( "r_rtxBindlessMode", "1", CVAR_ARCHIVE_ND | CVAR_LATCH );
 	ri.Cvar_CheckRange( r_rtxBindlessMode, "0", "2", CV_INTEGER );
 	ri.Cvar_SetDescription( r_rtxBindlessMode,
-		"RTX bindless path: 0=off (SSBO fallback), 1=descriptor indexing (Phase A), 2=atlas fallback (Phase B stub)." );
+		"RTX bindless path: 0=force SSBO albedo, 1=descriptor indexing (Phase A.1b centroid UV), 2=atlas fallback (stub)." );
 	ri.Cvar_SetGroup( r_rtxBindlessMode, CVG_RENDERER );
 	r_pathtrace = ri.Cvar_Get( "r_pathtrace", "0", CVAR_ARCHIVE_ND | CVAR_LATCH );
 	ri.Cvar_CheckRange( r_pathtrace, "0", "1", CV_INTEGER );

@@ -2,15 +2,16 @@
 ===========================================================================
 Copyright (C) 2026 Gopex LLC. All rights reserved.
 
-D2 Phase A.1 — RTX bindless texture table + per-primitive material SSBO.
-Pack emits dense textureIndex from diffuse images; hit shaders keep SSBO
-albedo until descriptor indexing + AS UVs land (r_rtxBindless sampling off).
+D2 Phase A.1b — RTX bindless texture table + per-primitive material SSBO.
+Pack emits dense textureIndex; when r_rtxBindless 1 + mode 1 + indexing,
+Hybrid1 samples the descriptor array at centroid UV (AS vertex UVs follow-up).
 See docs/RTX_HIT_SHADER_UV.md.
 ===========================================================================
 */
 
 #include "tr_local.h"
 #include "vk.h"
+#include "vk_util.h"
 #include "vk_rtx_bindless.h"
 #include "vk_rtx_material.h"
 #include <stdlib.h>
@@ -21,6 +22,7 @@ typedef struct {
 	qboolean		ready;
 	qboolean		indexing_supported;
 	uint32_t		cap;
+	uint32_t		descriptor_array_count;
 	uint32_t		texture_count;
 	uint32_t		valid_prim_count;
 	VkBuffer		prim_buffer;
@@ -317,9 +319,10 @@ void vk_rtx_bindless_init( void )
 	s_bindless.texture_count = 0u;
 	s_bindless.valid_prim_count = 0u;
 	s_bindless.entity_base = 0u;
+	s_bindless.descriptor_array_count = 1u;
 
 	ri.Printf( PRINT_ALL,
-		"[VK][RTX] bindless Phase A.1: r_rtxBindless=%d mode=%d cap=%u indexing=%s (prim textureIndex emit; hit UV sample deferred)\n",
+		"[VK][RTX] bindless Phase A.1b: r_rtxBindless=%d mode=%d cap=%u indexing=%s (centroid UV sample when active)\n",
 		r_rtxBindless ? r_rtxBindless->integer : 0,
 		r_rtxBindlessMode ? r_rtxBindlessMode->integer : 0,
 		s_bindless.cap,
@@ -336,14 +339,24 @@ void vk_rtx_bindless_shutdown( void )
 
 qboolean vk_rtx_bindless_active( void )
 {
+	int mode;
+
 	if ( !s_bindless.ready || !r_rtxBindless || r_rtxBindless->integer <= 0 ) {
 		return qfalse;
 	}
-	if ( r_rtxBindlessMode && r_rtxBindlessMode->integer == 0 ) {
+	if ( !s_bindless.indexing_supported ) {
 		return qfalse;
 	}
-	/* Phase A.1: indices emitted; sampling waits on AS UVs + descriptor array. */
-	return qfalse;
+	mode = r_rtxBindlessMode ? r_rtxBindlessMode->integer : 0;
+	/* mode 0 = force SSBO; mode 1 = descriptor indexing; mode 2 = atlas (not yet). */
+	if ( mode == 0 ) {
+		return qfalse;
+	}
+	if ( mode != 1 ) {
+		return qfalse;
+	}
+	/* Phase A.1b: centroid UV sample via descriptor array (AS vertex UVs still follow-up). */
+	return ( s_bindless.texture_count > 0u ) ? qtrue : qfalse;
 }
 
 uint32_t vk_rtx_bindless_texture_count( void )
@@ -427,45 +440,85 @@ void vk_rtx_bindless_sync_prim_materials( uint32_t worldPrimCount, uint32_t enti
 
 void vk_rtx_bindless_bind_textures( VkDescriptorSet set, uint32_t binding )
 {
-	VkDescriptorImageInfo info;
+	VkDescriptorImageInfo *infos = NULL;
 	VkWriteDescriptorSet write;
-	VkImageView view;
+	VkImageView whiteView;
+	VkSampler sampler;
+	uint32_t arrayCount;
+	uint32_t writeCount;
+	uint32_t i;
+	Vk_Sampler_Def sd;
 
 	if ( set == VK_NULL_HANDLE ) {
 		return;
 	}
 
-	view = VK_NULL_HANDLE;
+	whiteView = VK_NULL_HANDLE;
 	if ( tr.whiteImage && tr.whiteImage->view != VK_NULL_HANDLE ) {
-		view = tr.whiteImage->view;
+		whiteView = tr.whiteImage->view;
 	} else if ( tr.defaultImage && tr.defaultImage->view != VK_NULL_HANDLE ) {
-		view = tr.defaultImage->view;
+		whiteView = tr.defaultImage->view;
 	}
-	if ( view == VK_NULL_HANDLE ) {
+	if ( whiteView == VK_NULL_HANDLE ) {
 		return;
 	}
 
-	Com_Memset( &info, 0, sizeof( info ) );
-	{
-		Vk_Sampler_Def sd;
-		Com_Memset( &sd, 0, sizeof( sd ) );
-		sd.gl_mag_filter = sd.gl_min_filter = GL_NEAREST;
-		sd.address_mode = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
-		sd.noAnisotropy = qtrue;
-		info.sampler = vk_find_sampler( &sd );
+	Com_Memset( &sd, 0, sizeof( sd ) );
+	sd.gl_mag_filter = sd.gl_min_filter = GL_LINEAR;
+	sd.address_mode = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+	sd.noAnisotropy = qtrue;
+	sampler = vk_find_sampler( &sd );
+
+	arrayCount = s_bindless.descriptor_array_count;
+	if ( arrayCount < 1u ) {
+		arrayCount = 1u;
 	}
-	info.imageView = view;
-	info.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+	writeCount = arrayCount;
+	if ( writeCount > s_bindless.cap && s_bindless.cap > 0u ) {
+		writeCount = s_bindless.cap;
+	}
+
+	infos = (VkDescriptorImageInfo *)malloc( sizeof( VkDescriptorImageInfo ) * writeCount );
+	if ( !infos ) {
+		return;
+	}
+	Com_Memset( infos, 0, sizeof( VkDescriptorImageInfo ) * writeCount );
+
+	for ( i = 0u; i < writeCount; i++ ) {
+		image_t *img = NULL;
+		infos[i].sampler = sampler;
+		infos[i].imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+		if ( i < s_bindless.texture_count && s_bindless.images ) {
+			img = s_bindless.images[i];
+		}
+		if ( img && img->view != VK_NULL_HANDLE ) {
+			infos[i].imageView = img->view;
+			if ( img->vk_sampler != VK_NULL_HANDLE ) {
+				infos[i].sampler = img->vk_sampler;
+			}
+		} else {
+			infos[i].imageView = whiteView;
+		}
+	}
 
 	Com_Memset( &write, 0, sizeof( write ) );
 	write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
 	write.dstSet = set;
 	write.dstBinding = binding;
 	write.dstArrayElement = 0;
-	write.descriptorCount = 1;
+	write.descriptorCount = writeCount;
 	write.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-	write.pImageInfo = &info;
+	write.pImageInfo = infos;
 	qvkUpdateDescriptorSets( vk.device, 1, &write, 0, NULL );
+	free( infos );
+}
+
+void vk_rtx_bindless_set_descriptor_array_count( uint32_t count )
+{
+	if ( count < 1u ) {
+		count = 1u;
+	}
+	s_bindless.descriptor_array_count = count;
 }
 
 void vk_rtx_bindless_bind_prim_material( VkDescriptorSet set, uint32_t binding )
@@ -564,6 +617,7 @@ void vk_rtx_bindless_bind_textures( VkDescriptorSet set, uint32_t binding )
 	(void)set;
 	(void)binding;
 }
+void vk_rtx_bindless_set_descriptor_array_count( uint32_t count ) { (void)count; }
 void vk_rtx_bindless_bind_prim_material( VkDescriptorSet set, uint32_t binding )
 {
 	(void)set;

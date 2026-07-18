@@ -51,6 +51,13 @@ static qboolean R_CullMD3SurfaceMeshlets( md3Surface_t *surface, int frame, cons
 	if ( surface->numVerts > MESHLET_MD3_MAX_VERTS || surface->numTriangles > MESHLET_MD3_MAX_TRIS ) {
 		return qtrue;
 	}
+	/*
+	 * Meshlets bake bind-pose (frame 0) AABBs. Animated frames make frustum/LOD
+	 * culls unsafe — fall back to drawing the full surface.
+	 */
+	if ( frame != 0 ) {
+		return qtrue;
+	}
 
 	mcount = R_Meshlets_Lookup( surface, &meshlets );
 	if ( mcount <= 0 || !meshlets ) {
@@ -76,7 +83,6 @@ static qboolean R_CullMD3SurfaceMeshlets( md3Surface_t *surface, int frame, cons
 		}
 	}
 
-	(void)frame;
 	vcount = R_Meshlets_CullViewFrustumXform( meshlets, mcount, entityAxis, entityOrigin,
 		visible, MESHLET_MAX_PER_SURFACE );
 	if ( vcount > 0 && R_Meshlets_WantMdi() ) {

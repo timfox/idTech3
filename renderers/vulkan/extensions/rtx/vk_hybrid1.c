@@ -42,6 +42,8 @@ typedef struct {
 	float params4[4];
 	float params5[4];
 	float dlightDir[4];
+	/* x = bindless texture count when active (0 = SSBO-only), y = array cap */
+	float bindlessMeta[4];
 } VkHybrid1FrameUBO_t;
 
 typedef struct {
@@ -78,6 +80,7 @@ static struct {
 	VkDescriptorSet     shadow_set;
 	VkDescriptorSet     spec_set;
 	VkDescriptorSet     diffuse_set;
+	uint32_t            bindless_array_count;
 	VkBuffer            sbt_shadow_buffer;
 	VkDeviceMemory      sbt_shadow_memory;
 	VkBuffer            sbt_spec_buffer;
@@ -1120,6 +1123,11 @@ static void HYBRID1_FillFrameUbo( VkHybrid1FrameUBO_t *ubo )
 		ubo->dlightDir[2] = dl->origin[2];
 		ubo->dlightDir[3] = 0.65f;
 	}
+	ubo->bindlessMeta[0] = ubo->bindlessMeta[1] = ubo->bindlessMeta[2] = ubo->bindlessMeta[3] = 0.0f;
+	if ( vk_rtx_bindless_active() ) {
+		ubo->bindlessMeta[0] = (float)vk_rtx_bindless_texture_count();
+		ubo->bindlessMeta[1] = (float)vk_rtx_bindless_cap();
+	}
 }
 
 qboolean vk_hybrid1_active( void )
@@ -1423,10 +1431,22 @@ void vk_hybrid1_init( void )
 	rtBindings[14].descriptorCount = 1;
 	rtBindings[14].stageFlags = VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR;
 
-	/* D2 Phase A scaffold: single diffuse slot (expand to bindless array when indexing lands). */
+	/* D2 Phase A.1b: bindless diffuse array when descriptor indexing is available.
+	 * Fixed array size (not VARIABLE_COUNT) because PrimMaterial occupies binding 16. */
+	hybrid1.bindless_array_count = 1u;
+	if ( vk_rtx_bindless_indexing_supported() ) {
+		uint32_t cap = vk_rtx_bindless_cap();
+		if ( cap < 1u ) {
+			cap = 1u;
+		}
+		if ( cap > 4096u ) {
+			cap = 4096u;
+		}
+		hybrid1.bindless_array_count = cap;
+	}
 	rtBindings[15].binding = 15;
 	rtBindings[15].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-	rtBindings[15].descriptorCount = 1;
+	rtBindings[15].descriptorCount = hybrid1.bindless_array_count;
 	rtBindings[15].stageFlags = VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR | VK_SHADER_STAGE_RAYGEN_BIT_KHR;
 
 	rtBindings[16].binding = 16;
@@ -1434,11 +1454,30 @@ void vk_hybrid1_init( void )
 	rtBindings[16].descriptorCount = 1;
 	rtBindings[16].stageFlags = VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR;
 
-	Com_Memset( &dslci, 0, sizeof( dslci ) );
-	dslci.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-	dslci.bindingCount = 17;
-	dslci.pBindings = rtBindings;
-	VK_CHECK( qvkCreateDescriptorSetLayout( vk.device, &dslci, NULL, &hybrid1.rt_dsl ) );
+	{
+		VkDescriptorBindingFlags bindingFlags[17];
+		VkDescriptorSetLayoutBindingFlagsCreateInfo bindingFlagsInfo;
+		uint32_t bi;
+
+		Com_Memset( bindingFlags, 0, sizeof( bindingFlags ) );
+		for ( bi = 0; bi < 17; bi++ ) {
+			bindingFlags[bi] = 0;
+		}
+		if ( hybrid1.bindless_array_count > 1u ) {
+			bindingFlags[15] = VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT;
+		}
+		Com_Memset( &bindingFlagsInfo, 0, sizeof( bindingFlagsInfo ) );
+		bindingFlagsInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_BINDING_FLAGS_CREATE_INFO;
+		bindingFlagsInfo.bindingCount = 17;
+		bindingFlagsInfo.pBindingFlags = bindingFlags;
+
+		Com_Memset( &dslci, 0, sizeof( dslci ) );
+		dslci.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+		dslci.pNext = ( hybrid1.bindless_array_count > 1u ) ? &bindingFlagsInfo : NULL;
+		dslci.bindingCount = 17;
+		dslci.pBindings = rtBindings;
+		VK_CHECK( qvkCreateDescriptorSetLayout( vk.device, &dslci, NULL, &hybrid1.rt_dsl ) );
+	}
 
 	Com_Memset( poolSizes, 0, sizeof( poolSizes ) );
 	poolSizes[0].type = VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR;
@@ -1448,7 +1487,7 @@ void vk_hybrid1_init( void )
 	poolSizes[2].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
 	poolSizes[2].descriptorCount = 3;
 	poolSizes[3].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-	poolSizes[3].descriptorCount = 24;
+	poolSizes[3].descriptorCount = 24u + 3u * hybrid1.bindless_array_count;
 	poolSizes[4].type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
 	poolSizes[4].descriptorCount = 21;
 	Com_Memset( &dpci, 0, sizeof( dpci ) );
@@ -1463,6 +1502,8 @@ void vk_hybrid1_init( void )
 	plci.setLayoutCount = 1;
 	plci.pSetLayouts = &hybrid1.rt_dsl;
 	VK_CHECK( qvkCreatePipelineLayout( vk.device, &plci, NULL, &hybrid1.rt_pl ) );
+
+	vk_rtx_bindless_set_descriptor_array_count( hybrid1.bindless_array_count );
 
 	Com_Memset( &allocInfo, 0, sizeof( allocInfo ) );
 	allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;

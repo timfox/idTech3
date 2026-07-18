@@ -1694,6 +1694,24 @@ void HandleEvents( void )
 					Cvar_SetIntegerValue( "vid_ypos", e.window.data2 );
 				}
 				break;
+			case SDL_EVENT_WINDOW_RESIZED:
+			case SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED:
+				/* Keep Vulkan swapchain/FBO in sync with the SDL window. */
+				if ( !glw_state.isFullscreen && e.window.data1 > 0 && e.window.data2 > 0 ) {
+					static int s_lastW, s_lastH;
+					if ( e.window.data1 != s_lastW || e.window.data2 != s_lastH ) {
+						s_lastW = e.window.data1;
+						s_lastH = e.window.data2;
+						if ( e.window.data1 != glw_state.window_width ||
+						     e.window.data2 != glw_state.window_height ) {
+							Cvar_Set( "r_mode", "-1" );
+							Cvar_SetIntegerValue( "r_customWidth", e.window.data1 );
+							Cvar_SetIntegerValue( "r_customHeight", e.window.data2 );
+							Cbuf_AddText( "vid_restart\n" );
+						}
+					}
+				}
+				break;
 			case SDL_EVENT_WINDOW_HIDDEN:
 			case SDL_EVENT_WINDOW_MINIMIZED:
 				gw_active = qfalse; gw_minimized = qtrue;

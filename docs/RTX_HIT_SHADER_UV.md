@@ -1,6 +1,6 @@
 # RTX hit-shader UV / bindless texturing (D2 design)
 
-**Status:** Phase A.1 pack emit landed (Jul 2026). World/entity pack writes dense `textureIndex` into `PrimMaterialSSBO`; hit shaders still sample SSBO albedo (`r_rtxBindless` default 0, `vk_rtx_bindless_active()` false until AS UVs + descriptor array).
+**Status:** Phase A.1b landed (Jul 2026). World/entity pack writes dense `textureIndex` into `PrimMaterialSSBO`; with `r_rtxBindless 1` + `r_rtxBindlessMode 1` + descriptor indexing, Hybrid1 samples the bindless array at **centroid UV** (`vec2(0.5)`). True hit barycentric UV still needs AS vertex attributes.
 
 ## Problem
 
@@ -137,7 +137,8 @@ Short automated client pass on OpenArena `oa_dm1` with deferred + Hybrid1 latche
 - **Fixed (Jul 2026) entity TLAS mid-frame destroy:** once-per-frame entity rebuild; retire old TLAS/entity BLAS instead of destroying under an open CB; flush retired after queue idle (world rebuild) / next entity refresh. **Verified:** Hybrid1 quality 1/3 + `r_rtxEntities 1` on `oa_dm1` (entity BLAS UPDATE, 2 TLAS instances) clean quit.
 - **Landed (Jul 2026) D2 Phase A scaffold:** `vk_rtx_bindless.c` + Hybrid1 RT bindings 15/16; prim materials filled with `textureIndex=0xFFFFFFFF`; hit shader still samples SSBO albedo. Master latch stays off until Phase A.1 (real indices + UV attrs + nonuniform sample). **Verified:** Hybrid1 quality 1 + `r_rtxEntities 1` on `oa_dm1` — `bindless=… active:0 indexing:1 worldPrims:4096 entityPrims:6629`, clean quit.
 - **Landed (Jul 2026) D2 Phase A.1 pack emit:** world/entity pack writes dense `textureIndex` via `vk_rtx_material_diffuse_image_bindless`; host staging uses heap (`malloc`) so `TAG_RENDERER` FreeAll cannot steal it; `rtx_status` reports `textures:N validPrims:M`; Hybrid1 UBO `viewOrigin.w` = world prim count for entity PrimMaterial offset. Hit sampling still SSBO (no AS UVs / descriptor array yet). **Verified:** Hybrid1 quality 1 + entities on `oa_dm1` — `textures:29 validPrims:9555 worldPrims:4096 entityPrims:5507`, clean quit.
-- **Next:** Phase A.1b — AS UV attributes + bindless descriptor array sample when `r_rtxBindless 1`.
+- **Landed (Jul 2026) D2 Phase A.1b:** Hybrid1 binding 15 expands to a partially-bound descriptor array (`r_rtxBindlessCap`); `vk_rtx_bindless_active()` true when latch+mode1+indexing+textures; hit samples `nonuniformEXT(bindlessDiffuse[texIdx])` at centroid UV; UBO `bindlessMeta.x` gates the path. AS vertex UVs remain follow-up.
+- **Next:** Phase C — AS UV attributes + glint jacobian from material UV.
 
 ## References
 

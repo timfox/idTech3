@@ -220,6 +220,12 @@ static int GLW_SetMode( int mode, const char *modeFS, qboolean fullscreen )
 	int y;
 	Uint64 flags = SDL_WINDOW_HIGH_PIXEL_DENSITY | SDL_WINDOW_VULKAN;
 
+	/* Wayland/libdecor needs RESIZABLE for a real window chrome and sane
+	 * configure events; without it the window is fixed-size and presentation
+	 * can stay black after mode fallbacks. */
+	if ( !fullscreen )
+		flags |= SDL_WINDOW_RESIZABLE;
+
 	Com_Printf( "Initializing Vulkan display\n" );
 
 	// If a window exists, note its display

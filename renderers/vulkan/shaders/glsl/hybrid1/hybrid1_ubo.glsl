@@ -13,4 +13,5 @@ layout( set = 0, binding = 2, std140 ) uniform Hybrid1Frame {
 	vec4 params4; /* glint: density, microRough, pixelFilter, sampleBudget */
 	vec4 params5; /* glint: maxLod, dClamp, roughLo, roughHi */
 	vec4 dlightDir; /* xyz = first dlight world origin, w = weight (0=off) */
+	vec4 bindlessMeta; /* x = texture count when active (0=SSBO), y = array cap */
 } h1;

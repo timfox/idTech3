@@ -610,6 +610,11 @@ int R_Meshlets_AppendVisibleIndexes( md3Surface_t *surface, int vertexBase,
 	if ( surface->numVerts > 512 || surface->numTriangles > 1024 || surface->numTriangles < 1 ) {
 		return -1;
 	}
+	/* Animated MD3: bind-pose meshlet AABBs are unsafe for cull/LOD — full index emit. */
+	if ( backEnd.currentEntity &&
+		( backEnd.currentEntity->e.frame != 0 || backEnd.currentEntity->e.oldframe != 0 ) ) {
+		return -1;
+	}
 
 	mcount = R_Meshlets_Lookup( surface, &meshlets );
 	if ( mcount <= 0 || !meshlets ) {

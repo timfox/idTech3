@@ -1,4 +1,6 @@
-/* Requires hybrid1_ubo.glsl included before this file. */
+/* Requires hybrid1_ubo.glsl included before this file.
+ * Parent rchit must enable GL_EXT_nonuniform_qualifier.
+ */
 
 layout( set = 0, binding = 9, std430 ) readonly buffer WorldAlbedoSSBO {
 	float rgb[];
@@ -26,8 +28,8 @@ layout( set = 0, binding = 16, std430 ) readonly buffer PrimMaterialSSBO {
 	Hybrid1PrimMaterial mats[];
 } primMat;
 
-/* Reserved for Phase A sampling (descriptor bound; unused until bindless latch). */
-layout( set = 0, binding = 15 ) uniform sampler2D bindlessDiffuseFallback;
+/* Phase A.1b: bindless diffuse array (centroid UV until AS attrs land). */
+layout( set = 0, binding = 15 ) uniform sampler2D bindlessDiffuse[];
 
 vec3 hybrid1_defaultAlbedo( void )
 {
@@ -116,23 +118,22 @@ vec3 hybrid1_sampleHitNormal( void )
 vec3 hybrid1_sampleHitAlbedo( sampler2D albedoTex )
 {
 	/*
-	 * D2 Phase A.1: PrimMaterialSSBO carries dense textureIndex from pack
-	 * (INVALID = no diffuse image). Hit UV bindless sample still deferred —
-	 * keep SSBO RGB / G-buffer fallback until AS attrs + descriptor array.
+	 * D2 Phase A.1b: when bindlessMeta.x > 0, sample the bindless array at
+	 * centroid UV (0.5) until AS vertex UVs land. Otherwise SSBO / G-buffer.
 	 */
 	{
 		uint nMat = uint( primMat.mats.length() );
 		uint primIdx = uint( max( gl_PrimitiveID, 0 ) );
+		uint texCount = uint( max( h1.bindlessMeta.x, 0.0 ) );
 		if ( gl_InstanceCustomIndexEXT == 1 ) {
 			primIdx += uint( max( h1.viewOrigin.w, 0.0 ) );
 		}
-		if ( nMat > 0u && primIdx < nMat ) {
+		if ( texCount > 0u && nMat > 0u && primIdx < nMat ) {
 			uint texIdx = primMat.mats[primIdx].textureIndex;
-			if ( texIdx != 0xFFFFFFFFu ) {
-				/* Indices are live for status/debug; sampling waits on Phase A.1b. */
-				vec2 keep = vec2( textureSize( bindlessDiffuseFallback, 0 ) );
-				if ( keep.x < 0.0 ) {
-					return vec3( keep, 0.0 );
+			if ( texIdx != 0xFFFFFFFFu && texIdx < texCount ) {
+				vec3 c = texture( nonuniformEXT( bindlessDiffuse[texIdx] ), vec2( 0.5 ) ).rgb;
+				if ( dot( c, c ) > 1e-8 ) {
+					return c;
 				}
 			}
 		}

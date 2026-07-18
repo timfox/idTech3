@@ -15,7 +15,7 @@ exec demo_meshlets.cfg
 meshlet_status
 ```
 
-When enabled, MD3 surfaces (≤512 verts / ≤1024 tris) bake at load, skip add if fully culled, and compact draw when partially visible. With `r_meshletsMdiDraw 1`, each visible meshlet range is issued via `vkCmdDrawIndexedIndirect` against the tess index buffer (falls back to a single `vkCmdDrawIndexed` if the entry point is missing). With `r_meshletsLod 1`, frustum-visible meshlets whose projected AABB diagonal is below `r_meshletsLodPixels` are dropped (distance / FOV screen-size LOD).
+When enabled, MD3 surfaces (≤512 verts / ≤1024 tris) bake at load, skip add if fully culled, and compact draw when partially visible. With `r_meshletsMdiDraw 1`, each visible meshlet range is issued via `vkCmdDrawIndexedIndirect` against the tess index buffer (falls back to a single `vkCmdDrawIndexed` if the entry point is missing). With `r_meshletsLod 1`, frustum-visible meshlets whose projected AABB diagonal is below `r_meshletsLodPixels` are dropped (distance / FOV screen-size LOD). **Animated MD3** (`frame != 0`) skips meshlet cull/LOD/compact and draws the full surface — bind-pose AABBs are unsafe under animation.
 
 ## Cvars / commands
 

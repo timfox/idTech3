@@ -25,8 +25,8 @@ qboolean vk_rtx_bindless_indexing_supported( void );
 
 /*
  * Pack-time prim materials (Phase A.1): dense textureIndex into host staging,
- * then sync uploads [world | entity] to PrimMaterialSSBO. Sampling still off
- * until AS UVs + descriptor array (active() stays false).
+ * then sync uploads [world | entity] to PrimMaterialSSBO. Phase A.1b samples
+ * the bindless array at centroid UV when active(); AS vertex UVs remain follow-up.
  */
 void vk_rtx_bindless_reset_texture_table( void );
 void vk_rtx_bindless_prepare_capacity( uint32_t totalPrims );
@@ -42,6 +42,8 @@ void vk_rtx_bindless_sync_prim_materials( uint32_t worldPrimCount, uint32_t enti
 
 void vk_rtx_bindless_bind_textures( VkDescriptorSet set, uint32_t binding );
 void vk_rtx_bindless_bind_prim_material( VkDescriptorSet set, uint32_t binding );
+/* Hybrid1 RT set binding 15 array size (1 = scaffold, cap when indexing). */
+void vk_rtx_bindless_set_descriptor_array_count( uint32_t count );
 
 void vk_rtx_bindless_status_line( void );
 
@@ -65,6 +67,7 @@ void vk_rtx_bindless_set_entity_prim_from_shader( uint32_t entityPrimIndex, cons
 void vk_rtx_bindless_sync_prim_materials( uint32_t worldPrimCount, uint32_t entityPrimCount );
 void vk_rtx_bindless_bind_textures( VkDescriptorSet set, uint32_t binding );
 void vk_rtx_bindless_bind_prim_material( VkDescriptorSet set, uint32_t binding );
+void vk_rtx_bindless_set_descriptor_array_count( uint32_t count );
 void vk_rtx_bindless_status_line( void );
 
 #endif

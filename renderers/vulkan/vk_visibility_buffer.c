@@ -50,7 +50,8 @@ qboolean vk_visibility_buffer_fill_wanted( void )
 
 qboolean vk_material_classify_wanted( void )
 {
-	return ( vk_visibility_buffer_fill_wanted() && r_materialClassify &&
+	/* Classify needs the class RT (visibility buffer latch), not Morton fill. */
+	return ( vk_visibility_buffer_active() && r_materialClassify &&
 		r_materialClassify->integer ) ? qtrue : qfalse;
 }
 
@@ -827,17 +828,21 @@ qboolean vk_visibility_buffer_draw_debug( void )
 
 void vk_visibility_buffer_status_f( void )
 {
-	ri.Printf( PRINT_ALL, "==== visibility buffer (2027 Phase 1) ====\n" );
-	ri.Printf( PRINT_ALL, "cvar      : r_visibilityBuffer=%d fill=%d debug=%d classify=%d\n",
+	ri.Printf( PRINT_ALL, "==== visibility buffer (2027 Phase 1 / 1.5) ====\n" );
+	ri.Printf( PRINT_ALL, "cvar      : r_visibilityBuffer=%d fill=%d debug=%d classify=%d deferredClassify=%d\n",
 		r_visibilityBuffer ? r_visibilityBuffer->integer : 0,
 		r_visibilityBufferFill ? r_visibilityBufferFill->integer : 0,
 		r_visibilityBufferDebug ? r_visibilityBufferDebug->integer : 0,
-		r_materialClassify ? r_materialClassify->integer : 0 );
+		r_materialClassify ? r_materialClassify->integer : 0,
+		r_deferredMaterialClassify ? r_deferredMaterialClassify->integer : 0 );
 	ri.Printf( PRINT_ALL, "active    : allocated=%s fillWanted=%s classifyWanted=%s mode=%d\n",
 		vk.visibilityBufferAllocated ? "yes" : "no",
 		vk_visibility_buffer_fill_wanted() ? "yes" : "no",
 		vk_material_classify_wanted() ? "yes" : "no",
 		r_renderMode ? r_renderMode->integer : -1 );
+	ri.Printf( PRINT_ALL, "encoding  : depth_proxy (Morton+depth bucket; true gl_PrimitiveID MRT follow-up)\n" );
+	ri.Printf( PRINT_ALL, "consumers : ids/bary=debug(+lateShade5) class=deferred_when_classify deferredClassify=%s\n",
+		( r_deferredMaterialClassify && r_deferredMaterialClassify->integer ) ? "on" : "off" );
 	ri.Printf( PRINT_ALL, "images    : ids=%s bary=%s class=%s\n",
 		vk.visibility_buffer_ids ? "yes" : "no",
 		vk.visibility_buffer_bary ? "yes" : "no",

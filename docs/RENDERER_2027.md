@@ -44,7 +44,7 @@ Compact **visibility-buffer sidecar** coexisting with the classic G-buffer:
 | `r_visibilityBuffer` | Latch: allocate ID + bary + class RTs (needs `r_fbo`, `r_renderMode` 1/2/3) |
 | `r_visibilityBufferFill` | After opaque (mode 3) or geometry: compute fill of packed draw/prim IDs + bary proxies |
 | `r_visibilityBufferDebug` | 0=off, 1=drawId, 2=primId, 3=bary, 4=material class, 5=late-shade scaffold (albedo×class) |
-| `r_materialClassify` | Compute class map from G-buffer material + depth (experimental stub) |
+| `r_materialClassify` | Compute class map from G-buffer material + depth (needs visbuf latch; **not** Morton fill) |
 | `r_deferredMaterialClassify` | Deferred lighting consumes class map (default **0**; manual opt-in only) |
 
 **Phase 1.5 (fill + late-shade preview):**
@@ -75,7 +75,7 @@ Demo: `exec demo_visibility_2027.cfg`. The overlay keeps `r_deferredMaterialClas
 | **P1** | Visibility foundation + material-class stub (this doc / cvars above) |
 | **P1.5** | Visbuf Morton/depth fill + late-shade debug mode 5 |
 | **P2** | GPU-driven meshlets — **`r_meshletsMdiDraw`** + **`r_meshletsLod`** screen LOD; persistent IBO + mesh shaders remain follow-up ([MESHLETS.md](MESHLETS.md)) |
-| **P3** | Reservoir-sampled hybrid path — ReSTIR DI on Hybrid1, NVC/FSA, [RTX_HIT_SHADER_UV.md](RTX_HIT_SHADER_UV.md) |
+| **P3** | Reservoir-sampled hybrid path — ReSTIR DI on Hybrid1, NVC/FSA; **bindless A.1b** centroid sample ([RTX_HIT_SHADER_UV.md](RTX_HIT_SHADER_UV.md); AS UVs follow-up) |
 | **P4** | Material-classified OIT — mode 3 + MBOIT overlay (`vulkan_overlay_oit_clustered.cfg`); class-specialized paths remain follow-up ([MOMENT_OIT_STOCHASTIC_ALPHA.md](MOMENT_OIT_STOCHASTIC_ALPHA.md)) |
 | **P5** | Neural material/texture reconstruction (chocolate scaffold; no mandatory vendor SDK) |
 | **P6** | Heterogeneous resolution, sparse volumetrics, OMM, character skin/hair paths |

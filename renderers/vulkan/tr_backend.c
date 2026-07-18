@@ -1870,7 +1870,16 @@ static const void *RB_DrawSurfs( const void *data ) {
 		vk_deferred_lighting_apply_after_geometry();
 		backEnd.drawSurfFilter = 2; /* transparent only (Forward+ shade) */
 		if ( r_oit && r_oit->integer && r_fbo && r_fbo->integer ) {
-			/* OIT after deferred; residual risk documented in UNIFIED_CLUSTERED_RENDERER.md */
+			/* OIT replaces Forward+ transparent shade on mode 3 (no tile-lit OIT yet). */
+			{
+				static qboolean s_oit_mode3_logged;
+				if ( !s_oit_mode3_logged ) {
+					ri.Printf( PRINT_ALL,
+						"[VK][unified] r_oit=%d: OIT pass after deferred (skips Forward+ transparent shade)\n",
+						r_oit->integer );
+					s_oit_mode3_logged = qtrue;
+				}
+			}
 			vk_oit_pass( cmd );
 		} else {
 			RB_RenderDrawSurfList( cmd->drawSurfs, cmd->numDrawSurfs );
