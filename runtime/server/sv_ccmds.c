@@ -31,6 +31,7 @@ static void SV_P2PPunch_f( void );
 static void SV_P2PPunchStatus_f( void );
 static void SV_P2PList_f( void );
 static void SV_P2PCandidates_f( void );
+static void SV_P2PGracePrime_f( void );
 /*
 ===============================================================================
 

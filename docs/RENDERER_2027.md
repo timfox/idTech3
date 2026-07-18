@@ -44,13 +44,13 @@ Compact **visibility-buffer sidecar** coexisting with the classic G-buffer:
 | `r_visibilityBuffer` | Latch: allocate ID + bary + class RTs (needs `r_fbo`, `r_renderMode` 1/2/3) |
 | `r_visibilityBufferFill` | After opaque (mode 3) or geometry: compute fill of packed draw/prim IDs + bary proxies |
 | `r_visibilityBufferDebug` | 0=off, 1=drawId, 2=primId, 3=bary, 4=material class |
-| `r_materialClassify` | Compute class map from G-buffer material + depth |
-| `r_deferredMaterialClassify` | Deferred lighting consumes class map (skip cutout/emissive; tune layered/transmission) |
+| `r_materialClassify` | Compute class map from G-buffer material + depth (experimental stub) |
+| `r_deferredMaterialClassify` | Deferred lighting consumes class map (default **0**; manual opt-in only) |
 
 **Deferred lighting notes (post–Phase 1):**
 
 - Direct MRT normals are **world-space**; depth-fill normals are **view-space**. `deferred_lighting.comp` transforms world→view when `normalsAreWorld=1`.
-- With `r_deferredMaterialClassify 1` + classify fill, specialized opaque dispatch uses the class map.
+- With `r_deferredMaterialClassify 1` + classify fill, specialized opaque dispatch uses the class map (EMPTY=sky; LAYERED/TRANSMISSION tune; EMISSIVE skips additive). ALPHA_TEST is reserved for real cutouts and is not inferred from low confidence.
 
 Enable:
 
@@ -59,7 +59,7 @@ exec vulkan_overlay_visibility_2027.cfg
 vid_restart
 ```
 
-Demo: `exec demo_visibility_2027.cfg`. Console: `visibility_buffer_status`, `renderer_status`.
+Demo: `exec demo_visibility_2027.cfg`. The overlay keeps `r_deferredMaterialClassify 0` by default; enable it manually only when validating the experimental deferred consumer. Console: `visibility_buffer_status`, `renderer_status`.
 
 **Phase 1 encoding note:** fill is depth-derived (tile draw id + depth prim proxy + intra-tile bary). True `gl_PrimitiveID` / instance MRT export is a follow-up; Neural/Hybrid1 consumers still read the classic G-buffer.
 

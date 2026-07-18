@@ -45,12 +45,12 @@ void main() {
 
 	vec2 uv = ( vec2( pix ) + 0.5 ) / vec2( pc.extent );
 	float depth = texture( depthTex, uv ).r;
-	vec4 fallbackMaterial = vec4( clamp( pc.materialParams.x, 0.0, 1.0 ),
+	vec4 baseMaterial = vec4( clamp( pc.materialParams.x, 0.0, 1.0 ),
 		clamp( pc.materialParams.y, 0.04, 1.0 ), 1.0, 0.0 );
 
 	if ( !validDepth( depth ) ) {
 		imageStore( normalOut, ivec2( pix ), vec4( 0.0, 0.0, 1.0, 0.0 ) );
-		imageStore( materialOut, ivec2( pix ), fallbackMaterial );
+		imageStore( materialOut, ivec2( pix ), baseMaterial );
 		return;
 	}
 
@@ -89,5 +89,6 @@ void main() {
 	}
 
 	imageStore( normalOut, ivec2( pix ), vec4( n, confidence ) );
-	imageStore( materialOut, ivec2( pix ), fallbackMaterial );
+	/* material.a = sourceConfidence (same signal as normal.a) for classify. */
+	imageStore( materialOut, ivec2( pix ), vec4( baseMaterial.rgb, confidence ) );
 }

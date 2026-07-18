@@ -143,10 +143,9 @@ void main() {
 			imageStore( outLit, ivec2( pix ), vec4( 0.0 ) );
 			return;
 		}
-		/* Alpha-tested cutouts: skip deferred dynamics (base pass already shaded / unstable edges). */
+		/* ALPHA_TEST: stub has no reliable cutout signal yet — shade as opaque. */
 		if ( matClass == CLASS_ALPHA_TEST ) {
-			imageStore( outLit, ivec2( pix ), vec4( 0.0 ) );
-			return;
+			matClass = CLASS_SIMPLE_OPAQUE;
 		}
 		/* Emissive: dynamics already in unlit base; skip additive to avoid double-bright. */
 		if ( matClass == CLASS_EMISSIVE && pc.additive != 0u ) {

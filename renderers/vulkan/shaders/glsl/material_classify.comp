@@ -4,6 +4,9 @@
  * Compute material classification stub (Phase 1).
  * Reads G-buffer material (metalness, roughness, AO, confidence) + depth.
  * Writes R8UI class IDs — see vk_visibility_buffer.h VK_MATCLASS_*.
+ *
+ * Low confidence is NOT mapped to ALPHA_TEST (no real cutout signal yet);
+ * invalid depth → EMPTY; everything else defaults to SIMPLE_OPAQUE.
  */
 
 layout(local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
@@ -23,7 +26,7 @@ const uint CLASS_SIMPLE_OPAQUE = 1u;
 const uint CLASS_LAYERED = 2u;
 const uint CLASS_TRANSMISSION = 3u;
 const uint CLASS_EMISSIVE = 4u;
-const uint CLASS_ALPHA_TEST = 5u;
+/* CLASS_ALPHA_TEST = 5 reserved for real cutout signals (not inferred from confidence). */
 /* CLASS_TRANSPARENT_FWD = 6 reserved for Forward+ path (not written here). */
 
 bool validDepth( float depth ) {
@@ -50,14 +53,15 @@ void main() {
 		vec4 mat = texture( materialTex, uv );
 		float metal = mat.r;
 		float rough = mat.g;
-		float confidence = mat.a;
-		if ( confidence < 0.35 ) {
-			cls = CLASS_ALPHA_TEST;
-		} else if ( metal > 0.55 ) {
+		/* Confidence reserved for future soft weighting; do not remap to ALPHA_TEST. */
+		if ( metal > 0.55 ) {
 			cls = CLASS_LAYERED;
 		} else if ( metal < 0.12 && rough < 0.18 ) {
 			cls = CLASS_TRANSMISSION;
-		} else if ( rough > 0.92 && metal < 0.05 ) {
+		}
+		/* EMISSIVE only when metalness is near-zero and roughness is extremely high
+		 * AND material alpha confidence is high (avoids false-positive black-outs). */
+		else if ( rough > 0.98 && metal < 0.02 && mat.a > 0.85 ) {
 			cls = CLASS_EMISSIVE;
 		}
 	}

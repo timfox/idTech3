@@ -2736,12 +2736,12 @@ static void R_Register( void )
 	ri.Cvar_SetDescription( r_deferredNormalEdgeThreshold,
 		"View-space depth delta threshold for deferred normal reconstruction. Lower values reject silhouette-crossing neighbors more aggressively." );
 	ri.Cvar_SetGroup( r_deferredNormalEdgeThreshold, CVG_RENDERER );
-	r_deferredMaterialClassify = ri.Cvar_Get( "r_deferredMaterialClassify", "1", CVAR_ARCHIVE_ND );
+	r_deferredMaterialClassify = ri.Cvar_Get( "r_deferredMaterialClassify", "0", CVAR_ARCHIVE_ND );
 	ri.Cvar_CheckRange( r_deferredMaterialClassify, "0", "1", CV_INTEGER );
 	ri.Cvar_SetDescription( r_deferredMaterialClassify,
-		"When r_materialClassify 1 and visibility class map is filled: deferred lighting uses class IDs "
-		"(skip EMPTY/ALPHA_TEST/emissive-additive; boost LAYERED spec; soften TRANSMISSION). "
-		"Requires r_visibilityBuffer + r_visibilityBufferFill. See docs/RENDERER_2027.md." );
+		"Experimental: when r_materialClassify 1 and visibility class map is filled, deferred lighting uses class IDs "
+		"(EMPTY=sky skip; LAYERED/TRANSMISSION tune; EMISSIVE skips additive). Default 0 — enable via "
+		"vulkan_overlay_visibility_2027.cfg. Requires r_visibilityBuffer + r_visibilityBufferFill. See docs/RENDERER_2027.md." );
 	ri.Cvar_SetGroup( r_deferredMaterialClassify, CVG_RENDERER );
 	if ( r_deferredMaterialClassify && r_deferredMaterialClassify->integer ) {
 		ri.Printf( PRINT_ALL, "[VK][deferred] r_deferredMaterialClassify=1 (class map drives deferred dispatch when classify fill is on)\n" );

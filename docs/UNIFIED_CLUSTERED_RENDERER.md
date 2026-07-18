@@ -38,7 +38,7 @@ Console: `renderer_status` prints a `unified` row when mode 3 is active.
 
 Depth is **not** cleared between deferred composite and transparent draws.
 
-Deferred lighting transforms direct-export **world** normals to view space, and can consume the material class map (`r_deferredMaterialClassify` + `r_materialClassify`) — see [RENDERER_2027.md](RENDERER_2027.md).
+Deferred lighting transforms direct-export **world** normals to view space, and can optionally consume the material class map (`r_deferredMaterialClassify` default 0 + `r_materialClassify`) — see [RENDERER_2027.md](RENDERER_2027.md).
 
 ## OIT note
 
