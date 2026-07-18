@@ -48,6 +48,11 @@ const char *vk_post_fog_source_name( VkImageView color_source )
 	return "unknown_view";
 }
 
+static qboolean vk_post_fog_source_is_viable( VkImageView color_source )
+{
+	return color_source != VK_NULL_HANDLE && vk_post_fog_source_image( color_source ) != VK_NULL_HANDLE;
+}
+
 static void vk_write_color_descriptor_image( VkDescriptorSet descriptor, VkImageView color_view )
 {
 	VkDescriptorImageInfo info;
@@ -249,20 +254,15 @@ void vk_log_post_fog_rebind( const char *reason, VkImageView color_source )
 	}
 }
 
-void vk_set_scene_post_fog_source( VkImageView color_source )
-{
-	vk.scene_post_fog_color_source = color_source ? color_source : vk.color_image_view;
-}
-
 static VkImageView vk_choose_post_fog_fallback_source( const char *reason )
 {
 	VkImageView fallback = VK_NULL_HANDLE;
 
-	if ( vk.scene_post_fog_color_source != VK_NULL_HANDLE ) {
+	if ( vk_post_fog_source_is_viable( vk.scene_post_fog_color_source ) ) {
 		fallback = vk.scene_post_fog_color_source;
-	} else if ( vk.post_fog_color_source != VK_NULL_HANDLE ) {
+	} else if ( vk_post_fog_source_is_viable( vk.post_fog_color_source ) ) {
 		fallback = vk.post_fog_color_source;
-	} else {
+	} else if ( vk_post_fog_source_is_viable( vk.color_image_view ) ) {
 		fallback = vk.color_image_view;
 	}
 
@@ -276,12 +276,21 @@ static VkImageView vk_choose_post_fog_fallback_source( const char *reason )
 	return fallback;
 }
 
+void vk_set_scene_post_fog_source( VkImageView color_source )
+{
+	if ( !vk_post_fog_source_is_viable( color_source ) ) {
+		color_source = vk_choose_post_fog_fallback_source( "set_scene_post_fog_source" );
+	}
+
+	vk.scene_post_fog_color_source = color_source;
+}
+
 void vk_update_post_fog_descriptors( VkImageView color_source )
 {
 	VkImageView old_source;
 	qboolean updated_luminance = qfalse;
 
-	if ( color_source == VK_NULL_HANDLE ) {
+	if ( !vk_post_fog_source_is_viable( color_source ) ) {
 		color_source = vk_choose_post_fog_fallback_source( "update_post_fog_descriptors" );
 	}
 
@@ -311,16 +320,16 @@ void vk_validate_post_fog_runtime_sources( const char *reason )
 	VkImageView defaultSource = vk.color_image_view;
 	qboolean changed = qfalse;
 
-	if ( defaultSource != VK_NULL_HANDLE && vk_post_fog_source_image( defaultSource ) == VK_NULL_HANDLE ) {
+	if ( !vk_post_fog_source_is_viable( defaultSource ) ) {
 		defaultSource = VK_NULL_HANDLE;
 	}
 
-	if ( repairedPostFog == VK_NULL_HANDLE || vk_post_fog_source_image( repairedPostFog ) == VK_NULL_HANDLE ) {
+	if ( !vk_post_fog_source_is_viable( repairedPostFog ) ) {
 		repairedPostFog = defaultSource;
 		changed = qtrue;
 	}
 
-	if ( repairedScene == VK_NULL_HANDLE || vk_post_fog_source_image( repairedScene ) == VK_NULL_HANDLE ) {
+	if ( !vk_post_fog_source_is_viable( repairedScene ) ) {
 		repairedScene = repairedPostFog != VK_NULL_HANDLE ? repairedPostFog : defaultSource;
 		changed = qtrue;
 	}
@@ -349,7 +358,9 @@ void vk_validate_post_fog_runtime_sources( const char *reason )
  */
 VkImageView vk_get_post_fog_source( void )
 {
-	if ( vk.post_fog_color_source != VK_NULL_HANDLE ) {
+	vk_validate_post_fog_runtime_sources( "get_post_fog_source" );
+
+	if ( vk_post_fog_source_is_viable( vk.post_fog_color_source ) ) {
 		return vk.post_fog_color_source;
 	}
 	return vk_choose_post_fog_fallback_source( "get_post_fog_source" );
@@ -357,10 +368,12 @@ VkImageView vk_get_post_fog_source( void )
 
 VkImageView vk_get_luminance_source( void )
 {
-	if ( vk.scene_post_fog_color_source != VK_NULL_HANDLE ) {
+	vk_validate_post_fog_runtime_sources( "get_luminance_source" );
+
+	if ( vk_post_fog_source_is_viable( vk.scene_post_fog_color_source ) ) {
 		return vk.scene_post_fog_color_source;
 	}
-	if ( vk.post_fog_color_source != VK_NULL_HANDLE ) {
+	if ( vk_post_fog_source_is_viable( vk.post_fog_color_source ) ) {
 		return vk.post_fog_color_source;
 	}
 	return vk_choose_post_fog_fallback_source( "get_luminance_source" );

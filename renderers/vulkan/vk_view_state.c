@@ -79,11 +79,52 @@ void vk_reset_scene_src_rect_tracking( void )
 
 qboolean vk_get_scene_src_rect( VkRect2D *out_rect )
 {
+	uint32_t maxW;
+	uint32_t maxH;
+	VkRect2D validated;
+
 	if ( !out_rect || !vk_scene_src_rect_valid ) {
 		return qfalse;
 	}
 
-	*out_rect = vk_scene_src_rect;
+	maxW = ( glConfig.vidWidth > 0 ) ? (uint32_t)glConfig.vidWidth : vk_get_render_target_width();
+	maxH = ( glConfig.vidHeight > 0 ) ? (uint32_t)glConfig.vidHeight : vk_get_render_target_height();
+	if ( maxW == 0u || maxH == 0u ) {
+		vk_scene_src_rect_valid = qfalse;
+		return qfalse;
+	}
+
+	validated = vk_scene_src_rect;
+	if ( validated.offset.x < 0 ) {
+		int32_t dx = -validated.offset.x;
+		validated.offset.x = 0;
+		validated.extent.width = ( validated.extent.width > (uint32_t)dx ) ?
+			( validated.extent.width - (uint32_t)dx ) : 0u;
+	}
+	if ( validated.offset.y < 0 ) {
+		int32_t dy = -validated.offset.y;
+		validated.offset.y = 0;
+		validated.extent.height = ( validated.extent.height > (uint32_t)dy ) ?
+			( validated.extent.height - (uint32_t)dy ) : 0u;
+	}
+	if ( (uint32_t)validated.offset.x >= maxW || (uint32_t)validated.offset.y >= maxH ||
+		validated.extent.width == 0u || validated.extent.height == 0u ) {
+		vk_scene_src_rect_valid = qfalse;
+		return qfalse;
+	}
+	if ( (uint32_t)validated.offset.x + validated.extent.width > maxW ) {
+		validated.extent.width = maxW - (uint32_t)validated.offset.x;
+	}
+	if ( (uint32_t)validated.offset.y + validated.extent.height > maxH ) {
+		validated.extent.height = maxH - (uint32_t)validated.offset.y;
+	}
+	if ( validated.extent.width == 0u || validated.extent.height == 0u ) {
+		vk_scene_src_rect_valid = qfalse;
+		return qfalse;
+	}
+
+	vk_scene_src_rect = validated;
+	*out_rect = validated;
 	return qtrue;
 }
 
