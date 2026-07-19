@@ -591,6 +591,8 @@ void vk_end_frame_record_taa_pass( VkImageView *post_fog_src, VkImageView *lumin
 				*luminance_src = *post_fog_src;
 			}
 		}
+		/* Even if TAA was skipped, flush any deferred weapon onto the HDR source. */
+		RB_FlushDeferredWeaponAfterTaa( post_fog_src, luminance_src );
 		return;
 	}
 
@@ -645,6 +647,9 @@ void vk_end_frame_record_taa_pass( VkImageView *post_fog_src, VkImageView *lumin
 			*luminance_src = *post_fog_src;
 		}
 	}
+
+	/* Weapon/view-model after world TAA — never contaminate history. */
+	RB_FlushDeferredWeaponAfterTaa( post_fog_src, luminance_src );
 }
 
 void vk_end_frame_record_luminance_pass( VkImageView luminance_src )

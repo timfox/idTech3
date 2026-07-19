@@ -169,8 +169,8 @@ void main() {
 	float depthConf = 1.0;
 	if ( useDisocc > 0.5 ) {
 		float depthDelta = abs( depthNdc - histDepth );
-		/* Reversed-Z: larger = nearer; relative mismatch rejects. */
-		depthConf = 1.0 - smoothstep( 0.002, 0.04, depthDelta );
+		/* Reversed-Z: larger = nearer; relative mismatch rejects immediately. */
+		depthConf = 1.0 - smoothstep( 0.001, 0.025, depthDelta );
 	}
 
 	float velocityConf = 1.0 - smoothstep( 4.0, 24.0, motionLen );
@@ -182,24 +182,67 @@ void main() {
 	float lumaConf = 1.0 - smoothstep( 0.04, 0.35, lumaDiff );
 
 	/* Reactive: near-camera weapon/HUD-ish depth, fast motion, large luma change,
-	 * plus stamped transparent/OIT/stochastic coverage when maskBound (midsGamma.a). */
+	 * stamped transparent/OIT/stochastic coverage, and invalid motion vectors.
+	 * Prefer current-frame noise over long trails. */
 	float reactive = 0.0;
 	if ( useReactive > 0.5 ) {
-		float nearWeapon = smoothstep( 0.92, 0.995, depthNdc ); /* near in reversed-Z */
-		float fastMotion = smoothstep( 6.0, 20.0, motionLen );
-		float flash = smoothstep( 0.15, 0.5, lumaDiff );
-		reactive = clamp( max( nearWeapon, max( fastMotion * 0.75, flash ) ), 0.0, 1.0 );
+		float nearWeapon = smoothstep( 0.90, 0.998, depthNdc ); /* near in reversed-Z */
+		float fastMotion = smoothstep( 4.0, 16.0, motionLen );
+		float flash = smoothstep( 0.10, 0.40, lumaDiff );
+		reactive = clamp( max( nearWeapon, max( fastMotion * 0.85, flash ) ), 0.0, 1.0 );
+		if ( !mvValid && postfx.depthParams.z > 0.5 ) {
+			reactive = max( reactive, 0.85 );
+		}
 		if ( postfx.midsGamma.a > 0.5 ) {
 			float stamped = textureLod( reactiveMaskTex, sampleUV, 0.0 ).r;
-			reactive = max( reactive, clamp( stamped, 0.0, 1.0 ) );
+			/* Any meaningful transparent/OIT stamp fully prefers current. */
+			if ( stamped > 0.02 ) {
+				reactive = max( reactive, max( stamped, 0.95 ) );
+			}
 		}
 	}
 	float reactiveConf = 1.0 - reactive;
 
 	float confidence = clamp( depthConf * velocityConf * lumaConf * reactiveConf, 0.0, 1.0 );
+	/* Hard reject when reactive is high — do not blend a fixed global weight. */
+	if ( reactive > 0.90 ) {
+		confidence = 0.0;
+	}
 
 	if ( debugMode > 1.5 ) {
-		/* Rejection reason viz */
+		/* Rejection reason / ownership viz (r_debugHistoryRejection / r_temporalDebugView). */
+		float dbg = debugMode;
+		if ( dbg > 2.5 && dbg < 3.5 ) {
+			/* 3 = reactive mask */
+			out_color = vec4( reactive, reactive * 0.35, 1.0 - reactive, 1.0 );
+			return;
+		}
+		if ( dbg > 3.5 && dbg < 4.5 ) {
+			/* 4 = history weight / confidence */
+			out_color = vec4( confidence, confidence, confidence, 1.0 );
+			return;
+		}
+		if ( dbg > 4.5 && dbg < 5.5 ) {
+			/* 5 = disocclusion (1 - depthConf) */
+			out_color = vec4( 1.0 - depthConf, 0.2, 0.2, 1.0 );
+			return;
+		}
+		if ( dbg > 5.5 && dbg < 6.5 ) {
+			/* 6 = reprojected history UV */
+			out_color = vec4( historyUV, 0.0, 1.0 );
+			return;
+		}
+		if ( dbg > 6.5 && dbg < 7.5 ) {
+			/* 7 = near-weapon heuristic mask */
+			float nearWeapon = smoothstep( 0.90, 0.998, depthNdc );
+			out_color = vec4( nearWeapon, 0.15, 0.15, 1.0 );
+			return;
+		}
+		if ( dbg > 7.5 && dbg < 8.5 ) {
+			/* 8 = world vs reactive ownership */
+			out_color = vec4( reactive > 0.5 ? vec3( 1.0, 0.85, 0.1 ) : vec3( 0.15, 0.35, 1.0 ), 1.0 );
+			return;
+		}
 		if ( reactive > 0.55 ) {
 			out_color = vec4( 1.0, 1.0, 0.0, 1.0 ); /* yellow reactive */
 			return;

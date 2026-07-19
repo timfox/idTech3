@@ -627,6 +627,50 @@ else
 fi
 
 echo ""
+echo "Weapon-after-TAA temporal ownership:"
+VK_TEMP_C="$PROJECT_ROOT/renderers/vulkan/vk_temporal.c"
+VK_BACKEND="$PROJECT_ROOT/renderers/vulkan/tr_backend.c"
+VK_FRAME_END="$PROJECT_ROOT/renderers/vulkan/vk_frame_end.c"
+if ! grep -q 'vk_temporal_want_weapon_after_taa' "$VK_TEMP_C" 2>/dev/null; then
+  fail "vk_temporal.c missing vk_temporal_want_weapon_after_taa"
+elif ! grep -q 'RB_TryDeferWeaponDrawSurfs' "$VK_BACKEND" 2>/dev/null; then
+  fail "tr_backend.c missing RB_TryDeferWeaponDrawSurfs"
+elif ! grep -q 'RB_FlushDeferredWeaponAfterTaa' "$VK_BACKEND" 2>/dev/null; then
+  fail "tr_backend.c missing RB_FlushDeferredWeaponAfterTaa"
+elif ! grep -q 'RB_FlushDeferredWeaponAfterTaa' "$VK_FRAME_END" 2>/dev/null; then
+  fail "vk_frame_end.c missing weapon flush after TAA"
+elif ! grep -q 'r_temporalWeaponAfterTaa' "$PROJECT_ROOT/renderers/vulkan/vk_aa_policy.c" 2>/dev/null; then
+  fail "vk_aa_policy.c missing r_temporalWeaponAfterTaa registration"
+elif ! grep -q 'stochMode >= 2 && !vk_temporal_reconstruction_wanted' "$PROJECT_ROOT/renderers/vulkan/vk_view_state.c" 2>/dev/null; then
+  fail "vk_view_state.c missing stochastic mode-2 fallback when TAA off"
+elif ! grep -q 'reactive > 0.90' "$TAA_FRAG" 2>/dev/null; then
+  fail "taa.frag missing hard reactive history reject"
+else
+  pass "Weapon-after-TAA + stochastic TAA-off fallback + reactive hard reject"
+fi
+
+echo ""
+echo "OIT resolve math + reversed-Z depth:"
+OIT_RESOLVE="$PROJECT_ROOT/renderers/vulkan/shaders/glsl/oit_resolve.frag"
+OIT_PIPE="$PROJECT_ROOT/renderers/vulkan/vk_pipeline_helpers.c"
+if [[ ! -f "$OIT_RESOLVE" ]]; then
+  fail "oit_resolve.frag missing"
+elif ! grep -q 'c_avg \* coverage + opaque \* revealage' "$OIT_RESOLVE" 2>/dev/null; then
+  fail "oit_resolve.frag missing McGuire composite C_avg*(1-R)+C_bg*R"
+elif grep -qE 'oit_result \+ opaque \* revealage|accum\.rgb / max\(accum\.a.*, 1e-5\);\s*out_color = vec4\(oit_result \+ opaque' "$OIT_RESOLVE" 2>/dev/null; then
+  fail "oit_resolve.frag still uses broken C_avg + C_bg*R (missing coverage scale)"
+elif ! grep -q 'VK_COMPARE_OP_GREATER_OR_EQUAL' "$OIT_PIPE" 2>/dev/null; then
+  fail "vk_pipeline_helpers.c OIT depth missing reversed-Z GREATER_OR_EQUAL"
+elif grep -q 'oit_accum.*LESS_OR_EQUAL\|depthCompareOp = VK_COMPARE_OP_LESS_OR_EQUAL' "$OIT_PIPE" 2>/dev/null; then
+  # Allow LESS only if not in OIT pipelines — flag if any LESS remains in this helper file's OIT section.
+  if grep -n 'depthCompareOp = VK_COMPARE_OP_LESS_OR_EQUAL' "$OIT_PIPE" 2>/dev/null | grep -q .; then
+    fail "vk_pipeline_helpers.c still has LESS_OR_EQUAL depth (OIT must match reversed-Z)"
+  fi
+else
+  pass "OIT: McGuire resolve + reversed-Z GREATER_OR_EQUAL depth"
+fi
+
+echo ""
 echo "RTX demo: invViewProj uses Vulkan projection + render-target extent:"
 RTX_C="$PROJECT_ROOT/renderers/vulkan/extensions/rtx/vk_rtx.c"
 if [[ ! -f "$RTX_C" ]]; then

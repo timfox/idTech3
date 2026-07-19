@@ -1644,6 +1644,7 @@ extern cvar_t	*r_temporalHistoryWeight;
 extern cvar_t	*r_temporalVarianceClip;
 extern cvar_t	*r_temporalDisocclusion;
 extern cvar_t	*r_temporalReactiveMask;
+extern cvar_t	*r_temporalWeaponAfterTaa;
 extern cvar_t	*r_temporalSmaaCleanup;
 extern cvar_t	*r_debugMotionVectors;
 extern cvar_t	*r_debugHistoryRejection;
@@ -2566,6 +2567,12 @@ typedef struct drawSurfsCommand_s {
 	drawSurf_t *drawSurfs;
 	int		numDrawSurfs;
 } drawSurfsCommand_t;
+
+#ifdef USE_VULKAN
+/* Defer first-person weapon until after world Temporal Reconstruction. */
+qboolean RB_TryDeferWeaponDrawSurfs( const drawSurfsCommand_t *cmd );
+void RB_FlushDeferredWeaponAfterTaa( VkImageView *post_fog_src, VkImageView *luminance_src );
+#endif
 
 typedef struct
 {

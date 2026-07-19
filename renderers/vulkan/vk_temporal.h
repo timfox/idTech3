@@ -56,6 +56,13 @@ qboolean vk_temporal_has_reason( uint32_t reasonMask );
 /* True when r_volumetricFogSkipStatic and view has been near-static ~0.5s (death cam). */
 qboolean vk_temporal_near_static_streak_guard( void );
 
+/* World Temporal Reconstruction is active this frame (r_taa / aaMode / upscale). */
+qboolean vk_temporal_reconstruction_wanted( void );
+/* Defer RDF_NOWORLDMODEL weapon draws until after world TAA. */
+qboolean vk_temporal_want_weapon_after_taa( void );
+qboolean vk_temporal_defer_weapon_drawsurfs( const void *drawSurfsCmd );
+void vk_temporal_flush_deferred_weapon_after_taa( VkImageView *post_fog_src, VkImageView *luminance_src );
+
 void vk_reset_motion_history( void );
 void vk_reset_taa_history( void );
 void vk_reset_volumetric_history( void );

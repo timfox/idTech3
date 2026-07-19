@@ -169,11 +169,12 @@ void vk_update_postfx_params( uint32_t cmd_index )
 	params.colorGrade2[3] = ( r_temporalReactiveMask && r_temporalReactiveMask->integer ) ? 1.0f : 0.0f;
 	params.midsGamma[3] = ( r_temporalReactiveMask && r_temporalReactiveMask->integer &&
 		vk.reactive_mask_view != VK_NULL_HANDLE ) ? 1.0f : 0.0f;
+	/* shadowsLift.a → TAA debugMode: 1=MV, 2=reject reasons, 3–8 ownership viz. */
 	params.shadowsLift[3] = 0.0f;
 	if ( r_debugMotionVectors && r_debugMotionVectors->integer ) {
 		params.shadowsLift[3] = 1.0f;
-	} else if ( r_debugHistoryRejection && r_debugHistoryRejection->integer ) {
-		params.shadowsLift[3] = 2.0f;
+	} else if ( r_debugHistoryRejection && r_debugHistoryRejection->integer > 0 ) {
+		params.shadowsLift[3] = (float)r_debugHistoryRejection->integer;
 	}
 
 	if ( backEnd.projection2D || !tr.world || backEnd.viewParms.portalView != PV_NONE ) {

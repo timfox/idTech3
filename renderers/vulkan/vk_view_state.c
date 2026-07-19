@@ -563,9 +563,15 @@ void vk_update_mvp( const float *m )
 		}
 	}
 
-	/* Stochastic alpha-clipped materials: reserved[6]=mode, reserved[7]=frame seed. */
+	/* Stochastic alpha-clipped materials: reserved[6]=mode, reserved[7]=frame seed.
+	 * Mode 2 (temporal hash) requires Temporal Reconstruction; otherwise fall back to
+	 * screen-space hash (1) so coverage is not frozen without history. */
 	if ( r_stochasticAlpha && r_stochasticAlpha->integer > 0 ) {
-		push_constants.reserved[6] = (float)r_stochasticAlpha->integer;
+		int stochMode = r_stochasticAlpha->integer;
+		if ( stochMode >= 2 && !vk_temporal_reconstruction_wanted() ) {
+			stochMode = 1;
+		}
+		push_constants.reserved[6] = (float)stochMode;
 		push_constants.reserved[7] = (float)( tr.frameCount & 1023 );
 	}
 	/* Visibility PrimID MRT: reserved[5] = monotonic draw id. */

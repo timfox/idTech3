@@ -42,7 +42,7 @@ Demo: `exec demo_oit_clustered.cfg`. See [UNIFIED_CLUSTERED_RENDERER.md](UNIFIED
 
 ### Temporal Reconstruction
 
-When `r_taa` / `r_aaMode` 4–5 is active, OIT revealage stamps a dedicated R8 **reactive mask** (not `oit_reveal` itself) so Temporal Reconstruction prefers the current frame on glass/smoke (`r_temporalReactiveMask 1`). Forward+ transparent and stochastic survivors also stamp via `gen_frag`. See [HDR_GAPS.md](HDR_GAPS.md) §6.8.
+When `r_taa` / `r_aaMode` 4–5 is active, OIT revealage stamps a dedicated R8 **reactive mask** (not `oit_reveal` itself) so Temporal Reconstruction prefers the current frame on glass/smoke (`r_temporalReactiveMask 1`). Forward+ transparent and stochastic survivors also stamp via `gen_frag`. Raw OIT accum/reveal are never temporally blended — resolve into HDR first. First-person weapons are deferred past world TAA (`r_temporalWeaponAfterTaa 1`). See [HDR_GAPS.md](HDR_GAPS.md) §6.8.
 
 ### Resolve equation (WBOIT / MBOIT accum)
 
@@ -63,14 +63,14 @@ Hashed / temporal alpha clip for **foliage, grates, hair cards, fabric holes, an
 |------|----------|
 | `0` | Hard `alphaFunc` discard (default) |
 | `1` | Screen-space interleaved gradient noise hash |
-| `2` | Temporal hash (frame-seeded; pair with `r_taa 1`) |
+| `2` | Temporal hash (frame-seeded; requires Temporal Reconstruction — auto-falls back to mode 1 when TAA is off) |
 
 ```
 seta r_stochasticAlpha 2
 seta r_taa 1
 ```
 
-No `vid_restart` required (push-constant driven). Applies to `GT0` / `LT128` / `GE128`.
+No `vid_restart` required (push-constant driven). Applies to `GT0` / `LT128` / `GE128`. If mode 2 is set while `r_taa` is off, the backend pushes mode 1 so coverage is not frozen without history.
 
 ## Related
 

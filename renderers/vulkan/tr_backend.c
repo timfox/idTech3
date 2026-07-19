@@ -45,6 +45,9 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "vk_scene_pass.h"
 #include "vk_reactive_mask.h"
 #include "vk_ambient_visibility.h"
+#include "vk_image_layout.h"
+#include "vk_post_fog.h"
+#include "vk_view_state.h"
 #endif
 
 backEndData_t	*backEndData;
@@ -1904,6 +1907,160 @@ void RB_RenderVolumetricShadowView( const viewParms_t *shadowViewParms, drawSurf
 #endif
 
 
+#ifdef USE_VULKAN
+static drawSurfsCommand_t s_deferredWeaponCmd;
+static qboolean s_deferredWeaponPending = qfalse;
+
+/*
+================
+RB_TryDeferWeaponDrawSurfs
+
+When Temporal Reconstruction is active, RDF_NOWORLDMODEL weapon/view-model
+draws must not write into the world color buffer that feeds TAA history.
+================
+*/
+qboolean RB_TryDeferWeaponDrawSurfs( const drawSurfsCommand_t *cmd )
+{
+	if ( !cmd ) {
+		return qfalse;
+	}
+	if ( !( cmd->refdef.rdflags & RDF_NOWORLDMODEL ) ) {
+		return qfalse;
+	}
+	if ( !backEnd.doneWorldScene ) {
+		return qfalse;
+	}
+	if ( !vk_temporal_want_weapon_after_taa() ) {
+		return qfalse;
+	}
+#ifdef VK_CUBEMAP
+	if ( cmd->viewParms.targetCube != NULL ) {
+		return qfalse;
+	}
+#endif
+
+	s_deferredWeaponCmd = *cmd;
+	s_deferredWeaponPending = qtrue;
+	backEnd.doneSurfaces = qtrue;
+	if ( r_temporalDebug && r_temporalDebug->integer ) {
+		ri.Printf( PRINT_DEVELOPER,
+			"[VK][temporal] deferred weapon/view-model until after world TAA (%d surfs)\n",
+			cmd->numDrawSurfs );
+	}
+	return qtrue;
+}
+
+static void RB_CopyHdrViewToColor( VkImageView srcView, uint32_t width, uint32_t height )
+{
+	VkImage srcImage;
+	VkImageCopy region;
+
+	if ( srcView == VK_NULL_HANDLE || srcView == vk.color_image_view ) {
+		return;
+	}
+	srcImage = vk_post_fog_source_image( srcView );
+	if ( srcImage == VK_NULL_HANDLE || srcImage == vk.color_image || vk.color_image == VK_NULL_HANDLE ) {
+		return;
+	}
+
+	Com_Memset( &region, 0, sizeof( region ) );
+	region.srcSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+	region.srcSubresource.layerCount = 1;
+	region.dstSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+	region.dstSubresource.layerCount = 1;
+	region.extent.width = width > 0 ? width : 1;
+	region.extent.height = height > 0 ? height : 1;
+	region.extent.depth = 1;
+
+	record_image_layout_transition( vk.cmd->command_buffer, srcImage, VK_IMAGE_ASPECT_COLOR_BIT,
+		VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+		VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT | VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+		VK_PIPELINE_STAGE_TRANSFER_BIT );
+	record_image_layout_transition( vk.cmd->command_buffer, vk.color_image, VK_IMAGE_ASPECT_COLOR_BIT,
+		VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+		VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT | VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+		VK_PIPELINE_STAGE_TRANSFER_BIT );
+	qvkCmdCopyImage( vk.cmd->command_buffer,
+		srcImage, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+		vk.color_image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+		1, &region );
+	record_image_layout_transition( vk.cmd->command_buffer, srcImage, VK_IMAGE_ASPECT_COLOR_BIT,
+		VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+		VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT );
+	record_image_layout_transition( vk.cmd->command_buffer, vk.color_image, VK_IMAGE_ASPECT_COLOR_BIT,
+		VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+		VK_PIPELINE_STAGE_TRANSFER_BIT,
+		VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT | VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT );
+}
+
+/*
+================
+RB_FlushDeferredWeaponAfterTaa
+
+Copies the resolved world HDR into color_image (if needed), then draws the
+deferred weapon/view-model after Temporal Reconstruction so it never enters
+world history.
+================
+*/
+void RB_FlushDeferredWeaponAfterTaa( VkImageView *post_fog_src, VkImageView *luminance_src )
+{
+	uint32_t width = 0;
+	uint32_t height = 0;
+	VkImageView src;
+
+	if ( !s_deferredWeaponPending ) {
+		return;
+	}
+	s_deferredWeaponPending = qfalse;
+
+	if ( !vk.fboActive || !vk.cmd || vk.cmd->command_buffer == VK_NULL_HANDLE ) {
+		return;
+	}
+
+	src = ( post_fog_src && *post_fog_src != VK_NULL_HANDLE ) ? *post_fog_src : vk.color_image_view;
+	vk_get_active_render_extent( &width, &height );
+	if ( width == 0 || height == 0 ) {
+		width = vk_get_render_target_width();
+		height = vk_get_render_target_height();
+	}
+
+	if ( vk.inRenderPass ) {
+		vk_end_render_pass();
+	}
+
+	RB_CopyHdrViewToColor( src, width, height );
+
+	backEnd.refdef = s_deferredWeaponCmd.refdef;
+	backEnd.viewParms = s_deferredWeaponCmd.viewParms;
+	backEnd.drawSurfFilter = 0;
+	backEnd.oitMomentsPass = qfalse;
+	backEnd.oitAccumPass = qfalse;
+	backEnd.reactiveMaskStamp = qfalse;
+	backEnd.projection2D = qfalse;
+
+	vk_begin_post_bloom_render_pass();
+	RB_BeginDrawingView();
+	RB_RenderDrawSurfList( s_deferredWeaponCmd.drawSurfs, s_deferredWeaponCmd.numDrawSurfs );
+	RB_EndSurface();
+	if ( vk.inRenderPass ) {
+		vk_end_render_pass();
+	}
+
+	if ( post_fog_src ) {
+		*post_fog_src = vk.color_image_view;
+	}
+	if ( luminance_src ) {
+		*luminance_src = vk.color_image_view;
+	}
+	vk_set_scene_post_fog_source( vk.color_image_view );
+	vk_set_post_chain_last_writer( "weapon_after_taa" );
+
+	if ( r_temporalDebug && r_temporalDebug->integer ) {
+		ri.Printf( PRINT_DEVELOPER, "[VK][temporal] flushed deferred weapon after TAA\n" );
+	}
+}
+#endif
+
 /*
 =============
 RB_DrawSurfs
@@ -1916,6 +2073,14 @@ static const void *RB_DrawSurfs( const void *data ) {
 	RB_EndSurface();
 
 	cmd = (const drawSurfsCommand_t *)data;
+
+#ifdef USE_VULKAN
+	/* First-person weapon: defer until after world Temporal Reconstruction so
+	 * weapon pixels never enter TAA history (dark offset silhouettes / trails). */
+	if ( RB_TryDeferWeaponDrawSurfs( cmd ) ) {
+		return (const void *)( cmd + 1 );
+	}
+#endif
 
 	backEnd.refdef = cmd->refdef;
 	backEnd.viewParms = cmd->viewParms;
@@ -2519,6 +2684,7 @@ static const void *RB_SwapBuffers( const void *data ) {
 	backEnd.doneBloom = qfalse;
 	backEnd.doneSSAO = qfalse;
 	backEnd.doneLensFlare = qfalse;
+	s_deferredWeaponPending = qfalse;
 #endif
 
 	return (const void *)(cmd + 1);

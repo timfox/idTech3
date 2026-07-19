@@ -223,6 +223,7 @@ static qboolean AV_CreateLayout( const VkDescriptorType *types, uint32_t count,
 static VkPipeline AV_CreateComputePipeline( VkShaderModule module, VkPipelineLayout layout, const char *name )
 {
 	VkComputePipelineCreateInfo ci;
+	VkPipeline pipeline = VK_NULL_HANDLE;
 	Com_Memset( &ci, 0, sizeof( ci ) );
 	ci.sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO;
 	ci.stage.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
@@ -230,9 +231,9 @@ static VkPipeline AV_CreateComputePipeline( VkShaderModule module, VkPipelineLay
 	ci.stage.module = module;
 	ci.stage.pName = "main";
 	ci.layout = layout;
-	VK_CHECK( qvkCreateComputePipelines( vk.device, vk.pipelineCache, 1, &ci, NULL, &ci.basePipelineHandle ) );
-	SET_OBJECT_NAME( ci.basePipelineHandle, name, VK_DEBUG_REPORT_OBJECT_TYPE_PIPELINE_EXT );
-	return ci.basePipelineHandle;
+	VK_CHECK( qvkCreateComputePipelines( vk.device, vk.pipelineCache, 1, &ci, NULL, &pipeline ) );
+	SET_OBJECT_NAME( pipeline, name, VK_DEBUG_REPORT_OBJECT_TYPE_PIPELINE_EXT );
+	return pipeline;
 }
 
 static void AV_DestroyPipelines( void )
@@ -333,14 +334,16 @@ static qboolean AV_CreatePipelines( void )
 static void AV_RegisterCvars( void )
 {
 	if ( r_ambientVisibilityMode ) return;
-	r_ambientVisibilityMode = ri.Cvar_Get( "r_ambientVisibilityMode", "2", CVAR_ARCHIVE_ND );
+	/* These three values change image extents. Latching them prevents a live cvar
+	 * edit from destroying images that an older command buffer can still sample. */
+	r_ambientVisibilityMode = ri.Cvar_Get( "r_ambientVisibilityMode", "2", CVAR_ARCHIVE_ND | CVAR_LATCH );
 	r_ambientVisibilityStrength = ri.Cvar_Get( "r_ambientVisibilityStrength", "1", CVAR_ARCHIVE_ND );
 	r_rtaoRaysPerPixel = ri.Cvar_Get( "r_rtaoRaysPerPixel", "1", CVAR_ARCHIVE_ND );
 	r_rtaoRadius = ri.Cvar_Get( "r_rtaoRadius", "96", CVAR_ARCHIVE_ND );
 	r_rtaoMinRadius = ri.Cvar_Get( "r_rtaoMinRadius", "12", CVAR_ARCHIVE_ND );
 	r_rtaoRayBias = ri.Cvar_Get( "r_rtaoRayBias", "0.02", CVAR_ARCHIVE_ND );
 	r_rtaoNormalBias = ri.Cvar_Get( "r_rtaoNormalBias", "0.05", CVAR_ARCHIVE_ND );
-	r_rtaoResolutionScale = ri.Cvar_Get( "r_rtaoResolutionScale", "0.5", CVAR_ARCHIVE_ND );
+	r_rtaoResolutionScale = ri.Cvar_Get( "r_rtaoResolutionScale", "0.5", CVAR_ARCHIVE_ND | CVAR_LATCH );
 	r_rtaoContactVisibility = ri.Cvar_Get( "r_rtaoContactVisibility", "1", CVAR_ARCHIVE_ND );
 	r_rtaoTemporal = ri.Cvar_Get( "r_rtaoTemporal", "1", CVAR_ARCHIVE_ND );
 	r_rtaoSpatialFilter = ri.Cvar_Get( "r_rtaoSpatialFilter", "1", CVAR_ARCHIVE_ND );
@@ -351,7 +354,7 @@ static void AV_RegisterCvars( void )
 	r_gtaoSlices = ri.Cvar_Get( "r_gtaoSlices", "4", CVAR_ARCHIVE_ND );
 	r_gtaoSteps = ri.Cvar_Get( "r_gtaoSteps", "6", CVAR_ARCHIVE_ND );
 	r_gtaoThickness = ri.Cvar_Get( "r_gtaoThickness", "2", CVAR_ARCHIVE_ND );
-	r_gtaoHalfRes = ri.Cvar_Get( "r_gtaoHalfRes", "0", CVAR_ARCHIVE_ND );
+	r_gtaoHalfRes = ri.Cvar_Get( "r_gtaoHalfRes", "0", CVAR_ARCHIVE_ND | CVAR_LATCH );
 	ri.Cvar_CheckRange( r_ambientVisibilityMode, "0", "5", CV_INTEGER );
 	ri.Cvar_CheckRange( r_ambientVisibilityStrength, "0", "1", CV_FLOAT );
 	ri.Cvar_CheckRange( r_rtaoRaysPerPixel, "1", "8", CV_INTEGER );
@@ -384,7 +387,8 @@ static void AV_Status_f( void )
 	ri.Printf( PRINT_ALL,
 		"[AV] rayQuery=%d TLAS=%s (%s) memory~%.2f MiB timings raw=%.3f temporal=%.3f filter=%.3f total=%.3f ms\n",
 		AV_RayQueryAvailable(), tlasMode, tlasReason,
-		(double)av.traceWidth * av.traceHeight * 8.0 * 12.0 / ( 1024.0 * 1024.0 ),
+		( (double)av.traceWidth * av.traceHeight * 8.0 * 11.0 +
+		  (double)av.width * av.height * 8.0 * 2.0 ) / ( 1024.0 * 1024.0 ),
 		av.timings[0], av.timings[1], av.timings[2], av.timings[3] );
 }
 
@@ -595,7 +599,7 @@ void vk_ambient_visibility_apply_after_geometry( void )
 	if ( vk_pathtrace_active() ) {
 		static qboolean warned;
 		if ( !warned ) {
-			ri.Printf( PRINT_WARNING, "[AV] full path tracing disables standalone ambient-visibility darkening; output remains a debug/denoiser feature\n" );
+			ri.Printf( PRINT_WARNING, "[AV] full path tracing disables standalone ambient visibility to avoid double-darkening traced transport\n" );
 			warned = qtrue;
 		}
 		return;
@@ -624,12 +628,18 @@ void vk_ambient_visibility_apply_after_geometry( void )
 	depthView = vk.depth_image_view_sample ? vk.depth_image_view_sample : vk.depth_image_view;
 	normalView = vk.deferred_gbuffer_normal_view ? vk.deferred_gbuffer_normal_view : tr.whiteImage->view;
 	classView = vk.visibility_buffer_class_view ? vk.visibility_buffer_class_view : vk.deferred_class_stub_view;
-	if ( !classView ) classView = tr.whiteImage->view;
 	motionView = vk.motion_vector_view ? vk.motion_vector_view : tr.whiteImage->view;
 	AV_FillView( invView, projInfo, &normalsAreWorld );
 	if ( av.queryPool && qvkCmdResetQueryPool )
 		qvkCmdResetQueryPool( cmd, av.queryPool, vk.cmd_index * AV_QUERY_COUNT, AV_QUERY_COUNT );
 	AV_WriteTimestamp( cmd, AV_QUERY_RAW_BEGIN );
+
+	/* Every statically declared sampled descriptor must name an image in the
+	 * advertised layout even when its debug/Hybrid branch is dynamically unused. */
+	AV_Transition( cmd, &av.gtao, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL );
+	AV_Transition( cmd, &av.gtaoAux, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL );
+	AV_Transition( cmd, &av.reference, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL );
+	AV_Transition( cmd, &av.referenceAux, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL );
 
 	/* GTAO production/fallback and hybrid current-frame assistance. */
 	if ( effectiveMode == 2u || effectiveMode == 4u ) {
@@ -695,7 +705,13 @@ void vk_ambient_visibility_apply_after_geometry( void )
 	}
 	AV_WriteTimestamp( cmd, AV_QUERY_RAW_END );
 
-	if ( mode == 5u ) { current = &av.reference; currentAux = &av.referenceAux; finalImage = &av.reference; }
+	if ( mode == 5u ) {
+		current = &av.reference; currentAux = &av.referenceAux; finalImage = &av.reference;
+		/* Preserve the fixed timestamp topology when temporal/filtering are
+		 * intentionally bypassed by Reference AO. */
+		AV_WriteTimestamp( cmd, AV_QUERY_TEMPORAL_END );
+		AV_WriteTimestamp( cmd, AV_QUERY_FILTER_END );
+	}
 	else {
 		current = effectiveMode == 2u ? &av.gtao : &av.raw;
 		currentAux = effectiveMode == 2u ? &av.gtaoAux : &av.rawAux;
@@ -763,7 +779,8 @@ void vk_ambient_visibility_apply_after_geometry( void )
 
 	/* Apply only before deferred dynamic lighting. Forward+/OIT/weapon views keep the
 	 * directional output available but do not sample opaque-depth AO incorrectly. */
-	if ( vk_deferred_lighting_active() && vk.color_format == VK_FORMAT_R16G16B16A16_SFLOAT ) {
+	if ( vk_deferred_lighting_active() && classView &&
+		vk.color_format == VK_FORMAT_R16G16B16A16_SFLOAT ) {
 		AV_ImageWrite( &writes[0], &infos[0], av.compositeSet, 0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, linear, finalImage->view, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL );
 		AV_ImageWrite( &writes[1], &infos[1], av.compositeSet, 1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, nearest, currentAux->view, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL );
 		AV_ImageWrite( &writes[2], &infos[2], av.compositeSet, 2, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, linear, av.gtao.view, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL );

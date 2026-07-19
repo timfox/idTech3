@@ -4,6 +4,7 @@
 #include "vk_util.h"
 #include "vk_view_state.h"
 #include "vk_ambient_visibility.h"
+#include "vk_upscale.h"
 #include <math.h>
 
 float vk_prev_view_matrix[16];
@@ -469,4 +470,32 @@ void vk_temporal_update_auto_exposure( void )
 		vk.adaptedExposure += ( targetExp - vk.adaptedExposure ) * speed;
 		vk.adaptedExposure = ( vk.adaptedExposure < minExposure ) ? minExposure : ( vk.adaptedExposure > maxExposure ? maxExposure : vk.adaptedExposure );
 	}
+}
+
+qboolean vk_temporal_reconstruction_wanted( void )
+{
+	if ( !vk.fboActive ) {
+		return qfalse;
+	}
+	if ( r_taa && r_taa->integer ) {
+		return qtrue;
+	}
+	if ( R_Upscale_WantTemporal() ) {
+		return qtrue;
+	}
+	if ( r_aaMode && r_aaMode->integer >= 4 && r_aaMode->integer <= 5 ) {
+		return qtrue;
+	}
+	return qfalse;
+}
+
+qboolean vk_temporal_want_weapon_after_taa( void )
+{
+	if ( !vk_temporal_reconstruction_wanted() ) {
+		return qfalse;
+	}
+	if ( !r_temporalWeaponAfterTaa || !r_temporalWeaponAfterTaa->integer ) {
+		return qfalse;
+	}
+	return qtrue;
 }

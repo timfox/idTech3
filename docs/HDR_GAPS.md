@@ -107,9 +107,15 @@ Both feed into linear HDR; no conflict.
 
 **Policy**: `vk_aa_policy.c` maps `r_aaMode` 0–6 onto SMAA / FXAA / Temporal Reconstruction / supersample. Mode **5** defers SMAA until after temporal resolve (cleanup). Mode **3** is SMAA T2x scaffold (SMAA + light history).
 
-**Temporal Reconstruction** (`r_taa`): confidence-guided resolve after the post-fog source, before luminance and gamma. Uses `vk_temporal` reset policy (resize, map load, camera cut, missing prev matrices). Skips portals / near-static streak guard. Partial unreliable motion **softens** history weight instead of killing the whole pass. First-person weapons do **not** set whole-frame `unreliableMotionThisFrame`.
+**Temporal Reconstruction** (`r_taa`): confidence-guided resolve after the post-fog source, before luminance and gamma. Uses `vk_temporal` reset policy (resize, map load, camera cut, missing prev matrices). Skips portals / near-static streak guard. Partial unreliable motion **softens** history weight instead of killing the whole pass.
 
-**History**: YCoCg variance clipping (`r_temporalVarianceClip`), depth disocclusion (`r_temporalDisocclusion`), reactive path (`r_temporalReactiveMask`): heuristics (near/weapon, motion, luma) **max’d** with a stamped full-res R8 mask from OIT reveal / Forward+ transparent / stochastic survivors (`vk.reactive_mask_*`, TAA set 5). Cap via `r_temporalHistoryWeight` (default 0.80). Debug overlays: `r_debugMotionVectors`, `r_debugHistoryRejection` (yellow = reactive). SMAA-only (`r_aaMode 2`, `r_taa 0`) never allocates the mask.
+**Weapon ownership** (`r_temporalWeaponAfterTaa` 1, default): `RDF_NOWORLDMODEL` weapon/view-model draws are deferred until **after** world Temporal Reconstruction (`RB_TryDeferWeaponDrawSurfs` / `RB_FlushDeferredWeaponAfterTaa`). Weapon pixels never enter `taa_history`, which was the primary cause of dark offset silhouette trails when looking around with TAA on. With the cvar at 0, weapons fall back into the world HDR buffer before TAA (legacy / debug).
+
+**History**: Per-pixel confidence (not one fixed global weight) from depth disocclusion (`r_temporalDisocclusion`), velocity/MV validity, luminance delta, and reactive path (`r_temporalReactiveMask`): heuristics (near depth, motion, luma) **max’d** with a stamped full-res R8 mask from OIT reveal / Forward+ transparent / stochastic survivors (`vk.reactive_mask_*`, TAA set 5). Stamped coverage hard-rejects history (prefer current-frame noise over trails). Cap via `r_temporalHistoryWeight` (default 0.80).
+
+**OIT vs TAA order**: OIT accumulates and **resolves into current HDR scene color before** Temporal Reconstruction; raw OIT buffers are never temporally blended. Stochastic alpha mode 2 falls back to mode 1 when TAA is off.
+
+**Debug**: `r_debugMotionVectors` (1); `r_debugHistoryRejection` 0–8 (MV / reject reasons / reactive / confidence / disocclusion / history UV / near-weapon / world-vs-reactive). SMAA-only (`r_aaMode 2`, `r_taa 0`) never allocates the reactive mask.
 
 **Motion**: `r_taaMotionVectors` **1** (default) samples the main-pass motion attachment. **0** uses depth + `prevViewProj` reprojection only.
 
@@ -130,7 +136,7 @@ Both feed into linear HDR; no conflict.
 7. **SSAO** (if `r_ssao`): copy `color_image` to `fog_scene`, samples depth, blur, combine with scene into `fog_scene`. When SSAO is on, `fog_scene` becomes the post-fog source.
 8. **Volumetric compute + composite** → fog over scene (when enabled). Reads and writes `fog_scene`.
 9. **SMAA / FXAA** (if enabled and not deferred cleanup): edge detect / resolve. Runs after volumetrics (or after 2D overlays if volumetrics skipped). Output is the post-fog source.
-10. **Temporal Reconstruction** (if `r_taa` 1 / `r_aaMode` 4–5): confidence resolve on post-fog source; history ping-pong in `taa_history` images. Mode **5** then runs light SMAA cleanup on the resolve.
+10. **Temporal Reconstruction** (if `r_taa` 1 / `r_aaMode` 4–5): confidence resolve on post-fog source; history ping-pong in `taa_history` images. Mode **5** then runs light SMAA cleanup on the resolve. When `r_temporalWeaponAfterTaa` 1, deferred weapon/view-model draws flush **after** this step into `color_image` (separate temporal ownership).
 11. **Luminance pass** (if `r_exposure_auto`): compute pass on post-fog source (after temporal when enabled); result used next frame for eye adaptation.
 12. **Gamma pass** → tonemap, exposure, gamma → swapchain.
 

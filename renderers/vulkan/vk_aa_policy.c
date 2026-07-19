@@ -13,6 +13,7 @@ cvar_t *r_temporalHistoryWeight;
 cvar_t *r_temporalVarianceClip;
 cvar_t *r_temporalDisocclusion;
 cvar_t *r_temporalReactiveMask;
+cvar_t *r_temporalWeaponAfterTaa;
 cvar_t *r_temporalSmaaCleanup;
 cvar_t *r_debugMotionVectors;
 cvar_t *r_debugHistoryRejection;
@@ -90,9 +91,16 @@ void vk_aa_policy_register_cvars( void )
 	r_temporalReactiveMask = ri.Cvar_Get( "r_temporalReactiveMask", "1", CVAR_ARCHIVE_ND );
 	ri.Cvar_CheckRange( r_temporalReactiveMask, "0", "1", CV_INTEGER );
 	ri.Cvar_SetDescription( r_temporalReactiveMask,
-		"Prefer current frame for reactive pixels: stamped OIT/transparent/stochastic mask "
-		"(when Temporal Reconstruction is on) max'd with near/weapon/motion/luma heuristics." );
+		"Stamp + sample a transparency reactive mask for Temporal Reconstruction "
+		"(OIT/Forward+ transparent/stochastic). Strongly reduces history weight." );
 	ri.Cvar_SetGroup( r_temporalReactiveMask, CVG_RENDERER );
+
+	r_temporalWeaponAfterTaa = ri.Cvar_Get( "r_temporalWeaponAfterTaa", "1", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_temporalWeaponAfterTaa, "0", "1", CV_INTEGER );
+	ri.Cvar_SetDescription( r_temporalWeaponAfterTaa,
+		"Defer RDF_NOWORLDMODEL weapon/view-model draws until after world Temporal Reconstruction "
+		"so weapon pixels never enter TAA history (fixes dark offset silhouettes)." );
+	ri.Cvar_SetGroup( r_temporalWeaponAfterTaa, CVG_RENDERER );
 
 	r_temporalSmaaCleanup = ri.Cvar_Get( "r_temporalSmaaCleanup", "0", CVAR_ARCHIVE_ND );
 	ri.Cvar_CheckRange( r_temporalSmaaCleanup, "0", "1", CV_INTEGER );
@@ -107,10 +115,18 @@ void vk_aa_policy_register_cvars( void )
 	ri.Cvar_SetGroup( r_debugMotionVectors, CVG_RENDERER );
 
 	r_debugHistoryRejection = ri.Cvar_Get( "r_debugHistoryRejection", "0", CVAR_ARCHIVE_ND );
-	ri.Cvar_CheckRange( r_debugHistoryRejection, "0", "1", CV_INTEGER );
+	ri.Cvar_CheckRange( r_debugHistoryRejection, "0", "8", CV_INTEGER );
 	ri.Cvar_SetDescription( r_debugHistoryRejection,
-		"Color-code history rejection: green=accept, red=depth, blue=normal/proxy, yellow=reactive, "
-		"magenta=invalid MV, cyan=luma, white=cut/reset." );
+		"Temporal Reconstruction debug:\n"
+		" 0 off\n"
+		" 1 motion vectors (also r_debugMotionVectors)\n"
+		" 2 rejection reasons (legacy color codes)\n"
+		" 3 reactive mask\n"
+		" 4 history confidence/weight\n"
+		" 5 disocclusion\n"
+		" 6 reprojected history UV\n"
+		" 7 near-weapon heuristic\n"
+		" 8 world vs reactive ownership" );
 	ri.Cvar_SetGroup( r_debugHistoryRejection, CVG_RENDERER );
 }
 
