@@ -21,6 +21,7 @@ Extracted from vk.c for incremental modularization.
 #include "vk_forward_plus.h"
 #include "vk_deferred_gbuffer.h"
 #include "vk_visibility_buffer.h"
+#include "vk_ambient_visibility.h"
 #include "vk_swapchain.h"
 #include "vk_sync.h"
 #include "vk_temporal.h"
@@ -59,6 +60,13 @@ void vk_teardown_presentation_targets( void )
 			qvkResetCommandBuffer( vk.tess[i].command_buffer, 0 );
 		}
 	}
+
+	/* Drop descriptor/pipeline bindings that hold G-buffer / AV image views
+	 * before destroying the underlying attachments (resize / swapchain restart). */
+	vk_deferred_gbuffer_invalidate_runtime();
+	vk_visibility_buffer_shutdown();
+	vk_ambient_visibility_shutdown();
+	vk_deferred_gbuffer_note_recreate( "presentation_teardown" );
 
 	vk_destroy_pipelines( qfalse );
 	vk_destroy_framebuffers();
@@ -111,8 +119,12 @@ void vk_restore_presentation_targets( void )
 	vk_update_post_process_pipelines();
 	vk_validate_pbr_ibl_resources();
 	vk_forward_plus_ensure_runtime();
+	vk_deferred_gbuffer_note_recreate( "presentation_restore" );
 	vk_deferred_gbuffer_ensure_runtime();
 	vk_visibility_buffer_ensure_runtime();
+	/* AV re-inits lazily on frame_begin once G-buffer resources are live. */
+	vk_ambient_visibility_init();
+	vk_ambient_visibility_reset_history();
 
 #ifdef USE_IMGUI
 	VkImgui_SwapchainRestarted();

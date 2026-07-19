@@ -258,9 +258,14 @@ void vk_deferred_gbuffer_note_recreate( const char *reason )
 
 void vk_deferred_gbuffer_set_fallback( const char *reason )
 {
+	const char *msg = reason && reason[0] ? reason : "unknown";
+
+	if ( vk.deferredGbufferFallbackActive &&
+		!Q_stricmp( vk.deferredGbufferFallbackReason, msg ) ) {
+		return;
+	}
 	vk.deferredGbufferFallbackActive = qtrue;
-	Q_strncpyz( vk.deferredGbufferFallbackReason,
-		reason && reason[0] ? reason : "unknown",
+	Q_strncpyz( vk.deferredGbufferFallbackReason, msg,
 		sizeof( vk.deferredGbufferFallbackReason ) );
 	ri.Cvar_Set( "r_havenrpFallbackReason", vk.deferredGbufferFallbackReason );
 	ri.Printf( PRINT_WARNING, S_COLOR_YELLOW
@@ -288,11 +293,12 @@ static qboolean vk_dgb_fail_inject( const char *which )
 	return qfalse;
 }
 
-qboolean vk_deferred_lighting_wanted( void )
+/* Pipelines may be built whenever G-buffer resources exist — not gated on per-frame fill. */
+static qboolean vk_deferred_lighting_pipelines_wanted( void )
 {
 	int mode;
 
-	if ( !vk_deferred_gbuffer_fill_wanted() || !r_deferredLighting || !r_deferredLighting->integer ) {
+	if ( !vk_deferred_gbuffer_active() || !r_deferredLighting || !r_deferredLighting->integer ) {
 		return qfalse;
 	}
 	if ( !r_renderMode || !r_forwardPlus || !r_forwardPlus->integer ) {
@@ -300,6 +306,11 @@ qboolean vk_deferred_lighting_wanted( void )
 	}
 	mode = r_renderMode->integer;
 	return ( mode == 1 || mode == 3 ) ? qtrue : qfalse;
+}
+
+static qboolean vk_deferred_lighting_wanted( void )
+{
+	return ( vk_deferred_lighting_pipelines_wanted() && vk_deferred_gbuffer_fill_wanted() ) ? qtrue : qfalse;
 }
 
 qboolean vk_deferred_lighting_active( void )
@@ -310,7 +321,7 @@ qboolean vk_deferred_lighting_active( void )
 qboolean vk_unified_clustered_active( void )
 {
 	return ( r_renderMode && r_renderMode->integer == 3 &&
-		vk_deferred_lighting_wanted() ) ? qtrue : qfalse;
+		vk_deferred_lighting_pipelines_wanted() ) ? qtrue : qfalse;
 }
 
 qboolean vk_deferred_opaque_transparent_split( void )
@@ -319,7 +330,7 @@ qboolean vk_deferred_opaque_transparent_split( void )
 	if ( vk_unified_clustered_active() ) {
 		return qtrue;
 	}
-	if ( r_renderMode && r_renderMode->integer == 1 && vk_deferred_lighting_active() ) {
+	if ( r_renderMode && r_renderMode->integer == 1 && vk_deferred_lighting_pipelines_wanted() ) {
 		return qtrue;
 	}
 	return qfalse;
@@ -417,7 +428,7 @@ void vk_deferred_gbuffer_ensure_runtime( void )
 		vk_dgb_create_pipeline();
 	}
 
-	if ( vk_deferred_lighting_wanted() ) {
+	if ( vk_deferred_lighting_pipelines_wanted() ) {
 		if ( !vk.deferred_gbuffer.lighting_pipeline_ready ||
 			vk.deferred_gbuffer.lighting_pipeline == VK_NULL_HANDLE ||
 			vk.deferred_gbuffer.lighting_descriptor == VK_NULL_HANDLE ) {
@@ -449,7 +460,7 @@ void vk_deferred_gbuffer_status_f( void )
 	ri.Printf( PRINT_ALL, "allocated : %s directExport=%s\n",
 		vk.deferredGbufferAllocated ? "yes" : "no",
 		vk.deferredGbufferDirectExport ? "yes" : "no" );
-	ri.Printf( PRINT_ALL, "fill      : wanted=%s active_this_frame=check_capture\n",
+	ri.Printf( PRINT_ALL, "fill      : wanted=%s\n",
 		vk_deferred_gbuffer_fill_wanted() ? "yes" : "no" );
 	ri.Printf( PRINT_ALL, "generation: %u valid=%s extent=%ux%u (active=%ux%u)\n",
 		vk.deferredGbufferGeneration,
@@ -466,164 +477,6 @@ void vk_deferred_gbuffer_status_f( void )
 		vk.deferredGbufferLastRecreateReason[0] ? vk.deferredGbufferLastRecreateReason : "none" );
 	ri.Printf( PRINT_ALL, "==========================================\n" );
 }
-
-/* --- original lighting/active helpers replaced above; keep destroy helpers --- */
-
-#if 0
-qboolean vk_deferred_gbuffer_active( void )
-{
-	return ( vk.deferredGbufferAllocated && r_renderMode &&
-		( r_renderMode->integer == 1 || r_renderMode->integer == 2 || r_renderMode->integer == 3 ) &&
-		r_deferredGBuffer && r_deferredGBuffer->integer ) ? qtrue : qfalse;
-}
-
-qboolean vk_deferred_gbuffer_fill_wanted( void )
-{
-	/* Menu/cinematic (no finished world): skip fill — NVIDIA SIGSEGV path when
-	 * G-buffer capture runs without a completed main pass / world view. */
-	if ( !tr.world || !backEnd.doneWorldScene ) {
-		return qfalse;
-	}
-	return ( vk_deferred_gbuffer_active() && r_deferredGBufferFill && r_deferredGBufferFill->integer ) ? qtrue : qfalse;
-}
-
-static qboolean vk_deferred_lighting_wanted( void )
-{
-	int mode;
-
-	if ( !vk_deferred_gbuffer_fill_wanted() || !r_deferredLighting || !r_deferredLighting->integer ) {
-		return qfalse;
-	}
-	if ( !r_renderMode || !r_forwardPlus || !r_forwardPlus->integer ) {
-		return qfalse;
-	}
-	mode = r_renderMode->integer;
-	return ( mode == 1 || mode == 3 ) ? qtrue : qfalse;
-}
-
-qboolean vk_deferred_lighting_active( void )
-{
-	return vk_deferred_lighting_wanted();
-}
-
-qboolean vk_unified_clustered_active( void )
-{
-	return ( r_renderMode && r_renderMode->integer == 3 &&
-		vk_deferred_lighting_wanted() ) ? qtrue : qfalse;
-}
-
-qboolean vk_deferred_opaque_transparent_split( void )
-{
-	/* Mode 3 unified or mode 1 deferred: opaque→deferred→transparent Forward+. */
-	if ( vk_unified_clustered_active() ) {
-		return qtrue;
-	}
-	if ( r_renderMode && r_renderMode->integer == 1 && vk_deferred_lighting_active() ) {
-		return qtrue;
-	}
-	return qfalse;
-}
-
-qboolean vk_unified_clustered_opaque_handoff( void )
-{
-	/* Opaque world pass: hand dynamics to deferred. Skip weapon/UI views. */
-	if ( backEnd.drawSurfFilter != 1 ) {
-		return qfalse;
-	}
-	if ( backEnd.refdef.rdflags & RDF_NOWORLDMODEL ) {
-		return qfalse;
-	}
-	if ( vk_unified_clustered_active() ) {
-		return qtrue;
-	}
-	if ( r_renderMode && r_renderMode->integer == 1 && vk_deferred_lighting_active() ) {
-		return qtrue;
-	}
-	return qfalse;
-}
-
-qboolean vk_deferred_unlit_base_wanted( void )
-{
-	if ( !vk_deferred_lighting_wanted() ) {
-		return qfalse;
-	}
-	if ( !r_deferredUnlitBase || !r_deferredUnlitBase->integer ) {
-		return qfalse;
-	}
-	/* Mode 3: composite still additive; per-draw handoff is via fragment uniform. */
-	return qtrue;
-}
-
-static void vk_dgb_destroy_pipeline( void )
-{
-	vk_dgb_destroy_debug_gfx_pipeline();
-	vk_dgb_destroy_composite_gfx_pipeline();
-	vk_dgb_destroy_lighting_pipeline();
-	if ( vk.deferred_gbuffer.pipeline != VK_NULL_HANDLE ) {
-		qvkDestroyPipeline( vk.device, vk.deferred_gbuffer.pipeline, NULL );
-		vk.deferred_gbuffer.pipeline = VK_NULL_HANDLE;
-	}
-	if ( vk.deferred_gbuffer.pipeline_layout != VK_NULL_HANDLE ) {
-		qvkDestroyPipelineLayout( vk.device, vk.deferred_gbuffer.pipeline_layout, NULL );
-		vk.deferred_gbuffer.pipeline_layout = VK_NULL_HANDLE;
-	}
-	if ( vk.deferred_gbuffer.layout != VK_NULL_HANDLE ) {
-		qvkDestroyDescriptorSetLayout( vk.device, vk.deferred_gbuffer.layout, NULL );
-		vk.deferred_gbuffer.layout = VK_NULL_HANDLE;
-	}
-	if ( vk.deferred_gbuffer.pool != VK_NULL_HANDLE ) {
-		qvkDestroyDescriptorPool( vk.device, vk.deferred_gbuffer.pool, NULL );
-		vk.deferred_gbuffer.pool = VK_NULL_HANDLE;
-	}
-	vk.deferred_gbuffer.descriptor = VK_NULL_HANDLE;
-	vk.deferred_gbuffer.pipeline_ready = qfalse;
-	vk.deferred_gbuffer.fill_logged = qfalse;
-}
-
-void vk_deferred_gbuffer_init( void )
-{
-	Com_Memset( &vk.deferred_gbuffer, 0, sizeof( vk.deferred_gbuffer ) );
-}
-
-void vk_deferred_gbuffer_shutdown( void )
-{
-	vk_dgb_destroy_pipeline();
-}
-
-void vk_deferred_gbuffer_ensure_runtime( void )
-{
-	if ( !vk_deferred_gbuffer_active() || !vk.device || vk.device_lost ) {
-		return;
-	}
-
-	if ( vk.deferred_gbuffer.layout == VK_NULL_HANDLE ||
-		vk.deferred_gbuffer.pool == VK_NULL_HANDLE ||
-		vk.deferred_gbuffer.descriptor == VK_NULL_HANDLE ||
-		( !vk.deferred_gbuffer.pipeline_ready && !vk.deferredGbufferDirectExport ) ) {
-		vk_dgb_create_pipeline();
-	}
-
-	if ( vk_deferred_lighting_wanted() ) {
-		if ( !vk.deferred_gbuffer.lighting_pipeline_ready ||
-			vk.deferred_gbuffer.lighting_pipeline == VK_NULL_HANDLE ||
-			vk.deferred_gbuffer.lighting_descriptor == VK_NULL_HANDLE ) {
-			vk_dgb_create_lighting_pipeline();
-		}
-		if ( !vk.deferred_gbuffer.composite_gfx_ready ||
-			vk.deferred_gbuffer.composite_gfx_pipeline == VK_NULL_HANDLE ||
-			vk.deferred_gbuffer.composite_gfx_descriptor == VK_NULL_HANDLE ) {
-			vk_dgb_create_composite_gfx_pipeline();
-		}
-	}
-
-	if ( r_deferredGBufferDebug && r_deferredGBufferDebug->integer > 0 &&
-		( !vk.deferred_gbuffer.debug_gfx_ready ||
-		  vk.deferred_gbuffer.debug_gfx_pipeline == VK_NULL_HANDLE ||
-		  vk.deferred_gbuffer.debug_gfx_descriptor == VK_NULL_HANDLE ) ) {
-		vk_dgb_create_debug_gfx_pipeline();
-	}
-}
-#endif
 
 static void vk_dgb_create_descriptor_layout( void )
 {

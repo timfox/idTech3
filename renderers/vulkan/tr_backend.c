@@ -2235,13 +2235,16 @@ static const void *RB_DrawSurfs( const void *data ) {
 		CBTerrain_Frame();
 	}
 	if ( !vk_deferred_opaque_transparent_split() ) {
-		vk_deferred_gbuffer_capture_after_geometry();
-		vk_visibility_buffer_capture_after_geometry();
-		vk_ambient_visibility_apply_after_geometry();
-		if ( vk_visibility_late_shade_wanted() ) {
-			vk_visibility_late_shade_apply_after_geometry();
-		} else {
-			vk_deferred_lighting_apply_after_geometry();
+		/* Mode 2 sidecar / non-split: never refill G-buffer after weapon or UI. */
+		if ( !( cmd->refdef.rdflags & RDF_NOWORLDMODEL ) ) {
+			vk_deferred_gbuffer_capture_after_geometry();
+			vk_visibility_buffer_capture_after_geometry();
+			vk_ambient_visibility_apply_after_geometry();
+			if ( vk_visibility_late_shade_wanted() ) {
+				vk_visibility_late_shade_apply_after_geometry();
+			} else {
+				vk_deferred_lighting_apply_after_geometry();
+			}
 		}
 	}
 	vk_niv_apply_after_geometry();

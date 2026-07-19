@@ -16,6 +16,7 @@ atlases, froxel/fluid volumes, and teardown (split from vk.c).
 #include "vk_util.h"
 #include "vk_attachments.h"
 #include "vk_upscale.h"
+#include "vk_deferred_gbuffer.h"
 
 static void vk_create_fog_noise_texture( void );
 static void vk_destroy_sun_shadow_resources( void );
@@ -349,9 +350,12 @@ static void vk_create_deferred_gbuffer_scaffold( void )
 {
 	VkImageUsageFlags gbufUsage =
 		VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
+	cvar_t *failInject;
 
 	vk.deferredGbufferAllocated = qfalse;
 	vk.deferredGbufferDirectExport = qfalse;
+	vk.deferredGbufferExtentW = 0;
+	vk.deferredGbufferExtentH = 0;
 	vk.deferred_gbuffer_albedo = VK_NULL_HANDLE;
 	vk.deferred_gbuffer_albedo_view = VK_NULL_HANDLE;
 	vk.deferred_gbuffer_normal = VK_NULL_HANDLE;
@@ -363,9 +367,23 @@ static void vk_create_deferred_gbuffer_scaffold( void )
 	vk.deferred_class_stub = VK_NULL_HANDLE;
 	vk.deferred_class_stub_view = VK_NULL_HANDLE;
 
-	if ( !vk.fboActive || !r_renderMode ||
-		( r_renderMode->integer != 1 && r_renderMode->integer != 2 && r_renderMode->integer != 3 ) ||
-		!r_deferredGBuffer || !r_deferredGBuffer->integer ) {
+	if ( !vk_deferred_gbuffer_resources_wanted() ) {
+		return;
+	}
+
+	failInject = ri.Cvar_Get( "r_dgbFailInject", "0", CVAR_TEMP | CVAR_CHEAT );
+	if ( failInject && failInject->string &&
+		( !Q_stricmp( failInject->string, "alloc" ) || !Q_stricmp( failInject->string, "all" ) ) ) {
+		vk_deferred_gbuffer_set_fallback( "r_dgbFailInject=alloc" );
+		if ( r_deferredGBufferFill ) {
+			ri.Cvar_Set( "r_deferredGBufferFill", "0" );
+		}
+		if ( r_ssao && !r_ssao->integer ) {
+			ri.Cvar_Set( "r_ssao", "1" );
+		}
+		if ( ri.Cvar_VariableIntegerValue( "r_ambientVisibilityMode" ) >= 2 ) {
+			ri.Cvar_Set( "r_ambientVisibilityMode", "1" );
+		}
 		return;
 	}
 
@@ -390,23 +408,13 @@ static void vk_create_deferred_gbuffer_scaffold( void )
 		&vk.deferred_class_stub, &vk.deferred_class_stub_view,
 		VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, qfalse, 0 );
 
+	/* Image views are created later in vk_alloc_attachments() — only probe images here.
+	 * Final success/soft-fallback runs in vk_finalize_deferred_gbuffer_scaffold(). */
 	if ( vk.deferred_gbuffer_albedo == VK_NULL_HANDLE ||
-		vk.deferred_gbuffer_albedo_view == VK_NULL_HANDLE ||
 		vk.deferred_gbuffer_normal == VK_NULL_HANDLE ||
-		vk.deferred_gbuffer_normal_view == VK_NULL_HANDLE ||
 		vk.deferred_gbuffer_material == VK_NULL_HANDLE ||
-		vk.deferred_gbuffer_material_view == VK_NULL_HANDLE ||
-		vk.deferred_lighting_image == VK_NULL_HANDLE ||
-		vk.deferred_lighting_view == VK_NULL_HANDLE ) {
-		ri.Printf( PRINT_WARNING, S_COLOR_YELLOW
-			"[VK][deferred] G-buffer allocation failed — disabling r_deferredGBufferFill (Forward+ continues)\n"
-			S_COLOR_WHITE );
-		if ( r_deferredGBufferFill ) {
-			ri.Cvar_Set( "r_deferredGBufferFill", "0" );
-			r_deferredGBufferFill->integer = 0;
-			r_deferredGBufferFill->modified = qtrue;
-		}
-		ri.Cvar_Set( "r_havenrpFallbackReason", "gbuffer_alloc_failed" );
+		vk.deferred_lighting_image == VK_NULL_HANDLE ) {
+		vk_deferred_gbuffer_set_fallback( "gbuffer_image_create_failed" );
 		vk.deferredGbufferAllocated = qfalse;
 		vk.deferredGbufferDirectExport = qfalse;
 		return;
@@ -432,6 +440,81 @@ static void vk_create_deferred_gbuffer_scaffold( void )
 		"[VK][deferred] G-buffer scaffold: albedo (scene color format) + normal RGBA16F + material RGBA16F + motion sidecar + lighting RGBA16F + class stub%s%s\n",
 		vk.deferredGbufferDirectExport ? " (direct material export)" : " (depth fallback export)",
 		vk.visibilityBufferDirectExport ? " + PrimID MRT" : "" );
+}
+
+/*
+===============
+vk_finalize_deferred_gbuffer_scaffold
+===============
+After vk_alloc_attachments() binds memory and creates views, verify the G-buffer
+is usable. Soft-disable fill (and restore legacy SSAO) on failure so Forward+ continues.
+*/
+static void vk_finalize_deferred_gbuffer_scaffold( void )
+{
+	uint32_t extentW = 0, extentH = 0;
+	cvar_t *failInject;
+	char debugName[96];
+
+	if ( !vk_deferred_gbuffer_resources_wanted() ) {
+		return;
+	}
+	if ( !vk.deferredGbufferAllocated ) {
+		return;
+	}
+
+	failInject = ri.Cvar_Get( "r_dgbFailInject", "0", CVAR_TEMP | CVAR_CHEAT );
+	if ( ( failInject && failInject->string &&
+			( !Q_stricmp( failInject->string, "view" ) || !Q_stricmp( failInject->string, "all" ) ) ) ||
+		vk.deferred_gbuffer_albedo_view == VK_NULL_HANDLE ||
+		vk.deferred_gbuffer_normal_view == VK_NULL_HANDLE ||
+		vk.deferred_gbuffer_material_view == VK_NULL_HANDLE ||
+		vk.deferred_lighting_view == VK_NULL_HANDLE ) {
+		vk_deferred_gbuffer_set_fallback(
+			( failInject && failInject->string &&
+			  ( !Q_stricmp( failInject->string, "view" ) || !Q_stricmp( failInject->string, "all" ) ) )
+				? "r_dgbFailInject=view"
+				: "gbuffer_alloc_failed" );
+		if ( r_deferredGBufferFill ) {
+			ri.Cvar_Set( "r_deferredGBufferFill", "0" );
+		}
+		/* Quality profile turns SSAO off for AV; restore a usable AO owner. */
+		if ( r_ssao && !r_ssao->integer ) {
+			ri.Cvar_Set( "r_ssao", "1" );
+		}
+		if ( ri.Cvar_VariableIntegerValue( "r_ambientVisibilityMode" ) >= 2 ) {
+			ri.Cvar_Set( "r_ambientVisibilityMode", "1" );
+		}
+		vk.deferredGbufferAllocated = qfalse;
+		vk.deferredGbufferDirectExport = qfalse;
+		vk.deferredGbufferExtentW = 0;
+		vk.deferredGbufferExtentH = 0;
+		return;
+	}
+
+	vk_get_active_render_extent( &extentW, &extentH );
+	if ( extentW == 0u || extentH == 0u ) {
+		extentW = vk.mainColorWidth;
+		extentH = vk.mainColorHeight;
+	}
+	vk.deferredGbufferGeneration++;
+	if ( vk.deferredGbufferGeneration == 0u ) {
+		vk.deferredGbufferGeneration = 1u;
+	}
+	vk.deferredGbufferExtentW = extentW;
+	vk.deferredGbufferExtentH = extentH;
+	vk_deferred_gbuffer_clear_fallback();
+	vk_deferred_gbuffer_note_recreate( "scaffold_finalize" );
+	Com_sprintf( debugName, sizeof( debugName ), "dgb albedo gen%u %ux%u",
+		vk.deferredGbufferGeneration, extentW, extentH );
+	SET_OBJECT_NAME( vk.deferred_gbuffer_albedo, debugName, VK_DEBUG_REPORT_OBJECT_TYPE_IMAGE_EXT );
+	Com_sprintf( debugName, sizeof( debugName ), "dgb normal gen%u %ux%u",
+		vk.deferredGbufferGeneration, extentW, extentH );
+	SET_OBJECT_NAME( vk.deferred_gbuffer_normal, debugName, VK_DEBUG_REPORT_OBJECT_TYPE_IMAGE_EXT );
+	Com_sprintf( debugName, sizeof( debugName ), "dgb material gen%u %ux%u",
+		vk.deferredGbufferGeneration, extentW, extentH );
+	SET_OBJECT_NAME( vk.deferred_gbuffer_material, debugName, VK_DEBUG_REPORT_OBJECT_TYPE_IMAGE_EXT );
+	ri.Printf( PRINT_ALL, "[VK][deferred] G-buffer ready gen=%u extent=%ux%u\n",
+		vk.deferredGbufferGeneration, extentW, extentH );
 }
 
 /*
@@ -841,6 +924,7 @@ void vk_create_attachments( void )
 	vk.depth_image_layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
 
 	vk_alloc_attachments();
+	vk_finalize_deferred_gbuffer_scaffold();
 	vk_create_depth_sample_view();
 	vk_create_sun_shadow_resources();
 	vk_create_local_shadow_resources();
@@ -2283,6 +2367,9 @@ void vk_destroy_attachments( void )
 	}
 	vk.deferredGbufferAllocated = qfalse;
 	vk.deferredGbufferDirectExport = qfalse;
+	vk.deferredGbufferExtentW = 0;
+	vk.deferredGbufferExtentH = 0;
+	/* Keep generation counter so post-destroy consumers detect a mismatch until recreate. */
 
 	if ( vk.visibility_buffer_ids ) {
 		qvkDestroyImage( vk.device, vk.visibility_buffer_ids, NULL );

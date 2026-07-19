@@ -182,13 +182,17 @@ static qboolean R_RendererDeferredRuntimeReady( void )
 	}
 
 	if ( !vk.deferredGbufferAllocated ||
+		!vk_deferred_gbuffer_generation_valid() ||
 		vk.deferred_gbuffer_albedo_view == VK_NULL_HANDLE ||
 		vk.deferred_gbuffer_normal_view == VK_NULL_HANDLE ||
 		vk.deferred_gbuffer_material_view == VK_NULL_HANDLE ||
 		vk.deferred_lighting_view == VK_NULL_HANDLE ||
-		!vk.deferred_gbuffer.pipeline_ready ||
-		vk.deferred_gbuffer.pipeline == VK_NULL_HANDLE ||
 		vk.deferred_gbuffer.descriptor == VK_NULL_HANDLE ) {
+		return qfalse;
+	}
+	/* Direct MRT export skips fill compute; only require the CS pipeline when used. */
+	if ( !vk.deferredGbufferDirectExport &&
+		( !vk.deferred_gbuffer.pipeline_ready || vk.deferred_gbuffer.pipeline == VK_NULL_HANDLE ) ) {
 		return qfalse;
 	}
 
@@ -624,6 +628,17 @@ static void R_RendererStatus_f( void )
 		glConfig.vidWidth, glConfig.vidHeight, vk.renderWidth, vk.renderHeight );
 	ri.Printf( PRINT_ALL, "fbo/hdr   : r_fbo=%d active=%s r_hdr=%d colorFormat=%s\n",
 		R_CvarInteger( r_fbo ), R_YesNo( vk.fboActive ), R_CvarInteger( r_hdr ), vk_format_string( vk.color_format ) );
+	ri.Printf( PRINT_ALL, "gbuffer   : req=%s alloc=%s fill=%s gen=%u valid=%s extent=%ux%u view=%s\n",
+		vk_deferred_gbuffer_resources_wanted() ? "yes" : "no",
+		vk.deferredGbufferAllocated ? "yes" : "no",
+		vk_deferred_gbuffer_fill_wanted() ? "yes" : "no",
+		vk.deferredGbufferGeneration,
+		vk_deferred_gbuffer_generation_valid() ? "yes" : "no",
+		vk.deferredGbufferExtentW, vk.deferredGbufferExtentH,
+		vk_view_class_name( vk_classify_current_view() ) );
+	ri.Printf( PRINT_ALL, "gbuffer+  : recreate=%s fallback=%s\n",
+		vk.deferredGbufferLastRecreateReason[0] ? vk.deferredGbufferLastRecreateReason : "none",
+		vk.deferredGbufferFallbackReason[0] ? vk.deferredGbufferFallbackReason : "none" );
 	ri.Printf( PRINT_ALL, "pbr       : r_pbr=%d materialBlend=%d\n",
 		R_CvarInteger( r_pbr ), R_CvarInteger( r_materialBlend ) );
 	ri.Printf( PRINT_ALL, "contract  : clean=%s recovery=%s\n",

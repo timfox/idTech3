@@ -206,6 +206,146 @@ static SDL_HitTestResult SDL_HitTestFunc( SDL_Window *win, const SDL_Point *area
 
 /*
 ===============
+GLimp_FitWindowedSize
+
+Shrink a windowed size to the display's usable bounds while preserving aspect.
+Without this, requesting 1920x1080 on a 1080p desktop with a top panel/title
+bar yields something like 1920x1011 — wider than 16:9 — and the menu looks
+horizontally stretched.
+===============
+*/
+static void GLimp_FitWindowedSize( int *width, int *height, SDL_DisplayID display )
+{
+	SDL_Rect usable;
+	float aspect;
+	int maxW, maxH;
+	int fitW, fitH;
+
+	if ( !width || !height || *width <= 0 || *height <= 0 ) {
+		return;
+	}
+	if ( !display || !SDL_GetDisplayUsableBounds( display, &usable ) ) {
+		return;
+	}
+
+	/* Usable bounds exclude panels but not window chrome; reserve title-bar room. */
+	maxW = usable.w;
+	maxH = usable.h - 48;
+	if ( maxW < 640 ) {
+		maxW = usable.w;
+	}
+	if ( maxH < 480 ) {
+		maxH = usable.h;
+	}
+	if ( maxW < 320 || maxH < 240 ) {
+		return;
+	}
+
+	aspect = (float)*width / (float)*height;
+	fitW = *width;
+	fitH = *height;
+	if ( fitW > maxW ) {
+		fitW = maxW;
+		fitH = (int)( (float)fitW / aspect + 0.5f );
+	}
+	if ( fitH > maxH ) {
+		fitH = maxH;
+		fitW = (int)( (float)fitH * aspect + 0.5f );
+	}
+	fitW &= ~1;
+	fitH &= ~1;
+	if ( fitW < 320 ) {
+		fitW = 320;
+	}
+	if ( fitH < 240 ) {
+		fitH = 240;
+	}
+
+	if ( fitW != *width || fitH != *height ) {
+		Com_Printf( "...windowed %dx%d exceeds usable %dx%d; fitting %dx%d (aspect preserved)\n",
+			*width, *height, maxW, maxH, fitW, fitH );
+		*width = fitW;
+		*height = fitH;
+	}
+}
+
+/*
+===============
+GLimp_CorrectWindowedAspect
+
+If the WM clamped only one axis (classic 1920x1080 → 1920x1011), shrink the
+other axis so the drawable stays 1:1 with the requested aspect.
+===============
+*/
+static void GLimp_CorrectWindowedAspect( glconfig_t *config, float wantAspect )
+{
+	int pixelW, pixelH;
+	int logicalW, logicalH;
+	float gotAspect;
+	int newPixelW, newPixelH;
+	int newLogicalW, newLogicalH;
+
+	if ( !SDL_window || !config || wantAspect <= 0.01f ) {
+		return;
+	}
+
+	SDL_GetWindowSizeInPixels( SDL_window, &pixelW, &pixelH );
+	SDL_GetWindowSize( SDL_window, &logicalW, &logicalH );
+	if ( pixelW <= 0 || pixelH <= 0 || logicalW <= 0 || logicalH <= 0 ) {
+		return;
+	}
+
+	gotAspect = (float)pixelW / (float)pixelH;
+	if ( fabsf( gotAspect - wantAspect ) <= 0.012f ) {
+		return;
+	}
+
+	newPixelW = pixelW;
+	newPixelH = pixelH;
+	if ( gotAspect > wantAspect ) {
+		/* Too wide — reduce width. */
+		newPixelW = (int)( (float)pixelH * wantAspect + 0.5f ) & ~1;
+	} else {
+		/* Too tall — reduce height. */
+		newPixelH = (int)( (float)pixelW / wantAspect + 0.5f ) & ~1;
+	}
+	if ( newPixelW < 320 ) {
+		newPixelW = 320;
+	}
+	if ( newPixelH < 240 ) {
+		newPixelH = 240;
+	}
+	if ( newPixelW == pixelW && newPixelH == pixelH ) {
+		return;
+	}
+
+	newLogicalW = (int)( (float)newPixelW * ( (float)logicalW / (float)pixelW ) + 0.5f );
+	newLogicalH = (int)( (float)newPixelH * ( (float)logicalH / (float)pixelH ) + 0.5f );
+	if ( newLogicalW < 320 ) {
+		newLogicalW = 320;
+	}
+	if ( newLogicalH < 240 ) {
+		newLogicalH = 240;
+	}
+
+	Com_Printf( "...correcting windowed aspect %dx%d (%.3f) → %dx%d (%.3f)\n",
+		pixelW, pixelH, gotAspect, newPixelW, newPixelH, wantAspect );
+	SDL_SetWindowSize( SDL_window, newLogicalW, newLogicalH );
+	SDL_SyncWindow( SDL_window );
+
+	SDL_GetWindowSizeInPixels( SDL_window, &config->vidWidth, &config->vidHeight );
+	SDL_GetWindowSize( SDL_window, &logicalW, &logicalH );
+	glw_state.window_width = ( logicalW > 0 ) ? logicalW : config->vidWidth;
+	glw_state.window_height = ( logicalH > 0 ) ? logicalH : config->vidHeight;
+	glw_state.pixel_width = config->vidWidth;
+	glw_state.pixel_height = config->vidHeight;
+	if ( config->vidHeight > 0 ) {
+		config->windowAspect = (float)config->vidWidth / (float)config->vidHeight;
+	}
+}
+
+/*
+===============
 GLimp_SetMode
 ===============
 */
@@ -218,6 +358,7 @@ static int GLW_SetMode( int mode, const char *modeFS, qboolean fullscreen )
 	SDL_DisplayID display = 0;
 	int x;
 	int y;
+	float wantAspect = 0.0f;
 	Uint64 flags = SDL_WINDOW_HIGH_PIXEL_DENSITY | SDL_WINDOW_VULKAN;
 
 	/* Wayland/libdecor needs RESIZABLE for a real window chrome and sane
@@ -271,6 +412,14 @@ static int GLW_SetMode( int mode, const char *modeFS, qboolean fullscreen )
 	}
 
 	Com_Printf( " %d %d\n", config->vidWidth, config->vidHeight );
+
+	if ( !fullscreen ) {
+		GLimp_FitWindowedSize( &config->vidWidth, &config->vidHeight, display );
+		if ( config->vidHeight > 0 ) {
+			config->windowAspect = (float)config->vidWidth / (float)config->vidHeight;
+		}
+	}
+	wantAspect = config->windowAspect;
 
 	// Destroy existing state if it exists
 	if ( SDL_window != NULL )
@@ -515,6 +664,10 @@ static int GLW_SetMode( int mode, const char *modeFS, qboolean fullscreen )
 		glw_state.window_height = ( logicalH > 0 ) ? logicalH : config->vidHeight;
 		glw_state.pixel_width = config->vidWidth;
 		glw_state.pixel_height = config->vidHeight;
+	}
+
+	if ( !fullscreen ) {
+		GLimp_CorrectWindowedAspect( config, wantAspect );
 	}
 
 	SDL_WarpMouseInWindow( SDL_window, (float)( glw_state.window_width / 2 ), (float)( glw_state.window_height / 2 ) );

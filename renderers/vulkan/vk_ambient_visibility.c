@@ -44,6 +44,9 @@ typedef struct {
 	uint32_t width, height;
 	uint32_t traceWidth, traceHeight;
 	uint32_t historyIndex;
+	uint32_t gbufferGeneration;
+	uint32_t historyGeneration;
+	vkViewClass_t lastViewClass;
 	int lastMode;
 	float lastRadius;
 
@@ -417,7 +420,13 @@ static void AV_Status_f( void )
 		( av.rtaoPipe && vk_rtx_scene_ready() ? ( requested == 5 ? "Reference AO" : requested == 4 ? "Hybrid" : "RTAO" ) : "GTAO fallback" ),
 		av.ready, av.width, av.height, av.traceWidth, av.traceHeight,
 		requested == 5 ? r_referenceAORays->integer : r_rtaoRaysPerPixel->integer,
-		av.historyValid ? "valid" : "reset" );
+		av.historyValid ? "valid" : "reset(unoccluded)" );
+	ri.Printf( PRINT_ALL,
+		"[AV] gen gbuffer=%u history=%u match=%s viewClass=%s\n",
+		av.gbufferGeneration, av.historyGeneration,
+		( av.gbufferGeneration == vk_deferred_gbuffer_generation() &&
+		  av.historyGeneration == av.gbufferGeneration ) ? "yes" : "no",
+		vk_view_class_name( vk_classify_current_view() ) );
 	ri.Printf( PRINT_ALL,
 		"[AV] rayQuery=%d TLAS=%s (%s) memory~%.2f MiB timings raw=%.3f temporal=%.3f filter=%.3f total=%.3f ms\n",
 		AV_RayQueryAvailable(), tlasMode, tlasReason,
@@ -538,14 +547,17 @@ static void AV_ReadTimings( void )
 
 void vk_ambient_visibility_reset_history( void )
 {
+	/* historyValid=false forces temporal CS to seed unoccluded defaults (not black AO). */
 	av.historyValid = qfalse;
 	av.historyIndex = 0u;
+	av.historyGeneration = vk_deferred_gbuffer_generation();
 }
 
 qboolean vk_ambient_visibility_active( void )
 {
 	return av.ready && r_ambientVisibilityMode && r_ambientVisibilityMode->integer >= 2 &&
-		vk.fboActive && vk_deferred_gbuffer_active() ? qtrue : qfalse;
+		vk.fboActive && vk_deferred_gbuffer_active() &&
+		vk_deferred_gbuffer_generation_valid() ? qtrue : qfalse;
 }
 
 qboolean vk_ambient_visibility_blocks_legacy_post( void )
@@ -576,8 +588,31 @@ float vk_ambient_visibility_strength( void )
 void vk_ambient_visibility_init( void )
 {
 	VkQueryPoolCreateInfo qci;
+	cvar_t *failInject;
+
 	AV_RegisterCvars();
+	ri.Cvar_Get( "r_avFailInject", "0", CVAR_TEMP | CVAR_CHEAT );
 	if ( av.ready || !vk.device || !vk.fboActive ) return;
+	failInject = ri.Cvar_Get( "r_avFailInject", "0", CVAR_TEMP | CVAR_CHEAT );
+	if ( failInject && failInject->string &&
+		( !Q_stricmp( failInject->string, "history" ) || !Q_stricmp( failInject->string, "rtao" ) ||
+		  !Q_stricmp( failInject->string, "all" ) ) ) {
+		static qboolean s_avFailLogged;
+		if ( !s_avFailLogged ) {
+			ri.Printf( PRINT_WARNING, S_COLOR_YELLOW
+				"[AV] r_avFailInject=%s — skipping AV init (stable AO owner remains)\n" S_COLOR_WHITE,
+				failInject->string );
+			s_avFailLogged = qtrue;
+		}
+		vk_deferred_gbuffer_set_fallback( va( "r_avFailInject=%s", failInject->string ) );
+		if ( ri.Cvar_VariableIntegerValue( "r_ambientVisibilityMode" ) >= 2 ) {
+			ri.Cvar_Set( "r_ambientVisibilityMode", "1" );
+		}
+		if ( r_ssao && !r_ssao->integer ) {
+			ri.Cvar_Set( "r_ssao", "1" );
+		}
+		return;
+	}
 	if ( !AV_CreatePipelines() ) { AV_DestroyPipelines(); return; }
 	AV_CreateMetricBuffer();
 	if ( qvkCreateQueryPool && qvkCmdWriteTimestamp && qvkGetQueryPoolResults ) {
@@ -595,6 +630,9 @@ void vk_ambient_visibility_init( void )
 	}
 	av.ready = qtrue;
 	av.lastMode = -1;
+	av.lastViewClass = VK_VIEW_CLASS_NO_WORLD;
+	av.gbufferGeneration = vk_deferred_gbuffer_generation();
+	av.historyGeneration = av.gbufferGeneration;
 	ri.Printf( PRINT_ALL, "[AV] directional Ambient Visibility initialized (GTAO%s)\n",
 		av.rtaoPipe ? " + Hybrid1 TLAS ray query" : "; RTAO unavailable, safe GTAO fallback" );
 }
@@ -623,6 +661,9 @@ void vk_ambient_visibility_shutdown( void )
 void vk_ambient_visibility_frame_begin( void )
 {
 	uint32_t width, height;
+	uint32_t gbufGen;
+	vkViewClass_t viewClass;
+
 	AV_RegisterCvars();
 	if ( !av.ready && vk.device && vk.fboActive ) vk_ambient_visibility_init();
 	if ( !av.ready ) return;
@@ -630,11 +671,20 @@ void vk_ambient_visibility_frame_begin( void )
 	av.appliedThisFrame = qfalse;
 	width = vk_get_render_target_width(); height = vk_get_render_target_height();
 	if ( width && height ) AV_EnsureImages( width, height );
-	if ( av.lastMode != r_ambientVisibilityMode->integer || av.lastRadius != r_rtaoRadius->value ||
+
+	gbufGen = vk_deferred_gbuffer_generation();
+	viewClass = vk_classify_current_view();
+	if ( av.gbufferGeneration != gbufGen ||
+		av.historyGeneration != gbufGen ||
+		av.lastViewClass != viewClass ||
+		av.lastMode != r_ambientVisibilityMode->integer ||
+		av.lastRadius != r_rtaoRadius->value ||
 		vk.temporal.appliedResetReasons != 0u ) {
 		vk_ambient_visibility_reset_history();
+		av.gbufferGeneration = gbufGen;
 		av.lastMode = r_ambientVisibilityMode->integer;
 		av.lastRadius = r_rtaoRadius->value;
+		av.lastViewClass = viewClass;
 	}
 }
 
@@ -659,6 +709,12 @@ void vk_ambient_visibility_apply_after_geometry( void )
 	struct { uint32_t em[4]; float p[4]; } compositePush;
 
 	if ( av.appliedThisFrame || !vk_ambient_visibility_active() || !vk.cmd || !backEnd.doneSurfaces ) return;
+	if ( vk_classify_current_view() != VK_VIEW_CLASS_MAIN_WORLD ) return;
+	if ( !vk_deferred_gbuffer_generation_valid() ||
+		av.gbufferGeneration != vk_deferred_gbuffer_generation() ) {
+		vk_ambient_visibility_reset_history();
+		return;
+	}
 	if ( backEnd.refdef.rdflags & RDF_NOWORLDMODEL ) return;
 	if ( vk_pathtrace_active() ) {
 		static qboolean warned;
@@ -841,10 +897,12 @@ void vk_ambient_visibility_apply_after_geometry( void )
 		currentAux = &av.historyAux[writeIndex];
 	}
 
-	/* Apply only before deferred dynamic lighting. Forward+/OIT/weapon views keep the
-	 * directional output available but do not sample opaque-depth AO incorrectly. */
-	if ( vk_deferred_lighting_active() && classView &&
-		vk.color_format == VK_FORMAT_R16G16B16A16_SFLOAT ) {
+	/* Composite into HDR color for deferred lighting (mode 1/3) and Forward+
+	 * sidecar G-buffer (mode 2). Main-world only — weapon/portal/mirror already returned. */
+	if ( classView &&
+		vk.color_format == VK_FORMAT_R16G16B16A16_SFLOAT &&
+		( vk_deferred_lighting_active() ||
+		  ( r_renderMode && r_renderMode->integer == 2 && vk_deferred_gbuffer_fill_wanted() ) ) ) {
 		AV_ImageWrite( &writes[0], &infos[0], av.compositeSet, 0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, linear, finalImage->view, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL );
 		AV_ImageWrite( &writes[1], &infos[1], av.compositeSet, 1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, nearest, currentAux->view, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL );
 		AV_ImageWrite( &writes[2], &infos[2], av.compositeSet, 2, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, linear, av.gtao.view, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL );
