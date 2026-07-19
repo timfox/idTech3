@@ -70,10 +70,11 @@ void vk_aa_policy_register_cvars( void )
 		"Applies r_ext_smaa / r_ext_fxaa / r_taa. Latched; vid_restart for SMAA/FXAA." );
 	ri.Cvar_SetGroup( r_aaMode, CVG_RENDERER );
 
-	r_temporalHistoryWeight = ri.Cvar_Get( "r_temporalHistoryWeight", "0.80", CVAR_ARCHIVE_ND );
+	r_temporalHistoryWeight = ri.Cvar_Get( "r_temporalHistoryWeight", "0.72", CVAR_ARCHIVE_ND );
 	ri.Cvar_CheckRange( r_temporalHistoryWeight, "0", "0.95", CV_FLOAT );
 	ri.Cvar_SetDescription( r_temporalHistoryWeight,
-		"Max history weight for Temporal Reconstruction (scales stationary feedback). Default 0.80." );
+		"Max history weight for Temporal Reconstruction (scales stationary feedback). "
+		"Default 0.72 limits dark-scene silhouette / banner trails; raise toward 0.85 only if stable." );
 	ri.Cvar_SetGroup( r_temporalHistoryWeight, CVG_RENDERER );
 
 	r_temporalVarianceClip = ri.Cvar_Get( "r_temporalVarianceClip", "1", CVAR_ARCHIVE_ND );
@@ -91,8 +92,9 @@ void vk_aa_policy_register_cvars( void )
 	r_temporalReactiveMask = ri.Cvar_Get( "r_temporalReactiveMask", "1", CVAR_ARCHIVE_ND );
 	ri.Cvar_CheckRange( r_temporalReactiveMask, "0", "1", CV_INTEGER );
 	ri.Cvar_SetDescription( r_temporalReactiveMask,
-		"Stamp + sample a transparency reactive mask for Temporal Reconstruction "
-		"(OIT/Forward+ transparent/stochastic). Strongly reduces history weight." );
+		"Allocate/stamp a transparency reactive mask for Temporal Reconstruction "
+		"(OIT/Forward+ transparent/stochastic). Heuristic reject (weapon depth, luma flash, "
+		"history bleed) always runs when TAA is on; this cvar only enables the stamped mask." );
 	ri.Cvar_SetGroup( r_temporalReactiveMask, CVG_RENDERER );
 
 	r_temporalWeaponAfterTaa = ri.Cvar_Get( "r_temporalWeaponAfterTaa", "1", CVAR_ARCHIVE_ND );

@@ -984,6 +984,19 @@ static duk_ret_t Js_Binding_GetScreenSize( duk_context *ctx ) {
 	duk_put_prop_string( ctx, -2, "height" );
 	return 1;
 }
+
+static duk_ret_t Js_Binding_GetCursorPos( duk_context *ctx ) {
+	float x = 320.0f;
+	float y = 240.0f;
+
+	CL_GetHudCursorVirtual( &x, &y );
+	duk_push_object( ctx );
+	duk_push_number( ctx, (duk_double_t)x );
+	duk_put_prop_string( ctx, -2, "x" );
+	duk_push_number( ctx, (duk_double_t)y );
+	duk_put_prop_string( ctx, -2, "y" );
+	return 1;
+}
 #endif
 
 static void JsDebug_RegisterBindings( void ) {
@@ -1067,6 +1080,9 @@ static void JsDebug_RegisterBindings( void ) {
 
 	duk_push_c_function( s_jsContext, Js_Binding_GetScreenSize, 0 );
 	duk_put_prop_string( s_jsContext, -2, "getScreenSize" );
+
+	duk_push_c_function( s_jsContext, Js_Binding_GetCursorPos, 0 );
+	duk_put_prop_string( s_jsContext, -2, "getCursorPos" );
 #endif
 
 	duk_push_c_function( s_jsContext, Js_Binding_GetEngineInfo, 0 );

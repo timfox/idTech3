@@ -96,6 +96,8 @@ void main() {
 
 	float edgeMetric = max( depthGradient( depth, dl, dr ), depthGradient( depth, du, dd ) );
 	float edgeFactor = clamp( edgeMetric / max( threshold, 1e-4 ), 0.0, 1.0 );
+	/* Deeper confidence falloff on geometric edges reduces deferred lighting flicker into TAA. */
+	confidence *= mix( 1.0, 0.35, edgeFactor );
 	float fallbackMetalness = baseMaterial.r * ( 1.0 - 0.85 * edgeFactor );
 	float fallbackRoughness = mix( baseMaterial.g, 0.92, max( edgeFactor, 1.0 - confidence ) );
 	float fallbackAO = mix( 1.0, 0.82, edgeFactor * confidence );

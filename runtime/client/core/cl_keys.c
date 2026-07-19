@@ -656,6 +656,12 @@ static void CL_KeyDownEvent( int key, unsigned time )
 			Com_DL_Cleanup( &download );
 		}
 #endif
+		/* HavenRP City Menu: close overlay instead of opening the Q3 pause menu. */
+		if ( CL_RpMenuActive() ) {
+			Cvar_Set( "ui_rpMenu", "0" );
+			Key_ClearStates();
+			return;
+		}
 		if ( Key_GetCatcher() & KEYCATCH_CONSOLE ) {
 			// escape always closes console
 			Con_ToggleConsole_f();
@@ -718,6 +724,13 @@ static void CL_KeyDownEvent( int key, unsigned time )
 		Message_Key( key );
 	} else if ( cls.state == CA_DISCONNECTED ) {
 		Console_Key( key );
+	} else if ( CL_RpMenuActive() ) {
+		/* JS City Menu owns input via input_key — do not fire +attack / movement.
+		 * Still allow F4 so the toggle bind can close the menu. */
+		if ( key == K_F4 ) {
+			Key_ParseBinding( key, qtrue, time );
+		}
+		return;
 	} else {
 		// send the bound action
 		Key_ParseBinding( key, qtrue, time );

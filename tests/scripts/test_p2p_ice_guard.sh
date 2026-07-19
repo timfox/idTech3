@@ -54,6 +54,7 @@ log_file.close()
 cmd = [
     server_bin,
     "+set", "dedicated", "1",
+    "+set", "net_enabled", "1",
     "+set", "net_port", str(listen_port),
     "+set", "net_p2p", "1",
     "+set", "net_p2pBackend", "direct_udp",

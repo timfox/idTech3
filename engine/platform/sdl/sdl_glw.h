@@ -64,6 +64,8 @@ void IN_Init( void );
 void IN_Shutdown( void );
 /* Focus / un-minimize / presentation restore: re-assert relative mouse grab. */
 void IN_NotifyWindowRestored( void );
+/* Absolute mouse pixels in the game window (UI / RP menu pointer mode). */
+void IN_GetAbsMouse( int *x, int *y );
 
 // signals.c
 void InitSig( void );

@@ -59,7 +59,7 @@ Spine 1.0 freezes **one** certified combination set. Everything else is experime
 | Transparent WBOIT | Opt-in `modern_vulkan_quality.cfg` (`r_oit 1`) with TAA off |
 | Weapon / view-model | Forward+; after world TAA only when Temporal Reconstruction is enabled |
 | Presentation AA | SMAA 1x (`r_aaMode 2`) — default |
-| Temporal reconstruction | Optional overlays only (`vulkan_overlay_temporal_recon.cfg`) |
+| Temporal reconstruction | Optional overlays only (`vulkan_overlay_temporal_recon.cfg`: `r_aaMode 4`, no post-TAA SMAA cleanup, historyWeight 0.68) |
 | Ambient | GTAO (`r_ambientVisibilityMode 2`); SSAO off when GTAO on |
 | Shadows | Stable raster shadow path |
 | GI | Lightmaps + SH/IBL probes |
@@ -101,7 +101,7 @@ OIT corruption, black frames, and DEVICE_LOST-class failures are the failure mod
 - Per-effect histories
 - Rejection / ownership debug views
 
-A clean SMAA frame beats an advanced temporal frame with trails.
+A clean SMAA frame beats an advanced temporal frame with trails. Temporal overlay ships as `r_aaMode 4` (no post-TAA SMAA cleanup) specifically to avoid white silhouette / echoing-glow halos.
 
 ### 3. Material parity
 

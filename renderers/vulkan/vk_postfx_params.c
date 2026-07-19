@@ -142,11 +142,27 @@ void vk_update_postfx_params( uint32_t cmd_index )
 	}
 	{
 		float histCap = Com_Clamp( 0.0f, 0.95f,
-			r_temporalHistoryWeight ? r_temporalHistoryWeight->value : 0.80f );
+			r_temporalHistoryWeight ? r_temporalHistoryWeight->value : 0.72f );
 		float stationary = Com_Clamp( 0.0f, 0.99f, r_taa_feedbackStationary ? r_taa_feedbackStationary->value : 0.92f );
 		float motionFb = Com_Clamp( 0.0f, 0.99f, r_taa_feedbackMotion ? r_taa_feedbackMotion->value : 0.72f );
+		qboolean deferredLit = qfalse;
+
 		if ( vk.temporal.unreliableMotionThisFrame ) {
 			histCap *= 0.55f;
+		}
+		/*
+		 * Deferred lighting (mode 1/3) writes view-dependent specular into color_image
+		 * before TAA. Prefer current more aggressively so highlight trails do not ghost.
+		 * Stable (mode 2, r_deferredLighting 0) is unaffected.
+		 */
+		deferredLit = ( r_deferredLighting && r_deferredLighting->integer &&
+			r_renderMode && ( r_renderMode->integer == 1 || r_renderMode->integer == 3 ) ) ? qtrue : qfalse;
+		if ( deferredLit ) {
+			histCap *= 0.72f;
+			if ( r_deferredSpecular && r_deferredSpecular->integer ) {
+				histCap *= 0.88f;
+				motionFb = Com_Clamp( 0.0f, histCap, motionFb * 0.90f );
+			}
 		}
 		params.taaParams[1] = Com_Clamp( 0.0f, histCap, stationary );
 		params.taaParams[2] = Com_Clamp( 0.0f, histCap, motionFb );

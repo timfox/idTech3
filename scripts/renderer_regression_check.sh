@@ -732,7 +732,7 @@ elif ! grep -q 'r_temporalWeaponAfterTaa' "$PROJECT_ROOT/renderers/vulkan/vk_aa_
   fail "vk_aa_policy.c missing r_temporalWeaponAfterTaa registration"
 elif ! grep -q 'stochMode >= 2 && !vk_temporal_reconstruction_wanted' "$PROJECT_ROOT/renderers/vulkan/vk_view_state.c" 2>/dev/null; then
   fail "vk_view_state.c missing stochastic mode-2 fallback when TAA off"
-elif ! grep -q 'reactive > 0.90' "$TAA_FRAG" 2>/dev/null; then
+elif ! grep -qE 'reactive > 0\.(82|90)' "$TAA_FRAG" 2>/dev/null; then
   fail "taa.frag missing hard reactive history reject"
 else
 	pass "Weapon-after-TAA + stochastic TAA-off fallback + reactive hard reject"

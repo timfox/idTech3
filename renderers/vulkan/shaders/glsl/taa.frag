@@ -169,8 +169,12 @@ void main() {
 	float depthConf = 1.0;
 	if ( useDisocc > 0.5 ) {
 		float depthDelta = abs( depthNdc - histDepth );
-		/* Reversed-Z: larger = nearer; relative mismatch rejects immediately. */
-		depthConf = 1.0 - smoothstep( 0.001, 0.025, depthDelta );
+		/* Reversed-Z: larger = nearer. Tighter reject kills skyline / silhouette bleed. */
+		depthConf = 1.0 - smoothstep( 0.0004, 0.012, depthDelta );
+		/* Extra reject when current is near-far (sky/background) vs history nearer geo. */
+		if ( depthNdc < 0.08 && histDepth > depthNdc + 0.02 ) {
+			depthConf *= 0.25;
+		}
 	}
 
 	float velocityConf = 1.0 - smoothstep( 4.0, 24.0, motionLen );
@@ -178,34 +182,44 @@ void main() {
 		velocityConf *= 0.35;
 	}
 
-	float lumaDiff = abs( dot( current - history, LUMA ) );
-	float lumaConf = 1.0 - smoothstep( 0.04, 0.35, lumaDiff );
+	float currentLuma = max( dot( current, LUMA ), 0.0 );
+	float historyLuma = max( dot( history, LUMA ), 0.0 );
+	float lumaDiff = abs( currentLuma - historyLuma );
+	float lumaConf = 1.0 - smoothstep( 0.028, 0.26, lumaDiff );
 
-	/* Reactive: near-camera weapon/HUD-ish depth, fast motion, large luma change,
-	 * stamped transparent/OIT/stochastic coverage, and invalid motion vectors.
-	 * Prefer current-frame noise over long trails. */
-	float reactive = 0.0;
-	if ( useReactive > 0.5 ) {
-		float nearWeapon = smoothstep( 0.90, 0.998, depthNdc ); /* near in reversed-Z */
-		float fastMotion = smoothstep( 4.0, 16.0, motionLen );
-		float flash = smoothstep( 0.10, 0.40, lumaDiff );
-		reactive = clamp( max( nearWeapon, max( fastMotion * 0.85, flash ) ), 0.0, 1.0 );
-		if ( !mvValid && postfx.depthParams.z > 0.5 ) {
-			reactive = max( reactive, 0.85 );
-		}
-		if ( postfx.midsGamma.a > 0.5 ) {
-			float stamped = textureLod( reactiveMaskTex, sampleUV, 0.0 ).r;
-			/* Any meaningful transparent/OIT stamp fully prefers current. */
-			if ( stamped > 0.02 ) {
-				reactive = max( reactive, max( stamped, 0.95 ) );
-			}
+	/*
+	 * Heuristic reactive always runs with Temporal Reconstruction.
+	 * colorGrade2.w / midsGamma.a only gate the stamped OIT/transparent mask texture —
+	 * not near-weapon, flash, or silhouette bleed (those caused the echoing glow when
+	 * r_temporalReactiveMask was 0 or the mask was not allocated).
+	 */
+	float nearWeapon = smoothstep( 0.82, 0.995, depthNdc ); /* near in reversed-Z */
+	float fastMotion = smoothstep( 3.5, 14.0, motionLen );
+	float flash = smoothstep( 0.06, 0.28, lumaDiff );
+	/* View-dependent / emissive peaks: current much brighter than history. */
+	float highlightGhost = smoothstep( 0.10, 0.60, currentLuma - historyLuma ) *
+		smoothstep( 0.15, 1.10, currentLuma );
+	/* Dark geo over former bright history (skyline / HOST banner trails). */
+	float historyBleed = smoothstep( 0.06, 0.45, historyLuma - currentLuma ) *
+		smoothstep( 0.12, 0.85, historyLuma );
+	float reactive = clamp( max( nearWeapon,
+		max( fastMotion * 0.90,
+		max( flash, max( highlightGhost * 0.95, historyBleed * 0.98 ) ) ) ), 0.0, 1.0 );
+	if ( !mvValid && postfx.depthParams.z > 0.5 ) {
+		reactive = max( reactive, 0.90 );
+	}
+	if ( useReactive > 0.5 && postfx.midsGamma.a > 0.5 ) {
+		float stamped = textureLod( reactiveMaskTex, sampleUV, 0.0 ).r;
+		/* Any meaningful transparent/OIT stamp fully prefers current. */
+		if ( stamped > 0.02 ) {
+			reactive = max( reactive, max( stamped, 0.95 ) );
 		}
 	}
 	float reactiveConf = 1.0 - reactive;
 
 	float confidence = clamp( depthConf * velocityConf * lumaConf * reactiveConf, 0.0, 1.0 );
 	/* Hard reject when reactive is high — do not blend a fixed global weight. */
-	if ( reactive > 0.90 ) {
+	if ( reactive > 0.82 ) {
 		confidence = 0.0;
 	}
 
@@ -279,7 +293,10 @@ void main() {
 	if ( useVarClip > 0.5 ) {
 		vec3 meanY, sigmaY;
 		neighborhoodYCoCgStats( sampleUV, meanY, sigmaY );
+		/* Tighten further on highlight / reactive pixels so specular trails cannot stick. */
+		float highlightTighten = smoothstep( 0.20, 1.10, currentLuma );
 		float gamma = mix( 1.25, 0.55, max( motionFactor, reactive ) );
+		gamma = mix( gamma, gamma * 0.72, highlightTighten );
 		vec3 lo = meanY - gamma * sigmaY;
 		vec3 hi = meanY + gamma * sigmaY;
 		/* Tighter luminance (Y) than chroma */

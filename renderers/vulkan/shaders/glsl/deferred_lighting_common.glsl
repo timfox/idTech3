@@ -223,6 +223,20 @@ vec3 shadeDeferredPixel( uvec2 pix ) {
 		}
 	}
 
+	/*
+	 * Soft-cap specular energy relative to diffuse. Bright GGX peaks otherwise land in
+	 * color_image ahead of TAA and create highlight trails (no separate specular history).
+	 */
+	{
+		const vec3 lumaW = vec3( 0.2126, 0.7152, 0.0722 );
+		float specLuma = max( dot( specularAcc, lumaW ), 0.0 );
+		float diffLuma = max( dot( diffuseAcc, lumaW ), 0.0 );
+		float specCap = max( diffLuma * 2.5, 0.28 ) * max( pc.specularStrength, 0.01 );
+		if ( specLuma > specCap ) {
+			specularAcc *= specCap / max( specLuma, 1e-4 );
+		}
+	}
+
 	float roughMod = mix( 1.0, 0.85, roughness );
 	vec3 lit;
 	if ( pc.additive != 0u ) {

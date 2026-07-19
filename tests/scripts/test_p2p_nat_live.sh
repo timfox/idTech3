@@ -35,7 +35,7 @@ host)
 	LOG="$(mktemp)"
 	trap 'kill $(jobs -p) 2>/dev/null || true; rm -f "$LOG"' EXIT
 
-	"$SERVER_BIN" +set dedicated 1 +set net_port "$PORT" +set net_p2p 1 \
+	"$SERVER_BIN" +set dedicated 1 +set net_enabled 1 +set net_port "$PORT" +set net_p2p 1 \
 		+set net_p2pBackend direct_udp \
 		+set net_p2pAdvertiseAddress "udp:${P2P_NAT_HOST_IP:-127.0.0.1}:${PORT}" \
 		+set sv_p2pReconnectWindow 45 +set sv_p2pFailover reconnect \
@@ -74,7 +74,7 @@ client)
 			echo "p2p_punch_status"
 		done
 		echo "quit"
-	} | timeout "$TIMEOUT_SEC" "$SERVER_BIN" +set dedicated 1 +set net_port "$((PORT + 1))" \
+	} | timeout "$TIMEOUT_SEC" "$SERVER_BIN" +set dedicated 1 +set net_enabled 1 +set net_port "$((PORT + 1))" \
 		+set net_p2p 1 +set net_p2pBackend direct_udp +set com_hunkMegs 64 >"$LOG" 2>&1 || true
 
 	rg -q "ack:yes|punch acknowledged" "$LOG" || fail "client punch not acknowledged"

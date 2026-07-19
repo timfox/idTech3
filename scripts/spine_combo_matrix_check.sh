@@ -50,6 +50,9 @@ pass "quality matrix: stable + WBOIT + SSR + froxel, TAA off"
 # --- Temporal reconstruction overlay ---
 cvar_is "$TEMPORAL" r_taa 1 || fail "temporal overlay expects r_taa 1"
 cvar_is "$TEMPORAL" r_taaMotionVectors 1 || fail "temporal overlay expects motion vectors"
+cvar_is "$TEMPORAL" r_aaMode 4 || fail "temporal overlay expects r_aaMode 4 (no post-TAA SMAA cleanup halo)"
+cvar_is "$TEMPORAL" r_temporalSmaaCleanup 0 || fail "temporal overlay must keep r_temporalSmaaCleanup 0"
+cvar_is "$TEMPORAL" r_temporalHistoryWeight 0.68 || fail "temporal overlay expects conservative historyWeight 0.68"
 # Must not enable OIT in the temporal overlay (stacking is experimental)
 if grep -qE 'seta r_oit [12]' "$TEMPORAL"; then
   fail "temporal overlay must not enable OIT (use quality or explicit experimental stack)"
@@ -59,7 +62,11 @@ if ! grep -q 'r_temporalWeaponAfterTaa' "$TEMPORAL"; then
   fail "temporal overlay must seta r_temporalWeaponAfterTaa 1 (weapon history ownership)"
 fi
 cvar_is "$TEMPORAL" r_temporalWeaponAfterTaa 1 || fail "temporal overlay weapon-after must be 1"
-pass "temporal overlay: TAA+MVs, no OIT, weapon-after pinned"
+# Heuristic reactive (history bleed / near-weapon) must not be gated only on stamp mask
+TAA_FRAG="$ROOT/renderers/vulkan/shaders/glsl/taa.frag"
+grep -q 'historyBleed' "$TAA_FRAG" || fail "taa.frag missing historyBleed anti-echo reject"
+grep -q 'Heuristic reactive always runs' "$TAA_FRAG" || fail "taa.frag must keep heuristic reactive independent of stamp mask"
+pass "temporal overlay: TAA+MVs, aaMode 4, no cleanup halo, weapon-after pinned"
 
 # --- Safe recovery ---
 cvar_is "$SAFE" r_taa 0 || fail "gfx_safe must disable TAA"

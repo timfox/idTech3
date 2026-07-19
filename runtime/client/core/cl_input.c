@@ -368,6 +368,69 @@ static void CL_KeyMove( usercmd_t *cmd ) {
 
 /*
 =================
+CL_RpMenuActive
+
+HavenRP F4 City Menu uses ui_rpMenu without KEYCATCH_UI so the Q3 menu VM
+stays idle — still needs pointer mode (free look off, free cursor).
+=================
+*/
+qboolean CL_RpMenuActive( void ) {
+	return ( Cvar_VariableIntegerValue( "ui_rpMenu" ) != 0 ) ? qtrue : qfalse;
+}
+
+
+/*
+=================
+CL_GetHudCursorVirtual
+
+Map absolute window mouse pixels to 640x480 HUD space (inverse of SCR_AdjustFrom640).
+=================
+*/
+void CL_GetHudCursorVirtual( float *outX, float *outY ) {
+	int sx = 0;
+	int sy = 0;
+	float scale;
+	float offsetX;
+	float offsetY;
+	float uiScale;
+	float vx;
+	float vy;
+
+	IN_GetAbsMouse( &sx, &sy );
+
+	scale = (float)cls.glconfig.vidWidth / 640.0f;
+	{
+		const float yScale = (float)cls.glconfig.vidHeight / 480.0f;
+		if ( yScale < scale ) {
+			scale = yScale;
+		}
+	}
+	if ( scale < 0.001f ) {
+		scale = 1.0f;
+	}
+
+	offsetX = ( cls.glconfig.vidWidth - ( 640.0f * scale ) ) * 0.5f;
+	offsetY = ( cls.glconfig.vidHeight - ( 480.0f * scale ) ) * 0.5f;
+
+	uiScale = Com_Clamp( 0.5f, 4.0f, Cvar_VariableValue( "ui_scale" ) );
+	if ( uiScale < 0.001f ) {
+		uiScale = 1.0f;
+	}
+
+	vx = ( ( (float)sx - offsetX ) / scale - 320.0f ) / uiScale + 320.0f;
+	vy = ( ( (float)sy - offsetY ) / scale - 240.0f ) / uiScale + 240.0f;
+
+	if ( outX ) {
+		*outX = vx;
+	}
+	if ( outY ) {
+		*outY = vy;
+	}
+}
+
+
+/*
+=================
 CL_MouseEvent
 =================
 */
@@ -377,6 +440,9 @@ void CL_MouseEvent( int dx, int dy /*, int time*/ ) {
 #endif
 	if ( Key_GetCatcher() & KEYCATCH_UI ) {
 		VM_Call( uivm, 2, UI_MOUSE_EVENT, dx, dy );
+	} else if ( CL_RpMenuActive() ) {
+		/* Pointer mode for JS City Menu — do not apply look deltas. */
+		return;
 	} else if ( Key_GetCatcher() & KEYCATCH_CGAME ) {
 		VM_Call( cgvm, 2, CG_MOUSE_EVENT, dx, dy );
 	} else {

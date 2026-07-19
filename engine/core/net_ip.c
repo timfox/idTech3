@@ -437,6 +437,17 @@ static qboolean Sys_StringToSockaddr( const char *s, sockaddr_t *sadr, int sadr_
 					search = SearchAddrInfo( res, AF_INET6 );
 #endif
 			}
+			/*
+			 * Address parsing must still succeed when net_enabled is 0 (common after
+			 * headless smoke archives CVAR_ARCHIVE_ND). Socket open remains gated in
+			 * NET_Config; only hostname→sockaddr resolution falls back here.
+			 */
+			if ( !search )
+				search = SearchAddrInfo( res, AF_INET );
+#ifdef USE_IPV6
+			if ( !search )
+				search = SearchAddrInfo( res, AF_INET6 );
+#endif
 		}
 		else
 			search = SearchAddrInfo( res, family );

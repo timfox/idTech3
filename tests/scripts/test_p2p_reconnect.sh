@@ -90,6 +90,8 @@ host = "127.0.0.1"
 cmd = [
     server_bin,
     "+set", "dedicated", "1",
+    # Force IPv4 on: archived net_enabled 0 from headless smokes breaks StringToAdr.
+    "+set", "net_enabled", "1",
     "+set", "net_ip", host,
     "+set", "net_port", str(port),
     "+set", "fs_basepath", game_base,

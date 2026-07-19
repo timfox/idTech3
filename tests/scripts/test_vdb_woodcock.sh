@@ -31,7 +31,10 @@ grep -q 'vdb_rebuild_majorant' "$VDB"
 grep -q 'r_vdbFog' "$VDB"
 
 grep -q 'volumetric_integration' "$INIT"
-grep -q '0|1|2|3' "$INIT"
+grep -q 'r_volumetricFogIntegration' "$INIT"
+grep -q 'Cvar_CheckRange( r_volumetricFogIntegration, "0", "3"' "$INIT" ||
+	grep -q 'ri.Cvar_CheckRange( r_volumetricFogIntegration, "0", "3"' "$INIT"
+grep -q 'OpenVDB Woodcock\|Woodcock/delta' "$INIT"
 
 grep -q 'binding = 17' "$DEVICE"
 grep -q 'binding = 18' "$DEVICE"

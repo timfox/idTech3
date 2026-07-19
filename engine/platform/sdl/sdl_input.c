@@ -606,6 +606,29 @@ static void IN_WarpToWindowCenter( void )
 }
 
 
+void IN_GetAbsMouse( int *x, int *y ) {
+	if ( x ) {
+		*x = ( last_ui_mouse_x < 0 ) ? ( glw_state.window_width / 2 ) : last_ui_mouse_x;
+	}
+	if ( y ) {
+		*y = ( last_ui_mouse_y < 0 ) ? ( glw_state.window_height / 2 ) : last_ui_mouse_y;
+	}
+}
+
+/*
+===============
+IN_PointerUiMode
+
+Q3 UI catcher or HavenRP City Menu — free look off, absolute cursor on.
+===============
+*/
+static qboolean IN_PointerUiMode( void ) {
+	if ( Key_GetCatcher() & KEYCATCH_UI ) {
+		return qtrue;
+	}
+	return CL_RpMenuActive();
+}
+
 /*
 ===============
 IN_ActivateMouse
@@ -668,7 +691,7 @@ IN_DeactivateMouse
 static void IN_DeactivateMouse( void )
 {
 	const char* drv = SDL_GetCurrentVideoDriver();
-	qboolean uiActive = ( Key_GetCatcher() & KEYCATCH_UI ) ? qtrue : qfalse;
+	qboolean uiActive = IN_PointerUiMode();
 
 	if ( !mouseAvailable )
 		return;
@@ -1958,7 +1981,7 @@ void HandleEvents( void )
 				break;
 
 			case SDL_EVENT_MOUSE_MOTION:
-				if( mouseActive || ( Key_GetCatcher() & KEYCATCH_UI ) )
+				if( mouseActive || IN_PointerUiMode() )
 				{
 					int dx, dy;
 					if ( mouseActive ) {
@@ -2242,12 +2265,12 @@ void IN_Frame( void )
 		IN_ClearImeState();
 	}
 
-	if ( Key_GetCatcher() & ( KEYCATCH_CONSOLE | KEYCATCH_UI ) ) {
-		/* Release mouse and show cursor when console or menu is open.
+	if ( Key_GetCatcher() & ( KEYCATCH_CONSOLE | KEYCATCH_UI ) || CL_RpMenuActive() ) {
+		/* Release mouse and show cursor when console, Q3 menu, or HavenRP City Menu is open.
 		 * In fullscreen single-monitor, console may keep grab for consistency;
 		 * menu always releases so user can click UI elements. */
 		if ( !glw_state.isFullscreen || glw_state.monitorCount > 1 ||
-		     ( Key_GetCatcher() & KEYCATCH_UI ) ) {
+		     IN_PointerUiMode() ) {
 			IN_DeactivateMouse();
 			return;
 		}
