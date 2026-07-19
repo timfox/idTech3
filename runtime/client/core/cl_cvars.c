@@ -43,7 +43,11 @@ void CL_InitCvars( void )
 	Cvar_CheckRange( cl_autoNudge, "0", "1", CV_FLOAT );
 	Cvar_SetDescription( cl_autoNudge, "Automatic time nudge that uses your average ping as the time nudge, values:\n  0 - use fixed \\cl_timeNudge\n (0..1] - factor of median average ping to use as timenudge\n" );
 
+#ifdef LEGACY_STANDALONE
+	cl_autoGraphicsProfile = Cvar_Get( "cl_autoGraphicsProfile", "0", CVAR_ARCHIVE_ND );
+#else
 	cl_autoGraphicsProfile = Cvar_Get( "cl_autoGraphicsProfile", "1", CVAR_ARCHIVE_ND );
+#endif
 	Cvar_CheckRange( cl_autoGraphicsProfile, "0", "1", CV_INTEGER );
 	Cvar_SetDescription( cl_autoGraphicsProfile,
 		"Auto graphics profile on cgame load: baseq3+cgame.qvm -> classic_baseq3.cfg; "
@@ -97,10 +101,10 @@ void CL_InitCvars( void )
 	Cvar_Get ("name", "UnnamedPlayer", CVAR_USERINFO | CVAR_ARCHIVE_ND );
 	Cvar_Get ("rate", "25000", CVAR_USERINFO | CVAR_ARCHIVE );
 	Cvar_Get ("snaps", "40", CVAR_USERINFO | CVAR_ARCHIVE );
-	Cvar_Get ("model", "sarge", CVAR_USERINFO | CVAR_ARCHIVE_ND );
-	Cvar_Get ("headmodel", "sarge", CVAR_USERINFO | CVAR_ARCHIVE_ND );
-	Cvar_Get ("team_model", "sarge", CVAR_USERINFO | CVAR_ARCHIVE_ND );
-	Cvar_Get ("team_headmodel", "sarge", CVAR_USERINFO | CVAR_ARCHIVE_ND );
+	Cvar_Get ("model", "gargoyle", CVAR_USERINFO | CVAR_ARCHIVE_ND );
+	Cvar_Get ("headmodel", "gargoyle", CVAR_USERINFO | CVAR_ARCHIVE_ND );
+	Cvar_Get ("team_model", "gargoyle", CVAR_USERINFO | CVAR_ARCHIVE_ND );
+	Cvar_Get ("team_headmodel", "gargoyle", CVAR_USERINFO | CVAR_ARCHIVE_ND );
 	Cvar_Get ("color1", "4", CVAR_USERINFO | CVAR_ARCHIVE );
 	Cvar_Get ("color2", "5", CVAR_USERINFO | CVAR_ARCHIVE );
 	Cvar_Get ("handicap", "100", CVAR_USERINFO | CVAR_ARCHIVE_ND );
@@ -112,4 +116,48 @@ void CL_InitCvars( void )
 
 	Cvar_Get ("cg_viewsize", "100", CVAR_ARCHIVE_ND );
 	Cvar_Get ("cg_stereoSeparation", "0", CVAR_ROM);
+#ifdef LEGACY_STANDALONE
+	Cvar_Set( "cl_autoGraphicsProfile", "0" );
+	Cvar_Set( "net_p2p", "1" );
+	Cvar_Set( "net_sdr", "1" );
+	Cvar_Set( "net_p2pBackend", "auto" );
+	Cvar_Set( "net_p2pStun", "1" );
+	Cvar_Set( "net_p2pStunAutoAdvertise", "1" );
+	Cvar_Set( "net_p2pPunch", "1" );
+	Cvar_Set( "cl_p2pAutoReconnect", "1" );
+	Cvar_Set( "sv_p2pHostMigration", "1" );
+	Cvar_Set( "in_mouse", "1" );
+	Cvar_Set( "in_nograb", "0" );
+	Cvar_Set( "cl_freelook", "1" );
+	Cvar_Set( "sensitivity", "3" );
+	Cvar_Set( "cl_mouseAccel", "0" );
+	Cvar_Set( "m_filter", "0" );
+	Cvar_Set( "cl_builtInTtf", "1" );
+	Cvar_Set( "cl_builtInTtfConsole", "1" );
+	Cvar_Set( "r_sdfEnable", "1" );
+	Cvar_Set( "r_font", "fonts/Inter-Bold.ttf" );
+	Cvar_Set( "r_consoleFont", "fonts/consolemono.ttf" );
+	Cvar_Set( "r_fontKerning", "1" );
+	Cvar_Set( "r_fontConsoleProportional", "1" );
+	Cvar_Set( "r_fontDpi", "96" );
+	Cvar_Set( "r_fontLcd", "0" );
+	Cvar_Set( "r_fontMipmap", "0" );
+	Cvar_Set( "r_fontSubpixelPos", "0" );
+	Cvar_Set( "r_fontHint", "1" );
+	Cvar_Set( "r_fontShadow", "1" );
+	Cvar_Set( "r_fontSize", "14" );
+	Cvar_Set( "r_textMode", "1" );
+	Cvar_Set( "r_openWorld", "0" );
+	Cvar_Set( "cl_openWorldSync", "0" );
+	Cvar_Set( "r_bspStream", "0" );
+	Cvar_Set( "cm_stream", "0" );
+	Cvar_Set( "cm_streamMerge", "0" );
+	Cvar_Set( "cm_openWorldCollision", "0" );
+	Cvar_Set( "r_district", "0" );
+	Cvar_Set( "r_proc", "0" );
+	Cvar_Set( "r_cbtTerrain", "0" );
+	Cvar_Set( "r_vdb", "0" );
+	Cvar_Set( "r_vdbFog", "0" );
+	Cvar_Set( "r_volumetricFog", "0" );
+#endif
 }

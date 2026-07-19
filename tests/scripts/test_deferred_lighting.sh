@@ -18,7 +18,8 @@ check() {
 }
 
 DGB="$(idtech3_file renderers/vulkan/vk_deferred_gbuffer.c src/renderers/vulkan/vk_deferred_gbuffer.c)"
-LIT="$(idtech3_file renderers/vulkan/shaders/glsl/deferred_lighting.comp src/renderers/vulkan/shaders/glsl/deferred_lighting.comp)"
+LIT="$(idtech3_file renderers/vulkan/shaders/glsl/deferred_lighting_common.glsl src/renderers/vulkan/shaders/glsl/deferred_lighting_common.glsl)"
+LIT_ENTRY="$(idtech3_file renderers/vulkan/shaders/glsl/deferred_lighting.comp src/renderers/vulkan/shaders/glsl/deferred_lighting.comp)"
 COMP="$(idtech3_file renderers/vulkan/shaders/glsl/deferred_lighting_composite.frag src/renderers/vulkan/shaders/glsl/deferred_lighting_composite.frag)"
 GBUF_FILL="$(idtech3_file renderers/vulkan/shaders/glsl/deferred_gbuffer_fill.comp src/renderers/vulkan/shaders/glsl/deferred_gbuffer_fill.comp)"
 GBUF_DEBUG="$(idtech3_file renderers/vulkan/shaders/glsl/deferred_gbuffer_debug.frag src/renderers/vulkan/shaders/glsl/deferred_gbuffer_debug.frag)"
@@ -52,8 +53,9 @@ check "$TR_INIT" 'r_deferredNormalEdgeThreshold = ri.Cvar_Get' 'deferred normal 
 check "$TR_INIT" 'r_deferredGBufferDebug, "0", "6"' 'deferred debug exposes confidence and motion modes'
 check "$TR_INIT" 'r_renderMode 1/2' 'G-buffer cvar documents mode 1/2 sidecar'
 check "$DGB" 'materialParams' 'G-buffer push carries material/normal params'
-check "$DGB" 'r_renderMode->integer == 1 || r_renderMode->integer == 2' 'G-buffer active in mode 1/2'
+check "$DGB" 'r_renderMode->integer != 1 && r_renderMode->integer != 2 && r_renderMode->integer != 3' 'G-buffer active in mode 1/2/3'
 check "$DGB" 'mode == 1 || mode == 3' 'deferred lighting active in mode 1 and Unified Clustered mode 3'
+check "$LIT_ENTRY" 'deferred_lighting_common.glsl' 'deferred lighting entry includes shared shade helpers'
 check "$DGB" 'normal confidence' 'deferred debug logs normal confidence mode'
 check "$DGB" 'vk.motion_vector_view' 'deferred debug can inspect real motion sidecar'
 check "$DGB" 'direct material/motion export' 'direct export path preserves material shader output'

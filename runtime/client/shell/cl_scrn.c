@@ -217,7 +217,7 @@ static float SCR_UiPixelScale( void ) {
 	return pixelScale;
 }
 
-static int SCR_ComputeHudTtfPointSize( void ) {
+static int SCR_HudTtfTargetPixelHeight( void ) {
 	int basePt;
 	int targetPx;
 	float pixelScale;
@@ -228,12 +228,23 @@ static int SCR_ComputeHudTtfPointSize( void ) {
 	}
 
 	pixelScale = SCR_UiPixelScale();
-	targetPx = (int)( (float)BIGCHAR_HEIGHT * pixelScale + 0.5f );
+	/*
+	 * Rasterize near typical JS HUD body height (~12 virtual), not BIGCHAR (16).
+	 * An oversized atlas forces downscale and muddies counters at menu sizes.
+	 * r_fontSize still floors the target so raising it keeps a denser atlas.
+	 */
+	targetPx = (int)( 12.0f * pixelScale + 0.5f );
 	if ( targetPx < basePt ) {
 		targetPx = basePt;
 	}
+	if ( targetPx < 14 ) {
+		targetPx = 14;
+	}
+	return targetPx;
+}
 
-	return SCR_TtfPointSizeForPixelHeight( targetPx );
+static int SCR_ComputeHudTtfPointSize( void ) {
+	return SCR_TtfPointSizeForPixelHeight( SCR_HudTtfTargetPixelHeight() );
 }
 
 static int SCR_ComputeConsoleTtfPointSize( void ) {
@@ -399,7 +410,7 @@ void CL_RegisterBuiltInTrueTypeFonts( void ) {
 		Com_Printf( "Client: console text using bitmap charset (cl_builtInTtfConsole 0)\n" );
 	}
 	Com_Printf( "Client: built-in HUD TrueType font \"%s\" @ %dpt (target ~%dpx, dpi %d)\n",
-		hudPath, hudPt, (int)( (float)BIGCHAR_HEIGHT * SCR_UiPixelScale() + 0.5f ), Cvar_VariableIntegerValue( "r_fontDpi" ) );
+		hudPath, hudPt, SCR_HudTtfTargetPixelHeight(), Cvar_VariableIntegerValue( "r_fontDpi" ) );
 	if ( r_fontKerning ) {
 		Com_Printf( "Client: r_fontKerning %i (proportional xSkip + FreeType kern; Rougier HAL-05430837)\n",
 			r_fontKerning->integer );
@@ -505,25 +516,58 @@ static void SCR_TtfConsoleGlyphRect( float xx, float y, const glyphInfo_t *g, fl
 }
 
 
-static float SCR_TtfScaledTop( const glyphInfo_t *g, float cellH ) {
-	if ( !g || g->imageHeight <= 0 || cellH <= 0.0f ) {
-		return 0.0f;
+static float SCR_UiAdjustScale( void ) {
+	float scale;
+
+	scale = (float)cls.glconfig.vidWidth / 640.0f;
+	{
+		const float yScale = (float)cls.glconfig.vidHeight / 480.0f;
+		if ( yScale < scale ) {
+			scale = yScale;
+		}
 	}
-	return (float)g->top * cellH / (float)g->imageHeight;
+	if ( ui_scale ) {
+		scale *= Com_Clamp( 0.5f, 4.0f, ui_scale->value );
+	}
+	if ( scale < 0.001f ) {
+		scale = 1.0f;
+	}
+	return scale;
 }
 
 /*
-SCR_TtfCellAy
-Vertical origin for a TrueType glyph stretched into a square cell (virtual 640x480 or screen pixels).
-When baseline alignment is on, a row baseline sits above a descender gutter so cap height and descenders fit more naturally than pinning the atlas rect to y.
+SCR_TtfVirtualGlyphRect
+Aspect-correct glyph quad in 640x480 virtual units (used by HUD / JS text).
+Scale all metrics by cellH/refLinePx so advance, width, and baseline stay consistent.
 */
-static float SCR_TtfCellAy( float y, const glyphInfo_t *g, float cellH, int refLinePx, qboolean baselineAlign ) {
-	if ( !baselineAlign || refLinePx <= 0 || cellH <= 0.0f || !g || g->imageHeight <= 0 ) {
-		return y;
+static void SCR_TtfVirtualGlyphRect( float xx, float y, const glyphInfo_t *g, float cellH,
+		int refLinePx, qboolean baselineAlign,
+		float *outAx, float *outAy, float *outAw, float *outAh ) {
+	float scale;
+	int ref;
+
+	ref = refLinePx;
+	if ( ref <= 0 ) {
+		ref = ( g && g->imageHeight > 0 ) ? g->imageHeight : 1;
 	}
-	const float desc = Com_Clamp( 2.0f, 12.0f, cellH * 0.22f );
-	const float baselineInCell = cellH - desc;
-	return y + baselineInCell - SCR_TtfScaledTop( g, cellH );
+	scale = cellH / (float)ref;
+	*outAw = (float)g->imageWidth * scale;
+	*outAh = (float)g->imageHeight * scale;
+	if ( *outAw < 0.5f ) {
+		*outAw = 0.5f;
+	}
+	if ( *outAh < 0.5f ) {
+		*outAh = 0.5f;
+	}
+	*outAx = xx;
+	if ( baselineAlign ) {
+		const float desc = Com_Clamp( 1.0f, cellH * 0.25f, cellH * 0.28f );
+		const float baselineInCell = cellH - desc;
+		/* g->top is atlas pixels from glyph top to baseline — same scale as width/advance. */
+		*outAy = y + baselineInCell - ( (float)g->top * scale );
+	} else {
+		*outAy = y;
+	}
 }
 
 static float SCR_TtfShadowOffset( void ) {
@@ -565,6 +609,8 @@ static int SCR_TextRenderMode( void ) {
 static float SCR_TtfGlyphAdvance( const fontInfo_t *font, int refLinePx, float cellH,
 		const glyphInfo_t *g, int prevCh, int ch ) {
 	float adv;
+	float minAdv;
+	float track;
 
 	if ( !g || refLinePx <= 0 || cellH <= 0.0f ) {
 		return cellH;
@@ -573,6 +619,17 @@ static float SCR_TtfGlyphAdvance( const fontInfo_t *font, int refLinePx, float c
 	if ( r_fontKerning && r_fontKerning->integer && prevCh >= 0 && re.GetFontKerning ) {
 		adv += re.GetFontKerning( font, prevCh, ch ) * cellH / (float)refLinePx;
 	}
+	/* Never advance less than ~85% of ink width — only block hard overlaps. */
+	minAdv = (float)g->imageWidth * cellH / (float)refLinePx * 0.85f;
+	if ( adv < minAdv ) {
+		adv = minAdv;
+	}
+	/* Light tracking improves HUD readability without blowing out console density. */
+	track = cellH * 0.02f;
+	if ( track > 0.45f ) {
+		track = 0.45f;
+	}
+	adv += track;
 	if ( adv < 1.0f ) {
 		adv = 1.0f;
 	}
@@ -589,6 +646,7 @@ static qboolean SCR_DrawBuiltInTtfStringExtVirtual( int x, int y, float size, co
 	const float shOff = SCR_TtfShadowOffset();
 	const float sp = SCR_TtfSubpixelBias();
 	const qboolean baselineAlign = ( r_fontConsoleAlign && r_fontConsoleAlign->integer ) ? qtrue : qfalse;
+	const qboolean snapPx = !( r_fontSubpixelPos && r_fontSubpixelPos->integer );
 	const int refPx = cls.builtInHudRefLinePx;
 	int prevCh;
 
@@ -596,11 +654,10 @@ static qboolean SCR_DrawBuiltInTtfStringExtVirtual( int x, int y, float size, co
 		return qfalse;
 	}
 
-	/* Match SCR_DrawChar: cell is `size` x `size` in 640x480 virtual units; do not scale quad by
-	 * atlas pixel dimensions * useScale or huge clampedSize values blow up SCR_AdjustFrom640. */
+	/* Proportional, aspect-correct glyph quads in virtual 640x480 space. */
 	if ( shOff > 0.0f ) {
 		color[0] = color[1] = color[2] = 0.0f;
-		color[3] = setColor[3];
+		color[3] = setColor[3] * 0.40f;
 		re.SetColor( color );
 		s = string;
 		xx = (float)x;
@@ -609,6 +666,7 @@ static qboolean SCR_DrawBuiltInTtfStringExtVirtual( int x, int y, float size, co
 			int ch;
 			const glyphInfo_t *g;
 			float ax, ay, aw, ah;
+			float adv;
 
 			if ( !noColorEscape && Q_IsColorString( s ) ) {
 				s += 2;
@@ -628,18 +686,47 @@ static qboolean SCR_DrawBuiltInTtfStringExtVirtual( int x, int y, float size, co
 			ch &= 255;
 			g = &font->glyphs[ch];
 			if ( !g->glyph || g->imageHeight <= 0 || g->imageWidth <= 0 ) {
-				xx += cell;
+				adv = SCR_TtfGlyphAdvance( font, refPx, cell, g, prevCh, ch );
+				if ( snapPx ) {
+					const float sc = SCR_UiAdjustScale();
+					adv = floorf( adv * sc + 0.5f ) / sc;
+					if ( adv < 1.0f / sc ) {
+						adv = 1.0f / sc;
+					}
+				}
+				xx += adv;
+				prevCh = ch;
 				continue;
 			}
-			aw = cell;
-			ah = cell;
-			ax = xx + shOff;
-			ay = SCR_TtfCellAy( (float)y, g, cell, refPx, baselineAlign ) + shOff;
+			SCR_TtfVirtualGlyphRect( xx, (float)y, g, cell, refPx, baselineAlign, &ax, &ay, &aw, &ah );
+			ax += shOff;
+			ay += shOff;
 			SCR_AdjustFrom640( &ax, &ay, &aw, &ah );
-			ax += sp;
-			ay += sp;
+			if ( snapPx ) {
+				ax = floorf( ax + 0.5f );
+				/* Do not snap ay — per-glyph Y rounding causes baseline jitter. */
+				aw = floorf( aw + 0.5f );
+				ah = floorf( ah + 0.5f );
+				if ( aw < 1.0f ) {
+					aw = 1.0f;
+				}
+				if ( ah < 1.0f ) {
+					ah = 1.0f;
+				}
+			} else {
+				ax += sp;
+				ay += sp;
+			}
 			SCR_DrawStretchPicTtf( ax, ay, aw, ah, g->s, g->t, g->s2, g->t2, g->glyph );
-			xx += SCR_TtfGlyphAdvance( font, refPx, cell, g, prevCh, ch );
+			adv = SCR_TtfGlyphAdvance( font, refPx, cell, g, prevCh, ch );
+			if ( snapPx ) {
+				const float sc = SCR_UiAdjustScale();
+				adv = floorf( adv * sc + 0.5f ) / sc;
+				if ( adv < 1.0f / sc ) {
+					adv = 1.0f / sc;
+				}
+			}
+			xx += adv;
 			prevCh = ch;
 		}
 	}
@@ -653,6 +740,7 @@ static qboolean SCR_DrawBuiltInTtfStringExtVirtual( int x, int y, float size, co
 		int ch;
 		const glyphInfo_t *g;
 		float ax, ay, aw, ah;
+		float adv;
 
 		if ( Q_IsColorString( s ) ) {
 			if ( !forceColor ) {
@@ -680,18 +768,45 @@ static qboolean SCR_DrawBuiltInTtfStringExtVirtual( int x, int y, float size, co
 		ch &= 255;
 		g = &font->glyphs[ch];
 		if ( !g->glyph || g->imageHeight <= 0 || g->imageWidth <= 0 ) {
-			xx += cell;
+			adv = SCR_TtfGlyphAdvance( font, refPx, cell, g, prevCh, ch );
+			if ( snapPx ) {
+				const float sc = SCR_UiAdjustScale();
+				adv = floorf( adv * sc + 0.5f ) / sc;
+				if ( adv < 1.0f / sc ) {
+					adv = 1.0f / sc;
+				}
+			}
+			xx += adv;
+			prevCh = ch;
 			continue;
 		}
-		aw = cell;
-		ah = cell;
-		ax = xx;
-		ay = SCR_TtfCellAy( (float)y, g, cell, refPx, baselineAlign );
+		SCR_TtfVirtualGlyphRect( xx, (float)y, g, cell, refPx, baselineAlign, &ax, &ay, &aw, &ah );
 		SCR_AdjustFrom640( &ax, &ay, &aw, &ah );
-		ax += sp;
-		ay += sp;
+		if ( snapPx ) {
+			ax = floorf( ax + 0.5f );
+			/* Do not snap ay — per-glyph Y rounding causes baseline jitter. */
+			aw = floorf( aw + 0.5f );
+			ah = floorf( ah + 0.5f );
+			if ( aw < 1.0f ) {
+				aw = 1.0f;
+			}
+			if ( ah < 1.0f ) {
+				ah = 1.0f;
+			}
+		} else {
+			ax += sp;
+			ay += sp;
+		}
 		SCR_DrawStretchPicTtf( ax, ay, aw, ah, g->s, g->t, g->s2, g->t2, g->glyph );
-		xx += SCR_TtfGlyphAdvance( font, refPx, cell, g, prevCh, ch );
+		adv = SCR_TtfGlyphAdvance( font, refPx, cell, g, prevCh, ch );
+		if ( snapPx ) {
+			const float sc = SCR_UiAdjustScale();
+			adv = floorf( adv * sc + 0.5f ) / sc;
+			if ( adv < 1.0f / sc ) {
+				adv = 1.0f / sc;
+			}
+		}
+		xx += adv;
 		prevCh = ch;
 	}
 
@@ -1451,22 +1566,16 @@ static void SCR_DrawScreenField( stereoFrame_t stereoFrame ) {
 		VM_Call( uivm, 1, UI_REFRESH, cls.realtime );
 	}
 
-#ifdef USE_DUKTAPE
 	/* JS HUD must draw after FinishBloom (UI overlay pass), same as the console.
-	 * StretchPics queued earlier land in the HDR/bloom path and never composite. */
+	 * StretchPics queued earlier land in the HDR/bloom path and never composite.
+	 * Note: client/.c files may not define USE_DUKTAPE; JsDebug_DrawFrame is always
+	 * linked (real impl or stub from qcommon). */
 	if ( cls.state == CA_ACTIVE ) {
 		if ( re.FinishBloom ) {
 			re.FinishBloom();
 		}
-		{
-			/* Temporary visibility probe — remove after HUD path is confirmed. */
-			static const float s_jsHudProbeColor[4] = { 1.0f, 0.15f, 0.1f, 0.9f };
-			SCR_FillRect( 16, 16, 220, 72, s_jsHudProbeColor );
-			SCR_DrawStringExt( 24, 28, 14, "C-HUD PROBE", colorWhite, qtrue, qfalse );
-		}
 		JsDebug_DrawFrame( cls.frametime, cls.realFrametime );
 	}
-#endif
 
 	// console draws next
 	Con_DrawConsole ();

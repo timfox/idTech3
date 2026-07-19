@@ -729,13 +729,17 @@ static duk_ret_t Js_Binding_HudDrawPic( duk_context *ctx ) {
 	return 0;
 }
 
+/* Last color from hudSetColor — hudDrawText reads this (SCR_DrawStringExt needs explicit RGBA). */
+static vec4_t s_jsHudColor = { 1.0f, 1.0f, 1.0f, 1.0f };
+
 static duk_ret_t Js_Binding_HudDrawText( duk_context *ctx ) {
 	const int x = duk_require_int( ctx, 0 );
 	const int y = duk_require_int( ctx, 1 );
 	const char *text = duk_require_string( ctx, 2 );
 	const float size = ( duk_get_top( ctx ) > 3 ) ? (float)duk_to_number( ctx, 3 ) : 8.0f;
 
-	SCR_DrawStringExt( x, y, size, text, g_color_table[ColorIndex( COLOR_WHITE )], qtrue, qfalse );
+	/* forceColor=true so embedded ^# codes don't override hudSetColor; pass stored RGBA. */
+	SCR_DrawStringExt( x, y, size, text, s_jsHudColor, qtrue, qfalse );
 	return 0;
 }
 #endif
@@ -939,12 +943,11 @@ static duk_ret_t Js_Binding_GetMilliseconds( duk_context *ctx ) {
 
 #ifndef DEDICATED
 static duk_ret_t Js_Binding_HudSetColor( duk_context *ctx ) {
-	vec4_t color;
-	color[0] = (float)duk_require_number( ctx, 0 );
-	color[1] = (float)duk_require_number( ctx, 1 );
-	color[2] = (float)duk_require_number( ctx, 2 );
-	color[3] = ( duk_get_top( ctx ) > 3 ) ? (float)duk_to_number( ctx, 3 ) : 1.0f;
-	re.SetColor( color );
+	s_jsHudColor[0] = (float)duk_require_number( ctx, 0 );
+	s_jsHudColor[1] = (float)duk_require_number( ctx, 1 );
+	s_jsHudColor[2] = (float)duk_require_number( ctx, 2 );
+	s_jsHudColor[3] = ( duk_get_top( ctx ) > 3 ) ? (float)duk_to_number( ctx, 3 ) : 1.0f;
+	re.SetColor( s_jsHudColor );
 	return 0;
 }
 
@@ -960,6 +963,7 @@ static duk_ret_t Js_Binding_HudDrawRect( duk_context *ctx ) {
 
 static duk_ret_t Js_Binding_HudResetColor( duk_context *ctx ) {
 	(void)ctx;
+	s_jsHudColor[0] = s_jsHudColor[1] = s_jsHudColor[2] = s_jsHudColor[3] = 1.0f;
 	re.SetColor( NULL );
 	return 0;
 }
@@ -1198,7 +1202,6 @@ void JsDebug_DrawFrame( int msec, int realMsec ) {
 	const int startTime = Sys_Milliseconds();
 	const int budgetMs = JsDebug_ClampInt( js_frameCallbackBudgetMs ? js_frameCallbackBudgetMs->integer : 0, 0, 1000 );
 	static int s_lastBudgetWarnMs = 0;
-	static int s_drawFrameLogOnce = 0;
 
 	if ( !s_jsContext ) {
 		return;
@@ -1210,17 +1213,9 @@ void JsDebug_DrawFrame( int msec, int realMsec ) {
 	}
 
 	if ( !JsDebug_GetEventCallbacksArray( s_jsContext, "frame", qfalse ) ) {
-		if ( !s_drawFrameLogOnce ) {
-			s_drawFrameLogOnce = 1;
-			Com_Printf( S_COLOR_YELLOW "JavaScript: JsDebug_DrawFrame — no frame callbacks registered\n" );
-		}
 		return;
 	}
 	len = duk_get_length( s_jsContext, -1 );
-	if ( !s_drawFrameLogOnce ) {
-		s_drawFrameLogOnce = 1;
-		Com_Printf( S_COLOR_CYAN "JavaScript: JsDebug_DrawFrame — %u frame callback(s)\n", (unsigned)len );
-	}
 
 	for ( i = 0; i < len; i++ ) {
 		if ( budgetMs > 0 && ( Sys_Milliseconds() - startTime ) >= budgetMs ) {
@@ -1620,6 +1615,11 @@ void Cmd_JsExec_f( void ) {
 }
 
 void JsDebug_Frame( int msec, int realMsec ) {
+	(void)msec;
+	(void)realMsec;
+}
+
+void JsDebug_DrawFrame( int msec, int realMsec ) {
 	(void)msec;
 	(void)realMsec;
 }

@@ -6,7 +6,7 @@ The idTech3 JavaScript (Duktape) runtime exposes HUD drawing functions for custo
 
 ## When to Call
 
-**Critical:** `hudDrawPic`, `hudDrawText`, `hudSetColor`, `hudDrawRect`, and `hudResetColor` must be invoked from an `idtech3.on("frame", ...)` callback. The engine runs those callbacks from `SCR_DrawScreenField` (after `RE_BeginFrame` / world draw) so 2D commands are not discarded. Drawing outside this context will not appear.
+**Critical:** `hudDrawPic`, `hudDrawText`, `hudSetColor`, `hudDrawRect`, and `hudResetColor` must be invoked from an `idtech3.on("frame", ...)` callback. The engine runs those callbacks from `SCR_DrawScreenField` after `FinishBloom` (UI overlay pass), so 2D commands composite correctly under Vulkan. Drawing outside this context will not appear.
 
 ## Example: Frame-Based HUD
 
