@@ -62,6 +62,8 @@ void GLW_RestoreGamma( void );
 
 void IN_Init( void );
 void IN_Shutdown( void );
+/* Focus / un-minimize / presentation restore: re-assert relative mouse grab. */
+void IN_NotifyWindowRestored( void );
 
 // signals.c
 void InitSig( void );

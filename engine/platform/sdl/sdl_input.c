@@ -2127,6 +2127,10 @@ void HandleEvents( void )
 			case SDL_EVENT_WINDOW_RESTORED:
 			case SDL_EVENT_WINDOW_MAXIMIZED:
 				gw_minimized = qfalse;
+				IN_NotifyWindowRestored();
+				if ( re.NotifyWindowRestored ) {
+					re.NotifyWindowRestored( "window_restored" );
+				}
 				break;
 			case SDL_EVENT_WINDOW_FOCUS_LOST:
 				lastKeyDown = 0; Key_ClearStates(); IN_SyncModifiers();
@@ -2142,6 +2146,10 @@ void HandleEvents( void )
 				mouse_focus = qtrue;
 				if ( re.SetColorMappings ) {
 					re.SetColorMappings();
+				}
+				IN_NotifyWindowRestored();
+				if ( re.NotifyWindowRestored ) {
+					re.NotifyWindowRestored( "focus_gained" );
 				}
 				break;
 			case SDL_EVENT_WINDOW_MOUSE_ENTER:
@@ -2159,6 +2167,47 @@ void HandleEvents( void )
 	}
 }
 
+
+/*
+===============
+IN_NotifyWindowRestored
+
+Re-assert relative mouse after alt-tab / un-minimize / presentation restore.
+Forces ActivateMouse to re-run grab + relative mode even if already "active".
+===============
+*/
+void IN_NotifyWindowRestored( void )
+{
+	if ( !mouseAvailable ) {
+		return;
+	}
+
+	IN_GobbleMouseEvents();
+	mouse_frac_x = 0.0f;
+	mouse_frac_y = 0.0f;
+
+	/* Force the activate path even when mouseActive was sticky across focus loss. */
+	mouseActive = qfalse;
+
+	if ( !gw_active || ( in_nograb && in_nograb->integer ) ) {
+		return;
+	}
+	if ( Key_GetCatcher() & ( KEYCATCH_CONSOLE | KEYCATCH_UI ) ) {
+		return;
+	}
+
+	mouse_focus = qtrue;
+	IN_ActivateMouse();
+
+	if ( mouseActive && mouseRelativeWanted && SDL_window &&
+		!SDL_GetWindowRelativeMouseMode( SDL_window ) ) {
+		IN_SetRelativeMouse( qtrue );
+	}
+
+	Com_DPrintf( "[input] window restored: relative=%s grab=%s\n",
+		mouseRelativeActive ? "yes" : "no",
+		mouseActive ? "yes" : "no" );
+}
 
 /*
 ===============
@@ -2253,6 +2302,7 @@ static void IN_InputStatus_f( void )
 	Com_Printf( "  window focus:     %s\n", gw_active ? "yes" : "no" );
 	Com_Printf( "  mouse focus:      %s\n", mouse_focus ? "yes" : "no" );
 	Com_Printf( "  minimized:        %s\n", gw_minimized ? "yes" : "no" );
+	Com_Printf( "  restore hook:     IN_NotifyWindowRestored + re.NotifyWindowRestored\n" );
 	Com_Printf( "  mouse available:  %s (in_mouse=%d)\n", mouseAvailable ? "yes" : "no",
 		in_mouse ? in_mouse->integer : 0 );
 	Com_Printf( "  mouse active:     %s\n", mouseActive ? "yes" : "no" );

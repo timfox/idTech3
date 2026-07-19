@@ -97,8 +97,14 @@ grep -q 'vk_spine_expect_layout' "$ROOT/renderers/vulkan/vk_ambient_visibility.c
   fail "AV must expect depth read-only layout after transition"
 grep -q 'vk_spine_expect_layout' "$ROOT/renderers/vulkan/vk_frame_end.c" || \
   fail "TAA must expect HDR/history/reactive layouts"
+grep -q 'gamma_src' "$ROOT/renderers/vulkan/vk_frame_end.c" || \
+  fail "gamma must expect HDR sample layout"
 grep -q 'vk_spine_expect_layout' "$ROOT/renderers/vulkan/vk_post_aa.c" || \
   fail "SMAA must expect HDR sample layout"
+grep -q 'bloom_extract' "$ROOT/renderers/vulkan/vk_postfx_passes.c" || \
+  fail "bloom must expect HDR sample layout"
+grep -q 'VK_SPINE_RES_SSR' "$ROOT/renderers/vulkan/vk_postfx_passes.c" || \
+  fail "SSR must stamp SSR resource layout"
 grep -q 'vk_spine_expect_layout' "$ROOT/renderers/vulkan/vk_volumetric_pass_compute.c" || \
   fail "froxel must expect sun-shadow sample layout"
 grep -q 'HISTORY_READ' "$ROOT/renderers/vulkan/vk_frame_end.c" || \

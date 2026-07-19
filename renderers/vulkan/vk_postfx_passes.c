@@ -483,6 +483,9 @@ void vk_ssr_pass( void )
 		VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL, 0, 0 );
 	vk_spine_expect_layout( VK_SPINE_RES_DEPTH, VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL,
 		VK_SPINE_PASS_SSR, "ssr_depth" );
+	if ( vk.ssr_image != VK_NULL_HANDLE ) {
+		vk_spine_note_layout( VK_SPINE_RES_SSR, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL );
+	}
 
 	vk_begin_ssr_render_pass();
 	qvkCmdBindPipeline( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.ssr_pipeline );
@@ -768,6 +771,8 @@ qboolean vk_bloom( void )
 	vk_assert_ui_pass_consistency( "vk_bloom" );
 
 	vk_pass_diag_stage( "bloom_enter" );
+	vk_spine_expect_layout( VK_SPINE_RES_HDR_COLOR, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+		VK_SPINE_PASS_BLOOM, "bloom_extract" );
 	if ( r_fboDebug && r_fboDebug->integer >= 1 && vk_post_fog_fbo_debug_throttle() ) {
 		ri.Printf( PRINT_DEVELOPER,
 			"[VK][bloom] enter: source=%s capture=%dx%d render=%ux%u threshold=%.3f intensity=%.3f\n",
@@ -787,6 +792,8 @@ qboolean vk_bloom( void )
 
 	/* Ensure color_image is ready for sampling before bloom extract */
 	vk_barrier_post_fog_source_for_sampling( vk.color_image_view, "pre-bloom-extract" );
+	vk_spine_note_layout( VK_SPINE_RES_HDR_COLOR, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL );
+	vk_spine_note_barrier( VK_SPINE_RES_HDR_COLOR, VK_SPINE_PASS_BLOOM, "pre-bloom-extract" );
 	vk_pass_diag_stage( "bloom_extract" );
 
 	if ( !vk_bloom_validate_step( "extract", (uint32_t)gls.captureWidth, (uint32_t)gls.captureHeight, 0 ) ) {

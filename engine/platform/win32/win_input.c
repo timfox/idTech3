@@ -1226,6 +1226,21 @@ void IN_Activate( qboolean active ) {
 	}
 }
 
+/*
+===========
+IN_NotifyWindowRestored
+
+Focus / un-minimize / presentation restore — re-assert mouse for Spine input lifecycle.
+===========
+*/
+void IN_NotifyWindowRestored( void )
+{
+	if ( !gw_active || gw_minimized ) {
+		return;
+	}
+	IN_Activate( qtrue );
+	IN_ActivateMouse();
+}
 
 /*
 ==================

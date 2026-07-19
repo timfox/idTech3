@@ -44,13 +44,21 @@ grep -q 'VK_TEMPORAL_RESET_SWAPCHAIN_CHANGE' "$PRES" || fail "presentation must 
 grep -q 'vk_presentation_note_window_restored' "$PRES" || fail "presentation must expose window-restored recovery"
 grep -q 'minimize_to_active' "$ROOT/renderers/vulkan/vk_frame_submit.c" || \
   fail "begin_frame must recover from minimize→active"
+grep -q 'CL_HasFocus' "$ROOT/renderers/vulkan/vk_frame_submit.c" || \
+  fail "begin_frame must observe CL_HasFocus for alt-tab"
+grep -q 'NotifyWindowRestored' "$ROOT/renderers/common/tr_public.h" || \
+  fail "refexport NotifyWindowRestored missing"
+grep -q 'IN_NotifyWindowRestored' "$ROOT/engine/platform/sdl/sdl_input.c" || \
+  fail "SDL IN_NotifyWindowRestored missing"
+grep -q 're.NotifyWindowRestored' "$ROOT/engine/platform/sdl/sdl_input.c" || \
+  fail "FOCUS_GAINED must notify renderer presentation restore"
 grep -q 'restore aborted: swapchain recreate failed' "$PRES" || \
   fail "restore must soft-fail when swapchain recreate fails"
 grep -q 'vk_ambient_visibility_reset_history' "$TEMP_C" || fail "temporal apply_resets must reset AV history"
 grep -q 'vk_reset_taa_history' "$TEMP_C" || fail "temporal apply_resets must reset TAA history"
 grep -q 'appliedResetReasons' "$ROOT/renderers/vulkan/vk_ambient_visibility.c" || \
   fail "AV frame_begin must observe temporal appliedResetReasons"
-pass "restart/temporal ownership: swapchain sticky + minimize restore + shared AV/TAA reset"
+pass "restart/temporal ownership: swapchain sticky + minimize/focus restore + shared AV/TAA reset"
 
 # 2d. Temporal history ownership contract (weapon / portals / status)
 bash "$ROOT/scripts/temporal_ownership_check.sh"

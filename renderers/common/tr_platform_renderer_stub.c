@@ -182,6 +182,7 @@ static void Stub_TakeVideoFrame( int h, int w, byte *captureBuffer, byte *encode
 static void Stub_ThrottleBackend( void ) {}
 static void Stub_FinishBloom( void ) {}
 static void Stub_SetColorMappings( void ) {}
+static void Stub_NotifyWindowRestored( const char *reason ) { (void)reason; }
 static qboolean Stub_CanMinimize( void ) { return qfalse; }
 static const glconfig_t *Stub_GetConfig( void ) { return &s_glconfig; }
 static void Stub_VertexLighting( qboolean allowed ) { (void)allowed; }
@@ -280,6 +281,7 @@ refexport_t *GetRefAPI( int apiVersion, refimport_t *rimp )
 	re.inPVS = Stub_inPVS;
 	re.TakeVideoFrame = Stub_TakeVideoFrame;
 	re.SetColorMappings = Stub_SetColorMappings;
+	re.NotifyWindowRestored = Stub_NotifyWindowRestored;
 	re.ThrottleBackend = Stub_ThrottleBackend;
 	re.FinishBloom = Stub_FinishBloom;
 	re.CanMinimize = Stub_CanMinimize;

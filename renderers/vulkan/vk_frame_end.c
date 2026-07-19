@@ -982,6 +982,10 @@ void vk_end_frame_record_gamma_pass( VkImageView post_fog_src )
 	}
 
 	vk_barrier_post_fog_source_for_sampling( gamma_src, "vk_end_frame pre-gamma (gamma_src)" );
+	vk_spine_note_layout( VK_SPINE_RES_HDR_COLOR, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL );
+	vk_spine_note_barrier( VK_SPINE_RES_HDR_COLOR, VK_SPINE_PASS_PRESENTATION, "pre-gamma" );
+	vk_spine_expect_layout( VK_SPINE_RES_HDR_COLOR, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+		VK_SPINE_PASS_PRESENTATION, "gamma_src" );
 	vk_update_color_descriptor_image( gamma_src );
 
 	if ( vk.depth_image != VK_NULL_HANDLE ) {

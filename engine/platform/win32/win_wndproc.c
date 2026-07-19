@@ -725,6 +725,10 @@ LRESULT WINAPI MainWndProc( HWND hWnd, UINT uMsg, WPARAM  wParam, LPARAM lParam 
 				SetGameDisplaySettings();
 				if ( re.SetColorMappings )
 					re.SetColorMappings();
+				IN_NotifyWindowRestored();
+				if ( re.NotifyWindowRestored ) {
+					re.NotifyWindowRestored( "focus_gained" );
+				}
 			} else {
 				// don't restore gamma if we have multiple monitors
 				if ( glw_state.monitorCount <= 1 || gw_minimized )
@@ -743,6 +747,10 @@ LRESULT WINAPI MainWndProc( HWND hWnd, UINT uMsg, WPARAM  wParam, LPARAM lParam 
 			if ( gw_active ) {
 				if ( re.SetColorMappings )
 					re.SetColorMappings();
+				IN_NotifyWindowRestored();
+				if ( re.NotifyWindowRestored ) {
+					re.NotifyWindowRestored( "focus_gained" );
+				}
 			} else {
 				GLW_RestoreGamma();
 			}

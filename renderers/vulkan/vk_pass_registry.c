@@ -1013,6 +1013,15 @@ void vk_spine_attachments_created( uint32_t width, uint32_t height )
 	if ( vk.froxel_volume_image != VK_NULL_HANDLE ) {
 		vk_spine_note_layout( VK_SPINE_RES_FROXEL_SCATTER, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL );
 	}
+	if ( vk.ssr_image != VK_NULL_HANDLE ) {
+		vk_spine_note_layout( VK_SPINE_RES_SSR, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL );
+	}
+	if ( vk.bloom_image[0] != VK_NULL_HANDLE ) {
+		vk_spine_note_layout( VK_SPINE_RES_BLOOM_CHAIN, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL );
+	}
+	if ( vk.motion_vector_image != VK_NULL_HANDLE ) {
+		vk_spine_note_layout( VK_SPINE_RES_MOTION_VECTORS, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL );
+	}
 
 	/* Temporal histories invalidate across attachment recreate. */
 	vk_spine_note_temporal_history( VK_SPINE_RES_TAA_HISTORY, qfalse );

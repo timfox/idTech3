@@ -175,6 +175,9 @@ typedef struct {
 	/* SDL3 webcam preview upload (*webcam dynamic texture). */
 	void (*WebcamUploadFrame)( const byte *rgba, int width, int height );
 
+	/* Focus / un-minimize / keep-window vid_restart: clear stale present state + sticky temporal. */
+	void (*NotifyWindowRestored)( const char *reason );
+
 } refexport_t;
 
 //
@@ -279,6 +282,9 @@ typedef struct {
 
 	/* Arc Blanc ocean height sampling (NULL when module disabled). */
 	float (*ArcBlancSampleHeight)( float worldX, float worldZ );
+
+	/* Keyboard/window focus (gw_active). NULL-safe; used for alt-tab presentation recovery. */
+	qboolean (*CL_HasFocus)( void );
 
 } refimport_t;
 

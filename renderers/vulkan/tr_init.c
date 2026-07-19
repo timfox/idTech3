@@ -3882,6 +3882,18 @@ static void RE_EndRegistration( void ) {
 
 
 /*
+=============
+RE_NotifyWindowRestored
+
+Client focus / un-minimize / keep-window vid_restart → presentation sticky reset.
+=============
+*/
+static void RE_NotifyWindowRestored( const char *reason )
+{
+	vk_presentation_note_window_restored( reason ? reason : "client" );
+}
+
+/*
 @@@@@@@@@@@@@@@@@@@@@
 GetRefAPI
 @@@@@@@@@@@@@@@@@@@@@
@@ -3936,6 +3948,7 @@ refexport_t *GetRefAPI ( int apiVersion, refimport_t *rimp ) {
 	re.ArcBlancGpuOceanStep = RE_ArcBlancGpuOceanStep;
 	re.EmulatorUploadFrame = RE_EmulatorUploadFrame;
 	re.WebcamUploadFrame = RE_WebcamUploadFrame;
+	re.NotifyWindowRestored = RE_NotifyWindowRestored;
 	re.AddPolyToScene = RE_AddPolyToScene;
 	re.LightForPoint = R_LightForPoint;
 	re.AddLightToScene = RE_AddLightToScene;
