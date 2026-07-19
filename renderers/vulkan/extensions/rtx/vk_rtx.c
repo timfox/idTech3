@@ -1892,12 +1892,25 @@ void vk_rtx_record_demo_pass( VkCommandBuffer cmd )
 			}
 			frameUbo.outputSize[2] = (float)rtxMode;
 		}
-		frameUbo.outputSize[3] = r_rtxComposite ? r_rtxComposite->value : 0.0f;
+		frameUbo.outputSize[3] = r_rtxComposite ? r_rtxComposite->value : 0.55f;
 		if ( frameUbo.outputSize[3] < 0.0f ) {
 			frameUbo.outputSize[3] = 0.0f;
 		}
 		if ( frameUbo.outputSize[3] > 1.0f ) {
 			frameUbo.outputSize[3] = 1.0f;
+		}
+		/* Closest-hit still writes flat grey albedo — full replace (composite≈0)
+		 * paints the whole framebuffer grey. Keep a usable scene mix unless the
+		 * user explicitly asked for a near-pure RT slab (>= 0.05 keeps intent). */
+		if ( frameUbo.outputSize[3] < 0.05f ) {
+			static qboolean s_rtxCompositeGreyWarned;
+			if ( !s_rtxCompositeGreyWarned ) {
+				ri.Printf( PRINT_WARNING,
+					"[VK][RTX] r_rtxComposite near 0 replaces the scene with flat RT albedo (grey). "
+					"Clamping demo mix to 0.55; set r_rtxComposite 0.05..1 (1=scene only).\n" );
+				s_rtxCompositeGreyWarned = qtrue;
+			}
+			frameUbo.outputSize[3] = 0.55f;
 		}
 		frameUbo.traceParams[0] = ( r_rtxSamples && r_rtxSamples->integer > 0 ) ? (float)r_rtxSamples->integer : 1.0f;
 		if ( frameUbo.traceParams[0] > 8.0f ) {

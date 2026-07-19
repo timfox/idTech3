@@ -98,6 +98,9 @@ static cvar_t *r_gtaoSteps;
 static cvar_t *r_gtaoThickness;
 static cvar_t *r_gtaoHalfRes;
 
+static qboolean AV_FailInject( const char *which );
+static void AV_DemoteToLegacySsao( const char *reason );
+
 static qboolean AV_RayQueryAvailable( void )
 {
 #ifdef USE_VULKAN_RTX
@@ -131,6 +134,7 @@ static qboolean AV_CreateImage( av_image_t *img, uint32_t width, uint32_t height
 	VkMemoryRequirements req;
 	VkMemoryAllocateInfo mai;
 	VkImageViewCreateInfo vci;
+	VkResult res;
 
 	AV_DestroyImage( img );
 	Com_Memset( &ici, 0, sizeof( ici ) );
@@ -148,15 +152,33 @@ static qboolean AV_CreateImage( av_image_t *img, uint32_t width, uint32_t height
 		VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
 	ici.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 	ici.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-	VK_CHECK( qvkCreateImage( vk.device, &ici, NULL, &img->image ) );
+	res = qvkCreateImage( vk.device, &ici, NULL, &img->image );
+	if ( res != VK_SUCCESS ) {
+		ri.Printf( PRINT_WARNING, S_COLOR_YELLOW
+			"[AV] CreateImage(%s) failed: %s\n" S_COLOR_WHITE, name, vk_result_string( res ) );
+		AV_DestroyImage( img );
+		return qfalse;
+	}
 	qvkGetImageMemoryRequirements( vk.device, img->image, &req );
 	Com_Memset( &mai, 0, sizeof( mai ) );
 	mai.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
 	mai.allocationSize = req.size;
 	mai.memoryTypeIndex = vk_find_memory_type( vk.physical_device, req.memoryTypeBits,
 		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT );
-	VK_CHECK( qvkAllocateMemory( vk.device, &mai, NULL, &img->memory ) );
-	VK_CHECK( qvkBindImageMemory( vk.device, img->image, img->memory, 0 ) );
+	res = qvkAllocateMemory( vk.device, &mai, NULL, &img->memory );
+	if ( res != VK_SUCCESS ) {
+		ri.Printf( PRINT_WARNING, S_COLOR_YELLOW
+			"[AV] AllocateMemory(%s) failed: %s\n" S_COLOR_WHITE, name, vk_result_string( res ) );
+		AV_DestroyImage( img );
+		return qfalse;
+	}
+	res = qvkBindImageMemory( vk.device, img->image, img->memory, 0 );
+	if ( res != VK_SUCCESS ) {
+		ri.Printf( PRINT_WARNING, S_COLOR_YELLOW
+			"[AV] BindImageMemory(%s) failed: %s\n" S_COLOR_WHITE, name, vk_result_string( res ) );
+		AV_DestroyImage( img );
+		return qfalse;
+	}
 	Com_Memset( &vci, 0, sizeof( vci ) );
 	vci.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
 	vci.image = img->image;
@@ -165,7 +187,13 @@ static qboolean AV_CreateImage( av_image_t *img, uint32_t width, uint32_t height
 	vci.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
 	vci.subresourceRange.levelCount = 1;
 	vci.subresourceRange.layerCount = 1;
-	VK_CHECK( qvkCreateImageView( vk.device, &vci, NULL, &img->view ) );
+	res = qvkCreateImageView( vk.device, &vci, NULL, &img->view );
+	if ( res != VK_SUCCESS ) {
+		ri.Printf( PRINT_WARNING, S_COLOR_YELLOW
+			"[AV] CreateImageView(%s) failed: %s\n" S_COLOR_WHITE, name, vk_result_string( res ) );
+		AV_DestroyImage( img );
+		return qfalse;
+	}
 	img->layout = VK_IMAGE_LAYOUT_UNDEFINED;
 	img->width = width;
 	img->height = height;
@@ -186,11 +214,18 @@ static VkShaderModule AV_Module( const uint8_t *bytes, uint32_t size, const char
 {
 	VkShaderModuleCreateInfo ci;
 	VkShaderModule module = VK_NULL_HANDLE;
+	VkResult res;
+
 	Com_Memset( &ci, 0, sizeof( ci ) );
 	ci.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
 	ci.codeSize = size;
 	ci.pCode = (const uint32_t *)bytes;
-	VK_CHECK( qvkCreateShaderModule( vk.device, &ci, NULL, &module ) );
+	res = qvkCreateShaderModule( vk.device, &ci, NULL, &module );
+	if ( res != VK_SUCCESS ) {
+		ri.Printf( PRINT_WARNING, S_COLOR_YELLOW
+			"[AV] CreateShaderModule(%s) failed: %s\n" S_COLOR_WHITE, name, vk_result_string( res ) );
+		return VK_NULL_HANDLE;
+	}
 	SET_OBJECT_NAME( module, name, VK_DEBUG_REPORT_OBJECT_TYPE_SHADER_MODULE_EXT );
 	return module;
 }
@@ -202,7 +237,9 @@ static qboolean AV_CreateLayout( const VkDescriptorType *types, uint32_t count,
 	VkDescriptorSetLayoutCreateInfo dci;
 	VkPushConstantRange range;
 	VkPipelineLayoutCreateInfo pci;
+	VkResult res;
 	uint32_t i;
+
 	Com_Memset( bindings, 0, sizeof( bindings ) );
 	for ( i = 0; i < count; ++i ) {
 		bindings[i].binding = i;
@@ -214,7 +251,13 @@ static qboolean AV_CreateLayout( const VkDescriptorType *types, uint32_t count,
 	dci.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
 	dci.bindingCount = count;
 	dci.pBindings = bindings;
-	VK_CHECK( qvkCreateDescriptorSetLayout( vk.device, &dci, NULL, setLayout ) );
+	res = qvkCreateDescriptorSetLayout( vk.device, &dci, NULL, setLayout );
+	if ( res != VK_SUCCESS ) {
+		ri.Printf( PRINT_WARNING, S_COLOR_YELLOW
+			"[AV] CreateDescriptorSetLayout failed: %s\n" S_COLOR_WHITE, vk_result_string( res ) );
+		*setLayout = VK_NULL_HANDLE;
+		return qfalse;
+	}
 	Com_Memset( &range, 0, sizeof( range ) );
 	range.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
 	range.size = pushSize;
@@ -224,7 +267,15 @@ static qboolean AV_CreateLayout( const VkDescriptorType *types, uint32_t count,
 	pci.pSetLayouts = setLayout;
 	pci.pushConstantRangeCount = 1;
 	pci.pPushConstantRanges = &range;
-	VK_CHECK( qvkCreatePipelineLayout( vk.device, &pci, NULL, pipelineLayout ) );
+	res = qvkCreatePipelineLayout( vk.device, &pci, NULL, pipelineLayout );
+	if ( res != VK_SUCCESS ) {
+		ri.Printf( PRINT_WARNING, S_COLOR_YELLOW
+			"[AV] CreatePipelineLayout failed: %s\n" S_COLOR_WHITE, vk_result_string( res ) );
+		qvkDestroyDescriptorSetLayout( vk.device, *setLayout, NULL );
+		*setLayout = VK_NULL_HANDLE;
+		*pipelineLayout = VK_NULL_HANDLE;
+		return qfalse;
+	}
 	return qtrue;
 }
 
@@ -232,6 +283,11 @@ static VkPipeline AV_CreateComputePipeline( VkShaderModule module, VkPipelineLay
 {
 	VkComputePipelineCreateInfo ci;
 	VkPipeline pipeline = VK_NULL_HANDLE;
+	VkResult res;
+
+	if ( module == VK_NULL_HANDLE || layout == VK_NULL_HANDLE ) {
+		return VK_NULL_HANDLE;
+	}
 	Com_Memset( &ci, 0, sizeof( ci ) );
 	ci.sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO;
 	ci.stage.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
@@ -239,7 +295,12 @@ static VkPipeline AV_CreateComputePipeline( VkShaderModule module, VkPipelineLay
 	ci.stage.module = module;
 	ci.stage.pName = "main";
 	ci.layout = layout;
-	VK_CHECK( qvkCreateComputePipelines( vk.device, vk.pipelineCache, 1, &ci, NULL, &pipeline ) );
+	res = qvkCreateComputePipelines( vk.device, vk.pipelineCache, 1, &ci, NULL, &pipeline );
+	if ( res != VK_SUCCESS ) {
+		ri.Printf( PRINT_WARNING, S_COLOR_YELLOW
+			"[AV] CreateComputePipelines(%s) failed: %s\n" S_COLOR_WHITE, name, vk_result_string( res ) );
+		return VK_NULL_HANDLE;
+	}
 	SET_OBJECT_NAME( pipeline, name, VK_DEBUG_REPORT_OBJECT_TYPE_PIPELINE_EXT );
 	return pipeline;
 }
@@ -294,50 +355,81 @@ static qboolean AV_CreatePipelines( void )
 	VkDescriptorSetAllocateInfo ai;
 	VkDescriptorSetLayout layouts[5];
 	VkDescriptorSet sets[5];
-	uint32_t setCount = AV_RayQueryAvailable() ? 5u : 4u;
+	VkResult res;
+	uint32_t setCount = 4u;
 
 	av.gtaoCS = AV_Module( vk_av_gtao_cs_spv, VK_AV_GTAO_CS_SPV_SIZE, "Ambient Visibility GTAO" );
 	av.temporalCS = AV_Module( vk_av_temporal_cs_spv, VK_AV_TEMPORAL_CS_SPV_SIZE, "Ambient Visibility temporal" );
 	av.filterCS = AV_Module( vk_av_filter_cs_spv, VK_AV_FILTER_CS_SPV_SIZE, "Ambient Visibility filter" );
 	av.compositeCS = AV_Module( vk_av_composite_cs_spv, VK_AV_COMPOSITE_CS_SPV_SIZE, "Ambient Visibility composite" );
-	if ( AV_RayQueryAvailable() )
-		av.rtaoCS = AV_Module( vk_av_rtao_cs_spv, VK_AV_RTAO_CS_SPV_SIZE, "Ambient Visibility ray query" );
+	if ( !av.gtaoCS || !av.temporalCS || !av.filterCS || !av.compositeCS ) {
+		return qfalse;
+	}
 
-	AV_CreateLayout( gtaoTypes, ARRAY_LEN( gtaoTypes ), 128u, &av.gtaoLayout, &av.gtaoPL );
-	if ( AV_RayQueryAvailable() ) AV_CreateLayout( rtaoTypes, ARRAY_LEN( rtaoTypes ), 128u, &av.rtaoLayout, &av.rtaoPL );
-	AV_CreateLayout( temporalTypes, ARRAY_LEN( temporalTypes ), 112u, &av.temporalLayout, &av.temporalPL );
-	AV_CreateLayout( filterTypes, ARRAY_LEN( filterTypes ), 96u, &av.filterLayout, &av.filterPL );
-	AV_CreateLayout( compositeTypes, ARRAY_LEN( compositeTypes ), 32u, &av.compositeLayout, &av.compositePL );
+	/* RTAO is optional: soft-fail keeps GTAO path alive. */
+	if ( AV_RayQueryAvailable() ) {
+		av.rtaoCS = AV_Module( vk_av_rtao_cs_spv, VK_AV_RTAO_CS_SPV_SIZE, "Ambient Visibility ray query" );
+		if ( av.rtaoCS &&
+			AV_CreateLayout( rtaoTypes, ARRAY_LEN( rtaoTypes ), 128u, &av.rtaoLayout, &av.rtaoPL ) ) {
+			av.rtaoPipe = AV_CreateComputePipeline( av.rtaoCS, av.rtaoPL, "Ambient Visibility RTAO pipeline" );
+		}
+		if ( !av.rtaoPipe ) {
+			ri.Printf( PRINT_WARNING, S_COLOR_YELLOW
+				"[AV] RTAO pipeline unavailable — continuing with GTAO-only\n" S_COLOR_WHITE );
+		}
+	}
+	setCount = av.rtaoPipe ? 5u : 4u;
+
+	if ( !AV_CreateLayout( gtaoTypes, ARRAY_LEN( gtaoTypes ), 128u, &av.gtaoLayout, &av.gtaoPL ) ) {
+		return qfalse;
+	}
+	if ( !AV_CreateLayout( temporalTypes, ARRAY_LEN( temporalTypes ), 112u, &av.temporalLayout, &av.temporalPL ) ||
+		!AV_CreateLayout( filterTypes, ARRAY_LEN( filterTypes ), 96u, &av.filterLayout, &av.filterPL ) ||
+		!AV_CreateLayout( compositeTypes, ARRAY_LEN( compositeTypes ), 32u, &av.compositeLayout, &av.compositePL ) ) {
+		return qfalse;
+	}
 	av.gtaoPipe = AV_CreateComputePipeline( av.gtaoCS, av.gtaoPL, "Ambient Visibility GTAO pipeline" );
-	if ( AV_RayQueryAvailable() ) av.rtaoPipe = AV_CreateComputePipeline( av.rtaoCS, av.rtaoPL, "Ambient Visibility RTAO pipeline" );
 	av.temporalPipe = AV_CreateComputePipeline( av.temporalCS, av.temporalPL, "Ambient Visibility temporal pipeline" );
 	av.filterPipe = AV_CreateComputePipeline( av.filterCS, av.filterPL, "Ambient Visibility filter pipeline" );
 	av.compositePipe = AV_CreateComputePipeline( av.compositeCS, av.compositePL, "Ambient Visibility composite pipeline" );
+	if ( !av.gtaoPipe || !av.temporalPipe || !av.filterPipe || !av.compositePipe ) {
+		return qfalse;
+	}
 
 	Com_Memset( sizes, 0, sizeof( sizes ) );
 	sizes[0].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER; sizes[0].descriptorCount = 40;
 	sizes[1].type = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE; sizes[1].descriptorCount = 16;
 	sizes[2].type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER; sizes[2].descriptorCount = 2;
-	sizes[3].type = VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR; sizes[3].descriptorCount = AV_RayQueryAvailable() ? 2u : 0u;
+	sizes[3].type = VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR; sizes[3].descriptorCount = av.rtaoPipe ? 2u : 0u;
 	Com_Memset( &poolCI, 0, sizeof( poolCI ) );
 	poolCI.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
 	poolCI.maxSets = 5;
-	poolCI.poolSizeCount = AV_RayQueryAvailable() ? 4u : 3u;
+	poolCI.poolSizeCount = av.rtaoPipe ? 4u : 3u;
 	poolCI.pPoolSizes = sizes;
-	VK_CHECK( qvkCreateDescriptorPool( vk.device, &poolCI, NULL, &av.descriptorPool ) );
+	res = qvkCreateDescriptorPool( vk.device, &poolCI, NULL, &av.descriptorPool );
+	if ( res != VK_SUCCESS ) {
+		ri.Printf( PRINT_WARNING, S_COLOR_YELLOW
+			"[AV] CreateDescriptorPool failed: %s\n" S_COLOR_WHITE, vk_result_string( res ) );
+		return qfalse;
+	}
 	layouts[0] = av.gtaoLayout;
 	layouts[1] = av.temporalLayout;
 	layouts[2] = av.filterLayout;
 	layouts[3] = av.compositeLayout;
-	if ( AV_RayQueryAvailable() ) layouts[4] = av.rtaoLayout;
+	if ( av.rtaoPipe ) layouts[4] = av.rtaoLayout;
 	Com_Memset( &ai, 0, sizeof( ai ) );
 	ai.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
 	ai.descriptorPool = av.descriptorPool;
 	ai.descriptorSetCount = setCount;
 	ai.pSetLayouts = layouts;
-	VK_CHECK( qvkAllocateDescriptorSets( vk.device, &ai, sets ) );
+	res = qvkAllocateDescriptorSets( vk.device, &ai, sets );
+	if ( res != VK_SUCCESS ) {
+		ri.Printf( PRINT_WARNING, S_COLOR_YELLOW
+			"[AV] AllocateDescriptorSets failed: %s\n" S_COLOR_WHITE, vk_result_string( res ) );
+		return qfalse;
+	}
 	av.gtaoSet = sets[0]; av.temporalSet = sets[1]; av.filterSet = sets[2]; av.compositeSet = sets[3];
-	if ( AV_RayQueryAvailable() ) av.rtaoSet = sets[4];
+	if ( av.rtaoPipe ) av.rtaoSet = sets[4];
 	return qtrue;
 }
 
@@ -346,6 +438,7 @@ static qboolean AV_CreateMetricBuffer( void )
 	VkBufferCreateInfo bci;
 	VkMemoryRequirements req;
 	VkMemoryAllocateInfo mai;
+	VkResult res;
 	VkDeviceSize size = (VkDeviceSize)NUM_COMMAND_BUFFERS * sizeof( uint32_t ) * 4u;
 
 	Com_Memset( &bci, 0, sizeof( bci ) );
@@ -353,16 +446,47 @@ static qboolean AV_CreateMetricBuffer( void )
 	bci.size = size;
 	bci.usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
 	bci.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-	VK_CHECK( qvkCreateBuffer( vk.device, &bci, NULL, &av.metricBuffer ) );
+	res = qvkCreateBuffer( vk.device, &bci, NULL, &av.metricBuffer );
+	if ( res != VK_SUCCESS ) {
+		ri.Printf( PRINT_WARNING, S_COLOR_YELLOW
+			"[AV] CreateBuffer(metrics) failed: %s\n" S_COLOR_WHITE, vk_result_string( res ) );
+		return qfalse;
+	}
 	qvkGetBufferMemoryRequirements( vk.device, av.metricBuffer, &req );
 	Com_Memset( &mai, 0, sizeof( mai ) );
 	mai.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
 	mai.allocationSize = req.size;
 	mai.memoryTypeIndex = vk_find_memory_type( vk.physical_device, req.memoryTypeBits,
 		VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT );
-	VK_CHECK( qvkAllocateMemory( vk.device, &mai, NULL, &av.metricMemory ) );
-	VK_CHECK( qvkBindBufferMemory( vk.device, av.metricBuffer, av.metricMemory, 0 ) );
-	VK_CHECK( qvkMapMemory( vk.device, av.metricMemory, 0, size, 0, &av.metricMapped ) );
+	res = qvkAllocateMemory( vk.device, &mai, NULL, &av.metricMemory );
+	if ( res != VK_SUCCESS ) {
+		ri.Printf( PRINT_WARNING, S_COLOR_YELLOW
+			"[AV] AllocateMemory(metrics) failed: %s\n" S_COLOR_WHITE, vk_result_string( res ) );
+		qvkDestroyBuffer( vk.device, av.metricBuffer, NULL );
+		av.metricBuffer = VK_NULL_HANDLE;
+		return qfalse;
+	}
+	res = qvkBindBufferMemory( vk.device, av.metricBuffer, av.metricMemory, 0 );
+	if ( res != VK_SUCCESS ) {
+		ri.Printf( PRINT_WARNING, S_COLOR_YELLOW
+			"[AV] BindBufferMemory(metrics) failed: %s\n" S_COLOR_WHITE, vk_result_string( res ) );
+		qvkFreeMemory( vk.device, av.metricMemory, NULL );
+		qvkDestroyBuffer( vk.device, av.metricBuffer, NULL );
+		av.metricMemory = VK_NULL_HANDLE;
+		av.metricBuffer = VK_NULL_HANDLE;
+		return qfalse;
+	}
+	res = qvkMapMemory( vk.device, av.metricMemory, 0, size, 0, &av.metricMapped );
+	if ( res != VK_SUCCESS ) {
+		ri.Printf( PRINT_WARNING, S_COLOR_YELLOW
+			"[AV] MapMemory(metrics) failed: %s\n" S_COLOR_WHITE, vk_result_string( res ) );
+		qvkFreeMemory( vk.device, av.metricMemory, NULL );
+		qvkDestroyBuffer( vk.device, av.metricBuffer, NULL );
+		av.metricMemory = VK_NULL_HANDLE;
+		av.metricBuffer = VK_NULL_HANDLE;
+		av.metricMapped = NULL;
+		return qfalse;
+	}
 	Com_Memset( av.metricMapped, 0, (size_t)size );
 	SET_OBJECT_NAME( av.metricBuffer, "Ambient Visibility reference error reduction", VK_DEBUG_REPORT_OBJECT_TYPE_BUFFER_EXT );
 	return qtrue;
@@ -451,24 +575,39 @@ static qboolean AV_EnsureImages( uint32_t width, uint32_t height )
 	uint32_t tw, th;
 	int mode = r_ambientVisibilityMode ? r_ambientVisibilityMode->integer : 0;
 	int i;
+	qboolean ok = qtrue;
+
 	if ( mode == 2 ) scale = ( r_gtaoHalfRes && r_gtaoHalfRes->integer ) ? 0.5f : 1.0f;
 	else scale = r_rtaoResolutionScale ? r_rtaoResolutionScale->value : 0.5f;
 	if ( mode == 5 ) scale = 1.0f;
 	tw = MAX( 1u, (uint32_t)( width * scale + 0.5f ) );
 	th = MAX( 1u, (uint32_t)( height * scale + 0.5f ) );
-	if ( av.width == width && av.height == height && av.traceWidth == tw && av.traceHeight == th && av.raw.image ) return qtrue;
-	AV_CreateImage( &av.raw, tw, th, "Ambient Visibility raw" );
-	AV_CreateImage( &av.rawAux, tw, th, "Ambient Visibility raw auxiliary" );
-	AV_CreateImage( &av.gtao, tw, th, "Ambient Visibility GTAO" );
-	AV_CreateImage( &av.gtaoAux, tw, th, "Ambient Visibility GTAO auxiliary" );
-	for ( i = 0; i < 2; ++i ) {
-		AV_CreateImage( &av.history[i], tw, th, va( "Ambient Visibility History %d", i ) );
-		AV_CreateImage( &av.historyGeo[i], tw, th, va( "Ambient Visibility History Geometry %d", i ) );
-		AV_CreateImage( &av.historyAux[i], tw, th, va( "Ambient Visibility History Auxiliary %d", i ) );
+	if ( av.width == width && av.height == height && av.traceWidth == tw && av.traceHeight == th && av.raw.image ) {
+		return qtrue;
 	}
-	AV_CreateImage( &av.filtered, tw, th, "Ambient Visibility filtered" );
-	AV_CreateImage( &av.reference, width, height, "Reference AO" );
-	AV_CreateImage( &av.referenceAux, width, height, "Reference AO auxiliary" );
+	ok = AV_CreateImage( &av.raw, tw, th, "Ambient Visibility raw" ) && ok;
+	ok = AV_CreateImage( &av.rawAux, tw, th, "Ambient Visibility raw auxiliary" ) && ok;
+	ok = AV_CreateImage( &av.gtao, tw, th, "Ambient Visibility GTAO" ) && ok;
+	ok = AV_CreateImage( &av.gtaoAux, tw, th, "Ambient Visibility GTAO auxiliary" ) && ok;
+	for ( i = 0; i < 2; ++i ) {
+		ok = AV_CreateImage( &av.history[i], tw, th, va( "Ambient Visibility History %d", i ) ) && ok;
+		ok = AV_CreateImage( &av.historyGeo[i], tw, th, va( "Ambient Visibility History Geometry %d", i ) ) && ok;
+		ok = AV_CreateImage( &av.historyAux[i], tw, th, va( "Ambient Visibility History Auxiliary %d", i ) ) && ok;
+	}
+	ok = AV_CreateImage( &av.filtered, tw, th, "Ambient Visibility filtered" ) && ok;
+	ok = AV_CreateImage( &av.reference, width, height, "Reference AO" ) && ok;
+	ok = AV_CreateImage( &av.referenceAux, width, height, "Reference AO auxiliary" ) && ok;
+	if ( !ok ) {
+		AV_DestroyImage( &av.raw ); AV_DestroyImage( &av.rawAux );
+		AV_DestroyImage( &av.gtao ); AV_DestroyImage( &av.gtaoAux );
+		for ( i = 0; i < 2; ++i ) {
+			AV_DestroyImage( &av.history[i] ); AV_DestroyImage( &av.historyGeo[i] ); AV_DestroyImage( &av.historyAux[i] );
+		}
+		AV_DestroyImage( &av.filtered ); AV_DestroyImage( &av.reference ); AV_DestroyImage( &av.referenceAux );
+		av.width = av.height = av.traceWidth = av.traceHeight = 0;
+		AV_DemoteToLegacySsao( "AV image create failed (resize/OOM)" );
+		return qfalse;
+	}
 	av.width = width; av.height = height; av.traceWidth = tw; av.traceHeight = th;
 	vk_ambient_visibility_reset_history();
 	return qtrue;
@@ -634,8 +773,16 @@ void vk_ambient_visibility_init( void )
 			ri.Cvar_VariableString( "r_avFailInject" ) ) );
 		return;
 	}
-	if ( !AV_CreatePipelines() ) { AV_DestroyPipelines(); return; }
-	AV_CreateMetricBuffer();
+	if ( !AV_CreatePipelines() ) {
+		AV_DestroyPipelines();
+		AV_DemoteToLegacySsao( "AV pipeline create failed" );
+		return;
+	}
+	if ( !AV_CreateMetricBuffer() ) {
+		AV_DestroyPipelines();
+		AV_DemoteToLegacySsao( "AV metric buffer create failed" );
+		return;
+	}
 	if ( qvkCreateQueryPool && qvkCmdWriteTimestamp && qvkGetQueryPoolResults ) {
 		Com_Memset( &qci, 0, sizeof( qci ) );
 		qci.sType = VK_STRUCTURE_TYPE_QUERY_POOL_CREATE_INFO;
@@ -690,7 +837,9 @@ void vk_ambient_visibility_frame_begin( void )
 	AV_ReadTimings();
 	av.appliedThisFrame = qfalse;
 	width = vk_get_render_target_width(); height = vk_get_render_target_height();
-	if ( width && height ) AV_EnsureImages( width, height );
+	if ( width && height && !AV_EnsureImages( width, height ) ) {
+		return;
+	}
 
 	gbufGen = vk_deferred_gbuffer_generation();
 	/*

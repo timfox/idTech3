@@ -861,6 +861,7 @@ typedef struct {
 		VkDescriptorSet descriptor;
 		qboolean pipeline_ready;
 		qboolean fill_logged;
+		qboolean fill_create_failed; /* soft-fail sticky; cleared on destroy */
 		VkDescriptorSetLayout classify_layout;
 		VkPipelineLayout classify_pipeline_layout;
 		VkPipeline classify_pipeline;
@@ -868,12 +869,14 @@ typedef struct {
 		VkDescriptorSet classify_descriptor;
 		qboolean classify_pipeline_ready;
 		qboolean classify_logged;
+		qboolean classify_create_failed;
 		VkDescriptorSetLayout debug_gfx_layout;
 		VkPipelineLayout debug_gfx_pipeline_layout;
 		VkPipeline debug_gfx_pipeline;
 		VkDescriptorPool debug_gfx_pool;
 		VkDescriptorSet debug_gfx_descriptor;
 		qboolean debug_gfx_ready;
+		qboolean debug_create_failed;
 	} visibility_buffer;
 	VkImage visibility_buffer_ids;
 	VkImageView visibility_buffer_ids_view;

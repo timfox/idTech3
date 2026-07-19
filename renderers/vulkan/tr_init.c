@@ -3174,11 +3174,12 @@ static void R_Register( void )
 	ri.Cvar_SetGroup( r_rtxWorldAlbedoMode, CVG_RENDERER );
 	ri.Printf( PRINT_ALL, "[VK][RTX] r_rtxWorldAlbedoMode=%d (0=replace, 1=modulate × vertex)\n",
 		r_rtxWorldAlbedoMode->integer );
-	r_rtxComposite = ri.Cvar_Get( "r_rtxComposite", "0", CVAR_ARCHIVE_ND );
+	r_rtxComposite = ri.Cvar_Get( "r_rtxComposite", "0.55", CVAR_ARCHIVE_ND );
 	ri.Cvar_CheckRange( r_rtxComposite, "0", "1", CV_FLOAT );
 	ri.Cvar_SetDescription( r_rtxComposite,
 		"When USE_VULKAN_RTX and \\r_rtxDemo 1: blend resolved raster HDR color into the RT output per pixel. "
-		"0 = traced color only; 1 = resolved scene color only; 0.2 to 0.5 keeps traced grounding with scene detail." );
+		"0 = traced (flat albedo) only — looks grey; 1 = scene only; 0.4..0.7 recommended. "
+		"Values below 0.05 are clamped to 0.55 in the demo pass so the screen is not replaced with grey." );
 	ri.Cvar_SetGroup( r_rtxComposite, CVG_RENDERER );
 	r_rtxSamples = ri.Cvar_Get( "r_rtxSamples", "1", CVAR_ARCHIVE_ND );
 	ri.Cvar_CheckRange( r_rtxSamples, "1", "8", CV_INTEGER );

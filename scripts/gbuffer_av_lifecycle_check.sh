@@ -108,6 +108,18 @@ grep -q 'lastTlasRevision' "$AV_C" || fail "AV must track lastTlasRevision"
 if grep -n 'VK_CHECK' "$DGB_C" | grep -q .; then
   fail "deferred G-buffer create paths must soft-fail (no VK_CHECK left in vk_deferred_gbuffer.c)"
 fi
+# AV soft-fail (no VK_CHECK fatal on image/pipeline create)
+if grep -nE '^\s*VK_CHECK' "$AV_C" | grep -q .; then
+  fail "AV create paths must soft-fail (no VK_CHECK left in vk_ambient_visibility.c)"
+fi
+grep -q 'AV image create failed' "$AV_C" || fail "AV EnsureImages soft-fail demote missing"
+# Visibility soft-fail stickies
+VIS="$ROOT/renderers/vulkan/vk_visibility_buffer.c"
+grep -q 'fill_create_failed' "$VIS" "$VK_H" || fail "visbuf fill soft-fail sticky missing"
+grep -q 'classify_create_failed' "$VIS" "$VK_H" || fail "visbuf classify soft-fail sticky missing"
+if grep -nE '^\s*VK_CHECK' "$VIS" | grep -q .; then
+  fail "visibility buffer create paths must soft-fail (no VK_CHECK left)"
+fi
 pass "soft-fail pipeline + visibility view-class gate + TLAS→AV history"
 
 

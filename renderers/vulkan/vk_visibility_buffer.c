@@ -163,6 +163,7 @@ static void vk_visbuf_destroy_fill_pipeline( void )
 		vk.visibility_buffer.layout = VK_NULL_HANDLE;
 	}
 	vk.visibility_buffer.pipeline_ready = qfalse;
+	vk.visibility_buffer.fill_create_failed = qfalse;
 }
 
 static void vk_visbuf_destroy_classify_pipeline( void )
@@ -185,6 +186,7 @@ static void vk_visbuf_destroy_classify_pipeline( void )
 		vk.visibility_buffer.classify_layout = VK_NULL_HANDLE;
 	}
 	vk.visibility_buffer.classify_pipeline_ready = qfalse;
+	vk.visibility_buffer.classify_create_failed = qfalse;
 }
 
 static void vk_visbuf_destroy_debug_gfx_pipeline( void )
@@ -207,6 +209,7 @@ static void vk_visbuf_destroy_debug_gfx_pipeline( void )
 		vk.visibility_buffer.debug_gfx_layout = VK_NULL_HANDLE;
 	}
 	vk.visibility_buffer.debug_gfx_ready = qfalse;
+	vk.visibility_buffer.debug_create_failed = qfalse;
 }
 
 void vk_visibility_buffer_init( void )
@@ -266,13 +269,18 @@ static void vk_visbuf_create_fill_pipeline( void )
 	VkDescriptorPoolSize pool_sizes[2];
 	VkDescriptorPoolCreateInfo pool_ci;
 	VkDescriptorSetAllocateInfo alloc;
+	VkResult res;
 
 	if ( vk.visibility_buffer.pipeline_ready ) {
+		return;
+	}
+	if ( vk.visibility_buffer.fill_create_failed ) {
 		return;
 	}
 	if ( vk.modules.visibility_buffer_fill_cs == VK_NULL_HANDLE ) {
 		ri.Printf( PRINT_WARNING, S_COLOR_YELLOW
 			"[VK][visbuf] visibility_buffer_fill compute shader missing\n" S_COLOR_WHITE );
+		vk.visibility_buffer.fill_create_failed = qtrue;
 		return;
 	}
 
@@ -294,7 +302,14 @@ static void vk_visbuf_create_fill_pipeline( void )
 	desc.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
 	desc.bindingCount = 3;
 	desc.pBindings = bindings;
-	VK_CHECK( qvkCreateDescriptorSetLayout( vk.device, &desc, NULL, &vk.visibility_buffer.layout ) );
+	res = qvkCreateDescriptorSetLayout( vk.device, &desc, NULL, &vk.visibility_buffer.layout );
+	if ( res != VK_SUCCESS ) {
+		ri.Printf( PRINT_WARNING, S_COLOR_YELLOW
+			"[VK][visbuf] fill descriptor layout failed: %s\n" S_COLOR_WHITE, vk_result_string( res ) );
+		vk_visbuf_destroy_fill_pipeline();
+		vk.visibility_buffer.fill_create_failed = qtrue;
+		return;
+	}
 
 	push_range.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
 	push_range.offset = 0;
@@ -306,7 +321,14 @@ static void vk_visbuf_create_fill_pipeline( void )
 	pl_ci.pSetLayouts = &vk.visibility_buffer.layout;
 	pl_ci.pushConstantRangeCount = 1;
 	pl_ci.pPushConstantRanges = &push_range;
-	VK_CHECK( qvkCreatePipelineLayout( vk.device, &pl_ci, NULL, &vk.visibility_buffer.pipeline_layout ) );
+	res = qvkCreatePipelineLayout( vk.device, &pl_ci, NULL, &vk.visibility_buffer.pipeline_layout );
+	if ( res != VK_SUCCESS ) {
+		ri.Printf( PRINT_WARNING, S_COLOR_YELLOW
+			"[VK][visbuf] fill pipeline layout failed: %s\n" S_COLOR_WHITE, vk_result_string( res ) );
+		vk_visbuf_destroy_fill_pipeline();
+		vk.visibility_buffer.fill_create_failed = qtrue;
+		return;
+	}
 
 	Com_Memset( &stage, 0, sizeof( stage ) );
 	stage.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
@@ -318,8 +340,15 @@ static void vk_visbuf_create_fill_pipeline( void )
 	pipe_ci.sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO;
 	pipe_ci.stage = stage;
 	pipe_ci.layout = vk.visibility_buffer.pipeline_layout;
-	VK_CHECK( qvkCreateComputePipelines( vk.device, VK_NULL_HANDLE, 1, &pipe_ci, NULL,
-		&vk.visibility_buffer.pipeline ) );
+	res = qvkCreateComputePipelines( vk.device, VK_NULL_HANDLE, 1, &pipe_ci, NULL,
+		&vk.visibility_buffer.pipeline );
+	if ( res != VK_SUCCESS ) {
+		ri.Printf( PRINT_WARNING, S_COLOR_YELLOW
+			"[VK][visbuf] fill pipeline failed: %s\n" S_COLOR_WHITE, vk_result_string( res ) );
+		vk_visbuf_destroy_fill_pipeline();
+		vk.visibility_buffer.fill_create_failed = qtrue;
+		return;
+	}
 	SET_OBJECT_NAME( vk.visibility_buffer.pipeline, "pipeline - visibility buffer fill",
 		VK_DEBUG_REPORT_OBJECT_TYPE_PIPELINE_EXT );
 
@@ -333,16 +362,31 @@ static void vk_visbuf_create_fill_pipeline( void )
 	pool_ci.maxSets = 1;
 	pool_ci.poolSizeCount = 2;
 	pool_ci.pPoolSizes = pool_sizes;
-	VK_CHECK( qvkCreateDescriptorPool( vk.device, &pool_ci, NULL, &vk.visibility_buffer.pool ) );
+	res = qvkCreateDescriptorPool( vk.device, &pool_ci, NULL, &vk.visibility_buffer.pool );
+	if ( res != VK_SUCCESS ) {
+		ri.Printf( PRINT_WARNING, S_COLOR_YELLOW
+			"[VK][visbuf] fill descriptor pool failed: %s\n" S_COLOR_WHITE, vk_result_string( res ) );
+		vk_visbuf_destroy_fill_pipeline();
+		vk.visibility_buffer.fill_create_failed = qtrue;
+		return;
+	}
 
 	Com_Memset( &alloc, 0, sizeof( alloc ) );
 	alloc.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
 	alloc.descriptorPool = vk.visibility_buffer.pool;
 	alloc.descriptorSetCount = 1;
 	alloc.pSetLayouts = &vk.visibility_buffer.layout;
-	VK_CHECK( qvkAllocateDescriptorSets( vk.device, &alloc, &vk.visibility_buffer.descriptor ) );
+	res = qvkAllocateDescriptorSets( vk.device, &alloc, &vk.visibility_buffer.descriptor );
+	if ( res != VK_SUCCESS ) {
+		ri.Printf( PRINT_WARNING, S_COLOR_YELLOW
+			"[VK][visbuf] fill descriptor alloc failed: %s\n" S_COLOR_WHITE, vk_result_string( res ) );
+		vk_visbuf_destroy_fill_pipeline();
+		vk.visibility_buffer.fill_create_failed = qtrue;
+		return;
+	}
 
 	vk.visibility_buffer.pipeline_ready = qtrue;
+	vk.visibility_buffer.fill_create_failed = qfalse;
 	ri.Printf( PRINT_ALL, "[VK][visbuf] visibility fill compute pipeline ready\n" );
 }
 
@@ -357,13 +401,18 @@ static void vk_visbuf_create_classify_pipeline( void )
 	VkDescriptorPoolSize pool_sizes[2];
 	VkDescriptorPoolCreateInfo pool_ci;
 	VkDescriptorSetAllocateInfo alloc;
+	VkResult res;
 
 	if ( vk.visibility_buffer.classify_pipeline_ready ) {
+		return;
+	}
+	if ( vk.visibility_buffer.classify_create_failed ) {
 		return;
 	}
 	if ( vk.modules.material_classify_cs == VK_NULL_HANDLE ) {
 		ri.Printf( PRINT_WARNING, S_COLOR_YELLOW
 			"[VK][visbuf] material_classify compute shader missing\n" S_COLOR_WHITE );
+		vk.visibility_buffer.classify_create_failed = qtrue;
 		return;
 	}
 
@@ -385,7 +434,14 @@ static void vk_visbuf_create_classify_pipeline( void )
 	desc.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
 	desc.bindingCount = 3;
 	desc.pBindings = bindings;
-	VK_CHECK( qvkCreateDescriptorSetLayout( vk.device, &desc, NULL, &vk.visibility_buffer.classify_layout ) );
+	res = qvkCreateDescriptorSetLayout( vk.device, &desc, NULL, &vk.visibility_buffer.classify_layout );
+	if ( res != VK_SUCCESS ) {
+		ri.Printf( PRINT_WARNING, S_COLOR_YELLOW
+			"[VK][visbuf] classify descriptor layout failed: %s\n" S_COLOR_WHITE, vk_result_string( res ) );
+		vk_visbuf_destroy_classify_pipeline();
+		vk.visibility_buffer.classify_create_failed = qtrue;
+		return;
+	}
 
 	push_range.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
 	push_range.offset = 0;
@@ -397,8 +453,15 @@ static void vk_visbuf_create_classify_pipeline( void )
 	pl_ci.pSetLayouts = &vk.visibility_buffer.classify_layout;
 	pl_ci.pushConstantRangeCount = 1;
 	pl_ci.pPushConstantRanges = &push_range;
-	VK_CHECK( qvkCreatePipelineLayout( vk.device, &pl_ci, NULL,
-		&vk.visibility_buffer.classify_pipeline_layout ) );
+	res = qvkCreatePipelineLayout( vk.device, &pl_ci, NULL,
+		&vk.visibility_buffer.classify_pipeline_layout );
+	if ( res != VK_SUCCESS ) {
+		ri.Printf( PRINT_WARNING, S_COLOR_YELLOW
+			"[VK][visbuf] classify pipeline layout failed: %s\n" S_COLOR_WHITE, vk_result_string( res ) );
+		vk_visbuf_destroy_classify_pipeline();
+		vk.visibility_buffer.classify_create_failed = qtrue;
+		return;
+	}
 
 	Com_Memset( &stage, 0, sizeof( stage ) );
 	stage.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
@@ -410,8 +473,15 @@ static void vk_visbuf_create_classify_pipeline( void )
 	pipe_ci.sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO;
 	pipe_ci.stage = stage;
 	pipe_ci.layout = vk.visibility_buffer.classify_pipeline_layout;
-	VK_CHECK( qvkCreateComputePipelines( vk.device, VK_NULL_HANDLE, 1, &pipe_ci, NULL,
-		&vk.visibility_buffer.classify_pipeline ) );
+	res = qvkCreateComputePipelines( vk.device, VK_NULL_HANDLE, 1, &pipe_ci, NULL,
+		&vk.visibility_buffer.classify_pipeline );
+	if ( res != VK_SUCCESS ) {
+		ri.Printf( PRINT_WARNING, S_COLOR_YELLOW
+			"[VK][visbuf] classify pipeline failed: %s\n" S_COLOR_WHITE, vk_result_string( res ) );
+		vk_visbuf_destroy_classify_pipeline();
+		vk.visibility_buffer.classify_create_failed = qtrue;
+		return;
+	}
 	SET_OBJECT_NAME( vk.visibility_buffer.classify_pipeline, "pipeline - material classify",
 		VK_DEBUG_REPORT_OBJECT_TYPE_PIPELINE_EXT );
 
@@ -425,16 +495,31 @@ static void vk_visbuf_create_classify_pipeline( void )
 	pool_ci.maxSets = 1;
 	pool_ci.poolSizeCount = 2;
 	pool_ci.pPoolSizes = pool_sizes;
-	VK_CHECK( qvkCreateDescriptorPool( vk.device, &pool_ci, NULL, &vk.visibility_buffer.classify_pool ) );
+	res = qvkCreateDescriptorPool( vk.device, &pool_ci, NULL, &vk.visibility_buffer.classify_pool );
+	if ( res != VK_SUCCESS ) {
+		ri.Printf( PRINT_WARNING, S_COLOR_YELLOW
+			"[VK][visbuf] classify descriptor pool failed: %s\n" S_COLOR_WHITE, vk_result_string( res ) );
+		vk_visbuf_destroy_classify_pipeline();
+		vk.visibility_buffer.classify_create_failed = qtrue;
+		return;
+	}
 
 	Com_Memset( &alloc, 0, sizeof( alloc ) );
 	alloc.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
 	alloc.descriptorPool = vk.visibility_buffer.classify_pool;
 	alloc.descriptorSetCount = 1;
 	alloc.pSetLayouts = &vk.visibility_buffer.classify_layout;
-	VK_CHECK( qvkAllocateDescriptorSets( vk.device, &alloc, &vk.visibility_buffer.classify_descriptor ) );
+	res = qvkAllocateDescriptorSets( vk.device, &alloc, &vk.visibility_buffer.classify_descriptor );
+	if ( res != VK_SUCCESS ) {
+		ri.Printf( PRINT_WARNING, S_COLOR_YELLOW
+			"[VK][visbuf] classify descriptor alloc failed: %s\n" S_COLOR_WHITE, vk_result_string( res ) );
+		vk_visbuf_destroy_classify_pipeline();
+		vk.visibility_buffer.classify_create_failed = qtrue;
+		return;
+	}
 
 	vk.visibility_buffer.classify_pipeline_ready = qtrue;
+	vk.visibility_buffer.classify_create_failed = qfalse;
 	ri.Printf( PRINT_ALL, "[VK][visbuf] material classify compute pipeline ready\n" );
 }
 
@@ -763,8 +848,15 @@ static void vk_visbuf_create_debug_gfx_pipeline( void )
 	layout_ci.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
 	layout_ci.bindingCount = 4;
 	layout_ci.pBindings = bindings;
-	VK_CHECK( qvkCreateDescriptorSetLayout( vk.device, &layout_ci, NULL,
-		&vk.visibility_buffer.debug_gfx_layout ) );
+	res = qvkCreateDescriptorSetLayout( vk.device, &layout_ci, NULL,
+		&vk.visibility_buffer.debug_gfx_layout );
+	if ( res != VK_SUCCESS ) {
+		ri.Printf( PRINT_WARNING, S_COLOR_YELLOW
+			"[VK][visbuf] debug descriptor layout failed: %s\n" S_COLOR_WHITE, vk_result_string( res ) );
+		vk_visbuf_destroy_debug_gfx_pipeline();
+		vk.visibility_buffer.debug_create_failed = qtrue;
+		return;
+	}
 
 	push_range.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
 	push_range.offset = 0;
@@ -776,8 +868,15 @@ static void vk_visbuf_create_debug_gfx_pipeline( void )
 	pl_ci.pSetLayouts = &vk.visibility_buffer.debug_gfx_layout;
 	pl_ci.pushConstantRangeCount = 1;
 	pl_ci.pPushConstantRanges = &push_range;
-	VK_CHECK( qvkCreatePipelineLayout( vk.device, &pl_ci, NULL,
-		&vk.visibility_buffer.debug_gfx_pipeline_layout ) );
+	res = qvkCreatePipelineLayout( vk.device, &pl_ci, NULL,
+		&vk.visibility_buffer.debug_gfx_pipeline_layout );
+	if ( res != VK_SUCCESS ) {
+		ri.Printf( PRINT_WARNING, S_COLOR_YELLOW
+			"[VK][visbuf] debug pipeline layout failed: %s\n" S_COLOR_WHITE, vk_result_string( res ) );
+		vk_visbuf_destroy_debug_gfx_pipeline();
+		vk.visibility_buffer.debug_create_failed = qtrue;
+		return;
+	}
 
 	Com_Memset( stages, 0, sizeof( stages ) );
 	stages[0].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
@@ -845,8 +944,15 @@ static void vk_visbuf_create_debug_gfx_pipeline( void )
 	pipe_ci.layout = vk.visibility_buffer.debug_gfx_pipeline_layout;
 	pipe_ci.renderPass = vk.render_pass.post_bloom;
 	pipe_ci.subpass = 0;
-	VK_CHECK( qvkCreateGraphicsPipelines( vk.device, VK_NULL_HANDLE, 1, &pipe_ci, NULL,
-		&vk.visibility_buffer.debug_gfx_pipeline ) );
+	res = qvkCreateGraphicsPipelines( vk.device, VK_NULL_HANDLE, 1, &pipe_ci, NULL,
+		&vk.visibility_buffer.debug_gfx_pipeline );
+	if ( res != VK_SUCCESS ) {
+		ri.Printf( PRINT_WARNING, S_COLOR_YELLOW
+			"[VK][visbuf] debug pipeline failed: %s\n" S_COLOR_WHITE, vk_result_string( res ) );
+		vk_visbuf_destroy_debug_gfx_pipeline();
+		vk.visibility_buffer.debug_create_failed = qtrue;
+		return;
+	}
 	SET_OBJECT_NAME( vk.visibility_buffer.debug_gfx_pipeline, "pipeline - visibility buffer debug",
 		VK_DEBUG_REPORT_OBJECT_TYPE_PIPELINE_EXT );
 
@@ -857,16 +963,31 @@ static void vk_visbuf_create_debug_gfx_pipeline( void )
 	pool_ci.maxSets = 1;
 	pool_ci.poolSizeCount = 1;
 	pool_ci.pPoolSizes = pool_sizes;
-	VK_CHECK( qvkCreateDescriptorPool( vk.device, &pool_ci, NULL, &vk.visibility_buffer.debug_gfx_pool ) );
+	res = qvkCreateDescriptorPool( vk.device, &pool_ci, NULL, &vk.visibility_buffer.debug_gfx_pool );
+	if ( res != VK_SUCCESS ) {
+		ri.Printf( PRINT_WARNING, S_COLOR_YELLOW
+			"[VK][visbuf] debug descriptor pool failed: %s\n" S_COLOR_WHITE, vk_result_string( res ) );
+		vk_visbuf_destroy_debug_gfx_pipeline();
+		vk.visibility_buffer.debug_create_failed = qtrue;
+		return;
+	}
 
 	Com_Memset( &alloc, 0, sizeof( alloc ) );
 	alloc.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
 	alloc.descriptorPool = vk.visibility_buffer.debug_gfx_pool;
 	alloc.descriptorSetCount = 1;
 	alloc.pSetLayouts = &vk.visibility_buffer.debug_gfx_layout;
-	VK_CHECK( qvkAllocateDescriptorSets( vk.device, &alloc, &vk.visibility_buffer.debug_gfx_descriptor ) );
+	res = qvkAllocateDescriptorSets( vk.device, &alloc, &vk.visibility_buffer.debug_gfx_descriptor );
+	if ( res != VK_SUCCESS ) {
+		ri.Printf( PRINT_WARNING, S_COLOR_YELLOW
+			"[VK][visbuf] debug descriptor alloc failed: %s\n" S_COLOR_WHITE, vk_result_string( res ) );
+		vk_visbuf_destroy_debug_gfx_pipeline();
+		vk.visibility_buffer.debug_create_failed = qtrue;
+		return;
+	}
 
 	vk.visibility_buffer.debug_gfx_ready = qtrue;
+	vk.visibility_buffer.debug_create_failed = qfalse;
 }
 
 static void vk_visbuf_update_debug_descriptors( void )
