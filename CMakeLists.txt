@@ -3205,6 +3205,13 @@ set_tests_properties(test_howdark PROPERTIES
 	LABELS "smoke;validation"
 	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_howdark.sh;${CMAKE_SOURCE_DIR}/extensions/research/howdark/howdark_model.c")
 
+add_test(NAME test_nebrdf
+	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_nebrdf.sh
+	${CMAKE_BINARY_DIR})
+set_tests_properties(test_nebrdf PROPERTIES
+	LABELS "smoke;validation"
+	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_nebrdf.sh;${CMAKE_SOURCE_DIR}/extensions/research/nebrdf/nebrdf_model.c")
+
 add_test(NAME test_gccfer
 	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_gccfer.sh
 	WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
@@ -4192,6 +4199,17 @@ if(BUILD_UNIT_TESTS)
 	endif()
 	add_test(NAME unit_howdark COMMAND unit_howdark)
 	set_tests_properties(unit_howdark PROPERTIES LABELS "unit;validation")
+
+	add_executable(unit_nebrdf
+		tests/unit/test_nebrdf.c
+		extensions/research/nebrdf/nebrdf_model.c
+		extensions/research/nebrdf/nebrdf_eval.c)
+	target_include_directories(unit_nebrdf PRIVATE ${IDTECH3_UNIT_INCLUDE_DIRS})
+	if(UNIX AND NOT APPLE)
+		target_link_libraries(unit_nebrdf PRIVATE m)
+	endif()
+	add_test(NAME unit_nebrdf COMMAND unit_nebrdf)
+	set_tests_properties(unit_nebrdf PROPERTIES LABELS "unit;validation")
 
 	add_executable(unit_x3dpra
 		tests/unit/test_x3dpra.c

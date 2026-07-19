@@ -38,6 +38,7 @@ Documentation is grouped by **tier**. Most files remain at their historical path
 - [RADIUSFPS.md](RADIUSFPS.md), [DAX.md](DAX.md), [GCCFER.md](GCCFER.md), [X3DPRA.md](X3DPRA.md)
 - [VUDA.md](VUDA.md), [VKSPLAT.md](VKSPLAT.md), [CURAST.md](CURAST.md), [MIMIR.md](MIMIR.md), [IRIS.md](IRIS.md)
 - [HOWDARK.md](HOWDARK.md) — Filip & Vávra black materials (arXiv:2601.05094)
+- [NEBRDF.md](NEBRDF.md) — Shen et al. neural-enhanced analytical BRDF (arXiv:2604.24081)
 
 ### Optional submodules (external trees)
 

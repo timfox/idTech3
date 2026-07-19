@@ -60,6 +60,7 @@ The Vulkan renderer uses texture view swizzles to remap file channels into that 
 - **BaseColor/Albedo** is treated as **sRGB** by the Vulkan PBR path; packed maps (AO/Rough/Metal/etc.) are treated as **linear**.
 - If you use plain `*_orm` (no “S”), keep **alpha = 1.0** in the file if possible, since alpha can influence dielectric specular intensity in the current shader.
 - **Ultra-black / optical blacks:** a very low albedo + high roughness is only an approximate game proxy. Measured angular scattering (TIS, grazing specular) differs strongly across Vantablack, Musou, velvet, and matte coatings — see **[HOWDARK.md](HOWDARK.md)** (Filip & Vávra arXiv:2601.05094 research scaffold).
+- **Analytic GGX capacity:** shipping PBR uses compact GGX + Schlick F + Smith G. Fitting measured BRDFs can need hybrid neural enhancement of bottleneck terms (F, G, 1/E) — see **[NEBRDF.md](NEBRDF.md)** (Shen et al. arXiv:2604.24081 research scaffold; no weights in-engine yet).
 
 ## Multi-material height-blend
 

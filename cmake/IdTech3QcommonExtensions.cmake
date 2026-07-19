@@ -54,6 +54,9 @@ macro(idtech3_append_research_qcommon_sources)
 			${_IDTECH3_RESEARCH}/howdark/howdark_model.c
 			${_IDTECH3_RESEARCH}/howdark/howdark_eval.c
 			${_IDTECH3_RESEARCH}/howdark/howdark_console.c
+			${_IDTECH3_RESEARCH}/nebrdf/nebrdf_model.c
+			${_IDTECH3_RESEARCH}/nebrdf/nebrdf_eval.c
+			${_IDTECH3_RESEARCH}/nebrdf/nebrdf_console.c
 		)
 		if(USE_RADIUSFPS_CUDA)
 			enable_language(CUDA)

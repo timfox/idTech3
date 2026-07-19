@@ -596,6 +596,7 @@ vec3 F_SchlickRoughness( in vec3 F0, in float VH, in float roughness )
 float D_GGX( in float NH, in float alpha )
 {
 	// Trowbridge-Reitz GGX NDF using alpha (where alpha = roughness^2).
+	// Research: neural enhancement of F/G/1E — docs/NEBRDF.md (arXiv:2604.24081 scaffold).
 	float alphaSq = alpha * alpha;
 	float d = (NH * alphaSq - NH) * NH + 1;
 	return alphaSq / (PI * d * d);

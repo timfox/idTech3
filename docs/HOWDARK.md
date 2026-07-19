@@ -89,3 +89,4 @@ HDR measured BRDF texture + isotropic GPU lookup + `r_howdarkMeasured` debug mod
 - Filip & Vávra, arXiv:2601.05094 — BRDF, TIS, rendering, psychophysics
 - Supplementary BRDF EXRs / rendering code: Optica Dataset / Figshare (external)
 - Engine PBR baseline: [PBR_TEXTURES.md](PBR_TEXTURES.md)
+- Analytic GGX capacity / neural hats: [NEBRDF.md](NEBRDF.md) (Shen et al. arXiv:2604.24081)

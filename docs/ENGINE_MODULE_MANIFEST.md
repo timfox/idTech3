@@ -85,6 +85,7 @@ CMake: [`cmake/IdTech3QcommonExtensions.cmake`](../cmake/IdTech3QcommonExtension
 | `src/extensions/research/dax/` | extension | `cl_dax_*` | `tests/scripts/test_dax.sh` |
 | `src/extensions/research/x3dpra/` | extension | `cl_x3dpra_*` | `tests/scripts/test_x3dpra.sh` |
 | `extensions/research/howdark/` | extension | `cl_howdark_enable` — Filip & Vávra black materials | `tests/scripts/test_howdark.sh` |
+| `extensions/research/nebrdf/` | extension | `cl_nebrdf_enable` — Shen et al. neural-enhanced BRDF | `tests/scripts/test_nebrdf.sh` |
 
 Optional CUDA: `USE_RADIUSFPS_CUDA`, `USE_VUDA`, `USE_MIMIR_CUDA` (platform + profile dependent).
 
