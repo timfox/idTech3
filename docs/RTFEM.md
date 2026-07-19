@@ -57,6 +57,10 @@ exec demo_rtfem.cfg
 
 `modules/physics/phys_rtfem.c` POST-step tet FEM + CG + fracture islands + deform-mesh GPU skinning — separate epic.
 
+## Related
+
+- Stylized voxel PBD alternative (not FEM): [VGS.md](VGS.md)
+
 ## References
 
 - Parker & O’Brien, SCA 2009

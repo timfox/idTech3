@@ -40,6 +40,7 @@ Documentation is grouped by **tier**. Most files remain at their historical path
 - [HOWDARK.md](HOWDARK.md) — Filip & Vávra black materials (arXiv:2601.05094)
 - [NEBRDF.md](NEBRDF.md) — Shen et al. neural-enhanced analytical BRDF (arXiv:2604.24081)
 - [RTFEM.md](RTFEM.md) — Parker & O’Brien SCA 2009 real-time FEM/fracture scaffold
+- [VGS.md](VGS.md) — McGraw MIG 2024 Gram-Schmidt voxel soft-body scaffold
 
 ### Optional submodules (external trees)
 

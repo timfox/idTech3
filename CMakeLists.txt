@@ -3219,6 +3219,13 @@ set_tests_properties(test_rtfem PROPERTIES
 	LABELS "smoke;validation"
 	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_rtfem.sh;${CMAKE_SOURCE_DIR}/extensions/research/rtfem/rtfem_model.c")
 
+add_test(NAME test_vgs
+	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_vgs.sh
+	${CMAKE_BINARY_DIR})
+set_tests_properties(test_vgs PROPERTIES
+	LABELS "smoke;validation"
+	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_vgs.sh;${CMAKE_SOURCE_DIR}/extensions/research/vgs/vgs_model.c")
+
 add_test(NAME test_gccfer
 	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_gccfer.sh
 	WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
@@ -4228,6 +4235,17 @@ if(BUILD_UNIT_TESTS)
 	endif()
 	add_test(NAME unit_rtfem COMMAND unit_rtfem)
 	set_tests_properties(unit_rtfem PROPERTIES LABELS "unit;validation")
+
+	add_executable(unit_vgs
+		tests/unit/test_vgs.c
+		extensions/research/vgs/vgs_model.c
+		extensions/research/vgs/vgs_eval.c)
+	target_include_directories(unit_vgs PRIVATE ${IDTECH3_UNIT_INCLUDE_DIRS})
+	if(UNIX AND NOT APPLE)
+		target_link_libraries(unit_vgs PRIVATE m)
+	endif()
+	add_test(NAME unit_vgs COMMAND unit_vgs)
+	set_tests_properties(unit_vgs PROPERTIES LABELS "unit;validation")
 
 	add_executable(unit_x3dpra
 		tests/unit/test_x3dpra.c
