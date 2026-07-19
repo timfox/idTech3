@@ -9,6 +9,8 @@ hypercube search / fit metrics — not trained weights or GLSL MLP eval.
 ===========================================================================
 */
 
+#include "qcommon/q_shared.h"
+
 #ifdef __cplusplus
 extern "C" {
 #endif

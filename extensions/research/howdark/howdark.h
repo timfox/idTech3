@@ -9,6 +9,8 @@ paper Figs. 4–6 and 8 — not measured EXR BRDF evaluation.
 ===========================================================================
 */
 
+#include "qcommon/q_shared.h"
+
 #ifdef __cplusplus
 extern "C" {
 #endif

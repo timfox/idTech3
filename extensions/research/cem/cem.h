@@ -9,6 +9,8 @@ Not a world solver; engine DMM remains stress-grid debris (docs/PHYSICS.md).
 ===========================================================================
 */
 
+#include "qcommon/q_shared.h"
+
 #ifdef __cplusplus
 extern "C" {
 #endif

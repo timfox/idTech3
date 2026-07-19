@@ -9,6 +9,8 @@ Not a shipping FEM solver; documents paper constants and gaps vs engine DMM.
 ===========================================================================
 */
 
+#include "qcommon/q_shared.h"
+
 #ifdef __cplusplus
 extern "C" {
 #endif

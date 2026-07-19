@@ -390,6 +390,15 @@
     <ClCompile Include="..\..\..\renderers\vulkan\vk_upscale.c" />
     <ClCompile Include="..\..\..\renderers\vulkan\vk_vector_font.c" />
     <ClCompile Include="..\..\..\renderers\vulkan\vk_vt.c" />
+    <ClCompile Include="..\..\..\renderers\vulkan\extensions\rtx\vk_rcgi.c" />
+    <ClCompile Include="..\..\..\renderers\vulkan\extensions\rtx\vk_rtx_bindless.c" />
+    <ClCompile Include="..\..\..\renderers\vulkan\extensions\rtx\vk_surfel_gi.c" />
+    <ClCompile Include="..\..\..\renderers\vulkan\extensions\scaffold\vk_webcam_screen.c" />
+    <ClCompile Include="..\..\..\renderers\vulkan\vk_ambient_visibility.c" />
+    <ClCompile Include="..\..\..\renderers\vulkan\vk_pass_registry.c" />
+    <ClCompile Include="..\..\..\renderers\vulkan\vk_reactive_mask.c" />
+    <ClCompile Include="..\..\..\renderers\vulkan\vk_visibility_buffer.c" />
+    <ClCompile Include="..\..\..\renderers\vulkan\vk_vrcs.c" />
   <!-- IDTECH3_MSVC_MANIFEST_END -->
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

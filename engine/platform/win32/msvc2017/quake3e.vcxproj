@@ -731,6 +731,10 @@
     <ClCompile Include="..\..\server\sv_engine_sprites.c" />
     <ClCompile Include="..\..\server\sv_openworld.c" />
     <ClCompile Include="..\..\server\sv_physics.c" />
+    <ClCompile Include="..\..\..\world\world_config.cpp" />
+    <ClCompile Include="..\..\client\core\cl_oscar.c" />
+    <ClCompile Include="..\..\qcommon\net_oscar_roster.c" />
+    <ClCompile Include="..\..\server\sv_world_config.c" />
   <!-- IDTECH3_MSVC_MANIFEST_END -->
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
