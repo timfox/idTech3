@@ -11,7 +11,7 @@ This is more than “deferred plus Forward+.” Shipping today uses those as fou
 | Layer | Role |
 |-------|------|
 | **`r_renderMode 2`** | Forward+ primary (opt-in overlay / legacy modern path) |
-| **`r_renderMode 3`** | [Unified Clustered](UNIFIED_CLUSTERED_RENDERER.md) — deferred opaque + Forward+ transparent (shared tiles). **Shipping default** (`modern_vulkan.cfg`) and **spine** for 2027 layers |
+| **`r_renderMode 3`** | [Unified Clustered](UNIFIED_CLUSTERED_RENDERER.md) — unified heterogeneous shading / lighting ownership (2D tiles today; depth clusters planned). **Shipping default** (`modern_vulkan.cfg`) and **spine** for 2027 layers |
 | **2027 target** | Mode 3 + visibility buffer + meshlets + reservoir RT + neural reconstruction |
 
 Do **not** invent `r_renderMode 4` for this architecture. Opt-in sidecars stack on mode 3.
@@ -91,7 +91,7 @@ Demo: `exec demo_visibility_2027.cfg`. The overlay keeps `r_deferredMaterialClas
 | 3 | Visibility buffer | Classic G-buffer + P1 sidecar | Compact prim/bary/depth + late shade |
 | 4 | GPU-driven / Work Graphs | Meshlets CPU cull | Indirect draws → mesh shaders / WG |
 | 5 | Virtualized meshlets | MD3 meshlets + **MDI GPU draw** + **screen LOD** + sector stream | Continuous cluster LOD streaming |
-| 6 | Hybrid clustered | Mode 3 **tiled hybrid** EXISTS (2D tiles; Z-clusters TBD) | Spine for all layers |
+| 6 | Unified Clustered spine | Mode 3 EXISTS — 2D tiles today; depth clusters planned extension | Spine for all layers |
 | 7 | Stochastic alpha | `r_stochasticAlpha` | Temporally stable coverage + OMM |
 | 8 | Classified OIT | Global WBOIT/MBOIT + **mode 3 overlay** | Per-material-class paths |
 | 9 | Neural texture compression | VT / BC7 | Learned latent + decoder |

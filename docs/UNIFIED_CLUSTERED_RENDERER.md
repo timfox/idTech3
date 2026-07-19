@@ -1,25 +1,65 @@
 # Unified Clustered Renderer
 
-**Unified Clustered Renderer** — hybrid deferred and Forward+ shading (`r_renderMode 3`).
+The **Unified Clustered Renderer** is the engine’s primary high-fidelity rendering path. It combines deferred opaque shading, GPU-built light lists, Forward+ transparency, order-independent transparency, temporal reconstruction, and visibility-buffer migration within one coordinated frame architecture.
 
-Also called: Hybrid Clustered Deferred Renderer / Deferred + Forward+ Pipeline / **tiled hybrid** (2D 16×16 Forward+ tiles — **not** frustum Z-clusters).
+```cfg
+r_renderMode 3
+```
 
-## What it is
+The renderer is designed around **lighting ownership** rather than a single universal shading pass:
 
-| Pass | Role |
-|------|------|
-| G-buffer | Opaque albedo / normal / material |
-| Forward+ tile cull | Shared **2D** 16×16 light lists (same SSBOs as mode 1/2; no Z slices) |
-| Deferred lighting | Opaque conventional geometry (compute + composite) |
-| Forward+ fragment shade | Transparent / blend surfaces after deferred |
+* opaque world geometry uses deferred material evaluation and dynamic lighting
+* transparent, blended, weapon, and isolated view surfaces use Forward+
+* OIT surfaces use the shared tiled-light infrastructure during accumulation
+* HUD and presentation layers remain outside world temporal history
+* late shading can replace the conventional deferred consumer without duplicating lighting
 
-**Product lock:** this is a **tiled hybrid**, not true clustered shading with depth slices. Z-clusters remain a 2027 follow-up.
+This allows each surface category to use the shading method best suited to its visibility, blending, material, and temporal requirements while preserving a common light representation across the frame.
 
-Avoid calling this simply “deferred” (hides Forward+) or “deferred forward” (sounds contradictory).
+## Architecture
 
-## Enable (opt-in)
+| System | Responsibility |
+|--------|----------------|
+| GPU light preparation | Packs visible lights and builds screen-space light lists |
+| Opaque material capture | Records geometry, normals, material data, and optional classification |
+| Deferred lighting | Evaluates opaque world lighting in compute |
+| Forward+ shading | Handles transparent, blended, weapon, and isolated-view surfaces |
+| OIT integration | Resolves complex transparency over the opaque lighting result |
+| Visibility late shading | Optional exclusive consumer for deferred material data |
+| Temporal presentation | Motion vectors, TAA, bloom, neural effects, and final composition |
+| UI overlay | HUD and 2D presentation outside world reconstruction history |
 
-Shipping default is **`modern_vulkan.cfg`** (`r_renderMode 3` Unified Clustered). Equivalent profile: `exec modern_clustered.cfg`.
+The current production implementation uses **2D tiled** 16×16 screen-space light lists shared across deferred, Forward+, and OIT paths. The light-grid abstraction is intentionally structured so **depth-partitioned frustum clusters** can be introduced without replacing the surrounding material, transparency, or frame-composition architecture.
+
+## Design goals
+
+The mode 3 renderer is built to provide:
+
+* high dynamic-light counts with bounded per-pixel light evaluation
+* consistent lighting between opaque and transparent surfaces
+* independent shading ownership for world, weapon, transparency, and UI passes
+* compute-driven opaque lighting
+* material classification and visibility-buffer compatibility
+* stable temporal behavior across world and first-person rendering
+* production OIT support
+* explicit fallbacks for debugging and lower-complexity configurations
+* a migration path toward depth-clustered and GPU-driven scene rendering
+
+## Rendering model
+
+The renderer should not be described as simply deferred or Forward+.
+
+It is a **unified heterogeneous shading pipeline** in which multiple shading techniques operate over shared scene, light, depth, material, and temporal data.
+
+The product name is **Unified Clustered Renderer**.
+
+The current light assignment implementation is a **2D tiled light grid**. Depth-partitioned clusters are a planned extension of the same architecture rather than a separate renderer.
+
+Also called historically: Hybrid Clustered Deferred Renderer / Deferred + Forward+ Pipeline.
+
+## Enable
+
+Shipping default is **`modern_vulkan.cfg`** (`r_renderMode 3`). Equivalent profile: `exec modern_clustered.cfg`.
 
 ```
 exec vulkan_overlay_unified_clustered.cfg
@@ -43,13 +83,14 @@ Or use the safe overlay directly: `exec vulkan_overlay_unified_clustered_safe.cf
 
 1. Forward+ light pack + tile cull (optional depth cull after opaque prepass)
 2. Opaque draw (`drawSurfFilter` 1) with hybrid handoff (no Forward+ add; keep lightmap/vertex primary as static-lit base)
-3. G-buffer capture + visibility fill (optional) + deferred lighting compute + composite
-4. Transparent draw (`drawSurfFilter` 2) with Forward+ shade
-5. Neural / bloom / TAA as usual
+3. G-buffer capture + visibility fill (optional)
+4. Opaque lighting: deferred compute + composite **or** exclusive late-shade (`r_visibilityBufferLateShade`)
+5. Transparent draw (`drawSurfFilter` 2) with Forward+ shade, **or** OIT when `r_oit` is on
+6. Neural / bloom / TAA / presentation as usual
 
-Depth is **not** cleared between deferred composite and transparent draws.
+Depth is **not** cleared between opaque lighting and transparent draws.
 
-Deferred lighting transforms direct-export **world** normals to view space, and can optionally consume the material class map (`r_deferredMaterialClassify` default 0 + `r_materialClassify`) — see [RENDERER_2027.md](RENDERER_2027.md).
+Deferred lighting transforms direct-export **world** normals to view space, and can consume the material class map when `r_deferredMaterialClassify` and `r_materialClassify` are on — see [RENDERER_2027.md](RENDERER_2027.md).
 
 ## Weapon / HUD pass contract
 
@@ -80,5 +121,5 @@ Or demo: `exec demo_oit_clustered.cfg` (adds `r_stochasticAlpha 2` + TAA). Keep 
 - 2027 north-star (visibility buffer on this spine): [RENDERER_2027.md](RENDERER_2027.md)
 - Forward+ audit: [FORWARD_PLUS_PIPELINE_AUDIT.md](FORWARD_PLUS_PIPELINE_AUDIT.md)
 - Modes overview: [RENDERERS.md](RENDERERS.md)
-- Mode 1 deferred-only overlay: `vulkan_overlay_deferred.cfg`
+- Mode 1 deferred overlay: `vulkan_overlay_deferred.cfg`
 - Hybrid1 (RTX): [HYBRID_RENDERING1.md](HYBRID_RENDERING1.md) — separate from this lighting mode
