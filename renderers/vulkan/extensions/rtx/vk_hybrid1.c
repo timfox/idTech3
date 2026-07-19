@@ -24,6 +24,7 @@ with raster direct lighting. Requires USE_VULKAN_RTX, r_hybrid1 or r_rtx 1, r_rt
 #include "vk_temporal.h"
 #include "vk_skybox_hdr.h"
 #include "vk_post_fog.h"
+#include "vk_ambient_visibility.h"
 
 #ifdef USE_VULKAN_RTX
 
@@ -1369,7 +1370,7 @@ void vk_hybrid1_init( void )
 	VkDescriptorSetLayoutBinding rtBindings[18];
 	VkDescriptorSetLayoutBinding temporalBindings[9];
 	VkDescriptorSetLayoutBinding atrousBindings[7];
-	VkDescriptorSetLayoutBinding compositeBindings[7];
+	VkDescriptorSetLayoutBinding compositeBindings[8];
 	VkDescriptorSetLayoutCreateInfo dslci;
 	VkPipelineLayoutCreateInfo plci;
 	VkDescriptorPoolSize poolSizes[8];
@@ -1767,7 +1768,11 @@ void vk_hybrid1_init( void )
 	compositeBindings[6].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
 	compositeBindings[6].descriptorCount = 1;
 	compositeBindings[6].stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
-	dslci.bindingCount = 7;
+	compositeBindings[7].binding = 7;
+	compositeBindings[7].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+	compositeBindings[7].descriptorCount = 1;
+	compositeBindings[7].stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+	dslci.bindingCount = 8;
 	dslci.pBindings = compositeBindings;
 	VK_CHECK( qvkCreateDescriptorSetLayout( vk.device, &dslci, NULL, &hybrid1.composite_dsl ) );
 	pcRange.size = 48;
@@ -2239,10 +2244,11 @@ void vk_hybrid1_record_pass( VkCommandBuffer cmd )
 			float surfel[4];
 		} push;
 		VkSampler nearest = HYBRID1_NearestSampler();
-		VkDescriptorImageInfo infos[7];
-		VkWriteDescriptorSet writes[7];
+		VkDescriptorImageInfo infos[8];
+		VkWriteDescriptorSet writes[8];
 		VkImageView albedoView;
 		VkImageView surfelView;
+		VkImageView ambientVisibilityView;
 		qboolean surfelFusion;
 		qboolean rcgiFusion;
 
@@ -2258,6 +2264,8 @@ void vk_hybrid1_record_pass( VkCommandBuffer cmd )
 			surfelFusion = qfalse;
 			rcgiFusion = qfalse;
 		}
+		ambientVisibilityView = vk_ambient_visibility_available() ?
+			vk_ambient_visibility_view() : tr.whiteImage->view;
 
 		HYBRID1_BarrierImage( cmd, vk.color_image, colorRestoreLayout, VK_IMAGE_LAYOUT_GENERAL,
 			VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT | VK_ACCESS_SHADER_READ_BIT, VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT,
@@ -2286,6 +2294,9 @@ void vk_hybrid1_record_pass( VkCommandBuffer cmd )
 		infos[6].sampler = nearest;
 		infos[6].imageView = surfelView;
 		infos[6].imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+		infos[7].sampler = nearest;
+		infos[7].imageView = ambientVisibilityView;
+		infos[7].imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 		writes[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
 		writes[0].dstSet = hybrid1.composite_set;
 		writes[0].dstBinding = 0;
@@ -2328,7 +2339,10 @@ void vk_hybrid1_record_pass( VkCommandBuffer cmd )
 		writes[6].descriptorCount = 1;
 		writes[6].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
 		writes[6].pImageInfo = &infos[6];
-		qvkUpdateDescriptorSets( vk.device, 7, writes, 0, NULL );
+		writes[7] = writes[6];
+		writes[7].dstBinding = 7;
+		writes[7].pImageInfo = &infos[7];
+		qvkUpdateDescriptorSets( vk.device, 8, writes, 0, NULL );
 
 		push.extent[0] = (float)hybrid1.width;
 		push.extent[1] = (float)hybrid1.height;
@@ -2340,7 +2354,8 @@ void vk_hybrid1_record_pass( VkCommandBuffer cmd )
 		push.surfel[0] = rcgiFusion ? vk_rcgi_fusion_strength() :
 			( surfelFusion ? vk_surfel_gi_fusion_strength() : 0.0f );
 		push.surfel[1] = ( rcgiFusion || surfelFusion ) ? 1.0f : 0.0f;
-		push.surfel[2] = push.surfel[3] = 0.0f;
+		push.surfel[2] = vk_ambient_visibility_strength();
+		push.surfel[3] = 0.0f;
 
 		qvkCmdBindPipeline( cmd, VK_PIPELINE_BIND_POINT_COMPUTE, hybrid1.composite_pipeline );
 		qvkCmdBindDescriptorSets( cmd, VK_PIPELINE_BIND_POINT_COMPUTE, hybrid1.composite_pl, 0, 1, &hybrid1.composite_set, 0, NULL );

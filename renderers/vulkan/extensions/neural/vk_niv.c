@@ -14,6 +14,7 @@ See docs/NEURAL_IRRADIANCE_VOLUME.md.
 #include "vk_image_layout.h"
 #include "vk_view_state.h"
 #include "vk_deferred_gbuffer.h"
+#include "vk_ambient_visibility.h"
 #include "vk_render_pass.h"
 #include "vk_staging.h"
 #include "vk_cmd.h"
@@ -1054,9 +1055,14 @@ void vk_niv_apply_after_geometry( void )
 		( tr.whiteImage ? tr.whiteImage->view : VK_NULL_HANDLE );
 	albedoView = ( vk.deferred_gbuffer_albedo_view != VK_NULL_HANDLE && useGbuf ) ?
 		vk.deferred_gbuffer_albedo_view : vk.color_image_view;
-	hasAO = ( r_ssao && r_ssao->integer && vk.ssao_blur_image_view != VK_NULL_HANDLE ) ? qtrue : qfalse;
-	aoView = hasAO ? vk.ssao_blur_image_view :
-		( tr.whiteImage ? tr.whiteImage->view : VK_NULL_HANDLE );
+	if ( vk_ambient_visibility_available() ) {
+		hasAO = qtrue;
+		aoView = vk_ambient_visibility_view();
+	} else {
+		hasAO = ( r_ssao && r_ssao->integer && vk.ssao_blur_image_view != VK_NULL_HANDLE ) ? qtrue : qfalse;
+		aoView = hasAO ? vk.ssao_blur_image_view :
+			( tr.whiteImage ? tr.whiteImage->view : VK_NULL_HANDLE );
+	}
 
 	NIV_UpdateShadeDescriptors( depthView, normalView );
 
@@ -1194,7 +1200,8 @@ void vk_niv_apply_after_geometry( void )
 	compPush.strength = 1.0f;
 	compPush.skipSky = ( r_niv_skipSky && r_niv_skipSky->integer ) ? 1u : 0u;
 	compPush.normalAtten = ( useGbuf && r_niv_normalAtten ) ? r_niv_normalAtten->value : 0.0f;
-	compPush.aoStrength = ( hasAO && r_niv_ao ) ? r_niv_ao->value : 0.0f;
+	compPush.aoStrength = vk_ambient_visibility_available() ? vk_ambient_visibility_strength() :
+		( ( hasAO && r_niv_ao ) ? r_niv_ao->value : 0.0f );
 	compPush.hasNormal = useGbuf ? 1u : 0u;
 	compPush.hasAO = hasAO ? 1u : 0u;
 

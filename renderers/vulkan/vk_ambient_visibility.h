@@ -10,6 +10,8 @@ void vk_ambient_visibility_apply_after_geometry( void );
 void vk_ambient_visibility_reset_history( void );
 qboolean vk_ambient_visibility_blocks_legacy_post( void );
 qboolean vk_ambient_visibility_active( void );
+qboolean vk_ambient_visibility_available( void );
 VkImageView vk_ambient_visibility_view( void );
+float vk_ambient_visibility_strength( void );
 
 #endif

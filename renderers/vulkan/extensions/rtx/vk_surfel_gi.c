@@ -18,6 +18,7 @@ Chocolate RTX path; spawn / ray-query update / resolve / composite.
 #include "vk_image_layout.h"
 #include "vk_view_state.h"
 #include "vk_cmd.h"
+#include "vk_ambient_visibility.h"
 
 #ifdef USE_VULKAN_RTX
 #include "vk_surfel_gi_spirv.inc"
@@ -467,7 +468,9 @@ static qboolean SGI_CreatePipelines( void )
 	binds[1].binding = 1; binds[1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
 	binds[2].binding = 2; binds[2].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
 	binds[3].binding = 3; binds[3].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
-	lci.bindingCount = 4;
+	binds[4].binding = 4; binds[4].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+	binds[4].descriptorCount = 1; binds[4].stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+	lci.bindingCount = 5;
 	VK_CHECK( qvkCreateDescriptorSetLayout( vk.device, &lci, NULL, &sgi.composite_layout ) );
 
 	Com_Memset( &pcr, 0, sizeof( pcr ) );
@@ -804,7 +807,7 @@ void vk_surfel_gi_apply_after_geometry( void )
 	VkSampler nearest;
 	VkImageView depthView, normalView, albedoView;
 	VkDescriptorBufferInfo bSurfel, bCounter;
-	VkDescriptorImageInfo img[5];
+	VkDescriptorImageInfo img[6];
 	VkWriteDescriptorSet writes[8];
 	VkMemoryBarrier memBarrier;
 	float invViewProj[16];
@@ -829,7 +832,8 @@ void vk_surfel_gi_apply_after_geometry( void )
 		float strength;
 		uint32_t skipSky;
 		uint32_t debugMode;
-		uint32_t pad[3];
+		float avStrength;
+		uint32_t pad[2];
 	} compPush;
 
 	if ( !vk_surfel_gi_active() || !vk.cmd || vk.cmd->command_buffer == VK_NULL_HANDLE ) {
@@ -978,6 +982,9 @@ void vk_surfel_gi_apply_after_geometry( void )
 	img[3].imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 	img[4].sampler = nearest; img[4].imageView = sgi.irradiance.view;
 	img[4].imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+	img[5].sampler = nearest;
+	img[5].imageView = vk_ambient_visibility_available() ? vk_ambient_visibility_view() : tr.whiteImage->view;
+	img[5].imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 	{
 		VkDescriptorImageInfo colorInfo;
 		Com_Memset( &colorInfo, 0, sizeof( colorInfo ) );
@@ -989,7 +996,9 @@ void vk_surfel_gi_apply_after_geometry( void )
 		writes[2].dstSet = sgi.composite_set; writes[2].dstBinding = 2; writes[2].pImageInfo = &img[4];
 		writes[3].dstSet = sgi.composite_set; writes[3].dstBinding = 3;
 		writes[3].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE; writes[3].pImageInfo = &colorInfo;
-		qvkUpdateDescriptorSets( vk.device, 4, writes, 0, NULL );
+		writes[4] = writes[0]; writes[4].dstSet = sgi.composite_set; writes[4].dstBinding = 4;
+		writes[4].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER; writes[4].pImageInfo = &img[5];
+		qvkUpdateDescriptorSets( vk.device, 5, writes, 0, NULL );
 	}
 
 	attempts = (uint32_t)( r_surfelGi_spawn && r_surfelGi_spawn->integer > 0 ? r_surfelGi_spawn->integer : 1024 );
@@ -1144,7 +1153,8 @@ void vk_surfel_gi_apply_after_geometry( void )
 	compPush.strength = r_surfelGi_strength ? r_surfelGi_strength->value : 0.85f;
 	compPush.skipSky = ( r_surfelGi_skipSky && r_surfelGi_skipSky->integer ) ? 1u : 0u;
 	compPush.debugMode = (uint32_t)( r_surfelGi_debug ? r_surfelGi_debug->integer : 0 );
-	compPush.pad[0] = compPush.pad[1] = compPush.pad[2] = 0;
+	compPush.avStrength = vk_ambient_visibility_strength();
+	compPush.pad[0] = compPush.pad[1] = 0;
 
 	qvkCmdBindPipeline( cmd, VK_PIPELINE_BIND_POINT_COMPUTE, sgi.composite_pipe );
 	qvkCmdBindDescriptorSets( cmd, VK_PIPELINE_BIND_POINT_COMPUTE, sgi.composite_pl, 0, 1, &sgi.composite_set, 0, NULL );

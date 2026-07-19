@@ -505,13 +505,25 @@ qboolean vk_ambient_visibility_active( void )
 qboolean vk_ambient_visibility_blocks_legacy_post( void )
 {
 	if ( vk_pathtrace_active() ) return qtrue;
-	return r_ambientVisibilityMode && r_ambientVisibilityMode->integer >= 2 ? qtrue : qfalse;
+	/* Legacy SSAO is an explicit compatibility mode, not a second layer. */
+	return r_ambientVisibilityMode && r_ambientVisibilityMode->integer != 1 ? qtrue : qfalse;
+}
+
+qboolean vk_ambient_visibility_available( void )
+{
+	return vk_ambient_visibility_active() && av.appliedThisFrame ? qtrue : qfalse;
 }
 
 VkImageView vk_ambient_visibility_view( void )
 {
-	if ( !av.ready ) return VK_NULL_HANDLE;
+	if ( !vk_ambient_visibility_available() ) return VK_NULL_HANDLE;
 	return ( r_ambientVisibilityMode && r_ambientVisibilityMode->integer == 5 ) ? av.reference.view : av.filtered.view;
+}
+
+float vk_ambient_visibility_strength( void )
+{
+	return vk_ambient_visibility_available() && r_ambientVisibilityStrength ?
+		r_ambientVisibilityStrength->value : 0.0f;
 }
 
 void vk_ambient_visibility_init( void )

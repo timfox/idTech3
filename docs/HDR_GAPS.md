@@ -131,14 +131,15 @@ Both feed into linear HDR; no conflict.
 2. **OIT** (if `r_oit`): opaque copy to `fog_scene`, OIT accum for transparents, resolve to `color_image`. Runs during draw; output stays in HDR.
 3. **Copy scene** → `vk.fog_scene_image` (for volumetric composite)
 4. **Atmosphere pass** → additive sky where depth == far (only when `tr.world` and not `RDF_NOWORLDMODEL`; skipped for menus, videos)
-5. **SSR** (if `r_ssr`): screen-space reflections; reads color + depth, writes back to `color_image`. Before bloom. The Vulkan SSR subpass is created only when SSR is enabled (`vk_update_post_process_pipelines`); toggling **`r_ssr`** (or bloom/SSAO/SMAA/OIT, HDR color format, or certain bloom cvars) schedules a **post-pipeline rebuild** at the next frame start (`PostFX_PostPipelinesNeedUpdate` in `vk_postfx.c`, refresh in `vk_post_process_refresh.c`). Quality tuning cvars do not require that rebuild.
-6. **Bloom extraction** → from `color_image` to bloom chain (threshold + knee). **Bloom blend** → additive blend of blurred bloom back to `color_image`. Both before SSAO and luminance.
-7. **SSAO** (if `r_ssao`): copy `color_image` to `fog_scene`, samples depth, blur, combine with scene into `fog_scene`. When SSAO is on, `fog_scene` becomes the post-fog source.
-8. **Volumetric compute + composite** → fog over scene (when enabled). Reads and writes `fog_scene`.
-9. **SMAA / FXAA** (if enabled and not deferred cleanup): edge detect / resolve. Runs after volumetrics (or after 2D overlays if volumetrics skipped). Output is the post-fog source.
-10. **Temporal Reconstruction** (if `r_taa` 1 / `r_aaMode` 4–5): confidence resolve on post-fog source; history ping-pong in `taa_history` images. Mode **5** then runs light SMAA cleanup on the resolve. When `r_temporalWeaponAfterTaa` 1, deferred weapon/view-model draws flush **after** this step into `color_image` (separate temporal ownership).
-11. **Luminance pass** (if `r_exposure_auto`): compute pass on post-fog source (after temporal when enabled); result used next frame for eye adaptation.
-12. **Gamma pass** → tonemap, exposure, gamma → swapchain.
+5. **Directional Ambient Visibility** (deferred opaque path, `r_ambientVisibilityMode` 2–5): GTAO/RTAO/Hybrid/Reference production and temporal/filter passes run after G-buffer capture and before deferred dynamic lights. It attenuates the existing indirect/static-lit color and is sampled by supported GI composites; it does not darken later direct lights, emissive/transmission classes, Hybrid1 traced channels, or full path tracing. Mode 1 retains legacy post SSAO below.
+6. **SSR** (if `r_ssr`): screen-space reflections; reads color + depth, writes back to `color_image`. Before bloom. The Vulkan SSR subpass is created only when SSR is enabled (`vk_update_post_process_pipelines`); toggling **`r_ssr`** (or bloom/SSAO/SMAA/OIT, HDR color format, or certain bloom cvars) schedules a **post-pipeline rebuild** at the next frame start (`PostFX_PostPipelinesNeedUpdate` in `vk_postfx.c`, refresh in `vk_post_process_refresh.c`). Quality tuning cvars do not require that rebuild.
+7. **Bloom extraction** → from `color_image` to bloom chain (threshold + knee). **Bloom blend** → additive blend of blurred bloom back to `color_image`. Both before SSAO and luminance.
+8. **Legacy SSAO** (mode 1, if `r_ssao`): copy `color_image` to `fog_scene`, samples depth, blur, combine with scene into `fog_scene`. When SSAO is on, `fog_scene` becomes the post-fog source.
+9. **Volumetric compute + composite** → fog over scene (when enabled). Reads and writes `fog_scene`.
+10. **SMAA / FXAA** (if enabled and not deferred cleanup): edge detect / resolve. Runs after volumetrics (or after 2D overlays if volumetrics skipped). Output is the post-fog source.
+11. **Temporal Reconstruction** (if `r_taa` 1 / `r_aaMode` 4–5): confidence resolve on post-fog source; history ping-pong in `taa_history` images. Mode **5** then runs light SMAA cleanup on the resolve. When `r_temporalWeaponAfterTaa` 1, deferred weapon/view-model draws flush **after** this step into `color_image` (separate temporal ownership).
+12. **Luminance pass** (if `r_exposure_auto`): compute pass on post-fog source (after temporal when enabled); result used next frame for eye adaptation.
+13. **Gamma pass** → tonemap, exposure, gamma → swapchain.
 
 **OIT / SSAO / SSR and HDR**: All operate in HDR space. OIT resolve outputs to `color_image`; SSAO combine writes to `fog_scene`; SSR modifies `color_image`. Luminance and gamma consume the final post-fog source (SMAA output or `fog_scene`/`color_image` when SMAA off).
 

@@ -15,6 +15,7 @@ See docs/VERTEX_FEATURES_NEURAL_GI.md.
 #include "vk_image_layout.h"
 #include "vk_view_state.h"
 #include "vk_deferred_gbuffer.h"
+#include "vk_ambient_visibility.h"
 #include "vk_cmd.h"
 #include "vk_neural_io.h"
 
@@ -849,9 +850,14 @@ void vk_vfgi_apply_after_geometry( void )
 		( tr.whiteImage ? tr.whiteImage->view : VK_NULL_HANDLE );
 	albedoView = ( vk.deferred_gbuffer_albedo_view != VK_NULL_HANDLE && useGbuf ) ?
 		vk.deferred_gbuffer_albedo_view : vk.color_image_view;
-	hasAO = ( r_ssao && r_ssao->integer && vk.ssao_blur_image_view != VK_NULL_HANDLE ) ? qtrue : qfalse;
-	aoView = hasAO ? vk.ssao_blur_image_view :
-		( tr.whiteImage ? tr.whiteImage->view : VK_NULL_HANDLE );
+	if ( vk_ambient_visibility_available() ) {
+		hasAO = qtrue;
+		aoView = vk_ambient_visibility_view();
+	} else {
+		hasAO = ( r_ssao && r_ssao->integer && vk.ssao_blur_image_view != VK_NULL_HANDLE ) ? qtrue : qfalse;
+		aoView = hasAO ? vk.ssao_blur_image_view :
+			( tr.whiteImage ? tr.whiteImage->view : VK_NULL_HANDLE );
+	}
 
 	depth_aspect = VK_IMAGE_ASPECT_DEPTH_BIT;
 	if ( glConfig.stencilBits > 0 ) {
@@ -1066,7 +1072,8 @@ void vk_vfgi_apply_after_geometry( void )
 	compPush.strength = 1.0f;
 	compPush.skipSky = ( r_vfgi_skipSky && r_vfgi_skipSky->integer ) ? 1u : 0u;
 	compPush.normalAtten = ( useGbuf && r_vfgi_normalAtten ) ? r_vfgi_normalAtten->value : 0.0f;
-	compPush.aoStrength = ( hasAO && r_vfgi_ao ) ? r_vfgi_ao->value : 0.0f;
+	compPush.aoStrength = vk_ambient_visibility_available() ? vk_ambient_visibility_strength() :
+		( ( hasAO && r_vfgi_ao ) ? r_vfgi_ao->value : 0.0f );
 	compPush.hasNormal = useGbuf ? 1u : 0u;
 	compPush.hasAO = hasAO ? 1u : 0u;
 

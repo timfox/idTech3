@@ -239,12 +239,22 @@ Code: `renderers/vulkan/vk_forward_plus.c`, `VK_FP_*` constants; cvar registrati
 - Depth testing against opaque scene when MSAA off (transparent behind walls discarded)
 - Additive blend (ONE/ONE) surfaces included for particles, sparks, etc.
 
-### Screen-Space Ambient Occlusion (SSAO / HBAO)
-- **SSAO** (`r_ssaoMethod 0`): Hemisphere sampling with Halton(2,3) low-discrepancy sequence for better distribution and less noise
-- **HBAO** (`r_ssaoMethod 1`): Horizon-Based Ambient Occlusion - raymarches depth in multiple directions, tracks horizon angles; higher quality with fewer samples
-- Configurable radius, bias, intensity, power; SSAO sample count or HBAO directions/steps
-- Separable blur pass
-- Combine pass with debug visualization modes
+### Directional Ambient Visibility (GTAO / RTAO / Reference AO)
+
+Vulkan deferred rendering uses `vk_ambient_visibility.c` as the modern ambient-light visibility path. Its shared RGBA16F result stores diffuse visibility, an octahedrally encoded world-space bent normal, and a visibility-cone measure; a companion target stores average hit distance, variance, temporal confidence, and rejection reason. It runs after opaque G-buffer/class capture and before deferred dynamic lights, so it attenuates the indirect/static-lit scene without darkening direct lights. Transmission and emissive material classes are skipped. NIV, VFGI, RcGI, Surfel GI, and Hybrid1 RcGI/Surfel fusion sample the same visibility result for their diffuse indirect contribution; explicit Hybrid1 traced diffuse/specular paths do not.
+
+- `r_ambientVisibilityMode 0`: off.
+- `1`: compatibility SSAO/HBAO post path (`r_ssao` / `r_ssaoMethod`). This mode retains the old whole-scene combine and is not the preferred physically correct path.
+- `2`: production GTAO. Paired horizon slices use a view-space radius, thickness compensation, open/missing-data edge fallback, directional bent-normal estimation, temporal accumulation, and a depth/normal/hit-distance bilateral filter.
+- `3`: production ray-query RTAO using the shared Hybrid1 TLAS. If the build/device lacks ray query or the TLAS is not ready, it logs the reason and falls back to GTAO.
+- `4`: adaptive hybrid. GTAO fills uncertain/contact regions and RTAO owns high-confidence visibility; the estimates are confidence-selected rather than multiplied.
+- `5`: deterministic full-resolution Reference AO, 16–256 cosine-weighted rays per pixel, fixed seed, finite radius, and no temporal/spatial filtering. This is a validation path, not a shipping preset.
+
+RTAO uses dedicated history (never TAA history), motion reprojection, depth/normal/bent-normal/hit-distance validation, local variance clipping, bounded history age, and shared temporal reset reasons for cuts, teleports, FOV/projection changes, resolution changes, and renderer-mode changes. The ray-query default treats geometry present in the shared TLAS as opaque and relies on TLAS population to omit ordinary blended transparency. Per-candidate alpha-test evaluation is not yet available because the Ambient Visibility descriptor set does not bind shared opacity/UV metadata; foliage represented in the TLAS therefore follows the TLAS opaque policy.
+
+`r_rtaoDebug 1..20` exposes GTAO, raw/final visibility, bent normals, cone, average hit distance, variance, temporal confidence/weight, rejection reason, GTAO/RTAO difference, Reference AO scalar/bent-normal error, the cone-based specular-occlusion proxy, and screen-edge fallback. Use `ambient_visibility_status` for requested/effective mode, ray-query/TLAS state and fallback reason, image extents, approximate memory, history state, rays per pixel, and GPU timings; use `ambient_visibility_reset` to invalidate only this subsystem's history. The normal screenshot command captures any debug view.
+
+The old SSAO/HBAO implementation remains available only as mode 1 and as a fallback for older configurations. Its controls are `r_ssao`, `r_ssaoMethod`, `r_hbaoDirections`, and `r_hbaoSteps`.
 
 ### IQM Morph Targets (Vulkan)
 - IQM-only morph sidecar loading (`.morph`) with additive position and normal deltas
@@ -306,6 +316,25 @@ Code: `renderers/vulkan/vk_forward_plus.c`, `VK_FP_*` constants; cvar registrati
 | `r_deferredSpecular` | 1 | GGX + Smith + Fresnel specular on deferred dynamic lights (0=diffuse only). |
 | `r_deferredSpecularStrength` | 1 | Scale deferred dynamic specular (0–4). |
 | `r_deferredAOCoupling` | 0.65 | Attenuate deferred dynamic light by the G-buffer **material** AO channel (0=off, 1=full). Does not sample SSAO. |
+| `r_ambientVisibilityMode` | 2 | Directional Ambient Visibility: 0 off, 1 legacy SSAO/HBAO, 2 GTAO, 3 ray-query RTAO, 4 adaptive hybrid, 5 deterministic Reference AO. Latched; `vid_restart`. |
+| `r_ambientVisibilityStrength` | 1 | Blend indirect visibility from open (0) to the computed result (1). Direct/emissive/transmission and explicitly traced light paths are excluded. |
+| `r_rtaoRaysPerPixel` | 1 | Production RTAO rays per trace pixel (1–8). |
+| `r_rtaoRadius` | 96 | Environmental visibility radius in world/view units. |
+| `r_rtaoMinRadius` | 12 | Contact visibility band radius. |
+| `r_rtaoRayBias` | 0.02 | Ray-query minimum distance. |
+| `r_rtaoNormalBias` | 0.05 | World-space origin offset along the surface normal. |
+| `r_rtaoResolutionScale` | 0.5 | RTAO trace scale (0.25–1). Latched; `vid_restart`. |
+| `r_rtaoContactVisibility` | 1 | Calibrated near-contact band; tightens one estimator and is not multiplied as a second AO layer. |
+| `r_rtaoTemporal` | 1 | Dedicated Ambient Visibility temporal accumulation. |
+| `r_rtaoSpatialFilter` | 1 | Adaptive depth/normal/hit-distance bilateral filtering. |
+| `r_rtaoMaxHistory` | 16 | Maximum temporal history age (1–64 frames). |
+| `r_rtaoDebug` | 0 | Ambient Visibility/reference comparison view (0 normal, 1–20 diagnostics). |
+| `r_referenceAORays` | 64 | Reference AO rays per pixel (16–256). |
+| `r_referenceAOSeed` | 1 | Fixed deterministic Reference AO sample seed. |
+| `r_gtaoSlices` | 4 | GTAO horizon slice count (2–8). |
+| `r_gtaoSteps` | 6 | GTAO steps per half-slice (2–8). |
+| `r_gtaoThickness` | 2 | GTAO depth-layer thickness compensation in view units. |
+| `r_gtaoHalfRes` | 0 | Run GTAO at half resolution. Latched; `vid_restart`. |
 | `r_deferredDefaultMetalness` | 0 | Fallback metalness for MSAA/depth-derived G-buffer export. |
 | `r_deferredDefaultRoughness` | 0.55 | Fallback roughness for MSAA/depth-derived G-buffer export. |
 | `r_deferredNormalEdgeThreshold` | 0.08 | View-space depth delta used to reject silhouette-crossing neighbors during deferred normal reconstruction. |

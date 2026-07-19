@@ -5,13 +5,14 @@ layout(set = 0, binding = 0) uniform sampler2D depthTex;
 layout(set = 0, binding = 1) uniform sampler2D albedoTex;
 layout(set = 0, binding = 2) uniform sampler2D irradianceTex;
 layout(rgba16f, set = 0, binding = 3) uniform image2D colorOut;
+layout(set = 0, binding = 4) uniform sampler2D ambientVisibilityTex;
 
 layout(push_constant) uniform CompPush {
 	uvec2 extent;
 	float strength;
 	uint skipSky;
 	uint debugMode; /* 0=blend 1=irradiance 2=SH-ish L0 proxy 3=raw */
-	uint pad0;
+	float avStrength;
 	uint pad1;
 	uint pad2;
 } pc;
@@ -39,5 +40,7 @@ void main() {
 		imageStore(colorOut, ivec2(pix), vec4(irr.rgb * 4.0, cur.a));
 		return;
 	}
-	imageStore(colorOut, ivec2(pix), vec4(cur.rgb + albedo * irr.rgb * pc.strength, cur.a));
+	float av = clamp(texture(ambientVisibilityTex, uv).r, 0.0, 1.0);
+	float indirectVisibility = mix(1.0, av, clamp(pc.avStrength, 0.0, 1.0));
+	imageStore(colorOut, ivec2(pix), vec4(cur.rgb + albedo * irr.rgb * pc.strength * indirectVisibility, cur.a));
 }
