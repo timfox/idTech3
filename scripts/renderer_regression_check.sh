@@ -322,10 +322,16 @@ elif ! grep -q 'r_aaMode = ri.Cvar_Get' "$AA_POLICY" 2>/dev/null; then
   fail "vk_aa_policy.c missing r_aaMode cvar"
 elif ! grep -q 'vk_aa_policy_apply' "$TR_INIT_VK" 2>/dev/null; then
   fail "tr_init.c must call vk_aa_policy_apply"
-elif ! grep -q 'seta r_aaMode 2' "$PROJECT_ROOT/config/modern_vulkan.cfg" 2>/dev/null; then
-  fail "modern_vulkan.cfg must default r_aaMode 2 (SMAA 1x)"
-elif ! grep -q 'seta r_taa 0' "$PROJECT_ROOT/config/modern_vulkan.cfg" 2>/dev/null; then
-  fail "modern_vulkan.cfg must default r_taa 0 (SMAA baseline)"
+elif ! grep -q 'exec modern_vulkan_stable.cfg' "$PROJECT_ROOT/config/modern_vulkan.cfg" 2>/dev/null; then
+  fail "modern_vulkan.cfg must exec modern_vulkan_stable.cfg (Spine default)"
+elif ! grep -q 'seta r_aaMode 2' "$PROJECT_ROOT/config/modern_vulkan_stable.cfg" 2>/dev/null; then
+  fail "modern_vulkan_stable.cfg must default r_aaMode 2 (SMAA 1x)"
+elif ! grep -q 'seta r_taa 0' "$PROJECT_ROOT/config/modern_vulkan_stable.cfg" 2>/dev/null; then
+  fail "modern_vulkan_stable.cfg must default r_taa 0 (SMAA baseline)"
+elif ! grep -q 'seta r_renderMode 2' "$PROJECT_ROOT/config/modern_vulkan_stable.cfg" 2>/dev/null; then
+  fail "modern_vulkan_stable.cfg must default Forward+ mode 2"
+elif ! test -f "$PROJECT_ROOT/config/gfx_safe.cfg"; then
+  fail "missing config/gfx_safe.cfg recovery profile"
 elif ! grep -q 'vk_get_render_target_width' "$PROJECT_ROOT/renderers/vulkan/vk_post_aa.c" 2>/dev/null; then
   fail "vk_post_aa.c must size SMAA from render target extent"
 elif ! grep -q 'RF_FIRST_PERSON' "$PROJECT_ROOT/renderers/vulkan/vk_view_state.c" 2>/dev/null || \

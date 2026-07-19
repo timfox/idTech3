@@ -54,21 +54,24 @@ Spine 1.0 freezes **one** certified combination set. Everything else is experime
 
 | System | Shipping path |
 |--------|----------------|
-| Opaque world | Deferred clustered (`r_renderMode 3` + deferred lighting) |
-| Transparent world | Forward+ and/or WBOIT (`r_oit` 0/1); MBOIT (`r_oit` 2) hardens behind the same matrix |
-| Weapon / view-model | Forward+ **after** world temporal reconstruction when TAA is on |
+| Opaque / transparent world | **Forward+ (`r_renderMode 2`)** via `modern_vulkan_stable.cfg` (default) |
+| Clustered hybrid | Mode 3 via `modern_clustered.cfg` / experimental — harden after Spine |
+| Transparent WBOIT | Opt-in `modern_vulkan_quality.cfg` (`r_oit 1`) with TAA off |
+| Weapon / view-model | Forward+; after world TAA only when Temporal Reconstruction is enabled |
 | Presentation AA | SMAA 1x (`r_aaMode 2`) — default |
-| Temporal reconstruction | Optional, confidence-guided (`r_taa` / `r_aaMode` 4–5) |
-| Shadows | Stable raster shadow path (cascades / atlas — deepen in Phase 2) |
-| GI | Lightmaps + probes |
-| Reflections | SSR with probe fallback |
-| Volumetrics | Froxel path |
-| Hybrid1 | Experimental quality tier (selective signals only) |
-| Path tracing | Reference mode |
+| Temporal reconstruction | Optional overlays only (`vulkan_overlay_temporal_recon.cfg`) |
+| Ambient | GTAO (`r_ambientVisibilityMode 2`); SSAO off when GTAO on |
+| Shadows | Stable raster shadow path |
+| GI | Lightmaps + SH/IBL probes |
+| Reflections | SSR only on quality profile after validation |
+| Volumetrics | Off on stable; froxel on quality |
+| Hybrid1 / path tracing | `modern_vulkan_rt.cfg` / reference — experimental |
 
-**Defaults contract** (product profile): `exec modern_vulkan.cfg` — mode 3 + SMAA; Temporal Reconstruction and Hybrid1 remain opt-in overlays.
+**Defaults contract**: `modern_vulkan.cfg` → `exec modern_vulkan_stable.cfg`. Recovery: `exec gfx_safe.cfg`.
 
-Recovery: `renderer_modern_safe` / `renderer_clustered_safe` must remain boring and documented.
+Related configs: `modern_vulkan_quality.cfg`, `modern_vulkan_rt.cfg`, `modern_vulkan_experimental.cfg`, `gfx_safe.cfg`.
+
+Static gate: `./scripts/spine_stability_check.sh`.
 
 ---
 

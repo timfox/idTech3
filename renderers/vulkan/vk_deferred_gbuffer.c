@@ -151,6 +151,325 @@ static void vk_dgb_destroy_debug_gfx_pipeline( void )
 	vk.deferred_gbuffer.debug_gfx_ready = qfalse;
 }
 
+/*
+===============
+vk_classify_current_view
+===============
+*/
+vkViewClass_t vk_classify_current_view( void )
+{
+	if ( !tr.world ) {
+		return VK_VIEW_CLASS_NO_WORLD;
+	}
+	if ( backEnd.refdef.rdflags & RDF_NOWORLDMODEL ) {
+		return VK_VIEW_CLASS_WEAPON;
+	}
+	if ( backEnd.viewParms.portalView == PV_PORTAL ) {
+		return VK_VIEW_CLASS_PORTAL;
+	}
+	if ( backEnd.viewParms.portalView == PV_MIRROR ) {
+		return VK_VIEW_CLASS_MIRROR;
+	}
+	if ( backEnd.projection2D ) {
+		return VK_VIEW_CLASS_UI;
+	}
+	return VK_VIEW_CLASS_MAIN_WORLD;
+}
+
+const char *vk_view_class_name( vkViewClass_t cls )
+{
+	switch ( cls ) {
+	case VK_VIEW_CLASS_MAIN_WORLD: return "main_world";
+	case VK_VIEW_CLASS_PORTAL: return "portal";
+	case VK_VIEW_CLASS_MIRROR: return "mirror";
+	case VK_VIEW_CLASS_WEAPON: return "weapon";
+	case VK_VIEW_CLASS_NO_WORLD: return "no_world";
+	case VK_VIEW_CLASS_UI: return "ui";
+	default: return "unknown";
+	}
+}
+
+qboolean vk_deferred_gbuffer_resources_wanted( void )
+{
+	if ( !vk.fboActive || !r_renderMode || !r_deferredGBuffer || !r_deferredGBuffer->integer ) {
+		return qfalse;
+	}
+	if ( r_renderMode->integer != 1 && r_renderMode->integer != 2 && r_renderMode->integer != 3 ) {
+		return qfalse;
+	}
+	return qtrue;
+}
+
+qboolean vk_deferred_gbuffer_active( void )
+{
+	return ( vk.deferredGbufferAllocated && vk_deferred_gbuffer_resources_wanted() ) ? qtrue : qfalse;
+}
+
+qboolean vk_deferred_gbuffer_fill_wanted( void )
+{
+	vkViewClass_t cls;
+
+	if ( !vk_deferred_gbuffer_active() || !r_deferredGBufferFill || !r_deferredGBufferFill->integer ) {
+		return qfalse;
+	}
+	if ( !vk_deferred_gbuffer_generation_valid() ) {
+		return qfalse;
+	}
+	if ( !tr.world || !backEnd.doneWorldScene ) {
+		return qfalse;
+	}
+	cls = vk_classify_current_view();
+	/* G-buffer fill is main-world only — never weapon/menu/portal/mirror. */
+	if ( cls != VK_VIEW_CLASS_MAIN_WORLD ) {
+		return qfalse;
+	}
+	return qtrue;
+}
+
+uint32_t vk_deferred_gbuffer_generation( void )
+{
+	return vk.deferredGbufferGeneration;
+}
+
+qboolean vk_deferred_gbuffer_generation_valid( void )
+{
+	uint32_t w = 0, h = 0;
+
+	if ( !vk.deferredGbufferAllocated || vk.deferredGbufferGeneration == 0u ) {
+		return qfalse;
+	}
+	vk_get_active_render_extent( &w, &h );
+	if ( w == 0u || h == 0u ) {
+		w = vk.mainColorWidth;
+		h = vk.mainColorHeight;
+	}
+	if ( w != vk.deferredGbufferExtentW || h != vk.deferredGbufferExtentH ) {
+		return qfalse;
+	}
+	return qtrue;
+}
+
+void vk_deferred_gbuffer_note_recreate( const char *reason )
+{
+	Q_strncpyz( vk.deferredGbufferLastRecreateReason,
+		reason && reason[0] ? reason : "unspecified",
+		sizeof( vk.deferredGbufferLastRecreateReason ) );
+}
+
+void vk_deferred_gbuffer_set_fallback( const char *reason )
+{
+	vk.deferredGbufferFallbackActive = qtrue;
+	Q_strncpyz( vk.deferredGbufferFallbackReason,
+		reason && reason[0] ? reason : "unknown",
+		sizeof( vk.deferredGbufferFallbackReason ) );
+	ri.Cvar_Set( "r_havenrpFallbackReason", vk.deferredGbufferFallbackReason );
+	ri.Printf( PRINT_WARNING, S_COLOR_YELLOW
+		"[VK][deferred] fallback: %s (Forward+ continues; G-buffer/AV disabled)\n" S_COLOR_WHITE,
+		vk.deferredGbufferFallbackReason );
+}
+
+void vk_deferred_gbuffer_clear_fallback( void )
+{
+	vk.deferredGbufferFallbackActive = qfalse;
+	vk.deferredGbufferFallbackReason[0] = '\0';
+}
+
+static qboolean vk_dgb_fail_inject( const char *which )
+{
+	cvar_t *c;
+
+	c = ri.Cvar_Get( "r_dgbFailInject", "0", CVAR_TEMP | CVAR_CHEAT );
+	if ( !c || !c->string || !c->string[0] || !Q_stricmp( c->string, "0" ) ) {
+		return qfalse;
+	}
+	if ( !Q_stricmp( c->string, which ) || !Q_stricmp( c->string, "all" ) ) {
+		return qtrue;
+	}
+	return qfalse;
+}
+
+qboolean vk_deferred_lighting_wanted( void )
+{
+	int mode;
+
+	if ( !vk_deferred_gbuffer_fill_wanted() || !r_deferredLighting || !r_deferredLighting->integer ) {
+		return qfalse;
+	}
+	if ( !r_renderMode || !r_forwardPlus || !r_forwardPlus->integer ) {
+		return qfalse;
+	}
+	mode = r_renderMode->integer;
+	return ( mode == 1 || mode == 3 ) ? qtrue : qfalse;
+}
+
+qboolean vk_deferred_lighting_active( void )
+{
+	return vk_deferred_lighting_wanted();
+}
+
+qboolean vk_unified_clustered_active( void )
+{
+	return ( r_renderMode && r_renderMode->integer == 3 &&
+		vk_deferred_lighting_wanted() ) ? qtrue : qfalse;
+}
+
+qboolean vk_deferred_opaque_transparent_split( void )
+{
+	/* Mode 3 unified or mode 1 deferred: opaque→deferred→transparent Forward+. */
+	if ( vk_unified_clustered_active() ) {
+		return qtrue;
+	}
+	if ( r_renderMode && r_renderMode->integer == 1 && vk_deferred_lighting_active() ) {
+		return qtrue;
+	}
+	return qfalse;
+}
+
+qboolean vk_unified_clustered_opaque_handoff( void )
+{
+	/* Opaque world pass: hand dynamics to deferred. Skip weapon/UI views. */
+	if ( backEnd.drawSurfFilter != 1 ) {
+		return qfalse;
+	}
+	if ( vk_classify_current_view() != VK_VIEW_CLASS_MAIN_WORLD ) {
+		return qfalse;
+	}
+	if ( vk_unified_clustered_active() ) {
+		return qtrue;
+	}
+	if ( r_renderMode && r_renderMode->integer == 1 && vk_deferred_lighting_active() ) {
+		return qtrue;
+	}
+	return qfalse;
+}
+
+qboolean vk_deferred_unlit_base_wanted( void )
+{
+	if ( !vk_deferred_lighting_wanted() ) {
+		return qfalse;
+	}
+	if ( !r_deferredUnlitBase || !r_deferredUnlitBase->integer ) {
+		return qfalse;
+	}
+	/* Mode 3: composite still additive; per-draw handoff is via fragment uniform. */
+	return qtrue;
+}
+
+static void vk_dgb_destroy_pipeline( void )
+{
+	vk_dgb_destroy_debug_gfx_pipeline();
+	vk_dgb_destroy_composite_gfx_pipeline();
+	vk_dgb_destroy_lighting_pipeline();
+	if ( vk.deferred_gbuffer.pipeline != VK_NULL_HANDLE ) {
+		qvkDestroyPipeline( vk.device, vk.deferred_gbuffer.pipeline, NULL );
+		vk.deferred_gbuffer.pipeline = VK_NULL_HANDLE;
+	}
+	if ( vk.deferred_gbuffer.pipeline_layout != VK_NULL_HANDLE ) {
+		qvkDestroyPipelineLayout( vk.device, vk.deferred_gbuffer.pipeline_layout, NULL );
+		vk.deferred_gbuffer.pipeline_layout = VK_NULL_HANDLE;
+	}
+	if ( vk.deferred_gbuffer.layout != VK_NULL_HANDLE ) {
+		qvkDestroyDescriptorSetLayout( vk.device, vk.deferred_gbuffer.layout, NULL );
+		vk.deferred_gbuffer.layout = VK_NULL_HANDLE;
+	}
+	if ( vk.deferred_gbuffer.pool != VK_NULL_HANDLE ) {
+		qvkDestroyDescriptorPool( vk.device, vk.deferred_gbuffer.pool, NULL );
+		vk.deferred_gbuffer.pool = VK_NULL_HANDLE;
+	}
+	vk.deferred_gbuffer.descriptor = VK_NULL_HANDLE;
+	vk.deferred_gbuffer.pipeline_ready = qfalse;
+	vk.deferred_gbuffer.fill_logged = qfalse;
+}
+
+void vk_deferred_gbuffer_invalidate_runtime( void )
+{
+	vk_dgb_destroy_pipeline();
+	vk.deferred_gbuffer.lighting_logged = qfalse;
+	vk.deferred_gbuffer.composite_logged = qfalse;
+}
+
+void vk_deferred_gbuffer_init( void )
+{
+	Com_Memset( &vk.deferred_gbuffer, 0, sizeof( vk.deferred_gbuffer ) );
+	ri.Cvar_Get( "r_dgbFailInject", "0", CVAR_TEMP | CVAR_CHEAT );
+}
+
+void vk_deferred_gbuffer_shutdown( void )
+{
+	vk_deferred_gbuffer_invalidate_runtime();
+}
+
+void vk_deferred_gbuffer_ensure_runtime( void )
+{
+	if ( !vk_deferred_gbuffer_active() || !vk.device || vk.device_lost ) {
+		return;
+	}
+	if ( vk_dgb_fail_inject( "pipeline" ) || vk_dgb_fail_inject( "descriptor" ) ) {
+		vk_deferred_gbuffer_set_fallback( "r_dgbFailInject forced pipeline/descriptor failure" );
+		vk_deferred_gbuffer_invalidate_runtime();
+		return;
+	}
+
+	if ( vk.deferred_gbuffer.layout == VK_NULL_HANDLE ||
+		vk.deferred_gbuffer.pool == VK_NULL_HANDLE ||
+		vk.deferred_gbuffer.descriptor == VK_NULL_HANDLE ||
+		( !vk.deferred_gbuffer.pipeline_ready && !vk.deferredGbufferDirectExport ) ) {
+		vk_dgb_create_pipeline();
+	}
+
+	if ( vk_deferred_lighting_wanted() ) {
+		if ( !vk.deferred_gbuffer.lighting_pipeline_ready ||
+			vk.deferred_gbuffer.lighting_pipeline == VK_NULL_HANDLE ||
+			vk.deferred_gbuffer.lighting_descriptor == VK_NULL_HANDLE ) {
+			vk_dgb_create_lighting_pipeline();
+		}
+		if ( !vk.deferred_gbuffer.composite_gfx_ready ||
+			vk.deferred_gbuffer.composite_gfx_pipeline == VK_NULL_HANDLE ||
+			vk.deferred_gbuffer.composite_gfx_descriptor == VK_NULL_HANDLE ) {
+			vk_dgb_create_composite_gfx_pipeline();
+		}
+	}
+
+	if ( r_deferredGBufferDebug && r_deferredGBufferDebug->integer > 0 &&
+		( !vk.deferred_gbuffer.debug_gfx_ready ||
+		  vk.deferred_gbuffer.debug_gfx_pipeline == VK_NULL_HANDLE ||
+		  vk.deferred_gbuffer.debug_gfx_descriptor == VK_NULL_HANDLE ) ) {
+		vk_dgb_create_debug_gfx_pipeline();
+	}
+}
+
+void vk_deferred_gbuffer_status_f( void )
+{
+	uint32_t w = 0, h = 0;
+	vk_get_active_render_extent( &w, &h );
+	ri.Printf( PRINT_ALL, "======== Deferred G-buffer Status ========\n" );
+	ri.Printf( PRINT_ALL, "requested : resources=%s fillCvar=%d\n",
+		vk_deferred_gbuffer_resources_wanted() ? "yes" : "no",
+		r_deferredGBufferFill ? r_deferredGBufferFill->integer : 0 );
+	ri.Printf( PRINT_ALL, "allocated : %s directExport=%s\n",
+		vk.deferredGbufferAllocated ? "yes" : "no",
+		vk.deferredGbufferDirectExport ? "yes" : "no" );
+	ri.Printf( PRINT_ALL, "fill      : wanted=%s active_this_frame=check_capture\n",
+		vk_deferred_gbuffer_fill_wanted() ? "yes" : "no" );
+	ri.Printf( PRINT_ALL, "generation: %u valid=%s extent=%ux%u (active=%ux%u)\n",
+		vk.deferredGbufferGeneration,
+		vk_deferred_gbuffer_generation_valid() ? "yes" : "no",
+		vk.deferredGbufferExtentW, vk.deferredGbufferExtentH, w, h );
+	ri.Printf( PRINT_ALL, "viewClass : %s\n", vk_view_class_name( vk_classify_current_view() ) );
+	ri.Printf( PRINT_ALL, "runtime   : fillPipe=%s lightPipe=%s\n",
+		vk.deferred_gbuffer.pipeline_ready ? "yes" : "no",
+		vk.deferred_gbuffer.lighting_pipeline_ready ? "yes" : "no" );
+	ri.Printf( PRINT_ALL, "fallback  : active=%s reason=%s\n",
+		vk.deferredGbufferFallbackActive ? "yes" : "no",
+		vk.deferredGbufferFallbackReason[0] ? vk.deferredGbufferFallbackReason : "none" );
+	ri.Printf( PRINT_ALL, "recreate  : %s\n",
+		vk.deferredGbufferLastRecreateReason[0] ? vk.deferredGbufferLastRecreateReason : "none" );
+	ri.Printf( PRINT_ALL, "==========================================\n" );
+}
+
+/* --- original lighting/active helpers replaced above; keep destroy helpers --- */
+
+#if 0
 qboolean vk_deferred_gbuffer_active( void )
 {
 	return ( vk.deferredGbufferAllocated && r_renderMode &&
@@ -304,6 +623,7 @@ void vk_deferred_gbuffer_ensure_runtime( void )
 		vk_dgb_create_debug_gfx_pipeline();
 	}
 }
+#endif
 
 static void vk_dgb_create_descriptor_layout( void )
 {

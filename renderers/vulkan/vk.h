@@ -837,6 +837,14 @@ typedef struct {
 	VkImageView deferred_class_stub_view;
 	qboolean deferredGbufferAllocated;
 	qboolean deferredGbufferDirectExport;
+	/* Resource generation: bumped on create/destroy/extent/format/MSAA/mode changes.
+	 * Descriptors and AV history must match this before use. */
+	uint32_t deferredGbufferGeneration;
+	uint32_t deferredGbufferExtentW;
+	uint32_t deferredGbufferExtentH;
+	qboolean deferredGbufferFallbackActive;
+	char deferredGbufferFallbackReason[96];
+	char deferredGbufferLastRecreateReason[64];
 
 	/* Visibility-buffer sidecar (r_visibilityBuffer); see vk_visibility_buffer.c / docs/RENDERER_2027.md */
 	struct {

@@ -389,6 +389,29 @@ static void vk_create_deferred_gbuffer_scaffold( void )
 		VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT,
 		&vk.deferred_class_stub, &vk.deferred_class_stub_view,
 		VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, qfalse, 0 );
+
+	if ( vk.deferred_gbuffer_albedo == VK_NULL_HANDLE ||
+		vk.deferred_gbuffer_albedo_view == VK_NULL_HANDLE ||
+		vk.deferred_gbuffer_normal == VK_NULL_HANDLE ||
+		vk.deferred_gbuffer_normal_view == VK_NULL_HANDLE ||
+		vk.deferred_gbuffer_material == VK_NULL_HANDLE ||
+		vk.deferred_gbuffer_material_view == VK_NULL_HANDLE ||
+		vk.deferred_lighting_image == VK_NULL_HANDLE ||
+		vk.deferred_lighting_view == VK_NULL_HANDLE ) {
+		ri.Printf( PRINT_WARNING, S_COLOR_YELLOW
+			"[VK][deferred] G-buffer allocation failed — disabling r_deferredGBufferFill (Forward+ continues)\n"
+			S_COLOR_WHITE );
+		if ( r_deferredGBufferFill ) {
+			ri.Cvar_Set( "r_deferredGBufferFill", "0" );
+			r_deferredGBufferFill->integer = 0;
+			r_deferredGBufferFill->modified = qtrue;
+		}
+		ri.Cvar_Set( "r_havenrpFallbackReason", "gbuffer_alloc_failed" );
+		vk.deferredGbufferAllocated = qfalse;
+		vk.deferredGbufferDirectExport = qfalse;
+		return;
+	}
+
 	vk.deferredGbufferAllocated = qtrue;
 	vk.deferredGbufferDirectExport = vk.msaaActive ? qfalse : qtrue;
 	/* PrimID/bary MRT companions for gbuf shaders (USE_VISIBILITY_EXPORT). Full visbuf

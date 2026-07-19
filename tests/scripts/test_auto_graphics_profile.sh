@@ -19,12 +19,20 @@ grep -q 'modern_native.cfg' runtime/client/core/cl_cgame.c || fail 'modern cfg r
 
 [ -f config/classic_baseq3.cfg ] || fail 'config/classic_baseq3.cfg missing'
 [ -f config/modern_vulkan.cfg ] || fail 'config/modern_vulkan.cfg missing'
+[ -f config/modern_vulkan_stable.cfg ] || fail 'config/modern_vulkan_stable.cfg missing'
+[ -f config/gfx_safe.cfg ] || fail 'config/gfx_safe.cfg missing'
 [ -f config/modern_native.cfg ] || fail 'config/modern_native.cfg missing'
 grep -q 'r_classicLighting 1' config/classic_baseq3.cfg || fail 'classic cfg must set r_classicLighting 1'
+grep -q 'exec modern_vulkan_stable.cfg' config/modern_vulkan.cfg || fail 'modern_vulkan must exec stable spine'
 grep -q 'exec modern_vulkan.cfg' config/modern_native.cfg || fail 'modern native cfg must inherit modern_vulkan'
 grep -q 'r_classicLighting 0' config/modern_native.cfg || fail 'modern cfg must set r_classicLighting 0'
 
 grep -q 'classic_baseq3.cfg' scripts/compile_engine.sh || fail 'compile_engine must ship classic_baseq3.cfg'
 grep -q 'modern_vulkan.cfg' scripts/compile_engine.sh || fail 'compile_engine must ship modern_vulkan.cfg'
+grep -q 'modern_vulkan_stable.cfg' scripts/compile_engine.sh || fail 'compile_engine must ship modern_vulkan_stable.cfg'
+grep -q 'gfx_safe.cfg' scripts/compile_engine.sh || fail 'compile_engine must ship gfx_safe.cfg'
+
+grep -q 'input_status' engine/platform/sdl/sdl_input.c || fail 'input_status command missing'
+grep -q 'pixel_width' engine/platform/sdl/sdl_glw.h || fail 'logical/pixel window sizes missing'
 
 pass "auto graphics profile contract"

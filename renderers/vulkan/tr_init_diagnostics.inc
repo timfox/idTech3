@@ -433,13 +433,27 @@ static int R_RendererPrintCompatibilityWarnings( qboolean printOk )
 			R_RENDERER_WARN( "modern profile expects HDR enabled (r_hdr 1/2/3).\n" );
 		}
 		if ( !r_taa || !r_taa->integer ) {
-			R_RENDERER_WARN( "modern profile expects r_taa 1 for temporal resolve.\n" );
+			/* HavenRP stable/quality prefer SMAA-only; skip noisy TAA expectation. */
+			if ( Q_stricmp( R_NamedCvarString( "r_havenrpProfile" ), "stable" ) &&
+				Q_stricmp( R_NamedCvarString( "r_havenrpProfile" ), "quality" ) &&
+				Q_stricmp( R_NamedCvarString( "r_havenrpProfile" ), "safe" ) ) {
+				R_RENDERER_WARN( "modern profile expects r_taa 1 for temporal resolve.\n" );
+			}
 		}
 		if ( !r_taaMotionVectors || !r_taaMotionVectors->integer ) {
-			R_RENDERER_WARN( "modern profile expects r_taaMotionVectors 1 for material-pass motion vectors.\n" );
+			if ( Q_stricmp( R_NamedCvarString( "r_havenrpProfile" ), "stable" ) &&
+				Q_stricmp( R_NamedCvarString( "r_havenrpProfile" ), "quality" ) &&
+				Q_stricmp( R_NamedCvarString( "r_havenrpProfile" ), "safe" ) ) {
+				R_RENDERER_WARN( "modern profile expects r_taaMotionVectors 1 for material-pass motion vectors.\n" );
+			}
 		}
 		if ( !r_deferredGBuffer || !r_deferredGBuffer->integer || !r_deferredGBufferFill || !r_deferredGBufferFill->integer ) {
-			R_RENDERER_WARN( "modern profile expects r_deferredGBuffer 1 and r_deferredGBufferFill 1 for the sidecar G-buffer.\n" );
+			/* Stable keeps G-buffer off by design; quality enables it. */
+			if ( !Q_stricmp( R_NamedCvarString( "r_havenrpProfile" ), "quality" ) ||
+				!Q_stricmp( R_NamedCvarString( "r_havenrpProfile" ), "rt" ) ||
+				!Q_stricmp( R_NamedCvarString( "r_havenrpProfile" ), "experimental" ) ) {
+				R_RENDERER_WARN( "quality/rt/experimental profile expects r_deferredGBuffer 1 and r_deferredGBufferFill 1.\n" );
+			}
 		}
 		if ( r_deferredLighting && r_deferredLighting->integer ) {
 			R_RENDERER_WARN( "modern profile keeps r_deferredLighting 0; use renderer_modern_safe + vid_restart after mode-1/3 experiments.\n" );
@@ -447,7 +461,7 @@ static int R_RendererPrintCompatibilityWarnings( qboolean printOk )
 		if ( !R_RendererForwardPlusRuntimeReady() ) {
 			R_RENDERER_WARN( "modern profile cvars are active, but Forward+ runtime resources are incomplete (light/tile buffers or compute pipeline missing).\n" );
 		}
-		if ( !R_RendererDeferredRuntimeReady() ) {
+		if ( ( r_deferredGBuffer && r_deferredGBuffer->integer ) && !R_RendererDeferredRuntimeReady() ) {
 			R_RENDERER_WARN( "modern profile sidecar G-buffer cvars are active, but deferred runtime resources are incomplete.\n" );
 		}
 	}
