@@ -43,6 +43,38 @@ static void vk_oit_validate_pass_break( const char *stage )
 	}
 }
 
+/*
+ * Full-framebuffer visibility after OIT color writes. Render-pass EXTERNAL deps use
+ * BY_REGION which is insufficient when the next pass is a fullscreen resolve/stamp
+ * that reads neighboring (or all) texels — races show up as horizontal scanline tears.
+ */
+static void vk_oit_barrier_targets_for_sampling( const char *reason )
+{
+	VkMemoryBarrier mb;
+
+	if ( !vk.cmd || vk.cmd->command_buffer == VK_NULL_HANDLE ) {
+		return;
+	}
+
+	Com_Memset( &mb, 0, sizeof( mb ) );
+	mb.sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER;
+	mb.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+	mb.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+	qvkCmdPipelineBarrier( vk.cmd->command_buffer,
+		VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+		VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+		0, 1, &mb, 0, NULL, 0, NULL );
+
+	if ( r_fboDebug && r_fboDebug->integer >= 2 && vk_post_fog_fbo_debug_throttle() ) {
+		uint32_t w = 0, h = 0;
+		vk_get_active_render_extent( &w, &h );
+		ri.Printf( PRINT_DEVELOPER,
+			"[VK][OIT] barrier→sample (%s): render=%ux%u mainColor=%ux%u frame=%u\n",
+			reason ? reason : "unspecified", w, h,
+			vk.mainColorWidth, vk.mainColorHeight, vk.temporal.frameIndex );
+	}
+}
+
 static void vk_postfx_set_render_extent( uint32_t width, uint32_t height )
 {
 	vk.renderWidth = width;
@@ -272,6 +304,7 @@ void vk_oit_pass( const struct drawSurfsCommand_s *cmd )
 			backEnd.oitMomentsPass = qfalse;
 			backEnd.drawSurfFilter = 0;
 			vk_end_render_pass();
+			vk_oit_barrier_targets_for_sampling( "post-mboit-moments" );
 		}
 
 		vk_begin_render_pass_tracked( vk.render_pass.oit_accum, vk.framebuffers.oit_accum, qtrue, fullWidth, fullHeight );
@@ -284,12 +317,19 @@ void vk_oit_pass( const struct drawSurfsCommand_s *cmd )
 		}
 		vk_end_render_pass();
 
+		vk_oit_barrier_targets_for_sampling( bucket_mboit ? "post-mboit-accum" : "post-wboit-accum" );
 		vk_reactive_mask_stamp_from_reveal();
 
 		record_image_layout_transition( vk.cmd->command_buffer, vk.color_image, VK_IMAGE_ASPECT_COLOR_BIT,
 			VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
 			VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT );
 		vk_postfx_set_render_extent( fullWidth, fullHeight );
+		if ( r_fboDebug && r_fboDebug->integer >= 1 && vk_post_fog_fbo_debug_throttle() ) {
+			ri.Printf( PRINT_DEVELOPER,
+				"[VK][OIT] resolve: extent=%ux%u mainColor=%ux%u mboit=%d bucket=%d/%d frame=%u\n",
+				fullWidth, fullHeight, vk.mainColorWidth, vk.mainColorHeight,
+				(int)mboit, bucket + 1, bucket_count, vk.temporal.frameIndex );
+		}
 		vk_begin_render_pass_tracked( vk.render_pass.oit_resolve, vk.framebuffers.oit_resolve, qfalse, fullWidth, fullHeight );
 		qvkCmdBindPipeline( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.oit_resolve_pipeline );
 		{

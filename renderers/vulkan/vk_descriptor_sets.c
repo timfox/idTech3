@@ -207,6 +207,12 @@ void vk_update_attachment_descriptors( void ) {
 			}
 		}
 		if ( r_oit && r_oit->integer ) {
+			/* OIT resolve must use NEAREST — LINEAR across rows looks like scanline banding. */
+			sd.gl_mag_filter = sd.gl_min_filter = GL_NEAREST;
+			sd.max_lod_1_0 = qtrue;
+			sd.noAnisotropy = qtrue;
+			info.sampler = vk_find_sampler( &sd );
+			info.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 			if ( vk.fog_scene_image_view ) {
 				info.imageView = vk.fog_scene_image_view;
 				desc.dstSet = vk.oit_opaque_descriptor;

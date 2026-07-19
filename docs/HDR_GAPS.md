@@ -113,7 +113,9 @@ Both feed into linear HDR; no conflict.
 
 **History**: Per-pixel confidence (not one fixed global weight) from depth disocclusion (`r_temporalDisocclusion`), velocity/MV validity, luminance delta, and reactive path (`r_temporalReactiveMask`): heuristics (near depth, motion, luma) **max’d** with a stamped full-res R8 mask from OIT reveal / Forward+ transparent / stochastic survivors (`vk.reactive_mask_*`, TAA set 5). Stamped coverage hard-rejects history (prefer current-frame noise over trails). Cap via `r_temporalHistoryWeight` (default 0.80).
 
-**OIT vs TAA order**: OIT accumulates and **resolves into current HDR scene color before** Temporal Reconstruction; raw OIT buffers are never temporally blended. Stochastic alpha mode 2 falls back to mode 1 when TAA is off.
+**OIT vs TAA order**: OIT accumulates and **resolves into current HDR scene color before** Temporal Reconstruction; raw OIT buffers are never temporally blended. Resolve uses `texelFetch` + NEAREST and a full-framebuffer barrier after accum (avoids BY_REGION races that appear as horizontal scanline tears). Stochastic alpha mode 2 falls back to mode 1 when TAA is off.
+
+**Prev matrices**: Shared `vk_prev_*` view/projection are committed only in `vk_temporal_commit_frame_state` at frame end. Volumetric fog must not overwrite them mid-post (that collapsed TAA matrix reprojection to identity for pixels without motion vectors).
 
 **Debug**: `r_debugMotionVectors` (1); `r_debugHistoryRejection` 0–8 (MV / reject reasons / reactive / confidence / disocclusion / history UV / near-weapon / world-vs-reactive). SMAA-only (`r_aaMode 2`, `r_taa 0`) never allocates the reactive mask.
 

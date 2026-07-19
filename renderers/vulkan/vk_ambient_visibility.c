@@ -505,8 +505,9 @@ qboolean vk_ambient_visibility_active( void )
 qboolean vk_ambient_visibility_blocks_legacy_post( void )
 {
 	if ( vk_pathtrace_active() ) return qtrue;
-	/* Legacy SSAO is an explicit compatibility mode, not a second layer. */
-	return r_ambientVisibilityMode && r_ambientVisibilityMode->integer != 1 ? qtrue : qfalse;
+	/* Mode 0 = AV off (do not block r_ssao). Mode 1 = explicit legacy SSAO owner.
+	 * Mode >= 2 = AV owns AO and suppresses the post SSAO pass. */
+	return ( r_ambientVisibilityMode && r_ambientVisibilityMode->integer >= 2 ) ? qtrue : qfalse;
 }
 
 qboolean vk_ambient_visibility_available( void )

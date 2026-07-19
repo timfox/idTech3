@@ -21,6 +21,11 @@ static float R_NamedCvarValue( const char *name )
 	return Q_atof( ri.Cvar_VariableString( name ) );
 }
 
+static const char *R_NamedCvarString( const char *name )
+{
+	return ri.Cvar_VariableString( name );
+}
+
 static const char *R_YesNo( qboolean value )
 {
 	return value ? "yes" : "no";
@@ -57,6 +62,25 @@ static const char *R_RenderPassName( renderPass_t pass )
 
 static const char *R_RendererProfileName( void )
 {
+	const char *havenrp = R_NamedCvarString( "r_havenrpProfile" );
+
+	if ( havenrp && havenrp[0] && Q_stricmp( havenrp, "" ) ) {
+		if ( !Q_stricmp( havenrp, "stable" ) ) {
+			return "havenrp stable";
+		}
+		if ( !Q_stricmp( havenrp, "quality" ) ) {
+			return "havenrp quality";
+		}
+		if ( !Q_stricmp( havenrp, "rt" ) ) {
+			return "havenrp rt";
+		}
+		if ( !Q_stricmp( havenrp, "experimental" ) ) {
+			return "havenrp experimental";
+		}
+		if ( !Q_stricmp( havenrp, "safe" ) ) {
+			return "havenrp safe";
+		}
+	}
 	if ( r_renderMode && r_renderMode->integer == 3 ) {
 		return "unified clustered";
 	}
@@ -106,8 +130,6 @@ static qboolean R_RendererModeContractClean( void )
 		return ( R_CvarInteger( r_forwardPlus ) &&
 			R_CvarValue( r_forwardPlusShade ) > 0.0f &&
 			R_CvarInteger( r_forwardPlusDepthCull ) &&
-			R_CvarInteger( r_deferredGBuffer ) &&
-			R_CvarInteger( r_deferredGBufferFill ) &&
 			!R_CvarInteger( r_deferredLighting ) ) ? qtrue : qfalse;
 	case 3:
 		return ( R_CvarInteger( r_forwardPlus ) &&
@@ -511,8 +533,78 @@ static void R_RendererProfile_f( void )
 
 static void R_RendererStatus_f( void )
 {
+	const char *aoOwner;
+	const char *giOwner;
+	const char *reflOwner;
+	const char *temporalOwner;
+	const int avMode = R_NamedCvarInteger( "r_ambientVisibilityMode" );
+	const qboolean avActive = ( avMode >= 2 && R_CvarInteger( r_deferredGBuffer ) && vk_deferred_gbuffer_active() ) ? qtrue : qfalse;
+	const qboolean surfelOn = R_NamedCvarInteger( "r_surfelGi" ) ? qtrue : qfalse;
+	const qboolean rcgiOn = R_NamedCvarInteger( "r_rcgi" ) ? qtrue : qfalse;
+	const qboolean hybridOn = R_NamedCvarInteger( "r_hybrid1" ) ? qtrue : qfalse;
+	const qboolean ssrOn = R_NamedCvarInteger( "r_ssr" ) ? qtrue : qfalse;
+	const qboolean ssaoOn = R_NamedCvarInteger( "r_ssao" ) ? qtrue : qfalse;
+
+	if ( avActive ) {
+		aoOwner = "ambient_visibility";
+	} else if ( avMode == 1 && ssaoOn ) {
+		aoOwner = "legacy_ssao";
+	} else if ( ssaoOn && avMode < 2 ) {
+		aoOwner = "legacy_ssao";
+	} else {
+		aoOwner = "none";
+	}
+
+	if ( rcgiOn ) {
+		giOwner = "rcgi";
+	} else if ( surfelOn ) {
+		giOwner = "surfel_gi";
+	} else if ( R_CvarInteger( r_shWorldLighting ) || R_NamedCvarInteger( "r_shLighting" ) ) {
+		giOwner = "sh_ibl";
+	} else {
+		giOwner = "none";
+	}
+
+	if ( hybridOn && R_NamedCvarInteger( "r_hybrid1_spec" ) ) {
+		reflOwner = "hybrid1_spec";
+	} else if ( ssrOn ) {
+		reflOwner = "ssr";
+	} else {
+		reflOwner = "none";
+	}
+
+	if ( R_CvarInteger( r_taa ) ) {
+		temporalOwner = "taa";
+	} else if ( hybridOn ) {
+		temporalOwner = "hybrid1";
+	} else {
+		temporalOwner = "none";
+	}
+
 	ri.Printf( PRINT_ALL, "======== Renderer Status ========\n" );
-	ri.Printf( PRINT_ALL, "profile   : %s\n", R_RendererProfileName() );
+	ri.Printf( PRINT_ALL, "profile   : %s (r_havenrpProfile=%s)\n",
+		R_RendererProfileName(), R_NamedCvarString( "r_havenrpProfile" ) );
+	ri.Printf( PRINT_ALL, "mode req  : r_renderMode=%d\n", R_CvarInteger( r_renderMode ) );
+	ri.Printf( PRINT_ALL, "mode eff  : %s forwardPlus=%d deferredGBuffer=%d deferredLighting=%d\n",
+		R_RendererProfileName(), R_CvarInteger( r_forwardPlus ),
+		R_CvarInteger( r_deferredGBuffer ), R_CvarInteger( r_deferredLighting ) );
+	ri.Printf( PRINT_ALL, "owners    : AO=%s  diffuseGI=%s  reflections=%s  temporal=%s\n",
+		aoOwner, giOwner, reflOwner, temporalOwner );
+	ri.Printf( PRINT_ALL, "declared  : AO=%s GI=%s refl=%s temporal=%s\n",
+		R_NamedCvarString( "r_havenrpAoOwner" ),
+		R_NamedCvarString( "r_havenrpDiffuseGiOwner" ),
+		R_NamedCvarString( "r_havenrpReflectionOwner" ),
+		R_NamedCvarString( "r_havenrpTemporalOwner" ) );
+	ri.Printf( PRINT_ALL, "RT        : available=%s active(rtx=%d hybrid1=%d surfel=%d rcgi=%d)\n",
+		R_YesNo( R_RtxAvailable() ),
+		R_CvarInteger( r_rtx ), R_CvarInteger( r_hybrid1 ),
+		R_NamedCvarInteger( "r_surfelGi" ), R_NamedCvarInteger( "r_rcgi" ) );
+	ri.Printf( PRINT_ALL, "streaming : openWorld=%d bspStream=%d\n",
+		R_NamedCvarInteger( "r_openWorld" ), R_NamedCvarInteger( "r_bspStream" ) );
+	ri.Printf( PRINT_ALL, "fallback  : reason=%s lkg=%s fails=%d\n",
+		R_NamedCvarString( "r_havenrpFallbackReason" ),
+		R_NamedCvarString( "r_havenrpLkgProfile" ),
+		R_NamedCvarInteger( "r_havenrpFailCount" ) );
 	ri.Printf( PRINT_ALL, "backend   : Vulkan (%s)\n", glConfig.renderer_string );
 	ri.Printf( PRINT_ALL, "resolution: %dx%d renderTarget=%ux%u\n",
 		glConfig.vidWidth, glConfig.vidHeight, vk.renderWidth, vk.renderHeight );
@@ -520,86 +612,14 @@ static void R_RendererStatus_f( void )
 		R_CvarInteger( r_fbo ), R_YesNo( vk.fboActive ), R_CvarInteger( r_hdr ), vk_format_string( vk.color_format ) );
 	ri.Printf( PRINT_ALL, "pbr       : r_pbr=%d materialBlend=%d\n",
 		R_CvarInteger( r_pbr ), R_CvarInteger( r_materialBlend ) );
-	ri.Printf( PRINT_ALL, "mode      : r_renderMode=%d deferredLighting=%d deferredUnlitBase=%d deferredSpec=%.2f deferredAO=%.2f\n",
-		R_CvarInteger( r_renderMode ), R_CvarInteger( r_deferredLighting ),
-		R_CvarInteger( r_deferredUnlitBase ), R_CvarValue( r_deferredSpecularStrength ),
-		R_CvarValue( r_deferredAOCoupling ) );
 	ri.Printf( PRINT_ALL, "contract  : clean=%s recovery=%s\n",
 		R_YesNo( R_RendererModeContractClean() ), R_RendererRecommendedRecoveryCommand() );
-	ri.Printf( PRINT_ALL, "passes    : inRenderPass=%s active=%s uiOverlay=%s sourcesHealthy=%s\n",
-		R_YesNo( vk.inRenderPass ), R_RenderPassName( vk.renderPassIndex ),
-		R_YesNo( vk.uiOverlayActive ), R_YesNo( R_RendererSceneSourceHealthy() ) );
-	ri.Printf( PRINT_ALL, "passDiag  : begun=%s ended=%s stage=%s resume=%s selfHeal=%s continuation=%s extent=%ux%u\n",
-		vk.passDiag.lastBegunPass[0] ? vk.passDiag.lastBegunPass : "(none)",
-		vk.passDiag.lastEndedPass[0] ? vk.passDiag.lastEndedPass : "(none)",
-		vk.passDiag.lastPostStage[0] ? vk.passDiag.lastPostStage : "(none)",
-		vk.passDiag.lastResumeTarget[0] ? vk.passDiag.lastResumeTarget : "(none)",
-		R_YesNo( vk.passDiag.lastResumeSelfHeal ),
-		R_YesNo( vk.passDiag.inContinuationPass ),
-		vk.passDiag.lastPassWidth, vk.passDiag.lastPassHeight );
-	ri.Printf( PRINT_ALL, "present   : swapchainHealthy=%s extent=%ux%u images=%u fullscreen=%d srgb=%d\n",
-		R_YesNo( R_RendererSwapchainHealthy() ),
-		vk.swapchain_extent_valid ? vk.swapchain_extent.width : 0u,
-		vk.swapchain_extent_valid ? vk.swapchain_extent.height : 0u,
-		(unsigned int)vk.swapchain_image_count, glConfig.isFullscreen, R_CvarInteger( r_vk_swapchain_srgb ) );
-	ri.Printf( PRINT_ALL, "restart   : count=%u last=%s\n",
-		(unsigned int)vk.swapchain_restart_count, R_RendererSwapchainLastRestartName() );
-	ri.Printf( PRINT_ALL, "restartAt : recent=%s ms=%d\n",
-		R_YesNo( R_RendererSwapchainRestartRecent() ), vk.swapchain_last_restart_ms );
-	ri.Printf( PRINT_ALL, "sources   : postFog=%s scene=%s luminance=%s\n",
-		vk_post_fog_source_name( vk_get_post_fog_source() ),
-		vk_post_fog_source_name( vk.scene_post_fog_color_source ),
-		vk_post_fog_source_name( vk_get_luminance_source() ) );
-	ri.Printf( PRINT_ALL, "cubemaps  : runtime=%s total=%d ready=%d incomplete=%d hdrFallback=%s localReady=%s debug=\"%s\"\n",
-		R_YesNo( vk.cubemapActive ), tr.numCubemaps,
-		R_RendererCountReadyCubemaps(), R_RendererCountIncompleteCubemaps(),
-		R_YesNo( vk.pbr_ibl_using_hdr_fallback ), R_YesNo( vk.pbr_ibl_has_ready_local_cubemap ),
-		r_pbr_cubemapInfo ? r_pbr_cubemapInfo->string : "" );
-	if ( r_renderMode && r_renderMode->integer == 3 ) {
-		ri.Printf( PRINT_ALL,
-			"unified   : Unified Clustered Renderer — hybrid deferred + Forward+ "
-			"(opaque=deferred transparent=Forward+ tiles=shared active=%s ready=%s)\n",
-			R_YesNo( vk_unified_clustered_active() ),
-			R_YesNo( R_RendererUnifiedClusteredRuntimeReady() ) );
-	}
-	ri.Printf( PRINT_ALL, "forward+  : enabled=%d ready=%s shade=%.2f maxPerTile=%d lumSort=%d distSort=%d depthCull=%d\n",
-		R_CvarInteger( r_forwardPlus ), R_YesNo( R_RendererForwardPlusRuntimeReady() ),
-		R_CvarValue( r_forwardPlusShade ), R_CvarInteger( r_forwardPlusMaxPerTile ),
-		R_CvarInteger( r_forwardPlusLuminanceSort ), R_CvarInteger( r_forwardPlusDistanceSort ), R_CvarInteger( r_forwardPlusDepthCull ) );
-	ri.Printf( PRINT_ALL, "gbuffer   : cvar=%d fill=%d ready=%s allocated=%s directExport=%s debug=%d\n",
-		R_CvarInteger( r_deferredGBuffer ), R_CvarInteger( r_deferredGBufferFill ),
-		R_YesNo( R_RendererDeferredRuntimeReady() ),
-		R_YesNo( vk.deferredGbufferAllocated ), R_YesNo( vk.deferredGbufferDirectExport ), R_CvarInteger( r_deferredGBufferDebug ) );
-	ri.Printf( PRINT_ALL, "visbuf    : cvar=%d fill=%d classify=%d allocated=%s debug=%d\n",
-		R_CvarInteger( r_visibilityBuffer ), R_CvarInteger( r_visibilityBufferFill ),
-		R_CvarInteger( r_materialClassify ), R_YesNo( vk.visibilityBufferAllocated ),
-		R_CvarInteger( r_visibilityBufferDebug ) );
-	ri.Printf( PRINT_ALL, "temporal  : taa=%d motionVectors=%d temporalFrame=%u unreliableMotion=%s\n",
-		R_CvarInteger( r_taa ), R_CvarInteger( r_taaMotionVectors ), vk.temporal.frameIndex,
-		R_YesNo( vk.temporal.unreliableMotionThisFrame ) );
-	ri.Printf( PRINT_ALL, "post-aa   : smaa=%d active=%s fxaa=%d active=%s postAaAfterBloom=%d\n",
-		R_CvarInteger( r_ext_smaa ), R_YesNo( vk.smaaActive ), R_CvarInteger( r_ext_fxaa ),
-		R_YesNo( vk.fxaaActive ), R_CvarInteger( r_postAaAfterBloom ) );
-	ri.Printf( PRINT_ALL, "color     : post=%d tonemap=%d exposure=%.2f gamma=%.2f gradeEV=%.2f temp=%.2f tint=%.2f contrast=%.2f sat=%.2f vibrance=%.2f hue=%.1f\n",
-		R_CvarInteger( r_post ), R_CvarInteger( r_tonemap ), R_CvarValue( r_exposure ), R_CvarValue( r_gamma ),
-		PostFX_GetGradeExposureBias(), PostFX_GetGradeTemperature(), PostFX_GetGradeTint(),
-		PostFX_GetGradeContrast(), PostFX_GetGradeSaturation(), PostFX_GetGradeVibrance(), PostFX_GetGradeHue() );
-	ri.Printf( PRINT_ALL, "lighting  : ssao=%d method=%d blurReady=%s volumetric=%d iblSH=%d sunShadow=%d\n",
-		R_CvarInteger( r_ssao ), R_CvarInteger( r_ssaoMethod ),
-		R_YesNo( vk.ssao_blur_image_view != VK_NULL_HANDLE ), R_CvarInteger( r_volumetricFog ),
-		R_CvarInteger( r_pbr_shExtract ), R_CvarInteger( r_pbrSunShadow ) );
-	ri.Printf( PRINT_ALL, "gi/neural : ndgi=%d niv=%d ready=%s normal=%.2f ao=%.2f vfgi=%d ready=%s verts=%u normal=%.2f ao=%.2f nvc=%d ready=%s\n",
-		R_NamedCvarInteger( "r_ndgi" ),
-		R_NamedCvarInteger( "r_niv" ), R_YesNo( vk.niv.volume_ready && vk.niv.shade_ready && vk.niv.composite_ready ),
-		R_NamedCvarValue( "r_niv_normalAtten" ), R_NamedCvarValue( "r_niv_ao" ),
-		R_NamedCvarInteger( "r_vfgi" ), R_YesNo( vk.vfgi.buffers_ready && vk.vfgi.decode_ready && vk.vfgi.composite_ready ),
-		vk.vfgi.vertex_count, R_NamedCvarValue( "r_vfgi_normalAtten" ), R_NamedCvarValue( "r_vfgi_ao" ),
-		R_NamedCvarInteger( "r_nvc" ), R_YesNo( vk.nvc.weights_ready && vk.nvc.cache_ready && vk.nvc.restir_ready && vk.nvc.composite_ready ) );
-	ri.Printf( PRINT_ALL, "rtx       : available=%s r_rtx=%d r_rtxDemo=%d hybrid1=%d entities=%d tlasUpdate=%d\n",
-		R_YesNo( R_RtxAvailable() ), R_CvarInteger( r_rtx ), R_CvarInteger( r_rtxDemo ),
-		R_CvarInteger( r_hybrid1 ), R_CvarInteger( r_rtxEntities ), R_CvarInteger( r_rtxTlasUpdate ) );
-	ri.Printf( PRINT_ALL, "warnings  : %d\n", R_RendererPrintCompatibilityWarnings( qfalse ) );
-	ri.Printf( PRINT_ALL, "=================================\n" );
+	ri.Printf( PRINT_ALL, "==================================\n" );
+}
+
+static void R_HavenRPRendererStatus_f( void )
+{
+	R_RendererStatus_f();
 }
 
 static void R_RendererCompatibility_f( void )

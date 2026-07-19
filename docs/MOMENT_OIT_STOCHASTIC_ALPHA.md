@@ -42,7 +42,7 @@ Demo: `exec demo_oit_clustered.cfg`. See [UNIFIED_CLUSTERED_RENDERER.md](UNIFIED
 
 ### Temporal Reconstruction
 
-When `r_taa` / `r_aaMode` 4–5 is active, OIT revealage stamps a dedicated R8 **reactive mask** (not `oit_reveal` itself) so Temporal Reconstruction prefers the current frame on glass/smoke (`r_temporalReactiveMask 1`). Forward+ transparent and stochastic survivors also stamp via `gen_frag`. Raw OIT accum/reveal are never temporally blended — resolve into HDR first. First-person weapons are deferred past world TAA (`r_temporalWeaponAfterTaa 1`). See [HDR_GAPS.md](HDR_GAPS.md) §6.8.
+When `r_taa` / `r_aaMode` 4–5 is active, OIT revealage stamps a dedicated R8 **reactive mask** (not `oit_reveal` itself) so Temporal Reconstruction prefers the current frame on glass/smoke (`r_temporalReactiveMask 1`). Forward+ transparent and stochastic survivors also stamp via `gen_frag`. Raw OIT accum/reveal are never temporally blended — resolve into HDR first via `texelFetch` + NEAREST with an explicit accum→resolve barrier (prevents horizontal scanline tears from BY_REGION races). First-person weapons are deferred past world TAA (`r_temporalWeaponAfterTaa 1`). See [HDR_GAPS.md](HDR_GAPS.md) §6.8.
 
 ### Resolve equation (WBOIT / MBOIT accum)
 

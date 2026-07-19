@@ -789,9 +789,7 @@ void vk_update_volumetric_params( void )
 	}
 
 	Com_Memcpy( vk.volumetric_params_ptr, &params, sizeof( params ) );
-	Com_Memcpy( vk_prev_view_matrix, view, sizeof( vk_prev_view_matrix ) );
-	Com_Memcpy( vk_prev_projection_matrix, projection, sizeof( vk_prev_projection_matrix ) );
-	Com_Memcpy( vk_prev_viewproj_matrix, params.viewProj, sizeof( vk_prev_viewproj_matrix ) );
-	vk_prev_matrices_valid = qtrue;
+	/* Prev matrices are committed in vk_temporal_commit_frame_state() only —
+	 * do not overwrite shared prev state mid-frame (breaks TAA / MV consumers). */
 	vk.volumetric_frame++;
 }

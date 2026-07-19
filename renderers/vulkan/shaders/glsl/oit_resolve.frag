@@ -45,9 +45,22 @@ vec3 oit_magenta( void )
 }
 
 void main() {
-	vec3 opaque = textureLod( opaqueTex, frag_tex_coord, 0.0 ).rgb;
-	vec4 accum = textureLod( oitAccumTex, frag_tex_coord, 0.0 );
-	float revealage = textureLod( oitRevealTex, frag_tex_coord, 0.0 ).r;
+	ivec2 px = ivec2( gl_FragCoord.xy );
+	ivec2 opaqueSize = textureSize( opaqueTex, 0 );
+	ivec2 accumSize = textureSize( oitAccumTex, 0 );
+	ivec2 revealSize = textureSize( oitRevealTex, 0 );
+
+	/* Guard against extent mismatch / OOB (half-res or stale descriptor). */
+	if ( any( notEqual( opaqueSize, accumSize ) ) || any( notEqual( accumSize, revealSize ) ) ||
+		any( greaterThanEqual( px, opaqueSize ) ) || any( lessThan( px, ivec2( 0 ) ) ) ) {
+		out_color = vec4( oit_magenta(), 1.0 );
+		return;
+	}
+
+	/* texelFetch: no LINEAR bleed across rows (avoids scanline-like banding). */
+	vec3 opaque = texelFetch( opaqueTex, px, 0 ).rgb;
+	vec4 accum = texelFetch( oitAccumTex, px, 0 );
+	float revealage = texelFetch( oitRevealTex, px, 0 ).r;
 
 	if ( oit_invalid3( opaque ) || oit_invalid4( accum ) || oit_invalid( revealage ) ) {
 		out_color = vec4( oit_magenta(), 1.0 );
@@ -95,14 +108,14 @@ void main() {
 		/* Pass ownership: green=has OIT coverage, blue=opaque only. */
 		out_color = vec4( coverage > 1e-4 ? vec3( 0.1, 0.9, 0.2 ) : vec3( 0.1, 0.2, 0.9 ), 1.0 );
 	} else if ( mode == 9 ) {
-		vec4 moments = textureLod( oitMomentsTex, frag_tex_coord, 0.0 );
+		vec4 moments = texelFetch( oitMomentsTex, px, 0 );
 		if ( oit_invalid4( moments ) ) {
 			out_color = vec4( oit_magenta(), 1.0 );
 		} else {
 			out_color = vec4( abs( moments.rgb ), 1.0 );
 		}
 	} else if ( mode == 10 ) {
-		float b0 = textureLod( oitB0Tex, frag_tex_coord, 0.0 ).r;
+		float b0 = texelFetch( oitB0Tex, px, 0 ).r;
 		if ( oit_invalid( b0 ) ) {
 			out_color = vec4( oit_magenta(), 1.0 );
 		} else {

@@ -838,6 +838,22 @@ void vk_create_attachments( void )
 		SET_OBJECT_NAME( vk.ui_overlay_image_view, "ui overlay attachment view", VK_DEBUG_REPORT_OBJECT_TYPE_IMAGE_VIEW_EXT );
 		SET_OBJECT_NAME( vk.fog_scene_image, "fog scene copy", VK_DEBUG_REPORT_OBJECT_TYPE_IMAGE_EXT );
 		SET_OBJECT_NAME( vk.fog_scene_image_view, "fog scene copy view", VK_DEBUG_REPORT_OBJECT_TYPE_IMAGE_VIEW_EXT );
+		if ( vk.oit_accum_image ) {
+			SET_OBJECT_NAME( vk.oit_accum_image, "oit accum", VK_DEBUG_REPORT_OBJECT_TYPE_IMAGE_EXT );
+			SET_OBJECT_NAME( vk.oit_accum_image_view, "oit accum view", VK_DEBUG_REPORT_OBJECT_TYPE_IMAGE_VIEW_EXT );
+		}
+		if ( vk.oit_reveal_image ) {
+			SET_OBJECT_NAME( vk.oit_reveal_image, "oit revealage", VK_DEBUG_REPORT_OBJECT_TYPE_IMAGE_EXT );
+			SET_OBJECT_NAME( vk.oit_reveal_image_view, "oit revealage view", VK_DEBUG_REPORT_OBJECT_TYPE_IMAGE_VIEW_EXT );
+		}
+		if ( vk.oit_moments_image ) {
+			SET_OBJECT_NAME( vk.oit_moments_image, "oit moments", VK_DEBUG_REPORT_OBJECT_TYPE_IMAGE_EXT );
+			SET_OBJECT_NAME( vk.oit_moments_image_view, "oit moments view", VK_DEBUG_REPORT_OBJECT_TYPE_IMAGE_VIEW_EXT );
+		}
+		if ( vk.oit_b0_image ) {
+			SET_OBJECT_NAME( vk.oit_b0_image, "oit b0 optical depth", VK_DEBUG_REPORT_OBJECT_TYPE_IMAGE_EXT );
+			SET_OBJECT_NAME( vk.oit_b0_image_view, "oit b0 view", VK_DEBUG_REPORT_OBJECT_TYPE_IMAGE_VIEW_EXT );
+		}
 			SET_OBJECT_NAME( vk.volumetric_depth_image, "volumetric depth resolve", VK_DEBUG_REPORT_OBJECT_TYPE_IMAGE_EXT );
 			SET_OBJECT_NAME( vk.volumetric_depth_view, "volumetric depth resolve view", VK_DEBUG_REPORT_OBJECT_TYPE_IMAGE_VIEW_EXT );
 			SET_OBJECT_NAME( vk.motion_vector_image, "volumetric motion vectors", VK_DEBUG_REPORT_OBJECT_TYPE_IMAGE_EXT );

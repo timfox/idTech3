@@ -185,7 +185,12 @@ void vk_update_postfx_params( uint32_t cmd_index )
 	projection = backEnd.viewParms.projectionMatrix;
 	view = backEnd.viewParms.world.modelViewMatrix;
 
-	myGlMultMatrix( view, projection, viewProj );
+	/* Match rasterization: Vulkan Y-flip so depth reprojection agrees with MVs. */
+	{
+		float proj_vk[16];
+		vk_get_projection_matrix_vk( projection, proj_vk );
+		myGlMultMatrix( view, proj_vk, viewProj );
+	}
 	Com_Memcpy( params.viewMatrix, view, sizeof( params.viewMatrix ) );
 
 	if ( !vk_mat4_inverse( viewProj, params.invViewProj ) ) {
@@ -196,7 +201,11 @@ void vk_update_postfx_params( uint32_t cmd_index )
 		!vk_temporal_has_reason( VK_TEMPORAL_RESET_CAMERA_CUT | VK_TEMPORAL_RESET_MISSING_PREV_DATA |
 		VK_TEMPORAL_RESET_RENDERER_INIT | VK_TEMPORAL_RESET_SWAPCHAIN_CHANGE | VK_TEMPORAL_RESET_RENDER_SIZE_CHANGE |
 		VK_TEMPORAL_RESET_WORLD_CHANGE | VK_TEMPORAL_RESET_CLIENT_STATE_CHANGE | VK_TEMPORAL_RESET_EXPLICIT_DEBUG ) ) {
-		Com_Memcpy( params.prevViewProj, vk_prev_viewproj_matrix, sizeof( params.prevViewProj ) );
+		float prev_proj_vk[16];
+		float prev_vp[16];
+		vk_get_projection_matrix_vk( vk_prev_projection_matrix, prev_proj_vk );
+		myGlMultMatrix( vk_prev_view_matrix, prev_proj_vk, prev_vp );
+		Com_Memcpy( params.prevViewProj, prev_vp, sizeof( params.prevViewProj ) );
 		motion_valid = qtrue;
 	} else {
 		Com_Memcpy( params.prevViewProj, viewProj, sizeof( params.prevViewProj ) );

@@ -337,6 +337,9 @@ void vk_temporal_commit_frame_state( void )
 	const int clientState = ri.CL_GetState ? ri.CL_GetState() : CA_ACTIVE;
 	const qboolean worldValid = ( tr.world != NULL ) ? qtrue : qfalse;
 	const qboolean noWorldModel = ( backEnd.refdef.rdflags & RDF_NOWORLDMODEL ) ? qtrue : qfalse;
+	const float *projection;
+	const float *view;
+	float viewProj[16];
 
 	if ( vk.temporal.firstPersonProjectionThisFrame != vk.temporal.firstPersonProjectionLastFrame ) {
 		vk_temporal_request_sticky_reset( VK_TEMPORAL_RESET_CAMERA_CUT );
@@ -354,6 +357,22 @@ void vk_temporal_commit_frame_state( void )
 	Q_strncpyz( vk.temporal.worldName, ( worldValid && tr.world->name[0] ) ? tr.world->name : "", sizeof( vk.temporal.worldName ) );
 	VectorCopy( tr.refdef.vieworg, vk.prevViewOrigin );
 	VectorCopy( tr.refdef.viewaxis[0], vk.prevViewForward );
+
+	/*
+	 * Commit previous-frame matrices once at frame end — never mid-post (volumetric
+	 * used to overwrite these before TAA refreshed postfx, collapsing matrix
+	 * reprojection to identity and corrupting history UV for pixels without MVs).
+	 */
+	if ( worldValid && backEnd.doneWorldScene && !noWorldModel &&
+		backEnd.viewParms.portalView == PV_NONE ) {
+		projection = backEnd.viewParms.projectionMatrix;
+		view = backEnd.viewParms.world.modelViewMatrix;
+		myGlMultMatrix( view, projection, viewProj );
+		Com_Memcpy( vk_prev_view_matrix, view, sizeof( vk_prev_view_matrix ) );
+		Com_Memcpy( vk_prev_projection_matrix, projection, sizeof( vk_prev_projection_matrix ) );
+		Com_Memcpy( vk_prev_viewproj_matrix, viewProj, sizeof( vk_prev_viewproj_matrix ) );
+		vk_prev_matrices_valid = qtrue;
+	}
 }
 
 void vk_temporal_update_auto_exposure( void )

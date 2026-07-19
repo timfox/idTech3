@@ -37,6 +37,19 @@ void SV_OpenWorld_OnMapLoad( const char *mapname ) {
 		return;
 	}
 
+	/* Classic hub BSPs own the world. Streaming only augments sector_* maps
+	 * (or classic maps when r_openWorld is explicitly enabled). */
+	if ( !Cvar_VariableIntegerValue( "r_openWorld" ) &&
+		!Cvar_VariableIntegerValue( "com_openWorldSmoke" ) ) {
+		if ( Cvar_VariableIntegerValue( "r_bspStream" ) ) {
+			Cvar_Set( "r_bspStream", "0" );
+			Com_Printf( S_COLOR_YELLOW
+				"[sv_openworld] classic map %s: forced r_bspStream 0 (hub BSP ownership)\n",
+				mapname );
+		}
+		CM_Stream_Merge_ClearAll();
+	}
+
 	if ( sv_openWorld && sv_openWorld->integer &&
 		!Cvar_VariableIntegerValue( "r_openWorld" ) &&
 		!Cvar_VariableIntegerValue( "com_openWorldSmoke" ) ) {

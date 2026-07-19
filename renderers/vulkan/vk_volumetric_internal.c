@@ -12,6 +12,8 @@ Split from vk.c.
 #include "vk_image_layout.h"
 #include "vk_volumetric_internal.h"
 #include "vk_volumetric_params.h"
+#include "vk_view_state.h"
+#include "vk_post_fog.h"
 
 qboolean vk_volumetric_screen_integration_active( void )
 {
@@ -61,12 +63,24 @@ void vk_resolve_volumetric_depth_msaa( void )
 	{
 		int resolve_pc[2];
 		int depth_mode = r_volumetricFogDepthMode ? r_volumetricFogDepthMode->integer : 1;
+		uint32_t rw = 0, rh = 0;
 		resolve_pc[0] = depth_mode;
 		resolve_pc[1] = 0; /* 0 = use textureSamples() in shader */
 		qvkCmdPushConstants( vk.cmd->command_buffer, vk.volumetric_depth_resolve_pipeline_layout,
 			VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof( resolve_pc ), resolve_pc );
+		vk_get_active_render_extent( &rw, &rh );
+		if ( rw == 0 || rh == 0 ) {
+			rw = vk.mainColorWidth > 0 ? vk.mainColorWidth : (uint32_t)glConfig.vidWidth;
+			rh = vk.mainColorHeight > 0 ? vk.mainColorHeight : (uint32_t)glConfig.vidHeight;
+		}
+		/* Dispatch against render-target extent (not glConfig) so OIT MSAA depth covers all rows. */
+		qvkCmdDispatch( vk.cmd->command_buffer, ( rw + 7 ) / 8, ( rh + 7 ) / 8, 1 );
+		if ( r_fboDebug && r_fboDebug->integer >= 2 && vk_post_fog_fbo_debug_throttle() ) {
+			ri.Printf( PRINT_DEVELOPER,
+				"[VK][depth-resolve] dispatch=%ux%u groups workgroup=8x8 render=%ux%u\n",
+				( rw + 7 ) / 8, ( rh + 7 ) / 8, rw, rh );
+		}
 	}
-	qvkCmdDispatch( vk.cmd->command_buffer, ( glConfig.vidWidth + 7 ) / 8, ( glConfig.vidHeight + 7 ) / 8, 1 );
 
 	record_image_layout_transition( vk.cmd->command_buffer, vk.volumetric_depth_image, VK_IMAGE_ASPECT_COLOR_BIT,
 		VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,

@@ -425,6 +425,39 @@ else
 fi
 
 echo ""
+echo "Directional Ambient Visibility (GTAO / RTAO / Reference AO):"
+AV_C="$PROJECT_ROOT/renderers/vulkan/vk_ambient_visibility.c"
+AV_GLSL="$PROJECT_ROOT/renderers/vulkan/shaders/glsl/ambient_visibility"
+if [[ ! -f "$AV_C" || ! -f "$PROJECT_ROOT/renderers/vulkan/vk_ambient_visibility.h" ]]; then
+  fail "missing Ambient Visibility host module"
+elif ! grep -q 'r_ambientVisibilityMode' "$AV_C" 2>/dev/null || \
+     ! grep -q 'r_referenceAORays' "$AV_C" 2>/dev/null; then
+  fail "Ambient Visibility mode/reference cvars are missing"
+elif ! grep -q 'vk_ambient_visibility_apply_after_geometry' "$PROJECT_ROOT/renderers/vulkan/tr_backend.c" 2>/dev/null; then
+  fail "tr_backend.c missing Ambient Visibility opaque-geometry hook"
+elif ! grep -q 'vk_ambient_visibility_blocks_legacy_post' "$PROJECT_ROOT/renderers/vulkan/vk_postfx_passes.c" 2>/dev/null; then
+  fail "legacy SSAO is not mutually exclusive with Ambient Visibility"
+elif [[ ! -f "$AV_GLSL/av_gtao.comp" || ! -f "$AV_GLSL/av_rtao.comp" || \
+        ! -f "$AV_GLSL/av_temporal.comp" || ! -f "$AV_GLSL/av_filter.comp" || \
+        ! -f "$AV_GLSL/av_composite.comp" ]]; then
+  fail "Ambient Visibility shader suite is incomplete"
+elif ! grep -q 'rayQueryInitializeEXT' "$AV_GLSL/av_rtao.comp" 2>/dev/null; then
+  fail "RTAO shader missing ray-query traversal"
+elif ! grep -q 'historyGeo' "$AV_GLSL/av_temporal.comp" 2>/dev/null || \
+     ! grep -q 'motionTex' "$AV_GLSL/av_temporal.comp" 2>/dev/null; then
+  fail "Ambient Visibility temporal pass missing dedicated geometry/motion history"
+elif ! grep -q 'CLASS_TRANSMISSION=3' "$AV_GLSL/av_composite.comp" 2>/dev/null; then
+  fail "Ambient Visibility composite missing transmission/emissive exclusion policy"
+elif ! grep -q 'vk_ambient_visibility_view' "$PROJECT_ROOT/renderers/vulkan/extensions/rtx/vk_rcgi.c" 2>/dev/null || \
+     ! grep -q 'vk_ambient_visibility_view' "$PROJECT_ROOT/renderers/vulkan/extensions/rtx/vk_surfel_gi.c" 2>/dev/null; then
+  fail "RcGI/Surfel GI do not consume shared Ambient Visibility"
+elif ! grep -q 'vk_av_rtao_cs_spv' "$PROJECT_ROOT/renderers/vulkan/vk_ambient_visibility_spirv.inc" 2>/dev/null; then
+  fail "Ambient Visibility embedded SPIR-V is missing"
+else
+  pass "directional AV modes, dedicated history, GI consumers, fallback, debug/reference shaders wired"
+fi
+
+echo ""
 echo "Deferred G-buffer scaffold (r_renderMode 1 + r_deferredGBuffer):"
 if ! grep -q 'r_deferredGBuffer = ri.Cvar_Get' "$TR_INIT_VK" 2>/dev/null; then
   fail "tr_init.c missing r_deferredGBuffer cvar"
@@ -646,7 +679,30 @@ elif ! grep -q 'stochMode >= 2 && !vk_temporal_reconstruction_wanted' "$PROJECT_
 elif ! grep -q 'reactive > 0.90' "$TAA_FRAG" 2>/dev/null; then
   fail "taa.frag missing hard reactive history reject"
 else
-  pass "Weapon-after-TAA + stochastic TAA-off fallback + reactive hard reject"
+	pass "Weapon-after-TAA + stochastic TAA-off fallback + reactive hard reject"
+fi
+
+echo ""
+echo "OIT striping guards (barrier + NEAREST + texelFetch + depth dispatch):"
+OIT_RESOLVE="$PROJECT_ROOT/renderers/vulkan/shaders/glsl/oit_resolve.frag"
+OIT_PASS="$PROJECT_ROOT/renderers/vulkan/vk_postfx_passes.c"
+VK_VOL_INT="$PROJECT_ROOT/renderers/vulkan/vk_volumetric_internal.c"
+VK_TEMP="$PROJECT_ROOT/renderers/vulkan/vk_temporal.c"
+VK_DESC="$PROJECT_ROOT/renderers/vulkan/vk_descriptor_sets.c"
+if ! grep -q 'texelFetch( oitAccumTex' "$OIT_RESOLVE" 2>/dev/null; then
+  fail "oit_resolve.frag must texelFetch OIT buffers (not LINEAR textureLod)"
+elif ! grep -q 'vk_oit_barrier_targets_for_sampling' "$OIT_PASS" 2>/dev/null; then
+  fail "vk_postfx_passes.c missing OIT full-framebuffer sample barrier"
+elif ! grep -q 'GL_NEAREST' "$VK_DESC" 2>/dev/null || ! grep -A2 'r_oit && r_oit->integer' "$VK_DESC" 2>/dev/null | grep -q 'GL_NEAREST'; then
+  fail "OIT resolve descriptors must use GL_NEAREST"
+elif ! grep -q 'vk_get_active_render_extent' "$VK_VOL_INT" 2>/dev/null; then
+  fail "MSAA depth resolve must dispatch using active render extent"
+elif ! grep -q 'Commit previous-frame matrices once at frame end' "$VK_TEMP" 2>/dev/null; then
+  fail "vk_temporal_commit_frame_state must own prev matrix commit"
+elif grep -q 'Com_Memcpy( vk_prev_viewproj_matrix, params.viewProj' "$PROJECT_ROOT/renderers/vulkan/vk_volumetric_params.c" 2>/dev/null; then
+  fail "volumetric must not overwrite shared prev matrices mid-frame"
+else
+  pass "OIT striping guards: barrier, NEAREST, texelFetch, depth dispatch, matrix commit"
 fi
 
 echo ""
