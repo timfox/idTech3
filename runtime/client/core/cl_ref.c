@@ -379,10 +379,6 @@ static qboolean CL_IsMininized( void ) {
 	return gw_minimized;
 }
 
-static qboolean CL_HasFocus( void ) {
-	return gw_active;
-}
-
 static int CL_GetState( void ) {
 	return cls.state;
 }
@@ -611,7 +607,6 @@ static void CL_InitRef( void ) {
 #else
 	rimp.ArcBlancSampleHeight = NULL;
 #endif
-	rimp.CL_HasFocus = CL_HasFocus;
 #if defined(USE_RENDERER_DLOPEN) && USE_RENDERER_DLOPEN
 	ret = getRefAPI( REF_API_VERSION, &rimp );
 #else

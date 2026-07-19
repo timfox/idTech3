@@ -17,6 +17,7 @@ Chocolate RTX path; light grid / ray-query sample / cache shade / gather.
 #include "vk_image_layout.h"
 #include "vk_view_state.h"
 #include "vk_cmd.h"
+#include "vk_ambient_visibility.h"
 
 #ifdef USE_VULKAN_RTX
 #include "vk_rcgi_spirv.inc"
@@ -435,8 +436,14 @@ static qboolean RCGI_CreatePipelines( void )
 	lci.bindingCount = 6;
 	VK_CHECK( qvkCreateDescriptorSetLayout( vk.device, &lci, NULL, &rcgi.upscale_layout ) );
 
-	/* composite: depth@0 albedo@1 irradiance@2 colorOut@3 */
-	lci.bindingCount = 4;
+	/* composite: depth@0 albedo@1 irradiance@2 colorOut@3 ambientVisibility@4 */
+	binds[0].binding = 0; binds[0].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+	binds[1].binding = 1; binds[1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+	binds[2].binding = 2; binds[2].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+	binds[3].binding = 3; binds[3].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+	binds[4].binding = 4; binds[4].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+	binds[4].descriptorCount = 1; binds[4].stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+	lci.bindingCount = 5;
 	VK_CHECK( qvkCreateDescriptorSetLayout( vk.device, &lci, NULL, &rcgi.composite_layout ) );
 
 	Com_Memset( &pcr, 0, sizeof( pcr ) );
@@ -475,7 +482,7 @@ static qboolean RCGI_CreatePipelines( void )
 	plci.pSetLayouts = &rcgi.upscale_layout;
 	VK_CHECK( qvkCreatePipelineLayout( vk.device, &plci, NULL, &rcgi.upscale_pl ) );
 
-	pcr.size = sizeof( uint32_t ) * 2 + sizeof( float ) + sizeof( uint32_t ) * 4;
+	pcr.size = sizeof( uint32_t ) * 8;
 	plci.pSetLayouts = &rcgi.composite_layout;
 	VK_CHECK( qvkCreatePipelineLayout( vk.device, &plci, NULL, &rcgi.composite_pl ) );
 
@@ -939,7 +946,8 @@ void vk_rcgi_apply_after_geometry( void )
 		float strength;
 		uint32_t skipSky;
 		uint32_t debugMode;
-		uint32_t pad[3];
+		float avStrength;
+		uint32_t pad[2];
 	} compPush;
 
 	if ( !vk_rcgi_active() || !vk.cmd || vk.cmd->command_buffer == VK_NULL_HANDLE ) {
@@ -1120,12 +1128,21 @@ void vk_rcgi_apply_after_geometry( void )
 	imgInfo[2].sampler = linear; imgInfo[2].imageView = rcgi.irradiance.view;
 	imgInfo[2].imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 	imgInfo[3].imageView = vk.color_image_view; imgInfo[3].imageLayout = VK_IMAGE_LAYOUT_GENERAL;
-	writes[0].dstSet = rcgi.composite_set; writes[0].dstBinding = 0; writes[0].pImageInfo = &imgInfo[0];
-	writes[1].dstSet = rcgi.composite_set; writes[1].dstBinding = 1; writes[1].pImageInfo = &imgInfo[1];
-	writes[2].dstSet = rcgi.composite_set; writes[2].dstBinding = 2; writes[2].pImageInfo = &imgInfo[2];
+	imgInfo[4].sampler = nearest;
+	imgInfo[4].imageView = vk_ambient_visibility_available() ? vk_ambient_visibility_view() :
+		( tr.whiteImage ? tr.whiteImage->view : albedoView );
+	imgInfo[4].imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+	writes[0].dstSet = rcgi.composite_set; writes[0].dstBinding = 0;
+	writes[0].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER; writes[0].pImageInfo = &imgInfo[0];
+	writes[1].dstSet = rcgi.composite_set; writes[1].dstBinding = 1;
+	writes[1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER; writes[1].pImageInfo = &imgInfo[1];
+	writes[2].dstSet = rcgi.composite_set; writes[2].dstBinding = 2;
+	writes[2].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER; writes[2].pImageInfo = &imgInfo[2];
 	writes[3].dstSet = rcgi.composite_set; writes[3].dstBinding = 3;
 	writes[3].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE; writes[3].pImageInfo = &imgInfo[3];
-	qvkUpdateDescriptorSets( vk.device, 4, writes, 0, NULL );
+	writes[4].dstSet = rcgi.composite_set; writes[4].dstBinding = 4;
+	writes[4].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER; writes[4].pImageInfo = &imgInfo[4];
+	qvkUpdateDescriptorSets( vk.device, 5, writes, 0, NULL );
 
 	Com_Memset( &memBarrier, 0, sizeof( memBarrier ) );
 	memBarrier.sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER;
@@ -1347,7 +1364,8 @@ void vk_rcgi_apply_after_geometry( void )
 	compPush.strength = r_rcgi_strength ? r_rcgi_strength->value : 0.85f;
 	compPush.skipSky = 1u;
 	compPush.debugMode = (uint32_t)( r_rcgi_debug ? r_rcgi_debug->integer : 0 );
-	compPush.pad[0] = compPush.pad[1] = compPush.pad[2] = 0u;
+	compPush.avStrength = vk_ambient_visibility_strength();
+	compPush.pad[0] = compPush.pad[1] = 0u;
 	qvkCmdBindPipeline( cmd, VK_PIPELINE_BIND_POINT_COMPUTE, rcgi.composite_pipe );
 	qvkCmdBindDescriptorSets( cmd, VK_PIPELINE_BIND_POINT_COMPUTE, rcgi.composite_pl, 0, 1, &rcgi.composite_set, 0, NULL );
 	qvkCmdPushConstants( cmd, rcgi.composite_pl, VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof( compPush ), &compPush );

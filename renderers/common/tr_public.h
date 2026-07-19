@@ -283,9 +283,6 @@ typedef struct {
 	/* Arc Blanc ocean height sampling (NULL when module disabled). */
 	float (*ArcBlancSampleHeight)( float worldX, float worldZ );
 
-	/* Keyboard/window focus (gw_active). NULL-safe; used for alt-tab presentation recovery. */
-	qboolean (*CL_HasFocus)( void );
-
 } refimport_t;
 
 extern	refimport_t	ri;

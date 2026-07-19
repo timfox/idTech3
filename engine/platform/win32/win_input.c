@@ -1238,7 +1238,8 @@ void IN_NotifyWindowRestored( void )
 	if ( !gw_active || gw_minimized ) {
 		return;
 	}
-	IN_Activate( qtrue );
+	/* Force ActivateMouse even if sticky-active across focus loss (IN_Activate(qtrue) is a no-op). */
+	s_wmv.mouseActive = qfalse;
 	IN_ActivateMouse();
 }
 

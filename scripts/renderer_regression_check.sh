@@ -471,6 +471,16 @@ else
 fi
 
 echo ""
+echo "Spine platform restore hooks:"
+if [[ ! -f "$PROJECT_ROOT/scripts/spine_platform_restore_check.sh" ]]; then
+  fail "missing scripts/spine_platform_restore_check.sh"
+elif ! bash "$PROJECT_ROOT/scripts/spine_platform_restore_check.sh"; then
+  fail "spine_platform_restore_check.sh failed"
+else
+  pass "spine platform restore-hook static contract"
+fi
+
+echo ""
 echo "Directional Ambient Visibility (GTAO / RTAO / Reference AO):"
 AV_C="$PROJECT_ROOT/renderers/vulkan/vk_ambient_visibility.c"
 AV_GLSL="$PROJECT_ROOT/renderers/vulkan/shaders/glsl/ambient_visibility"

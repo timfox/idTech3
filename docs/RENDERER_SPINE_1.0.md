@@ -134,7 +134,7 @@ Spine 1.0 is done when:
 1. The locked matrix passes automated + manual combination tests (OIT × TAA × weapon × resize × alt-tab × `vid_restart` × windowed/FS).
 2. Every Spine attachment used in that matrix has a debug name and a documented producer/consumer. Runtime: `pass_registry_status` / `spine_status` (`r_spineValidate` 0–2). Static: `./scripts/pass_registry_check.sh` + `./scripts/spine_combo_matrix_check.sh` (also via `spine_stability_check.sh`). Lightweight registry tracks attachment generation, last writer/reader, history validity, phase order, layout stamps/expectations, and dual-ownership combos (AO, OIT×TAA); DEVICE_LOST dumps spine state.
 3. Temporal histories invalidate correctly for camera cut, projection change, resize, map change, and weapon/portal ownership. Console: `temporal_status` (also summarized on `havenrp_renderer_status`, including `rejectDbg`). Visual: `r_debugHistoryRejection` 1–8 (MV / reasons / reactive / confidence / disocclusion / history UV / near-weapon / world-vs-reactive). Static: `./scripts/temporal_ownership_check.sh` (also via `spine_stability_check.sh`). Shared `apply_resets` owns TAA / AV / volumetric / motion / occlusion; RDF_NOWORLDMODEL after world does not thrash; weapon defers until after world TAA when reconstruction is on; portals force camera-cut and do not own world matrix history.
-4. `input_status` / relative mouse lifecycle remain correct across focus and `vid_restart` (presentation path). Runtime: `IN_NotifyWindowRestored` + `re.NotifyWindowRestored` on FOCUS_GAINED / RESTORED; `CL_HasFocus` belt-and-suspenders in `vk_begin_frame`. Console: `input_status` reports restore hook.
+4. `input_status` / relative mouse lifecycle remain correct across focus and `vid_restart` (presentation path). Runtime: `IN_NotifyWindowRestored` + `re.NotifyWindowRestored` on FOCUS_GAINED / RESTORED (SDL + Win32; X11 stub). Static: `./scripts/spine_platform_restore_check.sh`. Console: `input_status` reports restore hook.
 5. DEVICE_LOST and black-frame classes from late post toggles are diagnosed with pass-diag context and do not recur on the certified profile. Runtime: `vk_report_device_lost_context` dumps late-post cvars (OIT/AA/AV/weapon-after/reactive/bloom), post-chain writer, and spine combo; frame-end stages stamp `taa_*` / `luminance_*` / `gamma_*`.
 6. Mode/feature combinations **outside** the matrix are latched or clearly experimental, with a safe recovery command.
 7. G-buffer / Ambient Visibility lifecycle: `./scripts/gbuffer_av_lifecycle_check.sh` (also via `spine_stability_check.sh`). Console: `deferred_gbuffer_status`, `ambient_visibility_status`, `havenrp_renderer_status`. Soft-fail create paths (G-buffer scaffold images + fill/lighting/composite/debug; AV images/pipelines; visibility fill/classify/debug + scaffold); `r_dgbFailInject` recovers when cleared; `r_avFailInject` demotes AO to `legacy_ssao` without killing G-buffer fill (`history` thrash-resets AV temporal only). Scaffold/AV image OOM demotes to legacy SSAO (Forward+ continues). Presentation teardown+restore sticky-resets temporal (`VK_TEMPORAL_RESET_SWAPCHAIN_CHANGE`) and rebinds deferred/AV. **Do not** enable `r_ambientVisibilityMode 4` in quality until the GPU matrix in that script’s footer passes.
@@ -147,11 +147,11 @@ Related checklists: [RENDERER_PHASE1_CHECKLIST_2026Q3.md](RENDERER_PHASE1_CHECKL
 
 **Do next**
 
-- Focus / alt-tab / input restore hooks landed (`NotifyWindowRestored`, `IN_NotifyWindowRestored`, `CL_HasFocus`); GPU-walk alt-tab + `input_status` next
+- Focus / alt-tab / input restore hooks landed (`NotifyWindowRestored`, `IN_NotifyWindowRestored` on SDL/Win32/X11 stub); GPU-walk alt-tab + `input_status` next
 - Late-post DEVICE_LOST / pass_diag + bloom/SSR/gamma layout expects landed; GPU-walk black-frame class next
 - OIT × TAA soft-demote when weapon-after off; experimental stack with weapon-after + `r_spineValidate 1`
 - Temporal ownership debug overlays (`r_debugHistoryRejection` 1–8) — GPU-walk next
-- Manual GPU combo matrix (static: `./scripts/spine_combo_matrix_check.sh` via `spine_stability_check.sh`)
+- Manual GPU combo matrix (static: `./scripts/spine_combo_matrix_check.sh` + `spine_platform_restore_check.sh` via `spine_stability_check.sh`)
 
 **Do not next (unless fixing a Spine blocker)**
 

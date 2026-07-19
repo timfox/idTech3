@@ -114,6 +114,7 @@ void	IN_Shutdown (void);
 void	IN_JoystickCommands (void);
 
 void	IN_Activate( qboolean active );
+void	IN_NotifyWindowRestored( void );
 void	IN_Frame( void );
 
 void	IN_UpdateWindow( RECT *window_rect, qboolean updateClipRegion );

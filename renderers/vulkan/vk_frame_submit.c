@@ -150,22 +150,13 @@ void vk_begin_frame( void )
 
 	/* Minimize skips the entire backend; on restore clear stale acquire flags and
 	 * sticky-reset temporal so the first visible frame does not present garbage.
-	 * Alt-tab without minimize is handled via re.NotifyWindowRestored from SDL, with
-	 * this CL_HasFocus edge as a belt-and-suspenders path. */
+	 * Alt-tab / FOCUS_GAINED is owned by the client via re.NotifyWindowRestored. */
 	{
 		static qboolean s_wasMinimized;
-		static qboolean s_hadFocus = qtrue;
 		const qboolean minimized = ri.CL_IsMinimized() ? qtrue : qfalse;
 
 		if ( s_wasMinimized && !minimized ) {
 			vk_presentation_note_window_restored( "minimize_to_active" );
-		}
-		if ( ri.CL_HasFocus ) {
-			const qboolean hasFocus = ri.CL_HasFocus() ? qtrue : qfalse;
-			if ( !s_hadFocus && hasFocus && !minimized ) {
-				vk_presentation_note_window_restored( "focus_gained" );
-			}
-			s_hadFocus = hasFocus;
 		}
 		s_wasMinimized = minimized;
 	}

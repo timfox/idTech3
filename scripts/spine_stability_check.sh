@@ -44,8 +44,6 @@ grep -q 'VK_TEMPORAL_RESET_SWAPCHAIN_CHANGE' "$PRES" || fail "presentation must 
 grep -q 'vk_presentation_note_window_restored' "$PRES" || fail "presentation must expose window-restored recovery"
 grep -q 'minimize_to_active' "$ROOT/renderers/vulkan/vk_frame_submit.c" || \
   fail "begin_frame must recover from minimize→active"
-grep -q 'CL_HasFocus' "$ROOT/renderers/vulkan/vk_frame_submit.c" || \
-  fail "begin_frame must observe CL_HasFocus for alt-tab"
 grep -q 'NotifyWindowRestored' "$ROOT/renderers/common/tr_public.h" || \
   fail "refexport NotifyWindowRestored missing"
 grep -q 'IN_NotifyWindowRestored' "$ROOT/engine/platform/sdl/sdl_input.c" || \
@@ -59,6 +57,9 @@ grep -q 'vk_reset_taa_history' "$TEMP_C" || fail "temporal apply_resets must res
 grep -q 'appliedResetReasons' "$ROOT/renderers/vulkan/vk_ambient_visibility.c" || \
   fail "AV frame_begin must observe temporal appliedResetReasons"
 pass "restart/temporal ownership: swapchain sticky + minimize/focus restore + shared AV/TAA reset"
+
+# 2c2. Cross-platform restore hooks (SDL / Win32 / X11 / stub renderer)
+bash "$ROOT/scripts/spine_platform_restore_check.sh"
 
 # 2d. Temporal history ownership contract (weapon / portals / status)
 bash "$ROOT/scripts/temporal_ownership_check.sh"

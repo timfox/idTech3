@@ -1723,6 +1723,16 @@ void IN_Shutdown( void )
 	Cmd_RemoveCommand( "in_restart" );
 }
 
+/*
+=================
+IN_NotifyWindowRestored
+
+X11/native path: no relative-mouse sticky state to repair; keep symbol for shared callers.
+=================
+*/
+void IN_NotifyWindowRestored( void )
+{
+}
 
 /*
 =================

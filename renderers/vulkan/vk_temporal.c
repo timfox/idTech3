@@ -18,6 +18,18 @@ qboolean vk_prev_volumetric_time_valid = qfalse;
 float vk_volumetric_noise_time = 0.0f;
 vk_volumetric_validation_state_t vk_volumetric_validation_state;
 
+/* Single table — regression check counts knownReasons[] entries once. */
+static const uint32_t knownReasons[] = {
+	VK_TEMPORAL_RESET_RENDERER_INIT,
+	VK_TEMPORAL_RESET_SWAPCHAIN_CHANGE,
+	VK_TEMPORAL_RESET_RENDER_SIZE_CHANGE,
+	VK_TEMPORAL_RESET_WORLD_CHANGE,
+	VK_TEMPORAL_RESET_CLIENT_STATE_CHANGE,
+	VK_TEMPORAL_RESET_CAMERA_CUT,
+	VK_TEMPORAL_RESET_EXPLICIT_DEBUG,
+	VK_TEMPORAL_RESET_MISSING_PREV_DATA
+};
+
 static const char *vk_temporal_reason_string( uint32_t reason )
 {
 	switch ( reason ) {
@@ -115,16 +127,6 @@ void vk_temporal_note_first_person_projection( void )
 
 static void vk_temporal_log_reset( uint32_t reasons, qboolean hardReset )
 {
-	uint32_t knownReasons[] = {
-		VK_TEMPORAL_RESET_RENDERER_INIT,
-		VK_TEMPORAL_RESET_SWAPCHAIN_CHANGE,
-		VK_TEMPORAL_RESET_RENDER_SIZE_CHANGE,
-		VK_TEMPORAL_RESET_WORLD_CHANGE,
-		VK_TEMPORAL_RESET_CLIENT_STATE_CHANGE,
-		VK_TEMPORAL_RESET_CAMERA_CUT,
-		VK_TEMPORAL_RESET_EXPLICIT_DEBUG,
-		VK_TEMPORAL_RESET_MISSING_PREV_DATA
-	};
 	char reasonBuf[256];
 	char *ptr = reasonBuf;
 	char *end = reasonBuf + sizeof( reasonBuf );
@@ -566,16 +568,6 @@ void vk_temporal_flush_deferred_weapon_after_taa( VkImageView *post_fog_src, VkI
 
 static void vk_temporal_format_reasons( uint32_t reasons, char *buf, size_t bufSize )
 {
-	static const uint32_t knownReasons[] = {
-		VK_TEMPORAL_RESET_RENDERER_INIT,
-		VK_TEMPORAL_RESET_SWAPCHAIN_CHANGE,
-		VK_TEMPORAL_RESET_RENDER_SIZE_CHANGE,
-		VK_TEMPORAL_RESET_WORLD_CHANGE,
-		VK_TEMPORAL_RESET_CLIENT_STATE_CHANGE,
-		VK_TEMPORAL_RESET_CAMERA_CUT,
-		VK_TEMPORAL_RESET_EXPLICIT_DEBUG,
-		VK_TEMPORAL_RESET_MISSING_PREV_DATA
-	};
 	char *ptr;
 	char *end;
 	int i;

@@ -27,6 +27,8 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 void IN_Init (void);
 void IN_Frame (void);
 void IN_Shutdown (void);
+/* Present on all platforms; no-op / reassert relative mouse where applicable. */
+void IN_NotifyWindowRestored( void );
 
 
 void IN_JoyMove( void );
