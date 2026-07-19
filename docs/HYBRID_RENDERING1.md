@@ -58,6 +58,8 @@ r_rtxEntities 1           // entity mesh BLAS: MD3 + CPU-skinned IQM/MDR + stati
 r_rtxEntityTriCap 65536
 ```
 
+Jointed IQM never uses dishonest bind-pose for RT: skin fail or missing poses → AABB (`skinfail=` / `proxyIqmFail` in `rtx_status`).
+
 `demo_hybrid1.cfg` sets `r_rtxEntities 1` and `r_hybrid1Quality 3`. Console **`rtx_status`** reports `entity_ents` / `entity_tris` / `mesh` breakdown (`md3` / `iqm` / `gltf` / `mdr`) / `proxy` reasons (`nonmesh` = unknown, `*fail` = pack failed → AABB), **entity BLAS mode** (`UPDATE` vs `REBUILD`), and **TLAS mode** (`UPDATE` vs `REBUILD` with reason).
 
 `r_rtx 1` **or** `r_hybrid1 1` before `vid_restart` enables KHR ray tracing device features.
@@ -69,7 +71,7 @@ r_rtxEntityTriCap 65536
 | 0 | custom | Leave individual `r_hybrid1_*` knobs alone |
 | 1 | performance | No diffuse RT; 2 A-trous iters; hard sun; no dlight shadows; **`r_hybrid1_glint` 0**, `r_glintSampleBudget` 0 |
 | 2 | balanced | No diffuse; 3 A-trous; soft sun 0.25°; 1 dlight shadow; **glint on**, budget 1 tap |
-| 3 | quality | Diffuse on; 4 A-trous; soft sun 0.5°; EnvBRDF IBL; 2 dlight shadows; **glint on**, budget 4 taps |
+| 3 | quality | Diffuse on; 4 A-trous; soft sun 0.5°; EnvBRDF IBL; 2 dlight shadows; **glint on**, budget 2 taps; ReSTIR DI scaffold on |
 
 Live (no latch). Entity BLAS stays a separate latched companion (`r_rtxEntities` + `vid_restart`).
 

@@ -201,8 +201,8 @@ static qboolean vk_rtx_pack_md3( const trRefEntity_t *ent, const viewParms_t *vi
 ===============
 vk_rtx_pack_iqm
 
-Bind-pose IQM when num_joints == 0 (or no poses). Jointed IQM CPU-skins via
-R_IQMSkinPositions; returns qfalse on budget/skin failure (AABB fallback).
+Bind-pose IQM only when num_joints == 0. Jointed IQM always CPU-skins via
+R_IQMSkinPositions; returns qfalse on missing poses/budget/skin failure (AABB).
 ===============
 */
 static qboolean vk_rtx_pack_iqm( const trRefEntity_t *ent, const viewParms_t *viewParms,
@@ -237,7 +237,11 @@ static qboolean vk_rtx_pack_iqm( const trRefEntity_t *ent, const viewParms_t *vi
 		return qfalse;
 	}
 
-	needSkin = (qboolean)( data->num_joints > 0 && data->num_poses > 0 );
+	/* Jointed meshes must never use dishonest bind-pose for RT. */
+	needSkin = (qboolean)( data->num_joints > 0 );
+	if ( needSkin && data->num_poses <= 0 ) {
+		return qfalse;
+	}
 	frame = ent->e.frame;
 	oldframe = ent->e.oldframe;
 	backlerp = ent->e.backlerp;

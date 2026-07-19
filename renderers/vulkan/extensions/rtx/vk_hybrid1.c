@@ -153,6 +153,10 @@ static void HYBRID1_ApplyQualityPreset( void )
 	int q;
 	const char *name;
 
+	/* Presets only rewrite knobs while Hybrid1 is enabled. */
+	if ( !r_hybrid1 || r_hybrid1->integer <= 0 ) {
+		return;
+	}
 	if ( !r_hybrid1Quality ) {
 		return;
 	}

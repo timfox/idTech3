@@ -43,6 +43,8 @@ check "$VK_RTX_WORLD" 'rtx_emit_grid_tris' 'grid triangle emit'
 check "$VK_RTX_WORLD" 'albedoRgb' 'per-primitive albedo pack'
 check "$VK_RTX_ENT" 'vk_rtx_pack_md3' 'MD3 entity mesh pack'
 check "$VK_RTX_ENT" 'vk_rtx_pack_aabb' 'AABB proxy fallback'
+check "$VK_RTX_ENT" 'R_IQMSkinPositions' 'jointed IQM CPU-skin into entity BLAS'
+check "$VK_RTX_ENT" 'needSkin = (qboolean)( data->num_joints > 0 )' 'jointed IQM never uses bind-pose'
 check "$VK_RTX_ENT_H" 'meshCpuSkinnedCount' 'entity pack CPU-skin success count'
 check "$VK_RTX_ENT" 'proxySkinnedCount = proxyIqmFail' 'proxySkinned rollup of skinned-format AABB fails'
 check "$VK_RTX" 'proxy_rate=' 'rtx_status reports entity AABB proxy rate'
@@ -51,6 +53,9 @@ check "$VK_RP" 'vk_hybrid1_active' 'hybrid frame path priority'
 check "$RCHIT" 'gl_InstanceCustomIndexEXT' 'instance-aware closest-hit'
 check "$TR_INIT" 'r_rtxTlasUpdate' 'r_rtxTlasUpdate cvar registration'
 check "$TR_INIT" 'r_rtxEntityTriCap' 'r_rtxEntityTriCap cvar registration'
+check "$TR_INIT" 'r_hybrid1Quality' 'r_hybrid1Quality cvar registration'
+check "$TR_INIT" 'Cvar_Get( "r_hybrid1", "0"' 'r_hybrid1 off by default'
+check "$TR_INIT" 'Cvar_Get( "r_rtx", "0"' 'r_rtx off by default'
 
 TR_IMAGE="$(idtech3_file renderers/vulkan/tr_image.c src/renderers/vulkan/tr_image.c)"
 VK_TEX="$(idtech3_file renderers/vulkan/vk_texture_image.c src/renderers/vulkan/vk_texture_image.c)"
@@ -66,6 +71,9 @@ VK_BINDLESS="$(idtech3_file renderers/vulkan/extensions/rtx/vk_rtx_bindless.c sr
 VK_HYBRID="$(idtech3_file renderers/vulkan/extensions/rtx/vk_hybrid1.c src/renderers/vulkan/extensions/rtx/vk_hybrid1.c)"
 VK_WORLD="$(idtech3_file renderers/vulkan/extensions/rtx/vk_rtx_world.c src/renderers/vulkan/extensions/rtx/vk_rtx_world.c)"
 VK_ENT="$(idtech3_file renderers/vulkan/extensions/rtx/vk_rtx_entities.c src/renderers/vulkan/extensions/rtx/vk_rtx_entities.c)"
+check "$VK_HYBRID" 'HYBRID1_ApplyQualityPreset' 'Hybrid1 quality preset applicator'
+check "$VK_HYBRID" 'r_hybrid1->integer <= 0' 'quality presets gated on r_hybrid1'
+check "$VK_HYBRID" 'quality=%d(%s)' 'hybrid1_status prints quality tier'
 check "$HIT_GLSL" 'WorldAlbedoSSBO' 'Hybrid1 hit world albedo SSBO'
 check "$HIT_GLSL" 'PrimMaterialSSBO' 'Hybrid1 hit prim material SSBO'
 check "$HIT_GLSL" 'PrimUvSSBO' 'Hybrid1 hit PrimUv SSBO'
