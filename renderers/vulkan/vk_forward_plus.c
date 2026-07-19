@@ -18,18 +18,40 @@ docs/RENDERER_2026_ARCHITECTURE_PASS.md.
 #define VK_FP_RECORD_STRIDE (sizeof(float) * 16) /* 4 x vec4 per light */
 #define VK_FP_HEADER_BYTES (sizeof(float) * 8) /* 2 x vec4: count/meta + tile grid / viewport */
 #define VK_FP_TILE_DIM 16u
+/* Max flat 2D tiles before Z expansion; total clusters = flat * z_slices (capped). */
 #define VK_FP_MAX_TILES (256u * 256u)
-/* Tile SSBO stores VK_FP_MAX_PER_TILE uint32 indices per tile; r_forwardPlusMaxPerTile clamps active count to [MIN, MAX]. */
+#define VK_FP_MAX_Z_SLICES 16u
+#define VK_FP_MAX_CLUSTERS (VK_FP_MAX_TILES * 8u)
+/* Tile SSBO stores VK_FP_MAX_PER_TILE uint32 indices per cluster; r_forwardPlusMaxPerTile clamps active count to [MIN, MAX]. */
 #define VK_FP_MIN_PER_TILE 4u
 #define VK_FP_MAX_PER_TILE 8u
 #define VK_FP_PARAM_BYTES 256u
 #define VK_FP_DUMMY_LIGHT_FLOATS 32u
 #define VK_FP_DUMMY_TILE_UINTS 32u
 
-static void vk_fp_compute_tile_grid( uint32_t *tiles_x, uint32_t *tiles_y, uint32_t *total_tiles, VkDeviceSize *tile_bytes )
+static uint32_t vk_fp_active_z_slices( void )
+{
+	uint32_t z = 1u;
+
+	if ( r_forwardPlusZSlices && r_forwardPlusZSlices->integer > 1 ) {
+		z = (uint32_t)r_forwardPlusZSlices->integer;
+	}
+	if ( z > VK_FP_MAX_Z_SLICES ) {
+		z = VK_FP_MAX_Z_SLICES;
+	}
+	if ( z < 1u ) {
+		z = 1u;
+	}
+	return z;
+}
+
+static void vk_fp_compute_tile_grid( uint32_t *tiles_x, uint32_t *tiles_y, uint32_t *z_slices_out,
+	uint32_t *total_clusters, VkDeviceSize *tile_bytes )
 {
 	uint32_t vw = vk_get_render_target_width();
 	uint32_t vh = vk_get_render_target_height();
+	uint32_t flat;
+	uint32_t z_slices = vk_fp_active_z_slices();
 
 	if ( vw < 16u ) {
 		vw = 1280u;
@@ -39,12 +61,21 @@ static void vk_fp_compute_tile_grid( uint32_t *tiles_x, uint32_t *tiles_y, uint3
 	}
 	*tiles_x = ( vw + VK_FP_TILE_DIM - 1u ) / VK_FP_TILE_DIM;
 	*tiles_y = ( vh + VK_FP_TILE_DIM - 1u ) / VK_FP_TILE_DIM;
-	*total_tiles = *tiles_x * *tiles_y;
-	if ( *total_tiles > VK_FP_MAX_TILES ) {
-		*total_tiles = VK_FP_MAX_TILES;
-		*tiles_y = *total_tiles / *tiles_x;
+	flat = *tiles_x * *tiles_y;
+	if ( flat > VK_FP_MAX_TILES ) {
+		flat = VK_FP_MAX_TILES;
+		*tiles_y = flat / *tiles_x;
+		if ( *tiles_y < 1u ) {
+			*tiles_y = 1u;
+		}
+		flat = *tiles_x * *tiles_y;
 	}
-	*tile_bytes = (VkDeviceSize)*total_tiles * (VkDeviceSize)VK_FP_MAX_PER_TILE * sizeof( uint32_t );
+	while ( z_slices > 1u && (uint64_t)flat * (uint64_t)z_slices > (uint64_t)VK_FP_MAX_CLUSTERS ) {
+		z_slices--;
+	}
+	*z_slices_out = z_slices;
+	*total_clusters = flat * z_slices;
+	*tile_bytes = (VkDeviceSize)*total_clusters * (VkDeviceSize)VK_FP_MAX_PER_TILE * sizeof( uint32_t );
 }
 
 static void vk_fp_destroy_tile_buffer_only( void )
@@ -92,7 +123,7 @@ static void vk_fp_ensure_tile_for_render_resolution( void )
 	VkMemoryRequirements mr;
 	VkMemoryAllocateInfo mai;
 	uint32_t mem_type;
-	uint32_t tiles_x, tiles_y, total_tiles;
+	uint32_t tiles_x, tiles_y, z_slices, total_clusters;
 	VkDeviceSize tile_bytes;
 	qboolean changed;
 	VkBuffer new_tile = VK_NULL_HANDLE;
@@ -109,9 +140,11 @@ static void vk_fp_ensure_tile_for_render_resolution( void )
 		return;
 	}
 
-	vk_fp_compute_tile_grid( &tiles_x, &tiles_y, &total_tiles, &tile_bytes );
+	vk_fp_compute_tile_grid( &tiles_x, &tiles_y, &z_slices, &total_clusters, &tile_bytes );
 
 	changed = ( tiles_x != vk.forward_plus.tiles_x || tiles_y != vk.forward_plus.tiles_y ||
+		z_slices != vk.forward_plus.z_slices ||
+		total_clusters != vk.forward_plus.tile_capacity_tiles ||
 		vk.forward_plus.tile_buffer == VK_NULL_HANDLE );
 
 	if ( !changed ) {
@@ -159,24 +192,29 @@ static void vk_fp_ensure_tile_for_render_resolution( void )
 	vk.forward_plus.tile_memory = new_mem;
 	vk.forward_plus.tiles_x = tiles_x;
 	vk.forward_plus.tiles_y = tiles_y;
-	vk.forward_plus.tile_capacity_tiles = total_tiles;
+	vk.forward_plus.z_slices = z_slices;
+	vk.forward_plus.tile_capacity_tiles = total_clusters;
 
 	vk_fp_update_compute_descriptor_tile_binding();
 	vk_forward_plus_init_graphics_descriptors();
 
-	ri.Printf( PRINT_DEVELOPER, "[VK][Forward+] tile grid resized to %ux%u (%u tiles)\n",
-		(unsigned)tiles_x, (unsigned)tiles_y, (unsigned)total_tiles );
+	ri.Printf( PRINT_DEVELOPER, "[VK][Forward+] cluster grid resized to %ux%ux%u (%u clusters)\n",
+		(unsigned)tiles_x, (unsigned)tiles_y, (unsigned)z_slices, (unsigned)total_clusters );
 }
 
 typedef struct {
 	uint32_t tile_grid[2];
-	uint32_t total_tiles;
+	uint32_t total_tiles; /* flat tiles * z_slices */
 	uint32_t num_lights;
 	uint32_t max_per_tile;
 	uint32_t luminance_sort;
 	uint32_t distance_sort;
 	uint32_t depth_cull;
 	uint32_t hi_z; /* r_forwardPlusHiZ: hierarchical depth probes for large lights */
+	uint32_t z_slices;
+	uint32_t z_slice_mode; /* 0=linear view depth, 1=log */
+	float z_near;
+	float z_far;
 } vk_fp_push_t;
 
 static VkDescriptorSet vk_fp_graphics_descriptor = VK_NULL_HANDLE;
@@ -461,6 +499,7 @@ void vk_forward_plus_shutdown( void )
 	vk.forward_plus.last_packed_count = 0u;
 	vk.forward_plus.tiles_x = 0u;
 	vk.forward_plus.tiles_y = 0u;
+	vk.forward_plus.z_slices = 0u;
 	vk_fp_destroy_dummy_buffers();
 }
 
@@ -506,7 +545,7 @@ static void vk_fp_create_buffers_and_compute( void )
 	VkMemoryRequirements mr;
 	VkMemoryAllocateInfo mai;
 	uint32_t mem_type;
-	uint32_t tiles_x, tiles_y, total_tiles;
+	uint32_t tiles_x, tiles_y, z_slices, total_clusters;
 	VkDeviceSize tile_bytes;
 	/* Up to VK_FP_MAX_GPU_LIGHTS (MAX_REAL_DLIGHTS); indices 0..31 still participate in tess.dlightBits skip. */
 	const uint32_t max_lights = (uint32_t)VK_FP_MAX_GPU_LIGHTS;
@@ -514,7 +553,7 @@ static void vk_fp_create_buffers_and_compute( void )
 
 	vk.forward_plus.max_per_tile = vk_fp_effective_max_per_tile();
 
-	vk_fp_compute_tile_grid( &tiles_x, &tiles_y, &total_tiles, &tile_bytes );
+	vk_fp_compute_tile_grid( &tiles_x, &tiles_y, &z_slices, &total_clusters, &tile_bytes );
 
 	bci.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
 	bci.pNext = NULL;
@@ -556,6 +595,7 @@ static void vk_fp_create_buffers_and_compute( void )
 		vk_fp_destroy_light_buffer();
 		vk.forward_plus.tiles_x = 0u;
 		vk.forward_plus.tiles_y = 0u;
+		vk.forward_plus.z_slices = 0u;
 		vk.forward_plus.tile_capacity_tiles = 0u;
 		return;
 	}
@@ -567,6 +607,7 @@ static void vk_fp_create_buffers_and_compute( void )
 		vk_fp_destroy_light_buffer();
 		vk.forward_plus.tiles_x = 0u;
 		vk.forward_plus.tiles_y = 0u;
+		vk.forward_plus.z_slices = 0u;
 		vk.forward_plus.tile_capacity_tiles = 0u;
 		return;
 	}
@@ -582,6 +623,7 @@ static void vk_fp_create_buffers_and_compute( void )
 		vk_fp_destroy_light_buffer();
 		vk.forward_plus.tiles_x = 0u;
 		vk.forward_plus.tiles_y = 0u;
+		vk.forward_plus.z_slices = 0u;
 		vk.forward_plus.tile_capacity_tiles = 0u;
 		return;
 	}
@@ -594,6 +636,7 @@ static void vk_fp_create_buffers_and_compute( void )
 		vk_fp_destroy_light_buffer();
 		vk.forward_plus.tiles_x = 0u;
 		vk.forward_plus.tiles_y = 0u;
+		vk.forward_plus.z_slices = 0u;
 		vk.forward_plus.tile_capacity_tiles = 0u;
 		return;
 	}
@@ -606,6 +649,7 @@ static void vk_fp_create_buffers_and_compute( void )
 		vk_fp_destroy_light_buffer();
 		vk.forward_plus.tiles_x = 0u;
 		vk.forward_plus.tiles_y = 0u;
+		vk.forward_plus.z_slices = 0u;
 		vk.forward_plus.tile_capacity_tiles = 0u;
 		ri.Printf( PRINT_WARNING, S_COLOR_YELLOW "[VK][Forward+] param buffer create failed; Forward+ init aborted\n" S_COLOR_WHITE );
 		return;
@@ -622,6 +666,7 @@ static void vk_fp_create_buffers_and_compute( void )
 		vk_fp_destroy_light_buffer();
 		vk.forward_plus.tiles_x = 0u;
 		vk.forward_plus.tiles_y = 0u;
+		vk.forward_plus.z_slices = 0u;
 		vk.forward_plus.tile_capacity_tiles = 0u;
 		ri.Printf( PRINT_WARNING, S_COLOR_YELLOW "[VK][Forward+] param buffer memory alloc failed; Forward+ init aborted\n" S_COLOR_WHITE );
 		return;
@@ -636,6 +681,7 @@ static void vk_fp_create_buffers_and_compute( void )
 		vk_fp_destroy_light_buffer();
 		vk.forward_plus.tiles_x = 0u;
 		vk.forward_plus.tiles_y = 0u;
+		vk.forward_plus.z_slices = 0u;
 		vk.forward_plus.tile_capacity_tiles = 0u;
 		ri.Printf( PRINT_WARNING, S_COLOR_YELLOW "[VK][Forward+] param buffer map/bind failed; Forward+ init aborted\n" S_COLOR_WHITE );
 		return;
@@ -660,6 +706,7 @@ static void vk_fp_create_buffers_and_compute( void )
 		vk_fp_destroy_light_buffer();
 		vk.forward_plus.tiles_x = 0u;
 		vk.forward_plus.tiles_y = 0u;
+		vk.forward_plus.z_slices = 0u;
 		vk.forward_plus.tile_capacity_tiles = 0u;
 		ri.Printf( PRINT_WARNING, S_COLOR_YELLOW "[VK][Forward+] tile cull pipeline layout create failed; Forward+ init aborted\n" S_COLOR_WHITE );
 		return;
@@ -681,6 +728,7 @@ static void vk_fp_create_buffers_and_compute( void )
 		vk_fp_destroy_light_buffer();
 		vk.forward_plus.tiles_x = 0u;
 		vk.forward_plus.tiles_y = 0u;
+		vk.forward_plus.z_slices = 0u;
 		vk.forward_plus.tile_capacity_tiles = 0u;
 		ri.Printf( PRINT_WARNING, S_COLOR_YELLOW "[VK][Forward+] tile cull compute pipeline create failed; Forward+ init aborted\n" S_COLOR_WHITE );
 		return;
@@ -698,6 +746,7 @@ static void vk_fp_create_buffers_and_compute( void )
 		vk_fp_destroy_light_buffer();
 		vk.forward_plus.tiles_x = 0u;
 		vk.forward_plus.tiles_y = 0u;
+		vk.forward_plus.z_slices = 0u;
 		vk.forward_plus.tile_capacity_tiles = 0u;
 		ri.Printf( PRINT_WARNING, S_COLOR_YELLOW "[VK][Forward+] descriptor set alloc failed (pool full?); Forward+ init aborted\n" S_COLOR_WHITE );
 		return;
@@ -729,12 +778,13 @@ static void vk_fp_create_buffers_and_compute( void )
 
 	vk.forward_plus.tiles_x = tiles_x;
 	vk.forward_plus.tiles_y = tiles_y;
-	vk.forward_plus.tile_capacity_tiles = total_tiles;
+	vk.forward_plus.z_slices = z_slices;
+	vk.forward_plus.tile_capacity_tiles = total_clusters;
 
 	vk_forward_plus_init_graphics_descriptors();
 
-	ri.Printf( PRINT_ALL, "[VK][Forward+] tile cull: %ux%u tiles (%u total), %u bytes/tile list, max %u lights/tile\n",
-		(unsigned)tiles_x, (unsigned)tiles_y, (unsigned)total_tiles, (unsigned)tile_bytes,
+	ri.Printf( PRINT_ALL, "[VK][Forward+] light grid: %ux%u tiles × %u Z-slices (%u clusters), %u bytes list, max %u lights/cluster\n",
+		(unsigned)tiles_x, (unsigned)tiles_y, (unsigned)z_slices, (unsigned)total_clusters, (unsigned)tile_bytes,
 		(unsigned)vk.forward_plus.max_per_tile );
 }
 
@@ -1109,6 +1159,26 @@ static void vk_forward_plus_dispatch_tile_cull_internal( qboolean use_depth_cull
 	param_f[21] = backEnd.refdef.vieworg[1];
 	param_f[22] = backEnd.refdef.vieworg[2];
 	param_f[23] = 0.0f;
+	/* clusterMeta: z_slices, z_mode, unused, unused */
+	param_u[24] = vk.forward_plus.z_slices > 0u ? vk.forward_plus.z_slices : 1u;
+	param_u[25] = ( r_forwardPlusZSliceMode && r_forwardPlusZSliceMode->integer ) ? 1u : 0u;
+	param_u[26] = 0u;
+	param_u[27] = 0u;
+	/* clusterZRange: near, far */
+	{
+		float zn = ( r_znear && r_znear->value > 0.0f ) ? r_znear->value : 4.0f;
+		float zf = backEnd.viewParms.zFar;
+		if ( zn < 1e-3f ) {
+			zn = 4.0f;
+		}
+		if ( zf <= zn + 1e-3f ) {
+			zf = zn + 4000.0f;
+		}
+		param_f[28] = zn;
+		param_f[29] = zf;
+		param_f[30] = 0.0f;
+		param_f[31] = 0.0f;
+	}
 
 	Com_Memset( barriers, 0, sizeof( barriers ) );
 	barriers[0].sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER;
@@ -1143,7 +1213,11 @@ static void vk_forward_plus_dispatch_tile_cull_internal( qboolean use_depth_cull
 
 	push.tile_grid[0] = vk.forward_plus.tiles_x;
 	push.tile_grid[1] = vk.forward_plus.tiles_y;
-	push.total_tiles = vk.forward_plus.tiles_x * vk.forward_plus.tiles_y;
+	push.z_slices = vk.forward_plus.z_slices > 0u ? vk.forward_plus.z_slices : 1u;
+	push.total_tiles = vk.forward_plus.tile_capacity_tiles;
+	if ( push.total_tiles == 0u ) {
+		push.total_tiles = vk.forward_plus.tiles_x * vk.forward_plus.tiles_y * push.z_slices;
+	}
 	push.num_lights = vk.forward_plus.last_packed_count;
 	push.max_per_tile = vk.forward_plus.max_per_tile;
 	push.luminance_sort = ( r_forwardPlusLuminanceSort && r_forwardPlusLuminanceSort->integer ) ? 1u : 0u;
@@ -1153,6 +1227,19 @@ static void vk_forward_plus_dispatch_tile_cull_internal( qboolean use_depth_cull
 	}
 	push.depth_cull = use_depth_cull ? 1u : 0u;
 	push.hi_z = ( use_depth_cull && r_forwardPlusHiZ && r_forwardPlusHiZ->integer ) ? 1u : 0u;
+	push.z_slice_mode = ( r_forwardPlusZSliceMode && r_forwardPlusZSliceMode->integer ) ? 1u : 0u;
+	{
+		float zn = ( r_znear && r_znear->value > 0.0f ) ? r_znear->value : 4.0f;
+		float zf = backEnd.viewParms.zFar;
+		if ( zn < 1e-3f ) {
+			zn = 4.0f;
+		}
+		if ( zf <= zn + 1e-3f ) {
+			zf = zn + 4000.0f;
+		}
+		push.z_near = zn;
+		push.z_far = zf;
+	}
 
 	if ( push.distance_sort ) {
 		static qboolean distance_sort_logged;
@@ -1168,6 +1255,17 @@ static void vk_forward_plus_dispatch_tile_cull_internal( qboolean use_depth_cull
 				"[VK][Forward+] r_forwardPlusDepthCull=1 (depth prepass + tile cull; lightVolumeDepthCull)%s\n",
 				push.hi_z ? "; r_forwardPlusHiZ=1 hierarchical probes" : "" );
 			depth_cull_logged = qtrue;
+		}
+	}
+	if ( push.z_slices > 1u ) {
+		static qboolean z_slice_logged;
+		if ( !z_slice_logged ) {
+			ri.Printf( PRINT_ALL,
+				"[VK][Forward+] Z-clustered light grid: %u slices (%s), near=%.1f far=%.1f\n",
+				(unsigned)push.z_slices,
+				push.z_slice_mode ? "log" : "linear",
+				push.z_near, push.z_far );
+			z_slice_logged = qtrue;
 		}
 	}
 

@@ -1381,6 +1381,7 @@ typedef struct {
 		uint32_t tile_capacity_tiles;
 		uint32_t tiles_x;
 		uint32_t tiles_y;
+		uint32_t z_slices; /* 1 = 2D tiled fallback; >1 = depth-partitioned clusters */
 		VkBuffer param_buffer;
 		VkDeviceMemory param_memory;
 		void *param_mapped;

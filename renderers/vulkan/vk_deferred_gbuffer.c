@@ -68,6 +68,10 @@ typedef struct {
 	float specularStrength;
 	uint32_t normalsAreWorld;
 	uint32_t useMaterialClass;
+	uint32_t zSlices;
+	uint32_t zSliceMode;
+	float zNear;
+	float zFar;
 } vk_deferred_light_push_t;
 
 typedef struct {
@@ -855,6 +859,20 @@ static void vk_dgb_fill_light_push( vk_deferred_light_push_t *push, uint32_t wid
 	push->normalsAreWorld = vk.deferredGbufferDirectExport ? 1u : 0u;
 	push->useMaterialClass = ( r_deferredMaterialClassify && r_deferredMaterialClassify->integer &&
 		vk_material_classify_wanted() && vk.visibility_buffer_class_view != VK_NULL_HANDLE ) ? 1u : 0u;
+	push->zSlices = vk.forward_plus.z_slices > 0u ? vk.forward_plus.z_slices : 1u;
+	push->zSliceMode = ( r_forwardPlusZSliceMode && r_forwardPlusZSliceMode->integer ) ? 1u : 0u;
+	{
+		float zn = ( r_znear && r_znear->value > 0.0f ) ? r_znear->value : 4.0f;
+		float zf = backEnd.viewParms.zFar;
+		if ( zn < 1e-3f ) {
+			zn = 4.0f;
+		}
+		if ( zf <= zn + 1e-3f ) {
+			zf = zn + 4000.0f;
+		}
+		push->zNear = zn;
+		push->zFar = zf;
+	}
 }
 
 static void vk_dgb_dispatch_lighting_compute( uint32_t width, uint32_t height )

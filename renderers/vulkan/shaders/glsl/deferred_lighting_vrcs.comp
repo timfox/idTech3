@@ -54,6 +54,10 @@ layout(push_constant) uniform Push {
 	uvec2 vrcsTileGrid;   /* 16x16 VRCS tiles */
 	uint debugMode;
 	uint reserved;
+	uint zSlices;
+	uint zSliceMode;
+	float zNear;
+	float zFar;
 } pc;
 
 #include "deferred_lighting_common.glsl"

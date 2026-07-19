@@ -21,6 +21,8 @@ layout(std430, set = 0, binding = 5) readonly buffer ParamSSBO {
 	mat4 clipFromWorld;
 	uvec4 tiles_xy_viewport;
 	vec4 viewOrg;
+	uvec4 clusterMeta;
+	vec4 clusterZRange;
 } params;
 layout(std430, set = 0, binding = 6) readonly buffer NvcWeights {
 	float data[];
@@ -150,7 +152,21 @@ void main() {
 	float tilePxY = vh / max(float(tilesY), 1.0);
 	uint tx = min(uint(px.x / tilePxX), tilesX - 1u);
 	uint ty = min(uint(px.y / tilePxY), tilesY - 1u);
-	uint tileId = ty * tilesX + tx;
+	uint zSlices = max(params.clusterMeta.x, 1u);
+	uint slice = 0u;
+	if (zSlices > 1u) {
+		float zNear = max(params.clusterZRange.x, 1e-3);
+		float zFar = max(params.clusterZRange.y, zNear + 1e-3);
+		float z = clamp(abs(wc.w), zNear, zFar);
+		uint zMode = params.clusterMeta.y;
+		float t = (zMode == 1u)
+			? (log(z / zNear) / max(log(zFar / zNear), 1e-5))
+			: ((z - zNear) / (zFar - zNear));
+		t = clamp(t, 0.0, 0.9999);
+		slice = min(uint(t * float(zSlices)), zSlices - 1u);
+	}
+	uint flatTiles = max(tilesX * tilesY, 1u);
+	uint tileId = (zSlices > 1u) ? (ty * tilesX + tx + slice * flatTiles) : (ty * tilesX + tx);
 	uint tbase = tileId * MAX_PER_TILE;
 
 	float nLights = lights.data[0].x;

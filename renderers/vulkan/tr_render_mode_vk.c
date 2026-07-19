@@ -60,6 +60,10 @@ void R_ApplyRenderModeLatch( void )
 		if ( r_forwardPlusShade && r_forwardPlusShade->value <= 0.0f ) {
 			R_LatchCvarFloat( r_forwardPlusShade, "r_forwardPlusShade", 1.0f );
 		}
+		if ( r_forwardPlusOverflowShade && r_forwardPlusOverflowShade->value <= 0.0f &&
+			!R_ClassicLightingActive() ) {
+			R_LatchCvarFloat( r_forwardPlusOverflowShade, "r_forwardPlusOverflowShade", 1.0f );
+		}
 		if ( r_deferredGBuffer && r_deferredGBuffer->integer &&
 			r_deferredLighting && r_deferredLighting->integer ) {
 			if ( mode != s_last_logged_mode ) {
@@ -85,6 +89,11 @@ void R_ApplyRenderModeLatch( void )
 		if ( r_forwardPlusShade && r_forwardPlusShade->value <= 0.0f ) {
 			R_LatchCvarFloat( r_forwardPlusShade, "r_forwardPlusShade", 1.0f );
 		}
+		/* Lights 32-63 are packed on GPU; enable Forward+ overflow shade for parity with deferred. */
+		if ( r_forwardPlusOverflowShade && r_forwardPlusOverflowShade->value <= 0.0f &&
+			!R_ClassicLightingActive() ) {
+			R_LatchCvarFloat( r_forwardPlusOverflowShade, "r_forwardPlusOverflowShade", 1.0f );
+		}
 		if ( mode != s_last_logged_mode ) {
 			ri.Printf( PRINT_ALL,
 				"[VK] r_renderMode 2: Forward+ primary (r_forwardPlus=1, r_forwardPlusShade=1, "
@@ -95,7 +104,7 @@ void R_ApplyRenderModeLatch( void )
 		}
 		break;
 	case 3:
-		/* Unified Clustered Renderer: deferred opaque + Forward+ transparent, shared tiles. */
+		/* Unified Clustered Renderer: deferred opaque + Forward+ transparent, shared light grid. */
 		R_LatchCvarInt( r_forwardPlus, "r_forwardPlus", 1 );
 		R_LatchCvarInt( r_forwardPlusDepthCull, "r_forwardPlusDepthCull", 1 );
 		R_LatchCvarInt( r_deferredGBuffer, "r_deferredGBuffer", 1 );
@@ -105,11 +114,17 @@ void R_ApplyRenderModeLatch( void )
 		if ( r_forwardPlusShade && r_forwardPlusShade->value <= 0.0f ) {
 			R_LatchCvarFloat( r_forwardPlusShade, "r_forwardPlusShade", 1.0f );
 		}
+		if ( r_forwardPlusOverflowShade && r_forwardPlusOverflowShade->value <= 0.0f &&
+			!R_ClassicLightingActive() ) {
+			R_LatchCvarFloat( r_forwardPlusOverflowShade, "r_forwardPlusOverflowShade", 1.0f );
+		}
+		/* Z-slices: configs set r_forwardPlusZSlices 8; keep 1 as explicit 2D diagnostic fallback. */
 		if ( mode != s_last_logged_mode ) {
 			ri.Printf( PRINT_ALL,
 				"[VK] Unified Clustered Renderer (r_renderMode 3): hybrid deferred opaque + "
-				"Forward+ transparent; shared tile lists (GPU cap %u)\n",
-				(unsigned)VK_FP_MAX_GPU_LIGHTS );
+				"Forward+ transparent; shared light grid (GPU cap %u, Z-slices %d)\n",
+				(unsigned)VK_FP_MAX_GPU_LIGHTS,
+				r_forwardPlusZSlices ? r_forwardPlusZSlices->integer : 1 );
 			s_last_logged_mode = mode;
 		}
 		break;

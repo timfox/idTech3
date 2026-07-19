@@ -364,6 +364,8 @@ cvar_t	*r_forwardPlusLuminanceSort;
 cvar_t	*r_forwardPlusDistanceSort;
 cvar_t	*r_forwardPlusDepthCull;
 cvar_t	*r_forwardPlusHiZ;
+cvar_t	*r_forwardPlusZSlices;
+cvar_t	*r_forwardPlusZSliceMode;
 cvar_t	*r_forwardPlusSpecularStrength;
 cvar_t	*r_forwardPlusEnergyRenorm;
 
@@ -3460,6 +3462,22 @@ static void R_Register( void )
 	ri.Cvar_SetDescription( r_forwardPlusHiZ,
 		"When 1 with \\r_forwardPlusDepthCull 1, expand depth probes (forwardPlusHiZPyramid) for hierarchical occlusion of large lights. Default 1." );
 	ri.Cvar_SetGroup( r_forwardPlusHiZ, CVG_RENDERER );
+	r_forwardPlusZSlices = ri.Cvar_Get( "r_forwardPlusZSlices", "1", CVAR_ARCHIVE_ND | CVAR_LATCH );
+	ri.Cvar_CheckRange( r_forwardPlusZSlices, "1", "16", CV_INTEGER );
+	ri.Cvar_SetDescription( r_forwardPlusZSlices,
+		"Forward+ / Unified Clustered Z-slice count. 1 = 2D tiled light lists (legacy). "
+		"2-16 = depth-partitioned frustum clusters shared by deferred, Forward+, and OIT. Latched; vid_restart." );
+	ri.Cvar_SetGroup( r_forwardPlusZSlices, CVG_RENDERER );
+	r_forwardPlusZSliceMode = ri.Cvar_Get( "r_forwardPlusZSliceMode", "1", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_forwardPlusZSliceMode, "0", "1", CV_INTEGER );
+	ri.Cvar_SetDescription( r_forwardPlusZSliceMode,
+		"Z-cluster depth partitioning: 0=linear view depth, 1=logarithmic (default). Requires \\r_forwardPlusZSlices > 1." );
+	ri.Cvar_SetGroup( r_forwardPlusZSliceMode, CVG_RENDERER );
+	if ( r_forwardPlusZSlices && r_forwardPlusZSlices->integer > 1 && r_forwardPlus && r_forwardPlus->integer ) {
+		ri.Printf( PRINT_ALL, "[VK][Forward+] Z-clustered light grid: %d slices (%s)\n",
+			r_forwardPlusZSlices->integer,
+			( r_forwardPlusZSliceMode && r_forwardPlusZSliceMode->integer ) ? "log" : "linear" );
+	}
 	r_forwardPlusSpecularStrength = ri.Cvar_Get( "r_forwardPlusSpecularStrength", "0.65", CVAR_ARCHIVE_ND );
 	ri.Cvar_CheckRange( r_forwardPlusSpecularStrength, "0", "4", CV_FLOAT );
 	ri.Cvar_SetDescription( r_forwardPlusSpecularStrength,

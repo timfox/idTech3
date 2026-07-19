@@ -8,6 +8,8 @@
 #ifndef DEFERRED_LIGHTING_COMMON_GLSL
 #define DEFERRED_LIGHTING_COMMON_GLSL
 
+#include "forward_plus_cluster.glsl"
+
 float viewZFromDepth( float depth ) {
 	return -pc.projInfo.w / max( depth + pc.projInfo.z, 1e-6 );
 }
@@ -156,11 +158,13 @@ vec3 shadeDeferredPixel( uvec2 pix ) {
 
 	uint tilesX = max( pc.tileGrid.x, 1u );
 	uint tilesY = max( pc.tileGrid.y, 1u );
+	uint zSlices = max( pc.zSlices, 1u );
 	float tilePxX = float( pc.extent.x ) / float( tilesX );
 	float tilePxY = float( pc.extent.y ) / float( tilesY );
 	uint tx = min( uint( float( pix.x ) / tilePxX ), tilesX - 1u );
 	uint ty = min( uint( float( pix.y ) / tilePxY ), tilesY - 1u );
-	uint tileId = ty * tilesX + tx;
+	uint slice = fp_view_depth_to_slice( abs( viewPos.z ), zSlices, pc.zSliceMode, pc.zNear, pc.zFar );
+	uint tileId = fp_cluster_index( tx, ty, tilesX, tilesY, slice, zSlices );
 	uint tbase = tileId * MAX_PER_TILE;
 
 	uint nPack = uint( max( lights.data[0].x + 0.5, 0.0 ) );

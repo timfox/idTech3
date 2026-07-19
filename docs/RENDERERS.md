@@ -64,7 +64,7 @@ The renderer profile rule is: start from **one** modern base (`modern_vulkan.cfg
 | Overlay | Use | Notes |
 |---------|-----|-------|
 | `vulkan_overlay_deferred.cfg` | Mode-1 deferred lighting development | Switches to `r_renderMode 1`, enables `r_deferredLighting 1`, disables `r_forwardPlusShade`, and turns TAA/SMAA/FXAA off by default so temporal/post-AA artifacts do not mask deferred lighting bugs. |
-| `vulkan_overlay_unified_clustered.cfg` | Unified Clustered Renderer | `r_renderMode 3`: unified heterogeneous shading / lighting ownership, shared 2D tile lists. See [UNIFIED_CLUSTERED_RENDERER.md](UNIFIED_CLUSTERED_RENDERER.md). |
+| `vulkan_overlay_unified_clustered.cfg` | Unified Clustered Renderer | `r_renderMode 3`: unified heterogeneous shading / lighting ownership, shared light grid (tiles × Z-slices). See [UNIFIED_CLUSTERED_RENDERER.md](UNIFIED_CLUSTERED_RENDERER.md). |
 | `vulkan_overlay_unified_clustered_safe.cfg` | Unified Clustered safe baseline | Mode 3 with TAA/SMAA/FXAA/OIT off and MSAA pinned off so clustered lighting and pass ordering can be debugged in isolation. |
 | `vulkan_overlay_oit_clustered.cfg` | Mode 3 + MBOIT | Unified Clustered + `r_oit 2` (optional stochastic via demo). See [MOMENT_OIT_STOCHASTIC_ALPHA.md](MOMENT_OIT_STOCHASTIC_ALPHA.md). |
 | `vulkan_overlay_visibility_2027.cfg` | 2027 visibility foundation | Mode 3 + G-buffer + `r_visibilityBuffer` + material classify. See [RENDERER_2027.md](RENDERER_2027.md). |
@@ -116,7 +116,9 @@ The G-buffer fill copies scene albedo. On **non-MSAA** FBO frames, opaque PBR sh
 | `r_forwardPlusMaxPerTile` | **4–8** lights indexed per **16×16** tile (**latched**; `vid_restart`). Lowers GPU work vs default **8**; tile SSBO keeps **8** `uint32` slots either way. |
 | `r_forwardPlusDebug` | **0–1** float: PBR heatmap overlay (lights per tile + borders). |
 | `r_forwardPlusShade` | **0–4** float: PBR shade for dlight indices **0–31** (not in `tess.dlightBits`); pipeline rebuild on change. |
-| `r_forwardPlusOverflowShade` | **0–4** (default **0**): PBR shade for indices **32–63**; requires `r_classicLighting 0`. Try **0.5** with modern lighting. |
+| `r_forwardPlusOverflowShade` | **0–4** (default **0**; mode 2/3 latch **1** when not classic): PBR shade for indices **32–63**; requires `r_classicLighting 0`. |
+| `r_forwardPlusZSlices` | **1–16** (default **1** = 2D tiled; shipping configs **8**): depth-partitioned cluster count. Latched; `vid_restart`. |
+| `r_forwardPlusZSliceMode` | **0** linear / **1** log view-depth (default **1**). |
 | `r_forwardPlusSpecularStrength` | **0–4** (default **0.65**): Forward+ dynamic specular scale (`modern_vulkan.cfg`). |
 | `r_forwardPlusEnergyRenorm` | **0–2** (default **0**): Legacy dual-path renorm; unused when Forward+ shade owns dynamics (projector skipped). |
 | `r_forwardPlusDepthCull` | **0/1** (code default **0**; **`modern_vulkan.cfg` 1**): post-opaque tile cull with 5 depth probes. |

@@ -1,10 +1,14 @@
 #version 450
+#extension GL_GOOGLE_include_directive : require
 
 /*
- * Forward+ scaffolding: per-tile light index list (max 8 per tile; tile pixel size = viewport / tileGrid).
- * CPU-packed lights: binding 0 — vec4 (x=count,...), vec4 (tiles_x, tiles_y, viewport_w, viewport_h), then count * 4 vec4 records.
+ * Forward+ / clustered light assignment.
+ * Per-cluster light index list (max 8). Cluster id = flatTile + slice * tilesX * tilesY.
+ * zSlices==1 preserves historical 2D tiled layout.
+ * CPU-packed lights: binding 0 — header + count * 4 vec4 records.
  * Spot/linear cull uses packed axis + cos_outer + segLen (rec[2]/rec[3]); point lights keep sphere overlap.
  * Depth cull: light volume Z extent vs per-tile nearest/farthest probes (lightVolumeDepthCull).
+ * Marker: forwardPlusZCluster
  */
 
 layout(local_size_x = 64, local_size_y = 1, local_size_z = 1) in;
@@ -25,6 +29,8 @@ layout(std430, set = 0, binding = 2) readonly buffer ParamSSBO {
 	mat4 clipFromWorld;
 	uvec4 tiles_xy_viewport;
 	vec4 viewOrg;
+	uvec4 clusterMeta;
+	vec4 clusterZRange;
 } params;
 
 layout(set = 0, binding = 3) uniform sampler2D depthTexture;
@@ -38,7 +44,13 @@ layout(push_constant) uniform Push {
 	uint distanceSort;
 	uint depthCull;
 	uint hiZ; /* forwardPlusHiZPyramid: expand probes with light screen radius */
+	uint zSlices;
+	uint zSliceMode;
+	float zNear;
+	float zFar;
 } pc;
+
+#include "forward_plus_cluster.glsl"
 
 bool sphere_tile_overlap(vec2 centerPx, float radiusPx, uint tileX, uint tileY, float tilePxX, float tilePxY) {
 	float minX = float(tileX) * tilePxX;
@@ -110,17 +122,21 @@ bool spot_frustum_tile_overlap(
 }
 
 void main() {
-	uint tileId = gl_GlobalInvocationID.x;
-	if (tileId >= pc.totalTiles) {
+	uint clusterId = gl_GlobalInvocationID.x;
+	if (clusterId >= pc.totalTiles) {
 		return;
 	}
 
 	uint tilesX = pc.tileGrid.x;
 	uint tilesY = pc.tileGrid.y;
-	uint tileX = tileId % tilesX;
-	uint tileY = tileId / tilesX;
+	uint zSlices = max(pc.zSlices, 1u);
+	uint xyTiles = fp_cluster_xy_count(tilesX, tilesY);
+	uint slice = (zSlices > 1u) ? (clusterId / xyTiles) : 0u;
+	uint xyId = (zSlices > 1u) ? (clusterId % xyTiles) : clusterId;
+	uint tileX = xyId % tilesX;
+	uint tileY = xyId / tilesX;
 
-	uint base = tileId * MAX_PER_TILE;
+	uint base = clusterId * MAX_PER_TILE;
 	for (uint k = 0u; k < MAX_PER_TILE; k++) {
 		tiles.cells[base + k] = 0xFFFFFFFFu;
 	}
@@ -138,6 +154,10 @@ void main() {
 	float vh = lights.data[1].w;
 	float tilePxX = vw / max(float(tilesX), 1.0);
 	float tilePxY = vh / max(float(tilesY), 1.0);
+
+	float sliceNear = pc.zNear;
+	float sliceFar = pc.zFar;
+	fp_slice_depth_range(slice, zSlices, pc.zSliceMode, pc.zNear, pc.zFar, sliceNear, sliceFar);
 
 	uint candLi[MAX_LIGHTS];
 	float candLum[MAX_LIGHTS];
@@ -221,11 +241,26 @@ void main() {
 			continue;
 		}
 
+		/* Positive view-depth range of the light influence volume. */
+		float lightNear = max(abs(clipW) - radius, pc.zNear);
+		float lightFar = abs(clipW) + radius;
+		if (isLinear > 0.5) {
+			vec3 tip = worldPos + normalize(lpack.xyz + vec3(1e-6)) * max(ltail.y, 1e-3);
+			vec2 tipPx;
+			float tipNdcZ, tipW;
+			if (project_world_to_px(tip, vw, vh, tipPx, tipNdcZ, tipW)) {
+				lightNear = min(lightNear, max(abs(tipW) - radius, pc.zNear));
+				lightFar = max(lightFar, abs(tipW) + radius);
+			}
+		}
+		if (zSlices > 1u && !fp_light_overlaps_slice(lightNear, lightFar, sliceNear, sliceFar)) {
+			continue;
+		}
+
 		if (pc.depthCull != 0u && originOnScreen) {
 			/*
 			 * Light-volume depth cull: reject when the entire influence volume
 			 * is behind the nearest tile surface (reversed-Z: larger = nearer).
-			 * lightZFar = farthest extent of the sphere/segment in [0,1] depth.
 			 * Marker: lightVolumeDepthCull
 			 */
 			float lightZCenter = ndcZ * 0.5 + 0.5;

@@ -73,6 +73,10 @@ typedef struct {
 	uint32_t vrcsTileGrid[2];
 	uint32_t debugMode;
 	uint32_t reserved;
+	uint32_t zSlices;
+	uint32_t zSliceMode;
+	float zNear;
+	float zFar;
 } vrcs_light_push_t;
 
 typedef struct {
@@ -631,6 +635,20 @@ static void VRCS_FillLightPush( vrcs_light_push_t *push, uint32_t width, uint32_
 	push->vrcsTileGrid[1] = vrcs.tilesY;
 	push->debugMode = r_vrcs_debug ? (uint32_t)r_vrcs_debug->integer : 0u;
 	push->reserved = 0;
+	push->zSlices = vk.forward_plus.z_slices > 0u ? vk.forward_plus.z_slices : 1u;
+	push->zSliceMode = ( r_forwardPlusZSliceMode && r_forwardPlusZSliceMode->integer ) ? 1u : 0u;
+	{
+		float zn = ( r_znear && r_znear->value > 0.0f ) ? r_znear->value : 4.0f;
+		float zf = backEnd.viewParms.zFar;
+		if ( zn < 1e-3f ) {
+			zn = 4.0f;
+		}
+		if ( zf <= zn + 1e-3f ) {
+			zf = zn + 4000.0f;
+		}
+		push->zNear = zn;
+		push->zFar = zf;
+	}
 }
 
 qboolean vk_vrcs_dispatch_deferred_lighting( uint32_t width, uint32_t height )

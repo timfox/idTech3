@@ -50,7 +50,7 @@ When **`r_renderMode 3`** (`vk_unified_clustered_active()`), geometry + deferred
 2. G-buffer capture + deferred lighting composite
 3. Transparent `drawSurfFilter=2` with Forward+ fragment shade (shared tile SSBO)
 
-See [UNIFIED_CLUSTERED_RENDERER.md](UNIFIED_CLUSTERED_RENDERER.md). Mode 3 is the shipping **Unified Clustered** default (unified heterogeneous shading / lighting ownership; 2D tiled light grid today, depth clusters planned); mode 2 remains the Forward+-primary recovery path.
+See [UNIFIED_CLUSTERED_RENDERER.md](UNIFIED_CLUSTERED_RENDERER.md). Mode 3 is the shipping **Unified Clustered** default (unified heterogeneous shading / lighting ownership; shared light grid with optional Z-slices via `r_forwardPlusZSlices`); mode 2 remains the Forward+-primary recovery path.
 
 ---
 

@@ -21,6 +21,9 @@ layout(set = 2, binding = 1) readonly buffer FpTileSSBO {
 layout(std430, set = 2, binding = 2) readonly buffer FpParamSSBO {
 	mat4 fp_clip_from_world;
 	uvec4 fp_tiles_xy_viewport;
+	vec4 fp_view_org;
+	uvec4 fp_cluster_meta;
+	vec4 fp_cluster_z_range;
 } fp_params;
 
 layout(location = 0) in vec2 frag_tex_coord0;
@@ -55,7 +58,22 @@ vec3 oit_forward_plus_add( vec3 baseRgb, vec3 N, vec3 worldPos )
 	px.y = 0.5 * ( 1.0 + ndc.y ) * vh;
 	uint tx = min( uint( px.x / tilePxX ), tilesX - 1u );
 	uint ty = min( uint( px.y / tilePxY ), tilesY - 1u );
-	uint tileId = ty * tilesX + tx;
+	uint zSlices = max( fp_params.fp_cluster_meta.x, 1u );
+	uint zMode = fp_params.fp_cluster_meta.y;
+	float zNear = max( fp_params.fp_cluster_z_range.x, 1e-3 );
+	float zFar = max( fp_params.fp_cluster_z_range.y, zNear + 1e-3 );
+	float viewDepth = abs( wc.w );
+	uint slice = 0u;
+	if ( zSlices > 1u ) {
+		float z = clamp( viewDepth, zNear, zFar );
+		float t = ( zMode == 1u )
+			? ( log( z / zNear ) / max( log( zFar / zNear ), 1e-5 ) )
+			: ( ( z - zNear ) / ( zFar - zNear ) );
+		t = clamp( t, 0.0, 0.9999 );
+		slice = min( uint( t * float( zSlices ) ), zSlices - 1u );
+	}
+	uint flatTiles = max( tilesX * tilesY, 1u );
+	uint tileId = ( zSlices > 1u ) ? ( ty * tilesX + tx + slice * flatTiles ) : ( ty * tilesX + tx );
 	uint tbase = tileId * 8u;
 	float nLights = fp_lights.fp_light_data[0].x;
 	uint maxPerTile = uint( max( fp_lights.fp_light_data[0].z + 0.5, 1.0 ) );
