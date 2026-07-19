@@ -67,6 +67,31 @@ static qboolean         g_touchActive = qfalse;
 static float            g_touchLastX;
 static float            g_touchLastY;
 
+/*
+===========
+IN_GetAbsMouse
+
+Absolute window mouse/touch for HavenRP City Menu / HUD cursor hit-tests.
+===========
+*/
+void IN_GetAbsMouse( int *x, int *y )
+{
+	int cx = g_windowWidth > 0 ? ( g_windowWidth / 2 ) : 0;
+	int cy = g_windowHeight > 0 ? ( g_windowHeight / 2 ) : 0;
+
+	if ( g_touchActive ) {
+		cx = (int)( g_touchLastX + 0.5f );
+		cy = (int)( g_touchLastY + 0.5f );
+	}
+
+	if ( x ) {
+		*x = cx;
+	}
+	if ( y ) {
+		*y = cy;
+	}
+}
+
 /* ---- Sys functions ---- */
 
 void NORETURN Sys_Quit( void ) {
