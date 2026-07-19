@@ -15,9 +15,7 @@ Temporal reactive mask buffer: clear, stamp (OIT reveal), barriers, pipelines.
 #include "vk_post_fog.h"
 #include "vk_scene_pass.h"
 #include "vk_pass_registry.h"
-#ifdef USE_VK_PBR
 #include "vk_forward_plus.h"
-#endif
 
 #include "vk_raster_ultra.h"
 
@@ -327,7 +325,6 @@ void vk_reactive_mask_update_taa_descriptors( void )
 
 void vk_reactive_mask_update_storage_descriptor( void )
 {
-#ifdef USE_VK_PBR
 	VkDescriptorImageInfo info;
 	VkWriteDescriptorSet write;
 	VkImageView view;
@@ -374,9 +371,6 @@ void vk_reactive_mask_update_storage_descriptor( void )
 		write.dstSet = sets[i];
 		qvkUpdateDescriptorSets( vk.device, 1, &write, 0, NULL );
 	}
-#else
-	(void)0;
-#endif
 }
 
 void vk_destroy_reactive_mask_pipeline( void )
