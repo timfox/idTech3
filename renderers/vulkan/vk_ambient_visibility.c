@@ -585,32 +585,53 @@ float vk_ambient_visibility_strength( void )
 		r_ambientVisibilityStrength->value : 0.0f;
 }
 
+static qboolean AV_FailInject( const char *which )
+{
+	cvar_t *c = ri.Cvar_Get( "r_avFailInject", "0", CVAR_TEMP | CVAR_CHEAT );
+
+	if ( !c || !c->string || !c->string[0] || !Q_stricmp( c->string, "0" ) ) {
+		return qfalse;
+	}
+	if ( !Q_stricmp( c->string, which ) || !Q_stricmp( c->string, "all" ) ) {
+		return qtrue;
+	}
+	return qfalse;
+}
+
+static void AV_DemoteToLegacySsao( const char *reason )
+{
+	static qboolean s_avDemoteLogged;
+
+	if ( !s_avDemoteLogged ) {
+		ri.Printf( PRINT_WARNING, S_COLOR_YELLOW
+			"[AV] %s — demoting to legacy_ssao (G-buffer fill left intact)\n" S_COLOR_WHITE,
+			reason && reason[0] ? reason : "AV unavailable" );
+		s_avDemoteLogged = qtrue;
+	}
+	if ( ri.Cvar_VariableIntegerValue( "r_ambientVisibilityMode" ) >= 2 ) {
+		ri.Cvar_Set( "r_ambientVisibilityMode", "1" );
+	}
+	if ( r_ssao && !r_ssao->integer ) {
+		ri.Cvar_Set( "r_ssao", "1" );
+	}
+}
+
 void vk_ambient_visibility_init( void )
 {
 	VkQueryPoolCreateInfo qci;
-	cvar_t *failInject;
 
 	AV_RegisterCvars();
 	ri.Cvar_Get( "r_avFailInject", "0", CVAR_TEMP | CVAR_CHEAT );
 	if ( av.ready || !vk.device || !vk.fboActive ) return;
-	failInject = ri.Cvar_Get( "r_avFailInject", "0", CVAR_TEMP | CVAR_CHEAT );
-	if ( failInject && failInject->string &&
-		( !Q_stricmp( failInject->string, "history" ) || !Q_stricmp( failInject->string, "rtao" ) ||
-		  !Q_stricmp( failInject->string, "all" ) ) ) {
-		static qboolean s_avFailLogged;
-		if ( !s_avFailLogged ) {
-			ri.Printf( PRINT_WARNING, S_COLOR_YELLOW
-				"[AV] r_avFailInject=%s — skipping AV init (stable AO owner remains)\n" S_COLOR_WHITE,
-				failInject->string );
-			s_avFailLogged = qtrue;
-		}
-		vk_deferred_gbuffer_set_fallback( va( "r_avFailInject=%s", failInject->string ) );
-		if ( ri.Cvar_VariableIntegerValue( "r_ambientVisibilityMode" ) >= 2 ) {
-			ri.Cvar_Set( "r_ambientVisibilityMode", "1" );
-		}
-		if ( r_ssao && !r_ssao->integer ) {
-			ri.Cvar_Set( "r_ssao", "1" );
-		}
+	/*
+	 * history: do not block init — frame_begin forces history reset for thrash tests.
+	 * rtao/all: skip AV pipelines and keep Forward+ on legacy_ssao. Never call
+	 * vk_deferred_gbuffer_set_fallback here — that would kill G-buffer fill and stick
+	 * until a full scaffold recreate.
+	 */
+	if ( AV_FailInject( "rtao" ) ) {
+		AV_DemoteToLegacySsao( va( "r_avFailInject=%s",
+			ri.Cvar_VariableString( "r_avFailInject" ) ) );
 		return;
 	}
 	if ( !AV_CreatePipelines() ) { AV_DestroyPipelines(); return; }
@@ -677,11 +698,14 @@ void vk_ambient_visibility_frame_begin( void )
 	 * frame after the world pass (same rule as TAA). Apply is already main-world-only.
 	 * Portal/mirror never own AV history because apply refuses those view classes.
 	 * TLAS rebuild (map load / entity BLAS churn) must discard RTAO temporal history.
+	 * r_avFailInject=history forces a thrash reset every frame (G-buffer stays live).
 	 */
 	{
 		uint32_t tlasRev = vk_rtx_tlas_revision();
+		qboolean forceHistory = AV_FailInject( "history" );
 
-		if ( av.gbufferGeneration != gbufGen ||
+		if ( forceHistory ||
+			av.gbufferGeneration != gbufGen ||
 			av.historyGeneration != gbufGen ||
 			av.lastMode != r_ambientVisibilityMode->integer ||
 			av.lastRadius != r_rtaoRadius->value ||

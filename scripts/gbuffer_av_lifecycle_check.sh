@@ -88,7 +88,15 @@ grep -q 'gbuffer_pipeline_' "$DGB_C" || fail "create_pipeline must soft-fail wit
 grep -q 'legacy_ssao' "$DGB_C" || fail "set_fallback must restore legacy_ssao owner"
 grep -q 'lighting_create_failed' "$DGB_C" "$VK_H" || fail "lighting soft-fail sticky missing"
 grep -q 'composite_create_failed' "$DGB_C" "$VK_H" || fail "composite soft-fail sticky missing"
+grep -q 'debug_create_failed' "$DGB_C" "$VK_H" || fail "debug soft-fail sticky missing"
 grep -q 'fail-inject cleared' "$DGB_C" || fail "fail-inject recovery path missing"
+# AV fail-inject must not kill G-buffer fill (sticky until scaffold recreate)
+if grep -nE '^\s*vk_deferred_gbuffer_set_fallback\s*\(' "$AV_C" | grep -q .; then
+  fail "AV must not call vk_deferred_gbuffer_set_fallback (decouple AO demote from G-buffer)"
+fi
+grep -q 'AV_FailInject' "$AV_C" || fail "AV_FailInject helper missing"
+grep -q 'AV_DemoteToLegacySsao' "$AV_C" || fail "AV demote-to-ssao helper missing"
+grep -q 'forceHistory' "$AV_C" || fail "r_avFailInject=history thrash path missing"
 # Visibility fill shares main-world view class
 grep -q 'VK_VIEW_CLASS_MAIN_WORLD' "$ROOT/renderers/vulkan/vk_visibility_buffer.c" || \
   fail "visibility fill must gate on MAIN_WORLD view class"
@@ -96,6 +104,10 @@ grep -q 'VK_VIEW_CLASS_MAIN_WORLD' "$ROOT/renderers/vulkan/vk_visibility_buffer.
 grep -q 'vk_rtx_tlas_revision' "$AV_C" "$ROOT/renderers/vulkan/extensions/rtx/vk_rtx.h" || \
   fail "TLAS revision API / AV consumption missing"
 grep -q 'lastTlasRevision' "$AV_C" || fail "AV must track lastTlasRevision"
+# No remaining VK_CHECK fatals on deferred G-buffer create paths
+if grep -n 'VK_CHECK' "$DGB_C" | grep -q .; then
+  fail "deferred G-buffer create paths must soft-fail (no VK_CHECK left in vk_deferred_gbuffer.c)"
+fi
 pass "soft-fail pipeline + visibility view-class gate + TLAS→AV history"
 
 
