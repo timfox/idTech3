@@ -63,6 +63,33 @@ if fn.index("vk_ambient_visibility_shutdown") > fn.index("vk_destroy_attachments
 print("PASS: teardown destroys descriptors/AV before attachments")
 PY
 
+# Presentation restore must rebind deferred/AV and sticky-invalidate temporal history
+python3 - <<'PY' || exit 1
+from pathlib import Path
+text = Path("renderers/vulkan/vk_presentation.c").read_text()
+td = text.split("void vk_teardown_presentation_targets", 1)[1].split("void vk_restore_presentation_targets", 1)[0]
+rs = text.split("void vk_restore_presentation_targets", 1)[1].split("void vk_restart_swapchain", 1)[0]
+for name in ("vk_temporal_request_sticky_reset", "VK_TEMPORAL_RESET_SWAPCHAIN_CHANGE"):
+    if name not in td:
+        raise SystemExit(f"FAIL: teardown must sticky-reset temporal ({name})")
+    if name not in rs:
+        raise SystemExit(f"FAIL: restore must sticky-reset temporal ({name})")
+for name in ("vk_deferred_gbuffer_ensure_runtime", "vk_visibility_buffer_ensure_runtime",
+             "vk_ambient_visibility_init", "vk_ambient_visibility_reset_history"):
+    if name not in rs:
+        raise SystemExit(f"FAIL: restore missing {name}")
+# Order: ensure deferred before AV init; AV reset after init; temporal sticky present
+if rs.index("vk_deferred_gbuffer_ensure_runtime") > rs.index("vk_ambient_visibility_init"):
+    raise SystemExit("FAIL: deferred ensure_runtime must precede AV init on restore")
+if rs.index("vk_ambient_visibility_init") > rs.index("vk_ambient_visibility_reset_history"):
+    raise SystemExit("FAIL: AV init must precede AV history reset on restore")
+print("PASS: restore rebinds deferred/AV + temporal sticky on teardown/restore")
+PY
+
+# Visibility scaffold soft-fail (sibling of G-buffer scaffold soft CreateImage)
+grep -q 'visibility IDs/bary soft-fail' "$ATT" || fail "visibility scaffold IDs soft-fail missing"
+grep -q 'visibility class soft-fail' "$ATT" || fail "visibility scaffold class soft-fail missing"
+
 # Non-split weapon guard
 grep -A8 'if ( !vk_deferred_opaque_transparent_split()' "$BE" | grep -q 'RDF_NOWORLDMODEL' || \
   fail "non-split G-buffer path must guard RDF_NOWORLDMODEL"

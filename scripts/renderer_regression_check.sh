@@ -441,6 +441,16 @@ else
 fi
 
 echo ""
+echo "Temporal history ownership:"
+if [[ ! -f "$PROJECT_ROOT/scripts/temporal_ownership_check.sh" ]]; then
+  fail "missing scripts/temporal_ownership_check.sh"
+elif ! bash "$PROJECT_ROOT/scripts/temporal_ownership_check.sh"; then
+  fail "temporal_ownership_check.sh failed"
+else
+  pass "temporal history ownership static contract"
+fi
+
+echo ""
 echo "Directional Ambient Visibility (GTAO / RTAO / Reference AO):"
 AV_C="$PROJECT_ROOT/renderers/vulkan/vk_ambient_visibility.c"
 AV_GLSL="$PROJECT_ROOT/renderers/vulkan/shaders/glsl/ambient_visibility"

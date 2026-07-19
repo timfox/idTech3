@@ -61,6 +61,13 @@ void vk_teardown_presentation_targets( void )
 		}
 	}
 
+	/*
+	 * Sticky temporal invalidation before tearing down history owners (TAA / AV /
+	 * volumetrics). Restore also requests this; requesting here covers partial
+	 * restore failures after attachments are already gone.
+	 */
+	vk_temporal_request_sticky_reset( VK_TEMPORAL_RESET_SWAPCHAIN_CHANGE );
+
 	/* Drop descriptor/pipeline bindings that hold G-buffer / AV image views
 	 * before destroying the underlying attachments (resize / swapchain restart). */
 	vk_deferred_gbuffer_invalidate_runtime();

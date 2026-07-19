@@ -63,6 +63,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "vk_post_fog.h"
 #include "vk_deferred_gbuffer.h"
 #include "vk_visibility_buffer.h"
+#include "vk_temporal.h"
 #include "vk_sim_render_profile.h"
 #include "vk_sim_render_debug.h"
 #include "vk_skybox_hdr.h"
@@ -1222,6 +1223,7 @@ static void R_Register( void )
 	ri.Cmd_AddCommand( "renderer_status", R_RendererStatus_f );
 	ri.Cmd_AddCommand( "havenrp_renderer_status", R_HavenRPRendererStatus_f );
 	ri.Cmd_AddCommand( "deferred_gbuffer_status", vk_deferred_gbuffer_status_f );
+	ri.Cmd_AddCommand( "temporal_status", vk_temporal_status_f );
 	ri.Cmd_AddCommand( "visibility_buffer_status", vk_visibility_buffer_status_f );
 	ri.Cmd_AddCommand( "renderer_profile", R_RendererProfile_f );
 	ri.Cmd_AddCommand( "renderer_health", R_RendererHealth_f );

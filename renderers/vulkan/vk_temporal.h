@@ -68,4 +68,7 @@ void vk_reset_motion_history( void );
 void vk_reset_taa_history( void );
 void vk_reset_volumetric_history( void );
 
+/* Console: temporal history ownership / reset state (Spine diagnostics). */
+void vk_temporal_status_f( void );
+
 #endif

@@ -862,9 +862,12 @@ static void R_RendererSubsystems_f( void )
 		R_CvarInteger( r_renderMode ), R_CvarInteger( r_forwardPlus ), R_CvarValue( r_forwardPlusShade ),
 		R_CvarInteger( r_deferredLighting ), R_CvarValue( r_deferredSpecularStrength ),
 		R_CvarValue( r_deferredAOCoupling ), R_CvarInteger( r_ssao ), R_CvarInteger( r_volumetricFog ) );
-	ri.Printf( PRINT_ALL, "temporal   : taa=%d motionVectors=%d frame=%u unreliable=%s history=%s\n",
+	ri.Printf( PRINT_ALL, "temporal   : taa=%d motionVectors=%d frame=%u unreliable=%s history=%s weaponAfter=%s recon=%s cameraCut=%s\n",
 		R_CvarInteger( r_taa ), R_CvarInteger( r_taaMotionVectors ), vk.temporal.frameIndex,
-		R_YesNo( vk.temporal.unreliableMotionThisFrame ), R_YesNo( vk.temporal.hasValidTAAHistory ) );
+		R_YesNo( vk.temporal.unreliableMotionThisFrame ), R_YesNo( vk.temporal.hasValidTAAHistory ),
+		R_YesNo( vk_temporal_want_weapon_after_taa() ),
+		R_YesNo( vk_temporal_reconstruction_wanted() ),
+		R_YesNo( vk.temporal.sharedCameraCut ) );
 	ri.Printf( PRINT_ALL, "post       : post=%d tonemap=%d exposure=%.2f bloom=%d smaa=%d fxaa=%d aaAfterBloom=%d\n",
 		R_CvarInteger( r_post ), R_CvarInteger( r_tonemap ), R_CvarValue( r_exposure ),
 		R_CvarInteger( r_bloom ), R_CvarInteger( r_ext_smaa ), R_CvarInteger( r_ext_fxaa ),

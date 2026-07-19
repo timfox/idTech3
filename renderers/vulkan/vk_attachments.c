@@ -642,16 +642,33 @@ static void vk_create_visibility_buffer_scaffold( void )
 	}
 
 	if ( !ids_from_deferred ) {
-		vk_create_fullres_color_attachment( VK_FORMAT_R32G32_UINT, usage,
-			&vk.visibility_buffer_ids, &vk.visibility_buffer_ids_view,
-			VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, qfalse );
-		vk_create_fullres_color_attachment( VK_FORMAT_R16G16_UNORM, usage,
-			&vk.visibility_buffer_bary, &vk.visibility_buffer_bary_view,
-			VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, qfalse );
+		if ( !vk_create_fullres_color_attachment_soft( VK_FORMAT_R32G32_UINT, usage,
+				&vk.visibility_buffer_ids, &vk.visibility_buffer_ids_view,
+				VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, qfalse ) ||
+			!vk_create_fullres_color_attachment_soft( VK_FORMAT_R16G16_UNORM, usage,
+				&vk.visibility_buffer_bary, &vk.visibility_buffer_bary_view,
+				VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, qfalse ) ) {
+			ri.Printf( PRINT_WARNING, S_COLOR_YELLOW
+				"[VK][visbuf] visibility IDs/bary soft-fail — scaffold disabled\n" S_COLOR_WHITE );
+			vk.visibility_buffer_ids = VK_NULL_HANDLE;
+			vk.visibility_buffer_ids_view = VK_NULL_HANDLE;
+			vk.visibility_buffer_bary = VK_NULL_HANDLE;
+			vk.visibility_buffer_bary_view = VK_NULL_HANDLE;
+			vk.visibilityBufferAllocated = qfalse;
+			vk.visibilityBufferDirectExport = qfalse;
+			return;
+		}
 	}
-	vk_create_fullres_color_attachment( VK_FORMAT_R8_UINT, classUsage,
-		&vk.visibility_buffer_class, &vk.visibility_buffer_class_view,
-		VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, qfalse );
+	if ( !vk_create_fullres_color_attachment_soft( VK_FORMAT_R8_UINT, classUsage,
+			&vk.visibility_buffer_class, &vk.visibility_buffer_class_view,
+			VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, qfalse ) ) {
+		ri.Printf( PRINT_WARNING, S_COLOR_YELLOW
+			"[VK][visbuf] visibility class soft-fail — scaffold disabled\n" S_COLOR_WHITE );
+		vk.visibility_buffer_class = VK_NULL_HANDLE;
+		vk.visibility_buffer_class_view = VK_NULL_HANDLE;
+		vk.visibilityBufferAllocated = qfalse;
+		return;
+	}
 	vk.visibilityBufferAllocated = qtrue;
 	vk.visibilityBufferDirectExport = ( vk.deferredGbufferDirectExport && !vk.msaaActive &&
 		vk.visibility_buffer_ids != VK_NULL_HANDLE ) ? qtrue : qfalse;

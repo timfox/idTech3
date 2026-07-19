@@ -4,6 +4,7 @@
 #include "vk_util.h"
 #include "vk_view_state.h"
 #include "vk_ambient_visibility.h"
+#include "vk_deferred_gbuffer.h"
 #include "vk_upscale.h"
 #include <math.h>
 
@@ -551,4 +552,115 @@ qboolean vk_temporal_want_weapon_after_taa( void )
 		return qfalse;
 	}
 	return qtrue;
+}
+
+static void vk_temporal_format_reasons( uint32_t reasons, char *buf, size_t bufSize )
+{
+	static const uint32_t knownReasons[] = {
+		VK_TEMPORAL_RESET_RENDERER_INIT,
+		VK_TEMPORAL_RESET_SWAPCHAIN_CHANGE,
+		VK_TEMPORAL_RESET_RENDER_SIZE_CHANGE,
+		VK_TEMPORAL_RESET_WORLD_CHANGE,
+		VK_TEMPORAL_RESET_CLIENT_STATE_CHANGE,
+		VK_TEMPORAL_RESET_CAMERA_CUT,
+		VK_TEMPORAL_RESET_EXPLICIT_DEBUG,
+		VK_TEMPORAL_RESET_MISSING_PREV_DATA
+	};
+	char *ptr;
+	char *end;
+	int i;
+
+	if ( !buf || bufSize == 0u ) {
+		return;
+	}
+	ptr = buf;
+	end = buf + bufSize;
+	*ptr = '\0';
+	if ( reasons == 0u ) {
+		Q_strncpyz( buf, "none", bufSize );
+		return;
+	}
+	for ( i = 0; i < (int)ARRAY_LEN( knownReasons ); i++ ) {
+		const uint32_t reason = knownReasons[i];
+		const char *name;
+		size_t len;
+
+		if ( !( reasons & reason ) ) {
+			continue;
+		}
+		name = vk_temporal_reason_string( reason );
+		if ( ptr != buf && ptr + 1 < end ) {
+			*ptr++ = ',';
+			*ptr = '\0';
+		}
+		len = strlen( name );
+		if ( ptr + len >= end ) {
+			break;
+		}
+		Com_Memcpy( ptr, name, len );
+		ptr += len;
+		*ptr = '\0';
+	}
+	if ( buf[0] == '\0' ) {
+		Q_strncpyz( buf, "unknown", bufSize );
+	}
+}
+
+/*
+===============
+vk_temporal_status_f
+
+Dump shared temporal ownership: reset reasons, history validity, weapon deferral,
+and world-matrix capture (Spine 1.0 diagnostics).
+===============
+*/
+void vk_temporal_status_f( void )
+{
+	char appliedBuf[256];
+	char stickyBuf[256];
+	char pendingBuf[256];
+	const qboolean recon = vk_temporal_reconstruction_wanted();
+	const qboolean weaponAfter = vk_temporal_want_weapon_after_taa();
+
+	vk_temporal_format_reasons( vk.temporal.appliedResetReasons, appliedBuf, sizeof( appliedBuf ) );
+	vk_temporal_format_reasons( vk.temporal.stickyResetReasons, stickyBuf, sizeof( stickyBuf ) );
+	vk_temporal_format_reasons( vk.temporal.pendingResetReasons, pendingBuf, sizeof( pendingBuf ) );
+
+	ri.Printf( PRINT_ALL, "======== Temporal Ownership Status ========\n" );
+	ri.Printf( PRINT_ALL, "frame     : %u prepared=%s\n",
+		vk.temporal.frameIndex, vk.temporal.preparedThisFrame ? "yes" : "no" );
+	ri.Printf( PRINT_ALL, "wanted    : reconstruction=%s weaponAfterTaa=%s (cvar=%d)\n",
+		recon ? "yes" : "no",
+		weaponAfter ? "yes" : "no",
+		r_temporalWeaponAfterTaa ? r_temporalWeaponAfterTaa->integer : 0 );
+	ri.Printf( PRINT_ALL, "history   : taa=%s idx=%u luminance=%s motionPrev=%s\n",
+		vk.temporal.hasValidTAAHistory ? "valid" : "reset",
+		vk.temporal.taaHistoryIndex,
+		vk.temporal.hasValidLuminance ? "valid" : "reset",
+		vk_prev_matrices_valid ? "valid" : "reset" );
+	ri.Printf( PRINT_ALL, "resets    : applied=%s sticky=%s pending=%s cameraCut=%s\n",
+		appliedBuf, stickyBuf, pendingBuf,
+		vk.temporal.sharedCameraCut ? "yes" : "no" );
+	ri.Printf( PRINT_ALL, "consumers : motion+taa+volumetric+occlusion+AV (via apply_resets)\n" );
+	ri.Printf( PRINT_ALL, "world     : name=%s valid=%s noWorld=%s gameplay=%s\n",
+		vk.temporal.worldName[0] ? vk.temporal.worldName : "<none>",
+		vk.temporal.worldWasValid ? "yes" : "no",
+		vk.temporal.noWorldModel ? "yes" : "no",
+		vk.temporal.stableGameplayState ? "yes" : "no" );
+	ri.Printf( PRINT_ALL, "matrices  : worldCaptured=%s fpProj=%s (this=%s last=%s)\n",
+		vk.temporal.worldMatricesCaptured ? "yes" : "no",
+		vk.temporal.firstPersonProjectionThisFrame ? "yes" : "no",
+		vk.temporal.firstPersonProjectionThisFrame ? "1" : "0",
+		vk.temporal.firstPersonProjectionLastFrame ? "1" : "0" );
+	ri.Printf( PRINT_ALL, "extent    : render=%ux%u swapchain=%ux%u nearStaticFrames=%d\n",
+		vk.temporal.lastRenderWidth, vk.temporal.lastRenderHeight,
+		vk.temporal.lastSwapchainWidth, vk.temporal.lastSwapchainHeight,
+		vk_near_static_view_frames );
+	ri.Printf( PRINT_ALL, "motion    : unreliable=%s viewClass=%s\n",
+		vk.temporal.unreliableMotionThisFrame ? "yes" : "no",
+		vk_view_class_name( vk_classify_current_view() ) );
+	ri.Printf( PRINT_ALL, "policy    : RDF_NOWORLDMODEL after doneWorldScene does not thrash history;\n" );
+	ri.Printf( PRINT_ALL, "            weapon draws defer until after world TAA when reconstruction on;\n" );
+	ri.Printf( PRINT_ALL, "            portals force camera-cut; commit prefers worldMatricesCaptured.\n" );
+	ri.Printf( PRINT_ALL, "===========================================\n" );
 }

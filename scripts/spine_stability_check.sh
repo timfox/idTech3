@@ -37,6 +37,19 @@ pass "stable/quality/rt/experimental/gfx_safe profiles"
 # 2b. G-buffer / AV lifecycle contract (does not promote AV mode 4)
 bash "$ROOT/scripts/gbuffer_av_lifecycle_check.sh"
 
+# 2c. Restart / temporal ownership (swapchain teardown ↔ restore)
+PRES="$ROOT/renderers/vulkan/vk_presentation.c"
+TEMP_C="$ROOT/renderers/vulkan/vk_temporal.c"
+grep -q 'VK_TEMPORAL_RESET_SWAPCHAIN_CHANGE' "$PRES" || fail "presentation must sticky-reset on swapchain change"
+grep -q 'vk_ambient_visibility_reset_history' "$TEMP_C" || fail "temporal apply_resets must reset AV history"
+grep -q 'vk_reset_taa_history' "$TEMP_C" || fail "temporal apply_resets must reset TAA history"
+grep -q 'appliedResetReasons' "$ROOT/renderers/vulkan/vk_ambient_visibility.c" || \
+  fail "AV frame_begin must observe temporal appliedResetReasons"
+pass "restart/temporal ownership: swapchain sticky + shared AV/TAA reset"
+
+# 2d. Temporal history ownership contract (weapon / portals / status)
+bash "$ROOT/scripts/temporal_ownership_check.sh"
+
 # 3. WBOIT clears + barriers + debug-Z
 grep -q 'renderPass == vk.render_pass.oit_accum' renderers/vulkan/vk_render_pass.c || fail "OIT accum clear site missing"
 grep -A12 'renderPass == vk.render_pass.oit_accum' renderers/vulkan/vk_render_pass.c | grep -q 'clear_values\[1\].color.float32\[0\] = 1.0f' || fail "OIT reveal clear one missing"

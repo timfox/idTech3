@@ -133,11 +133,11 @@ Spine 1.0 is done when:
 
 1. The locked matrix passes automated + manual combination tests (OIT × TAA × weapon × resize × alt-tab × `vid_restart` × windowed/FS).
 2. Every Spine attachment used in that matrix has a debug name and a documented producer/consumer.
-3. Temporal histories invalidate correctly for camera cut, projection change, resize, map change, and weapon/portal ownership.
+3. Temporal histories invalidate correctly for camera cut, projection change, resize, map change, and weapon/portal ownership. Console: `temporal_status` (also summarized on `havenrp_renderer_status`). Static: `./scripts/temporal_ownership_check.sh` (also via `spine_stability_check.sh`). Shared `apply_resets` owns TAA / AV / volumetric / motion / occlusion; RDF_NOWORLDMODEL after world does not thrash; weapon defers until after world TAA when reconstruction is on; portals force camera-cut and do not own world matrix history.
 4. `input_status` / relative mouse lifecycle remain correct across focus and `vid_restart` (presentation path).
 5. DEVICE_LOST and black-frame classes from late post toggles are diagnosed with pass-diag context and do not recur on the certified profile.
 6. Mode/feature combinations **outside** the matrix are latched or clearly experimental, with a safe recovery command.
-7. G-buffer / Ambient Visibility lifecycle: `./scripts/gbuffer_av_lifecycle_check.sh` (also via `spine_stability_check.sh`). Console: `deferred_gbuffer_status`, `ambient_visibility_status`, `havenrp_renderer_status`. Soft-fail create paths (G-buffer scaffold images + fill/lighting/composite/debug; AV images/pipelines; visibility fill/classify/debug); `r_dgbFailInject` recovers when cleared; `r_avFailInject` demotes AO to `legacy_ssao` without killing G-buffer fill (`history` thrash-resets AV temporal only). Scaffold/AV image OOM demotes to legacy SSAO (Forward+ continues). **Do not** enable `r_ambientVisibilityMode 4` in quality until the GPU matrix in that script’s footer passes.
+7. G-buffer / Ambient Visibility lifecycle: `./scripts/gbuffer_av_lifecycle_check.sh` (also via `spine_stability_check.sh`). Console: `deferred_gbuffer_status`, `ambient_visibility_status`, `havenrp_renderer_status`. Soft-fail create paths (G-buffer scaffold images + fill/lighting/composite/debug; AV images/pipelines; visibility fill/classify/debug + scaffold); `r_dgbFailInject` recovers when cleared; `r_avFailInject` demotes AO to `legacy_ssao` without killing G-buffer fill (`history` thrash-resets AV temporal only). Scaffold/AV image OOM demotes to legacy SSAO (Forward+ continues). Presentation teardown+restore sticky-resets temporal (`VK_TEMPORAL_RESET_SWAPCHAIN_CHANGE`) and rebinds deferred/AV. **Do not** enable `r_ambientVisibilityMode 4` in quality until the GPU matrix in that script’s footer passes.
 
 Related checklists: [RENDERER_PHASE1_CHECKLIST_2026Q3.md](RENDERER_PHASE1_CHECKLIST_2026Q3.md), [RENDERER_MODERNIZATION_ROADMAP_2026H2.md](RENDERER_MODERNIZATION_ROADMAP_2026H2.md), [RENDERER_CONFIDENCE.md](RENDERER_CONFIDENCE.md), [scripts/renderer_regression_check.sh](../scripts/renderer_regression_check.sh).
 
@@ -148,9 +148,9 @@ Related checklists: [RENDERER_PHASE1_CHECKLIST_2026Q3.md](RENDERER_PHASE1_CHECKL
 **Do next**
 
 - Pass/resource registry and validation for Spine attachments
-- Temporal history ownership and debug views
+- Temporal history ownership and debug views (`temporal_status` + `./scripts/temporal_ownership_check.sh` covered; expand visual rejection/ownership debug views next)
 - OIT × TAA × weapon matrix hardening
-- Restart / resize / focus / DEVICE_LOST reliability
+- Restart / resize / focus / DEVICE_LOST reliability (presentation teardown/restore + G-buffer/AV soft-fail paths covered statically)
 - Expanding the automated combination matrix
 
 **Do not next (unless fixing a Spine blocker)**

@@ -167,9 +167,10 @@ static const char *vk_rtx_state_string( void )
 	if ( !vk.rtxAvailable ) {
 		return "idle: latch r_rtx/r_hybrid1/r_raygun before vid_restart (or GPU lacks KHR RT)";
 	}
-	if ( ( !r_rtx || r_rtx->integer <= 0 ) && ( !r_hybrid1 || r_hybrid1->integer <= 0 )
+	if ( ( !r_rtx || r_rtx->integer <= 0 ) && ( !r_rtxDemo || !r_rtxDemo->integer )
+		&& ( !r_hybrid1 || r_hybrid1->integer <= 0 )
 		&& ( !r_raygun || r_raygun->integer <= 0 ) ) {
-		return "idle: enable r_rtx, r_hybrid1, or r_raygun before vid_restart";
+		return "idle: enable r_rtxDemo, r_rtx, r_hybrid1, or r_raygun before vid_restart";
 	}
 	if ( ( !r_rtxDemo || !r_rtxDemo->integer ) && ( !r_hybrid1 || r_hybrid1->integer <= 0 )
 		&& ( !r_raygun || r_raygun->integer <= 0 ) ) {
@@ -1576,7 +1577,8 @@ void vk_rtx_init( void )
 		ri.Printf( PRINT_DEVELOPER, "[VK][RTX] %s\n", vk_rtx_state_string() );
 		return;
 	}
-	if ( ( !r_rtx || r_rtx->integer <= 0 ) && ( !r_hybrid1 || r_hybrid1->integer <= 0 )
+	if ( ( !r_rtx || r_rtx->integer <= 0 ) && ( !r_rtxDemo || !r_rtxDemo->integer )
+		&& ( !r_hybrid1 || r_hybrid1->integer <= 0 )
 		&& ( !r_raygun || r_raygun->integer <= 0 ) ) {
 		ri.Printf( PRINT_DEVELOPER, "[VK][RTX] %s\n", vk_rtx_state_string() );
 		return;

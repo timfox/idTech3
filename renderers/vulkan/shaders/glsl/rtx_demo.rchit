@@ -87,8 +87,10 @@ void main()
 	vec3 worldPos = gl_WorldRayOriginEXT + gl_WorldRayDirectionEXT * gl_HitTEXT;
 
 	if ( mode == 1 ) {
-		float shadow = ( ndl > 1e-4 ) ? traceSunShadow( worldPos, L ) : 0.0;
-		hitValue = base * ( ambient + ( 1.0 - ambient ) * ndl * shadow );
+		/* Greyscale sun visibility for rgen scene modulate. */
+		float shadow = ( ndl > 1e-4 ) ? traceSunShadow( worldPos, L ) : 1.0;
+		float vis = 0.35 + 0.65 * max( ndl, 0.15 ) * mix( 0.35, 1.0, shadow );
+		hitValue = vec3( clamp( vis, 0.0, 1.0 ) );
 	} else if ( mode == 2 ) {
 		float lit = ambient + ( 1.0 - ambient ) * ndl;
 		hitValue = mix( base * lit, vec3( 0.45, 0.62, 0.95 ), 0.45 );
