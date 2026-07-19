@@ -215,7 +215,12 @@ qboolean vk_deferred_gbuffer_fill_wanted( void )
 	if ( !vk_deferred_gbuffer_generation_valid() ) {
 		return qfalse;
 	}
-	if ( !tr.world || !backEnd.doneWorldScene ) {
+	/*
+	 * Menu / no-map: no world pointer. Do NOT require doneWorldScene — that flag is
+	 * set only *after* geometry capture in RB_DrawSurfs, so gating on it would
+	 * permanently skip fill/AV/deferred lighting.
+	 */
+	if ( !tr.world ) {
 		return qfalse;
 	}
 	cls = vk_classify_current_view();
@@ -452,6 +457,8 @@ void vk_deferred_gbuffer_ensure_runtime( void )
 void vk_deferred_gbuffer_status_f( void )
 {
 	uint32_t w = 0, h = 0;
+	qboolean ok = qtrue;
+
 	vk_get_active_render_extent( &w, &h );
 	ri.Printf( PRINT_ALL, "======== Deferred G-buffer Status ========\n" );
 	ri.Printf( PRINT_ALL, "requested : resources=%s fillCvar=%d\n",
@@ -475,7 +482,33 @@ void vk_deferred_gbuffer_status_f( void )
 		vk.deferredGbufferFallbackReason[0] ? vk.deferredGbufferFallbackReason : "none" );
 	ri.Printf( PRINT_ALL, "recreate  : %s\n",
 		vk.deferredGbufferLastRecreateReason[0] ? vk.deferredGbufferLastRecreateReason : "none" );
+
+	if ( vk_deferred_gbuffer_resources_wanted() ) {
+		if ( !vk.deferredGbufferAllocated ) {
+			ri.Printf( PRINT_ALL, "verify    : FAIL allocated=0 while resources wanted\n" );
+			ok = qfalse;
+		} else if ( !vk_deferred_gbuffer_generation_valid() ) {
+			ri.Printf( PRINT_ALL, "verify    : FAIL generation/extent mismatch\n" );
+			ok = qfalse;
+		} else if ( vk.deferred_gbuffer_albedo_view == VK_NULL_HANDLE ||
+			vk.deferred_gbuffer_normal_view == VK_NULL_HANDLE ||
+			vk.deferred_gbuffer_material_view == VK_NULL_HANDLE ||
+			vk.deferred_lighting_view == VK_NULL_HANDLE ) {
+			ri.Printf( PRINT_ALL, "verify    : FAIL missing image views\n" );
+			ok = qfalse;
+		} else if ( !vk.deferredGbufferDirectExport &&
+			( !vk.deferred_gbuffer.pipeline_ready || vk.deferred_gbuffer.descriptor == VK_NULL_HANDLE ) ) {
+			ri.Printf( PRINT_ALL, "verify    : FAIL fill pipeline/descriptor not ready\n" );
+			ok = qfalse;
+		} else {
+			ri.Printf( PRINT_ALL, "verify    : OK gen=%u matches active extent %ux%u\n",
+				vk.deferredGbufferGeneration, w, h );
+		}
+	} else {
+		ri.Printf( PRINT_ALL, "verify    : skipped (resources not wanted)\n" );
+	}
 	ri.Printf( PRINT_ALL, "==========================================\n" );
+	(void)ok;
 }
 
 static void vk_dgb_create_descriptor_layout( void )

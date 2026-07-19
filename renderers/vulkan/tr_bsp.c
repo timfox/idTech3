@@ -28,6 +28,8 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "tr_sprite_props.h"
 #include "tr_decal_props.h"
 #include "tr_material_paint.h"
+#include "vk_ambient_visibility.h"
+#include "vk_temporal.h"
 #include "vk_ndgi.h"
 #include "vk_niv.h"
 #include "vk_nslm.h"
@@ -2988,6 +2990,11 @@ void RE_LoadWorldMap( const char *name ) {
 	// clear tr.world so if the level fails to load, the next
 	// try will not look at the partially loaded version
 	tr.world = NULL;
+#ifdef USE_VULKAN
+	/* Drop AV temporal history across map unload/reload (unoccluded defaults). */
+	vk_ambient_visibility_reset_history();
+	vk_temporal_request_sticky_reset( VK_TEMPORAL_RESET_WORLD_CHANGE );
+#endif
 
 	Com_Memset( &s_worldData, 0, sizeof( s_worldData ) );
 	Q_strncpyz( s_worldData.name, name, sizeof( s_worldData.name ) );

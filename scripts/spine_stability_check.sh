@@ -34,6 +34,9 @@ grep -q 'seta r_ssao 0' config/modern_vulkan_stable.cfg || fail "stable must dis
 grep -q 'seta r_oit 1' config/modern_vulkan_quality.cfg || fail "quality must enable WBOIT"
 pass "stable/quality/rt/experimental/gfx_safe profiles"
 
+# 2b. G-buffer / AV lifecycle contract (does not promote AV mode 4)
+bash "$ROOT/scripts/gbuffer_av_lifecycle_check.sh"
+
 # 3. WBOIT clears + barriers + debug-Z
 grep -q 'renderPass == vk.render_pass.oit_accum' renderers/vulkan/vk_render_pass.c || fail "OIT accum clear site missing"
 grep -A12 'renderPass == vk.render_pass.oit_accum' renderers/vulkan/vk_render_pass.c | grep -q 'clear_values\[1\].color.float32\[0\] = 1.0f' || fail "OIT reveal clear one missing"

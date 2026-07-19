@@ -1,0 +1,93 @@
+#!/usr/bin/env bash
+# Static contract: G-buffer + Ambient Visibility resource lifecycle hardening.
+# Does not promote AV mode 4. Does not modify modern_vulkan_stable.cfg ownership.
+set -euo pipefail
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+cd "$ROOT"
+fail() { echo "FAIL: $*" >&2; exit 1; }
+pass() { echo "PASS: $*"; }
+
+echo "=== G-buffer / AV lifecycle check ==="
+
+DGB_H="$ROOT/renderers/vulkan/vk_deferred_gbuffer.h"
+DGB_C="$ROOT/renderers/vulkan/vk_deferred_gbuffer.c"
+AV_C="$ROOT/renderers/vulkan/vk_ambient_visibility.c"
+PRES="$ROOT/renderers/vulkan/vk_presentation.c"
+ATT="$ROOT/renderers/vulkan/vk_attachments.c"
+BE="$ROOT/renderers/vulkan/tr_backend.c"
+VK_H="$ROOT/renderers/vulkan/vk.h"
+STABLE="$ROOT/config/modern_vulkan_stable.cfg"
+QUALITY="$ROOT/config/modern_vulkan_quality.cfg"
+
+[[ -f "$DGB_H" && -f "$DGB_C" && -f "$AV_C" && -f "$PRES" ]] || fail "missing core lifecycle sources"
+
+# Predicates separated
+grep -q 'vk_deferred_gbuffer_resources_wanted' "$DGB_H" || fail "resources_wanted missing from header"
+grep -q 'vk_deferred_gbuffer_fill_wanted' "$DGB_H" || fail "fill_wanted missing from header"
+grep -q 'vk_classify_current_view' "$DGB_H" || fail "view classification missing"
+grep -q 'vk_deferred_gbuffer_generation' "$DGB_H" || fail "generation API missing"
+grep -q 'vk_deferred_gbuffer_invalidate_runtime' "$DGB_H" || fail "invalidate_runtime missing"
+pass "resource vs fill predicates + view class + generation API"
+
+# fill_wanted must NOT require doneWorldScene (set after capture)
+if grep -n 'doneWorldScene' "$DGB_C" | grep -v 'Do NOT require doneWorldScene' | grep -q .; then
+  fail "fill_wanted / deferred gbuffer must not gate on doneWorldScene (flag is set after geometry capture)"
+fi
+pass "fill_wanted independent of doneWorldScene"
+
+# Generation fields
+grep -q 'deferredGbufferGeneration' "$VK_H" || fail "deferredGbufferGeneration missing from vk.h"
+grep -q 'deferredGbufferExtentW' "$VK_H" || fail "deferredGbufferExtentW missing"
+grep -q 'deferredGbufferFallbackReason' "$VK_H" || fail "fallback reason missing"
+grep -q 'deferredGbufferGeneration++' "$ATT" || fail "scaffold finalize must bump generation"
+pass "generation tracking in vk state + scaffold"
+
+# Presentation teardown order
+grep -q 'vk_deferred_gbuffer_invalidate_runtime' "$PRES" || fail "presentation teardown must invalidate deferred runtime"
+grep -q 'vk_visibility_buffer_shutdown' "$PRES" || fail "presentation teardown must shutdown visibility buffer"
+grep -q 'vk_ambient_visibility_shutdown' "$PRES" || fail "presentation teardown must shutdown AV"
+# invalidate before destroy_attachments
+python3 - <<'PY' || exit 1
+from pathlib import Path
+text = Path("renderers/vulkan/vk_presentation.c").read_text()
+fn = text.split("void vk_teardown_presentation_targets", 1)[1].split("void vk_restore_presentation_targets", 1)[0]
+for name in ("vk_deferred_gbuffer_invalidate_runtime", "vk_ambient_visibility_shutdown", "vk_destroy_attachments"):
+    if name not in fn:
+        raise SystemExit(f"FAIL: {name} missing from teardown")
+if fn.index("vk_deferred_gbuffer_invalidate_runtime") > fn.index("vk_destroy_attachments"):
+    raise SystemExit("FAIL: invalidate_runtime must run before destroy_attachments")
+if fn.index("vk_ambient_visibility_shutdown") > fn.index("vk_destroy_attachments"):
+    raise SystemExit("FAIL: AV shutdown must run before destroy_attachments")
+print("PASS: teardown destroys descriptors/AV before attachments")
+PY
+
+# Non-split weapon guard
+grep -A8 'if ( !vk_deferred_opaque_transparent_split()' "$BE" | grep -q 'RDF_NOWORLDMODEL' || \
+  fail "non-split G-buffer path must guard RDF_NOWORLDMODEL"
+pass "weapon/NOWORLDMODEL guard on non-split path"
+
+# Failure injection + diagnostics
+grep -q 'r_dgbFailInject' "$DGB_C" "$ATT" || fail "r_dgbFailInject missing"
+grep -q 'r_avFailInject' "$AV_C" || fail "r_avFailInject missing"
+grep -q 'deferred_gbuffer_status' "$ROOT/renderers/vulkan/tr_init.c" || fail "deferred_gbuffer_status command missing"
+grep -q 'gbuffer   :' "$ROOT/renderers/vulkan/tr_init_diagnostics.inc" || fail "havenrp_renderer_status gbuffer block missing"
+pass "failure injection + diagnostics"
+
+# Forward+ AV composite (mode 2)
+grep -q 'r_renderMode->integer == 2' "$AV_C" || fail "Forward+ mode-2 AV composite gate missing"
+pass "Forward+ AV composite path present"
+
+# Stable ownership frozen; quality must NOT silently enable mode 4 yet
+grep -q 'seta r_ambientVisibilityMode 2' "$STABLE" || fail "stable AV owner changed (expected mode 2 GTAO)"
+grep -q 'seta r_ssao 0' "$STABLE" || fail "stable must keep r_ssao 0"
+if grep -qE 'seta r_ambientVisibilityMode 4' "$QUALITY"; then
+  fail "quality must not promote AV mode 4 until GPU lifecycle matrix passes"
+fi
+pass "stable ownership unchanged; quality has not promoted AV mode 4"
+
+echo "=== G-buffer / AV lifecycle check PASSED ==="
+echo "Manual GPU matrix still required before promoting AV mode 4 to quality:"
+echo "  menu, maps, map restart/transition, 10x vid_restart, resize, fullscreen,"
+echo "  profile stable↔quality, AO 1→2→4→1, weapon, RDF_NOWORLDMODEL,"
+echo "  r_dgbFailInject / r_avFailInject, RT off, clean shutdown."
+echo "  Commands: deferred_gbuffer_status ; ambient_visibility_status ; havenrp_renderer_status"

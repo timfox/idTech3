@@ -137,6 +137,7 @@ Spine 1.0 is done when:
 4. `input_status` / relative mouse lifecycle remain correct across focus and `vid_restart` (presentation path).
 5. DEVICE_LOST and black-frame classes from late post toggles are diagnosed with pass-diag context and do not recur on the certified profile.
 6. Mode/feature combinations **outside** the matrix are latched or clearly experimental, with a safe recovery command.
+7. G-buffer / Ambient Visibility lifecycle: `./scripts/gbuffer_av_lifecycle_check.sh` (also via `spine_stability_check.sh`). Console: `deferred_gbuffer_status`, `ambient_visibility_status`, `havenrp_renderer_status`. **Do not** enable `r_ambientVisibilityMode 4` in quality until the GPU matrix in that script’s footer passes.
 
 Related checklists: [RENDERER_PHASE1_CHECKLIST_2026Q3.md](RENDERER_PHASE1_CHECKLIST_2026Q3.md), [RENDERER_MODERNIZATION_ROADMAP_2026H2.md](RENDERER_MODERNIZATION_ROADMAP_2026H2.md), [RENDERER_CONFIDENCE.md](RENDERER_CONFIDENCE.md), [scripts/renderer_regression_check.sh](../scripts/renderer_regression_check.sh).
 

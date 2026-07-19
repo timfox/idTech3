@@ -46,7 +46,6 @@ typedef struct {
 	uint32_t historyIndex;
 	uint32_t gbufferGeneration;
 	uint32_t historyGeneration;
-	vkViewClass_t lastViewClass;
 	int lastMode;
 	float lastRadius;
 
@@ -630,7 +629,6 @@ void vk_ambient_visibility_init( void )
 	}
 	av.ready = qtrue;
 	av.lastMode = -1;
-	av.lastViewClass = VK_VIEW_CLASS_NO_WORLD;
 	av.gbufferGeneration = vk_deferred_gbuffer_generation();
 	av.historyGeneration = av.gbufferGeneration;
 	ri.Printf( PRINT_ALL, "[AV] directional Ambient Visibility initialized (GTAO%s)\n",
@@ -662,7 +660,6 @@ void vk_ambient_visibility_frame_begin( void )
 {
 	uint32_t width, height;
 	uint32_t gbufGen;
-	vkViewClass_t viewClass;
 
 	AV_RegisterCvars();
 	if ( !av.ready && vk.device && vk.fboActive ) vk_ambient_visibility_init();
@@ -673,10 +670,13 @@ void vk_ambient_visibility_frame_begin( void )
 	if ( width && height ) AV_EnsureImages( width, height );
 
 	gbufGen = vk_deferred_gbuffer_generation();
-	viewClass = vk_classify_current_view();
+	/*
+	 * Do not reset on weapon/UI view-class flicker — RDF_NOWORLDMODEL flips every
+	 * frame after the world pass (same rule as TAA). Apply is already main-world-only.
+	 * Portal/mirror never own AV history because apply refuses those view classes.
+	 */
 	if ( av.gbufferGeneration != gbufGen ||
 		av.historyGeneration != gbufGen ||
-		av.lastViewClass != viewClass ||
 		av.lastMode != r_ambientVisibilityMode->integer ||
 		av.lastRadius != r_rtaoRadius->value ||
 		vk.temporal.appliedResetReasons != 0u ) {
@@ -684,7 +684,6 @@ void vk_ambient_visibility_frame_begin( void )
 		av.gbufferGeneration = gbufGen;
 		av.lastMode = r_ambientVisibilityMode->integer;
 		av.lastRadius = r_rtaoRadius->value;
-		av.lastViewClass = viewClass;
 	}
 }
 
@@ -898,11 +897,13 @@ void vk_ambient_visibility_apply_after_geometry( void )
 	}
 
 	/* Composite into HDR color for deferred lighting (mode 1/3) and Forward+
-	 * sidecar G-buffer (mode 2). Main-world only — weapon/portal/mirror already returned. */
+	 * sidecar G-buffer (mode 2). Main-world only — weapon/portal/mirror already returned.
+	 * Use active G-buffer resources (not fill_wanted): fill_wanted is the capture gate;
+	 * by the time we composite, capture for this view has already succeeded. */
 	if ( classView &&
 		vk.color_format == VK_FORMAT_R16G16B16A16_SFLOAT &&
 		( vk_deferred_lighting_active() ||
-		  ( r_renderMode && r_renderMode->integer == 2 && vk_deferred_gbuffer_fill_wanted() ) ) ) {
+		  ( r_renderMode && r_renderMode->integer == 2 && vk_deferred_gbuffer_active() ) ) ) {
 		AV_ImageWrite( &writes[0], &infos[0], av.compositeSet, 0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, linear, finalImage->view, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL );
 		AV_ImageWrite( &writes[1], &infos[1], av.compositeSet, 1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, nearest, currentAux->view, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL );
 		AV_ImageWrite( &writes[2], &infos[2], av.compositeSet, 2, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, linear, av.gtao.view, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL );
