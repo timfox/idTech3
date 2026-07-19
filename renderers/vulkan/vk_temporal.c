@@ -3,6 +3,7 @@
 #include "vk_temporal.h"
 #include "vk_util.h"
 #include "vk_view_state.h"
+#include "vk_ambient_visibility.h"
 #include <math.h>
 
 float vk_prev_view_matrix[16];
@@ -177,6 +178,7 @@ static void vk_temporal_apply_resets( qboolean hardReset )
 	vk_reset_taa_history();
 	vk_reset_volumetric_history();
 	vk_reset_occlusion_visibility();
+	vk_ambient_visibility_reset_history();
 	if ( nonCameraReasons != 0u ) {
 		vk.adaptedExposure = manualExposure;
 		vk.temporal.hasValidLuminance = qfalse;

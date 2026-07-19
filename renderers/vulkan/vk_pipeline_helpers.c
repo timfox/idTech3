@@ -262,11 +262,11 @@ void vk_create_oit_accum_pipeline( void )
 
 	Com_Memset( &depth_stencil, 0, sizeof( depth_stencil ) );
 	depth_stencil.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
-	/* When MSAA off: depth-test transparents against opaque scene. Weight uses gl_FragCoord.z. */
+	/* Reversed-Z main pass uses GREATER_OR_EQUAL; OIT must match (near = high depth). */
 	if ( vk_get_main_rasterization_samples() == VK_SAMPLE_COUNT_1_BIT ) {
 		depth_stencil.depthTestEnable = VK_TRUE;
 		depth_stencil.depthWriteEnable = VK_FALSE;
-		depth_stencil.depthCompareOp = VK_COMPARE_OP_LESS_OR_EQUAL;
+		depth_stencil.depthCompareOp = VK_COMPARE_OP_GREATER_OR_EQUAL;
 	} else {
 		depth_stencil.depthTestEnable = VK_FALSE;
 		depth_stencil.depthWriteEnable = VK_FALSE;
@@ -444,7 +444,7 @@ void vk_create_oit_moments_pipeline( void )
 	if ( vk_get_main_rasterization_samples() == VK_SAMPLE_COUNT_1_BIT ) {
 		depth_stencil.depthTestEnable = VK_TRUE;
 		depth_stencil.depthWriteEnable = VK_FALSE;
-		depth_stencil.depthCompareOp = VK_COMPARE_OP_LESS_OR_EQUAL;
+		depth_stencil.depthCompareOp = VK_COMPARE_OP_GREATER_OR_EQUAL;
 	} else {
 		depth_stencil.depthTestEnable = VK_FALSE;
 		depth_stencil.depthWriteEnable = VK_FALSE;
@@ -638,7 +638,7 @@ void vk_create_oit_accum_mboit_pipeline( void )
 	if ( vk_get_main_rasterization_samples() == VK_SAMPLE_COUNT_1_BIT ) {
 		depth_stencil.depthTestEnable = VK_TRUE;
 		depth_stencil.depthWriteEnable = VK_FALSE;
-		depth_stencil.depthCompareOp = VK_COMPARE_OP_LESS_OR_EQUAL;
+		depth_stencil.depthCompareOp = VK_COMPARE_OP_GREATER_OR_EQUAL;
 	} else {
 		depth_stencil.depthTestEnable = VK_FALSE;
 		depth_stencil.depthWriteEnable = VK_FALSE;

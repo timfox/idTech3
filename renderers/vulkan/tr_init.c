@@ -263,6 +263,7 @@ cvar_t	*r_hbaoSteps;
 cvar_t	*r_oit;
 cvar_t	*r_oitForwardPlus;
 cvar_t	*r_oitClassify;
+cvar_t	*r_oitDebug;
 cvar_t	*r_stochasticAlpha;
 cvar_t	*r_ssaoDebugView;
 cvar_t	*r_renderWidth;
@@ -2971,6 +2972,24 @@ static void R_Register( void )
 		" 1 - split alpha-blend (MBOIT/WBOIT) vs additive particles (WBOIT, no moments)\n"
 		"Requires \\r_oit 1 or 2. Hair cards stay on \\r_stochasticAlpha." );
 	ri.Cvar_SetGroup( r_oitClassify, CVG_RENDERER );
+	r_oitDebug = ri.Cvar_Get( "r_oitDebug", "0", CVAR_CHEAT );
+	ri.Cvar_CheckRange( r_oitDebug, "0", "11", CV_INTEGER );
+	ri.Cvar_SetDescription( r_oitDebug,
+		"OIT resolve debug view (cheat):\n"
+		" 0 - composite\n"
+		" 1 - raw accumulation RGB\n"
+		" 2 - accumulated alpha/weight\n"
+		" 3 - revealage\n"
+		" 4 - transmittance (revealage)\n"
+		" 5 - resolved transparent only\n"
+		" 6 - opaque background\n"
+		" 7 - coverage (1-revealage)\n"
+		" 8 - pass ownership (green=OIT, blue=opaque)\n"
+		" 9 - moment RGB (MBOIT)\n"
+		" 10 - optical depth b0 (MBOIT)\n"
+		" 11 - coverage×weight heat\n"
+		"NaN/Inf → magenta." );
+	ri.Cvar_SetGroup( r_oitDebug, CVG_RENDERER );
 	if ( r_oitClassify && r_oitClassify->integer ) {
 		ri.Printf( PRINT_ALL, "[VK] OIT: r_oitClassify=1 (alpha-blend + additive buckets)\n" );
 	}

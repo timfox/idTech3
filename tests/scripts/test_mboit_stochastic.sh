@@ -34,4 +34,9 @@ rg -q 'oitBucketFilter' "$ROOT/renderers/vulkan/tr_backend.c" || fail "oitBucket
 rg -q 'r_oitClassify' "$ROOT/renderers/vulkan/vk_postfx_passes.c" || fail "oit classify bucket loop"
 rg -q 'r_oitClassify' "$ROOT/docs/MOMENT_OIT_STOCHASTIC_ALPHA.md" || fail "oit classify docs"
 
+rg -q 'C_avg \* \(1 - revealage\)|c_avg \* coverage' "$ROOT/renderers/vulkan/shaders/glsl/oit_resolve.frag" || fail "WBOIT resolve must multiply by (1-revealage)"
+rg -q 'VK_COMPARE_OP_GREATER_OR_EQUAL' "$ROOT/renderers/vulkan/vk_pipeline_helpers.c" || fail "OIT depth must use reversed-Z GREATER_OR_EQUAL"
+rg -q 'r_oitDebug' "$ROOT/renderers/vulkan/tr_init.c" || fail "r_oitDebug cvar"
+rg -q 'RF_FIRST_PERSON \| RF_DEPTHHACK' "$ROOT/renderers/vulkan/tr_backend.c" || fail "weapon excluded from world OIT"
+
 echo "OK: MBOIT + stochastic alpha smoke checks passed"

@@ -34,6 +34,7 @@ Extracted from vk.c for incremental modularization.
 #include "vk_raygun.h"
 #include "vk_surfel_gi.h"
 #include "vk_rcgi.h"
+#include "vk_ambient_visibility.h"
 #include "vk_vrcs.h"
 #include "vk_grtx.h"
 #include "vk_vuda.h"
@@ -205,6 +206,7 @@ void vk_begin_frame( void )
 	vk_rcgi_frame_begin();
 #endif
 	vk_vrcs_frame_begin();
+	vk_ambient_visibility_frame_begin();
 	vk_vuda_frame_begin();
 
 	if ( vk.cmd->waitForFence ) {

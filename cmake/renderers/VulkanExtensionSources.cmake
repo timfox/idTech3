@@ -29,6 +29,7 @@ set(VK_CHOCOLATE_SPLAT_SRCS
 
 # Chocolate RT demos: always linked; real path when USE_VULKAN_RTX (internal #else stubs).
 set(VK_CHOCOLATE_RTX_SRCS
+	renderers/vulkan/vk_ambient_visibility.c
 	${_VK_EXT}/rtx/vk_hybrid1.c
 	${_VK_EXT}/rtx/vk_raygun.c
 	${_VK_EXT}/rtx/vk_surfel_gi.c

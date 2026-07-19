@@ -54,6 +54,7 @@ Extracted from vk.c for incremental modularization.
 #include "vk_raygun.h"
 #include "vk_surfel_gi.h"
 #include "vk_rcgi.h"
+#include "vk_ambient_visibility.h"
 #include "vk_pipeline_cache_disk.h"
 #include "vk_pipeline_helpers.h"
 #include "vk_raster_samples.h"
@@ -1163,14 +1164,21 @@ void vk_initialize( void )
 		SET_OBJECT_NAME( vk.pipeline_layout_ssao_combine, "pipeline layout - ssao_combine", VK_DEBUG_REPORT_OBJECT_TYPE_PIPELINE_LAYOUT_EXT );
 
 		if ( r_oit && r_oit->integer && vk.fboActive ) {
-			/* OIT resolve: set 0 = opaque, set 1 = accum, set 2 = revealage */
+			/* OIT resolve: set 0 = opaque, set 1 = accum, set 2 = revealage,
+			 * set 3 = moments, set 4 = b0 (placeholders when WBOIT).
+			 * Push: debugMode + oitMode. */
 			set_layouts[0] = vk.set_layout_sampler;
 			set_layouts[1] = vk.set_layout_sampler;
 			set_layouts[2] = vk.set_layout_sampler;
-			desc.setLayoutCount = 3;
+			set_layouts[3] = vk.set_layout_sampler;
+			set_layouts[4] = vk.set_layout_sampler;
+			desc.setLayoutCount = 5;
 			desc.pSetLayouts = set_layouts;
-			desc.pushConstantRangeCount = 0;
-			desc.pPushConstantRanges = NULL;
+			push_range.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+			push_range.offset = 0;
+			push_range.size = 16; /* ivec4 */
+			desc.pushConstantRangeCount = 1;
+			desc.pPushConstantRanges = &push_range;
 			VK_CHECK( qvkCreatePipelineLayout( vk.device, &desc, NULL, &vk.pipeline_layout_oit_resolve ) );
 			SET_OBJECT_NAME( vk.pipeline_layout_oit_resolve, "pipeline layout - oit_resolve", VK_DEBUG_REPORT_OBJECT_TYPE_PIPELINE_LAYOUT_EXT );
 
@@ -1309,6 +1317,7 @@ void vk_initialize( void )
 	vk_raygun_init();
 	vk_surfel_gi_init();
 	vk_rcgi_init();
+	vk_ambient_visibility_init();
 
 #ifdef VK_CUBEMAP
 	vk_create_cubemap_prefilter();

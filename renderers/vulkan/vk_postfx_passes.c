@@ -22,6 +22,7 @@ SSAO/HBAO pass, and vk_bloom. Split from vk.c.
 #include "vk_deferred_gbuffer.h"
 #include "vk_visibility_buffer.h"
 #include "vk_reactive_mask.h"
+#include "vk_ambient_visibility.h"
 
 static void vk_oit_validate_pass_break( const char *stage )
 {
@@ -292,8 +293,27 @@ void vk_oit_pass( const struct drawSurfsCommand_s *cmd )
 		vk_begin_render_pass_tracked( vk.render_pass.oit_resolve, vk.framebuffers.oit_resolve, qfalse, fullWidth, fullHeight );
 		qvkCmdBindPipeline( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.oit_resolve_pipeline );
 		{
-			VkDescriptorSet sets[3] = { vk.oit_opaque_descriptor, vk.oit_accum_descriptor, vk.oit_reveal_descriptor };
-			qvkCmdBindDescriptorSets( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.pipeline_layout_oit_resolve, 0, 3, sets, 0, NULL );
+			VkDescriptorSet moments_set = vk.oit_moments_descriptor != VK_NULL_HANDLE
+				? vk.oit_moments_descriptor : vk.oit_reveal_descriptor;
+			VkDescriptorSet b0_set = vk.oit_b0_descriptor != VK_NULL_HANDLE
+				? vk.oit_b0_descriptor : vk.oit_reveal_descriptor;
+			VkDescriptorSet sets[5] = {
+				vk.oit_opaque_descriptor,
+				vk.oit_accum_descriptor,
+				vk.oit_reveal_descriptor,
+				moments_set,
+				b0_set
+			};
+			int push_data[4];
+
+			qvkCmdBindDescriptorSets( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
+				vk.pipeline_layout_oit_resolve, 0, 5, sets, 0, NULL );
+			push_data[0] = ( r_oitDebug && r_oitDebug->integer > 0 ) ? r_oitDebug->integer : 0;
+			push_data[1] = mboit ? 2 : 1;
+			push_data[2] = 0;
+			push_data[3] = 0;
+			qvkCmdPushConstants( vk.cmd->command_buffer, vk.pipeline_layout_oit_resolve,
+				VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof( push_data ), push_data );
 		}
 		vk_postfx_draw_fullscreen_quad();
 		vk_end_render_pass();
@@ -423,7 +443,8 @@ qboolean vk_ssao_pass( void )
 {
 	static qboolean warned_msaa = qfalse;
 
-	if ( backEnd.doneSSAO || !r_ssao || !r_ssao->integer || !vk.fboActive || !backEnd.doneSurfaces )
+	if ( backEnd.doneSSAO || !r_ssao || !r_ssao->integer || !vk.fboActive || !backEnd.doneSurfaces ||
+		vk_ambient_visibility_blocks_legacy_post() )
 		return qfalse;
 	/* Pass culling: skip expensive SSAO for menus, cinematics, no-world.
 	 * Use doneWorldScene — HUD/weapon may set RDF_NOWORLDMODEL after the world view. */

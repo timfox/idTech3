@@ -44,6 +44,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "vk_fp64_points.h"
 #include "vk_scene_pass.h"
 #include "vk_reactive_mask.h"
+#include "vk_ambient_visibility.h"
 #endif
 
 backEndData_t	*backEndData;
@@ -677,6 +678,14 @@ void RB_RenderDrawSurfList( drawSurf_t *drawSurfs, int numDrawSurfs ) {
 				continue;  /* opaque only: skip transparent */
 			if ( backEnd.drawSurfFilter == 2 && !transparent )
 				continue;  /* transparent only: skip opaque */
+			/* World OIT must not accumulate first-person / depth-hack weapon geometry. */
+			if ( backEnd.drawSurfFilter == 2 &&
+				( backEnd.oitAccumPass || backEnd.oitMomentsPass ) &&
+				entityNum != REFENTITYNUM_WORLD ) {
+				const int rfx = backEnd.refdef.entities[ entityNum ].e.renderfx;
+				if ( rfx & ( RF_FIRST_PERSON | RF_DEPTHHACK ) )
+					continue;
+			}
 			/* OIT class buckets: 1=alpha-blend, 2=additive */
 			if ( backEnd.drawSurfFilter == 2 && backEnd.oitBucketFilter == 1 && additive )
 				continue;
@@ -1983,6 +1992,7 @@ static const void *RB_DrawSurfs( const void *data ) {
 		if ( !( cmd->refdef.rdflags & RDF_NOWORLDMODEL ) ) {
 			vk_deferred_gbuffer_capture_after_geometry();
 			vk_visibility_buffer_capture_after_geometry();
+			vk_ambient_visibility_apply_after_geometry();
 			if ( vk_visibility_late_shade_wanted() ) {
 				vk_visibility_late_shade_apply_after_geometry();
 			} else {
@@ -2062,6 +2072,7 @@ static const void *RB_DrawSurfs( const void *data ) {
 	if ( !vk_deferred_opaque_transparent_split() ) {
 		vk_deferred_gbuffer_capture_after_geometry();
 		vk_visibility_buffer_capture_after_geometry();
+		vk_ambient_visibility_apply_after_geometry();
 		if ( vk_visibility_late_shade_wanted() ) {
 			vk_visibility_late_shade_apply_after_geometry();
 		} else {

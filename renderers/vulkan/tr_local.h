@@ -1588,6 +1588,7 @@ extern cvar_t	*r_ssaoDebugView;
 extern cvar_t	*r_oit;
 extern cvar_t	*r_oitForwardPlus;
 extern cvar_t	*r_oitClassify;
+extern cvar_t	*r_oitDebug;
 extern cvar_t	*r_stochasticAlpha;
 extern cvar_t	*r_fbo;
 extern cvar_t	*r_fboCinematic;

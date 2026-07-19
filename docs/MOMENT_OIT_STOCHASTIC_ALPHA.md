@@ -44,6 +44,17 @@ Demo: `exec demo_oit_clustered.cfg`. See [UNIFIED_CLUSTERED_RENDERER.md](UNIFIED
 
 When `r_taa` / `r_aaMode` 4–5 is active, OIT revealage stamps a dedicated R8 **reactive mask** (not `oit_reveal` itself) so Temporal Reconstruction prefers the current frame on glass/smoke (`r_temporalReactiveMask 1`). Forward+ transparent and stochastic survivors also stamp via `gen_frag`. See [HDR_GAPS.md](HDR_GAPS.md) §6.8.
 
+### Resolve equation (WBOIT / MBOIT accum)
+
+McGuire/Bavoil composite (linear HDR):
+
+```
+C_avg = accum.rgb / max(accum.a, eps)
+C_out = C_avg * (1 - revealage) + C_bg * revealage
+```
+
+Clears: accum `vec4(0)`, revealage `1`. Depth test uses reversed-Z `GREATER_OR_EQUAL` (no depth write). Debug: `r_oitDebug` 1–11; NaN/Inf → magenta.
+
 ## Stochastic Alpha-Clipped Materials (`r_stochasticAlpha`)
 
 Hashed / temporal alpha clip for **foliage, grates, hair cards, fabric holes, and decals** (shader `alphaFunc`).

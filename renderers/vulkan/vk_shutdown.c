@@ -29,6 +29,7 @@ Split from vk.c.
 #include "vk_raygun.h"
 #include "vk_surfel_gi.h"
 #include "vk_rcgi.h"
+#include "vk_ambient_visibility.h"
 #include "vk_dressi.h"
 #include "vk_vdb.h"
 #include "vk_pipeline_cache_disk.h"
@@ -65,6 +66,7 @@ void vk_shutdown( refShutdownCode_t code )
 	vk_raygun_shutdown();
 	vk_surfel_gi_shutdown();
 	vk_rcgi_shutdown();
+	vk_ambient_visibility_shutdown();
 	R_Dressi_Shutdown();
 	vk_destroy_framebuffers();
 

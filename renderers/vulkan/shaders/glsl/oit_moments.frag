@@ -24,6 +24,7 @@ void main() {
 		ivec2 depthSize = textureSize( opaqueDepthTex, 0 );
 		vec2 depthUv = gl_FragCoord.xy / vec2( depthSize );
 		float opaqueDepth = textureLod( opaqueDepthTex, depthUv, 0.0 ).r;
+		/* Reversed-Z: discard fragments farther than opaque (lower depth). */
 		if ( gl_FragCoord.z + 1e-5 < opaqueDepth ) discard;
 	}
 
@@ -32,4 +33,8 @@ void main() {
 	float z2 = z * z;
 	out_moments = d * vec4(z, z2, z2 * z, z2 * z2);
 	out_b0 = d;
+	if ( any( isnan( out_moments ) ) || any( isinf( out_moments ) ) || isnan( out_b0 ) || isinf( out_b0 ) ) {
+		out_moments = vec4( 0.0 );
+		out_b0 = 0.0;
+	}
 }

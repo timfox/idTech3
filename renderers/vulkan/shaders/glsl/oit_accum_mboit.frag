@@ -147,11 +147,17 @@ void main() {
 	vec4 base = textureLod(tex0, frag_tex_coord0, 0.0) * frag_color0;
 	float alpha = clamp(base.a, 0.0, 0.999);
 	if (alpha < 0.01) discard;
+	if ( isnan( alpha ) || isinf( alpha ) || any( isnan( base.rgb ) ) || any( isinf( base.rgb ) ) ) {
+		out_color = vec4( 1.0, 0.0, 1.0, 1.0 );
+		out_reveal = 0.0;
+		return;
+	}
 
 	if ( manual_depth_test != 0 ) {
 		ivec2 depthSize = textureSize( opaqueDepthTex, 0 );
 		vec2 depthUv = gl_FragCoord.xy / vec2( depthSize );
 		float opaqueDepth = textureLod( opaqueDepthTex, depthUv, 0.0 ).r;
+		/* Reversed-Z: discard fragments farther than opaque (lower depth). */
 		if ( gl_FragCoord.z + 1e-5 < opaqueDepth ) discard;
 	}
 
@@ -162,17 +168,32 @@ void main() {
 			N = vec3( 0.0, 0.0, 1.0 );
 		}
 		litRgb += oit_forward_plus_add( base.rgb, N, frag_world_pos );
+		if ( any( isnan( litRgb ) ) || any( isinf( litRgb ) ) ) {
+			out_color = vec4( 1.0, 0.0, 1.0, 1.0 );
+			out_reveal = 0.0;
+			return;
+		}
 	}
 
 	ivec2 px = ivec2(gl_FragCoord.xy);
 	vec4 b = texelFetch(momentsTex, px, 0);
 	float b0 = texelFetch(b0Tex, px, 0).r;
+	if ( any( isnan( b ) ) || any( isinf( b ) ) || isnan( b0 ) || isinf( b0 ) ) {
+		out_color = vec4( 1.0, 0.0, 1.0, 1.0 );
+		out_reveal = 0.0;
+		return;
+	}
 	float z = clamp(gl_FragCoord.z, 0.0, 1.0);
 	float absCloser = AbsorbanceCloser(b0, b, z);
 	float T = exp(-absCloser);
 	T = clamp(T, 0.0, 1.0);
+	if ( isnan( T ) || isinf( T ) ) {
+		out_color = vec4( 1.0, 0.0, 1.0, 1.0 );
+		out_reveal = 0.0;
+		return;
+	}
 
-	float w = alpha * T;
-	out_color = vec4(litRgb * w, w);
+	float w = max( alpha * T, 1e-4 );
+	out_color = vec4( litRgb * w, w );
 	out_reveal = alpha;
 }

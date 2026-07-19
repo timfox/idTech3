@@ -125,11 +125,17 @@ void main() {
 	vec4 base = textureLod(tex0, frag_tex_coord0, 0.0) * frag_color0;
 	float alpha = base.a;
 	if (alpha < 0.01) discard;
+	if ( isnan( alpha ) || isinf( alpha ) || any( isnan( base.rgb ) ) || any( isinf( base.rgb ) ) ) {
+		out_color = vec4( 1.0, 0.0, 1.0, 1.0 );
+		out_reveal = 0.0;
+		return;
+	}
 
 	if ( manual_depth_test != 0 ) {
 		ivec2 depthSize = textureSize( opaqueDepthTex, 0 );
 		vec2 depthUv = gl_FragCoord.xy / vec2( depthSize );
 		float opaqueDepth = textureLod( opaqueDepthTex, depthUv, 0.0 ).r;
+		/* Reversed-Z: discard fragments farther than opaque (lower depth). */
 		if ( gl_FragCoord.z + 1e-5 < opaqueDepth ) discard;
 	}
 
@@ -140,10 +146,16 @@ void main() {
 			N = vec3( 0.0, 0.0, 1.0 );
 		}
 		litRgb += oit_forward_plus_add( base.rgb, N, frag_world_pos );
+		if ( any( isnan( litRgb ) ) || any( isinf( litRgb ) ) ) {
+			out_color = vec4( 1.0, 0.0, 1.0, 1.0 );
+			out_reveal = 0.0;
+			return;
+		}
 	}
 
+	/* McGuire WBOIT: accumulate (Ci * ai * w, ai * w); revealage via blend product(1-ai). */
 	float d = DEPTH_TO_WEIGHT(gl_FragCoord.z);
-	float w = alpha * pow(max(d, 0.01), 2.0);
-	out_color = vec4(litRgb * w, w);
+	float w = max( alpha * pow( max( d, 0.01 ), 2.0 ), 1e-4 );
+	out_color = vec4( litRgb * w, w );
 	out_reveal = alpha;
 }
