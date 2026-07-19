@@ -1062,8 +1062,9 @@ void CL_InitInput( void ) {
 	Cvar_CheckRange( cl_packetdup, "0", "5", CV_INTEGER );
 	Cvar_SetDescription( cl_packetdup, "Limits the number of previous client commands added in packet, helps in packet loss mitigation, increases client command packets size a bit." );
 
-	cl_run = Cvar_Get( "cl_run", "1", CVAR_ARCHIVE_ND );
-	Cvar_SetDescription( cl_run, "Persistent player running movement." );
+	/* HavenRP: walk by default; hold +speed (Shift) to sprint. */
+	cl_run = Cvar_Get( "cl_run", "0", CVAR_ARCHIVE_ND );
+	Cvar_SetDescription( cl_run, "0 = walk by default, hold +speed (Shift) to sprint. 1 = always run, +speed walks." );
 	cl_sensitivity = Cvar_Get( "sensitivity", "5", CVAR_ARCHIVE );
 	Cvar_SetDescription( cl_sensitivity, "Sets base mouse sensitivity (mouse speed)." );
 	cl_mouseAccel = Cvar_Get( "cl_mouseAccel", "0", CVAR_ARCHIVE_ND );
