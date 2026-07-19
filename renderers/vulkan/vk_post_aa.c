@@ -1,8 +1,10 @@
 #include "tr_local.h"
 #include "vk.h"
+#include "vk_aa_policy.h"
 #include "vk_post_aa.h"
 #include "vk_post_fog.h"
 #include "vk_render_pass.h"
+#include "vk_view_state.h"
 
 typedef struct {
 	float threshold;
@@ -97,8 +99,14 @@ static qboolean vk_smaa_passes( void )
 	if ( vk.color_image_view == VK_NULL_HANDLE || vk.smaa_output_image_view == VK_NULL_HANDLE ) {
 		return qfalse;
 	}
-	w = ( glConfig.vidWidth > 0 ) ? (uint32_t)glConfig.vidWidth : 1u;
-	h = ( glConfig.vidHeight > 0 ) ? (uint32_t)glConfig.vidHeight : 1u;
+	w = vk_get_render_target_width();
+	h = vk_get_render_target_height();
+	if ( w < 1u ) {
+		w = 1u;
+	}
+	if ( h < 1u ) {
+		h = 1u;
+	}
 
 	if ( !vk_run_smaa_pass( vk.smaa_edge_pipeline, vk.render_pass.smaa_edge, vk.framebuffers.smaa_edge,
 		vk.smaa_edge_descriptor, vk.smaa_edge_descriptor, w, h ) ) {
@@ -130,8 +138,14 @@ static qboolean vk_fxaa_pass( void )
 		return qfalse;
 	}
 
-	w = ( glConfig.vidWidth > 0 ) ? (uint32_t)glConfig.vidWidth : 1u;
-	h = ( glConfig.vidHeight > 0 ) ? (uint32_t)glConfig.vidHeight : 1u;
+	w = vk_get_render_target_width();
+	h = vk_get_render_target_height();
+	if ( w < 1u ) {
+		w = 1u;
+	}
+	if ( h < 1u ) {
+		h = 1u;
+	}
 
 	vk_begin_render_pass_tracked( vk.render_pass.smaa_compose, vk.framebuffers.smaa_compose, qfalse, w, h );
 	qvkCmdBindPipeline( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.fxaa_pipeline );
@@ -170,38 +184,87 @@ static qboolean vk_fxaa_pass( void )
 	return qtrue;
 }
 
-void vk_post_scene_aa_apply( void )
+static void vk_update_smaa_edge_source( VkImageView color_source )
+{
+	VkDescriptorImageInfo info;
+	VkWriteDescriptorSet desc;
+	Vk_Sampler_Def sd;
+
+	if ( color_source == VK_NULL_HANDLE || vk.smaa_edge_descriptor == VK_NULL_HANDLE ) {
+		return;
+	}
+
+	Com_Memset( &sd, 0, sizeof( sd ) );
+	sd.gl_mag_filter = sd.gl_min_filter = GL_LINEAR;
+	sd.max_lod_1_0 = qtrue;
+	sd.noAnisotropy = qtrue;
+
+	Com_Memset( &info, 0, sizeof( info ) );
+	info.sampler = vk_find_sampler( &sd );
+	info.imageView = color_source;
+	info.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+
+	Com_Memset( &desc, 0, sizeof( desc ) );
+	desc.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+	desc.dstSet = vk.smaa_edge_descriptor;
+	desc.dstBinding = 0;
+	desc.descriptorCount = 1;
+	desc.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+	desc.pImageInfo = &info;
+	qvkUpdateDescriptorSets( vk.device, 1, &desc, 0, NULL );
+}
+
+qboolean vk_post_scene_aa_apply_from( VkImageView color_source )
 {
 	VkImageView aa_output;
 	qboolean aa_ran = qfalse;
 
-	/* Use doneWorldScene — HUD/weapon may set RDF_NOWORLDMODEL after the world view. */
+	if ( color_source == VK_NULL_HANDLE ) {
+		return qfalse;
+	}
+	if ( !vk.smaaActive && !vk.fxaaActive ) {
+		return qfalse;
+	}
+
+	vk_barrier_post_fog_source_for_sampling( color_source, "pre-post-AA-from" );
+	if ( vk.smaaActive ) {
+		vk_update_smaa_edge_source( color_source );
+		aa_ran = vk_smaa_passes();
+	} else {
+		vk_update_color_descriptor_image( color_source );
+		aa_ran = vk_fxaa_pass();
+	}
+
+	aa_output = ( aa_ran && vk.smaa_output_image_view ) ? vk.smaa_output_image_view : color_source;
+	vk_set_scene_post_fog_source( aa_output );
+	vk_update_post_fog_descriptors( aa_output );
+	if ( aa_ran && aa_output == vk.smaa_output_image_view ) {
+		vk_set_post_chain_last_writer( "post_aa" );
+	}
+	return aa_ran;
+}
+
+void vk_post_scene_aa_apply( void )
+{
+	/*
+	 * Mode 5: defer SMAA until after Temporal Reconstruction. Do not rewrite
+	 * the post-fog source — volumetrics / bloom may already point at fog_scene.
+	 */
+	if ( vk_aa_policy_wants_temporal_cleanup_smaa() && r_taa && r_taa->integer ) {
+		return;
+	}
+
+	/* Menu / cinematic: 2D is authored into color_image (post_bloom fallback).
+	 * Keep it sharp — skip spatial AA so main-menu / connect UI stays crisp. */
 	if ( !tr.world || !backEnd.doneWorldScene ) {
 		vk_set_scene_post_fog_source( vk.color_image_view );
 		vk_update_post_fog_descriptors( vk.color_image_view );
 		return;
 	}
 
-	if ( !vk.smaaActive && !vk.fxaaActive ) {
+	if ( !vk_post_scene_aa_apply_from( vk.color_image_view ) ) {
 		vk_set_scene_post_fog_source( vk.color_image_view );
 		vk_update_post_fog_descriptors( vk.color_image_view );
-		return;
-	}
-
-	vk_barrier_post_fog_source_for_sampling( vk.color_image_view, "pre-post-AA" );
-
-	if ( vk.smaaActive ) {
-		aa_ran = vk_smaa_passes();
-	} else {
-		aa_ran = vk_fxaa_pass();
-	}
-
-	aa_output = ( aa_ran && vk.smaa_output_image_view ) ? vk.smaa_output_image_view : vk.color_image_view;
-	vk_set_scene_post_fog_source( aa_output );
-	vk_update_post_fog_descriptors( aa_output );
-	if ( aa_ran && aa_output == vk.smaa_output_image_view ) {
-		vk_set_post_chain_last_writer( "post_aa" );
-	} else {
 		vk_set_post_chain_last_writer( "bloom" );
 	}
 }

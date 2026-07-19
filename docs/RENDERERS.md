@@ -19,11 +19,11 @@ Build: `./scripts/compile_engine.sh vulkan` (OpenGL/`opengl` arg is rejected).
 The Vulkan 1.4 renderer is the primary rendering backend, built as a shared library (`idtech3_vulkan.so`). Requests Vulkan 1.4 when available; validation layers (Khronos, then LUNARG fallback) are enabled in debug builds on all platforms.
 
 ### Current Architecture
-- **Modern Vulkan default:** `exec modern_vulkan.cfg` then `vid_restart`. Unified Clustered (`r_renderMode 3`): unified heterogeneous shading with lighting ownership (deferred opaque + Forward+ transparent/weapon), HDR32/PBR, G-buffer, TAA + motion vectors on by default. Equivalent: `exec modern_clustered.cfg`.
+- **Modern Vulkan default:** `exec modern_vulkan.cfg` then `vid_restart`. Unified Clustered (`r_renderMode 3`): unified heterogeneous shading with lighting ownership (deferred opaque + Forward+ transparent/weapon), HDR32/PBR, G-buffer, **SMAA 1x** presentation AA (`r_aaMode 2`; Temporal Reconstruction opt-in via `r_aaMode` 4/5). Equivalent: `exec modern_clustered.cfg`.
 - `r_renderMode`: **0** forward (classic projector; `r_forwardPlus` may still be 1), **1** deferred lighting mode (G-buffer + optional `r_deferredLighting`), **2** Forward+ primary (`r_forwardPlus` 1, `r_forwardPlusShade` 1), **3** Unified Clustered Renderer (unified heterogeneous shading / lighting ownership — **shipping default** via `modern_vulkan.cfg`; see [UNIFIED_CLUSTERED_RENDERER.md](UNIFIED_CLUSTERED_RENDERER.md)). North-star 2027 stack builds on mode 3 — see [RENDERER_2027.md](RENDERER_2027.md).
 - **Deferred G-buffer sidecar:** `r_deferredGBuffer 1` + `r_deferredGBufferFill 1` now works with `r_renderMode` 1, 2, and 3. In mode 2/3 the deferred G-buffer sidecar captures albedo/normal/material for temporal, neural, RT, and debug consumers. `r_deferredLighting` runs in modes **1** and **3** (ignored in mode 2).
 - Vulkan is the supported rendering backend
-- **Shared temporal reset policy** (`vk_temporal.c`): centralizes history invalidation for volumetrics, motion vectors, exposure. Resize, map load, camera cut, and missing prev-frame data trigger resets. Ready for future TAA/upscaler integration.
+- **Shared temporal reset policy** (`vk_temporal.c`): centralizes history invalidation for volumetrics, motion vectors, exposure. Resize, map load, camera cut, and missing prev-frame data trigger resets. Used by Temporal Reconstruction (`r_taa` / `r_aaMode` 4–5) and volumetric history.
 - See [RENDERER_2026_ARCHITECTURE_PASS.md](RENDERER_2026_ARCHITECTURE_PASS.md) for the focused 2026 renderer direction
 
 ### Modern Vulkan Default
@@ -35,7 +35,7 @@ exec modern_vulkan.cfg
 vid_restart
 ```
 
-`modern_native.cfg` inherits this profile automatically when `cl_autoGraphicsProfile 1` loads a native cgame. The shipping default is **Unified Clustered** (`r_renderMode 3`): lighting ownership across deferred opaque + Forward+ transparent/weapon, with TAA + motion vectors on by default. Use `renderer_clustered_safe` if debugging (TAA/SMAA/FXAA/OIT off).
+`modern_native.cfg` inherits this profile automatically when `cl_autoGraphicsProfile 1` loads a native cgame. The shipping default is **Unified Clustered** (`r_renderMode 3`): lighting ownership across deferred opaque + Forward+ transparent/weapon, with **SMAA 1x** (`r_aaMode 2`) and motion-vector scaffolding on by default. Temporal Reconstruction is opt-in (`exec vulkan_overlay_temporal_recon.cfg`). Use `renderer_clustered_safe` if debugging (TAA/SMAA/FXAA/OIT off).
 
 For an in-session recovery back to the documented modern baseline after deferred or clustered experiments:
 
@@ -44,7 +44,7 @@ renderer_modern_safe
 vid_restart
 ```
 
-This restores mode 2 Forward+, depth-cull, the sidecar G-buffer, HDR/PBR, TAA/SMAA, and turns deferred lighting back off.
+This restores mode 2 Forward+, depth-cull, the sidecar G-buffer, HDR/PBR, SMAA baseline, and turns deferred lighting back off.
 
 The CI confidence target for this path is `test_modern_renderer_profile_runtime`: source-only checks run on normal hosted CI, while the self-hosted renderer Tier B workflow launches the client and exercises `renderer_profile`, `renderer_status`, and `renderer_compatibility` against the minimal renderer validation pack. `renderer_status` includes dedicated `lighting` and `gi/neural` rows so Forward+/SSAO/volumetrics/IBL plus NDGI/NIV/VFGI/NVC readiness can be checked without digging through individual cvars.
 
@@ -54,8 +54,8 @@ The CI confidence target for this path is `test_modern_renderer_profile_runtime`
 | Materials | `r_pbr 1`, `r_materialBlend 1` |
 | Lighting | `r_renderMode 3`, `r_forwardPlus 1`, `r_forwardPlusShade 1`, `r_forwardPlusDepthCull 1`, `r_deferredLighting 1` |
 | Deferred data | `r_deferredGBuffer 1`, `r_deferredGBufferFill 1`, `r_deferredLighting 0` |
-| Temporal AA | `r_taa 1`, `r_taaMotionVectors 1`, `r_temporalCpuSkinPrev 1` |
-| Post AA safety net | `r_ext_smaa 1`, `r_postAaAfterBloom 1` |
+| Presentation AA | `r_aaMode 2` (SMAA 1x), `r_taa 0`, `r_taaMotionVectors 1`, `r_temporalCpuSkinPrev 1` |
+| Post AA | `r_ext_smaa 1`, `r_postAaAfterBloom 1` |
 
 ### Vulkan Overlays
 
@@ -64,7 +64,9 @@ The renderer profile rule is: start from **one** modern base (`modern_vulkan.cfg
 | Overlay | Use | Notes |
 |---------|-----|-------|
 | `vulkan_overlay_deferred.cfg` | Mode-1 deferred lighting development | Switches to `r_renderMode 1`, enables `r_deferredLighting 1`, disables `r_forwardPlusShade`, and turns TAA/SMAA/FXAA off by default so temporal/post-AA artifacts do not mask deferred lighting bugs. |
-| `vulkan_overlay_unified_clustered.cfg` | Unified Clustered Renderer | `r_renderMode 3`: unified heterogeneous shading / lighting ownership, shared light grid (tiles × Z-slices). See [UNIFIED_CLUSTERED_RENDERER.md](UNIFIED_CLUSTERED_RENDERER.md). |
+| `vulkan_overlay_aa_sharp.cfg` | Competitive SMAA 1x | `r_aaMode 2`, `r_taa 0` |
+| `vulkan_overlay_temporal_recon.cfg` | Modern native temporal | `r_aaMode 5` + conservative history weight + SMAA cleanup |
+| `vulkan_overlay_temporal_perf.cfg` | Perf reconstruction | `r_aaMode 4` + `r_renderScale` / upscale |
 | `vulkan_overlay_unified_clustered_safe.cfg` | Unified Clustered safe baseline | Mode 3 with TAA/SMAA/FXAA/OIT off and MSAA pinned off so clustered lighting and pass ordering can be debugged in isolation. |
 | `vulkan_overlay_oit_clustered.cfg` | Mode 3 + MBOIT | Unified Clustered + `r_oit 2` (optional stochastic via demo). See [MOMENT_OIT_STOCHASTIC_ALPHA.md](MOMENT_OIT_STOCHASTIC_ALPHA.md). |
 | `vulkan_overlay_visibility_2027.cfg` | 2027 visibility foundation | Mode 3 + G-buffer + `r_visibilityBuffer` + material classify. See [RENDERER_2027.md](RENDERER_2027.md). |
@@ -212,18 +214,20 @@ Code: `renderers/vulkan/vk_forward_plus.c`, `VK_FP_*` constants; cvar registrati
 - Treat this as partial infrastructure rather than a production-ready Vulkan parity feature.
 
 ### Anti-Aliasing
-- **SMAA** (Sub-pixel Morphological Anti-Aliasing): edge detection, blend weight, and compose passes. Cvars: `r_ext_smaa` (enable), `r_smaa_preset` (0=Custom, 1=Low, 2=Medium, 3=High, 4=Ultra), `r_smaa_threshold` (0.01–0.5), `r_smaa_local_contrast` (1–4), `r_smaa_max_search_steps` (8–32), `r_smaa_corner_rounding` (0–1). Preset overrides manual params when non-zero. Edge detection uses max(left,right) and max(top,bottom) deltas (reference SMAA), HDR-safe luma, configurable corner rounding, and explicit LOD 0 sampling. Requires `r_fbo 1`.
+- **Policy (`r_aaMode`)**: unified presentation AA applicator (`vk_aa_policy.c`). **0** none, **1** FXAA, **2** SMAA 1x (**shipping default**), **3** SMAA T2x scaffold (SMAA + light temporal), **4** Temporal Reconstruction, **5** Temporal Reconstruction + SMAA cleanup, **6** supersample (`r_ext_supersample`). Applies `r_ext_smaa` / `r_ext_fxaa` / `r_taa`. Latched modes need `vid_restart` for SMAA/FXAA resource rebuild.
+- **SMAA** (Sub-pixel Morphological Anti-Aliasing): edge detection, blend weight, and compose passes. Cvars: `r_ext_smaa` (enable), `r_smaa_preset` (0=Custom, 1=Low, 2=Medium, 3=High, 4=Ultra), `r_smaa_threshold` (0.01–0.5), `r_smaa_local_contrast` (1–4), `r_smaa_max_search_steps` (8–32), `r_smaa_corner_rounding` (0–1). Preset overrides manual params when non-zero. Edge detection uses max(left,right) and max(top,bottom) deltas (reference SMAA), HDR-safe luma, configurable corner rounding, and explicit LOD 0 sampling. Requires `r_fbo 1`. Extent uses render-target size (`vk_get_render_target_width/height`), not window size alone.
 - **MSAA**: Multi-sample anti-aliasing for geometry edges. Cvar `r_ext_multisample` (0|2|4|8|16). Requires `r_fbo 1`. `r_msaa_sample_shading` enables per-sample shading for better alpha/specular quality (~2x fragment cost). `r_ext_alpha_to_coverage` improves alpha-tested surfaces (foliage, grates) when MSAA is on. MSAA and SMAA can be used together: MSAA handles geometry edges, SMAA handles alpha/transparency edges.
-- **TAA**: Default in `modern_vulkan.cfg` for the Vulkan HDR/post path. Cvars: `r_taa`, `r_taa_feedbackStationary`, `r_taa_feedbackMotion`, `r_taa_sharpen`. TAA is intentionally conservative: portal views, non-world/menu/cinematic paths, missing history, and first-person projection transitions invalidate or bypass history rather than trying to blend through unstable motion. Classic profiles may still set `r_taa 0`.
+- **Temporal Reconstruction** (`r_taa` / `r_aaMode` 4–5): confidence-guided resolve (`taa.frag`) with YCoCg variance clipping, depth/velocity/luma/reactive confidence, and optional post-recon SMAA cleanup (`r_aaMode 5`). Not the shipping default — `modern_vulkan.cfg` keeps **`r_aaMode 2` / `r_taa 0`**. First-person weapons do not poison whole-frame history; near-depth reactive prefers current. Debug: `r_debugMotionVectors`, `r_debugHistoryRejection`. Presets: `vulkan_overlay_aa_sharp.cfg`, `vulkan_overlay_temporal_recon.cfg`, `vulkan_overlay_temporal_perf.cfg`.
 
 ### Internal Resolution / Present Scaling
 - **Internal resolution controls**: `r_renderScale`, `r_renderWidth`, and `r_renderHeight` let the renderer shade at one resolution and present at another. This is the in-engine alternative to vendor upscalers.
 - `r_renderScale 0` disables custom internal resolution.
 - `r_renderScale 1/2` use nearest filtering; `3/4` use linear filtering. Modes `2/4` preserve aspect ratio with black bars; `1/3` stretch to the window.
 - Recommended combinations:
-  - modern default path: `exec modern_vulkan.cfg`
-  - sharp/classic path: `r_taa 0`, `r_ext_smaa 1`, optional MSAA
-  - softer temporal upsample path: `r_taa 1`, `r_renderScale 3` or `4`, custom `r_renderWidth` / `r_renderHeight`
+  - modern default path: `exec modern_vulkan.cfg` (SMAA 1x)
+  - sharp/classic path: `exec vulkan_overlay_aa_sharp.cfg` (`r_aaMode 2`)
+  - modern temporal: `exec vulkan_overlay_temporal_recon.cfg` (`r_aaMode 5`)
+  - performance reconstruction: `exec vulkan_overlay_temporal_perf.cfg` (`r_aaMode 4` + renderScale)
 - Current renderer truth: internal-resolution presentation is supported, but some post paths are still being hardened around source-region tracking and active render-target sizing. Prefer modest scale reductions first.
 - **Effective scene render target (Vulkan):** **`vk_get_render_target_width()` / `vk_get_render_target_height()`** in `renderers/vulkan/vk_view_state.c` return **`vk.mainColorWidth` / `mainColorHeight`** when **`vk.fboActive`** and those extents are set (main HDR color attachment); otherwise **`vk.renderWidth` / `vk.renderHeight`** if nonzero; otherwise **`glConfig.vidWidth` / `vidHeight`**. Sun shadow and other passes can temporarily change **`vk.renderWidth`**; packing and screen-space work that must match the **main color** image (Forward+ SSBO viewport, tile cull, SSAO/HBAO texel pushes, SSR → color copy, temporal history invalidation on resize—see `vk_temporal.c`, `vk_forward_plus.c`, `vk_postfx_passes.c`) uses this helper so dimensions stay aligned with the attachment the player sees, not transient globals.
 

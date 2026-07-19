@@ -382,6 +382,7 @@
     <ClCompile Include="..\..\..\renderers\vulkan\vk_lens_flare.c" />
     <ClCompile Include="..\..\..\renderers\vulkan\vk_meshlets.c" />
     <ClCompile Include="..\..\..\renderers\vulkan\vk_pipeline_cache_disk.c" />
+    <ClCompile Include="..\..\..\renderers\vulkan\vk_aa_policy.c" />
     <ClCompile Include="..\..\..\renderers\vulkan\vk_post_aa.c" />
     <ClCompile Include="..\..\..\renderers\vulkan\vk_sim_render_debug.c" />
     <ClCompile Include="..\..\..\renderers\vulkan\vk_sim_render_profile.c" />

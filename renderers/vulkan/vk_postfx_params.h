@@ -15,8 +15,8 @@ typedef struct {
 	float toneMapParams1[4];   /* highlightDesat, contrast, contrastPivot, legacyTonemapMode */
 	float colorBalance[4];     /* temperature, tint, exposureBias, preExposureScale */
 	float colorGrade[4];       /* saturation, vibrance, legacyContrast, legacySaturation */
-	float colorGrade2[4];      /* hueDegrees, reserved */
-	float shadowsLift[4];      /* rgb lift, unused */
+	float colorGrade2[4];      /* hueDegrees, temporalVarClip, temporalDisocc, temporalReactive */
+	float shadowsLift[4];      /* rgb lift, temporalDebugMode */
 	float midsGamma[4];        /* rgb gamma, unused */
 	float highlightsGain[4];   /* rgb gain, unused */
 	float splitShadow[4];      /* rgb tint, balance */

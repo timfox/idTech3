@@ -136,11 +136,21 @@ void vk_update_postfx_params( uint32_t cmd_index )
 	params.localExposureParams[2] = Com_Clamp( 0.0f, 3.0f, r_localExposure_shadowClamp ? r_localExposure_shadowClamp->value : 1.5f );
 	params.localExposureParams[3] = Com_Clamp( 0.0f, 3.0f, r_localExposure_highlightClamp ? r_localExposure_highlightClamp->value : 1.5f );
 	params.taaParams[0] = vk.temporal.hasValidTAAHistory ? 1.0f : 0.0f;
+	/* Soft-skip: partial entities with unreliable motion reduce history weight instead of killing TAA. */
 	if ( vk.temporal.unreliableMotionThisFrame ) {
-		params.taaParams[0] = 0.0f;
+		params.taaParams[0] = vk.temporal.hasValidTAAHistory ? 0.85f : 0.0f;
 	}
-	params.taaParams[1] = Com_Clamp( 0.0f, 0.99f, r_taa_feedbackStationary ? r_taa_feedbackStationary->value : 0.92f );
-	params.taaParams[2] = Com_Clamp( 0.0f, 0.99f, r_taa_feedbackMotion ? r_taa_feedbackMotion->value : 0.72f );
+	{
+		float histCap = Com_Clamp( 0.0f, 0.95f,
+			r_temporalHistoryWeight ? r_temporalHistoryWeight->value : 0.80f );
+		float stationary = Com_Clamp( 0.0f, 0.99f, r_taa_feedbackStationary ? r_taa_feedbackStationary->value : 0.92f );
+		float motionFb = Com_Clamp( 0.0f, 0.99f, r_taa_feedbackMotion ? r_taa_feedbackMotion->value : 0.72f );
+		if ( vk.temporal.unreliableMotionThisFrame ) {
+			histCap *= 0.55f;
+		}
+		params.taaParams[1] = Com_Clamp( 0.0f, histCap, stationary );
+		params.taaParams[2] = Com_Clamp( 0.0f, histCap, motionFb );
+	}
 	params.taaParams[3] = Com_Clamp( 0.0f, 1.0f, r_taa_sharpen ? r_taa_sharpen->value : 0.12f );
 	if ( R_Upscale_WantTemporal() ) {
 		float sharp = params.taaParams[3] + R_Upscale_GetSharpness();
@@ -153,12 +163,23 @@ void vk_update_postfx_params( uint32_t cmd_index )
 		params.lutParams[3] = jy;
 	}
 
-	if ( backEnd.projection2D || !tr.world || backEnd.viewParms.portalView != PV_NONE || backEnd.useFirstPersonProjection ) {
+	/* Temporal Reconstruction flags in spare PostFX channels (do not clobber motionBlur). */
+	params.colorGrade2[1] = ( r_temporalVarianceClip && r_temporalVarianceClip->integer ) ? 1.0f : 0.0f;
+	params.colorGrade2[2] = ( r_temporalDisocclusion && r_temporalDisocclusion->integer ) ? 1.0f : 0.0f;
+	params.colorGrade2[3] = ( r_temporalReactiveMask && r_temporalReactiveMask->integer ) ? 1.0f : 0.0f;
+	params.shadowsLift[3] = 0.0f;
+	if ( r_debugMotionVectors && r_debugMotionVectors->integer ) {
+		params.shadowsLift[3] = 1.0f;
+	} else if ( r_debugHistoryRejection && r_debugHistoryRejection->integer ) {
+		params.shadowsLift[3] = 2.0f;
+	}
+
+	if ( backEnd.projection2D || !tr.world || backEnd.viewParms.portalView != PV_NONE ) {
 		Com_Memcpy( vk.postfx_params_ptr[cmd_index], &params, sizeof( params ) );
 		return;
 	}
 
-	projection = backEnd.useFirstPersonProjection ? backEnd.firstPersonProjectionMatrix : backEnd.viewParms.projectionMatrix;
+	projection = backEnd.viewParms.projectionMatrix;
 	view = backEnd.viewParms.world.modelViewMatrix;
 
 	myGlMultMatrix( view, projection, viewProj );
@@ -168,7 +189,7 @@ void vk_update_postfx_params( uint32_t cmd_index )
 		Com_Memcpy( params.invViewProj, viewProj, sizeof( params.invViewProj ) );
 	}
 
-	if ( vk_prev_matrices_valid && !vk.temporal.unreliableMotionThisFrame &&
+	if ( vk_prev_matrices_valid &&
 		!vk_temporal_has_reason( VK_TEMPORAL_RESET_CAMERA_CUT | VK_TEMPORAL_RESET_MISSING_PREV_DATA |
 		VK_TEMPORAL_RESET_RENDERER_INIT | VK_TEMPORAL_RESET_SWAPCHAIN_CHANGE | VK_TEMPORAL_RESET_RENDER_SIZE_CHANGE |
 		VK_TEMPORAL_RESET_WORLD_CHANGE | VK_TEMPORAL_RESET_CLIENT_STATE_CHANGE | VK_TEMPORAL_RESET_EXPLICIT_DEBUG ) ) {
@@ -190,7 +211,8 @@ void vk_update_postfx_params( uint32_t cmd_index )
 		params.depthParams[1] = zFar;
 		params.depthParams[2] = ( r_taaMotionVectors && r_taaMotionVectors->integer &&
 			vk.motion_vector_view != VK_NULL_HANDLE ) ? 1.0f : 0.0f;
-		params.depthParams[3] = 0.0f;
+		params.depthParams[3] = Com_Clamp( 0.0f, 0.95f,
+			r_temporalHistoryWeight ? r_temporalHistoryWeight->value : 0.80f );
 	}
 
 	Com_Memcpy( vk.postfx_params_ptr[cmd_index], &params, sizeof( params ) );

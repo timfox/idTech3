@@ -101,7 +101,7 @@ Deferred lighting transforms direct-export **world** normals to view space, and 
 
 - **`RDF_NOWORLDMODEL`** views (first-person weapon, banners): opaque + transparent **Forward+ only** — no G-buffer capture, visibility fill, or deferred lighting. Opaque hybrid handoff is disabled so weapons keep normal Forward+ shade.
 - **HUD / StretchPic**: after world deferred/visbuf ends the main pass, `vk_prepare_2d` heals a missing render pass when `doneWorldScene && !inRenderPass` by beginning the UI overlay (or `post_bloom` fallback). Without that, 2D draws are dropped.
-- **TAA**: shipping `modern_vulkan.cfg` enables `r_taa 1` + `r_taaMotionVectors 1`. HUD stays in the UI overlay (outside TAA history). Weapon views must not force a world-history reset every frame (`r_temporalCpuSkinPrev 1`; first-person projection sticky compare). Bisect with `renderer_clustered_safe` (TAA off).
+- **Presentation AA**: shipping `modern_vulkan.cfg` uses **SMAA 1x** (`r_aaMode 2`, `r_taa 0`) with `r_taaMotionVectors 1` scaffolding. In-game HUD/menu StretchPics render to the **UI overlay** and are alpha-composited **after** tonemap (`uiOverlayContentValid` → `overlay_compose`), so SMAA/Temporal Reconstruction never blur or discard 2D. Main-menu / no-world UI draws into `color_image` via the post_bloom fallback and skips spatial AA for crisp text. Opt-in Temporal Reconstruction: `exec vulkan_overlay_temporal_recon.cfg`. Bisect with `renderer_clustered_safe` (AA off).
 
 ## OIT + mode 3
 

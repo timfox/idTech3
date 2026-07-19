@@ -101,15 +101,21 @@ Both feed into linear HDR; no conflict.
 
 **Known legacy coupling**: `VK_SetLightParams` only applies `r_intensity`/`r_gamma` scaling when hardware gamma is off and FBO is off; HDR FBO uses raw `dl->color`.
 
-## 6.8 TAA (`r_taa`)
+## 6.8 Presentation AA / Temporal Reconstruction (`r_aaMode`, `r_taa`)
 
-**Current**: Optional temporal resolve after the post-fog source (SMAA / volumetrics), before luminance and gamma. Uses `vk_temporal` reset policy (resize, map load, camera cut, missing prev matrices) and skips the pass on portals, `RDF_NOWORLDMODEL`, first-person projection toggles, and **unreliable motion** (e.g. `customShader` vertex deformation).
+**Shipping default**: **SMAA 1x** via `r_aaMode 2` (`r_ext_smaa 1`, `r_taa 0`) in engine defaults and `modern_vulkan.cfg`. Temporal Reconstruction is opt-in (`r_aaMode` 4/5 or `r_taa 1`).
 
-**History clamp**: `taa.frag` uses a 3×3 neighborhood min/max on the **current** color before blending reprojected history (prevents fireflies when history is valid).
+**Policy**: `vk_aa_policy.c` maps `r_aaMode` 0–6 onto SMAA / FXAA / Temporal Reconstruction / supersample. Mode **5** defers SMAA until after temporal resolve (cleanup). Mode **3** is SMAA T2x scaffold (SMAA + light history).
 
-**Motion**: `r_taaMotionVectors` **1** (default) samples the main-pass motion attachment (`gen_frag` `out_motion`, same as volumetric fog). **0** uses depth + `prevViewProj` reprojection only.
+**Temporal Reconstruction** (`r_taa`): confidence-guided resolve after the post-fog source, before luminance and gamma. Uses `vk_temporal` reset policy (resize, map load, camera cut, missing prev matrices). Skips portals / near-static streak guard. Partial unreliable motion **softens** history weight instead of killing the whole pass. First-person weapons do **not** set whole-frame `unreliableMotionThisFrame`.
 
-**Tuning**: `r_taa_feedbackStationary` / `r_taa_feedbackMotion` / `r_taa_sharpen`. Use `r_temporalDebug 1` to log reset reasons. Default **off**; enable when SMAA alone is not enough.
+**History**: YCoCg variance clipping (`r_temporalVarianceClip`), depth disocclusion (`r_temporalDisocclusion`), reactive heuristics (`r_temporalReactiveMask`), cap via `r_temporalHistoryWeight` (default 0.80). Debug overlays: `r_debugMotionVectors`, `r_debugHistoryRejection`.
+
+**Motion**: `r_taaMotionVectors` **1** (default) samples the main-pass motion attachment. **0** uses depth + `prevViewProj` reprojection only.
+
+**Tuning**: `r_taa_feedbackStationary` / `r_taa_feedbackMotion` / `r_taa_sharpen`. Use `r_temporalDebug 1` to log reset reasons.
+
+**Hybrid1 / path-trace**: Hybrid1 keeps **separate** SVGF channel histories and must not bind world `taa_history` as an RT denoiser. `r_hybrid1_taa` is a legacy hint (default **0**); use `r_aaMode` for presentation AA. Path-trace reference: `r_aaMode 0` + progressive accumulate (no world temporal over converged PT).
 
 ---
 
@@ -123,9 +129,9 @@ Both feed into linear HDR; no conflict.
 6. **Bloom extraction** → from `color_image` to bloom chain (threshold + knee). **Bloom blend** → additive blend of blurred bloom back to `color_image`. Both before SSAO and luminance.
 7. **SSAO** (if `r_ssao`): copy `color_image` to `fog_scene`, samples depth, blur, combine with scene into `fog_scene`. When SSAO is on, `fog_scene` becomes the post-fog source.
 8. **Volumetric compute + composite** → fog over scene (when enabled). Reads and writes `fog_scene`.
-9. **SMAA** (if enabled): edge detection, blend, resolve. Runs after volumetrics (or after 2D overlays if volumetrics skipped). Output is the post-fog source.
-10. **TAA** (if `r_taa` 1): temporal resolve on post-fog source; history ping-pong in `taa_history` images. Skipped when temporal policy marks the frame unstable.
-11. **Luminance pass** (if `r_exposure_auto`): compute pass on post-fog source (after TAA when enabled); result used next frame for eye adaptation.
+9. **SMAA / FXAA** (if enabled and not deferred cleanup): edge detect / resolve. Runs after volumetrics (or after 2D overlays if volumetrics skipped). Output is the post-fog source.
+10. **Temporal Reconstruction** (if `r_taa` 1 / `r_aaMode` 4–5): confidence resolve on post-fog source; history ping-pong in `taa_history` images. Mode **5** then runs light SMAA cleanup on the resolve.
+11. **Luminance pass** (if `r_exposure_auto`): compute pass on post-fog source (after temporal when enabled); result used next frame for eye adaptation.
 12. **Gamma pass** → tonemap, exposure, gamma → swapchain.
 
 **OIT / SSAO / SSR and HDR**: All operate in HDR space. OIT resolve outputs to `color_image`; SSAO combine writes to `fog_scene`; SSR modifies `color_image`. Luminance and gamma consume the final post-fog source (SMAA output or `fog_scene`/`color_image` when SMAA off).
@@ -134,7 +140,7 @@ Both feed into linear HDR; no conflict.
 
 ## 8. HDR UI
 
-**Current**: When `RDF_NOWORLDMODEL` or no world (menus, player config, videos), the gamma pass sets `paniniPad1 = 1.0`, which disables the HDR film pipeline (`noWorldLdr`). UI is **composited after tonemap**-menus and 2D overlays are authored as LDR and rendered on top of the (possibly tonemapped) framebuffer. Brightness and exposure are forced to 1.0 for these frames to avoid darkening or blowing out UI. No HDR-specific scaling or correction for UI; it is drawn in the same LDR output space as the gamma pass.
+**Current**: When `RDF_NOWORLDMODEL` or no world (menus, player config, videos), the gamma pass sets `paniniPad1 = 1.0`, which disables the HDR film pipeline (`noWorldLdr`). UI is **composited after tonemap** — in-game HUD/menu StretchPics use the **UI overlay** target and are alpha-blended onto the swapchain after gamma when `uiOverlayContentValid` is set (survives FinishBloom / bloom leaving the overlay recording pass). Main-menu / no-world UI draws into `color_image` via the post_bloom fallback and is tonemapped with forced brightness/exposure 1.0. Brightness and exposure are forced to 1.0 for these frames to avoid darkening or blowing out UI. No HDR-specific scaling or correction for UI; it is drawn in the same LDR output space as the gamma pass.
 
 ---
 

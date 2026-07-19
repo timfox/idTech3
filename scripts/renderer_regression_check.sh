@@ -229,12 +229,12 @@ else
 fi
 
 echo ""
-echo "TAA shader: neighborhoodMinMax must run before history clamp:"
+echo "TAA shader: YCoCg variance clip / neighborhood stats before history blend:"
 TAA_FRAG="$PROJECT_ROOT/renderers/vulkan/shaders/glsl/taa.frag"
-if ! grep -Eq 'neighborhoodMinMax\( (uv|sampleUV), mn, mx, avg \)' "$TAA_FRAG" 2>/dev/null; then
-  fail "taa.frag missing neighborhoodMinMax() call (history AABB clamp would be undefined)"
+if ! grep -q 'neighborhoodYCoCgStats\|RGBToYCoCg' "$TAA_FRAG" 2>/dev/null; then
+  fail "taa.frag missing YCoCg variance-clip neighborhood stats"
 else
-  pass "taa.frag calls neighborhoodMinMax before history clamp"
+  pass "taa.frag uses YCoCg variance clipping for Temporal Reconstruction"
 fi
 
 echo ""
@@ -311,6 +311,52 @@ elif ! grep -q 'vk_entity_note_motion_reliability' "$PROJECT_ROOT/renderers/vulk
   fail "vk_view_state.c missing per-entity motion reliability notes"
 else
   pass "TAA uses per-frame history confidence; per-entity motion policy wired"
+fi
+
+echo ""
+echo "Layered AA policy (r_aaMode + SMAA baseline):"
+AA_POLICY="$PROJECT_ROOT/renderers/vulkan/vk_aa_policy.c"
+if ! test -f "$AA_POLICY"; then
+  fail "missing renderers/vulkan/vk_aa_policy.c"
+elif ! grep -q 'r_aaMode = ri.Cvar_Get' "$AA_POLICY" 2>/dev/null; then
+  fail "vk_aa_policy.c missing r_aaMode cvar"
+elif ! grep -q 'vk_aa_policy_apply' "$TR_INIT_VK" 2>/dev/null; then
+  fail "tr_init.c must call vk_aa_policy_apply"
+elif ! grep -q 'seta r_aaMode 2' "$PROJECT_ROOT/config/modern_vulkan.cfg" 2>/dev/null; then
+  fail "modern_vulkan.cfg must default r_aaMode 2 (SMAA 1x)"
+elif ! grep -q 'seta r_taa 0' "$PROJECT_ROOT/config/modern_vulkan.cfg" 2>/dev/null; then
+  fail "modern_vulkan.cfg must default r_taa 0 (SMAA baseline)"
+elif ! grep -q 'vk_get_render_target_width' "$PROJECT_ROOT/renderers/vulkan/vk_post_aa.c" 2>/dev/null; then
+  fail "vk_post_aa.c must size SMAA from render target extent"
+elif ! grep -q 'RF_FIRST_PERSON' "$PROJECT_ROOT/renderers/vulkan/vk_view_state.c" 2>/dev/null || \
+     ! awk '/vk_entity_poison_global_motion/,/^}/' "$PROJECT_ROOT/renderers/vulkan/vk_view_state.c" | grep -q 'return qfalse'; then
+  fail "RF_FIRST_PERSON must not poison whole-frame temporal motion"
+elif ! grep -q 'RGBToYCoCg\|YCoCg' "$TAA_FRAG" 2>/dev/null; then
+  fail "taa.frag missing YCoCg variance clip path"
+elif ! test -f "$PROJECT_ROOT/config/vulkan_overlay_temporal_recon.cfg"; then
+  fail "missing config/vulkan_overlay_temporal_recon.cfg"
+elif ! test -f "$PROJECT_ROOT/config/vulkan_overlay_aa_sharp.cfg"; then
+  fail "missing config/vulkan_overlay_aa_sharp.cfg"
+elif ! test -f "$PROJECT_ROOT/config/vulkan_overlay_temporal_perf.cfg"; then
+  fail "missing config/vulkan_overlay_temporal_perf.cfg"
+elif grep -q 'r_hybrid1_taa && r_hybrid1_taa->integer && vk_hybrid1_active' "$VK_FRAME_END" 2>/dev/null; then
+  fail "vk_frame_end.c must not auto-force world TAA from r_hybrid1_taa (Hybrid1 owns separate histories)"
+else
+  pass "Layered AA: r_aaMode policy, SMAA baseline, weapon isolation, Temporal Reconstruction presets"
+fi
+
+echo ""
+echo "UI overlay compose after tonemap (HUD/menu 2D):"
+if ! grep -q 'uiOverlayContentValid' "$VK_FRAME_END" 2>/dev/null; then
+  fail "vk_frame_end.c must compose UI overlay when uiOverlayContentValid (not only uiOverlayActive)"
+elif ! grep -q 'prepare_post_leave_ui_overlay' "$VK_FRAME_END" 2>/dev/null; then
+  fail "vk_frame_end.c must leave UI overlay recording before post process"
+elif ! grep -q 'overlay_compose' "$VK_FRAME_END" 2>/dev/null; then
+  fail "vk_frame_end.c missing overlay_compose after gamma"
+elif ! grep -q 'vk_can_use_2d_overlay_path' "$PROJECT_ROOT/renderers/vulkan/vk_2d_transition.c" 2>/dev/null; then
+  fail "vk_2d_transition.c missing menu-safe overlay gating"
+else
+  pass "HUD/menu UI overlay survives post AA/TAA and composites after gamma"
 fi
 
 echo ""

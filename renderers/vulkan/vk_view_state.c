@@ -399,7 +399,8 @@ static qboolean vk_entity_poison_global_motion( const trRefEntity_t *ent, int mo
 		return qfalse;
 	}
 	if ( ent->e.renderfx & RF_FIRST_PERSON ) {
-		return qtrue;
+		/* Weapon pixels: reject in Temporal Reconstruction via reactive/near-depth, not whole-frame. */
+		return qfalse;
 	}
 	if ( ent->e.customShader &&
 		( !r_temporalCustomShaderMotion || !r_temporalCustomShaderMotion->integer ) ) {

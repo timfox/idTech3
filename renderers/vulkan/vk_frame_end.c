@@ -1,8 +1,10 @@
 #include "tr_local.h"
 #include "vk.h"
 #include "vk_frame_end.h"
+#include "vk_aa_policy.h"
 #include "vk_descriptor_sets.h"
 #include "vk_image_layout.h"
+#include "vk_post_aa.h"
 #include "vk_post_fog.h"
 #include "vk_post_process_push.h"
 #include "vk_postfx.h"
@@ -10,7 +12,6 @@
 #include "vk_render_pass.h"
 #include "vk_scene_pass.h"
 #include "vk_temporal.h"
-#include "vk_hybrid1.h"
 #include "vk_upscale.h"
 #include "vk_view_state.h"
 #include "vk_volumetric_pass.h"
@@ -120,10 +121,14 @@ static void vk_end_frame_validate_post_process_chain( const char *stage, VkImage
 			"[VK][fbo] %s: uiOverlayActive=1 but ui_overlay_image_view is null\n",
 			stage ? stage : "frame_end" );
 	}
-
-	if ( vk.uiOverlayActive && vk.render_pass.overlay_compose == VK_NULL_HANDLE ) {
+	if ( vk.uiOverlayContentValid && vk.ui_overlay_image_view == VK_NULL_HANDLE ) {
 		ri.Printf( PRINT_DEVELOPER, S_COLOR_YELLOW
-			"[VK][fbo] %s: uiOverlayActive=1 but overlay_compose render pass is null\n",
+			"[VK][fbo] %s: uiOverlayContentValid=1 but ui_overlay_image_view is null\n",
+			stage ? stage : "frame_end" );
+	}
+	if ( ( vk.uiOverlayActive || vk.uiOverlayContentValid ) && vk.render_pass.overlay_compose == VK_NULL_HANDLE ) {
+		ri.Printf( PRINT_DEVELOPER, S_COLOR_YELLOW
+			"[VK][fbo] %s: UI overlay content present but overlay_compose render pass is null\n",
 			stage ? stage : "frame_end" );
 	}
 
@@ -485,7 +490,19 @@ void vk_end_frame_prepare_post_process( VkImageView *post_fog_src, VkImageView *
 		*luminance_src = VK_NULL_HANDLE;
 	}
 
-	vk_end_render_pass();
+	/*
+	 * Close any open scene/UI draw pass before post. Keep uiOverlayContentValid so
+	 * gamma can still alpha-composite the LDR HUD/menu overlay after tonemap.
+	 * uiOverlayActive only means "currently recording into ui_overlay".
+	 */
+	if ( vk.inRenderPass &&
+		( vk.renderPassIndex == RENDER_PASS_UI_OVERLAY || vk.uiOverlayActive ) ) {
+		vk_end_render_pass();
+		vk.uiOverlayActive = qfalse;
+		vk_pass_diag_stage( "prepare_post_leave_ui_overlay" );
+	} else {
+		vk_end_render_pass();
+	}
 
 	if ( !backEnd.doneFog ) {
 		vk_volumetric_fog_pass();
@@ -539,9 +556,10 @@ void vk_end_frame_record_taa_pass( VkImageView *post_fog_src, VkImageView *lumin
 		/* Death cam / AFK: high stationary TAA feedback smears sky/fog into streaks. */
 		!vk_temporal_near_static_streak_guard();
 	taa_wanted = ( r_taa && r_taa->integer ) ? qtrue : qfalse;
-	if ( !taa_wanted && r_hybrid1_taa && r_hybrid1_taa->integer && vk_hybrid1_active() ) {
-		taa_wanted = qtrue;
-	}
+	/*
+	 * Hybrid1 owns separate SVGF / channel histories — do not auto-force world
+	 * taa_history as an RT denoiser. Optional presentation AA stays under r_aaMode / r_taa.
+	 */
 	if ( !taa_wanted && R_Upscale_WantTemporal() ) {
 		taa_wanted = qtrue;
 	}
@@ -562,6 +580,15 @@ void vk_end_frame_record_taa_pass( VkImageView *post_fog_src, VkImageView *lumin
 		vk.taa_history_descriptor[1] == VK_NULL_HANDLE ) {
 		if ( !allow_taa || !taa_wanted ) {
 			vk_reset_taa_history();
+		}
+		/* Mode 5: if temporal skipped on a world frame, still apply deferred SMAA cleanup.
+		 * Menus/cinematics keep color_image sharp (no world temporal path). */
+		if ( allow_taa &&
+			vk_aa_policy_wants_temporal_cleanup_smaa() && vk.smaaActive && taa_src != VK_NULL_HANDLE ) {
+			if ( vk_post_scene_aa_apply_from( taa_src ) ) {
+				*post_fog_src = vk_get_post_fog_source();
+				*luminance_src = *post_fog_src;
+			}
 		}
 		return;
 	}
@@ -599,6 +626,14 @@ void vk_end_frame_record_taa_pass( VkImageView *post_fog_src, VkImageView *lumin
 	vk_set_scene_post_fog_source( resolved_view );
 	vk_update_post_fog_descriptors( resolved_view );
 	vk_set_post_chain_last_writer( "taa" );
+
+	/* Mode 5 / r_temporalSmaaCleanup: light SMAA after Temporal Reconstruction. */
+	if ( vk_aa_policy_wants_temporal_cleanup_smaa() && vk.smaaActive ) {
+		if ( vk_post_scene_aa_apply_from( resolved_view ) ) {
+			*post_fog_src = vk_get_post_fog_source();
+			*luminance_src = *post_fog_src;
+		}
+	}
 }
 
 void vk_end_frame_record_luminance_pass( VkImageView luminance_src )
@@ -938,7 +973,12 @@ void vk_end_frame_record_gamma_pass( VkImageView post_fog_src )
 	VkImgui_RecordOverlayPass();
 #endif
 
-	if ( vk.uiOverlayActive &&
+	/*
+	 * Compose LDR UI/HUD after tonemap. Prefer uiOverlayContentValid over
+	 * uiOverlayActive: FinishBloom / post_bloom / prepare_post clear the active
+	 * recording flag but the overlay image still holds this frame's StretchPics.
+	 */
+	if ( vk.uiOverlayContentValid &&
 		vk.ui_overlay_image_view != VK_NULL_HANDLE &&
 		vk.overlay_compose_pipeline != VK_NULL_HANDLE &&
 		vk.render_pass.overlay_compose != VK_NULL_HANDLE &&

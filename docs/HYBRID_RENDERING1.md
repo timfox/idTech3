@@ -11,7 +11,7 @@ Implementation of the thesis **Hybrid-Rendering Techniques in GPU** (IST, July 2
 5. **Temporal accumulation** (shadow + spec) — reprojection, variance estimate, **variance color clamping** (history rectification).
 6. **Separable A-trous** — edge-avoiding 5-tap blur guided by depth, normals, luminance, variance; **adaptive start step** for roughness > 0.2 / shadow angle > 6°.
 7. **Composite** — modulate raster HDR by denoised shadow; add denoised specular; add denoised diffuse × albedo (or **RcGI / Surfel irradiance × albedo** when Hybrid1 fusion is active — RcGI preferred over Surfel when both on).
-8. **TAA** (optional) — post-process `r_taa` or auto via `r_hybrid1_taa 1` after composite.
+8. **Presentation AA** (optional) — Hybrid1 owns **separate** SVGF histories for shadow/spec/diffuse. World `taa_history` is **not** used as an RT denoiser. Prefer `r_aaMode 2` (SMAA) or opt-in `r_aaMode` 4/5 for presentation Temporal Reconstruction after composite. `r_hybrid1_taa` is a legacy hint (default 0) and no longer auto-forces world TAA.
 
 RT closest-hit shaders prefer a **per-primitive world albedo SSBO** when `gl_InstanceCustomIndexEXT == 0`. With **`r_rtxWorldMaterials 1`** (default), world pack prefers diffuse **shader avgColor** (via **`lightingStage`** when set); with **`r_rtxWorldUvSample 1`** (default) it upgrades to **UV-centroid 8×8 diffuse thumbs** (fallback: avgColor → BSP vertex/face colors, including **SF_GRID**). **`r_rtxWorldAlbedoMode 1`** modulates material/UV × vertex color to keep lightmap bake in RT bounces (default **0** = replace). Entity hits (`customIndex == 1`) use parallel **entity albedo/normal SSBOs** (geo normals + per-surface albedo when **`r_rtxEntityMaterials 1`** — default). With **`r_rtxEntityUvSample 1`** (default), pack-time **UV-centroid samples** of 8×8 diffuse thumbs replace flat texture averages for MD3/IQM/MDR/glTF prims; **`R_EnsureImageThumb`** builds thumbs lazily from CPU uploads, GPU blit readback (shell/compressed textures), or `avgColor` when `pic` was never available at create time; otherwise shader/texture averages (or `refEntity.shader` tint / gray when materials are off). If that miss, they reproject hit points into the deferred **G-buffer albedo** (when `r_deferredGBufferFill 1`) instead of flat placeholder colors. **D2 Phase A.1** emits dense `textureIndex` into Hybrid1 PrimMaterialSSBO from pack (`vk_rtx_bindless`); sampling stays SSBO until **`r_rtxBindless`** Phase A.1b (AS UVs + descriptor array) — see **`docs/RTX_HIT_SHADER_UV.md`**.
 
@@ -53,7 +53,8 @@ Optional:
 seta r_hybrid1Quality 2   // 0=custom, 1=performance, 2=balanced, 3=quality (live)
 r_hybrid1_diffuse 1       // or use quality 3 instead of hand-tuning
 r_hybrid1_ibl 1
-r_hybrid1_taa 1
+r_hybrid1_taa 0
+# presentation AA: r_aaMode 2 (SMAA) or r_aaMode 5 (Temporal Reconstruction + cleanup)
 r_rtxEntities 1           // entity mesh BLAS: MD3 + CPU-skinned IQM/MDR + static/CPU-skinned glTF (+ AABB on pack fail)
 r_rtxEntityTriCap 65536
 ```
@@ -85,7 +86,7 @@ Live (no latch). Entity BLAS stays a separate latched companion (`r_rtxEntities`
 | `r_hybrid1_spec` | 1 | Specular trace + denoise |
 | `r_hybrid1_diffuse` | 0 | Indirect diffuse trace + A-trous denoise |
 | `r_hybrid1_ibl` | 1 | Prefiltered/irradiance cubemap on RT miss and spec hits |
-| `r_hybrid1_taa` | 1 | Enable post TAA when Hybrid1 active |
+| `r_hybrid1_taa` | 0 | Legacy hint only; Hybrid1 does not drive world `taa_history`. Use `r_aaMode` for presentation AA |
 | `r_hybrid1_motion` | 1 | Motion-vector temporal reprojection for shadow/spec |
 | `r_hybrid1_historyClamp` | 1 | Variance color clamping |
 | `r_hybrid1_historyGamma` | 1.25 | Clamp box scale |

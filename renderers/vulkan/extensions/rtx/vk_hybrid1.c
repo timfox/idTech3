@@ -182,7 +182,7 @@ static void HYBRID1_ApplyQualityPreset( void )
 	ri.Cvar_Set( "r_hybrid1_spec", "1" );
 	ri.Cvar_Set( "r_hybrid1_ibl", "1" );
 	ri.Cvar_Set( "r_hybrid1_ggx", "1" );
-	ri.Cvar_Set( "r_hybrid1_taa", "1" );
+	ri.Cvar_Set( "r_hybrid1_taa", "0" );
 	ri.Cvar_Set( "r_hybrid1_motion", "1" );
 	ri.Cvar_Set( "r_hybrid1_historyClamp", "1" );
 	ri.Cvar_Set( "r_hybrid1_adaptiveBlur", "1" );

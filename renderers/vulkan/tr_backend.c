@@ -2356,7 +2356,8 @@ static const void *RB_FinishBloom( const void *data )
 	RB_EndSurface();
 
 #ifdef USE_VULKAN
-	/* Bloom owns color_image; end UI overlay ownership cleanly so later HUD can load-resume. */
+	/* Bloom owns color_image; end UI overlay recording so bloom can use the scene.
+	 * Keep uiOverlayContentValid — gamma still needs to compose this frame's HUD. */
 	if ( vk.uiOverlayActive ) {
 		if ( vk.inRenderPass ) {
 			vk_end_render_pass();

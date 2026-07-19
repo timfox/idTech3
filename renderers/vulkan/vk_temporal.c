@@ -85,8 +85,8 @@ qboolean vk_temporal_near_static_streak_guard( void )
 
 void vk_temporal_note_first_person_projection( void )
 {
+	/* Track FP projection for sticky camera compare, but do not disable world TAA globally. */
 	vk.temporal.firstPersonProjectionThisFrame = qtrue;
-	vk.temporal.unreliableMotionThisFrame = qtrue;
 }
 
 static void vk_temporal_log_reset( uint32_t reasons, qboolean hardReset )

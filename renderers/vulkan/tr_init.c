@@ -84,6 +84,7 @@ glstatic_t	gls;
 #ifdef USE_VULKAN
 #include "vk_device.h"
 #include "vk_forward_plus.h"
+#include "vk_aa_policy.h"
 static void VkInfo_f( void );
 static void VulkanInfo_f( void );
 static void VkVolumetricValidate_f( void );
@@ -3084,9 +3085,15 @@ static void R_Register( void )
 	r_smaa_corner_rounding = ri.Cvar_Get( "r_smaa_corner_rounding", "0.2", CVAR_ARCHIVE | CVAR_LATCH );
 	ri.Cvar_CheckRange( r_smaa_corner_rounding, "0", "1", CV_FLOAT );
 	ri.Cvar_SetDescription( r_smaa_corner_rounding, "SMAA corner rounding strength (0=off, 1=full). Attenuates edges at L-corners for smoother silhouettes." );
+
+	vk_aa_policy_register_cvars();
+
 	r_taa = ri.Cvar_Get( "r_taa", "0", CVAR_ARCHIVE_ND );
 	ri.Cvar_CheckRange( r_taa, "0", "1", CV_INTEGER );
-	ri.Cvar_SetDescription( r_taa, "Temporal resolve for Vulkan HDR post (after post-fog). Uses vk_temporal reset policy (resize, map load, camera cut). r_taaMotionVectors 1 uses main-pass per-pixel motion when available. Enabled by modern_vulkan.cfg; set 0 for classic/SMAA-only presentation." );
+	ri.Cvar_SetDescription( r_taa,
+		"Temporal Reconstruction AA for Vulkan HDR post (after post-fog). "
+		"Prefer r_aaMode 4/5 to enable; default presentation is SMAA via r_aaMode 2. "
+		"Uses vk_temporal reset policy; r_taaMotionVectors samples main-pass motion when available." );
 	ri.Cvar_SetGroup( r_taa, CVG_RENDERER );
 	r_taa_feedbackStationary = ri.Cvar_Get( "r_taa_feedbackStationary", "0.92", CVAR_ARCHIVE_ND );
 	ri.Cvar_CheckRange( r_taa_feedbackStationary, "0.0", "0.99", CV_FLOAT );
@@ -3379,9 +3386,11 @@ static void R_Register( void )
 	ri.Cvar_CheckRange( r_hybrid1_ibl, "0", "1", CV_INTEGER );
 	ri.Cvar_SetDescription( r_hybrid1_ibl, "Hybrid1: sample prefiltered/irradiance cubemaps on RT miss and secondary hits." );
 	ri.Cvar_SetGroup( r_hybrid1_ibl, CVG_RENDERER );
-	r_hybrid1_taa = ri.Cvar_Get( "r_hybrid1_taa", "1", CVAR_ARCHIVE_ND );
+	r_hybrid1_taa = ri.Cvar_Get( "r_hybrid1_taa", "0", CVAR_ARCHIVE_ND );
 	ri.Cvar_CheckRange( r_hybrid1_taa, "0", "1", CV_INTEGER );
-	ri.Cvar_SetDescription( r_hybrid1_taa, "Hybrid1: run post-process TAA after composite when r_hybrid1 is active (also set r_taa 1 to force always)." );
+	ri.Cvar_SetDescription( r_hybrid1_taa,
+		"Legacy hint only: Hybrid1 keeps separate SVGF channel histories and does not drive world taa_history. "
+		"Use r_aaMode 4/5 (or r_taa 1) for presentation Temporal Reconstruction after Hybrid1 composite." );
 	ri.Cvar_SetGroup( r_hybrid1_taa, CVG_RENDERER );
 	r_hybrid1_motion = ri.Cvar_Get( "r_hybrid1_motion", "1", CVAR_ARCHIVE_ND );
 	ri.Cvar_CheckRange( r_hybrid1_motion, "0", "1", CV_INTEGER );
@@ -3637,6 +3646,7 @@ void R_Init( void ) {
 #endif
 #endif
 	R_ApplyRenderModeLatch();
+	vk_aa_policy_apply();
 	ri.Printf( PRINT_ALL, "[VK] SH lighting: %s\n", r_shLighting && r_shLighting->integer ? "enabled" : "disabled" );
 	ri.Printf( PRINT_ALL, "[VK] SH world: %s\n", r_shWorldLighting && r_shWorldLighting->integer ? "enabled" : "disabled" );
 	ri.Printf( PRINT_ALL, "[VK] SH debug view: %d\n", r_shDebugView ? r_shDebugView->integer : 0 );

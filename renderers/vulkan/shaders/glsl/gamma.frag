@@ -14,8 +14,8 @@ layout(set = 2, binding = 0) uniform PostFXParams {
 	vec4 toneMapParams1;   /* highlightDesat, contrast, contrastPivot, legacyTonemapMode */
 	vec4 colorBalance;     /* temperature, tint, exposureBias, preExposureScale */
 	vec4 colorGrade;       /* saturation, vibrance, legacyContrast, legacySaturation */
-	vec4 colorGrade2;      /* hueDegrees, reserved */
-	vec4 shadowsLift;      /* rgb lift */
+	vec4 colorGrade2;      /* hueDegrees, temporalVarClip, temporalDisocc, temporalReactive */
+	vec4 shadowsLift;      /* rgb lift; .a = temporalDebugMode when TAA active */
 	vec4 midsGamma;        /* rgb gamma */
 	vec4 highlightsGain;   /* rgb gain */
 	vec4 splitShadow;      /* rgb tint, balance */
