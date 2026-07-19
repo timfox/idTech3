@@ -334,6 +334,12 @@ void vk_update_attachment_descriptors( void ) {
 		}
 		for ( i = 0; i < 2; i++ ) {
 			if ( vk.taa_history_image_view[i] ) {
+				/* Explicit LINEAR — prior OIT block leaves NEAREST on info.sampler. */
+				sd.gl_mag_filter = sd.gl_min_filter = GL_LINEAR;
+				sd.max_lod_1_0 = qtrue;
+				sd.noAnisotropy = qtrue;
+				info.sampler = vk_find_sampler( &sd );
+				info.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 				info.imageView = vk.taa_history_image_view[i];
 				desc.dstSet = vk.taa_history_descriptor[i];
 				qvkUpdateDescriptorSets( vk.device, 1, &desc, 0, NULL );

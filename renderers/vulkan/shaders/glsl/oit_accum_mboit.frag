@@ -174,6 +174,13 @@ void main() {
 			return;
 		}
 	}
+	/* Soft-cap HDR before moment-weighted accum (same blow-up path as WBOIT). */
+	{
+		float lum = dot( litRgb, vec3( 0.2126, 0.7152, 0.0722 ) );
+		if ( lum > 4.0 ) {
+			litRgb *= 4.0 / lum;
+		}
+	}
 
 	ivec2 px = ivec2(gl_FragCoord.xy);
 	vec4 b = texelFetch(momentsTex, px, 0);

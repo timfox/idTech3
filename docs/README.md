@@ -54,6 +54,7 @@ Documentation is grouped by **tier**. Most files remain at their historical path
 - [MOD_SDK.md](MOD_SDK.md)
 - [VOXEL_SPRITES.md](VOXEL_SPRITES.md) — MagicaVoxel `.vox` cube-mesh props (`misc_voxel` / `voxel_spawn`)
 - [UNIFIED_CLUSTERED_RENDERER.md](UNIFIED_CLUSTERED_RENDERER.md) — `r_renderMode 3` Unified Clustered (heterogeneous shading / lighting ownership)
+- [RENDERER_SPINE_1.0.md](RENDERER_SPINE_1.0.md) — production-certified frame matrix (stabilize before new techniques)
 - [RENDERER_2027.md](RENDERER_2027.md) — GPU-driven hybrid visibility north-star (vis buffer Phase 1)
 - [MOMENT_OIT_STOCHASTIC_ALPHA.md](MOMENT_OIT_STOCHASTIC_ALPHA.md) — MBOIT (`r_oit 2`) + stochastic alpha clip
 - [RADIANT.md](RADIANT.md)

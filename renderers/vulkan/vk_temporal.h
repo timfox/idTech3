@@ -49,6 +49,7 @@ extern vk_volumetric_validation_state_t vk_volumetric_validation_state;
 
 void vk_temporal_begin_frame( void );
 void vk_temporal_commit_frame_state( void );
+void vk_temporal_capture_world_viewparms( void );
 void vk_temporal_update_auto_exposure( void );
 void vk_temporal_request_sticky_reset( uint32_t reasons );
 void vk_temporal_note_first_person_projection( void );

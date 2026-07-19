@@ -51,6 +51,8 @@ static void vk_oit_validate_pass_break( const char *stage )
 static void vk_oit_barrier_targets_for_sampling( const char *reason )
 {
 	VkMemoryBarrier mb;
+	VkImageMemoryBarrier img[4];
+	uint32_t imgCount = 0;
 
 	if ( !vk.cmd || vk.cmd->command_buffer == VK_NULL_HANDLE ) {
 		return;
@@ -60,18 +62,44 @@ static void vk_oit_barrier_targets_for_sampling( const char *reason )
 	mb.sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER;
 	mb.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
 	mb.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+
+	Com_Memset( img, 0, sizeof( img ) );
+#define VK_OIT_BARRIER_IMG( handle, layout ) \
+	do { \
+		if ( ( handle ) != VK_NULL_HANDLE && imgCount < ARRAY_LEN( img ) ) { \
+			img[imgCount].sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER; \
+			img[imgCount].srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT; \
+			img[imgCount].dstAccessMask = VK_ACCESS_SHADER_READ_BIT; \
+			img[imgCount].oldLayout = ( layout ); \
+			img[imgCount].newLayout = ( layout ); \
+			img[imgCount].srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED; \
+			img[imgCount].dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED; \
+			img[imgCount].image = ( handle ); \
+			img[imgCount].subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT; \
+			img[imgCount].subresourceRange.levelCount = 1; \
+			img[imgCount].subresourceRange.layerCount = 1; \
+			imgCount++; \
+		} \
+	} while ( 0 )
+
+	VK_OIT_BARRIER_IMG( vk.oit_accum_image, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL );
+	VK_OIT_BARRIER_IMG( vk.oit_reveal_image, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL );
+	VK_OIT_BARRIER_IMG( vk.oit_moments_image, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL );
+	VK_OIT_BARRIER_IMG( vk.oit_b0_image, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL );
+#undef VK_OIT_BARRIER_IMG
+
 	qvkCmdPipelineBarrier( vk.cmd->command_buffer,
 		VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
 		VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
-		0, 1, &mb, 0, NULL, 0, NULL );
+		0, 1, &mb, 0, NULL, imgCount, imgCount ? img : NULL );
 
 	if ( r_fboDebug && r_fboDebug->integer >= 2 && vk_post_fog_fbo_debug_throttle() ) {
 		uint32_t w = 0, h = 0;
 		vk_get_active_render_extent( &w, &h );
 		ri.Printf( PRINT_DEVELOPER,
-			"[VK][OIT] barrier→sample (%s): render=%ux%u mainColor=%ux%u frame=%u\n",
+			"[VK][OIT] barrier→sample (%s): render=%ux%u mainColor=%ux%u imgs=%u frame=%u\n",
 			reason ? reason : "unspecified", w, h,
-			vk.mainColorWidth, vk.mainColorHeight, vk.temporal.frameIndex );
+			vk.mainColorWidth, vk.mainColorHeight, imgCount, vk.temporal.frameIndex );
 	}
 }
 
@@ -337,6 +365,10 @@ void vk_oit_pass( const struct drawSurfsCommand_s *cmd )
 				? vk.oit_moments_descriptor : vk.oit_reveal_descriptor;
 			VkDescriptorSet b0_set = vk.oit_b0_descriptor != VK_NULL_HANDLE
 				? vk.oit_b0_descriptor : vk.oit_reveal_descriptor;
+			/* WBOIT: bind opaque depth on set 3 for transparent-depth debug views. */
+			if ( !mboit && vk.oit_depth_descriptor != VK_NULL_HANDLE ) {
+				moments_set = vk.oit_depth_descriptor;
+			}
 			VkDescriptorSet sets[5] = {
 				vk.oit_opaque_descriptor,
 				vk.oit_accum_descriptor,

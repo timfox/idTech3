@@ -2305,6 +2305,7 @@ static const void *RB_DrawSurfs( const void *data ) {
 #endif
 		) {
 		backEnd.doneWorldScene = qtrue;
+		vk_temporal_capture_world_viewparms();
 	}
 
 	return (const void *)(cmd + 1);

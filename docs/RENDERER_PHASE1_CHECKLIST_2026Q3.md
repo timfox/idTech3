@@ -7,6 +7,7 @@ This document turns the Phase 1 renderer roadmap into an implementation-oriented
 
 Primary planning docs:
 
+- [RENDERER_SPINE_1.0.md](RENDERER_SPINE_1.0.md)
 - [RENDERER_MODERNIZATION_ROADMAP_2026H2.md](RENDERER_MODERNIZATION_ROADMAP_2026H2.md)
 - [RENDERER_2026_ARCHITECTURE_PASS.md](RENDERER_2026_ARCHITECTURE_PASS.md)
 - [FORWARD_PLUS_PIPELINE_AUDIT.md](FORWARD_PLUS_PIPELINE_AUDIT.md)
@@ -15,12 +16,13 @@ Primary planning docs:
 
 ## Phase 1 Goal
 
-Make the shipping Vulkan path reliable enough that:
+Deliver **[Renderer Spine 1.0](RENDERER_SPINE_1.0.md)**: make the certified Vulkan combination matrix reliable enough that:
 
-- `r_renderMode 2` remains the default product path
+- Unified Clustered (`r_renderMode 3`) is the architectural product path and becomes shipping-strong only after Spine exit criteria
 - late-frame post toggles do not black-screen or corrupt output
 - device loss is easier to diagnose
-- mode 1 and mode 3 remain clearly experimental until they are stable
+- Temporal Reconstruction, OIT, Hybrid1, and research overlays stay clearly optional / experimental until they pass the same matrix
+- recovery profiles (`renderer_modern_safe`, `renderer_clustered_safe`) remain boring
 
 ---
 

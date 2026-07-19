@@ -59,6 +59,27 @@ static void vk_temporal_clear_frame_state( void )
 	vk.temporal.sharedCameraCut = qfalse;
 	vk.temporal.unreliableMotionThisFrame = qfalse;
 	vk.temporal.firstPersonProjectionThisFrame = qfalse;
+	vk.temporal.worldMatricesCaptured = qfalse;
+}
+
+/*
+===============
+vk_temporal_capture_world_viewparms
+
+Snapshot world camera matrices while backEnd still holds the world view.
+Must run before deferred weapon / HUD overwrites RDF_NOWORLDMODEL viewParms.
+===============
+*/
+void vk_temporal_capture_world_viewparms( void )
+{
+	if ( backEnd.viewParms.portalView != PV_NONE ) {
+		return;
+	}
+	Com_Memcpy( vk.temporal.worldViewMatrix, backEnd.viewParms.world.modelViewMatrix,
+		sizeof( vk.temporal.worldViewMatrix ) );
+	Com_Memcpy( vk.temporal.worldProjectionMatrix, backEnd.viewParms.projectionMatrix,
+		sizeof( vk.temporal.worldProjectionMatrix ) );
+	vk.temporal.worldMatricesCaptured = qtrue;
 }
 
 static void vk_temporal_request_reset( uint32_t reasons )
@@ -336,6 +357,8 @@ void vk_temporal_commit_frame_state( void )
 {
 	const int clientState = ri.CL_GetState ? ri.CL_GetState() : CA_ACTIVE;
 	const qboolean worldValid = ( tr.world != NULL ) ? qtrue : qfalse;
+	/* Live refdef may be weapon/HUD (RDF_NOWORLDMODEL) after deferred flush — track that
+	 * for telemetry only; matrix commit uses the world snapshot when available. */
 	const qboolean noWorldModel = ( backEnd.refdef.rdflags & RDF_NOWORLDMODEL ) ? qtrue : qfalse;
 	const float *projection;
 	const float *view;
@@ -362,8 +385,19 @@ void vk_temporal_commit_frame_state( void )
 	 * Commit previous-frame matrices once at frame end — never mid-post (volumetric
 	 * used to overwrite these before TAA refreshed postfx, collapsing matrix
 	 * reprojection to identity and corrupting history UV for pixels without MVs).
+	 *
+	 * Prefer matrices captured at world draw time: RB_FlushDeferredWeaponAfterTaa
+	 * replaces backEnd.viewParms with a first-person RDF_NOWORLDMODEL camera.
 	 */
-	if ( worldValid && backEnd.doneWorldScene && !noWorldModel &&
+	if ( worldValid && backEnd.doneWorldScene && vk.temporal.worldMatricesCaptured ) {
+		projection = vk.temporal.worldProjectionMatrix;
+		view = vk.temporal.worldViewMatrix;
+		myGlMultMatrix( view, projection, viewProj );
+		Com_Memcpy( vk_prev_view_matrix, view, sizeof( vk_prev_view_matrix ) );
+		Com_Memcpy( vk_prev_projection_matrix, projection, sizeof( vk_prev_projection_matrix ) );
+		Com_Memcpy( vk_prev_viewproj_matrix, viewProj, sizeof( vk_prev_viewproj_matrix ) );
+		vk_prev_matrices_valid = qtrue;
+	} else if ( worldValid && backEnd.doneWorldScene && !noWorldModel &&
 		backEnd.viewParms.portalView == PV_NONE ) {
 		projection = backEnd.viewParms.projectionMatrix;
 		view = backEnd.viewParms.world.modelViewMatrix;

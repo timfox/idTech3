@@ -1462,6 +1462,12 @@ typedef struct {
 		uint32_t lastSwapchainHeight;
 		char worldName[MAX_QPATH];
 		uint32_t frameIndex;
+		/* World view/projection snapshotted when doneWorldScene becomes true.
+		 * Weapon flush after TAA overwrites backEnd.viewParms with RDF_NOWORLDMODEL;
+		 * commit must use these, not live backEnd. */
+		qboolean worldMatricesCaptured;
+		float worldViewMatrix[16];
+		float worldProjectionMatrix[16];
 	} temporal;
 
 	//

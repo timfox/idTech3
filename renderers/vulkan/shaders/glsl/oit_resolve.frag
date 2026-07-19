@@ -68,11 +68,19 @@ void main() {
 	}
 
 	revealage = clamp( revealage, 0.0, 1.0 );
-	float wsum = max( accum.a, 1e-5 );
+	/* Raise floor slightly so sparse/noisy weight sums do not amplify into solid slabs. */
+	float wsum = max( accum.a, 1e-3 );
 	vec3 c_avg = accum.rgb / wsum;
 	if ( oit_invalid3( c_avg ) ) {
 		out_color = vec4( oit_magenta(), 1.0 );
 		return;
+	}
+	/* Cap average layer luminance so resolve cannot paint near-opaque HDR sheets. */
+	{
+		float lum = dot( max( c_avg, vec3( 0.0 ) ), vec3( 0.2126, 0.7152, 0.0722 ) );
+		if ( lum > 8.0 ) {
+			c_avg *= 8.0 / lum;
+		}
 	}
 
 	float coverage = 1.0 - revealage;
@@ -125,6 +133,18 @@ void main() {
 		/* Cluster / light heuristic proxy: coverage × accum weight magnitude. */
 		float heat = clamp( coverage * min( accum.a, 16.0 ) * 0.1, 0.0, 1.0 );
 		out_color = vec4( heat, heat * 0.4, 1.0 - heat, 1.0 );
+	} else if ( mode == 12 ) {
+		/* Estimated layer/fragment count from product revealage (α≈const). */
+		float est = -log( max( revealage, 1e-4 ) );
+		out_color = vec4( vec3( clamp( est * 0.2, 0.0, 1.0 ) ), 1.0 );
+	} else if ( mode == 13 ) {
+		/* Transparent-pixel opaque depth (WBOIT binds depth on set 3; MBOIT shows moment.r). */
+		float d = texelFetch( oitMomentsTex, px, 0 ).r;
+		if ( oit_invalid( d ) ) {
+			out_color = vec4( oit_magenta(), 1.0 );
+		} else {
+			out_color = vec4( vec3( clamp( d, 0.0, 1.0 ) ), 1.0 );
+		}
 	} else {
 		out_color = vec4( resolved, 1.0 );
 	}

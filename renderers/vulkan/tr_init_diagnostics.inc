@@ -736,19 +736,28 @@ static void R_RendererModernSafe_f( void )
 	ri.Cvar_Set( "r_forwardPlusShade", "1" );
 	ri.Cvar_Set( "r_forwardPlusDepthCull", "1" );
 	ri.Cvar_Set( "r_forwardPlusSpecularStrength", "0.65" );
-	ri.Cvar_Set( "r_forwardPlusEnergyRenorm", "0.45" );
+	ri.Cvar_Set( "r_forwardPlusEnergyRenorm", "0" );
 	ri.Cvar_Set( "r_ext_multisample", "0" );
 	ri.Cvar_Set( "r_deferredGBuffer", "1" );
 	ri.Cvar_Set( "r_deferredGBufferFill", "1" );
 	ri.Cvar_Set( "r_deferredLighting", "0" );
 	ri.Cvar_Set( "r_deferredGBufferDebug", "0" );
-	ri.Cvar_Set( "r_taa", "1" );
-	ri.Cvar_Set( "r_taaMotionVectors", "1" );
+	ri.Cvar_Set( "r_ambientVisibilityMode", "2" );
+	ri.Cvar_Set( "r_ssao", "0" );
+	ri.Cvar_Set( "r_visibilityBuffer", "0" );
+	ri.Cvar_Set( "r_oit", "0" );
+	ri.Cvar_Set( "r_stochasticAlpha", "0" );
+	ri.Cvar_Set( "r_aaMode", "2" );
+	ri.Cvar_Set( "r_taa", "0" );
+	ri.Cvar_Set( "r_taaMotionVectors", "0" );
 	ri.Cvar_Set( "r_ext_smaa", "1" );
 	ri.Cvar_Set( "r_ext_fxaa", "0" );
 	ri.Cvar_Set( "r_postAaAfterBloom", "1" );
+	ri.Cvar_Set( "r_hybrid1", "0" );
+	ri.Cvar_Set( "r_rtxDemo", "0" );
+	ri.Cvar_Set( "r_openWorld", "0" );
 	ri.Printf( PRINT_ALL,
-		"[VK] Modern safe preset applied: mode 2 Forward+ + sidecar G-buffer + TAA/SMAA restored, deferred lighting off, MSAA off. Run vid_restart.\n" );
+		"[VK] Modern safe preset applied: Spine Forward+ + SMAA/GTAO, TAA/OIT/RT/vis off, MSAA off. Run vid_restart (or exec gfx_safe.cfg).\n" );
 }
 
 static void R_RendererClusteredSafe_f( void )

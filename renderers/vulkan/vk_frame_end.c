@@ -617,12 +617,18 @@ void vk_end_frame_record_taa_pass( VkImageView *post_fog_src, VkImageView *lumin
 		taaWidth, taaHeight, vk.taa_pipeline );
 	{
 		VkDescriptorSet reactive_set = vk.taa_reactive_descriptor[vk.cmd_index];
+		VkDescriptorSet depth_set = vk.depth_descriptor[vk.cmd_index];
 		if ( reactive_set == VK_NULL_HANDLE ) {
 			reactive_set = vk.taa_motion_descriptor[vk.cmd_index]; /* should not happen */
 		}
+		/* MSAA: sample resolved R32F depth (same binding as OIT), not the MSAA attachment. */
+		if ( vk.msaaActive && vk.volumetric_depth_view != VK_NULL_HANDLE &&
+			vk.oit_depth_descriptor != VK_NULL_HANDLE ) {
+			depth_set = vk.oit_depth_descriptor;
+		}
 		vk_end_frame_bind_taa_sets(
 			vk.post_color_descriptor[vk.cmd_index],
-			vk.depth_descriptor[vk.cmd_index],
+			depth_set,
 			vk.postfx_params_descriptor[vk.cmd_index],
 			vk.taa_history_descriptor[readIndex],
 			vk.taa_motion_descriptor[vk.cmd_index],

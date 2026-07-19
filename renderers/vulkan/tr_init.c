@@ -2974,7 +2974,7 @@ static void R_Register( void )
 		"Requires \\r_oit 1 or 2. Hair cards stay on \\r_stochasticAlpha." );
 	ri.Cvar_SetGroup( r_oitClassify, CVG_RENDERER );
 	r_oitDebug = ri.Cvar_Get( "r_oitDebug", "0", CVAR_CHEAT );
-	ri.Cvar_CheckRange( r_oitDebug, "0", "11", CV_INTEGER );
+	ri.Cvar_CheckRange( r_oitDebug, "0", "13", CV_INTEGER );
 	ri.Cvar_SetDescription( r_oitDebug,
 		"OIT resolve debug view (cheat):\n"
 		" 0 - composite\n"
@@ -2989,6 +2989,8 @@ static void R_Register( void )
 		" 9 - moment RGB (MBOIT)\n"
 		" 10 - optical depth b0 (MBOIT)\n"
 		" 11 - coverage×weight heat\n"
+		" 12 - estimated fragment/layer count\n"
+		" 13 - opaque depth at transparent pixels (WBOIT)\n"
 		"NaN/Inf → magenta." );
 	ri.Cvar_SetGroup( r_oitDebug, CVG_RENDERER );
 	if ( r_oitClassify && r_oitClassify->integer ) {

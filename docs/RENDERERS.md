@@ -24,6 +24,7 @@ The Vulkan 1.4 renderer is the primary rendering backend, built as a shared libr
 - **Deferred G-buffer sidecar:** `r_deferredGBuffer 1` + `r_deferredGBufferFill 1` now works with `r_renderMode` 1, 2, and 3. In mode 2/3 the deferred G-buffer sidecar captures albedo/normal/material for temporal, neural, RT, and debug consumers. `r_deferredLighting` runs in modes **1** and **3** (ignored in mode 2).
 - Vulkan is the supported rendering backend
 - **Shared temporal reset policy** (`vk_temporal.c`): centralizes history invalidation for volumetrics, motion vectors, exposure. Resize, map load, camera cut, and missing prev-frame data trigger resets. Used by Temporal Reconstruction (`r_taa` / `r_aaMode` 4–5) and volumetric history.
+- See [RENDERER_SPINE_1.0.md](RENDERER_SPINE_1.0.md) for the production-spine milestone (stabilize before adding techniques)
 - See [RENDERER_2026_ARCHITECTURE_PASS.md](RENDERER_2026_ARCHITECTURE_PASS.md) for the focused 2026 renderer direction
 
 ### Modern Vulkan Default

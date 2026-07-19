@@ -11,7 +11,9 @@ layout(location = 0) in vec2 frag_tex_coord;
 layout(location = 0) out float out_reactive;
 
 void main() {
-	float reveal = textureLod( revealTex, frag_tex_coord, 0.0 ).r;
+	/* texelFetch: match OIT resolve — no LINEAR bleed across rows into the reactive mask. */
+	ivec2 px = ivec2( gl_FragCoord.xy );
+	float reveal = texelFetch( revealTex, px, 0 ).r;
 	float coverage = clamp( 1.0 - reveal, 0.0, 1.0 );
 	/* Soft floor: even light glass must reject stale history strongly. */
 	if ( coverage > 0.02 ) {

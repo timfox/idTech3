@@ -123,7 +123,8 @@ vec3 oit_forward_plus_add( vec3 baseRgb, vec3 N, vec3 worldPos )
 
 void main() {
 	vec4 base = textureLod(tex0, frag_tex_coord0, 0.0) * frag_color0;
-	float alpha = base.a;
+	/* Match MBOIT: alpha→1 collapses revealage to 0 (near-opaque glass). */
+	float alpha = clamp( base.a, 0.0, 0.999 );
 	if (alpha < 0.01) discard;
 	if ( isnan( alpha ) || isinf( alpha ) || any( isnan( base.rgb ) ) || any( isinf( base.rgb ) ) ) {
 		out_color = vec4( 1.0, 0.0, 1.0, 1.0 );
@@ -150,6 +151,13 @@ void main() {
 			out_color = vec4( 1.0, 0.0, 1.0, 1.0 );
 			out_reveal = 0.0;
 			return;
+		}
+	}
+	/* Soft-cap HDR before WBOIT weighting — unbounded Forward+ blew resolve into near-opaque. */
+	{
+		float lum = dot( litRgb, vec3( 0.2126, 0.7152, 0.0722 ) );
+		if ( lum > 4.0 ) {
+			litRgb *= 4.0 / lum;
 		}
 	}
 

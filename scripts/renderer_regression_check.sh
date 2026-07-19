@@ -699,10 +699,30 @@ elif ! grep -q 'vk_get_active_render_extent' "$VK_VOL_INT" 2>/dev/null; then
   fail "MSAA depth resolve must dispatch using active render extent"
 elif ! grep -q 'Commit previous-frame matrices once at frame end' "$VK_TEMP" 2>/dev/null; then
   fail "vk_temporal_commit_frame_state must own prev matrix commit"
+elif ! grep -q 'vk_temporal_capture_world_viewparms' "$VK_TEMP" 2>/dev/null; then
+  fail "world viewparms must be snapshotted before weapon flush for prev-matrix commit"
+elif ! grep -q 'clamp( base.a, 0.0, 0.999 )' "$PROJECT_ROOT/renderers/vulkan/shaders/glsl/oit_accum.frag" 2>/dev/null; then
+  fail "WBOIT accum must clamp alpha like MBOIT"
 elif grep -q 'Com_Memcpy( vk_prev_viewproj_matrix, params.viewProj' "$PROJECT_ROOT/renderers/vulkan/vk_volumetric_params.c" 2>/dev/null; then
   fail "volumetric must not overwrite shared prev matrices mid-frame"
 else
   pass "OIT striping guards: barrier, NEAREST, texelFetch, depth dispatch, matrix commit"
+fi
+
+echo ""
+echo "Input mouse-look lifecycle (SDL3):"
+SDL_IN="$PROJECT_ROOT/engine/platform/sdl/sdl_input.c"
+SDL_GLW="$PROJECT_ROOT/engine/platform/sdl/sdl_glw.h"
+if ! grep -q 'input_status' "$SDL_IN" 2>/dev/null; then
+  fail "sdl_input.c missing input_status command"
+elif ! grep -q 'pixel_width' "$SDL_GLW" 2>/dev/null; then
+  fail "sdl_glw.h must separate logical window_* from pixel_*"
+elif ! grep -q 'mouse_frac_x' "$SDL_IN" 2>/dev/null; then
+  fail "sdl_input.c must accumulate float mouse deltas (HiDPI)"
+elif ! grep -q 'IN_SetRelativeMouse' "$SDL_IN" 2>/dev/null; then
+  fail "sdl_input.c must check relative mouse mode return value"
+else
+  pass "SDL mouse-look: input_status, logical/pixel sizes, float accum, relative mode"
 fi
 
 echo ""

@@ -629,6 +629,16 @@ void vk_create_render_passes( void )
 
 	if ( r_oit && r_oit->integer && fboActive )
 	{
+		/* Full-framebuffer deps for OIT: BY_REGION races produce horizontal
+		 * scanline tears when the next pass is a fullscreen resolve. */
+		VkSubpassDependency oit_deps[2];
+		oit_deps[0] = deps[0];
+		oit_deps[1] = deps[1];
+		oit_deps[0].dependencyFlags = 0;
+		oit_deps[1].dependencyFlags = 0;
+		desc.dependencyCount = 2;
+		desc.pDependencies = oit_deps;
+
 		/* OIT accumulation pass:
 		 *  RT0 = weighted color accumulation
 		 *  RT1 = revealage product
@@ -742,6 +752,10 @@ void vk_create_render_passes( void )
 		attachments[0].finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 		VK_CHECK( qvkCreateRenderPass( device, &desc, NULL, &vk.render_pass.oit_resolve ) );
 		SET_OBJECT_NAME( vk.render_pass.oit_resolve, "render pass - oit_resolve", VK_DEBUG_REPORT_OBJECT_TYPE_RENDER_PASS_EXT );
+
+		/* Restore shared deps for later post passes. */
+		desc.dependencyCount = 2;
+		desc.pDependencies = &deps[0];
 	}
 
 	if ( PostFX_SSR_IsEnabled() && fboActive )

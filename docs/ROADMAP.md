@@ -4,7 +4,7 @@
 
 Priorities that keep **CI green** and **README/build truth** aligned:
 
-**Long-arc goal (id Tech 6–8 class, incrementally):** converge on **lighting scale** (Forward+ / clustered lists), **temporal robustness** (history + motion vectors before heavy TAA/upscale), **trustworthy GPU glTF**, and **locked-in validation** (Tier A everywhere, Tier B where `GAME_BASE` exists). Treat **Metal / RTX / full-cluster deferred** as later tiers once the forward path and CI are boringly stable—not parallel science projects on `main`.
+**Long-arc goal (id Tech 6–8 class, incrementally):** ship **[Renderer Spine 1.0](RENDERER_SPINE_1.0.md)** first—stable resources, histories, pass ownership, and a locked combination matrix on Unified Clustered—then deepen shadows/material parity/geometry throughput and selective Hybrid1. Treat Metal / universal hybrid RT / neural-vis research as later tiers once the Spine is boring—not parallel science projects on `main`.
 
 1. **Watch GitHub Actions on `main`** - especially **Android** (CMake + Gradle `assembleDebug`, OpenSSL/Lua/FetchContent caches) and **MSYS curl**.
 2. **Renderer validation** - Tier B (self-hosted `GAME_BASE`) and Tier C (manual GPU notes) when you have hardware/content; keep `renderer_regression_check` passing on default CI (manifest + GLSL + **IQM_MORPH_TOP_K** C/GLSL parity + **glTF vs IQM** joint/morph `#define` parity + morph cap consistency in `tr_local.h` + Forward+ **`gen_frag.tmpl` tile stride** vs **`MAX_PER_TILE`**; repo manifest includes **`docs/FORWARD_PLUS_PIPELINE_AUDIT.md`**).
@@ -92,7 +92,7 @@ Priorities that keep **CI green** and **README/build truth** aligned:
 | P2 | **glTF CPU tess polish** | **`r_gltfCpuQtangent`** qtangent recompute when stage textures look like a normal map (`norm` / `bump` / `nmap` / `_n.`); **`_norm`** shader try from `normalTexture` on CPU tess path |
 | P2 | **Engine systems hardening** | Telemetry / replay / save / quest / dialogue - define stable APIs + minimal tests |
 | P3 | **GOAP content** | Data-driven actions; perf limits; debug draw |
-| P3 | **Vulkan architecture pass** | Forward+ **64** GPU lights + `r_renderMode 2` latch done; TAA optional with motion vectors — polish motion on skinned/customShader |
+| P3 | **Renderer Spine 1.0** | Locked matrix on mode 3 (deferred opaque + Forward+/OIT transparent + SMAA default); resource ownership; temporal histories; combination tests — [RENDERER_SPINE_1.0.md](RENDERER_SPINE_1.0.md) |
 
 ### Renderer 2026 Architecture Pass
 - [x] Lighting scalability (incremental): clustered Forward+ packs **64** GPU lights; classic projector/`dlightBits` remain **32**; `r_renderMode 2` latches Forward+ shade. See `docs/RENDERER_2026_ARCHITECTURE_PASS.md`.

@@ -1,6 +1,6 @@
 # Renderer Modernization Roadmap (2026 H2)
 
-**Date**: July 18, 2026  
+**Date**: July 19, 2026 (Spine 1.0 framing)  
 **Scope**: Vulkan renderer stabilization, lighting architecture, temporal behavior, pass ownership, and backend prioritization
 
 ---
@@ -9,10 +9,13 @@
 
 This document defines the practical renderer modernization plan for the second half of 2026.
 
+**Canonical next milestone:** [RENDERER_SPINE_1.0.md](RENDERER_SPINE_1.0.md) — production-certified frame architecture and locked feature matrix. Architecture breadth is already high; the work is depth, integration, and reliability.
+
 The goal is not to replace the renderer with a brand-new framegraph or to chase every experimental rendering tier in parallel. The goal is to make the existing Vulkan path boringly reliable first, then widen capability in a controlled way.
 
 This roadmap aligns with:
 
+- [RENDERER_SPINE_1.0.md](RENDERER_SPINE_1.0.md)
 - [ROADMAP.md](ROADMAP.md)
 - [RENDERER_2026_ARCHITECTURE_PASS.md](RENDERER_2026_ARCHITECTURE_PASS.md)
 - [FORWARD_PLUS_PIPELINE_AUDIT.md](FORWARD_PLUS_PIPELINE_AUDIT.md)
@@ -64,31 +67,32 @@ The notable part of this repro is that it did **not** require enabling an entire
 
 ## Strategic Decisions
 
-### 1. Stabilize the shipping path first
+### 1. Stabilize the Spine shipping path first
 
-Treat **`r_renderMode 2`** as the product path:
+Treat **Unified Clustered (`r_renderMode 3`)** as the **architectural product path**, but only as **shipping-strong** after [Renderer Spine 1.0](RENDERER_SPINE_1.0.md) exit criteria.
 
-- Forward+ primary
+Certified defaults (when Spine-certified):
+
+- Deferred opaque + Forward+ transparent / weapon
 - HDR + PBR
-- sidecar G-buffer
-- TAA / motion-vector capable path
+- Shared light-grid / clustered lists
+- SMAA 1x presentation AA (`r_aaMode 2`)
+- Temporal Reconstruction optional and confidence-guided
 
-Keep **`r_renderMode 1`** and **`r_renderMode 3`** explicitly experimental until they stop producing:
-
-- black frames
-- corrupted output
-- device-loss crashes
+Keep **`r_renderMode 0` / `1` / `2`** as supported fallbacks and recovery profiles (`renderer_modern_safe`), not as competing “add another modern path” targets. Hybrid1, path tracing, visibility-buffer, and neural stacks stay **experimental** until the Spine matrix is boring.
 
 #### Required work
 
+- Pass/resource ownership registry (producer, consumer, layout, history, resize/`vid_restart`).
 - Expand runtime validation around `renderer_profile`, `renderer_status`, render-mode latches, pass ordering, and AA handoff.
-- Add more source/runtime guards around render-pass resume behavior and attachment/state correctness.
+- Combination matrix: OIT × TAA × weapon × resize × alt-tab × `vid_restart`.
 - Keep recovery commands and safe renderer profiles documented and reliable.
 
 #### Non-goals
 
-- Do not treat every renderer mode as equally production-ready.
-- Do not broaden default profiles while mode-specific instability still exists.
+- Do not treat every renderer mode or research overlay as equally production-ready.
+- Do not add new named techniques for category coverage until Spine 1.0 exits.
+- Do not make Hybrid1 or path tracing a prerequisite for the default look.
 
 ### 2. Finish the lighting architecture
 
