@@ -284,24 +284,6 @@ static qboolean R_RendererSwapchainRestartRecent( void )
 	return ( now - vk.swapchain_last_restart_ms ) <= restartWindowMs ? qtrue : qfalse;
 }
 
-static qboolean R_RendererCubemapIblReady( const cubemap_t *cube )
-{
-	if ( !cube || !cube->prefiltered_image || !cube->irradiance_image ) {
-		return qfalse;
-	}
-	if ( cube->prefiltered_image->handle == VK_NULL_HANDLE ||
-		cube->prefiltered_image->view == VK_NULL_HANDLE ||
-		cube->prefiltered_image->descriptor == VK_NULL_HANDLE ) {
-		return qfalse;
-	}
-	if ( cube->irradiance_image->handle == VK_NULL_HANDLE ||
-		cube->irradiance_image->view == VK_NULL_HANDLE ||
-		cube->irradiance_image->descriptor == VK_NULL_HANDLE ) {
-		return qfalse;
-	}
-	return qtrue;
-}
-
 static int R_RendererCountReadyCubemaps( void )
 {
 	return vk.pbr_ibl_ready_cubemap_count;

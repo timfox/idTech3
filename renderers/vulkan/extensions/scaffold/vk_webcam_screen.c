@@ -36,6 +36,6 @@ void RE_WebcamUploadFrame( const byte *rgba, int width, int height )
 	}
 
 	if ( s_webcamImage ) {
-		R_UploadSubImage( (byte *)rgba, 0, 0, width, height, s_webcamImage );
+		R_UploadSubImage( (byte *)(uintptr_t)(const void *)rgba, 0, 0, width, height, s_webcamImage );
 	}
 }
