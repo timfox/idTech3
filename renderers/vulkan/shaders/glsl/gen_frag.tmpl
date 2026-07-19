@@ -187,6 +187,9 @@ layout (constant_id = 10) const int acff = 0; // NONE, RGB, RGBA, ALPHA
 
 #extension GL_GOOGLE_include_directive : require
 #include "glint_ndf.glsl"
+#ifdef USE_FORWARD_PLUS_FRAG
+#include "forward_plus_cluster.glsl"
+#endif
 
 layout(location = 9) in vec4 var_Normal;
 layout(location = 10) in vec4 var_LightDir;
@@ -1529,23 +1532,16 @@ void main() {
 					uint zMode = fp_params.fp_cluster_meta.y;
 					float zNear = max( fp_params.fp_cluster_z_range.x, 1e-3 );
 					float zFar = max( fp_params.fp_cluster_z_range.y, zNear + 1e-3 );
-					float viewDepth = abs( wc.w );
-					uint slice = 0u;
-					if ( zSlices > 1u ) {
-						float z = clamp( viewDepth, zNear, zFar );
-						float t = ( zMode == 1u )
-							? ( log( z / zNear ) / max( log( zFar / zNear ), 1e-5 ) )
-							: ( ( z - zNear ) / ( zFar - zNear ) );
-						t = clamp( t, 0.0, 0.9999 );
-						slice = min( uint( t * float( zSlices ) ), zSlices - 1u );
-					}
-					uint flatTiles = max( tilesX * tilesY, 1u );
-					uint tileId = ( zSlices > 1u ) ? ( ty * tilesX + tx + slice * flatTiles ) : ( ty * tilesX + tx );
+					uint slice = fp_view_depth_to_slice( abs( wc.w ), zSlices, zMode, zNear, zFar );
+					uint tileId = fp_cluster_index( tx, ty, tilesX, tilesY, slice, zSlices );
 					uint tbase = tileId * 8u;
 					float nLights = fp_lights.fp_light_data[0].x;
 					uint maxPerTile = uint( max( fp_lights.fp_light_data[0].z + 0.5, 1.0 ) );
 					maxPerTile = min( maxPerTile, 8u );
 					uint skipMask = floatBitsToUint( pbrForwardPlus.y );
+					vec3 fpDiffAcc = vec3( 0.0 );
+					vec3 fpSpecAcc = vec3( 0.0 );
+					float fpSpecStrAcc = 0.65;
 					for ( uint k = 0u; k < maxPerTile; k++ ) {
 						uint li = fp_tiles.fp_tile_cells[ tbase + k ];
 						if ( li == 0xFFFFFFFFu ) {
@@ -1629,9 +1625,21 @@ void main() {
 						float specMul = ( deluxe_mapping > 0 ) ? deluxe_specular_scale : 1.0;
 						vec3 Fsfp = CalcSpecular( specular.rgb, Hfp, NHfp, NLfp, NE, LHfp, VHfp, roughness, baseUV, shadingFrame, anisoAmount, Lfp, E ) * specMul;
 						float fpSpecStr = ( pbrForwardPlus.z > 0.0 ) ? pbrForwardPlus.z : 0.65;
-						fpAdd += lc.rgb * addBoost * ( Fd * ( att * NLfp * shadeStr )
-							+ Fsfp * ( att * shadeStr * fpSpecStr ) );
+						fpSpecStrAcc = fpSpecStr;
+						fpDiffAcc += lc.rgb * addBoost * Fd * ( att * NLfp * shadeStr );
+						fpSpecAcc += lc.rgb * addBoost * Fsfp * ( att * shadeStr * fpSpecStr );
 					}
+					/* Soft-cap Forward+ specular vs diffuse (parity with deferred_lighting_common). */
+					{
+						const vec3 lumaW = vec3( 0.2126, 0.7152, 0.0722 );
+						float specLuma = max( dot( fpSpecAcc, lumaW ), 0.0 );
+						float diffLuma = max( dot( fpDiffAcc, lumaW ), 0.0 );
+						float specCap = max( diffLuma * 2.5, 0.28 ) * max( fpSpecStrAcc, 0.01 );
+						if ( specLuma > specCap ) {
+							fpSpecAcc *= specCap / max( specLuma, 1e-4 );
+						}
+					}
+					fpAdd = fpDiffAcc + fpSpecAcc;
 				}
 			}
 		}

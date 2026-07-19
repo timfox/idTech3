@@ -55,7 +55,7 @@ Spine 1.0 freezes **one** certified combination set. Everything else is experime
 | System | Shipping path |
 |--------|----------------|
 | Opaque / transparent world | **Forward+ (`r_renderMode 2`)** via `modern_vulkan_stable.cfg` (default) |
-| Clustered hybrid | Mode 3 via `modern_clustered.cfg` / experimental — harden after Spine |
+| Clustered hybrid | Mode 3 via `modern_clustered.cfg` / experimental — harden after Spine (shared `forward_plus_cluster.glsl`, Forward+ specular soft-cap, combo-matrix gates) |
 | Transparent WBOIT | Opt-in `modern_vulkan_quality.cfg` (`r_oit 1`) with TAA off |
 | Weapon / view-model | Forward+; after world TAA only when Temporal Reconstruction is enabled |
 | Presentation AA | SMAA 1x (`r_aaMode 2`) — default |

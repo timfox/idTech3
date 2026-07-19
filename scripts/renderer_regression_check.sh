@@ -265,18 +265,37 @@ echo ""
 echo "Unified Clustered Renderer (r_renderMode 3 frame split):"
 TB_C="$PROJECT_ROOT/renderers/vulkan/tr_backend.c"
 DGB_UC="$PROJECT_ROOT/renderers/vulkan/vk_deferred_gbuffer.c"
+GEN_FRAG_UC="$PROJECT_ROOT/renderers/vulkan/shaders/glsl/gen_frag.tmpl"
+OIT_ACCUM_UC="$PROJECT_ROOT/renderers/vulkan/shaders/glsl/oit_accum.frag"
+OIT_MBOIT_UC="$PROJECT_ROOT/renderers/vulkan/shaders/glsl/oit_accum_mboit.frag"
 if ! grep -q 'vk_unified_clustered_active' "$DGB_UC" 2>/dev/null; then
   fail "vk_deferred_gbuffer.c missing vk_unified_clustered_active"
 elif ! grep -q 'vk_unified_clustered_active' "$TB_C" 2>/dev/null; then
   fail "tr_backend.c missing Unified Clustered opaque/transparent split"
 elif ! test -f "$PROJECT_ROOT/config/vulkan_overlay_unified_clustered.cfg"; then
   fail "missing config/vulkan_overlay_unified_clustered.cfg"
+elif ! test -f "$PROJECT_ROOT/config/modern_clustered.cfg"; then
+  fail "missing config/modern_clustered.cfg"
 elif ! test -f "$PROJECT_ROOT/docs/UNIFIED_CLUSTERED_RENDERER.md"; then
   fail "missing docs/UNIFIED_CLUSTERED_RENDERER.md"
-elif ! grep -q 'pbrDebugMode.y' "$PROJECT_ROOT/renderers/vulkan/shaders/glsl/gen_frag.tmpl" 2>/dev/null; then
+elif ! grep -q 'pbrDebugMode.y' "$GEN_FRAG_UC" 2>/dev/null; then
   fail "gen_frag.tmpl missing mode 3 hybrid handoff (pbrDebugMode.y)"
+elif ! grep -q 'forward_plus_cluster.glsl' "$GEN_FRAG_UC" 2>/dev/null; then
+  fail "gen_frag.tmpl must include forward_plus_cluster.glsl for Z-slice parity"
+elif ! grep -q 'fp_cluster_index' "$GEN_FRAG_UC" 2>/dev/null; then
+  fail "gen_frag.tmpl must use fp_cluster_index"
+elif ! grep -q 'Soft-cap Forward+ specular' "$GEN_FRAG_UC" 2>/dev/null; then
+  fail "gen_frag.tmpl missing Forward+ specular soft-cap (deferred parity)"
+elif ! grep -q 'forward_plus_cluster.glsl' "$OIT_ACCUM_UC" 2>/dev/null; then
+  fail "oit_accum.frag must include forward_plus_cluster.glsl"
+elif ! grep -q 'fp_cluster_index' "$OIT_ACCUM_UC" 2>/dev/null; then
+  fail "oit_accum.frag must use fp_cluster_index"
+elif ! grep -q 'forward_plus_cluster.glsl' "$OIT_MBOIT_UC" 2>/dev/null; then
+  fail "oit_accum_mboit.frag must include forward_plus_cluster.glsl"
+elif ! grep -q 'r_oitForwardPlus' "$TB_C" 2>/dev/null; then
+  fail "tr_backend.c OIT path should document r_oitForwardPlus"
 else
-  pass "Unified Clustered Renderer (mode 3) wired"
+  pass "Unified Clustered Renderer (mode 3) wired + shared cluster GLSL + soft-cap"
 fi
 
 echo ""

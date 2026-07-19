@@ -279,6 +279,51 @@ static void IN_Win32Mouse( int *mx, int *my )
 
 
 /*
+===========
+IN_GetAbsMouse
+
+Absolute client-area mouse for HavenRP City Menu / HUD cursor hit-tests.
+===========
+*/
+void IN_GetAbsMouse( int *x, int *y )
+{
+	POINT pt;
+	RECT cr;
+	int cx = 0;
+	int cy = 0;
+
+	if ( g_wv.hWnd && GetCursorPos( &pt ) && ScreenToClient( g_wv.hWnd, &pt ) ) {
+		cx = pt.x;
+		cy = pt.y;
+		if ( GetClientRect( g_wv.hWnd, &cr ) ) {
+			if ( cx < cr.left ) {
+				cx = cr.left;
+			}
+			if ( cy < cr.top ) {
+				cy = cr.top;
+			}
+			if ( cx > cr.right - 1 ) {
+				cx = cr.right - 1;
+			}
+			if ( cy > cr.bottom - 1 ) {
+				cy = cr.bottom - 1;
+			}
+		}
+	} else {
+		cx = cls.glconfig.vidWidth > 0 ? ( cls.glconfig.vidWidth / 2 ) : 0;
+		cy = cls.glconfig.vidHeight > 0 ? ( cls.glconfig.vidHeight / 2 ) : 0;
+	}
+
+	if ( x ) {
+		*x = cx;
+	}
+	if ( y ) {
+		*y = cy;
+	}
+}
+
+
+/*
 ============================================================
 
 RAW INPUT MOUSE CONTROL

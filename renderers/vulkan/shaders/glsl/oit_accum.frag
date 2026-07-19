@@ -4,6 +4,8 @@
  *  RT1 tracks revealage = product(1 - alpha)
  * Optional Forward+ dynamic lights (set 2) when r_oitForwardPlus is on.
  */
+#extension GL_GOOGLE_include_directive : require
+#include "forward_plus_cluster.glsl"
 #define DEPTH_TO_WEIGHT(z) (z)
 
 layout (constant_id = 0) const int manual_depth_test = 0;
@@ -62,18 +64,8 @@ vec3 oit_forward_plus_add( vec3 baseRgb, vec3 N, vec3 worldPos )
 	uint zMode = fp_params.fp_cluster_meta.y;
 	float zNear = max( fp_params.fp_cluster_z_range.x, 1e-3 );
 	float zFar = max( fp_params.fp_cluster_z_range.y, zNear + 1e-3 );
-	float viewDepth = abs( wc.w );
-	uint slice = 0u;
-	if ( zSlices > 1u ) {
-		float z = clamp( viewDepth, zNear, zFar );
-		float t = ( zMode == 1u )
-			? ( log( z / zNear ) / max( log( zFar / zNear ), 1e-5 ) )
-			: ( ( z - zNear ) / ( zFar - zNear ) );
-		t = clamp( t, 0.0, 0.9999 );
-		slice = min( uint( t * float( zSlices ) ), zSlices - 1u );
-	}
-	uint flatTiles = max( tilesX * tilesY, 1u );
-	uint tileId = ( zSlices > 1u ) ? ( ty * tilesX + tx + slice * flatTiles ) : ( ty * tilesX + tx );
+	uint slice = fp_view_depth_to_slice( abs( wc.w ), zSlices, zMode, zNear, zFar );
+	uint tileId = fp_cluster_index( tx, ty, tilesX, tilesY, slice, zSlices );
 	uint tbase = tileId * 8u;
 	float nLights = fp_lights.fp_light_data[0].x;
 	uint maxPerTile = uint( max( fp_lights.fp_light_data[0].z + 0.5, 1.0 ) );

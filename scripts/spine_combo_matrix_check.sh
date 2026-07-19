@@ -68,6 +68,28 @@ grep -q 'historyBleed' "$TAA_FRAG" || fail "taa.frag missing historyBleed anti-e
 grep -q 'Heuristic reactive always runs' "$TAA_FRAG" || fail "taa.frag must keep heuristic reactive independent of stamp mask"
 pass "temporal overlay: TAA+MVs, aaMode 4, no cleanup halo, weapon-after pinned"
 
+# --- Unified Clustered (opt-in mode 3; must not displace Spine stable mode 2) ---
+CLUSTERED="$ROOT/config/modern_clustered.cfg"
+UC_OVERLAY="$ROOT/config/vulkan_overlay_unified_clustered.cfg"
+GEN_FRAG="$ROOT/renderers/vulkan/shaders/glsl/gen_frag.tmpl"
+OIT_ACCUM="$ROOT/renderers/vulkan/shaders/glsl/oit_accum.frag"
+OIT_MBOIT="$ROOT/renderers/vulkan/shaders/glsl/oit_accum_mboit.frag"
+[[ -f "$CLUSTERED" && -f "$UC_OVERLAY" ]] || fail "missing modern_clustered / unified clustered overlay"
+cvar_is "$STABLE" r_renderMode 2 || fail "stable must remain renderMode 2 (clustered is opt-in)"
+cvar_is "$CLUSTERED" r_renderMode 3 || fail "modern_clustered expects r_renderMode 3"
+cvar_is "$CLUSTERED" r_forwardPlusZSlices 8 || fail "modern_clustered expects ZSlices 8"
+cvar_is "$CLUSTERED" r_taa 0 || fail "modern_clustered must keep TAA off (SMAA baseline)"
+cvar_is "$UC_OVERLAY" r_renderMode 3 || fail "unified clustered overlay expects r_renderMode 3"
+cvar_is "$UC_OVERLAY" r_forwardPlusZSlices 8 || fail "unified clustered overlay expects ZSlices 8"
+grep -q 'forward_plus_cluster.glsl' "$GEN_FRAG" || fail "gen_frag.tmpl must include forward_plus_cluster.glsl"
+grep -q 'fp_cluster_index' "$GEN_FRAG" || fail "gen_frag.tmpl must use fp_cluster_index"
+grep -q 'forward_plus_cluster.glsl' "$OIT_ACCUM" || fail "oit_accum.frag must include forward_plus_cluster.glsl"
+grep -q 'fp_cluster_index' "$OIT_ACCUM" || fail "oit_accum.frag must use fp_cluster_index"
+grep -q 'forward_plus_cluster.glsl' "$OIT_MBOIT" || fail "oit_accum_mboit.frag must include forward_plus_cluster.glsl"
+grep -q 'fp_cluster_index' "$OIT_MBOIT" || fail "oit_accum_mboit.frag must use fp_cluster_index"
+grep -q 'Soft-cap Forward+ specular' "$GEN_FRAG" || fail "gen_frag.tmpl missing Forward+ specular soft-cap"
+pass "clustered opt-in: mode 3 + ZSlices 8, shared cluster GLSL, soft-cap; stable stays mode 2"
+
 # --- Safe recovery ---
 cvar_is "$SAFE" r_taa 0 || fail "gfx_safe must disable TAA"
 cvar_is "$SAFE" r_oit 0 || fail "gfx_safe must disable OIT"
@@ -93,5 +115,5 @@ fi
 pass "no shipping cfg enables OIT+TAA together"
 
 echo "=== Spine combination matrix check PASSED ==="
-echo "Manual GPU: exec modern_vulkan_stable.cfg | quality | temporal_recon | gfx_safe;"
+echo "Manual GPU: exec modern_vulkan_stable.cfg | quality | temporal_recon | modern_clustered | gfx_safe;"
 echo "  stack OIT+TAA only with r_temporalWeaponAfterTaa 1 + r_spineValidate 1."

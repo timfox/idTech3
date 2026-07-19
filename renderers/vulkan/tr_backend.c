@@ -2170,7 +2170,7 @@ static const void *RB_DrawSurfs( const void *data ) {
 		backEnd.drawSurfFilter = 2; /* transparent only (Forward+ shade) */
 		backEnd.reactiveMaskStamp = qfalse;
 		if ( r_oit && r_oit->integer && r_fbo && r_fbo->integer ) {
-			/* OIT replaces Forward+ transparent shade (no tile-lit OIT yet). */
+			/* OIT replaces Forward+ transparent shade; r_oitForwardPlus samples the shared tile/Z grid. */
 			{
 				static qboolean s_oit_mode3_logged;
 				if ( !s_oit_mode3_logged ) {

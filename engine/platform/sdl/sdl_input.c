@@ -607,11 +607,22 @@ static void IN_WarpToWindowCenter( void )
 
 
 void IN_GetAbsMouse( int *x, int *y ) {
+	int lx = ( last_ui_mouse_x < 0 ) ? ( glw_state.window_width / 2 ) : last_ui_mouse_x;
+	int ly = ( last_ui_mouse_y < 0 ) ? ( glw_state.window_height / 2 ) : last_ui_mouse_y;
+	/* SDL motion/button coords are logical window pixels; HUD layout uses drawable size. */
+	if ( glw_state.window_width > 0 && glw_state.pixel_width > 0 &&
+	     glw_state.window_width != glw_state.pixel_width ) {
+		lx = (int)lroundf( (float)lx * ( (float)glw_state.pixel_width / (float)glw_state.window_width ) );
+	}
+	if ( glw_state.window_height > 0 && glw_state.pixel_height > 0 &&
+	     glw_state.window_height != glw_state.pixel_height ) {
+		ly = (int)lroundf( (float)ly * ( (float)glw_state.pixel_height / (float)glw_state.window_height ) );
+	}
 	if ( x ) {
-		*x = ( last_ui_mouse_x < 0 ) ? ( glw_state.window_width / 2 ) : last_ui_mouse_x;
+		*x = lx;
 	}
 	if ( y ) {
-		*y = ( last_ui_mouse_y < 0 ) ? ( glw_state.window_height / 2 ) : last_ui_mouse_y;
+		*y = ly;
 	}
 }
 
@@ -709,11 +720,21 @@ static void IN_DeactivateMouse( void )
 		mouse_frac_y = 0.0f;
 
 		if ( gw_active ) {
-			IN_WarpToWindowCenter();
-			/* Set last to 0 so the warp's motion event produces delta (cx,cy), moving
-			 * the UI cursor from 0,0 to center. */
-			last_ui_mouse_x = 0;
-			last_ui_mouse_y = 0;
+			/* HavenRP City Menu: keep the real pointer — do not warp to center (that
+			 * leaves last_ui at 0,0 until the next motion and breaks click hit-tests). */
+			if ( uiActive && !( Key_GetCatcher() & KEYCATCH_UI ) ) {
+				float mx = 0.0f;
+				float my = 0.0f;
+				SDL_GetMouseState( &mx, &my );
+				last_ui_mouse_x = (int)lroundf( mx );
+				last_ui_mouse_y = (int)lroundf( my );
+			} else {
+				IN_WarpToWindowCenter();
+				/* Set last to 0 so the warp's motion event produces delta (cx,cy), moving
+				 * the UI cursor from 0,0 to center. */
+				last_ui_mouse_x = 0;
+				last_ui_mouse_y = 0;
+			}
 		} else
 		{
 			if ( glw_state.isFullscreen )
@@ -727,10 +748,9 @@ static void IN_DeactivateMouse( void )
 		mouseActive = qfalse;
 	}
 
-	/* In menu/UI mode the engine draws its own cursor, so hide the OS cursor to avoid
-	 * a second pointer drifting away from the in-game one. Keep fullscreen non-UI
-	 * paths hidden as well to match captured-mouse behavior. */
-	if ( uiActive || glw_state.isFullscreen )
+	/* Q3 UI draws its own cursor — hide the OS pointer there.
+	 * HavenRP City Menu uses absolute OS cursor + HUD crosshair hit-tests. */
+	if ( ( Key_GetCatcher() & KEYCATCH_UI ) || ( glw_state.isFullscreen && !uiActive ) )
 		SDL_HideCursor();
 	else
 		SDL_ShowCursor();
@@ -2040,6 +2060,11 @@ void HandleEvents( void )
 			case SDL_EVENT_MOUSE_BUTTON_UP:
 				{
 					int b;
+					/* Keep absolute cursor fresh even when the click arrives without a prior move. */
+					if ( IN_PointerUiMode() ) {
+						last_ui_mouse_x = (int)lroundf( e.button.x );
+						last_ui_mouse_y = (int)lroundf( e.button.y );
+					}
 					switch( e.button.button )
 					{
 						case SDL_BUTTON_LEFT:   b = K_MOUSE1;     break;

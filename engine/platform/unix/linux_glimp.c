@@ -972,6 +972,36 @@ void IN_ActivateMouse( void )
 
 
 /*
+===========
+IN_GetAbsMouse
+
+Absolute window mouse for HavenRP City Menu / HUD cursor (X11 / non-SDL path).
+===========
+*/
+void IN_GetAbsMouse( int *x, int *y )
+{
+	Window root_ret, child_ret;
+	int root_x, root_y, win_x, win_y;
+	unsigned int mask;
+	int cx = cls.glconfig.vidWidth > 0 ? ( cls.glconfig.vidWidth / 2 ) : 0;
+	int cy = cls.glconfig.vidHeight > 0 ? ( cls.glconfig.vidHeight / 2 ) : 0;
+
+	if ( dpy && win && XQueryPointer( dpy, win, &root_ret, &child_ret,
+			&root_x, &root_y, &win_x, &win_y, &mask ) ) {
+		cx = win_x;
+		cy = win_y;
+	}
+
+	if ( x ) {
+		*x = cx;
+	}
+	if ( y ) {
+		*y = cy;
+	}
+}
+
+
+/*
 ================
 IN_DeactivateMouse
 ================

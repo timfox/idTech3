@@ -1,6 +1,8 @@
 # Unified Clustered Renderer
 
-The **Unified Clustered Renderer** is the engine’s primary high-fidelity rendering path. It combines deferred opaque shading, GPU-built light lists, Forward+ transparency, order-independent transparency, temporal reconstruction, and visibility-buffer migration within one coordinated frame architecture.
+The **Unified Clustered Renderer** (`r_renderMode 3`) is the engine’s high-fidelity **opt-in** lighting path. It combines deferred opaque shading, GPU-built light lists, Forward+ transparency, order-independent transparency, temporal reconstruction, and visibility-buffer migration within one coordinated frame architecture.
+
+Spine 1.0 shipping default remains **Forward+ mode 2** (`modern_vulkan.cfg` → `modern_vulkan_stable.cfg`). Mode 3 is enabled via `modern_clustered.cfg` or the overlay below — see [RENDERER_SPINE_1.0.md](RENDERER_SPINE_1.0.md).
 
 ```cfg
 r_renderMode 3
@@ -29,7 +31,7 @@ This allows each surface category to use the shading method best suited to its v
 | Temporal presentation | Motion vectors, TAA, bloom, neural effects, and final composition |
 | UI overlay | HUD and 2D presentation outside world reconstruction history |
 
-The current production implementation uses a shared Forward+ **light grid**: 16×16 screen tiles, optionally expanded by **logarithmic Z-slices** (`r_forwardPlusZSlices`; default **1** = 2D-only; shipping configs set **8**). Deferred, Forward+, and OIT consume the same cluster index lists.
+The current implementation uses a shared Forward+ **light grid**: 16×16 screen tiles, optionally expanded by **logarithmic Z-slices** (`r_forwardPlusZSlices`; default **1** = 2D-only; clustered profiles set **8**). Deferred, Forward+, and OIT consume the same cluster index lists (`forward_plus_cluster.glsl`).
 
 ## Design goals
 
@@ -58,13 +60,13 @@ The production light assignment path supports:
 * **2D tiled** lists when `r_forwardPlusZSlices 1` (legacy / diagnostic fallback)
 * **Depth-partitioned frustum clusters** (depth-partitioned) when `r_forwardPlusZSlices` is **2–16** (logarithmic by default via `r_forwardPlusZSliceMode 1`)
 
-Cluster layout is `tileXY + slice * tilesX * tilesY`, shared by deferred opaque, Forward+ transparent, OIT, FSA, and NVC consumers. Mode 3 latches `r_forwardPlusOverflowShade 1` so lights 32–63 shade on transparent paths the same way deferred already does. Shipping configs enable `r_forwardPlusZSlices 8`; set **1** for an explicit 2D tiled comparison.
+Cluster layout is `tileXY + slice * tilesX * tilesY`, shared by deferred opaque, Forward+ transparent, OIT, FSA, and NVC consumers. Mode 3 latches `r_forwardPlusOverflowShade 1` so lights 32–63 shade on transparent paths the same way deferred already does. Clustered profiles enable `r_forwardPlusZSlices 8`; set **1** for an explicit 2D tiled comparison.
 
 Also called historically: Hybrid Clustered Deferred Renderer / Deferred + Forward+ Pipeline.
 
 ## Enable
 
-Shipping default is **`modern_vulkan.cfg`** (`r_renderMode 3`). Equivalent profile: `exec modern_clustered.cfg`.
+Opt-in profile: `exec modern_clustered.cfg` (or overlay below). Spine stable default stays mode 2.
 
 ```
 exec vulkan_overlay_unified_clustered.cfg

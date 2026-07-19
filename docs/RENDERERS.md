@@ -106,7 +106,7 @@ renderer_deferred_safe
 vid_restart
 ```
 
-This profile sets `r_renderMode 1`, `r_deferredGBuffer 1`, `r_deferredGBufferFill 1`, and `r_deferredLighting 1`. It uses the same **opaque deferred + Forward+ transparent** split as mode 3 (`r_forwardPlusShade 1` on transparent; opaque handoff skips Forward+ add). Prefer `r_ext_multisample 0` for direct material export; MSAA uses depth-fallback fill with `deferredMsaaSafeMaterials` confidence floor. Safe debug: `renderer_deferred_safe`. Shipping default remains `modern_vulkan.cfg` (mode 3).
+This profile sets `r_renderMode 1`, `r_deferredGBuffer 1`, `r_deferredGBufferFill 1`, and `r_deferredLighting 1`. It uses the same **opaque deferred + Forward+ transparent** split as mode 3 (`r_forwardPlusShade 1` on transparent; opaque handoff skips Forward+ add). Prefer `r_ext_multisample 0` for direct material export; MSAA uses depth-fallback fill with `deferredMsaaSafeMaterials` confidence floor. Safe debug: `renderer_deferred_safe`. Shipping default remains `modern_vulkan.cfg` (Spine stable mode 2).
 
 The G-buffer fill copies scene albedo. On **non-MSAA** FBO frames, opaque PBR shaders **directly export** normals and material (metalness/roughness/AO). **MSAA** forces the depth-derived fallback (default metal/rough/AO=1). Prefer `r_ext_multisample 0` with `modern_vulkan.cfg` for true material export. Fallback defaults: `r_deferredDefaultMetalness`, `r_deferredDefaultRoughness`, `r_deferredNormalEdgeThreshold`.
 
