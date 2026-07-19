@@ -30,7 +30,7 @@ check "$VK_RTX" 'VK_BUILD_ACCELERATION_STRUCTURE_MODE_UPDATE_KHR' 'TLAS UPDATE b
 check "$VK_RTX" 'ALLOW_UPDATE_BIT_KHR' 'TLAS ALLOW_UPDATE flag'
 check "$VK_RTX" 'rtx_status' 'rtx_status console command'
 check "$VK_RTX" 'vk_rtx_state_string' 'rtx_status reports readiness state'
-check "$VK_RTX" 'idle: enable r_rtx, r_hybrid1, or r_raygun before vid_restart' 'rtx_status explains disabled consumers'
+check "$VK_RTX" 'idle: enable r_rtxDemo, r_rtx, r_hybrid1, or r_raygun before vid_restart' 'rtx_status explains disabled consumers'
 check "$VK_RTX" 'waiting: TLAS not built yet' 'rtx_status explains pending TLAS'
 check "$VK_RTX" 'vk_rtx_rebuild_entity_tlas' 'entity TLAS refresh path'
 check "$VK_RTX" 'r_rtxEntityTriCap' 'entity triangle budget cvar use'

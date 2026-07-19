@@ -516,7 +516,7 @@ void Con_Init( void )
 	/* Ensure FreeType console glyphs are requested once the renderer is up.
 	   SCR_Init / CL_RegisterBuiltInTrueTypeFonts own the actual load; this
 	   latches con_scale so Con_CheckResize refreshes smallchar metrics. */
-	Cvar_Get( "cl_builtInTtfConsole", "1", CVAR_ARCHIVE_ND );
+	Cvar_Get( "cl_builtInTtfConsole", "0", CVAR_ARCHIVE_ND );
 	Cvar_Get( "r_consoleFont", "fonts/Inter-Regular.ttf", CVAR_ARCHIVE );
 	if ( con_scale ) {
 		con_scale->modified = qtrue;

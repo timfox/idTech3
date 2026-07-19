@@ -1406,10 +1406,10 @@ void SCR_Init( void ) {
 			"drawn before pre-baked SDF when both are available. Set 0 to prefer SDF (r_sdfEnable) or legacy bigchars if r_font fails. "
 			"Requires BUILD_FREETYPE and valid font files (e.g. base/fonts/Inter-Regular.ttf)." );
 
-		cl_builtInTtfConsole = Cvar_Get( "cl_builtInTtfConsole", "1", CVAR_ARCHIVE_ND );
+		cl_builtInTtfConsole = Cvar_Get( "cl_builtInTtfConsole", "0", CVAR_ARCHIVE_ND );
 		Cvar_CheckRange( cl_builtInTtfConsole, "0", "1", CV_INTEGER );
 		Cvar_SetDescription( cl_builtInTtfConsole,
-			"When 1 (default), draw console/notify with FreeType (r_font / r_consoleFont). Set 0 to use the legacy 8x16 bitmap charset." );
+			"When 1, draw console/notify with FreeType (r_font / r_consoleFont). Default 0 uses the legacy 8x16 bitmap charset." );
 	}
 
 	r_fontConsoleAlign = Cvar_Get( "r_fontConsoleAlign", "1", CVAR_ARCHIVE );

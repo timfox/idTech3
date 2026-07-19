@@ -10,6 +10,7 @@ fail() { echo "FAIL: $*" >&2; exit 1; }
 FACE="$(idtech3_require_file runtime/game/g_facial.c src/game/g_facial.c)"
 FACEH="$(idtech3_require_file runtime/game/g_facial.h src/game/g_facial.h)"
 LUA="$(idtech3_require_file runtime/game/g_lua_bindings.c src/game/g_lua_bindings.c)"
+LUA_REG="$(idtech3_require_file runtime/game/g_lua_registration.inc src/game/g_lua_registration.inc)"
 CGAME="${IDTECH3_CLIENT}/core/cl_cgame.c"
 DOC="${ROOT}/docs/FACS.md"
 
@@ -23,7 +24,7 @@ rg -q 'Face_ApplyMorphsToEntity' "$FACEH" || fail "Face_ApplyMorphsToEntity not 
 rg -q 'com_faceFacs' "$FACE" || fail "com_faceFacs cvar missing"
 rg -q 's_facsTable' "$FACE" || fail "FACS mapping table missing"
 rg -q 'l_face_setAU' "$LUA" || fail "Lua setAU binding missing"
-rg -q 'SIDE_BOTH' "$LUA" || fail "Lua FACS side constants missing"
+rg -q 'SIDE_BOTH' "$LUA_REG" || fail "Lua FACS side constants missing"
 rg -q 'Face_AUName' "$LUA" || fail "Lua AU name constants missing"
 rg -q 'CL_Face_ApplyMorphs' "$CGAME" || fail "cgame morph apply missing"
 rg -q 'AU12' "$DOC" || fail "docs missing AU12"

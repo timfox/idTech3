@@ -108,7 +108,7 @@ source_checks() {
 	check_grep "$tr_diag" 'R_RendererPrintCompatibilityWarnings' "compatibility warnings share one implementation"
 	check_grep "$tr_diag" 'modern profile expects r_forwardPlus 1' "compatibility warns on broken Forward+ profile"
 	check_grep "$tr_diag" 'modern profile expects r_forwardPlusDepthCull 1' "compatibility warns on missing Forward+ depth cull"
-	check_grep "$tr_diag" 'modern profile expects r_deferredGBuffer 1' "compatibility warns on missing sidecar G-buffer"
+	check_grep "$tr_diag" 'quality/rt/experimental profile expects r_deferredGBuffer 1' "compatibility warns on missing sidecar G-buffer"
 	check_grep "$tr_diag" 'renderer_modern_safe + vid_restart' "compatibility warns on stale deferred lighting in modern mode"
 	check_grep "$tr_diag" 'r_niv_useGBuffer 1 needs r_deferredGBuffer 1' "compatibility warns on NIV G-buffer mismatch"
 	check_grep "$tr_diag" 'r_vfgi_useGBuffer 1 needs r_deferredGBuffer 1' "compatibility warns on VFGI G-buffer mismatch"
