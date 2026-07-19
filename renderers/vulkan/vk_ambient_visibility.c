@@ -46,6 +46,7 @@ typedef struct {
 	uint32_t historyIndex;
 	uint32_t gbufferGeneration;
 	uint32_t historyGeneration;
+	uint32_t lastTlasRevision;
 	int lastMode;
 	float lastRadius;
 
@@ -631,6 +632,7 @@ void vk_ambient_visibility_init( void )
 	av.lastMode = -1;
 	av.gbufferGeneration = vk_deferred_gbuffer_generation();
 	av.historyGeneration = av.gbufferGeneration;
+	av.lastTlasRevision = vk_rtx_tlas_revision();
 	ri.Printf( PRINT_ALL, "[AV] directional Ambient Visibility initialized (GTAO%s)\n",
 		av.rtaoPipe ? " + Hybrid1 TLAS ray query" : "; RTAO unavailable, safe GTAO fallback" );
 }
@@ -674,16 +676,23 @@ void vk_ambient_visibility_frame_begin( void )
 	 * Do not reset on weapon/UI view-class flicker — RDF_NOWORLDMODEL flips every
 	 * frame after the world pass (same rule as TAA). Apply is already main-world-only.
 	 * Portal/mirror never own AV history because apply refuses those view classes.
+	 * TLAS rebuild (map load / entity BLAS churn) must discard RTAO temporal history.
 	 */
-	if ( av.gbufferGeneration != gbufGen ||
-		av.historyGeneration != gbufGen ||
-		av.lastMode != r_ambientVisibilityMode->integer ||
-		av.lastRadius != r_rtaoRadius->value ||
-		vk.temporal.appliedResetReasons != 0u ) {
-		vk_ambient_visibility_reset_history();
-		av.gbufferGeneration = gbufGen;
-		av.lastMode = r_ambientVisibilityMode->integer;
-		av.lastRadius = r_rtaoRadius->value;
+	{
+		uint32_t tlasRev = vk_rtx_tlas_revision();
+
+		if ( av.gbufferGeneration != gbufGen ||
+			av.historyGeneration != gbufGen ||
+			av.lastMode != r_ambientVisibilityMode->integer ||
+			av.lastRadius != r_rtaoRadius->value ||
+			av.lastTlasRevision != tlasRev ||
+			vk.temporal.appliedResetReasons != 0u ) {
+			vk_ambient_visibility_reset_history();
+			av.gbufferGeneration = gbufGen;
+			av.lastMode = r_ambientVisibilityMode->integer;
+			av.lastRadius = r_rtaoRadius->value;
+			av.lastTlasRevision = tlasRev;
+		}
 	}
 }
 

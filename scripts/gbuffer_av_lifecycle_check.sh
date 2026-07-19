@@ -86,10 +86,17 @@ pass "descriptor generation + shutdown order + demo cfg"
 # Soft-fail pipeline create (no VK_CHECK fatal on G-buffer fill path)
 grep -q 'gbuffer_pipeline_' "$DGB_C" || fail "create_pipeline must soft-fail with fallback reason"
 grep -q 'legacy_ssao' "$DGB_C" || fail "set_fallback must restore legacy_ssao owner"
+grep -q 'lighting_create_failed' "$DGB_C" "$VK_H" || fail "lighting soft-fail sticky missing"
+grep -q 'composite_create_failed' "$DGB_C" "$VK_H" || fail "composite soft-fail sticky missing"
+grep -q 'fail-inject cleared' "$DGB_C" || fail "fail-inject recovery path missing"
 # Visibility fill shares main-world view class
 grep -q 'VK_VIEW_CLASS_MAIN_WORLD' "$ROOT/renderers/vulkan/vk_visibility_buffer.c" || \
   fail "visibility fill must gate on MAIN_WORLD view class"
-pass "soft-fail pipeline + visibility view-class gate"
+# TLAS rebuild must invalidate AV temporal history (RTAO)
+grep -q 'vk_rtx_tlas_revision' "$AV_C" "$ROOT/renderers/vulkan/extensions/rtx/vk_rtx.h" || \
+  fail "TLAS revision API / AV consumption missing"
+grep -q 'lastTlasRevision' "$AV_C" || fail "AV must track lastTlasRevision"
+pass "soft-fail pipeline + visibility view-class gate + TLAS→AV history"
 
 
 # Stable ownership frozen; quality must NOT silently enable mode 4 yet

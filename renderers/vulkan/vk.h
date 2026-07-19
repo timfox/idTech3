@@ -819,6 +819,7 @@ typedef struct {
 		VkDescriptorSet lighting_descriptor;
 		qboolean lighting_pipeline_ready;
 		qboolean lighting_logged;
+		qboolean lighting_create_failed; /* soft-fail sticky; cleared on invalidate */
 		VkDescriptorSetLayout composite_gfx_layout;
 		VkPipelineLayout composite_gfx_pipeline_layout;
 		VkPipeline composite_gfx_pipeline;
@@ -826,6 +827,7 @@ typedef struct {
 		VkDescriptorSet composite_gfx_descriptor;
 		qboolean composite_gfx_ready;
 		qboolean composite_logged;
+		qboolean composite_create_failed; /* soft-fail sticky; cleared on invalidate */
 	} deferred_gbuffer;
 	VkImage deferred_gbuffer_albedo;
 	VkImageView deferred_gbuffer_albedo_view;
