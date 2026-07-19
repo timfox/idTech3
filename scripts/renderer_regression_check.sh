@@ -250,7 +250,9 @@ elif ! grep -q 'R_ApplyRenderModeLatch();' "$TR_INIT_VK" 2>/dev/null; then
 elif ! grep -q 'R_ApplyRenderModeLatch();' "$PROJECT_ROOT/renderers/vulkan/vk_forward_plus.c" 2>/dev/null; then
   fail "vk_forward_plus.c should call R_ApplyRenderModeLatch() during Forward+ init"
 elif ! grep -q 'r_deferredLighting' "$RENDER_MODE_C" 2>/dev/null; then
-  fail "tr_render_mode_vk.c should latch deferred lighting (r_forwardPlusShade 0)"
+  fail "tr_render_mode_vk.c should latch deferred lighting"
+elif ! grep -q 'deferred opaque + Forward+ transparent' "$RENDER_MODE_C" 2>/dev/null; then
+  fail "tr_render_mode_vk.c mode 1 should document deferred opaque + Forward+ transparent"
 elif ! grep -q 'Unified Clustered Renderer' "$RENDER_MODE_C" 2>/dev/null; then
   fail "tr_render_mode_vk.c missing r_renderMode 3 Unified Clustered latch"
 elif ! grep -q 'CheckRange( r_renderMode, "0", "3"' "$TR_INIT_VK" 2>/dev/null; then
@@ -797,6 +799,14 @@ elif ! grep -q 'pbrForwardPlus\[2\]' "$PROJECT_ROOT/renderers/vulkan/tr_shade.c"
   fail "tr_shade.c must push specular strength via pbrForwardPlus[2]"
 elif ! grep -q 'sceneNearest' "$FP_COMP" 2>/dev/null; then
   fail "forward_plus_tile_cull.comp should use multi-probe sceneNearest depth cull"
+elif ! grep -q 'spotFrustumTileCull\|spot_frustum_tile_overlap' "$FP_COMP" 2>/dev/null; then
+  fail "forward_plus_tile_cull.comp must implement spotFrustumTileCull for linear lights"
+elif ! grep -q 'lightVolumeDepthCull' "$FP_COMP" 2>/dev/null; then
+  fail "forward_plus_tile_cull.comp must implement lightVolumeDepthCull (volume Z vs sceneNearest)"
+elif ! grep -q 'forwardPlusHiZPyramid\|hiZ' "$FP_COMP" 2>/dev/null; then
+  fail "forward_plus_tile_cull.comp must implement forwardPlusHiZPyramid / hiZ push"
+elif ! grep -q 'r_forwardPlusHiZ' "$TR_INIT_VK" 2>/dev/null; then
+  fail "tr_init.c missing r_forwardPlusHiZ cvar"
 elif ! grep -q 'aliases to 32-bit HDR' "$VK_DEVICE" 2>/dev/null; then
   fail "vk_device.c must honestly alias r_hdr 3 to 32-bit HDR"
 elif ! grep -q 'toneMapParams0' "$GAMMA_FRAG" 2>/dev/null || ! grep -q 'Tonemap_AgX' "$GAMMA_FRAG" 2>/dev/null; then
@@ -804,7 +814,7 @@ elif ! grep -q 'toneMapParams0' "$GAMMA_FRAG" 2>/dev/null || ! grep -q 'Tonemap_
 elif ! grep -q 'agxStrength\|invWhite\|highlightDesat' "$GAMMA_FRAG" 2>/dev/null; then
   fail "gamma.frag Tonemap_AgX should consume toe/shoulder/whitePoint/desat"
 else
-  pass "Forward+ specular/renorm cvars + tile probes + r_hdr 3 alias + AgX grade knobs"
+  pass "Forward+ specular/renorm cvars + spot frustum + light-volume depth + AgX grade knobs"
 fi
 
 echo ""

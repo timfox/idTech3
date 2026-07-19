@@ -161,10 +161,11 @@ void main() {
 			return;
 		}
 		if ( matClass == CLASS_LAYERED ) {
-			classSpecScale = 1.35;
+			/* Mild metal boost — calibrated vs Forward+ reference (was 1.35). */
+			classSpecScale = 1.12;
 		} else if ( matClass == CLASS_TRANSMISSION ) {
-			classSpecScale = 0.45;
-			classDiffScale = 0.65;
+			classSpecScale = 0.75;
+			classDiffScale = 0.85;
 		}
 	}
 

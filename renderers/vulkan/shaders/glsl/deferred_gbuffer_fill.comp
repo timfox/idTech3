@@ -100,6 +100,16 @@ void main() {
 	float fallbackRoughness = mix( baseMaterial.g, 0.92, max( edgeFactor, 1.0 - confidence ) );
 	float fallbackAO = mix( 1.0, 0.82, edgeFactor * confidence );
 
+	/*
+	 * deferredMsaaSafeMaterials: when depth-fallback is used under MSAA (no direct MRT),
+	 * keep a usable confidence floor on flat surfaces so metal/rough do not collapse to defaults.
+	 */
+	if ( pc.materialParams.w > 0.5 ) {
+		confidence = max( confidence, mix( 0.65, 0.35, edgeFactor ) );
+		fallbackRoughness = mix( baseMaterial.g, fallbackRoughness, 0.5 );
+		fallbackMetalness = mix( baseMaterial.r, fallbackMetalness, 0.5 );
+	}
+
 	imageStore( normalOut, ivec2( pix ), vec4( n, confidence ) );
 	/* material.a = sourceConfidence (same signal as normal.a) for classify. */
 	imageStore( materialOut, ivec2( pix ), vec4( fallbackMetalness, fallbackRoughness, fallbackAO, confidence ) );

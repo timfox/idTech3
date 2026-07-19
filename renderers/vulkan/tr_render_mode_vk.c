@@ -55,23 +55,23 @@ void R_ApplyRenderModeLatch( void )
 		R_LatchCvarInt( r_deferredGBuffer, "r_deferredGBuffer", 1 );
 		R_LatchCvarInt( r_deferredGBufferFill, "r_deferredGBufferFill", 1 );
 		R_LatchCvarInt( r_forwardPlus, "r_forwardPlus", 1 );
-		if ( r_forwardPlusShade && r_forwardPlusShade->value > 0.0f ) {
-			R_LatchCvarFloat( r_forwardPlusShade, "r_forwardPlusShade", 0.0f );
+		R_LatchCvarInt( r_deferredUnlitBase, "r_deferredUnlitBase", 1 );
+		/* Transparent Forward+ shade; opaque uses deferred handoff (same split as mode 3). */
+		if ( r_forwardPlusShade && r_forwardPlusShade->value <= 0.0f ) {
+			R_LatchCvarFloat( r_forwardPlusShade, "r_forwardPlusShade", 1.0f );
 		}
 		if ( r_deferredGBuffer && r_deferredGBuffer->integer &&
 			r_deferredLighting && r_deferredLighting->integer ) {
 			if ( mode != s_last_logged_mode ) {
 				ri.Printf( PRINT_ALL,
-					"[VK] r_renderMode 1 + r_deferredLighting 1: deferred diffuse (r_forwardPlus=1, "
-					"r_forwardPlusShade=0, r_deferredGBuffer=1, r_deferredGBufferFill=1, "
-					"r_deferredUnlitBase additive)\n" );
+					"[VK] r_renderMode 1 + r_deferredLighting 1: deferred opaque + Forward+ transparent "
+					"(r_forwardPlusShade=1 on filter 2; r_deferredUnlitBase; same contract as mode 3)\n" );
 				s_last_logged_mode = mode;
 			}
 		} else if ( mode != s_last_logged_mode ) {
 			ri.Printf( PRINT_ALL,
-				"[VK] r_renderMode 1 (deferred G-buffer scaffold). "
-				"forcing r_deferredGBuffer 1 + r_deferredGBufferFill 1 captures RTs; "
-				"r_deferredLighting 1 enables experimental diffuse. vid_restart after latch.\n" );
+				"[VK] r_renderMode 1 (deferred G-buffer). "
+				"r_deferredLighting 1 enables opaque deferred + transparent Forward+. vid_restart after latch.\n" );
 			s_last_logged_mode = mode;
 		}
 		break;

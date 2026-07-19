@@ -63,8 +63,8 @@ source_checks() {
 	check_grep "$cfg" 'seta r_deferredLighting 1' "modern profile enables deferred lighting for mode 3"
 	check_grep "$cfg" 'seta r_pbr 1' "modern profile enables PBR"
 	check_grep "$cfg" 'seta r_hdr 2' "modern profile enables HDR32"
-	check_grep "$cfg" 'seta r_taa 0' "modern profile defaults TAA off for mode 3 stability"
-	check_grep "$cfg" 'seta r_taaMotionVectors 0' "modern profile defaults motion-vector TAA off"
+	check_grep "$cfg" 'seta r_taa 1' "modern profile defaults TAA on for mode 3"
+	check_grep "$cfg" 'seta r_taaMotionVectors 1' "modern profile defaults motion-vector TAA on"
 
 	check_grep "$deferred" 'exec modern_vulkan.cfg' "deferred overlay inherits modern profile"
 	check_grep "$deferred" 'seta r_renderMode 1' "deferred overlay selects deferred mode"

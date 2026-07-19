@@ -102,7 +102,7 @@ renderer_deferred_safe
 vid_restart
 ```
 
-This profile sets `r_renderMode 1`, `r_deferredGBuffer 1`, `r_deferredGBufferFill 1`, and `r_deferredLighting 1`. It also forces `r_forwardPlusShade 0` so dynamic lights come from the deferred compute/composite path instead of being applied once by Forward+ primary shading and again by the legacy lit-surface pass. Because the mode-1 path is still experimental, the profile also disables **TAA**, **SMAA**, **FXAA**, and `r_postAaAfterBloom` by default so temporal/post-AA artifacts do not hide core lighting regressions while debugging. Deferred dynamic lights can be attenuated by the **material AO** channel with `r_deferredAOCoupling` (not screen-space SSAO), and highlights use **GGX** specular scaled by `r_deferredSpecularStrength`. Additive deferred diffuse is albedo×(1−metalness)×irradiance to match Forward+ `Fd`. The deferred lighting mode is still experimental; the reliable shipping/native default remains `modern_vulkan.cfg`.
+This profile sets `r_renderMode 1`, `r_deferredGBuffer 1`, `r_deferredGBufferFill 1`, and `r_deferredLighting 1`. It uses the same **opaque deferred + Forward+ transparent** split as mode 3 (`r_forwardPlusShade 1` on transparent; opaque handoff skips Forward+ add). Prefer `r_ext_multisample 0` for direct material export; MSAA uses depth-fallback fill with `deferredMsaaSafeMaterials` confidence floor. Safe debug: `renderer_deferred_safe`. Shipping default remains `modern_vulkan.cfg` (mode 3).
 
 The G-buffer fill copies scene albedo. On **non-MSAA** FBO frames, opaque PBR shaders **directly export** normals and material (metalness/roughness/AO). **MSAA** forces the depth-derived fallback (default metal/rough/AO=1). Prefer `r_ext_multisample 0` with `modern_vulkan.cfg` for true material export. Fallback defaults: `r_deferredDefaultMetalness`, `r_deferredDefaultRoughness`, `r_deferredNormalEdgeThreshold`.
 
@@ -118,7 +118,7 @@ The G-buffer fill copies scene albedo. On **non-MSAA** FBO frames, opaque PBR sh
 | `r_forwardPlusShade` | **0–4** float: PBR shade for dlight indices **0–31** (not in `tess.dlightBits`); pipeline rebuild on change. |
 | `r_forwardPlusOverflowShade` | **0–4** (default **0**): PBR shade for indices **32–63**; requires `r_classicLighting 0`. Try **0.5** with modern lighting. |
 | `r_forwardPlusSpecularStrength` | **0–4** (default **0.65**): Forward+ dynamic specular scale (`modern_vulkan.cfg`). |
-| `r_forwardPlusEnergyRenorm` | **0–2** (default **0.45**): Soft primary-direct renorm vs Forward+ add. |
+| `r_forwardPlusEnergyRenorm` | **0–2** (default **0**): Legacy dual-path renorm; unused when Forward+ shade owns dynamics (projector skipped). |
 | `r_forwardPlusDepthCull` | **0/1** (code default **0**; **`modern_vulkan.cfg` 1**): post-opaque tile cull with 5 depth probes. |
 | `r_forwardPlusLuminanceSort` | **0/1** (default **1**): when a tile is overloaded, keep brightest lights by RGB sum. |
 | `r_forwardPlusDistanceSort` | **0/1** (default **0**): when overloaded, prefer nearest lights to the camera (`vieworg`). |

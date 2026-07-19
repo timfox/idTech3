@@ -345,8 +345,8 @@ static int R_RendererPrintCompatibilityWarnings( qboolean printOk )
 		if ( !r_forwardPlus || !r_forwardPlus->integer ) {
 			R_RENDERER_WARN( "deferred lighting mode needs r_forwardPlus 1 for tile light lists.\n" );
 		}
-		if ( r_forwardPlusShade && r_forwardPlusShade->value > 0.0f ) {
-			R_RENDERER_WARN( "mode-1 deferred expects r_forwardPlusShade 0 so the deferred scaffold does not double-light opaque surfaces.\n" );
+		if ( r_forwardPlusShade && r_forwardPlusShade->value <= 0.0f ) {
+			R_RENDERER_WARN( "mode-1 deferred expects r_forwardPlusShade > 0 for transparent Forward+ (opaque uses deferred handoff).\n" );
 		}
 		if ( !r_deferredGBuffer || !r_deferredGBuffer->integer || !r_deferredGBufferFill || !r_deferredGBufferFill->integer ) {
 			R_RENDERER_WARN( "mode-1 deferred expects r_deferredGBuffer 1 and r_deferredGBufferFill 1 for the opaque capture path.\n" );

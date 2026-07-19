@@ -17,7 +17,7 @@ rg -q 'r_visibilityBuffer = ri.Cvar_Get' "$ROOT/renderers/vulkan/tr_init.c" || f
 rg -q 'r_visibilityBufferFill = ri.Cvar_Get' "$ROOT/renderers/vulkan/tr_init.c" || fail "r_visibilityBufferFill cvar missing"
 rg -q 'r_materialClassify = ri.Cvar_Get' "$ROOT/renderers/vulkan/tr_init.c" || fail "r_materialClassify cvar missing"
 rg -q 'r_deferredMaterialClassify = ri.Cvar_Get' "$ROOT/renderers/vulkan/tr_init.c" || fail "r_deferredMaterialClassify cvar missing"
-rg -q 'r_deferredMaterialClassify", "0"' "$ROOT/renderers/vulkan/tr_init.c" || fail "r_deferredMaterialClassify should default to 0"
+rg -q 'r_deferredMaterialClassify", "1"' "$ROOT/renderers/vulkan/tr_init.c" || fail "r_deferredMaterialClassify should default to 1"
 rg -q 'CLASS_ALPHA_TEST' "$ROOT/renderers/vulkan/shaders/glsl/deferred_lighting.comp" || fail "deferred ALPHA_TEST handling missing"
 rg -Fq 'matClass = CLASS_SIMPLE_OPAQUE' "$ROOT/renderers/vulkan/shaders/glsl/deferred_lighting.comp" || fail "ALPHA_TEST should remap to opaque, not black-out"
 rg -q 'confidence' "$ROOT/renderers/vulkan/shaders/glsl/deferred_gbuffer_fill.comp" || fail "material confidence write missing"
@@ -52,5 +52,9 @@ rg -q 'morton2d5' "$ROOT/renderers/vulkan/shaders/glsl/visibility_buffer_fill.co
 rg -q 'pc.mode == 5' "$ROOT/renderers/vulkan/shaders/glsl/visibility_buffer_debug.frag" || fail "late-shade debug mode 5 missing"
 rg -q 'albedoTex' "$ROOT/renderers/vulkan/shaders/glsl/visibility_buffer_debug.frag" || fail "albedo binding missing"
 rg -q 'deferred_gbuffer_albedo_view' "$ROOT/renderers/vulkan/vk_visibility_buffer.c" || fail "albedo descriptor wiring missing"
+rg -q 'vk_visibility_late_shade_wanted' "$ROOT/renderers/vulkan/vk_visibility_buffer.c" || fail "late shade wanted helper missing"
+rg -q 'r_visibilityBufferLateShade' "$ROOT/renderers/vulkan/tr_init.c" || fail "r_visibilityBufferLateShade cvar missing"
+rg -q 'vk_visibility_late_shade_apply_after_geometry' "$ROOT/renderers/vulkan/tr_backend.c" || fail "backend late shade exclusive path missing"
+rg -q 'confidence' "$ROOT/renderers/vulkan/shaders/glsl/material_classify.comp" || fail "classify confidence gate missing"
 
 echo "OK: visibility buffer Phase 1 / 1.5 smoke checks passed"

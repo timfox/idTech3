@@ -183,16 +183,34 @@ qboolean vk_unified_clustered_active( void )
 		vk_deferred_lighting_wanted() ) ? qtrue : qfalse;
 }
 
+qboolean vk_deferred_opaque_transparent_split( void )
+{
+	/* Mode 3 unified or mode 1 deferred: opaque→deferred→transparent Forward+. */
+	if ( vk_unified_clustered_active() ) {
+		return qtrue;
+	}
+	if ( r_renderMode && r_renderMode->integer == 1 && vk_deferred_lighting_active() ) {
+		return qtrue;
+	}
+	return qfalse;
+}
+
 qboolean vk_unified_clustered_opaque_handoff( void )
 {
-	/* Opaque world pass of mode 3: hand dynamics to deferred. Skip weapon/UI views. */
-	if ( !vk_unified_clustered_active() || backEnd.drawSurfFilter != 1 ) {
+	/* Opaque world pass: hand dynamics to deferred. Skip weapon/UI views. */
+	if ( backEnd.drawSurfFilter != 1 ) {
 		return qfalse;
 	}
 	if ( backEnd.refdef.rdflags & RDF_NOWORLDMODEL ) {
 		return qfalse;
 	}
-	return qtrue;
+	if ( vk_unified_clustered_active() ) {
+		return qtrue;
+	}
+	if ( r_renderMode && r_renderMode->integer == 1 && vk_deferred_lighting_active() ) {
+		return qtrue;
+	}
+	return qfalse;
 }
 
 qboolean vk_deferred_unlit_base_wanted( void )
@@ -456,7 +474,7 @@ static void vk_dgb_fill_proj_info( vk_deferred_gbuf_push_t *push )
 		Com_Clamp( 0.04f, 1.0f, r_deferredDefaultRoughness->value ) : 0.55f;
 	push->materialParams[2] = r_deferredNormalEdgeThreshold ?
 		Com_Clamp( 0.001f, 1.0f, r_deferredNormalEdgeThreshold->value ) : 0.08f;
-	push->materialParams[3] = 0.0f;
+	push->materialParams[3] = vk.msaaActive ? 1.0f : 0.0f;
 }
 
 void vk_deferred_gbuffer_capture_after_geometry( void )

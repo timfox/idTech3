@@ -31,7 +31,7 @@ check "$TR_DIAG" 'contract   : clean=%s recovery=%s' 'renderer_subsystems prints
 check "$TR_DIAG" 'renderer_modern_safe' 'modern recovery command participates in contract reporting'
 check "$TR_DIAG" 'renderer_deferred_safe' 'deferred recovery command participates in contract reporting'
 check "$TR_DIAG" 'renderer_clustered_safe' 'clustered recovery command participates in contract reporting'
-check "$TR_DIAG" 'mode-1 deferred expects r_forwardPlusShade 0' 'mode-1 compatibility warns on Forward+ shade drift'
+check "$TR_DIAG" 'mode-1 deferred expects r_forwardPlusShade > 0' 'mode-1 compatibility warns on Forward+ shade drift'
 check "$TR_DIAG" 'mode-1 deferred expects r_deferredGBuffer 1 and r_deferredGBufferFill 1' 'mode-1 compatibility warns on missing G-buffer scaffold'
 check "$TR_DIAG" 'modern profile cvars are active, but Forward+ runtime resources are incomplete' 'mode-2 compatibility warns when Forward+ runtime resources are missing'
 check "$TR_DIAG" 'mode-1 deferred cvars are active, but deferred runtime resources are incomplete' 'mode-1 compatibility warns when deferred runtime resources are missing'

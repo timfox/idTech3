@@ -217,6 +217,7 @@ cvar_t	*r_deferredGBufferDebug;
 cvar_t	*r_visibilityBuffer;
 cvar_t	*r_visibilityBufferFill;
 cvar_t	*r_visibilityBufferDebug;
+cvar_t	*r_visibilityBufferLateShade;
 cvar_t	*r_materialClassify;
 cvar_t	*r_deferredLighting;
 cvar_t	*r_deferredUnlitBase;
@@ -362,6 +363,7 @@ cvar_t	*r_forwardPlusOverflowShade;
 cvar_t	*r_forwardPlusLuminanceSort;
 cvar_t	*r_forwardPlusDistanceSort;
 cvar_t	*r_forwardPlusDepthCull;
+cvar_t	*r_forwardPlusHiZ;
 cvar_t	*r_forwardPlusSpecularStrength;
 cvar_t	*r_forwardPlusEnergyRenorm;
 
@@ -2697,7 +2699,7 @@ static void R_Register( void )
 	ri.Cvar_SetGroup( r_fbo, CVG_RENDERER );
 	r_renderMode = ri.Cvar_Get( "r_renderMode", "0", CVAR_ARCHIVE_ND | CVAR_LATCH );
 	ri.Cvar_CheckRange( r_renderMode, "0", "3", CV_INTEGER );
-	ri.Cvar_SetDescription( r_renderMode, "Vulkan lighting path (latched, vid_restart).\n 0: Forward (classic projector; r_forwardPlus may still be 1)\n 1: Deferred lighting mode (r_deferredGBuffer 1; r_deferredLighting 1 latches r_forwardPlus 1, r_forwardPlusShade 0)\n 2: Modern default Forward+ primary (sets r_forwardPlus 1 and r_forwardPlusShade 1; may use r_deferredGBuffer as sidecar)\n 3: Unified Clustered Renderer — hybrid deferred opaque + Forward+ transparent (shared tile lists)" );
+	ri.Cvar_SetDescription( r_renderMode, "Vulkan lighting path (latched, vid_restart).\n 0: Forward (classic projector; r_forwardPlus may still be 1)\n 1: Deferred opaque + Forward+ transparent (same split as mode 3; r_deferredLighting 1)\n 2: Modern Forward+ primary (sets r_forwardPlus 1 and r_forwardPlusShade 1; may use r_deferredGBuffer as sidecar)\n 3: Unified Clustered Renderer — hybrid deferred opaque + Forward+ transparent (shared tile lists; shipping default)" );
 	r_deferredGBuffer = ri.Cvar_Get( "r_deferredGBuffer", "0", CVAR_ARCHIVE_ND | CVAR_LATCH );
 	ri.Cvar_CheckRange( r_deferredGBuffer, "0", "1", CV_INTEGER );
 	ri.Cvar_SetDescription( r_deferredGBuffer,
@@ -2748,9 +2750,17 @@ static void R_Register( void )
 	ri.Cvar_CheckRange( r_visibilityBufferDebug, "0", "5", CV_INTEGER );
 	ri.Cvar_SetDescription( r_visibilityBufferDebug,
 		"Visualize visibility buffer on scene color before bloom: 0=off, 1=drawId, 2=primId, 3=bary, 4=material class, "
-		"5=late-shade scaffold (albedo*class). Requires r_visibilityBuffer 1 and r_visibilityBufferFill 1." );
+		"5=late-shade preview (albedo*class; pairs with r_visibilityBufferLateShade). Requires r_visibilityBuffer 1." );
 	ri.Cvar_SetGroup( r_visibilityBufferDebug, CVG_RENDERER );
-	r_materialClassify = ri.Cvar_Get( "r_materialClassify", "0", CVAR_ARCHIVE_ND );
+	r_visibilityBufferLateShade = ri.Cvar_Get( "r_visibilityBufferLateShade", "0", CVAR_ARCHIVE_ND | CVAR_LATCH );
+	ri.Cvar_CheckRange( r_visibilityBufferLateShade, "0", "1", CV_INTEGER );
+	ri.Cvar_SetDescription( r_visibilityBufferLateShade,
+		"Exclusive late-shade opaque lighting (PrimID fill=2, non-MSAA): skips classic deferred lighting and shades once from G-buffer MRTs + Forward+ tiles. Default 0. Requires r_visibilityBuffer 1, r_visibilityBufferFill 2, r_deferredLighting 1." );
+	ri.Cvar_SetGroup( r_visibilityBufferLateShade, CVG_RENDERER );
+	if ( r_visibilityBufferLateShade && r_visibilityBufferLateShade->integer ) {
+		ri.Printf( PRINT_ALL, "[VK][visbuf] r_visibilityBufferLateShade=1 (exclusive late-shade; no dual deferred lighting)\n" );
+	}
+	r_materialClassify = ri.Cvar_Get( "r_materialClassify", "1", CVAR_ARCHIVE_ND );
 	ri.Cvar_CheckRange( r_materialClassify, "0", "1", CV_INTEGER );
 	ri.Cvar_SetDescription( r_materialClassify,
 		"With r_visibilityBufferFill 1: compute material class map (simple/layered/transmission/emissive/alpha_test) "
@@ -2817,12 +2827,12 @@ static void R_Register( void )
 	ri.Cvar_SetDescription( r_deferredNormalEdgeThreshold,
 		"View-space depth delta threshold for deferred normal reconstruction. Lower values reject silhouette-crossing neighbors more aggressively." );
 	ri.Cvar_SetGroup( r_deferredNormalEdgeThreshold, CVG_RENDERER );
-	r_deferredMaterialClassify = ri.Cvar_Get( "r_deferredMaterialClassify", "0", CVAR_ARCHIVE_ND );
+	r_deferredMaterialClassify = ri.Cvar_Get( "r_deferredMaterialClassify", "1", CVAR_ARCHIVE_ND );
 	ri.Cvar_CheckRange( r_deferredMaterialClassify, "0", "1", CV_INTEGER );
 	ri.Cvar_SetDescription( r_deferredMaterialClassify,
-		"Experimental: when r_materialClassify 1 and visibility class map is filled, deferred lighting uses class IDs "
-		"(EMPTY=sky skip; LAYERED/TRANSMISSION tune; EMISSIVE skips additive). Default 0 — enable via "
-		"vulkan_overlay_visibility_2027.cfg. Requires r_visibilityBuffer + r_visibilityBufferFill. See docs/RENDERER_2027.md." );
+		"When r_materialClassify 1 and visibility class map is filled, deferred lighting uses class IDs "
+		"(EMPTY/LAYERED/TRANSMISSION/EMISSIVE) with calibrated energy scales. Default 1. "
+		"Requires r_visibilityBuffer. See docs/RENDERER_2027.md." );
 	ri.Cvar_SetGroup( r_deferredMaterialClassify, CVG_RENDERER );
 	if ( r_deferredMaterialClassify && r_deferredMaterialClassify->integer ) {
 		ri.Printf( PRINT_ALL, "[VK][deferred] r_deferredMaterialClassify=1 (class map drives deferred dispatch when classify fill is on)\n" );
@@ -3443,17 +3453,22 @@ static void R_Register( void )
 	r_forwardPlusDepthCull = ri.Cvar_Get( "r_forwardPlusDepthCull", "0", CVAR_ARCHIVE_ND );
 	ri.Cvar_CheckRange( r_forwardPlusDepthCull, "0", "1", CV_INTEGER );
 	ri.Cvar_SetDescription( r_forwardPlusDepthCull,
-		"When 1, a depth prepass fills the depth buffer, then tile cull rejects lights behind the nearest surface in each tile (5 probes: corners+center), then opaque color draws. When 0, cull runs at view start without depth (legacy). Requires \\r_forwardPlus 1 (no vid_restart). modern_vulkan.cfg sets 1." );
+		"When 1, a depth prepass fills the depth buffer, then tile cull rejects lights behind the nearest surface in each tile (lightVolumeDepthCull), then opaque color draws. When 0, cull runs at view start without depth (legacy). Requires \\r_forwardPlus 1 (no vid_restart). modern_vulkan.cfg sets 1." );
 	ri.Cvar_SetGroup( r_forwardPlusDepthCull, CVG_RENDERER );
+	r_forwardPlusHiZ = ri.Cvar_Get( "r_forwardPlusHiZ", "1", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_forwardPlusHiZ, "0", "1", CV_INTEGER );
+	ri.Cvar_SetDescription( r_forwardPlusHiZ,
+		"When 1 with \\r_forwardPlusDepthCull 1, expand depth probes (forwardPlusHiZPyramid) for hierarchical occlusion of large lights. Default 1." );
+	ri.Cvar_SetGroup( r_forwardPlusHiZ, CVG_RENDERER );
 	r_forwardPlusSpecularStrength = ri.Cvar_Get( "r_forwardPlusSpecularStrength", "0.65", CVAR_ARCHIVE_ND );
 	ri.Cvar_CheckRange( r_forwardPlusSpecularStrength, "0", "4", CV_FLOAT );
 	ri.Cvar_SetDescription( r_forwardPlusSpecularStrength,
 		"Forward+ dynamic specular scale (default 0.65 preserves prior art balance). Mirrors r_deferredSpecularStrength for the mode-2 path. Requires r_forwardPlusShade > 0 (no vid_restart)." );
 	ri.Cvar_SetGroup( r_forwardPlusSpecularStrength, CVG_RENDERER );
-	r_forwardPlusEnergyRenorm = ri.Cvar_Get( "r_forwardPlusEnergyRenorm", "0.45", CVAR_ARCHIVE_ND );
+	r_forwardPlusEnergyRenorm = ri.Cvar_Get( "r_forwardPlusEnergyRenorm", "0", CVAR_ARCHIVE_ND );
 	ri.Cvar_CheckRange( r_forwardPlusEnergyRenorm, "0", "2", CV_FLOAT );
 	ri.Cvar_SetDescription( r_forwardPlusEnergyRenorm,
-		"Soft primary-direct attenuation when Forward+ add is bright: fpRenorm = clamp(1 - (fpAdd/primary)*this, 0.35, 1). Higher = more renorm of classic projector energy. Default 0.45." );
+		"Legacy primary×Forward+ renorm (0=off, recommended). When r_forwardPlusShade > 0 the classic projector is skipped so Forward+ owns dynamics; renorm is unused. Non-zero restores soft attenuate of primaryDirect when both paths were stacked." );
 	ri.Cvar_SetGroup( r_forwardPlusEnergyRenorm, CVG_RENDERER );
 	r_ext_alpha_to_coverage = ri.Cvar_Get( "r_ext_alpha_to_coverage", "1", CVAR_ARCHIVE_ND | CVAR_LATCH );
 	ri.Cvar_CheckRange( r_ext_alpha_to_coverage, "0", "1", CV_INTEGER );

@@ -33,7 +33,7 @@ DEFERRED_CFG="$ROOT/config/deferred_vulkan.cfg"
 
 check "$DEFERRED_CFG" 'seta r_renderMode 1' 'deferred profile selects mode 1'
 check "$DEFERRED_CFG" 'seta r_deferredLighting 1' 'deferred profile enables deferred lighting'
-check "$DEFERRED_CFG" 'seta r_forwardPlusShade 0' 'deferred profile disables Forward+ primary shade'
+check "$DEFERRED_CFG" 'seta r_forwardPlusShade 1' 'deferred profile enables Forward+ transparent shade'
 check "$DEFERRED_CFG" 'seta r_deferredAOCoupling 0.65' 'deferred profile enables AO-coupled dynamic lighting'
 check "$DEFERRED_CFG" 'seta r_deferredSpecularStrength 1' 'deferred profile pins specular strength'
 check "$DEFERRED_CFG" 'seta r_deferredDefaultRoughness 0.55' 'deferred profile sets fallback roughness'

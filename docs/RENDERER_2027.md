@@ -68,6 +68,8 @@ Demo: `exec demo_visibility_2027.cfg`. The overlay keeps `r_deferredMaterialClas
 
 **Phase 1 encoding note:** `r_visibilityBufferFill 1` is depth-derived (tile draw id + depth prim proxy + intra-tile bary). `r_visibilityBufferFill 2` prefers true `gl_PrimitiveID` + monotonic drawId MRT (UV bary weights) when deferred direct export is non-MSAA; falls back to depth proxy otherwise. Neural/Hybrid1 consumers still read the classic G-buffer.
 
+**Exclusive late-shade:** `r_visibilityBufferLateShade 1` (default 0) runs opaque lighting once from PrimID + G-buffer MRTs + Forward+ tiles and **skips** classic deferred lighting (no dual path).
+
 ## Phase ladder
 
 | Phase | Focus |
@@ -89,7 +91,7 @@ Demo: `exec demo_visibility_2027.cfg`. The overlay keeps `r_deferredMaterialClas
 | 3 | Visibility buffer | Classic G-buffer + P1 sidecar | Compact prim/bary/depth + late shade |
 | 4 | GPU-driven / Work Graphs | Meshlets CPU cull | Indirect draws → mesh shaders / WG |
 | 5 | Virtualized meshlets | MD3 meshlets + **MDI GPU draw** + **screen LOD** + sector stream | Continuous cluster LOD streaming |
-| 6 | Hybrid clustered | Mode 3 EXISTS | Spine for all layers |
+| 6 | Hybrid clustered | Mode 3 **tiled hybrid** EXISTS (2D tiles; Z-clusters TBD) | Spine for all layers |
 | 7 | Stochastic alpha | `r_stochasticAlpha` | Temporally stable coverage + OMM |
 | 8 | Classified OIT | Global WBOIT/MBOIT + **mode 3 overlay** | Per-material-class paths |
 | 9 | Neural texture compression | VT / BC7 | Learned latent + decoder |

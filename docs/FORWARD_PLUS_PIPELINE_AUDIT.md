@@ -50,7 +50,7 @@ When **`r_renderMode 3`** (`vk_unified_clustered_active()`), geometry + deferred
 2. G-buffer capture + deferred lighting composite
 3. Transparent `drawSurfFilter=2` with Forward+ fragment shade (shared tile SSBO)
 
-See [UNIFIED_CLUSTERED_RENDERER.md](UNIFIED_CLUSTERED_RENDERER.md). Mode 2 remains the shipping Forward+ primary default.
+See [UNIFIED_CLUSTERED_RENDERER.md](UNIFIED_CLUSTERED_RENDERER.md). Mode 3 is the shipping **tiled hybrid** default (2D tiles, not Z-clusters); mode 2 remains the Forward+-primary recovery path.
 
 ---
 
@@ -93,7 +93,11 @@ Linear array: **`total_tiles × MAX_PER_TILE`** **`uint32`** indices. Unused slo
 - Else **`r_forwardPlusLuminanceSort` 1** (default) — partial selection by **RGB sum** (brightest lights win).
 - Else — first **`maxPerTile`** candidates in index order (legacy).
 
-**Depth cull (`depthCull` push, `r_forwardPlusDepthCull` 1):** after screen overlap, sample **`depthTexture`** (binding **3**) at the tile **corners + center** (5 probes) and take the **nearest** reversed-Z depth. Reject when **`lightZ01 < sceneNearest - ε`**. Requires dispatch **after** opaque draws (§2).
+**Projection / coverage:**
+- **Point:** screen-space sphere AABB vs tile (`sphere_tile_overlap`).
+- **Linear/spot (`spotFrustumTileCull`):** coverage from origin + tip + segment mid, expanded by cone opening (`cos_outer` / `segLen` from packed records).
+
+**Depth cull (`depthCull` / `r_forwardPlusDepthCull` 1 — `lightVolumeDepthCull`):** sample tile corners + center; reject when the light **volume** nearest Z is behind `sceneNearest` (reversed-Z). Not full Hi-Z yet — see roadmap Hi-Z phase.
 
 ---
 
@@ -170,10 +174,11 @@ As of **July 18, 2026**, live renderer bisecting also showed that an otherwise w
 
 ### Suggested next steps (roadmap)
 
-1. **Depth-aware culling** — **partial:** **`r_forwardPlusDepthCull`** (5 probes / nearest reverse-Z, post-opaque). Still open: Hi-Z / light-volume vs depth.
+1. **Depth-aware culling** — **partial:** **`r_forwardPlusDepthCull`** light-volume Z vs 5 probes; **`spotFrustumTileCull`** for linear lights. Still open: Hi-Z pyramid.
 2. **Sort or priority** — **done for overload:** **`r_forwardPlusDistanceSort`** and **`r_forwardPlusLuminanceSort`** (see §4).
 3. **Decouple** Forward+ light ceiling from **`MAX_DLIGHTS`** only if the **game protocol** and **`tess.dlightBits`** story are redesigned together.
 4. **Tier B** map with mixed point + spot lights to validate heatmap vs ground truth.
+5. **Energy without renorm** — single-path Forward+ ownership (mode 2) so **`r_forwardPlusEnergyRenorm`** can stay at 0.
 
 ---
 

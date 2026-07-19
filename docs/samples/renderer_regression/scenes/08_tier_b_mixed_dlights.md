@@ -31,5 +31,5 @@ Repository variable **`IDTECH3_MAPS_EXTRA`** (space-separated names) is forwarde
 
 ## Notes
 
-- Forward+ tile cull uses a **screen-space sphere** approximation for both types; tight spotlight frusta are not modeled.
+- Forward+ tile cull uses **`spotFrustumTileCull`** for linear lights (origin + tip + mid) and sphere overlap for points; **`lightVolumeDepthCull`** rejects volumes behind tile nearest depth when `r_forwardPlusDepthCull` 1.
 - `r_temporalCustomShaderMotion` is unrelated but documented for motion-vector policy (see `tr_init.c` / `vk_view_state.c`).

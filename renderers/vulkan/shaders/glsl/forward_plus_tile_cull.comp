@@ -3,6 +3,8 @@
 /*
  * Forward+ scaffolding: per-tile light index list (max 8 per tile; tile pixel size = viewport / tileGrid).
  * CPU-packed lights: binding 0 — vec4 (x=count,...), vec4 (tiles_x, tiles_y, viewport_w, viewport_h), then count * 4 vec4 records.
+ * Spot/linear cull uses packed axis + cos_outer + segLen (rec[2]/rec[3]); point lights keep sphere overlap.
+ * Depth cull: light volume Z extent vs per-tile nearest/farthest probes (lightVolumeDepthCull).
  */
 
 layout(local_size_x = 64, local_size_y = 1, local_size_z = 1) in;
@@ -35,6 +37,7 @@ layout(push_constant) uniform Push {
 	uint luminanceSort;
 	uint distanceSort;
 	uint depthCull;
+	uint hiZ; /* forwardPlusHiZPyramid: expand probes with light screen radius */
 } pc;
 
 bool sphere_tile_overlap(vec2 centerPx, float radiusPx, uint tileX, uint tileY, float tilePxX, float tilePxY) {
@@ -44,6 +47,66 @@ bool sphere_tile_overlap(vec2 centerPx, float radiusPx, uint tileX, uint tileY, 
 	float maxY = minY + tilePxY;
 	vec2 closest = clamp(centerPx, vec2(minX, minY), vec2(maxX, maxY));
 	return distance(centerPx, closest) <= radiusPx + 1e-3;
+}
+
+bool project_world_to_px(vec3 worldPos, float vw, float vh, out vec2 px, out float ndcZ, out float clipW) {
+	vec4 clip = params.clipFromWorld * vec4(worldPos, 1.0);
+	if (abs(clip.w) < 1e-5) {
+		return false;
+	}
+	vec3 ndc = clip.xyz / clip.w;
+	ndcZ = ndc.z;
+	clipW = clip.w;
+	if (ndc.z < -1.0 || ndc.z > 1.0 || ndc.x < -1.5 || ndc.x > 1.5 || ndc.y < -1.5 || ndc.y > 1.5) {
+		return false;
+	}
+	px.x = 0.5 * (1.0 + ndc.x) * vw;
+	px.y = 0.5 * (1.0 + ndc.y) * vh;
+	return true;
+}
+
+/*
+ * Spot/linear screen coverage: sphere at origin OR at tip, expanded by cone opening.
+ * Marker: spotFrustumTileCull — used by renderer_regression_check.sh.
+ */
+bool spot_frustum_tile_overlap(
+	vec3 origin, vec3 axis, float cosOuter, float segLen, float radius,
+	float vw, float vh, uint tileX, uint tileY, float tilePxX, float tilePxY)
+{
+	vec3 tip = origin + axis * max(segLen, 1e-3);
+	float open = clamp(1.0 - cosOuter, 0.0, 1.0);
+	float coneBoost = 1.0 + open * 1.5;
+
+	vec2 px0, px1;
+	float z0, z1, w0, w1;
+	bool ok0 = project_world_to_px(origin, vw, vh, px0, z0, w0);
+	bool ok1 = project_world_to_px(tip, vw, vh, px1, z1, w1);
+	if (!ok0 && !ok1) {
+		return false;
+	}
+
+	if (ok0) {
+		float rPx = clamp(radius * coneBoost * (0.5 * vw) / max(abs(w0), 1e-3), 2.0, vw + vh);
+		if (sphere_tile_overlap(px0, rPx, tileX, tileY, tilePxX, tilePxY)) {
+			return true;
+		}
+	}
+	if (ok1) {
+		float tipR = radius * (0.35 + open);
+		float rPx = clamp(tipR * (0.5 * vw) / max(abs(w1), 1e-3), 2.0, vw + vh);
+		if (sphere_tile_overlap(px1, rPx, tileX, tileY, tilePxX, tilePxY)) {
+			return true;
+		}
+	}
+	/* Segment mid coverage for long tubes. */
+	if (ok0 && ok1) {
+		vec2 mid = 0.5 * (px0 + px1);
+		float midR = 0.5 * (distance(px0, px1) + radius);
+		if (sphere_tile_overlap(mid, midR, tileX, tileY, tilePxX, tilePxY)) {
+			return true;
+		}
+	}
+	return false;
 }
 
 void main() {
@@ -82,62 +145,111 @@ void main() {
 	uint candCount = 0u;
 	vec3 viewOrg = params.viewOrg.xyz;
 
+	/* Precompute tile depth range once when depth cull is on (lightVolumeDepthCull).
+	 * With hiZ: expand probe footprint so large lights see hierarchical nearest depth. */
+	float sceneNearest = 0.0;
+	if (pc.depthCull != 0u) {
+		float minX = float(tileX) * tilePxX;
+		float minY = float(tileY) * tilePxY;
+		float maxX = minX + tilePxX;
+		float maxY = minY + tilePxY;
+		/* forwardPlusHiZPyramid: pad tile AABB by up to 2 tiles for conservative large-light cull. */
+		float padX = (pc.hiZ != 0u) ? tilePxX * 2.0 : 0.0;
+		float padY = (pc.hiZ != 0u) ? tilePxY * 2.0 : 0.0;
+		minX = max(minX - padX, 0.0);
+		minY = max(minY - padY, 0.0);
+		maxX = min(maxX + padX, vw);
+		maxY = min(maxY + padY, vh);
+		vec2 probes[9];
+		uint probeCount = 5u;
+		probes[0] = vec2((minX + maxX) * 0.5, (minY + maxY) * 0.5);
+		probes[1] = vec2(minX + 0.5, minY + 0.5);
+		probes[2] = vec2(maxX - 0.5, minY + 0.5);
+		probes[3] = vec2(minX + 0.5, maxY - 0.5);
+		probes[4] = vec2(maxX - 0.5, maxY - 0.5);
+		if (pc.hiZ != 0u) {
+			probeCount = 9u;
+			probes[5] = vec2((minX + maxX) * 0.5, minY + 0.5);
+			probes[6] = vec2((minX + maxX) * 0.5, maxY - 0.5);
+			probes[7] = vec2(minX + 0.5, (minY + maxY) * 0.5);
+			probes[8] = vec2(maxX - 0.5, (minY + maxY) * 0.5);
+		}
+		sceneNearest = 0.0;
+		for (uint pi = 0u; pi < probeCount; pi++) {
+			vec2 depthUv = vec2(probes[pi].x / max(vw, 1.0), probes[pi].y / max(vh, 1.0));
+			depthUv = clamp(depthUv, vec2(0.0), vec2(1.0));
+			float d = texture(depthTexture, depthUv).r;
+			sceneNearest = max(sceneNearest, d);
+		}
+	}
+
 	for (uint li = 0u; li < n; li++) {
 		uint b = 2u + li * REC_VEC4S;
 		vec3 worldPos = lights.data[b].xyz;
 		float radius = max(lights.data[b].w, 1e-4);
+		vec4 lc = lights.data[b + 1u];
+		float isLinear = lc.w;
+		vec4 lpack = lights.data[b + 2u];
+		vec4 ltail = lights.data[b + 3u];
 
-		vec4 clip = params.clipFromWorld * vec4(worldPos, 1.0);
-		if (abs(clip.w) < 1e-5) {
+		vec2 centerPx = vec2(0.0);
+		float ndcZ = 0.0;
+		float clipW = 1.0;
+		bool originOnScreen = project_world_to_px(worldPos, vw, vh, centerPx, ndcZ, clipW);
+		if (!originOnScreen && isLinear <= 0.5) {
 			continue;
 		}
 
-		vec3 ndc = clip.xyz / clip.w;
-		if (ndc.z < -1.0 || ndc.z > 1.0 || ndc.x < -1.2 || ndc.x > 1.2 || ndc.y < -1.2 || ndc.y > 1.2) {
-			continue;
-		}
-
-		vec2 centerPx;
-		centerPx.x = 0.5 * (1.0 + ndc.x) * vw;
-		centerPx.y = 0.5 * (1.0 + ndc.y) * vh;
-
-		float distW = max(abs(clip.w), 1e-3);
-		float radiusPx = clamp(radius * (0.5 * vw) / distW, 2.0, vw + vh);
-
-		if (!sphere_tile_overlap(centerPx, radiusPx, tileX, tileY, tilePxX, tilePxY)) {
-			continue;
-		}
-
-		if (pc.depthCull != 0u) {
-			/*
-			 * Sample tile corners + center (min-depth style probes).
-			 * Reversed-Z: nearer surfaces have larger depth. Use the nearest
-			 * surface in the tile (max sceneZ) so lights fully behind local
-			 * occluders drop even when the light's sphere center is empty sky.
-			 */
-			float minX = float(tileX) * tilePxX;
-			float minY = float(tileY) * tilePxY;
-			float maxX = minX + tilePxX;
-			float maxY = minY + tilePxY;
-			vec2 probes[5];
-			probes[0] = vec2((minX + maxX) * 0.5, (minY + maxY) * 0.5);
-			probes[1] = vec2(minX + 0.5, minY + 0.5);
-			probes[2] = vec2(maxX - 0.5, minY + 0.5);
-			probes[3] = vec2(minX + 0.5, maxY - 0.5);
-			probes[4] = vec2(maxX - 0.5, maxY - 0.5);
-			float sceneNearest = 0.0;
-			for (uint pi = 0u; pi < 5u; pi++) {
-				vec2 depthUv = vec2(probes[pi].x / max(vw, 1.0), probes[pi].y / max(vh, 1.0));
-				depthUv = clamp(depthUv, vec2(0.0), vec2(1.0));
-				sceneNearest = max(sceneNearest, texture(depthTexture, depthUv).r);
+		bool overlaps = false;
+		if (isLinear > 0.5) {
+			vec3 axis = lpack.xyz;
+			float alen = length(axis);
+			if (alen > 1e-5) {
+				axis /= alen;
 			}
-			float lightZ = ndc.z * 0.5 + 0.5;
-			if (lightZ < sceneNearest - 1e-4) {
+			float cosOuter = lpack.w;
+			float segLen = max(ltail.y, 1e-3);
+			overlaps = spot_frustum_tile_overlap(
+				worldPos, axis, cosOuter, segLen, radius,
+				vw, vh, tileX, tileY, tilePxX, tilePxY);
+		} else {
+			float distW = max(abs(clipW), 1e-3);
+			float radiusPx = clamp(radius * (0.5 * vw) / distW, 2.0, vw + vh);
+			overlaps = sphere_tile_overlap(centerPx, radiusPx, tileX, tileY, tilePxX, tilePxY);
+		}
+		if (!overlaps) {
+			continue;
+		}
+
+		if (pc.depthCull != 0u && originOnScreen) {
+			/*
+			 * Light-volume depth cull: reject when the entire influence volume
+			 * is behind the nearest tile surface (reversed-Z: larger = nearer).
+			 * lightZFar = farthest extent of the sphere/segment in [0,1] depth.
+			 * Marker: lightVolumeDepthCull
+			 */
+			float lightZCenter = ndcZ * 0.5 + 0.5;
+			float lightZNear = lightZCenter;
+			float lightZFar = lightZCenter;
+			float zExtent = clamp(radius / max(abs(clipW), 1e-3), 0.0, 0.5);
+			lightZNear = clamp(lightZCenter + zExtent, 0.0, 1.0);
+			lightZFar = clamp(lightZCenter - zExtent, 0.0, 1.0);
+			if (isLinear > 0.5) {
+				vec3 tip = worldPos + normalize(lpack.xyz + vec3(1e-6)) * max(ltail.y, 1e-3);
+				vec2 tipPx;
+				float tipNdcZ, tipW;
+				if (project_world_to_px(tip, vw, vh, tipPx, tipNdcZ, tipW)) {
+					float tipZ = tipNdcZ * 0.5 + 0.5;
+					lightZNear = max(lightZNear, tipZ);
+					lightZFar = min(lightZFar, tipZ);
+				}
+			}
+			/* Fully behind nearest occluder: volume's nearest point still farther than scene. */
+			if (lightZNear < sceneNearest - 1e-4) {
 				continue;
 			}
 		}
 
-		vec4 lc = lights.data[b + 1u];
 		float lum = lc.x + lc.y + lc.z;
 
 		candLi[candCount] = li;

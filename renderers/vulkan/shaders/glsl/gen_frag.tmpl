@@ -1625,11 +1625,12 @@ void main() {
 	 * are skipped above so deferred compute owns dynamics; zeroing primary here
 	 * collapses indoor lightmapped maps to near-black after albedo copy + composite. */
 	float fpRenorm = 1.0;
-	if ( !deferredAdditiveHandoff && ( forward_plus_shade_strength > 1e-6 || pbrForwardPlus.x > 1e-6 ) ) {
+	/* Legacy renorm only when r_forwardPlusEnergyRenorm > 0 (dual-path debugging). */
+	if ( !deferredAdditiveHandoff && pbrForwardPlus.w > 1e-6 &&
+		( forward_plus_shade_strength > 1e-6 || pbrForwardPlus.x > 1e-6 ) ) {
 		float pL = length( primaryDirect );
 		float fL = length( fpAdd );
-		float renormFactor = ( pbrForwardPlus.w > 0.0 ) ? pbrForwardPlus.w : 0.45;
-		fpRenorm = clamp( 1.0 - ( fL / ( pL + 1e-3 ) ) * renormFactor, 0.35, 1.0 );
+		fpRenorm = clamp( 1.0 - ( fL / ( pL + 1e-3 ) ) * pbrForwardPlus.w, 0.35, 1.0 );
 	}
 	vec3 directLighting = primaryDirect * fpRenorm + fpAdd;
 #if defined( USE_FORWARD_PLUS_FRAG ) && defined( USE_FORWARD_PLUS_WORLD_POS )

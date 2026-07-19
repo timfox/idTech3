@@ -91,6 +91,48 @@ qboolean vk_material_classify_wanted( void )
 		r_materialClassify->integer ) ? qtrue : qfalse;
 }
 
+qboolean vk_visibility_late_shade_wanted( void )
+{
+	/*
+	 * Exclusive late-shade: PrimID fill + non-MSAA + deferred lighting wanted.
+	 * When on, backend skips classic deferred lighting and runs this path instead.
+	 */
+	if ( !r_visibilityBufferLateShade || !r_visibilityBufferLateShade->integer ) {
+		return qfalse;
+	}
+	if ( !vk_visibility_buffer_active() ) {
+		return qfalse;
+	}
+	if ( !r_visibilityBufferFill || r_visibilityBufferFill->integer < 2 ) {
+		return qfalse;
+	}
+	if ( vk.msaaActive || !vk.visibilityBufferDirectExport ) {
+		return qfalse;
+	}
+	if ( !vk_deferred_lighting_active() ) {
+		return qfalse;
+	}
+	return qtrue;
+}
+
+void vk_visibility_late_shade_apply_after_geometry( void )
+{
+	if ( !vk_visibility_late_shade_wanted() ) {
+		return;
+	}
+	{
+		static qboolean s_late_logged;
+		if ( !s_late_logged ) {
+			ri.Printf( PRINT_ALL,
+				"[VK][visbuf] r_visibilityBufferLateShade=1: exclusive late-shade "
+				"(PrimID + G-buffer MRTs + Forward+ tiles; skips classic deferred lighting path)\n" );
+			s_late_logged = qtrue;
+		}
+	}
+	/* Reuse deferred lighting compute as the late-shade consumer (single path). */
+	vk_deferred_lighting_apply_after_geometry();
+}
+
 static void vk_visbuf_destroy_fill_pipeline( void )
 {
 	if ( vk.visibility_buffer.pipeline != VK_NULL_HANDLE ) {

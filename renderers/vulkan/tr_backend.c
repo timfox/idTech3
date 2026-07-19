@@ -1965,24 +1965,29 @@ static const void *RB_DrawSurfs( const void *data ) {
 #endif
 
 #ifdef USE_VULKAN
-	if ( vk_unified_clustered_active() ) {
-		/* Unified Clustered: opaque → G-buffer + deferred → transparent Forward+.
+	if ( vk_deferred_opaque_transparent_split() ) {
+		/* Mode 1 deferred or mode 3 Unified Clustered:
+		 * opaque → G-buffer + deferred → transparent Forward+.
 		 * Weapon/UI (RDF_NOWORLDMODEL): Forward+ only — no second deferred composite. */
 		backEnd.drawSurfFilter = 1; /* opaque only */
 		RB_RenderDrawSurfList( cmd->drawSurfs, cmd->numDrawSurfs );
 		if ( !( cmd->refdef.rdflags & RDF_NOWORLDMODEL ) ) {
 			vk_deferred_gbuffer_capture_after_geometry();
 			vk_visibility_buffer_capture_after_geometry();
-			vk_deferred_lighting_apply_after_geometry();
+			if ( vk_visibility_late_shade_wanted() ) {
+				vk_visibility_late_shade_apply_after_geometry();
+			} else {
+				vk_deferred_lighting_apply_after_geometry();
+			}
 		}
 		backEnd.drawSurfFilter = 2; /* transparent only (Forward+ shade) */
 		if ( r_oit && r_oit->integer && r_fbo && r_fbo->integer ) {
-			/* OIT replaces Forward+ transparent shade on mode 3 (no tile-lit OIT yet). */
+			/* OIT replaces Forward+ transparent shade (no tile-lit OIT yet). */
 			{
 				static qboolean s_oit_mode3_logged;
 				if ( !s_oit_mode3_logged ) {
 					ri.Printf( PRINT_ALL,
-						"[VK][unified] r_oit=%d: OIT pass after deferred (skips Forward+ transparent shade)%s\n",
+						"[VK][deferred-split] r_oit=%d: OIT pass after deferred (skips Forward+ transparent shade)%s\n",
 						r_oit->integer,
 						( r_oitForwardPlus && r_oitForwardPlus->integer )
 							? ( r_oit->integer == 2
@@ -2014,10 +2019,14 @@ static const void *RB_DrawSurfs( const void *data ) {
 	if ( CBTerrain_IsEnabled() ) {
 		CBTerrain_Frame();
 	}
-	if ( !vk_unified_clustered_active() ) {
+	if ( !vk_deferred_opaque_transparent_split() ) {
 		vk_deferred_gbuffer_capture_after_geometry();
 		vk_visibility_buffer_capture_after_geometry();
-		vk_deferred_lighting_apply_after_geometry();
+		if ( vk_visibility_late_shade_wanted() ) {
+			vk_visibility_late_shade_apply_after_geometry();
+		} else {
+			vk_deferred_lighting_apply_after_geometry();
+		}
 	}
 	vk_niv_apply_after_geometry();
 	vk_surfel_gi_apply_after_geometry();

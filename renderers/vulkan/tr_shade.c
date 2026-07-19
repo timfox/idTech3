@@ -1464,16 +1464,21 @@ static void RB_IterateStagesGeneric( const shaderCommands_t *input )
 		uniform.pbrForwardPlus[0] = -1.0f;
 		uniform.pbrForwardPlus[1] = 0.0f;
 		uniform.pbrForwardPlus[2] = 0.65f;
-		uniform.pbrForwardPlus[3] = 0.45f;
+		uniform.pbrForwardPlus[3] = 0.0f;
 		if ( r_forwardPlus && r_forwardPlus->integer && !R_ClassicLightingActive() ) {
 			if ( r_forwardPlusOverflowShade && r_forwardPlusOverflowShade->value > 0.0f ) {
 				uniform.pbrForwardPlus[0] = Com_Clamp( 0.0f, 4.0f, r_forwardPlusOverflowShade->value );
 			}
-			const uint32_t bits = (uint32_t)tess.dlightBits;
-			if ( bits != 0u ) {
-				float maskF;
-				Com_Memcpy( &maskF, &bits, sizeof( maskF ) );
-				uniform.pbrForwardPlus[1] = maskF;
+			/* Single-path: when Forward+ shade owns dynamics, do not skip via dlightBits
+			 * (classic projector is suppressed). Only mask when shade is off or deferred handoff. */
+			if ( !( r_forwardPlusShade && r_forwardPlusShade->value > 0.0f ) ||
+				vk_unified_clustered_opaque_handoff() || vk_deferred_unlit_base_wanted() ) {
+				const uint32_t bits = (uint32_t)tess.dlightBits;
+				if ( bits != 0u ) {
+					float maskF;
+					Com_Memcpy( &maskF, &bits, sizeof( maskF ) );
+					uniform.pbrForwardPlus[1] = maskF;
+				}
 			}
 			if ( r_forwardPlusSpecularStrength ) {
 				uniform.pbrForwardPlus[2] = Com_Clamp( 0.0f, 4.0f, r_forwardPlusSpecularStrength->value );
@@ -1487,7 +1492,7 @@ static void RB_IterateStagesGeneric( const shaderCommands_t *input )
 		uniform.pbrForwardPlus[0] = -1.0f;
 		uniform.pbrForwardPlus[1] = 0.0f;
 		uniform.pbrForwardPlus[2] = 0.65f;
-		uniform.pbrForwardPlus[3] = 0.45f;
+		uniform.pbrForwardPlus[3] = 0.0f;
 	}
 #endif
 #endif // USE_VULKAN
@@ -2308,6 +2313,10 @@ void RB_StageIteratorGeneric( void )
 	if ( r_dlightMode->integer == 0 )
 #ifdef USE_VULKAN
 	if ( !vk_deferred_unlit_base_wanted() )
+	/* Single-path Forward+: shade owns dynamics — skip classic projector. */
+	if ( !( r_forwardPlus && r_forwardPlus->integer && r_forwardPlusShade &&
+			r_forwardPlusShade->value > 0.0f && !vk_unified_clustered_opaque_handoff() &&
+			!R_ClassicLightingActive() ) )
 #endif
 	if ( !worldShOverride && tess.dlightBits && tess.shader->sort <= SS_OPAQUE && !(tess.shader->surfaceFlags & (SURF_NODLIGHT | SURF_SKY) ) ) {
 		if ( !fogCollapse ) {

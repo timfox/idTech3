@@ -195,7 +195,11 @@ static qboolean vk_temporal_compute_shared_camera_cut( uint32_t *outReasons )
 	qboolean worldValid = ( tr.world != NULL ) ? qtrue : qfalse;
 	qboolean noWorldModel = ( backEnd.refdef.rdflags & RDF_NOWORLDMODEL ) ? qtrue : qfalse;
 	qboolean worldTransition = ( worldValid != vk.temporal.worldWasValid ) ? qtrue : qfalse;
+	/* Weapon/HUD after world: RDF_NOWORLDMODEL flips every frame — do not reset TAA history. */
 	qboolean noWorldTransition = ( noWorldModel != vk.temporal.noWorldModel ) ? qtrue : qfalse;
+	if ( noWorldTransition && backEnd.doneWorldScene && worldValid ) {
+		noWorldTransition = qfalse;
+	}
 	qboolean cameraCut = qfalse;
 
 	{

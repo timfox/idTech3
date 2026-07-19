@@ -37,5 +37,12 @@ rg -q 'RB_ValidateUnifiedClusteredTransparentHandoff' "$ROOT/renderers/vulkan/tr
 rg -q 'RB_RepairUnifiedClusteredTransparentHandoff' "$ROOT/renderers/vulkan/tr_backend.c" || fail "mode3 transparent handoff self-heal helper missing"
 rg -Fq 'transparent Forward+ handoff: expected active main render pass' "$ROOT/renderers/vulkan/tr_backend.c" || fail "mode3 transparent handoff warning missing"
 rg -Fq 'transparent Forward+ handoff self-heal: resuming main render pass before transparent shade' "$ROOT/renderers/vulkan/tr_backend.c" || fail "mode3 transparent handoff self-heal log missing"
+rg -q 'RDF_NOWORLDMODEL' "$ROOT/renderers/vulkan/tr_backend.c" || fail "mode3 RDF_NOWORLDMODEL deferred gate missing"
+rg -Fq 'cmd->refdef.rdflags & RDF_NOWORLDMODEL' "$ROOT/renderers/vulkan/tr_backend.c" || fail "mode3 skips deferred on no-world views"
+rg -Fq 'backEnd.refdef.rdflags & RDF_NOWORLDMODEL' "$ROOT/renderers/vulkan/vk_deferred_gbuffer.c" || fail "opaque handoff skips no-world views"
+rg -Fq 'prepare_2d heal: doneWorldScene with !inRenderPass' "$ROOT/renderers/vulkan/vk_2d_transition.c" || fail "prepare_2d doneWorldScene heal missing"
+rg -Fq 'prepare_2d_done_world_heal' "$ROOT/renderers/vulkan/vk_2d_transition.c" || fail "prepare_2d heal diag stage missing"
+rg -q 'tiled hybrid|2D tiles|not frustum Z-clusters' "$ROOT/docs/UNIFIED_CLUSTERED_RENDERER.md" || fail "tiled hybrid product lock missing from docs"
+rg -q 'vk_deferred_opaque_transparent_split' "$ROOT/renderers/vulkan/tr_backend.c" || fail "mode1/mode3 shared split helper missing"
 
 echo "OK: unified clustered smoke checks passed"
