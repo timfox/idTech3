@@ -3191,12 +3191,19 @@ set_tests_properties(test_dlm PROPERTIES
 	LABELS "smoke;validation"
 	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_dlm.sh;${CMAKE_SOURCE_DIR}/extensions/research/dlm/dlm_matrix.c")
 
-add_test(NAME test_sfca
+	add_test(NAME test_sfca
 	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_sfca.sh
 	${CMAKE_BINARY_DIR})
 set_tests_properties(test_sfca PROPERTIES
 	LABELS "smoke;validation"
 	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_sfca.sh;${CMAKE_SOURCE_DIR}/extensions/research/sfca/sfca_core.c")
+
+add_test(NAME test_howdark
+	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_howdark.sh
+	${CMAKE_BINARY_DIR})
+set_tests_properties(test_howdark PROPERTIES
+	LABELS "smoke;validation"
+	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_howdark.sh;${CMAKE_SOURCE_DIR}/extensions/research/howdark/howdark_model.c")
 
 add_test(NAME test_gccfer
 	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_gccfer.sh
@@ -4174,6 +4181,17 @@ if(BUILD_UNIT_TESTS)
 	endif()
 	add_test(NAME unit_sfca COMMAND unit_sfca)
 	set_tests_properties(unit_sfca PROPERTIES LABELS "unit;validation")
+
+	add_executable(unit_howdark
+		tests/unit/test_howdark.c
+		extensions/research/howdark/howdark_model.c
+		extensions/research/howdark/howdark_eval.c)
+	target_include_directories(unit_howdark PRIVATE ${IDTECH3_UNIT_INCLUDE_DIRS})
+	if(UNIX AND NOT APPLE)
+		target_link_libraries(unit_howdark PRIVATE m)
+	endif()
+	add_test(NAME unit_howdark COMMAND unit_howdark)
+	set_tests_properties(unit_howdark PROPERTIES LABELS "unit;validation")
 
 	add_executable(unit_x3dpra
 		tests/unit/test_x3dpra.c

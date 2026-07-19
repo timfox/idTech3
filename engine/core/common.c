@@ -42,6 +42,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "dk_qsd/dk_qsd.h"
 #include "dlm/dlm.h"
 #include "sfca/sfca.h"
+#include "howdark/howdark.h"
 #include "x3dpra/x3dpra_console.h"
 #endif
 #ifdef USE_DUKTAPE
@@ -4250,6 +4251,7 @@ void Com_Init( char *commandLine ) {
 	DK_Qsd_ConsoleInit();
 	DLM_ConsoleInit();
 	SFCA_ConsoleInit();
+	HowDark_ConsoleInit();
 #endif
 
 	Com_Printf( "--- Common Initialization Complete ---\n" );

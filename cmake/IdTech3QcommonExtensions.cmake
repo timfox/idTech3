@@ -51,6 +51,9 @@ macro(idtech3_append_research_qcommon_sources)
 			${_IDTECH3_RESEARCH}/sfca/sfca_run.c
 			${_IDTECH3_RESEARCH}/sfca/sfca_scan.c
 			${_IDTECH3_RESEARCH}/sfca/sfca_console.c
+			${_IDTECH3_RESEARCH}/howdark/howdark_model.c
+			${_IDTECH3_RESEARCH}/howdark/howdark_eval.c
+			${_IDTECH3_RESEARCH}/howdark/howdark_console.c
 		)
 		if(USE_RADIUSFPS_CUDA)
 			enable_language(CUDA)
