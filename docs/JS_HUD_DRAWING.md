@@ -6,7 +6,7 @@ The idTech3 JavaScript (Duktape) runtime exposes HUD drawing functions for custo
 
 ## When to Call
 
-**Critical:** `hudDrawPic`, `hudDrawText`, `hudSetColor`, `hudDrawRect`, and `hudResetColor` must be invoked from an `idtech3.on("frame", ...)` callback. The frame event fires once per rendered frame, before the game HUD is drawn. Drawing outside this context will not appear or may cause undefined behavior.
+**Critical:** `hudDrawPic`, `hudDrawText`, `hudSetColor`, `hudDrawRect`, and `hudResetColor` must be invoked from an `idtech3.on("frame", ...)` callback. The engine runs those callbacks from `SCR_DrawScreenField` (after `RE_BeginFrame` / world draw) so 2D commands are not discarded. Drawing outside this context will not appear.
 
 ## Example: Frame-Based HUD
 

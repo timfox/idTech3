@@ -1,0 +1,46 @@
+{
+	"sources" : 
+	[
+		{
+			"file" : "/home/tim/Desktop/idtech3/.fetchcontent-cache/idtech3_sdl3-subbuild/CMakeFiles/idtech3_sdl3-populate"
+		},
+		{
+			"file" : "/home/tim/Desktop/idtech3/.fetchcontent-cache/idtech3_sdl3-subbuild/CMakeFiles/idtech3_sdl3-populate.rule"
+		},
+		{
+			"file" : "/home/tim/Desktop/idtech3/.fetchcontent-cache/idtech3_sdl3-subbuild/CMakeFiles/idtech3_sdl3-populate-complete.rule"
+		},
+		{
+			"file" : "/home/tim/Desktop/idtech3/.fetchcontent-cache/idtech3_sdl3-subbuild/idtech3_sdl3-populate-prefix/src/idtech3_sdl3-populate-stamp/idtech3_sdl3-populate-build.rule"
+		},
+		{
+			"file" : "/home/tim/Desktop/idtech3/.fetchcontent-cache/idtech3_sdl3-subbuild/idtech3_sdl3-populate-prefix/src/idtech3_sdl3-populate-stamp/idtech3_sdl3-populate-configure.rule"
+		},
+		{
+			"file" : "/home/tim/Desktop/idtech3/.fetchcontent-cache/idtech3_sdl3-subbuild/idtech3_sdl3-populate-prefix/src/idtech3_sdl3-populate-stamp/idtech3_sdl3-populate-download.rule"
+		},
+		{
+			"file" : "/home/tim/Desktop/idtech3/.fetchcontent-cache/idtech3_sdl3-subbuild/idtech3_sdl3-populate-prefix/src/idtech3_sdl3-populate-stamp/idtech3_sdl3-populate-install.rule"
+		},
+		{
+			"file" : "/home/tim/Desktop/idtech3/.fetchcontent-cache/idtech3_sdl3-subbuild/idtech3_sdl3-populate-prefix/src/idtech3_sdl3-populate-stamp/idtech3_sdl3-populate-mkdir.rule"
+		},
+		{
+			"file" : "/home/tim/Desktop/idtech3/.fetchcontent-cache/idtech3_sdl3-subbuild/idtech3_sdl3-populate-prefix/src/idtech3_sdl3-populate-stamp/idtech3_sdl3-populate-patch.rule"
+		},
+		{
+			"file" : "/home/tim/Desktop/idtech3/.fetchcontent-cache/idtech3_sdl3-subbuild/idtech3_sdl3-populate-prefix/src/idtech3_sdl3-populate-stamp/idtech3_sdl3-populate-test.rule"
+		},
+		{
+			"file" : "/home/tim/Desktop/idtech3/.fetchcontent-cache/idtech3_sdl3-subbuild/idtech3_sdl3-populate-prefix/src/idtech3_sdl3-populate-stamp/idtech3_sdl3-populate-update.rule"
+		}
+	],
+	"target" : 
+	{
+		"labels" : 
+		[
+			"idtech3_sdl3-populate"
+		],
+		"name" : "idtech3_sdl3-populate"
+	}
+}

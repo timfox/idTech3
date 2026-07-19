@@ -1451,6 +1451,23 @@ static void SCR_DrawScreenField( stereoFrame_t stereoFrame ) {
 		VM_Call( uivm, 1, UI_REFRESH, cls.realtime );
 	}
 
+#ifdef USE_DUKTAPE
+	/* JS HUD must draw after FinishBloom (UI overlay pass), same as the console.
+	 * StretchPics queued earlier land in the HDR/bloom path and never composite. */
+	if ( cls.state == CA_ACTIVE ) {
+		if ( re.FinishBloom ) {
+			re.FinishBloom();
+		}
+		{
+			/* Temporary visibility probe — remove after HUD path is confirmed. */
+			static const float s_jsHudProbeColor[4] = { 1.0f, 0.15f, 0.1f, 0.9f };
+			SCR_FillRect( 16, 16, 220, 72, s_jsHudProbeColor );
+			SCR_DrawStringExt( 24, 28, 14, "C-HUD PROBE", colorWhite, qtrue, qfalse );
+		}
+		JsDebug_DrawFrame( cls.frametime, cls.realFrametime );
+	}
+#endif
+
 	// console draws next
 	Con_DrawConsole ();
 

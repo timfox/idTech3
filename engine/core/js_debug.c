@@ -953,7 +953,8 @@ static duk_ret_t Js_Binding_HudDrawRect( duk_context *ctx ) {
 	float y = (float)duk_require_number( ctx, 1 );
 	float w = (float)duk_require_number( ctx, 2 );
 	float h = (float)duk_require_number( ctx, 3 );
-	re.DrawStretchPic( x, y, w, h, 0, 0, 1, 1, cls.whiteShader );
+	/* Match hudDrawPic / hudDrawText: 640x480 virtual coords. */
+	SCR_DrawPic( x, y, w, h, cls.whiteShader );
 	return 0;
 }
 
@@ -1153,17 +1154,15 @@ static void JsDebug_TrackScript( const char *scriptPath ) {
 }
 
 void JsDebug_Frame( int msec, int realMsec ) {
-	duk_uarridx_t len;
-	duk_uarridx_t i;
-	const int startTime = Sys_Milliseconds();
-	const int budgetMs = JsDebug_ClampInt( js_frameCallbackBudgetMs ? js_frameCallbackBudgetMs->integer : 0, 0, 1000 );
-	static int s_lastBudgetWarnMs = 0;
+	(void)msec;
+	(void)realMsec;
 
 	if ( !s_jsContext ) {
 		return;
 	}
 
-	/* Process timers */
+	/* Process timers only. Frame HUD callbacks run in JsDebug_DrawFrame during
+	 * SCR_DrawScreenField so re.DrawStretchPic lands after RE_BeginFrame. */
 	{
 		int now = Sys_Milliseconds();
 		int ti;
@@ -1191,6 +1190,19 @@ void JsDebug_Frame( int msec, int realMsec ) {
 			}
 		}
 	}
+}
+
+void JsDebug_DrawFrame( int msec, int realMsec ) {
+	duk_uarridx_t len;
+	duk_uarridx_t i;
+	const int startTime = Sys_Milliseconds();
+	const int budgetMs = JsDebug_ClampInt( js_frameCallbackBudgetMs ? js_frameCallbackBudgetMs->integer : 0, 0, 1000 );
+	static int s_lastBudgetWarnMs = 0;
+	static int s_drawFrameLogOnce = 0;
+
+	if ( !s_jsContext ) {
+		return;
+	}
 
 	JsDebug_InitPolicyCvars();
 	if ( !js_allowEvents || !js_allowEvents->integer ) {
@@ -1198,9 +1210,17 @@ void JsDebug_Frame( int msec, int realMsec ) {
 	}
 
 	if ( !JsDebug_GetEventCallbacksArray( s_jsContext, "frame", qfalse ) ) {
+		if ( !s_drawFrameLogOnce ) {
+			s_drawFrameLogOnce = 1;
+			Com_Printf( S_COLOR_YELLOW "JavaScript: JsDebug_DrawFrame — no frame callbacks registered\n" );
+		}
 		return;
 	}
 	len = duk_get_length( s_jsContext, -1 );
+	if ( !s_drawFrameLogOnce ) {
+		s_drawFrameLogOnce = 1;
+		Com_Printf( S_COLOR_CYAN "JavaScript: JsDebug_DrawFrame — %u frame callback(s)\n", (unsigned)len );
+	}
 
 	for ( i = 0; i < len; i++ ) {
 		if ( budgetMs > 0 && ( Sys_Milliseconds() - startTime ) >= budgetMs ) {

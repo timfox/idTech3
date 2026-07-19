@@ -1,0 +1,21 @@
+# ninja log v7
+1	8	1784482301106622588	idtech3_sdl3-populate-prefix/src/idtech3_sdl3-populate-stamp/idtech3_sdl3-populate-mkdir	168c76f22c158fd9
+1	8	1784482301106622588	/home/tim/Desktop/idtech3/.fetchcontent-cache/idtech3_sdl3-subbuild/idtech3_sdl3-populate-prefix/src/idtech3_sdl3-populate-stamp/idtech3_sdl3-populate-mkdir	168c76f22c158fd9
+8	764	1784482301863667334	idtech3_sdl3-populate-prefix/src/idtech3_sdl3-populate-stamp/idtech3_sdl3-populate-download	94c54e3160a14045
+8	764	1784482301863667334	/home/tim/Desktop/idtech3/.fetchcontent-cache/idtech3_sdl3-subbuild/idtech3_sdl3-populate-prefix/src/idtech3_sdl3-populate-stamp/idtech3_sdl3-populate-download	94c54e3160a14045
+764	772	1784482301870667748	idtech3_sdl3-populate-prefix/src/idtech3_sdl3-populate-stamp/idtech3_sdl3-populate-update	20f38a89198bf212
+764	772	1784482301870667748	/home/tim/Desktop/idtech3/.fetchcontent-cache/idtech3_sdl3-subbuild/idtech3_sdl3-populate-prefix/src/idtech3_sdl3-populate-stamp/idtech3_sdl3-populate-update	20f38a89198bf212
+772	780	1784482301878668221	idtech3_sdl3-populate-prefix/src/idtech3_sdl3-populate-stamp/idtech3_sdl3-populate-patch	50506ba3d4686ae5
+772	780	1784482301878668221	/home/tim/Desktop/idtech3/.fetchcontent-cache/idtech3_sdl3-subbuild/idtech3_sdl3-populate-prefix/src/idtech3_sdl3-populate-stamp/idtech3_sdl3-populate-patch	50506ba3d4686ae5
+780	787	1784482301885668634	idtech3_sdl3-populate-prefix/src/idtech3_sdl3-populate-stamp/idtech3_sdl3-populate-configure	8ec2cf9b13ccdddd
+780	787	1784482301885668634	/home/tim/Desktop/idtech3/.fetchcontent-cache/idtech3_sdl3-subbuild/idtech3_sdl3-populate-prefix/src/idtech3_sdl3-populate-stamp/idtech3_sdl3-populate-configure	8ec2cf9b13ccdddd
+787	793	1784482301891668989	idtech3_sdl3-populate-prefix/src/idtech3_sdl3-populate-stamp/idtech3_sdl3-populate-build	56e66a359ee01bb8
+787	793	1784482301891668989	/home/tim/Desktop/idtech3/.fetchcontent-cache/idtech3_sdl3-subbuild/idtech3_sdl3-populate-prefix/src/idtech3_sdl3-populate-stamp/idtech3_sdl3-populate-build	56e66a359ee01bb8
+793	801	1784482301899669462	idtech3_sdl3-populate-prefix/src/idtech3_sdl3-populate-stamp/idtech3_sdl3-populate-install	739abd64d5796fea
+793	801	1784482301899669462	/home/tim/Desktop/idtech3/.fetchcontent-cache/idtech3_sdl3-subbuild/idtech3_sdl3-populate-prefix/src/idtech3_sdl3-populate-stamp/idtech3_sdl3-populate-install	739abd64d5796fea
+801	809	1784482301907669935	idtech3_sdl3-populate-prefix/src/idtech3_sdl3-populate-stamp/idtech3_sdl3-populate-test	d77136bd8451febd
+801	809	1784482301907669935	/home/tim/Desktop/idtech3/.fetchcontent-cache/idtech3_sdl3-subbuild/idtech3_sdl3-populate-prefix/src/idtech3_sdl3-populate-stamp/idtech3_sdl3-populate-test	d77136bd8451febd
+809	821	1784482301920670703	CMakeFiles/idtech3_sdl3-populate-complete	2f387ae98e5f3e50
+809	821	1784482301920670703	idtech3_sdl3-populate-prefix/src/idtech3_sdl3-populate-stamp/idtech3_sdl3-populate-done	2f387ae98e5f3e50
+809	821	1784482301920670703	/home/tim/Desktop/idtech3/.fetchcontent-cache/idtech3_sdl3-subbuild/CMakeFiles/idtech3_sdl3-populate-complete	2f387ae98e5f3e50
+809	821	1784482301920670703	/home/tim/Desktop/idtech3/.fetchcontent-cache/idtech3_sdl3-subbuild/idtech3_sdl3-populate-prefix/src/idtech3_sdl3-populate-stamp/idtech3_sdl3-populate-done	2f387ae98e5f3e50

@@ -1,0 +1,3 @@
+/home/tim/Desktop/idtech3/.fetchcontent-cache/idtech3_sdl3-subbuild/CMakeFiles/idtech3_sdl3-populate.dir
+/home/tim/Desktop/idtech3/.fetchcontent-cache/idtech3_sdl3-subbuild/CMakeFiles/edit_cache.dir
+/home/tim/Desktop/idtech3/.fetchcontent-cache/idtech3_sdl3-subbuild/CMakeFiles/rebuild_cache.dir

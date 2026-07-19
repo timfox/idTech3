@@ -1,0 +1,12 @@
+# This is a generated file and its contents are an internal implementation detail.
+# The download step will be re-executed if anything in this file changes.
+# No other meaning or use of this file is supported.
+
+method=url
+command=/usr/bin/cmake;-DCMAKE_MESSAGE_LOG_LEVEL=VERBOSE;-P;/home/tim/Desktop/idtech3/.fetchcontent-cache/idtech3_sdl3-subbuild/idtech3_sdl3-populate-prefix/src/idtech3_sdl3-populate-stamp/download-idtech3_sdl3-populate.cmake;COMMAND;/usr/bin/cmake;-DCMAKE_MESSAGE_LOG_LEVEL=VERBOSE;-P;/home/tim/Desktop/idtech3/.fetchcontent-cache/idtech3_sdl3-subbuild/idtech3_sdl3-populate-prefix/src/idtech3_sdl3-populate-stamp/verify-idtech3_sdl3-populate.cmake;COMMAND;/usr/bin/cmake;-DCMAKE_MESSAGE_LOG_LEVEL=VERBOSE;-P;/home/tim/Desktop/idtech3/.fetchcontent-cache/idtech3_sdl3-subbuild/idtech3_sdl3-populate-prefix/src/idtech3_sdl3-populate-stamp/extract-idtech3_sdl3-populate.cmake
+source_dir=/home/tim/Desktop/idtech3/.fetchcontent-cache/idtech3_sdl3-src
+work_dir=/home/tim/Desktop/idtech3/.fetchcontent-cache
+url(s)=https://github.com/libsdl-org/SDL/releases/download/release-3.2.22/SDL3-3.2.22.tar.gz
+hash=SHA256=f29d00cbcee273c0a54f3f32f86bf5c595e8823a96b1d92a145aac40571ebfcc
+      no_extract=
+
