@@ -507,10 +507,15 @@ static int GLW_SetMode( int mode, const char *modeFS, qboolean fullscreen )
 		SDL_SetWindowHitTest( SDL_window, SDL_HitTestFunc, NULL );
 
 	SDL_GetWindowSizeInPixels( SDL_window, &config->vidWidth, &config->vidHeight );
-
-	// save render dimensions as renderer may change it in advance
-	glw_state.window_width = config->vidWidth;
-	glw_state.window_height = config->vidHeight;
+	{
+		int logicalW = 0, logicalH = 0;
+		SDL_GetWindowSize( SDL_window, &logicalW, &logicalH );
+		/* WarpMouseInWindow expects window coordinates, not drawable pixels. */
+		glw_state.window_width = ( logicalW > 0 ) ? logicalW : config->vidWidth;
+		glw_state.window_height = ( logicalH > 0 ) ? logicalH : config->vidHeight;
+		glw_state.pixel_width = config->vidWidth;
+		glw_state.pixel_height = config->vidHeight;
+	}
 
 	SDL_WarpMouseInWindow( SDL_window, (float)( glw_state.window_width / 2 ), (float)( glw_state.window_height / 2 ) );
 

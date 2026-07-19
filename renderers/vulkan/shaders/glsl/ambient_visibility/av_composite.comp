@@ -12,6 +12,12 @@ layout(set = 0, binding = 4) uniform sampler2D referenceAux;
 layout(set = 0, binding = 5) uniform usampler2D classTex;
 layout(rgba16f, set = 0, binding = 6) uniform image2D colorOut;
 layout(set = 0, binding = 7) uniform sampler2D depthTex;
+layout(std430, set = 0, binding = 8) buffer ReferenceMetrics {
+	uint visibilityErrorSum;
+	uint bentErrorSum;
+	uint sampleCount;
+	uint pad;
+} metrics;
 
 layout(push_constant) uniform CompositePush {
 	uvec4 extentMode;        /* xy full extent, z debug, w referenceValid */
@@ -36,6 +42,14 @@ void main() {
 	uint cls = texelFetch(classTex, ip, 0).r;
 	uint debugMode = pc.extentMode.z;
 	vec3 outRgb = scene.rgb;
+	if (pc.extentMode.w != 0u && (pix.x & 3u) == 0u && (pix.y & 3u) == 0u &&
+		av_valid_depth(textureLod(depthTex, uv, 0.0).r)) {
+		float visibilityError = abs(av.r - ref.r);
+		float bentError = acos(clamp(dot(av_oct_decode(av.gb), av_oct_decode(ref.gb)), -1.0, 1.0)) / AV_PI;
+		atomicAdd(metrics.visibilityErrorSum, uint(clamp(visibilityError, 0.0, 1.0) * 2048.0 + 0.5));
+		atomicAdd(metrics.bentErrorSum, uint(clamp(bentError, 0.0, 1.0) * 2048.0 + 0.5));
+		atomicAdd(metrics.sampleCount, 1u);
+	}
 
 	if (debugMode == 1u) outRgb = vec3(gtao.r);
 	else if (debugMode == 2u) outRgb = vec3(av.r);

@@ -160,6 +160,11 @@ qboolean vk_deferred_gbuffer_active( void )
 
 qboolean vk_deferred_gbuffer_fill_wanted( void )
 {
+	/* Menu/cinematic (no finished world): skip fill — NVIDIA SIGSEGV path when
+	 * G-buffer capture runs without a completed main pass / world view. */
+	if ( !tr.world || !backEnd.doneWorldScene ) {
+		return qfalse;
+	}
 	return ( vk_deferred_gbuffer_active() && r_deferredGBufferFill && r_deferredGBufferFill->integer ) ? qtrue : qfalse;
 }
 

@@ -21,6 +21,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 */
 
 #include <SDL3/SDL.h>
+#include <math.h>
 
 #include "../../client/client.h"
 #include "sdl_glw.h"
@@ -38,13 +39,31 @@ static int joystick_hotplug_watch_added = 0;
 
 static qboolean mouseAvailable = qfalse;
 static qboolean mouseActive = qfalse;
+static qboolean mouseRelativeWanted = qfalse;
+static qboolean mouseRelativeActive = qfalse;
 
 /* Last absolute mouse position when in UI mode (ungrabbed). Used to compute deltas
  * from SDL_EVENT_MOUSE_MOTION x,y so the UI cursor tracks correctly after warp-to-center. */
 static int last_ui_mouse_x = -1;
 static int last_ui_mouse_y = -1;
 
+/* SDL3 reports float relative deltas (sub-pixel on HiDPI). Accumulate fractions so
+ * slow motion is not truncated to zero by (int) cast. */
+static float mouse_frac_x = 0.0f;
+static float mouse_frac_y = 0.0f;
+
+/* Diagnostics for input_status / in_mouseDebug. */
+static float s_dbg_raw_xrel = 0.0f;
+static float s_dbg_raw_yrel = 0.0f;
+static int s_dbg_post_dx = 0;
+static int s_dbg_post_dy = 0;
+static int s_dbg_accum_dx = 0;
+static int s_dbg_accum_dy = 0;
+static int s_dbg_event_count = 0;
+static int s_dbg_relative_fail = 0;
+
 static cvar_t *in_mouse;
+static cvar_t *in_mouseDebug;
 
 #ifdef USE_JOYSTICK
 static cvar_t *in_joystick;
@@ -534,6 +553,61 @@ static void IN_GobbleMouseEvents( void )
 
 /*
 ===============
+IN_SetRelativeMouse
+===============
+*/
+static qboolean IN_SetRelativeMouse( qboolean enable )
+{
+	qboolean ok;
+
+	mouseRelativeWanted = enable;
+	ok = SDL_SetWindowRelativeMouseMode( SDL_window, enable ) ? qtrue : qfalse;
+	if ( !ok ) {
+		s_dbg_relative_fail++;
+		Com_DPrintf( "SDL_SetWindowRelativeMouseMode(%d) failed: %s\n",
+			(int)enable, SDL_GetError() );
+		mouseRelativeActive = SDL_GetWindowRelativeMouseMode( SDL_window ) ? qtrue : qfalse;
+		return mouseRelativeActive;
+	}
+	mouseRelativeActive = enable;
+	return qtrue;
+}
+
+
+/*
+===============
+IN_WarpToWindowCenter
+===============
+*/
+static void IN_WarpToWindowCenter( void )
+{
+	int cx, cy;
+
+	if ( !SDL_window ) {
+		return;
+	}
+	/* Prefer live logical size; fall back to cached. */
+	{
+		int lw = 0, lh = 0;
+		if ( SDL_GetWindowSize( SDL_window, &lw, &lh ) && lw > 0 && lh > 0 ) {
+			glw_state.window_width = lw;
+			glw_state.window_height = lh;
+		}
+	}
+	cx = glw_state.window_width / 2;
+	cy = glw_state.window_height / 2;
+	if ( cx < 1 ) {
+		cx = 1;
+	}
+	if ( cy < 1 ) {
+		cy = 1;
+	}
+	SDL_WarpMouseInWindow( SDL_window, (float)cx, (float)cy );
+}
+
+
+/*
+===============
 IN_ActivateMouse
 ===============
 */
@@ -545,14 +619,20 @@ static void IN_ActivateMouse( void )
 	if ( !mouseActive )
 	{
 		IN_GobbleMouseEvents();
+		mouse_frac_x = 0.0f;
+		mouse_frac_y = 0.0f;
 
-		SDL_SetWindowRelativeMouseMode( SDL_window, in_mouse->integer == 1 );
+		IN_SetRelativeMouse( in_mouse->integer == 1 );
 		SDL_SetWindowMouseGrab( SDL_window, true );
 
 		if ( glw_state.isFullscreen )
 			SDL_HideCursor();
 
-		SDL_WarpMouseInWindow( SDL_window, (float)( glw_state.window_width / 2 ), (float)( glw_state.window_height / 2 ) );
+		/* Only warp when relative mode is unavailable — warps under relative mode
+		 * generate spurious motion on some Wayland/X11 stacks. */
+		if ( !mouseRelativeActive ) {
+			IN_WarpToWindowCenter();
+		}
 
 #ifdef DEBUG_EVENTS
 		Com_Printf( "%4i %s\n", Sys_Milliseconds(), __func__ );
@@ -565,10 +645,10 @@ static void IN_ActivateMouse( void )
 		if ( in_nograb->modified || !mouseActive )
 		{
 			if ( in_nograb->integer ) {
-				SDL_SetWindowRelativeMouseMode( SDL_window, false );
+				IN_SetRelativeMouse( qfalse );
 				SDL_SetWindowMouseGrab( SDL_window, false );
 			} else {
-				SDL_SetWindowRelativeMouseMode( SDL_window, in_mouse->integer == 1 );
+				IN_SetRelativeMouse( in_mouse->integer == 1 );
 				SDL_SetWindowMouseGrab( SDL_window, true );
 			}
 
@@ -601,12 +681,12 @@ static void IN_DeactivateMouse( void )
 		IN_GobbleMouseEvents();
 
 		SDL_SetWindowMouseGrab( SDL_window, false );
-		SDL_SetWindowRelativeMouseMode( SDL_window, false );
+		IN_SetRelativeMouse( qfalse );
+		mouse_frac_x = 0.0f;
+		mouse_frac_y = 0.0f;
 
 		if ( gw_active ) {
-			int cx = glw_state.window_width / 2;
-			int cy = glw_state.window_height / 2;
-			SDL_WarpMouseInWindow( SDL_window, (float)cx, (float)cy );
+			IN_WarpToWindowCenter();
 			/* Set last to 0 so the warp's motion event produces delta (cx,cy), moving
 			 * the UI cursor from 0,0 to center. */
 			last_ui_mouse_x = 0;
@@ -1882,17 +1962,48 @@ void HandleEvents( void )
 				{
 					int dx, dy;
 					if ( mouseActive ) {
-						/* Grabbed: use relative deltas */
-						if( !e.motion.xrel && !e.motion.yrel )
+						float xrel = e.motion.xrel;
+						float yrel = e.motion.yrel;
+						s_dbg_raw_xrel = xrel;
+						s_dbg_raw_yrel = yrel;
+						s_dbg_event_count++;
+						/* When relative mode failed, prefer absolute delta vs window
+						 * center so warp-to-center fallback still produces look input. */
+						if ( !mouseRelativeActive ) {
+							const float cx = (float)( glw_state.window_width / 2 );
+							const float cy = (float)( glw_state.window_height / 2 );
+							xrel = e.motion.x - cx;
+							yrel = e.motion.y - cy;
+							s_dbg_raw_xrel = xrel;
+							s_dbg_raw_yrel = yrel;
+						} else if ( xrel == 0.0f && yrel == 0.0f ) {
 							break;
-						dx = (int)e.motion.xrel;
-						dy = (int)e.motion.yrel;
+						}
+						/* Accumulate SDL3 float deltas so sub-pixel HiDPI motion is not lost. */
+						mouse_frac_x += xrel;
+						mouse_frac_y += yrel;
+						dx = (int)mouse_frac_x;
+						dy = (int)mouse_frac_y;
+						mouse_frac_x -= (float)dx;
+						mouse_frac_y -= (float)dy;
+						if ( !dx && !dy )
+							break;
+						s_dbg_post_dx = dx;
+						s_dbg_post_dy = dy;
+						s_dbg_accum_dx += dx;
+						s_dbg_accum_dy += dy;
+						if ( in_mouseDebug && in_mouseDebug->integer ) {
+							Com_Printf( "mouse raw=%.3f,%.3f post=%d,%d rel=%d grab=%d\n",
+								xrel, yrel, dx, dy,
+								(int)mouseRelativeActive,
+								(int)SDL_GetWindowMouseGrab( SDL_window ) );
+						}
 					} else {
 						/* UI mode, ungrabbed: use absolute position to compute delta. */
 						int prev_x = ( last_ui_mouse_x < 0 ) ? 0 : last_ui_mouse_x;
 						int prev_y = ( last_ui_mouse_y < 0 ) ? 0 : last_ui_mouse_y;
-						last_ui_mouse_x = (int)e.motion.x;
-						last_ui_mouse_y = (int)e.motion.y;
+						last_ui_mouse_x = (int)lroundf( e.motion.x );
+						last_ui_mouse_y = (int)lroundf( e.motion.y );
 						dx = last_ui_mouse_x - prev_x;
 						dy = last_ui_mouse_y - prev_y;
 						if ( !dx && !dy )
@@ -1977,18 +2088,33 @@ void HandleEvents( void )
 			case SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED:
 				IN_UpdateDisplayScaleCvars();
 				IN_UpdateTextInputArea();
-				/* Keep Vulkan swapchain/FBO in sync with the SDL window. */
-				if ( !glw_state.isFullscreen && e.window.data1 > 0 && e.window.data2 > 0 ) {
-					static int s_lastW, s_lastH;
-					if ( e.window.data1 != s_lastW || e.window.data2 != s_lastH ) {
-						s_lastW = e.window.data1;
-						s_lastH = e.window.data2;
-						if ( e.window.data1 != glw_state.window_width ||
-						     e.window.data2 != glw_state.window_height ) {
-							Cvar_Set( "r_mode", "-1" );
-							Cvar_SetIntegerValue( "r_customWidth", e.window.data1 );
-							Cvar_SetIntegerValue( "r_customHeight", e.window.data2 );
-							Cbuf_AddText( "vid_restart\n" );
+				/* Keep Vulkan swapchain/FBO in sync with the SDL window.
+				 * RESIZED delivers logical size; PIXEL_SIZE_CHANGED delivers pixels.
+				 * Always query both live sizes — never compare event data against the
+				 * wrong coordinate space (HiDPI caused endless vid_restart). */
+				if ( !glw_state.isFullscreen && SDL_window ) {
+					int logicalW = 0, logicalH = 0;
+					int pixelW = 0, pixelH = 0;
+					static int s_lastPixelW, s_lastPixelH;
+
+					SDL_GetWindowSize( SDL_window, &logicalW, &logicalH );
+					SDL_GetWindowSizeInPixels( SDL_window, &pixelW, &pixelH );
+					if ( logicalW > 0 && logicalH > 0 ) {
+						glw_state.window_width = logicalW;
+						glw_state.window_height = logicalH;
+					}
+					if ( pixelW > 0 && pixelH > 0 ) {
+						glw_state.pixel_width = pixelW;
+						glw_state.pixel_height = pixelH;
+						if ( pixelW != s_lastPixelW || pixelH != s_lastPixelH ) {
+							s_lastPixelW = pixelW;
+							s_lastPixelH = pixelH;
+							if ( pixelW != cls.glconfig.vidWidth || pixelH != cls.glconfig.vidHeight ) {
+								Cvar_Set( "r_mode", "-1" );
+								Cvar_SetIntegerValue( "r_customWidth", pixelW );
+								Cvar_SetIntegerValue( "r_customHeight", pixelH );
+								Cbuf_AddText( "vid_restart\n" );
+							}
 						}
 					}
 				}
@@ -2003,10 +2129,17 @@ void HandleEvents( void )
 				gw_minimized = qfalse;
 				break;
 			case SDL_EVENT_WINDOW_FOCUS_LOST:
-				lastKeyDown = 0; Key_ClearStates(); IN_SyncModifiers(); gw_active = qfalse;
+				lastKeyDown = 0; Key_ClearStates(); IN_SyncModifiers();
+				gw_active = qfalse;
+				mouse_focus = qfalse;
 				break;
 			case SDL_EVENT_WINDOW_FOCUS_GAINED:
-				lastKeyDown = 0; Key_ClearStates(); IN_SyncModifiers(); gw_active = qtrue; gw_minimized = qfalse;
+				lastKeyDown = 0; Key_ClearStates(); IN_SyncModifiers();
+				gw_active = qtrue;
+				gw_minimized = qfalse;
+				/* Treat keyboard focus as sufficient for relative mouse; MOUSE_ENTER
+				 * may never fire after vid_restart / fullscreen transitions. */
+				mouse_focus = qtrue;
 				if ( re.SetColorMappings ) {
 					re.SetColorMappings();
 				}
@@ -2015,7 +2148,9 @@ void HandleEvents( void )
 				mouse_focus = qtrue;
 				break;
 			case SDL_EVENT_WINDOW_MOUSE_LEAVE:
-				if ( glw_state.isFullscreen )
+				/* Do not drop relative mouse on leave while the window still has
+				 * keyboard focus — Wayland/X11 often emit leave during grab. */
+				if ( !gw_active )
 					mouse_focus = qfalse;
 				break;
 		default:
@@ -2069,18 +2204,89 @@ void IN_Frame( void )
 		}
 	}
 
-	if ( !gw_active || !mouse_focus || in_nograb->integer ) {
+	if ( !gw_active || in_nograb->integer ) {
 		IN_DeactivateMouse();
 		return;
 	}
 
+	/* Keyboard focus is enough; mouse_focus is advisory after leave events. */
+	if ( !mouse_focus ) {
+		mouse_focus = qtrue;
+	}
+
 	IN_ActivateMouse();
 
-	//IN_ProcessEvents();
-	//HandleEvents();
+	/* Re-assert relative mode if SDL dropped it (Wayland constraint loss). */
+	if ( mouseActive && mouseRelativeWanted && !SDL_GetWindowRelativeMouseMode( SDL_window ) ) {
+		IN_SetRelativeMouse( qtrue );
+	}
 
-	// Set event time for next frame to earliest possible time an event could happen
-	//in_eventTime = Sys_Milliseconds();
+	/* If relative mode is still unavailable, keep the cursor centered so absolute
+	 * motion can be converted to deltas without hitting the window edge. Do not
+	 * warp when relative mode is live — that injects spurious motion on Wayland. */
+	if ( mouseActive && mouseRelativeWanted && !mouseRelativeActive &&
+	     !( in_nograb && in_nograb->integer ) ) {
+		IN_WarpToWindowCenter();
+	}
+}
+
+
+/*
+===============
+IN_InputStatus_f
+===============
+*/
+static void IN_InputStatus_f( void )
+{
+	const char *drv = SDL_GetCurrentVideoDriver();
+	const int catcher = Key_GetCatcher();
+	const qboolean relLive = ( SDL_window && SDL_GetWindowRelativeMouseMode( SDL_window ) ) ? qtrue : qfalse;
+	const qboolean grabLive = ( SDL_window && SDL_GetWindowMouseGrab( SDL_window ) ) ? qtrue : qfalse;
+	const qboolean cursorVis = SDL_CursorVisible() ? qtrue : qfalse;
+	const float sens = Cvar_VariableValue( "sensitivity" );
+	const float mPitch = Cvar_VariableValue( "m_pitch" );
+	const float mYaw = Cvar_VariableValue( "m_yaw" );
+	const int freelook = (int)Cvar_VariableValue( "cl_freelook" );
+
+	Com_Printf( "=== input_status ===\n" );
+	Com_Printf( "  backend:          SDL3 / %s\n", drv ? drv : "(none)" );
+	Com_Printf( "  window focus:     %s\n", gw_active ? "yes" : "no" );
+	Com_Printf( "  mouse focus:      %s\n", mouse_focus ? "yes" : "no" );
+	Com_Printf( "  minimized:        %s\n", gw_minimized ? "yes" : "no" );
+	Com_Printf( "  mouse available:  %s (in_mouse=%d)\n", mouseAvailable ? "yes" : "no",
+		in_mouse ? in_mouse->integer : 0 );
+	Com_Printf( "  mouse active:     %s\n", mouseActive ? "yes" : "no" );
+	Com_Printf( "  relative wanted:  %s\n", mouseRelativeWanted ? "yes" : "no" );
+	Com_Printf( "  relative active:  %s (SDL live=%s)\n",
+		mouseRelativeActive ? "yes" : "no", relLive ? "yes" : "no" );
+	Com_Printf( "  relative fails:   %d\n", s_dbg_relative_fail );
+	Com_Printf( "  raw input:        %s (SDL relative mode)\n",
+		( in_mouse && in_mouse->integer == 1 ) ? "requested" : "off" );
+	Com_Printf( "  grab state:       %s (SDL live=%s)\n",
+		( mouseActive && !( in_nograb && in_nograb->integer ) ) ? "wanted" : "released",
+		grabLive ? "yes" : "no" );
+	Com_Printf( "  cursor visible:   %s\n", cursorVis ? "yes" : "no" );
+	Com_Printf( "  UI capture:       %s\n", ( catcher & KEYCATCH_UI ) ? "yes" : "no" );
+	Com_Printf( "  console capture:  %s\n", ( catcher & KEYCATCH_CONSOLE ) ? "yes" : "no" );
+	Com_Printf( "  cgame capture:    %s\n", ( catcher & KEYCATCH_CGAME ) ? "yes" : "no" );
+	Com_Printf( "  in_nograb:        %d\n", in_nograb ? in_nograb->integer : 0 );
+	Com_Printf( "  fullscreen:       %s\n", glw_state.isFullscreen ? "yes" : "no" );
+	Com_Printf( "  window logical:   %dx%d\n", glw_state.window_width, glw_state.window_height );
+	Com_Printf( "  window pixels:    %dx%d\n", glw_state.pixel_width, glw_state.pixel_height );
+	Com_Printf( "  latest raw delta: %.3f, %.3f\n", s_dbg_raw_xrel, s_dbg_raw_yrel );
+	Com_Printf( "  latest post delta:%d, %d\n", s_dbg_post_dx, s_dbg_post_dy );
+	Com_Printf( "  accum delta:      %d, %d (events=%d)\n",
+		s_dbg_accum_dx, s_dbg_accum_dy, s_dbg_event_count );
+	Com_Printf( "  sensitivity:      %.3f\n", sens );
+	Com_Printf( "  m_yaw / m_pitch:  %.4f / %.4f\n", mYaw, mPitch );
+	Com_Printf( "  cl_freelook:      %d\n", freelook );
+	Com_Printf( "  yaw/pitch scale:  sens*m_yaw=%.5f  sens*m_pitch=%.5f\n",
+		sens * mYaw, sens * mPitch );
+
+	/* Reset session accumulators so repeated input_status shows fresh motion. */
+	s_dbg_accum_dx = 0;
+	s_dbg_accum_dy = 0;
+	s_dbg_event_count = 0;
 }
 
 
@@ -2127,6 +2333,9 @@ void IN_Init( void )
 		"  0 - disable mouse input\n" \
 		"  1 - di/raw mouse\n" \
 		" -1 - win32 mouse" );
+	in_mouseDebug = Cvar_Get( "in_mouseDebug", "0", CVAR_TEMP );
+	Cvar_CheckRange( in_mouseDebug, "0", "1", CV_INTEGER );
+	Cvar_SetDescription( in_mouseDebug, "Print per-motion raw/post mouse deltas and relative/grab state." );
 
 #ifdef USE_JOYSTICK
 	in_joystick = Cvar_Get( "in_joystick", "0", CVAR_ARCHIVE|CVAR_LATCH );
@@ -2232,6 +2441,7 @@ void IN_Init( void )
 
 	Cmd_AddCommand( "minimize", IN_Minimize );
 	Cmd_AddCommand( "in_restart", IN_Restart );
+	Cmd_AddCommand( "input_status", IN_InputStatus_f );
 #ifdef USE_JOYSTICK
 	Cmd_AddCommand( "gamepad_status", IN_GamepadStatus_f );
 	Cmd_AddCommand( "gamepad_load_mappings", IN_GamepadLoadMappings_f );
@@ -2280,6 +2490,7 @@ void IN_Shutdown( void )
 
 	Cmd_RemoveCommand( "minimize" );
 	Cmd_RemoveCommand( "in_restart" );
+	Cmd_RemoveCommand( "input_status" );
 #ifdef USE_JOYSTICK
 	Cmd_RemoveCommand( "gamepad_status" );
 	Cmd_RemoveCommand( "gamepad_load_mappings" );

@@ -14,6 +14,7 @@ Split from vk.c.
 #include "vk_volumetric_params.h"
 #include "vk_view_state.h"
 #include "vk_post_fog.h"
+#include "vk_scene_pass.h"
 
 qboolean vk_volumetric_screen_integration_active( void )
 {

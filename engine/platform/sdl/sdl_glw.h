@@ -38,8 +38,13 @@ typedef struct
 	int desktop_width;
 	int desktop_height;
 
+	/* Logical window size (SDL_GetWindowSize) — use for WarpMouseInWindow. */
 	int window_width;
 	int window_height;
+
+	/* Drawable pixel size (SDL_GetWindowSizeInPixels) — matches glConfig.vid*. */
+	int pixel_width;
+	int pixel_height;
 
 	int monitorCount;
 

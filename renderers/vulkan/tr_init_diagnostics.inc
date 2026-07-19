@@ -559,7 +559,7 @@ static void R_RendererStatus_f( void )
 		giOwner = "rcgi";
 	} else if ( surfelOn ) {
 		giOwner = "surfel_gi";
-	} else if ( R_CvarInteger( r_shWorldLighting ) || R_NamedCvarInteger( "r_shLighting" ) ) {
+	} else if ( R_NamedCvarInteger( "r_shWorldLighting" ) || R_NamedCvarInteger( "r_shLighting" ) || R_NamedCvarInteger( "r_pbr_shExtract" ) ) {
 		giOwner = "sh_ibl";
 	} else {
 		giOwner = "none";
@@ -573,7 +573,7 @@ static void R_RendererStatus_f( void )
 		reflOwner = "none";
 	}
 
-	if ( R_CvarInteger( r_taa ) ) {
+	if ( R_NamedCvarInteger( "r_taa" ) ) {
 		temporalOwner = "taa";
 	} else if ( hybridOn ) {
 		temporalOwner = "hybrid1";
@@ -597,7 +597,7 @@ static void R_RendererStatus_f( void )
 		R_NamedCvarString( "r_havenrpTemporalOwner" ) );
 	ri.Printf( PRINT_ALL, "RT        : available=%s active(rtx=%d hybrid1=%d surfel=%d rcgi=%d)\n",
 		R_YesNo( R_RtxAvailable() ),
-		R_CvarInteger( r_rtx ), R_CvarInteger( r_hybrid1 ),
+		R_NamedCvarInteger( "r_rtx" ), R_NamedCvarInteger( "r_hybrid1" ),
 		R_NamedCvarInteger( "r_surfelGi" ), R_NamedCvarInteger( "r_rcgi" ) );
 	ri.Printf( PRINT_ALL, "streaming : openWorld=%d bspStream=%d\n",
 		R_NamedCvarInteger( "r_openWorld" ), R_NamedCvarInteger( "r_bspStream" ) );

@@ -65,7 +65,12 @@ typedef struct {
 	VkDescriptorPool descriptorPool;
 	VkDescriptorSet gtaoSet, rtaoSet, temporalSet, filterSet, compositeSet;
 	VkQueryPool queryPool;
+	VkBuffer metricBuffer;
+	VkDeviceMemory metricMemory;
+	void *metricMapped;
 	double timings[4]; /* raw, temporal, filter, total ms */
+	double errors[2];  /* scalar visibility MAE, bent-normal angular MAE (degrees) */
+	uint32_t errorSamples;
 } av_state_t;
 
 static av_state_t av;
@@ -279,7 +284,8 @@ static qboolean AV_CreatePipelines( void )
 		VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
 		VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
 		VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-		VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER };
+		VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+		VK_DESCRIPTOR_TYPE_STORAGE_BUFFER };
 	VkDescriptorPoolSize sizes[4];
 	VkDescriptorPoolCreateInfo poolCI;
 	VkDescriptorSetAllocateInfo ai;
@@ -308,11 +314,12 @@ static qboolean AV_CreatePipelines( void )
 	Com_Memset( sizes, 0, sizeof( sizes ) );
 	sizes[0].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER; sizes[0].descriptorCount = 40;
 	sizes[1].type = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE; sizes[1].descriptorCount = 16;
-	sizes[2].type = VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR; sizes[2].descriptorCount = AV_RayQueryAvailable() ? 2u : 0u;
+	sizes[2].type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER; sizes[2].descriptorCount = 2;
+	sizes[3].type = VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR; sizes[3].descriptorCount = AV_RayQueryAvailable() ? 2u : 0u;
 	Com_Memset( &poolCI, 0, sizeof( poolCI ) );
 	poolCI.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
 	poolCI.maxSets = 5;
-	poolCI.poolSizeCount = AV_RayQueryAvailable() ? 3u : 2u;
+	poolCI.poolSizeCount = AV_RayQueryAvailable() ? 4u : 3u;
 	poolCI.pPoolSizes = sizes;
 	VK_CHECK( qvkCreateDescriptorPool( vk.device, &poolCI, NULL, &av.descriptorPool ) );
 	layouts[0] = av.gtaoLayout;
@@ -328,6 +335,33 @@ static qboolean AV_CreatePipelines( void )
 	VK_CHECK( qvkAllocateDescriptorSets( vk.device, &ai, sets ) );
 	av.gtaoSet = sets[0]; av.temporalSet = sets[1]; av.filterSet = sets[2]; av.compositeSet = sets[3];
 	if ( AV_RayQueryAvailable() ) av.rtaoSet = sets[4];
+	return qtrue;
+}
+
+static qboolean AV_CreateMetricBuffer( void )
+{
+	VkBufferCreateInfo bci;
+	VkMemoryRequirements req;
+	VkMemoryAllocateInfo mai;
+	VkDeviceSize size = (VkDeviceSize)NUM_COMMAND_BUFFERS * sizeof( uint32_t ) * 4u;
+
+	Com_Memset( &bci, 0, sizeof( bci ) );
+	bci.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+	bci.size = size;
+	bci.usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
+	bci.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+	VK_CHECK( qvkCreateBuffer( vk.device, &bci, NULL, &av.metricBuffer ) );
+	qvkGetBufferMemoryRequirements( vk.device, av.metricBuffer, &req );
+	Com_Memset( &mai, 0, sizeof( mai ) );
+	mai.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+	mai.allocationSize = req.size;
+	mai.memoryTypeIndex = vk_find_memory_type( vk.physical_device, req.memoryTypeBits,
+		VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT );
+	VK_CHECK( qvkAllocateMemory( vk.device, &mai, NULL, &av.metricMemory ) );
+	VK_CHECK( qvkBindBufferMemory( vk.device, av.metricBuffer, av.metricMemory, 0 ) );
+	VK_CHECK( qvkMapMemory( vk.device, av.metricMemory, 0, size, 0, &av.metricMapped ) );
+	Com_Memset( av.metricMapped, 0, (size_t)size );
+	SET_OBJECT_NAME( av.metricBuffer, "Ambient Visibility reference error reduction", VK_DEBUG_REPORT_OBJECT_TYPE_BUFFER_EXT );
 	return qtrue;
 }
 
@@ -390,6 +424,10 @@ static void AV_Status_f( void )
 		( (double)av.traceWidth * av.traceHeight * 8.0 * 11.0 +
 		  (double)av.width * av.height * 8.0 * 2.0 ) / ( 1024.0 * 1024.0 ),
 		av.timings[0], av.timings[1], av.timings[2], av.timings[3] );
+	ri.Printf( PRINT_ALL,
+		"[AV] reference error samples=%u visibility_MAE=%.6f bent_normal_MAE=%.3f degrees%s\n",
+		av.errorSamples, av.errors[0], av.errors[1],
+		av.errorSamples ? "" : " (enable r_rtaoDebug 15 or 16)" );
 }
 
 static void AV_Reset_f( void )
@@ -488,6 +526,14 @@ static void AV_ReadTimings( void )
 	av.timings[1] = (double)( q[4] - q[2] ) * ms;
 	av.timings[2] = (double)( q[6] - q[4] ) * ms;
 	av.timings[3] = (double)( q[8] - q[0] ) * ms;
+	if ( av.metricMapped ) {
+		const uint32_t *m = (const uint32_t *)av.metricMapped + vk.cmd_index * 4u;
+		av.errorSamples = m[2];
+		if ( m[2] > 0u ) {
+			av.errors[0] = (double)m[0] / ( (double)m[2] * 2048.0 );
+			av.errors[1] = (double)m[1] / ( (double)m[2] * 2048.0 ) * 180.0;
+		}
+	}
 }
 
 void vk_ambient_visibility_reset_history( void )
@@ -533,6 +579,7 @@ void vk_ambient_visibility_init( void )
 	AV_RegisterCvars();
 	if ( av.ready || !vk.device || !vk.fboActive ) return;
 	if ( !AV_CreatePipelines() ) { AV_DestroyPipelines(); return; }
+	AV_CreateMetricBuffer();
 	if ( qvkCreateQueryPool && qvkCmdWriteTimestamp && qvkGetQueryPoolResults ) {
 		Com_Memset( &qci, 0, sizeof( qci ) );
 		qci.sType = VK_STRUCTURE_TYPE_QUERY_POOL_CREATE_INFO;
@@ -560,6 +607,9 @@ void vk_ambient_visibility_shutdown( void )
 		ri.Cmd_RemoveCommand( "ambient_visibility_reset" );
 	}
 	if ( av.queryPool ) qvkDestroyQueryPool( vk.device, av.queryPool, NULL );
+	if ( av.metricMapped ) qvkUnmapMemory( vk.device, av.metricMemory );
+	if ( av.metricBuffer ) qvkDestroyBuffer( vk.device, av.metricBuffer, NULL );
+	if ( av.metricMemory ) qvkFreeMemory( vk.device, av.metricMemory, NULL );
 	AV_DestroyPipelines();
 	AV_DestroyImage( &av.raw ); AV_DestroyImage( &av.rawAux );
 	AV_DestroyImage( &av.gtao ); AV_DestroyImage( &av.gtaoAux );
@@ -596,6 +646,7 @@ void vk_ambient_visibility_apply_after_geometry( void )
 	VkSampler nearest = AV_Sampler( qfalse ), linear = AV_Sampler( qtrue );
 	VkDescriptorImageInfo infos[12];
 	VkWriteDescriptorSet writes[12];
+	VkDescriptorBufferInfo metricInfo;
 	float invView[16], projInfo[4];
 	uint32_t normalsAreWorld, readIndex, writeIndex, gx, gy, mode, effectiveMode;
 	qboolean rtReady = qfalse, needReference = qfalse;
@@ -804,15 +855,45 @@ void vk_ambient_visibility_apply_after_geometry( void )
 		AV_ImageWrite( &writes[7], &infos[7], av.compositeSet, 7, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, nearest, depthView, VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL );
 		record_image_layout_transition( cmd, vk.color_image, VK_IMAGE_ASPECT_COLOR_BIT,
 			VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_GENERAL, 0, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT );
-		qvkUpdateDescriptorSets( vk.device, 8, writes, 0, NULL );
+		Com_Memset( &metricInfo, 0, sizeof( metricInfo ) );
+		metricInfo.buffer = av.metricBuffer;
+		metricInfo.offset = (VkDeviceSize)vk.cmd_index * sizeof( uint32_t ) * 4u;
+		metricInfo.range = sizeof( uint32_t ) * 4u;
+		Com_Memset( &writes[8], 0, sizeof( writes[8] ) );
+		writes[8].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+		writes[8].dstSet = av.compositeSet; writes[8].dstBinding = 8;
+		writes[8].descriptorCount = 1; writes[8].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+		writes[8].pBufferInfo = &metricInfo;
+		qvkUpdateDescriptorSets( vk.device, 9, writes, 0, NULL );
+		qvkCmdFillBuffer( cmd, av.metricBuffer, metricInfo.offset, metricInfo.range, 0u );
+		{
+			VkBufferMemoryBarrier metricBarrier;
+			Com_Memset( &metricBarrier, 0, sizeof( metricBarrier ) );
+			metricBarrier.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER;
+			metricBarrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+			metricBarrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT;
+			metricBarrier.buffer = av.metricBuffer; metricBarrier.offset = metricInfo.offset; metricBarrier.size = metricInfo.range;
+			qvkCmdPipelineBarrier( cmd, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+				0, 0, NULL, 1, &metricBarrier, 0, NULL );
+		}
 		Com_Memset( &compositePush, 0, sizeof( compositePush ) );
 		compositePush.em[0] = av.width; compositePush.em[1] = av.height; compositePush.em[2] = r_rtaoDebug->integer;
-		compositePush.em[3] = needReference || mode == 5u; compositePush.p[0] = r_ambientVisibilityStrength->value;
+		compositePush.em[3] = needReference ? 1u : 0u; compositePush.p[0] = r_ambientVisibilityStrength->value;
 		compositePush.p[1] = (float)effectiveMode; compositePush.p[2] = rtReady ? 1.0f : 0.0f;
 		qvkCmdBindPipeline( cmd, VK_PIPELINE_BIND_POINT_COMPUTE, av.compositePipe );
 		qvkCmdBindDescriptorSets( cmd, VK_PIPELINE_BIND_POINT_COMPUTE, av.compositePL, 0, 1, &av.compositeSet, 0, NULL );
 		qvkCmdPushConstants( cmd, av.compositePL, VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof( compositePush ), &compositePush );
 		gx = ( av.width + 7u ) / 8u; gy = ( av.height + 7u ) / 8u; qvkCmdDispatch( cmd, gx, gy, 1 );
+		{
+			VkBufferMemoryBarrier metricBarrier;
+			Com_Memset( &metricBarrier, 0, sizeof( metricBarrier ) );
+			metricBarrier.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER;
+			metricBarrier.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
+			metricBarrier.dstAccessMask = VK_ACCESS_HOST_READ_BIT;
+			metricBarrier.buffer = av.metricBuffer; metricBarrier.offset = metricInfo.offset; metricBarrier.size = metricInfo.range;
+			qvkCmdPipelineBarrier( cmd, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_HOST_BIT,
+				0, 0, NULL, 1, &metricBarrier, 0, NULL );
+		}
 		record_image_layout_transition( cmd, vk.color_image, VK_IMAGE_ASPECT_COLOR_BIT,
 			VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, 0 );
 	}
