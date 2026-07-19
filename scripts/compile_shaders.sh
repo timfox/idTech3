@@ -145,6 +145,7 @@ pathtrace_spv_bytes = {}
 hybrid1_spv_bytes = {}
 raygun_spv_bytes = {}
 surfel_spv_bytes = {}
+rcgi_spv_bytes = {}
 
 def append_shader_data(spv_path, array_name):
     # Write a leading blank line before each array so a truncated prior write
@@ -164,7 +165,7 @@ def append_shader_data(spv_path, array_name):
         f.flush()
         os.fsync(f.fileno())
 
-def compile_shader(stage, source, array_name, binding_expr=None, defines="", rtx_collect=False, grtx_collect=False, pathtrace_collect=False, hybrid1_collect=False, raygun_collect=False, surfel_collect=False):
+def compile_shader(stage, source, array_name, binding_expr=None, defines="", rtx_collect=False, grtx_collect=False, pathtrace_collect=False, hybrid1_collect=False, raygun_collect=False, surfel_collect=False, rcgi_collect=False):
     global task_counter
     input_path = glsl_dir / source
     if not input_path.is_file():
@@ -189,6 +190,8 @@ def compile_shader(stage, source, array_name, binding_expr=None, defines="", rtx
         raygun_spv_bytes[array_name] = tmp_spv.read_bytes()
     if surfel_collect:
         surfel_spv_bytes[array_name] = tmp_spv.read_bytes()
+    if rcgi_collect:
+        rcgi_spv_bytes[array_name] = tmp_spv.read_bytes()
     append_shader_data(tmp_spv, array_name)
     if binding_expr:
         bindings.append((binding_expr, array_name))
@@ -395,6 +398,10 @@ compile_shader("comp", "visibility_buffer_fill.comp", "visibility_buffer_fill_cs
 compile_shader("frag", "visibility_buffer_debug.frag", "visibility_buffer_debug_fs", binding_expr="vk.modules.visibility_buffer_debug_fs")
 compile_shader("comp", "material_classify.comp", "material_classify_cs", binding_expr="vk.modules.material_classify_cs")
 compile_shader("comp", "deferred_lighting.comp", "deferred_lighting_cs", binding_expr="vk.modules.deferred_lighting_cs")
+compile_shader("comp", "deferred_lighting_vrcs.comp", "deferred_lighting_vrcs_cs", binding_expr="vk.modules.deferred_lighting_vrcs_cs")
+compile_shader("comp", "vrcs/vrcs_sri.comp", "vrcs_sri_cs", binding_expr="vk.modules.vrcs_sri_cs")
+compile_shader("comp", "vrcs/vrcs_pack.comp", "vrcs_pack_cs", binding_expr="vk.modules.vrcs_pack_cs")
+compile_shader("comp", "vrcs/vrcs_deblock.comp", "vrcs_deblock_cs", binding_expr="vk.modules.vrcs_deblock_cs")
 compile_shader("comp", "ndgi/ndgi_decompress.comp", "ndgi_decompress_cs", binding_expr="vk.modules.ndgi_decompress_cs")
 compile_shader("comp", "niv/niv_shade.comp", "niv_shade_cs", binding_expr="vk.modules.niv_shade_cs")
 compile_shader("comp", "niv/niv_composite.comp", "niv_composite_cs", binding_expr="vk.modules.niv_composite_cs")
@@ -490,6 +497,15 @@ compile_shader("comp", "surfel_gi/surfel_update.comp", "surfel_update_cs", surfe
 compile_shader("comp", "surfel_gi/surfel_hash.comp", "surfel_hash_cs", surfel_collect=True)
 compile_shader("comp", "surfel_gi/surfel_resolve.comp", "surfel_resolve_cs", surfel_collect=True)
 compile_shader("comp", "surfel_gi/surfel_composite.comp", "surfel_composite_cs", surfel_collect=True)
+
+compile_shader("comp", "rcgi/rcgi_light_grid.comp", "rcgi_light_grid_cs", rcgi_collect=True)
+compile_shader("comp", "rcgi/rcgi_sample.comp", "rcgi_sample_cs", rcgi_collect=True)
+compile_shader("comp", "rcgi/rcgi_cache_shade.comp", "rcgi_cache_shade_cs", rcgi_collect=True)
+compile_shader("comp", "rcgi/rcgi_volume_update.comp", "rcgi_volume_update_cs", rcgi_collect=True)
+compile_shader("comp", "rcgi/rcgi_final_gather.comp", "rcgi_final_gather_cs", rcgi_collect=True)
+compile_shader("comp", "rcgi/rcgi_denoise.comp", "rcgi_denoise_cs", rcgi_collect=True)
+compile_shader("comp", "rcgi/rcgi_upscale.comp", "rcgi_upscale_cs", rcgi_collect=True)
+compile_shader("comp", "rcgi/rcgi_composite.comp", "rcgi_composite_cs", rcgi_collect=True)
 
 compile_shader("vert", "dressi/dressi_soft.vert", "dressi_soft_vs", binding_expr="vk.modules.dressi_soft_vs")
 compile_shader("frag", "dressi/dressi_soft.frag", "dressi_soft_fs", binding_expr="vk.modules.dressi_soft_fs")
@@ -711,6 +727,44 @@ def write_vk_surfel_gi_spirv_inc():
     print(f"Wrote {out_path}")
 
 write_vk_surfel_gi_spirv_inc()
+
+def write_vk_rcgi_spirv_inc():
+    """Emit renderers/vulkan/extensions/rtx/vk_rcgi_spirv.inc for Radiance Cache GI."""
+    root = Path(os.environ.get("PROJECT_ROOT", "")).resolve()
+    if not root or not root.is_dir():
+        sys.exit("PROJECT_ROOT must be set for RcGI SPIR-V embed")
+    out_path = root / "renderers/vulkan/extensions/rtx/vk_rcgi_spirv.inc"
+    mapping = [
+        ("rcgi_light_grid_cs", "vk_rcgi_light_grid_cs_spv", "VK_RCGI_LIGHT_GRID_CS_SPV_SIZE"),
+        ("rcgi_sample_cs", "vk_rcgi_sample_cs_spv", "VK_RCGI_SAMPLE_CS_SPV_SIZE"),
+        ("rcgi_cache_shade_cs", "vk_rcgi_cache_shade_cs_spv", "VK_RCGI_CACHE_SHADE_CS_SPV_SIZE"),
+        ("rcgi_volume_update_cs", "vk_rcgi_volume_update_cs_spv", "VK_RCGI_VOLUME_UPDATE_CS_SPV_SIZE"),
+        ("rcgi_final_gather_cs", "vk_rcgi_final_gather_cs_spv", "VK_RCGI_FINAL_GATHER_CS_SPV_SIZE"),
+        ("rcgi_denoise_cs", "vk_rcgi_denoise_cs_spv", "VK_RCGI_DENOISE_CS_SPV_SIZE"),
+        ("rcgi_upscale_cs", "vk_rcgi_upscale_cs_spv", "VK_RCGI_UPSCALE_CS_SPV_SIZE"),
+        ("rcgi_composite_cs", "vk_rcgi_composite_cs_spv", "VK_RCGI_COMPOSITE_CS_SPV_SIZE"),
+    ]
+    lines = []
+    lines.append("/* Auto-generated by scripts/compile_shaders.sh — do not edit by hand */")
+    lines.append("")
+    for src_name, c_array, size_macro in mapping:
+        if src_name not in rcgi_spv_bytes:
+            sys.exit(f"Missing RcGI SPIR-V blob for {src_name}")
+        data = rcgi_spv_bytes[src_name]
+        lines.append(f"/* {src_name}.spv {len(data)} bytes */")
+        lines.append(f"static const uint8_t {c_array}[] = {{")
+        for offset in range(0, len(data), 16):
+            chunk = data[offset:offset + 16]
+            bytes_text = ", ".join(f"0x{b:02X}" for b in chunk)
+            suffix = "," if offset + 16 < len(data) else ""
+            lines.append(f"\t{bytes_text}{suffix}")
+        lines.append("};")
+        lines.append(f"#define {size_macro} ({len(data)}u)")
+        lines.append("")
+    out_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    print(f"Wrote {out_path}")
+
+write_vk_rcgi_spirv_inc()
 
 with binding_file.open("w") as f:
     f.write("// this file is autogenerated during shader compilation\n")

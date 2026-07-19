@@ -354,8 +354,8 @@ elif ! grep -q 'r_deferredUnlitBase = ri.Cvar_Get' "$TR_INIT_VK" 2>/dev/null; th
   fail "tr_init.c missing r_deferredUnlitBase cvar"
 elif ! grep -q 'vk_deferred_unlit_base_wanted' "$DGB_C" 2>/dev/null; then
   fail "vk_deferred_gbuffer.c missing vk_deferred_unlit_base_wanted"
-elif ! grep -q 'pc.additive' "$PROJECT_ROOT/renderers/vulkan/shaders/glsl/deferred_lighting.comp" 2>/dev/null; then
-  fail "deferred_lighting.comp missing additive composite path"
+elif ! grep -q 'pc.additive\|additive' "$PROJECT_ROOT/renderers/vulkan/shaders/glsl/deferred_lighting_common.glsl" 2>/dev/null; then
+  fail "deferred_lighting_common.glsl missing additive composite path"
 elif ! grep -q 'r_deferredLightingStrength = ri.Cvar_Get' "$TR_INIT_VK" 2>/dev/null; then
   fail "tr_init.c missing r_deferredLightingStrength cvar"
 elif ! grep -q 'vk_deferred_unlit_base_wanted' "$PROJECT_ROOT/renderers/vulkan/tr_shade.c" 2>/dev/null; then
@@ -368,10 +368,14 @@ elif ! grep -q 'r_deferredSpecular = ri.Cvar_Get' "$TR_INIT_VK" 2>/dev/null; the
   fail "tr_init.c missing r_deferredSpecular cvar"
 elif ! grep -q 'sceneBaseTex' "$PROJECT_ROOT/renderers/vulkan/shaders/glsl/deferred_lighting_composite.frag" 2>/dev/null; then
   fail "deferred_lighting_composite.frag missing sceneBaseTex additive blend"
-elif ! grep -q 'pc.specular' "$PROJECT_ROOT/renderers/vulkan/shaders/glsl/deferred_lighting.comp" 2>/dev/null; then
-  fail "deferred_lighting.comp missing specular toggle"
+elif ! grep -q 'pc.specular\|specularStrength' "$PROJECT_ROOT/renderers/vulkan/shaders/glsl/deferred_lighting_common.glsl" 2>/dev/null; then
+  fail "deferred_lighting_common.glsl missing specular toggle"
+elif ! grep -q 'Diffuse_Burley' "$PROJECT_ROOT/renderers/vulkan/shaders/glsl/deferred_lighting_common.glsl" 2>/dev/null; then
+  fail "deferred_lighting_common.glsl missing Diffuse_Burley (Forward+ Fd parity)"
+elif ! grep -q 'kD' "$PROJECT_ROOT/renderers/vulkan/shaders/glsl/deferred_lighting_common.glsl" 2>/dev/null; then
+  fail "deferred_lighting_common.glsl missing Fresnel kD energy term"
 else
-  pass "deferred lighting compute + composite wired"
+  pass "deferred lighting compute + composite + Burley Fd parity wired"
 fi
 
 echo ""
@@ -666,12 +670,16 @@ elif ! grep -q 'HYBRID1_RefreshRtDescriptors' "$H1_C" 2>/dev/null; then
   fail "vk_hybrid1.c missing per-frame IBL/G-buffer descriptor refresh"
 elif ! grep -q 'r_hybrid1_motion' "$H1_C" 2>/dev/null; then
   fail "vk_hybrid1.c missing motion-vector temporal path"
+elif ! grep -q 'tlas_mode=' "$H1_C" 2>/dev/null; then
+  fail "hybrid1_status must report tlas_mode="
+elif ! grep -q 'vk_rtx_tlas_status' "$H1_C" 2>/dev/null; then
+  fail "vk_hybrid1.c must call vk_rtx_tlas_status for UPDATE/REBUILD reason"
 elif [[ ! -f "$H1_TEMP" || ! -f "$H1_ATR" ]]; then
   fail "hybrid1 temporal/atrous shaders missing"
 elif [[ ! -f "$PROJECT_ROOT/renderers/vulkan/shaders/glsl/hybrid1/hybrid1_diffuse.rgen" ]]; then
   fail "hybrid1 diffuse RT shaders missing"
 else
-  pass "hybrid1 SVGF shadow/spec/diffuse + IBL + separable atrous wired"
+  pass "hybrid1 SVGF shadow/spec/diffuse + IBL + separable atrous + TLAS status wired"
 fi
 
 echo ""
@@ -813,6 +821,10 @@ elif ! grep -q 'toneMapParams0' "$GAMMA_FRAG" 2>/dev/null || ! grep -q 'Tonemap_
   fail "gamma.frag Tonemap_AgX must use toneMapParams grade knobs"
 elif ! grep -q 'agxStrength\|invWhite\|highlightDesat' "$GAMMA_FRAG" 2>/dev/null; then
   fail "gamma.frag Tonemap_AgX should consume toe/shoulder/whitePoint/desat"
+elif ! grep -q 'default \*\*0\*\*' "$PROJECT_ROOT/docs/FORWARD_PLUS_PIPELINE_AUDIT.md" 2>/dev/null; then
+  fail "FORWARD_PLUS_PIPELINE_AUDIT.md should document r_forwardPlusEnergyRenorm default **0**"
+elif ! grep -q 'AgX = 4\|AgX (\`4\`)' "$PROJECT_ROOT/docs/samples/renderer_regression/scenes/05_postfx.md" 2>/dev/null; then
+  fail "05_postfx.md must document AgX as r_tonemap 4 (Filmic is 3)"
 else
   pass "Forward+ specular/renorm cvars + spot frustum + light-volume depth + AgX grade knobs"
 fi

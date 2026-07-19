@@ -22,9 +22,15 @@ source_checks() {
 
 	rg -q 'unit_oscar_protocol' CMakeLists.txt || fail "missing OSCAR protocol unit test registration"
 	rg -q 'unit_oscar_raw' CMakeLists.txt || fail "missing raw OSCAR unit test registration"
+	rg -q 'unit_oscar_roster' CMakeLists.txt || fail "missing OSCAR roster unit test registration"
+	test -f tests/unit/test_oscar_roster.c || fail "missing OSCAR roster unit test"
+	test -f engine/core/net_oscar_roster.c || fail "missing OSCAR roster module"
 	rg -q 'OSCAR_STATE_AUTHENTICATING' engine/core/net_oscar.h || fail "missing OSCAR state machine"
 	rg -q 'OSCAR_BuddyCount' engine/core/net_oscar.h engine/core/net_oscar.c || fail "missing buddy roster API"
 	rg -q 'OSCAR_GetRosterGeneration' engine/core/net_oscar.h engine/core/net_oscar.c || fail "missing roster generation"
+	rg -q 'OSCAR_SetEventSink' engine/core/net_oscar.h runtime/client/core/cl_oscar.c || fail "missing OSCAR client event sink"
+	rg -q 'OSCAR_RawBuildChatLeave' engine/core/net_oscar.c engine/core/net_oscar_raw.c || fail "missing chat leave/signoff builder"
+	rg -q 'CL_Oscar_EventSink' runtime/client/core/cl_oscar.c || fail "missing client AIM notify sink"
 	rg -q 'IDTECH3_OSCAR_TOKEN' engine/core/net_oscar.c docs/OSCAR_INTEGRATION.md || fail "missing protected token/env guidance"
 	rg -q 'IDTECH3_OSCAR_PASSWORD' engine/core/net_oscar.c docs/OSCAR_INTEGRATION.md || fail "missing protected direct password guidance"
 	rg -q 'GET /engine HTTP/1.1' engine/core/net_oscar.c || fail "missing gateway WebSocket handshake"
@@ -78,6 +84,14 @@ runtime_checks() {
 		fail "unit_oscar_raw is not built"
 	else
 		echo "SKIP: unit_oscar_raw not built"
+	fi
+
+	if [[ -x "$build/unit_oscar_roster" ]]; then
+		"$build/unit_oscar_roster"
+	elif [[ "${IDTECH3_RUNTIME_REQUIRED:-0}" == "1" ]]; then
+		fail "unit_oscar_roster is not built"
+	else
+		echo "SKIP: unit_oscar_roster not built"
 	fi
 
 	"$ROOT/tests/scripts/idtech3_minimal_content_smoke.sh" oscar

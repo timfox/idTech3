@@ -62,6 +62,8 @@ int OSCAR_RawBuildServiceRequest( unsigned short sequence, unsigned int requestI
 int OSCAR_RawBuildChatServiceRequest( unsigned short sequence, unsigned int requestId, unsigned short exchange,
                                       const char *roomCookie, unsigned short instance, byte *out, int outSize );
 int OSCAR_RawBuildChatMessage( unsigned short sequence, unsigned int requestId, const char *text, byte *out, int outSize );
+/* FLAP channel signoff for tearing down the Chat service socket cleanly. */
+int OSCAR_RawBuildChatLeave( unsigned short sequence, byte *out, int outSize );
 
 qboolean OSCAR_RawParseFlap( const byte *data, int dataLen, oscarRawFlapFrame_t *frame, int *consumed );
 qboolean OSCAR_RawParseSnac( const byte *payload, int payloadLen, oscarRawSnac_t *snac );

@@ -1,0 +1,108 @@
+#version 460
+#extension GL_EXT_ray_query : require
+#extension GL_GOOGLE_include_directive : require
+layout(local_size_x = 8, local_size_y = 8) in;
+
+#include "rcgi.glsl"
+
+layout(set = 0, binding = 0) uniform accelerationStructureEXT topLevelAS;
+layout(set = 0, binding = 1) uniform sampler2D depthTex;
+layout(set = 0, binding = 2) uniform sampler2D normalTex;
+layout(std430, set = 0, binding = 3) readonly buffer CacheBuf {
+	RcGiCacheCell cells[];
+};
+layout(set = 0, binding = 4) uniform sampler2D probeAtlas;
+layout(rgba16f, set = 0, binding = 5) uniform image2D shR;
+layout(rgba16f, set = 0, binding = 6) uniform image2D shG;
+layout(rgba16f, set = 0, binding = 7) uniform image2D shB;
+layout(rgba16f, set = 0, binding = 8) uniform image2D gatherIrr;
+
+layout(push_constant) uniform GatherPush {
+	uvec4 params; /* x=width y=height z=frame w=unused */
+	mat4  invViewProj;
+	vec4  camera; /* xyz, w maxRay */
+	vec4  cache; /* x=cellSize y=lodDist z=seed */
+} pc;
+
+vec3 world_from_uv(vec2 uv, float depth) {
+	vec4 clip = vec4(uv * 2.0 - 1.0, depth * 2.0 - 1.0, 1.0);
+	vec4 w = pc.invViewProj * clip;
+	return w.xyz / max(w.w, 1e-5);
+}
+
+vec3 sample_cache(vec3 pos, vec3 n) {
+	float distCam = length(pos - pc.camera.xyz);
+	uint idx = rcgi_spatial_hash(pos, max(pc.cache.x, 0.05), distCam, max(pc.cache.y, 8.0));
+	for (uint k = 0u; k < RCGI_CACHE_PROBE; ++k) {
+		uint slot = (idx + k) % RCGI_CACHE_CELLS;
+		RcGiCacheCell c = cells[slot];
+		if ((c.meta.x & RCGI_CACHE_VALID) == 0u) continue;
+		float nd = max(dot(normalize(c.normalDist.xyz), n), 0.0);
+		if (nd > 0.1) {
+			return c.radianceAge.xyz;
+		}
+	}
+	return vec3(-1.0);
+}
+
+vec3 sample_atlas(vec3 n) {
+	vec2 uv = rcgi_oct_encode(n);
+	return textureLod(probeAtlas, uv, 0.0).rgb;
+}
+
+void main() {
+	uvec2 pix = gl_GlobalInvocationID.xy;
+	if (pix.x >= pc.params.x || pix.y >= pc.params.y) {
+		return;
+	}
+	vec2 uv = (vec2(pix) + 0.5) / vec2(pc.params.xy);
+	float depth = texture(depthTex, uv).r;
+	vec4 shR4 = vec4(0.0);
+	vec4 shG4 = vec4(0.0);
+	vec4 shB4 = vec4(0.0);
+	vec3 irradiance = vec3(0.0);
+
+	if (depth <= 0.0 || depth >= 0.9999) {
+		imageStore(shR, ivec2(pix), shR4);
+		imageStore(shG, ivec2(pix), shG4);
+		imageStore(shB, ivec2(pix), shB4);
+		imageStore(gatherIrr, ivec2(pix), vec4(0.0));
+		return;
+	}
+
+	vec3 n = normalize(texture(normalTex, uv).xyz * 2.0 - 1.0);
+	vec3 pos = world_from_uv(uv, depth);
+	uint seed = pc.params.z * 747796405u + pix.x * 2891336453u + pix.y * 2246822519u + uint(pc.cache.z);
+	seed = seed * 1664525u + 1013904223u;
+	float u0 = float((seed >> 8u) & 0xFFFFu) / 65535.0;
+	seed = seed * 1664525u + 1013904223u;
+	float u1 = float((seed >> 8u) & 0xFFFFu) / 65535.0;
+	vec3 dir = rcgi_hemi(vec2(u0 * 0.98 + 0.01, u1), n);
+	float tmax = max(pc.camera.w, 1.0);
+
+	rayQueryEXT rq;
+	rayQueryInitializeEXT(rq, topLevelAS, gl_RayFlagsOpaqueEXT, 0xFF, pos + n * 0.05, 0.02, dir, tmax);
+	rayQueryProceedEXT(rq);
+
+	vec3 rad = sample_atlas(n);
+	if (rayQueryGetIntersectionTypeEXT(rq, true) == gl_RayQueryCommittedIntersectionTriangleEXT) {
+		float t = rayQueryGetIntersectionTEXT(rq, true);
+		vec3 hitPos = pos + dir * t;
+		vec3 cached = sample_cache(hitPos, n);
+		if (cached.x >= 0.0) {
+			rad = cached;
+		} else {
+			rad = rcgi_default_albedo() * 0.35;
+		}
+	} else {
+		rad = rcgi_default_sky();
+	}
+
+	rcgi_sh_accum(shR4, shG4, shB4, dir, rad, 1.0);
+	irradiance = rcgi_sh_eval(shR4, shG4, shB4, n);
+
+	imageStore(shR, ivec2(pix), shR4);
+	imageStore(shG, ivec2(pix), shG4);
+	imageStore(shB, ivec2(pix), shB4);
+	imageStore(gatherIrr, ivec2(pix), vec4(irradiance, 1.0));
+}

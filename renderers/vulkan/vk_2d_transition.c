@@ -10,6 +10,12 @@ static qboolean vk_can_use_2d_overlay_path( void )
 	if ( !vk.fboActive ) {
 		return qfalse;
 	}
+	/* Menu/cinematic (no finished world view): UI overlay begin after an empty
+	 * main pass SIGSEGVs inside the NVIDIA driver (vk_begin_ui_overlay_*).
+	 * In-game HUD with doneWorldScene is fine — keep the overlay path there. */
+	if ( !tr.world || !backEnd.doneWorldScene ) {
+		return qfalse;
+	}
 	if ( !vk.cmd || vk.cmd->swapchain_image_index >= MAX_SWAPCHAIN_IMAGES ) {
 		return qfalse;
 	}

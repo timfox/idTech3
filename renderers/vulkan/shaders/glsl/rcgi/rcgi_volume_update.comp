@@ -1,0 +1,60 @@
+#version 460
+#extension GL_GOOGLE_include_directive : require
+layout(local_size_x = 8, local_size_y = 8) in;
+
+#include "rcgi.glsl"
+
+layout(std430, set = 0, binding = 0) readonly buffer CacheBuf {
+	RcGiCacheCell cells[];
+};
+layout(rgba16f, set = 0, binding = 1) uniform image2D probeAtlas;
+
+layout(push_constant) uniform VolPush {
+	uvec4 params; /* x=cascade y=gridRes z=frame w=probesPerAxisInAtlas */
+	vec4  blend;  /* x=temporalBlend */
+} pc;
+
+ivec2 atlas_tile_origin(uint probeId) {
+	uint tilesX = RCGI_ATLAS_W / RCGI_PROBE_TILE;
+	uint tx = probeId % tilesX;
+	uint ty = probeId / tilesX;
+	return ivec2(int(tx * RCGI_PROBE_TILE), int(ty * RCGI_PROBE_TILE));
+}
+
+void main() {
+	uvec2 local = gl_LocalInvocationID.xy;
+	uint probeId = gl_WorkGroupID.x;
+	uint grid = max(pc.params.y, 1u);
+	uint probes = grid * grid * grid;
+	if (probeId >= probes || local.x >= RCGI_PROBE_TILE || local.y >= RCGI_PROBE_TILE) {
+		return;
+	}
+
+	ivec2 dest = atlas_tile_origin(probeId) + ivec2(local);
+	if (dest.x >= int(RCGI_ATLAS_W) || dest.y >= int(RCGI_ATLAS_H)) {
+		return;
+	}
+
+	vec2 uv = (vec2(local) + 0.5) / float(RCGI_PROBE_TILE);
+	vec3 dir = rcgi_oct_decode(uv);
+
+	/* Gather nearby cache cells with matching probeId (coarse). */
+	vec3 accum = vec3(0.0);
+	float wsum = 0.0;
+	uint stride = max(RCGI_CACHE_CELLS / 4096u, 1u);
+	for (uint i = 0u; i < RCGI_CACHE_CELLS; i += stride) {
+		RcGiCacheCell c = cells[i];
+		if ((c.meta.x & RCGI_CACHE_VALID) == 0u) continue;
+		if (c.meta.y != probeId) continue;
+		vec3 n = normalize(c.normalDist.xyz);
+		float w = max(dot(n, dir), 0.0);
+		w = w * w;
+		accum += c.radianceAge.xyz * w;
+		wsum += w;
+	}
+	vec3 color = (wsum > 1e-4) ? (accum / wsum) : rcgi_default_sky() * 0.2;
+	vec4 prev = imageLoad(probeAtlas, dest);
+	float a = clamp(pc.blend.x, 0.05, 0.95);
+	vec3 outc = mix(prev.rgb, color, a);
+	imageStore(probeAtlas, dest, vec4(outc, 1.0));
+}

@@ -3964,6 +3964,22 @@ if(BUILD_UNIT_TESTS)
 	add_test(NAME unit_oscar_raw COMMAND unit_oscar_raw)
 	set_tests_properties(unit_oscar_raw PROPERTIES LABELS "unit;networking;oscar;validation")
 
+	add_executable(unit_oscar_roster
+		tests/unit/test_oscar_roster.c
+		tests/stub_qcommon_min.c
+		engine/core/net_oscar_roster.c
+		engine/core/net_oscar_raw.c
+		engine/core/q_shared.c
+		engine/core/q_math.c)
+	target_include_directories(unit_oscar_roster PRIVATE
+		${CMAKE_SOURCE_DIR}
+		${CMAKE_SOURCE_DIR}/engine/core)
+	if(NOT MSVC)
+		target_link_libraries(unit_oscar_roster PRIVATE m)
+	endif()
+	add_test(NAME unit_oscar_roster COMMAND unit_oscar_roster)
+	set_tests_properties(unit_oscar_roster PROPERTIES LABELS "unit;networking;oscar;validation")
+
 	if(USE_SDL AND TARGET SDL3::SDL3)
 		add_executable(unit_sdl3_features tests/unit/test_sdl3_features.c)
 		target_link_libraries(unit_sdl3_features PRIVATE SDL3::SDL3)

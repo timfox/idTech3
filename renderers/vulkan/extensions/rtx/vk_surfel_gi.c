@@ -11,6 +11,7 @@ Chocolate RTX path; spawn / ray-query update / resolve / composite.
 #include "vk.h"
 #include "vk_surfel_gi.h"
 #include "vk_hybrid1.h"
+#include "vk_rcgi.h"
 #include "vk_rtx.h"
 #include "vk_rtx_bindless.h"
 #include "vk_util.h"
@@ -1118,11 +1119,16 @@ void vk_surfel_gi_apply_after_geometry( void )
 		VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
 		VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT );
 
-	/* Hybrid1 fusion: keep irradiance for Hybrid1 composite; skip Surfel scene add (no double GI). */
-	if ( vk_surfel_gi_hybrid1_fusion_active() ) {
+	/* Hybrid1 fusion: keep irradiance for Hybrid1 composite; skip Surfel scene add (no double GI).
+	 * Radiance Cache GI also owns diffuse when active (prefer RcGI over Surfel composite). */
+	if ( vk_surfel_gi_hybrid1_fusion_active() || vk_rcgi_active() ) {
 		static qboolean fusionLogged;
 		if ( !fusionLogged ) {
-			ri.Printf( PRINT_ALL, "[SurfelGI] Hybrid1 fusion active — irradiance handed to Hybrid1 composite\n" );
+			if ( vk_rcgi_active() ) {
+				ri.Printf( PRINT_ALL, "[SurfelGI] RcGI active — skipping Surfel scene composite\n" );
+			} else {
+				ri.Printf( PRINT_ALL, "[SurfelGI] Hybrid1 fusion active — irradiance handed to Hybrid1 composite\n" );
+			}
 			fusionLogged = qtrue;
 		}
 		sgi.frame++;

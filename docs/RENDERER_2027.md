@@ -56,6 +56,7 @@ Compact **visibility-buffer sidecar** coexisting with the classic G-buffer:
 
 - Direct MRT normals are **world-space**; depth-fill normals are **view-space**. `deferred_lighting.comp` transforms world→view when `normalsAreWorld=1`.
 - With `r_deferredMaterialClassify 1` + classify fill, specialized opaque dispatch uses the class map (EMPTY=sky; LAYERED/TRANSMISSION tune; EMISSIVE skips additive). ALPHA_TEST is reserved for real cutouts and is not inferred from low confidence.
+- **VRCS:** `r_vrcs 1` wraps deferred lighting compute with variable-rate primaries + deblock — see [VARIABLE_RATE_COMPUTE.md](VARIABLE_RATE_COMPUTE.md).
 
 Enable:
 

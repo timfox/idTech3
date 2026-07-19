@@ -1,0 +1,146 @@
+#version 450
+#extension GL_GOOGLE_include_directive : require
+
+/*
+ * Deferred lighting with Variable-Rate Compute Shading (VRCS).
+ * One workgroup = one 16x16 screen tile (256 threads); primaries shade, duplicates early-out.
+ */
+
+layout(local_size_x = 8, local_size_y = 4, local_size_z = 8) in;
+
+#define MAX_PER_TILE 8u
+#define REC_VEC4S 4u
+const float DEF_PI = 3.14159265;
+
+#include "vrcs/vrcs.glsl"
+
+layout(std430, set = 0, binding = 0) readonly buffer LightSSBO {
+	vec4 data[];
+} lights;
+
+layout(std430, set = 0, binding = 1) readonly buffer TileSSBO {
+	uint cells[];
+} tiles;
+
+layout(set = 0, binding = 2) uniform sampler2D depthTex;
+layout(set = 0, binding = 3) uniform sampler2D albedoTex;
+layout(set = 0, binding = 4) uniform sampler2D normalTex;
+layout(set = 0, binding = 5) uniform sampler2D materialTex;
+layout(rgba16f, set = 0, binding = 6) uniform writeonly image2D outLit;
+layout(set = 0, binding = 7) uniform usampler2D classMap;
+
+layout(std430, set = 0, binding = 8) readonly buffer TileHeaders {
+	uvec2 headers[];
+} tileHdr;
+
+layout(std430, set = 0, binding = 9) readonly buffer TileCoords {
+	uint coords[];
+} tileCoords;
+
+layout(push_constant) uniform Push {
+	mat4 viewMatrix;
+	vec4 projInfo;
+	uvec2 extent;
+	uvec2 tileGrid;       /* Forward+ light tile grid */
+	float strength;
+	uint maxPerTile;
+	uint numLights;
+	uint additive;
+	uint specular;
+	float aoStrength;
+	float specularStrength;
+	uint normalsAreWorld;
+	uint useMaterialClass;
+	uvec2 vrcsTileGrid;   /* 16x16 VRCS tiles */
+	uint debugMode;
+	uint reserved;
+} pc;
+
+#include "deferred_lighting_common.glsl"
+
+void storeWithCopies( uvec2 pix, uint copyBits, vec3 lit ) {
+	imageStore( outLit, ivec2( pix ), vec4( lit, 1.0 ) );
+	if ( ( copyBits & VRCS_COPY_H ) != 0u && pix.x + 1u < pc.extent.x ) {
+		imageStore( outLit, ivec2( pix.x + 1u, pix.y ), vec4( lit, 1.0 ) );
+	}
+	if ( ( copyBits & VRCS_COPY_V ) != 0u && pix.y + 1u < pc.extent.y ) {
+		imageStore( outLit, ivec2( pix.x, pix.y + 1u ), vec4( lit, 1.0 ) );
+	}
+	if ( ( copyBits & VRCS_COPY_D ) != 0u && pix.x + 1u < pc.extent.x && pix.y + 1u < pc.extent.y ) {
+		imageStore( outLit, ivec2( pix.x + 1u, pix.y + 1u ), vec4( lit, 1.0 ) );
+	}
+}
+
+void main() {
+	uvec2 tile = gl_WorkGroupID.xy;
+	uint lid = gl_LocalInvocationIndex;
+
+	if ( tile.x >= pc.vrcsTileGrid.x || tile.y >= pc.vrcsTileGrid.y ) {
+		return;
+	}
+
+	uint tileId = tile.y * pc.vrcsTileGrid.x + tile.x;
+	uvec2 hdr = tileHdr.headers[tileId];
+	uint primaryCount = hdr.x;
+	uint flags = hdr.y;
+
+	uvec2 pix;
+	uint copyBits = 0u;
+
+	if ( ( flags & VRCS_FLAG_SKY ) != 0u ) {
+		/* Entire tile sky — only clear if this thread maps to a pixel. */
+		pix = tile * VRCS_TILE + uvec2( lid & 15u, lid >> 4u );
+		if ( lid < 256u && pix.x < pc.extent.x && pix.y < pc.extent.y ) {
+			imageStore( outLit, ivec2( pix ), vec4( 0.0 ) );
+		}
+		return;
+	}
+
+	if ( ( flags & VRCS_FLAG_FORCE_1X1 ) != 0u || primaryCount == 0u ) {
+		/* Full-rate: lid maps to tile-local raster order. */
+		pix = tile * VRCS_TILE + uvec2( lid & 15u, lid >> 4u );
+		if ( pix.x >= pc.extent.x || pix.y >= pc.extent.y ) {
+			return;
+		}
+		vec3 lit = shadeDeferredPixel( pix );
+		imageStore( outLit, ivec2( pix ), vec4( lit, 1.0 ) );
+		return;
+	}
+
+	if ( ( flags & VRCS_FLAG_ALL_2X2 ) != 0u ) {
+		/* 64 primaries at even coords; lid 0..63 shade, rest early-out. */
+		if ( lid >= 64u ) {
+			return;
+		}
+		uint lx = ( lid & 7u ) * 2u;
+		uint ly = ( lid >> 3u ) * 2u;
+		pix = tile * VRCS_TILE + uvec2( lx, ly );
+		if ( pix.x >= pc.extent.x || pix.y >= pc.extent.y ) {
+			return;
+		}
+		copyBits = VRCS_COPY_H | VRCS_COPY_V | VRCS_COPY_D;
+		vec3 lit = shadeDeferredPixel( pix );
+		storeWithCopies( pix, copyBits, lit );
+		return;
+	}
+
+	/* Wave-packed primaries: threads >= primaryCount uniform early-out. */
+	if ( lid >= primaryCount ) {
+		return;
+	}
+
+	uint payload = tileCoords.coords[tileId * VRCS_MAX_PACK + lid];
+	uvec2 local = vrcsUnpackLocalXY( payload );
+	copyBits = vrcsUnpackCopyBits( payload );
+	pix = tile * VRCS_TILE + local;
+	if ( pix.x >= pc.extent.x || pix.y >= pc.extent.y ) {
+		return;
+	}
+
+	vec3 lit = shadeDeferredPixel( pix );
+	if ( pc.debugMode == 3u ) {
+		/* Tile flags tint */
+		lit = vec3( 0.2, 0.8, 1.0 );
+	}
+	storeWithCopies( pix, copyBits, lit );
+}

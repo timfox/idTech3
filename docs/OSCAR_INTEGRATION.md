@@ -67,16 +67,16 @@ Do not store OSCAR account passwords in archived cvars. Use
 `IDTECH3_OSCAR_PASSWORD` or protected server configuration outside downloadable
 game data.
 
-## Dedicated Commands
+## Shared Console Commands
 
 | Command | Purpose |
 | --- | --- |
 | `oscar_status` | Print OSCAR state, room, buddy count, and last error. |
 | `oscar_buddies` | Dump the in-memory buddy roster. |
 | `oscar_connect` | Connect and authenticate. |
-| `oscar_disconnect` | Disconnect. |
+| `oscar_disconnect` | Disconnect (also clears the in-memory roster). |
 | `oscar_join <room>` | Join a room (direct Chat socket or gateway). |
-| `oscar_leave [room]` | Leave a room. |
+| `oscar_leave [room]` | Leave a room (direct: Chat FLAP signoff + socket teardown). |
 | `oscar_announce <message>` | Send a message to the current/default room. |
 | `oscar_im <screenName> <message>` | Send a direct message. |
 | `oscar_presence <status> [message]` | Set presence. Direct mode supports `available`, `away`, `dnd`, `out`, `busy`, `chat`, and `invisible`. |
@@ -86,6 +86,10 @@ game data.
 These register from qcommon (`OSCAR_RegisterCommands`) so **client and dedicated**
 both see them. They remain operator/console commands — player chat must not be
 forwarded into account or gateway administration.
+
+Client notify: with `cl_oscarNotify 1`, the AIM shell registers an event sink so
+IM/room/presence messages print with optional AIM coloring (`cl_oscarChat 1`)
+without draining `OSCAR_PollEvent` (Lua keep receiving events).
 
 ## Client AIM UI
 
@@ -185,6 +189,8 @@ escaping, event parsing, malformed input, and oversized frame rejection.
 `unit_oscar_raw` verifies raw FLAP/TLV/SNAC helpers for login, BOS cookie signon,
 client-online, IM receive parsing, presence publishing, temporary buddy
 subscription, buddy presence parsing, service responses, and chat message
-encoding/parsing. `test_oscar_bridge` verifies that both direct and gateway code
-paths stay wired (roster APIs, Chat service path, client shell, docs) without
-shelling out to external tools.
+encoding/parsing. `unit_oscar_roster` verifies in-memory buddy roster updates
+from parsed presence payloads, snapshot formatting, and Chat leave signoff.
+`test_oscar_bridge` verifies that both direct and gateway code paths stay wired
+(roster APIs, Chat service path, client shell, docs) without shelling out to
+external tools.

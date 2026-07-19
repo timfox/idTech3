@@ -1,0 +1,129 @@
+#version 450
+#extension GL_GOOGLE_include_directive : require
+
+/*
+ * VRCS pack: per-16x16-tile primary list + flags from SRI + depth.
+ * One workgroup = one 16x16 tile (256 threads).
+ */
+
+layout(local_size_x = 16, local_size_y = 16, local_size_z = 1) in;
+
+#include "vrcs.glsl"
+
+layout(set = 0, binding = 0) uniform usampler2D sriTex;
+layout(set = 0, binding = 1) uniform sampler2D depthTex;
+layout(std430, set = 0, binding = 2) writeonly buffer TileHeaders {
+	uvec2 headers[]; /* x=primaryCount, y=flags */
+} tileHdr;
+layout(std430, set = 0, binding = 3) writeonly buffer TileCoords {
+	uint coords[]; /* tiles * VRCS_MAX_PACK */
+} tileCoords;
+
+layout(push_constant) uniform Push {
+	uvec2 extent;
+	uvec2 tileGrid;
+	uint rotatePrimary;
+	uint reserved;
+} pc;
+
+shared uint sPrimaryCount;
+shared uint sCovered;
+shared uint sRate2x2;
+shared uint sPacked[VRCS_MAX_PACK];
+
+void main() {
+	uvec2 tile = gl_WorkGroupID.xy;
+	uint lid = gl_LocalInvocationIndex;
+	uvec2 local = gl_LocalInvocationID.xy;
+
+	if ( lid == 0u ) {
+		sPrimaryCount = 0u;
+		sCovered = 0u;
+		sRate2x2 = 0u;
+	}
+	barrier();
+
+	if ( tile.x >= pc.tileGrid.x || tile.y >= pc.tileGrid.y ) {
+		return;
+	}
+
+	uvec2 pix = tile * VRCS_TILE + local;
+	bool inBounds = pix.x < pc.extent.x && pix.y < pc.extent.y;
+
+	uint rate = VRCS_RATE_1X1;
+	bool covered = false;
+	if ( inBounds ) {
+		vec2 uv = ( vec2( pix ) + 0.5 ) / vec2( pc.extent );
+		float depth = textureLod( depthTex, uv, 0.0 ).r;
+		covered = ( depth > 0.0 && depth < 1.0 );
+		rate = texelFetch( sriTex, ivec2( pix >> 1u ), 0 ).r;
+	}
+
+	uint qx = pix.x & 1u;
+	uint qy = pix.y & 1u;
+	bool rotated = false;
+	if ( pc.rotatePrimary != 0u && rate == VRCS_RATE_2X2 ) {
+		qx ^= 1u;
+		qy ^= 1u;
+		rotated = true;
+	}
+
+	bool isPrimary = false;
+	uint copyBits = 0u;
+	if ( inBounds && covered ) {
+		atomicAdd( sCovered, 1u );
+		if ( rate == VRCS_RATE_2X2 ) {
+			atomicAdd( sRate2x2, 1u );
+		}
+		isPrimary = vrcsIsPrimaryInQuad( rate, qx, qy );
+		if ( isPrimary ) {
+			if ( rotated ) {
+				copyBits = VRCS_COPY_H | VRCS_COPY_V | VRCS_COPY_D;
+			} else {
+				copyBits = vrcsCopyBitsForPrimary( rate, pix.x & 1u, pix.y & 1u );
+			}
+		}
+	}
+
+	barrier();
+
+	if ( isPrimary ) {
+		uint slot = atomicAdd( sPrimaryCount, 1u );
+		if ( slot < VRCS_MAX_PACK ) {
+			sPacked[slot] = vrcsPackPayload( local.x, local.y, copyBits );
+		}
+	}
+
+	barrier();
+
+	if ( lid == 0u ) {
+		uint rawCount = sPrimaryCount;
+		uint flags = 0u;
+		uint count = rawCount;
+
+		if ( sCovered == 0u ) {
+			flags |= VRCS_FLAG_SKY;
+			count = 0u;
+		} else if ( rawCount > VRCS_MAX_PACK || rawCount >= 256u ) {
+			/* Cannot retire a full duplicate wave — shade every pixel. */
+			flags |= VRCS_FLAG_FORCE_1X1;
+			count = 0u;
+		} else {
+			uint primaryWaves = ( rawCount + VRCS_WAVE - 1u ) / VRCS_WAVE;
+			if ( primaryWaves >= 8u ) {
+				flags |= VRCS_FLAG_FORCE_1X1;
+				count = 0u;
+			} else if ( sCovered == 256u && sRate2x2 == 256u && rawCount == 64u ) {
+				flags |= VRCS_FLAG_ALL_2X2;
+			}
+		}
+
+		uint tileId = tile.y * pc.tileGrid.x + tile.x;
+		tileHdr.headers[tileId] = uvec2( count, flags );
+
+		uint base = tileId * VRCS_MAX_PACK;
+		for ( uint i = 0u; i < count; i++ ) {
+			tileCoords.coords[base + i] = sPacked[i];
+		}
+	}
+}

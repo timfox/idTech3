@@ -1,0 +1,45 @@
+#version 460
+layout(local_size_x = 8, local_size_y = 8) in;
+
+layout(set = 0, binding = 0) uniform sampler2D depthTex;
+layout(set = 0, binding = 1) uniform sampler2D normalTex;
+layout(set = 0, binding = 2) uniform sampler2D gatherIn;
+layout(rgba16f, set = 0, binding = 3) uniform image2D gatherOut;
+
+layout(push_constant) uniform DenoisePush {
+	uvec4 params; /* x=width y=height z=axis(0=H,1=V) w=unused */
+	vec4  sigma;  /* x=spatial y=depth z=normal */
+} pc;
+
+void main() {
+	uvec2 pix = gl_GlobalInvocationID.xy;
+	if (pix.x >= pc.params.x || pix.y >= pc.params.y) {
+		return;
+	}
+	vec2 texel = 1.0 / vec2(pc.params.xy);
+	vec2 uv = (vec2(pix) + 0.5) * texel;
+	float depth = texture(depthTex, uv).r;
+	vec3 n = normalize(texture(normalTex, uv).xyz * 2.0 - 1.0);
+	vec4 center = texture(gatherIn, uv);
+	if (depth <= 0.0 || depth >= 0.9999) {
+		imageStore(gatherOut, ivec2(pix), center);
+		return;
+	}
+
+	vec3 accum = vec3(0.0);
+	float wsum = 0.0;
+	ivec2 axis = (pc.params.z == 0u) ? ivec2(1, 0) : ivec2(0, 1);
+	const float kernel[5] = float[](0.06, 0.24, 0.40, 0.24, 0.06);
+	for (int i = -2; i <= 2; ++i) {
+		vec2 suv = uv + vec2(axis) * float(i) * texel;
+		float sd = texture(depthTex, suv).r;
+		vec3 sn = normalize(texture(normalTex, suv).xyz * 2.0 - 1.0);
+		vec3 sc = texture(gatherIn, suv).rgb;
+		float wd = exp(-abs(sd - depth) * pc.sigma.y);
+		float wn = pow(max(dot(n, sn), 0.0), pc.sigma.z);
+		float w = kernel[i + 2] * wd * wn;
+		accum += sc * w;
+		wsum += w;
+	}
+	imageStore(gatherOut, ivec2(pix), vec4(accum / max(wsum, 1e-4), center.a));
+}

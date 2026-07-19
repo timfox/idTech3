@@ -11,6 +11,7 @@ Open OSCAR client: direct FLAP/BOS (+ optional Chat service) or JSON gateway.
 #include "net_oscar.h"
 #include "net_oscar_protocol.h"
 #include "net_oscar_raw.h"
+#include "net_oscar_roster.h"
 
 #include <errno.h>
 #include <string.h>
@@ -99,9 +100,9 @@ typedef struct {
 	oscarEvent_t events[OSCAR_EVENT_QUEUE];
 	int eventHead;
 	int eventTail;
-	oscarBuddy_t buddies[OSCAR_MAX_BUDDIES];
-	int buddyCount;
-	unsigned int rosterGeneration;
+	oscarRoster_t roster;
+	oscarEventSinkFn eventSink;
+	void *eventSinkUserdata;
 } oscarClient_t;
 
 static oscarClient_t oscar;
@@ -299,6 +300,9 @@ static void OSCAR_QueueEvent( const oscarEvent_t *ev )
 	if ( oscar.eventHead == oscar.eventTail ) {
 		oscar.eventTail = ( oscar.eventTail + 1 ) % OSCAR_EVENT_QUEUE;
 	}
+	if ( oscar.eventSink ) {
+		oscar.eventSink( ev, oscar.eventSinkUserdata );
+	}
 }
 
 static void OSCAR_CloseChatSocket( void )
@@ -367,128 +371,67 @@ static oscarMode_t OSCAR_ConfiguredMode( void )
 static void OSCAR_RefreshRosterSnapshot( void )
 {
 	char buf[OSCAR_ROSTER_CVAR_MAX];
-	int used = 0;
-	int i;
 
-	buf[0] = '\0';
-	for ( i = 0; i < oscar.buddyCount; i++ ) {
-		char piece[MAX_NAME_LENGTH + 40];
-		int pieceLen;
-
-		Com_sprintf( piece, sizeof( piece ), "%s:%s%s",
-			oscar.buddies[i].screenName,
-			oscar.buddies[i].status[0] ? oscar.buddies[i].status : ( oscar.buddies[i].online ? "online" : "offline" ),
-			( i + 1 < oscar.buddyCount ) ? ";" : "" );
-		pieceLen = (int)strlen( piece );
-		if ( used + pieceLen >= (int)sizeof( buf ) - 1 ) {
-			break;
-		}
-		Com_Memcpy( buf + used, piece, pieceLen + 1 );
-		used += pieceLen;
-	}
+	OSCAR_Roster_FormatSnapshot( &oscar.roster, buf, sizeof( buf ) );
 	Cvar_Set( "oscar_rosterSnapshot", buf );
-	Cvar_Set( "oscar_rosterGen", va( "%u", oscar.rosterGeneration ) );
+	Cvar_Set( "oscar_rosterGen", va( "%u", oscar.roster.generation ) );
 	OSCAR_RefreshUiSnapshot();
-}
-
-static int OSCAR_RosterFind( const char *screenName )
-{
-	int i;
-
-	if ( !screenName || !screenName[0] ) {
-		return -1;
-	}
-	for ( i = 0; i < oscar.buddyCount; i++ ) {
-		if ( !Q_stricmp( oscar.buddies[i].screenName, screenName ) ) {
-			return i;
-		}
-	}
-	return -1;
 }
 
 static int OSCAR_RosterEnsure( const char *screenName )
 {
-	int idx;
-
-	idx = OSCAR_RosterFind( screenName );
+	int idx = OSCAR_Roster_Ensure( &oscar.roster, screenName );
 	if ( idx >= 0 ) {
-		return idx;
+		OSCAR_RefreshRosterSnapshot();
 	}
-	if ( oscar.buddyCount >= OSCAR_MAX_BUDDIES ) {
-		return -1;
-	}
-	idx = oscar.buddyCount++;
-	Com_Memset( &oscar.buddies[idx], 0, sizeof( oscar.buddies[idx] ) );
-	Q_strncpyz( oscar.buddies[idx].screenName, screenName, sizeof( oscar.buddies[idx].screenName ) );
-	Q_strncpyz( oscar.buddies[idx].status, "offline", sizeof( oscar.buddies[idx].status ) );
-	oscar.buddies[idx].online = qfalse;
-	oscar.rosterGeneration++;
-	OSCAR_RefreshRosterSnapshot();
 	return idx;
 }
 
 static void OSCAR_RosterApplyPresence( const oscarEvent_t *ev )
 {
-	int idx;
-	qboolean online;
+	unsigned int before = oscar.roster.generation;
 
-	if ( !ev || !ev->screenName[0] ) {
-		return;
+	OSCAR_Roster_ApplyPresence( &oscar.roster, ev );
+	if ( oscar.roster.generation != before ) {
+		OSCAR_RefreshRosterSnapshot();
 	}
-	idx = OSCAR_RosterEnsure( ev->screenName );
-	if ( idx < 0 ) {
-		return;
-	}
-	online = (qboolean)( Q_stricmp( ev->status, "offline" ) != 0 );
-	Q_strncpyz( oscar.buddies[idx].status, ev->status[0] ? ev->status : ( online ? "available" : "offline" ),
-		sizeof( oscar.buddies[idx].status ) );
-	Q_strncpyz( oscar.buddies[idx].awayMessage, ev->text, sizeof( oscar.buddies[idx].awayMessage ) );
-	oscar.buddies[idx].online = online;
-	oscar.rosterGeneration++;
-	OSCAR_RefreshRosterSnapshot();
 }
 
 static void OSCAR_RosterRemove( const char *screenName )
 {
-	int idx = OSCAR_RosterFind( screenName );
-	int i;
+	unsigned int before = oscar.roster.generation;
 
-	if ( idx < 0 ) {
-		return;
+	OSCAR_Roster_Remove( &oscar.roster, screenName );
+	if ( oscar.roster.generation != before ) {
+		OSCAR_RefreshRosterSnapshot();
 	}
-	for ( i = idx; i < oscar.buddyCount - 1; i++ ) {
-		oscar.buddies[i] = oscar.buddies[i + 1];
-	}
-	oscar.buddyCount--;
-	oscar.rosterGeneration++;
-	OSCAR_RefreshRosterSnapshot();
 }
 
 int OSCAR_BuddyCount( void )
 {
-	return oscar.buddyCount;
+	return OSCAR_Roster_Count( &oscar.roster );
 }
 
 qboolean OSCAR_BuddyGet( int index, oscarBuddy_t *out )
 {
-	if ( !out || index < 0 || index >= oscar.buddyCount ) {
-		return qfalse;
-	}
-	*out = oscar.buddies[index];
-	return qtrue;
+	return OSCAR_Roster_Get( &oscar.roster, index, out );
 }
 
 void OSCAR_BuddyClear( void )
 {
-	oscar.buddyCount = 0;
-	Com_Memset( oscar.buddies, 0, sizeof( oscar.buddies ) );
-	oscar.rosterGeneration++;
+	OSCAR_Roster_Clear( &oscar.roster );
 	OSCAR_RefreshRosterSnapshot();
 }
 
 unsigned int OSCAR_GetRosterGeneration( void )
 {
-	return oscar.rosterGeneration;
+	return OSCAR_Roster_Generation( &oscar.roster );
+}
+
+void OSCAR_SetEventSink( oscarEventSinkFn fn, void *userdata )
+{
+	oscar.eventSink = fn;
+	oscar.eventSinkUserdata = userdata;
 }
 
 static qboolean OSCAR_BuildAddress( const char *hostIn, int port, struct sockaddr_storage *addr, int *addrLen, int *family )
@@ -811,18 +754,19 @@ static void OSCAR_HandleEvent( const oscarEvent_t *ev )
 		OSCAR_Disconnect( ev->text );
 		break;
 	case OSCAR_EVENT_ROOM_MESSAGE:
-		if ( !oscar_notify || oscar_notify->integer ) {
+		/* Client event sink owns AIM-colored notify when registered. */
+		if ( !oscar.eventSink && ( !oscar_notify || oscar_notify->integer ) ) {
 			Com_Printf( S_COLOR_CYAN "OSCAR room %s <%s>: %s\n", ev->room, ev->screenName, ev->text );
 		}
 		break;
 	case OSCAR_EVENT_INSTANT_MESSAGE:
-		if ( !oscar_notify || oscar_notify->integer ) {
+		if ( !oscar.eventSink && ( !oscar_notify || oscar_notify->integer ) ) {
 			Com_Printf( S_COLOR_CYAN "OSCAR IM <%s>: %s\n", ev->screenName, ev->text );
 		}
 		break;
 	case OSCAR_EVENT_PRESENCE_CHANGED:
 		OSCAR_RosterApplyPresence( ev );
-		if ( oscar_presence && oscar_presence->integer ) {
+		if ( !oscar.eventSink && oscar_presence && oscar_presence->integer ) {
 			Com_Printf( "OSCAR presence %s: %s\n", ev->screenName, ev->status );
 		}
 		break;
@@ -1186,6 +1130,9 @@ static void OSCAR_ReadSocket( void )
 
 void OSCAR_Init( void )
 {
+	oscarEventSinkFn sink = oscar.eventSink;
+	void *sinkUser = oscar.eventSinkUserdata;
+
 	OSCAR_RegisterCvars();
 	Com_Memset( &oscar, 0, sizeof( oscar ) );
 	oscar.initialized = qtrue;
@@ -1194,6 +1141,9 @@ void OSCAR_Init( void )
 	oscar.state = OSCAR_STATE_DISABLED;
 	oscar.mode = OSCAR_ConfiguredMode();
 	oscar.nextRequestId = 1;
+	oscar.eventSink = sink;
+	oscar.eventSinkUserdata = sinkUser;
+	OSCAR_Roster_Init( &oscar.roster );
 	Cvar_Set( "oscar_lastEvent", "" );
 	Cvar_Set( "oscar_eventLog", "" );
 	OSCAR_RefreshRosterSnapshot();
@@ -1272,6 +1222,7 @@ void OSCAR_Disconnect( const char *reason )
 
 	OSCAR_CloseSocket();
 	oscar.currentRoom[0] = '\0';
+	OSCAR_BuddyClear();
 	if ( reason && reason[0] ) {
 		Q_strncpyz( oscar.lastError, reason, sizeof( oscar.lastError ) );
 	}
@@ -1427,9 +1378,18 @@ qboolean OSCAR_LeaveRoom( const char *room )
 	qboolean ok;
 
 	if ( oscar.mode == OSCAR_MODE_DIRECT ) {
+		byte frame[OSCAR_RAW_MAX_FRAME];
+		int len;
+
 		if ( room && room[0] && oscar.currentRoom[0] && Q_stricmp( oscar.currentRoom, room ) ) {
 			OSCAR_SetError( "not in that chat room" );
 			return qfalse;
+		}
+		if ( oscar.chatSocket != OSCAR_INVALID_SOCKET && oscar.chatPhase == OSCAR_CHAT_ONLINE ) {
+			len = OSCAR_RawBuildChatLeave( oscar.chatFlapSequence++, frame, sizeof( frame ) );
+			if ( len > 0 ) {
+				OSCAR_SendChatFrameBuffer( frame, len );
+			}
 		}
 		OSCAR_CloseChatSocket();
 		oscar.currentRoom[0] = '\0';

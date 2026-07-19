@@ -91,7 +91,7 @@ Both feed into linear HDR; no conflict.
 
 **World resolve** (menus/UI skip via `paniniPad1`): exposure (`r_exposure` / auto), pre-exposure (`r_pre_exposure_scale`), bloom knee, tonemap (`r_tonemap`), then display encode (`r_gamma` via `apply_srgb_gamma` when the swapchain is UNORM).
 
-**Tonemap + grade**: Filmic and **AgX** (`r_tonemap` 3) both read `toneMapParams0/1` (toe / shoulder / whitePoint / highlightDesat from `r_grade_*`). AgX is no longer a fixed curve.
+**Tonemap + grade**: Filmic (`r_tonemap` 3) and **AgX** (`r_tonemap` 4) both read `toneMapParams0/1` (toe / shoulder / whitePoint / highlightDesat from `r_grade_*`). AgX is no longer a fixed curve.
 
 **Grading stack** (`r_post` 1): local exposure, white balance, LUT, contrast/saturation, motion blur, DOF, chromatic aberration, vignette, film grain, outline — all gated separately from resolve so `r_post 0` still tonemaps HDR instead of hard-clipping to 1.0.
 

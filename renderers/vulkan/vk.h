@@ -1581,6 +1581,10 @@ typedef struct {
 		VkShaderModule deferred_gbuffer_fill_cs;
 		VkShaderModule deferred_gbuffer_debug_fs;
 		VkShaderModule deferred_lighting_cs;
+		VkShaderModule deferred_lighting_vrcs_cs;
+		VkShaderModule vrcs_sri_cs;
+		VkShaderModule vrcs_pack_cs;
+		VkShaderModule vrcs_deblock_cs;
 		VkShaderModule deferred_lighting_composite_fs;
 		VkShaderModule visibility_buffer_fill_cs;
 		VkShaderModule visibility_buffer_debug_fs;

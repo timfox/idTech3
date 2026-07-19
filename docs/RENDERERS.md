@@ -294,15 +294,11 @@ Code: `renderers/vulkan/vk_forward_plus.c`, `VK_FP_*` constants; cvar registrati
 | `r_deferredGBuffer` | 0 | With `r_renderMode` 1/2/3: allocate albedo/normal/material/lighting G-buffer images. `modern_vulkan.cfg` sets **1** as a sidecar. Latched; `r_fbo` 1. |
 | `r_deferredGBufferFill` | 0 | With G-buffer RTs: copy scene albedo after geometry (mode 3: after opaque). On non-MSAA FBO frames, opaque PBR material shaders directly export normals and material; MSAA/legacy paths keep the depth-derived fallback. Material is RGBA16F: metalness, roughness, AO, source confidence. `modern_vulkan.cfg` sets **1**. |
 | `r_deferredGBufferDebug` | 0 | Before bloom: show G-buffer on scene color (1=albedo, 2=normal, 3=material, 4=lighting, 5=normal confidence, 6=motion vectors from the main material pass). |
-| `r_deferredLighting` | 0 | Deferred diffuse (Forward+ tiles, point+spot). Modes **1** and **3**. Mode 1 latches `r_forwardPlusShade` 0; mode 3 keeps Forward+ shade for transparent. Ignored by mode-2 modern default. |
+| `r_deferredLighting` | 0 | Deferred dynamic lights (Forward+ tiles, point+spot): Disney/Burley **Fd** + Fresnel **kD**, GGX specular. Modes **1** and **3**. Mode 1 latches `r_forwardPlusShade` 0; mode 3 keeps Forward+ shade for transparent. Ignored by mode-2 modern default. |
 | `r_deferredUnlitBase` | 1 | Additive dynamic on static-lit scene copy; skips classic lit-surf pass. **0** = legacy multiply composite. |
 | `r_deferredLightingStrength` | 1 | Scale deferred dynamic diffuse (0–4). |
 | `r_deferredSpecular` | 1 | GGX + Smith + Fresnel specular on deferred dynamic lights (0=diffuse only). |
 | `r_deferredSpecularStrength` | 1 | Scale deferred dynamic specular (0–4). |
-| `r_deferredAOCoupling` | 0.65 | Attenuate deferred dynamic light by the G-buffer **material** AO channel (0=off, 1=full). Does not sample SSAO. |
-| `r_deferredDefaultMetalness` | 0 | Fallback metalness for MSAA/depth-derived G-buffer export. |
-| `r_deferredDefaultRoughness` | 0.55 | Fallback roughness for MSAA/depth-derived G-buffer export. |
-| `r_deferredSpecularStrength` | 1 | Scale deferred dynamic specular highlights when `r_deferredSpecular 1` (0–4). |
 | `r_deferredAOCoupling` | 0.65 | Attenuate deferred dynamic light by the G-buffer **material** AO channel (0=off, 1=full). Does not sample SSAO. |
 | `r_deferredDefaultMetalness` | 0 | Fallback metalness for MSAA/depth-derived G-buffer export. |
 | `r_deferredDefaultRoughness` | 0.55 | Fallback roughness for MSAA/depth-derived G-buffer export. |
@@ -315,7 +311,7 @@ Code: `renderers/vulkan/vk_forward_plus.c`, `VK_FP_*` constants; cvar registrati
 | `r_fogFluid` | 0 | Fluid-driven volumetric fog (0=off, 1=on). Vorticity/buoyancy: `r_fogFluidVorticity`, `r_fogFluidBuoyancy`. |
 | `r_bloom` | 0 | Bloom enable |
 | `r_bloom_threshold` | 0.6 | Bloom extraction threshold |
-| `r_hdr` | 2 | HDR format (0=8-bit, 1=RGBA16F, 2=RGBA32F default, 3=RGBA64F optional/gated, -1=4-bit test) |
+| `r_hdr` | 2 | HDR format (0=8-bit, 1=RGBA16F, 2=RGBA32F default, 3=aliases to 32-bit with startup warning; RGBA64F not implemented) |
 | `r_hdr_lightmap_scale` | 2.0 | HDR lightmap intensity (1=normal, 2+=brighter for 8-bit lightmaps) |
 | `r_lightmap_srgb_decode` | 0 | When r_hdr 1/2: 0=linear (default), 1=sRGB→linear for gamma-encoded lightmaps |
 | `r_ndgi` | 0 | **Neural Dynamic GI** (experimental): temporal baked lightmaps from neural feature atlas + VT page decode. See [NEURAL_DYNAMIC_GI.md](NEURAL_DYNAMIC_GI.md). Latched; needs BSP lightmaps. |

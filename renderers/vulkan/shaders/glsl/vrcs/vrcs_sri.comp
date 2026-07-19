@@ -1,0 +1,68 @@
+#version 450
+#extension GL_GOOGLE_include_directive : require
+
+/*
+ * VRCS shading-rate image: one R8_UINT rate per 2x2 pixels from prior-frame luma gradients.
+ */
+
+layout(local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
+
+#include "vrcs.glsl"
+
+layout(set = 0, binding = 0) uniform sampler2D historyTex;
+layout(r8ui, set = 0, binding = 1) uniform writeonly uimage2D sriOut;
+
+layout(push_constant) uniform Push {
+	uvec2 extent;       /* full-res pixel extent */
+	uvec2 sriExtent;    /* ceil(extent/2) */
+	float edgeThresh;
+	float flatThresh;
+	uint extraHalf;     /* 1 = re-test 2x2 with tighter flat, no 1x1 */
+	uint quality;       /* 0 aggressive, 1 balanced, 2 quality — scales thresholds */
+} pc;
+
+void main() {
+	uvec2 sriCoord = gl_GlobalInvocationID.xy;
+	if ( sriCoord.x >= pc.sriExtent.x || sriCoord.y >= pc.sriExtent.y ) {
+		return;
+	}
+
+	/* Sample 2x2 block centers in full-res history. */
+	vec2 base = vec2( float( sriCoord.x * 2u ) + 0.5, float( sriCoord.y * 2u ) + 0.5 );
+	vec2 invExt = 1.0 / max( vec2( pc.extent ), vec2( 1.0 ) );
+
+	float l00 = vrcsLuma( textureLod( historyTex, ( base + vec2( 0.0, 0.0 ) ) * invExt, 0.0 ).rgb );
+	float l10 = vrcsLuma( textureLod( historyTex, ( base + vec2( 1.0, 0.0 ) ) * invExt, 0.0 ).rgb );
+	float l01 = vrcsLuma( textureLod( historyTex, ( base + vec2( 0.0, 1.0 ) ) * invExt, 0.0 ).rgb );
+	float l11 = vrcsLuma( textureLod( historyTex, ( base + vec2( 1.0, 1.0 ) ) * invExt, 0.0 ).rgb );
+
+	/* Sobel-ish gradients on the 2x2. */
+	float gx = abs( ( l10 + l11 ) - ( l00 + l01 ) ) * 0.5;
+	float gy = abs( ( l01 + l11 ) - ( l00 + l10 ) ) * 0.5;
+	float g = max( gx, gy );
+	float gDir = abs( gx - gy );
+
+	float qScale = ( pc.quality == 0u ) ? 1.35 : ( ( pc.quality >= 2u ) ? 0.65 : 1.0 );
+	float edgeT = max( pc.edgeThresh * qScale, 1e-5 );
+	float flatT = max( pc.flatThresh * qScale, 1e-5 );
+
+	uint rate = VRCS_RATE_2X2;
+	if ( g >= edgeT ) {
+		rate = VRCS_RATE_1X1;
+	} else if ( g >= flatT ) {
+		/* Prefer axis-aligned half rate matching dominant gradient. */
+		rate = ( gx >= gy ) ? VRCS_RATE_2X1 : VRCS_RATE_1X2;
+		if ( gDir < flatT * 0.25 ) {
+			rate = VRCS_RATE_1X1;
+		}
+	}
+
+	if ( pc.extraHalf != 0u && rate == VRCS_RATE_2X2 ) {
+		float flatTight = flatT * 0.55;
+		if ( g >= flatTight ) {
+			rate = ( gx >= gy ) ? VRCS_RATE_2X1 : VRCS_RATE_1X2;
+		}
+	}
+
+	imageStore( sriOut, ivec2( sriCoord ), uvec4( rate, 0u, 0u, 0u ) );
+}

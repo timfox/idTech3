@@ -72,4 +72,8 @@ qboolean OSCAR_BuddyGet( int index, oscarBuddy_t *out );
 void OSCAR_BuddyClear( void );
 unsigned int OSCAR_GetRosterGeneration( void );
 
+/* Optional fan-out for client notify / UI without draining OSCAR_PollEvent. */
+typedef void ( *oscarEventSinkFn )( const oscarEvent_t *ev, void *userdata );
+void OSCAR_SetEventSink( oscarEventSinkFn fn, void *userdata );
+
 #endif /* NET_OSCAR_H */

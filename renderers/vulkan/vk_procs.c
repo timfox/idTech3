@@ -48,6 +48,7 @@ PFN_vkCmdBindPipeline							qvkCmdBindPipeline;
 PFN_vkCmdBindVertexBuffers						qvkCmdBindVertexBuffers;
 PFN_vkCmdBlitImage								qvkCmdBlitImage;
 PFN_vkCmdClearAttachments						qvkCmdClearAttachments;
+PFN_vkCmdFillBuffer								qvkCmdFillBuffer;
 PFN_vkCmdCopyBuffer								qvkCmdCopyBuffer;
 PFN_vkCmdCopyBufferToImage						qvkCmdCopyBufferToImage;
 PFN_vkCmdCopyImage								qvkCmdCopyImage;

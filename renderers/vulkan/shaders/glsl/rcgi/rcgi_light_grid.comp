@@ -1,0 +1,52 @@
+#version 460
+#extension GL_GOOGLE_include_directive : require
+layout(local_size_x = 4, local_size_y = 4, local_size_z = 4) in;
+
+#include "rcgi.glsl"
+
+layout(std430, set = 0, binding = 0) readonly buffer LightList {
+	RcGiLight lights[];
+};
+layout(std430, set = 0, binding = 1) writeonly buffer GridIds {
+	uint cellIds[]; /* cascades * grid^3 * MAX_LIGHT_IDS */
+};
+layout(std430, set = 0, binding = 2) writeonly buffer GridCounts {
+	uint cellCounts[]; /* cascades * grid^3 */
+};
+
+layout(push_constant) uniform GridPush {
+	uvec4 params; /* x=cascade y=lightCount z=gridRes w=maxIds */
+	vec4  cascadeOrigin; /* xyz origin, w halfExtent */
+} pc;
+
+void main() {
+	uvec3 cell = gl_GlobalInvocationID.xyz;
+	uint grid = max(pc.params.z, 1u);
+	if (cell.x >= grid || cell.y >= grid || cell.z >= grid) {
+		return;
+	}
+
+	uint cascade = pc.params.x;
+	float halfExt = max(pc.cascadeOrigin.w, 1.0);
+	float cellSize = (halfExt * 2.0) / float(grid);
+	vec3 origin = pc.cascadeOrigin.xyz - vec3(halfExt);
+	vec3 cellMin = origin + vec3(cell) * cellSize;
+	vec3 cellMax = cellMin + vec3(cellSize);
+
+	uint flatCell = cascade * (grid * grid * grid) + cell.z * (grid * grid) + cell.y * grid + cell.x;
+	uint base = flatCell * RCGI_MAX_LIGHT_IDS;
+	uint count = 0u;
+	uint nLights = min(pc.params.y, RCGI_MAX_LIGHTS);
+
+	for (uint i = 0u; i < nLights && count < RCGI_MAX_LIGHT_IDS; ++i) {
+		vec3 lp = lights[i].posRange.xyz;
+		float r = lights[i].posRange.w;
+		vec3 closest = clamp(lp, cellMin, cellMax);
+		float d2 = dot(lp - closest, lp - closest);
+		if (d2 <= r * r) {
+			cellIds[base + count] = i;
+			count++;
+		}
+	}
+	cellCounts[flatCell] = count;
+}

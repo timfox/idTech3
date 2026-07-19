@@ -78,8 +78,9 @@ void R_ApplyRenderModeLatch( void )
 	case 2:
 		R_LatchCvarInt( r_forwardPlus, "r_forwardPlus", 1 );
 		R_LatchCvarInt( r_forwardPlusDepthCull, "r_forwardPlusDepthCull", 1 );
-		R_LatchCvarInt( r_deferredGBuffer, "r_deferredGBuffer", 1 );
-		R_LatchCvarInt( r_deferredGBufferFill, "r_deferredGBufferFill", 1 );
+		/* Sidecar G-buffer is optional for mode 2 ("may use"). Forcing fill=1
+		 * crashes NVIDIA after gbuffer capture when UI overlay resumes
+		 * (vk_begin_ui_overlay_render_pass_load → SIGSEGV in glcore). */
 		R_LatchCvarInt( r_deferredLighting, "r_deferredLighting", 0 );
 		if ( r_forwardPlusShade && r_forwardPlusShade->value <= 0.0f ) {
 			R_LatchCvarFloat( r_forwardPlusShade, "r_forwardPlusShade", 1.0f );
@@ -87,8 +88,8 @@ void R_ApplyRenderModeLatch( void )
 		if ( mode != s_last_logged_mode ) {
 			ri.Printf( PRINT_ALL,
 				"[VK] r_renderMode 2: Forward+ primary (r_forwardPlus=1, r_forwardPlusShade=1, "
-				"r_forwardPlusDepthCull=1, sidecar G-buffer on, deferred lighting off; GPU cap %u; "
-				"classic projector/dlightBits still %d)\n",
+				"r_forwardPlusDepthCull=1, sidecar G-buffer opt-in via r_deferredGBuffer, "
+				"deferred lighting off; GPU cap %u; classic projector/dlightBits still %d)\n",
 				(unsigned)VK_FP_MAX_GPU_LIGHTS, MAX_DLIGHTS );
 			s_last_logged_mode = mode;
 		}

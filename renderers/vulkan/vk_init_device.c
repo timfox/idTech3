@@ -24,6 +24,7 @@ Extracted from vk.c for incremental modularization.
 #include "vk_forward_plus.h"
 #include "vk_deferred_gbuffer.h"
 #include "vk_visibility_buffer.h"
+#include "vk_vrcs.h"
 #include "vk_view_state.h"
 #include "vk_sim_render_profile.h"
 #include "vk_fp64_points.h"
@@ -52,6 +53,7 @@ Extracted from vk.c for incremental modularization.
 #include "vk_hybrid1.h"
 #include "vk_raygun.h"
 #include "vk_surfel_gi.h"
+#include "vk_rcgi.h"
 #include "vk_pipeline_cache_disk.h"
 #include "vk_pipeline_helpers.h"
 #include "vk_raster_samples.h"
@@ -1276,6 +1278,7 @@ void vk_initialize( void )
 	vk_forward_plus_init();
 	vk_deferred_gbuffer_init();
 	vk_visibility_buffer_init();
+	vk_vrcs_init();
 
 	vk_pipeline_cache_create( &props );
 
@@ -1304,6 +1307,7 @@ void vk_initialize( void )
 	vk_hybrid1_init();
 	vk_raygun_init();
 	vk_surfel_gi_init();
+	vk_rcgi_init();
 
 #ifdef VK_CUBEMAP
 	vk_create_cubemap_prefilter();

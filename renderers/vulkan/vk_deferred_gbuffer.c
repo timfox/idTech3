@@ -11,6 +11,7 @@ Mode 3 = Unified Clustered Renderer (deferred opaque + Forward+ transparent).
 #include "vk.h"
 #include "vk_deferred_gbuffer.h"
 #include "vk_visibility_buffer.h"
+#include "vk_vrcs.h"
 #include "vk_image_layout.h"
 #include "vk_post_fog.h"
 #include "vk_render_pass.h"
@@ -871,6 +872,11 @@ static void vk_dgb_dispatch_lighting_compute( uint32_t width, uint32_t height )
 	}
 	if ( vk.forward_plus.buffer == VK_NULL_HANDLE || vk.forward_plus.tile_buffer == VK_NULL_HANDLE ||
 		vk.deferred_lighting_image == VK_NULL_HANDLE || vk.deferred_lighting_view == VK_NULL_HANDLE ) {
+		return;
+	}
+
+	/* VRCS path: SRI + pack + wave-packed lighting + deblock (own pipelines). */
+	if ( vk_vrcs_dispatch_deferred_lighting( width, height ) ) {
 		return;
 	}
 

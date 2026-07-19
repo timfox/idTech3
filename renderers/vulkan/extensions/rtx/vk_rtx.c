@@ -2269,6 +2269,16 @@ uint32_t vk_rtx_entity_normal_count( void )
 	return rtx.entity_normal_count;
 }
 
+void vk_rtx_tlas_status( const char **modeOut, const char **reasonOut )
+{
+	if ( modeOut ) {
+		*modeOut = rtx.tlas_build_mode[0] ? rtx.tlas_build_mode : "n/a";
+	}
+	if ( reasonOut ) {
+		*reasonOut = rtx.tlas_rebuild_reason[0] ? rtx.tlas_rebuild_reason : "n/a";
+	}
+}
+
 #else /* !USE_VULKAN_RTX */
 
 void vk_rtx_init( void )
@@ -2297,5 +2307,14 @@ void vk_rtx_bind_entity_albedo_ssbo( VkDescriptorSet set, uint32_t binding ) { (
 uint32_t vk_rtx_entity_albedo_count( void ) { return 0u; }
 void vk_rtx_bind_entity_normal_ssbo( VkDescriptorSet set, uint32_t binding ) { (void)set; (void)binding; }
 uint32_t vk_rtx_entity_normal_count( void ) { return 0u; }
+void vk_rtx_tlas_status( const char **modeOut, const char **reasonOut )
+{
+	if ( modeOut ) {
+		*modeOut = "n/a";
+	}
+	if ( reasonOut ) {
+		*reasonOut = "stub";
+	}
+}
 
 #endif /* USE_VULKAN_RTX */

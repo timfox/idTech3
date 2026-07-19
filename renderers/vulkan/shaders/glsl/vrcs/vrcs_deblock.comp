@@ -1,0 +1,95 @@
+#version 450
+#extension GL_GOOGLE_include_directive : require
+
+/*
+ * VRCS deblocker: average primary with duplicate neighbors per SRI rate (in-place UAV).
+ * Fixes half-pixel offset without modifying lighting shaders.
+ */
+
+layout(local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
+
+#include "vrcs.glsl"
+
+layout(set = 0, binding = 0) uniform usampler2D sriTex;
+layout(rgba16f, set = 0, binding = 1) uniform image2D litImage;
+
+layout(push_constant) uniform Push {
+	uvec2 extent;
+	uint debugMode; /* 0=off (deblock), 1=show rates, 2=primary mask */
+	uint reserved;
+} pc;
+
+vec3 rateColor( uint rate ) {
+	if ( rate == VRCS_RATE_1X1 ) {
+		return vec3( 1.0, 0.2, 0.2 );
+	}
+	if ( rate == VRCS_RATE_2X1 ) {
+		return vec3( 0.2, 1.0, 0.2 );
+	}
+	if ( rate == VRCS_RATE_1X2 ) {
+		return vec3( 0.2, 0.4, 1.0 );
+	}
+	return vec3( 1.0, 1.0, 0.2 );
+}
+
+void main() {
+	uvec2 pix = gl_GlobalInvocationID.xy;
+	if ( pix.x >= pc.extent.x || pix.y >= pc.extent.y ) {
+		return;
+	}
+
+	ivec2 ip = ivec2( pix );
+	uint rate = texelFetch( sriTex, ivec2( pix >> 1u ), 0 ).r;
+	uint qx = pix.x & 1u;
+	uint qy = pix.y & 1u;
+
+	if ( pc.debugMode == 1u ) {
+		imageStore( litImage, ip, vec4( rateColor( rate ), 1.0 ) );
+		return;
+	}
+	if ( pc.debugMode == 2u ) {
+		bool prim = vrcsIsPrimaryInQuad( rate, qx, qy );
+		imageStore( litImage, ip, vec4( prim ? vec3( 1.0, 0.9, 0.2 ) : vec3( 0.15, 0.15, 0.4 ), 1.0 ) );
+		return;
+	}
+
+	if ( rate == VRCS_RATE_1X1 ) {
+		return;
+	}
+
+	vec4 self = imageLoad( litImage, ip );
+	vec3 acc = self.rgb;
+	float w = 1.0;
+
+	if ( rate == VRCS_RATE_2X1 ) {
+		int ox = ( qx == 0u ) ? 1 : -1;
+		ivec2 np = ip + ivec2( ox, 0 );
+		if ( np.x >= 0 && np.x < int( pc.extent.x ) ) {
+			acc += imageLoad( litImage, np ).rgb;
+			w += 1.0;
+		}
+	} else if ( rate == VRCS_RATE_1X2 ) {
+		int oy = ( qy == 0u ) ? 1 : -1;
+		ivec2 np = ip + ivec2( 0, oy );
+		if ( np.y >= 0 && np.y < int( pc.extent.y ) ) {
+			acc += imageLoad( litImage, np ).rgb;
+			w += 1.0;
+		}
+	} else {
+		/* 2x2: average the four pixels of the block (from each thread — race ok). */
+		ivec2 base = ivec2( int( pix.x & ~1u ), int( pix.y & ~1u ) );
+		acc = vec3( 0.0 );
+		w = 0.0;
+		for ( int dy = 0; dy < 2; dy++ ) {
+			for ( int dx = 0; dx < 2; dx++ ) {
+				ivec2 np = base + ivec2( dx, dy );
+				if ( np.x < int( pc.extent.x ) && np.y < int( pc.extent.y ) ) {
+					acc += imageLoad( litImage, np ).rgb;
+					w += 1.0;
+				}
+			}
+		}
+	}
+
+	imageStore( litImage, ip, vec4( acc / max( w, 1.0 ), self.a ) );
+}

@@ -103,7 +103,8 @@ static const char *vk_sim_render_debug_tonemap_label( int mode )
 		case 0: return "none";
 		case 1: return "Reinhard";
 		case 2: return "ACES";
-		case 3: return "AgX";
+		case 3: return "Filmic";
+		case 4: return "AgX";
 		default: return "custom";
 	}
 }

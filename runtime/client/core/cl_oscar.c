@@ -222,37 +222,110 @@ void CL_Oscar_RegisterLua( struct lua_State *L )
 }
 #endif
 
+static void CL_Oscar_EventSink( const oscarEvent_t *ev, void *userdata )
+{
+	cvar_t *oscar_notify;
+	qboolean aimStyle;
+	qboolean shellNotify;
+
+	(void)userdata;
+	if ( !ev ) {
+		return;
+	}
+	oscar_notify = Cvar_Get( "oscar_notify", "1", 0 );
+	shellNotify = (qboolean)( cl_oscarNotify && cl_oscarNotify->integer );
+	aimStyle = (qboolean)( shellNotify && cl_oscarChat && cl_oscarChat->integer );
+
+	/* When the client sink is registered, it owns IM/room/presence display. */
+	switch ( ev->type ) {
+	case OSCAR_EVENT_INSTANT_MESSAGE:
+		if ( oscar_notify && !oscar_notify->integer ) {
+			return;
+		}
+		if ( !shellNotify && ( !oscar_notify || !oscar_notify->integer ) ) {
+			return;
+		}
+		Com_Printf( "%s%s <%s>: %s\n",
+			aimStyle ? S_COLOR_YELLOW : S_COLOR_CYAN,
+			aimStyle ? "AIM IM" : "OSCAR IM",
+			ev->screenName[0] ? ev->screenName : "?",
+			ev->text );
+		break;
+	case OSCAR_EVENT_ROOM_MESSAGE:
+		if ( oscar_notify && !oscar_notify->integer ) {
+			return;
+		}
+		Com_Printf( "%s%s %s <%s>: %s\n",
+			aimStyle ? S_COLOR_GREEN : S_COLOR_CYAN,
+			aimStyle ? "AIM #" : "OSCAR room",
+			ev->room[0] ? ev->room : "?",
+			ev->screenName[0] ? ev->screenName : "?",
+			ev->text );
+		break;
+	case OSCAR_EVENT_PRESENCE_CHANGED:
+		if ( !Cvar_VariableIntegerValue( "oscar_presence" ) ) {
+			return;
+		}
+		if ( !shellNotify && !Cvar_VariableIntegerValue( "oscar_presence" ) ) {
+			return;
+		}
+		Com_Printf( "%s%s %s: %s\n",
+			aimStyle ? S_COLOR_CYAN : "",
+			aimStyle ? "AIM" : "OSCAR presence",
+			ev->screenName[0] ? ev->screenName : "buddy",
+			ev->status[0] ? ev->status : "online" );
+		break;
+	case OSCAR_EVENT_CONNECTED:
+		if ( shellNotify ) {
+			Com_Printf( S_COLOR_WHITE "AIM: connected\n" );
+		}
+		break;
+	case OSCAR_EVENT_DISCONNECTED:
+		if ( shellNotify ) {
+			Com_Printf( S_COLOR_YELLOW "AIM: disconnected%s%s\n",
+				ev->text[0] ? " — " : "", ev->text );
+		}
+		break;
+	case OSCAR_EVENT_ERROR:
+		if ( shellNotify ) {
+			Com_Printf( S_COLOR_RED "AIM error: %s\n", ev->text[0] ? ev->text : "unknown" );
+		}
+		break;
+	default:
+		break;
+	}
+}
+
 void CL_Oscar_Init( void )
 {
 	cl_oscarNotify = Cvar_Get( "cl_oscarNotify", "1", CVAR_ARCHIVE );
 	cl_oscarChat = Cvar_Get( "cl_oscarChat", "1", CVAR_ARCHIVE );
 	cl_oscarUi = Cvar_Get( "cl_oscarUi", "1", CVAR_ARCHIVE );
-	Cvar_SetDescription( cl_oscarNotify, "When 1, mirror OSCAR IM/room/presence into console notify when oscar_notify is on." );
+	Cvar_SetDescription( cl_oscarNotify, "When 1, mirror OSCAR IM/room/presence into console notify (client AIM shell)." );
 	Cvar_SetDescription( cl_oscarChat, "When 1, print OSCAR chat-oriented messages with AIM-style coloring." );
 	Cvar_SetDescription( cl_oscarUi, "When 1, show OSCAR buddy panel in the ImGui inspector (requires r_imgui)." );
 	s_lastRosterGen = OSCAR_GetRosterGeneration();
+	OSCAR_SetEventSink( CL_Oscar_EventSink, NULL );
 	Com_Printf( "OSCAR client shell: notify=%d chat=%d ui=%d\n",
 		cl_oscarNotify->integer, cl_oscarChat->integer, cl_oscarUi->integer );
 }
 
 void CL_Oscar_Shutdown( void )
 {
+	OSCAR_SetEventSink( NULL, NULL );
 }
 
 /*
 ===============
 CL_Oscar_Frame
 
-Lightweight client-side roster dirty log (events already printf via oscar_notify).
+Roster dirty tracking; IM/room/presence notify is delivered via OSCAR_SetEventSink.
 ===============
 */
 void CL_Oscar_Frame( void )
 {
 	unsigned int gen;
 
-	if ( !cl_oscarNotify || !cl_oscarNotify->integer ) {
-		return;
-	}
 	if ( !OSCAR_IsAvailable() ) {
 		return;
 	}
@@ -260,7 +333,10 @@ void CL_Oscar_Frame( void )
 	gen = OSCAR_GetRosterGeneration();
 	if ( gen != s_lastRosterGen ) {
 		s_lastRosterGen = gen;
-		/* Presence/IM printf is handled in net_oscar; keep this quiet. */
-		(void)cl_oscarChat;
+		if ( cl_oscarNotify && cl_oscarNotify->integer &&
+		     Cvar_VariableIntegerValue( "oscar_presence" ) ) {
+			Com_Printf( "AIM roster updated (%d buddies, gen %u)\n",
+				OSCAR_BuddyCount(), gen );
+		}
 	}
 }

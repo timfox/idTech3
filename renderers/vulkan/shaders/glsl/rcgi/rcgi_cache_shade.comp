@@ -1,0 +1,87 @@
+#version 460
+#extension GL_GOOGLE_include_directive : require
+layout(local_size_x = 64) in;
+
+#include "rcgi.glsl"
+
+layout(std430, set = 0, binding = 0) buffer CacheBuf {
+	RcGiCacheCell cells[];
+};
+layout(std430, set = 0, binding = 1) readonly buffer ActiveList {
+	uint activeCount;
+	uint pad0;
+	uint pad1;
+	uint pad2;
+	uint activeIndices[];
+};
+layout(std430, set = 0, binding = 2) readonly buffer LightList {
+	RcGiLight lights[];
+};
+layout(std430, set = 0, binding = 3) readonly buffer GridIds {
+	uint cellIds[];
+};
+layout(std430, set = 0, binding = 4) readonly buffer GridCounts {
+	uint cellCounts[];
+};
+
+layout(push_constant) uniform ShadePush {
+	uvec4 params; /* x=cascade y=gridRes z=lightCount w=frame */
+	vec4  cascadeOrigin;
+	vec4  sun; /* xyz dir, w intensity */
+} pc;
+
+vec3 shade_point(vec3 pos, vec3 n) {
+	vec3 col = rcgi_default_sky() * 0.15;
+	float ndlSun = max(dot(n, normalize(-pc.sun.xyz)), 0.0);
+	col += vec3(1.0, 0.97, 0.92) * ndlSun * max(pc.sun.w, 0.0);
+
+	uint grid = max(pc.params.y, 1u);
+	float halfExt = max(pc.cascadeOrigin.w, 1.0);
+	vec3 origin = pc.cascadeOrigin.xyz - vec3(halfExt);
+	float cellSize = (halfExt * 2.0) / float(grid);
+	ivec3 c = ivec3(floor((pos - origin) / cellSize));
+	c = clamp(c, ivec3(0), ivec3(int(grid) - 1));
+	uint flatCell = pc.params.x * (grid * grid * grid) + uint(c.z) * (grid * grid) + uint(c.y) * grid + uint(c.x);
+	uint count = min(cellCounts[flatCell], RCGI_MAX_LIGHT_IDS);
+	uint base = flatCell * RCGI_MAX_LIGHT_IDS;
+	uint nLights = min(pc.params.z, RCGI_MAX_LIGHTS);
+
+	for (uint i = 0u; i < count; ++i) {
+		uint li = cellIds[base + i];
+		if (li >= nLights) continue;
+		vec3 L = lights[li].posRange.xyz - pos;
+		float dist = length(L);
+		float range = max(lights[li].posRange.w, 0.01);
+		if (dist > range) continue;
+		L /= max(dist, 1e-4);
+		float atten = 1.0 - smoothstep(range * 0.6, range, dist);
+		float ndl = max(dot(n, L), 0.0);
+		col += lights[li].color.rgb * ndl * atten;
+	}
+	return col;
+}
+
+void main() {
+	uint i = gl_GlobalInvocationID.x;
+	if (i >= activeCount || i >= RCGI_CACHE_CELLS) {
+		return;
+	}
+	uint slot = activeIndices[i];
+	if (slot >= RCGI_CACHE_CELLS) {
+		return;
+	}
+	RcGiCacheCell cell = cells[slot];
+	if ((cell.meta.x & RCGI_CACHE_VALID) == 0u) {
+		return;
+	}
+	/* Reconstruct approximate hit position from probe is unavailable; modulate albedo by lighting at origin proxy. */
+	vec3 n = normalize(cell.normalDist.xyz);
+	vec3 albedo = cell.radianceAge.xyz;
+	vec3 lit = shade_point(pc.cascadeOrigin.xyz, n);
+	if ((cell.meta.x & RCGI_CACHE_HIT) != 0u) {
+		cells[slot].radianceAge.xyz = albedo * lit;
+	} else {
+		cells[slot].radianceAge.xyz = albedo;
+	}
+	cells[slot].meta.w = pc.params.w;
+}

@@ -760,6 +760,12 @@ int OSCAR_RawBuildChatMessage( unsigned short sequence, unsigned int requestId, 
 	return OSCAR_RawBuildSnac( sequence, OSCAR_FAMILY_CHAT, OSCAR_CHAT_CHANNEL_MSG_TO_HOST, requestId, body, bodyUsed, out, outSize );
 }
 
+int OSCAR_RawBuildChatLeave( unsigned short sequence, byte *out, int outSize )
+{
+	/* Chat rooms are bound to the Chat FLAP connection; signoff closes the room. */
+	return OSCAR_RawBuildFlap( OSCAR_RAW_FLAP_SIGNOFF, sequence, NULL, 0, out, outSize );
+}
+
 qboolean OSCAR_RawParseChatMessage( const oscarRawSnac_t *snac, const char *roomName, oscarEvent_t *eventOut )
 {
 	const byte *body;

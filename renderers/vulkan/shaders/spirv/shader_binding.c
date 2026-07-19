@@ -419,6 +419,14 @@ void vk_bind_generated_shaders( void ){
     vk_set_shader_name( vk.modules.material_classify_cs, "material_classify_cs" );
     vk.modules.deferred_lighting_cs = SHADER_MODULE( deferred_lighting_cs );
     vk_set_shader_name( vk.modules.deferred_lighting_cs, "deferred_lighting_cs" );
+    vk.modules.deferred_lighting_vrcs_cs = SHADER_MODULE( deferred_lighting_vrcs_cs );
+    vk_set_shader_name( vk.modules.deferred_lighting_vrcs_cs, "deferred_lighting_vrcs_cs" );
+    vk.modules.vrcs_sri_cs = SHADER_MODULE( vrcs_sri_cs );
+    vk_set_shader_name( vk.modules.vrcs_sri_cs, "vrcs_sri_cs" );
+    vk.modules.vrcs_pack_cs = SHADER_MODULE( vrcs_pack_cs );
+    vk_set_shader_name( vk.modules.vrcs_pack_cs, "vrcs_pack_cs" );
+    vk.modules.vrcs_deblock_cs = SHADER_MODULE( vrcs_deblock_cs );
+    vk_set_shader_name( vk.modules.vrcs_deblock_cs, "vrcs_deblock_cs" );
     vk.modules.ndgi_decompress_cs = SHADER_MODULE( ndgi_decompress_cs );
     vk_set_shader_name( vk.modules.ndgi_decompress_cs, "ndgi_decompress_cs" );
     vk.modules.niv_shade_cs = SHADER_MODULE( niv_shade_cs );

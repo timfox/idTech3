@@ -15,6 +15,7 @@ with raster direct lighting. Requires USE_VULKAN_RTX, r_hybrid1 or r_rtx 1, r_rt
 #include "vk_rtx.h"
 #include "vk_rtx_bindless.h"
 #include "vk_surfel_gi.h"
+#include "vk_rcgi.h"
 #include "vk_util.h"
 #include "vk_view_state.h"
 #include "vk_image_layout.h"
@@ -273,6 +274,10 @@ static const char *HYBRID1_StateString( void )
 
 static void HYBRID1_Status_f( void )
 {
+	const char *tlasMode = "n/a";
+	const char *tlasReason = "n/a";
+
+	vk_rtx_tlas_status( &tlasMode, &tlasReason );
 	ri.Printf( PRINT_ALL,
 		"[VK][Hybrid1] state=%s active=%d ready=%d sceneReady=%d rtx=%d fbo=%d demo=%d quality=%d(%s) %ux%u frame=%u\n"
 		"  channels shadow=%d spec=%d diffuse=%d ibl=%d motion=%d taa=%d debug=%d\n"
@@ -283,6 +288,7 @@ static void HYBRID1_Status_f( void )
 		"  composite shadowStr=%.2f specStr=%.2f diffuseStr=%.2f deferredGBuffer=%d\n"
 		"  surfelFusion=%d (Surfel irradiance as diffuse GI when both active)\n"
 		"  restir=%d ready=%d reservoirBytes=%zu ping=%u (P3 DI scaffold; shade pass TBD)\n"
+		"  tlas_mode=%s reason=%s\n"
 		"  note: Hybrid1 is the production RT lighting path; seta r_hybrid1Quality 1|2|3; rtx_status for TLAS/entities\n",
 		HYBRID1_StateString(),
 		vk_hybrid1_active() ? 1 : 0,
@@ -328,11 +334,13 @@ static void HYBRID1_Status_f( void )
 		r_hybrid1_specStrength ? r_hybrid1_specStrength->value : 1.0f,
 		r_hybrid1_diffuseStrength ? r_hybrid1_diffuseStrength->value : 1.0f,
 		vk_deferred_gbuffer_fill_wanted() ? 1 : 0,
-		vk_surfel_gi_hybrid1_fusion_active() ? 1 : 0,
+		vk_rcgi_hybrid1_fusion_active() ? 1 : ( vk_surfel_gi_hybrid1_fusion_active() ? 1 : 0 ),
 		( r_hybrid1_restir && r_hybrid1_restir->integer ) ? 1 : 0,
 		hybrid1.restir_ready ? 1 : 0,
 		(size_t)hybrid1.restir_reservoir_bytes,
-		hybrid1.frame_index & 1u );
+		hybrid1.frame_index & 1u,
+		tlasMode,
+		tlasReason );
 }
 
 static void HYBRID1_Reset_f( void )
@@ -2037,8 +2045,8 @@ void vk_hybrid1_record_pass( VkCommandBuffer cmd )
 	}
 
 	doDiffuse = ( r_hybrid1_diffuse && r_hybrid1_diffuse->integer ) ? qtrue : qfalse;
-	/* Surfel owns diffuse GI under Hybrid1 fusion — skip Hybrid1 diffuse RT. */
-	if ( vk_surfel_gi_hybrid1_fusion_active() ) {
+	/* RcGI / Surfel own diffuse GI under Hybrid1 fusion — skip Hybrid1 diffuse RT. */
+	if ( vk_rcgi_hybrid1_fusion_active() || vk_surfel_gi_hybrid1_fusion_active() ) {
 		doDiffuse = qfalse;
 	}
 	doShadow = ( !r_hybrid1_shadow || r_hybrid1_shadow->integer ) ? qtrue : qfalse;
@@ -2232,14 +2240,19 @@ void vk_hybrid1_record_pass( VkCommandBuffer cmd )
 		VkImageView albedoView;
 		VkImageView surfelView;
 		qboolean surfelFusion;
+		qboolean rcgiFusion;
 
 		albedoView = vk.deferred_gbuffer_albedo_view ? vk.deferred_gbuffer_albedo_view :
 			( vk.deferred_gbuffer_material_view ? vk.deferred_gbuffer_material_view : vk.color_image_view );
-		surfelFusion = vk_surfel_gi_hybrid1_fusion_active();
-		surfelView = surfelFusion ? vk_surfel_gi_irradiance_view() : albedoView;
+		/* Prefer Radiance Cache GI over Surfel when both fuse into Hybrid1. */
+		rcgiFusion = vk_rcgi_hybrid1_fusion_active();
+		surfelFusion = !rcgiFusion && vk_surfel_gi_hybrid1_fusion_active();
+		surfelView = rcgiFusion ? vk_rcgi_irradiance_view() :
+			( surfelFusion ? vk_surfel_gi_irradiance_view() : albedoView );
 		if ( surfelView == VK_NULL_HANDLE ) {
 			surfelView = albedoView;
 			surfelFusion = qfalse;
+			rcgiFusion = qfalse;
 		}
 
 		HYBRID1_BarrierImage( cmd, vk.color_image, colorRestoreLayout, VK_IMAGE_LAYOUT_GENERAL,
@@ -2320,8 +2333,9 @@ void vk_hybrid1_record_pass( VkCommandBuffer cmd )
 		push.strengths[1] = doSpec ? ( r_hybrid1_specStrength ? r_hybrid1_specStrength->value : 1.0f ) : 0.0f;
 		push.strengths[2] = (float)( r_hybrid1_debug ? r_hybrid1_debug->integer : 0 );
 		push.strengths[3] = doDiffuse ? ( r_hybrid1_diffuseStrength ? r_hybrid1_diffuseStrength->value : 1.0f ) : 0.0f;
-		push.surfel[0] = surfelFusion ? vk_surfel_gi_fusion_strength() : 0.0f;
-		push.surfel[1] = surfelFusion ? 1.0f : 0.0f;
+		push.surfel[0] = rcgiFusion ? vk_rcgi_fusion_strength() :
+			( surfelFusion ? vk_surfel_gi_fusion_strength() : 0.0f );
+		push.surfel[1] = ( rcgiFusion || surfelFusion ) ? 1.0f : 0.0f;
 		push.surfel[2] = push.surfel[3] = 0.0f;
 
 		qvkCmdBindPipeline( cmd, VK_PIPELINE_BIND_POINT_COMPUTE, hybrid1.composite_pipeline );

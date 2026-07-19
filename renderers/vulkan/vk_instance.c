@@ -608,9 +608,11 @@ static qboolean vk_create_device( VkPhysicalDevice physical_device, int device_i
 			cvar_t *r_hybrid1_cvar = ri.Cvar_Get( "r_hybrid1", "0", CVAR_ARCHIVE_ND | CVAR_LATCH );
 			cvar_t *r_raygun_cvar = ri.Cvar_Get( "r_raygun", "0", CVAR_ARCHIVE_ND | CVAR_LATCH );
 			cvar_t *r_surfelGi_cvar = ri.Cvar_Get( "r_surfelGi", "0", CVAR_ARCHIVE_ND | CVAR_LATCH );
+			cvar_t *r_rcgi_cvar = ri.Cvar_Get( "r_rcgi", "0", CVAR_ARCHIVE_ND | CVAR_LATCH );
 			if ( ( r_rtx_cvar && r_rtx_cvar->integer > 0 ) || ( r_hybrid1_cvar && r_hybrid1_cvar->integer > 0 )
 				|| ( r_raygun_cvar && r_raygun_cvar->integer > 0 )
-				|| ( r_surfelGi_cvar && r_surfelGi_cvar->integer > 0 ) ) {
+				|| ( r_surfelGi_cvar && r_surfelGi_cvar->integer > 0 )
+				|| ( r_rcgi_cvar && r_rcgi_cvar->integer > 0 ) ) {
 				if ( qvkGetPhysicalDeviceFeatures2 == NULL ) {
 					ri.Printf( PRINT_WARNING, "[VK] Ray tracing: vkGetPhysicalDeviceFeatures2 unavailable; cannot verify RT features\n" );
 				} else if ( device_extension_count + 5 > ARRAY_LEN( device_extension_list ) ) {
@@ -666,7 +668,7 @@ static qboolean vk_create_device( VkPhysicalDevice physical_device, int device_i
 					}
 				}
 			} else {
-				ri.Printf( PRINT_ALL, "[VK][RTX] chocolate path ready (GPU has KHR RT; set r_rtx / r_hybrid1 / r_raygun / r_surfelGi 1 + vid_restart)\n" );
+				ri.Printf( PRINT_ALL, "[VK][RTX] chocolate path ready (GPU has KHR RT; set r_rtx / r_hybrid1 / r_raygun / r_surfelGi / r_rcgi 1 + vid_restart)\n" );
 			}
 		}
 #endif
@@ -1061,6 +1063,7 @@ void vk_init_vulkan_library( void )
 	INIT_DEVICE_FUNCTION(vkCmdBindVertexBuffers)
 	INIT_DEVICE_FUNCTION(vkCmdBlitImage)
 	INIT_DEVICE_FUNCTION(vkCmdClearAttachments)
+	INIT_DEVICE_FUNCTION(vkCmdFillBuffer)
 	INIT_DEVICE_FUNCTION(vkCmdCopyBuffer)
 	INIT_DEVICE_FUNCTION(vkCmdCopyBufferToImage)
 	INIT_DEVICE_FUNCTION(vkCmdCopyImage)
@@ -1239,6 +1242,7 @@ void vk_deinit_device_functions( void )
 	qvkCmdBindVertexBuffers = NULL;
 	qvkCmdBlitImage = NULL;
 	qvkCmdClearAttachments = NULL;
+	qvkCmdFillBuffer = NULL;
 	qvkCmdCopyBuffer = NULL;
 	qvkCmdCopyBufferToImage = NULL;
 	qvkCmdCopyImage = NULL;

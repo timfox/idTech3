@@ -15,7 +15,7 @@ This document is a **technical audit** of the current **Forward+ scaffolding** i
 | **Fragment / `gen_frag.tmpl`** (PBR) | Optional **debug heatmap** (`r_forwardPlusDebug`), optional **additive experimental shade** (`r_forwardPlusShade` → specialization **`forward_plus_shade_strength`**). Uses **`fp_params.fp_clip_from_world`** and SSBO light + tile data. |
 | **Uniform bridge / `tr_shade.c`** | When Forward+ is on, **`pbrForwardPlus.y`** carries **`floatBitsToUint(tess.dlightBits)`** so the fragment path can **skip** culled lights that the surface already received via the classic packed path (first **32** indices). |
 
-**Cvars** (see `tr_init.c`): `r_forwardPlus`, `r_forwardPlusMaxPerTile` (latched **4–8**), `r_forwardPlusDebug`, `r_forwardPlusShade` (pipeline invalidation on change in `vk_frame_submit.c`), `r_forwardPlusSpecularStrength` (default **0.65**), `r_forwardPlusEnergyRenorm` (default **0.45** — soft primary vs Forward+ mix), `r_forwardPlusLuminanceSort` (**0/1**, default **1** — tile overload picks brightest lights by RGB sum), `r_forwardPlusDistanceSort` (**0/1**, default **0** — nearest lights when overloaded), `r_forwardPlusDepthCull` (**0/1**, default **0** in code; **`modern_vulkan.cfg` sets 1** — post-opaque tile cull with 5 depth probes per tile).
+**Cvars** (see `tr_init.c`): `r_forwardPlus`, `r_forwardPlusMaxPerTile` (latched **4–8**), `r_forwardPlusDebug`, `r_forwardPlusShade` (pipeline invalidation on change in `vk_frame_submit.c`), `r_forwardPlusSpecularStrength` (default **0.65**), `r_forwardPlusEnergyRenorm` (default **0** — soft primary vs Forward+ mix; `modern_vulkan.cfg` keeps 0), `r_forwardPlusLuminanceSort` (**0/1**, default **1** — tile overload picks brightest lights by RGB sum), `r_forwardPlusDistanceSort` (**0/1**, default **0** — nearest lights when overloaded), `r_forwardPlusDepthCull` (**0/1**, default **0** in code; **`modern_vulkan.cfg` sets 1** — post-opaque tile cull with 5 depth probes per tile).
 
 ---
 
@@ -163,7 +163,7 @@ Linear array: **`total_tiles × MAX_PER_TILE`** **`uint32`** indices. Unused slo
 |------|-----------|------|
 | **Tile overload ordering** | Low–Medium (quality) | **`r_forwardPlusDistanceSort`** (nearest) or **`r_forwardPlusLuminanceSort`** (brightest, default when distance off) when a tile exceeds **`maxPerTile`**; else index order. |
 | **Depth cull probes** | Low–Medium (quality) | **`r_forwardPlusDepthCull` 1** rejects lights behind the **nearest** of 5 tile probes (corners+center). Still open: full light-volume vs Hi-Z. |
-| **Primary + Forward+ energy** | Medium (art) | Tunable via **`r_forwardPlusEnergyRenorm`** / **`r_forwardPlusSpecularStrength`** (defaults preserve prior 0.45 / 0.65 heuristics). |
+| **Primary + Forward+ energy** | Medium (art) | Tunable via **`r_forwardPlusEnergyRenorm`** / **`r_forwardPlusSpecularStrength`** (defaults **0** / **0.65**; mode-2 owns dynamics so renorm stays off). |
 | **Sphere screen approximation** | Low–Medium | Conservative enough for prototyping; not a tight spotlight frustum test. |
 | **`dlightBits` 32-bit** | Low | Matches **`MAX_DLIGHTS`** today; document if caps change. |
 | **Compute inside render pass** | Low (portability) | Valid now; revisit with subpass graphs or render graph. |

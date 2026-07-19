@@ -21,12 +21,14 @@ Split from vk.c.
 #include "vk_forward_plus.h"
 #include "vk_deferred_gbuffer.h"
 #include "vk_visibility_buffer.h"
+#include "vk_vrcs.h"
 #include "vk_rtx.h"
 #include "vk_grtx.h"
 #include "vk_pathtrace.h"
 #include "vk_hybrid1.h"
 #include "vk_raygun.h"
 #include "vk_surfel_gi.h"
+#include "vk_rcgi.h"
 #include "vk_dressi.h"
 #include "vk_vdb.h"
 #include "vk_pipeline_cache_disk.h"
@@ -62,6 +64,7 @@ void vk_shutdown( refShutdownCode_t code )
 	vk_hybrid1_shutdown();
 	vk_raygun_shutdown();
 	vk_surfel_gi_shutdown();
+	vk_rcgi_shutdown();
 	R_Dressi_Shutdown();
 	vk_destroy_framebuffers();
 
@@ -216,6 +219,7 @@ void vk_shutdown( refShutdownCode_t code )
 
 	VDB_Shutdown();
 	vk_forward_plus_shutdown();
+	vk_vrcs_shutdown();
 	vk_deferred_gbuffer_shutdown();
 	vk_visibility_buffer_shutdown();
 
@@ -435,6 +439,10 @@ for (i = 0; i < 2; i++) {
 	VK_DESTROY_SHADER_MODULE_FIELD( vk.modules.deferred_gbuffer_fill_cs );
 	VK_DESTROY_SHADER_MODULE_FIELD( vk.modules.deferred_gbuffer_debug_fs );
 	VK_DESTROY_SHADER_MODULE_FIELD( vk.modules.deferred_lighting_cs );
+	VK_DESTROY_SHADER_MODULE_FIELD( vk.modules.deferred_lighting_vrcs_cs );
+	VK_DESTROY_SHADER_MODULE_FIELD( vk.modules.vrcs_sri_cs );
+	VK_DESTROY_SHADER_MODULE_FIELD( vk.modules.vrcs_pack_cs );
+	VK_DESTROY_SHADER_MODULE_FIELD( vk.modules.vrcs_deblock_cs );
 	VK_DESTROY_SHADER_MODULE_FIELD( vk.modules.deferred_lighting_composite_fs );
 	VK_DESTROY_SHADER_MODULE_FIELD( vk.modules.visibility_buffer_fill_cs );
 	VK_DESTROY_SHADER_MODULE_FIELD( vk.modules.visibility_buffer_debug_fs );

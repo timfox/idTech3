@@ -22,7 +22,7 @@ This allows each surface category to use the shading method best suited to its v
 |--------|----------------|
 | GPU light preparation | Packs visible lights and builds screen-space light lists |
 | Opaque material capture | Records geometry, normals, material data, and optional classification |
-| Deferred lighting | Evaluates opaque world lighting in compute |
+| Deferred lighting | Evaluates opaque world lighting in compute (optional **VRCS** via `r_vrcs` — [VARIABLE_RATE_COMPUTE.md](VARIABLE_RATE_COMPUTE.md)) |
 | Forward+ shading | Handles transparent, blended, weapon, and isolated-view surfaces |
 | OIT integration | Resolves complex transparency over the opaque lighting result |
 | Visibility late shading | Optional exclusive consumer for deferred material data |

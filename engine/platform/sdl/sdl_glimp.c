@@ -375,6 +375,7 @@ static int GLW_SetMode( int mode, const char *modeFS, qboolean fullscreen )
 		SDL_SetNumberProperty( props, SDL_PROP_WINDOW_CREATE_WIDTH_NUMBER, config->vidWidth );
 		SDL_SetNumberProperty( props, SDL_PROP_WINDOW_CREATE_HEIGHT_NUMBER, config->vidHeight );
 		SDL_SetNumberProperty( props, SDL_PROP_WINDOW_CREATE_FLAGS_NUMBER, (Sint64)flags );
+		SDL_ClearError();
 		SDL_window = SDL_CreateWindowWithProperties( props );
 		SDL_DestroyProperties( props );
 
@@ -572,6 +573,14 @@ static rserr_t GLimp_StartDriverAndSetMode( int mode, const char *modeFS, qboole
 
 		Com_Printf( "SDL using driver \"%s\"\n", driverName );
 		Com_Printf( "SDL3 video initialized.\n" );
+
+		/* Must load Vulkan AFTER SDL_Init(VIDEO). Doing it earlier leaves a
+		 * stale error ("Video subsystem has not been initialized" /
+		 * "Invalid fullscreen display mode") that breaks mode selection. */
+		SDL_ClearError();
+		if ( !SDL_Vulkan_LoadLibrary( NULL ) )
+			Com_Printf( "[VK] SDL Vulkan load check: %s\n", SDL_GetError() );
+		Com_Printf( "[VK] SDL video driver: %s\n", driverName ? driverName : "(none)" );
 	}
 
 	err = GLW_SetMode( mode, modeFS, fullscreen );
@@ -611,11 +620,6 @@ void VKimp_Init( glconfig_t *config )
 #endif
 
 	Com_DPrintf( "VKimp_Init()\n" );
-
-	Com_Printf( "[VK] SDL video driver: %s\n", SDL_GetCurrentVideoDriver() ? SDL_GetCurrentVideoDriver() : "(none)" );
-	if ( !SDL_Vulkan_LoadLibrary( NULL ) )
-		Com_Printf( "[VK] SDL Vulkan load check: %s\n", SDL_GetError() );
-	/* else leave loaded for window creation and GetVkGetInstanceProcAddr */
 
 	in_nograb = Cvar_Get( "in_nograb", "0", CVAR_ARCHIVE );
 	Cvar_SetDescription( in_nograb, "Do not capture mouse in game, may be useful during online streaming." );

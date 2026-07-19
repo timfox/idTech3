@@ -42,6 +42,7 @@ extern PFN_vkCmdBindPipeline							qvkCmdBindPipeline;
 extern PFN_vkCmdBindVertexBuffers						qvkCmdBindVertexBuffers;
 extern PFN_vkCmdBlitImage								qvkCmdBlitImage;
 extern PFN_vkCmdClearAttachments						qvkCmdClearAttachments;
+extern PFN_vkCmdFillBuffer								qvkCmdFillBuffer;
 extern PFN_vkCmdCopyBuffer								qvkCmdCopyBuffer;
 extern PFN_vkCmdCopyBufferToImage						qvkCmdCopyBufferToImage;
 extern PFN_vkCmdCopyImage								qvkCmdCopyImage;
