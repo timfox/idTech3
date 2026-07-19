@@ -459,9 +459,10 @@ compile_shader("frag", "deferred_lighting_composite.frag", "deferred_lighting_co
 compile_shader("vert", "terrain/terrain.vert", "terrain_vs", binding_expr="vk.modules.terrain_vs")
 compile_shader("frag", "terrain/terrain.frag", "terrain_fs", binding_expr="vk.modules.terrain_fs")
 
-# KHR ray tracing demo shaders (SPIR-V also embedded in vk_rtx_demo_spirv.inc; recompile to refresh blobs)
+# Compile KHR ray tracing demo shaders (SPIR-V also embedded in vk_rtx_demo_spirv.inc; recompile to refresh blobs)
 compile_shader("rgen", "rtx_demo.rgen", "rtx_demo_rgen_spv", rtx_collect=True)
 compile_shader("rmiss", "rtx_demo.rmiss", "rtx_demo_rmiss_spv", rtx_collect=True)
+compile_shader("rmiss", "rtx_demo_shadow.rmiss", "rtx_demo_shadow_rmiss_spv", rtx_collect=True)
 compile_shader("rchit", "rtx_demo.rchit", "rtx_demo_rchit_spv", rtx_collect=True)
 
 compile_shader("rgen", "grtx/grtx_trace.rgen", "grtx_trace_rgen_spv", grtx_collect=True)
@@ -531,6 +532,7 @@ def write_vk_rtx_demo_spirv_inc():
     mapping = [
         ("rtx_demo_rgen_spv", "vk_rtx_demo_rgen_spv", "VK_RTX_DEMO_RGEN_SPV_SIZE"),
         ("rtx_demo_rmiss_spv", "vk_rtx_demo_rmiss_spv", "VK_RTX_DEMO_RMISS_SPV_SIZE"),
+        ("rtx_demo_shadow_rmiss_spv", "vk_rtx_demo_shadow_rmiss_spv", "VK_RTX_DEMO_SHADOW_RMISS_SPV_SIZE"),
         ("rtx_demo_rchit_spv", "vk_rtx_demo_rchit_spv", "VK_RTX_DEMO_RCHIT_SPV_SIZE"),
     ]
     lines = []

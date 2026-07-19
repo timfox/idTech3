@@ -32,6 +32,10 @@ typedef struct {
 	float outputSize[4];
 	/* x = r_rtxSamples; yzw reserved */
 	float traceParams[4];
+	/* xyz = world-space direction toward sun */
+	float sunDir[4];
+	/* x = world albedo prim count; y = world normal prim count */
+	float primCounts[4];
 } VkRtxFrameUBO_t;
 
 static void vk_rtx_get_trace_extent( uint32_t *w, uint32_t *h )
@@ -55,6 +59,7 @@ static struct {
 	uint32_t		scratch_alignment; /* minAccelerationStructureScratchOffsetAlignment */
 	VkShaderModule		rgen;
 	VkShaderModule		rmiss;
+	VkShaderModule		rmiss_shadow;
 	VkShaderModule		rchit;
 	VkDescriptorPool	pool;
 	VkDescriptorSetLayout	dsl;
@@ -1490,6 +1495,10 @@ void vk_rtx_shutdown( void )
 		qvkDestroyShaderModule( vk.device, rtx.rmiss, NULL );
 		rtx.rmiss = VK_NULL_HANDLE;
 	}
+	if ( rtx.rmiss_shadow != VK_NULL_HANDLE ) {
+		qvkDestroyShaderModule( vk.device, rtx.rmiss_shadow, NULL );
+		rtx.rmiss_shadow = VK_NULL_HANDLE;
+	}
 	if ( rtx.rchit != VK_NULL_HANDLE ) {
 		qvkDestroyShaderModule( vk.device, rtx.rchit, NULL );
 		rtx.rchit = VK_NULL_HANDLE;
@@ -1531,14 +1540,14 @@ void vk_rtx_init( void )
 	VkPhysicalDeviceRayTracingPipelinePropertiesKHR rtProps;
 	VkPhysicalDeviceAccelerationStructurePropertiesKHR asProps;
 	VkPhysicalDeviceProperties2 props2;
-	VkDescriptorSetLayoutBinding bindings[6];
+	VkDescriptorSetLayoutBinding bindings[8];
 	VkDescriptorSetLayoutCreateInfo dslci;
-	VkDescriptorPoolSize poolSizes[4];
+	VkDescriptorPoolSize poolSizes[5];
 	VkDescriptorPoolCreateInfo pci;
 	VkPipelineLayoutCreateInfo plci;
 	VkDescriptorSetAllocateInfo allocInfo;
-	VkPipelineShaderStageCreateInfo stages[3];
-	VkRayTracingShaderGroupCreateInfoKHR groups[3];
+	VkPipelineShaderStageCreateInfo stages[4];
+	VkRayTracingShaderGroupCreateInfoKHR groups[4];
 	VkRayTracingPipelineCreateInfoKHR rtpci;
 	VkWriteDescriptorSet writes[5];
 	VkDescriptorBufferInfo uboInfo;
@@ -1604,13 +1613,14 @@ void vk_rtx_init( void )
 
 	rtx.rgen = vk_rtx_shader_module( vk_rtx_demo_rgen_spv, VK_RTX_DEMO_RGEN_SPV_SIZE, "rtx_demo.rgen" );
 	rtx.rmiss = vk_rtx_shader_module( vk_rtx_demo_rmiss_spv, VK_RTX_DEMO_RMISS_SPV_SIZE, "rtx_demo.rmiss" );
+	rtx.rmiss_shadow = vk_rtx_shader_module( vk_rtx_demo_shadow_rmiss_spv, VK_RTX_DEMO_SHADOW_RMISS_SPV_SIZE, "rtx_demo_shadow.rmiss" );
 	rtx.rchit = vk_rtx_shader_module( vk_rtx_demo_rchit_spv, VK_RTX_DEMO_RCHIT_SPV_SIZE, "rtx_demo.rchit" );
 
 	Com_Memset( bindings, 0, sizeof( bindings ) );
 	bindings[0].binding = 0;
 	bindings[0].descriptorType = VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR;
 	bindings[0].descriptorCount = 1;
-	bindings[0].stageFlags = VK_SHADER_STAGE_RAYGEN_BIT_KHR;
+	bindings[0].stageFlags = VK_SHADER_STAGE_RAYGEN_BIT_KHR | VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR;
 	bindings[1].binding = 1;
 	bindings[1].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
 	bindings[1].descriptorCount = 1;
@@ -1631,10 +1641,18 @@ void vk_rtx_init( void )
 	bindings[5].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
 	bindings[5].descriptorCount = 1;
 	bindings[5].stageFlags = VK_SHADER_STAGE_RAYGEN_BIT_KHR;
+	bindings[6].binding = 6;
+	bindings[6].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+	bindings[6].descriptorCount = 1;
+	bindings[6].stageFlags = VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR;
+	bindings[7].binding = 7;
+	bindings[7].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+	bindings[7].descriptorCount = 1;
+	bindings[7].stageFlags = VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR;
 
 	Com_Memset( &dslci, 0, sizeof( dslci ) );
 	dslci.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-	dslci.bindingCount = 6;
+	dslci.bindingCount = 8;
 	dslci.pBindings = bindings;
 	VK_CHECK( qvkCreateDescriptorSetLayout( vk.device, &dslci, NULL, &rtx.dsl ) );
 
@@ -1646,10 +1664,12 @@ void vk_rtx_init( void )
 	poolSizes[2].descriptorCount = 1;
 	poolSizes[3].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
 	poolSizes[3].descriptorCount = 3;
+	poolSizes[4].type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+	poolSizes[4].descriptorCount = 2;
 	Com_Memset( &pci, 0, sizeof( pci ) );
 	pci.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
 	pci.maxSets = 1;
-	pci.poolSizeCount = 4;
+	pci.poolSizeCount = 5;
 	pci.pPoolSizes = poolSizes;
 	VK_CHECK( qvkCreateDescriptorPool( vk.device, &pci, NULL, &rtx.pool ) );
 
@@ -1719,6 +1739,8 @@ void vk_rtx_init( void )
 	vk_fsa_write_rtx_importance_descriptor( rtx.descriptor_set );
 
 	vk_rtx_rebuild_world_blas();
+	vk_rtx_bind_world_albedo_ssbo( rtx.descriptor_set, 6 );
+	vk_rtx_bind_world_normal_ssbo( rtx.descriptor_set, 7 );
 
 	Com_Memset( stages, 0, sizeof( stages ) );
 	stages[0].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
@@ -1730,9 +1752,13 @@ void vk_rtx_init( void )
 	stages[1].module = rtx.rmiss;
 	stages[1].pName = "main";
 	stages[2].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-	stages[2].stage = VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR;
-	stages[2].module = rtx.rchit;
+	stages[2].stage = VK_SHADER_STAGE_MISS_BIT_KHR;
+	stages[2].module = rtx.rmiss_shadow;
 	stages[2].pName = "main";
+	stages[3].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+	stages[3].stage = VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR;
+	stages[3].module = rtx.rchit;
+	stages[3].pName = "main";
 
 	Com_Memset( groups, 0, sizeof( groups ) );
 	groups[0].sType = VK_STRUCTURE_TYPE_RAY_TRACING_SHADER_GROUP_CREATE_INFO_KHR;
@@ -1750,19 +1776,26 @@ void vk_rtx_init( void )
 	groups[1].intersectionShader = VK_SHADER_UNUSED_KHR;
 
 	groups[2].sType = VK_STRUCTURE_TYPE_RAY_TRACING_SHADER_GROUP_CREATE_INFO_KHR;
-	groups[2].type = VK_RAY_TRACING_SHADER_GROUP_TYPE_TRIANGLES_HIT_GROUP_KHR;
-	groups[2].generalShader = VK_SHADER_UNUSED_KHR;
-	groups[2].closestHitShader = 2;
+	groups[2].type = VK_RAY_TRACING_SHADER_GROUP_TYPE_GENERAL_KHR;
+	groups[2].generalShader = 2;
+	groups[2].closestHitShader = VK_SHADER_UNUSED_KHR;
 	groups[2].anyHitShader = VK_SHADER_UNUSED_KHR;
 	groups[2].intersectionShader = VK_SHADER_UNUSED_KHR;
 
+	groups[3].sType = VK_STRUCTURE_TYPE_RAY_TRACING_SHADER_GROUP_CREATE_INFO_KHR;
+	groups[3].type = VK_RAY_TRACING_SHADER_GROUP_TYPE_TRIANGLES_HIT_GROUP_KHR;
+	groups[3].generalShader = VK_SHADER_UNUSED_KHR;
+	groups[3].closestHitShader = 3;
+	groups[3].anyHitShader = VK_SHADER_UNUSED_KHR;
+	groups[3].intersectionShader = VK_SHADER_UNUSED_KHR;
+
 	Com_Memset( &rtpci, 0, sizeof( rtpci ) );
 	rtpci.sType = VK_STRUCTURE_TYPE_RAY_TRACING_PIPELINE_CREATE_INFO_KHR;
-	rtpci.stageCount = 3;
+	rtpci.stageCount = 4;
 	rtpci.pStages = stages;
-	rtpci.groupCount = 3;
+	rtpci.groupCount = 4;
 	rtpci.pGroups = groups;
-	rtpci.maxPipelineRayRecursionDepth = 1;
+	rtpci.maxPipelineRayRecursionDepth = 2;
 	rtpci.layout = rtx.pl;
 	pipeRes = qvkCreateRayTracingPipelinesKHR( vk.device, VK_NULL_HANDLE, vk.pipelineCache, 1, &rtpci, NULL, &rtx.pipeline );
 	if ( pipeRes != VK_SUCCESS ) {
@@ -1772,7 +1805,7 @@ void vk_rtx_init( void )
 	}
 	SET_OBJECT_NAME( rtx.pipeline, "rtx_demo_pipeline", VK_DEBUG_REPORT_OBJECT_TYPE_PIPELINE_EXT );
 
-	hbufSize = (size_t)rtx.shader_group_base_alignment * 3u;
+	hbufSize = (size_t)rtx.shader_group_base_alignment * 4u;
 	sbtSize = (VkDeviceSize)hbufSize;
 	vk_rtx_alloc_buffer( sbtSize,
 		VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_SHADER_BINDING_TABLE_BIT_KHR | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
@@ -1781,12 +1814,12 @@ void vk_rtx_init( void )
 	VK_CHECK( qvkMapMemory( vk.device, rtx.sbt_memory, 0, sbtSize, 0, (void **)&sbtHost ) );
 	Com_Memset( sbtHost, 0, hbufSize );
 	{
-		uint8_t packedHandles[96];
-		if ( rtx.handle_size * 3u > sizeof( packedHandles ) ) {
+		uint8_t packedHandles[128];
+		if ( rtx.handle_size * 4u > sizeof( packedHandles ) ) {
 			ri.Error( ERR_FATAL, "[VK][RTX] shader group handle size overflow" );
 		}
-		VK_CHECK( qvkGetRayTracingShaderGroupHandlesKHR( vk.device, rtx.pipeline, 0, 3, rtx.handle_size * 3u, packedHandles ) );
-		for ( gi = 0; gi < 3; gi++ ) {
+		VK_CHECK( qvkGetRayTracingShaderGroupHandlesKHR( vk.device, rtx.pipeline, 0, 4, rtx.handle_size * 4u, packedHandles ) );
+		for ( gi = 0; gi < 4; gi++ ) {
 			Com_Memcpy( sbtHost + (size_t)rtx.shader_group_base_alignment * (size_t)gi,
 				packedHandles + (size_t)rtx.handle_size * (size_t)gi,
 				rtx.handle_size );
@@ -1819,6 +1852,8 @@ void vk_rtx_frame_begin( void )
 	/* Rebuild world BLAS at frame start (queue idle, no open frame CB). Mid-pass
 	 * destroy+rebuild of TLAS/BLAS while recording caused NVIDIA DEVICE_LOST. */
 	vk_rtx_rebuild_world_blas();
+	vk_rtx_bind_world_albedo_ssbo( rtx.descriptor_set, 6 );
+	vk_rtx_bind_world_normal_ssbo( rtx.descriptor_set, 7 );
 
 	vk_rtx_get_trace_extent( &w, &h );
 	if ( w == rtx.width && h == rtx.height ) {
@@ -1916,6 +1951,14 @@ void vk_rtx_record_demo_pass( VkCommandBuffer cmd )
 		if ( frameUbo.traceParams[0] > 8.0f ) {
 			frameUbo.traceParams[0] = 8.0f;
 		}
+		frameUbo.sunDir[0] = tr.sunDirection[0];
+		frameUbo.sunDir[1] = tr.sunDirection[1];
+		frameUbo.sunDir[2] = tr.sunDirection[2];
+		frameUbo.sunDir[3] = 0.0f;
+		frameUbo.primCounts[0] = (float)rtx.world_albedo_count;
+		frameUbo.primCounts[1] = (float)rtx.world_normal_count;
+		frameUbo.primCounts[2] = 0.0f;
+		frameUbo.primCounts[3] = 0.0f;
 		vk_fsa_patch_rtx_trace_params( frameUbo.traceParams, (uint32_t)tr.frameCount );
 		Com_Memcpy( rtx.rtx_ubo_ptr, &frameUbo, sizeof( frameUbo ) );
 	}
@@ -1954,8 +1997,8 @@ void vk_rtx_record_demo_pass( VkCommandBuffer cmd )
 	raygenRegion.size = rtx.shader_group_base_alignment;
 	missRegion.deviceAddress = sbtBase + rtx.shader_group_base_alignment;
 	missRegion.stride = rtx.shader_group_base_alignment;
-	missRegion.size = rtx.shader_group_base_alignment;
-	hitRegion.deviceAddress = sbtBase + 2u * rtx.shader_group_base_alignment;
+	missRegion.size = 2u * rtx.shader_group_base_alignment; /* sky + shadow */
+	hitRegion.deviceAddress = sbtBase + 3u * rtx.shader_group_base_alignment;
 	hitRegion.stride = rtx.shader_group_base_alignment;
 	hitRegion.size = rtx.shader_group_base_alignment;
 

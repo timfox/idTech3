@@ -274,6 +274,96 @@ static void create_color_attachment(
 #endif
 }
 
+/*
+ * Soft-fail CreateImage for experimental G-buffer / visibility scaffolds.
+ * On failure leaves *image as VK_NULL_HANDLE and does not enqueue attachment memory.
+ */
+static qboolean create_color_attachment_soft(
+	uint32_t width, uint32_t height,
+	VkSampleCountFlagBits samples, VkFormat format,
+	VkImageUsageFlags usage, VkImage *image,
+	VkImageView *image_view, VkImageLayout image_layout,
+	qboolean multisample, VkImageCreateFlags flags )
+{
+	VkImageCreateInfo create_desc;
+	VkMemoryRequirements memory_requirements;
+	VkResult res;
+
+	*image = VK_NULL_HANDLE;
+	if ( multisample && !( usage & VK_IMAGE_USAGE_SAMPLED_BIT ) )
+		usage |= VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT;
+
+	create_desc.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+	create_desc.pNext = NULL;
+	create_desc.flags = flags;
+	create_desc.imageType = VK_IMAGE_TYPE_2D;
+	create_desc.format = format;
+	create_desc.extent.width = width;
+	create_desc.extent.height = height;
+	create_desc.extent.depth = 1;
+	create_desc.mipLevels = 1;
+	create_desc.arrayLayers = ( flags & VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT ) ? 6 : 1;
+	create_desc.samples = samples;
+	create_desc.tiling = VK_IMAGE_TILING_OPTIMAL;
+	create_desc.usage = usage;
+	create_desc.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+	create_desc.queueFamilyIndexCount = 0;
+	create_desc.pQueueFamilyIndices = NULL;
+	create_desc.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+	res = qvkCreateImage( vk.device, &create_desc, NULL, image );
+	if ( res != VK_SUCCESS ) {
+		ri.Printf( PRINT_WARNING, S_COLOR_YELLOW
+			"[VK][deferred] CreateImage soft-fail (%ux%u fmt=%d): %s\n" S_COLOR_WHITE,
+			width, height, (int)format, vk_result_string( res ) );
+		*image = VK_NULL_HANDLE;
+		return qfalse;
+	}
+
+	vk_get_image_memory_erquirements( *image, &memory_requirements );
+
+#ifdef USE_VK_PBR
+	{
+		VkImageViewType view_type = VK_IMAGE_VIEW_TYPE_2D;
+		if ( flags & VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT )
+			view_type = VK_IMAGE_VIEW_TYPE_CUBE;
+		vk_add_attachment_desc( *image, image_view, usage, &memory_requirements, format, VK_IMAGE_ASPECT_COLOR_BIT, image_layout, view_type );
+	}
+#else
+	vk_add_attachment_desc( *image, image_view, usage, &memory_requirements, format, VK_IMAGE_ASPECT_COLOR_BIT, image_layout );
+#endif
+	return qtrue;
+}
+
+static void vk_create_fullres_color_attachment(
+	VkFormat format,
+	VkImageUsageFlags usage,
+	VkImage *image,
+	VkImageView *image_view,
+	VkImageLayout image_layout,
+	qboolean allowTransient )
+{
+	uint32_t width = 0;
+	uint32_t height = 0;
+
+	vk_get_active_render_extent( &width, &height );
+	create_color_attachment( width, height, VK_SAMPLE_COUNT_1_BIT, format, usage, image, image_view, image_layout, allowTransient, 0 );
+}
+
+static qboolean vk_create_fullres_color_attachment_soft(
+	VkFormat format,
+	VkImageUsageFlags usage,
+	VkImage *image,
+	VkImageView *image_view,
+	VkImageLayout image_layout,
+	qboolean allowTransient )
+{
+	uint32_t width = 0;
+	uint32_t height = 0;
+
+	vk_get_active_render_extent( &width, &height );
+	return create_color_attachment_soft( width, height, VK_SAMPLE_COUNT_1_BIT, format, usage,
+		image, image_view, image_layout, allowTransient, 0 );
+}
 
 static void create_depth_attachment( uint32_t width, uint32_t height, VkSampleCountFlagBits samples, VkImage *image, VkImageView *image_view, qboolean allowTransient )
 {
@@ -282,7 +372,7 @@ static void create_depth_attachment( uint32_t width, uint32_t height, VkSampleCo
 	VkImageAspectFlags image_aspect_flags;
 	const qboolean sampledDepth = qtrue;
 
-	// create depth image
+	/* create depth image */
 	create_desc.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
 	create_desc.pNext = NULL;
 	create_desc.flags = 0;
@@ -320,21 +410,6 @@ static void create_depth_attachment( uint32_t width, uint32_t height, VkSampleCo
 #else
 	vk_add_attachment_desc( *image, image_view, create_desc.usage, &memory_requirements, vk.depth_format, image_aspect_flags, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL );
 #endif
-}
-
-static void vk_create_fullres_color_attachment(
-	VkFormat format,
-	VkImageUsageFlags usage,
-	VkImage *image,
-	VkImageView *image_view,
-	VkImageLayout image_layout,
-	qboolean allowTransient )
-{
-	uint32_t width = 0;
-	uint32_t height = 0;
-
-	vk_get_active_render_extent( &width, &height );
-	create_color_attachment( width, height, VK_SAMPLE_COUNT_1_BIT, format, usage, image, image_view, image_layout, allowTransient, 0 );
 }
 
 /*
@@ -387,26 +462,30 @@ static void vk_create_deferred_gbuffer_scaffold( void )
 		return;
 	}
 
-	vk_create_fullres_color_attachment( vk.color_format, gbufUsage | VK_IMAGE_USAGE_TRANSFER_DST_BIT,
-		&vk.deferred_gbuffer_albedo, &vk.deferred_gbuffer_albedo_view,
-		VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, qfalse );
-	vk_create_fullres_color_attachment( VK_FORMAT_R16G16B16A16_SFLOAT,
-		gbufUsage | VK_IMAGE_USAGE_STORAGE_BIT,
-		&vk.deferred_gbuffer_normal, &vk.deferred_gbuffer_normal_view,
-		VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, qfalse );
-	vk_create_fullres_color_attachment( VK_FORMAT_R16G16B16A16_SFLOAT,
-		gbufUsage | VK_IMAGE_USAGE_STORAGE_BIT,
-		&vk.deferred_gbuffer_material, &vk.deferred_gbuffer_material_view,
-		VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, qfalse );
-	vk_create_fullres_color_attachment( VK_FORMAT_R16G16B16A16_SFLOAT,
-		gbufUsage | VK_IMAGE_USAGE_STORAGE_BIT,
-		&vk.deferred_lighting_image, &vk.deferred_lighting_view,
-		VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, qfalse );
-	/* Stub class map for deferred lighting binding 7 when visibility classify is off. */
-	create_color_attachment( 1, 1, VK_SAMPLE_COUNT_1_BIT, VK_FORMAT_R8_UINT,
-		VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT,
-		&vk.deferred_class_stub, &vk.deferred_class_stub_view,
-		VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, qfalse, 0 );
+	if ( !vk_create_fullres_color_attachment_soft( vk.color_format, gbufUsage | VK_IMAGE_USAGE_TRANSFER_DST_BIT,
+			&vk.deferred_gbuffer_albedo, &vk.deferred_gbuffer_albedo_view,
+			VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, qfalse ) ||
+		!vk_create_fullres_color_attachment_soft( VK_FORMAT_R16G16B16A16_SFLOAT,
+			gbufUsage | VK_IMAGE_USAGE_STORAGE_BIT,
+			&vk.deferred_gbuffer_normal, &vk.deferred_gbuffer_normal_view,
+			VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, qfalse ) ||
+		!vk_create_fullres_color_attachment_soft( VK_FORMAT_R16G16B16A16_SFLOAT,
+			gbufUsage | VK_IMAGE_USAGE_STORAGE_BIT,
+			&vk.deferred_gbuffer_material, &vk.deferred_gbuffer_material_view,
+			VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, qfalse ) ||
+		!vk_create_fullres_color_attachment_soft( VK_FORMAT_R16G16B16A16_SFLOAT,
+			gbufUsage | VK_IMAGE_USAGE_STORAGE_BIT,
+			&vk.deferred_lighting_image, &vk.deferred_lighting_view,
+			VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, qfalse ) ||
+		!create_color_attachment_soft( 1, 1, VK_SAMPLE_COUNT_1_BIT, VK_FORMAT_R8_UINT,
+			VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT,
+			&vk.deferred_class_stub, &vk.deferred_class_stub_view,
+			VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, qfalse, 0 ) ) {
+		vk_deferred_gbuffer_set_fallback( "gbuffer_image_create_failed" );
+		vk.deferredGbufferAllocated = qfalse;
+		vk.deferredGbufferDirectExport = qfalse;
+		return;
+	}
 
 	/* Image views are created later in vk_alloc_attachments() — only probe images here.
 	 * Final success/soft-fallback runs in vk_finalize_deferred_gbuffer_scaffold(). */
@@ -428,13 +507,24 @@ static void vk_create_deferred_gbuffer_scaffold( void )
 	if ( vk.deferredGbufferDirectExport && vk.visibility_buffer_ids == VK_NULL_HANDLE ) {
 		VkImageUsageFlags visUsage =
 			VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
-		vk_create_fullres_color_attachment( VK_FORMAT_R32G32_UINT, visUsage,
-			&vk.visibility_buffer_ids, &vk.visibility_buffer_ids_view,
-			VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, qfalse );
-		vk_create_fullres_color_attachment( VK_FORMAT_R16G16_UNORM, visUsage,
-			&vk.visibility_buffer_bary, &vk.visibility_buffer_bary_view,
-			VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, qfalse );
-		vk.visibilityBufferDirectExport = qtrue;
+		if ( !vk_create_fullres_color_attachment_soft( VK_FORMAT_R32G32_UINT, visUsage,
+				&vk.visibility_buffer_ids, &vk.visibility_buffer_ids_view,
+				VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, qfalse ) ||
+			!vk_create_fullres_color_attachment_soft( VK_FORMAT_R16G16_UNORM, visUsage,
+				&vk.visibility_buffer_bary, &vk.visibility_buffer_bary_view,
+				VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, qfalse ) ) {
+			/* Keep G-buffer; drop PrimID MRT companions and fall back to depth export. */
+			vk.visibility_buffer_ids = VK_NULL_HANDLE;
+			vk.visibility_buffer_ids_view = VK_NULL_HANDLE;
+			vk.visibility_buffer_bary = VK_NULL_HANDLE;
+			vk.visibility_buffer_bary_view = VK_NULL_HANDLE;
+			vk.visibilityBufferDirectExport = qfalse;
+			vk.deferredGbufferDirectExport = qfalse;
+			ri.Printf( PRINT_WARNING, S_COLOR_YELLOW
+				"[VK][deferred] PrimID MRT soft-fail — using depth-fallback G-buffer export\n" S_COLOR_WHITE );
+		} else {
+			vk.visibilityBufferDirectExport = qtrue;
+		}
 	}
 	ri.Printf( PRINT_ALL,
 		"[VK][deferred] G-buffer scaffold: albedo (scene color format) + normal RGBA16F + material RGBA16F + motion sidecar + lighting RGBA16F + class stub%s%s\n",

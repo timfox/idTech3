@@ -12,6 +12,8 @@ layout(set = 0, binding = 2, std140) uniform RtxFrame {
 	vec4 zNearFar;     /* x=zNear, y=zFar */
 	vec4 outputSize;   /* xy = width,height; z = r_rtx mode; w = r_rtxComposite blend */
 	vec4 traceParams;  /* x = r_rtxSamples */
+	vec4 sunDir;       /* xyz toward sun (matches closest-hit) */
+	vec4 primCounts;   /* unused in rgen; kept for UBO parity */
 } rtx;
 
 layout(set = 0, binding = 3) uniform sampler2D depthTex;

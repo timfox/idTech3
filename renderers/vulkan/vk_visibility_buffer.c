@@ -825,8 +825,12 @@ static void vk_visbuf_create_debug_gfx_pipeline( void )
 	VkDescriptorPoolCreateInfo pool_ci;
 	VkDescriptorSetAllocateInfo alloc;
 	int i;
+	VkResult res;
 
 	if ( vk.visibility_buffer.debug_gfx_ready ) {
+		return;
+	}
+	if ( vk.visibility_buffer.debug_create_failed ) {
 		return;
 	}
 	if ( vk.modules.visibility_buffer_debug_fs == VK_NULL_HANDLE || vk.modules.gamma_vs == VK_NULL_HANDLE ) {

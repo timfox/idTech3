@@ -40,6 +40,8 @@ grep -q 'deferredGbufferGeneration' "$VK_H" || fail "deferredGbufferGeneration m
 grep -q 'deferredGbufferExtentW' "$VK_H" || fail "deferredGbufferExtentW missing"
 grep -q 'deferredGbufferFallbackReason' "$VK_H" || fail "fallback reason missing"
 grep -q 'deferredGbufferGeneration++' "$ATT" || fail "scaffold finalize must bump generation"
+grep -q 'create_color_attachment_soft' "$ATT" || fail "G-buffer scaffold must soft-fail CreateImage"
+grep -q 'vk_create_fullres_color_attachment_soft' "$ATT" || fail "fullres soft CreateImage helper missing"
 pass "generation tracking in vk state + scaffold"
 
 # Presentation teardown order
