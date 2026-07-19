@@ -1,0 +1,93 @@
+#version 460
+#extension GL_EXT_ray_query : require
+#extension GL_GOOGLE_include_directive : require
+layout(local_size_x = 8, local_size_y = 8) in;
+
+#include "av_common.glsl"
+
+layout(set = 0, binding = 0) uniform accelerationStructureEXT topLevelAS;
+layout(set = 0, binding = 1) uniform sampler2D depthTex;
+layout(set = 0, binding = 2) uniform sampler2D normalTex;
+layout(rgba16f, set = 0, binding = 3) uniform writeonly image2D avOut;
+layout(rgba16f, set = 0, binding = 4) uniform writeonly image2D auxOut;
+
+layout(push_constant) uniform RTAOPush {
+	uvec4 extentFrame;       /* xy trace extent, z frame/view, w normalsAreWorld */
+	vec4 projInfo;
+	mat4 invView;
+	vec4 params0;            /* environmental radius, contact radius, ray bias, normal bias */
+	uvec4 params1;           /* rays, fixed seed, reference, alpha policy */
+} pc;
+
+void main() {
+	uvec2 pix = gl_GlobalInvocationID.xy;
+	if (any(greaterThanEqual(pix, pc.extentFrame.xy))) return;
+	ivec2 ip = ivec2(pix);
+	vec2 uv = (vec2(pix) + 0.5) / vec2(pc.extentFrame.xy);
+	float depth = textureLod(depthTex, uv, 0.0).r;
+	vec3 sampledN = textureLod(normalTex, uv, 0.0).xyz;
+	vec3 worldN = av_world_normal(sampledN, pc.extentFrame.w, pc.invView);
+	if (!av_valid_depth(depth)) {
+		imageStore(avOut, ip, vec4(1.0, av_oct_encode(worldN), 1.0));
+		imageStore(auxOut, ip, vec4(1.0, 0.0, 1.0, 0.0));
+		return;
+	}
+
+	vec3 viewPos = av_view_position(uv, depth, pc.projInfo);
+	vec3 worldPos = (pc.invView * vec4(viewPos, 1.0)).xyz;
+	float radius = max(pc.params0.x, 0.01);
+	float contactRadius = clamp(pc.params0.y, 0.001, radius);
+	uint rays = clamp(pc.params1.x, 1u, 256u);
+	uint frameSeed = pc.params1.y != 0u ? pc.params1.y : pc.extentFrame.z;
+	uint scramble = av_hash(pix.x + pix.y * pc.extentFrame.x + frameSeed * 0x9e3779b9u);
+	vec3 origin = worldPos + worldN * max(pc.params0.w, 0.0);
+	float tMin = max(pc.params0.z, 0.0001);
+	float visibleSum = 0.0;
+	float visibleSq = 0.0;
+	vec3 bentSum = vec3(0.0);
+	float hitDistanceSum = 0.0;
+	float hitWeight = 0.0;
+	float hitCount = 0.0;
+
+	for (uint i = 0u; i < 256u; ++i) {
+		if (i >= rays) break;
+		vec2 xi = av_sample_2d(i, scramble ^ (i * 0x85ebca6bu));
+		vec3 dir = av_cosine_hemisphere(xi, worldN);
+		rayQueryEXT query;
+		/* Stable default: ordinary blended geometry is absent from the TLAS; geometry
+		 * represented in Hybrid1 is treated opaque. Alpha candidate confirmation is
+		 * enabled only once the shared bindless opacity metadata is available. */
+		rayQueryInitializeEXT(query, topLevelAS,
+			gl_RayFlagsTerminateOnFirstHitEXT | gl_RayFlagsOpaqueEXT,
+			0xFF, origin, tMin, dir, radius);
+		while (rayQueryProceedEXT(query)) { }
+		bool hit = rayQueryGetIntersectionTypeEXT(query, true) ==
+			gl_RayQueryCommittedIntersectionTriangleEXT;
+		float t = hit ? rayQueryGetIntersectionTEXT(query, true) : radius;
+		float environmental = hit ? av_finite_radius_visibility(t, radius) : 1.0;
+		float contact = (hit && t < contactRadius) ? av_finite_radius_visibility(t, contactRadius) : 1.0;
+		/* Visibility-band composition: contact may tighten environmental visibility,
+		 * but is never added/multiplied as a second darkening layer. */
+		float sampleVisibility = mix(environmental, min(environmental, contact), 0.65);
+		visibleSum += sampleVisibility;
+		visibleSq += sampleVisibility * sampleVisibility;
+		bentSum += dir * max(sampleVisibility, 0.001);
+		if (hit) {
+			hitDistanceSum += t;
+			hitWeight += 1.0;
+			hitCount += 1.0;
+		}
+	}
+
+	float invRays = 1.0 / float(rays);
+	float visibility = clamp(visibleSum * invRays, 0.0, 1.0);
+	float variance = max(visibleSq * invRays - visibility * visibility, 0.0);
+	vec3 bent = av_safe_normalize(bentSum, worldN);
+	float directionalConcentration = clamp(length(bentSum) / max(visibleSum, 1e-4), 0.0, 1.0);
+	float cone = 1.0 - (1.0 - visibility) * directionalConcentration;
+	float avgHitNorm = hitWeight > 0.0 ? (hitDistanceSum / hitWeight) / radius : 1.0;
+	float sampleConfidence = 1.0 - exp2(-float(rays) * 0.5);
+	imageStore(avOut, ip, vec4(visibility, av_oct_encode(bent), clamp(cone, 0.0, 1.0)));
+	imageStore(auxOut, ip, vec4(clamp(avgHitNorm, 0.0, 1.0), variance,
+		sampleConfidence, hitCount * invRays));
+}

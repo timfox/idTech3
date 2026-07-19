@@ -1,0 +1,72 @@
+#version 460
+#extension GL_GOOGLE_include_directive : require
+layout(local_size_x = 8, local_size_y = 8) in;
+
+#include "av_common.glsl"
+
+layout(set = 0, binding = 0) uniform sampler2D finalAV;
+layout(set = 0, binding = 1) uniform sampler2D finalAux;
+layout(set = 0, binding = 2) uniform sampler2D rawGTAO;
+layout(set = 0, binding = 3) uniform sampler2D referenceAV;
+layout(set = 0, binding = 4) uniform sampler2D referenceAux;
+layout(set = 0, binding = 5) uniform usampler2D classTex;
+layout(rgba16f, set = 0, binding = 6) uniform image2D colorOut;
+layout(set = 0, binding = 7) uniform sampler2D depthTex;
+
+layout(push_constant) uniform CompositePush {
+	uvec4 extentMode;        /* xy full extent, z debug, w referenceValid */
+	vec4 params;             /* apply strength, mode, traced mask, unused */
+} pc;
+
+vec3 heat(float e) {
+	return clamp(vec3(1.5 * e, 1.5 - abs(e * 3.0 - 1.5), 1.5 * (1.0 - e)), 0.0, 1.0);
+}
+
+void main() {
+	uvec2 pix = gl_GlobalInvocationID.xy;
+	if (any(greaterThanEqual(pix, pc.extentMode.xy))) return;
+	ivec2 ip = ivec2(pix);
+	vec2 uv = (vec2(pix) + 0.5) / vec2(pc.extentMode.xy);
+	vec4 av = textureLod(finalAV, uv, 0.0);
+	vec4 aux = textureLod(finalAux, uv, 0.0);
+	vec4 gtao = textureLod(rawGTAO, uv, 0.0);
+	vec4 ref = textureLod(referenceAV, uv, 0.0);
+	vec4 refAux = textureLod(referenceAux, uv, 0.0);
+	vec4 scene = imageLoad(colorOut, ip);
+	uint cls = texelFetch(classTex, ip, 0).r;
+	uint debugMode = pc.extentMode.z;
+	vec3 outRgb = scene.rgb;
+
+	if (debugMode == 1u) outRgb = vec3(gtao.r);
+	else if (debugMode == 2u) outRgb = vec3(av.r);
+	else if (debugMode == 3u) outRgb = vec3(av.r);
+	else if (debugMode == 4u) outRgb = av_oct_decode(av.gb) * 0.5 + 0.5;
+	else if (debugMode == 5u) outRgb = vec3(av.a);
+	else if (debugMode == 6u) outRgb = vec3(aux.r);
+	else if (debugMode == 7u) outRgb = heat(clamp(sqrt(max(aux.y, 0.0)) * 4.0, 0.0, 1.0));
+	else if (debugMode == 8u || debugMode == 9u) outRgb = vec3(aux.z);
+	else if (debugMode == 10u) outRgb = heat(clamp(aux.a * 4.0, 0.0, 1.0));
+	else if (debugMode == 11u) outRgb = vec3(aux.a > 0.001 ? 0.0 : 1.0, aux.a > 0.001 ? 1.0 : 0.0, 0.0);
+	else if (debugMode == 12u) outRgb = vec3(pc.params.z);
+	else if (debugMode == 13u) outRgb = vec3(aux.z, 0.25, 1.0 - aux.z);
+	else if (debugMode == 14u) outRgb = heat(abs(gtao.r - av.r));
+	else if (debugMode == 15u && pc.extentMode.w != 0u) outRgb = heat(abs(av.r - ref.r));
+	else if (debugMode == 16u && pc.extentMode.w != 0u) {
+		float a = acos(clamp(dot(av_oct_decode(av.gb), av_oct_decode(ref.gb)), -1.0, 1.0)) / AV_PI;
+		outRgb = heat(a);
+	} else if (debugMode == 17u) {
+		/* Visibility-cone specular fallback proxy; explicit traced reflections do not use it. */
+		float so = clamp(pow(av.r, mix(1.0, 0.25, av.a)), 0.0, 1.0);
+		outRgb = vec3(so);
+	} else if (debugMode == 20u) {
+		outRgb = vec3(1.0 - gtao.a, gtao.a, 0.0);
+	} else if (debugMode == 0u) {
+		/* CLASS_TRANSMISSION=3 and CLASS_EMISSIVE=4 are intentionally untouched.
+		 * Dynamic deferred lights are added after this pass. */
+		if (cls != 3u && cls != 4u && av_valid_depth(textureLod(depthTex, uv, 0.0).r)) {
+			float visibility = mix(1.0, clamp(av.r, 0.0, 1.0), clamp(pc.params.x, 0.0, 1.0));
+			outRgb *= visibility;
+		}
+	}
+	imageStore(colorOut, ip, vec4(outRgb, scene.a));
+}

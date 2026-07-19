@@ -1,0 +1,111 @@
+#version 460
+#extension GL_GOOGLE_include_directive : require
+layout(local_size_x = 8, local_size_y = 8) in;
+
+#include "av_common.glsl"
+
+layout(set = 0, binding = 0) uniform sampler2D depthTex;
+layout(set = 0, binding = 1) uniform sampler2D normalTex;
+layout(rgba16f, set = 0, binding = 2) uniform writeonly image2D avOut;
+layout(rgba16f, set = 0, binding = 3) uniform writeonly image2D auxOut;
+
+layout(push_constant) uniform GTAOPush {
+	uvec4 extentFrame;       /* xy trace extent, z frame/view scramble, w normalsAreWorld */
+	vec4 projInfo;
+	mat4 invView;
+	vec4 params0;            /* radius, thickness, falloffStart, edgeFadePixels */
+	vec4 params1;            /* slices, steps, temporal-enabled, unused */
+} pc;
+
+void store_open(ivec2 pix, vec3 n) {
+	imageStore(avOut, pix, vec4(1.0, av_oct_encode(n), 1.0));
+	imageStore(auxOut, pix, vec4(1.0, 0.0, 1.0, 0.0));
+}
+
+void main() {
+	uvec2 pix = gl_GlobalInvocationID.xy;
+	if (any(greaterThanEqual(pix, pc.extentFrame.xy))) return;
+	ivec2 ip = ivec2(pix);
+	vec2 uv = (vec2(pix) + 0.5) / vec2(pc.extentFrame.xy);
+	float depth = textureLod(depthTex, uv, 0.0).r;
+	vec3 sampledN = textureLod(normalTex, uv, 0.0).xyz;
+	vec3 worldN = av_world_normal(sampledN, pc.extentFrame.w, pc.invView);
+	if (!av_valid_depth(depth)) {
+		store_open(ip, worldN);
+		return;
+	}
+
+	vec3 centerVS = av_view_position(uv, depth, pc.projInfo);
+	vec3 viewN = pc.extentFrame.w != 0u
+		? av_safe_normalize((inverse(pc.invView) * vec4(worldN, 0.0)).xyz, vec3(0.0, 0.0, 1.0))
+		: av_safe_normalize(sampledN, vec3(0.0, 0.0, 1.0));
+	float radius = max(pc.params0.x, 0.01);
+	float thickness = max(pc.params0.y, 0.001);
+	uint slices = uint(clamp(pc.params1.x, 2.0, 8.0));
+	uint steps = uint(clamp(pc.params1.y, 2.0, 8.0));
+	uint scramble = av_hash(pix.x + pix.y * pc.extentFrame.x + pc.extentFrame.z * 0x9e3779b9u);
+	float rotation = 2.0 * AV_PI * av_u01(scramble);
+	float occlusionSum = 0.0;
+	float occlusionSq = 0.0;
+	float sampleWeight = 0.0;
+	vec3 bentVS = vec3(0.0);
+	float edgeMissing = 0.0;
+	vec2 invExtent = 1.0 / vec2(pc.extentFrame.xy);
+
+	/* XeGTAO-style paired horizon slices. The radius is world/view-space, so the
+	 * projected footprint contracts with distance instead of being camera-distance AO. */
+	for (uint s = 0u; s < 8u; ++s) {
+		if (s >= slices) break;
+		float angle = rotation + (float(s) + 0.5) * AV_PI / float(slices);
+		vec2 axis = vec2(cos(angle), sin(angle));
+		for (int side = -1; side <= 1; side += 2) {
+			float horizon = -1.0;
+			float sideVisibility = 1.0;
+			for (uint j = 1u; j <= 8u; ++j) {
+				if (j > steps) break;
+				float f = (float(j) + av_u01(scramble ^ (j * 0x85ebca6bu))) / float(steps + 1u);
+				/* Approximate focal projection from invProj; cap to avoid huge near-plane kernels. */
+				vec2 pixelRadius = vec2(radius / max(abs(centerVS.z), 1e-3)) /
+					max(abs(pc.projInfo.xy), vec2(1e-3)) * 0.5 * vec2(pc.extentFrame.xy);
+				vec2 suv = uv + axis * float(side) * f * pixelRadius * invExtent;
+				if (any(lessThanEqual(suv, vec2(0.0))) || any(greaterThanEqual(suv, vec2(1.0)))) {
+					edgeMissing += 1.0;
+					break;
+				}
+				float sd = textureLod(depthTex, suv, 0.0).r;
+				if (!av_valid_depth(sd)) continue;
+				vec3 delta = av_view_position(suv, sd, pc.projInfo) - centerVS;
+				float dist = length(delta);
+				if (dist <= 1e-4 || dist > radius) continue;
+				vec3 hdir = delta / dist;
+				float facing = dot(viewN, hdir);
+				/* Thickness compensation suppresses depth-layer discontinuities/thin silhouettes. */
+				float thickWeight = 1.0 - smoothstep(thickness, thickness * 4.0,
+					max(abs(delta.z) - abs(delta.xy.x) - abs(delta.xy.y), 0.0));
+				float distanceWeight = 1.0 - smoothstep(pc.params0.z * radius, radius, dist);
+				float candidate = facing * thickWeight * distanceWeight;
+				horizon = max(horizon, candidate);
+			}
+			sideVisibility = 1.0 - clamp(max(horizon, 0.0), 0.0, 1.0);
+			occlusionSum += 1.0 - sideVisibility;
+			occlusionSq += (1.0 - sideVisibility) * (1.0 - sideVisibility);
+			sampleWeight += 1.0;
+			vec3 openVS = av_safe_normalize(vec3(axis * float(side), max(sideVisibility, 0.05)), viewN);
+			bentVS += mix(viewN, openVS, 1.0 - sideVisibility) * sideVisibility;
+		}
+	}
+
+	float meanOcc = occlusionSum / max(sampleWeight, 1.0);
+	float variance = max(occlusionSq / max(sampleWeight, 1.0) - meanOcc * meanOcc, 0.0);
+	float visibility = clamp(1.0 - meanOcc, 0.0, 1.0);
+	float edgeFraction = edgeMissing / max(sampleWeight * float(steps), 1.0);
+	/* Missing screen data is unknown, not black. Fade toward open near screen edges. */
+	float edgePx = min(min(float(pix.x), float(pc.extentFrame.x - 1u - pix.x)),
+		min(float(pix.y), float(pc.extentFrame.y - 1u - pix.y)));
+	float edgeConfidence = smoothstep(0.0, max(pc.params0.w, 1.0), edgePx) * (1.0 - edgeFraction);
+	visibility = mix(1.0, visibility, edgeConfidence);
+	vec3 bentWorld = av_safe_normalize((pc.invView * vec4(av_safe_normalize(bentVS, viewN), 0.0)).xyz, worldN);
+	float cone = 1.0 - (1.0 - visibility) * clamp(length(bentVS) / max(sampleWeight, 1.0), 0.0, 1.0);
+	imageStore(avOut, ip, vec4(visibility, av_oct_encode(bentWorld), clamp(cone, 0.0, 1.0)));
+	imageStore(auxOut, ip, vec4(1.0, variance, edgeConfidence, edgeFraction));
+}

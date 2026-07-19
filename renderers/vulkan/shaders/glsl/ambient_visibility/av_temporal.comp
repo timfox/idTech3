@@ -1,0 +1,96 @@
+#version 460
+#extension GL_GOOGLE_include_directive : require
+layout(local_size_x = 8, local_size_y = 8) in;
+
+#include "av_common.glsl"
+
+layout(set = 0, binding = 0) uniform sampler2D currentAV;
+layout(set = 0, binding = 1) uniform sampler2D currentAux;
+layout(set = 0, binding = 2) uniform sampler2D gtaoAV;
+layout(set = 0, binding = 3) uniform sampler2D depthTex;
+layout(set = 0, binding = 4) uniform sampler2D normalTex;
+layout(set = 0, binding = 5) uniform sampler2D motionTex;
+layout(set = 0, binding = 6) uniform sampler2D historyAV;
+layout(set = 0, binding = 7) uniform sampler2D historyGeo;
+layout(set = 0, binding = 8) uniform sampler2D historyAux;
+layout(rgba16f, set = 0, binding = 9) uniform writeonly image2D historyOut;
+layout(rgba16f, set = 0, binding = 10) uniform writeonly image2D geoOut;
+layout(rgba16f, set = 0, binding = 11) uniform writeonly image2D auxOut;
+
+layout(push_constant) uniform TemporalPush {
+	uvec4 extentFlags;       /* xy extent, z reset, w normalsAreWorld */
+	mat4 invView;
+	vec4 params0;            /* base history, depth tolerance, normal dot, bent dot */
+	vec4 params1;            /* hit tolerance, max history, use motion, hybrid */
+} pc;
+
+void main() {
+	uvec2 pix = gl_GlobalInvocationID.xy;
+	if (any(greaterThanEqual(pix, pc.extentFlags.xy))) return;
+	ivec2 ip = ivec2(pix);
+	vec2 uv = (vec2(pix) + 0.5) / vec2(pc.extentFlags.xy);
+	vec4 cur = textureLod(currentAV, uv, 0.0);
+	vec4 aux = textureLod(currentAux, uv, 0.0);
+	vec3 curBent = av_oct_decode(cur.gb);
+	float depth = textureLod(depthTex, uv, 0.0).r;
+	vec3 normal = av_world_normal(textureLod(normalTex, uv, 0.0).xyz,
+		pc.extentFlags.w, pc.invView);
+
+	/* Hybrid assistance is a calibrated selection, never GTAO*RTAO. Ray confidence
+	 * owns low frequency; GTAO fills current-frame uncertainty/contact detail. */
+	if (pc.params1.w > 0.5) {
+		vec4 gtao = textureLod(gtaoAV, uv, 0.0);
+		float rayConfidence = clamp(aux.z * (1.0 - sqrt(max(aux.y, 0.0))), 0.0, 1.0);
+		cur.r = mix(gtao.r, cur.r, rayConfidence);
+		curBent = av_safe_normalize(mix(av_oct_decode(gtao.gb), curBent, rayConfidence), normal);
+		cur.gb = av_oct_encode(curBent);
+		cur.a = mix(gtao.a, cur.a, rayConfidence);
+	}
+
+	vec2 motion = pc.params1.z > 0.5 ? textureLod(motionTex, uv, 0.0).rg : vec2(0.0);
+	bool motionValid = !any(isnan(motion)) && !any(isinf(motion));
+	vec2 huv = uv - (motionValid ? motion : vec2(0.0));
+	bool inBounds = all(greaterThanEqual(huv, vec2(0.0))) && all(lessThanEqual(huv, vec2(1.0)));
+	vec4 h = inBounds ? textureLod(historyAV, huv, 0.0) : cur;
+	vec4 hg = inBounds ? textureLod(historyGeo, huv, 0.0) : vec4(depth, av_oct_encode(normal), 0.0);
+	vec4 haux = inBounds ? textureLod(historyAux, huv, 0.0) : aux;
+	vec3 hBent = av_oct_decode(h.gb);
+	vec3 hNormal = av_oct_decode(hg.gb);
+
+	float depthConf = 1.0 - smoothstep(pc.params0.y, pc.params0.y * 4.0,
+		abs(depth - hg.r));
+	float normalConf = smoothstep(pc.params0.z, 1.0, dot(normal, hNormal));
+	float bentConf = smoothstep(pc.params0.w, 1.0, dot(curBent, hBent));
+	float hitConf = 1.0 - smoothstep(pc.params1.x, pc.params1.x * 3.0,
+		abs(aux.r - haux.r));
+	float velocityPx = length(motion * vec2(pc.extentFlags.xy));
+	float motionConf = 1.0 - smoothstep(2.0, 24.0, velocityPx);
+	float age = clamp(hg.a * max(pc.params1.y, 1.0), 0.0, pc.params1.y);
+	float ageConf = 1.0 - smoothstep(pc.params1.y - 1.0, pc.params1.y, age);
+	float valid = (pc.extentFlags.z == 0u && inBounds && motionValid && av_valid_depth(depth)) ? 1.0 : 0.0;
+	float historyWeight = clamp(pc.params0.x * depthConf * normalConf * bentConf * hitConf *
+		motionConf * ageConf * valid, 0.0, 0.95);
+
+	/* Variance-guided local clipping prevents stale dark visibility from escaping the
+	 * current 3x3 distribution at disocclusions. */
+	float mn = 1.0, mx = 0.0, mean = 0.0, mean2 = 0.0;
+	vec2 texel = 1.0 / vec2(pc.extentFlags.xy);
+	for (int y = -1; y <= 1; ++y) for (int x = -1; x <= 1; ++x) {
+		float v = textureLod(currentAV, clamp(uv + vec2(x, y) * texel, 0.0, 1.0), 0.0).r;
+		mn = min(mn, v); mx = max(mx, v); mean += v; mean2 += v * v;
+	}
+	mean /= 9.0; mean2 /= 9.0;
+	float sigma = sqrt(max(mean2 - mean * mean, 1e-6));
+	h.r = clamp(h.r, max(mn, mean - 1.5 * sigma), min(mx, mean + 1.5 * sigma));
+	float outVisibility = mix(cur.r, h.r, historyWeight);
+	vec3 outBent = av_safe_normalize(mix(curBent, hBent, historyWeight), normal);
+	float outCone = mix(cur.a, h.a, historyWeight);
+	float outAge = historyWeight > 0.05 ? min(age + 1.0, pc.params1.y) : 1.0;
+	uint reason = valid < 0.5 ? 1u : depthConf < 0.5 ? 2u : normalConf < 0.5 ? 3u :
+		bentConf < 0.5 ? 4u : hitConf < 0.5 ? 5u : motionConf < 0.5 ? 6u : 0u;
+	imageStore(historyOut, ip, vec4(outVisibility, av_oct_encode(outBent), outCone));
+	/* geoOut.a is dedicated normalized history age; historyAux.r stores hit distance. */
+	imageStore(geoOut, ip, vec4(depth, av_oct_encode(normal), outAge / max(pc.params1.y, 1.0)));
+	imageStore(auxOut, ip, vec4(aux.r, mix(aux.y, max(aux.y, sigma * sigma), historyWeight),
+		historyWeight, float(reason) / 15.0));
+}
