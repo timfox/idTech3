@@ -427,8 +427,11 @@ static qboolean RCGI_CreatePipelines( void )
 	lci.pBindings = binds;
 	VK_CHECK( qvkCreateDescriptorSetLayout( vk.device, &lci, NULL, &rcgi.light_grid_layout ) );
 
-	/* sample: AS@0 cache@1 active@2 hit@3 worldAlb@4 worldN@5 */
-	binds[0].binding = 0; binds[0].descriptorType = VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR;
+	/* sample: dummy@0 cache@1 active@2 hit@3 worldAlb@4 worldN@5
+	 * Binding 0 is intentionally NOT an AS — NVIDIA glvkspirv SIGSEGVs when
+	 * creating a compute pipeline for this stage with RayQueryKHR. */
+	Com_Memset( binds, 0, sizeof( binds ) );
+	binds[0].binding = 0; binds[0].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
 	binds[0].descriptorCount = 1; binds[0].stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
 	binds[1].binding = 1; binds[1].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
 	binds[2].binding = 2; binds[2].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
@@ -1040,19 +1043,20 @@ void vk_rcgi_apply_after_geometry( void )
 	writes[2] = writes[0]; writes[2].dstBinding = 2; writes[2].pBufferInfo = &bInfo[2];
 	qvkUpdateDescriptorSets( vk.device, 3, writes, 0, NULL );
 
-	/* sample descriptors */
-	bInfo[0].buffer = rcgi.cache.buffer;
-	bInfo[1].buffer = rcgi.activeList.buffer;
-	bInfo[2].buffer = rcgi.hitPack.buffer;
-	bInfo[3].buffer = rcgi.dummy_albedo.buffer;
-	bInfo[4].buffer = rcgi.dummy_normal.buffer;
-	writes[0].dstSet = rcgi.sample_set; writes[0].dstBinding = 1; writes[0].pBufferInfo = &bInfo[0];
-	writes[1].dstSet = rcgi.sample_set; writes[1].dstBinding = 2; writes[1].pBufferInfo = &bInfo[1];
-	writes[2].dstSet = rcgi.sample_set; writes[2].dstBinding = 3; writes[2].pBufferInfo = &bInfo[2];
-	writes[3].dstSet = rcgi.sample_set; writes[3].dstBinding = 4; writes[3].pBufferInfo = &bInfo[3];
-	writes[4].dstSet = rcgi.sample_set; writes[4].dstBinding = 5; writes[4].pBufferInfo = &bInfo[4];
-	qvkUpdateDescriptorSets( vk.device, 5, writes, 0, NULL );
-	vk_rtx_bind_tlas_descriptor( rcgi.sample_set );
+	/* sample descriptors — binding 0 is dummy SSBO (no TLAS / RayQuery on this stage) */
+	bInfo[0].buffer = rcgi.dummy_albedo.buffer; bInfo[0].range = VK_WHOLE_SIZE;
+	bInfo[1].buffer = rcgi.cache.buffer; bInfo[1].range = VK_WHOLE_SIZE;
+	bInfo[2].buffer = rcgi.activeList.buffer; bInfo[2].range = VK_WHOLE_SIZE;
+	bInfo[3].buffer = rcgi.hitPack.buffer; bInfo[3].range = VK_WHOLE_SIZE;
+	bInfo[4].buffer = rcgi.dummy_albedo.buffer; bInfo[4].range = VK_WHOLE_SIZE;
+	bInfo[5].buffer = rcgi.dummy_normal.buffer; bInfo[5].range = VK_WHOLE_SIZE;
+	writes[0].dstSet = rcgi.sample_set; writes[0].dstBinding = 0; writes[0].pBufferInfo = &bInfo[0];
+	writes[1].dstSet = rcgi.sample_set; writes[1].dstBinding = 1; writes[1].pBufferInfo = &bInfo[1];
+	writes[2].dstSet = rcgi.sample_set; writes[2].dstBinding = 2; writes[2].pBufferInfo = &bInfo[2];
+	writes[3].dstSet = rcgi.sample_set; writes[3].dstBinding = 3; writes[3].pBufferInfo = &bInfo[3];
+	writes[4].dstSet = rcgi.sample_set; writes[4].dstBinding = 4; writes[4].pBufferInfo = &bInfo[4];
+	writes[5].dstSet = rcgi.sample_set; writes[5].dstBinding = 5; writes[5].pBufferInfo = &bInfo[5];
+	qvkUpdateDescriptorSets( vk.device, 6, writes, 0, NULL );
 	if ( vk_rtx_world_albedo_count() > 0u ) {
 		vk_rtx_bind_world_albedo_ssbo( rcgi.sample_set, 4 );
 	}
@@ -1212,7 +1216,8 @@ void vk_rcgi_apply_after_geometry( void )
 	qvkCmdBindPipeline( cmd, VK_PIPELINE_BIND_POINT_COMPUTE, rcgi.sample_pipe );
 	qvkCmdBindDescriptorSets( cmd, VK_PIPELINE_BIND_POINT_COMPUTE, rcgi.sample_pl, 0, 1, &rcgi.sample_set, 0, NULL );
 	qvkCmdPushConstants( cmd, rcgi.sample_pl, VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof( samplePush ), &samplePush );
-	qvkCmdDispatch( cmd, ( probes + 63u ) / 64u, 1, 1 );
+	/* One (probe, ray) work item per invocation (matches rcgi_sample.comp). */
+	qvkCmdDispatch( cmd, ( probes * rays + 63u ) / 64u, 1, 1 );
 
 	qvkCmdPipelineBarrier( cmd, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
 		0, 1, &memBarrier, 0, NULL, 0, NULL );

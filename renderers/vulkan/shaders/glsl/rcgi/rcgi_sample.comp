@@ -1,11 +1,19 @@
 #version 460
-#extension GL_EXT_ray_query : require
 #extension GL_GOOGLE_include_directive : require
+/*
+ * NVIDIA workaround: rcgi_sample must not contain RayQueryKHR SPIR-V.
+ * vkCreateComputePipelines SIGSEGVs in libnvidia-glvkspirv (595.x) for any
+ * RcGI sample module that declares/uses ray query — even unreachable.
+ * Binding 0 is a dummy storage buffer (host layout matches). TLAS sampling
+ * is deferred until a driver-safe RQ pattern exists; probes get sky seeds.
+ */
 layout(local_size_x = 64) in;
 
 #include "rcgi.glsl"
 
-layout(set = 0, binding = 0) uniform accelerationStructureEXT topLevelAS;
+layout(std430, set = 0, binding = 0) readonly buffer DummyAsSlot {
+	uint dummyAsWords[];
+};
 layout(std430, set = 0, binding = 1) buffer CacheBuf {
 	RcGiCacheCell cells[];
 };
@@ -17,7 +25,7 @@ layout(std430, set = 0, binding = 2) buffer ActiveList {
 	uint activeIndices[];
 };
 layout(std430, set = 0, binding = 3) writeonly buffer HitPack {
-	uvec4 hits[]; /* per probe*ray: xy packed ids, z bary+flags, w floatBits hitDist */
+	uvec4 hits[];
 };
 layout(std430, set = 0, binding = 4) readonly buffer WorldAlbedoSSBO {
 	float rgb[];
@@ -27,105 +35,51 @@ layout(std430, set = 0, binding = 5) readonly buffer WorldNormalSSBO {
 };
 
 layout(push_constant) uniform SamplePush {
-	uvec4 params; /* x=cascade y=gridRes z=raysPerProbe w=frame */
-	vec4  cascadeOrigin; /* xyz, w halfExtent */
-	vec4  camera; /* xyz cam, w maxRayDist */
-	vec4  cache; /* x=cellSize y=lodDist z=seed w=unused */
+	uvec4 params;
+	vec4  cascadeOrigin;
+	vec4  camera;
+	vec4  cache;
 } pc;
 
-vec3 probe_pos(uint cascade, uvec3 cell, uint grid, vec3 origin, float halfExt) {
+vec3 probe_pos(uvec3 cell, uint grid, vec3 origin, float halfExt) {
 	float cellSize = (halfExt * 2.0) / float(grid);
 	vec3 o = origin - vec3(halfExt);
 	return o + (vec3(cell) + 0.5) * cellSize;
 }
 
 void main() {
-	uint probeLocal = gl_GlobalInvocationID.x;
 	uint grid = max(pc.params.y, 1u);
 	uint probes = grid * grid * grid;
-	if (probeLocal >= probes) {
+	uint rays = clamp(pc.params.z, 1u, 64u);
+	uint work = probes * rays;
+	uint id = gl_GlobalInvocationID.x;
+	if (id >= work) {
 		return;
 	}
 
+	uint probeLocal = id / rays;
+	uint r = id - probeLocal * rays;
 	uint gx = probeLocal % grid;
 	uint gy = (probeLocal / grid) % grid;
 	uint gz = probeLocal / (grid * grid);
-	uint cascade = pc.params.x;
-	uint rays = clamp(pc.params.z, 1u, 64u);
-	vec3 origin = probe_pos(cascade, uvec3(gx, gy, gz), grid, pc.cascadeOrigin.xyz, pc.cascadeOrigin.w);
-	uint seed = pc.params.w * 747796405u + probeLocal * 2891336453u + uint(pc.cache.z);
+	vec3 origin = probe_pos(uvec3(gx, gy, gz), grid, pc.cascadeOrigin.xyz, pc.cascadeOrigin.w);
 
-	for (uint r = 0u; r < rays; ++r) {
-		seed = seed * 1664525u + 1013904223u;
-		float u0 = float((seed >> 8u) & 0xFFFFu) / 65535.0;
-		seed = seed * 1664525u + 1013904223u;
-		float u1 = float((seed >> 8u) & 0xFFFFu) / 65535.0;
-		/* Cosine-weighted around +Z then randomize with second hash as up. */
-		vec3 n = vec3(0.0, 0.0, 1.0);
-		if ((r & 1u) != 0u) n = vec3(0.0, 1.0, 0.0);
-		if ((r & 2u) != 0u) n = vec3(1.0, 0.0, 0.0);
-		vec3 dir = rcgi_hemi(vec2(u0 * 0.99 + 0.01, u1), n);
-		float tmax = max(pc.camera.w, 1.0);
+	float hitDist = max(pc.camera.w, 1.0) * 0.25;
+	hits[id] = uvec4(dummyAsWords.length() > 0u ? dummyAsWords[0] : 0u,
+		0u, 0u, floatBitsToUint(hitDist));
 
-		rayQueryEXT rq;
-		rayQueryInitializeEXT(rq, topLevelAS, gl_RayFlagsOpaqueEXT, 0xFF, origin, 0.05, dir, tmax);
-		rayQueryProceedEXT(rq);
+	vec3 radiance = rcgi_default_sky();
+	if (rgb.length() > 3u && nxyz.length() > 3u && origin.x > 1.0e20) {
+		radiance = vec3(rgb[0], rgb[1], rgb[2]);
+	}
 
-		uint hitIndex = probeLocal * rays + r;
-		uvec4 pack = uvec4(0u);
-		vec3 radiance = rcgi_default_sky();
-		vec3 hitN = -dir;
-		float hitDist = tmax;
-		uint flags = RCGI_CACHE_VALID;
+	uint slot = id % RCGI_CACHE_CELLS;
+	cells[slot].radianceAge = vec4(radiance, float(pc.params.w));
+	cells[slot].normalDist = vec4(0.0, 0.0, 1.0, hitDist);
+	cells[slot].meta = uvec4(RCGI_CACHE_VALID, probeLocal, r, pc.params.w);
 
-		if (rayQueryGetIntersectionTypeEXT(rq, true) == gl_RayQueryCommittedIntersectionTriangleEXT) {
-			flags |= RCGI_CACHE_HIT;
-			hitDist = rayQueryGetIntersectionTEXT(rq, true);
-			vec2 bary = rayQueryGetIntersectionBarycentricsEXT(rq, true);
-			int primId = rayQueryGetIntersectionPrimitiveIndexEXT(rq, true);
-			uint custom = rayQueryGetIntersectionInstanceCustomIndexEXT(rq, true);
-			pack.x = uint(primId) | (custom << 24u);
-			pack.y = rayQueryGetIntersectionInstanceIdEXT(rq, true);
-			pack.z = packUnorm2x16(bary);
-			pack.w = floatBitsToUint(hitDist);
-
-			uint prim = uint(max(primId, 0));
-			if (custom == 0u && rgb.length() >= (prim + 1u) * 3u) {
-				radiance = vec3(rgb[prim * 3u], rgb[prim * 3u + 1u], rgb[prim * 3u + 2u]);
-			} else {
-				radiance = rcgi_default_albedo();
-			}
-			if (custom == 0u && nxyz.length() >= (prim + 1u) * 3u) {
-				hitN = normalize(vec3(nxyz[prim * 3u], nxyz[prim * 3u + 1u], nxyz[prim * 3u + 2u]));
-			}
-		} else {
-			pack.w = floatBitsToUint(tmax);
-		}
-		hits[hitIndex] = pack;
-
-		vec3 hitPos = origin + dir * hitDist;
-		float distCam = length(hitPos - pc.camera.xyz);
-		uint idx = rcgi_spatial_hash(hitPos, max(pc.cache.x, 0.05), distCam, max(pc.cache.y, 8.0));
-
-		/* Linear probe a few slots on collision. */
-		uint slot = idx;
-		for (uint k = 0u; k < RCGI_CACHE_PROBE; ++k) {
-			uint trySlot = (idx + k) % RCGI_CACHE_CELLS;
-			if ((cells[trySlot].meta.x & RCGI_CACHE_VALID) == 0u ||
-			    cells[trySlot].meta.w + 8u < pc.params.w) {
-				slot = trySlot;
-				break;
-			}
-			slot = trySlot;
-		}
-
-		cells[slot].radianceAge = vec4(radiance, float(pc.params.w));
-		cells[slot].normalDist = vec4(hitN, hitDist);
-		cells[slot].meta = uvec4(flags, probeLocal, r, pc.params.w);
-
-		uint ai = atomicAdd(activeCount, 1u);
-		if (ai < RCGI_CACHE_CELLS) {
-			activeIndices[ai] = slot;
-		}
+	uint ai = atomicAdd(activeCount, 1u);
+	if (ai < RCGI_CACHE_CELLS) {
+		activeIndices[ai] = slot;
 	}
 }

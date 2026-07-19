@@ -75,7 +75,13 @@ pass "failure injection + diagnostics"
 
 # Forward+ AV composite (mode 2)
 grep -q 'r_renderMode->integer == 2' "$AV_C" || fail "Forward+ mode-2 AV composite gate missing"
-pass "Forward+ AV composite path present"
+grep -q 'descriptor_generation' "$VK_H" || fail "descriptor_generation missing from vk.h"
+grep -q 'descriptor_generation = vk.deferredGbufferGeneration' "$DGB_C" || fail "fill descriptors must stamp generation"
+grep -q 'lighting_descriptor_generation = vk.deferredGbufferGeneration' "$DGB_C" || fail "lighting descriptors must stamp generation"
+grep -q 'vk_deferred_gbuffer_invalidate_runtime' "$ROOT/renderers/vulkan/vk_shutdown.c" || fail "shutdown must invalidate deferred before attachment destroy"
+grep -q 'demo_gbuffer_av_lifecycle.cfg' "$ROOT/scripts/compile_engine.sh" || fail "lifecycle demo cfg must be packaged"
+[[ -f "$ROOT/config/demo_gbuffer_av_lifecycle.cfg" ]] || fail "demo_gbuffer_av_lifecycle.cfg missing"
+pass "descriptor generation + shutdown order + demo cfg"
 
 # Stable ownership frozen; quality must NOT silently enable mode 4 yet
 grep -q 'seta r_ambientVisibilityMode 2' "$STABLE" || fail "stable AV owner changed (expected mode 2 GTAO)"

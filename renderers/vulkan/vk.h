@@ -803,6 +803,9 @@ typedef struct {
 		VkDescriptorSet descriptor;
 		qboolean pipeline_ready;
 		qboolean fill_logged;
+		/* Matches vk.deferredGbufferGeneration after descriptor writes. */
+		uint32_t descriptor_generation;
+		uint32_t lighting_descriptor_generation;
 		VkDescriptorSetLayout debug_gfx_layout;
 		VkPipelineLayout debug_gfx_pipeline_layout;
 		VkPipeline debug_gfx_pipeline;

@@ -68,6 +68,8 @@ void vk_shutdown( refShutdownCode_t code )
 	vk_rcgi_shutdown();
 	vk_ambient_visibility_shutdown();
 	R_Dressi_Shutdown();
+	vk_deferred_gbuffer_invalidate_runtime();
+	vk_visibility_buffer_shutdown();
 	vk_destroy_framebuffers();
 
 	vk_destroy_pipelines( qtrue ); /* reset counter */

@@ -395,6 +395,8 @@ static void vk_dgb_destroy_pipeline( void )
 	vk.deferred_gbuffer.descriptor = VK_NULL_HANDLE;
 	vk.deferred_gbuffer.pipeline_ready = qfalse;
 	vk.deferred_gbuffer.fill_logged = qfalse;
+	vk.deferred_gbuffer.descriptor_generation = 0u;
+	vk.deferred_gbuffer.lighting_descriptor_generation = 0u;
 }
 
 void vk_deferred_gbuffer_invalidate_runtime( void )
@@ -474,9 +476,11 @@ void vk_deferred_gbuffer_status_f( void )
 		vk_deferred_gbuffer_generation_valid() ? "yes" : "no",
 		vk.deferredGbufferExtentW, vk.deferredGbufferExtentH, w, h );
 	ri.Printf( PRINT_ALL, "viewClass : %s\n", vk_view_class_name( vk_classify_current_view() ) );
-	ri.Printf( PRINT_ALL, "runtime   : fillPipe=%s lightPipe=%s\n",
+	ri.Printf( PRINT_ALL, "runtime   : fillPipe=%s lightPipe=%s descGen=%u lightDescGen=%u\n",
 		vk.deferred_gbuffer.pipeline_ready ? "yes" : "no",
-		vk.deferred_gbuffer.lighting_pipeline_ready ? "yes" : "no" );
+		vk.deferred_gbuffer.lighting_pipeline_ready ? "yes" : "no",
+		vk.deferred_gbuffer.descriptor_generation,
+		vk.deferred_gbuffer.lighting_descriptor_generation );
 	ri.Printf( PRINT_ALL, "fallback  : active=%s reason=%s\n",
 		vk.deferredGbufferFallbackActive ? "yes" : "no",
 		vk.deferredGbufferFallbackReason[0] ? vk.deferredGbufferFallbackReason : "none" );
@@ -497,12 +501,17 @@ void vk_deferred_gbuffer_status_f( void )
 			ri.Printf( PRINT_ALL, "verify    : FAIL missing image views\n" );
 			ok = qfalse;
 		} else if ( !vk.deferredGbufferDirectExport &&
+			vk.deferred_gbuffer.descriptor_generation != vk.deferredGbufferGeneration ) {
+			ri.Printf( PRINT_ALL, "verify    : FAIL fill descriptor gen %u != resource gen %u\n",
+				vk.deferred_gbuffer.descriptor_generation, vk.deferredGbufferGeneration );
+			ok = qfalse;
+		} else if ( !vk.deferredGbufferDirectExport &&
 			( !vk.deferred_gbuffer.pipeline_ready || vk.deferred_gbuffer.descriptor == VK_NULL_HANDLE ) ) {
 			ri.Printf( PRINT_ALL, "verify    : FAIL fill pipeline/descriptor not ready\n" );
 			ok = qfalse;
 		} else {
-			ri.Printf( PRINT_ALL, "verify    : OK gen=%u matches active extent %ux%u\n",
-				vk.deferredGbufferGeneration, w, h );
+			ri.Printf( PRINT_ALL, "verify    : OK gen=%u descGen=%u extent %ux%u\n",
+				vk.deferredGbufferGeneration, vk.deferred_gbuffer.descriptor_generation, w, h );
 		}
 	} else {
 		ri.Printf( PRINT_ALL, "verify    : skipped (resources not wanted)\n" );
@@ -626,6 +635,10 @@ static void vk_dgb_update_descriptors( void )
 	if ( vk.deferred_gbuffer.descriptor == VK_NULL_HANDLE ) {
 		return;
 	}
+	if ( vk.deferred_gbuffer_normal_view == VK_NULL_HANDLE ||
+		vk.deferred_gbuffer_material_view == VK_NULL_HANDLE ) {
+		return;
+	}
 
 	depth_view = vk.depth_image_view_sample ? vk.depth_image_view_sample : vk.depth_image_view;
 	Com_Memset( &depth_sd, 0, sizeof( depth_sd ) );
@@ -669,6 +682,7 @@ static void vk_dgb_update_descriptors( void )
 	writes[2].pImageInfo = &material_info;
 
 	qvkUpdateDescriptorSets( vk.device, 3, writes, 0, NULL );
+	vk.deferred_gbuffer.descriptor_generation = vk.deferredGbufferGeneration;
 }
 
 static void vk_dgb_fill_proj_info( vk_deferred_gbuf_push_t *push )
@@ -788,6 +802,15 @@ void vk_deferred_gbuffer_capture_after_geometry( void )
 
 	if ( !vk.deferredGbufferDirectExport ) {
 		vk_dgb_update_descriptors();
+		if ( vk.deferred_gbuffer.descriptor_generation != vk.deferredGbufferGeneration ) {
+			ri.Printf( PRINT_WARNING, S_COLOR_YELLOW
+				"[VK][deferred] skip fill dispatch: descriptor gen %u != resource gen %u\n" S_COLOR_WHITE,
+				vk.deferred_gbuffer.descriptor_generation, vk.deferredGbufferGeneration );
+			if ( resume_main ) {
+				vk_resume_current_render_pass();
+			}
+			return;
+		}
 
 		vk_dgb_fill_proj_info( &push );
 		push.extent[0] = width;
@@ -1035,6 +1058,7 @@ static void vk_dgb_update_lighting_descriptors( void )
 	writes[7].pImageInfo = &img_infos[5];
 
 	qvkUpdateDescriptorSets( vk.device, 8, writes, 0, NULL );
+	vk.deferred_gbuffer.lighting_descriptor_generation = vk.deferredGbufferGeneration;
 }
 
 static void vk_dgb_fill_light_push( vk_deferred_light_push_t *push, uint32_t width, uint32_t height )
@@ -1145,6 +1169,15 @@ static void vk_dgb_dispatch_lighting_compute( uint32_t width, uint32_t height )
 		0, 0 );
 
 	vk_dgb_update_lighting_descriptors();
+	if ( vk.deferred_gbuffer.lighting_descriptor_generation != vk.deferredGbufferGeneration ) {
+		ri.Printf( PRINT_WARNING, S_COLOR_YELLOW
+			"[VK][deferred] skip lighting dispatch: descriptor gen %u != resource gen %u\n" S_COLOR_WHITE,
+			vk.deferred_gbuffer.lighting_descriptor_generation, vk.deferredGbufferGeneration );
+		record_image_layout_transition( vk.cmd->command_buffer, vk.deferred_lighting_image, VK_IMAGE_ASPECT_COLOR_BIT,
+			VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+			0, 0 );
+		return;
+	}
 	vk_dgb_fill_light_push( &push, width, height );
 
 	qvkCmdBindPipeline( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, vk.deferred_gbuffer.lighting_pipeline );
