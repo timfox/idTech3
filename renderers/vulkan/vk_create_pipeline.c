@@ -1368,9 +1368,7 @@ VkPipeline vk_create_pipeline( const Vk_Pipeline_Def *def, renderPass_t renderPa
 		attachment_blend_states[1].colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT;
 	}
 	if ( main_deferred_export_target &&
-#ifdef USE_VK_PBR
 		use_pbr &&
-#endif
 		attachment_blend_state.blendEnable == VK_FALSE &&
 		def->shadow_phase == SHADOW_DISABLED &&
 		depth_stencil_state.depthTestEnable == VK_TRUE &&
