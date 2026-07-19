@@ -566,6 +566,7 @@ void	JsDebug_DrawFrame( int msec, int realMsec );
 void	SCR_DebugGraph( float value );
 
 int		SCR_GetBigStringWidth( const char *str );	// returns in virtual 640x480 coordinates
+float	SCR_MeasureHudStringWidth( float size, const char *string );	/* proportional HUD / JS text width */
 
 void	SCR_AdjustFrom640( float *x, float *y, float *w, float *h );
 void	SCR_FillRect( float x, float y, float width, float height, 

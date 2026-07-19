@@ -968,6 +968,14 @@ static duk_ret_t Js_Binding_HudResetColor( duk_context *ctx ) {
 	return 0;
 }
 
+static duk_ret_t Js_Binding_HudMeasureText( duk_context *ctx ) {
+	const char *text = duk_require_string( ctx, 0 );
+	const float size = ( duk_get_top( ctx ) > 1 ) ? (float)duk_to_number( ctx, 1 ) : 8.0f;
+
+	duk_push_number( ctx, (duk_double_t)SCR_MeasureHudStringWidth( size, text ) );
+	return 1;
+}
+
 static duk_ret_t Js_Binding_GetScreenSize( duk_context *ctx ) {
 	duk_push_object( ctx );
 	duk_push_int( ctx, cls.glconfig.vidWidth );
@@ -1053,6 +1061,9 @@ static void JsDebug_RegisterBindings( void ) {
 
 	duk_push_c_function( s_jsContext, Js_Binding_HudResetColor, 0 );
 	duk_put_prop_string( s_jsContext, -2, "hudResetColor" );
+
+	duk_push_c_function( s_jsContext, Js_Binding_HudMeasureText, DUK_VARARGS );
+	duk_put_prop_string( s_jsContext, -2, "hudMeasureText" );
 
 	duk_push_c_function( s_jsContext, Js_Binding_GetScreenSize, 0 );
 	duk_put_prop_string( s_jsContext, -2, "getScreenSize" );
@@ -1505,7 +1516,7 @@ void Cmd_JsList_f( void ) {
 	}
 
 	Com_Printf( "JavaScript: runtime initialized\n" );
-	Com_Printf( "JavaScript: API namespace idtech3 (print, cvarGet, cvarSet, exec, readFile, writeFile, appendFile, include, require, on, off, textureLoad, textureReload, materialRegister, hudDrawPic, hudDrawText)\n" );
+	Com_Printf( "JavaScript: API namespace idtech3 (print, cvarGet, cvarSet, exec, readFile, writeFile, appendFile, include, require, on, off, textureLoad, textureReload, materialRegister, hudDrawPic, hudDrawText, hudMeasureText, hudDrawRect)\n" );
 	Com_Printf( "JavaScript: script path policy ui/, client/, frontend/, scripts/js/\n" );
 	Com_Printf( "JavaScript: callbacks frame=%d map_load=%d client_connect=%d ui_open=%d ui_close=%d menu_changed=%d input_key=%d mouse_move=%d console_open=%d\n",
 		JsDebug_EventCallbackCount( "frame" ),
