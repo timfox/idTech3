@@ -73,8 +73,18 @@ qboolean vk_visibility_buffer_active( void )
 
 qboolean vk_visibility_buffer_fill_wanted( void )
 {
+	vkViewClass_t cls;
+
 	if ( !vk_visibility_buffer_active() || !r_visibilityBufferFill ||
 		!r_visibilityBufferFill->integer ) {
+		return qfalse;
+	}
+	/* Same ownership as G-buffer: main world only, never weapon/menu/portal. */
+	if ( !tr.world ) {
+		return qfalse;
+	}
+	cls = vk_classify_current_view();
+	if ( cls != VK_VIEW_CLASS_MAIN_WORLD ) {
 		return qfalse;
 	}
 	/* fill=2 prefers PrimID MRT; skip depth-proxy compute when MRT is live. */

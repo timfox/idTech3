@@ -431,6 +431,16 @@ else
 fi
 
 echo ""
+echo "G-buffer / Ambient Visibility lifecycle:"
+if [[ ! -x "$PROJECT_ROOT/scripts/gbuffer_av_lifecycle_check.sh" && ! -f "$PROJECT_ROOT/scripts/gbuffer_av_lifecycle_check.sh" ]]; then
+  fail "missing scripts/gbuffer_av_lifecycle_check.sh"
+elif ! bash "$PROJECT_ROOT/scripts/gbuffer_av_lifecycle_check.sh"; then
+  fail "gbuffer_av_lifecycle_check.sh failed"
+else
+  pass "G-buffer/AV lifecycle static contract"
+fi
+
+echo ""
 echo "Directional Ambient Visibility (GTAO / RTAO / Reference AO):"
 AV_C="$PROJECT_ROOT/renderers/vulkan/vk_ambient_visibility.c"
 AV_GLSL="$PROJECT_ROOT/renderers/vulkan/shaders/glsl/ambient_visibility"

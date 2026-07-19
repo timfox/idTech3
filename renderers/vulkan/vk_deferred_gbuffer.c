@@ -273,8 +273,20 @@ void vk_deferred_gbuffer_set_fallback( const char *reason )
 	Q_strncpyz( vk.deferredGbufferFallbackReason, msg,
 		sizeof( vk.deferredGbufferFallbackReason ) );
 	ri.Cvar_Set( "r_havenrpFallbackReason", vk.deferredGbufferFallbackReason );
+
+	/* Keep Forward+ alive with a stable AO owner when experimental AV/G-buffer fails. */
+	if ( r_deferredGBufferFill && r_deferredGBufferFill->integer ) {
+		ri.Cvar_Set( "r_deferredGBufferFill", "0" );
+	}
+	if ( ri.Cvar_VariableIntegerValue( "r_ambientVisibilityMode" ) >= 2 ) {
+		ri.Cvar_Set( "r_ambientVisibilityMode", "1" );
+	}
+	if ( r_ssao && !r_ssao->integer ) {
+		ri.Cvar_Set( "r_ssao", "1" );
+	}
+
 	ri.Printf( PRINT_WARNING, S_COLOR_YELLOW
-		"[VK][deferred] fallback: %s (Forward+ continues; G-buffer/AV disabled)\n" S_COLOR_WHITE,
+		"[VK][deferred] fallback: %s (Forward+ continues; G-buffer/AV off → legacy_ssao)\n" S_COLOR_WHITE,
 		vk.deferredGbufferFallbackReason );
 }
 
@@ -422,6 +434,24 @@ void vk_deferred_gbuffer_ensure_runtime( void )
 	if ( !vk_deferred_gbuffer_active() || !vk.device || vk.device_lost ) {
 		return;
 	}
+	/*
+	 * Soft fallback sticks until cleared. Fail-inject causes can recover when the
+	 * inject cvar returns to 0 (re-enable fill if G-buffer images are still live).
+	 */
+	if ( vk.deferredGbufferFallbackActive ) {
+		if ( Q_stristr( vk.deferredGbufferFallbackReason, "r_dgbFailInject" ) &&
+			!vk_dgb_fail_inject( "pipeline" ) && !vk_dgb_fail_inject( "descriptor" ) &&
+			!vk_dgb_fail_inject( "alloc" ) && !vk_dgb_fail_inject( "view" ) &&
+			!vk_dgb_fail_inject( "all" ) ) {
+			vk_deferred_gbuffer_clear_fallback();
+			if ( vk.deferredGbufferAllocated && r_deferredGBufferFill && !r_deferredGBufferFill->integer ) {
+				ri.Cvar_Set( "r_deferredGBufferFill", "1" );
+			}
+			ri.Printf( PRINT_ALL, "[VK][deferred] fail-inject cleared — retrying G-buffer runtime\n" );
+		} else {
+			return;
+		}
+	}
 	if ( vk_dgb_fail_inject( "pipeline" ) || vk_dgb_fail_inject( "descriptor" ) ) {
 		vk_deferred_gbuffer_set_fallback( "r_dgbFailInject forced pipeline/descriptor failure" );
 		vk_deferred_gbuffer_invalidate_runtime();
@@ -549,7 +579,9 @@ static void vk_dgb_create_descriptor_layout( void )
 	desc.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
 	desc.bindingCount = 3;
 	desc.pBindings = bindings;
-	VK_CHECK( qvkCreateDescriptorSetLayout( vk.device, &desc, NULL, &vk.deferred_gbuffer.layout ) );
+	if ( qvkCreateDescriptorSetLayout( vk.device, &desc, NULL, &vk.deferred_gbuffer.layout ) != VK_SUCCESS ) {
+		vk.deferred_gbuffer.layout = VK_NULL_HANDLE;
+	}
 }
 
 static void vk_dgb_create_pipeline( void )
@@ -558,16 +590,27 @@ static void vk_dgb_create_pipeline( void )
 	VkPipelineLayoutCreateInfo pl_ci;
 	VkPipelineShaderStageCreateInfo stage;
 	VkComputePipelineCreateInfo pipe_ci;
+	VkResult res;
 
 	if ( vk.deferred_gbuffer.pipeline_ready ) {
 		return;
 	}
 	if ( vk.modules.deferred_gbuffer_fill_cs == VK_NULL_HANDLE ) {
 		ri.Printf( PRINT_WARNING, S_COLOR_YELLOW "[VK][deferred] deferred_gbuffer_fill compute shader missing\n" S_COLOR_WHITE );
+		vk_deferred_gbuffer_set_fallback( "gbuffer_fill_shader_missing" );
+		return;
+	}
+	if ( vk_dgb_fail_inject( "pipeline" ) || vk_dgb_fail_inject( "descriptor" ) ) {
+		vk_deferred_gbuffer_set_fallback( "r_dgbFailInject forced pipeline/descriptor failure" );
+		vk_dgb_destroy_pipeline();
 		return;
 	}
 
 	vk_dgb_create_descriptor_layout();
+	if ( vk.deferred_gbuffer.layout == VK_NULL_HANDLE ) {
+		vk_deferred_gbuffer_set_fallback( "gbuffer_descriptor_layout_failed" );
+		return;
+	}
 
 	push_range.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
 	push_range.offset = 0;
@@ -579,7 +622,12 @@ static void vk_dgb_create_pipeline( void )
 	pl_ci.pSetLayouts = &vk.deferred_gbuffer.layout;
 	pl_ci.pushConstantRangeCount = 1;
 	pl_ci.pPushConstantRanges = &push_range;
-	VK_CHECK( qvkCreatePipelineLayout( vk.device, &pl_ci, NULL, &vk.deferred_gbuffer.pipeline_layout ) );
+	res = qvkCreatePipelineLayout( vk.device, &pl_ci, NULL, &vk.deferred_gbuffer.pipeline_layout );
+	if ( res != VK_SUCCESS ) {
+		vk_deferred_gbuffer_set_fallback( va( "gbuffer_pipeline_layout_%s", vk_result_string( res ) ) );
+		vk_dgb_destroy_pipeline();
+		return;
+	}
 
 	Com_Memset( &stage, 0, sizeof( stage ) );
 	stage.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
@@ -591,7 +639,12 @@ static void vk_dgb_create_pipeline( void )
 	pipe_ci.sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO;
 	pipe_ci.stage = stage;
 	pipe_ci.layout = vk.deferred_gbuffer.pipeline_layout;
-	VK_CHECK( qvkCreateComputePipelines( vk.device, VK_NULL_HANDLE, 1, &pipe_ci, NULL, &vk.deferred_gbuffer.pipeline ) );
+	res = qvkCreateComputePipelines( vk.device, VK_NULL_HANDLE, 1, &pipe_ci, NULL, &vk.deferred_gbuffer.pipeline );
+	if ( res != VK_SUCCESS ) {
+		vk_deferred_gbuffer_set_fallback( va( "gbuffer_pipeline_%s", vk_result_string( res ) ) );
+		vk_dgb_destroy_pipeline();
+		return;
+	}
 	SET_OBJECT_NAME( vk.deferred_gbuffer.pipeline, "pipeline - deferred gbuffer fill", VK_DEBUG_REPORT_OBJECT_TYPE_PIPELINE_EXT );
 
 	{
@@ -609,14 +662,24 @@ static void vk_dgb_create_pipeline( void )
 		pool_ci.maxSets = 1;
 		pool_ci.poolSizeCount = 2;
 		pool_ci.pPoolSizes = pool_sizes;
-		VK_CHECK( qvkCreateDescriptorPool( vk.device, &pool_ci, NULL, &vk.deferred_gbuffer.pool ) );
+		res = qvkCreateDescriptorPool( vk.device, &pool_ci, NULL, &vk.deferred_gbuffer.pool );
+		if ( res != VK_SUCCESS ) {
+			vk_deferred_gbuffer_set_fallback( va( "gbuffer_descriptor_pool_%s", vk_result_string( res ) ) );
+			vk_dgb_destroy_pipeline();
+			return;
+		}
 
 		Com_Memset( &alloc, 0, sizeof( alloc ) );
 		alloc.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
 		alloc.descriptorPool = vk.deferred_gbuffer.pool;
 		alloc.descriptorSetCount = 1;
 		alloc.pSetLayouts = &vk.deferred_gbuffer.layout;
-		VK_CHECK( qvkAllocateDescriptorSets( vk.device, &alloc, &vk.deferred_gbuffer.descriptor ) );
+		res = qvkAllocateDescriptorSets( vk.device, &alloc, &vk.deferred_gbuffer.descriptor );
+		if ( res != VK_SUCCESS ) {
+			vk_deferred_gbuffer_set_fallback( va( "gbuffer_descriptor_alloc_%s", vk_result_string( res ) ) );
+			vk_dgb_destroy_pipeline();
+			return;
+		}
 	}
 
 	vk.deferred_gbuffer.pipeline_ready = qtrue;
@@ -895,7 +958,9 @@ static void vk_dgb_create_lighting_descriptor_layout( void )
 	desc.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
 	desc.bindingCount = 8;
 	desc.pBindings = bindings;
-	VK_CHECK( qvkCreateDescriptorSetLayout( vk.device, &desc, NULL, &vk.deferred_gbuffer.lighting_layout ) );
+	if ( qvkCreateDescriptorSetLayout( vk.device, &desc, NULL, &vk.deferred_gbuffer.lighting_layout ) != VK_SUCCESS ) {
+		vk.deferred_gbuffer.lighting_layout = VK_NULL_HANDLE;
+	}
 }
 
 static void vk_dgb_create_lighting_pipeline( void )
@@ -904,6 +969,7 @@ static void vk_dgb_create_lighting_pipeline( void )
 	VkPipelineLayoutCreateInfo pl_ci;
 	VkPipelineShaderStageCreateInfo stage;
 	VkComputePipelineCreateInfo pipe_ci;
+	VkResult res;
 
 	if ( vk.deferred_gbuffer.lighting_pipeline_ready ) {
 		return;
@@ -914,6 +980,10 @@ static void vk_dgb_create_lighting_pipeline( void )
 	}
 
 	vk_dgb_create_lighting_descriptor_layout();
+	if ( vk.deferred_gbuffer.lighting_layout == VK_NULL_HANDLE ) {
+		ri.Printf( PRINT_WARNING, S_COLOR_YELLOW "[VK][deferred] lighting descriptor layout failed\n" S_COLOR_WHITE );
+		return;
+	}
 
 	push_range.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
 	push_range.offset = 0;
@@ -925,7 +995,13 @@ static void vk_dgb_create_lighting_pipeline( void )
 	pl_ci.pSetLayouts = &vk.deferred_gbuffer.lighting_layout;
 	pl_ci.pushConstantRangeCount = 1;
 	pl_ci.pPushConstantRanges = &push_range;
-	VK_CHECK( qvkCreatePipelineLayout( vk.device, &pl_ci, NULL, &vk.deferred_gbuffer.lighting_pipeline_layout ) );
+	res = qvkCreatePipelineLayout( vk.device, &pl_ci, NULL, &vk.deferred_gbuffer.lighting_pipeline_layout );
+	if ( res != VK_SUCCESS ) {
+		ri.Printf( PRINT_WARNING, S_COLOR_YELLOW
+			"[VK][deferred] lighting pipeline layout failed: %s\n" S_COLOR_WHITE, vk_result_string( res ) );
+		vk_dgb_destroy_lighting_pipeline();
+		return;
+	}
 
 	Com_Memset( &stage, 0, sizeof( stage ) );
 	stage.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
@@ -937,7 +1013,13 @@ static void vk_dgb_create_lighting_pipeline( void )
 	pipe_ci.sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO;
 	pipe_ci.stage = stage;
 	pipe_ci.layout = vk.deferred_gbuffer.lighting_pipeline_layout;
-	VK_CHECK( qvkCreateComputePipelines( vk.device, VK_NULL_HANDLE, 1, &pipe_ci, NULL, &vk.deferred_gbuffer.lighting_pipeline ) );
+	res = qvkCreateComputePipelines( vk.device, VK_NULL_HANDLE, 1, &pipe_ci, NULL, &vk.deferred_gbuffer.lighting_pipeline );
+	if ( res != VK_SUCCESS ) {
+		ri.Printf( PRINT_WARNING, S_COLOR_YELLOW
+			"[VK][deferred] lighting pipeline failed: %s\n" S_COLOR_WHITE, vk_result_string( res ) );
+		vk_dgb_destroy_lighting_pipeline();
+		return;
+	}
 	SET_OBJECT_NAME( vk.deferred_gbuffer.lighting_pipeline, "pipeline - deferred lighting", VK_DEBUG_REPORT_OBJECT_TYPE_PIPELINE_EXT );
 
 	{
@@ -957,14 +1039,26 @@ static void vk_dgb_create_lighting_pipeline( void )
 		pool_ci.maxSets = 1;
 		pool_ci.poolSizeCount = 3;
 		pool_ci.pPoolSizes = pool_sizes;
-		VK_CHECK( qvkCreateDescriptorPool( vk.device, &pool_ci, NULL, &vk.deferred_gbuffer.lighting_pool ) );
+		res = qvkCreateDescriptorPool( vk.device, &pool_ci, NULL, &vk.deferred_gbuffer.lighting_pool );
+		if ( res != VK_SUCCESS ) {
+			ri.Printf( PRINT_WARNING, S_COLOR_YELLOW
+				"[VK][deferred] lighting descriptor pool failed: %s\n" S_COLOR_WHITE, vk_result_string( res ) );
+			vk_dgb_destroy_lighting_pipeline();
+			return;
+		}
 
 		Com_Memset( &alloc, 0, sizeof( alloc ) );
 		alloc.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
 		alloc.descriptorPool = vk.deferred_gbuffer.lighting_pool;
 		alloc.descriptorSetCount = 1;
 		alloc.pSetLayouts = &vk.deferred_gbuffer.lighting_layout;
-		VK_CHECK( qvkAllocateDescriptorSets( vk.device, &alloc, &vk.deferred_gbuffer.lighting_descriptor ) );
+		res = qvkAllocateDescriptorSets( vk.device, &alloc, &vk.deferred_gbuffer.lighting_descriptor );
+		if ( res != VK_SUCCESS ) {
+			ri.Printf( PRINT_WARNING, S_COLOR_YELLOW
+				"[VK][deferred] lighting descriptor alloc failed: %s\n" S_COLOR_WHITE, vk_result_string( res ) );
+			vk_dgb_destroy_lighting_pipeline();
+			return;
+		}
 	}
 
 	vk.deferred_gbuffer.lighting_pipeline_ready = qtrue;

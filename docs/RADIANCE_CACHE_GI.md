@@ -73,3 +73,5 @@ See [HYBRID_RENDERING1.md](HYBRID_RENDERING1.md).
 ## Status
 
 v1 chocolate scaffold: light grid, ray-query sample, spatial-hash cache, probe atlas, SH2 gather, denoise/upscale, composite + Hybrid1 fusion. Specular probe re-fit and froxel SH for transparencies remain follow-ups.
+
+**NVIDIA soft-disable (Jul 2026):** On vendor `0x10DE` (observed with driver 595.x / Blackwell), `vkCreateComputePipelines` for `rcgi_sample` SIGSEGVs inside `libnvidia-glvkspirv`. `vk_rcgi_init` soft-disables `r_rcgi` and prints a warning; use Surfel GI (`r_surfelGi` / `modern_vulkan_rt`) for diffuse GI on that path.

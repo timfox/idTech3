@@ -83,6 +83,15 @@ grep -q 'demo_gbuffer_av_lifecycle.cfg' "$ROOT/scripts/compile_engine.sh" || fai
 [[ -f "$ROOT/config/demo_gbuffer_av_lifecycle.cfg" ]] || fail "demo_gbuffer_av_lifecycle.cfg missing"
 pass "descriptor generation + shutdown order + demo cfg"
 
+# Soft-fail pipeline create (no VK_CHECK fatal on G-buffer fill path)
+grep -q 'gbuffer_pipeline_' "$DGB_C" || fail "create_pipeline must soft-fail with fallback reason"
+grep -q 'legacy_ssao' "$DGB_C" || fail "set_fallback must restore legacy_ssao owner"
+# Visibility fill shares main-world view class
+grep -q 'VK_VIEW_CLASS_MAIN_WORLD' "$ROOT/renderers/vulkan/vk_visibility_buffer.c" || \
+  fail "visibility fill must gate on MAIN_WORLD view class"
+pass "soft-fail pipeline + visibility view-class gate"
+
+
 # Stable ownership frozen; quality must NOT silently enable mode 4 yet
 grep -q 'seta r_ambientVisibilityMode 2' "$STABLE" || fail "stable AV owner changed (expected mode 2 GTAO)"
 grep -q 'seta r_ssao 0' "$STABLE" || fail "stable must keep r_ssao 0"

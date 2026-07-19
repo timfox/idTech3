@@ -115,6 +115,7 @@ static struct {
 	uint32_t		entity_proxy_mdr_fail;
 	char			tlas_build_mode[16];
 	char			tlas_rebuild_reason[48];
+	uint32_t		tlas_revision;
 	VkBuffer		entity_vertex_buffer;
 	VkDeviceMemory	entity_vertex_memory;
 	VkBuffer		entity_index_buffer;
@@ -1411,6 +1412,10 @@ static void vk_rtx_rebuild_entity_tlas( void )
 
 	rtx.tlas_valid = qtrue;
 	rtx.tlas_instance_count = maxInstTLAS;
+	rtx.tlas_revision++;
+	if ( rtx.tlas_revision == 0u ) {
+		rtx.tlas_revision = 1u;
+	}
 
 	if ( tlasUpdate ) {
 		static qboolean tlas_update_logged;
@@ -2279,6 +2284,11 @@ void vk_rtx_tlas_status( const char **modeOut, const char **reasonOut )
 	}
 }
 
+uint32_t vk_rtx_tlas_revision( void )
+{
+	return rtx.tlas_revision;
+}
+
 #else /* !USE_VULKAN_RTX */
 
 void vk_rtx_init( void )
@@ -2315,6 +2325,11 @@ void vk_rtx_tlas_status( const char **modeOut, const char **reasonOut )
 	if ( reasonOut ) {
 		*reasonOut = "stub";
 	}
+}
+
+uint32_t vk_rtx_tlas_revision( void )
+{
+	return 0u;
 }
 
 #endif /* USE_VULKAN_RTX */

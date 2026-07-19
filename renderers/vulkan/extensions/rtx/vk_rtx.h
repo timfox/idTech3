@@ -23,6 +23,7 @@ uint32_t vk_rtx_entity_albedo_count( void );
 void vk_rtx_bind_entity_normal_ssbo( VkDescriptorSet set, uint32_t binding );
 uint32_t vk_rtx_entity_normal_count( void );
 void vk_rtx_tlas_status( const char **modeOut, const char **reasonOut );
+uint32_t vk_rtx_tlas_revision( void );
 
 #else
 
@@ -45,5 +46,6 @@ uint32_t vk_rtx_entity_albedo_count( void );
 void vk_rtx_bind_entity_normal_ssbo( VkDescriptorSet set, uint32_t binding );
 uint32_t vk_rtx_entity_normal_count( void );
 void vk_rtx_tlas_status( const char **modeOut, const char **reasonOut );
+uint32_t vk_rtx_tlas_revision( void );
 
 #endif

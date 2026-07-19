@@ -82,8 +82,7 @@ void main() {
 
 	rayQueryEXT rq;
 	rayQueryInitializeEXT(rq, topLevelAS, gl_RayFlagsOpaqueEXT, 0xFF, pos + n * 0.05, 0.02, dir, tmax);
-	while (rayQueryProceedEXT(rq)) {
-	}
+	rayQueryProceedEXT(rq);
 
 	vec3 rad = sample_atlas(n);
 	if (rayQueryGetIntersectionTypeEXT(rq, true) == gl_RayQueryCommittedIntersectionTriangleEXT) {

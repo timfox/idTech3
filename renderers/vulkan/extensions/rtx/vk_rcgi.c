@@ -17,7 +17,6 @@ Chocolate RTX path; light grid / ray-query sample / cache shade / gather.
 #include "vk_image_layout.h"
 #include "vk_view_state.h"
 #include "vk_cmd.h"
-#include "vk_ambient_visibility.h"
 
 #ifdef USE_VULKAN_RTX
 #include "vk_rcgi_spirv.inc"
@@ -291,63 +290,15 @@ static VkShaderModule RCGI_Module( const uint8_t *code, uint32_t size, const cha
 {
 	VkShaderModuleCreateInfo ci;
 	VkShaderModule mod = VK_NULL_HANDLE;
-	uint32_t *aligned = NULL;
-	VkResult res;
-
-	if ( !code || size < 4u || ( size & 3u ) != 0u ) {
-		ri.Printf( PRINT_WARNING, "[RcGI] Invalid SPIR-V for %s (size=%u)\n", name, size );
-		return VK_NULL_HANDLE;
-	}
-
-	/* NVIDIA CreateShaderModule requires 4-byte-aligned pCode; static uint8_t[] is not guaranteed. */
-	aligned = (uint32_t *)ri.Hunk_AllocateTempMemory( (int)size );
-	if ( !aligned ) {
-		ri.Printf( PRINT_WARNING, "[RcGI] Out of temp memory for shader module %s\n", name );
-		return VK_NULL_HANDLE;
-	}
-	Com_Memcpy( aligned, code, size );
-
-	ri.Printf( PRINT_ALL, "[RcGI] creating shader module %s (%u bytes)\n", name, size );
 	Com_Memset( &ci, 0, sizeof( ci ) );
 	ci.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
 	ci.codeSize = size;
-	ci.pCode = aligned;
-	res = qvkCreateShaderModule( vk.device, &ci, NULL, &mod );
-	ri.Hunk_FreeTempMemory( aligned );
-	if ( res != VK_SUCCESS ) {
-		ri.Printf( PRINT_WARNING, "[RcGI] Failed to create shader module %s (%s)\n",
-			name, vk_result_string( res ) );
+	ci.pCode = (const uint32_t *)code;
+	if ( qvkCreateShaderModule( vk.device, &ci, NULL, &mod ) != VK_SUCCESS ) {
+		ri.Printf( PRINT_WARNING, "[RcGI] Failed to create shader module %s\n", name );
 		return VK_NULL_HANDLE;
 	}
 	return mod;
-}
-
-static qboolean RCGI_CreateComputePipe( VkPipelineLayout layout, VkShaderModule module,
-	const char *name, VkPipeline *outPipe )
-{
-	VkComputePipelineCreateInfo pci;
-	VkPipelineShaderStageCreateInfo stage;
-	VkResult res;
-
-	Com_Memset( &stage, 0, sizeof( stage ) );
-	stage.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-	stage.stage = VK_SHADER_STAGE_COMPUTE_BIT;
-	stage.module = module;
-	stage.pName = "main";
-	Com_Memset( &pci, 0, sizeof( pci ) );
-	pci.sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO;
-	pci.stage = stage;
-	pci.layout = layout;
-
-	ri.Printf( PRINT_ALL, "[RcGI] creating compute pipeline %s\n", name );
-	res = qvkCreateComputePipelines( vk.device, vk.pipelineCache, 1, &pci, NULL, outPipe );
-	if ( res != VK_SUCCESS ) {
-		ri.Printf( PRINT_WARNING, "[RcGI] Failed to create compute pipeline %s (%s)\n",
-			name, vk_result_string( res ) );
-		*outPipe = VK_NULL_HANDLE;
-		return qfalse;
-	}
-	return qtrue;
 }
 
 static void RCGI_DestroyPipelines( void )
@@ -399,6 +350,8 @@ static qboolean RCGI_CreatePipelines( void )
 	VkDescriptorSetLayoutCreateInfo lci;
 	VkPushConstantRange pcr;
 	VkPipelineLayoutCreateInfo plci;
+	VkComputePipelineCreateInfo pci;
+	VkPipelineShaderStageCreateInfo stage;
 	VkDescriptorPoolSize sizes[4];
 	VkDescriptorPoolCreateInfo poolCi;
 	VkDescriptorSetAllocateInfo alloc;
@@ -427,11 +380,8 @@ static qboolean RCGI_CreatePipelines( void )
 	lci.pBindings = binds;
 	VK_CHECK( qvkCreateDescriptorSetLayout( vk.device, &lci, NULL, &rcgi.light_grid_layout ) );
 
-	/* sample: dummy@0 cache@1 active@2 hit@3 worldAlb@4 worldN@5
-	 * Binding 0 is intentionally NOT an AS — NVIDIA glvkspirv SIGSEGVs when
-	 * creating a compute pipeline for this stage with RayQueryKHR. */
-	Com_Memset( binds, 0, sizeof( binds ) );
-	binds[0].binding = 0; binds[0].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+	/* sample: AS@0 cache@1 active@2 hit@3 worldAlb@4 worldN@5 */
+	binds[0].binding = 0; binds[0].descriptorType = VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR;
 	binds[0].descriptorCount = 1; binds[0].stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
 	binds[1].binding = 1; binds[1].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
 	binds[2].binding = 2; binds[2].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
@@ -442,7 +392,7 @@ static qboolean RCGI_CreatePipelines( void )
 	VK_CHECK( qvkCreateDescriptorSetLayout( vk.device, &lci, NULL, &rcgi.sample_layout ) );
 
 	/* cache_shade: cache@0 active@1 lights@2 gridIds@3 gridCounts@4
-	 * Reset binds[0] — leftover ACCELERATION_STRUCTURE from sample crashes NVIDIA glvkspirv. */
+	 * Must reset binds[0] — leftover ACCELERATION_STRUCTURE from sample is wrong. */
 	binds[0].binding = 0; binds[0].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
 	binds[0].descriptorCount = 1; binds[0].stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
 	binds[1].binding = 1; binds[1].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
@@ -480,25 +430,13 @@ static qboolean RCGI_CreatePipelines( void )
 	VK_CHECK( qvkCreateDescriptorSetLayout( vk.device, &lci, NULL, &rcgi.denoise_layout ) );
 
 	/* upscale: depth@0 normal@1 gatherLow@2 history@3 irrOut@4 histOut@5 */
-	binds[0].binding = 0; binds[0].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-	binds[1].binding = 1; binds[1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-	binds[2].binding = 2; binds[2].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-	binds[3].binding = 3; binds[3].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
 	binds[4].binding = 4; binds[4].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
-	binds[4].descriptorCount = 1; binds[4].stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
 	binds[5].binding = 5; binds[5].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
-	binds[5].descriptorCount = 1; binds[5].stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
 	lci.bindingCount = 6;
 	VK_CHECK( qvkCreateDescriptorSetLayout( vk.device, &lci, NULL, &rcgi.upscale_layout ) );
 
-	/* composite: depth@0 albedo@1 irradiance@2 colorOut@3 ambient visibility@4 */
-	binds[0].binding = 0; binds[0].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-	binds[1].binding = 1; binds[1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-	binds[2].binding = 2; binds[2].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-	binds[3].binding = 3; binds[3].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
-	binds[4].binding = 4; binds[4].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-	binds[4].descriptorCount = 1; binds[4].stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
-	lci.bindingCount = 5;
+	/* composite: depth@0 albedo@1 irradiance@2 colorOut@3 */
+	lci.bindingCount = 4;
 	VK_CHECK( qvkCreateDescriptorSetLayout( vk.device, &lci, NULL, &rcgi.composite_layout ) );
 
 	Com_Memset( &pcr, 0, sizeof( pcr ) );
@@ -537,20 +475,34 @@ static qboolean RCGI_CreatePipelines( void )
 	plci.pSetLayouts = &rcgi.upscale_layout;
 	VK_CHECK( qvkCreatePipelineLayout( vk.device, &plci, NULL, &rcgi.upscale_pl ) );
 
-	pcr.size = sizeof( uint32_t ) * 8;
+	pcr.size = sizeof( uint32_t ) * 2 + sizeof( float ) + sizeof( uint32_t ) * 4;
 	plci.pSetLayouts = &rcgi.composite_layout;
 	VK_CHECK( qvkCreatePipelineLayout( vk.device, &plci, NULL, &rcgi.composite_pl ) );
 
-	if ( !RCGI_CreateComputePipe( rcgi.light_grid_pl, rcgi.light_grid_cs, "rcgi_light_grid", &rcgi.light_grid_pipe ) ||
-	     !RCGI_CreateComputePipe( rcgi.sample_pl, rcgi.sample_cs, "rcgi_sample", &rcgi.sample_pipe ) ||
-	     !RCGI_CreateComputePipe( rcgi.cache_shade_pl, rcgi.cache_shade_cs, "rcgi_cache_shade", &rcgi.cache_shade_pipe ) ||
-	     !RCGI_CreateComputePipe( rcgi.volume_update_pl, rcgi.volume_update_cs, "rcgi_volume_update", &rcgi.volume_update_pipe ) ||
-	     !RCGI_CreateComputePipe( rcgi.final_gather_pl, rcgi.final_gather_cs, "rcgi_final_gather", &rcgi.final_gather_pipe ) ||
-	     !RCGI_CreateComputePipe( rcgi.denoise_pl, rcgi.denoise_cs, "rcgi_denoise", &rcgi.denoise_pipe ) ||
-	     !RCGI_CreateComputePipe( rcgi.upscale_pl, rcgi.upscale_cs, "rcgi_upscale", &rcgi.upscale_pipe ) ||
-	     !RCGI_CreateComputePipe( rcgi.composite_pl, rcgi.composite_cs, "rcgi_composite", &rcgi.composite_pipe ) ) {
-		return qfalse;
-	}
+	Com_Memset( &stage, 0, sizeof( stage ) );
+	stage.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+	stage.stage = VK_SHADER_STAGE_COMPUTE_BIT;
+	stage.pName = "main";
+	Com_Memset( &pci, 0, sizeof( pci ) );
+	pci.sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO;
+	pci.stage = stage;
+
+	pci.layout = rcgi.light_grid_pl; pci.stage.module = rcgi.light_grid_cs;
+	VK_CHECK( qvkCreateComputePipelines( vk.device, vk.pipelineCache, 1, &pci, NULL, &rcgi.light_grid_pipe ) );
+	pci.layout = rcgi.sample_pl; pci.stage.module = rcgi.sample_cs;
+	VK_CHECK( qvkCreateComputePipelines( vk.device, vk.pipelineCache, 1, &pci, NULL, &rcgi.sample_pipe ) );
+	pci.layout = rcgi.cache_shade_pl; pci.stage.module = rcgi.cache_shade_cs;
+	VK_CHECK( qvkCreateComputePipelines( vk.device, vk.pipelineCache, 1, &pci, NULL, &rcgi.cache_shade_pipe ) );
+	pci.layout = rcgi.volume_update_pl; pci.stage.module = rcgi.volume_update_cs;
+	VK_CHECK( qvkCreateComputePipelines( vk.device, vk.pipelineCache, 1, &pci, NULL, &rcgi.volume_update_pipe ) );
+	pci.layout = rcgi.final_gather_pl; pci.stage.module = rcgi.final_gather_cs;
+	VK_CHECK( qvkCreateComputePipelines( vk.device, vk.pipelineCache, 1, &pci, NULL, &rcgi.final_gather_pipe ) );
+	pci.layout = rcgi.denoise_pl; pci.stage.module = rcgi.denoise_cs;
+	VK_CHECK( qvkCreateComputePipelines( vk.device, vk.pipelineCache, 1, &pci, NULL, &rcgi.denoise_pipe ) );
+	pci.layout = rcgi.upscale_pl; pci.stage.module = rcgi.upscale_cs;
+	VK_CHECK( qvkCreateComputePipelines( vk.device, vk.pipelineCache, 1, &pci, NULL, &rcgi.upscale_pipe ) );
+	pci.layout = rcgi.composite_pl; pci.stage.module = rcgi.composite_cs;
+	VK_CHECK( qvkCreateComputePipelines( vk.device, vk.pipelineCache, 1, &pci, NULL, &rcgi.composite_pipe ) );
 
 	Com_Memset( sizes, 0, sizeof( sizes ) );
 	sizes[0].type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER; sizes[0].descriptorCount = 48;
@@ -833,6 +785,21 @@ void vk_rcgi_init( void )
 		return;
 	}
 
+	/* NVIDIA 595.x / Blackwell: vkCreateComputePipelines for rcgi_sample SIGSEGVs
+	 * inside libnvidia-glvkspirv (layout+SPIR-V combo). Soft-disable instead of crash.
+	 * Surfel GI remains the supported diffuse-GI path on this driver. */
+	{
+		VkPhysicalDeviceProperties props;
+		Com_Memset( &props, 0, sizeof( props ) );
+		qvkGetPhysicalDeviceProperties( vk.physical_device, &props );
+		if ( props.vendorID == 0x10DEu ) {
+			ri.Printf( PRINT_WARNING,
+				"[RcGI] soft-disabled on NVIDIA (vendor 0x10DE): driver glvkspirv SIGSEGV during sample pipeline create. Use r_surfelGi / modern_vulkan_rt.\n" );
+			ri.Cvar_Set( "r_rcgi", "0" );
+			return;
+		}
+	}
+
 	if ( !RCGI_CreateStaticResources() ) {
 		ri.Printf( PRINT_WARNING, "[RcGI] static resource create failed — disabling r_rcgi\n" );
 		ri.Cvar_Set( "r_rcgi", "0" );
@@ -840,7 +807,7 @@ void vk_rcgi_init( void )
 		return;
 	}
 	if ( !RCGI_CreatePipelines() ) {
-		ri.Printf( PRINT_WARNING, "[RcGI] pipeline create failed — disabling r_rcgi (see prior [RcGI] lines)\n" );
+		ri.Printf( PRINT_WARNING, "[RcGI] pipeline create failed — disabling r_rcgi\n" );
 		ri.Cvar_Set( "r_rcgi", "0" );
 		vk_rcgi_shutdown();
 		return;
@@ -972,8 +939,7 @@ void vk_rcgi_apply_after_geometry( void )
 		float strength;
 		uint32_t skipSky;
 		uint32_t debugMode;
-		float avStrength;
-		uint32_t pad[2];
+		uint32_t pad[3];
 	} compPush;
 
 	if ( !vk_rcgi_active() || !vk.cmd || vk.cmd->command_buffer == VK_NULL_HANDLE ) {
@@ -1043,20 +1009,19 @@ void vk_rcgi_apply_after_geometry( void )
 	writes[2] = writes[0]; writes[2].dstBinding = 2; writes[2].pBufferInfo = &bInfo[2];
 	qvkUpdateDescriptorSets( vk.device, 3, writes, 0, NULL );
 
-	/* sample descriptors — binding 0 is dummy SSBO (no TLAS / RayQuery on this stage) */
-	bInfo[0].buffer = rcgi.dummy_albedo.buffer; bInfo[0].range = VK_WHOLE_SIZE;
-	bInfo[1].buffer = rcgi.cache.buffer; bInfo[1].range = VK_WHOLE_SIZE;
-	bInfo[2].buffer = rcgi.activeList.buffer; bInfo[2].range = VK_WHOLE_SIZE;
-	bInfo[3].buffer = rcgi.hitPack.buffer; bInfo[3].range = VK_WHOLE_SIZE;
-	bInfo[4].buffer = rcgi.dummy_albedo.buffer; bInfo[4].range = VK_WHOLE_SIZE;
-	bInfo[5].buffer = rcgi.dummy_normal.buffer; bInfo[5].range = VK_WHOLE_SIZE;
-	writes[0].dstSet = rcgi.sample_set; writes[0].dstBinding = 0; writes[0].pBufferInfo = &bInfo[0];
-	writes[1].dstSet = rcgi.sample_set; writes[1].dstBinding = 1; writes[1].pBufferInfo = &bInfo[1];
-	writes[2].dstSet = rcgi.sample_set; writes[2].dstBinding = 2; writes[2].pBufferInfo = &bInfo[2];
-	writes[3].dstSet = rcgi.sample_set; writes[3].dstBinding = 3; writes[3].pBufferInfo = &bInfo[3];
-	writes[4].dstSet = rcgi.sample_set; writes[4].dstBinding = 4; writes[4].pBufferInfo = &bInfo[4];
-	writes[5].dstSet = rcgi.sample_set; writes[5].dstBinding = 5; writes[5].pBufferInfo = &bInfo[5];
-	qvkUpdateDescriptorSets( vk.device, 6, writes, 0, NULL );
+	/* sample descriptors */
+	bInfo[0].buffer = rcgi.cache.buffer;
+	bInfo[1].buffer = rcgi.activeList.buffer;
+	bInfo[2].buffer = rcgi.hitPack.buffer;
+	bInfo[3].buffer = rcgi.dummy_albedo.buffer;
+	bInfo[4].buffer = rcgi.dummy_normal.buffer;
+	writes[0].dstSet = rcgi.sample_set; writes[0].dstBinding = 1; writes[0].pBufferInfo = &bInfo[0];
+	writes[1].dstSet = rcgi.sample_set; writes[1].dstBinding = 2; writes[1].pBufferInfo = &bInfo[1];
+	writes[2].dstSet = rcgi.sample_set; writes[2].dstBinding = 3; writes[2].pBufferInfo = &bInfo[2];
+	writes[3].dstSet = rcgi.sample_set; writes[3].dstBinding = 4; writes[3].pBufferInfo = &bInfo[3];
+	writes[4].dstSet = rcgi.sample_set; writes[4].dstBinding = 5; writes[4].pBufferInfo = &bInfo[4];
+	qvkUpdateDescriptorSets( vk.device, 5, writes, 0, NULL );
+	vk_rtx_bind_tlas_descriptor( rcgi.sample_set );
 	if ( vk_rtx_world_albedo_count() > 0u ) {
 		vk_rtx_bind_world_albedo_ssbo( rcgi.sample_set, 4 );
 	}
@@ -1155,17 +1120,12 @@ void vk_rcgi_apply_after_geometry( void )
 	imgInfo[2].sampler = linear; imgInfo[2].imageView = rcgi.irradiance.view;
 	imgInfo[2].imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 	imgInfo[3].imageView = vk.color_image_view; imgInfo[3].imageLayout = VK_IMAGE_LAYOUT_GENERAL;
-	imgInfo[4].sampler = linear;
-	imgInfo[4].imageView = vk_ambient_visibility_available() ? vk_ambient_visibility_view() : tr.whiteImage->view;
-	imgInfo[4].imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 	writes[0].dstSet = rcgi.composite_set; writes[0].dstBinding = 0; writes[0].pImageInfo = &imgInfo[0];
 	writes[1].dstSet = rcgi.composite_set; writes[1].dstBinding = 1; writes[1].pImageInfo = &imgInfo[1];
 	writes[2].dstSet = rcgi.composite_set; writes[2].dstBinding = 2; writes[2].pImageInfo = &imgInfo[2];
 	writes[3].dstSet = rcgi.composite_set; writes[3].dstBinding = 3;
 	writes[3].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE; writes[3].pImageInfo = &imgInfo[3];
-	writes[4] = writes[0]; writes[4].dstSet = rcgi.composite_set; writes[4].dstBinding = 4;
-	writes[4].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER; writes[4].pImageInfo = &imgInfo[4];
-	qvkUpdateDescriptorSets( vk.device, 5, writes, 0, NULL );
+	qvkUpdateDescriptorSets( vk.device, 4, writes, 0, NULL );
 
 	Com_Memset( &memBarrier, 0, sizeof( memBarrier ) );
 	memBarrier.sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER;
@@ -1216,8 +1176,7 @@ void vk_rcgi_apply_after_geometry( void )
 	qvkCmdBindPipeline( cmd, VK_PIPELINE_BIND_POINT_COMPUTE, rcgi.sample_pipe );
 	qvkCmdBindDescriptorSets( cmd, VK_PIPELINE_BIND_POINT_COMPUTE, rcgi.sample_pl, 0, 1, &rcgi.sample_set, 0, NULL );
 	qvkCmdPushConstants( cmd, rcgi.sample_pl, VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof( samplePush ), &samplePush );
-	/* One (probe, ray) work item per invocation (matches rcgi_sample.comp). */
-	qvkCmdDispatch( cmd, ( probes * rays + 63u ) / 64u, 1, 1 );
+	qvkCmdDispatch( cmd, ( probes + 63u ) / 64u, 1, 1 );
 
 	qvkCmdPipelineBarrier( cmd, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
 		0, 1, &memBarrier, 0, NULL, 0, NULL );
@@ -1388,8 +1347,7 @@ void vk_rcgi_apply_after_geometry( void )
 	compPush.strength = r_rcgi_strength ? r_rcgi_strength->value : 0.85f;
 	compPush.skipSky = 1u;
 	compPush.debugMode = (uint32_t)( r_rcgi_debug ? r_rcgi_debug->integer : 0 );
-	compPush.avStrength = vk_ambient_visibility_strength();
-	compPush.pad[0] = compPush.pad[1] = 0u;
+	compPush.pad[0] = compPush.pad[1] = compPush.pad[2] = 0u;
 	qvkCmdBindPipeline( cmd, VK_PIPELINE_BIND_POINT_COMPUTE, rcgi.composite_pipe );
 	qvkCmdBindDescriptorSets( cmd, VK_PIPELINE_BIND_POINT_COMPUTE, rcgi.composite_pl, 0, 1, &rcgi.composite_set, 0, NULL );
 	qvkCmdPushConstants( cmd, rcgi.composite_pl, VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof( compPush ), &compPush );
