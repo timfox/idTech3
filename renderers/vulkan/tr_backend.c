@@ -2607,6 +2607,12 @@ static const void *RB_FinishBloom( const void *data )
 #endif
 
 	backEnd.drawConsole = qtrue;
+	/* Console StretchPics follow FinishBloom in the same client frame. If
+	 * projection2D stays true, RB_StretchPic skips SetGL2D/prepare_2d and
+	 * records into whatever pass bloom left open (usually post_bloom HDR).
+	 * That never reaches overlay_compose, so the console looks empty. Force a
+	 * 2D re-entry so prepare_2d resumes the UI overlay (or post_bloom fallback). */
+	backEnd.projection2D = qfalse;
 
 	return (const void *)(cmd + 1);
 }
