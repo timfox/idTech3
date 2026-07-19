@@ -29,4 +29,9 @@ rg -q 'reserved\[6\]' "$ROOT/renderers/vulkan/vk_view_state.c" || fail "stoch pu
 rg -q 'r_oit 2' "$ROOT/config/vulkan_overlay_oit_clustered.cfg" || fail "clustered overlay sets MBOIT"
 rg -q 'vulkan_overlay_unified_clustered' "$ROOT/config/vulkan_overlay_oit_clustered.cfg" || fail "clustered overlay stacks mode 3"
 
+rg -q 'r_oitClassify' "$ROOT/renderers/vulkan/tr_init.c" || fail "r_oitClassify cvar"
+rg -q 'oitBucketFilter' "$ROOT/renderers/vulkan/tr_backend.c" || fail "oitBucketFilter draw filter"
+rg -q 'r_oitClassify' "$ROOT/renderers/vulkan/vk_postfx_passes.c" || fail "oit classify bucket loop"
+rg -q 'r_oitClassify' "$ROOT/docs/MOMENT_OIT_STOCHASTIC_ALPHA.md" || fail "oit classify docs"
+
 echo "OK: MBOIT + stochastic alpha smoke checks passed"

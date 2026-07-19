@@ -864,6 +864,8 @@ typedef struct {
 	VkImage visibility_buffer_class;
 	VkImageView visibility_buffer_class_view;
 	qboolean visibilityBufferAllocated;
+	/* True PrimID/instance MRT into ids/bary during opaque raster (non-MSAA). */
+	qboolean visibilityBufferDirectExport;
 
 	/* Neural Irradiance Volume (r_niv); see vk_niv.c */
 	struct {

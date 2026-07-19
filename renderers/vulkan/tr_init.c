@@ -260,6 +260,7 @@ cvar_t	*r_hbaoDirections;
 cvar_t	*r_hbaoSteps;
 cvar_t	*r_oit;
 cvar_t	*r_oitForwardPlus;
+cvar_t	*r_oitClassify;
 cvar_t	*r_stochasticAlpha;
 cvar_t	*r_ssaoDebugView;
 cvar_t	*r_renderWidth;
@@ -350,6 +351,7 @@ cvar_t	*r_hybrid1_diffuseStrength;
 cvar_t	*r_hybrid1_ibl;
 cvar_t	*r_hybrid1_taa;
 cvar_t	*r_hybrid1_motion;
+cvar_t	*r_hybrid1_restir;
 cvar_t	*r_vdbFog;
 cvar_t	*r_vdbFogBlend;
 cvar_t	*r_forwardPlus;
@@ -2731,13 +2733,16 @@ static void R_Register( void )
 		ri.Printf( PRINT_ALL, "[VK][visbuf] r_visibilityBuffer=1 (visibility RTs when r_renderMode 1/2/3)\n" );
 	}
 	r_visibilityBufferFill = ri.Cvar_Get( "r_visibilityBufferFill", "0", CVAR_ARCHIVE_ND );
-	ri.Cvar_CheckRange( r_visibilityBufferFill, "0", "1", CV_INTEGER );
+	ri.Cvar_CheckRange( r_visibilityBufferFill, "0", "2", CV_INTEGER );
 	ri.Cvar_SetDescription( r_visibilityBufferFill,
-		"With r_visibilityBuffer 1: after opaque (mode 3) or main geometry, fill draw/prim ID + bary proxies from depth (compute). "
-		"True gl_PrimitiveID MRT export is a follow-up." );
+		"With r_visibilityBuffer 1: after opaque (mode 3) or main geometry:\n"
+		" 0 - off\n"
+		" 1 - depth-proxy compute fill (Morton/depth draw/prim ids)\n"
+		" 2 - prefer true PrimID/drawId MRT when available (non-MSAA deferred export); else depth proxy\n"
+		"Material classify still runs when r_materialClassify 1." );
 	ri.Cvar_SetGroup( r_visibilityBufferFill, CVG_RENDERER );
 	if ( r_visibilityBufferFill && r_visibilityBufferFill->integer ) {
-		ri.Printf( PRINT_ALL, "[VK][visbuf] r_visibilityBufferFill=1 (capture after geometry each frame)\n" );
+		ri.Printf( PRINT_ALL, "[VK][visbuf] r_visibilityBufferFill=%d\n", r_visibilityBufferFill->integer );
 	}
 	r_visibilityBufferDebug = ri.Cvar_Get( "r_visibilityBufferDebug", "0", CVAR_ARCHIVE_ND );
 	ri.Cvar_CheckRange( r_visibilityBufferDebug, "0", "5", CV_INTEGER );
@@ -2945,6 +2950,17 @@ static void R_Register( void )
 	ri.Cvar_CheckRange( r_oitForwardPlus, "0", "1", CV_INTEGER );
 	ri.Cvar_SetDescription( r_oitForwardPlus, "Forward+-lit OIT accumulation (tile lights on transparent surfaces). Default 1. Applies to \\r_oit 1 (WBOIT) and \\r_oit 2 (MBOIT accum; moments pass stays unlit). Requires \\r_forwardPlus 1. Mode 3: use with OIT instead of Forward+ transparent shade." );
 	ri.Cvar_SetGroup( r_oitForwardPlus, CVG_RENDERER );
+	r_oitClassify = ri.Cvar_Get( "r_oitClassify", "0", CVAR_ARCHIVE_ND | CVAR_LATCH );
+	ri.Cvar_CheckRange( r_oitClassify, "0", "1", CV_INTEGER );
+	ri.Cvar_SetDescription( r_oitClassify,
+		"Class-specialized OIT buckets (P4):\n"
+		" 0 - single transparent bucket (default)\n"
+		" 1 - split alpha-blend (MBOIT/WBOIT) vs additive particles (WBOIT, no moments)\n"
+		"Requires \\r_oit 1 or 2. Hair cards stay on \\r_stochasticAlpha." );
+	ri.Cvar_SetGroup( r_oitClassify, CVG_RENDERER );
+	if ( r_oitClassify && r_oitClassify->integer ) {
+		ri.Printf( PRINT_ALL, "[VK] OIT: r_oitClassify=1 (alpha-blend + additive buckets)\n" );
+	}
 	if ( r_oit->integer == 1 ) {
 		ri.Printf( PRINT_ALL, "[VK] OIT: WBOIT (weighted blended) enabled%s.\n",
 			( r_oitForwardPlus && r_oitForwardPlus->integer ) ? " + Forward+ lit" : "" );
@@ -3166,12 +3182,12 @@ static void R_Register( void )
 	ri.Cvar_SetDescription( r_rtxTlasUpdate,
 		"When \\r_rtxEntities 1: 1=TLAS UPDATE when instance count stable (faster hybrid path); 0=full TLAS rebuild each frame." );
 	ri.Cvar_SetGroup( r_rtxTlasUpdate, CVG_RENDERER );
-	r_rtxBindless = ri.Cvar_Get( "r_rtxBindless", "0", CVAR_ARCHIVE_ND | CVAR_LATCH );
+	r_rtxBindless = ri.Cvar_Get( "r_rtxBindless", "1", CVAR_ARCHIVE_ND | CVAR_LATCH );
 	ri.Cvar_CheckRange( r_rtxBindless, "0", "1", CV_INTEGER );
 	ri.Cvar_SetDescription( r_rtxBindless,
 		"D2 Phase A: RTX hit-shader bindless diffuse table (USE_VULKAN_RTX). 0=SSBO albedo fallback only; latch + vid_restart. See docs/RTX_HIT_SHADER_UV.md." );
 	ri.Cvar_SetGroup( r_rtxBindless, CVG_RENDERER );
-	ri.Printf( PRINT_ALL, "[VK][RTX] r_rtxBindless=%d (hit bindless; set 1 + r_rtxBindlessMode 1 for Phase A.1b centroid sample)\n",
+	ri.Printf( PRINT_ALL, "[VK][RTX] r_rtxBindless=%d (hit bindless default on; r_rtxBindlessMode 1 for Phase A.1b centroid sample)\n",
 		r_rtxBindless->integer );
 	r_rtxBindlessCap = ri.Cvar_Get( "r_rtxBindlessCap", "4096", CVAR_ARCHIVE_ND | CVAR_LATCH );
 	ri.Cvar_CheckRange( r_rtxBindlessCap, "1", "16384", CV_INTEGER );
@@ -3359,9 +3375,18 @@ static void R_Register( void )
 	ri.Cvar_CheckRange( r_hybrid1_motion, "0", "1", CV_INTEGER );
 	ri.Cvar_SetDescription( r_hybrid1_motion, "Hybrid1 temporal: use screen-space motion vectors for history reprojection when available." );
 	ri.Cvar_SetGroup( r_hybrid1_motion, CVG_RENDERER );
+	r_hybrid1_restir = ri.Cvar_Get( "r_hybrid1_restir", "0", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_hybrid1_restir, "0", "1", CV_INTEGER );
+	ri.Cvar_SetDescription( r_hybrid1_restir,
+		"Hybrid1 ReSTIR DI scaffold (P3): 0=off, 1=allocate temporal reservoir SSBO ping-pong (shade pass TBD). Quality preset 3 enables this." );
+	ri.Cvar_SetGroup( r_hybrid1_restir, CVG_RENDERER );
 	if ( r_hybrid1 && r_hybrid1->integer ) {
 		ri.Printf( PRINT_ALL,
 			"[VK][Hybrid1] r_hybrid1=1 (latched; USE_VULKAN_RTX, r_rtxDemo 1 + r_fbo 1, vid_restart; r_hybrid1Quality 0=custom/1=perf/2=balanced/3=quality)\n" );
+		if ( r_hybrid1_restir && r_hybrid1_restir->integer ) {
+			ri.Printf( PRINT_ALL,
+				"[VK][Hybrid1] r_hybrid1_restir=1 (ReSTIR DI scaffold; hybrid1_status for reservoir buffer)\n" );
+		}
 	}
 	r_vdbFog = ri.Cvar_Get( "r_vdbFog", "0", CVAR_ARCHIVE_ND );
 	ri.Cvar_CheckRange( r_vdbFog, "0", "1", CV_INTEGER );

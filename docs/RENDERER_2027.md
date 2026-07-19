@@ -10,8 +10,8 @@ This is more than “deferred plus Forward+.” Shipping today uses those as fou
 
 | Layer | Role |
 |-------|------|
-| **`r_renderMode 2`** | Shipping default — Forward+ primary |
-| **`r_renderMode 3`** | [Unified Clustered](UNIFIED_CLUSTERED_RENDERER.md) — deferred opaque + Forward+ transparent (shared tiles). **Spine** for 2027 layers |
+| **`r_renderMode 2`** | Forward+ primary (opt-in overlay / legacy modern path) |
+| **`r_renderMode 3`** | [Unified Clustered](UNIFIED_CLUSTERED_RENDERER.md) — deferred opaque + Forward+ transparent (shared tiles). **Shipping default** (`modern_vulkan.cfg`) and **spine** for 2027 layers |
 | **2027 target** | Mode 3 + visibility buffer + meshlets + reservoir RT + neural reconstruction |
 
 Do **not** invent `r_renderMode 4` for this architecture. Opt-in sidecars stack on mode 3.
@@ -49,7 +49,7 @@ Compact **visibility-buffer sidecar** coexisting with the classic G-buffer:
 
 **Phase 1.5 (fill + late-shade preview):**
 
-- Fill uses Morton locality + depth buckets for more stable draw/prim proxies (still depth-derived until true prim MRT).
+- Fill uses Morton locality + depth buckets when `r_visibilityBufferFill 1`, or true PrimID/drawId MRT when fill=2 and non-MSAA deferred export is live.
 - Debug mode **5** samples G-buffer albedo × class tint as a late-shade scaffold.
 
 **Deferred lighting notes (post–Phase 1):**
@@ -66,7 +66,7 @@ vid_restart
 
 Demo: `exec demo_visibility_2027.cfg`. The overlay keeps `r_deferredMaterialClassify 0` by default; enable it manually only when validating the experimental deferred consumer. Console: `visibility_buffer_status`, `renderer_status`.
 
-**Phase 1 encoding note:** fill is depth-derived (tile draw id + depth prim proxy + intra-tile bary). True `gl_PrimitiveID` / instance MRT export is a follow-up; Neural/Hybrid1 consumers still read the classic G-buffer.
+**Phase 1 encoding note:** `r_visibilityBufferFill 1` is depth-derived (tile draw id + depth prim proxy + intra-tile bary). `r_visibilityBufferFill 2` prefers true `gl_PrimitiveID` + monotonic drawId MRT (UV bary weights) when deferred direct export is non-MSAA; falls back to depth proxy otherwise. Neural/Hybrid1 consumers still read the classic G-buffer.
 
 ## Phase ladder
 
@@ -76,7 +76,7 @@ Demo: `exec demo_visibility_2027.cfg`. The overlay keeps `r_deferredMaterialClas
 | **P1.5** | Visbuf Morton/depth fill + late-shade debug mode 5 |
 | **P2** | GPU-driven meshlets — **`r_meshletsMdiDraw`** + **`r_meshletsLod`** screen LOD; persistent IBO + mesh shaders remain follow-up ([MESHLETS.md](MESHLETS.md)) |
 | **P3** | Reservoir-sampled hybrid path — ReSTIR DI on Hybrid1, NVC/FSA; **bindless A.1c** bary UV + PrimUv ([RTX_HIT_SHADER_UV.md](RTX_HIT_SHADER_UV.md)) |
-| **P4** | Material-classified OIT — mode 3 + MBOIT overlay (`vulkan_overlay_oit_clustered.cfg`); class-specialized paths remain follow-up ([MOMENT_OIT_STOCHASTIC_ALPHA.md](MOMENT_OIT_STOCHASTIC_ALPHA.md)) |
+| **P4** | Material-classified OIT — mode 3 + MBOIT overlay; `r_oitClassify 1` two-bucket (alpha-blend vs additive); further class paths remain follow-up ([MOMENT_OIT_STOCHASTIC_ALPHA.md](MOMENT_OIT_STOCHASTIC_ALPHA.md)) |
 | **P5** | Neural material/texture reconstruction (chocolate scaffold; no mandatory vendor SDK) |
 | **P6** | Heterogeneous resolution, sparse volumetrics, OMM, character skin/hair paths |
 

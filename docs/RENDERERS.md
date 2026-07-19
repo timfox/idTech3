@@ -19,9 +19,9 @@ Build: `./scripts/compile_engine.sh vulkan` (OpenGL/`opengl` arg is rejected).
 The Vulkan 1.4 renderer is the primary rendering backend, built as a shared library (`idtech3_vulkan.so`). Requests Vulkan 1.4 when available; validation layers (Khronos, then LUNARG fallback) are enabled in debug builds on all platforms.
 
 ### Current Architecture
-- **Modern Vulkan default:** `exec modern_vulkan.cfg` then `vid_restart`. This is the boring path: FBO + HDR32 + PBR/material blending + **Forward+ primary lighting** + TAA/motion vectors + a deferred G-buffer sidecar.
-- `r_renderMode`: **0** forward (classic projector; `r_forwardPlus` may still be 1), **1** deferred lighting mode (G-buffer + optional `r_deferredLighting`), **2** modern Forward+ primary (`r_forwardPlus` 1, `r_forwardPlusShade` 1, latched via `vid_restart`), **3** Unified Clustered Renderer (hybrid deferred opaque + Forward+ transparent; opt-in — see [UNIFIED_CLUSTERED_RENDERER.md](UNIFIED_CLUSTERED_RENDERER.md)). North-star 2027 stack (visibility buffer + meshlets + reservoir RT + neural recon) builds on mode 3 — see [RENDERER_2027.md](RENDERER_2027.md).
-- **Deferred G-buffer sidecar:** `r_deferredGBuffer 1` + `r_deferredGBufferFill 1` now works with `r_renderMode` 1, 2, and 3. In mode 2 it captures albedo/normal/material for temporal, neural, RT, and debug consumers while Forward+ remains the lighting path. `r_deferredLighting` runs in modes **1** and **3** (ignored in mode 2).
+- **Modern Vulkan default:** `exec modern_vulkan.cfg` then `vid_restart`. Unified Clustered (`r_renderMode 3`): deferred opaque + Forward+ transparent, HDR32/PBR, G-buffer, TAA off by default for stability. Equivalent: `exec modern_clustered.cfg`.
+- `r_renderMode`: **0** forward (classic projector; `r_forwardPlus` may still be 1), **1** deferred lighting mode (G-buffer + optional `r_deferredLighting`), **2** Forward+ primary (`r_forwardPlus` 1, `r_forwardPlusShade` 1), **3** Unified Clustered Renderer (hybrid deferred opaque + Forward+ transparent — **shipping default** via `modern_vulkan.cfg`; see [UNIFIED_CLUSTERED_RENDERER.md](UNIFIED_CLUSTERED_RENDERER.md)). North-star 2027 stack builds on mode 3 — see [RENDERER_2027.md](RENDERER_2027.md).
+- **Deferred G-buffer sidecar:** `r_deferredGBuffer 1` + `r_deferredGBufferFill 1` now works with `r_renderMode` 1, 2, and 3. In mode 2/3 the deferred G-buffer sidecar captures albedo/normal/material for temporal, neural, RT, and debug consumers. `r_deferredLighting` runs in modes **1** and **3** (ignored in mode 2).
 - Vulkan is the supported rendering backend
 - **Shared temporal reset policy** (`vk_temporal.c`): centralizes history invalidation for volumetrics, motion vectors, exposure. Resize, map load, camera cut, and missing prev-frame data trigger resets. Ready for future TAA/upscaler integration.
 - See [RENDERER_2026_ARCHITECTURE_PASS.md](RENDERER_2026_ARCHITECTURE_PASS.md) for the focused 2026 renderer direction
@@ -35,7 +35,7 @@ exec modern_vulkan.cfg
 vid_restart
 ```
 
-`modern_native.cfg` inherits this profile automatically when `cl_autoGraphicsProfile 1` loads a native cgame. The profile deliberately keeps **deferred lighting** off because the stable default is Forward+ primary lighting; the deferred G-buffer is captured as a sidecar for TAA/advanced systems and future framegraph unification.
+`modern_native.cfg` inherits this profile automatically when `cl_autoGraphicsProfile 1` loads a native cgame. The shipping default is **Unified Clustered** (`r_renderMode 3`): deferred opaque lighting + Forward+ transparent, with TAA/SMAA off by default for stability. Use `renderer_clustered_safe` if debugging.
 
 For an in-session recovery back to the documented modern baseline after deferred or clustered experiments:
 
@@ -52,14 +52,14 @@ The CI confidence target for this path is `test_modern_renderer_profile_runtime`
 |------|------------------|
 | Framebuffer/HDR | `r_fbo 1`, `r_hdr 2` |
 | Materials | `r_pbr 1`, `r_materialBlend 1` |
-| Lighting | `r_renderMode 2`, `r_forwardPlus 1`, `r_forwardPlusShade 1`, `r_forwardPlusDepthCull 1` |
+| Lighting | `r_renderMode 3`, `r_forwardPlus 1`, `r_forwardPlusShade 1`, `r_forwardPlusDepthCull 1`, `r_deferredLighting 1` |
 | Deferred data | `r_deferredGBuffer 1`, `r_deferredGBufferFill 1`, `r_deferredLighting 0` |
 | Temporal AA | `r_taa 1`, `r_taaMotionVectors 1`, `r_temporalCpuSkinPrev 1` |
 | Post AA safety net | `r_ext_smaa 1`, `r_postAaAfterBloom 1` |
 
 ### Vulkan Overlays
 
-The renderer profile rule is: start from **one** modern base, then apply an overlay only for the experimental path you want to test. Each overlay `exec`s `modern_vulkan.cfg` first, so the baseline remains Forward+ + G-buffer sidecar + PBR + HDR + TAA.
+The renderer profile rule is: start from **one** modern base (`modern_vulkan.cfg` = mode 3 clustered), then apply an overlay only for the experimental path you want to test.
 
 | Overlay | Use | Notes |
 |---------|-----|-------|
@@ -290,7 +290,7 @@ Code: `renderers/vulkan/vk_forward_plus.c`, `VK_FP_*` constants; cvar registrati
 |------|---------|-------------|
 | `r_fbo` | 1 | Framebuffer objects (required for PBR, HDR, bloom, MSAA, SMAA, SSAO). Use vid_restart after changing. |
 | `r_pbr` | 1 | Physically Based Rendering (metalness/roughness, IBL). Requires r_fbo 1. |
-| `r_renderMode` | 0 | **0** forward, **1** deferred lighting mode, **2** Forward+ primary, **3** Unified Clustered (hybrid deferred + Forward+). `modern_vulkan.cfg` sets **2**. Latched; `vid_restart`. |
+| `r_renderMode` | 0 | **0** forward, **1** deferred lighting mode, **2** Forward+ primary, **3** Unified Clustered (hybrid deferred + Forward+). `modern_vulkan.cfg` sets **3**. Latched; `vid_restart`. |
 | `r_deferredGBuffer` | 0 | With `r_renderMode` 1/2/3: allocate albedo/normal/material/lighting G-buffer images. `modern_vulkan.cfg` sets **1** as a sidecar. Latched; `r_fbo` 1. |
 | `r_deferredGBufferFill` | 0 | With G-buffer RTs: copy scene albedo after geometry (mode 3: after opaque). On non-MSAA FBO frames, opaque PBR material shaders directly export normals and material; MSAA/legacy paths keep the depth-derived fallback. Material is RGBA16F: metalness, roughness, AO, source confidence. `modern_vulkan.cfg` sets **1**. |
 | `r_deferredGBufferDebug` | 0 | Before bloom: show G-buffer on scene color (1=albedo, 2=normal, 3=material, 4=lighting, 5=normal confidence, 6=motion vectors from the main material pass). |

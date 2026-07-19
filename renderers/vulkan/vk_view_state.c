@@ -567,12 +567,17 @@ void vk_update_mvp( const float *m )
 		push_constants.reserved[6] = (float)r_stochasticAlpha->integer;
 		push_constants.reserved[7] = (float)( tr.frameCount & 1023 );
 	}
+	/* Visibility PrimID MRT: reserved[5] = monotonic draw id. */
+	if ( vk.visibilityBufferDirectExport ) {
+		push_constants.reserved[5] = (float)( backEnd.visDrawId++ );
+	}
 
 	layout = vk.pipeline_layout;
 	if ( backEnd.oitMomentsPass && vk.pipeline_layout_oit_moments != VK_NULL_HANDLE ) {
 		layout = vk.pipeline_layout_oit_moments;
 		oit_layout = qtrue;
 	} else if ( backEnd.oitAccumPass && r_oit && r_oit->integer == 2 &&
+		backEnd.oitBucketFilter != 2 &&
 		vk.pipeline_layout_oit_accum_mboit != VK_NULL_HANDLE ) {
 		layout = vk.pipeline_layout_oit_accum_mboit;
 		oit_layout = qtrue;

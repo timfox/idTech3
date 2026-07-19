@@ -57,24 +57,25 @@ source_checks() {
 	[[ -f "$hybrid" ]] || fail "missing Hybrid1 overlay"
 	[[ -f "$tr_diag" ]] || fail "missing renderer diagnostics include"
 
-	check_grep "$cfg" 'seta r_renderMode 2' "modern profile selects Forward+ mode"
+	check_grep "$cfg" 'seta r_renderMode 3' "modern profile selects Unified Clustered mode"
 	check_grep "$cfg" 'seta r_forwardPlus 1' "modern profile enables Forward+"
 	check_grep "$cfg" 'seta r_deferredGBuffer 1' "modern profile enables G-buffer sidecar"
-	check_grep "$cfg" 'seta r_deferredLighting 0' "modern profile keeps deferred lighting as overlay"
+	check_grep "$cfg" 'seta r_deferredLighting 1' "modern profile enables deferred lighting for mode 3"
 	check_grep "$cfg" 'seta r_pbr 1' "modern profile enables PBR"
 	check_grep "$cfg" 'seta r_hdr 2' "modern profile enables HDR32"
-	check_grep "$cfg" 'seta r_taa 1' "modern profile enables TAA"
-	check_grep "$cfg" 'seta r_taaMotionVectors 1' "modern profile enables motion-vector TAA"
+	check_grep "$cfg" 'seta r_taa 0' "modern profile defaults TAA off for mode 3 stability"
+	check_grep "$cfg" 'seta r_taaMotionVectors 0' "modern profile defaults motion-vector TAA off"
 
 	check_grep "$deferred" 'exec modern_vulkan.cfg' "deferred overlay inherits modern profile"
 	check_grep "$deferred" 'seta r_renderMode 1' "deferred overlay selects deferred mode"
 	check_grep "$rtx" 'exec modern_vulkan.cfg' "RTX overlay inherits modern profile"
 	check_grep "$hybrid" 'exec modern_vulkan.cfg' "Hybrid1 overlay inherits modern profile"
 	if grep -q 'seta r_renderMode 1' "$hybrid"; then
-		fail "Hybrid1 overlay must not replace modern Forward+ base"
+		fail "Hybrid1 overlay must not replace modern clustered base with mode 1"
 	fi
 
 	check_grep "scripts/compile_engine.sh" 'modern_vulkan.cfg' "release packaging includes modern profile"
+	check_grep "scripts/compile_engine.sh" 'modern_clustered.cfg' "release packaging includes clustered profile"
 	check_grep "scripts/compile_engine.sh" 'vulkan_overlay_deferred.cfg' "release packaging includes deferred overlay"
 	check_grep "scripts/compile_engine.sh" 'vulkan_overlay_rtx.cfg' "release packaging includes RTX overlay"
 	check_grep "scripts/compile_engine.sh" 'vulkan_overlay_hybrid1.cfg' "release packaging includes Hybrid1 overlay"

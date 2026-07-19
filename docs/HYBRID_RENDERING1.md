@@ -27,7 +27,16 @@ Secondary rays also sample a packed **per-primitive world normal SSBO** (`hybrid
 ./scripts/compile_engine.sh vulkan rtx   # USE_VULKAN_RTX=ON
 ```
 
-In-game (latched — **`vid_restart`** after toggling):
+In-game (latched — **`vid_restart`** after toggling). Preferred path inherits **mode 3** from `modern_vulkan.cfg`:
+
+```
+exec vulkan_overlay_hybrid1.cfg
+vid_restart
+```
+
+That enables Hybrid1 quality 3, entity BLAS, **`r_rtxBindless 1`**, and **`r_hybrid1_restir 1`** (ReSTIR DI reservoir scaffold; shade pass TBD — see `hybrid1_status`).
+
+Manual (deferred mode 1 also works):
 
 ```
 r_fbo 1
@@ -38,7 +47,6 @@ r_deferredGBuffer 1
 r_deferredGBufferFill 1
 vid_restart
 ```
-
 Optional:
 
 ```

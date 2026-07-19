@@ -17,7 +17,7 @@ Avoid calling this simply “deferred” (hides Forward+) or “deferred forward
 
 ## Enable (opt-in)
 
-Shipping default remains **`modern_vulkan.cfg`** (`r_renderMode 2`).
+Shipping default is **`modern_vulkan.cfg`** (`r_renderMode 3` Unified Clustered). Equivalent profile: `exec modern_clustered.cfg`.
 
 ```
 exec vulkan_overlay_unified_clustered.cfg

@@ -123,6 +123,10 @@ static struct {
 	hybrid1_image_t     hist_spec[2];
 	hybrid1_image_t     var_shadow[2];
 	hybrid1_image_t     var_spec[2];
+	VkBuffer            restir_reservoir[2];
+	VkDeviceMemory      restir_reservoir_memory[2];
+	VkDeviceSize        restir_reservoir_bytes;
+	qboolean            restir_ready;
 	qboolean            traced;
 	qboolean            cmds_registered;
 } hybrid1;
@@ -192,6 +196,7 @@ static void HYBRID1_ApplyQualityPreset( void )
 		ri.Cvar_Set( "r_hybrid1_temporalAlpha", "0.15" );
 		ri.Cvar_Set( "r_hybrid1_glint", "0" );
 		ri.Cvar_Set( "r_glintSampleBudget", "0" );
+		ri.Cvar_Set( "r_hybrid1_restir", "0" );
 	} else if ( q == 2 ) {
 		name = "balanced";
 		ri.Cvar_Set( "r_hybrid1_diffuse", "0" );
@@ -202,6 +207,7 @@ static void HYBRID1_ApplyQualityPreset( void )
 		ri.Cvar_Set( "r_hybrid1_temporalAlpha", "0.1" );
 		ri.Cvar_Set( "r_hybrid1_glint", "1" );
 		ri.Cvar_Set( "r_glintSampleBudget", "1" );
+		ri.Cvar_Set( "r_hybrid1_restir", "0" );
 	} else {
 		name = "quality";
 		ri.Cvar_Set( "r_hybrid1_diffuse", "1" );
@@ -212,6 +218,7 @@ static void HYBRID1_ApplyQualityPreset( void )
 		ri.Cvar_Set( "r_hybrid1_temporalAlpha", "0.1" );
 		ri.Cvar_Set( "r_hybrid1_glint", "1" );
 		ri.Cvar_Set( "r_glintSampleBudget", "2" );
+		ri.Cvar_Set( "r_hybrid1_restir", "1" );
 	}
 
 	s_hybrid1AppliedQuality = q;
@@ -275,6 +282,7 @@ static void HYBRID1_Status_f( void )
 		"  ggx=%d glint=%d iblMode=%d diffuseDirect=%d dlightShadows=%d\n"
 		"  composite shadowStr=%.2f specStr=%.2f diffuseStr=%.2f deferredGBuffer=%d\n"
 		"  surfelFusion=%d (Surfel irradiance as diffuse GI when both active)\n"
+		"  restir=%d ready=%d reservoirBytes=%zu ping=%u (P3 DI scaffold; shade pass TBD)\n"
 		"  note: Hybrid1 is the production RT lighting path; seta r_hybrid1Quality 1|2|3; rtx_status for TLAS/entities\n",
 		HYBRID1_StateString(),
 		vk_hybrid1_active() ? 1 : 0,
@@ -320,7 +328,11 @@ static void HYBRID1_Status_f( void )
 		r_hybrid1_specStrength ? r_hybrid1_specStrength->value : 1.0f,
 		r_hybrid1_diffuseStrength ? r_hybrid1_diffuseStrength->value : 1.0f,
 		vk_deferred_gbuffer_fill_wanted() ? 1 : 0,
-		vk_surfel_gi_hybrid1_fusion_active() ? 1 : 0 );
+		vk_surfel_gi_hybrid1_fusion_active() ? 1 : 0,
+		( r_hybrid1_restir && r_hybrid1_restir->integer ) ? 1 : 0,
+		hybrid1.restir_ready ? 1 : 0,
+		(size_t)hybrid1.restir_reservoir_bytes,
+		hybrid1.frame_index & 1u );
 }
 
 static void HYBRID1_Reset_f( void )
@@ -375,6 +387,7 @@ static qboolean HYBRID1_ConsumeCvarResets( void )
 		r_hybrid1_dlightShadows,
 		r_hybrid1_ibl,
 		r_hybrid1_motion,
+		r_hybrid1_restir,
 		NULL
 	};
 	int i;
@@ -514,6 +527,9 @@ static void HYBRID1_DestroyAllImages( void )
 	HYBRID1_DestroyImage( &hybrid1.var_spec[1] );
 }
 
+static void HYBRID1_DestroyRestirBuffers( void );
+static void HYBRID1_EnsureRestirBuffers( uint32_t w, uint32_t h );
+
 static void HYBRID1_CreateImages( uint32_t w, uint32_t h )
 {
 	HYBRID1_CreateImage( &hybrid1.raw_shadow, w, h, "hybrid1 raw shadow" );
@@ -536,6 +552,66 @@ static void HYBRID1_CreateImages( uint32_t w, uint32_t h )
 	hybrid1.width = w;
 	hybrid1.height = h;
 	hybrid1.traced = qfalse;
+	HYBRID1_EnsureRestirBuffers( w, h );
+}
+
+#define HYBRID1_RESTIR_STRIDE 16u /* vec4 reservoir stub per pixel */
+
+static void HYBRID1_DestroyRestirBuffers( void )
+{
+	int i;
+	for ( i = 0; i < 2; i++ ) {
+		if ( hybrid1.restir_reservoir[i] != VK_NULL_HANDLE ) {
+			qvkDestroyBuffer( vk.device, hybrid1.restir_reservoir[i], NULL );
+			hybrid1.restir_reservoir[i] = VK_NULL_HANDLE;
+		}
+		if ( hybrid1.restir_reservoir_memory[i] != VK_NULL_HANDLE ) {
+			qvkFreeMemory( vk.device, hybrid1.restir_reservoir_memory[i], NULL );
+			hybrid1.restir_reservoir_memory[i] = VK_NULL_HANDLE;
+		}
+	}
+	hybrid1.restir_reservoir_bytes = 0;
+	hybrid1.restir_ready = qfalse;
+}
+
+static void HYBRID1_EnsureRestirBuffers( uint32_t w, uint32_t h )
+{
+	VkDeviceSize need;
+	int i;
+
+	if ( !r_hybrid1_restir || !r_hybrid1_restir->integer || w == 0 || h == 0 ) {
+		HYBRID1_DestroyRestirBuffers();
+		return;
+	}
+	need = (VkDeviceSize)w * (VkDeviceSize)h * (VkDeviceSize)HYBRID1_RESTIR_STRIDE;
+	if ( hybrid1.restir_ready && hybrid1.restir_reservoir_bytes == need ) {
+		return;
+	}
+	HYBRID1_DestroyRestirBuffers();
+	for ( i = 0; i < 2; i++ ) {
+		VkBufferCreateInfo bi;
+		VkMemoryRequirements req;
+		VkMemoryAllocateInfo ai;
+
+		Com_Memset( &bi, 0, sizeof( bi ) );
+		bi.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+		bi.size = need;
+		bi.usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
+		VK_CHECK( qvkCreateBuffer( vk.device, &bi, NULL, &hybrid1.restir_reservoir[i] ) );
+		qvkGetBufferMemoryRequirements( vk.device, hybrid1.restir_reservoir[i], &req );
+		Com_Memset( &ai, 0, sizeof( ai ) );
+		ai.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+		ai.allocationSize = req.size;
+		ai.memoryTypeIndex = vk_find_memory_type( vk.physical_device, req.memoryTypeBits,
+			VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT );
+		VK_CHECK( qvkAllocateMemory( vk.device, &ai, NULL, &hybrid1.restir_reservoir_memory[i] ) );
+		VK_CHECK( qvkBindBufferMemory( vk.device, hybrid1.restir_reservoir[i],
+			hybrid1.restir_reservoir_memory[i], 0 ) );
+	}
+	hybrid1.restir_reservoir_bytes = need;
+	hybrid1.restir_ready = qtrue;
+	ri.Printf( PRINT_ALL, "[VK][Hybrid1] ReSTIR DI scaffold: %ux%u reservoir ping-pong %zuB/slice\n",
+		w, h, (size_t)need );
 }
 
 static VkSampler HYBRID1_NearestSampler( void )
@@ -1148,6 +1224,7 @@ qboolean vk_hybrid1_active( void )
 
 void vk_hybrid1_shutdown( void )
 {
+	HYBRID1_DestroyRestirBuffers();
 	if ( hybrid1.composite_pipeline != VK_NULL_HANDLE ) {
 		qvkDestroyPipeline( vk.device, hybrid1.composite_pipeline, NULL );
 	}
@@ -2036,6 +2113,10 @@ void vk_hybrid1_record_pass( VkCommandBuffer cmd )
 		HYBRID1_TraceDispatch( cmd, hybrid1.diffuse_pipeline, hybrid1.sbt_diffuse_buffer );
 	}
 	hybrid1.traced = qtrue;
+	if ( r_hybrid1_restir && r_hybrid1_restir->integer && hybrid1.restir_ready ) {
+		/* P3: dispatch hybrid1_restir.comp here; ping-pong cur/prev buffers. */
+		(void)hybrid1.restir_reservoir[hybrid1.frame_index & 1u];
+	}
 
 	if ( doShadow ) {
 		HYBRID1_BarrierImage( cmd, hybrid1.raw_shadow.image, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,

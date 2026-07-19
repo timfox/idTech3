@@ -112,7 +112,7 @@ Suggested caps (tunable cvars):
 6. ~~Bindless descriptor array + `GL_EXT_nonuniform_qualifier` when `r_rtxBindless 1` + indexing supported.~~
 7. ~~World `PrimUvSSBO` + Hybrid1/Surfel/PT barycentric sample (entity UV pack follow-up).~~
 8. ~~Surfel / pathtrace descriptor parity (PrimMaterial + PrimUv + bindless).~~
-9. Visbuf true `gl_PrimitiveID` MRT (deferred; AS UV covers bindless hit texturing).
+9. Visbuf true `gl_PrimitiveID` MRT — landed via `r_visibilityBufferFill 2` + deferred direct export (UV bary weights; hardware barycentric optional follow-up).
 
 ## Risks
 

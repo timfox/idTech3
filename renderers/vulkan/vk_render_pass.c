@@ -37,7 +37,7 @@ void vk_set_fullscreen_viewport_scissor( uint32_t width, uint32_t height )
 void vk_begin_render_pass_tracked( VkRenderPass renderPass, VkFramebuffer frameBuffer, qboolean clearValues, uint32_t width, uint32_t height )
 {
 	VkRenderPassBeginInfo render_pass_begin_info;
-	VkClearValue clear_values[5];
+	VkClearValue clear_values[7];
 
 	if ( width == 0 ) {
 		width = 1u;
@@ -85,6 +85,17 @@ void vk_begin_render_pass_tracked( VkRenderPass renderPass, VkFramebuffer frameB
 					clear_values[4].color.float32[2] = 1.0f;
 					clear_values[4].color.float32[3] = 0.0f;
 					clear_count = 5;
+					if ( vk.visibilityBufferDirectExport ) {
+						clear_values[5].color.uint32[0] = 0u;
+						clear_values[5].color.uint32[1] = 0u;
+						clear_values[5].color.uint32[2] = 0u;
+						clear_values[5].color.uint32[3] = 0u;
+						clear_values[6].color.float32[0] = 0.0f;
+						clear_values[6].color.float32[1] = 0.0f;
+						clear_values[6].color.float32[2] = 0.0f;
+						clear_values[6].color.float32[3] = 0.0f;
+						clear_count = 7;
+					}
 				}
 			} else {
 				clear_count = vk.msaaActive ? 3 : 2;
@@ -207,10 +218,10 @@ void vk_end_render_pass_tracked( void )
 void vk_create_render_passes( void )
 {
 	VkSampleCountFlagBits vkSamples = vk_get_main_rasterization_samples();
-	VkAttachmentDescription attachments[5]; // color | depth | motion | gbuf normal/msaa color | gbuf material/msaa motion
-	VkAttachmentReference colorResolveRefs[4];
+	VkAttachmentDescription attachments[7]; // color | depth | motion | gbuf N | gbuf M | vis ids | vis bary
+	VkAttachmentReference colorResolveRefs[6];
 	VkAttachmentReference colorResolveRef;
-	VkAttachmentReference colorRefs[4];
+	VkAttachmentReference colorRefs[6];
 	VkAttachmentReference colorRef0;
 	VkAttachmentReference depthRef0;
 	VkSubpassDescription subpass;
@@ -219,6 +230,7 @@ void vk_create_render_passes( void )
 	VkFormat depth_format;
 	VkDevice device;
 	const qboolean fboActive = vk.fboActive;
+	const qboolean visMrt = ( fboActive && vk.deferredGbufferDirectExport && vk.visibilityBufferDirectExport ) ? qtrue : qfalse;
 	uint32_t i;
 
 	depth_format = vk.depth_format;
@@ -276,6 +288,10 @@ void vk_create_render_passes( void )
 	colorRefs[2].layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 	colorRefs[3].attachment = VK_ATTACHMENT_UNUSED;
 	colorRefs[3].layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+	colorRefs[4].attachment = VK_ATTACHMENT_UNUSED;
+	colorRefs[4].layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+	colorRefs[5].attachment = VK_ATTACHMENT_UNUSED;
+	colorRefs[5].layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 
 	depthRef0.attachment = 1;
 	depthRef0.layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
@@ -289,6 +305,10 @@ void vk_create_render_passes( void )
 	colorResolveRefs[2].layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 	colorResolveRefs[3].attachment = VK_ATTACHMENT_UNUSED;
 	colorResolveRefs[3].layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+	colorResolveRefs[4].attachment = VK_ATTACHMENT_UNUSED;
+	colorResolveRefs[4].layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+	colorResolveRefs[5].attachment = VK_ATTACHMENT_UNUSED;
+	colorResolveRefs[5].layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 
 	if ( fboActive ) {
 		// velocity buffer used for per-pixel reprojection.
@@ -319,12 +339,39 @@ void vk_create_render_passes( void )
 
 			colorRefs[2].attachment = 3;
 			colorRefs[3].attachment = 4;
+
+			if ( visMrt ) {
+				attachments[5].flags = 0;
+				attachments[5].format = VK_FORMAT_R32G32_UINT;
+				attachments[5].samples = VK_SAMPLE_COUNT_1_BIT;
+				attachments[5].loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+				attachments[5].storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+				attachments[5].stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+				attachments[5].stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+				attachments[5].initialLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+				attachments[5].finalLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+
+				attachments[6].flags = 0;
+				attachments[6].format = VK_FORMAT_R16G16_UNORM;
+				attachments[6].samples = VK_SAMPLE_COUNT_1_BIT;
+				attachments[6].loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+				attachments[6].storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+				attachments[6].stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+				attachments[6].stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+				attachments[6].initialLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+				attachments[6].finalLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+
+				colorRefs[4].attachment = 5;
+				colorRefs[5].attachment = 6;
+			}
 		}
 	}
 
 	Com_Memset( &subpass, 0, sizeof( subpass ) );
 	subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
-	subpass.colorAttachmentCount = ( fboActive && vk.deferredGbufferDirectExport ) ? 4 : ( fboActive ? 2 : 1 );
+	subpass.colorAttachmentCount = ( fboActive && vk.deferredGbufferDirectExport )
+		? ( visMrt ? 6 : 4 )
+		: ( fboActive ? 2 : 1 );
 	subpass.pColorAttachments = colorRefs;
 	subpass.pDepthStencilAttachment = &depthRef0;
 	subpass.pResolveAttachments = NULL;
@@ -337,7 +384,9 @@ void vk_create_render_passes( void )
 	desc.pSubpasses = &subpass;
 
 	desc.subpassCount = 1;
-	desc.attachmentCount = ( fboActive && vk.deferredGbufferDirectExport ) ? 5 : ( fboActive ? 3 : 2 );
+	desc.attachmentCount = ( fboActive && vk.deferredGbufferDirectExport )
+		? ( visMrt ? 7 : 5 )
+		: ( fboActive ? 3 : 2 );
 
 	if ( vk.msaaActive )
 	{
@@ -442,6 +491,10 @@ void vk_create_render_passes( void )
 		} else if ( fboActive && vk.deferredGbufferDirectExport ) {
 			attachments[3].loadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
 			attachments[4].loadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
+			if ( vk.visibilityBufferDirectExport ) {
+				attachments[5].loadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
+				attachments[6].loadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
+			}
 		}
 		VK_CHECK( qvkCreateRenderPass( device, &desc, NULL, &vk.render_pass.main_resume ) );
 		SET_OBJECT_NAME( vk.render_pass.main_resume, "render pass - main_resume", VK_DEBUG_REPORT_OBJECT_TYPE_RENDER_PASS_EXT );
@@ -471,11 +524,17 @@ void vk_create_render_passes( void )
 				attachments[4].storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
 			}
 		} else if ( fboActive && vk.deferredGbufferDirectExport ) {
-			/* Preserve direct-export normal/material MRTs across post_bloom begin. */
+			/* Preserve direct-export normal/material(/vis) MRTs across post_bloom begin. */
 			attachments[3].loadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
 			attachments[3].storeOp = VK_ATTACHMENT_STORE_OP_STORE;
 			attachments[4].loadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
 			attachments[4].storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+			if ( vk.visibilityBufferDirectExport ) {
+				attachments[5].loadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
+				attachments[5].storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+				attachments[6].loadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
+				attachments[6].storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+			}
 		}
 #ifdef USE_VULKAN_RTX
 		/* RTX demo blit leaves resolved color in COLOR_ATTACHMENT_OPTIMAL; match layouts so post_bloom is valid. */

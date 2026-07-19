@@ -515,6 +515,7 @@ void vk_bind_descriptor_sets( void )
 				vk.pipeline_layout_oit_moments, 0, set_count, sets, 0, NULL );
 		}
 	} else if ( backEnd.oitAccumPass && r_oit && r_oit->integer == 2 &&
+		backEnd.oitBucketFilter != 2 &&
 		vk.pipeline_layout_oit_accum_mboit != VK_NULL_HANDLE ) {
 		/* MBOIT accum: set 0 = tex0; 1 = depth; 2 = moments; 3 = b0; 4 = Forward+ (when lit). */
 		if ( vk.cmd->descriptor_set.current[VK_DESC_TEXTURE0] != VK_NULL_HANDLE ) {
@@ -601,7 +602,9 @@ void vk_bind_pipeline( uint32_t pipeline ) {
 
 	if ( backEnd.oitMomentsPass && vk.oit_moments_pipeline != VK_NULL_HANDLE ) {
 		vkpipe = vk.oit_moments_pipeline;
-	} else if ( backEnd.oitAccumPass && r_oit && r_oit->integer == 2 && vk.oit_accum_mboit_pipeline != VK_NULL_HANDLE ) {
+	} else if ( backEnd.oitAccumPass && r_oit && r_oit->integer == 2 &&
+		backEnd.oitBucketFilter != 2 &&
+		vk.oit_accum_mboit_pipeline != VK_NULL_HANDLE ) {
 		vkpipe = vk.oit_accum_mboit_pipeline;
 	} else if ( backEnd.oitAccumPass && vk.oit_accum_pipeline != VK_NULL_HANDLE ) {
 		vkpipe = vk.oit_accum_pipeline;

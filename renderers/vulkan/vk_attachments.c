@@ -390,9 +390,24 @@ static void vk_create_deferred_gbuffer_scaffold( void )
 		VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, qfalse, 0 );
 	vk.deferredGbufferAllocated = qtrue;
 	vk.deferredGbufferDirectExport = vk.msaaActive ? qfalse : qtrue;
+	/* PrimID/bary MRT companions for gbuf shaders (USE_VISIBILITY_EXPORT). Full visbuf
+	 * feature (class/fill/debug) still requires r_visibilityBuffer; these images are
+	 * created whenever deferred direct export is live so attachment counts match. */
+	if ( vk.deferredGbufferDirectExport && vk.visibility_buffer_ids == VK_NULL_HANDLE ) {
+		VkImageUsageFlags visUsage =
+			VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+		vk_create_fullres_color_attachment( VK_FORMAT_R32G32_UINT, visUsage,
+			&vk.visibility_buffer_ids, &vk.visibility_buffer_ids_view,
+			VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, qfalse );
+		vk_create_fullres_color_attachment( VK_FORMAT_R16G16_UNORM, visUsage,
+			&vk.visibility_buffer_bary, &vk.visibility_buffer_bary_view,
+			VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, qfalse );
+		vk.visibilityBufferDirectExport = qtrue;
+	}
 	ri.Printf( PRINT_ALL,
-		"[VK][deferred] G-buffer scaffold: albedo (scene color format) + normal RGBA16F + material RGBA16F + motion sidecar + lighting RGBA16F + class stub%s\n",
-		vk.deferredGbufferDirectExport ? " (direct material export)" : " (depth fallback export)" );
+		"[VK][deferred] G-buffer scaffold: albedo (scene color format) + normal RGBA16F + material RGBA16F + motion sidecar + lighting RGBA16F + class stub%s%s\n",
+		vk.deferredGbufferDirectExport ? " (direct material export)" : " (depth fallback export)",
+		vk.visibilityBufferDirectExport ? " + PrimID MRT" : "" );
 }
 
 /*
@@ -404,14 +419,22 @@ IDs = R32G32_UINT (draw/prim), bary = R16G16_UNORM, class = R8_UINT.
 */
 static void vk_create_visibility_buffer_scaffold( void )
 {
+	/* COLOR_ATTACHMENT for true PrimID MRT; STORAGE for depth-proxy compute fill. */
 	VkImageUsageFlags usage =
+		VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+	VkImageUsageFlags classUsage =
 		VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
+	qboolean ids_from_deferred = ( vk.visibility_buffer_ids != VK_NULL_HANDLE ) ? qtrue : qfalse;
 
 	vk.visibilityBufferAllocated = qfalse;
-	vk.visibility_buffer_ids = VK_NULL_HANDLE;
-	vk.visibility_buffer_ids_view = VK_NULL_HANDLE;
-	vk.visibility_buffer_bary = VK_NULL_HANDLE;
-	vk.visibility_buffer_bary_view = VK_NULL_HANDLE;
+	/* Keep PrimID MRT flag if deferred scaffold already allocated ids/bary. */
+	if ( !ids_from_deferred ) {
+		vk.visibilityBufferDirectExport = qfalse;
+		vk.visibility_buffer_ids = VK_NULL_HANDLE;
+		vk.visibility_buffer_ids_view = VK_NULL_HANDLE;
+		vk.visibility_buffer_bary = VK_NULL_HANDLE;
+		vk.visibility_buffer_bary_view = VK_NULL_HANDLE;
+	}
 	vk.visibility_buffer_class = VK_NULL_HANDLE;
 	vk.visibility_buffer_class_view = VK_NULL_HANDLE;
 
@@ -421,18 +444,26 @@ static void vk_create_visibility_buffer_scaffold( void )
 		return;
 	}
 
-	vk_create_fullres_color_attachment( VK_FORMAT_R32G32_UINT, usage,
-		&vk.visibility_buffer_ids, &vk.visibility_buffer_ids_view,
-		VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, qfalse );
-	vk_create_fullres_color_attachment( VK_FORMAT_R16G16_UNORM, usage,
-		&vk.visibility_buffer_bary, &vk.visibility_buffer_bary_view,
-		VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, qfalse );
-	vk_create_fullres_color_attachment( VK_FORMAT_R8_UINT, usage,
+	if ( !ids_from_deferred ) {
+		vk_create_fullres_color_attachment( VK_FORMAT_R32G32_UINT, usage,
+			&vk.visibility_buffer_ids, &vk.visibility_buffer_ids_view,
+			VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, qfalse );
+		vk_create_fullres_color_attachment( VK_FORMAT_R16G16_UNORM, usage,
+			&vk.visibility_buffer_bary, &vk.visibility_buffer_bary_view,
+			VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, qfalse );
+	}
+	vk_create_fullres_color_attachment( VK_FORMAT_R8_UINT, classUsage,
 		&vk.visibility_buffer_class, &vk.visibility_buffer_class_view,
 		VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, qfalse );
 	vk.visibilityBufferAllocated = qtrue;
+	vk.visibilityBufferDirectExport = ( vk.deferredGbufferDirectExport && !vk.msaaActive &&
+		vk.visibility_buffer_ids != VK_NULL_HANDLE ) ? qtrue : qfalse;
 	ri.Printf( PRINT_ALL,
-		"[VK][visbuf] visibility scaffold: IDs R32G32_UINT + bary R16G16_UNORM + class R8_UINT\n" );
+		"[VK][visbuf] visibility scaffold: IDs R32G32_UINT + bary R16G16_UNORM + class R8_UINT%s\n",
+		vk.visibilityBufferDirectExport ? " (PrimID MRT export)" : " (compute fill / MSAA fallback)" );
+	if ( vk.visibilityBufferDirectExport ) {
+		ri.Printf( PRINT_ALL, "[VK][visbuf] true gl_PrimitiveID / drawId MRT enabled\n" );
+	}
 }
 
 static void vk_create_fullres_msaa_color_attachment(
@@ -2184,6 +2215,7 @@ void vk_destroy_attachments( void )
 		vk.visibility_buffer_class_view = VK_NULL_HANDLE;
 	}
 	vk.visibilityBufferAllocated = qfalse;
+	vk.visibilityBufferDirectExport = qfalse;
 
 	if ( vk.msaa_image ) {
 		qvkDestroyImage( vk.device, vk.msaa_image, NULL );

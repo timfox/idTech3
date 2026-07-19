@@ -29,7 +29,9 @@ Demo: `exec demo_mboit.cfg` (or `vulkan_overlay_mboit.cfg`).
 
 ### With Unified Clustered (`r_renderMode 3`)
 
-Pair OIT with deferred opaque. Both WBOIT and MBOIT accum use Forward+ tile lights via `r_oitForwardPlus 1` (default; MBOIT moments pass stays unlit):
+Pair OIT with deferred opaque. Both WBOIT and MBOIT accum use Forward+ tile lights via `r_oitForwardPlus 1` (default; MBOIT moments pass stays unlit).
+
+`r_oitClassify 1` splits transparent draws into alpha-blend (MBOIT/WBOIT) vs additive particles/smoke (WBOIT, no moments), compositing additive last. Default `0` keeps a single global bucket. Hair cards stay on `r_stochasticAlpha`, not OIT.
 
 ```
 exec vulkan_overlay_oit_clustered.cfg

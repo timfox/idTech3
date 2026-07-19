@@ -73,8 +73,15 @@ qboolean vk_visibility_buffer_active( void )
 
 qboolean vk_visibility_buffer_fill_wanted( void )
 {
-	return ( vk_visibility_buffer_active() && r_visibilityBufferFill &&
-		r_visibilityBufferFill->integer ) ? qtrue : qfalse;
+	if ( !vk_visibility_buffer_active() || !r_visibilityBufferFill ||
+		!r_visibilityBufferFill->integer ) {
+		return qfalse;
+	}
+	/* fill=2 prefers PrimID MRT; skip depth-proxy compute when MRT is live. */
+	if ( r_visibilityBufferFill->integer >= 2 && vk.visibilityBufferDirectExport ) {
+		return qfalse;
+	}
+	return qtrue;
 }
 
 qboolean vk_material_classify_wanted( void )
@@ -497,16 +504,30 @@ void vk_visibility_buffer_capture_after_geometry( void )
 	vk_visbuf_classify_push_t class_push;
 	uint32_t gx, gy;
 	qboolean resume_main;
+	qboolean do_fill;
+	qboolean do_classify;
 
-	if ( !vk_visibility_buffer_fill_wanted() ) {
+	do_fill = vk_visibility_buffer_fill_wanted();
+	do_classify = vk_material_classify_wanted();
+	/* fill=2 + PrimID MRT: skip depth proxy but still run classify. */
+	if ( !do_fill && !do_classify ) {
+		if ( vk.visibilityBufferDirectExport && r_visibilityBufferFill &&
+			r_visibilityBufferFill->integer >= 2 && !vk.visibility_buffer.fill_logged ) {
+			ri.Printf( PRINT_ALL,
+				"[VK][visbuf] r_visibilityBufferFill=2 (PrimID MRT; skipping depth-proxy compute)\n" );
+			vk.visibility_buffer.fill_logged = qtrue;
+		}
+		return;
+	}
+	if ( !vk_visibility_buffer_active() ) {
 		return;
 	}
 	vk_visibility_buffer_ensure_runtime();
 	if ( !vk.cmd || vk.cmd->command_buffer == VK_NULL_HANDLE ) {
 		return;
 	}
-	if ( vk.visibility_buffer_ids == VK_NULL_HANDLE || vk.visibility_buffer_bary == VK_NULL_HANDLE ||
-		vk.depth_image == VK_NULL_HANDLE ) {
+	if ( do_fill && ( vk.visibility_buffer_ids == VK_NULL_HANDLE || vk.visibility_buffer_bary == VK_NULL_HANDLE ||
+		vk.depth_image == VK_NULL_HANDLE ) ) {
 		return;
 	}
 
@@ -516,20 +537,6 @@ void vk_visibility_buffer_capture_after_geometry( void )
 	}
 	vk_visbuf_validate_compute_break( "visibility_buffer_capture_after_geometry", resume_main );
 
-	vk_visbuf_create_fill_pipeline();
-	if ( !vk.visibility_buffer.pipeline_ready || vk.visibility_buffer.pipeline == VK_NULL_HANDLE ) {
-		if ( resume_main ) {
-			vk_resume_current_render_pass();
-		}
-		return;
-	}
-
-	if ( !vk.visibility_buffer.fill_logged ) {
-		ri.Printf( PRINT_ALL,
-			"[VK][visbuf] r_visibilityBufferFill=1 (depth-derived draw/prim id + bary proxy)\n" );
-		vk.visibility_buffer.fill_logged = qtrue;
-	}
-
 	width = vk_get_render_target_width();
 	height = vk_get_render_target_height();
 	if ( width == 0 || height == 0 ) {
@@ -538,50 +545,79 @@ void vk_visibility_buffer_capture_after_geometry( void )
 		}
 		return;
 	}
+	gx = ( width + 7u ) / 8u;
+	gy = ( height + 7u ) / 8u;
 
 	depth_aspect = VK_IMAGE_ASPECT_DEPTH_BIT;
 	if ( glConfig.stencilBits > 0 ) {
 		depth_aspect |= VK_IMAGE_ASPECT_STENCIL_BIT;
 	}
 
-	record_depth_image_layout_transition( vk.cmd->command_buffer, depth_aspect,
-		VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL,
-		VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT,
-		VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT );
+	if ( do_fill ) {
+		vk_visbuf_create_fill_pipeline();
+		if ( !vk.visibility_buffer.pipeline_ready || vk.visibility_buffer.pipeline == VK_NULL_HANDLE ) {
+			do_fill = qfalse;
+			if ( !do_classify ) {
+				if ( resume_main ) {
+					vk_resume_current_render_pass();
+				}
+				return;
+			}
+		}
+	}
 
-	record_image_layout_transition( vk.cmd->command_buffer, vk.visibility_buffer_ids,
-		VK_IMAGE_ASPECT_COLOR_BIT,
-		VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_GENERAL, 0, 0 );
-	record_image_layout_transition( vk.cmd->command_buffer, vk.visibility_buffer_bary,
-		VK_IMAGE_ASPECT_COLOR_BIT,
-		VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_GENERAL, 0, 0 );
+	if ( do_fill || do_classify ) {
+		record_depth_image_layout_transition( vk.cmd->command_buffer, depth_aspect,
+			VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL,
+			VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT,
+			VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT );
+	}
 
-	vk_visbuf_update_fill_descriptors();
+	if ( do_fill ) {
+		if ( !vk.visibility_buffer.fill_logged ) {
+			ri.Printf( PRINT_ALL,
+				"[VK][visbuf] r_visibilityBufferFill=%d (depth-derived draw/prim id + bary proxy)\n",
+				r_visibilityBufferFill ? r_visibilityBufferFill->integer : 1 );
+			vk.visibility_buffer.fill_logged = qtrue;
+		}
 
-	Com_Memset( &fill_push, 0, sizeof( fill_push ) );
-	fill_push.extent[0] = width;
-	fill_push.extent[1] = height;
-	fill_push.tileSize = 16u;
+		record_image_layout_transition( vk.cmd->command_buffer, vk.visibility_buffer_ids,
+			VK_IMAGE_ASPECT_COLOR_BIT,
+			VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_GENERAL, 0, 0 );
+		record_image_layout_transition( vk.cmd->command_buffer, vk.visibility_buffer_bary,
+			VK_IMAGE_ASPECT_COLOR_BIT,
+			VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_GENERAL, 0, 0 );
 
-	qvkCmdBindPipeline( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE,
-		vk.visibility_buffer.pipeline );
-	qvkCmdBindDescriptorSets( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE,
-		vk.visibility_buffer.pipeline_layout, 0, 1, &vk.visibility_buffer.descriptor, 0, NULL );
-	qvkCmdPushConstants( vk.cmd->command_buffer, vk.visibility_buffer.pipeline_layout,
-		VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof( fill_push ), &fill_push );
+		vk_visbuf_update_fill_descriptors();
 
-	gx = ( width + 7u ) / 8u;
-	gy = ( height + 7u ) / 8u;
-	qvkCmdDispatch( vk.cmd->command_buffer, gx, gy, 1 );
+		Com_Memset( &fill_push, 0, sizeof( fill_push ) );
+		fill_push.extent[0] = width;
+		fill_push.extent[1] = height;
+		fill_push.tileSize = 16u;
 
-	record_image_layout_transition( vk.cmd->command_buffer, vk.visibility_buffer_ids,
-		VK_IMAGE_ASPECT_COLOR_BIT,
-		VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, 0, 0 );
-	record_image_layout_transition( vk.cmd->command_buffer, vk.visibility_buffer_bary,
-		VK_IMAGE_ASPECT_COLOR_BIT,
-		VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, 0, 0 );
+		qvkCmdBindPipeline( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE,
+			vk.visibility_buffer.pipeline );
+		qvkCmdBindDescriptorSets( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE,
+			vk.visibility_buffer.pipeline_layout, 0, 1, &vk.visibility_buffer.descriptor, 0, NULL );
+		qvkCmdPushConstants( vk.cmd->command_buffer, vk.visibility_buffer.pipeline_layout,
+			VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof( fill_push ), &fill_push );
 
-	if ( vk_material_classify_wanted() && vk.visibility_buffer_class != VK_NULL_HANDLE ) {
+		qvkCmdDispatch( vk.cmd->command_buffer, gx, gy, 1 );
+
+		record_image_layout_transition( vk.cmd->command_buffer, vk.visibility_buffer_ids,
+			VK_IMAGE_ASPECT_COLOR_BIT,
+			VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, 0, 0 );
+		record_image_layout_transition( vk.cmd->command_buffer, vk.visibility_buffer_bary,
+			VK_IMAGE_ASPECT_COLOR_BIT,
+			VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, 0, 0 );
+	} else if ( vk.visibilityBufferDirectExport && r_visibilityBufferFill &&
+		r_visibilityBufferFill->integer >= 2 && !vk.visibility_buffer.fill_logged ) {
+		ri.Printf( PRINT_ALL,
+			"[VK][visbuf] r_visibilityBufferFill=2 (PrimID MRT; skipping depth-proxy compute)\n" );
+		vk.visibility_buffer.fill_logged = qtrue;
+	}
+
+	if ( do_classify && vk.visibility_buffer_class != VK_NULL_HANDLE ) {
 		vk_visbuf_create_classify_pipeline();
 		if ( vk.visibility_buffer.classify_pipeline_ready &&
 			vk.visibility_buffer.classify_pipeline != VK_NULL_HANDLE ) {
@@ -618,10 +654,12 @@ void vk_visibility_buffer_capture_after_geometry( void )
 		}
 	}
 
-	record_depth_image_layout_transition( vk.cmd->command_buffer, depth_aspect,
-		VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
-		VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-		VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT );
+	if ( do_fill || do_classify ) {
+		record_depth_image_layout_transition( vk.cmd->command_buffer, depth_aspect,
+			VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
+			VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+			VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT );
+	}
 
 	if ( resume_main ) {
 		vk_resume_current_render_pass();
@@ -906,7 +944,10 @@ void vk_visibility_buffer_status_f( void )
 		vk_visibility_buffer_fill_wanted() ? "yes" : "no",
 		vk_material_classify_wanted() ? "yes" : "no",
 		r_renderMode ? r_renderMode->integer : -1 );
-	ri.Printf( PRINT_ALL, "encoding  : depth_proxy (Morton+depth bucket; true gl_PrimitiveID MRT follow-up)\n" );
+	ri.Printf( PRINT_ALL, "encoding  : %s\n",
+		vk.visibilityBufferDirectExport
+			? "prim_mrt (gl_PrimitiveID + drawId; UV bary weights)"
+			: "depth_proxy (Morton+depth bucket; true gl_PrimitiveID MRT follow-up)" );
 	ri.Printf( PRINT_ALL, "consumers : ids/bary=debug(+lateShade5) class=deferred_when_classify deferredClassify=%s\n",
 		( r_deferredMaterialClassify && r_deferredMaterialClassify->integer ) ? "on" : "off" );
 	ri.Printf( PRINT_ALL, "images    : ids=%s bary=%s class=%s\n",

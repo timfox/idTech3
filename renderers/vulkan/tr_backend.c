@@ -637,8 +637,8 @@ void RB_RenderDrawSurfList( drawSurf_t *drawSurfs, int numDrawSurfs ) {
 	depthRange = qfalse;
 
 	backEnd.pc.c_surfaces += numDrawSurfs;
-
 #ifdef USE_VULKAN
+	backEnd.visDrawId = 0;
 	vk_vegetation_clear_staging();
 #endif
 
@@ -665,15 +665,21 @@ void RB_RenderDrawSurfList( drawSurf_t *drawSurfs, int numDrawSurfs ) {
 			unsigned stageBits = shader->stages[0] ? shader->stages[0]->stateBits : 0;
 			unsigned srcBlend = stageBits & GLS_SRCBLEND_BITS;
 			unsigned dstBlend = stageBits & GLS_DSTBLEND_BITS;
+			qboolean additive = ( srcBlend == GLS_SRCBLEND_ONE && dstBlend == GLS_DSTBLEND_ONE );
 			qboolean transparent = (
 				( shader->sort >= SS_BLEND0 && shader->sort <= SS_BLEND6 ) ||
 				( srcBlend == GLS_SRCBLEND_SRC_ALPHA && dstBlend == GLS_DSTBLEND_ONE_MINUS_SRC_ALPHA ) ||
-				( srcBlend == GLS_SRCBLEND_ONE && dstBlend == GLS_DSTBLEND_ONE )
+				additive
 			);
 			if ( backEnd.drawSurfFilter == 1 && transparent )
 				continue;  /* opaque only: skip transparent */
 			if ( backEnd.drawSurfFilter == 2 && !transparent )
 				continue;  /* transparent only: skip opaque */
+			/* OIT class buckets: 1=alpha-blend, 2=additive */
+			if ( backEnd.drawSurfFilter == 2 && backEnd.oitBucketFilter == 1 && additive )
+				continue;
+			if ( backEnd.drawSurfFilter == 2 && backEnd.oitBucketFilter == 2 && !additive )
+				continue;
 		}
 		if ( ( vk.renderPassIndex == RENDER_PASS_SCREENMAP || vk.renderPassIndex == RENDER_PASS_SUN_SHADOW ) &&
 			entityNum != REFENTITYNUM_WORLD && backEnd.refdef.entities[ entityNum ].e.renderfx & RF_DEPTHHACK ) {

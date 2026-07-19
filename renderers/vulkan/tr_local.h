@@ -1329,6 +1329,8 @@ typedef struct {
 	int drawSurfFilter;
 	qboolean oitMomentsPass;	/* MBOIT pass 1: accumulate optical-depth moments */
 	qboolean oitAccumPass;		/* OIT pass 2 (or WBOIT single pass): weighted color accumulation */
+	int oitBucketFilter;		/* 0=all transparent; 1=alpha-blend; 2=additive (r_oitClassify) */
+	uint32_t visDrawId;			/* monotonic draw id for PrimID MRT push */
 
 	/* First-person rendering: custom FOV and anti-clipping scale */
 	qboolean useFirstPersonProjection;
@@ -1584,6 +1586,7 @@ extern cvar_t	*r_hbaoSteps;
 extern cvar_t	*r_ssaoDebugView;
 extern cvar_t	*r_oit;
 extern cvar_t	*r_oitForwardPlus;
+extern cvar_t	*r_oitClassify;
 extern cvar_t	*r_stochasticAlpha;
 extern cvar_t	*r_fbo;
 extern cvar_t	*r_fboCinematic;
@@ -1721,6 +1724,7 @@ extern cvar_t	*r_hybrid1_diffuseStrength;
 extern cvar_t	*r_hybrid1_ibl;
 extern cvar_t	*r_hybrid1_taa;
 extern cvar_t	*r_hybrid1_motion;
+extern cvar_t	*r_hybrid1_restir;
 extern cvar_t	*r_raygun;
 extern cvar_t	*r_raygun_fxaa;
 extern cvar_t	*r_raygun_reflection;

@@ -202,6 +202,9 @@ void vk_oit_pass( const struct drawSurfsCommand_s *cmd )
 	uint32_t fullWidth = 0;
 	uint32_t fullHeight = 0;
 	qboolean mboit = ( r_oit && r_oit->integer == 2 );
+	qboolean classify = ( r_oitClassify && r_oitClassify->integer );
+	int bucket;
+	int bucket_count;
 
 	if ( !r_oit || !r_oit->integer || !r_fbo || !r_fbo->integer || !vk.fboActive ||
 		vk.render_pass.oit_accum == VK_NULL_HANDLE || vk.render_pass.oit_resolve == VK_NULL_HANDLE ||
@@ -242,44 +245,59 @@ void vk_oit_pass( const struct drawSurfsCommand_s *cmd )
 		vk_resolve_volumetric_depth_msaa();
 	}
 
-	if ( mboit ) {
-		/* MBOIT pass 1: accumulate optical-depth moments. */
-		vk_begin_render_pass_tracked( vk.render_pass.oit_moments, vk.framebuffers.oit_moments, qtrue, fullWidth, fullHeight );
-		backEnd.oitMomentsPass = qtrue;
-		backEnd.drawSurfFilter = 2;
-		RB_RenderDrawSurfList( cmd->drawSurfs, cmd->numDrawSurfs );
-		backEnd.oitMomentsPass = qfalse;
-		backEnd.drawSurfFilter = 0;
+	bucket_count = classify ? 2 : 1;
+	for ( bucket = 0; bucket < bucket_count; bucket++ ) {
+		qboolean bucket_mboit = mboit;
+		/* Bucket 0 = all (or alpha-blend); bucket 1 = additive (WBOIT only, no moments). */
+		if ( classify ) {
+			backEnd.oitBucketFilter = ( bucket == 0 ) ? 1 : 2;
+			bucket_mboit = ( mboit && bucket == 0 ) ? qtrue : qfalse;
+			if ( bucket == 1 ) {
+				/* Composite bucket A into color, then use as base for additive. */
+				vk_copy_color_to_fog_scene( fullWidth, fullHeight );
+			}
+		} else {
+			backEnd.oitBucketFilter = 0;
+		}
+
+		if ( bucket_mboit ) {
+			vk_begin_render_pass_tracked( vk.render_pass.oit_moments, vk.framebuffers.oit_moments, qtrue, fullWidth, fullHeight );
+			backEnd.oitMomentsPass = qtrue;
+			backEnd.drawSurfFilter = 2;
+			RB_RenderDrawSurfList( cmd->drawSurfs, cmd->numDrawSurfs );
+			backEnd.oitMomentsPass = qfalse;
+			backEnd.drawSurfFilter = 0;
+			vk_end_render_pass();
+		}
+
+		vk_begin_render_pass_tracked( vk.render_pass.oit_accum, vk.framebuffers.oit_accum, qtrue, fullWidth, fullHeight );
+		if ( bucket_mboit ? vk.oit_accum_mboit_pipeline : vk.oit_accum_pipeline ) {
+			backEnd.oitAccumPass = qtrue;
+			backEnd.drawSurfFilter = 2;
+			RB_RenderDrawSurfList( cmd->drawSurfs, cmd->numDrawSurfs );
+			backEnd.oitAccumPass = qfalse;
+			backEnd.drawSurfFilter = 0;
+		}
 		vk_end_render_pass();
-	}
 
-	/* OIT accum pass: draw transparent surfaces. */
-	vk_begin_render_pass_tracked( vk.render_pass.oit_accum, vk.framebuffers.oit_accum, qtrue, fullWidth, fullHeight );
-	if ( mboit ? vk.oit_accum_mboit_pipeline : vk.oit_accum_pipeline ) {
-		backEnd.oitAccumPass = qtrue;
-		backEnd.drawSurfFilter = 2;
-		RB_RenderDrawSurfList( cmd->drawSurfs, cmd->numDrawSurfs );
-		backEnd.oitAccumPass = qfalse;
-		backEnd.drawSurfFilter = 0;
+		record_image_layout_transition( vk.cmd->command_buffer, vk.color_image, VK_IMAGE_ASPECT_COLOR_BIT,
+			VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+			VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT );
+		vk_postfx_set_render_extent( fullWidth, fullHeight );
+		vk_begin_render_pass_tracked( vk.render_pass.oit_resolve, vk.framebuffers.oit_resolve, qfalse, fullWidth, fullHeight );
+		qvkCmdBindPipeline( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.oit_resolve_pipeline );
+		{
+			VkDescriptorSet sets[3] = { vk.oit_opaque_descriptor, vk.oit_accum_descriptor, vk.oit_reveal_descriptor };
+			qvkCmdBindDescriptorSets( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.pipeline_layout_oit_resolve, 0, 3, sets, 0, NULL );
+		}
+		vk_postfx_draw_fullscreen_quad();
+		vk_end_render_pass();
+		record_image_layout_transition( vk.cmd->command_buffer, vk.color_image, VK_IMAGE_ASPECT_COLOR_BIT,
+			VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+			VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT );
 	}
-	vk_end_render_pass();
+	backEnd.oitBucketFilter = 0;
 
-	/* OIT resolve: composite opaque + accum to main color */
-	record_image_layout_transition( vk.cmd->command_buffer, vk.color_image, VK_IMAGE_ASPECT_COLOR_BIT,
-		VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-		VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT );
-	vk_postfx_set_render_extent( fullWidth, fullHeight );
-	vk_begin_render_pass_tracked( vk.render_pass.oit_resolve, vk.framebuffers.oit_resolve, qfalse, fullWidth, fullHeight );
-	qvkCmdBindPipeline( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.oit_resolve_pipeline );
-	{
-		VkDescriptorSet sets[3] = { vk.oit_opaque_descriptor, vk.oit_accum_descriptor, vk.oit_reveal_descriptor };
-		qvkCmdBindDescriptorSets( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.pipeline_layout_oit_resolve, 0, 3, sets, 0, NULL );
-	}
-	vk_postfx_draw_fullscreen_quad();
-	vk_end_render_pass();
-	record_image_layout_transition( vk.cmd->command_buffer, vk.color_image, VK_IMAGE_ASPECT_COLOR_BIT,
-		VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-		VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT );
 	if ( vk.msaaActive ) {
 		VkImageAspectFlags depth_aspect = VK_IMAGE_ASPECT_DEPTH_BIT;
 		if ( glConfig.stencilBits > 0 ) {

@@ -217,8 +217,8 @@ def with_forward_plus_vert(defines):
     return defines
 
 def with_deferred_export_frag(defines):
-    """PBR gen_frag variants that export normal/material MRT sidecars."""
-    return with_forward_plus_frag(defines + " -DUSE_DEFERRED_EXPORT")
+    """PBR gen_frag variants that export normal/material + PrimID/bary MRT sidecars."""
+    return with_forward_plus_frag(defines + " -DUSE_DEFERRED_EXPORT -DUSE_VISIBILITY_EXPORT")
 
 def compile_individual_shaders():
     print("Compiling standalone GLSL stages...")
