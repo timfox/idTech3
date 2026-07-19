@@ -151,6 +151,7 @@ static void vk_dgb_destroy_debug_gfx_pipeline( void )
 	}
 	vk.deferred_gbuffer.debug_gfx_descriptor = VK_NULL_HANDLE;
 	vk.deferred_gbuffer.debug_gfx_ready = qfalse;
+	vk.deferred_gbuffer.debug_create_failed = qfalse;
 }
 
 /*
@@ -420,6 +421,7 @@ void vk_deferred_gbuffer_invalidate_runtime( void )
 	vk.deferred_gbuffer.composite_logged = qfalse;
 	vk.deferred_gbuffer.lighting_create_failed = qfalse;
 	vk.deferred_gbuffer.composite_create_failed = qfalse;
+	vk.deferred_gbuffer.debug_create_failed = qfalse;
 }
 
 void vk_deferred_gbuffer_init( void )
@@ -1629,8 +1631,12 @@ static void vk_dgb_create_debug_gfx_pipeline( void )
 	VkDescriptorPoolSize pool_size;
 	VkDescriptorPoolCreateInfo pool_ci;
 	VkDescriptorSetAllocateInfo alloc;
+	VkResult res;
 
 	if ( vk.deferred_gbuffer.debug_gfx_ready ) {
+		return;
+	}
+	if ( vk.deferred_gbuffer.debug_create_failed ) {
 		return;
 	}
 	if ( vk.modules.deferred_gbuffer_debug_fs == VK_NULL_HANDLE || vk.modules.gamma_vs == VK_NULL_HANDLE ) {
@@ -1650,7 +1656,13 @@ static void vk_dgb_create_debug_gfx_pipeline( void )
 	layout_ci.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
 	layout_ci.bindingCount = 1;
 	layout_ci.pBindings = &binding;
-	VK_CHECK( qvkCreateDescriptorSetLayout( vk.device, &layout_ci, NULL, &vk.deferred_gbuffer.debug_gfx_layout ) );
+	res = qvkCreateDescriptorSetLayout( vk.device, &layout_ci, NULL, &vk.deferred_gbuffer.debug_gfx_layout );
+	if ( res != VK_SUCCESS ) {
+		ri.Printf( PRINT_WARNING, S_COLOR_YELLOW
+			"[VK][deferred] debug descriptor layout failed: %s\n" S_COLOR_WHITE, vk_result_string( res ) );
+		vk.deferred_gbuffer.debug_create_failed = qtrue;
+		return;
+	}
 
 	push_range.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
 	push_range.offset = 0;
@@ -1662,7 +1674,14 @@ static void vk_dgb_create_debug_gfx_pipeline( void )
 	pl_ci.pSetLayouts = &vk.deferred_gbuffer.debug_gfx_layout;
 	pl_ci.pushConstantRangeCount = 1;
 	pl_ci.pPushConstantRanges = &push_range;
-	VK_CHECK( qvkCreatePipelineLayout( vk.device, &pl_ci, NULL, &vk.deferred_gbuffer.debug_gfx_pipeline_layout ) );
+	res = qvkCreatePipelineLayout( vk.device, &pl_ci, NULL, &vk.deferred_gbuffer.debug_gfx_pipeline_layout );
+	if ( res != VK_SUCCESS ) {
+		ri.Printf( PRINT_WARNING, S_COLOR_YELLOW
+			"[VK][deferred] debug pipeline layout failed: %s\n" S_COLOR_WHITE, vk_result_string( res ) );
+		vk_dgb_destroy_debug_gfx_pipeline();
+		vk.deferred_gbuffer.debug_create_failed = qtrue;
+		return;
+	}
 
 	Com_Memset( stages, 0, sizeof( stages ) );
 	stages[0].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
@@ -1734,7 +1753,14 @@ static void vk_dgb_create_debug_gfx_pipeline( void )
 	pipe_ci.layout = vk.deferred_gbuffer.debug_gfx_pipeline_layout;
 	pipe_ci.renderPass = vk.render_pass.post_bloom;
 	pipe_ci.subpass = 0;
-	VK_CHECK( qvkCreateGraphicsPipelines( vk.device, VK_NULL_HANDLE, 1, &pipe_ci, NULL, &vk.deferred_gbuffer.debug_gfx_pipeline ) );
+	res = qvkCreateGraphicsPipelines( vk.device, VK_NULL_HANDLE, 1, &pipe_ci, NULL, &vk.deferred_gbuffer.debug_gfx_pipeline );
+	if ( res != VK_SUCCESS ) {
+		ri.Printf( PRINT_WARNING, S_COLOR_YELLOW
+			"[VK][deferred] debug pipeline failed: %s\n" S_COLOR_WHITE, vk_result_string( res ) );
+		vk_dgb_destroy_debug_gfx_pipeline();
+		vk.deferred_gbuffer.debug_create_failed = qtrue;
+		return;
+	}
 
 	pool_size.type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
 	pool_size.descriptorCount = 1;
@@ -1743,16 +1769,31 @@ static void vk_dgb_create_debug_gfx_pipeline( void )
 	pool_ci.maxSets = 1;
 	pool_ci.poolSizeCount = 1;
 	pool_ci.pPoolSizes = &pool_size;
-	VK_CHECK( qvkCreateDescriptorPool( vk.device, &pool_ci, NULL, &vk.deferred_gbuffer.debug_gfx_pool ) );
+	res = qvkCreateDescriptorPool( vk.device, &pool_ci, NULL, &vk.deferred_gbuffer.debug_gfx_pool );
+	if ( res != VK_SUCCESS ) {
+		ri.Printf( PRINT_WARNING, S_COLOR_YELLOW
+			"[VK][deferred] debug descriptor pool failed: %s\n" S_COLOR_WHITE, vk_result_string( res ) );
+		vk_dgb_destroy_debug_gfx_pipeline();
+		vk.deferred_gbuffer.debug_create_failed = qtrue;
+		return;
+	}
 
 	Com_Memset( &alloc, 0, sizeof( alloc ) );
 	alloc.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
 	alloc.descriptorPool = vk.deferred_gbuffer.debug_gfx_pool;
 	alloc.descriptorSetCount = 1;
 	alloc.pSetLayouts = &vk.deferred_gbuffer.debug_gfx_layout;
-	VK_CHECK( qvkAllocateDescriptorSets( vk.device, &alloc, &vk.deferred_gbuffer.debug_gfx_descriptor ) );
+	res = qvkAllocateDescriptorSets( vk.device, &alloc, &vk.deferred_gbuffer.debug_gfx_descriptor );
+	if ( res != VK_SUCCESS ) {
+		ri.Printf( PRINT_WARNING, S_COLOR_YELLOW
+			"[VK][deferred] debug descriptor alloc failed: %s\n" S_COLOR_WHITE, vk_result_string( res ) );
+		vk_dgb_destroy_debug_gfx_pipeline();
+		vk.deferred_gbuffer.debug_create_failed = qtrue;
+		return;
+	}
 
 	vk.deferred_gbuffer.debug_gfx_ready = qtrue;
+	vk.deferred_gbuffer.debug_create_failed = qfalse;
 }
 
 static void vk_dgb_update_debug_descriptor( VkImageView view )

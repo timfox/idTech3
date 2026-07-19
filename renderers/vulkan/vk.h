@@ -812,6 +812,7 @@ typedef struct {
 		VkDescriptorPool debug_gfx_pool;
 		VkDescriptorSet debug_gfx_descriptor;
 		qboolean debug_gfx_ready;
+		qboolean debug_create_failed; /* soft-fail sticky; cleared on invalidate */
 		VkDescriptorSetLayout lighting_layout;
 		VkPipelineLayout lighting_pipeline_layout;
 		VkPipeline lighting_pipeline;
