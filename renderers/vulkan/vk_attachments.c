@@ -17,6 +17,7 @@ atlases, froxel/fluid volumes, and teardown (split from vk.c).
 #include "vk_attachments.h"
 #include "vk_upscale.h"
 #include "vk_deferred_gbuffer.h"
+#include "vk_pass_registry.h"
 
 static void vk_create_fog_noise_texture( void );
 static void vk_destroy_sun_shadow_resources( void );
@@ -1206,6 +1207,11 @@ void vk_create_attachments( void )
     SET_OBJECT_NAME( vk.cubeMap.depth_image, "cubemap depth image", VK_DEBUG_REPORT_OBJECT_TYPE_IMAGE_EXT );
     SET_OBJECT_NAME( vk.cubeMap.depth_image_view, "cubemap depth image view", VK_DEBUG_REPORT_OBJECT_TYPE_IMAGE_VIEW_EXT );
 
+	{
+		uint32_t aw = 0, ah = 0;
+		vk_get_active_render_extent( &aw, &ah );
+		vk_spine_attachments_created( aw, ah );
+	}
 }
 
 static void vk_create_fog_noise_texture( void )
@@ -2276,6 +2282,7 @@ void vk_destroy_attachments( void )
 {
 	uint32_t i;
 
+	vk_spine_attachments_destroyed();
 	vk_destroy_volumetric_params_buffer();
 	vk_destroy_postfx_params_buffers();
 	vk_destroy_froxel_images();

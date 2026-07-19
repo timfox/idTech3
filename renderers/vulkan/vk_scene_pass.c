@@ -1,6 +1,7 @@
 #include "tr_local.h"
 #include "vk.h"
 #include "vk_post_fog.h"
+#include "vk_pass_registry.h"
 #include "vk_render_pass.h"
 #include "vk_scene_pass.h"
 #include "vk_util.h"
@@ -89,11 +90,13 @@ void vk_pass_diag_begin( const char *passName, uint32_t width, uint32_t height )
 	} else if ( passName && !Q_stricmp( passName, "main" ) ) {
 		vk.passDiag.inContinuationPass = qfalse;
 	}
+	vk_spine_pass_begin_named( passName, width, height );
 }
 
 void vk_pass_diag_end( const char *passName )
 {
 	Q_strncpyz( vk.passDiag.lastEndedPass, passName ? passName : "unknown", sizeof( vk.passDiag.lastEndedPass ) );
+	vk_spine_pass_end_named( passName );
 }
 
 void vk_pass_diag_stage( const char *stageName )
@@ -157,6 +160,7 @@ void vk_report_device_lost_context( const char *where )
 		vk.renderWidth, vk.renderHeight,
 		vk_scene_pass_name( vk.renderPassIndex ),
 		vk_post_fog_source_name( vk_get_post_fog_source() ) );
+	vk_spine_dump_device_lost();
 }
 
 void vk_fatal_device_lost( const char *where, VkResult res )

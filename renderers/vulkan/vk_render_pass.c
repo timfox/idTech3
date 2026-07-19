@@ -3,6 +3,7 @@
 #include "vk_postfx.h"
 #include "vk_render_pass.h"
 #include "vk_scene_pass.h"
+#include "vk_pass_registry.h"
 #include "vk_validation.h"
 #include "vk_rtx.h"
 #include "vk_fsa.h"
@@ -121,6 +122,8 @@ void vk_begin_render_pass_tracked( VkRenderPass renderPass, VkFramebuffer frameB
 			clear_values[1].color.float32[2] = 1.0f;
 			clear_values[1].color.float32[3] = 1.0f;
 			clear_count = vk.msaaActive ? 2 : 3;
+			vk_spine_note_clear( VK_SPINE_RES_OIT_ACCUM, VK_SPINE_PASS_WBOIT_ACCUM );
+			vk_spine_note_clear( VK_SPINE_RES_OIT_REVEAL, VK_SPINE_PASS_WBOIT_ACCUM );
 		}
 		if ( renderPass == vk.render_pass.oit_moments ) {
 			clear_values[0].color.float32[0] = 0.0f;
@@ -132,6 +135,8 @@ void vk_begin_render_pass_tracked( VkRenderPass renderPass, VkFramebuffer frameB
 			clear_values[1].color.float32[2] = 0.0f;
 			clear_values[1].color.float32[3] = 0.0f;
 			clear_count = vk.msaaActive ? 2 : 3;
+			vk_spine_note_clear( VK_SPINE_RES_OIT_MOMENTS, VK_SPINE_PASS_MBOIT_MOMENTS );
+			vk_spine_note_clear( VK_SPINE_RES_OIT_B0, VK_SPINE_PASS_MBOIT_MOMENTS );
 		}
 		render_pass_begin_info.clearValueCount = clear_count;
 		render_pass_begin_info.pClearValues = clear_values;

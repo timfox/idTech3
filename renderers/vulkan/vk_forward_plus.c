@@ -15,6 +15,7 @@ docs/RENDERER_2026_ARCHITECTURE_PASS.md.
 #include "vk_util.h"
 #include "vk_view_state.h"
 #include "vk_reactive_mask.h"
+#include "vk_pass_registry.h"
 
 #define VK_FP_RECORD_STRIDE (sizeof(float) * 16) /* 4 x vec4 per light */
 #define VK_FP_HEADER_BYTES (sizeof(float) * 8) /* 2 x vec4: count/meta + tile grid / viewport */
@@ -1056,12 +1057,15 @@ void vk_forward_plus_upload_refdef( void )
 	if ( !r_forwardPlus || !r_forwardPlus->integer ) {
 		return;
 	}
+	vk_spine_pass_begin( VK_SPINE_PASS_LIGHT_PACK );
 	vk_forward_plus_ensure_runtime();
 	if ( !vk.cmd || vk.cmd->command_buffer == VK_NULL_HANDLE ) {
+		vk_spine_pass_end( VK_SPINE_PASS_LIGHT_PACK );
 		return;
 	}
 	if ( vk.forward_plus.buffer == VK_NULL_HANDLE || vk.forward_plus.staging == VK_NULL_HANDLE ||
 		vk.forward_plus.staging_ptr == NULL || vk.forward_plus.last_upload_bytes == 0u ) {
+		vk_spine_pass_end( VK_SPINE_PASS_LIGHT_PACK );
 		return;
 	}
 
@@ -1102,6 +1106,7 @@ void vk_forward_plus_upload_refdef( void )
 	b[0].size = VK_WHOLE_SIZE;
 	qvkCmdPipelineBarrier( vk.cmd->command_buffer,
 		VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, 0, 0, NULL, 1, b, 0, NULL );
+	vk_spine_pass_end( VK_SPINE_PASS_LIGHT_PACK );
 }
 
 VkDescriptorSet vk_forward_plus_get_graphics_descriptor_set( void )
@@ -1299,10 +1304,14 @@ static void vk_forward_plus_dispatch_tile_cull_internal( qboolean use_depth_cull
 
 void vk_forward_plus_dispatch_tile_cull( void )
 {
+	vk_spine_pass_begin( VK_SPINE_PASS_TILE_CONSTRUCT );
 	vk_forward_plus_dispatch_tile_cull_internal( qfalse );
+	vk_spine_pass_end( VK_SPINE_PASS_TILE_CONSTRUCT );
 }
 
 void vk_forward_plus_dispatch_tile_cull_after_opaque( void )
 {
+	vk_spine_pass_begin( VK_SPINE_PASS_TILE_CONSTRUCT );
 	vk_forward_plus_dispatch_tile_cull_internal( qtrue );
+	vk_spine_pass_end( VK_SPINE_PASS_TILE_CONSTRUCT );
 }

@@ -18,6 +18,7 @@ composite fullscreen draw, SMAA subpasses. Split from vk.c.
 #include "vk_sim_render_debug.h"
 #include "vk_post_fog.h"
 #include "vk_temporal.h"
+#include "vk_pass_registry.h"
 #include "vk_nslm.h"
 
 static const float vk_local_shadow_flip_matrix[16] = {
@@ -830,7 +831,14 @@ void vk_volumetric_fog_pass( void )
 		ri.Printf( PRINT_ALL, "[VK][fog] transition froxelVolume/extinction SHADER_READ_ONLY_OPTIMAL->GENERAL (fragment->compute)\n" );
 	}
 
+	vk_spine_pass_begin( VK_SPINE_PASS_FROXEL_VOLUME );
+	if ( vk.sun_shadow_image != VK_NULL_HANDLE ) {
+		vk_spine_expect_layout( VK_SPINE_RES_SHADOW_SUN, VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL,
+			VK_SPINE_PASS_FROXEL_VOLUME, "froxel_sun_shadow" );
+	}
 	vk_volumetric_compute_pass();
+	vk_spine_note_barrier( VK_SPINE_RES_FROXEL_SCATTER, VK_SPINE_PASS_FROXEL_VOLUME, "froxel_compute" );
+	vk_spine_pass_end( VK_SPINE_PASS_FROXEL_VOLUME );
 
 	if ( r_volumetricFogTemporalWeight->value > 0.0f ) {
 		vk_copy_froxel_history();

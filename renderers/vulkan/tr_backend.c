@@ -24,6 +24,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #ifdef USE_VULKAN
 #include "vk_terrain.h"
 #include "vk_temporal.h"
+#include "vk_pass_registry.h"
 #include "vk_forward_plus.h"
 #include "vk_deferred_gbuffer.h"
 #include "vk_visibility_buffer.h"
@@ -2030,6 +2031,7 @@ void RB_FlushDeferredWeaponAfterTaa( VkImageView *post_fog_src, VkImageView *lum
 
 	RB_CopyHdrViewToColor( src, width, height );
 
+	vk_spine_pass_begin( VK_SPINE_PASS_WEAPON );
 	backEnd.refdef = s_deferredWeaponCmd.refdef;
 	backEnd.viewParms = s_deferredWeaponCmd.viewParms;
 	backEnd.drawSurfFilter = 0;
@@ -2058,6 +2060,7 @@ void RB_FlushDeferredWeaponAfterTaa( VkImageView *post_fog_src, VkImageView *lum
 	if ( r_temporalDebug && r_temporalDebug->integer ) {
 		ri.Printf( PRINT_DEVELOPER, "[VK][temporal] flushed deferred weapon after TAA\n" );
 	}
+	vk_spine_pass_end( VK_SPINE_PASS_WEAPON );
 }
 #endif
 

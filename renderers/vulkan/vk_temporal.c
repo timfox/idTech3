@@ -659,6 +659,12 @@ void vk_temporal_status_f( void )
 	ri.Printf( PRINT_ALL, "motion    : unreliable=%s viewClass=%s\n",
 		vk.temporal.unreliableMotionThisFrame ? "yes" : "no",
 		vk_view_class_name( vk_classify_current_view() ) );
+	ri.Printf( PRINT_ALL, "debug     : temporalDebug=%d historyRejection=%d motionVectors=%d\n",
+		r_temporalDebug ? r_temporalDebug->integer : 0,
+		r_debugHistoryRejection ? r_debugHistoryRejection->integer : 0,
+		r_debugMotionVectors ? r_debugMotionVectors->integer : 0 );
+	ri.Printf( PRINT_ALL, "            rejection viz: 0=off 1=MV 2=reasons 3=reactive 4=confidence\n" );
+	ri.Printf( PRINT_ALL, "            5=disocclusion 6=historyUV 7=nearWeapon 8=worldVsReactive\n" );
 	ri.Printf( PRINT_ALL, "policy    : RDF_NOWORLDMODEL after doneWorldScene does not thrash history;\n" );
 	ri.Printf( PRINT_ALL, "            weapon draws defer until after world TAA when reconstruction on;\n" );
 	ri.Printf( PRINT_ALL, "            portals force camera-cut; commit prefers worldMatricesCaptured.\n" );

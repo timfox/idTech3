@@ -11,6 +11,7 @@ when volumetrics are skipped or SMAA is applied.
 #include "tr_local.h"
 #include "vk.h"
 #include "vk_post_fog.h"
+#include "vk_pass_registry.h"
 
 /*
 ===============
@@ -189,6 +190,8 @@ void vk_barrier_motion_vector_for_sampling( const char *reason )
 		VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT,
 		VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
 		0, 0, NULL, 0, NULL, 1, &barrier );
+
+	vk_spine_note_layout( VK_SPINE_RES_MOTION_VECTORS, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL );
 
 	if ( r_fboDebug && r_fboDebug->integer >= 2 && vk_post_fog_fbo_debug_throttle() ) {
 		ri.Printf( PRINT_DEVELOPER,

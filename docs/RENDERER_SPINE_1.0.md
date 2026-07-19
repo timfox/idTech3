@@ -132,8 +132,8 @@ Shadow depth, geometry throughput (instance → MDI → Hi-Z → meshlets), and 
 Spine 1.0 is done when:
 
 1. The locked matrix passes automated + manual combination tests (OIT × TAA × weapon × resize × alt-tab × `vid_restart` × windowed/FS).
-2. Every Spine attachment used in that matrix has a debug name and a documented producer/consumer.
-3. Temporal histories invalidate correctly for camera cut, projection change, resize, map change, and weapon/portal ownership. Console: `temporal_status` (also summarized on `havenrp_renderer_status`). Static: `./scripts/temporal_ownership_check.sh` (also via `spine_stability_check.sh`). Shared `apply_resets` owns TAA / AV / volumetric / motion / occlusion; RDF_NOWORLDMODEL after world does not thrash; weapon defers until after world TAA when reconstruction is on; portals force camera-cut and do not own world matrix history.
+2. Every Spine attachment used in that matrix has a debug name and a documented producer/consumer. Runtime: `pass_registry_status` / `spine_status` (`r_spineValidate` 0–2). Static: `./scripts/pass_registry_check.sh` + `./scripts/spine_combo_matrix_check.sh` (also via `spine_stability_check.sh`). Lightweight registry tracks attachment generation, last writer/reader, history validity, phase order, layout stamps/expectations, and dual-ownership combos (AO, OIT×TAA); DEVICE_LOST dumps spine state.
+3. Temporal histories invalidate correctly for camera cut, projection change, resize, map change, and weapon/portal ownership. Console: `temporal_status` (also summarized on `havenrp_renderer_status`, including `rejectDbg`). Visual: `r_debugHistoryRejection` 1–8 (MV / reasons / reactive / confidence / disocclusion / history UV / near-weapon / world-vs-reactive). Static: `./scripts/temporal_ownership_check.sh` (also via `spine_stability_check.sh`). Shared `apply_resets` owns TAA / AV / volumetric / motion / occlusion; RDF_NOWORLDMODEL after world does not thrash; weapon defers until after world TAA when reconstruction is on; portals force camera-cut and do not own world matrix history.
 4. `input_status` / relative mouse lifecycle remain correct across focus and `vid_restart` (presentation path).
 5. DEVICE_LOST and black-frame classes from late post toggles are diagnosed with pass-diag context and do not recur on the certified profile.
 6. Mode/feature combinations **outside** the matrix are latched or clearly experimental, with a safe recovery command.
@@ -147,11 +147,11 @@ Related checklists: [RENDERER_PHASE1_CHECKLIST_2026Q3.md](RENDERER_PHASE1_CHECKL
 
 **Do next**
 
-- Pass/resource registry and validation for Spine attachments
-- Temporal history ownership and debug views (`temporal_status` + `./scripts/temporal_ownership_check.sh` covered; expand visual rejection/ownership debug views next)
-- OIT × TAA × weapon matrix hardening
-- Restart / resize / focus / DEVICE_LOST reliability (presentation teardown/restore + G-buffer/AV soft-fail paths covered statically)
-- Expanding the automated combination matrix
+- Pass/resource registry: layout expects on TAA/SMAA/SSR/AV/OIT/froxel + conditional TAA history read landed; deepen remaining consumer expects as bugs appear
+- Temporal ownership debug: `temporal_status` + `r_debugHistoryRejection` 1–8 + havenrp `rejectDbg` covered; GPU-walk overlays next
+- OIT × TAA × weapon: quality keeps OIT without TAA; temporal overlay pins `r_temporalWeaponAfterTaa 1`; runtime combo validators when both on
+- Restart / resize / focus / DEVICE_LOST reliability (presentation + G-buffer/AV soft-fail + spine DEVICE_LOST dump covered statically)
+- Manual GPU combo matrix (static: `./scripts/spine_combo_matrix_check.sh` via `spine_stability_check.sh`)
 
 **Do not next (unless fixing a Spine blocker)**
 

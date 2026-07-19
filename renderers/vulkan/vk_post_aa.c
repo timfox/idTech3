@@ -3,6 +3,7 @@
 #include "vk_aa_policy.h"
 #include "vk_post_aa.h"
 #include "vk_post_fog.h"
+#include "vk_pass_registry.h"
 #include "vk_render_pass.h"
 #include "vk_view_state.h"
 
@@ -108,18 +109,25 @@ static qboolean vk_smaa_passes( void )
 		h = 1u;
 	}
 
+	vk_spine_pass_begin( VK_SPINE_PASS_SMAA );
+	vk_spine_expect_layout( VK_SPINE_RES_HDR_COLOR, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+		VK_SPINE_PASS_SMAA, "smaa_edge_input" );
 	if ( !vk_run_smaa_pass( vk.smaa_edge_pipeline, vk.render_pass.smaa_edge, vk.framebuffers.smaa_edge,
 		vk.smaa_edge_descriptor, vk.smaa_edge_descriptor, w, h ) ) {
+		vk_spine_pass_end( VK_SPINE_PASS_SMAA );
 		return qfalse;
 	}
 	if ( !vk_run_smaa_pass( vk.smaa_blend_pipeline, vk.render_pass.smaa_blend, vk.framebuffers.smaa_blend,
 		vk.smaa_edge_descriptor, vk.smaa_blend_descriptor, w, h ) ) {
+		vk_spine_pass_end( VK_SPINE_PASS_SMAA );
 		return qfalse;
 	}
 	if ( !vk_run_smaa_pass( vk.smaa_compose_pipeline, vk.render_pass.smaa_compose, vk.framebuffers.smaa_compose,
 		vk.smaa_edge_descriptor, vk.smaa_compose_descriptor, w, h ) ) {
+		vk_spine_pass_end( VK_SPINE_PASS_SMAA );
 		return qfalse;
 	}
+	vk_spine_pass_end( VK_SPINE_PASS_SMAA );
 	return qtrue;
 }
 

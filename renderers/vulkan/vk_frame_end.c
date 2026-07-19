@@ -9,6 +9,7 @@
 #include "vk_post_process_push.h"
 #include "vk_postfx.h"
 #include "vk_postfx_params.h"
+#include "vk_pass_registry.h"
 #include "vk_reactive_mask.h"
 #include "vk_render_pass.h"
 #include "vk_scene_pass.h"
@@ -600,14 +601,28 @@ void vk_end_frame_record_taa_pass( VkImageView *post_fog_src, VkImageView *lumin
 	writeIndex = 1u - readIndex;
 
 	vk_barrier_post_fog_source_for_sampling( taa_src, "vk_end_frame pre-taa (current)" );
+	vk_spine_note_barrier( VK_SPINE_RES_HDR_COLOR, VK_SPINE_PASS_TEMPORAL_RECON, "pre-taa-current" );
+	vk_spine_expect_layout( VK_SPINE_RES_HDR_COLOR, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+		VK_SPINE_PASS_TEMPORAL_RECON, "taa_current" );
 	if ( r_taaMotionVectors && r_taaMotionVectors->integer && vk.motion_vector_image != VK_NULL_HANDLE ) {
 		vk_barrier_motion_vector_for_sampling( "vk_end_frame pre-taa (motion)" );
+		vk_spine_note_barrier( VK_SPINE_RES_MOTION_VECTORS, VK_SPINE_PASS_TEMPORAL_RECON, "pre-taa-motion" );
+		vk_spine_expect_layout( VK_SPINE_RES_MOTION_VECTORS, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+			VK_SPINE_PASS_TEMPORAL_RECON, "taa_motion" );
 	}
 	if ( vk_reactive_mask_active() ) {
 		vk_barrier_reactive_mask_for_sampling( "vk_end_frame pre-taa (reactive)" );
+		vk_spine_note_barrier( VK_SPINE_RES_REACTIVE_MASK, VK_SPINE_PASS_TEMPORAL_RECON, "pre-taa-reactive" );
+		vk_spine_expect_layout( VK_SPINE_RES_REACTIVE_MASK, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+			VK_SPINE_PASS_TEMPORAL_RECON, "taa_reactive" );
 	}
 	if ( vk.temporal.hasValidTAAHistory ) {
 		vk_barrier_post_fog_source_for_sampling( vk.taa_history_image_view[readIndex], "vk_end_frame pre-taa (history)" );
+		vk_spine_note_read( VK_SPINE_RES_TAA_HISTORY, VK_SPINE_PASS_TEMPORAL_RECON,
+			VK_SPINE_ACCESS_HISTORY_READ );
+		vk_spine_note_barrier( VK_SPINE_RES_TAA_HISTORY, VK_SPINE_PASS_TEMPORAL_RECON, "pre-taa-history" );
+		vk_spine_expect_layout( VK_SPINE_RES_TAA_HISTORY, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+			VK_SPINE_PASS_TEMPORAL_RECON, "taa_history" );
 	}
 	vk_update_color_descriptor_image( taa_src );
 	vk_get_active_render_extent( &taaWidth, &taaHeight );

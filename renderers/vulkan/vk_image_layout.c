@@ -1,6 +1,7 @@
 #include "tr_local.h"
 #include "vk.h"
 #include "vk_image_layout.h"
+#include "vk_pass_registry.h"
 
 void record_image_layout_transition( VkCommandBuffer command_buffer, VkImage image, VkImageAspectFlags image_aspect_flags,
 	VkImageLayout old_layout, VkImageLayout new_layout, uint32_t src_stage_override, uint32_t dst_stage_override )
@@ -229,4 +230,6 @@ void record_depth_image_layout_transition( VkCommandBuffer command_buffer, VkIma
 	record_image_layout_transition( command_buffer, vk.depth_image, image_aspect_flags,
 		vk.depth_image_layout, new_layout, src_stage_override, dst_stage_override );
 	vk.depth_image_layout = new_layout;
+	vk_spine_note_layout( VK_SPINE_RES_DEPTH, new_layout );
+	vk_spine_note_barrier( VK_SPINE_RES_DEPTH, VK_SPINE_PASS_NONE, "depth_layout" );
 }

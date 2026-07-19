@@ -23,6 +23,7 @@ SSAO/HBAO pass, and vk_bloom. Split from vk.c.
 #include "vk_visibility_buffer.h"
 #include "vk_reactive_mask.h"
 #include "vk_ambient_visibility.h"
+#include "vk_pass_registry.h"
 
 static void vk_oit_validate_pass_break( const char *stage )
 {
@@ -92,6 +93,11 @@ static void vk_oit_barrier_targets_for_sampling( const char *reason )
 		VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
 		VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
 		0, 1, &mb, 0, NULL, imgCount, imgCount ? img : NULL );
+
+	vk_spine_note_barrier( VK_SPINE_RES_OIT_ACCUM, VK_SPINE_PASS_OIT_RESOLVE, reason );
+	vk_spine_note_barrier( VK_SPINE_RES_OIT_REVEAL, VK_SPINE_PASS_OIT_RESOLVE, reason );
+	vk_spine_note_barrier( VK_SPINE_RES_OIT_MOMENTS, VK_SPINE_PASS_OIT_RESOLVE, reason );
+	vk_spine_note_barrier( VK_SPINE_RES_OIT_B0, VK_SPINE_PASS_OIT_RESOLVE, reason );
 
 	if ( r_fboDebug && r_fboDebug->integer >= 2 && vk_post_fog_fbo_debug_throttle() ) {
 		uint32_t w = 0, h = 0;
@@ -288,6 +294,12 @@ void vk_oit_pass( const struct drawSurfsCommand_s *cmd )
 	if ( !mboit && vk.oit_accum_pipeline == VK_NULL_HANDLE )
 		return;
 
+	if ( mboit ) {
+		vk_spine_pass_begin( VK_SPINE_PASS_MBOIT_MOMENTS );
+	} else {
+		vk_spine_pass_begin( VK_SPINE_PASS_WBOIT_ACCUM );
+	}
+
 	vk_end_render_pass();
 	vk_oit_validate_pass_break( "oit_pass_begin" );
 	vk_get_active_render_extent( &fullWidth, &fullHeight );
@@ -348,6 +360,21 @@ void vk_oit_pass( const struct drawSurfsCommand_s *cmd )
 		vk_oit_barrier_targets_for_sampling( bucket_mboit ? "post-mboit-accum" : "post-wboit-accum" );
 		vk_reactive_mask_stamp_from_reveal();
 
+		if ( bucket == 0 ) {
+			if ( mboit ) {
+				vk_spine_pass_end( VK_SPINE_PASS_MBOIT_MOMENTS );
+				vk_spine_pass_begin( VK_SPINE_PASS_MBOIT_ACCUM );
+				vk_spine_pass_end( VK_SPINE_PASS_MBOIT_ACCUM );
+			} else {
+				vk_spine_pass_end( VK_SPINE_PASS_WBOIT_ACCUM );
+			}
+			vk_spine_pass_begin( VK_SPINE_PASS_OIT_RESOLVE );
+			vk_spine_expect_layout( VK_SPINE_RES_OIT_ACCUM, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+				VK_SPINE_PASS_OIT_RESOLVE, "oit_resolve" );
+			vk_spine_expect_layout( VK_SPINE_RES_OIT_REVEAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+				VK_SPINE_PASS_OIT_RESOLVE, "oit_resolve" );
+		}
+
 		record_image_layout_transition( vk.cmd->command_buffer, vk.color_image, VK_IMAGE_ASPECT_COLOR_BIT,
 			VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
 			VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT );
@@ -394,6 +421,7 @@ void vk_oit_pass( const struct drawSurfsCommand_s *cmd )
 			VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT );
 	}
 	backEnd.oitBucketFilter = 0;
+	vk_spine_pass_end( VK_SPINE_PASS_OIT_RESOLVE );
 
 	if ( vk.msaaActive ) {
 		VkImageAspectFlags depth_aspect = VK_IMAGE_ASPECT_DEPTH_BIT;
@@ -453,6 +481,8 @@ void vk_ssr_pass( void )
 
 	record_depth_image_layout_transition( vk.cmd->command_buffer, depth_aspect,
 		VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL, 0, 0 );
+	vk_spine_expect_layout( VK_SPINE_RES_DEPTH, VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL,
+		VK_SPINE_PASS_SSR, "ssr_depth" );
 
 	vk_begin_ssr_render_pass();
 	qvkCmdBindPipeline( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.ssr_pipeline );

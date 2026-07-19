@@ -21,6 +21,7 @@ Extracted from vk.c for incremental modularization.
 #include "vk_scene_pass.h"
 #include "vk_frame_end.h"
 #include "vk_temporal.h"
+#include "vk_pass_registry.h"
 #include "vk_forward_plus.h"
 #include "vk_deferred_gbuffer.h"
 #include "vk_visibility_buffer.h"
@@ -1318,6 +1319,7 @@ void vk_initialize( void )
 	vk_surfel_gi_init();
 	vk_rcgi_init();
 	vk_ambient_visibility_init();
+	vk_spine_registry_init();
 
 #ifdef VK_CUBEMAP
 	vk_create_cubemap_prefilter();

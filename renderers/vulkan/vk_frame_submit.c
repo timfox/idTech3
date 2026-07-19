@@ -25,6 +25,7 @@ Extracted from vk.c for incremental modularization.
 #include "vk_staging.h"
 #include "vk_swapchain.h"
 #include "vk_temporal.h"
+#include "vk_pass_registry.h"
 #include "vk_util.h"
 #include "vk_volumetric_internal.h"
 #include "vk_sim_render_debug.h"
@@ -356,6 +357,7 @@ void vk_prepare_frame_temporal_state( void )
 	}
 
 	vk_temporal_begin_frame();
+	vk_spine_frame_begin();
 	vk_update_postfx_params( vk.cmd_index );
 	vk.temporal.preparedThisFrame = qtrue;
 }
@@ -396,6 +398,7 @@ void vk_end_frame( void )
 	if ( vk.geometry_buffer_size_new )
 	{
 		vk_resize_geometry_buffer();
+		vk_spine_frame_end();
 		return;
 	}
 
@@ -407,12 +410,16 @@ void vk_end_frame( void )
 
 		if ( PostFX_SSR_IsEnabled() )
 		{
+			vk_spine_pass_begin( VK_SPINE_PASS_SSR );
 			vk_ssr_pass();
+			vk_spine_pass_end( VK_SPINE_PASS_SSR );
 		}
 
 		if ( r_bloom->integer )
 		{
+			vk_spine_pass_begin( VK_SPINE_PASS_BLOOM );
 			vk_bloom();
+			vk_spine_pass_end( VK_SPINE_PASS_BLOOM );
 		}
 
 		if ( vk.lensFlareActive )
@@ -431,9 +438,15 @@ void vk_end_frame( void )
 			VkImageView luminance_src;
 
 			vk_end_frame_prepare_post_process( &post_fog_src, &luminance_src );
+			vk_spine_pass_begin( VK_SPINE_PASS_TEMPORAL_RECON );
 			vk_end_frame_record_taa_pass( &post_fog_src, &luminance_src );
+			vk_spine_pass_end( VK_SPINE_PASS_TEMPORAL_RECON );
+			vk_spine_pass_begin( VK_SPINE_PASS_EYE_ADAPTATION );
 			vk_end_frame_record_luminance_pass( luminance_src );
+			vk_spine_pass_end( VK_SPINE_PASS_EYE_ADAPTATION );
+			vk_spine_pass_begin( VK_SPINE_PASS_PRESENTATION );
 			vk_end_frame_record_gamma_pass( post_fog_src );
+			vk_spine_pass_end( VK_SPINE_PASS_PRESENTATION );
 		}
 
 		/* After gamma/overlay have written the swapchain (LDR presentable). */
@@ -475,6 +488,7 @@ void vk_end_frame( void )
 	}
 	vk.cmd->waitForFence = qtrue;
 	vk_temporal_commit_frame_state();
+	vk_spine_frame_end();
 	vk_vuda_after_queue_submit();
 
 	backEnd.pc.msec = ri.Milliseconds() - backEnd.pc.msec;

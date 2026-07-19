@@ -64,6 +64,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "vk_deferred_gbuffer.h"
 #include "vk_visibility_buffer.h"
 #include "vk_temporal.h"
+#include "vk_pass_registry.h"
 #include "vk_sim_render_profile.h"
 #include "vk_sim_render_debug.h"
 #include "vk_skybox_hdr.h"
@@ -3544,7 +3545,7 @@ static void R_Register( void )
 		" 4 - linear filtering, preserve aspect ratio (black bars on sides)\n" );
 	r_temporalDebug = ri.Cvar_Get( "r_temporalDebug", "0", CVAR_ARCHIVE_ND );
 	ri.Cvar_CheckRange( r_temporalDebug, "0", "2", CV_INTEGER );
-	ri.Cvar_SetDescription( r_temporalDebug, "Temporal diagnostics:\n 0 - off\n 1 - log temporal reset reasons\n 2 - log reset reasons plus shared camera-cut and invalidated consumers." );
+	ri.Cvar_SetDescription( r_temporalDebug, "Temporal diagnostics:\n 0 - off\n 1 - log temporal reset reasons\n 2 - log reset reasons plus shared camera-cut and invalidated consumers.\n Visual ownership/rejection overlays: r_debugHistoryRejection 1–8 (see temporal_status)." );
 	r_temporalCustomShaderMotion = ri.Cvar_Get( "r_temporalCustomShaderMotion", "0", CVAR_ARCHIVE_ND );
 	ri.Cvar_CheckRange( r_temporalCustomShaderMotion, "0", "1", CV_INTEGER );
 	ri.Cvar_SetDescription( r_temporalCustomShaderMotion,

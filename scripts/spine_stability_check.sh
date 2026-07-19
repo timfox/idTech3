@@ -50,6 +50,12 @@ pass "restart/temporal ownership: swapchain sticky + shared AV/TAA reset"
 # 2d. Temporal history ownership contract (weapon / portals / status)
 bash "$ROOT/scripts/temporal_ownership_check.sh"
 
+# 2e. Pass/resource registry (lightweight ownership validation)
+bash "$ROOT/scripts/pass_registry_check.sh"
+
+# 2f. Combination matrix (stable / quality / temporal / safe)
+bash "$ROOT/scripts/spine_combo_matrix_check.sh"
+
 # 3. WBOIT clears + barriers + debug-Z
 grep -q 'renderPass == vk.render_pass.oit_accum' renderers/vulkan/vk_render_pass.c || fail "OIT accum clear site missing"
 grep -A12 'renderPass == vk.render_pass.oit_accum' renderers/vulkan/vk_render_pass.c | grep -q 'clear_values\[1\].color.float32\[0\] = 1.0f' || fail "OIT reveal clear one missing"

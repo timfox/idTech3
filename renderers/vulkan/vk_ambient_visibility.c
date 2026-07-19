@@ -12,6 +12,7 @@ average hit distance, variance, temporal confidence, rejection reason.
 #include "vk.h"
 #include "vk_ambient_visibility.h"
 #include "vk_deferred_gbuffer.h"
+#include "vk_pass_registry.h"
 #include "vk_image_layout.h"
 #include "vk_pathtrace.h"
 #include "vk_rtx.h"
@@ -906,6 +907,8 @@ void vk_ambient_visibility_apply_after_geometry( void )
 		return;
 	}
 	if ( !av.raw.image || !vk.depth_image ) return;
+
+	vk_spine_pass_begin( VK_SPINE_PASS_AMBIENT_VISIBILITY );
 	cmd = vk.cmd->command_buffer;
 	mode = (uint32_t)r_ambientVisibilityMode->integer;
 	effectiveMode = mode;
@@ -926,6 +929,8 @@ void vk_ambient_visibility_apply_after_geometry( void )
 	vk_end_render_pass();
 	record_depth_image_layout_transition( cmd, depthAspect, VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL,
 		0, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT );
+	vk_spine_expect_layout( VK_SPINE_RES_DEPTH, VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL,
+		VK_SPINE_PASS_AMBIENT_VISIBILITY, "av_after_depth_transition" );
 	depthView = vk.depth_image_view_sample ? vk.depth_image_view_sample : vk.depth_image_view;
 	normalView = vk.deferred_gbuffer_normal_view ? vk.deferred_gbuffer_normal_view : tr.whiteImage->view;
 	classView = vk.visibility_buffer_class_view ? vk.visibility_buffer_class_view : vk.deferred_class_stub_view;
@@ -1141,4 +1146,6 @@ void vk_ambient_visibility_apply_after_geometry( void )
 	AV_WriteTimestamp( cmd, AV_QUERY_COMPOSITE_END );
 	AV_Barrier( cmd );
 	av.appliedThisFrame = qtrue; av.frame++;
+	vk_spine_pass_end( VK_SPINE_PASS_AMBIENT_VISIBILITY );
+	vk_spine_note_temporal_history( VK_SPINE_RES_AV_HISTORY, av.historyValid );
 }

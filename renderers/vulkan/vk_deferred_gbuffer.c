@@ -16,6 +16,7 @@ Mode 3 = Unified Clustered Renderer (deferred opaque + Forward+ transparent).
 #include "vk_post_fog.h"
 #include "vk_render_pass.h"
 #include "vk_scene_pass.h"
+#include "vk_pass_registry.h"
 #include "vk_util.h"
 #include "vk_view_state.h"
 
@@ -798,6 +799,8 @@ void vk_deferred_gbuffer_capture_after_geometry( void )
 		return;
 	}
 
+	vk_spine_pass_begin( VK_SPINE_PASS_GBUFFER_FILL );
+
 	resume_main = ( vk.inRenderPass && vk.renderPassIndex == RENDER_PASS_MAIN ) ? qtrue : qfalse;
 	if ( vk.inRenderPass ) {
 		vk_end_render_pass();
@@ -810,6 +813,7 @@ void vk_deferred_gbuffer_capture_after_geometry( void )
 			if ( resume_main ) {
 				vk_resume_current_render_pass();
 			}
+			vk_spine_pass_end( VK_SPINE_PASS_GBUFFER_FILL );
 			return;
 		}
 	}
@@ -915,6 +919,7 @@ void vk_deferred_gbuffer_capture_after_geometry( void )
 	if ( resume_main ) {
 		vk_resume_current_render_pass();
 	}
+	vk_spine_pass_end( VK_SPINE_PASS_GBUFFER_FILL );
 }
 
 static void vk_dgb_create_lighting_descriptor_layout( void )

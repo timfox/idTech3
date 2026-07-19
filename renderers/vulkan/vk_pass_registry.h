@@ -1,0 +1,176 @@
+/*
+===========================================================================
+Lightweight Spine pass / resource registry (Renderer Spine 1.0).
+
+Not a frame-graph rewrite: declarative ownership + optional runtime validation
+around the existing Vulkan path. Cheap stamps always; full checks when
+r_spineValidate > 0 (or on DEVICE_LOST dump).
+===========================================================================
+*/
+#ifndef VK_PASS_REGISTRY_H
+#define VK_PASS_REGISTRY_H
+
+#include "../common/tr_types.h"
+#include "../common/vulkan/vulkan.h"
+#include "vk_deferred_gbuffer.h"
+
+/* Frame phase order (production spine). */
+typedef enum {
+	VK_SPINE_PHASE_FRAME_BEGIN = 0,
+	VK_SPINE_PHASE_SCENE_PREP,
+	VK_SPINE_PHASE_WORLD_DEPTH,
+	VK_SPINE_PHASE_WORLD_OPAQUE,
+	VK_SPINE_PHASE_OPAQUE_LIGHTING,
+	VK_SPINE_PHASE_SCREEN_SPACE,
+	VK_SPINE_PHASE_WORLD_TRANSPARENCY,
+	VK_SPINE_PHASE_TRANSPARENCY_RESOLVE,
+	VK_SPINE_PHASE_TEMPORAL,
+	VK_SPINE_PHASE_POST,
+	VK_SPINE_PHASE_WEAPON,
+	VK_SPINE_PHASE_UI,
+	VK_SPINE_PHASE_PRESENT,
+	VK_SPINE_PHASE_FRAME_END,
+	VK_SPINE_PHASE_COUNT
+} vkSpinePhase;
+
+typedef enum {
+	VK_SPINE_CAT_SCENE_PREP = 0,
+	VK_SPINE_CAT_DEPTH,
+	VK_SPINE_CAT_OPAQUE_RASTER,
+	VK_SPINE_CAT_DEFERRED,
+	VK_SPINE_CAT_FORWARD_PLUS,
+	VK_SPINE_CAT_TRANSPARENCY,
+	VK_SPINE_CAT_OIT,
+	VK_SPINE_CAT_RAY_TRACING,
+	VK_SPINE_CAT_TEMPORAL,
+	VK_SPINE_CAT_POST,
+	VK_SPINE_CAT_WEAPON,
+	VK_SPINE_CAT_UI,
+	VK_SPINE_CAT_PRESENTATION,
+	VK_SPINE_CAT_MAINTENANCE,
+	VK_SPINE_CAT_COUNT
+} vkSpinePassCategory;
+
+/* Access kinds for declared resource edges. */
+typedef enum {
+	VK_SPINE_ACCESS_SAMPLED_READ           = 1u << 0,
+	VK_SPINE_ACCESS_STORAGE_READ           = 1u << 1,
+	VK_SPINE_ACCESS_STORAGE_WRITE          = 1u << 2,
+	VK_SPINE_ACCESS_COLOR_WRITE            = 1u << 3,
+	VK_SPINE_ACCESS_DEPTH_READ             = 1u << 4,
+	VK_SPINE_ACCESS_DEPTH_WRITE            = 1u << 5,
+	VK_SPINE_ACCESS_TRANSFER_READ          = 1u << 6,
+	VK_SPINE_ACCESS_TRANSFER_WRITE         = 1u << 7,
+	VK_SPINE_ACCESS_INDIRECT_READ          = 1u << 8,
+	VK_SPINE_ACCESS_AS_READ                = 1u << 9,
+	VK_SPINE_ACCESS_HISTORY_READ           = 1u << 10,
+	VK_SPINE_ACCESS_HISTORY_WRITE          = 1u << 11
+} vkSpineAccess;
+
+/* Production-spine attachment / buffer identities. */
+typedef enum {
+	VK_SPINE_RES_NONE = 0,
+	VK_SPINE_RES_SWAPCHAIN_COLOR,
+	VK_SPINE_RES_DEPTH,
+	VK_SPINE_RES_HDR_COLOR,
+	VK_SPINE_RES_MOTION_VECTORS,
+	VK_SPINE_RES_GBUFFER_ALBEDO,
+	VK_SPINE_RES_GBUFFER_NORMAL,
+	VK_SPINE_RES_GBUFFER_MATERIAL,
+	VK_SPINE_RES_DEFERRED_LIGHTING,
+	VK_SPINE_RES_SSAO,
+	VK_SPINE_RES_AV_HISTORY,
+	VK_SPINE_RES_AV_FILTERED,
+	VK_SPINE_RES_SSR,
+	VK_SPINE_RES_OIT_ACCUM,
+	VK_SPINE_RES_OIT_REVEAL,
+	VK_SPINE_RES_OIT_MOMENTS,
+	VK_SPINE_RES_OIT_B0,
+	VK_SPINE_RES_TAA_HISTORY,
+	VK_SPINE_RES_REACTIVE_MASK,
+	VK_SPINE_RES_BLOOM_CHAIN,
+	VK_SPINE_RES_EXPOSURE_LUMINANCE,
+	VK_SPINE_RES_SHADOW_SUN,
+	VK_SPINE_RES_FROXEL_SCATTER,
+	VK_SPINE_RES_FORWARD_PLUS_LIGHTS,
+	VK_SPINE_RES_COUNT
+} vkSpineResourceId;
+
+/* Minimum registered production passes (Spine 1.0). */
+typedef enum {
+	VK_SPINE_PASS_NONE = 0,
+	VK_SPINE_PASS_FRAME_PREP,
+	VK_SPINE_PASS_LIGHT_PACK,
+	VK_SPINE_PASS_TILE_CONSTRUCT,
+	VK_SPINE_PASS_SUN_SHADOW,
+	VK_SPINE_PASS_WORLD_OPAQUE,
+	VK_SPINE_PASS_GBUFFER_FILL,
+	VK_SPINE_PASS_DEFERRED_LIGHTING,
+	VK_SPINE_PASS_FORWARD_PLUS_OPAQUE,
+	VK_SPINE_PASS_SSR,
+	VK_SPINE_PASS_AMBIENT_VISIBILITY,
+	VK_SPINE_PASS_FROXEL_VOLUME,
+	VK_SPINE_PASS_TRANSPARENT_FORWARD_PLUS,
+	VK_SPINE_PASS_WBOIT_ACCUM,
+	VK_SPINE_PASS_MBOIT_MOMENTS,
+	VK_SPINE_PASS_MBOIT_ACCUM,
+	VK_SPINE_PASS_OIT_RESOLVE,
+	VK_SPINE_PASS_REACTIVE_MASK,
+	VK_SPINE_PASS_TEMPORAL_RECON,
+	VK_SPINE_PASS_SMAA,
+	VK_SPINE_PASS_BLOOM,
+	VK_SPINE_PASS_EYE_ADAPTATION,
+	VK_SPINE_PASS_WEAPON,
+	VK_SPINE_PASS_HUD_2D,
+	VK_SPINE_PASS_PRESENTATION,
+	VK_SPINE_PASS_HISTORY_MAINT,
+	VK_SPINE_PASS_COUNT
+} vkSpinePassId;
+
+typedef struct {
+	vkSpineResourceId resource;
+	uint32_t access; /* vkSpineAccess bits */
+} vkSpineResourceEdge;
+
+void vk_spine_registry_init( void );
+void vk_spine_registry_shutdown( void );
+
+void vk_spine_frame_begin( void );
+void vk_spine_frame_end( void );
+
+void vk_spine_pass_begin( vkSpinePassId pass );
+void vk_spine_pass_end( vkSpinePassId pass );
+/* Map sticky pass_diag / scene-pass string names onto registry IDs. */
+void vk_spine_pass_begin_named( const char *name, uint32_t width, uint32_t height );
+void vk_spine_pass_end_named( const char *name );
+
+void vk_spine_note_write( vkSpineResourceId res, vkSpinePassId pass, uint32_t access );
+void vk_spine_note_read( vkSpineResourceId res, vkSpinePassId pass, uint32_t access );
+/* Attachment clear / layout-barrier contracts (cheap stamps; validated when r_spineValidate > 0). */
+void vk_spine_note_clear( vkSpineResourceId res, vkSpinePassId pass );
+void vk_spine_note_barrier( vkSpineResourceId res, vkSpinePassId pass, const char *reason );
+/* Track expected VkImageLayout for Spine attachments (cheap stamp; expect checks when validating). */
+void vk_spine_note_layout( vkSpineResourceId res, VkImageLayout layout );
+void vk_spine_expect_layout( vkSpineResourceId res, VkImageLayout expected, vkSpinePassId pass, const char *where );
+VkImageLayout vk_spine_resource_layout( vkSpineResourceId res );
+const char *vk_spine_layout_name( VkImageLayout layout );
+qboolean vk_spine_resource_cleared_this_frame( vkSpineResourceId res );
+qboolean vk_spine_resource_barriered_this_frame( vkSpineResourceId res );
+
+void vk_spine_attachments_created( uint32_t width, uint32_t height );
+void vk_spine_attachments_destroyed( void );
+
+void vk_spine_note_temporal_history( vkSpineResourceId res, qboolean valid );
+void vk_spine_validate_feature_combos( void );
+
+qboolean vk_spine_validate_enabled( void );
+uint32_t vk_spine_attachment_generation( void );
+const char *vk_spine_pass_name( vkSpinePassId pass );
+const char *vk_spine_resource_name( vkSpineResourceId res );
+const char *vk_spine_phase_name( vkSpinePhase phase );
+vkSpinePassId vk_spine_last_writer( vkSpineResourceId res );
+
+void vk_spine_dump_device_lost( void );
+void vk_spine_status_f( void );
+
+#endif /* VK_PASS_REGISTRY_H */

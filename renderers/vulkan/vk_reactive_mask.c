@@ -14,6 +14,7 @@ Temporal reactive mask buffer: clear, stamp (OIT reveal), barriers, pipelines.
 #include "vk_upscale.h"
 #include "vk_post_fog.h"
 #include "vk_scene_pass.h"
+#include "vk_pass_registry.h"
 #ifdef USE_VK_PBR
 #include "vk_forward_plus.h"
 #endif
@@ -85,6 +86,7 @@ void vk_barrier_reactive_mask_for_sampling( const char *reason )
 		0, 0, NULL, 0, NULL, 1, &barrier );
 
 	vk.reactive_mask_layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+	vk_spine_note_layout( VK_SPINE_RES_REACTIVE_MASK, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL );
 
 	if ( r_fboDebug && r_fboDebug->integer >= 2 && vk_post_fog_fbo_debug_throttle() ) {
 		ri.Printf( PRINT_DEVELOPER,
@@ -129,6 +131,7 @@ void vk_barrier_reactive_mask_for_storage( const char *reason )
 		0, 0, NULL, 0, NULL, 1, &barrier );
 
 	vk.reactive_mask_layout = VK_IMAGE_LAYOUT_GENERAL;
+	vk_spine_note_layout( VK_SPINE_RES_REACTIVE_MASK, VK_IMAGE_LAYOUT_GENERAL );
 	(void)reason;
 }
 
@@ -190,6 +193,10 @@ void vk_reactive_mask_clear( void )
 		0, 0, NULL, 0, NULL, 1, &barrier );
 
 	vk.reactive_mask_layout = VK_IMAGE_LAYOUT_GENERAL;
+	vk_spine_pass_begin( VK_SPINE_PASS_REACTIVE_MASK );
+	vk_spine_note_clear( VK_SPINE_RES_REACTIVE_MASK, VK_SPINE_PASS_REACTIVE_MASK );
+	vk_spine_note_barrier( VK_SPINE_RES_REACTIVE_MASK, VK_SPINE_PASS_REACTIVE_MASK, "reactive_clear" );
+	vk_spine_pass_end( VK_SPINE_PASS_REACTIVE_MASK );
 }
 
 void vk_reactive_mask_stamp_from_reveal( void )

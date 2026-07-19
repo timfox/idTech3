@@ -74,6 +74,19 @@ grep -q 'weaponAfter' "$DIAG" || fail "havenrp_renderer_status must report weapo
 grep -q 'vk_temporal_reconstruction_wanted' "$DIAG" || fail "havenrp temporal line must report recon"
 pass "temporal_status + havenrp temporal ownership dump"
 
+# Visual rejection / ownership debug views (taa.frag + cvars)
+TAA_FRAG="$ROOT/renderers/vulkan/shaders/glsl/taa.frag"
+AA="$ROOT/renderers/vulkan/vk_aa_policy.c"
+grep -q 'r_debugHistoryRejection' "$AA" || fail "r_debugHistoryRejection cvar missing"
+grep -q 'r_debugMotionVectors' "$AA" || fail "r_debugMotionVectors cvar missing"
+grep -q 'world vs reactive ownership' "$TAA_FRAG" || fail "taa.frag mode 8 ownership viz missing"
+grep -q 'near-weapon heuristic' "$TAA_FRAG" || fail "taa.frag mode 7 near-weapon viz missing"
+grep -q 'disocclusion' "$TAA_FRAG" || fail "taa.frag mode 5 disocclusion viz missing"
+grep -q 'reactive mask' "$TAA_FRAG" || fail "taa.frag mode 3 reactive viz missing"
+grep -q 'historyRejection' "$TEMP_C" || fail "temporal_status must report historyRejection debug"
+grep -q 'rejectDbg' "$DIAG" || fail "havenrp temporal line must report rejectDbg"
+pass "temporal rejection/ownership visual debug modes 1–8"
+
 # Stable profile must not require TAA (ownership stays SMAA on stable)
 STABLE="$ROOT/config/modern_vulkan_stable.cfg"
 if grep -qE 'seta r_taa 1' "$STABLE"; then
@@ -83,4 +96,5 @@ pass "stable temporal owner remains non-TAA"
 
 echo "=== Temporal ownership check PASSED ==="
 echo "Manual GPU: temporal_status during look/weapon/vid_restart/map change;"
-echo "  r_temporalDebug 2; r_taa 1 + r_temporalWeaponAfterTaa 1 weapon silhouette check."
+echo "  r_temporalDebug 2; r_taa 1 + r_temporalWeaponAfterTaa 1 weapon silhouette check;"
+echo "  r_debugHistoryRejection 2|3|8 for rejection/reactive/ownership overlays."

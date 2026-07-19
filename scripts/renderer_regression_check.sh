@@ -451,6 +451,26 @@ else
 fi
 
 echo ""
+echo "Pass/resource registry:"
+if [[ ! -f "$PROJECT_ROOT/scripts/pass_registry_check.sh" ]]; then
+  fail "missing scripts/pass_registry_check.sh"
+elif ! bash "$PROJECT_ROOT/scripts/pass_registry_check.sh"; then
+  fail "pass_registry_check.sh failed"
+else
+  pass "pass/resource registry static contract"
+fi
+
+echo ""
+echo "Spine combination matrix:"
+if [[ ! -f "$PROJECT_ROOT/scripts/spine_combo_matrix_check.sh" ]]; then
+  fail "missing scripts/spine_combo_matrix_check.sh"
+elif ! bash "$PROJECT_ROOT/scripts/spine_combo_matrix_check.sh"; then
+  fail "spine_combo_matrix_check.sh failed"
+else
+  pass "spine combination matrix static contract"
+fi
+
+echo ""
 echo "Directional Ambient Visibility (GTAO / RTAO / Reference AO):"
 AV_C="$PROJECT_ROOT/renderers/vulkan/vk_ambient_visibility.c"
 AV_GLSL="$PROJECT_ROOT/renderers/vulkan/shaders/glsl/ambient_visibility"
