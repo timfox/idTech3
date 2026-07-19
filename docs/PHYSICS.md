@@ -109,6 +109,8 @@ Parker & O’Brien SCA 2009 (Pixelux trade-name DMM / Force Unleashed) describes
 
 McGraw MIG 2024 **Gram-Schmidt voxel (VGS)** constraints are a stylized PBD voxel soft-body path (not FEM) — scaffold + CPU Alg. 1 in **[VGS.md](VGS.md)** (`cl_vgs_enable`); shipping jelly props remain XPBD softblob distance lattices.
 
+Xie et al. arXiv:2508.04076 **3D Crack Element Method (CEM)** is an ES-FEM element-deactivation / topology-based \(G\) path for dynamic fracture — scaffold + CPU \(G_I/G_{II}\) in **[CEM.md](CEM.md)** (`cl_cem_enable`); it is **not** what `phys_dmm` implements today.
+
 ```bash
 phys_spawn_sensor 0 0 32
 phys_spawn_slider 0 0 64

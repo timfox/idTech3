@@ -69,6 +69,7 @@ exec demo_vgs.cfg
 
 - Soft deformables: [PHYSICS.md](PHYSICS.md)
 - Tet FEM scaffold (alternative): [RTFEM.md](RTFEM.md)
+- ES-FEM crack elements (alternative fracture path): [CEM.md](CEM.md)
 
 ## References
 

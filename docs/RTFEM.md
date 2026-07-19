@@ -60,6 +60,7 @@ exec demo_rtfem.cfg
 ## Related
 
 - Stylized voxel PBD alternative (not FEM): [VGS.md](VGS.md)
+- ES-FEM element-deactivation fracture (not shipping): [CEM.md](CEM.md)
 
 ## References
 

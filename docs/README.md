@@ -41,6 +41,7 @@ Documentation is grouped by **tier**. Most files remain at their historical path
 - [NEBRDF.md](NEBRDF.md) — Shen et al. neural-enhanced analytical BRDF (arXiv:2604.24081)
 - [RTFEM.md](RTFEM.md) — Parker & O’Brien SCA 2009 real-time FEM/fracture scaffold
 - [VGS.md](VGS.md) — McGraw MIG 2024 Gram-Schmidt voxel soft-body scaffold
+- [CEM.md](CEM.md) — Xie et al. arXiv:2508.04076 3D Crack Element Method scaffold
 
 ### Optional submodules (external trees)
 

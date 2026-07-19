@@ -63,6 +63,9 @@ macro(idtech3_append_research_qcommon_sources)
 			${_IDTECH3_RESEARCH}/vgs/vgs_model.c
 			${_IDTECH3_RESEARCH}/vgs/vgs_eval.c
 			${_IDTECH3_RESEARCH}/vgs/vgs_console.c
+			${_IDTECH3_RESEARCH}/cem/cem_model.c
+			${_IDTECH3_RESEARCH}/cem/cem_eval.c
+			${_IDTECH3_RESEARCH}/cem/cem_console.c
 		)
 		if(USE_RADIUSFPS_CUDA)
 			enable_language(CUDA)

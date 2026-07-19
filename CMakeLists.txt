@@ -3226,6 +3226,13 @@ set_tests_properties(test_vgs PROPERTIES
 	LABELS "smoke;validation"
 	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_vgs.sh;${CMAKE_SOURCE_DIR}/extensions/research/vgs/vgs_model.c")
 
+add_test(NAME test_cem
+	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_cem.sh
+	${CMAKE_BINARY_DIR})
+set_tests_properties(test_cem PROPERTIES
+	LABELS "smoke;validation"
+	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_cem.sh;${CMAKE_SOURCE_DIR}/extensions/research/cem/cem_model.c")
+
 add_test(NAME test_gccfer
 	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_gccfer.sh
 	WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
@@ -4246,6 +4253,17 @@ if(BUILD_UNIT_TESTS)
 	endif()
 	add_test(NAME unit_vgs COMMAND unit_vgs)
 	set_tests_properties(unit_vgs PROPERTIES LABELS "unit;validation")
+
+	add_executable(unit_cem
+		tests/unit/test_cem.c
+		extensions/research/cem/cem_model.c
+		extensions/research/cem/cem_eval.c)
+	target_include_directories(unit_cem PRIVATE ${IDTECH3_UNIT_INCLUDE_DIRS})
+	if(UNIX AND NOT APPLE)
+		target_link_libraries(unit_cem PRIVATE m)
+	endif()
+	add_test(NAME unit_cem COMMAND unit_cem)
+	set_tests_properties(unit_cem PROPERTIES LABELS "unit;validation")
 
 	add_executable(unit_x3dpra
 		tests/unit/test_x3dpra.c

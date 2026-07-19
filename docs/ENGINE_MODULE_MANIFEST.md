@@ -88,6 +88,7 @@ CMake: [`cmake/IdTech3QcommonExtensions.cmake`](../cmake/IdTech3QcommonExtension
 | `extensions/research/nebrdf/` | extension | `cl_nebrdf_enable` — Shen et al. neural-enhanced BRDF | `tests/scripts/test_nebrdf.sh` |
 | `extensions/research/rtfem/` | extension | `cl_rtfem_enable` — Parker & O’Brien SCA 2009 FEM scaffold | `tests/scripts/test_rtfem.sh` |
 | `extensions/research/vgs/` | extension | `cl_vgs_enable` — McGraw MIG 2024 Gram-Schmidt voxel scaffold | `tests/scripts/test_vgs.sh` |
+| `extensions/research/cem/` | extension | `cl_cem_enable` — Xie et al. arXiv:2508.04076 Crack Element Method | `tests/scripts/test_cem.sh` |
 
 Optional CUDA: `USE_RADIUSFPS_CUDA`, `USE_VUDA`, `USE_MIMIR_CUDA` (platform + profile dependent).
 
