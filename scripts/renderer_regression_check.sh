@@ -599,6 +599,34 @@ else
 fi
 
 echo ""
+echo "Temporal reactive mask (R8 stamp + TAA set 5):"
+VK_H="$PROJECT_ROOT/renderers/vulkan/vk.h"
+VK_REACTIVE="$PROJECT_ROOT/renderers/vulkan/vk_reactive_mask.c"
+if ! grep -q 'reactive_mask_image' "$VK_H" 2>/dev/null; then
+  fail "vk.h missing reactive_mask_image"
+elif ! grep -q 'taa_reactive_descriptor' "$VK_H" 2>/dev/null; then
+  fail "vk.h missing taa_reactive_descriptor"
+elif ! grep -q 'layout(set = 5, binding = 0) uniform sampler2D reactiveMaskTex' "$TAA_FRAG" 2>/dev/null; then
+  fail "taa.frag missing reactiveMaskTex binding (set 5)"
+elif ! grep -q 'midsGamma.a' "$TAA_FRAG" 2>/dev/null; then
+  fail "taa.frag missing midsGamma.a maskBound gate"
+elif ! grep -q 'vk_reactive_mask_clear' "$VK_REACTIVE" 2>/dev/null; then
+  fail "vk_reactive_mask.c missing clear helper"
+elif ! grep -q 'vk_reactive_mask_stamp_from_reveal' "$VK_REACTIVE" 2>/dev/null; then
+  fail "vk_reactive_mask.c missing OIT reveal stamp"
+elif ! grep -q 'vk_reactive_mask_clear' "$PROJECT_ROOT/renderers/vulkan/tr_backend.c" 2>/dev/null; then
+  fail "tr_backend.c missing reactive mask clear hook"
+elif ! grep -q 'vk_reactive_mask_stamp_from_reveal' "$PROJECT_ROOT/renderers/vulkan/vk_postfx_passes.c" 2>/dev/null; then
+  fail "vk_postfx_passes.c missing OIT reactive stamp hook"
+elif ! grep -q 'set_layouts\[5\] = vk.set_layout_sampler' "$PROJECT_ROOT/renderers/vulkan/vk_init_device.c" 2>/dev/null; then
+  fail "vk_init_device.c TAA layout missing set 5 sampler"
+elif ! grep -q 'reactiveMaskImg' "$PROJECT_ROOT/renderers/vulkan/shaders/glsl/gen_frag.tmpl" 2>/dev/null; then
+  fail "gen_frag.tmpl missing reactiveMaskImg storage image"
+else
+  pass "Temporal reactive mask: R8 attach, clear/stamp, TAA set 5, gen_frag store"
+fi
+
+echo ""
 echo "RTX demo: invViewProj uses Vulkan projection + render-target extent:"
 RTX_C="$PROJECT_ROOT/renderers/vulkan/extensions/rtx/vk_rtx.c"
 if [[ ! -f "$RTX_C" ]]; then

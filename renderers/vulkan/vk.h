@@ -665,6 +665,7 @@ typedef struct {
 		VkRenderPass oit_accum;
 		VkRenderPass oit_moments;
 		VkRenderPass oit_resolve;
+		VkRenderPass reactive_stamp;	/* R8 MAX-blend stamp from OIT reveal */
 		VkRenderPass ssr;
 #ifdef VK_PBR_BRDFLUT
 		VkRenderPass brdflut;
@@ -690,7 +691,8 @@ typedef struct {
 	VkPipelineLayout pipeline_layout;			// default shaders
 	VkPipelineLayout pipeline_layout_storage;	// flare test shader layout
 	VkPipelineLayout pipeline_layout_post_process;	// post-processing
-	VkPipelineLayout pipeline_layout_taa;	/* post-processing + motion vectors (set 4) */
+	VkPipelineLayout pipeline_layout_taa;	/* post-processing + motion (set 4) + reactive (set 5) */
+	VkPipelineLayout pipeline_layout_reactive_stamp;	/* reveal sampler -> R8 mask */
 	VkPipelineLayout pipeline_layout_blend;		// post-processing
 	VkPipelineLayout pipeline_layout_smaa;
 	VkPipelineLayout pipeline_layout_ssao;		// ssao (depth + push constants)
@@ -769,6 +771,8 @@ typedef struct {
 	char postChainLastWriter[16];	/* scene | bloom | post_aa | taa */
 	VkDescriptorSet depth_descriptor[NUM_COMMAND_BUFFERS];	/* per-frame (VUID-03047) */
 	VkDescriptorSet taa_motion_descriptor[NUM_COMMAND_BUFFERS];
+	VkDescriptorSet taa_reactive_descriptor[NUM_COMMAND_BUFFERS];
+	VkDescriptorSet reactive_stamp_reveal_descriptor;
 		VkDescriptorSet postfx_params_descriptor[NUM_COMMAND_BUFFERS];
 		VkDescriptorSet smaa_edge_descriptor;
 		VkDescriptorSet smaa_blend_descriptor;
@@ -1323,6 +1327,7 @@ typedef struct {
 		VkFramebuffer oit_accum;
 		VkFramebuffer oit_moments;
 		VkFramebuffer oit_resolve;
+		VkFramebuffer reactive_stamp;
 		VkFramebuffer ssr;
 		VkFramebuffer main[MAX_SWAPCHAIN_IMAGES];
 		VkFramebuffer gamma[MAX_SWAPCHAIN_IMAGES];
@@ -1553,6 +1558,7 @@ typedef struct {
 		VkShaderModule fp64_points_single_vs;
 		VkShaderModule fp64_points_single_fs;
 		VkShaderModule taa_fs;
+		VkShaderModule reactive_stamp_reveal_fs;
 		VkShaderModule ssr_fs;
 
 		VkShaderModule fog_fs;
@@ -1725,6 +1731,7 @@ typedef struct {
 	VkPipeline fxaa_pipeline;
 	VkPipeline lens_flare_pipeline;
 	VkPipeline taa_pipeline;
+	VkPipeline reactive_stamp_pipeline;	/* fullscreen stamp from OIT reveal into R8 mask */
 	VkPipeline ssao_pipeline;
 	VkPipeline hbao_pipeline;
 	VkPipeline ssao_blur_pipeline;
@@ -1805,6 +1812,12 @@ typedef struct {
 	VkImageView motion_vector_view;
 	VkImage motion_vector_msaa_image;
 	VkImageView motion_vector_msaa_view;
+	/* Temporal Reconstruction reactive mask (R8); gated on TAA / temporal upscale / r_aaMode 3–5 */
+	VkImage reactive_mask_image;
+	VkImageView reactive_mask_view;
+	VkImageLayout reactive_mask_layout;
+	VkImage reactive_mask_stub_image;	/* 1x1 black when full mask not allocated */
+	VkImageView reactive_mask_stub_view;
 	VkImage fog_noise_image;
 	VkImageView fog_noise_view;
 	VkDeviceMemory fog_noise_memory;

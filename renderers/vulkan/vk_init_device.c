@@ -583,7 +583,7 @@ void vk_initialize( void )
 		uint32_t j, maxSets;
 
 		pool_size[0].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-			pool_size[0].descriptorCount = MAX_DRAWIMAGES + NUM_COMMAND_BUFFERS + NUM_COMMAND_BUFFERS + NUM_COMMAND_BUFFERS + 3 + 6 + VK_NUM_BLOOM_PASSES * 2 + 32; // color[N], post_color[N], depth[N], screenmap, ssao, volumetric, bloom, SMAA, TAA
+			pool_size[0].descriptorCount = MAX_DRAWIMAGES + NUM_COMMAND_BUFFERS + NUM_COMMAND_BUFFERS + NUM_COMMAND_BUFFERS + 3 + 6 + VK_NUM_BLOOM_PASSES * 2 + 32 + NUM_COMMAND_BUFFERS + 1; // + TAA reactive[N] + reactive stamp reveal
 #ifdef USE_VK_PBR
         if ( vk.pbrActive )
             pool_size[0].descriptorCount += 2 + ( MAX_DRAWIMAGES * 9 ) + 24; // brdf-lut + irradiance | PBR maps | blend layer arrays (3×8)
@@ -599,7 +599,7 @@ void vk_initialize( void )
 		pool_size[2].descriptorCount = 1 + NUM_COMMAND_BUFFERS * 3; // flare storage + IQM skin/morph + glTF topo SSBO
 
 		pool_size[3].type = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
-			pool_size[3].descriptorCount = 22 + NUM_COMMAND_BUFFERS;	/* luminance[N] binding 1 */
+			pool_size[3].descriptorCount = 22 + NUM_COMMAND_BUFFERS + 4;	/* + Forward+ reactive mask storage */
 
 		pool_size[4].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
 		pool_size[4].descriptorCount = 8 + NUM_COMMAND_BUFFERS;
@@ -1091,7 +1091,8 @@ void vk_initialize( void )
 		set_layouts[2] = vk.set_layout_postfx_uniform;
 		set_layouts[3] = vk.set_layout_sampler;
 		set_layouts[4] = vk.set_layout_sampler;
-		desc.setLayoutCount = 5;
+		set_layouts[5] = vk.set_layout_sampler;
+		desc.setLayoutCount = 6;
 		desc.pSetLayouts = set_layouts;
 		VK_CHECK( qvkCreatePipelineLayout( vk.device, &desc, NULL, &vk.pipeline_layout_taa ) );
 		SET_OBJECT_NAME( vk.pipeline_layout_taa, "pipeline layout - taa", VK_DEBUG_REPORT_OBJECT_TYPE_PIPELINE_LAYOUT_EXT );

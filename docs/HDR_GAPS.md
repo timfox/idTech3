@@ -109,7 +109,7 @@ Both feed into linear HDR; no conflict.
 
 **Temporal Reconstruction** (`r_taa`): confidence-guided resolve after the post-fog source, before luminance and gamma. Uses `vk_temporal` reset policy (resize, map load, camera cut, missing prev matrices). Skips portals / near-static streak guard. Partial unreliable motion **softens** history weight instead of killing the whole pass. First-person weapons do **not** set whole-frame `unreliableMotionThisFrame`.
 
-**History**: YCoCg variance clipping (`r_temporalVarianceClip`), depth disocclusion (`r_temporalDisocclusion`), reactive heuristics (`r_temporalReactiveMask`), cap via `r_temporalHistoryWeight` (default 0.80). Debug overlays: `r_debugMotionVectors`, `r_debugHistoryRejection`.
+**History**: YCoCg variance clipping (`r_temporalVarianceClip`), depth disocclusion (`r_temporalDisocclusion`), reactive path (`r_temporalReactiveMask`): heuristics (near/weapon, motion, luma) **max’d** with a stamped full-res R8 mask from OIT reveal / Forward+ transparent / stochastic survivors (`vk.reactive_mask_*`, TAA set 5). Cap via `r_temporalHistoryWeight` (default 0.80). Debug overlays: `r_debugMotionVectors`, `r_debugHistoryRejection` (yellow = reactive). SMAA-only (`r_aaMode 2`, `r_taa 0`) never allocates the mask.
 
 **Motion**: `r_taaMotionVectors` **1** (default) samples the main-pass motion attachment. **0** uses depth + `prevViewProj` reprojection only.
 

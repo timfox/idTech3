@@ -9,6 +9,7 @@
 #include "vk_post_process_push.h"
 #include "vk_postfx.h"
 #include "vk_postfx_params.h"
+#include "vk_reactive_mask.h"
 #include "vk_render_pass.h"
 #include "vk_scene_pass.h"
 #include "vk_temporal.h"
@@ -166,12 +167,12 @@ static void vk_end_frame_bind_post_process_sets( VkDescriptorSet set0, VkDescrip
 }
 
 static void vk_end_frame_bind_taa_sets( VkDescriptorSet set0, VkDescriptorSet set1, VkDescriptorSet set2,
-	VkDescriptorSet set3, VkDescriptorSet set4 )
+	VkDescriptorSet set3, VkDescriptorSet set4, VkDescriptorSet set5 )
 {
-	VkDescriptorSet sets[5] = { set0, set1, set2, set3, set4 };
+	VkDescriptorSet sets[6] = { set0, set1, set2, set3, set4, set5 };
 
 	qvkCmdBindDescriptorSets( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
-		vk.pipeline_layout_taa, 0, 5, sets, 0, NULL );
+		vk.pipeline_layout_taa, 0, 6, sets, 0, NULL );
 }
 
 static qboolean vk_end_frame_gamma_chain_ready( void )
@@ -600,6 +601,9 @@ void vk_end_frame_record_taa_pass( VkImageView *post_fog_src, VkImageView *lumin
 	if ( r_taaMotionVectors && r_taaMotionVectors->integer && vk.motion_vector_image != VK_NULL_HANDLE ) {
 		vk_barrier_motion_vector_for_sampling( "vk_end_frame pre-taa (motion)" );
 	}
+	if ( vk_reactive_mask_active() ) {
+		vk_barrier_reactive_mask_for_sampling( "vk_end_frame pre-taa (reactive)" );
+	}
 	if ( vk.temporal.hasValidTAAHistory ) {
 		vk_barrier_post_fog_source_for_sampling( vk.taa_history_image_view[readIndex], "vk_end_frame pre-taa (history)" );
 	}
@@ -609,12 +613,19 @@ void vk_end_frame_record_taa_pass( VkImageView *post_fog_src, VkImageView *lumin
 
 	vk_end_frame_begin_post_process_pass( vk.render_pass.taa, vk.framebuffers.taa[writeIndex],
 		taaWidth, taaHeight, vk.taa_pipeline );
-	vk_end_frame_bind_taa_sets(
-		vk.post_color_descriptor[vk.cmd_index],
-		vk.depth_descriptor[vk.cmd_index],
-		vk.postfx_params_descriptor[vk.cmd_index],
-		vk.taa_history_descriptor[readIndex],
-		vk.taa_motion_descriptor[vk.cmd_index] );
+	{
+		VkDescriptorSet reactive_set = vk.taa_reactive_descriptor[vk.cmd_index];
+		if ( reactive_set == VK_NULL_HANDLE ) {
+			reactive_set = vk.taa_motion_descriptor[vk.cmd_index]; /* should not happen */
+		}
+		vk_end_frame_bind_taa_sets(
+			vk.post_color_descriptor[vk.cmd_index],
+			vk.depth_descriptor[vk.cmd_index],
+			vk.postfx_params_descriptor[vk.cmd_index],
+			vk.taa_history_descriptor[readIndex],
+			vk.taa_motion_descriptor[vk.cmd_index],
+			reactive_set );
+	}
 	vk_end_frame_draw_fullscreen_quad( taaWidth, taaHeight );
 	vk_end_render_pass();
 

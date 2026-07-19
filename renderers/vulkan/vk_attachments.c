@@ -15,6 +15,7 @@ atlases, froxel/fluid volumes, and teardown (split from vk.c).
 #include "vk_temporal.h"
 #include "vk_util.h"
 #include "vk_attachments.h"
+#include "vk_upscale.h"
 
 static void vk_create_fog_noise_texture( void );
 static void vk_destroy_sun_shadow_resources( void );
@@ -684,6 +685,32 @@ void vk_create_attachments( void )
 						VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
 						&vk.motion_vector_msaa_image, &vk.motion_vector_msaa_view, qtrue );
 				}
+				/* Temporal reactive mask: full-res when TAA / temporal upscale / r_aaMode 3–5; else 1x1 stub for FP set. */
+				{
+					qboolean want_reactive = qfalse;
+					VkImageUsageFlags reactiveUsage =
+						VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT |
+						VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
+					if ( r_taa && r_taa->integer ) {
+						want_reactive = qtrue;
+					} else if ( r_aaMode && r_aaMode->integer >= 3 && r_aaMode->integer <= 5 ) {
+						want_reactive = qtrue;
+					} else if ( R_Upscale_WantTemporal() ) {
+						want_reactive = qtrue;
+					}
+					if ( want_reactive ) {
+						vk_create_fullres_color_attachment( VK_FORMAT_R8_UNORM, reactiveUsage,
+							&vk.reactive_mask_image, &vk.reactive_mask_view,
+							VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, qfalse );
+						vk.reactive_mask_layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+						ri.Printf( PRINT_ALL, "[VK] Temporal reactive mask: full-res R8 allocated\n" );
+					} else {
+						create_color_attachment( 1, 1, VK_SAMPLE_COUNT_1_BIT, VK_FORMAT_R8_UNORM, reactiveUsage,
+							&vk.reactive_mask_stub_image, &vk.reactive_mask_stub_view,
+							VK_IMAGE_LAYOUT_GENERAL, qfalse, 0 );
+						ri.Printf( PRINT_ALL, "[VK] Temporal reactive mask: 1x1 stub (SMAA-only / TAA off)\n" );
+					}
+				}
 
 		// screenmap-msaa
 		if ( vk.screenMapSamples > VK_SAMPLE_COUNT_1_BIT ) {
@@ -813,6 +840,13 @@ void vk_create_attachments( void )
 			SET_OBJECT_NAME( vk.volumetric_depth_view, "volumetric depth resolve view", VK_DEBUG_REPORT_OBJECT_TYPE_IMAGE_VIEW_EXT );
 			SET_OBJECT_NAME( vk.motion_vector_image, "volumetric motion vectors", VK_DEBUG_REPORT_OBJECT_TYPE_IMAGE_EXT );
 			SET_OBJECT_NAME( vk.motion_vector_view, "volumetric motion vectors view", VK_DEBUG_REPORT_OBJECT_TYPE_IMAGE_VIEW_EXT );
+			if ( vk.reactive_mask_image ) {
+				SET_OBJECT_NAME( vk.reactive_mask_image, "temporal reactive mask", VK_DEBUG_REPORT_OBJECT_TYPE_IMAGE_EXT );
+				SET_OBJECT_NAME( vk.reactive_mask_view, "temporal reactive mask view", VK_DEBUG_REPORT_OBJECT_TYPE_IMAGE_VIEW_EXT );
+			}
+			if ( vk.reactive_mask_stub_image ) {
+				SET_OBJECT_NAME( vk.reactive_mask_stub_image, "temporal reactive mask stub", VK_DEBUG_REPORT_OBJECT_TYPE_IMAGE_EXT );
+			}
 			for ( int fluid_idx = 0; fluid_idx < 2; fluid_idx++ ) {
 				SET_OBJECT_NAME( vk.fluid_velocity_images[fluid_idx], va( "fluid velocity %d", fluid_idx ), VK_DEBUG_REPORT_OBJECT_TYPE_IMAGE_EXT );
 				SET_OBJECT_NAME( vk.fluid_velocity_views[fluid_idx], va( "fluid velocity view %d", fluid_idx ), VK_DEBUG_REPORT_OBJECT_TYPE_IMAGE_VIEW_EXT );
@@ -2124,6 +2158,19 @@ void vk_destroy_attachments( void )
 		qvkDestroyImageView( vk.device, vk.motion_vector_view, NULL );
 		vk.motion_vector_image = VK_NULL_HANDLE;
 		vk.motion_vector_view = VK_NULL_HANDLE;
+	}
+	if ( vk.reactive_mask_image ) {
+		qvkDestroyImage( vk.device, vk.reactive_mask_image, NULL );
+		qvkDestroyImageView( vk.device, vk.reactive_mask_view, NULL );
+		vk.reactive_mask_image = VK_NULL_HANDLE;
+		vk.reactive_mask_view = VK_NULL_HANDLE;
+		vk.reactive_mask_layout = VK_IMAGE_LAYOUT_UNDEFINED;
+	}
+	if ( vk.reactive_mask_stub_image ) {
+		qvkDestroyImage( vk.device, vk.reactive_mask_stub_image, NULL );
+		qvkDestroyImageView( vk.device, vk.reactive_mask_stub_view, NULL );
+		vk.reactive_mask_stub_image = VK_NULL_HANDLE;
+		vk.reactive_mask_stub_view = VK_NULL_HANDLE;
 	}
 	if ( vk.motion_vector_msaa_image ) {
 		qvkDestroyImage( vk.device, vk.motion_vector_msaa_image, NULL );

@@ -13,6 +13,7 @@ Extracted from vk.c for incremental modularization.
 #include "vk_pipeline_helpers.h"
 #include "vk_postfx.h"
 #include "vk_scene_pass.h"
+#include "vk_reactive_mask.h"
 
 void vk_update_post_process_pipelines( void )
 {
@@ -74,6 +75,7 @@ void vk_update_post_process_pipelines( void )
 				vk_create_oit_accum_mboit_pipeline();
 			}
 		}
+		vk_create_reactive_mask_pipeline();
 		if ( PostFX_SSR_IsEnabled() ) {
 			vk_create_post_process_pipeline( 13, postWidth, postHeight );
 		}

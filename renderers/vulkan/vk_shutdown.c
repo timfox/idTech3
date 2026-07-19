@@ -171,6 +171,10 @@ void vk_shutdown( refShutdownCode_t code )
 		qvkDestroyPipelineLayout( vk.device, vk.pipeline_layout_taa, NULL );
 		vk.pipeline_layout_taa = VK_NULL_HANDLE;
 	}
+	if ( vk.pipeline_layout_reactive_stamp != VK_NULL_HANDLE && qvkDestroyPipelineLayout != NULL ) {
+		qvkDestroyPipelineLayout( vk.device, vk.pipeline_layout_reactive_stamp, NULL );
+		vk.pipeline_layout_reactive_stamp = VK_NULL_HANDLE;
+	}
 	if ( vk.pipeline_layout_blend != VK_NULL_HANDLE && qvkDestroyPipelineLayout != NULL ) {
 		qvkDestroyPipelineLayout( vk.device, vk.pipeline_layout_blend, NULL );
 		vk.pipeline_layout_blend = VK_NULL_HANDLE;
@@ -407,6 +411,7 @@ for (i = 0; i < 2; i++) {
 	VK_DESTROY_SHADER_MODULE_FIELD( vk.modules.oit_moments_fs );
 	VK_DESTROY_SHADER_MODULE_FIELD( vk.modules.oit_accum_mboit_fs );
 	VK_DESTROY_SHADER_MODULE_FIELD( vk.modules.oit_resolve_fs );
+	VK_DESTROY_SHADER_MODULE_FIELD( vk.modules.reactive_stamp_reveal_fs );
 	VK_DESTROY_SHADER_MODULE_FIELD( vk.modules.ssao_debug_fs );
 	VK_DESTROY_SHADER_MODULE_FIELD( vk.modules.ssao_depth_debug_fs );
 	VK_DESTROY_SHADER_MODULE_FIELD( vk.modules.ssr_fs );

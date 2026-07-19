@@ -17,6 +17,7 @@ Descriptor set allocation and image/buffer binding updates (split from vk.c).
 #include "vk_attachments.h"
 #include "vk_volumetric_params.h"
 #include "vk_vdb.h"
+#include "vk_reactive_mask.h"
 
 void vk_update_attachment_descriptors( void ) {
 	uint32_t i;
@@ -158,6 +159,29 @@ void vk_update_attachment_descriptors( void ) {
 				motion_desc.dstSet = vk.taa_motion_descriptor[i];
 				qvkUpdateDescriptorSets( vk.device, 1, &motion_desc, 0, NULL );
 			}
+		}
+
+		vk_reactive_mask_update_taa_descriptors();
+		vk_reactive_mask_update_storage_descriptor();
+		if ( vk.reactive_stamp_reveal_descriptor != VK_NULL_HANDLE && vk.oit_reveal_image_view != VK_NULL_HANDLE ) {
+			VkDescriptorImageInfo reveal_info;
+			VkWriteDescriptorSet reveal_desc;
+			Com_Memset( &reveal_info, 0, sizeof( reveal_info ) );
+			sd.gl_mag_filter = sd.gl_min_filter = GL_NEAREST;
+			sd.address_mode = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+			sd.max_lod_1_0 = qtrue;
+			sd.noAnisotropy = qtrue;
+			reveal_info.sampler = vk_find_sampler( &sd );
+			reveal_info.imageView = vk.oit_reveal_image_view;
+			reveal_info.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+			Com_Memset( &reveal_desc, 0, sizeof( reveal_desc ) );
+			reveal_desc.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+			reveal_desc.dstSet = vk.reactive_stamp_reveal_descriptor;
+			reveal_desc.dstBinding = 0;
+			reveal_desc.descriptorCount = 1;
+			reveal_desc.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+			reveal_desc.pImageInfo = &reveal_info;
+			qvkUpdateDescriptorSets( vk.device, 1, &reveal_desc, 0, NULL );
 		}
 
 		if ( r_ssao && r_ssao->integer )
@@ -968,7 +992,9 @@ void vk_init_descriptors( void )
 		for ( i = 0; i < NUM_COMMAND_BUFFERS; i++ ) {
 			VK_CHECK( qvkAllocateDescriptorSets( vk.device, &alloc, &vk.depth_descriptor[i] ) );
 			VK_CHECK( qvkAllocateDescriptorSets( vk.device, &alloc, &vk.taa_motion_descriptor[i] ) );
+			VK_CHECK( qvkAllocateDescriptorSets( vk.device, &alloc, &vk.taa_reactive_descriptor[i] ) );
 		}
+		VK_CHECK( qvkAllocateDescriptorSets( vk.device, &alloc, &vk.reactive_stamp_reveal_descriptor ) );
 
 		if ( r_ssao && r_ssao->integer ) {
 			VK_CHECK( qvkAllocateDescriptorSets( vk.device, &alloc, &vk.ssao_descriptor ) );

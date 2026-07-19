@@ -14,6 +14,7 @@ docs/RENDERER_2026_ARCHITECTURE_PASS.md.
 #include "vk_image_layout.h"
 #include "vk_util.h"
 #include "vk_view_state.h"
+#include "vk_reactive_mask.h"
 
 #define VK_FP_RECORD_STRIDE (sizeof(float) * 16) /* 4 x vec4 per light */
 #define VK_FP_HEADER_BYTES (sizeof(float) * 8) /* 2 x vec4: count/meta + tile grid / viewport */
@@ -332,7 +333,7 @@ static void vk_fp_write_graphics_descriptor( VkBuffer light_buf, VkBuffer tile_b
 
 void vk_forward_plus_create_set_layout( void )
 {
-	VkDescriptorSetLayoutBinding binds[5];
+	VkDescriptorSetLayoutBinding binds[6];
 	VkDescriptorSetLayoutCreateInfo layout_ci;
 
 #ifdef USE_VK_PBR
@@ -361,11 +362,16 @@ void vk_forward_plus_create_set_layout( void )
 	binds[4].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
 	binds[4].descriptorCount = 1;
 	binds[4].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+	/* Temporal reactive mask (R8 storage); stamped by gen_frag when transparent/stochastic. */
+	binds[5].binding = 5;
+	binds[5].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+	binds[5].descriptorCount = 1;
+	binds[5].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
 
 	layout_ci.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
 	layout_ci.pNext = NULL;
 	layout_ci.flags = 0;
-	layout_ci.bindingCount = 5;
+	layout_ci.bindingCount = 6;
 	layout_ci.pBindings = binds;
 	VK_CHECK( qvkCreateDescriptorSetLayout( vk.device, &layout_ci, NULL, &vk.set_layout_forward_plus ) );
 	SET_OBJECT_NAME( vk.set_layout_forward_plus, "descriptor set layout - forward+", VK_DEBUG_REPORT_OBJECT_TYPE_DESCRIPTOR_SET_LAYOUT_EXT );
@@ -413,6 +419,7 @@ void vk_forward_plus_init_graphics_descriptors( void )
 	} else {
 		vk_fp_write_graphics_descriptor( vk_fp_dummy_light_buf, vk_fp_dummy_tile_buf, vk_fp_dummy_param_buf );
 	}
+	vk_reactive_mask_update_storage_descriptor();
 #endif
 }
 

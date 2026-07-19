@@ -400,6 +400,17 @@ void vk_create_framebuffers( void )
 		SET_OBJECT_NAME( vk.framebuffers.oit_resolve, "framebuffer - oit_resolve", VK_DEBUG_REPORT_OBJECT_TYPE_FRAMEBUFFER_EXT );
 	}
 
+	if ( vk.render_pass.reactive_stamp != VK_NULL_HANDLE && vk.reactive_mask_view != VK_NULL_HANDLE ) {
+		desc.renderPass = vk.render_pass.reactive_stamp;
+		desc.attachmentCount = 1;
+		desc.width = fullresWidth;
+		desc.height = fullresHeight;
+		framebuffer_attachments[0] = vk.reactive_mask_view;
+		VK_CHECK( qvkCreateFramebuffer( vk.device, &desc, NULL, &vk.framebuffers.reactive_stamp ) );
+		SET_OBJECT_NAME( vk.framebuffers.reactive_stamp, "framebuffer - reactive_stamp",
+			VK_DEBUG_REPORT_OBJECT_TYPE_FRAMEBUFFER_EXT );
+	}
+
 	if ( PostFX_SSR_IsEnabled() && vk.render_pass.ssr != VK_NULL_HANDLE && vk.ssr_image_view )
 	{
 		desc.renderPass = vk.render_pass.ssr;
@@ -491,6 +502,10 @@ void vk_destroy_framebuffers( void ) {
 	if ( vk.framebuffers.oit_resolve != VK_NULL_HANDLE ) {
 		qvkDestroyFramebuffer( vk.device, vk.framebuffers.oit_resolve, NULL );
 		vk.framebuffers.oit_resolve = VK_NULL_HANDLE;
+	}
+	if ( vk.framebuffers.reactive_stamp != VK_NULL_HANDLE ) {
+		qvkDestroyFramebuffer( vk.device, vk.framebuffers.reactive_stamp, NULL );
+		vk.framebuffers.reactive_stamp = VK_NULL_HANDLE;
 	}
 
 	if ( vk.framebuffers.ssr != VK_NULL_HANDLE ) {

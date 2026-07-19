@@ -1330,6 +1330,7 @@ typedef struct {
 	qboolean oitMomentsPass;	/* MBOIT pass 1: accumulate optical-depth moments */
 	qboolean oitAccumPass;		/* OIT pass 2 (or WBOIT single pass): weighted color accumulation */
 	int oitBucketFilter;		/* 0=all transparent; 1=alpha-blend; 2=additive (r_oitClassify) */
+	qboolean reactiveMaskStamp;	/* gen_frag imageStore into Temporal reactive mask */
 	uint32_t visDrawId;			/* monotonic draw id for PrimID MRT push */
 
 	/* First-person rendering: custom FOV and anti-clipping scale */

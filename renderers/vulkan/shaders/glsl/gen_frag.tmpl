@@ -225,6 +225,7 @@ layout(std430, set = 18, binding = 2) readonly buffer FpParamSSBO {
 	vec4 fp_cluster_z_range;
 } fp_params;
 layout(set = 18, binding = 4) uniform sampler2D fp_sun_shadow_map;
+layout(set = 18, binding = 5, r8) uniform image2D reactiveMaskImg;
 #endif
 
 /* Dedicated material-blend layer arrays (set 19): unique textures for layers 0..7. */
@@ -1829,5 +1830,21 @@ void main() {
 #else
 	out_color = base;
 #endif
+#endif
+
+#ifdef USE_FORWARD_PLUS_FRAG
+	/* Temporal reactive mask: stamp surviving transparent (z) or stochastic (stochMode) coverage.
+	 * w = stamp path active this draw; z = transparent drawSurfFilter=2. */
+	if ( pbrMaterialBlend.w > 0.5 ) {
+		bool doStamp = ( pbrMaterialBlend.z > 0.5 );
+#ifdef USE_ATEST
+		if ( stochPc.stochMode > 0.5 ) {
+			doStamp = true;
+		}
+#endif
+		if ( doStamp ) {
+			imageStore( reactiveMaskImg, ivec2( gl_FragCoord.xy ), vec4( 1.0 ) );
+		}
+	}
 #endif
 }

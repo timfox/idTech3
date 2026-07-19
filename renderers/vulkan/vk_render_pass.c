@@ -1172,6 +1172,61 @@ void vk_create_render_passes( void )
 		SET_OBJECT_NAME( vk.render_pass.taa, "render pass - taa", VK_DEBUG_REPORT_OBJECT_TYPE_RENDER_PASS_EXT );
 	}
 
+	/* Reactive mask stamp: single R8 color, LOAD/STORE, final SHADER_READ_ONLY */
+	if ( vk.reactive_mask_image != VK_NULL_HANDLE ) {
+		VkAttachmentDescription stampAtt;
+		VkAttachmentReference stampRef;
+		VkSubpassDescription stampSub;
+		VkSubpassDependency stampDeps[2];
+		VkRenderPassCreateInfo stampDesc;
+
+		Com_Memset( &stampAtt, 0, sizeof( stampAtt ) );
+		stampAtt.format = VK_FORMAT_R8_UNORM;
+		stampAtt.samples = VK_SAMPLE_COUNT_1_BIT;
+		stampAtt.loadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
+		stampAtt.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+		stampAtt.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+		stampAtt.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+		stampAtt.initialLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+		stampAtt.finalLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+
+		stampRef.attachment = 0;
+		stampRef.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+
+		Com_Memset( &stampSub, 0, sizeof( stampSub ) );
+		stampSub.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
+		stampSub.colorAttachmentCount = 1;
+		stampSub.pColorAttachments = &stampRef;
+
+		Com_Memset( stampDeps, 0, sizeof( stampDeps ) );
+		stampDeps[0].srcSubpass = VK_SUBPASS_EXTERNAL;
+		stampDeps[0].dstSubpass = 0;
+		stampDeps[0].srcStageMask = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT | VK_PIPELINE_STAGE_TRANSFER_BIT;
+		stampDeps[0].dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+		stampDeps[0].srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT | VK_ACCESS_TRANSFER_WRITE_BIT;
+		stampDeps[0].dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+		stampDeps[0].dependencyFlags = VK_DEPENDENCY_BY_REGION_BIT;
+		stampDeps[1].srcSubpass = 0;
+		stampDeps[1].dstSubpass = VK_SUBPASS_EXTERNAL;
+		stampDeps[1].srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+		stampDeps[1].dstStageMask = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+		stampDeps[1].srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+		stampDeps[1].dstAccessMask = VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT;
+		stampDeps[1].dependencyFlags = VK_DEPENDENCY_BY_REGION_BIT;
+
+		Com_Memset( &stampDesc, 0, sizeof( stampDesc ) );
+		stampDesc.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
+		stampDesc.pAttachments = &stampAtt;
+		stampDesc.attachmentCount = 1;
+		stampDesc.pSubpasses = &stampSub;
+		stampDesc.subpassCount = 1;
+		stampDesc.pDependencies = stampDeps;
+		stampDesc.dependencyCount = 2;
+		VK_CHECK( qvkCreateRenderPass( device, &stampDesc, NULL, &vk.render_pass.reactive_stamp ) );
+		SET_OBJECT_NAME( vk.render_pass.reactive_stamp, "render pass - reactive_stamp",
+			VK_DEBUG_REPORT_OBJECT_TYPE_RENDER_PASS_EXT );
+	}
+
 	// screenmap
 	desc.dependencyCount = 2;
 	desc.pDependencies = &deps[0];

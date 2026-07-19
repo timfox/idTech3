@@ -1993,6 +1993,9 @@ static void RB_IterateStagesGeneric( const shaderCommands_t *input )
 				Com_Memcpy( uniform.pbrShCoeffs, block.shCoeffs, sizeof( uniform.pbrShCoeffs ) );
 				Vector4Copy( block.parallaxParams, uniform.pbrParallaxParams );
 				Vector4Copy( block.materialBlend, uniform.pbrMaterialBlend );
+				if ( backEnd.reactiveMaskStamp ) {
+					uniform.pbrMaterialBlend[3] = 1.0f;
+				}
 
 				vk_push_uniform_cached( &uniform );
 			}
@@ -2171,6 +2174,7 @@ static uint32_t vk_push_uniform_cached( const vkUniform_t *u )
 	static uint32_t last_camera_offset = ~0U;
 	static uint32_t last_uniform_offset = ~0U;
 	static vkUniform_t last_uniform;
+	vkUniform_t stamped;
 
 	// Reset cache when we move to a new command buffer.
 	if ( vk.cmd == NULL || vk.cmd->command_buffer != last_cmd_buf ) {
@@ -2178,6 +2182,15 @@ static uint32_t vk_push_uniform_cached( const vkUniform_t *u )
 		last_camera_offset = ~0U;
 		last_uniform_offset = ~0U;
 		Com_Memset( &last_uniform, 0, sizeof( last_uniform ) );
+	}
+
+	if ( backEnd.reactiveMaskStamp && u != NULL ) {
+		Com_Memcpy( &stamped, u, sizeof( stamped ) );
+		stamped.pbrMaterialBlend[3] = 1.0f;
+		if ( backEnd.drawSurfFilter == 2 ) {
+			stamped.pbrMaterialBlend[2] = 1.0f; /* transparent filter: stamp all survivors */
+		}
+		u = &stamped;
 	}
 
 	if ( last_uniform_offset != ~0U &&

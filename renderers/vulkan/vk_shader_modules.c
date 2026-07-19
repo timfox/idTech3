@@ -241,6 +241,7 @@ void vk_create_shader_modules( void )
 	vk.modules.ssao_debug_fs = SHADER_MODULE( ssao_debug_frag_spv );
 	vk.modules.ssao_depth_debug_fs = SHADER_MODULE( ssao_depth_debug_frag_spv );
 	vk.modules.ssr_fs = SHADER_MODULE( ssr_frag_spv );
+	vk.modules.reactive_stamp_reveal_fs = SHADER_MODULE( reactive_stamp_reveal_frag_spv );
 
 	SET_OBJECT_NAME( vk.modules.bloom_fs, "bloom extraction fragment module", VK_DEBUG_REPORT_OBJECT_TYPE_SHADER_MODULE_EXT );
 	SET_OBJECT_NAME( vk.modules.blur_fs, "gaussian blur fragment module", VK_DEBUG_REPORT_OBJECT_TYPE_SHADER_MODULE_EXT );

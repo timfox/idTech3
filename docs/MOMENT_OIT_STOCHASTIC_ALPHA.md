@@ -40,6 +40,10 @@ vid_restart
 
 Demo: `exec demo_oit_clustered.cfg`. See [UNIFIED_CLUSTERED_RENDERER.md](UNIFIED_CLUSTERED_RENDERER.md). Set `r_oitForwardPlus 0` to restore unlit MBOIT/WBOIT accum.
 
+### Temporal Reconstruction
+
+When `r_taa` / `r_aaMode` 4–5 is active, OIT revealage stamps a dedicated R8 **reactive mask** (not `oit_reveal` itself) so Temporal Reconstruction prefers the current frame on glass/smoke (`r_temporalReactiveMask 1`). Forward+ transparent and stochastic survivors also stamp via `gen_frag`. See [HDR_GAPS.md](HDR_GAPS.md) §6.8.
+
 ## Stochastic Alpha-Clipped Materials (`r_stochasticAlpha`)
 
 Hashed / temporal alpha clip for **foliage, grates, hair cards, fabric holes, and decals** (shader `alphaFunc`).

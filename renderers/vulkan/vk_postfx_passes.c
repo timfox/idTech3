@@ -21,6 +21,7 @@ SSAO/HBAO pass, and vk_bloom. Split from vk.c.
 #include "vk_view_state.h"
 #include "vk_deferred_gbuffer.h"
 #include "vk_visibility_buffer.h"
+#include "vk_reactive_mask.h"
 
 static void vk_oit_validate_pass_break( const char *stage )
 {
@@ -230,6 +231,8 @@ void vk_oit_pass( const struct drawSurfsCommand_s *cmd )
 	vk_oit_validate_pass_break( "oit_pass_begin" );
 	vk_get_active_render_extent( &fullWidth, &fullHeight );
 
+	vk_reactive_mask_clear();
+
 	/* Copy opaque scene to fog_scene for resolve */
 	vk_copy_color_to_fog_scene( fullWidth, fullHeight );
 
@@ -279,6 +282,8 @@ void vk_oit_pass( const struct drawSurfsCommand_s *cmd )
 			backEnd.drawSurfFilter = 0;
 		}
 		vk_end_render_pass();
+
+		vk_reactive_mask_stamp_from_reveal();
 
 		record_image_layout_transition( vk.cmd->command_buffer, vk.color_image, VK_IMAGE_ASPECT_COLOR_BIT,
 			VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,

@@ -167,6 +167,8 @@ void vk_update_postfx_params( uint32_t cmd_index )
 	params.colorGrade2[1] = ( r_temporalVarianceClip && r_temporalVarianceClip->integer ) ? 1.0f : 0.0f;
 	params.colorGrade2[2] = ( r_temporalDisocclusion && r_temporalDisocclusion->integer ) ? 1.0f : 0.0f;
 	params.colorGrade2[3] = ( r_temporalReactiveMask && r_temporalReactiveMask->integer ) ? 1.0f : 0.0f;
+	params.midsGamma[3] = ( r_temporalReactiveMask && r_temporalReactiveMask->integer &&
+		vk.reactive_mask_view != VK_NULL_HANDLE ) ? 1.0f : 0.0f;
 	params.shadowsLift[3] = 0.0f;
 	if ( r_debugMotionVectors && r_debugMotionVectors->integer ) {
 		params.shadowsLift[3] = 1.0f;

@@ -43,6 +43,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "vk_vt.h"
 #include "vk_fp64_points.h"
 #include "vk_scene_pass.h"
+#include "vk_reactive_mask.h"
 #endif
 
 backEndData_t	*backEndData;
@@ -1971,7 +1972,14 @@ static const void *RB_DrawSurfs( const void *data ) {
 		 * opaque → G-buffer + deferred → transparent Forward+.
 		 * Weapon/UI (RDF_NOWORLDMODEL): Forward+ only — no second deferred composite. */
 		backEnd.drawSurfFilter = 1; /* opaque only */
+		backEnd.reactiveMaskStamp = qfalse;
+		if ( vk_reactive_mask_stamp_enabled() && r_stochasticAlpha && r_stochasticAlpha->integer > 0 ) {
+			vk_reactive_mask_clear();
+			backEnd.reactiveMaskStamp = qtrue;
+			vk_barrier_reactive_mask_for_storage( "deferred-split opaque stochastic" );
+		}
 		RB_RenderDrawSurfList( cmd->drawSurfs, cmd->numDrawSurfs );
+		backEnd.reactiveMaskStamp = qfalse;
 		if ( !( cmd->refdef.rdflags & RDF_NOWORLDMODEL ) ) {
 			vk_deferred_gbuffer_capture_after_geometry();
 			vk_visibility_buffer_capture_after_geometry();
@@ -1982,6 +1990,7 @@ static const void *RB_DrawSurfs( const void *data ) {
 			}
 		}
 		backEnd.drawSurfFilter = 2; /* transparent only (Forward+ shade) */
+		backEnd.reactiveMaskStamp = qfalse;
 		if ( r_oit && r_oit->integer && r_fbo && r_fbo->integer ) {
 			/* OIT replaces Forward+ transparent shade (no tile-lit OIT yet). */
 			{
@@ -2004,17 +2013,47 @@ static const void *RB_DrawSurfs( const void *data ) {
 		} else {
 			RB_RepairUnifiedClusteredTransparentHandoff( qfalse );
 			RB_ValidateUnifiedClusteredTransparentHandoff( qfalse );
+			vk_reactive_mask_clear();
+			backEnd.reactiveMaskStamp = vk_reactive_mask_stamp_enabled() ? qtrue : qfalse;
+			if ( backEnd.reactiveMaskStamp ) {
+				vk_barrier_reactive_mask_for_storage( "forward+ transparent" );
+			}
 			RB_RenderDrawSurfList( cmd->drawSurfs, cmd->numDrawSurfs );
+			backEnd.reactiveMaskStamp = qfalse;
 		}
 		backEnd.drawSurfFilter = 0;
 	} else if ( r_oit && r_oit->integer && r_fbo && r_fbo->integer ) {
 		backEnd.drawSurfFilter = 1; /* opaque only */
+		/* Stochastic foliage may stamp during opaque when r_stochasticAlpha is on. */
+		backEnd.reactiveMaskStamp = qfalse;
+		if ( vk_reactive_mask_stamp_enabled() && r_stochasticAlpha && r_stochasticAlpha->integer > 0 ) {
+			vk_reactive_mask_clear();
+			backEnd.reactiveMaskStamp = qtrue;
+			vk_barrier_reactive_mask_for_storage( "opaque stochastic" );
+		}
 		RB_RenderDrawSurfList( cmd->drawSurfs, cmd->numDrawSurfs );
+		backEnd.reactiveMaskStamp = qfalse;
 		backEnd.drawSurfFilter = 0;
 		vk_oit_pass( cmd );
 	} else
 #endif
+	{
+#ifdef USE_VULKAN
+		backEnd.reactiveMaskStamp = qfalse;
+		if ( vk_reactive_mask_stamp_enabled() &&
+			( ( r_stochasticAlpha && r_stochasticAlpha->integer > 0 ) ||
+			  !( vk_deferred_opaque_transparent_split() ) ) ) {
+			/* Non-split path: stamp stochastic + any blended draws in the single list. */
+			vk_reactive_mask_clear();
+			backEnd.reactiveMaskStamp = qtrue;
+			vk_barrier_reactive_mask_for_storage( "single-pass draws" );
+		}
+#endif
 	RB_RenderDrawSurfList( cmd->drawSurfs, cmd->numDrawSurfs );
+#ifdef USE_VULKAN
+		backEnd.reactiveMaskStamp = qfalse;
+#endif
+	}
 
 #ifdef USE_VULKAN
 	if ( CBTerrain_IsEnabled() ) {

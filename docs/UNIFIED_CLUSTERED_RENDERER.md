@@ -116,6 +116,8 @@ vid_restart
 
 Or demo: `exec demo_oit_clustered.cfg` (adds `r_stochasticAlpha 2` + TAA). Keep `r_ext_multisample 0`.
 
+With Temporal Reconstruction (`r_aaMode` 4/5), OIT reveal coverage stamps a full-res R8 **reactive mask** so glass/smoke prefer the current frame (`r_temporalReactiveMask 1`). See [HDR_GAPS.md](HDR_GAPS.md) §6.8.
+
 ## Late-shade (optional exclusive)
 
 `r_visibilityBufferLateShade 1` (latched) + `r_visibilityBufferFill 2` + non-MSAA: opaque lighting runs the **late-shade** consumer only (G-buffer MRTs + Forward+ tiles). Classic `vk_deferred_lighting_apply_after_geometry` is skipped — no dual lighting path. Debug mode 5 previews class×albedo. Neural/Hybrid1 still read the G-buffer until migrated.

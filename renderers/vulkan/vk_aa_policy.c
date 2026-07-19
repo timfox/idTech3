@@ -90,7 +90,8 @@ void vk_aa_policy_register_cvars( void )
 	r_temporalReactiveMask = ri.Cvar_Get( "r_temporalReactiveMask", "1", CVAR_ARCHIVE_ND );
 	ri.Cvar_CheckRange( r_temporalReactiveMask, "0", "1", CV_INTEGER );
 	ri.Cvar_SetDescription( r_temporalReactiveMask,
-		"Prefer current frame for reactive pixels (near/weapon, fast motion, transparent heuristics)." );
+		"Prefer current frame for reactive pixels: stamped OIT/transparent/stochastic mask "
+		"(when Temporal Reconstruction is on) max'd with near/weapon/motion/luma heuristics." );
 	ri.Cvar_SetGroup( r_temporalReactiveMask, CVG_RENDERER );
 
 	r_temporalSmaaCleanup = ri.Cvar_Get( "r_temporalSmaaCleanup", "0", CVAR_ARCHIVE_ND );

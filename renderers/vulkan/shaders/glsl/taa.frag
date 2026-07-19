@@ -36,6 +36,7 @@ layout(set = 2, binding = 0) uniform PostFXParams {
 } postfx;
 layout(set = 3, binding = 0) uniform sampler2D historyColor;
 layout(set = 4, binding = 0) uniform sampler2D motionTex;
+layout(set = 5, binding = 0) uniform sampler2D reactiveMaskTex;
 
 layout(location = 0) in vec2 frag_tex_coord;
 layout(location = 0) out vec4 out_color;
@@ -180,13 +181,18 @@ void main() {
 	float lumaDiff = abs( dot( current - history, LUMA ) );
 	float lumaConf = 1.0 - smoothstep( 0.04, 0.35, lumaDiff );
 
-	/* Reactive: near-camera weapon/HUD-ish depth, fast motion, large luma change */
+	/* Reactive: near-camera weapon/HUD-ish depth, fast motion, large luma change,
+	 * plus stamped transparent/OIT/stochastic coverage when maskBound (midsGamma.a). */
 	float reactive = 0.0;
 	if ( useReactive > 0.5 ) {
 		float nearWeapon = smoothstep( 0.92, 0.995, depthNdc ); /* near in reversed-Z */
 		float fastMotion = smoothstep( 6.0, 20.0, motionLen );
 		float flash = smoothstep( 0.15, 0.5, lumaDiff );
 		reactive = clamp( max( nearWeapon, max( fastMotion * 0.75, flash ) ), 0.0, 1.0 );
+		if ( postfx.midsGamma.a > 0.5 ) {
+			float stamped = textureLod( reactiveMaskTex, sampleUV, 0.0 ).r;
+			reactive = max( reactive, clamp( stamped, 0.0, 1.0 ) );
+		}
 	}
 	float reactiveConf = 1.0 - reactive;
 
