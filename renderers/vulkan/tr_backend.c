@@ -1966,12 +1966,15 @@ static const void *RB_DrawSurfs( const void *data ) {
 
 #ifdef USE_VULKAN
 	if ( vk_unified_clustered_active() ) {
-		/* Unified Clustered: opaque → G-buffer + deferred → transparent Forward+. */
+		/* Unified Clustered: opaque → G-buffer + deferred → transparent Forward+.
+		 * Weapon/UI (RDF_NOWORLDMODEL): Forward+ only — no second deferred composite. */
 		backEnd.drawSurfFilter = 1; /* opaque only */
 		RB_RenderDrawSurfList( cmd->drawSurfs, cmd->numDrawSurfs );
-		vk_deferred_gbuffer_capture_after_geometry();
-		vk_visibility_buffer_capture_after_geometry();
-		vk_deferred_lighting_apply_after_geometry();
+		if ( !( cmd->refdef.rdflags & RDF_NOWORLDMODEL ) ) {
+			vk_deferred_gbuffer_capture_after_geometry();
+			vk_visibility_buffer_capture_after_geometry();
+			vk_deferred_lighting_apply_after_geometry();
+		}
 		backEnd.drawSurfFilter = 2; /* transparent only (Forward+ shade) */
 		if ( r_oit && r_oit->integer && r_fbo && r_fbo->integer ) {
 			/* OIT replaces Forward+ transparent shade on mode 3 (no tile-lit OIT yet). */

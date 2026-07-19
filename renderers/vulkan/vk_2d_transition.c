@@ -80,6 +80,22 @@ void vk_prepare_2d( void )
 		return;
 	}
 
+	/* World scene finished but mid-frame compute (deferred/visbuf) left no active pass:
+	 * first HUD StretchPic must open UI overlay (or post_bloom fallback) instead of dropping. */
+	if ( !vk.inRenderPass && backEnd.doneWorldScene && vk.fboActive &&
+		vk.cmd && vk.cmd->command_buffer != VK_NULL_HANDLE &&
+		vk.cmd->swapchain_image_index < MAX_SWAPCHAIN_IMAGES ) {
+		static qboolean s_prepare2d_heal_logged;
+		if ( r_fboDebug && r_fboDebug->integer && !s_prepare2d_heal_logged ) {
+			ri.Printf( PRINT_ALL,
+				"[VK][2d] prepare_2d heal: doneWorldScene with !inRenderPass — begin UI overlay/fallback\n" );
+			s_prepare2d_heal_logged = qtrue;
+		}
+		vk_pass_diag_stage( "prepare_2d_done_world_heal" );
+		vk_begin_2d_overlay_or_fallback( vk.uiOverlayContentValid );
+		return;
+	}
+
 	if ( !vk.cmd || vk.cmd->command_buffer == VK_NULL_HANDLE || !vk.inRenderPass ) {
 		return;
 	}

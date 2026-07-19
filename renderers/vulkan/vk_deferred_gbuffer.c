@@ -185,8 +185,14 @@ qboolean vk_unified_clustered_active( void )
 
 qboolean vk_unified_clustered_opaque_handoff( void )
 {
-	/* Opaque pass of mode 3: drawSurfFilter == 1. */
-	return ( vk_unified_clustered_active() && backEnd.drawSurfFilter == 1 ) ? qtrue : qfalse;
+	/* Opaque world pass of mode 3: hand dynamics to deferred. Skip weapon/UI views. */
+	if ( !vk_unified_clustered_active() || backEnd.drawSurfFilter != 1 ) {
+		return qfalse;
+	}
+	if ( backEnd.refdef.rdflags & RDF_NOWORLDMODEL ) {
+		return qfalse;
+	}
+	return qtrue;
 }
 
 qboolean vk_deferred_unlit_base_wanted( void )
