@@ -545,6 +545,8 @@ void vk_end_frame_record_taa_pass( VkImageView *post_fog_src, VkImageView *lumin
 		return;
 	}
 
+	vk_pass_diag_stage( "taa_enter" );
+
 	taa_src = ( *post_fog_src != VK_NULL_HANDLE ) ? *post_fog_src : vk.color_image_view;
 	/* Prefer doneWorldScene over the last refdef (HUD/weapon may set RDF_NOWORLDMODEL). */
 	allow_taa = ( tr.world != NULL ) &&
@@ -565,6 +567,10 @@ void vk_end_frame_record_taa_pass( VkImageView *post_fog_src, VkImageView *lumin
 	if ( !taa_wanted && R_Upscale_WantTemporal() ) {
 		taa_wanted = qtrue;
 	}
+	if ( taa_wanted && vk_spine_combo_suppress_taa() ) {
+		vk_pass_diag_stage( "taa_suppress_illegal_combo" );
+		taa_wanted = qfalse;
+	}
 
 	if ( !allow_taa ||
 		!taa_wanted ||
@@ -580,6 +586,7 @@ void vk_end_frame_record_taa_pass( VkImageView *post_fog_src, VkImageView *lumin
 		vk.framebuffers.taa[1] == VK_NULL_HANDLE ||
 		vk.taa_history_descriptor[0] == VK_NULL_HANDLE ||
 		vk.taa_history_descriptor[1] == VK_NULL_HANDLE ) {
+		vk_pass_diag_stage( taa_wanted ? "taa_skip_resources" : "taa_skip" );
 		if ( !allow_taa || !taa_wanted ) {
 			vk_reset_taa_history();
 		}
@@ -671,6 +678,7 @@ void vk_end_frame_record_taa_pass( VkImageView *post_fog_src, VkImageView *lumin
 
 	/* Weapon/view-model after world TAA — never contaminate history. */
 	RB_FlushDeferredWeaponAfterTaa( post_fog_src, luminance_src );
+	vk_pass_diag_stage( "taa_exit" );
 }
 
 void vk_end_frame_record_luminance_pass( VkImageView luminance_src )
@@ -680,6 +688,8 @@ void vk_end_frame_record_luminance_pass( VkImageView luminance_src )
 	int clientState = ri.CL_GetState ? ri.CL_GetState() : CA_ACTIVE;
 	qboolean allow_cinematic_luminance = ( clientState == CA_ACTIVE && tr.world != NULL ) ||
 		( clientState == CA_CINEMATIC && fbo_cinematic && fbo_cinematic->integer );
+
+	vk_pass_diag_stage( "luminance_enter" );
 
 	if ( vk.cmd == NULL || vk.cmd->command_buffer == VK_NULL_HANDLE ||
 		exp_auto == NULL || !exp_auto->integer ||
@@ -691,6 +701,7 @@ void vk_end_frame_record_luminance_pass( VkImageView luminance_src )
 		vk.luminance_staging_buffer == VK_NULL_HANDLE ||
 		luminance_src == VK_NULL_HANDLE ||
 		luminance_src == vk.luminance_image_view ) {
+		vk_pass_diag_stage( "luminance_skip" );
 		return;
 	}
 
@@ -744,6 +755,7 @@ void vk_end_frame_record_luminance_pass( VkImageView luminance_src )
 	record_image_layout_transition( vk.cmd->command_buffer, vk.luminance_image, VK_IMAGE_ASPECT_COLOR_BIT,
 		VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_IMAGE_LAYOUT_GENERAL,
 		VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT );
+	vk_pass_diag_stage( "luminance_exit" );
 }
 
 static void vk_end_frame_update_gamma_target( void )
@@ -880,6 +892,8 @@ void vk_end_frame_record_gamma_pass( VkImageView post_fog_src )
 	VkImageView preferred = ( post_fog_src != VK_NULL_HANDLE ) ? post_fog_src : vk.color_image_view;
 	VkImageView gamma_src;
 
+	vk_pass_diag_stage( "gamma_enter" );
+
 	/* Prefer expected writer when viable so bloom/AA/TAA intent wins over stale handles. */
 	if ( expected_src != VK_NULL_HANDLE && vk_post_fog_source_image( expected_src ) != VK_NULL_HANDLE ) {
 		preferred = expected_src;
@@ -939,12 +953,14 @@ void vk_end_frame_record_gamma_pass( VkImageView post_fog_src )
 		if ( !vk_end_frame_try_repair_gamma_chain( &gamma_src ) ) {
 			gamma_src = vk_end_frame_choose_viable_color_source( gamma_src, "gamma_pass_repair_failed" );
 			if ( vk_end_frame_record_emergency_present( gamma_src ) ) {
+				vk_pass_diag_stage( "gamma_emergency_present" );
 				return;
 			}
 			if ( vk_post_fog_fbo_debug_throttle() ) {
 				ri.Printf( PRINT_DEVELOPER, S_COLOR_YELLOW "[VK][fbo] gamma pass skipped: missing pipeline/descriptor/renderpass/framebuffer or zero size (%dx%d), and emergency present fallback was unavailable\n",
 					vk.renderWidth, vk.renderHeight );
 			}
+			vk_pass_diag_stage( "gamma_skip_chain" );
 			return;
 		}
 	}
@@ -955,11 +971,13 @@ void vk_end_frame_record_gamma_pass( VkImageView post_fog_src )
 
 	if ( gamma_src == VK_NULL_HANDLE ) {
 		if ( vk_end_frame_record_emergency_present( vk_end_frame_choose_viable_color_source( vk.color_image_view, "gamma_pass_last_resort" ) ) ) {
+			vk_pass_diag_stage( "gamma_emergency_present" );
 			return;
 		}
 		if ( vk_post_fog_fbo_debug_throttle() ) {
 			ri.Printf( PRINT_DEVELOPER, S_COLOR_YELLOW "[VK][fbo] gamma pass skipped: no valid color source (post_fog or color_image), and emergency present fallback was unavailable\n" );
 		}
+		vk_pass_diag_stage( "gamma_skip_null_source" );
 		return;
 	}
 
@@ -1029,4 +1047,5 @@ void vk_end_frame_record_gamma_pass( VkImageView post_fog_src )
 		vk_end_frame_draw_fullscreen_quad( vk.renderWidth, vk.renderHeight );
 		vk_end_render_pass();
 	}
+	vk_pass_diag_stage( "gamma_exit" );
 }

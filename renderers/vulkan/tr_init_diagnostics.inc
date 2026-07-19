@@ -869,9 +869,11 @@ static void R_RendererSubsystems_f( void )
 		R_YesNo( vk_temporal_reconstruction_wanted() ),
 		R_YesNo( vk.temporal.sharedCameraCut ),
 		ri.Cvar_VariableIntegerValue( "r_debugHistoryRejection" ) );
-	ri.Printf( PRINT_ALL, "spine      : validate=%d attachGen=%u (pass_registry_status for full dump)\n",
+	ri.Printf( PRINT_ALL, "spine      : validate=%d attachGen=%u combo=%s suppressTaa=%s (pass_registry_status for full dump)\n",
 		ri.Cvar_VariableIntegerValue( "r_spineValidate" ),
-		vk_spine_attachment_generation() );
+		vk_spine_attachment_generation(),
+		vk_spine_combo_fallback(),
+		R_YesNo( vk_spine_combo_suppress_taa() ) );
 	ri.Printf( PRINT_ALL, "post       : post=%d tonemap=%d exposure=%.2f bloom=%d smaa=%d fxaa=%d aaAfterBloom=%d\n",
 		R_CvarInteger( r_post ), R_CvarInteger( r_tonemap ), R_CvarValue( r_exposure ),
 		R_CvarInteger( r_bloom ), R_CvarInteger( r_ext_smaa ), R_CvarInteger( r_ext_fxaa ),

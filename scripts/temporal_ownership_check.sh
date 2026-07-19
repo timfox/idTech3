@@ -58,6 +58,10 @@ pass "world matrix capture + portal isolation"
 grep -q 'RB_TryDeferWeaponDrawSurfs' "$BE" || fail "weapon defer entry missing"
 grep -q 'RB_FlushDeferredWeaponAfterTaa' "$BE" "$FRAME" || fail "weapon flush after TAA missing"
 grep -q 'vk_temporal_want_weapon_after_taa' "$TEMP_C" "$BE" || fail "weapon-after-TAA gate missing"
+grep -q 'vk_temporal_defer_weapon_drawsurfs' "$TEMP_C" "$TEMP_H" || \
+  fail "temporal weapon defer wrapper missing"
+grep -q 'vk_temporal_flush_deferred_weapon_after_taa' "$TEMP_C" "$TEMP_H" || \
+  fail "temporal weapon flush wrapper missing"
 grep -q 'r_temporalWeaponAfterTaa' "$ROOT/renderers/vulkan/vk_aa_policy.c" || \
   fail "r_temporalWeaponAfterTaa cvar missing"
 pass "weapon deferred until after world TAA"

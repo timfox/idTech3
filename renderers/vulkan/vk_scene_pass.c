@@ -146,6 +146,15 @@ void vk_report_device_lost_context( const char *where )
 		r_ext_smaa ? r_ext_smaa->integer : -1,
 		r_taa ? r_taa->integer : -1 );
 	ri.Printf( PRINT_ALL,
+		"[VK][device_lost] latePost oit=%d aaMode=%d avMode=%d weaponAfterTaa=%d reactiveMask=%d bloomThr=%.3f bloomInt=%.3f\n",
+		r_oit ? r_oit->integer : -1,
+		r_aaMode ? r_aaMode->integer : -1,
+		ri.Cvar_VariableIntegerValue( "r_ambientVisibilityMode" ),
+		r_temporalWeaponAfterTaa ? r_temporalWeaponAfterTaa->integer : -1,
+		r_temporalReactiveMask ? r_temporalReactiveMask->integer : -1,
+		r_bloom_threshold ? r_bloom_threshold->value : -1.0f,
+		r_bloom_intensity ? r_bloom_intensity->value : -1.0f );
+	ri.Printf( PRINT_ALL,
 		"[VK][device_lost] pass begun=%s ended=%s stage=%s resume=%s selfHeal=%s inPass=%s continuation=%s extent=%ux%u\n",
 		vk.passDiag.lastBegunPass[0] ? vk.passDiag.lastBegunPass : "(none)",
 		vk.passDiag.lastEndedPass[0] ? vk.passDiag.lastEndedPass : "(none)",
@@ -156,10 +165,12 @@ void vk_report_device_lost_context( const char *where )
 		vk.passDiag.inContinuationPass ? "yes" : "no",
 		vk.passDiag.lastPassWidth, vk.passDiag.lastPassHeight );
 	ri.Printf( PRINT_ALL,
-		"[VK][device_lost] renderTarget=%ux%u activePass=%s postFog=%s\n",
+		"[VK][device_lost] renderTarget=%ux%u activePass=%s postFog=%s postChainWriter=%s combo=%s\n",
 		vk.renderWidth, vk.renderHeight,
 		vk_scene_pass_name( vk.renderPassIndex ),
-		vk_post_fog_source_name( vk_get_post_fog_source() ) );
+		vk_post_fog_source_name( vk_get_post_fog_source() ),
+		vk_post_chain_last_writer_name(),
+		vk_spine_combo_fallback() );
 	vk_spine_dump_device_lost();
 }
 

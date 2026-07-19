@@ -66,6 +66,7 @@ typedef struct {
 	uint32_t violationCount;
 	char lastViolation[128];
 	char comboFallback[96];
+	qboolean suppressTaaThisFrame;
 } vkSpineRuntime;
 
 static vkSpineRuntime s_spine;
@@ -604,7 +605,7 @@ void vk_spine_registry_init( void )
 		ri.Cmd_AddCommand( "pass_registry_status", vk_spine_status_f );
 		ri.Cmd_AddCommand( "spine_status", vk_spine_status_f );
 	}
-	ri.Printf( PRINT_ALL, "[VK][spine] pass/resource registry ready (r_spineValidate=%d)\n",
+	ri.Printf( PRINT_ALL, "[VK][spine] pass/resource registry ready (r_spineValidate=%d; combo soft-demote + DEVICE_LOST late-post context)\n",
 		r_spineValidate ? r_spineValidate->integer : 0 );
 }
 
@@ -1049,17 +1050,29 @@ void vk_spine_validate_feature_combos( void )
 	qboolean ssaoOn;
 	qboolean oitOn;
 	qboolean taaOn;
+	qboolean weaponAfter;
+	static qboolean s_warnedDualAo;
+	static qboolean s_warnedOitTaa;
+	static qboolean s_warnedOitTaaWeapon;
+	static qboolean s_warnedTaaWeapon;
 
 	if ( !s_spine.initialized ) {
 		return;
 	}
 	s_spine.comboFallback[0] = '\0';
+	s_spine.suppressTaaThisFrame = qfalse;
 
 	/* Dual owner: legacy SSAO and AV both requesting the AO signal. */
 	avOn = ( ri.Cvar_VariableIntegerValue( "r_ambientVisibilityMode" ) >= 2 ) ? qtrue : qfalse;
 	ssaoOn = ( r_ssao && r_ssao->integer ) ? qtrue : qfalse;
 	if ( ssaoOn && avOn ) {
 		Q_strncpyz( s_spine.comboFallback, "dual_ao_ssao_and_av", sizeof( s_spine.comboFallback ) );
+		if ( !s_warnedDualAo ) {
+			ri.Printf( PRINT_ALL, S_COLOR_YELLOW
+				"[VK][spine] illegal combo: r_ssao + AV both on (one AO owner). "
+				"Recovery: exec gfx_safe.cfg or seta r_ssao 0\n" );
+			s_warnedDualAo = qtrue;
+		}
 		if ( vk_spine_validate_enabled() ) {
 			vk_spine_record_violation(
 				"feature combo: r_ssao and r_ambientVisibilityMode both on (one AO owner expected)" );
@@ -1068,27 +1081,60 @@ void vk_spine_validate_feature_combos( void )
 
 	oitOn = ( r_oit && r_oit->integer ) ? qtrue : qfalse;
 	taaOn = ( r_taa && r_taa->integer ) ? qtrue : qfalse;
+	weaponAfter = ( r_temporalWeaponAfterTaa && r_temporalWeaponAfterTaa->integer ) ? qtrue : qfalse;
 	if ( oitOn && taaOn ) {
 		Q_strncpyz( s_spine.comboFallback, "oit_x_taa", sizeof( s_spine.comboFallback ) );
-		if ( vk_spine_validate_enabled() ) {
-			vk_spine_record_violation(
-				"feature combo: OIT + TAA both enabled (quality matrix; weapon-after-TAA required)" );
-		}
-		if ( !r_temporalWeaponAfterTaa || !r_temporalWeaponAfterTaa->integer ) {
+		if ( !weaponAfter ) {
 			Q_strncpyz( s_spine.comboFallback, "oit_x_taa_without_weapon_after",
 				sizeof( s_spine.comboFallback ) );
+			/* Soft-demote world TAA this frame — weapon would poison history under OIT. */
+			s_spine.suppressTaaThisFrame = qtrue;
+			if ( !s_warnedOitTaaWeapon ) {
+				ri.Printf( PRINT_ALL, S_COLOR_YELLOW
+					"[VK][spine] illegal combo: OIT + TAA without r_temporalWeaponAfterTaa 1; "
+					"suppressing world TAA this frame. Seta r_temporalWeaponAfterTaa 1 or disable OIT/TAA. "
+					"Recovery: exec modern_vulkan_quality.cfg (OIT, no TAA) or vulkan_overlay_temporal_recon.cfg\n" );
+				s_warnedOitTaaWeapon = qtrue;
+			}
 			if ( vk_spine_validate_enabled() ) {
 				vk_spine_record_violation(
 					"feature combo: OIT + TAA requires r_temporalWeaponAfterTaa 1" );
 			}
+		} else if ( !s_warnedOitTaa ) {
+			ri.Printf( PRINT_ALL, S_COLOR_YELLOW
+				"[VK][spine] experimental combo: OIT + TAA (weapon-after on). "
+				"Certified matrix keeps them separate; enable r_spineValidate 1 while testing.\n" );
+			s_warnedOitTaa = qtrue;
+			if ( vk_spine_validate_enabled() ) {
+				vk_spine_record_violation(
+					"feature combo: OIT + TAA both enabled (quality matrix; weapon-after-TAA required)" );
+			}
+		} else if ( vk_spine_validate_enabled() ) {
+			vk_spine_record_violation(
+				"feature combo: OIT + TAA both enabled (quality matrix; weapon-after-TAA required)" );
 		}
-	} else if ( taaOn && ( !r_temporalWeaponAfterTaa || !r_temporalWeaponAfterTaa->integer ) ) {
+	} else if ( taaOn && !weaponAfter ) {
 		Q_strncpyz( s_spine.comboFallback, "taa_without_weapon_after", sizeof( s_spine.comboFallback ) );
+		if ( !s_warnedTaaWeapon ) {
+			ri.Printf( PRINT_ALL, S_COLOR_YELLOW
+				"[VK][spine] warning: TAA without r_temporalWeaponAfterTaa 1 (weapon can poison history)\n" );
+			s_warnedTaaWeapon = qtrue;
+		}
 		if ( vk_spine_validate_enabled() ) {
 			vk_spine_record_violation(
 				"feature combo: TAA without r_temporalWeaponAfterTaa 1 (weapon can poison history)" );
 		}
 	}
+}
+
+qboolean vk_spine_combo_suppress_taa( void )
+{
+	return s_spine.suppressTaaThisFrame;
+}
+
+const char *vk_spine_combo_fallback( void )
+{
+	return s_spine.comboFallback[0] ? s_spine.comboFallback : "none";
 }
 
 void vk_spine_dump_device_lost( void )
@@ -1109,7 +1155,7 @@ void vk_spine_dump_device_lost( void )
 		s_spine.violationCount,
 		s_spine.lastViolation[0] ? s_spine.lastViolation : "none",
 		s_spine.comboFallback[0] ? s_spine.comboFallback : "none" );
-	for ( r = (vkSpineResourceId)1; r < VK_SPINE_RES_COUNT && shown < 12; r++ ) {
+	for ( r = (vkSpineResourceId)1; r < VK_SPINE_RES_COUNT && shown < 24; r++ ) {
 		const vkSpineResourceRuntime *rt = &s_spine.resources[r];
 		if ( !rt->alive && rt->lastWriter == VK_SPINE_PASS_NONE ) {
 			continue;

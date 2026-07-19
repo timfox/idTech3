@@ -162,6 +162,9 @@ void vk_spine_attachments_destroyed( void );
 
 void vk_spine_note_temporal_history( vkSpineResourceId res, qboolean valid );
 void vk_spine_validate_feature_combos( void );
+/* Illegal OIT×TAA without weapon-after: suppress world TAA for this frame. */
+qboolean vk_spine_combo_suppress_taa( void );
+const char *vk_spine_combo_fallback( void );
 
 qboolean vk_spine_validate_enabled( void );
 uint32_t vk_spine_attachment_generation( void );

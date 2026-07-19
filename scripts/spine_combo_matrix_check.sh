@@ -72,6 +72,7 @@ pass "gfx_safe recovery: no TAA/OIT/AO/post-AA"
 # --- Runtime combo validators exist ---
 grep -q 'dual_ao_ssao_and_av' "$REG_C" || fail "runtime dual-AO validator missing"
 grep -q 'oit_x_taa_without_weapon_after' "$REG_C" || fail "runtime OIT×TAA×weapon validator missing"
+grep -q 'suppressing world TAA this frame' "$REG_C" || fail "OIT×TAA without weapon-after must soft-demote TAA"
 grep -q 'taa_without_weapon_after' "$REG_C" || fail "runtime TAA×weapon validator missing"
 grep -q 'r_temporalWeaponAfterTaa' "$AA" || fail "weapon-after-TAA cvar registration missing"
 grep -q 'vk_spine_expect_layout' "$REG_C" || fail "layout expectation API missing from registry"

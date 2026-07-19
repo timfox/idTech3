@@ -100,7 +100,18 @@ void vk_restore_presentation_targets( void )
 
 	vk_create_sync_primitives();
 	vk_create_swapchain( vk.physical_device, vk.device, vk_surface, vk.present_format, &vk.swapchain, qfalse );
+	if ( vk.swapchain == VK_NULL_HANDLE ) {
+		ri.Printf( PRINT_WARNING,
+			"[VK][presentation] restore aborted: swapchain recreate failed (temporal sticky already set)\n" );
+		vk_reset_presentation_runtime_state();
+		vk_pass_diag_reset();
+		return;
+	}
 	vk_create_attachments();
+	if ( vk.color_image == VK_NULL_HANDLE ) {
+		ri.Printf( PRINT_WARNING,
+			"[VK][presentation] restore incomplete: color attachment missing after recreate\n" );
+	}
 	vk_create_render_passes();
 	vk_create_framebuffers();
 
@@ -142,6 +153,21 @@ void vk_restore_presentation_targets( void )
 #endif
 
 	vk_temporal_request_sticky_reset( VK_TEMPORAL_RESET_SWAPCHAIN_CHANGE );
+}
+
+void vk_presentation_note_window_restored( const char *reason )
+{
+	if ( vk.device == VK_NULL_HANDLE || vk.device_lost ) {
+		return;
+	}
+
+	vk_reset_presentation_runtime_state();
+	vk_pass_diag_reset();
+	vk_temporal_request_sticky_reset( VK_TEMPORAL_RESET_SWAPCHAIN_CHANGE );
+
+	ri.Printf( PRINT_DEVELOPER,
+		"[VK][presentation] window restored (%s): cleared acquire flags + sticky temporal reset\n",
+		reason ? reason : "unknown" );
 }
 
 void vk_restart_swapchain( const char *funcname, VkResult res )

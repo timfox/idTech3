@@ -148,6 +148,17 @@ void vk_begin_frame( void )
 	if ( vk.frame_count++ )
 		return;
 
+	/* Minimize skips the entire backend; on restore clear stale acquire flags and
+	 * sticky-reset temporal so the first visible frame does not present garbage. */
+	{
+		static qboolean s_wasMinimized;
+		const qboolean minimized = ri.CL_IsMinimized() ? qtrue : qfalse;
+		if ( s_wasMinimized && !minimized ) {
+			vk_presentation_note_window_restored( "minimize_to_active" );
+		}
+		s_wasMinimized = minimized;
+	}
+
 	if ( !ri.CL_IsMinimized() && vk_restart_swapchain_if_extent_mismatch( __func__, "begin_frame" ) ) {
 		return;
 	}

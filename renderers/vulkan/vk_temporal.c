@@ -554,6 +554,16 @@ qboolean vk_temporal_want_weapon_after_taa( void )
 	return qtrue;
 }
 
+qboolean vk_temporal_defer_weapon_drawsurfs( const void *drawSurfsCmd )
+{
+	return RB_TryDeferWeaponDrawSurfs( (const drawSurfsCommand_t *)drawSurfsCmd );
+}
+
+void vk_temporal_flush_deferred_weapon_after_taa( VkImageView *post_fog_src, VkImageView *luminance_src )
+{
+	RB_FlushDeferredWeaponAfterTaa( post_fog_src, luminance_src );
+}
+
 static void vk_temporal_format_reasons( uint32_t reasons, char *buf, size_t bufSize )
 {
 	static const uint32_t knownReasons[] = {

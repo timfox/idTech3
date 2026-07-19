@@ -104,6 +104,17 @@ grep -q 'vk_spine_expect_layout' "$ROOT/renderers/vulkan/vk_volumetric_pass_comp
 grep -q 'HISTORY_READ' "$ROOT/renderers/vulkan/vk_frame_end.c" || \
   fail "TAA must stamp HISTORY_READ only when history valid"
 grep -q 'vk_spine_note_temporal_history' "$REG_C" || fail "frame_begin must sync TAA history validity"
+grep -q 'vk_spine_combo_suppress_taa' "$REG_H" "$REG_C" || fail "OIT×TAA soft-demote API missing"
+grep -q 'suppressTaaThisFrame' "$REG_C" || fail "combo soft-demote state missing"
+grep -q 'taa_suppress_illegal_combo' "$ROOT/renderers/vulkan/vk_frame_end.c" || \
+  fail "TAA must observe spine combo soft-demote"
+grep -q 'taa_enter' "$ROOT/renderers/vulkan/vk_frame_end.c" || fail "TAA pass_diag stage missing"
+grep -q 'gamma_enter' "$ROOT/renderers/vulkan/vk_frame_end.c" || fail "gamma pass_diag stage missing"
+grep -q 'luminance_enter' "$ROOT/renderers/vulkan/vk_frame_end.c" || fail "luminance pass_diag stage missing"
+grep -q 'latePost oit=' "$ROOT/renderers/vulkan/vk_scene_pass.c" || \
+  fail "DEVICE_LOST dump must include late-post feature context"
+grep -q 'postChainWriter' "$ROOT/renderers/vulkan/vk_scene_pass.c" || \
+  fail "DEVICE_LOST dump must include post-chain writer"
 pass "instrumented spine passes (bloom/TAA/weapon/AV/OIT/G-buffer/Forward+/SMAA/shadow/froxel/layout)"
 
 # OIT × TAA × weapon matrix ownership (profiles)
