@@ -3212,6 +3212,13 @@ set_tests_properties(test_nebrdf PROPERTIES
 	LABELS "smoke;validation"
 	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_nebrdf.sh;${CMAKE_SOURCE_DIR}/extensions/research/nebrdf/nebrdf_model.c")
 
+add_test(NAME test_rtfem
+	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_rtfem.sh
+	${CMAKE_BINARY_DIR})
+set_tests_properties(test_rtfem PROPERTIES
+	LABELS "smoke;validation"
+	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_rtfem.sh;${CMAKE_SOURCE_DIR}/extensions/research/rtfem/rtfem_model.c")
+
 add_test(NAME test_gccfer
 	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_gccfer.sh
 	WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
@@ -4210,6 +4217,17 @@ if(BUILD_UNIT_TESTS)
 	endif()
 	add_test(NAME unit_nebrdf COMMAND unit_nebrdf)
 	set_tests_properties(unit_nebrdf PROPERTIES LABELS "unit;validation")
+
+	add_executable(unit_rtfem
+		tests/unit/test_rtfem.c
+		extensions/research/rtfem/rtfem_model.c
+		extensions/research/rtfem/rtfem_eval.c)
+	target_include_directories(unit_rtfem PRIVATE ${IDTECH3_UNIT_INCLUDE_DIRS})
+	if(UNIX AND NOT APPLE)
+		target_link_libraries(unit_rtfem PRIVATE m)
+	endif()
+	add_test(NAME unit_rtfem COMMAND unit_rtfem)
+	set_tests_properties(unit_rtfem PROPERTIES LABELS "unit;validation")
 
 	add_executable(unit_x3dpra
 		tests/unit/test_x3dpra.c

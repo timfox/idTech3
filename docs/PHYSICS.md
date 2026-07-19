@@ -105,6 +105,8 @@ Soft Step capsules + spherical joints driven by **ProcAnim** (balance / stumble 
 
 Not FEM. Soft Step **rigid proxy** + stress grid; contacts / impacts accumulate strain; on fracture `Dmm_SpawnFragments` replaces the proxy with debris boxes. Cvars: `phys_dmm_enabled`, `phys_dmm_resolution`, `phys_dmm_fracture`. Soft materials still use `xpbd_cloth` / `softblob`.
 
+Parker & O’Brien SCA 2009 (Pixelux trade-name DMM / Force Unleashed) describes **corotational tet FEM + fracture** — that design is documented as a research scaffold in **[RTFEM.md](RTFEM.md)** (`cl_rtfem_enable`); it is **not** what `phys_dmm` implements today.
+
 ```bash
 phys_spawn_sensor 0 0 32
 phys_spawn_slider 0 0 64

@@ -44,6 +44,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "sfca/sfca.h"
 #include "howdark/howdark.h"
 #include "nebrdf/nebrdf.h"
+#include "rtfem/rtfem.h"
 #include "x3dpra/x3dpra_console.h"
 #endif
 #ifdef USE_DUKTAPE
@@ -4254,6 +4255,7 @@ void Com_Init( char *commandLine ) {
 	SFCA_ConsoleInit();
 	HowDark_ConsoleInit();
 	NeBrdf_ConsoleInit();
+	RtFem_ConsoleInit();
 #endif
 
 	Com_Printf( "--- Common Initialization Complete ---\n" );
