@@ -106,7 +106,7 @@ renderer_deferred_safe
 vid_restart
 ```
 
-This profile sets `r_renderMode 1`, `r_deferredGBuffer 1`, `r_deferredGBufferFill 1`, and `r_deferredLighting 1`. It uses the same **opaque deferred + Forward+ transparent** split as mode 3 (`r_forwardPlusShade 1` on transparent; opaque handoff skips Forward+ add). Prefer `r_ext_multisample 0` for direct material export; MSAA uses depth-fallback fill with `deferredMsaaSafeMaterials` confidence floor. Safe debug: `renderer_deferred_safe`. Shipping default remains `modern_vulkan.cfg` (mode 3).
+This profile sets `r_renderMode 1`, `r_deferredGBuffer 1`, `r_deferredGBufferFill 1`, and `r_deferredLighting 1`. It uses the same **opaque deferred + Forward+ transparent** split as mode 3 (`r_forwardPlusShade 1` on transparent; opaque handoff skips Forward+ add). Prefer `r_ext_multisample 0` for direct material export; MSAA uses depth-fallback fill with `deferredMsaaSafeMaterials` confidence floor. Safe debug: `renderer_deferred_safe`. Shipping default remains `modern_vulkan.cfg` → `modern_vulkan_stable.cfg` (**mode 2** Forward+).
 
 The G-buffer fill copies scene albedo. On **non-MSAA** FBO frames, opaque PBR shaders **directly export** normals and material (metalness/roughness/AO). **MSAA** forces the depth-derived fallback (default metal/rough/AO=1). Prefer `r_ext_multisample 0` with `modern_vulkan.cfg` for true material export. Fallback defaults: `r_deferredDefaultMetalness`, `r_deferredDefaultRoughness`, `r_deferredNormalEdgeThreshold`.
 
@@ -308,7 +308,7 @@ The old SSAO/HBAO implementation remains available only as mode 1 and as a fallb
 |------|---------|-------------|
 | `r_fbo` | 1 | Framebuffer objects (required for PBR, HDR, bloom, MSAA, SMAA, SSAO). Use vid_restart after changing. |
 | `r_pbr` | 1 | Physically Based Rendering (metalness/roughness, IBL). Requires r_fbo 1. |
-| `r_renderMode` | 0 | **0** forward, **1** deferred lighting mode, **2** Forward+ primary, **3** Unified Clustered (heterogeneous shading / lighting ownership). `modern_vulkan.cfg` sets **3**. Latched; `vid_restart`. |
+| `r_renderMode` | 0 | **0** forward, **1** deferred lighting mode, **2** Forward+ primary (**Spine shipping default** via `modern_vulkan_stable.cfg`), **3** Unified Clustered (heterogeneous shading / lighting ownership; `modern_clustered.cfg`). Latched; `vid_restart`. |
 | `r_deferredGBuffer` | 0 | With `r_renderMode` 1/2/3: allocate albedo/normal/material/lighting G-buffer images. `modern_vulkan.cfg` sets **1** as a sidecar. Latched; `r_fbo` 1. |
 | `r_deferredGBufferFill` | 0 | With G-buffer RTs: copy scene albedo after geometry (mode 3: after opaque). On non-MSAA FBO frames, opaque PBR material shaders directly export normals and material; MSAA/legacy paths keep the depth-derived fallback. Material is RGBA16F: metalness, roughness, AO, source confidence. `modern_vulkan.cfg` sets **1**. |
 | `r_deferredGBufferDebug` | 0 | Before bloom: show G-buffer on scene color (1=albedo, 2=normal, 3=material, 4=lighting, 5=normal confidence, 6=motion vectors from the main material pass). |
@@ -444,6 +444,56 @@ See [HDR_GAPS.md](HDR_GAPS.md) for HDR pipeline gaps, risks, and render order.
 - Uses librsvg when available; NanoSVG fallback on all platforms
 - Cvars: `r_svgRasterScale`, `r_svgMaxRasterSize`, `r_svgMaxFileBytes`
 - Use `.svg` files in textures/ or gfx/ for scalable UI elements
+
+### Spine diagnostics and recovery
+
+Use these when bisecting black frames, temporal trails, AO regressions, resize/`vid_restart` failures, or DEVICE_LOST on the modern Vulkan path. Full exit criteria: [RENDERER_SPINE_1.0.md](RENDERER_SPINE_1.0.md).
+
+**Headless static gates** (run after renderer/G-buffer/temporal changes):
+
+```bash
+./scripts/spine_stability_check.sh
+./scripts/gbuffer_av_lifecycle_check.sh
+./scripts/temporal_ownership_check.sh
+```
+
+**In-game status dump** (packaged as `demo_gbuffer_av_lifecycle.cfg`):
+
+```cfg
+exec demo_gbuffer_av_lifecycle.cfg
+```
+
+| Command | What it reports |
+|---------|-----------------|
+| `deferred_gbuffer_status` | G-buffer scaffold extent, generation, fill/lighting/composite availability, soft-fail fallback reason |
+| `ambient_visibility_status` | Requested/effective AV mode, TLAS/RTAO readiness, history state, GPU timings, reference-error metrics |
+| `temporal_status` | Shared reset reasons (applied/sticky/pending), TAA history validity, weapon-after-TAA, world-matrix capture |
+| `havenrp_renderer_status` | Aggregated renderer spine summary (gbuffer, temporal, weapon deferral, lighting rows) |
+| `input_status` | Relative mouse / focus lifecycle (Spine presentation path) |
+
+**Recovery presets:**
+
+```cfg
+exec gfx_safe.cfg
+vid_restart
+
+renderer_modern_safe
+vid_restart
+```
+
+**Dev fail-inject cvars** (`CVAR_CHEAT`, clear to recover without `vid_restart` where noted):
+
+| Cvar | Values | Effect |
+|------|--------|--------|
+| `r_dgbFailInject` | `alloc`, `view`, `pipeline`, `descriptor`, `all` | Forces G-buffer soft-fail → legacy SSAO owner; clears when set `0` |
+| `r_avFailInject` | `history`, `rtao`, `all` | Demotes AO only (`legacy_ssao`); G-buffer fill stays live. `history` thrash-resets AV temporal each frame |
+
+**Common pitfalls:**
+
+- `r_ambientVisibilityMode 4` (adaptive hybrid) is **not** promoted in `modern_vulkan_quality.cfg` until the manual GPU matrix in `gbuffer_av_lifecycle_check.sh` passes.
+- Presentation teardown+restore sticky-resets temporal history (`VK_TEMPORAL_RESET_SWAPCHAIN_CHANGE`) and rebinds deferred/AV — expect one-frame resets after resize/alt-tab.
+- RDF_NOWORLDMODEL after `doneWorldScene` does not thrash shared temporal history; weapon draws defer until after world TAA when temporal reconstruction is on (`r_temporalWeaponAfterTaa`).
+- Set `r_temporalDebug 2` for reset-reason logging during TAA/OIT bisects.
 
 ## Future Renderers (Planned)
 

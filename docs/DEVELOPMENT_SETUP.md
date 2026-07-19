@@ -81,7 +81,7 @@ See [CSHARP.md](CSHARP.md). Lua `Engine.*` bindings register on the **client** w
 
 ### FreeUSD (default ON)
 
-`USE_FREEUSD=ON` is the CMake default. The library lives in the **Git submodule** `src/external/FreeUSD` ([gopexllc/FreeUSD](https://github.com/gopexllc/FreeUSD)); `./scripts/compile_engine.sh` runs `git submodule update --init` when needed. If the submodule is missing, CMake **FetchContent** can fetch the same pin (network). Init manually with `./scripts/init_optional_submodules.sh --freeusd`. Disable with `./scripts/compile_engine.sh vulkan nofreeusd` or `-DUSE_FREEUSD=OFF`.
+`USE_FREEUSD=ON` is the CMake default. The library lives in the **Git submodule** `third_party/FreeUSD` ([gopexllc/FreeUSD](https://github.com/gopexllc/FreeUSD)); `./scripts/compile_engine.sh` runs `git submodule update --init` when needed. If the submodule is missing, CMake **FetchContent** can fetch the same pin (network). Init manually with `./scripts/init_optional_submodules.sh --freeusd`. Disable with `./scripts/compile_engine.sh vulkan nofreeusd` or `-DUSE_FREEUSD=OFF`.
 
 See [FREEUSD.md](FREEUSD.md) for mesh import cvars (`r_freeusd`, `r_freeusdPickLargest`, …) and console tools (`usd_info`, `usd_meshes`, `usd_load`, …). Test USDA files: `tests/data/usd/`.
 
@@ -303,6 +303,24 @@ cd build-vk-Release && ctest -C Release --output-on-failure
 # CTest through presets
 ctest --preset test-vulkan-release
 ```
+
+### Renderer Spine static checks (headless)
+
+For Vulkan renderer, G-buffer, Ambient Visibility, temporal-history, and profile-contract changes, run the Spine static gates before GPU work:
+
+```bash
+./scripts/spine_stability_check.sh          # umbrella: profiles + gbuffer/AV + temporal + WBOIT guards
+./scripts/gbuffer_av_lifecycle_check.sh     # G-buffer / AV soft-fail, presentation teardown/restore
+./scripts/temporal_ownership_check.sh       # shared temporal resets, weapon-after-TAA, portal isolation
+```
+
+These scripts grep source contracts only (no GPU). In-game diagnostics after boot or `vid_restart`:
+
+```cfg
+exec demo_gbuffer_av_lifecycle.cfg
+```
+
+Console: `deferred_gbuffer_status`, `ambient_visibility_status`, `temporal_status`, `havenrp_renderer_status`. Recovery from bad experiments: `exec gfx_safe.cfg` then `vid_restart`. See [RENDERER_SPINE_1.0.md](RENDERER_SPINE_1.0.md) and [RENDERER_CONFIDENCE.md](RENDERER_CONFIDENCE.md).
 
 ## IDE Setup
 

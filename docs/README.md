@@ -68,7 +68,7 @@ Documentation is grouped by **tier**. Most files remain at their historical path
 
 ## Repository layout (2026)
 
-Top-level symlinks (`engine/`, `runtime/`, `modules/`, `extensions/`, `renderers/`) → canonical `src/*` tree. **Legacy paths under `src/` remain authoritative.** See [core/REPOSITORY_LAYOUT_2026.md](core/REPOSITORY_LAYOUT_2026.md), [core/LEGACY_AND_MODERN.md](core/LEGACY_AND_MODERN.md), and [ENGINE_REORG_PLAN.md](ENGINE_REORG_PLAN.md).
+Canonical sources live under **`engine/`**, **`runtime/`**, **`modules/`**, **`extensions/`**, and **`renderers/`** (Phase 5c/5e). **`src/`** is README-only after shim removal; cross-domain `#include` paths still use **`scripts/layout_forwarding_symlinks.sh`** until the include rewrite finishes. See [core/REPOSITORY_LAYOUT_2026.md](core/REPOSITORY_LAYOUT_2026.md), [core/SHIM_REMOVAL_CHECKLIST.md](core/SHIM_REMOVAL_CHECKLIST.md), [core/LEGACY_AND_MODERN.md](core/LEGACY_AND_MODERN.md), and [ENGINE_REORG_PLAN.md](ENGINE_REORG_PLAN.md).
 
 ## Archive
 

@@ -6,7 +6,7 @@ This document lists **automated** checks you can run today and **manual** passes
 
 Treat this file as a **default gate** for any change that touches rendering, shaders, mesh tangents, or image loaders used by the renderer:
 
-1. Run **automated** rows in the table below (at minimum `renderer_regression_check.sh` + your usual build).
+1. Run **automated** rows in the table below (at minimum `renderer_regression_check.sh` + **`spine_stability_check.sh`** for renderer/G-buffer/temporal changes + your usual build).
 2. For **graphics PRs**, run the **manual** short list or note why it is N/A (e.g. docs-only).
 3. Prefer **first-party** warning/correctness fixes over new subsystems until the gate is green.
 
@@ -21,6 +21,9 @@ On **`main`**, GitHub Actions **`.github/workflows/build.yml`** runs **`renderer
 | Check | Command | What it proves |
 |--------|---------|----------------|
 | Renderer regression (repo) | `./scripts/renderer_regression_check.sh` | Regression docs present (manifest includes `docs/ARCHITECTURE.md`, `docs/ROADMAP.md`, `BUILD.md`, `docs/FORWARD_PLUS_PIPELINE_AUDIT.md`, `src/renderers/vulkan/vk_temporal.h`, …); `shader_data.c` / `shader_binding.c` exist; recursive GLSL `glslang` pass; IQM/glTF morph **#define** parity; Forward+ **tile cull vs `tr_types.h` / `vk_forward_plus.c`** caps; **`gen_frag.tmpl`** tile stride `tileId * Nu` matches **`MAX_PER_TILE`**; **`r_forwardPlusMaxPerTile`** range wired to `vk_forward_plus_get_*_per_tile_cap`; PBR **`forward_plus_shade_strength`** `constant_id` matches `vk_create_pipeline.c`; Forward+ **`depthCull`** push + depth binding **3**; volumetric VDB binding **17** + **`vdbParams`** UBO fields; **`vk_temporal`** reset bitmask count matches switch + `knownReasons[]` table. Manifest lines strip **CRLF** so Windows checkouts do not false-fail path existence. Optional: set `GAME_BASE` and uncomment BSP paths in `OPTIONAL_GAME_ASSETS.txt` to require packaged maps. |
+| **Renderer Spine stability** | `./scripts/spine_stability_check.sh` | Umbrella static contract for [Spine 1.0](RENDERER_SPINE_1.0.md): `modern_vulkan_stable.cfg` / quality / gfx_safe profile pins, mouse `input_status` symbols, WBOIT clears/barriers, packaging. Delegates to `gbuffer_av_lifecycle_check.sh` and `temporal_ownership_check.sh`. |
+| **G-buffer / AV lifecycle** | `./scripts/gbuffer_av_lifecycle_check.sh` | Soft-fail create paths for deferred G-buffer, Ambient Visibility, and visibility-buffer scaffolds; presentation teardown/restore order; `r_dgbFailInject` / `r_avFailInject`; descriptor generation; TLAS→AV history invalidation; stable profile keeps `r_ambientVisibilityMode 2`. |
+| **Temporal ownership** | `./scripts/temporal_ownership_check.sh` | Shared `apply_resets` (TAA/AV/volumetric/motion/occlusion); RDF_NOWORLDMODEL thrash guard; weapon-after-TAA deferral; portal/world-matrix isolation; `temporal_status` registration; stable profile must not enable `r_taa 1`. |
 | Map load sanity (content) | `GAME_BASE=/abs/path/to/base ./scripts/renderer_regression_maps.sh` | Dedicated server runs `+map` for each `rtest_*` map; log scanned for `ERROR:`, `couldn't load`, `CM_LoadMap`, crashes. Requires full game base (VM + assets), not the regression pk3 alone. `RELEASE_DIR` optional (default `<repo>/release`). Optional `MAPS_EXTRA="name1 name2"` (or repo var `IDTECH3_MAPS_EXTRA` on Tier B self-hosted) appends more BSPs. Mixed dlights checklist: `docs/samples/renderer_regression/scenes/08_tier_b_mixed_dlights.md`. |
 | Full local CI parity | `./scripts/validate_ci_build.sh` | SPIR-V generation, Vulkan Release build, smoke test, renderer regression check. |
 | CMake smoke + artifacts | `ctest --output-on-failure` (from `build-vk-Release`) | Smoke, **renderer_regression_check**, artifacts, unit hooks, **demo_game pk3 layout** (`test_demo_game_pk3`). |
@@ -138,5 +141,6 @@ That sequence closes the gap between engine-side confidence and renderer evidenc
 ## See also
 
 - [RENDERERS.md](RENDERERS.md) - feature inventory and cvars
+- [RENDERER_SPINE_1.0.md](RENDERER_SPINE_1.0.md) - production-certified frame matrix and exit criteria
 - [RELEASE_CHECKLIST.md](RELEASE_CHECKLIST.md) - pre-release steps
 - `./scripts/validate_ci_build.sh` - local mirror of Ubuntu CI expectations

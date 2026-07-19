@@ -64,7 +64,7 @@ Also called historically: Hybrid Clustered Deferred Renderer / Deferred + Forwar
 
 ## Enable
 
-Shipping default is **`modern_vulkan.cfg`** (`r_renderMode 3`). Equivalent profile: `exec modern_clustered.cfg`.
+**Shipping default** is **`modern_vulkan.cfg`** → **`modern_vulkan_stable.cfg`** (`r_renderMode 2` Forward+). Mode 3 is opt-in: `exec modern_clustered.cfg` or `exec vulkan_overlay_unified_clustered.cfg`.
 
 ```
 exec vulkan_overlay_unified_clustered.cfg
