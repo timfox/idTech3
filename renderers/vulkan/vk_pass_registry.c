@@ -133,6 +133,22 @@ static const vkSpineResourceEdge s_writes_av[] = {
 	{ VK_SPINE_RES_HDR_COLOR, VK_SPINE_ACCESS_COLOR_WRITE },
 };
 
+static const vkSpineResourceEdge s_reads_raster_gi[] = {
+	{ VK_SPINE_RES_DEPTH, VK_SPINE_ACCESS_DEPTH_READ },
+	{ VK_SPINE_RES_GBUFFER_ALBEDO, VK_SPINE_ACCESS_SAMPLED_READ },
+	{ VK_SPINE_RES_GBUFFER_NORMAL, VK_SPINE_ACCESS_SAMPLED_READ },
+	{ VK_SPINE_RES_HDR_COLOR, VK_SPINE_ACCESS_SAMPLED_READ },
+	{ VK_SPINE_RES_AV_FILTERED, VK_SPINE_ACCESS_SAMPLED_READ },
+	{ VK_SPINE_RES_PROBE_GRID, VK_SPINE_ACCESS_STORAGE_READ },
+};
+static const vkSpineResourceEdge s_writes_raster_gi[] = {
+	{ VK_SPINE_RES_PROBE_IRRADIANCE, VK_SPINE_ACCESS_STORAGE_WRITE },
+	{ VK_SPINE_RES_SSGI_RADIANCE, VK_SPINE_ACCESS_STORAGE_WRITE },
+	{ VK_SPINE_RES_SSGI_CONFIDENCE, VK_SPINE_ACCESS_STORAGE_WRITE },
+	{ VK_SPINE_RES_INDIRECT_DIFFUSE, VK_SPINE_ACCESS_STORAGE_WRITE },
+	{ VK_SPINE_RES_HDR_COLOR, VK_SPINE_ACCESS_COLOR_WRITE },
+};
+
 static const vkSpineResourceEdge s_reads_ssr[] = {
 	{ VK_SPINE_RES_HDR_COLOR, VK_SPINE_ACCESS_SAMPLED_READ },
 	{ VK_SPINE_RES_DEPTH, VK_SPINE_ACCESS_DEPTH_READ },
@@ -311,6 +327,12 @@ static const vkSpinePassDesc s_passes[VK_SPINE_PASS_COUNT] = {
 		VK_SPINE_VIEW_MAIN, qfalse, qtrue,
 		s_reads_av, (int)ARRAY_LEN( s_reads_av ),
 		s_writes_av, (int)ARRAY_LEN( s_writes_av )
+	},
+	[VK_SPINE_PASS_RASTER_GI] = {
+		VK_SPINE_PASS_RASTER_GI, "raster_gi", VK_SPINE_CAT_POST, VK_SPINE_PHASE_SCREEN_SPACE,
+		VK_SPINE_VIEW_MAIN, qfalse, qfalse,
+		s_reads_raster_gi, (int)ARRAY_LEN( s_reads_raster_gi ),
+		s_writes_raster_gi, (int)ARRAY_LEN( s_writes_raster_gi )
 	},
 	[VK_SPINE_PASS_FROXEL_VOLUME] = {
 		VK_SPINE_PASS_FROXEL_VOLUME, "froxel_volume", VK_SPINE_CAT_POST, VK_SPINE_PHASE_SCREEN_SPACE,
@@ -556,6 +578,11 @@ const char *vk_spine_resource_name( vkSpineResourceId res )
 	case VK_SPINE_RES_SHADOW_SUN: return "shadow_sun";
 	case VK_SPINE_RES_FROXEL_SCATTER: return "froxel_scatter";
 	case VK_SPINE_RES_FORWARD_PLUS_LIGHTS: return "forward_plus_lights";
+	case VK_SPINE_RES_PROBE_GRID: return "probe_grid";
+	case VK_SPINE_RES_PROBE_IRRADIANCE: return "probe_irradiance";
+	case VK_SPINE_RES_SSGI_RADIANCE: return "ssgi_radiance";
+	case VK_SPINE_RES_SSGI_CONFIDENCE: return "ssgi_confidence";
+	case VK_SPINE_RES_INDIRECT_DIFFUSE: return "indirect_diffuse";
 	default: return "none";
 	}
 }
@@ -1126,7 +1153,7 @@ void vk_spine_attachments_created( uint32_t width, uint32_t height )
 	vk_spine_set_resource_alive( VK_SPINE_RES_OIT_ACCUM,
 		vk.oit_accum_image != VK_NULL_HANDLE, width, height, VK_FORMAT_R16G16B16A16_SFLOAT );
 	vk_spine_set_resource_alive( VK_SPINE_RES_OIT_REVEAL,
-		vk.oit_reveal_image != VK_NULL_HANDLE, width, height, VK_FORMAT_R8_UNORM );
+		vk.oit_reveal_image != VK_NULL_HANDLE, width, height, VK_FORMAT_R16_SFLOAT );
 	vk_spine_set_resource_alive( VK_SPINE_RES_OIT_MOMENTS,
 		vk.oit_moments_image != VK_NULL_HANDLE, width, height, VK_FORMAT_R16G16B16A16_SFLOAT );
 	vk_spine_set_resource_alive( VK_SPINE_RES_OIT_B0,

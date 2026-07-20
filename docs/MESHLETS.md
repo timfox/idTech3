@@ -45,4 +45,8 @@ When enabled, MD3 surfaces (≤512 verts / ≤1024 tris) bake at load, skip add 
 - BSP world / skinned meshlets
 - GPU cull / continuous cluster LOD streaming
 
+## Raster Ultra 1.6
+
+See [RASTER_ULTRA_1.6.md](RASTER_ULTRA_1.6.md): stable uint64 cache keys + generation, normal-cone metadata/cull, companion GPU scene / Hi-Z overlay (`vulkan_overlay_raster_ultra_1_6_geometry.cfg`).
+
 See also [RENDERER_2027.md](RENDERER_2027.md) Phase 2.

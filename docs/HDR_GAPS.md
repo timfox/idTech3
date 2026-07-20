@@ -105,7 +105,7 @@ Both feed into linear HDR; no conflict.
 
 **Shipping default**: **SMAA 1x** via `r_aaMode 2` (`r_ext_smaa 1`, `r_taa 0`) in engine defaults and `modern_vulkan.cfg`. Temporal Reconstruction is opt-in (`r_aaMode` 4/5 or `r_taa 1`).
 
-**Policy**: `vk_aa_policy.c` maps `r_aaMode` 0–6 onto SMAA / FXAA / Temporal Reconstruction / supersample. Mode **5** defers SMAA until after temporal resolve (cleanup). Mode **3** is SMAA T2x scaffold (SMAA + light history).
+**Policy**: `vk_aa_policy.c` maps `r_aaMode` 0–6 onto SMAA / FXAA / Present-Time Adaptive Reconstruction / Temporal Reconstruction / supersample. Mode **3** is current-frame-first adaptive recon (migrated from SMAA T2x). Mode **5** defers SMAA until after temporal resolve (cleanup). Mode **6** is spatial supersample reference. Certified zero-history remains mode **2**.
 
 **Temporal Reconstruction** (`r_taa`): confidence-guided resolve after the post-fog source, before luminance and gamma. Uses `vk_temporal` reset policy (resize, map load, camera cut, missing prev matrices). Skips portals / near-static streak guard. Partial unreliable motion **softens** history weight instead of killing the whole pass.
 
@@ -145,7 +145,7 @@ Both feed into linear HDR; no conflict.
 8. **Legacy SSAO** (mode 1, if `r_ssao`): copy `color_image` to `fog_scene`, samples depth, blur, combine with scene into `fog_scene`. When SSAO is on, `fog_scene` becomes the post-fog source.
 9. **Volumetric compute + composite** → fog over scene (when enabled). Reads and writes `fog_scene`.
 10. **SMAA / FXAA** (if enabled and not deferred cleanup): edge detect / resolve. Runs after volumetrics (or after 2D overlays if volumetrics skipped). Output is the post-fog source.
-11. **Temporal Reconstruction** (if `r_taa` 1 / `r_aaMode` 4–5): confidence resolve on post-fog source; history ping-pong in `taa_history` images. Mode **5** then runs light SMAA cleanup on the resolve. When `r_temporalWeaponAfterTaa` 1, deferred weapon/view-model draws flush **after** this step into `color_image` (separate temporal ownership).
+11. **Temporal / Adaptive Reconstruction** (if `r_taa` 1 / `r_aaMode` 3–5): confidence resolve on post-fog source; history ping-pong in `taa_history` images. Mode **3** (Present-Time Adaptive) uses strict history caps + current-frame spatial fallback on reject — no full-frame SMAA over the resolve. Mode **5** may run light SMAA cleanup. When `r_temporalWeaponAfterTaa` 1, deferred weapon/view-model draws flush **after** this step into `color_image` (separate temporal ownership).
 12. **Luminance pass** (if `r_exposure_auto`): compute pass on post-fog source (after temporal when enabled); result used next frame for eye adaptation.
 13. **Gamma pass** → tonemap, exposure, gamma → swapchain.
 

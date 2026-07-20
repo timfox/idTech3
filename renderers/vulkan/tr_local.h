@@ -1330,6 +1330,8 @@ typedef struct {
 	qboolean oitMomentsPass;	/* MBOIT pass 1: accumulate optical-depth moments */
 	qboolean oitAccumPass;		/* OIT pass 2 (or WBOIT single pass): weighted color accumulation */
 	int oitBucketFilter;		/* 0=all transparent; 1=alpha-blend; 2=additive (r_oitClassify) */
+	qboolean refractiveOnlyPass;	/* Raster Ultra 1.4: sorted refractive after OIT */
+	qboolean skipRefractivePass;	/* Skip refractive during Forward+ transparent when OIT owns blend */
 	qboolean reactiveMaskStamp;	/* gen_frag imageStore into Temporal reactive mask */
 	uint32_t visDrawId;			/* monotonic draw id for PrimID MRT push */
 
@@ -1654,6 +1656,7 @@ extern cvar_t	*r_temporalHistoryWeight;
 extern cvar_t	*r_temporalVarianceClip;
 extern cvar_t	*r_temporalDisocclusion;
 extern cvar_t	*r_temporalReactiveMask;
+extern cvar_t	*r_reactiveMaskForce;
 extern cvar_t	*r_temporalWeaponAfterTaa;
 extern cvar_t	*r_temporalSmaaCleanup;
 extern cvar_t	*r_debugMotionVectors;

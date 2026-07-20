@@ -19,6 +19,8 @@ Temporal reactive mask buffer: clear, stamp (OIT reveal), barriers, pipelines.
 #include "vk_forward_plus.h"
 #endif
 
+#include "vk_raster_ultra.h"
+
 static int s_reactive_mask_cleared_frame = -1;
 
 qboolean vk_reactive_mask_wanted( void )
@@ -34,6 +36,16 @@ qboolean vk_reactive_mask_wanted( void )
 	}
 	if ( r_aaMode && r_aaMode->integer >= 3 && r_aaMode->integer <= 5 ) {
 		return qtrue;
+	}
+	if ( ri.Cvar_VariableIntegerValue( "r_reactiveMaskForce" ) ) {
+		return qtrue;
+	}
+	if ( VK_RasterUltra_Active() ) {
+		if ( ri.Cvar_VariableIntegerValue( "r_oit" ) ||
+			ri.Cvar_VariableIntegerValue( "r_gpuParticles" ) ||
+			ri.Cvar_VariableIntegerValue( "r_distortion" ) ) {
+			return qtrue;
+		}
 	}
 	return qfalse;
 }

@@ -10,10 +10,13 @@
 typedef struct {
 	vec3_t mins;
 	vec3_t maxs;
+	vec3_t coneAxis;   /* average face normal (local); length 0 = disabled */
+	float  coneCutoff; /* cos(half-angle); < -1 = disabled */
 	uint16_t firstIndex;
 	uint16_t indexCount;
 	uint16_t firstVert;
 	uint16_t vertCount;
+	uint32_t materialClass; /* 0 opaque, 1 alpha-test, 2 other */
 } meshlet_t;
 
 /* Host-side VkDrawIndexedIndirectCommand layout (5 x uint32). */
@@ -35,7 +38,13 @@ void R_Meshlets_InvalidateCache( void );
 int R_Meshlets_Bake( const vec3_t *positions, int numVerts, const int *indexes, int numIndexes,
 	meshlet_t *out, int maxOut );
 
-/* Cache local-space bake keyed by surface (or other stable pointer). */
+/* Cache local-space bake keyed by stable uint64 (not transient CPU pointers). */
+uint64_t R_Meshlets_StableKey( const char *modelName, const char *surfaceName, int surfaceIndex );
+int R_Meshlets_CacheLocalKey( uint64_t key, const vec3_t *positions, int numVerts,
+	const int *indexes, int numIndexes );
+int R_Meshlets_LookupKey( uint64_t key, const meshlet_t **outMeshlets );
+
+/* Legacy pointer key — hashes address + generation; prefer StableKey / CacheLocalKey. */
 int R_Meshlets_CacheLocal( const void *key, const vec3_t *positions, int numVerts,
 	const int *indexes, int numIndexes );
 int R_Meshlets_Lookup( const void *key, const meshlet_t **outMeshlets );

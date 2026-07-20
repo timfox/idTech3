@@ -150,7 +150,10 @@ void PostFX_RegisterCvars(void) {
 		"When r_ssr_roughnessThreshold > 0: exponent on (1 - N·V) for grazing SSR weight. Higher = narrower grazing band." );
 
 	r_atmosphere             = ri.Cvar_Get("r_atmosphere",             "0",    CVAR_ARCHIVE);
-	ri.Cvar_SetDescription( r_atmosphere, "Atmospheric scattering for sky and fog. Requires r_fbo 1." );
+	ri.Cvar_SetDescription( r_atmosphere,
+		"Physical atmospheric sky (Rayleigh/Mie). Requires r_fbo 1.\n"
+		"Raster Ultra 1.7: only paints when r_skyOwner 1 (physical). "
+		"Classic maps keep r_skyOwner 0 so skybox and atmosphere never dual-contribute." );
 	r_atmosphere_sunDirX     = ri.Cvar_Get("r_atmosphere_sunDirX",     "0.3",  CVAR_ARCHIVE);
 	r_atmosphere_sunDirY     = ri.Cvar_Get("r_atmosphere_sunDirY",     "0.8",  CVAR_ARCHIVE);
 	r_atmosphere_sunDirZ     = ri.Cvar_Get("r_atmosphere_sunDirZ",     "0.5",  CVAR_ARCHIVE);

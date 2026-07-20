@@ -103,6 +103,27 @@ vec3 applyResolveSharpen( vec2 uv, vec3 resolved ) {
 	return max( resolved + ( resolved - blur ) * sharpen * 0.35, vec3( 0.0 ) );
 }
 
+/*
+ * Edge-aware current-frame neighborhood (SMAA-class spatial fallback).
+ * Used when history is rejected under Present-Time Adaptive Reconstruction —
+ * not a full-frame SMAA pass over the resolve.
+ */
+vec3 spatialCurrentFallback( vec2 uv ) {
+	vec2 texel = texelSize();
+	vec3 c0 = sampleCurrent( uv );
+	vec3 cL = sampleCurrent( uv + vec2( -texel.x, 0.0 ) );
+	vec3 cR = sampleCurrent( uv + vec2( texel.x, 0.0 ) );
+	vec3 cU = sampleCurrent( uv + vec2( 0.0, -texel.y ) );
+	vec3 cD = sampleCurrent( uv + vec2( 0.0, texel.y ) );
+	float l0 = max( dot( c0, LUMA ), 1e-4 );
+	float wL = 1.0 / ( 1.0 + abs( max( dot( cL, LUMA ), 0.0 ) - l0 ) * 8.0 );
+	float wR = 1.0 / ( 1.0 + abs( max( dot( cR, LUMA ), 0.0 ) - l0 ) * 8.0 );
+	float wU = 1.0 / ( 1.0 + abs( max( dot( cU, LUMA ), 0.0 ) - l0 ) * 8.0 );
+	float wD = 1.0 / ( 1.0 + abs( max( dot( cD, LUMA ), 0.0 ) - l0 ) * 8.0 );
+	float wSum = 1.0 + wL + wR + wU + wD;
+	return ( c0 + cL * wL + cR * wR + cU * wU + cD * wD ) / wSum;
+}
+
 void main() {
 	vec2 uv = frag_tex_coord;
 	vec2 texel = texelSize();
@@ -111,18 +132,23 @@ void main() {
 	float depthNdc = textureLod( depthTex, sampleUV, 0.0 ).r;
 
 	/* colorGrade2.yzw: Temporal Reconstruction flags (gamma uses .x = hue only).
-	 * shadowsLift.a: debug mode (gamma uses .rgb only). */
+	 * shadowsLift.a: debug mode (gamma uses .rgb only).
+	 * highlightsGain.a: adaptive recon pack (>0.5 on). */
 	float useVarClip = postfx.colorGrade2.y;
 	float useDisocc = postfx.colorGrade2.z;
 	float useReactive = postfx.colorGrade2.w;
 	float debugMode = postfx.shadowsLift.a;
+	float adaptivePack = postfx.highlightsGain.a;
+	bool adaptive = adaptivePack >= 1.0;
+	bool adaptSpatial = adaptivePack >= 2.0;
+	float adaptBudget = adaptive ? clamp( adaptivePack - ( adaptSpatial ? 2.0 : 1.0 ), 0.0, 1.0 ) : 0.0;
 
 	if ( postfx.taaParams.x < 0.5 || postfx.frameInfo.w < 0.5 || depthNdc <= 0.0 || depthNdc >= 1.0 ) {
 		if ( debugMode > 1.5 ) {
 			out_color = vec4( 1.0, 1.0, 1.0, 1.0 ); /* white = cut/reset */
 			return;
 		}
-		out_color = vec4( current, 1.0 );
+		out_color = vec4( adaptive && adaptSpatial ? spatialCurrentFallback( sampleUV ) : current, 1.0 );
 		return;
 	}
 
@@ -170,22 +196,24 @@ void main() {
 	if ( useDisocc > 0.5 ) {
 		float depthDelta = abs( depthNdc - histDepth );
 		/* Reversed-Z: larger = nearer. Tighter reject kills skyline / silhouette bleed. */
-		depthConf = 1.0 - smoothstep( 0.0004, 0.012, depthDelta );
+		float dLo = adaptive ? 0.00025 : 0.0004;
+		float dHi = adaptive ? 0.008 : 0.012;
+		depthConf = 1.0 - smoothstep( dLo, dHi, depthDelta );
 		/* Extra reject when current is near-far (sky/background) vs history nearer geo. */
 		if ( depthNdc < 0.08 && histDepth > depthNdc + 0.02 ) {
 			depthConf *= 0.25;
 		}
 	}
 
-	float velocityConf = 1.0 - smoothstep( 4.0, 24.0, motionLen );
+	float velocityConf = 1.0 - smoothstep( adaptive ? 2.5 : 4.0, adaptive ? 16.0 : 24.0, motionLen );
 	if ( !mvValid && postfx.depthParams.z > 0.5 ) {
-		velocityConf *= 0.35;
+		velocityConf *= adaptive ? 0.15 : 0.35;
 	}
 
 	float currentLuma = max( dot( current, LUMA ), 0.0 );
 	float historyLuma = max( dot( history, LUMA ), 0.0 );
 	float lumaDiff = abs( currentLuma - historyLuma );
-	float lumaConf = 1.0 - smoothstep( 0.028, 0.26, lumaDiff );
+	float lumaConf = 1.0 - smoothstep( adaptive ? 0.018 : 0.028, adaptive ? 0.18 : 0.26, lumaDiff );
 
 	/*
 	 * Heuristic reactive always runs with Temporal Reconstruction.
@@ -206,7 +234,7 @@ void main() {
 		max( fastMotion * 0.90,
 		max( flash, max( highlightGhost * 0.95, historyBleed * 0.98 ) ) ) ), 0.0, 1.0 );
 	if ( !mvValid && postfx.depthParams.z > 0.5 ) {
-		reactive = max( reactive, 0.90 );
+		reactive = max( reactive, adaptive ? 0.98 : 0.90 );
 	}
 	if ( useReactive > 0.5 && postfx.midsGamma.a > 0.5 ) {
 		float stamped = textureLod( reactiveMaskTex, sampleUV, 0.0 ).r;
@@ -219,13 +247,48 @@ void main() {
 
 	float confidence = clamp( depthConf * velocityConf * lumaConf * reactiveConf, 0.0, 1.0 );
 	/* Hard reject when reactive is high — do not blend a fixed global weight. */
-	if ( reactive > 0.82 ) {
+	float reactiveHard = adaptive ? 0.65 : 0.82;
+	if ( reactive > reactiveHard ) {
 		confidence = 0.0;
 	}
+	if ( adaptive && depthConf < 0.35 ) {
+		confidence = 0.0; /* immediate disocclusion → current-frame spatial */
+	}
+
+	/* Difficult-pixel mask for bounded extra current-frame samples. */
+	float difficult = clamp( max( 1.0 - confidence,
+		max( reactive, max( 1.0 - depthConf, motionFactor ) ) ), 0.0, 1.0 );
+	bool wantExtraSamples = adaptive && difficult > ( 1.0 - adaptBudget * 0.85 );
 
 	if ( debugMode > 1.5 ) {
 		/* Rejection reason / ownership viz (r_debugHistoryRejection / r_temporalDebugView). */
 		float dbg = debugMode;
+		if ( dbg > 8.5 && dbg < 9.5 ) {
+			/* 9 = adaptive current-frame sample mask */
+			float m = wantExtraSamples ? 1.0 : difficult;
+			out_color = vec4( m, m * 0.4, 1.0 - m, 1.0 );
+			return;
+		}
+		if ( dbg > 9.5 && dbg < 10.5 ) {
+			/* 10 = current (R) vs history (G) contribution proxy */
+			float histW = clamp( confidence * 0.5, 0.0, 1.0 );
+			out_color = vec4( 1.0 - histW, histW, 0.15, 1.0 );
+			return;
+		}
+		if ( dbg > 10.5 && dbg < 11.5 ) {
+			/* 11 = neighborhood luminance variance */
+			vec3 meanY, sigmaY;
+			neighborhoodYCoCgStats( sampleUV, meanY, sigmaY );
+			float v = clamp( sigmaY.x * 4.0, 0.0, 1.0 );
+			out_color = vec4( v, v * 0.5, 0.1, 1.0 );
+			return;
+		}
+		if ( dbg > 11.5 && dbg < 12.5 ) {
+			/* 12 = unclipped history vs current delta */
+			float d = clamp( lumaDiff * 3.0, 0.0, 1.0 );
+			out_color = vec4( d, 0.2, 1.0 - d, 1.0 );
+			return;
+		}
 		if ( dbg > 2.5 && dbg < 3.5 ) {
 			/* 3 = reactive mask */
 			out_color = vec4( reactive, reactive * 0.35, 1.0 - reactive, 1.0 );
@@ -248,8 +311,8 @@ void main() {
 		}
 		if ( dbg > 6.5 && dbg < 7.5 ) {
 			/* 7 = near-weapon heuristic mask */
-			float nearWeapon = smoothstep( 0.90, 0.998, depthNdc );
-			out_color = vec4( nearWeapon, 0.15, 0.15, 1.0 );
+			float nearWeaponDbg = smoothstep( 0.90, 0.998, depthNdc );
+			out_color = vec4( nearWeaponDbg, 0.15, 0.15, 1.0 );
 			return;
 		}
 		if ( dbg > 7.5 && dbg < 8.5 ) {
@@ -287,9 +350,13 @@ void main() {
 	/* Cap via depthParams.w carrying r_temporalHistoryWeight */
 	float maxHist = clamp( postfx.depthParams.w, 0.0, 0.95 );
 	baseWeight = min( baseWeight, maxHist );
+	if ( adaptive ) {
+		baseWeight = min( baseWeight, 0.42 );
+	}
 
-	float feedback = clamp( baseWeight * confidence, 0.0, 0.95 );
+	float feedback = clamp( baseWeight * confidence, 0.0, adaptive ? 0.42 : 0.95 );
 
+	vec3 historyClipped = history;
 	if ( useVarClip > 0.5 ) {
 		vec3 meanY, sigmaY;
 		neighborhoodYCoCgStats( sampleUV, meanY, sigmaY );
@@ -297,14 +364,17 @@ void main() {
 		float highlightTighten = smoothstep( 0.20, 1.10, currentLuma );
 		float gamma = mix( 1.25, 0.55, max( motionFactor, reactive ) );
 		gamma = mix( gamma, gamma * 0.72, highlightTighten );
+		if ( adaptive ) {
+			gamma *= 0.78; /* tighter clip — current neighborhood owns bounds */
+		}
 		vec3 lo = meanY - gamma * sigmaY;
 		vec3 hi = meanY + gamma * sigmaY;
 		/* Tighter luminance (Y) than chroma */
 		lo.x = meanY.x - gamma * sigmaY.x * 0.85;
 		hi.x = meanY.x + gamma * sigmaY.x * 0.85;
-		vec3 histY = RGBToYCoCg( history );
+		vec3 histY = RGBToYCoCg( historyClipped );
 		histY = clamp( histY, lo, hi );
-		history = max( YCoCgToRGB( histY ), vec3( 0.0 ) );
+		historyClipped = max( YCoCgToRGB( histY ), vec3( 0.0 ) );
 	} else {
 		/* Legacy RGB neighborhood clamp fallback */
 		vec3 mn = vec3( 1e30 );
@@ -316,10 +386,17 @@ void main() {
 				mx = max( mx, c );
 			}
 		}
-		history = clamp( history, mn, mx );
+		historyClipped = clamp( historyClipped, mn, mx );
 	}
 
-	vec3 resolved = mix( current, history, feedback );
+	vec3 currentSample = current;
+	if ( wantExtraSamples && adaptSpatial ) {
+		currentSample = spatialCurrentFallback( sampleUV );
+	} else if ( confidence < 0.08 && adaptSpatial ) {
+		currentSample = spatialCurrentFallback( sampleUV );
+	}
+
+	vec3 resolved = mix( currentSample, historyClipped, feedback );
 	resolved = applyResolveSharpen( sampleUV, resolved );
 	out_color = vec4( resolved, 1.0 );
 }

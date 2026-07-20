@@ -341,7 +341,7 @@ typedef struct vkUniform_s {
 	vec4_t pbrShCoeffs[9];
 	/* Parallax occlusion (POM): x=height scale, y=self-shadow strength, z=shadow ray steps (float bits as int), w=unused */
 	vec4_t pbrParallaxParams;
-	/* Material blend: x=sharpness, yzw unused */
+	/* Material blend: x=sharpness; y unused; z/w reactive stamp (transparent) */
 	vec4_t pbrMaterialBlend;
 	/* Forward+: x overflow shade; y skip mask (tess.dlightBits) */
 	vec4_t pbrForwardPlus;
@@ -354,6 +354,8 @@ typedef struct vkUniform_s {
 	vec4_t pbrSunShadowCascadeRows[12]; /* cascades 1..3 × 4 columns */
 	vec4_t pbrSunShadowSplits;
 	vec4_t pbrSunShadowMeta;
+	/* Raster Ultra 1.8 surface evolution: x=wetness y=snow z=dust/soot w=rust/moss/damage */
+	vec4_t pbrSurfaceEvolution;
 #endif
 } vkUniform_t;
 

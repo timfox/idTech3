@@ -1,0 +1,83 @@
+#version 460
+layout(local_size_x = 8, local_size_y = 8) in;
+
+struct Particle {
+	vec4 posLife;
+	vec4 velSize;
+	vec4 colorEmi;
+	vec4 meta;
+};
+
+layout(std430, set = 0, binding = 0) readonly buffer ParticleBuf {
+	Particle particles[];
+};
+layout(set = 0, binding = 1) uniform sampler2D depthTex;
+layout(rgba16f, set = 0, binding = 2) uniform image2D sceneColor;
+layout(r8, set = 0, binding = 3) uniform image2D reactiveMask;
+
+layout(push_constant) uniform Push {
+	uvec4 extentMeta; /* xy extent, z count, w normalsUnused */
+	vec4  projInfo;
+	mat4  view;
+	mat4  proj;
+	vec4  params0; /* softScale, emissiveBoost, lightAmbient, stampReactive */
+} pc;
+
+bool valid_depth( float d ) { return d > 0.0 && d < 0.999999; }
+
+vec3 view_pos( vec2 uv, float depth ) {
+	float viewZ = -pc.projInfo.w / max( depth + pc.projInfo.z, 1e-6 );
+	vec2 ndc = uv * 2.0 - 1.0;
+	return vec3( ndc.x * ( -viewZ ) * pc.projInfo.x,
+		ndc.y * ( -viewZ ) * pc.projInfo.y, viewZ );
+}
+
+void main() {
+	uvec2 pix = gl_GlobalInvocationID.xy;
+	if ( any( greaterThanEqual( pix, pc.extentMeta.xy ) ) ) return;
+	ivec2 ip = ivec2( pix );
+	vec2 uv = ( vec2( pix ) + 0.5 ) / vec2( pc.extentMeta.xy );
+	float depth = textureLod( depthTex, uv, 0.0 ).r;
+	vec4 scene = imageLoad( sceneColor, ip );
+	if ( !valid_depth( depth ) || pc.extentMeta.z == 0u ) {
+		imageStore( sceneColor, ip, scene );
+		return;
+	}
+	vec3 centerVS = view_pos( uv, depth );
+	vec3 accum = vec3( 0.0 );
+	float cov = 0.0;
+	float softScale = max( pc.params0.x, 0.01 );
+	uint n = min( pc.extentMeta.z, 4096u );
+
+	for ( uint i = 0u; i < n; ++i ) {
+		Particle p = particles[i];
+		if ( p.posLife.w <= 0.01 ) continue;
+		vec4 clip = pc.proj * ( pc.view * vec4( p.posLife.xyz, 1.0 ) );
+		if ( clip.w <= 1e-4 ) continue;
+		vec2 puv = clip.xy / clip.w * 0.5 + 0.5;
+		float px = length( ( puv - uv ) * vec2( pc.extentMeta.xy ) );
+		float radius = max( p.velSize.w, 1.0 );
+		if ( px > radius * 2.0 ) continue;
+		/* Soft particle: fade when particle depth is behind scene within softness. */
+		vec4 pVS4 = pc.view * vec4( p.posLife.xyz, 1.0 );
+		float pDepth = -pVS4.z;
+		float sceneDepth = -centerVS.z;
+		float softR = max( p.meta.z, 1.0 ) * softScale;
+		float soft = clamp( ( sceneDepth - pDepth + softR ) / ( softR * 2.0 ), 0.0, 1.0 );
+		float fall = 1.0 - smoothstep( 0.0, radius, px );
+		float a = fall * soft * clamp( p.posLife.w, 0.0, 1.0 );
+		if ( a <= 1e-4 ) continue;
+		vec3 col = p.colorEmi.rgb * ( 1.0 + p.colorEmi.a * pc.params0.y );
+		/* Simplified lit: ambient only (clustered full BRDF reserved for opaque). */
+		col *= max( pc.params0.z, 0.05 );
+		accum += col * a;
+		cov = max( cov, a );
+	}
+
+	scene.rgb += accum;
+	imageStore( sceneColor, ip, scene );
+	if ( pc.params0.w > 0.5 && cov > 0.05 ) {
+		float prev = imageLoad( reactiveMask, ip ).r;
+		imageStore( reactiveMask, ip, vec4( max( prev, cov ) ) );
+	}
+}

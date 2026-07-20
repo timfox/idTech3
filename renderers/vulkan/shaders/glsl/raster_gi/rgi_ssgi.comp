@@ -1,0 +1,126 @@
+#version 460
+#extension GL_GOOGLE_include_directive : require
+layout(local_size_x = 8, local_size_y = 8) in;
+
+#include "rgi_common.glsl"
+
+layout(set = 0, binding = 0) uniform sampler2D depthTex;
+layout(set = 0, binding = 1) uniform sampler2D normalTex;
+layout(set = 0, binding = 2) uniform sampler2D sceneColorTex;
+layout(set = 0, binding = 3) uniform sampler2D albedoTex;
+layout(rgba16f, set = 0, binding = 4) uniform writeonly image2D ssgiRadOut;
+layout(rgba16f, set = 0, binding = 5) uniform writeonly image2D ssgiMetaOut;
+
+layout(push_constant) uniform SsgiPush {
+	uvec4 extentMeta;   /* xy extent, z frame, w normalsAreWorld */
+	vec4  projInfo;
+	mat4  invView;
+	mat4  view;
+	vec4  params0;      /* maxDistance, thickness, stepCount, nearFieldScale */
+	vec4  params1;      /* edgeFadePixels, minHitDist, unused, unused */
+} pc;
+
+void main() {
+	uvec2 pix = gl_GlobalInvocationID.xy;
+	if ( any( greaterThanEqual( pix, pc.extentMeta.xy ) ) ) {
+		return;
+	}
+	ivec2 ip = ivec2( pix );
+	vec2 uv = ( vec2( pix ) + 0.5 ) / vec2( pc.extentMeta.xy );
+	float depth = textureLod( depthTex, uv, 0.0 ).r;
+	vec3 sampledN = textureLod( normalTex, uv, 0.0 ).xyz;
+	vec3 worldN = rgi_world_normal( sampledN, pc.extentMeta.w, pc.invView );
+
+	if ( !rgi_valid_depth( depth ) ) {
+		imageStore( ssgiRadOut, ip, vec4( 0.0 ) );
+		imageStore( ssgiMetaOut, ip, vec4( 0.0 ) );
+		return;
+	}
+
+	vec3 viewPos = rgi_view_position( uv, depth, pc.projInfo );
+	vec3 viewN = rgi_safe_normalize( ( pc.view * vec4( worldN, 0.0 ) ).xyz, vec3( 0.0, 0.0, 1.0 ) );
+	uint scramble = uint( pix.x + pix.y * pc.extentMeta.x ) ^ ( pc.extentMeta.z * 0x9e3779b9u );
+	vec2 u = vec2( rgi_hash_f( scramble ), rgi_hash_f( scramble * 747796405u + 2891336453u ) );
+	vec3 rayDirVS = rgi_cosine_hemisphere( u, viewN );
+
+	float maxDist = max( pc.params0.x, 1.0 );
+	float thickness = max( pc.params0.y, 0.01 );
+	uint steps = uint( clamp( pc.params0.z, 4.0, 32.0 ) );
+	float edgeFade = max( pc.params1.x, 1.0 );
+	float minHit = max( pc.params1.y, 0.05 );
+
+	vec3 radiance = vec3( 0.0 );
+	float confidence = 0.0;
+	float hitDist = 0.0;
+	vec2 hitUV = uv;
+	float edgeMiss = 0.0;
+	float bestConf = 0.0;
+
+	vec3 marchPos = viewPos + viewN * 0.05;
+	float stepLen = maxDist / float( steps );
+	vec2 invExtent = 1.0 / vec2( pc.extentMeta.xy );
+
+	for ( uint i = 1u; i <= 32u; ++i ) {
+		if ( i > steps ) {
+			break;
+		}
+		marchPos += rayDirVS * stepLen;
+		float trav = length( marchPos - viewPos );
+		if ( trav < minHit ) {
+			continue;
+		}
+		/* Project to screen */
+		float z = -marchPos.z;
+		if ( z <= 1e-3 ) {
+			break;
+		}
+		vec2 ndc = vec2( marchPos.x / ( z * pc.projInfo.x ), marchPos.y / ( z * pc.projInfo.y ) );
+		vec2 suv = ndc * 0.5 + 0.5;
+		if ( any( lessThan( suv, vec2( 0.0 ) ) ) || any( greaterThanEqual( suv, vec2( 1.0 ) ) ) ) {
+			edgeMiss = 1.0;
+			break;
+		}
+		float sd = textureLod( depthTex, suv, 0.0 ).r;
+		if ( !rgi_valid_depth( sd ) ) {
+			continue;
+		}
+		vec3 sampleVS = rgi_view_position( suv, sd, pc.projInfo );
+		float delta = sampleVS.z - marchPos.z;
+		/* Hit when ray crosses scene depth within thickness. */
+		if ( delta > 0.0 && delta < thickness ) {
+			vec3 hitN = rgi_world_normal( textureLod( normalTex, suv, 0.0 ).xyz, pc.extentMeta.w, pc.invView );
+			vec3 hitNvs = rgi_safe_normalize( ( pc.view * vec4( hitN, 0.0 ) ).xyz, viewN );
+			float facing = max( -dot( hitNvs, rayDirVS ), 0.0 );
+			float edgeDist = min( min( suv.x, 1.0 - suv.x ), min( suv.y, 1.0 - suv.y ) );
+			float edgeConf = clamp( edgeDist * float( pc.extentMeta.x ) / edgeFade, 0.0, 1.0 );
+			float thickConf = 1.0 - clamp( delta / thickness, 0.0, 1.0 );
+			float distConf = 1.0 - clamp( trav / maxDist, 0.0, 1.0 );
+			float conf = facing * edgeConf * thickConf * distConf;
+			if ( conf > bestConf ) {
+				bestConf = conf;
+				vec3 scene = textureLod( sceneColorTex, suv, 0.0 ).rgb;
+				vec3 albedo = textureLod( albedoTex, suv, 0.0 ).rgb;
+				/* Approximate outgoing diffuse from hit; avoid feeding full HDR specular. */
+				radiance = scene * max( albedo, vec3( 0.05 ) );
+				confidence = conf;
+				hitDist = trav;
+				hitUV = suv;
+			}
+			/* First acceptable hit is enough for current-frame correctness. */
+			if ( conf > 0.35 ) {
+				break;
+			}
+		}
+		if ( delta < -thickness * 2.0 ) {
+			/* Ray went behind geometry without a thickness match — reject. */
+			break;
+		}
+	}
+
+	confidence *= ( 1.0 - edgeMiss );
+	confidence = clamp( confidence, 0.0, 1.0 );
+	radiance *= confidence * max( pc.params0.w, 0.0 );
+
+	imageStore( ssgiRadOut, ip, vec4( radiance, confidence ) );
+	imageStore( ssgiMetaOut, ip, vec4( hitUV, hitDist, confidence ) );
+}

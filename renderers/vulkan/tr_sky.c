@@ -21,6 +21,9 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 */
 // tr_sky.c
 #include "tr_local.h"
+#ifdef USE_VULKAN
+#include "vk_sky_owner.h"
+#endif
 
 #define SKY_SUBDIVISIONS		8
 #define HALF_SKY_SUBDIVISIONS	(SKY_SUBDIVISIONS/2)
@@ -756,6 +759,17 @@ void RB_StageIteratorSky( void ) {
 	if ( r_fastsky->integer ) {
 		return;
 	}
+
+#ifdef USE_VULKAN
+	/*
+	 * Raster Ultra 1.7: exclusive sky ownership.
+	 * When physical/HDR/solid owns the sky, suppress classic skybox + cloud shells
+	 * so they cannot double-contribute radiance with atmosphere.
+	 */
+	if ( !vk_sky_owner_wants_classic_skybox() ) {
+		return;
+	}
+#endif
 
 #ifdef USE_VBO
 	VBO_UnBind();

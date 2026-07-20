@@ -28,8 +28,28 @@ Split from vk.c.
 #include "vk_hybrid1.h"
 #include "vk_raygun.h"
 #include "vk_surfel_gi.h"
+#include "vk_gpu_scene.h"
+#include "vk_meshlets.h"
+#include "vk_weather.h"
+#include "vk_volumetric_clouds.h"
+#include "vk_material_ir.h"
+#include "vk_material_graph.h"
+#include "vk_material_instance.h"
+#include "vk_material_cache.h"
+#include "vk_surface_evolution.h"
+#include "vk_vshadow.h"
+#include "vk_present_color.h"
+#include "vk_exposure_histogram.h"
+#include "vk_cinematic_camera.h"
+#include "vk_capture_pipeline.h"
+#include "vk_color_grade.h"
+#include "vk_reference_lab.h"
 #include "vk_rcgi.h"
 #include "vk_ambient_visibility.h"
+#include "vk_raster_gi.h"
+#include "vk_gpu_particles.h"
+#include "vk_deferred_decals.h"
+#include "vk_distortion.h"
 #include "vk_selective_sun_shadow.h"
 #include "vk_selective_reflection.h"
 #include "vk_pass_registry.h"
@@ -70,6 +90,10 @@ void vk_shutdown( refShutdownCode_t code )
 	vk_surfel_gi_shutdown();
 	vk_rcgi_shutdown();
 	vk_ambient_visibility_shutdown();
+	vk_raster_gi_shutdown();
+	vk_gpu_particles_shutdown();
+	vk_deferred_decals_shutdown();
+	vk_distortion_shutdown();
 	vk_shs_shutdown();
 	vk_shr_shutdown();
 	vk_spine_registry_shutdown();
@@ -104,6 +128,22 @@ void vk_shutdown( refShutdownCode_t code )
 #endif
 
 	SkyboxHDR_Shutdown();
+	vk_reference_lab_shutdown();
+	vk_color_grade_shutdown();
+	vk_capture_pipeline_shutdown();
+	vk_cinematic_camera_shutdown();
+	vk_exposure_histogram_shutdown();
+	vk_present_color_shutdown();
+	vk_vshadow_shutdown();
+	vk_surface_evolution_shutdown();
+	vk_material_cache_shutdown();
+	vk_material_instance_shutdown();
+	vk_material_graph_shutdown();
+	vk_material_ir_shutdown();
+	vk_volumetric_clouds_shutdown();
+	vk_weather_shutdown();
+	vk_gpu_scene_shutdown();
+	R_Meshlets_Shutdown();
 
 	if ( vk.pipelineCache != VK_NULL_HANDLE ) {
 		vk_pipeline_cache_save();

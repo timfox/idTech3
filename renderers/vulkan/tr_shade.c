@@ -30,6 +30,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "vk_selective_sun_shadow.h"
 #include "vk_selective_reflection.h"
 #include "vk_sun_csm.h"
+#include "vk_surface_evolution.h"
 #endif
 #include "../common/tr_vector_font.h"
 #ifdef USE_VULKAN
@@ -2040,6 +2041,7 @@ static void RB_IterateStagesGeneric( const shaderCommands_t *input )
 				if ( backEnd.reactiveMaskStamp ) {
 					uniform.pbrMaterialBlend[3] = 1.0f;
 				}
+				vk_surface_evolution_fill_ubo( uniform.pbrSurfaceEvolution );
 
 				vk_push_uniform_cached( &uniform );
 			}

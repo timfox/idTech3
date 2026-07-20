@@ -19,6 +19,16 @@ Extracted from vk.c for incremental modularization.
 #include "vk_post_fog.h"
 #include "vk_postfx.h"
 #include "vk_postfx_params.h"
+#include "vk_present_recon.h"
+#include "vk_gpu_scene.h"
+#include "vk_weather.h"
+#include "vk_volumetric_clouds.h"
+#include "vk_surface_evolution.h"
+#include "vk_vshadow.h"
+#include "vk_cinematic_camera.h"
+#include "vk_exposure_histogram.h"
+#include "vk_reference_lab.h"
+#include "vk_hiz.h"
 #include "vk_render_pass.h"
 #include "vk_resource_destroy.h"
 #include "vk_scene_pass.h"
@@ -36,6 +46,10 @@ Extracted from vk.c for incremental modularization.
 #include "vk_surfel_gi.h"
 #include "vk_rcgi.h"
 #include "vk_ambient_visibility.h"
+#include "vk_raster_gi.h"
+#include "vk_gpu_particles.h"
+#include "vk_deferred_decals.h"
+#include "vk_distortion.h"
 #include "vk_selective_sun_shadow.h"
 #include "vk_selective_reflection.h"
 #include "vk_vrcs.h"
@@ -150,6 +164,8 @@ void vk_begin_frame( void )
 	if ( vk.frame_count++ )
 		return;
 
+	vk_present_recon_begin_frame();
+
 	/* Minimize skips the entire backend; on restore clear stale acquire flags and
 	 * sticky-reset temporal so the first visible frame does not present garbage.
 	 * Alt-tab / FOCUS_GAINED is owned by the client via re.NotifyWindowRestored. */
@@ -225,6 +241,10 @@ void vk_begin_frame( void )
 #endif
 	vk_vrcs_frame_begin();
 	vk_ambient_visibility_frame_begin();
+	vk_raster_gi_frame_begin();
+	vk_gpu_particles_frame_begin();
+	vk_deferred_decals_frame_begin();
+	vk_distortion_frame_begin();
 	vk_vuda_frame_begin();
 
 	if ( vk.cmd->waitForFence ) {
@@ -504,6 +524,20 @@ void vk_end_frame( void )
 		}
 	}
 	vk.cmd->waitForFence = qtrue;
+	vk_present_recon_note_gpu_submit();
+	if ( vk.temporal.sharedCameraCut ) {
+		vk_volumetric_clouds_on_camera_cut();
+		vk_hiz_on_camera_cut();
+		vk_vshadow_on_camera_cut();
+		vk_exposure_histogram_on_camera_cut();
+	}
+	vk_weather_update();
+	vk_surface_evolution_update();
+	vk_vshadow_begin_frame();
+	vk_cinematic_camera_begin_frame();
+	vk_reference_lab_begin_frame();
+	vk_volumetric_clouds_begin_frame();
+	vk_gpu_scene_end_frame();
 	vk_temporal_commit_frame_state();
 	vk_spine_frame_end();
 	vk_vuda_after_queue_submit();
@@ -557,6 +591,7 @@ void vk_present_frame( void )
 	vk.cmd->swapchain_image_acquired = qfalse;
 
 	res = qvkQueuePresentKHR( vk.queue, &present_info );
+	vk_present_recon_note_present();
 	switch ( res ) {
 		case VK_SUCCESS:
 			break;

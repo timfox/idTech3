@@ -7,6 +7,7 @@
 #include "vk_deferred_gbuffer.h"
 #include "vk_upscale.h"
 #include "vk_pass_registry.h"
+#include "vk_exposure_histogram.h"
 #include <math.h>
 
 float vk_prev_view_matrix[16];
@@ -443,6 +444,7 @@ void vk_temporal_update_auto_exposure( void )
 			  VK_TEMPORAL_RESET_EXPLICIT_DEBUG |
 			  VK_TEMPORAL_RESET_MISSING_PREV_DATA ) ) ? qtrue : qfalse;
 		float target = target_var->value > 0.0f ? target_var->value : 1.0f;
+		float meterScale = vk_exposure_histogram_meter_scale();
 		float legacySpeed = speed_var->value > 0.0f ? speed_var->value * 0.016f : 0.02f;
 		float speedUp = speed_up_var && speed_up_var->value > 0.0f ? speed_up_var->value * 0.016f : legacySpeed;
 		float speedDown = speed_down_var && speed_down_var->value > 0.0f ? speed_down_var->value * 0.016f : legacySpeed;
@@ -467,6 +469,17 @@ void vk_temporal_update_auto_exposure( void )
 				luminanceValid = qtrue;
 			}
 
+			if ( luminanceValid ) {
+				vk_exposure_histogram_notify_luminance( avgLogLum, qtrue );
+				target *= meterScale;
+				if ( vk_exposure_histogram_active() ) {
+					const vkExposureHistogramState_t *hst = vk_exposure_histogram_state();
+					if ( hst && hst->fixedExposure ) {
+						targetExp = manualExposure;
+						luminanceValid = qfalse;
+					}
+				}
+			}
 			if ( luminanceValid ) {
 				if ( vk.temporal.hasValidLuminance ) {
 					float delta = avgLogLum - vk.temporal.filteredAvgLogLuminance;
@@ -506,6 +519,7 @@ void vk_temporal_update_auto_exposure( void )
 			cvar_t *cap_var = ri.Cvar_Get( "r_exposure_auto_cap_on_cut", "1.35", 0 );
 			float cap = cap_var ? cap_var->value : 1.35f;
 			speed = 0.5f;
+			vk_exposure_histogram_on_camera_cut();
 			if ( cap > 0.0f && targetExp > cap ) {
 				targetExp = cap;
 			}
@@ -541,7 +555,8 @@ qboolean vk_temporal_reconstruction_wanted( void )
 	if ( R_Upscale_WantTemporal() ) {
 		return qtrue;
 	}
-	if ( r_aaMode && r_aaMode->integer >= 4 && r_aaMode->integer <= 5 ) {
+	/* Mode 3 = Present-Time Adaptive Reconstruction; 4–5 = Temporal Reconstruction. */
+	if ( r_aaMode && r_aaMode->integer >= 3 && r_aaMode->integer <= 5 ) {
 		return qtrue;
 	}
 	return qfalse;
@@ -669,8 +684,12 @@ void vk_temporal_status_f( void )
 		r_debugMotionVectors ? r_debugMotionVectors->integer : 0 );
 	ri.Printf( PRINT_ALL, "            rejection viz: 0=off 1=MV 2=reasons 3=reactive 4=confidence\n" );
 	ri.Printf( PRINT_ALL, "            5=disocclusion 6=historyUV 7=nearWeapon 8=worldVsReactive\n" );
+	ri.Printf( PRINT_ALL, "            9=adaptiveSample 10=currVsHist 11=neighVar 12=histDelta\n" );
 	ri.Printf( PRINT_ALL, "policy    : RDF_NOWORLDMODEL after doneWorldScene does not thrash history;\n" );
 	ri.Printf( PRINT_ALL, "            weapon draws defer until after world TAA when reconstruction on;\n" );
 	ri.Printf( PRINT_ALL, "            portals force camera-cut; commit prefers worldMatricesCaptured.\n" );
+	ri.Printf( PRINT_ALL, "present   : adaptive=%s frame_generation=off presentation_source=current_simulation_frame\n",
+		( r_aaMode && r_aaMode->integer == 3 ) ? "yes (aaMode 3)" :
+		( r_presentAdaptiveRecon && r_presentAdaptiveRecon->integer ) ? "flag" : "no" );
 	ri.Printf( PRINT_ALL, "===========================================\n" );
 }

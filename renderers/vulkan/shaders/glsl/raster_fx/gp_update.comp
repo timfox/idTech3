@@ -1,0 +1,42 @@
+#version 460
+layout(local_size_x = 64) in;
+
+struct Particle {
+	vec4 posLife;   /* xyz, life 0..1 */
+	vec4 velSize;   /* xyz velocity, w size */
+	vec4 colorEmi;  /* rgb, emissive */
+	vec4 meta;      /* class, rot, softRadius, flags */
+};
+
+layout(std430, set = 0, binding = 0) buffer ParticleBuf {
+	Particle particles[];
+};
+
+layout(push_constant) uniform Push {
+	uint count;
+	float dt;
+	float gravity;
+	float drag;
+	vec4  wind; /* xyz + unused */
+} pc;
+
+void main() {
+	uint i = gl_GlobalInvocationID.x;
+	if ( i >= pc.count ) return;
+	Particle p = particles[i];
+	float life = p.posLife.w;
+	if ( life <= 0.0 ) {
+		particles[i] = p;
+		return;
+	}
+	vec3 vel = p.velSize.xyz;
+	vel += vec3( 0.0, 0.0, -pc.gravity ) * pc.dt;
+	vel += pc.wind.xyz * pc.dt;
+	vel *= max( 0.0, 1.0 - pc.drag * pc.dt );
+	p.posLife.xyz += vel * pc.dt;
+	p.velSize.xyz = vel;
+	p.posLife.w = max( 0.0, life - pc.dt / max( p.meta.y, 0.05 ) );
+	/* Fade color with life */
+	p.colorEmi.a = p.posLife.w;
+	particles[i] = p;
+}

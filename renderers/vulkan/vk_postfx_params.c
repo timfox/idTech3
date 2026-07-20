@@ -2,6 +2,8 @@
 #include "vk.h"
 #include "vk_postfx.h"
 #include "vk_postfx_params.h"
+#include "vk_present_color.h"
+#include "vk_present_recon.h"
 #include "vk_temporal.h"
 #include "vk_upscale.h"
 #include "vk_util.h"
@@ -68,7 +70,7 @@ void vk_update_postfx_params( uint32_t cmd_index )
 	params.toneMapParams1[0] = Com_Clamp( 0.0f, 1.0f, PostFX_GetGradeHighlightDesat() );
 	params.toneMapParams1[1] = Com_Clamp( 0.25f, 4.0f, PostFX_GetGradeContrast() );
 	params.toneMapParams1[2] = Com_Clamp( 0.1f, 0.9f, PostFX_GetGradeContrastPivot() );
-	params.toneMapParams1[3] = (float)( r_tonemap ? r_tonemap->integer : 3 );
+	params.toneMapParams1[3] = (float)vk_present_color_preferred_tonemap();
 	params.colorBalance[0] = Com_Clamp( -1.0f, 1.0f, PostFX_GetGradeTemperature() );
 	params.colorBalance[1] = Com_Clamp( -1.0f, 1.0f, PostFX_GetGradeTint() );
 	params.colorBalance[2] = Com_Clamp( -4.0f, 4.0f, PostFX_GetGradeExposureBias() );
@@ -146,6 +148,7 @@ void vk_update_postfx_params( uint32_t cmd_index )
 		float stationary = Com_Clamp( 0.0f, 0.99f, r_taa_feedbackStationary ? r_taa_feedbackStationary->value : 0.92f );
 		float motionFb = Com_Clamp( 0.0f, 0.99f, r_taa_feedbackMotion ? r_taa_feedbackMotion->value : 0.72f );
 		qboolean deferredLit = qfalse;
+		qboolean adaptive = vk_present_recon_wants_adaptive();
 
 		if ( vk.temporal.unreliableMotionThisFrame ) {
 			histCap *= 0.55f;
@@ -163,6 +166,14 @@ void vk_update_postfx_params( uint32_t cmd_index )
 				histCap *= 0.88f;
 				motionFb = Com_Clamp( 0.0f, histCap, motionFb * 0.90f );
 			}
+		}
+		/* Present-Time Adaptive: hard-cap history so current frame stays authoritative. */
+		if ( adaptive ) {
+			float adaptCap = Com_Clamp( 0.0f, 0.85f,
+				r_presentAdaptiveHistoryCap ? r_presentAdaptiveHistoryCap->value : 0.42f );
+			histCap = fminf( histCap, adaptCap );
+			stationary = fminf( stationary, histCap );
+			motionFb = fminf( motionFb, histCap * 0.70f );
 		}
 		params.taaParams[1] = Com_Clamp( 0.0f, histCap, stationary );
 		params.taaParams[2] = Com_Clamp( 0.0f, histCap, motionFb );
@@ -185,10 +196,26 @@ void vk_update_postfx_params( uint32_t cmd_index )
 	params.colorGrade2[3] = ( r_temporalReactiveMask && r_temporalReactiveMask->integer ) ? 1.0f : 0.0f;
 	params.midsGamma[3] = ( r_temporalReactiveMask && r_temporalReactiveMask->integer &&
 		vk.reactive_mask_view != VK_NULL_HANDLE ) ? 1.0f : 0.0f;
-	/* shadowsLift.a → TAA debugMode: 1=MV, 2=reject reasons, 3–8 ownership viz. */
+	/*
+	 * highlightsGain.a → Present-Time Adaptive Reconstruction:
+	 *   0 = off
+	 *   1.0+budget = adaptive, spatial fallback off
+	 *   2.0+budget = adaptive, spatial fallback on
+	 * budget in [0,1] (r_presentAdaptiveBudget).
+	 */
+	params.highlightsGain[3] = 0.0f;
+	if ( vk_present_recon_wants_adaptive() ) {
+		float budget = Com_Clamp( 0.0f, 1.0f,
+			r_presentAdaptiveBudget ? r_presentAdaptiveBudget->value : 0.15f );
+		float base = ( r_presentAdaptiveSpatial && r_presentAdaptiveSpatial->integer ) ? 2.0f : 1.0f;
+		params.highlightsGain[3] = base + budget;
+	}
+	/* shadowsLift.a → TAA debugMode: 1=MV, 2=reject reasons, 3–12 ownership / adaptive viz. */
 	params.shadowsLift[3] = 0.0f;
 	if ( r_debugMotionVectors && r_debugMotionVectors->integer ) {
 		params.shadowsLift[3] = 1.0f;
+	} else if ( r_debugAdaptiveSampleMask && r_debugAdaptiveSampleMask->integer ) {
+		params.shadowsLift[3] = 9.0f;
 	} else if ( r_debugHistoryRejection && r_debugHistoryRejection->integer > 0 ) {
 		params.shadowsLift[3] = (float)r_debugHistoryRejection->integer;
 	}

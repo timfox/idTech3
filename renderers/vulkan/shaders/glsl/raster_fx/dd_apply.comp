@@ -1,0 +1,93 @@
+#version 460
+layout(local_size_x = 8, local_size_y = 8) in;
+
+struct Decal {
+	vec4 centerRadius; /* xyz center, w radius */
+	vec4 axisOpacity;  /* xyz normal/axis, w opacity */
+	vec4 albedo;       /* rgb albedo tint, w unused */
+	vec4 props;        /* roughness delta, metallic delta, emissive, priority */
+};
+
+layout(std430, set = 0, binding = 0) readonly buffer DecalBuf {
+	Decal decals[];
+};
+layout(set = 0, binding = 1) uniform sampler2D depthTex;
+layout(set = 0, binding = 2) uniform sampler2D normalTex;
+layout(rgba16f, set = 0, binding = 3) uniform image2D albedoImg;
+layout(rgba16f, set = 0, binding = 4) uniform image2D normalImg;
+layout(rgba16f, set = 0, binding = 5) uniform image2D materialImg;
+
+layout(push_constant) uniform Push {
+	uvec4 extentMeta; /* xy, z count, w normalsAreWorld */
+	vec4  projInfo;
+	mat4  invView;
+} pc;
+
+bool valid_depth( float d ) { return d > 0.0 && d < 0.999999; }
+
+vec3 view_pos( vec2 uv, float depth ) {
+	float viewZ = -pc.projInfo.w / max( depth + pc.projInfo.z, 1e-6 );
+	vec2 ndc = uv * 2.0 - 1.0;
+	return vec3( ndc.x * ( -viewZ ) * pc.projInfo.x,
+		ndc.y * ( -viewZ ) * pc.projInfo.y, viewZ );
+}
+
+/* Reoriented normal mapping (RNM) blend. */
+vec3 rnm_blend( vec3 baseN, vec3 detailN ) {
+	vec3 t = baseN + vec3( 0.0, 0.0, 1.0 );
+	vec3 u = detailN * vec3( -1.0, -1.0, 1.0 );
+	return normalize( t * dot( t, u ) - u * t.z );
+}
+
+void main() {
+	uvec2 pix = gl_GlobalInvocationID.xy;
+	if ( any( greaterThanEqual( pix, pc.extentMeta.xy ) ) ) return;
+	if ( pc.extentMeta.z == 0u ) return;
+	ivec2 ip = ivec2( pix );
+	vec2 uv = ( vec2( pix ) + 0.5 ) / vec2( pc.extentMeta.xy );
+	float depth = textureLod( depthTex, uv, 0.0 ).r;
+	if ( !valid_depth( depth ) ) return;
+
+	vec3 viewP = view_pos( uv, depth );
+	vec3 worldP = ( pc.invView * vec4( viewP, 1.0 ) ).xyz;
+	vec3 baseN = textureLod( normalTex, uv, 0.0 ).xyz;
+	if ( pc.extentMeta.w == 0u ) {
+		baseN = normalize( ( pc.invView * vec4( baseN * 2.0 - 1.0, 0.0 ) ).xyz );
+	} else {
+		baseN = normalize( baseN );
+	}
+
+	vec4 albedo = imageLoad( albedoImg, ip );
+	vec4 nOut = imageLoad( normalImg, ip );
+	vec4 mat = imageLoad( materialImg, ip );
+	float bestPri = -1.0;
+
+	uint n = min( pc.extentMeta.z, 256u );
+	for ( uint i = 0u; i < n; ++i ) {
+		Decal d = decals[i];
+		float r = max( d.centerRadius.w, 1.0 );
+		vec3 delta = worldP - d.centerRadius.xyz;
+		float dist = length( delta );
+		if ( dist > r ) continue;
+		vec3 axis = normalize( d.axisOpacity.xyz );
+		float facing = abs( dot( baseN, axis ) );
+		if ( facing < 0.15 ) continue;
+		float opac = d.axisOpacity.w * ( 1.0 - dist / r ) * facing;
+		if ( opac <= 1e-3 ) continue;
+		float pri = d.props.w;
+		if ( pri < bestPri ) continue;
+		bestPri = pri;
+		albedo.rgb = mix( albedo.rgb, d.albedo.rgb, clamp( opac, 0.0, 1.0 ) );
+		/* Detail normal along projection plane (flat tilt). */
+		vec3 detail = normalize( mix( vec3( 0.0, 0.0, 1.0 ), axis, 0.35 ) );
+		vec3 blended = rnm_blend( baseN, detail );
+		nOut.xyz = mix( nOut.xyz, blended, opac * 0.5 );
+		mat.g = clamp( mat.g + d.props.x * opac, 0.0, 1.0 ); /* roughness */
+		mat.b = clamp( mat.b + d.props.y * opac, 0.0, 1.0 ); /* metallic */
+		mat.a = clamp( mat.a + d.props.z * opac, 0.0, 1.0 ); /* emissive-ish */
+	}
+
+	imageStore( albedoImg, ip, albedo );
+	imageStore( normalImg, ip, nOut );
+	imageStore( materialImg, ip, mat );
+}

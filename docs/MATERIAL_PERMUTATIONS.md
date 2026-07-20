@@ -19,3 +19,5 @@ Hybrid deferred + Forward+ must not explode pipeline variant count.
 - [ ] RTX hybrid does not duplicate full forward permutations
 - [ ] `r_pbr` / `r_forwardPlus` toggles have fallbacks
 - [ ] Material blend uses specialization constants `material_blend_layers` (2..8) / `material_height_mask` (8 bits) and descriptor set 19 layer arrays (not new `#ifdef` FS variants) — see [MATERIAL_BLEND.md](MATERIAL_BLEND.md)
+- [ ] Raster Ultra 1.8 surface evolution uses UBO `pbrSurfaceEvolution` only (no `USE_SURFACE_EVOLUTION` `#ifdef`) — see [RASTER_ULTRA_1.8.md](RASTER_ULTRA_1.8.md)
+- [ ] Controlled material graph compiles to IR feature groups; do not add unrestricted node-graph SPIR-V variants

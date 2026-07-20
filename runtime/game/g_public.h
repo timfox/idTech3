@@ -418,6 +418,12 @@ typedef enum {
 	G_PHYS_PMOVE_CORRECT,	/* opt-in CastMover correction of origin/velocity */
 	G_PHYS_CREATERAGDOLL,	/* Soft Step ragdoll from .rag/MD3 bind (death path) */
 	G_LOC_LOOKUP,
+	G_ENGINE_DB_AVAILABLE,	/* qboolean EngineDB_IsAvailable( void ) */
+	G_ENGINE_DB_EXEC,		/* qboolean EngineDB_Exec( const char *sql ) */
+	G_ENGINE_DB_QUERYONE,	/* qboolean EngineDB_QueryOne( const char *sql, char *out, int outSize ) */
+	G_ENGINE_DB_PROFILE_SET,	/* qboolean EngineDB_ProfileSet( const char *key, const char *value ) */
+	G_ENGINE_DB_PROFILE_GET,	/* qboolean EngineDB_ProfileGet( const char *key, char *out, int outSize ) */
+	G_ENGINE_DB_PROFILE_DELETE,	/* qboolean EngineDB_ProfileDelete( const char *key ) */
 	G_TRAP_GETVALUE = COM_TRAP_GETVALUE
 
 } gameImport_t;

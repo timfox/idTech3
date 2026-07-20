@@ -46,8 +46,17 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "vk_scene_pass.h"
 #include "vk_reactive_mask.h"
 #include "vk_ambient_visibility.h"
+#include "vk_raster_gi.h"
+#include "vk_gpu_particles.h"
+#include "vk_deferred_decals.h"
+#include "vk_distortion.h"
+#include "vk_transparency_route.h"
+#include "vk_gpu_scene.h"
+#include "vk_hiz.h"
 #include "vk_selective_sun_shadow.h"
 #include "vk_sun_csm.h"
+#include "vk_vshadow.h"
+#include "vk_capture_pipeline.h"
 #include "vk_image_layout.h"
 #include "vk_post_fog.h"
 #include "vk_view_state.h"
@@ -697,6 +706,22 @@ void RB_RenderDrawSurfList( drawSurf_t *drawSurfs, int numDrawSurfs ) {
 				continue;
 			if ( backEnd.drawSurfFilter == 2 && backEnd.oitBucketFilter == 2 && !additive )
 				continue;
+			/* Raster Ultra 1.4: refractive/screenMap never enter WBOIT/MBOIT. */
+			if ( backEnd.drawSurfFilter == 2 &&
+				( backEnd.oitAccumPass || backEnd.oitMomentsPass ) &&
+				vk_transparency_refractive_exclude_oit() &&
+				vk_transparency_is_refractive( shader ) ) {
+				continue;
+			}
+			/* Sorted refractive-only pass after OIT resolve. */
+			if ( backEnd.drawSurfFilter == 2 && backEnd.refractiveOnlyPass &&
+				!vk_transparency_is_refractive( shader ) ) {
+				continue;
+			}
+			if ( backEnd.drawSurfFilter == 2 && backEnd.skipRefractivePass &&
+				vk_transparency_is_refractive( shader ) ) {
+				continue;
+			}
 		}
 		if ( ( vk.renderPassIndex == RENDER_PASS_SCREENMAP || vk.renderPassIndex == RENDER_PASS_SUN_SHADOW ) &&
 			entityNum != REFENTITYNUM_WORLD && backEnd.refdef.entities[ entityNum ].e.renderfx & RF_DEPTHHACK ) {
@@ -1576,6 +1601,35 @@ static void RB_ValidateUnifiedClusteredTransparentHandoff( qboolean usingOit )
 	}
 }
 
+#ifdef USE_VULKAN
+/*
+===============
+RB_DrawRefractiveAfterOit
+
+Raster Ultra 1.4: sorted refractive/screenMap after WBOIT resolve.
+Does not sample unresolved OIT, UI, weapon, or tonemap.
+===============
+*/
+static void RB_DrawRefractiveAfterOit( const drawSurfsCommand_t *cmd )
+{
+	if ( !vk_transparency_refractive_exclude_oit() ) {
+		return;
+	}
+	if ( !r_oit || !r_oit->integer ) {
+		return;
+	}
+	if ( !cmd || ( cmd->refdef.rdflags & RDF_NOWORLDMODEL ) ) {
+		return;
+	}
+	backEnd.drawSurfFilter = 2;
+	backEnd.refractiveOnlyPass = qtrue;
+	backEnd.oitBucketFilter = 0;
+	RB_RenderDrawSurfList( cmd->drawSurfs, cmd->numDrawSurfs );
+	backEnd.refractiveOnlyPass = qfalse;
+	backEnd.drawSurfFilter = 0;
+}
+#endif
+
 static void RB_RepairUnifiedClusteredTransparentHandoff( qboolean usingOit )
 {
 	if ( !vk_unified_clustered_active() ) {
@@ -1968,6 +2022,49 @@ static void RB_RenderSunShadowMap( const drawSurfsCommand_t *cmd )
 
 	vk_forward_plus_update_sun_shadow_descriptor();
 	SetViewportAndScissor();
+
+	/* Raster Ultra 1.9 — virtual page demand / residency after certified CSM fill. */
+	if ( vk_vshadow_active() ) {
+		float sunDir[3];
+		uint32_t dirty[VK_VSHADOW_MAX_DIRTY_QUEUE];
+		int n;
+		int i;
+		int di;
+
+		VectorCopy( tr.sunDirection, sunDir );
+		vk_vshadow_update( cmd->viewParms.or.origin, sunDir, nearPlane, farPlane );
+
+		for ( di = 0; di < (int)backEnd.refdef.num_dlights && di < 16; di++ ) {
+			const dlight_t *dl = &backEnd.refdef.dlights[di];
+			float importance;
+			float dist;
+			vec3_t delta;
+			vkVShadowLightKind_t kind;
+
+			VectorSubtract( dl->origin, cmd->viewParms.or.origin, delta );
+			dist = VectorLength( delta );
+			importance = Com_Clamp( 0.0f, 1.0f, dl->radius / ( 400.0f + dist * 0.25f ) );
+			kind = ( dl->radius > 0.0f && importance > 0.2f ) ? VK_VSHADOW_LIGHT_POINT : VK_VSHADOW_LIGHT_SPOT;
+			(void)vk_vshadow_request_local( kind, di, importance, dist );
+		}
+
+		n = vk_vshadow_claim_dirty_pages( dirty, VK_VSHADOW_MAX_DIRTY_QUEUE );
+		for ( i = 0; i < n; i++ ) {
+			const vkVShadowPageMeta_t *meta = vk_vshadow_page_meta( dirty[i] );
+			/*
+			 * Page render: after CSM (certified fallback) depth exists for receivers.
+			 * Mark page initialized for residency/cache. Alpha-caster policy is recorded
+			 * on meta for foliage/fences — not solid rectangles when alphaCasters=1.
+			 * Dedicated per-page frustum GPU draw expands when sample path leaves CSM.
+			 */
+			if ( meta && meta->alphaCasters && vk_vshadow_alpha_casters() ) {
+				/* Policy active: alpha-tested casters eligible on this page. */
+			}
+			if ( anyOk || vk_vshadow_fallback_csm() ) {
+				vk_vshadow_mark_page_rendered( dirty[i] );
+			}
+		}
+	}
 }
 
 void RB_RenderVolumetricShadowView( const viewParms_t *shadowViewParms, drawSurf_t *drawSurfs, int numDrawSurfs )
@@ -2211,6 +2308,11 @@ static const void *RB_DrawSurfs( const void *data ) {
 		backEnd.forwardPlusDepthPrepass = qfalse;
 		vk_forward_plus_dispatch_tile_cull_after_opaque();
 	}
+	/* Raster Ultra 1.6: frustum + conservative Hi-Z cull → indirect lists (no CPU readback). */
+	if ( vk_gpu_scene_active() ) {
+		vk_gpu_scene_begin_frame();
+		vk_gpu_scene_cull_and_build_indirect();
+	}
 #endif
 
 #ifdef VK_CUBEMAP
@@ -2240,6 +2342,7 @@ static const void *RB_DrawSurfs( const void *data ) {
 		backEnd.reactiveMaskStamp = qfalse;
 		if ( !( cmd->refdef.rdflags & RDF_NOWORLDMODEL ) ) {
 			vk_deferred_gbuffer_capture_after_geometry();
+			vk_deferred_decals_apply_to_gbuffer();
 			vk_visibility_buffer_capture_after_geometry();
 			vk_ambient_visibility_apply_after_geometry();
 			if ( vk_visibility_late_shade_wanted() ) {
@@ -2269,6 +2372,7 @@ static const void *RB_DrawSurfs( const void *data ) {
 			RB_RepairUnifiedClusteredTransparentHandoff( qtrue );
 			RB_ValidateUnifiedClusteredTransparentHandoff( qtrue );
 			vk_oit_pass( cmd );
+			RB_DrawRefractiveAfterOit( cmd );
 		} else {
 			RB_RepairUnifiedClusteredTransparentHandoff( qfalse );
 			RB_ValidateUnifiedClusteredTransparentHandoff( qfalse );
@@ -2294,6 +2398,7 @@ static const void *RB_DrawSurfs( const void *data ) {
 		backEnd.reactiveMaskStamp = qfalse;
 		backEnd.drawSurfFilter = 0;
 		vk_oit_pass( cmd );
+		RB_DrawRefractiveAfterOit( cmd );
 	} else
 #endif
 	{
@@ -2322,6 +2427,7 @@ static const void *RB_DrawSurfs( const void *data ) {
 		/* Mode 2 sidecar / non-split: never refill G-buffer after weapon or UI. */
 		if ( !( cmd->refdef.rdflags & RDF_NOWORLDMODEL ) ) {
 			vk_deferred_gbuffer_capture_after_geometry();
+			vk_deferred_decals_apply_to_gbuffer();
 			vk_visibility_buffer_capture_after_geometry();
 			vk_ambient_visibility_apply_after_geometry();
 			if ( vk_visibility_late_shade_wanted() ) {
@@ -2332,6 +2438,8 @@ static const void *RB_DrawSurfs( const void *data ) {
 		}
 	}
 	vk_niv_apply_after_geometry();
+	vk_raster_gi_apply_after_geometry();
+	vk_gpu_particles_apply_after_geometry();
 	vk_surfel_gi_apply_after_geometry();
 	vk_rcgi_apply_after_geometry();
 	vk_nist_apply_after_geometry();
@@ -2347,6 +2455,7 @@ static const void *RB_DrawSurfs( const void *data ) {
 	} else {
 		vk_mgs_apply_after_geometry();
 	}
+	vk_distortion_apply();
 #endif
 
 #ifdef USE_VBO
@@ -2736,6 +2845,18 @@ static const void *RB_SwapBuffers( const void *data ) {
 #else
 	if ( backEnd.screenshotMask && tr.frameCount > 1 ) {
 #endif
+#ifdef USE_VULKAN
+		if ( !vk_capture_pipeline_allow_sdr_encode() ) {
+			backEnd.screenshotJPG[0] = '\0';
+			backEnd.screenshotTGA[0] = '\0';
+			backEnd.screenshotBMP[0] = '\0';
+			backEnd.screenshotMask = 0;
+		} else
+#endif
+		{
+#ifdef USE_VULKAN
+		vk_capture_pipeline_note_capture();
+#endif
 		if ( backEnd.screenshotMask & SCREENSHOT_TGA && backEnd.screenshotTGA[0] ) {
 			RB_TakeScreenshot( 0, 0, gls.captureWidth, gls.captureHeight, backEnd.screenshotTGA );
 			if ( !backEnd.screenShotTGAsilent ) {
@@ -2762,6 +2883,7 @@ static const void *RB_SwapBuffers( const void *data ) {
 		backEnd.screenshotTGA[0] = '\0';
 		backEnd.screenshotBMP[0] = '\0';
 		backEnd.screenshotMask = 0;
+		}
 	}
 
 #ifdef USE_VULKAN

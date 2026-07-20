@@ -28,6 +28,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "../physics/phys_bullet.h"
 #include "../physics/phys_ragdoll_bind.h"
 #include "com_loc.h"
+#include "engine_db.h"
 
 #include "../botlib/botlib.h"
 
@@ -593,6 +594,37 @@ static qboolean SV_GetValue( char* value, int valueSize, const char* key )
 	if ( !Q_stricmp( key, "trap_Loc_Lookup" ) )
 	{
 		Com_sprintf( value, valueSize, "%i", G_LOC_LOOKUP );
+		return qtrue;
+	}
+
+	if ( !Q_stricmp( key, "trap_EngineDB_Available" ) )
+	{
+		Com_sprintf( value, valueSize, "%i", G_ENGINE_DB_AVAILABLE );
+		return qtrue;
+	}
+	if ( !Q_stricmp( key, "trap_EngineDB_Exec" ) )
+	{
+		Com_sprintf( value, valueSize, "%i", G_ENGINE_DB_EXEC );
+		return qtrue;
+	}
+	if ( !Q_stricmp( key, "trap_EngineDB_QueryOne" ) )
+	{
+		Com_sprintf( value, valueSize, "%i", G_ENGINE_DB_QUERYONE );
+		return qtrue;
+	}
+	if ( !Q_stricmp( key, "trap_EngineDB_ProfileSet" ) )
+	{
+		Com_sprintf( value, valueSize, "%i", G_ENGINE_DB_PROFILE_SET );
+		return qtrue;
+	}
+	if ( !Q_stricmp( key, "trap_EngineDB_ProfileGet" ) )
+	{
+		Com_sprintf( value, valueSize, "%i", G_ENGINE_DB_PROFILE_GET );
+		return qtrue;
+	}
+	if ( !Q_stricmp( key, "trap_EngineDB_ProfileDelete" ) )
+	{
+		Com_sprintf( value, valueSize, "%i", G_ENGINE_DB_PROFILE_DELETE );
 		return qtrue;
 	}
 
@@ -1360,6 +1392,25 @@ static intptr_t SV_GameSystemCalls( intptr_t *args ) {
 
 	case G_LOC_LOOKUP:
 		return Com_Loc_Lookup( (const char *)VMA( 1 ), VMA( 2 ), (int)args[3] );
+
+	case G_ENGINE_DB_AVAILABLE:
+		EngineDB_Init();
+		return EngineDB_IsAvailable() ? 1 : 0;
+
+	case G_ENGINE_DB_EXEC:
+		return EngineDB_Exec( (const char *)VMA( 1 ) ) ? 1 : 0;
+
+	case G_ENGINE_DB_QUERYONE:
+		return EngineDB_QueryOne( (const char *)VMA( 1 ), VMA( 2 ), (int)args[3] ) ? 1 : 0;
+
+	case G_ENGINE_DB_PROFILE_SET:
+		return EngineDB_ProfileSet( (const char *)VMA( 1 ), (const char *)VMA( 2 ) ) ? 1 : 0;
+
+	case G_ENGINE_DB_PROFILE_GET:
+		return EngineDB_ProfileGet( (const char *)VMA( 1 ), VMA( 2 ), (int)args[3] ) ? 1 : 0;
+
+	case G_ENGINE_DB_PROFILE_DELETE:
+		return EngineDB_ProfileDelete( (const char *)VMA( 1 ) ) ? 1 : 0;
 
 	default:
 		Com_Error( ERR_DROP, "Bad game system trap: %ld", (long int) args[0] );

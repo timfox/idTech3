@@ -6,6 +6,8 @@
 #include "vk_volumetric_fog_color.h"
 #include "vk_volumetric_params.h"
 #include "vk_vdb.h"
+#include "vk_weather.h"
+#include "vk_volumetric_clouds.h"
 #include <math.h>
 
 static void vk_tint_local_fog_volume_color( vec3_t io ) {
@@ -88,12 +90,16 @@ void vk_update_volumetric_params( void )
 	float temporal_weight = r_volumetricFogTemporalWeight ? r_volumetricFogTemporalWeight->value : 0.0f;
 	float jitter_amount = r_volumetricFogJitter ? r_volumetricFogJitter->value : 0.0f;
 	float sun_intensity = r_volumetricFogSunIntensity ? r_volumetricFogSunIntensity->value : 1.0f;
+	/* Cloud shadows + weather sun visibility modulate directional volumetric lighting only. */
+	sun_intensity *= vk_volumetric_clouds_sun_shadow_factor();
 	float ambient_intensity = r_volumetricFogAmbientIntensity ? r_volumetricFogAmbientIntensity->value : 1.0f;
 	float noise_scale = r_volumetricFogNoiseScale ? r_volumetricFogNoiseScale->value : 0.0125f;
 	float noise_strength = r_volumetricFogNoiseStrength ? r_volumetricFogNoiseStrength->value : 0.85f;
 	float noise_threshold = r_volumetricFogNoiseThreshold ? r_volumetricFogNoiseThreshold->value : 0.2f;
 	float g_aniso = r_volumetricFogAniso ? r_volumetricFogAniso->value : 0.0f;
 	float fog_density = r_volumetricFogDensity ? r_volumetricFogDensity->value : 0.0f;
+	/* Raster Ultra 1.7 weather: scale global froxel density. */
+	fog_density *= vk_weather_fog_density_scale();
 	float extinction_scale = r_volumetricFogExtinctionScale ? r_volumetricFogExtinctionScale->value : 1.0f;
 	float height_falloff = r_volumetricFogHeightFalloff ? r_volumetricFogHeightFalloff->value : 0.0f;
 	float near_plane = ( r_znear ) ? r_znear->value : 8.0f;

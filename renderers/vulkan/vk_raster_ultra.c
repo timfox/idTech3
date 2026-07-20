@@ -8,6 +8,7 @@ Raster Ultra 1.0 — lock RT off; report raster completeness.
 #include "vk_raster_ultra.h"
 #include "vk_selective_sun_shadow.h"
 #include "vk_selective_reflection.h"
+#include "vk_transparency_route.h"
 
 static cvar_t *r_rasterUltra;
 static qboolean s_inited;
@@ -58,12 +59,15 @@ void VK_RasterUltra_Init( void )
 		VK_RasterUltra_Enforce();
 	}
 
+	vk_transparency_route_init();
+
 	ri.Printf( PRINT_ALL, "[VK][RasterUltra] active=%d (0=off; experimental high-end raster, RT locked)\n",
 		r_rasterUltra->integer );
 }
 
 void VK_RasterUltra_Shutdown( void )
 {
+	vk_transparency_route_shutdown();
 	s_inited = qfalse;
 	s_enforcedOnce = qfalse;
 }

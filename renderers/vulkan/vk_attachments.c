@@ -427,7 +427,8 @@ them for deferred opaque lighting.
 static void vk_create_deferred_gbuffer_scaffold( void )
 {
 	VkImageUsageFlags gbufUsage =
-		VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
+		VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT |
+		VK_IMAGE_USAGE_STORAGE_BIT;
 	cvar_t *failInject;
 
 	vk.deferredGbufferAllocated = qfalse;
@@ -904,15 +905,25 @@ void vk_create_attachments( void )
 				/* Temporal reactive mask: full-res when TAA / temporal upscale / r_aaMode 3–5; else 1x1 stub for FP set. */
 				{
 					qboolean want_reactive = qfalse;
+					cvar_t *ruCvar;
 					VkImageUsageFlags reactiveUsage =
 						VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT |
 						VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
+					ruCvar = ri.Cvar_Get( "r_rasterUltra", "0", CVAR_LATCH );
 					if ( r_taa && r_taa->integer ) {
 						want_reactive = qtrue;
 					} else if ( r_aaMode && r_aaMode->integer >= 3 && r_aaMode->integer <= 5 ) {
 						want_reactive = qtrue;
 					} else if ( R_Upscale_WantTemporal() ) {
 						want_reactive = qtrue;
+					} else if ( r_reactiveMaskForce && r_reactiveMaskForce->integer ) {
+						want_reactive = qtrue;
+					} else if ( ruCvar && ruCvar->integer ) {
+						if ( ( r_oit && r_oit->integer ) ||
+							ri.Cvar_VariableIntegerValue( "r_gpuParticles" ) ||
+							ri.Cvar_VariableIntegerValue( "r_distortion" ) ) {
+							want_reactive = qtrue;
+						}
 					}
 					if ( want_reactive ) {
 						vk_create_fullres_color_attachment( VK_FORMAT_R8_UNORM, reactiveUsage,

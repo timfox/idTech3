@@ -123,8 +123,14 @@ void vk_occlusion_readback( void )
 		sizeof( vk_entity_occlusion_visibility ), vk_entity_occlusion_visibility,
 		sizeof( uint64_t ), VK_QUERY_RESULT_64_BIT | VK_QUERY_RESULT_WAIT_BIT );
 	if ( res != VK_SUCCESS ) {
-		ri.Printf( PRINT_WARNING, "Occlusion readback failed: %s\n", vk_result_string( res ) );
-		Com_Memset( vk_entity_occlusion_visibility, 0, sizeof( vk_entity_occlusion_visibility ) );
+		/*
+		 * Raster Ultra 1.6: never treat failed/stale query readback as "all occluded".
+		 * Zeroing hid every entity for a frame (one-frame disappearance). Prefer
+		 * conservative all-visible until the next successful query — same as camera-cut reset.
+		 */
+		ri.Printf( PRINT_WARNING, "Occlusion readback failed: %s (keeping entities visible)\n",
+			vk_result_string( res ) );
+		Com_Memset( vk_entity_occlusion_visibility, 0xFF, sizeof( vk_entity_occlusion_visibility ) );
 		return;
 	}
 }

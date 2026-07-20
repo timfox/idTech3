@@ -64,6 +64,24 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "vk_deferred_gbuffer.h"
 #include "vk_visibility_buffer.h"
 #include "vk_temporal.h"
+#include "vk_present_recon.h"
+#include "vk_gpu_scene.h"
+#include "vk_hiz.h"
+#include "vk_sky_owner.h"
+#include "vk_weather.h"
+#include "vk_volumetric_clouds.h"
+#include "vk_material_ir.h"
+#include "vk_material_graph.h"
+#include "vk_material_instance.h"
+#include "vk_material_cache.h"
+#include "vk_surface_evolution.h"
+#include "vk_vshadow.h"
+#include "vk_present_color.h"
+#include "vk_exposure_histogram.h"
+#include "vk_cinematic_camera.h"
+#include "vk_capture_pipeline.h"
+#include "vk_color_grade.h"
+#include "vk_reference_lab.h"
 #include "vk_pass_registry.h"
 #include "vk_selective_sun_shadow.h"
 #include "vk_selective_reflection.h"
@@ -1230,6 +1248,8 @@ static void R_Register( void )
 	ri.Cmd_AddCommand( "havenrp_renderer_status", R_HavenRPRendererStatus_f );
 	ri.Cmd_AddCommand( "deferred_gbuffer_status", vk_deferred_gbuffer_status_f );
 	ri.Cmd_AddCommand( "temporal_status", vk_temporal_status_f );
+	ri.Cmd_AddCommand( "present_recon_status", vk_present_recon_status_f );
+	ri.Cmd_AddCommand( "motion_vector_cert", vk_motion_vector_cert_status_f );
 	ri.Cmd_AddCommand( "visibility_buffer_status", vk_visibility_buffer_status_f );
 	ri.Cmd_AddCommand( "renderer_profile", R_RendererProfile_f );
 	ri.Cmd_AddCommand( "renderer_health", R_RendererHealth_f );
@@ -3133,13 +3153,16 @@ static void R_Register( void )
 	ri.Cvar_SetDescription( r_smaa_corner_rounding, "SMAA corner rounding strength (0=off, 1=full). Attenuates edges at L-corners for smoother silhouettes." );
 
 	vk_aa_policy_register_cvars();
+	vk_present_recon_register_cvars();
+	vk_present_recon_init();
 
 	r_taa = ri.Cvar_Get( "r_taa", "0", CVAR_ARCHIVE_ND );
 	ri.Cvar_CheckRange( r_taa, "0", "1", CV_INTEGER );
 	ri.Cvar_SetDescription( r_taa,
-		"Temporal Reconstruction AA for Vulkan HDR post (after post-fog). "
-		"Prefer r_aaMode 4/5 to enable; default presentation is SMAA via r_aaMode 2. "
-		"Uses vk_temporal reset policy; r_taaMotionVectors samples main-pass motion when available." );
+		"Temporal / adaptive reconstruction for Vulkan HDR post (after post-fog). "
+		"r_aaMode 2 = SMAA (default); 3 = Present-Time Adaptive Reconstruction; "
+		"4/5 = Temporal Reconstruction. Uses vk_temporal reset policy; "
+		"r_taaMotionVectors samples main-pass motion when available." );
 	ri.Cvar_SetGroup( r_taa, CVG_RENDERER );
 	r_taa_feedbackStationary = ri.Cvar_Get( "r_taa_feedbackStationary", "0.92", CVAR_ARCHIVE_ND );
 	ri.Cvar_CheckRange( r_taa_feedbackStationary, "0.0", "0.99", CV_FLOAT );
@@ -3666,6 +3689,22 @@ void R_Init( void ) {
 	R_Upscale_Init();
 	R_VT_Init();
 	R_Meshlets_Init();
+	vk_gpu_scene_init();
+	vk_sky_owner_init();
+	vk_weather_init();
+	vk_volumetric_clouds_init();
+	vk_material_ir_init();
+	vk_material_graph_init();
+	vk_material_instance_init();
+	vk_material_cache_init();
+	vk_surface_evolution_init();
+	vk_vshadow_init();
+	vk_present_color_init();
+	vk_exposure_histogram_init();
+	vk_cinematic_camera_init();
+	vk_capture_pipeline_init();
+	vk_color_grade_init();
+	vk_reference_lab_init();
 #ifdef USE_VULKAN
 	R_NDGI_Init();
 	R_NIV_Init();

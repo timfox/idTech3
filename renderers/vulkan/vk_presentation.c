@@ -22,6 +22,10 @@ Extracted from vk.c for incremental modularization.
 #include "vk_deferred_gbuffer.h"
 #include "vk_visibility_buffer.h"
 #include "vk_ambient_visibility.h"
+#include "vk_raster_gi.h"
+#include "vk_gpu_particles.h"
+#include "vk_deferred_decals.h"
+#include "vk_distortion.h"
 #include "vk_swapchain.h"
 #include "vk_sync.h"
 #include "vk_temporal.h"
@@ -73,6 +77,10 @@ void vk_teardown_presentation_targets( void )
 	vk_deferred_gbuffer_invalidate_runtime();
 	vk_visibility_buffer_shutdown();
 	vk_ambient_visibility_shutdown();
+	vk_raster_gi_shutdown();
+	vk_gpu_particles_shutdown();
+	vk_deferred_decals_shutdown();
+	vk_distortion_shutdown();
 	vk_deferred_gbuffer_note_recreate( "presentation_teardown" );
 
 	vk_destroy_pipelines( qfalse );
@@ -143,6 +151,10 @@ void vk_restore_presentation_targets( void )
 	/* AV re-inits lazily on frame_begin once G-buffer resources are live. */
 	vk_ambient_visibility_init();
 	vk_ambient_visibility_reset_history();
+	vk_raster_gi_init();
+	vk_gpu_particles_init();
+	vk_deferred_decals_init();
+	vk_distortion_init();
 
 #ifdef USE_IMGUI
 	VkImgui_SwapchainRestarted();

@@ -1,0 +1,109 @@
+#version 460
+#extension GL_GOOGLE_include_directive : require
+layout(local_size_x = 8, local_size_y = 8) in;
+
+#include "rgi_common.glsl"
+
+layout(set = 0, binding = 0) uniform sampler2D depthTex;
+layout(set = 0, binding = 1) uniform sampler2D normalTex;
+layout(set = 0, binding = 2) readonly buffer ProbeBuf {
+	RgiProbe probes[];
+};
+layout(rgba16f, set = 0, binding = 3) uniform writeonly image2D probeIrrOut;
+layout(rgba16f, set = 0, binding = 4) uniform writeonly image2D probeMetaOut;
+
+layout(push_constant) uniform ProbeSamplePush {
+	uvec4 extentMeta;     /* xy extent, z probeCount, w normalsAreWorld */
+	uvec4 gridDim;        /* xyz grid dims, w unused */
+	vec4  worldMin;       /* xyz */
+	vec4  worldMax;       /* xyz */
+	vec4  projInfo;
+	mat4  invView;
+	vec4  params0;        /* spacing, staticScale, dynamicScale, minVis */
+} pc;
+
+ivec3 rgi_clamp_cell( ivec3 c ) {
+	return clamp( c, ivec3( 0 ), ivec3( pc.gridDim.xyz ) - 1 );
+}
+
+uint rgi_probe_index( ivec3 c ) {
+	return uint( c.x + c.y * int( pc.gridDim.x ) + c.z * int( pc.gridDim.x * pc.gridDim.y ) );
+}
+
+void main() {
+	uvec2 pix = gl_GlobalInvocationID.xy;
+	if ( any( greaterThanEqual( pix, pc.extentMeta.xy ) ) ) {
+		return;
+	}
+	ivec2 ip = ivec2( pix );
+	vec2 uv = ( vec2( pix ) + 0.5 ) / vec2( pc.extentMeta.xy );
+	float depth = textureLod( depthTex, uv, 0.0 ).r;
+	vec3 sampledN = textureLod( normalTex, uv, 0.0 ).xyz;
+	vec3 worldN = rgi_world_normal( sampledN, pc.extentMeta.w, pc.invView );
+
+	if ( !rgi_valid_depth( depth ) || pc.extentMeta.z == 0u ) {
+		imageStore( probeIrrOut, ip, vec4( 0.0 ) );
+		imageStore( probeMetaOut, ip, vec4( 0.0, 0.0, 0.0, 0.0 ) );
+		return;
+	}
+
+	vec3 viewPos = rgi_view_position( uv, depth, pc.projInfo );
+	vec3 worldPos = ( pc.invView * vec4( viewPos, 1.0 ) ).xyz;
+
+	vec3 extent = max( pc.worldMax.xyz - pc.worldMin.xyz, vec3( 1.0 ) );
+	vec3 local = ( worldPos - pc.worldMin.xyz ) / extent;
+	vec3 gridF = local * vec3( pc.gridDim.xyz ) - 0.5;
+	ivec3 base = ivec3( floor( gridF ) );
+	vec3 frac = fract( gridF );
+
+	vec3 irrSum = vec3( 0.0 );
+	float wSum = 0.0;
+	float confSum = 0.0;
+	float visSum = 0.0;
+	float minVis = max( pc.params0.w, 0.0 );
+	float spacing = max( pc.params0.x, 1.0 );
+
+	for ( int z = 0; z < 2; ++z ) {
+		for ( int y = 0; y < 2; ++y ) {
+			for ( int x = 0; x < 2; ++x ) {
+				ivec3 c = rgi_clamp_cell( base + ivec3( x, y, z ) );
+				uint idx = rgi_probe_index( c );
+				if ( idx >= pc.extentMeta.z ) {
+					continue;
+				}
+				RgiProbe p = probes[idx];
+				float valid = p.posValid.w;
+				if ( valid <= 1e-4 ) {
+					continue;
+				}
+				vec3 toProbe = p.posValid.xyz - worldPos;
+				float dist = length( toProbe );
+				vec3 dir = dist > 1e-4 ? toProbe / dist : worldN;
+				float facing = max( dot( worldN, dir ), 0.0 );
+				float trilin = ( x == 0 ? 1.0 - frac.x : frac.x ) *
+					( y == 0 ? 1.0 - frac.y : frac.y ) *
+					( z == 0 ? 1.0 - frac.z : frac.z );
+				float distW = 1.0 / ( 1.0 + ( dist / spacing ) * ( dist / spacing ) );
+				float vis = max( facing * distW, minVis );
+				float w = trilin * vis * valid;
+				if ( w <= 1e-6 ) {
+					continue;
+				}
+				vec3 sampleDir = rgi_safe_normalize( worldN + dir * 0.15, worldN );
+				irrSum += rgi_eval_probe( p, sampleDir ) * w;
+				wSum += w;
+				confSum += valid * w;
+				visSum += vis * w;
+			}
+		}
+	}
+
+	vec3 irr = wSum > 1e-5 ? irrSum / wSum : vec3( 0.0 );
+	float conf = wSum > 1e-5 ? clamp( confSum / wSum, 0.0, 1.0 ) : 0.0;
+	float vis = wSum > 1e-5 ? clamp( visSum / wSum, 0.0, 1.0 ) : 0.0;
+	/* Ownership mute: staticScale on L0 baseline already baked into probe L0 on CPU. */
+	irr *= mix( pc.params0.y, pc.params0.z, step( 0.01, conf ) );
+
+	imageStore( probeIrrOut, ip, vec4( irr, conf ) );
+	imageStore( probeMetaOut, ip, vec4( vis, conf, wSum > 1e-5 ? 1.0 : 0.0, 0.0 ) );
+}

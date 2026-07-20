@@ -1,0 +1,66 @@
+#version 460
+layout(local_size_x = 8, local_size_y = 8) in;
+
+layout(set = 0, binding = 0) uniform sampler2D sceneColorTex;
+layout(set = 0, binding = 1) uniform sampler2D depthTex;
+layout(set = 0, binding = 2) uniform sampler2D distortTex; /* rg offset, b mask, a class */
+layout(rgba16f, set = 0, binding = 3) uniform image2D sceneOut;
+layout(r8, set = 0, binding = 4) uniform image2D reactiveMask;
+
+layout(push_constant) uniform Push {
+	uvec4 extentMeta; /* xy, z debug, w stampReactive */
+	vec4  params0;    /* maxDistortPixels, depthTol, unused, unused */
+} pc;
+
+bool valid_depth( float d ) { return d > 0.0 && d < 0.999999; }
+
+void main() {
+	uvec2 pix = gl_GlobalInvocationID.xy;
+	if ( any( greaterThanEqual( pix, pc.extentMeta.xy ) ) ) return;
+	ivec2 ip = ivec2( pix );
+	vec2 uv = ( vec2( pix ) + 0.5 ) / vec2( pc.extentMeta.xy );
+	vec4 dsample = textureLod( distortTex, uv, 0.0 );
+	float mask = dsample.b;
+	vec2 offset = dsample.rg;
+	float maxPx = max( pc.params0.x, 1.0 );
+	offset = clamp( offset, vec2( -maxPx ), vec2( maxPx ) ) / vec2( pc.extentMeta.xy );
+
+	if ( mask <= 1e-4 || all( equal( offset, vec2( 0.0 ) ) ) ) {
+		/* Pass-through: already in sceneOut if same image — load from tex. */
+		vec3 c = textureLod( sceneColorTex, uv, 0.0 ).rgb;
+		if ( pc.extentMeta.z == 1u ) {
+			imageStore( sceneOut, ip, vec4( 0.0, 0.0, 0.0, 1.0 ) );
+		} else {
+			imageStore( sceneOut, ip, vec4( c, 1.0 ) );
+		}
+		return;
+	}
+
+	vec2 suv = clamp( uv + offset, vec2( 0.001 ), vec2( 0.999 ) );
+	float depth = textureLod( depthTex, uv, 0.0 ).r;
+	float sdepth = textureLod( depthTex, suv, 0.0 ).r;
+	if ( !valid_depth( depth ) || !valid_depth( sdepth ) ||
+		abs( depth - sdepth ) > pc.params0.y ) {
+		/* Depth-aware reject → no distortion. */
+		vec3 c = textureLod( sceneColorTex, uv, 0.0 ).rgb;
+		imageStore( sceneOut, ip, vec4( c, 1.0 ) );
+		return;
+	}
+
+	vec3 distorted = textureLod( sceneColorTex, suv, 0.0 ).rgb;
+	vec3 base = textureLod( sceneColorTex, uv, 0.0 ).rgb;
+	vec3 outc = mix( base, distorted, clamp( mask, 0.0, 1.0 ) );
+
+	if ( pc.extentMeta.z == 1u ) {
+		imageStore( sceneOut, ip, vec4( offset * 10.0 + 0.5, mask, 1.0 ) );
+	} else if ( pc.extentMeta.z == 2u ) {
+		imageStore( sceneOut, ip, vec4( abs( offset ) * 20.0, 0.0, 1.0 ) );
+	} else {
+		imageStore( sceneOut, ip, vec4( outc, 1.0 ) );
+	}
+
+	if ( pc.extentMeta.w != 0u && mask > 0.05 ) {
+		float prev = imageLoad( reactiveMask, ip ).r;
+		imageStore( reactiveMask, ip, vec4( max( prev, mask ) ) );
+	}
+}

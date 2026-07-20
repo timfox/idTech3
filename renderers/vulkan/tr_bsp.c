@@ -24,12 +24,15 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "tr_local.h"
 #ifdef USE_VULKAN
 #include "vk.h"
+#include "vk_raster_gi.h"
 #include "tr_bsp_stream.h"
 #include "tr_sprite_props.h"
 #include "tr_decal_props.h"
 #include "tr_material_paint.h"
 #include "vk_ambient_visibility.h"
 #include "vk_temporal.h"
+#include "vk_vshadow.h"
+#include "vk_exposure_histogram.h"
 #include "vk_ndgi.h"
 #include "vk_niv.h"
 #include "vk_nslm.h"
@@ -42,6 +45,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "vk_mgs.h"
 #include "vk_squeezeme.h"
 #include "vk_wsp.h"
+#include "vk_gpu_scene.h"
 
 #ifdef VK_CUBEMAP
 #define JSON_IMPLEMENTATION
@@ -2961,6 +2965,9 @@ void RE_LoadWorldMap( const char *name ) {
 
 	R_SpriteProps_Clear();
 	RE_BspStream_ClearAll();
+	vk_gpu_scene_on_world_load();
+	vk_vshadow_on_map_change();
+	vk_exposure_histogram_on_map_change();
 
 	// set default sun direction to be used if it isn't
 	// overridden by a shader
@@ -3094,6 +3101,7 @@ void RE_LoadWorldMap( const char *name ) {
 	R_VFGI_OnMapLoad( s_worldData.baseName );
 	R_RenderFormer_OnMapLoad( s_worldData.baseName );
 	vk_grtx_on_map_load( s_worldData.baseName );
+	vk_raster_gi_on_map_load();
 	if ( !R_SQZ_Enabled() ) {
 		R_MGS_OnMapLoad( s_worldData.baseName );
 	}

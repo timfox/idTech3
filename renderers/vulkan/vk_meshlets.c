@@ -17,7 +17,7 @@ See docs/MESHLETS.md.
 #define MESHLET_MDI_FRAME_MAX 2048
 
 typedef struct {
-	const void *key;
+	uint64_t key;
 	int count;
 	meshlet_t meshlets[MESHLET_MAX_PER_SURFACE];
 } meshlet_cache_entry_t;
@@ -35,11 +35,13 @@ static int s_cacheMisses;
 static int s_cullVisible;
 static int s_cullTotal;
 static int s_lodCulled;
+static int s_coneCulled;
 static int s_mdiCount;
 static int s_mdiTris;
 static int s_mdiDrawCalls;
 static int s_compactIndexes;
 static int s_compactSurfaces;
+static uint32_t s_cacheGeneration;
 static meshlet_cache_entry_t s_cache[MESHLET_CACHE_SLOTS];
 static meshlet_draw_cmd_t s_mdiCmds[MESHLET_MAX_PER_SURFACE];
 static meshlet_draw_cmd_t s_frameCmds[MESHLET_MDI_FRAME_MAX];
@@ -60,11 +62,12 @@ static void Meshlets_Status_f( void )
 		}
 	}
 	ri.Printf( PRINT_ALL,
-		"[VK][meshlets] active=%d bakeCalls=%d cache hits=%d misses=%d slots=%d/%d\n"
-		"  lastCull visible=%d / total=%d lodCulled=%d lod=%d mdi=%d cmds=%d tris=%d mdiDraw=%d gpuDraws=%d\n"
-		"  compact=%d lastIndexes=%d surfaces=%d\n",
+		"[VK][meshlets] active=%d bakeCalls=%d cache hits=%d misses=%d slots=%d/%d gen=%u\n"
+		"  lastCull visible=%d / total=%d lodCulled=%d coneCulled=%d lod=%d mdi=%d cmds=%d tris=%d mdiDraw=%d gpuDraws=%d\n"
+		"  compact=%d lastIndexes=%d surfaces=%d (stable uint64 keys — no transient pointers)\n",
 		R_Meshlets_Active() ? 1 : 0, s_bakeCount, s_cacheHits, s_cacheMisses,
-		used, MESHLET_CACHE_SLOTS, s_cullVisible, s_cullTotal, s_lodCulled,
+		used, MESHLET_CACHE_SLOTS, s_cacheGeneration,
+		s_cullVisible, s_cullTotal, s_lodCulled, s_coneCulled,
 		( r_meshletsLod && r_meshletsLod->integer ) ? 1 : 0,
 		( r_meshletsMdi && r_meshletsMdi->integer ) ? 1 : 0,
 		s_mdiCount, s_mdiTris,
@@ -115,11 +118,12 @@ void R_Meshlets_Init( void )
 
 	Com_Memset( s_cache, 0, sizeof( s_cache ) );
 	s_bakeCount = s_cacheHits = s_cacheMisses = 0;
-	s_cullVisible = s_cullTotal = s_lodCulled = 0;
+	s_cullVisible = s_cullTotal = s_lodCulled = s_coneCulled = 0;
 	s_mdiCount = s_mdiTris = s_mdiDrawCalls = 0;
 	s_compactIndexes = s_compactSurfaces = 0;
 	s_frameCmdCount = 0;
 	s_mdiDrawLogged = qfalse;
+	s_cacheGeneration = 1;
 
 	if ( !s_cmds ) {
 		ri.Cmd_AddCommand( "meshlet_status", Meshlets_Status_f );
@@ -161,6 +165,36 @@ void R_Meshlets_InvalidateCache( void )
 {
 	Com_Memset( s_cache, 0, sizeof( s_cache ) );
 	s_cacheHits = s_cacheMisses = 0;
+	s_cacheGeneration++;
+	if ( s_cacheGeneration == 0 ) {
+		s_cacheGeneration = 1;
+	}
+}
+
+uint64_t R_Meshlets_StableKey( const char *modelName, const char *surfaceName, int surfaceIndex )
+{
+	uint64_t h = 14695981039346656037ull;
+	const char *p;
+
+	if ( modelName ) {
+		for ( p = modelName; *p; p++ ) {
+			h ^= (uint64_t)(unsigned char)*p;
+			h *= 1099511628211ull;
+		}
+	}
+	h ^= 0x9e3779b97f4a7c15ull;
+	if ( surfaceName ) {
+		for ( p = surfaceName; *p; p++ ) {
+			h ^= (uint64_t)(unsigned char)*p;
+			h *= 1099511628211ull;
+		}
+	}
+	h ^= (uint64_t)(uint32_t)surfaceIndex * 0x100000001b3ull;
+	h ^= (uint64_t)s_cacheGeneration << 32;
+	if ( h == 0 ) {
+		h = 1;
+	}
+	return h;
 }
 
 int R_Meshlets_Bake( const vec3_t *positions, int numVerts, const int *indexes, int numIndexes,
@@ -181,16 +215,23 @@ int R_Meshlets_Bake( const vec3_t *positions, int numVerts, const int *indexes, 
 		int localVerts = 0;
 		int localTris = 0;
 		int start = cursor;
+		vec3_t coneAcc;
+		int coneN = 0;
 
 		ClearBounds( m->mins, m->maxs );
+		VectorClear( coneAcc );
 		m->firstIndex = (uint16_t)cursor;
 		m->firstVert = 0;
 		m->vertCount = 0;
+		m->coneCutoff = -2.0f;
+		m->materialClass = 0;
+		VectorClear( m->coneAxis );
 
 		while ( cursor + 2 < numIndexes && localTris < triBudget && localVerts < vertBudget ) {
 			int a = indexes[cursor];
 			int b = indexes[cursor + 1];
 			int c = indexes[cursor + 2];
+			vec3_t e0, e1, n;
 			if ( a < 0 || b < 0 || c < 0 || a >= numVerts || b >= numVerts || c >= numVerts ) {
 				cursor += 3;
 				continue;
@@ -198,12 +239,43 @@ int R_Meshlets_Bake( const vec3_t *positions, int numVerts, const int *indexes, 
 			AddPointToBounds( positions[a], m->mins, m->maxs );
 			AddPointToBounds( positions[b], m->mins, m->maxs );
 			AddPointToBounds( positions[c], m->mins, m->maxs );
+			VectorSubtract( positions[b], positions[a], e0 );
+			VectorSubtract( positions[c], positions[a], e1 );
+			CrossProduct( e0, e1, n );
+			if ( VectorNormalize( n ) > 0.0f ) {
+				VectorAdd( coneAcc, n, coneAcc );
+				coneN++;
+			}
 			localTris++;
 			localVerts += 3;
 			cursor += 3;
 		}
 		m->indexCount = (uint16_t)( cursor - start );
 		m->vertCount = (uint16_t)( localVerts > MESHLET_MAX_VERTS ? MESHLET_MAX_VERTS : localVerts );
+		if ( coneN > 0 && VectorNormalize( coneAcc ) > 0.0f ) {
+			float minDot = 1.0f;
+			int t;
+			VectorCopy( coneAcc, m->coneAxis );
+			for ( t = start; t + 2 < cursor; t += 3 ) {
+				int a = indexes[t], b = indexes[t + 1], c = indexes[t + 2];
+				vec3_t e0, e1, n;
+				float d;
+				if ( a < 0 || b < 0 || c < 0 || a >= numVerts || b >= numVerts || c >= numVerts ) {
+					continue;
+				}
+				VectorSubtract( positions[b], positions[a], e0 );
+				VectorSubtract( positions[c], positions[a], e1 );
+				CrossProduct( e0, e1, n );
+				if ( VectorNormalize( n ) <= 0.0f ) {
+					continue;
+				}
+				d = DotProduct( m->coneAxis, n );
+				if ( d < minDot ) {
+					minDot = d;
+				}
+			}
+			m->coneCutoff = minDot - 0.05f;
+		}
 		if ( m->indexCount >= 3 ) {
 			mcount++;
 		} else {
@@ -213,29 +285,26 @@ int R_Meshlets_Bake( const vec3_t *positions, int numVerts, const int *indexes, 
 	return mcount;
 }
 
-static meshlet_cache_entry_t *Meshlets_FindSlot( const void *key, qboolean create )
+static meshlet_cache_entry_t *Meshlets_FindSlotKey( uint64_t key, qboolean create )
 {
-	uintptr_t h;
 	int i;
 
-	if ( !key ) {
+	if ( key == 0 ) {
 		return NULL;
 	}
-	h = (uintptr_t)key;
 	for ( i = 0; i < MESHLET_CACHE_SLOTS; i++ ) {
-		int idx = (int)( ( h + (uintptr_t)i ) % (uintptr_t)MESHLET_CACHE_SLOTS );
+		int idx = (int)( ( key + (uint64_t)i ) % (uint64_t)MESHLET_CACHE_SLOTS );
 		if ( s_cache[idx].key == key ) {
 			return &s_cache[idx];
 		}
-		if ( create && s_cache[idx].key == NULL ) {
+		if ( create && s_cache[idx].key == 0 ) {
 			s_cache[idx].key = key;
 			s_cache[idx].count = 0;
 			return &s_cache[idx];
 		}
 	}
 	if ( create ) {
-		/* Evict hashed slot */
-		int idx = (int)( h % (uintptr_t)MESHLET_CACHE_SLOTS );
+		int idx = (int)( key % (uint64_t)MESHLET_CACHE_SLOTS );
 		s_cache[idx].key = key;
 		s_cache[idx].count = 0;
 		return &s_cache[idx];
@@ -243,26 +312,27 @@ static meshlet_cache_entry_t *Meshlets_FindSlot( const void *key, qboolean creat
 	return NULL;
 }
 
-int R_Meshlets_CacheLocal( const void *key, const vec3_t *positions, int numVerts,
+int R_Meshlets_CacheLocalKey( uint64_t key, const vec3_t *positions, int numVerts,
 	const int *indexes, int numIndexes )
 {
 	meshlet_cache_entry_t *e;
 
-	if ( !R_Meshlets_Active() || !key ) {
+	if ( !R_Meshlets_Active() || key == 0 ) {
 		return 0;
 	}
-	e = Meshlets_FindSlot( key, qtrue );
+	e = Meshlets_FindSlotKey( key, qtrue );
 	if ( !e ) {
 		return 0;
 	}
 	e->count = R_Meshlets_Bake( positions, numVerts, indexes, numIndexes,
 		e->meshlets, MESHLET_MAX_PER_SURFACE );
+	s_cacheMisses++;
 	return e->count;
 }
 
-int R_Meshlets_Lookup( const void *key, const meshlet_t **outMeshlets )
+int R_Meshlets_LookupKey( uint64_t key, const meshlet_t **outMeshlets )
 {
-	meshlet_cache_entry_t *e = Meshlets_FindSlot( key, qfalse );
+	meshlet_cache_entry_t *e = Meshlets_FindSlotKey( key, qfalse );
 
 	if ( !e || e->count <= 0 ) {
 		s_cacheMisses++;
@@ -276,6 +346,33 @@ int R_Meshlets_Lookup( const void *key, const meshlet_t **outMeshlets )
 		*outMeshlets = e->meshlets;
 	}
 	return e->count;
+}
+
+int R_Meshlets_CacheLocal( const void *key, const vec3_t *positions, int numVerts,
+	const int *indexes, int numIndexes )
+{
+	uint64_t sk;
+	if ( !key ) {
+		return 0;
+	}
+	sk = (uint64_t)(uintptr_t)key ^ ( (uint64_t)s_cacheGeneration << 17 );
+	if ( sk == 0 ) {
+		sk = 1;
+	}
+	return R_Meshlets_CacheLocalKey( sk, positions, numVerts, indexes, numIndexes );
+}
+
+int R_Meshlets_Lookup( const void *key, const meshlet_t **outMeshlets )
+{
+	uint64_t sk;
+	if ( !key ) {
+		return 0;
+	}
+	sk = (uint64_t)(uintptr_t)key ^ ( (uint64_t)s_cacheGeneration << 17 );
+	if ( sk == 0 ) {
+		sk = 1;
+	}
+	return R_Meshlets_LookupKey( sk, outMeshlets );
 }
 
 static qboolean Meshlet_AABBInPlane( const vec3_t mins, const vec3_t maxs, const cplane_t *plane )
@@ -379,6 +476,7 @@ int R_Meshlets_CullViewFrustumXform( const meshlet_t *meshlets, int count,
 	s_cullTotal = count;
 	s_cullVisible = 0;
 	s_lodCulled = 0;
+	s_coneCulled = 0;
 	if ( !meshlets || !visible || maxVisible <= 0 ) {
 		return 0;
 	}
@@ -401,6 +499,23 @@ int R_Meshlets_CullViewFrustumXform( const meshlet_t *meshlets, int count,
 			if ( !Meshlet_AABBInPlane( wmins, wmaxs, &tr.viewParms.frustum[p] ) ) {
 				inside = qfalse;
 				break;
+			}
+		}
+		/* Normal cone cull: back-facing clusters (preserves hard-edge partitions via cutoff). */
+		if ( inside && meshlets[i].coneCutoff > -1.5f ) {
+			vec3_t coneWorld, viewDir, center;
+			float d;
+			center[0] = 0.5f * ( wmins[0] + wmaxs[0] );
+			center[1] = 0.5f * ( wmins[1] + wmaxs[1] );
+			center[2] = 0.5f * ( wmins[2] + wmaxs[2] );
+			VectorRotate( meshlets[i].coneAxis, (const vec3_t *)entityAxis, coneWorld );
+			VectorSubtract( center, tr.viewParms.or.origin, viewDir );
+			if ( VectorNormalize( viewDir ) > 0.0f ) {
+				d = DotProduct( coneWorld, viewDir );
+				if ( d < meshlets[i].coneCutoff ) {
+					s_coneCulled++;
+					inside = qfalse;
+				}
 			}
 		}
 		if ( inside && Meshlet_PassesScreenLod( wmins, wmaxs ) ) {

@@ -52,12 +52,13 @@ Implementation: 2×2 depth atlas when cascades > 1; per-cascade viewport render;
 
 ## Explicit gaps (next vertical)
 
-1. Contact-shadow supplement
-2. Local spot atlas → Forward+/deferred sample
-3. LTC rectangular area lights (tables exist, not uploaded)
-4. Bent-normal → SH/IBL
-5. Deferred IBL / probe terminal specular
-6. GPU soak / cascade seam validation
+1. ~~Contact-shadow supplement~~ *(still open — see Ultra lighting)*  
+2. Soft-particle overdraw cost under heavy `gpu_particles_burst` *(1.4 follow-up)*  
+3. LTC rectangular area lights  
+4. Deferred IBL / probe terminal specular  
+5. GPU soak for WBOIT × particles × distortion  
+6. ~~Diffuse probe GI + SSGI~~ → [RASTER_ULTRA_1.3.md](RASTER_ULTRA_1.3.md)  
+7. ~~WBOIT / particles / decals / distortion~~ → [RASTER_ULTRA_1.4.md](RASTER_ULTRA_1.4.md)
 
 ## Static gate
 

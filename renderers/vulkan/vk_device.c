@@ -11,6 +11,7 @@ Extracted from vk.c for incremental modularization.
 #include "vk.h"
 #include "vk_device.h"
 #include "vk_util.h"
+#include "vk_present_color.h"
 
 static VkFormat get_depth_format( VkPhysicalDevice physical_device )
 {
@@ -195,6 +196,10 @@ static void get_present_format( int present_bits, VkFormat *bgr, VkFormat *rgb )
 	}
 }
 
+#include "tr_local.h"
+#include "vk.h"
+#include "vk_present_color.h"
+
 qboolean vk_select_surface_format( VkPhysicalDevice physical_device, VkSurfaceKHR surface )
 {
 	VkFormat base_bgr, base_rgb;
@@ -217,6 +222,8 @@ qboolean vk_select_surface_format( VkPhysicalDevice physical_device, VkSurfaceKH
 	candidates = (VkSurfaceFormatKHR*)ri.Malloc( format_count * sizeof(VkSurfaceFormatKHR) );
 
 	VK_CHECK( qvkGetPhysicalDeviceSurfaceFormatsKHR( physical_device, surface, &format_count, candidates ) );
+
+	vk_present_color_on_surface_formats( candidates, format_count );
 
 	get_present_format( 24, &base_bgr, &base_rgb );
 
@@ -258,6 +265,8 @@ qboolean vk_select_surface_format( VkPhysicalDevice physical_device, VkSurfaceKH
 	if ( !r_fbo->integer ) {
 		vk.present_format = vk.base_format;
 	}
+
+	vk_present_color_apply_selection( &vk.present_format );
 
 	if ( r_vk_swapchain_srgb ) {
 		ri.Cvar_Set( "r_vk_swapchain_srgb", vk_format_is_srgb( vk.present_format.format ) ? "1" : "0" );

@@ -22,6 +22,9 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 // tr_light.c
 
 #include "tr_local.h"
+#ifdef USE_VULKAN
+#include "vk_raster_gi.h"
+#endif
 
 #define	DLIGHT_AT_RADIUS		16
 // at the edge of a dlight's influence, this amount of light will be added
@@ -641,6 +644,27 @@ void R_SetupEntityLighting( const trRefdef_t *refdef, trRefEntity_t *ent ) {
 		R_ClearSHCoeffs( ent->shCoeffs );
 		ent->shLightingValid = qfalse;
 	}
+
+#ifdef USE_VULKAN
+	/* Raster Ultra 1.3: dynamic objects — probe GI owns indirect diffuse when ready. */
+	if ( vk_raster_gi_probes_ready() ) {
+		vec3_t probeAmb;
+		vec3_t sampleN;
+		float conf = 0.0f;
+		VectorCopy( ent->lightDir, sampleN );
+		if ( VectorLength( sampleN ) < 0.1f ) {
+			sampleN[2] = 1.0f;
+		}
+		VectorNormalize( sampleN );
+		if ( vk_raster_gi_sample_entity( lightOrigin, sampleN, probeAmb, &conf ) && conf > 0.05f ) {
+			float w = Com_Clamp( 0.0f, 1.0f, conf );
+			/* Blend toward probe ambient; keep some lightgrid for continuity. */
+			ent->ambientLight[0] = ent->ambientLight[0] * ( 1.0f - w * 0.75f ) + probeAmb[0] * w * 0.75f;
+			ent->ambientLight[1] = ent->ambientLight[1] * ( 1.0f - w * 0.75f ) + probeAmb[1] * w * 0.75f;
+			ent->ambientLight[2] = ent->ambientLight[2] * ( 1.0f - w * 0.75f ) + probeAmb[2] * w * 0.75f;
+		}
+	}
+#endif
 
 	// bonus items and view weapons have a fixed minimum add
 	if ( 1 /* ent->e.renderfx & RF_MINLIGHT */ ) {
