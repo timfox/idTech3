@@ -67,6 +67,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "vk_pass_registry.h"
 #include "vk_selective_sun_shadow.h"
 #include "vk_selective_reflection.h"
+#include "tr_mesh_normal_policy.h"
 #include "vk_sim_render_profile.h"
 #include "vk_sim_render_debug.h"
 #include "vk_skybox_hdr.h"
@@ -3740,6 +3741,7 @@ void R_Init( void ) {
 
 	R_InitSkins();
 
+	R_MeshNormalPolicy_Init();
 	R_ModelInit();
 
 	R_InitFreeType();
@@ -3773,6 +3775,8 @@ static void RE_Shutdown( refShutdownCode_t code ) {
 	//}
 #endif
 	ri.Printf( PRINT_ALL, "RE_Shutdown( %i )\n", code );
+
+	R_MeshNormalPolicy_Shutdown();
 
 	ri.Cmd_RemoveCommand( "modellist" );
 	ri.Cmd_RemoveCommand( "screenshotBMP" );

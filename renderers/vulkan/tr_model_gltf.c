@@ -18,6 +18,7 @@ skeleton, and animations into engine-native structures.
 #include "tr_local.h"
 #include "tr_gltf_topo.h"
 #include "tr_model_gltf.h"
+#include "tr_mesh_normal_policy.h"
 
 /* glTF GPU path reuses IQM skin + morph SSBO layouts; keep caps aligned at compile time. */
 STATIC_ASSERT( GLTF_MAX_JOINTS == IQM_MAX_JOINTS, "GLTF_MAX_JOINTS must match IQM_MAX_JOINTS (shared skin matrix layout)" );
@@ -387,6 +388,7 @@ qboolean R_LoadGLTF(const char *filename, gltfModel_t *model) {
 
 	gltf_load_materials(data, model);
 	gltf_load_meshes(data, model);
+	R_MeshNormalPolicy_ProcessGLTFModel( model, filename );
 	gltf_load_skeleton(data, model);
 	gltf_load_animations(data, model);
 

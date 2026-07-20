@@ -611,6 +611,11 @@ static void R_RendererStatus_f( void )
 		vk_shr_active() ? 1 : 0, vk_shr_owner_name(),
 		vk_shr_rt_owns() ? 1 : 0, vk_shr_ssr_allowed() ? 1 : 0,
 		vk_shr_fallback_reason(), vk_shr_fail_inject() );
+	ri.Printf( PRINT_ALL, "meshNrm   : policy=%d (0=legacy) preserve=%d crease=%.1f splitTangents=%d\n",
+		(int)R_MeshNormalPolicy_Get(),
+		R_MeshNormalPolicy_PreserveAuthored() ? 1 : 0,
+		R_MeshNormalPolicy_HardEdgeAngleDeg(),
+		R_MeshNormalPolicy_SplitTangentsAtHardEdges() ? 1 : 0 );
 	ri.Printf( PRINT_ALL, "declared  : AO=%s GI=%s refl=%s temporal=%s\n",
 		R_NamedCvarString( "r_havenrpAoOwner" ),
 		R_NamedCvarString( "r_havenrpDiffuseGiOwner" ),

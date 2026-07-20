@@ -335,6 +335,9 @@
     <ClCompile Include="..\..\..\renderers\vulkan\tr_model_gltf.c">
       <AdditionalIncludeDirectories>..\..\..\external\include\cgltf;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
+    <ClCompile Include="..\..\..\renderers\vulkan\tr_mesh_normal_policy.c">
+      <AdditionalIncludeDirectories>..\..\..\external\include\cgltf;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\..\renderers\vulkan\iqm.h" />
@@ -347,6 +350,7 @@
     <ClInclude Include="..\..\..\renderers\vulkan\vk_fluidsim.h" />
     <ClInclude Include="..\..\..\renderers\vulkan\vk_postfx.h" />
     <ClInclude Include="..\..\..\renderers\vulkan\tr_model_gltf.h" />
+    <ClInclude Include="..\..\..\renderers\vulkan\tr_mesh_normal_policy.h" />
   </ItemGroup>
 
   <ItemGroup>
