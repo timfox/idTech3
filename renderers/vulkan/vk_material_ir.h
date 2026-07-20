@@ -52,7 +52,8 @@ enum {
 	VK_MAT_FEAT_HEIGHT_BLEND   = ( 1u << 10 ),
 	VK_MAT_FEAT_SHEEN          = ( 1u << 11 ),
 	VK_MAT_FEAT_FLOWMAP        = ( 1u << 12 ),
-	VK_MAT_FEAT_EVOLUTION      = ( 1u << 13 )
+	VK_MAT_FEAT_EVOLUTION      = ( 1u << 13 ),
+	VK_MAT_FEAT_FREQUENCY      = ( 1u << 14 )
 };
 
 /* Dynamic feature bits — instance / weather driven (no new SPIR-V). */
@@ -105,6 +106,15 @@ typedef struct vkMaterialIR_s {
 	float damage;
 	float uvScale;
 	float heightBlendSharpness;
+	/* Raster Ultra 1.12 — optional frequency metadata (defaults when unset). */
+	float expectedTexelDensity;
+	float patternPeriod;
+	float proceduralMaxFreq;
+	float preferredAnisotropy;
+	uint8_t detailFrequencyBand; /* 0 macro, 1 meso, 2 micro */
+	uint8_t alphaCoveragePolicy; /* 0 default, 1 coverage-preserve, 2 stochastic-eligible */
+	uint8_t antiMoireImportance; /* 0–3 */
+	uint8_t stochasticEligible;
 	qboolean fromClassic;
 	qboolean valid;
 } vkMaterialIR_t;

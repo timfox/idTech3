@@ -9,21 +9,25 @@ Modernized id Tech 3: **Vulkan renderer with PBR**, validation and smoke-tested 
 ### Engine pillars
 
 1. **Compatibility first** — QVM + native modules, classic `.pk3` / cvar / trap surface ([COMPATIBILITY.md](docs/COMPATIBILITY.md)); `./scripts/q3_openarena_compat_check.sh` on **`core`** builds.
-2. **Renderer** - Vulkan 1.x path with PBR, froxel volumetrics, SSAO, MSAA/SMAA, spherical harmonics lighting, SDF HUD text.
+2. **Renderer** - Vulkan path with PBR, Forward+/Unified Clustered, froxel volumetrics, GTAO/SSAO, SMAA, SH lighting, and SDF HUD text.
 3. **Tooling** - GPU detection, validation layers, performance HUD, safe mode, CI matrix builds, smoke tests and shader validation in the build. **[FreeUSD](docs/FREEUSD.md)** Git submodule (`src/external/FreeUSD`, default ON) for USDA import and `usd_*` tools. Optional **[Tiled Map Editor](docs/TILED.md)** submodule (`tools/tiled`, GPL-2.0) for tile-based level design—not linked into the engine build.
-4. **Platform** - Linux, Windows, macOS, Android; IPv4/IPv6 networking, modern codecs and asset loaders.
+4. **Platform** - Linux x86 and arm64, Windows, macOS, and Android
 
 ### Features
 
 **Rendering**:
 * Vulkan renderer
 * Physically Based Rendering (PBR)
-* Spherical Harmonics lighting support
-* Screen Space Ambient Occlusion (SSAO)
+* Forward+ and Unified Clustered lighting (`modern_vulkan.cfg`; `r_renderMode` 2/3)
+* Spherical Harmonics / IBL lighting
+* GTAO ambient visibility (SSAO fallback)
+* Froxel volumetric fog/lighting (optional VDB / Woodcock path)
+* MSAA and SMAA; optional temporal reconstruction
+* Moment OIT / WBOIT transparency (opt-in)
 * High-quality SDF HUD text rendering with UTF-8 glyph support
 * SVG asset rasterization (NanoSVG / NanoSVRast, built-in; no extra system libs)
-* Froxel-based Volumetric Lighting with 2D Navier–Stokes fluid solver
-* MSAA and SMAA anti-aliasing
+* Opt-in high-end **Raster Ultra** profile (`exec modern_raster_ultra.cfg`; RT locked off). Overlays: cinematic lighting, probe GI, particles/decals, present-time AA, GPU-driven geometry, atmosphere/weather/clouds, material authoring 2.0, virtualized shadows, HDR presentation, Reference Lab, and frequency-aware moiré suppression ([docs/RASTER_ULTRA_1.12.md](docs/RASTER_ULTRA_1.12.md)).
+* Experimental RTX / Hybrid1 paths available when built with `USE_VULKAN_RTX` (not Raster Ultra)
 
 **Audio**:
 * OpenAL backend with HRTF for 3D positional audio
@@ -134,17 +138,8 @@ The engine features a built-in, cross-platform Editor designed for rapid develop
 - Multi-user collaborative editing support (via server-client connections).
 - Extensible via plugins—extend with custom editors or workflow integrations.
 
-**Platforms:**  
-The Editor runs on Windows, Linux, and MacOS.
-
 Refer to the documentation or `scripts/launch_editor.sh` to get started with the desktop Editor.
 
-
-### Long-term Feature Plans
-
-* Ray tracing (WIP)
-* Path tracing
-* Voxels
 
 ### Links
 

@@ -8,6 +8,7 @@ Vulkan sampler creation and management. Extracted from vk.c for modularization.
 
 #include "tr_local.h"
 #include "vk.h"
+#include "vk_frequency_aware.h"
 
 VkSampler vk_find_sampler( const Vk_Sampler_Def *def )
 {
@@ -83,6 +84,13 @@ VkSampler vk_find_sampler( const Vk_Sampler_Def *def )
 	desc.addressModeV = address_mode;
 	desc.addressModeW = address_mode;
 	desc.mipLodBias = r_mipLodBias->value;
+	/* Raster Ultra 1.12: while frequency-aware is active, clamp aggressive sharpening. */
+	if ( vk_frequency_aware_active() ) {
+		float floorBias = vk_frequency_aware_mip_bias_floor();
+		if ( desc.mipLodBias < floorBias ) {
+			desc.mipLodBias = floorBias;
+		}
+	}
 
 	if ( def->noAnisotropy || mipmap_mode == VK_SAMPLER_MIPMAP_MODE_NEAREST || mag_filter == VK_FILTER_NEAREST ) {
 		desc.anisotropyEnable = VK_FALSE;
@@ -90,7 +98,14 @@ VkSampler vk_find_sampler( const Vk_Sampler_Def *def )
 	} else {
 		desc.anisotropyEnable = ( r_ext_texture_filter_anisotropic->integer && vk.samplerAnisotropy ) ? VK_TRUE : VK_FALSE;
 		if ( desc.anisotropyEnable ) {
-			desc.maxAnisotropy = MIN( r_ext_max_anisotropy->integer, vk.maxAnisotropy );
+			float maxAniso = (float)MIN( r_ext_max_anisotropy->integer, (int)vk.maxAnisotropy );
+			if ( vk_frequency_aware_active() ) {
+				const vkFreqState_t *fs = vk_frequency_aware_state();
+				if ( fs && (float)fs->samplerAnisotropyCap > maxAniso ) {
+					maxAniso = MIN( (float)fs->samplerAnisotropyCap, vk.maxAnisotropy );
+				}
+			}
+			desc.maxAnisotropy = maxAniso;
 		}
 	}
 

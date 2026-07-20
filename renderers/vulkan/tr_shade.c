@@ -31,6 +31,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "vk_selective_reflection.h"
 #include "vk_sun_csm.h"
 #include "vk_surface_evolution.h"
+#include "vk_frequency_aware.h"
 #endif
 #include "../common/tr_vector_font.h"
 #ifdef USE_VULKAN
@@ -1649,11 +1650,24 @@ static void RB_IterateStagesGeneric( const shaderCommands_t *input )
 			Vector4Copy( pStage->transmissionScale, block.transmissionScale );
 			Vector4Copy( pStage->subsurfaceColor, block.subsurfaceColor );
 			Vector4Copy( pStage->subsurfaceParams, block.subsurfaceParams );
-			Vector4Set( block.advancedParams,
-				( r_pbr_multiScatter && r_pbr_multiScatter->integer ) ? 1.0f : 0.0f,
-				( r_pbr_multiScatterStrength ? r_pbr_multiScatterStrength->value : 1.0f ),
-				( r_pbr_fresnelRoughness && r_pbr_fresnelRoughness->integer ) ? 1.0f : 0.0f,
-				( r_pbr_specularAA && r_pbr_specularAA->integer ) ? LerpClamp( ( r_pbr_specularAAStrength ? r_pbr_specularAAStrength->value : 0.5f ), 0.0f, 2.0f ) : 0.0f );
+			{
+				float aaStrength = 0.0f;
+				if ( r_pbr_specularAA && r_pbr_specularAA->integer ) {
+					aaStrength = LerpClamp( ( r_pbr_specularAAStrength ? r_pbr_specularAAStrength->value : 0.5f ), 0.0f, 2.0f );
+					/* Raster Ultra 1.12: frequency-aware may raise strength (Toksvig path); never a global roughness rewrite. */
+					if ( vk_frequency_aware_active() ) {
+						float fa = vk_frequency_aware_specular_aa_strength();
+						if ( fa > aaStrength ) {
+							aaStrength = LerpClamp( fa, 0.0f, 2.0f );
+						}
+					}
+				}
+				Vector4Set( block.advancedParams,
+					( r_pbr_multiScatter && r_pbr_multiScatter->integer ) ? 1.0f : 0.0f,
+					( r_pbr_multiScatterStrength ? r_pbr_multiScatterStrength->value : 1.0f ),
+					( r_pbr_fresnelRoughness && r_pbr_fresnelRoughness->integer ) ? 1.0f : 0.0f,
+					aaStrength );
+			}
 
 			float glintDensityExp = r_glintDensity ? LerpClamp( r_glintDensity->value, -4.0f, 6.0f ) : 3.0f;
 			float glintDensity = 1000.0f * powf( 10.0f, glintDensityExp );

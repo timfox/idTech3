@@ -552,11 +552,18 @@ copy_to_release() {
   if [ -f "$PROJECT_ROOT/config/steamdeck.cfg" ]; then
     cp -f "$PROJECT_ROOT/config/steamdeck.cfg" "$dest/base/steamdeck.cfg"
   fi
-  for cfg in classic_baseq3.cfg modern_vulkan.cfg modern_vulkan_stable.cfg modern_vulkan_quality.cfg modern_vulkan_rt.cfg modern_vulkan_experimental.cfg gfx_safe.cfg demo_gbuffer_av_lifecycle.cfg modern_clustered.cfg deferred_vulkan.cfg vulkan_overlay_deferred.cfg vulkan_overlay_unified_clustered.cfg vulkan_overlay_unified_clustered_safe.cfg vulkan_overlay_oit_clustered.cfg vulkan_overlay_spine_1_1_cert.cfg vulkan_overlay_selective_hybrid.cfg vulkan_overlay_pt_reference.cfg vulkan_overlay_visibility_2027.cfg vulkan_overlay_rtx.cfg vulkan_overlay_hybrid1.cfg vulkan_overlay_aa_sharp.cfg vulkan_overlay_temporal_recon.cfg vulkan_overlay_temporal_perf.cfg modern_native.cfg modern_lighting.cfg console_ttf.cfg console_sdf.cfg; do
+  for cfg in classic_baseq3.cfg modern_vulkan.cfg modern_vulkan_stable.cfg modern_vulkan_quality.cfg modern_vulkan_rt.cfg modern_vulkan_experimental.cfg gfx_safe.cfg demo_gbuffer_av_lifecycle.cfg modern_clustered.cfg deferred_vulkan.cfg vulkan_overlay_deferred.cfg vulkan_overlay_unified_clustered.cfg vulkan_overlay_unified_clustered_safe.cfg vulkan_overlay_oit_clustered.cfg vulkan_overlay_spine_1_1_cert.cfg vulkan_overlay_selective_hybrid.cfg vulkan_overlay_pt_reference.cfg vulkan_overlay_visibility_2027.cfg vulkan_overlay_rtx.cfg vulkan_overlay_hybrid1.cfg vulkan_overlay_aa_sharp.cfg vulkan_overlay_temporal_recon.cfg vulkan_overlay_temporal_perf.cfg modern_native.cfg modern_openarena.cfg modern_lighting.cfg console_ttf.cfg console_sdf.cfg modern_raster_reference.cfg modern_raster_ultra.cfg modern_low_latency.cfg modern_experimental.cfg vulkan_overlay_raster_ultra_1_6_geometry.cfg vulkan_overlay_raster_ultra_1_7_atmosphere.cfg vulkan_overlay_raster_ultra_1_8_materials.cfg vulkan_overlay_raster_ultra_1_9_virtual_shadows.cfg vulkan_overlay_raster_ultra_1_10_hdr_presentation.cfg vulkan_overlay_raster_ultra_1_11_reference_lab.cfg vulkan_overlay_frequency_aware.cfg; do
     if [ -f "$PROJECT_ROOT/config/$cfg" ]; then
       cp -f "$PROJECT_ROOT/config/$cfg" "$dest/base/$cfg"
       if [ -d "$dest/baseq3" ]; then
         cp -f "$PROJECT_ROOT/config/$cfg" "$dest/baseq3/$cfg"
+      fi
+      # Also ship into active fs_game trees when present (openarena / havenrp).
+      if [ -d "$dest/openarena" ]; then
+        cp -f "$PROJECT_ROOT/config/$cfg" "$dest/openarena/$cfg"
+      fi
+      if [ -d "$dest/havenrp" ]; then
+        cp -f "$PROJECT_ROOT/config/$cfg" "$dest/havenrp/$cfg"
       fi
     fi
   done

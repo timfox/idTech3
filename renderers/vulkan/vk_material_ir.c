@@ -65,6 +65,14 @@ void vk_material_ir_reset( vkMaterialIR_t *ir )
 	ir->opacity = 1.0f;
 	ir->uvScale = 1.0f;
 	ir->heightBlendSharpness = 8.0f;
+	ir->expectedTexelDensity = 1.0f;
+	ir->patternPeriod = 0.0f;
+	ir->proceduralMaxFreq = 0.0f;
+	ir->preferredAnisotropy = 8.0f;
+	ir->detailFrequencyBand = 1; /* meso */
+	ir->alphaCoveragePolicy = 0;
+	ir->antiMoireImportance = 0;
+	ir->stochasticEligible = 0;
 	ir->fromClassic = qtrue;
 }
 
@@ -110,7 +118,9 @@ qboolean vk_material_ir_from_shader( const shader_t *shader, vkMaterialIR_t *out
 		out->blendMode = VK_MAT_BLEND_ALPHA;
 	} else if ( shader->contentFlags & CONTENTS_WATER ) {
 		out->domain = VK_MAT_DOMAIN_WATER;
-		feat |= VK_MAT_FEAT_WATER;
+		feat |= VK_MAT_FEAT_WATER | VK_MAT_FEAT_FREQUENCY;
+		out->detailFrequencyBand = 2; /* micro waves */
+		out->antiMoireImportance = 2;
 	}
 
 	stage = NULL;
@@ -130,7 +140,9 @@ qboolean vk_material_ir_from_shader( const shader_t *shader, vkMaterialIR_t *out
 
 	if ( stage->stateBits & GLS_ATEST_BITS ) {
 		out->domain = VK_MAT_DOMAIN_ALPHA_TEST;
-		feat |= VK_MAT_FEAT_ALPHA_TEST;
+		feat |= VK_MAT_FEAT_ALPHA_TEST | VK_MAT_FEAT_FREQUENCY;
+		out->alphaCoveragePolicy = 1;
+		out->antiMoireImportance = 2;
 	}
 
 #ifdef USE_VK_PBR

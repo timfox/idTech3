@@ -262,8 +262,8 @@ static void GLimp_FitWindowedSize( int *width, int *height, SDL_DisplayID displa
 	}
 
 	if ( fitW != *width || fitH != *height ) {
-		Com_Printf( "...windowed %dx%d exceeds usable %dx%d; fitting %dx%d (aspect preserved)\n",
-			*width, *height, maxW, maxH, fitW, fitH );
+		Com_Printf( "...windowed %dx%d exceeds usable %dx%d (max %dx%d); fitting %dx%d (aspect preserved)\n",
+			*width, *height, usable.w, usable.h, maxW, maxH, fitW, fitH );
 		*width = fitW;
 		*height = fitH;
 	}
@@ -669,6 +669,18 @@ static int GLW_SetMode( int mode, const char *modeFS, qboolean fullscreen )
 	if ( !fullscreen ) {
 		GLimp_CorrectWindowedAspect( config, wantAspect );
 	}
+
+	/*
+	 * Persist the drawable we actually created into r_custom* so the next
+	 * mode set does not re-request an oversized archived size (e.g. 1011)
+	 * that Fit shrinks every time — that mismatch fed an endless destroy
+	 * vid_restart loop via SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED.
+	 */
+	if ( !fullscreen && config->vidWidth > 0 && config->vidHeight > 0 ) {
+		Cvar_SetIntegerValue( "r_customWidth", config->vidWidth );
+		Cvar_SetIntegerValue( "r_customHeight", config->vidHeight );
+	}
+	glw_state.modeSetTime = Sys_Milliseconds();
 
 	SDL_WarpMouseInWindow( SDL_window, (float)( glw_state.window_width / 2 ), (float)( glw_state.window_height / 2 ) );
 

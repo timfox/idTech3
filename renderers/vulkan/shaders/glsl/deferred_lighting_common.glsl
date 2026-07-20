@@ -109,7 +109,7 @@ float ApplyDeferredSpecularAA( float roughness, vec2 uv, ivec2 pix )
 	if ( pc.specularAA <= 0.0 ) {
 		return roughness;
 	}
-	/* Screen-space normal variance (compute path; matches Forward+ Toksvig-style inflate). */
+	/* Screen-space normal variance (compute path; Toksvig-style inflate, Ultra 1.12). */
 	ivec2 sz = textureSize( normalTex, 0 );
 	ivec2 px = clamp( pix, ivec2( 0 ), sz - ivec2( 1 ) );
 	vec3 nC = texture( normalTex, uv ).xyz;
@@ -118,8 +118,9 @@ float ApplyDeferredSpecularAA( float roughness, vec2 uv, ivec2 pix )
 	vec3 dndx = nX - nC;
 	vec3 dndy = nY - nC;
 	float variance = min( dot( dndx, dndx ) + dot( dndy, dndy ), 0.5 );
+	float toksvig = variance / ( 1.0 + variance );
 	float alpha = max( roughness * roughness, 0.0004 );
-	alpha = clamp( alpha + variance * pc.specularAA, 0.0004, 1.0 );
+	alpha = clamp( alpha + toksvig * pc.specularAA, 0.0004, 1.0 );
 	return clamp( sqrt( alpha ), 0.02, 1.0 );
 }
 

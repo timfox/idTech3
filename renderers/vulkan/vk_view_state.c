@@ -2,6 +2,7 @@
 #include "vk.h"
 #include "vk_temporal.h"
 #include "vk_view_state.h"
+#include "vk_frequency_aware.h"
 
 typedef struct vkMvpPushConstants_s {
 	float mvp[16];
@@ -573,6 +574,11 @@ void vk_update_mvp( const float *m )
 		}
 		push_constants.reserved[6] = (float)stochMode;
 		push_constants.reserved[7] = (float)( tr.frameCount & 1023 );
+	} else if ( vk_frequency_aware_alpha_coverage() && tess.sdfUiEdge < 0.0f && tess.subpixelShift < 0.0f &&
+		tess.vectorCurveCount <= 0 ) {
+		/* Raster Ultra 1.12: coverage-preserving alpha via stoch_r4 (reserved[4]).
+		 * Skip UI/SDF/vector font pushes that own reserved[0..4]. */
+		push_constants.reserved[4] = 1.0f;
 	}
 	/* Visibility PrimID MRT: reserved[5] = monotonic draw id. */
 	if ( vk.visibilityBufferDirectExport ) {

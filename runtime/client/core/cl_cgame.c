@@ -1516,6 +1516,11 @@ static qboolean CL_UserRequestedModernGraphics( void ) {
 	if ( Cvar_VariableIntegerValue( "r_hybrid1" ) ) {
 		return qtrue;
 	}
+	/* Raster Ultra / frequency-aware overlays are explicitly modern. */
+	if ( Cvar_VariableIntegerValue( "r_rasterUltra" ) ||
+		Cvar_VariableIntegerValue( "r_frequencyAware" ) ) {
+		return qtrue;
+	}
 	/* Explicit modern stack already latched (e.g. +set r_fbo 1 +set r_pbr 1). */
 	if ( Cvar_VariableIntegerValue( "r_fbo" ) && Cvar_VariableIntegerValue( "r_pbr" ) ) {
 		return qtrue;
@@ -1639,6 +1644,9 @@ static void CL_ApplyGraphicsProfile( vm_t *vm ) {
 	const qboolean isQvm = ( vm && !vm->dllHandle );
 	const qboolean isBaseQ3 = CL_IsBaseQ3Game();
 	const qboolean isOpenArena = CL_IsOpenArenaGame();
+	/* Prevent exec+vid_restart loops: CL_InitCGame runs again after every restart. */
+	static qboolean s_oaModernProfileQueued;
+	static qboolean s_nativeModernProfileQueued;
 
 	if ( !cl_autoGraphicsProfile || !cl_autoGraphicsProfile->integer ) {
 		return;
@@ -1657,7 +1665,26 @@ static void CL_ApplyGraphicsProfile( vm_t *vm ) {
 			Com_Printf( "[client] cl_autoGraphicsProfile: modern OpenArena "
 				"(preserving user modern/hybrid graphics; middleware off)\n" );
 			CL_ApplyOpenArenaMiddlewareOff();
-			Cbuf_AddText( "exec modern_openarena.cfg\nvid_restart\n" );
+			/*
+			 * Queue OA modern cfg at most once per process. Re-queuing vid_restart
+			 * on every cgame init caused an infinite restart loop; on Wayland that
+			 * repeatedly destroyed the window and SIGSEGV'd inside libdecor-gtk.
+			 *
+			 * When Raster Ultra / frequency-aware overlays are already latched
+			 * (cmdline +exec), skip the extra restart — modern_openarena.cfg would
+			 * only fight those overlays and the user already queued keep_window.
+			 */
+			if ( !s_oaModernProfileQueued ) {
+				s_oaModernProfileQueued = qtrue;
+				Cbuf_AddText( "exec modern_openarena.cfg\n" );
+				if ( !Cvar_VariableIntegerValue( "r_rasterUltra" ) &&
+					!Cvar_VariableIntegerValue( "r_frequencyAware" ) ) {
+					Cbuf_AddText( "vid_restart keep_window\n" );
+				} else {
+					Com_Printf( "[client] cl_autoGraphicsProfile: skipped vid_restart "
+						"(r_rasterUltra / r_frequencyAware already active)\n" );
+				}
+			}
 		} else {
 			Com_Printf( "[client] cl_autoGraphicsProfile: classic native OpenArena\n" );
 			CL_ApplyClassicBaseq3Cvars();
@@ -1670,7 +1697,10 @@ static void CL_ApplyGraphicsProfile( vm_t *vm ) {
 	if ( !isQvm ) {
 		Com_Printf( "[client] cl_autoGraphicsProfile: modern native cgame\n" );
 		cls.stockBaseq3 = qfalse;
-		Cbuf_AddText( "exec modern_native.cfg\nvid_restart\n" );
+		if ( !s_nativeModernProfileQueued ) {
+			s_nativeModernProfileQueued = qtrue;
+			Cbuf_AddText( "exec modern_native.cfg\nvid_restart keep_window\n" );
+		}
 		return;
 	}
 

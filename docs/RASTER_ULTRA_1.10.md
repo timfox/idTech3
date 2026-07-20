@@ -114,4 +114,4 @@ Manual: dark→bright doorway, AgX vs filmic, HDR10 request on SDR monitor (fall
 
 Screenshots could silently encode HDR-intent modes into 8-bit SDR. Ultra 1.10 **blocks silent HDR→SDR** and documents display vs scene-linear capture spaces. Second: exposure history now **resets on cut/map** via histogram controller so incompatible maps do not pump.
 
-Next: [RASTER_ULTRA_1.11.md](RASTER_ULTRA_1.11.md) — Reference Lab + automated visual certification (no new techniques).
+Next: [RASTER_ULTRA_1.11.md](RASTER_ULTRA_1.11.md) — Reference Lab + automated visual certification (no new techniques). Then [RASTER_ULTRA_1.12.md](RASTER_ULTRA_1.12.md) — frequency-aware moiré suppression.

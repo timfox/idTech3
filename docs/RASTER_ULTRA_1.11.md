@@ -6,11 +6,31 @@ Continuation of [RASTER_ULTRA_1.10.md](RASTER_ULTRA_1.10.md). **No new rendering
 
 ## Enable
 
+Configs must be on the game search path (`release/base/`, `release/openarena/`, etc. — installed by `compile_engine.sh`). `r_referenceLab` is **latched**, so you need `vid_restart`.
+
+**Shell:**
+```
+./release/idtech3 +set fs_game openarena \
+  +exec modern_raster_reference.cfg \
+  +exec vulkan_overlay_raster_ultra_1_11_reference_lab.cfg \
+  +vid_restart
+```
+
+**In-console (if already running):**
 ```
 exec modern_raster_reference.cfg
 exec vulkan_overlay_raster_ultra_1_11_reference_lab.cfg
 vid_restart
 ```
+
+**Confirm it worked** — look for:
+```
+[VK][ReferenceLab] enabled scenes=23 ...
+[renderer] Raster Ultra 1.11 Reference Lab: ...
+```
+Then run `reference_lab_status` (active must be **yes**) and `r_referenceLab` (must be **1**).
+
+If you still see `ReferenceLab] off`, the cfg was not found (`couldn't exec ...`) or you skipped `vid_restart`.
 
 Commands: `reference_lab_status`, `reference_lab_scenes`
 

@@ -46,6 +46,10 @@ typedef struct
 	int pixel_width;
 	int pixel_height;
 
+	/* Sys_Milliseconds() when GLW_SetMode last succeeded — resize handler
+	 * ignores vid_restart for a short grace period (fit/WM configure noise). */
+	int modeSetTime;
+
 	int monitorCount;
 
 } glwstate_t;

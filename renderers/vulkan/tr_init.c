@@ -82,6 +82,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "vk_capture_pipeline.h"
 #include "vk_color_grade.h"
 #include "vk_reference_lab.h"
+#include "vk_frequency_aware.h"
 #include "vk_pass_registry.h"
 #include "vk_selective_sun_shadow.h"
 #include "vk_selective_reflection.h"
@@ -1765,9 +1766,9 @@ static void R_Register( void )
 	r_railSegmentLength = ri.Cvar_Get( "r_railSegmentLength", "32", CVAR_ARCHIVE_ND );
 	ri.Cvar_SetDescription( r_railSegmentLength, "Length of segments in railgun trails." );
 
-	r_ambientScale = ri.Cvar_Get( "r_ambientScale", "0.6", CVAR_CHEAT );
+	r_ambientScale = ri.Cvar_Get( "r_ambientScale", "1.2", CVAR_ARCHIVE_ND );
 	ri.Cvar_SetDescription( r_ambientScale, "Light grid ambient light scaling on entity models." );
-	r_directedScale = ri.Cvar_Get( "r_directedScale", "1", CVAR_CHEAT );
+	r_directedScale = ri.Cvar_Get( "r_directedScale", "1.15", CVAR_ARCHIVE_ND );
 	ri.Cvar_SetDescription( r_directedScale, "Light grid direct light scaling on entity models." );
 	r_shLighting = ri.Cvar_Get( "r_shLighting", "1", CVAR_ARCHIVE_ND );
 	ri.Cvar_SetDescription( r_shLighting, "Enable spherical harmonics ambient lighting for entity models." );
@@ -3705,6 +3706,7 @@ void R_Init( void ) {
 	vk_capture_pipeline_init();
 	vk_color_grade_init();
 	vk_reference_lab_init();
+	vk_frequency_aware_init();
 #ifdef USE_VULKAN
 	R_NDGI_Init();
 	R_NIV_Init();

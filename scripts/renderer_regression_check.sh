@@ -1289,6 +1289,16 @@ else
 fi
 
 echo ""
+echo "Raster Ultra 1.12 Frequency-Aware:"
+if [[ ! -f "$PROJECT_ROOT/scripts/raster_ultra_1_12_check.sh" ]]; then
+  fail "missing scripts/raster_ultra_1_12_check.sh"
+elif ! bash "$PROJECT_ROOT/scripts/raster_ultra_1_12_check.sh"; then
+  fail "raster_ultra_1_12_check.sh failed"
+else
+  pass "Raster Ultra 1.12 frequency-aware static contract"
+fi
+
+echo ""
 if [ -n "${GAME_BASE:-}" ]; then
   echo "Optional game base: $GAME_BASE"
   ASSETS_LIST="${GAME_ASSETS_LIST:-$PROJECT_ROOT/docs/samples/renderer_regression/OPTIONAL_GAME_ASSETS.txt}"

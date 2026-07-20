@@ -44,6 +44,7 @@ Split from vk.c.
 #include "vk_capture_pipeline.h"
 #include "vk_color_grade.h"
 #include "vk_reference_lab.h"
+#include "vk_frequency_aware.h"
 #include "vk_rcgi.h"
 #include "vk_ambient_visibility.h"
 #include "vk_raster_gi.h"
@@ -129,6 +130,7 @@ void vk_shutdown( refShutdownCode_t code )
 
 	SkyboxHDR_Shutdown();
 	vk_reference_lab_shutdown();
+	vk_frequency_aware_shutdown();
 	vk_color_grade_shutdown();
 	vk_capture_pipeline_shutdown();
 	vk_cinematic_camera_shutdown();

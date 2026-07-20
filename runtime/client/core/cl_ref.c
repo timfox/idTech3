@@ -216,7 +216,13 @@ Wrapper for CL_Vid_Restart
 static void CL_Vid_Restart_f( void ) {
 
 	if ( Q_stricmp( Cmd_Argv( 1 ), "keep_window" ) == 0 || Q_stricmp( Cmd_Argv( 1 ), "fast" ) == 0 ) {
-		// fast path: keep window
+		/* Same debounce as destroy path — stacked keep_window still loops R_Init. */
+		if ( cls.lastVidRestart ) {
+			if ( abs( cls.lastVidRestart - Sys_Milliseconds() ) < 500 ) {
+				return;
+			}
+		}
+		cls.lastVidRestart = Sys_Milliseconds();
 		CL_Ref_VidRestart( REF_KEEP_WINDOW );
 	} else {
 		if ( cls.lastVidRestart ) {
@@ -225,6 +231,7 @@ static void CL_Vid_Restart_f( void ) {
 				return;
 			}
 		}
+		cls.lastVidRestart = Sys_Milliseconds();
 		CL_Ref_VidRestart( REF_DESTROY_WINDOW );
 	}
 }

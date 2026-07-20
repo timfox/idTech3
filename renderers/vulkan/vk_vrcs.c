@@ -15,6 +15,7 @@ Variable-Rate Compute Shading (VRCS) — SRI, 16x16 pack, deferred lighting wrap
 #include "vk_util.h"
 #include "vk_view_state.h"
 #include "vk_cmd.h"
+#include "vk_frequency_aware.h"
 
 #define VRCS_TILE           16u
 #define VRCS_MAX_PACK       224u
@@ -652,6 +653,12 @@ static void VRCS_FillLightPush( vrcs_light_push_t *push, uint32_t width, uint32_
 	}
 	push->specularAA = ( r_pbr_specularAA && r_pbr_specularAA->integer ) ?
 		Com_Clamp( 0.0f, 2.0f, r_pbr_specularAAStrength ? r_pbr_specularAAStrength->value : 0.5f ) : 0.0f;
+	if ( vk_frequency_aware_active() ) {
+		float fa = vk_frequency_aware_specular_aa_strength();
+		if ( fa > push->specularAA ) {
+			push->specularAA = Com_Clamp( 0.0f, 2.0f, fa );
+		}
+	}
 }
 
 qboolean vk_vrcs_dispatch_deferred_lighting( uint32_t width, uint32_t height )

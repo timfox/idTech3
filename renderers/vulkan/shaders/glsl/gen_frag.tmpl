@@ -590,16 +590,21 @@ vec3 CalcNormal( in vec3 vertexNormal, in vec4 vertexTangent, in vec2 frag_tex_c
 
 float ApplySpecularAA( in float roughness, in vec3 N )
 {
-	if ( pbrAdvancedParams.w <= 0.0 || normal_texture_set < 0 ) {
+	if ( pbrAdvancedParams.w <= 0.0 ) {
 		return roughness;
 	}
 
+	/* Screen-space normal variance (shaded N). Toksvig-style inflate of α. */
 	vec3 dndx = dFdx( N );
 	vec3 dndy = dFdy( N );
 	float variance = min( dot( dndx, dndx ) + dot( dndy, dndy ), 0.5 );
+	/* Geometric contribution from interpolated vertex normals (subpixel bevels; preserves hard edges via discontinuities). */
+	vec3 gdx = dFdx( var_Normal.xyz );
+	vec3 gdy = dFdy( var_Normal.xyz );
+	variance = min( variance + 0.35 * ( dot( gdx, gdx ) + dot( gdy, gdy ) ), 0.5 );
+	float toksvig = variance / ( 1.0 + variance );
 	float alpha = max( roughness * roughness, 0.0004 );
-
-	alpha = clamp( alpha + variance * pbrAdvancedParams.w, 0.0004, 1.0 );
+	alpha = clamp( alpha + toksvig * pbrAdvancedParams.w, 0.0004, 1.0 );
 	return clamp( sqrt( alpha ), 0.02, 1.0 );
 }
 
@@ -882,7 +887,6 @@ vec3 CalcBurleySubsurface( in vec3 N, in vec3 L, in vec3 subsurfaceColor, in flo
 #endif
 
 #ifdef USE_ATEST
-#if 0
 float CorrectAlpha(float threshold, float alpha, vec2 tc)
 {
 	ivec2 ts = textureSize(texture0, 0);
@@ -893,7 +897,6 @@ float CorrectAlpha(float threshold, float alpha, vec2 tc)
 	float ac = threshold + (alpha - threshold) * scale;
 	return ac;
 }
-#endif
 #endif
 
 void main() {
@@ -1251,6 +1254,23 @@ void main() {
 #endif // !USE_CL1
 #endif // !USE_TX1
 
+#ifdef USE_ATEST
+	/* Frequency-aware coverage-preserving alpha (Raster Ultra 1.12).
+	 * Opt-in via stoch_r4 push when r_frequencyAlphaCoverage is on and stochastic is off.
+	 * Does not force TAA or global blur. */
+	if ( stochPc.stochMode < 0.5 && stochPc.stoch_r4 > 0.5 ) {
+		float covA = color0.a;
+		if ( alpha_test_func == 2 ) {
+			covA = CorrectAlpha( alpha_test_value, 1.0 - color0.a, frag_tex_coord0 );
+			if ( covA >= alpha_test_value ) discard;
+		} else if ( alpha_test_func == 3 ) {
+			covA = CorrectAlpha( alpha_test_value, color0.a, frag_tex_coord0 );
+			if ( covA < alpha_test_value ) discard;
+		} else if ( alpha_test_func == 1 ) {
+			if ( color0.a == alpha_test_value ) discard;
+		}
+	} else
+#endif
 #ifdef USE_ATEST
 #if 0
 	if (alpha_to_coverage != 0) {

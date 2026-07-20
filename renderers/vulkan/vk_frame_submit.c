@@ -28,6 +28,7 @@ Extracted from vk.c for incremental modularization.
 #include "vk_cinematic_camera.h"
 #include "vk_exposure_histogram.h"
 #include "vk_reference_lab.h"
+#include "vk_frequency_aware.h"
 #include "vk_hiz.h"
 #include "vk_render_pass.h"
 #include "vk_resource_destroy.h"
@@ -536,6 +537,7 @@ void vk_end_frame( void )
 	vk_vshadow_begin_frame();
 	vk_cinematic_camera_begin_frame();
 	vk_reference_lab_begin_frame();
+	vk_frequency_aware_begin_frame();
 	vk_volumetric_clouds_begin_frame();
 	vk_gpu_scene_end_frame();
 	vk_temporal_commit_frame_state();

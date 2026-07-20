@@ -20,6 +20,7 @@ Mode 3 = Unified Clustered Renderer (deferred opaque + Forward+ transparent).
 #include "vk_pass_registry.h"
 #include "vk_util.h"
 #include "vk_view_state.h"
+#include "vk_frequency_aware.h"
 
 static void vk_dgb_validate_compute_break( const char *stage, qboolean resume_main )
 {
@@ -1228,6 +1229,12 @@ static void vk_dgb_fill_light_push( vk_deferred_light_push_t *push, uint32_t wid
 	}
 	push->specularAA = ( r_pbr_specularAA && r_pbr_specularAA->integer ) ?
 		Com_Clamp( 0.0f, 2.0f, r_pbr_specularAAStrength ? r_pbr_specularAAStrength->value : 0.5f ) : 0.0f;
+	if ( vk_frequency_aware_active() ) {
+		float fa = vk_frequency_aware_specular_aa_strength();
+		if ( fa > push->specularAA ) {
+			push->specularAA = Com_Clamp( 0.0f, 2.0f, fa );
+		}
+	}
 }
 
 static void vk_dgb_dispatch_lighting_compute( uint32_t width, uint32_t height )
