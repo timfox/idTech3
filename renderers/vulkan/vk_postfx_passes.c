@@ -25,6 +25,7 @@ SSAO/HBAO pass, and vk_bloom. Split from vk.c.
 #include "vk_ambient_visibility.h"
 #include "vk_selective_reflection.h"
 #include "vk_pass_registry.h"
+#include "vk_forward_plus.h"
 
 static void vk_oit_validate_pass_break( const char *stage )
 {
@@ -176,6 +177,7 @@ static void vk_postfx_run_blur_pass( uint32_t passIndex, VkDescriptorSet sourceD
 static void vk_copy_color_to_fog_scene( uint32_t width, uint32_t height )
 {
 	VkImageCopy copy_region;
+	VkMemoryBarrier mb;
 
 	if ( vk.fog_scene_image == VK_NULL_HANDLE || vk.color_image == VK_NULL_HANDLE ) {
 		return;
@@ -190,16 +192,29 @@ static void vk_copy_color_to_fog_scene( uint32_t width, uint32_t height )
 	copy_region.extent.height = height;
 	copy_region.extent.depth = 1;
 
-	/* Main/post_bloom FBO color finalLayout is SHADER_READ_ONLY. Include color-attachment
-	 * output in src stages so a prior attachment write is visible even if a pass left
-	 * residual COLOR_ATTACHMENT access outstanding. */
+	/* Full visibility of prior color attachment / resolve writes before TRANSFER.
+	 * Classified OIT bucket-1 copies color immediately after resolve; RP EXTERNAL
+	 * BY_REGION deps alone are insufficient for a fullscreen image copy. */
+	Com_Memset( &mb, 0, sizeof( mb ) );
+	mb.sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER;
+	mb.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT | VK_ACCESS_TRANSFER_WRITE_BIT;
+	mb.dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
+	qvkCmdPipelineBarrier( vk.cmd->command_buffer,
+		VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT | VK_PIPELINE_STAGE_TRANSFER_BIT,
+		VK_PIPELINE_STAGE_TRANSFER_BIT,
+		0, 1, &mb, 0, NULL, 0, NULL );
+
+	/* Main / OIT resolve / post_bloom leave color in SHADER_READ_ONLY. Include color-
+	 * attachment output in src stages so residual COLOR_ATTACHMENT access is visible. */
 	record_image_layout_transition( vk.cmd->command_buffer, vk.color_image, VK_IMAGE_ASPECT_COLOR_BIT,
 		VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
 		VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT | VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
 		VK_PIPELINE_STAGE_TRANSFER_BIT );
+	/* fog_scene may be UNDEFINED on first use after create; UNDEFINED→DST is always valid. */
 	record_image_layout_transition( vk.cmd->command_buffer, vk.fog_scene_image, VK_IMAGE_ASPECT_COLOR_BIT,
-		VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-		VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT );
+		VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+		VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT | VK_PIPELINE_STAGE_TRANSFER_BIT,
+		VK_PIPELINE_STAGE_TRANSFER_BIT );
 	qvkCmdCopyImage( vk.cmd->command_buffer,
 		vk.color_image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
 		vk.fog_scene_image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
@@ -209,7 +224,8 @@ static void vk_copy_color_to_fog_scene( uint32_t width, uint32_t height )
 		VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT );
 	record_image_layout_transition( vk.cmd->command_buffer, vk.fog_scene_image, VK_IMAGE_ASPECT_COLOR_BIT,
 		VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-		VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT );
+		VK_PIPELINE_STAGE_TRANSFER_BIT,
+		VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT | VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT );
 }
 
 static void vk_oit_note_fallback( const char *reason )
@@ -416,6 +432,11 @@ void vk_oit_pass( const struct drawSurfsCommand_s *cmd )
 
 	vk_reactive_mask_clear();
 
+	/* Align Forward+ viewport params with the OIT framebuffer before lit accum. */
+	if ( r_oitForwardPlus && r_oitForwardPlus->integer ) {
+		vk_forward_plus_refresh_viewport_params( fullWidth, fullHeight );
+	}
+
 	/* Copy opaque scene to fog_scene for resolve */
 	vk_copy_color_to_fog_scene( fullWidth, fullHeight );
 
@@ -449,7 +470,9 @@ void vk_oit_pass( const struct drawSurfsCommand_s *cmd )
 			backEnd.oitBucketFilter = ( bucket == 0 ) ? 1 : 2;
 			bucket_mboit = ( mboit && bucket == 0 ) ? qtrue : qfalse;
 			if ( bucket == 1 ) {
-				/* Composite bucket A into color, then use as base for additive. */
+				/* Composite bucket A into color, then use as base for additive.
+				 * vk_copy_color_to_fog_scene includes a full color-write→transfer barrier. */
+				vk_barrier_post_fog_source_for_sampling( vk.color_image_view, "post-oit-bucket0-pre-copy" );
 				vk_copy_color_to_fog_scene( fullWidth, fullHeight );
 			}
 		} else {
@@ -619,6 +642,7 @@ void vk_oit_pass( const struct drawSurfsCommand_s *cmd )
 	}
 
 	/* Resume main pass for sun, flares, etc. Weapon draws later (RDF_NOWORLDMODEL). */
+	vk_barrier_post_fog_source_for_sampling( vk.color_image_view, "post-oit-pre-post_bloom" );
 	vk_begin_post_bloom_render_pass();
 }
 

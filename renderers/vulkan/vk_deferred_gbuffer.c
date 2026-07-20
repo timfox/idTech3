@@ -1575,9 +1575,10 @@ static void vk_dgb_composite_lit_to_color( uint32_t width, uint32_t height )
 		vk_end_render_pass();
 	}
 
-	record_image_layout_transition( vk.cmd->command_buffer, vk.color_image, VK_IMAGE_ASPECT_COLOR_BIT,
-		VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-		0, 0 );
+	/* post_bloom initialLayout is SHADER_READ_ONLY (non-RTX). Do not pre-transition
+	 * to COLOR_ATTACHMENT — that mismatched the RP and left tile-shaped undefined
+	 * loads into the deferred composite that OIT later copies as opaqueTex. */
+	vk_barrier_post_fog_source_for_sampling( vk.color_image_view, "pre-deferred-composite" );
 
 	vk_begin_post_bloom_render_pass();
 	vk_dgb_update_composite_descriptor();

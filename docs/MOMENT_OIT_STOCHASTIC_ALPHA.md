@@ -74,6 +74,12 @@ Clears: accum `vec4(0)`, revealage `1`. Depth test uses reversed-Z `GREATER_OR_E
 - Weapon flush asserts OIT flags cleared
 - `r_oitDirectTest 1` clears+resolves without transparent draws
 - `oit_capture` / expanded `oit_status` FrameContext (frame, cmdIndex, swapchainImage independent)
+- Deferred composite no longer pre-transitions color to `COLOR_ATTACHMENT` before `post_bloom` (matches SHADER_READ initialLayout)
+- `fog_scene` copy: full color-write→transfer barrier; `UNDEFINED→TRANSFER_DST` for fog_scene; classify bucket-1 barrier before refresh
+- Forward+ viewport params refreshed to OIT extent before lit accum
+- Distortion same-image sample uses `GENERAL` layout (was SHADER_READ vs GENERAL UB → tile bands)
+
+**Repro cfg install:** shipped into `release/base/`, `release/openarena/`, `release/havenrp/` via `compile_engine.sh`. If `couldn't exec repro_oit_corruption.cfg`, rebuild/copy or `exec` from those trees.
 
 **Pass order (world):** opaque → deferred → OIT accum → OIT resolve → refractive (water/glass when `r_refractiveExcludeOit 1`) → weapon (`RDF_NOWORLDMODEL`) → post → UI. Weapon never writes world OIT targets.
 

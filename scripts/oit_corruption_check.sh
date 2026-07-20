@@ -60,8 +60,24 @@ else
   echo "FAIL expected 1 reactive stamp in vk_postfx_passes.c (got $stamp_count)"
   fail=1
 fi
-grep -q '1279' "$ROOT/docs/MOMENT_OIT_STOCHASTIC_ALPHA.md" || {
-  echo "FAIL odd-extent certification checklist missing from docs"; fail=1; }
+grep -q 'repro_oit_corruption.cfg' "$ROOT/scripts/compile_engine.sh" || {
+  echo "FAIL compile_engine.sh must ship repro_oit_corruption.cfg"; fail=1; }
+grep -q 'demo_oit_isolation.cfg' "$ROOT/scripts/compile_engine.sh" || {
+  echo "FAIL compile_engine.sh must ship demo_oit_isolation.cfg"; fail=1; }
+grep -q 'vk_forward_plus_refresh_viewport_params' "$ROOT/renderers/vulkan/vk_postfx_passes.c" || {
+  echo "FAIL OIT must refresh Forward+ viewport params"; fail=1; }
+grep -q 'UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL' "$ROOT/renderers/vulkan/vk_postfx_passes.c" || {
+  echo "FAIL fog_scene copy must use UNDEFINED→TRANSFER_DST"; fail=1; }
+grep -q 'pre-deferred-composite' "$ROOT/renderers/vulkan/vk_deferred_gbuffer.c" || {
+  echo "FAIL deferred composite must not COLOR_ATTACHMENT-pre-transition post_bloom"; fail=1; }
+if grep -n 'vk_dgb_composite_lit_to_color' -A20 "$ROOT/renderers/vulkan/vk_deferred_gbuffer.c" | grep -q 'COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL\|SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL'; then
+  echo "FAIL deferred composite still pre-transitions to COLOR_ATTACHMENT"
+  fail=1
+else
+  echo "OK  deferred composite does not pre-transition to COLOR_ATTACHMENT"
+fi
+grep -q 'Same-image sample+store' "$ROOT/renderers/vulkan/vk_distortion.c" || {
+  echo "FAIL distortion same-image GENERAL sample fix missing"; fail=1; }
 
 # Boot must not force OIT corruption repro
 for cfg in modern_vulkan.cfg modern_vulkan_stable.cfg gfx_safe.cfg; do

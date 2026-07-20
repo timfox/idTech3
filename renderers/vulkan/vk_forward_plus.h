@@ -21,6 +21,8 @@ void vk_forward_plus_upload_refdef( void );
 void vk_forward_plus_ensure_render_resolution( void );
 void vk_forward_plus_dispatch_tile_cull( void );
 void vk_forward_plus_dispatch_tile_cull_after_opaque( void );
+/* Stamp OIT/accum viewport into Forward+ param SSBO (no re-cull). */
+void vk_forward_plus_refresh_viewport_params( uint32_t width, uint32_t height );
 VkDescriptorSet vk_forward_plus_get_graphics_descriptor_set( void );
 /* Teardown order: pipeline before descriptor pool; layout after pool (vk_shutdown). */
 void vk_forward_plus_destroy_compute_pipeline( void );

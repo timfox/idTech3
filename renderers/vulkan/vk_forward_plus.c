@@ -1369,3 +1369,20 @@ void vk_forward_plus_dispatch_tile_cull_after_opaque( void )
 	vk_forward_plus_dispatch_tile_cull_internal( qtrue );
 	vk_spine_pass_end( VK_SPINE_PASS_TILE_CONSTRUCT );
 }
+
+void vk_forward_plus_refresh_viewport_params( uint32_t width, uint32_t height )
+{
+	uint32_t *param_u;
+
+	if ( !r_forwardPlus || !r_forwardPlus->integer ) {
+		return;
+	}
+	if ( vk.forward_plus.param_mapped == NULL || width == 0 || height == 0 ) {
+		return;
+	}
+	param_u = (uint32_t *)vk.forward_plus.param_mapped;
+	param_u[16] = vk.forward_plus.tiles_x;
+	param_u[17] = vk.forward_plus.tiles_y;
+	param_u[18] = width;
+	param_u[19] = height;
+}

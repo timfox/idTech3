@@ -599,9 +599,11 @@ void vk_distortion_apply( void )
 	}
 
 	Com_Memset( imgInfos, 0, sizeof( imgInfos ) );
+	/* Same-image sample+store: both must use GENERAL once color is GENERAL.
+	 * SHADER_READ sample layout against a GENERAL image produced tile/band UB. */
 	imgInfos[0].sampler = linear;
 	imgInfos[0].imageView = vk.color_image_view;
-	imgInfos[0].imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+	imgInfos[0].imageLayout = VK_IMAGE_LAYOUT_GENERAL;
 	imgInfos[1].sampler = linear;
 	imgInfos[1].imageView = depthView;
 	imgInfos[1].imageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
