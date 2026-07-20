@@ -94,6 +94,7 @@ typedef struct cmodel_s {
 	vec3_t		mins, maxs;
 	cLeaf_t		leaf;			// submodels don't reference the main tree
 	int			goldsrcHeadnode;
+	int			goldsrcContents;	// entity-class contents for BSP30 inline models
 } cmodel_t;
 
 typedef struct {
