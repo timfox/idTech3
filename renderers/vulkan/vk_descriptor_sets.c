@@ -208,26 +208,33 @@ void vk_update_attachment_descriptors( void ) {
 			}
 		}
 		if ( r_oit && r_oit->integer ) {
+			qboolean oit_desc_ok = qtrue;
 			/* OIT resolve must use NEAREST — LINEAR across rows looks like scanline banding. */
 			sd.gl_mag_filter = sd.gl_min_filter = GL_NEAREST;
 			sd.max_lod_1_0 = qtrue;
 			sd.noAnisotropy = qtrue;
 			info.sampler = vk_find_sampler( &sd );
 			info.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-			if ( vk.fog_scene_image_view ) {
+			if ( vk.fog_scene_image_view && vk.oit_opaque_descriptor != VK_NULL_HANDLE ) {
 				info.imageView = vk.fog_scene_image_view;
 				desc.dstSet = vk.oit_opaque_descriptor;
 				qvkUpdateDescriptorSets( vk.device, 1, &desc, 0, NULL );
+			} else {
+				oit_desc_ok = qfalse;
 			}
-			if ( vk.oit_accum_image_view ) {
+			if ( vk.oit_accum_image_view && vk.oit_accum_descriptor != VK_NULL_HANDLE ) {
 				info.imageView = vk.oit_accum_image_view;
 				desc.dstSet = vk.oit_accum_descriptor;
 				qvkUpdateDescriptorSets( vk.device, 1, &desc, 0, NULL );
+			} else {
+				oit_desc_ok = qfalse;
 			}
-			if ( vk.oit_reveal_image_view ) {
+			if ( vk.oit_reveal_image_view && vk.oit_reveal_descriptor != VK_NULL_HANDLE ) {
 				info.imageView = vk.oit_reveal_image_view;
 				desc.dstSet = vk.oit_reveal_descriptor;
 				qvkUpdateDescriptorSets( vk.device, 1, &desc, 0, NULL );
+			} else {
+				oit_desc_ok = qfalse;
 			}
 			if ( vk.oit_depth_descriptor ) {
 				VkImageView depth_view = VK_NULL_HANDLE;
@@ -249,19 +256,33 @@ void vk_update_attachment_descriptors( void ) {
 					info.imageLayout = depth_layout;
 					desc.dstSet = vk.oit_depth_descriptor;
 					qvkUpdateDescriptorSets( vk.device, 1, &desc, 0, NULL );
+				} else {
+					oit_desc_ok = qfalse;
 				}
+			} else {
+				oit_desc_ok = qfalse;
 			}
 			if ( r_oit->integer == 2 ) {
-				if ( vk.oit_moments_image_view ) {
+				info.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+				if ( vk.oit_moments_image_view && vk.oit_moments_descriptor != VK_NULL_HANDLE ) {
 					info.imageView = vk.oit_moments_image_view;
 					desc.dstSet = vk.oit_moments_descriptor;
 					qvkUpdateDescriptorSets( vk.device, 1, &desc, 0, NULL );
+				} else {
+					oit_desc_ok = qfalse;
 				}
-				if ( vk.oit_b0_image_view ) {
+				if ( vk.oit_b0_image_view && vk.oit_b0_descriptor != VK_NULL_HANDLE ) {
 					info.imageView = vk.oit_b0_image_view;
 					desc.dstSet = vk.oit_b0_descriptor;
 					qvkUpdateDescriptorSets( vk.device, 1, &desc, 0, NULL );
+				} else {
+					oit_desc_ok = qfalse;
 				}
+			}
+			if ( oit_desc_ok && vk.oitAttachmentGeneration > 0 ) {
+				vk.oitDescriptorGeneration = vk.oitAttachmentGeneration;
+			} else {
+				vk.oitDescriptorGeneration = 0;
 			}
 		}
 

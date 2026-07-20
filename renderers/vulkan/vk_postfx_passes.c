@@ -190,9 +190,13 @@ static void vk_copy_color_to_fog_scene( uint32_t width, uint32_t height )
 	copy_region.extent.height = height;
 	copy_region.extent.depth = 1;
 
+	/* Main/post_bloom FBO color finalLayout is SHADER_READ_ONLY. Include color-attachment
+	 * output in src stages so a prior attachment write is visible even if a pass left
+	 * residual COLOR_ATTACHMENT access outstanding. */
 	record_image_layout_transition( vk.cmd->command_buffer, vk.color_image, VK_IMAGE_ASPECT_COLOR_BIT,
 		VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
-		VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT );
+		VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT | VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+		VK_PIPELINE_STAGE_TRANSFER_BIT );
 	record_image_layout_transition( vk.cmd->command_buffer, vk.fog_scene_image, VK_IMAGE_ASPECT_COLOR_BIT,
 		VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
 		VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT );
@@ -206,6 +210,53 @@ static void vk_copy_color_to_fog_scene( uint32_t width, uint32_t height )
 	record_image_layout_transition( vk.cmd->command_buffer, vk.fog_scene_image, VK_IMAGE_ASPECT_COLOR_BIT,
 		VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
 		VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT );
+}
+
+static void vk_oit_note_fallback( const char *reason )
+{
+	if ( reason && reason[0] ) {
+		Q_strncpyz( vk.oitLastFallbackReason, reason, sizeof( vk.oitLastFallbackReason ) );
+	} else {
+		vk.oitLastFallbackReason[0] = '\0';
+	}
+	{
+		static char s_last_logged[96];
+		if ( reason && Q_stricmp( s_last_logged, reason ) != 0 ) {
+			ri.Printf( PRINT_WARNING, S_COLOR_YELLOW
+				"[VK][OIT] skip: %s (fallback sorted-alpha / refractive)\n" S_COLOR_WHITE,
+				reason );
+			Q_strncpyz( s_last_logged, reason, sizeof( s_last_logged ) );
+		}
+	}
+}
+
+static qboolean vk_oit_resources_ready( uint32_t fullWidth, uint32_t fullHeight, qboolean mboit )
+{
+	if ( vk.oitAttachmentGeneration == 0 ||
+		vk.oitDescriptorGeneration != vk.oitAttachmentGeneration ) {
+		vk_oit_note_fallback( "descriptor generation != attachment generation" );
+		return qfalse;
+	}
+	if ( vk.oitExtentWidth != 0 && vk.oitExtentHeight != 0 &&
+		( vk.oitExtentWidth != fullWidth || vk.oitExtentHeight != fullHeight ) ) {
+		vk_oit_note_fallback( "OIT attachment extent mismatch vs render extent" );
+		return qfalse;
+	}
+	if ( vk.framebuffers.oit_accum == VK_NULL_HANDLE ||
+		vk.framebuffers.oit_resolve == VK_NULL_HANDLE ||
+		vk.oit_accum_image_view == VK_NULL_HANDLE ||
+		vk.oit_reveal_image_view == VK_NULL_HANDLE ||
+		vk.fog_scene_image_view == VK_NULL_HANDLE ) {
+		vk_oit_note_fallback( "missing OIT image view or framebuffer" );
+		return qfalse;
+	}
+	if ( mboit && ( vk.framebuffers.oit_moments == VK_NULL_HANDLE ||
+		vk.oit_moments_image_view == VK_NULL_HANDLE ||
+		vk.oit_b0_image_view == VK_NULL_HANDLE ) ) {
+		vk_oit_note_fallback( "missing MBOIT moments/b0 resources" );
+		return qfalse;
+	}
+	return qtrue;
 }
 
 void vk_begin_bloom_extract_render_pass( void )
@@ -294,6 +345,9 @@ void vk_oit_pass( const struct drawSurfsCommand_s *cmd )
 	int bucket;
 	int bucket_count;
 
+	vk.oitClearedThisFrame = qfalse;
+	vk.oitWeaponExcluded = qtrue; /* world OIT never admits RF_FIRST_PERSON / RF_DEPTHHACK */
+
 	if ( !r_oit || !r_oit->integer || !r_fbo || !r_fbo->integer || !vk.fboActive ||
 		vk.render_pass.oit_accum == VK_NULL_HANDLE || vk.render_pass.oit_resolve == VK_NULL_HANDLE ||
 		vk.framebuffers.oit_accum == VK_NULL_HANDLE || vk.framebuffers.oit_resolve == VK_NULL_HANDLE ||
@@ -302,6 +356,7 @@ void vk_oit_pass( const struct drawSurfsCommand_s *cmd )
 		vk.oit_reveal_descriptor == VK_NULL_HANDLE || vk.oit_depth_descriptor == VK_NULL_HANDLE ||
 		vk.fog_scene_image_view == VK_NULL_HANDLE || vk.oit_accum_image_view == VK_NULL_HANDLE ||
 		vk.oit_reveal_image_view == VK_NULL_HANDLE ) {
+		vk_oit_note_fallback( "OIT disabled or core resources unavailable" );
 		vk_spine_note_oit_skipped();
 		return;
 	}
@@ -311,11 +366,22 @@ void vk_oit_pass( const struct drawSurfsCommand_s *cmd )
 		vk.oit_moments_pipeline == VK_NULL_HANDLE || vk.oit_accum_mboit_pipeline == VK_NULL_HANDLE ||
 		vk.oit_moments_image_view == VK_NULL_HANDLE || vk.oit_b0_image_view == VK_NULL_HANDLE ||
 		vk.oit_moments_descriptor == VK_NULL_HANDLE || vk.oit_b0_descriptor == VK_NULL_HANDLE ) ) {
+		vk_oit_note_fallback( "MBOIT resources incomplete" );
 		vk_spine_note_oit_skipped();
 		return;
 	}
 
 	if ( !mboit && vk.oit_accum_pipeline == VK_NULL_HANDLE ) {
+		vk_oit_note_fallback( "WBOIT accum pipeline missing" );
+		vk_spine_note_oit_skipped();
+		return;
+	}
+
+	vk_end_render_pass();
+	vk_oit_validate_pass_break( "oit_pass_begin" );
+	vk_get_active_render_extent( &fullWidth, &fullHeight );
+
+	if ( !vk_oit_resources_ready( fullWidth, fullHeight, mboit ) ) {
 		vk_spine_note_oit_skipped();
 		return;
 	}
@@ -325,10 +391,6 @@ void vk_oit_pass( const struct drawSurfsCommand_s *cmd )
 	} else {
 		vk_spine_pass_begin( VK_SPINE_PASS_WBOIT_ACCUM );
 	}
-
-	vk_end_render_pass();
-	vk_oit_validate_pass_break( "oit_pass_begin" );
-	vk_get_active_render_extent( &fullWidth, &fullHeight );
 
 	vk_reactive_mask_clear();
 
@@ -345,6 +407,16 @@ void vk_oit_pass( const struct drawSurfsCommand_s *cmd )
 			VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT,
 			VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT | VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT );
 		vk_resolve_volumetric_depth_msaa();
+	} else {
+		/* Non-MSAA accum binds depth as attachment; AV/deferred may leave READ_ONLY. */
+		VkImageAspectFlags depth_aspect = VK_IMAGE_ASPECT_DEPTH_BIT;
+		if ( glConfig.stencilBits > 0 ) {
+			depth_aspect |= VK_IMAGE_ASPECT_STENCIL_BIT;
+		}
+		record_depth_image_layout_transition( vk.cmd->command_buffer, depth_aspect,
+			VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
+			VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT | VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+			VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT );
 	}
 
 	bucket_count = classify ? 2 : 1;
@@ -374,6 +446,7 @@ void vk_oit_pass( const struct drawSurfsCommand_s *cmd )
 		}
 
 		vk_begin_render_pass_tracked( vk.render_pass.oit_accum, vk.framebuffers.oit_accum, qtrue, fullWidth, fullHeight );
+		vk.oitClearedThisFrame = qtrue;
 		if ( bucket_mboit ? vk.oit_accum_mboit_pipeline : vk.oit_accum_pipeline ) {
 			backEnd.oitAccumPass = qtrue;
 			backEnd.drawSurfFilter = 2;
@@ -400,15 +473,25 @@ void vk_oit_pass( const struct drawSurfsCommand_s *cmd )
 				VK_SPINE_PASS_OIT_RESOLVE, "oit_resolve" );
 		}
 
+		if ( vk.oitDescriptorGeneration != vk.oitAttachmentGeneration ) {
+			vk_oit_note_fallback( "stale OIT descriptors before resolve" );
+			vk_spine_note_oit_skipped();
+			backEnd.oitBucketFilter = 0;
+			vk_spine_pass_end( VK_SPINE_PASS_OIT_RESOLVE );
+			vk_begin_post_bloom_render_pass();
+			return;
+		}
+
 		record_image_layout_transition( vk.cmd->command_buffer, vk.color_image, VK_IMAGE_ASPECT_COLOR_BIT,
 			VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
 			VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT );
 		vk_postfx_set_render_extent( fullWidth, fullHeight );
 		if ( r_fboDebug && r_fboDebug->integer >= 1 && vk_post_fog_fbo_debug_throttle() ) {
 			ri.Printf( PRINT_DEVELOPER,
-				"[VK][OIT] resolve: extent=%ux%u mainColor=%ux%u mboit=%d bucket=%d/%d frame=%u\n",
+				"[VK][OIT] resolve: extent=%ux%u mainColor=%ux%u mboit=%d bucket=%d/%d frame=%u gen=%u/%u\n",
 				fullWidth, fullHeight, vk.mainColorWidth, vk.mainColorHeight,
-				(int)mboit, bucket + 1, bucket_count, vk.temporal.frameIndex );
+				(int)mboit, bucket + 1, bucket_count, vk.temporal.frameIndex,
+				vk.oitAttachmentGeneration, vk.oitDescriptorGeneration );
 		}
 		vk_begin_render_pass_tracked( vk.render_pass.oit_resolve, vk.framebuffers.oit_resolve, qfalse, fullWidth, fullHeight );
 		qvkCmdBindPipeline( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.oit_resolve_pipeline );
@@ -449,6 +532,7 @@ void vk_oit_pass( const struct drawSurfsCommand_s *cmd )
 		vk_reactive_mask_stamp_from_reveal();
 	}
 	backEnd.oitBucketFilter = 0;
+	vk.oitLastFallbackReason[0] = '\0';
 	vk_spine_pass_end( VK_SPINE_PASS_OIT_RESOLVE );
 
 	if ( vk.msaaActive ) {
@@ -462,7 +546,7 @@ void vk_oit_pass( const struct drawSurfsCommand_s *cmd )
 			VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT );
 	}
 
-	/* Resume main pass for sun, flares, etc. */
+	/* Resume main pass for sun, flares, etc. Weapon draws later (RDF_NOWORLDMODEL). */
 	vk_begin_post_bloom_render_pass();
 }
 

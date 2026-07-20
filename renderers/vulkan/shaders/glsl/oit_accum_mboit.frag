@@ -57,13 +57,20 @@ float AbsorbanceCloser( float b0, vec4 b, float z )
 	return clamp(pGe, 0.0, 1.0) * b0;
 }
 
-vec3 oit_forward_plus_add( vec3 baseRgb, vec3 N, vec3 worldPos )
+vec3 oit_forward_plus_add( vec3 baseRgb, vec3 N, vec3 worldPos, out bool clusterOob )
 {
 	vec3 fpAdd = vec3( 0.0 );
-	uint tilesX = uint( fp_lights.fp_light_data[1].x + 0.5 );
-	uint tilesY = uint( fp_lights.fp_light_data[1].y + 0.5 );
-	float vw = fp_lights.fp_light_data[1].z;
-	float vh = fp_lights.fp_light_data[1].w;
+	clusterOob = false;
+	uint tilesX = fp_params.fp_tiles_xy_viewport.x;
+	uint tilesY = fp_params.fp_tiles_xy_viewport.y;
+	float vw = float( fp_params.fp_tiles_xy_viewport.z );
+	float vh = float( fp_params.fp_tiles_xy_viewport.w );
+	if ( tilesX == 0u || tilesY == 0u || vw <= 1.0 || vh <= 1.0 ) {
+		tilesX = uint( fp_lights.fp_light_data[1].x + 0.5 );
+		tilesY = uint( fp_lights.fp_light_data[1].y + 0.5 );
+		vw = fp_lights.fp_light_data[1].z;
+		vh = fp_lights.fp_light_data[1].w;
+	}
 	if ( tilesX == 0u || tilesY == 0u || vw <= 1.0 || vh <= 1.0 ) {
 		return fpAdd;
 	}
@@ -88,11 +95,21 @@ vec3 oit_forward_plus_add( vec3 baseRgb, vec3 N, vec3 worldPos )
 	float zFar = max( fp_params.fp_cluster_z_range.y, zNear + 1e-3 );
 	uint slice = fp_view_depth_to_slice( abs( wc.w ), zSlices, zMode, zNear, zFar );
 	uint tileId = fp_cluster_index( tx, ty, tilesX, tilesY, slice, zSlices );
+	uint clusterCount = tilesX * tilesY * zSlices;
+	uint tileLen = clusterCount * 8u;
+	if ( tileId >= clusterCount ) {
+		clusterOob = true;
+		return fpAdd;
+	}
 	uint tbase = tileId * 8u;
 	float nLights = fp_lights.fp_light_data[0].x;
 	uint maxPerTile = uint( max( fp_lights.fp_light_data[0].z + 0.5, 1.0 ) );
 	maxPerTile = min( maxPerTile, 8u );
 	for ( uint k = 0u; k < maxPerTile; k++ ) {
+		if ( tbase + k >= tileLen ) {
+			clusterOob = true;
+			break;
+		}
 		uint li = fp_tiles.fp_tile_cells[ tbase + k ];
 		if ( li == 0xFFFFFFFFu ) {
 			continue;
@@ -159,8 +176,9 @@ void main() {
 		if ( dot( N, N ) < 1e-8 ) {
 			N = vec3( 0.0, 0.0, 1.0 );
 		}
-		litRgb += oit_forward_plus_add( base.rgb, N, frag_world_pos );
-		if ( any( isnan( litRgb ) ) || any( isinf( litRgb ) ) ) {
+		bool clusterOob = false;
+		litRgb += oit_forward_plus_add( base.rgb, N, frag_world_pos, clusterOob );
+		if ( clusterOob || any( isnan( litRgb ) ) || any( isinf( litRgb ) ) ) {
 			out_color = vec4( 1.0, 0.0, 1.0, 1.0 );
 			out_reveal = 0.0;
 			return;

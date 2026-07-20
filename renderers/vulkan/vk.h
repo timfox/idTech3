@@ -1289,6 +1289,14 @@ typedef struct {
 	VkDescriptorSet oit_depth_descriptor;
 	VkDescriptorSet oit_moments_descriptor;
 	VkDescriptorSet oit_b0_descriptor;
+	/* Bumped when OIT images/FBs recreate; descriptors must match before accum/resolve. */
+	uint32_t oitAttachmentGeneration;
+	uint32_t oitDescriptorGeneration;
+	uint32_t oitExtentWidth;
+	uint32_t oitExtentHeight;
+	char oitLastFallbackReason[96];
+	qboolean oitClearedThisFrame;
+	qboolean oitWeaponExcluded;
 	VkImage ssr_image;
 	VkImageView ssr_image_view;
 	VkDescriptorSet ssr_descriptor[2];	/* [0]=color, [1]=depth */

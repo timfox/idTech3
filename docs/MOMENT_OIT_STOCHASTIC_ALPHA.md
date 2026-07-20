@@ -53,7 +53,17 @@ C_avg = accum.rgb / max(accum.a, eps)
 C_out = C_avg * (1 - revealage) + C_bg * revealage
 ```
 
-Clears: accum `vec4(0)`, revealage `1`. Depth test uses reversed-Z `GREATER_OR_EQUAL` (no depth write). Debug: `r_oitDebug` 1–11; NaN/Inf → magenta.
+Clears: accum `vec4(0)`, revealage `1`. Depth test uses reversed-Z `GREATER_OR_EQUAL` (no depth write). Debug: `r_oitDebug` 1–13; NaN/Inf / cluster OOB → magenta. Console: `oit_status`.
+
+### Glyph / block corruption fix (resolve FB ownership)
+
+**Root cause:** `oit_resolve` framebuffer creation reused `attachmentCount` 2/3 from the accum/moments FB setup while the resolve render pass has a single color attachment. On drivers that still create the FB, resolve could sample/write wrong attachment identity — repeated block/glyph-like patterns across HDR (including under the first-person weapon).
+
+**Fixes:** force `attachmentCount = 1` for resolve; `oitAttachmentGeneration` / `oitDescriptorGeneration` must match before accum/resolve (else skip OIT); non-MSAA depth restored to `DEPTH_STENCIL_ATTACHMENT_OPTIMAL` before accum; Forward+ tile reads bounds-checked.
+
+**Pass order (world):** opaque → deferred → OIT accum → OIT resolve → refractive (water/glass when `r_refractiveExcludeOit 1`) → weapon (`RDF_NOWORLDMODEL`) → post → UI. Weapon never writes world OIT targets.
+
+**Repro / isolation:** `./scripts/repro_oit_corruption.sh` or `exec demo_oit_isolation.cfg` after Ultra/FA. Isolation matrix: `r_oit 0` → WBOIT raw (`r_oitForwardPlus 0`) → lit → weapon hide/show → `oit_status`.
 
 ## Stochastic Alpha-Clipped Materials (`r_stochasticAlpha`)
 

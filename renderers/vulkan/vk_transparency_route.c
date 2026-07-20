@@ -5,11 +5,59 @@ Raster Ultra 1.4 — transparency classification + refractive exclusion helpers.
 */
 
 #include "tr_local.h"
+#include "vk.h"
 #include "vk_transparency_route.h"
 
 static cvar_t *r_transparencyDebug;
 static cvar_t *r_refractiveExcludeOit;
 static qboolean s_inited;
+
+static void VK_Oit_Status_f( void )
+{
+	const int requested = r_oit ? r_oit->integer : 0;
+	int effective = 0;
+	const char *viewClass = "world";
+
+	if ( requested > 0 && vk.fboActive &&
+		vk.oitDescriptorGeneration == vk.oitAttachmentGeneration &&
+		vk.oitAttachmentGeneration > 0 &&
+		vk.framebuffers.oit_accum != VK_NULL_HANDLE &&
+		vk.framebuffers.oit_resolve != VK_NULL_HANDLE ) {
+		effective = requested;
+	}
+
+	if ( backEnd.refdef.rdflags & RDF_NOWORLDMODEL ) {
+		viewClass = "noworldmodel";
+	}
+
+	ri.Printf( PRINT_ALL,
+		"oit_status:\n"
+		"  requested=%d effective=%d classify=%d forwardPlus=%d refractiveExclude=%d\n"
+		"  formats: accum=R16G16B16A16_SFLOAT reveal=R16_SFLOAT color=%s\n"
+		"  extent=%ux%u (mainColor=%ux%u render=%ux%u)\n"
+		"  attachmentGen=%u descriptorGen=%u match=%d\n"
+		"  clearedThisFrame=%d weaponExcluded=%d\n"
+		"  frameSlot=%u swapchainImage=%u cmdIndex=%u\n"
+		"  lastFallback=%s\n"
+		"  viewClass=%s passOrder=opaque->deferred->oit_accum->oit_resolve->refractive->weapon->post->ui\n",
+		requested, effective,
+		r_oitClassify ? r_oitClassify->integer : 0,
+		r_oitForwardPlus ? r_oitForwardPlus->integer : 0,
+		r_refractiveExcludeOit ? r_refractiveExcludeOit->integer : 1,
+		vk_format_string( vk.color_format ),
+		vk.oitExtentWidth, vk.oitExtentHeight,
+		vk.mainColorWidth, vk.mainColorHeight,
+		vk.renderWidth, vk.renderHeight,
+		vk.oitAttachmentGeneration, vk.oitDescriptorGeneration,
+		( vk.oitDescriptorGeneration == vk.oitAttachmentGeneration && vk.oitAttachmentGeneration > 0 ) ? 1 : 0,
+		vk.oitClearedThisFrame ? 1 : 0,
+		vk.oitWeaponExcluded ? 1 : 0,
+		vk.temporal.frameIndex,
+		vk.cmd ? vk.cmd->swapchain_image_index : 0u,
+		vk.cmd_index,
+		vk.oitLastFallbackReason[0] ? vk.oitLastFallbackReason : "(none)",
+		viewClass );
+}
 
 const char *vk_transparency_class_name( vkTransparencyClass_t cls )
 {
@@ -158,6 +206,7 @@ void vk_transparency_route_init( void )
 
 	if ( ri.Cmd_AddCommand ) {
 		ri.Cmd_AddCommand( "transparency_route_status", VK_TransparencyRoute_Status_f );
+		ri.Cmd_AddCommand( "oit_status", VK_Oit_Status_f );
 	}
 	s_inited = qtrue;
 	ri.Printf( PRINT_ALL, "[VK][Xparent] transparency routing initialized (refractiveExcludeOit=%d)\n",
@@ -168,6 +217,7 @@ void vk_transparency_route_shutdown( void )
 {
 	if ( ri.Cmd_RemoveCommand ) {
 		ri.Cmd_RemoveCommand( "transparency_route_status" );
+		ri.Cmd_RemoveCommand( "oit_status" );
 	}
 	s_inited = qfalse;
 }

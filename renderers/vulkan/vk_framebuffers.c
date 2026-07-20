@@ -394,10 +394,15 @@ void vk_create_framebuffers( void )
 			SET_OBJECT_NAME( vk.framebuffers.oit_moments, "framebuffer - oit_moments", VK_DEBUG_REPORT_OBJECT_TYPE_FRAMEBUFFER_EXT );
 		}
 
+		/* Resolve RP has a single color attachment — reset count left at 2/3 by accum/moments. */
 		desc.renderPass = vk.render_pass.oit_resolve;
+		desc.attachmentCount = 1;
+		desc.width = fullresWidth;
+		desc.height = fullresHeight;
 		framebuffer_attachments[0] = vk.color_image_view;
 		VK_CHECK( qvkCreateFramebuffer( vk.device, &desc, NULL, &vk.framebuffers.oit_resolve ) );
 		SET_OBJECT_NAME( vk.framebuffers.oit_resolve, "framebuffer - oit_resolve", VK_DEBUG_REPORT_OBJECT_TYPE_FRAMEBUFFER_EXT );
+		vk.oitAttachmentGeneration++;
 	}
 
 	if ( vk.render_pass.reactive_stamp != VK_NULL_HANDLE && vk.reactive_mask_view != VK_NULL_HANDLE ) {

@@ -788,7 +788,7 @@ if ! grep -q 'texelFetch( oitAccumTex' "$OIT_RESOLVE" 2>/dev/null; then
   fail "oit_resolve.frag must texelFetch OIT buffers (not LINEAR textureLod)"
 elif ! grep -q 'vk_oit_barrier_targets_for_sampling' "$OIT_PASS" 2>/dev/null; then
   fail "vk_postfx_passes.c missing OIT full-framebuffer sample barrier"
-elif ! grep -q 'GL_NEAREST' "$VK_DESC" 2>/dev/null || ! grep -A2 'r_oit && r_oit->integer' "$VK_DESC" 2>/dev/null | grep -q 'GL_NEAREST'; then
+elif ! grep -q 'GL_NEAREST' "$VK_DESC" 2>/dev/null || ! grep -A8 'r_oit && r_oit->integer' "$VK_DESC" 2>/dev/null | grep -q 'GL_NEAREST'; then
   fail "OIT resolve descriptors must use GL_NEAREST"
 elif ! grep -q 'vk_get_active_render_extent' "$VK_VOL_INT" 2>/dev/null; then
   fail "MSAA depth resolve must dispatch using active render extent"
@@ -810,6 +810,27 @@ elif grep -q 'Com_Memcpy( vk_prev_viewproj_matrix, params.viewProj' "$PROJECT_RO
   fail "volumetric must not overwrite shared prev matrices mid-frame"
 else
   pass "OIT striping guards: barrier, NEAREST, texelFetch, depth dispatch, matrix commit"
+fi
+
+echo ""
+echo "OIT resolve framebuffer attachmentCount + generations:"
+OIT_FB="$PROJECT_ROOT/renderers/vulkan/vk_framebuffers.c"
+OIT_DESC="$PROJECT_ROOT/renderers/vulkan/vk_descriptor_sets.c"
+OIT_PASS="$PROJECT_ROOT/renderers/vulkan/vk_postfx_passes.c"
+if ! grep -A8 'oit_resolve' "$OIT_FB" 2>/dev/null | grep -q 'attachmentCount = 1'; then
+  fail "oit_resolve framebuffer must set attachmentCount=1 (accum leaves 2/3)"
+elif ! grep -q 'oitAttachmentGeneration' "$PROJECT_ROOT/renderers/vulkan/vk.h" 2>/dev/null; then
+  fail "vk.h missing oitAttachmentGeneration"
+elif ! grep -q 'oitDescriptorGeneration = vk.oitAttachmentGeneration' "$OIT_DESC" 2>/dev/null; then
+  fail "OIT descriptors must sync oitDescriptorGeneration after rebind"
+elif ! grep -q 'descriptor generation != attachment generation' "$OIT_PASS" 2>/dev/null; then
+  fail "vk_oit_pass must gate on attachment/descriptor generation match"
+elif ! grep -q 'oit_status' "$PROJECT_ROOT/renderers/vulkan/vk_transparency_route.c" 2>/dev/null; then
+  fail "missing oit_status command"
+elif ! grep -q 'clusterOob' "$PROJECT_ROOT/renderers/vulkan/shaders/glsl/oit_accum.frag" 2>/dev/null; then
+  fail "oit_accum.frag missing Forward+ cluster OOB guard"
+else
+  pass "OIT resolve FB attachmentCount=1 + generation gate + oit_status + cluster OOB"
 fi
 
 echo ""
