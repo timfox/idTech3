@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
-# One-command repro for r_oit glyph/block corruption (OpenArena + Raster Ultra + FA).
-# Usage: ./scripts/repro_oit_corruption.sh
+# Deterministic repro for r_oit rectangular/band corruption (OpenArena + Raster Ultra).
+# Usage: ./scripts/repro_oit_corruption.sh [extra +args]
 # After load: oit_status ; walk to water/glass doorway with weapon visible.
+# Isolation: see config/repro_oit_corruption.cfg header.
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 BIN="${ROOT}/release/idtech3"
@@ -14,6 +15,6 @@ exec "$BIN" \
 	+set sv_pure 0 \
 	+exec modern_raster_ultra.cfg \
 	+exec vulkan_overlay_frequency_aware.cfg \
-	+exec demo_oit_isolation.cfg \
+	+exec repro_oit_corruption.cfg \
 	+vid_restart keep_window \
 	"$@"

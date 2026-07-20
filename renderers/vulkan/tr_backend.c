@@ -2221,6 +2221,21 @@ void RB_FlushDeferredWeaponAfterTaa( VkImageView *post_fog_src, VkImageView *lum
 	backEnd.reactiveMaskStamp = qfalse;
 	backEnd.projection2D = qfalse;
 
+	/* Weapon must not inherit world OIT blend/descriptor state. */
+	if ( backEnd.oitAccumPass || backEnd.oitMomentsPass || backEnd.oitBucketFilter ) {
+		ri.Printf( PRINT_WARNING, S_COLOR_YELLOW
+			"[VK][OIT] weapon flush: OIT flags still set — forcing clear\n" S_COLOR_WHITE );
+		backEnd.oitAccumPass = qfalse;
+		backEnd.oitMomentsPass = qfalse;
+		backEnd.oitBucketFilter = 0;
+	}
+	if ( r_fboDebug && r_fboDebug->integer >= 1 ) {
+		ri.Printf( PRINT_DEVELOPER,
+			"[VK][OIT] weapon isolation: oitAccum=%d oitMoments=%d frameState=%u unhealthy=%d\n",
+			backEnd.oitAccumPass ? 1 : 0, backEnd.oitMomentsPass ? 1 : 0,
+			vk.oitFrameState, vk.oitUnhealthy ? 1 : 0 );
+	}
+
 	vk_begin_post_bloom_render_pass();
 	RB_BeginDrawingView();
 	RB_RenderDrawSurfList( s_deferredWeaponCmd.drawSurfs, s_deferredWeaponCmd.numDrawSurfs );

@@ -858,11 +858,12 @@ void vk_create_attachments( void )
 					VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
 					&vk.oit_b0_image, &vk.oit_b0_image_view, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, qfalse );
 			}
-			vk.oitAttachmentGeneration++;
 			vk.oitExtentWidth = fullWidth;
 			vk.oitExtentHeight = fullHeight;
-			/* Descriptors must be rewritten after new views; mismatch gates vk_oit_pass. */
+			/* Descriptors must be rewritten after new views; FB create bumps generation once. */
 			vk.oitDescriptorGeneration = 0;
+			vk.oitFrameState = VK_OIT_FRAME_UNTOUCHED;
+			vk.oitUnhealthy = qfalse;
 		}
 
 		// ssr (same format as color)
@@ -2416,6 +2417,9 @@ void vk_destroy_attachments( void )
 	vk.oitDescriptorGeneration = 0;
 	vk.oitExtentWidth = 0;
 	vk.oitExtentHeight = 0;
+	vk.oitFrameState = VK_OIT_FRAME_UNTOUCHED;
+	vk.oitUnhealthy = qtrue; /* force gen match after recreate */
+	vk.oitLastFallbackReason[0] = '\0';
 
 	if ( vk.ssr_image ) {
 		qvkDestroyImage( vk.device, vk.ssr_image, NULL );

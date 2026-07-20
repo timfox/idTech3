@@ -3049,6 +3049,15 @@ static void R_Register( void )
 		" 13 - opaque depth at transparent pixels (WBOIT)\n"
 		"NaN/Inf → magenta." );
 	ri.Cvar_SetGroup( r_oitDebug, CVG_RENDERER );
+	{
+		cvar_t *r_oitDirectTest;
+		r_oitDirectTest = ri.Cvar_Get( "r_oitDirectTest", "0", CVAR_CHEAT );
+		ri.Cvar_CheckRange( r_oitDirectTest, "0", "1", CV_INTEGER );
+		ri.Cvar_SetDescription( r_oitDirectTest,
+			"OIT lifecycle isolation: clear accum/reveal and resolve without transparent draws.\n"
+			"Proves attachment/resolve correctness independent of materials. Cheat." );
+		ri.Cvar_SetGroup( r_oitDirectTest, CVG_RENDERER );
+	}
 	if ( r_oitClassify && r_oitClassify->integer ) {
 		ri.Printf( PRINT_ALL, "[VK] OIT: r_oitClassify=1 (alpha-blend + additive buckets)\n" );
 	}

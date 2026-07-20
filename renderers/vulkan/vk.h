@@ -59,6 +59,17 @@ typedef void (VKAPI_PTR *PFN_vkCmdSetColorWriteMaskEXT)(VkCommandBuffer commandB
 
 #define NUM_COMMAND_BUFFERS 2	// number of command buffers / render semaphores / framebuffer sets
 
+#define VK_OIT_FRAME_UNTOUCHED    0u
+#define VK_OIT_FRAME_CLEARED      1u
+#define VK_OIT_FRAME_ACCUMULATED  2u
+#define VK_OIT_FRAME_RESOLVED     3u
+
+#define VK_OIT_CAPTURE_CONTEXT    1u
+#define VK_OIT_CAPTURE_STAGES     2u
+
+/* OIT is singleton-persistent (not per swapchain slot). FrameContext separates
+ * cmd/swapchain indices from attachment/descriptor generations. */
+
 #define VK_VOLUMETRIC_QUERY_SLOTS 16
 #define VK_VOLUMETRIC_QUERY_COUNT (VK_VOLUMETRIC_QUERY_SLOTS * NUM_COMMAND_BUFFERS)
 
@@ -1297,6 +1308,14 @@ typedef struct {
 	char oitLastFallbackReason[96];
 	qboolean oitClearedThisFrame;
 	qboolean oitWeaponExcluded;
+	/* Per-frame OIT lifecycle: resolve only from CLEARED or ACCUMULATED. */
+	uint32_t oitFrameState; /* 0=UNTOUCHED 1=CLEARED 2=ACCUMULATED 3=RESOLVED */
+	uint32_t oitFrameNumber;
+	uint32_t oitCmdIndex;
+	uint32_t oitSwapchainImageIndex;
+	uint32_t oitCapturePending; /* bit flags: 1=context 2=mark_stages */
+	qboolean oitUnhealthy;
+	uint32_t oitFallbackCount;
 	VkImage ssr_image;
 	VkImageView ssr_image_view;
 	VkDescriptorSet ssr_descriptor[2];	/* [0]=color, [1]=depth */

@@ -402,7 +402,9 @@ void vk_create_framebuffers( void )
 		framebuffer_attachments[0] = vk.color_image_view;
 		VK_CHECK( qvkCreateFramebuffer( vk.device, &desc, NULL, &vk.framebuffers.oit_resolve ) );
 		SET_OBJECT_NAME( vk.framebuffers.oit_resolve, "framebuffer - oit_resolve", VK_DEBUG_REPORT_OBJECT_TYPE_FRAMEBUFFER_EXT );
+		/* Single authoritative bump after images + all OIT FBs exist. */
 		vk.oitAttachmentGeneration++;
+		vk.oitUnhealthy = qfalse;
 	}
 
 	if ( vk.render_pass.reactive_stamp != VK_NULL_HANDLE && vk.reactive_mask_view != VK_NULL_HANDLE ) {

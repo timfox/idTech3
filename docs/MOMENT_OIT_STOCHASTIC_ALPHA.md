@@ -57,13 +57,38 @@ Clears: accum `vec4(0)`, revealage `1`. Depth test uses reversed-Z `GREATER_OR_E
 
 ### Glyph / block corruption fix (resolve FB ownership)
 
-**Root cause:** `oit_resolve` framebuffer creation reused `attachmentCount` 2/3 from the accum/moments FB setup while the resolve render pass has a single color attachment. On drivers that still create the FB, resolve could sample/write wrong attachment identity — repeated block/glyph-like patterns across HDR (including under the first-person weapon).
+**Root cause (earlier):** `oit_resolve` framebuffer creation reused `attachmentCount` 2/3 from the accum/moments FB setup while the resolve render pass has a single color attachment. On drivers that still create the FB, resolve could sample/write wrong attachment identity — repeated block/glyph-like patterns across HDR (including under the first-person weapon).
 
 **Fixes:** force `attachmentCount = 1` for resolve; `oitAttachmentGeneration` / `oitDescriptorGeneration` must match before accum/resolve (else skip OIT); non-MSAA depth restored to `DEPTH_STENCIL_ATTACHMENT_OPTIMAL` before accum; Forward+ tile reads bounds-checked.
 
+### Rectangular / tile-band corruption fix (resolve layout lifecycle)
+
+**Root cause:** Resolve used `initialLayout=COLOR_ATTACHMENT` + `loadOp=DONT_CARE` after an explicit `SHADER_READ→COLOR_ATTACHMENT` transition. When that old-layout assumption was wrong (classify mid-loop fog_scene copy, deferred/MSAA residuals), DONT_CARE left **undefined tile memory** in horizontal bands / rectangular blocks. The weapon region showed the same corrupted HDR because resolve runs before weapon.
+
+**Fixes (WBOIT-first):**
+- Resolve RP: `initialLayout=UNDEFINED`, `loadOp=DONT_CARE`, `finalLayout=SHADER_READ_ONLY` (fullscreen rewrite; no fragile pre-transition)
+- Single `oitAttachmentGeneration` bump after OIT FBs exist; descriptors must match
+- `oitFrameState` UNTOUCHED→CLEARED→ACCUMULATED→RESOLVED; refuse resolve from UNTOUCHED
+- Reactive reveal stamp once after final classify bucket (not between buckets)
+- Extent triad check (oitExtent vs render vs mainColor) before resolve
+- Weapon flush asserts OIT flags cleared
+- `r_oitDirectTest 1` clears+resolves without transparent draws
+- `oit_capture` / expanded `oit_status` FrameContext (frame, cmdIndex, swapchainImage independent)
+
 **Pass order (world):** opaque → deferred → OIT accum → OIT resolve → refractive (water/glass when `r_refractiveExcludeOit 1`) → weapon (`RDF_NOWORLDMODEL`) → post → UI. Weapon never writes world OIT targets.
 
-**Repro / isolation:** `./scripts/repro_oit_corruption.sh` or `exec demo_oit_isolation.cfg` after Ultra/FA. Isolation matrix: `r_oit 0` → WBOIT raw (`r_oitForwardPlus 0`) → lit → weapon hide/show → `oit_status`.
+**Repro / isolation:** `./scripts/repro_oit_corruption.sh` or `exec repro_oit_corruption.cfg` after Ultra/FA. Matrix: `r_oit 0` → WBOIT raw (`r_oitForwardPlus 0`, `r_oitClassify 0`) → classify → lit → `r_oitDirectTest 1` → weapon hide/show → `oit_status` / `oit_capture stages`. Static gate: `./scripts/oit_corruption_check.sh`.
+
+### Promotion (after this fix)
+
+| Capability | Class |
+|------------|--------|
+| WBOIT unlit | quality opt-in (lifecycle hardened; live soak pending device run) |
+| WBOIT Forward+ | quality opt-in |
+| WBOIT classify buckets | quality opt-in |
+| MBOIT | experimental until WBOIT live matrix passes |
+| Weapon interaction | quality opt-in (resolve-before-weapon + state clear) |
+| Boot `modern_vulkan.cfg` | unchanged certified fallback |
 
 ## Stochastic Alpha-Clipped Materials (`r_stochasticAlpha`)
 

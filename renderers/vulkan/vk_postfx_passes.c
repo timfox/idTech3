@@ -342,11 +342,32 @@ void vk_oit_pass( const struct drawSurfsCommand_s *cmd )
 	uint32_t fullHeight = 0;
 	qboolean mboit = ( r_oit && r_oit->integer == 2 );
 	qboolean classify = ( r_oitClassify && r_oitClassify->integer );
+	qboolean directTest = ( ri.Cvar_VariableIntegerValue( "r_oitDirectTest" ) != 0 );
 	int bucket;
 	int bucket_count;
 
 	vk.oitClearedThisFrame = qfalse;
 	vk.oitWeaponExcluded = qtrue; /* world OIT never admits RF_FIRST_PERSON / RF_DEPTHHACK */
+	vk.oitFrameState = VK_OIT_FRAME_UNTOUCHED;
+	vk.oitFrameNumber = vk.temporal.frameIndex;
+	vk.oitCmdIndex = vk.cmd_index;
+	vk.oitSwapchainImageIndex = vk.cmd ? vk.cmd->swapchain_image_index : 0u;
+
+	if ( vk.oitCapturePending & VK_OIT_CAPTURE_CONTEXT ) {
+		ri.Printf( PRINT_ALL,
+			"[VK][OIT] FrameContext frame=%u cmd=%u swap=%u genAtt=%u genDesc=%u "
+			"oitExtent=%ux%u render=%ux%u mainColor=%ux%u fif=%d swapCount=%u "
+			"classify=%d fp=%d directTest=%d unhealthy=%d fallbacks=%u\n",
+			vk.oitFrameNumber, vk.oitCmdIndex, vk.oitSwapchainImageIndex,
+			vk.oitAttachmentGeneration, vk.oitDescriptorGeneration,
+			vk.oitExtentWidth, vk.oitExtentHeight, vk.renderWidth, vk.renderHeight,
+			vk.mainColorWidth, vk.mainColorHeight,
+			NUM_COMMAND_BUFFERS, vk.swapchain_image_count,
+			classify ? 1 : 0,
+			( r_oitForwardPlus && r_oitForwardPlus->integer ) ? 1 : 0,
+			directTest ? 1 : 0,
+			vk.oitUnhealthy ? 1 : 0, vk.oitFallbackCount );
+	}
 
 	if ( !r_oit || !r_oit->integer || !r_fbo || !r_fbo->integer || !vk.fboActive ||
 		vk.render_pass.oit_accum == VK_NULL_HANDLE || vk.render_pass.oit_resolve == VK_NULL_HANDLE ||
@@ -357,6 +378,7 @@ void vk_oit_pass( const struct drawSurfsCommand_s *cmd )
 		vk.fog_scene_image_view == VK_NULL_HANDLE || vk.oit_accum_image_view == VK_NULL_HANDLE ||
 		vk.oit_reveal_image_view == VK_NULL_HANDLE ) {
 		vk_oit_note_fallback( "OIT disabled or core resources unavailable" );
+		vk.oitFallbackCount++;
 		vk_spine_note_oit_skipped();
 		return;
 	}
@@ -436,25 +458,36 @@ void vk_oit_pass( const struct drawSurfsCommand_s *cmd )
 
 		if ( bucket_mboit ) {
 			vk_begin_render_pass_tracked( vk.render_pass.oit_moments, vk.framebuffers.oit_moments, qtrue, fullWidth, fullHeight );
-			backEnd.oitMomentsPass = qtrue;
-			backEnd.drawSurfFilter = 2;
-			RB_RenderDrawSurfList( cmd->drawSurfs, cmd->numDrawSurfs );
-			backEnd.oitMomentsPass = qfalse;
-			backEnd.drawSurfFilter = 0;
+			vk.oitFrameState = VK_OIT_FRAME_CLEARED;
+			if ( !directTest ) {
+				backEnd.oitMomentsPass = qtrue;
+				backEnd.drawSurfFilter = 2;
+				RB_RenderDrawSurfList( cmd->drawSurfs, cmd->numDrawSurfs );
+				backEnd.oitMomentsPass = qfalse;
+				backEnd.drawSurfFilter = 0;
+			}
 			vk_end_render_pass();
 			vk_oit_barrier_targets_for_sampling( "post-mboit-moments", qtrue, qfalse );
 		}
 
 		vk_begin_render_pass_tracked( vk.render_pass.oit_accum, vk.framebuffers.oit_accum, qtrue, fullWidth, fullHeight );
 		vk.oitClearedThisFrame = qtrue;
-		if ( bucket_mboit ? vk.oit_accum_mboit_pipeline : vk.oit_accum_pipeline ) {
+		vk.oitFrameState = VK_OIT_FRAME_CLEARED;
+		if ( !directTest && ( bucket_mboit ? vk.oit_accum_mboit_pipeline : vk.oit_accum_pipeline ) ) {
 			backEnd.oitAccumPass = qtrue;
 			backEnd.drawSurfFilter = 2;
 			RB_RenderDrawSurfList( cmd->drawSurfs, cmd->numDrawSurfs );
 			backEnd.oitAccumPass = qfalse;
 			backEnd.drawSurfFilter = 0;
+			vk.oitFrameState = VK_OIT_FRAME_ACCUMULATED;
 		}
 		vk_end_render_pass();
+
+		if ( vk.oitCapturePending & VK_OIT_CAPTURE_STAGES ) {
+			ri.Printf( PRINT_ALL,
+				"[VK][OIT] capture stage=accum bucket=%d state=%u cleared=%d directTest=%d\n",
+				bucket, vk.oitFrameState, vk.oitClearedThisFrame ? 1 : 0, directTest ? 1 : 0 );
+		}
 
 		vk_oit_barrier_targets_for_sampling( bucket_mboit ? "post-mboit-accum" : "post-wboit-accum", qfalse, qtrue );
 
@@ -477,23 +510,51 @@ void vk_oit_pass( const struct drawSurfsCommand_s *cmd )
 			vk_oit_note_fallback( "stale OIT descriptors before resolve" );
 			vk_spine_note_oit_skipped();
 			backEnd.oitBucketFilter = 0;
+			vk.oitUnhealthy = qtrue;
+			vk.oitFallbackCount++;
 			vk_spine_pass_end( VK_SPINE_PASS_OIT_RESOLVE );
 			vk_begin_post_bloom_render_pass();
 			return;
 		}
 
-		record_image_layout_transition( vk.cmd->command_buffer, vk.color_image, VK_IMAGE_ASPECT_COLOR_BIT,
-			VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-			VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT );
+		if ( vk.oitFrameState != VK_OIT_FRAME_CLEARED &&
+			vk.oitFrameState != VK_OIT_FRAME_ACCUMULATED ) {
+			vk_oit_note_fallback( "resolve refused: OIT attachments UNTOUCHED this frame" );
+			vk.oitUnhealthy = qtrue;
+			vk.oitFallbackCount++;
+			vk_spine_note_oit_skipped();
+			backEnd.oitBucketFilter = 0;
+			vk_spine_pass_end( VK_SPINE_PASS_OIT_RESOLVE );
+			vk_begin_post_bloom_render_pass();
+			return;
+		}
+
+		/* Resolve RP uses initialLayout=UNDEFINED + DONT_CARE: discards prior color,
+		 * fullscreen FS rewrites every pixel from fog_scene+accum, finalLayout=
+		 * SHADER_READ_ONLY. Do not pre-transition — that raced with classify mid-loop
+		 * and left tile-shaped undefined contents under DONT_CARE. */
 		vk_postfx_set_render_extent( fullWidth, fullHeight );
+		if ( fullWidth != vk.oitExtentWidth || fullHeight != vk.oitExtentHeight ||
+			( vk.mainColorWidth && ( fullWidth != vk.mainColorWidth || fullHeight != vk.mainColorHeight ) ) ) {
+			vk_oit_note_fallback( "resolve extent triad mismatch" );
+			vk.oitUnhealthy = qtrue;
+			vk.oitFallbackCount++;
+			vk_spine_note_oit_skipped();
+			backEnd.oitBucketFilter = 0;
+			vk_spine_pass_end( VK_SPINE_PASS_OIT_RESOLVE );
+			vk_begin_post_bloom_render_pass();
+			return;
+		}
 		if ( r_fboDebug && r_fboDebug->integer >= 1 && vk_post_fog_fbo_debug_throttle() ) {
 			ri.Printf( PRINT_DEVELOPER,
-				"[VK][OIT] resolve: extent=%ux%u mainColor=%ux%u mboit=%d bucket=%d/%d frame=%u gen=%u/%u\n",
+				"[VK][OIT] resolve: extent=%ux%u mainColor=%ux%u mboit=%d bucket=%d/%d frame=%u gen=%u/%u state=%u\n",
 				fullWidth, fullHeight, vk.mainColorWidth, vk.mainColorHeight,
-				(int)mboit, bucket + 1, bucket_count, vk.temporal.frameIndex,
-				vk.oitAttachmentGeneration, vk.oitDescriptorGeneration );
+				(int)mboit, bucket + 1, bucket_count, vk.oitFrameNumber,
+				vk.oitAttachmentGeneration, vk.oitDescriptorGeneration, vk.oitFrameState );
 		}
 		vk_begin_render_pass_tracked( vk.render_pass.oit_resolve, vk.framebuffers.oit_resolve, qfalse, fullWidth, fullHeight );
+		/* Guarantee scissor/viewport cover the entire resolve FB (no DONT_CARE edge bands). */
+		vk_set_fullscreen_viewport_scissor( fullWidth, fullHeight );
 		qvkCmdBindPipeline( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.oit_resolve_pipeline );
 		{
 			VkDescriptorSet moments_set = vk.oit_moments_descriptor != VK_NULL_HANDLE
@@ -524,15 +585,26 @@ void vk_oit_pass( const struct drawSurfsCommand_s *cmd )
 		}
 		vk_postfx_draw_fullscreen_quad();
 		vk_end_render_pass();
-		record_image_layout_transition( vk.cmd->command_buffer, vk.color_image, VK_IMAGE_ASPECT_COLOR_BIT,
-			VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-			VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT );
+		/* RP finalLayout is SHADER_READ_ONLY — ready for fog_scene copy / post_bloom. */
+		vk.oitFrameState = VK_OIT_FRAME_RESOLVED;
 
-		/* Stamp after resolve so reactive pass never sits between accum writes and composite. */
-		vk_reactive_mask_stamp_from_reveal();
+		if ( vk.oitCapturePending & VK_OIT_CAPTURE_STAGES ) {
+			ri.Printf( PRINT_ALL,
+				"[VK][OIT] capture stage=resolve bucket=%d/%d frame=%u cmd=%u swap=%u "
+				"gen=%u/%u extent=%ux%u state=%u\n",
+				bucket + 1, bucket_count, vk.oitFrameNumber, vk.oitCmdIndex, vk.oitSwapchainImageIndex,
+				vk.oitAttachmentGeneration, vk.oitDescriptorGeneration,
+				fullWidth, fullHeight, vk.oitFrameState );
+		}
+	}
+	/* Stamp once after final bucket resolve so reactive never sits between accum and composite. */
+	vk_reactive_mask_stamp_from_reveal();
+	if ( vk.oitCapturePending ) {
+		vk.oitCapturePending = 0;
 	}
 	backEnd.oitBucketFilter = 0;
 	vk.oitLastFallbackReason[0] = '\0';
+	vk.oitUnhealthy = qfalse;
 	vk_spine_pass_end( VK_SPINE_PASS_OIT_RESOLVE );
 
 	if ( vk.msaaActive ) {

@@ -17,12 +17,14 @@ static void VK_Oit_Status_f( void )
 	const int requested = r_oit ? r_oit->integer : 0;
 	int effective = 0;
 	const char *viewClass = "world";
+	const char *stateName = "UNTOUCHED";
 
 	if ( requested > 0 && vk.fboActive &&
 		vk.oitDescriptorGeneration == vk.oitAttachmentGeneration &&
 		vk.oitAttachmentGeneration > 0 &&
 		vk.framebuffers.oit_accum != VK_NULL_HANDLE &&
-		vk.framebuffers.oit_resolve != VK_NULL_HANDLE ) {
+		vk.framebuffers.oit_resolve != VK_NULL_HANDLE &&
+		!vk.oitUnhealthy ) {
 		effective = requested;
 	}
 
@@ -30,20 +32,29 @@ static void VK_Oit_Status_f( void )
 		viewClass = "noworldmodel";
 	}
 
+	switch ( vk.oitFrameState ) {
+	case VK_OIT_FRAME_CLEARED: stateName = "CLEARED"; break;
+	case VK_OIT_FRAME_ACCUMULATED: stateName = "ACCUMULATED"; break;
+	case VK_OIT_FRAME_RESOLVED: stateName = "RESOLVED"; break;
+	default: stateName = "UNTOUCHED"; break;
+	}
+
 	ri.Printf( PRINT_ALL,
 		"oit_status:\n"
-		"  requested=%d effective=%d classify=%d forwardPlus=%d refractiveExclude=%d\n"
+		"  requested=%d effective=%d classify=%d forwardPlus=%d refractiveExclude=%d directTest=%d\n"
 		"  formats: accum=R16G16B16A16_SFLOAT reveal=R16_SFLOAT color=%s\n"
 		"  extent=%ux%u (mainColor=%ux%u render=%ux%u)\n"
 		"  attachmentGen=%u descriptorGen=%u match=%d\n"
-		"  clearedThisFrame=%d weaponExcluded=%d\n"
-		"  frameSlot=%u swapchainImage=%u cmdIndex=%u\n"
+		"  clearedThisFrame=%d frameState=%s weaponExcluded=%d unhealthy=%d fallbacks=%u\n"
+		"  FrameContext: frame=%u cmdIndex=%u swapchainImage=%u (fif=%d swapCount=%u)\n"
 		"  lastFallback=%s\n"
-		"  viewClass=%s passOrder=opaque->deferred->oit_accum->oit_resolve->refractive->weapon->post->ui\n",
+		"  viewClass=%s passOrder=opaque->deferred->oit_accum->oit_resolve->refractive->weapon->post->ui\n"
+		"  resolveRP=UNDEFINED/DONT_CARE→SHADER_READ (discard; fullscreen rewrite)\n",
 		requested, effective,
 		r_oitClassify ? r_oitClassify->integer : 0,
 		r_oitForwardPlus ? r_oitForwardPlus->integer : 0,
 		r_refractiveExcludeOit ? r_refractiveExcludeOit->integer : 1,
+		ri.Cvar_VariableIntegerValue( "r_oitDirectTest" ),
 		vk_format_string( vk.color_format ),
 		vk.oitExtentWidth, vk.oitExtentHeight,
 		vk.mainColorWidth, vk.mainColorHeight,
@@ -51,12 +62,33 @@ static void VK_Oit_Status_f( void )
 		vk.oitAttachmentGeneration, vk.oitDescriptorGeneration,
 		( vk.oitDescriptorGeneration == vk.oitAttachmentGeneration && vk.oitAttachmentGeneration > 0 ) ? 1 : 0,
 		vk.oitClearedThisFrame ? 1 : 0,
+		stateName,
 		vk.oitWeaponExcluded ? 1 : 0,
-		vk.temporal.frameIndex,
-		vk.cmd ? vk.cmd->swapchain_image_index : 0u,
-		vk.cmd_index,
+		vk.oitUnhealthy ? 1 : 0,
+		vk.oitFallbackCount,
+		vk.oitFrameNumber,
+		vk.oitCmdIndex,
+		vk.oitSwapchainImageIndex,
+		NUM_COMMAND_BUFFERS,
+		vk.swapchain_image_count,
 		vk.oitLastFallbackReason[0] ? vk.oitLastFallbackReason : "(none)",
 		viewClass );
+}
+
+static void VK_Oit_Capture_f( void )
+{
+	const char *arg = ( ri.Cmd_Argc() >= 2 ) ? ri.Cmd_Argv( 1 ) : "context";
+
+	if ( !Q_stricmp( arg, "stages" ) || !Q_stricmp( arg, "all" ) ) {
+		vk.oitCapturePending = VK_OIT_CAPTURE_CONTEXT | VK_OIT_CAPTURE_STAGES;
+		ri.Printf( PRINT_ALL, "oit_capture: next OIT pass will log FrameContext + accum/resolve stages\n" );
+	} else if ( !Q_stricmp( arg, "context" ) ) {
+		vk.oitCapturePending = VK_OIT_CAPTURE_CONTEXT;
+		ri.Printf( PRINT_ALL, "oit_capture: next OIT pass will log FrameContext\n" );
+	} else {
+		ri.Printf( PRINT_ALL, "usage: oit_capture [context|stages|all]\n" );
+		ri.Printf( PRINT_ALL, "  Then screenshot with r_oitDebug 1..13 to save stage visuals.\n" );
+	}
 }
 
 const char *vk_transparency_class_name( vkTransparencyClass_t cls )
@@ -207,6 +239,7 @@ void vk_transparency_route_init( void )
 	if ( ri.Cmd_AddCommand ) {
 		ri.Cmd_AddCommand( "transparency_route_status", VK_TransparencyRoute_Status_f );
 		ri.Cmd_AddCommand( "oit_status", VK_Oit_Status_f );
+		ri.Cmd_AddCommand( "oit_capture", VK_Oit_Capture_f );
 	}
 	s_inited = qtrue;
 	ri.Printf( PRINT_ALL, "[VK][Xparent] transparency routing initialized (refractiveExcludeOit=%d)\n",
@@ -218,6 +251,7 @@ void vk_transparency_route_shutdown( void )
 	if ( ri.Cmd_RemoveCommand ) {
 		ri.Cmd_RemoveCommand( "transparency_route_status" );
 		ri.Cmd_RemoveCommand( "oit_status" );
+		ri.Cmd_RemoveCommand( "oit_capture" );
 	}
 	s_inited = qfalse;
 }

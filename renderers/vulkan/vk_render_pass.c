@@ -759,15 +759,19 @@ void vk_create_render_passes( void )
 			SET_OBJECT_NAME( vk.render_pass.oit_moments, "render pass - oit_moments", VK_DEBUG_REPORT_OBJECT_TYPE_RENDER_PASS_EXT );
 		}
 
-		/* OIT resolve pass: composite opaque + accum to main color */
+		/* OIT resolve: discard prior color (UNDEFINED), fullscreen composite rewrites
+		 * every pixel, leave SHADER_READ_ONLY for post_bloom / fog_scene copy.
+		 * Avoids COLOR_ATTACHMENT layout races that produced tile/band garbage with
+		 * DONT_CARE when the prior layout assumption was wrong. */
 		desc.attachmentCount = 1;
 		subpass.colorAttachmentCount = 1;
 		subpass.pColorAttachments = &colorRef0;
 		subpass.pDepthStencilAttachment = NULL;
 		attachments[0].format = vk.color_format;
 		attachments[0].loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-		attachments[0].initialLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-		attachments[0].finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+		attachments[0].storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+		attachments[0].initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+		attachments[0].finalLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 		VK_CHECK( qvkCreateRenderPass( device, &desc, NULL, &vk.render_pass.oit_resolve ) );
 		SET_OBJECT_NAME( vk.render_pass.oit_resolve, "render pass - oit_resolve", VK_DEBUG_REPORT_OBJECT_TYPE_RENDER_PASS_EXT );
 

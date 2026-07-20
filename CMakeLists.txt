@@ -3582,6 +3582,12 @@ set_tests_properties(test_cinematic_engine_1_0 PROPERTIES
 	LABELS "scripts;validation;renderer;cinematic"
 	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/scripts/cinematic_engine_1_0_check.sh;${CMAKE_SOURCE_DIR}/docs/CINEMATIC_ENGINE_PLATFORM_1.0.md;${CMAKE_SOURCE_DIR}/config/modern_cinematic_raster.cfg")
 
+add_test(NAME test_oit_corruption
+	COMMAND ${CMAKE_SOURCE_DIR}/scripts/oit_corruption_check.sh)
+set_tests_properties(test_oit_corruption PROPERTIES
+	LABELS "scripts;validation;renderer;oit"
+	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/scripts/oit_corruption_check.sh;${CMAKE_SOURCE_DIR}/config/repro_oit_corruption.cfg;${CMAKE_SOURCE_DIR}/docs/MOMENT_OIT_STOCHASTIC_ALPHA.md")
+
 add_test(NAME test_high_throughput_1_0
 	COMMAND ${CMAKE_SOURCE_DIR}/scripts/high_throughput_1_0_check.sh)
 set_tests_properties(test_high_throughput_1_0 PROPERTIES
