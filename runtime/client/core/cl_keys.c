@@ -806,6 +806,13 @@ void CL_KeyEvent( int key, qboolean down, unsigned time )
 {
 #if defined(USE_DUKTAPE) || defined(USE_CSHARP)
 	Com_ScriptEmitEvent( "input_key", Key_KeynumToString( key ), NULL, key, down ? 1 : 0 );
+	/* Deliver virtual HUD coords with the click so City Menu hit-tests match the OS cursor. */
+	if ( down && key == K_MOUSE1 && CL_RpMenuActive() ) {
+		float vx = 320.0f;
+		float vy = 240.0f;
+		CL_GetHudCursorVirtual( &vx, &vy );
+		Com_ScriptEmitEvent( "rp_click", NULL, NULL, (int)( vx + 0.5f ), (int)( vy + 0.5f ) );
+	}
 #endif
 
 	if ( down )

@@ -606,10 +606,27 @@ static void IN_WarpToWindowCenter( void )
 }
 
 
+static qboolean IN_PointerUiMode( void );
+
 void IN_GetAbsMouse( int *x, int *y ) {
-	int lx = ( last_ui_mouse_x < 0 ) ? ( glw_state.window_width / 2 ) : last_ui_mouse_x;
-	int ly = ( last_ui_mouse_y < 0 ) ? ( glw_state.window_height / 2 ) : last_ui_mouse_y;
-	/* SDL motion/button coords are logical window pixels; HUD layout uses drawable size. */
+	int lx;
+	int ly;
+
+	/* Prefer a live sample in pointer-UI mode so clicks match the OS cursor. */
+	if ( IN_PointerUiMode() && SDL_window ) {
+		float mx = 0.0f;
+		float my = 0.0f;
+		SDL_GetMouseState( &mx, &my );
+		lx = (int)lroundf( mx );
+		ly = (int)lroundf( my );
+		last_ui_mouse_x = lx;
+		last_ui_mouse_y = ly;
+	} else {
+		lx = ( last_ui_mouse_x < 0 ) ? ( glw_state.window_width / 2 ) : last_ui_mouse_x;
+		ly = ( last_ui_mouse_y < 0 ) ? ( glw_state.window_height / 2 ) : last_ui_mouse_y;
+	}
+
+	/* SDL coords are logical window pixels; HUD layout uses drawable pixels. */
 	if ( glw_state.window_width > 0 && glw_state.pixel_width > 0 &&
 	     glw_state.window_width != glw_state.pixel_width ) {
 		lx = (int)lroundf( (float)lx * ( (float)glw_state.pixel_width / (float)glw_state.window_width ) );

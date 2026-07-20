@@ -139,6 +139,7 @@ static qboolean JsDebug_IsSupportedEvent( const char *eventName ) {
 		!Q_stricmp( eventName, "menu_changed" ) ||
 		!Q_stricmp( eventName, "input_key" ) ||
 		!Q_stricmp( eventName, "mouse_move" ) ||
+		!Q_stricmp( eventName, "rp_click" ) ||
 		!Q_stricmp( eventName, "console_open" ) ||
 		!Q_stricmp( eventName, "entity_spawn" ) ||
 		!Q_stricmp( eventName, "entity_death" ) ||
@@ -1399,6 +1400,16 @@ void JsDebug_EmitEvent( const char *eventName, const char *s0, const char *s1, i
 			duk_put_prop_string( s_jsContext, -2, "dx" );
 			duk_push_int( s_jsContext, i1 );
 			duk_put_prop_string( s_jsContext, -2, "dy" );
+		}
+		if ( !Q_stricmp( eventName, "rp_click" ) ) {
+			duk_push_int( s_jsContext, i0 );
+			duk_put_prop_string( s_jsContext, -2, "x" );
+			duk_push_int( s_jsContext, i1 );
+			duk_put_prop_string( s_jsContext, -2, "y" );
+			duk_push_int( s_jsContext, i0 );
+			duk_put_prop_string( s_jsContext, -2, "i0" );
+			duk_push_int( s_jsContext, i1 );
+			duk_put_prop_string( s_jsContext, -2, "i1" );
 		}
 		if ( !Q_stricmp( eventName, "ui_open" ) || !Q_stricmp( eventName, "ui_close" ) || !Q_stricmp( eventName, "console_open" ) ) {
 			duk_push_int( s_jsContext, i0 );
