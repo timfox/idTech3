@@ -27,6 +27,8 @@ layout(set = 0, binding = 4) uniform sampler2D normalTex;
 layout(set = 0, binding = 5) uniform sampler2D materialTex;
 layout(rgba16f, set = 0, binding = 6) uniform writeonly image2D outLit;
 layout(set = 0, binding = 7) uniform usampler2D classMap;
+layout(set = 0, binding = 8) uniform sampler2D ltcMatTex;
+layout(set = 0, binding = 9) uniform sampler2D ltcAmpTex;
 
 layout(push_constant) uniform Push {
 	mat4 viewMatrix;
@@ -49,6 +51,8 @@ layout(push_constant) uniform Push {
 	float specularAA;
 } pc;
 
+#define USE_LTC_AREA_LIGHT
+#include "ltc_area_light.glsl"
 #include "deferred_lighting_common.glsl"
 
 void main() {

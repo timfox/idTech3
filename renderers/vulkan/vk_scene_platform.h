@@ -63,12 +63,21 @@ typedef struct vkSceneNode_s {
 	qboolean          visible;
 	uint32_t          layer;
 	uint32_t          materialId;     /* runtime material index / 0 */
-	uint32_t          lightIndex;     /* dlight index when kind==LIGHT; ~0 none */
+	uint32_t          lightIndex;     /* dlight index when kind==LIGHT; ~0 = authored-only */
 	uint32_t          gpuHandle;      /* vk_gpu_scene instance handle; 0 = none */
 	uint32_t          revision;
 	uint32_t          dirty;
 	uint32_t          streamingCell;
 	qboolean          alive;
+	/* Light parameters (kind==LIGHT). Authored fixtures pack when lightIndex==~0. */
+	qboolean          lightAuthored;
+	qboolean          lightHasColor;
+	qboolean          lightHasRadius;
+	qboolean          lightHasArea;
+	float             lightColor[3];
+	float             lightRadius;
+	float             lightHalfW;
+	float             lightHalfH;
 } vkSceneNode_t;
 
 typedef struct vkSceneInvalidationEvent_s {
@@ -118,12 +127,22 @@ qboolean vk_scene_platform_edit_material( vkSceneId_t id, uint32_t materialId );
 qboolean vk_scene_platform_link_gpu_instance( vkSceneId_t id, uint32_t gpuHandle );
 qboolean vk_scene_platform_link_light( vkSceneId_t id, uint32_t lightIndex );
 
+/* Live light parameter edit + authored area fixtures (packed into Forward+ SSBO). */
+qboolean vk_scene_platform_edit_light_color( vkSceneId_t id, const vec3_t color );
+qboolean vk_scene_platform_edit_light_radius( vkSceneId_t id, float radius );
+qboolean vk_scene_platform_edit_light_area( vkSceneId_t id, float halfW, float halfH );
+void vk_scene_platform_apply_light_override( uint32_t lightIndex, dlight_t *dl );
+uint32_t vk_scene_platform_append_authored_lights( float *base, uint32_t n, uint32_t max_pack );
+vkSceneId_t vk_scene_platform_spawn_area_light( const vec3_t origin, float halfW, float halfH,
+	const vec3_t color, float radius );
+
 void vk_scene_platform_note_invalidation( vkSceneId_t id, uint32_t flags );
 uint32_t vk_scene_platform_consume_pending_dirty( void );
 
 void vk_scene_platform_status_f( void );
 void vk_scene_platform_node_status_f( void );
 void vk_scene_platform_invalidate_debug_f( void );
+void vk_scene_platform_light_status_f( void );
 
 const char *vk_scene_platform_kind_name( vkSceneNodeKind_t k );
 

@@ -208,7 +208,9 @@ void main() {
 		vec3 worldPos = lights.data[b].xyz;
 		float radius = max(lights.data[b].w, 1e-4);
 		vec4 lc = lights.data[b + 1u];
-		float isLinear = lc.w;
+		float lightType = lc.w;
+		bool isArea = lightType >= 1.5;
+		bool isSpot = lightType > 0.5 && !isArea;
 		vec4 lpack = lights.data[b + 2u];
 		vec4 ltail = lights.data[b + 3u];
 
@@ -216,12 +218,12 @@ void main() {
 		float ndcZ = 0.0;
 		float clipW = 1.0;
 		bool originOnScreen = project_world_to_px(worldPos, vw, vh, centerPx, ndcZ, clipW);
-		if (!originOnScreen && isLinear <= 0.5) {
+		if (!originOnScreen && !isSpot) {
 			continue;
 		}
 
 		bool overlaps = false;
-		if (isLinear > 0.5) {
+		if (isSpot) {
 			vec3 axis = lpack.xyz;
 			float alen = length(axis);
 			if (alen > 1e-5) {
@@ -233,6 +235,7 @@ void main() {
 				worldPos, axis, cosOuter, segLen, radius,
 				vw, vh, tileX, tileY, tilePxX, tilePxY);
 		} else {
+			/* Point + rect area: sphere influence. */
 			float distW = max(abs(clipW), 1e-3);
 			float radiusPx = clamp(radius * (0.5 * vw) / distW, 2.0, vw + vh);
 			overlaps = sphere_tile_overlap(centerPx, radiusPx, tileX, tileY, tilePxX, tilePxY);
@@ -244,7 +247,7 @@ void main() {
 		/* Positive view-depth range of the light influence volume. */
 		float lightNear = max(abs(clipW) - radius, pc.zNear);
 		float lightFar = abs(clipW) + radius;
-		if (isLinear > 0.5) {
+		if (isSpot) {
 			vec3 tip = worldPos + normalize(lpack.xyz + vec3(1e-6)) * max(ltail.y, 1e-3);
 			vec2 tipPx;
 			float tipNdcZ, tipW;
@@ -269,7 +272,7 @@ void main() {
 			float zExtent = clamp(radius / max(abs(clipW), 1e-3), 0.0, 0.5);
 			lightZNear = clamp(lightZCenter + zExtent, 0.0, 1.0);
 			lightZFar = clamp(lightZCenter - zExtent, 0.0, 1.0);
-			if (isLinear > 0.5) {
+			if (isSpot) {
 				vec3 tip = worldPos + normalize(lpack.xyz + vec3(1e-6)) * max(ltail.y, 1e-3);
 				vec2 tipPx;
 				float tipNdcZ, tipW;

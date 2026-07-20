@@ -20,6 +20,9 @@ need "renderers/vulkan/vk_scene_platform.c"
 need "renderers/vulkan/vk_scene_platform.h"
 need "renderers/vulkan/vk_photometric.c"
 need "renderers/vulkan/vk_photometric.h"
+need "renderers/vulkan/vk_ltc.c"
+need "renderers/vulkan/vk_ltc.h"
+need "renderers/vulkan/shaders/glsl/ltc_area_light.glsl"
 
 CFG="$ROOT/config/modern_cinematic_raster.cfg"
 
@@ -37,6 +40,18 @@ grep -q 'vk_scene_platform_edit_transform' "$ROOT/renderers/vulkan/vk_scene_plat
 }
 grep -q 'vk_gpu_scene_update_instance_transform' "$ROOT/renderers/vulkan/vk_scene_platform.c" || {
   echo "FAIL GPU instance link on edit missing"; fail=1;
+}
+grep -q 'vk_scene_platform_edit_light_color\|light_spawn_area' "$ROOT/renderers/vulkan/vk_scene_platform.c" || {
+  echo "FAIL live light edit missing"; fail=1;
+}
+grep -q 'vk_ltc_init' "$ROOT/renderers/vulkan/vk_ltc.c" || {
+  echo "FAIL LTC upload missing"; fail=1;
+}
+grep -q 'EvalRectAreaLight\|USE_LTC_AREA_LIGHT' "$ROOT/renderers/vulkan/shaders/glsl/gen_frag.tmpl" || {
+  echo "FAIL Forward+ LTC shade missing"; fail=1;
+}
+grep -q 'USE_LTC_AREA_LIGHT' "$ROOT/renderers/vulkan/shaders/glsl/deferred_lighting.comp" || {
+  echo "FAIL deferred LTC shade missing"; fail=1;
 }
 grep -q 'screenshotEXR' "$ROOT/renderers/vulkan/tr_init.c" || {
   echo "FAIL screenshotEXR command missing"; fail=1;
@@ -65,11 +80,12 @@ done
 
 if grep -qiE 'accelerationStructure|rayQuery|vkCmdTraceRays' \
   "$ROOT/renderers/vulkan/vk_scene_platform.c" \
-  "$ROOT/renderers/vulkan/vk_photometric.c"; then
-  echo "FAIL scene/photometric modules must not use RT APIs"
+  "$ROOT/renderers/vulkan/vk_photometric.c" \
+  "$ROOT/renderers/vulkan/vk_ltc.c"; then
+  echo "FAIL scene/photometric/ltc modules must not use RT APIs"
   fail=1
 else
-  echo "OK  no RT APIs in scene/photometric"
+  echo "OK  no RT APIs in scene/photometric/ltc"
 fi
 
 grep -qi 'not.*boot default\|NOT the boot default' "$ROOT/docs/CINEMATIC_ENGINE_PLATFORM_1.0.md" "$CFG" || {

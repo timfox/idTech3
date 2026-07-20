@@ -23,7 +23,7 @@ typedef struct vkPhotometricState_s {
 	qboolean active;
 	qboolean applyToPack;
 	qboolean ltcTablesPresent;
-	qboolean ltcUploaded;       /* Slice 1: tables linked; GPU upload deferred */
+	qboolean ltcUploaded;       /* GPU mat/amp LUTs uploaded (vk_ltc) */
 	float    legacyScale;       /* candela → legacy multiplier */
 	float    defaultKelvin;
 	uint32_t conversions;

@@ -21,6 +21,7 @@ Mode 3 = Unified Clustered Renderer (deferred opaque + Forward+ transparent).
 #include "vk_util.h"
 #include "vk_view_state.h"
 #include "vk_frequency_aware.h"
+#include "vk_ltc.h"
 
 static void vk_dgb_validate_compute_break( const char *stage, qboolean resume_main )
 {
@@ -927,7 +928,7 @@ void vk_deferred_gbuffer_capture_after_geometry( void )
 
 static void vk_dgb_create_lighting_descriptor_layout( void )
 {
-	VkDescriptorSetLayoutBinding bindings[8];
+	VkDescriptorSetLayoutBinding bindings[10];
 	VkDescriptorSetLayoutCreateInfo desc;
 
 	if ( vk.deferred_gbuffer.lighting_layout != VK_NULL_HANDLE ) {
@@ -967,10 +968,19 @@ static void vk_dgb_create_lighting_descriptor_layout( void )
 	bindings[7].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
 	bindings[7].descriptorCount = 1;
 	bindings[7].stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+	/* LTC mat / amp for rectangular area lights */
+	bindings[8].binding = 8;
+	bindings[8].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+	bindings[8].descriptorCount = 1;
+	bindings[8].stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+	bindings[9].binding = 9;
+	bindings[9].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+	bindings[9].descriptorCount = 1;
+	bindings[9].stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
 
 	Com_Memset( &desc, 0, sizeof( desc ) );
 	desc.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-	desc.bindingCount = 8;
+	desc.bindingCount = 10;
 	desc.pBindings = bindings;
 	if ( qvkCreateDescriptorSetLayout( vk.device, &desc, NULL, &vk.deferred_gbuffer.lighting_layout ) != VK_SUCCESS ) {
 		vk.deferred_gbuffer.lighting_layout = VK_NULL_HANDLE;
@@ -1052,7 +1062,7 @@ static void vk_dgb_create_lighting_pipeline( void )
 		pool_sizes[0].type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
 		pool_sizes[0].descriptorCount = 2;
 		pool_sizes[1].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-		pool_sizes[1].descriptorCount = 5;
+		pool_sizes[1].descriptorCount = 7;
 		pool_sizes[2].type = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
 		pool_sizes[2].descriptorCount = 1;
 
@@ -1177,6 +1187,8 @@ static void vk_dgb_update_lighting_descriptors( void )
 	writes[7].pImageInfo = &img_infos[5];
 
 	qvkUpdateDescriptorSets( vk.device, 8, writes, 0, NULL );
+	vk_ltc_init();
+	vk_ltc_update_deferred_lighting_descriptors( vk.deferred_gbuffer.lighting_descriptor );
 	vk.deferred_gbuffer.lighting_descriptor_generation = vk.deferredGbufferGeneration;
 }
 

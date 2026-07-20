@@ -215,6 +215,24 @@ vec3 shadeDeferredPixel( uvec2 pix ) {
 		float att;
 		float addBoost = mix( 1.0, 1.25, step( 0.5, ltail.z ) );
 
+#ifdef USE_LTC_AREA_LIGHT
+		if ( fpLightIsArea( lc.w ) ) {
+			vec3 halfU = ( pc.viewMatrix * vec4( lpack.xyz, 0.0 ) ).xyz;
+			vec3 halfV = ( pc.viewMatrix * vec4( ltail.xyz, 0.0 ) ).xyz;
+			float addBoostA = mix( 1.0, 1.25, step( 0.5, lpack.w ) );
+			vec3 areaLit = EvalRectAreaLight(
+				N, V, viewPos, lView, halfU, halfV,
+				lc.rgb * addBoostA, albedo, F0, metalness, roughness,
+				ltcMatTex, ltcAmpTex );
+			diffuseAcc += areaLit * aoCoupling * classDiffScale * shadingConfidence;
+			continue;
+		}
+#else
+		if ( lc.w >= 1.5 ) {
+			/* Area light without LTC bindings (e.g. VRCS path) — skip rather than mis-shade as spot. */
+			continue;
+		}
+#endif
 		if ( lc.w < 0.5 ) {
 			att = attenPointLight( lView, viewPos, rad, L );
 		} else {

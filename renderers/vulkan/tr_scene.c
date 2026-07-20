@@ -405,6 +405,11 @@ static void RE_AddDynamicLightToScene( const vec3_t org, float intensity, float 
 	dl->color[2] = b;
 	dl->additive = additive;
 	dl->linear = qfalse;
+	dl->area = qfalse;
+	dl->areaHalfWidth = 0.0f;
+	dl->areaHalfHeight = 0.0f;
+	VectorSet( dl->areaRight, 1.0f, 0.0f, 0.0f );
+	VectorSet( dl->areaUp, 0.0f, 0.0f, 1.0f );
 }
 
 
@@ -452,6 +457,76 @@ void RE_AddLinearLightToScene( const vec3_t start, const vec3_t end, float inten
 	dl->color[2] = b;
 	dl->additive = 0;
 	dl->linear = qtrue;
+	dl->area = qfalse;
+	dl->areaHalfWidth = 0.0f;
+	dl->areaHalfHeight = 0.0f;
+	VectorSet( dl->areaRight, 1.0f, 0.0f, 0.0f );
+	VectorSet( dl->areaUp, 0.0f, 0.0f, 1.0f );
+}
+
+/*
+=====================
+RE_AddAreaLightToScene
+
+Rectangular area light for LTC shading (Forward+ / deferred). Intensity is
+legacy-scale luminance; photometric nits convert via vk_photometric when active.
+=====================
+*/
+void RE_AddAreaLightToScene( const vec3_t org, float halfWidth, float halfHeight,
+	const vec3_t right, const vec3_t up, float intensity, float r, float g, float b )
+{
+	dlight_t *dl;
+	vec3_t rAxis, uAxis;
+	float rLen, uLen;
+	float diag;
+
+	if ( !tr.registered ) {
+		return;
+	}
+	if ( r_numdlights >= (int)ARRAY_LEN( backEndData->dlights ) ) {
+		return;
+	}
+	if ( intensity <= 0.0f || halfWidth <= 0.0f || halfHeight <= 0.0f ) {
+		return;
+	}
+
+	VectorCopy( right ? right : vec3_origin, rAxis );
+	VectorCopy( up ? up : vec3_origin, uAxis );
+	rLen = VectorNormalize( rAxis );
+	uLen = VectorNormalize( uAxis );
+	if ( rLen <= 1e-4f ) {
+		VectorSet( rAxis, 1.0f, 0.0f, 0.0f );
+	}
+	if ( uLen <= 1e-4f ) {
+		VectorSet( uAxis, 0.0f, 0.0f, 1.0f );
+	}
+
+	if ( r_dlightMode->integer ) {
+		r *= r_dlightIntensity->value;
+		g *= r_dlightIntensity->value;
+		b *= r_dlightIntensity->value;
+		intensity *= r_dlightScale->value;
+	}
+
+	dl = &backEndData->dlights[r_numdlights++];
+	VectorCopy( org, dl->origin );
+	VectorClear( dl->origin2 );
+	diag = sqrtf( halfWidth * halfWidth + halfHeight * halfHeight );
+	/* radius = cull/influence sphere (same role as point dlight radius). */
+	dl->radius = intensity;
+	if ( dl->radius < diag * 2.0f ) {
+		dl->radius = diag * 2.0f;
+	}
+	dl->color[0] = r;
+	dl->color[1] = g;
+	dl->color[2] = b;
+	dl->additive = 0;
+	dl->linear = qfalse;
+	dl->area = qtrue;
+	dl->areaHalfWidth = halfWidth;
+	dl->areaHalfHeight = halfHeight;
+	VectorCopy( rAxis, dl->areaRight );
+	VectorCopy( uAxis, dl->areaUp );
 }
 
 

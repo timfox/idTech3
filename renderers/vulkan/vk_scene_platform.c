@@ -99,6 +99,10 @@ void vk_scene_platform_init( void )
 		ri.Cmd_AddCommand( "scene_invalidate_debug", vk_scene_platform_invalidate_debug_f );
 		ri.Cmd_AddCommand( "scene_set_origin", vk_scene_platform_node_status_f );
 		ri.Cmd_AddCommand( "scene_set_visible", vk_scene_platform_node_status_f );
+		ri.Cmd_AddCommand( "light_status", vk_scene_platform_light_status_f );
+		ri.Cmd_AddCommand( "light_spawn_area", vk_scene_platform_light_status_f );
+		ri.Cmd_AddCommand( "light_set_color", vk_scene_platform_light_status_f );
+		ri.Cmd_AddCommand( "light_set_radius", vk_scene_platform_light_status_f );
 		s_cmds = qtrue;
 	}
 
@@ -117,6 +121,10 @@ void vk_scene_platform_shutdown( void )
 		ri.Cmd_RemoveCommand( "scene_invalidate_debug" );
 		ri.Cmd_RemoveCommand( "scene_set_origin" );
 		ri.Cmd_RemoveCommand( "scene_set_visible" );
+		ri.Cmd_RemoveCommand( "light_status" );
+		ri.Cmd_RemoveCommand( "light_spawn_area" );
+		ri.Cmd_RemoveCommand( "light_set_color" );
+		ri.Cmd_RemoveCommand( "light_set_radius" );
 		s_cmds = qfalse;
 	}
 	Com_Memset( &s_state, 0, sizeof( s_state ) );
@@ -399,7 +407,220 @@ qboolean vk_scene_platform_link_light( vkSceneId_t id, uint32_t lightIndex )
 	}
 	n->kind = VK_SCENE_KIND_LIGHT;
 	n->lightIndex = lightIndex;
+	n->lightAuthored = qfalse;
 	return qtrue;
+}
+
+qboolean vk_scene_platform_edit_light_color( vkSceneId_t id, const vec3_t color )
+{
+	vkSceneNode_t *n = NULL;
+	if ( !vk_scene_platform_active() || !s_state.liveEdit ) {
+		return qfalse;
+	}
+	if ( !vk_scene_platform_find( id, &n ) || !color || n->kind != VK_SCENE_KIND_LIGHT ) {
+		return qfalse;
+	}
+	VectorCopy( color, n->lightColor );
+	n->lightHasColor = qtrue;
+	n->revision++;
+	n->dirty |= VK_SCENE_DIRTY_LIGHT;
+	s_state.editCount++;
+	vk_scene_platform_note_invalidation( id,
+		VK_SCENE_DIRTY_LIGHT | VK_SCENE_DIRTY_SHADOW | VK_SCENE_DIRTY_GI | VK_SCENE_DIRTY_VOLUME );
+	return qtrue;
+}
+
+qboolean vk_scene_platform_edit_light_radius( vkSceneId_t id, float radius )
+{
+	vkSceneNode_t *n = NULL;
+	if ( !vk_scene_platform_active() || !s_state.liveEdit ) {
+		return qfalse;
+	}
+	if ( !vk_scene_platform_find( id, &n ) || n->kind != VK_SCENE_KIND_LIGHT ) {
+		return qfalse;
+	}
+	n->lightRadius = radius > 0.0f ? radius : 0.0f;
+	n->lightHasRadius = qtrue;
+	n->revision++;
+	n->dirty |= VK_SCENE_DIRTY_LIGHT | VK_SCENE_DIRTY_BOUNDS;
+	s_state.editCount++;
+	vk_scene_platform_note_invalidation( id,
+		VK_SCENE_DIRTY_LIGHT | VK_SCENE_DIRTY_SHADOW | VK_SCENE_DIRTY_GI | VK_SCENE_DIRTY_VOLUME );
+	return qtrue;
+}
+
+qboolean vk_scene_platform_edit_light_area( vkSceneId_t id, float halfW, float halfH )
+{
+	vkSceneNode_t *n = NULL;
+	if ( !vk_scene_platform_active() || !s_state.liveEdit ) {
+		return qfalse;
+	}
+	if ( !vk_scene_platform_find( id, &n ) || n->kind != VK_SCENE_KIND_LIGHT ) {
+		return qfalse;
+	}
+	n->lightHalfW = halfW > 0.0f ? halfW : 0.01f;
+	n->lightHalfH = halfH > 0.0f ? halfH : 0.01f;
+	n->lightHasArea = qtrue;
+	n->revision++;
+	n->dirty |= VK_SCENE_DIRTY_LIGHT | VK_SCENE_DIRTY_BOUNDS;
+	s_state.editCount++;
+	vk_scene_platform_note_invalidation( id,
+		VK_SCENE_DIRTY_LIGHT | VK_SCENE_DIRTY_SHADOW | VK_SCENE_DIRTY_GI );
+	return qtrue;
+}
+
+void vk_scene_platform_apply_light_override( uint32_t lightIndex, dlight_t *dl )
+{
+	uint32_t i;
+	if ( !dl || !vk_scene_platform_active() ) {
+		return;
+	}
+	for ( i = 0; i < s_state.nodeCount; i++ ) {
+		vkSceneNode_t *n = &s_nodes[i];
+		if ( !n->alive || n->kind != VK_SCENE_KIND_LIGHT || n->lightAuthored ) {
+			continue;
+		}
+		if ( n->lightIndex != lightIndex ) {
+			continue;
+		}
+		if ( !n->visible ) {
+			dl->radius = 0.0f;
+			VectorClear( dl->color );
+			return;
+		}
+		VectorCopy( n->worldOrigin, dl->origin );
+		if ( n->lightHasColor ) {
+			VectorCopy( n->lightColor, dl->color );
+		}
+		if ( n->lightHasRadius ) {
+			dl->radius = n->lightRadius;
+		}
+		if ( n->lightHasArea ) {
+			dl->area = qtrue;
+			dl->linear = qfalse;
+			dl->areaHalfWidth = n->lightHalfW;
+			dl->areaHalfHeight = n->lightHalfH;
+			VectorSet( dl->areaRight, n->worldAxis[0][0], n->worldAxis[0][1], n->worldAxis[0][2] );
+			VectorSet( dl->areaUp, n->worldAxis[2][0], n->worldAxis[2][1], n->worldAxis[2][2] );
+			if ( VectorLength( dl->areaRight ) < 1e-4f ) {
+				VectorSet( dl->areaRight, 1.0f, 0.0f, 0.0f );
+			}
+			if ( VectorLength( dl->areaUp ) < 1e-4f ) {
+				VectorSet( dl->areaUp, 0.0f, 0.0f, 1.0f );
+			}
+			VectorNormalize( dl->areaRight );
+			VectorNormalize( dl->areaUp );
+		}
+		return;
+	}
+}
+
+uint32_t vk_scene_platform_append_authored_lights( float *base, uint32_t n, uint32_t max_pack )
+{
+	uint32_t i;
+	const uint32_t headerFloats = 8u;
+	const uint32_t strideFloats = 16u;
+
+	if ( !base || !vk_scene_platform_active() || max_pack == 0u ) {
+		return n;
+	}
+
+	for ( i = 0; i < s_state.nodeCount && n < max_pack; i++ ) {
+		const vkSceneNode_t *node = &s_nodes[i];
+		float *rec;
+		vec3_t halfU, halfV;
+		float diag;
+		float colorScale = 1.0f;
+
+		if ( !node->alive || node->kind != VK_SCENE_KIND_LIGHT || !node->lightAuthored ) {
+			continue;
+		}
+		if ( !node->visible ) {
+			continue;
+		}
+
+		rec = base + headerFloats + n * strideFloats;
+		rec[0] = node->worldOrigin[0];
+		rec[1] = node->worldOrigin[1];
+		rec[2] = node->worldOrigin[2];
+		rec[3] = node->lightHasRadius ? node->lightRadius : 256.0f;
+		rec[4] = node->lightHasColor ? node->lightColor[0] * colorScale : 1.0f;
+		rec[5] = node->lightHasColor ? node->lightColor[1] * colorScale : 1.0f;
+		rec[6] = node->lightHasColor ? node->lightColor[2] * colorScale : 1.0f;
+
+		if ( node->lightHasArea ) {
+			float hw = node->lightHalfW > 0.0f ? node->lightHalfW : 16.0f;
+			float hh = node->lightHalfH > 0.0f ? node->lightHalfH : 16.0f;
+			vec3_t right, up;
+			VectorSet( right, node->worldAxis[0][0], node->worldAxis[0][1], node->worldAxis[0][2] );
+			VectorSet( up, node->worldAxis[2][0], node->worldAxis[2][1], node->worldAxis[2][2] );
+			if ( VectorLength( right ) < 1e-4f ) {
+				VectorSet( right, 1.0f, 0.0f, 0.0f );
+			}
+			if ( VectorLength( up ) < 1e-4f ) {
+				VectorSet( up, 0.0f, 0.0f, 1.0f );
+			}
+			VectorNormalize( right );
+			VectorNormalize( up );
+			VectorScale( right, hw, halfU );
+			VectorScale( up, hh, halfV );
+			diag = sqrtf( hw * hw + hh * hh );
+			if ( rec[3] < diag * 2.0f ) {
+				rec[3] = diag * 2.0f;
+			}
+			rec[7] = 2.0f;
+			rec[8] = halfU[0];
+			rec[9] = halfU[1];
+			rec[10] = halfU[2];
+			rec[11] = 0.0f;
+			rec[12] = halfV[0];
+			rec[13] = halfV[1];
+			rec[14] = halfV[2];
+			rec[15] = 0.0f;
+		} else {
+			rec[7] = 0.0f;
+			rec[8] = rec[9] = rec[10] = 0.0f;
+			rec[11] = -1.0f;
+			rec[12] = -1.0f;
+			rec[13] = rec[3];
+			rec[14] = 0.0f;
+			rec[15] = 0.0f;
+		}
+		n++;
+	}
+	return n;
+}
+
+vkSceneId_t vk_scene_platform_spawn_area_light( const vec3_t origin, float halfW, float halfH,
+	const vec3_t color, float radius )
+{
+	vkSceneId_t id;
+	vkSceneNode_t *n = NULL;
+
+	if ( !vk_scene_platform_active() ) {
+		return 0;
+	}
+	vk_scene_platform_ensure_world_nodes();
+	id = vk_scene_platform_create_node( VK_SCENE_KIND_LIGHT, "area_light", s_rootId );
+	if ( !vk_scene_platform_find( id, &n ) ) {
+		return 0;
+	}
+	VectorCopy( origin, n->localOrigin );
+	VectorCopy( origin, n->worldOrigin );
+	n->lightAuthored = qtrue;
+	n->lightIndex = ~0u;
+	n->lightHasArea = qtrue;
+	n->lightHalfW = halfW > 0.0f ? halfW : 16.0f;
+	n->lightHalfH = halfH > 0.0f ? halfH : 16.0f;
+	n->lightHasColor = qtrue;
+	VectorCopy( color, n->lightColor );
+	n->lightHasRadius = qtrue;
+	n->lightRadius = radius > 0.0f ? radius : 256.0f;
+	n->visible = qtrue;
+	vk_scene_platform_note_invalidation( id,
+		VK_SCENE_DIRTY_LIGHT | VK_SCENE_DIRTY_SHADOW | VK_SCENE_DIRTY_GI | VK_SCENE_DIRTY_VOLUME );
+	s_state.editCount++;
+	return id;
 }
 
 const char *vk_scene_platform_kind_name( vkSceneNodeKind_t k )
@@ -433,6 +654,7 @@ void vk_scene_platform_status_f( void )
 	ri.Printf( PRINT_ALL, "commands       : scene_node_status <idHex>, scene_invalidate_debug\n" );
 	ri.Printf( PRINT_ALL, "               : scene_set_origin <idHex> x y z\n" );
 	ri.Printf( PRINT_ALL, "               : scene_set_visible <idHex> 0|1\n" );
+	ri.Printf( PRINT_ALL, "               : light_status [idHex], light_spawn_area, light_set_color/radius\n" );
 
 	for ( i = 0; i < s_state.nodeCount && i < 12u; i++ ) {
 		const vkSceneNode_t *n = &s_nodes[i];
@@ -520,4 +742,95 @@ void vk_scene_platform_invalidate_debug_f( void )
 			ev->frame, (unsigned long long)ev->id, ev->flags );
 	}
 	ri.Printf( PRINT_ALL, "pending dirty mask=0x%x\n", s_pendingDirty );
+}
+
+void vk_scene_platform_light_status_f( void )
+{
+	const char *cmd = ri.Cmd_Argv( 0 );
+	vkSceneId_t id;
+	const vkSceneNode_t *n;
+	uint32_t i;
+
+	if ( !Q_stricmp( cmd, "light_spawn_area" ) ) {
+		vec3_t o, c;
+		float hw, hh, rad;
+		if ( ri.Cmd_Argc() < 9 ) {
+			ri.Printf( PRINT_ALL,
+				"Usage: light_spawn_area x y z halfW halfH r g b [radius]\n" );
+			return;
+		}
+		o[0] = (float)atof( ri.Cmd_Argv( 1 ) );
+		o[1] = (float)atof( ri.Cmd_Argv( 2 ) );
+		o[2] = (float)atof( ri.Cmd_Argv( 3 ) );
+		hw = (float)atof( ri.Cmd_Argv( 4 ) );
+		hh = (float)atof( ri.Cmd_Argv( 5 ) );
+		c[0] = (float)atof( ri.Cmd_Argv( 6 ) );
+		c[1] = (float)atof( ri.Cmd_Argv( 7 ) );
+		c[2] = (float)atof( ri.Cmd_Argv( 8 ) );
+		rad = ( ri.Cmd_Argc() >= 10 ) ? (float)atof( ri.Cmd_Argv( 9 ) ) : 256.0f;
+		id = vk_scene_platform_spawn_area_light( o, hw, hh, c, rad );
+		if ( id ) {
+			ri.Printf( PRINT_ALL, "light_spawn_area: id=0x%llx\n", (unsigned long long)id );
+		} else {
+			ri.Printf( PRINT_ALL, "light_spawn_area: failed (enable r_scenePlatform)\n" );
+		}
+		return;
+	}
+	if ( !Q_stricmp( cmd, "light_set_color" ) ) {
+		vec3_t c;
+		if ( ri.Cmd_Argc() < 5 ) {
+			ri.Printf( PRINT_ALL, "Usage: light_set_color <idHex> r g b\n" );
+			return;
+		}
+		id = (vkSceneId_t)strtoull( ri.Cmd_Argv( 1 ), NULL, 0 );
+		c[0] = (float)atof( ri.Cmd_Argv( 2 ) );
+		c[1] = (float)atof( ri.Cmd_Argv( 3 ) );
+		c[2] = (float)atof( ri.Cmd_Argv( 4 ) );
+		ri.Printf( PRINT_ALL, "light_set_color: %s\n",
+			vk_scene_platform_edit_light_color( id, c ) ? "ok" : "failed" );
+		return;
+	}
+	if ( !Q_stricmp( cmd, "light_set_radius" ) ) {
+		if ( ri.Cmd_Argc() < 3 ) {
+			ri.Printf( PRINT_ALL, "Usage: light_set_radius <idHex> radius\n" );
+			return;
+		}
+		id = (vkSceneId_t)strtoull( ri.Cmd_Argv( 1 ), NULL, 0 );
+		ri.Printf( PRINT_ALL, "light_set_radius: %s\n",
+			vk_scene_platform_edit_light_radius( id, (float)atof( ri.Cmd_Argv( 2 ) ) ) ? "ok" : "failed" );
+		return;
+	}
+
+	ri.Printf( PRINT_ALL, "=== Light status (scene platform) ===\n" );
+	if ( ri.Cmd_Argc() >= 2 ) {
+		id = (vkSceneId_t)strtoull( ri.Cmd_Argv( 1 ), NULL, 0 );
+		n = vk_scene_platform_get( id );
+		if ( !n || n->kind != VK_SCENE_KIND_LIGHT ) {
+			ri.Printf( PRINT_ALL, "light_status: id 0x%llx not a light\n", (unsigned long long)id );
+			return;
+		}
+		ri.Printf( PRINT_ALL, "id=0x%llx authored=%d dlightIdx=%u visible=%d\n",
+			(unsigned long long)id, n->lightAuthored ? 1 : 0, n->lightIndex, n->visible ? 1 : 0 );
+		ri.Printf( PRINT_ALL, "origin=%.1f %.1f %.1f\n",
+			n->worldOrigin[0], n->worldOrigin[1], n->worldOrigin[2] );
+		ri.Printf( PRINT_ALL, "color=%s (%.3f %.3f %.3f) radius=%s (%.1f)\n",
+			n->lightHasColor ? "set" : "-",
+			n->lightColor[0], n->lightColor[1], n->lightColor[2],
+			n->lightHasRadius ? "set" : "-", n->lightRadius );
+		ri.Printf( PRINT_ALL, "area=%s half=%.1f x %.1f dirty=0x%x\n",
+			n->lightHasArea ? "yes" : "no", n->lightHalfW, n->lightHalfH, n->dirty );
+		return;
+	}
+	for ( i = 0; i < s_state.nodeCount; i++ ) {
+		n = &s_nodes[i];
+		if ( !n->alive || n->kind != VK_SCENE_KIND_LIGHT ) {
+			continue;
+		}
+		ri.Printf( PRINT_ALL, "  id=0x%llx %s area=%d color=(%.2f %.2f %.2f) rad=%.0f\n",
+			(unsigned long long)n->id,
+			n->lightAuthored ? "authored" : "linked",
+			n->lightHasArea ? 1 : 0,
+			n->lightColor[0], n->lightColor[1], n->lightColor[2],
+			n->lightRadius );
+	}
 }

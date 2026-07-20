@@ -233,6 +233,10 @@ layout(std430, set = 18, binding = 2) readonly buffer FpParamSSBO {
 } fp_params;
 layout(set = 18, binding = 4) uniform sampler2D fp_sun_shadow_map;
 layout(set = 18, binding = 5, r8) uniform image2D reactiveMaskImg;
+layout(set = 18, binding = 6) uniform sampler2D ltc_mat_texture;
+layout(set = 18, binding = 7) uniform sampler2D ltc_amp_texture;
+#define USE_LTC_AREA_LIGHT
+#include "ltc_area_light.glsl"
 #endif
 
 /* Dedicated material-blend layer arrays (set 19): unique textures for layers 0..7. */
@@ -1697,10 +1701,21 @@ void main() {
 						float rad = max( fp_lights.fp_light_data[ b0 ].w, 1e-3 );
 						vec4 lc = fp_lights.fp_light_data[ b0 + 1u ];
 						vec4 lpack = fp_lights.fp_light_data[ b0 + 2u ];
+						vec4 ltail = fp_lights.fp_light_data[ b0 + 3u ];
 						vec3 Ldir;
 						float att = 0.0;
 						float NLfp = 0.0;
-						if ( lc.w < 0.5 ) {
+						if ( fpLightIsArea( lc.w ) ) {
+							vec3 halfU = lpack.xyz;
+							vec3 halfV = ltail.xyz;
+							float addBoostA = mix( 1.0, 1.25, step( 0.5, lpack.w ) );
+							vec3 areaContrib = EvalRectAreaLight(
+								N, E, var_WorldPos, lpos, halfU, halfV,
+								lc.rgb * addBoostA, diffuse.rgb, specular.rgb, 0.0, roughness,
+								ltc_mat_texture, ltc_amp_texture );
+							fpDiffAcc += areaContrib * shadeStr;
+							continue;
+						} else if ( lc.w < 0.5 ) {
 							vec3 Lw = lpos - var_WorldPos;
 							float dist = length( Lw );
 							if ( dist > rad ) {
@@ -1715,8 +1730,8 @@ void main() {
 						} else {
 							vec3 axis = normalize( vec3( lpack.x, lpack.y, lpack.z ) );
 							float cosOuter = lpack.w;
-							float cosInner = fp_lights.fp_light_data[ b0 + 3u ].x;
-							float segLen = max( fp_lights.fp_light_data[ b0 + 3u ].y, 1e-3 );
+							float cosInner = ltail.x;
+							float segLen = max( ltail.y, 1e-3 );
 							vec3 v = var_WorldPos - lpos;
 							float tAx = dot( v, axis );
 							float tCl = clamp( tAx, 0.0, segLen );
@@ -1742,7 +1757,7 @@ void main() {
 							continue;
 						}
 						/* Packed dlight_t.additive (vk_forward_plus.c rec[14]) — slightly stronger add like legacy ADD blend. */
-						float fpAdditive = fp_lights.fp_light_data[ b0 + 3u ].z;
+						float fpAdditive = ltail.z;
 						float addBoost = mix( 1.0, 1.25, step( 0.5, fpAdditive ) );
 						vec3 Lfp = Ldir;
 						vec3 Hfp = normalize( Lfp + E );

@@ -138,6 +138,12 @@ typedef struct dlight_s {
 	vec3_t	transformed2;		// origin2 in local coordinate system
 	int		additive;			// texture detail is lost tho when the lightmap is dark
 	qboolean linear;
+	/* Rectangular area light (Cinematic Platform LTC path). When set, linear is ignored. */
+	qboolean area;
+	float	areaHalfWidth;
+	float	areaHalfHeight;
+	vec3_t	areaRight;			/* world-space unit right; scaled by halfWidth at pack */
+	vec3_t	areaUp;				/* world-space unit up; scaled by halfHeight at pack */
 	struct litSurf_s	*head;
 	struct litSurf_s	*tail;
 } dlight_t;
@@ -2403,6 +2409,9 @@ void RE_SetEntityMorphWeight( const refEntity_t *ent, const char *name, float we
 void RE_AddRefEntityToScene( const refEntity_t *ent, qboolean intShaderTime );
 void RE_AddPolyToScene( qhandle_t hShader , int numVerts, const polyVert_t *verts, int num );
 void RE_AddLightToScene( const vec3_t org, float intensity, float r, float g, float b );
+/* Internal / tools: rect area light for Forward+ LTC (not a public refExport ABI add). */
+void RE_AddAreaLightToScene( const vec3_t org, float halfWidth, float halfHeight,
+	const vec3_t right, const vec3_t up, float intensity, float r, float g, float b );
 void RE_AddAdditiveLightToScene( const vec3_t org, float intensity, float r, float g, float b );
 void RE_AddLinearLightToScene( const vec3_t start, const vec3_t end, float intensity, float r, float g, float b );
 

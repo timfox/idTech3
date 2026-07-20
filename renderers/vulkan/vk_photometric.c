@@ -6,6 +6,7 @@ Cinematic Engine Platform 1.0 — Photometric lighting contract.
 
 #include "tr_local.h"
 #include "vk_photometric.h"
+#include "vk_ltc.h"
 #include "ltc_tables.h"
 
 static cvar_t *r_photometricLights;
@@ -40,8 +41,8 @@ void vk_photometric_init( void )
 {
 	vk_photometric_register_cvars();
 	Com_Memset( &s_photo, 0, sizeof( s_photo ) );
-	s_photo.ltcTablesPresent = qtrue; /* ltc_tables.h linked */
-	s_photo.ltcUploaded = qfalse;
+	s_photo.ltcTablesPresent = qtrue;
+	s_photo.ltcUploaded = vk_ltc_uploaded();
 	s_photo.legacyScale = r_photometricLegacyScale ? r_photometricLegacyScale->value : 0.001f;
 	s_photo.defaultKelvin = r_photometricKelvin ? r_photometricKelvin->value : 6500.0f;
 
@@ -52,7 +53,7 @@ void vk_photometric_init( void )
 
 	if ( r_photometricLights && r_photometricLights->integer ) {
 		ri.Printf( PRINT_ALL,
-			"[VK] Photometric lights: active (legacyScale=%.4f kelvin=%.0f LTC_tables=%s upload=pending)\n",
+			"[VK] Photometric lights: active (legacyScale=%.4f kelvin=%.0f LTC_tables=%s)\n",
 			s_photo.legacyScale, s_photo.defaultKelvin,
 			s_photo.ltcTablesPresent ? "present" : "missing" );
 		(void)s_ltcMatCanonical[0]; /* ensure LTC table is linked */
@@ -79,6 +80,7 @@ const vkPhotometricState_t *vk_photometric_state( void )
 	s_photo.applyToPack = s_photo.active;
 	s_photo.legacyScale = r_photometricLegacyScale ? r_photometricLegacyScale->value : 0.001f;
 	s_photo.defaultKelvin = r_photometricKelvin ? r_photometricKelvin->value : 6500.0f;
+	s_photo.ltcUploaded = vk_ltc_uploaded();
 	return &s_photo;
 }
 
@@ -169,7 +171,7 @@ void vk_photometric_status_f( void )
 	ri.Printf( PRINT_ALL, "legacyScale    : %.6f (candela→legacy)\n", st->legacyScale );
 	ri.Printf( PRINT_ALL, "defaultKelvin  : %.0f → rgb(%.3f %.3f %.3f)\n",
 		st->defaultKelvin, rgb[0], rgb[1], rgb[2] );
-	ri.Printf( PRINT_ALL, "LTC            : tables=%s uploaded=%s (area-light shading quality opt-in)\n",
+	ri.Printf( PRINT_ALL, "LTC            : tables=%s uploaded=%s (Forward+/deferred rect area lights)\n",
 		st->ltcTablesPresent ? "yes" : "no", st->ltcUploaded ? "yes" : "no" );
 	ri.Printf( PRINT_ALL, "conversions    : %u\n", st->conversions );
 	ri.Printf( PRINT_ALL, "contract       : deferred/Forward+/volumetrics/GI/tools share these units\n" );

@@ -16,6 +16,9 @@ docs/RENDERER_2026_ARCHITECTURE_PASS.md.
 #include "vk_view_state.h"
 #include "vk_reactive_mask.h"
 #include "vk_pass_registry.h"
+#include "vk_ltc.h"
+#include "vk_scene_platform.h"
+#include "vk_photometric.h"
 
 #define VK_FP_RECORD_STRIDE (sizeof(float) * 16) /* 4 x vec4 per light */
 #define VK_FP_HEADER_BYTES (sizeof(float) * 8) /* 2 x vec4: count/meta + tile grid / viewport */
@@ -334,7 +337,7 @@ static void vk_fp_write_graphics_descriptor( VkBuffer light_buf, VkBuffer tile_b
 
 void vk_forward_plus_create_set_layout( void )
 {
-	VkDescriptorSetLayoutBinding binds[6];
+	VkDescriptorSetLayoutBinding binds[8];
 	VkDescriptorSetLayoutCreateInfo layout_ci;
 
 #ifdef USE_VK_PBR
@@ -368,11 +371,20 @@ void vk_forward_plus_create_set_layout( void )
 	binds[5].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
 	binds[5].descriptorCount = 1;
 	binds[5].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+	/* LTC mat / amp LUTs for rectangular area lights (fragment + deferred via shared tables). */
+	binds[6].binding = 6;
+	binds[6].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+	binds[6].descriptorCount = 1;
+	binds[6].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+	binds[7].binding = 7;
+	binds[7].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+	binds[7].descriptorCount = 1;
+	binds[7].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
 
 	layout_ci.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
 	layout_ci.pNext = NULL;
 	layout_ci.flags = 0;
-	layout_ci.bindingCount = 6;
+	layout_ci.bindingCount = 8;
 	layout_ci.pBindings = binds;
 	VK_CHECK( qvkCreateDescriptorSetLayout( vk.device, &layout_ci, NULL, &vk.set_layout_forward_plus ) );
 	SET_OBJECT_NAME( vk.set_layout_forward_plus, "descriptor set layout - forward+", VK_DEBUG_REPORT_OBJECT_TYPE_DESCRIPTOR_SET_LAYOUT_EXT );
@@ -421,6 +433,8 @@ void vk_forward_plus_init_graphics_descriptors( void )
 		vk_fp_write_graphics_descriptor( vk_fp_dummy_light_buf, vk_fp_dummy_tile_buf, vk_fp_dummy_param_buf );
 	}
 	vk_reactive_mask_update_storage_descriptor();
+	vk_ltc_init();
+	vk_ltc_update_forward_plus_descriptors( vk_fp_graphics_descriptor );
 #endif
 }
 
@@ -992,18 +1006,30 @@ void vk_forward_plus_update_for_refdef( void )
 		base[0] = 0.0f;
 	}
 
-	/* Drop stale records when the packed count shrinks (or dlights is null); SSBO is not fully rewritten each frame. */
-	if ( n < max_pack ) {
-		float *tail = base + (uint32_t)( VK_FP_HEADER_BYTES / sizeof( float ) ) +
-			(uint32_t)n * (uint32_t)( VK_FP_RECORD_STRIDE / sizeof( float ) );
-		Com_Memset( tail, 0, (size_t)( max_pack - n ) * (size_t)VK_FP_RECORD_STRIDE );
+	/* Clear full pack region so shrinks / authored appends cannot leave stale lights. */
+	{
+		float *body = base + (uint32_t)( VK_FP_HEADER_BYTES / sizeof( float ) );
+		Com_Memset( body, 0, (size_t)max_pack * (size_t)VK_FP_RECORD_STRIDE );
 	}
 
-	for ( i = 0; i < n; i++ ) {
-		const dlight_t *L = dl + i;
+	for ( i = 0; i < n && dl; i++ ) {
+		dlight_t packed;
+		const dlight_t *L;
 		float *rec = base + (uint32_t)( VK_FP_HEADER_BYTES / sizeof( float ) ) + (uint32_t)i * (uint32_t)( VK_FP_RECORD_STRIDE / sizeof( float ) );
 		vec3_t dir;
 		float len;
+		float photoScale;
+
+		Com_Memcpy( &packed, dl + i, sizeof( packed ) );
+		/* Live-edit overrides from scene platform (origin/color/radius/visibility/area). */
+		if ( vk_scene_platform_active() ) {
+			vk_scene_platform_apply_light_override( (uint32_t)i, &packed );
+		}
+		L = &packed;
+		if ( !L->radius || ( L->color[0] <= 0.0f && L->color[1] <= 0.0f && L->color[2] <= 0.0f ) ) {
+			Com_Memset( rec, 0, (size_t)VK_FP_RECORD_STRIDE );
+			continue;
+		}
 
 		rec[0] = L->origin[0];
 		rec[1] = L->origin[1];
@@ -1013,13 +1039,34 @@ void vk_forward_plus_update_for_refdef( void )
 		{
 			vec3_t scaledColor;
 			R_DynamicLightColor( L, scaledColor );
-			rec[4] = MAX( scaledColor[0], 0.0f );
-			rec[5] = MAX( scaledColor[1], 0.0f );
-			rec[6] = MAX( scaledColor[2], 0.0f );
+			photoScale = vk_photometric_pack_intensity_scale(
+				MAX( MAX( scaledColor[0], scaledColor[1] ), scaledColor[2] ), L->radius );
+			rec[4] = MAX( scaledColor[0] * photoScale, 0.0f );
+			rec[5] = MAX( scaledColor[1] * photoScale, 0.0f );
+			rec[6] = MAX( scaledColor[2] * photoScale, 0.0f );
 		}
-		rec[7] = L->linear ? 1.0f : 0.0f;
 
-		if ( L->linear ) {
+		if ( L->area ) {
+			vec3_t halfU, halfV;
+			float diag;
+			/* type = 2.0 → rect area (lc.w >= 1.5 in shaders). */
+			rec[7] = 2.0f;
+			VectorScale( L->areaRight, L->areaHalfWidth, halfU );
+			VectorScale( L->areaUp, L->areaHalfHeight, halfV );
+			diag = sqrtf( L->areaHalfWidth * L->areaHalfWidth + L->areaHalfHeight * L->areaHalfHeight );
+			if ( rec[3] < diag * 2.0f ) {
+				rec[3] = diag * 2.0f;
+			}
+			rec[8] = halfU[0];
+			rec[9] = halfU[1];
+			rec[10] = halfU[2];
+			rec[11] = L->additive ? 1.0f : 0.0f;
+			rec[12] = halfV[0];
+			rec[13] = halfV[1];
+			rec[14] = halfV[2];
+			rec[15] = 0.0f;
+		} else if ( L->linear ) {
+			rec[7] = 1.0f;
 			VectorSubtract( L->origin2, L->origin, dir );
 			len = VectorNormalize( dir );
 			if ( len <= 0.001f ) {
@@ -1034,6 +1081,7 @@ void vk_forward_plus_update_for_refdef( void )
 			rec[14] = L->additive ? 1.0f : 0.0f;
 			rec[15] = 0.0f;
 		} else {
+			rec[7] = 0.0f;
 			rec[8] = 0.0f;
 			rec[9] = 0.0f;
 			rec[10] = 0.0f;
@@ -1043,6 +1091,12 @@ void vk_forward_plus_update_for_refdef( void )
 			rec[14] = L->additive ? 1.0f : 0.0f;
 			rec[15] = 0.0f;
 		}
+	}
+
+	/* Append scene-authored lights (area fixtures / live-edit spawns) if budget remains. */
+	if ( vk_scene_platform_active() ) {
+		n = vk_scene_platform_append_authored_lights( base, n, (uint32_t)max_pack );
+		base[0] = (float)n;
 	}
 
 	vk.forward_plus.last_packed_count = n;
