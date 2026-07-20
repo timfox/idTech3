@@ -18,6 +18,7 @@ Descriptor set allocation and image/buffer binding updates (split from vk.c).
 #include "vk_volumetric_params.h"
 #include "vk_vdb.h"
 #include "vk_reactive_mask.h"
+#include "vk_pass_registry.h"
 
 void vk_update_attachment_descriptors( void ) {
 	uint32_t i;
@@ -363,6 +364,8 @@ void vk_update_attachment_descriptors( void ) {
 		}
 #endif
 	}
+	/* Attachment recreate must rebuild every dependent descriptor set. */
+	vk_spine_note_descriptors_rebound();
 }
 
 void vk_update_volumetric_descriptors( void )

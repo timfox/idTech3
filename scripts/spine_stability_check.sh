@@ -70,6 +70,9 @@ bash "$ROOT/scripts/pass_registry_check.sh"
 # 2f. Combination matrix (stable / quality / temporal / safe)
 bash "$ROOT/scripts/spine_combo_matrix_check.sh"
 
+# 2g. Spine 1.1 certification static contracts (opt-in WBOIT×TAA×weapon)
+bash "$ROOT/scripts/spine_1_1_cert_check.sh"
+
 # 3. WBOIT clears + barriers + debug-Z
 grep -q 'renderPass == vk.render_pass.oit_accum' renderers/vulkan/vk_render_pass.c || fail "OIT accum clear site missing"
 grep -A12 'renderPass == vk.render_pass.oit_accum' renderers/vulkan/vk_render_pass.c | grep -q 'clear_values\[1\].color.float32\[0\] = 1.0f' || fail "OIT reveal clear one missing"

@@ -548,6 +548,7 @@ void vk_end_frame_record_taa_pass( VkImageView *post_fog_src, VkImageView *lumin
 	vk_pass_diag_stage( "taa_enter" );
 
 	taa_src = ( *post_fog_src != VK_NULL_HANDLE ) ? *post_fog_src : vk.color_image_view;
+	vk_spine_cert_check_taa_input( taa_src );
 	/* Prefer doneWorldScene over the last refdef (HUD/weapon may set RDF_NOWORLDMODEL). */
 	allow_taa = ( tr.world != NULL ) &&
 		backEnd.doneWorldScene &&
@@ -677,6 +678,7 @@ void vk_end_frame_record_taa_pass( VkImageView *post_fog_src, VkImageView *lumin
 	}
 
 	/* Weapon/view-model after world TAA — never contaminate history. */
+	vk_spine_cert_check_weapon_flush_order( qtrue );
 	RB_FlushDeferredWeaponAfterTaa( post_fog_src, luminance_src );
 	vk_pass_diag_stage( "taa_exit" );
 }

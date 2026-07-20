@@ -98,6 +98,10 @@ static void vk_oit_barrier_targets_for_sampling( const char *reason )
 	vk_spine_note_barrier( VK_SPINE_RES_OIT_REVEAL, VK_SPINE_PASS_OIT_RESOLVE, reason );
 	vk_spine_note_barrier( VK_SPINE_RES_OIT_MOMENTS, VK_SPINE_PASS_OIT_RESOLVE, reason );
 	vk_spine_note_barrier( VK_SPINE_RES_OIT_B0, VK_SPINE_PASS_OIT_RESOLVE, reason );
+	vk_spine_note_layout( VK_SPINE_RES_OIT_ACCUM, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL );
+	vk_spine_note_layout( VK_SPINE_RES_OIT_REVEAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL );
+	vk_spine_note_layout( VK_SPINE_RES_OIT_MOMENTS, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL );
+	vk_spine_note_layout( VK_SPINE_RES_OIT_B0, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL );
 
 	if ( r_fboDebug && r_fboDebug->integer >= 2 && vk_post_fog_fbo_debug_throttle() ) {
 		uint32_t w = 0, h = 0;
@@ -281,18 +285,24 @@ void vk_oit_pass( const struct drawSurfsCommand_s *cmd )
 		vk.oit_opaque_descriptor == VK_NULL_HANDLE || vk.oit_accum_descriptor == VK_NULL_HANDLE ||
 		vk.oit_reveal_descriptor == VK_NULL_HANDLE || vk.oit_depth_descriptor == VK_NULL_HANDLE ||
 		vk.fog_scene_image_view == VK_NULL_HANDLE || vk.oit_accum_image_view == VK_NULL_HANDLE ||
-		vk.oit_reveal_image_view == VK_NULL_HANDLE )
+		vk.oit_reveal_image_view == VK_NULL_HANDLE ) {
+		vk_spine_note_oit_skipped();
 		return;
+	}
 
 	if ( mboit && ( vk.render_pass.oit_moments == VK_NULL_HANDLE ||
 		vk.framebuffers.oit_moments == VK_NULL_HANDLE ||
 		vk.oit_moments_pipeline == VK_NULL_HANDLE || vk.oit_accum_mboit_pipeline == VK_NULL_HANDLE ||
 		vk.oit_moments_image_view == VK_NULL_HANDLE || vk.oit_b0_image_view == VK_NULL_HANDLE ||
-		vk.oit_moments_descriptor == VK_NULL_HANDLE || vk.oit_b0_descriptor == VK_NULL_HANDLE ) )
+		vk.oit_moments_descriptor == VK_NULL_HANDLE || vk.oit_b0_descriptor == VK_NULL_HANDLE ) ) {
+		vk_spine_note_oit_skipped();
 		return;
+	}
 
-	if ( !mboit && vk.oit_accum_pipeline == VK_NULL_HANDLE )
+	if ( !mboit && vk.oit_accum_pipeline == VK_NULL_HANDLE ) {
+		vk_spine_note_oit_skipped();
 		return;
+	}
 
 	if ( mboit ) {
 		vk_spine_pass_begin( VK_SPINE_PASS_MBOIT_MOMENTS );

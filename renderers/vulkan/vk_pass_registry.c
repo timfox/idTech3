@@ -10,12 +10,17 @@ Lightweight Spine pass / resource registry implementation.
 #include "vk_scene_pass.h"
 #include "vk_temporal.h"
 #include "vk_util.h"
+#include <math.h>
 #include <stdarg.h>
 
 cvar_t *r_spineValidate;
+cvar_t *r_spineCert;
 
 #define VK_SPINE_MAX_OPEN 8
 #define VK_SPINE_MAX_VIOLATIONS 16
+#define VK_SPINE_CERT_BLACK_SETTLE_FRAMES 45
+#define VK_SPINE_CERT_BLACK_STREAK 8
+#define VK_SPINE_CERT_BLACK_LOG_LUM_FLOOR (-12.0f)
 
 typedef struct {
 	vkSpinePassId id;
@@ -55,6 +60,15 @@ typedef struct {
 typedef struct {
 	qboolean initialized;
 	uint32_t attachmentGeneration;
+	uint32_t descriptorGeneration;
+	qboolean descriptorsPendingRebound;
+	uint32_t liveResourceCount;
+	uint32_t liveResourceBaseline;
+	qboolean liveBaselineArmed;
+	uint32_t certFrameIndex;
+	uint32_t blackStreak;
+	qboolean oitResolvedThisFrame;
+	qboolean oitSkippedThisFrame;
 	vkSpinePhase currentPhase;
 	vkSpinePhase highestPhase;
 	vkSpinePassId openStack[VK_SPINE_MAX_OPEN];
@@ -67,6 +81,7 @@ typedef struct {
 	char lastViolation[128];
 	char comboFallback[96];
 	qboolean suppressTaaThisFrame;
+	qboolean spine11CertActive;
 } vkSpineRuntime;
 
 static vkSpineRuntime s_spine;
@@ -408,12 +423,79 @@ static void vk_spine_record_violation( const char *fmt, ... )
 
 qboolean vk_spine_validate_enabled( void )
 {
+	if ( r_spineCert && r_spineCert->integer ) {
+		return qtrue;
+	}
 	return ( r_spineValidate && r_spineValidate->integer > 0 ) ? qtrue : qfalse;
+}
+
+qboolean vk_spine_is_spine_1_1_combo( void )
+{
+	const int oit = r_oit ? r_oit->integer : 0;
+	const int taa = r_taa ? r_taa->integer : 0;
+	const int weaponAfter = r_temporalWeaponAfterTaa ? r_temporalWeaponAfterTaa->integer : 0;
+	const int mode = r_renderMode ? r_renderMode->integer : 0;
+	const int aaMode = r_aaMode ? r_aaMode->integer : 0;
+	const int cleanup = r_temporalSmaaCleanup ? r_temporalSmaaCleanup->integer : 0;
+
+	/* WBOIT × Temporal Reconstruction × weapon-after on Unified Clustered. */
+	return ( oit == 1 && taa && weaponAfter && mode == 3 && aaMode == 4 && !cleanup ) ? qtrue : qfalse;
+}
+
+qboolean vk_spine_cert_active( void )
+{
+	if ( !vk_spine_is_spine_1_1_combo() ) {
+		return qfalse;
+	}
+	if ( r_spineCert && r_spineCert->integer ) {
+		return qtrue;
+	}
+	/* Full cert matrix under validate still runs ownership asserts. */
+	return vk_spine_validate_enabled();
 }
 
 uint32_t vk_spine_attachment_generation( void )
 {
 	return s_spine.attachmentGeneration;
+}
+
+uint32_t vk_spine_descriptor_generation( void )
+{
+	return s_spine.descriptorGeneration;
+}
+
+uint32_t vk_spine_violation_count( void )
+{
+	return s_spine.violationCount;
+}
+
+void vk_spine_reset_cert_counters( void )
+{
+	s_spine.violationCount = 0u;
+	s_spine.lastViolation[0] = '\0';
+	s_spine.blackStreak = 0u;
+	s_spine.certFrameIndex = 0u;
+	s_spine.liveBaselineArmed = qfalse;
+	s_spine.liveResourceBaseline = 0u;
+}
+
+static uint32_t vk_spine_count_alive_resources( void )
+{
+	uint32_t n = 0u;
+	vkSpineResourceId r;
+
+	for ( r = (vkSpineResourceId)1; r < VK_SPINE_RES_COUNT; r++ ) {
+		if ( s_spine.resources[r].alive ) {
+			n++;
+		}
+	}
+	return n;
+}
+
+static qboolean vk_spine_is_oit_resource( vkSpineResourceId res )
+{
+	return ( res == VK_SPINE_RES_OIT_ACCUM || res == VK_SPINE_RES_OIT_REVEAL ||
+		res == VK_SPINE_RES_OIT_MOMENTS || res == VK_SPINE_RES_OIT_B0 ) ? qtrue : qfalse;
 }
 
 const char *vk_spine_phase_name( vkSpinePhase phase )
@@ -592,6 +674,7 @@ void vk_spine_registry_init( void )
 	Com_Memset( &s_spine, 0, sizeof( s_spine ) );
 	s_spine.initialized = qtrue;
 	s_spine.attachmentGeneration = 1u;
+	s_spine.descriptorGeneration = 1u;
 	s_spine.currentPhase = VK_SPINE_PHASE_FRAME_BEGIN;
 
 	r_spineValidate = ri.Cvar_Get( "r_spineValidate", "0", CVAR_ARCHIVE_ND );
@@ -601,12 +684,29 @@ void vk_spine_registry_init( void )
 		" 0 - ownership stamps only (cheap)\n"
 		" 1 - validate phase order / stale reads (developer)\n"
 		" 2 - same, PRINT_ALL on violations" );
+	r_spineCert = ri.Cvar_Get( "r_spineCert", "0", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_spineCert, "0", "1", CV_INTEGER );
+	ri.Cvar_SetDescription( r_spineCert,
+		"Spine 1.1 certification asserts (black-frame / descriptor gen / OIT×TAA ownership). "
+		"Use with exec vulkan_overlay_spine_1_1_cert.cfg." );
 	if ( ri.Cmd_AddCommand ) {
 		ri.Cmd_AddCommand( "pass_registry_status", vk_spine_status_f );
 		ri.Cmd_AddCommand( "spine_status", vk_spine_status_f );
 	}
-	ri.Printf( PRINT_ALL, "[VK][spine] pass/resource registry ready (r_spineValidate=%d; combo soft-demote + DEVICE_LOST late-post context)\n",
-		r_spineValidate ? r_spineValidate->integer : 0 );
+	/* Attachments may already exist (init order: create_attachments before registry). */
+	if ( vk.color_image != VK_NULL_HANDLE ) {
+		uint32_t aw = 0, ah = 0;
+		vk_get_active_render_extent( &aw, &ah );
+		/* Stamp at gen 1 without double-bump: attachments_created increments. */
+		s_spine.attachmentGeneration = 0u;
+		vk_spine_attachments_created( aw, ah );
+		/* vk_init_descriptors may run after us and will clear pending rebound. */
+	}
+	ri.Printf( PRINT_ALL,
+		"[VK][spine] pass/resource registry ready (r_spineValidate=%d r_spineCert=%d; "
+		"Spine 1.1 WBOIT×TAA×weapon cert + DEVICE_LOST late-post context)\n",
+		r_spineValidate ? r_spineValidate->integer : 0,
+		r_spineCert ? r_spineCert->integer : 0 );
 }
 
 void vk_spine_registry_shutdown( void )
@@ -630,14 +730,32 @@ void vk_spine_frame_begin( void )
 	s_spine.openCount = 0;
 	s_spine.lastBegun = VK_SPINE_PASS_NONE;
 	s_spine.lastEnded = VK_SPINE_PASS_NONE;
+	s_spine.oitResolvedThisFrame = qfalse;
+	s_spine.oitSkippedThisFrame = qfalse;
+	s_spine.certFrameIndex++;
 	Com_Memset( s_spine.framePassMask, 0, sizeof( s_spine.framePassMask ) );
 	for ( i = 0; i < VK_SPINE_RES_COUNT; i++ ) {
 		/* Keep alive/generation/extent across frames; clear per-frame edge stamps. */
 		s_spine.resources[i].clearedThisFrame = qfalse;
 		s_spine.resources[i].barrierThisFrame = qfalse;
+		/* OIT targets are single-frame — never carry history validity. */
+		if ( vk_spine_is_oit_resource( (vkSpineResourceId)i ) ) {
+			s_spine.resources[i].historyValid = qfalse;
+		}
 		if ( vk_spine_validate_enabled() ) {
 			s_spine.resources[i].lastReader = VK_SPINE_PASS_NONE;
 			s_spine.resources[i].lastReadAccess = 0u;
+		}
+	}
+	if ( vk_spine_validate_enabled() ) {
+		if ( s_spine.descriptorsPendingRebound ) {
+			vk_spine_record_violation(
+				"attachments recreated without descriptor rebound (attGen=%u descGen=%u)",
+				s_spine.attachmentGeneration, s_spine.descriptorGeneration );
+		} else if ( s_spine.descriptorGeneration != s_spine.attachmentGeneration ) {
+			vk_spine_record_violation(
+				"stale descriptor generation %u (attachment %u)",
+				s_spine.descriptorGeneration, s_spine.attachmentGeneration );
 		}
 	}
 	vk_spine_pass_begin( VK_SPINE_PASS_FRAME_PREP );
@@ -668,6 +786,8 @@ void vk_spine_frame_end( void )
 	vk_spine_note_temporal_history( VK_SPINE_RES_TAA_HISTORY,
 		vk.temporal.hasValidTAAHistory );
 	vk_spine_pass_end( VK_SPINE_PASS_HISTORY_MAINT );
+	vk_spine_cert_check_black_frame();
+	vk_spine_cert_check_resource_growth();
 	s_spine.currentPhase = VK_SPINE_PHASE_FRAME_END;
 	s_spine.openCount = 0;
 }
@@ -766,9 +886,25 @@ void vk_spine_note_write( vkSpineResourceId res, vkSpinePassId pass, uint32_t ac
 	rt = &s_spine.resources[res];
 	rt->lastWriter = pass;
 	rt->lastWriteAccess = access;
-	if ( ( access & VK_SPINE_ACCESS_HISTORY_WRITE ) != 0u ) {
+	if ( vk_spine_is_oit_resource( res ) &&
+		( access & ( VK_SPINE_ACCESS_HISTORY_WRITE | VK_SPINE_ACCESS_HISTORY_READ ) ) != 0u ) {
+		if ( vk_spine_validate_enabled() ) {
+			vk_spine_record_violation(
+				"OIT resource %s must remain single-frame (history write by %s forbidden)",
+				vk_spine_resource_name( res ), vk_spine_pass_name( pass ) );
+		}
+		rt->historyValid = qfalse;
+	} else if ( ( access & VK_SPINE_ACCESS_HISTORY_WRITE ) != 0u ) {
 		rt->historyValid = qtrue;
 		rt->ownerViewClass = vk_classify_current_view();
+	}
+	/* Weapon must never own TAA history (ordering ownership, not dual buffers). */
+	if ( pass == VK_SPINE_PASS_WEAPON && res == VK_SPINE_RES_TAA_HISTORY &&
+		vk_spine_validate_enabled() ) {
+		vk_spine_record_violation( "weapon pass wrote TAA history (weapon must stay presentation-only)" );
+	}
+	if ( pass == VK_SPINE_PASS_OIT_RESOLVE && res == VK_SPINE_RES_HDR_COLOR ) {
+		s_spine.oitResolvedThisFrame = qtrue;
 	}
 	if ( vk_spine_validate_enabled() && rt->alive &&
 		rt->generation != 0u && rt->generation != s_spine.attachmentGeneration ) {
@@ -791,6 +927,19 @@ void vk_spine_note_read( vkSpineResourceId res, vkSpinePassId pass, uint32_t acc
 
 	if ( !vk_spine_validate_enabled() ) {
 		return;
+	}
+	if ( vk_spine_is_oit_resource( res ) &&
+		( access & ( VK_SPINE_ACCESS_HISTORY_READ | VK_SPINE_ACCESS_HISTORY_WRITE ) ) != 0u ) {
+		vk_spine_record_violation(
+			"OIT resource %s treated as history by %s (single-frame only)",
+			vk_spine_resource_name( res ), vk_spine_pass_name( pass ) );
+	}
+	/* Temporal Reconstruction must not sample raw OIT targets as current color. */
+	if ( pass == VK_SPINE_PASS_TEMPORAL_RECON && vk_spine_is_oit_resource( res ) &&
+		( access & ( VK_SPINE_ACCESS_SAMPLED_READ | VK_SPINE_ACCESS_HISTORY_READ ) ) != 0u ) {
+		vk_spine_record_violation(
+			"TAA sampled raw OIT %s (resolved HDR only)",
+			vk_spine_resource_name( res ) );
 	}
 	if ( rt->alive && rt->generation != 0u && rt->generation != s_spine.attachmentGeneration ) {
 		vk_spine_record_violation( "read %s by %s: stale generation %u (current %u)",
@@ -951,6 +1100,9 @@ void vk_spine_attachments_created( uint32_t width, uint32_t height )
 	if ( s_spine.attachmentGeneration == 0u ) {
 		s_spine.attachmentGeneration = 1u;
 	}
+	/* Recreated images invalidate every dependent descriptor until rebound. */
+	s_spine.descriptorsPendingRebound = qtrue;
+	s_spine.liveBaselineArmed = qfalse;
 
 	vk_spine_set_resource_alive( VK_SPINE_RES_DEPTH, vk.depth_image != VK_NULL_HANDLE, width, height, depthFmt );
 	vk_spine_set_resource_alive( VK_SPINE_RES_HDR_COLOR, vk.color_image != VK_NULL_HANDLE, width, height, colorFmt );
@@ -1026,6 +1178,18 @@ void vk_spine_attachments_created( uint32_t width, uint32_t height )
 	/* Temporal histories invalidate across attachment recreate. */
 	vk_spine_note_temporal_history( VK_SPINE_RES_TAA_HISTORY, qfalse );
 	vk_spine_note_temporal_history( VK_SPINE_RES_AV_HISTORY, qfalse );
+
+	s_spine.liveResourceCount = vk_spine_count_alive_resources();
+}
+
+void vk_spine_note_descriptors_rebound( void )
+{
+	if ( !s_spine.initialized ) {
+		return;
+	}
+	s_spine.descriptorGeneration = s_spine.attachmentGeneration;
+	s_spine.descriptorsPendingRebound = qfalse;
+	s_spine.liveResourceCount = vk_spine_count_alive_resources();
 }
 
 void vk_spine_attachments_destroyed( void )
@@ -1091,6 +1255,7 @@ void vk_spine_validate_feature_combos( void )
 	oitOn = ( r_oit && r_oit->integer ) ? qtrue : qfalse;
 	taaOn = ( r_taa && r_taa->integer ) ? qtrue : qfalse;
 	weaponAfter = ( r_temporalWeaponAfterTaa && r_temporalWeaponAfterTaa->integer ) ? qtrue : qfalse;
+	s_spine.spine11CertActive = vk_spine_is_spine_1_1_combo();
 	if ( oitOn && taaOn ) {
 		Q_strncpyz( s_spine.comboFallback, "oit_x_taa", sizeof( s_spine.comboFallback ) );
 		if ( !weaponAfter ) {
@@ -1109,18 +1274,42 @@ void vk_spine_validate_feature_combos( void )
 				vk_spine_record_violation(
 					"feature combo: OIT + TAA requires r_temporalWeaponAfterTaa 1" );
 			}
-		} else if ( !s_warnedOitTaa ) {
-			ri.Printf( PRINT_ALL, S_COLOR_YELLOW
-				"[VK][spine] experimental combo: OIT + TAA (weapon-after on). "
-				"Certified matrix keeps them separate; enable r_spineValidate 1 while testing.\n" );
-			s_warnedOitTaa = qtrue;
-			if ( vk_spine_validate_enabled() ) {
-				vk_spine_record_violation(
-					"feature combo: OIT + TAA both enabled (quality matrix; weapon-after-TAA required)" );
+		} else if ( s_spine.spine11CertActive ) {
+			/* Spine 1.1 certified: mode3 + WBOIT + Temporal Reconstruction + weapon-after. */
+			Q_strncpyz( s_spine.comboFallback, "spine_1_1_oit_taa_weapon",
+				sizeof( s_spine.comboFallback ) );
+			if ( !s_warnedOitTaa ) {
+				ri.Printf( PRINT_ALL,
+					"[VK][spine] Spine 1.1 certified combo active: mode3 + WBOIT + Temporal Reconstruction "
+					"+ weapon-after-TAA (r_spineCert=%d)\n",
+					r_spineCert ? r_spineCert->integer : 0 );
+				s_warnedOitTaa = qtrue;
 			}
-		} else if ( vk_spine_validate_enabled() ) {
-			vk_spine_record_violation(
-				"feature combo: OIT + TAA both enabled (quality matrix; weapon-after-TAA required)" );
+			/* No violation — this is the certified ownership path. */
+		} else if ( r_oit && r_oit->integer == 2 ) {
+			/* MBOIT × TAA remains experimental until WBOIT cert soak passes. */
+			Q_strncpyz( s_spine.comboFallback, "mboit_x_taa_experimental",
+				sizeof( s_spine.comboFallback ) );
+			if ( !s_warnedOitTaa ) {
+				ri.Printf( PRINT_ALL, S_COLOR_YELLOW
+					"[VK][spine] experimental combo: MBOIT + TAA (weapon-after on). "
+					"Spine 1.1 cert targets WBOIT (r_oit 1) only; keep MBOIT off for cert.\n" );
+				s_warnedOitTaa = qtrue;
+			}
+			if ( vk_spine_validate_enabled() && r_spineValidate && r_spineValidate->integer >= 2 ) {
+				vk_spine_record_violation(
+					"feature combo: MBOIT + TAA experimental (not Spine 1.1 certified)" );
+			}
+		} else {
+			/* WBOIT+TAA+weapon but missing mode3/aaMode4 pins — experimental, no perpetual fail. */
+			Q_strncpyz( s_spine.comboFallback, "oit_x_taa_experimental",
+				sizeof( s_spine.comboFallback ) );
+			if ( !s_warnedOitTaa ) {
+				ri.Printf( PRINT_ALL, S_COLOR_YELLOW
+					"[VK][spine] experimental combo: OIT + TAA (weapon-after on). "
+					"For Spine 1.1 cert: exec vulkan_overlay_spine_1_1_cert.cfg\n" );
+				s_warnedOitTaa = qtrue;
+			}
 		}
 	} else if ( taaOn && !weaponAfter ) {
 		Q_strncpyz( s_spine.comboFallback, "taa_without_weapon_after", sizeof( s_spine.comboFallback ) );
@@ -1133,6 +1322,146 @@ void vk_spine_validate_feature_combos( void )
 			vk_spine_record_violation(
 				"feature combo: TAA without r_temporalWeaponAfterTaa 1 (weapon can poison history)" );
 		}
+	}
+}
+
+void vk_spine_note_oit_skipped( void )
+{
+	if ( !s_spine.initialized ) {
+		return;
+	}
+	s_spine.oitSkippedThisFrame = qtrue;
+	/* Fallback scene-color producer remains HDR color_image (opaque / deferred result). */
+	if ( vk.color_image != VK_NULL_HANDLE ) {
+		vk_spine_note_write( VK_SPINE_RES_HDR_COLOR, VK_SPINE_PASS_WORLD_OPAQUE,
+			VK_SPINE_ACCESS_COLOR_WRITE );
+		vk_spine_note_layout( VK_SPINE_RES_HDR_COLOR, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL );
+	}
+}
+
+void vk_spine_cert_check_taa_input( VkImageView taa_src )
+{
+	if ( !vk_spine_cert_active() || !vk_spine_validate_enabled() ) {
+		return;
+	}
+	if ( taa_src == VK_NULL_HANDLE ) {
+		return;
+	}
+	/* Key invariant: TAA consumes only resolved world color, never raw OIT targets. */
+	if ( taa_src == vk.oit_accum_image_view ||
+		taa_src == vk.oit_reveal_image_view ||
+		taa_src == vk.oit_moments_image_view ||
+		taa_src == vk.oit_b0_image_view ) {
+		vk_spine_record_violation(
+			"TAA current bound to raw OIT attachment (resolved HDR only)" );
+	}
+	if ( r_oit && r_oit->integer == 1 && !s_spine.oitSkippedThisFrame &&
+		s_spine.oitResolvedThisFrame ) {
+		/* After WBOIT resolve, OIT color-write layouts must not remain attachment-optimal. */
+		if ( vk_spine_resource_layout( VK_SPINE_RES_OIT_ACCUM ) ==
+			VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL ) {
+			vk_spine_record_violation(
+				"TAA begin while OIT accum still COLOR_ATTACHMENT (need resolve barrier)" );
+		}
+	}
+}
+
+void vk_spine_cert_check_black_frame( void )
+{
+	float avgLogLum;
+
+	if ( !vk_spine_cert_active() || !( r_spineCert && r_spineCert->integer ) ) {
+		return;
+	}
+	if ( s_spine.certFrameIndex < VK_SPINE_CERT_BLACK_SETTLE_FRAMES ) {
+		s_spine.blackStreak = 0u;
+		return;
+	}
+	if ( !vk.luminance_staging_ptr || !backEnd.doneWorldScene || tr.world == NULL ) {
+		return;
+	}
+	avgLogLum = *(const float *)vk.luminance_staging_ptr;
+	if ( !isfinite( avgLogLum ) ) {
+		vk_spine_record_violation( "NaN/Inf luminance (avgLogLum=%g)", (double)avgLogLum );
+		s_spine.blackStreak++;
+		return;
+	}
+	if ( avgLogLum < VK_SPINE_CERT_BLACK_LOG_LUM_FLOOR ) {
+		s_spine.blackStreak++;
+		if ( s_spine.blackStreak >= VK_SPINE_CERT_BLACK_STREAK ) {
+			vk_spine_record_violation(
+				"black-frame streak: avgLogLum=%g for %u frames",
+				(double)avgLogLum, s_spine.blackStreak );
+		}
+	} else {
+		s_spine.blackStreak = 0u;
+	}
+}
+
+void vk_spine_cert_check_resource_growth( void )
+{
+	uint32_t live;
+
+	if ( !vk_spine_cert_active() || !( r_spineCert && r_spineCert->integer ) ) {
+		return;
+	}
+	if ( s_spine.descriptorsPendingRebound ) {
+		return;
+	}
+	live = vk_spine_count_alive_resources();
+	s_spine.liveResourceCount = live;
+	if ( !s_spine.liveBaselineArmed ) {
+		if ( s_spine.certFrameIndex >= VK_SPINE_CERT_BLACK_SETTLE_FRAMES ) {
+			s_spine.liveResourceBaseline = live;
+			s_spine.liveBaselineArmed = qtrue;
+		}
+		return;
+	}
+	/* Attachment recreate resets baseline; otherwise growth is a leak signal. */
+	if ( live > s_spine.liveResourceBaseline + 2u ) {
+		vk_spine_record_violation(
+			"resource growth: alive=%u baseline=%u (possible leak after recreate)",
+			live, s_spine.liveResourceBaseline );
+		s_spine.liveResourceBaseline = live;
+	}
+}
+
+void vk_spine_cert_check_history_invalidated( uint32_t resetReasons )
+{
+	const uint32_t lifecycle =
+		VK_TEMPORAL_RESET_SWAPCHAIN_CHANGE |
+		VK_TEMPORAL_RESET_RENDER_SIZE_CHANGE |
+		VK_TEMPORAL_RESET_WORLD_CHANGE |
+		VK_TEMPORAL_RESET_RENDERER_INIT |
+		VK_TEMPORAL_RESET_CLIENT_STATE_CHANGE;
+
+	if ( !vk_spine_validate_enabled() || resetReasons == 0u ) {
+		return;
+	}
+	if ( ( resetReasons & lifecycle ) == 0u ) {
+		return;
+	}
+	/* Sticky lifecycle resets must clear world TAA history. */
+	if ( vk.temporal.hasValidTAAHistory ) {
+		vk_spine_record_violation(
+			"TAA history still valid after lifecycle reset (reasons=0x%x)",
+			resetReasons );
+	}
+	vk_spine_note_temporal_history( VK_SPINE_RES_TAA_HISTORY, qfalse );
+}
+
+void vk_spine_cert_check_weapon_flush_order( qboolean taaRanThisFrame )
+{
+	if ( !vk_spine_cert_active() || !vk_spine_validate_enabled() ) {
+		return;
+	}
+	if ( !taaRanThisFrame ) {
+		return;
+	}
+	/* World Temporal Reconstruction must have been observed before weapon flush. */
+	if ( !vk_spine_was_observed( VK_SPINE_PASS_TEMPORAL_RECON ) ) {
+		vk_spine_record_violation(
+			"weapon flush before Temporal Reconstruction (weapon must stay after world TAA)" );
 	}
 }
 
@@ -1155,15 +1484,17 @@ void vk_spine_dump_device_lost( void )
 		return;
 	}
 	ri.Printf( PRINT_ALL,
-		"[VK][device_lost][spine] gen=%u phase=%s begun=%s ended=%s open=%d violations=%u last=%s combo=%s\n",
+		"[VK][device_lost][spine] gen=%u descGen=%u phase=%s begun=%s ended=%s open=%d violations=%u last=%s combo=%s spine11=%s\n",
 		s_spine.attachmentGeneration,
+		s_spine.descriptorGeneration,
 		vk_spine_phase_name( s_spine.currentPhase ),
 		vk_spine_pass_name( s_spine.lastBegun ),
 		vk_spine_pass_name( s_spine.lastEnded ),
 		s_spine.openCount,
 		s_spine.violationCount,
 		s_spine.lastViolation[0] ? s_spine.lastViolation : "none",
-		s_spine.comboFallback[0] ? s_spine.comboFallback : "none" );
+		s_spine.comboFallback[0] ? s_spine.comboFallback : "none",
+		s_spine.spine11CertActive ? "yes" : "no" );
 	for ( r = (vkSpineResourceId)1; r < VK_SPINE_RES_COUNT && shown < 24; r++ ) {
 		const vkSpineResourceRuntime *rt = &s_spine.resources[r];
 		if ( !rt->alive && rt->lastWriter == VK_SPINE_PASS_NONE ) {
@@ -1189,18 +1520,27 @@ void vk_spine_status_f( void )
 
 	vk_get_active_render_extent( &w, &h );
 	ri.Printf( PRINT_ALL, "======== Spine Pass/Resource Registry ========\n" );
-	ri.Printf( PRINT_ALL, "validate  : r_spineValidate=%d enabled=%s\n",
+	ri.Printf( PRINT_ALL, "validate  : r_spineValidate=%d r_spineCert=%d enabled=%s spine11=%s\n",
 		r_spineValidate ? r_spineValidate->integer : 0,
-		vk_spine_validate_enabled() ? "yes" : "no" );
-	ri.Printf( PRINT_ALL, "generation: attachments=%u activeExtent=%ux%u\n",
-		s_spine.attachmentGeneration, w, h );
+		r_spineCert ? r_spineCert->integer : 0,
+		vk_spine_validate_enabled() ? "yes" : "no",
+		vk_spine_is_spine_1_1_combo() ? "yes" : "no" );
+	ri.Printf( PRINT_ALL, "generation: attachments=%u descriptors=%u pendingRebound=%s live=%u baseline=%u extent=%ux%u\n",
+		s_spine.attachmentGeneration,
+		s_spine.descriptorGeneration,
+		s_spine.descriptorsPendingRebound ? "yes" : "no",
+		s_spine.liveResourceCount,
+		s_spine.liveResourceBaseline,
+		w, h );
 	ri.Printf( PRINT_ALL, "phase     : current=%s highest=%s\n",
 		vk_spine_phase_name( s_spine.currentPhase ),
 		vk_spine_phase_name( s_spine.highestPhase ) );
-	ri.Printf( PRINT_ALL, "frame     : begun=%s ended=%s open=%d\n",
+	ri.Printf( PRINT_ALL, "frame     : begun=%s ended=%s open=%d certFrame=%u blackStreak=%u\n",
 		vk_spine_pass_name( s_spine.lastBegun ),
 		vk_spine_pass_name( s_spine.lastEnded ),
-		s_spine.openCount );
+		s_spine.openCount,
+		s_spine.certFrameIndex,
+		s_spine.blackStreak );
 	ri.Printf( PRINT_ALL, "violations: count=%u last=%s\n",
 		s_spine.violationCount,
 		s_spine.lastViolation[0] ? s_spine.lastViolation : "none" );

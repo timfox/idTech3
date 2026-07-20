@@ -111,6 +111,9 @@ grep -q 'HISTORY_READ' "$ROOT/renderers/vulkan/vk_frame_end.c" || \
   fail "TAA must stamp HISTORY_READ only when history valid"
 grep -q 'vk_spine_note_temporal_history' "$REG_C" || fail "frame_begin must sync TAA history validity"
 grep -q 'vk_spine_combo_suppress_taa' "$REG_H" "$REG_C" || fail "OIT×TAA soft-demote API missing"
+grep -q 'vk_spine_is_spine_1_1_combo' "$REG_H" "$REG_C" || fail "Spine 1.1 combo API missing"
+grep -q 'vk_spine_note_descriptors_rebound' "$REG_H" "$REG_C" || fail "descriptor rebound API missing"
+grep -q 'vk_spine_cert_check_taa_input' "$REG_H" "$REG_C" || fail "TAA input cert check missing"
 grep -q 'suppressTaaThisFrame' "$REG_C" || fail "combo soft-demote state missing"
 grep -q 'taa_suppress_illegal_combo' "$ROOT/renderers/vulkan/vk_frame_end.c" || \
   fail "TAA must observe spine combo soft-demote"

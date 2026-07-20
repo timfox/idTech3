@@ -107,6 +107,17 @@ grep -q 'r_temporalWeaponAfterTaa' "$AA" || fail "weapon-after-TAA cvar registra
 grep -q 'vk_spine_expect_layout' "$REG_C" || fail "layout expectation API missing from registry"
 pass "runtime combo + layout expectation validators present"
 
+# --- Spine 1.1 opt-in cert (must not displace shipping matrix) ---
+CERT="$ROOT/config/vulkan_overlay_spine_1_1_cert.cfg"
+[[ -f "$CERT" ]] || fail "missing vulkan_overlay_spine_1_1_cert.cfg"
+cvar_is "$CERT" r_oit 1 || fail "Spine 1.1 cert expects WBOIT"
+cvar_is "$CERT" r_spineCert 1 || fail "Spine 1.1 cert expects r_spineCert 1"
+grep -q 'spine_1_1_oit_taa_weapon' "$REG_C" || fail "Spine 1.1 certified combo id missing"
+grep -q 'vk_spine_is_spine_1_1_combo' "$REG_C" || fail "Spine 1.1 combo detector missing"
+# Shipping defaults still must not enable OIT+TAA together
+cvar_is "$STABLE" r_renderMode 2 || fail "stable must remain mode 2 after Spine 1.1"
+pass "Spine 1.1 cert overlay present; shipping matrix unchanged"
+
 # --- Illegal stacks must not be defaults ---
 # quality∩temporal must not be a single default cfg that enables both OIT and TAA
 if grep -qE 'seta r_oit [12]' "$QUALITY" && grep -qE 'seta r_taa 1' "$QUALITY"; then
@@ -116,4 +127,5 @@ pass "no shipping cfg enables OIT+TAA together"
 
 echo "=== Spine combination matrix check PASSED ==="
 echo "Manual GPU: exec modern_vulkan_stable.cfg | quality | temporal_recon | modern_clustered | gfx_safe;"
-echo "  stack OIT+TAA only with r_temporalWeaponAfterTaa 1 + r_spineValidate 1."
+echo "  Spine 1.1 cert: exec vulkan_overlay_spine_1_1_cert.cfg; vid_restart; spine_1_1_stress"
+echo "  illegal OIT+TAA without weapon-after still soft-demotes TAA."

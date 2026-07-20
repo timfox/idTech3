@@ -490,6 +490,16 @@ else
 fi
 
 echo ""
+echo "Spine 1.1 certification:"
+if [[ ! -f "$PROJECT_ROOT/scripts/spine_1_1_cert_check.sh" ]]; then
+  fail "missing scripts/spine_1_1_cert_check.sh"
+elif ! bash "$PROJECT_ROOT/scripts/spine_1_1_cert_check.sh"; then
+  fail "spine_1_1_cert_check.sh failed"
+else
+  pass "Spine 1.1 certification static contract"
+fi
+
+echo ""
 echo "Spine platform restore hooks:"
 if [[ ! -f "$PROJECT_ROOT/scripts/spine_platform_restore_check.sh" ]]; then
   fail "missing scripts/spine_platform_restore_check.sh"

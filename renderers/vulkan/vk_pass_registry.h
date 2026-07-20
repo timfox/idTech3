@@ -159,6 +159,8 @@ qboolean vk_spine_resource_barriered_this_frame( vkSpineResourceId res );
 
 void vk_spine_attachments_created( uint32_t width, uint32_t height );
 void vk_spine_attachments_destroyed( void );
+/* Call after vk_update_attachment_descriptors rebinds views to live attachments. */
+void vk_spine_note_descriptors_rebound( void );
 
 void vk_spine_note_temporal_history( vkSpineResourceId res, qboolean valid );
 void vk_spine_validate_feature_combos( void );
@@ -166,8 +168,25 @@ void vk_spine_validate_feature_combos( void );
 qboolean vk_spine_combo_suppress_taa( void );
 const char *vk_spine_combo_fallback( void );
 
+/* Spine 1.1: mode3 + WBOIT + Temporal Reconstruction + weapon-after. */
+qboolean vk_spine_is_spine_1_1_combo( void );
+qboolean vk_spine_cert_active( void );
+/* Skipped OIT: HDR color remains the valid scene-color producer (single-frame OIT never becomes history). */
+void vk_spine_note_oit_skipped( void );
+/* Cert: TAA current must be resolved world HDR — never raw OIT accum/reveal/moments. */
+void vk_spine_cert_check_taa_input( VkImageView taa_src );
+void vk_spine_cert_check_black_frame( void );
+void vk_spine_cert_check_resource_growth( void );
+/* After sticky temporal resets (resize/vid_restart/focus/map), history must be invalid. */
+void vk_spine_cert_check_history_invalidated( uint32_t resetReasons );
+/* Weapon flush must not precede Temporal Reconstruction when world TAA ran this frame. */
+void vk_spine_cert_check_weapon_flush_order( qboolean taaRanThisFrame );
+
 qboolean vk_spine_validate_enabled( void );
 uint32_t vk_spine_attachment_generation( void );
+uint32_t vk_spine_descriptor_generation( void );
+uint32_t vk_spine_violation_count( void );
+void vk_spine_reset_cert_counters( void );
 const char *vk_spine_pass_name( vkSpinePassId pass );
 const char *vk_spine_resource_name( vkSpineResourceId res );
 const char *vk_spine_phase_name( vkSpinePhase phase );

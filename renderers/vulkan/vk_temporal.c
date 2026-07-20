@@ -6,6 +6,7 @@
 #include "vk_ambient_visibility.h"
 #include "vk_deferred_gbuffer.h"
 #include "vk_upscale.h"
+#include "vk_pass_registry.h"
 #include <math.h>
 
 float vk_prev_view_matrix[16];
@@ -211,6 +212,7 @@ static void vk_temporal_apply_resets( qboolean hardReset )
 	}
 
 	vk_temporal_log_reset( reasons, hardReset );
+	vk_spine_cert_check_history_invalidated( reasons );
 }
 
 static qboolean vk_temporal_compute_shared_camera_cut( uint32_t *outReasons )

@@ -147,9 +147,10 @@ Related checklists: [RENDERER_PHASE1_CHECKLIST_2026Q3.md](RENDERER_PHASE1_CHECKL
 
 **Do next**
 
+- Spine 1.1 opt-in cert (mode3 + WBOIT + Temporal Reconstruction + weapon-after): see [RENDERER_SPINE_1.1.md](RENDERER_SPINE_1.1.md); static `./scripts/spine_1_1_cert_check.sh`; GPU soak via `spine_1_1_stress` (GPU cert pending until soak green)
 - Focus / alt-tab / input restore hooks landed (`NotifyWindowRestored`, `IN_NotifyWindowRestored` on SDL/Win32/X11 stub); GPU-walk alt-tab + `input_status` next
 - Late-post DEVICE_LOST / pass_diag + bloom/SSR/gamma layout expects landed; GPU-walk black-frame class next
-- OIT × TAA soft-demote when weapon-after off; experimental stack with weapon-after + `r_spineValidate 1`
+- OIT × TAA soft-demote when weapon-after off; Spine 1.1 cert path when weapon-after + mode3 + WBOIT + aaMode 4
 - Temporal ownership debug overlays (`r_debugHistoryRejection` 1–8) — GPU-walk next
 - Manual GPU combo matrix (static: `./scripts/spine_combo_matrix_check.sh` + `spine_platform_restore_check.sh` via `spine_stability_check.sh`)
 
@@ -159,11 +160,13 @@ Related checklists: [RENDERER_PHASE1_CHECKLIST_2026Q3.md](RENDERER_PHASE1_CHECKL
 - Making Hybrid1 or path tracing required for the default look
 - Expanding neural / visibility-buffer / reservoir research as default paths
 - Full virtualized geometry or DLSS-class reconstruction before temporal data is correct
+- Promoting MBOIT×TAA or AV mode 4 into the certified matrix before WBOIT soak passes
 
 ---
 
 ## Related docs
 
+- [RENDERER_SPINE_1.1.md](RENDERER_SPINE_1.1.md) — opt-in WBOIT × Temporal Reconstruction × weapon-after cert
 - [UNIFIED_CLUSTERED_RENDERER.md](UNIFIED_CLUSTERED_RENDERER.md) — mode 3 architecture
 - [FORWARD_PLUS_PIPELINE_AUDIT.md](FORWARD_PLUS_PIPELINE_AUDIT.md) — Forward+ risks
 - [HDR_GAPS.md](HDR_GAPS.md) — HDR / TAA / OIT order

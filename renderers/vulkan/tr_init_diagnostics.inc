@@ -800,6 +800,126 @@ static void R_RendererClusteredSafe_f( void )
 		"[VK] Unified Clustered safe preset applied: mode 3 + temporal/post AA/OIT off + MSAA off. Run vid_restart.\n" );
 }
 
+static void R_RendererSpine11Cert_f( void )
+{
+	ri.Cmd_ExecuteText( EXEC_APPEND, "exec vulkan_overlay_spine_1_1_cert.cfg\n" );
+	ri.Printf( PRINT_ALL,
+		"[VK][spine] Spine 1.1 cert overlay queued. Run vid_restart. "
+		"Recovery: exec modern_vulkan.cfg. Stress: spine_1_1_stress\n" );
+}
+
+static void R_Spine11Stress_f( void )
+{
+	int vidRestarts = 20;
+	int resizes = 50;
+	int focus = 20;
+	int mapChanges = 0;
+	int i;
+	uint32_t beforeViolations;
+
+	if ( ri.Cmd_Argc() > 1 ) {
+		vidRestarts = atoi( ri.Cmd_Argv( 1 ) );
+	}
+	if ( ri.Cmd_Argc() > 2 ) {
+		resizes = atoi( ri.Cmd_Argv( 2 ) );
+	}
+	if ( ri.Cmd_Argc() > 3 ) {
+		focus = atoi( ri.Cmd_Argv( 3 ) );
+	}
+	if ( ri.Cmd_Argc() > 4 ) {
+		mapChanges = atoi( ri.Cmd_Argv( 4 ) );
+	}
+	if ( vidRestarts < 0 ) {
+		vidRestarts = 0;
+	}
+	if ( resizes < 0 ) {
+		resizes = 0;
+	}
+	if ( focus < 0 ) {
+		focus = 0;
+	}
+	if ( mapChanges < 0 ) {
+		mapChanges = 0;
+	}
+
+	if ( !vk_spine_is_spine_1_1_combo() ) {
+		ri.Printf( PRINT_WARNING,
+			"[VK][spine] spine_1_1_stress: cert combo not active. "
+			"Run renderer_spine_1_1_cert; vid_restart first.\n" );
+	}
+
+	beforeViolations = vk_spine_violation_count();
+	vk_spine_reset_cert_counters();
+
+	ri.Printf( PRINT_ALL,
+		"[VK][spine] spine_1_1_stress: queue vid_restart=%d resize=%d focus=%d map=%d "
+		"(prior violations=%u; counters reset)\n",
+		vidRestarts, resizes, focus, mapChanges, beforeViolations );
+
+	/* Resolution flip soak (resize class) — alternate custom extents + vid_restart. */
+	for ( i = 0; i < resizes; i++ ) {
+		const int w = ( i & 1 ) ? 1280 : 1600;
+		const int h = ( i & 1 ) ? 720 : 900;
+		ri.Cmd_ExecuteText( EXEC_APPEND, va(
+			"seta r_mode -1\n"
+			"seta r_customwidth %d\n"
+			"seta r_customheight %d\n"
+			"vid_restart\n"
+			"wait\nwait\n",
+			w, h ) );
+	}
+
+	for ( i = 0; i < vidRestarts; i++ ) {
+		ri.Cmd_ExecuteText( EXEC_APPEND, "vid_restart\nwait\nwait\n" );
+	}
+
+	for ( i = 0; i < focus; i++ ) {
+		ri.Cmd_ExecuteText( EXEC_APPEND, "spine_1_1_focus_pulse\nwait\n" );
+	}
+
+	for ( i = 0; i < mapChanges; i++ ) {
+		/* Optional: only meaningful with game data / rtest pack. */
+		ri.Cmd_ExecuteText( EXEC_APPEND,
+			"map rtest_parity\nwait\nwait\nwait\nwait\n" );
+	}
+
+	ri.Cmd_ExecuteText( EXEC_APPEND, "wait\nwait\nspine_1_1_stress_report\n" );
+}
+
+static void R_Spine11FocusPulse_f( void )
+{
+	vk_presentation_note_window_restored( "spine_1_1_focus_pulse" );
+	ri.Printf( PRINT_DEVELOPER, "[VK][spine] synthetic focus/restore pulse (sticky temporal reset)\n" );
+}
+
+static void R_Spine11StressReport_f( void )
+{
+	const uint32_t violations = vk_spine_violation_count();
+	const qboolean combo = vk_spine_is_spine_1_1_combo();
+	const qboolean pending = ( vk_spine_attachment_generation() != vk_spine_descriptor_generation() );
+
+	ri.Printf( PRINT_ALL, "======== Spine 1.1 stress report ========\n" );
+	ri.Printf( PRINT_ALL, "combo     : %s (%s)\n",
+		combo ? "spine_1_1" : "not_cert",
+		vk_spine_combo_fallback() );
+	ri.Printf( PRINT_ALL, "generation: att=%u desc=%u mismatch=%s\n",
+		vk_spine_attachment_generation(),
+		vk_spine_descriptor_generation(),
+		pending ? "YES" : "no" );
+	ri.Printf( PRINT_ALL, "violations: %u last context via spine_status\n", violations );
+	if ( violations != 0u || pending || !combo ) {
+		ri.Printf( PRINT_ALL, S_COLOR_YELLOW
+			"[VK][spine] CERT FAIL: violations=%u pendingDesc=%s combo=%s\n" S_COLOR_WHITE,
+			violations, pending ? "yes" : "no", combo ? "yes" : "no" );
+	} else {
+		ri.Printf( PRINT_ALL, S_COLOR_GREEN
+			"[VK][spine] CERT PASS (static stress segment): zero violations, descriptors synced, combo active\n"
+			S_COLOR_WHITE );
+	}
+	ri.Printf( PRINT_ALL, "=========================================\n" );
+	ri.Cmd_ExecuteText( EXEC_APPEND, "spine_status\n" );
+}
+
 static void R_RendererSubsystems_f( void )
 {
 	const int warnings = R_RendererPrintCompatibilityWarnings( qfalse );

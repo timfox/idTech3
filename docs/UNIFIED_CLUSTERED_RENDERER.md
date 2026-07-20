@@ -2,7 +2,7 @@
 
 The **Unified Clustered Renderer** (`r_renderMode 3`) is the engine’s high-fidelity **opt-in** lighting path. It combines deferred opaque shading, GPU-built light lists, Forward+ transparency, order-independent transparency, temporal reconstruction, and visibility-buffer migration within one coordinated frame architecture.
 
-Spine 1.0 shipping default remains **Forward+ mode 2** (`modern_vulkan.cfg` → `modern_vulkan_stable.cfg`). Mode 3 is enabled via `modern_clustered.cfg` or the overlay below — see [RENDERER_SPINE_1.0.md](RENDERER_SPINE_1.0.md).
+Spine 1.0 shipping default remains **Forward+ mode 2** (`modern_vulkan.cfg` → `modern_vulkan_stable.cfg`). Mode 3 is enabled via `modern_clustered.cfg` or the overlay below — see [RENDERER_SPINE_1.0.md](RENDERER_SPINE_1.0.md). Spine 1.1 opt-in cert (mode 3 + WBOIT + Temporal Reconstruction + weapon-after): [RENDERER_SPINE_1.1.md](RENDERER_SPINE_1.1.md).
 
 ```cfg
 r_renderMode 3

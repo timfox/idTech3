@@ -1231,6 +1231,10 @@ static void R_Register( void )
 	ri.Cmd_AddCommand( "renderer_deferred_safe", R_RendererDeferredSafe_f );
 	ri.Cmd_AddCommand( "renderer_modern_safe", R_RendererModernSafe_f );
 	ri.Cmd_AddCommand( "renderer_clustered_safe", R_RendererClusteredSafe_f );
+	ri.Cmd_AddCommand( "renderer_spine_1_1_cert", R_RendererSpine11Cert_f );
+	ri.Cmd_AddCommand( "spine_1_1_stress", R_Spine11Stress_f );
+	ri.Cmd_AddCommand( "spine_1_1_focus_pulse", R_Spine11FocusPulse_f );
+	ri.Cmd_AddCommand( "spine_1_1_stress_report", R_Spine11StressReport_f );
 	ri.Cmd_AddCommand( "renderer_subsystems", R_RendererSubsystems_f );
 	ri.Cmd_AddCommand( "renderer_compat", R_RendererCompatibility_f );
 	ri.Cmd_AddCommand( "renderer_compatibility", R_RendererCompatibility_f );
@@ -3774,6 +3778,10 @@ static void RE_Shutdown( refShutdownCode_t code ) {
 	ri.Cmd_RemoveCommand( "renderer_deferred_safe" );
 	ri.Cmd_RemoveCommand( "renderer_modern_safe" );
 	ri.Cmd_RemoveCommand( "renderer_clustered_safe" );
+	ri.Cmd_RemoveCommand( "renderer_spine_1_1_cert" );
+	ri.Cmd_RemoveCommand( "spine_1_1_stress" );
+	ri.Cmd_RemoveCommand( "spine_1_1_focus_pulse" );
+	ri.Cmd_RemoveCommand( "spine_1_1_stress_report" );
 	ri.Cmd_RemoveCommand( "renderer_subsystems" );
 	ri.Cmd_RemoveCommand( "renderer_compat" );
 	ri.Cmd_RemoveCommand( "renderer_compatibility" );
