@@ -1146,7 +1146,7 @@ leaf content.
 */
 static void CM_GoldSrcTraceThroughTree( traceWork_t *tw, int num,
 		float p1f, float p2f, const vec3_t p1, const vec3_t p2,
-		const cplane_t *enterPlane, int enterSide ) {
+		const cplane_t *enterPlane, int enterSide, int contentsOverride ) {
 	cNode_t *node;
 	cplane_t *plane;
 	double t1, t2, offset;
@@ -1160,11 +1160,15 @@ static void CM_GoldSrcTraceThroughTree( traceWork_t *tw, int num,
 
 	if ( num < 0 ) {
 		const cLeaf_t *leaf = &cm.leafs[-1 - num];
-		if ( !( leaf->contents & tw->contents ) ) {
+		int leafContents = leaf->contents;
+		if ( contentsOverride >= 0 && leafContents ) {
+			leafContents = contentsOverride;
+		}
+		if ( !( leafContents & tw->contents ) ) {
 			return;
 		}
 
-		tw->trace.contents = leaf->contents;
+		tw->trace.contents = leafContents;
 		if ( p1f <= 0.0f ) {
 			tw->trace.startsolid = qtrue;
 		}
@@ -1201,12 +1205,12 @@ static void CM_GoldSrcTraceThroughTree( traceWork_t *tw, int num,
 
 	if ( t1 >= offset && t2 >= offset ) {
 		CM_GoldSrcTraceThroughTree( tw, node->children[0], p1f, p2f,
-				p1, p2, enterPlane, enterSide );
+				p1, p2, enterPlane, enterSide, contentsOverride );
 		return;
 	}
 	if ( t1 <= -offset && t2 <= -offset ) {
 		CM_GoldSrcTraceThroughTree( tw, node->children[1], p1f, p2f,
-				p1, p2, enterPlane, enterSide );
+				p1, p2, enterPlane, enterSide, contentsOverride );
 		return;
 	}
 
@@ -1231,14 +1235,14 @@ static void CM_GoldSrcTraceThroughTree( traceWork_t *tw, int num,
 	VectorMA( p1, frac, p2, mid );
 	VectorMA( mid, -frac, p1, mid );
 	CM_GoldSrcTraceThroughTree( tw, node->children[side], p1f, midf,
-			p1, mid, enterPlane, enterSide );
+			p1, mid, enterPlane, enterSide, contentsOverride );
 
 	frac2 = Com_Clamp( 0.0f, 1.0f, frac2 );
 	midf = p1f + ( p2f - p1f ) * frac2;
 	VectorMA( p1, frac2, p2, mid );
 	VectorMA( mid, -frac2, p1, mid );
 	CM_GoldSrcTraceThroughTree( tw, node->children[side ^ 1], midf, p2f,
-			mid, p2, plane, side );
+			mid, p2, plane, side, contentsOverride );
 }
 
 
@@ -1370,8 +1374,9 @@ static void CM_Trace( trace_t *results, const vec3_t start, const vec3_t end, co
 
 	if ( cm.goldsrc && model != BOX_MODEL_HANDLE && model != CAPSULE_MODEL_HANDLE ) {
 		int root = model ? cmod->goldsrcHeadnode : cm.goldsrcWorldHeadnode;
+		int contentsOverride = model ? cmod->goldsrcContents : -1;
 		CM_GoldSrcTraceThroughTree( &tw, root, 0.0f, 1.0f,
-				tw.start, tw.end, NULL, 0 );
+				tw.start, tw.end, NULL, 0, contentsOverride );
 		if ( tw.trace.startsolid ) {
 			int endNode = root;
 			while ( endNode >= 0 ) {
@@ -1379,7 +1384,13 @@ static void CM_Trace( trace_t *results, const vec3_t start, const vec3_t end, co
 				float d = DotProduct( tw.end, node->plane->normal ) - node->plane->dist;
 				endNode = node->children[d < 0.0f];
 			}
-			tw.trace.allsolid = ( cm.leafs[-1 - endNode].contents & brushmask ) != 0;
+			{
+				int endContents = cm.leafs[-1 - endNode].contents;
+				if ( contentsOverride >= 0 && endContents ) {
+					endContents = contentsOverride;
+				}
+				tw.trace.allsolid = ( endContents & brushmask ) != 0;
+			}
 			if ( tw.trace.allsolid ) {
 				tw.trace.fraction = 0.0f;
 			}

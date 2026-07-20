@@ -234,11 +234,15 @@ int CM_PointContents( const vec3_t p, clipHandle_t model ) {
 	cmodel_t	*clipm;
 
 	if ( cm.goldsrc ) {
-		int num = model ? CM_ClipHandleToModel( model )->goldsrcHeadnode : cm.goldsrcWorldHeadnode;
+		cmodel_t *goldsrcModel = model ? CM_ClipHandleToModel( model ) : NULL;
+		int num = goldsrcModel ? goldsrcModel->goldsrcHeadnode : cm.goldsrcWorldHeadnode;
 		while ( num >= 0 ) {
 			cNode_t *node = &cm.nodes[num];
 			float planeDistance = DotProduct( p, node->plane->normal ) - node->plane->dist;
 			num = node->children[planeDistance < 0.0f];
+		}
+		if ( goldsrcModel && cm.leafs[-1 - num].contents ) {
+			return goldsrcModel->goldsrcContents;
 		}
 		return cm.leafs[-1 - num].contents;
 	}

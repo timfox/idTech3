@@ -48,6 +48,52 @@ static const void *CM_GoldSrcLump( const byte *buffer, int length,
 	return buffer + ofs;
 }
 
+static void CM_GoldSrcAssignModelContents( void ) {
+	const char *parse = cm.entityString;
+	const char *token;
+
+	while ( parse && *( token = COM_Parse( &parse ) ) ) {
+		char classname[MAX_TOKEN_CHARS] = "";
+		char model[MAX_TOKEN_CHARS] = "";
+		if ( token[0] != '{' ) {
+			break;
+		}
+
+		while ( parse && *( token = COM_Parse( &parse ) ) && token[0] != '}' ) {
+			char key[MAX_TOKEN_CHARS];
+			Q_strncpyz( key, token, sizeof( key ) );
+			token = COM_Parse( &parse );
+			if ( !token[0] ) {
+				break;
+			}
+			if ( !Q_stricmp( key, "classname" ) ) {
+				Q_strncpyz( classname, token, sizeof( classname ) );
+			}
+			else if ( !Q_stricmp( key, "model" ) ) {
+				Q_strncpyz( model, token, sizeof( model ) );
+			}
+		}
+
+		if ( model[0] == '*' ) {
+			int modelIndex = atoi( model + 1 );
+			if ( modelIndex > 0 && modelIndex < cm.numSubModels ) {
+				if ( !Q_stricmp( classname, "func_water" ) ) {
+					cm.cmodels[modelIndex].goldsrcContents = CONTENTS_WATER;
+				}
+				else if ( !Q_stricmp( classname, "func_illusionary" ) ) {
+					cm.cmodels[modelIndex].goldsrcContents = 0;
+				}
+				else if ( !Q_stricmp( classname, "func_ladder" ) ) {
+					cm.cmodels[modelIndex].goldsrcContents = CONTENTS_SOLID | CONTENTS_DONOTENTER;
+				}
+				else if ( !Q_stricmpn( classname, "trigger_", 8 ) ) {
+					cm.cmodels[modelIndex].goldsrcContents = CONTENTS_TRIGGER;
+				}
+			}
+		}
+	}
+}
+
 void CM_LoadGoldSrcMap( const byte *buffer, int length, const char *name ) {
 	const goldsrc_header_t *header = (const goldsrc_header_t *)buffer;
 	const goldsrc_plane_t *inPlanes;
@@ -134,12 +180,14 @@ void CM_LoadGoldSrcMap( const byte *buffer, int length, const char *name ) {
 			cm.cmodels[i].maxs[j] = LittleFloat( inModels[i].maxs[j] ) + 1.0f;
 		}
 		cm.cmodels[i].goldsrcHeadnode = LittleLong( inModels[i].headnode[0] );
+		cm.cmodels[i].goldsrcContents = CONTENTS_SOLID;
 	}
 
 	cm.entityString = Hunk_Alloc( entityLen + 1, h_high );
 	Com_Memcpy( cm.entityString, entities, entityLen );
 	cm.entityString[entityLen] = '\0';
 	cm.numEntityChars = entityLen + 1;
+	CM_GoldSrcAssignModelContents();
 
 	cm.numClusters = 1;
 	cm.clusterBytes = 32;
