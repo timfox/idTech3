@@ -233,6 +233,16 @@ int CM_PointContents( const vec3_t p, clipHandle_t model ) {
 	float		d;
 	cmodel_t	*clipm;
 
+	if ( cm.goldsrc ) {
+		int num = model ? CM_ClipHandleToModel( model )->goldsrcHeadnode : cm.goldsrcWorldHeadnode;
+		while ( num >= 0 ) {
+			cNode_t *node = &cm.nodes[num];
+			float planeDistance = DotProduct( p, node->plane->normal ) - node->plane->dist;
+			num = node->children[planeDistance < 0.0f];
+		}
+		return cm.leafs[-1 - num].contents;
+	}
+
 	if (!cm.numNodes) {	// map not loaded
 		return 0;
 	}

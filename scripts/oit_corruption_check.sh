@@ -64,10 +64,30 @@ grep -q 'repro_oit_corruption.cfg' "$ROOT/scripts/compile_engine.sh" || {
   echo "FAIL compile_engine.sh must ship repro_oit_corruption.cfg"; fail=1; }
 grep -q 'demo_oit_isolation.cfg' "$ROOT/scripts/compile_engine.sh" || {
   echo "FAIL compile_engine.sh must ship demo_oit_isolation.cfg"; fail=1; }
+grep -q 'seta sv_pure 0' "$ROOT/config/repro_oit_corruption.cfg" || {
+  echo "FAIL repro cfg must set sv_pure 0 (avoids Unpure reconnect crash)"; fail=1; }
+grep -q 'CVAR_ARCHIVE );' "$ROOT/runtime/server/sv_init.c" && \
+  grep -A1 'sv_p2pHostMigration = Cvar_Get' "$ROOT/runtime/server/sv_init.c" | grep -q 'CVAR_ARCHIVE' || {
+  echo "FAIL sv_p2p* must not use CVAR_SERVERINFO (overflow)"; fail=1; }
+if grep -E 'sv_p2pHostMigration = Cvar_Get\(.*"sv_p2pHostMigration".*CVAR_SERVERINFO' "$ROOT/runtime/server/sv_init.c" >/dev/null; then
+  echo "FAIL sv_p2pHostMigration still CVAR_SERVERINFO"
+  fail=1
+else
+  echo "OK  sv_p2p* not stuffed into CVAR_SERVERINFO"
+fi
+grep -q 'flags &= ~(int)CVAR_SERVERINFO' "$ROOT/runtime/server/sv_init.c" || {
+  echo "FAIL must clear leftover CVAR_SERVERINFO on sv_p2p*"; fail=1; }
+grep -q 'NET_P2P_IsEnabled' "$ROOT/runtime/server/sv_main.c" || {
+  echo "FAIL SV_AddP2PServerInfo must skip when net_p2p off"; fail=1; }
+grep -q 'g_airControl->flags &= ~(int)CVAR_SERVERINFO' "$ROOT/runtime/server/sv_enhanced.c" || {
+  echo "FAIL enhanced movement must leave SERVERINFO budget for OA keys"; fail=1; }
+grep -q 'seta net_p2p 0' "$ROOT/config/repro_oit_corruption.cfg" || {
+  echo "FAIL repro must disable net_p2p"; fail=1; }
 grep -q 'vk_forward_plus_refresh_viewport_params' "$ROOT/renderers/vulkan/vk_postfx_passes.c" || {
   echo "FAIL OIT must refresh Forward+ viewport params"; fail=1; }
-grep -q 'UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL' "$ROOT/renderers/vulkan/vk_postfx_passes.c" || {
-  echo "FAIL fog_scene copy must use UNDEFINED→TRANSFER_DST"; fail=1; }
+grep -q 'fogOld, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL' "$ROOT/renderers/vulkan/vk_postfx_passes.c" || \
+grep -q 'fog_scene_layout' "$ROOT/renderers/vulkan/vk_postfx_passes.c" || {
+  echo "FAIL fog_scene copy must track layout before TRANSFER_DST"; fail=1; }
 grep -q 'pre-deferred-composite' "$ROOT/renderers/vulkan/vk_deferred_gbuffer.c" || {
   echo "FAIL deferred composite must not COLOR_ATTACHMENT-pre-transition post_bloom"; fail=1; }
 if grep -n 'vk_dgb_composite_lit_to_color' -A20 "$ROOT/renderers/vulkan/vk_deferred_gbuffer.c" | grep -q 'COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL\|SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL'; then
@@ -76,8 +96,22 @@ if grep -n 'vk_dgb_composite_lit_to_color' -A20 "$ROOT/renderers/vulkan/vk_defer
 else
   echo "OK  deferred composite does not pre-transition to COLOR_ATTACHMENT"
 fi
-grep -q 'Same-image sample+store' "$ROOT/renderers/vulkan/vk_distortion.c" || {
-  echo "FAIL distortion same-image GENERAL sample fix missing"; fail=1; }
+grep -q 'fog_scene_layout' "$ROOT/renderers/vulkan/vk.h" || {
+  echo "FAIL fog_scene_layout tracking missing"; fail=1; }
+grep -q 'RDF_NOWORLDMODEL' "$ROOT/renderers/vulkan/vk_distortion.c" || {
+  echo "FAIL distortion must skip weapon pass"; fail=1; }
+grep -q 'vk_copy_color_to_fog_scene' "$ROOT/renderers/vulkan/vk_distortion.c" || {
+  echo "FAIL distortion must ping-pong via fog_scene"; fail=1; }
+grep -q 'Same-image sample+store' "$ROOT/renderers/vulkan/vk_distortion.c" && {
+  echo "FAIL distortion still documents same-image GENERAL sample"; fail=1; }
+grep -q 'oit_accum_additive_pipeline' "$ROOT/renderers/vulkan/vk.h" || {
+  echo "FAIL additive OIT accum pipeline missing"; fail=1; }
+grep -q 'colorWriteMask = 0' "$ROOT/renderers/vulkan/vk_pipeline_helpers.c" || {
+  echo "FAIL additive reveal write-mask off missing"; fail=1; }
+grep -q 'alpha < 1e-3' "$ROOT/renderers/vulkan/shaders/glsl/oit_accum.frag" || {
+  echo "FAIL soft-alpha discard floor missing"; fail=1; }
+grep -q 'smoothstep( 0.0, 0.04, coverage )' "$ROOT/renderers/vulkan/shaders/glsl/oit_resolve.frag" || {
+  echo "FAIL resolve soft coverage missing"; fail=1; }
 
 # Boot must not force OIT corruption repro
 for cfg in modern_vulkan.cfg modern_vulkan_stable.cfg gfx_safe.cfg; do

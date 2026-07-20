@@ -897,6 +897,7 @@ void vk_create_attachments( void )
 				vk_create_fullres_color_attachment( vk.color_format,
 					VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
 					&vk.fog_scene_image, &vk.fog_scene_image_view, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, qfalse );
+				vk.fog_scene_layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 				vk_create_fullres_color_attachment( VK_FORMAT_R32_SFLOAT,
 					VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
 					&vk.volumetric_depth_image, &vk.volumetric_depth_view, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, qfalse );
@@ -2449,6 +2450,7 @@ void vk_destroy_attachments( void )
 		qvkDestroyImageView( vk.device, vk.fog_scene_image_view, NULL );
 		vk.fog_scene_image = VK_NULL_HANDLE;
 		vk.fog_scene_image_view = VK_NULL_HANDLE;
+		vk.fog_scene_layout = VK_IMAGE_LAYOUT_UNDEFINED;
 	}
 	if ( vk.volumetric_depth_image ) {
 		qvkDestroyImage( vk.device, vk.volumetric_depth_image, NULL );

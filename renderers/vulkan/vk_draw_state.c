@@ -607,7 +607,18 @@ void vk_bind_pipeline( uint32_t pipeline ) {
 		vk.oit_accum_mboit_pipeline != VK_NULL_HANDLE ) {
 		vkpipe = vk.oit_accum_mboit_pipeline;
 	} else if ( backEnd.oitAccumPass && vk.oit_accum_pipeline != VK_NULL_HANDLE ) {
-		vkpipe = vk.oit_accum_pipeline;
+		qboolean additiveDraw = ( backEnd.oitBucketFilter == 2 ) ? qtrue : qfalse;
+		if ( !additiveDraw && tess.shader && tess.shader->stages[0] ) {
+			const unsigned stageBits = tess.shader->stages[0]->stateBits;
+			const unsigned srcBlend = stageBits & GLS_SRCBLEND_BITS;
+			const unsigned dstBlend = stageBits & GLS_DSTBLEND_BITS;
+			additiveDraw = ( srcBlend == GLS_SRCBLEND_ONE && dstBlend == GLS_DSTBLEND_ONE ) ? qtrue : qfalse;
+		}
+		if ( additiveDraw && vk.oit_accum_additive_pipeline != VK_NULL_HANDLE ) {
+			vkpipe = vk.oit_accum_additive_pipeline;
+		} else {
+			vkpipe = vk.oit_accum_pipeline;
+		}
 	} else {
 		vkpipe = vk_gen_pipeline( pipeline );
 	}

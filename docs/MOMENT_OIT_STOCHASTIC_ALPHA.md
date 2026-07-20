@@ -78,8 +78,14 @@ Clears: accum `vec4(0)`, revealage `1`. Depth test uses reversed-Z `GREATER_OR_E
 - `fog_scene` copy: full color-write→transfer barrier; `UNDEFINED→TRANSFER_DST` for fog_scene; classify bucket-1 barrier before refresh
 - Forward+ viewport params refreshed to OIT extent before lit accum
 - Distortion same-image sample uses `GENERAL` layout (was SHADER_READ vs GENERAL UB → tile bands)
+- Distortion now ping-pongs via `fog_scene` (sample) → `color` (store); skips `RDF_NOWORLDMODEL` weapon pass
+- `fog_scene_layout` tracked; copies prefer `mainColor` extent so no uncopied texels remain
+- **Additive ONE/ONE particles** no longer multiply revealage (dedicated accum pipeline with reveal write-mask off) — fixes glow stipple + dark holes
+- Soft-alpha discard floor `1e-3` (was `0.01`); WBOIT weight floor `5e-2`; resolve softstep + near-black coverage guard
 
 **Repro cfg install:** shipped into `release/base/`, `release/openarena/`, `release/havenrp/` via `compile_engine.sh`. If `couldn't exec repro_oit_corruption.cfg`, rebuild/copy or `exec` from those trees.
+
+**Reconnect / Unpure crash (vid_restart):** `MAX_INFO_STRING` (1024) SERVERINFO overflow dropped OA `videoflags`/`voteflags` when enhanced movement cvars + P2P ads competed for space → Unpure remount → SIGSEGV. Fix: demote enhanced/world-config keys from `CVAR_SERVERINFO`; skip `SV_AddP2PServerInfo` when `net_p2p` is off; `sv_p2p*` stay ARCHIVE-only. Repro launches with `+set sv_pure 0` (`sv_pure` is latched — in-console `seta` alone is not enough before `vid_restart`).
 
 **Pass order (world):** opaque → deferred → OIT accum → OIT resolve → refractive (water/glass when `r_refractiveExcludeOit 1`) → weapon (`RDF_NOWORLDMODEL`) → post → UI. Weapon never writes world OIT targets.
 

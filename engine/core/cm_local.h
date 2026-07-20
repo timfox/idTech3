@@ -81,6 +81,7 @@ typedef struct {
 typedef struct {
 	int			cluster;
 	int			area;
+	int			contents;		// used directly by GoldSrc BSP leaves
 
 	int			firstLeafBrush;
 	int			numLeafBrushes;
@@ -92,6 +93,7 @@ typedef struct {
 typedef struct cmodel_s {
 	vec3_t		mins, maxs;
 	cLeaf_t		leaf;			// submodels don't reference the main tree
+	int			goldsrcHeadnode;
 } cmodel_t;
 
 typedef struct {
@@ -125,6 +127,8 @@ typedef struct {
 
 typedef struct {
 	char		name[MAX_QPATH];
+	qboolean	goldsrc;
+	int			goldsrcWorldHeadnode;
 
 	int			numShaders;
 	dshader_t	*shaders;
@@ -198,6 +202,7 @@ typedef struct
 } sphere_t;
 
 void CM_FloodAreaConnections( void );
+void CM_LoadGoldSrcMap( const byte *buffer, int length, const char *name );
 
 typedef struct {
 	vec3_t		start;
