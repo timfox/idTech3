@@ -252,6 +252,10 @@ void vk_destroy_pipelines( qboolean resetCounter )
 		qvkDestroyPipeline( vk.device, vk.fxaa_pipeline, NULL );
 		vk.fxaa_pipeline = VK_NULL_HANDLE;
 	}
+	if ( vk.spatial_adaptive_pipeline != VK_NULL_HANDLE ) {
+		qvkDestroyPipeline( vk.device, vk.spatial_adaptive_pipeline, NULL );
+		vk.spatial_adaptive_pipeline = VK_NULL_HANDLE;
+	}
 	if ( vk.lens_flare_pipeline != VK_NULL_HANDLE ) {
 		qvkDestroyPipeline( vk.device, vk.lens_flare_pipeline, NULL );
 		vk.lens_flare_pipeline = VK_NULL_HANDLE;

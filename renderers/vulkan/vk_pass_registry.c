@@ -388,6 +388,12 @@ static const vkSpinePassDesc s_passes[VK_SPINE_PASS_COUNT] = {
 		s_reads_reactive, (int)ARRAY_LEN( s_reads_reactive ),
 		s_writes_reactive, (int)ARRAY_LEN( s_writes_reactive )
 	},
+	[VK_SPINE_PASS_SPATIAL_AA] = {
+		VK_SPINE_PASS_SPATIAL_AA, "spatial_aa", VK_SPINE_CAT_POST, VK_SPINE_PHASE_POST,
+		VK_SPINE_VIEW_MAIN, qtrue, qfalse,
+		s_reads_smaa, (int)ARRAY_LEN( s_reads_smaa ),
+		s_writes_smaa, (int)ARRAY_LEN( s_writes_smaa )
+	},
 	[VK_SPINE_PASS_SMAA] = {
 		VK_SPINE_PASS_SMAA, "smaa", VK_SPINE_CAT_POST, VK_SPINE_PHASE_POST,
 		VK_SPINE_VIEW_ANY, qtrue, qfalse,

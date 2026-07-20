@@ -3570,6 +3570,12 @@ set_tests_properties(test_raster_ultra_2_0 PROPERTIES
 	LABELS "scripts;validation;renderer;raster_ultra"
 	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/scripts/raster_ultra_2_0_check.sh;${CMAKE_SOURCE_DIR}/docs/RASTER_ULTRA_2.0.md;${CMAKE_SOURCE_DIR}/config/modern_raster_ultra_2.cfg")
 
+add_test(NAME test_raster_ultra_2_1
+	COMMAND ${CMAKE_SOURCE_DIR}/scripts/raster_ultra_2_1_check.sh)
+set_tests_properties(test_raster_ultra_2_1 PROPERTIES
+	LABELS "scripts;validation;renderer;raster_ultra"
+	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/scripts/raster_ultra_2_1_check.sh;${CMAKE_SOURCE_DIR}/docs/RASTER_ULTRA_2.1.md;${CMAKE_SOURCE_DIR}/config/modern_raster_cinematic.cfg")
+
 add_test(NAME test_md3_paint
 	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_md3_paint.sh)
 set_tests_properties(test_md3_paint PROPERTIES

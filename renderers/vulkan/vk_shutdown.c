@@ -475,6 +475,7 @@ for (i = 0; i < 2; i++) {
 	VK_DESTROY_SHADER_MODULE_FIELD( vk.modules.smaa_blend_fs );
 	VK_DESTROY_SHADER_MODULE_FIELD( vk.modules.smaa_compose_fs );
 	VK_DESTROY_SHADER_MODULE_FIELD( vk.modules.fxaa_fs );
+	VK_DESTROY_SHADER_MODULE_FIELD( vk.modules.spatial_adaptive_fs );
 	VK_DESTROY_SHADER_MODULE_FIELD( vk.modules.lens_flare_fs );
 	VK_DESTROY_SHADER_MODULE_FIELD( vk.modules.fp64_points_native_vs );
 	VK_DESTROY_SHADER_MODULE_FIELD( vk.modules.fp64_points_native_fs );

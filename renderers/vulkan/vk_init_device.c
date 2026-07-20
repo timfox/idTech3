@@ -1133,7 +1133,8 @@ void vk_initialize( void )
 
 			smaa_push_range.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
 			smaa_push_range.offset = 0;
-			smaa_push_range.size = 16; /* threshold, localContrast, maxSearchSteps, pad */
+			/* 32 bytes: SMAA uses 16; spatial adaptive SS push uses 24. */
+			smaa_push_range.size = 32;
 
 			Com_Memset( &smaa_desc, 0, sizeof( smaa_desc ) );
 			smaa_desc.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;

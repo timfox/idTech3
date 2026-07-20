@@ -6,6 +6,7 @@
 #include "vk_pass_registry.h"
 #include "vk_render_pass.h"
 #include "vk_view_state.h"
+#include "vk_spatial_aa.h"
 
 typedef struct {
 	float threshold;
@@ -23,7 +24,9 @@ typedef struct {
 
 qboolean vk_post_aa_output_active( void )
 {
-	return vk.smaaActive || vk.fxaaActive;
+	const vkSpatialAaState_t *saa = vk_spatial_aa_state();
+	return vk.smaaActive || vk.fxaaActive ||
+		( vk_spatial_aa_active() && saa && saa->adaptiveSS );
 }
 
 static qboolean vk_run_smaa_pass( VkPipeline pipeline, VkRenderPass pass, VkFramebuffer framebuffer,
@@ -225,31 +228,43 @@ static void vk_update_smaa_edge_source( VkImageView color_source )
 qboolean vk_post_scene_aa_apply_from( VkImageView color_source )
 {
 	VkImageView aa_output;
+	VkImageView aa_input;
 	qboolean aa_ran = qfalse;
 
 	if ( color_source == VK_NULL_HANDLE ) {
 		return qfalse;
 	}
-	if ( !vk.smaaActive && !vk.fxaaActive ) {
+	if ( !vk.smaaActive && !vk.fxaaActive && !vk_spatial_aa_wants_adaptive_ss() ) {
 		return qfalse;
 	}
 
-	vk_barrier_post_fog_source_for_sampling( color_source, "pre-post-AA-from" );
+	aa_input = vk_spatial_aa_prepare_input( color_source );
+
+	vk_barrier_post_fog_source_for_sampling( aa_input, "pre-post-AA-from" );
 	if ( vk.smaaActive ) {
-		vk_update_smaa_edge_source( color_source );
+		vk_update_smaa_edge_source( aa_input );
 		aa_ran = vk_smaa_passes();
-	} else {
-		vk_update_color_descriptor_image( color_source );
+	} else if ( vk.fxaaActive ) {
+		vk_update_color_descriptor_image( aa_input );
 		aa_ran = vk_fxaa_pass();
+	} else if ( aa_input != color_source ) {
+		/* Adaptive-only: history[0] holds resolved current frame. */
+		aa_ran = qtrue;
+		vk_set_scene_post_fog_source( aa_input );
+		vk_update_post_fog_descriptors( aa_input );
+		vk_set_post_chain_last_writer( "spatial_aa" );
+		return qtrue;
 	}
 
-	aa_output = ( aa_ran && vk.smaa_output_image_view ) ? vk.smaa_output_image_view : color_source;
+	aa_output = ( aa_ran && vk.smaa_output_image_view ) ? vk.smaa_output_image_view : aa_input;
 	vk_set_scene_post_fog_source( aa_output );
 	vk_update_post_fog_descriptors( aa_output );
 	if ( aa_ran && aa_output == vk.smaa_output_image_view ) {
 		vk_set_post_chain_last_writer( "post_aa" );
+	} else if ( aa_input != color_source ) {
+		vk_set_post_chain_last_writer( "spatial_aa" );
 	}
-	return aa_ran;
+	return aa_ran || ( aa_input != color_source );
 }
 
 void vk_post_scene_aa_apply( void )

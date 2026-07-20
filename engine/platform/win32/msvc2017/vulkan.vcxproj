@@ -413,6 +413,7 @@
     <ClCompile Include="..\..\..\renderers\vulkan\vk_selective_reflection.c" />
     <ClCompile Include="..\..\..\renderers\vulkan\vk_pass_registry.c" />
     <ClCompile Include="..\..\..\renderers\vulkan\vk_reactive_mask.c" />
+    <ClCompile Include="..\..\..\renderers\vulkan\vk_spatial_aa.c" />
     <ClCompile Include="..\..\..\renderers\vulkan\vk_visibility_buffer.c" />
     <ClCompile Include="..\..\..\renderers\vulkan\vk_vrcs.c" />
   <!-- IDTECH3_MSVC_MANIFEST_END -->

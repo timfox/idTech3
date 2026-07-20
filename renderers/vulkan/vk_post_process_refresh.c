@@ -38,6 +38,8 @@ void vk_update_post_process_pipelines( void )
 		if ( vk.fxaaActive ) {
 			vk_create_post_process_pipeline( 24, postWidth, postHeight );
 		}
+		/* Spatial adaptive SS reuses TAA history[0] as current-frame scratch (TAA off). */
+		vk_create_post_process_pipeline( 26, postWidth, postHeight );
 		vk_create_post_process_pipeline( 23, postWidth, postHeight );
 		if ( r_bloom->integer ) {
 			uint32_t width = gls.captureWidth;

@@ -85,6 +85,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "vk_color_grade.h"
 #include "vk_reference_lab.h"
 #include "vk_frequency_aware.h"
+#include "vk_spatial_aa.h"
 #include "vk_pass_registry.h"
 #include "vk_raster_gi.h"
 #include "vk_selective_sun_shadow.h"
@@ -3712,6 +3713,7 @@ void R_Init( void ) {
 	vk_color_grade_init();
 	vk_reference_lab_init();
 	vk_frequency_aware_init();
+	vk_spatial_aa_init();
 #ifdef USE_VULKAN
 	R_NDGI_Init();
 	R_NIV_Init();
@@ -3836,6 +3838,8 @@ static void RE_Shutdown( refShutdownCode_t code ) {
 	R_MeshNormalPolicy_Shutdown();
 	VK_SunCSM_Shutdown();
 	VK_RasterUltra_Shutdown();
+	vk_spatial_aa_shutdown();
+	vk_frequency_aware_shutdown();
 	VK_VegGpu_Shutdown();
 	VK_Biome_Shutdown();
 	CBTerrain_OnWorldUnload();

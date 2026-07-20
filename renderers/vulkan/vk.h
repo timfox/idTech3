@@ -1591,6 +1591,7 @@ typedef struct {
 		VkShaderModule smaa_blend_fs;
 		VkShaderModule smaa_compose_fs;
 		VkShaderModule fxaa_fs;
+		VkShaderModule spatial_adaptive_fs;
 		VkShaderModule lens_flare_fs;
 		VkShaderModule fp64_points_native_vs;
 		VkShaderModule fp64_points_native_fs;
@@ -1770,6 +1771,7 @@ typedef struct {
 	VkPipeline smaa_blend_pipeline;
 	VkPipeline smaa_compose_pipeline;
 	VkPipeline fxaa_pipeline;
+	VkPipeline spatial_adaptive_pipeline;
 	VkPipeline lens_flare_pipeline;
 	VkPipeline taa_pipeline;
 	VkPipeline reactive_stamp_pipeline;	/* fullscreen stamp from OIT reveal into R8 mask */

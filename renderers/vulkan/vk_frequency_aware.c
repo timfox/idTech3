@@ -216,6 +216,10 @@ void vk_frequency_aware_begin_frame( void )
 		tier >= VK_FREQ_TIER_ULTRA ) ? qtrue : qfalse;
 
 	s_freq.mipLodBiasClamp = r_frequencyMipBiasFloor ? r_frequencyMipBiasFloor->value : -0.25f;
+	/* Selective SS (cinematic / high tier): soften aggressive negative mip bias to cut texture moiré. */
+	if ( s_freq.selectiveSS && s_freq.mipLodBiasClamp < 0.0f ) {
+		s_freq.mipLodBiasClamp = 0.0f;
+	}
 	s_freq.samplerAnisotropyCap = (uint32_t)Com_Clamp( 1, 16,
 		(float)( r_materialAnisotropyMax ? r_materialAnisotropyMax->integer : 16 ) );
 
@@ -224,10 +228,14 @@ void vk_frequency_aware_begin_frame( void )
 		s_freq.specularAaStrength = 0.65f;
 	} else if ( tier == VK_FREQ_TIER_MEDIUM ) {
 		s_freq.specularAaStrength = 0.85f;
-	} else 	if ( tier == VK_FREQ_TIER_HIGH ) {
+	} else if ( tier == VK_FREQ_TIER_HIGH ) {
 		s_freq.specularAaStrength = 1.0f;
 	} else {
 		s_freq.specularAaStrength = 1.15f;
+	}
+	if ( s_freq.selectiveSS ) {
+		s_freq.specularAaStrength = Com_Clamp( 0.0f, 1.35f, s_freq.specularAaStrength + 0.15f );
+		s_freq.alphaCoverage = qtrue;
 	}
 }
 
@@ -324,8 +332,8 @@ void vk_frequency_aware_status_f( void )
 		s_freq.proceduralCutoff ? "yes" : "no",
 		s_freq.waterFrequency ? "yes" : "no",
 		s_freq.shadowDecorrelate ? "yes" : "no" );
-	ri.Printf( PRINT_ALL, "experimental   : selectiveSS=%s stochastic=%s (default off)\n",
-		s_freq.selectiveSS ? "yes" : "no",
+	ri.Printf( PRINT_ALL, "experimental   : selectiveSS=%s stochastic=%s\n",
+		s_freq.selectiveSS ? "yes (moiré + adaptive path)" : "no",
 		s_freq.stochasticFilter ? "yes" : "no" );
 	ri.Printf( PRINT_ALL, "specularAa     : strength=%.2f (Toksvig-style variance; not global roughness)\n",
 		s_freq.specularAaStrength );

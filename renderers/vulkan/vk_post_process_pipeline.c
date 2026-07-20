@@ -284,6 +284,16 @@ void vk_create_post_process_pipeline( int program_index, uint32_t width, uint32_
 			target_format = vk.color_format;
 			blend = qfalse;
 			break;
+		case 26:
+			pipeline = &vk.spatial_adaptive_pipeline;
+			fsmodule = vk.modules.spatial_adaptive_fs;
+			renderpass = vk.render_pass.taa;
+			layout = vk.pipeline_layout_smaa;
+			samples = VK_SAMPLE_COUNT_1_BIT;
+			pipeline_name = "spatial adaptive SS pipeline";
+			target_format = vk.color_format;
+			blend = qfalse;
+			break;
 		case 25:
 			pipeline = &vk.lens_flare_pipeline;
 			fsmodule = vk.modules.lens_flare_fs;
