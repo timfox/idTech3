@@ -46,6 +46,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "vk_squeezeme.h"
 #include "vk_wsp.h"
 #include "vk_gpu_scene.h"
+#include "vk_scene_platform.h"
 #include "vk_terrain.h"
 #include "vk_biome.h"
 #include "vk_vegetation_gpu.h"
@@ -2969,6 +2970,7 @@ void RE_LoadWorldMap( const char *name ) {
 	R_SpriteProps_Clear();
 	RE_BspStream_ClearAll();
 	vk_gpu_scene_on_world_load();
+	vk_scene_platform_on_world_load();
 	CBTerrain_OnWorldLoad();
 	VK_Biome_OnWorldLoad();
 	VK_VegGpu_OnWorldLoad();

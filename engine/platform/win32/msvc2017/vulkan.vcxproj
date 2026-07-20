@@ -414,6 +414,8 @@
     <ClCompile Include="..\..\..\renderers\vulkan\vk_pass_registry.c" />
     <ClCompile Include="..\..\..\renderers\vulkan\vk_reactive_mask.c" />
     <ClCompile Include="..\..\..\renderers\vulkan\vk_spatial_aa.c" />
+    <ClCompile Include="..\..\..\renderers\vulkan\vk_scene_platform.c" />
+    <ClCompile Include="..\..\..\renderers\vulkan\vk_photometric.c" />
     <ClCompile Include="..\..\..\renderers\vulkan\vk_visibility_buffer.c" />
     <ClCompile Include="..\..\..\renderers\vulkan\vk_vrcs.c" />
   <!-- IDTECH3_MSVC_MANIFEST_END -->

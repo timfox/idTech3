@@ -1,6 +1,8 @@
 /* Renderer screenshot, levelshot, and video-frame capture helpers.
  * Included by tr_init.c to preserve renderer backend ABI. */
 
+#include "../common/tr_image_loaders.h"
+
 /*
 ==================
 RB_ReadPixels
@@ -155,6 +157,46 @@ void RB_TakeScreenshotJPEG( int x, int y, int width, int height, const char *fil
 	R_GammaCorrect( buffer + offset, memcount );
 
 	ri.CL_SaveJPG( fileName, r_screenshotJpegQuality->integer, width, height, buffer + offset, padlen );
+	ri.Hunk_FreeTempMemory( buffer );
+}
+
+/*
+==================
+RB_TakeScreenshotEXR
+
+Display-buffer capture linearized to float RGBA and written via TinyEXR.
+True scene-linear HDR readback remains a follow-on (capture pipeline colorSpace).
+==================
+*/
+void RB_TakeScreenshotEXR( int x, int y, int width, int height, const char *fileName )
+{
+	byte *buffer;
+	float *rgba;
+	size_t offset = 0;
+	int padlen;
+	int i, n;
+	const byte *src;
+
+	(void)x;
+	(void)y;
+	buffer = RB_ReadPixels( 0, 0, width, height, &offset, &padlen, 0 );
+	rgba = (float *)ri.Hunk_AllocateTempMemory( (size_t)width * (size_t)height * 4u * sizeof( float ) );
+	src = buffer + offset;
+	n = width * height;
+	for ( i = 0; i < n; i++ ) {
+		/* Approximate sRGB → linear for EXR honesty on display captures. */
+		float r = src[i * 3 + 0] / 255.0f;
+		float g = src[i * 3 + 1] / 255.0f;
+		float b = src[i * 3 + 2] / 255.0f;
+		rgba[i * 4 + 0] = ( r <= 0.04045f ) ? ( r / 12.92f ) : powf( ( r + 0.055f ) / 1.055f, 2.4f );
+		rgba[i * 4 + 1] = ( g <= 0.04045f ) ? ( g / 12.92f ) : powf( ( g + 0.055f ) / 1.055f, 2.4f );
+		rgba[i * 4 + 2] = ( b <= 0.04045f ) ? ( b / 12.92f ) : powf( ( b + 0.055f ) / 1.055f, 2.4f );
+		rgba[i * 4 + 3] = 1.0f;
+	}
+	if ( !R_SaveEXR( fileName, rgba, width, height ) ) {
+		ri.Printf( PRINT_WARNING, "screenshotEXR: failed to write %s\n", fileName );
+	}
+	ri.Hunk_FreeTempMemory( rgba );
 	ri.Hunk_FreeTempMemory( buffer );
 }
 
@@ -410,6 +452,9 @@ static void R_ScreenShot_f( void ) {
 	} else if ( Q_stricmp( ri.Cmd_Argv(0), "screenshotBMP" ) == 0 ) {
 		typeMask = SCREENSHOT_BMP;
 		ext = "bmp";
+	} else if ( Q_stricmp( ri.Cmd_Argv(0), "screenshotEXR" ) == 0 ) {
+		typeMask = SCREENSHOT_EXR;
+		ext = "exr";
 	} else {
 		typeMask = SCREENSHOT_TGA;
 		ext = "tga";
@@ -449,6 +494,9 @@ static void R_ScreenShot_f( void ) {
 	} else if ( typeMask == SCREENSHOT_BMP ) {
 		backEnd.screenShotBMPsilent = silent;
 		Q_strncpyz( backEnd.screenshotBMP, checkname, sizeof( backEnd.screenshotBMP ) );
+	} else if ( typeMask == SCREENSHOT_EXR ) {
+		backEnd.screenShotEXRsilent = silent;
+		Q_strncpyz( backEnd.screenshotEXR, checkname, sizeof( backEnd.screenshotEXR ) );
 	} else {
 		backEnd.screenShotTGAsilent = silent;
 		Q_strncpyz( backEnd.screenshotTGA, checkname, sizeof( backEnd.screenshotTGA ) );

@@ -2850,7 +2850,19 @@ static const void *RB_SwapBuffers( const void *data ) {
 	if ( backEnd.screenshotMask && tr.frameCount > 1 ) {
 #endif
 #ifdef USE_VULKAN
-		if ( !vk_capture_pipeline_allow_sdr_encode() ) {
+		/* EXR is float export — do not apply SDR encode block. */
+		if ( backEnd.screenshotMask & SCREENSHOT_EXR && backEnd.screenshotEXR[0] ) {
+			vk_capture_pipeline_note_capture();
+			RB_TakeScreenshotEXR( 0, 0, gls.captureWidth, gls.captureHeight, backEnd.screenshotEXR );
+			if ( !backEnd.screenShotEXRsilent ) {
+				ri.Printf( PRINT_ALL, "Wrote %s (display-linearized EXR)\n", backEnd.screenshotEXR );
+			}
+			backEnd.screenshotEXR[0] = '\0';
+			backEnd.screenshotMask &= ~SCREENSHOT_EXR;
+		}
+		if ( !backEnd.screenshotMask ) {
+			/* only EXR was requested */
+		} else if ( !vk_capture_pipeline_allow_sdr_encode() ) {
 			backEnd.screenshotJPG[0] = '\0';
 			backEnd.screenshotTGA[0] = '\0';
 			backEnd.screenshotBMP[0] = '\0';
@@ -2886,6 +2898,7 @@ static const void *RB_SwapBuffers( const void *data ) {
 		backEnd.screenshotJPG[0] = '\0';
 		backEnd.screenshotTGA[0] = '\0';
 		backEnd.screenshotBMP[0] = '\0';
+		backEnd.screenshotEXR[0] = '\0';
 		backEnd.screenshotMask = 0;
 		}
 	}

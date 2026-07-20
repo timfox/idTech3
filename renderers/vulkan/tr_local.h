@@ -1289,7 +1289,8 @@ enum {
 	SCREENSHOT_JPG = 1<<1,
 	SCREENSHOT_BMP = 1<<2,
 	SCREENSHOT_BMP_CLIPBOARD = 1<<3,
-	SCREENSHOT_AVI = 1<<4 // take video frame
+	SCREENSHOT_AVI = 1<<4, // take video frame
+	SCREENSHOT_EXR = 1<<5  // scene/display float EXR (TinyEXR)
 };
 
 // all state modified by the back end is separated
@@ -1309,13 +1310,15 @@ typedef struct {
 	qboolean	doneWorldScene; /* 3D world view drawn this frame (not RDF_NOWORLDMODEL / cubemap) */
 	trRefEntity_t	entity2D;	// currentEntity will point at this when doing 2D rendering
 
-	int		screenshotMask;		// tga | jpg | bmp
+	int		screenshotMask;		// tga | jpg | bmp | exr
 	char	screenshotTGA[ MAX_OSPATH ];
 	char	screenshotJPG[ MAX_OSPATH ];
 	char	screenshotBMP[ MAX_OSPATH ];
+	char	screenshotEXR[ MAX_OSPATH ];
 	qboolean screenShotTGAsilent;
 	qboolean screenShotJPGsilent;
 	qboolean screenShotBMPsilent;
+	qboolean screenShotEXRsilent;
 	videoFrameCommand_t	vcmd;	// avi capture
 	
 	qboolean throttle;
@@ -2653,6 +2656,7 @@ void RB_ExecuteRenderCommands( const void *data );
 void RB_TakeScreenshot( int x, int y, int width, int height, const char *fileName );
 void RB_TakeScreenshotJPEG( int x, int y, int width, int height, const char *fileName );
 void RB_TakeScreenshotBMP( int x, int y, int width, int height, const char *fileName, int clipboard );
+void RB_TakeScreenshotEXR( int x, int y, int width, int height, const char *fileName );
 
 void R_AddDrawSurfCmd( drawSurf_t *drawSurfs, int numDrawSurfs );
 

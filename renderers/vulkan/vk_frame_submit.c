@@ -30,6 +30,7 @@ Extracted from vk.c for incremental modularization.
 #include "vk_reference_lab.h"
 #include "vk_frequency_aware.h"
 #include "vk_spatial_aa.h"
+#include "vk_scene_platform.h"
 #include "vk_hiz.h"
 #include "vk_render_pass.h"
 #include "vk_resource_destroy.h"
@@ -398,6 +399,7 @@ void vk_prepare_frame_temporal_state( void )
 	vk_temporal_begin_frame();
 	vk_spatial_aa_begin_frame();
 	vk_frequency_aware_begin_frame();
+	vk_scene_platform_begin_frame();
 	vk_spine_frame_begin();
 	vk_update_postfx_params( vk.cmd_index );
 	vk.temporal.preparedThisFrame = qtrue;

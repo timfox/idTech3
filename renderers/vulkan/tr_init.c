@@ -86,6 +86,9 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "vk_reference_lab.h"
 #include "vk_frequency_aware.h"
 #include "vk_spatial_aa.h"
+#include "vk_scene_platform.h"
+#include "vk_photometric.h"
+#include "vk_gpu_scene.h"
 #include "vk_pass_registry.h"
 #include "vk_raster_gi.h"
 #include "vk_selective_sun_shadow.h"
@@ -1245,6 +1248,7 @@ static void R_Register( void )
 	ri.Cmd_AddCommand( "screenshot", R_ScreenShot_f );
 	ri.Cmd_AddCommand( "screenshotJPEG", R_ScreenShot_f );
 	ri.Cmd_AddCommand( "screenshotBMP", R_ScreenShot_f );
+	ri.Cmd_AddCommand( "screenshotEXR", R_ScreenShot_f );
 	ri.Cmd_AddCommand( "gfxinfo", GfxInfo_f );
 #ifdef USE_VULKAN
 	ri.Cmd_AddCommand( "vkinfo", VkInfo_f );
@@ -3714,6 +3718,8 @@ void R_Init( void ) {
 	vk_reference_lab_init();
 	vk_frequency_aware_init();
 	vk_spatial_aa_init();
+	vk_scene_platform_init();
+	vk_photometric_init();
 #ifdef USE_VULKAN
 	R_NDGI_Init();
 	R_NIV_Init();
@@ -3839,14 +3845,19 @@ static void RE_Shutdown( refShutdownCode_t code ) {
 	VK_SunCSM_Shutdown();
 	VK_RasterUltra_Shutdown();
 	vk_spatial_aa_shutdown();
+	vk_scene_platform_shutdown();
+	vk_photometric_shutdown();
 	vk_frequency_aware_shutdown();
 	VK_VegGpu_Shutdown();
 	VK_Biome_Shutdown();
 	CBTerrain_OnWorldUnload();
+	vk_scene_platform_on_world_unload();
+	vk_gpu_scene_on_world_unload();
 
 	ri.Cmd_RemoveCommand( "modellist" );
 	ri.Cmd_RemoveCommand( "screenshotBMP" );
 	ri.Cmd_RemoveCommand( "screenshotJPEG" );
+	ri.Cmd_RemoveCommand( "screenshotEXR" );
 	ri.Cmd_RemoveCommand( "screenshot" );
 	ri.Cmd_RemoveCommand( "imagelist" );
 	ri.Cmd_RemoveCommand( "shaderlist" );

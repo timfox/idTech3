@@ -1353,6 +1353,13 @@ elif ! bash "$PROJECT_ROOT/scripts/raster_ultra_2_1_check.sh"; then
 else
   pass "Raster Ultra 2.1 spatial AA static gate"
 fi
+if [[ ! -f "$PROJECT_ROOT/scripts/cinematic_engine_1_0_check.sh" ]]; then
+  fail "missing scripts/cinematic_engine_1_0_check.sh"
+elif ! bash "$PROJECT_ROOT/scripts/cinematic_engine_1_0_check.sh"; then
+  fail "cinematic_engine_1_0_check.sh failed"
+else
+  pass "Cinematic Engine Platform 1.0 environment-slice static gate"
+fi
 
 echo ""
 if [ -n "${GAME_BASE:-}" ]; then
