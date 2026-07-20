@@ -1372,7 +1372,8 @@ void main() {
 	#endif
 
 	vec4 specular = vec4( 0.04, 0.04, 0.04, 1.0 );
-	float roughness = 0.99;
+	/* Legacy surfaces without physical maps: rough dielectric concrete, not dead 0.99. */
+	float roughness = 0.72;
 	float metalness = 0.0;
 	float AO = 1.0;
 	vec3 emissive = vec3( 0.0 );
@@ -1713,6 +1714,23 @@ void main() {
 			debugColor = vec3( clamp( abs( glintDebugComp ) * 10.0, 0.0, 1.0 ) );
 		} else if ( debugMode == 8 ) {
 			debugColor = vec3( clamp( glintDebugWeight, 0.0, 1.0 ) );
+		} else if ( debugMode == 9 ) {
+			debugColor = diffuse.rgb;
+		} else if ( debugMode == 10 ) {
+			debugColor = N * 0.5 + 0.5;
+		} else if ( debugMode == 11 ) {
+			debugColor = vec3( roughness );
+		} else if ( debugMode == 12 ) {
+			debugColor = vec3( metalness );
+		} else if ( debugMode == 13 ) {
+			debugColor = ambientContribution;
+		} else if ( debugMode == 14 ) {
+			debugColor = vec3( AO );
+		} else if ( debugMode == 15 ) {
+			debugColor = emissive;
+		} else if ( debugMode == 16 ) {
+			/* Pre-tonemap energy proxy: direct + ambient + IBL (no bloom). */
+			debugColor = directLighting + ambientContribution + diffuseIrradiance + iblSpec + emissive;
 		} else if ( debugMode == 17 || debugMode == 18 || debugMode == 19 ) {
 			/* Resource-health views: flags packed in pbrDebugMode.z (hasEnv|hasIrr<<1|dictValid<<2). */
 			int bindFlags = int( pbrDebugMode.z + 0.5 );
@@ -1752,6 +1770,14 @@ void main() {
 	}
 	if ( env_texture_set >= 0 ) {
 		out_color.rgb += iblSpec;
+	}
+	/* Soft ambient floor: preserve readable detail in lightmap cavities without a flat wash.
+	 * Only lifts unresolved ambient (not a global constant add on bright surfaces). */
+	{
+		float outLum = dot( out_color.rgb, vec3( 0.2126, 0.7152, 0.0722 ) );
+		float floorAmt = 0.018 * ( 1.0 - metalness );
+		float lift = clamp( ( floorAmt - outLum ) / max( floorAmt, 1e-4 ), 0.0, 1.0 );
+		out_color.rgb += diffuse.rgb * kD * floorAmt * lift * 0.65;
 	}
 
 	// Clearcoat: second specular lobe on top; scale by (1 - max F0 of base) for approximate energy balance.

@@ -86,6 +86,8 @@ Retail **baseq3** with **`cgame.qvm`** auto-loads **`classic_baseq3.cfg`** when 
 
 Other **QVM mods** (e.g. OpenArena) keep the conservative renderer defaults (**`r_classicLighting 1`**) without forcing a cfg.
 
+**Native OpenArena** auto-loads **`classic_openarena_native.cfg`** unless the user already requested modern graphics (**`cl_preferModernGraphics 1`**, selective hybrid, **`r_renderMode` ≥ 3**, or **`r_fbo`+`r_pbr`**), in which case **`modern_openarena.cfg`** is used (PBR/FBO/SSR with OA middleware off). Visual repro: **`exec vulkan_overlay_oa_rpg3dm2_visual.cfg`** — see [SCENE_VISUAL_QUALITY_OA_RPG3DM2.md](SCENE_VISUAL_QUALITY_OA_RPG3DM2.md).
+
 Disable auto selection with **`cl_autoGraphicsProfile 0`**. Manual presets: **`config/modern_vulkan.cfg`** (stable renderer default), overlays **`config/vulkan_overlay_deferred.cfg`**, **`config/vulkan_overlay_rtx.cfg`**, **`config/vulkan_overlay_hybrid1.cfg`**, plus **`config/deferred_vulkan.cfg`** (standalone legacy deferred profile), **`config/modern_lighting.cfg`** (lighting only), **`config/modern_native.cfg`**, and **`config/classic_baseq3.cfg`**.
 
 

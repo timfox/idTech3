@@ -1330,19 +1330,22 @@ static void R_Register( void )
 	r_pbr_debug = ri.Cvar_Get( "r_pbr_debug", "0", CVAR_ARCHIVE_ND );
 	ri.Cvar_CheckRange( r_pbr_debug, "0", "19", CV_INTEGER );
 	ri.Cvar_SetDescription( r_pbr_debug,
-		"PBR debug view override (Vulkan PBR only):\n"
-		" 0 - off (standard PBR)\n"
-		" 1 - show direct lighting only\n"
-		" 2 - show specular environment contribution only\n"
-		" 3 - show diffuse irradiance only\n"
-		" 4 - show env/irradiance cubemap samples\n"
-		" 5 - show glint D term (log)\n"
-		" 6 - show glint lambda (LOD)\n"
-		" 7 - show glint compensation\n"
-		" 8 - show glint weight\n"
-		" 17 - irradiance resource health (red=missing view, green=finite sample)\n"
-		" 18 - glint resource health (red=off, green=procedural ready)\n"
-		" 19 - environment/prefilter resource health (red=missing view, green=finite sample)\n" );
+		"PBR lighting decomposition (Vulkan PBR):\n"
+		" 0 - off\n"
+		" 1 - direct lighting\n"
+		" 2 - IBL specular\n"
+		" 3 - diffuse irradiance\n"
+		" 4 - env/irradiance samples\n"
+		" 5-8 - glint debug\n"
+		" 9 - albedo\n"
+		" 10 - world normal\n"
+		" 11 - roughness\n"
+		" 12 - metallic\n"
+		" 13 - ambient contribution\n"
+		" 14 - material AO\n"
+		" 15 - emissive\n"
+		" 16 - pre-tonemap energy sum\n"
+		" 17-19 - IBL/glint resource health\n" );
 
 	r_pbr_bindlog = ri.Cvar_Get( "r_pbr_bindlog", "0", CVAR_TEMP );
 	ri.Cvar_CheckRange( r_pbr_bindlog, "0", "1", CV_INTEGER );

@@ -14,6 +14,7 @@ cvar_t	*rconAddress;
 cvar_t	*cl_timeout;
 cvar_t	*cl_autoNudge;
 cvar_t	*cl_autoGraphicsProfile;
+cvar_t	*cl_preferModernGraphics;
 cvar_t	*cl_timeNudge;
 cvar_t	*cl_showTimeDelta;
 cvar_t	*cl_shownet;
@@ -51,8 +52,15 @@ void CL_InitCvars( void )
 	Cvar_CheckRange( cl_autoGraphicsProfile, "0", "1", CV_INTEGER );
 	Cvar_SetDescription( cl_autoGraphicsProfile,
 		"Auto graphics profile on cgame load: baseq3+cgame.qvm -> classic_baseq3.cfg; "
-		"native cgame -> modern_native.cfg (execs modern_vulkan.cfg). "
-		"Manual Vulkan overlays: vulkan_overlay_deferred.cfg, vulkan_overlay_rtx.cfg, vulkan_overlay_hybrid1.cfg." );
+		"OpenArena native -> classic_openarena_native.cfg unless modern/hybrid already requested "
+		"(r_fbo+r_pbr, selective hybrid, or cl_preferModernGraphics 1) -> modern_openarena.cfg; "
+		"other native cgame -> modern_native.cfg. Set 0 to disable auto selection." );
+
+	cl_preferModernGraphics = Cvar_Get( "cl_preferModernGraphics", "0", CVAR_ARCHIVE_ND );
+	Cvar_CheckRange( cl_preferModernGraphics, "0", "1", CV_INTEGER );
+	Cvar_SetDescription( cl_preferModernGraphics,
+		"When 1, OpenArena native auto-profile uses modern_openarena.cfg (PBR/FBO/SSR) "
+		"instead of classic_openarena_native.cfg. Also implied by selective hybrid or r_fbo+r_pbr." );
 	cl_timeNudge = Cvar_Get( "cl_timeNudge", "0", CVAR_TEMP );
 	Cvar_CheckRange( cl_timeNudge, "-30", "30", CV_INTEGER );
 	Cvar_SetDescription( cl_timeNudge, "Allows more or less latency to be added in the interest of better smoothness or better responsiveness." );

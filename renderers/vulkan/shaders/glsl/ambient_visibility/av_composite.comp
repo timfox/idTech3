@@ -21,7 +21,7 @@ layout(std430, set = 0, binding = 8) buffer ReferenceMetrics {
 
 layout(push_constant) uniform CompositePush {
 	uvec4 extentMode;        /* xy full extent, z debug, w referenceValid */
-	vec4 params;             /* apply strength, mode, traced mask, unused */
+	vec4 params;             /* apply strength, mode, traced mask, visibility floor */
 } pc;
 
 vec3 heat(float e) {
@@ -76,10 +76,20 @@ void main() {
 		outRgb = vec3(1.0 - gtao.a, gtao.a, 0.0);
 	} else if (debugMode == 0u) {
 		/* CLASS_TRANSMISSION=3 and CLASS_EMISSIVE=4 are intentionally untouched.
-		 * Dynamic deferred lights are added after this pass. */
+		 * Do not multiply full HDR by raw AO (that crushes lightmaps + direct + emissive).
+		 * Soft floor + luminance-weighted apply approximate "indirect only" ownership. */
 		if (cls != 3u && cls != 4u && av_valid_depth(textureLod(depthTex, uv, 0.0).r)) {
-			float visibility = mix(1.0, clamp(av.r, 0.0, 1.0), clamp(pc.params.x, 0.0, 1.0));
-			outRgb *= visibility;
+			float strength = clamp(pc.params.x, 0.0, 1.0);
+			float floorV = clamp(pc.params.w, 0.0, 0.75);
+			float rawVis = clamp(av.r, 0.0, 1.0);
+			float visibility = mix(1.0, rawVis, strength);
+			visibility = mix(floorV, 1.0, visibility);
+			float lum = dot(scene.rgb, vec3(0.2126, 0.7152, 0.0722));
+			/* Bright lit texels (likely direct/lightmap peaks) keep more energy;
+			 * darker recesses receive more AO grounding. */
+			float indirectWeight = clamp(1.0 - smoothstep(0.08, 0.85, lum), 0.15, 1.0);
+			float apply = mix(1.0, visibility, indirectWeight);
+			outRgb = scene.rgb * apply;
 		}
 	}
 	imageStore(colorOut, ip, vec4(outRgb, scene.a));

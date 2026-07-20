@@ -81,6 +81,7 @@ static av_state_t av;
 
 static cvar_t *r_ambientVisibilityMode;
 static cvar_t *r_ambientVisibilityStrength;
+static cvar_t *r_ambientVisibilityFloor;
 static cvar_t *r_rtaoRaysPerPixel;
 static cvar_t *r_rtaoRadius;
 static cvar_t *r_rtaoMinRadius;
@@ -500,6 +501,7 @@ static void AV_RegisterCvars( void )
 	 * edit from destroying images that an older command buffer can still sample. */
 	r_ambientVisibilityMode = ri.Cvar_Get( "r_ambientVisibilityMode", "2", CVAR_ARCHIVE_ND | CVAR_LATCH );
 	r_ambientVisibilityStrength = ri.Cvar_Get( "r_ambientVisibilityStrength", "1", CVAR_ARCHIVE_ND );
+	r_ambientVisibilityFloor = ri.Cvar_Get( "r_ambientVisibilityFloor", "0.28", CVAR_ARCHIVE_ND );
 	r_rtaoRaysPerPixel = ri.Cvar_Get( "r_rtaoRaysPerPixel", "1", CVAR_ARCHIVE_ND );
 	r_rtaoRadius = ri.Cvar_Get( "r_rtaoRadius", "96", CVAR_ARCHIVE_ND );
 	r_rtaoMinRadius = ri.Cvar_Get( "r_rtaoMinRadius", "12", CVAR_ARCHIVE_ND );
@@ -519,6 +521,11 @@ static void AV_RegisterCvars( void )
 	r_gtaoHalfRes = ri.Cvar_Get( "r_gtaoHalfRes", "0", CVAR_ARCHIVE_ND | CVAR_LATCH );
 	ri.Cvar_CheckRange( r_ambientVisibilityMode, "0", "5", CV_INTEGER );
 	ri.Cvar_CheckRange( r_ambientVisibilityStrength, "0", "1", CV_FLOAT );
+	ri.Cvar_CheckRange( r_ambientVisibilityFloor, "0", "0.75", CV_FLOAT );
+	ri.Cvar_SetDescription( r_ambientVisibilityFloor,
+		"Minimum ambient-visibility multiplier when applying GTAO/AV to HDR color. "
+		"Prevents lightmapped scenes from crushing to pure black. "
+		"AV still must not darken emissive/transmission classes." );
 	ri.Cvar_CheckRange( r_rtaoRaysPerPixel, "1", "8", CV_INTEGER );
 	ri.Cvar_CheckRange( r_rtaoRadius, "1", "2048", CV_FLOAT );
 	ri.Cvar_CheckRange( r_rtaoMinRadius, "0.1", "512", CV_FLOAT );
@@ -1126,6 +1133,7 @@ void vk_ambient_visibility_apply_after_geometry( void )
 		compositePush.em[0] = av.width; compositePush.em[1] = av.height; compositePush.em[2] = r_rtaoDebug->integer;
 		compositePush.em[3] = needReference ? 1u : 0u; compositePush.p[0] = r_ambientVisibilityStrength->value;
 		compositePush.p[1] = (float)effectiveMode; compositePush.p[2] = rtReady ? 1.0f : 0.0f;
+		compositePush.p[3] = r_ambientVisibilityFloor ? r_ambientVisibilityFloor->value : 0.28f;
 		qvkCmdBindPipeline( cmd, VK_PIPELINE_BIND_POINT_COMPUTE, av.compositePipe );
 		qvkCmdBindDescriptorSets( cmd, VK_PIPELINE_BIND_POINT_COMPUTE, av.compositePL, 0, 1, &av.compositeSet, 0, NULL );
 		qvkCmdPushConstants( cmd, av.compositePL, VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof( compositePush ), &compositePush );

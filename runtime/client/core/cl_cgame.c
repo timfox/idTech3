@@ -1496,6 +1496,35 @@ static qboolean CL_IsOpenArenaGame( void ) {
 
 /*
 ====================
+CL_UserRequestedModernGraphics
+
+True when the user already opted into HDR/PBR/hybrid before cgame auto-profile,
+so OpenArena must not wipe modern renderer settings with classic_openarena_native.cfg.
+====================
+*/
+static qboolean CL_UserRequestedModernGraphics( void ) {
+	if ( cl_preferModernGraphics && cl_preferModernGraphics->integer ) {
+		return qtrue;
+	}
+	if ( Cvar_VariableIntegerValue( "r_selectiveHybridReflection" ) ||
+		Cvar_VariableIntegerValue( "r_selectiveHybridSunShadow" ) ) {
+		return qtrue;
+	}
+	if ( Cvar_VariableIntegerValue( "r_renderMode" ) >= 3 ) {
+		return qtrue;
+	}
+	if ( Cvar_VariableIntegerValue( "r_hybrid1" ) ) {
+		return qtrue;
+	}
+	/* Explicit modern stack already latched (e.g. +set r_fbo 1 +set r_pbr 1). */
+	if ( Cvar_VariableIntegerValue( "r_fbo" ) && Cvar_VariableIntegerValue( "r_pbr" ) ) {
+		return qtrue;
+	}
+	return qfalse;
+}
+
+/*
+====================
 CL_ApplyClassicBaseq3Cvars
 
 Synchronous retail-safe defaults before cgame.qvm CG_INIT (exec classic_baseq3.cfg
@@ -1546,6 +1575,34 @@ static void CL_ApplyClassicBaseq3Cvars( void ) {
 
 /*
 ====================
+CL_ApplyOpenArenaMiddlewareOff
+
+Disable OA-incompatible middleware without touching the modern renderer stack.
+====================
+*/
+static void CL_ApplyOpenArenaMiddlewareOff( void ) {
+	Cvar_Set( "cl_physicsEnabled", "0" );
+	Cvar_Set( "cl_openWorldSync", "0" );
+	Cvar_Set( "r_bspStream", "0" );
+	Cvar_Set( "r_district", "0" );
+	Cvar_Set( "cm_stream", "0" );
+	Cvar_Set( "cm_streamMerge", "0" );
+	Cvar_Set( "cm_openWorldCollision", "0" );
+	Cvar_Set( "cl_engineSprites", "0" );
+	Cvar_Set( "r_spriteProps", "0" );
+	Cvar_Set( "cl_navEnabled", "0" );
+	Cvar_Set( "cl_particlesEnabled", "0" );
+	Cvar_Set( "g_ecsMotion", "0" );
+	Cvar_Set( "sv_engineSprites", "0" );
+	Cvar_Set( "sv_engineSpritesSpawn", "0" );
+	Cvar_Set( "sv_engineDecals", "0" );
+	Cvar_Set( "sv_engineDecalsSpawn", "0" );
+	Cvar_Set( "sv_openWorld", "0" );
+	CM_Stream_Merge_ClearAll();
+}
+
+/*
+====================
 CL_TryEarlyStockBaseq3Profile
 
 Listen-server map loads call SCR_UpdateScreen before cgame init; disable ImGui
@@ -1574,6 +1631,8 @@ void CL_TryEarlyStockBaseq3Profile( void ) {
 CL_ApplyGraphicsProfile
 
 baseq3 + cgame.qvm -> classic retail look; native cgame -> modern Vulkan stack.
+OpenArena native prefers classic presentation unless the user already requested
+modern/hybrid graphics (do not clobber +exec selective hybrid).
 ====================
 */
 static void CL_ApplyGraphicsProfile( vm_t *vm ) {
@@ -1593,10 +1652,18 @@ static void CL_ApplyGraphicsProfile( vm_t *vm ) {
 	}
 
 	if ( isOpenArena && !isQvm ) {
-		Com_Printf( "[client] cl_autoGraphicsProfile: classic native OpenArena\n" );
-		CL_ApplyClassicBaseq3Cvars();
 		cls.stockBaseq3 = qfalse;
-		Cbuf_AddText( "exec classic_openarena_native.cfg\n" );
+		if ( CL_UserRequestedModernGraphics() ) {
+			Com_Printf( "[client] cl_autoGraphicsProfile: modern OpenArena "
+				"(preserving user modern/hybrid graphics; middleware off)\n" );
+			CL_ApplyOpenArenaMiddlewareOff();
+			Cbuf_AddText( "exec modern_openarena.cfg\nvid_restart\n" );
+		} else {
+			Com_Printf( "[client] cl_autoGraphicsProfile: classic native OpenArena\n" );
+			CL_ApplyClassicBaseq3Cvars();
+			cls.stockBaseq3 = qfalse;
+			Cbuf_AddText( "exec classic_openarena_native.cfg\n" );
+		}
 		return;
 	}
 
