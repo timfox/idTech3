@@ -77,7 +77,28 @@ Clears: accum `vec4(0)`, revealage `1`. Depth test uses reversed-Z `GREATER_OR_E
 
 **Pass order (world):** opaque → deferred → OIT accum → OIT resolve → refractive (water/glass when `r_refractiveExcludeOit 1`) → weapon (`RDF_NOWORLDMODEL`) → post → UI. Weapon never writes world OIT targets.
 
-**Repro / isolation:** `./scripts/repro_oit_corruption.sh` or `exec repro_oit_corruption.cfg` after Ultra/FA. Matrix: `r_oit 0` → WBOIT raw (`r_oitForwardPlus 0`, `r_oitClassify 0`) → classify → lit → `r_oitDirectTest 1` → weapon hide/show → `oit_status` / `oit_capture stages`. Static gate: `./scripts/oit_corruption_check.sh`.
+**Repro / isolation:** `./scripts/repro_oit_corruption.sh` or `exec repro_oit_corruption.cfg` after Ultra/FA.
+
+**First corrupt producer (code + isolation):** `oit_resolve` writing `color_image` under `DONT_CARE` with a wrong prior layout — not accum/reveal contents when cleared. Weapon contamination = same resolved HDR under the gun.
+
+**Isolation matrix (device; stop at first band/tile failure):**
+
+| Step | Setting | Expected if fix holds |
+|------|---------|------------------------|
+| B0 | `r_oit 0` | Clean opaque/weapon/UI |
+| B1 | WBOIT raw (`r_oitForwardPlus 0`, `r_oitClassify 0`) | No rectangular bands |
+| B2 | `r_oitClassify 1` | No mid-bucket bands |
+| B3 | `r_oitForwardPlus 1` | No magenta tile slabs (OOB) |
+| B4 | `r_oitDebug` 1–13 | Stage views coherent |
+| B5 | `r_oitDebug 14` | Magenta×coverage only (ignore accum RGB) |
+| B5b | `r_oitDebug 15` | Smooth FragCoord UV (no bands) |
+| B6 | `r_oitDirectTest 1` | Pure opaque after clear |
+| B6b | `r_oitDirectTest 2` | Smooth half UV-gradient composite |
+| B7 | `cg_drawGun 0/1` | Gun clean when world resolve clean |
+
+**Odd extents (device):** native + 1279×719 / 1365×767 / 1601×901 (`r_renderWidth`/`r_renderHeight` or window resize). Lifecycle: `vid_restart`, map change. No invented soak timings — report measured duration only if run.
+
+Commands: `oit_status` / `oit_capture stages`. Static gate: `./scripts/oit_corruption_check.sh`.
 
 ### Promotion (after this fix)
 

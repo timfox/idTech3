@@ -16,7 +16,7 @@ layout(set = 4, binding = 0) uniform sampler2D oitB0Tex;
 layout(push_constant) uniform OitResolvePush {
 	int debugMode; /* 0=composite, see r_oitDebug */
 	int oitMode;   /* 1=WBOIT, 2=MBOIT */
-	int pad0;
+	int directTest; /* 0=off, 1=clear+resolve, 2=synthetic UV gradient composite */
 	int pad1;
 } pc;
 
@@ -64,6 +64,17 @@ void main() {
 
 	if ( oit_invalid3( opaque ) || oit_invalid4( accum ) || oit_invalid( revealage ) ) {
 		out_color = vec4( oit_magenta(), 1.0 );
+		return;
+	}
+
+	/* r_oitDirectTest 2: ignore attachment contents; synthetic UV gradient composite.
+	 * Clean half-blend of opaque + (u,v,0.25) proves resolve addressing/lifecycle
+	 * independent of transparent geometry (Phase B6). */
+	if ( pc.directTest >= 2 ) {
+		float u = float( px.x ) / float( max( opaqueSize.x - 1, 1 ) );
+		float v = float( px.y ) / float( max( opaqueSize.y - 1, 1 ) );
+		vec3 synth = vec3( u, v, 0.25 );
+		out_color = vec4( mix( opaque, synth, 0.5 ), 1.0 );
 		return;
 	}
 
@@ -150,6 +161,14 @@ void main() {
 		} else {
 			out_color = vec4( vec3( clamp( d, 0.0, 1.0 ) ), 1.0 );
 		}
+	} else if ( mode == 14 ) {
+		/* Constant-color diagnostic (Phase B5): ignore accum RGB; coverage from reveal. */
+		out_color = vec4( mix( opaque, vec3( 1.0, 0.0, 1.0 ), coverage ), 1.0 );
+	} else if ( mode == 15 ) {
+		/* Resolve addressing diagnostic: FragCoord UV (bands here ⇒ wrong extent/fetch). */
+		float u = float( px.x ) / float( max( opaqueSize.x - 1, 1 ) );
+		float v = float( px.y ) / float( max( opaqueSize.y - 1, 1 ) );
+		out_color = vec4( u, v, 0.0, 1.0 );
 	} else {
 		out_color = vec4( resolved, 1.0 );
 	}

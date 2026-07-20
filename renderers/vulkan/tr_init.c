@@ -3030,7 +3030,7 @@ static void R_Register( void )
 		"Requires \\r_oit 1 or 2. Hair cards stay on \\r_stochasticAlpha." );
 	ri.Cvar_SetGroup( r_oitClassify, CVG_RENDERER );
 	r_oitDebug = ri.Cvar_Get( "r_oitDebug", "0", CVAR_CHEAT );
-	ri.Cvar_CheckRange( r_oitDebug, "0", "13", CV_INTEGER );
+	ri.Cvar_CheckRange( r_oitDebug, "0", "15", CV_INTEGER );
 	ri.Cvar_SetDescription( r_oitDebug,
 		"OIT resolve debug view (cheat):\n"
 		" 0 - composite\n"
@@ -3047,15 +3047,19 @@ static void R_Register( void )
 		" 11 - coverage×weight heat\n"
 		" 12 - estimated fragment/layer count\n"
 		" 13 - opaque depth at transparent pixels (WBOIT)\n"
+		" 14 - constant magenta×coverage (ignore accum RGB)\n"
+		" 15 - FragCoord UV addressing diagnostic\n"
 		"NaN/Inf → magenta." );
 	ri.Cvar_SetGroup( r_oitDebug, CVG_RENDERER );
 	{
 		cvar_t *r_oitDirectTest;
 		r_oitDirectTest = ri.Cvar_Get( "r_oitDirectTest", "0", CVAR_CHEAT );
-		ri.Cvar_CheckRange( r_oitDirectTest, "0", "1", CV_INTEGER );
+		ri.Cvar_CheckRange( r_oitDirectTest, "0", "2", CV_INTEGER );
 		ri.Cvar_SetDescription( r_oitDirectTest,
-			"OIT lifecycle isolation: clear accum/reveal and resolve without transparent draws.\n"
-			"Proves attachment/resolve correctness independent of materials. Cheat." );
+			"OIT lifecycle isolation (cheat):\n"
+			" 0 - off\n"
+			" 1 - clear accum/reveal, skip transparent draws, resolve (pure opaque)\n"
+			" 2 - same as 1, but resolve composites a synthetic UV gradient (addressing test)" );
 		ri.Cvar_SetGroup( r_oitDirectTest, CVG_RENDERER );
 	}
 	if ( r_oitClassify && r_oitClassify->integer ) {

@@ -42,6 +42,26 @@ grep -q 'VK_OIT_FRAME_UNTOUCHED' "$ROOT/renderers/vulkan/vk.h" || { echo "FAIL f
 grep -q 'oit_capture' "$ROOT/renderers/vulkan/vk_transparency_route.c" || { echo "FAIL oit_capture cmd"; fail=1; }
 grep -q 'r_oitDirectTest' "$ROOT/renderers/vulkan/tr_init.c" || { echo "FAIL r_oitDirectTest"; fail=1; }
 grep -q 'weapon isolation' "$ROOT/renderers/vulkan/tr_backend.c" || { echo "FAIL weapon isolation log"; fail=1; }
+grep -q 'resolve refused: OIT attachments UNTOUCHED' "$ROOT/renderers/vulkan/vk_postfx_passes.c" || {
+  echo "FAIL resolve must refuse UNTOUCHED frame state"; fail=1; }
+grep -q 'mode == 14' "$ROOT/renderers/vulkan/shaders/glsl/oit_resolve.frag" || {
+  echo "FAIL constant-color diagnostic (mode 14)"; fail=1; }
+grep -q 'mode == 15' "$ROOT/renderers/vulkan/shaders/glsl/oit_resolve.frag" || {
+  echo "FAIL UV addressing diagnostic (mode 15)"; fail=1; }
+grep -q 'directTest >= 2' "$ROOT/renderers/vulkan/shaders/glsl/oit_resolve.frag" || {
+  echo "FAIL DirectTest synthetic gradient path"; fail=1; }
+grep -q 'vk_reactive_mask_stamp_from_reveal' "$ROOT/renderers/vulkan/vk_postfx_passes.c" || {
+  echo "FAIL reactive stamp after OIT"; fail=1; }
+# Reactive stamp must not sit between classify buckets (single call after loop)
+stamp_count=$(grep -c 'vk_reactive_mask_stamp_from_reveal' "$ROOT/renderers/vulkan/vk_postfx_passes.c" || true)
+if [[ "$stamp_count" -eq 1 ]]; then
+  echo "OK  single reactive stamp after OIT buckets"
+else
+  echo "FAIL expected 1 reactive stamp in vk_postfx_passes.c (got $stamp_count)"
+  fail=1
+fi
+grep -q '1279' "$ROOT/docs/MOMENT_OIT_STOCHASTIC_ALPHA.md" || {
+  echo "FAIL odd-extent certification checklist missing from docs"; fail=1; }
 
 # Boot must not force OIT corruption repro
 for cfg in modern_vulkan.cfg modern_vulkan_stable.cfg gfx_safe.cfg; do

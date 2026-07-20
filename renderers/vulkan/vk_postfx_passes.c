@@ -578,7 +578,7 @@ void vk_oit_pass( const struct drawSurfsCommand_s *cmd )
 				vk.pipeline_layout_oit_resolve, 0, 5, sets, 0, NULL );
 			push_data[0] = ( r_oitDebug && r_oitDebug->integer > 0 ) ? r_oitDebug->integer : 0;
 			push_data[1] = mboit ? 2 : 1;
-			push_data[2] = 0;
+			push_data[2] = ri.Cvar_VariableIntegerValue( "r_oitDirectTest" );
 			push_data[3] = 0;
 			qvkCmdPushConstants( vk.cmd->command_buffer, vk.pipeline_layout_oit_resolve,
 				VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof( push_data ), push_data );
