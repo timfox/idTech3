@@ -7,6 +7,7 @@ atlases, froxel/fluid volumes, and teardown (split from vk.c).
 
 #include "tr_local.h"
 #include "vk.h"
+#include "vk_sun_csm.h"
 #include "vk_postfx.h"
 #include "vk_cmd.h"
 #include "vk_image_layout.h"
@@ -1379,7 +1380,17 @@ static void vk_destroy_sun_shadow_resources( void )
 	}
 	vk.sun_shadow_width = 0;
 	vk.sun_shadow_height = 0;
+	vk.sun_shadow_tile_size = 0;
+	vk.sun_shadow_cascade_count = 1;
 	Matrix16Identity( vk.sun_shadow_matrix0 );
+	{
+		int ci;
+		for ( ci = 0; ci < 4; ci++ ) {
+			Matrix16Identity( vk.sun_shadow_matrix[ci] );
+			vk.sun_shadow_splits[ci] = 0.0f;
+		}
+	}
+	vk.sun_shadow_near = 4.0f;
 	vk.sun_shadow_valid = qfalse;
 }
 
@@ -1406,9 +1417,38 @@ static void vk_create_sun_shadow_resources( void )
 
 	vk_destroy_sun_shadow_resources();
 
-	vk.sun_shadow_width = (uint32_t)map_size;
-	vk.sun_shadow_height = (uint32_t)map_size;
+	{
+		int cascades = VK_SunCSM_CascadeCount();
+		int atlas = map_size;
+		int tile = map_size;
+		if ( cascades < 1 ) {
+			cascades = 1;
+		}
+		if ( cascades > 4 ) {
+			cascades = 4;
+		}
+		if ( cascades > 1 ) {
+			/* Keep atlas ≤ 4096: shrink tile if needed. */
+			if ( map_size * 2 > 4096 ) {
+				map_size = 2048;
+			}
+			atlas = map_size * 2;
+			tile = map_size;
+		}
+		vk.sun_shadow_tile_size = (uint32_t)tile;
+		vk.sun_shadow_cascade_count = (uint32_t)cascades;
+		vk.sun_shadow_width = (uint32_t)atlas;
+		vk.sun_shadow_height = (uint32_t)atlas;
+	}
 	Matrix16Identity( vk.sun_shadow_matrix0 );
+	{
+		int ci;
+		for ( ci = 0; ci < 4; ci++ ) {
+			Matrix16Identity( vk.sun_shadow_matrix[ci] );
+			vk.sun_shadow_splits[ci] = 0.0f;
+		}
+	}
+	vk.sun_shadow_near = 4.0f;
 	vk.sun_shadow_valid = qfalse;
 
 	if ( glConfig.stencilBits > 0 ) {

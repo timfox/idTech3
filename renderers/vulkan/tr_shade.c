@@ -29,6 +29,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "vk_meshlets.h"
 #include "vk_selective_sun_shadow.h"
 #include "vk_selective_reflection.h"
+#include "vk_sun_csm.h"
 #endif
 #include "../common/tr_vector_font.h"
 #ifdef USE_VULKAN
@@ -64,6 +65,9 @@ extern cvar_t *r_shDebugView;
 
 static void VK_FillPbrSunShadowUniform( vkUniform_t *ubo ) {
 	int i;
+	int c;
+	int cascades;
+	int grid;
 
 	if ( !ubo ) {
 		return;
@@ -72,26 +76,60 @@ static void VK_FillPbrSunShadowUniform( vkUniform_t *ubo ) {
 	for ( i = 0; i < 4; i++ ) {
 		Vector4Set( ubo->pbrSunShadowRows[i], 0.0f, 0.0f, 0.0f, 0.0f );
 	}
+	for ( i = 0; i < 12; i++ ) {
+		Vector4Set( ubo->pbrSunShadowCascadeRows[i], 0.0f, 0.0f, 0.0f, 0.0f );
+	}
 	Vector4Set( ubo->pbrSunShadowParams, 0.0f, 0.0f, 0.0f, 0.0f );
+	Vector4Set( ubo->pbrSunShadowSplits, 0.0f, 0.0f, 0.0f, 0.0f );
+	Vector4Set( ubo->pbrSunShadowMeta, 1.0f, 1.0f, 0.0f, 4.0f );
 
 	if ( !r_pbrSunShadow || !r_pbrSunShadow->integer || !vk.sun_shadow_valid || R_ClassicLightingActive() ) {
 		return;
 	}
-	/* Exclusive sun owner: when Hybrid1/RQ RT owns sun, force invalid raster params. */
 	if ( vk_shs_rt_owns_sun() ) {
 		return;
 	}
 
-	for ( i = 0; i < 4; i++ ) {
-		ubo->pbrSunShadowRows[i][0] = vk.sun_shadow_matrix0[i * 4 + 0];
-		ubo->pbrSunShadowRows[i][1] = vk.sun_shadow_matrix0[i * 4 + 1];
-		ubo->pbrSunShadowRows[i][2] = vk.sun_shadow_matrix0[i * 4 + 2];
-		ubo->pbrSunShadowRows[i][3] = vk.sun_shadow_matrix0[i * 4 + 3];
+	cascades = (int)vk.sun_shadow_cascade_count;
+	if ( cascades < 1 ) {
+		cascades = 1;
 	}
+	if ( cascades > 4 ) {
+		cascades = 4;
+	}
+	grid = ( cascades <= 1 ) ? 1 : 2;
+
+	for ( i = 0; i < 4; i++ ) {
+		ubo->pbrSunShadowRows[i][0] = vk.sun_shadow_matrix[0][i * 4 + 0];
+		ubo->pbrSunShadowRows[i][1] = vk.sun_shadow_matrix[0][i * 4 + 1];
+		ubo->pbrSunShadowRows[i][2] = vk.sun_shadow_matrix[0][i * 4 + 2];
+		ubo->pbrSunShadowRows[i][3] = vk.sun_shadow_matrix[0][i * 4 + 3];
+	}
+	for ( c = 1; c < cascades; c++ ) {
+		for ( i = 0; i < 4; i++ ) {
+			int dst = ( c - 1 ) * 4 + i;
+			ubo->pbrSunShadowCascadeRows[dst][0] = vk.sun_shadow_matrix[c][i * 4 + 0];
+			ubo->pbrSunShadowCascadeRows[dst][1] = vk.sun_shadow_matrix[c][i * 4 + 1];
+			ubo->pbrSunShadowCascadeRows[dst][2] = vk.sun_shadow_matrix[c][i * 4 + 2];
+			ubo->pbrSunShadowCascadeRows[dst][3] = vk.sun_shadow_matrix[c][i * 4 + 3];
+		}
+	}
+
 	ubo->pbrSunShadowParams[0] = ( r_fogShadowBias ) ? r_fogShadowBias->value : 0.001f;
 	ubo->pbrSunShadowParams[1] = ( r_fogShadowPcfRadius ) ? r_fogShadowPcfRadius->value : 1.0f;
 	ubo->pbrSunShadowParams[2] = 1.0f;
 	ubo->pbrSunShadowParams[3] = ( r_pbrSunShadowStrength ) ? Com_Clamp( 0.0f, 1.0f, r_pbrSunShadowStrength->value ) : 1.0f;
+
+	Vector4Set( ubo->pbrSunShadowSplits,
+		vk.sun_shadow_splits[0],
+		vk.sun_shadow_splits[1],
+		vk.sun_shadow_splits[2],
+		vk.sun_shadow_splits[3] );
+	Vector4Set( ubo->pbrSunShadowMeta,
+		(float)cascades,
+		1.0f / (float)grid,
+		VK_SunCSM_CascadeBlend(),
+		vk.sun_shadow_near > 0.0f ? vk.sun_shadow_near : 4.0f );
 }
 
 static qboolean R_StageHasLightmap( const shaderStage_t *pStage ) {

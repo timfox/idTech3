@@ -339,6 +339,7 @@
       <AdditionalIncludeDirectories>..\..\..\external\include\cgltf;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <ClCompile Include="..\..\..\renderers\vulkan\vk_raster_ultra.c" />
+    <ClCompile Include="..\..\..\renderers\vulkan\vk_sun_csm.c" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\..\renderers\vulkan\iqm.h" />
@@ -353,6 +354,7 @@
     <ClInclude Include="..\..\..\renderers\vulkan\tr_model_gltf.h" />
     <ClInclude Include="..\..\..\renderers\vulkan\tr_mesh_normal_policy.h" />
     <ClInclude Include="..\..\..\renderers\vulkan\vk_raster_ultra.h" />
+    <ClInclude Include="..\..\..\renderers\vulkan\vk_sun_csm.h" />
   </ItemGroup>
 
   <ItemGroup>

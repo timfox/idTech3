@@ -164,12 +164,13 @@ vec3 shadeDeferredPixel( uvec2 pix ) {
 	}
 	vec3 albedo = texture( albedoTex, uv ).rgb;
 	vec4 material = texture( materialTex, uv );
-	float materialConfidence = clamp( material.a, 0.0, 1.0 );
+	float materialConfidence = 1.0; /* clearcoat packed in material.a; confidence from normal.w */
 	float shadingConfidence = min( normalConfidence, materialConfidence );
 	float metalness = mix( 0.0, clamp( material.r, 0.0, 1.0 ), shadingConfidence );
 	float roughness = mix( 0.92, clamp( material.g, 0.04, 1.0 ), shadingConfidence );
 	roughness = ApplyDeferredSpecularAA( roughness, uv, ivec2( pix ) );
 	float materialAO = clamp( material.b, 0.0, 1.0 );
+	float clearcoat = clamp( material.a, 0.0, 1.0 );
 	float aoCoupling = mix( 1.0, materialAO, clamp( pc.aoStrength, 0.0, 1.0 ) * shadingConfidence );
 	vec3 V = safeNormalizeOr( -viewPos, vec3( 0.0, 0.0, 1.0 ) );
 	N = safeNormalizeOr( mix( vec3( 0.0, 0.0, 1.0 ), N, max( shadingConfidence, 0.15 ) ), vec3( 0.0, 0.0, 1.0 ) );
@@ -240,6 +241,18 @@ vec3 shadeDeferredPixel( uvec2 pix ) {
 			float Vis = CalcVisibility( NL, NE, alpha );
 			specularAcc += lc.rgb * addBoost * att * ( D * Vis * F * NL ) *
 				mix( 1.0, aoCoupling, 0.5 ) * pc.specularStrength * classSpecScale * shadingConfidence;
+
+			/* Clearcoat: dielectric F0=0.04 lobe; attenuate base (Forward+ parity). */
+			if ( clearcoat > 1e-4 ) {
+				float ccRough = mix( 0.08, 0.35, roughness );
+				float ccAlpha = max( ccRough * ccRough, 0.001 );
+				float ccD = D_GGX( NH, ccAlpha );
+				float ccVis = CalcVisibility( NL, NE, ccAlpha );
+				vec3 ccF = vec3( 0.04 ) + ( vec3( 1.0 ) - vec3( 0.04 ) ) * Pow5( 1.0 - VH );
+				specularAcc *= ( 1.0 - clearcoat * 0.85 );
+				specularAcc += lc.rgb * addBoost * att * ( ccD * ccVis * ccF * NL ) *
+					clearcoat * pc.specularStrength * shadingConfidence;
+			}
 		}
 	}
 

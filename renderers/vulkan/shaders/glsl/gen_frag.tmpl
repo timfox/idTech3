@@ -46,8 +46,11 @@ layout(set = 0, binding = 0) uniform UBO {
 	vec4 pbrParallaxParams; // x=scale, y=shadow str, z=shadow steps (float), w=unused (reserved)
 	vec4 pbrMaterialBlend; // x=height-blend sharpness, yzw unused
 	vec4 pbrForwardPlus; // x: overflow shade; y: skip mask (tess.dlightBits); z: specular strength; w: energy renorm factor
-	vec4 pbrSunShadowRows[4]; // light clip matrix (column-major columns)
+	vec4 pbrSunShadowRows[4]; // cascade 0 light-clip matrix columns
 	vec4 pbrSunShadowParams; // x: bias, y: PCF radius (texels), z: valid, w: strength
+	vec4 pbrSunShadowCascadeRows[12]; // cascades 1..3 (4 columns each)
+	vec4 pbrSunShadowSplits; // xyz = cascade far depths (view), w = blend fraction
+	vec4 pbrSunShadowMeta; // x=cascadeCount y=atlasTileScale z=debug w=nearPlane
 #endif
 //#endif
 };
@@ -236,26 +239,19 @@ layout(set = 19, binding = 0) uniform sampler2D blend_albedo[8];
 layout(set = 19, binding = 1) uniform sampler2D blend_normal[8];
 layout(set = 19, binding = 2) uniform sampler2D blend_orm[8];
 
-float pbrSunShadowVisibility( vec3 worldPos ) {
-	if ( pbrSunShadowParams.z < 0.5 ) {
-		return 1.0;
-	}
-	mat4 shadowMat = mat4(
-		pbrSunShadowRows[0],
-		pbrSunShadowRows[1],
-		pbrSunShadowRows[2],
-		pbrSunShadowRows[3]
-	);
+float pbrSunShadowSampleCascade( mat4 shadowMat, vec3 worldPos, float tileScale, float tileOffsetX, float tileOffsetY ) {
 	vec4 lightClip = shadowMat * vec4( worldPos, 1.0 );
 	if ( abs( lightClip.w ) <= 1e-6 ) {
 		return 1.0;
 	}
 	vec3 ndc = lightClip.xyz / lightClip.w;
-	vec2 uv = ndc.xy * 0.5 + 0.5;
+	vec2 uvLocal = ndc.xy * 0.5 + 0.5;
 	float depth = ndc.z * 0.5 + 0.5;
-	if ( any( lessThan( uv, vec2( 0.0 ) ) ) || any( greaterThan( uv, vec2( 1.0 ) ) ) || depth <= 0.0 || depth >= 1.0 ) {
-		return 1.0;
+	if ( any( lessThan( uvLocal, vec2( 0.0 ) ) ) || any( greaterThan( uvLocal, vec2( 1.0 ) ) ) ||
+		depth <= 0.0 || depth >= 1.0 ) {
+		return -1.0; /* out of cascade */
 	}
+	vec2 uv = uvLocal * tileScale + vec2( tileOffsetX, tileOffsetY );
 	float compareDepth = depth - max( pbrSunShadowParams.x, 0.0 );
 	vec2 invSize = vec2( 1.0 / max( textureSize( fp_sun_shadow_map, 0 ).x, 1.0 ),
 		1.0 / max( textureSize( fp_sun_shadow_map, 0 ).y, 1.0 ) );
@@ -273,6 +269,73 @@ float pbrSunShadowVisibility( vec3 worldPos ) {
 		}
 	}
 	return lit * ( 1.0 / 9.0 );
+}
+
+mat4 pbrSunShadowMatrix( int cascade ) {
+	if ( cascade <= 0 ) {
+		return mat4( pbrSunShadowRows[0], pbrSunShadowRows[1], pbrSunShadowRows[2], pbrSunShadowRows[3] );
+	}
+	int base = ( cascade - 1 ) * 4;
+	return mat4(
+		pbrSunShadowCascadeRows[base + 0],
+		pbrSunShadowCascadeRows[base + 1],
+		pbrSunShadowCascadeRows[base + 2],
+		pbrSunShadowCascadeRows[base + 3] );
+}
+
+float pbrSunShadowCascadeFar( int cascade ) {
+	if ( cascade <= 0 ) return pbrSunShadowSplits.x;
+	if ( cascade == 1 ) return pbrSunShadowSplits.y;
+	if ( cascade == 2 ) return pbrSunShadowSplits.z;
+	return pbrSunShadowSplits.w;
+}
+
+float pbrSunShadowVisibility( vec3 worldPos ) {
+	if ( pbrSunShadowParams.z < 0.5 ) {
+		return 1.0;
+	}
+	int count = int( clamp( pbrSunShadowMeta.x, 1.0, 4.0 ) );
+	float nearZ = max( pbrSunShadowMeta.w, 0.1 );
+	float blend = clamp( pbrSunShadowMeta.z, 0.0, 0.5 );
+	float viewZ = max( length( worldPos - eyePos.xyz ), nearZ );
+
+	int cascade = count - 1;
+	for ( int i = 0; i < 4; ++i ) {
+		if ( i >= count ) {
+			break;
+		}
+		if ( viewZ < pbrSunShadowCascadeFar( i ) ) {
+			cascade = i;
+			break;
+		}
+	}
+
+	int grid = ( count <= 1 ) ? 1 : 2;
+	float ts = 1.0 / float( grid );
+	float ox = float( cascade % grid ) * ts;
+	float oy = float( cascade / grid ) * ts;
+	float vis = pbrSunShadowSampleCascade( pbrSunShadowMatrix( cascade ), worldPos, ts, ox, oy );
+	if ( vis < 0.0 ) {
+		vis = 1.0;
+	}
+
+	if ( blend > 1e-4 && cascade + 1 < count ) {
+		float splitFar = pbrSunShadowCascadeFar( cascade );
+		float splitNear = ( cascade == 0 ) ? nearZ : pbrSunShadowCascadeFar( cascade - 1 );
+		float range = max( splitFar - splitNear, 1e-3 );
+		float edge = ( viewZ - ( splitFar - blend * range ) ) / max( blend * range, 1e-3 );
+		edge = clamp( edge, 0.0, 1.0 );
+		if ( edge > 0.0 ) {
+			int c1 = cascade + 1;
+			float ox1 = float( c1 % grid ) * ts;
+			float oy1 = float( c1 / grid ) * ts;
+			float vis1 = pbrSunShadowSampleCascade( pbrSunShadowMatrix( c1 ), worldPos, ts, ox1, oy1 );
+			if ( vis1 >= 0.0 ) {
+				vis = mix( vis, vis1, edge );
+			}
+		}
+	}
+	return vis;
 }
 
 // prob use ubo for specularScale & normalScale ..
@@ -1423,10 +1486,15 @@ void main() {
 	roughness = ApplySpecularAA( roughness, N );
 	roughness = clamp( roughness, 0.02, 1.0 );
 
+	float deferredClearcoat = 0.0;
+	if ( clearcoat_texture_set >= 0 ) {
+		deferredClearcoat = clamp( texture( clearcoat_texture, frag_tex_coord0 ).r * pbrClearcoatScale.x, 0.0, 1.0 );
+	}
+
 #ifdef USE_DEFERRED_EXPORT
-	/* World-space normal + material; deferred_lighting.comp transforms N to view when normalsAreWorld=1. */
+	/* World-space normal + material; a = clearcoat weight for deferred lobe parity. */
 	out_deferred_normal = vec4( normalize( N ), 1.0 );
-	out_deferred_material = vec4( metalness, roughness, AO, 1.0 );
+	out_deferred_material = vec4( metalness, roughness, AO, deferredClearcoat );
 #ifdef USE_VISIBILITY_EXPORT
 	{
 		uint drawId = 0u;

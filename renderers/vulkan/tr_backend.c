@@ -47,6 +47,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "vk_reactive_mask.h"
 #include "vk_ambient_visibility.h"
 #include "vk_selective_sun_shadow.h"
+#include "vk_sun_csm.h"
 #include "vk_image_layout.h"
 #include "vk_post_fog.h"
 #include "vk_view_state.h"
@@ -1663,10 +1664,10 @@ static qboolean RB_ShouldRenderSunShadowMap( const drawSurfsCommand_t *cmd )
 	return qtrue;
 }
 
-static qboolean RB_BuildSunShadowView( const drawSurfsCommand_t *cmd, viewParms_t *shadowParms, float *outViewProj )
+static qboolean RB_BuildSunShadowViewRange( const drawSurfsCommand_t *cmd, float nearPlane, float farPlane,
+	int viewportX, int viewportY, int viewportW, int viewportH,
+	viewParms_t *shadowParms, float *outViewProj )
 {
-	float nearPlane;
-	float farPlane;
 	float tanHalfX;
 	float tanHalfY;
 	float nearW, nearH, farW, farH;
@@ -1685,22 +1686,14 @@ static qboolean RB_BuildSunShadowView( const drawSurfsCommand_t *cmd, viewParms_
 	float invW, invH, invD;
 	float left, right, bottom, top, zNear, zFar;
 	int i;
+	uint32_t snapW, snapH;
 
 	if ( !cmd || !shadowParms || !outViewProj ) {
 		return qfalse;
 	}
 
-	nearPlane = ( r_znear ) ? r_znear->value : 5.0f;
 	if ( nearPlane < 0.1f ) {
 		nearPlane = 0.1f;
-	}
-
-	farPlane = cmd->viewParms.zFar;
-	if ( r_fogShadowMaxDistance ) {
-		const float maxDistance = r_fogShadowMaxDistance->value;
-		if ( maxDistance > nearPlane && farPlane > maxDistance ) {
-			farPlane = maxDistance;
-		}
 	}
 	if ( farPlane <= nearPlane + 1.0f ) {
 		return qfalse;
@@ -1772,9 +1765,11 @@ static qboolean RB_BuildSunShadowView( const drawSurfsCommand_t *cmd, viewParms_
 	bottom = lightMin[1] - padding;
 	top = lightMax[1] + padding;
 
-	if ( r_fogShadowSnap && r_fogShadowSnap->integer && vk.sun_shadow_width > 0u && vk.sun_shadow_height > 0u ) {
-		const float texelX = ( right - left ) / (float)vk.sun_shadow_width;
-		const float texelY = ( top - bottom ) / (float)vk.sun_shadow_height;
+	snapW = ( viewportW > 0 ) ? (uint32_t)viewportW : vk.sun_shadow_tile_size;
+	snapH = ( viewportH > 0 ) ? (uint32_t)viewportH : vk.sun_shadow_tile_size;
+	if ( VK_SunCSM_Stable() && snapW > 0u && snapH > 0u ) {
+		const float texelX = ( right - left ) / (float)snapW;
+		const float texelY = ( top - bottom ) / (float)snapH;
 		const float halfW = ( right - left ) * 0.5f;
 		const float halfH = ( top - bottom ) * 0.5f;
 		float centerX = ( left + right ) * 0.5f;
@@ -1806,14 +1801,14 @@ static qboolean RB_BuildSunShadowView( const drawSurfsCommand_t *cmd, viewParms_
 	VectorCopy( lightRight, shadowParms->or.axis[1] );
 	VectorCopy( lightUp, shadowParms->or.axis[2] );
 	shadowParms->portalView = PV_NONE;
-	shadowParms->viewportX = 0;
-	shadowParms->viewportY = 0;
-	shadowParms->viewportWidth = (int)vk.sun_shadow_width;
-	shadowParms->viewportHeight = (int)vk.sun_shadow_height;
-	shadowParms->scissorX = 0;
-	shadowParms->scissorY = 0;
-	shadowParms->scissorWidth = (int)vk.sun_shadow_width;
-	shadowParms->scissorHeight = (int)vk.sun_shadow_height;
+	shadowParms->viewportX = viewportX;
+	shadowParms->viewportY = viewportY;
+	shadowParms->viewportWidth = viewportW;
+	shadowParms->viewportHeight = viewportH;
+	shadowParms->scissorX = viewportX;
+	shadowParms->scissorY = viewportY;
+	shadowParms->scissorWidth = viewportW;
+	shadowParms->scissorHeight = viewportH;
 	shadowParms->zFar = farPlane;
 
 	Matrix16Identity( shadowParms->projectionMatrix );
@@ -1856,11 +1851,36 @@ static qboolean RB_BuildSunShadowView( const drawSurfsCommand_t *cmd, viewParms_
 	return qtrue;
 }
 
+static qboolean RB_BuildSunShadowView( const drawSurfsCommand_t *cmd, viewParms_t *shadowParms, float *outViewProj )
+{
+	float nearPlane = ( r_znear ) ? r_znear->value : 5.0f;
+	float farPlane = cmd->viewParms.zFar;
+	float maxDist = VK_SunCSM_MaxDistance();
+
+	if ( nearPlane < 0.1f ) {
+		nearPlane = 0.1f;
+	}
+	if ( maxDist > nearPlane && farPlane > maxDist ) {
+		farPlane = maxDist;
+	}
+	return RB_BuildSunShadowViewRange( cmd, nearPlane, farPlane,
+		0, 0, (int)vk.sun_shadow_width, (int)vk.sun_shadow_height,
+		shadowParms, outViewProj );
+}
+
 static void RB_RenderSunShadowMap( const drawSurfsCommand_t *cmd )
 {
 	viewParms_t savedViewParms;
 	viewParms_t shadowViewParms;
 	float shadowViewProj[16];
+	float splits[VK_SUN_CSM_MAX];
+	float nearPlane;
+	float farPlane;
+	float maxDist;
+	float sliceNear;
+	int cascades;
+	int c;
+	int anyOk = 0;
 
 	if ( !RB_ShouldRenderSunShadowMap( cmd ) ) {
 		vk.sun_shadow_valid = qfalse;
@@ -1868,10 +1888,32 @@ static void RB_RenderSunShadowMap( const drawSurfsCommand_t *cmd )
 		return;
 	}
 
-	if ( !RB_BuildSunShadowView( cmd, &shadowViewParms, shadowViewProj ) ) {
-		vk.sun_shadow_valid = qfalse;
-		Matrix16Identity( vk.sun_shadow_matrix0 );
-		return;
+	cascades = (int)vk.sun_shadow_cascade_count;
+	if ( cascades < 1 ) {
+		cascades = VK_SunCSM_CascadeCount();
+	}
+	if ( cascades < 1 ) {
+		cascades = 1;
+	}
+	if ( cascades > VK_SUN_CSM_MAX ) {
+		cascades = VK_SUN_CSM_MAX;
+	}
+
+	nearPlane = ( r_znear ) ? r_znear->value : 5.0f;
+	if ( nearPlane < 0.1f ) {
+		nearPlane = 0.1f;
+	}
+	farPlane = cmd->viewParms.zFar;
+	maxDist = VK_SunCSM_MaxDistance();
+	if ( maxDist > nearPlane && farPlane > maxDist ) {
+		farPlane = maxDist;
+	}
+	VK_SunCSM_ComputeSplits( nearPlane, farPlane, cascades, VK_SunCSM_SplitLambda(), splits );
+	vk.sun_shadow_near = nearPlane;
+	vk.sun_shadow_cascade_count = (uint32_t)cascades;
+	for ( c = 0; c < VK_SUN_CSM_MAX; c++ ) {
+		vk.sun_shadow_splits[c] = ( c < cascades ) ? splits[c] : splits[cascades - 1];
+		Matrix16Identity( vk.sun_shadow_matrix[c] );
 	}
 
 	if ( !vk_begin_sun_shadow_render_pass() ) {
@@ -1880,16 +1922,50 @@ static void RB_RenderSunShadowMap( const drawSurfsCommand_t *cmd )
 		return;
 	}
 
-	vk.sun_shadow_valid = qtrue;
-	Com_Memcpy( vk.sun_shadow_matrix0, shadowViewProj, sizeof( vk.sun_shadow_matrix0 ) );
-
 	savedViewParms = backEnd.viewParms;
-	backEnd.viewParms = shadowViewParms;
-	RB_BeginDrawingView();
-	RB_RenderDrawSurfList( cmd->drawSurfs, cmd->numDrawSurfs );
-	RB_EndSurface();
+	sliceNear = nearPlane;
+
+	for ( c = 0; c < cascades; c++ ) {
+		int vx, vy, tile, atlas;
+		float sliceFar = splits[c];
+
+		VK_SunCSM_AtlasTile( c, cascades, (int)vk.sun_shadow_tile_size, &vx, &vy, &tile, &atlas );
+		if ( !RB_BuildSunShadowViewRange( cmd, sliceNear, sliceFar, vx, vy, tile, tile,
+			&shadowViewParms, shadowViewProj ) ) {
+			sliceNear = sliceFar;
+			continue;
+		}
+
+		Com_Memcpy( vk.sun_shadow_matrix[c], shadowViewProj, sizeof( shadowViewProj ) );
+		if ( c == 0 ) {
+			Com_Memcpy( vk.sun_shadow_matrix0, shadowViewProj, sizeof( vk.sun_shadow_matrix0 ) );
+		}
+		anyOk = 1;
+
+		backEnd.viewParms = shadowViewParms;
+		SetViewportAndScissor();
+		RB_BeginDrawingView();
+		RB_RenderDrawSurfList( cmd->drawSurfs, cmd->numDrawSurfs );
+		RB_EndSurface();
+
+		sliceNear = sliceFar;
+	}
+
 	backEnd.viewParms = savedViewParms;
 	vk_end_sun_shadow_render_pass();
+
+	vk.sun_shadow_valid = anyOk ? qtrue : qfalse;
+	if ( !anyOk ) {
+		Matrix16Identity( vk.sun_shadow_matrix0 );
+	}
+
+	if ( VK_SunCSM_Debug() >= 2 && anyOk ) {
+		ri.Printf( PRINT_ALL, "[VK][CSM] cascades=%d atlas=%ux%u tile=%u splits=%.0f/%.0f/%.0f/%.0f\n",
+			cascades, vk.sun_shadow_width, vk.sun_shadow_height, vk.sun_shadow_tile_size,
+			vk.sun_shadow_splits[0], vk.sun_shadow_splits[1],
+			vk.sun_shadow_splits[2], vk.sun_shadow_splits[3] );
+	}
+
 	vk_forward_plus_update_sun_shadow_descriptor();
 	SetViewportAndScissor();
 }

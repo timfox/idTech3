@@ -626,6 +626,9 @@ static void R_RendererStatus_f( void )
 		R_MeshNormalPolicy_HardEdgeAngleDeg(),
 		R_MeshNormalPolicy_SplitTangentsAtHardEdges() ? 1 : 0 );
 	VK_RasterUltra_PrintStatus();
+	ri.Printf( PRINT_ALL, "csm       : cascades=%u atlas=%ux%u tile=%u valid=%d\n",
+		vk.sun_shadow_cascade_count, vk.sun_shadow_width, vk.sun_shadow_height,
+		vk.sun_shadow_tile_size, vk.sun_shadow_valid ? 1 : 0 );
 	ri.Printf( PRINT_ALL, "declared  : AO=%s GI=%s refl=%s temporal=%s\n",
 		R_NamedCvarString( "r_havenrpAoOwner" ),
 		R_NamedCvarString( "r_havenrpDiffuseGiOwner" ),

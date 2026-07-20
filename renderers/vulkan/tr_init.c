@@ -69,6 +69,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "vk_selective_reflection.h"
 #include "tr_mesh_normal_policy.h"
 #include "vk_raster_ultra.h"
+#include "vk_sun_csm.h"
 #include "vk_sim_render_profile.h"
 #include "vk_sim_render_debug.h"
 #include "vk_skybox_hdr.h"
@@ -3751,6 +3752,7 @@ void R_Init( void ) {
 	R_MeshNormalPolicy_Init();
 	VK_RasterUltra_Init();
 	VK_RasterUltra_Enforce();
+	VK_SunCSM_Init();
 	R_ModelInit();
 
 	R_InitFreeType();
@@ -3786,6 +3788,7 @@ static void RE_Shutdown( refShutdownCode_t code ) {
 	ri.Printf( PRINT_ALL, "RE_Shutdown( %i )\n", code );
 
 	R_MeshNormalPolicy_Shutdown();
+	VK_SunCSM_Shutdown();
 	VK_RasterUltra_Shutdown();
 
 	ri.Cmd_RemoveCommand( "modellist" );

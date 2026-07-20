@@ -345,9 +345,15 @@ typedef struct vkUniform_s {
 	vec4_t pbrMaterialBlend;
 	/* Forward+: x overflow shade; y skip mask (tess.dlightBits) */
 	vec4_t pbrForwardPlus;
-	/* Sun shadow (PBR direct): rows 0-3 = light clip matrix columns; params x=bias y=pcf z=valid w=strength */
+	/* Sun shadow (PBR direct): rows 0-3 = cascade0 matrix; cascade1-3 in pbrSunShadowCascadeRows.
+	 * params: x=bias y=pcf z=valid w=strength
+	 * splits: x/y/z = cascade far planes (view depth), w = blend fraction
+	 * meta: x=cascadeCount y=atlasTileScale (1/grid) z=debug w=nearPlane */
 	vec4_t pbrSunShadowRows[4];
 	vec4_t pbrSunShadowParams;
+	vec4_t pbrSunShadowCascadeRows[12]; /* cascades 1..3 × 4 columns */
+	vec4_t pbrSunShadowSplits;
+	vec4_t pbrSunShadowMeta;
 #endif
 } vkUniform_t;
 
@@ -1894,7 +1900,12 @@ typedef struct {
 	int fluid_dynamic_pressure_iterations;
 	uint32_t sun_shadow_width;
 	uint32_t sun_shadow_height;
-	float sun_shadow_matrix0[16];
+	uint32_t sun_shadow_tile_size; /* per-cascade tile (atlas cell) */
+	uint32_t sun_shadow_cascade_count;
+	float sun_shadow_matrix0[16]; /* cascade 0 / fog fallback */
+	float sun_shadow_matrix[4][16];
+	float sun_shadow_splits[4]; /* far plane of each cascade (view depth) */
+	float sun_shadow_near; /* camera near used for splits */
 	qboolean sun_shadow_valid;
 	uint32_t local_spot_shadow_atlas_size;
 	uint32_t local_spot_shadow_tile_size;
