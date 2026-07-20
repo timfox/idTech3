@@ -479,6 +479,11 @@ typedef struct {
 	vec4_t normalScale;
 	vec4_t specularScale;
 	vec4_t emissiveScale;
+	/* Raster Ultra 1.13 — explicit emissive GI transport (off unless flagged). */
+	qboolean		emissiveAffectsGI;
+	float			emissiveGIIntensity;
+	float			emissiveGIRadius;
+	float			emissiveGIImportance;
 	vec4_t clearcoatScale;
 	vec4_t sheenScale;
 	vec4_t anisotropyScale;

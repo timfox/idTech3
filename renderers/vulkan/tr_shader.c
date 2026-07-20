@@ -344,6 +344,10 @@ static qboolean ParseStage( shaderStage_t *stage, const char **text )
 	}
 
 	Vector4Set( stage->emissiveScale, 1.0f, 1.0f, 1.0f, 1.0f );
+	stage->emissiveAffectsGI = qfalse;
+	stage->emissiveGIIntensity = 1.0f;
+	stage->emissiveGIRadius = 256.0f;
+	stage->emissiveGIImportance = 1.0f;
 	Vector4Set( stage->clearcoatScale, 1.0f, 1.0f, 1.0f, 1.0f );
 	Vector4Set( stage->sheenScale, 1.0f, 1.0f, 1.0f, 1.0f );
 	Vector4Set( stage->anisotropyScale, 0.0f, 0.0f, 0.0f, 0.0f );
@@ -1175,6 +1179,33 @@ static qboolean ParseStage( shaderStage_t *stage, const char **text )
 			}
 			stage->emissiveScale[2] = atof( token );
 			stage->vk_pbr_flags |= PBR_HAS_EMISSIVE;
+		}
+		else if ( !Q_stricmp( token, "emissiveAffectsGI" ) )
+		{
+			/* Raster Ultra 1.13: explicit emissive→GI flag (default off). */
+			token = COM_ParseExt( text, qfalse );
+			stage->emissiveAffectsGI = ( token[0] == 0 || atoi( token ) != 0 ) ? qtrue : qfalse;
+		}
+		else if ( !Q_stricmp( token, "emissiveGIIntensity" ) )
+		{
+			token = COM_ParseExt( text, qfalse );
+			if ( token[0] ) {
+				stage->emissiveGIIntensity = (float)atof( token );
+			}
+		}
+		else if ( !Q_stricmp( token, "emissiveGIRadius" ) )
+		{
+			token = COM_ParseExt( text, qfalse );
+			if ( token[0] ) {
+				stage->emissiveGIRadius = (float)atof( token );
+			}
+		}
+		else if ( !Q_stricmp( token, "emissiveGIImportance" ) )
+		{
+			token = COM_ParseExt( text, qfalse );
+			if ( token[0] ) {
+				stage->emissiveGIImportance = (float)atof( token );
+			}
 		}
 		else if ( !Q_stricmp( token, "clearcoatscale" ) )
 		{

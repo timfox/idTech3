@@ -145,6 +145,8 @@ static const vkSpineResourceEdge s_writes_raster_gi[] = {
 	{ VK_SPINE_RES_PROBE_IRRADIANCE, VK_SPINE_ACCESS_STORAGE_WRITE },
 	{ VK_SPINE_RES_SSGI_RADIANCE, VK_SPINE_ACCESS_STORAGE_WRITE },
 	{ VK_SPINE_RES_SSGI_CONFIDENCE, VK_SPINE_ACCESS_STORAGE_WRITE },
+	{ VK_SPINE_RES_RADIANCE_CLIPMAP, VK_SPINE_ACCESS_STORAGE_WRITE },
+	{ VK_SPINE_RES_RADIANCE_CACHE_IRRADIANCE, VK_SPINE_ACCESS_STORAGE_WRITE },
 	{ VK_SPINE_RES_INDIRECT_DIFFUSE, VK_SPINE_ACCESS_STORAGE_WRITE },
 	{ VK_SPINE_RES_HDR_COLOR, VK_SPINE_ACCESS_COLOR_WRITE },
 };
@@ -582,6 +584,8 @@ const char *vk_spine_resource_name( vkSpineResourceId res )
 	case VK_SPINE_RES_PROBE_IRRADIANCE: return "probe_irradiance";
 	case VK_SPINE_RES_SSGI_RADIANCE: return "ssgi_radiance";
 	case VK_SPINE_RES_SSGI_CONFIDENCE: return "ssgi_confidence";
+	case VK_SPINE_RES_RADIANCE_CLIPMAP: return "radiance_clipmap";
+	case VK_SPINE_RES_RADIANCE_CACHE_IRRADIANCE: return "radiance_cache_irradiance";
 	case VK_SPINE_RES_INDIRECT_DIFFUSE: return "indirect_diffuse";
 	default: return "none";
 	}

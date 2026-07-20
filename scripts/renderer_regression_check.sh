@@ -798,6 +798,14 @@ elif ! grep -q 'vk_temporal_capture_world_viewparms' "$VK_TEMP" 2>/dev/null; the
   fail "world viewparms must be snapshotted before weapon flush for prev-matrix commit"
 elif ! grep -q 'clamp( base.a, 0.0, 0.999 )' "$PROJECT_ROOT/renderers/vulkan/shaders/glsl/oit_accum.frag" 2>/dev/null; then
   fail "WBOIT accum must clamp alpha like MBOIT"
+elif ! grep -q 'zTrad = clamp( 1.0 - DEPTH_TO_WEIGHT' "$PROJECT_ROOT/renderers/vulkan/shaders/glsl/oit_accum.frag" 2>/dev/null; then
+  fail "WBOIT must adapt McGuire weight for reversed-Z (zTrad)"
+elif ! grep -q 'clamp( aFactor \* 1e8 \* zFactor, 1e-2, 3e3 )' "$PROJECT_ROOT/renderers/vulkan/shaders/glsl/oit_accum.frag" 2>/dev/null; then
+  fail "WBOIT weight must clamp [1e-2, 3e3] to prevent fp16 underflow stipple"
+elif ! grep -q 'coverage < 1e-4' "$PROJECT_ROOT/renderers/vulkan/shaders/glsl/oit_resolve.frag" 2>/dev/null; then
+  fail "OIT resolve must skip tiny coverage (underflow stipple guard)"
+elif ! grep -q 'Stamp after resolve' "$PROJECT_ROOT/renderers/vulkan/vk_postfx_passes.c" 2>/dev/null; then
+  fail "reactive stamp must run after OIT resolve (not between accum and composite)"
 elif grep -q 'Com_Memcpy( vk_prev_viewproj_matrix, params.viewProj' "$PROJECT_ROOT/renderers/vulkan/vk_volumetric_params.c" 2>/dev/null; then
   fail "volumetric must not overwrite shared prev matrices mid-frame"
 else

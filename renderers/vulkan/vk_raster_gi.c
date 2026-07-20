@@ -8,6 +8,7 @@ Raster-only; RT locked by Raster Ultra. Ownership: docs/RASTER_ULTRA_1.3.md.
 #include "tr_local.h"
 #include "vk.h"
 #include "vk_raster_gi.h"
+#include "vk_radiance_clipmap.h"
 #include "vk_util.h"
 #include "vk_image_layout.h"
 #include "vk_view_state.h"
@@ -401,7 +402,8 @@ static qboolean RGI_CreatePipelines( void )
 		VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
 		VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
 		VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-		VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE
+		VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,
+		VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER
 	};
 	VkDescriptorPoolSize sizes[3];
 	VkDescriptorPoolCreateInfo poolCI;
@@ -417,9 +419,10 @@ static qboolean RGI_CreatePipelines( void )
 		return qfalse;
 	}
 	/* push sizes must match GLSL push_constant blocks (std430-ish aligned). */
+	/* Resolve push: uvec4 + 3×vec4 = 64 bytes (Ultra 1.13 cache params). */
 	if ( !RGI_CreateLayout( probeTypes, ARRAY_LEN( probeTypes ), 160u, &rgi.probeLayout, &rgi.probePL ) ||
 		!RGI_CreateLayout( ssgiTypes, ARRAY_LEN( ssgiTypes ), 192u, &rgi.ssgiLayout, &rgi.ssgiPL ) ||
-		!RGI_CreateLayout( resolveTypes, ARRAY_LEN( resolveTypes ), 48u, &rgi.resolveLayout, &rgi.resolvePL ) ) {
+		!RGI_CreateLayout( resolveTypes, ARRAY_LEN( resolveTypes ), 64u, &rgi.resolveLayout, &rgi.resolvePL ) ) {
 		return qfalse;
 	}
 	rgi.probePipe = RGI_CreateComputePipeline( rgi.probeCS, rgi.probePL, "RGI probe pipeline" );
@@ -430,7 +433,7 @@ static qboolean RGI_CreatePipelines( void )
 	}
 
 	Com_Memset( sizes, 0, sizeof( sizes ) );
-	sizes[0].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER; sizes[0].descriptorCount = 24;
+	sizes[0].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER; sizes[0].descriptorCount = 32;
 	sizes[1].type = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE; sizes[1].descriptorCount = 12;
 	sizes[2].type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER; sizes[2].descriptorCount = 4;
 	Com_Memset( &poolCI, 0, sizeof( poolCI ) );
@@ -1128,6 +1131,7 @@ void vk_raster_gi_invalidate( void )
 {
 	RGI_FreeProbes();
 	rgi.gbufferGeneration = 0;
+	vk_radiance_clipmap_invalidate();
 }
 
 void vk_raster_gi_on_map_load( void )
@@ -1136,6 +1140,7 @@ void vk_raster_gi_on_map_load( void )
 	if ( r_probeGi && r_probeGi->integer && rgi.ready ) {
 		RGI_EnsureProbes();
 	}
+	vk_radiance_clipmap_on_map_load();
 }
 
 qboolean vk_raster_gi_active( void )
@@ -1267,6 +1272,7 @@ void vk_raster_gi_shutdown( void )
 	RGI_DestroyImage( &rgi.ssgiRad );
 	RGI_DestroyImage( &rgi.ssgiMeta );
 	RGI_FreeProbes();
+	vk_radiance_clipmap_shutdown();
 	Com_Memset( &rgi, 0, sizeof( rgi ) );
 }
 
@@ -1303,6 +1309,7 @@ void vk_raster_gi_init( void )
 	}
 	rgi.ready = qtrue;
 	rgi.gbufferGeneration = vk_deferred_gbuffer_generation();
+	vk_radiance_clipmap_init();
 	ri.Printf( PRINT_ALL,
 		"[RGI] Raster Ultra probe GI + SSGI initialized (r_probeGi=%d r_ssgi=%d; RT unused)\n",
 		r_probeGi->integer, r_ssgi ? r_ssgi->integer : 0 );
@@ -1329,6 +1336,7 @@ void vk_raster_gi_frame_begin( void )
 	if ( vk_deferred_gbuffer_generation() != rgi.gbufferGeneration ) {
 		rgi.gbufferGeneration = vk_deferred_gbuffer_generation();
 	}
+	vk_radiance_clipmap_frame_begin();
 }
 
 static void RGI_ImageWrite( VkWriteDescriptorSet *w, VkDescriptorImageInfo *info,
@@ -1405,6 +1413,7 @@ void vk_raster_gi_apply_after_geometry( void )
 		uint32_t extentMeta[4];
 		float params0[4];
 		float params1[4];
+		float params2[4];
 	} resolvePush;
 
 	if ( rgi.appliedThisFrame || !vk_raster_gi_active() || !vk.cmd || !backEnd.doneSurfaces ) {
@@ -1432,6 +1441,7 @@ void vk_raster_gi_apply_after_geometry( void )
 	t0 = ri.Milliseconds ? ri.Milliseconds() : 0;
 	RGI_BudgetUpdate( &backEnd.refdef );
 	RGI_UploadProbes();
+	vk_radiance_clipmap_update( &backEnd.refdef );
 	if ( ri.Milliseconds ) {
 		rgi.lastCpuUpdateMs = (double)( ri.Milliseconds() - t0 );
 	}
@@ -1567,6 +1577,12 @@ void vk_raster_gi_apply_after_geometry( void )
 	RGI_Transition( cmd, &rgi.ssgiRad, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL );
 	RGI_Transition( cmd, &rgi.ssgiMeta, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL );
 
+	/* Radiance clipmap sample (Ultra 1.13) — before resolve composition. */
+	if ( vk_radiance_clipmap_active() ) {
+		vk_radiance_clipmap_dispatch_sample( cmd, depthView, normalView,
+			invView, projInfo, normalsAreWorld, rgi.width, rgi.height );
+	}
+
 	/* Resolve into HDR */
 	record_image_layout_transition( cmd, vk.color_image, VK_IMAGE_ASPECT_COLOR_BIT,
 		VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_GENERAL,
@@ -1587,7 +1603,21 @@ void vk_raster_gi_apply_after_geometry( void )
 		linear, aoView, hasAO ? VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL : VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL );
 	RGI_ImageWrite( &writes[7], &infos[7], rgi.resolveSet, 7, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,
 		VK_NULL_HANDLE, vk.color_image_view, VK_IMAGE_LAYOUT_GENERAL );
-	qvkUpdateDescriptorSets( vk.device, 8, writes, 0, NULL );
+	{
+		VkImageView cacheIrr = vk_radiance_clipmap_irradiance_view();
+		VkImageView cacheMeta = vk_radiance_clipmap_meta_view();
+		if ( !cacheIrr ) {
+			cacheIrr = tr.blackImage->view;
+		}
+		if ( !cacheMeta ) {
+			cacheMeta = tr.blackImage->view;
+		}
+		RGI_ImageWrite( &writes[8], &infos[8], rgi.resolveSet, 8, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+			linear, cacheIrr, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL );
+		RGI_ImageWrite( &writes[9], &infos[9], rgi.resolveSet, 9, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+			linear, cacheMeta, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL );
+	}
+	qvkUpdateDescriptorSets( vk.device, 10, writes, 0, NULL );
 
 	Com_Memset( &resolvePush, 0, sizeof( resolvePush ) );
 	resolvePush.extentMeta[0] = rgi.width;
@@ -1599,6 +1629,13 @@ void vk_raster_gi_apply_after_geometry( void )
 	resolvePush.params0[2] = r_rasterGiAoStrength ? r_rasterGiAoStrength->value : 1.0f;
 	resolvePush.params0[3] = r_rasterGiLightmapDelta ? r_rasterGiLightmapDelta->value : 1.0f;
 	resolvePush.params1[2] = 1.0f; /* duplicate-energy soft clamp on */
+	{
+		cvar_t *rcs = ri.Cvar_Get( "r_radianceCacheStrength", "1", CVAR_ARCHIVE_ND );
+		cvar_t *rcq = ri.Cvar_Get( "r_radianceCacheQuality", "3", CVAR_ARCHIVE_ND );
+		resolvePush.params1[3] = rcs ? rcs->value : 1.0f;
+		resolvePush.params2[0] = vk_radiance_clipmap_ready() ? 1.0f : 0.0f;
+		resolvePush.params2[1] = ( rcq && rcq->integer <= 1 ) ? 0.25f : 1.0f;
+	}
 
 	vk_spine_note_write( VK_SPINE_RES_INDIRECT_DIFFUSE, VK_SPINE_PASS_RASTER_GI, VK_SPINE_ACCESS_STORAGE_WRITE );
 	vk_spine_note_write( VK_SPINE_RES_HDR_COLOR, VK_SPINE_PASS_RASTER_GI, VK_SPINE_ACCESS_COLOR_WRITE );

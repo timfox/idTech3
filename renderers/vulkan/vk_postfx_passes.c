@@ -49,8 +49,11 @@ static void vk_oit_validate_pass_break( const char *stage )
  * Full-framebuffer visibility after OIT color writes. Render-pass EXTERNAL deps use
  * BY_REGION which is insufficient when the next pass is a fullscreen resolve/stamp
  * that reads neighboring (or all) texels — races show up as horizontal scanline tears.
+ *
+ * Accum/moments passes leave their written targets in COLOR_ATTACHMENT_OPTIMAL; this
+ * barrier transitions only those images to SHADER_READ_ONLY for the next consumer.
  */
-static void vk_oit_barrier_targets_for_sampling( const char *reason )
+static void vk_oit_barrier_targets_for_sampling( const char *reason, qboolean momentsWritten, qboolean accumWritten )
 {
 	VkMemoryBarrier mb;
 	VkImageMemoryBarrier img[4];
@@ -66,14 +69,14 @@ static void vk_oit_barrier_targets_for_sampling( const char *reason )
 	mb.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
 
 	Com_Memset( img, 0, sizeof( img ) );
-#define VK_OIT_BARRIER_IMG( handle, layout ) \
+#define VK_OIT_BARRIER_IMG( handle ) \
 	do { \
 		if ( ( handle ) != VK_NULL_HANDLE && imgCount < ARRAY_LEN( img ) ) { \
 			img[imgCount].sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER; \
 			img[imgCount].srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT; \
 			img[imgCount].dstAccessMask = VK_ACCESS_SHADER_READ_BIT; \
-			img[imgCount].oldLayout = ( layout ); \
-			img[imgCount].newLayout = ( layout ); \
+			img[imgCount].oldLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL; \
+			img[imgCount].newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL; \
 			img[imgCount].srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED; \
 			img[imgCount].dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED; \
 			img[imgCount].image = ( handle ); \
@@ -84,33 +87,45 @@ static void vk_oit_barrier_targets_for_sampling( const char *reason )
 		} \
 	} while ( 0 )
 
-	VK_OIT_BARRIER_IMG( vk.oit_accum_image, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL );
-	VK_OIT_BARRIER_IMG( vk.oit_reveal_image, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL );
-	VK_OIT_BARRIER_IMG( vk.oit_moments_image, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL );
-	VK_OIT_BARRIER_IMG( vk.oit_b0_image, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL );
+	if ( momentsWritten ) {
+		VK_OIT_BARRIER_IMG( vk.oit_moments_image );
+		VK_OIT_BARRIER_IMG( vk.oit_b0_image );
+	}
+	if ( accumWritten ) {
+		VK_OIT_BARRIER_IMG( vk.oit_accum_image );
+		VK_OIT_BARRIER_IMG( vk.oit_reveal_image );
+	}
 #undef VK_OIT_BARRIER_IMG
+
+	if ( imgCount == 0 ) {
+		return;
+	}
 
 	qvkCmdPipelineBarrier( vk.cmd->command_buffer,
 		VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
 		VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
-		0, 1, &mb, 0, NULL, imgCount, imgCount ? img : NULL );
+		0, /* full framebuffer — not BY_REGION */
+		1, &mb, 0, NULL, imgCount, img );
 
-	vk_spine_note_barrier( VK_SPINE_RES_OIT_ACCUM, VK_SPINE_PASS_OIT_RESOLVE, reason );
-	vk_spine_note_barrier( VK_SPINE_RES_OIT_REVEAL, VK_SPINE_PASS_OIT_RESOLVE, reason );
-	vk_spine_note_barrier( VK_SPINE_RES_OIT_MOMENTS, VK_SPINE_PASS_OIT_RESOLVE, reason );
-	vk_spine_note_barrier( VK_SPINE_RES_OIT_B0, VK_SPINE_PASS_OIT_RESOLVE, reason );
-	vk_spine_note_layout( VK_SPINE_RES_OIT_ACCUM, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL );
-	vk_spine_note_layout( VK_SPINE_RES_OIT_REVEAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL );
-	vk_spine_note_layout( VK_SPINE_RES_OIT_MOMENTS, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL );
-	vk_spine_note_layout( VK_SPINE_RES_OIT_B0, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL );
+	if ( accumWritten ) {
+		vk_spine_note_barrier( VK_SPINE_RES_OIT_ACCUM, VK_SPINE_PASS_OIT_RESOLVE, reason );
+		vk_spine_note_barrier( VK_SPINE_RES_OIT_REVEAL, VK_SPINE_PASS_OIT_RESOLVE, reason );
+		vk_spine_note_layout( VK_SPINE_RES_OIT_ACCUM, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL );
+		vk_spine_note_layout( VK_SPINE_RES_OIT_REVEAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL );
+	}
+	if ( momentsWritten ) {
+		vk_spine_note_barrier( VK_SPINE_RES_OIT_MOMENTS, VK_SPINE_PASS_OIT_RESOLVE, reason );
+		vk_spine_note_barrier( VK_SPINE_RES_OIT_B0, VK_SPINE_PASS_OIT_RESOLVE, reason );
+		vk_spine_note_layout( VK_SPINE_RES_OIT_MOMENTS, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL );
+		vk_spine_note_layout( VK_SPINE_RES_OIT_B0, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL );
+	}
 
 	if ( r_fboDebug && r_fboDebug->integer >= 2 && vk_post_fog_fbo_debug_throttle() ) {
 		uint32_t w = 0, h = 0;
 		vk_get_active_render_extent( &w, &h );
 		ri.Printf( PRINT_DEVELOPER,
-			"[VK][OIT] barrier→sample (%s): render=%ux%u mainColor=%ux%u imgs=%u frame=%u\n",
-			reason ? reason : "unspecified", w, h,
-			vk.mainColorWidth, vk.mainColorHeight, imgCount, vk.temporal.frameIndex );
+			"[VK][OIT] barrier COLOR→SHADER_READ (%s): render=%ux%u imgs=%u frame=%u\n",
+			reason ? reason : "unspecified", w, h, imgCount, vk.temporal.frameIndex );
 	}
 }
 
@@ -355,7 +370,7 @@ void vk_oit_pass( const struct drawSurfsCommand_s *cmd )
 			backEnd.oitMomentsPass = qfalse;
 			backEnd.drawSurfFilter = 0;
 			vk_end_render_pass();
-			vk_oit_barrier_targets_for_sampling( "post-mboit-moments" );
+			vk_oit_barrier_targets_for_sampling( "post-mboit-moments", qtrue, qfalse );
 		}
 
 		vk_begin_render_pass_tracked( vk.render_pass.oit_accum, vk.framebuffers.oit_accum, qtrue, fullWidth, fullHeight );
@@ -368,8 +383,7 @@ void vk_oit_pass( const struct drawSurfsCommand_s *cmd )
 		}
 		vk_end_render_pass();
 
-		vk_oit_barrier_targets_for_sampling( bucket_mboit ? "post-mboit-accum" : "post-wboit-accum" );
-		vk_reactive_mask_stamp_from_reveal();
+		vk_oit_barrier_targets_for_sampling( bucket_mboit ? "post-mboit-accum" : "post-wboit-accum", qfalse, qtrue );
 
 		if ( bucket == 0 ) {
 			if ( mboit ) {
@@ -430,6 +444,9 @@ void vk_oit_pass( const struct drawSurfsCommand_s *cmd )
 		record_image_layout_transition( vk.cmd->command_buffer, vk.color_image, VK_IMAGE_ASPECT_COLOR_BIT,
 			VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
 			VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT );
+
+		/* Stamp after resolve so reactive pass never sits between accum writes and composite. */
+		vk_reactive_mask_stamp_from_reveal();
 	}
 	backEnd.oitBucketFilter = 0;
 	vk_spine_pass_end( VK_SPINE_PASS_OIT_RESOLVE );

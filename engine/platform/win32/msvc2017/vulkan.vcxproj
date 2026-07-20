@@ -404,6 +404,7 @@
     <ClCompile Include="..\..\..\renderers\vulkan\extensions\scaffold\vk_webcam_screen.c" />
     <ClCompile Include="..\..\..\renderers\vulkan\vk_ambient_visibility.c" />
     <ClCompile Include="..\..\..\renderers\vulkan\vk_raster_gi.c" />
+    <ClCompile Include="..\..\..\renderers\vulkan\vk_radiance_clipmap.c" />
     <ClCompile Include="..\..\..\renderers\vulkan\vk_gpu_particles.c" />
     <ClCompile Include="..\..\..\renderers\vulkan\vk_deferred_decals.c" />
     <ClCompile Include="..\..\..\renderers\vulkan\vk_distortion.c" />

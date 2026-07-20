@@ -117,11 +117,11 @@ Both feed into linear HDR; no conflict.
 
 **History**: Per-pixel confidence (not one fixed global weight) from depth disocclusion (`r_temporalDisocclusion`), velocity/MV validity, luminance delta, and reactive path: heuristics (near depth, motion, luma flash, highlight ghost, **history-bleed**) always run with TAA and are **max’d** with an optional stamped full-res R8 mask when `r_temporalReactiveMask` 1 (`vk.reactive_mask_*`, TAA set 5). High reactive hard-rejects history (`reactive > 0.82`). Cap via `r_temporalHistoryWeight` (default **0.72**; temporal overlay **0.68**; further lowered when deferred lighting/specular is active).
 
-**OIT vs TAA order**: OIT accumulates and **resolves into current HDR scene color before** Temporal Reconstruction; raw OIT buffers are never temporally blended. Resolve uses `texelFetch` + NEAREST and a full-framebuffer barrier after accum (avoids BY_REGION races that appear as horizontal scanline tears). Stochastic alpha mode 2 falls back to mode 1 when TAA is off.
+**OIT vs TAA order**: OIT accumulates and **resolves into current HDR scene color before** Temporal Reconstruction; raw OIT buffers are never temporally blended. Resolve uses `texelFetch` + NEAREST and an explicit **COLOR→SHADER_READ** full-framebuffer barrier after accum (avoids BY_REGION / same-layout races that appear as horizontal scanline tears). Reactive reveal stamping runs **after** resolve. Stochastic alpha mode 2 falls back to mode 1 when TAA is off.
 
 **Prev matrices**: Shared `vk_prev_*` view/projection are committed only in `vk_temporal_commit_frame_state` at frame end, from world matrices snapshotted by `vk_temporal_capture_world_viewparms` when `doneWorldScene` is set (weapon/HUD `RDF_NOWORLDMODEL` must not replace the commit source). Volumetric fog must not overwrite them mid-post (that collapsed TAA matrix reprojection to identity for pixels without motion vectors).
 
-**OIT accum stability**: WBOIT clamps alpha to `[0,0.999]` (same as MBOIT) and soft-caps Forward+ lit luminance before weighting; resolve soft-caps `c_avg` so sparse weight sums cannot paint near-opaque HDR sheets.
+**OIT accum stability**: WBOIT clamps alpha to `[0,0.999]` (same as MBOIT) and soft-caps Forward+ lit luminance before weighting; depth weight is the McGuire/Bavoil curve adapted for reversed-Z and clamped to `[1e-2, 3e3]` (prevents fp16 underflow stipple). Resolve soft-caps `c_avg` and skips composite when coverage `< 1e-4`.
 
 **Debug**: `r_debugMotionVectors` (1); `r_debugHistoryRejection` 0–8 (MV / reject reasons / reactive / confidence / disocclusion / history UV / near-weapon / world-vs-reactive). SMAA-only (`r_aaMode 2`, `r_taa 0`) never allocates the reactive mask.
 

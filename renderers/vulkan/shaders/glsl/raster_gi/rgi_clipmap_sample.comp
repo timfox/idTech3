@@ -1,0 +1,187 @@
+#version 460
+#extension GL_GOOGLE_include_directive : require
+layout(local_size_x = 8, local_size_y = 8) in;
+
+#include "rgi_common.glsl"
+
+/* Raster Ultra 1.13 — sample camera-centered clipmapped radiance cache. */
+
+struct RcCell {
+	vec4 posConf;   /* xyz origin, w confidence (0 if solid) */
+	vec4 L0_age;    /* rgb L0, w age */
+	vec4 L1x_occ;   /* rgb L1x, w occupancy */
+	vec4 L1y_var;   /* rgb L1y, w variance */
+	vec4 L1z_rev;   /* rgb L1z, w lightingRev */
+	vec4 nrmDirty;  /* xyz normal, w leakRisk */
+};
+
+layout(set = 0, binding = 0) uniform sampler2D depthTex;
+layout(set = 0, binding = 1) uniform sampler2D normalTex;
+layout(set = 0, binding = 2) readonly buffer CellBuf {
+	RcCell cells[];
+};
+layout(rgba16f, set = 0, binding = 3) uniform writeonly image2D cacheIrrOut;
+layout(rgba16f, set = 0, binding = 4) uniform writeonly image2D cacheMetaOut;
+
+layout(push_constant) uniform ClipmapSamplePush {
+	uvec4 extentMeta;     /* xy extent, z cellCount, w normalsAreWorld */
+	uvec4 levelsMeta;     /* x levels, y grid, z lightingRev, w debug */
+	vec4  cam;            /* xyz camera */
+	vec4  cellSizes;      /* per-level cell size (up to 4) */
+	vec4  origins[4];     /* per-level min corner xyz */
+	vec4  projInfo;
+	mat4  invView;
+	vec4  params0;        /* strengthMute, levelBlend, qualityMute, minConf */
+} pc;
+
+uint rc_cell_index( uint level, ivec3 c, uint grid ) {
+	return level * grid * grid * grid
+		+ uint( c.x ) + uint( c.y ) * grid + uint( c.z ) * grid * grid;
+}
+
+vec3 rc_eval( RcCell cell, vec3 N ) {
+	vec3 L0 = cell.L0_age.rgb;
+	vec3 L1 = cell.L1x_occ.rgb * N.x + cell.L1y_var.rgb * N.y + cell.L1z_rev.rgb * N.z;
+	return max( L0 + L1, vec3( 0.0 ) );
+}
+
+void rc_sample_level( uint level, vec3 worldPos, vec3 N, inout vec3 irr, inout float conf, inout float leak )
+{
+	uint levels = pc.levelsMeta.x;
+	uint grid = max( pc.levelsMeta.y, 1u );
+	if ( level >= levels ) {
+		return;
+	}
+	float cs = pc.cellSizes[level];
+	if ( cs < 1.0 ) {
+		return;
+	}
+	vec3 origin = pc.origins[level].xyz;
+	vec3 local = ( worldPos - origin ) / cs - 0.5;
+	ivec3 base = ivec3( floor( local ) );
+	vec3 frac = fract( local );
+	vec3 sum = vec3( 0.0 );
+	float wSum = 0.0;
+	float confSum = 0.0;
+	float leakSum = 0.0;
+	float minConf = max( pc.params0.w, 0.0 );
+
+	for ( int z = 0; z < 2; ++z ) {
+		for ( int y = 0; y < 2; ++y ) {
+			for ( int x = 0; x < 2; ++x ) {
+				ivec3 c = clamp( base + ivec3( x, y, z ), ivec3( 0 ), ivec3( int( grid ) ) - 1 );
+				uint idx = rc_cell_index( level, c, grid );
+				if ( idx >= pc.extentMeta.z ) {
+					continue;
+				}
+				RcCell cell = cells[idx];
+				float valid = cell.posConf.w;
+				if ( valid <= minConf || cell.L1x_occ.w > 0.5 ) {
+					continue;
+				}
+				vec3 toCell = cell.posConf.xyz - worldPos;
+				float dist = length( toCell );
+				float facing = max( dot( N, normalize( toCell + N * 1e-3 ) ), 0.0 );
+				float w = valid * ( 1.0 - abs( frac.x - float( x ) ) )
+					* ( 1.0 - abs( frac.y - float( y ) ) )
+					* ( 1.0 - abs( frac.z - float( z ) ) );
+				w *= mix( 0.35, 1.0, facing );
+				w *= exp( -dist / max( cs * 2.0, 1.0 ) );
+				if ( w <= 1e-5 ) {
+					continue;
+				}
+				sum += rc_eval( cell, N ) * w;
+				wSum += w;
+				confSum += valid * w;
+				leakSum += cell.nrmDirty.w * w;
+			}
+		}
+	}
+	if ( wSum > 1e-4 ) {
+		irr = sum / wSum;
+		conf = clamp( confSum / wSum, 0.0, 1.0 );
+		leak = clamp( leakSum / wSum, 0.0, 1.0 );
+	}
+}
+
+void main() {
+	uvec2 pix = gl_GlobalInvocationID.xy;
+	if ( any( greaterThanEqual( pix, pc.extentMeta.xy ) ) ) {
+		return;
+	}
+	ivec2 ip = ivec2( pix );
+	vec2 uv = ( vec2( pix ) + 0.5 ) / vec2( pc.extentMeta.xy );
+	float depth = textureLod( depthTex, uv, 0.0 ).r;
+	vec3 sampledN = textureLod( normalTex, uv, 0.0 ).xyz;
+	vec3 worldN = rgi_world_normal( sampledN, pc.extentMeta.w, pc.invView );
+
+	if ( !rgi_valid_depth( depth ) || pc.extentMeta.z == 0u ) {
+		imageStore( cacheIrrOut, ip, vec4( 0.0 ) );
+		imageStore( cacheMetaOut, ip, vec4( 0.0 ) );
+		return;
+	}
+
+	vec3 viewPos = rgi_view_position( uv, depth, pc.projInfo );
+	vec3 worldPos = ( pc.invView * vec4( viewPos, 1.0 ) ).xyz;
+
+	/* Select finest covering level; blend to coarser near edges to hide clipmap rings. */
+	uint levels = max( pc.levelsMeta.x, 1u );
+	uint grid = max( pc.levelsMeta.y, 1u );
+	float blendW = max( pc.params0.y, 0.05 );
+	vec3 irr0 = vec3( 0.0 ), irr1 = vec3( 0.0 );
+	float conf0 = 0.0, conf1 = 0.0;
+	float leak0 = 0.0, leak1 = 0.0;
+	uint best = 0u;
+	float bestDist = 1e20;
+
+	for ( uint li = 0u; li < levels; ++li ) {
+		float cs = pc.cellSizes[li];
+		if ( cs < 1.0 ) {
+			continue;
+		}
+		vec3 origin = pc.origins[li].xyz;
+		vec3 local = ( worldPos - origin ) / cs;
+		float halfExtent = 0.5 * float( grid );
+		vec3 d = abs( local - vec3( halfExtent ) );
+		float edge = max( max( d.x, d.y ), d.z ) / halfExtent;
+		if ( edge < bestDist && edge < 0.98 ) {
+			bestDist = edge;
+			best = li;
+		}
+	}
+
+	rc_sample_level( best, worldPos, worldN, irr0, conf0, leak0 );
+	if ( best + 1u < levels ) {
+		rc_sample_level( best + 1u, worldPos, worldN, irr1, conf1, leak1 );
+	}
+
+	float edgeFade = smoothstep( 1.0 - blendW, 1.0, bestDist );
+	vec3 irr = mix( irr0, irr1, edgeFade );
+	float conf = mix( conf0, conf1, edgeFade ) * pc.params0.z;
+	float leak = mix( leak0, leak1, edgeFade );
+	/* Reject stale / leaky samples. */
+	conf *= ( 1.0 - 0.75 * leak );
+	conf = clamp( conf, 0.0, 1.0 );
+	irr *= max( pc.params0.x, 0.0 );
+
+	uint debugMode = pc.levelsMeta.w;
+	if ( debugMode == 1u ) {
+		/* Level index heatmap. */
+		imageStore( cacheIrrOut, ip, vec4( float( best ) / max( float( levels - 1u ), 1.0 ), conf, edgeFade, 1.0 ) );
+		imageStore( cacheMetaOut, ip, vec4( conf, leak, float( best ), edgeFade ) );
+		return;
+	}
+	if ( debugMode == 2u ) {
+		imageStore( cacheIrrOut, ip, vec4( vec3( conf ), 1.0 ) );
+		imageStore( cacheMetaOut, ip, vec4( conf, leak, 0.0, 1.0 ) );
+		return;
+	}
+	if ( debugMode == 3u ) {
+		imageStore( cacheIrrOut, ip, vec4( vec3( leak ), 1.0 ) );
+		imageStore( cacheMetaOut, ip, vec4( conf, leak, 0.0, 1.0 ) );
+		return;
+	}
+
+	imageStore( cacheIrrOut, ip, vec4( irr, conf ) );
+	imageStore( cacheMetaOut, ip, vec4( conf, leak, float( best ), edgeFade ) );
+}

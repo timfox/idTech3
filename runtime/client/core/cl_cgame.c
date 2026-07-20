@@ -1671,19 +1671,20 @@ static void CL_ApplyGraphicsProfile( vm_t *vm ) {
 			 * repeatedly destroyed the window and SIGSEGV'd inside libdecor-gtk.
 			 *
 			 * When Raster Ultra / frequency-aware overlays are already latched
-			 * (cmdline +exec), skip the extra restart — modern_openarena.cfg would
-			 * only fight those overlays and the user already queued keep_window.
+			 * (cmdline +exec), do NOT exec modern_openarena.cfg — it pulls
+			 * modern_vulkan_stable and latches r_oit 0 / other spine values that
+			 * fight the overlay until the next restart.
 			 */
-			if ( !s_oaModernProfileQueued ) {
-				s_oaModernProfileQueued = qtrue;
-				Cbuf_AddText( "exec modern_openarena.cfg\n" );
-				if ( !Cvar_VariableIntegerValue( "r_rasterUltra" ) &&
-					!Cvar_VariableIntegerValue( "r_frequencyAware" ) ) {
-					Cbuf_AddText( "vid_restart keep_window\n" );
-				} else {
-					Com_Printf( "[client] cl_autoGraphicsProfile: skipped vid_restart "
-						"(r_rasterUltra / r_frequencyAware already active)\n" );
+			if ( Cvar_VariableIntegerValue( "r_rasterUltra" ) ||
+				Cvar_VariableIntegerValue( "r_frequencyAware" ) ) {
+				if ( !s_oaModernProfileQueued ) {
+					s_oaModernProfileQueued = qtrue;
+					Com_Printf( "[client] cl_autoGraphicsProfile: middleware off only "
+						"(skipped modern_openarena.cfg; Ultra/FA already active)\n" );
 				}
+			} else if ( !s_oaModernProfileQueued ) {
+				s_oaModernProfileQueued = qtrue;
+				Cbuf_AddText( "exec modern_openarena.cfg\nvid_restart keep_window\n" );
 			}
 		} else {
 			Com_Printf( "[client] cl_autoGraphicsProfile: classic native OpenArena\n" );

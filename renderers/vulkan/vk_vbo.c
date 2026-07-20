@@ -62,6 +62,19 @@ qboolean vk_alloc_vbo( const byte *vbo_data, int vbo_size )
 	VkBufferCopy copyRegion[1];
 	VkDeviceSize uploadDone;
 
+	if ( !vbo_data || vbo_size <= 0 ) {
+		return qfalse;
+	}
+	/* After mid-session destroy restarts, staging can be missing — memcpy SEGV. */
+	if ( !vk.staging_buffer.ptr || vk.staging_buffer.size == 0 ||
+		vk.staging_buffer.handle == VK_NULL_HANDLE ) {
+		ri.Printf( PRINT_WARNING, S_COLOR_YELLOW
+			"%s: staging buffer not ready (size=%u ptr=%p); skip world VBO upload\n"
+			S_COLOR_WHITE,
+			__func__, (unsigned)vk.staging_buffer.size, (void *)vk.staging_buffer.ptr );
+		return qfalse;
+	}
+
 	vk_release_vbo();
 
 	desc.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
@@ -867,32 +880,31 @@ void R_BuildWorldVBO( msurface_t *surf, int surfCount )
 	ri.Hunk_FreeTempMemory( surfList );
 
 //__fail:
-	vk_alloc_vbo( vbo->vbo_buffer, vbo->vbo_size );
-
-	//if ( err == GL_OUT_OF_MEMORY )
-	//	ri.Printf( PRINT_WARNING, "%s: out of memory\n", __func__ );
-	//else
-	//	ri.Printf( PRINT_ERROR, "%s: error %i\n", __func__, err );
-#if 0
-	// reset vbo markers
-	for ( i = 0, sf = surf; i < surfCount; i++, sf++ ) {
-		face = (srfSurfaceFace_t *) sf->data;
-		if ( face->surfaceType == SF_FACE ) {
-			face->vboItemIndex = 0;
-			continue;
-		}
-		tris = (srfTriangles_t *) sf->data;
-		if ( tris->surfaceType == SF_TRIANGLES ) {
-			tris->vboItemIndex = 0;
-			continue;
-		}
-		grid = (srfGridMesh_t *) sf->data;
-		if ( grid->surfaceType == SF_GRID ) {
-			grid->vboItemIndex = 0;
-			continue;
-		}
-	}
+	if ( !vk_alloc_vbo( vbo->vbo_buffer, vbo->vbo_size ) ) {
+		ri.Printf( PRINT_WARNING, S_COLOR_YELLOW
+			"R_BuildWorldVBO: GPU upload failed; falling back to non-VBO world draws\n"
+			S_COLOR_WHITE );
+		/* Clear per-surface VBO markers so draw path skips static VBO. */
+		for ( i = 0, sf = surf; i < surfCount; i++, sf++ ) {
+			face = (srfSurfaceFace_t *) sf->data;
+			if ( face->surfaceType == SF_FACE ) {
+				face->vboItemIndex = 0;
+				continue;
+			}
+			tris = (srfTriangles_t *) sf->data;
+			if ( tris->surfaceType == SF_TRIANGLES ) {
+				tris->vboItemIndex = 0;
+				continue;
+			}
+#ifdef USE_VBO_GRID
+			grid = (srfGridMesh_t *) sf->data;
+			if ( grid->surfaceType == SF_GRID ) {
+				grid->vboItemIndex = 0;
+			}
 #endif
+		}
+		vbo->items_count = 0;
+	}
 
 	// release host memory
 	ri.Hunk_FreeTempMemory( vbo->vbo_buffer );

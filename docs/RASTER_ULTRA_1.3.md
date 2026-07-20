@@ -90,3 +90,7 @@ Pass `raster_gi`. Resources: `probe_grid`, `probe_irradiance`, `ssgi_radiance`, 
 | Probe GI | **experimental** (quality opt-in via Ultra) |
 | SSGI | **experimental** |
 | Boot default | unchanged (`modern_vulkan.cfg`) |
+
+## Related
+
+- [RASTER_ULTRA_1.13.md](RASTER_ULTRA_1.13.md) — clipmapped radiance cache + emissive transport (experimental)

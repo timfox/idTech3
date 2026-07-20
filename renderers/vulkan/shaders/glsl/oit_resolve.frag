@@ -84,6 +84,11 @@ void main() {
 	}
 
 	float coverage = 1.0 - revealage;
+	/* Tiny coverage: keep opaque — avoids stipple from underflowed weight sums. */
+	if ( coverage < 1e-4 ) {
+		out_color = vec4( opaque, 1.0 );
+		return;
+	}
 	vec3 resolved = c_avg * coverage + opaque * revealage;
 	if ( oit_invalid3( resolved ) ) {
 		out_color = vec4( oit_magenta(), 1.0 );

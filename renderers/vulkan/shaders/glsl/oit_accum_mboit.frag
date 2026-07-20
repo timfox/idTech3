@@ -192,7 +192,9 @@ void main() {
 		return;
 	}
 
-	float w = max( alpha * T, 1e-4 );
-	out_color = vec4( litRgb * w, w );
+	/* Premultiplied: (Ci*ai*T, ai*T) — matches WBOIT accumulate form. */
+	out_color = vec4( litRgb * alpha, alpha ) * T;
+	out_color = max( out_color, vec4( 0.0 ) );
+	out_color.a = max( out_color.a, 1e-4 );
 	out_reveal = alpha;
 }

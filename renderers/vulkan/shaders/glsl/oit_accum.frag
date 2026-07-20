@@ -153,9 +153,16 @@ void main() {
 		}
 	}
 
-	/* McGuire WBOIT: accumulate (Ci * ai * w, ai * w); revealage via blend product(1-ai). */
-	float d = DEPTH_TO_WEIGHT(gl_FragCoord.z);
-	float w = max( alpha * pow( max( d, 0.01 ), 2.0 ), 1e-4 );
-	out_color = vec4( litRgb * w, w );
+	/*
+	 * McGuire/Bavoil WBOIT weight (JCGT 2013), adapted for reversed-Z.
+	 * Paper assumes gl_FragCoord.z with 0=near, 1=far. We map rz→zTrad first.
+	 * Clamping to [1e-2, 3e3] prevents fp16 underflow that resolves as stipple bands.
+	 */
+	float zTrad = clamp( 1.0 - DEPTH_TO_WEIGHT( gl_FragCoord.z ), 0.0, 1.0 );
+	float aFactor = pow( min( 1.0, alpha * 10.0 ) + 0.01, 3.0 );
+	float zFactor = pow( 1.0 - zTrad * 0.9, 3.0 );
+	float w = clamp( aFactor * 1e8 * zFactor, 1e-2, 3e3 );
+	/* Premultiplied accumulate: (Ci*ai*w, ai*w); revealage via blend product(1-ai). */
+	out_color = vec4( litRgb * alpha, alpha ) * w;
 	out_reveal = alpha;
 }
