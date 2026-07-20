@@ -558,6 +558,11 @@ static void R_RendererStatus_f( void )
 	const char *giOwner;
 	const char *reflOwner;
 	const char *temporalOwner;
+	const char *opaqueOwner;
+	const char *transOwner;
+	const char *oitOwner;
+	const char *aaOwner;
+	const char *exposureOwner;
 	const int avMode = R_NamedCvarInteger( "r_ambientVisibilityMode" );
 	const qboolean avActive = ( avMode >= 2 && R_CvarInteger( r_deferredGBuffer ) && vk_deferred_gbuffer_active() ) ? qtrue : qfalse;
 	const qboolean surfelOn = R_NamedCvarInteger( "r_surfelGi" ) ? qtrue : qfalse;
@@ -565,6 +570,11 @@ static void R_RendererStatus_f( void )
 	const qboolean hybridOn = R_NamedCvarInteger( "r_hybrid1" ) ? qtrue : qfalse;
 	const qboolean ssrOn = R_NamedCvarInteger( "r_ssr" ) ? qtrue : qfalse;
 	const qboolean ssaoOn = R_NamedCvarInteger( "r_ssao" ) ? qtrue : qfalse;
+	const qboolean rasterGiOn = vk_raster_gi_active();
+	const qboolean cacheOn = R_NamedCvarInteger( "r_radianceCache" ) ? qtrue : qfalse;
+	const int oitMode = R_NamedCvarInteger( "r_oit" );
+	const int aaMode = R_NamedCvarInteger( "r_aaMode" );
+	const int mode = R_CvarInteger( r_renderMode );
 
 	if ( avActive ) {
 		aoOwner = "ambient_visibility";
@@ -580,10 +590,14 @@ static void R_RendererStatus_f( void )
 		giOwner = "rcgi";
 	} else if ( surfelOn ) {
 		giOwner = "surfel_gi";
+	} else if ( rasterGiOn && cacheOn ) {
+		giOwner = "raster_gi+cache";
+	} else if ( rasterGiOn ) {
+		giOwner = "raster_gi";
 	} else if ( R_NamedCvarInteger( "r_shWorldLighting" ) || R_NamedCvarInteger( "r_shLighting" ) || R_NamedCvarInteger( "r_pbr_shExtract" ) ) {
 		giOwner = "sh_ibl";
 	} else {
-		giOwner = "none";
+		giOwner = "lightmap_baseline";
 	}
 
 	if ( vk_shr_active() ) {
@@ -593,26 +607,78 @@ static void R_RendererStatus_f( void )
 	} else if ( ssrOn ) {
 		reflOwner = "ssr";
 	} else {
-		reflOwner = "none";
+		reflOwner = "ibl_probe";
 	}
 
 	if ( R_NamedCvarInteger( "r_taa" ) ) {
 		temporalOwner = "taa";
+	} else if ( aaMode == 3 ) {
+		temporalOwner = "present_adaptive";
+	} else if ( aaMode == 4 || aaMode == 5 ) {
+		temporalOwner = "temporal_recon";
 	} else if ( hybridOn ) {
 		temporalOwner = "hybrid1";
 	} else {
 		temporalOwner = "none";
 	}
 
-	ri.Printf( PRINT_ALL, "======== Renderer Status ========\n" );
+	if ( mode == 3 && R_CvarInteger( r_deferredLighting ) ) {
+		opaqueOwner = "deferred";
+	} else if ( R_CvarInteger( r_forwardPlus ) ) {
+		opaqueOwner = "forward_plus";
+	} else {
+		opaqueOwner = "classic";
+	}
+
+	if ( oitMode == 1 ) {
+		transOwner = "wboit_forward_plus";
+		oitOwner = "wboit";
+	} else if ( oitMode == 2 ) {
+		transOwner = "mboit_forward_plus";
+		oitOwner = "mboit";
+	} else if ( R_CvarInteger( r_forwardPlus ) ) {
+		transOwner = "forward_plus_sorted";
+		oitOwner = "none";
+	} else {
+		transOwner = "classic_sorted";
+		oitOwner = "none";
+	}
+
+	if ( aaMode == 2 ) {
+		aaOwner = "smaa";
+	} else if ( aaMode == 3 ) {
+		aaOwner = "present_adaptive";
+	} else if ( aaMode == 4 || aaMode == 5 ) {
+		aaOwner = "temporal_recon";
+	} else if ( aaMode == 1 ) {
+		aaOwner = "fxaa";
+	} else {
+		aaOwner = "none";
+	}
+
+	if ( R_NamedCvarInteger( "r_exposureHistogram" ) ) {
+		exposureOwner = "histogram";
+	} else {
+		exposureOwner = "luminance";
+	}
+
+	ri.Printf( PRINT_ALL, "======== Renderer Status (Raster Ultra 2.0) ========\n" );
 	ri.Printf( PRINT_ALL, "profile   : %s (r_havenrpProfile=%s)\n",
 		R_RendererProfileName(), R_NamedCvarString( "r_havenrpProfile" ) );
-	ri.Printf( PRINT_ALL, "mode req  : r_renderMode=%d\n", R_CvarInteger( r_renderMode ) );
+	ri.Printf( PRINT_ALL, "mode req  : r_renderMode=%d\n", mode );
 	ri.Printf( PRINT_ALL, "mode eff  : %s forwardPlus=%d deferredGBuffer=%d deferredLighting=%d\n",
 		R_RendererProfileName(), R_CvarInteger( r_forwardPlus ),
 		R_CvarInteger( r_deferredGBuffer ), R_CvarInteger( r_deferredLighting ) );
-	ri.Printf( PRINT_ALL, "owners    : AO=%s  diffuseGI=%s  reflections=%s  temporal=%s  sunShadow=%s\n",
-		aoOwner, giOwner, reflOwner, temporalOwner, vk_shs_owner_name() );
+	ri.Printf( PRINT_ALL, "owners    : opaque=%s  transparent=%s  AO=%s  diffuseGI=%s\n",
+		opaqueOwner, transOwner, aoOwner, giOwner );
+	ri.Printf( PRINT_ALL, "owners+   : reflections=%s  OIT=%s  AA=%s  temporal=%s  exposure=%s  sunShadow=%s\n",
+		reflOwner, oitOwner, aaOwner, temporalOwner, exposureOwner, vk_shs_owner_name() );
+	ri.Printf( PRINT_ALL, "spine     : contract=%s reason=%s violations=%u attachGen=%u descGen=%u\n",
+		vk_spine_ultra_contract_ok() ? "ok" : "fail",
+		vk_spine_ultra_contract_reason(),
+		vk_spine_violation_count(),
+		vk_spine_attachment_generation(),
+		vk_spine_descriptor_generation() );
 	ri.Printf( PRINT_ALL, "shs       : active=%d rtOwns=%d fallback=%s failInject=0x%x\n",
 		vk_shs_active() ? 1 : 0, vk_shs_rt_owns_sun() ? 1 : 0,
 		vk_shs_fallback_reason(), vk_shs_fail_inject() );
@@ -666,7 +732,7 @@ static void R_RendererStatus_f( void )
 		R_CvarInteger( r_pbr ), R_CvarInteger( r_materialBlend ) );
 	ri.Printf( PRINT_ALL, "contract  : clean=%s recovery=%s\n",
 		R_YesNo( R_RendererModeContractClean() ), R_RendererRecommendedRecoveryCommand() );
-	ri.Printf( PRINT_ALL, "==================================\n" );
+	ri.Printf( PRINT_ALL, "================================================\n" );
 }
 
 static void R_HavenRPRendererStatus_f( void )

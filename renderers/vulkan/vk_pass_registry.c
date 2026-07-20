@@ -13,6 +13,7 @@ Lightweight Spine pass / resource registry implementation.
 #include "tr_render_mode_vk.h"
 #include "vk_selective_reflection.h"
 #include "vk_postfx.h"
+#include "vk_raster_ultra.h"
 #include <math.h>
 #include <stdarg.h>
 
@@ -85,6 +86,8 @@ typedef struct {
 	char comboFallback[96];
 	qboolean suppressTaaThisFrame;
 	qboolean spine11CertActive;
+	qboolean ultraContractOk;
+	char ultraContractReason[96];
 } vkSpineRuntime;
 
 static vkSpineRuntime s_spine;
@@ -325,14 +328,15 @@ static const vkSpinePassDesc s_passes[VK_SPINE_PASS_COUNT] = {
 		s_writes_ssr, (int)ARRAY_LEN( s_writes_ssr )
 	},
 	[VK_SPINE_PASS_AMBIENT_VISIBILITY] = {
-		VK_SPINE_PASS_AMBIENT_VISIBILITY, "ambient_visibility", VK_SPINE_CAT_POST, VK_SPINE_PHASE_SCREEN_SPACE,
-		VK_SPINE_VIEW_MAIN, qfalse, qtrue,
+		VK_SPINE_PASS_AMBIENT_VISIBILITY, "ambient_visibility", VK_SPINE_CAT_POST, VK_SPINE_PHASE_OPAQUE_LIGHTING,
+		VK_SPINE_VIEW_MAIN, qtrue, qtrue,
 		s_reads_av, (int)ARRAY_LEN( s_reads_av ),
 		s_writes_av, (int)ARRAY_LEN( s_writes_av )
 	},
 	[VK_SPINE_PASS_RASTER_GI] = {
-		VK_SPINE_PASS_RASTER_GI, "raster_gi", VK_SPINE_CAT_POST, VK_SPINE_PHASE_SCREEN_SPACE,
-		VK_SPINE_VIEW_MAIN, qfalse, qfalse,
+		/* Runs after OIT in mode 3 — allow phase regression vs transparency. */
+		VK_SPINE_PASS_RASTER_GI, "raster_gi", VK_SPINE_CAT_POST, VK_SPINE_PHASE_POST,
+		VK_SPINE_VIEW_MAIN, qtrue, qfalse,
 		s_reads_raster_gi, (int)ARRAY_LEN( s_reads_raster_gi ),
 		s_writes_raster_gi, (int)ARRAY_LEN( s_writes_raster_gi )
 	},
@@ -876,6 +880,7 @@ void vk_spine_frame_end( void )
 	vk_spine_note_temporal_history( VK_SPINE_RES_TAA_HISTORY,
 		vk.temporal.hasValidTAAHistory );
 	vk_spine_pass_end( VK_SPINE_PASS_HISTORY_MAINT );
+	vk_spine_validate_ultra_frame_contract();
 	vk_spine_cert_check_black_frame();
 	vk_spine_cert_check_resource_growth();
 	s_spine.currentPhase = VK_SPINE_PHASE_FRAME_END;
@@ -1668,6 +1673,73 @@ void vk_spine_dump_device_lost( void )
 	}
 }
 
+void vk_spine_validate_ultra_frame_contract( void )
+{
+	qboolean ok = qtrue;
+	char reason[96];
+
+	reason[0] = '\0';
+	s_spine.ultraContractOk = qtrue;
+	s_spine.ultraContractReason[0] = '\0';
+
+	if ( !VK_RasterUltra_Active() ) {
+		Q_strncpyz( s_spine.ultraContractReason, "inactive", sizeof( s_spine.ultraContractReason ) );
+		return;
+	}
+
+	/* Mode-3 Ultra: require opaque lighting spine stamps when deferred is on. */
+	if ( r_renderMode && r_renderMode->integer == 3 &&
+		r_deferredLighting && r_deferredLighting->integer ) {
+		if ( !vk_spine_was_observed( VK_SPINE_PASS_GBUFFER_FILL ) ) {
+			ok = qfalse;
+			Q_strncpyz( reason, "missing_gbuffer_fill", sizeof( reason ) );
+		} else if ( !vk_spine_was_observed( VK_SPINE_PASS_DEFERRED_LIGHTING ) ) {
+			ok = qfalse;
+			Q_strncpyz( reason, "missing_deferred_lighting", sizeof( reason ) );
+		} else if ( !vk_spine_was_observed( VK_SPINE_PASS_AMBIENT_VISIBILITY ) &&
+			ri.Cvar_VariableIntegerValue( "r_ambientVisibilityMode" ) >= 2 ) {
+			ok = qfalse;
+			Q_strncpyz( reason, "missing_ambient_visibility", sizeof( reason ) );
+		}
+	}
+
+	/* OIT must never be last writer of TAA history. */
+	if ( vk_spine_last_writer( VK_SPINE_RES_TAA_HISTORY ) == VK_SPINE_PASS_WBOIT_ACCUM ||
+		vk_spine_last_writer( VK_SPINE_RES_TAA_HISTORY ) == VK_SPINE_PASS_MBOIT_ACCUM ||
+		vk_spine_last_writer( VK_SPINE_RES_TAA_HISTORY ) == VK_SPINE_PASS_MBOIT_MOMENTS ) {
+		ok = qfalse;
+		Q_strncpyz( reason, "oit_wrote_taa_history", sizeof( reason ) );
+	}
+
+	s_spine.ultraContractOk = ok;
+	if ( !ok ) {
+		Q_strncpyz( s_spine.ultraContractReason, reason, sizeof( s_spine.ultraContractReason ) );
+		if ( vk_spine_validate_enabled() ) {
+			vk_spine_record_violation( "ultra_frame_contract: %s", reason );
+		} else {
+			static qboolean s_logged;
+			if ( !s_logged ) {
+				ri.Printf( PRINT_ALL, S_COLOR_YELLOW
+					"[VK][spine] Raster Ultra frame contract: %s (enable r_spineValidate 1 for per-frame)\n"
+					S_COLOR_WHITE, reason );
+				s_logged = qtrue;
+			}
+		}
+	} else {
+		Q_strncpyz( s_spine.ultraContractReason, "ok", sizeof( s_spine.ultraContractReason ) );
+	}
+}
+
+qboolean vk_spine_ultra_contract_ok( void )
+{
+	return s_spine.ultraContractOk;
+}
+
+const char *vk_spine_ultra_contract_reason( void )
+{
+	return s_spine.ultraContractReason[0] ? s_spine.ultraContractReason : "n/a";
+}
+
 void vk_spine_status_f( void )
 {
 	vkSpinePassId p;
@@ -1702,6 +1774,9 @@ void vk_spine_status_f( void )
 		s_spine.lastViolation[0] ? s_spine.lastViolation : "none" );
 	ri.Printf( PRINT_ALL, "combo     : %s\n",
 		s_spine.comboFallback[0] ? s_spine.comboFallback : "none" );
+	ri.Printf( PRINT_ALL, "ultra2    : contract=%s reason=%s\n",
+		vk_spine_ultra_contract_ok() ? "ok" : "fail",
+		vk_spine_ultra_contract_reason() );
 
 	ri.Printf( PRINT_ALL, "---- passes (declared / observed this frame) ----\n" );
 	for ( p = (vkSpinePassId)1; p < VK_SPINE_PASS_COUNT; p++ ) {

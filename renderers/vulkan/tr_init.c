@@ -86,6 +86,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "vk_reference_lab.h"
 #include "vk_frequency_aware.h"
 #include "vk_pass_registry.h"
+#include "vk_raster_gi.h"
 #include "vk_selective_sun_shadow.h"
 #include "vk_selective_reflection.h"
 #include "tr_mesh_normal_policy.h"

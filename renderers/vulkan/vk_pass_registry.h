@@ -228,4 +228,9 @@ vkSpinePassId vk_spine_last_writer( vkSpineResourceId res );
 void vk_spine_dump_device_lost( void );
 void vk_spine_status_f( void );
 
+/* Raster Ultra 2.0 — production frame-contract checks (opt-in via r_spineValidate / Ultra). */
+void vk_spine_validate_ultra_frame_contract( void );
+qboolean vk_spine_ultra_contract_ok( void );
+const char *vk_spine_ultra_contract_reason( void );
+
 #endif /* VK_PASS_REGISTRY_H */

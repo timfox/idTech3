@@ -159,10 +159,10 @@ void main() {
 	vec3 irr = mix( irr0, irr1, edgeFade );
 	float conf = mix( conf0, conf1, edgeFade ) * pc.params0.z;
 	float leak = mix( leak0, leak1, edgeFade );
-	/* Reject stale / leaky samples. */
-	conf *= ( 1.0 - 0.75 * leak );
+	/* Reject stale / leaky samples (Raster Ultra 2.0 thin-wall hardening). */
+	conf *= ( 1.0 - 0.92 * leak );
 	conf = clamp( conf, 0.0, 1.0 );
-	irr *= max( pc.params0.x, 0.0 );
+	irr *= ( 1.0 - 0.85 * leak ) * max( pc.params0.x, 0.0 );
 
 	uint debugMode = pc.levelsMeta.w;
 	if ( debugMode == 1u ) {

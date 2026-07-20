@@ -70,7 +70,7 @@ GTAO modulates **approximate unresolved** probe/cache ambient only. Valid SSGI s
 - Sample-time leakRisk attenuates confidence
 - Debug: `r_rasterGiDebug` 8 / 11; `r_radianceCacheDebug` 1–3
 
-**Known residual:** thin non-solid walls / portals may still leak until portal/room classification deepens — next fix target.
+**Known residual:** thin non-solid walls / portals may still leak until portal/room classification deepens — partially mitigated in Raster Ultra 2.0 (`RC_BlockedBetween` + stronger leak mute); see [RASTER_ULTRA_2.0.md](RASTER_ULTRA_2.0.md).
 
 ## Dynamic behavior
 

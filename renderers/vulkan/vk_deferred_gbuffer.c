@@ -1609,10 +1609,21 @@ void vk_deferred_lighting_apply_after_geometry( void )
 		return;
 	}
 
+	vk_spine_pass_begin( VK_SPINE_PASS_DEFERRED_LIGHTING );
+	vk_spine_note_write( VK_SPINE_RES_DEFERRED_LIGHTING, VK_SPINE_PASS_DEFERRED_LIGHTING,
+		VK_SPINE_ACCESS_STORAGE_WRITE | VK_SPINE_ACCESS_COLOR_WRITE );
+	vk_spine_note_read( VK_SPINE_RES_GBUFFER_ALBEDO, VK_SPINE_PASS_DEFERRED_LIGHTING,
+		VK_SPINE_ACCESS_SAMPLED_READ );
+	vk_spine_note_read( VK_SPINE_RES_GBUFFER_NORMAL, VK_SPINE_PASS_DEFERRED_LIGHTING,
+		VK_SPINE_ACCESS_SAMPLED_READ );
+	vk_spine_note_read( VK_SPINE_RES_DEPTH, VK_SPINE_PASS_DEFERRED_LIGHTING,
+		VK_SPINE_ACCESS_DEPTH_READ );
+
 	vk_dgb_dispatch_lighting_compute( width, height );
 
 	vk_dgb_create_composite_gfx_pipeline();
 	if ( !vk.deferred_gbuffer.composite_gfx_ready || vk.deferred_gbuffer.composite_gfx_pipeline == VK_NULL_HANDLE ) {
+		vk_spine_pass_end( VK_SPINE_PASS_DEFERRED_LIGHTING );
 		return;
 	}
 
@@ -1624,6 +1635,9 @@ void vk_deferred_lighting_apply_after_geometry( void )
 	}
 
 	vk_dgb_composite_lit_to_color( width, height );
+	vk_spine_note_write( VK_SPINE_RES_HDR_COLOR, VK_SPINE_PASS_DEFERRED_LIGHTING,
+		VK_SPINE_ACCESS_COLOR_WRITE );
+	vk_spine_pass_end( VK_SPINE_PASS_DEFERRED_LIGHTING );
 }
 
 static void vk_dgb_create_debug_gfx_pipeline( void )

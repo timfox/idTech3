@@ -68,10 +68,14 @@ void main() {
 		cacheMeta = textureLod( cacheMetaTex, uv, 0.0 );
 	}
 	float cacheConf = clamp( cache.a, 0.0, 1.0 ) * clamp( pc.params2.y, 0.0, 1.0 );
+	float cacheLeak = clamp( cacheMeta.y, 0.0, 1.0 );
 	float cacheStrength = max( pc.params1.w, 0.0 );
+	/* Mute leaky cache energy at resolve (adjacent-room / thin-wall). */
+	cacheConf *= ( 1.0 - 0.9 * cacheLeak );
 
 	vec3 probeIndirect = probe.rgb * albedo * ao * max( pc.params0.x, 0.0 ) * max( pc.params0.w, 0.0 );
-	vec3 cacheIndirect = cache.rgb * albedo * ao * cacheStrength * max( pc.params0.w, 0.0 );
+	vec3 cacheIndirect = cache.rgb * albedo * ao * cacheStrength * max( pc.params0.w, 0.0 )
+		* ( 1.0 - 0.8 * cacheLeak );
 	/* Prefer validated cache over probes for dynamic delta; probes fill gaps. */
 	float cacheW = clamp( cacheConf * cacheConf, 0.0, 1.0 );
 	vec3 baseGI = mix( probeIndirect, cacheIndirect, cacheW );

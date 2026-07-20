@@ -531,14 +531,17 @@ static mnode_t *RC_PointInLeaf( const vec3_t p )
 static float RC_OccupancyAt( const vec3_t p )
 {
 	/* Conservative multi-sample: any solid neighbor counts as blocked (reduces thin-wall leaks). */
-	static const float offs[7][3] = {
+	static const float offs[13][3] = {
 		{ 0, 0, 0 },
+		{ 4, 0, 0 }, { -4, 0, 0 },
+		{ 0, 4, 0 }, { 0, -4, 0 },
+		{ 0, 0, 4 }, { 0, 0, -4 },
 		{ 12, 0, 0 }, { -12, 0, 0 },
 		{ 0, 12, 0 }, { 0, -12, 0 },
 		{ 0, 0, 12 }, { 0, 0, -12 }
 	};
 	int i, solid = 0;
-	for ( i = 0; i < 7; ++i ) {
+	for ( i = 0; i < 13; ++i ) {
 		vec3_t q;
 		mnode_t *leaf;
 		VectorSet( q, p[0] + offs[i][0], p[1] + offs[i][1], p[2] + offs[i][2] );
@@ -554,6 +557,33 @@ static float RC_OccupancyAt( const vec3_t p )
 		return 0.55f; /* partial — damp inject/propagate */
 	}
 	return 0.0f;
+}
+
+/*
+===============
+RC_BlockedBetween
+
+Segment solid test between neighboring clipmap cells — blocks thin-wall bleed
+when empty cells sit on opposite sides of a thin BSP wall.
+===============
+*/
+static qboolean RC_BlockedBetween( const vec3_t a, const vec3_t b )
+{
+	static const float fracs[3] = { 0.25f, 0.5f, 0.75f };
+	int i;
+
+	for ( i = 0; i < 3; ++i ) {
+		vec3_t q;
+		mnode_t *leaf;
+		q[0] = a[0] + ( b[0] - a[0] ) * fracs[i];
+		q[1] = a[1] + ( b[1] - a[1] ) * fracs[i];
+		q[2] = a[2] + ( b[2] - a[2] ) * fracs[i];
+		leaf = RC_PointInLeaf( q );
+		if ( !leaf || ( leaf->contents & CONTENTS_SOLID ) ) {
+			return qtrue;
+		}
+	}
+	return qfalse;
 }
 
 static int RC_CellIndex( int level, int x, int y, int z )
@@ -868,6 +898,11 @@ static void RC_Propagate( int iters )
 									( n[k]->L0[0] + n[k]->L0[1] + n[k]->L0[2] ) > 0.1f ) {
 									c->leakRisk = Com_Clamp( 0.0f, 1.0f, c->leakRisk + 0.05f );
 								}
+								continue;
+							}
+							/* Thin-wall gate: empty cells on both sides still blocked by BSP. */
+							if ( RC_BlockedBetween( c->origin, n[k]->origin ) ) {
+								c->leakRisk = Com_Clamp( 0.0f, 1.0f, c->leakRisk + 0.2f );
 								continue;
 							}
 							w = n[k]->confidence * ( 1.0f - n[k]->occupancy );
