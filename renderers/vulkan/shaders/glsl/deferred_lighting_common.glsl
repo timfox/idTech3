@@ -104,6 +104,25 @@ const uint CLASS_TRANSMISSION = 3u;
 const uint CLASS_EMISSIVE = 4u;
 const uint CLASS_ALPHA_TEST = 5u;
 
+float ApplyDeferredSpecularAA( float roughness, vec2 uv, ivec2 pix )
+{
+	if ( pc.specularAA <= 0.0 ) {
+		return roughness;
+	}
+	/* Screen-space normal variance (compute path; matches Forward+ Toksvig-style inflate). */
+	ivec2 sz = textureSize( normalTex, 0 );
+	ivec2 px = clamp( pix, ivec2( 0 ), sz - ivec2( 1 ) );
+	vec3 nC = texture( normalTex, uv ).xyz;
+	vec3 nX = texelFetch( normalTex, clamp( px + ivec2( 1, 0 ), ivec2( 0 ), sz - ivec2( 1 ) ), 0 ).xyz;
+	vec3 nY = texelFetch( normalTex, clamp( px + ivec2( 0, 1 ), ivec2( 0 ), sz - ivec2( 1 ) ), 0 ).xyz;
+	vec3 dndx = nX - nC;
+	vec3 dndy = nY - nC;
+	float variance = min( dot( dndx, dndx ) + dot( dndy, dndy ), 0.5 );
+	float alpha = max( roughness * roughness, 0.0004 );
+	alpha = clamp( alpha + variance * pc.specularAA, 0.0004, 1.0 );
+	return clamp( sqrt( alpha ), 0.02, 1.0 );
+}
+
 vec3 shadeDeferredPixel( uvec2 pix ) {
 	vec2 uv = ( vec2( pix ) + 0.5 ) / vec2( pc.extent );
 	float depth = texture( depthTex, uv ).r;
@@ -149,6 +168,7 @@ vec3 shadeDeferredPixel( uvec2 pix ) {
 	float shadingConfidence = min( normalConfidence, materialConfidence );
 	float metalness = mix( 0.0, clamp( material.r, 0.0, 1.0 ), shadingConfidence );
 	float roughness = mix( 0.92, clamp( material.g, 0.04, 1.0 ), shadingConfidence );
+	roughness = ApplyDeferredSpecularAA( roughness, uv, ivec2( pix ) );
 	float materialAO = clamp( material.b, 0.0, 1.0 );
 	float aoCoupling = mix( 1.0, materialAO, clamp( pc.aoStrength, 0.0, 1.0 ) * shadingConfidence );
 	vec3 V = safeNormalizeOr( -viewPos, vec3( 0.0, 0.0, 1.0 ) );

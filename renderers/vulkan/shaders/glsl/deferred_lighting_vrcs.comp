@@ -58,6 +58,7 @@ layout(push_constant) uniform Push {
 	uint zSliceMode;
 	float zNear;
 	float zFar;
+	float specularAA;
 } pc;
 
 #include "deferred_lighting_common.glsl"

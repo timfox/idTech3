@@ -80,6 +80,15 @@ static const char *R_RendererProfileName( void )
 		if ( !Q_stricmp( havenrp, "safe" ) ) {
 			return "havenrp safe";
 		}
+		if ( !Q_stricmp( havenrp, "raster_ultra" ) ) {
+			return "havenrp raster ultra";
+		}
+		if ( !Q_stricmp( havenrp, "low_latency" ) ) {
+			return "havenrp low latency";
+		}
+		if ( !Q_stricmp( havenrp, "raster_reference" ) ) {
+			return "havenrp raster reference";
+		}
 	}
 	if ( r_renderMode && r_renderMode->integer == 5 ) {
 		return "path traced reference";
@@ -616,15 +625,18 @@ static void R_RendererStatus_f( void )
 		R_MeshNormalPolicy_PreserveAuthored() ? 1 : 0,
 		R_MeshNormalPolicy_HardEdgeAngleDeg(),
 		R_MeshNormalPolicy_SplitTangentsAtHardEdges() ? 1 : 0 );
+	VK_RasterUltra_PrintStatus();
 	ri.Printf( PRINT_ALL, "declared  : AO=%s GI=%s refl=%s temporal=%s\n",
 		R_NamedCvarString( "r_havenrpAoOwner" ),
 		R_NamedCvarString( "r_havenrpDiffuseGiOwner" ),
 		R_NamedCvarString( "r_havenrpReflectionOwner" ),
 		R_NamedCvarString( "r_havenrpTemporalOwner" ) );
-	ri.Printf( PRINT_ALL, "RT        : available=%s active(rtx=%d hybrid1=%d surfel=%d rcgi=%d)\n",
+	ri.Printf( PRINT_ALL, "RT        : available=%s active(rtx=%d hybrid1=%d surfel=%d rcgi=%d) "
+		"requested=%d effective=%d\n",
 		R_YesNo( R_RtxAvailable() ),
 		R_NamedCvarInteger( "r_rtx" ), R_NamedCvarInteger( "r_hybrid1" ),
-		R_NamedCvarInteger( "r_surfelGi" ), R_NamedCvarInteger( "r_rcgi" ) );
+		R_NamedCvarInteger( "r_surfelGi" ), R_NamedCvarInteger( "r_rcgi" ),
+		VK_RasterUltra_RTRequestedCount(), VK_RasterUltra_RTEffectiveCount() );
 	ri.Printf( PRINT_ALL, "streaming : openWorld=%d bspStream=%d\n",
 		R_NamedCvarInteger( "r_openWorld" ), R_NamedCvarInteger( "r_bspStream" ) );
 	ri.Printf( PRINT_ALL, "fallback  : reason=%s lkg=%s fails=%d\n",

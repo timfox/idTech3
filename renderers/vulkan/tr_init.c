@@ -68,6 +68,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "vk_selective_sun_shadow.h"
 #include "vk_selective_reflection.h"
 #include "tr_mesh_normal_policy.h"
+#include "vk_raster_ultra.h"
 #include "vk_sim_render_profile.h"
 #include "vk_sim_render_debug.h"
 #include "vk_skybox_hdr.h"
@@ -3479,8 +3480,13 @@ static void R_Register( void )
 	ri.Cvar_SetDescription( r_forwardPlusMaxPerTile, "Forward+ tile list length per 16px tile (min VK_FP_MIN_PER_TILE, max VK_FP_MAX_PER_TILE in vk_forward_plus.c; latched). Lower values reduce GPU work when \\r_forwardPlus 1. Requires vid_restart after change." );
 	ri.Cvar_SetGroup( r_forwardPlusMaxPerTile, CVG_RENDERER );
 	r_forwardPlusDebug = ri.Cvar_Get( "r_forwardPlusDebug", "0", CVAR_ARCHIVE_ND );
-	ri.Cvar_CheckRange( r_forwardPlusDebug, "0", "1", CV_FLOAT );
-	ri.Cvar_SetDescription( r_forwardPlusDebug, "PBR Forward+ debug overlay strength (0=off, typ. 0.08–0.25): heatmap by lights per 16px tile + tile borders. Requires \\r_forwardPlus 1." );
+	ri.Cvar_CheckRange( r_forwardPlusDebug, "0", "3", CV_FLOAT );
+	ri.Cvar_SetDescription( r_forwardPlusDebug,
+		"Forward+ / clustered debug overlay:\n"
+		" 0 = off\n"
+		" 0.08–1.0 = lights-per-cluster occupancy heatmap (uses Z-slice when r_forwardPlusZSlices>1)\n"
+		" 2 = Z-slice ID colors\n"
+		"Requires \\r_forwardPlus 1." );
 	ri.Cvar_SetGroup( r_forwardPlusDebug, CVG_RENDERER );
 	r_forwardPlusShade = ri.Cvar_Get( "r_forwardPlusShade", "0", CVAR_ARCHIVE_ND );
 	ri.Cvar_CheckRange( r_forwardPlusShade, "0", "4", CV_FLOAT );
@@ -3693,6 +3699,7 @@ void R_Init( void ) {
 #endif
 #endif
 	R_ApplyRenderModeLatch();
+	VK_RasterUltra_Enforce();
 	vk_aa_policy_apply();
 	ri.Printf( PRINT_ALL, "[VK] SH lighting: %s\n", r_shLighting && r_shLighting->integer ? "enabled" : "disabled" );
 	ri.Printf( PRINT_ALL, "[VK] SH world: %s\n", r_shWorldLighting && r_shWorldLighting->integer ? "enabled" : "disabled" );
@@ -3742,6 +3749,8 @@ void R_Init( void ) {
 	R_InitSkins();
 
 	R_MeshNormalPolicy_Init();
+	VK_RasterUltra_Init();
+	VK_RasterUltra_Enforce();
 	R_ModelInit();
 
 	R_InitFreeType();
@@ -3777,6 +3786,7 @@ static void RE_Shutdown( refShutdownCode_t code ) {
 	ri.Printf( PRINT_ALL, "RE_Shutdown( %i )\n", code );
 
 	R_MeshNormalPolicy_Shutdown();
+	VK_RasterUltra_Shutdown();
 
 	ri.Cmd_RemoveCommand( "modellist" );
 	ri.Cmd_RemoveCommand( "screenshotBMP" );

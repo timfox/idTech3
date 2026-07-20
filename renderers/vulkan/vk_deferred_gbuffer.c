@@ -74,6 +74,7 @@ typedef struct {
 	uint32_t zSliceMode;
 	float zNear;
 	float zFar;
+	float specularAA; /* normal-variance roughness inflate (parity with Forward+ ApplySpecularAA) */
 } vk_deferred_light_push_t;
 
 typedef struct {
@@ -1225,6 +1226,8 @@ static void vk_dgb_fill_light_push( vk_deferred_light_push_t *push, uint32_t wid
 		push->zNear = zn;
 		push->zFar = zf;
 	}
+	push->specularAA = ( r_pbr_specularAA && r_pbr_specularAA->integer ) ?
+		Com_Clamp( 0.0f, 2.0f, r_pbr_specularAAStrength ? r_pbr_specularAAStrength->value : 0.5f ) : 0.0f;
 }
 
 static void vk_dgb_dispatch_lighting_compute( uint32_t width, uint32_t height )
