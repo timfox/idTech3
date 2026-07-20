@@ -16,6 +16,8 @@ Requires USE_VULKAN_RTX, r_rtx 1, r_rtxDemo 1, r_pathtrace 1 (latched) + vid_res
 #include "vk_view_state.h"
 #include "vk_image_layout.h"
 #include "vk_cmd.h"
+#include "tr_render_mode_vk.h"
+#include "vk_hybrid1.h"
 
 #ifdef USE_VULKAN_RTX
 
@@ -602,7 +604,17 @@ void vk_pathtrace_shutdown( void )
 
 qboolean vk_pathtrace_active( void )
 {
-	return pathtrace.ready && r_pathtrace && r_pathtrace->integer > 0;
+	if ( !pathtrace.ready || !r_pathtrace || r_pathtrace->integer <= 0 ) {
+		return qfalse;
+	}
+	/*
+	 * Selective Hybrid (mode 4) / Hybrid1: PT must not run as an additive overlay
+	 * on completed raster+hybrid lighting. Mode 5 is the exclusive PT owner.
+	 */
+	if ( !R_RenderMode_IsPathTracedReference() && vk_hybrid1_active() ) {
+		return qfalse;
+	}
+	return qtrue;
 }
 
 void vk_pathtrace_init( void )

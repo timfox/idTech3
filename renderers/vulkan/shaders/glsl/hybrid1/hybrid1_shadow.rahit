@@ -1,0 +1,55 @@
+#version 460
+#extension GL_EXT_ray_tracing : require
+#extension GL_EXT_nonuniform_qualifier : require
+#extension GL_GOOGLE_include_directive : enable
+#include "hybrid1_ubo.glsl"
+#include "hybrid1_hit.glsl"
+
+/* Alpha-tested candidate intersections for Selective Hybrid Shadows.
+ * Opaque prims fall through to closest-hit; alpha holes IgnoreIntersection. */
+layout( location = 0 ) rayPayloadInEXT vec2 shadowPayload;
+
+void main()
+{
+	uint nMat = uint( primMat.mats.length() );
+	uint primIdx = uint( max( gl_PrimitiveID, 0 ) );
+	if ( gl_InstanceCustomIndexEXT == 1 ) {
+		primIdx += uint( max( h1.viewOrigin.w, 0.0 ) );
+	}
+
+	uint flags = 0u;
+	if ( nMat > 0u && primIdx < nMat ) {
+		flags = primMat.mats[primIdx].uvSetFlags >> 16;
+	}
+
+	/* Bit 2 = RTX_PRIM_MATERIAL_FLAG_ALPHA_TEST (0x0004). */
+	if ( ( flags & 0x4u ) == 0u ) {
+		return;
+	}
+
+	float a = 1.0;
+	uint texCount = uint( max( h1.bindlessMeta.x, 0.0 ) );
+	if ( texCount > 0u && nMat > 0u && primIdx < nMat ) {
+		uint texIdx = primMat.mats[primIdx].textureIndex;
+		if ( texIdx != 0xFFFFFFFFu && texIdx < texCount ) {
+			vec2 uv = vec2( 0.5 );
+			uint nuv = uint( primUv.uv6.length() );
+			if ( nuv >= ( primIdx + 1u ) * 6u ) {
+				uint base = primIdx * 6u;
+				vec2 uv0 = vec2( primUv.uv6[base + 0u], primUv.uv6[base + 1u] );
+				vec2 uv1 = vec2( primUv.uv6[base + 2u], primUv.uv6[base + 3u] );
+				vec2 uv2 = vec2( primUv.uv6[base + 4u], primUv.uv6[base + 5u] );
+				float w = max( 1.0 - baryCoord.x - baryCoord.y, 0.0 );
+				uv = uv0 * w + uv1 * baryCoord.x + uv2 * baryCoord.y;
+			}
+			a = texture( nonuniformEXT( bindlessDiffuse[texIdx] ), uv ).a;
+		}
+	} else {
+		/* Fallback: treat missing alpha metadata as opaque blocker. */
+		return;
+	}
+
+	if ( a < 0.5 ) {
+		ignoreIntersectionEXT;
+	}
+}

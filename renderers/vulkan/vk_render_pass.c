@@ -13,6 +13,7 @@
 #include "vk_raygun.h"
 #include "vk_dressi.h"
 #include "vk_iris.h"
+#include "tr_render_mode_vk.h"
 
 void vk_set_fullscreen_viewport_scissor( uint32_t width, uint32_t height )
 {
@@ -190,7 +191,17 @@ void vk_end_render_pass_tracked( void )
 	}
 
 #ifdef USE_VULKAN_RTX
-	if ( vk_hybrid1_active() &&
+	/*
+	 * Spine 1.2 RT consumer ownership (one lighting owner per frame end):
+	 *  - Mode 5 + pathtrace: exclusive PT reference (no Hybrid1 / RTX demo overlay)
+	 *  - Else Hybrid1 (selective hybrid signals) → Raygun → RTX demo → GRTX
+	 *  - Pathtrace only when not demoted by Hybrid1 (see vk_pathtrace_active)
+	 * Never run Hybrid1 and full PT as additive doubles.
+	 */
+	if ( R_RenderMode_IsPathTracedReference() && vk_pathtrace_active() &&
+		( vk.renderPassIndex == RENDER_PASS_MAIN || vk.renderPassIndex == RENDER_PASS_POST_BLOOM ) ) {
+		vk_pathtrace_record_pass( vk.cmd->command_buffer );
+	} else if ( vk_hybrid1_active() &&
 		( vk.renderPassIndex == RENDER_PASS_MAIN || vk.renderPassIndex == RENDER_PASS_POST_BLOOM ) ) {
 		vk_hybrid1_record_pass( vk.cmd->command_buffer );
 	} else if ( vk_raygun_active() &&
@@ -206,7 +217,7 @@ void vk_end_render_pass_tracked( void )
 		( vk.renderPassIndex == RENDER_PASS_MAIN || vk.renderPassIndex == RENDER_PASS_POST_BLOOM ) ) {
 		vk_grtx_record_pass( vk.cmd->command_buffer );
 	}
-	if ( vk_pathtrace_active() &&
+	if ( !R_RenderMode_IsPathTracedReference() && vk_pathtrace_active() &&
 		( vk.renderPassIndex == RENDER_PASS_MAIN || vk.renderPassIndex == RENDER_PASS_POST_BLOOM ) ) {
 		vk_pathtrace_record_pass( vk.cmd->command_buffer );
 	}

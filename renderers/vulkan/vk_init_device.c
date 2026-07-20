@@ -56,6 +56,8 @@ Extracted from vk.c for incremental modularization.
 #include "vk_surfel_gi.h"
 #include "vk_rcgi.h"
 #include "vk_ambient_visibility.h"
+#include "vk_selective_sun_shadow.h"
+#include "vk_selective_reflection.h"
 #include "vk_pipeline_cache_disk.h"
 #include "vk_pipeline_helpers.h"
 #include "vk_raster_samples.h"
@@ -1319,6 +1321,8 @@ void vk_initialize( void )
 	vk_surfel_gi_init();
 	vk_rcgi_init();
 	vk_ambient_visibility_init();
+	vk_shs_init();
+	vk_shr_init();
 	vk_spine_registry_init();
 
 #ifdef VK_CUBEMAP

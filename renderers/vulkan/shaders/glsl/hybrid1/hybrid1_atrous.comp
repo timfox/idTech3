@@ -50,12 +50,16 @@ void main()
 	int iter = int( pc.params.x );
 	if ( pc.adaptiveBlur != 0u ) {
 		if ( pc.params.z < 0.5 ) {
-			float shadowAngle = texture( rawGuideTex, uv ).g;
+			/* Shadow angle lives in A; G is ray hit distance (SHS / Hybrid1). */
+			float shadowAngle = texture( rawGuideTex, uv ).a;
 			if ( shadowAngle > pc.edge.z && iter == 0 ) {
 				iter = 1;
 			}
 		} else if ( pc.params.z < 1.5 ) {
-			float roughness = texture( rawGuideTex, uv ).a;
+			/* Spec: unpack roughness from packed A (SHR: hit bit in high half). */
+			float packedA = texture( rawGuideTex, uv ).a;
+			float roughness = ( packedA >= 0.5 ) ? ( ( packedA - 0.5 ) / 0.499 ) : ( packedA / 0.499 );
+			roughness = clamp( roughness, 0.02, 1.0 );
 			if ( roughness > pc.edge.w && iter == 0 ) {
 				iter = 1;
 			}

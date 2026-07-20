@@ -1,7 +1,9 @@
 #version 450
 /*
- * Hybrid1 temporal accumulation + variance estimation + history rectification (variance color clamping).
+ * Hybrid1 temporal accumulation + variance estimation + history rectification.
  * channel: 0 = shadow (R), 1 = specular (RGB)
+ * When shsMode!=0, apply Selective Hybrid Shadows / Reflections rejection
+ * (prefer noise over ghosting). shsMode 1 = shadow, 2 = specular (SHR).
  */
 #extension GL_GOOGLE_include_directive : enable
 #include "hybrid1_common.glsl"
@@ -26,7 +28,8 @@ layout( push_constant ) uniform Hybrid1TemporalPush {
 	uint hasGBuffer;
 	uint firstFrame;
 	uint useMotion;
-	uint pad1;
+	uint shsMode;
+	vec4 shs; /* x=maxAge, y=hitDistRelTol, z=normalDotMin, w=unused */
 } pc;
 
 void main()
@@ -52,18 +55,55 @@ void main()
 	vec3 filtered;
 	vec3 histWrite;
 	vec3 varWrite;
+	float rejectReason = 0.0; /* 0=ok 1=first 2=oob 3=motion 4=normal 5=hitDist 6=age 7=invalid */
 
 	if ( pc.params.w < 0.5 ) {
 		float rawVis = raw.r;
 		float histVis = rawVis;
 		float variance = 0.0;
+		float histAge = 0.0;
+		float histHitT = raw.g;
+		float alpha = pc.params.y;
 
-		if ( pc.firstFrame == 0u ) {
+		if ( pc.firstFrame != 0u ) {
+			rejectReason = 1.0;
+		} else {
 			vec2 histUv = hybrid1_historyUV( pc.invViewProj, pc.prevViewProj, uv, depth, motionTex, pc.useMotion );
-			if ( histUv.x >= 0.0 && histUv.x <= 1.0 && histUv.y >= 0.0 && histUv.y <= 1.0 ) {
-				histVis = texture( historyTex, histUv ).r;
+			if ( histUv.x < 0.0 || histUv.x > 1.0 || histUv.y < 0.0 || histUv.y > 1.0 ) {
+				rejectReason = 2.0;
+			} else if ( pc.useMotion != 0u ) {
+				vec2 motion = texture( motionTex, uv ).rg;
+				if ( any( isnan( motion ) ) || any( isinf( motion ) ) || length( motion ) > 0.35 ) {
+					rejectReason = 3.0;
+				}
+			}
+
+			if ( rejectReason < 0.5 ) {
+				vec4 histSample = texture( historyTex, histUv );
+				histVis = histSample.r;
+				histHitT = histSample.g;
+				histAge = histSample.b;
 				variance = texture( varianceHistTex, histUv ).r;
-				if ( pc.params.z > 0.5 ) {
+
+				if ( pc.shsMode != 0u ) {
+					vec3 N = hybrid1_decodeNormal( normalTex, uv, pc.hasGBuffer );
+					vec3 Nh = hybrid1_decodeNormal( normalTex, histUv, pc.hasGBuffer );
+					if ( dot( N, Nh ) < pc.shs.z ) {
+						rejectReason = 4.0;
+					}
+					float rel = abs( raw.g - histHitT ) / max( max( raw.g, histHitT ), 1.0 );
+					if ( rejectReason < 0.5 && rel > pc.shs.y ) {
+						rejectReason = 5.0;
+					}
+					if ( rejectReason < 0.5 && histAge >= pc.shs.x ) {
+						rejectReason = 6.0;
+					}
+					if ( rejectReason < 0.5 && raw.b < 0.5 ) {
+						rejectReason = 7.0;
+					}
+				}
+
+				if ( rejectReason < 0.5 && pc.params.z > 0.5 ) {
 					float mn;
 					float mx;
 					float mean;
@@ -74,24 +114,69 @@ void main()
 			}
 		}
 
-		float alpha = pc.params.y;
+		if ( rejectReason > 0.5 ) {
+			histVis = rawVis;
+			histAge = 0.0;
+			alpha = 1.0;
+		} else {
+			histAge = min( histAge + 1.0, pc.shs.x );
+			if ( pc.shsMode != 0u ) {
+				/* Age-aware: older history contributes less; never a high fixed weight. */
+				float ageFade = 1.0 - clamp( histAge / max( pc.shs.x, 1.0 ), 0.0, 0.75 );
+				alpha = max( alpha, mix( alpha, 1.0, ageFade * 0.35 ) );
+			}
+		}
+
 		filtered.r = mix( histVis, rawVis, alpha );
 		filtered.g = raw.g;
-		filtered.b = 0.0;
+		filtered.b = rejectReason;
 		variance = mix( variance, ( rawVis - filtered.r ) * ( rawVis - filtered.r ), 0.2 );
-		histWrite = vec3( filtered.r, raw.g, 0.0 );
-		varWrite = vec3( variance, 0.0, 0.0 );
+		histWrite = vec3( filtered.r, raw.g, histAge );
+		varWrite = vec3( variance, alpha, rejectReason );
 	} else {
+		/* Specular channel — SHR (shsMode==2): reject on motion/normal/source/age. */
 		vec3 rawRgb = raw.rgb;
 		vec3 histRgb = rawRgb;
 		vec3 variance = vec3( 0.0 );
+		float alpha = pc.params.y;
+		float rawHit = ( raw.a >= 0.5 ) ? 1.0 : 0.0;
+		float histAge = 0.0;
 
-		if ( pc.firstFrame == 0u ) {
+		if ( pc.firstFrame != 0u ) {
+			rejectReason = 1.0;
+		} else {
 			vec2 histUv = hybrid1_historyUV( pc.invViewProj, pc.prevViewProj, uv, depth, motionTex, pc.useMotion );
-			if ( histUv.x >= 0.0 && histUv.x <= 1.0 && histUv.y >= 0.0 && histUv.y <= 1.0 ) {
-				histRgb = texture( historyTex, histUv ).rgb;
+			if ( histUv.x < 0.0 || histUv.x > 1.0 || histUv.y < 0.0 || histUv.y > 1.0 ) {
+				rejectReason = 2.0;
+			} else if ( pc.useMotion != 0u ) {
+				vec2 motion = texture( motionTex, uv ).rg;
+				if ( any( isnan( motion ) ) || any( isinf( motion ) ) || length( motion ) > 0.35 ) {
+					rejectReason = 3.0;
+				}
+			}
+
+			if ( rejectReason < 0.5 ) {
+				vec4 histSample = texture( historyTex, histUv );
+				histRgb = histSample.rgb;
 				variance = texture( varianceHistTex, histUv ).rgb;
-				if ( pc.params.z > 0.5 ) {
+				histAge = variance.g;
+
+				if ( pc.shsMode == 2u ) {
+					vec3 N = hybrid1_decodeNormal( normalTex, uv, pc.hasGBuffer );
+					vec3 Nh = hybrid1_decodeNormal( normalTex, histUv, pc.hasGBuffer );
+					if ( dot( N, Nh ) < pc.shs.z ) {
+						rejectReason = 4.0;
+					}
+					float histHit = ( histSample.a >= 0.5 ) ? 1.0 : 0.0;
+					if ( rejectReason < 0.5 && abs( rawHit - histHit ) > 0.5 ) {
+						rejectReason = 5.0; /* hit ↔ miss/probe transition */
+					}
+					if ( rejectReason < 0.5 && histAge >= pc.shs.x ) {
+						rejectReason = 6.0;
+					}
+				}
+
+				if ( rejectReason < 0.5 && pc.params.z > 0.5 ) {
 					vec3 mn;
 					vec3 mx;
 					vec3 mean;
@@ -102,11 +187,25 @@ void main()
 			}
 		}
 
-		float alpha = pc.params.y;
+		if ( rejectReason > 0.5 ) {
+			histRgb = rawRgb;
+			histAge = 0.0;
+			alpha = 1.0;
+		} else if ( pc.shsMode == 2u ) {
+			histAge = min( histAge + 1.0, pc.shs.x );
+			float ageFade = 1.0 - clamp( histAge / max( pc.shs.x, 1.0 ), 0.0, 0.75 );
+			alpha = max( alpha, mix( alpha, 1.0, ageFade * 0.35 ) );
+		}
+
 		filtered = mix( histRgb, rawRgb, alpha );
 		variance = mix( variance, ( rawRgb - filtered ) * ( rawRgb - filtered ), vec3( 0.2 ) );
 		histWrite = filtered;
-		varWrite = variance;
+		if ( pc.shsMode == 2u ) {
+			/* variance: R=luma var, G=age, B=reject (matches shadow debug layout) */
+			varWrite = vec3( length( variance ), histAge, rejectReason );
+		} else {
+			varWrite = variance;
+		}
 	}
 
 	imageStore( filteredOut, ivec2( pix ), vec4( filtered, raw.a ) );

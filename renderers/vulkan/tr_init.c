@@ -65,6 +65,8 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "vk_visibility_buffer.h"
 #include "vk_temporal.h"
 #include "vk_pass_registry.h"
+#include "vk_selective_sun_shadow.h"
+#include "vk_selective_reflection.h"
 #include "vk_sim_render_profile.h"
 #include "vk_sim_render_debug.h"
 #include "vk_skybox_hdr.h"
@@ -2711,8 +2713,16 @@ static void R_Register( void )
 		"Use vid_restart after changing. Default 1 recommended." );
 	ri.Cvar_SetGroup( r_fbo, CVG_RENDERER );
 	r_renderMode = ri.Cvar_Get( "r_renderMode", "0", CVAR_ARCHIVE_ND | CVAR_LATCH );
-	ri.Cvar_CheckRange( r_renderMode, "0", "3", CV_INTEGER );
-	ri.Cvar_SetDescription( r_renderMode, "Vulkan lighting path (latched, vid_restart).\n 0: Forward (classic projector; r_forwardPlus may still be 1)\n 1: Deferred opaque + Forward+ transparent (same split as mode 3; r_deferredLighting 1)\n 2: Modern Forward+ primary (sets r_forwardPlus 1 and r_forwardPlusShade 1; may use r_deferredGBuffer as sidecar)\n 3: Unified Clustered Renderer — hybrid deferred opaque + Forward+ transparent (shared tile lists; shipping default)" );
+	ri.Cvar_CheckRange( r_renderMode, "0", "5", CV_INTEGER );
+	ri.Cvar_SetDescription( r_renderMode,
+		"Vulkan lighting path (latched, vid_restart).\n"
+		" 0: Forward (classic projector; r_forwardPlus may still be 1)\n"
+		" 1: Deferred opaque + Forward+ transparent (r_deferredLighting 1)\n"
+		" 2: Tier A Certified Raster — Forward+ primary (Spine 1.0 boot via modern_vulkan.cfg)\n"
+		" 3: Unified Clustered — deferred opaque + Forward+ transparent (opt-in)\n"
+		" 4: Tier B Selective Hybrid — clustered raster + exclusive RT signal owners (opt-in; RTX)\n"
+		" 5: Tier C Path-Traced Reference — exclusive PT lighting (opt-in; not gameplay default)\n"
+		"See docs/RENDERER_SPINE_1.2.md. Recovery: exec modern_vulkan.cfg / gfx_safe.cfg." );
 	r_deferredGBuffer = ri.Cvar_Get( "r_deferredGBuffer", "0", CVAR_ARCHIVE_ND | CVAR_LATCH );
 	ri.Cvar_CheckRange( r_deferredGBuffer, "0", "1", CV_INTEGER );
 	ri.Cvar_SetDescription( r_deferredGBuffer,
@@ -3402,8 +3412,10 @@ static void R_Register( void )
 	ri.Cvar_SetDescription( r_hybrid1_specStrength, "Hybrid1 composite: additive denoised specular weight." );
 	ri.Cvar_SetGroup( r_hybrid1_specStrength, CVG_RENDERER );
 	r_hybrid1_debug = ri.Cvar_Get( "r_hybrid1_debug", "0", CVAR_ARCHIVE_ND );
-	ri.Cvar_CheckRange( r_hybrid1_debug, "0", "4", CV_INTEGER );
-	ri.Cvar_SetDescription( r_hybrid1_debug, "Hybrid1 debug view: 0=composite, 1=shadow vis, 2=spec RGB, 3=shadow angle, 4=diffuse." );
+	ri.Cvar_CheckRange( r_hybrid1_debug, "0", "12", CV_INTEGER );
+	ri.Cvar_SetDescription( r_hybrid1_debug,
+		"Hybrid1 debug: 0=composite 1=filtered shadow 2=spec 3=shadow angle 4=diffuse 5=surfel "
+		"6=raw RT shadow 7=hitDist 8=TLAS coverage 9=alphaCandidates 10=histWeight 11=reject 12=diff." );
 	ri.Cvar_SetGroup( r_hybrid1_debug, CVG_RENDERER );
 	r_hybrid1_diffuse = ri.Cvar_Get( "r_hybrid1_diffuse", "0", CVAR_ARCHIVE_ND );
 	ri.Cvar_CheckRange( r_hybrid1_diffuse, "0", "1", CV_INTEGER );

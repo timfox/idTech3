@@ -754,7 +754,8 @@ static void vk_rtx_rebuild_world_blas( void )
 	Com_Memset( &geometryBLAS, 0, sizeof( geometryBLAS ) );
 	geometryBLAS.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_KHR;
 	geometryBLAS.geometryType = VK_GEOMETRY_TYPE_TRIANGLES_KHR;
-	geometryBLAS.flags = VK_GEOMETRY_OPAQUE_BIT_KHR;
+	/* Non-opaque: Selective Hybrid Shadows any-hit can discard alpha-tested holes. */
+	geometryBLAS.flags = 0;
 	geometryBLAS.geometry.triangles = triangles;
 
 	Com_Memset( &buildInfoBLAS, 0, sizeof( buildInfoBLAS ) );
@@ -1207,7 +1208,8 @@ static void vk_rtx_rebuild_entity_tlas( void )
 			Com_Memset( &geometryBLAS, 0, sizeof( geometryBLAS ) );
 			geometryBLAS.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_KHR;
 			geometryBLAS.geometryType = VK_GEOMETRY_TYPE_TRIANGLES_KHR;
-			geometryBLAS.flags = VK_GEOMETRY_OPAQUE_BIT_KHR;
+			/* Non-opaque so alpha-tested entity foliage participates in SHS any-hit. */
+			geometryBLAS.flags = 0;
 			geometryBLAS.geometry.triangles = triangles;
 
 			Com_Memset( &buildInfoBLAS, 0, sizeof( buildInfoBLAS ) );

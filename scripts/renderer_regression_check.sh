@@ -500,6 +500,16 @@ else
 fi
 
 echo ""
+echo "Spine 1.2 mode model:"
+if [[ ! -f "$PROJECT_ROOT/scripts/spine_1_2_mode_check.sh" ]]; then
+  fail "missing scripts/spine_1_2_mode_check.sh"
+elif ! bash "$PROJECT_ROOT/scripts/spine_1_2_mode_check.sh"; then
+  fail "spine_1_2_mode_check.sh failed"
+else
+  pass "Spine 1.2 mode model static contract"
+fi
+
+echo ""
 echo "Spine platform restore hooks:"
 if [[ ! -f "$PROJECT_ROOT/scripts/spine_platform_restore_check.sh" ]]; then
   fail "missing scripts/spine_platform_restore_check.sh"

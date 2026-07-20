@@ -18,6 +18,7 @@ Coexists with classic G-buffer; does not replace deferred lighting consumers.
 #include "vk_util.h"
 #include "vk_view_state.h"
 #include "vk_post_fog.h"
+#include "tr_render_mode_vk.h"
 
 static void vk_visbuf_validate_compute_break( const char *stage, qboolean resume_main )
 {
@@ -67,7 +68,7 @@ static void vk_visbuf_create_debug_gfx_pipeline( void );
 qboolean vk_visibility_buffer_active( void )
 {
 	return ( vk.visibilityBufferAllocated && r_renderMode &&
-		( r_renderMode->integer == 1 || r_renderMode->integer == 2 || r_renderMode->integer == 3 ) &&
+		R_RenderMode_WantsGBuffer() &&
 		r_visibilityBuffer && r_visibilityBuffer->integer ) ? qtrue : qfalse;
 }
 

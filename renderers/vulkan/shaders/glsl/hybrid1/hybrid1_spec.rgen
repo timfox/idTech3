@@ -3,6 +3,7 @@
 #extension GL_GOOGLE_include_directive : enable
 #include "hybrid1_ubo.glsl"
 #include "hybrid1_brdf.glsl"
+#include "hybrid1_ibl.glsl"
 #include "../glint_ndf.glsl"
 
 layout( location = 0 ) rayPayloadEXT vec4 specRadiance;
@@ -13,6 +14,7 @@ layout( rgba16f, set = 0, binding = 1 ) uniform writeonly image2D specOut;
 layout( set = 0, binding = 3 ) uniform sampler2D depthTex;
 layout( set = 0, binding = 4 ) uniform sampler2D normalTex;
 layout( set = 0, binding = 5 ) uniform sampler2D materialTex;
+layout( set = 0, binding = 6 ) uniform samplerCube prefilterTex;
 
 void main()
 {
@@ -21,7 +23,8 @@ void main()
 	float depth = textureLod( depthTex, uv, 0.0 ).r;
 
 	if ( depth <= 0.0 || depth >= 1.0 ) {
-		imageStore( specOut, ivec2( gl_LaunchIDEXT.xy ), vec4( 0.0, 0.0, 0.0, 1.0 ) );
+		/* Packed miss confidence (A < 0.5) — sky / no primary surface. */
+		imageStore( specOut, ivec2( gl_LaunchIDEXT.xy ), vec4( 0.0, 0.0, 0.0, 0.0 ) );
 		return;
 	}
 
@@ -57,7 +60,13 @@ void main()
 		R = normalize( R );
 	}
 	if ( roughness >= h1.params2.w ) {
-		imageStore( specOut, ivec2( gl_LaunchIDEXT.xy ), vec4( 0.0, 0.0, 0.0, roughness ) );
+		/* Too rough for RT budget: terminal probe/IBL (miss packing, not a geometry hit). */
+		vec3 probeRgb = vec3( 0.35, 0.42, 0.55 );
+		if ( h1.params1.w > 0.5 ) {
+			probeRgb = hybrid1_samplePrefilter( prefilterTex, R, roughness );
+		}
+		float packedMiss = clamp( roughness, 0.0, 1.0 ) * 0.499;
+		imageStore( specOut, ivec2( gl_LaunchIDEXT.xy ), vec4( probeRgb, packedMiss ) );
 		return;
 	}
 
@@ -89,7 +98,7 @@ void main()
 
 	specRadiance = vec4( 0.0 );
 	specRadiance.w = roughness;
-	traceRayEXT( topLevelAS, gl_RayFlagsOpaqueEXT, 0xFFu, 0u, 0u, 0u, ro, max( h1.params2.y, 1e-4 ), rd, 1.0e5, 0 );
+	traceRayEXT( topLevelAS, gl_RayFlagsNoneEXT, 0xFFu, 0u, 0u, 0u, ro, max( h1.params2.y, 1e-4 ), rd, 1.0e5, 0 );
 
 	vec3 outRgb = specRadiance.rgb;
 	if ( h1.params3.x > 0.5 ) {
@@ -145,5 +154,9 @@ void main()
 	if ( !all( equal( outRgb, outRgb ) ) ) {
 		outRgb = vec3( 0.0 );
 	}
-	imageStore( specOut, ivec2( gl_LaunchIDEXT.xy ), vec4( outRgb, roughness ) );
+	/* Pack: A = roughness in [0,0.5) for miss/probe, [0.5,1] for RT hit (SHR confidence). */
+	float roughAbs = abs( specRadiance.w );
+	float hitConf = ( specRadiance.w < 0.0 ) ? 1.0 : 0.0;
+	float packedA = clamp( roughAbs, 0.0, 1.0 ) * 0.499 + hitConf * 0.5;
+	imageStore( specOut, ivec2( gl_LaunchIDEXT.xy ), vec4( outRgb, packedA ) );
 }

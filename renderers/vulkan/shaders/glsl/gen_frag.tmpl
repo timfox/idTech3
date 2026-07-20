@@ -1676,8 +1676,11 @@ void main() {
 		diffuseIrradiance = CalcDiffuseIrradiance( N ) * diffuse.rgb * AO * kD;
 	}
 	vec3 iblSpec = vec3( 0.0 );
-	if ( env_texture_set >= 0 ) {
-		iblSpec = CalcIBLContribution( roughness, N, E, NE, specular.rgb * AO, pbrGlintFlags.w, anisoAmount );
+	if ( env_texture_set >= 0 && pbrDebugMode.w < 0.5 ) {
+		/* Do not multiply IBL specular by scalar AO (darkens reflections incorrectly).
+		 * Specular occlusion for unresolved probe fallback is applied later via Ambient Visibility
+		 * / SHR probe path only — valid RT reflections must not be crushed here. */
+		iblSpec = CalcIBLContribution( roughness, N, E, NE, specular.rgb, pbrGlintFlags.w, anisoAmount );
 	}
 
 	vec3 debugDir = reflect( -E, N );

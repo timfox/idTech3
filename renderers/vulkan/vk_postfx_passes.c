@@ -23,6 +23,7 @@ SSAO/HBAO pass, and vk_bloom. Split from vk.c.
 #include "vk_visibility_buffer.h"
 #include "vk_reactive_mask.h"
 #include "vk_ambient_visibility.h"
+#include "vk_selective_reflection.h"
 #include "vk_pass_registry.h"
 
 static void vk_oit_validate_pass_break( const char *stage )
@@ -474,12 +475,18 @@ void vk_ssr_pass( void )
 		return;
 	}
 
+	/* Selective Hybrid Reflections: exclusive owner — do not write SSR when RT owns. */
+	if ( !vk_shr_ssr_allowed() ) {
+		return;
+	}
+
 	if ( vk.renderPassIndex == RENDER_PASS_SCREENMAP || vk.renderPassIndex == RENDER_PASS_SUN_SHADOW )
 	{
 		return;
 	}
 
-	if ( !backEnd.doneSurfaces || !backEnd.doneBloom )
+	/* Require geometry; bloom no longer gates SSR (HDR_GAPS / SHR schedule). */
+	if ( !backEnd.doneSurfaces )
 	{
 		return;
 	}

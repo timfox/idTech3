@@ -147,6 +147,7 @@ raygun_spv_bytes = {}
 surfel_spv_bytes = {}
 rcgi_spv_bytes = {}
 av_spv_bytes = {}
+shs_spv_bytes = {}
 
 def append_shader_data(spv_path, array_name):
     # Write a leading blank line before each array so a truncated prior write
@@ -166,7 +167,7 @@ def append_shader_data(spv_path, array_name):
         f.flush()
         os.fsync(f.fileno())
 
-def compile_shader(stage, source, array_name, binding_expr=None, defines="", rtx_collect=False, grtx_collect=False, pathtrace_collect=False, hybrid1_collect=False, raygun_collect=False, surfel_collect=False, rcgi_collect=False, av_collect=False):
+def compile_shader(stage, source, array_name, binding_expr=None, defines="", rtx_collect=False, grtx_collect=False, pathtrace_collect=False, hybrid1_collect=False, raygun_collect=False, surfel_collect=False, rcgi_collect=False, av_collect=False, shs_collect=False):
     global task_counter
     input_path = glsl_dir / source
     if not input_path.is_file():
@@ -195,6 +196,8 @@ def compile_shader(stage, source, array_name, binding_expr=None, defines="", rtx
         rcgi_spv_bytes[array_name] = tmp_spv.read_bytes()
     if av_collect:
         av_spv_bytes[array_name] = tmp_spv.read_bytes()
+    if shs_collect:
+        shs_spv_bytes[array_name] = tmp_spv.read_bytes()
     append_shader_data(tmp_spv, array_name)
     if binding_expr:
         bindings.append((binding_expr, array_name))
@@ -480,9 +483,11 @@ compile_shader("comp", "pt_composite.comp", "pt_composite_cs", pathtrace_collect
 compile_shader("rgen", "hybrid1/hybrid1_shadow.rgen", "hybrid1_shadow_rgen_spv", hybrid1_collect=True)
 compile_shader("rmiss", "hybrid1/hybrid1_shadow.rmiss", "hybrid1_shadow_rmiss_spv", hybrid1_collect=True)
 compile_shader("rchit", "hybrid1/hybrid1_shadow.rchit", "hybrid1_shadow_rchit_spv", hybrid1_collect=True)
+compile_shader("rahit", "hybrid1/hybrid1_shadow.rahit", "hybrid1_shadow_rahit_spv", hybrid1_collect=True)
 compile_shader("rgen", "hybrid1/hybrid1_spec.rgen", "hybrid1_spec_rgen_spv", hybrid1_collect=True)
 compile_shader("rmiss", "hybrid1/hybrid1_spec.rmiss", "hybrid1_spec_rmiss_spv", hybrid1_collect=True)
 compile_shader("rchit", "hybrid1/hybrid1_spec.rchit", "hybrid1_spec_rchit_spv", hybrid1_collect=True)
+compile_shader("rahit", "hybrid1/hybrid1_spec.rahit", "hybrid1_spec_rahit_spv", hybrid1_collect=True)
 compile_shader("rgen", "hybrid1/hybrid1_diffuse.rgen", "hybrid1_diffuse_rgen_spv", hybrid1_collect=True)
 compile_shader("rmiss", "hybrid1/hybrid1_diffuse.rmiss", "hybrid1_diffuse_rmiss_spv", hybrid1_collect=True)
 compile_shader("rchit", "hybrid1/hybrid1_diffuse.rchit", "hybrid1_diffuse_rchit_spv", hybrid1_collect=True)
@@ -516,6 +521,8 @@ compile_shader("comp", "ambient_visibility/av_rtao.comp", "av_rtao_cs", av_colle
 compile_shader("comp", "ambient_visibility/av_temporal.comp", "av_temporal_cs", av_collect=True)
 compile_shader("comp", "ambient_visibility/av_filter.comp", "av_filter_cs", av_collect=True)
 compile_shader("comp", "ambient_visibility/av_composite.comp", "av_composite_cs", av_collect=True)
+
+compile_shader("comp", "selective_hybrid/shs_sun_shadow.comp", "shs_sun_shadow_cs", shs_collect=True)
 
 compile_shader("vert", "dressi/dressi_soft.vert", "dressi_soft_vs", binding_expr="vk.modules.dressi_soft_vs")
 compile_shader("frag", "dressi/dressi_soft.frag", "dressi_soft_fs", binding_expr="vk.modules.dressi_soft_fs")
@@ -637,9 +644,11 @@ def write_vk_hybrid1_spirv_inc():
         ("hybrid1_shadow_rgen_spv", "vk_hybrid1_shadow_rgen_spv", "VK_HYBRID1_SHADOW_RGEN_SPV_SIZE"),
         ("hybrid1_shadow_rmiss_spv", "vk_hybrid1_shadow_rmiss_spv", "VK_HYBRID1_SHADOW_RMISS_SPV_SIZE"),
         ("hybrid1_shadow_rchit_spv", "vk_hybrid1_shadow_rchit_spv", "VK_HYBRID1_SHADOW_RCHIT_SPV_SIZE"),
+        ("hybrid1_shadow_rahit_spv", "vk_hybrid1_shadow_rahit_spv", "VK_HYBRID1_SHADOW_RAHIT_SPV_SIZE"),
         ("hybrid1_spec_rgen_spv", "vk_hybrid1_spec_rgen_spv", "VK_HYBRID1_SPEC_RGEN_SPV_SIZE"),
         ("hybrid1_spec_rmiss_spv", "vk_hybrid1_spec_rmiss_spv", "VK_HYBRID1_SPEC_RMISS_SPV_SIZE"),
         ("hybrid1_spec_rchit_spv", "vk_hybrid1_spec_rchit_spv", "VK_HYBRID1_SPEC_RCHIT_SPV_SIZE"),
+        ("hybrid1_spec_rahit_spv", "vk_hybrid1_spec_rahit_spv", "VK_HYBRID1_SPEC_RAHIT_SPV_SIZE"),
         ("hybrid1_diffuse_rgen_spv", "vk_hybrid1_diffuse_rgen_spv", "VK_HYBRID1_DIFFUSE_RGEN_SPV_SIZE"),
         ("hybrid1_diffuse_rmiss_spv", "vk_hybrid1_diffuse_rmiss_spv", "VK_HYBRID1_DIFFUSE_RMISS_SPV_SIZE"),
         ("hybrid1_diffuse_rchit_spv", "vk_hybrid1_diffuse_rchit_spv", "VK_HYBRID1_DIFFUSE_RCHIT_SPV_SIZE"),
@@ -808,6 +817,34 @@ def write_vk_ambient_visibility_spirv_inc():
     print(f"Wrote {out_path}")
 
 write_vk_ambient_visibility_spirv_inc()
+
+def write_vk_selective_sun_shadow_spirv_inc():
+    """Emit embedded SPIR-V for Selective Hybrid Shadows ray-query raw pass."""
+    root = Path(os.environ.get("PROJECT_ROOT", "")).resolve()
+    if not root or not root.is_dir():
+        sys.exit("PROJECT_ROOT must be set for SHS SPIR-V embed")
+    out_path = root / "renderers/vulkan/vk_selective_sun_shadow_spirv.inc"
+    mapping = [
+        ("shs_sun_shadow_cs", "vk_shs_sun_shadow_cs_spv", "VK_SHS_SUN_SHADOW_CS_SPV_SIZE"),
+    ]
+    lines = ["/* Auto-generated by scripts/compile_shaders.sh — do not edit by hand */", ""]
+    for src_name, c_array, size_macro in mapping:
+        if src_name not in shs_spv_bytes:
+            sys.exit(f"Missing SHS SPIR-V blob for {src_name}")
+        data = shs_spv_bytes[src_name]
+        lines.append(f"/* {src_name}.spv {len(data)} bytes */")
+        lines.append(f"static const uint8_t {c_array}[] = {{")
+        for offset in range(0, len(data), 16):
+            chunk = data[offset:offset + 16]
+            suffix = "," if offset + 16 < len(data) else ""
+            lines.append("\t" + ", ".join(f"0x{b:02X}" for b in chunk) + suffix)
+        lines.append("};")
+        lines.append(f"#define {size_macro} ({len(data)}u)")
+        lines.append("")
+    out_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    print(f"Wrote {out_path}")
+
+write_vk_selective_sun_shadow_spirv_inc()
 
 with binding_file.open("w") as f:
     f.write("// this file is autogenerated during shader compilation\n")

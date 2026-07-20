@@ -10,6 +10,9 @@ Lightweight Spine pass / resource registry implementation.
 #include "vk_scene_pass.h"
 #include "vk_temporal.h"
 #include "vk_util.h"
+#include "tr_render_mode_vk.h"
+#include "vk_selective_reflection.h"
+#include "vk_postfx.h"
 #include <math.h>
 #include <stdarg.h>
 
@@ -1321,6 +1324,72 @@ void vk_spine_validate_feature_combos( void )
 		if ( vk_spine_validate_enabled() ) {
 			vk_spine_record_violation(
 				"feature combo: TAA without r_temporalWeaponAfterTaa 1 (weapon can poison history)" );
+		}
+	}
+
+	/* Spine 1.2: Hybrid1 × pathtrace dual lighting ownership. */
+	{
+		static qboolean s_warnedHybridPt;
+		static qboolean s_warnedMode5Taa;
+		const qboolean hybridOn = ( r_hybrid1 && r_hybrid1->integer > 0 ) ? qtrue : qfalse;
+		const qboolean ptOn = ( r_pathtrace && r_pathtrace->integer > 0 ) ? qtrue : qfalse;
+		const qboolean mode5 = R_RenderMode_IsPathTracedReference();
+		const qboolean mode4 = R_RenderMode_IsSelectiveHybrid();
+
+		if ( hybridOn && ptOn && !mode5 ) {
+			Q_strncpyz( s_spine.comboFallback, "hybrid1_x_pathtrace",
+				sizeof( s_spine.comboFallback ) );
+			if ( !s_warnedHybridPt ) {
+				ri.Printf( PRINT_ALL, S_COLOR_YELLOW
+					"[VK][spine] illegal combo: Hybrid1 + pathtrace both on outside mode 5; "
+					"PT demoted (no double lighting). Use r_renderMode 5 for exclusive PT reference, "
+					"or disable r_pathtrace / r_hybrid1. Recovery: exec modern_vulkan.cfg\n" );
+				s_warnedHybridPt = qtrue;
+			}
+			if ( vk_spine_validate_enabled() ) {
+				vk_spine_record_violation(
+					"feature combo: Hybrid1 and pathtrace both enabled (one lighting owner)" );
+			}
+		} else if ( mode5 && ptOn ) {
+			Q_strncpyz( s_spine.comboFallback, "spine_1_2_pt_reference",
+				sizeof( s_spine.comboFallback ) );
+		} else if ( mode4 && hybridOn ) {
+			Q_strncpyz( s_spine.comboFallback, "spine_1_2_selective_hybrid",
+				sizeof( s_spine.comboFallback ) );
+		}
+
+		if ( mode5 && taaOn ) {
+			if ( !s_warnedMode5Taa ) {
+				ri.Printf( PRINT_ALL, S_COLOR_YELLOW
+					"[VK][spine] mode 5 PT reference: prefer r_taa 0 / r_aaMode 0 for converged reference "
+					"(world TAA trails fight path-trace accumulation)\n" );
+				s_warnedMode5Taa = qtrue;
+			}
+		}
+	}
+
+	/* Selective Hybrid Reflections: Hybrid1 spec + SSR without SHR stacks energy. */
+	{
+		static qboolean s_warnedHybridSsr;
+		const qboolean hybridSpec = ( r_hybrid1 && r_hybrid1->integer > 0 &&
+			r_hybrid1_spec && r_hybrid1_spec->integer > 0 ) ? qtrue : qfalse;
+		const qboolean ssrOn = PostFX_SSR_IsEnabled();
+		const qboolean shrOn = vk_shr_active();
+
+		if ( hybridSpec && ssrOn && !shrOn ) {
+			Q_strncpyz( s_spine.comboFallback, "hybrid1_spec_x_ssr_without_shr",
+				sizeof( s_spine.comboFallback ) );
+			if ( !s_warnedHybridSsr ) {
+				ri.Printf( PRINT_ALL, S_COLOR_YELLOW
+					"[VK][spine] illegal combo: Hybrid1 specular + SSR without "
+					"r_selectiveHybridReflection (duplicate reflection energy). "
+					"Enable SHR or disable one source. Recovery: exec modern_vulkan.cfg\n" );
+				s_warnedHybridSsr = qtrue;
+			}
+			if ( vk_spine_validate_enabled() ) {
+				vk_spine_record_violation(
+					"feature combo: hybrid1_spec + SSR without selective hybrid reflections" );
+			}
 		}
 	}
 }

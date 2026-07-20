@@ -30,6 +30,8 @@ Split from vk.c.
 #include "vk_surfel_gi.h"
 #include "vk_rcgi.h"
 #include "vk_ambient_visibility.h"
+#include "vk_selective_sun_shadow.h"
+#include "vk_selective_reflection.h"
 #include "vk_pass_registry.h"
 #include "vk_dressi.h"
 #include "vk_vdb.h"
@@ -68,6 +70,8 @@ void vk_shutdown( refShutdownCode_t code )
 	vk_surfel_gi_shutdown();
 	vk_rcgi_shutdown();
 	vk_ambient_visibility_shutdown();
+	vk_shs_shutdown();
+	vk_shr_shutdown();
 	vk_spine_registry_shutdown();
 	R_Dressi_Shutdown();
 	vk_deferred_gbuffer_invalidate_runtime();

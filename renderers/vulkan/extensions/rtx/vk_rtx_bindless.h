@@ -14,6 +14,7 @@ typedef struct {
 #define RTX_PRIM_MATERIAL_INVALID 0xFFFFFFFFu
 #define RTX_PRIM_MATERIAL_FLAG_THUMB 0x0001u
 #define RTX_PRIM_MATERIAL_FLAG_SRGB  0x0002u
+#define RTX_PRIM_MATERIAL_FLAG_ALPHA_TEST 0x0004u /* GLS_ATEST_* — any-hit shadow candidates */
 
 void vk_rtx_bindless_init( void );
 void vk_rtx_bindless_shutdown( void );

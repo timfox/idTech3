@@ -36,6 +36,8 @@ Extracted from vk.c for incremental modularization.
 #include "vk_surfel_gi.h"
 #include "vk_rcgi.h"
 #include "vk_ambient_visibility.h"
+#include "vk_selective_sun_shadow.h"
+#include "vk_selective_reflection.h"
 #include "vk_vrcs.h"
 #include "vk_grtx.h"
 #include "vk_vuda.h"
@@ -210,6 +212,8 @@ void vk_begin_frame( void )
 
 	vk.cmd = &vk.tess[ vk.cmd_index ];
 
+	vk_shs_frame_begin();
+	vk_shr_frame_begin();
 #ifdef USE_VULKAN_RTX
 	vk_rtx_frame_begin();
 	vk_grtx_frame_begin();

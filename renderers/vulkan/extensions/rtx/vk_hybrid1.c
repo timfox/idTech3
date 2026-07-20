@@ -25,6 +25,9 @@ with raster direct lighting. Requires USE_VULKAN_RTX, r_hybrid1 or r_rtx 1, r_rt
 #include "vk_skybox_hdr.h"
 #include "vk_post_fog.h"
 #include "vk_ambient_visibility.h"
+#include "vk_selective_sun_shadow.h"
+#include "vk_selective_reflection.h"
+#include "tr_render_mode_vk.h"
 
 #ifdef USE_VULKAN_RTX
 
@@ -64,9 +67,11 @@ static struct {
 	VkShaderModule      shadow_rgen;
 	VkShaderModule      shadow_rmiss;
 	VkShaderModule      shadow_rchit;
+	VkShaderModule      shadow_rahit;
 	VkShaderModule      spec_rgen;
 	VkShaderModule      spec_rmiss;
 	VkShaderModule      spec_rchit;
+	VkShaderModule      spec_rahit;
 	VkShaderModule      diffuse_rgen;
 	VkShaderModule      diffuse_rmiss;
 	VkShaderModule      diffuse_rchit;
@@ -917,13 +922,15 @@ static void HYBRID1_RefreshRtDescriptors( void )
 	HYBRID1_UpdateRtDescriptors( hybrid1.diffuse_set, hybrid1.raw_diffuse.view );
 }
 
-static VkPipeline HYBRID1_CreateRtPipeline( VkShaderModule rgen, VkShaderModule rmiss, VkShaderModule rchit, const char *name )
+static VkPipeline HYBRID1_CreateRtPipeline( VkShaderModule rgen, VkShaderModule rmiss, VkShaderModule rchit,
+	VkShaderModule rahit, const char *name )
 {
-	VkPipelineShaderStageCreateInfo stages[3];
+	VkPipelineShaderStageCreateInfo stages[4];
 	VkRayTracingShaderGroupCreateInfoKHR groups[3];
 	VkRayTracingPipelineCreateInfoKHR rtpci;
 	VkPipeline pipeline;
 	VkResult res;
+	uint32_t stageCount = 3;
 
 	Com_Memset( stages, 0, sizeof( stages ) );
 	stages[0].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
@@ -938,21 +945,37 @@ static VkPipeline HYBRID1_CreateRtPipeline( VkShaderModule rgen, VkShaderModule 
 	stages[2].stage = VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR;
 	stages[2].module = rchit;
 	stages[2].pName = "main";
+	if ( rahit != VK_NULL_HANDLE ) {
+		stages[3].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+		stages[3].stage = VK_SHADER_STAGE_ANY_HIT_BIT_KHR;
+		stages[3].module = rahit;
+		stages[3].pName = "main";
+		stageCount = 4;
+	}
 
 	Com_Memset( groups, 0, sizeof( groups ) );
 	groups[0].sType = VK_STRUCTURE_TYPE_RAY_TRACING_SHADER_GROUP_CREATE_INFO_KHR;
 	groups[0].type = VK_RAY_TRACING_SHADER_GROUP_TYPE_GENERAL_KHR;
 	groups[0].generalShader = 0;
+	groups[0].closestHitShader = VK_SHADER_UNUSED_KHR;
+	groups[0].anyHitShader = VK_SHADER_UNUSED_KHR;
+	groups[0].intersectionShader = VK_SHADER_UNUSED_KHR;
 	groups[1].sType = VK_STRUCTURE_TYPE_RAY_TRACING_SHADER_GROUP_CREATE_INFO_KHR;
 	groups[1].type = VK_RAY_TRACING_SHADER_GROUP_TYPE_GENERAL_KHR;
 	groups[1].generalShader = 1;
+	groups[1].closestHitShader = VK_SHADER_UNUSED_KHR;
+	groups[1].anyHitShader = VK_SHADER_UNUSED_KHR;
+	groups[1].intersectionShader = VK_SHADER_UNUSED_KHR;
 	groups[2].sType = VK_STRUCTURE_TYPE_RAY_TRACING_SHADER_GROUP_CREATE_INFO_KHR;
 	groups[2].type = VK_RAY_TRACING_SHADER_GROUP_TYPE_TRIANGLES_HIT_GROUP_KHR;
+	groups[2].generalShader = VK_SHADER_UNUSED_KHR;
 	groups[2].closestHitShader = 2;
+	groups[2].anyHitShader = ( rahit != VK_NULL_HANDLE ) ? 3u : VK_SHADER_UNUSED_KHR;
+	groups[2].intersectionShader = VK_SHADER_UNUSED_KHR;
 
 	Com_Memset( &rtpci, 0, sizeof( rtpci ) );
 	rtpci.sType = VK_STRUCTURE_TYPE_RAY_TRACING_PIPELINE_CREATE_INFO_KHR;
-	rtpci.stageCount = 3;
+	rtpci.stageCount = stageCount;
 	rtpci.pStages = stages;
 	rtpci.groupCount = 3;
 	rtpci.pGroups = groups;
@@ -1169,7 +1192,12 @@ static void HYBRID1_FillFrameUbo( VkHybrid1FrameUBO_t *ubo )
 	if ( ubo->outputSize[2] < 0.01f ) {
 		ubo->outputSize[2] = 1.0f;
 	}
-	ubo->outputSize[3] = r_hybrid1_dlightShadows ? (float)r_hybrid1_dlightShadows->integer : 0.0f;
+	/* SHS 1.0: local lights stay raster — never RT dlight shadows while RT owns sun. */
+	if ( vk_shs_sun_only_rt() ) {
+		ubo->outputSize[3] = 0.0f;
+	} else {
+		ubo->outputSize[3] = r_hybrid1_dlightShadows ? (float)r_hybrid1_dlightShadows->integer : 0.0f;
+	}
 	ubo->params0[0] = r_hybrid1_historyGamma ? r_hybrid1_historyGamma->value : 1.25f;
 	ubo->params0[1] = r_hybrid1_temporalAlpha ? r_hybrid1_temporalAlpha->value : 0.1f;
 	ubo->params0[2] = ( r_hybrid1_reinhard && r_hybrid1_reinhard->integer ) ? 1.0f : 0.0f;
@@ -1182,6 +1210,12 @@ static void HYBRID1_FillFrameUbo( VkHybrid1FrameUBO_t *ubo )
 	ubo->params2[1] = r_hybrid1_tMin ? r_hybrid1_tMin->value : 0.01f;
 	ubo->params2[2] = ( r_hybrid1_contactHarden && r_hybrid1_contactHarden->integer ) ? 1.0f : 0.0f;
 	ubo->params2[3] = r_hybrid1_specRoughMax ? r_hybrid1_specRoughMax->value : 0.98f;
+	if ( vk_shr_rt_owns() ) {
+		float shrMax = vk_shr_roughness_rt_max();
+		if ( ubo->params2[3] > shrMax ) {
+			ubo->params2[3] = shrMax;
+		}
+	}
 	ubo->params3[0] = ( r_hybrid1_ggx && r_hybrid1_ggx->integer ) ? 1.0f : 0.0f;
 	ubo->params3[1] = r_hybrid1_iblMode ? (float)r_hybrid1_iblMode->integer : 1.0f;
 	ubo->params3[2] = ( r_hybrid1_diffuseDirect && r_hybrid1_diffuseDirect->integer ) ? 1.0f : 0.0f;
@@ -1230,6 +1264,10 @@ qboolean vk_hybrid1_active( void )
 		return qfalse;
 	}
 	if ( !r_rtxDemo || !r_rtxDemo->integer ) {
+		return qfalse;
+	}
+	/* Tier C: path-traced reference owns lighting exclusively — Hybrid1 must not overlay. */
+	if ( R_RenderMode_IsPathTracedReference() && r_pathtrace && r_pathtrace->integer > 0 ) {
 		return qfalse;
 	}
 	return ( hybrid1.ready && vk_rtx_scene_ready() ) ? qtrue : qfalse;
@@ -1301,6 +1339,9 @@ void vk_hybrid1_shutdown( void )
 	if ( hybrid1.shadow_rchit != VK_NULL_HANDLE ) {
 		qvkDestroyShaderModule( vk.device, hybrid1.shadow_rchit, NULL );
 	}
+	if ( hybrid1.shadow_rahit != VK_NULL_HANDLE ) {
+		qvkDestroyShaderModule( vk.device, hybrid1.shadow_rahit, NULL );
+	}
 	if ( hybrid1.spec_rgen != VK_NULL_HANDLE ) {
 		qvkDestroyShaderModule( vk.device, hybrid1.spec_rgen, NULL );
 	}
@@ -1309,6 +1350,9 @@ void vk_hybrid1_shutdown( void )
 	}
 	if ( hybrid1.spec_rchit != VK_NULL_HANDLE ) {
 		qvkDestroyShaderModule( vk.device, hybrid1.spec_rchit, NULL );
+	}
+	if ( hybrid1.spec_rahit != VK_NULL_HANDLE ) {
+		qvkDestroyShaderModule( vk.device, hybrid1.spec_rahit, NULL );
 	}
 	if ( hybrid1.diffuse_rgen != VK_NULL_HANDLE ) {
 		qvkDestroyShaderModule( vk.device, hybrid1.diffuse_rgen, NULL );
@@ -1370,7 +1414,7 @@ void vk_hybrid1_init( void )
 	VkDescriptorSetLayoutBinding rtBindings[18];
 	VkDescriptorSetLayoutBinding temporalBindings[9];
 	VkDescriptorSetLayoutBinding atrousBindings[7];
-	VkDescriptorSetLayoutBinding compositeBindings[8];
+	VkDescriptorSetLayoutBinding compositeBindings[11];
 	VkDescriptorSetLayoutCreateInfo dslci;
 	VkPipelineLayoutCreateInfo plci;
 	VkDescriptorPoolSize poolSizes[8];
@@ -1419,9 +1463,11 @@ void vk_hybrid1_init( void )
 	hybrid1.shadow_rgen = HYBRID1_ShaderModule( vk_hybrid1_shadow_rgen_spv, VK_HYBRID1_SHADOW_RGEN_SPV_SIZE, "hybrid1_shadow.rgen" );
 	hybrid1.shadow_rmiss = HYBRID1_ShaderModule( vk_hybrid1_shadow_rmiss_spv, VK_HYBRID1_SHADOW_RMISS_SPV_SIZE, "hybrid1_shadow.rmiss" );
 	hybrid1.shadow_rchit = HYBRID1_ShaderModule( vk_hybrid1_shadow_rchit_spv, VK_HYBRID1_SHADOW_RCHIT_SPV_SIZE, "hybrid1_shadow.rchit" );
+	hybrid1.shadow_rahit = HYBRID1_ShaderModule( vk_hybrid1_shadow_rahit_spv, VK_HYBRID1_SHADOW_RAHIT_SPV_SIZE, "hybrid1_shadow.rahit" );
 	hybrid1.spec_rgen = HYBRID1_ShaderModule( vk_hybrid1_spec_rgen_spv, VK_HYBRID1_SPEC_RGEN_SPV_SIZE, "hybrid1_spec.rgen" );
 	hybrid1.spec_rmiss = HYBRID1_ShaderModule( vk_hybrid1_spec_rmiss_spv, VK_HYBRID1_SPEC_RMISS_SPV_SIZE, "hybrid1_spec.rmiss" );
 	hybrid1.spec_rchit = HYBRID1_ShaderModule( vk_hybrid1_spec_rchit_spv, VK_HYBRID1_SPEC_RCHIT_SPV_SIZE, "hybrid1_spec.rchit" );
+	hybrid1.spec_rahit = HYBRID1_ShaderModule( vk_hybrid1_spec_rahit_spv, VK_HYBRID1_SPEC_RAHIT_SPV_SIZE, "hybrid1_spec.rahit" );
 	hybrid1.diffuse_rgen = HYBRID1_ShaderModule( vk_hybrid1_diffuse_rgen_spv, VK_HYBRID1_DIFFUSE_RGEN_SPV_SIZE, "hybrid1_diffuse.rgen" );
 	hybrid1.diffuse_rmiss = HYBRID1_ShaderModule( vk_hybrid1_diffuse_rmiss_spv, VK_HYBRID1_DIFFUSE_RMISS_SPV_SIZE, "hybrid1_diffuse.rmiss" );
 	hybrid1.diffuse_rchit = HYBRID1_ShaderModule( vk_hybrid1_diffuse_rchit_spv, VK_HYBRID1_DIFFUSE_RCHIT_SPV_SIZE, "hybrid1_diffuse.rchit" );
@@ -1615,9 +1661,12 @@ void vk_hybrid1_init( void )
 	HYBRID1_UpdateRtDescriptors( hybrid1.spec_set, hybrid1.raw_spec.view );
 	HYBRID1_UpdateRtDescriptors( hybrid1.diffuse_set, hybrid1.raw_diffuse.view );
 
-	hybrid1.shadow_pipeline = HYBRID1_CreateRtPipeline( hybrid1.shadow_rgen, hybrid1.shadow_rmiss, hybrid1.shadow_rchit, "hybrid1_shadow_rt" );
-	hybrid1.spec_pipeline = HYBRID1_CreateRtPipeline( hybrid1.spec_rgen, hybrid1.spec_rmiss, hybrid1.spec_rchit, "hybrid1_spec_rt" );
-	hybrid1.diffuse_pipeline = HYBRID1_CreateRtPipeline( hybrid1.diffuse_rgen, hybrid1.diffuse_rmiss, hybrid1.diffuse_rchit, "hybrid1_diffuse_rt" );
+	hybrid1.shadow_pipeline = HYBRID1_CreateRtPipeline( hybrid1.shadow_rgen, hybrid1.shadow_rmiss, hybrid1.shadow_rchit,
+		hybrid1.shadow_rahit, "hybrid1_shadow_rt" );
+	hybrid1.spec_pipeline = HYBRID1_CreateRtPipeline( hybrid1.spec_rgen, hybrid1.spec_rmiss, hybrid1.spec_rchit,
+		hybrid1.spec_rahit, "hybrid1_spec_rt" );
+	hybrid1.diffuse_pipeline = HYBRID1_CreateRtPipeline( hybrid1.diffuse_rgen, hybrid1.diffuse_rmiss, hybrid1.diffuse_rchit,
+		VK_NULL_HANDLE, "hybrid1_diffuse_rt" );
 	if ( hybrid1.shadow_pipeline == VK_NULL_HANDLE || hybrid1.spec_pipeline == VK_NULL_HANDLE ||
 		hybrid1.diffuse_pipeline == VK_NULL_HANDLE ) {
 		vk_hybrid1_shutdown();
@@ -1672,7 +1721,7 @@ void vk_hybrid1_init( void )
 
 	pcRange.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
 	pcRange.offset = 0;
-	pcRange.size = 160;
+	pcRange.size = 192; /* +shsMode + shs vec4 for Selective Hybrid Shadows rejection */
 	plci.setLayoutCount = 1;
 	plci.pSetLayouts = &hybrid1.temporal_dsl;
 	plci.pushConstantRangeCount = 1;
@@ -1772,13 +1821,32 @@ void vk_hybrid1_init( void )
 	compositeBindings[7].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
 	compositeBindings[7].descriptorCount = 1;
 	compositeBindings[7].stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
-	dslci.bindingCount = 8;
+	compositeBindings[8].binding = 8;
+	compositeBindings[8].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+	compositeBindings[8].descriptorCount = 1;
+	compositeBindings[8].stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+	compositeBindings[9].binding = 9;
+	compositeBindings[9].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+	compositeBindings[9].descriptorCount = 1;
+	compositeBindings[9].stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+	compositeBindings[10].binding = 10;
+	compositeBindings[10].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+	compositeBindings[10].descriptorCount = 1;
+	compositeBindings[10].stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+	dslci.bindingCount = 11;
 	dslci.pBindings = compositeBindings;
 	VK_CHECK( qvkCreateDescriptorSetLayout( vk.device, &dslci, NULL, &hybrid1.composite_dsl ) );
-	pcRange.size = 48;
+	pcRange.size = 64; /* extent + strengths + surfel + sun */
 	plci.pSetLayouts = &hybrid1.composite_dsl;
 	VK_CHECK( qvkCreatePipelineLayout( vk.device, &plci, NULL, &hybrid1.composite_pl ) );
+	Com_Memset( poolSizes, 0, sizeof( poolSizes ) );
+	poolSizes[0].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+	poolSizes[0].descriptorCount = 16;
+	poolSizes[1].type = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+	poolSizes[1].descriptorCount = 2;
 	dpci.maxSets = 1;
+	dpci.poolSizeCount = 2;
+	dpci.pPoolSizes = poolSizes;
 	VK_CHECK( qvkCreateDescriptorPool( vk.device, &dpci, NULL, &hybrid1.composite_pool ) );
 	allocInfo.descriptorPool = hybrid1.composite_pool;
 	allocInfo.pSetLayouts = &hybrid1.composite_dsl;
@@ -1889,11 +1957,13 @@ static void HYBRID1_RecordTemporal( VkCommandBuffer cmd, VkDescriptorSet set, fl
 		uint32_t hasGBuffer;
 		uint32_t firstFrame;
 		uint32_t useMotion;
-		uint32_t pad1;
+		uint32_t shsMode;
+		float shs[4];
 	} push;
 	VkHybrid1FrameUBO_t uboLocal;
 	uint32_t gx;
 	uint32_t gy;
+	float alpha;
 
 	HYBRID1_BindTemporalSet( set, raw, histRead, filtered, histWrite, varRead, varWrite );
 	HYBRID1_FillFrameUbo( &uboLocal );
@@ -1908,13 +1978,31 @@ static void HYBRID1_RecordTemporal( VkCommandBuffer cmd, VkDescriptorSet set, fl
 	push.extent[2] = 0.0f;
 	push.extent[3] = 0.0f;
 	push.params[0] = uboLocal.params0[0];
-	push.params[1] = uboLocal.params0[1];
+	alpha = uboLocal.params0[1];
+	if ( channel < 0.5f && vk_shs_rt_owns_sun() ) {
+		if ( alpha < vk_shs_temporal_alpha_floor() ) {
+			alpha = vk_shs_temporal_alpha_floor();
+		}
+	}
+	if ( channel > 0.5f && vk_shr_rt_owns() ) {
+		if ( alpha < vk_shr_temporal_alpha_floor() ) {
+			alpha = vk_shr_temporal_alpha_floor();
+		}
+	}
+	push.params[1] = alpha;
 	push.params[2] = ( r_hybrid1_historyClamp && r_hybrid1_historyClamp->integer ) ? 1.0f : 0.0f;
 	push.params[3] = channel;
 	push.hasGBuffer = vk_deferred_gbuffer_fill_wanted() ? 1u : 0u;
 	push.firstFrame = ( hybrid1.frame_index == 0 ) ? 1u : 0u;
 	push.useMotion = ( r_hybrid1_motion && r_hybrid1_motion->integer &&
 		vk.motion_vector_view != VK_NULL_HANDLE && !vk.temporal.unreliableMotionThisFrame ) ? 1u : 0u;
+	push.shsMode = ( channel < 0.5f && vk_shs_rt_owns_sun() ) ? 1u :
+		( ( channel > 0.5f && vk_shr_rt_owns() ) ? 2u : 0u );
+	push.shs[0] = (float)( ( channel > 0.5f && vk_shr_rt_owns() ) ?
+		vk_shr_max_history_age() : vk_shs_max_history_age() );
+	push.shs[1] = 0.35f; /* hit-distance relative discontinuity */
+	push.shs[2] = r_hybrid1_normalDot ? r_hybrid1_normalDot->value : 0.92f;
+	push.shs[3] = 0.0f;
 
 	gx = ( hybrid1.width + 7u ) / 8u;
 	gy = ( hybrid1.height + 7u ) / 8u;
@@ -2060,18 +2148,43 @@ void vk_hybrid1_record_pass( VkCommandBuffer cmd )
 	}
 	doShadow = ( !r_hybrid1_shadow || r_hybrid1_shadow->integer ) ? qtrue : qfalse;
 	doSpec = ( !r_hybrid1_spec || r_hybrid1_spec->integer ) ? qtrue : qfalse;
+	/* SHR: Hybrid1 specular only while RT owns reflections. */
+	if ( vk_shr_active() && !vk_shr_rt_owns() ) {
+		doSpec = qfalse;
+	}
+	if ( vk_shr_pathtrace_blocks() ) {
+		doSpec = qfalse;
+	}
+	if ( vk_shs_active() && !vk_shs_rt_owns_sun() ) {
+		doShadow = qfalse;
+	}
+	if ( vk_shs_pathtrace_blocks() ) {
+		doShadow = qfalse;
+	}
 	if ( !doShadow && !doSpec && !doDiffuse ) {
 		/* Nothing to trace or composite — skip TLAS refresh / depth barrier. */
 		return;
 	}
 
 	vk_rtx_scene_prepare();
+	vk_shs_note_tlas_ok( vk_rtx_scene_ready() );
+	vk_shr_note_tlas_ok( vk_rtx_scene_ready() );
 
 	if ( vk_temporal_has_reason( VK_TEMPORAL_RESET_CAMERA_CUT | VK_TEMPORAL_RESET_MISSING_PREV_DATA |
 		VK_TEMPORAL_RESET_RENDERER_INIT | VK_TEMPORAL_RESET_SWAPCHAIN_CHANGE |
 		VK_TEMPORAL_RESET_RENDER_SIZE_CHANGE | VK_TEMPORAL_RESET_WORLD_CHANGE |
 		VK_TEMPORAL_RESET_CLIENT_STATE_CHANGE ) ) {
 		HYBRID1_ResetHistory();
+		vk_shs_invalidate_history( "temporal_lifecycle_reset" );
+		vk_shr_invalidate_history( "temporal_lifecycle_reset" );
+	}
+	if ( vk_shs_fail_inject_active( VK_SHS_FAIL_HISTORY ) ) {
+		HYBRID1_ResetHistory();
+		vk_shs_note_history_ok( qfalse );
+	}
+	if ( vk_shr_fail_inject_active( VK_SHR_FAIL_HISTORY ) ) {
+		HYBRID1_ResetHistory();
+		vk_shr_note_history_ok( qfalse );
 	}
 
 	depthAspect = VK_IMAGE_ASPECT_DEPTH_BIT;
@@ -2102,7 +2215,8 @@ void vk_hybrid1_record_pass( VkCommandBuffer cmd )
 		HYBRID1_BarrierImage( cmd, hybrid1.raw_shadow.image,
 			hybrid1.traced ? VK_IMAGE_LAYOUT_GENERAL : VK_IMAGE_LAYOUT_UNDEFINED,
 			VK_IMAGE_LAYOUT_GENERAL, 0, VK_ACCESS_SHADER_WRITE_BIT,
-			VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_RAY_TRACING_SHADER_BIT_KHR );
+			VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
+			VK_PIPELINE_STAGE_RAY_TRACING_SHADER_BIT_KHR | VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT );
 	}
 	if ( doSpec ) {
 		HYBRID1_BarrierImage( cmd, hybrid1.raw_spec.image,
@@ -2118,8 +2232,20 @@ void vk_hybrid1_record_pass( VkCommandBuffer cmd )
 	}
 
 	if ( doShadow ) {
-		qvkCmdBindDescriptorSets( cmd, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, hybrid1.rt_pl, 0, 1, &hybrid1.shadow_set, 0, NULL );
-		HYBRID1_TraceDispatch( cmd, hybrid1.shadow_pipeline, hybrid1.sbt_shadow_buffer );
+		qboolean usedRq = qfalse;
+		if ( vk_shs_prefer_ray_query() ) {
+			usedRq = vk_shs_record_raw_ray_query( cmd, hybrid1.raw_shadow.view, hybrid1.width, hybrid1.height );
+		}
+		if ( !usedRq ) {
+			if ( vk_shs_fail_inject_active( VK_SHS_FAIL_RT_PIPELINE ) ) {
+				vk_shs_note_rt_pipeline_ok( qfalse );
+			} else {
+				qvkCmdBindDescriptorSets( cmd, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, hybrid1.rt_pl, 0, 1, &hybrid1.shadow_set, 0, NULL );
+				HYBRID1_TraceDispatch( cmd, hybrid1.shadow_pipeline, hybrid1.sbt_shadow_buffer );
+				vk_shs_note_rt_pipeline_ok( hybrid1.shadow_pipeline != VK_NULL_HANDLE );
+				vk_shs_note_descriptor_ok( qtrue );
+			}
+		}
 	}
 	if ( doSpec ) {
 		qvkCmdBindDescriptorSets( cmd, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, hybrid1.rt_pl, 0, 1, &hybrid1.spec_set, 0, NULL );
@@ -2242,15 +2368,19 @@ void vk_hybrid1_record_pass( VkCommandBuffer cmd )
 			float extent[4];
 			float strengths[4];
 			float surfel[4];
+			float sun[4];
 		} push;
 		VkSampler nearest = HYBRID1_NearestSampler();
-		VkDescriptorImageInfo infos[8];
-		VkWriteDescriptorSet writes[8];
+		VkDescriptorImageInfo infos[11];
+		VkWriteDescriptorSet writes[11];
 		VkImageView albedoView;
 		VkImageView surfelView;
 		VkImageView ambientVisibilityView;
+		VkImageView normalView;
+		VkImageView varianceView;
 		qboolean surfelFusion;
 		qboolean rcgiFusion;
+		uint32_t wi;
 
 		albedoView = vk.deferred_gbuffer_albedo_view ? vk.deferred_gbuffer_albedo_view :
 			( vk.deferred_gbuffer_material_view ? vk.deferred_gbuffer_material_view : vk.color_image_view );
@@ -2266,11 +2396,14 @@ void vk_hybrid1_record_pass( VkCommandBuffer cmd )
 		}
 		ambientVisibilityView = vk_ambient_visibility_available() ?
 			vk_ambient_visibility_view() : tr.whiteImage->view;
+		normalView = vk.deferred_gbuffer_normal_view ? vk.deferred_gbuffer_normal_view : tr.whiteImage->view;
+		varianceView = hybrid1.var_shadow[cur].view ? hybrid1.var_shadow[cur].view : tr.whiteImage->view;
 
 		HYBRID1_BarrierImage( cmd, vk.color_image, colorRestoreLayout, VK_IMAGE_LAYOUT_GENERAL,
 			VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT | VK_ACCESS_SHADER_READ_BIT, VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT,
 			VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT | VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
 			VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT );
+		HYBRID1_BarrierColorRead( cmd, hybrid1.raw_shadow.image );
 
 		Com_Memset( infos, 0, sizeof( infos ) );
 		Com_Memset( writes, 0, sizeof( writes ) );
@@ -2297,65 +2430,52 @@ void vk_hybrid1_record_pass( VkCommandBuffer cmd )
 		infos[7].sampler = nearest;
 		infos[7].imageView = ambientVisibilityView;
 		infos[7].imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-		writes[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-		writes[0].dstSet = hybrid1.composite_set;
-		writes[0].dstBinding = 0;
-		writes[0].descriptorCount = 1;
-		writes[0].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-		writes[0].pImageInfo = &infos[0];
-		writes[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-		writes[1].dstSet = hybrid1.composite_set;
-		writes[1].dstBinding = 1;
-		writes[1].descriptorCount = 1;
-		writes[1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-		writes[1].pImageInfo = &infos[1];
-		writes[2].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-		writes[2].dstSet = hybrid1.composite_set;
-		writes[2].dstBinding = 2;
-		writes[2].descriptorCount = 1;
-		writes[2].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-		writes[2].pImageInfo = &infos[2];
-		writes[3].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-		writes[3].dstSet = hybrid1.composite_set;
-		writes[3].dstBinding = 3;
-		writes[3].descriptorCount = 1;
-		writes[3].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-		writes[3].pImageInfo = &infos[3];
-		writes[4].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-		writes[4].dstSet = hybrid1.composite_set;
-		writes[4].dstBinding = 4;
-		writes[4].descriptorCount = 1;
-		writes[4].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-		writes[4].pImageInfo = &infos[4];
-		writes[5].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-		writes[5].dstSet = hybrid1.composite_set;
-		writes[5].dstBinding = 5;
-		writes[5].descriptorCount = 1;
-		writes[5].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
-		writes[5].pImageInfo = &infos[5];
-		writes[6].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-		writes[6].dstSet = hybrid1.composite_set;
-		writes[6].dstBinding = 6;
-		writes[6].descriptorCount = 1;
-		writes[6].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-		writes[6].pImageInfo = &infos[6];
-		writes[7] = writes[6];
-		writes[7].dstBinding = 7;
-		writes[7].pImageInfo = &infos[7];
-		qvkUpdateDescriptorSets( vk.device, 8, writes, 0, NULL );
+		infos[8].sampler = nearest;
+		infos[8].imageView = hybrid1.raw_shadow.view;
+		infos[8].imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+		infos[9].sampler = nearest;
+		infos[9].imageView = normalView;
+		infos[9].imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+		infos[10].sampler = nearest;
+		infos[10].imageView = varianceView;
+		infos[10].imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+		for ( wi = 0; wi < 11; wi++ ) {
+			writes[wi].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+			writes[wi].dstSet = hybrid1.composite_set;
+			writes[wi].dstBinding = wi;
+			writes[wi].descriptorCount = 1;
+			writes[wi].descriptorType = ( wi == 5 ) ? VK_DESCRIPTOR_TYPE_STORAGE_IMAGE :
+				VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+			writes[wi].pImageInfo = &infos[wi];
+		}
+		qvkUpdateDescriptorSets( vk.device, 11, writes, 0, NULL );
 
 		push.extent[0] = (float)hybrid1.width;
 		push.extent[1] = (float)hybrid1.height;
-		push.extent[2] = push.extent[3] = 0.0f;
+		push.extent[2] = vk_shr_probe_specular_occlusion_strength();
+		push.extent[3] = 0.0f;
 		push.strengths[0] = doShadow ? ( r_hybrid1_shadowStrength ? r_hybrid1_shadowStrength->value : 0.85f ) : 0.0f;
 		push.strengths[1] = doSpec ? ( r_hybrid1_specStrength ? r_hybrid1_specStrength->value : 1.0f ) : 0.0f;
-		push.strengths[2] = (float)( r_hybrid1_debug ? r_hybrid1_debug->integer : 0 );
+		{
+			int dbg = vk_shr_composite_debug_mode();
+			if ( dbg <= 0 ) {
+				dbg = vk_shs_composite_debug_mode();
+			}
+			push.strengths[2] = (float)dbg;
+		}
 		push.strengths[3] = doDiffuse ? ( r_hybrid1_diffuseStrength ? r_hybrid1_diffuseStrength->value : 1.0f ) : 0.0f;
 		push.surfel[0] = rcgiFusion ? vk_rcgi_fusion_strength() :
 			( surfelFusion ? vk_surfel_gi_fusion_strength() : 0.0f );
 		push.surfel[1] = ( rcgiFusion || surfelFusion ) ? 1.0f : 0.0f;
 		push.surfel[2] = vk_ambient_visibility_strength();
-		push.surfel[3] = 0.0f;
+		push.surfel[3] = ( vk_shs_rt_owns_sun() ? 1.0f : 0.0f ) + ( vk_shr_rt_owns() ? 2.0f : 0.0f );
+		push.sun[0] = tr.sunDirection[0];
+		push.sun[1] = tr.sunDirection[1];
+		push.sun[2] = tr.sunDirection[2];
+		push.sun[3] = ( tr.sunLight[0] + tr.sunLight[1] + tr.sunLight[2] ) * ( 1.0f / 3.0f );
+		if ( push.sun[3] < 0.01f ) {
+			push.sun[3] = 1.0f;
+		}
 
 		qvkCmdBindPipeline( cmd, VK_PIPELINE_BIND_POINT_COMPUTE, hybrid1.composite_pipeline );
 		qvkCmdBindDescriptorSets( cmd, VK_PIPELINE_BIND_POINT_COMPUTE, hybrid1.composite_pl, 0, 1, &hybrid1.composite_set, 0, NULL );

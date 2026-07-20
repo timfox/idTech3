@@ -1,7 +1,7 @@
 #version 450
 /*
  * Composite denoised shadow + specular + optional diffuse with raster HDR.
- * Optional Surfel GI irradiance (binding 6) when Hybrid1↔Surfel fusion is active.
+ * SHS mode: darken estimated sun term only (never multiply local lights / lightmaps twice).
  */
 layout( local_size_x = 8, local_size_y = 8, local_size_z = 1 ) in;
 
@@ -13,11 +13,15 @@ layout( set = 0, binding = 4 ) uniform sampler2D albedoTex;
 layout( rgba16f, set = 0, binding = 5 ) uniform image2D colorOut;
 layout( set = 0, binding = 6 ) uniform sampler2D surfelIrradianceTex;
 layout( set = 0, binding = 7 ) uniform sampler2D ambientVisibilityTex;
+layout( set = 0, binding = 8 ) uniform sampler2D rawShadowTex;
+layout( set = 0, binding = 9 ) uniform sampler2D normalTex;
+layout( set = 0, binding = 10 ) uniform sampler2D varianceTex;
 
 layout( push_constant ) uniform Hybrid1CompositePush {
-	vec4 extent;
+	vec4 extent;    /* xy = size, z = probe specular occlusion (SHR), w unused */
 	vec4 strengths; /* x=shadow, y=spec, z=debug mode, w=diffuse */
-	vec4 surfel;    /* x=strength, y=useSurfel, z=ambient visibility strength */
+	vec4 surfel;    /* x=strength, y=useSurfel, z=ambient visibility strength, w=shsFlags (1=SHS,2=SHR,3=both) */
+	vec4 sun;       /* xyz = sun direction (to light), w = sun intensity scale */
 } pc;
 
 void main()
@@ -36,34 +40,86 @@ void main()
 	}
 
 	float shadowVis = texture( shadowTex, uv ).r;
+	vec4 rawSh = texture( rawShadowTex, uv );
 	vec3 specRgb = texture( specTex, uv ).rgb;
 	vec3 diffuseRgb = texture( diffuseTex, uv ).rgb;
 	vec3 albedo = texture( albedoTex, uv ).rgb;
 	vec3 surfelIrr = texture( surfelIrradianceTex, uv ).rgb;
+	vec3 N = texture( normalTex, uv ).xyz * 2.0 - 1.0;
+	float nLen = length( N );
+	if ( nLen > 0.01 ) {
+		N /= nLen;
+	} else {
+		N = vec3( 0.0, 0.0, 1.0 );
+	}
+	vec3 varSample = texture( varianceTex, uv ).rgb;
 	float shadowStr = pc.strengths.x;
 	float specStr = pc.strengths.y;
 	int debugMode = int( pc.strengths.z + 0.5 );
 	float diffuseStr = pc.strengths.w;
 	float surfelStr = pc.surfel.x;
 	float useSurfel = pc.surfel.y;
+	float shsFlags = pc.surfel.w;
+	float shsMode = ( shsFlags >= 1.0 && shsFlags < 2.0 ) ? 1.0 :
+		( shsFlags >= 3.0 ? 1.0 : 0.0 );
+	float shrMode = ( shsFlags >= 2.0 ) ? 1.0 : 0.0;
+	float probeSpecOcc = clamp( pc.extent.z, 0.0, 1.0 );
 	float av = mix( 1.0, clamp( texture( ambientVisibilityTex, uv ).r, 0.0, 1.0 ),
 		clamp( pc.surfel.z, 0.0, 1.0 ) );
 
 	vec3 outRgb = scene.rgb;
+	vec3 L = normalize( pc.sun.xyz );
+	float ndl = max( dot( N, L ), 0.0 );
+	vec3 estSun = albedo * ndl * max( pc.sun.w, 0.0 );
+
+	float packedSpecA = texture( specTex, uv ).a;
+	float rtHitConf = ( packedSpecA >= 0.5 ) ? 1.0 : 0.0;
 
 	if ( debugMode == 1 ) {
 		outRgb = vec3( shadowVis );
 	} else if ( debugMode == 2 ) {
 		outRgb = specRgb;
 	} else if ( debugMode == 3 ) {
-		outRgb = vec3( texture( shadowTex, uv ).g / 90.0 );
+		outRgb = vec3( texture( shadowTex, uv ).a / 90.0 );
 	} else if ( debugMode == 4 ) {
 		outRgb = diffuseRgb * albedo;
 	} else if ( debugMode == 5 ) {
 		outRgb = surfelIrr;
+	} else if ( debugMode == 6 ) {
+		outRgb = vec3( rawSh.r );
+	} else if ( debugMode == 7 ) {
+		outRgb = vec3( clamp( rawSh.g / 2048.0, 0.0, 1.0 ) );
+	} else if ( debugMode == 8 ) {
+		outRgb = vec3( rawSh.b );
+	} else if ( debugMode == 9 ) {
+		outRgb = vec3( clamp( rawSh.a / 8.0, 0.0, 1.0 ) );
+	} else if ( debugMode == 10 ) {
+		outRgb = vec3( varSample.g );
+	} else if ( debugMode == 11 ) {
+		outRgb = vec3( varSample.b / 7.0 );
+	} else if ( debugMode == 12 ) {
+		outRgb = vec3( abs( 1.0 - shadowVis ) );
+	} else if ( debugMode == 13 ) {
+		/* SHR: RT hit confidence */
+		outRgb = vec3( rtHitConf );
+	} else if ( debugMode == 14 ) {
+		/* SHR: selected source — R=RT G=probe(miss) */
+		outRgb = vec3( rtHitConf, 1.0 - rtHitConf, 0.0 );
 	} else {
-		float shadowFactor = mix( 1.0, shadowVis, clamp( shadowStr, 0.0, 1.0 ) );
-		outRgb = scene.rgb * shadowFactor + specRgb * specStr + diffuseRgb * albedo * diffuseStr;
+		if ( shsMode > 0.5 && shadowStr > 1e-4 ) {
+			float apply = clamp( shadowStr, 0.0, 1.0 ) * ( 1.0 - clamp( shadowVis, 0.0, 1.0 ) );
+			outRgb = max( scene.rgb - estSun * apply, vec3( 0.0 ) );
+		} else {
+			float shadowFactor = mix( 1.0, shadowVis, clamp( shadowStr, 0.0, 1.0 ) );
+			outRgb = scene.rgb * shadowFactor;
+		}
+		/* Specular: valid RT hits never multiply scalar AO/AV.
+		 * Probe/miss path may receive calibrated specular occlusion. */
+		float specOcc = 1.0;
+		if ( shrMode > 0.5 && rtHitConf < 0.5 ) {
+			specOcc = mix( 1.0, av, probeSpecOcc );
+		}
+		outRgb += specRgb * specStr * specOcc + diffuseRgb * albedo * diffuseStr;
 		if ( useSurfel > 0.5 ) {
 			outRgb += albedo * surfelIrr * surfelStr * av;
 		}

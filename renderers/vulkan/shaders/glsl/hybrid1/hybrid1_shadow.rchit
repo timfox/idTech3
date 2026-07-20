@@ -1,9 +1,10 @@
 #version 460
 #extension GL_EXT_ray_tracing : require
 
-layout( location = 0 ) rayPayloadInEXT float shadowVis;
+/* payload: x = visibility (0=shadowed), y = hit T */
+layout( location = 0 ) rayPayloadInEXT vec2 shadowPayload;
 
 void main()
 {
-	shadowVis = 0.0;
+	shadowPayload = vec2( 0.0, gl_HitTEXT );
 }

@@ -267,11 +267,25 @@ void vk_rtx_bindless_set_prim_from_image( uint32_t primIndex, image_t *img )
 void vk_rtx_bindless_set_prim_from_shader( uint32_t primIndex, const shader_t *shader )
 {
 	image_t *img = NULL;
+	uint16_t alphaFlags = 0;
+	int i;
 
 	if ( shader ) {
 		img = vk_rtx_material_diffuse_image_bindless( shader );
+		for ( i = 0; i < MAX_SHADER_STAGES; i++ ) {
+			if ( !shader->stages[i] ) {
+				break;
+			}
+			if ( shader->stages[i]->active && ( shader->stages[i]->stateBits & GLS_ATEST_BITS ) ) {
+				alphaFlags = RTX_PRIM_MATERIAL_FLAG_ALPHA_TEST;
+				break;
+			}
+		}
 	}
 	vk_rtx_bindless_set_prim_from_image( primIndex, img );
+	if ( alphaFlags && s_bindless.host_mats && primIndex < s_bindless.host_capacity ) {
+		s_bindless.host_mats[primIndex].flags |= alphaFlags;
+	}
 }
 
 void vk_rtx_bindless_set_entity_prim_from_image( uint32_t entityPrimIndex, image_t *img )

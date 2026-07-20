@@ -167,6 +167,7 @@ Related checklists: [RENDERER_PHASE1_CHECKLIST_2026Q3.md](RENDERER_PHASE1_CHECKL
 ## Related docs
 
 - [RENDERER_SPINE_1.1.md](RENDERER_SPINE_1.1.md) — opt-in WBOIT × Temporal Reconstruction × weapon-after cert
+- [RENDERER_SPINE_1.2.md](RENDERER_SPINE_1.2.md) — Selective Hybrid (mode 4) + Path-Traced Reference (mode 5)
 - [UNIFIED_CLUSTERED_RENDERER.md](UNIFIED_CLUSTERED_RENDERER.md) — mode 3 architecture
 - [FORWARD_PLUS_PIPELINE_AUDIT.md](FORWARD_PLUS_PIPELINE_AUDIT.md) — Forward+ risks
 - [HDR_GAPS.md](HDR_GAPS.md) — HDR / TAA / OIT order

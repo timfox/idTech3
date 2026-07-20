@@ -46,6 +46,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "vk_scene_pass.h"
 #include "vk_reactive_mask.h"
 #include "vk_ambient_visibility.h"
+#include "vk_selective_sun_shadow.h"
 #include "vk_image_layout.h"
 #include "vk_post_fog.h"
 #include "vk_view_state.h"
@@ -1632,6 +1633,10 @@ static qboolean RB_ShouldRenderSunShadowMap( const drawSurfsCommand_t *cmd )
 		r_volumetricFog && r_volumetricFog->integer );
 
 	if ( !vk.fboActive ) {
+		return qfalse;
+	}
+	/* Selective Hybrid Shadows: RT owns sun visibility — never also raster-cascade. */
+	if ( vk_shs_rt_owns_sun() && !fogSun ) {
 		return qfalse;
 	}
 	if ( !pbrSun && !fogSun ) {

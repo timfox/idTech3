@@ -10,6 +10,7 @@ Mode 3 = Unified Clustered Renderer (deferred opaque + Forward+ transparent).
 #include "tr_local.h"
 #include "vk.h"
 #include "vk_deferred_gbuffer.h"
+#include "tr_render_mode_vk.h"
 #include "vk_visibility_buffer.h"
 #include "vk_vrcs.h"
 #include "vk_image_layout.h"
@@ -198,7 +199,7 @@ qboolean vk_deferred_gbuffer_resources_wanted( void )
 	if ( !vk.fboActive || !r_renderMode || !r_deferredGBuffer || !r_deferredGBuffer->integer ) {
 		return qfalse;
 	}
-	if ( r_renderMode->integer != 1 && r_renderMode->integer != 2 && r_renderMode->integer != 3 ) {
+	if ( !R_RenderMode_WantsGBuffer() ) {
 		return qfalse;
 	}
 	return qtrue;
@@ -317,16 +318,13 @@ static qboolean vk_dgb_fail_inject( const char *which )
 /* Pipelines may be built whenever G-buffer resources exist — not gated on per-frame fill. */
 static qboolean vk_deferred_lighting_pipelines_wanted( void )
 {
-	int mode;
-
 	if ( !vk_deferred_gbuffer_active() || !r_deferredLighting || !r_deferredLighting->integer ) {
 		return qfalse;
 	}
 	if ( !r_renderMode || !r_forwardPlus || !r_forwardPlus->integer ) {
 		return qfalse;
 	}
-	mode = r_renderMode->integer;
-	return ( mode == 1 || mode == 3 ) ? qtrue : qfalse;
+	return R_RenderMode_WantsDeferredLighting();
 }
 
 static qboolean vk_deferred_lighting_wanted( void )
@@ -341,17 +339,20 @@ qboolean vk_deferred_lighting_active( void )
 
 qboolean vk_unified_clustered_active( void )
 {
-	return ( r_renderMode && r_renderMode->integer == 3 &&
+	return ( R_RenderMode_IsUnifiedClustered() &&
 		vk_deferred_lighting_pipelines_wanted() ) ? qtrue : qfalse;
 }
 
 qboolean vk_deferred_opaque_transparent_split( void )
 {
-	/* Mode 3 unified or mode 1 deferred: opaque→deferred→transparent Forward+. */
+	/* Mode 3/4 unified, mode 1 deferred, or mode 5 PT scaffold: opaque→deferred→transparent. */
 	if ( vk_unified_clustered_active() ) {
 		return qtrue;
 	}
 	if ( r_renderMode && r_renderMode->integer == 1 && vk_deferred_lighting_pipelines_wanted() ) {
+		return qtrue;
+	}
+	if ( R_RenderMode_IsPathTracedReference() && vk_deferred_lighting_pipelines_wanted() ) {
 		return qtrue;
 	}
 	return qfalse;

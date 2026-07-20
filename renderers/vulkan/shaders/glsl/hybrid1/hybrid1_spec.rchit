@@ -38,4 +38,6 @@ void main()
 	}
 
 	specRadiance.rgb = hit;
+	/* Negative roughness marks a geometry hit for SHR confidence (miss keeps +roughness). */
+	specRadiance.w = -clamp( roughness, 0.02, 1.0 );
 }

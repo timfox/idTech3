@@ -118,6 +118,10 @@ grep -q 'vk_spine_is_spine_1_1_combo' "$REG_C" || fail "Spine 1.1 combo detector
 cvar_is "$STABLE" r_renderMode 2 || fail "stable must remain mode 2 after Spine 1.1"
 pass "Spine 1.1 cert overlay present; shipping matrix unchanged"
 
+# --- Spine 1.2 mode model (opt-in; must not displace Tier A) ---
+bash "$ROOT/scripts/spine_1_2_mode_check.sh"
+
+
 # --- Illegal stacks must not be defaults ---
 # quality∩temporal must not be a single default cfg that enables both OIT and TAA
 if grep -qE 'seta r_oit [12]' "$QUALITY" && grep -qE 'seta r_taa 1' "$QUALITY"; then

@@ -1,0 +1,79 @@
+#version 460
+/*
+ * Selective Hybrid Shadows 1.0 — raw sun visibility via rayQuery.
+ * Output (RGBA16F): R = binary visibility, G = hit distance (or tmax),
+ * B = validity (1 = shaded world pixel), A = alpha-candidate count (0 until any-hit).
+ */
+#extension GL_EXT_ray_query : require
+#extension GL_GOOGLE_include_directive : enable
+
+layout( local_size_x = 8, local_size_y = 8, local_size_z = 1 ) in;
+
+layout( set = 0, binding = 0 ) uniform accelerationStructureEXT topLevelAS;
+layout( set = 0, binding = 1 ) uniform sampler2D depthTex;
+layout( set = 0, binding = 2 ) uniform sampler2D normalTex;
+layout( rgba16f, set = 0, binding = 3 ) uniform writeonly image2D shadowOut;
+
+layout( push_constant ) uniform ShsSunShadowPush {
+	mat4 invViewProj;
+	vec4 extent;       /* xy pixels */
+	vec4 sunDirBias;   /* xyz sun dir (to light), w ray bias */
+	vec4 params;       /* x = tMin, y = tMax, z = hasGBuffer, w = frame seed */
+} pc;
+
+void main()
+{
+	uvec2 pix = gl_GlobalInvocationID.xy;
+	if ( pix.x >= uint( pc.extent.x ) || pix.y >= uint( pc.extent.y ) ) {
+		return;
+	}
+
+	vec2 uv = ( vec2( pix ) + 0.5 ) / max( pc.extent.xy, vec2( 1.0 ) );
+	float depth = textureLod( depthTex, uv, 0.0 ).r;
+	if ( depth <= 0.0 || depth >= 1.0 ) {
+		imageStore( shadowOut, ivec2( pix ), vec4( 1.0, 0.0, 0.0, 0.0 ) );
+		return;
+	}
+
+	vec4 clip = vec4( uv * 2.0 - 1.0, depth, 1.0 );
+	vec4 worldPos4 = pc.invViewProj * clip;
+	worldPos4 /= max( abs( worldPos4.w ), 1e-6 );
+	vec3 worldPos = worldPos4.xyz;
+
+	vec3 N = vec3( 0.0, 0.0, 1.0 );
+	if ( pc.params.z > 0.5 ) {
+		N = textureLod( normalTex, uv, 0.0 ).xyz * 2.0 - 1.0;
+		float nLen = length( N );
+		if ( nLen > 0.01 ) {
+			N /= nLen;
+		}
+	}
+
+	vec3 L = normalize( pc.sunDirBias.xyz );
+	float bias = max( pc.sunDirBias.w, 0.0 );
+	/* Robust origin: geometric normal offset + light-facing bias. */
+	float ndl = clamp( dot( N, L ), 0.0, 1.0 );
+	vec3 ro = worldPos + N * ( bias * mix( 1.5, 1.0, ndl ) ) + L * ( bias * 0.25 );
+	float tMin = max( pc.params.x, 1e-4 );
+	float tMax = max( pc.params.y, tMin + 1.0 );
+
+	rayQueryEXT query;
+	float alphaCandidates = 0.0;
+	/* Non-opaque TLAS: confirm candidates (alpha-tested foliage may ignore). */
+	rayQueryInitializeEXT( query, topLevelAS,
+		gl_RayFlagsTerminateOnFirstHitEXT | gl_RayFlagsSkipClosestHitShaderEXT,
+		0xFFu, ro, tMin, L, tMax );
+	while ( rayQueryProceedEXT( query ) ) {
+		alphaCandidates += 1.0;
+		/* Without GPU any-hit on rayQuery, commit all triangle candidates.
+		 * Hybrid1 RT pipeline path runs hybrid1_shadow.rahit for true alpha. */
+		rayQueryConfirmIntersectionEXT( query );
+	}
+
+	bool hit = rayQueryGetIntersectionTypeEXT( query, true ) ==
+		gl_RayQueryCommittedIntersectionTriangleEXT;
+	float hitT = hit ? rayQueryGetIntersectionTEXT( query, true ) : tMax;
+	float vis = hit ? 0.0 : 1.0;
+
+	imageStore( shadowOut, ivec2( pix ), vec4( vis, hitT, 1.0, alphaCandidates ) );
+}

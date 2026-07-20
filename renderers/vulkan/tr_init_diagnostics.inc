@@ -81,6 +81,12 @@ static const char *R_RendererProfileName( void )
 			return "havenrp safe";
 		}
 	}
+	if ( r_renderMode && r_renderMode->integer == 5 ) {
+		return "path traced reference";
+	}
+	if ( r_renderMode && r_renderMode->integer == 4 ) {
+		return "selective hybrid";
+	}
 	if ( r_renderMode && r_renderMode->integer == 3 ) {
 		return "unified clustered";
 	}
@@ -104,6 +110,12 @@ static const char *R_RendererProfileName( void )
 
 static const char *R_RendererRecommendedRecoveryCommand( void )
 {
+	if ( r_renderMode && r_renderMode->integer == 5 ) {
+		return "exec modern_vulkan.cfg";
+	}
+	if ( r_renderMode && r_renderMode->integer == 4 ) {
+		return "exec modern_vulkan.cfg";
+	}
 	if ( r_renderMode && r_renderMode->integer == 3 ) {
 		return "renderer_clustered_safe";
 	}
@@ -565,7 +577,9 @@ static void R_RendererStatus_f( void )
 		giOwner = "none";
 	}
 
-	if ( hybridOn && R_NamedCvarInteger( "r_hybrid1_spec" ) ) {
+	if ( vk_shr_active() ) {
+		reflOwner = vk_shr_owner_name();
+	} else if ( hybridOn && R_NamedCvarInteger( "r_hybrid1_spec" ) ) {
 		reflOwner = "hybrid1_spec";
 	} else if ( ssrOn ) {
 		reflOwner = "ssr";
@@ -588,8 +602,15 @@ static void R_RendererStatus_f( void )
 	ri.Printf( PRINT_ALL, "mode eff  : %s forwardPlus=%d deferredGBuffer=%d deferredLighting=%d\n",
 		R_RendererProfileName(), R_CvarInteger( r_forwardPlus ),
 		R_CvarInteger( r_deferredGBuffer ), R_CvarInteger( r_deferredLighting ) );
-	ri.Printf( PRINT_ALL, "owners    : AO=%s  diffuseGI=%s  reflections=%s  temporal=%s\n",
-		aoOwner, giOwner, reflOwner, temporalOwner );
+	ri.Printf( PRINT_ALL, "owners    : AO=%s  diffuseGI=%s  reflections=%s  temporal=%s  sunShadow=%s\n",
+		aoOwner, giOwner, reflOwner, temporalOwner, vk_shs_owner_name() );
+	ri.Printf( PRINT_ALL, "shs       : active=%d rtOwns=%d fallback=%s failInject=0x%x\n",
+		vk_shs_active() ? 1 : 0, vk_shs_rt_owns_sun() ? 1 : 0,
+		vk_shs_fallback_reason(), vk_shs_fail_inject() );
+	ri.Printf( PRINT_ALL, "shr       : active=%d owner=%s rt=%d ssrAllowed=%d fallback=%s failInject=0x%x\n",
+		vk_shr_active() ? 1 : 0, vk_shr_owner_name(),
+		vk_shr_rt_owns() ? 1 : 0, vk_shr_ssr_allowed() ? 1 : 0,
+		vk_shr_fallback_reason(), vk_shr_fail_inject() );
 	ri.Printf( PRINT_ALL, "declared  : AO=%s GI=%s refl=%s temporal=%s\n",
 		R_NamedCvarString( "r_havenrpAoOwner" ),
 		R_NamedCvarString( "r_havenrpDiffuseGiOwner" ),

@@ -18,6 +18,7 @@ atlases, froxel/fluid volumes, and teardown (split from vk.c).
 #include "vk_upscale.h"
 #include "vk_deferred_gbuffer.h"
 #include "vk_pass_registry.h"
+#include "tr_render_mode_vk.h"
 
 static void vk_create_fog_noise_texture( void );
 static void vk_destroy_sun_shadow_resources( void );
@@ -637,7 +638,7 @@ static void vk_create_visibility_buffer_scaffold( void )
 	vk.visibility_buffer_class_view = VK_NULL_HANDLE;
 
 	if ( !vk.fboActive || !r_renderMode ||
-		( r_renderMode->integer != 1 && r_renderMode->integer != 2 && r_renderMode->integer != 3 ) ||
+		!R_RenderMode_WantsGBuffer() ||
 		!r_visibilityBuffer || !r_visibilityBuffer->integer ) {
 		return;
 	}

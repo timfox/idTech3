@@ -27,6 +27,8 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #ifdef USE_VULKAN
 #include "vk_deferred_gbuffer.h"
 #include "vk_meshlets.h"
+#include "vk_selective_sun_shadow.h"
+#include "vk_selective_reflection.h"
 #endif
 #include "../common/tr_vector_font.h"
 #ifdef USE_VULKAN
@@ -73,6 +75,10 @@ static void VK_FillPbrSunShadowUniform( vkUniform_t *ubo ) {
 	Vector4Set( ubo->pbrSunShadowParams, 0.0f, 0.0f, 0.0f, 0.0f );
 
 	if ( !r_pbrSunShadow || !r_pbrSunShadow->integer || !vk.sun_shadow_valid || R_ClassicLightingActive() ) {
+		return;
+	}
+	/* Exclusive sun owner: when Hybrid1/RQ RT owns sun, force invalid raster params. */
+	if ( vk_shs_rt_owns_sun() ) {
 		return;
 	}
 
@@ -1442,7 +1448,7 @@ static void RB_IterateStagesGeneric( const shaderCommands_t *input )
 	uniform.pbrDebugMode[0] = pbr_debug;
 	uniform.pbrDebugMode[1] = 0.0f;
 	uniform.pbrDebugMode[2] = 0.0f;
-	uniform.pbrDebugMode[3] = 0.0f;
+	uniform.pbrDebugMode[3] = vk_shr_suppress_gen_frag_ibl_spec() ? 1.0f : 0.0f;
 #ifdef USE_VULKAN
 	/* Mode 3 Unified Clustered opaque pass: hand dynamics to deferred lighting. */
 	if ( vk_unified_clustered_opaque_handoff() ) {
