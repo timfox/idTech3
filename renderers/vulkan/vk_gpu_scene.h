@@ -1,9 +1,10 @@
 #pragma once
 
 /*
- * Raster Ultra 1.6 — Persistent GPU scene + cull/indirect scaffolding.
+ * Raster Ultra 1.6 / 1.14 — Persistent GPU scene + cull/indirect scaffolding.
  *
  * Classic BSP remains authoritative when world type is classic or metadata is absent.
+ * Terrain / streamed / hybrid only become effective when metadata is present.
  * No transient CPU pointers in GPU records. RT stays off under Raster Ultra.
  */
 
@@ -17,10 +18,16 @@
 #define VK_GPU_SCENE_INDIRECT_MAX    8192
 
 typedef enum {
-	VK_WORLD_TYPE_CLASSIC_BSP = 0,
-	VK_WORLD_TYPE_STREAMED    = 1,
-	VK_WORLD_TYPE_HYBRID      = 2
+	VK_WORLD_TYPE_CLASSIC_BSP = 0, /* WORLD_CLASSIC_BSP — default */
+	VK_WORLD_TYPE_TERRAIN     = 1, /* WORLD_TERRAIN — CBT heightfield primary */
+	VK_WORLD_TYPE_STREAMED    = 2, /* WORLD_STREAMED — open-world / sector stream */
+	VK_WORLD_TYPE_HYBRID      = 3  /* WORLD_HYBRID — BSP + terrain/stream */
 } vkWorldType_t;
+
+#define WORLD_CLASSIC_BSP VK_WORLD_TYPE_CLASSIC_BSP
+#define WORLD_TERRAIN     VK_WORLD_TYPE_TERRAIN
+#define WORLD_STREAMED    VK_WORLD_TYPE_STREAMED
+#define WORLD_HYBRID      VK_WORLD_TYPE_HYBRID
 
 typedef enum {
 	VK_GPU_SCENE_STREAM_RESIDENT = 0,
@@ -88,7 +95,14 @@ void vk_gpu_scene_begin_frame( void );
 void vk_gpu_scene_end_frame( void );
 
 qboolean vk_gpu_scene_active( void );
+
+/* Requested cvar value (may differ from effective). */
+vkWorldType_t vk_gpu_scene_world_type_requested( void );
+/* Effective ownership after metadata / fallback routing. */
 vkWorldType_t vk_gpu_scene_world_type( void );
+const char *vk_gpu_scene_world_fallback_reason( void );
+qboolean vk_gpu_scene_terrain_metadata_present( void );
+qboolean vk_gpu_scene_terrain_resources_ready( void );
 
 /* Map / restart lifecycle — invalidate generation, keep classic BSP path. */
 void vk_gpu_scene_on_world_load( void );

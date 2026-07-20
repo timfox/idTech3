@@ -16,6 +16,7 @@ repeated props. No CPU pointers in GPU records. No frame generation.
 #include "vk_view_state.h"
 #include "vk_pass_registry.h"
 #include "vk_raster_ultra.h"
+#include "vk_terrain.h"
 
 #include <math.h>
 
@@ -26,6 +27,8 @@ static cvar_t *r_gpuSceneDebug;
 static cvar_t *r_gpuSceneWorldType;
 static cvar_t *r_gpuSceneHlod;
 static cvar_t *r_gpuSceneLodHysteresis;
+
+static char s_worldFallbackReason[96];
 
 static vkGpuSceneInstance_t s_instances[VK_GPU_SCENE_MAX_INSTANCES];
 static vkGpuSceneMesh_t     s_meshes[VK_GPU_SCENE_MAX_MESHES];
@@ -167,13 +170,14 @@ void vk_gpu_scene_register_cvars( void )
 		"When r_gpuScene 1: pack VkDrawIndexedIndirectCommand list (host; no readback)." );
 
 	r_gpuSceneWorldType = ri.Cvar_Get( "r_gpuSceneWorldType", "0", CVAR_ARCHIVE_ND | CVAR_LATCH );
-	ri.Cvar_CheckRange( r_gpuSceneWorldType, "0", "2", CV_INTEGER );
+	ri.Cvar_CheckRange( r_gpuSceneWorldType, "0", "3", CV_INTEGER );
 	ri.Cvar_SetDescription( r_gpuSceneWorldType,
-		"World ownership:\n"
-		" 0 classic BSP (default — no streaming metadata required)\n"
-		" 1 streamed terrain/world\n"
-		" 2 hybrid (BSP + streamed augment)\n"
-		"Absent streaming metadata always routes as classic BSP." );
+		"World ownership (Raster Ultra 1.14):\n"
+		" 0 classic BSP (default — always safe)\n"
+		" 1 terrain (CBT heightfield; requires terrain metadata)\n"
+		" 2 streamed (open-world / sector stream metadata)\n"
+		" 3 hybrid (BSP + terrain/stream augment)\n"
+		"Absent metadata always routes as classic BSP — classic maps stay valid." );
 
 	r_gpuSceneHlod = ri.Cvar_Get( "r_gpuSceneHlod", "0", CVAR_ARCHIVE_ND );
 	ri.Cvar_CheckRange( r_gpuSceneHlod, "0", "1", CV_INTEGER );
@@ -240,7 +244,7 @@ qboolean vk_gpu_scene_active( void )
 	return ( r_gpuScene && r_gpuScene->integer ) ? qtrue : qfalse;
 }
 
-vkWorldType_t vk_gpu_scene_world_type( void )
+vkWorldType_t vk_gpu_scene_world_type_requested( void )
 {
 	int t;
 
@@ -248,14 +252,75 @@ vkWorldType_t vk_gpu_scene_world_type( void )
 		return VK_WORLD_TYPE_CLASSIC_BSP;
 	}
 	t = r_gpuSceneWorldType->integer;
-	if ( t < 0 || t > 2 ) {
-		return VK_WORLD_TYPE_CLASSIC_BSP;
-	}
-	/* No streaming metadata → always classic (do not black classic maps). */
-	if ( t != VK_WORLD_TYPE_CLASSIC_BSP && ( !tr.world || !tr.world->name[0] ) ) {
+	if ( t < 0 || t > (int)VK_WORLD_TYPE_HYBRID ) {
 		return VK_WORLD_TYPE_CLASSIC_BSP;
 	}
 	return (vkWorldType_t)t;
+}
+
+qboolean vk_gpu_scene_terrain_metadata_present( void )
+{
+	return CBTerrain_HasMetadata();
+}
+
+qboolean vk_gpu_scene_terrain_resources_ready( void )
+{
+	return CBTerrain_ResourcesReady();
+}
+
+const char *vk_gpu_scene_world_fallback_reason( void )
+{
+	return s_worldFallbackReason[0] ? s_worldFallbackReason : "none";
+}
+
+vkWorldType_t vk_gpu_scene_world_type( void )
+{
+	vkWorldType_t requested = vk_gpu_scene_world_type_requested();
+	qboolean hasWorld = ( tr.world && tr.world->name[0] ) ? qtrue : qfalse;
+	qboolean hasTerrain = CBTerrain_HasMetadata();
+	qboolean hasStream = qfalse;
+
+	s_worldFallbackReason[0] = '\0';
+
+	if ( !hasWorld ) {
+		Q_strncpyz( s_worldFallbackReason, "no_world", sizeof( s_worldFallbackReason ) );
+		return VK_WORLD_TYPE_CLASSIC_BSP;
+	}
+
+	/* Streamed metadata: open-world / BSP stream residency (soft signal). */
+	if ( ri.Cvar_VariableIntegerValue( "r_openWorld" ) ) {
+		hasStream = qtrue;
+	}
+
+	switch ( requested ) {
+	case VK_WORLD_TYPE_CLASSIC_BSP:
+		return VK_WORLD_TYPE_CLASSIC_BSP;
+
+	case VK_WORLD_TYPE_TERRAIN:
+		if ( hasTerrain ) {
+			return VK_WORLD_TYPE_TERRAIN;
+		}
+		Q_strncpyz( s_worldFallbackReason, "no_terrain_metadata", sizeof( s_worldFallbackReason ) );
+		return VK_WORLD_TYPE_CLASSIC_BSP;
+
+	case VK_WORLD_TYPE_STREAMED:
+		if ( hasStream ) {
+			return VK_WORLD_TYPE_STREAMED;
+		}
+		Q_strncpyz( s_worldFallbackReason, "no_stream_metadata", sizeof( s_worldFallbackReason ) );
+		return VK_WORLD_TYPE_CLASSIC_BSP;
+
+	case VK_WORLD_TYPE_HYBRID:
+		if ( hasTerrain || hasStream ) {
+			return VK_WORLD_TYPE_HYBRID;
+		}
+		Q_strncpyz( s_worldFallbackReason, "no_hybrid_metadata", sizeof( s_worldFallbackReason ) );
+		return VK_WORLD_TYPE_CLASSIC_BSP;
+
+	default:
+		Q_strncpyz( s_worldFallbackReason, "invalid_request", sizeof( s_worldFallbackReason ) );
+		return VK_WORLD_TYPE_CLASSIC_BSP;
+	}
 }
 
 void vk_gpu_scene_on_world_load( void )
@@ -552,12 +617,17 @@ const vkGpuSceneDrawCmd_t *vk_gpu_scene_indirect_cmds( void )
 
 void vk_gpu_scene_status_f( void )
 {
-	static const char *worldNames[] = { "classic_bsp", "streamed", "hybrid" };
+	static const char *worldNames[] = { "classic_bsp", "terrain", "streamed", "hybrid" };
+	vkWorldType_t req = vk_gpu_scene_world_type_requested();
 	vkWorldType_t wt = vk_gpu_scene_world_type();
 
-	ri.Printf( PRINT_ALL, "======== GPU Scene (Raster Ultra 1.6) ========\n" );
+	ri.Printf( PRINT_ALL, "======== GPU Scene (Raster Ultra 1.6/1.14) ========\n" );
 	ri.Printf( PRINT_ALL, "active       : %s\n", vk_gpu_scene_active() ? "yes" : "no" );
-	ri.Printf( PRINT_ALL, "world_type   : %s (%d)\n", worldNames[wt], (int)wt );
+	ri.Printf( PRINT_ALL, "world_req    : %s (%d)\n", worldNames[req], (int)req );
+	ri.Printf( PRINT_ALL, "world_eff    : %s (%d)\n", worldNames[wt], (int)wt );
+	ri.Printf( PRINT_ALL, "fallback     : %s\n", vk_gpu_scene_world_fallback_reason() );
+	ri.Printf( PRINT_ALL, "terrain_meta : %s\n", vk_gpu_scene_terrain_metadata_present() ? "yes" : "no" );
+	ri.Printf( PRINT_ALL, "terrain_res  : %s\n", vk_gpu_scene_terrain_resources_ready() ? "ready" : "idle" );
 	ri.Printf( PRINT_ALL, "generation   : %u\n", s_generation );
 	ri.Printf( PRINT_ALL, "meshes       : %u / %u\n", s_meshCount, VK_GPU_SCENE_MAX_MESHES );
 	ri.Printf( PRINT_ALL, "instances    : %u / %u\n", s_instanceCount, VK_GPU_SCENE_MAX_INSTANCES );
@@ -568,8 +638,8 @@ void vk_gpu_scene_status_f( void )
 		s_rejectFrustum, s_rejectHiz, s_rejectLod, s_rejectStream );
 	ri.Printf( PRINT_ALL, "cull_frames  : %u\n", s_cullFrames );
 	ri.Printf( PRINT_ALL, "meshlets     : companion r_meshlets (stable cache + MDI)\n" );
-	ri.Printf( PRINT_ALL, "classic_bsp  : always valid when world_type=0 or no stream metadata\n" );
+	ri.Printf( PRINT_ALL, "classic_bsp  : default; terrain never replaces BSP without metadata\n" );
 	ri.Printf( PRINT_ALL, "frame_gen    : off | RT: locked under Raster Ultra\n" );
-	ri.Printf( PRINT_ALL, "==============================================\n" );
+	ri.Printf( PRINT_ALL, "===================================================\n" );
 	vk_hiz_status_f();
 }

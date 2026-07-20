@@ -56,6 +56,8 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "vk_raygun.h"
 #include "vk_fluidsim.h"
 #include "vk_terrain.h"
+#include "vk_biome.h"
+#include "vk_vegetation_gpu.h"
 #include "vk_vdb.h"
 #include "vk_postfx.h"
 #include "vk_flashlight.h"
@@ -3614,6 +3616,8 @@ static void R_Register( void )
 
 	// Register modular subsystem cvars
 	CBTerrain_RegisterCvars();
+	VK_Biome_Init();
+	VK_VegGpu_Init();
 	PostFX_RegisterCvars();
 	VDB_Init();
 	ProjLight_Init();
@@ -3831,6 +3835,9 @@ static void RE_Shutdown( refShutdownCode_t code ) {
 	R_MeshNormalPolicy_Shutdown();
 	VK_SunCSM_Shutdown();
 	VK_RasterUltra_Shutdown();
+	VK_VegGpu_Shutdown();
+	VK_Biome_Shutdown();
+	CBTerrain_OnWorldUnload();
 
 	ri.Cmd_RemoveCommand( "modellist" );
 	ri.Cmd_RemoveCommand( "screenshotBMP" );

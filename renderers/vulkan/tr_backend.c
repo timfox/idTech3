@@ -23,6 +23,8 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "../common/tr_vector_font.h"
 #ifdef USE_VULKAN
 #include "vk_terrain.h"
+#include "vk_biome.h"
+#include "vk_vegetation_gpu.h"
 #include "vk_temporal.h"
 #include "vk_pass_registry.h"
 #include "vk_forward_plus.h"
@@ -2423,6 +2425,8 @@ static const void *RB_DrawSurfs( const void *data ) {
 	if ( CBTerrain_IsEnabled() ) {
 		CBTerrain_Frame();
 	}
+	VK_Biome_Frame();
+	VK_VegGpu_Frame();
 	if ( !vk_deferred_opaque_transparent_split() ) {
 		/* Mode 2 sidecar / non-split: never refill G-buffer after weapon or UI. */
 		if ( !( cmd->refdef.rdflags & RDF_NOWORLDMODEL ) ) {

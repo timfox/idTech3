@@ -29,10 +29,11 @@ Persistent records (`vk_gpu_scene.*`) with **stable handles** (no CPU pointers o
 | Value | Path |
 |-------|------|
 | 0 | **classic BSP** (default) — GPU scene only augments registered instances |
-| 1 | streamed terrain/world |
-| 2 | hybrid |
+| 1 | **terrain** (CBT heightfield; requires terrain metadata) — see [RASTER_ULTRA_1.14.md](RASTER_ULTRA_1.14.md) |
+| 2 | streamed open-world / sector stream |
+| 3 | hybrid (BSP + terrain/stream augment) |
 
-Absent streaming metadata always routes as classic BSP — **classic maps never go black**.
+Absent streaming/terrain metadata always routes as classic BSP — **classic maps never go black**.
 
 ## Culling
 

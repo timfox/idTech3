@@ -422,6 +422,50 @@ static const vkSpinePassDesc s_passes[VK_SPINE_PASS_COUNT] = {
 		VK_SPINE_PASS_HISTORY_MAINT, "history_maint", VK_SPINE_CAT_MAINTENANCE, VK_SPINE_PHASE_FRAME_END,
 		VK_SPINE_VIEW_ANY, qtrue, qtrue, NULL, 0, NULL, 0
 	},
+	[VK_SPINE_PASS_TERRAIN_LOD] = {
+		VK_SPINE_PASS_TERRAIN_LOD, "terrain_lod", VK_SPINE_CAT_SCENE_PREP, VK_SPINE_PHASE_WORLD_OPAQUE,
+		VK_SPINE_VIEW_MAIN, qtrue, qfalse, NULL, 0, NULL, 0
+	},
+	[VK_SPINE_PASS_TERRAIN_CULL] = {
+		VK_SPINE_PASS_TERRAIN_CULL, "terrain_cull", VK_SPINE_CAT_SCENE_PREP, VK_SPINE_PHASE_WORLD_OPAQUE,
+		VK_SPINE_VIEW_MAIN, qtrue, qfalse, NULL, 0, NULL, 0
+	},
+	[VK_SPINE_PASS_TERRAIN_DRAW] = {
+		VK_SPINE_PASS_TERRAIN_DRAW, "terrain_draw", VK_SPINE_CAT_OPAQUE_RASTER, VK_SPINE_PHASE_WORLD_OPAQUE,
+		VK_SPINE_VIEW_MAIN, qtrue, qfalse, NULL, 0, NULL, 0
+	},
+	[VK_SPINE_PASS_BIOME_EVAL] = {
+		VK_SPINE_PASS_BIOME_EVAL, "biome_eval", VK_SPINE_CAT_SCENE_PREP, VK_SPINE_PHASE_WORLD_OPAQUE,
+		VK_SPINE_VIEW_MAIN, qtrue, qfalse, NULL, 0, NULL, 0
+	},
+	[VK_SPINE_PASS_VEG_GENERATE] = {
+		VK_SPINE_PASS_VEG_GENERATE, "veg_generate", VK_SPINE_CAT_SCENE_PREP, VK_SPINE_PHASE_WORLD_OPAQUE,
+		VK_SPINE_VIEW_MAIN, qtrue, qfalse, NULL, 0, NULL, 0
+	},
+	[VK_SPINE_PASS_VEG_CULL] = {
+		VK_SPINE_PASS_VEG_CULL, "veg_cull", VK_SPINE_CAT_SCENE_PREP, VK_SPINE_PHASE_WORLD_OPAQUE,
+		VK_SPINE_VIEW_MAIN, qtrue, qfalse, NULL, 0, NULL, 0
+	},
+	[VK_SPINE_PASS_VEG_DRAW] = {
+		VK_SPINE_PASS_VEG_DRAW, "veg_draw", VK_SPINE_CAT_OPAQUE_RASTER, VK_SPINE_PHASE_WORLD_OPAQUE,
+		VK_SPINE_VIEW_MAIN, qtrue, qfalse, NULL, 0, NULL, 0
+	},
+	[VK_SPINE_PASS_VEG_WIND] = {
+		VK_SPINE_PASS_VEG_WIND, "veg_wind", VK_SPINE_CAT_SCENE_PREP, VK_SPINE_PHASE_WORLD_OPAQUE,
+		VK_SPINE_VIEW_MAIN, qtrue, qfalse, NULL, 0, NULL, 0
+	},
+	[VK_SPINE_PASS_VEG_INTERACTION] = {
+		VK_SPINE_PASS_VEG_INTERACTION, "veg_interaction", VK_SPINE_CAT_SCENE_PREP, VK_SPINE_PHASE_WORLD_OPAQUE,
+		VK_SPINE_VIEW_MAIN, qtrue, qfalse, NULL, 0, NULL, 0
+	},
+	[VK_SPINE_PASS_TERRAIN_DEFORM] = {
+		VK_SPINE_PASS_TERRAIN_DEFORM, "terrain_deform", VK_SPINE_CAT_SCENE_PREP, VK_SPINE_PHASE_WORLD_OPAQUE,
+		VK_SPINE_VIEW_MAIN, qtrue, qfalse, NULL, 0, NULL, 0
+	},
+	[VK_SPINE_PASS_TERRAIN_RESIDENCY] = {
+		VK_SPINE_PASS_TERRAIN_RESIDENCY, "terrain_residency", VK_SPINE_CAT_MAINTENANCE, VK_SPINE_PHASE_FRAME_END,
+		VK_SPINE_VIEW_ANY, qtrue, qfalse, NULL, 0, NULL, 0
+	},
 };
 
 /* ---- Helpers ---- */
@@ -587,6 +631,18 @@ const char *vk_spine_resource_name( vkSpineResourceId res )
 	case VK_SPINE_RES_RADIANCE_CLIPMAP: return "radiance_clipmap";
 	case VK_SPINE_RES_RADIANCE_CACHE_IRRADIANCE: return "radiance_cache_irradiance";
 	case VK_SPINE_RES_INDIRECT_DIFFUSE: return "indirect_diffuse";
+	case VK_SPINE_RES_TERRAIN_HEIGHT: return "terrain_height";
+	case VK_SPINE_RES_TERRAIN_CHUNK_META: return "terrain_chunk_meta";
+	case VK_SPINE_RES_TERRAIN_LOD_STATE: return "terrain_lod_state";
+	case VK_SPINE_RES_BIOME_MAP: return "biome_map";
+	case VK_SPINE_RES_TERRAIN_LAYER_MAP: return "terrain_layer_map";
+	case VK_SPINE_RES_VEG_INSTANCE_BUFFER: return "veg_instance_buffer";
+	case VK_SPINE_RES_VEG_VISIBLE_LIST: return "veg_visible_list";
+	case VK_SPINE_RES_VEG_INDIRECT: return "veg_indirect";
+	case VK_SPINE_RES_VEG_WIND_FIELD: return "veg_wind_field";
+	case VK_SPINE_RES_VEG_INTERACTION_FIELD: return "veg_interaction_field";
+	case VK_SPINE_RES_TERRAIN_DEFORM: return "terrain_deform";
+	case VK_SPINE_RES_TERRAIN_RESIDENCY: return "terrain_residency";
 	default: return "none";
 	}
 }
