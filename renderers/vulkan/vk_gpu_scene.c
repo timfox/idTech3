@@ -615,6 +615,93 @@ const vkGpuSceneDrawCmd_t *vk_gpu_scene_indirect_cmds( void )
 	return s_indirect;
 }
 
+static VkBuffer GPUScene_IndirectVkBuffer( void )
+{
+	return s_indirectBuf;
+}
+
+qboolean vk_gpu_scene_indirect_buffer_ready( void )
+{
+	(void)GPUScene_IndirectVkBuffer;
+	return ( s_indirectMapped != NULL && s_indirectBuf != VK_NULL_HANDLE ) ? qtrue : qfalse;
+}
+
+void vk_gpu_scene_merge_compatible_draws( uint32_t *outCmdsIn, uint32_t *outCmdsOut,
+	uint32_t *outGroups, uint32_t *outSkipped )
+{
+	uint32_t i;
+	uint32_t out = 0;
+	uint32_t groups = 0;
+	uint32_t skipped = 0;
+	vkGpuSceneDrawCmd_t compacted[VK_GPU_SCENE_INDIRECT_MAX];
+	const uint32_t inCount = s_indirectCount;
+
+	if ( outCmdsIn ) {
+		*outCmdsIn = inCount;
+	}
+	if ( inCount == 0u || !vk_gpu_scene_active() ) {
+		if ( outCmdsOut ) {
+			*outCmdsOut = 0u;
+		}
+		if ( outGroups ) {
+			*outGroups = 0u;
+		}
+		if ( outSkipped ) {
+			*outSkipped = 0u;
+		}
+		return;
+	}
+
+	compacted[0] = s_indirect[0];
+	out = 1u;
+	groups = 1u;
+
+	for ( i = 1u; i < inCount; i++ ) {
+		const vkGpuSceneDrawCmd_t *prev = &compacted[out - 1u];
+		const vkGpuSceneDrawCmd_t *cur = &s_indirect[i];
+		qboolean compatible;
+
+		/* Same index range + vertex offset → same mesh draw; instanceCount accumulates. */
+		compatible = ( prev->indexCount == cur->indexCount &&
+			prev->firstIndex == cur->firstIndex &&
+			prev->vertexOffset == cur->vertexOffset &&
+			prev->indexCount > 0u ) ? qtrue : qfalse;
+
+		if ( compatible ) {
+			compacted[out - 1u].instanceCount += cur->instanceCount;
+			/* Keep firstInstance as base handle for the group. */
+			groups++;
+		} else {
+			if ( cur->indexCount == 0u ) {
+				skipped++;
+				continue;
+			}
+			if ( out < VK_GPU_SCENE_INDIRECT_MAX ) {
+				compacted[out++] = *cur;
+				groups++;
+			} else {
+				skipped++;
+			}
+		}
+	}
+
+	s_indirectCount = out;
+	Com_Memcpy( s_indirect, compacted, sizeof( vkGpuSceneDrawCmd_t ) * out );
+	if ( s_indirectMapped && out > 0u ) {
+		Com_Memcpy( s_indirectMapped, s_indirect, sizeof( vkGpuSceneDrawCmd_t ) * out );
+	}
+
+	if ( outCmdsOut ) {
+		*outCmdsOut = out;
+	}
+	if ( outGroups ) {
+		*outGroups = groups;
+	}
+	if ( outSkipped ) {
+		*outSkipped = skipped;
+	}
+}
+
 void vk_gpu_scene_status_f( void )
 {
 	static const char *worldNames[] = { "classic_bsp", "terrain", "streamed", "hybrid" };

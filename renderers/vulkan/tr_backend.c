@@ -54,6 +54,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "vk_distortion.h"
 #include "vk_transparency_route.h"
 #include "vk_gpu_scene.h"
+#include "vk_ht_throughput.h"
 #include "vk_hiz.h"
 #include "vk_selective_sun_shadow.h"
 #include "vk_sun_csm.h"
@@ -2314,6 +2315,8 @@ static const void *RB_DrawSurfs( const void *data ) {
 	if ( vk_gpu_scene_active() ) {
 		vk_gpu_scene_begin_frame();
 		vk_gpu_scene_cull_and_build_indirect();
+		/* HT Slice A: coalesce compatible indirect draws before any consumer. */
+		vk_ht_merge_gpu_scene_draws();
 	}
 #endif
 

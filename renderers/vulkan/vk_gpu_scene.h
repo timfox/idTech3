@@ -125,6 +125,17 @@ uint32_t vk_gpu_scene_indirect_count( void );
 const uint32_t *vk_gpu_scene_visible_handles( void );
 const vkGpuSceneDrawCmd_t *vk_gpu_scene_indirect_cmds( void );
 
+/*
+ * Compatible geometry merge (High-Throughput Slice A): coalesce consecutive draws that
+ * share mesh index range into a single multi-instance command.
+ * Does not merge across empty / incompatible ranges. Rewrites host indirect + mapped buffer.
+ */
+void vk_gpu_scene_merge_compatible_draws( uint32_t *outCmdsIn, uint32_t *outCmdsOut,
+	uint32_t *outGroups, uint32_t *outSkipped );
+
+/* Non-null when host-visible indirect buffer is mapped (draw consumers check separately). */
+qboolean vk_gpu_scene_indirect_buffer_ready( void );
+
 void vk_gpu_scene_status_f( void );
 
 #endif /* USE_VULKAN */

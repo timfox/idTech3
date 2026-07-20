@@ -21,6 +21,7 @@ Extracted from vk.c for incremental modularization.
 #include "vk_postfx_params.h"
 #include "vk_present_recon.h"
 #include "vk_gpu_scene.h"
+#include "vk_ht_throughput.h"
 #include "vk_weather.h"
 #include "vk_volumetric_clouds.h"
 #include "vk_surface_evolution.h"
@@ -400,6 +401,7 @@ void vk_prepare_frame_temporal_state( void )
 	vk_spatial_aa_begin_frame();
 	vk_frequency_aware_begin_frame();
 	vk_scene_platform_begin_frame();
+	vk_ht_throughput_begin_frame();
 	vk_spine_frame_begin();
 	vk_update_postfx_params( vk.cmd_index );
 	vk.temporal.preparedThisFrame = qtrue;
@@ -545,6 +547,7 @@ void vk_end_frame( void )
 	vk_frequency_aware_begin_frame();
 	vk_volumetric_clouds_begin_frame();
 	vk_gpu_scene_end_frame();
+	vk_ht_throughput_end_frame();
 	vk_temporal_commit_frame_state();
 	vk_spine_frame_end();
 	vk_vuda_after_queue_submit();
