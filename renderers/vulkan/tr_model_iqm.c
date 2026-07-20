@@ -23,6 +23,9 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 */
 
 #include "tr_local.h"
+#ifdef USE_VULKAN
+#include "vk_ht_animation.h"
+#endif
 
 #define	LL(x) x=LittleLong(x)
 
@@ -1195,6 +1198,30 @@ qboolean R_LoadIQM( model_t *mod, void *buffer, int filesize, const char *mod_na
 
 	(void)R_LoadIQMMorphSidecar( iqmData, mod_name );
 
+#ifdef USE_VULKAN
+	if ( vk_ht_animation_active() && iqmData->num_poses > 0 && iqmData->num_frames > 0 && iqmData->poses ) {
+		uint32_t topo = (uint32_t)iqmData->num_joints ^ ( (uint32_t)iqmData->num_poses << 8 );
+		uint32_t skId = vk_ht_anim_register_skeleton( mod_name, (uint32_t)iqmData->num_poses, topo );
+		uint32_t clipId = vk_ht_anim_register_clip( mod_name, skId,
+			(uint32_t)iqmData->num_frames, (uint32_t)iqmData->num_poses, 1.0f, qtrue );
+		vkHtAnimCompressMetrics_t metrics;
+		/* Layout-compatible cast: vkHtAnimPoseSample_t == iqmTransform_t fields. */
+		(void)vk_ht_anim_compress_pose_tracks( clipId,
+			(const vkHtAnimPoseSample_t *)iqmData->poses,
+			(uint32_t)iqmData->num_frames, (uint32_t)iqmData->num_poses,
+			NULL, &metrics );
+		if ( metrics.measured ) {
+			ri.Printf( PRINT_DEVELOPER,
+				"[VK][ht-anim] IQM '%s' compress: ok=%d maxAng=%.3fdeg maxPos=%.4f "
+				"src=%u cmp=%u fallback=%d\n",
+				mod_name, metrics.withinTolerance ? 1 : 0,
+				metrics.maxAngularDeg, metrics.maxPositional,
+				metrics.sourceBytes, metrics.compressedBytes,
+				metrics.withinTolerance ? 0 : 1 );
+		}
+	}
+#endif
+
 	return qtrue;
 }
 
@@ -1496,10 +1523,11 @@ void R_IQMCommitSurfaceBatch( void )
 	float *morphPayload;
 
 	if ( !s_iqmGpuBatch.enabled || s_iqmGpuBatch.skinCount <= 0 ||
-		s_iqmGpuBatch.morphVertexCount <= 0 || s_iqmGpuBatch.activeCount <= 0 ) {
+		s_iqmGpuBatch.morphVertexCount <= 0 ) {
 		vk_reset_iqm_storage_offsets();
 		return;
 	}
+	/* activeCount may be 0 for skin-only GPU path (r_iqmGpu). */
 
 	skinFloats = 1u + 2u * ( (size_t)s_iqmGpuBatch.skinCount * 12u + (size_t)s_iqmGpuBatch.skinCount * 9u );
 	skinBytes = skinFloats * sizeof( float );
@@ -1912,7 +1940,11 @@ void RB_IQMSurfaceAnim( const surfaceType_t *surface ) {
 	applyMorph = ( ent && ent->morphActiveCount > 0 && morphSurface &&
 		morphSurface->deltaPos && morphSurface->deltaNorm &&
 		ent->morphActiveCount <= IQM_MORPH_TOP_K );
+#ifdef USE_VULKAN
+	useGpuMorphPath = vk_ht_anim_want_iqm_gpu_skin( applyMorph, data->num_poses );
+#else
 	useGpuMorphPath = ( applyMorph && data->num_poses > 0 );
+#endif
 
 	RB_CHECKOVERFLOW( surf->num_vertexes, surf->num_triangles * 3 );
 
@@ -1944,15 +1976,20 @@ void RB_IQMSurfaceAnim( const surfaceType_t *surface ) {
 			useGpuMorphPath = qfalse;
 		}
 		if ( s_iqmGpuBatch.enabled ) {
-			if ( s_iqmGpuBatch.activeCount != ent->morphActiveCount ) {
-				useGpuMorphPath = qfalse;
-			} else {
-				for ( i = 0; i < ent->morphActiveCount; i++ ) {
-					if ( fabsf( s_iqmGpuBatch.weights[i] - ent->morphActiveWeight[i] ) > 0.0001f ) {
-						useGpuMorphPath = qfalse;
-						break;
+			if ( applyMorph ) {
+				if ( s_iqmGpuBatch.activeCount != ent->morphActiveCount ) {
+					useGpuMorphPath = qfalse;
+				} else {
+					for ( i = 0; i < ent->morphActiveCount; i++ ) {
+						if ( fabsf( s_iqmGpuBatch.weights[i] - ent->morphActiveWeight[i] ) > 0.0001f ) {
+							useGpuMorphPath = qfalse;
+							break;
+						}
 					}
 				}
+			} else if ( s_iqmGpuBatch.activeCount != 0 ) {
+				/* Do not mix morph and skin-only surfaces in one GPU batch. */
+				useGpuMorphPath = qfalse;
 			}
 		}
 		if ( useGpuMorphPath ) {
@@ -1961,19 +1998,23 @@ void RB_IQMSurfaceAnim( const surfaceType_t *surface ) {
 			gpuMorphBase = s_iqmGpuBatch.morphVertexCount;
 			if ( !s_iqmGpuBatch.enabled ) {
 				s_iqmGpuBatch.enabled = qtrue;
-				s_iqmGpuBatch.activeCount = ent->morphActiveCount;
+				s_iqmGpuBatch.activeCount = applyMorph ? ent->morphActiveCount : 0;
 				for ( weightIndex = 0; weightIndex < IQM_MORPH_TOP_K; weightIndex++ ) {
 					s_iqmGpuBatch.weights[weightIndex] =
-						( weightIndex < ent->morphActiveCount ) ? ent->morphActiveWeight[weightIndex] : 0.0f;
+						( applyMorph && weightIndex < ent->morphActiveCount ) ? ent->morphActiveWeight[weightIndex] : 0.0f;
 				}
 			}
 #ifdef USE_VULKAN
-			if ( entMutable && !entMutable->morphGpuWeightsPrimedSingleUse ) {
+			if ( applyMorph && entMutable && !entMutable->morphGpuWeightsPrimedSingleUse ) {
 				for ( weightIndex = 0; weightIndex < IQM_MORPH_TOP_K; weightIndex++ ) {
 					s_iqmGpuBatch.prevWeights[weightIndex] =
 						( weightIndex < ent->morphActiveCount ) ? ent->morphActiveWeight[weightIndex] : 0.0f;
 				}
 				entMutable->morphGpuWeightsPrimedSingleUse = qtrue;
+			} else if ( !applyMorph ) {
+				for ( weightIndex = 0; weightIndex < IQM_MORPH_TOP_K; weightIndex++ ) {
+					s_iqmGpuBatch.prevWeights[weightIndex] = 0.0f;
+				}
 			} else
 #endif
 			{
@@ -2343,6 +2384,35 @@ void RB_IQMSurfaceAnim( const surfaceType_t *surface ) {
 			outColor[v].rgba[3] = 255;
 		}
 	}
+
+#ifdef USE_VULKAN
+	if ( vk_ht_animation_active() && ent ) {
+		uint32_t instId;
+		vec3_t toEnt;
+		float dist;
+		vkHtDeformKind_t kind;
+
+		instId = vk_ht_anim_acquire_instance( tr.currentEntityNum,
+			tr.currentModel ? tr.currentModel->index : 0,
+			tr.currentModel ? tr.currentModel->name : "iqm" );
+		VectorSubtract( ent->e.origin, tr.viewParms.or.origin, toEnt );
+		dist = VectorLength( toEnt );
+		vk_ht_anim_select_lod( instId, dist, 64.0f, qtrue, qtrue, qfalse );
+		(void)vk_ht_anim_should_update_pose( instId, (uint32_t)tr.frameSceneNum );
+
+		if ( useGpuMorphPath ) {
+			kind = applyMorph ? VK_HT_DEFORM_MORPH_PLUS_SKIN_GPU : VK_HT_DEFORM_SKELETAL_GPU_VS;
+			/* Prev bone palette from clip oldframe is always written on GPU path. */
+			vk_ht_anim_note_deformation( instId, kind, qtrue, qtrue );
+		} else if ( data->num_poses > 0 ) {
+			kind = applyMorph ? VK_HT_DEFORM_MORPH_CPU : VK_HT_DEFORM_SKELETAL_CPU;
+			vk_ht_anim_note_deformation( instId, kind, qfalse, qfalse );
+		}
+		vk_ht_anim_count_skin_path( useGpuMorphPath
+			? ( applyMorph ? VK_HT_DEFORM_MORPH_PLUS_SKIN_GPU : VK_HT_DEFORM_SKELETAL_GPU_VS )
+			: ( applyMorph ? VK_HT_DEFORM_MORPH_CPU : VK_HT_DEFORM_SKELETAL_CPU ) );
+	}
+#endif
 
 	tri = data->triangles + 3 * surf->first_triangle;
 	ptr = &tess.indexes[tess.numIndexes];

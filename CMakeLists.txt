@@ -3582,6 +3582,18 @@ set_tests_properties(test_cinematic_engine_1_0 PROPERTIES
 	LABELS "scripts;validation;renderer;cinematic"
 	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/scripts/cinematic_engine_1_0_check.sh;${CMAKE_SOURCE_DIR}/docs/CINEMATIC_ENGINE_PLATFORM_1.0.md;${CMAKE_SOURCE_DIR}/config/modern_cinematic_raster.cfg")
 
+add_test(NAME test_high_throughput_1_0
+	COMMAND ${CMAKE_SOURCE_DIR}/scripts/high_throughput_1_0_check.sh)
+set_tests_properties(test_high_throughput_1_0 PROPERTIES
+	LABELS "scripts;validation;renderer;high_throughput"
+	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/scripts/high_throughput_1_0_check.sh;${CMAKE_SOURCE_DIR}/docs/HIGH_THROUGHPUT_RASTER_1.0.md;${CMAKE_SOURCE_DIR}/config/modern_high_throughput.cfg")
+
+add_test(NAME test_high_throughput_1_1
+	COMMAND ${CMAKE_SOURCE_DIR}/scripts/high_throughput_1_1_check.sh)
+set_tests_properties(test_high_throughput_1_1 PROPERTIES
+	LABELS "scripts;validation;renderer;high_throughput"
+	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/scripts/high_throughput_1_1_check.sh;${CMAKE_SOURCE_DIR}/docs/HIGH_THROUGHPUT_RASTER_1.1.md;${CMAKE_SOURCE_DIR}/config/modern_high_throughput_animation.cfg")
+
 add_test(NAME test_md3_paint
 	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_md3_paint.sh)
 set_tests_properties(test_md3_paint PROPERTIES

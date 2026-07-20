@@ -11,7 +11,7 @@ Ray tracing remains optional (locked off under this candidate).
 | Slice | Scope | Status |
 |-------|--------|--------|
 | **A — GPU throughput** | Global indices, GPU scene, cull, light/decal binning, indirect, merge, profiling | **shipped (opt-in)** |
-| B — Animated data | Compact tangents, skeletal compression, geometry cache | not started |
+| B — Animated data | Compact tangents, skeletal compression, geometry cache | **superseded by HT 1.1** — see `docs/HIGH_THROUGHPUT_RASTER_1.1.md` |
 | C — Surface interaction | Material compositing, geometry-aware decals, damage | not started |
 | D — Water and effects | Dedicated water, dense GPU particles | not started |
 | E — Certification | Budgets, soak, promotion | not started |
