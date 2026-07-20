@@ -544,6 +544,8 @@ void vk_begin_ssao_blur_render_pass( void );
 void vk_begin_ssao_combine_render_pass( void );
 struct drawSurfsCommand_s;
 void vk_oit_pass( const struct drawSurfsCommand_s *cmd );
+/* Full-res color → fog_scene (OIT opaque / SSAO / distortion sample source). */
+void vk_copy_color_to_fog_scene( uint32_t width, uint32_t height );
 void vk_begin_ssr_render_pass( void );
 void vk_ssr_pass( void );
 void vk_vegetation_wind_prepare_draw( void );
@@ -806,6 +808,7 @@ typedef struct {
 	VkImageView ui_overlay_image_view;
 	VkImage fog_scene_image;
 	VkImageView fog_scene_image_view;
+	VkImageLayout fog_scene_layout; /* tracked for color→fog_scene copies */
 	VkImage smaa_edge_image;
 	VkImageView smaa_edge_image_view;
 		VkImage smaa_blend_image;
@@ -1799,6 +1802,7 @@ typedef struct {
 	VkPipeline ssao_blur_pipeline;
 	VkPipeline ssao_combine_pipeline;
 	VkPipeline oit_accum_pipeline;	/* WBOIT accumulation for transparent surfaces */
+	VkPipeline oit_accum_additive_pipeline; /* WBOIT color only — no revealage occlusion (ONE/ONE) */
 	VkPipeline oit_moments_pipeline;	/* MBOIT pass 1: moment accumulation */
 	VkPipeline oit_accum_mboit_pipeline;	/* MBOIT pass 2: moment-weighted WBOIT accum */
 	VkPipeline oit_resolve_pipeline;

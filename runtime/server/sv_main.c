@@ -113,6 +113,26 @@ static void SV_AddP2PServerInfo( char *buffer, int bufferSize )
 {
 	char p2pAddress[MAX_STRING_CHARS];
 	char sessionId[128];
+	int beforeLen;
+	int afterLen;
+
+	if ( !buffer || bufferSize < 64 ) {
+		return;
+	}
+
+	/* Local / non-P2P listen servers must not advertise p2p* keys — they crowd out
+	 * OA videoflags/voteflags inside the 1024-byte SERVERINFO budget and previously
+	 * triggered Unpure reconnect storms after vid_restart. */
+	if ( !NET_P2P_IsEnabled() ) {
+		return;
+	}
+
+	/* Prefer core OA keys (videoflags/voteflags) over P2P ads when the
+	 * 1024-byte SERVERINFO budget is nearly exhausted. */
+	beforeLen = (int)strlen( buffer );
+	if ( beforeLen > bufferSize - 180 ) {
+		return;
+	}
 
 	Info_SetValueForKey_s( buffer, bufferSize, "p2p", NET_P2P_IsReady() ? "1" : "0" );
 	Info_SetValueForKey_s( buffer, bufferSize, "p2pmigrate",
@@ -127,6 +147,10 @@ static void SV_AddP2PServerInfo( char *buffer, int bufferSize )
 	SV_BuildP2PSessionId( sessionId, sizeof( sessionId ) );
 	Info_SetValueForKey_s( buffer, bufferSize, "p2psession", sessionId );
 
+	afterLen = (int)strlen( buffer );
+	if ( afterLen > bufferSize - 96 ) {
+		return;
+	}
 	if ( NET_P2P_GetLocalAddressString( p2pAddress, sizeof( p2pAddress ) ) ) {
 		Info_SetValueForKey_s( buffer, bufferSize, "p2paddr", p2pAddress );
 	}

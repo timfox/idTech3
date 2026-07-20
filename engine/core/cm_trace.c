@@ -1134,6 +1134,113 @@ static void CM_TraceThroughTree( traceWork_t *tw, int num, float p1f, float p2f,
 	CM_TraceThroughTree( tw, node->children[side^1], midf, p2f, mid, p2 );
 }
 
+/*
+==================
+CM_GoldSrcTraceThroughTree
+
+GoldSrc stores contents directly on BSP leaves instead of referencing a list
+of convex brushes. Traverse the same separating planes with the moving shape
+expanded onto each plane and stop when the swept volume enters a requested
+leaf content.
+==================
+*/
+static void CM_GoldSrcTraceThroughTree( traceWork_t *tw, int num,
+		float p1f, float p2f, const vec3_t p1, const vec3_t p2,
+		const cplane_t *enterPlane, int enterSide ) {
+	cNode_t *node;
+	cplane_t *plane;
+	double t1, t2, offset;
+	float frac, frac2, midf;
+	vec3_t mid;
+	int side;
+
+	if ( tw->trace.fraction <= p1f ) {
+		return;
+	}
+
+	if ( num < 0 ) {
+		const cLeaf_t *leaf = &cm.leafs[-1 - num];
+		if ( !( leaf->contents & tw->contents ) ) {
+			return;
+		}
+
+		tw->trace.contents = leaf->contents;
+		if ( p1f <= 0.0f ) {
+			tw->trace.startsolid = qtrue;
+		}
+		else {
+			tw->trace.fraction = p1f;
+		}
+
+		if ( enterPlane ) {
+			if ( enterSide == 0 ) {
+				VectorCopy( enterPlane->normal, tw->trace.plane.normal );
+				tw->trace.plane.dist = enterPlane->dist;
+			}
+			else {
+				VectorNegate( enterPlane->normal, tw->trace.plane.normal );
+				tw->trace.plane.dist = -enterPlane->dist;
+			}
+			tw->trace.plane.type = PlaneTypeForNormal( tw->trace.plane.normal );
+			SetPlaneSignbits( &tw->trace.plane );
+		}
+		return;
+	}
+
+	if ( num >= cm.numNodes ) {
+		Com_Error( ERR_DROP, "%s: bad GoldSrc node %d", __func__, num );
+	}
+
+	node = &cm.nodes[num];
+	plane = node->plane;
+	t1 = DotProductDP( plane->normal, p1 ) - plane->dist;
+	t2 = DotProductDP( plane->normal, p2 ) - plane->dist;
+	offset = fabs( tw->size[1][0] * plane->normal[0] ) +
+			fabs( tw->size[1][1] * plane->normal[1] ) +
+			fabs( tw->size[1][2] * plane->normal[2] );
+
+	if ( t1 >= offset && t2 >= offset ) {
+		CM_GoldSrcTraceThroughTree( tw, node->children[0], p1f, p2f,
+				p1, p2, enterPlane, enterSide );
+		return;
+	}
+	if ( t1 <= -offset && t2 <= -offset ) {
+		CM_GoldSrcTraceThroughTree( tw, node->children[1], p1f, p2f,
+				p1, p2, enterPlane, enterSide );
+		return;
+	}
+
+	if ( t1 < t2 ) {
+		side = 1;
+		frac = (float)(( t1 + offset + SURFACE_CLIP_EPSILON ) / ( t1 - t2 ));
+		frac2 = (float)(( t1 - offset - SURFACE_CLIP_EPSILON ) / ( t1 - t2 ));
+	}
+	else if ( t1 > t2 ) {
+		side = 0;
+		frac = (float)(( t1 - offset - SURFACE_CLIP_EPSILON ) / ( t1 - t2 ));
+		frac2 = (float)(( t1 + offset + SURFACE_CLIP_EPSILON ) / ( t1 - t2 ));
+	}
+	else {
+		side = 0;
+		frac = 0.0f;
+		frac2 = 1.0f;
+	}
+
+	frac = Com_Clamp( 0.0f, 1.0f, frac );
+	midf = p1f + ( p2f - p1f ) * frac;
+	VectorMA( p1, frac, p2, mid );
+	VectorMA( mid, -frac, p1, mid );
+	CM_GoldSrcTraceThroughTree( tw, node->children[side], p1f, midf,
+			p1, mid, enterPlane, enterSide );
+
+	frac2 = Com_Clamp( 0.0f, 1.0f, frac2 );
+	midf = p1f + ( p2f - p1f ) * frac2;
+	VectorMA( p1, frac2, p2, mid );
+	VectorMA( mid, -frac2, p1, mid );
+	CM_GoldSrcTraceThroughTree( tw, node->children[side ^ 1], midf, p2f,
+			mid, p2, plane, side );
+}
+
 
 //======================================================================
 
@@ -1261,6 +1368,25 @@ static void CM_Trace( trace_t *results, const vec3_t start, const vec3_t end, co
 		}
 	}
 
+	if ( cm.goldsrc && model != BOX_MODEL_HANDLE && model != CAPSULE_MODEL_HANDLE ) {
+		int root = model ? cmod->goldsrcHeadnode : cm.goldsrcWorldHeadnode;
+		CM_GoldSrcTraceThroughTree( &tw, root, 0.0f, 1.0f,
+				tw.start, tw.end, NULL, 0 );
+		if ( tw.trace.startsolid ) {
+			int endNode = root;
+			while ( endNode >= 0 ) {
+				const cNode_t *node = &cm.nodes[endNode];
+				float d = DotProduct( tw.end, node->plane->normal ) - node->plane->dist;
+				endNode = node->children[d < 0.0f];
+			}
+			tw.trace.allsolid = ( cm.leafs[-1 - endNode].contents & brushmask ) != 0;
+			if ( tw.trace.allsolid ) {
+				tw.trace.fraction = 0.0f;
+			}
+		}
+		goto trace_complete;
+	}
+
 	//
 	// check for position test special case
 	//
@@ -1339,6 +1465,7 @@ static void CM_Trace( trace_t *results, const vec3_t start, const vec3_t end, co
 		}
 	}
 
+trace_complete:
 	// generate endpos from the original, unmodified start/end
 	if ( tw.trace.fraction == 1 ) {
 		VectorCopy (end, tw.trace.endpos);

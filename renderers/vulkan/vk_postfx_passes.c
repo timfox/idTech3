@@ -174,12 +174,33 @@ static void vk_postfx_run_blur_pass( uint32_t passIndex, VkDescriptorSet sourceD
 	vk_end_render_pass();
 }
 
-static void vk_copy_color_to_fog_scene( uint32_t width, uint32_t height )
+void vk_copy_color_to_fog_scene( uint32_t width, uint32_t height )
 {
 	VkImageCopy copy_region;
 	VkMemoryBarrier mb;
+	VkImageLayout fogOld;
+	uint32_t copyW;
+	uint32_t copyH;
 
 	if ( vk.fog_scene_image == VK_NULL_HANDLE || vk.color_image == VK_NULL_HANDLE ) {
+		return;
+	}
+	if ( !vk.cmd || vk.cmd->command_buffer == VK_NULL_HANDLE ) {
+		return;
+	}
+
+	/* Prefer main color extent so we never leave uncopied fog_scene texels. */
+	copyW = width;
+	copyH = height;
+	if ( vk.mainColorWidth > 0u && vk.mainColorHeight > 0u ) {
+		if ( copyW == 0u || copyW > vk.mainColorWidth ) {
+			copyW = vk.mainColorWidth;
+		}
+		if ( copyH == 0u || copyH > vk.mainColorHeight ) {
+			copyH = vk.mainColorHeight;
+		}
+	}
+	if ( copyW == 0u || copyH == 0u ) {
 		return;
 	}
 
@@ -188,13 +209,11 @@ static void vk_copy_color_to_fog_scene( uint32_t width, uint32_t height )
 	copy_region.srcSubresource.layerCount = 1;
 	copy_region.dstSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
 	copy_region.dstSubresource.layerCount = 1;
-	copy_region.extent.width = width;
-	copy_region.extent.height = height;
+	copy_region.extent.width = copyW;
+	copy_region.extent.height = copyH;
 	copy_region.extent.depth = 1;
 
-	/* Full visibility of prior color attachment / resolve writes before TRANSFER.
-	 * Classified OIT bucket-1 copies color immediately after resolve; RP EXTERNAL
-	 * BY_REGION deps alone are insufficient for a fullscreen image copy. */
+	/* Full visibility of prior color attachment / resolve writes before TRANSFER. */
 	Com_Memset( &mb, 0, sizeof( mb ) );
 	mb.sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER;
 	mb.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT | VK_ACCESS_TRANSFER_WRITE_BIT;
@@ -204,17 +223,24 @@ static void vk_copy_color_to_fog_scene( uint32_t width, uint32_t height )
 		VK_PIPELINE_STAGE_TRANSFER_BIT,
 		0, 1, &mb, 0, NULL, 0, NULL );
 
-	/* Main / OIT resolve / post_bloom leave color in SHADER_READ_ONLY. Include color-
-	 * attachment output in src stages so residual COLOR_ATTACHMENT access is visible. */
 	record_image_layout_transition( vk.cmd->command_buffer, vk.color_image, VK_IMAGE_ASPECT_COLOR_BIT,
 		VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
 		VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT | VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
 		VK_PIPELINE_STAGE_TRANSFER_BIT );
-	/* fog_scene may be UNDEFINED on first use after create; UNDEFINED→DST is always valid. */
+
+	fogOld = vk.fog_scene_layout;
+	if ( fogOld != VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL &&
+		fogOld != VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL &&
+		fogOld != VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL &&
+		fogOld != VK_IMAGE_LAYOUT_GENERAL ) {
+		fogOld = VK_IMAGE_LAYOUT_UNDEFINED;
+	}
 	record_image_layout_transition( vk.cmd->command_buffer, vk.fog_scene_image, VK_IMAGE_ASPECT_COLOR_BIT,
-		VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-		VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT | VK_PIPELINE_STAGE_TRANSFER_BIT,
+		fogOld, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+		VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT | VK_PIPELINE_STAGE_TRANSFER_BIT | VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
 		VK_PIPELINE_STAGE_TRANSFER_BIT );
+	vk.fog_scene_layout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+
 	qvkCmdCopyImage( vk.cmd->command_buffer,
 		vk.color_image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
 		vk.fog_scene_image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
@@ -226,6 +252,7 @@ static void vk_copy_color_to_fog_scene( uint32_t width, uint32_t height )
 		VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
 		VK_PIPELINE_STAGE_TRANSFER_BIT,
 		VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT | VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT );
+	vk.fog_scene_layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 }
 
 static void vk_oit_note_fallback( const char *reason )
@@ -413,6 +440,9 @@ void vk_oit_pass( const struct drawSurfsCommand_s *cmd )
 		vk_oit_note_fallback( "WBOIT accum pipeline missing" );
 		vk_spine_note_oit_skipped();
 		return;
+	}
+	if ( !mboit && classify && vk.oit_accum_additive_pipeline == VK_NULL_HANDLE ) {
+		ri.Printf( PRINT_WARNING, "[VK][OIT] additive accum pipeline missing — revealage may occlude particles\n" );
 	}
 
 	vk_end_render_pass();

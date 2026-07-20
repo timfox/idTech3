@@ -89,8 +89,9 @@ static cvar_t *g_warmupReadyPercentage;
 static cvar_t *g_warmupDelay;
 
 void SV_Enhanced_Init( void ) {
-	/* Unlagged */
-	sv_unlagged            = Cvar_Get( "sv_unlagged",            "1",    CVAR_SERVERINFO | CVAR_ARCHIVE );
+	/* Unlagged — ARCHIVE only (SERVERINFO budget is tight with OA videoflags/voteflags). */
+	sv_unlagged            = Cvar_Get( "sv_unlagged",            "1",    CVAR_ARCHIVE );
+	sv_unlagged->flags &= ~(int)CVAR_SERVERINFO;
 	sv_unlaggedMaxRewind   = Cvar_Get( "sv_unlaggedMaxRewind",   "800",  CVAR_ARCHIVE );
 	sv_unlaggedProjectiles = Cvar_Get( "sv_unlaggedProjectiles", "0",    CVAR_ARCHIVE );
 	Cvar_SetDescription( sv_unlagged, "Enable backward reconciliation for hitscan weapons (0 = off, 1 = on)." );
@@ -107,14 +108,20 @@ void SV_Enhanced_Init( void ) {
 	Cvar_SetDescription( sv_latencyEqualizer, "Add artificial delay to low-ping players to equalize ping (0 = off)." );
 	Cvar_SetDescription( sv_latencyEqualizerTarget, "Target ping in ms for latency equalizer." );
 
-	/* Movement physics */
-	g_airControl       = Cvar_Get( "g_airControl",       "0",    CVAR_SERVERINFO | CVAR_ARCHIVE );
+	/* Movement physics — not advertised in SERVERINFO (keeps OA videoflags/voteflags). */
+	g_airControl       = Cvar_Get( "g_airControl",       "0",    CVAR_ARCHIVE );
+	g_airControl->flags &= ~(int)CVAR_SERVERINFO;
 	g_airControlAmount = Cvar_Get( "g_airControlAmount", "0.6",  CVAR_ARCHIVE );
-	g_rampJump         = Cvar_Get( "g_rampJump",         "0",    CVAR_SERVERINFO | CVAR_ARCHIVE );
-	g_additiveJump     = Cvar_Get( "g_additiveJump",     "0",    CVAR_SERVERINFO | CVAR_ARCHIVE );
-	g_crouchSlide      = Cvar_Get( "g_crouchSlide",      "0",    CVAR_SERVERINFO | CVAR_ARCHIVE );
-	g_wallJump         = Cvar_Get( "g_wallJump",         "0",    CVAR_SERVERINFO | CVAR_ARCHIVE );
-	g_doubleJump       = Cvar_Get( "g_doubleJump",       "0",    CVAR_SERVERINFO | CVAR_ARCHIVE );
+	g_rampJump         = Cvar_Get( "g_rampJump",         "0",    CVAR_ARCHIVE );
+	g_rampJump->flags &= ~(int)CVAR_SERVERINFO;
+	g_additiveJump     = Cvar_Get( "g_additiveJump",     "0",    CVAR_ARCHIVE );
+	g_additiveJump->flags &= ~(int)CVAR_SERVERINFO;
+	g_crouchSlide      = Cvar_Get( "g_crouchSlide",      "0",    CVAR_ARCHIVE );
+	g_crouchSlide->flags &= ~(int)CVAR_SERVERINFO;
+	g_wallJump         = Cvar_Get( "g_wallJump",         "0",    CVAR_ARCHIVE );
+	g_wallJump->flags &= ~(int)CVAR_SERVERINFO;
+	g_doubleJump       = Cvar_Get( "g_doubleJump",       "0",    CVAR_ARCHIVE );
+	g_doubleJump->flags &= ~(int)CVAR_SERVERINFO;
 	g_doubleJumpWindow = Cvar_Get( "g_doubleJumpWindow", "400",  CVAR_ARCHIVE );
 	Cvar_SetDescription( g_airControl, "Enable air control for strafing (0 = vanilla, 1 = CPM-style)." );
 	Cvar_SetDescription( g_rampJump, "Enable ramp/slope jumping (0 = off, 1 = on)." );
@@ -124,7 +131,8 @@ void SV_Enhanced_Init( void ) {
 	Cvar_SetDescription( g_doubleJump, "Enable double jump (0 = off, 1 = on)." );
 
 	/* Voting */
-	g_allowVote      = Cvar_Get( "g_allowVote",      "1",  CVAR_SERVERINFO | CVAR_ARCHIVE );
+	g_allowVote      = Cvar_Get( "g_allowVote",      "1",  CVAR_ARCHIVE );
+	g_allowVote->flags &= ~(int)CVAR_SERVERINFO;
 	g_voteDelay      = Cvar_Get( "g_voteDelay",      "30", CVAR_ARCHIVE );
 	g_voteLimit      = Cvar_Get( "g_voteLimit",      "3",  CVAR_ARCHIVE );
 	g_voteMinPlayers = Cvar_Get( "g_voteMinPlayers", "2",  CVAR_ARCHIVE );
@@ -146,7 +154,8 @@ void SV_Enhanced_Init( void ) {
 	Cvar_SetDescription( g_autoBalance, "Automatically move players to balance teams between rounds." );
 
 	/* Gameplay */
-	g_missilesThruTeleporters = Cvar_Get( "g_missilesThruTeleporters", "1",    CVAR_SERVERINFO | CVAR_ARCHIVE );
+	g_missilesThruTeleporters = Cvar_Get( "g_missilesThruTeleporters", "1",    CVAR_ARCHIVE );
+	g_missilesThruTeleporters->flags &= ~(int)CVAR_SERVERINFO;
 	g_selfDamage              = Cvar_Get( "g_selfDamage",              "1.0",  CVAR_ARCHIVE );
 	g_weaponRespawn           = Cvar_Get( "g_weaponRespawn",           "5",    CVAR_ARCHIVE );
 	g_armorProtection         = Cvar_Get( "g_armorProtection",         "0.66", CVAR_ARCHIVE );

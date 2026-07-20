@@ -95,10 +95,29 @@ void main() {
 	}
 
 	float coverage = 1.0 - revealage;
-	/* Tiny coverage: keep opaque — avoids stipple from underflowed weight sums. */
+	/* Soft floor: hard 1e-4 cutoffs left sparse soft-alpha as screen-door stipple. */
 	if ( coverage < 1e-4 ) {
 		out_color = vec4( opaque, 1.0 );
 		return;
+	}
+	{
+		float soft = smoothstep( 0.0, 0.04, coverage );
+		coverage *= soft;
+		revealage = 1.0 - coverage;
+	}
+	/* Near-black average with real coverage → prefer opaque (additive/hole guard). */
+	{
+		float avgLum = dot( max( c_avg, vec3( 0.0 ) ), vec3( 0.2126, 0.7152, 0.0722 ) );
+		if ( coverage > 0.15 && avgLum < 0.02 ) {
+			float keep = clamp( avgLum / 0.02, 0.0, 1.0 );
+			c_avg = mix( opaque, c_avg, keep );
+			coverage *= keep;
+			revealage = 1.0 - coverage;
+			if ( coverage < 1e-4 ) {
+				out_color = vec4( opaque, 1.0 );
+				return;
+			}
+		}
 	}
 	vec3 resolved = c_avg * coverage + opaque * revealage;
 	if ( oit_invalid3( resolved ) ) {

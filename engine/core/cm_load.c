@@ -24,6 +24,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "cm_local.h"
 #include "cm_stream.h"
 #include "cluster_graph.h"
+#include "qfiles_goldsrc.h"
 
 #ifdef BSPC
 
@@ -660,6 +661,21 @@ void CM_LoadMap( const char *name, qboolean clientload, int *checksum ) {
 	}
 
 	*checksum = cm.checksum = LittleLong( Com_BlockChecksum( buf, length ) );
+
+	if ( length >= (int)sizeof( goldsrc_header_t ) &&
+			LittleLong( *(const int32_t *)buf ) == GOLDSRC_BSP_VERSION ) {
+		CM_LoadGoldSrcMap( buf, length, name );
+		FS_FreeFile( buf );
+		CM_InitBoxHull();
+		CM_FloodAreaConnections();
+		ClusterGraph_Init();
+		ClusterGraph_RebuildFromMap();
+		if ( !clientload ) {
+			Q_strncpyz( cm.name, name, sizeof( cm.name ) );
+		}
+		CM_Stream_OnBaseMapLoad( name );
+		return;
+	}
 
 	header = *(dheader_t *)buf;
 	for ( i = 0; (size_t) i < sizeof( dheader_t ) / sizeof( int32_t ); i++ ) {

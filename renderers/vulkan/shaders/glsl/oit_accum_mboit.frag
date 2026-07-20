@@ -155,7 +155,7 @@ vec3 oit_forward_plus_add( vec3 baseRgb, vec3 N, vec3 worldPos, out bool cluster
 void main() {
 	vec4 base = textureLod(tex0, frag_tex_coord0, 0.0) * frag_color0;
 	float alpha = clamp(base.a, 0.0, 0.999);
-	if (alpha < 0.01) discard;
+	if (alpha < 1e-3) discard;
 	if ( isnan( alpha ) || isinf( alpha ) || any( isnan( base.rgb ) ) || any( isinf( base.rgb ) ) ) {
 		out_color = vec4( 1.0, 0.0, 1.0, 1.0 );
 		out_reveal = 0.0;

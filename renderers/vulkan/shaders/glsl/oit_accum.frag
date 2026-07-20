@@ -134,7 +134,8 @@ void main() {
 	vec4 base = textureLod(tex0, frag_tex_coord0, 0.0) * frag_color0;
 	/* Match MBOIT: alpha→1 collapses revealage to 0 (near-opaque glass). */
 	float alpha = clamp( base.a, 0.0, 0.999 );
-	if (alpha < 0.01) discard;
+	/* Soft glows / rings: hard 0.01 discard dithered the falloff into checkerboard. */
+	if ( alpha < 1e-3 ) discard;
 	if ( isnan( alpha ) || isinf( alpha ) || any( isnan( base.rgb ) ) || any( isinf( base.rgb ) ) ) {
 		out_color = vec4( 1.0, 0.0, 1.0, 1.0 );
 		out_reveal = 0.0;
@@ -174,13 +175,14 @@ void main() {
 	/*
 	 * McGuire/Bavoil WBOIT weight (JCGT 2013), adapted for reversed-Z.
 	 * Paper assumes gl_FragCoord.z with 0=near, 1=far. We map rz→zTrad first.
-	 * Clamping to [1e-2, 3e3] prevents fp16 underflow that resolves as stipple bands.
+	 * Clamping to [5e-2, 3e3] prevents fp16 underflow that resolves as stipple bands.
 	 */
 	float zTrad = clamp( 1.0 - DEPTH_TO_WEIGHT( gl_FragCoord.z ), 0.0, 1.0 );
 	float aFactor = pow( min( 1.0, alpha * 10.0 ) + 0.01, 3.0 );
 	float zFactor = pow( 1.0 - zTrad * 0.9, 3.0 );
-	float w = clamp( aFactor * 1e8 * zFactor, 1e-2, 3e3 );
-	/* Premultiplied accumulate: (Ci*ai*w, ai*w); revealage via blend product(1-ai). */
+	float w = clamp( aFactor * 1e8 * zFactor, 5e-2, 3e3 );
+	/* Premultiplied accumulate: (Ci*ai*w, ai*w); revealage via blend product(1-ai).
+	 * Additive bucket uses a pipeline with reveal write-mask off (host). */
 	out_color = vec4( litRgb * alpha, alpha ) * w;
 	out_reveal = alpha;
 }

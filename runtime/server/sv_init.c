@@ -855,18 +855,26 @@ void SV_Init( void )
 	Cvar_SetDescription( sv_dlRate, "Bandwidth allotted to PK3 file downloads via UDP, in kbyte/s." );
 	sv_floodProtect = Cvar_Get( "sv_floodProtect", "1", CVAR_ARCHIVE | CVAR_SERVERINFO );
 	Cvar_SetDescription( sv_floodProtect, "Toggle server flood protection to keep players from bringing the server down." );
-	sv_p2pHostMigration = Cvar_Get( "sv_p2pHostMigration", "0", CVAR_SERVERINFO | CVAR_ARCHIVE );
+	sv_p2pHostMigration = Cvar_Get( "sv_p2pHostMigration", "0", CVAR_ARCHIVE );
+	sv_p2pHostMigration->flags &= ~(int)CVAR_SERVERINFO;
 	Cvar_SetDescription( sv_p2pHostMigration,
-		"Advertise whether the session supports host migration after listen-host failure (0=off, 1=on)." );
-	sv_p2pReconnectWindow = Cvar_Get( "sv_p2pReconnectWindow", "45", CVAR_SERVERINFO | CVAR_ARCHIVE );
+		"Advertise whether the session supports host migration after listen-host failure (0=off, 1=on).\n"
+		"Injected into serverinfo via SV_AddP2PServerInfo (not CVAR_SERVERINFO — avoids 1024-byte overflow)." );
+	sv_p2pReconnectWindow = Cvar_Get( "sv_p2pReconnectWindow", "45", CVAR_ARCHIVE );
+	sv_p2pReconnectWindow->flags &= ~(int)CVAR_SERVERINFO;
 	Cvar_SetDescription( sv_p2pReconnectWindow,
-		"Advertised reconnect recovery window in seconds for P2P or hosted sessions." );
-	sv_p2pFailover = Cvar_Get( "sv_p2pFailover", "reconnect", CVAR_SERVERINFO | CVAR_ARCHIVE );
+		"Advertised reconnect recovery window in seconds for P2P or hosted sessions.\n"
+		"Injected into serverinfo via SV_AddP2PServerInfo (not CVAR_SERVERINFO)." );
+	sv_p2pFailover = Cvar_Get( "sv_p2pFailover", "reconnect", CVAR_ARCHIVE );
+	sv_p2pFailover->flags &= ~(int)CVAR_SERVERINFO;
 	Cvar_SetDescription( sv_p2pFailover,
-		"Advertised multiplayer recovery policy: reconnect, migrate, or none." );
-	sv_p2pSessionId = Cvar_Get( "sv_p2pSessionId", "auto", CVAR_SERVERINFO | CVAR_ARCHIVE );
+		"Advertised multiplayer recovery policy: reconnect, migrate, or none.\n"
+		"Injected into serverinfo via SV_AddP2PServerInfo (not CVAR_SERVERINFO)." );
+	sv_p2pSessionId = Cvar_Get( "sv_p2pSessionId", "auto", CVAR_ARCHIVE );
+	sv_p2pSessionId->flags &= ~(int)CVAR_SERVERINFO;
 	Cvar_SetDescription( sv_p2pSessionId,
-		"Advertised P2P session identifier; auto derives from fs_game, sv_serverid, and mapname." );
+		"Advertised P2P session identifier; auto derives from fs_game, sv_serverid, and mapname.\n"
+		"Injected into serverinfo via SV_AddP2PServerInfo (not CVAR_SERVERINFO)." );
 
 	// systeminfo
 	Cvar_Get( "sv_cheats", "1", CVAR_SYSTEMINFO | CVAR_ROM );

@@ -549,7 +549,7 @@ void vk_distortion_apply( void )
 {
 	VkCommandBuffer cmd;
 	VkImageAspectFlags depthAspect = VK_IMAGE_ASPECT_DEPTH_BIT;
-	VkImageView depthView, reactiveView;
+	VkImageView depthView, reactiveView, sampleView;
 	VkSampler linear;
 	VkDescriptorImageInfo imgInfos[5];
 	VkWriteDescriptorSet writes[5];
@@ -563,10 +563,17 @@ void vk_distortion_apply( void )
 	if ( !vk_distortion_active() ) {
 		return;
 	}
+	/* Weapon / viewmodel pass must not RMW the HDR color buffer. */
+	if ( backEnd.refdef.rdflags & RDF_NOWORLDMODEL ) {
+		return;
+	}
 	if ( !vk.cmd || vk.cmd->command_buffer == VK_NULL_HANDLE ) {
 		return;
 	}
 	if ( vk.color_image == VK_NULL_HANDLE || vk.depth_image == VK_NULL_HANDLE ) {
+		return;
+	}
+	if ( vk.fog_scene_image == VK_NULL_HANDLE || vk.fog_scene_image_view == VK_NULL_HANDLE ) {
 		return;
 	}
 	if ( !dist.width || !dist.height ) {
@@ -587,9 +594,13 @@ void vk_distortion_apply( void )
 		depthAspect |= VK_IMAGE_ASPECT_STENCIL_BIT;
 	}
 	record_depth_image_layout_transition( cmd, depthAspect,
-		VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
+		VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL,
 		VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT,
 		VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT );
+
+	/* Ping-pong: sample stable fog_scene copy, store into color GENERAL.
+	 * Same-image GENERAL sample+store races produce mid-screen static stipple. */
+	vk_copy_color_to_fog_scene( dist.width, dist.height );
 	record_image_layout_transition( cmd, vk.color_image, VK_IMAGE_ASPECT_COLOR_BIT,
 		VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_GENERAL,
 		0, 0 );
@@ -598,12 +609,11 @@ void vk_distortion_apply( void )
 		vk_barrier_reactive_mask_for_storage( "distortion-apply" );
 	}
 
+	sampleView = vk.fog_scene_image_view;
 	Com_Memset( imgInfos, 0, sizeof( imgInfos ) );
-	/* Same-image sample+store: both must use GENERAL once color is GENERAL.
-	 * SHADER_READ sample layout against a GENERAL image produced tile/band UB. */
 	imgInfos[0].sampler = linear;
-	imgInfos[0].imageView = vk.color_image_view;
-	imgInfos[0].imageLayout = VK_IMAGE_LAYOUT_GENERAL;
+	imgInfos[0].imageView = sampleView;
+	imgInfos[0].imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 	imgInfos[1].sampler = linear;
 	imgInfos[1].imageView = depthView;
 	imgInfos[1].imageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;

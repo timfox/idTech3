@@ -180,6 +180,11 @@ void vk_create_oit_accum_pipeline( void )
 		qvkDestroyPipeline( vk.device, vk.oit_accum_pipeline, NULL );
 		vk.oit_accum_pipeline = VK_NULL_HANDLE;
 	}
+	if ( vk.oit_accum_additive_pipeline != VK_NULL_HANDLE ) {
+		vk_wait_idle();
+		qvkDestroyPipeline( vk.device, vk.oit_accum_additive_pipeline, NULL );
+		vk.oit_accum_additive_pipeline = VK_NULL_HANDLE;
+	}
 
 	/* Gen vertex layout: position, color, texcoord (TYPE_SIGNLE_TEXTURE) */
 	Com_Memset( &vertex_input, 0, sizeof( vertex_input ) );
@@ -330,6 +335,15 @@ void vk_create_oit_accum_pipeline( void )
 	if ( qvkCreateGraphicsPipelines( vk.device, vk.pipelineCache, 1, &create_info, NULL, &vk.oit_accum_pipeline ) == VK_SUCCESS ) {
 		SET_OBJECT_NAME( vk.oit_accum_pipeline, "pipeline - oit accum", VK_DEBUG_REPORT_OBJECT_TYPE_PIPELINE_EXT );
 		ri.Printf( PRINT_ALL, "[VK] OIT accum pipeline created (weighted blended OIT)\n" );
+	}
+
+	/* Additive / particle bucket: accumulate color, do not multiply revealage.
+	 * ONE/ONE materials must not occlude the opaque background (black holes + stipple). */
+	blend_attachments[1].blendEnable = VK_FALSE;
+	blend_attachments[1].colorWriteMask = 0;
+	if ( qvkCreateGraphicsPipelines( vk.device, vk.pipelineCache, 1, &create_info, NULL, &vk.oit_accum_additive_pipeline ) == VK_SUCCESS ) {
+		SET_OBJECT_NAME( vk.oit_accum_additive_pipeline, "pipeline - oit accum additive", VK_DEBUG_REPORT_OBJECT_TYPE_PIPELINE_EXT );
+		ri.Printf( PRINT_ALL, "[VK] OIT additive accum pipeline created (no revealage occlusion)\n" );
 	}
 }
 

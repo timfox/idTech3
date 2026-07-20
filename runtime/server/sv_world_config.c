@@ -115,10 +115,13 @@ SV_WorldConfig_Init
 ===============
 */
 void SV_WorldConfig_Init( void ) {
-	sv_worldConfigEnable = Cvar_Get( "sv_worldConfigEnable", "0", CVAR_ARCHIVE | CVAR_SERVERINFO );
+	/* ARCHIVE only — SERVERINFO budget must keep OA videoflags/voteflags. */
+	sv_worldConfigEnable = Cvar_Get( "sv_worldConfigEnable", "0", CVAR_ARCHIVE );
+	sv_worldConfigEnable->flags &= ~(int)CVAR_SERVERINFO;
 	Cvar_SetDescription( sv_worldConfigEnable,
 		"Publish CS_ENGINE_WORLD_CONFIG and authorize named world-config transitions." );
-	sv_worldConfig = Cvar_Get( "sv_worldConfig", "default", CVAR_ARCHIVE | CVAR_SERVERINFO );
+	sv_worldConfig = Cvar_Get( "sv_worldConfig", "default", CVAR_ARCHIVE );
+	sv_worldConfig->flags &= ~(int)CVAR_SERVERINFO;
 	Cvar_SetDescription( sv_worldConfig,
 		"Server-authoritative world config name (geometry/nav/spawns/lighting)." );
 

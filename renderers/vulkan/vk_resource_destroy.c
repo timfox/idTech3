@@ -302,6 +302,10 @@ void vk_destroy_pipelines( qboolean resetCounter )
 		qvkDestroyPipeline( vk.device, vk.oit_accum_pipeline, NULL );
 		vk.oit_accum_pipeline = VK_NULL_HANDLE;
 	}
+	if ( vk.oit_accum_additive_pipeline != VK_NULL_HANDLE ) {
+		qvkDestroyPipeline( vk.device, vk.oit_accum_additive_pipeline, NULL );
+		vk.oit_accum_additive_pipeline = VK_NULL_HANDLE;
+	}
 	if ( vk.oit_moments_pipeline != VK_NULL_HANDLE ) {
 		qvkDestroyPipeline( vk.device, vk.oit_moments_pipeline, NULL );
 		vk.oit_moments_pipeline = VK_NULL_HANDLE;
