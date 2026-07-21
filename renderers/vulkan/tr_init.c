@@ -1313,6 +1313,7 @@ static void R_Register( void )
 	ri.Cmd_AddCommand( "temporal_ghost_status", vk_temporal_ghost_status_f );
 	ri.Cmd_AddCommand( "surf_validateTemporalConfig", vk_surf_validate_temporal_config_f );
 	ri.Cmd_AddCommand( "r_printViewmodelProjection", vk_print_viewmodel_projection_f );
+	ri.Cmd_AddCommand( "temporal_motion_status", vk_motion_status_f );
 	ri.Cmd_AddCommand( "present_recon_status", vk_present_recon_status_f );
 	ri.Cmd_AddCommand( "motion_vector_cert", vk_motion_vector_cert_status_f );
 	ri.Cmd_AddCommand( "visibility_buffer_status", vk_visibility_buffer_status_f );

@@ -683,6 +683,14 @@ static void CL_KeyDownEvent( int key, unsigned time )
 
 		if ( !( Key_GetCatcher( ) & KEYCATCH_UI ) ) {
 			if ( cls.state == CA_ACTIVE && !clc.demoplaying ) {
+				/* Route the pause menu to the JS overlay (ui_rpMenu pointer
+				 * mode) instead of the native UI VM when opted in. */
+				if ( Cvar_VariableIntegerValue( "cl_jsEscapeMenu" ) ) {
+					Cvar_Set( "ui_rpMenu", "1" );
+					Key_ClearStates();
+					CL_JsNotifyMenuChanged( UIMENU_INGAME );
+					return;
+				}
 				VM_Call( uivm, 1, UI_SET_ACTIVE_MENU, UIMENU_INGAME );
 				CL_JsNotifyMenuChanged( UIMENU_INGAME );
 			}

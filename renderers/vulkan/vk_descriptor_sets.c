@@ -1166,6 +1166,9 @@ void vk_init_descriptors( void )
 		VK_CHECK( qvkAllocateDescriptorSets( vk.device, &alloc, &vk.temporal_class_stamp_descriptor ) );
 		VK_CHECK( qvkAllocateDescriptorSets( vk.device, &alloc, &vk.temporal_class_fallback_descriptor ) );
 		VK_CHECK( qvkAllocateDescriptorSets( vk.device, &alloc, &vk.temporal_reactive_fallback_descriptor ) );
+		VK_CHECK( qvkAllocateDescriptorSets( vk.device, &alloc, &vk.taa_object_id_descriptor[0] ) );
+		VK_CHECK( qvkAllocateDescriptorSets( vk.device, &alloc, &vk.taa_object_id_descriptor[1] ) );
+		VK_CHECK( qvkAllocateDescriptorSets( vk.device, &alloc, &vk.taa_object_id_stub_descriptor ) );
 
 		if ( r_ssao && r_ssao->integer ) {
 			VK_CHECK( qvkAllocateDescriptorSets( vk.device, &alloc, &vk.ssao_descriptor ) );

@@ -20,3 +20,4 @@ void vk_update_mvp( const float *m );
 void vk_read_mvp_transform( float *mvp );
 void vk_read_prev_mvp_transform( float *prev_mvp );
 void vk_print_viewmodel_projection_f( void );
+void vk_motion_status_f( void );

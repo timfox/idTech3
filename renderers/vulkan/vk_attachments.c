@@ -1014,6 +1014,39 @@ void vk_create_attachments( void )
 						ri.Printf( PRINT_ALL, "[VK] Temporal class mask: dual R8 allocated (WORLD/WEAPON)\n" );
 					}
 				}
+				/* Dynamic-object identity ping-pong (R32_UINT storage + sampled). */
+				{
+					qboolean want_object_id = qfalse;
+					cvar_t *objIdCvar = ri.Cvar_Get( "r_temporalObjectId", "1", CVAR_ARCHIVE_ND | CVAR_LATCH );
+					VkImageUsageFlags objIdUsage =
+						VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT |
+						VK_IMAGE_USAGE_TRANSFER_DST_BIT;
+					if ( objIdCvar && objIdCvar->integer ) {
+						if ( r_taa && r_taa->integer ) {
+							want_object_id = qtrue;
+						} else if ( r_aaMode && r_aaMode->integer >= 3 && r_aaMode->integer <= 5 ) {
+							want_object_id = qtrue;
+						} else if ( R_Upscale_WantTemporal() ) {
+							want_object_id = qtrue;
+						}
+					}
+					if ( want_object_id ) {
+						int oi;
+						for ( oi = 0; oi < 2; oi++ ) {
+							vk_create_fullres_color_attachment( VK_FORMAT_R32_UINT, objIdUsage,
+								&vk.object_id_image[oi], &vk.object_id_view[oi],
+								VK_IMAGE_LAYOUT_GENERAL, qfalse );
+							vk.object_id_layout[oi] = VK_IMAGE_LAYOUT_GENERAL;
+						}
+						vk.temporal.objectIdIndex = 0;
+						vk.temporal.objectIdHasPrev = qfalse;
+						ri.Printf( PRINT_ALL, "[VK] Temporal object identity: dual R32_UINT allocated\n" );
+					}
+					/* Always allocate a 1x1 GENERAL stub so TAA/forward+ descriptors stay legal. */
+					create_color_attachment( 1, 1, VK_SAMPLE_COUNT_1_BIT, VK_FORMAT_R32_UINT,
+						objIdUsage, &vk.object_id_stub_image, &vk.object_id_stub_view,
+						VK_IMAGE_LAYOUT_GENERAL, qfalse, 0 );
+				}
 				/* True temporal depth history. R32F stores the exact single-sample
 				 * reversed-Z representation consumed by TAA on the next frame. */
 				{
@@ -1277,6 +1310,16 @@ void vk_create_attachments( void )
 				i == 0 ? "TemporalClassR8View[0]" : "TemporalPrevClassR8View[1]",
 				VK_DEBUG_REPORT_OBJECT_TYPE_IMAGE_VIEW_EXT );
 		}
+		if ( vk.object_id_image[i] ) {
+			SET_OBJECT_NAME( vk.object_id_image[i], va( "TemporalObjectIdR32U[%d]", i ),
+				VK_DEBUG_REPORT_OBJECT_TYPE_IMAGE_EXT );
+			SET_OBJECT_NAME( vk.object_id_view[i], va( "TemporalObjectIdR32UView[%d]", i ),
+				VK_DEBUG_REPORT_OBJECT_TYPE_IMAGE_VIEW_EXT );
+		}
+	}
+	if ( vk.object_id_stub_image ) {
+		SET_OBJECT_NAME( vk.object_id_stub_image, "TemporalObjectIdStubR32U", VK_DEBUG_REPORT_OBJECT_TYPE_IMAGE_EXT );
+		SET_OBJECT_NAME( vk.object_id_stub_view, "TemporalObjectIdStubR32UView", VK_DEBUG_REPORT_OBJECT_TYPE_IMAGE_VIEW_EXT );
 	}
 	if ( vk.reactive_mask_image ) {
 		SET_OBJECT_NAME( vk.reactive_mask_image, "TemporalReactiveR8", VK_DEBUG_REPORT_OBJECT_TYPE_IMAGE_EXT );
@@ -2629,7 +2672,20 @@ void vk_destroy_attachments( void )
 				vk.temporal_class_view[ci] = VK_NULL_HANDLE;
 				vk.temporal_class_layout[ci] = VK_IMAGE_LAYOUT_UNDEFINED;
 			}
+			if ( vk.object_id_image[ci] ) {
+				qvkDestroyImage( vk.device, vk.object_id_image[ci], NULL );
+				qvkDestroyImageView( vk.device, vk.object_id_view[ci], NULL );
+				vk.object_id_image[ci] = VK_NULL_HANDLE;
+				vk.object_id_view[ci] = VK_NULL_HANDLE;
+				vk.object_id_layout[ci] = VK_IMAGE_LAYOUT_UNDEFINED;
+			}
 		}
+	}
+	if ( vk.object_id_stub_image ) {
+		qvkDestroyImage( vk.device, vk.object_id_stub_image, NULL );
+		qvkDestroyImageView( vk.device, vk.object_id_stub_view, NULL );
+		vk.object_id_stub_image = VK_NULL_HANDLE;
+		vk.object_id_stub_view = VK_NULL_HANDLE;
 	}
 	if ( vk.motion_vector_msaa_image ) {
 		qvkDestroyImage( vk.device, vk.motion_vector_msaa_image, NULL );

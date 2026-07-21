@@ -816,6 +816,9 @@ typedef struct {
 	VkDescriptorSet taa_motion_descriptor[NUM_COMMAND_BUFFERS];
 	VkDescriptorSet taa_reactive_descriptor[NUM_COMMAND_BUFFERS];
 	VkDescriptorSet taa_class_descriptor[NUM_COMMAND_BUFFERS];
+	/* Dynamic-object identity ping-pong (curr/prev views) + 1x1 stub for identity-off frames. */
+	VkDescriptorSet taa_object_id_descriptor[2];
+	VkDescriptorSet taa_object_id_stub_descriptor;
 	VkDescriptorSet temporal_prev_depth_descriptor[2];
 	VkDescriptorSet temporal_depth_copy_descriptor[2];
 	VkDescriptorSet weapon_history_descriptor[2];
@@ -1604,6 +1607,10 @@ typedef struct {
 		/* Class ping-pong: classHistoryIndex selects previous for TAA. */
 		uint32_t classHistoryIndex;
 		qboolean classHasPrev;
+		/* Object-identity ping-pong: objectIdIndex is this frame's stamp slot. */
+		uint32_t objectIdIndex;
+		qboolean objectIdHasPrev;
+		uint64_t objectIdFrameId[2];
 	} temporal;
 
 	//
@@ -1983,6 +1990,12 @@ typedef struct {
 	VkImage temporal_class_image[2];
 	VkImageView temporal_class_view[2];
 	VkImageLayout temporal_class_layout[2];
+	/* Dynamic-object identity ping-pong (R32_UINT, packed reversed-Z depth<<16 | stableId&0xFFFF). */
+	VkImage object_id_image[2];
+	VkImageView object_id_view[2];
+	VkImageLayout object_id_layout[2];
+	VkImage object_id_stub_image;	/* 1x1 GENERAL storage image bound when identity disabled */
+	VkImageView object_id_stub_view;
 	/* True previous-frame depth, normalized to single-sample reversed-Z R32F. */
 	VkImage temporal_prev_depth_image[2];
 	VkImageView temporal_prev_depth_view[2];

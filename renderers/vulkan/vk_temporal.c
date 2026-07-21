@@ -10,6 +10,7 @@
 #include "vk_exposure_histogram.h"
 #include "vk_postfx.h"
 #include "vk_reactive_mask.h"
+#include "vk_object_id.h"
 #include "vk_temporal_class.h"
 #include "vk_image_layout.h"
 #include "vk_scene_pass.h"
@@ -436,6 +437,7 @@ void vk_reset_taa_history( void )
 	vk.temporal.weaponMatricesValid = qfalse;
 	vk.temporal.weaponMatricesHavePrev = qfalse;
 	vk.temporal.classHasPrev = qfalse;
+	vk_object_id_reset();
 	vk_reset_weapon_history();
 }
 

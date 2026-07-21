@@ -49,6 +49,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "vk_render_pass.h"
 #include "vk_reactive_mask.h"
 #include "vk_temporal_class.h"
+#include "vk_object_id.h"
 #include "vk_ambient_visibility.h"
 #include "vk_raster_gi.h"
 #include "vk_gpu_particles.h"
@@ -2604,6 +2605,14 @@ static const void *RB_DrawSurfs( const void *data ) {
 		vk_gpu_scene_cull_and_build_indirect();
 		/* HT Slice A: coalesce compatible indirect draws before any consumer. */
 		vk_ht_merge_gpu_scene_draws();
+	}
+#endif
+
+#ifdef USE_VULKAN
+	/* Clear + bind the dynamic-object identity buffer before opaque world draws so
+	 * gen_frag can stamp per-entity ids. First-person weapon (NOWORLDMODEL) is excluded. */
+	if ( !( cmd->refdef.rdflags & RDF_NOWORLDMODEL ) ) {
+		vk_object_id_begin_frame();
 	}
 #endif
 

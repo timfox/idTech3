@@ -157,6 +157,33 @@ layout(push_constant) uniform VisTransform {
 } visPc;
 #endif
 
+#if defined(USE_FORWARD_PLUS_FRAG) && !defined(USE_ATEST) && !defined(USE_VISIBILITY_EXPORT)
+/* Same layout as vkMvpPushConstants_t; reserved[2]=motionInvalid, reserved[3]=objectId bits. */
+layout(push_constant) uniform ObjTransform {
+	mat4 obj_mvp;
+	mat4 obj_prevMvp;
+	float obj_r0;
+	float obj_r1;
+	float obj_r2;
+	float obj_r3;
+	float obj_r4;
+	float obj_r5;
+	float obj_r6;
+	float obj_r7;
+} objPc;
+#endif
+
+/* Object-identity source (reserved[3] = stableId float bits) across push-constant variants. */
+#ifdef USE_FORWARD_PLUS_FRAG
+#if defined(USE_ATEST)
+#define OBJ_ID_BITS stochPc.stoch_r3
+#elif defined(USE_VISIBILITY_EXPORT)
+#define OBJ_ID_BITS visPc.vis_r3
+#else
+#define OBJ_ID_BITS objPc.obj_r3
+#endif
+#endif
+
 layout (constant_id = 3) const int alpha_to_coverage = 0;
 //layout (constant_id = 4) const int color_mode = 0;
 //layout (constant_id = 5) const int abs_light = 0;
@@ -235,6 +262,8 @@ layout(set = 18, binding = 4) uniform sampler2D fp_sun_shadow_map;
 layout(set = 18, binding = 5, r8) uniform image2D reactiveMaskImg;
 layout(set = 18, binding = 6) uniform sampler2D ltc_mat_texture;
 layout(set = 18, binding = 7) uniform sampler2D ltc_amp_texture;
+/* Dynamic-object identity buffer: packed (reversedZ<<16 | stableId16), imageAtomicMax. */
+layout(set = 18, binding = 8, r32ui) uniform uimage2D objectIdImg;
 #define USE_LTC_AREA_LIGHT
 #include "ltc_area_light.glsl"
 #endif
@@ -2049,6 +2078,16 @@ void main() {
 #endif
 		if ( doStamp ) {
 			imageStore( reactiveMaskImg, ivec2( gl_FragCoord.xy ), vec4( 1.0 ) );
+		}
+	}
+	/* Dynamic-object identity stamp: frontmost owner via depth-packed imageAtomicMax.
+	 * id == 0 means world/static (feature off or non-dynamic draw) → never stamp. */
+	{
+		uint objId = floatBitsToUint( OBJ_ID_BITS ) & 0xFFFFu;
+		if ( objId != 0u ) {
+			uint depthBits = uint( clamp( gl_FragCoord.z, 0.0, 1.0 ) * 65535.0 );
+			uint packed = ( depthBits << 16 ) | objId;
+			imageAtomicMax( objectIdImg, ivec2( gl_FragCoord.xy ), packed );
 		}
 	}
 #endif

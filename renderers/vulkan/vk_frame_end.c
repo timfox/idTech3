@@ -12,6 +12,7 @@
 #include "vk_pass_registry.h"
 #include "vk_reactive_mask.h"
 #include "vk_temporal_class.h"
+#include "vk_object_id.h"
 #include <assert.h>
 #include "vk_render_pass.h"
 #include "vk_scene_pass.h"
@@ -171,12 +172,12 @@ static void vk_end_frame_bind_post_process_sets( VkDescriptorSet set0, VkDescrip
 
 static void vk_end_frame_bind_taa_sets( VkDescriptorSet set0, VkDescriptorSet set1, VkDescriptorSet set2,
 	VkDescriptorSet set3, VkDescriptorSet set4, VkDescriptorSet set5, VkDescriptorSet set6,
-	VkDescriptorSet set7 )
+	VkDescriptorSet set7, VkDescriptorSet set8, VkDescriptorSet set9 )
 {
-	VkDescriptorSet sets[8] = { set0, set1, set2, set3, set4, set5, set6, set7 };
+	VkDescriptorSet sets[10] = { set0, set1, set2, set3, set4, set5, set6, set7, set8, set9 };
 
 	qvkCmdBindDescriptorSets( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
-		vk.pipeline_layout_taa, 0, 8, sets, 0, NULL );
+		vk.pipeline_layout_taa, 0, 10, sets, 0, NULL );
 }
 
 static qboolean vk_end_frame_gamma_chain_ready( void )
@@ -756,6 +757,10 @@ void vk_end_frame_record_taa_pass( VkImageView *post_fog_src, VkImageView *lumin
 		vk_barrier_temporal_class_for_sampling( "vk_end_frame pre-taa (class)" );
 		vk_temporal_class_update_taa_descriptors();
 	}
+	if ( vk_object_id_active() ) {
+		vk_barrier_object_id_for_sampling( "vk_end_frame pre-taa (object id)" );
+	}
+	vk_object_id_update_taa_descriptors();
 	if ( vk.temporal.hasValidTAAHistory ) {
 		vk_barrier_post_fog_source_for_sampling( vk.taa_history_image_view[readIndex], "vk_end_frame pre-taa (history)" );
 		vk_spine_note_read( VK_SPINE_RES_TAA_HISTORY, VK_SPINE_PASS_TEMPORAL_RECON,
@@ -782,8 +787,11 @@ void vk_end_frame_record_taa_pass( VkImageView *post_fog_src, VkImageView *lumin
 			vk.taa_motion_descriptor[vk.cmd_index],
 			reactive_set,
 			class_set,
-			vk.temporal_prev_depth_descriptor[readIndex] );
+			vk.temporal_prev_depth_descriptor[readIndex],
+			vk_object_id_curr_descriptor(),
+			vk_object_id_prev_descriptor() );
 	}
+	vk_object_id_commit();
 	vk_end_frame_draw_fullscreen_quad( taaWidth, taaHeight );
 	vk_end_render_pass();
 

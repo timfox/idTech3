@@ -4,6 +4,7 @@
 #include "vk_view_state.h"
 #include "vk_frequency_aware.h"
 #include "vk_upscale.h"
+#include "vk_object_id.h"
 #include <math.h>
 
 typedef struct vkMvpPushConstants_s {
@@ -403,6 +404,59 @@ void vk_reset_motion_history( void )
 	vk.temporal.weaponEntityIdPrev = 0;
 	Com_Memset( &vk_viewmodel_projection_current, 0, sizeof( vk_viewmodel_projection_current ) );
 	Com_Memset( &vk_viewmodel_projection_previous, 0, sizeof( vk_viewmodel_projection_previous ) );
+}
+
+static const char *vk_motion_invalid_reason_name( int reason )
+{
+	switch ( reason ) {
+		case VK_MOTION_OK: return "ok";
+		case VK_MOTION_INVALID_NO_PREV: return "no_prev";
+		case VK_MOTION_INVALID_TELEPORT: return "teleport";
+		case VK_MOTION_INVALID_MODEL_CHANGE: return "model_change";
+		case VK_MOTION_INVALID_SKIN_CHANGE: return "skin_change";
+		case VK_MOTION_INVALID_TRANSFORM_JUMP: return "transform_jump";
+		case VK_MOTION_INVALID_SLOT_REUSE: return "slot_reuse";
+		case VK_MOTION_INVALID_ANIM_NO_POSE: return "anim_no_pose";
+		case VK_MOTION_INVALID_FIRST_PERSON: return "first_person";
+		case VK_MOTION_INVALID_CUSTOM_SHADER: return "custom_shader";
+		default: return "?";
+	}
+}
+
+/*
+ * temporal_motion_status: per-entity dynamic-object motion + identity report.
+ * Text realization of the requested helmet overlay — dump the same fields the
+ * TAA resolve uses to accept/reject history so ghosting can be diagnosed live.
+ */
+void vk_motion_status_f( void )
+{
+	int i;
+	int shown = 0;
+
+	ri.Printf( PRINT_ALL, "Dynamic-object temporal motion (frame %u, objIdBuf=%s, prev=%s)\n",
+		vk.temporal.frameIndex,
+		vk_object_id_active() ? "on" : "off",
+		vk.temporal.objectIdHasPrev ? "valid" : "none" );
+	ri.Printf( PRINT_ALL, "  slot=%u curr=%d prev=%d\n",
+		vk.temporal.objectIdIndex, vk_motion_curr_count, vk_motion_prev_count );
+	ri.Printf( PRINT_ALL, "  %-4s %-6s %-6s %-8s %-6s %-6s %-14s\n",
+		"idx", "model", "id16", "frameId", "gen", "prev", "lastInvalid" );
+
+	for ( i = 0; i < vk_motion_curr_count && i < MAX_REFENTITIES; i++ ) {
+		const vkEntityMotionRecord_t *c = &vk_motion_curr[i];
+		if ( !c->valid ) {
+			continue;
+		}
+		ri.Printf( PRINT_ALL, "  %-4d %-6d %-6u %-8u %-6u %-6s %-14s\n",
+			i, c->hModel, (unsigned)( c->stableId & 0xFFFFu ), (unsigned)c->frameId,
+			(unsigned)c->generation,
+			c->lastInvalidReason == VK_MOTION_OK ? "yes" : "no",
+			vk_motion_invalid_reason_name( c->lastInvalidReason ) );
+		shown++;
+	}
+	if ( shown == 0 ) {
+		ri.Printf( PRINT_ALL, "  (no dynamic objects this frame)\n" );
+	}
 }
 
 static float vk_projection_fov_degrees( float scale )
@@ -947,10 +1001,17 @@ void vk_update_mvp( const float *m )
 	 */
 	if ( tess.sdfUiEdge < 0.0f && tess.subpixelShift < 0.0f && tess.vectorCurveCount <= 0 &&
 		vk_motion_draw_is_dynamic ) {
-		union { uint32_t u; float f; } idBits;
 		push_constants.reserved[2] = vk_motion_draw_invalid ? 1.0f : 0.0f;
-		idBits.u = vk_motion_draw_stable_id;
-		push_constants.reserved[3] = idBits.f;
+		/* reserved[3] = 16-bit stable object id (float bits) — only when the identity
+		 * buffer is allocated, so disabled frames leave id 0 and gen_frag never stamps. */
+		if ( vk_object_id_active() ) {
+			union { uint32_t u; float f; } idBits;
+			idBits.u = ( vk_motion_draw_stable_id & 0xFFFFu );
+			if ( idBits.u == 0u ) {
+				idBits.u = 1u; /* reserve 0 for background; avoid a live object hashing to 0 */
+			}
+			push_constants.reserved[3] = idBits.f;
+		}
 	}
 
 	layout = vk.pipeline_layout;

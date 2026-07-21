@@ -42,6 +42,9 @@ layout(set = 4, binding = 0) uniform sampler2D motionTex;
 layout(set = 5, binding = 0) uniform sampler2D reactiveMaskTex;
 layout(set = 6, binding = 0) uniform sampler2D temporalClassTex;
 layout(set = 7, binding = 0) uniform sampler2D previousDepthTex;
+/* Dynamic-object identity (R32_UINT): packed (reversedZ<<16 | stableId16). */
+layout(set = 8, binding = 0) uniform usampler2D currentObjectId;
+layout(set = 9, binding = 0) uniform usampler2D previousObjectId;
 
 layout(location = 0) in vec2 frag_tex_coord;
 layout(location = 0) out vec4 out_color;
@@ -285,6 +288,19 @@ void main() {
 		}
 	}
 
+	/*
+	 * True per-pixel object-identity rejection.
+	 * currentObjectId is stamped this frame at the pixel; previousObjectId is last
+	 * frame's buffer sampled at the reprojected history UV. Any mismatch means the
+	 * pixel's owner changed between frames — object moved, disoccluded background,
+	 * background→object, entity-slot reuse, or overlapping object — so the history
+	 * cannot be trusted. World/static pixels read 0 in both buffers (also when the
+	 * identity feature is off and the 1x1 stub is bound), so they are never rejected.
+	 */
+	uint currObjId = texture( currentObjectId, sampleUV ).r & 0xFFFFu;
+	uint prevObjId = texture( previousObjectId, historyUV ).r & 0xFFFFu;
+	bool objectIdReject = ( currObjId != prevObjId );
+
 	/* Confidence factors */
 	float depthConf = 1.0;
 	float neighborhoodDepthReject = 0.0;
@@ -386,6 +402,11 @@ void main() {
 		confidence = 0.0;
 		reactive = max( reactive, 0.98 );
 	}
+	/* Object-identity mismatch: hard reject history and prefer current color. */
+	if ( objectIdReject ) {
+		confidence = 0.0;
+		reactive = max( reactive, 0.98 );
+	}
 	if ( adaptive && depthConf < 0.35 ) {
 		confidence = 0.0; /* immediate disocclusion → current-frame spatial */
 	}
@@ -420,11 +441,19 @@ void main() {
 			return;
 		}
 		if ( od < 5.5 ) {
-			/* 3–5 object ID placeholders (WORLD class until dedicated ID RT) */
-			float idProxy = fract( depthNdc * 64.0 );
-			if ( od < 3.5 ) out_color = vec4( idProxy, 0.2, 1.0 - idProxy, 1.0 );
-			else if ( od < 4.5 ) out_color = vec4( fract( histDepth * 64.0 ), 0.4, 0.2, 1.0 );
-			else out_color = vec4( classReject ? 1.0 : 0.0, 0.2, 0.2, 1.0 );
+			/* 3 = current object id (hashed to color), 4 = previous object id at history UV,
+			 * 5 = identity-reject mask (magenta where current/prev ids disagree). */
+			if ( od < 3.5 ) {
+				float h = float( currObjId ) / 65535.0;
+				out_color = ( currObjId == 0u ) ? vec4( 0.05, 0.05, 0.05, 1.0 )
+					: vec4( fract( h * 97.0 ), fract( h * 31.0 ), fract( h * 13.0 ), 1.0 );
+			} else if ( od < 4.5 ) {
+				float h = float( prevObjId ) / 65535.0;
+				out_color = ( prevObjId == 0u ) ? vec4( 0.05, 0.05, 0.05, 1.0 )
+					: vec4( fract( h * 97.0 ), fract( h * 31.0 ), fract( h * 13.0 ), 1.0 );
+			} else {
+				out_color = objectIdReject ? vec4( 1.0, 0.0, 1.0, 1.0 ) : vec4( 0.0, 0.35, 0.0, 1.0 );
+			}
 			return;
 		}
 		if ( od < 6.5 ) { out_color = vec4( depthNdc, depthNdc, depthNdc, 1.0 ); return; }
