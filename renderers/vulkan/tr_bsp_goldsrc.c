@@ -7,6 +7,9 @@ ordinary idTech3 planar surfaces. Embedded indexed textures are expanded to
 RGBA at load time. GoldSrc lightmaps use a different packing model, so this
 initial bridge uses vertex-white lighting while retaining the original base
 textures and geometry.
+
+This is an independent binary-format implementation. It does not include or
+depend on Half-Life SDK source, headers, or libraries.
 ===========================================================================
 */
 
@@ -23,6 +26,14 @@ typedef struct {
 	int *textureHeights;
 	int numTextures;
 } goldsrcRenderLoad_t;
+
+#define GOLDSRC_MAX_WADS 16
+
+typedef struct {
+	byte *data;
+	int length;
+	char name[MAX_QPATH];
+} goldsrcWadFile_t;
 
 static int GS_LumpLength( const goldsrcRenderLoad_t *load, int lump ) {
 	return LittleLong( load->header->lumps[lump].filelen );
@@ -69,10 +80,185 @@ static void GS_TextureName( char *out, int outSize, const goldsrc_miptex_t *mipt
 	}
 }
 
+static qboolean GS_MiptexPixelsValid( const goldsrc_miptex_t *miptex, int available ) {
+	uint32_t width = LittleLong( miptex->width );
+	uint32_t height = LittleLong( miptex->height );
+	uint32_t pixelOffset = LittleLong( miptex->offsets[0] );
+	uint64_t pixelCount = (uint64_t)width * height;
+	uint64_t paletteOffset = (uint64_t)LittleLong( miptex->offsets[3] ) + pixelCount / 64 + 2;
+
+	return width > 0 && height > 0 && width <= 4096 && height <= 4096 &&
+			pixelOffset > 0 && pixelCount <= INT_MAX &&
+			(uint64_t)pixelOffset + pixelCount <= (uint64_t)available &&
+			paletteOffset + 256 * 3 <= (uint64_t)available;
+}
+
+static image_t *GS_CreateTextureImage( const char *shaderName,
+		const goldsrc_miptex_t *miptex, int available ) {
+	uint32_t width = LittleLong( miptex->width );
+	uint32_t height = LittleLong( miptex->height );
+	uint32_t pixelOffset = LittleLong( miptex->offsets[0] );
+	uint64_t pixelCount = (uint64_t)width * height;
+	uint64_t paletteOffset = (uint64_t)LittleLong( miptex->offsets[3] ) + pixelCount / 64 + 2;
+	const byte *pixels;
+	const byte *palette;
+	byte *rgba;
+	image_t *image;
+	int p;
+
+	if ( !GS_MiptexPixelsValid( miptex, available ) ) {
+		return NULL;
+	}
+
+	pixels = (const byte *)miptex + pixelOffset;
+	palette = (const byte *)miptex + paletteOffset;
+	rgba = ri.Hunk_AllocateTempMemory( (int)pixelCount * 4 );
+	for ( p = 0; p < (int)pixelCount; p++ ) {
+		int colorIndex = pixels[p];
+		rgba[p * 4 + 0] = palette[colorIndex * 3 + 0];
+		rgba[p * 4 + 1] = palette[colorIndex * 3 + 1];
+		rgba[p * 4 + 2] = palette[colorIndex * 3 + 2];
+		rgba[p * 4 + 3] = ( miptex->name[0] == '{' && colorIndex == 255 ) ? 0 : 255;
+	}
+
+	image = R_CreateImage( shaderName, NULL, rgba, (int)width, (int)height,
+			IMGFLAG_MIPMAP | IMGFLAG_NO_COMPRESSION, 0, 0 );
+	ri.Hunk_FreeTempMemory( rgba );
+	return image;
+}
+
+static image_t *GS_CreateFallbackImage( const char *shaderName, const char *textureName ) {
+	byte rgba[64 * 64 * 4];
+	unsigned hash = 2166136261u;
+	int x, y;
+	const unsigned char *s = (const unsigned char *)textureName;
+
+	while ( *s ) {
+		hash = ( hash ^ *s++ ) * 16777619u;
+	}
+	for ( y = 0; y < 64; y++ ) {
+		for ( x = 0; x < 64; x++ ) {
+			int p = ( y * 64 + x ) * 4;
+			int checker = ( ( x >> 3 ) ^ ( y >> 3 ) ) & 1;
+			int grid = ( x == 0 || y == 0 || x == 63 || y == 63 );
+			rgba[p + 0] = grid ? 255 : (byte)( 48 + ( ( hash >> 0 ) & 127 ) * ( checker ? 1 : 2 ) / 2 );
+			rgba[p + 1] = grid ? 64 : (byte)( 48 + ( ( hash >> 8 ) & 127 ) * ( checker ? 1 : 2 ) / 2 );
+			rgba[p + 2] = grid ? 255 : (byte)( 48 + ( ( hash >> 16 ) & 127 ) * ( checker ? 1 : 2 ) / 2 );
+			rgba[p + 3] = 255;
+		}
+	}
+	return R_CreateImage( shaderName, NULL, rgba, 64, 64,
+			IMGFLAG_MIPMAP | IMGFLAG_NO_COMPRESSION, 0, 0 );
+}
+
+static const char *GS_BaseName( const char *path ) {
+	const char *base = path;
+	while ( *path ) {
+		if ( *path == '/' || *path == '\\' ) {
+			base = path + 1;
+		}
+		path++;
+	}
+	return base;
+}
+
+static int GS_LoadReferencedWads( const goldsrcRenderLoad_t *load,
+		goldsrcWadFile_t wads[GOLDSRC_MAX_WADS] ) {
+	const byte *entities = GS_LumpData( load, GOLDSRC_LUMP_ENTITIES );
+	int entityLength = GS_LumpLength( load, GOLDSRC_LUMP_ENTITIES );
+	char *entityText = ri.Hunk_AllocateTempMemory( entityLength + 1 );
+	const char *parse;
+	const char *token;
+	char wadList[MAX_STRING_CHARS] = "";
+	int count = 0;
+	int i;
+
+	Com_Memcpy( entityText, entities, entityLength );
+	entityText[entityLength] = '\0';
+	parse = entityText;
+	if ( *( token = COM_Parse( &parse ) ) == '{' ) {
+		while ( parse && *( token = COM_Parse( &parse ) ) && token[0] != '}' ) {
+			char key[MAX_TOKEN_CHARS];
+			Q_strncpyz( key, token, sizeof( key ) );
+			token = COM_Parse( &parse );
+			if ( !Q_stricmp( key, "wad" ) ) {
+				Q_strncpyz( wadList, token, sizeof( wadList ) );
+			}
+		}
+	}
+	ri.Hunk_FreeTempMemory( entityText );
+
+	for ( parse = wadList; *parse && count < GOLDSRC_MAX_WADS; ) {
+		char entry[MAX_OSPATH];
+		char qpath[MAX_QPATH];
+		const char *base;
+		int len = 0;
+		qboolean duplicate = qfalse;
+
+		while ( *parse == ';' || *parse == ' ' ) parse++;
+		while ( parse[len] && parse[len] != ';' && len < (int)sizeof( entry ) - 1 ) len++;
+		Com_Memcpy( entry, parse, len );
+		entry[len] = '\0';
+		parse += len;
+		while ( *parse && *parse != ';' ) parse++;
+		base = GS_BaseName( entry );
+		if ( !base[0] || Q_stricmp( COM_GetExtension( base ), "wad" ) ) continue;
+		for ( i = 0; i < count; i++ ) {
+			if ( !Q_stricmp( wads[i].name, base ) ) duplicate = qtrue;
+		}
+		if ( duplicate ) continue;
+
+		Com_sprintf( qpath, sizeof( qpath ), "wads/%s", base );
+		wads[count].length = ri.FS_ReadFile( qpath, (void **)&wads[count].data );
+		if ( wads[count].length <= 0 ) {
+			ri.Printf( PRINT_WARNING, "GoldSrc texture WAD not present: %s (optional, place owned copy at %s)\n",
+					base, qpath );
+			continue;
+		}
+		Q_strncpyz( wads[count].name, base, sizeof( wads[count].name ) );
+		count++;
+	}
+	return count;
+}
+
+static const goldsrc_miptex_t *GS_FindWadTexture( const goldsrcWadFile_t *wad,
+		const char *textureName, int *available ) {
+	const goldsrc_wad_header_t *header;
+	const goldsrc_wad_lump_t *lumps;
+	int tableOffset, numLumps, i;
+
+	if ( wad->length < (int)sizeof( *header ) ) return NULL;
+	header = (const goldsrc_wad_header_t *)wad->data;
+	if ( memcmp( header->identification, GOLDSRC_WAD3_ID, 4 ) ) return NULL;
+	numLumps = LittleLong( header->numlumps );
+	tableOffset = LittleLong( header->infotableofs );
+	if ( numLumps < 0 || tableOffset < 0 || tableOffset > wad->length ||
+			numLumps > ( wad->length - tableOffset ) / (int)sizeof( *lumps ) ) return NULL;
+	lumps = (const goldsrc_wad_lump_t *)( wad->data + tableOffset );
+	for ( i = 0; i < numLumps; i++ ) {
+		char name[17];
+		int offset, size;
+		Com_Memcpy( name, lumps[i].name, 16 );
+		name[16] = '\0';
+		if ( Q_stricmp( name, textureName ) || lumps[i].compression != 0 ) continue;
+		offset = LittleLong( lumps[i].filepos );
+		size = LittleLong( lumps[i].disksize );
+		if ( offset < 0 || size < (int)sizeof( goldsrc_miptex_t ) ||
+				offset > wad->length || size > wad->length - offset ) return NULL;
+		*available = size;
+		return (const goldsrc_miptex_t *)( wad->data + offset );
+	}
+	return NULL;
+}
+
 static void GS_LoadTextures( goldsrcRenderLoad_t *load ) {
 	const byte *lump = GS_LumpData( load, GOLDSRC_LUMP_TEXTURES );
 	int lumpLength = GS_LumpLength( load, GOLDSRC_LUMP_TEXTURES );
 	int numTextures;
+	goldsrcWadFile_t wads[GOLDSRC_MAX_WADS];
+	int numWads;
+	int embeddedCount = 0, wadCount = 0, fallbackCount = 0;
+	qboolean needsWads = qfalse;
 	int i;
 
 	if ( lumpLength < 4 ) {
@@ -91,18 +277,25 @@ static void GS_LoadTextures( goldsrcRenderLoad_t *load ) {
 	load->textureHeights = ri.Hunk_Alloc( MAX( numTextures, 1 ) * sizeof( *load->textureHeights ), h_low );
 	load->world->numShaders = numTextures;
 	load->world->shaders = ri.Hunk_Alloc( MAX( numTextures, 1 ) * sizeof( *load->world->shaders ), h_low );
+	Com_Memset( wads, 0, sizeof( wads ) );
+	for ( i = 0; i < numTextures; i++ ) {
+		int textureOffset = LittleLong( ((const int32_t *)( lump + 4 ))[i] );
+		if ( textureOffset >= 0 && textureOffset <= lumpLength - (int)sizeof( goldsrc_miptex_t ) ) {
+			const goldsrc_miptex_t *miptex = (const goldsrc_miptex_t *)( lump + textureOffset );
+			if ( LittleLong( miptex->offsets[0] ) == 0 ) needsWads = qtrue;
+		}
+	}
+	numWads = needsWads ? GS_LoadReferencedWads( load, wads ) : 0;
 
 	for ( i = 0; i < numTextures; i++ ) {
 		int textureOffset = LittleLong( ((const int32_t *)( lump + 4 ))[i] );
 		const goldsrc_miptex_t *miptex;
 		char shaderName[MAX_QPATH];
-		uint32_t width, height, pixelOffset;
-		uint64_t pixelCount, paletteOffset;
-		byte *rgba;
-		const byte *pixels, *palette;
+		uint32_t width, height;
 		image_t *image;
 		qhandle_t shaderHandle;
-		int p;
+		char textureName[17];
+		int w;
 
 		load->textureShaders[i] = tr.defaultShader;
 		load->textureWidths[i] = 64;
@@ -112,42 +305,43 @@ static void GS_LoadTextures( goldsrcRenderLoad_t *load ) {
 		}
 
 		miptex = (const goldsrc_miptex_t *)( lump + textureOffset );
+		Com_Memcpy( textureName, miptex->name, 16 );
+		textureName[16] = '\0';
 		GS_TextureName( shaderName, sizeof( shaderName ), miptex, i );
 		Q_strncpyz( load->world->shaders[i].shader, shaderName,
 				sizeof( load->world->shaders[i].shader ) );
 		width = LittleLong( miptex->width );
 		height = LittleLong( miptex->height );
-		pixelOffset = LittleLong( miptex->offsets[0] );
 		if ( width == 0 || height == 0 || width > 4096 || height > 4096 ) {
 			continue;
 		}
 		load->textureWidths[i] = (int)width;
 		load->textureHeights[i] = (int)height;
-		pixelCount = (uint64_t)width * height;
-		paletteOffset = (uint64_t)LittleLong( miptex->offsets[3] ) + pixelCount / 64 + 2;
-		if ( pixelOffset == 0 || pixelCount > INT_MAX ||
-				(uint64_t)textureOffset + pixelOffset + pixelCount > (uint64_t)lumpLength ||
-				(uint64_t)textureOffset + paletteOffset + 256 * 3 > (uint64_t)lumpLength ) {
-			continue;
+		image = GS_CreateTextureImage( shaderName, miptex, lumpLength - textureOffset );
+		if ( image ) {
+			embeddedCount++;
 		}
-
-		pixels = (const byte *)miptex + pixelOffset;
-		palette = (const byte *)miptex + paletteOffset;
-		rgba = ri.Hunk_AllocateTempMemory( (int)pixelCount * 4 );
-		for ( p = 0; p < (int)pixelCount; p++ ) {
-			int colorIndex = pixels[p];
-			rgba[p * 4 + 0] = palette[colorIndex * 3 + 0];
-			rgba[p * 4 + 1] = palette[colorIndex * 3 + 1];
-			rgba[p * 4 + 2] = palette[colorIndex * 3 + 2];
-			rgba[p * 4 + 3] = ( miptex->name[0] == '{' && colorIndex == 255 ) ? 0 : 255;
+		for ( w = 0; !image && w < numWads; w++ ) {
+			int available = 0;
+			const goldsrc_miptex_t *wadMiptex = GS_FindWadTexture( &wads[w], textureName, &available );
+			if ( wadMiptex ) image = GS_CreateTextureImage( shaderName, wadMiptex, available );
 		}
-
-		image = R_CreateImage( shaderName, NULL, rgba, (int)width, (int)height,
-				IMGFLAG_MIPMAP | IMGFLAG_NO_COMPRESSION, 0, 0 );
-		ri.Hunk_FreeTempMemory( rgba );
+		if ( image ) {
+			if ( !LittleLong( miptex->offsets[0] ) ) wadCount++;
+		}
+		else {
+			image = GS_CreateFallbackImage( shaderName, textureName );
+			fallbackCount++;
+		}
 		shaderHandle = RE_RegisterShaderFromImage( shaderName, LIGHTMAP_BY_VERTEX, image, qfalse );
 		load->textureShaders[i] = R_GetShaderByHandle( shaderHandle );
 	}
+
+	for ( i = 0; i < numWads; i++ ) {
+		ri.FS_FreeFile( wads[i].data );
+	}
+	ri.Printf( PRINT_ALL, "...GoldSrc textures: %d embedded, %d from WAD3, %d generated fallbacks\n",
+			embeddedCount, wadCount, fallbackCount );
 }
 
 static void GS_LoadPlanes( goldsrcRenderLoad_t *load ) {
@@ -425,6 +619,16 @@ static void GS_LoadVisibilityAndEntities( goldsrcRenderLoad_t *load ) {
 	load->world->entityParsePoint = load->world->entityString;
 }
 
+/*
+ * Quake 3 reserves fog slot zero to mean "no fog", even on maps with no
+ * fog volumes.  Several renderer paths rely on that sentinel being present.
+ * GoldSrc BSP30 has no equivalent fog lump, so provide the same empty slot.
+ */
+static void GS_LoadFogs( goldsrcRenderLoad_t *load ) {
+	load->world->numfogs = 1;
+	load->world->fogs = ri.Hunk_Alloc( sizeof( *load->world->fogs ), h_low );
+}
+
 void R_LoadGoldSrcWorld( const char *mapname, const byte *buffer, int size, world_t *world ) {
 	goldsrcRenderLoad_t load;
 	Com_Memset( &load, 0, sizeof( load ) );
@@ -444,6 +648,7 @@ void R_LoadGoldSrcWorld( const char *mapname, const byte *buffer, int size, worl
 	GS_LoadNodesAndLeafs( &load );
 	GS_LoadSubmodels( &load );
 	GS_LoadVisibilityAndEntities( &load );
+	GS_LoadFogs( &load );
 
 	ri.Printf( PRINT_ALL, "...loaded GoldSrc BSP30: %d faces, %d textures, %d models\n",
 			world->numsurfaces, load.numTextures, world->numBModels );

@@ -1,9 +1,12 @@
 /*
 ===========================================================================
-GoldSrc / Half-Life BSP v30 on-disk structures.
+GoldSrc / Half-Life BSP v30 and WAD3 on-disk structures.
 
 These structures are intentionally isolated from qfiles.h because the two
 formats use several of the same historic type names with different layouts.
+
+This is a clean-room file-format description.  It has no dependency on, and
+contains no source copied from, the Half-Life SDK.
 ===========================================================================
 */
 
@@ -72,6 +75,11 @@ typedef struct {
 } goldsrc_node_t;
 
 typedef struct {
+	int32_t planenum;
+	int16_t children[2];
+} goldsrc_clipnode_t;
+
+typedef struct {
 	int32_t contents;
 	int32_t visofs;
 	int16_t mins[3];
@@ -121,5 +129,23 @@ typedef struct {
 	uint32_t height;
 	uint32_t offsets[4];
 } goldsrc_miptex_t;
+
+#define GOLDSRC_WAD3_ID "WAD3"
+
+typedef struct {
+	char identification[4];
+	int32_t numlumps;
+	int32_t infotableofs;
+} goldsrc_wad_header_t;
+
+typedef struct {
+	int32_t filepos;
+	int32_t disksize;
+	int32_t size;
+	uint8_t type;
+	uint8_t compression;
+	uint8_t padding[2];
+	char name[16];
+} goldsrc_wad_lump_t;
 
 #endif
