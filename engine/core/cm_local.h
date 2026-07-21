@@ -23,6 +23,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "q_shared.h"
 #include "qcommon.h"
 #include "cm_polylib.h"
+#include "qfiles_goldsrc.h"
 
 #define	MAX_SUBMODELS			256
 #define	BOX_MODEL_HANDLE		255
@@ -93,7 +94,7 @@ typedef struct {
 typedef struct cmodel_s {
 	vec3_t		mins, maxs;
 	cLeaf_t		leaf;			// submodels don't reference the main tree
-	int			goldsrcHeadnode;
+	int			goldsrcHeadnodes[GOLDSRC_MAX_MAP_HULLS];
 	int			goldsrcContents;	// entity-class contents for BSP30 inline models
 } cmodel_t;
 
@@ -129,7 +130,9 @@ typedef struct {
 typedef struct {
 	char		name[MAX_QPATH];
 	qboolean	goldsrc;
-	int			goldsrcWorldHeadnode;
+	int			goldsrcWorldHeadnodes[GOLDSRC_MAX_MAP_HULLS];
+	int			numGoldSrcClipNodes;
+	cNode_t		*goldsrcClipNodes;
 
 	int			numShaders;
 	dshader_t	*shaders;
@@ -204,6 +207,7 @@ typedef struct
 
 void CM_FloodAreaConnections( void );
 void CM_LoadGoldSrcMap( const byte *buffer, int length, const char *name );
+int CM_GoldSrcContents( int contents );
 
 typedef struct {
 	vec3_t		start;

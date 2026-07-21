@@ -233,9 +233,9 @@ int CM_PointContents( const vec3_t p, clipHandle_t model ) {
 	float		d;
 	cmodel_t	*clipm;
 
-	if ( cm.goldsrc ) {
+	if ( cm.goldsrc && model != BOX_MODEL_HANDLE && model != CAPSULE_MODEL_HANDLE ) {
 		cmodel_t *goldsrcModel = model ? CM_ClipHandleToModel( model ) : NULL;
-		int num = goldsrcModel ? goldsrcModel->goldsrcHeadnode : cm.goldsrcWorldHeadnode;
+		int num = goldsrcModel ? goldsrcModel->goldsrcHeadnodes[0] : cm.goldsrcWorldHeadnodes[0];
 		while ( num >= 0 ) {
 			cNode_t *node = &cm.nodes[num];
 			float planeDistance = DotProduct( p, node->plane->normal ) - node->plane->dist;
