@@ -98,7 +98,9 @@ typedef enum {
 #define USE_DEDICATED_ALLOCATION
 #endif
 //#define MIN_IMAGE_ALIGN (128*1024)
-#define MAX_ATTACHMENTS_IN_POOL (32+VK_NUM_BLOOM_PASSES*2) // extra space for new SMAA buffers, screenmap, bloom, SSAO, etc.
+/* Temporal class/history, prev-depth ping-pong, deferred G-buffer + PrimID MRT,
+ * bloom, SMAA, screenmap, and SSAO all enqueue into one batch before alloc. */
+#define MAX_ATTACHMENTS_IN_POOL (56+VK_NUM_BLOOM_PASSES*2)
 
 #define VK_DESC_STORAGE      0
 #define VK_DESC_UNIFORM      0

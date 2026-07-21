@@ -67,6 +67,8 @@ Retail **Quake III Arena**, **OpenArena**, and most classic **`.pk3` mods** expe
 
 Details: [ARCHITECTURE.md](ARCHITECTURE.md#native-game-modules-vm) (`vm.c`, `vm_native_module.c`, `FS_LoadLibrary`).
 
+**Trace syscall ABI:** Engine `trace_t` includes BSP30 plane-provenance fields (68 bytes). Retail native OpenArena-style modules still expect the pre-provenance layout (52 bytes with native `bool` qbooleans). `G_TRACE` / cgame CM-trace syscalls marshal a compact result into game/cgame DLLs; QVMs keep the int-qboolean `legacy_trace_t` path. Do not write the full engine `trace_t` into third-party modules.
+
 ## Troubleshooting Quick Reference
 
 | Symptom | Likely cause | Fix |
@@ -75,6 +77,7 @@ Details: [ARCHITECTURE.md](ARCHITECTURE.md#native-game-modules-vm) (`vm.c`, `vm_
 | "Couldn't get a visual" / Vulkan fails | SDL without Vulkan | `./scripts/build_sdl_vulkan_rpi.sh`; use `run_vulkan.sh` |
 | Vulkan init fails on Pi | System SDL without Vulkan | `./scripts/build_sdl_vulkan_rpi.sh`; `run_vulkan.sh` or `LD_LIBRARY_PATH=/usr/local/lib:$LD_LIBRARY_PATH` |
 | "VM_Create on UI failed" | Missing ui.qvm / native UI | Ensure game provides `ui.qvm` or `ui.aarch64.so` in base/ |
+| `stack smashing detected` on map load (OA native) | Engine wrote oversized `trace_t` into game.so | Rebuild engine with native-compat trace marshal (`sv_game.c` / `cl_cgame.c`) |
 | Black screen / wrong colors | FBO/HDR issue | `r_fbo 0` or `r_exposure_auto 0` `r_volumetricFog 0`; `vid_restart` |
 | Lighting looks “modern” on baseq3 | Modern renderer features enabled | Default **`r_classicLighting 1`** preserves retail look; **`exec modern_lighting.cfg`** for PBR sun shadow + SH world tint |
 

@@ -69,7 +69,8 @@ int main(void)
 	/* Anchors for retail cgame.qvm / ui.qvm (LP64 host, Q3 1.32 field order). */
 	ASSERT_EQ( sizeof( playerState_t ), 468, "playerState_t retail size" );
 	ASSERT_EQ( sizeof( entityState_t ), 208, "entityState_t retail size" );
-	ASSERT_EQ( sizeof( trace_t ), 52, "trace_t retail size" );
+	/* Engine trace_t is retail 52 + 16 BSP30 provenance fields. */
+	ASSERT_EQ( sizeof( trace_t ), 68, "trace_t engine size (retail+provenance)" );
 	ASSERT_EQ( sizeof( usercmd_t ), 24, "usercmd_t retail size" );
 	ASSERT_EQ( sizeof( glconfig_t ), 11324, "glconfig_t retail size" );
 	ASSERT_EQ( sizeof( legacyGameState_t ), 20100, "legacyGameState_t retail size" );

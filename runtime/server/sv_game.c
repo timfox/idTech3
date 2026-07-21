@@ -270,8 +270,10 @@ static qboolean SV_UseLegacyNativeEntityNums( void );
  * larger there than in the native engine build where qboolean is bool. Trace
  * syscalls for QVMs must marshal into the legacy layout explicitly.
  *
- * Native trace_t also carries BSP30 plane provenance fields that retail QVMs
- * do not have. Those are omitted from the legacy marshal.
+ * Native engine trace_t also carries BSP30 plane provenance fields that retail
+ * QVMs and third-party native game DLLs (OpenArena, etc.) do not have. Those
+ * must never be written through G_TRACE / G_TRACECAPSULE — doing so overflows
+ * the game module's stack buffer (stack-smashing abort in FinishSpawningItem).
  */
 typedef struct {
 	int			allsolid;
@@ -284,13 +286,40 @@ typedef struct {
 	int			entityNum;
 } legacy_trace_t;
 
+/* Native-DLL retail layout: bool qbooleans, no BSP30 provenance (52 bytes). */
+typedef struct {
+	qboolean	allsolid;
+	qboolean	startsolid;
+	float		fraction;
+	vec3_t		endpos;
+	cplane_t	plane;
+	int			surfaceFlags;
+	int			contents;
+	int			entityNum;
+} native_compat_trace_t;
+
 /* +4: two legacy int qbooleans vs native bools. -16: native provenance fields. */
 STATIC_ASSERT( sizeof( legacy_trace_t ) == sizeof( trace_t ) + 4 - 16,
 		"legacy_trace_t must match retail qagame trace layout" );
+STATIC_ASSERT( sizeof( native_compat_trace_t ) + 16 == sizeof( trace_t ),
+		"native_compat_trace_t must be engine trace_t without provenance" );
+STATIC_ASSERT( sizeof( native_compat_trace_t ) == 52,
+		"native_compat_trace_t must match retail native qagame trace size" );
 
 static void SV_FillLegacyTrace( legacy_trace_t *out, const trace_t *in ) {
 	out->allsolid = in->allsolid ? 1 : 0;
 	out->startsolid = in->startsolid ? 1 : 0;
+	out->fraction = in->fraction;
+	VectorCopy( in->endpos, out->endpos );
+	out->plane = in->plane;
+	out->surfaceFlags = in->surfaceFlags;
+	out->contents = in->contents;
+	out->entityNum = SV_EngineEntityNumToGame( in->entityNum );
+}
+
+static void SV_FillNativeCompatTrace( native_compat_trace_t *out, const trace_t *in ) {
+	out->allsolid = in->allsolid;
+	out->startsolid = in->startsolid;
 	out->fraction = in->fraction;
 	VectorCopy( in->endpos, out->endpos );
 	out->plane = in->plane;
@@ -761,9 +790,9 @@ static intptr_t SV_GameSystemCalls( intptr_t *args ) {
 				VM_CHECKBOUNDS( gvm, args[1], sizeof( legacy_trace_t ) );
 				SV_FillLegacyTrace( (legacy_trace_t *)VMA(1), &trace );
 			} else {
-				VM_CHECKBOUNDS( gvm, args[1], sizeof( trace_t ) );
-				trace.entityNum = SV_EngineEntityNumToGame( trace.entityNum );
-				*(trace_t *)VMA(1) = trace;
+				/* Native DLLs (OA etc.) expect retail size without BSP30 fields. */
+				VM_CHECKBOUNDS( gvm, args[1], sizeof( native_compat_trace_t ) );
+				SV_FillNativeCompatTrace( (native_compat_trace_t *)VMA(1), &trace );
 			}
 		}
 		return 0;
@@ -777,9 +806,8 @@ static intptr_t SV_GameSystemCalls( intptr_t *args ) {
 				VM_CHECKBOUNDS( gvm, args[1], sizeof( legacy_trace_t ) );
 				SV_FillLegacyTrace( (legacy_trace_t *)VMA(1), &trace );
 			} else {
-				VM_CHECKBOUNDS( gvm, args[1], sizeof( trace_t ) );
-				trace.entityNum = SV_EngineEntityNumToGame( trace.entityNum );
-				*(trace_t *)VMA(1) = trace;
+				VM_CHECKBOUNDS( gvm, args[1], sizeof( native_compat_trace_t ) );
+				SV_FillNativeCompatTrace( (native_compat_trace_t *)VMA(1), &trace );
 			}
 		}
 		return 0;

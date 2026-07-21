@@ -182,24 +182,43 @@ static void vk_alloc_attachments( void )
 }
 
 
-static void vk_add_attachment_desc( VkImage desc, VkImageView *image_view, VkImageUsageFlags usage, VkMemoryRequirements *reqs, VkFormat image_format, VkImageAspectFlags aspect_flags, VkImageLayout image_layout
+static qboolean vk_add_attachment_desc_soft( VkImage desc, VkImageView *image_view, VkImageUsageFlags usage, VkMemoryRequirements *reqs, VkFormat image_format, VkImageAspectFlags aspect_flags, VkImageLayout image_layout
 #ifdef USE_VK_PBR
 	, VkImageViewType view_type )
 #endif
 {
 	if ( num_attachments >= ARRAY_LEN( attachments ) ) {
-		ri.Error( ERR_FATAL, "Attachments array overflow" );
-	} else {
-		attachments[ num_attachments ].descriptor = desc;
-		attachments[ num_attachments ].image_view = image_view;
-		attachments[ num_attachments ].viewType = view_type;
-		attachments[ num_attachments ].usage = usage;
-		attachments[ num_attachments ].reqs = *reqs;
-		attachments[ num_attachments ].aspect_flags = aspect_flags;
-		attachments[ num_attachments ].image_layout = image_layout;
-		attachments[ num_attachments ].image_format = image_format;
-		attachments[ num_attachments ].memory_offset = 0;
-		num_attachments++;
+		return qfalse;
+	}
+	attachments[ num_attachments ].descriptor = desc;
+	attachments[ num_attachments ].image_view = image_view;
+#ifdef USE_VK_PBR
+	attachments[ num_attachments ].viewType = view_type;
+#else
+	attachments[ num_attachments ].viewType = VK_IMAGE_VIEW_TYPE_2D;
+#endif
+	attachments[ num_attachments ].usage = usage;
+	attachments[ num_attachments ].reqs = *reqs;
+	attachments[ num_attachments ].aspect_flags = aspect_flags;
+	attachments[ num_attachments ].image_layout = image_layout;
+	attachments[ num_attachments ].image_format = image_format;
+	attachments[ num_attachments ].memory_offset = 0;
+	num_attachments++;
+	return qtrue;
+}
+
+static void vk_add_attachment_desc( VkImage desc, VkImageView *image_view, VkImageUsageFlags usage, VkMemoryRequirements *reqs, VkFormat image_format, VkImageAspectFlags aspect_flags, VkImageLayout image_layout
+#ifdef USE_VK_PBR
+	, VkImageViewType view_type )
+#endif
+{
+	if ( !vk_add_attachment_desc_soft( desc, image_view, usage, reqs, image_format, aspect_flags, image_layout
+#ifdef USE_VK_PBR
+			, view_type
+#endif
+			) ) {
+		ri.Error( ERR_FATAL, "Attachments array overflow (%u/%u)",
+				(unsigned)num_attachments, (unsigned)ARRAY_LEN( attachments ) );
 	}
 }
 
@@ -329,10 +348,24 @@ static qboolean create_color_attachment_soft(
 		VkImageViewType view_type = VK_IMAGE_VIEW_TYPE_2D;
 		if ( flags & VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT )
 			view_type = VK_IMAGE_VIEW_TYPE_CUBE;
-		vk_add_attachment_desc( *image, image_view, usage, &memory_requirements, format, VK_IMAGE_ASPECT_COLOR_BIT, image_layout, view_type );
+		if ( !vk_add_attachment_desc_soft( *image, image_view, usage, &memory_requirements, format, VK_IMAGE_ASPECT_COLOR_BIT, image_layout, view_type ) ) {
+			qvkDestroyImage( vk.device, *image, NULL );
+			*image = VK_NULL_HANDLE;
+			ri.Printf( PRINT_WARNING, S_COLOR_YELLOW
+				"[VK][deferred] attachment pool full (%ux%u) — soft-fail\n" S_COLOR_WHITE,
+				width, height );
+			return qfalse;
+		}
 	}
 #else
-	vk_add_attachment_desc( *image, image_view, usage, &memory_requirements, format, VK_IMAGE_ASPECT_COLOR_BIT, image_layout );
+	if ( !vk_add_attachment_desc_soft( *image, image_view, usage, &memory_requirements, format, VK_IMAGE_ASPECT_COLOR_BIT, image_layout ) ) {
+		qvkDestroyImage( vk.device, *image, NULL );
+		*image = VK_NULL_HANDLE;
+		ri.Printf( PRINT_WARNING, S_COLOR_YELLOW
+			"[VK][deferred] attachment pool full (%ux%u) — soft-fail\n" S_COLOR_WHITE,
+			width, height );
+		return qfalse;
+	}
 #endif
 	return qtrue;
 }

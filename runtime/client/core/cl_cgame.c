@@ -99,7 +99,8 @@ typedef struct {
 /*
  * Retail cgame.qvm keeps enum-backed qboolean, so its trace_t is wider there
  * than in the native client build. CM trace syscalls must marshal into that
- * layout. Native BSP30 provenance fields are not part of the retail layout.
+ * layout. Native BSP30 provenance fields are not part of the retail layout and
+ * must not be written into third-party native cgame DLLs (stack overflow).
  */
 typedef struct {
 	int			allsolid;
@@ -112,9 +113,24 @@ typedef struct {
 	int			entityNum;
 } legacy_trace_t;
 
+typedef struct {
+	qboolean	allsolid;
+	qboolean	startsolid;
+	float		fraction;
+	vec3_t		endpos;
+	cplane_t	plane;
+	int			surfaceFlags;
+	int			contents;
+	int			entityNum;
+} native_compat_trace_t;
+
 /* +4: two legacy int qbooleans vs native bools. -16: native provenance fields. */
 STATIC_ASSERT( sizeof( legacy_trace_t ) == sizeof( trace_t ) + 4 - 16,
 		"legacy_trace_t must match retail cgame trace layout" );
+STATIC_ASSERT( sizeof( native_compat_trace_t ) + 16 == sizeof( trace_t ),
+		"native_compat_trace_t must be engine trace_t without provenance" );
+STATIC_ASSERT( sizeof( native_compat_trace_t ) == 52,
+		"native_compat_trace_t must match retail native cgame trace size" );
 
 static qboolean CL_UsesLegacyQvmLayout( void ) {
 	return ( cgvm && !cgvm->dllHandle ) ? qtrue : qfalse;
@@ -234,13 +250,25 @@ static void CL_FillLegacyTrace( legacy_trace_t *out, const trace_t *in ) {
 	out->entityNum = CL_EngineEntityNumToGame( in->entityNum );
 }
 
+static void CL_FillNativeCompatTrace( native_compat_trace_t *out, const trace_t *in ) {
+	out->allsolid = in->allsolid;
+	out->startsolid = in->startsolid;
+	out->fraction = in->fraction;
+	VectorCopy( in->endpos, out->endpos );
+	out->plane = in->plane;
+	out->surfaceFlags = in->surfaceFlags;
+	out->contents = in->contents;
+	out->entityNum = CL_EngineEntityNumToGame( in->entityNum );
+}
+
 static void CL_WriteTraceResult( int vmDest, void *vmTrace, const trace_t *trace ) {
 	if ( CL_UsesLegacyQvmLayout() ) {
 		VM_CHECKBOUNDS( cgvm, vmDest, sizeof( legacy_trace_t ) );
 		CL_FillLegacyTrace( (legacy_trace_t *)vmTrace, trace );
 	} else {
-		VM_CHECKBOUNDS( cgvm, vmDest, sizeof( trace_t ) );
-		*(trace_t *)vmTrace = *trace;
+		/* Native DLLs expect retail size without BSP30 provenance fields. */
+		VM_CHECKBOUNDS( cgvm, vmDest, sizeof( native_compat_trace_t ) );
+		CL_FillNativeCompatTrace( (native_compat_trace_t *)vmTrace, trace );
 	}
 }
 
