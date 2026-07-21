@@ -1134,6 +1134,9 @@ static void CM_TraceThroughTree( traceWork_t *tw, int num, float p1f, float p2f,
 	CM_TraceThroughTree( tw, node->children[side^1], midf, p2f, mid, p2 );
 }
 
+/* BSP30 collision hulls use a 1/32-unit crossing skin. */
+#define GOLDSRC_SURFACE_CLIP_EPSILON ( 0.03125f )
+
 /*
 ==================
 CM_GoldSrcTraceThroughTree
@@ -1226,13 +1229,13 @@ static void CM_GoldSrcTraceThroughTree( traceWork_t *tw, int num,
 
 	if ( t1 < t2 ) {
 		side = 1;
-		frac2 = (float)(( t1 + offset + SURFACE_CLIP_EPSILON ) / ( t1 - t2 ));
-		frac = (float)(( t1 - offset + SURFACE_CLIP_EPSILON ) / ( t1 - t2 ));
+		frac2 = (float)(( t1 + offset + GOLDSRC_SURFACE_CLIP_EPSILON ) / ( t1 - t2 ));
+		frac = (float)(( t1 - offset + GOLDSRC_SURFACE_CLIP_EPSILON ) / ( t1 - t2 ));
 	}
 	else if ( t1 > t2 ) {
 		side = 0;
-		frac2 = (float)(( t1 - offset - SURFACE_CLIP_EPSILON ) / ( t1 - t2 ));
-		frac = (float)(( t1 + offset + SURFACE_CLIP_EPSILON ) / ( t1 - t2 ));
+		frac2 = (float)(( t1 - offset - GOLDSRC_SURFACE_CLIP_EPSILON ) / ( t1 - t2 ));
+		frac = (float)(( t1 + offset + GOLDSRC_SURFACE_CLIP_EPSILON ) / ( t1 - t2 ));
 	}
 	else {
 		side = 0;
@@ -1256,9 +1259,11 @@ static void CM_GoldSrcTraceThroughTree( traceWork_t *tw, int num,
 }
 
 static qboolean CM_GoldSrcBoxTouchesContents( int num, const vec3_t point,
-		const vec3_t extents, int contentsOverride, int mask, qboolean clipTree ) {
+		const vec3_t extents, int contentsOverride, int mask, qboolean clipTree,
+		float contactEpsilon ) {
 	cNode_t *node;
 	float distance, offset;
+	qboolean frontSolid, backSolid;
 
 	if ( num < 0 ) {
 		int leafContents = clipTree ? CM_GoldSrcContents( num ) : cm.leafs[-1 - num].contents;
@@ -1273,18 +1278,34 @@ static qboolean CM_GoldSrcBoxTouchesContents( int num, const vec3_t point,
 	offset = fabsf( extents[0] * node->plane->normal[0] ) +
 			fabsf( extents[1] * node->plane->normal[1] ) +
 			fabsf( extents[2] * node->plane->normal[2] );
-	if ( distance > offset ) {
+	if ( distance >= offset + contactEpsilon ) {
 		return CM_GoldSrcBoxTouchesContents( node->children[0], point, extents,
-				contentsOverride, mask, clipTree );
+				contentsOverride, mask, clipTree, contactEpsilon );
 	}
-	if ( distance < -offset ) {
+	if ( distance <= -offset - contactEpsilon ) {
 		return CM_GoldSrcBoxTouchesContents( node->children[1], point, extents,
-				contentsOverride, mask, clipTree );
+				contentsOverride, mask, clipTree, contactEpsilon );
 	}
-	return CM_GoldSrcBoxTouchesContents( node->children[0], point, extents,
-			contentsOverride, mask, clipTree ) ||
-			CM_GoldSrcBoxTouchesContents( node->children[1], point, extents,
-			contentsOverride, mask, clipTree );
+
+	frontSolid = CM_GoldSrcBoxTouchesContents( node->children[0], point, extents,
+			contentsOverride, mask, clipTree, contactEpsilon );
+	backSolid = CM_GoldSrcBoxTouchesContents( node->children[1], point, extents,
+			contentsOverride, mask, clipTree, contactEpsilon );
+
+	/*
+	 * A swept trace deliberately stops GOLDSRC_SURFACE_CLIP_EPSILON short of
+	 * a BSP plane. Floating-point rounding can put the following position test
+	 * a tiny amount across that plane. Treat the epsilon band as contact rather
+	 * than penetration when either side is open; deeper overlap still checks
+	 * both children normally. This prevents a valid rail/ramp impact from
+	 * becoming startsolid on the next player frame.
+	 */
+	if ( contactEpsilon > 0.0f &&
+			( distance >= offset - contactEpsilon ||
+			  distance <= -offset + contactEpsilon ) ) {
+		return frontSolid && backSolid;
+	}
+	return frontSolid || backSolid;
 }
 
 
@@ -1458,9 +1479,32 @@ static void CM_Trace( trace_t *results, const vec3_t start, const vec3_t end, co
 		}
 		CM_GoldSrcTraceThroughTree( &tw, root, 0.0f, 1.0f,
 				tw.start, tw.end, NULL, 0, contentsOverride, clipTree, traceExtents );
+		/*
+		 * The crossing epsilon may clamp an entry fraction to zero when the
+		 * hull merely starts on a ramp plane. Verify the unmodified start point
+		 * before reporting startsolid/allsolid; otherwise pmove treats valid
+		 * surf contact as an embedded player and repeatedly jitters the hull.
+		 */
+		if ( tw.trace.startsolid &&
+				!CM_GoldSrcBoxTouchesContents( root, tw.start, traceExtents,
+				contentsOverride, brushmask, clipTree,
+				GOLDSRC_SURFACE_CLIP_EPSILON ) ) {
+			tw.trace.startsolid = qfalse;
+			/*
+			 * The recursive trace can enter the far leaf at fraction zero when
+			 * the clear start is less than one clip epsilon from a plane. If the
+			 * requested endpoint is solid, this is an immediate collision, not a
+			 * clear sweep. Keep the entry plane and stop at the valid start.
+			 */
+			if ( CM_GoldSrcBoxTouchesContents( root, tw.end, traceExtents,
+					contentsOverride, brushmask, clipTree, 0.0f ) ) {
+				tw.trace.fraction = 0.0f;
+				tw.trace.allsolid = qfalse;
+			}
+		}
 		if ( tw.trace.startsolid ) {
 			tw.trace.allsolid = CM_GoldSrcBoxTouchesContents( root, tw.end,
-					traceExtents, contentsOverride, brushmask, clipTree );
+					traceExtents, contentsOverride, brushmask, clipTree, 0.0f );
 			if ( tw.trace.allsolid ) {
 				tw.trace.fraction = 0.0f;
 			}
