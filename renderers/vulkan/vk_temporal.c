@@ -586,15 +586,22 @@ qboolean vk_temporal_want_weapon_after_world_post( void )
 		return qtrue;
 	}
 	/*
-	 * Architecture B for unsupported view-model consumers: world SSR finishes
-	 * first, then the weapon is composited by the existing deferred weapon pass.
-	 * This keeps DEPTH_RANGE_WEAPON color/depth out of SSR without guessing a
-	 * device-depth threshold that could also reject nearby world geometry.
+	 * Architecture B for unsupported view-model consumers: world SSR/SSAO
+	 * finish first, then the weapon is composited by the existing deferred
+	 * weapon pass. This keeps DEPTH_RANGE_WEAPON color/depth out of those
+	 * passes without guessing a device-depth threshold that could also reject
+	 * nearby world geometry.
 	 */
 	if ( vk.fboActive &&
-		r_weaponSsrIsolation && r_weaponSsrIsolation->integer &&
-		PostFX_SSR_IsEnabled() ) {
-		return qtrue;
+		r_weaponSsrIsolation && r_weaponSsrIsolation->integer ) {
+		if ( PostFX_SSR_IsEnabled() ) {
+			return qtrue;
+		}
+		/* SSAO also samples depth; keep weapon out when AO is live. */
+		if ( ri.Cvar_VariableIntegerValue( "r_ssao" ) &&
+			ri.Cvar_VariableIntegerValue( "r_temporalAO" ) ) {
+			return qtrue;
+		}
 	}
 	return qfalse;
 }
@@ -775,10 +782,13 @@ void vk_temporal_ghost_status_f( void )
 	ri.Printf( PRINT_ALL, "               : 4) r_temporalAO 0  5) r_temporalTransparency 0  6) r_bloom/r_motionBlur/r_dof 0\n" );
 	if ( !recon && ssr && vk_temporal_want_weapon_after_world_post() ) {
 		ri.Printf( PRINT_ALL, "live finding   : reconstruction OFF + SSR ON + isolation ON\n" );
-		ri.Printf( PRINT_ALL, "               : weapon is deferred; SSR receives world-only color/depth.\n" );
+		ri.Printf( PRINT_ALL, "               : weapon is deferred; SSR/SSAO receive world-only color/depth.\n" );
 	} else if ( !recon && ssr ) {
 		ri.Printf( PRINT_ALL, "live finding   : reconstruction OFF + SSR ON → SSR samples post-weapon depth\n" );
 		ri.Printf( PRINT_ALL, "               : (DEPTH_RANGE_WEAPON [0.6..1.0]); primary screen-space contaminant.\n" );
+	} else if ( !recon && !ssr && vk_temporal_want_weapon_after_world_post() ) {
+		ri.Printf( PRINT_ALL, "live finding   : reconstruction OFF + isolation ON (SSAO and/or other depth consumers)\n" );
+		ri.Printf( PRINT_ALL, "               : weapon is deferred past incompatible world post.\n" );
 	} else if ( !recon && !ssr ) {
 		ri.Printf( PRINT_ALL, "live finding   : reconstruction OFF + SSR off → residual silhouette echoes are NOT\n" );
 		ri.Printf( PRINT_ALL, "               : from TAA/SSR; check FP projection / multi-part weapon draws next.\n" );
@@ -787,6 +797,6 @@ void vk_temporal_ghost_status_f( void )
 	} else {
 		ri.Printf( PRINT_ALL, "live finding   : see docs/RENDERER_TEMPORAL_GHOSTING.md\n" );
 	}
-	ri.Printf( PRINT_ALL, "docs           : docs/RENDERER_TEMPORAL_GHOSTING.md (no broad fix applied yet)\n" );
+	ri.Printf( PRINT_ALL, "docs           : docs/RENDERER_TEMPORAL_GHOSTING.md\n" );
 	ri.Printf( PRINT_ALL, "=========================================\n" );
 }

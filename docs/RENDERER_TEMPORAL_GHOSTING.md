@@ -1,8 +1,8 @@
 # First-Person Weapon Temporal Ghosting
 
-**Status:** First screen-space offender fixed with weapon-after-world-post isolation; residual non-temporal silhouette noted.  
-**Date:** 2026-07-20  
-**Constraint:** No broad renderer algorithm fixes until the first pass is confirmed (this document). Debug toggles and views are in place.
+**Status:** Structural fix verified. SSR/SSAO isolation + Surf first-person presentation defaults are in place.  
+**Date:** 2026-07-21  
+**Constraint:** Smallest structurally correct fix first; no blur/clamp masks.
 
 ## Symptoms
 
@@ -18,9 +18,9 @@ Observed on Surf (`fs_game surf`, `surf_aztec`) and similar first-person views:
 | Consumer | Typical Surf value | Notes |
 |---|---|---|
 | `r_taa` | **0** | World TAA / Temporal Reconstruction **off** |
-| `r_aaMode` | **0** | No SMAA / present adaptive recon |
+| `r_aaMode` | **2** | SMAA (spatial only; not temporal reconstruction) |
 | `reconstruction` | **no** | `vk_temporal_reconstruction_wanted() == false` |
-| `weaponAfterTaa` | no | Deferral idle because reconstruction is off |
+| `weaponAfterWorldPost` | **yes** (default) | `r_weaponSsrIsolation 1` + SSR/SSAO live |
 | `r_ssr` | **1** (Surf `surf.cfg`) | Screen-space reflections **on** unless gated |
 | `r_bloom` / `r_motionBlur` / `r_oit` | 0 | Off in the measured session |
 
@@ -40,7 +40,7 @@ Corrected order (`r_weaponSsrIsolation 1`, default):
 
 1. World draws complete.
 2. RDF_NOWORLDMODEL weapon draw command is deferred.
-3. SSR and other world post passes run without weapon color/depth.
+3. SSR/SSAO and other world post passes run without weapon color/depth.
 4. Existing deferred-weapon pass composites the weapon after world post.
 5. Luminance/presentation continue from the weapon-composited HDR source.
 
@@ -66,9 +66,9 @@ Mechanism:
 
 ### Structural correction
 
-The renderer now uses Architecture B for SSR:
+The renderer now uses Architecture B for SSR/SSAO:
 
-- `r_weaponSsrIsolation 1` (default) defers the first-person view weapon whenever SSR is live.
+- `r_weaponSsrIsolation 1` (default) defers the first-person view weapon whenever SSR **or** SSAO is live.
 - The existing `r_temporalWeaponAfterTaa` path remains responsible for TAA/TSR isolation.
 - Both policies converge on the same deferred weapon composite after world post.
 - The deferred path queues every RDF_NOWORLDMODEL draw command. Surf emits two
@@ -78,23 +78,40 @@ The renderer now uses Architecture B for SSR:
 
 This does not infer weapon identity from raw reversed-Z values, so nearby world geometry cannot be accidentally rejected by an unsafe `depth > 0.6` heuristic.
 
-Rotating-camera validation (`weapon_ssr_rotate_isolated.cfg`, 36 captured
-frames): 72 commands were deferred and all 36 flushes replayed exactly two
-commands; no queue overflow, unknown command, build error, or linter error.
+### Verification (2026-07-21)
 
-### B. Residual silhouette with all temporal / post consumers off
+Same-pose A/B with the multi-command queue (`r_weaponSsrIsolation 0` → `1`):
 
-`ghost_safe.cfg` forced:
+| Region | Mean \|Δ\| |
+|---|---|
+| Full frame | 4.73 |
+| Gun crop | **16.16** |
+| Floor-left (control) | 0.63 |
 
-`r_ssr 0`, `r_temporalSSR 0`, `r_ssao 0`, `r_temporalAO 0`, `r_taa 0`, `r_aaMode 0`, `r_tsr 0`, bloom/motionBlur/DoF/sharpen/fog/transparency off, `r_pbr 0`.
+Isolation changes the gun silhouette region while leaving distant floor nearly unchanged. Live status with isolation on:
 
-**Result:** Soft dark under-gun banding / rail “echo” **still readable** in screenshots. Quantitative luma strip under the gun shows only ~2 strong dark features (not a long temporal history ladder).
+`reconstruction OFF + SSR ON + isolation ON` → `weaponAfterWorldPost=yes`.
 
-So after SSR is gated, remaining “duplication” is **not** explained by TAA/SSR/SSAO/bloom. Leading hypotheses for the residual (not fixed yet):
+Static gate: `scripts/temporal_ghost_check.sh` (`ctest -R test_temporal_ghost`).
 
-1. Surf disables `r_firstPersonFovEnabled` / `r_firstPersonScaleEnabled` and uses a very small `r_firstPersonZNear` → extreme close-up perspective on multi-part MD3 (hand + weapon + barrel + sight).
-2. Same-frame multi-surface draws (rail / barrel ribs) misread as ghosts.
-3. A still-ungated main-pass effect (to be bisected next with `r_temporalDebug` once reconstruction is intentionally enabled).
+### B. Residual silhouette was first-person projection, not temporal
+
+Surf previously archived:
+
+`r_firstPersonFovEnabled 0`, `r_firstPersonScaleEnabled 0`, `r_firstPersonZNear 0.125`
+
+That placed the MD3 millimetres from the camera at scene FOV, which made the rear of the machinegun look stretched / “duplicated.” Defaults are now:
+
+| Cvar | Value | Where |
+|---|---|---|
+| `r_firstPersonFovEnabled` | 1 | `release/surf/surf.cfg`, `autoexec.cfg` |
+| `r_firstPersonScaleEnabled` | 1 | same |
+| `r_firstPersonFov` | 65 | same |
+| `r_firstPersonZNear` | 4 | same |
+
+`release/surf/autoexec.cfg` also sets `com_nativeLibraryExtractPk3 0` so the loose
+`release/surf/vm/game.x86_64.so` wins over the older `game.so` embedded in
+`openarena.pk3` (pk3 extract was aborting in `PM_GroundTrace` on BSP30 maps).
 
 ### C. TAA path (not active in Surf default)
 
@@ -145,7 +162,7 @@ Each can be disabled without masking via blur:
 | `r_tsr` | 1 | Present adaptive / aaMode 3–5 / upscale temporal |
 | `r_temporalAO` | 1 | SSAO pass |
 | `r_temporalSSR` | 1 | SSR (even if `r_ssr 1`) |
-| `r_weaponSsrIsolation` | 1 | Composite the view weapon after world SSR |
+| `r_weaponSsrIsolation` | 1 | Composite the view weapon after world SSR/SSAO |
 | `r_temporalFog` | 1 | Volumetric froxel history weight |
 | `r_temporalTransparency` | 1 | OIT / transparent reactive stamp |
 | `r_motionBlur` | 0 | Camera motion blur |
@@ -168,19 +185,15 @@ Example cfgs live under `release/surf/ghost_on.cfg` and `ghost_off.cfg` / `ghost
 ## What was intentionally not changed
 
 - No raw-depth SSR hit-reject was added; ordering isolates weapon depth structurally.
-- No TAA history / motion-vector broad fix.
+- No TAA history / motion-vector broad fix beyond the existing weapon-after-TAA path.
 - No blur / excessive confidence clamps as a cosmetic mask.
 - `modern_vulkan.cfg` boot defaults untouched.
-
-## Next fix candidates (when approved)
-
-1. Verify `r_weaponSsrIsolation 1` during deterministic camera rotation.
-2. **Residual:** re-enable sane first-person projection for Surf (`r_firstPersonFovEnabled` / scale) and/or audit multi-part view-weapon draws.
-3. Enable `r_taa 1` and verify weapon deferral + debug views 1–6 separately.
 
 ## Related
 
 - `docs/MOMENT_OIT_STOCHASTIC_ALPHA.md` — prior OIT / distortion corruption work.
+- `scripts/temporal_ghost_check.sh` — static regression gate.
 - `renderers/vulkan/vk_view_state.c` — `DEPTH_RANGE_WEAPON`.
 - `renderers/vulkan/shaders/glsl/ssr.frag` — reflection march + debug overlays.
 - `renderers/vulkan/vk_temporal.c` — ownership / deferred weapon policy / `temporal_ghost_status`.
+- `engine/core/cm_trace.c` — GoldSrc recursion depth guard (`GOLDSRC_MAX_TRACE_DEPTH`).

@@ -1627,7 +1627,10 @@ static void SCR_DrawScreenField( stereoFrame_t stereoFrame ) {
 	 * StretchPics queued earlier land in the HDR/bloom path and never composite.
 	 * Note: client/.c files may not define USE_DUKTAPE; JsDebug_DrawFrame is always
 	 * linked (real impl or stub from qcommon). */
-	if ( cls.state == CA_ACTIVE ) {
+	/* Surf HUD synthetic preview is intentionally available from the menu so
+	 * layout work does not require joining a server.  Normal scripts retain the
+	 * historical CA_ACTIVE-only frame behavior. */
+	if ( cls.state == CA_ACTIVE || Cvar_VariableIntegerValue( "cg_surfHudDebug" ) ) {
 		if ( re.FinishBloom ) {
 			re.FinishBloom();
 		}
