@@ -1,4 +1,4 @@
-# GoldSrc BSP30 and WAD3 format support
+# BSP30 and WAD3 format support
 
 The engine's BSP30 and WAD3 readers are clean-room file-format parsers. They
 are implemented in the engine's existing GPL-licensed code and do not include,

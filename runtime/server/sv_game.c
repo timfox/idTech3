@@ -270,7 +270,7 @@ static qboolean SV_UseLegacyNativeEntityNums( void );
  * larger there than in the native engine build where qboolean is bool. Trace
  * syscalls for QVMs must marshal into the legacy layout explicitly.
  *
- * Native trace_t also carries GoldSrc plane provenance fields that retail QVMs
+ * Native trace_t also carries BSP30 plane provenance fields that retail QVMs
  * do not have. Those are omitted from the legacy marshal.
  */
 typedef struct {

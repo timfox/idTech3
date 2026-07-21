@@ -1,6 +1,6 @@
 /*
 ===========================================================================
-GoldSrc BSP v30 collision-map translation.
+BSP30 BSP v30 collision-map translation.
 
 Point contents retain the render BSP's spatial leaves. Swept boxes use the
 map's precomputed clipnode hulls through the existing idTech3 collision API.
@@ -10,17 +10,17 @@ source or runtime dependency.
 */
 
 #include "cm_local.h"
-#include "qfiles_goldsrc.h"
+#include "qfiles_bsp30.h"
 
-#define GOLDSRC_BOX_PLANES 12
-#define GOLDSRC_BOX_SIDES 6
+#define BSP30_BOX_PLANES 12
+#define BSP30_BOX_SIDES 6
 
-int CM_GoldSrcContents( int contents ) {
+int CM_Bsp30Contents( int contents ) {
 	switch ( contents ) {
-	case GOLDSRC_CONTENTS_SOLID:
-	case GOLDSRC_CONTENTS_CLIP:
+	case BSP30_CONTENTS_SOLID:
+	case BSP30_CONTENTS_CLIP:
 		return CONTENTS_SOLID;
-	case GOLDSRC_CONTENTS_WATER:
+	case BSP30_CONTENTS_WATER:
 	case -9:  /* directional current contents are water volumes */
 	case -10:
 	case -11:
@@ -28,26 +28,26 @@ int CM_GoldSrcContents( int contents ) {
 	case -13:
 	case -14:
 		return CONTENTS_WATER;
-	case GOLDSRC_CONTENTS_SLIME:
+	case BSP30_CONTENTS_SLIME:
 		return CONTENTS_SLIME;
-	case GOLDSRC_CONTENTS_LAVA:
+	case BSP30_CONTENTS_LAVA:
 		return CONTENTS_LAVA;
 	default:
 		return 0;
 	}
 }
 
-static const void *CM_GoldSrcLump( const byte *buffer, int length,
-		const goldsrc_header_t *header, int lumpIndex, size_t elementSize,
+static const void *CM_Bsp30Lump( const byte *buffer, int length,
+		const bsp30_header_t *header, int lumpIndex, size_t elementSize,
 		int *count, const char *name ) {
 	int ofs = LittleLong( header->lumps[lumpIndex].fileofs );
 	int len = LittleLong( header->lumps[lumpIndex].filelen );
 
 	if ( ofs < 0 || len < 0 || ofs > length || len > length - ofs ) {
-		Com_Error( ERR_DROP, "%s: %s has invalid GoldSrc lump %d", __func__, name, lumpIndex );
+		Com_Error( ERR_DROP, "%s: %s has invalid BSP30 lump %d", __func__, name, lumpIndex );
 	}
 	if ( elementSize && (size_t)len % elementSize != 0 ) {
-		Com_Error( ERR_DROP, "%s: %s has malformed GoldSrc lump %d", __func__, name, lumpIndex );
+		Com_Error( ERR_DROP, "%s: %s has malformed BSP30 lump %d", __func__, name, lumpIndex );
 	}
 	if ( count ) {
 		*count = elementSize ? (int)((size_t)len / elementSize) : len;
@@ -55,7 +55,7 @@ static const void *CM_GoldSrcLump( const byte *buffer, int length,
 	return buffer + ofs;
 }
 
-static void CM_GoldSrcAssignModelContents( void ) {
+static void CM_Bsp30AssignModelContents( void ) {
 	const char *parse = cm.entityString;
 	const char *token;
 
@@ -85,30 +85,30 @@ static void CM_GoldSrcAssignModelContents( void ) {
 			int modelIndex = atoi( model + 1 );
 			if ( modelIndex > 0 && modelIndex < cm.numSubModels ) {
 				if ( !Q_stricmp( classname, "func_water" ) ) {
-					cm.cmodels[modelIndex].goldsrcContents = CONTENTS_WATER;
+					cm.cmodels[modelIndex].bsp30Contents = CONTENTS_WATER;
 				}
 				else if ( !Q_stricmp( classname, "func_illusionary" ) ) {
-					cm.cmodels[modelIndex].goldsrcContents = 0;
+					cm.cmodels[modelIndex].bsp30Contents = 0;
 				}
 				else if ( !Q_stricmp( classname, "func_ladder" ) ) {
-					cm.cmodels[modelIndex].goldsrcContents = CONTENTS_SOLID | CONTENTS_DONOTENTER;
+					cm.cmodels[modelIndex].bsp30Contents = CONTENTS_SOLID | CONTENTS_DONOTENTER;
 				}
 				else if ( !Q_stricmpn( classname, "trigger_", 8 ) ) {
-					cm.cmodels[modelIndex].goldsrcContents = CONTENTS_TRIGGER;
+					cm.cmodels[modelIndex].bsp30Contents = CONTENTS_TRIGGER;
 				}
 			}
 		}
 	}
 }
 
-void CM_LoadGoldSrcMap( const byte *buffer, int length, const char *name ) {
-	const goldsrc_header_t *header = (const goldsrc_header_t *)buffer;
-	const goldsrc_plane_t *inPlanes;
-	const goldsrc_node_t *inNodes;
-	const goldsrc_clipnode_t *inClipNodes;
-	const goldsrc_leaf_t *inLeafs;
-	const goldsrc_model_t *inModels;
-	const goldsrc_face_t *inFaces;
+void CM_LoadBSP30Map( const byte *buffer, int length, const char *name ) {
+	const bsp30_header_t *header = (const bsp30_header_t *)buffer;
+	const bsp30_plane_t *inPlanes;
+	const bsp30_node_t *inNodes;
+	const bsp30_clipnode_t *inClipNodes;
+	const bsp30_leaf_t *inLeafs;
+	const bsp30_model_t *inModels;
+	const bsp30_face_t *inFaces;
 	const byte *entities;
 	int numPlanes, numNodes, numClipNodes, numLeafs, numModels, numFaces, entityLen;
 	int i, j;
@@ -117,47 +117,47 @@ void CM_LoadGoldSrcMap( const byte *buffer, int length, const char *name ) {
 	int bevelPlanes = 0;
 	int axialBevelPlanes = 0;
 
-	if ( length < (int)sizeof( *header ) || LittleLong( header->version ) != GOLDSRC_BSP_VERSION ) {
-		Com_Error( ERR_DROP, "%s: %s is not a GoldSrc BSP v30", __func__, name );
+	if ( length < (int)sizeof( *header ) || LittleLong( header->version ) != BSP30_BSP_VERSION ) {
+		Com_Error( ERR_DROP, "%s: %s is not a BSP30 BSP v30", __func__, name );
 	}
 
-	inPlanes = CM_GoldSrcLump( buffer, length, header, GOLDSRC_LUMP_PLANES,
+	inPlanes = CM_Bsp30Lump( buffer, length, header, BSP30_LUMP_PLANES,
 			sizeof( *inPlanes ), &numPlanes, name );
-	inNodes = CM_GoldSrcLump( buffer, length, header, GOLDSRC_LUMP_NODES,
+	inNodes = CM_Bsp30Lump( buffer, length, header, BSP30_LUMP_NODES,
 			sizeof( *inNodes ), &numNodes, name );
-	inClipNodes = CM_GoldSrcLump( buffer, length, header, GOLDSRC_LUMP_CLIPNODES,
+	inClipNodes = CM_Bsp30Lump( buffer, length, header, BSP30_LUMP_CLIPNODES,
 			sizeof( *inClipNodes ), &numClipNodes, name );
-	inLeafs = CM_GoldSrcLump( buffer, length, header, GOLDSRC_LUMP_LEAFS,
+	inLeafs = CM_Bsp30Lump( buffer, length, header, BSP30_LUMP_LEAFS,
 			sizeof( *inLeafs ), &numLeafs, name );
-	inModels = CM_GoldSrcLump( buffer, length, header, GOLDSRC_LUMP_MODELS,
+	inModels = CM_Bsp30Lump( buffer, length, header, BSP30_LUMP_MODELS,
 			sizeof( *inModels ), &numModels, name );
-	inFaces = CM_GoldSrcLump( buffer, length, header, GOLDSRC_LUMP_FACES,
+	inFaces = CM_Bsp30Lump( buffer, length, header, BSP30_LUMP_FACES,
 			sizeof( *inFaces ), &numFaces, name );
-	entities = CM_GoldSrcLump( buffer, length, header, GOLDSRC_LUMP_ENTITIES,
+	entities = CM_Bsp30Lump( buffer, length, header, BSP30_LUMP_ENTITIES,
 			1, &entityLen, name );
 
 	if ( numPlanes <= 0 || numNodes <= 0 || numLeafs <= 0 || numModels <= 0 ) {
-		Com_Error( ERR_DROP, "%s: %s has incomplete GoldSrc collision data", __func__, name );
+		Com_Error( ERR_DROP, "%s: %s has incomplete BSP30 collision data", __func__, name );
 	}
 	if ( numModels > MAX_SUBMODELS ) {
 		Com_Error( ERR_DROP, "%s: %s has %d inline models (maximum %d)",
 				__func__, name, numModels, MAX_SUBMODELS );
 	}
 
-	cm.goldsrc = qtrue;
-	for ( i = 0; i < GOLDSRC_MAX_MAP_HULLS; i++ ) {
-		cm.goldsrcWorldHeadnodes[i] = LittleLong( inModels[0].headnode[i] );
+	cm.bsp30 = qtrue;
+	for ( i = 0; i < BSP30_MAX_MAP_HULLS; i++ ) {
+		cm.bsp30WorldHeadnodes[i] = LittleLong( inModels[0].headnode[i] );
 	}
 
 	cm.numShaders = 1;
 	cm.shaders = Hunk_Alloc( sizeof( *cm.shaders ), h_high );
-	Q_strncpyz( cm.shaders[0].shader, "textures/goldsrc/default", sizeof( cm.shaders[0].shader ) );
+	Q_strncpyz( cm.shaders[0].shader, "textures/bsp30/default", sizeof( cm.shaders[0].shader ) );
 	cm.shaders[0].contentFlags = CONTENTS_SOLID;
 
 	cm.numPlanes = numPlanes;
-	cm.planes = Hunk_Alloc( ( numPlanes + GOLDSRC_BOX_PLANES ) * sizeof( *cm.planes ), h_high );
-	cm.goldsrcPlaneKind = Hunk_Alloc( ( numPlanes + GOLDSRC_BOX_PLANES ) *
-			sizeof( *cm.goldsrcPlaneKind ), h_high );
+	cm.planes = Hunk_Alloc( ( numPlanes + BSP30_BOX_PLANES ) * sizeof( *cm.planes ), h_high );
+	cm.bsp30PlaneKind = Hunk_Alloc( ( numPlanes + BSP30_BOX_PLANES ) *
+			sizeof( *cm.bsp30PlaneKind ), h_high );
 	for ( i = 0; i < numPlanes; i++ ) {
 		cplane_t *out = &cm.planes[i];
 		for ( j = 0; j < 3; j++ ) {
@@ -172,10 +172,10 @@ void CM_LoadGoldSrcMap( const byte *buffer, int length, const char *name ) {
 		 */
 		if ( out->type == PLANE_X || out->type == PLANE_Y ||
 				out->type == PLANE_Z ) {
-			cm.goldsrcPlaneKind[i] = (byte)TRACE_PLANE_AXIAL_BEVEL;
+			cm.bsp30PlaneKind[i] = (byte)TRACE_PLANE_AXIAL_BEVEL;
 		}
 		else {
-			cm.goldsrcPlaneKind[i] = (byte)TRACE_PLANE_BEVEL;
+			cm.bsp30PlaneKind[i] = (byte)TRACE_PLANE_BEVEL;
 		}
 	}
 
@@ -185,7 +185,7 @@ void CM_LoadGoldSrcMap( const byte *buffer, int length, const char *name ) {
 			Com_Error( ERR_DROP, "%s: %s face %d has invalid plane %d",
 					__func__, name, i, planeNum );
 		}
-		cm.goldsrcPlaneKind[planeNum] = (byte)TRACE_PLANE_WORLD_FACE;
+		cm.bsp30PlaneKind[planeNum] = (byte)TRACE_PLANE_WORLD_FACE;
 	}
 
 	/*
@@ -194,29 +194,29 @@ void CM_LoadGoldSrcMap( const byte *buffer, int length, const char *name ) {
 	 * velocity constraints.
 	 */
 	for ( i = 0; i < numPlanes; i++ ) {
-		if ( cm.goldsrcPlaneKind[i] == (byte)TRACE_PLANE_WORLD_FACE ) {
+		if ( cm.bsp30PlaneKind[i] == (byte)TRACE_PLANE_WORLD_FACE ) {
 			continue;
 		}
 		for ( j = 0; j < numPlanes; j++ ) {
-			if ( cm.goldsrcPlaneKind[j] != (byte)TRACE_PLANE_WORLD_FACE ) {
+			if ( cm.bsp30PlaneKind[j] != (byte)TRACE_PLANE_WORLD_FACE ) {
 				continue;
 			}
 			if ( DotProduct( cm.planes[i].normal, cm.planes[j].normal ) >
 					0.9995f ) {
-				cm.goldsrcPlaneKind[i] = (byte)TRACE_PLANE_HULL_FACE;
+				cm.bsp30PlaneKind[i] = (byte)TRACE_PLANE_HULL_FACE;
 				break;
 			}
 		}
 	}
 
 	for ( i = 0; i < numPlanes; i++ ) {
-		if ( cm.goldsrcPlaneKind[i] == (byte)TRACE_PLANE_WORLD_FACE ) {
+		if ( cm.bsp30PlaneKind[i] == (byte)TRACE_PLANE_WORLD_FACE ) {
 			worldFacePlanes++;
 		}
-		else if ( cm.goldsrcPlaneKind[i] == (byte)TRACE_PLANE_HULL_FACE ) {
+		else if ( cm.bsp30PlaneKind[i] == (byte)TRACE_PLANE_HULL_FACE ) {
 			hullFacePlanes++;
 		}
-		else if ( cm.goldsrcPlaneKind[i] == (byte)TRACE_PLANE_AXIAL_BEVEL ) {
+		else if ( cm.bsp30PlaneKind[i] == (byte)TRACE_PLANE_AXIAL_BEVEL ) {
 			axialBevelPlanes++;
 		}
 		else {
@@ -241,27 +241,27 @@ void CM_LoadGoldSrcMap( const byte *buffer, int length, const char *name ) {
 		}
 	}
 
-	cm.numGoldSrcClipNodes = numClipNodes;
-	cm.goldsrcClipNodes = Hunk_Alloc( MAX( numClipNodes, 1 ) * sizeof( *cm.goldsrcClipNodes ), h_high );
+	cm.numBSP30ClipNodes = numClipNodes;
+	cm.bsp30ClipNodes = Hunk_Alloc( MAX( numClipNodes, 1 ) * sizeof( *cm.bsp30ClipNodes ), h_high );
 	for ( i = 0; i < numClipNodes; i++ ) {
 		int planeNum = LittleLong( inClipNodes[i].planenum );
 		if ( planeNum < 0 || planeNum >= numPlanes ) {
 			Com_Error( ERR_DROP, "%s: %s clipnode %d has invalid plane %d", __func__, name, i, planeNum );
 		}
-		cm.goldsrcClipNodes[i].plane = &cm.planes[planeNum];
+		cm.bsp30ClipNodes[i].plane = &cm.planes[planeNum];
 		for ( j = 0; j < 2; j++ ) {
 			int child = LittleShort( inClipNodes[i].children[j] );
 			if ( child >= numClipNodes ) {
 				Com_Error( ERR_DROP, "%s: %s clipnode %d has invalid child %d", __func__, name, i, child );
 			}
-			cm.goldsrcClipNodes[i].children[j] = child;
+			cm.bsp30ClipNodes[i].children[j] = child;
 		}
 	}
 
 	cm.numLeafs = numLeafs;
 	cm.leafs = Hunk_Alloc( ( numLeafs + 2 ) * sizeof( *cm.leafs ), h_high );
 	for ( i = 0; i < numLeafs; i++ ) {
-		cm.leafs[i].contents = CM_GoldSrcContents( LittleLong( inLeafs[i].contents ) );
+		cm.leafs[i].contents = CM_Bsp30Contents( LittleLong( inLeafs[i].contents ) );
 		cm.leafs[i].cluster = cm.leafs[i].contents & CONTENTS_SOLID ? -1 : 0;
 		cm.leafs[i].area = 0;
 	}
@@ -273,17 +273,17 @@ void CM_LoadGoldSrcMap( const byte *buffer, int length, const char *name ) {
 			cm.cmodels[i].mins[j] = LittleFloat( inModels[i].mins[j] ) - 1.0f;
 			cm.cmodels[i].maxs[j] = LittleFloat( inModels[i].maxs[j] ) + 1.0f;
 		}
-		for ( j = 0; j < GOLDSRC_MAX_MAP_HULLS; j++ ) {
-			cm.cmodels[i].goldsrcHeadnodes[j] = LittleLong( inModels[i].headnode[j] );
+		for ( j = 0; j < BSP30_MAX_MAP_HULLS; j++ ) {
+			cm.cmodels[i].bsp30Headnodes[j] = LittleLong( inModels[i].headnode[j] );
 		}
-		cm.cmodels[i].goldsrcContents = CONTENTS_SOLID;
+		cm.cmodels[i].bsp30Contents = CONTENTS_SOLID;
 	}
 
 	cm.entityString = Hunk_Alloc( entityLen + 1, h_high );
 	Com_Memcpy( cm.entityString, entities, entityLen );
 	cm.entityString[entityLen] = '\0';
 	cm.numEntityChars = entityLen + 1;
-	CM_GoldSrcAssignModelContents();
+	CM_Bsp30AssignModelContents();
 
 	cm.numClusters = 1;
 	cm.clusterBytes = 32;
@@ -299,7 +299,7 @@ void CM_LoadGoldSrcMap( const byte *buffer, int length, const char *name ) {
 	cm.numBrushes = 0;
 	cm.brushes = Hunk_Alloc( sizeof( *cm.brushes ), h_high );
 	cm.numBrushSides = 0;
-	cm.brushsides = Hunk_Alloc( GOLDSRC_BOX_SIDES * sizeof( *cm.brushsides ), h_high );
+	cm.brushsides = Hunk_Alloc( BSP30_BOX_SIDES * sizeof( *cm.brushsides ), h_high );
 	cm.numLeafBrushes = 0;
 	cm.leafbrushes = Hunk_Alloc( sizeof( *cm.leafbrushes ), h_high );
 	cm.numLeafSurfaces = 0;
@@ -307,7 +307,7 @@ void CM_LoadGoldSrcMap( const byte *buffer, int length, const char *name ) {
 	cm.numSurfaces = 0;
 	cm.surfaces = Hunk_Alloc( sizeof( *cm.surfaces ), h_high );
 
-	Com_Printf( "GoldSrc BSP v30 collision: %d nodes, %d clipnodes, %d leaves, "
+	Com_Printf( "BSP30 BSP v30 collision: %d nodes, %d clipnodes, %d leaves, "
 			"%d inline models, planes=%d (world=%d hull=%d bevel=%d axial=%d)\n",
 			numNodes, numClipNodes, numLeafs, numModels, numPlanes,
 			worldFacePlanes, hullFacePlanes, bevelPlanes, axialBevelPlanes );

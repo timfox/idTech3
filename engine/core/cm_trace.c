@@ -1135,24 +1135,24 @@ static void CM_TraceThroughTree( traceWork_t *tw, int num, float p1f, float p2f,
 }
 
 /* BSP30 collision hulls use a 1/32-unit crossing skin. */
-#define GOLDSRC_SURFACE_CLIP_EPSILON ( 0.03125f )
+#define BSP30_SURFACE_CLIP_EPSILON ( 0.03125f )
 /*
  * Clipnode trees can be deep, and BoxTouchesContents branches into both
  * children when a box straddles a plane. Bound recursion so a pathological
  * walk cannot smash the thread stack (seen as PM_GroundTrace canary abort).
  */
-#define GOLDSRC_MAX_TRACE_DEPTH 512
+#define BSP30_MAX_TRACE_DEPTH 512
 
 /*
 ==================
-CM_GoldSrcTraceThroughTree
+CM_Bsp30TraceThroughTree
 
 BSP30 render nodes terminate in indexed leaves, while collision clipnodes
 terminate directly in content codes. Traverse either tree, expanding only by
 the extents not already represented by a precomputed collision hull.
 ==================
 */
-static void CM_GoldSrcTraceThroughTree( traceWork_t *tw, int num,
+static void CM_Bsp30TraceThroughTree( traceWork_t *tw, int num,
 		float p1f, float p2f, const vec3_t p1, const vec3_t p2,
 		const cplane_t *enterPlane, int enterSide, int enterClipnode,
 		int contentsOverride, qboolean clipTree, const vec3_t extents,
@@ -1164,7 +1164,7 @@ static void CM_GoldSrcTraceThroughTree( traceWork_t *tw, int num,
 	vec3_t mid;
 	int side;
 
-	if ( depth > GOLDSRC_MAX_TRACE_DEPTH ) {
+	if ( depth > BSP30_MAX_TRACE_DEPTH ) {
 		return;
 	}
 
@@ -1175,12 +1175,12 @@ static void CM_GoldSrcTraceThroughTree( traceWork_t *tw, int num,
 	if ( num < 0 ) {
 		int leafContents;
 		if ( clipTree ) {
-			leafContents = CM_GoldSrcContents( num );
+			leafContents = CM_Bsp30Contents( num );
 		}
 		else {
 			int leafIndex = -1 - num;
 			if ( leafIndex < 0 || leafIndex >= cm.numLeafs ) {
-				Com_Error( ERR_DROP, "%s: bad GoldSrc leaf %d", __func__, leafIndex );
+				Com_Error( ERR_DROP, "%s: bad BSP30 leaf %d", __func__, leafIndex );
 			}
 			leafContents = cm.leafs[leafIndex].contents;
 		}
@@ -1219,20 +1219,20 @@ static void CM_GoldSrcTraceThroughTree( traceWork_t *tw, int num,
 			tw->trace.planeKind = TRACE_PLANE_WORLD_FACE;
 			planeNum = (int)( enterPlane - cm.planes );
 			if ( planeNum >= 0 && planeNum < cm.numPlanes &&
-					cm.goldsrcPlaneKind ) {
+					cm.bsp30PlaneKind ) {
 				tw->trace.planeKind =
-						(tracePlaneKind_t)cm.goldsrcPlaneKind[planeNum];
+						(tracePlaneKind_t)cm.bsp30PlaneKind[planeNum];
 			}
 		}
 		return;
 	}
 
-	if ( ( clipTree && num >= cm.numGoldSrcClipNodes ) ||
+	if ( ( clipTree && num >= cm.numBSP30ClipNodes ) ||
 			( !clipTree && num >= cm.numNodes ) ) {
-		Com_Error( ERR_DROP, "%s: bad GoldSrc %snode %d", __func__, clipTree ? "clip" : "", num );
+		Com_Error( ERR_DROP, "%s: bad BSP30 %snode %d", __func__, clipTree ? "clip" : "", num );
 	}
 
-	node = clipTree ? &cm.goldsrcClipNodes[num] : &cm.nodes[num];
+	node = clipTree ? &cm.bsp30ClipNodes[num] : &cm.nodes[num];
 	plane = node->plane;
 	t1 = DotProductDP( plane->normal, p1 ) - plane->dist;
 	t2 = DotProductDP( plane->normal, p2 ) - plane->dist;
@@ -1241,13 +1241,13 @@ static void CM_GoldSrcTraceThroughTree( traceWork_t *tw, int num,
 			fabs( extents[2] * plane->normal[2] );
 
 	if ( t1 >= offset && t2 >= offset ) {
-		CM_GoldSrcTraceThroughTree( tw, node->children[0], p1f, p2f,
+		CM_Bsp30TraceThroughTree( tw, node->children[0], p1f, p2f,
 				p1, p2, enterPlane, enterSide, enterClipnode, contentsOverride,
 				clipTree, extents, depth + 1 );
 		return;
 	}
 	if ( t1 <= -offset && t2 <= -offset ) {
-		CM_GoldSrcTraceThroughTree( tw, node->children[1], p1f, p2f,
+		CM_Bsp30TraceThroughTree( tw, node->children[1], p1f, p2f,
 				p1, p2, enterPlane, enterSide, enterClipnode, contentsOverride,
 				clipTree, extents, depth + 1 );
 		return;
@@ -1255,13 +1255,13 @@ static void CM_GoldSrcTraceThroughTree( traceWork_t *tw, int num,
 
 	if ( t1 < t2 ) {
 		side = 1;
-		frac2 = (float)(( t1 + offset + GOLDSRC_SURFACE_CLIP_EPSILON ) / ( t1 - t2 ));
-		frac = (float)(( t1 - offset + GOLDSRC_SURFACE_CLIP_EPSILON ) / ( t1 - t2 ));
+		frac2 = (float)(( t1 + offset + BSP30_SURFACE_CLIP_EPSILON ) / ( t1 - t2 ));
+		frac = (float)(( t1 - offset + BSP30_SURFACE_CLIP_EPSILON ) / ( t1 - t2 ));
 	}
 	else if ( t1 > t2 ) {
 		side = 0;
-		frac2 = (float)(( t1 - offset - GOLDSRC_SURFACE_CLIP_EPSILON ) / ( t1 - t2 ));
-		frac = (float)(( t1 + offset + GOLDSRC_SURFACE_CLIP_EPSILON ) / ( t1 - t2 ));
+		frac2 = (float)(( t1 - offset - BSP30_SURFACE_CLIP_EPSILON ) / ( t1 - t2 ));
+		frac = (float)(( t1 + offset + BSP30_SURFACE_CLIP_EPSILON ) / ( t1 - t2 ));
 	}
 	else {
 		side = 0;
@@ -1273,7 +1273,7 @@ static void CM_GoldSrcTraceThroughTree( traceWork_t *tw, int num,
 	midf = p1f + ( p2f - p1f ) * frac;
 	VectorSubtract( p2, p1, mid );
 	VectorMA( p1, frac, mid, mid );
-	CM_GoldSrcTraceThroughTree( tw, node->children[side], p1f, midf,
+	CM_Bsp30TraceThroughTree( tw, node->children[side], p1f, midf,
 			p1, mid, enterPlane, enterSide, enterClipnode, contentsOverride,
 			clipTree, extents, depth + 1 );
 
@@ -1281,52 +1281,52 @@ static void CM_GoldSrcTraceThroughTree( traceWork_t *tw, int num,
 	midf = p1f + ( p2f - p1f ) * frac2;
 	VectorSubtract( p2, p1, mid );
 	VectorMA( p1, frac2, mid, mid );
-	CM_GoldSrcTraceThroughTree( tw, node->children[side ^ 1], midf, p2f,
+	CM_Bsp30TraceThroughTree( tw, node->children[side ^ 1], midf, p2f,
 			mid, p2, plane, side, num, contentsOverride, clipTree, extents,
 			depth + 1 );
 }
 
-static qboolean CM_GoldSrcBoxTouchesContents( int num, const vec3_t point,
+static qboolean CM_Bsp30BoxTouchesContents( int num, const vec3_t point,
 		const vec3_t extents, int contentsOverride, int mask, qboolean clipTree,
 		float contactEpsilon, int depth ) {
 	cNode_t *node;
 	float distance, offset;
 	qboolean frontSolid, backSolid;
 
-	if ( depth > GOLDSRC_MAX_TRACE_DEPTH ) {
+	if ( depth > BSP30_MAX_TRACE_DEPTH ) {
 		/* Conservative: treat unbounded walks as solid contact. */
 		return qtrue;
 	}
 
 	if ( num < 0 ) {
-		int leafContents = clipTree ? CM_GoldSrcContents( num ) : cm.leafs[-1 - num].contents;
+		int leafContents = clipTree ? CM_Bsp30Contents( num ) : cm.leafs[-1 - num].contents;
 		if ( contentsOverride >= 0 && leafContents ) {
 			leafContents = contentsOverride;
 		}
 		return ( leafContents & mask ) != 0;
 	}
 
-	node = clipTree ? &cm.goldsrcClipNodes[num] : &cm.nodes[num];
+	node = clipTree ? &cm.bsp30ClipNodes[num] : &cm.nodes[num];
 	distance = DotProduct( point, node->plane->normal ) - node->plane->dist;
 	offset = fabsf( extents[0] * node->plane->normal[0] ) +
 			fabsf( extents[1] * node->plane->normal[1] ) +
 			fabsf( extents[2] * node->plane->normal[2] );
 	if ( distance >= offset + contactEpsilon ) {
-		return CM_GoldSrcBoxTouchesContents( node->children[0], point, extents,
+		return CM_Bsp30BoxTouchesContents( node->children[0], point, extents,
 				contentsOverride, mask, clipTree, contactEpsilon, depth + 1 );
 	}
 	if ( distance <= -offset - contactEpsilon ) {
-		return CM_GoldSrcBoxTouchesContents( node->children[1], point, extents,
+		return CM_Bsp30BoxTouchesContents( node->children[1], point, extents,
 				contentsOverride, mask, clipTree, contactEpsilon, depth + 1 );
 	}
 
-	frontSolid = CM_GoldSrcBoxTouchesContents( node->children[0], point, extents,
+	frontSolid = CM_Bsp30BoxTouchesContents( node->children[0], point, extents,
 			contentsOverride, mask, clipTree, contactEpsilon, depth + 1 );
-	backSolid = CM_GoldSrcBoxTouchesContents( node->children[1], point, extents,
+	backSolid = CM_Bsp30BoxTouchesContents( node->children[1], point, extents,
 			contentsOverride, mask, clipTree, contactEpsilon, depth + 1 );
 
 	/*
-	 * A swept trace deliberately stops GOLDSRC_SURFACE_CLIP_EPSILON short of
+	 * A swept trace deliberately stops BSP30_SURFACE_CLIP_EPSILON short of
 	 * a BSP plane. Floating-point rounding can put the following position test
 	 * a tiny amount across that plane. Treat the epsilon band as contact rather
 	 * than penetration when either side is open; deeper overlap still checks
@@ -1468,10 +1468,10 @@ static void CM_Trace( trace_t *results, const vec3_t start, const vec3_t end, co
 		}
 	}
 
-	if ( cm.goldsrc && model != BOX_MODEL_HANDLE && model != CAPSULE_MODEL_HANDLE ) {
-		const int *headnodes = model ? cmod->goldsrcHeadnodes : cm.goldsrcWorldHeadnodes;
+	if ( cm.bsp30 && model != BOX_MODEL_HANDLE && model != CAPSULE_MODEL_HANDLE ) {
+		const int *headnodes = model ? cmod->bsp30Headnodes : cm.bsp30WorldHeadnodes;
 		int root = headnodes[0];
-		int contentsOverride = model ? cmod->goldsrcContents : -1;
+		int contentsOverride = model ? cmod->bsp30Contents : -1;
 		qboolean clipTree = qfalse;
 		vec3_t traceExtents;
 
@@ -1483,24 +1483,24 @@ static void CM_Trace( trace_t *results, const vec3_t start, const vec3_t end, co
 		 * then expand only by extents beyond that hull. Surf stand/crouch AABBs
 		 * match hull 1/3 exactly, so residual extents are zero — a point sweep
 		 * through the pre-expanded clip tree, not a second Minkowski expand.
-		 * Non-GoldSrc idTech3 boxes retain the hull-3 fallback used by the
+		 * Non-BSP30 idTech3 boxes retain the hull-3 fallback used by the
 		 * compatibility path.
 		 */
-		if ( cm.numGoldSrcClipNodes > 0 &&
+		if ( cm.numBSP30ClipNodes > 0 &&
 				( traceExtents[0] > 0.0f || traceExtents[1] > 0.0f || traceExtents[2] > 0.0f ) &&
-				headnodes[3] >= 0 && headnodes[3] < cm.numGoldSrcClipNodes ) {
+				headnodes[3] >= 0 && headnodes[3] < cm.numBSP30ClipNodes ) {
 			vec3_t hullExtents;
 			int axis;
 
 			if ( traceExtents[0] >= 15.5f && traceExtents[1] >= 15.5f &&
 					traceExtents[2] >= 35.5f &&
-					headnodes[1] >= 0 && headnodes[1] < cm.numGoldSrcClipNodes ) {
+					headnodes[1] >= 0 && headnodes[1] < cm.numBSP30ClipNodes ) {
 				root = headnodes[1];
 				VectorSet( hullExtents, 16.0f, 16.0f, 36.0f );
 			}
 			else if ( traceExtents[0] >= 31.5f && traceExtents[1] >= 31.5f &&
 					traceExtents[2] >= 31.5f &&
-					headnodes[2] >= 0 && headnodes[2] < cm.numGoldSrcClipNodes ) {
+					headnodes[2] >= 0 && headnodes[2] < cm.numBSP30ClipNodes ) {
 				root = headnodes[2];
 				VectorSet( hullExtents, 32.0f, 32.0f, 32.0f );
 			}
@@ -1513,7 +1513,7 @@ static void CM_Trace( trace_t *results, const vec3_t start, const vec3_t end, co
 				traceExtents[axis] = MAX( 0.0f, traceExtents[axis] - hullExtents[axis] );
 			}
 		}
-		CM_GoldSrcTraceThroughTree( &tw, root, 0.0f, 1.0f,
+		CM_Bsp30TraceThroughTree( &tw, root, 0.0f, 1.0f,
 				tw.start, tw.end, NULL, 0, -1, contentsOverride, clipTree,
 				traceExtents, 0 );
 		/*
@@ -1523,9 +1523,9 @@ static void CM_Trace( trace_t *results, const vec3_t start, const vec3_t end, co
 		 * surf contact as an embedded player and repeatedly jitters the hull.
 		 */
 		if ( tw.trace.startsolid &&
-				!CM_GoldSrcBoxTouchesContents( root, tw.start, traceExtents,
+				!CM_Bsp30BoxTouchesContents( root, tw.start, traceExtents,
 				contentsOverride, brushmask, clipTree,
-				GOLDSRC_SURFACE_CLIP_EPSILON, 0 ) ) {
+				BSP30_SURFACE_CLIP_EPSILON, 0 ) ) {
 			tw.trace.startsolid = qfalse;
 			/*
 			 * The recursive trace can enter the far leaf at fraction zero when
@@ -1533,14 +1533,14 @@ static void CM_Trace( trace_t *results, const vec3_t start, const vec3_t end, co
 			 * requested endpoint is solid, this is an immediate collision, not a
 			 * clear sweep. Keep the entry plane and stop at the valid start.
 			 */
-			if ( CM_GoldSrcBoxTouchesContents( root, tw.end, traceExtents,
+			if ( CM_Bsp30BoxTouchesContents( root, tw.end, traceExtents,
 					contentsOverride, brushmask, clipTree, 0.0f, 0 ) ) {
 				tw.trace.fraction = 0.0f;
 				tw.trace.allsolid = qfalse;
 			}
 		}
 		if ( tw.trace.startsolid ) {
-			tw.trace.allsolid = CM_GoldSrcBoxTouchesContents( root, tw.end,
+			tw.trace.allsolid = CM_Bsp30BoxTouchesContents( root, tw.end,
 					traceExtents, contentsOverride, brushmask, clipTree, 0.0f, 0 );
 			if ( tw.trace.allsolid ) {
 				tw.trace.fraction = 0.0f;
@@ -1551,10 +1551,10 @@ static void CM_Trace( trace_t *results, const vec3_t start, const vec3_t end, co
 		 * Decisive comparison: native clipnode hull (point through pre-expanded
 		 * hull 1/3) versus a naive full-box sweep through hull 0. When these
 		 * disagree at a ramp transition, movement receives different planes
-		 * than GoldSrc would have produced.
+		 * than BSP30 would have produced.
 		 */
-		if ( cm_goldsrcCompare && cm_goldsrcCompare->integer &&
-				cm.numGoldSrcClipNodes > 0 &&
+		if ( cm_bsp30Compare && cm_bsp30Compare->integer &&
+				cm.numBSP30ClipNodes > 0 &&
 				( tw.size[1][0] > 0.0f || tw.size[1][1] > 0.0f ||
 						tw.size[1][2] > 0.0f ) ) {
 			traceWork_t naive;
@@ -1572,7 +1572,7 @@ static void CM_Trace( trace_t *results, const vec3_t start, const vec3_t end, co
 			naive.trace.sourceClipnode = -1;
 			VectorCopy( tw.size[1], naiveExtents );
 
-			CM_GoldSrcTraceThroughTree( &naive, naiveRoot, 0.0f, 1.0f,
+			CM_Bsp30TraceThroughTree( &naive, naiveRoot, 0.0f, 1.0f,
 					tw.start, tw.end, NULL, 0, -1, contentsOverride, qfalse,
 					naiveExtents, 0 );
 
@@ -1586,7 +1586,7 @@ static void CM_Trace( trace_t *results, const vec3_t start, const vec3_t end, co
 					fabsf( tw.trace.plane.normal[2] -
 							naive.trace.plane.normal[2] ) > 0.001f ) {
 				Com_Printf(
-						"cm_goldsrcCompare mismatch: "
+						"cm_bsp30Compare mismatch: "
 						"native(f=%.6f ss=%d as=%d n=(%.4f %.4f %.4f) "
 						"kind=%d clip=%d ext=(%.1f %.1f %.1f)) "
 						"naiveBox(f=%.6f ss=%d as=%d n=(%.4f %.4f %.4f) "

@@ -8,7 +8,7 @@ The engine framework is based on id Tech 3 (GPLv2).
 
 Background map system for menu screens.
 Loads and renders a non-playable 3D map behind the UI, similar to
-Source Engine / GoldSrc background maps. Supports camera paths,
+Source Engine / BSP30 background maps. Supports camera paths,
 ambient audio, fog overrides, and per-menu map selection.
 ===========================================================================
 */

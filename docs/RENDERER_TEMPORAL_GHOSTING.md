@@ -196,4 +196,4 @@ Example cfgs live under `release/surf/ghost_on.cfg` and `ghost_off.cfg` / `ghost
 - `renderers/vulkan/vk_view_state.c` — `DEPTH_RANGE_WEAPON`.
 - `renderers/vulkan/shaders/glsl/ssr.frag` — reflection march + debug overlays.
 - `renderers/vulkan/vk_temporal.c` — ownership / deferred weapon policy / `temporal_ghost_status`.
-- `engine/core/cm_trace.c` — GoldSrc recursion depth guard (`GOLDSRC_MAX_TRACE_DEPTH`).
+- `engine/core/cm_trace.c` — BSP30 recursion depth guard (`BSP30_MAX_TRACE_DEPTH`).

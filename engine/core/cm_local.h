@@ -23,7 +23,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "q_shared.h"
 #include "qcommon.h"
 #include "cm_polylib.h"
-#include "qfiles_goldsrc.h"
+#include "qfiles_bsp30.h"
 
 #define	MAX_SUBMODELS			256
 #define	BOX_MODEL_HANDLE		255
@@ -82,7 +82,7 @@ typedef struct {
 typedef struct {
 	int			cluster;
 	int			area;
-	int			contents;		// used directly by GoldSrc BSP leaves
+	int			contents;		// used directly by BSP30 BSP leaves
 
 	int			firstLeafBrush;
 	int			numLeafBrushes;
@@ -94,8 +94,8 @@ typedef struct {
 typedef struct cmodel_s {
 	vec3_t		mins, maxs;
 	cLeaf_t		leaf;			// submodels don't reference the main tree
-	int			goldsrcHeadnodes[GOLDSRC_MAX_MAP_HULLS];
-	int			goldsrcContents;	// entity-class contents for BSP30 inline models
+	int			bsp30Headnodes[BSP30_MAX_MAP_HULLS];
+	int			bsp30Contents;	// entity-class contents for BSP30 inline models
 } cmodel_t;
 
 typedef struct {
@@ -129,11 +129,11 @@ typedef struct {
 
 typedef struct {
 	char		name[MAX_QPATH];
-	qboolean	goldsrc;
-	int			goldsrcWorldHeadnodes[GOLDSRC_MAX_MAP_HULLS];
-	int			numGoldSrcClipNodes;
-	cNode_t		*goldsrcClipNodes;
-	byte		*goldsrcPlaneKind;	/* parallel to planes[0..numPlanes) */
+	qboolean	bsp30;
+	int			bsp30WorldHeadnodes[BSP30_MAX_MAP_HULLS];
+	int			numBSP30ClipNodes;
+	cNode_t		*bsp30ClipNodes;
+	byte		*bsp30PlaneKind;	/* parallel to planes[0..numPlanes) */
 
 	int			numShaders;
 	dshader_t	*shaders;
@@ -194,7 +194,7 @@ extern	int			c_traces, c_brush_traces, c_patch_traces;
 extern	cvar_t		*cm_noAreas;
 extern	cvar_t		*cm_noCurves;
 extern	cvar_t		*cm_playerCurveClip;
-extern	cvar_t		*cm_goldsrcCompare;
+extern	cvar_t		*cm_bsp30Compare;
 
 // cm_test.c
 
@@ -208,8 +208,8 @@ typedef struct
 } sphere_t;
 
 void CM_FloodAreaConnections( void );
-void CM_LoadGoldSrcMap( const byte *buffer, int length, const char *name );
-int CM_GoldSrcContents( int contents );
+void CM_LoadBSP30Map( const byte *buffer, int length, const char *name );
+int CM_Bsp30Contents( int contents );
 
 typedef struct {
 	vec3_t		start;

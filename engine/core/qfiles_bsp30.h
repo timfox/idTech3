@@ -1,6 +1,6 @@
 /*
 ===========================================================================
-GoldSrc / Half-Life BSP v30 and WAD3 on-disk structures.
+BSP30 / Half-Life BSP v30 and WAD3 on-disk structures.
 
 These structures are intentionally isolated from qfiles.h because the two
 formats use several of the same historic type names with different layouts.
@@ -10,60 +10,60 @@ contains no source copied from, the Half-Life SDK.
 ===========================================================================
 */
 
-#ifndef QFILES_GOLDSRC_H
-#define QFILES_GOLDSRC_H
+#ifndef QFILES_BSP30_H
+#define QFILES_BSP30_H
 
 #include <stdint.h>
 
-#define GOLDSRC_BSP_VERSION 30
-#define GOLDSRC_HEADER_LUMPS 15
-#define GOLDSRC_MAX_MAP_HULLS 4
-#define GOLDSRC_LIGHT_STYLES 4
+#define BSP30_BSP_VERSION 30
+#define BSP30_HEADER_LUMPS 15
+#define BSP30_MAX_MAP_HULLS 4
+#define BSP30_LIGHT_STYLES 4
 
 enum {
-	GOLDSRC_LUMP_ENTITIES = 0,
-	GOLDSRC_LUMP_PLANES,
-	GOLDSRC_LUMP_TEXTURES,
-	GOLDSRC_LUMP_VERTEXES,
-	GOLDSRC_LUMP_VISIBILITY,
-	GOLDSRC_LUMP_NODES,
-	GOLDSRC_LUMP_TEXINFO,
-	GOLDSRC_LUMP_FACES,
-	GOLDSRC_LUMP_LIGHTING,
-	GOLDSRC_LUMP_CLIPNODES,
-	GOLDSRC_LUMP_LEAFS,
-	GOLDSRC_LUMP_MARKSURFACES,
-	GOLDSRC_LUMP_EDGES,
-	GOLDSRC_LUMP_SURFEDGES,
-	GOLDSRC_LUMP_MODELS
+	BSP30_LUMP_ENTITIES = 0,
+	BSP30_LUMP_PLANES,
+	BSP30_LUMP_TEXTURES,
+	BSP30_LUMP_VERTEXES,
+	BSP30_LUMP_VISIBILITY,
+	BSP30_LUMP_NODES,
+	BSP30_LUMP_TEXINFO,
+	BSP30_LUMP_FACES,
+	BSP30_LUMP_LIGHTING,
+	BSP30_LUMP_CLIPNODES,
+	BSP30_LUMP_LEAFS,
+	BSP30_LUMP_MARKSURFACES,
+	BSP30_LUMP_EDGES,
+	BSP30_LUMP_SURFEDGES,
+	BSP30_LUMP_MODELS
 };
 
 enum {
-	GOLDSRC_CONTENTS_EMPTY = -1,
-	GOLDSRC_CONTENTS_SOLID = -2,
-	GOLDSRC_CONTENTS_WATER = -3,
-	GOLDSRC_CONTENTS_SLIME = -4,
-	GOLDSRC_CONTENTS_LAVA = -5,
-	GOLDSRC_CONTENTS_SKY = -6,
-	GOLDSRC_CONTENTS_ORIGIN = -7,
-	GOLDSRC_CONTENTS_CLIP = -8
+	BSP30_CONTENTS_EMPTY = -1,
+	BSP30_CONTENTS_SOLID = -2,
+	BSP30_CONTENTS_WATER = -3,
+	BSP30_CONTENTS_SLIME = -4,
+	BSP30_CONTENTS_LAVA = -5,
+	BSP30_CONTENTS_SKY = -6,
+	BSP30_CONTENTS_ORIGIN = -7,
+	BSP30_CONTENTS_CLIP = -8
 };
 
 typedef struct {
 	int32_t fileofs;
 	int32_t filelen;
-} goldsrc_lump_t;
+} bsp30_lump_t;
 
 typedef struct {
 	int32_t version;
-	goldsrc_lump_t lumps[GOLDSRC_HEADER_LUMPS];
-} goldsrc_header_t;
+	bsp30_lump_t lumps[BSP30_HEADER_LUMPS];
+} bsp30_header_t;
 
 typedef struct {
 	float normal[3];
 	float dist;
 	int32_t type;
-} goldsrc_plane_t;
+} bsp30_plane_t;
 
 typedef struct {
 	int32_t planenum;
@@ -72,12 +72,12 @@ typedef struct {
 	int16_t maxs[3];
 	uint16_t firstface;
 	uint16_t numfaces;
-} goldsrc_node_t;
+} bsp30_node_t;
 
 typedef struct {
 	int32_t planenum;
 	int16_t children[2];
-} goldsrc_clipnode_t;
+} bsp30_clipnode_t;
 
 typedef struct {
 	int32_t contents;
@@ -87,27 +87,27 @@ typedef struct {
 	uint16_t firstmarksurface;
 	uint16_t nummarksurfaces;
 	uint8_t ambient_level[4];
-} goldsrc_leaf_t;
+} bsp30_leaf_t;
 
 typedef struct {
 	float mins[3];
 	float maxs[3];
 	float origin[3];
-	int32_t headnode[GOLDSRC_MAX_MAP_HULLS];
+	int32_t headnode[BSP30_MAX_MAP_HULLS];
 	int32_t visleafs;
 	int32_t firstface;
 	int32_t numfaces;
-} goldsrc_model_t;
+} bsp30_model_t;
 
 typedef struct {
 	float point[3];
-} goldsrc_vertex_t;
+} bsp30_vertex_t;
 
 typedef struct {
 	float vecs[2][4];
 	int32_t miptex;
 	int32_t flags;
-} goldsrc_texinfo_t;
+} bsp30_texinfo_t;
 
 typedef struct {
 	uint16_t planenum;
@@ -115,28 +115,28 @@ typedef struct {
 	int32_t firstedge;
 	int16_t numedges;
 	int16_t texinfo;
-	uint8_t styles[GOLDSRC_LIGHT_STYLES];
+	uint8_t styles[BSP30_LIGHT_STYLES];
 	int32_t lightofs;
-} goldsrc_face_t;
+} bsp30_face_t;
 
 typedef struct {
 	uint16_t v[2];
-} goldsrc_edge_t;
+} bsp30_edge_t;
 
 typedef struct {
 	char name[16];
 	uint32_t width;
 	uint32_t height;
 	uint32_t offsets[4];
-} goldsrc_miptex_t;
+} bsp30_miptex_t;
 
-#define GOLDSRC_WAD3_ID "WAD3"
+#define BSP30_WAD3_ID "WAD3"
 
 typedef struct {
 	char identification[4];
 	int32_t numlumps;
 	int32_t infotableofs;
-} goldsrc_wad_header_t;
+} bsp30_wad_header_t;
 
 typedef struct {
 	int32_t filepos;
@@ -146,6 +146,6 @@ typedef struct {
 	uint8_t compression;
 	uint8_t padding[2];
 	char name[16];
-} goldsrc_wad_lump_t;
+} bsp30_wad_lump_t;
 
 #endif

@@ -233,16 +233,16 @@ int CM_PointContents( const vec3_t p, clipHandle_t model ) {
 	float		d;
 	cmodel_t	*clipm;
 
-	if ( cm.goldsrc && model != BOX_MODEL_HANDLE && model != CAPSULE_MODEL_HANDLE ) {
-		cmodel_t *goldsrcModel = model ? CM_ClipHandleToModel( model ) : NULL;
-		int num = goldsrcModel ? goldsrcModel->goldsrcHeadnodes[0] : cm.goldsrcWorldHeadnodes[0];
+	if ( cm.bsp30 && model != BOX_MODEL_HANDLE && model != CAPSULE_MODEL_HANDLE ) {
+		cmodel_t *bsp30Model = model ? CM_ClipHandleToModel( model ) : NULL;
+		int num = bsp30Model ? bsp30Model->bsp30Headnodes[0] : cm.bsp30WorldHeadnodes[0];
 		while ( num >= 0 ) {
 			cNode_t *node = &cm.nodes[num];
 			float planeDistance = DotProduct( p, node->plane->normal ) - node->plane->dist;
 			num = node->children[planeDistance < 0.0f];
 		}
-		if ( goldsrcModel && cm.leafs[-1 - num].contents ) {
-			return goldsrcModel->goldsrcContents;
+		if ( bsp30Model && cm.leafs[-1 - num].contents ) {
+			return bsp30Model->bsp30Contents;
 		}
 		return cm.leafs[-1 - num].contents;
 	}

@@ -1,10 +1,10 @@
 /*
 ===========================================================================
-GoldSrc / Half-Life BSP v30 renderer bridge.
+BSP30 / Half-Life BSP v30 renderer bridge.
 
-GoldSrc faces are reconstructed from edges and surfedges and submitted as
+BSP30 faces are reconstructed from edges and surfedges and submitted as
 ordinary idTech3 planar surfaces. Embedded indexed textures are expanded to
-RGBA at load time. GoldSrc lightmaps use a different packing model, so this
+RGBA at load time. BSP30 lightmaps use a different packing model, so this
 initial bridge uses vertex-white lighting while retaining the original base
 textures and geometry.
 
@@ -14,73 +14,73 @@ depend on Half-Life SDK source, headers, or libraries.
 */
 
 #include "tr_local.h"
-#include "../../engine/core/qfiles_goldsrc.h"
+#include "../../engine/core/qfiles_bsp30.h"
 
 typedef struct {
 	const byte *base;
 	int size;
-	const goldsrc_header_t *header;
+	const bsp30_header_t *header;
 	world_t *world;
 	shader_t **textureShaders;
 	int *textureWidths;
 	int *textureHeights;
 	int numTextures;
-} goldsrcRenderLoad_t;
+} bsp30RenderLoad_t;
 
-#define GOLDSRC_MAX_WADS 16
+#define BSP30_MAX_WADS 16
 
 typedef struct {
 	byte *data;
 	int length;
 	char name[MAX_QPATH];
-} goldsrcWadFile_t;
+} bsp30WadFile_t;
 
-static int GS_LumpLength( const goldsrcRenderLoad_t *load, int lump ) {
+static int GS_LumpLength( const bsp30RenderLoad_t *load, int lump ) {
 	return LittleLong( load->header->lumps[lump].filelen );
 }
 
-static const byte *GS_LumpData( const goldsrcRenderLoad_t *load, int lump ) {
+static const byte *GS_LumpData( const bsp30RenderLoad_t *load, int lump ) {
 	return load->base + LittleLong( load->header->lumps[lump].fileofs );
 }
 
-static int GS_LumpCount( const goldsrcRenderLoad_t *load, int lump, int elementSize ) {
+static int GS_LumpCount( const bsp30RenderLoad_t *load, int lump, int elementSize ) {
 	int length = GS_LumpLength( load, lump );
 	if ( elementSize <= 0 || length % elementSize ) {
-		ri.Error( ERR_DROP, "%s: malformed GoldSrc lump %d", __func__, lump );
+		ri.Error( ERR_DROP, "%s: malformed BSP30 lump %d", __func__, lump );
 	}
 	return length / elementSize;
 }
 
-static void GS_ValidateHeader( const goldsrcRenderLoad_t *load, const char *mapname ) {
+static void GS_ValidateHeader( const bsp30RenderLoad_t *load, const char *mapname ) {
 	int i;
 
-	if ( load->size < (int)sizeof( goldsrc_header_t ) ||
-			LittleLong( load->header->version ) != GOLDSRC_BSP_VERSION ) {
-		ri.Error( ERR_DROP, "%s: %s is not a GoldSrc BSP v30 map", __func__, mapname );
+	if ( load->size < (int)sizeof( bsp30_header_t ) ||
+			LittleLong( load->header->version ) != BSP30_BSP_VERSION ) {
+		ri.Error( ERR_DROP, "%s: %s is not a BSP30 BSP v30 map", __func__, mapname );
 	}
 
-	for ( i = 0; i < GOLDSRC_HEADER_LUMPS; i++ ) {
+	for ( i = 0; i < BSP30_HEADER_LUMPS; i++ ) {
 		int offset = LittleLong( load->header->lumps[i].fileofs );
 		int length = LittleLong( load->header->lumps[i].filelen );
 		if ( offset < 0 || length < 0 || offset > load->size || length > load->size - offset ) {
-			ri.Error( ERR_DROP, "%s: %s has invalid GoldSrc lump %d", __func__, mapname, i );
+			ri.Error( ERR_DROP, "%s: %s has invalid BSP30 lump %d", __func__, mapname, i );
 		}
 	}
 }
 
-static void GS_TextureName( char *out, int outSize, const goldsrc_miptex_t *miptex, int index ) {
+static void GS_TextureName( char *out, int outSize, const bsp30_miptex_t *miptex, int index ) {
 	char raw[17];
 	Com_Memcpy( raw, miptex->name, 16 );
 	raw[16] = '\0';
 	if ( raw[0] ) {
-		Com_sprintf( out, outSize, "*goldsrc/%s", raw );
+		Com_sprintf( out, outSize, "*bsp30/%s", raw );
 	}
 	else {
-		Com_sprintf( out, outSize, "*goldsrc/texture_%d", index );
+		Com_sprintf( out, outSize, "*bsp30/texture_%d", index );
 	}
 }
 
-static qboolean GS_MiptexPixelsValid( const goldsrc_miptex_t *miptex, int available ) {
+static qboolean GS_MiptexPixelsValid( const bsp30_miptex_t *miptex, int available ) {
 	uint32_t width = LittleLong( miptex->width );
 	uint32_t height = LittleLong( miptex->height );
 	uint32_t pixelOffset = LittleLong( miptex->offsets[0] );
@@ -94,7 +94,7 @@ static qboolean GS_MiptexPixelsValid( const goldsrc_miptex_t *miptex, int availa
 }
 
 static image_t *GS_CreateTextureImage( const char *shaderName,
-		const goldsrc_miptex_t *miptex, int available ) {
+		const bsp30_miptex_t *miptex, int available ) {
 	uint32_t width = LittleLong( miptex->width );
 	uint32_t height = LittleLong( miptex->height );
 	uint32_t pixelOffset = LittleLong( miptex->offsets[0] );
@@ -162,10 +162,10 @@ static const char *GS_BaseName( const char *path ) {
 	return base;
 }
 
-static int GS_LoadReferencedWads( const goldsrcRenderLoad_t *load,
-		goldsrcWadFile_t wads[GOLDSRC_MAX_WADS] ) {
-	const byte *entities = GS_LumpData( load, GOLDSRC_LUMP_ENTITIES );
-	int entityLength = GS_LumpLength( load, GOLDSRC_LUMP_ENTITIES );
+static int GS_LoadReferencedWads( const bsp30RenderLoad_t *load,
+		bsp30WadFile_t wads[BSP30_MAX_WADS] ) {
+	const byte *entities = GS_LumpData( load, BSP30_LUMP_ENTITIES );
+	int entityLength = GS_LumpLength( load, BSP30_LUMP_ENTITIES );
 	char *entityText = ri.Hunk_AllocateTempMemory( entityLength + 1 );
 	const char *parse;
 	const char *token;
@@ -188,7 +188,7 @@ static int GS_LoadReferencedWads( const goldsrcRenderLoad_t *load,
 	}
 	ri.Hunk_FreeTempMemory( entityText );
 
-	for ( parse = wadList; *parse && count < GOLDSRC_MAX_WADS; ) {
+	for ( parse = wadList; *parse && count < BSP30_MAX_WADS; ) {
 		char entry[MAX_OSPATH];
 		char qpath[MAX_QPATH];
 		const char *base;
@@ -211,7 +211,7 @@ static int GS_LoadReferencedWads( const goldsrcRenderLoad_t *load,
 		Com_sprintf( qpath, sizeof( qpath ), "wads/%s", base );
 		wads[count].length = ri.FS_ReadFile( qpath, (void **)&wads[count].data );
 		if ( wads[count].length <= 0 ) {
-			ri.Printf( PRINT_WARNING, "GoldSrc texture WAD not present: %s (optional, place owned copy at %s)\n",
+			ri.Printf( PRINT_WARNING, "BSP30 texture WAD not present: %s (optional, place owned copy at %s)\n",
 					base, qpath );
 			continue;
 		}
@@ -221,20 +221,20 @@ static int GS_LoadReferencedWads( const goldsrcRenderLoad_t *load,
 	return count;
 }
 
-static const goldsrc_miptex_t *GS_FindWadTexture( const goldsrcWadFile_t *wad,
+static const bsp30_miptex_t *GS_FindWadTexture( const bsp30WadFile_t *wad,
 		const char *textureName, int *available ) {
-	const goldsrc_wad_header_t *header;
-	const goldsrc_wad_lump_t *lumps;
+	const bsp30_wad_header_t *header;
+	const bsp30_wad_lump_t *lumps;
 	int tableOffset, numLumps, i;
 
 	if ( wad->length < (int)sizeof( *header ) ) return NULL;
-	header = (const goldsrc_wad_header_t *)wad->data;
-	if ( memcmp( header->identification, GOLDSRC_WAD3_ID, 4 ) ) return NULL;
+	header = (const bsp30_wad_header_t *)wad->data;
+	if ( memcmp( header->identification, BSP30_WAD3_ID, 4 ) ) return NULL;
 	numLumps = LittleLong( header->numlumps );
 	tableOffset = LittleLong( header->infotableofs );
 	if ( numLumps < 0 || tableOffset < 0 || tableOffset > wad->length ||
 			numLumps > ( wad->length - tableOffset ) / (int)sizeof( *lumps ) ) return NULL;
-	lumps = (const goldsrc_wad_lump_t *)( wad->data + tableOffset );
+	lumps = (const bsp30_wad_lump_t *)( wad->data + tableOffset );
 	for ( i = 0; i < numLumps; i++ ) {
 		char name[17];
 		int offset, size;
@@ -243,19 +243,19 @@ static const goldsrc_miptex_t *GS_FindWadTexture( const goldsrcWadFile_t *wad,
 		if ( Q_stricmp( name, textureName ) || lumps[i].compression != 0 ) continue;
 		offset = LittleLong( lumps[i].filepos );
 		size = LittleLong( lumps[i].disksize );
-		if ( offset < 0 || size < (int)sizeof( goldsrc_miptex_t ) ||
+		if ( offset < 0 || size < (int)sizeof( bsp30_miptex_t ) ||
 				offset > wad->length || size > wad->length - offset ) return NULL;
 		*available = size;
-		return (const goldsrc_miptex_t *)( wad->data + offset );
+		return (const bsp30_miptex_t *)( wad->data + offset );
 	}
 	return NULL;
 }
 
-static void GS_LoadTextures( goldsrcRenderLoad_t *load ) {
-	const byte *lump = GS_LumpData( load, GOLDSRC_LUMP_TEXTURES );
-	int lumpLength = GS_LumpLength( load, GOLDSRC_LUMP_TEXTURES );
+static void GS_LoadTextures( bsp30RenderLoad_t *load ) {
+	const byte *lump = GS_LumpData( load, BSP30_LUMP_TEXTURES );
+	int lumpLength = GS_LumpLength( load, BSP30_LUMP_TEXTURES );
 	int numTextures;
-	goldsrcWadFile_t wads[GOLDSRC_MAX_WADS];
+	bsp30WadFile_t wads[BSP30_MAX_WADS];
 	int numWads;
 	int embeddedCount = 0, wadCount = 0, fallbackCount = 0;
 	qboolean needsWads = qfalse;
@@ -268,7 +268,7 @@ static void GS_LoadTextures( goldsrcRenderLoad_t *load ) {
 
 	numTextures = LittleLong( *(const int32_t *)lump );
 	if ( numTextures < 0 || numTextures > ( lumpLength - 4 ) / 4 ) {
-		ri.Error( ERR_DROP, "%s: invalid GoldSrc texture directory", __func__ );
+		ri.Error( ERR_DROP, "%s: invalid BSP30 texture directory", __func__ );
 	}
 
 	load->numTextures = numTextures;
@@ -280,8 +280,8 @@ static void GS_LoadTextures( goldsrcRenderLoad_t *load ) {
 	Com_Memset( wads, 0, sizeof( wads ) );
 	for ( i = 0; i < numTextures; i++ ) {
 		int textureOffset = LittleLong( ((const int32_t *)( lump + 4 ))[i] );
-		if ( textureOffset >= 0 && textureOffset <= lumpLength - (int)sizeof( goldsrc_miptex_t ) ) {
-			const goldsrc_miptex_t *miptex = (const goldsrc_miptex_t *)( lump + textureOffset );
+		if ( textureOffset >= 0 && textureOffset <= lumpLength - (int)sizeof( bsp30_miptex_t ) ) {
+			const bsp30_miptex_t *miptex = (const bsp30_miptex_t *)( lump + textureOffset );
 			if ( LittleLong( miptex->offsets[0] ) == 0 ) needsWads = qtrue;
 		}
 	}
@@ -289,7 +289,7 @@ static void GS_LoadTextures( goldsrcRenderLoad_t *load ) {
 
 	for ( i = 0; i < numTextures; i++ ) {
 		int textureOffset = LittleLong( ((const int32_t *)( lump + 4 ))[i] );
-		const goldsrc_miptex_t *miptex;
+		const bsp30_miptex_t *miptex;
 		char shaderName[MAX_QPATH];
 		uint32_t width, height;
 		image_t *image;
@@ -304,7 +304,7 @@ static void GS_LoadTextures( goldsrcRenderLoad_t *load ) {
 			continue;
 		}
 
-		miptex = (const goldsrc_miptex_t *)( lump + textureOffset );
+		miptex = (const bsp30_miptex_t *)( lump + textureOffset );
 		Com_Memcpy( textureName, miptex->name, 16 );
 		textureName[16] = '\0';
 		GS_TextureName( shaderName, sizeof( shaderName ), miptex, i );
@@ -323,7 +323,7 @@ static void GS_LoadTextures( goldsrcRenderLoad_t *load ) {
 		}
 		for ( w = 0; !image && w < numWads; w++ ) {
 			int available = 0;
-			const goldsrc_miptex_t *wadMiptex = GS_FindWadTexture( &wads[w], textureName, &available );
+			const bsp30_miptex_t *wadMiptex = GS_FindWadTexture( &wads[w], textureName, &available );
 			if ( wadMiptex ) image = GS_CreateTextureImage( shaderName, wadMiptex, available );
 		}
 		if ( image ) {
@@ -340,13 +340,13 @@ static void GS_LoadTextures( goldsrcRenderLoad_t *load ) {
 	for ( i = 0; i < numWads; i++ ) {
 		ri.FS_FreeFile( wads[i].data );
 	}
-	ri.Printf( PRINT_ALL, "...GoldSrc textures: %d embedded, %d from WAD3, %d generated fallbacks\n",
+	ri.Printf( PRINT_ALL, "...BSP30 textures: %d embedded, %d from WAD3, %d generated fallbacks\n",
 			embeddedCount, wadCount, fallbackCount );
 }
 
-static void GS_LoadPlanes( goldsrcRenderLoad_t *load ) {
-	const goldsrc_plane_t *input = (const goldsrc_plane_t *)GS_LumpData( load, GOLDSRC_LUMP_PLANES );
-	int count = GS_LumpCount( load, GOLDSRC_LUMP_PLANES, sizeof( *input ) );
+static void GS_LoadPlanes( bsp30RenderLoad_t *load ) {
+	const bsp30_plane_t *input = (const bsp30_plane_t *)GS_LumpData( load, BSP30_LUMP_PLANES );
+	int count = GS_LumpCount( load, BSP30_LUMP_PLANES, sizeof( *input ) );
 	int i, j;
 
 	load->world->numplanes = count;
@@ -362,37 +362,37 @@ static void GS_LoadPlanes( goldsrcRenderLoad_t *load ) {
 	}
 }
 
-static int GS_SurfaceVertex( const goldsrcRenderLoad_t *load, int surfedgeIndex ) {
-	const int32_t *surfedges = (const int32_t *)GS_LumpData( load, GOLDSRC_LUMP_SURFEDGES );
-	const goldsrc_edge_t *edges = (const goldsrc_edge_t *)GS_LumpData( load, GOLDSRC_LUMP_EDGES );
-	int numSurfedges = GS_LumpCount( load, GOLDSRC_LUMP_SURFEDGES, sizeof( *surfedges ) );
-	int numEdges = GS_LumpCount( load, GOLDSRC_LUMP_EDGES, sizeof( *edges ) );
+static int GS_SurfaceVertex( const bsp30RenderLoad_t *load, int surfedgeIndex ) {
+	const int32_t *surfedges = (const int32_t *)GS_LumpData( load, BSP30_LUMP_SURFEDGES );
+	const bsp30_edge_t *edges = (const bsp30_edge_t *)GS_LumpData( load, BSP30_LUMP_EDGES );
+	int numSurfedges = GS_LumpCount( load, BSP30_LUMP_SURFEDGES, sizeof( *surfedges ) );
+	int numEdges = GS_LumpCount( load, BSP30_LUMP_EDGES, sizeof( *edges ) );
 	int edgeIndex;
 
 	if ( surfedgeIndex < 0 || surfedgeIndex >= numSurfedges ) {
-		ri.Error( ERR_DROP, "%s: invalid GoldSrc surfedge", __func__ );
+		ri.Error( ERR_DROP, "%s: invalid BSP30 surfedge", __func__ );
 	}
 	edgeIndex = LittleLong( surfedges[surfedgeIndex] );
 	if ( edgeIndex >= 0 ) {
 		if ( edgeIndex >= numEdges ) {
-			ri.Error( ERR_DROP, "%s: invalid GoldSrc edge", __func__ );
+			ri.Error( ERR_DROP, "%s: invalid BSP30 edge", __func__ );
 		}
 		return LittleShort( edges[edgeIndex].v[0] );
 	}
 	edgeIndex = -edgeIndex;
 	if ( edgeIndex >= numEdges ) {
-		ri.Error( ERR_DROP, "%s: invalid GoldSrc edge", __func__ );
+		ri.Error( ERR_DROP, "%s: invalid BSP30 edge", __func__ );
 	}
 	return LittleShort( edges[edgeIndex].v[1] );
 }
 
-static void GS_LoadSurfaces( goldsrcRenderLoad_t *load ) {
-	const goldsrc_face_t *faces = (const goldsrc_face_t *)GS_LumpData( load, GOLDSRC_LUMP_FACES );
-	const goldsrc_vertex_t *vertices = (const goldsrc_vertex_t *)GS_LumpData( load, GOLDSRC_LUMP_VERTEXES );
-	const goldsrc_texinfo_t *texinfos = (const goldsrc_texinfo_t *)GS_LumpData( load, GOLDSRC_LUMP_TEXINFO );
-	int numFaces = GS_LumpCount( load, GOLDSRC_LUMP_FACES, sizeof( *faces ) );
-	int numVertices = GS_LumpCount( load, GOLDSRC_LUMP_VERTEXES, sizeof( *vertices ) );
-	int numTexinfos = GS_LumpCount( load, GOLDSRC_LUMP_TEXINFO, sizeof( *texinfos ) );
+static void GS_LoadSurfaces( bsp30RenderLoad_t *load ) {
+	const bsp30_face_t *faces = (const bsp30_face_t *)GS_LumpData( load, BSP30_LUMP_FACES );
+	const bsp30_vertex_t *vertices = (const bsp30_vertex_t *)GS_LumpData( load, BSP30_LUMP_VERTEXES );
+	const bsp30_texinfo_t *texinfos = (const bsp30_texinfo_t *)GS_LumpData( load, BSP30_LUMP_TEXINFO );
+	int numFaces = GS_LumpCount( load, BSP30_LUMP_FACES, sizeof( *faces ) );
+	int numVertices = GS_LumpCount( load, BSP30_LUMP_VERTEXES, sizeof( *vertices ) );
+	int numTexinfos = GS_LumpCount( load, BSP30_LUMP_TEXINFO, sizeof( *texinfos ) );
 	int numPlanes = load->world->numplanes;
 	int i;
 
@@ -408,13 +408,13 @@ static void GS_LoadSurfaces( goldsrcRenderLoad_t *load ) {
 		int side = LittleShort( faces[i].side );
 		int allocationSize, indicesOffset;
 		srfSurfaceFace_t *face;
-		const goldsrc_texinfo_t *texinfo;
+		const bsp30_texinfo_t *texinfo;
 		int textureIndex, textureWidth = 64, textureHeight = 64;
 		int j;
 
 		if ( numPoints < 3 || numPoints > 4096 || texinfoIndex < 0 || texinfoIndex >= numTexinfos ||
 				planeIndex < 0 || planeIndex >= numPlanes ) {
-			ri.Error( ERR_DROP, "%s: invalid GoldSrc face %d", __func__, i );
+			ri.Error( ERR_DROP, "%s: invalid BSP30 face %d", __func__, i );
 		}
 		indicesOffset = sizeof( *face ) - sizeof( face->points ) + sizeof( face->points[0] ) * numPoints;
 		allocationSize = indicesOffset + sizeof( int ) * numIndices;
@@ -449,7 +449,7 @@ static void GS_LoadSurfaces( goldsrcRenderLoad_t *load ) {
 			byte white[4] = { 255, 255, 255, 255 };
 			int k;
 			if ( vertexIndex < 0 || vertexIndex >= numVertices ) {
-				ri.Error( ERR_DROP, "%s: invalid GoldSrc vertex", __func__ );
+				ri.Error( ERR_DROP, "%s: invalid BSP30 vertex", __func__ );
 			}
 			for ( k = 0; k < 3; k++ ) {
 				point[k] = LittleFloat( vertices[vertexIndex].point[k] );
@@ -483,16 +483,16 @@ static void GS_LoadSurfaces( goldsrcRenderLoad_t *load ) {
 	}
 }
 
-static void GS_LoadMarksurfaces( goldsrcRenderLoad_t *load ) {
-	const uint16_t *input = (const uint16_t *)GS_LumpData( load, GOLDSRC_LUMP_MARKSURFACES );
-	int count = GS_LumpCount( load, GOLDSRC_LUMP_MARKSURFACES, sizeof( *input ) );
+static void GS_LoadMarksurfaces( bsp30RenderLoad_t *load ) {
+	const uint16_t *input = (const uint16_t *)GS_LumpData( load, BSP30_LUMP_MARKSURFACES );
+	int count = GS_LumpCount( load, BSP30_LUMP_MARKSURFACES, sizeof( *input ) );
 	int i;
 	load->world->nummarksurfaces = count;
 	load->world->marksurfaces = ri.Hunk_Alloc( MAX( count, 1 ) * sizeof( *load->world->marksurfaces ), h_low );
 	for ( i = 0; i < count; i++ ) {
 		int surfaceIndex = LittleShort( input[i] );
 		if ( surfaceIndex < 0 || surfaceIndex >= load->world->numsurfaces ) {
-			ri.Error( ERR_DROP, "%s: invalid GoldSrc marksurface", __func__ );
+			ri.Error( ERR_DROP, "%s: invalid BSP30 marksurface", __func__ );
 		}
 		load->world->marksurfaces[i] = &load->world->surfaces[surfaceIndex];
 	}
@@ -507,21 +507,21 @@ static void GS_SetParent( mnode_t *node, mnode_t *parent ) {
 	GS_SetParent( node->children[1], node );
 }
 
-static int GS_RenderContents( int goldsrcContents ) {
-	switch ( goldsrcContents ) {
-	case GOLDSRC_CONTENTS_SOLID: return CONTENTS_SOLID;
-	case GOLDSRC_CONTENTS_WATER: return CONTENTS_WATER;
-	case GOLDSRC_CONTENTS_SLIME: return CONTENTS_SLIME;
-	case GOLDSRC_CONTENTS_LAVA: return CONTENTS_LAVA;
+static int GS_RenderContents( int bsp30Contents ) {
+	switch ( bsp30Contents ) {
+	case BSP30_CONTENTS_SOLID: return CONTENTS_SOLID;
+	case BSP30_CONTENTS_WATER: return CONTENTS_WATER;
+	case BSP30_CONTENTS_SLIME: return CONTENTS_SLIME;
+	case BSP30_CONTENTS_LAVA: return CONTENTS_LAVA;
 	default: return 0;
 	}
 }
 
-static void GS_LoadNodesAndLeafs( goldsrcRenderLoad_t *load ) {
-	const goldsrc_node_t *nodes = (const goldsrc_node_t *)GS_LumpData( load, GOLDSRC_LUMP_NODES );
-	const goldsrc_leaf_t *leafs = (const goldsrc_leaf_t *)GS_LumpData( load, GOLDSRC_LUMP_LEAFS );
-	int numNodes = GS_LumpCount( load, GOLDSRC_LUMP_NODES, sizeof( *nodes ) );
-	int numLeafs = GS_LumpCount( load, GOLDSRC_LUMP_LEAFS, sizeof( *leafs ) );
+static void GS_LoadNodesAndLeafs( bsp30RenderLoad_t *load ) {
+	const bsp30_node_t *nodes = (const bsp30_node_t *)GS_LumpData( load, BSP30_LUMP_NODES );
+	const bsp30_leaf_t *leafs = (const bsp30_leaf_t *)GS_LumpData( load, BSP30_LUMP_LEAFS );
+	int numNodes = GS_LumpCount( load, BSP30_LUMP_NODES, sizeof( *nodes ) );
+	int numLeafs = GS_LumpCount( load, BSP30_LUMP_LEAFS, sizeof( *leafs ) );
 	int i, j;
 
 	load->world->numDecisionNodes = numNodes;
@@ -531,7 +531,7 @@ static void GS_LoadNodesAndLeafs( goldsrcRenderLoad_t *load ) {
 		mnode_t *out = &load->world->nodes[i];
 		int planeIndex = LittleLong( nodes[i].planenum );
 		if ( planeIndex < 0 || planeIndex >= load->world->numplanes ) {
-			ri.Error( ERR_DROP, "%s: invalid GoldSrc node plane", __func__ );
+			ri.Error( ERR_DROP, "%s: invalid BSP30 node plane", __func__ );
 		}
 		out->contents = CONTENTS_NODE;
 		out->plane = &load->world->planes[planeIndex];
@@ -542,12 +542,12 @@ static void GS_LoadNodesAndLeafs( goldsrcRenderLoad_t *load ) {
 		for ( j = 0; j < 2; j++ ) {
 			int child = (int16_t)LittleShort( nodes[i].children[j] );
 			if ( child >= 0 ) {
-				if ( child >= numNodes ) ri.Error( ERR_DROP, "%s: invalid GoldSrc node child", __func__ );
+				if ( child >= numNodes ) ri.Error( ERR_DROP, "%s: invalid BSP30 node child", __func__ );
 				out->children[j] = &load->world->nodes[child];
 			}
 			else {
 				int leafIndex = -1 - child;
-				if ( leafIndex < 0 || leafIndex >= numLeafs ) ri.Error( ERR_DROP, "%s: invalid GoldSrc leaf child", __func__ );
+				if ( leafIndex < 0 || leafIndex >= numLeafs ) ri.Error( ERR_DROP, "%s: invalid BSP30 leaf child", __func__ );
 				out->children[j] = &load->world->nodes[numNodes + leafIndex];
 			}
 		}
@@ -565,7 +565,7 @@ static void GS_LoadNodesAndLeafs( goldsrcRenderLoad_t *load ) {
 		out->cluster = out->contents == CONTENTS_SOLID ? -1 : 0;
 		out->area = 0;
 		if ( firstMark < 0 || numMarks < 0 || firstMark > load->world->nummarksurfaces - numMarks ) {
-			ri.Error( ERR_DROP, "%s: invalid GoldSrc leaf marksurfaces", __func__ );
+			ri.Error( ERR_DROP, "%s: invalid BSP30 leaf marksurfaces", __func__ );
 		}
 		out->firstmarksurface = load->world->marksurfaces + firstMark;
 		out->nummarksurfaces = numMarks;
@@ -575,9 +575,9 @@ static void GS_LoadNodesAndLeafs( goldsrcRenderLoad_t *load ) {
 	}
 }
 
-static void GS_LoadSubmodels( goldsrcRenderLoad_t *load ) {
-	const goldsrc_model_t *input = (const goldsrc_model_t *)GS_LumpData( load, GOLDSRC_LUMP_MODELS );
-	int count = GS_LumpCount( load, GOLDSRC_LUMP_MODELS, sizeof( *input ) );
+static void GS_LoadSubmodels( bsp30RenderLoad_t *load ) {
+	const bsp30_model_t *input = (const bsp30_model_t *)GS_LumpData( load, BSP30_LUMP_MODELS );
+	int count = GS_LumpCount( load, BSP30_LUMP_MODELS, sizeof( *input ) );
 	int i, j;
 
 	load->world->numBModels = count;
@@ -591,7 +591,7 @@ static void GS_LoadSubmodels( goldsrcRenderLoad_t *load ) {
 			ri.Error( ERR_DROP, "%s: R_AllocModel failed", __func__ );
 		}
 		if ( firstFace < 0 || numFaces < 0 || firstFace > load->world->numsurfaces - numFaces ) {
-			ri.Error( ERR_DROP, "%s: invalid GoldSrc submodel surfaces", __func__ );
+			ri.Error( ERR_DROP, "%s: invalid BSP30 submodel surfaces", __func__ );
 		}
 		model->type = MOD_BRUSH;
 		model->bmodel = out;
@@ -605,9 +605,9 @@ static void GS_LoadSubmodels( goldsrcRenderLoad_t *load ) {
 	}
 }
 
-static void GS_LoadVisibilityAndEntities( goldsrcRenderLoad_t *load ) {
-	const byte *entities = GS_LumpData( load, GOLDSRC_LUMP_ENTITIES );
-	int entityLength = GS_LumpLength( load, GOLDSRC_LUMP_ENTITIES );
+static void GS_LoadVisibilityAndEntities( bsp30RenderLoad_t *load ) {
+	const byte *entities = GS_LumpData( load, BSP30_LUMP_ENTITIES );
+	int entityLength = GS_LumpLength( load, BSP30_LUMP_ENTITIES );
 	load->world->numClusters = 1;
 	load->world->clusterBytes = 1;
 	load->world->vis = NULL;
@@ -622,19 +622,19 @@ static void GS_LoadVisibilityAndEntities( goldsrcRenderLoad_t *load ) {
 /*
  * Quake 3 reserves fog slot zero to mean "no fog", even on maps with no
  * fog volumes.  Several renderer paths rely on that sentinel being present.
- * GoldSrc BSP30 has no equivalent fog lump, so provide the same empty slot.
+ * BSP30 BSP30 has no equivalent fog lump, so provide the same empty slot.
  */
-static void GS_LoadFogs( goldsrcRenderLoad_t *load ) {
+static void GS_LoadFogs( bsp30RenderLoad_t *load ) {
 	load->world->numfogs = 1;
 	load->world->fogs = ri.Hunk_Alloc( sizeof( *load->world->fogs ), h_low );
 }
 
-void R_LoadGoldSrcWorld( const char *mapname, const byte *buffer, int size, world_t *world ) {
-	goldsrcRenderLoad_t load;
+void R_LoadBSP30World( const char *mapname, const byte *buffer, int size, world_t *world ) {
+	bsp30RenderLoad_t load;
 	Com_Memset( &load, 0, sizeof( load ) );
 	load.base = buffer;
 	load.size = size;
-	load.header = (const goldsrc_header_t *)buffer;
+	load.header = (const bsp30_header_t *)buffer;
 	load.world = world;
 
 	GS_ValidateHeader( &load, mapname );
@@ -650,6 +650,6 @@ void R_LoadGoldSrcWorld( const char *mapname, const byte *buffer, int size, worl
 	GS_LoadVisibilityAndEntities( &load );
 	GS_LoadFogs( &load );
 
-	ri.Printf( PRINT_ALL, "...loaded GoldSrc BSP30: %d faces, %d textures, %d models\n",
+	ri.Printf( PRINT_ALL, "...loaded BSP30 BSP30: %d faces, %d textures, %d models\n",
 			world->numsurfaces, load.numTextures, world->numBModels );
 }

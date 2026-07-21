@@ -99,7 +99,7 @@ typedef struct {
 /*
  * Retail cgame.qvm keeps enum-backed qboolean, so its trace_t is wider there
  * than in the native client build. CM trace syscalls must marshal into that
- * layout. Native GoldSrc provenance fields are not part of the retail layout.
+ * layout. Native BSP30 provenance fields are not part of the retail layout.
  */
 typedef struct {
 	int			allsolid;

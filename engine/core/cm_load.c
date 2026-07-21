@@ -24,7 +24,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "cm_local.h"
 #include "cm_stream.h"
 #include "cluster_graph.h"
-#include "qfiles_goldsrc.h"
+#include "qfiles_bsp30.h"
 
 #ifdef BSPC
 
@@ -65,7 +65,7 @@ static byte *cmod_base;
 cvar_t		*cm_noAreas;
 cvar_t		*cm_noCurves;
 cvar_t		*cm_playerCurveClip;
-cvar_t		*cm_goldsrcCompare;
+cvar_t		*cm_bsp30Compare;
 #endif
 
 static cmodel_t box_model;
@@ -622,8 +622,8 @@ void CM_LoadMap( const char *name, qboolean clientload, int *checksum ) {
 	Cvar_SetDescription( cm_noCurves, "Do not collide against curves." );
 	cm_playerCurveClip = Cvar_Get( "cm_playerCurveClip", "1", CVAR_ARCHIVE_ND | CVAR_CHEAT );
 	Cvar_SetDescription( cm_playerCurveClip, "Collide player against curves." );
-	cm_goldsrcCompare = Cvar_Get( "cm_goldsrcCompare", "0", CVAR_TEMP );
-	Cvar_SetDescription( cm_goldsrcCompare,
+	cm_bsp30Compare = Cvar_Get( "cm_bsp30Compare", "0", CVAR_TEMP );
+	Cvar_SetDescription( cm_bsp30Compare,
 			"Log BSP30 traces that differ between the native clipnode hull "
 			"(point through pre-expanded hull) and a naive box sweep through "
 			"hull 0. Use at failing ramp transitions." );
@@ -668,9 +668,9 @@ void CM_LoadMap( const char *name, qboolean clientload, int *checksum ) {
 
 	*checksum = cm.checksum = LittleLong( Com_BlockChecksum( buf, length ) );
 
-	if ( length >= (int)sizeof( goldsrc_header_t ) &&
-			LittleLong( *(const int32_t *)buf ) == GOLDSRC_BSP_VERSION ) {
-		CM_LoadGoldSrcMap( buf, length, name );
+	if ( length >= (int)sizeof( bsp30_header_t ) &&
+			LittleLong( *(const int32_t *)buf ) == BSP30_BSP_VERSION ) {
+		CM_LoadBSP30Map( buf, length, name );
 		FS_FreeFile( buf );
 		CM_InitBoxHull();
 		CM_FloodAreaConnections();

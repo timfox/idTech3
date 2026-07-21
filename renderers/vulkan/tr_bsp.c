@@ -22,7 +22,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 // tr_map.c
 
 #include "tr_local.h"
-#include "../../engine/core/qfiles_goldsrc.h"
+#include "../../engine/core/qfiles_bsp30.h"
 #ifdef USE_VULKAN
 #include "vk.h"
 #include "vk_raster_gi.h"
@@ -3021,8 +3021,8 @@ void RE_LoadWorldMap( const char *name ) {
 	startMarker = ri.Hunk_Alloc(0, h_low);
 	c_gridVerts = 0;
 
-	if ( LittleLong( *(const int32_t *)buffer.b ) == GOLDSRC_BSP_VERSION ) {
-		R_LoadGoldSrcWorld( name, buffer.b, size, &s_worldData );
+	if ( LittleLong( *(const int32_t *)buffer.b ) == BSP30_BSP_VERSION ) {
+		R_LoadBSP30World( name, buffer.b, size, &s_worldData );
 	}
 	else {
 	header = (dheader_t *)buffer.b;
