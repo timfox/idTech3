@@ -307,6 +307,34 @@ old `firstPersonProjectionThisFrame == LastFrame` gate was incorrectly disabling
 world history whenever the viewmodel FOV path ran. Weapon history still resets
 independently on weapon switch / FOV discontinuity.
 
+## World dynamic-object echoes (helmet / pickups)
+
+**Symptom:** Faint offset silhouette copies around rotating or bobbing world
+models (armor, helmets, weapons on the ground) against static walls. Not
+weapon-path specific.
+
+**Root cause (2026-07-21):** Entity previous-model history was keyed by
+`refdef.entities[]` **slot index**. When the cgame reorders the entity list
+between frames, the previous model matrix either misses or silently falls back
+to **current = previous** (zero object velocity). Temporal Reconstruction then
+samples stale history at the wrong UV → translucent echoes.
+
+**Fix:**
+
+1. Spatial match previous transforms by `hModel` + nearest origin (with
+   teleport / skin / jump invalidation).
+2. When previous data is unavailable, emit **NaN motion** (never a silent zero
+   vector) so TAA hard-rejects history.
+3. Stronger relative depth + trailing-edge neighborhood disocclusion dilation.
+4. Cap history weight for moving pixels (`r_dynamicObjectHistoryMax`).
+
+**Debug:** `r_temporalObjectDebug` 0–12 (see cvar description). Confirm the
+scene tint is not a debug view: `r_temporalDebug 0` and `r_temporalObjectDebug 0`.
+Independent bisect gates already exist: `r_taa`, `r_tsr`, `r_temporalAO`,
+`r_temporalSSR`, `r_temporalFog`, `r_motionBlur`, `r_bloom`, `r_sharpen`.
+
+**Cfg:** `config/temporal_dynamic_object_test.cfg`
+
 ## What was intentionally not changed
 
 - No raw-depth SSR hit-reject was added; ordering isolates weapon depth structurally.
@@ -314,6 +342,8 @@ independently on weapon switch / FOV discontinuity.
 - `modern_vulkan.cfg` boot defaults untouched.
 - SKY has a reserved debug color but is not stamped separately yet; unstamped
   sky follows WORLD ownership.
+- A dedicated per-pixel object-ID render target (instance + generation) is still
+  a follow-up; current rejection uses spatial identity + NaN motion + depth.
 
 ## Related
 

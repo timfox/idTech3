@@ -22,14 +22,59 @@ typedef struct vkOitPushConstants_s {
 static VkRect2D vk_scene_src_rect;
 static qboolean vk_scene_src_rect_valid;
 
-static float vk_prev_entity_model_matrices[MAX_REFENTITIES][16];
-static float vk_curr_entity_model_matrices[MAX_REFENTITIES][16];
-static int vk_prev_entity_model_handles[MAX_REFENTITIES];
-static int vk_curr_entity_model_handles[MAX_REFENTITIES];
-static int vk_prev_entity_types[MAX_REFENTITIES];
-static int vk_curr_entity_types[MAX_REFENTITIES];
-static qboolean vk_prev_entity_model_valid[MAX_REFENTITIES];
-static qboolean vk_curr_entity_model_valid[MAX_REFENTITIES];
+/*
+ * Dynamic-object motion history keyed by spatial match (hModel + nearest origin),
+ * not refdef slot index. Slot rematching across frames was the primary cause of
+ * zero object velocity → stale TAA history ghosts on rotating/bobbing pickups.
+ */
+typedef enum {
+	VK_MOTION_OK = 0,
+	VK_MOTION_INVALID_NO_PREV,
+	VK_MOTION_INVALID_TELEPORT,
+	VK_MOTION_INVALID_MODEL_CHANGE,
+	VK_MOTION_INVALID_SKIN_CHANGE,
+	VK_MOTION_INVALID_TRANSFORM_JUMP,
+	VK_MOTION_INVALID_SLOT_REUSE,
+	VK_MOTION_INVALID_ANIM_NO_POSE,
+	VK_MOTION_INVALID_FIRST_PERSON,
+	VK_MOTION_INVALID_CUSTOM_SHADER
+} vkMotionInvalidReason_t;
+
+typedef struct {
+	qboolean		valid;
+	vec3_t			origin;
+	float			matrix[16];
+	int				hModel;
+	int				reType;
+	int				skinNum;
+	qhandle_t		customSkin;
+	qhandle_t		customShader;
+	int				frame;
+	int				oldframe;
+	uint32_t		generation;
+	uint32_t		stableId;
+	uint32_t		frameId;
+	int				lastInvalidReason;
+} vkEntityMotionRecord_t;
+
+static vkEntityMotionRecord_t vk_motion_prev[MAX_REFENTITIES];
+static vkEntityMotionRecord_t vk_motion_curr[MAX_REFENTITIES];
+static int vk_motion_prev_count;
+static int vk_motion_curr_count;
+
+/* Per-draw result consumed by vk_update_mvp for push-constant motion meta. */
+static qboolean vk_motion_draw_invalid;
+static uint32_t vk_motion_draw_stable_id;
+static uint32_t vk_motion_draw_generation;
+static int vk_motion_draw_invalid_reason;
+static qboolean vk_motion_draw_is_dynamic;
+
+#ifndef VK_MOTION_TELEPORT_UNITS
+#define VK_MOTION_TELEPORT_UNITS 96.0f
+#endif
+#ifndef VK_MOTION_JUMP_UNITS
+#define VK_MOTION_JUMP_UNITS 48.0f
+#endif
 
 typedef struct {
 	qboolean valid;
@@ -317,29 +362,39 @@ void vk_snap_gpu_morph_weights_for_motion( void )
 
 void vk_begin_motion_frame( void )
 {
-	for ( int i = 0; i < MAX_REFENTITIES; i++ ) {
-		if ( vk_curr_entity_model_valid[i] ) {
-			Com_Memcpy( vk_prev_entity_model_matrices[i], vk_curr_entity_model_matrices[i], sizeof( vk_prev_entity_model_matrices[i] ) );
-			vk_prev_entity_model_handles[i] = vk_curr_entity_model_handles[i];
-			vk_prev_entity_types[i] = vk_curr_entity_types[i];
-			vk_prev_entity_model_valid[i] = qtrue;
-		} else {
-			vk_prev_entity_model_valid[i] = qfalse;
-		}
-		vk_curr_entity_model_valid[i] = qfalse;
+	int i;
+
+	/* Promote this frame's records to previous for the next frame's lookup. */
+	vk_motion_prev_count = vk_motion_curr_count;
+	if ( vk_motion_prev_count > MAX_REFENTITIES ) {
+		vk_motion_prev_count = MAX_REFENTITIES;
 	}
+	for ( i = 0; i < vk_motion_prev_count; i++ ) {
+		vk_motion_prev[i] = vk_motion_curr[i];
+	}
+	for ( ; i < MAX_REFENTITIES; i++ ) {
+		vk_motion_prev[i].valid = qfalse;
+	}
+	vk_motion_curr_count = 0;
+	Com_Memset( vk_motion_curr, 0, sizeof( vk_motion_curr ) );
+	vk_motion_draw_invalid = qfalse;
+	vk_motion_draw_stable_id = 0;
+	vk_motion_draw_generation = 0;
+	vk_motion_draw_invalid_reason = VK_MOTION_OK;
+	vk_motion_draw_is_dynamic = qfalse;
 }
 
 void vk_reset_motion_history( void )
 {
-	Com_Memset( vk_prev_entity_model_matrices, 0, sizeof( vk_prev_entity_model_matrices ) );
-	Com_Memset( vk_curr_entity_model_matrices, 0, sizeof( vk_curr_entity_model_matrices ) );
-	Com_Memset( vk_prev_entity_model_handles, 0, sizeof( vk_prev_entity_model_handles ) );
-	Com_Memset( vk_curr_entity_model_handles, 0, sizeof( vk_curr_entity_model_handles ) );
-	Com_Memset( vk_prev_entity_types, 0, sizeof( vk_prev_entity_types ) );
-	Com_Memset( vk_curr_entity_types, 0, sizeof( vk_curr_entity_types ) );
-	Com_Memset( vk_prev_entity_model_valid, 0, sizeof( vk_prev_entity_model_valid ) );
-	Com_Memset( vk_curr_entity_model_valid, 0, sizeof( vk_curr_entity_model_valid ) );
+	Com_Memset( vk_motion_prev, 0, sizeof( vk_motion_prev ) );
+	Com_Memset( vk_motion_curr, 0, sizeof( vk_motion_curr ) );
+	vk_motion_prev_count = 0;
+	vk_motion_curr_count = 0;
+	vk_motion_draw_invalid = qfalse;
+	vk_motion_draw_stable_id = 0;
+	vk_motion_draw_generation = 0;
+	vk_motion_draw_invalid_reason = VK_MOTION_OK;
+	vk_motion_draw_is_dynamic = qfalse;
 
 	/* Invalidate first-person weapon prev MVP (cut / resize / weapon switch path). */
 	vk.temporal.weaponMatricesValid = qfalse;
@@ -524,31 +579,6 @@ static void vk_capture_weapon_matrices( void )
 	vk.temporal.weaponMatricesValid = qtrue;
 }
 
-static int vk_get_current_entity_motion_index( void )
-{
-	const trRefEntity_t *ent = backEnd.currentEntity;
-	const trRefEntity_t *base = backEnd.refdef.entities;
-
-	if ( !ent || ent == &tr.worldEntity || !base || backEnd.refdef.num_entities <= 0 ) {
-		return -1;
-	}
-	if ( ent < base || ent >= base + backEnd.refdef.num_entities ) {
-		return -1;
-	}
-	return (int)( ent - base );
-}
-
-static qboolean vk_entity_has_rigid_prev_model( const trRefEntity_t *ent, int motion_index )
-{
-	if ( !ent || motion_index < 0 ) {
-		return qfalse;
-	}
-	return ( ent->e.reType == RT_MODEL &&
-		vk_prev_entity_model_valid[motion_index] &&
-		vk_prev_entity_model_handles[motion_index] == ent->e.hModel &&
-		vk_prev_entity_types[motion_index] == (int)ent->e.reType ) ? qtrue : qfalse;
-}
-
 static qboolean vk_entity_animates_this_frame( const trRefEntity_t *ent )
 {
 	if ( !ent ) {
@@ -597,74 +627,198 @@ static qboolean vk_entity_has_gpu_deform_motion( const trRefEntity_t *ent )
 	return vk_entity_likely_gpu_deform_motion( ent );
 }
 
-static qboolean vk_entity_poison_global_motion( const trRefEntity_t *ent, int motion_index )
+static float vk_motion_origin_dist_sq( const vec3_t a, const vec3_t b )
 {
-	if ( !ent ) {
-		return qfalse;
-	}
-	if ( ent->e.renderfx & RF_FIRST_PERSON ) {
-		/* Weapon pixels: reject in Temporal Reconstruction via reactive/near-depth, not whole-frame. */
-		return qfalse;
-	}
-	if ( ent->e.customShader &&
-		( !r_temporalCustomShaderMotion || !r_temporalCustomShaderMotion->integer ) ) {
-		return qtrue;
-	}
-	if ( r_temporalCpuSkinPrev && r_temporalCpuSkinPrev->integer ) {
-		return qfalse;
-	}
-	if ( !vk_entity_has_rigid_prev_model( ent, motion_index ) &&
-		vk_entity_animates_this_frame( ent ) &&
-		!vk_entity_has_gpu_deform_motion( ent ) ) {
-		return qtrue;
-	}
-	return qfalse;
+	const float dx = a[0] - b[0];
+	const float dy = a[1] - b[1];
+	const float dz = a[2] - b[2];
+	return dx * dx + dy * dy + dz * dz;
 }
 
-static qboolean vk_entity_skip_rigid_prev_model( const trRefEntity_t *ent, int motion_index )
+static float vk_motion_matrix_origin_delta( const float *a, const float *b )
 {
-	if ( !ent ) {
-		return qfalse;
-	}
-	if ( ent->e.renderfx & RF_FIRST_PERSON ) {
-		return qtrue;
-	}
-	if ( ent->e.customShader &&
-		( !r_temporalCustomShaderMotion || !r_temporalCustomShaderMotion->integer ) ) {
-		return qtrue;
-	}
-	if ( !vk_entity_has_rigid_prev_model( ent, motion_index ) &&
-		vk_entity_animates_this_frame( ent ) &&
-		!vk_entity_has_gpu_deform_motion( ent ) ) {
-		return qtrue;
-	}
-	return qfalse;
+	const float dx = a[12] - b[12];
+	const float dy = a[13] - b[13];
+	const float dz = a[14] - b[14];
+	return sqrtf( dx * dx + dy * dy + dz * dz );
 }
 
-static void vk_entity_note_motion_reliability( const trRefEntity_t *ent, int motion_index )
+static uint32_t vk_motion_hash_u32( uint32_t x )
 {
-	qboolean poisonGlobal;
-	qboolean skipRigidPrev;
+	x ^= x >> 16;
+	x *= 0x7feb352du;
+	x ^= x >> 15;
+	x *= 0x846ca68bu;
+	x ^= x >> 16;
+	return x;
+}
+
+static uint32_t vk_motion_make_stable_id( const trRefEntity_t *ent, uint32_t generation )
+{
+	uint32_t h;
 
 	if ( !ent ) {
+		return generation;
+	}
+	h = (uint32_t)ent->e.hModel;
+	h = vk_motion_hash_u32( h ^ (uint32_t)ent->e.reType * 0x9e3779b9u );
+	h = vk_motion_hash_u32( h ^ (uint32_t)ent->e.skinNum );
+	h = vk_motion_hash_u32( h ^ (uint32_t)ent->e.customSkin );
+	h = vk_motion_hash_u32( h ^ (uint32_t)ent->e.customShader );
+	h = vk_motion_hash_u32( h ^ (uint32_t)( (int)floorf( ent->e.origin[0] * 0.25f ) ) );
+	h = vk_motion_hash_u32( h ^ (uint32_t)( (int)floorf( ent->e.origin[1] * 0.25f ) ) );
+	h = vk_motion_hash_u32( h ^ (uint32_t)( (int)floorf( ent->e.origin[2] * 0.25f ) ) );
+	return ( h & 0xfffffff0u ) | ( generation & 0xfu );
+}
+
+static int vk_motion_find_prev_match( const trRefEntity_t *ent, float *outDist )
+{
+	int i;
+	int best = -1;
+	float bestDist = VK_MOTION_TELEPORT_UNITS;
+	float teleportLimit = VK_MOTION_TELEPORT_UNITS;
+
+	if ( !ent || vk_motion_prev_count <= 0 ) {
+		return -1;
+	}
+
+	for ( i = 0; i < vk_motion_prev_count; i++ ) {
+		float d;
+		if ( !vk_motion_prev[i].valid ) {
+			continue;
+		}
+		if ( vk_motion_prev[i].hModel != ent->e.hModel ) {
+			continue;
+		}
+		if ( vk_motion_prev[i].reType != (int)ent->e.reType ) {
+			continue;
+		}
+		d = sqrtf( vk_motion_origin_dist_sq( ent->e.origin, vk_motion_prev[i].origin ) );
+		if ( d < bestDist && d <= teleportLimit ) {
+			bestDist = d;
+			best = i;
+		}
+	}
+
+	if ( outDist ) {
+		*outDist = ( best >= 0 ) ? bestDist : 1e30f;
+	}
+	return best;
+}
+
+static void vk_motion_fill_nan_matrix( float *m )
+{
+	int i;
+	for ( i = 0; i < 16; i++ ) {
+		m[i] = 0.0f / 0.0f;
+	}
+}
+
+static void vk_motion_resolve_entity( const trRefEntity_t *ent, float *outPrevModel, qboolean *outHavePrev )
+{
+	int match;
+	float matchDist = 1e30f;
+	vkEntityMotionRecord_t *curr;
+	uint32_t generation = 1u;
+	int reason = VK_MOTION_OK;
+	qboolean havePrev = qfalse;
+
+	vk_motion_draw_invalid = qfalse;
+	vk_motion_draw_stable_id = 0;
+	vk_motion_draw_generation = 0;
+	vk_motion_draw_invalid_reason = VK_MOTION_OK;
+	vk_motion_draw_is_dynamic = qfalse;
+
+	if ( outHavePrev ) {
+		*outHavePrev = qfalse;
+	}
+	if ( !ent || !outPrevModel ) {
 		return;
 	}
 
-	poisonGlobal = vk_entity_poison_global_motion( ent, motion_index );
-	skipRigidPrev = vk_entity_skip_rigid_prev_model( ent, motion_index );
+	if ( ent->e.renderfx & RF_FIRST_PERSON ) {
+		vk_motion_draw_invalid_reason = VK_MOTION_INVALID_FIRST_PERSON;
+		return;
+	}
 
-	if ( poisonGlobal ) {
-		if ( !vk.temporal.unreliableMotionThisFrame && r_temporalDebug && r_temporalDebug->integer >= 2 ) {
-			ri.Printf( PRINT_DEVELOPER, "[VK][temporal] global unreliable motion entity type=%d customShader=%d frame=%d oldframe=%d backlerp=%.3f rf_fp=%d gpuDeform=%d\n",
-				ent->e.reType, ent->e.customShader, ent->e.frame, ent->e.oldframe, ent->e.backlerp,
-				( ent->e.renderfx & RF_FIRST_PERSON ) ? 1 : 0,
-				vk_entity_has_gpu_deform_motion( ent ) ? 1 : 0 );
+	match = vk_motion_find_prev_match( ent, &matchDist );
+
+	if ( match < 0 ) {
+		reason = VK_MOTION_INVALID_NO_PREV;
+		generation = 1u;
+	} else {
+		const vkEntityMotionRecord_t *prev = &vk_motion_prev[match];
+		generation = prev->generation ? prev->generation : 1u;
+		if ( prev->customSkin != ent->e.customSkin || prev->customShader != ent->e.customShader ||
+			prev->skinNum != ent->e.skinNum ) {
+			reason = VK_MOTION_INVALID_SKIN_CHANGE;
+			generation++;
+		} else if ( matchDist > VK_MOTION_TELEPORT_UNITS * 0.85f ) {
+			reason = VK_MOTION_INVALID_TELEPORT;
+			generation++;
+		} else {
+			const float jump = vk_motion_matrix_origin_delta( backEnd.or.modelMatrix, prev->matrix );
+			if ( jump > VK_MOTION_JUMP_UNITS ) {
+				reason = VK_MOTION_INVALID_TRANSFORM_JUMP;
+				generation++;
+			} else {
+				havePrev = qtrue;
+				Com_Memcpy( outPrevModel, prev->matrix, sizeof( float ) * 16 );
+			}
 		}
-		vk.temporal.unreliableMotionThisFrame = qtrue;
-	} else if ( skipRigidPrev && r_temporalDebug && r_temporalDebug->integer >= 2 ) {
-		ri.Printf( PRINT_DEVELOPER, "[VK][temporal] per-entity motion fallback (prev MVP = current) type=%d frame=%d oldframe=%d gpuDeform=%d\n",
-			ent->e.reType, ent->e.frame, ent->e.oldframe,
-			vk_entity_has_gpu_deform_motion( ent ) ? 1 : 0 );
+	}
+
+	if ( havePrev && vk_entity_animates_this_frame( ent ) && !vk_entity_has_gpu_deform_motion( ent ) ) {
+		if ( r_temporalCpuSkinPrev && r_temporalCpuSkinPrev->integer ) {
+			havePrev = qfalse;
+			reason = VK_MOTION_INVALID_ANIM_NO_POSE;
+			generation++;
+		} else {
+			vk.temporal.unreliableMotionThisFrame = qtrue;
+		}
+	}
+
+	if ( ent->e.customShader &&
+		( !r_temporalCustomShaderMotion || !r_temporalCustomShaderMotion->integer ) ) {
+		havePrev = qfalse;
+		reason = VK_MOTION_INVALID_CUSTOM_SHADER;
+	}
+
+	if ( !havePrev ) {
+		vk_motion_draw_invalid = qtrue;
+		vk_motion_draw_invalid_reason = reason;
+		vk_motion_fill_nan_matrix( outPrevModel );
+	} else if ( outHavePrev ) {
+		*outHavePrev = qtrue;
+	}
+
+	vk_motion_draw_generation = generation;
+	vk_motion_draw_stable_id = vk_motion_make_stable_id( ent, generation );
+	vk_motion_draw_is_dynamic = qtrue;
+
+	if ( vk_motion_curr_count < MAX_REFENTITIES ) {
+		curr = &vk_motion_curr[vk_motion_curr_count++];
+		Com_Memset( curr, 0, sizeof( *curr ) );
+		curr->valid = qtrue;
+		VectorCopy( ent->e.origin, curr->origin );
+		Com_Memcpy( curr->matrix, backEnd.or.modelMatrix, sizeof( curr->matrix ) );
+		curr->hModel = ent->e.hModel;
+		curr->reType = (int)ent->e.reType;
+		curr->skinNum = ent->e.skinNum;
+		curr->customSkin = ent->e.customSkin;
+		curr->customShader = ent->e.customShader;
+		curr->frame = ent->e.frame;
+		curr->oldframe = ent->e.oldframe;
+		curr->generation = generation;
+		curr->stableId = vk_motion_draw_stable_id;
+		curr->frameId = vk.temporal.frameIndex;
+		curr->lastInvalidReason = reason;
+	}
+
+	if ( r_temporalDebug && r_temporalDebug->integer >= 2 && vk_motion_draw_invalid ) {
+		ri.Printf( PRINT_DEVELOPER,
+			"[VK][temporal] entity motion invalid reason=%d hModel=%d gen=%u dist=%.1f\n",
+			reason, ent->e.hModel, generation, matchDist );
 	}
 }
 
@@ -673,42 +827,30 @@ static void vk_get_prev_mvp_transform( float *prev_mvp )
 	float prev_model[16];
 	float prev_model_view[16];
 	float prev_proj[16];
-	int motion_index;
+	qboolean havePrev = qfalse;
 
 	if ( backEnd.projection2D || !vk_prev_matrices_valid ) {
 		vk_get_mvp_transform( prev_mvp );
 		return;
 	}
 
-	/* First-person weapon: velocity from stored weapon MVP, never world-depth reprojection. */
 	if ( backEnd.currentEntity && ( backEnd.currentEntity->e.renderfx & RF_FIRST_PERSON ) &&
 		vk.temporal.weaponMatricesHavePrev ) {
 		myGlMultMatrix( vk.temporal.weaponPrevModelMatrix, vk.temporal.weaponPrevViewMatrix, prev_model_view );
 		vk_get_projection_matrix_vk( vk.temporal.weaponPrevProjectionMatrix, prev_proj );
 		myGlMultMatrix( prev_model_view, prev_proj, prev_mvp );
+		vk_motion_draw_invalid = qfalse;
+		vk_motion_draw_is_dynamic = qtrue;
 		return;
 	}
 
 	Com_Memcpy( prev_model, backEnd.or.modelMatrix, sizeof( prev_model ) );
+	vk_motion_draw_invalid = qfalse;
+	vk_motion_draw_is_dynamic = qfalse;
 
-	motion_index = vk_get_current_entity_motion_index();
-	if ( motion_index >= 0 && backEnd.currentEntity && backEnd.currentEntity->e.reType == RT_MODEL ) {
-		if ( !vk_curr_entity_model_valid[motion_index] ) {
-			Com_Memcpy( vk_curr_entity_model_matrices[motion_index], backEnd.or.modelMatrix, sizeof( vk_curr_entity_model_matrices[motion_index] ) );
-			vk_curr_entity_model_handles[motion_index] = backEnd.currentEntity->e.hModel;
-			vk_curr_entity_types[motion_index] = (int)backEnd.currentEntity->e.reType;
-			vk_curr_entity_model_valid[motion_index] = qtrue;
-		}
-
-		vk_entity_note_motion_reliability( backEnd.currentEntity, motion_index );
-
-		/* Rigid entity motion: previous model matrix. GPU skin deformation uses prev pose in the skin SSBO. */
-		if ( !vk_entity_skip_rigid_prev_model( backEnd.currentEntity, motion_index ) &&
-			vk_prev_entity_model_valid[motion_index] &&
-			vk_prev_entity_model_handles[motion_index] == backEnd.currentEntity->e.hModel &&
-			vk_prev_entity_types[motion_index] == (int)backEnd.currentEntity->e.reType ) {
-			Com_Memcpy( prev_model, vk_prev_entity_model_matrices[motion_index], sizeof( prev_model ) );
-		}
+	if ( backEnd.currentEntity && backEnd.currentEntity->e.reType == RT_MODEL &&
+		!( backEnd.currentEntity->e.renderfx & RF_FIRST_PERSON ) ) {
+		vk_motion_resolve_entity( backEnd.currentEntity, prev_model, &havePrev );
 	}
 
 	myGlMultMatrix( prev_model, vk_prev_view_matrix, prev_model_view );
@@ -796,6 +938,19 @@ void vk_update_mvp( const float *m )
 	/* Visibility PrimID MRT: reserved[5] = monotonic draw id. */
 	if ( vk.visibilityBufferDirectExport ) {
 		push_constants.reserved[5] = (float)( backEnd.visDrawId++ );
+	}
+
+	/*
+	 * Dynamic-object motion meta for fragment shaders (when UI/SDF/vector do not
+	 * own reserved[2..3]): reserved[2]=motionInvalid, reserved[3]=objectId bits.
+	 * NaN prevClip is the primary invalid signal; these floats aid debug / ID stamp.
+	 */
+	if ( tess.sdfUiEdge < 0.0f && tess.subpixelShift < 0.0f && tess.vectorCurveCount <= 0 &&
+		vk_motion_draw_is_dynamic ) {
+		union { uint32_t u; float f; } idBits;
+		push_constants.reserved[2] = vk_motion_draw_invalid ? 1.0f : 0.0f;
+		idBits.u = vk_motion_draw_stable_id;
+		push_constants.reserved[3] = idBits.f;
 	}
 
 	layout = vk.pipeline_layout;

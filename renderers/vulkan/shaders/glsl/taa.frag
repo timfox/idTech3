@@ -237,6 +237,17 @@ void main() {
 	float motionLen = length( velocity );
 	float motionFactor = smoothstep( 0.2, 8.0, motionLen );
 
+	/* Object-debug / dynamic tuning from packed PostFX (DoF-off channels). */
+	float dynHistMax = ( postfx.depthOfField.x < 0.5 ) ? clamp( postfx.depthOfField.y, 0.0, 0.85 ) : 0.48;
+	float dynDepthThresh = ( postfx.depthOfField.x < 0.5 ) ? clamp( postfx.depthOfField.z, 0.001, 0.1 ) : 0.012;
+	float dynDilation = ( postfx.depthOfField.x < 0.5 ) ? clamp( postfx.depthOfField.w, 0.0, 4.0 ) : 1.5;
+	dynDilation = clamp( dynDilation + motionLen * 0.08, 1.0, 2.5 );
+	float velLimit = 48.0;
+	float objectDebug = 0.0;
+	if ( postfx.temporalDebugParams.x > 100.0 ) {
+		objectDebug = postfx.temporalDebugParams.x - 100.0;
+	}
+
 	/*
 	 * Class-aware history rejection (r_weaponTemporalMode via splitShadow.a):
 	 *   0 = no weapon history (force current when prev class is WEAPON)
@@ -276,6 +287,7 @@ void main() {
 
 	/* Confidence factors */
 	float depthConf = 1.0;
+	float neighborhoodDepthReject = 0.0;
 	if ( useDisocc > 0.5 ) {
 		if ( postfx.temporalValidity.y < 0.5 ) {
 			depthConf = 0.0;
@@ -284,15 +296,46 @@ void main() {
 			float sampledPreviousLinear = linearizeReversedDepth( histDepth );
 			float relativeDepthError = abs( predictedPreviousLinear - sampledPreviousLinear ) /
 				max( max( predictedPreviousLinear, sampledPreviousLinear ), 1e-3 );
-			float dLo = adaptive ? 0.0025 : 0.004;
-			float dHi = adaptive ? 0.025 : 0.04;
+			/* Stricter for small/fast movers (helmet silhouettes). */
+			float dLo = adaptive ? 0.0015 : dynDepthThresh;
+			float dHi = adaptive ? 0.018 : max( dynDepthThresh * 4.0, 0.03 );
 			depthConf = 1.0 - smoothstep( dLo, dHi, relativeDepthError );
+
+			/*
+			 * Neighborhood depth test at silhouettes: if any nearby current depth
+			 * disagrees strongly with history at the reprojected UV, reject.
+			 * Dilate along the trailing edge (-velocity) where background is uncovered.
+			 */
+			vec2 trailDir = length( velocity ) > 1e-3 ? normalize( -velocity ) : vec2( 0.0 );
+			float ndMin = 1e30;
+			float ndMax = -1e30;
+			for ( int oy = -1; oy <= 1; ++oy ) {
+				for ( int ox = -1; ox <= 1; ++ox ) {
+					vec2 o = vec2( float( ox ), float( oy ) );
+					vec2 p = sampleUV + o * texel * dynDilation + trailDir * texel * ( dynDilation - 1.0 );
+					float d = textureLod( depthTex, clamp( p, 0.0, 1.0 ), 0.0 ).r;
+					float lin = linearizeReversedDepth( d );
+					ndMin = min( ndMin, lin );
+					ndMax = max( ndMax, lin );
+				}
+			}
+			float histLin = sampledPreviousLinear;
+			float layerGap = abs( histLin - clamp( histLin, ndMin, ndMax ) ) /
+				max( max( histLin, ndMax ), 1e-3 );
+			neighborhoodDepthReject = smoothstep( dLo, dHi, layerGap );
+			depthConf *= 1.0 - neighborhoodDepthReject;
 		}
 	}
 
 	float velocityConf = 1.0 - smoothstep( adaptive ? 2.5 : 4.0, adaptive ? 16.0 : 24.0, motionLen );
 	if ( !mvValid && postfx.depthParams.z > 0.5 ) {
-		velocityConf *= adaptive ? 0.15 : 0.35;
+		/* Missing/invalid object motion: hard-reject, never blend stale history. */
+		velocityConf = 0.0;
+		depthConf = 0.0;
+	}
+	/* Cap velocity contribution for dynamic-scale motion. */
+	if ( motionLen > velLimit ) {
+		velocityConf = 0.0;
 	}
 
 	float currentLuma = max( dot( current, LUMA ), 0.0 );
@@ -315,11 +358,14 @@ void main() {
 	/* Dark geo over former bright history (skyline / HOST banner trails). */
 	float historyBleed = smoothstep( 0.06, 0.45, historyLuma - currentLuma ) *
 		smoothstep( 0.12, 0.85, historyLuma );
+	/* Trailing-edge disocclusion: high motion + depth reject → reactive. */
+	float trailDisocc = neighborhoodDepthReject * smoothstep( 1.5, 6.0, motionLen );
 	float reactive = clamp( max( nearWeapon,
 		max( fastMotion * 0.90,
-		max( flash, max( highlightGhost * 0.95, historyBleed * 0.98 ) ) ) ), 0.0, 1.0 );
+		max( flash, max( highlightGhost * 0.95,
+		max( historyBleed * 0.98, trailDisocc ) ) ) ) ), 0.0, 1.0 );
 	if ( !mvValid && postfx.depthParams.z > 0.5 ) {
-		reactive = max( reactive, adaptive ? 0.98 : 0.90 );
+		reactive = max( reactive, 1.0 );
 	}
 	if ( useReactive > 0.5 && postfx.midsGamma.a > 0.5 ) {
 		float stamped = textureLod( reactiveMaskTex, sampleUV, 0.0 ).r;
@@ -346,11 +392,53 @@ void main() {
 	if ( !adaptive && depthConf < 0.20 ) {
 		confidence = 0.0; /* hard reject: real previous-depth mismatch */
 	}
+	if ( any( isnan( history ) ) || any( isinf( history ) ) || any( lessThan( history, vec3( -1e-3 ) ) ) ) {
+		confidence = 0.0;
+		history = current;
+	}
 
 	/* Difficult-pixel mask for bounded extra current-frame samples. */
 	float difficult = clamp( max( 1.0 - confidence,
 		max( reactive, max( 1.0 - depthConf, motionFactor ) ) ), 0.0, 1.0 );
 	bool wantExtraSamples = adaptive && difficult > ( 1.0 - adaptBudget * 0.85 );
+
+	/* r_temporalObjectDebug 1–12 (encoded as temporalDebugParams.x = 100+mode). */
+	if ( objectDebug > 0.5 ) {
+		float od = objectDebug;
+		if ( od < 1.5 ) {
+			/* 1 object velocity */
+			vec2 vel = velocity * 0.05;
+			bool bad = any( isnan( motion ) ) || any( isinf( motion ) );
+			float large = motionLen > 40.0 ? 1.0 : 0.0;
+			out_color = bad ? vec4( 1.0, 0.0, 1.0, 1.0 ) :
+				( large > 0.5 ? vec4( 1.0, 1.0, 0.0, 1.0 ) : vec4( abs( vel.x ), abs( vel.y ), 0.15, 1.0 ) );
+			return;
+		}
+		if ( od < 2.5 ) {
+			/* 2 previous transform validity */
+			out_color = mvValid ? vec4( 0.0, 1.0, 0.0, 1.0 ) : vec4( 1.0, 0.0, 0.0, 1.0 );
+			return;
+		}
+		if ( od < 5.5 ) {
+			/* 3–5 object ID placeholders (WORLD class until dedicated ID RT) */
+			float idProxy = fract( depthNdc * 64.0 );
+			if ( od < 3.5 ) out_color = vec4( idProxy, 0.2, 1.0 - idProxy, 1.0 );
+			else if ( od < 4.5 ) out_color = vec4( fract( histDepth * 64.0 ), 0.4, 0.2, 1.0 );
+			else out_color = vec4( classReject ? 1.0 : 0.0, 0.2, 0.2, 1.0 );
+			return;
+		}
+		if ( od < 6.5 ) { out_color = vec4( depthNdc, depthNdc, depthNdc, 1.0 ); return; }
+		if ( od < 7.5 ) { out_color = vec4( histDepth, histDepth, histDepth, 1.0 ); return; }
+		if ( od < 8.5 ) { out_color = vec4( 1.0 - depthConf, neighborhoodDepthReject, 0.1, 1.0 ); return; }
+		if ( od < 9.5 ) { out_color = vec4( confidence, confidence, confidence, 1.0 ); return; }
+		if ( od < 10.5 ) {
+			float d = clamp( lumaDiff * 3.0, 0.0, 1.0 );
+			out_color = vec4( d, 0.2, 1.0 - d, 1.0 );
+			return;
+		}
+		if ( od < 11.5 ) { out_color = vec4( reactive, reactive * 0.35, 1.0 - reactive, 1.0 ); return; }
+		if ( od < 12.5 ) { out_color = vec4( trailDisocc, neighborhoodDepthReject, 1.0 - depthConf, 1.0 ); return; }
+	}
 
 	if ( debugMode > 1.5 ) {
 		/* Rejection reason / ownership viz (r_debugHistoryRejection / r_temporalDebugView). */
@@ -442,6 +530,10 @@ void main() {
 	/* Cap via depthParams.w carrying r_temporalHistoryWeight */
 	float maxHist = clamp( postfx.depthParams.w, 0.0, 0.95 );
 	baseWeight = min( baseWeight, maxHist );
+	/* Dynamic objects (significant screen motion): cap below static-world maximum. */
+	if ( motionLen > 1.25 ) {
+		baseWeight = min( baseWeight, dynHistMax );
+	}
 	if ( adaptive ) {
 		baseWeight = min( baseWeight, 0.42 );
 	}
@@ -452,10 +544,12 @@ void main() {
 	if ( useVarClip > 0.5 ) {
 		vec3 meanY, sigmaY;
 		neighborhoodYCoCgStats( sampleUV, meanY, sigmaY );
-		/* Tighten further on highlight / reactive pixels so specular trails cannot stick. */
+		/* Tighten further on highlight / reactive / silhouette pixels so trails cannot stick. */
 		float highlightTighten = smoothstep( 0.20, 1.10, currentLuma );
+		float edgeTighten = max( neighborhoodDepthReject, reactive );
 		float gamma = mix( 1.25, 0.55, max( motionFactor, reactive ) );
 		gamma = mix( gamma, gamma * 0.72, highlightTighten );
+		gamma = mix( gamma, gamma * 0.65, edgeTighten );
 		if ( adaptive ) {
 			gamma *= 0.78; /* tighter clip — current neighborhood owns bounds */
 		}

@@ -32,7 +32,10 @@ layout(location = 1) out vec2 out_motion;
 
 void main() {
 	out_motion = vec2(0.0);
-	if ( abs(var_CurrentClip.w) > 1e-6 && abs(var_PrevClip.w) > 1e-6 ) {
+	if ( any( isnan( var_PrevClip ) ) || any( isinf( var_PrevClip ) ) ||
+		any( isnan( var_CurrentClip ) ) || any( isinf( var_CurrentClip ) ) ) {
+		out_motion = vec2( 0.0 / 0.0 );
+	} else if ( abs(var_CurrentClip.w) > 1e-6 && abs(var_PrevClip.w) > 1e-6 ) {
 		vec2 currUV = var_CurrentClip.xy / var_CurrentClip.w * 0.5 + 0.5;
 		vec2 prevUV = var_PrevClip.xy / var_PrevClip.w * 0.5 + 0.5;
 		out_motion = currUV - prevUV;

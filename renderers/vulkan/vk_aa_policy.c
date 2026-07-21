@@ -20,6 +20,12 @@ cvar_t *r_temporalVarianceClip;
 cvar_t *r_temporalDisocclusion;
 cvar_t *r_temporalReactiveMask;
 cvar_t *r_reactiveMaskForce;
+cvar_t *r_dynamicObjectHistoryMax;
+cvar_t *r_dynamicObjectDepthThreshold;
+cvar_t *r_dynamicObjectReactiveScale;
+cvar_t *r_dynamicObjectRejectDilation;
+cvar_t *r_dynamicObjectVelocityLimit;
+cvar_t *r_temporalObjectDebug;
 cvar_t *r_temporalWeaponAfterTaa;
 cvar_t *r_weaponSsrIsolation;
 cvar_t *r_weaponTemporalMode;
@@ -112,6 +118,54 @@ void vk_aa_policy_register_cvars( void )
 	ri.Cvar_SetDescription( r_temporalDisocclusion,
 		"Depth-based disocclusion rejection for Temporal Reconstruction (1=on)." );
 	ri.Cvar_SetGroup( r_temporalDisocclusion, CVG_RENDERER );
+
+	r_dynamicObjectHistoryMax = ri.Cvar_Get( "r_dynamicObjectHistoryMax", "0.48", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_dynamicObjectHistoryMax, "0", "0.85", CV_FLOAT );
+	ri.Cvar_SetDescription( r_dynamicObjectHistoryMax,
+		"Max TAA history weight for pixels with significant object/screen motion "
+		"(below static-world r_temporalHistoryWeight)." );
+	ri.Cvar_SetGroup( r_dynamicObjectHistoryMax, CVG_RENDERER );
+
+	r_dynamicObjectDepthThreshold = ri.Cvar_Get( "r_dynamicObjectDepthThreshold", "0.012", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_dynamicObjectDepthThreshold, "0.001", "0.1", CV_FLOAT );
+	ri.Cvar_SetDescription( r_dynamicObjectDepthThreshold,
+		"Relative linear-depth error threshold for dynamic-object silhouette rejection." );
+	ri.Cvar_SetGroup( r_dynamicObjectDepthThreshold, CVG_RENDERER );
+
+	r_dynamicObjectReactiveScale = ri.Cvar_Get( "r_dynamicObjectReactiveScale", "1.0", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_dynamicObjectReactiveScale, "0", "2", CV_FLOAT );
+	ri.Cvar_SetGroup( r_dynamicObjectReactiveScale, CVG_RENDERER );
+
+	r_dynamicObjectRejectDilation = ri.Cvar_Get( "r_dynamicObjectRejectDilation", "1.5", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_dynamicObjectRejectDilation, "0", "4", CV_FLOAT );
+	ri.Cvar_SetDescription( r_dynamicObjectRejectDilation,
+		"Trailing-edge disocclusion dilation in pixels for moving dynamic objects." );
+	ri.Cvar_SetGroup( r_dynamicObjectRejectDilation, CVG_RENDERER );
+
+	r_dynamicObjectVelocityLimit = ri.Cvar_Get( "r_dynamicObjectVelocityLimit", "48", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_dynamicObjectVelocityLimit, "4", "256", CV_FLOAT );
+	ri.Cvar_SetDescription( r_dynamicObjectVelocityLimit,
+		"Screen-space velocity (pixels) above which history is rejected as invalid/teleport." );
+	ri.Cvar_SetGroup( r_dynamicObjectVelocityLimit, CVG_RENDERER );
+
+	r_temporalObjectDebug = ri.Cvar_Get( "r_temporalObjectDebug", "0", CVAR_TEMP );
+	ri.Cvar_CheckRange( r_temporalObjectDebug, "0", "12", CV_INTEGER );
+	ri.Cvar_SetDescription( r_temporalObjectDebug,
+		"Dynamic-object temporal debug:\n"
+		" 0 final\n"
+		" 1 object velocity (magenta=NaN/Inf, yellow=large)\n"
+		" 2 previous transform validity\n"
+		" 3 current object ID proxy\n"
+		" 4 reprojected previous object ID proxy\n"
+		" 5 object-ID rejection\n"
+		" 6 current depth\n"
+		" 7 previous depth\n"
+		" 8 depth rejection\n"
+		" 9 history weight\n"
+		" 10 current versus history difference\n"
+		" 11 reactive mask\n"
+		" 12 disocclusion mask" );
+	ri.Cvar_SetGroup( r_temporalObjectDebug, CVG_RENDERER );
 
 	r_temporalReactiveMask = ri.Cvar_Get( "r_temporalReactiveMask", "1", CVAR_ARCHIVE_ND );
 	ri.Cvar_CheckRange( r_temporalReactiveMask, "0", "1", CV_INTEGER );

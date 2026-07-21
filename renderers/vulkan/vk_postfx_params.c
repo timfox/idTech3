@@ -211,6 +211,22 @@ void vk_update_postfx_params( uint32_t cmd_index )
 		params.temporalDebugParams[2] += 2.0f; /* split-screen compare marker */
 	}
 	params.temporalDebugParams[3] = r_weaponLocalAO && r_weaponLocalAO->integer ? 1.0f : 0.0f;
+	/* Dynamic-object temporal debug overrides vector-scale channel (debug views only). */
+	{
+		cvar_t *objDbg = ri.Cvar_Get( "r_temporalObjectDebug", "0", CVAR_TEMP );
+		if ( objDbg && objDbg->integer > 0 ) {
+			params.temporalDebugParams[0] = 100.0f + (float)objDbg->integer;
+		}
+	}
+	/* Pack dynamic-object resolve knobs into DoF channels when DoF is off (TAA-only consumers). */
+	if ( !( params.depthOfField[0] > 0.5f ) ) {
+		cvar_t *dynHist = ri.Cvar_Get( "r_dynamicObjectHistoryMax", "0.48", CVAR_ARCHIVE_ND );
+		cvar_t *dynDepth = ri.Cvar_Get( "r_dynamicObjectDepthThreshold", "0.012", CVAR_ARCHIVE_ND );
+		cvar_t *dynDilate = ri.Cvar_Get( "r_dynamicObjectRejectDilation", "1.5", CVAR_ARCHIVE_ND );
+		params.depthOfField[1] = dynHist ? dynHist->value : 0.48f;
+		params.depthOfField[2] = dynDepth ? dynDepth->value : 0.012f;
+		params.depthOfField[3] = dynDilate ? dynDilate->value : 1.5f;
+	}
 	if ( R_Upscale_WantTemporal() ) {
 		float sharp = params.taaParams[3] + R_Upscale_GetSharpness();
 		params.taaParams[3] = Com_Clamp( 0.0f, 1.0f, sharp );
