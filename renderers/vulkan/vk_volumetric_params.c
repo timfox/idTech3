@@ -88,6 +88,12 @@ void vk_update_volumetric_params( void )
 	float linear_dlight_cos_outer;
 	float linear_dlight_cos_inner;
 	float temporal_weight = r_volumetricFogTemporalWeight ? r_volumetricFogTemporalWeight->value : 0.0f;
+	{
+		cvar_t *r_temporalFog = ri.Cvar_Get( "r_temporalFog", "1", CVAR_ARCHIVE_ND );
+		if ( r_temporalFog && !r_temporalFog->integer ) {
+			temporal_weight = 0.0f;
+		}
+	}
 	float jitter_amount = r_volumetricFogJitter ? r_volumetricFogJitter->value : 0.0f;
 	float sun_intensity = r_volumetricFogSunIntensity ? r_volumetricFogSunIntensity->value : 1.0f;
 	/* Cloud shadows + weather sun visibility modulate directional volumetric lighting only. */

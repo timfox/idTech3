@@ -1260,6 +1260,7 @@ static void R_Register( void )
 	ri.Cmd_AddCommand( "havenrp_renderer_status", R_HavenRPRendererStatus_f );
 	ri.Cmd_AddCommand( "deferred_gbuffer_status", vk_deferred_gbuffer_status_f );
 	ri.Cmd_AddCommand( "temporal_status", vk_temporal_status_f );
+	ri.Cmd_AddCommand( "temporal_ghost_status", vk_temporal_ghost_status_f );
 	ri.Cmd_AddCommand( "present_recon_status", vk_present_recon_status_f );
 	ri.Cmd_AddCommand( "motion_vector_cert", vk_motion_vector_cert_status_f );
 	ri.Cmd_AddCommand( "visibility_buffer_status", vk_visibility_buffer_status_f );
@@ -3619,8 +3620,75 @@ static void R_Register( void )
 		" 3 - linear filtering, stretch to full size\n"
 		" 4 - linear filtering, preserve aspect ratio (black bars on sides)\n" );
 	r_temporalDebug = ri.Cvar_Get( "r_temporalDebug", "0", CVAR_ARCHIVE_ND );
-	ri.Cvar_CheckRange( r_temporalDebug, "0", "2", CV_INTEGER );
-	ri.Cvar_SetDescription( r_temporalDebug, "Temporal diagnostics:\n 0 - off\n 1 - log temporal reset reasons\n 2 - log reset reasons plus shared camera-cut and invalidated consumers.\n Visual ownership/rejection overlays: r_debugHistoryRejection 1–8 (see temporal_status)." );
+	ri.Cvar_CheckRange( r_temporalDebug, "0", "16", CV_INTEGER );
+	ri.Cvar_SetDescription( r_temporalDebug,
+		"Temporal ghosting diagnostics (see docs/RENDERER_TEMPORAL_GHOSTING.md):\n"
+		" 0 off\n"
+		" 1 final motion vectors (velocity)\n"
+		" 2 depth / history rejection\n"
+		" 3 temporal history weight\n"
+		" 4 disocclusion / reactive mask\n"
+		" 5 weapon depth mask (TAA near-weapon or SSR weapon-range depth)\n"
+		" 6 current vs history contribution\n"
+		" 7–12 extended: historyUV / weapon-vs-world MV / depth / NaN (see temporal_ghost_status)\n"
+		"Any non-zero also logs temporal reset reasons (developer)." );
+	{
+		cvar_t *r_tsr = ri.Cvar_Get( "r_tsr", "1", CVAR_ARCHIVE_ND );
+		cvar_t *r_temporalAO = ri.Cvar_Get( "r_temporalAO", "1", CVAR_ARCHIVE_ND );
+		cvar_t *r_temporalSSR = ri.Cvar_Get( "r_temporalSSR", "1", CVAR_ARCHIVE_ND );
+		cvar_t *r_temporalFog = ri.Cvar_Get( "r_temporalFog", "1", CVAR_ARCHIVE_ND );
+		cvar_t *r_temporalTransparency = ri.Cvar_Get( "r_temporalTransparency", "1", CVAR_ARCHIVE_ND );
+		cvar_t *r_dof = ri.Cvar_Get( "r_dof", "0", CVAR_ARCHIVE_ND );
+
+		ri.Cvar_CheckRange( r_tsr, "0", "1", CV_INTEGER );
+		ri.Cvar_SetDescription( r_tsr,
+			"Master enable for Temporal Super-Resolution / present adaptive reconstruction "
+			"(aaMode 3–5 and upscale temporal). 0 disables without changing r_taa." );
+		ri.Cvar_SetGroup( r_tsr, CVG_RENDERER );
+
+		ri.Cvar_CheckRange( r_temporalAO, "0", "1", CV_INTEGER );
+		ri.Cvar_SetDescription( r_temporalAO, "Master enable for SSAO (temporal AO consumer). 0 skips the SSAO pass." );
+		ri.Cvar_SetGroup( r_temporalAO, CVG_RENDERER );
+
+		ri.Cvar_CheckRange( r_temporalSSR, "0", "1", CV_INTEGER );
+		ri.Cvar_SetDescription( r_temporalSSR,
+			"Master enable for SSR as a temporal-adjacent consumer. 0 disables SSR even when r_ssr 1 "
+			"(use for weapon-trail bisect; see docs/RENDERER_TEMPORAL_GHOSTING.md)." );
+		ri.Cvar_SetGroup( r_temporalSSR, CVG_RENDERER );
+
+		ri.Cvar_CheckRange( r_temporalFog, "0", "1", CV_INTEGER );
+		ri.Cvar_SetDescription( r_temporalFog,
+			"Master enable for volumetric froxel temporal history. 0 forces temporal weight to 0." );
+		ri.Cvar_SetGroup( r_temporalFog, CVG_RENDERER );
+
+		ri.Cvar_CheckRange( r_temporalTransparency, "0", "1", CV_INTEGER );
+		ri.Cvar_SetDescription( r_temporalTransparency,
+			"Master enable for transparency reactive-mask stamping into Temporal Reconstruction. "
+			"0 skips the stamped OIT/transparent reactive path." );
+		ri.Cvar_SetGroup( r_temporalTransparency, CVG_RENDERER );
+
+		ri.Cvar_CheckRange( r_dof, "0", "1", CV_INTEGER );
+		ri.Cvar_SetDescription( r_dof, "Alias for r_depthOfField (thin-lens DoF in the gamma post pass)." );
+		ri.Cvar_SetGroup( r_dof, CVG_RENDERER );
+		if ( r_dof->integer && ri.Cvar_VariableIntegerValue( "r_depthOfField" ) == 0 ) {
+			ri.Cvar_Set( "r_depthOfField", "1" );
+		}
+
+		ri.Printf( PRINT_ALL,
+			"[VK][temporal] independent gates: taa=%d tsr=%d ao=%d ssr=%d fog=%d transparency=%d "
+			"motionBlur=%d dof=%d bloom=%d sharpen=%s (debug=%d)\n",
+			ri.Cvar_VariableIntegerValue( "r_taa" ),
+			r_tsr->integer,
+			r_temporalAO->integer,
+			r_temporalSSR->integer,
+			r_temporalFog->integer,
+			r_temporalTransparency->integer,
+			ri.Cvar_VariableIntegerValue( "r_motionBlur" ),
+			ri.Cvar_VariableIntegerValue( "r_depthOfField" ),
+			ri.Cvar_VariableIntegerValue( "r_bloom" ),
+			ri.Cvar_VariableString( "r_sharpen" ),
+			r_temporalDebug->integer );
+	}
 	r_temporalCustomShaderMotion = ri.Cvar_Get( "r_temporalCustomShaderMotion", "0", CVAR_ARCHIVE_ND );
 	ri.Cvar_CheckRange( r_temporalCustomShaderMotion, "0", "1", CV_INTEGER );
 	ri.Cvar_SetDescription( r_temporalCustomShaderMotion,

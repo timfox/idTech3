@@ -133,6 +133,7 @@ typedef struct {
 	int			goldsrcWorldHeadnodes[GOLDSRC_MAX_MAP_HULLS];
 	int			numGoldSrcClipNodes;
 	cNode_t		*goldsrcClipNodes;
+	byte		*goldsrcPlaneKind;	/* parallel to planes[0..numPlanes) */
 
 	int			numShaders;
 	dshader_t	*shaders;

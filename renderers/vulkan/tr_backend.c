@@ -2090,15 +2090,16 @@ void RB_RenderVolumetricShadowView( const viewParms_t *shadowViewParms, drawSurf
 
 
 #ifdef USE_VULKAN
-static drawSurfsCommand_t s_deferredWeaponCmd;
-static qboolean s_deferredWeaponPending = qfalse;
+#define MAX_DEFERRED_WEAPON_COMMANDS 16
+static drawSurfsCommand_t s_deferredWeaponCmds[MAX_DEFERRED_WEAPON_COMMANDS];
+static int s_deferredWeaponCmdCount;
 
 /*
 ================
 RB_TryDeferWeaponDrawSurfs
 
-When Temporal Reconstruction is active, RDF_NOWORLDMODEL weapon/view-model
-draws must not write into the world color buffer that feeds TAA history.
+RDF_NOWORLDMODEL weapon/view-model draws are deferred when world temporal
+reconstruction or SSR must complete without weapon color/depth contamination.
 ================
 */
 qboolean RB_TryDeferWeaponDrawSurfs( const drawSurfsCommand_t *cmd )
@@ -2112,7 +2113,7 @@ qboolean RB_TryDeferWeaponDrawSurfs( const drawSurfsCommand_t *cmd )
 	if ( !backEnd.doneWorldScene ) {
 		return qfalse;
 	}
-	if ( !vk_temporal_want_weapon_after_taa() ) {
+	if ( !vk_temporal_want_weapon_after_world_post() ) {
 		return qfalse;
 	}
 #ifdef VK_CUBEMAP
@@ -2121,13 +2122,19 @@ qboolean RB_TryDeferWeaponDrawSurfs( const drawSurfsCommand_t *cmd )
 	}
 #endif
 
-	s_deferredWeaponCmd = *cmd;
-	s_deferredWeaponPending = qtrue;
+	if ( s_deferredWeaponCmdCount >= MAX_DEFERRED_WEAPON_COMMANDS ) {
+		ri.Printf( PRINT_WARNING, S_COLOR_YELLOW
+			"[VK][weapon] deferred command queue full (%d); drawing command in legacy order\n"
+			S_COLOR_WHITE, MAX_DEFERRED_WEAPON_COMMANDS );
+		return qfalse;
+	}
+	s_deferredWeaponCmds[s_deferredWeaponCmdCount++] = *cmd;
 	backEnd.doneSurfaces = qtrue;
 	if ( r_temporalDebug && r_temporalDebug->integer ) {
 		ri.Printf( PRINT_DEVELOPER,
-			"[VK][temporal] deferred weapon/view-model until after world TAA (%d surfs)\n",
-			cmd->numDrawSurfs );
+			"[VK][temporal] deferred weapon/view-model until after world post "
+			"(command=%d surfs=%d)\n",
+			s_deferredWeaponCmdCount, cmd->numDrawSurfs );
 	}
 	return qtrue;
 }
@@ -2180,8 +2187,8 @@ static void RB_CopyHdrViewToColor( VkImageView srcView, uint32_t width, uint32_t
 RB_FlushDeferredWeaponAfterTaa
 
 Copies the resolved world HDR into color_image (if needed), then draws the
-deferred weapon/view-model after Temporal Reconstruction so it never enters
-world history.
+deferred weapon/view-model after incompatible world post passes. The legacy
+function name is retained for ABI stability.
 ================
 */
 void RB_FlushDeferredWeaponAfterTaa( VkImageView *post_fog_src, VkImageView *luminance_src )
@@ -2189,11 +2196,14 @@ void RB_FlushDeferredWeaponAfterTaa( VkImageView *post_fog_src, VkImageView *lum
 	uint32_t width = 0;
 	uint32_t height = 0;
 	VkImageView src;
+	int commandCount;
+	int i;
 
-	if ( !s_deferredWeaponPending ) {
+	if ( s_deferredWeaponCmdCount == 0 ) {
 		return;
 	}
-	s_deferredWeaponPending = qfalse;
+	commandCount = s_deferredWeaponCmdCount;
+	s_deferredWeaponCmdCount = 0;
 
 	if ( !vk.fboActive || !vk.cmd || vk.cmd->command_buffer == VK_NULL_HANDLE ) {
 		return;
@@ -2213,8 +2223,6 @@ void RB_FlushDeferredWeaponAfterTaa( VkImageView *post_fog_src, VkImageView *lum
 	RB_CopyHdrViewToColor( src, width, height );
 
 	vk_spine_pass_begin( VK_SPINE_PASS_WEAPON );
-	backEnd.refdef = s_deferredWeaponCmd.refdef;
-	backEnd.viewParms = s_deferredWeaponCmd.viewParms;
 	backEnd.drawSurfFilter = 0;
 	backEnd.oitMomentsPass = qfalse;
 	backEnd.oitAccumPass = qfalse;
@@ -2237,9 +2245,15 @@ void RB_FlushDeferredWeaponAfterTaa( VkImageView *post_fog_src, VkImageView *lum
 	}
 
 	vk_begin_post_bloom_render_pass();
-	RB_BeginDrawingView();
-	RB_RenderDrawSurfList( s_deferredWeaponCmd.drawSurfs, s_deferredWeaponCmd.numDrawSurfs );
-	RB_EndSurface();
+	for ( i = 0; i < commandCount; i++ ) {
+		const drawSurfsCommand_t *weaponCmd = &s_deferredWeaponCmds[i];
+
+		backEnd.refdef = weaponCmd->refdef;
+		backEnd.viewParms = weaponCmd->viewParms;
+		RB_BeginDrawingView();
+		RB_RenderDrawSurfList( weaponCmd->drawSurfs, weaponCmd->numDrawSurfs );
+		RB_EndSurface();
+	}
 	if ( vk.inRenderPass ) {
 		vk_end_render_pass();
 	}
@@ -2251,10 +2265,12 @@ void RB_FlushDeferredWeaponAfterTaa( VkImageView *post_fog_src, VkImageView *lum
 		*luminance_src = vk.color_image_view;
 	}
 	vk_set_scene_post_fog_source( vk.color_image_view );
-	vk_set_post_chain_last_writer( "weapon_after_taa" );
+	vk_set_post_chain_last_writer( "weapon_after_world_post" );
 
 	if ( r_temporalDebug && r_temporalDebug->integer ) {
-		ri.Printf( PRINT_DEVELOPER, "[VK][temporal] flushed deferred weapon after TAA\n" );
+		ri.Printf( PRINT_DEVELOPER,
+			"[VK][temporal] flushed %d deferred weapon commands after world post\n",
+			commandCount );
 	}
 	vk_spine_pass_end( VK_SPINE_PASS_WEAPON );
 }
@@ -2935,7 +2951,7 @@ static const void *RB_SwapBuffers( const void *data ) {
 	backEnd.doneBloom = qfalse;
 	backEnd.doneSSAO = qfalse;
 	backEnd.doneLensFlare = qfalse;
-	s_deferredWeaponPending = qfalse;
+	s_deferredWeaponCmdCount = 0;
 #endif
 
 	return (const void *)(cmd + 1);

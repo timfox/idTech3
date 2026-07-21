@@ -342,7 +342,20 @@ void PostFX_RegisterCvars(void) {
 		r_vegWind->integer ? "on" : "off");
 }
 
-qboolean PostFX_SSR_IsEnabled(void) { return r_ssr && r_ssr->integer > 0; }
+qboolean PostFX_SSR_IsEnabled(void)
+{
+	cvar_t *r_temporalSSR;
+
+	if ( !r_ssr || r_ssr->integer <= 0 ) {
+		return qfalse;
+	}
+	/* Independent bisect gate — does not change r_ssr default. */
+	r_temporalSSR = ri.Cvar_Get( "r_temporalSSR", "1", CVAR_ARCHIVE_ND );
+	if ( r_temporalSSR && !r_temporalSSR->integer ) {
+		return qfalse;
+	}
+	return qtrue;
+}
 float PostFX_SSR_GetMaxDistance(void) { return r_ssr_maxDistance ? r_ssr_maxDistance->value : 100.0f; }
 float PostFX_SSR_GetStepSize(void) { return r_ssr_stepSize ? r_ssr_stepSize->value : 1.0f; }
 float PostFX_SSR_GetThickness(void) { return r_ssr_thickness ? r_ssr_thickness->value : 0.5f; }
@@ -506,7 +519,17 @@ qboolean PostFX_MotionBlur_IsEnabled(void) { return r_motionBlur && r_motionBlur
 float PostFX_MotionBlur_GetStrength(void) { return r_motionBlurStrength ? r_motionBlurStrength->value : 1.0f; }
 float PostFX_MotionBlur_GetMaxRadius(void) { return r_motionBlurMaxRadius ? r_motionBlurMaxRadius->value : 24.0f; }
 int PostFX_MotionBlur_GetSamples(void) { return r_motionBlurSamples ? r_motionBlurSamples->integer : 12; }
-qboolean PostFX_DepthOfField_IsEnabled(void) { return r_depthOfField && r_depthOfField->integer > 0; }
+qboolean PostFX_DepthOfField_IsEnabled(void)
+{
+	cvar_t *r_dof;
+
+	/* r_dof mirrors r_depthOfField for the independent temporal-subsystem toggle list. */
+	r_dof = ri.Cvar_Get( "r_dof", "0", CVAR_ARCHIVE_ND );
+	if ( r_dof && r_dof->integer > 0 ) {
+		return qtrue;
+	}
+	return ( r_depthOfField && r_depthOfField->integer > 0 ) ? qtrue : qfalse;
+}
 float PostFX_DepthOfField_GetFocusDistance(void) { return r_dofFocusDistance ? r_dofFocusDistance->value : 768.0f; }
 float PostFX_DepthOfField_GetFocusRange(void) { return r_dofFocusRange ? r_dofFocusRange->value : 192.0f; }
 float PostFX_DepthOfField_GetAperture(void) { return r_dofAperture ? r_dofAperture->value : 1.4f; }

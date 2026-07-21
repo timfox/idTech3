@@ -97,8 +97,9 @@ typedef struct {
 } retailRefEntity_t;
 
 /*
- * Retail cgame.qvm keeps enum-backed qboolean, so trace_t is wider there than
- * in the native client build. CM trace syscalls must marshal into that layout.
+ * Retail cgame.qvm keeps enum-backed qboolean, so its trace_t is wider there
+ * than in the native client build. CM trace syscalls must marshal into that
+ * layout. Native GoldSrc provenance fields are not part of the retail layout.
  */
 typedef struct {
 	int			allsolid;
@@ -111,7 +112,9 @@ typedef struct {
 	int			entityNum;
 } legacy_trace_t;
 
-STATIC_ASSERT( sizeof( legacy_trace_t ) == sizeof( trace_t ) + 4, "legacy_trace_t must match retail cgame trace layout" );
+/* +4: two legacy int qbooleans vs native bools. -16: native provenance fields. */
+STATIC_ASSERT( sizeof( legacy_trace_t ) == sizeof( trace_t ) + 4 - 16,
+		"legacy_trace_t must match retail cgame trace layout" );
 
 static qboolean CL_UsesLegacyQvmLayout( void ) {
 	return ( cgvm && !cgvm->dllHandle ) ? qtrue : qfalse;

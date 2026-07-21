@@ -210,7 +210,8 @@ void vk_update_postfx_params( uint32_t cmd_index )
 		float base = ( r_presentAdaptiveSpatial && r_presentAdaptiveSpatial->integer ) ? 2.0f : 1.0f;
 		params.highlightsGain[3] = base + budget;
 	}
-	/* shadowsLift.a → TAA debugMode: 1=MV, 2=reject reasons, 3–12 ownership / adaptive viz. */
+	/* shadowsLift.a → TAA debugMode: 1=MV, 2=reject reasons, 3–12 ownership / adaptive viz.
+	 * r_temporalDebug (user-facing) maps onto the same codes; r_debugHistoryRejection wins if set. */
 	params.shadowsLift[3] = 0.0f;
 	if ( r_debugMotionVectors && r_debugMotionVectors->integer ) {
 		params.shadowsLift[3] = 1.0f;
@@ -218,6 +219,23 @@ void vk_update_postfx_params( uint32_t cmd_index )
 		params.shadowsLift[3] = 9.0f;
 	} else if ( r_debugHistoryRejection && r_debugHistoryRejection->integer > 0 ) {
 		params.shadowsLift[3] = (float)r_debugHistoryRejection->integer;
+	} else if ( r_temporalDebug && r_temporalDebug->integer > 0 ) {
+		/* User modes 1–6 → internal TAA debug codes. */
+		static const int temporalDebugMap[7] = {
+			0,
+			1,  /* velocity / final MV */
+			2,  /* depth rejection reasons */
+			4,  /* history weight / confidence */
+			5,  /* disocclusion */
+			7,  /* weapon mask */
+			10  /* current vs history */
+		};
+		int mode = r_temporalDebug->integer;
+		if ( mode >= 1 && mode <= 6 ) {
+			params.shadowsLift[3] = (float)temporalDebugMap[mode];
+		} else if ( mode >= 7 && mode <= 16 ) {
+			params.shadowsLift[3] = (float)mode;
+		}
 	}
 
 	if ( backEnd.projection2D || !tr.world || backEnd.viewParms.portalView != PV_NONE ) {

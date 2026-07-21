@@ -1128,6 +1128,17 @@ typedef struct cplane_s {
 } cplane_t;
 
 
+/*
+ * Collision plane provenance for GoldSrc / BSP30 traces. Default zero is a
+ * world face so unmarked Q3 and entity hits keep historical behavior.
+ */
+typedef enum {
+	TRACE_PLANE_WORLD_FACE = 0,
+	TRACE_PLANE_HULL_FACE,
+	TRACE_PLANE_BEVEL,
+	TRACE_PLANE_AXIAL_BEVEL
+} tracePlaneKind_t;
+
 // a trace is returned when a box is swept through the world
 typedef struct {
 	qboolean	allsolid;	// if true, plane is not valid
@@ -1138,6 +1149,10 @@ typedef struct {
 	int			surfaceFlags;	// surface hit
 	int			contents;	// contents on other side of surface hit
 	int			entityNum;	// entity the contacted surface is a part of
+	tracePlaneKind_t	planeKind;	// GoldSrc plane provenance; WORLD_FACE otherwise
+	int			sourceBrush;	// Q3 brush index, or -1 when unused
+	int			sourceSide;		// brush side / GoldSrc enter side
+	int			sourceClipnode;	// GoldSrc clipnode that supplied the plane, or -1
 } trace_t;
 
 // trace->entityNum can also be 0 to (MAX_GENTITIES-1)

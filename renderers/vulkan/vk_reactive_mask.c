@@ -57,10 +57,16 @@ qboolean vk_reactive_mask_active( void )
 
 qboolean vk_reactive_mask_stamp_enabled( void )
 {
+	cvar_t *r_temporalTransparency;
+
 	if ( !vk_reactive_mask_active() ) {
 		return qfalse;
 	}
 	if ( !r_temporalReactiveMask || !r_temporalReactiveMask->integer ) {
+		return qfalse;
+	}
+	r_temporalTransparency = ri.Cvar_Get( "r_temporalTransparency", "1", CVAR_ARCHIVE_ND );
+	if ( r_temporalTransparency && !r_temporalTransparency->integer ) {
 		return qfalse;
 	}
 	return qtrue;

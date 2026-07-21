@@ -61,6 +61,8 @@ qboolean vk_temporal_near_static_streak_guard( void );
 qboolean vk_temporal_reconstruction_wanted( void );
 /* Defer RDF_NOWORLDMODEL weapon draws until after world TAA. */
 qboolean vk_temporal_want_weapon_after_taa( void );
+/* Defer weapon until after world temporal/SSR passes that cannot consume weapon depth safely. */
+qboolean vk_temporal_want_weapon_after_world_post( void );
 qboolean vk_temporal_defer_weapon_drawsurfs( const void *drawSurfsCmd );
 void vk_temporal_flush_deferred_weapon_after_taa( VkImageView *post_fog_src, VkImageView *luminance_src );
 
@@ -70,5 +72,7 @@ void vk_reset_volumetric_history( void );
 
 /* Console: temporal history ownership / reset state (Spine diagnostics). */
 void vk_temporal_status_f( void );
+/* Console: pass inventory for weapon-trail / temporal-ghost bisect. */
+void vk_temporal_ghost_status_f( void );
 
 #endif
