@@ -868,12 +868,10 @@ void R_BuildWorldVBO( msurface_t *surf, int surfCount )
 				tris->vboItemIndex = 0;
 				continue;
 			}
-#ifdef USE_VBO_GRID
 			grid = (srfGridMesh_t *) sf->data;
 			if ( grid->surfaceType == SF_GRID ) {
 				grid->vboItemIndex = 0;
 			}
-#endif
 		}
 		vbo->items_count = 0;
 	}
