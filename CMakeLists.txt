@@ -3588,6 +3588,12 @@ set_tests_properties(test_oit_corruption PROPERTIES
 	LABELS "scripts;validation;renderer;oit"
 	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/scripts/oit_corruption_check.sh;${CMAKE_SOURCE_DIR}/config/repro_oit_corruption.cfg;${CMAKE_SOURCE_DIR}/docs/MOMENT_OIT_STOCHASTIC_ALPHA.md")
 
+add_test(NAME test_temporal_ghost
+	COMMAND ${CMAKE_SOURCE_DIR}/scripts/temporal_ghost_check.sh)
+set_tests_properties(test_temporal_ghost PROPERTIES
+	LABELS "scripts;validation;renderer;temporal"
+	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/scripts/temporal_ghost_check.sh;${CMAKE_SOURCE_DIR}/docs/RENDERER_TEMPORAL_GHOSTING.md")
+
 add_test(NAME test_high_throughput_1_0
 	COMMAND ${CMAKE_SOURCE_DIR}/scripts/high_throughput_1_0_check.sh)
 set_tests_properties(test_high_throughput_1_0 PROPERTIES

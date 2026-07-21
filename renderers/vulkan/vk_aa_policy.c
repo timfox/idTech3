@@ -122,8 +122,8 @@ void vk_aa_policy_register_cvars( void )
 	r_weaponSsrIsolation = ri.Cvar_Get( "r_weaponSsrIsolation", "1", CVAR_ARCHIVE_ND );
 	ri.Cvar_CheckRange( r_weaponSsrIsolation, "0", "1", CV_INTEGER );
 	ri.Cvar_SetDescription( r_weaponSsrIsolation,
-		"Defer RDF_NOWORLDMODEL weapon/view-model draws until after world SSR. "
-		"Prevents DEPTH_RANGE_WEAPON color/depth from contaminating SSR; 0 restores legacy ordering." );
+		"Defer RDF_NOWORLDMODEL weapon/view-model draws until after world SSR/SSAO. "
+		"Prevents DEPTH_RANGE_WEAPON color/depth from contaminating those passes; 0 restores legacy ordering." );
 	ri.Cvar_SetGroup( r_weaponSsrIsolation, CVG_RENDERER );
 	ri.Printf( PRINT_ALL, "[VK][weapon] SSR isolation %s (r_weaponSsrIsolation=%d)\n",
 		r_weaponSsrIsolation->integer ? "enabled" : "disabled",

@@ -65,6 +65,7 @@ static byte *cmod_base;
 cvar_t		*cm_noAreas;
 cvar_t		*cm_noCurves;
 cvar_t		*cm_playerCurveClip;
+cvar_t		*cm_goldsrcCompare;
 #endif
 
 static cmodel_t box_model;
@@ -621,6 +622,11 @@ void CM_LoadMap( const char *name, qboolean clientload, int *checksum ) {
 	Cvar_SetDescription( cm_noCurves, "Do not collide against curves." );
 	cm_playerCurveClip = Cvar_Get( "cm_playerCurveClip", "1", CVAR_ARCHIVE_ND | CVAR_CHEAT );
 	Cvar_SetDescription( cm_playerCurveClip, "Collide player against curves." );
+	cm_goldsrcCompare = Cvar_Get( "cm_goldsrcCompare", "0", CVAR_TEMP );
+	Cvar_SetDescription( cm_goldsrcCompare,
+			"Log BSP30 traces that differ between the native clipnode hull "
+			"(point through pre-expanded hull) and a naive box sweep through "
+			"hull 0. Use at failing ramp transitions." );
 #endif
 
 	Com_DPrintf( "%s( '%s', %i )\n", __func__, name, clientload );
