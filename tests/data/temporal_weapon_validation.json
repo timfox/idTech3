@@ -1,0 +1,128 @@
+{
+  "schema": 1,
+  "feature": "Temporal Weapon Resolve",
+  "map": "surf_aztec",
+  "requiredBuffers": [
+    "final_hdr",
+    "final_ldr",
+    "class_current",
+    "class_previous",
+    "weapon_mvp_velocity",
+    "velocity_merged",
+    "depth_current",
+    "depth_previous",
+    "depth_rejection",
+    "class_rejection",
+    "reactive_mask",
+    "history_weight",
+    "weapon_history_validity"
+  ],
+  "failureCriteria": {
+    "maximumTrailFrames": 2,
+    "allowWorldReceivesWeaponHistory": false,
+    "allowWeaponReceivesWorldHistory": false,
+    "allowInvalidHistoryAfterClassTransition": false,
+    "allowNonFiniteVelocity": false,
+    "allowHistoryAfterReset": false,
+    "allowDescriptorSubstitution": false,
+    "requireSurfTemporalStartup": true
+  },
+  "cases": [
+    {
+      "id": "baseline_mode0_native",
+      "tier": "gate",
+      "set": {"r_weaponTemporalMode": 0, "r_renderScale": 1.0, "r_firstPersonFov": 65, "r_firstPersonZNear": 4, "r_bloom": 1},
+      "motion": "camera_rotation_weapon_bob"
+    },
+    {
+      "id": "baseline_mode1_native",
+      "tier": "gate",
+      "set": {"r_weaponTemporalMode": 1, "r_renderScale": 1.0, "r_firstPersonFov": 65, "r_firstPersonZNear": 4, "r_bloom": 1},
+      "motion": "camera_translation_recoil"
+    },
+    {
+      "id": "baseline_mode2_native",
+      "tier": "gate",
+      "set": {"r_weaponTemporalMode": 2, "r_renderScale": 1.0, "r_firstPersonFov": 65, "r_firstPersonZNear": 4, "r_bloom": 1},
+      "motion": "rapid_strafe_recoil"
+    },
+    {
+      "id": "mode2_scale75_ultrawide",
+      "tier": "gate",
+      "set": {"r_weaponTemporalMode": 2, "r_renderScale": 0.75, "r_firstPersonFov": 55, "r_firstPersonZNear": 4, "r_bloom": 1},
+      "viewport": "3440x1440",
+      "motion": "surf_speed_camera_rotation"
+    },
+    {
+      "id": "mode2_scale50_fov80",
+      "tier": "gate",
+      "set": {"r_weaponTemporalMode": 2, "r_renderScale": 0.5, "r_firstPersonFov": 80, "r_firstPersonZNear": 1, "r_bloom": 1},
+      "motion": "thin_sight_rapid_strafe"
+    },
+    {
+      "id": "runtime_resize",
+      "tier": "lifecycle",
+      "set": {"r_weaponTemporalMode": 2, "r_renderScale": 0.75},
+      "event": "resize_1920x1080_to_1280x720",
+      "motion": "camera_translation"
+    },
+    {
+      "id": "ads_world_fov_change",
+      "tier": "projection",
+      "set": {"r_weaponTemporalMode": 2, "r_firstPersonFov": 65, "cg_fov": 90},
+      "event": "ads_then_world_fov_110",
+      "motion": "weapon_animation"
+    },
+    {
+      "id": "weapon_switch",
+      "tier": "lifecycle",
+      "set": {"r_weaponTemporalMode": 2},
+      "event": "weapon_switch_during_recoil",
+      "motion": "weapon_switch"
+    },
+    {
+      "id": "teleport",
+      "tier": "lifecycle",
+      "set": {"r_weaponTemporalMode": 2},
+      "event": "teleport",
+      "motion": "camera_cut"
+    },
+    {
+      "id": "bloom_emissive_bright_weapon",
+      "tier": "presentation",
+      "set": {"r_weaponTemporalMode": 2, "r_weaponBloomMode": 1, "r_bloom": 1},
+      "presentation": "emissive_weapon_dark_world_muzzle_flash"
+    },
+    {
+      "id": "bloom_off_dark_weapon",
+      "tier": "presentation",
+      "set": {"r_weaponTemporalMode": 1, "r_weaponBloomMode": 0, "r_bloom": 0},
+      "presentation": "dark_weapon_bright_wall"
+    },
+    {
+      "id": "missing_class_descriptor",
+      "tier": "fault",
+      "set": {"r_weaponTemporalMode": 1, "r_temporalDropClassDescriptor": 1},
+      "expect": ["TemporalUnclassifiedR8", "forced_history_rejection", "no_descriptor_alias"]
+    },
+    {
+      "id": "reactive_disabled",
+      "tier": "fault",
+      "set": {"r_weaponTemporalMode": 2, "r_temporalReactiveMask": 0},
+      "motion": "muzzle_flash_recoil"
+    },
+    {
+      "id": "taa_off_comparison",
+      "tier": "comparison",
+      "set": {"r_taa": 0, "r_weaponTemporalMode": 0, "r_weaponBloomMode": 1},
+      "motion": "surf_speed_camera_rotation"
+    },
+    {
+      "id": "toggle_stress",
+      "tier": "lifecycle",
+      "set": {"r_weaponTemporalMode": 2},
+      "event": "toggle_taa_modes_resize_alt_tab_renderer_restart",
+      "motion": "weapon_switch"
+    }
+  ]
+}

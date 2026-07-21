@@ -135,6 +135,19 @@ void vk_update_attachment_descriptors( void ) {
 					depth_desc.dstSet = vk.depth_descriptor[i];
 					qvkUpdateDescriptorSets( vk.device, 1, &depth_desc, 0, NULL );
 				}
+				{
+					VkImageView taaDepthView = vk.msaaActive && vk.volumetric_depth_view != VK_NULL_HANDLE ?
+						vk.volumetric_depth_view : depth_info.imageView;
+					VkImageLayout taaDepthLayout = vk.msaaActive && vk.volumetric_depth_view != VK_NULL_HANDLE ?
+						VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL :
+						VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
+					depth_info.imageView = taaDepthView;
+					depth_info.imageLayout = taaDepthLayout;
+					for ( i = 0; i < NUM_COMMAND_BUFFERS; i++ ) {
+						depth_desc.dstSet = vk.taa_depth_descriptor[i];
+						qvkUpdateDescriptorSets( vk.device, 1, &depth_desc, 0, NULL );
+					}
+				}
 			}
 		}
 
@@ -166,6 +179,87 @@ void vk_update_attachment_descriptors( void ) {
 		vk_reactive_mask_update_taa_descriptors();
 		vk_reactive_mask_update_storage_descriptor();
 		vk_temporal_class_update_taa_descriptors();
+		{
+			VkDescriptorImageInfo fallbackInfo;
+			VkWriteDescriptorSet fallbackWrite;
+			Com_Memset( &fallbackInfo, 0, sizeof( fallbackInfo ) );
+			sd.gl_mag_filter = sd.gl_min_filter = GL_NEAREST;
+			sd.address_mode = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+			sd.max_lod_1_0 = qtrue;
+			sd.noAnisotropy = qtrue;
+			fallbackInfo.sampler = vk_find_sampler( &sd );
+			fallbackInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+			Com_Memset( &fallbackWrite, 0, sizeof( fallbackWrite ) );
+			fallbackWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+			fallbackWrite.dstBinding = 0;
+			fallbackWrite.descriptorCount = 1;
+			fallbackWrite.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+			fallbackWrite.pImageInfo = &fallbackInfo;
+			if ( vk.temporal_class_fallback_descriptor != VK_NULL_HANDLE &&
+				vk.temporal_class_fallback_view != VK_NULL_HANDLE ) {
+				fallbackInfo.imageView = vk.temporal_class_fallback_view;
+				fallbackWrite.dstSet = vk.temporal_class_fallback_descriptor;
+				qvkUpdateDescriptorSets( vk.device, 1, &fallbackWrite, 0, NULL );
+			}
+			if ( vk.temporal_reactive_fallback_descriptor != VK_NULL_HANDLE &&
+				vk.temporal_reactive_fallback_view != VK_NULL_HANDLE ) {
+				fallbackInfo.imageView = vk.temporal_reactive_fallback_view;
+				fallbackWrite.dstSet = vk.temporal_reactive_fallback_descriptor;
+				qvkUpdateDescriptorSets( vk.device, 1, &fallbackWrite, 0, NULL );
+			}
+		}
+		if ( vk.volumetric_depth_resolve_layout != VK_NULL_HANDLE ) {
+			VkDescriptorImageInfo depth_copy_info[2];
+			VkWriteDescriptorSet depth_copy_writes[2];
+			VkImageView depth_source = vk.msaaActive ?
+				vk.volumetric_depth_view :
+				( vk.depth_image_view_sample ? vk.depth_image_view_sample : vk.depth_image_view );
+			VkImageLayout depth_source_layout = vk.msaaActive ?
+				VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL :
+				VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
+			uint32_t di;
+
+			Com_Memset( depth_copy_info, 0, sizeof( depth_copy_info ) );
+			Com_Memset( depth_copy_writes, 0, sizeof( depth_copy_writes ) );
+			sd.gl_mag_filter = sd.gl_min_filter = GL_NEAREST;
+			sd.address_mode = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+			sd.max_lod_1_0 = qtrue;
+			sd.noAnisotropy = qtrue;
+			depth_copy_info[0].sampler = vk_find_sampler( &sd );
+			depth_copy_info[0].imageView = depth_source;
+			depth_copy_info[0].imageLayout = depth_source_layout;
+			depth_copy_info[1].sampler = VK_NULL_HANDLE;
+			depth_copy_info[1].imageLayout = VK_IMAGE_LAYOUT_GENERAL;
+
+			for ( di = 0; di < 2; di++ ) {
+				if ( depth_source == VK_NULL_HANDLE ||
+					vk.temporal_prev_depth_view[di] == VK_NULL_HANDLE ||
+					vk.temporal_depth_copy_descriptor[di] == VK_NULL_HANDLE ) {
+					continue;
+				}
+				depth_copy_info[1].imageView = vk.temporal_prev_depth_view[di];
+				depth_copy_writes[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+				depth_copy_writes[0].dstSet = vk.temporal_depth_copy_descriptor[di];
+				depth_copy_writes[0].dstBinding = 0;
+				depth_copy_writes[0].descriptorCount = 1;
+				depth_copy_writes[0].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+				depth_copy_writes[0].pImageInfo = &depth_copy_info[0];
+				depth_copy_writes[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+				depth_copy_writes[1].dstSet = vk.temporal_depth_copy_descriptor[di];
+				depth_copy_writes[1].dstBinding = 1;
+				depth_copy_writes[1].descriptorCount = 1;
+				depth_copy_writes[1].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+				depth_copy_writes[1].pImageInfo = &depth_copy_info[1];
+				qvkUpdateDescriptorSets( vk.device, 2, depth_copy_writes, 0, NULL );
+				if ( vk.weapon_prev_depth_view[di] != VK_NULL_HANDLE &&
+					vk.weapon_depth_copy_descriptor[di] != VK_NULL_HANDLE ) {
+					depth_copy_info[1].imageView = vk.weapon_prev_depth_view[di];
+					depth_copy_writes[0].dstSet = vk.weapon_depth_copy_descriptor[di];
+					depth_copy_writes[1].dstSet = vk.weapon_depth_copy_descriptor[di];
+					qvkUpdateDescriptorSets( vk.device, 2, depth_copy_writes, 0, NULL );
+				}
+			}
+		}
 		if ( vk.reactive_stamp_reveal_descriptor != VK_NULL_HANDLE && vk.oit_reveal_image_view != VK_NULL_HANDLE ) {
 			VkDescriptorImageInfo reveal_info;
 			VkWriteDescriptorSet reveal_desc;
@@ -366,6 +460,38 @@ void vk_update_attachment_descriptors( void ) {
 				info.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 				info.imageView = vk.taa_history_image_view[i];
 				desc.dstSet = vk.taa_history_descriptor[i];
+				qvkUpdateDescriptorSets( vk.device, 1, &desc, 0, NULL );
+			}
+		}
+		for ( i = 0; i < 2; i++ ) {
+			if ( vk.temporal_prev_depth_view[i] != VK_NULL_HANDLE &&
+				vk.temporal_prev_depth_descriptor[i] != VK_NULL_HANDLE ) {
+				sd.gl_mag_filter = sd.gl_min_filter = GL_NEAREST;
+				sd.address_mode = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+				sd.max_lod_1_0 = qtrue;
+				sd.noAnisotropy = qtrue;
+				info.sampler = vk_find_sampler( &sd );
+				info.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+				info.imageView = vk.temporal_prev_depth_view[i];
+				desc.dstSet = vk.temporal_prev_depth_descriptor[i];
+				qvkUpdateDescriptorSets( vk.device, 1, &desc, 0, NULL );
+			}
+			if ( vk.weapon_history_view[i] != VK_NULL_HANDLE &&
+				vk.weapon_history_descriptor[i] != VK_NULL_HANDLE ) {
+				sd.gl_mag_filter = sd.gl_min_filter = GL_LINEAR;
+				info.sampler = vk_find_sampler( &sd );
+				info.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+				info.imageView = vk.weapon_history_view[i];
+				desc.dstSet = vk.weapon_history_descriptor[i];
+				qvkUpdateDescriptorSets( vk.device, 1, &desc, 0, NULL );
+			}
+			if ( vk.weapon_prev_depth_view[i] != VK_NULL_HANDLE &&
+				vk.weapon_prev_depth_descriptor[i] != VK_NULL_HANDLE ) {
+				sd.gl_mag_filter = sd.gl_min_filter = GL_NEAREST;
+				info.sampler = vk_find_sampler( &sd );
+				info.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+				info.imageView = vk.weapon_prev_depth_view[i];
+				desc.dstSet = vk.weapon_prev_depth_descriptor[i];
 				qvkUpdateDescriptorSets( vk.device, 1, &desc, 0, NULL );
 			}
 		}
@@ -1029,12 +1155,17 @@ void vk_init_descriptors( void )
 			}
 		for ( i = 0; i < NUM_COMMAND_BUFFERS; i++ ) {
 			VK_CHECK( qvkAllocateDescriptorSets( vk.device, &alloc, &vk.depth_descriptor[i] ) );
+			VK_CHECK( qvkAllocateDescriptorSets( vk.device, &alloc, &vk.taa_depth_descriptor[i] ) );
 			VK_CHECK( qvkAllocateDescriptorSets( vk.device, &alloc, &vk.taa_motion_descriptor[i] ) );
 			VK_CHECK( qvkAllocateDescriptorSets( vk.device, &alloc, &vk.taa_reactive_descriptor[i] ) );
 			VK_CHECK( qvkAllocateDescriptorSets( vk.device, &alloc, &vk.taa_class_descriptor[i] ) );
+			VK_CHECK( qvkAllocateDescriptorSets( vk.device, &alloc, &vk.weapon_current_class_descriptor[i] ) );
+			VK_CHECK( qvkAllocateDescriptorSets( vk.device, &alloc, &vk.weapon_world_descriptor[i] ) );
 		}
 		VK_CHECK( qvkAllocateDescriptorSets( vk.device, &alloc, &vk.reactive_stamp_reveal_descriptor ) );
 		VK_CHECK( qvkAllocateDescriptorSets( vk.device, &alloc, &vk.temporal_class_stamp_descriptor ) );
+		VK_CHECK( qvkAllocateDescriptorSets( vk.device, &alloc, &vk.temporal_class_fallback_descriptor ) );
+		VK_CHECK( qvkAllocateDescriptorSets( vk.device, &alloc, &vk.temporal_reactive_fallback_descriptor ) );
 
 		if ( r_ssao && r_ssao->integer ) {
 			VK_CHECK( qvkAllocateDescriptorSets( vk.device, &alloc, &vk.ssao_descriptor ) );
@@ -1073,6 +1204,9 @@ void vk_init_descriptors( void )
 		}
 		for ( i = 0; i < 2; i++ ) {
 			VK_CHECK( qvkAllocateDescriptorSets( vk.device, &alloc, &vk.taa_history_descriptor[i] ) );
+			VK_CHECK( qvkAllocateDescriptorSets( vk.device, &alloc, &vk.temporal_prev_depth_descriptor[i] ) );
+			VK_CHECK( qvkAllocateDescriptorSets( vk.device, &alloc, &vk.weapon_history_descriptor[i] ) );
+			VK_CHECK( qvkAllocateDescriptorSets( vk.device, &alloc, &vk.weapon_prev_depth_descriptor[i] ) );
 		}
 
 		alloc.descriptorSetCount = 1;
@@ -1100,6 +1234,10 @@ void vk_init_descriptors( void )
 			if ( vk.volumetric_depth_resolve_layout != VK_NULL_HANDLE ) {
 				alloc.pSetLayouts = &vk.volumetric_depth_resolve_layout;
 				VK_CHECK( qvkAllocateDescriptorSets( vk.device, &alloc, &vk.volumetric_depth_resolve_descriptor ) );
+				for ( i = 0; i < 2; i++ ) {
+					VK_CHECK( qvkAllocateDescriptorSets( vk.device, &alloc, &vk.temporal_depth_copy_descriptor[i] ) );
+					VK_CHECK( qvkAllocateDescriptorSets( vk.device, &alloc, &vk.weapon_depth_copy_descriptor[i] ) );
+				}
 			}
 			if ( vk.luminance_layout != VK_NULL_HANDLE ) {
 				alloc.pSetLayouts = &vk.luminance_layout;

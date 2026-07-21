@@ -56,6 +56,14 @@ VkImageView vk_temporal_class_prev_view( void )
 	return vk.temporal_class_view[prev];
 }
 
+VkImageView vk_temporal_class_current_view( void )
+{
+	if ( !vk_temporal_class_active() ) {
+		return VK_NULL_HANDLE;
+	}
+	return vk.temporal_class_view[vk.temporal.classHistoryIndex & 1u];
+}
+
 static uint32_t vk_temporal_class_curr_index( void )
 {
 	return 1u - ( vk.temporal.classHistoryIndex & 1u );
@@ -65,7 +73,7 @@ void vk_barrier_temporal_class_for_sampling( const char *reason )
 {
 	VkImageMemoryBarrier barrier;
 	uint32_t idx;
-	int i;
+	uint32_t i;
 
 	if ( !vk.cmd || vk.cmd->command_buffer == VK_NULL_HANDLE || !vk_temporal_class_active() ) {
 		return;
@@ -211,7 +219,9 @@ void vk_temporal_class_stamp_weapon_from_depth( void )
 
 	Com_Memset( &info, 0, sizeof( info ) );
 	info.imageView = depthView;
-	info.imageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
+	info.imageLayout = ( vk.msaaActive && depthView == vk.volumetric_depth_view ) ?
+		VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL :
+		VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
 	{
 		Vk_Sampler_Def sd;
 		Com_Memset( &sd, 0, sizeof( sd ) );
@@ -295,7 +305,10 @@ void vk_temporal_class_stamp_weapon_from_depth( void )
 	/* Promote stamped buffer to previous for next TAA. */
 	vk.temporal.classHistoryIndex = curr;
 	vk.temporal.classHasPrev = qtrue;
+	vk.temporal.prevClassValid = qtrue;
+	vk.temporal.classFrameId[curr] = vk.temporal.frameIndex;
 	s_class_committed_frame = tr.frameCount;
+	vk_temporal_class_update_current_weapon_descriptors();
 
 	/* Restore depth for subsequent attachment use. */
 	{
@@ -350,6 +363,8 @@ void vk_temporal_class_commit_world_only( void )
 
 	vk.temporal.classHistoryIndex = curr;
 	vk.temporal.classHasPrev = qtrue;
+	vk.temporal.prevClassValid = qtrue;
+	vk.temporal.classFrameId[curr] = vk.temporal.frameIndex;
 	s_class_committed_frame = tr.frameCount;
 }
 
@@ -398,6 +413,42 @@ void vk_temporal_class_update_taa_descriptors( void )
 			continue;
 		}
 		write.dstSet = vk.taa_class_descriptor[i];
+		qvkUpdateDescriptorSets( vk.device, 1, &write, 0, NULL );
+		vk.taaClassBoundView[i] = view;
+	}
+}
+
+void vk_temporal_class_update_current_weapon_descriptors( void )
+{
+	VkDescriptorImageInfo info;
+	VkWriteDescriptorSet write;
+	VkImageView view = vk_temporal_class_current_view();
+	int i;
+
+	if ( view == VK_NULL_HANDLE ) {
+		return;
+	}
+	Com_Memset( &info, 0, sizeof( info ) );
+	info.imageView = view;
+	info.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+	{
+		Vk_Sampler_Def sd;
+		Com_Memset( &sd, 0, sizeof( sd ) );
+		sd.gl_mag_filter = sd.gl_min_filter = GL_NEAREST;
+		sd.address_mode = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+		sd.max_lod_1_0 = qtrue;
+		sd.noAnisotropy = qtrue;
+		info.sampler = vk_find_sampler( &sd );
+	}
+	Com_Memset( &write, 0, sizeof( write ) );
+	write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+	write.dstBinding = 0;
+	write.descriptorCount = 1;
+	write.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+	write.pImageInfo = &info;
+	i = vk.cmd_index;
+	if ( i < NUM_COMMAND_BUFFERS && vk.weapon_current_class_descriptor[i] != VK_NULL_HANDLE ) {
+		write.dstSet = vk.weapon_current_class_descriptor[i];
 		qvkUpdateDescriptorSets( vk.device, 1, &write, 0, NULL );
 	}
 }

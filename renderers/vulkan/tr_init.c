@@ -66,6 +66,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "vk_deferred_gbuffer.h"
 #include "vk_visibility_buffer.h"
 #include "vk_temporal.h"
+#include "vk_view_state.h"
 #include "vk_present_recon.h"
 #include "vk_gpu_scene.h"
 #include "vk_hiz.h"
@@ -128,6 +129,52 @@ static void VkVolumetricValidate_f( void );
 static void GfxInfo( void );
 static void VarInfo( void );
 static void GL_SetDefaultState( void );
+
+static qboolean R_IsSurfGame( void )
+{
+	const char *fsGame = ri.Cvar_VariableString( "fs_game" );
+	const char *baseGame = ri.Cvar_VariableString( "fs_basegame" );
+
+	return ( ( fsGame && !Q_stricmp( fsGame, "surf" ) ) ||
+		( baseGame && !Q_stricmp( baseGame, "surf" ) ) ) ? qtrue : qfalse;
+}
+
+static void R_MigrateSurfViewmodelProjection( void )
+{
+	static qboolean warnedAlias;
+	static qboolean warnedMigration;
+	const char *obsoleteFovEnabled;
+	qboolean migrated = qfalse;
+
+	if ( !R_IsSurfGame() ) {
+		return;
+	}
+
+	/* Historical local configs used this unscoped name; it has never driven
+	 * the renderer projection and must not appear to override the real cvar. */
+	obsoleteFovEnabled = ri.Cvar_VariableString( "FovEnabled" );
+	if ( obsoleteFovEnabled && obsoleteFovEnabled[0] && !warnedAlias ) {
+		ri.Printf( PRINT_WARNING,
+			S_COLOR_YELLOW "[Surf] obsolete FovEnabled=\"%s\" is ignored; "
+			"use r_firstPersonFovEnabled\n", obsoleteFovEnabled );
+		warnedAlias = qtrue;
+	}
+
+	if ( !r_firstPersonFovEnabled->integer || r_firstPersonZNear->value <= 0.1251f ) {
+		ri.Cvar_Set( "r_firstPersonFovEnabled", "1" );
+		ri.Cvar_Set( "r_firstPersonFov", "65" );
+		ri.Cvar_Set( "r_firstPersonZNear", "4" );
+		migrated = qtrue;
+	}
+
+	if ( migrated && !warnedMigration ) {
+		ri.Printf( PRINT_WARNING,
+			S_COLOR_YELLOW "[Surf] migrated stale viewmodel projection: "
+			"r_firstPersonFovEnabled=1 r_firstPersonFov=65 r_firstPersonZNear=4. "
+			"Use an explicit debug cfg after startup for legacy comparison.\n" );
+		warnedMigration = qtrue;
+	}
+}
 
 cvar_t	*r_flareSize;
 cvar_t	*r_flareFade;
@@ -1260,7 +1307,11 @@ static void R_Register( void )
 	ri.Cmd_AddCommand( "havenrp_renderer_status", R_HavenRPRendererStatus_f );
 	ri.Cmd_AddCommand( "deferred_gbuffer_status", vk_deferred_gbuffer_status_f );
 	ri.Cmd_AddCommand( "temporal_status", vk_temporal_status_f );
+	ri.Cmd_AddCommand( "r_dumpTemporalState", vk_temporal_status_f );
+	ri.Cmd_AddCommand( "r_captureTemporalDebug", vk_capture_temporal_debug_f );
 	ri.Cmd_AddCommand( "temporal_ghost_status", vk_temporal_ghost_status_f );
+	ri.Cmd_AddCommand( "surf_validateTemporalConfig", vk_surf_validate_temporal_config_f );
+	ri.Cmd_AddCommand( "r_printViewmodelProjection", vk_print_viewmodel_projection_f );
 	ri.Cmd_AddCommand( "present_recon_status", vk_present_recon_status_f );
 	ri.Cmd_AddCommand( "motion_vector_cert", vk_motion_vector_cert_status_f );
 	ri.Cmd_AddCommand( "visibility_buffer_status", vk_visibility_buffer_status_f );
@@ -1660,6 +1711,7 @@ static void R_Register( void )
 	ri.Cvar_CheckRange( r_firstPersonZNear, "0.01", "8", CV_FLOAT );
 	ri.Cvar_SetDescription( r_firstPersonZNear, "Near clip plane for first-person primitives (arms, weapons). Smaller values reduce clipping of close geometry." );
 	ri.Cvar_SetGroup( r_firstPersonZNear, CVG_RENDERER );
+	R_MigrateSurfViewmodelProjection();
 	r_ignoreGLErrors = ri.Cvar_Get( "r_ignoreGLErrors", "1", CVAR_ARCHIVE_ND );
 	ri.Cvar_SetDescription( r_ignoreGLErrors, "Ignore OpenGL errors." );
 	r_teleporterFlash = ri.Cvar_Get( "r_teleporterFlash", "1", CVAR_ARCHIVE );
@@ -3886,6 +3938,7 @@ void R_Init( void ) {
 	vk_create_brfdlut();
 #endif
 	vk_validate_pbr_ibl_resources();
+	vk_surf_log_temporal_config();
 #endif
 
 	R_InitShaders();
@@ -3976,6 +4029,10 @@ static void RE_Shutdown( refShutdownCode_t code ) {
 	ri.Cmd_RemoveCommand( "renderer_compatibility" );
 	ri.Cmd_RemoveCommand( "vkVolumetricValidate" );
 	ri.Cmd_RemoveCommand( "r_aaQuality" );
+	ri.Cmd_RemoveCommand( "r_dumpTemporalState" );
+	ri.Cmd_RemoveCommand( "r_captureTemporalDebug" );
+	ri.Cmd_RemoveCommand( "surf_validateTemporalConfig" );
+	ri.Cmd_RemoveCommand( "r_printViewmodelProjection" );
 #endif
 
 	//if ( tr.registered ) {

@@ -400,6 +400,7 @@ compile_shader("comp", "volumetric/fluid_divergence.comp", "fluid_divergence_cs"
 compile_shader("comp", "volumetric/fluid_pressure.comp", "fluid_pressure_cs", binding_expr="vk.modules.fluid_pressure_cs")
 compile_shader("comp", "volumetric/fluid_gradient.comp", "fluid_gradient_cs", binding_expr="vk.modules.fluid_gradient_cs")
 compile_shader("comp", "volumetric/depth_resolve_msaa.comp", "volumetric_depth_resolve_msaa_cs", binding_expr="vk.modules.volumetric_depth_resolve_msaa_cs")
+compile_shader("comp", "temporal/depth_history_copy.comp", "temporal_depth_history_copy_cs", binding_expr="vk.modules.temporal_depth_history_copy_cs")
 compile_shader("comp", "postfx/luminance.comp", "luminance_cs", binding_expr="vk.modules.luminance_cs")
 compile_shader("comp", "vegetation_wind.comp", "vegetation_wind_cs", binding_expr="vk.modules.vegetation_wind_cs")
 compile_shader("comp", "terrain/cbt_terrain.comp", "cbt_terrain_cs", binding_expr="vk.modules.cbt_terrain_cs")

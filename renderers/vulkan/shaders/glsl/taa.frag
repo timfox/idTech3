@@ -33,11 +33,15 @@ layout(set = 2, binding = 0) uniform PostFXParams {
 	vec4 autoExposureParams;
 	vec4 localExposureParams;
 	vec4 taaParams;
+	vec4 temporalValidity;
+	vec4 weaponTemporalParams;
+	vec4 temporalDebugParams;
 } postfx;
 layout(set = 3, binding = 0) uniform sampler2D historyColor;
 layout(set = 4, binding = 0) uniform sampler2D motionTex;
 layout(set = 5, binding = 0) uniform sampler2D reactiveMaskTex;
 layout(set = 6, binding = 0) uniform sampler2D temporalClassTex;
+layout(set = 7, binding = 0) uniform sampler2D previousDepthTex;
 
 layout(location = 0) in vec2 frag_tex_coord;
 layout(location = 0) out vec4 out_color;
@@ -68,12 +72,21 @@ vec3 YCoCgToRGB( vec3 ycocg ) {
 	return vec3( Y + Co - Cg, Y + Cg, Y - Co - Cg );
 }
 
-vec2 reprojectHistoryUV( vec2 uv, float depthNdc ) {
+vec2 reprojectHistoryUV( vec2 uv, float depthNdc, out float previousDepthNdc ) {
 	vec4 posClip = vec4( uv * 2.0 - 1.0, depthNdc, 1.0 );
 	vec4 posWorld = postfx.invViewProj * posClip;
 	posWorld /= max( posWorld.w, 1e-6 );
 	vec4 prevClip = postfx.prevViewProj * posWorld;
+	previousDepthNdc = prevClip.z / max( prevClip.w, 1e-6 );
 	return prevClip.xy / max( prevClip.w, 1e-6 ) * 0.5 + 0.5;
+}
+
+/* Vulkan world projection is finite reversed-Z: near=1, far=0. */
+float linearizeReversedDepth( float depthNdc ) {
+	float zNear = max( postfx.depthParams.x, 1e-4 );
+	float zFar = max( postfx.depthParams.y, zNear + 1e-3 );
+	return ( zNear * zFar ) /
+		max( zNear + clamp( depthNdc, 0.0, 1.0 ) * ( zFar - zNear ), 1e-6 );
 }
 
 void neighborhoodYCoCgStats( vec2 uv, out vec3 meanY, out vec3 sigmaY ) {
@@ -158,15 +171,17 @@ void main() {
 	vec2 historyUV;
 	vec2 motion = vec2( 0.0 );
 	bool mvValid = false;
+	float predictedPreviousDepthNdc = depthNdc;
+	vec2 matrixHistoryUV = reprojectHistoryUV( sampleUV, depthNdc, predictedPreviousDepthNdc );
 	if ( postfx.depthParams.z > 0.5 ) {
 		motion = textureLod( motionTex, sampleUV, 0.0 ).rg;
 		historyUV = sampleUV - motion;
 		mvValid = !( any( isnan( motion ) ) || any( isinf( motion ) ) );
 		if ( !mvValid ) {
-			historyUV = reprojectHistoryUV( sampleUV, depthNdc );
+			historyUV = matrixHistoryUV;
 		}
 	} else {
-		historyUV = reprojectHistoryUV( sampleUV, depthNdc );
+		historyUV = matrixHistoryUV;
 	}
 
 	if ( any( lessThan( historyUV, vec2( 0.0 ) ) ) || any( greaterThan( historyUV, vec2( 1.0 ) ) ) ) {
@@ -188,7 +203,6 @@ void main() {
 
 	/* Extended r_temporalDebug views that need depth before full resolve. */
 	{
-		float nearWeaponEarly = smoothstep( 0.82, 0.995, depthNdc );
 		if ( debugMode > 12.5 && debugMode < 13.5 ) {
 			/* 13 = NaN/Inf detection on current / motion */
 			bool bad = any( isnan( current ) ) || any( isinf( current ) ) ||
@@ -198,17 +212,18 @@ void main() {
 			return;
 		}
 		if ( debugMode > 13.5 && debugMode < 14.5 ) {
-			/* 14 = weapon-only motion (MV * weapon mask) */
+			/* 14 = pre-weapon merged velocity (weapon is not rendered yet). */
 			vec2 texSize = vec2( textureSize( currentColor, 0 ) );
-			vec2 vel = ( sampleUV - historyUV ) * texSize * 0.05 * nearWeaponEarly;
-			out_color = vec4( abs( vel.x ), abs( vel.y ), nearWeaponEarly, 1.0 );
+			vec2 vel = ( sampleUV - historyUV ) * texSize * 0.05;
+			out_color = vec4( abs( vel.x ), abs( vel.y ), 0.15, 1.0 );
 			return;
 		}
 		if ( debugMode > 14.5 && debugMode < 15.5 ) {
-			/* 15 = world-only motion (MV * (1-weapon)) */
+			/* 15 = prior-class-gated velocity; 21 is actual post-draw weapon MVP. */
 			vec2 texSize = vec2( textureSize( currentColor, 0 ) );
-			vec2 vel = ( sampleUV - historyUV ) * texSize * 0.05 * ( 1.0 - nearWeaponEarly );
-			out_color = vec4( abs( vel.x ), abs( vel.y ), 1.0 - nearWeaponEarly, 1.0 );
+			float priorWeapon = textureLod( temporalClassTex, historyUV, 0.0 ).r > CLASS_WEAPON_THRESH ? 1.0 : 0.0;
+			vec2 vel = ( sampleUV - historyUV ) * texSize * 0.05 * priorWeapon;
+			out_color = vec4( abs( vel.x ), abs( vel.y ), priorWeapon, 1.0 );
 			return;
 		}
 		if ( debugMode > 15.5 && debugMode < 16.5 ) {
@@ -219,7 +234,7 @@ void main() {
 	}
 
 	vec3 history = textureLod( historyColor, historyUV, 0.0 ).rgb;
-	float histDepth = textureLod( depthTex, historyUV, 0.0 ).r;
+	float histDepth = textureLod( previousDepthTex, historyUV, 0.0 ).r;
 
 	vec2 texSize = vec2( textureSize( currentColor, 0 ) );
 	vec2 velocity = ( sampleUV - historyUV ) * texSize;
@@ -230,7 +245,7 @@ void main() {
 	 * Class-aware history rejection (r_weaponTemporalMode via splitShadow.a):
 	 *   0 = no weapon history (force current when prev class is WEAPON)
 	 *   1 = classified shared history (reject WEAPON↔WORLD mismatch) [default]
-	 *   2 = reserved (separate weapon history RT — treat as mode 1)
+	 *   2 = independent weapon history; world resolve still rejects weapon history here
 	 * Prev class is dilated 1–2 px along motion so silhouette edges do not bleed.
 	 */
 	float weaponTemporalMode = postfx.splitShadow.a;
@@ -266,14 +281,16 @@ void main() {
 	/* Confidence factors */
 	float depthConf = 1.0;
 	if ( useDisocc > 0.5 ) {
-		float depthDelta = abs( depthNdc - histDepth );
-		/* Reversed-Z: larger = nearer. Tighter reject kills skyline / silhouette bleed. */
-		float dLo = adaptive ? 0.00025 : 0.0004;
-		float dHi = adaptive ? 0.008 : 0.012;
-		depthConf = 1.0 - smoothstep( dLo, dHi, depthDelta );
-		/* Extra reject when current is near-far (sky/background) vs history nearer geo. */
-		if ( depthNdc < 0.08 && histDepth > depthNdc + 0.02 ) {
-			depthConf *= 0.25;
+		if ( postfx.temporalValidity.y < 0.5 ) {
+			depthConf = 0.0;
+		} else {
+			float predictedPreviousLinear = linearizeReversedDepth( predictedPreviousDepthNdc );
+			float sampledPreviousLinear = linearizeReversedDepth( histDepth );
+			float relativeDepthError = abs( predictedPreviousLinear - sampledPreviousLinear ) /
+				max( max( predictedPreviousLinear, sampledPreviousLinear ), 1e-3 );
+			float dLo = adaptive ? 0.0025 : 0.004;
+			float dHi = adaptive ? 0.025 : 0.04;
+			depthConf = 1.0 - smoothstep( dLo, dHi, relativeDepthError );
 		}
 	}
 

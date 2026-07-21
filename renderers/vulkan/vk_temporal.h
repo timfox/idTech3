@@ -63,16 +63,27 @@ qboolean vk_temporal_reconstruction_wanted( void );
 qboolean vk_temporal_want_weapon_after_taa( void );
 /* Defer weapon until after world temporal/SSR passes that cannot consume weapon depth safely. */
 qboolean vk_temporal_want_weapon_after_world_post( void );
+qboolean vk_temporal_defer_bloom_for_weapon( void );
 qboolean vk_temporal_defer_weapon_drawsurfs( const void *drawSurfsCmd );
 void vk_temporal_flush_deferred_weapon_after_taa( VkImageView *post_fog_src, VkImageView *luminance_src );
 
 void vk_reset_motion_history( void );
 void vk_reset_taa_history( void );
+void vk_reset_weapon_history( void );
 void vk_reset_volumetric_history( void );
+/* Normalize/copy current depth into the selected R32F history image. */
+qboolean vk_temporal_store_previous_depth( uint32_t writeIndex );
+qboolean vk_temporal_store_weapon_depth( uint32_t writeIndex );
+/* Resolve MSAA depth before TAA samples the normalized current-depth view. */
+qboolean vk_temporal_prepare_current_depth( void );
 
 /* Console: temporal history ownership / reset state (Spine diagnostics). */
 void vk_temporal_status_f( void );
 /* Console: pass inventory for weapon-trail / temporal-ghost bisect. */
 void vk_temporal_ghost_status_f( void );
+void vk_capture_temporal_debug_f( void );
+/* Surf shipping-profile startup summary and resource/cvar validation. */
+void vk_surf_log_temporal_config( void );
+void vk_surf_validate_temporal_config_f( void );
 
 #endif

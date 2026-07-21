@@ -268,6 +268,18 @@ void vk_begin_frame( void )
 			vk_volumetric_perf_wanted() ) {
 			vk_update_volumetric_perf_queries();
 		}
+		if ( vk.weapon_temporal_query_pool != VK_NULL_HANDLE ) {
+			uint64_t queryValues[VK_WEAPON_TEMPORAL_QUERY_SLOTS];
+			const uint32_t queryBase = vk.cmd_index * VK_WEAPON_TEMPORAL_QUERY_SLOTS;
+			if ( qvkGetQueryPoolResults( vk.device, vk.weapon_temporal_query_pool,
+				queryBase, VK_WEAPON_TEMPORAL_QUERY_SLOTS, sizeof( queryValues ),
+				queryValues, sizeof( uint64_t ), VK_QUERY_RESULT_64_BIT ) == VK_SUCCESS &&
+				queryValues[1] >= queryValues[0] ) {
+				vk.temporal.weaponResolveGpuMs =
+					(float)( queryValues[1] - queryValues[0] ) *
+					vk.weapon_temporal_timestamp_period_ns * 1.0e-6f;
+			}
+		}
 		VK_SimRenderDebugFrameEnd();
 		if ( r_occlusionCulling && r_occlusionCulling->integer ) {
 			vk_occlusion_readback();
@@ -314,6 +326,16 @@ _retry:
 	if ( vk.volumetric_query_pool != VK_NULL_HANDLE && !qvkResetQueryPoolEXT && qvkCmdResetQueryPool ) {
 		const uint32_t qbase = vk.cmd_index * VK_VOLUMETRIC_QUERY_SLOTS;
 		qvkCmdResetQueryPool( vk.cmd->command_buffer, vk.volumetric_query_pool, qbase, VK_VOLUMETRY_QUERY_USED );
+	}
+	if ( vk.weapon_temporal_query_pool != VK_NULL_HANDLE ) {
+		const uint32_t queryBase = vk.cmd_index * VK_WEAPON_TEMPORAL_QUERY_SLOTS;
+		if ( qvkResetQueryPoolEXT ) {
+			qvkResetQueryPoolEXT( vk.device, vk.weapon_temporal_query_pool,
+				queryBase, VK_WEAPON_TEMPORAL_QUERY_SLOTS );
+		} else if ( qvkCmdResetQueryPool ) {
+			qvkCmdResetQueryPool( vk.cmd->command_buffer, vk.weapon_temporal_query_pool,
+				queryBase, VK_WEAPON_TEMPORAL_QUERY_SLOTS );
+		}
 	}
 
 	if ( vk.colorWriteMaskDynamic && qvkCmdSetColorWriteMaskEXT )
@@ -394,6 +416,26 @@ void vk_prepare_frame_temporal_state( void )
 		r_taaMotionVectors->modified = qfalse;
 		reset_taa = qtrue;
 	}
+	if ( r_weaponTemporalMode && r_weaponTemporalMode->modified ) {
+		r_weaponTemporalMode->modified = qfalse;
+		reset_taa = qtrue;
+	}
+	if ( r_weaponTemporalHistoryWeight && r_weaponTemporalHistoryWeight->modified ) {
+		r_weaponTemporalHistoryWeight->modified = qfalse;
+		vk_reset_weapon_history();
+	}
+	if ( r_weaponTemporalVarianceGamma && r_weaponTemporalVarianceGamma->modified ) {
+		r_weaponTemporalVarianceGamma->modified = qfalse;
+		vk_reset_weapon_history();
+	}
+	if ( r_weaponTemporalDepthThreshold && r_weaponTemporalDepthThreshold->modified ) {
+		r_weaponTemporalDepthThreshold->modified = qfalse;
+		vk_reset_weapon_history();
+	}
+	if ( r_weaponTemporalReactiveScale && r_weaponTemporalReactiveScale->modified ) {
+		r_weaponTemporalReactiveScale->modified = qfalse;
+		vk_reset_weapon_history();
+	}
 	if ( reset_taa ) {
 		vk_reset_taa_history();
 	}
@@ -462,7 +504,7 @@ void vk_end_frame( void )
 			vk_spine_pass_end( VK_SPINE_PASS_SSR );
 		}
 
-		if ( r_bloom->integer )
+		if ( r_bloom->integer && !vk_temporal_defer_bloom_for_weapon() )
 		{
 			vk_spine_pass_begin( VK_SPINE_PASS_BLOOM );
 			vk_bloom();
@@ -488,6 +530,13 @@ void vk_end_frame( void )
 			vk_spine_pass_begin( VK_SPINE_PASS_TEMPORAL_RECON );
 			vk_end_frame_record_taa_pass( &post_fog_src, &luminance_src );
 			vk_spine_pass_end( VK_SPINE_PASS_TEMPORAL_RECON );
+			if ( vk_temporal_defer_bloom_for_weapon() && !backEnd.doneBloom ) {
+				vk_spine_pass_begin( VK_SPINE_PASS_BLOOM );
+				vk_bloom();
+				vk_spine_pass_end( VK_SPINE_PASS_BLOOM );
+				post_fog_src = vk_get_post_fog_source();
+				luminance_src = post_fog_src;
+			}
 			vk_spine_pass_begin( VK_SPINE_PASS_EYE_ADAPTATION );
 			vk_end_frame_record_luminance_pass( luminance_src );
 			vk_spine_pass_end( VK_SPINE_PASS_EYE_ADAPTATION );

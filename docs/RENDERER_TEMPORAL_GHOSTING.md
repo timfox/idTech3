@@ -17,14 +17,16 @@ Observed on Surf (`fs_game surf`, `surf_aztec`) and similar first-person views:
 
 | Consumer | Typical Surf value | Notes |
 |---|---|---|
-| `r_taa` | **0** | World TAA / Temporal Reconstruction **off** |
-| `r_aaMode` | **2** | SMAA (spatial only; not temporal reconstruction) |
-| `reconstruction` | **no** | `vk_temporal_reconstruction_wanted() == false` |
+| `r_taa` | **1** | World TAA / Temporal Reconstruction **on** (shipping Surf profile) |
+| `r_aaMode` | **4** | Native Temporal Reconstruction |
+| `reconstruction` | **yes** | `vk_temporal_reconstruction_wanted() == true` |
 | `weaponAfterWorldPost` | **yes** (default) | `r_weaponSsrIsolation 1` + SSR/SSAO live |
 | `r_ssr` | **1** (Surf `surf.cfg`) | Screen-space reflections **on** unless gated |
 | `r_bloom` / `r_motionBlur` / `r_oit` | 0 | Off in the measured session |
 
-**Important:** With reconstruction off, this cannot be classic TAA history ghosting until `r_taa` / `r_aaMode` 3–5 / upscale temporal is enabled.
+**Important:** Surf now boots through the Temporal Weapon Resolve path. The
+zero-history renderer remains supported only through explicit comparison cfgs
+such as `ghost_safe.cfg`; it is not the normal startup profile.
 
 ## Pass order (relevant slice)
 
@@ -96,28 +98,64 @@ Static gate: `scripts/temporal_ghost_check.sh` (`ctest -R test_temporal_ghost`).
 
 ### B. Residual silhouette was first-person projection, not temporal
 
-Surf previously archived:
+Old Surf archives could retain `r_firstPersonFovEnabled 0` and
+`r_firstPersonZNear 0.125`. The renderer now warns once and migrates that exact
+legacy combination instead of silently using it. The authoritative projection
+inputs in `release/surf/surf.cfg` are:
 
-`r_firstPersonFovEnabled 0`, `r_firstPersonScaleEnabled 0`, `r_firstPersonZNear 0.125`
+| Input | Surf value | Effective meaning |
+|---|---:|---|
+| `cg_fov` | 90 | Nominal world horizontal FOV |
+| `r_firstPersonFovEnabled` | 1 | Select custom weapon projection |
+| `r_firstPersonFov` | 65 | Weapon horizontal FOV, degrees |
+| `r_firstPersonZNear` | 4 | Weapon near plane, world units (clamped 0.01–8) |
+| `r_firstPersonScaleEnabled` / `r_firstPersonScale` | 1 / 1.0 | Enabled, identity model-view scale |
 
-That placed the MD3 millimetres from the camera at scene FOV, which made the rear of the machinegun look stretched / “duplicated.” Defaults are now:
+`r_printViewmodelProjection`, captured on `surf_aztec` at 1280×720 after the
+Architecture-B deferred weapon draw, reported:
 
-| Cvar | Value | Where |
-|---|---|---|
-| `r_firstPersonFovEnabled` | 1 | `release/surf/surf.cfg`, `autoexec.cfg` |
-| `r_firstPersonScaleEnabled` | 1 | same |
-| `r_firstPersonFov` | 65 | same |
-| `r_firstPersonZNear` | 4 | same |
+```text
+effective weapon FOV  : 65.000 deg horizontal
+effective world FOV   : 90.000 x 58.733 deg (horizontal x vertical)
+aspect-adjusted FOV   : 39.444 deg vertical (from 65.000 deg horizontal)
+z-near / z-far        : 4.000 / 10043.434
+projection mode       : custom horizontal weapon FOV (r_firstPersonFovEnabled=1)
+reversed-Z state      : enabled (Vulkan 0..1 clip depth)
+depth-range remap     : DEPTH_RANGE_WEAPON [0.600, 1.000]
+jitter state          : current=(0.0000, 0.0000) px appliedToWeapon=no
+previous-frame values : weaponFov=65.000 x 39.444 worldFov=90.000 x 58.733 z=4.000/dynamic
+```
+
+Weapon z-far has no independent cvar: it shares the dynamically computed world
+view z-far, so its numeric value changes with map bounds/view. Aspect
+compensation is automatic from the effective world FOV pair; there is no
+aspect cvar. `r_zproj` is the projection-plane construction distance and does
+not change the resulting FOV. Handedness/model offsets and ADS are owned by the
+cgame entity/refdef transform—there is no renderer-side handedness or ADS
+projection override. An ADS world-FOV change therefore affects the world
+projection while the configured 65-degree weapon projection remains stable.
+
+Weapon motion capture selects the same effective
+`backEnd.firstPersonProjectionMatrix` used for the current draw. Its previous
+MVP therefore uses the exact 65-degree, z-near-4 projection rather than the
+world projection.
 
 `release/surf/autoexec.cfg` also sets `com_nativeLibraryExtractPk3 0` so the loose
 `release/surf/vm/game.x86_64.so` wins over the older `game.so` embedded in
 `openarena.pk3` (pk3 extract was aborting in `PM_GroundTrace` on BSP30 maps).
 
-### C. TAA path (not active in Surf default)
+### C. TAA path (Surf default)
 
-When `r_taa 1` or `r_aaMode` 3–5 is enabled, use `r_temporalDebug` 1–6 and confirm `r_temporalWeaponAfterTaa` defers the weapon until after world history.
+Surf explicitly sets `r_aaMode 4`, `r_taa 1`, `r_taaMotionVectors 1`,
+`r_temporalReactiveMask 1`, `r_temporalWeaponAfterTaa 1`, and
+`r_weaponTemporalMode 1`. It also sets `r_bloom 1` and
+`r_weaponBloomMode 1` so combined world/weapon HDR enters bloom once. Use
+`r_temporalDebug` 1–33 and confirm
+`r_temporalWeaponAfterTaa` defers the weapon until after world history.
 
-Note: `taa.frag` currently samples **current** depth at the reprojected UV for `histDepth` — there is no true previous-depth RT yet. Debug mode “previous-frame depth” is therefore approximate.
+`taa.frag` samples a persistent R32F previous-frame depth image at the
+reprojected UV. Current depth is never substituted for unavailable history;
+invalid depth history forces current-frame color.
 
 ## Debug views (`r_temporalDebug`)
 
@@ -137,11 +175,34 @@ Note: `taa.frag` currently samples **current** depth at the reprojected UV for `
 | 11 | Neighborhood variance |
 | 12 | History delta |
 | 13 | NaN / Inf detection (magenta) |
-| 14 | Weapon-only motion vectors |
-| 15 | World-only motion vectors |
-| 16 | Current depth |
+| 14 | Pre-weapon world resolve velocity (weapon has not been drawn yet) |
+| 15 | Prior-class-gated world-resolve velocity; not weapon MVP |
+| 16 | Current temporal class (gray=world, blue=reserved sky, white=weapon) |
+| 17 | Previous temporal class |
+| 18 | Reprojected previous class |
+| 19 | Class rejection (red=reject, green=accept) |
+| 20 | World-only velocity |
+| 21 | Actual post-draw weapon MVP velocity |
+| 22 | Final merged velocity |
+| 23 | Raw reactive mask |
+| 24 | Dilated reactive mask |
+| 25 | Weapon temporal confidence |
+| 26 | Weapon history validity |
+| 27 | Current weapon composition coverage |
+| 28 | Current weapon depth |
+| 29 | Previous weapon depth |
+| 30 | Reprojected previous weapon depth |
+| 31 | Absolute depth difference |
+| 32 | Relative depth error |
+| 33 | Final depth rejection |
 
 When reconstruction is **off**, modes 5 / 2 / 4 / 13 also run through the SSR pass as overlays (weapon depth tinted on the scene).
+
+Modes 16–33 run the post-weapon diagnostic resolve and display a one-line
+overlay containing effective weapon/world FOV, depth range, jitter, previous-MVP
+state, independent validity bits, and temporal frame ID. Velocity colors use
+RG for signed XY, yellow for out-of-range values, and magenta for non-finite
+data. `r_temporalDebugVectorScale` controls vector display scale.
 
 Legacy aliases: `r_debugHistoryRejection`, `r_debugMotionVectors` (still honored; override packing when set).
 
@@ -150,7 +211,31 @@ Commands:
 ```
 temporal_status
 temporal_ghost_status
+surf_validateTemporalConfig
+r_printViewmodelProjection
+r_dumpTemporalState
+r_captureTemporalDebug
 ```
+
+On `fs_game surf`, renderer startup prints the effective TAA, weapon history
+mode, class/reactive targets, MVP velocity availability, previous-depth status,
+and weapon composition stage. `surf_validateTemporalConfig` repeats the
+resource and cvar checks with PASS/WARN/FAIL diagnostics. Safe mode and
+zero-history comparison cfgs intentionally produce warnings until `surf.cfg`
+is restored and the renderer is restarted.
+
+Surf configuration layering:
+
+- Renderer-wide defaults remain conservative (`r_taa 0`) for non-Surf games.
+- `config.cfg` loads before Surf `autoexec.cfg`; the packaged autoexec mirrors
+  the temporal resource cvars so archived values cannot prevent allocation in
+  `R_Init`.
+- `mapscripts/g_default.cfg` re-applies authoritative `surf.cfg` on ordinary
+  map loads. No shipping map-specific cfg overrides the temporal values.
+- Command-line `+exec` comparison cfgs can intentionally disable TAA after the
+  shipping profile. `ghost_safe.cfg` is the supported zero-history comparison.
+- Engine safe mode skips archived config and autoexec; `gfx_safe.cfg` also
+  explicitly keeps TAA off as the renderer recovery path.
 
 ## Independent subsystem gates
 
@@ -163,7 +248,8 @@ Each can be disabled without masking via blur:
 | `r_temporalAO` | 1 | SSAO pass |
 | `r_temporalSSR` | 1 | SSR (even if `r_ssr 1`) |
 | `r_weaponSsrIsolation` | 1 | Composite the view weapon after world SSR/SSAO |
-| `r_weaponTemporalMode` | 1 | TAA-on weapon history: 0=none, 1=classified shared (default), 2=reserved |
+| `r_weaponTemporalMode` | 1 | TAA-on weapon history: 0=current only, 1=classified shared (default), 2=independent weapon color/depth history |
+| `r_weaponBloomMode` | 1 | 0=no weapon bloom, 1=combined HDR before one global bloom, 2=independent-history presentation with the same single combined bloom |
 | `r_temporalFog` | 1 | Volumetric froxel history weight |
 | `r_temporalTransparency` | 1 | OIT / transparent reactive stamp |
 | `r_motionBlur` | 0 | Camera motion blur |
@@ -185,26 +271,41 @@ Example cfgs live under `release/surf/ghost_on.cfg` and `ghost_off.cfg` / `ghost
 
 ## TAA-on policy (Temporal Weapon Resolve)
 
-When Temporal Reconstruction is active (`r_taa 1` / `r_aaMode` 3–5 / temporal upscale), Architecture B still composites the weapon **after** world TAA. Additionally:
+When Temporal Reconstruction is active (`r_taa 1` / `r_aaMode` 3–5 /
+temporal upscale), Architecture B resolves the weapon after world TAA, then
+composites world and weapon HDR before the one global bloom pass. Additionally:
 
 | Concern | Policy |
 |---|---|
-| Pass order | World draw → SSR/SSAO/TAA → deferred weapon composite → present |
+| Pass order | World draw → SSR/SSAO/TAA → weapon resolve/composite → combined HDR bloom → tone map/present |
 | History ownership | World TAA history never includes weapon color (weapon after TAA) |
 | Class mask | R8 `TEMPORAL_CLASS_WORLD` / `WEAPON` stamped after weapon flush from `DEPTH_RANGE_WEAPON` |
 | History reject | `taa.frag` rejects WEAPON↔WORLD mismatch (and mode 0 forces no weapon history); 1–2 px motion-aware dilation |
 | Weapon motion | Prev weapon MVP stored in `vk.temporal`; velocities are `currentUV - previousUV` (not world-depth reprojection) |
 | Reactive | Weapon depth stamp with depth-aware dilation so gun edges prefer current samples |
-| Cvar | `r_weaponTemporalMode` 0 / 1 (default) / 2 (reserved separate weapon history RT) |
+| Cvar | `r_weaponTemporalMode` 0 / 1 (default) / 2 (separate weapon color/depth/coverage history) |
 
 Live check: `r_taa 1` + `r_temporalDebug 5` while rotating — confirm `weaponAfterWorldPost=yes`, no dark wall trails, sharp weapon edges without multi-frame echoes.
+
+True previous depth is now dual R32F history. TAA compares reprojected predicted
+previous depth with the actual prior-frame sample; it never samples current
+depth at the history UV as a substitute. Modes 16–33, frame-ID ownership,
+descriptor fault injection, capture commands, memory accounting, and the formal
+matrix are documented in [TEMPORAL_WEAPON_VALIDATION.md](TEMPORAL_WEAPON_VALIDATION.md).
+
+World TAA no longer rejects a frame solely because first-person projection was
+active. Architecture B intentionally uses a separate weapon projection, so the
+old `firstPersonProjectionThisFrame == LastFrame` gate was incorrectly disabling
+world history whenever the viewmodel FOV path ran. Weapon history still resets
+independently on weapon switch / FOV discontinuity.
 
 ## What was intentionally not changed
 
 - No raw-depth SSR hit-reject was added; ordering isolates weapon depth structurally.
-- No separate full-resolution weapon history RT (`r_weaponTemporalMode 2` remains a stub).
 - No blur / excessive confidence clamps as a cosmetic mask.
 - `modern_vulkan.cfg` boot defaults untouched.
+- SKY has a reserved debug color but is not stamped separately yet; unstamped
+  sky follows WORLD ownership.
 
 ## Related
 

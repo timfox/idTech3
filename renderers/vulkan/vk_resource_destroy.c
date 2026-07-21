@@ -269,6 +269,14 @@ void vk_destroy_pipelines( qboolean resetCounter )
 		qvkDestroyPipeline( vk.device, vk.taa_pipeline, NULL );
 		vk.taa_pipeline = VK_NULL_HANDLE;
 	}
+	if ( vk.weapon_taa_pipeline != VK_NULL_HANDLE ) {
+		qvkDestroyPipeline( vk.device, vk.weapon_taa_pipeline, NULL );
+		vk.weapon_taa_pipeline = VK_NULL_HANDLE;
+	}
+	if ( vk.weapon_taa_composite_pipeline != VK_NULL_HANDLE ) {
+		qvkDestroyPipeline( vk.device, vk.weapon_taa_composite_pipeline, NULL );
+		vk.weapon_taa_composite_pipeline = VK_NULL_HANDLE;
+	}
 
 	if ( vk.ssao_pipeline != VK_NULL_HANDLE ) {
 		qvkDestroyPipeline( vk.device, vk.ssao_pipeline, NULL );
@@ -338,6 +346,10 @@ void vk_destroy_pipelines( qboolean resetCounter )
 	if ( vk.volumetric_depth_resolve_pipeline != VK_NULL_HANDLE ) {
 		qvkDestroyPipeline( vk.device, vk.volumetric_depth_resolve_pipeline, NULL );
 		vk.volumetric_depth_resolve_pipeline = VK_NULL_HANDLE;
+	}
+	if ( vk.temporal_depth_history_copy_pipeline != VK_NULL_HANDLE ) {
+		qvkDestroyPipeline( vk.device, vk.temporal_depth_history_copy_pipeline, NULL );
+		vk.temporal_depth_history_copy_pipeline = VK_NULL_HANDLE;
 	}
 	if ( vk.luminance_pipeline != VK_NULL_HANDLE ) {
 		qvkDestroyPipeline( vk.device, vk.luminance_pipeline, NULL );

@@ -304,6 +304,17 @@ void vk_create_framebuffers( void )
 		framebuffer_attachments[0] = vk.taa_history_image_view[1];
 		VK_CHECK( qvkCreateFramebuffer( vk.device, &desc, NULL, &vk.framebuffers.taa[1] ) );
 		SET_OBJECT_NAME( vk.framebuffers.taa[1], "framebuffer - taa history 1", VK_DEBUG_REPORT_OBJECT_TYPE_FRAMEBUFFER_EXT );
+		if ( vk.weapon_history_view[0] != VK_NULL_HANDLE &&
+			vk.weapon_history_view[1] != VK_NULL_HANDLE ) {
+			framebuffer_attachments[0] = vk.weapon_history_view[0];
+			VK_CHECK( qvkCreateFramebuffer( vk.device, &desc, NULL, &vk.framebuffers.weapon_taa[0] ) );
+			SET_OBJECT_NAME( vk.framebuffers.weapon_taa[0], "framebuffer - weapon taa history 0",
+				VK_DEBUG_REPORT_OBJECT_TYPE_FRAMEBUFFER_EXT );
+			framebuffer_attachments[0] = vk.weapon_history_view[1];
+			VK_CHECK( qvkCreateFramebuffer( vk.device, &desc, NULL, &vk.framebuffers.weapon_taa[1] ) );
+			SET_OBJECT_NAME( vk.framebuffers.weapon_taa[1], "framebuffer - weapon taa history 1",
+				VK_DEBUG_REPORT_OBJECT_TYPE_FRAMEBUFFER_EXT );
+		}
 	}
 
 	if ( r_bloom->integer )
@@ -602,6 +613,10 @@ void vk_destroy_framebuffers( void ) {
 		if ( vk.framebuffers.taa[n] != VK_NULL_HANDLE ) {
 			qvkDestroyFramebuffer( vk.device, vk.framebuffers.taa[n], NULL );
 			vk.framebuffers.taa[n] = VK_NULL_HANDLE;
+		}
+		if ( vk.framebuffers.weapon_taa[n] != VK_NULL_HANDLE ) {
+			qvkDestroyFramebuffer( vk.device, vk.framebuffers.weapon_taa[n], NULL );
+			vk.framebuffers.weapon_taa[n] = VK_NULL_HANDLE;
 		}
 	}
 

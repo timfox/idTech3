@@ -72,6 +72,8 @@ typedef void (VKAPI_PTR *PFN_vkCmdSetColorWriteMaskEXT)(VkCommandBuffer commandB
 
 #define VK_VOLUMETRIC_QUERY_SLOTS 16
 #define VK_VOLUMETRIC_QUERY_COUNT (VK_VOLUMETRIC_QUERY_SLOTS * NUM_COMMAND_BUFFERS)
+#define VK_WEAPON_TEMPORAL_QUERY_SLOTS 2
+#define VK_WEAPON_TEMPORAL_QUERY_COUNT (VK_WEAPON_TEMPORAL_QUERY_SLOTS * NUM_COMMAND_BUFFERS)
 
 typedef enum {
 	VK_VOLUMETRY_QUERY_FOG_START = 0,
@@ -716,6 +718,8 @@ typedef struct {
 	VkPipelineLayout pipeline_layout_storage;	// flare test shader layout
 	VkPipelineLayout pipeline_layout_post_process;	// post-processing
 	VkPipelineLayout pipeline_layout_taa;	/* post-processing + motion (set 4) + reactive (set 5) + class (set 6) */
+	VkPipelineLayout pipeline_layout_weapon_taa;
+	VkPipelineLayout pipeline_layout_weapon_composite;
 	VkPipelineLayout pipeline_layout_reactive_stamp;	/* reveal sampler -> R8 mask */
 	VkPipelineLayout pipeline_layout_temporal_class_stamp;	/* depth -> R8 class */
 	VkPipelineLayout pipeline_layout_blend;		// post-processing
@@ -737,6 +741,8 @@ typedef struct {
 	VkDescriptorSetLayout volumetric_depth_resolve_layout;
 	VkDescriptorSetLayout volumetric_fluid_layout;
 	VkQueryPool volumetric_query_pool;
+	VkQueryPool weapon_temporal_query_pool;
+	float weapon_temporal_timestamp_period_ns;
 	VkDescriptorSet volumetric_compute_descriptor;
 	VkDescriptorSet volumetric_composite_descriptor;
 	VkDescriptorSet volumetric_depth_resolve_descriptor;
@@ -760,6 +766,7 @@ typedef struct {
 	VkPipeline volumetric_compute_pipeline;
 	VkPipeline volumetric_composite_pipeline;
 	VkPipeline volumetric_depth_resolve_pipeline;
+	VkPipeline temporal_depth_history_copy_pipeline;
 	VkPipeline volumetric_fluid_advect_pipeline;
 	VkPipeline volumetric_fluid_divergence_pipeline;
 	VkPipeline volumetric_fluid_pressure_pipeline;
@@ -795,9 +802,21 @@ typedef struct {
 	VkImageView scene_post_fog_color_source;	/* scene-only source for luminance/exposure before HUD/console */
 	char postChainLastWriter[16];	/* scene | bloom | post_aa | taa */
 	VkDescriptorSet depth_descriptor[NUM_COMMAND_BUFFERS];	/* per-frame (VUID-03047) */
+	VkDescriptorSet taa_depth_descriptor[NUM_COMMAND_BUFFERS];	/* normalized single-sample current depth */
 	VkDescriptorSet taa_motion_descriptor[NUM_COMMAND_BUFFERS];
 	VkDescriptorSet taa_reactive_descriptor[NUM_COMMAND_BUFFERS];
 	VkDescriptorSet taa_class_descriptor[NUM_COMMAND_BUFFERS];
+	VkDescriptorSet temporal_prev_depth_descriptor[2];
+	VkDescriptorSet temporal_depth_copy_descriptor[2];
+	VkDescriptorSet weapon_history_descriptor[2];
+	VkDescriptorSet weapon_prev_depth_descriptor[2];
+	VkDescriptorSet weapon_depth_copy_descriptor[2];
+	VkDescriptorSet weapon_current_class_descriptor[NUM_COMMAND_BUFFERS];
+	VkDescriptorSet weapon_world_descriptor[NUM_COMMAND_BUFFERS];
+	VkDescriptorSet temporal_class_fallback_descriptor;
+	VkDescriptorSet temporal_reactive_fallback_descriptor;
+	VkImageView taaClassBoundView[NUM_COMMAND_BUFFERS];
+	VkImageView taaReactiveBoundView[NUM_COMMAND_BUFFERS];
 	VkDescriptorSet reactive_stamp_reveal_descriptor;
 	VkDescriptorSet temporal_class_stamp_descriptor;
 		VkDescriptorSet postfx_params_descriptor[NUM_COMMAND_BUFFERS];
@@ -821,6 +840,8 @@ typedef struct {
 		VkImageView smaa_output_image_view;
 		VkImage taa_history_image[2];
 		VkImageView taa_history_image_view[2];
+		VkImage weapon_history_image[2];
+		VkImageView weapon_history_view[2];
 
 	/* Deferred G-buffer sidecar (r_renderMode 1/2 + r_deferredGBuffer 1); fill via vk_deferred_gbuffer.c */
 	struct {
@@ -1404,6 +1425,7 @@ typedef struct {
 		VkFramebuffer smaa_blend;
 		VkFramebuffer smaa_compose;
 		VkFramebuffer taa[2];
+		VkFramebuffer weapon_taa[2];
 		VkFramebuffer volumetric[MAX_SWAPCHAIN_IMAGES];
 		VkFramebuffer atmosphere[MAX_SWAPCHAIN_IMAGES];
 		VkFramebuffer ui_overlay[MAX_SWAPCHAIN_IMAGES];
@@ -1518,6 +1540,21 @@ typedef struct {
 		float filteredAvgLogLuminance;
 		qboolean hasValidTAAHistory;
 		uint32_t taaHistoryIndex;
+		uint64_t taaHistoryFrameId[2];
+		uint64_t prevDepthFrameId[2];
+		uint64_t classFrameId[2];
+		uint64_t weaponHistoryFrameId[2];
+		uint64_t weaponDepthFrameId[2];
+		qboolean prevColorValid;
+		qboolean prevDepthValid;
+		qboolean prevClassValid;
+		qboolean prevVelocityValid;
+		qboolean lastTaaAllowed;
+		qboolean lastTaaWanted;
+		qboolean lastTaaDepthReady;
+		uint32_t lastTaaGateMask;
+		uint32_t lastTaaMissingMask;
+		uint32_t prevDepthIndex;
 		uint32_t lastRenderWidth;
 		uint32_t lastRenderHeight;
 		uint32_t lastSwapchainWidth;
@@ -1533,6 +1570,15 @@ typedef struct {
 		/* First-person weapon prev/curr matrices for velocity (non-jittered). */
 		qboolean weaponMatricesValid;
 		qboolean weaponMatricesHavePrev;
+		qboolean weaponHistoryValid;
+		qboolean weaponRenderedThisFrame;
+		uint32_t weaponHistoryIndex;
+		uint32_t weaponHistoryResetSerial;
+		float weaponResolveGpuMs;
+		uint32_t missingClassDescriptorFrames;
+		uint32_t missingReactiveDescriptorFrames;
+		uint32_t fallbackTextureUsageFrames;
+		uint32_t forcedHistoryRejectFrames;
 		float weaponViewMatrix[16];
 		float weaponProjectionMatrix[16];
 		float weaponPrevViewMatrix[16];
@@ -1663,6 +1709,9 @@ typedef struct {
 		VkShaderModule volumetric_fog_fs_hdr64;
 		VkShaderModule volumetric_fog_cs;
 		VkShaderModule volumetric_depth_resolve_msaa_cs;
+		VkShaderModule temporal_depth_history_copy_cs;
+		VkShaderModule weapon_taa_fs;
+		VkShaderModule weapon_taa_composite_fs;
 		VkShaderModule luminance_cs;
 		VkShaderModule vegetation_wind_cs;
 		VkShaderModule fluid_advect_cs;
@@ -1817,6 +1866,8 @@ typedef struct {
 	VkPipeline spatial_adaptive_pipeline;
 	VkPipeline lens_flare_pipeline;
 	VkPipeline taa_pipeline;
+	VkPipeline weapon_taa_pipeline;
+	VkPipeline weapon_taa_composite_pipeline;
 	VkPipeline reactive_stamp_pipeline;	/* fullscreen stamp from OIT reveal into R8 mask */
 	VkPipeline reactive_stamp_weapon_pipeline;	/* fullscreen stamp WEAPON from depth into R8 mask */
 	VkPipeline temporal_class_stamp_pipeline;	/* fullscreen stamp WEAPON class from depth */
@@ -1907,10 +1958,21 @@ typedef struct {
 	VkImageLayout reactive_mask_layout;
 	VkImage reactive_mask_stub_image;	/* 1x1 black when full mask not allocated */
 	VkImageView reactive_mask_stub_view;
+	VkImage temporal_reactive_fallback_image;
+	VkImageView temporal_reactive_fallback_view;
+	VkImage temporal_class_fallback_image;
+	VkImageView temporal_class_fallback_view;
 	/* Temporal classification ping-pong (WORLD=0, WEAPON=1). */
 	VkImage temporal_class_image[2];
 	VkImageView temporal_class_view[2];
 	VkImageLayout temporal_class_layout[2];
+	/* True previous-frame depth, normalized to single-sample reversed-Z R32F. */
+	VkImage temporal_prev_depth_image[2];
+	VkImageView temporal_prev_depth_view[2];
+	VkImageLayout temporal_prev_depth_layout[2];
+	VkImage weapon_prev_depth_image[2];
+	VkImageView weapon_prev_depth_view[2];
+	VkImageLayout weapon_prev_depth_layout[2];
 	VkImage fog_noise_image;
 	VkImageView fog_noise_view;
 	VkDeviceMemory fog_noise_memory;

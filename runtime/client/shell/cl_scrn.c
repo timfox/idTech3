@@ -1635,6 +1635,12 @@ static void SCR_DrawScreenField( stereoFrame_t stereoFrame ) {
 					SCR_DrawSmallString( 8, 64, fallback, (int)strlen( fallback ) );
 					}
 				}
+				if ( Cvar_VariableIntegerValue( "r_temporalDebug" ) >= 16 ) {
+					const char *temporalInfo = Cvar_VariableString( "r_temporalOverlayInfo" );
+					if ( temporalInfo && temporalInfo[0] ) {
+						SCR_DrawSmallString( 8, 80, temporalInfo, (int)strlen( temporalInfo ) );
+					}
+				}
 				break;
 		}
 	}

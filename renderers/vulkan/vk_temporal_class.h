@@ -33,12 +33,14 @@ void vk_temporal_class_commit_world_only( void );
 
 void vk_barrier_temporal_class_for_sampling( const char *reason );
 void vk_temporal_class_update_taa_descriptors( void );
+void vk_temporal_class_update_current_weapon_descriptors( void );
 
 void vk_create_temporal_class_pipeline( void );
 void vk_destroy_temporal_class_pipeline( void );
 
 /* Previous-class view for TAA (NULL if inactive). */
 VkImageView vk_temporal_class_prev_view( void );
+VkImageView vk_temporal_class_current_view( void );
 
 #ifdef __cplusplus
 }

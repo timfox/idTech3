@@ -187,6 +187,20 @@ void vk_update_postfx_params( uint32_t cmd_index )
 		params.taaParams[2] = Com_Clamp( 0.0f, histCap, motionFb );
 	}
 	params.taaParams[3] = Com_Clamp( 0.0f, 1.0f, r_taa_sharpen ? r_taa_sharpen->value : 0.12f );
+	params.temporalValidity[0] = vk.temporal.prevColorValid ? 1.0f : 0.0f;
+	params.temporalValidity[1] = vk.temporal.prevDepthValid ? 1.0f : 0.0f;
+	params.temporalValidity[2] = vk.temporal.prevClassValid ? 1.0f : 0.0f;
+	params.temporalValidity[3] = vk.temporal.weaponHistoryValid ? 1.0f : 0.0f;
+	params.weaponTemporalParams[0] = r_weaponTemporalHistoryWeight ?
+		r_weaponTemporalHistoryWeight->value : 0.58f;
+	params.weaponTemporalParams[1] = r_weaponTemporalVarianceGamma ?
+		r_weaponTemporalVarianceGamma->value : 0.75f;
+	params.weaponTemporalParams[2] = r_weaponTemporalDepthThreshold ?
+		r_weaponTemporalDepthThreshold->value : 0.025f;
+	params.weaponTemporalParams[3] = r_weaponTemporalReactiveScale ?
+		r_weaponTemporalReactiveScale->value : 1.0f;
+	params.temporalDebugParams[0] = r_temporalDebugVectorScale ?
+		r_temporalDebugVectorScale->value : 80.0f;
 	if ( R_Upscale_WantTemporal() ) {
 		float sharp = params.taaParams[3] + R_Upscale_GetSharpness();
 		params.taaParams[3] = Com_Clamp( 0.0f, 1.0f, sharp );
@@ -216,7 +230,7 @@ void vk_update_postfx_params( uint32_t cmd_index )
 		}
 		params.splitShadow[3] = (float)Com_Clamp( 0, 2, mode->integer );
 		params.splitHighlight[3] = ( vk.temporal_class_image[0] != VK_NULL_HANDLE &&
-			vk.temporal.classHasPrev ) ? 1.0f : 0.0f;
+			vk.temporal.classHasPrev && vk.temporal.prevClassValid ) ? 1.0f : 0.0f;
 	}
 	/*
 	 * highlightsGain.a → Present-Time Adaptive Reconstruction:
@@ -255,7 +269,7 @@ void vk_update_postfx_params( uint32_t cmd_index )
 		int mode = r_temporalDebug->integer;
 		if ( mode >= 1 && mode <= 6 ) {
 			params.shadowsLift[3] = (float)temporalDebugMap[mode];
-		} else if ( mode >= 7 && mode <= 16 ) {
+		} else if ( mode >= 7 && mode <= 33 ) {
 			params.shadowsLift[3] = (float)mode;
 		}
 	}
@@ -295,6 +309,7 @@ void vk_update_postfx_params( uint32_t cmd_index )
 	}
 
 	params.frameInfo[3] = motion_valid ? 1.0f : 0.0f;
+	vk.temporal.prevVelocityValid = motion_valid;
 
 	{
 		float zNear = ( r_znear && r_znear->value > 0.0f ) ? r_znear->value : 8.0f;

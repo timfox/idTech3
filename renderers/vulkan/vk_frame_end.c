@@ -12,6 +12,7 @@
 #include "vk_pass_registry.h"
 #include "vk_reactive_mask.h"
 #include "vk_temporal_class.h"
+#include <assert.h>
 #include "vk_render_pass.h"
 #include "vk_scene_pass.h"
 #include "vk_temporal.h"
@@ -169,12 +170,13 @@ static void vk_end_frame_bind_post_process_sets( VkDescriptorSet set0, VkDescrip
 }
 
 static void vk_end_frame_bind_taa_sets( VkDescriptorSet set0, VkDescriptorSet set1, VkDescriptorSet set2,
-	VkDescriptorSet set3, VkDescriptorSet set4, VkDescriptorSet set5, VkDescriptorSet set6 )
+	VkDescriptorSet set3, VkDescriptorSet set4, VkDescriptorSet set5, VkDescriptorSet set6,
+	VkDescriptorSet set7 )
 {
-	VkDescriptorSet sets[7] = { set0, set1, set2, set3, set4, set5, set6 };
+	VkDescriptorSet sets[8] = { set0, set1, set2, set3, set4, set5, set6, set7 };
 
 	qvkCmdBindDescriptorSets( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
-		vk.pipeline_layout_taa, 0, 7, sets, 0, NULL );
+		vk.pipeline_layout_taa, 0, 8, sets, 0, NULL );
 }
 
 static qboolean vk_end_frame_gamma_chain_ready( void )
@@ -541,6 +543,12 @@ void vk_end_frame_record_taa_pass( VkImageView *post_fog_src, VkImageView *lumin
 	uint32_t writeIndex;
 	qboolean allow_taa;
 	qboolean taa_wanted;
+	qboolean current_depth_ready = qfalse;
+	VkDescriptorSet reactive_set = VK_NULL_HANDLE;
+	VkDescriptorSet class_set = VK_NULL_HANDLE;
+	qboolean descriptor_fault = qfalse;
+	static qboolean warned_missing_reactive = qfalse;
+	static qboolean warned_missing_class = qfalse;
 
 	if ( post_fog_src == NULL || luminance_src == NULL ) {
 		return;
@@ -554,7 +562,6 @@ void vk_end_frame_record_taa_pass( VkImageView *post_fog_src, VkImageView *lumin
 	allow_taa = ( tr.world != NULL ) &&
 		backEnd.doneWorldScene &&
 		( backEnd.viewParms.portalView == PV_NONE ) &&
-		( vk.temporal.firstPersonProjectionThisFrame == vk.temporal.firstPersonProjectionLastFrame ) &&
 		!vk_temporal_has_reason( VK_TEMPORAL_RESET_CAMERA_CUT | VK_TEMPORAL_RESET_MISSING_PREV_DATA |
 			VK_TEMPORAL_RESET_RENDERER_INIT | VK_TEMPORAL_RESET_SWAPCHAIN_CHANGE |
 			VK_TEMPORAL_RESET_RENDER_SIZE_CHANGE | VK_TEMPORAL_RESET_WORLD_CHANGE |
@@ -573,25 +580,80 @@ void vk_end_frame_record_taa_pass( VkImageView *post_fog_src, VkImageView *lumin
 		vk_pass_diag_stage( "taa_suppress_illegal_combo" );
 		taa_wanted = qfalse;
 	}
+	if ( allow_taa && taa_wanted && vk.cmd != NULL &&
+		vk.cmd->command_buffer != VK_NULL_HANDLE ) {
+		current_depth_ready = vk_temporal_prepare_current_depth();
+	}
+	vk.temporal.lastTaaAllowed = allow_taa;
+	vk.temporal.lastTaaWanted = taa_wanted;
+	vk.temporal.lastTaaDepthReady = current_depth_ready;
+	vk.temporal.lastTaaGateMask =
+		( tr.world == NULL ? 1u : 0u ) |
+		( !backEnd.doneWorldScene ? 2u : 0u ) |
+		( backEnd.viewParms.portalView != PV_NONE ? 4u : 0u ) |
+		( vk_temporal_has_reason( VK_TEMPORAL_RESET_CAMERA_CUT |
+			VK_TEMPORAL_RESET_MISSING_PREV_DATA | VK_TEMPORAL_RESET_RENDERER_INIT |
+			VK_TEMPORAL_RESET_SWAPCHAIN_CHANGE | VK_TEMPORAL_RESET_RENDER_SIZE_CHANGE |
+			VK_TEMPORAL_RESET_WORLD_CHANGE | VK_TEMPORAL_RESET_CLIENT_STATE_CHANGE ) ? 16u : 0u ) |
+		( vk_temporal_near_static_streak_guard() ? 32u : 0u );
+	vk.temporal.lastTaaMissingMask =
+		( vk.cmd == NULL || vk.cmd->command_buffer == VK_NULL_HANDLE ? 1u : 0u ) |
+		( taa_src == VK_NULL_HANDLE ? 2u : 0u ) |
+		( vk.taa_pipeline == VK_NULL_HANDLE || vk.pipeline_layout_taa == VK_NULL_HANDLE ||
+			vk.render_pass.taa == VK_NULL_HANDLE ? 4u : 0u ) |
+		( vk.post_color_descriptor[vk.cmd_index] == VK_NULL_HANDLE ||
+			vk.taa_depth_descriptor[vk.cmd_index] == VK_NULL_HANDLE ||
+			vk.postfx_params_descriptor[vk.cmd_index] == VK_NULL_HANDLE ? 8u : 0u ) |
+		( vk.framebuffers.taa[0] == VK_NULL_HANDLE ||
+			vk.framebuffers.taa[1] == VK_NULL_HANDLE ? 16u : 0u ) |
+		( vk.taa_history_descriptor[0] == VK_NULL_HANDLE ||
+			vk.taa_history_descriptor[1] == VK_NULL_HANDLE ? 32u : 0u ) |
+		( vk.temporal_prev_depth_descriptor[0] == VK_NULL_HANDLE ||
+			vk.temporal_prev_depth_descriptor[1] == VK_NULL_HANDLE ? 64u : 0u ) |
+		( vk.temporal_class_fallback_descriptor == VK_NULL_HANDLE ||
+			vk.temporal_reactive_fallback_descriptor == VK_NULL_HANDLE ? 128u : 0u );
 
 	if ( !allow_taa ||
 		!taa_wanted ||
+		!current_depth_ready ||
 		vk.cmd == NULL || vk.cmd->command_buffer == VK_NULL_HANDLE ||
 		taa_src == VK_NULL_HANDLE ||
 		vk.taa_pipeline == VK_NULL_HANDLE ||
 		vk.pipeline_layout_taa == VK_NULL_HANDLE ||
 		vk.render_pass.taa == VK_NULL_HANDLE ||
 		vk.post_color_descriptor[vk.cmd_index] == VK_NULL_HANDLE ||
-		vk.depth_descriptor[vk.cmd_index] == VK_NULL_HANDLE ||
+		vk.taa_depth_descriptor[vk.cmd_index] == VK_NULL_HANDLE ||
 		vk.postfx_params_descriptor[vk.cmd_index] == VK_NULL_HANDLE ||
 		vk.framebuffers.taa[0] == VK_NULL_HANDLE ||
 		vk.framebuffers.taa[1] == VK_NULL_HANDLE ||
 		vk.taa_history_descriptor[0] == VK_NULL_HANDLE ||
-		vk.taa_history_descriptor[1] == VK_NULL_HANDLE ) {
-		vk_pass_diag_stage( taa_wanted ? "taa_skip_resources" : "taa_skip" );
-		if ( !allow_taa || !taa_wanted ) {
-			vk_reset_taa_history();
+		vk.taa_history_descriptor[1] == VK_NULL_HANDLE ||
+		vk.temporal_prev_depth_descriptor[0] == VK_NULL_HANDLE ||
+		vk.temporal_prev_depth_descriptor[1] == VK_NULL_HANDLE ||
+		vk.temporal_class_fallback_descriptor == VK_NULL_HANDLE ||
+		vk.temporal_reactive_fallback_descriptor == VK_NULL_HANDLE ) {
+		if ( r_temporalDebug && r_temporalDebug->integer >= 2 &&
+			( vk.temporal.frameIndex % 30u ) == 0u ) {
+			ri.Printf( PRINT_DEVELOPER,
+				"[VK][temporal] TAA gate skip: wanted=%d allow=%d depthReady=%d world=%d "
+				"doneWorld=%d portal=%d fpStable=%d resetBlock=%d nearStatic=%d "
+				"pipeline=%d framebuffer=%d descriptor=%d\n",
+				taa_wanted, allow_taa, current_depth_ready, tr.world != NULL,
+				backEnd.doneWorldScene, backEnd.viewParms.portalView != PV_NONE,
+				vk.temporal.firstPersonProjectionThisFrame ==
+					vk.temporal.firstPersonProjectionLastFrame,
+				vk_temporal_has_reason( VK_TEMPORAL_RESET_CAMERA_CUT |
+					VK_TEMPORAL_RESET_MISSING_PREV_DATA | VK_TEMPORAL_RESET_RENDERER_INIT |
+					VK_TEMPORAL_RESET_SWAPCHAIN_CHANGE | VK_TEMPORAL_RESET_RENDER_SIZE_CHANGE |
+					VK_TEMPORAL_RESET_WORLD_CHANGE | VK_TEMPORAL_RESET_CLIENT_STATE_CHANGE ),
+				vk_temporal_near_static_streak_guard(),
+				vk.taa_pipeline != VK_NULL_HANDLE,
+				vk.framebuffers.taa[0] != VK_NULL_HANDLE && vk.framebuffers.taa[1] != VK_NULL_HANDLE,
+				vk.taa_history_descriptor[0] != VK_NULL_HANDLE &&
+					vk.temporal_prev_depth_descriptor[0] != VK_NULL_HANDLE );
 		}
+		vk_pass_diag_stage( taa_wanted ? "taa_skip_resources" : "taa_skip" );
+		vk_reset_taa_history();
 		/* Mode 5: if temporal skipped on a world frame, still apply deferred SMAA cleanup.
 		 * Menus/cinematics keep color_image sharp (no world temporal path). */
 		if ( allow_taa &&
@@ -603,12 +665,76 @@ void vk_end_frame_record_taa_pass( VkImageView *post_fog_src, VkImageView *lumin
 		}
 		/* Even if TAA was skipped, flush any deferred weapon onto the HDR source. */
 		RB_FlushDeferredWeaponAfterTaa( post_fog_src, luminance_src );
+		if ( r_weaponTemporalMode && r_weaponTemporalMode->integer == 2 &&
+			!vk.temporal.weaponRenderedThisFrame ) {
+			vk_reset_weapon_history();
+		}
 		vk_temporal_class_commit_world_only();
 		return;
 	}
 
 	readIndex = vk.temporal.taaHistoryIndex & 1u;
 	writeIndex = 1u - readIndex;
+#ifndef NDEBUG
+	if ( vk.temporal.hasValidTAAHistory ) {
+		assert( vk.temporal.taaHistoryFrameId[readIndex] + 1u == vk.temporal.frameIndex );
+	}
+	if ( vk.temporal.prevDepthValid ) {
+		assert( vk.temporal.prevDepthFrameId[readIndex] + 1u == vk.temporal.frameIndex );
+	}
+	if ( vk.temporal.prevClassValid ) {
+		assert( vk.temporal.classFrameId[vk.temporal.classHistoryIndex & 1u] + 1u ==
+			vk.temporal.frameIndex );
+	}
+#endif
+	reactive_set = vk.taa_reactive_descriptor[vk.cmd_index];
+	class_set = vk.taa_class_descriptor[vk.cmd_index];
+	if ( reactive_set == VK_NULL_HANDLE ) {
+		vk.temporal.missingReactiveDescriptorFrames++;
+		vk.temporal.fallbackTextureUsageFrames++;
+		reactive_set = vk.temporal_reactive_fallback_descriptor;
+		descriptor_fault = qtrue;
+		if ( !warned_missing_reactive ) {
+			ri.Printf( PRINT_WARNING, S_COLOR_YELLOW
+				"[VK][temporal] missing reactive descriptor for cmd frame %u; binding TemporalReactiveFallbackR8 and rejecting history\n"
+				S_COLOR_WHITE, vk.cmd_index );
+			warned_missing_reactive = qtrue;
+		}
+	} else {
+		warned_missing_reactive = qfalse;
+	}
+	if ( class_set == VK_NULL_HANDLE ||
+		( r_temporalDropClassDescriptor && r_temporalDropClassDescriptor->integer ) ) {
+		vk.temporal.missingClassDescriptorFrames++;
+		vk.temporal.fallbackTextureUsageFrames++;
+		class_set = vk.temporal_class_fallback_descriptor;
+		descriptor_fault = qtrue;
+		if ( !warned_missing_class ) {
+			ri.Printf( PRINT_WARNING, S_COLOR_YELLOW
+				"[VK][temporal] temporal class descriptor unavailable%s for cmd frame %u; "
+				"binding TemporalUnclassifiedR8 and rejecting all history\n" S_COLOR_WHITE,
+				( r_temporalDropClassDescriptor && r_temporalDropClassDescriptor->integer ) ?
+					" (r_temporalDropClassDescriptor fault injection)" : "",
+				vk.cmd_index );
+			warned_missing_class = qtrue;
+		}
+	} else {
+		warned_missing_class = qfalse;
+	}
+	if ( descriptor_fault ) {
+		vk.temporal.forcedHistoryRejectFrames++;
+		vk.temporal.hasValidTAAHistory = qfalse;
+		vk.temporal.prevColorValid = qfalse;
+		vk.temporal.prevClassValid = qfalse;
+	}
+#ifndef NDEBUG
+	if ( !descriptor_fault ) {
+		assert( class_set != reactive_set );
+		assert( vk.taaClassBoundView[vk.cmd_index] != vk.taaReactiveBoundView[vk.cmd_index] );
+		assert( vk.taaClassBoundView[vk.cmd_index] == vk_temporal_class_prev_view() ||
+			!vk.temporal.classHasPrev );
+	}
+#endif
 
 	vk_barrier_post_fog_source_for_sampling( taa_src, "vk_end_frame pre-taa (current)" );
 	vk_spine_note_barrier( VK_SPINE_RES_HDR_COLOR, VK_SPINE_PASS_TEMPORAL_RECON, "pre-taa-current" );
@@ -647,20 +773,7 @@ void vk_end_frame_record_taa_pass( VkImageView *post_fog_src, VkImageView *lumin
 	vk_end_frame_begin_post_process_pass( vk.render_pass.taa, vk.framebuffers.taa[writeIndex],
 		taaWidth, taaHeight, vk.taa_pipeline );
 	{
-		VkDescriptorSet reactive_set = vk.taa_reactive_descriptor[vk.cmd_index];
-		VkDescriptorSet class_set = vk.taa_class_descriptor[vk.cmd_index];
-		VkDescriptorSet depth_set = vk.depth_descriptor[vk.cmd_index];
-		if ( reactive_set == VK_NULL_HANDLE ) {
-			reactive_set = vk.taa_motion_descriptor[vk.cmd_index]; /* should not happen */
-		}
-		if ( class_set == VK_NULL_HANDLE ) {
-			class_set = reactive_set;
-		}
-		/* MSAA: sample resolved R32F depth (same binding as OIT), not the MSAA attachment. */
-		if ( vk.msaaActive && vk.volumetric_depth_view != VK_NULL_HANDLE &&
-			vk.oit_depth_descriptor != VK_NULL_HANDLE ) {
-			depth_set = vk.oit_depth_descriptor;
-		}
+		VkDescriptorSet depth_set = vk.taa_depth_descriptor[vk.cmd_index];
 		vk_end_frame_bind_taa_sets(
 			vk.post_color_descriptor[vk.cmd_index],
 			depth_set,
@@ -668,7 +781,8 @@ void vk_end_frame_record_taa_pass( VkImageView *post_fog_src, VkImageView *lumin
 			vk.taa_history_descriptor[readIndex],
 			vk.taa_motion_descriptor[vk.cmd_index],
 			reactive_set,
-			class_set );
+			class_set,
+			vk.temporal_prev_depth_descriptor[readIndex] );
 	}
 	vk_end_frame_draw_fullscreen_quad( taaWidth, taaHeight );
 	vk_end_render_pass();
@@ -676,6 +790,16 @@ void vk_end_frame_record_taa_pass( VkImageView *post_fog_src, VkImageView *lumin
 	resolved_view = vk.taa_history_image_view[writeIndex];
 	vk.temporal.taaHistoryIndex = writeIndex;
 	vk.temporal.hasValidTAAHistory = qtrue;
+	vk.temporal.prevColorValid = qtrue;
+	vk.temporal.taaHistoryFrameId[writeIndex] = vk.temporal.frameIndex;
+	if ( !vk_temporal_store_previous_depth( writeIndex ) ) {
+		/* Color may still be presented, but cannot be trusted as temporal history
+		 * without its matching previous-depth ownership. */
+		vk.temporal.hasValidTAAHistory = qfalse;
+		vk.temporal.prevColorValid = qfalse;
+	} else {
+		vk.temporal.prevDepthFrameId[writeIndex] = vk.temporal.frameIndex;
+	}
 	*post_fog_src = resolved_view;
 	*luminance_src = resolved_view;
 	vk_set_scene_post_fog_source( resolved_view );
@@ -693,6 +817,10 @@ void vk_end_frame_record_taa_pass( VkImageView *post_fog_src, VkImageView *lumin
 	/* Weapon/view-model after world TAA — never contaminate history. */
 	vk_spine_cert_check_weapon_flush_order( qtrue );
 	RB_FlushDeferredWeaponAfterTaa( post_fog_src, luminance_src );
+	if ( r_weaponTemporalMode && r_weaponTemporalMode->integer == 2 &&
+		!vk.temporal.weaponRenderedThisFrame ) {
+		vk_reset_weapon_history();
+	}
 	/* If no weapon was drawn, still age out previous weapon class silhouette. */
 	vk_temporal_class_commit_world_only();
 	vk_pass_diag_stage( "taa_exit" );

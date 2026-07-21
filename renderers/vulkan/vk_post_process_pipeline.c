@@ -335,6 +335,26 @@ void vk_create_post_process_pipeline( int program_index, uint32_t width, uint32_
 			target_format = vk.color_format;
 			blend = qfalse;
 			break;
+		case 27:
+			pipeline = &vk.weapon_taa_pipeline;
+			fsmodule = vk.modules.weapon_taa_fs;
+			renderpass = vk.render_pass.taa;
+			layout = vk.pipeline_layout_weapon_taa;
+			samples = VK_SAMPLE_COUNT_1_BIT;
+			pipeline_name = "weapon taa resolve pipeline";
+			target_format = vk.color_format;
+			blend = qfalse;
+			break;
+		case 28:
+			pipeline = &vk.weapon_taa_composite_pipeline;
+			fsmodule = vk.modules.weapon_taa_composite_fs;
+			renderpass = vk.render_pass.post_bloom;
+			layout = vk.pipeline_layout_weapon_composite;
+			samples = vk_get_main_rasterization_samples();
+			pipeline_name = "weapon taa composite pipeline";
+			target_format = vk.color_format;
+			blend = qfalse;
+			break;
 #ifdef VK_PBR_BRDFLUT
 		case 4:
 			pipeline = &vk.brdflut_pipeline;

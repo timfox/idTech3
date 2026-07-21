@@ -46,6 +46,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "vk_vt.h"
 #include "vk_fp64_points.h"
 #include "vk_scene_pass.h"
+#include "vk_render_pass.h"
 #include "vk_reactive_mask.h"
 #include "vk_temporal_class.h"
 #include "vk_ambient_visibility.h"
@@ -63,7 +64,9 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "vk_capture_pipeline.h"
 #include "vk_image_layout.h"
 #include "vk_post_fog.h"
+#include "vk_postfx_params.h"
 #include "vk_view_state.h"
+#include <assert.h>
 #endif
 
 backEndData_t	*backEndData;
@@ -622,6 +625,10 @@ static void RB_BeginDrawingView( void ) {
 }
 
 static void RB_LightingPass( void );
+#ifdef USE_VULKAN
+static qboolean s_skipDeferredWeaponSurfaces;
+static qboolean s_drawDeferredWeaponSurfacesOnly;
+#endif
 
 /*
 ==================
@@ -665,7 +672,11 @@ void RB_RenderDrawSurfList( drawSurf_t *drawSurfs, int numDrawSurfs ) {
 #endif
 
 	for (i = 0, drawSurf = drawSurfs ; i < numDrawSurfs ; i++, drawSurf++) {
-		if ( drawSurf->sort == oldSort ) {
+		if ( drawSurf->sort == oldSort
+#ifdef USE_VULKAN
+			&& !s_skipDeferredWeaponSurfaces && !s_drawDeferredWeaponSurfacesOnly
+#endif
+			) {
 			// fast path, same as previous sort
 			{
 				int oldNumVertexes = tess.numVertexes;
@@ -680,6 +691,19 @@ void RB_RenderDrawSurfList( drawSurf_t *drawSurfs, int numDrawSurfs ) {
 
 		R_DecomposeSort( drawSurf->sort, &entityNum, &shader, &fogNum, &dlighted );
 #ifdef USE_VULKAN
+		if ( s_skipDeferredWeaponSurfaces || s_drawDeferredWeaponSurfacesOnly ) {
+			qboolean firstPersonSurface = qfalse;
+			if ( entityNum != REFENTITYNUM_WORLD && entityNum >= 0 &&
+				entityNum < backEnd.refdef.num_entities ) {
+				firstPersonSurface =
+					( backEnd.refdef.entities[entityNum].e.renderfx & RF_FIRST_PERSON )
+						? qtrue : qfalse;
+			}
+			if ( ( s_skipDeferredWeaponSurfaces && firstPersonSurface ) ||
+				( s_drawDeferredWeaponSurfacesOnly && !firstPersonSurface ) ) {
+				continue;
+			}
+		}
 		if ( backEnd.depthOnlyWorldPass && entityNum != REFENTITYNUM_WORLD ) {
 			continue;  /* occlusion pass: world depth only */
 		}
@@ -2093,7 +2117,10 @@ void RB_RenderVolumetricShadowView( const viewParms_t *shadowViewParms, drawSurf
 #ifdef USE_VULKAN
 #define MAX_DEFERRED_WEAPON_COMMANDS 16
 static drawSurfsCommand_t s_deferredWeaponCmds[MAX_DEFERRED_WEAPON_COMMANDS];
+static qboolean s_deferredWeaponMixed[MAX_DEFERRED_WEAPON_COMMANDS];
 static int s_deferredWeaponCmdCount;
+static const char *s_weaponTemporalFailureReason;
+static qboolean s_weaponTemporalFailureWarned;
 
 /*
 ================
@@ -2105,13 +2132,35 @@ reconstruction or SSR must complete without weapon color/depth contamination.
 */
 qboolean RB_TryDeferWeaponDrawSurfs( const drawSurfsCommand_t *cmd )
 {
+	qboolean mixedWorldWeapon = qfalse;
+	int i;
+
 	if ( !cmd ) {
 		return qfalse;
 	}
 	if ( !( cmd->refdef.rdflags & RDF_NOWORLDMODEL ) ) {
-		return qfalse;
+		for ( i = 0; i < cmd->numDrawSurfs; i++ ) {
+			int entityNum;
+			shader_t *shader;
+			int fogNum;
+			int dlighted;
+
+			R_DecomposeSort( cmd->drawSurfs[i].sort, &entityNum, &shader, &fogNum, &dlighted );
+			(void)shader;
+			(void)fogNum;
+			(void)dlighted;
+			if ( entityNum != REFENTITYNUM_WORLD && entityNum >= 0 &&
+				entityNum < cmd->refdef.num_entities &&
+				( cmd->refdef.entities[entityNum].e.renderfx & RF_FIRST_PERSON ) ) {
+				mixedWorldWeapon = qtrue;
+				break;
+			}
+		}
+		if ( !mixedWorldWeapon ) {
+			return qfalse;
+		}
 	}
-	if ( !backEnd.doneWorldScene ) {
+	if ( !mixedWorldWeapon && !backEnd.doneWorldScene ) {
 		return qfalse;
 	}
 	if ( !vk_temporal_want_weapon_after_world_post() ) {
@@ -2129,15 +2178,20 @@ qboolean RB_TryDeferWeaponDrawSurfs( const drawSurfsCommand_t *cmd )
 			S_COLOR_WHITE, MAX_DEFERRED_WEAPON_COMMANDS );
 		return qfalse;
 	}
-	s_deferredWeaponCmds[s_deferredWeaponCmdCount++] = *cmd;
+	s_deferredWeaponCmds[s_deferredWeaponCmdCount] = *cmd;
+	s_deferredWeaponMixed[s_deferredWeaponCmdCount] = mixedWorldWeapon;
+	s_deferredWeaponCmdCount++;
 	backEnd.doneSurfaces = qtrue;
+	if ( mixedWorldWeapon ) {
+		s_skipDeferredWeaponSurfaces = qtrue;
+	}
 	if ( r_temporalDebug && r_temporalDebug->integer ) {
 		ri.Printf( PRINT_DEVELOPER,
 			"[VK][temporal] deferred weapon/view-model until after world post "
 			"(command=%d surfs=%d)\n",
 			s_deferredWeaponCmdCount, cmd->numDrawSurfs );
 	}
-	return qtrue;
+	return mixedWorldWeapon ? qfalse : qtrue;
 }
 
 static void RB_CopyHdrViewToColor( VkImageView srcView, uint32_t width, uint32_t height )
@@ -2183,6 +2237,179 @@ static void RB_CopyHdrViewToColor( VkImageView srcView, uint32_t width, uint32_t
 		VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT | VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT );
 }
 
+static void RB_UpdateWeaponWorldDescriptor( VkImageView worldView )
+{
+	VkDescriptorImageInfo info;
+	VkWriteDescriptorSet write;
+	Vk_Sampler_Def sd;
+
+	if ( worldView == VK_NULL_HANDLE || vk.cmd_index >= NUM_COMMAND_BUFFERS ||
+		vk.weapon_world_descriptor[vk.cmd_index] == VK_NULL_HANDLE ) {
+		return;
+	}
+	Com_Memset( &sd, 0, sizeof( sd ) );
+	sd.gl_mag_filter = sd.gl_min_filter = GL_LINEAR;
+	sd.address_mode = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+	sd.max_lod_1_0 = qtrue;
+	sd.noAnisotropy = qtrue;
+	Com_Memset( &info, 0, sizeof( info ) );
+	info.sampler = vk_find_sampler( &sd );
+	info.imageView = worldView;
+	info.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+	Com_Memset( &write, 0, sizeof( write ) );
+	write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+	write.dstSet = vk.weapon_world_descriptor[vk.cmd_index];
+	write.dstBinding = 0;
+	write.descriptorCount = 1;
+	write.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+	write.pImageInfo = &info;
+	qvkUpdateDescriptorSets( vk.device, 1, &write, 0, NULL );
+}
+
+static void RB_DrawTemporalFullscreen( uint32_t width, uint32_t height )
+{
+	VkViewport viewport;
+	VkRect2D scissor;
+
+	Com_Memset( &viewport, 0, sizeof( viewport ) );
+	viewport.width = (float)width;
+	viewport.height = (float)height;
+	viewport.minDepth = 0.0f;
+	viewport.maxDepth = 1.0f;
+	Com_Memset( &scissor, 0, sizeof( scissor ) );
+	scissor.extent.width = width;
+	scissor.extent.height = height;
+	qvkCmdSetViewport( vk.cmd->command_buffer, 0, 1, &viewport );
+	qvkCmdSetScissor( vk.cmd->command_buffer, 0, 1, &scissor );
+	qvkCmdDraw( vk.cmd->command_buffer, 4, 1, 0, 0 );
+}
+
+static qboolean RB_ResolveIndependentWeaponHistory( VkImageView worldView,
+	uint32_t width, uint32_t height )
+{
+	VkDescriptorSet sets[9];
+	uint32_t readIndex = vk.temporal.weaponHistoryIndex & 1u;
+	uint32_t writeIndex = 1u - readIndex;
+	s_weaponTemporalFailureReason = NULL;
+
+#ifndef NDEBUG
+	if ( vk.temporal.weaponHistoryValid ) {
+		assert( vk.temporal.weaponHistoryFrameId[readIndex] + 1u == vk.temporal.frameIndex );
+		assert( vk.temporal.weaponDepthFrameId[readIndex] + 1u == vk.temporal.frameIndex );
+	}
+#endif
+	if ( worldView == VK_NULL_HANDLE || worldView == vk.color_image_view ||
+		vk.weapon_taa_pipeline == VK_NULL_HANDLE ||
+		vk.weapon_taa_composite_pipeline == VK_NULL_HANDLE ||
+		vk.pipeline_layout_weapon_taa == VK_NULL_HANDLE ||
+		vk.pipeline_layout_weapon_composite == VK_NULL_HANDLE ||
+		vk.framebuffers.weapon_taa[writeIndex] == VK_NULL_HANDLE ||
+		vk.weapon_history_descriptor[readIndex] == VK_NULL_HANDLE ||
+		vk.weapon_prev_depth_descriptor[readIndex] == VK_NULL_HANDLE ||
+		vk.weapon_current_class_descriptor[vk.cmd_index] == VK_NULL_HANDLE ) {
+		s_weaponTemporalFailureReason =
+			( worldView == VK_NULL_HANDLE ) ? "missing world view" :
+			( worldView == vk.color_image_view ) ? "world/weapon HDR are not isolated" :
+			( vk.weapon_taa_pipeline == VK_NULL_HANDLE ) ? "missing weapon TAA pipeline" :
+			( vk.weapon_taa_composite_pipeline == VK_NULL_HANDLE ) ? "missing weapon composite pipeline" :
+			( vk.framebuffers.weapon_taa[writeIndex] == VK_NULL_HANDLE ) ? "missing weapon history framebuffer" :
+			( vk.weapon_history_descriptor[readIndex] == VK_NULL_HANDLE ) ? "missing weapon history descriptor" :
+			( vk.weapon_prev_depth_descriptor[readIndex] == VK_NULL_HANDLE ) ? "missing weapon depth descriptor" :
+			"missing current weapon class descriptor";
+		vk_reset_weapon_history();
+		return qfalse;
+	}
+	if ( !vk_temporal_prepare_current_depth() ) {
+		s_weaponTemporalFailureReason = "current depth preparation failed";
+		vk_reset_weapon_history();
+		return qfalse;
+	}
+
+	RB_UpdateWeaponWorldDescriptor( worldView );
+	vk_barrier_post_fog_source_for_sampling( vk.color_image_view, "weapon mode2 current combined" );
+	vk_barrier_post_fog_source_for_sampling( worldView, "weapon mode2 world" );
+	vk_barrier_temporal_class_for_sampling( "weapon mode2 class" );
+	vk_barrier_reactive_mask_for_sampling( "weapon mode2 reactive" );
+	vk_update_postfx_params( vk.cmd_index );
+
+	sets[0] = vk.color_descriptor[vk.cmd_index];
+	sets[1] = vk.taa_depth_descriptor[vk.cmd_index];
+	sets[2] = vk.postfx_params_descriptor[vk.cmd_index];
+	sets[3] = vk.weapon_history_descriptor[readIndex];
+	sets[4] = vk.taa_motion_descriptor[vk.cmd_index];
+	sets[5] = vk.taa_reactive_descriptor[vk.cmd_index];
+	sets[6] = vk.taa_class_descriptor[vk.cmd_index];
+	sets[7] = vk.weapon_prev_depth_descriptor[readIndex];
+	sets[8] = vk.weapon_current_class_descriptor[vk.cmd_index];
+	{
+		int i;
+		for ( i = 0; i < 9; i++ ) {
+			if ( sets[i] == VK_NULL_HANDLE ) {
+				s_weaponTemporalFailureReason = "required weapon resolve descriptor is null";
+				vk_reset_weapon_history();
+				return qfalse;
+			}
+		}
+	}
+
+	vk_pass_diag_stage( "weapon_temporal_resolve_begin" );
+	if ( vk.weapon_temporal_query_pool != VK_NULL_HANDLE && qvkCmdWriteTimestamp ) {
+		const uint32_t queryBase = vk.cmd_index * VK_WEAPON_TEMPORAL_QUERY_SLOTS;
+		qvkCmdWriteTimestamp( vk.cmd->command_buffer, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
+			vk.weapon_temporal_query_pool, queryBase );
+	}
+	vk_begin_render_pass_tracked( vk.render_pass.taa, vk.framebuffers.weapon_taa[writeIndex],
+		width, height, qfalse );
+	qvkCmdBindPipeline( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
+		vk.weapon_taa_pipeline );
+	qvkCmdBindDescriptorSets( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
+		vk.pipeline_layout_weapon_taa, 0, 9, sets, 0, NULL );
+	RB_DrawTemporalFullscreen( width, height );
+	vk_end_render_pass();
+
+	if ( !vk_temporal_store_weapon_depth( writeIndex ) ) {
+		s_weaponTemporalFailureReason = "weapon previous-depth copy failed";
+		vk_reset_weapon_history();
+		return qfalse;
+	}
+	{
+		VkImageAspectFlags depthAspect = VK_IMAGE_ASPECT_DEPTH_BIT;
+		if ( glConfig.stencilBits > 0 ) {
+			depthAspect |= VK_IMAGE_ASPECT_STENCIL_BIT;
+		}
+		record_depth_image_layout_transition( vk.cmd->command_buffer, depthAspect,
+			VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
+			VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT | VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+			VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT );
+	}
+
+	vk_begin_post_bloom_render_pass();
+	qvkCmdBindPipeline( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
+		vk.weapon_taa_composite_pipeline );
+	{
+		VkDescriptorSet compositeSets[2] = {
+			vk.weapon_world_descriptor[vk.cmd_index],
+			vk.weapon_history_descriptor[writeIndex]
+		};
+		qvkCmdBindDescriptorSets( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
+			vk.pipeline_layout_weapon_composite, 0, 2, compositeSets, 0, NULL );
+	}
+	RB_DrawTemporalFullscreen( width, height );
+	vk_end_render_pass();
+
+	vk.temporal.weaponHistoryIndex = writeIndex;
+	vk.temporal.weaponHistoryValid = qtrue;
+	vk.temporal.weaponHistoryFrameId[writeIndex] = vk.temporal.frameIndex;
+	vk.temporal.weaponDepthFrameId[writeIndex] = vk.temporal.frameIndex;
+	if ( vk.weapon_temporal_query_pool != VK_NULL_HANDLE && qvkCmdWriteTimestamp ) {
+		const uint32_t queryBase = vk.cmd_index * VK_WEAPON_TEMPORAL_QUERY_SLOTS;
+		qvkCmdWriteTimestamp( vk.cmd->command_buffer, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
+			vk.weapon_temporal_query_pool, queryBase + 1u );
+	}
+	vk_pass_diag_stage( "weapon_temporal_resolve_end" );
+	return qtrue;
+}
+
 /*
 ================
 RB_FlushDeferredWeaponAfterTaa
@@ -2209,6 +2436,7 @@ void RB_FlushDeferredWeaponAfterTaa( VkImageView *post_fog_src, VkImageView *lum
 	if ( !vk.fboActive || !vk.cmd || vk.cmd->command_buffer == VK_NULL_HANDLE ) {
 		return;
 	}
+	vk.temporal.weaponRenderedThisFrame = qtrue;
 
 	src = ( post_fog_src && *post_fog_src != VK_NULL_HANDLE ) ? *post_fog_src : vk.color_image_view;
 	vk_get_active_render_extent( &width, &height );
@@ -2251,12 +2479,38 @@ void RB_FlushDeferredWeaponAfterTaa( VkImageView *post_fog_src, VkImageView *lum
 
 		backEnd.refdef = weaponCmd->refdef;
 		backEnd.viewParms = weaponCmd->viewParms;
+		s_drawDeferredWeaponSurfacesOnly = s_deferredWeaponMixed[i];
 		RB_BeginDrawingView();
 		RB_RenderDrawSurfList( weaponCmd->drawSurfs, weaponCmd->numDrawSurfs );
 		RB_EndSurface();
+		s_drawDeferredWeaponSurfacesOnly = qfalse;
 	}
 	if ( vk.inRenderPass ) {
 		vk_end_render_pass();
+	}
+
+	/* Classify weapon pixels + stamp reactive for next-frame TAA / upscale. */
+	if ( !vk_temporal_prepare_current_depth() ) {
+		vk_reset_weapon_history();
+	}
+	vk_temporal_class_stamp_weapon_from_depth();
+	vk_reactive_mask_stamp_weapon_from_depth();
+	if ( ( r_weaponTemporalMode && r_weaponTemporalMode->integer == 2 ) ||
+		( r_temporalDebug && r_temporalDebug->integer >= 16 ) ) {
+		if ( !RB_ResolveIndependentWeaponHistory( src, width, height ) ) {
+			if ( !s_weaponTemporalFailureWarned ) {
+				ri.Printf( PRINT_WARNING, S_COLOR_YELLOW
+					"[VK][weapon] independent temporal resolve unavailable (%s); "
+					"using current-frame weapon and rejecting weapon history\n" S_COLOR_WHITE,
+					s_weaponTemporalFailureReason ? s_weaponTemporalFailureReason : "unknown reason" );
+				s_weaponTemporalFailureWarned = qtrue;
+			}
+		} else {
+			s_weaponTemporalFailureWarned = qfalse;
+		}
+	} else {
+		s_weaponTemporalFailureWarned = qfalse;
+		vk_reset_weapon_history();
 	}
 
 	if ( post_fog_src ) {
@@ -2266,11 +2520,8 @@ void RB_FlushDeferredWeaponAfterTaa( VkImageView *post_fog_src, VkImageView *lum
 		*luminance_src = vk.color_image_view;
 	}
 	vk_set_scene_post_fog_source( vk.color_image_view );
-	vk_set_post_chain_last_writer( "weapon_after_world_post" );
-
-	/* Classify weapon pixels + stamp reactive for next-frame TAA / upscale. */
-	vk_temporal_class_stamp_weapon_from_depth();
-	vk_reactive_mask_stamp_weapon_from_depth();
+	vk_set_post_chain_last_writer( r_weaponTemporalMode && r_weaponTemporalMode->integer == 2 ?
+		"weapon_temporal_mode2" : "weapon_after_world_post" );
 
 	if ( r_temporalDebug && r_temporalDebug->integer ) {
 		ri.Printf( PRINT_DEVELOPER,
@@ -2546,6 +2797,9 @@ static const void *RB_DrawSurfs( const void *data ) {
 		backEnd.doneWorldScene = qtrue;
 		vk_temporal_capture_world_viewparms();
 	}
+#ifdef USE_VULKAN
+	s_skipDeferredWeaponSurfaces = qfalse;
+#endif
 
 	return (const void *)(cmd + 1);
 }
@@ -2825,7 +3079,7 @@ static const void *RB_FinishBloom( const void *data )
 	if ( r_ssao && r_ssao->integer ) {
 		vk_ssao_pass();
 	}
-	if ( r_bloom->integer ) {
+	if ( r_bloom->integer && !vk_temporal_defer_bloom_for_weapon() ) {
 		vk_bloom();
 	}
 	if ( vk.lensFlareActive ) {
@@ -2957,6 +3211,8 @@ static const void *RB_SwapBuffers( const void *data ) {
 	backEnd.doneSSAO = qfalse;
 	backEnd.doneLensFlare = qfalse;
 	s_deferredWeaponCmdCount = 0;
+	s_skipDeferredWeaponSurfaces = qfalse;
+	s_drawDeferredWeaponSurfacesOnly = qfalse;
 #endif
 
 	return (const void *)(cmd + 1);

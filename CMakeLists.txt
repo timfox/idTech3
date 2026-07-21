@@ -3594,6 +3594,27 @@ set_tests_properties(test_temporal_ghost PROPERTIES
 	LABELS "scripts;validation;renderer;temporal"
 	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/scripts/temporal_ghost_check.sh;${CMAKE_SOURCE_DIR}/docs/RENDERER_TEMPORAL_GHOSTING.md")
 
+add_test(NAME test_surf_temporal_startup
+	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_surf_temporal_startup.sh)
+set_tests_properties(test_surf_temporal_startup PROPERTIES
+	LABELS "scripts;validation;renderer;temporal;surf"
+	TIMEOUT 60
+	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_surf_temporal_startup.sh;${CMAKE_SOURCE_DIR}/config/surf.cfg;${CMAKE_SOURCE_DIR}/config/surf_autoexec.cfg")
+
+add_test(NAME test_surf_viewmodel_projection
+	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_surf_viewmodel_projection.sh)
+set_tests_properties(test_surf_viewmodel_projection PROPERTIES
+	LABELS "scripts;validation;renderer;temporal;surf"
+	TIMEOUT 60
+	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_surf_viewmodel_projection.sh;${CMAKE_SOURCE_DIR}/config/surf.cfg")
+
+add_test(NAME test_temporal_weapon_validation
+	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_temporal_weapon_validation.sh)
+set_tests_properties(test_temporal_weapon_validation PROPERTIES
+	LABELS "scripts;validation;renderer;temporal;surf"
+	TIMEOUT 60
+	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_temporal_weapon_validation.sh;${CMAKE_SOURCE_DIR}/tests/data/temporal_weapon_validation.json")
+
 add_test(NAME test_high_throughput_1_0
 	COMMAND ${CMAKE_SOURCE_DIR}/scripts/high_throughput_1_0_check.sh)
 set_tests_properties(test_high_throughput_1_0 PROPERTIES

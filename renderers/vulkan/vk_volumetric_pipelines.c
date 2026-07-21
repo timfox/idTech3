@@ -178,6 +178,36 @@ static void vk_create_volumetric_depth_resolve_pipeline( void )
 	SET_OBJECT_NAME( vk.volumetric_depth_resolve_pipeline, "pipeline - volumetric depth resolve", VK_DEBUG_REPORT_OBJECT_TYPE_PIPELINE_EXT );
 }
 
+static void vk_create_temporal_depth_history_copy_pipeline( void )
+{
+	VkPipelineShaderStageCreateInfo stage;
+	VkComputePipelineCreateInfo desc;
+
+	if ( vk.temporal_depth_history_copy_pipeline != VK_NULL_HANDLE ) {
+		qvkDestroyPipeline( vk.device, vk.temporal_depth_history_copy_pipeline, NULL );
+		vk.temporal_depth_history_copy_pipeline = VK_NULL_HANDLE;
+	}
+	if ( vk.volumetric_depth_resolve_pipeline_layout == VK_NULL_HANDLE ||
+		vk.modules.temporal_depth_history_copy_cs == VK_NULL_HANDLE ) {
+		return;
+	}
+
+	Com_Memset( &stage, 0, sizeof( stage ) );
+	stage.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+	stage.stage = VK_SHADER_STAGE_COMPUTE_BIT;
+	stage.module = vk.modules.temporal_depth_history_copy_cs;
+	stage.pName = "main";
+
+	Com_Memset( &desc, 0, sizeof( desc ) );
+	desc.sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO;
+	desc.stage = stage;
+	desc.layout = vk.volumetric_depth_resolve_pipeline_layout;
+	VK_CHECK( qvkCreateComputePipelines( vk.device, VK_NULL_HANDLE, 1, &desc, NULL,
+		&vk.temporal_depth_history_copy_pipeline ) );
+	SET_OBJECT_NAME( vk.temporal_depth_history_copy_pipeline,
+		"pipeline - temporal previous depth copy", VK_DEBUG_REPORT_OBJECT_TYPE_PIPELINE_EXT );
+}
+
 static void vk_create_luminance_pipeline( void )
 {
 	if ( vk.luminance_pipeline != VK_NULL_HANDLE ) {
@@ -322,6 +352,7 @@ void vk_create_volumetric_pipelines( void )
 {
 	vk_create_volumetric_pipeline_layouts();
 	vk_create_volumetric_depth_resolve_pipeline();
+	vk_create_temporal_depth_history_copy_pipeline();
 	vk_create_luminance_pipeline();
 	vk_create_volumetric_compute_pipeline();
 	vk_create_volumetric_fluid_pipelines();

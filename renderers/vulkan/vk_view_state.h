@@ -19,3 +19,4 @@ void vk_update_depth_range( Vk_Depth_Range depth_range );
 void vk_update_mvp( const float *m );
 void vk_read_mvp_transform( float *mvp );
 void vk_read_prev_mvp_transform( float *prev_mvp );
+void vk_print_viewmodel_projection_f( void );

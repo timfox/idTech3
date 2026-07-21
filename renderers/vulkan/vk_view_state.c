@@ -31,6 +31,25 @@ static int vk_curr_entity_types[MAX_REFENTITIES];
 static qboolean vk_prev_entity_model_valid[MAX_REFENTITIES];
 static qboolean vk_curr_entity_model_valid[MAX_REFENTITIES];
 
+typedef struct {
+	qboolean valid;
+	uint32_t frame;
+	float weaponFovX;
+	float weaponFovY;
+	float worldFovX;
+	float worldFovY;
+	float zNear;
+	float zFar;
+	float jitterX;
+	float jitterY;
+	qboolean overrideEnabled;
+	qboolean usingOverride;
+	qboolean jitterApplied;
+} vkViewmodelProjectionDiagnostic_t;
+
+static vkViewmodelProjectionDiagnostic_t vk_viewmodel_projection_current;
+static vkViewmodelProjectionDiagnostic_t vk_viewmodel_projection_previous;
+
 uint32_t vk_get_render_target_width( void )
 {
 	if ( vk.fboActive && vk.mainColorWidth > 0u ) {
@@ -327,11 +346,126 @@ void vk_reset_motion_history( void )
 	vk.temporal.weaponMatricesHavePrev = qfalse;
 	vk.temporal.weaponEntityId = 0;
 	vk.temporal.weaponEntityIdPrev = 0;
+	Com_Memset( &vk_viewmodel_projection_current, 0, sizeof( vk_viewmodel_projection_current ) );
+	Com_Memset( &vk_viewmodel_projection_previous, 0, sizeof( vk_viewmodel_projection_previous ) );
+}
+
+static float vk_projection_fov_degrees( float scale )
+{
+	if ( fabsf( scale ) < 1e-6f ) {
+		return 0.0f;
+	}
+	return 2.0f * atanf( 1.0f / fabsf( scale ) ) * 180.0f / (float)M_PI;
+}
+
+static void vk_capture_viewmodel_projection_diagnostic( const float *projection )
+{
+	vkViewmodelProjectionDiagnostic_t next;
+	float jitterX = 0.0f;
+	float jitterY = 0.0f;
+
+	if ( !projection ) {
+		return;
+	}
+
+	if ( vk_viewmodel_projection_current.valid &&
+		vk_viewmodel_projection_current.frame != (uint32_t)tr.frameCount ) {
+		vk_viewmodel_projection_previous = vk_viewmodel_projection_current;
+	}
+
+	Com_Memset( &next, 0, sizeof( next ) );
+	R_Upscale_GetJitter( &jitterX, &jitterY );
+	next.valid = qtrue;
+	next.frame = (uint32_t)tr.frameCount;
+	next.weaponFovX = vk_projection_fov_degrees( projection[0] );
+	next.weaponFovY = vk_projection_fov_degrees( projection[5] );
+	next.worldFovX = backEnd.viewParms.fovX;
+	next.worldFovY = backEnd.viewParms.fovY;
+	next.zNear = backEnd.useFirstPersonProjection
+		? Com_Clamp( 0.01f, 8.0f, r_firstPersonZNear->value )
+		: r_znear->value;
+	next.zFar = backEnd.viewParms.zFar;
+	next.jitterX = jitterX;
+	next.jitterY = jitterY;
+	next.overrideEnabled = ( r_firstPersonFovEnabled && r_firstPersonFovEnabled->integer )
+		? qtrue : qfalse;
+	next.usingOverride = backEnd.useFirstPersonProjection;
+	/* The custom projection builder deliberately emits stable XY terms. */
+	next.jitterApplied = ( !backEnd.useFirstPersonProjection &&
+		( jitterX != 0.0f || jitterY != 0.0f ) ) ? qtrue : qfalse;
+	vk_viewmodel_projection_current = next;
+	if ( r_temporalDebug && r_temporalDebug->integer >= 16 ) {
+		ri.Cvar_Set( "r_temporalOverlayInfo",
+			va( "Temporal weapon: mode=%d FOV=%.1fx%.1f world=%.1fx%.1f z=%.2f/%.0f "
+				"jitter=%.3f,%.3f MVPprev=%d hist={C%d D%d K%d W%d} frame=%u",
+				r_weaponTemporalMode ? r_weaponTemporalMode->integer : 0,
+				next.weaponFovX, next.weaponFovY, next.worldFovX, next.worldFovY,
+				next.zNear, next.zFar, next.jitterX, next.jitterY,
+				vk.temporal.weaponMatricesHavePrev ? 1 : 0,
+				vk.temporal.prevColorValid ? 1 : 0,
+				vk.temporal.prevDepthValid ? 1 : 0,
+				vk.temporal.prevClassValid ? 1 : 0,
+				vk.temporal.weaponHistoryValid ? 1 : 0,
+				vk.temporal.frameIndex ) );
+	}
+}
+
+void vk_print_viewmodel_projection_f( void )
+{
+	const vkViewmodelProjectionDiagnostic_t *current = &vk_viewmodel_projection_current;
+	const vkViewmodelProjectionDiagnostic_t *previous = &vk_viewmodel_projection_previous;
+
+	ri.Printf( PRINT_ALL, "======== Viewmodel Projection ========\n" );
+	if ( !current->valid ) {
+		ri.Printf( PRINT_ALL, "effective state       : unavailable (no RF_FIRST_PERSON draw captured)\n" );
+		ri.Printf( PRINT_ALL, "configured weapon FOV : %.3f deg horizontal (override=%s)\n",
+			r_firstPersonFov ? r_firstPersonFov->value : 0.0f,
+			( r_firstPersonFovEnabled && r_firstPersonFovEnabled->integer ) ? "enabled" : "disabled" );
+		ri.Printf( PRINT_ALL, "configured z-near     : %.3f\n",
+			r_firstPersonZNear ? r_firstPersonZNear->value : 0.0f );
+		ri.Printf( PRINT_ALL, "======================================\n" );
+		return;
+	}
+
+	ri.Printf( PRINT_ALL, "effective weapon FOV  : %.3f deg horizontal\n", current->weaponFovX );
+	ri.Printf( PRINT_ALL, "effective world FOV   : %.3f x %.3f deg (horizontal x vertical)\n",
+		current->worldFovX, current->worldFovY );
+	ri.Printf( PRINT_ALL, "aspect-adjusted FOV   : %.3f deg vertical (from %.3f deg horizontal)\n",
+		current->weaponFovY, current->weaponFovX );
+	ri.Printf( PRINT_ALL, "z-near / z-far        : %.3f / %.3f\n", current->zNear, current->zFar );
+	ri.Printf( PRINT_ALL, "projection mode       : %s (r_firstPersonFovEnabled=%d)\n",
+		current->usingOverride ? "custom horizontal weapon FOV" : "scene/world projection",
+		current->overrideEnabled ? 1 : 0 );
+#ifdef USE_VULKAN
+	ri.Printf( PRINT_ALL, "reversed-Z state      : enabled (Vulkan 0..1 clip depth)\n" );
+#else
+	ri.Printf( PRINT_ALL, "reversed-Z state      : disabled\n" );
+#endif
+	ri.Printf( PRINT_ALL, "depth-range remap     : DEPTH_RANGE_WEAPON [0.600, 1.000]\n" );
+	ri.Printf( PRINT_ALL, "jitter state          : current=(%.4f, %.4f) px appliedToWeapon=%s\n",
+		current->jitterX, current->jitterY, current->jitterApplied ? "yes" : "no" );
+
+	if ( previous->valid ) {
+		ri.Printf( PRINT_ALL,
+			"previous-frame values : frame=%u weaponFov=%.3f x %.3f worldFov=%.3f x %.3f "
+			"z=%.3f/%.3f jitter=(%.4f, %.4f) mode=%s\n",
+			previous->frame,
+			previous->weaponFovX, previous->weaponFovY,
+			previous->worldFovX, previous->worldFovY,
+			previous->zNear, previous->zFar,
+			previous->jitterX, previous->jitterY,
+			previous->usingOverride ? "custom" : "scene" );
+	} else {
+		ri.Printf( PRINT_ALL, "previous-frame values : unavailable (history not captured yet)\n" );
+	}
+	ri.Printf( PRINT_ALL, "matrix provenance     : current and velocity history use the same effective weapon projection\n" );
+	ri.Printf( PRINT_ALL, "======================================\n" );
 }
 
 static void vk_capture_weapon_matrices( void )
 {
 	const trRefEntity_t *ent = backEnd.currentEntity;
+	const float *projection;
 	uint32_t entityId;
 	float fovDelta;
 
@@ -342,16 +476,22 @@ static void vk_capture_weapon_matrices( void )
 		return;
 	}
 
+	projection = backEnd.useFirstPersonProjection
+		? backEnd.firstPersonProjectionMatrix
+		: backEnd.viewParms.projectionMatrix;
+	vk_capture_viewmodel_projection_diagnostic( projection );
+
 	entityId = (uint32_t)ent->e.hModel;
 	/* Weapon switch or FOV jump → drop prev so velocity does not invent a teleport. */
 	fovDelta = 0.0f;
 	if ( vk.temporal.weaponMatricesValid ) {
 		/* Projection [0] scales with cot(fov/2); large change ⇒ FOV cut. */
-		fovDelta = fabsf( backEnd.viewParms.projectionMatrix[0] - vk.temporal.weaponProjectionMatrix[0] );
+		fovDelta = fabsf( projection[0] - vk.temporal.weaponProjectionMatrix[0] );
 	}
 	if ( vk.temporal.weaponMatricesValid &&
 		( entityId != vk.temporal.weaponEntityId || fovDelta > 0.02f ) ) {
 		vk.temporal.weaponMatricesHavePrev = qfalse;
+		vk_reset_weapon_history();
 	} else if ( vk.temporal.weaponMatricesValid ) {
 		Com_Memcpy( vk.temporal.weaponPrevViewMatrix, vk.temporal.weaponViewMatrix,
 			sizeof( vk.temporal.weaponPrevViewMatrix ) );
@@ -366,14 +506,16 @@ static void vk_capture_weapon_matrices( void )
 	Com_Memcpy( vk.temporal.weaponViewMatrix, backEnd.viewParms.world.modelViewMatrix,
 		sizeof( vk.temporal.weaponViewMatrix ) );
 	/* Non-jittered projection (strip temporal upscale jitter from [8]/[9] if present). */
-	Com_Memcpy( vk.temporal.weaponProjectionMatrix, backEnd.viewParms.projectionMatrix,
+	Com_Memcpy( vk.temporal.weaponProjectionMatrix, projection,
 		sizeof( vk.temporal.weaponProjectionMatrix ) );
-	{
+	if ( !backEnd.useFirstPersonProjection ) {
 		float jx = 0.0f, jy = 0.0f;
+		const float width = (float)vk_get_render_target_width();
+		const float height = (float)vk_get_render_target_height();
 		R_Upscale_GetJitter( &jx, &jy );
-		if ( jx != 0.0f || jy != 0.0f ) {
-			vk.temporal.weaponProjectionMatrix[8] -= jx;
-			vk.temporal.weaponProjectionMatrix[9] -= jy;
+		if ( ( jx != 0.0f || jy != 0.0f ) && width > 0.0f && height > 0.0f ) {
+			vk.temporal.weaponProjectionMatrix[8] -= ( 2.0f * jx ) / width;
+			vk.temporal.weaponProjectionMatrix[9] -= ( 2.0f * jy ) / height;
 		}
 	}
 	Com_Memcpy( vk.temporal.weaponModelMatrix, backEnd.or.modelMatrix,

@@ -9,7 +9,13 @@
 #include "vk_pass_registry.h"
 #include "vk_exposure_histogram.h"
 #include "vk_postfx.h"
+#include "vk_reactive_mask.h"
+#include "vk_temporal_class.h"
+#include "vk_image_layout.h"
+#include "vk_scene_pass.h"
+#include "vk_volumetric_internal.h"
 #include <math.h>
+#include <stdlib.h>
 
 float vk_prev_view_matrix[16];
 float vk_prev_projection_matrix[16];
@@ -32,6 +38,235 @@ static const uint32_t knownReasons[] = {
 	VK_TEMPORAL_RESET_EXPLICIT_DEBUG,
 	VK_TEMPORAL_RESET_MISSING_PREV_DATA
 };
+
+static qboolean vk_surf_temporal_is_game( void )
+{
+	const char *fsGame = ri.Cvar_VariableString( "fs_game" );
+	const char *baseGame = ri.Cvar_VariableString( "fs_basegame" );
+
+	if ( fsGame && !Q_stricmp( fsGame, "surf" ) ) {
+		return qtrue;
+	}
+	if ( baseGame && !Q_stricmp( baseGame, "surf" ) ) {
+		return qtrue;
+	}
+	return qfalse;
+}
+
+static const char *vk_surf_weapon_temporal_mode_name( int mode )
+{
+	switch ( mode ) {
+	case 0:
+		return "no weapon history";
+	case 1:
+		return "classified shared history";
+	case 2:
+		return "independent weapon history";
+	default:
+		return "invalid";
+	}
+}
+
+static void vk_surf_validation_line( const char *result, const char *item, const char *detail )
+{
+	ri.Printf( PRINT_ALL, "  %-4s %-30s %s\n", result, item, detail );
+}
+
+void vk_surf_log_temporal_config( void )
+{
+	const int mode = r_weaponTemporalMode ? r_weaponTemporalMode->integer : -1;
+	const qboolean classAvailable = vk_temporal_class_active() &&
+		vk.temporal_class_stamp_pipeline != VK_NULL_HANDLE;
+	const qboolean reactiveAvailable = vk_reactive_mask_active() &&
+		vk.reactive_stamp_weapon_pipeline != VK_NULL_HANDLE;
+	const qboolean velocityAvailable = r_taaMotionVectors && r_taaMotionVectors->integer &&
+		vk.motion_vector_image != VK_NULL_HANDLE && vk.motion_vector_view != VK_NULL_HANDLE;
+	const qboolean previousDepthAvailable =
+		vk.temporal_prev_depth_image[0] != VK_NULL_HANDLE &&
+		vk.temporal_prev_depth_image[1] != VK_NULL_HANDLE &&
+		vk.temporal_depth_history_copy_pipeline != VK_NULL_HANDLE;
+	const qboolean combinedBeforeBloom = vk_temporal_defer_bloom_for_weapon();
+
+	if ( !vk_surf_temporal_is_game() ) {
+		return;
+	}
+
+	ri.Printf( PRINT_ALL, "Surf temporal configuration:\n" );
+	ri.Printf( PRINT_ALL, "  TAA: %s\n", ( r_taa && r_taa->integer ) ? "enabled" : "disabled" );
+	ri.Printf( PRINT_ALL, "  weapon temporal mode: %s\n",
+		vk_surf_weapon_temporal_mode_name( mode ) );
+	ri.Printf( PRINT_ALL, "  weapon class mask: %s\n", classAvailable ? "available" : "unavailable" );
+	ri.Printf( PRINT_ALL, "  weapon reactive mask: %s\n", reactiveAvailable ? "available" : "unavailable" );
+	ri.Printf( PRINT_ALL, "  weapon MVP velocity: %s\n", velocityAvailable ? "available" : "unavailable" );
+	ri.Printf( PRINT_ALL, "  previous depth: %s\n",
+		previousDepthAvailable ? "available (dual R32F history)" : "unavailable" );
+	ri.Printf( PRINT_ALL, "  weapon composition stage: %s\n",
+		combinedBeforeBloom ? "pre-bloom combined HDR" : "post-bloom (weapon bloom disabled)" );
+	vk_surf_validate_temporal_config_f();
+}
+
+void vk_surf_validate_temporal_config_f( void )
+{
+	const int mode = r_weaponTemporalMode ? r_weaponTemporalMode->integer : -1;
+	const qboolean taaEnabled = r_taa && r_taa->integer;
+	const qboolean classEnabled = mode > 0;
+	const qboolean classAvailable = vk_temporal_class_active() &&
+		vk.temporal_class_stamp_pipeline != VK_NULL_HANDLE &&
+		vk.temporal_class_stamp_descriptor != VK_NULL_HANDLE;
+	const qboolean reactiveEnabled = r_temporalReactiveMask && r_temporalReactiveMask->integer;
+	const qboolean reactiveAvailable = vk_reactive_mask_active() &&
+		vk.reactive_stamp_weapon_pipeline != VK_NULL_HANDLE;
+	const qboolean velocityEnabled = r_taaMotionVectors && r_taaMotionVectors->integer;
+	const qboolean velocityAvailable = velocityEnabled &&
+		vk.motion_vector_image != VK_NULL_HANDLE && vk.motion_vector_view != VK_NULL_HANDLE;
+	const qboolean weaponAfter = r_temporalWeaponAfterTaa &&
+		r_temporalWeaponAfterTaa->integer && vk_temporal_want_weapon_after_world_post();
+	const qboolean previousDepthAvailable =
+		vk.temporal_prev_depth_image[0] != VK_NULL_HANDLE &&
+		vk.temporal_prev_depth_image[1] != VK_NULL_HANDLE &&
+		vk.temporal_prev_depth_descriptor[0] != VK_NULL_HANDLE &&
+		vk.temporal_prev_depth_descriptor[1] != VK_NULL_HANDLE &&
+		vk.temporal_depth_history_copy_pipeline != VK_NULL_HANDLE;
+	int failures = 0;
+	int warnings = 0;
+
+	ri.Printf( PRINT_ALL, "======== Surf Temporal Validation ========\n" );
+	if ( vk_surf_temporal_is_game() ) {
+		vk_surf_validation_line( "PASS", "Surf game context", "fs_game/fs_basegame is surf" );
+	} else {
+		vk_surf_validation_line( "WARN", "Surf game context", "not running fs_game surf" );
+		warnings++;
+	}
+
+	if ( r_fbo && r_fbo->integer ) {
+		vk_surf_validation_line( "PASS", "r_fbo", "1" );
+	} else {
+		vk_surf_validation_line( "FAIL", "r_fbo", "must be 1; execute surf.cfg then vid_restart" );
+		failures++;
+	}
+	if ( taaEnabled ) {
+		vk_surf_validation_line( "PASS", "r_taa", "1 (Temporal Reconstruction active)" );
+	} else {
+		vk_surf_validation_line( "FAIL", "r_taa", "0; Surf shipping path requires 1" );
+		failures++;
+	}
+	if ( r_aaMode && r_aaMode->integer == 4 ) {
+		vk_surf_validation_line( "PASS", "r_aaMode", "4 (native Temporal Reconstruction)" );
+	} else {
+		vk_surf_validation_line( "WARN", "r_aaMode", "expected 4; AA policy may override r_taa" );
+		warnings++;
+	}
+	if ( mode == 1 || mode == 2 ) {
+		vk_surf_validation_line( "PASS", "r_weaponTemporalMode",
+			mode == 1 ? "1 (classified shared history)" : "2 (independent weapon history)" );
+	} else {
+		vk_surf_validation_line( "FAIL", "r_weaponTemporalMode",
+			"expected 1 or 2; mode 0 is a current-frame correctness baseline" );
+		failures++;
+	}
+	if ( classAvailable ) {
+		vk_surf_validation_line( "PASS", "weapon class target", "R8 ping-pong + stamp pipeline available" );
+	} else {
+		vk_surf_validation_line( classEnabled ? "FAIL" : "WARN", "weapon class target",
+			classEnabled ? "classification enabled without a valid class texture/pipeline" :
+			"classification disabled" );
+		if ( classEnabled ) {
+			failures++;
+		} else {
+			warnings++;
+		}
+	}
+	if ( reactiveEnabled ) {
+		vk_surf_validation_line( "PASS", "r_temporalReactiveMask", "1" );
+	} else {
+		vk_surf_validation_line( "FAIL", "r_temporalReactiveMask",
+			"0; weapon silhouettes cannot stamp reactive coverage" );
+		failures++;
+	}
+	if ( reactiveAvailable ) {
+		vk_surf_validation_line( "PASS", "weapon reactive target", "R8 target + weapon stamp pipeline available" );
+	} else {
+		vk_surf_validation_line( reactiveEnabled ? "FAIL" : "WARN", "weapon reactive target",
+			reactiveEnabled ? "reactive masking enabled without a reactive target/pipeline" :
+			"reactive masking disabled" );
+		if ( reactiveEnabled ) {
+			failures++;
+		} else {
+			warnings++;
+		}
+	}
+	if ( velocityEnabled ) {
+		vk_surf_validation_line( "PASS", "r_taaMotionVectors", "1" );
+	} else {
+		vk_surf_validation_line( "FAIL", "r_taaMotionVectors",
+			"0; temporal weapon resolve requires weapon MVP velocity" );
+		failures++;
+	}
+	if ( velocityAvailable ) {
+		vk_surf_validation_line( "PASS", "weapon MVP velocity path",
+			"motion target available; first-person prev MVP capture enabled" );
+	} else {
+		vk_surf_validation_line( "FAIL", "weapon MVP velocity path",
+			"temporal weapon resolve enabled without a motion target" );
+		failures++;
+	}
+	if ( weaponAfter ) {
+		vk_surf_validation_line( "PASS", "weapon composition",
+			vk_temporal_defer_bloom_for_weapon() ?
+				"after world TAA, before one combined HDR bloom" :
+				"after world TAA (weapon bloom intentionally disabled)" );
+	} else {
+		vk_surf_validation_line( "FAIL", "weapon composition",
+			"pre-bloom; set r_temporalWeaponAfterTaa 1 and r_weaponSsrIsolation 1" );
+		failures++;
+	}
+	if ( r_weaponSsrIsolation && r_weaponSsrIsolation->integer ) {
+		vk_surf_validation_line( "PASS", "r_weaponSsrIsolation", "1" );
+	} else {
+		vk_surf_validation_line( "FAIL", "r_weaponSsrIsolation",
+			"0; weapon depth may contaminate world SSR/SSAO" );
+		failures++;
+	}
+	if ( r_weaponBloomMode && r_weaponBloomMode->integer == 1 ) {
+		vk_surf_validation_line( "PASS", "r_weaponBloomMode",
+			"1 (weapon composite precedes one combined HDR bloom)" );
+	} else {
+		vk_surf_validation_line( "WARN", "r_weaponBloomMode",
+			"Surf default is 1; mode 0 is comparison and mode 2 retains combined bloom ordering" );
+		warnings++;
+	}
+
+	if ( previousDepthAvailable ) {
+		vk_surf_validation_line( "PASS", "previous depth",
+			"dual R32F history + copy pipeline + descriptors available" );
+	} else {
+		vk_surf_validation_line( "FAIL", "previous depth",
+			"required temporal previous-depth resource unavailable" );
+		failures++;
+	}
+
+	if ( !taaEnabled && mode > 0 ) {
+		vk_surf_validation_line( "WARN", "contradictory combination",
+			"TAA disabled while weapon temporal mode is enabled" );
+		warnings++;
+	}
+	if ( classEnabled && !classAvailable ) {
+		vk_surf_validation_line( "FAIL", "contradictory combination",
+			"weapon classification enabled without a valid class texture" );
+	}
+	if ( taaEnabled && mode > 0 && !velocityAvailable ) {
+		vk_surf_validation_line( "FAIL", "contradictory combination",
+			"temporal weapon resolve enabled without velocity" );
+	}
+	if ( reactiveEnabled && !reactiveAvailable ) {
+		vk_surf_validation_line( "FAIL", "contradictory combination",
+			"reactive masking enabled without a reactive target" );
+	}
+
+	ri.Printf( PRINT_ALL, "RESULT: %s (%d fail, %d warn)\n",
+		failures ? "FAIL" : warnings ? "WARN" : "PASS", failures, warnings );
+	ri.Printf( PRINT_ALL, "==========================================\n" );
+}
 
 static const char *vk_temporal_reason_string( uint32_t reason )
 {
@@ -76,6 +311,7 @@ static void vk_temporal_clear_frame_state( void )
 	vk.temporal.unreliableMotionThisFrame = qfalse;
 	vk.temporal.firstPersonProjectionThisFrame = qfalse;
 	vk.temporal.worldMatricesCaptured = qfalse;
+	vk.temporal.weaponRenderedThisFrame = qfalse;
 }
 
 /*
@@ -182,10 +418,140 @@ static void vk_temporal_log_reset( uint32_t reasons, qboolean hardReset )
 void vk_reset_taa_history( void )
 {
 	vk.temporal.hasValidTAAHistory = qfalse;
+	vk.temporal.prevColorValid = qfalse;
+	vk.temporal.prevDepthValid = qfalse;
+	vk.temporal.prevClassValid = qfalse;
+	vk.temporal.prevVelocityValid = qfalse;
 	vk.temporal.taaHistoryIndex = 0u;
+	vk.temporal.prevDepthIndex = 0u;
 	vk.temporal.weaponMatricesValid = qfalse;
 	vk.temporal.weaponMatricesHavePrev = qfalse;
 	vk.temporal.classHasPrev = qfalse;
+	vk_reset_weapon_history();
+}
+
+void vk_reset_weapon_history( void )
+{
+	vk.temporal.weaponHistoryValid = qfalse;
+	vk.temporal.weaponHistoryIndex = 0u;
+	vk.temporal.weaponHistoryResetSerial++;
+}
+
+qboolean vk_temporal_prepare_current_depth( void )
+{
+	VkImageAspectFlags depthAspect = VK_IMAGE_ASPECT_DEPTH_BIT;
+
+	if ( glConfig.stencilBits > 0 ) {
+		depthAspect |= VK_IMAGE_ASPECT_STENCIL_BIT;
+	}
+	if ( vk.cmd == NULL || vk.cmd->command_buffer == VK_NULL_HANDLE ||
+		vk.depth_image == VK_NULL_HANDLE ) {
+		return qfalse;
+	}
+	record_depth_image_layout_transition( vk.cmd->command_buffer, depthAspect,
+		VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL,
+		VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT,
+		VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT | VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT );
+	if ( !vk.msaaActive ) {
+		return ( vk.depth_image_view_sample != VK_NULL_HANDLE || vk.depth_image_view != VK_NULL_HANDLE ) ?
+			qtrue : qfalse;
+	}
+	if ( vk.volumetric_depth_image == VK_NULL_HANDLE ||
+		vk.volumetric_depth_view == VK_NULL_HANDLE ||
+		vk.volumetric_depth_resolve_pipeline == VK_NULL_HANDLE ||
+		vk.volumetric_depth_resolve_descriptor == VK_NULL_HANDLE ) {
+		return qfalse;
+	}
+	vk_resolve_volumetric_depth_msaa();
+	return qtrue;
+}
+
+qboolean vk_temporal_store_previous_depth( uint32_t writeIndex )
+{
+	uint32_t width = 0u;
+	uint32_t height = 0u;
+
+	writeIndex &= 1u;
+	if ( vk.cmd == NULL || vk.cmd->command_buffer == VK_NULL_HANDLE ||
+		vk.temporal_depth_history_copy_pipeline == VK_NULL_HANDLE ||
+		vk.volumetric_depth_resolve_pipeline_layout == VK_NULL_HANDLE ||
+		vk.temporal_depth_copy_descriptor[writeIndex] == VK_NULL_HANDLE ||
+		vk.temporal_prev_depth_image[writeIndex] == VK_NULL_HANDLE ) {
+		vk.temporal.prevDepthValid = qfalse;
+		return qfalse;
+	}
+	vk_get_active_render_extent( &width, &height );
+	if ( width == 0u || height == 0u ) {
+		width = vk_get_render_target_width();
+		height = vk_get_render_target_height();
+	}
+	if ( width == 0u || height == 0u ) {
+		vk.temporal.prevDepthValid = qfalse;
+		return qfalse;
+	}
+
+	record_image_layout_transition( vk.cmd->command_buffer,
+		vk.temporal_prev_depth_image[writeIndex], VK_IMAGE_ASPECT_COLOR_BIT,
+		vk.temporal_prev_depth_layout[writeIndex], VK_IMAGE_LAYOUT_GENERAL,
+		VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT );
+	vk.temporal_prev_depth_layout[writeIndex] = VK_IMAGE_LAYOUT_GENERAL;
+
+	qvkCmdBindPipeline( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE,
+		vk.temporal_depth_history_copy_pipeline );
+	qvkCmdBindDescriptorSets( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE,
+		vk.volumetric_depth_resolve_pipeline_layout, 0, 1,
+		&vk.temporal_depth_copy_descriptor[writeIndex], 0, NULL );
+	qvkCmdDispatch( vk.cmd->command_buffer, ( width + 7u ) / 8u, ( height + 7u ) / 8u, 1u );
+
+	record_image_layout_transition( vk.cmd->command_buffer,
+		vk.temporal_prev_depth_image[writeIndex], VK_IMAGE_ASPECT_COLOR_BIT,
+		VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+		VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT );
+	vk.temporal_prev_depth_layout[writeIndex] = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+	vk.temporal.prevDepthIndex = writeIndex;
+	vk.temporal.prevDepthValid = qtrue;
+	return qtrue;
+}
+
+qboolean vk_temporal_store_weapon_depth( uint32_t writeIndex )
+{
+	uint32_t width = 0u;
+	uint32_t height = 0u;
+
+	writeIndex &= 1u;
+	if ( vk.cmd == NULL || vk.cmd->command_buffer == VK_NULL_HANDLE ||
+		vk.temporal_depth_history_copy_pipeline == VK_NULL_HANDLE ||
+		vk.volumetric_depth_resolve_pipeline_layout == VK_NULL_HANDLE ||
+		vk.weapon_depth_copy_descriptor[writeIndex] == VK_NULL_HANDLE ||
+		vk.weapon_prev_depth_image[writeIndex] == VK_NULL_HANDLE ) {
+		return qfalse;
+	}
+	vk_get_active_render_extent( &width, &height );
+	if ( width == 0u || height == 0u ) {
+		width = vk_get_render_target_width();
+		height = vk_get_render_target_height();
+	}
+	if ( width == 0u || height == 0u ) {
+		return qfalse;
+	}
+
+	record_image_layout_transition( vk.cmd->command_buffer,
+		vk.weapon_prev_depth_image[writeIndex], VK_IMAGE_ASPECT_COLOR_BIT,
+		vk.weapon_prev_depth_layout[writeIndex], VK_IMAGE_LAYOUT_GENERAL,
+		VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT );
+	vk.weapon_prev_depth_layout[writeIndex] = VK_IMAGE_LAYOUT_GENERAL;
+	qvkCmdBindPipeline( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE,
+		vk.temporal_depth_history_copy_pipeline );
+	qvkCmdBindDescriptorSets( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE,
+		vk.volumetric_depth_resolve_pipeline_layout, 0, 1,
+		&vk.weapon_depth_copy_descriptor[writeIndex], 0, NULL );
+	qvkCmdDispatch( vk.cmd->command_buffer, ( width + 7u ) / 8u, ( height + 7u ) / 8u, 1u );
+	record_image_layout_transition( vk.cmd->command_buffer,
+		vk.weapon_prev_depth_image[writeIndex], VK_IMAGE_ASPECT_COLOR_BIT,
+		VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+		VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT );
+	vk.weapon_prev_depth_layout[writeIndex] = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+	return qtrue;
 }
 
 static void vk_temporal_apply_resets( qboolean hardReset )
@@ -609,6 +975,14 @@ qboolean vk_temporal_want_weapon_after_world_post( void )
 	return qfalse;
 }
 
+qboolean vk_temporal_defer_bloom_for_weapon( void )
+{
+	return vk.fboActive && r_bloom && r_bloom->integer &&
+		r_weaponBloomMode && r_weaponBloomMode->integer > 0 &&
+		vk_temporal_want_weapon_after_world_post() &&
+		vk_temporal_reconstruction_wanted();
+}
+
 qboolean vk_temporal_defer_weapon_drawsurfs( const void *drawSurfsCmd )
 {
 	return RB_TryDeferWeaponDrawSurfs( (const drawSurfsCommand_t *)drawSurfsCmd );
@@ -689,11 +1063,64 @@ void vk_temporal_status_f( void )
 		weaponAfter ? "yes" : "no",
 		r_temporalWeaponAfterTaa ? r_temporalWeaponAfterTaa->integer : 0,
 		r_weaponSsrIsolation ? r_weaponSsrIsolation->integer : 0 );
+	ri.Printf( PRINT_ALL,
+		"taa gate  : world=%d doneWorld=%d portal=%d fpStable=%d resetBlock=%d nearStatic=%d "
+		"pipelines=%d framebuffers=%d descriptors=%d "
+		"last={wanted:%d allow:%d depth:%d gate:0x%x missing:0x%x}\n",
+		tr.world != NULL, backEnd.doneWorldScene,
+		backEnd.viewParms.portalView != PV_NONE,
+		vk.temporal.firstPersonProjectionThisFrame == vk.temporal.firstPersonProjectionLastFrame,
+		vk_temporal_has_reason( VK_TEMPORAL_RESET_CAMERA_CUT | VK_TEMPORAL_RESET_MISSING_PREV_DATA |
+			VK_TEMPORAL_RESET_RENDERER_INIT | VK_TEMPORAL_RESET_SWAPCHAIN_CHANGE |
+			VK_TEMPORAL_RESET_RENDER_SIZE_CHANGE | VK_TEMPORAL_RESET_WORLD_CHANGE |
+			VK_TEMPORAL_RESET_CLIENT_STATE_CHANGE ),
+		vk_temporal_near_static_streak_guard(),
+		vk.taa_pipeline != VK_NULL_HANDLE && vk.temporal_depth_history_copy_pipeline != VK_NULL_HANDLE,
+		vk.framebuffers.taa[0] != VK_NULL_HANDLE && vk.framebuffers.taa[1] != VK_NULL_HANDLE,
+		vk.taa_history_descriptor[0] != VK_NULL_HANDLE &&
+			vk.temporal_prev_depth_descriptor[0] != VK_NULL_HANDLE,
+		vk.temporal.lastTaaWanted, vk.temporal.lastTaaAllowed,
+		vk.temporal.lastTaaDepthReady, vk.temporal.lastTaaGateMask,
+		vk.temporal.lastTaaMissingMask );
 	ri.Printf( PRINT_ALL, "history   : taa=%s idx=%u luminance=%s motionPrev=%s\n",
 		vk.temporal.hasValidTAAHistory ? "valid" : "reset",
 		vk.temporal.taaHistoryIndex,
 		vk.temporal.hasValidLuminance ? "valid" : "reset",
 		vk_prev_matrices_valid ? "valid" : "reset" );
+	ri.Printf( PRINT_ALL,
+		"bindings  : missingClass=%u missingReactive=%u fallback=%u forcedReject=%u\n",
+		vk.temporal.missingClassDescriptorFrames,
+		vk.temporal.missingReactiveDescriptorFrames,
+		vk.temporal.fallbackTextureUsageFrames,
+		vk.temporal.forcedHistoryRejectFrames );
+	ri.Printf( PRINT_ALL,
+		"validity  : color=%d depth=%d class=%d velocity=%d weapon=%d\n",
+		vk.temporal.prevColorValid, vk.temporal.prevDepthValid,
+		vk.temporal.prevClassValid, vk.temporal.prevVelocityValid,
+		vk.temporal.weaponHistoryValid );
+	ri.Printf( PRINT_ALL,
+		"frame IDs : color={%llu,%llu} depth={%llu,%llu} class={%llu,%llu} "
+		"weapon={%llu,%llu} weaponDepth={%llu,%llu}\n",
+		(unsigned long long)vk.temporal.taaHistoryFrameId[0],
+		(unsigned long long)vk.temporal.taaHistoryFrameId[1],
+		(unsigned long long)vk.temporal.prevDepthFrameId[0],
+		(unsigned long long)vk.temporal.prevDepthFrameId[1],
+		(unsigned long long)vk.temporal.classFrameId[0],
+		(unsigned long long)vk.temporal.classFrameId[1],
+		(unsigned long long)vk.temporal.weaponHistoryFrameId[0],
+		(unsigned long long)vk.temporal.weaponHistoryFrameId[1],
+		(unsigned long long)vk.temporal.weaponDepthFrameId[0],
+		(unsigned long long)vk.temporal.weaponDepthFrameId[1] );
+	ri.Printf( PRINT_ALL,
+		"resources : extent=%ux%u colorFmt=%d depthFmt=R32F classFmt=R8 "
+		"sets={depth:%s class:%s reactive:%s weapon:%s}\n",
+		vk_get_render_target_width(), vk_get_render_target_height(), (int)vk.color_format,
+		vk.temporal_prev_depth_descriptor[vk.temporal.prevDepthIndex & 1u] ? "bound" : "missing",
+		vk.taa_class_descriptor[vk.cmd_index] ? "bound" : "missing",
+		vk.taa_reactive_descriptor[vk.cmd_index] ? "bound" : "missing",
+		vk.weapon_history_descriptor[vk.temporal.weaponHistoryIndex & 1u] ? "bound" : "missing" );
+	ri.Printf( PRINT_ALL, "timing    : independent weapon resolve %.3f ms GPU\n",
+		vk.temporal.weaponResolveGpuMs );
 	ri.Printf( PRINT_ALL, "resets    : applied=%s sticky=%s pending=%s cameraCut=%s\n",
 		appliedBuf, stickyBuf, pendingBuf,
 		vk.temporal.sharedCameraCut ? "yes" : "no" );
@@ -731,6 +1158,25 @@ void vk_temporal_status_f( void )
 		( r_aaMode && r_aaMode->integer == 3 ) ? "yes (aaMode 3)" :
 		( r_presentAdaptiveRecon && r_presentAdaptiveRecon->integer ) ? "flag" : "no" );
 	ri.Printf( PRINT_ALL, "===========================================\n" );
+}
+
+void vk_capture_temporal_debug_f( void )
+{
+	int mode;
+
+	if ( ri.Cmd_Argc() < 2 ) {
+		ri.Printf( PRINT_ALL, "usage: r_captureTemporalDebug <1..33>\n" );
+		return;
+	}
+	mode = atoi( ri.Cmd_Argv( 1 ) );
+	if ( mode < 1 || mode > 33 ) {
+		ri.Printf( PRINT_WARNING, "r_captureTemporalDebug: mode must be 1..33\n" );
+		return;
+	}
+	ri.Cvar_Set( "r_temporalDebug", va( "%d", mode ) );
+	ri.Cmd_ExecuteText( EXEC_APPEND,
+		va( "wait 2; screenshot temporal_debug_%02d\n", mode ) );
+	ri.Printf( PRINT_ALL, "[VK][temporal] queued temporal_debug_%02d capture\n", mode );
 }
 
 /*

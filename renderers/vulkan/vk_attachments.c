@@ -944,6 +944,16 @@ void vk_create_attachments( void )
 							VK_IMAGE_LAYOUT_GENERAL, qfalse, 0 );
 						ri.Printf( PRINT_ALL, "[VK] Temporal reactive mask: 1x1 stub (SMAA-only / TAA off)\n" );
 					}
+					/* Dedicated legal bindings for descriptor-fault handling.
+					 * Their texels are never trusted: binding either forces current-frame history rejection. */
+					create_color_attachment( 1, 1, VK_SAMPLE_COUNT_1_BIT, VK_FORMAT_R8_UNORM,
+						VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT,
+						&vk.temporal_reactive_fallback_image, &vk.temporal_reactive_fallback_view,
+						VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, qfalse, 0 );
+					create_color_attachment( 1, 1, VK_SAMPLE_COUNT_1_BIT, VK_FORMAT_R8_UNORM,
+						VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT,
+						&vk.temporal_class_fallback_image, &vk.temporal_class_fallback_view,
+						VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, qfalse, 0 );
 				}
 				/* Temporal class ping-pong (same want as reactive / TAA). */
 				{
@@ -970,6 +980,27 @@ void vk_create_attachments( void )
 						vk.temporal.classHasPrev = qfalse;
 						ri.Printf( PRINT_ALL, "[VK] Temporal class mask: dual R8 allocated (WORLD/WEAPON)\n" );
 					}
+				}
+				/* True temporal depth history. R32F stores the exact single-sample
+				 * reversed-Z representation consumed by TAA on the next frame. */
+				{
+					int di;
+					VkImageUsageFlags depthHistoryUsage =
+						VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT |
+						VK_IMAGE_USAGE_TRANSFER_DST_BIT;
+					for ( di = 0; di < 2; di++ ) {
+						vk_create_fullres_color_attachment( VK_FORMAT_R32_SFLOAT, depthHistoryUsage,
+							&vk.temporal_prev_depth_image[di], &vk.temporal_prev_depth_view[di],
+							VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, qfalse );
+						vk.temporal_prev_depth_layout[di] = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+						vk_create_fullres_color_attachment( VK_FORMAT_R32_SFLOAT, depthHistoryUsage,
+							&vk.weapon_prev_depth_image[di], &vk.weapon_prev_depth_view[di],
+							VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, qfalse );
+						vk.weapon_prev_depth_layout[di] = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+					}
+					vk.temporal.prevDepthIndex = 0u;
+					vk.temporal.prevDepthValid = qfalse;
+					ri.Printf( PRINT_ALL, "[VK] Temporal previous depth: dual R32F allocated\n" );
 				}
 
 		// screenmap-msaa
@@ -1022,6 +1053,12 @@ void vk_create_attachments( void )
 				taaUsage, &vk.taa_history_image[0], &vk.taa_history_image_view[0], VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, qfalse );
 			vk_create_fullres_color_attachment( vk.color_format,
 				taaUsage, &vk.taa_history_image[1], &vk.taa_history_image_view[1], VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, qfalse );
+			vk_create_fullres_color_attachment( vk.color_format,
+				taaUsage, &vk.weapon_history_image[0], &vk.weapon_history_view[0], VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, qfalse );
+			vk_create_fullres_color_attachment( vk.color_format,
+				taaUsage, &vk.weapon_history_image[1], &vk.weapon_history_view[1], VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, qfalse );
+			vk.temporal.weaponHistoryIndex = 0u;
+			vk.temporal.weaponHistoryValid = qfalse;
 		}
 
 		vk_create_deferred_gbuffer_scaffold();
@@ -1187,6 +1224,38 @@ void vk_create_attachments( void )
 			SET_OBJECT_NAME( vk.taa_history_image[i], va( "taa history image %d", i ), VK_DEBUG_REPORT_OBJECT_TYPE_IMAGE_EXT );
 			SET_OBJECT_NAME( vk.taa_history_image_view[i], va( "taa history image view %d", i ), VK_DEBUG_REPORT_OBJECT_TYPE_IMAGE_VIEW_EXT );
 		}
+		if ( vk.temporal_prev_depth_image[i] ) {
+			SET_OBJECT_NAME( vk.temporal_prev_depth_image[i], va( "TemporalPrevDepthR32F[%d]", i ), VK_DEBUG_REPORT_OBJECT_TYPE_IMAGE_EXT );
+			SET_OBJECT_NAME( vk.temporal_prev_depth_view[i], va( "TemporalPrevDepthR32FView[%d]", i ), VK_DEBUG_REPORT_OBJECT_TYPE_IMAGE_VIEW_EXT );
+		}
+		if ( vk.weapon_prev_depth_image[i] ) {
+			SET_OBJECT_NAME( vk.weapon_prev_depth_image[i], va( "WeaponPrevDepthR32F[%d]", i ), VK_DEBUG_REPORT_OBJECT_TYPE_IMAGE_EXT );
+			SET_OBJECT_NAME( vk.weapon_prev_depth_view[i], va( "WeaponPrevDepthR32FView[%d]", i ), VK_DEBUG_REPORT_OBJECT_TYPE_IMAGE_VIEW_EXT );
+		}
+		if ( vk.weapon_history_image[i] ) {
+			SET_OBJECT_NAME( vk.weapon_history_image[i], va( "WeaponTemporalHistory[%d]", i ), VK_DEBUG_REPORT_OBJECT_TYPE_IMAGE_EXT );
+			SET_OBJECT_NAME( vk.weapon_history_view[i], va( "WeaponTemporalHistoryView[%d]", i ), VK_DEBUG_REPORT_OBJECT_TYPE_IMAGE_VIEW_EXT );
+		}
+		if ( vk.temporal_class_image[i] ) {
+			SET_OBJECT_NAME( vk.temporal_class_image[i],
+				i == 0 ? "TemporalClassR8[0]" : "TemporalPrevClassR8[1]",
+				VK_DEBUG_REPORT_OBJECT_TYPE_IMAGE_EXT );
+			SET_OBJECT_NAME( vk.temporal_class_view[i],
+				i == 0 ? "TemporalClassR8View[0]" : "TemporalPrevClassR8View[1]",
+				VK_DEBUG_REPORT_OBJECT_TYPE_IMAGE_VIEW_EXT );
+		}
+	}
+	if ( vk.reactive_mask_image ) {
+		SET_OBJECT_NAME( vk.reactive_mask_image, "TemporalReactiveR8", VK_DEBUG_REPORT_OBJECT_TYPE_IMAGE_EXT );
+		SET_OBJECT_NAME( vk.reactive_mask_view, "TemporalReactiveR8View", VK_DEBUG_REPORT_OBJECT_TYPE_IMAGE_VIEW_EXT );
+	}
+	if ( vk.temporal_class_fallback_image ) {
+		SET_OBJECT_NAME( vk.temporal_class_fallback_image, "TemporalUnclassifiedR8", VK_DEBUG_REPORT_OBJECT_TYPE_IMAGE_EXT );
+		SET_OBJECT_NAME( vk.temporal_class_fallback_view, "TemporalUnclassifiedR8View", VK_DEBUG_REPORT_OBJECT_TYPE_IMAGE_VIEW_EXT );
+	}
+	if ( vk.temporal_reactive_fallback_image ) {
+		SET_OBJECT_NAME( vk.temporal_reactive_fallback_image, "TemporalReactiveFallbackR8", VK_DEBUG_REPORT_OBJECT_TYPE_IMAGE_EXT );
+		SET_OBJECT_NAME( vk.temporal_reactive_fallback_view, "TemporalReactiveFallbackR8View", VK_DEBUG_REPORT_OBJECT_TYPE_IMAGE_VIEW_EXT );
 	}
 	if ( vk.deferred_gbuffer_albedo ) {
 		SET_OBJECT_NAME( vk.deferred_gbuffer_albedo, "deferred gbuffer albedo", VK_DEBUG_REPORT_OBJECT_TYPE_IMAGE_EXT );
@@ -2503,6 +2572,20 @@ void vk_destroy_attachments( void )
 		vk.reactive_mask_stub_image = VK_NULL_HANDLE;
 		vk.reactive_mask_stub_view = VK_NULL_HANDLE;
 	}
+	if ( vk.temporal_reactive_fallback_image ) {
+		qvkDestroyImage( vk.device, vk.temporal_reactive_fallback_image, NULL );
+		qvkDestroyImageView( vk.device, vk.temporal_reactive_fallback_view, NULL );
+		vk.temporal_reactive_fallback_image = VK_NULL_HANDLE;
+		vk.temporal_reactive_fallback_view = VK_NULL_HANDLE;
+	}
+	if ( vk.temporal_class_fallback_image ) {
+		qvkDestroyImage( vk.device, vk.temporal_class_fallback_image, NULL );
+		qvkDestroyImageView( vk.device, vk.temporal_class_fallback_view, NULL );
+		vk.temporal_class_fallback_image = VK_NULL_HANDLE;
+		vk.temporal_class_fallback_view = VK_NULL_HANDLE;
+	}
+	vk.temporal_class_fallback_descriptor = VK_NULL_HANDLE;
+	vk.temporal_reactive_fallback_descriptor = VK_NULL_HANDLE;
 	{
 		int ci;
 		for ( ci = 0; ci < 2; ci++ ) {
@@ -2552,7 +2635,40 @@ void vk_destroy_attachments( void )
 			vk.taa_history_image_view[i] = VK_NULL_HANDLE;
 		}
 		vk.taa_history_descriptor[i] = VK_NULL_HANDLE;
+		if ( vk.temporal_prev_depth_image[i] ) {
+			qvkDestroyImage( vk.device, vk.temporal_prev_depth_image[i], NULL );
+			vk.temporal_prev_depth_image[i] = VK_NULL_HANDLE;
+		}
+		if ( vk.temporal_prev_depth_view[i] ) {
+			qvkDestroyImageView( vk.device, vk.temporal_prev_depth_view[i], NULL );
+			vk.temporal_prev_depth_view[i] = VK_NULL_HANDLE;
+		}
+		vk.temporal_prev_depth_layout[i] = VK_IMAGE_LAYOUT_UNDEFINED;
+		vk.temporal_prev_depth_descriptor[i] = VK_NULL_HANDLE;
+		vk.temporal_depth_copy_descriptor[i] = VK_NULL_HANDLE;
+		if ( vk.weapon_prev_depth_image[i] ) {
+			qvkDestroyImage( vk.device, vk.weapon_prev_depth_image[i], NULL );
+			vk.weapon_prev_depth_image[i] = VK_NULL_HANDLE;
+		}
+		if ( vk.weapon_prev_depth_view[i] ) {
+			qvkDestroyImageView( vk.device, vk.weapon_prev_depth_view[i], NULL );
+			vk.weapon_prev_depth_view[i] = VK_NULL_HANDLE;
+		}
+		if ( vk.weapon_history_image[i] ) {
+			qvkDestroyImage( vk.device, vk.weapon_history_image[i], NULL );
+			vk.weapon_history_image[i] = VK_NULL_HANDLE;
+		}
+		if ( vk.weapon_history_view[i] ) {
+			qvkDestroyImageView( vk.device, vk.weapon_history_view[i], NULL );
+			vk.weapon_history_view[i] = VK_NULL_HANDLE;
+		}
+		vk.weapon_prev_depth_layout[i] = VK_IMAGE_LAYOUT_UNDEFINED;
+		vk.weapon_history_descriptor[i] = VK_NULL_HANDLE;
+		vk.weapon_prev_depth_descriptor[i] = VK_NULL_HANDLE;
+		vk.weapon_depth_copy_descriptor[i] = VK_NULL_HANDLE;
 	}
+	vk.temporal.prevDepthValid = qfalse;
+	vk.temporal.weaponHistoryValid = qfalse;
 	if ( vk.deferred_gbuffer_albedo ) {
 		qvkDestroyImage( vk.device, vk.deferred_gbuffer_albedo, NULL );
 		qvkDestroyImageView( vk.device, vk.deferred_gbuffer_albedo_view, NULL );

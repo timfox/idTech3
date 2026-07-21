@@ -444,6 +444,7 @@ void vk_reactive_mask_update_taa_descriptors( void )
 		}
 		desc.dstSet = vk.taa_reactive_descriptor[i];
 		qvkUpdateDescriptorSets( vk.device, 1, &desc, 0, NULL );
+		vk.taaReactiveBoundView[i] = view;
 	}
 }
 

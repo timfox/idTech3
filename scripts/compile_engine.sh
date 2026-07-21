@@ -568,6 +568,14 @@ copy_to_release() {
     fi
   done
 
+  # Surf ships its own explicit renderer profile. autoexec applies the temporal
+  # resource bootstrap before R_Init; surf.cfg remains the authoritative map
+  # profile and is re-applied by mapscripts/g_default.cfg.
+  if [ -d "$dest/surf" ]; then
+    cp -f "$PROJECT_ROOT/config/surf.cfg" "$dest/surf/surf.cfg"
+    cp -f "$PROJECT_ROOT/config/surf_autoexec.cfg" "$dest/surf/autoexec.cfg"
+  fi
+
   # Client
   if [ -f "$BUILD_DIR/idtech3.x86_64" ]; then
     cp -f "$BUILD_DIR/idtech3.x86_64" "$dest/${GAME_NAME}.x86_64"

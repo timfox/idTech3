@@ -656,14 +656,25 @@ void R_SetupFirstPersonProjection( viewParms_t *dest, float *outProjection )
 
 	{
 		float aspect;
-		if ( dest->viewportWidth > 0 && dest->viewportHeight > 0 ) {
+		/*
+		 * Derive the active display aspect from the scene FOV pair first.
+		 * Deferred Architecture-B weapon commands can execute after viewport
+		 * bookkeeping has changed; the world FOV pair remains the projection
+		 * actually used for this view.
+		 */
+		if ( dest->fovX > 0.0f && dest->fovX < 179.0f &&
+			dest->fovY > 0.0f && dest->fovY < 179.0f ) {
+			const float tanHalfX = (float)tan( dest->fovX * (float)M_PI / 360.0f );
+			const float tanHalfY = (float)tan( dest->fovY * (float)M_PI / 360.0f );
+			aspect = ( fabsf( tanHalfX ) > 1e-6f ) ? tanHalfY / tanHalfX : 0.75f;
+		} else if ( dest->viewportWidth > 0 && dest->viewportHeight > 0 ) {
 			aspect = (float)dest->viewportHeight / (float)dest->viewportWidth;
 		} else if ( tr.refdef.width > 0 && tr.refdef.height > 0 ) {
 			aspect = (float)tr.refdef.height / (float)tr.refdef.width;
 		} else {
 			aspect = 0.75f;
 		}
-		fovY = 2.0f * (float)atan( tan( fovX * (float)M_PI / 360.0f ) * aspect ) * 360.0f / (float)M_PI;
+		fovY = 2.0f * (float)atan( tan( fovX * (float)M_PI / 360.0f ) * aspect ) * 180.0f / (float)M_PI;
 	}
 
 	if ( stereoSep != 0.0f ) {

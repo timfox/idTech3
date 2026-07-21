@@ -156,6 +156,10 @@ void vk_shutdown( refShutdownCode_t code )
 		qvkDestroyQueryPool( vk.device, vk.volumetric_query_pool, NULL );
 		vk.volumetric_query_pool = VK_NULL_HANDLE;
 	}
+	if ( vk.weapon_temporal_query_pool != VK_NULL_HANDLE ) {
+		qvkDestroyQueryPool( vk.device, vk.weapon_temporal_query_pool, NULL );
+		vk.weapon_temporal_query_pool = VK_NULL_HANDLE;
+	}
 	if ( vk.occlusion_query_pool != VK_NULL_HANDLE ) {
 		qvkDestroyQueryPool( vk.device, vk.occlusion_query_pool, NULL );
 		vk.occlusion_query_pool = VK_NULL_HANDLE;
@@ -222,6 +226,14 @@ void vk_shutdown( refShutdownCode_t code )
 	if ( vk.pipeline_layout_taa != VK_NULL_HANDLE && qvkDestroyPipelineLayout != NULL ) {
 		qvkDestroyPipelineLayout( vk.device, vk.pipeline_layout_taa, NULL );
 		vk.pipeline_layout_taa = VK_NULL_HANDLE;
+	}
+	if ( vk.pipeline_layout_weapon_taa != VK_NULL_HANDLE && qvkDestroyPipelineLayout != NULL ) {
+		qvkDestroyPipelineLayout( vk.device, vk.pipeline_layout_weapon_taa, NULL );
+		vk.pipeline_layout_weapon_taa = VK_NULL_HANDLE;
+	}
+	if ( vk.pipeline_layout_weapon_composite != VK_NULL_HANDLE && qvkDestroyPipelineLayout != NULL ) {
+		qvkDestroyPipelineLayout( vk.device, vk.pipeline_layout_weapon_composite, NULL );
+		vk.pipeline_layout_weapon_composite = VK_NULL_HANDLE;
 	}
 	if ( vk.pipeline_layout_reactive_stamp != VK_NULL_HANDLE && qvkDestroyPipelineLayout != NULL ) {
 		qvkDestroyPipelineLayout( vk.device, vk.pipeline_layout_reactive_stamp, NULL );
@@ -490,10 +502,13 @@ for (i = 0; i < 2; i++) {
 	VK_DESTROY_SHADER_MODULE_FIELD( vk.modules.fp64_points_single_vs );
 	VK_DESTROY_SHADER_MODULE_FIELD( vk.modules.fp64_points_single_fs );
 	VK_DESTROY_SHADER_MODULE_FIELD( vk.modules.taa_fs );
+	VK_DESTROY_SHADER_MODULE_FIELD( vk.modules.weapon_taa_fs );
+	VK_DESTROY_SHADER_MODULE_FIELD( vk.modules.weapon_taa_composite_fs );
 	VK_DESTROY_SHADER_MODULE_FIELD( vk.modules.volumetric_fog_vs );
 	VK_DESTROY_SHADER_MODULE_FIELD( vk.modules.volumetric_fog_fs );
 	VK_DESTROY_SHADER_MODULE_FIELD( vk.modules.volumetric_fog_cs );
 	VK_DESTROY_SHADER_MODULE_FIELD( vk.modules.volumetric_depth_resolve_msaa_cs );
+	VK_DESTROY_SHADER_MODULE_FIELD( vk.modules.temporal_depth_history_copy_cs );
 	VK_DESTROY_SHADER_MODULE_FIELD( vk.modules.luminance_cs );
 	VK_DESTROY_SHADER_MODULE_FIELD( vk.modules.vegetation_wind_cs );
 	VK_DESTROY_SHADER_MODULE_FIELD( vk.modules.fluid_advect_cs );

@@ -1143,13 +1143,177 @@ static void CM_TraceThroughTree( traceWork_t *tw, int num, float p1f, float p2f,
  */
 #define BSP30_MAX_TRACE_DEPTH 512
 
+static qboolean CM_Bsp30BoxTouchesContents( int num, const vec3_t point,
+		const vec3_t extents, int contentsOverride, int mask, qboolean clipTree,
+		float contactEpsilon, int depth );
+
+/*
+==================
+CM_Bsp30ClipHullCheck
+
+Point/box sweep through a pre-expanded BSP30 clipnode hull. Crossing math
+matches the classic recursive hull check: stop epsilon short of the split
+plane, then treat a solid far child as the impact. Returns qfalse once an
+impact has been recorded.
+==================
+*/
+static qboolean CM_Bsp30ClipHullCheck( traceWork_t *tw, int num,
+		float p1f, float p2f, const vec3_t p1, const vec3_t p2,
+		int hullRoot, int contentsOverride, const vec3_t extents, int depth ) {
+	cNode_t *node;
+	cplane_t *plane;
+	double t1, t2, offset;
+	float frac, midf;
+	vec3_t mid;
+	int side;
+	int farChild;
+
+	if ( depth > BSP30_MAX_TRACE_DEPTH ) {
+		return qtrue;
+	}
+
+	if ( tw->trace.fraction <= p1f ) {
+		return qfalse;
+	}
+
+	/* Clipnode children that are negative are content codes. */
+	if ( num < 0 ) {
+		int leafContents = CM_Bsp30Contents( num );
+
+		if ( contentsOverride >= 0 && leafContents ) {
+			leafContents = contentsOverride;
+		}
+		if ( leafContents & tw->contents ) {
+			tw->trace.startsolid = qtrue;
+		} else {
+			tw->trace.allsolid = qfalse;
+		}
+		return qtrue;
+	}
+
+	if ( num >= cm.numBSP30ClipNodes ) {
+		Com_Error( ERR_DROP, "%s: bad BSP30 clipnode %d", __func__, num );
+	}
+
+	node = &cm.bsp30ClipNodes[num];
+	plane = node->plane;
+	t1 = DotProductDP( plane->normal, p1 ) - plane->dist;
+	t2 = DotProductDP( plane->normal, p2 ) - plane->dist;
+	offset = fabs( extents[0] * plane->normal[0] ) +
+			fabs( extents[1] * plane->normal[1] ) +
+			fabs( extents[2] * plane->normal[2] );
+
+	if ( t1 >= offset && t2 >= offset ) {
+		return CM_Bsp30ClipHullCheck( tw, node->children[0], p1f, p2f,
+				p1, p2, hullRoot, contentsOverride, extents, depth + 1 );
+	}
+	if ( t1 < -offset && t2 < -offset ) {
+		return CM_Bsp30ClipHullCheck( tw, node->children[1], p1f, p2f,
+				p1, p2, hullRoot, contentsOverride, extents, depth + 1 );
+	}
+
+	/* Parallel to the split (or numerically identical distances). */
+	if ( t1 == t2 ) {
+		side = ( t1 < 0.0 ) ? 1 : 0;
+		return CM_Bsp30ClipHullCheck( tw, node->children[side], p1f, p2f,
+				p1, p2, hullRoot, contentsOverride, extents, depth + 1 );
+	}
+
+	/*
+	 * Put the crosspoint epsilon pixels on the near side of the split.
+	 * Side selection follows the classic hull check (based on p1), not the
+	 * Quake III leaf-walk (based on t1 < t2).
+	 */
+	if ( t1 < 0.0 ) {
+		side = 1;
+		frac = (float)( ( t1 + offset + BSP30_SURFACE_CLIP_EPSILON ) / ( t1 - t2 ) );
+	} else {
+		side = 0;
+		frac = (float)( ( t1 - offset - BSP30_SURFACE_CLIP_EPSILON ) / ( t1 - t2 ) );
+	}
+	if ( frac < 0.0f ) {
+		frac = 0.0f;
+	}
+	if ( frac > 1.0f ) {
+		frac = 1.0f;
+	}
+
+	midf = p1f + ( p2f - p1f ) * frac;
+	VectorSubtract( p2, p1, mid );
+	VectorMA( p1, frac, mid, mid );
+
+	if ( !CM_Bsp30ClipHullCheck( tw, node->children[side], p1f, midf,
+			p1, mid, hullRoot, contentsOverride, extents, depth + 1 ) ) {
+		return qfalse;
+	}
+
+	farChild = node->children[side ^ 1];
+	if ( !CM_Bsp30BoxTouchesContents( farChild, mid, extents, contentsOverride,
+			tw->contents, qtrue, 0.0f, depth + 1 ) ) {
+		return CM_Bsp30ClipHullCheck( tw, farChild, midf, p2f,
+				mid, p2, hullRoot, contentsOverride, extents, depth + 1 );
+	}
+
+	/* Far side is solid at the crossing — this is the impact. */
+	if ( tw->trace.allsolid ) {
+		return qfalse;
+	}
+
+	if ( !side ) {
+		VectorCopy( plane->normal, tw->trace.plane.normal );
+		tw->trace.plane.dist = plane->dist;
+	} else {
+		VectorNegate( plane->normal, tw->trace.plane.normal );
+		tw->trace.plane.dist = -plane->dist;
+	}
+	tw->trace.plane.type = PlaneTypeForNormal( tw->trace.plane.normal );
+	SetPlaneSignbits( &tw->trace.plane );
+	tw->trace.sourceBrush = -1;
+	tw->trace.sourceSide = side;
+	tw->trace.sourceClipnode = num;
+	{
+		int planeNum = (int)( plane - cm.planes );
+		tw->trace.planeKind = TRACE_PLANE_WORLD_FACE;
+		if ( planeNum >= 0 && planeNum < cm.numPlanes && cm.bsp30PlaneKind ) {
+			tw->trace.planeKind = (tracePlaneKind_t)cm.bsp30PlaneKind[planeNum];
+		}
+	}
+	if ( farChild < 0 ) {
+		tw->trace.contents = CM_Bsp30Contents( farChild );
+		if ( contentsOverride >= 0 && tw->trace.contents ) {
+			tw->trace.contents = contentsOverride;
+		}
+	} else {
+		tw->trace.contents = CONTENTS_SOLID;
+	}
+
+	/*
+	 * Float error can leave mid inside solid; back up along the segment until
+	 * the point is clear (classic hull-check recovery).
+	 */
+	while ( CM_Bsp30BoxTouchesContents( hullRoot, mid, extents, contentsOverride,
+			tw->contents, qtrue, 0.0f, 0 ) ) {
+		frac -= 0.1f;
+		if ( frac < 0.0f ) {
+			break;
+		}
+		midf = p1f + ( p2f - p1f ) * frac;
+		VectorSubtract( p2, p1, mid );
+		VectorMA( p1, frac, mid, mid );
+	}
+
+	if ( midf < tw->trace.fraction ) {
+		tw->trace.fraction = midf;
+	}
+	return qfalse;
+}
+
 /*
 ==================
 CM_Bsp30TraceThroughTree
 
-BSP30 render nodes terminate in indexed leaves, while collision clipnodes
-terminate directly in content codes. Traverse either tree, expanding only by
-the extents not already represented by a precomputed collision hull.
+BSP30 render-node walk used when a clipnode hull is unavailable (and by the
+cm_bsp30Compare naive path). Clipnode player traces use CM_Bsp30ClipHullCheck.
 ==================
 */
 static void CM_Bsp30TraceThroughTree( traceWork_t *tw, int num,
@@ -1513,9 +1677,20 @@ static void CM_Trace( trace_t *results, const vec3_t start, const vec3_t end, co
 				traceExtents[axis] = MAX( 0.0f, traceExtents[axis] - hullExtents[axis] );
 			}
 		}
-		CM_Bsp30TraceThroughTree( &tw, root, 0.0f, 1.0f,
-				tw.start, tw.end, NULL, 0, -1, contentsOverride, clipTree,
-				traceExtents, 0 );
+		if ( clipTree ) {
+			/*
+			 * Classic hull check starts allsolid and clears it on the first
+			 * empty content visit. Impacts use near-side epsilon + far-child
+			 * solidity, not Quake III leaf-walk fractions.
+			 */
+			tw.trace.allsolid = qtrue;
+			CM_Bsp30ClipHullCheck( &tw, root, 0.0f, 1.0f,
+					tw.start, tw.end, root, contentsOverride, traceExtents, 0 );
+		} else {
+			CM_Bsp30TraceThroughTree( &tw, root, 0.0f, 1.0f,
+					tw.start, tw.end, NULL, 0, -1, contentsOverride, qfalse,
+					traceExtents, 0 );
+		}
 		/*
 		 * The crossing epsilon may clamp an entry fraction to zero when the
 		 * hull merely starts on a ramp plane. Verify the unmodified start point
@@ -1527,6 +1702,7 @@ static void CM_Trace( trace_t *results, const vec3_t start, const vec3_t end, co
 				contentsOverride, brushmask, clipTree,
 				BSP30_SURFACE_CLIP_EPSILON, 0 ) ) {
 			tw.trace.startsolid = qfalse;
+			tw.trace.allsolid = qfalse;
 			/*
 			 * The recursive trace can enter the far leaf at fraction zero when
 			 * the clear start is less than one clip epsilon from a plane. If the
@@ -1536,7 +1712,6 @@ static void CM_Trace( trace_t *results, const vec3_t start, const vec3_t end, co
 			if ( CM_Bsp30BoxTouchesContents( root, tw.end, traceExtents,
 					contentsOverride, brushmask, clipTree, 0.0f, 0 ) ) {
 				tw.trace.fraction = 0.0f;
-				tw.trace.allsolid = qfalse;
 			}
 		}
 		if ( tw.trace.startsolid ) {
@@ -1545,6 +1720,9 @@ static void CM_Trace( trace_t *results, const vec3_t start, const vec3_t end, co
 			if ( tw.trace.allsolid ) {
 				tw.trace.fraction = 0.0f;
 			}
+		} else if ( tw.trace.allsolid ) {
+			/* Started empty (or cleared above) — cannot still be allsolid. */
+			tw.trace.allsolid = qfalse;
 		}
 #ifndef BSPC
 		/*

@@ -23,6 +23,13 @@ cvar_t *r_reactiveMaskForce;
 cvar_t *r_temporalWeaponAfterTaa;
 cvar_t *r_weaponSsrIsolation;
 cvar_t *r_weaponTemporalMode;
+cvar_t *r_weaponTemporalHistoryWeight;
+cvar_t *r_weaponTemporalVarianceGamma;
+cvar_t *r_weaponTemporalDepthThreshold;
+cvar_t *r_weaponTemporalReactiveScale;
+cvar_t *r_temporalDebugVectorScale;
+cvar_t *r_weaponBloomMode;
+cvar_t *r_temporalDropClassDescriptor;
 cvar_t *r_temporalSmaaCleanup;
 cvar_t *r_debugMotionVectors;
 cvar_t *r_debugHistoryRejection;
@@ -134,10 +141,37 @@ void vk_aa_policy_register_cvars( void )
 	ri.Cvar_CheckRange( r_weaponTemporalMode, "0", "2", CV_INTEGER );
 	ri.Cvar_SetDescription( r_weaponTemporalMode,
 		"Weapon Temporal Reconstruction: 0=no weapon history, 1=classified shared history (default), "
-		"2=reserved (separate weapon history RT)." );
+		"2=independent weapon color/depth/coverage history." );
 	ri.Cvar_SetGroup( r_weaponTemporalMode, CVG_RENDERER );
 	ri.Printf( PRINT_ALL, "[VK][weapon] temporal mode %d (r_weaponTemporalMode)\n",
 		r_weaponTemporalMode->integer );
+
+	r_weaponTemporalHistoryWeight = ri.Cvar_Get( "r_weaponTemporalHistoryWeight", "0.58", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_weaponTemporalHistoryWeight, "0", "0.9", CV_FLOAT );
+	r_weaponTemporalVarianceGamma = ri.Cvar_Get( "r_weaponTemporalVarianceGamma", "0.75", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_weaponTemporalVarianceGamma, "0.1", "3", CV_FLOAT );
+	r_weaponTemporalDepthThreshold = ri.Cvar_Get( "r_weaponTemporalDepthThreshold", "0.025", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_weaponTemporalDepthThreshold, "0.001", "0.25", CV_FLOAT );
+	r_weaponTemporalReactiveScale = ri.Cvar_Get( "r_weaponTemporalReactiveScale", "1.0", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_weaponTemporalReactiveScale, "0", "4", CV_FLOAT );
+	ri.Cvar_SetGroup( r_weaponTemporalHistoryWeight, CVG_RENDERER );
+	ri.Cvar_SetGroup( r_weaponTemporalVarianceGamma, CVG_RENDERER );
+	ri.Cvar_SetGroup( r_weaponTemporalDepthThreshold, CVG_RENDERER );
+	ri.Cvar_SetGroup( r_weaponTemporalReactiveScale, CVG_RENDERER );
+	r_temporalDebugVectorScale = ri.Cvar_Get( "r_temporalDebugVectorScale", "80", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_temporalDebugVectorScale, "1", "1000", CV_FLOAT );
+	ri.Cvar_SetGroup( r_temporalDebugVectorScale, CVG_RENDERER );
+	r_weaponBloomMode = ri.Cvar_Get( "r_weaponBloomMode", "1", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_weaponBloomMode, "0", "2", CV_INTEGER );
+	ri.Cvar_SetDescription( r_weaponBloomMode,
+		"Architecture B weapon bloom: 0=world bloom before weapon (no weapon bloom), "
+		"1=combined HDR global bloom after weapon (default), 2=dedicated weapon bloom policy." );
+	ri.Cvar_SetGroup( r_weaponBloomMode, CVG_RENDERER );
+	r_temporalDropClassDescriptor = ri.Cvar_Get( "r_temporalDropClassDescriptor", "0", CVAR_TEMP );
+	ri.Cvar_CheckRange( r_temporalDropClassDescriptor, "0", "1", CV_INTEGER );
+	ri.Cvar_SetDescription( r_temporalDropClassDescriptor,
+		"Fault injection: drop the temporal class descriptor for one or more frames. "
+		"The renderer must bind TemporalUnclassifiedR8 and reject all history safely." );
 
 	r_temporalSmaaCleanup = ri.Cvar_Get( "r_temporalSmaaCleanup", "0", CVAR_ARCHIVE_ND );
 	ri.Cvar_CheckRange( r_temporalSmaaCleanup, "0", "1", CV_INTEGER );

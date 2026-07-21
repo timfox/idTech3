@@ -538,6 +538,8 @@ void vk_initialize( void )
 
 	vk.volumetric_query_pool = VK_NULL_HANDLE;
 	vk.volumetric_timestamp_period_ns = props.limits.timestampPeriod;
+	vk.weapon_temporal_query_pool = VK_NULL_HANDLE;
+	vk.weapon_temporal_timestamp_period_ns = props.limits.timestampPeriod;
 	vk.volumetric_total_ms = 0.0f;
 	vk.volumetric_fluid_ms = 0.0f;
 	vk.fluid_dynamic_resolution_scale = 1.0f;
@@ -559,6 +561,17 @@ void vk_initialize( void )
 				qvkResetQueryPoolEXT( vk.device, vk.volumetric_query_pool, 0, VK_VOLUMETRIC_QUERY_COUNT );
 		} else {
 			vk.volumetric_query_pool = VK_NULL_HANDLE;
+		}
+		query_desc.queryCount = VK_WEAPON_TEMPORAL_QUERY_COUNT;
+		if ( qvkCreateQueryPool( vk.device, &query_desc, NULL, &vk.weapon_temporal_query_pool ) == VK_SUCCESS ) {
+			SET_OBJECT_NAME( vk.weapon_temporal_query_pool, "weapon temporal timestamp query pool",
+				VK_DEBUG_REPORT_OBJECT_TYPE_QUERY_POOL_EXT );
+			if ( qvkResetQueryPoolEXT ) {
+				qvkResetQueryPoolEXT( vk.device, vk.weapon_temporal_query_pool, 0,
+					VK_WEAPON_TEMPORAL_QUERY_COUNT );
+			}
+		} else {
+			vk.weapon_temporal_query_pool = VK_NULL_HANDLE;
 		}
 	}
 
@@ -1101,10 +1114,34 @@ void vk_initialize( void )
 		set_layouts[4] = vk.set_layout_sampler;
 		set_layouts[5] = vk.set_layout_sampler;
 		set_layouts[6] = vk.set_layout_sampler;
-		desc.setLayoutCount = 7;
+		set_layouts[7] = vk.set_layout_sampler;
+		desc.setLayoutCount = 8;
 		desc.pSetLayouts = set_layouts;
 		VK_CHECK( qvkCreatePipelineLayout( vk.device, &desc, NULL, &vk.pipeline_layout_taa ) );
 		SET_OBJECT_NAME( vk.pipeline_layout_taa, "pipeline layout - taa", VK_DEBUG_REPORT_OBJECT_TYPE_PIPELINE_LAYOUT_EXT );
+
+		set_layouts[0] = vk.set_layout_sampler;       /* current combined color */
+		set_layouts[1] = vk.set_layout_sampler;       /* current weapon depth */
+		set_layouts[2] = vk.set_layout_postfx_uniform;
+		set_layouts[3] = vk.set_layout_sampler;       /* previous weapon history */
+		set_layouts[4] = vk.set_layout_sampler;       /* weapon MVP velocity */
+		set_layouts[5] = vk.set_layout_sampler;       /* reactive */
+		set_layouts[6] = vk.set_layout_sampler;       /* previous class */
+		set_layouts[7] = vk.set_layout_sampler;       /* previous weapon depth */
+		set_layouts[8] = vk.set_layout_sampler;       /* current class */
+		desc.setLayoutCount = 9;
+		desc.pSetLayouts = set_layouts;
+		VK_CHECK( qvkCreatePipelineLayout( vk.device, &desc, NULL, &vk.pipeline_layout_weapon_taa ) );
+		SET_OBJECT_NAME( vk.pipeline_layout_weapon_taa, "pipeline layout - weapon taa",
+			VK_DEBUG_REPORT_OBJECT_TYPE_PIPELINE_LAYOUT_EXT );
+
+		set_layouts[0] = vk.set_layout_sampler;
+		set_layouts[1] = vk.set_layout_sampler;
+		desc.setLayoutCount = 2;
+		desc.pSetLayouts = set_layouts;
+		VK_CHECK( qvkCreatePipelineLayout( vk.device, &desc, NULL, &vk.pipeline_layout_weapon_composite ) );
+		SET_OBJECT_NAME( vk.pipeline_layout_weapon_composite, "pipeline layout - weapon taa composite",
+			VK_DEBUG_REPORT_OBJECT_TYPE_PIPELINE_LAYOUT_EXT );
 
 		/* Blend pipeline: 4 sampler sets for texture0..texture3 (blend.frag). Must not reuse postfx_uniform. */
 		set_layouts[0] = vk.set_layout_sampler;

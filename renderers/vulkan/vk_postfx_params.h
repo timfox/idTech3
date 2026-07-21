@@ -28,6 +28,9 @@ typedef struct {
 	float autoExposureParams[4]; /* avgLogLum, targetLum, minExposure, maxExposure */
 	float localExposureParams[4]; /* enabled, strength, shadowClampEV, highlightClampEV */
 	float taaParams[4];        /* validHistory, stationaryFeedback, motionFeedback, sharpen */
+	float temporalValidity[4]; /* previous color, depth, class, weapon history */
+	float weaponTemporalParams[4]; /* historyWeight, varianceGamma, depthThreshold, reactiveScale */
+	float temporalDebugParams[4]; /* vectorScale, reserved */
 } VkPostFXParams;
 
 typedef struct {
