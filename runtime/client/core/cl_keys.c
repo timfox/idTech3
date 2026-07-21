@@ -812,7 +812,10 @@ Called by the system for both key up and key down events
 */
 void CL_KeyEvent( int key, qboolean down, unsigned time )
 {
-#if defined(USE_DUKTAPE) || defined(USE_CSHARP)
+	/* No USE_DUKTAPE/USE_CSHARP guard: client objects do not carry those
+	 * defines (qcommon does), and Com_ScriptEmitEvent is always linked —
+	 * real implementation or stub.  A guard here silently compiles the
+	 * emission out and JS overlays never receive input. */
 	Com_ScriptEmitEvent( "input_key", Key_KeynumToString( key ), NULL, key, down ? 1 : 0 );
 	/* Deliver virtual HUD coords with the click so City Menu hit-tests match the OS cursor. */
 	if ( down && key == K_MOUSE1 && CL_RpMenuActive() ) {
@@ -821,7 +824,6 @@ void CL_KeyEvent( int key, qboolean down, unsigned time )
 		CL_GetHudCursorVirtual( &vx, &vy );
 		Com_ScriptEmitEvent( "rp_click", NULL, NULL, (int)( vx + 0.5f ), (int)( vy + 0.5f ) );
 	}
-#endif
 
 	if ( down )
 		CL_KeyDownEvent( key, time );

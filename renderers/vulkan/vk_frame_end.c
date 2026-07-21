@@ -8,6 +8,7 @@
 #include "vk_post_fog.h"
 #include "vk_post_process_push.h"
 #include "vk_postfx.h"
+#include "vk_ui_blur.h"
 #include "vk_postfx_params.h"
 #include "vk_pass_registry.h"
 #include "vk_reactive_mask.h"
@@ -1187,6 +1188,15 @@ void vk_end_frame_record_gamma_pass( VkImageView post_fog_src )
 #ifdef USE_IMGUI
 	VkImgui_RecordOverlayPass();
 #endif
+
+	/*
+	 * CSS filter / backdrop-filter blur. Runs after the tonemap draw wrote the
+	 * swapchain and before the HUD overlay compose so panel text/borders drawn
+	 * into the overlay stay sharp over the blurred backdrop. No-op when idle.
+	 */
+	if ( vk_ui_blur_has_work() ) {
+		vk_ui_blur_execute( gamma_src );
+	}
 
 	/*
 	 * Compose LDR UI/HUD after tonemap. Prefer uiOverlayContentValid over

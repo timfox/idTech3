@@ -1158,6 +1158,9 @@ void vk_init_vulkan_library( void )
 
 	if ( vk.debugMarkers ) {
 		INIT_DEVICE_FUNCTION_EXT(vkDebugMarkerSetObjectNameEXT)
+		INIT_DEVICE_FUNCTION_EXT(vkCmdDebugMarkerBeginEXT)
+		INIT_DEVICE_FUNCTION_EXT(vkCmdDebugMarkerEndEXT)
+		INIT_DEVICE_FUNCTION_EXT(vkCmdDebugMarkerInsertEXT)
 	}
 
 	if ( vk.colorWriteMaskDynamic ) {
@@ -1332,6 +1335,9 @@ void vk_deinit_device_functions( void )
 	qvkGetImageMemoryRequirements2KHR = NULL;
 
 	qvkDebugMarkerSetObjectNameEXT = NULL;
+	qvkCmdDebugMarkerBeginEXT = NULL;
+	qvkCmdDebugMarkerEndEXT = NULL;
+	qvkCmdDebugMarkerInsertEXT = NULL;
 	qvkCmdClearColorImage = NULL;
 
 #ifdef USE_VULKAN_RTX

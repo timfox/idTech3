@@ -24,6 +24,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #ifdef USE_VULKAN
 #include "vk_terrain.h"
 #include "vk_biome.h"
+#include "vk_ui_blur.h"
 #include "vk_vegetation_gpu.h"
 #include "vk_temporal.h"
 #include "vk_pass_registry.h"
@@ -2826,6 +2827,7 @@ static const void *RB_DrawBuffer( const void *data ) {
 
 #ifdef USE_VULKAN
 	vk_begin_frame();
+	vk_ui_blur_begin_frame();
 
 	tess.depthRange = DEPTH_RANGE_NORMAL;
 
@@ -3296,6 +3298,25 @@ static const void *RB_PrefilterEnvMap( const void *data )
 }
 #endif
 
+#ifdef USE_VULKAN
+/*
+====================
+RB_UIFilter
+
+Forward a queued CSS backdrop-filter / filter blur op to the UI blur compositor.
+====================
+*/
+static const void *RB_UIFilter( const void *data ) {
+	const uiFilterCommand_t *cmd = data;
+	if ( cmd->kind == 0 ) {
+		vk_ui_blur_enqueue_backdrop( &cmd->backdrop );
+	} else {
+		vk_ui_blur_enqueue_layer( &cmd->layer );
+	}
+	return (const void *)(cmd + 1);
+}
+#endif
+
 /*
 ====================
 RB_ExecuteRenderCommands
@@ -3344,6 +3365,11 @@ void RB_ExecuteRenderCommands( const void *data ) {
 		case RC_CLEARCOLOR:
 			data = RB_ClearColor(data);
 			break;
+#ifdef USE_VULKAN
+		case RC_UI_FILTER:
+			data = RB_UIFilter(data);
+			break;
+#endif
 		case RC_END_OF_LIST:
 		default:
 			// stop rendering

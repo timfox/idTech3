@@ -405,6 +405,42 @@ void RE_StretchPic( float x, float y, float w, float h,
 	RE_StretchPicEx( x, y, w, h, s1, t1, s2, t2, hShader, -1.0f );
 }
 
+/*
+=============
+RE_UIBackdropBlur / RE_UIFilterLayer
+
+Enqueue a CSS backdrop-filter / filter blur op. Recorded into the command stream
+so it executes at frame end (after tonemap, before HUD overlay compose).
+=============
+*/
+void RE_UIBackdropBlur( const uiBackdropFilter_t *bf ) {
+	uiFilterCommand_t *cmd;
+	if ( !tr.registered || !bf ) {
+		return;
+	}
+	cmd = R_GetCommandBuffer( sizeof( *cmd ) );
+	if ( !cmd ) {
+		return;
+	}
+	cmd->commandId = RC_UI_FILTER;
+	cmd->kind = 0;
+	cmd->backdrop = *bf;
+}
+
+void RE_UIFilterLayer( const uiCompositorLayer_t *layer ) {
+	uiFilterCommand_t *cmd;
+	if ( !tr.registered || !layer ) {
+		return;
+	}
+	cmd = R_GetCommandBuffer( sizeof( *cmd ) );
+	if ( !cmd ) {
+		return;
+	}
+	cmd->commandId = RC_UI_FILTER;
+	cmd->kind = 1;
+	cmd->layer = *layer;
+}
+
 #define MODE_RED_CYAN	1
 #define MODE_RED_BLUE	2
 #define MODE_RED_GREEN	3

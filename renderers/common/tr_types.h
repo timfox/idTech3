@@ -109,6 +109,48 @@ typedef struct engineDecalDesc_s {
 	qhandle_t	shader;
 } engineDecalDesc_t;
 
+/*
+ * CSS-style UI filter / backdrop-filter blur compositor (renderers/vulkan/vk_ui_blur.c).
+ * Rects are supplied in normalized screen space [0,1] (origin top-left) so the
+ * renderer is independent of the client's 640x480 virtual scaling and of the
+ * current render/dynamic resolution. The client wrapper (SCR_UIBackdropBlur /
+ * SCR_UIFilterLayer) performs the virtual->normalized conversion.
+ */
+typedef enum {
+	UI_FILTER_NONE = 0,
+	UI_FILTER_BLUR
+} uiFilterType_t;
+
+typedef struct {
+	uiFilterType_t	type;
+	float			radius;			/* blur radius in virtual (640x480) pixels */
+} uiFilterOp_t;
+
+#define UI_MAX_FILTER_OPS 4
+
+typedef struct {
+	int				numOps;
+	uiFilterOp_t	ops[UI_MAX_FILTER_OPS];
+} uiFilterChain_t;
+
+typedef struct uiBackdropFilter_s {
+	float			rect[4];		/* normalized minX, minY, maxX, maxY */
+	float			cornerRadius;	/* normalized to min(width,height); 0 = square */
+	float			radius;			/* blur radius in virtual (640x480) pixels */
+	float			rotation;		/* radians, about rect center (transformed panels) */
+	float			opacity;		/* 0..1 */
+	float			tint[4];		/* optional straight-alpha tint over the blur (a<=0 = none) */
+} uiBackdropFilter_t;
+
+typedef struct uiCompositorLayer_s {
+	float			rect[4];		/* normalized minX, minY, maxX, maxY */
+	float			cornerRadius;	/* normalized to min(width,height); 0 = square */
+	float			rotation;		/* radians, about rect center */
+	float			opacity;		/* 0..1 */
+	qhandle_t		shader;			/* content image blurred by filter: blur() */
+	uiFilterChain_t	filter;			/* filter op chain applied to the layer */
+} uiCompositorLayer_t;
+
 typedef struct {
 	refEntityType_t	reType;
 	int			renderfx;

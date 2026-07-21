@@ -59,6 +59,7 @@ Documentation is grouped by **tier**. Most files remain at their historical path
 - [RENDERER_SPINE_1.0.md](RENDERER_SPINE_1.0.md) — production-certified frame matrix (stabilize before new techniques)- [AUTHORED_MESH_NORMALS.md](AUTHORED_MESH_NORMALS.md) — experimental DCC hard-edge / authored-normal import policy
 - [RENDERER_2027.md](RENDERER_2027.md) — GPU-driven hybrid visibility north-star (vis buffer Phase 1)
 - [MOMENT_OIT_STOCHASTIC_ALPHA.md](MOMENT_OIT_STOCHASTIC_ALPHA.md) — MBOIT (`r_oit 2`) + stochastic alpha clip
+- [UI_BLUR.md](UI_BLUR.md) — CSS-style `filter` / `backdrop-filter` blur for the JS UI compositor (`ui_blurQuality`, `ui_filterDebug`)
 - [RADIANT.md](RADIANT.md)
 - [VOIP.md](VOIP.md) — Opus voice chat + head lip flap
 - [P2P_NETWORKING.md](P2P_NETWORKING.md) — Steam SDR / direct_udp P2P, ICE-lite, reconnect/migrate

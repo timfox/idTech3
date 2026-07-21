@@ -266,6 +266,18 @@ void vk_create_shader_modules( void )
 	SET_OBJECT_NAME( vk.modules.gamma_vs, "gamma post-processing vertex module", VK_DEBUG_REPORT_OBJECT_TYPE_SHADER_MODULE_EXT );
 	SET_OBJECT_NAME( vk.modules.atmosphere_fs, "atmosphere fragment module", VK_DEBUG_REPORT_OBJECT_TYPE_SHADER_MODULE_EXT );
 
+	/* UI CSS filter / backdrop-filter blur compositor. */
+	vk.modules.ui_blur_sample_fs = SHADER_MODULE( ui_blur_sample_frag_spv );
+	vk.modules.ui_blur_gauss_fs = SHADER_MODULE( ui_blur_gauss_frag_spv );
+	vk.modules.ui_blur_down_fs = SHADER_MODULE( ui_blur_down_frag_spv );
+	vk.modules.ui_blur_up_fs = SHADER_MODULE( ui_blur_up_frag_spv );
+	vk.modules.ui_blur_composite_fs = SHADER_MODULE( ui_blur_composite_frag_spv );
+	SET_OBJECT_NAME( vk.modules.ui_blur_sample_fs, "ui blur sample fragment module", VK_DEBUG_REPORT_OBJECT_TYPE_SHADER_MODULE_EXT );
+	SET_OBJECT_NAME( vk.modules.ui_blur_gauss_fs, "ui blur gauss fragment module", VK_DEBUG_REPORT_OBJECT_TYPE_SHADER_MODULE_EXT );
+	SET_OBJECT_NAME( vk.modules.ui_blur_down_fs, "ui blur kawase down fragment module", VK_DEBUG_REPORT_OBJECT_TYPE_SHADER_MODULE_EXT );
+	SET_OBJECT_NAME( vk.modules.ui_blur_up_fs, "ui blur kawase up fragment module", VK_DEBUG_REPORT_OBJECT_TYPE_SHADER_MODULE_EXT );
+	SET_OBJECT_NAME( vk.modules.ui_blur_composite_fs, "ui blur composite fragment module", VK_DEBUG_REPORT_OBJECT_TYPE_SHADER_MODULE_EXT );
+
 	vk.modules.smaa_edge_fs = SHADER_MODULE( smaa_edge_frag_spv );
 	vk.modules.smaa_blend_fs = SHADER_MODULE( smaa_blend_frag_spv );
 	vk.modules.smaa_compose_fs = SHADER_MODULE( smaa_compose_frag_spv );

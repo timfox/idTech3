@@ -649,11 +649,21 @@ void CM_TraceThroughBrush( traceWork_t *tw, const cbrush_t *brush ) {
 			tw->trace.fraction = enterFrac;
 			if ( clipplane != NULL ) {
 				tw->trace.plane = *clipplane;
+				tw->trace.sourcePlane = (int)( clipplane - cm.planes );
+			} else {
+				tw->trace.sourcePlane = -1;
 			}
 			if ( leadside != NULL ) {
 				tw->trace.surfaceFlags = leadside->surfaceFlags;
+				tw->trace.sourceSide = (int)( leadside - brush->sides );
+			} else {
+				tw->trace.sourceSide = -1;
 			}
 			tw->trace.contents = brush->contents;
+			tw->trace.sourceBrush = (int)( brush - cm.brushes );
+			tw->trace.sourceClipnode = -1;
+			tw->trace.sourceHull = -1;
+			tw->trace.planeKind = TRACE_PLANE_WORLD_FACE;
 		}
 	}
 }
@@ -1273,6 +1283,7 @@ static qboolean CM_Bsp30ClipHullCheck( traceWork_t *tw, int num,
 	tw->trace.sourceClipnode = num;
 	{
 		int planeNum = (int)( plane - cm.planes );
+		tw->trace.sourcePlane = planeNum;
 		tw->trace.planeKind = TRACE_PLANE_WORLD_FACE;
 		if ( planeNum >= 0 && planeNum < cm.numPlanes && cm.bsp30PlaneKind ) {
 			tw->trace.planeKind = (tracePlaneKind_t)cm.bsp30PlaneKind[planeNum];
@@ -1382,6 +1393,7 @@ static void CM_Bsp30TraceThroughTree( traceWork_t *tw, int num,
 			tw->trace.sourceClipnode = enterClipnode;
 			tw->trace.planeKind = TRACE_PLANE_WORLD_FACE;
 			planeNum = (int)( enterPlane - cm.planes );
+			tw->trace.sourcePlane = planeNum;
 			if ( planeNum >= 0 && planeNum < cm.numPlanes &&
 					cm.bsp30PlaneKind ) {
 				tw->trace.planeKind =
@@ -1530,6 +1542,12 @@ static void CM_Trace( trace_t *results, const vec3_t start, const vec3_t end, co
 	// fill in a default trace
 	Com_Memset( &tw, 0, sizeof(tw) );
 	tw.trace.fraction = 1;	// assume it goes the entire distance until shown otherwise
+	tw.trace.planeKind = TRACE_PLANE_WORLD_FACE;
+	tw.trace.sourceBrush = -1;
+	tw.trace.sourceSide = -1;
+	tw.trace.sourceClipnode = -1;
+	tw.trace.sourcePlane = -1;
+	tw.trace.sourceHull = -1;
 	VectorCopy(origin, tw.modelOrigin);
 
 	if (!cm.numNodes) {
@@ -1660,16 +1678,19 @@ static void CM_Trace( trace_t *results, const vec3_t start, const vec3_t end, co
 					traceExtents[2] >= 35.5f &&
 					headnodes[1] >= 0 && headnodes[1] < cm.numBSP30ClipNodes ) {
 				root = headnodes[1];
+				tw.trace.sourceHull = 1;
 				VectorSet( hullExtents, 16.0f, 16.0f, 36.0f );
 			}
 			else if ( traceExtents[0] >= 31.5f && traceExtents[1] >= 31.5f &&
 					traceExtents[2] >= 31.5f &&
 					headnodes[2] >= 0 && headnodes[2] < cm.numBSP30ClipNodes ) {
 				root = headnodes[2];
+				tw.trace.sourceHull = 2;
 				VectorSet( hullExtents, 32.0f, 32.0f, 32.0f );
 			}
 			else {
 				root = headnodes[3];
+				tw.trace.sourceHull = 3;
 				VectorSet( hullExtents, 16.0f, 16.0f, 18.0f );
 			}
 			clipTree = qtrue;

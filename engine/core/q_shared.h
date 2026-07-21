@@ -1129,8 +1129,17 @@ typedef struct cplane_s {
 
 
 /*
- * Collision plane provenance for BSP30 / BSP30 traces. Default zero is a
- * world face so unmarked Q3 and entity hits keep historical behavior.
+ * Collision plane construction kind.
+ *
+ * Do not treat WORLD_FACE as a complete identity: for diagnostics also read
+ * sourceClipnode / sourcePlane / sourceHull / collisionBackend. WORLD_FACE
+ * only means "plane came from a map face (or unmarked default)", not which
+ * facet or how the hull was expanded.
+ *
+ *   TRACE_PLANE_WORLD_FACE  — map face / unmarked default
+ *   TRACE_PLANE_HULL_FACE   — face from a pre-expanded BSP30 clip hull
+ *   TRACE_PLANE_BEVEL       — non-axial bevel generated for hull expansion
+ *   TRACE_PLANE_AXIAL_BEVEL — axial bevel generated for hull expansion
  */
 typedef enum {
 	TRACE_PLANE_WORLD_FACE = 0,
@@ -1138,6 +1147,53 @@ typedef enum {
 	TRACE_PLANE_BEVEL,
 	TRACE_PLANE_AXIAL_BEVEL
 } tracePlaneKind_t;
+
+/*
+ * Which collision backend produced the hit. Sentinels and backends that do
+ * not apply leave related source* fields at -1.
+ */
+typedef enum {
+	TRACE_BACKEND_UNKNOWN = 0,
+	TRACE_BACKEND_BSP29,
+	TRACE_BACKEND_BSP30,
+	TRACE_BACKEND_Q3_BRUSH,
+	TRACE_BACKEND_TRANSFORMED_ENTITY,
+	TRACE_BACKEND_SYNTHETIC
+} traceCollisionBackend_t;
+
+#define SURF_TRACE_EX_VERSION	1u
+
+/*
+ * Versioned extended trace for Surf (and other modules that negotiate it).
+ * Written only by G_TRACE_EX / CG_CM_BOXTRACE_EX — never by legacy G_TRACE.
+ *
+ * Callers must zero-initialize, set version + size, then invoke the trap.
+ * Unsupported fields are filled with documented sentinels (-1 / UNKNOWN).
+ */
+typedef struct {
+	/* Legacy-compatible native layout (matches native_compat_trace_t). */
+	qboolean	allsolid;
+	qboolean	startsolid;
+	float		fraction;
+	vec3_t		endpos;
+	cplane_t	plane;
+	int			surfaceFlags;
+	int			contents;
+	int			entityNum;
+
+	uint32_t	version;	/* SURF_TRACE_EX_VERSION */
+	uint32_t	size;		/* sizeof(surfTraceEx_t) from the caller */
+
+	int			planeKind;		/* tracePlaneKind_t */
+	int			sourceClipnode;	/* BSP30 clipnode index, or -1 */
+	int			sourcePlane;	/* cm.planes[] index, or -1 */
+	int			sourceHull;		/* active BSP30 hull 0..3, or -1 */
+	int			sourceBrush;	/* Q3 brush index, or -1 */
+	int			sourceFacet;	/* backend-specific facet index, or -1 */
+	int			sourceSide;		/* brush side / BSP30 enter side, or -1 */
+	int			contentsSource;	/* contents that classified the hit, or 0 */
+	int			collisionBackend;	/* traceCollisionBackend_t */
+} surfTraceEx_t;
 
 // a trace is returned when a box is swept through the world
 typedef struct {
@@ -1149,10 +1205,13 @@ typedef struct {
 	int			surfaceFlags;	// surface hit
 	int			contents;	// contents on other side of surface hit
 	int			entityNum;	// entity the contacted surface is a part of
-	tracePlaneKind_t	planeKind;	// BSP30 plane provenance; WORLD_FACE otherwise
-	int			sourceBrush;	// Q3 brush index, or -1 when unused
-	int			sourceSide;		// brush side / BSP30 enter side
-	int			sourceClipnode;	// BSP30 clipnode that supplied the plane, or -1
+	/* Engine-internal provenance. Never written through legacy G_TRACE. */
+	tracePlaneKind_t	planeKind;
+	int			sourceBrush;	/* Q3 brush index, or -1 when unused */
+	int			sourceSide;		/* brush side / BSP30 enter side, or -1 */
+	int			sourceClipnode;	/* BSP30 clipnode, or -1 */
+	int			sourcePlane;	/* cm.planes[] index, or -1 */
+	int			sourceHull;		/* BSP30 hull 0..3, or -1 */
 } trace_t;
 
 // trace->entityNum can also be 0 to (MAX_GENTITIES-1)

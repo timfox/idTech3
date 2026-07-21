@@ -730,6 +730,61 @@ static duk_ret_t Js_Binding_HudDrawPic( duk_context *ctx ) {
 	return 0;
 }
 
+/*
+ * hudBackdropBlur(x, y, w, h, radius [, cornerRadius, opacity, r, g, b, a, rotation])
+ * CSS backdrop-filter: blur() — blurs only content behind the panel rect.
+ * 640x480 virtual coords; radius / cornerRadius in virtual px; tint straight-alpha.
+ */
+static duk_ret_t Js_Binding_HudBackdropBlur( duk_context *ctx ) {
+	const float x = (float)duk_require_number( ctx, 0 );
+	const float y = (float)duk_require_number( ctx, 1 );
+	const float w = (float)duk_require_number( ctx, 2 );
+	const float h = (float)duk_require_number( ctx, 3 );
+	const float radius = (float)duk_require_number( ctx, 4 );
+	const int top = duk_get_top( ctx );
+	const float cornerRadius = ( top > 5 ) ? (float)duk_to_number( ctx, 5 ) : 0.0f;
+	const float opacity = ( top > 6 ) ? (float)duk_to_number( ctx, 6 ) : 1.0f;
+	vec4_t tint = { 0.0f, 0.0f, 0.0f, 0.0f };
+	float rotation = 0.0f;
+
+	if ( top > 10 ) {
+		tint[0] = (float)duk_to_number( ctx, 7 );
+		tint[1] = (float)duk_to_number( ctx, 8 );
+		tint[2] = (float)duk_to_number( ctx, 9 );
+		tint[3] = (float)duk_to_number( ctx, 10 );
+	}
+	if ( top > 11 ) {
+		rotation = (float)duk_to_number( ctx, 11 );
+	}
+	SCR_UIBackdropBlur( x, y, w, h, radius, cornerRadius, rotation, opacity, tint );
+	return 0;
+}
+
+/*
+ * hudFilterBlurPic(x, y, w, h, shaderOrName, radius [, cornerRadius, opacity, rotation])
+ * CSS filter: blur() — draws the image blurred (the element itself is blurred).
+ */
+static duk_ret_t Js_Binding_HudFilterBlurPic( duk_context *ctx ) {
+	const float x = (float)duk_require_number( ctx, 0 );
+	const float y = (float)duk_require_number( ctx, 1 );
+	const float w = (float)duk_require_number( ctx, 2 );
+	const float h = (float)duk_require_number( ctx, 3 );
+	qhandle_t shader;
+	const float radius = (float)duk_require_number( ctx, 5 );
+	const int top = duk_get_top( ctx );
+	const float cornerRadius = ( top > 6 ) ? (float)duk_to_number( ctx, 6 ) : 0.0f;
+	const float opacity = ( top > 7 ) ? (float)duk_to_number( ctx, 7 ) : 1.0f;
+	const float rotation = ( top > 8 ) ? (float)duk_to_number( ctx, 8 ) : 0.0f;
+
+	if ( duk_is_number( ctx, 4 ) ) {
+		shader = (qhandle_t)duk_to_int( ctx, 4 );
+	} else {
+		shader = re.RegisterShader( duk_require_string( ctx, 4 ) );
+	}
+	SCR_UIFilterLayer( x, y, w, h, shader, radius, cornerRadius, rotation, opacity );
+	return 0;
+}
+
 /* Last color from hudSetColor — hudDrawText reads this (SCR_DrawStringExt needs explicit RGBA). */
 static vec4_t s_jsHudColor = { 1.0f, 1.0f, 1.0f, 1.0f };
 
@@ -1064,6 +1119,12 @@ static void JsDebug_RegisterBindings( void ) {
 
 	duk_push_c_function( s_jsContext, Js_Binding_HudDrawPic, 5 );
 	duk_put_prop_string( s_jsContext, -2, "hudDrawPic" );
+
+	duk_push_c_function( s_jsContext, Js_Binding_HudBackdropBlur, DUK_VARARGS );
+	duk_put_prop_string( s_jsContext, -2, "hudBackdropBlur" );
+
+	duk_push_c_function( s_jsContext, Js_Binding_HudFilterBlurPic, DUK_VARARGS );
+	duk_put_prop_string( s_jsContext, -2, "hudFilterBlurPic" );
 
 	duk_push_c_function( s_jsContext, Js_Binding_HudDrawText, DUK_VARARGS );
 	duk_put_prop_string( s_jsContext, -2, "hudDrawText" );

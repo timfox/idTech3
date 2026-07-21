@@ -178,6 +178,12 @@ typedef struct {
 	/* Focus / un-minimize / keep-window vid_restart: clear stale present state + sticky temporal. */
 	void (*NotifyWindowRestored)( const char *reason );
 
+	/* CSS-style UI compositor blur. Enqueue per-frame ops; the renderer executes
+	 * them at frame end (after tonemap, before HUD overlay compose). Rects are in
+	 * normalized screen space. No-op on stub renderers / when unavailable. */
+	void (*UIBackdropBlur)( const uiBackdropFilter_t *bf );
+	void (*UIFilterLayer)( const uiCompositorLayer_t *layer );
+
 } refexport_t;
 
 //

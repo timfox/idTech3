@@ -28,6 +28,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "cl_superhud.h"
 #include "cl_sdf_font.h"
 #include "cl_vector_font.h"
+#include "ui_filter.h"
 #include "q_utf8.h"
 
 static qboolean	scr_initialized;		// ready to draw
@@ -1537,6 +1538,8 @@ void SCR_Init( void ) {
 			Cvar_Set( "ui_open_tab", "" );
 		}
 	}
+
+	UIFilter_Init();
 
 	scr_initialized = qtrue;
 }

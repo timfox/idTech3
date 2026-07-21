@@ -298,13 +298,18 @@ typedef struct {
 	int			entityNum;
 } native_compat_trace_t;
 
-/* +4: two legacy int qbooleans vs native bools. -16: native provenance fields. */
-STATIC_ASSERT( sizeof( legacy_trace_t ) == sizeof( trace_t ) + 4 - 16,
+/* Provenance appended to engine trace_t: planeKind + 5 ints = 24 bytes. */
+enum { SV_TRACE_PROVENANCE_BYTES = 24 };
+
+/* +4: two legacy int qbooleans vs native bools. -provenance: engine-only fields. */
+STATIC_ASSERT( sizeof( legacy_trace_t ) == sizeof( trace_t ) + 4 - SV_TRACE_PROVENANCE_BYTES,
 		"legacy_trace_t must match retail qagame trace layout" );
-STATIC_ASSERT( sizeof( native_compat_trace_t ) + 16 == sizeof( trace_t ),
+STATIC_ASSERT( sizeof( native_compat_trace_t ) + SV_TRACE_PROVENANCE_BYTES == sizeof( trace_t ),
 		"native_compat_trace_t must be engine trace_t without provenance" );
 STATIC_ASSERT( sizeof( native_compat_trace_t ) == 52,
 		"native_compat_trace_t must match retail native qagame trace size" );
+STATIC_ASSERT( sizeof( surfTraceEx_t ) >= sizeof( native_compat_trace_t ) + 8,
+		"surfTraceEx_t must carry versioned provenance beyond the retail base" );
 
 static void SV_FillLegacyTrace( legacy_trace_t *out, const trace_t *in ) {
 	out->allsolid = in->allsolid ? 1 : 0;
@@ -326,6 +331,65 @@ static void SV_FillNativeCompatTrace( native_compat_trace_t *out, const trace_t 
 	out->surfaceFlags = in->surfaceFlags;
 	out->contents = in->contents;
 	out->entityNum = SV_EngineEntityNumToGame( in->entityNum );
+}
+
+/*
+ * Fill a versioned Surf extended trace. The destination is zeroed first so no
+ * stack garbage crosses the engine/module boundary. Legacy G_TRACE paths are
+ * unchanged and still write only native_compat_trace_t / legacy_trace_t.
+ */
+static void SV_FillSurfTraceEx( surfTraceEx_t *out, const trace_t *in ) {
+	uint32_t callerVersion;
+	uint32_t callerSize;
+
+	callerVersion = out->version;
+	callerSize = out->size;
+
+	Com_Memset( out, 0, sizeof( *out ) );
+	out->version = SURF_TRACE_EX_VERSION;
+	out->size = sizeof( *out );
+
+	out->allsolid = in->allsolid;
+	out->startsolid = in->startsolid;
+	out->fraction = in->fraction;
+	VectorCopy( in->endpos, out->endpos );
+	out->plane = in->plane;
+	out->surfaceFlags = in->surfaceFlags;
+	out->contents = in->contents;
+	out->entityNum = SV_EngineEntityNumToGame( in->entityNum );
+
+	out->planeKind = (int)in->planeKind;
+	out->sourceClipnode = in->sourceClipnode;
+	out->sourcePlane = in->sourcePlane;
+	out->sourceHull = in->sourceHull;
+	out->sourceBrush = in->sourceBrush;
+	out->sourceFacet = -1;
+	out->sourceSide = in->sourceSide;
+	out->contentsSource = in->contents;
+
+	if ( in->entityNum != ENTITYNUM_WORLD && in->entityNum != ENTITYNUM_NONE ) {
+		out->collisionBackend = TRACE_BACKEND_TRANSFORMED_ENTITY;
+	} else if ( in->sourceClipnode >= 0 || in->sourceHull >= 0 ) {
+		out->collisionBackend = TRACE_BACKEND_BSP30;
+	} else if ( in->sourceBrush >= 0 || in->fraction < 1.0f ) {
+		out->collisionBackend = TRACE_BACKEND_Q3_BRUSH;
+	} else {
+		out->collisionBackend = TRACE_BACKEND_UNKNOWN;
+	}
+
+	/* Reject mismatched callers without leaving partial garbage. */
+	if ( callerVersion != 0 && callerVersion != SURF_TRACE_EX_VERSION ) {
+		out->planeKind = TRACE_PLANE_WORLD_FACE;
+		out->sourceClipnode = -1;
+		out->sourcePlane = -1;
+		out->sourceHull = -1;
+		out->sourceBrush = -1;
+		out->sourceFacet = -1;
+		out->sourceSide = -1;
+		out->contentsSource = 0;
+		out->collisionBackend = TRACE_BACKEND_UNKNOWN;
+	}
+	(void)callerSize;
 }
 
 /*
@@ -553,6 +617,12 @@ static qboolean SV_GetValue( char* value, int valueSize, const char* key )
 	if ( !Q_stricmp( key, "trap_EngineDecalSpawn" ) )
 	{
 		Com_sprintf( value, valueSize, "%i", G_ENGINE_DECAL_SPAWN );
+		return qtrue;
+	}
+
+	if ( !Q_stricmp( key, "trap_TraceEx" ) )
+	{
+		Com_sprintf( value, valueSize, "%i", G_TRACE_EX );
 		return qtrue;
 	}
 
@@ -809,6 +879,18 @@ static intptr_t SV_GameSystemCalls( intptr_t *args ) {
 				VM_CHECKBOUNDS( gvm, args[1], sizeof( native_compat_trace_t ) );
 				SV_FillNativeCompatTrace( (native_compat_trace_t *)VMA(1), &trace );
 			}
+		}
+		return 0;
+	case G_TRACE_EX:
+		{
+			trace_t trace;
+			surfTraceEx_t *out;
+
+			VM_CHECKBOUNDS( gvm, args[1], sizeof( surfTraceEx_t ) );
+			out = (surfTraceEx_t *)VMA(1);
+			SV_Trace( &trace, VMA(2), VMA(3), VMA(4), VMA(5),
+				SV_GameEntityNumToEngine( args[6] ), args[7], /*int capsule*/ qfalse );
+			SV_FillSurfTraceEx( out, &trace );
 		}
 		return 0;
 	case G_POINT_CONTENTS:

@@ -133,6 +133,9 @@ extern PFN_vkGetBufferMemoryRequirements2KHR			qvkGetBufferMemoryRequirements2KH
 extern PFN_vkGetImageMemoryRequirements2KHR				qvkGetImageMemoryRequirements2KHR;
 
 extern PFN_vkDebugMarkerSetObjectNameEXT				qvkDebugMarkerSetObjectNameEXT;
+extern PFN_vkCmdDebugMarkerBeginEXT						qvkCmdDebugMarkerBeginEXT;
+extern PFN_vkCmdDebugMarkerEndEXT						qvkCmdDebugMarkerEndEXT;
+extern PFN_vkCmdDebugMarkerInsertEXT					qvkCmdDebugMarkerInsertEXT;
 
 extern PFN_vkCmdClearColorImage								qvkCmdClearColorImage;
 

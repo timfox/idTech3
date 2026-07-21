@@ -124,13 +124,18 @@ typedef struct {
 	int			entityNum;
 } native_compat_trace_t;
 
-/* +4: two legacy int qbooleans vs native bools. -16: native provenance fields. */
-STATIC_ASSERT( sizeof( legacy_trace_t ) == sizeof( trace_t ) + 4 - 16,
+/* Provenance appended to engine trace_t: planeKind + 5 ints = 24 bytes. */
+enum { CL_TRACE_PROVENANCE_BYTES = 24 };
+
+/* +4: two legacy int qbooleans vs native bools. -provenance: engine-only fields. */
+STATIC_ASSERT( sizeof( legacy_trace_t ) == sizeof( trace_t ) + 4 - CL_TRACE_PROVENANCE_BYTES,
 		"legacy_trace_t must match retail cgame trace layout" );
-STATIC_ASSERT( sizeof( native_compat_trace_t ) + 16 == sizeof( trace_t ),
+STATIC_ASSERT( sizeof( native_compat_trace_t ) + CL_TRACE_PROVENANCE_BYTES == sizeof( trace_t ),
 		"native_compat_trace_t must be engine trace_t without provenance" );
 STATIC_ASSERT( sizeof( native_compat_trace_t ) == 52,
 		"native_compat_trace_t must match retail native cgame trace size" );
+STATIC_ASSERT( sizeof( surfTraceEx_t ) >= sizeof( native_compat_trace_t ) + 8,
+		"surfTraceEx_t must carry versioned provenance beyond the retail base" );
 
 static qboolean CL_UsesLegacyQvmLayout( void ) {
 	return ( cgvm && !cgvm->dllHandle ) ? qtrue : qfalse;
@@ -259,6 +264,60 @@ static void CL_FillNativeCompatTrace( native_compat_trace_t *out, const trace_t 
 	out->surfaceFlags = in->surfaceFlags;
 	out->contents = in->contents;
 	out->entityNum = CL_EngineEntityNumToGame( in->entityNum );
+}
+
+/*
+ * Fill a versioned Surf extended trace for client prediction. Legacy
+ * CG_CM_BOXTRACE paths remain retail-sized and never write provenance.
+ */
+static void CL_FillSurfTraceEx( surfTraceEx_t *out, const trace_t *in ) {
+	uint32_t callerVersion;
+
+	callerVersion = out->version;
+
+	Com_Memset( out, 0, sizeof( *out ) );
+	out->version = SURF_TRACE_EX_VERSION;
+	out->size = sizeof( *out );
+
+	out->allsolid = in->allsolid;
+	out->startsolid = in->startsolid;
+	out->fraction = in->fraction;
+	VectorCopy( in->endpos, out->endpos );
+	out->plane = in->plane;
+	out->surfaceFlags = in->surfaceFlags;
+	out->contents = in->contents;
+	out->entityNum = CL_EngineEntityNumToGame( in->entityNum );
+
+	out->planeKind = (int)in->planeKind;
+	out->sourceClipnode = in->sourceClipnode;
+	out->sourcePlane = in->sourcePlane;
+	out->sourceHull = in->sourceHull;
+	out->sourceBrush = in->sourceBrush;
+	out->sourceFacet = -1;
+	out->sourceSide = in->sourceSide;
+	out->contentsSource = in->contents;
+
+	if ( in->entityNum != ENTITYNUM_WORLD && in->entityNum != ENTITYNUM_NONE ) {
+		out->collisionBackend = TRACE_BACKEND_TRANSFORMED_ENTITY;
+	} else if ( in->sourceClipnode >= 0 || in->sourceHull >= 0 ) {
+		out->collisionBackend = TRACE_BACKEND_BSP30;
+	} else if ( in->sourceBrush >= 0 || in->fraction < 1.0f ) {
+		out->collisionBackend = TRACE_BACKEND_Q3_BRUSH;
+	} else {
+		out->collisionBackend = TRACE_BACKEND_UNKNOWN;
+	}
+
+	if ( callerVersion != 0 && callerVersion != SURF_TRACE_EX_VERSION ) {
+		out->planeKind = TRACE_PLANE_WORLD_FACE;
+		out->sourceClipnode = -1;
+		out->sourcePlane = -1;
+		out->sourceHull = -1;
+		out->sourceBrush = -1;
+		out->sourceFacet = -1;
+		out->sourceSide = -1;
+		out->contentsSource = 0;
+		out->collisionBackend = TRACE_BACKEND_UNKNOWN;
+	}
 }
 
 static void CL_WriteTraceResult( int vmDest, void *vmTrace, const trace_t *trace ) {
@@ -886,6 +945,11 @@ static qboolean CL_GetValue( char* value, int valueSize, const char* key ) {
 		return qtrue;
 	}
 
+	if ( !Q_stricmp( key, "trap_CM_BoxTraceEx" ) ) {
+		Com_sprintf( value, valueSize, "%i", CG_CM_BOXTRACE_EX );
+		return qtrue;
+	}
+
 	if ( !Q_stricmp( key, "trap_Cvar_SetDescription_Q3E" ) ) {
 		Com_sprintf( value, valueSize, "%i", CG_CVAR_SETDESCRIPTION );
 		return qtrue;
@@ -1012,6 +1076,18 @@ static intptr_t CL_CgameSystemCalls( intptr_t *args ) {
 			CM_BoxTrace( &trace, VMA(2), VMA(3), VMA(4), VMA(5),
 				CL_GameEntityNumToEngine( args[6] ), args[7], /*int capsule*/ qfalse );
 			CL_WriteTraceResult( 1, VMA(1), &trace );
+		}
+		return 0;
+	case CG_CM_BOXTRACE_EX:
+		{
+			trace_t trace;
+			surfTraceEx_t *out;
+
+			VM_CHECKBOUNDS( cgvm, args[1], sizeof( surfTraceEx_t ) );
+			out = (surfTraceEx_t *)VMA(1);
+			CM_BoxTrace( &trace, VMA(2), VMA(3), VMA(4), VMA(5),
+				CL_GameEntityNumToEngine( args[6] ), args[7], /*int capsule*/ qfalse );
+			CL_FillSurfTraceEx( out, &trace );
 		}
 		return 0;
 	case CG_CM_CAPSULETRACE:

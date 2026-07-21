@@ -206,6 +206,17 @@ typedef enum {
 
 	CG_ENGINE_DECAL_ADD_LOCAL,
 
+	/*
+	 * Surf extended box trace for client prediction. Writes surfTraceEx_t with
+	 * trustworthy provenance. Legacy CG_CM_BOXTRACE remains retail-sized.
+	 *
+	 *   void trap_CM_BoxTraceEx( surfTraceEx_t *results,
+	 *       const vec3_t start, const vec3_t end,
+	 *       const vec3_t mins, const vec3_t maxs,
+	 *       clipHandle_t model, int brushmask );
+	 */
+	CG_CM_BOXTRACE_EX,
+
 	CG_TRAP_GETVALUE = COM_TRAP_GETVALUE,
 
 } cgameImport_t;

@@ -2638,6 +2638,14 @@ typedef struct
 	int commandId;
 } clearColorCommand_t;
 
+typedef struct
+{
+	int commandId;
+	int kind;               /* 0 = backdrop-filter, 1 = filter layer */
+	uiBackdropFilter_t backdrop;
+	uiCompositorLayer_t layer;
+} uiFilterCommand_t;
+
 typedef enum {
 	RC_END_OF_LIST,
 	RC_SET_COLOR,
@@ -2650,7 +2658,8 @@ typedef enum {
 	RC_COLORMASK,
 	RC_CLEARDEPTH,
 	RC_CLEARCOLOR,
-	RC_CONVOLVECUBEMAP
+	RC_CONVOLVECUBEMAP,
+	RC_UI_FILTER
 } renderCommand_t;
 
 
@@ -2693,6 +2702,8 @@ void RE_StretchPicEx( float x, float y, float w, float h,
 					  float s1, float t1, float s2, float t2, qhandle_t hShader, float sdfEdgeSoftening );
 void RE_StretchPicSubpixel( float x, float y, float w, float h,
 					  float s1, float t1, float s2, float t2, qhandle_t hShader, float subpixelShift );
+void RE_UIBackdropBlur( const uiBackdropFilter_t *bf );
+void RE_UIFilterLayer( const uiCompositorLayer_t *layer );
 void RE_BeginFrame( stereoFrame_t stereoFrame );
 void RE_EndFrame( int *frontEndMsec, int *backEndMsec );
 void RE_TakeVideoFrame( int width, int height,

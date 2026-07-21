@@ -4,14 +4,22 @@ Client Steamworks integration (`USE_STEAM`) for achievements, overlay, rich pres
 
 ## Build
 
-Requires the [Steamworks SDK](https://partner.steamgames.com/doc/sdk). This machine’s default path is `/home/tim/SteamWorks/sdk`.
+`USE_STEAM` defaults to **ON**. When the Steamworks SDK is found, the full API is linked; without an SDK the client still builds using the stub path.
+
+Requires the [Steamworks SDK](https://partner.steamgames.com/doc/sdk). This machine’s default path is `/home/tim/SteamWorks/sdk` (auto-detected when present, or set via `STEAMWORKS_SDK` / `-DSTEAMWORKS_SDK=`).
 
 ```bash
-# Convenience (sets USE_STEAM + STEAMWORKS_SDK)
+# Default build already enables Steam when the SDK is available
+./scripts/compile_engine.sh vulkan
+
+# Explicit (same as default)
 ./scripts/compile_engine.sh vulkan steam
 
+# Disable Steam
+./scripts/compile_engine.sh vulkan no-steam
+
 # Override SDK root
-STEAMWORKS_SDK=/path/to/sdk ./scripts/compile_engine.sh vulkan steam
+STEAMWORKS_SDK=/path/to/sdk ./scripts/compile_engine.sh vulkan
 
 # Or configure CMake directly
 cmake -S . -B build-vk-Release \
@@ -20,7 +28,7 @@ cmake -S . -B build-vk-Release \
   ...
 ```
 
-CMake resolves `STEAMWORKS_SDK` from the cache variable first, then `$ENV{STEAMWORKS_SDK}`. When the SDK is found it:
+CMake resolves `STEAMWORKS_SDK` from the cache variable first, then `$ENV{STEAMWORKS_SDK}`, then `/home/tim/SteamWorks/sdk` when that tree exists. When the SDK is found it:
 
 - Compiles `steam_shared.c` / `cl_steam.c` as C++ (Steamworks headers are C++) with a C ABI
 - Copies `libsteam_api.so` and `steam_appid.txt` into the build directory

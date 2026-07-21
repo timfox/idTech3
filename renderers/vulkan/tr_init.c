@@ -28,6 +28,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "tr_decal_props.h"
 #include "tr_material_paint.h"
 #include "vk_upscale.h"
+#include "vk_ui_blur.h"
 #include "vk_vt.h"
 #include "vk_meshlets.h"
 #include "vk_ndgi.h"
@@ -1301,6 +1302,7 @@ static void R_Register( void )
 	ri.Cmd_AddCommand( "screenshotEXR", R_ScreenShot_f );
 	ri.Cmd_AddCommand( "gfxinfo", GfxInfo_f );
 #ifdef USE_VULKAN
+	vk_ui_blur_register_cvars();
 	ri.Cmd_AddCommand( "vkinfo", VkInfo_f );
 	ri.Cmd_AddCommand( "vulkaninfo", VulkanInfo_f );
 	ri.Cmd_AddCommand( "renderer_status", R_RendererStatus_f );
@@ -3947,6 +3949,7 @@ void R_Init( void ) {
 #endif
 	vk_validate_pbr_ibl_resources();
 	vk_surf_log_temporal_config();
+	vk_ui_blur_init();
 #endif
 
 	R_InitShaders();
@@ -3992,6 +3995,7 @@ static void RE_Shutdown( refShutdownCode_t code ) {
 #endif
 	ri.Printf( PRINT_ALL, "RE_Shutdown( %i )\n", code );
 
+	vk_ui_blur_shutdown();
 	R_MeshNormalPolicy_Shutdown();
 	VK_SunCSM_Shutdown();
 	VK_RasterUltra_Shutdown();
@@ -4024,6 +4028,7 @@ static void RE_Shutdown( refShutdownCode_t code ) {
 	ri.Cmd_RemoveCommand( "renderer_status" );
 	ri.Cmd_RemoveCommand( "havenrp_renderer_status" );
 	ri.Cmd_RemoveCommand( "renderer_profile" );
+	ri.Cmd_RemoveCommand( "ui_blur_status" );
 	ri.Cmd_RemoveCommand( "renderer_health" );
 	ri.Cmd_RemoveCommand( "renderer_deferred_safe" );
 	ri.Cmd_RemoveCommand( "renderer_modern_safe" );
@@ -4256,6 +4261,8 @@ refexport_t *GetRefAPI ( int apiVersion, refimport_t *rimp ) {
 	re.VectorFontActive = RE_VectorFontActive;
 	re.DrawVectorString = RE_DrawVectorString;
 	re.DrawVectorGlyph = RE_DrawVectorGlyph;
+	re.UIBackdropBlur = RE_UIBackdropBlur;
+	re.UIFilterLayer = RE_UIFilterLayer;
 
 #ifdef USE_VUDA
 	re.VudaActive = R_VUDA_Active;

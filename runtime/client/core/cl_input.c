@@ -435,9 +435,8 @@ CL_MouseEvent
 =================
 */
 void CL_MouseEvent( int dx, int dy /*, int time*/ ) {
-#if defined(USE_DUKTAPE) || defined(USE_CSHARP)
+	/* Unguarded like CL_KeyEvent: Com_ScriptEmitEvent is always linked. */
 	Com_ScriptEmitEvent( "mouse_move", NULL, NULL, dx, dy );
-#endif
 	if ( Key_GetCatcher() & KEYCATCH_UI ) {
 		VM_Call( uivm, 2, UI_MOUSE_EVENT, dx, dy );
 	} else if ( CL_RpMenuActive() ) {

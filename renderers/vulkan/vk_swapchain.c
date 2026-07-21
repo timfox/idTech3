@@ -127,6 +127,11 @@ void vk_create_swapchain( VkPhysicalDevice physical_device, VkDevice device, VkS
 	desc.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
 	if ( !vk.fboActive ) {
 		desc.imageUsage |= VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
+	} else if ( ( surface_caps.supportedUsageFlags & VK_IMAGE_USAGE_TRANSFER_SRC_BIT ) != 0 ) {
+		/* UI backdrop-filter blur copies the tonemapped swapchain into a transient
+		 * pooled texture (never sampling the live image). Requires TRANSFER_SRC. */
+		desc.imageUsage |= VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
+		vk.swapchainTransferSrc = qtrue;
 	}
 	desc.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
 	desc.queueFamilyIndexCount = 0;

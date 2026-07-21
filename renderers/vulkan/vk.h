@@ -1694,6 +1694,12 @@ typedef struct {
 		VkShaderModule gamma_fs;
 		VkShaderModule overlay_compose_fs;
 		VkShaderModule gamma_vs;
+		/* UI CSS filter / backdrop-filter blur compositor (vk_ui_blur.c) */
+		VkShaderModule ui_blur_sample_fs;
+		VkShaderModule ui_blur_gauss_fs;
+		VkShaderModule ui_blur_down_fs;
+		VkShaderModule ui_blur_up_fs;
+		VkShaderModule ui_blur_composite_fs;
 		VkShaderModule atmosphere_fs;
 		VkShaderModule smaa_edge_fs;
 		VkShaderModule smaa_blend_fs;
@@ -2070,6 +2076,7 @@ typedef struct {
 	VkImageLayout initSwapchainLayout;
 
 	qboolean clearAttachment;		// requires VK_IMAGE_USAGE_TRANSFER_DST_BIT for swapchains
+	qboolean swapchainTransferSrc;	// swapchain created with TRANSFER_SRC (UI backdrop blur copy)
 	qboolean fboActive;
 	qboolean isV3DV;				/* Raspberry Pi Vulkan driver (V3DV); used for RPi5-friendly hints */
 	qboolean blitEnabled;

@@ -574,6 +574,12 @@ void	SCR_FillRect( float x, float y, float width, float height,
 void	SCR_DrawPic( float x, float y, float width, float height, qhandle_t hShader );
 void	SCR_DrawNamedPic( float x, float y, float width, float height, const char *picname );
 
+/* shell/ui_filter.c — CSS-style filter/backdrop-filter blur (640x480 virtual coords) */
+void	SCR_UIBackdropBlur( float x, float y, float w, float h, float radius,
+					float cornerRadius, float rotation, float opacity, const vec4_t tint );
+void	SCR_UIFilterLayer( float x, float y, float w, float h, qhandle_t hShader,
+					float radius, float cornerRadius, float rotation, float opacity );
+
 void	SCR_DrawBigString( int x, int y, const char *s, float alpha, qboolean noColorEscape );			// draws a string with embedded color control characters with fade
 void	SCR_DrawStringExt( int x, int y, float size, const char *string, const float *setColor, qboolean forceColor, qboolean noColorEscape );
 void	SCR_DrawHudString( float x, float y, float size, const char *string, const float *setColor, qboolean forceColor, qboolean noColorEscape );	/* fractional virtual coords (JS HUD) */

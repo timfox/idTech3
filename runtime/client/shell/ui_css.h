@@ -26,12 +26,18 @@ typedef struct {
 	float   border;
 	float   font_size;
 	char    font[UICSS_FONT_LEN];
+	float   filter_blur;     /* filter: blur(Npx) radius, virtual px */
+	float   backdrop_blur;   /* backdrop-filter / -webkit-backdrop-filter: blur(Npx) */
+	float   border_radius;   /* border-radius in virtual px */
 	qboolean has_color;
 	qboolean has_background_color;
 	qboolean has_border_color;
 	qboolean has_border;
 	qboolean has_font_size;
 	qboolean has_font;
+	qboolean has_filter_blur;
+	qboolean has_backdrop_blur;
+	qboolean has_border_radius;
 } ui_css_styles_t;
 
 void     UICSS_Init( void );

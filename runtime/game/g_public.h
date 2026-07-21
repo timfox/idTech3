@@ -424,6 +424,20 @@ typedef enum {
 	G_ENGINE_DB_PROFILE_SET,	/* qboolean EngineDB_ProfileSet( const char *key, const char *value ) */
 	G_ENGINE_DB_PROFILE_GET,	/* qboolean EngineDB_ProfileGet( const char *key, char *out, int outSize ) */
 	G_ENGINE_DB_PROFILE_DELETE,	/* qboolean EngineDB_ProfileDelete( const char *key ) */
+	/*
+	 * Surf extended trace. Writes a zero-initialized, versioned surfTraceEx_t
+	 * including BSP30 provenance. Legacy G_TRACE / G_TRACECAPSULE are unchanged
+	 * and still marshal only the retail native_compat_trace_t layout.
+	 *
+	 *   void trap_TraceEx( surfTraceEx_t *results,
+	 *       const vec3_t start, const vec3_t mins, const vec3_t maxs,
+	 *       const vec3_t end, int passEntityNum, int contentmask );
+	 *
+	 * Caller must set results->version = SURF_TRACE_EX_VERSION and
+	 * results->size = sizeof(*results) before the call (structure is then
+	 * zeroed and refilled by the engine).
+	 */
+	G_TRACE_EX,
 	G_TRAP_GETVALUE = COM_TRAP_GETVALUE
 
 } gameImport_t;

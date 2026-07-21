@@ -10,6 +10,7 @@ background-color, border, border-color. No external dependencies.
 
 #include "client.h"
 #include "ui_css.h"
+#include "ui_filter.h"
 
 #define UICSS_SELECTOR_LEN  64
 #define UICSS_VALUE_LEN    128
@@ -29,12 +30,18 @@ typedef struct {
 	float border;
 	float font_size;
 	char font[UICSS_FONT_LEN];
+	float filter_blur;
+	float backdrop_blur;
+	float border_radius;
 	qboolean has_color;
 	qboolean has_background_color;
 	qboolean has_border_color;
 	qboolean has_border;
 	qboolean has_font_size;
 	qboolean has_font;
+	qboolean has_filter_blur;
+	qboolean has_backdrop_blur;
+	qboolean has_border_radius;
 } ui_css_rule_t;
 
 static ui_css_rule_t css_rules[UICSS_MAX_RULES];
@@ -217,6 +224,22 @@ static qboolean parse_rule( const char **pp, ui_css_rule_t *rule ) {
 		} else if ( Q_stricmp( prop, "font-family" ) == 0 || Q_stricmp( prop, "font" ) == 0 ) {
 			Q_strncpyz( rule->font, val, sizeof( rule->font ) );
 			rule->has_font = qtrue;
+		} else if ( Q_stricmp( prop, "filter" ) == 0 ) {
+			uiFilterChain_t chain;
+			if ( UIFilter_ParseChain( val, &chain ) && chain.ops[0].type == UI_FILTER_BLUR ) {
+				rule->filter_blur = chain.ops[0].radius;
+				rule->has_filter_blur = qtrue;
+			}
+		} else if ( Q_stricmp( prop, "backdrop-filter" ) == 0 ||
+				Q_stricmp( prop, "-webkit-backdrop-filter" ) == 0 ) {
+			uiFilterChain_t chain;
+			if ( UIFilter_ParseChain( val, &chain ) && chain.ops[0].type == UI_FILTER_BLUR ) {
+				rule->backdrop_blur = chain.ops[0].radius;
+				rule->has_backdrop_blur = qtrue;
+			}
+		} else if ( Q_stricmp( prop, "border-radius" ) == 0 ) {
+			float r = (float)atof( val );
+			if ( r >= 0 ) { rule->border_radius = r; rule->has_border_radius = qtrue; }
 		}
 		skip_ws_and_comments( &p );
 		if ( *p == ';' ) p++;
@@ -327,6 +350,18 @@ qboolean UICSS_GetStyles( const char *id, const char *class_name, const char *ta
 		if ( r->has_font ) {
 			Q_strncpyz( out->font, r->font, sizeof( out->font ) );
 			out->has_font = qtrue;
+		}
+		if ( r->has_filter_blur ) {
+			out->filter_blur = r->filter_blur;
+			out->has_filter_blur = qtrue;
+		}
+		if ( r->has_backdrop_blur ) {
+			out->backdrop_blur = r->backdrop_blur;
+			out->has_backdrop_blur = qtrue;
+		}
+		if ( r->has_border_radius ) {
+			out->border_radius = r->border_radius;
+			out->has_border_radius = qtrue;
 		}
 	}
 	return any;

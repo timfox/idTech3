@@ -16,6 +16,8 @@ test -f docs/STEAM.md || fail "missing docs/STEAM.md"
 test -f steam_appid.txt || fail "missing steam_appid.txt"
 test -f config/steamdeck.cfg || fail "missing config/steamdeck.cfg"
 
+grep -q 'OPTION(USE_STEAM "Enable Steam API' CMakeLists.txt || fail "missing USE_STEAM option"
+grep -q 'Enable Steam API.*" ON)' CMakeLists.txt || fail "USE_STEAM should default ON"
 grep -q 'STEAMWORKS_SDK' CMakeLists.txt || fail "CMake missing STEAMWORKS_SDK cache"
 grep -q 'CACHE PATH "Steamworks SDK root' CMakeLists.txt || fail "CMake missing STEAMWORKS_SDK CACHE PATH"
 grep -q '\${STEAMWORKS_SDK}' CMakeLists.txt || fail "CMake HINTS missing \${STEAMWORKS_SDK}"
@@ -23,8 +25,11 @@ grep -q 'LANGUAGE CXX' CMakeLists.txt || fail "CMake missing LANGUAGE CXX for St
 grep -q 'file(COPY "${STEAMWORKS_LIBRARY}"' CMakeLists.txt || fail "CMake missing libsteam_api copy"
 grep -q 'steam_appid.txt' CMakeLists.txt || fail "CMake missing steam_appid.txt copy"
 
+grep -q 'STEAM=1' scripts/compile_engine.sh || fail "compile_engine.sh should default STEAM=1"
 grep -q 'steam|use-steam)' scripts/compile_engine.sh || fail "compile_engine.sh missing steam arg"
+grep -q 'no-steam|nosteam)' scripts/compile_engine.sh || fail "compile_engine.sh missing no-steam opt-out"
 grep -q 'USE_STEAM=ON' scripts/compile_engine.sh || fail "compile_engine.sh missing USE_STEAM=ON"
+grep -q 'USE_STEAM=OFF' scripts/compile_engine.sh || fail "compile_engine.sh missing USE_STEAM=OFF path"
 grep -q 'libsteam_api.so' scripts/compile_engine.sh || fail "compile_engine.sh missing libsteam_api release copy"
 
 grep -q 'Steam_Frame()' runtime/client/core/cl_frame.c || fail "CL_Frame missing Steam_Frame()"
