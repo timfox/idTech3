@@ -152,12 +152,20 @@ Surf explicitly sets `r_aaMode 4`, `r_taa 1`, `r_taaMotionVectors 1`,
 `r_weaponBloomMode 1` so combined world/weapon HDR enters bloom once. Use
 `r_temporalDebug` 1–33 and confirm
 `r_temporalWeaponAfterTaa` defers the weapon until after world history.
+Mode 2 adds dedicated class-gated weapon bloom after the flush (`vk_weapon_bloom`).
+Presentation policies (`r_weaponAnalyticFog`, `r_weaponLocalReflection`,
+`r_weaponLocalAO`, `r_weaponReadabilityLight`, `r_weaponThinSightReject`) default
+restrained/off; dump with `r_printWeaponPresentation`. Depth-reject GPU counters
+print via `r_dumpTemporalState`.
 
 `taa.frag` samples a persistent R32F previous-frame depth image at the
 reprojected UV. Current depth is never substituted for unavailable history;
 invalid depth history forces current-frame color.
 
 ## Debug views (`r_temporalDebug`)
+
+`r_temporalDebug` is range-checked to **0–33** (0 = off; values outside the
+range are clamped at cvar registration in `tr_init.c`).
 
 | Value | View |
 |---|---|
@@ -249,7 +257,7 @@ Each can be disabled without masking via blur:
 | `r_temporalSSR` | 1 | SSR (even if `r_ssr 1`) |
 | `r_weaponSsrIsolation` | 1 | Composite the view weapon after world SSR/SSAO |
 | `r_weaponTemporalMode` | 1 | TAA-on weapon history: 0=current only, 1=classified shared (default), 2=independent weapon color/depth history |
-| `r_weaponBloomMode` | 1 | 0=no weapon bloom, 1=combined HDR before one global bloom, 2=independent-history presentation with the same single combined bloom |
+| `r_weaponBloomMode` | 1 | 0=no weapon bloom, 1=combined HDR before one global bloom, 2=legacy world bloom + dedicated class-gated weapon bloom (`vk_weapon_bloom`) |
 | `r_temporalFog` | 1 | Volumetric froxel history weight |
 | `r_temporalTransparency` | 1 | OIT / transparent reactive stamp |
 | `r_motionBlur` | 0 | Camera motion blur |
@@ -309,6 +317,9 @@ independently on weapon switch / FOV discontinuity.
 
 ## Related
 
+- `docs/TEMPORAL_RESOURCE_OWNERSHIP.md` — per-resource ownership: owner module,
+  producer/consumer passes, formats, validity bits, frame IDs, reset scopes,
+  destruction sites.
 - `docs/MOMENT_OIT_STOCHASTIC_ALPHA.md` — prior OIT / distortion corruption work.
 - `scripts/temporal_ghost_check.sh` — static regression gate.
 - `renderers/vulkan/vk_view_state.c` — `DEPTH_RANGE_WEAPON`.

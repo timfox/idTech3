@@ -401,6 +401,8 @@ void vk_bind_generated_shaders( void ){
     vk_set_shader_name( vk.modules.volumetric_depth_resolve_msaa_cs, "volumetric_depth_resolve_msaa_cs" );
     vk.modules.temporal_depth_history_copy_cs = SHADER_MODULE( temporal_depth_history_copy_cs );
     vk_set_shader_name( vk.modules.temporal_depth_history_copy_cs, "temporal_depth_history_copy_cs" );
+    vk.modules.temporal_depth_reject_stats_cs = SHADER_MODULE( temporal_depth_reject_stats_cs );
+    vk_set_shader_name( vk.modules.temporal_depth_reject_stats_cs, "temporal_depth_reject_stats_cs" );
     vk.modules.luminance_cs = SHADER_MODULE( luminance_cs );
     vk_set_shader_name( vk.modules.luminance_cs, "luminance_cs" );
     vk.modules.vegetation_wind_cs = SHADER_MODULE( vegetation_wind_cs );

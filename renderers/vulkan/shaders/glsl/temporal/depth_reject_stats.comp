@@ -1,0 +1,72 @@
+#version 450
+/* Count real previous-depth rejects vs pixels that would pass the old
+ * current-depth-at-history-UV approximation. */
+
+layout(local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
+
+layout(binding = 0) uniform sampler2D currentDepth;
+layout(binding = 1) uniform sampler2D previousDepth;
+layout(binding = 2) uniform sampler2D motionTex;
+layout(binding = 3) buffer DepthRejectStats {
+	uint realRejectCount;
+	uint oldApproxWouldPassCount;
+	uint bothAgreeRejectCount;
+	uint sampleCount;
+} stats;
+
+layout(push_constant) uniform Push {
+	vec4 depthParams; /* x=zNear y=zFar z=prevDepthValid w=threshold */
+} push;
+
+float linearizeReversedDepth(float depthNdc) {
+	float zNear = max(push.depthParams.x, 1e-4);
+	float zFar = max(push.depthParams.y, zNear + 1e-3);
+	float d = clamp(depthNdc, 0.0, 1.0);
+	return (zNear * zFar) / max(zFar - d * (zFar - zNear), 1e-5);
+}
+
+void main() {
+	ivec2 pixel = ivec2(gl_GlobalInvocationID.xy);
+	ivec2 size = textureSize(currentDepth, 0);
+	if (any(greaterThanEqual(pixel, size))) {
+		return;
+	}
+
+	atomicAdd(stats.sampleCount, 1u);
+	if (push.depthParams.z < 0.5) {
+		return;
+	}
+
+	vec2 uv = (vec2(pixel) + 0.5) / vec2(size);
+	vec2 motion = textureLod(motionTex, uv, 0.0).rg;
+	if (any(isnan(motion)) || any(isinf(motion))) {
+		return;
+	}
+	vec2 historyUV = uv - motion;
+	if (any(lessThan(historyUV, vec2(0.0))) || any(greaterThan(historyUV, vec2(1.0)))) {
+		return;
+	}
+
+	float depthNow = texelFetch(currentDepth, pixel, 0).r;
+	float histDepth = textureLod(previousDepth, historyUV, 0.0).r;
+	float oldApproxDepth = textureLod(currentDepth, historyUV, 0.0).r;
+	float threshold = max(push.depthParams.w, 1e-4);
+
+	float nowLin = linearizeReversedDepth(depthNow);
+	float histLin = linearizeReversedDepth(histDepth);
+	float oldLin = linearizeReversedDepth(oldApproxDepth);
+	float realErr = abs(nowLin - histLin) / max(max(nowLin, histLin), 1e-3);
+	float oldErr = abs(nowLin - oldLin) / max(max(nowLin, oldLin), 1e-3);
+	bool realReject = realErr > threshold;
+	bool oldWouldPass = oldErr <= threshold;
+
+	if (realReject) {
+		atomicAdd(stats.realRejectCount, 1u);
+		if (oldWouldPass) {
+			atomicAdd(stats.oldApproxWouldPassCount, 1u);
+		}
+	}
+	if (realReject && !oldWouldPass) {
+		atomicAdd(stats.bothAgreeRejectCount, 1u);
+	}
+}

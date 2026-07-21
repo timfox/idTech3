@@ -102,6 +102,33 @@ grep -q 'vk_temporal_class_stamp_weapon_from_depth' "$ROOT/renderers/vulkan/tr_b
 grep -qi 'r_weaponTemporalMode' "$ROOT/docs/RENDERER_TEMPORAL_GHOSTING.md" || {
   echo "FAIL ghosting doc must describe r_weaponTemporalMode / TAA-on policy"; fail=1; }
 
+# --- Temporal completion: true previous depth, weapon resolve, bloom policy ---
+grep -q 'previousDepthTex' "$ROOT/renderers/vulkan/shaders/glsl/taa.frag" || {
+  echo "FAIL taa.frag must sample persistent previous depth (previousDepthTex)"; fail=1; }
+need "renderers/vulkan/shaders/glsl/weapon_taa.frag"
+need "renderers/vulkan/shaders/glsl/weapon_taa_composite.frag"
+need "renderers/vulkan/shaders/glsl/weapon_bloom_extract.frag"
+need "renderers/vulkan/shaders/glsl/temporal/depth_reject_stats.comp"
+need "docs/TEMPORAL_RESOURCE_OWNERSHIP.md"
+grep -q 'r_weaponBloomMode' "$ROOT/renderers/vulkan/vk_aa_policy.c" || {
+  echo "FAIL r_weaponBloomMode cvar registration missing"; fail=1; }
+grep -q 'vk_weapon_bloom' "$ROOT/renderers/vulkan/vk_postfx_passes.c" || {
+  echo "FAIL vk_weapon_bloom implementation missing"; fail=1; }
+grep -q 'vk_temporal_dispatch_depth_reject_stats' "$ROOT/renderers/vulkan/vk_temporal.c" || {
+  echo "FAIL depth reject stats dispatch missing"; fail=1; }
+grep -q 'r_weaponThinSightReject' "$ROOT/renderers/vulkan/vk_aa_policy.c" || {
+  echo "FAIL r_weaponThinSightReject presentation cvar missing"; fail=1; }
+grep -q 'r_printWeaponPresentation' "$ROOT/renderers/vulkan/tr_init.c" || {
+  echo "FAIL r_printWeaponPresentation command missing"; fail=1; }
+grep -qE 'TemporalUnclassifiedR8|temporal_class_fallback' "$ROOT/renderers/vulkan/vk_frame_end.c" || {
+  echo "FAIL dedicated class fallback (TemporalUnclassifiedR8 / temporal_class_fallback) missing"; fail=1; }
+if grep -qE 'class_set\s*=\s*reactive_set' "$ROOT/renderers/vulkan/vk_frame_end.c"; then
+  echo "FAIL silent class_set = reactive_set descriptor substitution reintroduced"
+  fail=1
+else
+  echo "OK  no silent class=reactive descriptor fallback"
+fi
+
 if [[ "$fail" -ne 0 ]]; then
   echo "temporal_ghost_check: FAIL"
   exit 1

@@ -230,9 +230,18 @@ void vk_surf_validate_temporal_config_f( void )
 	if ( r_weaponBloomMode && r_weaponBloomMode->integer == 1 ) {
 		vk_surf_validation_line( "PASS", "r_weaponBloomMode",
 			"1 (weapon composite precedes one combined HDR bloom)" );
+	} else if ( r_weaponBloomMode && r_weaponBloomMode->integer == 2 ) {
+		if ( vk.weapon_bloom_extract_pipeline != VK_NULL_HANDLE ) {
+			vk_surf_validation_line( "PASS", "r_weaponBloomMode",
+				"2 (dedicated class-gated weapon bloom after weapon flush)" );
+		} else {
+			vk_surf_validation_line( "FAIL", "r_weaponBloomMode",
+				"2 requested but weapon_bloom_extract_pipeline is missing" );
+			failures++;
+		}
 	} else {
 		vk_surf_validation_line( "WARN", "r_weaponBloomMode",
-			"Surf default is 1; mode 0 is comparison and mode 2 retains combined bloom ordering" );
+			"Surf default is 1; mode 0 is comparison and mode 2 is dedicated weapon bloom" );
 		warnings++;
 	}
 
@@ -552,6 +561,183 @@ qboolean vk_temporal_store_weapon_depth( uint32_t writeIndex )
 		VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT );
 	vk.weapon_prev_depth_layout[writeIndex] = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 	return qtrue;
+}
+
+static qboolean vk_temporal_ensure_depth_reject_stats_buffer( void )
+{
+	VkBufferCreateInfo bci;
+	VkMemoryRequirements memReq;
+	VkMemoryAllocateInfo mai;
+
+	if ( vk.temporal_depth_reject_stats_buffer != VK_NULL_HANDLE &&
+		vk.temporal_depth_reject_stats_mapped != NULL ) {
+		return qtrue;
+	}
+	if ( vk.device == VK_NULL_HANDLE ) {
+		return qfalse;
+	}
+
+	Com_Memset( &bci, 0, sizeof( bci ) );
+	bci.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+	bci.size = sizeof( uint32_t ) * 4u;
+	bci.usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
+	bci.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+	VK_CHECK( qvkCreateBuffer( vk.device, &bci, NULL, &vk.temporal_depth_reject_stats_buffer ) );
+
+	qvkGetBufferMemoryRequirements( vk.device, vk.temporal_depth_reject_stats_buffer, &memReq );
+	Com_Memset( &mai, 0, sizeof( mai ) );
+	mai.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+	mai.allocationSize = memReq.size;
+	mai.memoryTypeIndex = vk_find_memory_type( vk.physical_device, memReq.memoryTypeBits,
+		VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT );
+	VK_CHECK( qvkAllocateMemory( vk.device, &mai, NULL, &vk.temporal_depth_reject_stats_memory ) );
+	VK_CHECK( qvkBindBufferMemory( vk.device, vk.temporal_depth_reject_stats_buffer,
+		vk.temporal_depth_reject_stats_memory, 0 ) );
+	VK_CHECK( qvkMapMemory( vk.device, vk.temporal_depth_reject_stats_memory, 0, bci.size, 0,
+		&vk.temporal_depth_reject_stats_mapped ) );
+	Com_Memset( vk.temporal_depth_reject_stats_mapped, 0, (size_t)bci.size );
+	SET_OBJECT_NAME( vk.temporal_depth_reject_stats_buffer,
+		"TemporalDepthRejectStatsSSBO", VK_DEBUG_REPORT_OBJECT_TYPE_BUFFER_EXT );
+	return qtrue;
+}
+
+static void vk_temporal_update_depth_reject_stats_descriptor( uint32_t prevDepthIndex )
+{
+	VkDescriptorImageInfo depthInfo;
+	VkDescriptorImageInfo prevInfo;
+	VkDescriptorImageInfo motionInfo;
+	VkDescriptorBufferInfo bufInfo;
+	VkWriteDescriptorSet writes[4];
+	Vk_Sampler_Def sd;
+	VkSampler sampler;
+
+	if ( vk.temporal_depth_reject_stats_descriptor == VK_NULL_HANDLE ||
+		vk.temporal_depth_reject_stats_buffer == VK_NULL_HANDLE ) {
+		return;
+	}
+
+	prevDepthIndex &= 1u;
+	Com_Memset( &sd, 0, sizeof( sd ) );
+	sd.gl_mag_filter = sd.gl_min_filter = GL_NEAREST;
+	sd.address_mode = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+	sd.max_lod_1_0 = qtrue;
+	sd.noAnisotropy = qtrue;
+	sampler = vk_find_sampler( &sd );
+
+	Com_Memset( &depthInfo, 0, sizeof( depthInfo ) );
+	depthInfo.sampler = sampler;
+	depthInfo.imageView = ( vk.depth_image_view_sample != VK_NULL_HANDLE ) ?
+		vk.depth_image_view_sample : vk.depth_image_view;
+	if ( vk.msaaActive && vk.volumetric_depth_view != VK_NULL_HANDLE ) {
+		depthInfo.imageView = vk.volumetric_depth_view;
+	}
+	depthInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+
+	Com_Memset( &prevInfo, 0, sizeof( prevInfo ) );
+	prevInfo.sampler = sampler;
+	prevInfo.imageView = vk.temporal_prev_depth_view[prevDepthIndex];
+	prevInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+
+	Com_Memset( &motionInfo, 0, sizeof( motionInfo ) );
+	motionInfo.sampler = sampler;
+	motionInfo.imageView = vk.motion_vector_view;
+	motionInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+
+	Com_Memset( &bufInfo, 0, sizeof( bufInfo ) );
+	bufInfo.buffer = vk.temporal_depth_reject_stats_buffer;
+	bufInfo.offset = 0;
+	bufInfo.range = sizeof( uint32_t ) * 4u;
+
+	Com_Memset( writes, 0, sizeof( writes ) );
+	writes[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+	writes[0].dstSet = vk.temporal_depth_reject_stats_descriptor;
+	writes[0].dstBinding = 0;
+	writes[0].descriptorCount = 1;
+	writes[0].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+	writes[0].pImageInfo = &depthInfo;
+
+	writes[1] = writes[0];
+	writes[1].dstBinding = 1;
+	writes[1].pImageInfo = &prevInfo;
+
+	writes[2] = writes[0];
+	writes[2].dstBinding = 2;
+	writes[2].pImageInfo = &motionInfo;
+
+	writes[3].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+	writes[3].dstSet = vk.temporal_depth_reject_stats_descriptor;
+	writes[3].dstBinding = 3;
+	writes[3].descriptorCount = 1;
+	writes[3].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+	writes[3].pBufferInfo = &bufInfo;
+
+	if ( depthInfo.imageView == VK_NULL_HANDLE || prevInfo.imageView == VK_NULL_HANDLE ||
+		motionInfo.imageView == VK_NULL_HANDLE ) {
+		return;
+	}
+	qvkUpdateDescriptorSets( vk.device, 4, writes, 0, NULL );
+}
+
+void vk_temporal_dispatch_depth_reject_stats( uint32_t prevDepthIndex )
+{
+	uint32_t width = 0u;
+	uint32_t height = 0u;
+	float push[4];
+	uint32_t *counters;
+
+	if ( vk.cmd == NULL || vk.cmd->command_buffer == VK_NULL_HANDLE ||
+		vk.temporal_depth_reject_stats_pipeline == VK_NULL_HANDLE ||
+		vk.temporal_depth_reject_stats_pipeline_layout == VK_NULL_HANDLE ||
+		vk.temporal_depth_reject_stats_descriptor == VK_NULL_HANDLE ) {
+		return;
+	}
+	if ( !vk_temporal_ensure_depth_reject_stats_buffer() ) {
+		return;
+	}
+
+	counters = (uint32_t *)vk.temporal_depth_reject_stats_mapped;
+	counters[0] = counters[1] = counters[2] = counters[3] = 0u;
+
+	vk_temporal_update_depth_reject_stats_descriptor( prevDepthIndex );
+	vk_get_active_render_extent( &width, &height );
+	if ( width == 0u || height == 0u ) {
+		width = vk_get_render_target_width();
+		height = vk_get_render_target_height();
+	}
+	if ( width == 0u || height == 0u ) {
+		return;
+	}
+
+	push[0] = r_znear ? r_znear->value : 8.0f;
+	push[1] = backEnd.viewParms.zFar;
+	if ( push[1] <= push[0] ) {
+		push[1] = push[0] + 100.0f;
+	}
+	push[2] = vk.temporal.prevDepthValid ? 1.0f : 0.0f;
+	push[3] = 0.04f;
+
+	qvkCmdBindPipeline( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE,
+		vk.temporal_depth_reject_stats_pipeline );
+	qvkCmdBindDescriptorSets( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE,
+		vk.temporal_depth_reject_stats_pipeline_layout, 0, 1,
+		&vk.temporal_depth_reject_stats_descriptor, 0, NULL );
+	qvkCmdPushConstants( vk.cmd->command_buffer, vk.temporal_depth_reject_stats_pipeline_layout,
+		VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof( push ), push );
+	qvkCmdDispatch( vk.cmd->command_buffer, ( width + 7u ) / 8u, ( height + 7u ) / 8u, 1u );
+}
+
+void vk_temporal_readback_depth_reject_stats( void )
+{
+	const uint32_t *counters;
+
+	if ( vk.temporal_depth_reject_stats_mapped == NULL ) {
+		return;
+	}
+	counters = (const uint32_t *)vk.temporal_depth_reject_stats_mapped;
+	vk.temporal.depthRealRejectCount = counters[0];
+	vk.temporal.depthOldApproxWouldPassCount = counters[1];
+	vk.temporal.depthBothAgreeRejectCount = counters[2];
+	vk.temporal.depthSampleCount = counters[3];
 }
 
 static void vk_temporal_apply_resets( qboolean hardReset )
@@ -977,10 +1163,19 @@ qboolean vk_temporal_want_weapon_after_world_post( void )
 
 qboolean vk_temporal_defer_bloom_for_weapon( void )
 {
+	/* Mode 1 only: combined HDR before one global bloom.
+	 * Mode 2 keeps legacy world bloom order and adds dedicated weapon bloom after the flush. */
 	return vk.fboActive && r_bloom && r_bloom->integer &&
-		r_weaponBloomMode && r_weaponBloomMode->integer > 0 &&
+		r_weaponBloomMode && r_weaponBloomMode->integer == 1 &&
 		vk_temporal_want_weapon_after_world_post() &&
 		vk_temporal_reconstruction_wanted();
+}
+
+qboolean vk_temporal_want_dedicated_weapon_bloom( void )
+{
+	return vk.fboActive && r_bloom && r_bloom->integer &&
+		r_weaponBloomMode && r_weaponBloomMode->integer == 2 &&
+		vk_temporal_want_weapon_after_world_post();
 }
 
 qboolean vk_temporal_defer_weapon_drawsurfs( const void *drawSurfsCmd )
@@ -1149,8 +1344,16 @@ void vk_temporal_status_f( void )
 	ri.Printf( PRINT_ALL, "            r_temporalDebug: 0=off 1=velocity 2=depthReject 3=histWeight\n" );
 	ri.Printf( PRINT_ALL, "            4=disocclusion 5=weaponMask 6=currVsHist\n" );
 	ri.Printf( PRINT_ALL, "            7=histUV 8=worldVsReactive 9=adaptSample 10=currVsHist\n" );
-	ri.Printf( PRINT_ALL, "            11=neighVar 12=histDelta 13=NaN 14=weaponMV 15=worldMV 16=currDepth\n" );
+	ri.Printf( PRINT_ALL, "            11=neighVar 12=histDelta 13=NaN 14=preWeaponMV 15=priorClassMV\n" );
+	ri.Printf( PRINT_ALL, "            16–27 class/velocity/reactive/confidence (weapon resolve)\n" );
+	ri.Printf( PRINT_ALL, "            28–33 depth/prev-depth/rejection (weapon resolve)\n" );
 	ri.Printf( PRINT_ALL, "            rejection viz (r_debugHistoryRejection): same codes 1–12\n" );
+	vk_temporal_readback_depth_reject_stats();
+	ri.Printf( PRINT_ALL, "depthRej  : real=%u oldApproxWouldPass=%u bothAgree=%u samples=%u\n",
+		vk.temporal.depthRealRejectCount,
+		vk.temporal.depthOldApproxWouldPassCount,
+		vk.temporal.depthBothAgreeRejectCount,
+		vk.temporal.depthSampleCount );
 	ri.Printf( PRINT_ALL, "policy    : RDF_NOWORLDMODEL after doneWorldScene does not thrash history;\n" );
 	ri.Printf( PRINT_ALL, "            weapon draws defer after world TAA and after SSR when isolation is on;\n" );
 	ri.Printf( PRINT_ALL, "            portals force camera-cut; commit prefers worldMatricesCaptured.\n" );
@@ -1248,4 +1451,44 @@ void vk_temporal_ghost_status_f( void )
 	}
 	ri.Printf( PRINT_ALL, "docs           : docs/RENDERER_TEMPORAL_GHOSTING.md\n" );
 	ri.Printf( PRINT_ALL, "=========================================\n" );
+}
+
+void vk_print_weapon_presentation_f( void )
+{
+	const int bloomMode = r_weaponBloomMode ? r_weaponBloomMode->integer : 0;
+	const int temporalMode = r_weaponTemporalMode ? r_weaponTemporalMode->integer : 0;
+	const char *bloomName =
+		bloomMode == 1 ? "combined HDR before one global bloom" :
+		bloomMode == 2 ? "dedicated class-gated weapon bloom" :
+		"legacy world bloom (no weapon bloom)";
+	const char *fogSrc = ( r_weaponAnalyticFog && r_weaponAnalyticFog->integer ) ?
+		"analytic camera-space (weapon only)" : "none (weapon inherits no volumetric history)";
+	const char *reflSrc = ( r_weaponLocalReflection && r_weaponLocalReflection->integer ) ?
+		"weapon-local probe/IBL" : "shared IBL only; world SSR disabled for weapon";
+	const char *aoSrc = ( r_weaponLocalAO && r_weaponLocalAO->integer ) ?
+		"weapon-local non-temporal contact" : "material AO only; no world temporal AO";
+
+	ri.Printf( PRINT_ALL, "======== Weapon Presentation Policy ========\n" );
+	ri.Printf( PRINT_ALL, "temporal mode : %d (r_weaponTemporalMode) compare=%d\n",
+		temporalMode, r_weaponTemporalCompare ? r_weaponTemporalCompare->integer : 0 );
+	ri.Printf( PRINT_ALL, "bloom         : mode %d — %s\n", bloomMode, bloomName );
+	ri.Printf( PRINT_ALL, "exposure      : shared scene HDR epoch (single tonemap/grade after bloom)\n" );
+	ri.Printf( PRINT_ALL, "fog           : %s (r_weaponAnalyticFog=%d)\n",
+		fogSrc, r_weaponAnalyticFog ? r_weaponAnalyticFog->integer : 0 );
+	ri.Printf( PRINT_ALL, "reflections   : %s (r_weaponLocalReflection=%d)\n",
+		reflSrc, r_weaponLocalReflection ? r_weaponLocalReflection->integer : 0 );
+	ri.Printf( PRINT_ALL, "AO            : %s (r_weaponLocalAO=%d)\n",
+		aoSrc, r_weaponLocalAO ? r_weaponLocalAO->integer : 0 );
+	ri.Printf( PRINT_ALL, "readability   : %s intensity=%.3f\n",
+		( r_weaponReadabilityLight && r_weaponReadabilityLight->integer ) ? "ON" : "off",
+		r_weaponReadabilityLightIntensity ? r_weaponReadabilityLightIntensity->value : 0.0f );
+	ri.Printf( PRINT_ALL, "thin sights   : rejectScale=%.3f (r_weaponThinSightReject)\n",
+		r_weaponThinSightReject ? r_weaponThinSightReject->value : 0.0f );
+	ri.Printf( PRINT_ALL, "isolation     : weapon deferred past world SSR/SSAO/volumetric history\n" );
+	ri.Printf( PRINT_ALL, "history valid : weapon=%s worldColor=%s prevDepth=%s class=%s\n",
+		vk.temporal.weaponHistoryValid ? "yes" : "no",
+		vk.temporal.prevColorValid ? "yes" : "no",
+		vk.temporal.prevDepthValid ? "yes" : "no",
+		vk.temporal.prevClassValid ? "yes" : "no" );
+	ri.Printf( PRINT_ALL, "=============================================\n" );
 }

@@ -201,6 +201,16 @@ void vk_update_postfx_params( uint32_t cmd_index )
 		r_weaponTemporalReactiveScale->value : 1.0f;
 	params.temporalDebugParams[0] = r_temporalDebugVectorScale ?
 		r_temporalDebugVectorScale->value : 80.0f;
+	params.temporalDebugParams[1] = r_weaponThinSightReject ?
+		r_weaponThinSightReject->value : 0.65f;
+	params.temporalDebugParams[2] = 0.0f;
+	if ( r_weaponAnalyticFog && r_weaponAnalyticFog->integer ) {
+		params.temporalDebugParams[2] += 1.0f;
+	}
+	if ( r_weaponTemporalCompare && r_weaponTemporalCompare->integer == 1 ) {
+		params.temporalDebugParams[2] += 2.0f; /* split-screen compare marker */
+	}
+	params.temporalDebugParams[3] = r_weaponLocalAO && r_weaponLocalAO->integer ? 1.0f : 0.0f;
 	if ( R_Upscale_WantTemporal() ) {
 		float sharp = params.taaParams[3] + R_Upscale_GetSharpness();
 		params.taaParams[3] = Com_Clamp( 0.0f, 1.0f, sharp );
@@ -225,10 +235,19 @@ void vk_update_postfx_params( uint32_t cmd_index )
 	 */
 	if ( s_pack_weapon_temporal_for_taa ) {
 		cvar_t *mode = r_weaponTemporalMode;
+		int effectiveMode;
 		if ( !mode ) {
 			mode = ri.Cvar_Get( "r_weaponTemporalMode", "1", CVAR_ARCHIVE_ND );
 		}
-		params.splitShadow[3] = (float)Com_Clamp( 0, 2, mode->integer );
+		effectiveMode = Com_Clamp( 0, 2, mode->integer );
+		if ( r_weaponTemporalCompare && r_weaponTemporalCompare->integer == 2 ) {
+			/* Alternate frames: 0 → 1 → 2 → 0 … */
+			effectiveMode = (int)( vk.temporal.frameIndex % 3u );
+		} else if ( r_weaponTemporalCompare && r_weaponTemporalCompare->integer == 1 ) {
+			/* Split handled in weapon_taa_composite; pack mode 2 so history path stays live. */
+			effectiveMode = 2;
+		}
+		params.splitShadow[3] = (float)effectiveMode;
 		params.splitHighlight[3] = ( vk.temporal_class_image[0] != VK_NULL_HANDLE &&
 			vk.temporal.classHasPrev && vk.temporal.prevClassValid ) ? 1.0f : 0.0f;
 	}

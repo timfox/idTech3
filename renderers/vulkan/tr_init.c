@@ -1309,6 +1309,7 @@ static void R_Register( void )
 	ri.Cmd_AddCommand( "temporal_status", vk_temporal_status_f );
 	ri.Cmd_AddCommand( "r_dumpTemporalState", vk_temporal_status_f );
 	ri.Cmd_AddCommand( "r_captureTemporalDebug", vk_capture_temporal_debug_f );
+	ri.Cmd_AddCommand( "r_printWeaponPresentation", vk_print_weapon_presentation_f );
 	ri.Cmd_AddCommand( "temporal_ghost_status", vk_temporal_ghost_status_f );
 	ri.Cmd_AddCommand( "surf_validateTemporalConfig", vk_surf_validate_temporal_config_f );
 	ri.Cmd_AddCommand( "r_printViewmodelProjection", vk_print_viewmodel_projection_f );
@@ -3672,7 +3673,7 @@ static void R_Register( void )
 		" 3 - linear filtering, stretch to full size\n"
 		" 4 - linear filtering, preserve aspect ratio (black bars on sides)\n" );
 	r_temporalDebug = ri.Cvar_Get( "r_temporalDebug", "0", CVAR_ARCHIVE_ND );
-	ri.Cvar_CheckRange( r_temporalDebug, "0", "16", CV_INTEGER );
+	ri.Cvar_CheckRange( r_temporalDebug, "0", "33", CV_INTEGER );
 	ri.Cvar_SetDescription( r_temporalDebug,
 		"Temporal ghosting diagnostics (see docs/RENDERER_TEMPORAL_GHOSTING.md):\n"
 		" 0 off\n"
@@ -3682,7 +3683,13 @@ static void R_Register( void )
 		" 4 disocclusion / reactive mask\n"
 		" 5 weapon depth mask (TAA near-weapon or SSR weapon-range depth)\n"
 		" 6 current vs history contribution\n"
-		" 7–12 extended: historyUV / weapon-vs-world MV / depth / NaN (see temporal_ghost_status)\n"
+		" 7–13 history UV / variance / NaN\n"
+		" 14 pre-weapon world-resolve velocity\n"
+		" 15 prior-class-gated world-resolve velocity\n"
+		" 16–27 Architecture B class/velocity/reactive/confidence views\n"
+		" 28–33 previous-depth / depth-rejection views\n"
+		"Modes 16–33 require the post-weapon diagnostic resolve "
+		"(r_weaponTemporalMode 2 or the capture command).\n"
 		"Any non-zero also logs temporal reset reasons (developer)." );
 	{
 		cvar_t *r_tsr = ri.Cvar_Get( "r_tsr", "1", CVAR_ARCHIVE_ND );
@@ -4031,6 +4038,7 @@ static void RE_Shutdown( refShutdownCode_t code ) {
 	ri.Cmd_RemoveCommand( "r_aaQuality" );
 	ri.Cmd_RemoveCommand( "r_dumpTemporalState" );
 	ri.Cmd_RemoveCommand( "r_captureTemporalDebug" );
+	ri.Cmd_RemoveCommand( "r_printWeaponPresentation" );
 	ri.Cmd_RemoveCommand( "surf_validateTemporalConfig" );
 	ri.Cmd_RemoveCommand( "r_printViewmodelProjection" );
 #endif

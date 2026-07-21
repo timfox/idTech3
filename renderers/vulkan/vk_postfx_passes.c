@@ -1226,3 +1226,151 @@ qboolean vk_bloom( void )
 
 	return qtrue;
 }
+
+/*
+===============
+vk_weapon_bloom
+
+Dedicated class-gated weapon bloom (r_weaponBloomMode 2). World bloom already ran
+in legacy order; this extracts bright weapon-class pixels after the weapon flush,
+blurs, and additively composites once onto the combined HDR color.
+===============
+*/
+qboolean vk_weapon_bloom( void )
+{
+	uint32_t i;
+	const char *skipReason = NULL;
+	VkDescriptorSet classSet;
+	VkPipelineLayout extractLayout;
+	const qboolean canBlitDownsample = vk_format_has_features( vk.physical_device, vk.bloom_format,
+		VK_FORMAT_FEATURE_BLIT_SRC_BIT | VK_FORMAT_FEATURE_BLIT_DST_BIT | VK_FORMAT_FEATURE_SAMPLED_IMAGE_FILTER_LINEAR_BIT );
+
+	if ( !vk_temporal_want_dedicated_weapon_bloom() ) {
+		return qfalse;
+	}
+	if ( vk.renderPassIndex == RENDER_PASS_SCREENMAP || vk.renderPassIndex == RENDER_PASS_SUN_SHADOW ) {
+		return qfalse;
+	}
+	if ( !backEnd.doneSurfaces || !vk.fboActive || !tr.world || !backEnd.doneWorldScene ) {
+		return qfalse;
+	}
+	if ( !vk_bloom_resources_ready( &skipReason ) ) {
+		ri.Printf( PRINT_DEVELOPER, S_COLOR_YELLOW
+			"[VK][weapon-bloom] skip: %s\n", skipReason ? skipReason : "unknown" );
+		return qfalse;
+	}
+	if ( vk.weapon_bloom_extract_pipeline == VK_NULL_HANDLE ) {
+		ri.Printf( PRINT_DEVELOPER, S_COLOR_YELLOW
+			"[VK][weapon-bloom] skip: missing weapon bloom extract pipeline\n" );
+		return qfalse;
+	}
+
+	classSet = vk.weapon_current_class_descriptor[vk.cmd_index];
+	if ( classSet == VK_NULL_HANDLE ) {
+		classSet = vk.taa_class_descriptor[vk.cmd_index];
+	}
+	if ( classSet == VK_NULL_HANDLE || vk.color_descriptor[vk.cmd_index] == VK_NULL_HANDLE ) {
+		ri.Printf( PRINT_DEVELOPER, S_COLOR_YELLOW
+			"[VK][weapon-bloom] skip: missing color/class descriptors\n" );
+		return qfalse;
+	}
+
+	extractLayout = vk.pipeline_layout_weapon_bloom != VK_NULL_HANDLE ?
+		vk.pipeline_layout_weapon_bloom : vk.pipeline_layout_weapon_composite;
+	if ( extractLayout == VK_NULL_HANDLE ) {
+		return qfalse;
+	}
+
+	if ( vk.inRenderPass ) {
+		vk_end_render_pass();
+	}
+
+	vk_barrier_post_fog_source_for_sampling( vk.color_image_view, "pre-weapon-bloom-extract" );
+	vk_pass_diag_stage( "weapon_bloom_extract" );
+
+	vk_begin_bloom_extract_render_pass();
+	qvkCmdBindPipeline( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
+		vk.weapon_bloom_extract_pipeline );
+	{
+		VkDescriptorSet bloom_sets[2] = {
+			vk.color_descriptor[vk.cmd_index],
+			classSet
+		};
+		qvkCmdBindDescriptorSets( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
+			extractLayout, 0, 2, bloom_sets, 0, NULL );
+	}
+	vk_postfx_draw_fullscreen_quad();
+	vk_end_render_pass();
+
+	if ( canBlitDownsample ) {
+		vk_pass_diag_stage( "weapon_bloom_downsample_blur" );
+		for ( i = 0; i < VK_NUM_BLOOM_PASSES * 2; i += 2 ) {
+			VkImageBlit region;
+			const uint32_t level = i / 2;
+			const uint32_t srcIndex = ( i == 0 ) ? 0 : i;
+			const uint32_t dstIndex = i + 2;
+			const uint32_t srcWidth = MAX( 1u, gls.captureWidth / ( 1u << level ) );
+			const uint32_t srcHeight = MAX( 1u, gls.captureHeight / ( 1u << level ) );
+			const uint32_t dstWidth = MAX( 1u, srcWidth / 2u );
+			const uint32_t dstHeight = MAX( 1u, srcHeight / 2u );
+			VkCommandBuffer cmd = vk.cmd->command_buffer;
+
+			record_image_layout_transition( cmd, vk.bloom_image[srcIndex], VK_IMAGE_ASPECT_COLOR_BIT,
+				VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, 0, 0 );
+			record_image_layout_transition( cmd, vk.bloom_image[dstIndex], VK_IMAGE_ASPECT_COLOR_BIT,
+				VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 0, 0 );
+
+			Com_Memset( &region, 0, sizeof( region ) );
+			region.srcSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+			region.srcSubresource.layerCount = 1;
+			region.srcOffsets[1].x = (int32_t)srcWidth;
+			region.srcOffsets[1].y = (int32_t)srcHeight;
+			region.srcOffsets[1].z = 1;
+			region.dstSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+			region.dstSubresource.layerCount = 1;
+			region.dstOffsets[1].x = (int32_t)dstWidth;
+			region.dstOffsets[1].y = (int32_t)dstHeight;
+			region.dstOffsets[1].z = 1;
+
+			qvkCmdBlitImage( cmd, vk.bloom_image[srcIndex], VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+				vk.bloom_image[dstIndex], VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region, VK_FILTER_LINEAR );
+
+			record_image_layout_transition( cmd, vk.bloom_image[srcIndex], VK_IMAGE_ASPECT_COLOR_BIT,
+				VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, 0, 0 );
+			record_image_layout_transition( cmd, vk.bloom_image[dstIndex], VK_IMAGE_ASPECT_COLOR_BIT,
+				VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, 0, 0 );
+
+			vk_postfx_run_blur_pass( i + 0, vk.bloom_image_descriptor[dstIndex] );
+			vk_postfx_run_blur_pass( i + 1, vk.bloom_image_descriptor[i + 1] );
+		}
+	} else {
+		vk_pass_diag_stage( "weapon_bloom_blur" );
+		for ( i = 0; i < VK_NUM_BLOOM_PASSES * 2; i += 2 ) {
+			vk_postfx_run_blur_pass( i + 0, vk.bloom_image_descriptor[i + 0] );
+			vk_postfx_run_blur_pass( i + 1, vk.bloom_image_descriptor[i + 1] );
+		}
+	}
+
+	vk_begin_post_bloom_render_pass();
+	vk_pass_diag_stage( "weapon_bloom_blend" );
+	{
+		VkDescriptorSet dset[VK_NUM_BLOOM_PASSES];
+		for ( i = 0; i < VK_NUM_BLOOM_PASSES; i++ ) {
+			dset[i] = vk.bloom_image_descriptor[( i + 1 ) * 2];
+		}
+		qvkCmdBindPipeline( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.bloom_blend_pipeline );
+		qvkCmdBindDescriptorSets( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
+			vk.pipeline_layout_blend, 0, ARRAY_LEN( dset ), dset, 0, NULL );
+		vk_postfx_draw_fullscreen_quad();
+	}
+
+	if ( vk.color_image_view != VK_NULL_HANDLE ) {
+		vk_barrier_post_fog_source_for_sampling( vk.color_image_view, "post-weapon-bloom" );
+		vk_set_scene_post_fog_source( vk.color_image_view );
+		vk_update_post_fog_descriptors( vk.color_image_view );
+		vk_set_post_chain_last_writer( "weapon_bloom" );
+	}
+
+	ri.Printf( PRINT_DEVELOPER, "[VK][weapon-bloom] dedicated class-gated bloom composited\n" );
+	return qtrue;
+}

@@ -33,6 +33,13 @@ cvar_t *r_temporalDropClassDescriptor;
 cvar_t *r_temporalSmaaCleanup;
 cvar_t *r_debugMotionVectors;
 cvar_t *r_debugHistoryRejection;
+cvar_t *r_weaponAnalyticFog;
+cvar_t *r_weaponLocalReflection;
+cvar_t *r_weaponLocalAO;
+cvar_t *r_weaponReadabilityLight;
+cvar_t *r_weaponReadabilityLightIntensity;
+cvar_t *r_weaponThinSightReject;
+cvar_t *r_weaponTemporalCompare;
 
 static qboolean s_want_temporal_cleanup_smaa;
 static qboolean s_want_smaa_t2x;
@@ -165,8 +172,63 @@ void vk_aa_policy_register_cvars( void )
 	ri.Cvar_CheckRange( r_weaponBloomMode, "0", "2", CV_INTEGER );
 	ri.Cvar_SetDescription( r_weaponBloomMode,
 		"Architecture B weapon bloom: 0=world bloom before weapon (no weapon bloom), "
-		"1=combined HDR global bloom after weapon (default), 2=dedicated weapon bloom policy." );
+		"1=combined HDR global bloom after weapon (default), "
+		"2=legacy world bloom + dedicated class-gated weapon bloom after weapon flush." );
 	ri.Cvar_SetGroup( r_weaponBloomMode, CVG_RENDERER );
+	ri.Printf( PRINT_ALL, "[VK][weapon] bloom mode %d (r_weaponBloomMode)\n",
+		r_weaponBloomMode->integer );
+
+	r_weaponAnalyticFog = ri.Cvar_Get( "r_weaponAnalyticFog", "0", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_weaponAnalyticFog, "0", "1", CV_INTEGER );
+	ri.Cvar_SetDescription( r_weaponAnalyticFog,
+		"Analytic camera-space fog for first-person weapon pixels only. "
+		"Never samples world volumetric temporal history (Architecture B)." );
+	ri.Cvar_SetGroup( r_weaponAnalyticFog, CVG_RENDERER );
+
+	r_weaponLocalReflection = ri.Cvar_Get( "r_weaponLocalReflection", "0", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_weaponLocalReflection, "0", "1", CV_INTEGER );
+	ri.Cvar_SetDescription( r_weaponLocalReflection,
+		"Weapon-local probe/IBL reflection approximation. World SSR stays disabled for weapon pixels." );
+	ri.Cvar_SetGroup( r_weaponLocalReflection, CVG_RENDERER );
+
+	r_weaponLocalAO = ri.Cvar_Get( "r_weaponLocalAO", "0", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_weaponLocalAO, "0", "1", CV_INTEGER );
+	ri.Cvar_SetDescription( r_weaponLocalAO,
+		"Subtle non-temporal weapon-local contact/crease AO. Never samples world temporal AO." );
+	ri.Cvar_SetGroup( r_weaponLocalAO, CVG_RENDERER );
+
+	r_weaponReadabilityLight = ri.Cvar_Get( "r_weaponReadabilityLight", "0", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_weaponReadabilityLight, "0", "1", CV_INTEGER );
+	ri.Cvar_SetDescription( r_weaponReadabilityLight,
+		"Optional authored first-person readability light (restrained; off by default)." );
+	ri.Cvar_SetGroup( r_weaponReadabilityLight, CVG_RENDERER );
+
+	r_weaponReadabilityLightIntensity = ri.Cvar_Get( "r_weaponReadabilityLightIntensity", "0.15", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_weaponReadabilityLightIntensity, "0", "1", CV_FLOAT );
+	ri.Cvar_SetGroup( r_weaponReadabilityLightIntensity, CVG_RENDERER );
+
+	r_weaponThinSightReject = ri.Cvar_Get( "r_weaponThinSightReject", "0.65", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_weaponThinSightReject, "0", "2", CV_FLOAT );
+	ri.Cvar_SetDescription( r_weaponThinSightReject,
+		"Responsive rejection scale for thin sights / fast silhouettes in weapon TAA "
+		"(coverage + MVP velocity + class transition + reactive; not world depth)." );
+	ri.Cvar_SetGroup( r_weaponThinSightReject, CVG_RENDERER );
+
+	r_weaponTemporalCompare = ri.Cvar_Get( "r_weaponTemporalCompare", "0", CVAR_TEMP );
+	ri.Cvar_CheckRange( r_weaponTemporalCompare, "0", "2", CV_INTEGER );
+	ri.Cvar_SetDescription( r_weaponTemporalCompare,
+		"Mode comparison debug: 0=off, 1=split-screen (left mode0 / right mode2), "
+		"2=alternate frames between modes 0/1/2." );
+	ri.Cvar_SetGroup( r_weaponTemporalCompare, CVG_RENDERER );
+
+	ri.Printf( PRINT_ALL,
+		"[VK][weapon] presentation: fog=%d reflection=%d ao=%d readability=%d thinSight=%.2f\n",
+		r_weaponAnalyticFog->integer,
+		r_weaponLocalReflection->integer,
+		r_weaponLocalAO->integer,
+		r_weaponReadabilityLight->integer,
+		r_weaponThinSightReject->value );
+
 	r_temporalDropClassDescriptor = ri.Cvar_Get( "r_temporalDropClassDescriptor", "0", CVAR_TEMP );
 	ri.Cvar_CheckRange( r_temporalDropClassDescriptor, "0", "1", CV_INTEGER );
 	ri.Cvar_SetDescription( r_temporalDropClassDescriptor,

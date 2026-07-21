@@ -355,6 +355,17 @@ void vk_create_post_process_pipeline( int program_index, uint32_t width, uint32_
 			target_format = vk.color_format;
 			blend = qfalse;
 			break;
+		case 29:
+			pipeline = &vk.weapon_bloom_extract_pipeline;
+			fsmodule = vk.modules.weapon_bloom_extract_fs;
+			renderpass = vk.render_pass.bloom_extract;
+			layout = vk.pipeline_layout_weapon_bloom != VK_NULL_HANDLE ?
+				vk.pipeline_layout_weapon_bloom : vk.pipeline_layout_weapon_composite;
+			samples = VK_SAMPLE_COUNT_1_BIT;
+			pipeline_name = "weapon bloom extract pipeline";
+			target_format = vk.capture_format;
+			blend = qfalse;
+			break;
 #ifdef VK_PBR_BRDFLUT
 		case 4:
 			pipeline = &vk.brdflut_pipeline;

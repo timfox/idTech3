@@ -236,6 +236,10 @@ void vk_destroy_pipelines( qboolean resetCounter )
 		qvkDestroyPipeline( vk.device, vk.bloom_extract_pipeline, NULL );
 		vk.bloom_extract_pipeline = VK_NULL_HANDLE;
 	}
+	if ( vk.weapon_bloom_extract_pipeline != VK_NULL_HANDLE ) {
+		qvkDestroyPipeline( vk.device, vk.weapon_bloom_extract_pipeline, NULL );
+		vk.weapon_bloom_extract_pipeline = VK_NULL_HANDLE;
+	}
 
 	if ( vk.bloom_blend_pipeline != VK_NULL_HANDLE ) {
 		qvkDestroyPipeline( vk.device, vk.bloom_blend_pipeline, NULL );
@@ -350,6 +354,26 @@ void vk_destroy_pipelines( qboolean resetCounter )
 	if ( vk.temporal_depth_history_copy_pipeline != VK_NULL_HANDLE ) {
 		qvkDestroyPipeline( vk.device, vk.temporal_depth_history_copy_pipeline, NULL );
 		vk.temporal_depth_history_copy_pipeline = VK_NULL_HANDLE;
+	}
+	if ( vk.temporal_depth_reject_stats_pipeline != VK_NULL_HANDLE ) {
+		qvkDestroyPipeline( vk.device, vk.temporal_depth_reject_stats_pipeline, NULL );
+		vk.temporal_depth_reject_stats_pipeline = VK_NULL_HANDLE;
+	}
+	if ( vk.temporal_depth_reject_stats_pipeline_layout != VK_NULL_HANDLE ) {
+		qvkDestroyPipelineLayout( vk.device, vk.temporal_depth_reject_stats_pipeline_layout, NULL );
+		vk.temporal_depth_reject_stats_pipeline_layout = VK_NULL_HANDLE;
+	}
+	if ( vk.temporal_depth_reject_stats_buffer != VK_NULL_HANDLE ) {
+		if ( vk.temporal_depth_reject_stats_mapped ) {
+			qvkUnmapMemory( vk.device, vk.temporal_depth_reject_stats_memory );
+			vk.temporal_depth_reject_stats_mapped = NULL;
+		}
+		qvkDestroyBuffer( vk.device, vk.temporal_depth_reject_stats_buffer, NULL );
+		vk.temporal_depth_reject_stats_buffer = VK_NULL_HANDLE;
+	}
+	if ( vk.temporal_depth_reject_stats_memory != VK_NULL_HANDLE ) {
+		qvkFreeMemory( vk.device, vk.temporal_depth_reject_stats_memory, NULL );
+		vk.temporal_depth_reject_stats_memory = VK_NULL_HANDLE;
 	}
 	if ( vk.luminance_pipeline != VK_NULL_HANDLE ) {
 		qvkDestroyPipeline( vk.device, vk.luminance_pipeline, NULL );

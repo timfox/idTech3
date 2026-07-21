@@ -281,6 +281,7 @@ void vk_create_shader_modules( void )
 	vk.modules.taa_fs = SHADER_MODULE( taa_frag_spv );
 	vk.modules.weapon_taa_fs = SHADER_MODULE( weapon_taa_frag_spv );
 	vk.modules.weapon_taa_composite_fs = SHADER_MODULE( weapon_taa_composite_frag_spv );
+	vk.modules.weapon_bloom_extract_fs = SHADER_MODULE( weapon_bloom_extract_frag_spv );
 
 	SET_OBJECT_NAME( vk.modules.smaa_edge_fs, "smaa edge fragment module", VK_DEBUG_REPORT_OBJECT_TYPE_SHADER_MODULE_EXT );
 	SET_OBJECT_NAME( vk.modules.smaa_blend_fs, "smaa blend fragment module", VK_DEBUG_REPORT_OBJECT_TYPE_SHADER_MODULE_EXT );
@@ -297,6 +298,7 @@ void vk_create_shader_modules( void )
 	SET_OBJECT_NAME( vk.modules.taa_fs, "taa fragment module", VK_DEBUG_REPORT_OBJECT_TYPE_SHADER_MODULE_EXT );
 	SET_OBJECT_NAME( vk.modules.weapon_taa_fs, "weapon taa fragment module", VK_DEBUG_REPORT_OBJECT_TYPE_SHADER_MODULE_EXT );
 	SET_OBJECT_NAME( vk.modules.weapon_taa_composite_fs, "weapon taa composite fragment module", VK_DEBUG_REPORT_OBJECT_TYPE_SHADER_MODULE_EXT );
+	SET_OBJECT_NAME( vk.modules.weapon_bloom_extract_fs, "weapon bloom extract fragment module", VK_DEBUG_REPORT_OBJECT_TYPE_SHADER_MODULE_EXT );
 
 #ifdef VK_PBR_BRDFLUT
 	vk.modules.brdflut_fs = SHADER_MODULE( brdflut_frag_spv );

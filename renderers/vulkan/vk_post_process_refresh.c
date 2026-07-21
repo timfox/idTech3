@@ -50,6 +50,7 @@ void vk_update_post_process_pipelines( void )
 			uint32_t i;
 
 			vk_create_post_process_pipeline( 1, width, height );
+			vk_create_post_process_pipeline( 29, width, height );
 
 			for ( i = 0; i < ARRAY_LEN( vk.blur_pipeline ); i += 2 ) {
 				width /= 2;

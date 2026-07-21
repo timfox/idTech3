@@ -626,7 +626,7 @@ void vk_initialize( void )
 		pool_size[4].descriptorCount = 8 + NUM_COMMAND_BUFFERS;
 
 		pool_size[5].type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-		pool_size[5].descriptorCount = 12; /* forward+ + CBT draw commands SSBO */
+		pool_size[5].descriptorCount = 13; /* forward+ + CBT + temporal depth-reject stats */
 
 		for ( j = 0, maxSets = 0; j < ARRAY_LEN( pool_size ); j++ ) {
 			maxSets += pool_size[j].descriptorCount;
@@ -998,6 +998,33 @@ void vk_initialize( void )
 				VK_CHECK( qvkCreateDescriptorSetLayout( vk.device, &resolve_layout_desc, NULL, &vk.volumetric_depth_resolve_layout ) );
 			}
 
+			{
+				VkDescriptorSetLayoutBinding reject_bindings[4];
+				VkDescriptorSetLayoutCreateInfo reject_layout_desc;
+				uint32_t bi;
+
+				for ( bi = 0; bi < 3; bi++ ) {
+					reject_bindings[bi].binding = bi;
+					reject_bindings[bi].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+					reject_bindings[bi].descriptorCount = 1;
+					reject_bindings[bi].stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+					reject_bindings[bi].pImmutableSamplers = NULL;
+				}
+				reject_bindings[3].binding = 3;
+				reject_bindings[3].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+				reject_bindings[3].descriptorCount = 1;
+				reject_bindings[3].stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+				reject_bindings[3].pImmutableSamplers = NULL;
+
+				reject_layout_desc.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+				reject_layout_desc.pNext = NULL;
+				reject_layout_desc.flags = 0;
+				reject_layout_desc.bindingCount = ARRAY_LEN( reject_bindings );
+				reject_layout_desc.pBindings = reject_bindings;
+				VK_CHECK( qvkCreateDescriptorSetLayout( vk.device, &reject_layout_desc, NULL,
+					&vk.temporal_depth_reject_stats_layout ) );
+			}
+
 			/* Luminance pass for eye adaptation */
 			{
 				VkDescriptorSetLayoutBinding lum_bindings[2];
@@ -1142,6 +1169,8 @@ void vk_initialize( void )
 		VK_CHECK( qvkCreatePipelineLayout( vk.device, &desc, NULL, &vk.pipeline_layout_weapon_composite ) );
 		SET_OBJECT_NAME( vk.pipeline_layout_weapon_composite, "pipeline layout - weapon taa composite",
 			VK_DEBUG_REPORT_OBJECT_TYPE_PIPELINE_LAYOUT_EXT );
+		/* Same 2-sampler layout as composite: color + class for dedicated weapon bloom. */
+		vk.pipeline_layout_weapon_bloom = vk.pipeline_layout_weapon_composite;
 
 		/* Blend pipeline: 4 sampler sets for texture0..texture3 (blend.frag). Must not reuse postfx_uniform. */
 		set_layouts[0] = vk.set_layout_sampler;

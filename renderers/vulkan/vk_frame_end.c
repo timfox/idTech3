@@ -800,6 +800,9 @@ void vk_end_frame_record_taa_pass( VkImageView *post_fog_src, VkImageView *lumin
 	} else {
 		vk.temporal.prevDepthFrameId[writeIndex] = vk.temporal.frameIndex;
 	}
+	/* Instrument real previous-depth rejects vs old current-depth-at-history-UV approximation.
+	 * Uses the depth history that TAA just sampled (readIndex), before next-frame overwrite. */
+	vk_temporal_dispatch_depth_reject_stats( readIndex );
 	*post_fog_src = resolved_view;
 	*luminance_src = resolved_view;
 	vk_set_scene_post_fog_source( resolved_view );

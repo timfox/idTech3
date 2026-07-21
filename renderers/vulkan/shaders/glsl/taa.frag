@@ -226,11 +226,7 @@ void main() {
 			out_color = vec4( abs( vel.x ), abs( vel.y ), priorWeapon, 1.0 );
 			return;
 		}
-		if ( debugMode > 15.5 && debugMode < 16.5 ) {
-			/* 16 = current depth (grayscale) */
-			out_color = vec4( depthNdc, depthNdc, depthNdc, 1.0 );
-			return;
-		}
+		/* Modes 16–33 are owned by the post-weapon diagnostic resolve (weapon_taa.frag). */
 	}
 
 	vec3 history = textureLod( historyColor, historyUV, 0.0 ).rgb;
@@ -346,6 +342,9 @@ void main() {
 	}
 	if ( adaptive && depthConf < 0.35 ) {
 		confidence = 0.0; /* immediate disocclusion → current-frame spatial */
+	}
+	if ( !adaptive && depthConf < 0.20 ) {
+		confidence = 0.0; /* hard reject: real previous-depth mismatch */
 	}
 
 	/* Difficult-pixel mask for bounded extra current-frame samples. */

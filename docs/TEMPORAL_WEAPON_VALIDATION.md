@@ -21,6 +21,10 @@ invalidates it independently.
 
 ## Resource ownership
 
+Full per-resource ownership (owner module, producer/consumer pass, format,
+validity bit, frame ID field, reset scope, destruction site) is tabulated in
+[TEMPORAL_RESOURCE_OWNERSHIP.md](TEMPORAL_RESOURCE_OWNERSHIP.md). Summary:
+
 - World color: `taa_history_image[2]`; committed only after a valid world TAA pass.
 - World depth: `temporal_prev_depth_image[2]`, R32F reversed-Z, copied after the
   world resolve and before deferred weapon depth is written.
@@ -103,9 +107,28 @@ reverse-Z, depth remap, and current/previous matrix provenance.
 5. one exposure/tone-map/presentation path
 
 Weapon depth remains excluded from world AO, SSR, SSGI, and volumetric history.
-Mode 0 intentionally retains the no-weapon-bloom comparison. Mode 2 currently
-uses the same single combined-HDR bloom ordering while retaining independent
-weapon temporal ownership; it does not double-bloom or double-tone-map.
+Mode 0 intentionally retains the no-weapon-bloom comparison.
+
+**Mode 2** (`r_weaponBloomMode 2`): legacy world bloom order (before weapon) plus
+a dedicated class-gated extract (`weapon_bloom_extract.frag` → shared blur mips →
+additive `vk_weapon_bloom()` after the weapon flush). Exactly one weapon bloom
+extraction per frame; no second exposure/tone-map. Surf shipping default remains
+mode 1.
+
+## Presentation policies (Architecture B WS8)
+
+Restrained defaults (off unless Surf art direction enables them):
+
+| Cvar | Default | Role |
+|------|---------|------|
+| `r_weaponAnalyticFog` | 0 | Camera-space fog for weapon pixels only |
+| `r_weaponLocalReflection` | 0 | Probe/IBL local reflection; world SSR stays off for weapon |
+| `r_weaponLocalAO` | 0 | Non-temporal contact darkening |
+| `r_weaponReadabilityLight` | 0 | Authored FP readability light |
+| `r_weaponThinSightReject` | 0.65 | Thin-sight / silhouette responsive rejection in weapon TAA |
+| `r_weaponTemporalCompare` | 0 | 1=split (left current-only), 2=alternate modes |
+
+Diagnostics: `r_printWeaponPresentation`, depth-reject counters in `r_dumpTemporalState`.
 
 ## Matrix and capture harness
 
@@ -141,6 +164,19 @@ At width × height pixels:
 For RGBA16F at 1920×1080 this is 15.8 MiB world-depth plus 47.5 MiB mode-2
 weapon state, 63.3 MiB total. RGBA32F doubles only the weapon-color component.
 `r_dumpTemporalState` reports the runtime color format and mode-2 GPU time.
+
+### GPU timing (scaffold)
+
+Fill in from the `timing` line of `r_dumpTemporalState` on the target GPU
+(`independent weapon resolve N ms GPU`; modes 0/1 report 0 for the mode-2
+resolve — record the world TAA delta from the frame profiler instead).
+
+| Measurement | Mode 0 (no weapon history) | Mode 1 (classified shared) | Mode 2 (independent history) |
+|---|---:|---:|---:|
+| Independent weapon resolve (ms GPU) | n/a | n/a | TBD |
+| World TAA resolve delta vs mode 0 (ms GPU) | baseline | TBD | TBD |
+| Combined bloom (deferred re-run, ms GPU) | TBD | TBD | TBD |
+| Extra history memory (see cost accounting) | 0 | 0 | 47.5 MiB @ 1080p RGBA16F |
 
 ## Measurable failure criteria
 

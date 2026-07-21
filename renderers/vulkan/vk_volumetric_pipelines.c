@@ -18,62 +18,74 @@ static inline qboolean vk_hdr64_active( void )
 
 static void vk_create_volumetric_pipeline_layouts( void )
 {
-	if ( vk.volumetric_compute_pipeline_layout != VK_NULL_HANDLE ||
-		vk.volumetric_composite_pipeline_layout != VK_NULL_HANDLE ||
-		vk.volumetric_depth_resolve_pipeline_layout != VK_NULL_HANDLE ||
-		vk.volumetric_fluid_pipeline_layout != VK_NULL_HANDLE ||
-		vk.cbt_terrain_compute_layout != VK_NULL_HANDLE )
-	{
-		return;
-	}
-
 	VkPipelineLayoutCreateInfo desc;
+
 	Com_Memset( &desc, 0, sizeof( desc ) );
 	desc.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
 	desc.pNext = NULL;
 	desc.flags = 0;
 	desc.setLayoutCount = 1;
-	desc.pSetLayouts = &vk.volumetric_compute_layout;
 	desc.pushConstantRangeCount = 0;
 	desc.pPushConstantRanges = NULL;
 
-	VK_CHECK( qvkCreatePipelineLayout( vk.device, &desc, NULL, &vk.volumetric_compute_pipeline_layout ) );
-
-	desc.pSetLayouts = &vk.volumetric_composite_layout;
-	VK_CHECK( qvkCreatePipelineLayout( vk.device, &desc, NULL, &vk.volumetric_composite_pipeline_layout ) );
-
+	if ( vk.volumetric_compute_pipeline_layout == VK_NULL_HANDLE &&
+		vk.volumetric_composite_pipeline_layout == VK_NULL_HANDLE &&
+		vk.volumetric_depth_resolve_pipeline_layout == VK_NULL_HANDLE &&
+		vk.volumetric_fluid_pipeline_layout == VK_NULL_HANDLE &&
+		vk.cbt_terrain_compute_layout == VK_NULL_HANDLE )
 	{
-		VkPushConstantRange resolve_push_range;
+		desc.pSetLayouts = &vk.volumetric_compute_layout;
+		VK_CHECK( qvkCreatePipelineLayout( vk.device, &desc, NULL, &vk.volumetric_compute_pipeline_layout ) );
 
-		resolve_push_range.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
-		resolve_push_range.offset = 0;
-		resolve_push_range.size = sizeof( int ) * 2;
-		desc.pSetLayouts = &vk.volumetric_depth_resolve_layout;
-		desc.pushConstantRangeCount = 1;
-		desc.pPushConstantRanges = &resolve_push_range;
-		VK_CHECK( qvkCreatePipelineLayout( vk.device, &desc, NULL, &vk.volumetric_depth_resolve_pipeline_layout ) );
-		desc.pushConstantRangeCount = 0;
-		desc.pPushConstantRanges = NULL;
+		desc.pSetLayouts = &vk.volumetric_composite_layout;
+		VK_CHECK( qvkCreatePipelineLayout( vk.device, &desc, NULL, &vk.volumetric_composite_pipeline_layout ) );
+
+		{
+			VkPushConstantRange resolve_push_range;
+
+			resolve_push_range.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+			resolve_push_range.offset = 0;
+			resolve_push_range.size = sizeof( int ) * 2;
+			desc.pSetLayouts = &vk.volumetric_depth_resolve_layout;
+			desc.pushConstantRangeCount = 1;
+			desc.pPushConstantRanges = &resolve_push_range;
+			VK_CHECK( qvkCreatePipelineLayout( vk.device, &desc, NULL, &vk.volumetric_depth_resolve_pipeline_layout ) );
+			desc.pushConstantRangeCount = 0;
+			desc.pPushConstantRanges = NULL;
+		}
+
+		if ( vk.luminance_layout != VK_NULL_HANDLE ) {
+			VkPushConstantRange luminance_push_range;
+			luminance_push_range.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+			luminance_push_range.offset = 0;
+			luminance_push_range.size = sizeof( VkLuminancePushConstants );
+			desc.pSetLayouts = &vk.luminance_layout;
+			desc.pushConstantRangeCount = 1;
+			desc.pPushConstantRanges = &luminance_push_range;
+			VK_CHECK( qvkCreatePipelineLayout( vk.device, &desc, NULL, &vk.luminance_pipeline_layout ) );
+			desc.pushConstantRangeCount = 0;
+			desc.pPushConstantRanges = NULL;
+		}
+
+		desc.pSetLayouts = &vk.volumetric_fluid_layout;
+		VK_CHECK( qvkCreatePipelineLayout( vk.device, &desc, NULL, &vk.volumetric_fluid_pipeline_layout ) );
+
+		desc.pSetLayouts = &vk.cbt_terrain_layout;
+		VK_CHECK( qvkCreatePipelineLayout( vk.device, &desc, NULL, &vk.cbt_terrain_compute_layout ) );
 	}
 
-	if ( vk.luminance_layout != VK_NULL_HANDLE ) {
-		VkPushConstantRange luminance_push_range;
-		luminance_push_range.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
-		luminance_push_range.offset = 0;
-		luminance_push_range.size = sizeof( VkLuminancePushConstants );
-		desc.pSetLayouts = &vk.luminance_layout;
+	if ( vk.temporal_depth_reject_stats_layout != VK_NULL_HANDLE &&
+		vk.temporal_depth_reject_stats_pipeline_layout == VK_NULL_HANDLE ) {
+		VkPushConstantRange reject_push_range;
+		reject_push_range.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+		reject_push_range.offset = 0;
+		reject_push_range.size = sizeof( float ) * 4;
+		desc.pSetLayouts = &vk.temporal_depth_reject_stats_layout;
 		desc.pushConstantRangeCount = 1;
-		desc.pPushConstantRanges = &luminance_push_range;
-		VK_CHECK( qvkCreatePipelineLayout( vk.device, &desc, NULL, &vk.luminance_pipeline_layout ) );
-		desc.pushConstantRangeCount = 0;
-		desc.pPushConstantRanges = NULL;
+		desc.pPushConstantRanges = &reject_push_range;
+		VK_CHECK( qvkCreatePipelineLayout( vk.device, &desc, NULL,
+			&vk.temporal_depth_reject_stats_pipeline_layout ) );
 	}
-
-	desc.pSetLayouts = &vk.volumetric_fluid_layout;
-	VK_CHECK( qvkCreatePipelineLayout( vk.device, &desc, NULL, &vk.volumetric_fluid_pipeline_layout ) );
-
-	desc.pSetLayouts = &vk.cbt_terrain_layout;
-	VK_CHECK( qvkCreatePipelineLayout( vk.device, &desc, NULL, &vk.cbt_terrain_compute_layout ) );
 }
 
 static void vk_create_volumetric_fluid_pipeline( VkPipeline *pipeline, VkShaderModule module, const char *debug_name )
@@ -206,6 +218,36 @@ static void vk_create_temporal_depth_history_copy_pipeline( void )
 		&vk.temporal_depth_history_copy_pipeline ) );
 	SET_OBJECT_NAME( vk.temporal_depth_history_copy_pipeline,
 		"pipeline - temporal previous depth copy", VK_DEBUG_REPORT_OBJECT_TYPE_PIPELINE_EXT );
+}
+
+static void vk_create_temporal_depth_reject_stats_pipeline( void )
+{
+	VkPipelineShaderStageCreateInfo stage;
+	VkComputePipelineCreateInfo desc;
+
+	if ( vk.temporal_depth_reject_stats_pipeline != VK_NULL_HANDLE ) {
+		qvkDestroyPipeline( vk.device, vk.temporal_depth_reject_stats_pipeline, NULL );
+		vk.temporal_depth_reject_stats_pipeline = VK_NULL_HANDLE;
+	}
+	if ( vk.temporal_depth_reject_stats_pipeline_layout == VK_NULL_HANDLE ||
+		vk.modules.temporal_depth_reject_stats_cs == VK_NULL_HANDLE ) {
+		return;
+	}
+
+	Com_Memset( &stage, 0, sizeof( stage ) );
+	stage.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+	stage.stage = VK_SHADER_STAGE_COMPUTE_BIT;
+	stage.module = vk.modules.temporal_depth_reject_stats_cs;
+	stage.pName = "main";
+
+	Com_Memset( &desc, 0, sizeof( desc ) );
+	desc.sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO;
+	desc.stage = stage;
+	desc.layout = vk.temporal_depth_reject_stats_pipeline_layout;
+	VK_CHECK( qvkCreateComputePipelines( vk.device, VK_NULL_HANDLE, 1, &desc, NULL,
+		&vk.temporal_depth_reject_stats_pipeline ) );
+	SET_OBJECT_NAME( vk.temporal_depth_reject_stats_pipeline,
+		"pipeline - temporal depth reject stats", VK_DEBUG_REPORT_OBJECT_TYPE_PIPELINE_EXT );
 }
 
 static void vk_create_luminance_pipeline( void )
@@ -353,6 +395,7 @@ void vk_create_volumetric_pipelines( void )
 	vk_create_volumetric_pipeline_layouts();
 	vk_create_volumetric_depth_resolve_pipeline();
 	vk_create_temporal_depth_history_copy_pipeline();
+	vk_create_temporal_depth_reject_stats_pipeline();
 	vk_create_luminance_pipeline();
 	vk_create_volumetric_compute_pipeline();
 	vk_create_volumetric_fluid_pipelines();

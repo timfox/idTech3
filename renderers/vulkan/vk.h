@@ -720,6 +720,7 @@ typedef struct {
 	VkPipelineLayout pipeline_layout_taa;	/* post-processing + motion (set 4) + reactive (set 5) + class (set 6) */
 	VkPipelineLayout pipeline_layout_weapon_taa;
 	VkPipelineLayout pipeline_layout_weapon_composite;
+	VkPipelineLayout pipeline_layout_weapon_bloom;
 	VkPipelineLayout pipeline_layout_reactive_stamp;	/* reveal sampler -> R8 mask */
 	VkPipelineLayout pipeline_layout_temporal_class_stamp;	/* depth -> R8 class */
 	VkPipelineLayout pipeline_layout_blend;		// post-processing
@@ -767,6 +768,13 @@ typedef struct {
 	VkPipeline volumetric_composite_pipeline;
 	VkPipeline volumetric_depth_resolve_pipeline;
 	VkPipeline temporal_depth_history_copy_pipeline;
+	VkPipeline temporal_depth_reject_stats_pipeline;
+	VkDescriptorSetLayout temporal_depth_reject_stats_layout;
+	VkPipelineLayout temporal_depth_reject_stats_pipeline_layout;
+	VkBuffer temporal_depth_reject_stats_buffer;
+	VkDeviceMemory temporal_depth_reject_stats_memory;
+	void *temporal_depth_reject_stats_mapped;
+	VkDescriptorSet temporal_depth_reject_stats_descriptor;
 	VkPipeline volumetric_fluid_advect_pipeline;
 	VkPipeline volumetric_fluid_divergence_pipeline;
 	VkPipeline volumetric_fluid_pressure_pipeline;
@@ -1579,6 +1587,10 @@ typedef struct {
 		uint32_t missingReactiveDescriptorFrames;
 		uint32_t fallbackTextureUsageFrames;
 		uint32_t forcedHistoryRejectFrames;
+		uint32_t depthRealRejectCount;
+		uint32_t depthOldApproxWouldPassCount;
+		uint32_t depthBothAgreeRejectCount;
+		uint32_t depthSampleCount;
 		float weaponViewMatrix[16];
 		float weaponProjectionMatrix[16];
 		float weaponPrevViewMatrix[16];
@@ -1712,6 +1724,8 @@ typedef struct {
 		VkShaderModule temporal_depth_history_copy_cs;
 		VkShaderModule weapon_taa_fs;
 		VkShaderModule weapon_taa_composite_fs;
+		VkShaderModule weapon_bloom_extract_fs;
+		VkShaderModule temporal_depth_reject_stats_cs;
 		VkShaderModule luminance_cs;
 		VkShaderModule vegetation_wind_cs;
 		VkShaderModule fluid_advect_cs;
@@ -1857,6 +1871,7 @@ typedef struct {
 	VkPipeline overlay_compose_pipeline;
 	VkPipeline capture_pipeline;
 	VkPipeline bloom_extract_pipeline;
+	VkPipeline weapon_bloom_extract_pipeline;
 	VkPipeline blur_pipeline[VK_NUM_BLOOM_PASSES*2]; // horizontal & vertical pairs
 	VkPipeline bloom_blend_pipeline;
 	VkPipeline smaa_edge_pipeline;

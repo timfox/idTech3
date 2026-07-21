@@ -152,6 +152,12 @@ void main() {
 		return;
 	}
 
+	/* Split-screen mode compare: left half forces current-only (mode 0 proxy). */
+	if (postfx.temporalDebugParams.z >= 2.0 && uv.x < 0.5) {
+		out_color = vec4(current, 1.0);
+		return;
+	}
+
 	if (previousClass <= CLASS_WEAPON_THRESH) {
 		out_color = vec4(current, 1.0);
 		return;
@@ -179,5 +185,37 @@ void main() {
 
 	float weight = clamp(postfx.weaponTemporalParams.x, 0.0, 0.9) *
 		depthConfidence * (1.0 - clamp(reactive, 0.0, 1.0));
+
+	/* Thin-sight / fast-silhouette responsive rejection (Architecture B WS8).
+	 * Uses coverage neighborhood + MVP velocity + class transition + reactive —
+	 * never world-depth heuristics. */
+	{
+		float thinScale = max(postfx.temporalDebugParams.y, 0.0);
+		if (thinScale > 0.001) {
+			float neighborWeapon = 0.0;
+			int neighbors = 0;
+			for (int y = -1; y <= 1; ++y) {
+				for (int x = -1; x <= 1; ++x) {
+					if (x == 0 && y == 0) {
+						continue;
+					}
+					float c = textureLod(currentClassTex, uv + vec2(x, y) * texel, 0.0).r;
+					neighborWeapon += c > CLASS_WEAPON_THRESH ? 1.0 : 0.0;
+					neighbors += 1;
+				}
+			}
+			float coverage = neighborWeapon / max(float(neighbors), 1.0);
+			float thinness = 1.0 - coverage;
+			float motionMag = length(motion) * 80.0;
+			float currW = currentClass > CLASS_WEAPON_THRESH ? 1.0 : 0.0;
+			float prevW = previousClass > CLASS_WEAPON_THRESH ? 1.0 : 0.0;
+			float classTransition = abs(currW - prevW);
+			float thinReject = clamp(
+				thinness * 1.4 + smoothstep(0.02, 0.12, motionMag) * 0.55 + classTransition * 0.75 + reactive * 0.35,
+				0.0, 1.0) * thinScale;
+			weight *= 1.0 - clamp(thinReject, 0.0, 1.0);
+		}
+	}
+
 	out_color = vec4(mix(current, history, weight), 1.0);
 }

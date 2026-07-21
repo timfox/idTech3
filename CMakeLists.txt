@@ -3615,6 +3615,27 @@ set_tests_properties(test_temporal_weapon_validation PROPERTIES
 	TIMEOUT 60
 	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_temporal_weapon_validation.sh;${CMAKE_SOURCE_DIR}/tests/data/temporal_weapon_validation.json")
 
+add_test(NAME test_weapon_bloom_policy
+	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_weapon_bloom_policy.sh)
+set_tests_properties(test_weapon_bloom_policy PROPERTIES
+	LABELS "scripts;validation;renderer;temporal;surf"
+	TIMEOUT 90
+	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_weapon_bloom_policy.sh;${CMAKE_SOURCE_DIR}/config/surf.cfg;${CMAKE_SOURCE_DIR}/renderers/vulkan/vk_frame_submit.c")
+
+add_test(NAME test_temporal_lifetime_faults
+	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_temporal_lifetime_faults.sh)
+set_tests_properties(test_temporal_lifetime_faults PROPERTIES
+	LABELS "scripts;validation;renderer;temporal;surf"
+	TIMEOUT 120
+	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_temporal_lifetime_faults.sh;${CMAKE_SOURCE_DIR}/tests/data/temporal_weapon_validation.json;${CMAKE_SOURCE_DIR}/renderers/vulkan/vk_temporal.c")
+
+add_test(NAME test_temporal_reset_policy
+	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_temporal_reset_policy.sh)
+set_tests_properties(test_temporal_reset_policy PROPERTIES
+	LABELS "scripts;validation;renderer;temporal"
+	TIMEOUT 60
+	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_temporal_reset_policy.sh;${CMAKE_SOURCE_DIR}/renderers/vulkan/vk_temporal.h")
+
 add_test(NAME test_high_throughput_1_0
 	COMMAND ${CMAKE_SOURCE_DIR}/scripts/high_throughput_1_0_check.sh)
 set_tests_properties(test_high_throughput_1_0 PROPERTIES

@@ -1239,6 +1239,10 @@ void vk_init_descriptors( void )
 					VK_CHECK( qvkAllocateDescriptorSets( vk.device, &alloc, &vk.weapon_depth_copy_descriptor[i] ) );
 				}
 			}
+			if ( vk.temporal_depth_reject_stats_layout != VK_NULL_HANDLE ) {
+				alloc.pSetLayouts = &vk.temporal_depth_reject_stats_layout;
+				VK_CHECK( qvkAllocateDescriptorSets( vk.device, &alloc, &vk.temporal_depth_reject_stats_descriptor ) );
+			}
 			if ( vk.luminance_layout != VK_NULL_HANDLE ) {
 				alloc.pSetLayouts = &vk.luminance_layout;
 				for ( i = 0; i < NUM_COMMAND_BUFFERS; i++ )

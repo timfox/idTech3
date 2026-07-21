@@ -192,6 +192,10 @@ void vk_shutdown( refShutdownCode_t code )
 		qvkDestroyDescriptorSetLayout( vk.device, vk.volumetric_depth_resolve_layout, NULL );
 		vk.volumetric_depth_resolve_layout = VK_NULL_HANDLE;
 	}
+	if ( vk.temporal_depth_reject_stats_layout != VK_NULL_HANDLE ) {
+		qvkDestroyDescriptorSetLayout( vk.device, vk.temporal_depth_reject_stats_layout, NULL );
+		vk.temporal_depth_reject_stats_layout = VK_NULL_HANDLE;
+	}
 	if ( vk.luminance_layout != VK_NULL_HANDLE ) {
 		qvkDestroyDescriptorSetLayout( vk.device, vk.luminance_layout, NULL );
 		vk.luminance_layout = VK_NULL_HANDLE;
@@ -504,6 +508,8 @@ for (i = 0; i < 2; i++) {
 	VK_DESTROY_SHADER_MODULE_FIELD( vk.modules.taa_fs );
 	VK_DESTROY_SHADER_MODULE_FIELD( vk.modules.weapon_taa_fs );
 	VK_DESTROY_SHADER_MODULE_FIELD( vk.modules.weapon_taa_composite_fs );
+	VK_DESTROY_SHADER_MODULE_FIELD( vk.modules.weapon_bloom_extract_fs );
+	VK_DESTROY_SHADER_MODULE_FIELD( vk.modules.temporal_depth_reject_stats_cs );
 	VK_DESTROY_SHADER_MODULE_FIELD( vk.modules.volumetric_fog_vs );
 	VK_DESTROY_SHADER_MODULE_FIELD( vk.modules.volumetric_fog_fs );
 	VK_DESTROY_SHADER_MODULE_FIELD( vk.modules.volumetric_fog_cs );

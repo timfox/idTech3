@@ -536,6 +536,12 @@ void vk_end_frame( void )
 				vk_spine_pass_end( VK_SPINE_PASS_BLOOM );
 				post_fog_src = vk_get_post_fog_source();
 				luminance_src = post_fog_src;
+			} else if ( vk_temporal_want_dedicated_weapon_bloom() ) {
+				vk_spine_pass_begin( VK_SPINE_PASS_BLOOM );
+				vk_weapon_bloom();
+				vk_spine_pass_end( VK_SPINE_PASS_BLOOM );
+				post_fog_src = vk_get_post_fog_source();
+				luminance_src = post_fog_src;
 			}
 			vk_spine_pass_begin( VK_SPINE_PASS_EYE_ADAPTATION );
 			vk_end_frame_record_luminance_pass( luminance_src );
