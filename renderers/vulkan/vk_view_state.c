@@ -3,6 +3,8 @@
 #include "vk_temporal.h"
 #include "vk_view_state.h"
 #include "vk_frequency_aware.h"
+#include "vk_upscale.h"
+#include <math.h>
 
 typedef struct vkMvpPushConstants_s {
 	float mvp[16];
@@ -319,6 +321,65 @@ void vk_reset_motion_history( void )
 	Com_Memset( vk_curr_entity_types, 0, sizeof( vk_curr_entity_types ) );
 	Com_Memset( vk_prev_entity_model_valid, 0, sizeof( vk_prev_entity_model_valid ) );
 	Com_Memset( vk_curr_entity_model_valid, 0, sizeof( vk_curr_entity_model_valid ) );
+
+	/* Invalidate first-person weapon prev MVP (cut / resize / weapon switch path). */
+	vk.temporal.weaponMatricesValid = qfalse;
+	vk.temporal.weaponMatricesHavePrev = qfalse;
+	vk.temporal.weaponEntityId = 0;
+	vk.temporal.weaponEntityIdPrev = 0;
+}
+
+static void vk_capture_weapon_matrices( void )
+{
+	const trRefEntity_t *ent = backEnd.currentEntity;
+	uint32_t entityId;
+	float fovDelta;
+
+	if ( !ent || !( ent->e.renderfx & RF_FIRST_PERSON ) ) {
+		return;
+	}
+	if ( backEnd.projection2D || backEnd.viewParms.portalView != PV_NONE ) {
+		return;
+	}
+
+	entityId = (uint32_t)ent->e.hModel;
+	/* Weapon switch or FOV jump → drop prev so velocity does not invent a teleport. */
+	fovDelta = 0.0f;
+	if ( vk.temporal.weaponMatricesValid ) {
+		/* Projection [0] scales with cot(fov/2); large change ⇒ FOV cut. */
+		fovDelta = fabsf( backEnd.viewParms.projectionMatrix[0] - vk.temporal.weaponProjectionMatrix[0] );
+	}
+	if ( vk.temporal.weaponMatricesValid &&
+		( entityId != vk.temporal.weaponEntityId || fovDelta > 0.02f ) ) {
+		vk.temporal.weaponMatricesHavePrev = qfalse;
+	} else if ( vk.temporal.weaponMatricesValid ) {
+		Com_Memcpy( vk.temporal.weaponPrevViewMatrix, vk.temporal.weaponViewMatrix,
+			sizeof( vk.temporal.weaponPrevViewMatrix ) );
+		Com_Memcpy( vk.temporal.weaponPrevProjectionMatrix, vk.temporal.weaponProjectionMatrix,
+			sizeof( vk.temporal.weaponPrevProjectionMatrix ) );
+		Com_Memcpy( vk.temporal.weaponPrevModelMatrix, vk.temporal.weaponModelMatrix,
+			sizeof( vk.temporal.weaponPrevModelMatrix ) );
+		vk.temporal.weaponEntityIdPrev = vk.temporal.weaponEntityId;
+		vk.temporal.weaponMatricesHavePrev = qtrue;
+	}
+
+	Com_Memcpy( vk.temporal.weaponViewMatrix, backEnd.viewParms.world.modelViewMatrix,
+		sizeof( vk.temporal.weaponViewMatrix ) );
+	/* Non-jittered projection (strip temporal upscale jitter from [8]/[9] if present). */
+	Com_Memcpy( vk.temporal.weaponProjectionMatrix, backEnd.viewParms.projectionMatrix,
+		sizeof( vk.temporal.weaponProjectionMatrix ) );
+	{
+		float jx = 0.0f, jy = 0.0f;
+		R_Upscale_GetJitter( &jx, &jy );
+		if ( jx != 0.0f || jy != 0.0f ) {
+			vk.temporal.weaponProjectionMatrix[8] -= jx;
+			vk.temporal.weaponProjectionMatrix[9] -= jy;
+		}
+	}
+	Com_Memcpy( vk.temporal.weaponModelMatrix, backEnd.or.modelMatrix,
+		sizeof( vk.temporal.weaponModelMatrix ) );
+	vk.temporal.weaponEntityId = entityId;
+	vk.temporal.weaponMatricesValid = qtrue;
 }
 
 static int vk_get_current_entity_motion_index( void )
@@ -477,6 +538,15 @@ static void vk_get_prev_mvp_transform( float *prev_mvp )
 		return;
 	}
 
+	/* First-person weapon: velocity from stored weapon MVP, never world-depth reprojection. */
+	if ( backEnd.currentEntity && ( backEnd.currentEntity->e.renderfx & RF_FIRST_PERSON ) &&
+		vk.temporal.weaponMatricesHavePrev ) {
+		myGlMultMatrix( vk.temporal.weaponPrevModelMatrix, vk.temporal.weaponPrevViewMatrix, prev_model_view );
+		vk_get_projection_matrix_vk( vk.temporal.weaponPrevProjectionMatrix, prev_proj );
+		myGlMultMatrix( prev_model_view, prev_proj, prev_mvp );
+		return;
+	}
+
 	Com_Memcpy( prev_model, backEnd.or.modelMatrix, sizeof( prev_model ) );
 
 	motion_index = vk_get_current_entity_motion_index();
@@ -526,6 +596,7 @@ void vk_update_mvp( const float *m )
 	vk_get_prev_mvp_transform( push_constants.prev_mvp );
 	Com_Memcpy( oit_push.prev_mvp, push_constants.prev_mvp, sizeof( oit_push.prev_mvp ) );
 	Com_Memcpy( oit_push.model, backEnd.or.modelMatrix, sizeof( oit_push.model ) );
+	vk_capture_weapon_matrices();
 	push_constants.reserved[0] = ( tess.sdfUiEdge >= 0.0f ) ? tess.sdfUiEdge : 0.0f;
 	if ( r_sdfScreenAa ) {
 		push_constants.reserved[1] = Com_Clamp( 0.0f, 8.0f, r_sdfScreenAa->value );

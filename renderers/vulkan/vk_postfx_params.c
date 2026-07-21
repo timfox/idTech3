@@ -5,10 +5,18 @@
 #include "vk_present_color.h"
 #include "vk_present_recon.h"
 #include "vk_temporal.h"
+#include "vk_temporal_class.h"
 #include "vk_upscale.h"
 #include "vk_util.h"
 #include "vk_view_state.h"
 #include <math.h>
+
+static qboolean s_pack_weapon_temporal_for_taa = qfalse;
+
+void vk_postfx_params_set_taa_weapon_pack( int enable )
+{
+	s_pack_weapon_temporal_for_taa = enable ? qtrue : qfalse;
+}
 
 void vk_update_postfx_params( uint32_t cmd_index )
 {
@@ -196,6 +204,20 @@ void vk_update_postfx_params( uint32_t cmd_index )
 	params.colorGrade2[3] = ( r_temporalReactiveMask && r_temporalReactiveMask->integer ) ? 1.0f : 0.0f;
 	params.midsGamma[3] = ( r_temporalReactiveMask && r_temporalReactiveMask->integer &&
 		vk.reactive_mask_view != VK_NULL_HANDLE ) ? 1.0f : 0.0f;
+	/*
+	 * TAA-only packing (restored on next gamma/post refresh):
+	 * splitShadow.a = r_weaponTemporalMode (0/1/2)
+	 * splitHighlight.a = temporal class attachment active
+	 */
+	if ( s_pack_weapon_temporal_for_taa ) {
+		cvar_t *mode = r_weaponTemporalMode;
+		if ( !mode ) {
+			mode = ri.Cvar_Get( "r_weaponTemporalMode", "1", CVAR_ARCHIVE_ND );
+		}
+		params.splitShadow[3] = (float)Com_Clamp( 0, 2, mode->integer );
+		params.splitHighlight[3] = ( vk.temporal_class_image[0] != VK_NULL_HANDLE &&
+			vk.temporal.classHasPrev ) ? 1.0f : 0.0f;
+	}
 	/*
 	 * highlightsGain.a → Present-Time Adaptive Reconstruction:
 	 *   0 = off

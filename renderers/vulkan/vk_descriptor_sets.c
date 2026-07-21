@@ -18,6 +18,7 @@ Descriptor set allocation and image/buffer binding updates (split from vk.c).
 #include "vk_volumetric_params.h"
 #include "vk_vdb.h"
 #include "vk_reactive_mask.h"
+#include "vk_temporal_class.h"
 #include "vk_pass_registry.h"
 
 void vk_update_attachment_descriptors( void ) {
@@ -164,6 +165,7 @@ void vk_update_attachment_descriptors( void ) {
 
 		vk_reactive_mask_update_taa_descriptors();
 		vk_reactive_mask_update_storage_descriptor();
+		vk_temporal_class_update_taa_descriptors();
 		if ( vk.reactive_stamp_reveal_descriptor != VK_NULL_HANDLE && vk.oit_reveal_image_view != VK_NULL_HANDLE ) {
 			VkDescriptorImageInfo reveal_info;
 			VkWriteDescriptorSet reveal_desc;
@@ -1029,8 +1031,10 @@ void vk_init_descriptors( void )
 			VK_CHECK( qvkAllocateDescriptorSets( vk.device, &alloc, &vk.depth_descriptor[i] ) );
 			VK_CHECK( qvkAllocateDescriptorSets( vk.device, &alloc, &vk.taa_motion_descriptor[i] ) );
 			VK_CHECK( qvkAllocateDescriptorSets( vk.device, &alloc, &vk.taa_reactive_descriptor[i] ) );
+			VK_CHECK( qvkAllocateDescriptorSets( vk.device, &alloc, &vk.taa_class_descriptor[i] ) );
 		}
 		VK_CHECK( qvkAllocateDescriptorSets( vk.device, &alloc, &vk.reactive_stamp_reveal_descriptor ) );
+		VK_CHECK( qvkAllocateDescriptorSets( vk.device, &alloc, &vk.temporal_class_stamp_descriptor ) );
 
 		if ( r_ssao && r_ssao->integer ) {
 			VK_CHECK( qvkAllocateDescriptorSets( vk.device, &alloc, &vk.ssao_descriptor ) );

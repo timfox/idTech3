@@ -734,13 +734,14 @@ static duk_ret_t Js_Binding_HudDrawPic( duk_context *ctx ) {
 static vec4_t s_jsHudColor = { 1.0f, 1.0f, 1.0f, 1.0f };
 
 static duk_ret_t Js_Binding_HudDrawText( duk_context *ctx ) {
-	const int x = duk_require_int( ctx, 0 );
-	const int y = duk_require_int( ctx, 1 );
+	const float x = (float)duk_require_number( ctx, 0 );
+	const float y = (float)duk_require_number( ctx, 1 );
 	const char *text = duk_require_string( ctx, 2 );
 	const float size = ( duk_get_top( ctx ) > 3 ) ? (float)duk_to_number( ctx, 3 ) : 8.0f;
 
-	/* forceColor=true so embedded ^# codes don't override hudSetColor; pass stored RGBA. */
-	SCR_DrawStringExt( x, y, size, text, s_jsHudColor, qtrue, qfalse );
+	/* forceColor=true so embedded ^# codes don't override hudSetColor; pass stored RGBA.
+	   Fractional virtual coordinates keep aligned HUD text stable at high resolutions. */
+	SCR_DrawHudString( x, y, size, text, s_jsHudColor, qtrue, qfalse );
 	return 0;
 }
 #endif

@@ -576,6 +576,7 @@ void	SCR_DrawNamedPic( float x, float y, float width, float height, const char *
 
 void	SCR_DrawBigString( int x, int y, const char *s, float alpha, qboolean noColorEscape );			// draws a string with embedded color control characters with fade
 void	SCR_DrawStringExt( int x, int y, float size, const char *string, const float *setColor, qboolean forceColor, qboolean noColorEscape );
+void	SCR_DrawHudString( float x, float y, float size, const char *string, const float *setColor, qboolean forceColor, qboolean noColorEscape );	/* fractional virtual coords (JS HUD) */
 void	SCR_DrawSmallStringExt( int x, int y, const char *string, const float *setColor, qboolean forceColor, qboolean noColorEscape );
 void	SCR_DrawSmallChar( int x, int y, int ch );
 void	SCR_DrawSmallString( int x, int y, const char *s, int len );

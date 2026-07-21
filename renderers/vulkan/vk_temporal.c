@@ -183,6 +183,9 @@ void vk_reset_taa_history( void )
 {
 	vk.temporal.hasValidTAAHistory = qfalse;
 	vk.temporal.taaHistoryIndex = 0u;
+	vk.temporal.weaponMatricesValid = qfalse;
+	vk.temporal.weaponMatricesHavePrev = qfalse;
+	vk.temporal.classHasPrev = qfalse;
 }
 
 static void vk_temporal_apply_resets( qboolean hardReset )

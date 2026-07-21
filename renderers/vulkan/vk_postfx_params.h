@@ -39,4 +39,7 @@ typedef struct {
 
 void vk_update_postfx_params( uint32_t cmd_index );
 
+/* When non-zero, next vk_update_postfx_params packs r_weaponTemporalMode into splitShadow.a. */
+void vk_postfx_params_set_taa_weapon_pack( int enable );
+
 #endif

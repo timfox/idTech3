@@ -163,6 +163,7 @@ Each can be disabled without masking via blur:
 | `r_temporalAO` | 1 | SSAO pass |
 | `r_temporalSSR` | 1 | SSR (even if `r_ssr 1`) |
 | `r_weaponSsrIsolation` | 1 | Composite the view weapon after world SSR/SSAO |
+| `r_weaponTemporalMode` | 1 | TAA-on weapon history: 0=none, 1=classified shared (default), 2=reserved |
 | `r_temporalFog` | 1 | Volumetric froxel history weight |
 | `r_temporalTransparency` | 1 | OIT / transparent reactive stamp |
 | `r_motionBlur` | 0 | Camera motion blur |
@@ -182,10 +183,26 @@ set r_taa 1                  # only after SSR gated — check TAA separately
 
 Example cfgs live under `release/surf/ghost_on.cfg` and `ghost_off.cfg` / `ghost_safe.cfg`.
 
+## TAA-on policy (Temporal Weapon Resolve)
+
+When Temporal Reconstruction is active (`r_taa 1` / `r_aaMode` 3–5 / temporal upscale), Architecture B still composites the weapon **after** world TAA. Additionally:
+
+| Concern | Policy |
+|---|---|
+| Pass order | World draw → SSR/SSAO/TAA → deferred weapon composite → present |
+| History ownership | World TAA history never includes weapon color (weapon after TAA) |
+| Class mask | R8 `TEMPORAL_CLASS_WORLD` / `WEAPON` stamped after weapon flush from `DEPTH_RANGE_WEAPON` |
+| History reject | `taa.frag` rejects WEAPON↔WORLD mismatch (and mode 0 forces no weapon history); 1–2 px motion-aware dilation |
+| Weapon motion | Prev weapon MVP stored in `vk.temporal`; velocities are `currentUV - previousUV` (not world-depth reprojection) |
+| Reactive | Weapon depth stamp with depth-aware dilation so gun edges prefer current samples |
+| Cvar | `r_weaponTemporalMode` 0 / 1 (default) / 2 (reserved separate weapon history RT) |
+
+Live check: `r_taa 1` + `r_temporalDebug 5` while rotating — confirm `weaponAfterWorldPost=yes`, no dark wall trails, sharp weapon edges without multi-frame echoes.
+
 ## What was intentionally not changed
 
 - No raw-depth SSR hit-reject was added; ordering isolates weapon depth structurally.
-- No TAA history / motion-vector broad fix beyond the existing weapon-after-TAA path.
+- No separate full-resolution weapon history RT (`r_weaponTemporalMode 2` remains a stub).
 - No blur / excessive confidence clamps as a cosmetic mask.
 - `modern_vulkan.cfg` boot defaults untouched.
 
@@ -196,4 +213,6 @@ Example cfgs live under `release/surf/ghost_on.cfg` and `ghost_off.cfg` / `ghost
 - `renderers/vulkan/vk_view_state.c` — `DEPTH_RANGE_WEAPON`.
 - `renderers/vulkan/shaders/glsl/ssr.frag` — reflection march + debug overlays.
 - `renderers/vulkan/vk_temporal.c` — ownership / deferred weapon policy / `temporal_ghost_status`.
+- `renderers/vulkan/vk_temporal_class.c` — WORLD/WEAPON class stamp for TAA rejection.
+- `renderers/vulkan/shaders/glsl/taa.frag` — class mismatch + reactive resolve.
 - `engine/core/cm_trace.c` — BSP30 recursion depth guard (`BSP30_MAX_TRACE_DEPTH`).

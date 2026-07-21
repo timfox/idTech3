@@ -47,6 +47,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "vk_fp64_points.h"
 #include "vk_scene_pass.h"
 #include "vk_reactive_mask.h"
+#include "vk_temporal_class.h"
 #include "vk_ambient_visibility.h"
 #include "vk_raster_gi.h"
 #include "vk_gpu_particles.h"
@@ -2266,6 +2267,10 @@ void RB_FlushDeferredWeaponAfterTaa( VkImageView *post_fog_src, VkImageView *lum
 	}
 	vk_set_scene_post_fog_source( vk.color_image_view );
 	vk_set_post_chain_last_writer( "weapon_after_world_post" );
+
+	/* Classify weapon pixels + stamp reactive for next-frame TAA / upscale. */
+	vk_temporal_class_stamp_weapon_from_depth();
+	vk_reactive_mask_stamp_weapon_from_depth();
 
 	if ( r_temporalDebug && r_temporalDebug->integer ) {
 		ri.Printf( PRINT_DEVELOPER,

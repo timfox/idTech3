@@ -22,6 +22,7 @@ cvar_t *r_temporalReactiveMask;
 cvar_t *r_reactiveMaskForce;
 cvar_t *r_temporalWeaponAfterTaa;
 cvar_t *r_weaponSsrIsolation;
+cvar_t *r_weaponTemporalMode;
 cvar_t *r_temporalSmaaCleanup;
 cvar_t *r_debugMotionVectors;
 cvar_t *r_debugHistoryRejection;
@@ -128,6 +129,15 @@ void vk_aa_policy_register_cvars( void )
 	ri.Printf( PRINT_ALL, "[VK][weapon] SSR isolation %s (r_weaponSsrIsolation=%d)\n",
 		r_weaponSsrIsolation->integer ? "enabled" : "disabled",
 		r_weaponSsrIsolation->integer );
+
+	r_weaponTemporalMode = ri.Cvar_Get( "r_weaponTemporalMode", "1", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_weaponTemporalMode, "0", "2", CV_INTEGER );
+	ri.Cvar_SetDescription( r_weaponTemporalMode,
+		"Weapon Temporal Reconstruction: 0=no weapon history, 1=classified shared history (default), "
+		"2=reserved (separate weapon history RT)." );
+	ri.Cvar_SetGroup( r_weaponTemporalMode, CVG_RENDERER );
+	ri.Printf( PRINT_ALL, "[VK][weapon] temporal mode %d (r_weaponTemporalMode)\n",
+		r_weaponTemporalMode->integer );
 
 	r_temporalSmaaCleanup = ri.Cvar_Get( "r_temporalSmaaCleanup", "0", CVAR_ARCHIVE_ND );
 	ri.Cvar_CheckRange( r_temporalSmaaCleanup, "0", "1", CV_INTEGER );

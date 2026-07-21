@@ -689,6 +689,7 @@ typedef struct {
 		VkRenderPass oit_moments;
 		VkRenderPass oit_resolve;
 		VkRenderPass reactive_stamp;	/* R8 MAX-blend stamp from OIT reveal */
+		VkRenderPass temporal_class_stamp;	/* R8 MAX-blend stamp WEAPON from depth */
 		VkRenderPass ssr;
 #ifdef VK_PBR_BRDFLUT
 		VkRenderPass brdflut;
@@ -714,8 +715,9 @@ typedef struct {
 	VkPipelineLayout pipeline_layout;			// default shaders
 	VkPipelineLayout pipeline_layout_storage;	// flare test shader layout
 	VkPipelineLayout pipeline_layout_post_process;	// post-processing
-	VkPipelineLayout pipeline_layout_taa;	/* post-processing + motion (set 4) + reactive (set 5) */
+	VkPipelineLayout pipeline_layout_taa;	/* post-processing + motion (set 4) + reactive (set 5) + class (set 6) */
 	VkPipelineLayout pipeline_layout_reactive_stamp;	/* reveal sampler -> R8 mask */
+	VkPipelineLayout pipeline_layout_temporal_class_stamp;	/* depth -> R8 class */
 	VkPipelineLayout pipeline_layout_blend;		// post-processing
 	VkPipelineLayout pipeline_layout_smaa;
 	VkPipelineLayout pipeline_layout_ssao;		// ssao (depth + push constants)
@@ -795,7 +797,9 @@ typedef struct {
 	VkDescriptorSet depth_descriptor[NUM_COMMAND_BUFFERS];	/* per-frame (VUID-03047) */
 	VkDescriptorSet taa_motion_descriptor[NUM_COMMAND_BUFFERS];
 	VkDescriptorSet taa_reactive_descriptor[NUM_COMMAND_BUFFERS];
+	VkDescriptorSet taa_class_descriptor[NUM_COMMAND_BUFFERS];
 	VkDescriptorSet reactive_stamp_reveal_descriptor;
+	VkDescriptorSet temporal_class_stamp_descriptor;
 		VkDescriptorSet postfx_params_descriptor[NUM_COMMAND_BUFFERS];
 		VkDescriptorSet smaa_edge_descriptor;
 		VkDescriptorSet smaa_blend_descriptor;
@@ -1385,6 +1389,7 @@ typedef struct {
 		VkFramebuffer oit_moments;
 		VkFramebuffer oit_resolve;
 		VkFramebuffer reactive_stamp;
+		VkFramebuffer temporal_class_stamp[2];
 		VkFramebuffer ssr;
 		VkFramebuffer main[MAX_SWAPCHAIN_IMAGES];
 		VkFramebuffer gamma[MAX_SWAPCHAIN_IMAGES];
@@ -1525,6 +1530,20 @@ typedef struct {
 		qboolean worldMatricesCaptured;
 		float worldViewMatrix[16];
 		float worldProjectionMatrix[16];
+		/* First-person weapon prev/curr matrices for velocity (non-jittered). */
+		qboolean weaponMatricesValid;
+		qboolean weaponMatricesHavePrev;
+		float weaponViewMatrix[16];
+		float weaponProjectionMatrix[16];
+		float weaponPrevViewMatrix[16];
+		float weaponPrevProjectionMatrix[16];
+		float weaponModelMatrix[16];
+		float weaponPrevModelMatrix[16];
+		uint32_t weaponEntityId;
+		uint32_t weaponEntityIdPrev;
+		/* Class ping-pong: classHistoryIndex selects previous for TAA. */
+		uint32_t classHistoryIndex;
+		qboolean classHasPrev;
 	} temporal;
 
 	//
@@ -1623,6 +1642,8 @@ typedef struct {
 		VkShaderModule fp64_points_single_fs;
 		VkShaderModule taa_fs;
 		VkShaderModule reactive_stamp_reveal_fs;
+		VkShaderModule reactive_stamp_weapon_fs;
+		VkShaderModule temporal_class_stamp_fs;
 		VkShaderModule ssr_fs;
 
 		VkShaderModule fog_fs;
@@ -1797,6 +1818,8 @@ typedef struct {
 	VkPipeline lens_flare_pipeline;
 	VkPipeline taa_pipeline;
 	VkPipeline reactive_stamp_pipeline;	/* fullscreen stamp from OIT reveal into R8 mask */
+	VkPipeline reactive_stamp_weapon_pipeline;	/* fullscreen stamp WEAPON from depth into R8 mask */
+	VkPipeline temporal_class_stamp_pipeline;	/* fullscreen stamp WEAPON class from depth */
 	VkPipeline ssao_pipeline;
 	VkPipeline hbao_pipeline;
 	VkPipeline ssao_blur_pipeline;
@@ -1884,6 +1907,10 @@ typedef struct {
 	VkImageLayout reactive_mask_layout;
 	VkImage reactive_mask_stub_image;	/* 1x1 black when full mask not allocated */
 	VkImageView reactive_mask_stub_view;
+	/* Temporal classification ping-pong (WORLD=0, WEAPON=1). */
+	VkImage temporal_class_image[2];
+	VkImageView temporal_class_view[2];
+	VkImageLayout temporal_class_layout[2];
 	VkImage fog_noise_image;
 	VkImageView fog_noise_view;
 	VkDeviceMemory fog_noise_memory;

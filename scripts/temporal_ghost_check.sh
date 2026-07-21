@@ -76,6 +76,32 @@ grep -qi 'r_weaponSsrIsolation' "$ROOT/docs/RENDERER_TEMPORAL_GHOSTING.md" || {
 grep -qi 'DEPTH_RANGE_WEAPON' "$ROOT/docs/RENDERER_TEMPORAL_GHOSTING.md" || {
   echo "FAIL ghosting doc must record the weapon depth-range root cause"; fail=1; }
 
+# --- Temporal Weapon Resolve: class mask + TAA reject + weapon MVP ---
+need "renderers/vulkan/vk_temporal_class.h"
+need "renderers/vulkan/vk_temporal_class.c"
+need "renderers/vulkan/shaders/glsl/temporal_class_stamp.frag"
+need "renderers/vulkan/shaders/glsl/reactive_stamp_weapon.frag"
+grep -q 'TEMPORAL_CLASS_WEAPON' "$ROOT/renderers/vulkan/vk_temporal_class.h" || {
+  echo "FAIL TEMPORAL_CLASS_WEAPON enum missing"; fail=1; }
+grep -q 'TEMPORAL_CLASS_WORLD' "$ROOT/renderers/vulkan/vk_temporal_class.h" || {
+  echo "FAIL TEMPORAL_CLASS_WORLD enum missing"; fail=1; }
+grep -q 'r_weaponTemporalMode' "$ROOT/renderers/vulkan/vk_aa_policy.c" || {
+  echo "FAIL r_weaponTemporalMode cvar registration missing"; fail=1; }
+grep -q 'layout(set = 6' "$ROOT/renderers/vulkan/shaders/glsl/taa.frag" || {
+  echo "FAIL taa.frag must sample temporal class on set 6"; fail=1; }
+grep -q 'classReject' "$ROOT/renderers/vulkan/shaders/glsl/taa.frag" || {
+  echo "FAIL taa.frag must implement class mismatch rejection"; fail=1; }
+grep -q 'weaponMatricesHavePrev' "$ROOT/renderers/vulkan/vk.h" || {
+  echo "FAIL weapon prev-MVP storage missing from vk.temporal"; fail=1; }
+grep -q 'vk_capture_weapon_matrices\|weaponPrevModelMatrix' "$ROOT/renderers/vulkan/vk_view_state.c" || {
+  echo "FAIL weapon prev-MVP capture missing from vk_view_state.c"; fail=1; }
+grep -q 'vk_reactive_mask_stamp_weapon_from_depth' "$ROOT/renderers/vulkan/vk_reactive_mask.c" || {
+  echo "FAIL reactive weapon stamp missing"; fail=1; }
+grep -q 'vk_temporal_class_stamp_weapon_from_depth' "$ROOT/renderers/vulkan/tr_backend.c" || {
+  echo "FAIL deferred weapon flush must stamp temporal class"; fail=1; }
+grep -qi 'r_weaponTemporalMode' "$ROOT/docs/RENDERER_TEMPORAL_GHOSTING.md" || {
+  echo "FAIL ghosting doc must describe r_weaponTemporalMode / TAA-on policy"; fail=1; }
+
 if [[ "$fail" -ne 0 ]]; then
   echo "temporal_ghost_check: FAIL"
   exit 1

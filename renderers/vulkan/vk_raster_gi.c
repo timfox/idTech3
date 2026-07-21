@@ -610,6 +610,7 @@ static void RGI_FreeProbes( void )
 	rgi.probeCount = 0;
 	rgi.probesReady = qfalse;
 	rgi.gridX = rgi.gridY = rgi.gridZ = 0;
+	rgi.mapName[0] = '\0';
 }
 
 static void RGI_UploadProbes( void )

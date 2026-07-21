@@ -37,11 +37,14 @@ layout(set = 2, binding = 0) uniform PostFXParams {
 layout(set = 3, binding = 0) uniform sampler2D historyColor;
 layout(set = 4, binding = 0) uniform sampler2D motionTex;
 layout(set = 5, binding = 0) uniform sampler2D reactiveMaskTex;
+layout(set = 6, binding = 0) uniform sampler2D temporalClassTex;
 
 layout(location = 0) in vec2 frag_tex_coord;
 layout(location = 0) out vec4 out_color;
 
 const vec3 LUMA = vec3( 0.2126, 0.7152, 0.0722 );
+/* Encoded as R8: WORLD=0, WEAPON≈1, SKY≈2/255 unused for now. */
+const float CLASS_WEAPON_THRESH = 0.5;
 
 vec2 texelSize( void ) {
 	return postfx.frameInfo.yz;
@@ -223,6 +226,43 @@ void main() {
 	float motionLen = length( velocity );
 	float motionFactor = smoothstep( 0.2, 8.0, motionLen );
 
+	/*
+	 * Class-aware history rejection (r_weaponTemporalMode via splitShadow.a):
+	 *   0 = no weapon history (force current when prev class is WEAPON)
+	 *   1 = classified shared history (reject WEAPON↔WORLD mismatch) [default]
+	 *   2 = reserved (separate weapon history RT — treat as mode 1)
+	 * Prev class is dilated 1–2 px along motion so silhouette edges do not bleed.
+	 */
+	float weaponTemporalMode = postfx.splitShadow.a;
+	float classActive = postfx.splitHighlight.a;
+	float prevClass = 0.0;
+	float currClassHint = 0.0;
+	bool classReject = false;
+	if ( classActive > 0.5 ) {
+		vec2 classDilate = texel * clamp( motionLen * 0.15, 1.0, 2.0 );
+		float c0 = textureLod( temporalClassTex, historyUV, 0.0 ).r;
+		float c1 = textureLod( temporalClassTex, historyUV + vec2( classDilate.x, 0.0 ), 0.0 ).r;
+		float c2 = textureLod( temporalClassTex, historyUV - vec2( classDilate.x, 0.0 ), 0.0 ).r;
+		float c3 = textureLod( temporalClassTex, historyUV + vec2( 0.0, classDilate.y ), 0.0 ).r;
+		float c4 = textureLod( temporalClassTex, historyUV - vec2( 0.0, classDilate.y ), 0.0 ).r;
+		prevClass = max( c0, max( c1, max( c2, max( c3, c4 ) ) ) );
+		/* Current frame is world-only during Architecture B TAA; weapon depth hints residual. */
+		currClassHint = smoothstep( 0.58, 0.62, depthNdc );
+		bool prevWeapon = prevClass > CLASS_WEAPON_THRESH;
+		bool currWeapon = currClassHint > 0.5;
+		if ( weaponTemporalMode < 0.5 ) {
+			/* Mode 0: never reuse history that landed on last-frame weapon. */
+			classReject = prevWeapon;
+		} else {
+			/* Mode 1/2: reject WEAPON↔WORLD cross-contamination. */
+			classReject = prevWeapon != currWeapon && ( prevWeapon || currWeapon );
+			/* Newly revealed world behind last-frame gun: force current. */
+			if ( prevWeapon && !currWeapon ) {
+				classReject = true;
+			}
+		}
+	}
+
 	/* Confidence factors */
 	float depthConf = 1.0;
 	if ( useDisocc > 0.5 ) {
@@ -282,6 +322,10 @@ void main() {
 	float reactiveHard = adaptive ? 0.65 : 0.82;
 	if ( reactive > reactiveHard ) {
 		confidence = 0.0;
+	}
+	if ( classReject ) {
+		confidence = 0.0;
+		reactive = max( reactive, 0.98 );
 	}
 	if ( adaptive && depthConf < 0.35 ) {
 		confidence = 0.0; /* immediate disocclusion → current-frame spatial */

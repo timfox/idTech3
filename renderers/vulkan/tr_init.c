@@ -4050,6 +4050,14 @@ static void RE_Shutdown( refShutdownCode_t code ) {
 #endif
 	}
 
+	/*
+	 * Drop renderer-owned zone pointers before FreeAll. RGI probes are allocated
+	 * with TAG_RENDERER; FreeAll frees them by tag walk but leaves rgi.probes as a
+	 * dangling pointer. The next map's vk_raster_gi_invalidate() would then
+	 * Z_Free a recycled block (often a pk3 pack_t) and corrupt fs_searchpaths.
+	 */
+	vk_raster_gi_invalidate();
+
 	ri.FreeAll();
 
 	tr.registered = qfalse;

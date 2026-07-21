@@ -945,6 +945,32 @@ void vk_create_attachments( void )
 						ri.Printf( PRINT_ALL, "[VK] Temporal reactive mask: 1x1 stub (SMAA-only / TAA off)\n" );
 					}
 				}
+				/* Temporal class ping-pong (same want as reactive / TAA). */
+				{
+					qboolean want_class = qfalse;
+					VkImageUsageFlags classUsage =
+						VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT |
+						VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
+					if ( r_taa && r_taa->integer ) {
+						want_class = qtrue;
+					} else if ( r_aaMode && r_aaMode->integer >= 3 && r_aaMode->integer <= 5 ) {
+						want_class = qtrue;
+					} else if ( R_Upscale_WantTemporal() ) {
+						want_class = qtrue;
+					}
+					if ( want_class ) {
+						int ci;
+						for ( ci = 0; ci < 2; ci++ ) {
+							vk_create_fullres_color_attachment( VK_FORMAT_R8_UNORM, classUsage,
+								&vk.temporal_class_image[ci], &vk.temporal_class_view[ci],
+								VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, qfalse );
+							vk.temporal_class_layout[ci] = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+						}
+						vk.temporal.classHistoryIndex = 0;
+						vk.temporal.classHasPrev = qfalse;
+						ri.Printf( PRINT_ALL, "[VK] Temporal class mask: dual R8 allocated (WORLD/WEAPON)\n" );
+					}
+				}
 
 		// screenmap-msaa
 		if ( vk.screenMapSamples > VK_SAMPLE_COUNT_1_BIT ) {
@@ -2476,6 +2502,18 @@ void vk_destroy_attachments( void )
 		qvkDestroyImageView( vk.device, vk.reactive_mask_stub_view, NULL );
 		vk.reactive_mask_stub_image = VK_NULL_HANDLE;
 		vk.reactive_mask_stub_view = VK_NULL_HANDLE;
+	}
+	{
+		int ci;
+		for ( ci = 0; ci < 2; ci++ ) {
+			if ( vk.temporal_class_image[ci] ) {
+				qvkDestroyImage( vk.device, vk.temporal_class_image[ci], NULL );
+				qvkDestroyImageView( vk.device, vk.temporal_class_view[ci], NULL );
+				vk.temporal_class_image[ci] = VK_NULL_HANDLE;
+				vk.temporal_class_view[ci] = VK_NULL_HANDLE;
+				vk.temporal_class_layout[ci] = VK_IMAGE_LAYOUT_UNDEFINED;
+			}
+		}
 	}
 	if ( vk.motion_vector_msaa_image ) {
 		qvkDestroyImage( vk.device, vk.motion_vector_msaa_image, NULL );

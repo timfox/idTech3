@@ -282,6 +282,128 @@ void vk_reactive_mask_stamp_from_reveal( void )
 	vk_barrier_reactive_mask_for_storage( "post-oit-stamp" );
 }
 
+void vk_reactive_mask_stamp_weapon_from_depth( void )
+{
+	uint32_t width = 0;
+	uint32_t height = 0;
+	VkImageMemoryBarrier barrier;
+	VkImageView depthView;
+	VkDescriptorImageInfo info;
+	VkWriteDescriptorSet write;
+	Vk_Sampler_Def sd;
+	VkImageAspectFlags depth_aspect;
+
+	if ( !vk_reactive_mask_active() ) {
+		return;
+	}
+	if ( !vk.cmd || vk.cmd->command_buffer == VK_NULL_HANDLE ) {
+		return;
+	}
+	if ( vk.render_pass.reactive_stamp == VK_NULL_HANDLE ||
+		vk.framebuffers.reactive_stamp == VK_NULL_HANDLE ||
+		vk.reactive_stamp_weapon_pipeline == VK_NULL_HANDLE ||
+		vk.pipeline_layout_reactive_stamp == VK_NULL_HANDLE ||
+		vk.reactive_stamp_reveal_descriptor == VK_NULL_HANDLE ) {
+		return;
+	}
+
+	depthView = vk.depth_image_view_sample;
+	if ( depthView == VK_NULL_HANDLE ) {
+		depthView = vk.depth_image_view;
+	}
+	if ( depthView == VK_NULL_HANDLE ) {
+		return;
+	}
+
+	if ( vk.inRenderPass ) {
+		vk_end_render_pass();
+	}
+
+	/* Ensure depth is sampleable. */
+	depth_aspect = VK_IMAGE_ASPECT_DEPTH_BIT;
+	if ( glConfig.stencilBits > 0 ) {
+		depth_aspect |= VK_IMAGE_ASPECT_STENCIL_BIT;
+	}
+	record_depth_image_layout_transition( vk.cmd->command_buffer, depth_aspect,
+		VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL, 0, 0 );
+
+	Com_Memset( &sd, 0, sizeof( sd ) );
+	sd.gl_mag_filter = sd.gl_min_filter = GL_NEAREST;
+	sd.address_mode = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+	sd.max_lod_1_0 = qtrue;
+	sd.noAnisotropy = qtrue;
+	Com_Memset( &info, 0, sizeof( info ) );
+	info.sampler = vk_find_sampler( &sd );
+	info.imageView = depthView;
+	info.imageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
+	Com_Memset( &write, 0, sizeof( write ) );
+	write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+	write.dstSet = vk.reactive_stamp_reveal_descriptor;
+	write.dstBinding = 0;
+	write.descriptorCount = 1;
+	write.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+	write.pImageInfo = &info;
+	qvkUpdateDescriptorSets( vk.device, 1, &write, 0, NULL );
+
+	if ( vk.reactive_mask_layout != VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL ) {
+		Com_Memset( &barrier, 0, sizeof( barrier ) );
+		barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+		barrier.oldLayout = vk.reactive_mask_layout;
+		barrier.newLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+		barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+		barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+		barrier.image = vk.reactive_mask_image;
+		barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+		barrier.subresourceRange.levelCount = VK_REMAINING_MIP_LEVELS;
+		barrier.subresourceRange.layerCount = VK_REMAINING_ARRAY_LAYERS;
+		barrier.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT | VK_ACCESS_SHADER_READ_BIT |
+			VK_ACCESS_TRANSFER_WRITE_BIT;
+		barrier.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+		qvkCmdPipelineBarrier( vk.cmd->command_buffer,
+			VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT | VK_PIPELINE_STAGE_TRANSFER_BIT,
+			VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+			0, 0, NULL, 0, NULL, 1, &barrier );
+		vk.reactive_mask_layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+	}
+
+	vk_get_active_render_extent( &width, &height );
+	vk_begin_render_pass_tracked( vk.render_pass.reactive_stamp, vk.framebuffers.reactive_stamp,
+		qfalse, width, height );
+	qvkCmdBindPipeline( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
+		vk.reactive_stamp_weapon_pipeline );
+	qvkCmdBindDescriptorSets( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
+		vk.pipeline_layout_reactive_stamp, 0, 1, &vk.reactive_stamp_reveal_descriptor, 0, NULL );
+	{
+		VkViewport viewport;
+		VkRect2D scissor;
+		Com_Memset( &viewport, 0, sizeof( viewport ) );
+		viewport.width = (float)width;
+		viewport.height = (float)height;
+		viewport.minDepth = 0.0f;
+		viewport.maxDepth = 1.0f;
+		Com_Memset( &scissor, 0, sizeof( scissor ) );
+		scissor.extent.width = width;
+		scissor.extent.height = height;
+		qvkCmdSetViewport( vk.cmd->command_buffer, 0, 1, &viewport );
+		qvkCmdSetScissor( vk.cmd->command_buffer, 0, 1, &scissor );
+	}
+	qvkCmdDraw( vk.cmd->command_buffer, 4, 1, 0, 0 );
+	vk_end_render_pass();
+
+	vk.reactive_mask_layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+	vk_reactive_mask_update_taa_descriptors();
+
+	record_depth_image_layout_transition( vk.cmd->command_buffer, depth_aspect,
+		VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL, 0, 0 );
+
+	/* Restore reveal descriptor if OIT reveal is available for later stamps. */
+	if ( vk.oit_reveal_image_view != VK_NULL_HANDLE ) {
+		info.imageView = vk.oit_reveal_image_view;
+		write.pImageInfo = &info;
+		qvkUpdateDescriptorSets( vk.device, 1, &write, 0, NULL );
+	}
+}
+
 void vk_reactive_mask_update_taa_descriptors( void )
 {
 	VkDescriptorImageInfo info;
@@ -384,6 +506,10 @@ void vk_destroy_reactive_mask_pipeline( void )
 	if ( vk.reactive_stamp_pipeline != VK_NULL_HANDLE ) {
 		qvkDestroyPipeline( vk.device, vk.reactive_stamp_pipeline, NULL );
 		vk.reactive_stamp_pipeline = VK_NULL_HANDLE;
+	}
+	if ( vk.reactive_stamp_weapon_pipeline != VK_NULL_HANDLE ) {
+		qvkDestroyPipeline( vk.device, vk.reactive_stamp_weapon_pipeline, NULL );
+		vk.reactive_stamp_weapon_pipeline = VK_NULL_HANDLE;
 	}
 	if ( vk.pipeline_layout_reactive_stamp != VK_NULL_HANDLE ) {
 		qvkDestroyPipelineLayout( vk.device, vk.pipeline_layout_reactive_stamp, NULL );
@@ -498,6 +624,15 @@ void vk_create_reactive_mask_pipeline( void )
 		&vk.reactive_stamp_pipeline ) );
 	SET_OBJECT_NAME( vk.reactive_stamp_pipeline, "reactive stamp from reveal",
 		VK_DEBUG_REPORT_OBJECT_TYPE_PIPELINE_EXT );
+
+	if ( vk.modules.reactive_stamp_weapon_fs != VK_NULL_HANDLE ) {
+		vk_set_shader_stage_desc( &shader_stages[1], VK_SHADER_STAGE_FRAGMENT_BIT,
+			vk.modules.reactive_stamp_weapon_fs, "main" );
+		VK_CHECK( qvkCreateGraphicsPipelines( vk.device, vk.pipelineCache, 1, &create_info, NULL,
+			&vk.reactive_stamp_weapon_pipeline ) );
+		SET_OBJECT_NAME( vk.reactive_stamp_weapon_pipeline, "reactive stamp weapon from depth",
+			VK_DEBUG_REPORT_OBJECT_TYPE_PIPELINE_EXT );
+	}
 
 	ri.Printf( PRINT_ALL, "[VK] Temporal reactive mask stamp pipeline ready\n" );
 }

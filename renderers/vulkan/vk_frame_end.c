@@ -11,6 +11,7 @@
 #include "vk_postfx_params.h"
 #include "vk_pass_registry.h"
 #include "vk_reactive_mask.h"
+#include "vk_temporal_class.h"
 #include "vk_render_pass.h"
 #include "vk_scene_pass.h"
 #include "vk_temporal.h"
@@ -168,12 +169,12 @@ static void vk_end_frame_bind_post_process_sets( VkDescriptorSet set0, VkDescrip
 }
 
 static void vk_end_frame_bind_taa_sets( VkDescriptorSet set0, VkDescriptorSet set1, VkDescriptorSet set2,
-	VkDescriptorSet set3, VkDescriptorSet set4, VkDescriptorSet set5 )
+	VkDescriptorSet set3, VkDescriptorSet set4, VkDescriptorSet set5, VkDescriptorSet set6 )
 {
-	VkDescriptorSet sets[6] = { set0, set1, set2, set3, set4, set5 };
+	VkDescriptorSet sets[7] = { set0, set1, set2, set3, set4, set5, set6 };
 
 	qvkCmdBindDescriptorSets( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
-		vk.pipeline_layout_taa, 0, 6, sets, 0, NULL );
+		vk.pipeline_layout_taa, 0, 7, sets, 0, NULL );
 }
 
 static qboolean vk_end_frame_gamma_chain_ready( void )
@@ -602,6 +603,7 @@ void vk_end_frame_record_taa_pass( VkImageView *post_fog_src, VkImageView *lumin
 		}
 		/* Even if TAA was skipped, flush any deferred weapon onto the HDR source. */
 		RB_FlushDeferredWeaponAfterTaa( post_fog_src, luminance_src );
+		vk_temporal_class_commit_world_only();
 		return;
 	}
 
@@ -624,6 +626,10 @@ void vk_end_frame_record_taa_pass( VkImageView *post_fog_src, VkImageView *lumin
 		vk_spine_expect_layout( VK_SPINE_RES_REACTIVE_MASK, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
 			VK_SPINE_PASS_TEMPORAL_RECON, "taa_reactive" );
 	}
+	if ( vk_temporal_class_active() ) {
+		vk_barrier_temporal_class_for_sampling( "vk_end_frame pre-taa (class)" );
+		vk_temporal_class_update_taa_descriptors();
+	}
 	if ( vk.temporal.hasValidTAAHistory ) {
 		vk_barrier_post_fog_source_for_sampling( vk.taa_history_image_view[readIndex], "vk_end_frame pre-taa (history)" );
 		vk_spine_note_read( VK_SPINE_RES_TAA_HISTORY, VK_SPINE_PASS_TEMPORAL_RECON,
@@ -634,15 +640,21 @@ void vk_end_frame_record_taa_pass( VkImageView *post_fog_src, VkImageView *lumin
 	}
 	vk_update_color_descriptor_image( taa_src );
 	vk_get_active_render_extent( &taaWidth, &taaHeight );
+	vk_postfx_params_set_taa_weapon_pack( qtrue );
 	vk_end_frame_refresh_postfx_params_for_target( taaWidth, taaHeight );
+	vk_postfx_params_set_taa_weapon_pack( qfalse );
 
 	vk_end_frame_begin_post_process_pass( vk.render_pass.taa, vk.framebuffers.taa[writeIndex],
 		taaWidth, taaHeight, vk.taa_pipeline );
 	{
 		VkDescriptorSet reactive_set = vk.taa_reactive_descriptor[vk.cmd_index];
+		VkDescriptorSet class_set = vk.taa_class_descriptor[vk.cmd_index];
 		VkDescriptorSet depth_set = vk.depth_descriptor[vk.cmd_index];
 		if ( reactive_set == VK_NULL_HANDLE ) {
 			reactive_set = vk.taa_motion_descriptor[vk.cmd_index]; /* should not happen */
+		}
+		if ( class_set == VK_NULL_HANDLE ) {
+			class_set = reactive_set;
 		}
 		/* MSAA: sample resolved R32F depth (same binding as OIT), not the MSAA attachment. */
 		if ( vk.msaaActive && vk.volumetric_depth_view != VK_NULL_HANDLE &&
@@ -655,7 +667,8 @@ void vk_end_frame_record_taa_pass( VkImageView *post_fog_src, VkImageView *lumin
 			vk.postfx_params_descriptor[vk.cmd_index],
 			vk.taa_history_descriptor[readIndex],
 			vk.taa_motion_descriptor[vk.cmd_index],
-			reactive_set );
+			reactive_set,
+			class_set );
 	}
 	vk_end_frame_draw_fullscreen_quad( taaWidth, taaHeight );
 	vk_end_render_pass();
@@ -680,6 +693,8 @@ void vk_end_frame_record_taa_pass( VkImageView *post_fog_src, VkImageView *lumin
 	/* Weapon/view-model after world TAA — never contaminate history. */
 	vk_spine_cert_check_weapon_flush_order( qtrue );
 	RB_FlushDeferredWeaponAfterTaa( post_fog_src, luminance_src );
+	/* If no weapon was drawn, still age out previous weapon class silhouette. */
+	vk_temporal_class_commit_world_only();
 	vk_pass_diag_stage( "taa_exit" );
 }
 

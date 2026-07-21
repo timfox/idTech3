@@ -23,6 +23,9 @@ void vk_barrier_reactive_mask_for_sampling( const char *reason );
 void vk_barrier_reactive_mask_for_storage( const char *reason );
 void vk_reactive_mask_stamp_from_reveal( void );
 
+/* After deferred weapon flush: MAX-blend high reactivity on DEPTH_RANGE_WEAPON. */
+void vk_reactive_mask_stamp_weapon_from_depth( void );
+
 void vk_reactive_mask_update_taa_descriptors( void );
 void vk_reactive_mask_update_storage_descriptor( void );
 

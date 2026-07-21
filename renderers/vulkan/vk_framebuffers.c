@@ -418,6 +418,24 @@ void vk_create_framebuffers( void )
 			VK_DEBUG_REPORT_OBJECT_TYPE_FRAMEBUFFER_EXT );
 	}
 
+	if ( vk.render_pass.temporal_class_stamp != VK_NULL_HANDLE ) {
+		int ci;
+		for ( ci = 0; ci < 2; ci++ ) {
+			if ( vk.temporal_class_view[ci] == VK_NULL_HANDLE ) {
+				continue;
+			}
+			desc.renderPass = vk.render_pass.temporal_class_stamp;
+			desc.attachmentCount = 1;
+			desc.width = fullresWidth;
+			desc.height = fullresHeight;
+			framebuffer_attachments[0] = vk.temporal_class_view[ci];
+			VK_CHECK( qvkCreateFramebuffer( vk.device, &desc, NULL,
+				&vk.framebuffers.temporal_class_stamp[ci] ) );
+			SET_OBJECT_NAME( vk.framebuffers.temporal_class_stamp[ci], "framebuffer - temporal_class_stamp",
+				VK_DEBUG_REPORT_OBJECT_TYPE_FRAMEBUFFER_EXT );
+		}
+	}
+
 	if ( PostFX_SSR_IsEnabled() && vk.render_pass.ssr != VK_NULL_HANDLE && vk.ssr_image_view )
 	{
 		desc.renderPass = vk.render_pass.ssr;
@@ -513,6 +531,15 @@ void vk_destroy_framebuffers( void ) {
 	if ( vk.framebuffers.reactive_stamp != VK_NULL_HANDLE ) {
 		qvkDestroyFramebuffer( vk.device, vk.framebuffers.reactive_stamp, NULL );
 		vk.framebuffers.reactive_stamp = VK_NULL_HANDLE;
+	}
+	{
+		int ci;
+		for ( ci = 0; ci < 2; ci++ ) {
+			if ( vk.framebuffers.temporal_class_stamp[ci] != VK_NULL_HANDLE ) {
+				qvkDestroyFramebuffer( vk.device, vk.framebuffers.temporal_class_stamp[ci], NULL );
+				vk.framebuffers.temporal_class_stamp[ci] = VK_NULL_HANDLE;
+			}
+		}
 	}
 
 	if ( vk.framebuffers.ssr != VK_NULL_HANDLE ) {

@@ -2036,12 +2036,13 @@ static void FS_ConvertFilename( char *name )
 }
 
 
+static void FS_ParseGameInfo( void );
+
 #ifdef USE_PK3_CACHE
 
 #define PK3_HASH_SIZE 512
 
 static void FS_FreePak( pack_t *pak );
-static void FS_ParseGameInfo( void );
 
 static pack_t *pakHashTable[ PK3_HASH_SIZE ];
 
@@ -2934,6 +2935,50 @@ static pack_t *FS_LoadZipFile( const char *zipfile )
 
 /*
 =================
+FS_DetachPakHandles
+
+Drop any open file-handle table references and handle-cache links to a pack
+before it is freed. FS_Restart uses FS_Shutdown(qfalse), which historically
+left zip handles open across a filesystem rebuild; with the pk3 cache those
+handles can outlive the pack and poison fs_searchpaths on the next map.
+=================
+*/
+static void FS_DetachPakHandles( pack_t *pak )
+{
+	int i;
+
+#ifdef USE_HANDLE_CACHE
+	if ( pak->next_h ) {
+		FS_RemoveFromHandleList( pak );
+	}
+#endif
+
+	for ( i = 1; i < MAX_FILE_HANDLES; i++ ) {
+		fileHandleData_t *fd = &fsh[i];
+
+		if ( fd->pak != pak ) {
+			continue;
+		}
+
+		if ( fd->zipFile && fd->handleFiles.file.z ) {
+			unzCloseCurrentFile( fd->handleFiles.file.z );
+			if ( fd->handleFiles.unique ) {
+				unzClose( fd->handleFiles.file.z );
+			}
+		}
+		Com_Memset( fd, 0, sizeof( *fd ) );
+	}
+
+	if ( pak->handle ) {
+		unzClose( pak->handle );
+		pak->handle = NULL;
+	}
+	pak->handleUsed = 0;
+}
+
+
+/*
+=================
 FS_FreePak
 
 Frees a pak structure and releases all associated resources
@@ -2941,16 +2986,7 @@ Frees a pak structure and releases all associated resources
 */
 static void FS_FreePak( pack_t *pak )
 {
-	if ( pak->handle )
-	{
-#ifdef USE_HANDLE_CACHE
-		if ( pak->next_h )
-			FS_RemoveFromHandleList( pak );
-#endif
-		unzClose( pak->handle );
-		pak->handle = NULL;
-	}
-
+	FS_DetachPakHandles( pak );
 	Z_Free( pak );
 }
 
@@ -3473,14 +3509,15 @@ void FS_Shutdown( qboolean closemfp )
 	searchpath_t	*p, *next;
 	int i;
 
-	// close opened files
-	if ( closemfp ) 
-	{
-		for ( i = 1; i < MAX_FILE_HANDLES; i++ )
-		{
-			if ( !fsh[i].handleFiles.file.v  )
-				continue;
-
+	// Always release pak-backed handles before searchpaths/packs are torn down.
+	// Map changes call FS_Restart -> FS_Shutdown(qfalse); leaving zip handles
+	// pointed at cached packs that FreeUnusedCache may free causes use-after-free
+	// in FS_FOpenFileRead during the next CG_RegisterGraphics.
+	for ( i = 1; i < MAX_FILE_HANDLES; i++ ) {
+		if ( !fsh[i].handleFiles.file.v && !fsh[i].pak ) {
+			continue;
+		}
+		if ( closemfp || fsh[i].pak || fsh[i].zipFile ) {
 			FS_FCloseFile( i );
 		}
 	}
@@ -3503,12 +3540,11 @@ void FS_Shutdown( qboolean closemfp )
 
 		if ( p->pack )
 		{
-#ifdef USE_PK3_CACHE
 #ifdef USE_HANDLE_CACHE
 			if ( p->pack->next_h )
 				FS_RemoveFromHandleList( p->pack );
 #endif
-#else
+#ifndef USE_PK3_CACHE
 			FS_FreePak( p->pack );
 #endif
 			p->pack = NULL;
@@ -3543,11 +3579,21 @@ FS_ReorderSearchPaths
 static void FS_ReorderSearchPaths( void ) {
 	searchpath_t **list, **paks, **dirs;
 	searchpath_t *path;
-	int i, ndirs, npaks, cnt;
+	int i, ndirs, npaks, cnt, actual;
 
 	cnt = fs_packCount + fs_dirCount + fs_pk3dirCount;
 	if ( cnt == 0 )
 		return;
+
+	actual = 0;
+	for ( path = fs_searchpaths; path; path = path->next ) {
+		actual++;
+	}
+	if ( actual != cnt ) {
+		Com_Printf( S_COLOR_YELLOW "WARNING: FS_ReorderSearchPaths count mismatch "
+				"(tracked=%d actual=%d); skipping reorder\n", cnt, actual );
+		return;
+	}
 
 	// relink path chains in following order:
 	// 1. pk3dirs @ pak files
@@ -3560,11 +3606,27 @@ static void FS_ReorderSearchPaths( void ) {
 	path = fs_searchpaths;
 	while ( path ) {
 		if ( path->pack || path->policy != DIR_STATIC ) {
+			if ( npaks >= fs_pk3dirCount + fs_packCount ) {
+				Com_Printf( S_COLOR_YELLOW "WARNING: FS_ReorderSearchPaths pak overflow; skipping reorder\n" );
+				Z_Free( list );
+				return;
+			}
 			paks[npaks++] = path;
 		} else {
+			if ( ndirs >= fs_dirCount ) {
+				Com_Printf( S_COLOR_YELLOW "WARNING: FS_ReorderSearchPaths dir overflow; skipping reorder\n" );
+				Z_Free( list );
+				return;
+			}
 			dirs[ndirs++] = path;
 		}
 		path = path->next;
+	}
+
+	if ( npaks + ndirs != cnt ) {
+		Com_Printf( S_COLOR_YELLOW "WARNING: FS_ReorderSearchPaths classification mismatch; skipping reorder\n" );
+		Z_Free( list );
+		return;
 	}
 
 	fs_searchpaths = list[0];

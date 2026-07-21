@@ -229,11 +229,12 @@ static int SCR_HudTtfTargetPixelHeight( void ) {
 
 	pixelScale = SCR_UiPixelScale();
 	/*
-	 * Rasterize near typical JS HUD body height (~12 virtual), not BIGCHAR (16).
-	 * An oversized atlas forces downscale and muddies counters at menu sizes.
-	 * r_fontSize still floors the target so raising it keeps a denser atlas.
+	 * Rasterize near the largest common HUD text height (~22 virtual: JS HUD
+	 * timers/counters), not the small body size.  Upscaling glyphs blurs the
+	 * big digits far more than mipmapped downscale (r_fontMipmap) hurts the
+	 * small labels.  r_fontSize still floors the target.
 	 */
-	targetPx = (int)( 12.0f * pixelScale + 0.5f );
+	targetPx = (int)( 22.0f * pixelScale + 0.5f );
 	if ( targetPx < basePt ) {
 		targetPx = basePt;
 	}
@@ -637,7 +638,7 @@ static float SCR_TtfGlyphAdvance( const fontInfo_t *font, int refLinePx, float c
 }
 
 
-static qboolean SCR_DrawBuiltInTtfStringExtVirtual( int x, int y, float size, const char *string,
+static qboolean SCR_DrawBuiltInTtfStringExtVirtual( float x, float y, float size, const char *string,
 		const fontInfo_t *font, const float *setColor, qboolean forceColor, qboolean noColorEscape ) {
 	vec4_t color;
 	const char *s;
@@ -1146,6 +1147,30 @@ bitmap_fallback:
 		xx += (int)clampedSize;
 	}
 	re.SetColor( NULL );
+}
+
+
+/*
+==================
+SCR_DrawHudString
+
+Float-position variant for the JS HUD: fractional virtual coordinates keep
+centered/right-aligned text stable at high resolutions (per-glyph physical
+pixel snapping still happens inside the TrueType path).
+==================
+*/
+void SCR_DrawHudString( float x, float y, float size, const char *string, const float *setColor,
+		qboolean forceColor, qboolean noColorEscape ) {
+	const float clampedSize = Com_Clamp( 1.0f, 256.0f, size );
+	const int textMode = SCR_TextRenderMode();
+
+	if ( ( textMode == 0 || textMode == 1 ) && cls.builtInTtfActive &&
+			SCR_DrawBuiltInTtfStringExtVirtual( x, y, clampedSize, string, &cls.builtInHudFont, setColor, forceColor, noColorEscape ) ) {
+		return;
+	}
+
+	/* Other text backends only accept integer virtual coordinates. */
+	SCR_DrawStringExt( (int)floorf( x + 0.5f ), (int)floorf( y + 0.5f ), size, string, setColor, forceColor, noColorEscape );
 }
 
 

@@ -9,6 +9,7 @@ Teardown for VkRenderPass handles and long-lived VkPipelines (split from vk.c).
 #include "vk_resource_destroy.h"
 #include "vk_forward_plus.h"
 #include "vk_reactive_mask.h"
+#include "vk_temporal_class.h"
 
 static void vk_clear_tess_last_pipelines( void )
 {
@@ -83,6 +84,10 @@ void vk_destroy_render_passes( void )
 	if ( vk.render_pass.reactive_stamp != VK_NULL_HANDLE ) {
 		qvkDestroyRenderPass( vk.device, vk.render_pass.reactive_stamp, NULL );
 		vk.render_pass.reactive_stamp = VK_NULL_HANDLE;
+	}
+	if ( vk.render_pass.temporal_class_stamp != VK_NULL_HANDLE ) {
+		qvkDestroyRenderPass( vk.device, vk.render_pass.temporal_class_stamp, NULL );
+		vk.render_pass.temporal_class_stamp = VK_NULL_HANDLE;
 	}
 
 	if ( vk.render_pass.ssr != VK_NULL_HANDLE ) {
@@ -298,6 +303,7 @@ void vk_destroy_pipelines( qboolean resetCounter )
 		vk.oit_resolve_pipeline = VK_NULL_HANDLE;
 	}
 	vk_destroy_reactive_mask_pipeline();
+	vk_destroy_temporal_class_pipeline();
 	if ( vk.oit_accum_pipeline != VK_NULL_HANDLE ) {
 		qvkDestroyPipeline( vk.device, vk.oit_accum_pipeline, NULL );
 		vk.oit_accum_pipeline = VK_NULL_HANDLE;
