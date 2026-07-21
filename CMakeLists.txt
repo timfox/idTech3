@@ -1045,6 +1045,7 @@ endif()
 OPTION(USE_DTLS "Enable DTLS encryption for game network traffic (OpenSSL)" ON)
 OPTION(USE_STEAM "Enable Steam API (achievements, overlay, rich presence, Deck detection)" OFF)
 OPTION(USE_STEAM_NETWORKING "Enable Steam Datagram Relay (SDR) transport" OFF)
+set(STEAMWORKS_SDK "" CACHE PATH "Steamworks SDK root (contains public/steam and redistributable_bin)")
 OPTION(USE_VULKAN_RTX "Enable Vulkan ray tracing (VK_KHR_ray_tracing_*); requires RT-capable GPU" OFF)
 OPTION(USE_EXPERIMENTAL_RENDERERS "Neural/scaffold renderer paths (NIV, RenderFormer, VkSplat, MGS, WPT, etc.)" ON)
 OPTION(USE_VUDA "CUDA-Vulkan spatial multiplexing interop (Linux + NVIDIA; KHR external memory fd)" OFF)
@@ -1352,16 +1353,28 @@ if(USE_STEAM OR USE_STEAM_NETWORKING)
   if(USE_STEAM_NETWORKING)
     list(APPEND QCOMMON_SRCS engine/core/net_sdr.c)
   endif()
+  # Prefer CMake cache -DSTEAMWORKS_SDK=, then environment, then common layouts.
+  if(NOT STEAMWORKS_SDK AND DEFINED ENV{STEAMWORKS_SDK})
+    set(STEAMWORKS_SDK "$ENV{STEAMWORKS_SDK}" CACHE PATH "Steamworks SDK root" FORCE)
+  endif()
   find_path(STEAMWORKS_INCLUDE_DIR steam/steam_api.h
-    HINTS $ENV{STEAMWORKS_SDK} $ENV{STEAMWORKS_SDK}/public
-    PATH_SUFFIXES include)
+    HINTS
+      ${STEAMWORKS_SDK}
+      ${STEAMWORKS_SDK}/public
+      $ENV{STEAMWORKS_SDK}
+      $ENV{STEAMWORKS_SDK}/public
+    PATH_SUFFIXES include public)
   if(STEAMWORKS_INCLUDE_DIR)
     find_library(STEAMWORKS_LIBRARY steam_api
-      HINTS $ENV{STEAMWORKS_SDK} $ENV{STEAMWORKS_SDK}/redistributable_bin
-      PATH_SUFFIXES linux64 linux32 win64)
+      HINTS
+        ${STEAMWORKS_SDK}/redistributable_bin
+        ${STEAMWORKS_SDK}
+        $ENV{STEAMWORKS_SDK}/redistributable_bin
+        $ENV{STEAMWORKS_SDK}
+      PATH_SUFFIXES linux64 linux32 win64 osx)
     if(STEAMWORKS_LIBRARY)
       set(STEAMWORKS_FOUND TRUE)
-      message(STATUS "Steam SDR: Steamworks SDK found (${STEAMWORKS_INCLUDE_DIR})")
+      message(STATUS "Steamworks SDK found (${STEAMWORKS_INCLUDE_DIR}, ${STEAMWORKS_LIBRARY})")
     endif()
   endif()
   if(NOT STEAMWORKS_FOUND)
@@ -1374,6 +1387,16 @@ if(USE_STEAM OR USE_STEAM_NETWORKING)
   endif()
   if(STEAMWORKS_FOUND)
     set(STEAMWORKS_AVAILABLE 1)
+    # Steamworks headers are C++; compile the Steam sources as C++ with C ABI.
+    set_source_files_properties(
+      ${CMAKE_SOURCE_DIR}/engine/core/steam_shared.c
+      ${CMAKE_SOURCE_DIR}/runtime/client/platform/cl_steam.c
+      PROPERTIES LANGUAGE CXX)
+    # Ship redistributable next to the binary so dlopen/rpath finds it at runtime.
+    file(COPY "${STEAMWORKS_LIBRARY}" DESTINATION "${CMAKE_BINARY_DIR}")
+    if(EXISTS "${CMAKE_SOURCE_DIR}/steam_appid.txt")
+      file(COPY "${CMAKE_SOURCE_DIR}/steam_appid.txt" DESTINATION "${CMAKE_BINARY_DIR}")
+    endif()
   else()
     set(STEAMWORKS_AVAILABLE 0)
   endif()
@@ -1572,15 +1595,6 @@ if(USE_STEAM_NETWORKING)
   if(STEAMWORKS_FOUND)
     target_include_directories(qcommon_ded PRIVATE ${STEAMWORKS_INCLUDE_DIR})
   endif()
-endif()
-if(USE_STEAM_NETWORKING AND STEAMWORKS_FOUND)
-  target_compile_definitions(client PRIVATE USE_STEAM_NETWORKING=1 USE_STEAM=1)
-  target_include_directories(client PRIVATE ${STEAMWORKS_INCLUDE_DIR})
-  message(STATUS "Steam: full API + SDR enabled")
-elseif(USE_STEAM AND STEAMWORKS_FOUND)
-  target_compile_definitions(client PRIVATE USE_STEAM=1)
-  target_include_directories(client PRIVATE ${STEAMWORKS_INCLUDE_DIR})
-  message(STATUS "Steam: API enabled (achievements, overlay, rich presence, Deck)")
 endif()
 
 # Apply SKIP_IDPAK_CHECK to qcommon targets that compile files.c
@@ -1881,6 +1895,16 @@ ENDIF()
 idtech3_first_party_warnings_as_errors(client)
 idtech3_client_include_domains(client)
 target_include_directories(client PRIVATE ${CMAKE_SOURCE_DIR})
+# Steam client defs must run after ADD_LIBRARY(client) above.
+if(USE_STEAM_NETWORKING AND STEAMWORKS_FOUND)
+	target_compile_definitions(client PRIVATE USE_STEAM_NETWORKING=1 USE_STEAM=1)
+	target_include_directories(client PRIVATE ${STEAMWORKS_INCLUDE_DIR})
+	message(STATUS "Steam: full API + SDR enabled")
+elseif(USE_STEAM AND STEAMWORKS_FOUND)
+	target_compile_definitions(client PRIVATE USE_STEAM=1)
+	target_include_directories(client PRIVATE ${STEAMWORKS_INCLUDE_DIR})
+	message(STATUS "Steam: API enabled (achievements, overlay, rich presence, Deck)")
+endif()
 # g_lua_bindings.c / cl_main include lua_compat.h (and duktape) before feature guards;
 # headers live under versioned dirs on Linux (e.g. /usr/include/lua5.4), so wire include paths.
 if(USE_LUA AND LUA_FOUND)
@@ -2844,6 +2868,18 @@ if(USE_RADIUSFPS_CUDA AND NOT ANDROID)
 endif()
 if((USE_STEAM OR USE_STEAM_NETWORKING) AND STEAMWORKS_FOUND)
   TARGET_LINK_LIBRARIES(${CNAME}${BINEXT} PRIVATE ${STEAMWORKS_LIBRARY})
+  if(UNIX AND NOT APPLE AND NOT ANDROID)
+    # Find libsteam_api.so next to the executable (copied into build/ and release/).
+    set_property(TARGET ${CNAME}${BINEXT} APPEND PROPERTY BUILD_RPATH "$ORIGIN")
+    set_property(TARGET ${CNAME}${BINEXT} APPEND PROPERTY INSTALL_RPATH "$ORIGIN")
+  endif()
+  if(USE_STEAM_NETWORKING AND NOT ANDROID)
+    TARGET_LINK_LIBRARIES(${DNAME}${BINEXT} PRIVATE ${STEAMWORKS_LIBRARY})
+    if(UNIX AND NOT APPLE)
+      set_property(TARGET ${DNAME}${BINEXT} APPEND PROPERTY BUILD_RPATH "$ORIGIN")
+      set_property(TARGET ${DNAME}${BINEXT} APPEND PROPERTY INSTALL_RPATH "$ORIGIN")
+    endif()
+  endif()
 endif()
 
 IF(WIN32)
@@ -3653,6 +3689,12 @@ add_test(NAME test_md3_paint
 set_tests_properties(test_md3_paint PROPERTIES
 	LABELS "scripts;validation;renderer;pbr"
 	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_md3_paint.sh;${CMAKE_SOURCE_DIR}/renderers/vulkan/tr_material_paint.c;${CMAKE_SOURCE_DIR}/docs/MATERIAL_BLEND.md")
+
+add_test(NAME test_steam_wiring
+	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_steam_wiring.sh)
+set_tests_properties(test_steam_wiring PROPERTIES
+	LABELS "scripts;validation;steam"
+	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_steam_wiring.sh;${CMAKE_SOURCE_DIR}/runtime/client/platform/cl_steam.c;${CMAKE_SOURCE_DIR}/docs/STEAM.md")
 
 add_test(NAME test_p2p_networking
 	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_p2p_networking.sh)

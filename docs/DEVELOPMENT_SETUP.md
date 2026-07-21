@@ -219,14 +219,16 @@ Each codec is optional and detected via pkg-config. Missing libraries are report
 ### Steam API and SDR (Steam Datagram Relay)
 ```bash
 # Full Steam API (achievements, overlay, rich presence, Steam Deck detection)
+./scripts/compile_engine.sh vulkan steam
+# Equivalent:
 cmake .. -DUSE_STEAM=ON -DSTEAMWORKS_SDK=/path/to/steamworks_sdk ...
 
 # Steam SDR transport (implies USE_STEAM when SDK found)
 cmake .. -DUSE_STEAM_NETWORKING=ON -DSTEAMWORKS_SDK=/path/to/steamworks_sdk ...
 ```
-Requires Steamworks SDK with `steam_api.h` (and `isteamnetworkingsockets.h` for SDR). Set `STEAMWORKS_SDK` to the SDK root.
+Requires Steamworks SDK with `steam_api.h` (and `isteamnetworkingsockets.h` for SDR). Set `STEAMWORKS_SDK` to the SDK root (CMake cache or env). See **[STEAM.md](STEAM.md)** for cvars, console commands, `steam_appid.txt`, and runtime layout.
 
-- **USE_STEAM**: Achievements, overlay, rich presence, Steam Deck auto-detection. When Deck is detected, `base/steamdeck.cfg` is auto-exec'd.
+- **USE_STEAM**: Achievements, overlay, rich presence, Steam Deck auto-detection, Steam Input status. When Deck is detected, `base/steamdeck.cfg` is auto-exec'd.
 - **USE_STEAM_NETWORKING**: SDR transport. Use `net_p2p 1` at runtime (`net_sdr` remains an alias). Client-hosted sessions can use `p2p_address` and `p2p_connect`; see `docs/P2P_NETWORKING.md`.
 - **USE_VULKAN_RTX** (default OFF): KHR ray tracing (`r_rtx`, Hybrid1, path trace, GRTX, Raygun). Without it, `#else` stubs log at init and cvars remain inert.
 - **USE_EXPERIMENTAL_RENDERERS** (default ON): Neural/scaffold paths (`r_niv`, `r_renderformer`, `r_vksplat`, `r_mgs`, `r_wpt`, etc.). Set OFF for lean renderer builds; `vk_experimental_renderer_stubs.c` supplies no-op symbols.

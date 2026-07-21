@@ -6,14 +6,28 @@ Shared Steam bootstrap used by both client and dedicated runtime paths.
 ===========================================================================
 */
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include "q_shared.h"
 #include "qcommon.h"
 #include "steam_shared.h"
 
+#ifdef __cplusplus
+}
+#endif
+
 #if ( defined(USE_STEAM) || defined(USE_STEAM_NETWORKING) ) && defined(STEAMWORKS_AVAILABLE) && STEAMWORKS_AVAILABLE
 #include <steam/steam_api.h>
 #ifdef USE_STEAM_NETWORKING
+#ifdef __cplusplus
+extern "C" {
+#endif
 #include "net_sdr.h"
+#ifdef __cplusplus
+}
+#endif
 #endif
 
 static qboolean steamSharedInitialized = qfalse;

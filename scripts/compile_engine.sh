@@ -25,6 +25,7 @@ VUDA=0
 EMULATOR=0
 MIMIR=0
 PYTHON=0
+STEAM=0
 CROSS_AARCH64=0
 CODECS_FOR_CROSS=0
 BUILD_DEMO_PK3=0
@@ -230,6 +231,14 @@ while [[ $# -gt 0 ]]; do
       PYTHON=0
       shift
       ;;
+    steam|use-steam)
+      STEAM=1
+      shift
+      ;;
+    no-steam|nosteam)
+      STEAM=0
+      shift
+      ;;
     --out|--output|--dir)
       if [[ $# -lt 2 ]]; then
         echo "Error: $1 requires a directory argument." >&2
@@ -411,6 +420,12 @@ else
   echo "CMake: USE_PYTHON=OFF"
 fi
 
+if [ "$STEAM" -eq 1 ]; then
+  STEAMWORKS_SDK_PATH="${STEAMWORKS_SDK:-/home/tim/SteamWorks/sdk}"
+  CMAKE_FLAGS+=("-DUSE_STEAM=ON" "-DSTEAMWORKS_SDK=${STEAMWORKS_SDK_PATH}")
+  echo "CMake: USE_STEAM=ON STEAMWORKS_SDK=${STEAMWORKS_SDK_PATH}"
+fi
+
 if [ "$FREEUSD" -eq 1 ]; then
   CMAKE_FLAGS+=("-DUSE_FREEUSD=ON")
   echo "CMake: USE_FREEUSD=ON (USDA mesh import + usd_* console tools)"
@@ -588,6 +603,20 @@ copy_to_release() {
   if [ -f "$BUILD_DIR/idtech3" ]; then
     cp -f "$BUILD_DIR/idtech3" "$dest/${GAME_NAME}"
     echo "Copied client -> $dest/${GAME_NAME}"
+  fi
+
+  # Steamworks redistributable + AppID file (required next to the binary when USE_STEAM).
+  if [ -f "$BUILD_DIR/libsteam_api.so" ]; then
+    cp -f "$BUILD_DIR/libsteam_api.so" "$dest/libsteam_api.so"
+    echo "Copied Steam API -> $dest/libsteam_api.so"
+  elif [ -n "${STEAMWORKS_SDK:-}" ] && [ -f "${STEAMWORKS_SDK}/redistributable_bin/linux64/libsteam_api.so" ]; then
+    cp -f "${STEAMWORKS_SDK}/redistributable_bin/linux64/libsteam_api.so" "$dest/libsteam_api.so"
+    echo "Copied Steam API -> $dest/libsteam_api.so"
+  fi
+  if [ -f "$BUILD_DIR/steam_appid.txt" ]; then
+    cp -f "$BUILD_DIR/steam_appid.txt" "$dest/steam_appid.txt"
+  elif [ -f "$PROJECT_ROOT/steam_appid.txt" ]; then
+    cp -f "$PROJECT_ROOT/steam_appid.txt" "$dest/steam_appid.txt"
   fi
 
   # Server

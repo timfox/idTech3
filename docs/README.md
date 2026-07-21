@@ -8,6 +8,7 @@ Documentation is grouped by **tier**. Most files remain at their historical path
 - [COMPATIBILITY.md](COMPATIBILITY.md)
 - [BUILD.md](../BUILD.md)
 - [DEVELOPMENT_SETUP.md](DEVELOPMENT_SETUP.md)
+- [STEAM.md](STEAM.md) — Steamworks API (`USE_STEAM`), Deck, achievements, overlay
 - [ENGINE_MODULE_MANIFEST.md](ENGINE_MODULE_MANIFEST.md) — build profile + source gates
 - [DEPRECATION_POLICY.md](DEPRECATION_POLICY.md)
 

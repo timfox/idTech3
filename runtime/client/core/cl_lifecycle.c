@@ -22,6 +22,7 @@ Copyright (C) 2026 Gopex LLC. All rights reserved.
 #include "cl_ml_worker.h"
 #include "cl_vuda.h"
 #include "cl_emulator.h"
+#include "cl_steam.h"
 #ifdef USE_CURL
 #include "cl_curl.h"
 #endif
@@ -188,6 +189,8 @@ void CL_Shutdown( const char *finalmsg, qboolean quit ) {
 	CL_VUDA_Shutdown();
 #endif
 	CL_Emulator_Shutdown();
+
+	Steam_Shutdown();
 
 	S_DisableSounds();
 

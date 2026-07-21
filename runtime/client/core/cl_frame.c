@@ -124,6 +124,7 @@ void CL_Frame( int msec, int realMsec ) {
 
 	CL_VoIP_Frame();
 	WS_Frame();
+	Steam_Frame();
 	CL_Steam_UpdateRichPresence();
 
 #ifdef USE_LUA
