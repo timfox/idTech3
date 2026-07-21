@@ -21,6 +21,7 @@ cvar_t *r_temporalDisocclusion;
 cvar_t *r_temporalReactiveMask;
 cvar_t *r_reactiveMaskForce;
 cvar_t *r_temporalWeaponAfterTaa;
+cvar_t *r_weaponSsrIsolation;
 cvar_t *r_temporalSmaaCleanup;
 cvar_t *r_debugMotionVectors;
 cvar_t *r_debugHistoryRejection;
@@ -117,6 +118,16 @@ void vk_aa_policy_register_cvars( void )
 		"Defer RDF_NOWORLDMODEL weapon/view-model draws until after world Temporal Reconstruction "
 		"so weapon pixels never enter TAA history (fixes dark offset silhouettes)." );
 	ri.Cvar_SetGroup( r_temporalWeaponAfterTaa, CVG_RENDERER );
+
+	r_weaponSsrIsolation = ri.Cvar_Get( "r_weaponSsrIsolation", "1", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_weaponSsrIsolation, "0", "1", CV_INTEGER );
+	ri.Cvar_SetDescription( r_weaponSsrIsolation,
+		"Defer RDF_NOWORLDMODEL weapon/view-model draws until after world SSR. "
+		"Prevents DEPTH_RANGE_WEAPON color/depth from contaminating SSR; 0 restores legacy ordering." );
+	ri.Cvar_SetGroup( r_weaponSsrIsolation, CVG_RENDERER );
+	ri.Printf( PRINT_ALL, "[VK][weapon] SSR isolation %s (r_weaponSsrIsolation=%d)\n",
+		r_weaponSsrIsolation->integer ? "enabled" : "disabled",
+		r_weaponSsrIsolation->integer );
 
 	r_temporalSmaaCleanup = ri.Cvar_Get( "r_temporalSmaaCleanup", "0", CVAR_ARCHIVE_ND );
 	ri.Cvar_CheckRange( r_temporalSmaaCleanup, "0", "1", CV_INTEGER );

@@ -108,9 +108,14 @@ void CM_LoadGoldSrcMap( const byte *buffer, int length, const char *name ) {
 	const goldsrc_clipnode_t *inClipNodes;
 	const goldsrc_leaf_t *inLeafs;
 	const goldsrc_model_t *inModels;
+	const goldsrc_face_t *inFaces;
 	const byte *entities;
-	int numPlanes, numNodes, numClipNodes, numLeafs, numModels, entityLen;
+	int numPlanes, numNodes, numClipNodes, numLeafs, numModels, numFaces, entityLen;
 	int i, j;
+	int worldFacePlanes = 0;
+	int hullFacePlanes = 0;
+	int bevelPlanes = 0;
+	int axialBevelPlanes = 0;
 
 	if ( length < (int)sizeof( *header ) || LittleLong( header->version ) != GOLDSRC_BSP_VERSION ) {
 		Com_Error( ERR_DROP, "%s: %s is not a GoldSrc BSP v30", __func__, name );
@@ -126,6 +131,8 @@ void CM_LoadGoldSrcMap( const byte *buffer, int length, const char *name ) {
 			sizeof( *inLeafs ), &numLeafs, name );
 	inModels = CM_GoldSrcLump( buffer, length, header, GOLDSRC_LUMP_MODELS,
 			sizeof( *inModels ), &numModels, name );
+	inFaces = CM_GoldSrcLump( buffer, length, header, GOLDSRC_LUMP_FACES,
+			sizeof( *inFaces ), &numFaces, name );
 	entities = CM_GoldSrcLump( buffer, length, header, GOLDSRC_LUMP_ENTITIES,
 			1, &entityLen, name );
 
@@ -149,6 +156,8 @@ void CM_LoadGoldSrcMap( const byte *buffer, int length, const char *name ) {
 
 	cm.numPlanes = numPlanes;
 	cm.planes = Hunk_Alloc( ( numPlanes + GOLDSRC_BOX_PLANES ) * sizeof( *cm.planes ), h_high );
+	cm.goldsrcPlaneKind = Hunk_Alloc( ( numPlanes + GOLDSRC_BOX_PLANES ) *
+			sizeof( *cm.goldsrcPlaneKind ), h_high );
 	for ( i = 0; i < numPlanes; i++ ) {
 		cplane_t *out = &cm.planes[i];
 		for ( j = 0; j < 3; j++ ) {
@@ -157,6 +166,62 @@ void CM_LoadGoldSrcMap( const byte *buffer, int length, const char *name ) {
 		out->dist = LittleFloat( inPlanes[i].dist );
 		out->type = PlaneTypeForNormal( out->normal );
 		SetPlaneSignbits( out );
+		/*
+		 * Default clipnode-only planes to bevel kinds. Faces below promote any
+		 * plane that also appears on rendered geometry to WORLD_FACE.
+		 */
+		if ( out->type == PLANE_X || out->type == PLANE_Y ||
+				out->type == PLANE_Z ) {
+			cm.goldsrcPlaneKind[i] = (byte)TRACE_PLANE_AXIAL_BEVEL;
+		}
+		else {
+			cm.goldsrcPlaneKind[i] = (byte)TRACE_PLANE_BEVEL;
+		}
+	}
+
+	for ( i = 0; i < numFaces; i++ ) {
+		int planeNum = LittleShort( inFaces[i].planenum );
+		if ( planeNum < 0 || planeNum >= numPlanes ) {
+			Com_Error( ERR_DROP, "%s: %s face %d has invalid plane %d",
+					__func__, name, i, planeNum );
+		}
+		cm.goldsrcPlaneKind[planeNum] = (byte)TRACE_PLANE_WORLD_FACE;
+	}
+
+	/*
+	 * Clipnode-only planes that share a world-face normal are hull expansions of
+	 * real geometry, not bevels. Promote those so surf movement keeps them as
+	 * velocity constraints.
+	 */
+	for ( i = 0; i < numPlanes; i++ ) {
+		if ( cm.goldsrcPlaneKind[i] == (byte)TRACE_PLANE_WORLD_FACE ) {
+			continue;
+		}
+		for ( j = 0; j < numPlanes; j++ ) {
+			if ( cm.goldsrcPlaneKind[j] != (byte)TRACE_PLANE_WORLD_FACE ) {
+				continue;
+			}
+			if ( DotProduct( cm.planes[i].normal, cm.planes[j].normal ) >
+					0.9995f ) {
+				cm.goldsrcPlaneKind[i] = (byte)TRACE_PLANE_HULL_FACE;
+				break;
+			}
+		}
+	}
+
+	for ( i = 0; i < numPlanes; i++ ) {
+		if ( cm.goldsrcPlaneKind[i] == (byte)TRACE_PLANE_WORLD_FACE ) {
+			worldFacePlanes++;
+		}
+		else if ( cm.goldsrcPlaneKind[i] == (byte)TRACE_PLANE_HULL_FACE ) {
+			hullFacePlanes++;
+		}
+		else if ( cm.goldsrcPlaneKind[i] == (byte)TRACE_PLANE_AXIAL_BEVEL ) {
+			axialBevelPlanes++;
+		}
+		else {
+			bevelPlanes++;
+		}
 	}
 
 	cm.numNodes = numNodes;
@@ -242,6 +307,8 @@ void CM_LoadGoldSrcMap( const byte *buffer, int length, const char *name ) {
 	cm.numSurfaces = 0;
 	cm.surfaces = Hunk_Alloc( sizeof( *cm.surfaces ), h_high );
 
-	Com_Printf( "GoldSrc BSP v30 collision: %d nodes, %d clipnodes, %d leaves, %d inline models\n",
-			numNodes, numClipNodes, numLeafs, numModels );
+	Com_Printf( "GoldSrc BSP v30 collision: %d nodes, %d clipnodes, %d leaves, "
+			"%d inline models, planes=%d (world=%d hull=%d bevel=%d axial=%d)\n",
+			numNodes, numClipNodes, numLeafs, numModels, numPlanes,
+			worldFacePlanes, hullFacePlanes, bevelPlanes, axialBevelPlanes );
 }

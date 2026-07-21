@@ -183,6 +183,38 @@ void main() {
 		return;
 	}
 
+	/* Extended r_temporalDebug views that need depth before full resolve. */
+	{
+		float nearWeaponEarly = smoothstep( 0.82, 0.995, depthNdc );
+		if ( debugMode > 12.5 && debugMode < 13.5 ) {
+			/* 13 = NaN/Inf detection on current / motion */
+			bool bad = any( isnan( current ) ) || any( isinf( current ) ) ||
+				isnan( depthNdc ) || isinf( depthNdc ) ||
+				any( isnan( motion ) ) || any( isinf( motion ) );
+			out_color = bad ? vec4( 1.0, 0.0, 1.0, 1.0 ) : vec4( current, 1.0 );
+			return;
+		}
+		if ( debugMode > 13.5 && debugMode < 14.5 ) {
+			/* 14 = weapon-only motion (MV * weapon mask) */
+			vec2 texSize = vec2( textureSize( currentColor, 0 ) );
+			vec2 vel = ( sampleUV - historyUV ) * texSize * 0.05 * nearWeaponEarly;
+			out_color = vec4( abs( vel.x ), abs( vel.y ), nearWeaponEarly, 1.0 );
+			return;
+		}
+		if ( debugMode > 14.5 && debugMode < 15.5 ) {
+			/* 15 = world-only motion (MV * (1-weapon)) */
+			vec2 texSize = vec2( textureSize( currentColor, 0 ) );
+			vec2 vel = ( sampleUV - historyUV ) * texSize * 0.05 * ( 1.0 - nearWeaponEarly );
+			out_color = vec4( abs( vel.x ), abs( vel.y ), 1.0 - nearWeaponEarly, 1.0 );
+			return;
+		}
+		if ( debugMode > 15.5 && debugMode < 16.5 ) {
+			/* 16 = current depth (grayscale) */
+			out_color = vec4( depthNdc, depthNdc, depthNdc, 1.0 );
+			return;
+		}
+	}
+
 	vec3 history = textureLod( historyColor, historyUV, 0.0 ).rgb;
 	float histDepth = textureLod( depthTex, historyUV, 0.0 ).r;
 

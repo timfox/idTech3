@@ -266,9 +266,12 @@ static qboolean sv_qvmEntityMappingLogged;
 static qboolean SV_UseLegacyNativeEntityNums( void );
 
 /*
- * Retail qagame.qvm uses the original enum-backed qboolean, so trace_t is
- * larger there than in the native engine build where qboolean is bool.
- * Trace syscalls for QVMs must marshal into the legacy layout explicitly.
+ * Retail qagame.qvm uses the original enum-backed qboolean, so its trace_t is
+ * larger there than in the native engine build where qboolean is bool. Trace
+ * syscalls for QVMs must marshal into the legacy layout explicitly.
+ *
+ * Native trace_t also carries GoldSrc plane provenance fields that retail QVMs
+ * do not have. Those are omitted from the legacy marshal.
  */
 typedef struct {
 	int			allsolid;
@@ -281,7 +284,9 @@ typedef struct {
 	int			entityNum;
 } legacy_trace_t;
 
-STATIC_ASSERT( sizeof( legacy_trace_t ) == sizeof( trace_t ) + 4, "legacy_trace_t must match retail qagame trace layout" );
+/* +4: two legacy int qbooleans vs native bools. -16: native provenance fields. */
+STATIC_ASSERT( sizeof( legacy_trace_t ) == sizeof( trace_t ) + 4 - 16,
+		"legacy_trace_t must match retail qagame trace layout" );
 
 static void SV_FillLegacyTrace( legacy_trace_t *out, const trace_t *in ) {
 	out->allsolid = in->allsolid ? 1 : 0;

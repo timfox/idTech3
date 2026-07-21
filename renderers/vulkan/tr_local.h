@@ -1672,6 +1672,7 @@ extern cvar_t	*r_temporalDisocclusion;
 extern cvar_t	*r_temporalReactiveMask;
 extern cvar_t	*r_reactiveMaskForce;
 extern cvar_t	*r_temporalWeaponAfterTaa;
+extern cvar_t	*r_weaponSsrIsolation;
 extern cvar_t	*r_temporalSmaaCleanup;
 extern cvar_t	*r_debugMotionVectors;
 extern cvar_t	*r_debugHistoryRejection;

@@ -70,7 +70,34 @@ void main() {
 	float roughnessThreshold = clamp(ssr.params2.x, 0.0, 1.0);
 	float intensity = ssr.params2.y;
 	float maxDepthGradient = ssr.params2.z;
-	float fresnelExponent = max(ssr.params2.w, 0.5);
+	float fresnelExponent = ssr.params2.w;
+
+	/* Negative fresnelExponent encodes r_temporalDebug while TAA is off. */
+	if (fresnelExponent < -0.5) {
+		int dbg = int(-fresnelExponent + 0.5);
+		/* DEPTH_RANGE_WEAPON maps to viewport minDepth=0.6 (reverse-Z near). */
+		float weaponMask = smoothstep(0.58, 0.62, rawDepth);
+		if (dbg == 5) {
+			vec3 overlay = mix(sceneColor, vec3(1.0, 0.15, 0.08), weaponMask);
+			out_color = vec4(overlay, 1.0);
+			return;
+		}
+		if (dbg == 2 || dbg == 4) {
+			/* Depth / disocclusion proxy: current depth grayscale + weapon tint. */
+			vec3 depthVis = vec3(rawDepth);
+			out_color = vec4(mix(depthVis, vec3(1.0, 0.2, 0.2), weaponMask), 1.0);
+			return;
+		}
+		if (dbg == 12 || dbg == 13) {
+			bool bad = any(isnan(sceneColor)) || any(isinf(sceneColor)) || isnan(rawDepth) || isinf(rawDepth);
+			out_color = bad ? vec4(1.0, 0.0, 1.0, 1.0) : vec4(sceneColor, 1.0);
+			return;
+		}
+		/* Fall through for other modes — still run SSR so confidence can be shown. */
+		fresnelExponent = max(abs(fresnelExponent), 0.5);
+	} else {
+		fresnelExponent = max(fresnelExponent, 0.5);
+	}
 
 	if (rawDepth <= 0.0 || rawDepth >= 1.0) {
 		out_color = vec4(sceneColor, 0.0);

@@ -8,6 +8,7 @@
 #include "vk_upscale.h"
 #include "vk_pass_registry.h"
 #include "vk_exposure_histogram.h"
+#include "vk_postfx.h"
 #include <math.h>
 
 float vk_prev_view_matrix[16];
@@ -546,11 +547,17 @@ void vk_temporal_update_auto_exposure( void )
 
 qboolean vk_temporal_reconstruction_wanted( void )
 {
+	cvar_t *r_tsr;
+
 	if ( !vk.fboActive ) {
 		return qfalse;
 	}
 	if ( r_taa && r_taa->integer ) {
 		return qtrue;
+	}
+	r_tsr = ri.Cvar_Get( "r_tsr", "1", CVAR_ARCHIVE_ND );
+	if ( r_tsr && !r_tsr->integer ) {
+		return qfalse;
 	}
 	if ( R_Upscale_WantTemporal() ) {
 		return qtrue;
@@ -571,6 +578,25 @@ qboolean vk_temporal_want_weapon_after_taa( void )
 		return qfalse;
 	}
 	return qtrue;
+}
+
+qboolean vk_temporal_want_weapon_after_world_post( void )
+{
+	if ( vk_temporal_want_weapon_after_taa() ) {
+		return qtrue;
+	}
+	/*
+	 * Architecture B for unsupported view-model consumers: world SSR finishes
+	 * first, then the weapon is composited by the existing deferred weapon pass.
+	 * This keeps DEPTH_RANGE_WEAPON color/depth out of SSR without guessing a
+	 * device-depth threshold that could also reject nearby world geometry.
+	 */
+	if ( vk.fboActive &&
+		r_weaponSsrIsolation && r_weaponSsrIsolation->integer &&
+		PostFX_SSR_IsEnabled() ) {
+		return qtrue;
+	}
+	return qfalse;
 }
 
 qboolean vk_temporal_defer_weapon_drawsurfs( const void *drawSurfsCmd )
@@ -639,7 +665,7 @@ void vk_temporal_status_f( void )
 	char stickyBuf[256];
 	char pendingBuf[256];
 	const qboolean recon = vk_temporal_reconstruction_wanted();
-	const qboolean weaponAfter = vk_temporal_want_weapon_after_taa();
+	const qboolean weaponAfter = vk_temporal_want_weapon_after_world_post();
 
 	vk_temporal_format_reasons( vk.temporal.appliedResetReasons, appliedBuf, sizeof( appliedBuf ) );
 	vk_temporal_format_reasons( vk.temporal.stickyResetReasons, stickyBuf, sizeof( stickyBuf ) );
@@ -648,10 +674,11 @@ void vk_temporal_status_f( void )
 	ri.Printf( PRINT_ALL, "======== Temporal Ownership Status ========\n" );
 	ri.Printf( PRINT_ALL, "frame     : %u prepared=%s\n",
 		vk.temporal.frameIndex, vk.temporal.preparedThisFrame ? "yes" : "no" );
-	ri.Printf( PRINT_ALL, "wanted    : reconstruction=%s weaponAfterTaa=%s (cvar=%d)\n",
+	ri.Printf( PRINT_ALL, "wanted    : reconstruction=%s weaponAfterWorldPost=%s (taaCvar=%d ssrIsolation=%d)\n",
 		recon ? "yes" : "no",
 		weaponAfter ? "yes" : "no",
-		r_temporalWeaponAfterTaa ? r_temporalWeaponAfterTaa->integer : 0 );
+		r_temporalWeaponAfterTaa ? r_temporalWeaponAfterTaa->integer : 0,
+		r_weaponSsrIsolation ? r_weaponSsrIsolation->integer : 0 );
 	ri.Printf( PRINT_ALL, "history   : taa=%s idx=%u luminance=%s motionPrev=%s\n",
 		vk.temporal.hasValidTAAHistory ? "valid" : "reset",
 		vk.temporal.taaHistoryIndex,
@@ -682,14 +709,84 @@ void vk_temporal_status_f( void )
 		r_temporalDebug ? r_temporalDebug->integer : 0,
 		r_debugHistoryRejection ? r_debugHistoryRejection->integer : 0,
 		r_debugMotionVectors ? r_debugMotionVectors->integer : 0 );
-	ri.Printf( PRINT_ALL, "            rejection viz: 0=off 1=MV 2=reasons 3=reactive 4=confidence\n" );
-	ri.Printf( PRINT_ALL, "            5=disocclusion 6=historyUV 7=nearWeapon 8=worldVsReactive\n" );
-	ri.Printf( PRINT_ALL, "            9=adaptiveSample 10=currVsHist 11=neighVar 12=histDelta\n" );
+	ri.Printf( PRINT_ALL, "            r_temporalDebug: 0=off 1=velocity 2=depthReject 3=histWeight\n" );
+	ri.Printf( PRINT_ALL, "            4=disocclusion 5=weaponMask 6=currVsHist\n" );
+	ri.Printf( PRINT_ALL, "            7=histUV 8=worldVsReactive 9=adaptSample 10=currVsHist\n" );
+	ri.Printf( PRINT_ALL, "            11=neighVar 12=histDelta 13=NaN 14=weaponMV 15=worldMV 16=currDepth\n" );
+	ri.Printf( PRINT_ALL, "            rejection viz (r_debugHistoryRejection): same codes 1–12\n" );
 	ri.Printf( PRINT_ALL, "policy    : RDF_NOWORLDMODEL after doneWorldScene does not thrash history;\n" );
-	ri.Printf( PRINT_ALL, "            weapon draws defer until after world TAA when reconstruction on;\n" );
+	ri.Printf( PRINT_ALL, "            weapon draws defer after world TAA and after SSR when isolation is on;\n" );
 	ri.Printf( PRINT_ALL, "            portals force camera-cut; commit prefers worldMatricesCaptured.\n" );
 	ri.Printf( PRINT_ALL, "present   : adaptive=%s frame_generation=off presentation_source=current_simulation_frame\n",
 		( r_aaMode && r_aaMode->integer == 3 ) ? "yes (aaMode 3)" :
 		( r_presentAdaptiveRecon && r_presentAdaptiveRecon->integer ) ? "flag" : "no" );
 	ri.Printf( PRINT_ALL, "===========================================\n" );
+}
+
+/*
+===============
+vk_temporal_ghost_status_f
+
+Pass inventory for first-person weapon trail bisect. Prints which temporal /
+temporal-adjacent consumers are live so a moving/turning camera test can
+isolate the first offending pass without enabling blur clamps.
+===============
+*/
+void vk_temporal_ghost_status_f( void )
+{
+	const qboolean recon = vk_temporal_reconstruction_wanted();
+	const qboolean ssr = PostFX_SSR_IsEnabled();
+	const int taa = r_taa ? r_taa->integer : 0;
+	const int aa = r_aaMode ? r_aaMode->integer : 0;
+	const int tsr = ri.Cvar_VariableIntegerValue( "r_tsr" );
+	const int temporalSSR = ri.Cvar_VariableIntegerValue( "r_temporalSSR" );
+	const int temporalAO = ri.Cvar_VariableIntegerValue( "r_temporalAO" );
+	const int temporalFog = ri.Cvar_VariableIntegerValue( "r_temporalFog" );
+	const int temporalTransparency = ri.Cvar_VariableIntegerValue( "r_temporalTransparency" );
+	const int bloom = ri.Cvar_VariableIntegerValue( "r_bloom" );
+	const int motionBlur = ri.Cvar_VariableIntegerValue( "r_motionBlur" );
+	const int dof = ri.Cvar_VariableIntegerValue( "r_depthOfField" ) ||
+		ri.Cvar_VariableIntegerValue( "r_dof" );
+	const int sharpen = ( atof( ri.Cvar_VariableString( "r_sharpen" ) ) > 0.0 ) ? 1 : 0;
+	const int ssao = ri.Cvar_VariableIntegerValue( "r_ssao" );
+	const int fog = ri.Cvar_VariableIntegerValue( "r_volumetricFog" );
+	const int oit = ri.Cvar_VariableIntegerValue( "r_oit" );
+	const int dbg = r_temporalDebug ? r_temporalDebug->integer : 0;
+	const float fogTemporalWeight = atof( ri.Cvar_VariableString( "r_volumetricFogTemporalWeight" ) );
+
+	ri.Printf( PRINT_ALL, "======== Temporal Ghost Bisect ========\n" );
+	ri.Printf( PRINT_ALL, "reconstruction : %s (r_taa=%d r_aaMode=%d r_tsr=%d weaponAfterWorldPost=%s)\n",
+		recon ? "ON" : "OFF", taa, aa, tsr,
+		vk_temporal_want_weapon_after_world_post() ? "yes" : "no" );
+	ri.Printf( PRINT_ALL, "consumers      : SSR=%s (r_ssr/r_temporalSSR=%d/%d) SSAO=%s (%d/%d)\n",
+		ssr ? "ON" : "off", ri.Cvar_VariableIntegerValue( "r_ssr" ), temporalSSR,
+		( ssao && temporalAO ) ? "ON" : "off", ssao, temporalAO );
+	ri.Printf( PRINT_ALL, "               : fogTemporal=%s (fog=%d gate=%d) transparencyReactive=%s (oit=%d)\n",
+		( fog && temporalFog && fogTemporalWeight > 0.0f ) ? "ON" : "off",
+		fog, temporalFog,
+		( temporalTransparency && ri.Cvar_VariableIntegerValue( "r_temporalReactiveMask" ) ) ? "ON" : "off",
+		oit );
+	ri.Printf( PRINT_ALL, "post           : bloom=%d motionBlur=%d dof=%d sharpen=%d\n",
+		bloom, motionBlur, dof, sharpen );
+	ri.Printf( PRINT_ALL, "weapon depth   : DEPTH_RANGE_WEAPON viewport [0.6..1.0] reverse-Z (see vk_view_state)\n" );
+	ri.Printf( PRINT_ALL, "debug          : r_temporalDebug=%d  (1 MV 2 reject 3 weight 4 disocc 5 weapon 6 curr/hist 13 NaN)\n",
+		dbg );
+	ri.Printf( PRINT_ALL, "bisect order   : 1) r_temporalSSR 0  2) r_taa 0 + r_tsr 0  3) r_temporalFog 0\n" );
+	ri.Printf( PRINT_ALL, "               : 4) r_temporalAO 0  5) r_temporalTransparency 0  6) r_bloom/r_motionBlur/r_dof 0\n" );
+	if ( !recon && ssr && vk_temporal_want_weapon_after_world_post() ) {
+		ri.Printf( PRINT_ALL, "live finding   : reconstruction OFF + SSR ON + isolation ON\n" );
+		ri.Printf( PRINT_ALL, "               : weapon is deferred; SSR receives world-only color/depth.\n" );
+	} else if ( !recon && ssr ) {
+		ri.Printf( PRINT_ALL, "live finding   : reconstruction OFF + SSR ON → SSR samples post-weapon depth\n" );
+		ri.Printf( PRINT_ALL, "               : (DEPTH_RANGE_WEAPON [0.6..1.0]); primary screen-space contaminant.\n" );
+	} else if ( !recon && !ssr ) {
+		ri.Printf( PRINT_ALL, "live finding   : reconstruction OFF + SSR off → residual silhouette echoes are NOT\n" );
+		ri.Printf( PRINT_ALL, "               : from TAA/SSR; check FP projection / multi-part weapon draws next.\n" );
+	} else if ( recon ) {
+		ri.Printf( PRINT_ALL, "live finding   : reconstruction ON → use r_temporalDebug 1–6; confirm weaponAfterTaa.\n" );
+	} else {
+		ri.Printf( PRINT_ALL, "live finding   : see docs/RENDERER_TEMPORAL_GHOSTING.md\n" );
+	}
+	ri.Printf( PRINT_ALL, "docs           : docs/RENDERER_TEMPORAL_GHOSTING.md (no broad fix applied yet)\n" );
+	ri.Printf( PRINT_ALL, "=========================================\n" );
 }

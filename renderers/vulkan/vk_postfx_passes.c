@@ -26,6 +26,7 @@ SSAO/HBAO pass, and vk_bloom. Split from vk.c.
 #include "vk_selective_reflection.h"
 #include "vk_pass_registry.h"
 #include "vk_forward_plus.h"
+#include "vk_temporal.h"
 
 static void vk_oit_validate_pass_break( const char *stage )
 {
@@ -750,6 +751,11 @@ void vk_ssr_pass( void )
 	push.params2[1] = PostFX_SSR_GetIntensity();
 	push.params2[2] = PostFX_SSR_GetMaxDepthGradient();
 	push.params2[3] = PostFX_SSR_GetFresnelExponent();
+	/* Encode r_temporalDebug into fresnel channel when TAA reconstruction is off so SSR can
+	 * still visualize weapon-depth contamination (DEPTH_RANGE_WEAPON → [0.6,1] reverse-Z). */
+	if ( r_temporalDebug && r_temporalDebug->integer > 0 && !vk_temporal_reconstruction_wanted() ) {
+		push.params2[3] = -(float)r_temporalDebug->integer;
+	}
 
 	qvkCmdPushConstants( vk.cmd->command_buffer, vk.pipeline_layout_ssr, VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof( push ), &push );
 	vk_postfx_draw_fullscreen_quad();
@@ -795,6 +801,12 @@ qboolean vk_ssao_pass( void )
 	if ( backEnd.doneSSAO || !r_ssao || !r_ssao->integer || !vk.fboActive || !backEnd.doneSurfaces ||
 		vk_ambient_visibility_blocks_legacy_post() )
 		return qfalse;
+	{
+		cvar_t *r_temporalAO = ri.Cvar_Get( "r_temporalAO", "1", CVAR_ARCHIVE_ND );
+		if ( r_temporalAO && !r_temporalAO->integer ) {
+			return qfalse;
+		}
+	}
 	/* Pass culling: skip expensive SSAO for menus, cinematics, no-world.
 	 * Use doneWorldScene — HUD/weapon may set RDF_NOWORLDMODEL after the world view. */
 	if ( !tr.world || !backEnd.doneWorldScene )

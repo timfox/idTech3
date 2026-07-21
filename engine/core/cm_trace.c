@@ -1148,8 +1148,8 @@ the extents not already represented by a precomputed collision hull.
 */
 static void CM_GoldSrcTraceThroughTree( traceWork_t *tw, int num,
 		float p1f, float p2f, const vec3_t p1, const vec3_t p2,
-		const cplane_t *enterPlane, int enterSide, int contentsOverride,
-		qboolean clipTree, const vec3_t extents ) {
+		const cplane_t *enterPlane, int enterSide, int enterClipnode,
+		int contentsOverride, qboolean clipTree, const vec3_t extents ) {
 	cNode_t *node;
 	cplane_t *plane;
 	double t1, t2, offset;
@@ -1189,6 +1189,8 @@ static void CM_GoldSrcTraceThroughTree( traceWork_t *tw, int num,
 		}
 
 		if ( enterPlane ) {
+			int planeNum;
+
 			if ( enterSide == 0 ) {
 				VectorCopy( enterPlane->normal, tw->trace.plane.normal );
 				tw->trace.plane.dist = enterPlane->dist;
@@ -1199,6 +1201,17 @@ static void CM_GoldSrcTraceThroughTree( traceWork_t *tw, int num,
 			}
 			tw->trace.plane.type = PlaneTypeForNormal( tw->trace.plane.normal );
 			SetPlaneSignbits( &tw->trace.plane );
+
+			tw->trace.sourceBrush = -1;
+			tw->trace.sourceSide = enterSide;
+			tw->trace.sourceClipnode = enterClipnode;
+			tw->trace.planeKind = TRACE_PLANE_WORLD_FACE;
+			planeNum = (int)( enterPlane - cm.planes );
+			if ( planeNum >= 0 && planeNum < cm.numPlanes &&
+					cm.goldsrcPlaneKind ) {
+				tw->trace.planeKind =
+						(tracePlaneKind_t)cm.goldsrcPlaneKind[planeNum];
+			}
 		}
 		return;
 	}
@@ -1218,12 +1231,14 @@ static void CM_GoldSrcTraceThroughTree( traceWork_t *tw, int num,
 
 	if ( t1 >= offset && t2 >= offset ) {
 		CM_GoldSrcTraceThroughTree( tw, node->children[0], p1f, p2f,
-				p1, p2, enterPlane, enterSide, contentsOverride, clipTree, extents );
+				p1, p2, enterPlane, enterSide, enterClipnode, contentsOverride,
+				clipTree, extents );
 		return;
 	}
 	if ( t1 <= -offset && t2 <= -offset ) {
 		CM_GoldSrcTraceThroughTree( tw, node->children[1], p1f, p2f,
-				p1, p2, enterPlane, enterSide, contentsOverride, clipTree, extents );
+				p1, p2, enterPlane, enterSide, enterClipnode, contentsOverride,
+				clipTree, extents );
 		return;
 	}
 
@@ -1248,14 +1263,15 @@ static void CM_GoldSrcTraceThroughTree( traceWork_t *tw, int num,
 	VectorSubtract( p2, p1, mid );
 	VectorMA( p1, frac, mid, mid );
 	CM_GoldSrcTraceThroughTree( tw, node->children[side], p1f, midf,
-			p1, mid, enterPlane, enterSide, contentsOverride, clipTree, extents );
+			p1, mid, enterPlane, enterSide, enterClipnode, contentsOverride,
+			clipTree, extents );
 
 	frac2 = Com_Clamp( 0.0f, 1.0f, frac2 );
 	midf = p1f + ( p2f - p1f ) * frac2;
 	VectorSubtract( p2, p1, mid );
 	VectorMA( p1, frac2, mid, mid );
 	CM_GoldSrcTraceThroughTree( tw, node->children[side ^ 1], midf, p2f,
-			mid, p2, plane, side, contentsOverride, clipTree, extents );
+			mid, p2, plane, side, num, contentsOverride, clipTree, extents );
 }
 
 static qboolean CM_GoldSrcBoxTouchesContents( int num, const vec3_t point,
@@ -1447,8 +1463,11 @@ static void CM_Trace( trace_t *results, const vec3_t start, const vec3_t end, co
 		 * BSP30 supplies pre-expanded collision trees for a standing player
 		 * (hull 1, 32x32x72), large actors (hull 2, 64x64x64), and a crouched
 		 * player (hull 3, 32x32x36). Select the matching tree when possible,
-		 * then expand only by extents beyond that hull. Non-GoldSrc idTech3
-		 * boxes retain the hull-3 fallback used by the compatibility path.
+		 * then expand only by extents beyond that hull. Surf stand/crouch AABBs
+		 * match hull 1/3 exactly, so residual extents are zero — a point sweep
+		 * through the pre-expanded clip tree, not a second Minkowski expand.
+		 * Non-GoldSrc idTech3 boxes retain the hull-3 fallback used by the
+		 * compatibility path.
 		 */
 		if ( cm.numGoldSrcClipNodes > 0 &&
 				( traceExtents[0] > 0.0f || traceExtents[1] > 0.0f || traceExtents[2] > 0.0f ) &&
@@ -1478,7 +1497,8 @@ static void CM_Trace( trace_t *results, const vec3_t start, const vec3_t end, co
 			}
 		}
 		CM_GoldSrcTraceThroughTree( &tw, root, 0.0f, 1.0f,
-				tw.start, tw.end, NULL, 0, contentsOverride, clipTree, traceExtents );
+				tw.start, tw.end, NULL, 0, -1, contentsOverride, clipTree,
+				traceExtents );
 		/*
 		 * The crossing epsilon may clamp an entry fraction to zero when the
 		 * hull merely starts on a ramp plane. Verify the unmodified start point
