@@ -1316,6 +1316,7 @@ static void R_Register( void )
 	ri.Cmd_AddCommand( "surf_validateTemporalConfig", vk_surf_validate_temporal_config_f );
 	ri.Cmd_AddCommand( "r_printViewmodelProjection", vk_print_viewmodel_projection_f );
 	ri.Cmd_AddCommand( "temporal_motion_status", vk_motion_status_f );
+	ri.Cmd_AddCommand( "temporal_resolution_status", vk_temporal_resolution_status_f );
 	ri.Cmd_AddCommand( "present_recon_status", vk_present_recon_status_f );
 	ri.Cmd_AddCommand( "motion_vector_cert", vk_motion_vector_cert_status_f );
 	ri.Cmd_AddCommand( "visibility_buffer_status", vk_visibility_buffer_status_f );
@@ -3676,7 +3677,7 @@ static void R_Register( void )
 		" 3 - linear filtering, stretch to full size\n"
 		" 4 - linear filtering, preserve aspect ratio (black bars on sides)\n" );
 	r_temporalDebug = ri.Cvar_Get( "r_temporalDebug", "0", CVAR_ARCHIVE_ND );
-	ri.Cvar_CheckRange( r_temporalDebug, "0", "33", CV_INTEGER );
+	ri.Cvar_CheckRange( r_temporalDebug, "0", "35", CV_INTEGER );
 	ri.Cvar_SetDescription( r_temporalDebug,
 		"Temporal ghosting diagnostics (see docs/RENDERER_TEMPORAL_GHOSTING.md):\n"
 		" 0 off\n"
@@ -3689,11 +3690,28 @@ static void R_Register( void )
 		" 7–13 history UV / variance / NaN\n"
 		" 14 pre-weapon world-resolve velocity\n"
 		" 15 prior-class-gated world-resolve velocity\n"
-		" 16–27 Architecture B class/velocity/reactive/confidence views\n"
-		" 28–33 previous-depth / depth-rejection views\n"
-		"Modes 16–33 require the post-weapon diagnostic resolve "
-		"(r_weaponTemporalMode 2 or the capture command).\n"
+		" 16–27 Architecture B class/velocity/reactive/confidence views (weapon resolve)\n"
+		" 28 raw stored velocity (world)\n"
+		" 29 velocity as UV\n"
+		" 30 velocity as pixels (abs/64)\n"
+		" 31 history UV displacement\n"
+		" 32 velocity error ratio vs matrix reprojection (green=1x yellow=2x red=4x)\n"
+		" 33 previous-matrix temporal age (green=1 red>1)\n"
+		" 34 temporal resolves last frame (green=1 red>1)\n"
+		" 35 reprojection correspondence (cyan=current magenta=history)\n"
 		"Any non-zero also logs temporal reset reasons (developer)." );
+	{
+		cvar_t *resDbg = ri.Cvar_Get( "r_temporalResolutionDebug", "0", CVAR_TEMP );
+		cvar_t *velProbe = ri.Cvar_Get( "r_temporalVelocityProbe", "0", CVAR_TEMP );
+		ri.Cvar_CheckRange( resDbg, "0", "1", CV_INTEGER );
+		ri.Cvar_SetDescription( resDbg,
+			"Print scene/velocity/TAA/display extents + velocity-space convention each time they change. "
+			"Also run temporal_resolution_status." );
+		ri.Cvar_CheckRange( velProbe, "0", "2", CV_INTEGER );
+		ri.Cvar_SetDescription( velProbe,
+			"CPU reprojection probe: 0=off, 1=warn on 2x/4x/0.5x/0.25x scale or stale prev matrices, "
+			"2=print measured vs reconstructed displacement every ~60 frames." );
+	}
 	{
 		cvar_t *r_tsr = ri.Cvar_Get( "r_tsr", "1", CVAR_ARCHIVE_ND );
 		cvar_t *r_temporalAO = ri.Cvar_Get( "r_temporalAO", "1", CVAR_ARCHIVE_ND );

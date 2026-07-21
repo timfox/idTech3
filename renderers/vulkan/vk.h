@@ -1611,6 +1611,13 @@ typedef struct {
 		uint32_t objectIdIndex;
 		qboolean objectIdHasPrev;
 		uint64_t objectIdFrameId[2];
+		/* Phase 6: per-frame temporal resolve execution counters (double-resolve guard). */
+		uint32_t worldResolvesThisFrame;
+		uint32_t weaponResolvesThisFrame;
+		uint32_t upscaleBlitsThisFrame;
+		uint32_t worldResolvesLastFrame;
+		uint32_t weaponResolvesLastFrame;
+		uint32_t upscaleBlitsLastFrame;
 	} temporal;
 
 	//

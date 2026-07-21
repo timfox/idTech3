@@ -38,7 +38,8 @@ typedef enum {
 	VK_MOTION_INVALID_SLOT_REUSE,
 	VK_MOTION_INVALID_ANIM_NO_POSE,
 	VK_MOTION_INVALID_FIRST_PERSON,
-	VK_MOTION_INVALID_CUSTOM_SHADER
+	VK_MOTION_INVALID_CUSTOM_SHADER,
+	VK_MOTION_INVALID_STALE_PREV
 } vkMotionInvalidReason_t;
 
 typedef struct {
@@ -56,6 +57,7 @@ typedef struct {
 	uint32_t		stableId;
 	uint32_t		frameId;
 	int				lastInvalidReason;
+	uint32_t		prevAge;	/* temporal frames between matched prev record and this one (1 = healthy) */
 } vkEntityMotionRecord_t;
 
 static vkEntityMotionRecord_t vk_motion_prev[MAX_REFENTITIES];
@@ -404,6 +406,12 @@ void vk_reset_motion_history( void )
 	vk.temporal.weaponEntityIdPrev = 0;
 	Com_Memset( &vk_viewmodel_projection_current, 0, sizeof( vk_viewmodel_projection_current ) );
 	Com_Memset( &vk_viewmodel_projection_previous, 0, sizeof( vk_viewmodel_projection_previous ) );
+	/* Phase 5/7: drop previous-matrix ownership so the next commit starts clean. */
+	vk_prev_matrices_valid = qfalse;
+	vk_prev_matrices_frame = 0u;
+	vk_prev_jitter_valid = qfalse;
+	vk_prev_jitter_x = 0.0f;
+	vk_prev_jitter_y = 0.0f;
 }
 
 static const char *vk_motion_invalid_reason_name( int reason )
@@ -419,6 +427,7 @@ static const char *vk_motion_invalid_reason_name( int reason )
 		case VK_MOTION_INVALID_ANIM_NO_POSE: return "anim_no_pose";
 		case VK_MOTION_INVALID_FIRST_PERSON: return "first_person";
 		case VK_MOTION_INVALID_CUSTOM_SHADER: return "custom_shader";
+		case VK_MOTION_INVALID_STALE_PREV: return "stale_prev";
 		default: return "?";
 	}
 }
@@ -439,18 +448,23 @@ void vk_motion_status_f( void )
 		vk.temporal.objectIdHasPrev ? "valid" : "none" );
 	ri.Printf( PRINT_ALL, "  slot=%u curr=%d prev=%d\n",
 		vk.temporal.objectIdIndex, vk_motion_curr_count, vk_motion_prev_count );
-	ri.Printf( PRINT_ALL, "  %-4s %-6s %-6s %-8s %-6s %-6s %-14s\n",
-		"idx", "model", "id16", "frameId", "gen", "prev", "lastInvalid" );
+	ri.Printf( PRINT_ALL, "  %-4s %-6s %-6s %-8s %-6s %-6s %-5s %-14s\n",
+		"idx", "model", "id16", "frameId", "gen", "prev", "age", "lastInvalid" );
 
 	for ( i = 0; i < vk_motion_curr_count && i < MAX_REFENTITIES; i++ ) {
 		const vkEntityMotionRecord_t *c = &vk_motion_curr[i];
+		const char *ageColor;
 		if ( !c->valid ) {
 			continue;
 		}
-		ri.Printf( PRINT_ALL, "  %-4d %-6d %-6u %-8u %-6u %-6s %-14s\n",
+		/* Phase 5 overlay semantics: age 1 green, >1 red, no/invalid prev yellow. */
+		ageColor = ( c->lastInvalidReason != VK_MOTION_OK ) ? S_COLOR_YELLOW :
+			( c->prevAge == 1u ) ? S_COLOR_GREEN : S_COLOR_RED;
+		ri.Printf( PRINT_ALL, "  %-4d %-6d %-6u %-8u %-6u %-6s %s%-5u" S_COLOR_WHITE " %-14s\n",
 			i, c->hModel, (unsigned)( c->stableId & 0xFFFFu ), (unsigned)c->frameId,
 			(unsigned)c->generation,
 			c->lastInvalidReason == VK_MOTION_OK ? "yes" : "no",
+			ageColor, (unsigned)c->prevAge,
 			vk_motion_invalid_reason_name( c->lastInvalidReason ) );
 		shown++;
 	}
@@ -776,6 +790,9 @@ static void vk_motion_resolve_entity( const trRefEntity_t *ent, float *outPrevMo
 	uint32_t generation = 1u;
 	int reason = VK_MOTION_OK;
 	qboolean havePrev = qfalse;
+	uint32_t prevAge = 0u;
+	int dupIndex = -1;
+	int i;
 
 	vk_motion_draw_invalid = qfalse;
 	vk_motion_draw_stable_id = 0;
@@ -795,6 +812,25 @@ static void vk_motion_resolve_entity( const trRefEntity_t *ent, float *outPrevMo
 		return;
 	}
 
+	/*
+	 * Phase 5/8 dedupe: multi-stage draws (depth prepass, G-buffer, lighting,
+	 * OIT) resolve the same entity several times per frame. Reuse the record
+	 * appended by the first stage instead of growing vk_motion_curr — repeated
+	 * appends could exhaust MAX_REFENTITIES and starve later entities of
+	 * motion records (stale TAA history for whatever draws last).
+	 */
+	for ( i = vk_motion_curr_count - 1; i >= 0; i-- ) {
+		const vkEntityMotionRecord_t *c = &vk_motion_curr[i];
+		if ( c->valid && c->hModel == ent->e.hModel && c->reType == (int)ent->e.reType &&
+			c->frame == ent->e.frame && c->oldframe == ent->e.oldframe &&
+			c->skinNum == ent->e.skinNum && c->customSkin == ent->e.customSkin &&
+			c->customShader == ent->e.customShader &&
+			VectorCompare( c->origin, ent->e.origin ) ) {
+			dupIndex = i;
+			break;
+		}
+	}
+
 	match = vk_motion_find_prev_match( ent, &matchDist );
 
 	if ( match < 0 ) {
@@ -803,7 +839,17 @@ static void vk_motion_resolve_entity( const trRefEntity_t *ent, float *outPrevMo
 	} else {
 		const vkEntityMotionRecord_t *prev = &vk_motion_prev[match];
 		generation = prev->generation ? prev->generation : 1u;
-		if ( prev->customSkin != ent->e.customSkin || prev->customShader != ent->e.customShader ||
+		prevAge = ( vk.temporal.frameIndex > prev->frameId ) ?
+			( vk.temporal.frameIndex - prev->frameId ) : 0u;
+		if ( prevAge != 1u ) {
+			/*
+			 * Phase 5: the matched "previous" record is not exactly one temporal
+			 * frame old (skipped frame, promotion glitch). Reprojecting with it
+			 * would scale the object's velocity by its age — reject instead.
+			 */
+			reason = VK_MOTION_INVALID_STALE_PREV;
+			generation++;
+		} else if ( prev->customSkin != ent->e.customSkin || prev->customShader != ent->e.customShader ||
 			prev->skinNum != ent->e.skinNum ) {
 			reason = VK_MOTION_INVALID_SKIN_CHANGE;
 			generation++;
@@ -850,7 +896,16 @@ static void vk_motion_resolve_entity( const trRefEntity_t *ent, float *outPrevMo
 	vk_motion_draw_stable_id = vk_motion_make_stable_id( ent, generation );
 	vk_motion_draw_is_dynamic = qtrue;
 
-	if ( vk_motion_curr_count < MAX_REFENTITIES ) {
+	if ( dupIndex >= 0 ) {
+		/* Same entity resolved again this frame (later render stage): refresh in place. */
+		curr = &vk_motion_curr[dupIndex];
+		Com_Memcpy( curr->matrix, backEnd.or.modelMatrix, sizeof( curr->matrix ) );
+		curr->generation = generation;
+		curr->stableId = vk_motion_draw_stable_id;
+		curr->frameId = vk.temporal.frameIndex;
+		curr->lastInvalidReason = reason;
+		curr->prevAge = prevAge;
+	} else if ( vk_motion_curr_count < MAX_REFENTITIES ) {
 		curr = &vk_motion_curr[vk_motion_curr_count++];
 		Com_Memset( curr, 0, sizeof( *curr ) );
 		curr->valid = qtrue;
@@ -867,6 +922,15 @@ static void vk_motion_resolve_entity( const trRefEntity_t *ent, float *outPrevMo
 		curr->stableId = vk_motion_draw_stable_id;
 		curr->frameId = vk.temporal.frameIndex;
 		curr->lastInvalidReason = reason;
+		curr->prevAge = prevAge;
+	} else {
+		static uint32_t warnedFrame = ~0u;
+		if ( warnedFrame != vk.temporal.frameIndex ) {
+			warnedFrame = vk.temporal.frameIndex;
+			ri.Printf( PRINT_WARNING, S_COLOR_YELLOW
+				"[VK][temporal] motion record table full (%d) — later entities lose object velocity this frame\n"
+				S_COLOR_WHITE, MAX_REFENTITIES );
+		}
 	}
 
 	if ( r_temporalDebug && r_temporalDebug->integer >= 2 && vk_motion_draw_invalid ) {
@@ -876,10 +940,38 @@ static void vk_motion_resolve_entity( const trRefEntity_t *ent, float *outPrevMo
 	}
 }
 
+/*
+ * Phase 7: rebase the previous frame's embedded projection jitter onto the
+ * current frame's jitter. Both current and previous clip positions then carry
+ * the SAME constant clip-space offset, which cancels exactly in
+ * out_motion = currUV - prevUV — motion vectors stay jitter-free without
+ * maintaining a second, non-jittered matrix set.
+ */
+static void vk_motion_rebase_prev_projection_jitter( float *prev_proj_gl )
+{
+	float jx = 0.0f, jy = 0.0f;
+	uint32_t w, h;
+
+	if ( !R_Upscale_WantTemporal() || !vk_prev_jitter_valid ) {
+		return;
+	}
+	R_Upscale_GetJitter( &jx, &jy );
+	if ( jx == vk_prev_jitter_x && jy == vk_prev_jitter_y ) {
+		return;
+	}
+	w = vk_get_render_target_width();
+	h = vk_get_render_target_height();
+	if ( w < 1u ) w = 1u;
+	if ( h < 1u ) h = 1u;
+	prev_proj_gl[8] += ( 2.0f * ( jx - vk_prev_jitter_x ) ) / (float)w;
+	prev_proj_gl[9] += ( 2.0f * ( jy - vk_prev_jitter_y ) ) / (float)h;
+}
+
 static void vk_get_prev_mvp_transform( float *prev_mvp )
 {
 	float prev_model[16];
 	float prev_model_view[16];
+	float prev_proj_gl[16];
 	float prev_proj[16];
 	qboolean havePrev = qfalse;
 
@@ -891,7 +983,9 @@ static void vk_get_prev_mvp_transform( float *prev_mvp )
 	if ( backEnd.currentEntity && ( backEnd.currentEntity->e.renderfx & RF_FIRST_PERSON ) &&
 		vk.temporal.weaponMatricesHavePrev ) {
 		myGlMultMatrix( vk.temporal.weaponPrevModelMatrix, vk.temporal.weaponPrevViewMatrix, prev_model_view );
-		vk_get_projection_matrix_vk( vk.temporal.weaponPrevProjectionMatrix, prev_proj );
+		Com_Memcpy( prev_proj_gl, vk.temporal.weaponPrevProjectionMatrix, sizeof( prev_proj_gl ) );
+		vk_motion_rebase_prev_projection_jitter( prev_proj_gl );
+		vk_get_projection_matrix_vk( prev_proj_gl, prev_proj );
 		myGlMultMatrix( prev_model_view, prev_proj, prev_mvp );
 		vk_motion_draw_invalid = qfalse;
 		vk_motion_draw_is_dynamic = qtrue;
@@ -908,7 +1002,9 @@ static void vk_get_prev_mvp_transform( float *prev_mvp )
 	}
 
 	myGlMultMatrix( prev_model, vk_prev_view_matrix, prev_model_view );
-	vk_get_projection_matrix_vk( vk_prev_projection_matrix, prev_proj );
+	Com_Memcpy( prev_proj_gl, vk_prev_projection_matrix, sizeof( prev_proj_gl ) );
+	vk_motion_rebase_prev_projection_jitter( prev_proj_gl );
+	vk_get_projection_matrix_vk( prev_proj_gl, prev_proj );
 	myGlMultMatrix( prev_model_view, prev_proj, prev_mvp );
 }
 

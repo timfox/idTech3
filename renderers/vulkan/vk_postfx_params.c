@@ -304,9 +304,20 @@ void vk_update_postfx_params( uint32_t cmd_index )
 		int mode = r_temporalDebug->integer;
 		if ( mode >= 1 && mode <= 6 ) {
 			params.shadowsLift[3] = (float)temporalDebugMap[mode];
-		} else if ( mode >= 7 && mode <= 33 ) {
+		} else if ( mode >= 7 && mode <= 35 ) {
 			params.shadowsLift[3] = (float)mode;
 		}
+	}
+	/* Phase 9: pack age / resolve-count / velocity-space for modes 28–35.
+	 * Overwrites temporalDebugParams during TAA; next gamma refresh restores. */
+	if ( params.shadowsLift[3] >= 27.5f ) {
+		float age = 0.0f;
+		if ( vk_prev_matrices_valid && vk.temporal.frameIndex >= vk_prev_matrices_frame ) {
+			age = (float)( vk.temporal.frameIndex - vk_prev_matrices_frame );
+		}
+		params.temporalDebugParams[1] = age;
+		params.temporalDebugParams[2] = (float)vk.temporal.worldResolvesLastFrame;
+		params.temporalDebugParams[3] = 0.0f; /* VK_VELOCITY_SPACE_UV */
 	}
 
 	if ( backEnd.projection2D || !tr.world || backEnd.viewParms.portalView != PV_NONE ) {

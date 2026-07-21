@@ -163,6 +163,19 @@ void main() {
 	float adaptBudget = adaptive ? clamp( adaptivePack - ( adaptSpatial ? 2.0 : 1.0 ), 0.0, 1.0 ) : 0.0;
 
 	if ( postfx.taaParams.x < 0.5 || postfx.frameInfo.w < 0.5 || depthNdc <= 0.0 || depthNdc >= 1.0 ) {
+		/* Phase 9: age / resolve-count views remain useful even with no history. */
+		if ( debugMode > 32.5 && debugMode < 33.5 ) {
+			float age = postfx.temporalDebugParams.y;
+			out_color = age < 0.5 ? vec4( 1.0, 1.0, 0.0, 1.0 ) :
+				( age < 1.5 ? vec4( 0.0, 1.0, 0.0, 1.0 ) : vec4( 1.0, 0.0, 0.0, 1.0 ) );
+			return;
+		}
+		if ( debugMode > 33.5 && debugMode < 34.5 ) {
+			float resolves = postfx.temporalDebugParams.z;
+			out_color = resolves < 0.5 ? vec4( 0.2, 0.2, 0.2, 1.0 ) :
+				( resolves < 1.5 ? vec4( 0.0, 1.0, 0.0, 1.0 ) : vec4( 1.0, 0.0, 0.0, 1.0 ) );
+			return;
+		}
 		if ( debugMode > 1.5 ) {
 			out_color = vec4( 1.0, 1.0, 1.0, 1.0 ); /* white = cut/reset */
 			return;
@@ -229,7 +242,110 @@ void main() {
 			out_color = vec4( abs( vel.x ), abs( vel.y ), priorWeapon, 1.0 );
 			return;
 		}
-		/* Modes 16–33 are owned by the post-weapon diagnostic resolve (weapon_taa.frag). */
+		/* Modes 16–27 are owned by the post-weapon diagnostic resolve (weapon_taa.frag).
+		 * Modes 28–35: world reprojection debugger (Phase 9). */
+		if ( debugMode > 27.5 && debugMode < 35.5 ) {
+			vec2 texSize = vec2( textureSize( currentColor, 0 ) );
+			vec2 velUV = motion; /* VK_VELOCITY_SPACE_UV: currentUV - previousUV */
+			vec2 velPx = velUV * texSize;
+			float age = postfx.temporalDebugParams.y; /* prevMatricesAge */
+			float resolves = postfx.temporalDebugParams.z; /* worldResolvesLastFrame */
+			float spaceId = postfx.temporalDebugParams.w; /* 0=UV canonical */
+
+			if ( debugMode < 28.5 ) {
+				/* 28 = raw stored velocity (as signed RG, magenta = invalid) */
+				out_color = !mvValid ? vec4( 1.0, 0.0, 1.0, 1.0 ) :
+					vec4( 0.5 + velUV.x * 10.0, 0.5 + velUV.y * 10.0, 0.15, 1.0 );
+				return;
+			}
+			if ( debugMode < 29.5 ) {
+				/* 29 = velocity converted to UV (same as stored — confirms space) */
+				out_color = !mvValid ? vec4( 1.0, 0.0, 1.0, 1.0 ) :
+					vec4( abs( velUV ) * 20.0, spaceId * 0.25, 1.0 );
+				return;
+			}
+			if ( debugMode < 30.5 ) {
+				/* 30 = velocity converted to pixels (abs / 64 so 64px → 1.0) */
+				out_color = !mvValid ? vec4( 1.0, 0.0, 1.0, 1.0 ) :
+					vec4( abs( velPx ) / 64.0, 0.15, 1.0 );
+				return;
+			}
+			if ( debugMode < 31.5 ) {
+				/* 31 = history UV displacement magnitude (green = small, red = large) */
+				float disp = length( sampleUV - historyUV ) * max( texSize.x, texSize.y );
+				float t = clamp( disp / 64.0, 0.0, 1.0 );
+				out_color = vec4( t, 1.0 - t, 0.1, 1.0 );
+				return;
+			}
+			if ( debugMode < 32.5 ) {
+				/* 32 = velocity error ratio vs matrix reprojection.
+				 * Green ≈ 1.0; yellow ≈ 2x; red ≈ 4x; cyan ≈ 0.5x. */
+				vec2 matrixDisp = ( sampleUV - matrixHistoryUV ) * texSize;
+				vec2 mvDisp = ( sampleUV - historyUV ) * texSize;
+				float mLen = length( matrixDisp );
+				float vLen = length( mvDisp );
+				float ratio = ( mLen > 0.25 ) ? ( vLen / mLen ) : 1.0;
+				vec3 col;
+				if ( !mvValid ) {
+					col = vec3( 1.0, 0.0, 1.0 );
+				} else if ( abs( ratio - 1.0 ) < 0.08 ) {
+					col = vec3( 0.0, 1.0, 0.0 );
+				} else if ( abs( ratio - 2.0 ) < 0.25 ) {
+					col = vec3( 1.0, 1.0, 0.0 );
+				} else if ( abs( ratio - 4.0 ) < 0.5 ) {
+					col = vec3( 1.0, 0.0, 0.0 );
+				} else if ( abs( ratio - 0.5 ) < 0.1 ) {
+					col = vec3( 0.0, 1.0, 1.0 );
+				} else if ( abs( ratio - 0.25 ) < 0.08 ) {
+					col = vec3( 0.0, 0.4, 1.0 );
+				} else {
+					col = vec3( clamp( ratio * 0.25, 0.0, 1.0 ), 0.2, 0.2 );
+				}
+				out_color = vec4( col, 1.0 );
+				return;
+			}
+			if ( debugMode < 33.5 ) {
+				/* 33 = temporal frame age of previous matrices (1=green, >1=red, 0=yellow) */
+				if ( age < 0.5 ) {
+					out_color = vec4( 1.0, 1.0, 0.0, 1.0 );
+				} else if ( age < 1.5 ) {
+					out_color = vec4( 0.0, 1.0, 0.0, 1.0 );
+				} else {
+					float t = clamp( ( age - 1.0 ) / 3.0, 0.0, 1.0 );
+					out_color = vec4( 1.0, 1.0 - t, 0.0, 1.0 );
+				}
+				return;
+			}
+			if ( debugMode < 34.5 ) {
+				/* 34 = number of temporal resolves applied last frame (1=green, >1=red) */
+				if ( resolves < 0.5 ) {
+					out_color = vec4( 0.2, 0.2, 0.2, 1.0 );
+				} else if ( resolves < 1.5 ) {
+					out_color = vec4( 0.0, 1.0, 0.0, 1.0 );
+				} else {
+					out_color = vec4( 1.0, 0.0, 0.0, 1.0 );
+				}
+				return;
+			}
+			/* 35 = reprojection correspondence: current (cyan) + history lookup (magenta)
+			 * linked by a soft trail along the motion vector. */
+			{
+				vec2 trail = historyUV - sampleUV;
+				float along = length( trail ) > 1e-6 ?
+					clamp( dot( uv - sampleUV, trail ) / dot( trail, trail ), 0.0, 1.0 ) : 0.0;
+				vec2 closest = sampleUV + trail * along;
+				float distPx = length( ( uv - closest ) * texSize );
+				float onLine = 1.0 - smoothstep( 0.75, 1.75, distPx );
+				float atCurr = 1.0 - smoothstep( 1.5, 3.0, length( ( uv - sampleUV ) * texSize ) );
+				float atHist = 1.0 - smoothstep( 1.5, 3.0, length( ( uv - historyUV ) * texSize ) );
+				vec3 base = current * 0.35;
+				base = mix( base, vec3( 0.0, 1.0, 1.0 ), atCurr );
+				base = mix( base, vec3( 1.0, 0.0, 1.0 ), atHist );
+				base = mix( base, vec3( 1.0, 1.0, 0.2 ), onLine * ( 1.0 - max( atCurr, atHist ) ) );
+				out_color = vec4( base, 1.0 );
+				return;
+			}
+		}
 	}
 
 	vec3 history = textureLod( historyColor, historyUV, 0.0 ).rgb;

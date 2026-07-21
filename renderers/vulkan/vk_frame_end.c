@@ -776,6 +776,7 @@ void vk_end_frame_record_taa_pass( VkImageView *post_fog_src, VkImageView *lumin
 	vk_end_frame_refresh_postfx_params_for_target( taaWidth, taaHeight );
 	vk_postfx_params_set_taa_weapon_pack( qfalse );
 
+	vk_temporal_marker_begin( "TemporalResolveWorld" );
 	vk_end_frame_begin_post_process_pass( vk.render_pass.taa, vk.framebuffers.taa[writeIndex],
 		taaWidth, taaHeight, vk.taa_pipeline );
 	{
@@ -795,6 +796,14 @@ void vk_end_frame_record_taa_pass( VkImageView *post_fog_src, VkImageView *lumin
 	vk_object_id_commit();
 	vk_end_frame_draw_fullscreen_quad( taaWidth, taaHeight );
 	vk_end_render_pass();
+	vk_temporal_marker_end();
+	vk_temporal_note_world_resolve();
+	if ( R_Upscale_WantTemporal() ) {
+		/* r_upscale 2: temporal resolve at internal res IS the upscale path
+		 * (spatial blit to window follows in gamma). Count it so double-upscale
+		 * is detectable if a second temporal upsample is ever wired in. */
+		vk_temporal_note_upscale_blit();
+	}
 
 	resolved_view = vk.taa_history_image_view[writeIndex];
 	vk.temporal.taaHistoryIndex = writeIndex;
@@ -1154,6 +1163,7 @@ void vk_end_frame_record_gamma_pass( VkImageView post_fog_src )
 			VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL, 0, 0 );
 	}
 
+	vk_temporal_marker_begin( "FinalComposite" );
 	vk_end_frame_begin_post_process_pass( vk.render_pass.gamma,
 		vk.framebuffers.gamma[ vk.cmd->swapchain_image_index ],
 		vk.renderWidth, vk.renderHeight, vk.gamma_pipeline );
@@ -1175,6 +1185,7 @@ void vk_end_frame_record_gamma_pass( VkImageView post_fog_src )
 
 	vk_end_frame_draw_fullscreen_quad( vk.renderWidth, vk.renderHeight );
 	vk_end_render_pass();
+	vk_temporal_marker_end();
 
 	if ( vk.depth_image != VK_NULL_HANDLE ) {
 		VkImageAspectFlags da = VK_IMAGE_ASPECT_DEPTH_BIT;

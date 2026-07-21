@@ -347,6 +347,7 @@ Independent bisect gates already exist: `r_taa`, `r_tsr`, `r_temporalAO`,
 
 ## Related
 
+- `docs/RENDERER_TEMPORAL_REPROJECTION.md` — world 2×–4× velocity scale / frame-ownership fix (`r_temporalDebug` 28–35, `vk_velocity_space.h`).
 - `docs/TEMPORAL_RESOURCE_OWNERSHIP.md` — per-resource ownership: owner module,
   producer/consumer passes, formats, validity bits, frame IDs, reset scopes,
   destruction sites.

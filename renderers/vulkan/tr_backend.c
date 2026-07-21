@@ -2355,6 +2355,7 @@ static qboolean RB_ResolveIndependentWeaponHistory( VkImageView worldView,
 	}
 
 	vk_pass_diag_stage( "weapon_temporal_resolve_begin" );
+	vk_temporal_marker_begin( "TemporalResolveWeapon" );
 	if ( vk.weapon_temporal_query_pool != VK_NULL_HANDLE && qvkCmdWriteTimestamp ) {
 		const uint32_t queryBase = vk.cmd_index * VK_WEAPON_TEMPORAL_QUERY_SLOTS;
 		qvkCmdWriteTimestamp( vk.cmd->command_buffer, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
@@ -2368,6 +2369,8 @@ static qboolean RB_ResolveIndependentWeaponHistory( VkImageView worldView,
 		vk.pipeline_layout_weapon_taa, 0, 9, sets, 0, NULL );
 	RB_DrawTemporalFullscreen( width, height );
 	vk_end_render_pass();
+	vk_temporal_marker_end();
+	vk_temporal_note_weapon_resolve();
 
 	if ( !vk_temporal_store_weapon_depth( writeIndex ) ) {
 		s_weaponTemporalFailureReason = "weapon previous-depth copy failed";

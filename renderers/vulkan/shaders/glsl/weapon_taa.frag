@@ -80,7 +80,9 @@ void main() {
 	float reactive = rawReactive * max(postfx.weaponTemporalParams.w, 0.0);
 	float debugMode = postfx.shadowsLift.w;
 
-	if (debugMode >= 15.5 && debugMode < 33.5) {
+	/* Modes 16–27: Architecture B weapon class / velocity / reactive / confidence.
+	 * Modes 28–35 are owned by the world TAA resolve (reprojection debugger). */
+	if (debugMode >= 15.5 && debugMode < 27.5) {
 		vec2 texel = postfx.frameInfo.yz;
 		float currentWeapon = currentClass > CLASS_WEAPON_THRESH ? 1.0 : 0.0;
 		float previousWeapon = previousClass > CLASS_WEAPON_THRESH ? 1.0 : 0.0;
@@ -120,24 +122,8 @@ void main() {
 			out_color = vec4(confidence, confidence, confidence, 1.0);
 		} else if (debugMode < 26.5) {
 			out_color = vec4(postfx.temporalValidity.www, 1.0);
-		} else if (debugMode < 27.5) {
-			out_color = vec4(currentWeapon, currentWeapon, currentWeapon, 1.0);
-		} else if (debugMode < 28.5) {
-			out_color = vec4(depthNow, depthNow, depthNow, 1.0);
-		} else if (debugMode < 29.5) {
-			float d = textureLod(previousWeaponDepth, uv, 0.0).r;
-			out_color = vec4(d, d, d, 1.0);
-		} else if (debugMode < 30.5) {
-			out_color = vec4(depthPrev, depthPrev, depthPrev, 1.0);
-		} else if (debugMode < 31.5) {
-			float d = clamp(depthError * 50.0, 0.0, 1.0);
-			out_color = vec4(d, d, d, 1.0);
-		} else if (debugMode < 32.5) {
-			float relativeError = depthError / max(max(abs(depthNow), abs(depthPrev)), 1e-4);
-			out_color = vec4(clamp(relativeError, 0.0, 1.0), 0.0, 0.0, 1.0);
 		} else {
-			float reject = depthConfidence < 0.5 ? 1.0 : 0.0;
-			out_color = vec4(reject, 0.0, 0.0, 1.0);
+			out_color = vec4(currentWeapon, currentWeapon, currentWeapon, 1.0); /* 27 */
 		}
 		return;
 	}

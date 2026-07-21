@@ -73,6 +73,7 @@ static cvar_t *cl_mouseAccelStyle;
 static cvar_t *cl_showMouseRate;
 
 static cvar_t *cl_run;
+static cvar_t *cl_independentCrouch;
 static cvar_t *cl_freelook;
 
 static cvar_t *cl_yawspeed;
@@ -355,7 +356,20 @@ static void CL_KeyMove( usercmd_t *cmd ) {
 
 
 	up += movespeed * CL_KeyState (&in_up);
-	up -= movespeed * CL_KeyState (&in_down);
+	/*
+	 * Classic duck and jump are independent. Quake III subtracts crouch from
+	 * the same upmove axis used for jump, so holding both cancels to zero.
+	 * When enabled, crouch is BUTTON_CROUCH and upmove is jump-only.
+	 */
+	if ( cl_independentCrouch && cl_independentCrouch->integer ) {
+		if ( in_down.active ) {
+			cmd->buttons |= BUTTON_CROUCH;
+		} else {
+			cmd->buttons &= ~BUTTON_CROUCH;
+		}
+	} else {
+		up -= movespeed * CL_KeyState (&in_down);
+	}
 
 	forward += movespeed * CL_KeyState (&in_forward);
 	forward -= movespeed * CL_KeyState (&in_back);
@@ -1064,6 +1078,9 @@ void CL_InitInput( void ) {
 	/* HavenRP: walk by default; hold +speed (Shift) to sprint. */
 	cl_run = Cvar_Get( "cl_run", "0", CVAR_ARCHIVE_ND );
 	Cvar_SetDescription( cl_run, "0 = walk by default, hold +speed (Shift) to sprint. 1 = always run, +speed walks." );
+	cl_independentCrouch = Cvar_Get( "cl_independentCrouch", "0", CVAR_ARCHIVE_ND );
+	Cvar_SetDescription( cl_independentCrouch,
+			"1 = crouch is BUTTON_CROUCH (can hold crouch+jump). 0 = Quake III upmove crouch." );
 	cl_sensitivity = Cvar_Get( "sensitivity", "5", CVAR_ARCHIVE );
 	Cvar_SetDescription( cl_sensitivity, "Sets base mouse sensitivity (mouse speed)." );
 	cl_mouseAccel = Cvar_Get( "cl_mouseAccel", "0", CVAR_ARCHIVE_ND );

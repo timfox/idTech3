@@ -12,6 +12,7 @@
 #include "vk_reactive_mask.h"
 #include "vk_object_id.h"
 #include "vk_temporal_class.h"
+#include "vk_velocity_space.h"
 #include "vk_image_layout.h"
 #include "vk_scene_pass.h"
 #include "vk_volumetric_internal.h"
@@ -22,6 +23,10 @@ float vk_prev_view_matrix[16];
 float vk_prev_projection_matrix[16];
 float vk_prev_viewproj_matrix[16];
 qboolean vk_prev_matrices_valid = qfalse;
+uint32_t vk_prev_matrices_frame = 0u;
+float vk_prev_jitter_x = 0.0f;
+float vk_prev_jitter_y = 0.0f;
+qboolean vk_prev_jitter_valid = qfalse;
 int vk_prev_volumetric_time_ms = 0;
 int vk_near_static_view_frames = 0;
 qboolean vk_prev_volumetric_time_valid = qfalse;
@@ -322,6 +327,69 @@ static void vk_temporal_clear_frame_state( void )
 	vk.temporal.firstPersonProjectionThisFrame = qfalse;
 	vk.temporal.worldMatricesCaptured = qfalse;
 	vk.temporal.weaponRenderedThisFrame = qfalse;
+	/* Phase 6: roll per-frame temporal resolve counters. */
+	vk.temporal.worldResolvesLastFrame = vk.temporal.worldResolvesThisFrame;
+	vk.temporal.weaponResolvesLastFrame = vk.temporal.weaponResolvesThisFrame;
+	vk.temporal.upscaleBlitsLastFrame = vk.temporal.upscaleBlitsThisFrame;
+	vk.temporal.worldResolvesThisFrame = 0u;
+	vk.temporal.weaponResolvesThisFrame = 0u;
+	vk.temporal.upscaleBlitsThisFrame = 0u;
+}
+
+/*
+===============
+Phase 6 — GPU markers + once-per-frame temporal resolve accounting
+===============
+*/
+void vk_temporal_marker_begin( const char *name )
+{
+	if ( qvkCmdDebugMarkerBeginEXT && vk.cmd && vk.cmd->command_buffer != VK_NULL_HANDLE ) {
+		VkDebugMarkerMarkerInfoEXT info;
+		Com_Memset( &info, 0, sizeof( info ) );
+		info.sType = VK_STRUCTURE_TYPE_DEBUG_MARKER_MARKER_INFO_EXT;
+		info.pMarkerName = name;
+		info.color[0] = 0.15f; info.color[1] = 0.85f; info.color[2] = 0.95f; info.color[3] = 1.0f;
+		qvkCmdDebugMarkerBeginEXT( vk.cmd->command_buffer, &info );
+	}
+}
+
+void vk_temporal_marker_end( void )
+{
+	if ( qvkCmdDebugMarkerEndEXT && vk.cmd && vk.cmd->command_buffer != VK_NULL_HANDLE ) {
+		qvkCmdDebugMarkerEndEXT( vk.cmd->command_buffer );
+	}
+}
+
+static void vk_temporal_warn_double_resolve( const char *pass, uint32_t count )
+{
+	static uint32_t lastWarnFrame = ~0u;
+
+	if ( count <= 1u || lastWarnFrame == vk.temporal.frameIndex ) {
+		return;
+	}
+	lastWarnFrame = vk.temporal.frameIndex;
+	ri.Printf( PRINT_WARNING, S_COLOR_YELLOW
+		"[VK][temporal] %s executed %u times in frame %u — history would accumulate "
+		"multiple reprojection steps per frame (multi-silhouette ghosting)\n" S_COLOR_WHITE,
+		pass, count, vk.temporal.frameIndex );
+}
+
+void vk_temporal_note_world_resolve( void )
+{
+	vk.temporal.worldResolvesThisFrame++;
+	vk_temporal_warn_double_resolve( "TemporalResolveWorld", vk.temporal.worldResolvesThisFrame );
+}
+
+void vk_temporal_note_weapon_resolve( void )
+{
+	vk.temporal.weaponResolvesThisFrame++;
+	vk_temporal_warn_double_resolve( "TemporalResolveWeapon", vk.temporal.weaponResolvesThisFrame );
+}
+
+void vk_temporal_note_upscale_blit( void )
+{
+	vk.temporal.upscaleBlitsThisFrame++;
+	vk_temporal_warn_double_resolve( "TemporalUpscale", vk.temporal.upscaleBlitsThisFrame );
 }
 
 /*
@@ -915,6 +983,9 @@ void vk_temporal_begin_frame( void )
 
 	hardReset = ( vk.temporal.pendingResetReasons & ~VK_TEMPORAL_RESET_CAMERA_CUT ) != 0u ? qtrue : qfalse;
 	vk_temporal_apply_resets( hardReset );
+
+	/* Phase 3/4: extent + velocity-space report when r_temporalResolutionDebug is set. */
+	vk_temporal_resolution_report( qfalse );
 }
 
 void vk_temporal_commit_frame_state( void )
@@ -953,6 +1024,10 @@ void vk_temporal_commit_frame_state( void )
 	 * Prefer matrices captured at world draw time: RB_FlushDeferredWeaponAfterTaa
 	 * replaces backEnd.viewParms with a first-person RDF_NOWORLDMODEL camera.
 	 */
+	/* Phase 2/10: CPU reprojection probe runs against the still-previous matrices
+	 * before they are overwritten below. */
+	vk_temporal_velocity_probe();
+
 	if ( worldValid && backEnd.doneWorldScene && vk.temporal.worldMatricesCaptured ) {
 		projection = vk.temporal.worldProjectionMatrix;
 		view = vk.temporal.worldViewMatrix;
@@ -961,6 +1036,9 @@ void vk_temporal_commit_frame_state( void )
 		Com_Memcpy( vk_prev_projection_matrix, projection, sizeof( vk_prev_projection_matrix ) );
 		Com_Memcpy( vk_prev_viewproj_matrix, viewProj, sizeof( vk_prev_viewproj_matrix ) );
 		vk_prev_matrices_valid = qtrue;
+		vk_prev_matrices_frame = vk.temporal.frameIndex;
+		R_Upscale_GetJitter( &vk_prev_jitter_x, &vk_prev_jitter_y );
+		vk_prev_jitter_valid = qtrue;
 	} else if ( worldValid && backEnd.doneWorldScene && !noWorldModel &&
 		backEnd.viewParms.portalView == PV_NONE ) {
 		projection = backEnd.viewParms.projectionMatrix;
@@ -970,6 +1048,9 @@ void vk_temporal_commit_frame_state( void )
 		Com_Memcpy( vk_prev_projection_matrix, projection, sizeof( vk_prev_projection_matrix ) );
 		Com_Memcpy( vk_prev_viewproj_matrix, viewProj, sizeof( vk_prev_viewproj_matrix ) );
 		vk_prev_matrices_valid = qtrue;
+		vk_prev_matrices_frame = vk.temporal.frameIndex;
+		R_Upscale_GetJitter( &vk_prev_jitter_x, &vk_prev_jitter_y );
+		vk_prev_jitter_valid = qtrue;
 	}
 }
 
@@ -1493,4 +1574,281 @@ void vk_print_weapon_presentation_f( void )
 		vk.temporal.prevDepthValid ? "yes" : "no",
 		vk.temporal.prevClassValid ? "yes" : "no" );
 	ri.Printf( PRINT_ALL, "=============================================\n" );
+}
+
+/*
+===============================================================================
+Phase 1/3/4 — canonical velocity space + extent report (vk_velocity_space.h)
+===============================================================================
+*/
+
+const char *vk_velocity_space_name( vkVelocitySpace_t space )
+{
+	switch ( space ) {
+		case VK_VELOCITY_SPACE_UV: return "UV [0,1] @ render target";
+		case VK_VELOCITY_SPACE_PIXELS: return "pixels (derived, tagged extent)";
+		case VK_VELOCITY_SPACE_NDC: return "NDC [-1,1] (2x UV — never stored)";
+		default: return "?";
+	}
+}
+
+static void vk_temporal_extent_ratio_warn( const char *what,
+	uint32_t aW, uint32_t aH, uint32_t bW, uint32_t bH )
+{
+	float rw, rh;
+
+	if ( aW == 0u || aH == 0u || bW == 0u || bH == 0u || ( aW == bW && aH == bH ) ) {
+		return;
+	}
+	rw = (float)aW / (float)bW;
+	rh = (float)aH / (float)bH;
+	ri.Printf( PRINT_WARNING, S_COLOR_YELLOW
+		"[VK][temporal] %s extent %ux%u != render extent %ux%u (ratio %.3fx%.3f) — "
+		"velocity sampled across mismatched extents scales reprojection by that ratio\n"
+		S_COLOR_WHITE, what, aW, aH, bW, bH, rw, rh );
+}
+
+void vk_temporal_resolution_report( qboolean force )
+{
+	static cvar_t *resDebug = NULL;
+	static uint32_t lastHash = 0u;
+	uint32_t sceneW = vk_get_render_target_width();
+	uint32_t sceneH = vk_get_render_target_height();
+	uint32_t activeW = 0u, activeH = 0u;
+	uint32_t swapW = vk.swapchain_extent_valid ? vk.swapchain_extent.width : 0u;
+	uint32_t swapH = vk.swapchain_extent_valid ? vk.swapchain_extent.height : 0u;
+	/* Motion vectors / TAA history / prev depth are created via
+	 * vk_create_fullres_color_attachment at the main color extent. */
+	uint32_t velocityW = ( vk.motion_vector_image != VK_NULL_HANDLE ) ? vk.mainColorWidth : 0u;
+	uint32_t velocityH = ( vk.motion_vector_image != VK_NULL_HANDLE ) ? vk.mainColorHeight : 0u;
+	uint32_t historyW = ( vk.taa_history_image[0] != VK_NULL_HANDLE ) ? vk.mainColorWidth : 0u;
+	uint32_t historyH = ( vk.taa_history_image[0] != VK_NULL_HANDLE ) ? vk.mainColorHeight : 0u;
+	uint32_t hash;
+
+	if ( !resDebug ) {
+		resDebug = ri.Cvar_Get( "r_temporalResolutionDebug", "0", CVAR_TEMP );
+	}
+	if ( !force && ( !resDebug || !resDebug->integer ) ) {
+		return;
+	}
+	vk_get_active_render_extent( &activeW, &activeH );
+
+	hash = sceneW * 73856093u ^ sceneH * 19349663u ^ activeW * 83492791u ^ activeH * 2654435761u ^
+		swapW * 374761393u ^ swapH * 668265263u ^ velocityW * 2246822519u ^ velocityH * 3266489917u;
+	if ( !force && hash == lastHash ) {
+		return;
+	}
+	lastHash = hash;
+
+	ri.Printf( PRINT_ALL, "======== Temporal Resolution / Velocity Space ========\n" );
+	ri.Printf( PRINT_ALL, "  scene render extent    : %ux%u (vk_get_render_target_*)\n", sceneW, sceneH );
+	ri.Printf( PRINT_ALL, "  active viewport extent : %ux%u (vk.renderWidth/Height)\n", activeW, activeH );
+	ri.Printf( PRINT_ALL, "  velocity buffer extent : %ux%u (%s)\n", velocityW, velocityH,
+		vk.motion_vector_image != VK_NULL_HANDLE ? "R16G16_SFLOAT" : "not allocated" );
+	ri.Printf( PRINT_ALL, "  TAA input extent       : %ux%u (HDR color)\n", vk.mainColorWidth, vk.mainColorHeight );
+	ri.Printf( PRINT_ALL, "  TAA output extent      : %ux%u (history %s)\n", historyW, historyH,
+		vk.taa_history_image[0] != VK_NULL_HANDLE ? "allocated" : "missing" );
+	ri.Printf( PRINT_ALL, "  display/swapchain      : %ux%u window=%dx%d\n", swapW, swapH,
+		gls.windowWidth, gls.windowHeight );
+	ri.Printf( PRINT_ALL, "  r_renderScale=%d r_renderWidth=%d r_renderHeight=%d r_upscale=%s\n",
+		r_renderScale ? r_renderScale->integer : 0,
+		r_renderWidth ? r_renderWidth->integer : 0,
+		r_renderHeight ? r_renderHeight->integer : 0,
+		R_Upscale_WantTemporal() ? "2 (temporal)" : "off/spatial" );
+	{
+		float jx = 0.0f, jy = 0.0f;
+		R_Upscale_GetJitter( &jx, &jy );
+		ri.Printf( PRINT_ALL, "  jitter now=(%.4f,%.4f)px prevCommitted=(%.4f,%.4f)px\n",
+			jx, jy, vk_prev_jitter_x, vk_prev_jitter_y );
+	}
+	ri.Printf( PRINT_ALL, "  velocity space         : %s (canonical)\n",
+		vk_velocity_space_name( VK_VELOCITY_SPACE_CANONICAL ) );
+	ri.Printf( PRINT_ALL, "  convention             : out_motion = currentUV - previousUV; historyUV = sampleUV - motion\n" );
+	ri.Printf( PRINT_ALL, "  applied velocity scale : 1.0 (no pass may rescale stored motion)\n" );
+	ri.Printf( PRINT_ALL, "  prev matrices          : %s (frame %u, current frame %u, age %d)\n",
+		vk_prev_matrices_valid ? "valid" : "INVALID",
+		vk_prev_matrices_frame, vk.temporal.frameIndex,
+		vk_prev_matrices_valid ? (int)( vk.temporal.frameIndex - vk_prev_matrices_frame ) : -1 );
+	ri.Printf( PRINT_ALL, "  resolves last frame    : world=%u weapon=%u upscaleBlit=%u\n",
+		vk.temporal.worldResolvesLastFrame, vk.temporal.weaponResolvesLastFrame,
+		vk.temporal.upscaleBlitsLastFrame );
+	ri.Printf( PRINT_ALL, "======================================================\n" );
+
+	vk_temporal_extent_ratio_warn( "velocity buffer", velocityW, velocityH, sceneW, sceneH );
+	vk_temporal_extent_ratio_warn( "TAA history", historyW, historyH, sceneW, sceneH );
+	if ( vk_prev_matrices_valid && vk.temporal.frameIndex > vk_prev_matrices_frame + 1u ) {
+		ri.Printf( PRINT_WARNING, S_COLOR_YELLOW
+			"[VK][temporal] previous matrices are %u frames old (expected 1) — camera velocity "
+			"is exaggerated by that factor\n" S_COLOR_WHITE,
+			vk.temporal.frameIndex - vk_prev_matrices_frame );
+	}
+}
+
+void vk_temporal_resolution_status_f( void )
+{
+	vk_temporal_resolution_report( qtrue );
+}
+
+/*
+===============================================================================
+Phase 2/10 — CPU reprojection probe
+
+Projects a fixed world-space point through the current (captured world) and
+previous frame matrices using exactly the shader conversion chain
+(clip → NDC → *0.5+0.5 → UV → pixels), then cross-checks:
+  1. previous matrices are exactly one temporal frame old,
+  2. reconstructed pixel displacement via canonical UV equals the reference
+     NDC*0.5 conversion (flags 2x / 4x / 0.5x / 0.25x scale bugs),
+  3. velocity-buffer extent matches the render extent used for pixel units.
+===============================================================================
+*/
+void vk_temporal_velocity_probe( void )
+{
+	static cvar_t *probe = NULL;
+	static uint32_t lastPrintFrame = 0u;
+	float currProjVk[16], prevProjVk[16];
+	float currVP[16], prevVP[16];
+	float currClip[4], prevClip[4];
+	float point[4];
+	vec3_t p;
+	float currNdc[2], prevNdc[2], currUV[2], prevUV[2];
+	float velocityUV[2], velocityPx[2], ndcDeltaPx[2];
+	uint32_t extW, extH;
+	int i;
+
+	if ( !probe ) {
+		probe = ri.Cvar_Get( "r_temporalVelocityProbe", "0", CVAR_TEMP );
+	}
+	if ( !probe->integer ) {
+		return;
+	}
+	if ( !vk_prev_matrices_valid || !vk.temporal.worldMatricesCaptured || !tr.world ) {
+		return;
+	}
+
+	/* Fixed probe point 512 units along the current view forward. */
+	VectorMA( tr.refdef.vieworg, 512.0f, tr.refdef.viewaxis[0], p );
+	point[0] = p[0]; point[1] = p[1]; point[2] = p[2]; point[3] = 1.0f;
+
+	vk_get_projection_matrix_vk( vk.temporal.worldProjectionMatrix, currProjVk );
+	myGlMultMatrix( vk.temporal.worldViewMatrix, currProjVk, currVP );
+	vk_get_projection_matrix_vk( vk_prev_projection_matrix, prevProjVk );
+	myGlMultMatrix( vk_prev_view_matrix, prevProjVk, prevVP );
+
+	for ( i = 0; i < 4; i++ ) {
+		currClip[i] = point[0] * currVP[i] + point[1] * currVP[4 + i] +
+			point[2] * currVP[8 + i] + point[3] * currVP[12 + i];
+		prevClip[i] = point[0] * prevVP[i] + point[1] * prevVP[4 + i] +
+			point[2] * prevVP[8 + i] + point[3] * prevVP[12 + i];
+	}
+	if ( currClip[3] < 1e-4f || prevClip[3] < 1e-4f ) {
+		return;
+	}
+
+	currNdc[0] = currClip[0] / currClip[3];
+	currNdc[1] = currClip[1] / currClip[3];
+	prevNdc[0] = prevClip[0] / prevClip[3];
+	prevNdc[1] = prevClip[1] / prevClip[3];
+	/* Canonical NDC → UV conversion (the 0.5 factor under audit in Phase 2). */
+	currUV[0] = currNdc[0] * 0.5f + 0.5f;
+	currUV[1] = currNdc[1] * 0.5f + 0.5f;
+	prevUV[0] = prevNdc[0] * 0.5f + 0.5f;
+	prevUV[1] = prevNdc[1] * 0.5f + 0.5f;
+	velocityUV[0] = currUV[0] - prevUV[0];
+	velocityUV[1] = currUV[1] - prevUV[1];
+
+	extW = vk_get_render_target_width();
+	extH = vk_get_render_target_height();
+	velocityPx[0] = velocityUV[0] * (float)extW;
+	velocityPx[1] = velocityUV[1] * (float)extH;
+	/* Measured displacement in pixels (direct projection reference). */
+	ndcDeltaPx[0] = ( currNdc[0] - prevNdc[0] ) * 0.5f * (float)extW;
+	ndcDeltaPx[1] = ( currNdc[1] - prevNdc[1] ) * 0.5f * (float)extH;
+
+	{
+		/*
+		 * Independent reconstruction: replay taa.frag's reprojectHistoryUV()
+		 * (UV+depth → invViewProj → world → prevViewProj → prevUV). A missing
+		 * or doubled 0.5 NDC↔UV factor anywhere in that chain shows up as a
+		 * 2x / 4x / 0.5x / 0.25x ratio against the direct projection above.
+		 */
+		float invVP[16];
+		float reconPrevUV[2];
+		float reconVelPx[2] = { 0.0f, 0.0f };
+		qboolean reconValid = qfalse;
+
+		if ( vk_mat4_inverse( currVP, invVP ) ) {
+			float depthNdc = currClip[2] / currClip[3];
+			float posClip[4], posWorld[4], prevClip2[4];
+			posClip[0] = currUV[0] * 2.0f - 1.0f;
+			posClip[1] = currUV[1] * 2.0f - 1.0f;
+			posClip[2] = depthNdc;
+			posClip[3] = 1.0f;
+			for ( i = 0; i < 4; i++ ) {
+				posWorld[i] = posClip[0] * invVP[i] + posClip[1] * invVP[4 + i] +
+					posClip[2] * invVP[8 + i] + posClip[3] * invVP[12 + i];
+			}
+			if ( fabsf( posWorld[3] ) > 1e-6f ) {
+				posWorld[0] /= posWorld[3]; posWorld[1] /= posWorld[3];
+				posWorld[2] /= posWorld[3]; posWorld[3] = 1.0f;
+				for ( i = 0; i < 4; i++ ) {
+					prevClip2[i] = posWorld[0] * prevVP[i] + posWorld[1] * prevVP[4 + i] +
+						posWorld[2] * prevVP[8 + i] + posWorld[3] * prevVP[12 + i];
+				}
+				if ( prevClip2[3] > 1e-4f ) {
+					reconPrevUV[0] = prevClip2[0] / prevClip2[3] * 0.5f + 0.5f;
+					reconPrevUV[1] = prevClip2[1] / prevClip2[3] * 0.5f + 0.5f;
+					reconVelPx[0] = ( currUV[0] - reconPrevUV[0] ) * (float)extW;
+					reconVelPx[1] = ( currUV[1] - reconPrevUV[1] ) * (float)extH;
+					reconValid = qtrue;
+				}
+			}
+		}
+
+		float lenUVpx = sqrtf( velocityPx[0] * velocityPx[0] + velocityPx[1] * velocityPx[1] );
+		float lenRefPx = reconValid ?
+			sqrtf( reconVelPx[0] * reconVelPx[0] + reconVelPx[1] * reconVelPx[1] ) : lenUVpx;
+		float ratio = ( lenRefPx > 1e-4f ) ? lenUVpx / lenRefPx : 1.0f;
+		uint32_t age = vk.temporal.frameIndex - vk_prev_matrices_frame;
+		qboolean anomalous = qfalse;
+		const char *scaleWarn = NULL;
+
+		if ( ratio > 1.8f && ratio < 2.2f ) { scaleWarn = "2x"; }
+		else if ( ratio > 3.6f && ratio < 4.4f ) { scaleWarn = "4x"; }
+		else if ( ratio > 0.45f && ratio < 0.55f ) { scaleWarn = "0.5x"; }
+		else if ( ratio > 0.22f && ratio < 0.28f ) { scaleWarn = "0.25x"; }
+		else if ( ratio < 0.95f || ratio > 1.05f ) { scaleWarn = "non-unit"; }
+		if ( scaleWarn ) {
+			anomalous = qtrue;
+			ri.Printf( PRINT_WARNING, S_COLOR_YELLOW
+				"[VK][temporal][probe] velocity scale ratio %.3f (%s) — UV chain and NDC*0.5 "
+				"reference disagree; check NDC/UV conversion in producers\n" S_COLOR_WHITE,
+				ratio, scaleWarn );
+		}
+		if ( age != 1u && lenRefPx > 0.25f ) {
+			anomalous = qtrue;
+			ri.Printf( PRINT_WARNING, S_COLOR_YELLOW
+				"[VK][temporal][probe] previous matrices are %u frames old (expected 1) — "
+				"camera velocity exaggerated %ux\n" S_COLOR_WHITE, age, age );
+		}
+
+		if ( probe->integer >= 2 || anomalous ||
+			( vk.temporal.frameIndex - lastPrintFrame ) >= 60u ) {
+			lastPrintFrame = vk.temporal.frameIndex;
+			ri.Printf( PRINT_ALL,
+				"[VK][temporal][probe] frame=%u prevAge=%u extent=%ux%u\n"
+				"  measured displacement : %.3f, %.3f px\n"
+				"  encoded velocity (UV) : %.6f, %.6f\n"
+				"  encoded velocity (px) : %.3f, %.3f\n"
+				"  reconstructed (px)    : %.3f, %.3f\n"
+				"  error ratio           : %.4f\n",
+				vk.temporal.frameIndex, age, extW, extH,
+				ndcDeltaPx[0], ndcDeltaPx[1],
+				velocityUV[0], velocityUV[1],
+				velocityPx[0], velocityPx[1],
+				reconValid ? reconVelPx[0] : velocityPx[0],
+				reconValid ? reconVelPx[1] : velocityPx[1],
+				ratio );
+		}
+	}
 }

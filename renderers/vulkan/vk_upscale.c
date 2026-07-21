@@ -200,13 +200,16 @@ void R_Upscale_NoteJitter( float *jitterX, float *jitterY )
 {
 	float jx = 0.0f;
 	float jy = 0.0f;
-	uint32_t w;
-	uint32_t h;
-
-	s_prevJitterX = s_jitterX;
-	s_prevJitterY = s_jitterY;
+	/* Advance Halton exactly once per client frame (tr.frameCount).
+	 * R_SetupProjection / ApplyProjectionJitter may be called for world,
+	 * portal, and first-person cameras in the same frame — advancing on
+	 * every Apply would leave different draws with different jitters and
+	 * make the "previous" jitter commit ambiguous. */
+	static int s_lastAdvanceFrame = -1;
 
 	if ( !R_Upscale_WantTemporal() ) {
+		s_prevJitterX = s_jitterX;
+		s_prevJitterY = s_jitterY;
 		s_jitterX = 0.0f;
 		s_jitterY = 0.0f;
 		if ( jitterX ) {
@@ -218,22 +221,17 @@ void R_Upscale_NoteJitter( float *jitterX, float *jitterY )
 		return;
 	}
 
-	s_jitterFrame++;
-	/* Halton(2,3) in [-0.5,0.5] pixel offsets */
-	jx = Upscale_Halton( s_jitterFrame, 2u ) - 0.5f;
-	jy = Upscale_Halton( s_jitterFrame, 3u ) - 0.5f;
-
-	w = vk_get_render_target_width();
-	h = vk_get_render_target_height();
-	if ( w < 1u ) {
-		w = 1u;
+	if ( s_lastAdvanceFrame != tr.frameCount ) {
+		s_lastAdvanceFrame = tr.frameCount;
+		s_prevJitterX = s_jitterX;
+		s_prevJitterY = s_jitterY;
+		s_jitterFrame++;
+		/* Halton(2,3) in [-0.5,0.5] pixel offsets */
+		jx = Upscale_Halton( s_jitterFrame, 2u ) - 0.5f;
+		jy = Upscale_Halton( s_jitterFrame, 3u ) - 0.5f;
+		s_jitterX = jx;
+		s_jitterY = jy;
 	}
-	if ( h < 1u ) {
-		h = 1u;
-	}
-	/* Convert to NDC offset later; store as pixel jitter for TAA unjitter */
-	s_jitterX = jx;
-	s_jitterY = jy;
 
 	if ( jitterX ) {
 		*jitterX = s_jitterX;

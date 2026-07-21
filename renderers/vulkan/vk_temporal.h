@@ -41,6 +41,15 @@ extern float vk_prev_view_matrix[16];
 extern float vk_prev_projection_matrix[16];
 extern float vk_prev_viewproj_matrix[16];
 extern qboolean vk_prev_matrices_valid;
+/* Temporal frame index at which vk_prev_* matrices were committed (Phase 5:
+ * previous transforms must be exactly one temporal frame old). */
+extern uint32_t vk_prev_matrices_frame;
+/* Projection jitter (pixels) embedded in vk_prev_projection_matrix (Phase 7:
+ * producers rebase the previous projection onto the current jitter so motion
+ * vectors carry no jitter delta). */
+extern float vk_prev_jitter_x;
+extern float vk_prev_jitter_y;
+extern qboolean vk_prev_jitter_valid;
 extern int vk_prev_volumetric_time_ms;
 extern int vk_near_static_view_frames;
 extern qboolean vk_prev_volumetric_time_valid;
@@ -81,8 +90,17 @@ qboolean vk_temporal_prepare_current_depth( void );
 void vk_temporal_dispatch_depth_reject_stats( uint32_t prevDepthIndex );
 void vk_temporal_readback_depth_reject_stats( void );
 
+/* Phase 6: GPU debug markers + once-per-frame resolve counters. */
+void vk_temporal_marker_begin( const char *name );
+void vk_temporal_marker_end( void );
+void vk_temporal_note_world_resolve( void );
+void vk_temporal_note_weapon_resolve( void );
+void vk_temporal_note_upscale_blit( void );
+
 /* Console: temporal history ownership / reset state (Spine diagnostics). */
 void vk_temporal_status_f( void );
+/* Console: Phase 3/4 extent + velocity-space report (see vk_velocity_space.h). */
+void vk_temporal_resolution_status_f( void );
 /* Console: pass inventory for weapon-trail / temporal-ghost bisect. */
 void vk_temporal_ghost_status_f( void );
 void vk_capture_temporal_debug_f( void );

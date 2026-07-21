@@ -1431,6 +1431,9 @@ typedef struct playerState_s {
 
 #define	BUTTON_ANY			2048			// any key whatsoever
 
+/* Independent crouch (classic duck button). Jump stays on upmove. */
+#define	BUTTON_CROUCH		4096
+
 #define	MOVE_RUN			120			// if forwardmove or rightmove are >= MOVE_RUN,
 										// then BUTTON_WALKING should be set
 

@@ -1714,14 +1714,14 @@ static void CM_Trace( trace_t *results, const vec3_t start, const vec3_t end, co
 		}
 		/*
 		 * The crossing epsilon may clamp an entry fraction to zero when the
-		 * hull merely starts on a ramp plane. Verify the unmodified start point
-		 * before reporting startsolid/allsolid; otherwise pmove treats valid
-		 * surf contact as an embedded player and repeatedly jitters the hull.
+		 * hull merely starts on a ramp plane. Verify the unmodified start with
+		 * strict point/box contents (epsilon 0), matching classic hull-point
+		 * tests. An epsilon-band "AND" check here incorrectly cleared solid
+		 * starts near split planes.
 		 */
 		if ( tw.trace.startsolid &&
 				!CM_Bsp30BoxTouchesContents( root, tw.start, traceExtents,
-				contentsOverride, brushmask, clipTree,
-				BSP30_SURFACE_CLIP_EPSILON, 0 ) ) {
+				contentsOverride, brushmask, clipTree, 0.0f, 0 ) ) {
 			tw.trace.startsolid = qfalse;
 			tw.trace.allsolid = qfalse;
 			/*
