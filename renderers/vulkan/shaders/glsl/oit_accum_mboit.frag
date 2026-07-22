@@ -122,9 +122,10 @@ void main() {
 		uint cascades = uint( clamp( pc._pad0, 1.0, 4.0 ) );
 		float sunVis = 1.0;
 		if ( cascades > 0u && ( shadows.records[0].flags & 1u ) != 0u ) {
-			sunVis = ShadowContract_SampleCSM_BestFit(
+			float viewDist = length( frag_world_pos - fp_params.fp_view_org.xyz );
+			sunVis = ShadowContract_SampleCSM_FromRecords(
 				shadows.records[0], shadows.records[1], shadows.records[2], shadows.records[3],
-				sunShadowMap, frag_world_pos, 1.0, cascades );
+				sunShadowMap, frag_world_pos, viewDist, 1.0, cascades );
 		}
 		litRgb += base.rgb * vec3( pc.sunColorR, pc.sunColorG, pc.sunColorB ) *
 			wrap * pc.sunStrength * sunVis;

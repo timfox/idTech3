@@ -105,7 +105,7 @@ Track status: [OIT_FUTURE_TRACKS.md](OIT_FUTURE_TRACKS.md).
 
 ## Volumetric compatibility
 
-- **Preferred:** volumetric fog integrated on **opaque** froxel pass before OIT (`volumetricSource=opaque froxel before OIT` in `oit_fog_status`)
+- **Preferred / wired:** when `r_oitFogMode>=1`, `vk_volumetric_fog_before_oit()` runs froxel composite on opaque HDR **before** WBOIT; frame-end volumetric is skipped via `doneFog` (`oit_fog_status` → `volumetricSource=opaque froxel before OIT`)
 - **B6a cert case:** toggle `r_volumetricFog` + bloom; expect no double-fog bands (`oit_fog_status`, `r_oitFogDebug 6`)
 - OIT accum does not sample froxel volume directly in mode 1 — it applies analytic camera→fragment `T` on surface lit terms
 - Thick smoke stacks may need mode 2+ or hybrid volume proxies (research)

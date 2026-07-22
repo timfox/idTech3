@@ -5,6 +5,7 @@
 #include "vk_temporal.h"
 #include "vk_volumetric_pass.h"
 #include "vk_post_aa.h"
+#include "vk_render_pass.h"
 
 void vk_volumetric_skip_cleanup( const char *reason, uint32_t restoreDepthSrcStages )
 {
@@ -32,4 +33,34 @@ void vk_volumetric_skip_cleanup( const char *reason, uint32_t restoreDepthSrcSta
 	}
 
 	backEnd.doneFog = qtrue;
+}
+
+void vk_volumetric_fog_before_oit( void )
+{
+	cvar_t *fogMode;
+	static qboolean s_logged;
+
+	if ( backEnd.doneFog ) {
+		return;
+	}
+	fogMode = ri.Cvar_Get( "r_oitFogMode", "1", 0 );
+	if ( !fogMode || fogMode->integer < 1 ) {
+		return; /* Legacy mode 0: keep frame-end volumetric over full HDR. */
+	}
+	if ( !r_oit || !r_oit->integer || !r_fbo || !r_fbo->integer ) {
+		return;
+	}
+	if ( !tr.world || !backEnd.doneWorldScene ) {
+		return;
+	}
+
+	if ( !s_logged ) {
+		ri.Printf( PRINT_ALL,
+			"[VK][fog] pre-OIT volumetric (r_oitFogMode=%d): opaque fogged before WBOIT resolve\n",
+			fogMode->integer );
+		s_logged = qtrue;
+	}
+	/* Match frame-end: leave MAIN so color can leave COLOR_ATTACHMENT. */
+	vk_end_render_pass();
+	vk_volumetric_fog_pass();
 }

@@ -72,6 +72,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "vk_post_fog.h"
 #include "vk_postfx_params.h"
 #include "vk_view_state.h"
+#include "vk_volumetric_pass.h"
 #include <assert.h>
 #endif
 
@@ -2064,6 +2065,12 @@ static void RB_RenderSunShadowMap( const drawSurfsCommand_t *cmd )
 				vk_shadow_contract_set_bias_filter( (uint32_t)c,
 					( r_fogShadowBias ) ? r_fogShadowBias->value : 0.001f,
 					( r_fogShadowPcfRadius ) ? r_fogShadowPcfRadius->value : 1.0f );
+				/* Pack cascade far (+ near/blend on cascade 0) for OIT SampleCSM_FromRecords. */
+				rec->filterParams[1] = splits[c];
+				if ( c == 0 ) {
+					rec->filterParams[2] = nearPlane;
+					rec->filterParams[3] = VK_SunCSM_CascadeBlend();
+				}
 			}
 		}
 		anyOk = 1;
@@ -2720,6 +2727,7 @@ static const void *RB_DrawSurfs( const void *data ) {
 			}
 			RB_RepairUnifiedClusteredTransparentHandoff( qtrue );
 			RB_ValidateUnifiedClusteredTransparentHandoff( qtrue );
+			vk_volumetric_fog_before_oit();
 			vk_oit_pass( cmd );
 			RB_DrawRefractiveAfterOit( cmd );
 		} else {
@@ -2772,6 +2780,7 @@ static const void *RB_DrawSurfs( const void *data ) {
 				vk_black_frame_note_writer( "DeferredComposite" );
 			}
 		}
+		vk_volumetric_fog_before_oit();
 		vk_oit_pass( cmd );
 		vk_black_frame_note_writer( "WBOITResolve" );
 		vk_black_frame_note_draw( VK_BF_DRAW_OIT, (uint32_t)cmd->numDrawSurfs );

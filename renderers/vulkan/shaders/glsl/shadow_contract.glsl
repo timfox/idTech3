@@ -197,7 +197,7 @@ float ShadowContract_SampleCSM(
 
 /*
  * Best-fit cascade without CPU splits: try fine→coarse, first in-frustum wins.
- * Used by WBOIT when push space cannot carry split distances.
+ * Prefer SampleCSM_FromRecords when cascade far planes are stamped into filterParams.y.
  */
 float ShadowContract_SampleCSM_BestFit(
 	GpuShadowGpuRecord rec0,
@@ -226,16 +226,44 @@ float ShadowContract_SampleCSM_BestFit(
 		} else if ( i >= 3 ) {
 			rec = rec3;
 		}
-		float v = ShadowContract_SampleCascadeRaw( rec, shadowMap, worldPos );
-		if ( v >= 0.0 ) {
-			vis = v;
-			break;
+		vis = ShadowContract_SampleCascadeRaw( rec, shadowMap, worldPos );
+		if ( vis >= 0.0 ) {
+			return mix( 1.0, vis, clamp( strength, 0.0, 1.0 ) );
 		}
 	}
-	if ( vis < 0.0 ) {
-		return 1.0;
+	return 1.0;
+}
+
+/*
+ * Split-based CSM using meta packed into shadow SSBO records (no extra push):
+ *   filterParams.y = cascade far (view depth)
+ *   rec0.filterParams.z = nearZ, .w = blend fraction
+ * Falls back to BestFit when splits are unset (all far ≤ 0).
+ */
+float ShadowContract_SampleCSM_FromRecords(
+	GpuShadowGpuRecord rec0,
+	GpuShadowGpuRecord rec1,
+	GpuShadowGpuRecord rec2,
+	GpuShadowGpuRecord rec3,
+	sampler2D shadowMap,
+	vec3 worldPos,
+	float viewDist,
+	float strength,
+	uint cascadeCount )
+{
+	vec4 splits = vec4(
+		rec0.filterParams.y,
+		rec1.filterParams.y,
+		rec2.filterParams.y,
+		rec3.filterParams.y );
+	if ( splits.x <= 0.0 && splits.y <= 0.0 && splits.z <= 0.0 && splits.w <= 0.0 ) {
+		return ShadowContract_SampleCSM_BestFit(
+			rec0, rec1, rec2, rec3, shadowMap, worldPos, strength, cascadeCount );
 	}
-	return mix( 1.0, vis, clamp( strength, 0.0, 1.0 ) );
+	return ShadowContract_SampleCSM(
+		rec0, rec1, rec2, rec3, shadowMap, worldPos, viewDist, strength,
+		cascadeCount, splits, max( rec0.filterParams.z, 0.1 ),
+		clamp( rec0.filterParams.w, 0.0, 0.5 ) );
 }
 
 #endif

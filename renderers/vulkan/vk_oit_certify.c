@@ -786,13 +786,16 @@ static void VK_OitFogStatus_f( void )
 		"  fogDensity=%g fogDebug=%d\n"
 		"  accumulationFog=%s\n"
 		"  resolveFog=%s\n"
-		"  volumetricSource=opaque froxel before OIT (preferred)\n"
+		"  volumetricSource=%s\n"
 		"  depthApprox=view-space distance from fp_view_org / clip w\n"
 		"  doubleFogPrevention=%s\n"
 		"  passOrder=opaque(+vol) -> WBOIT fogged-lit accum -> resolve over fogged opaque -> weapon -> bloom\n",
 		fogMode, density, r_oitFogDebug ? r_oitFogDebug->integer : 0,
 		( fogMode >= 1 ) ? "fragment lit radiance * T(camera,frag)" : "none (legacy)",
 		( fogMode >= 1 ) ? "no second full-screen fog on transparent result" : "post stack may fog entire HDR",
+		( fogMode >= 1 )
+			? "opaque froxel before OIT (vk_volumetric_fog_before_oit; frame-end skipped via doneFog)"
+			: "frame-end volumetric over full HDR (legacy)",
 		( fogMode >= 1 ) ? "enabled (mode>=1)" : "not active" );
 }
 
