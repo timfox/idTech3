@@ -4,6 +4,10 @@ The **Unified Clustered Renderer** (`r_renderMode 3`) is the engine’s high-fid
 
 Spine 1.0 shipping default remains **Forward+ mode 2** (`modern_vulkan.cfg` → `modern_vulkan_stable.cfg`). Mode 3 is enabled via `modern_clustered.cfg` or the overlay below — see [RENDERER_SPINE_1.0.md](RENDERER_SPINE_1.0.md). Spine 1.1 opt-in cert (mode 3 + WBOIT + Temporal Reconstruction + weapon-after): [RENDERER_SPINE_1.1.md](RENDERER_SPINE_1.1.md).
 
+Surface-class ownership (opaque deferred vs Forward+ transparent/weapon/OIT) is defined in [RENDERER_PATH_OWNERSHIP.md](RENDERER_PATH_OWNERSHIP.md). Visibility-buffer late shade is an **opt-in sidecar** (`r_visibilityBuffer`), not `r_renderMode 4` (mode 4 remains Tier B Selective Hybrid).
+
+Shared cluster aliases: `r_clusterZSlices` → `r_forwardPlusZSlices`, `r_clusterDebug` → `r_forwardPlusDebug`, `r_clusterTileSize` = 16.
+
 ```cfg
 r_renderMode 3
 ```

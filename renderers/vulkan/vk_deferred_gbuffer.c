@@ -10,6 +10,7 @@ Mode 3 = Unified Clustered Renderer (deferred opaque + Forward+ transparent).
 #include "tr_local.h"
 #include "vk.h"
 #include "vk_deferred_gbuffer.h"
+#include "vk_render_path.h"
 #include "tr_render_mode_vk.h"
 #include "vk_visibility_buffer.h"
 #include "vk_vrcs.h"
@@ -22,6 +23,7 @@ Mode 3 = Unified Clustered Renderer (deferred opaque + Forward+ transparent).
 #include "vk_view_state.h"
 #include "vk_frequency_aware.h"
 #include "vk_ltc.h"
+#include "vk_forward_plus.h"
 
 static void vk_dgb_validate_compute_break( const char *stage, qboolean resume_main )
 {
@@ -81,6 +83,7 @@ typedef struct {
 
 typedef struct {
 	uint32_t additive;
+	uint32_t hybridCompare;
 } vk_deferred_composite_push_t;
 
 static void vk_dgb_create_pipeline( void );
@@ -393,7 +396,10 @@ qboolean vk_deferred_opaque_transparent_split( void )
 qboolean vk_unified_clustered_opaque_handoff( void )
 {
 	/* Opaque world pass: hand dynamics to deferred. Skip weapon/UI views.
-	 * Fail open to Forward+ when the deferred path cannot finish (avoids black REPLACE). */
+	 * Fail open to Forward+ when the deferred path cannot finish (avoids black REPLACE).
+	 * Authoritative class comes from R_SelectSurfaceRenderPath. */
+	renderPath_t path;
+
 	if ( backEnd.drawSurfFilter != 1 ) {
 		return qfalse;
 	}
@@ -403,24 +409,17 @@ qboolean vk_unified_clustered_opaque_handoff( void )
 	if ( !vk_deferred_lighting_path_ready() ) {
 		return qfalse;
 	}
-	if ( vk_unified_clustered_active() ) {
-		if ( !vk.deferred_gbuffer.handoff_ready_logged ) {
-			ri.Printf( PRINT_ALL,
-				"[VK][deferred] opaque handoff ready (mode %d) — Forward+ dynamics deferred to compute\n",
-				r_renderMode ? r_renderMode->integer : -1 );
-			vk.deferred_gbuffer.handoff_ready_logged = qtrue;
-		}
-		return qtrue;
+	path = R_SelectSurfaceRenderPath( tess.shader, NULL, 0u, (int)VK_VIEW_CLASS_MAIN_WORLD );
+	if ( !R_RenderPath_WantsDeferredHandoff( path ) ) {
+		return qfalse;
 	}
-	if ( r_renderMode && r_renderMode->integer == 1 && vk_deferred_lighting_active() ) {
-		if ( !vk.deferred_gbuffer.handoff_ready_logged ) {
-			ri.Printf( PRINT_ALL,
-				"[VK][deferred] opaque handoff ready (mode 1) — Forward+ dynamics deferred to compute\n" );
-			vk.deferred_gbuffer.handoff_ready_logged = qtrue;
-		}
-		return qtrue;
+	if ( !vk.deferred_gbuffer.handoff_ready_logged ) {
+		ri.Printf( PRINT_ALL,
+			"[VK][deferred] opaque handoff ready (mode %d) — Forward+ dynamics deferred to compute\n",
+			r_renderMode ? r_renderMode->integer : -1 );
+		vk.deferred_gbuffer.handoff_ready_logged = qtrue;
 	}
-	return qfalse;
+	return qtrue;
 }
 
 qboolean vk_deferred_unlit_base_wanted( void )
@@ -1669,6 +1668,7 @@ static void vk_dgb_composite_lit_to_color( uint32_t width, uint32_t height )
 	if ( vk.deferred_gbuffer.frame_capture_ok ) {
 		push.additive = 1u;
 	}
+	push.hybridCompare = ( r_hybridCompare && r_hybridCompare->integer ) ? 1u : 0u;
 
 	qvkCmdBindPipeline( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.deferred_gbuffer.composite_gfx_pipeline );
 	qvkCmdBindDescriptorSets( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
@@ -1720,6 +1720,7 @@ void vk_deferred_lighting_apply_after_geometry( void )
 
 	lighting_ok = vk_dgb_dispatch_lighting_compute( width, height );
 	vk.deferred_gbuffer.frame_lighting_ok = lighting_ok;
+	vk_cluster_assert_shared_consumers( "deferred_lighting" );
 
 	/*
 	 * Fullscreen composite REPLACES HDR color. Only do that when this frame has a valid

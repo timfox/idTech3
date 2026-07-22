@@ -308,11 +308,11 @@ The old SSAO/HBAO implementation remains available only as mode 1 and as a fallb
 |------|---------|-------------|
 | `r_fbo` | 1 | Framebuffer objects (required for PBR, HDR, bloom, MSAA, SMAA, SSAO). Use vid_restart after changing. |
 | `r_pbr` | 1 | Physically Based Rendering (metalness/roughness, IBL). Requires r_fbo 1. |
-| `r_renderMode` | 0 | **0** forward, **1** deferred lighting mode, **2** Forward+ primary, **3** Unified Clustered (heterogeneous shading / lighting ownership). `modern_vulkan.cfg` sets **3**. Latched; `vid_restart`. |
+| `r_renderMode` | 0 | **0** forward, **1** deferred lighting mode, **2** Forward+ primary (**Spine shipping default** via `modern_vulkan.cfg` → `modern_vulkan_stable.cfg`), **3** Unified Clustered (opt-in `modern_clustered.cfg`). Latched; `vid_restart`. Path ownership: [RENDERER_PATH_OWNERSHIP.md](RENDERER_PATH_OWNERSHIP.md). |
 | `r_deferredGBuffer` | 0 | With `r_renderMode` 1/2/3: allocate albedo/normal/material/lighting G-buffer images. `modern_vulkan.cfg` sets **1** as a sidecar. Latched; `r_fbo` 1. |
 | `r_deferredGBufferFill` | 0 | With G-buffer RTs: copy scene albedo after geometry (mode 3: after opaque). On non-MSAA FBO frames, opaque PBR material shaders directly export normals and material; MSAA/legacy paths keep the depth-derived fallback. Material is RGBA16F: metalness, roughness, AO, source confidence. `modern_vulkan.cfg` sets **1**. |
 | `r_deferredGBufferDebug` | 0 | Before bloom: show G-buffer on scene color (1=albedo, 2=normal, 3=material, 4=lighting, 5=normal confidence, 6=motion vectors from the main material pass). |
-| `r_deferredLighting` | 0 | Deferred dynamic lights (Forward+ tiles, point+spot): Disney/Burley **Fd** + Fresnel **kD**, GGX specular. Modes **1** and **3**. Mode 1 latches `r_forwardPlusShade` 0; mode 3 keeps Forward+ shade for transparent. Ignored by mode-2 modern default. |
+| `r_deferredLighting` | 0 | Deferred dynamic lights (Forward+ tiles, point+spot): Disney/Burley **Fd** + Fresnel **kD**, GGX specular. Modes **1** and **3** (also 4). Mode 1/3 keep Forward+ shade for transparent; opaque handoff skips Forward+ add when path-ready. Ignored by mode-2 modern default. |
 | `r_deferredUnlitBase` | 1 | Additive dynamic on static-lit scene copy; skips classic lit-surf pass. **0** = legacy multiply composite. |
 | `r_deferredLightingStrength` | 1 | Scale deferred dynamic diffuse (0–4). |
 | `r_deferredSpecular` | 1 | GGX + Smith + Fresnel specular on deferred dynamic lights (0=diffuse only). |

@@ -5,9 +5,21 @@
 /* GPU Forward+ light records (decoupled from surface dlightBits, which stays MAX_DLIGHTS). */
 #define VK_FP_MAX_GPU_LIGHTS 64
 
+/* Shared cluster aliases (docs/RENDERER_PATH_OWNERSHIP.md) — same SSBOs as Forward+. */
+#define VK_CLUSTER_TILE_SIZE 16u
+
 /* Tile list capacity (SSBO stride = max cap uint32s per tile); must match forward_plus_tile_cull.comp MAX_PER_TILE. */
 uint32_t vk_forward_plus_get_min_per_tile_cap( void );
 uint32_t vk_forward_plus_get_max_per_tile_cap( void );
+
+/* Contract: deferred lighting + Forward+ fragment bind the same tile buffer generation. */
+void vk_cluster_assert_shared_consumers( const char *consumer );
+uint32_t vk_cluster_list_generation( void );
+
+/* Thin wrappers naming the shared cluster API (call existing Forward+ implementations). */
+void vk_cluster_dispatch_tile_cull( void );
+VkBuffer vk_cluster_tile_buffer( void );
+VkBuffer vk_cluster_light_buffer( void );
 
 void vk_forward_plus_create_set_layout( void );
 void vk_forward_plus_init( void );

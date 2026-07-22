@@ -123,6 +123,7 @@ glstatic_t	gls;
 #ifdef USE_VULKAN
 #include "vk_device.h"
 #include "vk_forward_plus.h"
+#include "vk_render_path.h"
 #include "vk_aa_policy.h"
 static void VkInfo_f( void );
 static void VulkanInfo_f( void );
@@ -2892,10 +2893,11 @@ static void R_Register( void )
 	r_deferredLighting = ri.Cvar_Get( "r_deferredLighting", "0", CVAR_ARCHIVE_ND );
 	ri.Cvar_CheckRange( r_deferredLighting, "0", "1", CV_INTEGER );
 	ri.Cvar_SetDescription( r_deferredLighting,
-		"Deferred diffuse (point+spot lights via Forward+ tile lists). Requires r_renderMode 1 or 3, "
-		"r_deferredGBuffer 1, r_deferredGBufferFill 1, r_forwardPlus 1. Mode 1 latches r_forwardPlusShade 0. "
-		"Mode 3 (Unified Clustered) keeps Forward+ shade for transparent surfaces. "
-		"Ignored in r_renderMode 2 modern Forward+ default." );
+		"Deferred diffuse (point+spot lights via Forward+ tile lists). Requires r_renderMode 1, 3, or 4, "
+		"r_deferredGBuffer 1, r_deferredGBufferFill 1, r_forwardPlus 1. "
+		"Mode 1/3: opaque deferred handoff + Forward+ transparent (r_forwardPlusShade kept on for filter 2). "
+		"Fails open to Forward+ if G-buffer/lighting/composite is not path-ready. "
+		"Ignored in r_renderMode 2 modern Forward+ default. See docs/RENDERER_PATH_OWNERSHIP.md." );
 	ri.Cvar_SetGroup( r_deferredLighting, CVG_RENDERER );
 	if ( r_deferredLighting && r_deferredLighting->integer ) {
 		ri.Printf( PRINT_ALL, "[VK][deferred] r_deferredLighting=1 (G-buffer diffuse + Forward+ tiles; point+spot)\n" );
@@ -3648,6 +3650,30 @@ static void R_Register( void )
 			r_forwardPlusZSlices->integer,
 			( r_forwardPlusZSliceMode && r_forwardPlusZSliceMode->integer ) ? "log" : "linear" );
 	}
+	/* Clustered Hybrid M1 aliases — same light grid as Forward+ (docs/RENDERER_PATH_OWNERSHIP.md). */
+	{
+		cvar_t *clusterZ = ri.Cvar_Get( "r_clusterZSlices", "0", CVAR_ARCHIVE_ND | CVAR_LATCH );
+		cvar_t *clusterDebug = ri.Cvar_Get( "r_clusterDebug", "-1", CVAR_ARCHIVE_ND );
+		cvar_t *clusterTile = ri.Cvar_Get( "r_clusterTileSize", "16", CVAR_ROM );
+		ri.Cvar_SetDescription( clusterZ,
+			"Alias for r_forwardPlusZSlices (shared deferred/Forward+/OIT cluster grid). "
+			"When set > 0 at latch, copies into r_forwardPlusZSlices. See docs/RENDERER_PATH_OWNERSHIP.md." );
+		ri.Cvar_SetDescription( clusterDebug,
+			"Alias for r_forwardPlusDebug. When >= 0, copies into r_forwardPlusDebug each frame start." );
+		ri.Cvar_SetDescription( clusterTile,
+			"Shared cluster tile size in pixels (fixed 16; must match Forward+ cull). Read-only." );
+		if ( clusterTile && clusterTile->integer != 16 ) {
+			ri.Cvar_Set( "r_clusterTileSize", "16" );
+		}
+		if ( clusterZ && clusterZ->integer > 0 && r_forwardPlusZSlices ) {
+			char buf[16];
+			Com_sprintf( buf, sizeof( buf ), "%d", clusterZ->integer );
+			ri.Cvar_Set( "r_forwardPlusZSlices", buf );
+			r_forwardPlusZSlices->integer = clusterZ->integer;
+			r_forwardPlusZSlices->modified = qtrue;
+			ri.Printf( PRINT_ALL, "[VK][cluster] r_clusterZSlices=%d → r_forwardPlusZSlices\n", clusterZ->integer );
+		}
+	}
 	r_forwardPlusSpecularStrength = ri.Cvar_Get( "r_forwardPlusSpecularStrength", "0.65", CVAR_ARCHIVE_ND );
 	ri.Cvar_CheckRange( r_forwardPlusSpecularStrength, "0", "4", CV_FLOAT );
 	ri.Cvar_SetDescription( r_forwardPlusSpecularStrength,
@@ -3925,6 +3951,9 @@ void R_Init( void ) {
 #endif
 #endif
 	R_ApplyRenderModeLatch();
+#ifdef USE_VULKAN
+	R_RenderPath_RegisterCvars();
+#endif
 	VK_RasterUltra_Enforce();
 	vk_aa_policy_apply();
 	ri.Printf( PRINT_ALL, "[VK] SH lighting: %s\n", r_shLighting && r_shLighting->integer ? "enabled" : "disabled" );

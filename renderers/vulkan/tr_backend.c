@@ -30,6 +30,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "vk_pass_registry.h"
 #include "vk_forward_plus.h"
 #include "vk_deferred_gbuffer.h"
+#include "vk_render_path.h"
 #include "vk_visibility_buffer.h"
 #include "vk_niv.h"
 #include "vk_surfel_gi.h"
@@ -719,10 +720,33 @@ void RB_RenderDrawSurfList( drawSurf_t *drawSurfs, int numDrawSurfs ) {
 				( srcBlend == GLS_SRCBLEND_SRC_ALPHA && dstBlend == GLS_DSTBLEND_ONE_MINUS_SRC_ALPHA ) ||
 				additive
 			);
-			if ( backEnd.drawSurfFilter == 1 && transparent )
-				continue;  /* opaque only: skip transparent */
-			if ( backEnd.drawSurfFilter == 2 && !transparent )
-				continue;  /* transparent only: skip opaque */
+			if ( vk_deferred_opaque_transparent_split() ) {
+				unsigned pathFlags = 0u;
+				renderPath_t path;
+				vkViewClass_t viewCls = vk_classify_current_view();
+				if ( entityNum != REFENTITYNUM_WORLD ) {
+					const int rfx = backEnd.refdef.entities[entityNum].e.renderfx;
+					if ( rfx & ( RF_FIRST_PERSON | RF_DEPTHHACK ) ) {
+						pathFlags |= R_PATH_FLAG_WEAPON_CANDIDATE;
+					}
+				}
+				path = R_SelectSurfaceRenderPath( shader, drawSurfs->surface, pathFlags, (int)viewCls );
+				if ( backEnd.drawSurfFilter == 1 &&
+					( path == RENDER_PATH_FORWARD_PLUS_TRANSPARENT || path == RENDER_PATH_OIT ||
+					  path == RENDER_PATH_FORWARD_PLUS_WEAPON || path == RENDER_PATH_UI ) ) {
+					continue;
+				}
+				if ( backEnd.drawSurfFilter == 2 &&
+					( path == RENDER_PATH_DEFERRED_OPAQUE || path == RENDER_PATH_FORWARD_PLUS_OPAQUE ||
+					  path == RENDER_PATH_LEGACY_FORWARD || path == RENDER_PATH_SKY ) ) {
+					continue;
+				}
+			} else {
+				if ( backEnd.drawSurfFilter == 1 && transparent )
+					continue;  /* opaque only: skip transparent */
+				if ( backEnd.drawSurfFilter == 2 && !transparent )
+					continue;  /* transparent only: skip opaque */
+			}
 			/* World OIT must not accumulate first-person / depth-hack weapon geometry. */
 			if ( backEnd.drawSurfFilter == 2 &&
 				( backEnd.oitAccumPass || backEnd.oitMomentsPass ) &&
@@ -3227,6 +3251,15 @@ static const void *RB_SwapBuffers( const void *data ) {
 	s_deferredWeaponCmdCount = 0;
 	s_skipDeferredWeaponSurfaces = qfalse;
 	s_drawDeferredWeaponSurfacesOnly = qfalse;
+	R_RenderPath_BeginFrame();
+	{
+		cvar_t *clusterDebug = ri.Cvar_Get( "r_clusterDebug", "-1", CVAR_ARCHIVE_ND );
+		if ( clusterDebug && clusterDebug->integer >= 0 && r_forwardPlusDebug ) {
+			char buf[16];
+			Com_sprintf( buf, sizeof( buf ), "%g", (double)clusterDebug->value );
+			ri.Cvar_Set( "r_forwardPlusDebug", buf );
+		}
+	}
 #endif
 
 	return (const void *)(cmd + 1);

@@ -1498,6 +1498,8 @@ typedef struct {
 		VkDescriptorSet descriptor;
 		VkPipelineLayout pipeline_layout;
 		VkPipeline tile_pipeline;
+		/* Bumped on tile grid resize / successful cull — deferred lighting asserts match. */
+		uint32_t cluster_list_generation;
 	} forward_plus;
 
 	uint32_t uniform_item_size;

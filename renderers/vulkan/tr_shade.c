@@ -26,6 +26,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "tr_material_paint.h"
 #ifdef USE_VULKAN
 #include "vk_deferred_gbuffer.h"
+#include "vk_render_path.h"
 #include "vk_meshlets.h"
 #include "vk_selective_sun_shadow.h"
 #include "vk_selective_reflection.h"
@@ -1490,9 +1491,31 @@ static void RB_IterateStagesGeneric( const shaderCommands_t *input )
 	uniform.pbrDebugMode[2] = 0.0f;
 	uniform.pbrDebugMode[3] = vk_shr_suppress_gen_frag_ibl_spec() ? 1.0f : 0.0f;
 #ifdef USE_VULKAN
-	/* Mode 3 Unified Clustered opaque pass: hand dynamics to deferred lighting. */
-	if ( vk_unified_clustered_opaque_handoff() ) {
-		uniform.pbrDebugMode[1] = 1.0f;
+	{
+		unsigned pathFlags = 0u;
+		vkViewClass_t viewCls = vk_classify_current_view();
+		renderPath_t path;
+
+		if ( backEnd.currentEntity && backEnd.currentEntity != &tr.worldEntity ) {
+			const int rfx = backEnd.currentEntity->e.renderfx;
+			if ( rfx & ( RF_FIRST_PERSON | RF_DEPTHHACK ) ) {
+				pathFlags |= R_PATH_FLAG_WEAPON_CANDIDATE;
+			}
+		}
+		path = R_SelectSurfaceRenderPath( tess.shader, NULL, pathFlags, (int)viewCls );
+		R_RenderPath_Note( path );
+		/* Opaque deferred handoff from selector (not a second heuristic). */
+		if ( backEnd.drawSurfFilter == 1 && R_RenderPath_WantsDeferredHandoff( path ) &&
+			vk_deferred_lighting_path_ready() ) {
+			if ( r_hybridCompare && r_hybridCompare->integer ) {
+				uniform.pbrDebugMode[1] = 2.0f; /* hybrid: left deferred / right Forward+ */
+			} else {
+				uniform.pbrDebugMode[1] = 1.0f;
+			}
+		}
+		if ( r_renderPathDebug && r_renderPathDebug->integer >= 1 ) {
+			uniform.pbrDebugMode[2] = (float)path;
+		}
 	}
 #endif
 
@@ -1518,7 +1541,7 @@ static void RB_IterateStagesGeneric( const shaderCommands_t *input )
 			/* Single-path: when Forward+ shade owns dynamics, do not skip via dlightBits
 			 * (classic projector is suppressed). Only mask when shade is off or deferred handoff. */
 			if ( !( r_forwardPlusShade && r_forwardPlusShade->value > 0.0f ) ||
-				vk_unified_clustered_opaque_handoff() || vk_deferred_unlit_base_wanted() ) {
+				( uniform.pbrDebugMode[1] > 0.5f ) || vk_deferred_unlit_base_wanted() ) {
 				const uint32_t bits = (uint32_t)tess.dlightBits;
 				if ( bits != 0u ) {
 					float maskF;

@@ -10,8 +10,8 @@ This is more than “deferred plus Forward+.” Shipping today uses those as fou
 
 | Layer | Role |
 |-------|------|
-| **`r_renderMode 2`** | Forward+ primary (opt-in overlay / legacy modern path) |
-| **`r_renderMode 3`** | [Unified Clustered](UNIFIED_CLUSTERED_RENDERER.md) — unified heterogeneous shading / lighting ownership (2D tiles today; depth clusters planned). **Shipping default** (`modern_vulkan.cfg`) and **spine** for 2027 layers |
+| **`r_renderMode 2`** | Forward+ primary — **Spine shipping default** (`modern_vulkan.cfg` → `modern_vulkan_stable.cfg`) |
+| **`r_renderMode 3`** | [Unified Clustered](UNIFIED_CLUSTERED_RENDERER.md) — unified heterogeneous shading / lighting ownership (2D tiles + optional Z-slices). Opt-in via `modern_clustered.cfg`; **spine** for 2027 layers. Path ownership: [RENDERER_PATH_OWNERSHIP.md](RENDERER_PATH_OWNERSHIP.md) |
 | **2027 target** | Mode 3 + visibility buffer + meshlets + reservoir RT + neural reconstruction |
 
 Do **not** invent further `r_renderMode` values beyond Spine 1.2 without a certification gate. Spine 1.2 adds opt-in **`r_renderMode 4`** (Selective Hybrid) and **`5`** (Path-Traced Reference) — see [RENDERER_SPINE_1.2.md](RENDERER_SPINE_1.2.md). Sidecars that are not part of those tiers still stack on mode 3.

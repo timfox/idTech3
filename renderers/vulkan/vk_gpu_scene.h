@@ -46,30 +46,37 @@ typedef enum {
 	VK_GPU_SCENE_REJECT_OVERFLOW
 } vkGpuSceneReject_t;
 
-/* GPU-friendly instance record (no CPU pointers). */
+/* GPU-friendly instance record (no CPU pointers).
+ *
+ * Schema contract (Clustered Hybrid M1 — docs/RENDERER_PATH_OWNERSHIP.md):
+ *  - materialId / meshId / objectId identify shading + identity
+ *  - transform + prevTransform for motion vectors / temporal class
+ *  - flags high bits reserved for M2 materialPathReason / temporalClass
+ * Do not force-enable GPU-driven draws from this scaffold alone.
+ */
 typedef struct {
 	uint32_t handle;
 	uint32_t meshId;
 	uint32_t materialId;
 	uint32_t objectId;
 	float    transform[12];     /* 3x4 row-major */
-	float    prevTransform[12];
+	float    prevTransform[12]; /* reserved for temporal / motion */
 	float    mins[3];
 	float    maxs[3];
 	float    sphere[4];         /* xyz + radius */
 	uint32_t lodLevel;
 	uint32_t lodHysteresis;
-	uint32_t flags;             /* bit0 static, bit1 hlod, bit2 foliage, bit3 dynamic */
+	uint32_t flags;             /* bit0 static, bit1 hlod, bit2 foliage, bit3 dynamic; high bits reserved M2 */
 	uint32_t streamState;
 	uint32_t visibleAge;        /* frames visible — anti one-frame pop */
 	uint32_t lastReject;
 	uint32_t generation;
-	uint32_t _pad;
+	uint32_t _pad;              /* reserve: future temporalClass */
 } vkGpuSceneInstance_t;
 
 typedef struct {
 	uint32_t meshId;
-	uint32_t materialId;
+	uint32_t materialId;        /* shared material id with instance */
 	uint32_t firstMeshlet;
 	uint32_t meshletCount;
 	uint32_t indexFirst;

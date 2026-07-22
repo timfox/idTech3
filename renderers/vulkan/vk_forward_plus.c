@@ -898,6 +898,15 @@ void vk_forward_plus_init( void )
 {
 	R_ApplyRenderModeLatch();
 
+	/* CPU ↔ shader contract (Clustered Hybrid M1 schema). */
+	{
+		_Static_assert( VK_FP_RECORD_STRIDE == 64, "light record must be 4x vec4" );
+		_Static_assert( VK_FP_HEADER_BYTES == 32, "light header must be 2x vec4" );
+		_Static_assert( VK_FP_TILE_DIM == VK_CLUSTER_TILE_SIZE, "cluster tile size alias must match Forward+" );
+		_Static_assert( VK_FP_MAX_PER_TILE == 8u, "tile list stride must match deferred_lighting / gen_frag" );
+		_Static_assert( VK_FP_MAX_GPU_LIGHTS == 64, "GPU light cap must match pack path" );
+	}
+
 	vk_fp_destroy_compute_pipeline();
 	vk_fp_destroy_buffers();
 	vk_fp_destroy_light_buffer();
@@ -909,9 +918,16 @@ void vk_forward_plus_init( void )
 	}
 
 	vk_fp_create_buffers_and_compute();
+	vk.forward_plus.cluster_list_generation = 1u;
 
 	ri.Printf( PRINT_ALL, "[VK][Forward+] r_forwardPlus=1 device-local light SSBO + staging %u bytes (tile cull + PBR read VRAM)\n",
 		(unsigned)vk.forward_plus.capacity_bytes );
+	ri.Printf( PRINT_ALL,
+		"[VK][cluster] schema: record=%uB header=%uB tile=%ux%u maxPerTile=%u maxLights=%u gen=%u\n",
+		(unsigned)VK_FP_RECORD_STRIDE, (unsigned)VK_FP_HEADER_BYTES,
+		(unsigned)VK_FP_TILE_DIM, (unsigned)VK_FP_TILE_DIM,
+		(unsigned)VK_FP_MAX_PER_TILE, (unsigned)VK_FP_MAX_GPU_LIGHTS,
+		vk.forward_plus.cluster_list_generation );
 	if ( r_forwardPlusLuminanceSort && r_forwardPlusLuminanceSort->integer ) {
 		ri.Printf( PRINT_ALL, "[VK][Forward+] r_forwardPlusLuminanceSort=1 (tile overload picks brightest RGB sum)\n" );
 	}
@@ -1367,6 +1383,12 @@ void vk_forward_plus_dispatch_tile_cull( void )
 {
 	vk_spine_pass_begin( VK_SPINE_PASS_TILE_CONSTRUCT );
 	vk_forward_plus_dispatch_tile_cull_internal( qfalse );
+	if ( vk.forward_plus.tile_buffer != VK_NULL_HANDLE ) {
+		vk.forward_plus.cluster_list_generation++;
+		if ( vk.forward_plus.cluster_list_generation == 0u ) {
+			vk.forward_plus.cluster_list_generation = 1u;
+		}
+	}
 	vk_spine_pass_end( VK_SPINE_PASS_TILE_CONSTRUCT );
 }
 
@@ -1374,7 +1396,53 @@ void vk_forward_plus_dispatch_tile_cull_after_opaque( void )
 {
 	vk_spine_pass_begin( VK_SPINE_PASS_TILE_CONSTRUCT );
 	vk_forward_plus_dispatch_tile_cull_internal( qtrue );
+	if ( vk.forward_plus.tile_buffer != VK_NULL_HANDLE ) {
+		vk.forward_plus.cluster_list_generation++;
+		if ( vk.forward_plus.cluster_list_generation == 0u ) {
+			vk.forward_plus.cluster_list_generation = 1u;
+		}
+	}
 	vk_spine_pass_end( VK_SPINE_PASS_TILE_CONSTRUCT );
+}
+
+uint32_t vk_cluster_list_generation( void )
+{
+	return vk.forward_plus.cluster_list_generation;
+}
+
+void vk_cluster_assert_shared_consumers( const char *consumer )
+{
+	static uint32_t s_last_logged_gen;
+	const char *who = consumer && consumer[0] ? consumer : "unknown";
+
+	if ( vk.forward_plus.tile_buffer == VK_NULL_HANDLE || vk.forward_plus.buffer == VK_NULL_HANDLE ) {
+		ri.Printf( PRINT_WARNING, S_COLOR_YELLOW
+			"[VK][cluster] assert (%s): Forward+ light/tile SSBOs missing\n" S_COLOR_WHITE, who );
+		return;
+	}
+	if ( vk.forward_plus.cluster_list_generation != s_last_logged_gen ) {
+		ri.Printf( PRINT_DEVELOPER,
+			"[VK][cluster] shared consumers ok (%s): tile=%p light=%p gen=%u tiles=%ux%ux%u\n",
+			who, (void *)vk.forward_plus.tile_buffer, (void *)vk.forward_plus.buffer,
+			vk.forward_plus.cluster_list_generation,
+			vk.forward_plus.tiles_x, vk.forward_plus.tiles_y, vk.forward_plus.z_slices );
+		s_last_logged_gen = vk.forward_plus.cluster_list_generation;
+	}
+}
+
+void vk_cluster_dispatch_tile_cull( void )
+{
+	vk_forward_plus_dispatch_tile_cull();
+}
+
+VkBuffer vk_cluster_tile_buffer( void )
+{
+	return vk.forward_plus.tile_buffer;
+}
+
+VkBuffer vk_cluster_light_buffer( void )
+{
+	return vk.forward_plus.buffer;
 }
 
 void vk_forward_plus_refresh_viewport_params( uint32_t width, uint32_t height )

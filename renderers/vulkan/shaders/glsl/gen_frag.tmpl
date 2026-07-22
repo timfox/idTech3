@@ -1675,12 +1675,19 @@ void main() {
 	vec3 reflectance = Fd + Fs;
 
 	bool deferredAdditiveHandoff = ( deferred_unlit_base_strength > 1e-6 || pbrDebugMode.y > 0.5 );
+	/* r_hybridCompare 1: left half deferred handoff, right half Forward+ (pbrDebugMode.y == 2). */
+	if ( pbrDebugMode.y > 1.5 ) {
+		float vw = 1.0;
+#ifdef USE_FORWARD_PLUS_FRAG
+		vw = max( fp_lights.fp_light_data[1].z, 1.0 );
+#endif
+		deferredAdditiveHandoff = ( gl_FragCoord.x < vw * 0.5 );
+	}
 	vec3 fpAdd = vec3( 0.0 );
 #ifdef USE_FORWARD_PLUS_FRAG
 #if defined(USE_FORWARD_PLUS_WORLD_POS)
 	/* Opaque handoff: skip Forward+ add (deferred compute owns dynamics). Mode 1 no longer
 	 * bakes this via deferred_unlit_base_strength — only pbrDebugMode.y from the CPU handoff. */
-	float hybridDeferredOpaque = pbrDebugMode.y;
 	if ( !deferredAdditiveHandoff && ( forward_plus_shade_strength > 1e-6 || pbrForwardPlus.x > 1e-6 ) ) {
 		uint tilesX = uint( fp_lights.fp_light_data[1].x + 0.5 );
 		uint tilesY = uint( fp_lights.fp_light_data[1].y + 0.5 );
@@ -2067,6 +2074,20 @@ void main() {
 	out_color.rgb += emissive;
 	
 	out_color.a = diffuse.a;
+	/* r_renderPathDebug 1: tint by R_SelectSurfaceRenderPath id in pbrDebugMode.z */
+	if ( pbrDebugMode.z >= 0.5 ) {
+		int pid = int( pbrDebugMode.z + 0.5 );
+		vec3 pathTint = vec3( 0.25 );
+		if ( pid == 2 ) pathTint = vec3( 0.15, 0.55, 1.0 );       /* deferred_opaque */
+		else if ( pid == 3 ) pathTint = vec3( 0.20, 0.90, 0.35 );  /* fp_opaque */
+		else if ( pid == 4 ) pathTint = vec3( 1.0, 0.55, 0.10 );   /* fp_transparent */
+		else if ( pid == 5 ) pathTint = vec3( 1.0, 0.20, 0.75 );   /* fp_weapon */
+		else if ( pid == 6 ) pathTint = vec3( 0.70, 0.35, 1.0 );   /* oit */
+		else if ( pid == 7 ) pathTint = vec3( 0.45, 0.75, 1.0 );   /* sky */
+		else if ( pid == 8 ) pathTint = vec3( 0.90, 0.90, 0.20 );  /* ui */
+		else if ( pid == 1 ) pathTint = vec3( 0.65 );              /* legacy */
+		out_color.rgb = mix( out_color.rgb, pathTint, 0.45 );
+	}
 #else
 	out_color = base;
 #endif
