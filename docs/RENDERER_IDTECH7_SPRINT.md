@@ -37,6 +37,7 @@ Shared: GPU scene, materials, lights, clusters, shadows, probes, atmosphere, exp
 | 6 | Hi-Z + indirect draw validation | **Done** — compute downsample (`hiz_downsample.comp`), conservative sample, `hiz_status` / `depth_status` / `gpu_scene_status` |
 | 7 | Meshlet: one BSP class + one dynamic model | **Done** — `r_meshletsBspPilot` (SF_FACE), `r_meshletsModelPilot` (static MD3; animated skip) |
 | 8 | Virtual-shadow page fill | **Scaffold** — `vshadow_status` / `shadow_status`; CSM fallback default (full virtualization is next milestone) |
+| 8b | Deferred multi-cascade CSM | **Done** — `ShadowContract_SampleCSM` select+blend via SSBO records; parity with Forward+ splits |
 | 9 | Reflection-source hierarchy debug | **Done** — `r_reflectionDebug` aliases `r_shrDebug` source IDs |
 | 10 | Renderer laboratory expansion | **Done** — `VK_REFLAB_SCENE_SURF_SPEED` + `demo_reference_lab_surf_speed.cfg` + `test_reference_lab_surf_speed.sh` |
 | FC | Foundation Consolidation hub | **Gates green** — `tests/scripts/test_foundation_consolidation.sh` + `test_foundation_unit.sh` |

@@ -60,8 +60,13 @@ layout(push_constant) uniform Push {
 	uint gbufferCompact;
 	uint shadowFlags; /* bit0: sun shadow valid + SSBO bound */
 	float shadowStrength;
+	float shadowNear;
+	vec4 shadowSplits; /* cascade far view depths (std430 align 16) */
+	float shadowBlend; /* edge blend fraction 0..0.5 */
+	uint shadowCascadeCount; /* 1..4 CSM cascades */
 	uint shadowGeneration;
-	uint _shadowPad;
+	uint _shadowPad0;
+	uint _shadowPad1;
 } pc;
 
 #define USE_LTC_AREA_LIGHT

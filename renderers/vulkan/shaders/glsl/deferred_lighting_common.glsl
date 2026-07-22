@@ -321,13 +321,16 @@ vec3 shadeDeferredPixel( uvec2 pix ) {
 		lit = ( albedo * vec3( 0.04 ) + diffuseAcc + specularAcc ) * roughMod * pc.strength;
 	}
 
-	/* Foundation: apply cascade-0 sun shadow from GpuShadowRecord SSBO when valid. */
+	/* Foundation: multi-cascade sun CSM from GpuShadowRecord SSBO (Forward+ parity). */
 #ifdef DEFERRED_HAS_SHADOW_CONTRACT
 	if ( ( pc.shadowFlags & 1u ) != 0u && pc.shadowStrength > 0.0 ) {
 		mat4 invView = inverse( pc.viewMatrix );
 		vec3 worldPos = ( invView * vec4( viewPos, 1.0 ) ).xyz;
-		float sunVis = ShadowContract_SampleCascade(
-			shadows.records[0], sunShadowMap, worldPos, pc.shadowStrength );
+		float viewDist = max( length( viewPos ), max( pc.shadowNear, 0.1 ) );
+		float sunVis = ShadowContract_SampleCSM(
+			shadows.records[0], shadows.records[1], shadows.records[2], shadows.records[3],
+			sunShadowMap, worldPos, viewDist, pc.shadowStrength,
+			pc.shadowCascadeCount, pc.shadowSplits, pc.shadowNear, pc.shadowBlend );
 		/* Soften: keep some ambient so deferred doesn't go fully black in shadow. */
 		lit *= mix( 0.35, 1.0, sunVis );
 	}

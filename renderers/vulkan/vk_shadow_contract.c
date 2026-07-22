@@ -170,15 +170,10 @@ void vk_shadow_contract_note_consumer( uint32_t slot, const char *consumer )
 	if ( slot >= VK_SHADOW_CONTRACT_MAX_RECORDS || !consumer ) {
 		return;
 	}
+	/* Dedup status spam per frame, but still stamp every cascade slot. */
 	if ( !Q_stricmp( consumer, "deferred" ) ) {
-		if ( s_deferredConsumerNoted ) {
-			return;
-		}
 		s_deferredConsumerNoted = qtrue;
 	} else if ( !Q_stricmp( consumer, "forward_plus" ) ) {
-		if ( s_forwardPlusConsumerNoted ) {
-			return;
-		}
 		s_forwardPlusConsumerNoted = qtrue;
 	}
 	Q_strncpyz( s_records[slot].consumer, consumer, sizeof( s_records[slot].consumer ) );

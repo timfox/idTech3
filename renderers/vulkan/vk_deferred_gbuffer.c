@@ -25,6 +25,7 @@ Mode 3 = Unified Clustered Renderer (deferred opaque + Forward+ transparent).
 #include "vk_ltc.h"
 #include "vk_forward_plus.h"
 #include "vk_shadow_contract.h"
+#include "vk_sun_csm.h"
 
 static void vk_dgb_validate_compute_break( const char *stage, qboolean resume_main )
 {
@@ -86,8 +87,13 @@ typedef struct {
 	uint32_t gbufferCompact; /* 1: decode octahedral from material.ba; AO/clearcoat defaults */
 	uint32_t shadowFlags;
 	float shadowStrength;
+	float shadowNear;
+	float shadowSplits[4]; /* 16-byte aligned — matches GLSL vec4 */
+	float shadowBlend;
+	uint32_t shadowCascadeCount; /* 1..4 CSM cascades */
 	uint32_t shadowGeneration;
-	uint32_t _shadowPad;
+	uint32_t _shadowPad0;
+	uint32_t _shadowPad1;
 } vk_deferred_light_push_t;
 
 typedef struct {
@@ -95,9 +101,12 @@ typedef struct {
 	uint32_t hybridCompare;
 } vk_deferred_composite_push_t;
 
+static_assert( sizeof( vk_deferred_light_push_t ) % 4 == 0, "deferred light push align" );
+static_assert( sizeof( vk_deferred_light_push_t ) <= 256, "deferred light push exceeds common PC limit" );
+
 static qboolean s_gbufferCompactDualWriteLogged;
-/* Bump when deferred lighting descriptor layout changes (shadow SSBO bindings). */
-static const uint32_t s_deferredLightingLayoutVersion = 12u;
+/* Bump when deferred lighting descriptor/push layout changes. */
+static const uint32_t s_deferredLightingLayoutVersion = 13u;
 static uint32_t s_deferredLightingLayoutBuilt;
 static void vk_dgb_create_pipeline( void );
 static void vk_dgb_create_lighting_pipeline( void );
@@ -1427,16 +1436,45 @@ static void vk_dgb_fill_light_push( vk_deferred_light_push_t *push, uint32_t wid
 	push->gbufferCompact = ( r_gbufferCompact && r_gbufferCompact->integer ) ? 1u : 0u;
 	push->shadowFlags = 0u;
 	push->shadowStrength = 0.0f;
+	push->shadowNear = ( vk.sun_shadow_near > 0.0f ) ? vk.sun_shadow_near : 4.0f;
+	push->shadowSplits[0] = vk.sun_shadow_splits[0];
+	push->shadowSplits[1] = vk.sun_shadow_splits[1];
+	push->shadowSplits[2] = vk.sun_shadow_splits[2];
+	push->shadowSplits[3] = vk.sun_shadow_splits[3];
+	push->shadowBlend = VK_SunCSM_CascadeBlend();
+	push->shadowCascadeCount = 1u;
 	push->shadowGeneration = vk_shadow_contract_generation();
-	push->_shadowPad = 0u;
+	push->_shadowPad0 = 0u;
+	push->_shadowPad1 = 0u;
 	if ( vk.sun_shadow_valid && vk_shadow_contract_ssbo() != VK_NULL_HANDLE &&
 		( vk.sun_shadow_sample_view || vk.sun_shadow_view ) &&
 		( !r_pbrSunShadow || r_pbrSunShadow->integer ) ) {
 		const GpuShadowRecord *rec0 = vk_shadow_contract_record( 0 );
 		if ( rec0 && rec0->allocated ) {
+			uint32_t cascades = vk.sun_shadow_cascade_count;
+			uint32_t ci;
+			if ( cascades < 1u ) {
+				cascades = 1u;
+			}
+			if ( cascades > 4u ) {
+				cascades = 4u;
+			}
+			/* Require at least cascade 0; count only allocated consecutive slots. */
+			for ( ci = 1u; ci < cascades; ci++ ) {
+				const GpuShadowRecord *rec = vk_shadow_contract_record( ci );
+				if ( !rec || !rec->allocated ) {
+					cascades = ci;
+					break;
+				}
+			}
 			push->shadowFlags = 1u;
 			push->shadowStrength = ( r_pbrSunShadowStrength ) ?
 				Com_Clamp( 0.0f, 1.0f, r_pbrSunShadowStrength->value ) : 1.0f;
+			push->shadowCascadeCount = cascades;
+			vk_shadow_contract_note_consumer( 0, "deferred" );
+			for ( ci = 1u; ci < cascades; ci++ ) {
+				vk_shadow_contract_note_consumer( ci, "deferred" );
+			}
 		}
 	}
 	if ( vk_frequency_aware_active() ) {

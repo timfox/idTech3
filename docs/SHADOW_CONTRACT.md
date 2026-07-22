@@ -47,7 +47,7 @@ Depth formats: `D32_SFLOAT` or `D16` atlas tiles. Vshadow uses page table + comp
 
 GPU SSBO: packed `GpuShadowGpuRecord` (160 B × 16 slots) uploaded via `vk_shadow_contract_upload_ssbo()` after CSM finalize; bind with `vk_shadow_contract_ssbo()`.
 
-Deferred lighting binds SSBO at set0 binding 10 + sun CSM atlas at binding 11 (`shadow_contract.glsl`); cascade sample uses Forward+-matched depth compare (`ndc.z*0.5+0.5`, `compare <= map`) and atlasScaleBias tile UV. Enabled when `r_pbrSunShadow 1`. Forward+ continues to use UBO cascade rows and notes consumer `forward_plus`.
+Deferred lighting binds SSBO at set0 binding 10 + sun CSM atlas at binding 11 (`shadow_contract.glsl`); **multi-cascade select + edge blend** matches Forward+ (`ShadowContract_SampleCSM`, splits/near/blend in deferred light push). Depth compare uses `ndc.z*0.5+0.5`, `compare <= map`, and atlasScaleBias tile UV. Enabled when `r_pbrSunShadow 1`. Forward+ continues to use UBO cascade rows and notes consumer `forward_plus`.
 
 ---
 
