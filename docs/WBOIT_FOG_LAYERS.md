@@ -121,7 +121,7 @@ Future classify hooks — not separate fog policies in mode 1 today:
 | `TRANSPARENCY_SURFACE` | Glass, grates, foliage cards | WBOIT accum + mode 1 fog |
 | `TRANSPARENCY_PARTICLE` | Additive/modulate particles | Classify bucket; same fog on lit terms |
 | `TRANSPARENCY_VOLUME_PROXY` | Camera-aligned smoke quads | WBOIT; density may pair with higher `r_oitFogDensity` |
-| `TRANSPARENCY_REFRACTIVE` | Distortion / screenMap | **Excluded** from WBOIT (refractive ping-pong path) |
+| `TRANSPARENCY_REFRACTIVE` | Distortion / screenMap / portal | **Excluded** from WBOIT (refractive ping-pong path). Plain `glass`/`water` **names without screenMap stay in WBOIT**. |
 
 See `vk_transparency_route.h` for current `vkTransparencyClass_t` routing.
 Macros `TRANSPARENCY_SURFACE` / `PARTICLE` / `VOLUME_PROXY` / `REFRACTIVE` alias the class enum for fog ownership docs.

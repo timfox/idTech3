@@ -26,6 +26,7 @@ SSAO/HBAO pass, and vk_bloom. Split from vk.c.
 #include "vk_selective_reflection.h"
 #include "vk_pass_registry.h"
 #include "vk_forward_plus.h"
+#include "vk_shadow_contract.h"
 #include "vk_temporal.h"
 #include "vk_oit_certify.h"
 #include "vk_black_frame.h"
@@ -525,6 +526,8 @@ void vk_oit_pass( const struct drawSurfsCommand_s *cmd )
 		vk.oitClusterGenAtAccum = 0;
 		vk.oitLightBufferGenAtAccum = 0;
 	}
+	vk_shadow_contract_oit_update_descriptors();
+	vk_shadow_contract_note_consumer( 0, "oit" );
 	if ( ri.Cvar_VariableIntegerValue( "r_oitExtentDebug" ) ) {
 		ri.Printf( PRINT_ALL,
 			"[VK][OIT] extentDebug render=%ux%u oitActive=%ux%u oitAlloc=%ux%u "

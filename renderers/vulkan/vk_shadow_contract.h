@@ -62,6 +62,10 @@ uint32_t vk_shadow_contract_generation( void );
 const GpuShadowRecord *vk_shadow_contract_record( uint32_t slot );
 qboolean vk_shadow_contract_upload_ssbo( void );
 VkBuffer vk_shadow_contract_ssbo( void );
+/* WBOIT/MBOIT: SSBO + sun atlas descriptor set (binding 0 storage, 1 sampler). */
+VkDescriptorSetLayout vk_shadow_contract_oit_set_layout( void );
+VkDescriptorSet vk_shadow_contract_oit_descriptor( void );
+void vk_shadow_contract_oit_update_descriptors( void );
 void vk_shadow_contract_status_f( void );
 
 #ifdef __cplusplus

@@ -712,6 +712,7 @@ typedef struct {
 	VkDescriptorSetLayout set_layout_uniform;	// dynamic uniform buffer
 	VkDescriptorSetLayout set_layout_storage;	// feedback buffer
 	VkDescriptorSetLayout set_layout_postfx_uniform;	// post-process params uniform buffer
+	VkDescriptorSetLayout set_layout_oit_shadow;	/* WBOIT: shadow SSBO + sun atlas */
 #ifdef USE_VK_PBR
 	VkDescriptorSetLayout set_layout_forward_plus;	/* light + tile SSBOs (compute cull + PBR fragment debug) */
 #endif
@@ -1347,6 +1348,7 @@ typedef struct {
 	VkDescriptorSet oit_depth_descriptor;
 	VkDescriptorSet oit_moments_descriptor;
 	VkDescriptorSet oit_b0_descriptor;
+	VkDescriptorSet oit_shadow_descriptor; /* shadow contract SSBO + sun CSM atlas */
 	/* Bumped when OIT images/FBs recreate; descriptors must match before accum/resolve. */
 	uint32_t oitAttachmentGeneration;
 	uint32_t oitDescriptorGeneration;

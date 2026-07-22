@@ -182,6 +182,11 @@ void vk_shutdown( refShutdownCode_t code )
 	qvkDestroyDescriptorSetLayout(vk.device, vk.set_layout_sampler, NULL);
 	qvkDestroyDescriptorSetLayout(vk.device, vk.set_layout_uniform, NULL);
 	qvkDestroyDescriptorSetLayout(vk.device, vk.set_layout_storage, NULL);
+	if ( vk.set_layout_oit_shadow != VK_NULL_HANDLE ) {
+		qvkDestroyDescriptorSetLayout( vk.device, vk.set_layout_oit_shadow, NULL );
+		vk.set_layout_oit_shadow = VK_NULL_HANDLE;
+	}
+	vk.oit_shadow_descriptor = VK_NULL_HANDLE;
 	if ( vk.volumetric_compute_layout != VK_NULL_HANDLE ) {
 		qvkDestroyDescriptorSetLayout( vk.device, vk.volumetric_compute_layout, NULL );
 		vk.volumetric_compute_layout = VK_NULL_HANDLE;

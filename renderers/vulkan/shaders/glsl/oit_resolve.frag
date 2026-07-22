@@ -79,8 +79,12 @@ void main() {
 	}
 
 	revealage = clamp( revealage, 0.0, 1.0 );
-	/* Raise floor slightly so sparse/noisy weight sums do not amplify into solid slabs. */
-	float wsum = max( accum.a, 1e-3 );
+	/* Empty accumulation: preserve opaque (never black). */
+	if ( accum.a < 1e-5 && length( accum.rgb ) < 1e-5 ) {
+		out_color = vec4( opaque, 1.0 );
+		return;
+	}
+	float wsum = max( accum.a, 1e-4 );
 	vec3 c_avg = accum.rgb / wsum;
 	if ( oit_invalid3( c_avg ) ) {
 		out_color = vec4( oit_magenta(), 1.0 );
@@ -95,33 +99,26 @@ void main() {
 	}
 
 	float coverage = 1.0 - revealage;
-	/* Soft floor: hard 1e-4 cutoffs left sparse soft-alpha as screen-door stipple. */
-	if ( coverage < 1e-4 ) {
+	if ( coverage < 1e-5 ) {
 		out_color = vec4( opaque, 1.0 );
 		return;
 	}
-	/* Empty / near-empty accumulation: never replace opaque with black. */
-	if ( accum.a < 1e-4 && length( accum.rgb ) < 1e-4 ) {
-		out_color = vec4( opaque, 1.0 );
-		return;
-	}
+	/* Soften only ultra-thin coverage (was 0.04 — crushed soft glass). */
 	{
-		float soft = smoothstep( 0.0, 0.04, coverage );
+		float soft = smoothstep( 0.0, 0.008, coverage );
 		coverage *= soft;
 		revealage = 1.0 - coverage;
+		if ( coverage < 1e-5 ) {
+			out_color = vec4( opaque, 1.0 );
+			return;
+		}
 	}
-	/* Near-black average with real coverage → prefer opaque (additive/hole guard). */
+	/* Near-black average: gently lift toward opaque instead of hard silhouette kill. */
 	{
 		float avgLum = dot( max( c_avg, vec3( 0.0 ) ), vec3( 0.2126, 0.7152, 0.0722 ) );
-		if ( coverage > 0.15 && avgLum < 0.02 ) {
-			float keep = clamp( avgLum / 0.02, 0.0, 1.0 );
-			c_avg = mix( opaque, c_avg, keep );
-			coverage *= keep;
-			revealage = 1.0 - coverage;
-			if ( coverage < 1e-4 ) {
-				out_color = vec4( opaque, 1.0 );
-				return;
-			}
+		if ( coverage > 0.25 && avgLum < 0.008 ) {
+			float keep = clamp( avgLum / 0.008, 0.15, 1.0 );
+			c_avg = mix( opaque * 0.35, c_avg, keep );
 		}
 	}
 	vec3 resolved = c_avg * coverage + opaque * revealage;

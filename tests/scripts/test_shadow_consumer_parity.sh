@@ -32,12 +32,15 @@ GLSL="$ROOT/renderers/vulkan/shaders/glsl/shadow_contract.glsl"
 if [[ -f "$GLSL" ]]; then
 	grep -q 'ShadowContract_SampleCSM' "$GLSL" || fail "ShadowContract_SampleCSM missing"
 	grep -q 'ShadowContract_SampleCascadeRaw' "$GLSL" || fail "ShadowContract_SampleCascadeRaw missing"
+	grep -q 'ShadowContract_SampleCSM_BestFit' "$GLSL" || fail "ShadowContract_SampleCSM_BestFit missing"
 	pass "multi-cascade SampleCSM in shadow_contract.glsl"
 fi
 
 grep -q 'shadowCascadeCount' "$ROOT/renderers/vulkan/vk_deferred_gbuffer.c" || fail "deferred push missing shadowCascadeCount"
 grep -q 'ShadowContract_SampleCSM' "$ROOT/renderers/vulkan/shaders/glsl/deferred_lighting_common.glsl" || fail "deferred lighting must call SampleCSM"
-pass "deferred multi-cascade wiring present"
+grep -q 'set_layout_oit_shadow\|oit_shadow_descriptor' "$ROOT/renderers/vulkan/vk_shadow_contract.c" || fail "OIT shadow descriptor helpers missing"
+grep -q 'ShadowContract_SampleCSM_BestFit' "$ROOT/renderers/vulkan/shaders/glsl/oit_accum.frag" || fail "oit_accum must sample CSM"
+pass "deferred multi-cascade + OIT CSM wiring present"
 
 if [[ $failures -ne 0 ]]; then
 	echo "$failures check(s) failed"

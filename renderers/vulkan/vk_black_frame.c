@@ -262,7 +262,7 @@ static uint32_t VK_BF_ValidateFrame( qboolean printPass )
 
 	/* 8) Push-constant note */
 	ri.Printf( PRINT_ALL,
-		"NOTE: OIT push=224 B / resolve=16 B (see startup [VK][OIT] push layout)\n" );
+		"NOTE: OIT push=256 B / resolve=16 B (see startup [VK][OIT] push layout)\n" );
 
 	fails += vk_frame_contract_validate( printPass );
 

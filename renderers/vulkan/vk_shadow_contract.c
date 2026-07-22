@@ -20,6 +20,7 @@ static VkDeviceMemory s_ssboMem;
 static void *s_ssboMapped;
 static uint32_t s_ssboUploads;
 static qboolean s_ssboLogged;
+static qboolean s_oitShadowLayoutLogged;
 
 typedef struct {
 	uint32_t type;
@@ -270,8 +271,140 @@ VkBuffer vk_shadow_contract_ssbo( void )
 	return s_ssbo;
 }
 
+static void VK_ShadowContract_EnsureOitSetLayout( void )
+{
+	VkDescriptorSetLayoutBinding binds[2];
+	VkDescriptorSetLayoutCreateInfo ci;
+
+	if ( vk.set_layout_oit_shadow != VK_NULL_HANDLE ) {
+		return;
+	}
+	Com_Memset( binds, 0, sizeof( binds ) );
+	binds[0].binding = 0;
+	binds[0].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+	binds[0].descriptorCount = 1;
+	binds[0].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+	binds[1].binding = 1;
+	binds[1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+	binds[1].descriptorCount = 1;
+	binds[1].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+	Com_Memset( &ci, 0, sizeof( ci ) );
+	ci.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+	ci.bindingCount = 2;
+	ci.pBindings = binds;
+	if ( qvkCreateDescriptorSetLayout( vk.device, &ci, NULL, &vk.set_layout_oit_shadow ) != VK_SUCCESS ) {
+		vk.set_layout_oit_shadow = VK_NULL_HANDLE;
+		return;
+	}
+	SET_OBJECT_NAME( vk.set_layout_oit_shadow, "set layout - oit shadow",
+		VK_DEBUG_REPORT_OBJECT_TYPE_DESCRIPTOR_SET_LAYOUT_EXT );
+	if ( !s_oitShadowLayoutLogged ) {
+		ri.Printf( PRINT_ALL, "[VK][shadow_contract] OIT shadow set layout ready (SSBO+sunAtlas)\n" );
+		s_oitShadowLayoutLogged = qtrue;
+	}
+}
+
+VkDescriptorSetLayout vk_shadow_contract_oit_set_layout( void )
+{
+	VK_ShadowContract_EnsureOitSetLayout();
+	return vk.set_layout_oit_shadow;
+}
+
+void vk_shadow_contract_oit_update_descriptors( void )
+{
+	VkDescriptorSetAllocateInfo alloc;
+	VkDescriptorBufferInfo buf;
+	VkDescriptorImageInfo img;
+	VkWriteDescriptorSet writes[2];
+	VkBuffer ssbo;
+	VkImageView shadow_view;
+	VkSampler shadow_samp;
+	VkImageLayout shadow_layout;
+	Vk_Sampler_Def sd;
+	qboolean haveRealShadow;
+
+	VK_ShadowContract_EnsureOitSetLayout();
+	if ( vk.set_layout_oit_shadow == VK_NULL_HANDLE || vk.descriptor_pool == VK_NULL_HANDLE ) {
+		return;
+	}
+
+	ssbo = vk_shadow_contract_ssbo();
+	if ( ssbo == VK_NULL_HANDLE ) {
+		return;
+	}
+	vk_shadow_contract_upload_ssbo();
+
+	if ( vk.oit_shadow_descriptor == VK_NULL_HANDLE ) {
+		Com_Memset( &alloc, 0, sizeof( alloc ) );
+		alloc.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+		alloc.descriptorPool = vk.descriptor_pool;
+		alloc.descriptorSetCount = 1;
+		alloc.pSetLayouts = &vk.set_layout_oit_shadow;
+		if ( qvkAllocateDescriptorSets( vk.device, &alloc, &vk.oit_shadow_descriptor ) != VK_SUCCESS ) {
+			vk.oit_shadow_descriptor = VK_NULL_HANDLE;
+			return;
+		}
+		SET_OBJECT_NAME( vk.oit_shadow_descriptor, "descriptor - oit shadow",
+			VK_DEBUG_REPORT_OBJECT_TYPE_DESCRIPTOR_SET_EXT );
+	}
+
+	haveRealShadow = qfalse;
+	shadow_view = vk.sun_shadow_sample_view ? vk.sun_shadow_sample_view : vk.sun_shadow_view;
+	shadow_layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
+	if ( shadow_view != VK_NULL_HANDLE ) {
+		haveRealShadow = qtrue;
+	} else if ( tr.whiteImage && tr.whiteImage->view != VK_NULL_HANDLE ) {
+		shadow_view = tr.whiteImage->view;
+		shadow_layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+	}
+	if ( !shadow_view ) {
+		return;
+	}
+
+	Com_Memset( &sd, 0, sizeof( sd ) );
+	sd.gl_mag_filter = sd.gl_min_filter = GL_NEAREST;
+	sd.address_mode = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+	sd.noAnisotropy = qtrue;
+	shadow_samp = ( haveRealShadow && vk.sun_shadow_sampler )
+		? vk.sun_shadow_sampler : vk_find_sampler( &sd );
+
+	Com_Memset( &buf, 0, sizeof( buf ) );
+	buf.buffer = ssbo;
+	buf.offset = 0;
+	buf.range = VK_WHOLE_SIZE;
+	Com_Memset( &img, 0, sizeof( img ) );
+	img.sampler = shadow_samp;
+	img.imageView = shadow_view;
+	img.imageLayout = shadow_layout;
+
+	Com_Memset( writes, 0, sizeof( writes ) );
+	writes[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+	writes[0].dstSet = vk.oit_shadow_descriptor;
+	writes[0].dstBinding = 0;
+	writes[0].descriptorCount = 1;
+	writes[0].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+	writes[0].pBufferInfo = &buf;
+	writes[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+	writes[1].dstSet = vk.oit_shadow_descriptor;
+	writes[1].dstBinding = 1;
+	writes[1].descriptorCount = 1;
+	writes[1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+	writes[1].pImageInfo = &img;
+	qvkUpdateDescriptorSets( vk.device, 2, writes, 0, NULL );
+}
+
+VkDescriptorSet vk_shadow_contract_oit_descriptor( void )
+{
+	if ( vk.oit_shadow_descriptor == VK_NULL_HANDLE ) {
+		vk_shadow_contract_oit_update_descriptors();
+	}
+	return vk.oit_shadow_descriptor;
+}
+
 void vk_shadow_contract_shutdown( void )
 {
+	/* Descriptor set freed with descriptor_pool; only clear handle. */
+	vk.oit_shadow_descriptor = VK_NULL_HANDLE;
 	VK_ShadowContract_DestroySSBO();
 }
 

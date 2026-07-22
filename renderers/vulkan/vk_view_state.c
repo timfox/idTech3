@@ -13,7 +13,7 @@ typedef struct vkMvpPushConstants_s {
 	float reserved[8]; /* padding / future push data; size must match VkPushConstantRange in vk_init_device.c */
 } vkMvpPushConstants_t;
 
-/* OIT layouts: mvp + prevMvp + model (192 B) + lighting/fog (32 B) = 224 B. */
+/* OIT layouts: mvp + prevMvp + model (192 B) + fog/sun block (64 B) = 256 B. */
 typedef struct vkOitPushConstants_s {
 	float mvp[16];
 	float prev_mvp[16];
@@ -23,13 +23,16 @@ typedef struct vkOitPushConstants_s {
 	int fogMode;
 	int fogDebug;
 	float fogDensity;
-	float fogColorR;
-	float fogColorG;
-	float fogColorB;
+	float coverageScale; /* <1 softens near-opaque tex alpha (Q3 glass often a≈1) */
+	float sunDir[3];     /* world-space direction toward sun */
+	float sunStrength;   /* 0 = sun term off */
+	float sunColor[3];
+	float sunAmbient;    /* albedo * ambient when vertex looks unlit */
+	float _pad[2];
 } vkOitPushConstants_t;
 
-_Static_assert( sizeof( vkOitPushConstants_t ) == 224,
-	"OIT push constants must stay 224 bytes (pipeline_layout_oit_* ranges)" );
+_Static_assert( sizeof( vkOitPushConstants_t ) == 256,
+	"OIT push constants must stay 256 bytes (pipeline_layout_oit_* ranges)" );
 _Static_assert( sizeof( vkMvpPushConstants_t ) == 160,
 	"MVP push constants must match VkPushConstantRange in vk_init_device.c" );
 
@@ -1051,9 +1054,48 @@ void vk_update_mvp( const float *m )
 		cvar_t *fogDen = ri.Cvar_Get( "r_oitFogDensity", "0.0", 0 );
 		oit_push.fogDensity = fogDen ? fogDen->value : 0.0f;
 	}
-	oit_push.fogColorR = 0.7f;
-	oit_push.fogColorG = 0.75f;
-	oit_push.fogColorB = 0.8f;
+	/* Default: trust texture×vertex alpha. Soften when Q3 glass leaves alpha≈1. */
+	oit_push.coverageScale = 1.0f;
+	if ( tess.shader && tess.shader->sort >= SS_BLEND0 && tess.shader->name[0] ) {
+		if ( Q_stristr( tess.shader->name, "glass" ) || Q_stristr( tess.shader->name, "window" ) ||
+			Q_stristr( tess.shader->name, "trans" ) ) {
+			oit_push.coverageScale = 0.32f;
+		} else if ( Q_stristr( tess.shader->name, "water" ) || Q_stristr( tess.shader->name, "slime" ) ||
+			Q_stristr( tess.shader->name, "lava" ) ) {
+			oit_push.coverageScale = 0.48f;
+		}
+	}
+	/* Sun term for WBOIT (Forward+ tiles lack directional). Unshadowed — CSM bind is next. */
+	{
+		vec3_t sunDir;
+		float sunLen;
+		VectorCopy( tr.sunDirection, sunDir );
+		sunLen = VectorLength( sunDir );
+		if ( sunLen > 1e-4f ) {
+			VectorScale( sunDir, 1.0f / sunLen, sunDir );
+		} else {
+			sunDir[0] = 0.45f;
+			sunDir[1] = 0.3f;
+			sunDir[2] = 0.9f;
+			VectorNormalize( sunDir );
+		}
+		oit_push.sunDir[0] = sunDir[0];
+		oit_push.sunDir[1] = sunDir[1];
+		oit_push.sunDir[2] = sunDir[2];
+		oit_push.sunColor[0] = tr.sunLight[0];
+		oit_push.sunColor[1] = tr.sunLight[1];
+		oit_push.sunColor[2] = tr.sunLight[2];
+		if ( oit_push.sunColor[0] + oit_push.sunColor[1] + oit_push.sunColor[2] < 1e-4f ) {
+			oit_push.sunColor[0] = oit_push.sunColor[1] = oit_push.sunColor[2] = 1.0f;
+		}
+		oit_push.sunStrength = ( !R_ClassicLightingActive() && r_pbrSunShadow && r_pbrSunShadow->integer )
+			? ( ( r_pbrSunShadowStrength ) ? Com_Clamp( 0.0f, 1.0f, r_pbrSunShadowStrength->value ) : 1.0f )
+			: 0.65f;
+		oit_push.sunAmbient = 0.28f;
+		oit_push._pad[0] = (float)( ( vk.sun_shadow_cascade_count > 0u ) ?
+			( ( vk.sun_shadow_cascade_count > 4u ) ? 4u : vk.sun_shadow_cascade_count ) : 1u );
+		oit_push._pad[1] = vk.sun_shadow_valid ? 1.0f : 0.0f;
+	}
 	vk_capture_weapon_matrices();
 	push_constants.reserved[0] = ( tess.sdfUiEdge >= 0.0f ) ? tess.sdfUiEdge : 0.0f;
 	if ( r_sdfScreenAa ) {

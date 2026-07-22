@@ -195,4 +195,47 @@ float ShadowContract_SampleCSM(
 	return mix( 1.0, vis, clamp( strength, 0.0, 1.0 ) );
 }
 
+/*
+ * Best-fit cascade without CPU splits: try fine→coarse, first in-frustum wins.
+ * Used by WBOIT when push space cannot carry split distances.
+ */
+float ShadowContract_SampleCSM_BestFit(
+	GpuShadowGpuRecord rec0,
+	GpuShadowGpuRecord rec1,
+	GpuShadowGpuRecord rec2,
+	GpuShadowGpuRecord rec3,
+	sampler2D shadowMap,
+	vec3 worldPos,
+	float strength,
+	uint cascadeCount )
+{
+	if ( strength <= 0.0 || cascadeCount == 0u ) {
+		return 1.0;
+	}
+	int count = int( clamp( float( cascadeCount ), 1.0, 4.0 ) );
+	float vis = -1.0;
+	for ( int i = 0; i < 4; ++i ) {
+		if ( i >= count ) {
+			break;
+		}
+		GpuShadowGpuRecord rec = rec0;
+		if ( i == 1 ) {
+			rec = rec1;
+		} else if ( i == 2 ) {
+			rec = rec2;
+		} else if ( i >= 3 ) {
+			rec = rec3;
+		}
+		float v = ShadowContract_SampleCascadeRaw( rec, shadowMap, worldPos );
+		if ( v >= 0.0 ) {
+			vis = v;
+			break;
+		}
+	}
+	if ( vis < 0.0 ) {
+		return 1.0;
+	}
+	return mix( 1.0, vis, clamp( strength, 0.0, 1.0 ) );
+}
+
 #endif

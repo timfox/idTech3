@@ -188,19 +188,36 @@ qboolean vk_transparency_is_refractive( const shader_t *shader )
 	if ( !shader ) {
 		return qfalse;
 	}
+	/* Real refraction / portal / distortion: needs screenMap or explicit name.
+	 * Do NOT treat every "glass"/"water" blend shader as refractive — OpenArena
+	 * glass is usually simple alpha and belongs in WBOIT when r_oit 1. */
 	if ( shader->hasScreenMap ) {
 		return qtrue;
 	}
-	/* Heuristic: water/glass naming when screenMap absent but material is refractive. */
 	if ( shader->name[0] ) {
-		if ( Q_stristr( shader->name, "water" ) || Q_stristr( shader->name, "glass" ) ||
-			Q_stristr( shader->name, "portal" ) || Q_stristr( shader->name, "refract" ) ) {
+		if ( Q_stristr( shader->name, "portal" ) ||
+			Q_stristr( shader->name, "refract" ) ||
+			Q_stristr( shader->name, "distort" ) ||
+			Q_stristr( shader->name, "screenmap" ) ) {
 			if ( shader->sort >= SS_BLEND0 ) {
 				return qtrue;
 			}
 		}
 	}
 	return qfalse;
+}
+
+/* Classify water/glass for debug / routing without forcing refractive exclusion. */
+static qboolean VK_Transparency_NameIsWater( const shader_t *shader )
+{
+	return ( shader && shader->name[0] && Q_stristr( shader->name, "water" ) ) ? qtrue : qfalse;
+}
+
+static qboolean VK_Transparency_NameIsGlass( const shader_t *shader )
+{
+	return ( shader && shader->name[0] &&
+		( Q_stristr( shader->name, "glass" ) || Q_stristr( shader->name, "window" ) ||
+			Q_stristr( shader->name, "trans" ) ) ) ? qtrue : qfalse;
 }
 
 vkTransparencyClass_t vk_transparency_classify_shader( const shader_t *shader )
@@ -221,10 +238,10 @@ vkTransparencyClass_t vk_transparency_classify_shader( const shader_t *shader )
 	}
 
 	if ( vk_transparency_is_refractive( shader ) ) {
-		if ( shader->name[0] && Q_stristr( shader->name, "water" ) ) {
+		if ( VK_Transparency_NameIsWater( shader ) ) {
 			return VK_XPARENT_WATER;
 		}
-		if ( shader->name[0] && Q_stristr( shader->name, "glass" ) ) {
+		if ( VK_Transparency_NameIsGlass( shader ) ) {
 			return VK_XPARENT_GLASS;
 		}
 		return VK_XPARENT_REFRACTIVE;
@@ -250,6 +267,13 @@ vkTransparencyClass_t vk_transparency_classify_shader( const shader_t *shader )
 
 	oitOn = ( r_oit && r_oit->integer == 1 ) ? qtrue : qfalse;
 	if ( oitOn && shader->sort >= SS_BLEND0 && shader->sort <= SS_BLEND6 ) {
+		/* Label OA glass/water for debug; they accumulate in WBOIT (not refractive). */
+		if ( VK_Transparency_NameIsWater( shader ) ) {
+			return VK_XPARENT_WATER;
+		}
+		if ( VK_Transparency_NameIsGlass( shader ) ) {
+			return VK_XPARENT_GLASS;
+		}
 		return VK_XPARENT_WBOIT;
 	}
 	if ( shader->sort >= SS_BLEND0 ) {
@@ -292,8 +316,8 @@ void vk_transparency_route_init( void )
 	r_refractiveExcludeOit = ri.Cvar_Get( "r_refractiveExcludeOit", "1", CVAR_ARCHIVE_ND );
 	ri.Cvar_CheckRange( r_refractiveExcludeOit, "0", "1", CV_INTEGER );
 	ri.Cvar_SetDescription( r_refractiveExcludeOit,
-		"Exclude screenMap/water/glass refractive shaders from WBOIT/MBOIT;\n"
-		"draw them sorted after OIT resolve using opaque scene color (Raster Ultra 1.4)." );
+		"Exclude screenMap/portal/refract/distort shaders from WBOIT/MBOIT;\n"
+		"draw them sorted after OIT resolve. Plain glass/water alpha stays in WBOIT." );
 	ri.Cvar_SetGroup( r_refractiveExcludeOit, CVG_RENDERER );
 
 	if ( ri.Cmd_AddCommand ) {

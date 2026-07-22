@@ -49,6 +49,8 @@ GPU SSBO: packed `GpuShadowGpuRecord` (160 B × 16 slots) uploaded via `vk_shado
 
 Deferred lighting binds SSBO at set0 binding 10 + sun CSM atlas at binding 11 (`shadow_contract.glsl`); **multi-cascade select + edge blend** matches Forward+ (`ShadowContract_SampleCSM`, splits/near/blend in deferred light push). Depth compare uses `ndc.z*0.5+0.5`, `compare <= map`, and atlasScaleBias tile UV. Enabled when `r_pbrSunShadow 1`. Forward+ continues to use UBO cascade rows and notes consumer `forward_plus`.
 
+WBOIT accum (`oit_accum.frag`) samples **CSM via shadow-contract set 3** (`ShadowContract_SampleCSM_BestFit`) and modulates the directional sun term; consumer noted as `oit`.
+
 ---
 
 ## Lifecycle

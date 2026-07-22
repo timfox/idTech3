@@ -26,6 +26,12 @@ layout(std430, set = 4, binding = 2) readonly buffer FpParamSSBO {
 	vec4 fp_cluster_z_range;
 } fp_params;
 
+#include "shadow_contract.glsl"
+layout(std430, set = 5, binding = 0) readonly buffer ShadowContractSSBO {
+	GpuShadowGpuRecord records[];
+} shadows;
+layout(set = 5, binding = 1) uniform sampler2D sunShadowMap;
+
 #define CLUSTER_LIST_CELLS fp_tiles.fp_tile_cells
 #include "cluster_light_list.glsl"
 #include "forward_plus_light_eval.glsl"
@@ -46,9 +52,17 @@ layout(push_constant) uniform Transform {
 	int fogMode;
 	int fogDebug;
 	float fogDensity;
-	float fogColorR;
-	float fogColorG;
-	float fogColorB;
+	float coverageScale;
+	float sunDirX;
+	float sunDirY;
+	float sunDirZ;
+	float sunStrength;
+	float sunColorR;
+	float sunColorG;
+	float sunColorB;
+	float sunAmbient;
+	float _pad0;
+	float _pad1;
 } pc;
 
 float AbsorbanceCloser( float b0, vec4 b, float z )
@@ -73,6 +87,10 @@ float AbsorbanceCloser( float b0, vec4 b, float z )
 void main() {
 	vec4 base = textureLod(tex0, frag_tex_coord0, 0.0) * frag_color0;
 	float alpha = clamp(base.a, 0.0, 0.999);
+	if ( pc.coverageScale > 0.0 && pc.coverageScale < 0.999 && alpha > 0.85 ) {
+		float vertA = clamp( frag_color0.a, 0.05, 1.0 );
+		alpha = clamp( pc.coverageScale * vertA, 0.04, 0.82 );
+	}
 	if (alpha < 1e-3) discard;
 	if ( isnan( alpha ) || isinf( alpha ) || any( isnan( base.rgb ) ) || any( isinf( base.rgb ) ) ) {
 		out_color = vec4( 1.0, 0.0, 1.0, 1.0 );
@@ -87,13 +105,31 @@ void main() {
 		if ( gl_FragCoord.z + 1e-5 < opaqueDepth ) discard;
 	}
 
-	vec3 litRgb = base.rgb;
-	if ( forward_plus_lit != 0 ) {
-		vec3 N = normalize( cross( dFdx( frag_world_pos ), dFdy( frag_world_pos ) ) );
-		if ( dot( N, N ) < 1e-8 ) {
-			N = vec3( 0.0, 0.0, 1.0 );
+	vec3 N = normalize( cross( dFdx( frag_world_pos ), dFdy( frag_world_pos ) ) );
+	if ( dot( N, N ) < 1e-8 ) {
+		N = vec3( 0.0, 0.0, 1.0 );
+	}
+	vec3 V = normalize( fp_params.fp_view_org.xyz - frag_world_pos );
+	if ( dot( N, V ) < 0.0 ) {
+		N = -N;
+	}
+	float vertLum = dot( frag_color0.rgb, vec3( 0.2126, 0.7152, 0.0722 ) );
+	float ambMix = smoothstep( 0.85, 0.98, vertLum );
+	vec3 litRgb = base.rgb * mix( 1.0, max( clamp( pc.sunAmbient, 0.0, 1.0 ), 0.15 ), ambMix );
+	if ( pc.sunStrength > 1e-4 ) {
+		vec3 L = normalize( vec3( pc.sunDirX, pc.sunDirY, pc.sunDirZ ) );
+		float wrap = clamp( max( dot( N, L ), 0.0 ) * 0.85 + 0.15, 0.0, 1.0 );
+		uint cascades = uint( clamp( pc._pad0, 1.0, 4.0 ) );
+		float sunVis = 1.0;
+		if ( cascades > 0u && ( shadows.records[0].flags & 1u ) != 0u ) {
+			sunVis = ShadowContract_SampleCSM_BestFit(
+				shadows.records[0], shadows.records[1], shadows.records[2], shadows.records[3],
+				sunShadowMap, frag_world_pos, 1.0, cascades );
 		}
-		vec3 V = normalize( fp_params.fp_view_org.xyz - frag_world_pos );
+		litRgb += base.rgb * vec3( pc.sunColorR, pc.sunColorG, pc.sunColorB ) *
+			wrap * pc.sunStrength * sunVis;
+	}
+	if ( forward_plus_lit != 0 ) {
 		bool clusterOob = false;
 		uint lightCount = 0u;
 		vec3 addLit = FpEval_ForwardPlusAdd( base.rgb, N, V, frag_world_pos, 0.45, 0.0,
@@ -103,7 +139,7 @@ void main() {
 			out_reveal = 0.0;
 			return;
 		}
-		litRgb = ( pc.lightingDebug == 6 ) ? addLit : ( base.rgb + addLit );
+		litRgb = ( pc.lightingDebug == 6 ) ? addLit : ( litRgb + addLit );
 	}
 	{
 		float viewDepth = length( frag_world_pos - fp_params.fp_view_org.xyz );

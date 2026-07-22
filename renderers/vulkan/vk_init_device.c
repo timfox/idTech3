@@ -23,6 +23,7 @@ Extracted from vk.c for incremental modularization.
 #include "vk_temporal.h"
 #include "vk_pass_registry.h"
 #include "vk_forward_plus.h"
+#include "vk_shadow_contract.h"
 #include "vk_deferred_gbuffer.h"
 #include "vk_visibility_buffer.h"
 #include "vk_vrcs.h"
@@ -172,6 +173,8 @@ void vk_initialize( void )
 	Com_Memset( &vk.forward_plus, 0, sizeof( vk.forward_plus ) );
 #ifdef USE_VK_PBR
 	vk.set_layout_forward_plus = VK_NULL_HANDLE;
+	vk.set_layout_oit_shadow = VK_NULL_HANDLE;
+	vk.oit_shadow_descriptor = VK_NULL_HANDLE;
 #endif
 	vk.uniform_alignment = props.limits.minUniformBufferOffsetAlignment;
 	vk.uniform_item_size = PAD( sizeof( vkUniform_t ), (size_t)vk.uniform_alignment );
@@ -1260,7 +1263,7 @@ void vk_initialize( void )
 			SET_OBJECT_NAME( vk.pipeline_layout_oit_resolve, "pipeline layout - oit_resolve", VK_DEBUG_REPORT_OBJECT_TYPE_PIPELINE_LAYOUT_EXT );
 
 			/* OIT accum: set 0 = tex0, set 1 = opaque depth, set 2 = Forward+ lights,
-			 * push = mvp + prevMvp + model (192 bytes). Requires Forward+ set layout. */
+			 * set 3 = shadow contract (SSBO + sun atlas). Push = 256 B. */
 			set_layouts[0] = vk.set_layout_sampler;
 			set_layouts[1] = vk.set_layout_sampler;
 			desc.setLayoutCount = 2;
@@ -1270,10 +1273,21 @@ void vk_initialize( void )
 			} else {
 				ri.Printf( PRINT_WARNING, "[VK][OIT] Forward+ set layout missing; OIT accum unbound set2 — enable PBR/Forward+\n" );
 			}
+			{
+				VkDescriptorSetLayout oitShadowLayout = vk_shadow_contract_oit_set_layout();
+				if ( oitShadowLayout != VK_NULL_HANDLE && desc.setLayoutCount >= 3 ) {
+					set_layouts[3] = oitShadowLayout;
+					desc.setLayoutCount = 4;
+				} else if ( oitShadowLayout != VK_NULL_HANDLE && desc.setLayoutCount == 2 ) {
+					/* No Forward+: still bind shadow as set 2. */
+					set_layouts[2] = oitShadowLayout;
+					desc.setLayoutCount = 3;
+				}
+			}
 			desc.pSetLayouts = set_layouts;
 			push_range.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
 			push_range.offset = 0;
-			push_range.size = 224; /* 3 * mat4 + lighting/fog block */
+			push_range.size = 256; /* 3 * mat4 + fog/sun block */
 			desc.pushConstantRangeCount = 1;
 			desc.pPushConstantRanges = &push_range;
 			VK_CHECK( qvkCreatePipelineLayout( vk.device, &desc, NULL, &vk.pipeline_layout_oit_accum ) );
@@ -1283,10 +1297,10 @@ void vk_initialize( void )
 				qvkGetPhysicalDeviceProperties( vk.physical_device, &oitProps );
 				ri.Printf( PRINT_ALL,
 					"[VK][OIT] push layout: accum/moments/mboit=%u B resolve=%u B deviceMax=%u\n",
-					224u, 16u, (unsigned)oitProps.limits.maxPushConstantsSize );
-				if ( oitProps.limits.maxPushConstantsSize < 224u ) {
+					256u, 16u, (unsigned)oitProps.limits.maxPushConstantsSize );
+				if ( oitProps.limits.maxPushConstantsSize < 256u ) {
 					ri.Printf( PRINT_WARNING, S_COLOR_YELLOW
-						"[VK][OIT] device maxPushConstantsSize %u < 224 — OIT push may be invalid\n"
+						"[VK][OIT] device maxPushConstantsSize %u < 256 — OIT push may be invalid\n"
 						S_COLOR_WHITE, (unsigned)oitProps.limits.maxPushConstantsSize );
 				}
 			}
@@ -1299,15 +1313,14 @@ void vk_initialize( void )
 				desc.pSetLayouts = set_layouts;
 				push_range.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
 				push_range.offset = 0;
-				/* Match vkOitPushConstants_t (224): moments previously 192 while CPU pushed 224. */
-				push_range.size = 224;
+				push_range.size = 256;
 				desc.pushConstantRangeCount = 1;
 				desc.pPushConstantRanges = &push_range;
 				VK_CHECK( qvkCreatePipelineLayout( vk.device, &desc, NULL, &vk.pipeline_layout_oit_moments ) );
 				SET_OBJECT_NAME( vk.pipeline_layout_oit_moments, "pipeline layout - oit_moments", VK_DEBUG_REPORT_OBJECT_TYPE_PIPELINE_LAYOUT_EXT );
 
 				/* MBOIT pass 2: set 0 = tex0, set 1 = depth, set 2 = moments, set 3 = b0,
-				 * set 4 = Forward+ lights (when available). Push = mvp + prevMvp + model. */
+				 * set 4 = Forward+ lights, set 5 = shadow contract. */
 				set_layouts[0] = vk.set_layout_sampler;
 				set_layouts[1] = vk.set_layout_sampler;
 				set_layouts[2] = vk.set_layout_sampler;
@@ -1316,13 +1329,20 @@ void vk_initialize( void )
 				if ( vk.set_layout_forward_plus != VK_NULL_HANDLE ) {
 					set_layouts[4] = vk.set_layout_forward_plus;
 					desc.setLayoutCount = 5;
+					{
+						VkDescriptorSetLayout oitShadowLayout = vk_shadow_contract_oit_set_layout();
+						if ( oitShadowLayout != VK_NULL_HANDLE ) {
+							set_layouts[5] = oitShadowLayout;
+							desc.setLayoutCount = 6;
+						}
+					}
 				} else {
 					ri.Printf( PRINT_WARNING, "[VK][OIT] Forward+ set layout missing; MBOIT accum unbound set4 — enable PBR/Forward+\n" );
 				}
 				desc.pSetLayouts = set_layouts;
 				push_range.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
 				push_range.offset = 0;
-				push_range.size = 224;
+				push_range.size = 256;
 				desc.pushConstantRangeCount = 1;
 				desc.pPushConstantRanges = &push_range;
 				VK_CHECK( qvkCreatePipelineLayout( vk.device, &desc, NULL, &vk.pipeline_layout_oit_accum_mboit ) );
