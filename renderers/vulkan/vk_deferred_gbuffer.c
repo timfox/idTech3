@@ -26,6 +26,7 @@ Mode 3 = Unified Clustered Renderer (deferred opaque + Forward+ transparent).
 #include "vk_forward_plus.h"
 #include "vk_shadow_contract.h"
 #include "vk_sun_csm.h"
+#include "vk_deferred_honesty.h"
 
 static void vk_dgb_validate_compute_break( const char *stage, qboolean resume_main )
 {
@@ -85,6 +86,7 @@ typedef struct {
 	uint32_t compactLists;
 	uint32_t clusterCount;
 	uint32_t gbufferCompact; /* 1: decode octahedral from material.ba; AO/clearcoat defaults */
+	uint32_t mixedMaterial; /* 1: MIXED_MATERIAL_DEFERRED — LM + owner packing */
 	uint32_t shadowFlags;
 	float shadowStrength;
 	float shadowNear;
@@ -93,12 +95,12 @@ typedef struct {
 	uint32_t shadowCascadeCount; /* 1..4 CSM cascades */
 	uint32_t shadowGeneration;
 	uint32_t _shadowPad0;
-	uint32_t _shadowPad1;
 } vk_deferred_light_push_t;
 
 typedef struct {
 	uint32_t additive;
 	uint32_t hybridCompare;
+	uint32_t mixedMaterial;
 } vk_deferred_composite_push_t;
 
 static_assert( sizeof( vk_deferred_light_push_t ) % 4 == 0, "deferred light push align" );
@@ -106,7 +108,7 @@ static_assert( sizeof( vk_deferred_light_push_t ) <= 256, "deferred light push e
 
 static qboolean s_gbufferCompactDualWriteLogged;
 /* Bump when deferred lighting descriptor/push layout changes. */
-static const uint32_t s_deferredLightingLayoutVersion = 13u;
+static const uint32_t s_deferredLightingLayoutVersion = 14u;
 static uint32_t s_deferredLightingLayoutBuilt;
 static void vk_dgb_create_pipeline( void );
 static void vk_dgb_create_lighting_pipeline( void );
@@ -582,8 +584,10 @@ void vk_deferred_gbuffer_status_f( void )
 	vk_get_active_render_extent( &w, &h );
 	ri.Printf( PRINT_ALL, "======== Deferred G-buffer Status ========\n" );
 	ri.Printf( PRINT_ALL,
-		"architecture=HYBRID_ADDITIVE_DEFERRED (SceneBaseLit + dynamics; not full material deferred)\n"
-		"  use deferred_status for eligibility / lit-as-base counts\n" );
+		"architecture=%s\n"
+		"  use deferred_status for eligibility / lit-as-base / mixed export counts\n",
+		R_DeferredArchitecture_Name( (deferredArchitecture_t)(
+			r_deferredArchitecture ? r_deferredArchitecture->integer : 0 ) ) );
 	ri.Printf( PRINT_ALL, "requested : resources=%s fillCvar=%d\n",
 		vk_deferred_gbuffer_resources_wanted() ? "yes" : "no",
 		r_deferredGBufferFill ? r_deferredGBufferFill->integer : 0 );
@@ -1437,6 +1441,7 @@ static void vk_dgb_fill_light_push( vk_deferred_light_push_t *push, uint32_t wid
 	push->compactLists = vk.forward_plus.compact_lists ? 1u : 0u;
 	push->clusterCount = vk.forward_plus.tile_capacity_tiles;
 	push->gbufferCompact = ( r_gbufferCompact && r_gbufferCompact->integer ) ? 1u : 0u;
+	push->mixedMaterial = R_DeferredMixedMaterialWanted() ? 1u : 0u;
 	push->shadowFlags = 0u;
 	push->shadowStrength = 0.0f;
 	push->shadowNear = ( vk.sun_shadow_near > 0.0f ) ? vk.sun_shadow_near : 4.0f;
@@ -1448,7 +1453,6 @@ static void vk_dgb_fill_light_push( vk_deferred_light_push_t *push, uint32_t wid
 	push->shadowCascadeCount = 1u;
 	push->shadowGeneration = vk_shadow_contract_generation();
 	push->_shadowPad0 = 0u;
-	push->_shadowPad1 = 0u;
 	if ( vk.sun_shadow_valid && vk_shadow_contract_ssbo() != VK_NULL_HANDLE &&
 		( vk.sun_shadow_sample_view || vk.sun_shadow_view ) &&
 		( !r_pbrSunShadow || r_pbrSunShadow->integer ) ) {
@@ -1825,11 +1829,18 @@ static void vk_dgb_composite_lit_to_color( uint32_t width, uint32_t height )
 	vk_dgb_update_composite_descriptor();
 
 	push.additive = vk_deferred_unlit_base_wanted() ? 1u : 0u;
-	/* Never REPLACE with dynamic-only when we have a captured scene base — that path blacks maps. */
+	/* Never REPLACE with dynamic-only when we have a captured scene base — that path blacks maps.
+	 * MIXED_MATERIAL_DEFERRED still keeps additive=1 for non-owned Forward+ pixels; owned
+	 * pixels replace via lit.a in the composite shader. */
 	if ( vk.deferred_gbuffer.frame_capture_ok ) {
 		push.additive = 1u;
 	}
 	push.hybridCompare = ( r_hybridCompare && r_hybridCompare->integer > 0 ) ? (uint32_t)r_hybridCompare->integer : 0u;
+	if ( r_deferredArchitecture && r_deferredArchitecture->integer == DEFERRED_ARCH_COMPARE &&
+		push.hybridCompare == 0u ) {
+		push.hybridCompare = 1u;
+	}
+	push.mixedMaterial = R_DeferredMixedMaterialWanted() ? 1u : 0u;
 
 	qvkCmdBindPipeline( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.deferred_gbuffer.composite_gfx_pipeline );
 	qvkCmdBindDescriptorSets( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS,

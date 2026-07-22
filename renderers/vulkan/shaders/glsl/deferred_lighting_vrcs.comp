@@ -62,22 +62,23 @@ layout(push_constant) uniform Push {
 	uint compactLists;
 	uint clusterCount;
 	uint gbufferCompact;
+	uint mixedMaterial; /* 1: MIXED_MATERIAL_DEFERRED owner/LM packing */
 } pc;
 
 #define CLUSTER_LIST_CELLS tiles.cells
 #include "cluster_light_list.glsl"
 #include "deferred_lighting_common.glsl"
 
-void storeWithCopies( uvec2 pix, uint copyBits, vec3 lit ) {
-	imageStore( outLit, ivec2( pix ), vec4( lit, 1.0 ) );
+void storeWithCopies( uvec2 pix, uint copyBits, vec4 lit ) {
+	imageStore( outLit, ivec2( pix ), lit );
 	if ( ( copyBits & VRCS_COPY_H ) != 0u && pix.x + 1u < pc.extent.x ) {
-		imageStore( outLit, ivec2( pix.x + 1u, pix.y ), vec4( lit, 1.0 ) );
+		imageStore( outLit, ivec2( pix.x + 1u, pix.y ), lit );
 	}
 	if ( ( copyBits & VRCS_COPY_V ) != 0u && pix.y + 1u < pc.extent.y ) {
-		imageStore( outLit, ivec2( pix.x, pix.y + 1u ), vec4( lit, 1.0 ) );
+		imageStore( outLit, ivec2( pix.x, pix.y + 1u ), lit );
 	}
 	if ( ( copyBits & VRCS_COPY_D ) != 0u && pix.x + 1u < pc.extent.x && pix.y + 1u < pc.extent.y ) {
-		imageStore( outLit, ivec2( pix.x + 1u, pix.y + 1u ), vec4( lit, 1.0 ) );
+		imageStore( outLit, ivec2( pix.x + 1u, pix.y + 1u ), lit );
 	}
 }
 
@@ -112,8 +113,8 @@ void main() {
 		if ( pix.x >= pc.extent.x || pix.y >= pc.extent.y ) {
 			return;
 		}
-		vec3 lit = shadeDeferredPixel( pix );
-		imageStore( outLit, ivec2( pix ), vec4( lit, 1.0 ) );
+		vec4 lit = shadeDeferredPixel( pix );
+		imageStore( outLit, ivec2( pix ), lit );
 		return;
 	}
 
@@ -129,7 +130,7 @@ void main() {
 			return;
 		}
 		copyBits = VRCS_COPY_H | VRCS_COPY_V | VRCS_COPY_D;
-		vec3 lit = shadeDeferredPixel( pix );
+		vec4 lit = shadeDeferredPixel( pix );
 		storeWithCopies( pix, copyBits, lit );
 		return;
 	}
@@ -147,10 +148,10 @@ void main() {
 		return;
 	}
 
-	vec3 lit = shadeDeferredPixel( pix );
+	vec4 lit = shadeDeferredPixel( pix );
 	if ( pc.debugMode == 3u ) {
 		/* Tile flags tint */
-		lit = vec3( 0.2, 0.8, 1.0 );
+		lit = vec4( 0.2, 0.8, 1.0, lit.a );
 	}
 	storeWithCopies( pix, copyBits, lit );
 }

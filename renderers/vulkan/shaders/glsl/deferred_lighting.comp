@@ -57,7 +57,8 @@ layout(push_constant) uniform Push {
 	float specularAA;
 	uint compactLists;
 	uint clusterCount;
-	uint gbufferCompact;
+	uint gbufferCompact; /* 1: decode octahedral from material.ba; AO/clearcoat defaults */
+	uint mixedMaterial; /* 1: MIXED_MATERIAL_DEFERRED — LM in G-buffer, owner in normal.a */
 	uint shadowFlags; /* bit0: sun shadow valid + SSBO bound */
 	float shadowStrength;
 	float shadowNear;
@@ -66,7 +67,6 @@ layout(push_constant) uniform Push {
 	uint shadowCascadeCount; /* 1..4 CSM cascades */
 	uint shadowGeneration;
 	uint _shadowPad0;
-	uint _shadowPad1;
 } pc;
 
 #define USE_LTC_AREA_LIGHT
@@ -81,5 +81,5 @@ void main() {
 	if ( pix.x >= pc.extent.x || pix.y >= pc.extent.y ) {
 		return;
 	}
-	imageStore( outLit, ivec2( pix ), vec4( shadeDeferredPixel( pix ), 1.0 ) );
+	imageStore( outLit, ivec2( pix ), shadeDeferredPixel( pix ) );
 }

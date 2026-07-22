@@ -6,15 +6,19 @@ layout(set = 0, binding = 1) uniform sampler2D litTex;
 layout(push_constant) uniform CompositePC {
 	uint additive;
 	uint hybridCompare;
+	uint mixedMaterial; /* 1: replace owned pixels (lit.a) with deferred full lighting */
 } pc;
 
 layout(location = 0) in vec2 frag_tex_coord;
 layout(location = 0) out vec4 out_color;
 
 void main() {
-	vec3 dynamic = texture( litTex, frag_tex_coord ).rgb;
+	vec4 litSample = texture( litTex, frag_tex_coord );
+	vec3 dynamic = litSample.rgb;
 	vec3 base = texture( sceneBaseTex, frag_tex_coord ).rgb;
-	vec3 deferred = ( pc.additive != 0u ) ? ( base + dynamic ) : dynamic;
+	bool owned = ( pc.mixedMaterial != 0u && litSample.a > 0.5 );
+	vec3 deferred = owned ? dynamic :
+		( ( pc.additive != 0u ) ? ( base + dynamic ) : dynamic );
 
 	/*
 	 * hybridCompare:
@@ -71,8 +75,12 @@ void main() {
 		}
 	}
 
+	if ( owned ) {
+		out_color = vec4( dynamic, 1.0 );
+		return;
+	}
 	if ( pc.additive != 0u ) {
-		out_color = vec4( deferred, 1.0 );
+		out_color = vec4( base + dynamic, 1.0 );
 		return;
 	}
 	out_color = vec4( dynamic, 1.0 );

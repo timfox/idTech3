@@ -1507,11 +1507,16 @@ static void RB_IterateStagesGeneric( const shaderCommands_t *input )
 		}
 		path = R_SelectSurfaceRenderPath( tess.shader, NULL, pathFlags, (int)viewCls );
 		R_RenderPath_Note( path );
-		/* Opaque deferred handoff from selector (not a second heuristic). */
+		/* Opaque deferred handoff from selector (not a second heuristic).
+		 * y: 1=hybrid additive, 2=split compare, 3=mixed material (unlit+LM ownership). */
 		if ( backEnd.drawSurfFilter == 1 && R_RenderPath_WantsDeferredHandoff( path ) &&
 			vk_deferred_lighting_path_ready() ) {
-			if ( r_hybridCompare && r_hybridCompare->integer ) {
-				uniform.pbrDebugMode[1] = 2.0f; /* hybrid: left deferred / right Forward+ */
+			const qboolean mixed = R_DeferredMixedMaterialWanted();
+			if ( ( r_hybridCompare && r_hybridCompare->integer ) ||
+				( r_deferredArchitecture && r_deferredArchitecture->integer == DEFERRED_ARCH_COMPARE ) ) {
+				uniform.pbrDebugMode[1] = mixed ? 4.0f : 2.0f; /* left deferred / right Forward+ */
+			} else if ( mixed ) {
+				uniform.pbrDebugMode[1] = 3.0f;
 			} else {
 				uniform.pbrDebugMode[1] = 1.0f;
 			}

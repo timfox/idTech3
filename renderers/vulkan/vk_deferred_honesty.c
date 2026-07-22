@@ -43,11 +43,27 @@ const char *R_DeferredArchitecture_Name( deferredArchitecture_t arch )
 {
 	switch ( arch ) {
 	case DEFERRED_ARCH_ADDITIVE_HYBRID: return "HYBRID_ADDITIVE_DEFERRED";
-	case DEFERRED_ARCH_MIXED_ELIGIBILITY: return "MIXED_ELIGIBILITY_DEFERRED";
-	case DEFERRED_ARCH_STRICT_VALIDATION: return "STRICT_VALIDATION_DEFERRED";
-	case DEFERRED_ARCH_COMPARE: return "COMPARE_DEFERRED";
+	case DEFERRED_ARCH_MIXED_MATERIAL: return "MIXED_MATERIAL_DEFERRED";
+	case DEFERRED_ARCH_STRICT_VALIDATION: return "STRICT_DEFERRED_VALIDATION";
+	case DEFERRED_ARCH_COMPARE: return "DEFERRED_COMPARISON";
 	default: return "UNKNOWN";
 	}
+}
+
+qboolean R_DeferredMixedMaterialWanted( void )
+{
+	/* Arch 1+ use true unlit G-buffer + deferred static/dynamic for eligible pixels.
+	 * Arch 3 (compare) also drives the mixed export on the deferred side. */
+	if ( !r_deferredArchitecture ) {
+		return qfalse;
+	}
+	return ( r_deferredArchitecture->integer >= DEFERRED_ARCH_MIXED_MATERIAL ) ? qtrue : qfalse;
+}
+
+qboolean R_DeferredStrictValidationWanted( void )
+{
+	return ( r_deferredArchitecture &&
+		r_deferredArchitecture->integer == DEFERRED_ARCH_STRICT_VALIDATION ) ? qtrue : qfalse;
 }
 
 const char *R_DeferredCompositeMode_Name( deferredCompositeMode_t mode )
@@ -414,8 +430,8 @@ DeferredEligibilityResult R_GetDeferredEligibility(
 			flags |= GBUFFER_VALID_MATERIAL;
 		}
 		flags |= GBUFFER_VALID_BASE_COLOR;
-		/* Shipping hybrid still composites onto SceneBaseLit until arch=1 full replace. */
-		if ( !r_deferredArchitecture || r_deferredArchitecture->integer == DEFERRED_ARCH_ADDITIVE_HYBRID ) {
+		/* Arch 0 only: SceneBaseLit is sampled as deferred "albedo". */
+		if ( !R_DeferredMixedMaterialWanted() ) {
 			flags |= GBUFFER_USING_LIT_SCENE_AS_BASE;
 		}
 		res = DH_Make( DEFERRED_ELIGIBLE_FULL, DEFERRED_REASON_PBR_NATIVE );
@@ -427,36 +443,52 @@ DeferredEligibilityResult R_GetDeferredEligibility(
 	/* Classic translation path */
 	res.classic = R_TranslateClassicShaderToMaterial( shader );
 	if ( !res.classic.valid ) {
-		res = DH_Make( DEFERRED_FORWARD_FALLBACK, res.classic.failReason );
+		deferredEligibilityReason_t fail = res.classic.failReason;
+		/* Strict: surface unsupported for deferred — do not silently treat as normal Forward+. */
+		if ( R_DeferredStrictValidationWanted() ) {
+			res = DH_Make( DEFERRED_UNSUPPORTED, fail );
+		} else {
+			res = DH_Make( DEFERRED_FORWARD_FALLBACK, fail );
+		}
 		res.classic = R_TranslateClassicShaderToMaterial( shader ); /* restore details */
 		res.reasonName = R_DeferredEligibilityReason_Name( res.reason );
 		return res;
+	}
+
+	/*
+	 * MIXED_MATERIAL_DEFERRED needs the gbuf/PBR fragment path for unlit + LM MRT packing.
+	 * Pipeline export is gated on vk_pbr_flags — pure classic lightmap draws stay Forward+
+	 * (hybrid arch 0 can still use SceneBaseLit additive for them).
+	 */
+	if ( R_DeferredMixedMaterialWanted() ) {
+		qboolean canExport = qfalse;
+		int s;
+		for ( s = 0; s < MAX_SHADER_STAGES && s < shader->numUnfoggedPasses; s++ ) {
+			const shaderStage_t *st = shader->stages[s];
+			if ( st && st->active && st->vk_pbr_flags ) {
+				canExport = qtrue;
+				break;
+			}
+		}
+		if ( !canExport ) {
+			return DH_Make( DEFERRED_FORWARD_FALLBACK, DEFERRED_REASON_NO_BASE_COLOR_EXPORT );
+		}
 	}
 
 	res.eligibility = DEFERRED_ELIGIBLE_APPROXIMATE;
 	res.reason = DEFERRED_REASON_CLASSIC_TRANSLATED;
 	res.reasonName = R_DeferredEligibilityReason_Name( res.reason );
 	res.gbufferFlags = GBUFFER_TRANSLATED_CLASSIC | GBUFFER_APPROXIMATED | GBUFFER_VALID_BASE_COLOR;
+	/* Geometry normals + default rough/metal are enough for mixed unlit export. */
+	res.gbufferFlags |= GBUFFER_VALID_NORMAL | GBUFFER_VALID_MATERIAL;
 	if ( res.classic.hasNormalMap ) {
 		res.gbufferFlags |= GBUFFER_VALID_NORMAL;
 	}
 	if ( res.classic.hasSpecularOrPhysical ) {
 		res.gbufferFlags |= GBUFFER_VALID_MATERIAL;
 	}
-	if ( !r_deferredArchitecture || r_deferredArchitecture->integer == DEFERRED_ARCH_ADDITIVE_HYBRID ) {
+	if ( !R_DeferredMixedMaterialWanted() ) {
 		res.gbufferFlags |= GBUFFER_USING_LIT_SCENE_AS_BASE;
-	}
-	/* Without normal/material export, approximate deferred still risks default G-buffer under
-	 * direct MRT for non-PBR — keep hybrid additive only when architecture allows approx. */
-	if ( r_deferredArchitecture && r_deferredArchitecture->integer >= DEFERRED_ARCH_MIXED_ELIGIBILITY ) {
-		if ( !( res.gbufferFlags & GBUFFER_VALID_NORMAL ) ||
-			!( res.gbufferFlags & GBUFFER_VALID_MATERIAL ) ) {
-			/* Mixed mode: require more complete export; otherwise Forward+. */
-			if ( !( res.gbufferFlags & GBUFFER_VALID_NORMAL ) ) {
-				return DH_Make( DEFERRED_FORWARD_FALLBACK, DEFERRED_REASON_NO_NORMAL_EXPORT );
-			}
-			return DH_Make( DEFERRED_FORWARD_FALLBACK, DEFERRED_REASON_NO_MATERIAL_RESPONSE );
-		}
 	}
 	return res;
 }
@@ -554,20 +586,34 @@ void R_DeferredStatus_f( void )
 	deferredCompositeMode_t comp = (deferredCompositeMode_t)(
 		r_deferredCompositeMode ? r_deferredCompositeMode->integer : 0 );
 	uint32_t eligible = s_frame.deferredEligibleFull + s_frame.deferredEligibleApprox;
-	const char *brdfParity = "partial (shared GGX core; hybrid SceneBaseLit; sun=CSM modulate)";
-	const char *layout = ( r_gbufferCompact && r_gbufferCompact->integer )
-		? "scaffold_fp16 + compact_dual_write"
-		: "scaffold_fp16 (albedo=SceneBaseLit copy)";
+	const char *brdfParity;
+	const char *layout;
+	const char *ownership;
+
+	if ( arch >= DEFERRED_ARCH_MIXED_MATERIAL ) {
+		brdfParity = "partial (shared GGX; mixed unlit base + deferred lightmap; sun=CSM modulate)";
+		layout = ( r_gbufferCompact && r_gbufferCompact->integer )
+			? "scaffold_fp16 (mixed packs LM; compact dual-write overridden on owned)"
+			: "scaffold_fp16 (albedo=unlit base for owned; LM in G-buffer)";
+		ownership =
+			"  ownership: eligible → unlit GBufferBaseColor + deferred static(LM)+dynamic;\n"
+			"             ineligible → Forward+ SceneBaseLit; composite replaces owned pixels\n";
+	} else {
+		brdfParity = "partial (shared GGX core; hybrid SceneBaseLit; sun=CSM modulate)";
+		layout = ( r_gbufferCompact && r_gbufferCompact->integer )
+			? "scaffold_fp16 + compact_dual_write"
+			: "scaffold_fp16 (albedo=SceneBaseLit copy)";
+		ownership =
+			"  ownership: Forward+/legacy writes SceneBaseLit (lightmaps/static);\n"
+			"             deferred compute adds clustered dynamics\n";
+	}
 
 	ri.Printf( PRINT_ALL, "======== deferred_status (Deferred Honesty) ========\n" );
 	ri.Printf( PRINT_ALL, "activeRendererMode=r_renderMode %d\n",
 		r_renderMode ? r_renderMode->integer : -1 );
 	ri.Printf( PRINT_ALL, "deferredArchitecture=%d (%s)\n",
 		(int)arch, R_DeferredArchitecture_Name( arch ) );
-	ri.Printf( PRINT_ALL,
-		"  ownership: Forward+/legacy writes SceneBaseLit (lightmaps/static);\n"
-		"             deferred compute adds clustered dynamics; composite=%s\n",
-		R_DeferredCompositeMode_Name( comp ) );
+	ri.Printf( PRINT_ALL, "%s", ownership );
 	ri.Printf( PRINT_ALL, "compositeMode=%d (%s)\n", (int)comp, R_DeferredCompositeMode_Name( comp ) );
 	ri.Printf( PRINT_ALL, "gbufferLayout=%s\n", layout );
 	ri.Printf( PRINT_ALL, "sharedBrdfParity=%s\n", brdfParity );
@@ -591,9 +637,8 @@ void R_DeferredStatus_f( void )
 		s_frame.validNormals, s_frame.validMaterial,
 		s_frame.pbrNative, s_frame.classicTranslated );
 	ri.Printf( PRINT_ALL,
-		"NOTE: This is NOT a complete deferred renderer. Label=%s.\n"
-		"  Missing lobes in compute: IBL/sheen/SSS/transmission; sun is not full BRDF yet.\n"
-		"  Classic OA without translation → Forward+. See docs/DEFERRED_HONESTY.md\n",
+		"NOTE: Label=%s. Full BRDF parity / sun BRDF / IBL-in-compute are later phases.\n"
+		"  Classic OA without translation → Forward+ (or UNSUPPORTED in strict). See docs/DEFERRED_HONESTY.md\n",
 		R_DeferredArchitecture_Name( arch ) );
 }
 
@@ -647,10 +692,10 @@ void vk_deferred_honesty_register( void )
 	ri.Cvar_CheckRange( r_deferredArchitecture, "0", "3", CV_INTEGER );
 	ri.Cvar_SetDescription( r_deferredArchitecture,
 		"Deferred Honesty architecture (latched):\n"
-		" 0 = HYBRID_ADDITIVE_DEFERRED (SceneBaseLit + dynamics) — shipping\n"
-		" 1 = mixed eligibility (stricter Forward+ for incomplete materials)\n"
-		" 2 = strict validation\n"
-		" 3 = comparison\n"
+		" 0 = HYBRID_ADDITIVE_DEFERRED — SceneBaseLit + deferred dynamics (reference)\n"
+		" 1 = MIXED_MATERIAL_DEFERRED — eligible unlit G-buffer; deferred owns LM+dynamics\n"
+		" 2 = STRICT_DEFERRED_VALIDATION — mixed path; invalid surfaces shown explicitly\n"
+		" 3 = DEFERRED_COMPARISON — Forward+ vs mixed deferred\n"
 		"See docs/DEFERRED_HONESTY.md." );
 	ri.Cvar_SetGroup( r_deferredArchitecture, CVG_RENDERER );
 

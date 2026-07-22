@@ -101,13 +101,13 @@ vec3 SampleDeferredNormal( vec2 uv, vec4 material, out float normalConfidence )
 {
 	vec4 nSamp = texture( normalTex, uv );
 	vec3 Nsamp;
-	if ( pc.gbufferCompact != 0u ) {
+	if ( pc.gbufferCompact != 0u && pc.mixedMaterial == 0u ) {
 		/* Compact dual-write: octahedral in material.ba; normal.a holds AO (confidence = 1). */
 		Nsamp = GbufDecodeOctahedral( material.ba );
 		normalConfidence = 1.0;
 	} else {
 		Nsamp = nSamp.xyz;
-		normalConfidence = clamp( nSamp.w, 0.0, 1.0 );
+		normalConfidence = ( pc.mixedMaterial != 0u ) ? 1.0 : clamp( nSamp.w, 0.0, 1.0 );
 	}
 	return Nsamp;
 }
@@ -122,7 +122,7 @@ float ApplyDeferredSpecularAA( float roughness, vec2 uv, ivec2 pix, vec3 nC )
 	ivec2 px = clamp( pix, ivec2( 0 ), sz - ivec2( 1 ) );
 	vec3 nX;
 	vec3 nY;
-	if ( pc.gbufferCompact != 0u ) {
+	if ( pc.gbufferCompact != 0u && pc.mixedMaterial == 0u ) {
 		vec4 mX = texelFetch( materialTex, clamp( px + ivec2( 1, 0 ), ivec2( 0 ), sz - ivec2( 1 ) ), 0 );
 		vec4 mY = texelFetch( materialTex, clamp( px + ivec2( 0, 1 ), ivec2( 0 ), sz - ivec2( 1 ) ), 0 );
 		nX = GbufDecodeOctahedral( mX.ba );
@@ -142,12 +142,12 @@ float ApplyDeferredSpecularAA( float roughness, vec2 uv, ivec2 pix, vec3 nC )
 	return PbrGlancingRoughness( r, NV );
 }
 
-vec3 shadeDeferredPixel( uvec2 pix ) {
+vec4 shadeDeferredPixel( uvec2 pix ) {
 	vec2 uv = ( vec2( pix ) + 0.5 ) / vec2( pc.extent );
 	float depth = texture( depthTex, uv ).r;
 
 	if ( depth <= 0.0 || depth >= 1.0 ) {
-		return vec3( 0.0 );
+		return vec4( 0.0 );
 	}
 
 	uint matClass = CLASS_SIMPLE_OPAQUE;
@@ -156,13 +156,13 @@ vec3 shadeDeferredPixel( uvec2 pix ) {
 	if ( pc.useMaterialClass != 0u ) {
 		matClass = texelFetch( classMap, ivec2( pix ), 0 ).r;
 		if ( matClass == CLASS_EMPTY ) {
-			return vec3( 0.0 );
+			return vec4( 0.0 );
 		}
 		if ( matClass == CLASS_ALPHA_TEST ) {
 			matClass = CLASS_SIMPLE_OPAQUE;
 		}
 		if ( matClass == CLASS_EMISSIVE && pc.additive != 0u ) {
-			return vec3( 0.0 );
+			return vec4( 0.0 );
 		}
 		if ( matClass == CLASS_LAYERED ) {
 			classSpecScale = 1.12;
@@ -188,10 +188,28 @@ vec3 shadeDeferredPixel( uvec2 pix ) {
 	float metalness = mix( 0.0, clamp( material.r, 0.0, 1.0 ), shadingConfidence );
 	float roughness = mix( 0.92, clamp( material.g, 0.04, 1.0 ), shadingConfidence );
 	roughness = ApplyDeferredSpecularAA( roughness, uv, ivec2( pix ), Nsamp );
+
+	/* MIXED_MATERIAL_DEFERRED: owned pixels pack lightmap in material.ba + normal.a-bias. */
+	const float ownerBias = 1024.0;
+	bool mixedOwned = false;
+	vec3 lightmapIrr = vec3( 1.0 );
+	if ( pc.mixedMaterial != 0u ) {
+		float na = texture( normalTex, uv ).a;
+		mixedOwned = ( na >= ( ownerBias * 0.5 ) );
+		if ( !mixedOwned ) {
+			return vec4( 0.0 );
+		}
+		lightmapIrr = vec3( material.b, material.a, na - ownerBias );
+		lightmapIrr = max( lightmapIrr, vec3( 0.0 ) );
+	}
+
 	/* Compact: AO in normal.a; clearcoat defaults (material.ba is octahedral). */
 	float materialAO;
 	float clearcoat;
-	if ( pc.gbufferCompact != 0u ) {
+	if ( pc.mixedMaterial != 0u && mixedOwned ) {
+		materialAO = 1.0;
+		clearcoat = 0.0;
+	} else if ( pc.gbufferCompact != 0u ) {
 		materialAO = clamp( texture( normalTex, uv ).a, 0.0, 1.0 );
 		clearcoat = 0.0;
 	} else {
@@ -322,8 +340,13 @@ vec3 shadeDeferredPixel( uvec2 pix ) {
 
 	float roughMod = mix( 1.0, 0.85, roughness );
 	vec3 lit;
-	if ( pc.additive != 0u ) {
-		/* Additive: Fd already includes albedo × kD (Forward+ parity). */
+	if ( pc.mixedMaterial != 0u && mixedOwned ) {
+		/* True material deferred: static lightmap term + clustered dynamics (not SceneBaseLit). */
+		vec3 kDstatic = vec3( 1.0 - metalness );
+		vec3 staticTerm = albedo * kDstatic * lightmapIrr * aoCoupling;
+		lit = ( staticTerm + diffuseAcc + specularAcc ) * roughMod * pc.strength;
+	} else if ( pc.additive != 0u ) {
+		/* Additive hybrid: Fd already includes albedo × kD (Forward+ parity). */
 		lit = ( diffuseAcc + specularAcc ) * roughMod * pc.strength;
 	} else {
 		/* Multiply/legacy: ambient floor on albedo + Burley dynamic (albedo already in Fd). */
@@ -344,7 +367,9 @@ vec3 shadeDeferredPixel( uvec2 pix ) {
 		lit *= mix( 0.35, 1.0, sunVis );
 	}
 #endif
-	return lit;
+	/* .a = deferred pixel ownership for MIXED_MATERIAL_DEFERRED composite replace. */
+	float ownerA = ( pc.mixedMaterial != 0u && mixedOwned ) ? 1.0 : 0.0;
+	return vec4( lit, ownerA );
 }
 
 #endif

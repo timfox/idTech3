@@ -10,6 +10,7 @@ Variable-Rate Compute Shading (VRCS) — SRI, 16x16 pack, deferred lighting wrap
 #include "vk.h"
 #include "vk_vrcs.h"
 #include "vk_deferred_gbuffer.h"
+#include "vk_deferred_honesty.h"
 #include "vk_visibility_buffer.h"
 #include "vk_image_layout.h"
 #include "vk_util.h"
@@ -82,6 +83,7 @@ typedef struct {
 	uint32_t compactLists;
 	uint32_t clusterCount;
 	uint32_t gbufferCompact;
+	uint32_t mixedMaterial;
 } vrcs_light_push_t;
 
 typedef struct {
@@ -666,6 +668,7 @@ static void VRCS_FillLightPush( vrcs_light_push_t *push, uint32_t width, uint32_
 	push->compactLists = vk.forward_plus.compact_lists ? 1u : 0u;
 	push->clusterCount = vk.forward_plus.tile_capacity_tiles;
 	push->gbufferCompact = ( r_gbufferCompact && r_gbufferCompact->integer ) ? 1u : 0u;
+	push->mixedMaterial = R_DeferredMixedMaterialWanted() ? 1u : 0u;
 }
 
 qboolean vk_vrcs_dispatch_deferred_lighting( uint32_t width, uint32_t height )

@@ -20,6 +20,7 @@ TESTS=(
 	test_renderer_lab_capture.sh
 	test_deferred_honesty.sh
 	test_deferred_eligibility.sh
+	test_deferred_mixed_material.sh
 )
 
 failures=0

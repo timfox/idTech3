@@ -9,11 +9,20 @@
  */
 
 typedef enum {
-	DEFERRED_ARCH_ADDITIVE_HYBRID = 0, /* SceneBaseLit + deferred dynamics (shipping) */
-	DEFERRED_ARCH_MIXED_ELIGIBILITY = 1, /* full lighting for eligible; Forward+ else */
-	DEFERRED_ARCH_STRICT_VALIDATION = 2, /* invalid surfaces shown clearly */
-	DEFERRED_ARCH_COMPARE = 3
+	DEFERRED_ARCH_ADDITIVE_HYBRID = 0, /* SceneBaseLit + deferred dynamics (reference) */
+	DEFERRED_ARCH_MIXED_MATERIAL = 1,  /* true G-buffer + deferred static/dynamic for eligible */
+	DEFERRED_ARCH_STRICT_VALIDATION = 2, /* eligible deferred; invalid shown, no silent fallback */
+	DEFERRED_ARCH_COMPARE = 3          /* Forward+ vs mixed deferred comparison */
 } deferredArchitecture_t;
+
+/* Backward-compatible alias (Milestone 1 name). */
+#define DEFERRED_ARCH_MIXED_ELIGIBILITY DEFERRED_ARCH_MIXED_MATERIAL
+
+/* G-buffer normal.a owner bias for MIXED_MATERIAL_DEFERRED lightmap packing. */
+#define DEFERRED_OWNER_BIAS 1024.0f
+
+qboolean R_DeferredMixedMaterialWanted( void );
+qboolean R_DeferredStrictValidationWanted( void );
 
 typedef enum {
 	DEFERRED_COMPOSITE_ADDITIVE_HYBRID = 0,

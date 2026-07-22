@@ -20,7 +20,7 @@ Canonical selector: `R_SelectSurfaceRenderPath()` in [`renderers/vulkan/vk_rende
 
 ## Mode 3 surface-class ownership
 
-**Honest label:** when deferred lighting is active, the shipping architecture is **`HYBRID_ADDITIVE_DEFERRED`** — see [DEFERRED_HONESTY.md](DEFERRED_HONESTY.md). Fragment paths write **SceneBaseLit**; deferred compute adds dynamics. Not full material deferred.
+**Honest label:** when deferred lighting is active, architecture is selected by **`r_deferredArchitecture`** — see [DEFERRED_HONESTY.md](DEFERRED_HONESTY.md). Default **`HYBRID_ADDITIVE_DEFERRED`**: fragment paths write **SceneBaseLit**; deferred compute adds dynamics. **`MIXED_MATERIAL_DEFERRED`** (arch 1): eligible surfaces export unlit G-buffer + deferred lightmap ownership.
 
 | Class | Owner |
 |-------|--------|
