@@ -109,6 +109,32 @@ Full cert invariants: [RENDERER_SPINE_1.1.md](RENDERER_SPINE_1.1.md).
 
 Static gates: `./scripts/oit_corruption_check.sh`, `tests/scripts/test_wboit_*.sh`.
 
+## Live certification
+
+GPU operator certification is **separate** from static CI greps. See [WBOIT_GPU_CERTIFICATION.md](WBOIT_GPU_CERTIFICATION.md).
+
+| Command | Purpose |
+|---------|---------|
+| `oit_certify_wboit begin` | Start live B0–B7 case session |
+| `oit_certify_wboit pass` / `fail` / `next` | Record case outcome |
+| `oit_certify_wboit export` | Write JSON; promote LIVE_BASIC / LIVE_FULL |
+| `oit_soak_wboit 30` | 30-minute soak → LIVE_SOAKED |
+| `oit_certification_status` | Current level (STATIC_GATES … SPINE_1_1_CERTIFIED) |
+
+Static scripts alone do **not** certify — live pass/fail + soak required for Spine 1.1.
+
+## Fog through layers
+
+Per-fragment fog on lit WBOIT accumulation (`r_oitFogMode 1` default). Opaque HDR is fogged before OIT; resolve must not apply a second full-screen fog on transparent results.
+
+See [WBOIT_FOG_LAYERS.md](WBOIT_FOG_LAYERS.md). Demo: `exec demo_wboit_fog_layers.cfg`. Status: `oit_fog_status`.
+
+| Cvar | Purpose |
+|------|---------|
+| `r_oitFogMode` 0–3 | 0=legacy, **1=production**, 2=moments (fallback), 3=experimental |
+| `r_oitFogDensity` | `T=exp(-density×viewDepth)`; 0 disables |
+| `r_oitFogDebug` 1–7 | Depth, transmittance, double-fog detector (cheat) |
+
 ## WBOIT soak matrix (B0–B7)
 
 Device soak — stop at first band/tile failure. No invented timings; report measured duration only if run.

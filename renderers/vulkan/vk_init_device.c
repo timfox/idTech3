@@ -1273,7 +1273,7 @@ void vk_initialize( void )
 			desc.pSetLayouts = set_layouts;
 			push_range.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
 			push_range.offset = 0;
-			push_range.size = 208; /* 3 * mat4 + ivec4 lighting/parity */
+			push_range.size = 224; /* 3 * mat4 + lighting/fog block */
 			desc.pushConstantRangeCount = 1;
 			desc.pPushConstantRanges = &push_range;
 			VK_CHECK( qvkCreatePipelineLayout( vk.device, &desc, NULL, &vk.pipeline_layout_oit_accum ) );
@@ -1309,7 +1309,7 @@ void vk_initialize( void )
 				desc.pSetLayouts = set_layouts;
 				push_range.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
 				push_range.offset = 0;
-				push_range.size = 208;
+				push_range.size = 224;
 				desc.pushConstantRangeCount = 1;
 				desc.pPushConstantRanges = &push_range;
 				VK_CHECK( qvkCreatePipelineLayout( vk.device, &desc, NULL, &vk.pipeline_layout_oit_accum_mboit ) );

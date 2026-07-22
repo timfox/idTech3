@@ -359,12 +359,13 @@ typedef struct {
 	float		biasX;
 	float		biasY;
 
-	/* FreeType-backed TrueType fonts for HUD/console (see CL_RegisterBuiltInTrueTypeFonts). */
-	fontInfo_t	builtInHudFont;
+	/* FreeType-backed TrueType fonts for HUD/console (see CL_RegisterBuiltInTrueTypeFonts).
+	 * HUD uses up to three size tiers so labels / body / digits each rasterize near 1:1. */
+	fontInfo_t	builtInHudFonts[3];	/* 0=small, 1=medium, 2=large */
 	fontInfo_t	builtInConsoleFont;
-	int		builtInHudRefLinePx;
+	int		builtInHudRefLinePx[3];
 	int		builtInConsoleRefLinePx;
-	int		builtInHudPointSize;
+	int		builtInHudPointSize[3];
 	int		builtInConsolePointSize;
 	int		builtInConsoleCellW;
 	qboolean	builtInTtfActive;

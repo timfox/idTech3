@@ -62,6 +62,8 @@ Documentation is grouped by **tier**. Most files remain at their historical path
 - [RENDERER_SPINE_1.0.md](RENDERER_SPINE_1.0.md) — production-certified frame matrix (stabilize before new techniques)- [AUTHORED_MESH_NORMALS.md](AUTHORED_MESH_NORMALS.md) — experimental DCC hard-edge / authored-normal import policy
 - [RENDERER_2027.md](RENDERER_2027.md) — GPU-driven hybrid visibility north-star (vis buffer Phase 1)
 - [MOMENT_OIT_STOCHASTIC_ALPHA.md](MOMENT_OIT_STOCHASTIC_ALPHA.md) — production WBOIT (`r_oit 1`), experimental MBOIT (`r_oit 2`), stochastic alpha
+- [WBOIT_GPU_CERTIFICATION.md](WBOIT_GPU_CERTIFICATION.md) — live GPU cert levels, B0–B7 operator runner, soak (`oit_certify_wboit` / `oit_soak_wboit`)
+- [WBOIT_FOG_LAYERS.md](WBOIT_FOG_LAYERS.md) — fog-through-layers pass order, `r_oitFogMode`, no double-fog on resolve
 - [OIT_FUTURE_TRACKS.md](OIT_FUTURE_TRACKS.md) — deferred OIT research tracks (not this milestone)
 - [UI_BLUR.md](UI_BLUR.md) — CSS-style `filter` / `backdrop-filter` blur for the JS UI compositor (`ui_blurQuality`, `ui_filterDebug`)
 - [RADIANT.md](RADIANT.md)

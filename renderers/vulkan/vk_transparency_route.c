@@ -8,6 +8,7 @@ Raster Ultra 1.4 — transparency classification + refractive exclusion helpers.
 #include "vk.h"
 #include "vk_transparency_route.h"
 #include "vk_forward_plus.h"
+#include "vk_oit_certify.h"
 
 static cvar_t *r_transparencyDebug;
 static cvar_t *r_refractiveExcludeOit;
@@ -304,10 +305,12 @@ void vk_transparency_route_init( void )
 	s_inited = qtrue;
 	ri.Printf( PRINT_ALL, "[VK][Xparent] transparency routing initialized (refractiveExcludeOit=%d)\n",
 		r_refractiveExcludeOit->integer );
+	vk_oit_certify_init();
 }
 
 void vk_transparency_route_shutdown( void )
 {
+	vk_oit_certify_shutdown();
 	if ( ri.Cmd_RemoveCommand ) {
 		ri.Cmd_RemoveCommand( "transparency_route_status" );
 		ri.Cmd_RemoveCommand( "oit_status" );

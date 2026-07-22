@@ -283,9 +283,9 @@ void CL_Ref_Shutdown( refShutdownCode_t code ) {
 	SCR_Done();
 
 	cls.builtInTtfActive = qfalse;
-	Com_Memset( &cls.builtInHudFont, 0, sizeof( cls.builtInHudFont ) );
+	Com_Memset( cls.builtInHudFonts, 0, sizeof( cls.builtInHudFonts ) );
 	Com_Memset( &cls.builtInConsoleFont, 0, sizeof( cls.builtInConsoleFont ) );
-	cls.builtInHudRefLinePx = 0;
+	Com_Memset( cls.builtInHudRefLinePx, 0, sizeof( cls.builtInHudRefLinePx ) );
 	cls.builtInConsoleRefLinePx = 0;
 
 	if ( re.Shutdown ) {

@@ -3096,7 +3096,7 @@ static void R_Register( void )
 		"Requires \\r_oit 1 or 2. Hair cards stay on \\r_stochasticAlpha." );
 	ri.Cvar_SetGroup( r_oitClassify, CVG_RENDERER );
 	r_oitDebug = ri.Cvar_Get( "r_oitDebug", "0", CVAR_CHEAT );
-	ri.Cvar_CheckRange( r_oitDebug, "0", "16", CV_INTEGER );
+	ri.Cvar_CheckRange( r_oitDebug, "0", "19", CV_INTEGER );
 	ri.Cvar_SetDescription( r_oitDebug,
 		"OIT resolve debug view (cheat):\n"
 		" 0 - composite\n"
@@ -3116,7 +3116,10 @@ static void R_Register( void )
 		" 14 - constant magenta×coverage (ignore accum RGB)\n"
 		" 15 - FragCoord UV addressing diagnostic\n"
 		" 16 - invalid values (NaN/Inf mask)\n"
-		"NaN/Inf → magenta." );
+		" 17 - empty-pixel preservation (green=passthrough)\n"
+		" 18 - opaque input to resolve\n"
+		" 19 - final resolved coverage\n"
+		"NaN/Inf → preserve opaque (never full black)." );
 	ri.Cvar_SetGroup( r_oitDebug, CVG_RENDERER );
 	{
 		cvar_t *r_oitDirectTest;

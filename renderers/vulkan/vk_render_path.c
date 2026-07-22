@@ -11,6 +11,7 @@ Clustered Hybrid M1 — R_SelectSurfaceRenderPath + path debug counters.
 #include "vk_deferred_gbuffer.h"
 #include "vk_transparency_route.h"
 #include "tr_render_mode_vk.h"
+#include "vk.h"
 
 cvar_t *r_renderPathDebug;
 cvar_t *r_hybridCompare;
@@ -79,20 +80,41 @@ void R_RenderPath_Note( renderPath_t path )
 void R_RenderPath_Status_f( void )
 {
 	int i;
+	qboolean verbose = ( ri.Cmd_Argc() >= 2 && !Q_stricmp( ri.Cmd_Argv( 1 ), "verbose" ) );
 
 	ri.Printf( PRINT_ALL, "======== Render Path Status ========\n" );
 	ri.Printf( PRINT_ALL, "r_renderMode=%d pathDebug=%d hybridCompare=%d\n",
 		r_renderMode ? r_renderMode->integer : -1,
 		r_renderPathDebug ? r_renderPathDebug->integer : 0,
 		r_hybridCompare ? r_hybridCompare->integer : 0 );
-	ri.Printf( PRINT_ALL, "deferredPathReady=%s unified=%s\n",
+	ri.Printf( PRINT_ALL, "deferredPathReady=%s unified=%s split=%s lightingActive=%s\n",
 		vk_deferred_lighting_path_ready() ? "yes" : "no",
-		vk_unified_clustered_active() ? "yes" : "no" );
+		vk_unified_clustered_active() ? "yes" : "no",
+		vk_deferred_opaque_transparent_split() ? "yes" : "no",
+		vk_deferred_lighting_active() ? "yes" : "no" );
+	ri.Printf( PRINT_ALL, "oitFrameState=%u (0=untouched 3=resolved) r_oit=%d\n",
+		vk.oitFrameState, r_oit ? r_oit->integer : 0 );
 	for ( i = 0; i < RENDER_PATH_COUNT; i++ ) {
 		if ( s_pathCounts[i] == 0u && i != RENDER_PATH_NONE ) {
 			continue;
 		}
 		ri.Printf( PRINT_ALL, "  %-28s %u\n", R_RenderPath_Name( (renderPath_t)i ), s_pathCounts[i] );
+	}
+	if ( verbose ) {
+		uint32_t deferredN = s_pathCounts[RENDER_PATH_DEFERRED_OPAQUE];
+		uint32_t fpOpaqueN = s_pathCounts[RENDER_PATH_FORWARD_PLUS_OPAQUE];
+		uint32_t legacyN = s_pathCounts[RENDER_PATH_LEGACY_FORWARD];
+		uint32_t oitN = s_pathCounts[RENDER_PATH_OIT];
+		ri.Printf( PRINT_ALL,
+			"verbose: deferredOpaque=%u fpOpaque=%u legacy=%u oit=%u\n"
+			"  invariant: with lightingActive=0, deferredOpaque must be 0 (Forward+/legacy own color)\n"
+			"  post-OIT G-buffer capture is suppressed when oitFrameState==RESOLVED\n",
+			deferredN, fpOpaqueN, legacyN, oitN );
+		if ( !vk_deferred_lighting_active() && deferredN > 0u ) {
+			ri.Printf( PRINT_WARNING, S_COLOR_YELLOW
+				"[VK][path] WARNING: deferred_opaque selections while lighting inactive — check path ready\n"
+				S_COLOR_WHITE );
+		}
 	}
 }
 

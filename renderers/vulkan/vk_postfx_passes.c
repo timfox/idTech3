@@ -27,6 +27,7 @@ SSAO/HBAO pass, and vk_bloom. Split from vk.c.
 #include "vk_pass_registry.h"
 #include "vk_forward_plus.h"
 #include "vk_temporal.h"
+#include "vk_oit_certify.h"
 
 static void vk_oit_validate_pass_break( const char *stage )
 {
@@ -261,6 +262,7 @@ static void vk_oit_note_fallback( const char *reason )
 	if ( reason && reason[0] ) {
 		Q_strncpyz( vk.oitLastFallbackReason, reason, sizeof( vk.oitLastFallbackReason ) );
 		Q_strncpyz( vk.oitLastInvalidationReason, reason, sizeof( vk.oitLastInvalidationReason ) );
+		vk_oit_certify_note_anomaly( reason );
 	} else {
 		vk.oitLastFallbackReason[0] = '\0';
 	}
@@ -423,6 +425,7 @@ void vk_oit_pass( const struct drawSurfsCommand_s *cmd )
 	vk.oitResolveCount = 0;
 	vk.oitAccumPassCount = 0;
 	vk.oitDrawCount = 0;
+	vk_oit_certify_frame_tick();
 
 	if ( vk.oitCapturePending & VK_OIT_CAPTURE_CONTEXT ) {
 		ri.Printf( PRINT_ALL,

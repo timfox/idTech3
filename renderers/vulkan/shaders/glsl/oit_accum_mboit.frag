@@ -43,8 +43,12 @@ layout(push_constant) uniform Transform {
 	mat4 model;
 	int lightingDebug;
 	int parityCompare;
-	int pad0;
-	int pad1;
+	int fogMode;
+	int fogDebug;
+	float fogDensity;
+	float fogColorR;
+	float fogColorG;
+	float fogColorB;
 } pc;
 
 float AbsorbanceCloser( float b0, vec4 b, float z )
@@ -100,6 +104,24 @@ void main() {
 			return;
 		}
 		litRgb = ( pc.lightingDebug == 6 ) ? addLit : ( base.rgb + addLit );
+	}
+	{
+		float viewDepth = length( frag_world_pos - fp_params.fp_view_org.xyz );
+		float Tfog = 1.0;
+		float dens = max( pc.fogDensity, 0.0 );
+		if ( pc.fogMode >= 1 && dens > 1e-6 ) {
+			Tfog = clamp( exp( -pc.fogDensity * max( viewDepth, 0.0 ) ), 0.0, 1.0 );
+			litRgb *= Tfog;
+		}
+		if ( pc.fogDebug == 1 ) {
+			litRgb = vec3( clamp( viewDepth * 0.002, 0.0, 1.0 ) );
+		} else if ( pc.fogDebug == 2 ) {
+			litRgb = vec3( ( dens > 1e-6 ) ? Tfog : 1.0 );
+		} else if ( pc.fogDebug == 6 ) {
+			litRgb = ( pc.fogMode < 1 && dens > 1e-6 ) ? vec3( 1.0, 0.0, 1.0 ) : vec3( Tfog );
+		} else if ( pc.fogDebug == 7 ) {
+			litRgb = vec3( 1.0 - Tfog );
+		}
 	}
 	{
 		float lum = dot( litRgb, vec3( 0.2126, 0.7152, 0.0722 ) );

@@ -13,15 +13,19 @@ typedef struct vkMvpPushConstants_s {
 	float reserved[8]; /* padding / future push data; size must match VkPushConstantRange in vk_init_device.c */
 } vkMvpPushConstants_t;
 
-/* OIT layouts: mvp + prevMvp + model (192 B) + lightingDebug/parity (16 B) = 208 B. */
+/* OIT layouts: mvp + prevMvp + model (192 B) + lighting/fog (32 B) = 224 B. */
 typedef struct vkOitPushConstants_s {
 	float mvp[16];
 	float prev_mvp[16];
 	float model[16];
 	int lightingDebug;
 	int parityCompare;
-	int pad0;
-	int pad1;
+	int fogMode;
+	int fogDebug;
+	float fogDensity;
+	float fogColorR;
+	float fogColorG;
+	float fogColorB;
 } vkOitPushConstants_t;
 
 static VkRect2D vk_scene_src_rect;
@@ -1036,8 +1040,15 @@ void vk_update_mvp( const float *m )
 	Com_Memcpy( oit_push.model, backEnd.or.modelMatrix, sizeof( oit_push.model ) );
 	oit_push.lightingDebug = ri.Cvar_VariableIntegerValue( "r_oitLightingDebug" );
 	oit_push.parityCompare = ri.Cvar_VariableIntegerValue( "r_oitParityCompare" );
-	oit_push.pad0 = 0;
-	oit_push.pad1 = 0;
+	oit_push.fogMode = ri.Cvar_VariableIntegerValue( "r_oitFogMode" );
+	oit_push.fogDebug = ri.Cvar_VariableIntegerValue( "r_oitFogDebug" );
+	{
+		cvar_t *fogDen = ri.Cvar_Get( "r_oitFogDensity", "0.0", 0 );
+		oit_push.fogDensity = fogDen ? fogDen->value : 0.0f;
+	}
+	oit_push.fogColorR = 0.7f;
+	oit_push.fogColorG = 0.75f;
+	oit_push.fogColorB = 0.8f;
 	vk_capture_weapon_matrices();
 	push_constants.reserved[0] = ( tess.sdfUiEdge >= 0.0f ) ? tess.sdfUiEdge : 0.0f;
 	if ( r_sdfScreenAa ) {

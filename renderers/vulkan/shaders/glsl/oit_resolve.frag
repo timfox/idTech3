@@ -100,6 +100,11 @@ void main() {
 		out_color = vec4( opaque, 1.0 );
 		return;
 	}
+	/* Empty / near-empty accumulation: never replace opaque with black. */
+	if ( accum.a < 1e-4 && length( accum.rgb ) < 1e-4 ) {
+		out_color = vec4( opaque, 1.0 );
+		return;
+	}
 	{
 		float soft = smoothstep( 0.0, 0.04, coverage );
 		coverage *= soft;
@@ -121,7 +126,7 @@ void main() {
 	}
 	vec3 resolved = c_avg * coverage + opaque * revealage;
 	if ( oit_invalid3( resolved ) ) {
-		out_color = vec4( oit_magenta(), 1.0 );
+		out_color = vec4( opaque, 1.0 ); /* preserve opaque on NaN/Inf — never full black */
 		return;
 	}
 
@@ -192,6 +197,16 @@ void main() {
 		/* Invalid-value mask: magenta if any NaN/Inf in accum/reveal/resolved. */
 		bool bad = oit_invalid4( accum ) || oit_invalid( revealage ) || oit_invalid3( resolved );
 		out_color = bad ? vec4( oit_magenta(), 1.0 ) : vec4( 0.0, 0.2, 0.0, 1.0 );
+	} else if ( mode == 17 ) {
+		/* Empty-pixel preservation: green = opaque passthrough, yellow = blended. */
+		out_color = ( coverage < 1e-4 || ( accum.a < 1e-4 && length( accum.rgb ) < 1e-4 ) )
+			? vec4( 0.1, 0.9, 0.2, 1.0 ) : vec4( 0.9, 0.85, 0.1, 1.0 );
+	} else if ( mode == 18 ) {
+		/* Opaque input to resolve (fog_scene / pre-OIT HDR). */
+		out_color = vec4( opaque, 1.0 );
+	} else if ( mode == 19 ) {
+		/* Final resolved coverage. */
+		out_color = vec4( vec3( coverage ), 1.0 );
 	} else {
 		out_color = vec4( resolved, 1.0 );
 	}

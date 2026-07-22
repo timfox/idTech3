@@ -2726,6 +2726,24 @@ static const void *RB_DrawSurfs( const void *data ) {
 		RB_RenderDrawSurfList( cmd->drawSurfs, cmd->numDrawSurfs );
 		backEnd.reactiveMaskStamp = qfalse;
 		backEnd.drawSurfFilter = 0;
+		/*
+		 * Mode-2 / non-split + WBOIT: G-buffer / AV sidecars must run BEFORE OIT.
+		 * vk_oit_pass ends the main pass, resolves into HDR, and opens post_bloom.
+		 * Running capture afterward ends post_bloom, transitions color_image for
+		 * TRANSFER, and never restores the resolved HDR — all-black 3D with UI alive.
+		 */
+		if ( !( cmd->refdef.rdflags & RDF_NOWORLDMODEL ) ) {
+			vk_deferred_gbuffer_capture_after_geometry();
+			vk_deferred_decals_apply_to_gbuffer();
+			vk_visibility_buffer_capture_after_geometry();
+			vk_ambient_visibility_apply_after_geometry();
+			if ( vk_visibility_late_shade_wanted() ) {
+				vk_visibility_late_shade_apply_after_geometry();
+			} else if ( vk_deferred_lighting_active() ) {
+				/* Mode 2 normally does not want deferred lighting; gate keeps fail-open. */
+				vk_deferred_lighting_apply_after_geometry();
+			}
+		}
 		vk_oit_pass( cmd );
 		RB_DrawRefractiveAfterOit( cmd );
 	} else
@@ -2755,8 +2773,13 @@ static const void *RB_DrawSurfs( const void *data ) {
 	VK_Biome_Frame();
 	VK_VegGpu_Frame();
 	if ( !vk_deferred_opaque_transparent_split() ) {
-		/* Mode 2 sidecar / non-split: never refill G-buffer after weapon or UI. */
-		if ( !( cmd->refdef.rdflags & RDF_NOWORLDMODEL ) ) {
+		/*
+		 * Mode 2 sidecar / non-split without OIT (OIT path already captured above).
+		 * Never refill G-buffer after weapon/UI, and never after OIT resolve.
+		 */
+		if ( !( cmd->refdef.rdflags & RDF_NOWORLDMODEL ) &&
+			vk.oitFrameState != VK_OIT_FRAME_RESOLVED &&
+			vk.oitFrameState != VK_OIT_FRAME_ACCUMULATED ) {
 			vk_deferred_gbuffer_capture_after_geometry();
 			vk_deferred_decals_apply_to_gbuffer();
 			vk_visibility_buffer_capture_after_geometry();

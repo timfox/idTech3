@@ -46,8 +46,12 @@ layout(push_constant) uniform Transform {
 	mat4 model;
 	int lightingDebug;
 	int parityCompare;
-	int pad0;
-	int pad1;
+	int fogMode;
+	int fogDebug;
+	float fogDensity;
+	float fogColorR;
+	float fogColorG;
+	float fogColorB;
 } pc;
 
 void main() {
@@ -76,7 +80,6 @@ void main() {
 		vec3 V = normalize( fp_params.fp_view_org.xyz - frag_world_pos );
 		bool clusterOob = false;
 		uint lightCount = 0u;
-		/* Default dielectric translucent: low metal, mid roughness (parity scene overrides via materials later). */
 		float roughness = 0.45;
 		float metalness = 0.0;
 		vec3 addLit = FpEval_ForwardPlusAdd( base.rgb, N, V, frag_world_pos, roughness, metalness,
@@ -88,13 +91,45 @@ void main() {
 		}
 		if ( pc.lightingDebug == 6 ) {
 			litRgb = addLit;
-		} else if ( pc.parityCompare != 0 && alpha > 0.9 ) {
-			/* Near-opaque: show lit term alone for split compare (host may crop). */
-			litRgb = base.rgb + addLit;
 		} else {
 			litRgb = base.rgb + addLit;
 		}
 	}
+
+	/* Stage B fog: fog lit surface radiance once by camera→fragment transmittance.
+	 * Opaque background is assumed already fogged; resolve must not fog transparent again.
+	 * Mode 1 = production per-fragment T. Mode 2/3 = same T path today (moments optional later). */
+	{
+		float viewDepth = length( frag_world_pos - fp_params.fp_view_org.xyz );
+		float Tfog = 1.0;
+		float dens = max( pc.fogDensity, 0.0 );
+		if ( pc.fogMode >= 1 && dens > 1e-6 ) {
+			Tfog = clamp( exp( -pc.fogDensity * max( viewDepth, 0.0 ) ), 0.0, 1.0 );
+			/* Surface radiance attenuated; no in-scatter into accum (keeps WBOIT weights stable). */
+			litRgb *= Tfog;
+		}
+		/* Fog debug views always available when cheat debug > 0 (even density 0). */
+		if ( pc.fogDebug == 1 ) {
+			litRgb = vec3( clamp( viewDepth * 0.002, 0.0, 1.0 ) );
+		} else if ( pc.fogDebug == 2 ) {
+			litRgb = vec3( ( dens > 1e-6 ) ? Tfog : 1.0 );
+		} else if ( pc.fogDebug == 3 ) {
+			/* In-scatter placeholder (mode 1 does not add fog color into accum). */
+			litRgb = vec3( 0.0 );
+		} else if ( pc.fogDebug == 4 ) {
+			/* Weighted depth proxy: alpha * normalized depth. */
+			litRgb = vec3( clamp( viewDepth * 0.002, 0.0, 1.0 ) * alpha );
+		} else if ( pc.fogDebug == 5 ) {
+			litRgb = vec3( Tfog * alpha );
+		} else if ( pc.fogDebug == 6 ) {
+			/* Magenta = density set but fogMode legacy/off (double-fog risk with post stack). */
+			litRgb = ( pc.fogMode < 1 && dens > 1e-6 ) ? vec3( 1.0, 0.0, 1.0 ) : vec3( Tfog );
+		} else if ( pc.fogDebug == 7 ) {
+			/* Difference cue: show (1-T) — larger = more attenuated vs unfogged lit. */
+			litRgb = vec3( 1.0 - Tfog );
+		}
+	}
+
 	{
 		float lum = dot( litRgb, vec3( 0.2126, 0.7152, 0.0722 ) );
 		if ( lum > 4.0 ) {

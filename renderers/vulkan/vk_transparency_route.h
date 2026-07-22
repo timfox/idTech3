@@ -28,6 +28,15 @@ typedef enum {
 	VK_XPARENT_CLASS_COUNT
 } vkTransparencyClass_t;
 
+/*
+ * Semantic material routing flags (docs/WBOIT_FOG_LAYERS.md).
+ * Map onto vkTransparencyClass_t for fog / volume ownership — not separate OIT algorithms.
+ */
+#define TRANSPARENCY_SURFACE       VK_XPARENT_GLASS
+#define TRANSPARENCY_PARTICLE      VK_XPARENT_PARTICLE
+#define TRANSPARENCY_VOLUME_PROXY  VK_XPARENT_WBOIT /* camera-aligned smoke quads → WBOIT, not froxel */
+#define TRANSPARENCY_REFRACTIVE    VK_XPARENT_REFRACTIVE
+
 void vk_transparency_route_init( void );
 void vk_transparency_route_shutdown( void );
 

@@ -218,10 +218,11 @@ static float SCR_UiPixelScale( void ) {
 	return pixelScale;
 }
 
-static int SCR_HudTtfTargetPixelHeight( void ) {
+static int SCR_HudTtfTargetPixelHeightForVirtual( float virtualHeight ) {
 	int basePt;
 	int targetPx;
 	float pixelScale;
+	float floorVirt;
 
 	basePt = Cvar_VariableIntegerValue( "r_fontSize" );
 	if ( basePt <= 0 ) {
@@ -230,23 +231,128 @@ static int SCR_HudTtfTargetPixelHeight( void ) {
 
 	pixelScale = SCR_UiPixelScale();
 	/*
-	 * Rasterize near the largest common HUD text height (~22 virtual: JS HUD
-	 * timers/counters), not the small body size.  Upscaling glyphs blurs the
-	 * big digits far more than mipmapped downscale (r_fontMipmap) hurts the
-	 * small labels.  r_fontSize still floors the target.
+	 * Rasterize near the requested virtual HUD height so each tier stays close
+	 * to 1:1 atlas pixels.  Upscaling blurs; mipmapped downscale is cheaper.
+	 * r_fontSize still floors the target for the large tier.
 	 */
-	targetPx = (int)( 22.0f * pixelScale + 0.5f );
-	if ( targetPx < basePt ) {
+	if ( virtualHeight < 4.0f ) {
+		virtualHeight = 4.0f;
+	}
+	targetPx = (int)( virtualHeight * pixelScale + 0.5f );
+	floorVirt = virtualHeight;
+	if ( floorVirt >= 20.0f && targetPx < basePt ) {
 		targetPx = basePt;
 	}
-	if ( targetPx < 14 ) {
-		targetPx = 14;
+	if ( targetPx < 10 ) {
+		targetPx = 10;
+	}
+	if ( targetPx > 96 ) {
+		targetPx = 96;
 	}
 	return targetPx;
 }
 
+static int SCR_HudTtfTargetPixelHeight( void ) {
+	/* Large-tier default (timer / speed digits ~24–28 virtual). */
+	return SCR_HudTtfTargetPixelHeightForVirtual( 26.0f );
+}
+
 static int SCR_ComputeHudTtfPointSize( void ) {
 	return SCR_TtfPointSizeForPixelHeight( SCR_HudTtfTargetPixelHeight() );
+}
+
+static int SCR_ComputeHudTtfPointSizeTier( int tier ) {
+	static const float virtH[3] = { 8.0f, 14.0f, 26.0f };
+
+	if ( tier < 0 ) {
+		tier = 0;
+	}
+	if ( tier > 2 ) {
+		tier = 2;
+	}
+	return SCR_TtfPointSizeForPixelHeight( SCR_HudTtfTargetPixelHeightForVirtual( virtH[tier] ) );
+}
+
+static const char *SCR_HudTtfPathForTier( int tier ) {
+	const char *path;
+
+	if ( tier == 0 ) {
+		path = Cvar_VariableString( "r_fontHudSmall" );
+		if ( path && path[0] ) {
+			return path;
+		}
+	} else if ( tier == 1 ) {
+		path = Cvar_VariableString( "r_fontHudMedium" );
+		if ( path && path[0] ) {
+			return path;
+		}
+	}
+	path = Cvar_VariableString( "r_font" );
+	return ( path && path[0] ) ? path : "";
+}
+
+static int SCR_HudTtfRefLineFromFont( fontInfo_t *font ) {
+	glyphInfo_t *g;
+	int ref;
+
+	if ( !font ) {
+		return 0;
+	}
+	g = &font->glyphs[ (int)'M' & 255 ];
+	if ( !g->glyph || g->imageHeight <= 0 ) {
+		g = &font->glyphs[ (int)'0' & 255 ];
+	}
+	if ( !g->glyph || g->imageHeight <= 0 ) {
+		return 0;
+	}
+	ref = g->top - g->bottom;
+	if ( ref <= 0 ) {
+		ref = g->imageHeight;
+	}
+	return ref;
+}
+
+static qboolean SCR_HudTtfTierActive( int tier ) {
+	if ( tier < 0 || tier > 2 ) {
+		return qfalse;
+	}
+	return (qboolean)( cls.builtInHudRefLinePx[tier] > 0 &&
+		( cls.builtInHudFonts[tier].glyphs[ (int)'M' & 255 ].glyph ||
+		  cls.builtInHudFonts[tier].glyphs[ (int)'0' & 255 ].glyph ) );
+}
+
+static void SCR_PickHudTtf( float virtualSize, const fontInfo_t **fontOut, int *refPxOut ) {
+	float targetPx;
+	float bestDist;
+	int best;
+	int i;
+
+	*fontOut = NULL;
+	*refPxOut = 0;
+	if ( !cls.builtInTtfActive ) {
+		return;
+	}
+
+	targetPx = virtualSize * SCR_UiPixelScale();
+	best = -1;
+	bestDist = 1.0e9f;
+	for ( i = 0; i < 3; i++ ) {
+		float dist;
+
+		if ( !SCR_HudTtfTierActive( i ) ) {
+			continue;
+		}
+		dist = fabsf( (float)cls.builtInHudRefLinePx[i] - targetPx );
+		if ( dist < bestDist ) {
+			bestDist = dist;
+			best = i;
+		}
+	}
+	if ( best < 0 ) {
+		return;
+	}
+	*fontOut = &cls.builtInHudFonts[best];
+	*refPxOut = cls.builtInHudRefLinePx[best];
 }
 
 static int SCR_ComputeConsoleTtfPointSize( void ) {
@@ -282,17 +388,24 @@ Re-rasterize when console cell size or resolution changes (avoids blurry upscale
 ================
 */
 void CL_RefreshBuiltInTrueTypeFonts( void ) {
-	int wantHud;
+	int wantHud[3];
 	int wantCon;
+	int i;
 
 	if ( !Cvar_VariableIntegerValue( "cl_builtInTtf" ) || !re.RegisterFont ) {
 		return;
 	}
 
-	wantHud = SCR_ComputeHudTtfPointSize();
+	for ( i = 0; i < 3; i++ ) {
+		wantHud[i] = SCR_ComputeHudTtfPointSizeTier( i );
+	}
 	wantCon = SCR_ComputeConsoleTtfPointSize();
 
-	if ( cls.builtInTtfActive && wantHud == cls.builtInHudPointSize && wantCon == cls.builtInConsolePointSize ) {
+	if ( cls.builtInTtfActive &&
+			wantHud[0] == cls.builtInHudPointSize[0] &&
+			wantHud[1] == cls.builtInHudPointSize[1] &&
+			wantHud[2] == cls.builtInHudPointSize[2] &&
+			wantCon == cls.builtInConsolePointSize ) {
 		return;
 	}
 
@@ -315,20 +428,24 @@ legacy 16x16 bitmap charset (when r_font is set and BUILD_FREETYPE is on).
 void CL_RegisterBuiltInTrueTypeFonts( void ) {
 	const char *hudPath;
 	const char *conPath;
-	int hudPt;
+	const char *tierPath;
+	int hudPt[3];
 	int conPt;
+	int i;
+	int registered;
 	glyphInfo_t *g;
+	static const char *tierName[3] = { "small", "medium", "large" };
 
 	if ( !Cvar_VariableIntegerValue( "cl_builtInTtf" ) ) {
 		return;
 	}
 
 	cls.builtInTtfActive = qfalse;
-	Com_Memset( &cls.builtInHudFont, 0, sizeof( cls.builtInHudFont ) );
+	Com_Memset( cls.builtInHudFonts, 0, sizeof( cls.builtInHudFonts ) );
 	Com_Memset( &cls.builtInConsoleFont, 0, sizeof( cls.builtInConsoleFont ) );
-	cls.builtInHudRefLinePx = 0;
+	Com_Memset( cls.builtInHudRefLinePx, 0, sizeof( cls.builtInHudRefLinePx ) );
+	Com_Memset( cls.builtInHudPointSize, 0, sizeof( cls.builtInHudPointSize ) );
 	cls.builtInConsoleRefLinePx = 0;
-	cls.builtInHudPointSize = 0;
 	cls.builtInConsolePointSize = 0;
 	cls.builtInConsoleCellW = 0;
 
@@ -341,24 +458,57 @@ void CL_RegisterBuiltInTrueTypeFonts( void ) {
 		return;
 	}
 
-	hudPt = SCR_ComputeHudTtfPointSize();
-	conPt = SCR_ComputeConsoleTtfPointSize();
-
-	re.RegisterFont( hudPath, hudPt, &cls.builtInHudFont );
-	g = &cls.builtInHudFont.glyphs[ (int)'M' & 255 ];
-	if ( !g->glyph || g->imageHeight <= 0 ) {
-		g = &cls.builtInHudFont.glyphs[ (int)'0' & 255 ];
+	registered = 0;
+	for ( i = 0; i < 3; i++ ) {
+		tierPath = SCR_HudTtfPathForTier( i );
+		if ( !tierPath || !tierPath[0] ) {
+			tierPath = hudPath;
+		}
+		hudPt[i] = SCR_ComputeHudTtfPointSizeTier( i );
+		re.RegisterFont( tierPath, hudPt[i], &cls.builtInHudFonts[i] );
+		cls.builtInHudRefLinePx[i] = SCR_HudTtfRefLineFromFont( &cls.builtInHudFonts[i] );
+		if ( cls.builtInHudRefLinePx[i] <= 0 ) {
+			Com_Memset( &cls.builtInHudFonts[i], 0, sizeof( cls.builtInHudFonts[i] ) );
+			cls.builtInHudRefLinePx[i] = 0;
+			cls.builtInHudPointSize[i] = 0;
+			Com_Printf( S_COLOR_YELLOW "Client: HUD TrueType %s \"%s\" @ %dpt failed\n",
+				tierName[i], tierPath, hudPt[i] );
+			continue;
+		}
+		cls.builtInHudPointSize[i] = hudPt[i];
+		registered++;
+		Com_Printf( "Client: HUD TrueType %s \"%s\" @ %dpt (ref ~%dpx)\n",
+			tierName[i], tierPath, hudPt[i], cls.builtInHudRefLinePx[i] );
 	}
-	if ( !g->glyph || g->imageHeight <= 0 ) {
-		Com_Memset( &cls.builtInHudFont, 0, sizeof( cls.builtInHudFont ) );
+
+	if ( !registered ) {
 		Com_Printf( S_COLOR_YELLOW "Client: could not load r_font \"%s\" (TrueType); using bitmap charset for HUD\n", hudPath );
 		return;
 	}
 
-	cls.builtInHudRefLinePx = g->top - g->bottom;
-	if ( cls.builtInHudRefLinePx <= 0 ) {
-		cls.builtInHudRefLinePx = g->imageHeight;
+	/* If a mid tier failed, clone the nearest working atlas so picking always has options. */
+	for ( i = 0; i < 3; i++ ) {
+		int donor;
+
+		if ( SCR_HudTtfTierActive( i ) ) {
+			continue;
+		}
+		donor = ( i < 2 ) ? i + 1 : i - 1;
+		if ( !SCR_HudTtfTierActive( donor ) ) {
+			donor = 2;
+		}
+		if ( !SCR_HudTtfTierActive( donor ) ) {
+			donor = 0;
+		}
+		if ( !SCR_HudTtfTierActive( donor ) ) {
+			continue;
+		}
+		cls.builtInHudFonts[i] = cls.builtInHudFonts[donor];
+		cls.builtInHudRefLinePx[i] = cls.builtInHudRefLinePx[donor];
+		cls.builtInHudPointSize[i] = cls.builtInHudPointSize[donor];
 	}
+
+	conPt = SCR_ComputeConsoleTtfPointSize();
 
 	conPath = Cvar_VariableString( "r_consoleFont" );
 	if ( conPath && conPath[0] && Q_stricmp( conPath, hudPath ) != 0 ) {
@@ -394,7 +544,6 @@ void CL_RegisterBuiltInTrueTypeFonts( void ) {
 	}
 
 	cls.builtInTtfActive = qtrue;
-	cls.builtInHudPointSize = hudPt;
 	cls.builtInConsolePointSize = conPt;
 	cls.builtInConsoleCellW = SCR_ComputeConsoleTtfCellWidth( &cls.builtInConsoleFont, cls.builtInConsoleRefLinePx );
 	if ( cls.builtInConsoleCellW > 0 && cl_builtInTtfConsole && cl_builtInTtfConsole->integer ) {
@@ -411,8 +560,12 @@ void CL_RegisterBuiltInTrueTypeFonts( void ) {
 	} else if ( !cl_builtInTtfConsole || !cl_builtInTtfConsole->integer ) {
 		Com_Printf( "Client: console text using bitmap charset (cl_builtInTtfConsole 0)\n" );
 	}
-	Com_Printf( "Client: built-in HUD TrueType font \"%s\" @ %dpt (target ~%dpx, dpi %d)\n",
-		hudPath, hudPt, SCR_HudTtfTargetPixelHeight(), Cvar_VariableIntegerValue( "r_fontDpi" ) );
+	Com_Printf( "Client: built-in HUD TrueType tiers sm/md/lg @ %d/%d/%dpt (targets ~%d/%d/%dpx, dpi %d)\n",
+		cls.builtInHudPointSize[0], cls.builtInHudPointSize[1], cls.builtInHudPointSize[2],
+		SCR_HudTtfTargetPixelHeightForVirtual( 8.0f ),
+		SCR_HudTtfTargetPixelHeightForVirtual( 14.0f ),
+		SCR_HudTtfTargetPixelHeightForVirtual( 26.0f ),
+		Cvar_VariableIntegerValue( "r_fontDpi" ) );
 	if ( r_fontKerning ) {
 		Com_Printf( "Client: r_fontKerning %i (proportional xSkip + FreeType kern; Rougier HAL-05430837)\n",
 			r_fontKerning->integer );
@@ -640,7 +793,7 @@ static float SCR_TtfGlyphAdvance( const fontInfo_t *font, int refLinePx, float c
 
 
 static qboolean SCR_DrawBuiltInTtfStringExtVirtual( float x, float y, float size, const char *string,
-		const fontInfo_t *font, const float *setColor, qboolean forceColor, qboolean noColorEscape ) {
+		const fontInfo_t *font, int refPx, const float *setColor, qboolean forceColor, qboolean noColorEscape ) {
 	vec4_t color;
 	const char *s;
 	float xx;
@@ -649,10 +802,9 @@ static qboolean SCR_DrawBuiltInTtfStringExtVirtual( float x, float y, float size
 	const float sp = SCR_TtfSubpixelBias();
 	const qboolean baselineAlign = ( r_fontConsoleAlign && r_fontConsoleAlign->integer ) ? qtrue : qfalse;
 	const qboolean snapPx = !( r_fontSubpixelPos && r_fontSubpixelPos->integer );
-	const int refPx = cls.builtInHudRefLinePx;
 	int prevCh;
 
-	if ( !string || !string[0] || !setColor || !font ) {
+	if ( !string || !string[0] || !setColor || !font || refPx <= 0 ) {
 		return qfalse;
 	}
 
@@ -1071,9 +1223,14 @@ void SCR_DrawStringExt( int x, int y, float size, const char *string, const floa
 		goto bitmap_fallback;
 	}
 
-	if ( ( textMode == 0 || textMode == 1 ) && cls.builtInTtfActive &&
-			SCR_DrawBuiltInTtfStringExtVirtual( x, y, clampedSize, string, &cls.builtInHudFont, setColor, forceColor, noColorEscape ) ) {
-		return;
+	if ( ( textMode == 0 || textMode == 1 ) && cls.builtInTtfActive ) {
+		const fontInfo_t *hudFont = NULL;
+		int hudRef = 0;
+
+		SCR_PickHudTtf( clampedSize, &hudFont, &hudRef );
+		if ( hudFont && SCR_DrawBuiltInTtfStringExtVirtual( x, y, clampedSize, string, hudFont, hudRef, setColor, forceColor, noColorEscape ) ) {
+			return;
+		}
 	}
 
 	if ( ( textMode == 0 || textMode == 2 ) &&
@@ -1165,9 +1322,14 @@ void SCR_DrawHudString( float x, float y, float size, const char *string, const 
 	const float clampedSize = Com_Clamp( 1.0f, 256.0f, size );
 	const int textMode = SCR_TextRenderMode();
 
-	if ( ( textMode == 0 || textMode == 1 ) && cls.builtInTtfActive &&
-			SCR_DrawBuiltInTtfStringExtVirtual( x, y, clampedSize, string, &cls.builtInHudFont, setColor, forceColor, noColorEscape ) ) {
-		return;
+	if ( ( textMode == 0 || textMode == 1 ) && cls.builtInTtfActive ) {
+		const fontInfo_t *hudFont = NULL;
+		int hudRef = 0;
+
+		SCR_PickHudTtf( clampedSize, &hudFont, &hudRef );
+		if ( hudFont && SCR_DrawBuiltInTtfStringExtVirtual( x, y, clampedSize, string, hudFont, hudRef, setColor, forceColor, noColorEscape ) ) {
+			return;
+		}
 	}
 
 	/* Other text backends only accept integer virtual coordinates. */
@@ -1297,14 +1459,14 @@ float SCR_MeasureHudStringWidth( float size, const char *string ) {
 	float xx;
 	int prevCh;
 	const fontInfo_t *font;
-	const int refPx = cls.builtInHudRefLinePx;
+	int refPx;
 
 	if ( !string || !string[0] ) {
 		return 0.0f;
 	}
 
-	if ( cls.builtInTtfActive && refPx > 0 && cls.builtInHudFont.glyphs[ (int)'M' & 255 ].glyph ) {
-		font = &cls.builtInHudFont;
+	SCR_PickHudTtf( cell, &font, &refPx );
+	if ( cls.builtInTtfActive && font && refPx > 0 ) {
 		s = string;
 		xx = 0.0f;
 		prevCh = -1;
@@ -1509,6 +1671,15 @@ void SCR_Init( void ) {
 	Cvar_CheckRange( r_fontShadow, "0", "8", CV_INTEGER );
 	Cvar_SetDescription( r_fontShadow,
 		"Drop-shadow offset in pixels (console/notify) or virtual units (640x480 HUD bigchars). 0 disables the shadow pass for TrueType." );
+
+	{
+		cvar_t *fs = Cvar_Get( "r_fontHudSmall", "", CVAR_ARCHIVE );
+		Cvar_SetDescription( fs,
+			"Optional TrueType path for small HUD labels (~8 virtual). Empty uses r_font. Pair with an optical-size master (e.g. Inter 18pt)." );
+		fs = Cvar_Get( "r_fontHudMedium", "", CVAR_ARCHIVE );
+		Cvar_SetDescription( fs,
+			"Optional TrueType path for medium HUD body (~14 virtual). Empty uses r_font. Pair with an optical-size master (e.g. Inter 24pt)." );
+	}
 
 	r_fontSubpixel = Cvar_Get( "r_fontSubpixel", "0", CVAR_ARCHIVE );
 	Cvar_CheckRange( r_fontSubpixel, "0", "1", CV_INTEGER );
