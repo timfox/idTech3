@@ -778,8 +778,14 @@ int R_LightDirForPoint( vec3_t point, vec3_t lightDir, vec3_t normal, world_t *w
 {
 	trRefEntity_t ent;
 
-	if ( world->lightGridData == NULL )
-	  return qfalse;
+	/*
+	 * BSP30 / maps without a light grid still need a finite light direction.
+	 * Callers leave lightDir hunk-zeroed on failure; PBR normalize(0) → NaN → black HDR.
+	 */
+	if ( world->lightGridData == NULL ) {
+		VectorCopy( normal, lightDir );
+		return qfalse;
+	}
 
 	Com_Memset( &ent, 0, sizeof(ent) );
 	VectorCopy( point, ent.e.origin );

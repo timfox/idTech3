@@ -68,6 +68,18 @@ tests=(
 	test_reflection_fallback
 )
 
+# Cluster indexing lives in cmake target unit_cluster_math (links vk_cluster_math.cpp).
+if [[ -x "$ROOT/build-vk-Release/unit_cluster_math" ]]; then
+	if "$ROOT/build-vk-Release/unit_cluster_math"; then
+		echo "PASS: unit_cluster_math (cmake)"
+	else
+		echo "FAIL: unit_cluster_math"
+		failures=$((failures + 1))
+	fi
+else
+	echo "SKIP: unit_cluster_math binary not present (build unit_cluster_math)"
+fi
+
 for t in "${tests[@]}"; do
 	run_test "$ROOT/tests/unit/${t}.c"
 done

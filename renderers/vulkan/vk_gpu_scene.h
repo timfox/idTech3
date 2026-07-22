@@ -86,7 +86,7 @@ typedef struct GpuSceneObject {
 	float    boundsSphere[4];
 	float    boundsMin[4];
 	float    boundsMax[4];
-	uint32_t _pad;
+	uint32_t _pad[2]; /* SSBO 16-byte stride (sizeof must be multiple of 16) */
 } GpuSceneObject;
 
 typedef GpuSceneObject vkGpuSceneInstance_t;
@@ -166,5 +166,8 @@ void vk_gpu_scene_merge_compatible_draws( uint32_t *outCmdsIn, uint32_t *outCmds
 qboolean vk_gpu_scene_indirect_buffer_ready( void );
 
 void vk_gpu_scene_status_f( void );
+
+/* Print CPU/GPU schema sizes for layout parity (docs/GPU_SCENE.md). */
+void vk_gpu_scene_layout_f( void );
 
 #endif /* USE_VULKAN */

@@ -1062,6 +1062,7 @@ void vk_end_frame_record_gamma_pass( VkImageView post_fog_src )
 	VkImageView preferred = ( post_fog_src != VK_NULL_HANDLE ) ? post_fog_src : vk.color_image_view;
 	VkImageView gamma_src;
 
+	vk_black_frame_note_writer( "ToneMap" );
 	vk_pass_diag_stage( "gamma_enter" );
 
 	/* Prefer expected writer when viable so bloom/AA/TAA intent wins over stale handles. */

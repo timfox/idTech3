@@ -407,6 +407,7 @@ compile_shader("comp", "vegetation_wind.comp", "vegetation_wind_cs", binding_exp
 compile_shader("comp", "terrain/cbt_terrain.comp", "cbt_terrain_cs", binding_expr="vk.modules.cbt_terrain_cs")
 compile_shader("comp", "forward_plus_tile_cull.comp", "forward_plus_tile_cull_cs", binding_expr="vk.modules.forward_plus_tile_cull_cs")
 compile_shader("comp", "deferred_gbuffer_fill.comp", "deferred_gbuffer_fill_cs", binding_expr="vk.modules.deferred_gbuffer_fill_cs")
+compile_shader("comp", "hiz_downsample.comp", "hiz_downsample_cs", binding_expr="vk.modules.hiz_downsample_cs")
 compile_shader("frag", "deferred_gbuffer_debug.frag", "deferred_gbuffer_debug_fs", binding_expr="vk.modules.deferred_gbuffer_debug_fs")
 compile_shader("comp", "visibility_buffer_fill.comp", "visibility_buffer_fill_cs", binding_expr="vk.modules.visibility_buffer_fill_cs")
 compile_shader("frag", "visibility_buffer_debug.frag", "visibility_buffer_debug_fs", binding_expr="vk.modules.visibility_buffer_debug_fs")

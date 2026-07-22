@@ -29,15 +29,20 @@ Shared: GPU scene, materials, lights, clusters, shadows, probes, atmosphere, exp
 | # | Item | Status |
 |---|------|--------|
 | 1 | Black-frame / SceneHDR validation | **Done** — `renderer_validate_frame`, `renderer_resource_status`, `renderer_capture_black_frame`, `renderer_draw_status` |
+| 1b | Frame contract (FC Phase 1) | **Done** — `renderer_frame_status`, `renderer_capture_frame_contract`, per-resource history + black-frame class |
 | 2 | Compact G-buffer design + bandwidth | **Prep** — octahedral helpers, `r_gbufferCompact` dual-write, `gbuffer_bandwidth` scaffold vs compact + Forward+ fallback % |
 | 3 | Unify BRDF (Deferred / Forward+ / WBOIT) | **Done** — `pbr_brdf_core.glsl` in Forward+/OIT, deferred, and `gen_frag.tmpl` |
 | 4 | Specular AA (Toksvig + geo floor + glancing) | **Hardened** — shipping baseline; `r_pbr_specularAA` kill switch; no LEAN this sprint |
-| 5 | GPU scene records expansion | **Done** — prevTransform, objectId, temporalGeneration, shadowFlags, renderFlags; `r_gpuDrawCompare` |
-| 6 | Hi-Z + indirect draw validation | **Done** — compute downsample (`hiz_downsample.comp`), conservative sample, `hiz_status` / `gpu_scene_status` |
+| 5 | GPU scene records expansion | **Done** — prevTransform, objectId, temporalGeneration, shadowFlags, renderFlags; `r_gpuDrawCompare`; `gpu_scene_layout` |
+| 6 | Hi-Z + indirect draw validation | **Done** — compute downsample (`hiz_downsample.comp`), conservative sample, `hiz_status` / `depth_status` / `gpu_scene_status` |
 | 7 | Meshlet: one BSP class + one dynamic model | **Done** — `r_meshletsBspPilot` (SF_FACE), `r_meshletsModelPilot` (static MD3; animated skip) |
-| 8 | Virtual-shadow page fill | **Done** — claim_dirty → depth-fill companion mark; `vshadow_status` counters; CSM fallback default |
+| 8 | Virtual-shadow page fill | **Scaffold** — `vshadow_status` / `shadow_status`; CSM fallback default (full virtualization is next milestone) |
 | 9 | Reflection-source hierarchy debug | **Done** — `r_reflectionDebug` aliases `r_shrDebug` source IDs |
 | 10 | Renderer laboratory expansion | **Done** — `VK_REFLAB_SCENE_SURF_SPEED` + `demo_reference_lab_surf_speed.cfg` + `test_reference_lab_surf_speed.sh` |
+| FC | Foundation Consolidation hub | **Gates green** — `tests/scripts/test_foundation_consolidation.sh` + `test_foundation_unit.sh` |
+
+
+**Safe defaults:** `r_gpuScene 0`, `r_gpuDriven 0`, `r_hiZ 0` — classic BSP draws remain authoritative until GPU path is enabled deliberately.
 
 **Do not claim:** ReSTIR, full ray-traced GI, neural reconstruction, full G-buffer layout cutover, replacing BSP default draws, M5–M27 program milestones.
 

@@ -39,14 +39,6 @@ static const char *s_resNames[VK_FRAME_RES_COUNT] = {
 	"FinalLDR"
 };
 
-static const char *VK_FC_ResourceName( vkFrameContractResource_t res )
-{
-	if ( res < 0 || res >= VK_FRAME_RES_COUNT ) {
-		return "unknown";
-	}
-	return s_resNames[res];
-}
-
 static vkFrameContractResource_t VK_FC_ParseResource( const char *name )
 {
 	int i;
@@ -66,13 +58,14 @@ static vkFrameContractResource_t VK_FC_ParseResource( const char *name )
 	if ( !Q_stricmp( name, "SceneDepthPrevious" ) || !Q_stricmp( name, "DepthPrev" ) ) {
 		return VK_FRAME_RES_SCENE_DEPTH_PREVIOUS;
 	}
-	if ( !Q_stricmp( name, "GBuffer" ) || !Q_stricmp( name, "GBufferAlbedo" ) ) {
+	if ( !Q_stricmp( name, "GBuffer" ) || !Q_stricmp( name, "GBufferAlbedo" ) ||
+		!Q_stricmp( name, "GBuffer0" ) ) {
 		return VK_FRAME_RES_GBUFFER_ALBEDO;
 	}
-	if ( !Q_stricmp( name, "GBufferNormal" ) ) {
+	if ( !Q_stricmp( name, "GBufferNormal" ) || !Q_stricmp( name, "GBuffer1" ) ) {
 		return VK_FRAME_RES_GBUFFER_NORMAL;
 	}
-	if ( !Q_stricmp( name, "GBufferMaterial" ) ) {
+	if ( !Q_stricmp( name, "GBufferMaterial" ) || !Q_stricmp( name, "GBuffer2" ) ) {
 		return VK_FRAME_RES_GBUFFER_MATERIAL;
 	}
 	if ( !Q_stricmp( name, "GBufferLighting" ) || !Q_stricmp( name, "DeferredComposite" ) ) {
@@ -374,6 +367,51 @@ uint32_t vk_frame_contract_validate( qboolean printPass )
 		if ( printPass ) {
 			ri.Printf( PRINT_ALL,
 				"WARN[frame_contract]: SceneDepth writer not annotated (depth may still be valid)\n" );
+		}
+	}
+
+	/* Extent sanity: render vs SceneHDR meta. */
+	if ( hdr->extentW && hdr->extentH &&
+		( hdr->extentW != s_snap.renderExtentW || hdr->extentH != s_snap.renderExtentH ) &&
+		s_snap.renderExtentW && s_snap.renderExtentH ) {
+		if ( printPass ) {
+			ri.Printf( PRINT_WARNING,
+				"FAIL[frame_contract]: SceneHDR extent %ux%u != render %ux%u\n",
+				hdr->extentW, hdr->extentH, s_snap.renderExtentW, s_snap.renderExtentH );
+		}
+		fails++;
+	} else if ( printPass ) {
+		ri.Printf( PRINT_ALL, "PASS[frame_contract]: SceneHDR extent matches render (or unset)\n" );
+	}
+
+	/* Allowed multi-writer SceneHDR chain (opaque → OIT resolve → etc.). */
+	if ( hdr->writtenThisFrame && hdr->firstWriter[0] && hdr->lastWriter[0] &&
+		Q_stricmp( hdr->firstWriter, hdr->lastWriter ) && printPass ) {
+		ri.Printf( PRINT_ALL,
+			"NOTE[frame_contract]: SceneHDR multi-writer chain first=%s last=%s\n",
+			hdr->firstWriter, hdr->lastWriter );
+	}
+
+	/* Black-frame class: depth/geometry activity without SceneHDR writer. */
+	if ( vk.fboActive && backEnd.doneWorldScene &&
+		backEnd.pc.c_surfaces > 0 && !hdr->writtenThisFrame ) {
+		if ( printPass ) {
+			ri.Printf( PRINT_WARNING,
+				"FAIL[frame_contract]: surfaces=%i but SceneHDR unwritten (black-frame class)\n",
+				backEnd.pc.c_surfaces );
+		}
+		fails++;
+	}
+
+	/* Stale previous-frame temporal resources (generation 0 while current scene gen bumped). */
+	if ( s_snap.resources[VK_FRAME_RES_SCENE_HDR_PREVIOUS].readerCount > 0 &&
+		s_snap.resources[VK_FRAME_RES_SCENE_HDR_PREVIOUS].lastValidFrame + 1u < s_snap.frame &&
+		s_snap.frame > 2u ) {
+		if ( printPass ) {
+			ri.Printf( PRINT_WARNING,
+				"WARN[frame_contract]: SceneHDRPrevious may be stale (lastValid=%u frame=%u)\n",
+				s_snap.resources[VK_FRAME_RES_SCENE_HDR_PREVIOUS].lastValidFrame,
+				s_snap.frame );
 		}
 	}
 

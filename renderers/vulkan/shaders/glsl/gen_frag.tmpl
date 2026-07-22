@@ -1405,8 +1405,19 @@ void main() {
 	E = normalize(viewDir);
 
 	L = var_LightDir.xyz;
-	float sqrLightDist = dot(L, L);
-	L /= sqrt(sqrLightDist);
+	{
+		/* BSP30 / missing lightgrid can leave LightDir at 0 — normalize would NaN
+		 * and collapse the whole HDR path to black while UI/weapon still draw. */
+		float sqrLightDist = dot( L, L );
+		if ( sqrLightDist > 1e-12 ) {
+			L *= inversesqrt( sqrLightDist );
+		} else {
+			L = normalize( var_Normal.xyz );
+			if ( dot( L, L ) < 1e-12 ) {
+				L = vec3( 0.0, 0.0, 1.0 );
+			}
+		}
+	}
 
 	vec2 pbrSurfUV = frag_tex_coord0;
 	float pomSelfShadow = 1.0;

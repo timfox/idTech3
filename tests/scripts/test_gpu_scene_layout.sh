@@ -27,6 +27,7 @@ grep -q 'vkGpuSceneMesh_t' "$HDR" || fail "vkGpuSceneMesh_t missing"
 grep -q 'VK_GPU_SCENE_MAX_INSTANCES' "$HDR" || fail "capacity constants missing"
 pass "vk_gpu_scene.h schema present"
 
+grep -q 'gpu_scene_layout' "$SRC" || fail "gpu_scene_layout command missing"
 grep -q 'gpu_scene_status' "$SRC" || fail "gpu_scene_status command missing"
 grep -q 'r_gpuSceneDebug' "$SRC" || fail "r_gpuSceneDebug cvar missing"
 grep -q 'r_gpuScene' "$SRC" || fail "r_gpuScene cvar missing"
