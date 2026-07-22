@@ -19,6 +19,7 @@ lines for Lua/script integration (client-side game systems).
 #define SAVE_SLOTS 8
 #define QUEST_MAX 64
 #define DIALOGUE_MAX 32
+#define DIALOGUE_CHOICE_MAX 8
 
 typedef struct {
 	char name[64];
@@ -55,11 +56,18 @@ static int s_questCount;
 typedef struct {
 	char speaker[64];
 	char text[512];
+	char locKey[64];
+	char voice[MAX_QPATH];
+	float duration;
+	int choiceCount;
+	char choiceLabel[DIALOGUE_CHOICE_MAX][128];
+	char choiceNext[DIALOGUE_CHOICE_MAX][64];
 	qboolean used;
 } dialogueLine_t;
 
 static dialogueLine_t s_dialogue[DIALOGUE_MAX];
 static int s_dialogueCount;
+static cvar_t *cv_com_ubertools;
 
 /* ---- Telemetry ---- */
 
@@ -461,7 +469,10 @@ int EngineQuest_Count( void ) {
 void EngineDialogue_Init( void ) {
 	s_dialogueCount = 0;
 	Com_Memset( s_dialogue, 0, sizeof( s_dialogue ) );
-	Com_Printf( "EngineDialogue: buffer ready (Engine.Dialogue.*)\n" );
+	cv_com_ubertools = Cvar_Get( "com_ubertools", "1", CVAR_ARCHIVE_ND );
+	Cvar_SetDescription( cv_com_ubertools, "Master runtime toggle for ÜberTools clean-room features." );
+	Com_Printf( "EngineDialogue: buffer ready (Engine.Dialogue.*) com_ubertools=%d\n",
+		cv_com_ubertools ? cv_com_ubertools->integer : 1 );
 }
 
 void EngineDialogue_Shutdown( void ) {
@@ -469,6 +480,11 @@ void EngineDialogue_Shutdown( void ) {
 }
 
 int EngineDialogue_Start( const char *speaker, const char *text ) {
+	return EngineDialogue_StartEx( speaker, text, NULL, NULL, 0.0f );
+}
+
+int EngineDialogue_StartEx( const char *speaker, const char *text, const char *locKey,
+	const char *voice, float duration ) {
 	int i;
 	if ( !text ) {
 		return -1;
@@ -478,10 +494,75 @@ int EngineDialogue_Start( const char *speaker, const char *text ) {
 		s_dialogueCount = DIALOGUE_MAX - 1;
 	}
 	i = s_dialogueCount++;
+	Com_Memset( &s_dialogue[i], 0, sizeof( s_dialogue[i] ) );
 	s_dialogue[i].used = qtrue;
 	Q_strncpyz( s_dialogue[i].speaker, speaker ? speaker : "", sizeof( s_dialogue[0].speaker ) );
 	Q_strncpyz( s_dialogue[i].text, text, sizeof( s_dialogue[0].text ) );
+	if ( locKey ) {
+		Q_strncpyz( s_dialogue[i].locKey, locKey, sizeof( s_dialogue[0].locKey ) );
+	}
+	if ( voice ) {
+		Q_strncpyz( s_dialogue[i].voice, voice, sizeof( s_dialogue[0].voice ) );
+	}
+	s_dialogue[i].duration = duration;
 	return i;
+}
+
+qboolean EngineDialogue_AddChoice( int lineIndex, const char *label, const char *nextId ) {
+	dialogueLine_t *line;
+	int c;
+	if ( lineIndex < 0 || lineIndex >= s_dialogueCount || !label ) {
+		return qfalse;
+	}
+	line = &s_dialogue[lineIndex];
+	if ( line->choiceCount >= DIALOGUE_CHOICE_MAX ) {
+		return qfalse;
+	}
+	c = line->choiceCount++;
+	Q_strncpyz( line->choiceLabel[c], label, sizeof( line->choiceLabel[0] ) );
+	Q_strncpyz( line->choiceNext[c], nextId ? nextId : "", sizeof( line->choiceNext[0] ) );
+	return qtrue;
+}
+
+qboolean EngineDialogue_Get( int index, char *speakerOut, int speakerSize,
+	char *textOut, int textSize, char *locKeyOut, int locKeySize,
+	float *durationOut, int *choiceCountOut ) {
+	if ( index < 0 || index >= s_dialogueCount || !s_dialogue[index].used ) {
+		return qfalse;
+	}
+	if ( speakerOut && speakerSize > 0 ) {
+		Q_strncpyz( speakerOut, s_dialogue[index].speaker, speakerSize );
+	}
+	if ( textOut && textSize > 0 ) {
+		Q_strncpyz( textOut, s_dialogue[index].text, textSize );
+	}
+	if ( locKeyOut && locKeySize > 0 ) {
+		Q_strncpyz( locKeyOut, s_dialogue[index].locKey, locKeySize );
+	}
+	if ( durationOut ) {
+		*durationOut = s_dialogue[index].duration;
+	}
+	if ( choiceCountOut ) {
+		*choiceCountOut = s_dialogue[index].choiceCount;
+	}
+	return qtrue;
+}
+
+qboolean EngineDialogue_GetChoice( int lineIndex, int choiceIndex,
+	char *labelOut, int labelSize, char *nextOut, int nextSize ) {
+	if ( lineIndex < 0 || lineIndex >= s_dialogueCount ) {
+		return qfalse;
+	}
+	if ( choiceIndex < 0 || choiceIndex >= s_dialogue[lineIndex].choiceCount ) {
+		return qfalse;
+	}
+	if ( labelOut && labelSize > 0 ) {
+		Q_strncpyz( labelOut, s_dialogue[lineIndex].choiceLabel[choiceIndex], labelSize );
+	}
+	if ( nextOut && nextSize > 0 ) {
+		Q_strncpyz( nextOut, s_dialogue[lineIndex].choiceNext[choiceIndex], nextSize );
+	}
+	return qtrue;
 }
 
 void EngineDialogue_Clear( void ) {

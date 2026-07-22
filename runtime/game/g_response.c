@@ -135,8 +135,100 @@ void Response_TriggerConcept(const char *concept, const responseContext_t *ctx) 
 }
 
 int Response_LoadRulesFile(const char *filename) {
-	(void)filename;
-	return 0;
+	void *buf;
+	int len;
+	const char *p;
+	char line[512];
+	int loaded = 0;
+	int current = -1;
+
+	if (!filename || strstr(filename, "..")) {
+		return 0;
+	}
+	len = FS_ReadFile(filename, &buf);
+	if (len <= 0 || !buf) {
+		Com_Printf(S_COLOR_YELLOW "Response: failed to read %s\n", filename);
+		return 0;
+	}
+
+	p = (const char *)buf;
+	while (*p) {
+		const char *lineEnd = strchr(p, '\n');
+		size_t lineLen;
+		char *tok;
+		char *rest;
+
+		if (!lineEnd) {
+			lineEnd = p + strlen(p);
+		}
+		lineLen = (size_t)(lineEnd - p);
+		if (lineLen >= sizeof(line)) {
+			lineLen = sizeof(line) - 1;
+		}
+		Com_Memcpy(line, p, lineLen);
+		line[lineLen] = '\0';
+		p = (*lineEnd) ? lineEnd + 1 : lineEnd;
+
+		while (line[0] == ' ' || line[0] == '\t' || line[0] == '\r') {
+			memmove(line, line + 1, strlen(line));
+		}
+		if (!line[0] || line[0] == '#' || line[0] == ';') {
+			continue;
+		}
+
+		tok = line;
+		rest = line;
+		while (*rest && *rest != ' ' && *rest != '\t') {
+			rest++;
+		}
+		if (*rest) {
+			*rest++ = '\0';
+			while (*rest == ' ' || *rest == '\t') {
+				rest++;
+			}
+		}
+
+		if (!Q_stricmp(tok, "rule")) {
+			char name[64];
+			char concept[64];
+			if (sscanf(rest, "%63s %63s", name, concept) == 2) {
+				current = Response_AddRule(name, concept);
+				if (current >= 0) {
+					loaded++;
+				}
+			}
+		} else if (current >= 0 && !Q_stricmp(tok, "cooldown")) {
+			Response_SetCooldown(current, (float)atof(rest));
+		} else if (current >= 0 && !Q_stricmp(tok, "response")) {
+			char sound[MAX_QPATH];
+			char anim[64];
+			float delay = 0.0f, weight = 1.0f;
+			anim[0] = '\0';
+			if (sscanf(rest, "%63s %63s %f %f", sound, anim, &delay, &weight) >= 1) {
+				Response_AddResponse(current, sound, anim[0] ? anim : NULL, delay, weight);
+			}
+		} else if (current >= 0 && !Q_stricmp(tok, "criteria")) {
+			char ctype[32];
+			char sval[64];
+			float val = 0.0f;
+			responseCriteriaType_t type = RCRIT_CONCEPT_MATCH;
+			sval[0] = '\0';
+			if (sscanf(rest, "%31s %f", ctype, &val) >= 1) {
+				if (!Q_stricmp(ctype, "health_below")) type = RCRIT_HEALTH_BELOW;
+				else if (!Q_stricmp(ctype, "in_combat")) type = RCRIT_IN_COMBAT;
+				else if (!Q_stricmp(ctype, "random")) type = RCRIT_RANDOM_CHANCE;
+				else if (!Q_stricmp(ctype, "zone")) {
+					type = RCRIT_IN_ZONE;
+					sscanf(rest, "%31s %63s", ctype, sval);
+				}
+				Response_AddCriteria(current, type, val, sval[0] ? sval : NULL);
+			}
+		}
+	}
+
+	FS_FreeFile(buf);
+	Com_Printf("Response: loaded %d rule(s) from %s\n", loaded, filename);
+	return loaded;
 }
 
 int Response_GetRuleCount(void) { return numRules; }

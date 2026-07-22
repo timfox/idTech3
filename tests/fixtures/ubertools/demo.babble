@@ -1,0 +1,12 @@
+# synthetic babble fixture — not retail
+graph demo
+start hello
+node hello
+  speaker Guide
+  loc babble.demo.hello
+  duration 1.5
+  choice Continue next
+node next
+  speaker Guide
+  loc babble.demo.next
+  duration 1.0

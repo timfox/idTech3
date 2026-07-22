@@ -298,7 +298,7 @@ static const vkSpinePassDesc s_passes[VK_SPINE_PASS_COUNT] = {
 	},
 	[VK_SPINE_PASS_WORLD_OPAQUE] = {
 		VK_SPINE_PASS_WORLD_OPAQUE, "world_opaque", VK_SPINE_CAT_OPAQUE_RASTER, VK_SPINE_PHASE_WORLD_OPAQUE,
-		VK_SPINE_VIEW_MAIN | ( 1u << VK_VIEW_CLASS_PORTAL ) | ( 1u << VK_VIEW_CLASS_MIRROR ),
+		VK_SPINE_VIEW_MAIN | ( 1u << VK_VIEW_CLASS_PORTAL ) | ( 1u << VK_VIEW_CLASS_SKY_PORTAL ) | ( 1u << VK_VIEW_CLASS_MIRROR ),
 		qtrue, qfalse,
 		s_reads_world_opaque, (int)ARRAY_LEN( s_reads_world_opaque ),
 		s_writes_world_opaque, (int)ARRAY_LEN( s_writes_world_opaque )

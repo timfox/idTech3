@@ -2204,6 +2204,10 @@ static void ParseSort( const char **text ) {
 
 	if ( !Q_stricmp( token, "portal" ) ) {
 		shader.sort = SS_PORTAL;
+	} else if ( !Q_stricmp( token, "skyportal" ) ) {
+		/* ÜberTools-style sky portal: portal sort + sky isSky for pass classification */
+		shader.sort = SS_PORTAL;
+		shader.isSky = qtrue;
 	} else if ( !Q_stricmp( token, "sky" ) ) {
 		shader.sort = SS_ENVIRONMENT;
 	} else if ( !Q_stricmp( token, "opaque" ) ) {
@@ -2742,6 +2746,13 @@ static qboolean ParseShader( const char **text )
 		else if ( !Q_stricmp( token, "portal" ) )
 		{
 			shader.sort = SS_PORTAL;
+			continue;
+		}
+		// skyportal — portal view class with sky backdrop (ÜberTools compat)
+		else if ( !Q_stricmp( token, "skyportal" ) )
+		{
+			shader.sort = SS_PORTAL;
+			shader.isSky = qtrue;
 			continue;
 		}
 		// skyparms <cloudheight> <outerbox> <innerbox>

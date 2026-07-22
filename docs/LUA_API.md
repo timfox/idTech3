@@ -294,6 +294,25 @@ local n = Engine.Quest.count()
 Engine.Dialogue.start("Speaker", "Line of dialogue")
 Engine.Dialogue.clear()
 local n = Engine.Dialogue.count()
+local line = Engine.Dialogue.get(0)  -- {speaker,text,locKey,duration,choices}
+```
+
+## Engine.Loc
+
+```lua
+local text = Engine.Loc.lookup("dlg.intro.greet")  -- falls back to key
+```
+
+## Engine.Babble (USE_BABBLE)
+
+See [BABBLE.md](BABBLE.md).
+
+```lua
+Engine.Babble.load("dialogue/intro.babble")
+Engine.Babble.start("intro")
+Engine.Babble.advance(0)
+Engine.Babble.stop()
+Engine.Babble.active()
 ```
 
 ## Engine.FogBiology

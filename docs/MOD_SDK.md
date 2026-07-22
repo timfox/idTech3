@@ -98,6 +98,10 @@ Full enum: [g_public.h](../runtime/game/g_public.h) (before `G_TRAP_GETVALUE` = 
 | `r_bspStream` | 1 | Renderer overlay for streamed sector BSP |
 | `r_proc` | 0 | Procedural region/palette typing per sector |
 | `com_loc_language` | "en" | i18n table selection |
+| `com_ubertools` | 1 | Master ÜberTools clean-room runtime toggle |
+| `g_babble` | 1 | Babble dialogue graphs (`USE_BABBLE`) |
+| `com_tiki` | 1 | TIKI `.tik` model defs (`USE_TIKI`) |
+| `cl_subtitles` | 1 | On-screen dialogue subtitles |
 | `com_app_crdt` | 0 | Distributed Lua App CRDT (server push); see [APP_CRDT.md](APP_CRDT.md) |
 | `com_app_crdt_version` | 0.0.0 | Authoritative app semver (systeminfo) |
 | `com_app_crdt_auto` | 1 | Auto-publish idtech3backend manifest on map load |
@@ -120,7 +124,9 @@ Grouped lists: renderer [RENDERERS.md](RENDERERS.md), Lua [LUA_API.md](LUA_API.m
 | `Engine.Save` | `write`, `read`, `lastSlot` |
 | `Engine.DB` | `available`, `path`, `exec`, `queryOne`, `profileSet`, `profileGet`, `profileDelete` |
 | `Engine.Quest` | `add`, `setStage`, `getStage`, `count` |
-| `Engine.Dialogue` | `start`, `clear`, `count` |
+| `Engine.Dialogue` | `start`, `clear`, `count`, `get` |
+| `Engine.Loc` | `lookup` |
+| `Engine.Babble` | `load`, `start`, `advance`, `stop`, `active` (USE_BABBLE) |
 | `Engine.VDB` | volumetric grids |
 
 Reload: `script_reload` (requires `USE_LUA=ON`).

@@ -1,6 +1,8 @@
 # First-Person Weapon Temporal Ghosting
 
-**Status:** Structural fix verified. SSR/SSAO isolation + Surf first-person presentation defaults are in place.  
+**Status:** Surf shipping default is **SMAA** (`r_aaMode 2`, `r_taa 0`) to avoid
+world residual shading at high air speed. Temporal Reconstruction remains available
+via `exec surf_temporal_quality.cfg`. Weapon SSR isolation is unchanged.  
 **Date:** 2026-07-21  
 **Constraint:** Smallest structurally correct fix first; no blur/clamp masks.
 

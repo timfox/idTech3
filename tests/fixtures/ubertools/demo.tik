@@ -1,0 +1,18 @@
+# synthetic tiki fixture — not retail
+setup
+{
+  path models/demo/body.md3
+  scale 1.0
+  lod models/demo/body_1.md3 400
+}
+
+animations
+{
+  idle models/demo/idle.tan
+  walk {
+    path models/demo/walk.tan
+    framerate 18
+    cmd 3 footstep sound/player/step.wav
+    cmd 7 effect fx/dust
+  }
+}

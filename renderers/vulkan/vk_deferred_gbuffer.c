@@ -173,6 +173,9 @@ vkViewClass_t vk_classify_current_view( void )
 		return VK_VIEW_CLASS_WEAPON;
 	}
 	if ( backEnd.viewParms.portalView == PV_PORTAL ) {
+		if ( backEnd.viewParms.isSkyPortal ) {
+			return VK_VIEW_CLASS_SKY_PORTAL;
+		}
 		return VK_VIEW_CLASS_PORTAL;
 	}
 	if ( backEnd.viewParms.portalView == PV_MIRROR ) {
@@ -189,6 +192,7 @@ const char *vk_view_class_name( vkViewClass_t cls )
 	switch ( cls ) {
 	case VK_VIEW_CLASS_MAIN_WORLD: return "main_world";
 	case VK_VIEW_CLASS_PORTAL: return "portal";
+	case VK_VIEW_CLASS_SKY_PORTAL: return "sky_portal";
 	case VK_VIEW_CLASS_MIRROR: return "mirror";
 	case VK_VIEW_CLASS_WEAPON: return "weapon";
 	case VK_VIEW_CLASS_NO_WORLD: return "no_world";

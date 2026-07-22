@@ -99,6 +99,22 @@ void Choreo_Pause(choreoHandle_t h) {
 extern sfxHandle_t S_RegisterSound(const char *name, qboolean compressed);
 extern void S_StartLocalSound(sfxHandle_t sfx, int channelNum);
 
+static qboolean Choreo_SanitizeParam( const char *param, char *out, int outSize ) {
+	int i, o = 0;
+	if ( !param || !out || outSize <= 0 ) {
+		return qfalse;
+	}
+	for ( i = 0; param[i] && o < outSize - 1; i++ ) {
+		char c = param[i];
+		if ( c == '"' || c == '\'' || c == '\n' || c == '\r' || c == ';' || c == '\\' ) {
+			continue;
+		}
+		out[o++] = c;
+	}
+	out[o] = '\0';
+	return out[0] ? qtrue : qfalse;
+}
+
 static void Choreo_DispatchEvent(choreoScene_t *scene, const choreoEvent_t *evt) {
 	switch (evt->type) {
 		case CHOREO_EVT_SPEAK:
@@ -113,14 +129,15 @@ static void Choreo_DispatchEvent(choreoScene_t *scene, const choreoEvent_t *evt)
 		case CHOREO_EVT_ANIMATE:
 			{
 				int entNum = -1;
+				char safe[128];
 				if (evt->actorIndex >= 0 && evt->actorIndex < CHOREO_MAX_ACTORS) {
 					entNum = scene->actors[evt->actorIndex].entityNum;
 				}
 				Com_DPrintf("Choreo [%s]: actor %d (ent %d) animate \"%s\"\n",
 					scene->name, evt->actorIndex, entNum, evt->param);
-				if (evt->param[0]) {
+				if (evt->param[0] && Choreo_SanitizeParam(evt->param, safe, sizeof(safe))) {
 					Cbuf_AddText(va("lua Engine.Choreo.onAnimate(%d, %d, \"%s\")\n",
-						evt->actorIndex, entNum, evt->param));
+						evt->actorIndex, entNum, safe));
 				}
 			}
 			break;

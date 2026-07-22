@@ -54,6 +54,35 @@ extern refexport_t re;
 #endif
 #include "../../game/g_facial.h"
 #include "../../game/g_engine_systems.h"
+
+#ifdef USE_BABBLE
+#include "../../../modules/dialogue/babble.h"
+#include "../shell/cl_subtitles.h"
+
+static void CL_BabbleLoad_f( void ) {
+	if ( Cmd_Argc() < 2 ) {
+		Com_Printf( "usage: babble_load <path>\n" );
+		return;
+	}
+	Babble_LoadFile( Cmd_Argv( 1 ) );
+}
+
+static void CL_BabbleStart_f( void ) {
+	if ( Cmd_Argc() < 2 ) {
+		Com_Printf( "usage: babble_start <graph>\n" );
+		return;
+	}
+	Babble_Start( Cmd_Argv( 1 ) );
+}
+
+static void CL_BabbleAdvance_f( void ) {
+	int idx = ( Cmd_Argc() > 1 ) ? atoi( Cmd_Argv( 1 ) ) : -1;
+	Babble_Advance( idx );
+}
+#else
+#include "../shell/cl_subtitles.h"
+#endif
+
 #include "../../game/game_middleware_stubs.h"
 #include "../../game/g_lua_bindings.h"
 #include "client.h"
@@ -343,6 +372,17 @@ void CL_InitGameSystems(void) {
 	EngineSave_Init();
 	EngineQuest_Init();
 	EngineDialogue_Init();
+#ifdef USE_BABBLE
+	Babble_Init();
+	Cmd_AddCommand( "babble_load", CL_BabbleLoad_f );
+	Cmd_AddCommand( "babble_start", CL_BabbleStart_f );
+	Cmd_AddCommand( "babble_advance", CL_BabbleAdvance_f );
+#endif
+	CL_Subtitles_Init();
+	{
+		extern void CL_UberEffects_Init( void );
+		CL_UberEffects_Init();
+	}
 #ifdef USE_GAME_AI_MIDDLEWARE
 	BT_Init();
 #endif
@@ -385,6 +425,9 @@ void CL_ShutdownGameSystems(void) {
 	GOAP_Shutdown();
 #endif
 	EngineDialogue_Shutdown();
+#ifdef USE_BABBLE
+	Babble_Shutdown();
+#endif
 	EngineQuest_Shutdown();
 	EngineSave_Shutdown();
 	EngineReplay_Shutdown();

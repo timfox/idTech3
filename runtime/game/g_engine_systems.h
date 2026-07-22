@@ -43,6 +43,14 @@ int     EngineQuest_Count( void );
 void    EngineDialogue_Init( void );
 void    EngineDialogue_Shutdown( void );
 int     EngineDialogue_Start( const char *speaker, const char *text );
+int     EngineDialogue_StartEx( const char *speaker, const char *text, const char *locKey,
+	const char *voice, float duration );
+qboolean EngineDialogue_AddChoice( int lineIndex, const char *label, const char *nextId );
+qboolean EngineDialogue_Get( int index, char *speakerOut, int speakerSize,
+	char *textOut, int textSize, char *locKeyOut, int locKeySize,
+	float *durationOut, int *choiceCountOut );
+qboolean EngineDialogue_GetChoice( int lineIndex, int choiceIndex,
+	char *labelOut, int labelSize, char *nextOut, int nextSize );
 void    EngineDialogue_Clear( void );
 int     EngineDialogue_ActiveCount( void );
 

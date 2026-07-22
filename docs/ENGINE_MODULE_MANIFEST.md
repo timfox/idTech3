@@ -199,6 +199,23 @@ Test: `test_game_ai_middleware.sh`.
 
 ---
 
+## ÜberTools clean-room (Babble / TIKI)
+
+Gate: **`USE_UBERTOOLS_COMPAT`** (+ **`USE_BABBLE`**, **`USE_TIKI`**). OFF in `core`; ON in `game`/`full`/`research`.
+
+| Path | Tier | Runtime | Test |
+|------|------|---------|------|
+| `modules/dialogue/babble_*.c` | module | `g_babble`, `cl_subtitles` | `unit_babble_parse`, `test_ubertools_clean_room` |
+| `renderers/common/tr_model_tiki.c` | module | `com_tiki` | `unit_tiki_parse` |
+| `renderers/vulkan/tr_model_tiki_register.c` | module | `.tik` via `RE_RegisterModel` | — |
+| `runtime/client/shell/cl_subtitles.c` | module | `cl_subtitles` | — |
+| `runtime/client/shell/cl_uber_effects.c` | module | `cl_uberEffects` | — |
+| `renderers/vulkan/vk_authored_flares.c` | module | `r_authoredFlares` | — |
+
+Docs: [UBERTOOLS_CLEAN_ROOM.md](UBERTOOLS_CLEAN_ROOM.md), [BABBLE.md](BABBLE.md), [TIKI.md](TIKI.md). **No Miles.**
+
+---
+
 ## Governance
 
 - New unconditional `list(APPEND QCOMMON_SRCS` / `CLIENT_SRCS` in root `CMakeLists.txt` is **forbidden** — use cmake module macros; CI: `scripts/ci/audit_unconditional_sources.sh`.

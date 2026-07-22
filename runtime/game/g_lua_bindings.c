@@ -28,7 +28,9 @@ Usage from Lua:
 
 #include "q_shared.h"
 #include "qcommon.h"
+#include "com_loc.h"
 #include "g_lua_bindings.h"
+#include "g_engine_systems.h"
 
 #ifdef USE_OPEN_WORLD
 #include "../world/world_config.h"
@@ -1183,6 +1185,54 @@ static int l_dialogue_count(lua_State *L ) {
 	lua_pushinteger( L, EngineDialogue_ActiveCount() );
 	return 1;
 }
+static int l_dialogue_get( lua_State *L ) {
+	int idx = (int)luaL_checkinteger( L, 1 );
+	char speaker[64], text[512], locKey[64];
+	float duration = 0;
+	int choices = 0;
+	if ( !EngineDialogue_Get( idx, speaker, sizeof( speaker ), text, sizeof( text ),
+			locKey, sizeof( locKey ), &duration, &choices ) ) {
+		return 0;
+	}
+	lua_createtable( L, 0, 5 );
+	lua_pushstring( L, speaker ); lua_setfield( L, -2, "speaker" );
+	lua_pushstring( L, text ); lua_setfield( L, -2, "text" );
+	lua_pushstring( L, locKey ); lua_setfield( L, -2, "locKey" );
+	lua_pushnumber( L, duration ); lua_setfield( L, -2, "duration" );
+	lua_pushinteger( L, choices ); lua_setfield( L, -2, "choices" );
+	return 1;
+}
+static int l_loc_lookup( lua_State *L ) {
+	char out[COM_LOC_VALUE_SIZE];
+	const char *key = luaL_checkstring( L, 1 );
+	Com_Loc_Lookup( key, out, sizeof( out ) );
+	lua_pushstring( L, out );
+	return 1;
+}
+#ifdef USE_BABBLE
+#include "../../../modules/dialogue/babble.h"
+static int l_babble_load( lua_State *L ) {
+	lua_pushinteger( L, Babble_LoadFile( luaL_checkstring( L, 1 ) ) );
+	return 1;
+}
+static int l_babble_start( lua_State *L ) {
+	lua_pushinteger( L, Babble_Start( luaL_checkstring( L, 1 ) ) );
+	return 1;
+}
+static int l_babble_advance( lua_State *L ) {
+	lua_pushinteger( L, Babble_Advance( (int)luaL_optinteger( L, 1, -1 ) ) );
+	return 1;
+}
+static int l_babble_stop( lua_State *L ) {
+	(void)L;
+	Babble_Stop();
+	return 0;
+}
+static int l_babble_active( lua_State *L ) {
+	lua_pushboolean( L, Babble_IsActive() );
+	return 1;
+}
+#endif
 
 /* ========== ECS bindings ========== */
 

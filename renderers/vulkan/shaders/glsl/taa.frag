@@ -348,10 +348,24 @@ void main() {
 		}
 	}
 
+	vec2 texSize = vec2( textureSize( currentColor, 0 ) );
+	/* Matrix reprojection displacement (camera-only). If stored MVs understate
+	 * camera motion (silent zero / scale bug), prefer matrix history before
+	 * sampling so dark residual shading cannot linger from the wrong UV. */
+	{
+		vec2 storedVel = ( sampleUV - historyUV ) * texSize;
+		vec2 matrixVel = ( sampleUV - matrixHistoryUV ) * texSize;
+		float storedLen = length( storedVel );
+		float matrixLen = length( matrixVel );
+		if ( mvValid && storedLen + 0.75 < matrixLen * 0.45 && matrixLen > 3.0 ) {
+			historyUV = matrixHistoryUV;
+			motion = sampleUV - historyUV;
+		}
+	}
+
 	vec3 history = textureLod( historyColor, historyUV, 0.0 ).rgb;
 	float histDepth = textureLod( previousDepthTex, historyUV, 0.0 ).r;
 
-	vec2 texSize = vec2( textureSize( currentColor, 0 ) );
 	vec2 velocity = ( sampleUV - historyUV ) * texSize;
 	float motionLen = length( velocity );
 	float motionFactor = smoothstep( 0.2, 8.0, motionLen );
@@ -361,7 +375,8 @@ void main() {
 	float dynDepthThresh = ( postfx.depthOfField.x < 0.5 ) ? clamp( postfx.depthOfField.z, 0.001, 0.1 ) : 0.012;
 	float dynDilation = ( postfx.depthOfField.x < 0.5 ) ? clamp( postfx.depthOfField.w, 0.0, 4.0 ) : 1.5;
 	dynDilation = clamp( dynDilation + motionLen * 0.08, 1.0, 2.5 );
-	float velLimit = 48.0;
+	/* Surf / high camera speed: hard-reject earlier than the old 48 px cap. */
+	float velLimit = adaptive ? 28.0 : 36.0;
 	float objectDebug = 0.0;
 	if ( postfx.temporalDebugParams.x > 100.0 ) {
 		objectDebug = postfx.temporalDebugParams.x - 100.0;
@@ -482,20 +497,20 @@ void main() {
 	 * r_temporalReactiveMask was 0 or the mask was not allocated).
 	 */
 	float nearWeapon = smoothstep( 0.82, 0.995, depthNdc ); /* near in reversed-Z */
-	float fastMotion = smoothstep( 3.5, 14.0, motionLen );
+	float fastMotion = smoothstep( 2.5, 10.0, motionLen );
 	float flash = smoothstep( 0.06, 0.28, lumaDiff );
 	/* View-dependent / emissive peaks: current much brighter than history. */
 	float highlightGhost = smoothstep( 0.10, 0.60, currentLuma - historyLuma ) *
 		smoothstep( 0.15, 1.10, currentLuma );
-	/* Dark geo over former bright history (skyline / HOST banner trails). */
-	float historyBleed = smoothstep( 0.06, 0.45, historyLuma - currentLuma ) *
-		smoothstep( 0.12, 0.85, historyLuma );
+	/* Dark geo over former bright history (skyline / AZ / HOST banner trails). */
+	float historyBleed = smoothstep( 0.04, 0.35, historyLuma - currentLuma ) *
+		smoothstep( 0.08, 0.70, historyLuma );
 	/* Trailing-edge disocclusion: high motion + depth reject → reactive. */
-	float trailDisocc = neighborhoodDepthReject * smoothstep( 1.5, 6.0, motionLen );
+	float trailDisocc = neighborhoodDepthReject * smoothstep( 1.0, 5.0, motionLen );
 	float reactive = clamp( max( nearWeapon,
-		max( fastMotion * 0.90,
+		max( fastMotion * 0.95,
 		max( flash, max( highlightGhost * 0.95,
-		max( historyBleed * 0.98, trailDisocc ) ) ) ) ), 0.0, 1.0 );
+		max( historyBleed * 1.0, trailDisocc ) ) ) ) ), 0.0, 1.0 );
 	if ( !mvValid && postfx.depthParams.z > 0.5 ) {
 		reactive = max( reactive, 1.0 );
 	}

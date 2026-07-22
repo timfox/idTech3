@@ -1644,6 +1644,10 @@ static void SCR_DrawScreenField( stereoFrame_t stereoFrame ) {
 						SCR_DrawSmallString( 8, 80, temporalInfo, (int)strlen( temporalInfo ) );
 					}
 				}
+				{
+					extern void CL_Subtitles_Draw( void );
+					CL_Subtitles_Draw();
+				}
 				break;
 		}
 	}

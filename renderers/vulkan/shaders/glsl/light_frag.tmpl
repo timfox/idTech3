@@ -78,6 +78,9 @@ void main() {
 		vec2 currUV = var_CurrentClip.xy / var_CurrentClip.w * 0.5 + 0.5;
 		vec2 prevUV = var_PrevClip.xy / var_PrevClip.w * 0.5 + 0.5;
 		out_motion = currUV - prevUV;
+	} else {
+		/* Degenerate clip.w: do not emit silent zero motion (reads as "stationary"). */
+		out_motion = vec2( 0.0 / 0.0 );
 	}
 
 #ifdef USE_FOG

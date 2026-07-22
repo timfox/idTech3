@@ -22,6 +22,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 // tr_init.c -- functions that are not called every frame
 
 #include "tr_local.h"
+#include "vk_authored_flares.h"
 #include "tr_bsp_stream.h"
 #include "../common/tr_vector_font.h"
 #include "tr_sprite_props.h"
@@ -3980,6 +3981,7 @@ void R_Init( void ) {
 	VK_RasterUltra_Enforce();
 	VK_SunCSM_Init();
 	R_ModelInit();
+	R_AuthoredFlares_Init();
 
 	R_InitFreeType();
 

@@ -776,6 +776,7 @@ typedef struct {
 	orientationr_t	world;
 	vec3_t		pvsOrigin;			// may be different than or.origin for portals
 	portalView_t portalView;
+	qboolean	isSkyPortal;		/* portal surface also flagged isSky (ÜberTools skyportal) */
 	int			frameSceneNum;		// copied from tr.frameSceneNum
 	int			frameCount;			// copied from tr.frameCount
 	cplane_t	portalPlane;		// clip anything behind this if mirroring

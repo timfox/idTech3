@@ -1281,10 +1281,16 @@ static qboolean R_MirrorViewBySurface( const drawSurf_t *drawSurf, int entityNum
 
 	newParms = tr.viewParms;
 	newParms.portalView = PV_NONE;
+	newParms.isSkyPortal = qfalse;
 
 	if ( !R_GetPortalOrientations( drawSurf, entityNum, &surface, &camera, 
 		newParms.pvsOrigin, &newParms.portalView ) ) {
 		return qfalse;		// bad portal, no portalentity
+	}
+
+	/* ÜberTools skyportal: portal + isSky shader → isolated view class */
+	if ( tess.shader && tess.shader->isSky && newParms.portalView == PV_PORTAL ) {
+		newParms.isSkyPortal = qtrue;
 	}
 
 	// create dedicated set for each view

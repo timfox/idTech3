@@ -73,6 +73,9 @@ option(USE_RESEARCH_EXTENSIONS "Research/paper-repro qcommon modules (RadiusFPS,
 option(USE_OPEN_WORLD "Open-world, districts, sector graph, fog biology, genetic GAN core" ON)
 option(USE_ARC_BLANC "Arc Blanc real-time ocean (Tessendorf FFT + solid-fluid coupling)" OFF)
 option(USE_GAME_AI_MIDDLEWARE "Director/GOAP/Horde/BT gameplay middleware (g_director, g_goap, …)" ON)
+option(USE_UBERTOOLS_COMPAT "Clean-room ÜberTools (Babble/TIKI) compatibility stack; no Miles" ON)
+option(USE_BABBLE "Clean-room Babble dialogue graphs (requires USE_UBERTOOLS_COMPAT)" ON)
+option(USE_TIKI "Clean-room TIKI/TAN model defs (requires USE_UBERTOOLS_COMPAT)" ON)
 
 include(${CMAKE_SOURCE_DIR}/cmake/IdTech3Backend.cmake)
 include(${CMAKE_SOURCE_DIR}/cmake/IdTech3Emulator.cmake)
@@ -1666,10 +1669,12 @@ list(APPEND CLIENT_SRCS
   runtime/game/g_lua_bindings.c
 )
 include(${CMAKE_SOURCE_DIR}/cmake/modules/ClientGameAiSources.cmake)
+include(${CMAKE_SOURCE_DIR}/cmake/modules/UberToolsSources.cmake)
 idtech3_strip_game_ai_middleware_sources()
 idtech3_strip_client_extension_sources()
 idtech3_append_client_extension_sources()
 idtech3_append_game_ai_middleware_sources()
+idtech3_append_ubertools_client_sources()
 # Architecture-specific assembly (snd_mix etc). Unix x86_64 only; Windows uses C fallbacks.
 idtech3_init_asm_sources()
 if(ASM_SRCS)
@@ -1927,6 +1932,7 @@ if(USE_LIBTORRENT AND LIBTORRENT_FOUND)
 	target_link_libraries(client PRIVATE ${LIBTORRENT_TARGET})
 endif()
 idtech3_apply_game_ai_middleware_defs(client)
+idtech3_apply_ubertools_defs(client)
 
 if(USE_FLUX)
 	target_compile_definitions(client PRIVATE USE_FLUX)
@@ -1976,6 +1982,8 @@ set(RENDERER_COMMON_SRCS
 	renderers/common/tr_image_ktx2.c
 	renderers/common/tr_noise.c
 )
+include(${CMAKE_SOURCE_DIR}/cmake/modules/UberToolsSources.cmake)
+idtech3_append_ubertools_renderer_sources()
 IF(BUILD_FREETYPE)
 	list(REMOVE_ITEM RENDERER_COMMON_SRCS renderers/common/tr_font_stub.c)
 	list(REMOVE_ITEM RENDERER_COMMON_SRCS renderers/common/tr_vector_font_stub.c)
@@ -2077,6 +2085,7 @@ IF(USE_RENDERER_DLOPEN)
 	ADD_LIBRARY(${RENDERER_PREFIX}_vulkan${RENDEXT} SHARED ${RENDERER_VK_SRCS} ${RENDERER_COMMON_SRCS} ${AUX_SRCS})
 	idtech3_first_party_warnings_as_errors(${RENDERER_PREFIX}_vulkan${RENDEXT})
 	TARGET_COMPILE_DEFINITIONS(${RENDERER_PREFIX}_vulkan${RENDEXT} PRIVATE USE_RENDERER_DLOPEN RENDERER_VULKAN)
+	idtech3_apply_ubertools_defs(${RENDERER_PREFIX}_vulkan${RENDEXT})
 	if(USE_VULKAN_RTX)
 	  target_compile_definitions(${RENDERER_PREFIX}_vulkan${RENDEXT} PRIVATE USE_VULKAN_RTX=1)
 	  message(STATUS "Vulkan RTX: ray tracing extensions will be requested when available")
@@ -3011,6 +3020,13 @@ add_test(NAME test_check_loc
 set_tests_properties(test_check_loc PROPERTIES
 	LABELS "scripts;validation;i18n"
 	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_check_loc.sh;${CMAKE_SOURCE_DIR}/scripts/check_loc_keys.sh")
+
+add_test(NAME test_ubertools_clean_room
+	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_ubertools_clean_room.sh
+	WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+set_tests_properties(test_ubertools_clean_room PROPERTIES
+	LABELS "scripts;validation;ubertools"
+	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_ubertools_clean_room.sh;${CMAKE_SOURCE_DIR}/docs/UBERTOOLS_CLEAN_ROOM.md")
 
 add_test(NAME test_validate_assets
 	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_validate_assets.sh
@@ -4167,6 +4183,36 @@ if(BUILD_UNIT_TESTS)
 	endif()
 	add_test(NAME unit_vox_parse COMMAND unit_vox_parse)
 	set_tests_properties(unit_vox_parse PROPERTIES LABELS "unit;validation")
+
+	add_executable(unit_babble_parse
+		tests/unit/test_babble_parse.c
+		tests/stub_qcommon_min.c
+		modules/dialogue/babble_parse.c
+		engine/core/q_shared.c
+		engine/core/q_math.c)
+	target_include_directories(unit_babble_parse PRIVATE
+		${IDTECH3_UNIT_INCLUDE_DIRS}
+		${CMAKE_SOURCE_DIR})
+	if(NOT MSVC)
+		target_link_libraries(unit_babble_parse PRIVATE m)
+	endif()
+	add_test(NAME unit_babble_parse COMMAND unit_babble_parse)
+	set_tests_properties(unit_babble_parse PROPERTIES LABELS "unit;validation;ubertools")
+
+	add_executable(unit_tiki_parse
+		tests/unit/test_tiki_parse.c
+		tests/stub_qcommon_min.c
+		renderers/common/tr_model_tiki.c
+		engine/core/q_shared.c
+		engine/core/q_math.c)
+	target_include_directories(unit_tiki_parse PRIVATE
+		${IDTECH3_UNIT_INCLUDE_DIRS}
+		${CMAKE_SOURCE_DIR}/renderers/common)
+	if(NOT MSVC)
+		target_link_libraries(unit_tiki_parse PRIVATE m)
+	endif()
+	add_test(NAME unit_tiki_parse COMMAND unit_tiki_parse)
+	set_tests_properties(unit_tiki_parse PROPERTIES LABELS "unit;validation;ubertools")
 
 	add_executable(unit_engine_decal_map
 		tests/unit/test_engine_decal_map.c

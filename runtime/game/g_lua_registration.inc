@@ -371,9 +371,28 @@ void LuaBindings_RegisterAll(void *luaState) {
 		{"start", l_dialogue_start},
 		{"clear", l_dialogue_clear},
 		{"count", l_dialogue_count},
+		{"get", l_dialogue_get},
 		{NULL, NULL}
 	};
 	registerTable(L, "Dialogue", dialogueFuncs);
+
+	static const luaL_Reg locFuncs[] = {
+		{"lookup", l_loc_lookup},
+		{NULL, NULL}
+	};
+	registerTable(L, "Loc", locFuncs);
+
+#ifdef USE_BABBLE
+	static const luaL_Reg babbleFuncs[] = {
+		{"load", l_babble_load},
+		{"start", l_babble_start},
+		{"advance", l_babble_advance},
+		{"stop", l_babble_stop},
+		{"active", l_babble_active},
+		{NULL, NULL}
+	};
+	registerTable(L, "Babble", babbleFuncs);
+#endif
 
 	static const luaL_Reg vdbFuncs[] = {
 		{"load", l_vdb_load},
