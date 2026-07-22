@@ -75,6 +75,7 @@ cvar_t		*con_autoclear;
 cvar_t		*con_notifytime;
 cvar_t		*con_scale;
 cvar_t		*con_opacity;
+cvar_t		*con_height;
 cvar_t		*con_inputMode;
 cvar_t		*con_showVersion;
 cvar_t		*con_drawInput;
@@ -499,6 +500,9 @@ void Con_Init( void )
 	con_opacity = Cvar_Get( "con_opacity", "1", CVAR_ARCHIVE_ND );
 	Cvar_CheckRange( con_opacity, "0", "1", CV_FLOAT );
 	Cvar_SetDescription( con_opacity, "Console background opacity (0=transparent, 1=opaque)." );
+	con_height = Cvar_Get( "con_height", "1", CVAR_ARCHIVE_ND );
+	Cvar_CheckRange( con_height, "0.1", "1", CV_FLOAT );
+	Cvar_SetDescription( con_height, "Console open height as a fraction of the screen (1=fullscreen, 0.5=half)." );
 	con_inputMode = Cvar_Get( "con_inputMode", "3", CVAR_ARCHIVE_ND );
 	Cvar_CheckRange( con_inputMode, "0", "3", CV_INTEGER );
 	Cvar_SetDescription( con_inputMode,
@@ -1028,10 +1032,18 @@ Scroll it up or down
 void Con_RunConsole( void ) 
 {
 	// decide on the destination height of the console
-	if ( Key_GetCatcher( ) & KEYCATCH_CONSOLE )
-		con.finalFrac = 0.5;	// half screen
-	else
+	if ( Key_GetCatcher( ) & KEYCATCH_CONSOLE ) {
+		float height = ( con_height && con_height->value > 0.0f )
+				? con_height->value : 1.0f;
+		if ( height < 0.1f ) {
+			height = 0.1f;
+		} else if ( height > 1.0f ) {
+			height = 1.0f;
+		}
+		con.finalFrac = height;
+	} else {
 		con.finalFrac = 0.0;	// none visible
+	}
 	
 	// scroll towards the destination height
 	if ( con.finalFrac < con.displayFrac )

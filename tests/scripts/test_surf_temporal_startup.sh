@@ -48,6 +48,7 @@ required = {
     "r_fbo": "1",
     "r_aaMode": "2",
     "r_taa": "0",
+    "r_tsr": "0",
     "r_taaMotionVectors": "0",
     "r_temporalSSR": "0",
     "r_bloom": "0",

@@ -1190,6 +1190,11 @@ qboolean vk_temporal_reconstruction_wanted( void )
 	if ( !vk.fboActive ) {
 		return qfalse;
 	}
+	/*
+	 * r_taa is the hard enable. Do not keep reconstruction alive from a stale
+	 * latched r_aaMode 3–5 after the user sets r_taa 0 (Surf residual shading /
+	 * AZ-decal echoes). AA policy sets r_taa 1 when applying modes 3–5 at init.
+	 */
 	if ( r_taa && r_taa->integer ) {
 		return qtrue;
 	}
@@ -1197,11 +1202,8 @@ qboolean vk_temporal_reconstruction_wanted( void )
 	if ( r_tsr && !r_tsr->integer ) {
 		return qfalse;
 	}
+	/* Upscale temporal (r_upscale 2) may still request history with r_taa 0. */
 	if ( R_Upscale_WantTemporal() ) {
-		return qtrue;
-	}
-	/* Mode 3 = Present-Time Adaptive Reconstruction; 4–5 = Temporal Reconstruction. */
-	if ( r_aaMode && r_aaMode->integer >= 3 && r_aaMode->integer <= 5 ) {
 		return qtrue;
 	}
 	return qfalse;
