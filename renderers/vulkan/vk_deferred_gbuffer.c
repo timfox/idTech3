@@ -581,6 +581,9 @@ void vk_deferred_gbuffer_status_f( void )
 
 	vk_get_active_render_extent( &w, &h );
 	ri.Printf( PRINT_ALL, "======== Deferred G-buffer Status ========\n" );
+	ri.Printf( PRINT_ALL,
+		"architecture=HYBRID_ADDITIVE_DEFERRED (SceneBaseLit + dynamics; not full material deferred)\n"
+		"  use deferred_status for eligibility / lit-as-base counts\n" );
 	ri.Printf( PRINT_ALL, "requested : resources=%s fillCvar=%d\n",
 		vk_deferred_gbuffer_resources_wanted() ? "yes" : "no",
 		r_deferredGBufferFill ? r_deferredGBufferFill->integer : 0 );
@@ -1517,7 +1520,8 @@ static qboolean vk_dgb_dispatch_lighting_compute( uint32_t width, uint32_t heigh
 		ri.Printf( PRINT_ALL,
 			"[VK][deferred] r_deferredLighting=1 (%s dynamic; point+spot; strength=%.2f; specular=%s %.2f; ao=%.2f; "
 			"normals=%s; materialClassify=%s)\n",
-			vk_deferred_unlit_base_wanted() ? "additive+sceneBase" : "multiply",
+			vk_deferred_unlit_base_wanted()
+				? "HYBRID_ADDITIVE (SceneBaseLit+dynamics)" : "multiply",
 			( r_deferredLightingStrength && r_deferredLightingStrength->value > 0.0f ) ?
 				r_deferredLightingStrength->value : 1.0f,
 			( r_deferredSpecular && r_deferredSpecular->integer ) ? "on" : "off",

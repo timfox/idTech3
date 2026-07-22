@@ -26,6 +26,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "tr_material_paint.h"
 #ifdef USE_VULKAN
 #include "vk_deferred_gbuffer.h"
+#include "vk_deferred_honesty.h"
 #include "vk_render_path.h"
 #include "vk_meshlets.h"
 #include "vk_selective_sun_shadow.h"
@@ -1517,6 +1518,12 @@ static void RB_IterateStagesGeneric( const shaderCommands_t *input )
 		}
 		if ( r_renderPathDebug && r_renderPathDebug->integer >= 1 ) {
 			uniform.pbrDebugMode[2] = (float)path;
+		}
+		if ( r_deferredEligibilityDebug && r_deferredEligibilityDebug->integer >= 1 ) {
+			DeferredEligibilityResult elig =
+				R_GetDeferredEligibility( tess.shader, NULL, pathFlags, (int)viewCls );
+			/* Encode eligibility+1 so 0 remains "off" for the shader. */
+			uniform.pbrDebugMode[3] = (float)( (int)elig.eligibility + 1 );
 		}
 	}
 #endif

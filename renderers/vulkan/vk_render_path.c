@@ -8,6 +8,7 @@ Clustered Hybrid M1 — R_SelectSurfaceRenderPath + path debug counters.
 
 #include "tr_local.h"
 #include "vk_render_path.h"
+#include "vk_deferred_honesty.h"
 #include "vk_deferred_gbuffer.h"
 #include "vk_transparency_route.h"
 #include "tr_render_mode_vk.h"
@@ -71,6 +72,7 @@ qboolean R_RenderPath_WantsDeferredHandoff( renderPath_t path )
 void R_RenderPath_BeginFrame( void )
 {
 	Com_Memset( s_pathCounts, 0, sizeof( s_pathCounts ) );
+	vk_deferred_honesty_begin_frame();
 }
 
 void R_RenderPath_Note( renderPath_t path )
@@ -204,7 +206,7 @@ renderPath_t R_SelectSurfaceRenderPath(
 		goto done;
 	}
 
-	/* Opaque */
+	/* Opaque — Deferred Honesty: eligibility before claiming deferred ownership. */
 	if ( mode == 0 || R_ClassicLightingActive() ) {
 		path = RENDER_PATH_LEGACY_FORWARD;
 		reason = "classic_or_mode0";
@@ -220,8 +222,25 @@ renderPath_t R_SelectSurfaceRenderPath(
 	if ( ( mode == 1 || mode == 3 || mode == 4 ) &&
 		vk_deferred_lighting_path_ready() &&
 		vk_deferred_opaque_transparent_split() ) {
-		path = RENDER_PATH_DEFERRED_OPAQUE;
-		reason = "deferred_ready";
+		DeferredEligibilityResult elig =
+			R_GetDeferredEligibility( shader, surface, drawSurfSortFlags, viewClass );
+		R_DeferredHonesty_NoteOpaque();
+		R_DeferredHonesty_NoteEligibility( &elig );
+		if ( R_DeferredHonesty_WantsDeferredPath( &elig ) ) {
+			path = RENDER_PATH_DEFERRED_OPAQUE;
+			reason = elig.reasonName;
+			if ( elig.gbufferFlags & GBUFFER_USING_LIT_SCENE_AS_BASE ) {
+				R_DeferredHonesty_NoteLitSceneAsBase();
+			}
+			if ( elig.eligibility == DEFERRED_ELIGIBLE_APPROXIMATE &&
+				!( elig.gbufferFlags & GBUFFER_VALID_NORMAL ) ) {
+				R_DeferredHonesty_NoteDefaultGBuffer();
+			}
+			R_DeferredHonesty_NoteDeferredExported( elig.gbufferFlags );
+		} else {
+			path = RENDER_PATH_FORWARD_PLUS_OPAQUE;
+			reason = elig.reasonName;
+		}
 		goto done;
 	}
 
@@ -288,16 +307,23 @@ void R_RenderPath_RegisterCvars( void )
 	ri.Cvar_SetGroup( r_materialPathReason, CVG_RENDERER );
 
 	r_gbufferCompact = ri.Cvar_Get( "r_gbufferCompact", "0", CVAR_ARCHIVE_ND | CVAR_LATCH );
-	ri.Cvar_CheckRange( r_gbufferCompact, "0", "1", CV_INTEGER );
+	ri.Cvar_CheckRange( r_gbufferCompact, "0", "2", CV_INTEGER );
 	ri.Cvar_SetDescription( r_gbufferCompact,
-		"Compact G-buffer 2.0 prep (latched). Dual-writes octahedral into material.ba (direct MRT + depth fill);\n"
-		"AO in normal.a; lighting decodes oct. See docs/GBUFFER_2.md." );
+		"G-buffer storage layout only (after material correctness). Latched.\n"
+		" 0 = expanded scaffold\n"
+		" 1 = compact dual-write\n"
+		" 2 = compact + extension lookup (future)\n"
+		"Does not repair classic material export. See docs/DEFERRED_HONESTY.md." );
 	ri.Cvar_SetGroup( r_gbufferCompact, CVG_RENDERER );
+
+	vk_deferred_honesty_register();
 
 	if ( !s_statusCmdRegistered ) {
 		ri.Cmd_AddCommand( "render_path_status", R_RenderPath_Status_f );
 		s_statusCmdRegistered = qtrue;
-		ri.Printf( PRINT_ALL, "[VK][path] R_SelectSurfaceRenderPath ready (r_renderPathDebug, r_hybridCompare, render_path_status)\n" );
+		ri.Printf( PRINT_ALL,
+			"[VK][path] R_SelectSurfaceRenderPath ready (HYBRID_ADDITIVE_DEFERRED honesty; "
+			"deferred_status, r_deferredEligibilityDebug)\n" );
 	}
 }
 

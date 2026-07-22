@@ -41,6 +41,7 @@ Shared: GPU scene, materials, lights, clusters, shadows, probes, atmosphere, exp
 | 9 | Reflection-source hierarchy debug | **Done** — `r_reflectionDebug` aliases `r_shrDebug` source IDs |
 | 10 | Renderer laboratory expansion | **Done** — `VK_REFLAB_SCENE_SURF_SPEED` + `demo_reference_lab_surf_speed.cfg` + `test_reference_lab_surf_speed.sh` |
 | FC | Foundation Consolidation hub | **Gates green** — `tests/scripts/test_foundation_consolidation.sh` + `test_foundation_unit.sh` |
+| DH | Deferred Honesty | **Phase 1–4** — `HYBRID_ADDITIVE_DEFERRED` naming, `R_GetDeferredEligibility`, classic translation gate, `deferred_status` ([DEFERRED_HONESTY.md](DEFERRED_HONESTY.md)) |
 
 
 **Safe defaults:** `r_gpuScene 0`, `r_gpuDriven 0`, `r_hiZ 0` — classic BSP draws remain authoritative until GPU path is enabled deliberately.

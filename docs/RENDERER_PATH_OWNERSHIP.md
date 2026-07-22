@@ -20,17 +20,20 @@ Canonical selector: `R_SelectSurfaceRenderPath()` in [`renderers/vulkan/vk_rende
 
 ## Mode 3 surface-class ownership
 
+**Honest label:** when deferred lighting is active, the shipping architecture is **`HYBRID_ADDITIVE_DEFERRED`** — see [DEFERRED_HONESTY.md](DEFERRED_HONESTY.md). Fragment paths write **SceneBaseLit**; deferred compute adds dynamics. Not full material deferred.
+
 | Class | Owner |
 |-------|--------|
-| OPAQUE_STANDARD | Deferred compute (opaque handoff skips Forward+ tile add) |
-| OPAQUE_ALPHA_TESTED | Deferred if depth-written in G-buffer fill; else Forward+ opaque fallback |
-| OPAQUE_COMPLEX / refractive / clearcoat-heavy | Forward+ opaque fallback |
+| OPAQUE_STANDARD (PBR native or translated classic) | Deferred handoff + hybrid additive composite |
+| OPAQUE classic multi-stage / env / incomplete export | **Forward+** (`R_GetDeferredEligibility`) |
+| OPAQUE_ALPHA_TESTED (translated) | Deferred approx if eligible; else Forward+ |
+| OPAQUE_COMPLEX / refractive | Forward+ / unsupported |
 | TRANSLUCENT / PARTICLE | Forward+ transparent (or OIT when `r_oit` on) |
 | WEAPON (first-person / depth-hack) | Forward+ after world (Architecture B) |
 | SKY / WATER / VOLUMETRIC | Existing specialized paths |
 | UI | Overlay after tonemap |
 
-Modes **1** and **3** share the opaque→deferred→transparent split when deferred lighting is path-ready. Mode **2** keeps Forward+ on opaque (no deferred handoff). If deferred capture/lighting/composite is not ready, handoff **fails open** to Forward+ so the frame cannot go black.
+Modes **1** and **3** share the opaque→deferred→transparent split when deferred lighting is path-ready. Mode **2** keeps Forward+ on opaque (no deferred handoff). If deferred capture/lighting/composite is not ready, handoff **fails open** to Forward+ so the frame cannot go black. Console: `deferred_status`.
 
 ## Shared cluster grid
 

@@ -1,7 +1,8 @@
 # Compact G-Buffer 2 (Routing + Bandwidth)
 
 **Status:** Foundation Consolidation — compact layout design + material path routing.  
-**Design detail:** [GBUFFER_2_0.md](GBUFFER_2_0.md) · **Routing:** `vk_render_path.c` · **Fill:** `vk_deferred_gbuffer.c`
+**Honesty:** Shipping deferred is **`HYBRID_ADDITIVE_DEFERRED`** — see [DEFERRED_HONESTY.md](DEFERRED_HONESTY.md). Albedo attachment is often SceneBaseLit, not unlit base color.  
+**Design detail:** [GBUFFER_2_0.md](GBUFFER_2_0.md) · **Routing:** `vk_render_path.c` / `vk_deferred_honesty.c` · **Fill:** `vk_deferred_gbuffer.c`
 
 Summarizes the **target** compact G-buffer, bandwidth budgets, and **`R_SelectSurfaceRenderPath`** (material render path) for deferred vs Forward+ handoff.
 

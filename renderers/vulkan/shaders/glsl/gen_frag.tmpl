@@ -2121,8 +2121,18 @@ void main() {
 	out_color.rgb += emissive;
 	
 	out_color.a = diffuse.a;
-	/* r_renderPathDebug 1: tint by R_SelectSurfaceRenderPath id in pbrDebugMode.z */
-	if ( pbrDebugMode.z >= 0.5 ) {
+	/* r_deferredEligibilityDebug: pbrDebugMode.w = eligibility+1 (overrides path tint). */
+	if ( pbrDebugMode.w >= 0.5 ) {
+		int eid = int( pbrDebugMode.w + 0.5 ) - 1;
+		vec3 eligTint = vec3( 0.3 );
+		if ( eid == 0 ) eligTint = vec3( 0.15, 0.90, 0.25 );      /* FULL green */
+		else if ( eid == 1 ) eligTint = vec3( 0.95, 0.85, 0.15 ); /* APPROX yellow */
+		else if ( eid == 2 ) eligTint = vec3( 0.20, 0.45, 0.95 ); /* FORWARD blue */
+		else if ( eid == 3 ) eligTint = vec3( 0.95, 0.15, 0.85 ); /* UNSUPPORTED magenta */
+		else if ( eid == 4 ) eligTint = vec3( 0.95, 0.10, 0.10 ); /* FORCED red */
+		out_color.rgb = mix( out_color.rgb, eligTint, 0.50 );
+	} else if ( pbrDebugMode.z >= 0.5 ) {
+		/* r_renderPathDebug 1: tint by R_SelectSurfaceRenderPath id in pbrDebugMode.z */
 		int pid = int( pbrDebugMode.z + 0.5 );
 		vec3 pathTint = vec3( 0.25 );
 		if ( pid == 2 ) pathTint = vec3( 0.15, 0.55, 1.0 );       /* deferred_opaque */

@@ -67,6 +67,7 @@ tests=(
 	test_probe_selection
 	test_reflection_fallback
 	test_gbuffer_octahedral
+	test_deferred_eligibility
 )
 
 # Cluster indexing lives in cmake target unit_cluster_math (links vk_cluster_math.cpp).
