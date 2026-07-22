@@ -61,7 +61,8 @@ Documentation is grouped by **tier**. Most files remain at their historical path
 - [RASTER_ULTRA_1.0.md](RASTER_ULTRA_1.0.md) — Raster Ultra base (high-end raster-only; RT locked off). Later milestones: [1.1](RASTER_ULTRA_1.1.md) lighting · [1.3](RASTER_ULTRA_1.3.md) probe GI · [1.4](RASTER_ULTRA_1.4.md) transparency/particles/decals · [1.5](RASTER_ULTRA_1.5.md) present-time AA · [1.6](RASTER_ULTRA_1.6.md) GPU geometry · [1.7](RASTER_ULTRA_1.7.md) atmosphere/weather · [1.8](RASTER_ULTRA_1.8.md) materials · [1.9](RASTER_ULTRA_1.9.md) virtual shadows · [1.10](RASTER_ULTRA_1.10.md) HDR presentation · [1.11](RASTER_ULTRA_1.11.md) reference lab · [1.12](RASTER_ULTRA_1.12.md) frequency-aware / moiré suppression
 - [RENDERER_SPINE_1.0.md](RENDERER_SPINE_1.0.md) — production-certified frame matrix (stabilize before new techniques)- [AUTHORED_MESH_NORMALS.md](AUTHORED_MESH_NORMALS.md) — experimental DCC hard-edge / authored-normal import policy
 - [RENDERER_2027.md](RENDERER_2027.md) — GPU-driven hybrid visibility north-star (vis buffer Phase 1)
-- [MOMENT_OIT_STOCHASTIC_ALPHA.md](MOMENT_OIT_STOCHASTIC_ALPHA.md) — MBOIT (`r_oit 2`) + stochastic alpha clip
+- [MOMENT_OIT_STOCHASTIC_ALPHA.md](MOMENT_OIT_STOCHASTIC_ALPHA.md) — production WBOIT (`r_oit 1`), experimental MBOIT (`r_oit 2`), stochastic alpha
+- [OIT_FUTURE_TRACKS.md](OIT_FUTURE_TRACKS.md) — deferred OIT research tracks (not this milestone)
 - [UI_BLUR.md](UI_BLUR.md) — CSS-style `filter` / `backdrop-filter` blur for the JS UI compositor (`ui_blurQuality`, `ui_filterDebug`)
 - [RADIANT.md](RADIANT.md)
 - [VOIP.md](VOIP.md) — Opus voice chat + head lip flap

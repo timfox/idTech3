@@ -109,18 +109,24 @@ Deferred lighting transforms direct-export **world** normals to view space, and 
 - **HUD / StretchPic**: after world deferred/visbuf ends the main pass, `vk_prepare_2d` heals a missing render pass when `doneWorldScene && !inRenderPass` by beginning the UI overlay (or `post_bloom` fallback). Without that, 2D draws are dropped.
 - **Presentation AA**: shipping `modern_vulkan.cfg` uses **SMAA 1x** (`r_aaMode 2`, `r_taa 0`) with `r_taaMotionVectors 1` scaffolding. In-game HUD/menu StretchPics render to the **UI overlay** and are alpha-composited **after** tonemap (`uiOverlayContentValid` → `overlay_compose`), so SMAA/Temporal Reconstruction never blur or discard 2D. Main-menu / no-world UI draws into `color_image` via the post_bloom fallback and skips spatial AA for crisp text. Opt-in Temporal Reconstruction: `exec vulkan_overlay_temporal_recon.cfg`. Bisect with `renderer_clustered_safe` (AA off).
 
-## OIT + mode 3
+## OIT + mode 3 (shipping transparent path)
 
-When `r_oit` 1/2 is on with mode 3, the backend runs **`vk_oit_pass` instead of** the Forward+ transparent shade pass (`drawSurfFilter=2`). Moments/accum/resolve still composite over the deferred opaque base.
+**Production:** mode 3 + **WBOIT (`r_oit 1`)** is the shipping transparent path. The overlay `vulkan_overlay_oit_clustered.cfg` and profile `modern_clustered.cfg` both pin `r_oit 1`. **MBOIT is not required** for mode 3 certification.
 
-**WBOIT (`r_oit 1`) + `r_oitForwardPlus 1` (default):** accumulation samples Forward+ tile lights (set 2) using world-space position from the object→world push matrix. **MBOIT (`r_oit 2`) + `r_oitForwardPlus 1`:** moments pass stays unlit; accum samples the same tile lists on set 4.
+When `r_oit 1` is on with mode 3, the backend runs **`vk_oit_pass` instead of** the Forward+ transparent shade pass (`drawSurfFilter=2`). Accum/resolve composite over the deferred opaque base. **`vk_cluster_assert_shared_consumers( "oit_accum" )`** ensures OIT reads the same cluster header/light SSBOs and generation as deferred lighting.
+
+**WBOIT + `r_oitForwardPlus 1` (default):** accumulation samples Forward+ tile lights (set 2) using shared Burley+GGX eval (`forward_plus_light_eval.glsl`). Cluster generation at accum is recorded in `oitClusterGenAtAccum` for `oit_status` / debug.
+
+**Experimental MBOIT (`r_oit 2`):** optional via `vulkan_overlay_mboit.cfg`; moments pass stays unlit; accum can sample tile lists on set 4 when Forward+ lit.
 
 ```
 exec vulkan_overlay_oit_clustered.cfg
 vid_restart
 ```
 
-Or demo: `exec demo_oit_clustered.cfg` (adds `r_stochasticAlpha 2` + TAA). Keep `r_ext_multisample 0`.
+Stress / parity demos: `exec demo_wboit_stress_mode3.cfg`, `exec demo_wboit_parity.cfg`. Or `exec demo_oit_clustered.cfg` (adds `r_stochasticAlpha 2` + TAA). Keep `r_ext_multisample 0`.
+
+First-person weapons are **excluded** from world OIT (resolve before `RDF_NOWORLDMODEL` weapon pass). See [MOMENT_OIT_STOCHASTIC_ALPHA.md](MOMENT_OIT_STOCHASTIC_ALPHA.md).
 
 With Temporal Reconstruction (`r_aaMode` 4/5), OIT reveal coverage stamps a full-res R8 **reactive mask** so glass/smoke prefer the current frame (`r_temporalReactiveMask 1`). See [HDR_GAPS.md](HDR_GAPS.md) §6.8.
 

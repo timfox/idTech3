@@ -260,6 +260,7 @@ static void vk_oit_note_fallback( const char *reason )
 {
 	if ( reason && reason[0] ) {
 		Q_strncpyz( vk.oitLastFallbackReason, reason, sizeof( vk.oitLastFallbackReason ) );
+		Q_strncpyz( vk.oitLastInvalidationReason, reason, sizeof( vk.oitLastInvalidationReason ) );
 	} else {
 		vk.oitLastFallbackReason[0] = '\0';
 	}
@@ -276,6 +277,27 @@ static void vk_oit_note_fallback( const char *reason )
 
 static qboolean vk_oit_resources_ready( uint32_t fullWidth, uint32_t fullHeight, qboolean mboit )
 {
+	if ( ri.Cvar_VariableIntegerValue( "r_oitForceAllocationFailure" ) ) {
+		vk.oitCorruptionCount++;
+		vk_oit_note_fallback( "forced allocation failure" );
+		return qfalse;
+	}
+	if ( ri.Cvar_VariableIntegerValue( "r_oitForceGenerationMismatch" ) ) {
+		vk.oitCorruptionCount++;
+		vk_oit_note_fallback( "forced generation mismatch" );
+		return qfalse;
+	}
+	if ( ri.Cvar_VariableIntegerValue( "r_oitForceExtentMismatch" ) ) {
+		vk.oitCorruptionCount++;
+		vk.oitBoundsViolationCount++;
+		vk_oit_note_fallback( "forced extent mismatch" );
+		return qfalse;
+	}
+	if ( ri.Cvar_VariableIntegerValue( "r_oitForceInvalidAccum" ) ) {
+		vk.oitCorruptionCount++;
+		vk_oit_note_fallback( "forced invalid accum" );
+		return qfalse;
+	}
 	if ( vk.oitAttachmentGeneration == 0 ||
 		vk.oitDescriptorGeneration != vk.oitAttachmentGeneration ) {
 		vk_oit_note_fallback( "descriptor generation != attachment generation" );
@@ -283,6 +305,7 @@ static qboolean vk_oit_resources_ready( uint32_t fullWidth, uint32_t fullHeight,
 	}
 	if ( vk.oitExtentWidth != 0 && vk.oitExtentHeight != 0 &&
 		( vk.oitExtentWidth != fullWidth || vk.oitExtentHeight != fullHeight ) ) {
+		vk.oitBoundsViolationCount++;
 		vk_oit_note_fallback( "OIT attachment extent mismatch vs render extent" );
 		return qfalse;
 	}
@@ -396,6 +419,10 @@ void vk_oit_pass( const struct drawSurfsCommand_s *cmd )
 	vk.oitFrameNumber = vk.temporal.frameIndex;
 	vk.oitCmdIndex = vk.cmd_index;
 	vk.oitSwapchainImageIndex = vk.cmd ? vk.cmd->swapchain_image_index : 0u;
+	vk.oitClearCount = 0;
+	vk.oitResolveCount = 0;
+	vk.oitAccumPassCount = 0;
+	vk.oitDrawCount = 0;
 
 	if ( vk.oitCapturePending & VK_OIT_CAPTURE_CONTEXT ) {
 		ri.Printf( PRINT_ALL,
@@ -466,6 +493,33 @@ void vk_oit_pass( const struct drawSurfsCommand_s *cmd )
 	/* Align Forward+ viewport params with the OIT framebuffer before lit accum. */
 	if ( r_oitForwardPlus && r_oitForwardPlus->integer ) {
 		vk_forward_plus_refresh_viewport_params( fullWidth, fullHeight );
+		vk_cluster_assert_shared_consumers( "oit_accum" );
+		vk.oitClusterGenAtAccum = vk_cluster_list_generation();
+		vk.oitLightBufferGenAtAccum = vk.forward_plus.cluster_list_generation;
+		if ( ri.Cvar_VariableIntegerValue( "r_oitForceClusterMismatch" ) ) {
+			vk.oitClusterMismatchCount++;
+			vk.oitCorruptionCount++;
+			Q_strncpyz( vk.oitLastInvalidationReason, "forced cluster mismatch",
+				sizeof( vk.oitLastInvalidationReason ) );
+			ri.Printf( PRINT_WARNING, S_COLOR_YELLOW
+				"[VK][OIT] cluster generation force-mismatch (skip local lights)\n" S_COLOR_WHITE );
+		} else if ( ri.Cvar_VariableIntegerValue( "r_oitClusterDebug" ) == 3 ) {
+			ri.Printf( PRINT_ALL, "[VK][OIT] clusterGen=%u consumer=oit_accum\n",
+				vk.oitClusterGenAtAccum );
+		}
+	} else {
+		vk.oitClusterGenAtAccum = 0;
+		vk.oitLightBufferGenAtAccum = 0;
+	}
+	if ( ri.Cvar_VariableIntegerValue( "r_oitExtentDebug" ) ) {
+		ri.Printf( PRINT_ALL,
+			"[VK][OIT] extentDebug render=%ux%u oitActive=%ux%u oitAlloc=%ux%u "
+			"mainColor=%ux%u genAtt=%u genDesc=%u boundsViol=%u\n",
+			fullWidth, fullHeight, vk.oitExtentWidth, vk.oitExtentHeight,
+			vk.oitAllocatedExtentWidth, vk.oitAllocatedExtentHeight,
+			vk.mainColorWidth, vk.mainColorHeight,
+			vk.oitAttachmentGeneration, vk.oitDescriptorGeneration,
+			vk.oitBoundsViolationCount );
 	}
 
 	/* Copy opaque scene to fog_scene for resolve */
@@ -526,7 +580,15 @@ void vk_oit_pass( const struct drawSurfsCommand_s *cmd )
 
 		vk_begin_render_pass_tracked( vk.render_pass.oit_accum, vk.framebuffers.oit_accum, qtrue, fullWidth, fullHeight );
 		vk.oitClearedThisFrame = qtrue;
+		vk.oitClearCount++;
 		vk.oitFrameState = VK_OIT_FRAME_CLEARED;
+		if ( ri.Cvar_VariableIntegerValue( "r_oitForceSkipClear" ) ) {
+			vk.oitClearedThisFrame = qfalse;
+			vk.oitFrameState = VK_OIT_FRAME_UNTOUCHED;
+			vk.oitCorruptionCount++;
+			Q_strncpyz( vk.oitLastInvalidationReason, "forced skip clear",
+				sizeof( vk.oitLastInvalidationReason ) );
+		}
 		if ( !directTest && ( bucket_mboit ? vk.oit_accum_mboit_pipeline : vk.oit_accum_pipeline ) ) {
 			backEnd.oitAccumPass = qtrue;
 			backEnd.drawSurfFilter = 2;
@@ -534,6 +596,8 @@ void vk_oit_pass( const struct drawSurfsCommand_s *cmd )
 			backEnd.oitAccumPass = qfalse;
 			backEnd.drawSurfFilter = 0;
 			vk.oitFrameState = VK_OIT_FRAME_ACCUMULATED;
+			vk.oitAccumPassCount++;
+			vk.oitDrawCount += (uint32_t)cmd->numDrawSurfs;
 		}
 		vk_end_render_pass();
 
@@ -641,6 +705,15 @@ void vk_oit_pass( const struct drawSurfsCommand_s *cmd )
 		vk_end_render_pass();
 		/* RP finalLayout is SHADER_READ_ONLY — ready for fog_scene copy / post_bloom. */
 		vk.oitFrameState = VK_OIT_FRAME_RESOLVED;
+		vk.oitResolveCount++;
+		if ( ri.Cvar_VariableIntegerValue( "r_oitForceDoubleResolve" ) && bucket == bucket_count - 1 ) {
+			/* Second resolve attempt: refuse by leaving state RESOLVED and counting corruption. */
+			vk.oitCorruptionCount++;
+			Q_strncpyz( vk.oitLastInvalidationReason, "forced double resolve suppressed",
+				sizeof( vk.oitLastInvalidationReason ) );
+			ri.Printf( PRINT_WARNING, S_COLOR_YELLOW
+				"[VK][OIT] double resolve suppressed (already RESOLVED)\n" S_COLOR_WHITE );
+		}
 
 		if ( vk.oitCapturePending & VK_OIT_CAPTURE_STAGES ) {
 			ri.Printf( PRINT_ALL,

@@ -1363,6 +1363,23 @@ typedef struct {
 	uint32_t oitCapturePending; /* bit flags: 1=context 2=mark_stages */
 	qboolean oitUnhealthy;
 	uint32_t oitFallbackCount;
+	/* WBOIT production telemetry (Track A/D). */
+	uint32_t oitClearCount;
+	uint32_t oitResolveCount;
+	uint32_t oitAccumPassCount;
+	uint32_t oitCorruptionCount;
+	uint32_t oitClusterMismatchCount;
+	uint32_t oitBoundsViolationCount;
+	uint32_t oitAllocatedExtentWidth;
+	uint32_t oitAllocatedExtentHeight;
+	uint32_t oitClusterGenAtAccum;
+	uint32_t oitLightBufferGenAtAccum;
+	uint32_t oitDrawCount;
+	uint32_t oitLastPerfClearUs;
+	uint32_t oitLastPerfAccumUs;
+	uint32_t oitLastPerfResolveUs;
+	char oitLastInvalidationReason[96];
+	char oitProfileSourceHint[64];
 	VkImage ssr_image;
 	VkImageView ssr_image_view;
 	VkDescriptorSet ssr_descriptor[2];	/* [0]=color, [1]=depth */

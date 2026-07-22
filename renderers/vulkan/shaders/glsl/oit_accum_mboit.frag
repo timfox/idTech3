@@ -1,8 +1,6 @@
 #version 450
-/* Moment Transparency / MBOIT pass 2: WBOIT-style accum weighted by moment T(z).
- * Samples pass-1 moments + b0, reconstructs transmittance (Cantelli/MSM-style),
- * then accumulates (color * alpha * T, alpha * T) and revealage.
- * Optional Forward+ dynamic lights on set 4 when r_oitForwardPlus is on.
+/* Moment Transparency / MBOIT pass 2 (experimental): WBOIT-style accum weighted by moment T(z).
+ * Forward+ lights on set 4 via shared Burley+GGX + compact cluster lists.
  */
 #extension GL_GOOGLE_include_directive : require
 #include "forward_plus_cluster.glsl"
@@ -28,6 +26,10 @@ layout(std430, set = 4, binding = 2) readonly buffer FpParamSSBO {
 	vec4 fp_cluster_z_range;
 } fp_params;
 
+#define CLUSTER_LIST_CELLS fp_tiles.fp_tile_cells
+#include "cluster_light_list.glsl"
+#include "forward_plus_light_eval.glsl"
+
 layout(location = 0) in vec2 frag_tex_coord0;
 layout(location = 1) in vec4 frag_color0;
 layout(location = 2) in vec3 frag_world_pos;
@@ -35,7 +37,16 @@ layout(location = 2) in vec3 frag_world_pos;
 layout(location = 0) out vec4 out_color;
 layout(location = 1) out float out_reveal;
 
-/* Fraction of optical depth closer than z (biased). β=0.25 overestimation. */
+layout(push_constant) uniform Transform {
+	mat4 mvp;
+	mat4 prevMvp;
+	mat4 model;
+	int lightingDebug;
+	int parityCompare;
+	int pad0;
+	int pad1;
+} pc;
+
 float AbsorbanceCloser( float b0, vec4 b, float z )
 {
 	float inv = 1.0 / max(b0, 1e-5);
@@ -45,111 +56,14 @@ float AbsorbanceCloser( float b0, vec4 b, float z )
 	float t = z - mean;
 	float pGe;
 	if ( t <= 0.0 ) {
-		/* Cantelli: most mass is at/behind mean when querying in front */
 		pGe = var / (var + t * t + 1e-6);
 		pGe = 1.0 - clamp(pGe, 0.0, 1.0);
 	} else {
 		pGe = var / (var + t * t);
 		pGe = 1.0 - clamp(pGe, 0.0, 1.0);
 	}
-	/* Overestimation weight β = 0.25 (Münstermann / Moment Transparency) */
 	pGe = mix(pGe, 1.0, 0.25);
 	return clamp(pGe, 0.0, 1.0) * b0;
-}
-
-vec3 oit_forward_plus_add( vec3 baseRgb, vec3 N, vec3 worldPos, out bool clusterOob )
-{
-	vec3 fpAdd = vec3( 0.0 );
-	clusterOob = false;
-	uint tilesX = fp_params.fp_tiles_xy_viewport.x;
-	uint tilesY = fp_params.fp_tiles_xy_viewport.y;
-	float vw = float( fp_params.fp_tiles_xy_viewport.z );
-	float vh = float( fp_params.fp_tiles_xy_viewport.w );
-	if ( tilesX == 0u || tilesY == 0u || vw <= 1.0 || vh <= 1.0 ) {
-		tilesX = uint( fp_lights.fp_light_data[1].x + 0.5 );
-		tilesY = uint( fp_lights.fp_light_data[1].y + 0.5 );
-		vw = fp_lights.fp_light_data[1].z;
-		vh = fp_lights.fp_light_data[1].w;
-	}
-	if ( tilesX == 0u || tilesY == 0u || vw <= 1.0 || vh <= 1.0 ) {
-		return fpAdd;
-	}
-	float tilePxX = vw / max( float( tilesX ), 1.0 );
-	float tilePxY = vh / max( float( tilesY ), 1.0 );
-	vec4 wc = fp_params.fp_clip_from_world * vec4( worldPos, 1.0 );
-	if ( abs( wc.w ) <= 1e-5 ) {
-		return fpAdd;
-	}
-	vec3 ndc = wc.xyz / wc.w;
-	if ( ndc.z < -1.0 || ndc.z > 1.0 || ndc.x < -1.05 || ndc.x > 1.05 || ndc.y < -1.05 || ndc.y > 1.05 ) {
-		return fpAdd;
-	}
-	vec2 px;
-	px.x = 0.5 * ( 1.0 + ndc.x ) * vw;
-	px.y = 0.5 * ( 1.0 + ndc.y ) * vh;
-	uint tx = min( uint( px.x / tilePxX ), tilesX - 1u );
-	uint ty = min( uint( px.y / tilePxY ), tilesY - 1u );
-	uint zSlices = max( fp_params.fp_cluster_meta.x, 1u );
-	uint zMode = fp_params.fp_cluster_meta.y;
-	float zNear = max( fp_params.fp_cluster_z_range.x, 1e-3 );
-	float zFar = max( fp_params.fp_cluster_z_range.y, zNear + 1e-3 );
-	uint slice = fp_view_depth_to_slice( abs( wc.w ), zSlices, zMode, zNear, zFar );
-	uint tileId = fp_cluster_index( tx, ty, tilesX, tilesY, slice, zSlices );
-	uint clusterCount = tilesX * tilesY * zSlices;
-	uint tileLen = clusterCount * 8u;
-	if ( tileId >= clusterCount ) {
-		clusterOob = true;
-		return fpAdd;
-	}
-	uint tbase = tileId * 8u;
-	float nLights = fp_lights.fp_light_data[0].x;
-	uint maxPerTile = uint( max( fp_lights.fp_light_data[0].z + 0.5, 1.0 ) );
-	maxPerTile = min( maxPerTile, 8u );
-	for ( uint k = 0u; k < maxPerTile; k++ ) {
-		if ( tbase + k >= tileLen ) {
-			clusterOob = true;
-			break;
-		}
-		uint li = fp_tiles.fp_tile_cells[ tbase + k ];
-		if ( li == 0xFFFFFFFFu ) {
-			continue;
-		}
-		if ( float( li ) + 0.5 >= nLights ) {
-			continue;
-		}
-		uint b0 = 2u + li * 4u;
-		vec3 lpos = fp_lights.fp_light_data[ b0 ].xyz;
-		float rad = max( fp_lights.fp_light_data[ b0 ].w, 1e-3 );
-		vec4 lc = fp_lights.fp_light_data[ b0 + 1u ];
-		vec4 lpack = fp_lights.fp_light_data[ b0 + 2u ];
-		vec3 Ldir;
-		float att = 0.0;
-		float NLfp = 0.0;
-		if ( lc.w < 0.5 ) {
-			vec3 Lw = lpos - worldPos;
-			float dist = length( Lw );
-			if ( dist > rad ) {
-				continue;
-			}
-			float dr = dist / max( rad, 1e-4 );
-			att = clamp( 1.0 - dr * dr, 0.0, 1.0 );
-			Ldir = Lw / max( dist, 1e-4 );
-			NLfp = max( dot( N, Ldir ), 0.0 );
-		} else {
-			vec3 axis = normalize( vec3( lpack.x, lpack.y, lpack.z ) );
-			Ldir = -axis;
-			att = 1.0;
-			NLfp = max( dot( N, Ldir ), 0.0 );
-		}
-		if ( att <= 0.0 || NLfp <= 0.0 ) {
-			continue;
-		}
-		vec3 lightRgb = lc.rgb * att * NLfp;
-		float fpAdditive = fp_lights.fp_light_data[ b0 + 3u ].z;
-		float addBoost = mix( 1.0, 1.25, step( 0.5, fpAdditive ) );
-		fpAdd += baseRgb * lightRgb * addBoost;
-	}
-	return fpAdd;
 }
 
 void main() {
@@ -166,7 +80,6 @@ void main() {
 		ivec2 depthSize = textureSize( opaqueDepthTex, 0 );
 		vec2 depthUv = gl_FragCoord.xy / vec2( depthSize );
 		float opaqueDepth = textureLod( opaqueDepthTex, depthUv, 0.0 ).r;
-		/* Reversed-Z: discard fragments farther than opaque (lower depth). */
 		if ( gl_FragCoord.z + 1e-5 < opaqueDepth ) discard;
 	}
 
@@ -176,23 +89,31 @@ void main() {
 		if ( dot( N, N ) < 1e-8 ) {
 			N = vec3( 0.0, 0.0, 1.0 );
 		}
+		vec3 V = normalize( fp_params.fp_view_org.xyz - frag_world_pos );
 		bool clusterOob = false;
-		litRgb += oit_forward_plus_add( base.rgb, N, frag_world_pos, clusterOob );
-		if ( clusterOob || any( isnan( litRgb ) ) || any( isinf( litRgb ) ) ) {
+		uint lightCount = 0u;
+		vec3 addLit = FpEval_ForwardPlusAdd( base.rgb, N, V, frag_world_pos, 0.45, 0.0,
+			pc.lightingDebug, clusterOob, lightCount );
+		if ( clusterOob || any( isnan( addLit ) ) || any( isinf( addLit ) ) ) {
 			out_color = vec4( 1.0, 0.0, 1.0, 1.0 );
 			out_reveal = 0.0;
 			return;
 		}
+		litRgb = ( pc.lightingDebug == 6 ) ? addLit : ( base.rgb + addLit );
 	}
-	/* Soft-cap HDR before moment-weighted accum (same blow-up path as WBOIT). */
 	{
 		float lum = dot( litRgb, vec3( 0.2126, 0.7152, 0.0722 ) );
 		if ( lum > 4.0 ) {
 			litRgb *= 4.0 / lum;
 		}
+		litRgb = max( litRgb, vec3( 0.0 ) );
 	}
 
 	ivec2 px = ivec2(gl_FragCoord.xy);
+	ivec2 momentsSize = textureSize( momentsTex, 0 );
+	if ( px.x < 0 || px.y < 0 || px.x >= momentsSize.x || px.y >= momentsSize.y ) {
+		discard;
+	}
 	vec4 b = texelFetch(momentsTex, px, 0);
 	float b0 = texelFetch(b0Tex, px, 0).r;
 	if ( any( isnan( b ) ) || any( isinf( b ) ) || isnan( b0 ) || isinf( b0 ) ) {
@@ -210,7 +131,6 @@ void main() {
 		return;
 	}
 
-	/* Premultiplied: (Ci*ai*T, ai*T) — matches WBOIT accumulate form. */
 	out_color = vec4( litRgb * alpha, alpha ) * T;
 	out_color = max( out_color, vec4( 0.0 ) );
 	out_color.a = max( out_color.a, 1e-4 );

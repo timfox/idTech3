@@ -26,7 +26,8 @@ rg -q 'oit_moments' "$ROOT/renderers/vulkan/vk_postfx_passes.c" || fail "moments
 rg -q 'StochasticIGN|stochMode' "$ROOT/renderers/vulkan/shaders/glsl/gen_frag.tmpl" || fail "stochastic gen_frag"
 rg -q 'stochMode' "$ROOT/renderers/vulkan/shaders/glsl/light_frag.tmpl" || fail "stochastic light_frag"
 rg -q 'reserved\[6\]' "$ROOT/renderers/vulkan/vk_view_state.c" || fail "stoch push seed"
-rg -q 'r_oit 2' "$ROOT/config/vulkan_overlay_oit_clustered.cfg" || fail "clustered overlay sets MBOIT"
+rg -q 'r_oit 1' "$ROOT/config/vulkan_overlay_oit_clustered.cfg" || fail "clustered overlay sets production WBOIT"
+rg -q 'r_oit 2' "$ROOT/config/vulkan_overlay_mboit.cfg" || fail "mboit overlay keeps experimental MBOIT"
 rg -q 'vulkan_overlay_unified_clustered' "$ROOT/config/vulkan_overlay_oit_clustered.cfg" || fail "clustered overlay stacks mode 3"
 
 rg -q 'r_oitClassify' "$ROOT/renderers/vulkan/tr_init.c" || fail "r_oitClassify cvar"

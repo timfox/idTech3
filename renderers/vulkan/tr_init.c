@@ -3076,7 +3076,12 @@ static void R_Register( void )
 
 	r_oit = ri.Cvar_Get( "r_oit", "0", CVAR_ARCHIVE_ND | CVAR_LATCH );
 	ri.Cvar_CheckRange( r_oit, "0", "2", CV_INTEGER );
-	ri.Cvar_SetDescription( r_oit, "Order-independent transparency:\n 0 - off\n 1 - WBOIT (weighted blended OIT)\n 2 - MBOIT / Moment Transparency (glass, smoke, particles, overlapping translucent layers)\n Requires \\r_fbo 1." );
+	ri.Cvar_SetDescription( r_oit,
+		"Order-independent transparency:\n"
+		" 0 - off (sorted alpha)\n"
+		" 1 - WBOIT (production / Spine 1.1 certified path)\n"
+		" 2 - MBOIT / Moment Transparency (experimental; not Spine 1.1 certified)\n"
+		"Requires \\r_fbo 1." );
 	ri.Cvar_SetGroup( r_oit, CVG_RENDERER );
 	r_oitForwardPlus = ri.Cvar_Get( "r_oitForwardPlus", "1", CVAR_ARCHIVE_ND | CVAR_LATCH );
 	ri.Cvar_CheckRange( r_oitForwardPlus, "0", "1", CV_INTEGER );
@@ -3091,7 +3096,7 @@ static void R_Register( void )
 		"Requires \\r_oit 1 or 2. Hair cards stay on \\r_stochasticAlpha." );
 	ri.Cvar_SetGroup( r_oitClassify, CVG_RENDERER );
 	r_oitDebug = ri.Cvar_Get( "r_oitDebug", "0", CVAR_CHEAT );
-	ri.Cvar_CheckRange( r_oitDebug, "0", "15", CV_INTEGER );
+	ri.Cvar_CheckRange( r_oitDebug, "0", "16", CV_INTEGER );
 	ri.Cvar_SetDescription( r_oitDebug,
 		"OIT resolve debug view (cheat):\n"
 		" 0 - composite\n"
@@ -3104,16 +3109,29 @@ static void R_Register( void )
 		" 7 - coverage (1-revealage)\n"
 		" 8 - pass ownership (green=OIT, blue=opaque)\n"
 		" 9 - moment RGB (MBOIT)\n"
-		" 10 - optical depth b0 (MBOIT)\n"
-		" 11 - coverage×weight heat\n"
+		" 10 - optical depth b0 / raw weight (see docs)\n"
+		" 11 - coverage×weight heat / alpha contribution\n"
 		" 12 - estimated fragment/layer count\n"
 		" 13 - opaque depth at transparent pixels (WBOIT)\n"
 		" 14 - constant magenta×coverage (ignore accum RGB)\n"
 		" 15 - FragCoord UV addressing diagnostic\n"
+		" 16 - invalid values (NaN/Inf mask)\n"
 		"NaN/Inf → magenta." );
 	ri.Cvar_SetGroup( r_oitDebug, CVG_RENDERER );
 	{
 		cvar_t *r_oitDirectTest;
+		cvar_t *r_oitExtentDebug;
+		cvar_t *r_oitLightingDebug;
+		cvar_t *r_oitParityCompare;
+		cvar_t *r_oitClusterDebug;
+		cvar_t *r_oitForceAllocationFailure;
+		cvar_t *r_oitForceExtentMismatch;
+		cvar_t *r_oitForceGenerationMismatch;
+		cvar_t *r_oitForceSkipClear;
+		cvar_t *r_oitForceDoubleResolve;
+		cvar_t *r_oitForceInvalidAccum;
+		cvar_t *r_oitForceClusterMismatch;
+
 		r_oitDirectTest = ri.Cvar_Get( "r_oitDirectTest", "0", CVAR_CHEAT );
 		ri.Cvar_CheckRange( r_oitDirectTest, "0", "2", CV_INTEGER );
 		ri.Cvar_SetDescription( r_oitDirectTest,
@@ -3122,16 +3140,98 @@ static void R_Register( void )
 			" 1 - clear accum/reveal, skip transparent draws, resolve (pure opaque)\n"
 			" 2 - same as 1, but resolve composites a synthetic UV gradient (addressing test)" );
 		ri.Cvar_SetGroup( r_oitDirectTest, CVG_RENDERER );
+
+		r_oitExtentDebug = ri.Cvar_Get( "r_oitExtentDebug", "0", CVAR_CHEAT );
+		ri.Cvar_CheckRange( r_oitExtentDebug, "0", "1", CV_INTEGER );
+		ri.Cvar_SetDescription( r_oitExtentDebug,
+			"Overlay OIT vs render extents, viewport/scissor, generations, bounds violations (cheat)." );
+		ri.Cvar_SetGroup( r_oitExtentDebug, CVG_RENDERER );
+
+		r_oitLightingDebug = ri.Cvar_Get( "r_oitLightingDebug", "0", CVAR_CHEAT );
+		ri.Cvar_CheckRange( r_oitLightingDebug, "0", "8", CV_INTEGER );
+		ri.Cvar_SetDescription( r_oitLightingDebug,
+			"WBOIT lit-accum lighting debug (cheat):\n"
+			" 1 diffuse  2 specular  3 direct  4 indirect\n"
+			" 5 shadow  6 cluster light count  7 probe  8 BRDF-diff vs opaque" );
+		ri.Cvar_SetGroup( r_oitLightingDebug, CVG_RENDERER );
+
+		r_oitParityCompare = ri.Cvar_Get( "r_oitParityCompare", "0", CVAR_CHEAT );
+		ri.Cvar_CheckRange( r_oitParityCompare, "0", "1", CV_INTEGER );
+		ri.Cvar_SetDescription( r_oitParityCompare,
+			"Split-view / pre-composition opaque vs near-opaque WBOIT lit-term compare (cheat)." );
+		ri.Cvar_SetGroup( r_oitParityCompare, CVG_RENDERER );
+
+		r_oitClusterDebug = ri.Cvar_Get( "r_oitClusterDebug", "0", CVAR_CHEAT );
+		ri.Cvar_CheckRange( r_oitClusterDebug, "0", "5", CV_INTEGER );
+		ri.Cvar_SetDescription( r_oitClusterDebug,
+			"OIT cluster handoff debug (cheat):\n"
+			" 1 selected cluster  2 light count  3 generation mismatch\n"
+			" 4 transparent occupancy  5 retained/dropped lights" );
+		ri.Cvar_SetGroup( r_oitClusterDebug, CVG_RENDERER );
+
+		r_oitForceAllocationFailure = ri.Cvar_Get( "r_oitForceAllocationFailure", "0", CVAR_CHEAT );
+		ri.Cvar_CheckRange( r_oitForceAllocationFailure, "0", "1", CV_INTEGER );
+		ri.Cvar_SetGroup( r_oitForceAllocationFailure, CVG_RENDERER );
+		r_oitForceExtentMismatch = ri.Cvar_Get( "r_oitForceExtentMismatch", "0", CVAR_CHEAT );
+		ri.Cvar_CheckRange( r_oitForceExtentMismatch, "0", "1", CV_INTEGER );
+		ri.Cvar_SetGroup( r_oitForceExtentMismatch, CVG_RENDERER );
+		r_oitForceGenerationMismatch = ri.Cvar_Get( "r_oitForceGenerationMismatch", "0", CVAR_CHEAT );
+		ri.Cvar_CheckRange( r_oitForceGenerationMismatch, "0", "1", CV_INTEGER );
+		ri.Cvar_SetGroup( r_oitForceGenerationMismatch, CVG_RENDERER );
+		r_oitForceSkipClear = ri.Cvar_Get( "r_oitForceSkipClear", "0", CVAR_CHEAT );
+		ri.Cvar_CheckRange( r_oitForceSkipClear, "0", "1", CV_INTEGER );
+		ri.Cvar_SetGroup( r_oitForceSkipClear, CVG_RENDERER );
+		r_oitForceDoubleResolve = ri.Cvar_Get( "r_oitForceDoubleResolve", "0", CVAR_CHEAT );
+		ri.Cvar_CheckRange( r_oitForceDoubleResolve, "0", "1", CV_INTEGER );
+		ri.Cvar_SetGroup( r_oitForceDoubleResolve, CVG_RENDERER );
+		r_oitForceInvalidAccum = ri.Cvar_Get( "r_oitForceInvalidAccum", "0", CVAR_CHEAT );
+		ri.Cvar_CheckRange( r_oitForceInvalidAccum, "0", "1", CV_INTEGER );
+		ri.Cvar_SetGroup( r_oitForceInvalidAccum, CVG_RENDERER );
+		r_oitForceClusterMismatch = ri.Cvar_Get( "r_oitForceClusterMismatch", "0", CVAR_CHEAT );
+		ri.Cvar_CheckRange( r_oitForceClusterMismatch, "0", "1", CV_INTEGER );
+		ri.Cvar_SetGroup( r_oitForceClusterMismatch, CVG_RENDERER );
 	}
 	if ( r_oitClassify && r_oitClassify->integer ) {
 		ri.Printf( PRINT_ALL, "[VK] OIT: r_oitClassify=1 (alpha-blend + additive buckets)\n" );
 	}
 	if ( r_oit->integer == 1 ) {
-		ri.Printf( PRINT_ALL, "[VK] OIT: WBOIT (weighted blended) enabled%s.\n",
-			( r_oitForwardPlus && r_oitForwardPlus->integer ) ? " + Forward+ lit" : "" );
+		ri.Printf( PRINT_ALL,
+			"[VK] OIT implementation: WBOIT\n"
+			"[VK] OIT mode: 1\n"
+			"[VK] OIT accumulation format: R16G16B16A16_SFLOAT\n"
+			"[VK] OIT revealage format: R16_SFLOAT\n"
+			"[VK] OIT lit translucent path: %s\n"
+			"[VK] OIT render extent: %dx%d (after FBO init)\n"
+			"[VK] OIT MSAA mode: %d\n"
+			"[VK] OIT TAA state: aaMode=%d taa=%d\n",
+			( r_oitForwardPlus && r_oitForwardPlus->integer ) ? "Forward+ clustered" : "unlit",
+			glConfig.vidWidth, glConfig.vidHeight,
+			( r_ext_multisample && r_ext_multisample->integer ) ? r_ext_multisample->integer : 0,
+			( r_aaMode && r_aaMode->integer ) ? r_aaMode->integer : 0,
+			( r_taa && r_taa->integer ) ? r_taa->integer : 0 );
+		Q_strncpyz( vk.oitProfileSourceHint, "r_oit=1 (WBOIT production)",
+			sizeof( vk.oitProfileSourceHint ) );
 	} else if ( r_oit->integer == 2 ) {
-		ri.Printf( PRINT_ALL, "[VK] OIT: MBOIT (Moment Transparency) enabled%s.\n",
-			( r_oitForwardPlus && r_oitForwardPlus->integer ) ? " + Forward+ lit accum" : "" );
+		ri.Printf( PRINT_ALL,
+			"[VK] OIT implementation: MBOIT\n"
+			"[VK] OIT mode: 2\n"
+			S_COLOR_YELLOW "[VK] MBOIT is experimental and not Spine 1.1 certified.\n" S_COLOR_WHITE
+			"[VK] OIT accumulation format: R16G16B16A16_SFLOAT (+ moments/b0)\n"
+			"[VK] OIT revealage format: R16_SFLOAT\n"
+			"[VK] OIT lit translucent path: %s\n",
+			( r_oitForwardPlus && r_oitForwardPlus->integer ) ? "Forward+ clustered (accum)" : "unlit" );
+		Q_strncpyz( vk.oitProfileSourceHint, "r_oit=2 (MBOIT experimental)",
+			sizeof( vk.oitProfileSourceHint ) );
+		{
+			const char *haven = ri.Cvar_VariableString( "r_havenrpProfile" );
+			if ( haven && haven[0] && !Q_stricmp( haven, "stable" ) ) {
+				ri.Printf( PRINT_WARNING, S_COLOR_YELLOW
+					"[VK][OIT] WARNING: stable profile source selected MBOIT — use r_oit 1 for production.\n"
+					S_COLOR_WHITE );
+			}
+		}
+	} else {
+		vk.oitProfileSourceHint[0] = '\0';
 	}
 	r_stochasticAlpha = ri.Cvar_Get( "r_stochasticAlpha", "0", CVAR_ARCHIVE_ND );
 	ri.Cvar_CheckRange( r_stochasticAlpha, "0", "2", CV_INTEGER );

@@ -188,6 +188,10 @@ void main() {
 		float u = float( px.x ) / float( max( opaqueSize.x - 1, 1 ) );
 		float v = float( px.y ) / float( max( opaqueSize.y - 1, 1 ) );
 		out_color = vec4( u, v, 0.0, 1.0 );
+	} else if ( mode == 16 ) {
+		/* Invalid-value mask: magenta if any NaN/Inf in accum/reveal/resolved. */
+		bool bad = oit_invalid4( accum ) || oit_invalid( revealage ) || oit_invalid3( resolved );
+		out_color = bad ? vec4( oit_magenta(), 1.0 ) : vec4( 0.0, 0.2, 0.0, 1.0 );
 	} else {
 		out_color = vec4( resolved, 1.0 );
 	}

@@ -7,10 +7,22 @@ Raster Ultra 1.4 — transparency classification + refractive exclusion helpers.
 #include "tr_local.h"
 #include "vk.h"
 #include "vk_transparency_route.h"
+#include "vk_forward_plus.h"
 
 static cvar_t *r_transparencyDebug;
 static cvar_t *r_refractiveExcludeOit;
 static qboolean s_inited;
+
+static const char *VK_Oit_ImplName( int mode )
+{
+	if ( mode == 1 ) {
+		return "WBOIT";
+	}
+	if ( mode == 2 ) {
+		return "MBOIT";
+	}
+	return "off";
+}
 
 static void VK_Oit_Status_f( void )
 {
@@ -18,6 +30,10 @@ static void VK_Oit_Status_f( void )
 	int effective = 0;
 	const char *viewClass = "world";
 	const char *stateName = "UNTOUCHED";
+	const int msaa = ( r_ext_multisample && r_ext_multisample->integer ) ? r_ext_multisample->integer : 0;
+	const int taa = ( r_taa && r_taa->integer ) ? r_taa->integer : 0;
+	const int aaMode = ( r_aaMode && r_aaMode->integer ) ? r_aaMode->integer : 0;
+	const int renderMode = ( r_renderMode && r_renderMode->integer ) ? r_renderMode->integer : 0;
 
 	if ( requested > 0 && vk.fboActive &&
 		vk.oitDescriptorGeneration == vk.oitAttachmentGeneration &&
@@ -41,38 +57,81 @@ static void VK_Oit_Status_f( void )
 
 	ri.Printf( PRINT_ALL,
 		"oit_status:\n"
-		"  requested=%d effective=%d classify=%d forwardPlus=%d refractiveExclude=%d directTest=%d\n"
+		"  implementation=%s mode=%d effective=%d classify=%d forwardPlus=%d refractiveExclude=%d directTest=%d\n"
+		"  profileSource=%s renderMode=%d\n"
 		"  formats: accum=R16G16B16A16_SFLOAT reveal=R16_SFLOAT color=%s\n"
-		"  extent=%ux%u (mainColor=%ux%u render=%ux%u)\n"
+		"  litPath=%s\n"
+		"  activeExtent=%ux%u allocatedExtent=%ux%u (mainColor=%ux%u render=%ux%u)\n"
+		"  sampleCount=%d msaa=%d taa=%d aaMode=%d\n"
 		"  attachmentGen=%u descriptorGen=%u match=%d\n"
+		"  clusterGen=%u lightBufferGen=%u clusterMismatch=%u\n"
+		"  clearCount=%u accumPassCount=%u resolveCount=%u drawSurfs=%u\n"
 		"  clearedThisFrame=%d frameState=%s weaponExcluded=%d unhealthy=%d fallbacks=%u\n"
-		"  FrameContext: frame=%u cmdIndex=%u swapchainImage=%u (fif=%d swapCount=%u)\n"
+		"  corruption=%u boundsViolations=%u\n"
+		"  resourceValid=%d\n"
+		"  lastInvalidation=%s\n"
 		"  lastFallback=%s\n"
+		"  FrameContext: frame=%u cmdIndex=%u swapchainImage=%u (fif=%d swapCount=%u)\n"
 		"  viewClass=%s passOrder=opaque->deferred->oit_accum->oit_resolve->refractive->weapon->post->ui\n"
-		"  resolveRP=UNDEFINED/DONT_CARE→SHADER_READ (discard; fullscreen rewrite)\n",
-		requested, effective,
+		"  resolveRP=UNDEFINED/DONT_CARE→SHADER_READ (discard; fullscreen rewrite)\n"
+		"  perfUs: clear=%u accum=%u resolve=%u (CPU markers; see oit_perf)\n",
+		VK_Oit_ImplName( requested ), requested, effective,
 		r_oitClassify ? r_oitClassify->integer : 0,
 		r_oitForwardPlus ? r_oitForwardPlus->integer : 0,
 		r_refractiveExcludeOit ? r_refractiveExcludeOit->integer : 1,
 		ri.Cvar_VariableIntegerValue( "r_oitDirectTest" ),
+		vk.oitProfileSourceHint[0] ? vk.oitProfileSourceHint : "(runtime)",
+		renderMode,
 		vk_format_string( vk.color_format ),
+		( r_oitForwardPlus && r_oitForwardPlus->integer ) ? "Forward+ clustered" : "unlit",
 		vk.oitExtentWidth, vk.oitExtentHeight,
+		vk.oitAllocatedExtentWidth ? vk.oitAllocatedExtentWidth : vk.oitExtentWidth,
+		vk.oitAllocatedExtentHeight ? vk.oitAllocatedExtentHeight : vk.oitExtentHeight,
 		vk.mainColorWidth, vk.mainColorHeight,
 		vk.renderWidth, vk.renderHeight,
+		msaa > 0 ? msaa : 1, msaa, taa, aaMode,
 		vk.oitAttachmentGeneration, vk.oitDescriptorGeneration,
 		( vk.oitDescriptorGeneration == vk.oitAttachmentGeneration && vk.oitAttachmentGeneration > 0 ) ? 1 : 0,
+		vk.oitClusterGenAtAccum ? vk.oitClusterGenAtAccum : vk_cluster_list_generation(),
+		vk.oitLightBufferGenAtAccum ? vk.oitLightBufferGenAtAccum : vk_cluster_list_generation(),
+		vk.oitClusterMismatchCount,
+		vk.oitClearCount, vk.oitAccumPassCount, vk.oitResolveCount, vk.oitDrawCount,
 		vk.oitClearedThisFrame ? 1 : 0,
 		stateName,
 		vk.oitWeaponExcluded ? 1 : 0,
 		vk.oitUnhealthy ? 1 : 0,
 		vk.oitFallbackCount,
+		vk.oitCorruptionCount,
+		vk.oitBoundsViolationCount,
+		effective > 0 ? 1 : 0,
+		vk.oitLastInvalidationReason[0] ? vk.oitLastInvalidationReason : "(none)",
+		vk.oitLastFallbackReason[0] ? vk.oitLastFallbackReason : "(none)",
 		vk.oitFrameNumber,
 		vk.oitCmdIndex,
 		vk.oitSwapchainImageIndex,
 		NUM_COMMAND_BUFFERS,
 		vk.swapchain_image_count,
-		vk.oitLastFallbackReason[0] ? vk.oitLastFallbackReason : "(none)",
-		viewClass );
+		viewClass,
+		vk.oitLastPerfClearUs, vk.oitLastPerfAccumUs, vk.oitLastPerfResolveUs );
+}
+
+static void VK_Oit_Perf_f( void )
+{
+	const int requested = r_oit ? r_oit->integer : 0;
+	ri.Printf( PRINT_ALL,
+		"oit_perf:\n"
+		"  mode=%d (%s) resolution=%ux%u\n"
+		"  clearUs=%u accumUs=%u resolveUs=%u totalUs=%u\n"
+		"  clearCount=%u accumPassCount=%u resolveCount=%u drawSurfs=%u\n"
+		"  clusterGen=%u lightRefs=clustered Forward+\n"
+		"  resourceMemory=approx accum+reveal R16F targets at active extent\n"
+		"  overdrawEstimate=see r_oitDebug 12\n",
+		requested, VK_Oit_ImplName( requested ),
+		vk.oitExtentWidth, vk.oitExtentHeight,
+		vk.oitLastPerfClearUs, vk.oitLastPerfAccumUs, vk.oitLastPerfResolveUs,
+		vk.oitLastPerfClearUs + vk.oitLastPerfAccumUs + vk.oitLastPerfResolveUs,
+		vk.oitClearCount, vk.oitAccumPassCount, vk.oitResolveCount, vk.oitDrawCount,
+		vk.oitClusterGenAtAccum ? vk.oitClusterGenAtAccum : vk_cluster_list_generation() );
 }
 
 static void VK_Oit_Capture_f( void )
@@ -87,7 +146,7 @@ static void VK_Oit_Capture_f( void )
 		ri.Printf( PRINT_ALL, "oit_capture: next OIT pass will log FrameContext\n" );
 	} else {
 		ri.Printf( PRINT_ALL, "usage: oit_capture [context|stages|all]\n" );
-		ri.Printf( PRINT_ALL, "  Then screenshot with r_oitDebug 1..13 to save stage visuals.\n" );
+		ri.Printf( PRINT_ALL, "  Then screenshot with r_oitDebug 1..16 to save stage visuals.\n" );
 	}
 }
 
@@ -240,6 +299,7 @@ void vk_transparency_route_init( void )
 		ri.Cmd_AddCommand( "transparency_route_status", VK_TransparencyRoute_Status_f );
 		ri.Cmd_AddCommand( "oit_status", VK_Oit_Status_f );
 		ri.Cmd_AddCommand( "oit_capture", VK_Oit_Capture_f );
+		ri.Cmd_AddCommand( "oit_perf", VK_Oit_Perf_f );
 	}
 	s_inited = qtrue;
 	ri.Printf( PRINT_ALL, "[VK][Xparent] transparency routing initialized (refractiveExcludeOit=%d)\n",
@@ -252,6 +312,7 @@ void vk_transparency_route_shutdown( void )
 		ri.Cmd_RemoveCommand( "transparency_route_status" );
 		ri.Cmd_RemoveCommand( "oit_status" );
 		ri.Cmd_RemoveCommand( "oit_capture" );
+		ri.Cmd_RemoveCommand( "oit_perf" );
 	}
 	s_inited = qfalse;
 }

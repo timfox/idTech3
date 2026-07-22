@@ -11,12 +11,17 @@ Spine 1.1 certifies one opt-in stack on top of Spine 1.0 shipping defaults. It d
 - Weapon/world separation is **temporal ordering**, not dual history buffers — presentation-only weapon; no `weapon_history` resource.
 - Soft-demote without weapon-after remains; the former every-frame “experimental OIT×TAA” violation is cleared for the certified combo.
 
+## Transparency (production vs experimental)
+
+- **WBOIT (`r_oit 1`)** is the **production** order-independent transparency path for Spine 1.1 and mode 3 clustered handoff.
+- **MBOIT (`r_oit 2`)** remains **experimental** (startup warns; not certified). Cert and shipping overlays use **`r_oit 1` only**.
+
 ## Certified combination
 
 | Pin | Value |
 |-----|-------|
 | `r_renderMode` | **3** (Unified Clustered) |
-| `r_oit` | **1** (WBOIT) |
+| `r_oit` | **1** (WBOIT — production transparency) |
 | `r_aaMode` / `r_taa` | **4** / **1** (Temporal Reconstruction) |
 | `r_temporalWeaponAfterTaa` | **1** |
 | `r_temporalSmaaCleanup` | **0** |

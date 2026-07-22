@@ -72,7 +72,7 @@ source_checks() {
 	check_grep "$stable" 'seta r_aaMode 2' "stable profile defaults SMAA 1x (r_aaMode 2)"
 	check_grep "$stable" 'seta r_taa 0' "stable profile defaults Temporal Reconstruction off"
 	check_grep "$stable" 'seta r_ext_smaa 1' "stable profile enables SMAA"
-	check_grep "$stable" 'seta r_oit 0' "stable profile disables OIT"
+	check_grep "$stable" 'seta r_oit 1' "stable profile enables production WBOIT"
 	check_grep "$stable" 'seta r_stochasticAlpha 0' "stable profile disables stochastic alpha"
 	check_grep "$stable" 'seta r_visibilityBuffer 0' "stable profile disables visibility buffer"
 	check_grep "$stable" 'seta r_ambientVisibilityMode 2' "stable profile uses GTAO"

@@ -893,6 +893,8 @@ void vk_create_attachments( void )
 			}
 			vk.oitExtentWidth = fullWidth;
 			vk.oitExtentHeight = fullHeight;
+			vk.oitAllocatedExtentWidth = fullWidth;
+			vk.oitAllocatedExtentHeight = fullHeight;
 			/* Descriptors must be rewritten after new views; FB create bumps generation once. */
 			vk.oitDescriptorGeneration = 0;
 			vk.oitFrameState = VK_OIT_FRAME_UNTOUCHED;

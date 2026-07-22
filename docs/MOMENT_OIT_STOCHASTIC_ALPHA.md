@@ -1,99 +1,117 @@
-# Moment-Based OIT & Stochastic Alpha
+# Order-Independent Transparency (WBOIT Production)
 
-## Moment Transparency / MBOIT (`r_oit 2`)
+**WBOIT (`r_oit 1`) is the production transparency path** for glass, smoke, particles, and overlapping translucent layers. **MBOIT (`r_oit 2`) remains experimental** — see [Appendix: MBOIT](#appendix-mboit-moment-transparency-r_oit-2) and [OIT_FUTURE_TRACKS.md](OIT_FUTURE_TRACKS.md).
 
-Order-independent transparency for **glass, smoke, particles, translucent surfaces, and overlapping transparent layers**.
-
-| Mode | Technique |
-|------|-----------|
-| `r_oit 0` | Off (sorted alpha blend) |
-| `r_oit 1` | WBOIT (weighted blended) |
-| `r_oit 2` | **MBOIT / Moment Transparency** (Sharpe HPG 2018 / Münstermann I3D 2018 style) |
+| Mode | Class | Technique |
+|------|-------|-----------|
+| `r_oit 0` | Off | Sorted alpha blend |
+| `r_oit 1` | **Production** | **WBOIT** (weighted blended OIT) |
+| `r_oit 2` | Experimental | MBOIT / Moment Transparency |
 
 Requires `r_fbo 1` and `vid_restart`.
 
-### Algorithm (mode 2)
-
-1. Opaque geometry (depth write)
-2. **Moments pass** — additive optical depth `d = -log(1-α)` and power moments `d·(z,z²,z³,z⁴)`
-3. **Accum pass** — reconstruct transmittance `T(z)` from moments (Cantelli/MSM-style + β=0.25 overestimation), WBOIT-style weighted color + revealage
-4. **Resolve** — composite onto opaque background
+## Quick start (production)
 
 ```
 seta r_fbo 1
-seta r_oit 2
+seta r_oit 1
+seta r_oitForwardPlus 1
 vid_restart
 ```
 
-Demo: `exec demo_mboit.cfg` (or `vulkan_overlay_mboit.cfg`).
-
-### With Unified Clustered (`r_renderMode 3`)
-
-Pair OIT with deferred opaque. Both WBOIT and MBOIT accum use Forward+ tile lights via `r_oitForwardPlus 1` (default; MBOIT moments pass stays unlit).
-
-`r_oitClassify 1` splits transparent draws into alpha-blend (MBOIT/WBOIT) vs additive particles/smoke (WBOIT, no moments), compositing additive last. Default `0` keeps a single global bucket. Hair cards stay on `r_stochasticAlpha`, not OIT.
+Unified Clustered (mode 3) shipping overlay:
 
 ```
 exec vulkan_overlay_oit_clustered.cfg
 vid_restart
 ```
 
-Demo: `exec demo_oit_clustered.cfg`. See [UNIFIED_CLUSTERED_RENDERER.md](UNIFIED_CLUSTERED_RENDERER.md). Set `r_oitForwardPlus 0` to restore unlit MBOIT/WBOIT accum.
+Spine 1.1 certification pins WBOIT:
 
-### Temporal Reconstruction
+```
+exec vulkan_overlay_spine_1_1_cert.cfg
+vid_restart
+```
 
-When `r_taa` / `r_aaMode` 4–5 is active, OIT revealage stamps a dedicated R8 **reactive mask** (not `oit_reveal` itself) so Temporal Reconstruction prefers the current frame on glass/smoke (`r_temporalReactiveMask 1`). Forward+ transparent and stochastic survivors also stamp via `gen_frag`. Raw OIT accum/reveal are never temporally blended — resolve into HDR first via `texelFetch` + NEAREST with an explicit **COLOR_ATTACHMENT → SHADER_READ_ONLY** full-framebuffer barrier after accum (prevents horizontal scanline tears / stipple from BY_REGION races and same-layout barriers). WBOIT weights use the McGuire/Bavoil reversed-Z–adapted curve clamped to `[1e-2, 3e3]` so fp16 underflow cannot paint doorway stipple bands. First-person weapons are deferred past world TAA (`r_temporalWeaponAfterTaa 1`). See [HDR_GAPS.md](HDR_GAPS.md) §6.8.
+Demos: `exec demo_wboit_stress_mode3.cfg`, `exec demo_wboit_parity.cfg`, `exec demo_oit_clustered.cfg`.
 
-### Resolve equation (WBOIT / MBOIT accum)
+## WBOIT algorithm
 
-McGuire/Bavoil composite (linear HDR):
+1. Opaque geometry (depth write)
+2. **Accum pass** — McGuire/Bavoil weighted color + revealage (`R16G16B16A16` + `R16` reveal)
+3. **Resolve** — composite onto opaque HDR background
+
+Optional Forward+ lit accum (`r_oitForwardPlus 1`, default): accumulation samples the same cluster tile lists as deferred opaque, using shared Burley+GGX eval (`forward_plus_light_eval.glsl`).
+
+Resolve equation (linear HDR):
 
 ```
 C_avg = accum.rgb / max(accum.a, eps)
 C_out = C_avg * (1 - revealage) + C_bg * revealage
 ```
 
-Clears: accum `vec4(0)`, revealage `1`. Depth test uses reversed-Z `GREATER_OR_EQUAL` (no depth write). Debug: `r_oitDebug` 1–13; NaN/Inf / cluster OOB → magenta. Console: `oit_status`.
+Clears: accum `vec4(0)`, revealage `1`. Depth test uses reversed-Z `GREATER_OR_EQUAL` (no depth write).
 
-### Glyph / block corruption fix (resolve FB ownership)
+### Pass order (world)
 
-**Root cause (earlier):** `oit_resolve` framebuffer creation reused `attachmentCount` 2/3 from the accum/moments FB setup while the resolve render pass has a single color attachment. On drivers that still create the FB, resolve could sample/write wrong attachment identity — repeated block/glyph-like patterns across HDR (including under the first-person weapon).
+Opaque → deferred → **OIT accum → OIT resolve** → refractive (when `r_refractiveExcludeOit 1`) → weapon (`RDF_NOWORLDMODEL`) → post → UI.
 
-**Fixes:** force `attachmentCount = 1` for resolve; `oitAttachmentGeneration` / `oitDescriptorGeneration` must match before accum/resolve (else skip OIT); non-MSAA depth restored to `DEPTH_STENCIL_ATTACHMENT_OPTIMAL` before accum; Forward+ tile reads bounds-checked.
+**First-person weapons are excluded from world OIT targets.** Resolve runs before the weapon pass; weapon draws never write accum/reveal.
 
-### Rectangular / tile-band corruption fix (resolve layout lifecycle)
+### With Unified Clustered (`r_renderMode 3`)
 
-**Root cause:** Resolve used `initialLayout=COLOR_ATTACHMENT` + `loadOp=DONT_CARE` after an explicit `SHADER_READ→COLOR_ATTACHMENT` transition. When that old-layout assumption was wrong (classify mid-loop fog_scene copy, deferred/MSAA residuals), DONT_CARE left **undefined tile memory** in horizontal bands / rectangular blocks. The weapon region showed the same corrupted HDR because resolve runs before weapon.
+When `r_oit 1` is on, the backend runs **`vk_oit_pass` instead of** the Forward+ transparent shade pass. Cluster generation is shared with deferred via `vk_cluster_assert_shared_consumers( "oit_accum" )`. See [UNIFIED_CLUSTERED_RENDERER.md](UNIFIED_CLUSTERED_RENDERER.md).
 
-**Fixes (WBOIT-first):**
-- Resolve RP: `initialLayout=UNDEFINED`, `loadOp=DONT_CARE`, `finalLayout=SHADER_READ_ONLY` (fullscreen rewrite; no fragile pre-transition)
-- Single `oitAttachmentGeneration` bump after OIT FBs exist; descriptors must match
-- `oitFrameState` UNTOUCHED→CLEARED→ACCUMULATED→RESOLVED; refuse resolve from UNTOUCHED
-- Reactive reveal stamp once after final classify bucket (not between buckets)
-- Extent triad check (oitExtent vs render vs mainColor) before resolve
-- Weapon flush asserts OIT flags cleared
-- `r_oitDirectTest 1` clears+resolves without transparent draws
-- `oit_capture` / expanded `oit_status` FrameContext (frame, cmdIndex, swapchainImage independent)
-- Deferred composite no longer pre-transitions color to `COLOR_ATTACHMENT` before `post_bloom` (matches SHADER_READ initialLayout)
-- `fog_scene` copy: full color-write→transfer barrier; `UNDEFINED→TRANSFER_DST` for fog_scene; classify bucket-1 barrier before refresh
-- Forward+ viewport params refreshed to OIT extent before lit accum
-- Distortion same-image sample uses `GENERAL` layout (was SHADER_READ vs GENERAL UB → tile bands)
-- Distortion now ping-pongs via `fog_scene` (sample) → `color` (store); skips `RDF_NOWORLDMODEL` weapon pass
-- `fog_scene_layout` tracked; copies prefer `mainColor` extent so no uncopied texels remain
-- **Additive ONE/ONE particles** no longer multiply revealage (dedicated accum pipeline with reveal write-mask off) — fixes glow stipple + dark holes
-- Soft-alpha discard floor `1e-3` (was `0.01`); WBOIT weight floor `5e-2`; resolve softstep + near-black coverage guard
+`r_oitClassify 1` splits alpha-blend vs additive particles (additive uses a dedicated accum pipeline with reveal write-mask off). Default `0` keeps a single bucket. Hair cards stay on `r_stochasticAlpha`, not OIT.
 
-**Repro cfg install:** shipped into `release/base/`, `release/openarena/`, `release/havenrp/` via `compile_engine.sh`. If `couldn't exec repro_oit_corruption.cfg`, rebuild/copy or `exec` from those trees.
+## Promotion table
 
-**Reconnect / Unpure crash (vid_restart):** `MAX_INFO_STRING` (1024) SERVERINFO overflow dropped OA `videoflags`/`voteflags` when enhanced movement cvars + P2P ads competed for space → Unpure remount → SIGSEGV. Fix: demote enhanced/world-config keys from `CVAR_SERVERINFO`; skip `SV_AddP2PServerInfo` when `net_p2p` is off; `sv_p2p*` stay ARCHIVE-only. Repro launches with `+set sv_pure 0` (`sv_pure` is latched — in-console `seta` alone is not enough before `vid_restart`).
+| Capability | Class |
+|------------|--------|
+| WBOIT (`r_oit 1`) unlit | **Production** |
+| WBOIT Forward+ lit accum | **Production** |
+| WBOIT classify buckets | **Production** (opt-in via `r_oitClassify 1`) |
+| Mode 3 + WBOIT overlay | **Production** (`vulkan_overlay_oit_clustered.cfg`) |
+| Spine 1.1 cert stack | **Production** (`vulkan_overlay_spine_1_1_cert.cfg`, `r_oit 1`) |
+| Weapon / world separation | **Production** (resolve-before-weapon) |
+| MBOIT (`r_oit 2`) | **Experimental** — not Spine 1.1 certified |
+| Boot `modern_vulkan.cfg` stable spine | Unchanged Forward+ mode 2 fallback |
 
-**Pass order (world):** opaque → deferred → OIT accum → OIT resolve → refractive (water/glass when `r_refractiveExcludeOit 1`) → weapon (`RDF_NOWORLDMODEL`) → post → UI. Weapon never writes world OIT targets.
+Future / research tracks: [OIT_FUTURE_TRACKS.md](OIT_FUTURE_TRACKS.md).
 
-**Repro / isolation:** `./scripts/repro_oit_corruption.sh` or `exec repro_oit_corruption.cfg` after Ultra/FA.
+## Certification config
 
-**First corrupt producer (code + isolation):** `oit_resolve` writing `color_image` under `DONT_CARE` with a wrong prior layout — not accum/reveal contents when cleared. Weapon contamination = same resolved HDR under the gun.
+Spine 1.1 pins mode 3 + WBOIT + Temporal Reconstruction + weapon-after-TAA:
 
-**Isolation matrix (device; stop at first band/tile failure):**
+| Pin | Value |
+|-----|-------|
+| `r_renderMode` | 3 |
+| `r_oit` | **1** (WBOIT) |
+| `r_oitForwardPlus` | 1 |
+| Entry | `exec vulkan_overlay_spine_1_1_cert.cfg` |
+
+Full cert invariants: [RENDERER_SPINE_1.1.md](RENDERER_SPINE_1.1.md).
+
+## Console diagnostics
+
+| Command / cvar | Purpose |
+|----------------|---------|
+| `oit_status` | Frame state, generations, extents, cluster gen, unhealthy flags |
+| `oit_perf` | CPU markers for clear / accum / resolve |
+| `oit_capture stages` | Stage capture helper |
+| `r_oitDebug` 0–16 | Resolve-stage views (cheat); 14/15 = band/tile isolation |
+| `r_oitDirectTest` 0–2 | Clear+resolve without transparent draws (cheat) |
+| `r_oitExtentDebug` | Extent/viewport/generation overlay (cheat) |
+| `r_oitLightingDebug` 1–8 | Lit accum term views / BRDF-diff vs opaque (cheat) |
+| `r_oitParityCompare` | Near-opaque lit-term split compare (cheat) |
+| `r_oitClusterDebug` 1–5 | Cluster handoff / generation mismatch views (cheat) |
+| `r_oitForce*` | Fault injection for lifecycle tests (cheat) |
+
+Static gates: `./scripts/oit_corruption_check.sh`, `tests/scripts/test_wboit_*.sh`.
+
+## WBOIT soak matrix (B0–B7)
+
+Device soak — stop at first band/tile failure. No invented timings; report measured duration only if run.
 
 | Step | Setting | Expected if fix holds |
 |------|---------|------------------------|
@@ -102,45 +120,86 @@ Clears: accum `vec4(0)`, revealage `1`. Depth test uses reversed-Z `GREATER_OR_E
 | B2 | `r_oitClassify 1` | No mid-bucket bands |
 | B3 | `r_oitForwardPlus 1` | No magenta tile slabs (OOB) |
 | B4 | `r_oitDebug` 1–13 | Stage views coherent |
-| B5 | `r_oitDebug 14` | Magenta×coverage only (ignore accum RGB) |
-| B5b | `r_oitDebug 15` | Smooth FragCoord UV (no bands) |
+| B5 | `r_oitDebug` 14 | Magenta×coverage only (ignore accum RGB) |
+| B5b | `r_oitDebug` 15 | Smooth FragCoord UV (no bands) |
 | B6 | `r_oitDirectTest 1` | Pure opaque after clear |
 | B6b | `r_oitDirectTest 2` | Smooth half UV-gradient composite |
 | B7 | `cg_drawGun 0/1` | Gun clean when world resolve clean |
 
-**Odd extents (device):** native + 1279×719 / 1365×767 / 1601×901 (`r_renderWidth`/`r_renderHeight` or window resize). Lifecycle: `vid_restart`, map change. No invented soak timings — report measured duration only if run.
+**Odd extents (device):** exercise native resolution plus non-even sizes — **1919×1079**, **1921×1081**, **1279×719**, **1281×721** (`r_renderWidth` / `r_renderHeight` or window resize). Also useful: 1365×767, 1601×901. Lifecycle: `vid_restart`, map change. Tile indices are clamped in `forward_plus_light_eval.glsl`; use `r_oitExtentDebug 1` after `sv_cheats 1`.
 
-Commands: `oit_status` / `oit_capture stages`. Static gate: `./scripts/oit_corruption_check.sh`.
+**Isolation entry points:**
 
-### Promotion (after this fix)
+- `exec demo_oit_isolation.cfg`
+- `exec repro_oit_corruption.cfg` (also `./scripts/repro_oit_corruption.sh`)
+- `exec demo_wboit_stress_mode3.cfg`
 
-| Capability | Class |
-|------------|--------|
-| WBOIT unlit | quality opt-in (lifecycle hardened; live soak pending device run) |
-| WBOIT Forward+ | quality opt-in |
-| WBOIT classify buckets | quality opt-in |
-| MBOIT | experimental until WBOIT live matrix passes |
-| Weapon interaction | quality opt-in (resolve-before-weapon + state clear) |
-| Boot `modern_vulkan.cfg` | unchanged certified fallback |
+Shipped into `release/base/`, `release/openarena/`, `release/havenrp/` via `compile_engine.sh`.
+
+## Temporal reconstruction
+
+When `r_taa` / `r_aaMode` 4–5 is active, OIT revealage stamps a dedicated R8 **reactive mask** so Temporal Reconstruction prefers the current frame on glass/smoke (`r_temporalReactiveMask 1`). Raw OIT accum/reveal are never temporally blended — resolve into HDR first. First-person weapons are deferred past world TAA (`r_temporalWeaponAfterTaa 1`). See [HDR_GAPS.md](HDR_GAPS.md) §6.8.
+
+## Corruption fixes (WBOIT lifecycle)
+
+Key hardening (resolve layout, frame state, weapon exclusion, additive reveal mask, cluster OOB):
+
+- Resolve RP: `initialLayout=UNDEFINED`, `loadOp=DONT_CARE`, `finalLayout=SHADER_READ_ONLY`
+- `oitFrameState`: UNTOUCHED → CLEARED → ACCUMULATED → RESOLVED; refuse resolve from UNTOUCHED
+- Single `oitAttachmentGeneration` bump after FB creation; descriptors must match
+- Extent triad check before resolve; weapon flush asserts OIT flags cleared
+- Additive ONE/ONE particles: dedicated accum pipeline (reveal write-mask off)
+- WBOIT weights clamped `[5e-2, 3e3]`; soft-alpha discard floor `1e-3`
+
+**First corrupt producer (isolation):** `oit_resolve` writing `color_image` under `DONT_CARE` with wrong prior layout — weapon contamination = same resolved HDR under the gun.
+
+**Reconnect / Unpure crash (`vid_restart`):** repro launches with `+set sv_pure 0` (`sv_pure` is latched). See `repro_oit_corruption.cfg` comments.
+
+---
+
+## Appendix: MBOIT / Moment Transparency (`r_oit 2`)
+
+**Experimental only.** Startup warns: `MBOIT is experimental and not Spine 1.1 certified.` Use `vulkan_overlay_mboit.cfg` or `modern_vulkan_experimental.cfg`.
+
+### Algorithm (mode 2)
+
+1. Opaque geometry (depth write)
+2. **Moments pass** — optical depth `d = -log(1-α)` and power moments `d·(z,z²,z³,z⁴)`
+3. **Accum pass** — reconstruct transmittance from moments + WBOIT-style weighted color
+4. **Resolve** — composite onto opaque background
+
+```
+seta r_fbo 1
+seta r_oit 2
+vid_restart
+```
+
+Demo: `exec demo_mboit.cfg`. With mode 3: moments pass stays unlit; accum can use Forward+ tile lights on set 4 when `r_oitForwardPlus 1`.
+
+Promotion to production is tracked in [OIT_FUTURE_TRACKS.md](OIT_FUTURE_TRACKS.md).
+
+---
 
 ## Stochastic Alpha-Clipped Materials (`r_stochasticAlpha`)
 
-Hashed / temporal alpha clip for **foliage, grates, hair cards, fabric holes, and decals** (shader `alphaFunc`).
+Hashed / temporal alpha clip for **foliage, grates, hair cards, fabric holes, and decals** (shader `alphaFunc`). Not OIT.
 
 | Mode | Behavior |
 |------|----------|
 | `0` | Hard `alphaFunc` discard (default) |
 | `1` | Screen-space interleaved gradient noise hash |
-| `2` | Temporal hash (frame-seeded; requires Temporal Reconstruction — auto-falls back to mode 1 when TAA is off) |
+| `2` | Temporal hash (requires TAA; falls back to 1 when off) |
 
 ```
 seta r_stochasticAlpha 2
 seta r_taa 1
 ```
 
-No `vid_restart` required (push-constant driven). Applies to `GT0` / `LT128` / `GE128`. If mode 2 is set while `r_taa` is off, the backend pushes mode 1 so coverage is not frozen without history.
+No `vid_restart` required. Demo with mode 3 OIT: `exec demo_oit_clustered.cfg`.
 
 ## Related
 
-- Existing WBOIT: [RENDERERS.md](RENDERERS.md)
+- Renderer overview: [RENDERERS.md](RENDERERS.md)
 - Unified Clustered transparent path: [UNIFIED_CLUSTERED_RENDERER.md](UNIFIED_CLUSTERED_RENDERER.md)
+- Future tracks: [OIT_FUTURE_TRACKS.md](OIT_FUTURE_TRACKS.md)
+- Spine 1.1 cert: [RENDERER_SPINE_1.1.md](RENDERER_SPINE_1.1.md)

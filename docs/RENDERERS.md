@@ -70,7 +70,7 @@ The renderer profile rule is: start from **one** modern base (`modern_vulkan.cfg
 | `vulkan_overlay_temporal_recon.cfg` | Modern native temporal | `r_aaMode 5` + conservative history weight + SMAA cleanup |
 | `vulkan_overlay_temporal_perf.cfg` | Perf reconstruction | `r_aaMode 4` + `r_renderScale` / upscale |
 | `vulkan_overlay_unified_clustered_safe.cfg` | Unified Clustered safe baseline | Mode 3 with TAA/SMAA/FXAA/OIT off and MSAA pinned off so clustered lighting and pass ordering can be debugged in isolation. |
-| `vulkan_overlay_oit_clustered.cfg` | Mode 3 + MBOIT | Unified Clustered + `r_oit 2` (optional stochastic via demo). See [MOMENT_OIT_STOCHASTIC_ALPHA.md](MOMENT_OIT_STOCHASTIC_ALPHA.md). |
+| `vulkan_overlay_oit_clustered.cfg` | Mode 3 + WBOIT | Unified Clustered + production `r_oit 1` (MBOIT is experimental-only via `vulkan_overlay_mboit.cfg`). See [MOMENT_OIT_STOCHASTIC_ALPHA.md](MOMENT_OIT_STOCHASTIC_ALPHA.md). |
 | `vulkan_overlay_visibility_2027.cfg` | 2027 visibility foundation | Mode 3 + G-buffer + `r_visibilityBuffer` + material classify. See [RENDERER_2027.md](RENDERER_2027.md). |
 | `vulkan_overlay_rtx.cfg` | Plain RTX demo pass | Requires `USE_VULKAN_RTX`; keeps the modern Forward+ base and enables shared TLAS/entity BLAS. |
 | `vulkan_overlay_hybrid1.cfg` | Hybrid1 ray/raster path | Requires `USE_VULKAN_RTX`; enables shared TLAS/entity BLAS, Hybrid1 channels, and adaptive Ambient Visibility mode 4. |
@@ -234,9 +234,10 @@ Code: `renderers/vulkan/vk_forward_plus.c`, `VK_FP_*` constants; cvar registrati
 - **Effective scene render target (Vulkan):** **`vk_get_render_target_width()` / `vk_get_render_target_height()`** in `renderers/vulkan/vk_view_state.c` return **`vk.mainColorWidth` / `mainColorHeight`** when **`vk.fboActive`** and those extents are set (main HDR color attachment); otherwise **`vk.renderWidth` / `vk.renderHeight`** if nonzero; otherwise **`glConfig.vidWidth` / `vidHeight`**. Sun shadow and other passes can temporarily change **`vk.renderWidth`**; packing and screen-space work that must match the **main color** image (Forward+ SSBO viewport, tile cull, SSAO/HBAO texel pushes, SSR → color copy, temporal history invalidation on resize—see `vk_temporal.c`, `vk_forward_plus.c`, `vk_postfx_passes.c`) uses this helper so dimensions stay aligned with the attachment the player sees, not transient globals.
 
 ### Order-Independent Transparency (OIT)
-- Order-independent transparency: WBOIT (`r_oit 1`) and Moment Transparency / MBOIT (`r_oit 2`) for glass, smoke, particles, and overlapping translucent layers — see [MOMENT_OIT_STOCHASTIC_ALPHA.md](MOMENT_OIT_STOCHASTIC_ALPHA.md)
-- Stochastic alpha-clipped materials (`r_stochasticAlpha` 0–2) for foliage, grates, hair cards, fabric holes, and decals
-- Cvar `r_oit` (0=off, 1=WBOIT, 2=MBOIT). Requires `r_fbo 1` and `vid_restart` after changing
+- **Production:** WBOIT (`r_oit 1`) — weighted blended OIT for glass, smoke, particles, overlapping translucent layers; mode 3 overlay `vulkan_overlay_oit_clustered.cfg`; Spine 1.1 cert uses `r_oit 1`
+- **Experimental:** MBOIT / Moment Transparency (`r_oit 2`) — `modern_vulkan_experimental.cfg` / `vulkan_overlay_mboit.cfg` only; not Spine 1.1 certified
+- Stochastic alpha-clipped materials (`r_stochasticAlpha` 0–2) for foliage, grates, hair cards, fabric holes, and decals (separate from OIT)
+- Cvar `r_oit` (0=off, 1=WBOIT production, 2=MBOIT experimental). Requires `r_fbo 1` and `vid_restart` after changing. Future tracks: [OIT_FUTURE_TRACKS.md](OIT_FUTURE_TRACKS.md)
 - Opaque surfaces drawn first; transparent surfaces (alpha blend and additive) accumulated, then resolved
 - Depth testing against opaque scene when MSAA off (transparent behind walls discarded)
 - Additive blend (ONE/ONE) surfaces included for particles, sparks, etc.
