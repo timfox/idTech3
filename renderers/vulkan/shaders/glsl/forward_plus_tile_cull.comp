@@ -2,20 +2,21 @@
 #extension GL_GOOGLE_include_directive : require
 
 /*
- * Forward+ / clustered light assignment.
- * Per-cluster light index list (max 8). Cluster id = flatTile + slice * tilesX * tilesY.
- * zSlices==1 preserves historical 2D tiled layout.
- * CPU-packed lights: binding 0 — header + count * 4 vec4 records.
- * Spot/linear cull uses packed axis + cos_outer + segLen (rec[2]/rec[3]); point lights keep sphere overlap.
- * Depth cull: light volume Z extent vs per-tile nearest/farthest probes (lightVolumeDepthCull).
- * Marker: forwardPlusZCluster
+ * Forward+ / clustered light assignment (Clustered Hybrid M2).
+ * Legacy: fixed MAX_LEGACY_PER_TILE slots/cluster (sentinel 0xFFFFFFFF).
+ * Compact (pc.compactLists): header(offset,count) + shared index pool via atomic cursor.
+ * Cluster id = flatTile + slice * tilesX * tilesY. Marker: forwardPlusZCluster / ClusterFill
+ * Spot/linear cull + lightVolumeDepthCull unchanged. Directional sun is never packed into lists.
  */
 
 layout(local_size_x = 64, local_size_y = 1, local_size_z = 1) in;
 
-#define MAX_PER_TILE 8u
+#define MAX_LEGACY_PER_TILE 8u
+#define MAX_COMPACT_PER_TILE 32u
+#define MAX_PER_TILE MAX_COMPACT_PER_TILE
 #define MAX_LIGHTS 64u
 #define REC_VEC4S 4u
+#define CLUSTER_LIST_META_UINTS 4u
 
 layout(std430, set = 0, binding = 0) readonly buffer LightSSBO {
 	vec4 data[];
@@ -48,6 +49,10 @@ layout(push_constant) uniform Push {
 	uint zSliceMode;
 	float zNear;
 	float zFar;
+	uint compactLists;
+	uint indexCapacity;
+	uint overflowPolicy; /* 0=diag magenta meta, 1=truncate index order, 2=importance */
+	uint forceOverflow;
 } pc;
 
 #include "forward_plus_cluster.glsl"
@@ -136,9 +141,19 @@ void main() {
 	uint tileX = xyId % tilesX;
 	uint tileY = xyId / tilesX;
 
-	uint base = clusterId * MAX_PER_TILE;
-	for (uint k = 0u; k < MAX_PER_TILE; k++) {
-		tiles.cells[base + k] = 0xFFFFFFFFu;
+	uint legacyCap = MAX_LEGACY_PER_TILE;
+	uint slotCap = (pc.compactLists != 0u) ? MAX_COMPACT_PER_TILE : MAX_LEGACY_PER_TILE;
+	uint base = 0u;
+	if (pc.compactLists == 0u) {
+		base = clusterId * legacyCap;
+		for (uint k = 0u; k < legacyCap; k++) {
+			tiles.cells[base + k] = 0xFFFFFFFFu;
+		}
+	} else {
+		/* Clear header for this cluster; index pool cursor reset by CPU each frame. */
+		uint hoff = CLUSTER_LIST_META_UINTS + clusterId * 2u;
+		tiles.cells[hoff] = 0u;
+		tiles.cells[hoff + 1u] = 0u;
 	}
 
 	uint n = uint(max(lights.data[0].x + 0.5, 0.0));
@@ -146,9 +161,9 @@ void main() {
 
 	uint cap = pc.maxPerTile;
 	if (cap < 1u) {
-		cap = MAX_PER_TILE;
+		cap = slotCap;
 	}
-	cap = min(cap, MAX_PER_TILE);
+	cap = min(cap, slotCap);
 
 	float vw = lights.data[1].z;
 	float vh = lights.data[1].w;
@@ -244,15 +259,24 @@ void main() {
 			continue;
 		}
 
-		/* Positive view-depth range of the light influence volume. */
-		float lightNear = max(abs(clipW) - radius, pc.zNear);
+		/* Positive view-depth range of the light influence volume (conservative). */
+		float lightNear = max(abs(clipW) - radius, pc.zNear * 0.5);
 		float lightFar = abs(clipW) + radius;
+		/* Reject volumes fully behind the camera. */
+		if (lightFar < pc.zNear * 0.25) {
+			continue;
+		}
+		/* Near-plane intersection: expand Z (and rely on XY sphere inflate) conservatively. */
+		if (lightNear < pc.zNear) {
+			lightNear = pc.zNear * 0.5;
+			lightFar = max(lightFar, pc.zNear + radius);
+		}
 		if (isSpot) {
 			vec3 tip = worldPos + normalize(lpack.xyz + vec3(1e-6)) * max(ltail.y, 1e-3);
 			vec2 tipPx;
 			float tipNdcZ, tipW;
 			if (project_world_to_px(tip, vw, vh, tipPx, tipNdcZ, tipW)) {
-				lightNear = min(lightNear, max(abs(tipW) - radius, pc.zNear));
+				lightNear = min(lightNear, max(abs(tipW) - radius, pc.zNear * 0.5));
 				lightFar = max(lightFar, abs(tipW) + radius);
 			}
 		}
@@ -345,7 +369,37 @@ void main() {
 		}
 	}
 
-	for (uint k = 0u; k < useCount; k++) {
-		tiles.cells[base + k] = candLi[k];
+	if (pc.compactLists != 0u) {
+		/* Marker: ClusterFill — allocate into shared index pool. */
+		uint writeCount = useCount;
+		if (pc.forceOverflow != 0u) {
+			writeCount = max(writeCount, min(candCount, cap));
+		}
+		uint indexBase = CLUSTER_LIST_META_UINTS + pc.totalTiles * 2u;
+		uint off = atomicAdd(tiles.cells[0], writeCount);
+		uint clipped = writeCount;
+		if (off >= pc.indexCapacity) {
+			clipped = 0u;
+			atomicAdd(tiles.cells[1], 1u);
+		} else if (off + writeCount > pc.indexCapacity || pc.forceOverflow != 0u) {
+			clipped = (off < pc.indexCapacity) ? (pc.indexCapacity - off) : 0u;
+			if (pc.forceOverflow != 0u) {
+				clipped = min(clipped, 1u);
+			}
+			atomicAdd(tiles.cells[1], 1u);
+			if (pc.overflowPolicy == 0u) {
+				clipped = 0u; /* diagnostic: empty list + overflow meta */
+			}
+		}
+		uint hoff = CLUSTER_LIST_META_UINTS + clusterId * 2u;
+		tiles.cells[hoff] = off;
+		tiles.cells[hoff + 1u] = clipped;
+		for (uint k = 0u; k < clipped; k++) {
+			tiles.cells[indexBase + off + k] = candLi[k];
+		}
+	} else {
+		for (uint k = 0u; k < useCount; k++) {
+			tiles.cells[base + k] = candLi[k];
+		}
 	}
 }

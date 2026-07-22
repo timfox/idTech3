@@ -1494,12 +1494,22 @@ typedef struct {
 		VkDeviceMemory param_memory;
 		void *param_mapped;
 		uint32_t param_buffer_size;
-		uint32_t max_per_tile; /* 4..8 from r_forwardPlusMaxPerTile (latched); SSBO stride is always 8 slots */
+		uint32_t max_per_tile; /* legacy 4..8; compact uses r_clusterMaxLightsPerCluster up to 32 */
 		VkDescriptorSet descriptor;
 		VkPipelineLayout pipeline_layout;
 		VkPipeline tile_pipeline;
-		/* Bumped on tile grid resize / successful cull — deferred lighting asserts match. */
+		/* Bumped only after successful publish — deferred/FP assert match. */
 		uint32_t cluster_list_generation;
+		/* M2 compact lists */
+		qboolean compact_lists;
+		qboolean fallback_legacy;
+		uint32_t index_capacity;
+		uint32_t last_overflow_count;
+		uint32_t last_index_used;
+		float z_scale;
+		float z_bias;
+		float cluster_z_near;
+		float cluster_z_far;
 	} forward_plus;
 
 	uint32_t uniform_item_size;

@@ -1,6 +1,6 @@
 # Renderer Path Ownership
 
-**Status:** Milestone 1 (Clustered Hybrid)  
+**Status:** Milestone 2 (Clustered Hybrid) — see also [CLUSTERED_LIGHTING.md](CLUSTERED_LIGHTING.md)  
 **Audience:** Anyone choosing which surface path owns shading / lighting for a draw
 
 ## Shipping defaults
@@ -34,17 +34,21 @@ Modes **1** and **3** share the opaque→deferred→transparent split when defer
 
 ## Shared cluster grid
 
-Deferred lighting, Forward+ shade, and OIT (`r_oitForwardPlus`) consume the **same** Forward+ light + tile/Z-cluster SSBOs (set 18 / `forward_plus_cluster.glsl`).
+Deferred lighting, Forward+ shade, and OIT (`r_oitForwardPlus`) consume the **same** Forward+ light + compact header/index (or legacy tile) SSBOs (`cluster_contract.glsl` / `cluster_light_list.glsl`).
 
-| Alias cvar | Backs onto |
-|------------|------------|
+| Alias / cvar | Backs onto |
+|--------------|------------|
 | `r_clusterZSlices` | `r_forwardPlusZSlices` |
 | `r_clusterTileSize` | fixed **16** (validated at init) |
-| `r_clusterDebug` | `r_forwardPlusDebug` |
+| `r_clusterDebug` | `r_forwardPlusDebug` (mode **6** = Z-slice + crosshair) |
+| `r_clusterZFar` | clamp for log-Z far (default 4096; `min` with camera zFar) |
+| `r_clusterCompactLists` | compact header+index lists (−1 auto / 0 legacy / 1 force) |
 
 Clustered hybrid default: `r_forwardPlusZSlices 8` via `modern_clustered.cfg`.
 
-Parity gate: `vk_cluster_assert_shared_consumers()` — deferred lighting and Forward+ fragment must bind the same tile buffer + generation.
+Parity gate: `vk_cluster_assert_shared_consumers()` — deferred lighting and Forward+ fragment must bind the same tile/header buffer + generation.
+
+Details: [CLUSTERED_LIGHTING.md](CLUSTERED_LIGHTING.md).
 
 ## Debug
 
@@ -53,7 +57,7 @@ Parity gate: `vk_cluster_assert_shared_consumers()` — deferred lighting and Fo
 | `r_renderPathDebug 0` | off |
 | `1` | Tint shaded HDR by selected `renderPath_t` |
 | `2` | Also accumulate per-frame path counts (`render_path_status`) |
-| `r_hybridCompare 1` | Split-screen: left deferred opaque, right Forward+ opaque |
+| `r_hybridCompare 1–8` | Deferred vs Forward+ compare (split / abs / luma / …) — see CLUSTERED_LIGHTING.md |
 
 ## GPU scene / material schema (contract)
 

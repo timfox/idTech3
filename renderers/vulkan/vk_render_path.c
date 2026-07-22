@@ -234,11 +234,23 @@ void R_RenderPath_RegisterCvars( void )
 	ri.Cvar_SetGroup( r_renderPathDebug, CVG_RENDERER );
 
 	r_hybridCompare = ri.Cvar_Get( "r_hybridCompare", "0", CVAR_ARCHIVE_ND | CVAR_CHEAT );
-	ri.Cvar_CheckRange( r_hybridCompare, "0", "1", CV_INTEGER );
+	ri.Cvar_CheckRange( r_hybridCompare, "0", "8", CV_INTEGER );
 	ri.Cvar_SetDescription( r_hybridCompare,
-		"Split-screen deferred vs Forward+ opaque (left=deferred handoff, right=Forward+). "
-		"Requires deferred path ready (mode 1/3). Composite only updates the left half." );
+		"Deferred vs Forward+ hybrid compare (Clustered Hybrid M2):\n"
+		" 0 = off\n"
+		" 1 = split left deferred / right Forward+\n"
+		" 2 = abs RGB difference\n"
+		" 3 = relative luma difference\n"
+		" 4 = diffuse-only compare (tint)\n"
+		" 5 = specular-only compare (tint)\n"
+		" 6 = cluster index mismatch (magenta)\n"
+		" 7 = light-list membership mismatch\n"
+		" 8 = shadow term difference\n"
+		"Requires deferred path ready (mode 1/3). See docs/CLUSTERED_LIGHTING.md." );
 	ri.Cvar_SetGroup( r_hybridCompare, CVG_RENDERER );
+
+	ri.Cvar_Get( "r_hybridCompareWarn", "0.05", CVAR_ARCHIVE_ND | CVAR_CHEAT );
+	ri.Cvar_Get( "r_hybridCompareFail", "0.25", CVAR_ARCHIVE_ND | CVAR_CHEAT );
 
 	if ( !s_statusCmdRegistered ) {
 		ri.Cmd_AddCommand( "render_path_status", R_RenderPath_Status_f );

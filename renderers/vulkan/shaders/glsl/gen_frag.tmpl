@@ -266,6 +266,8 @@ layout(set = 18, binding = 7) uniform sampler2D ltc_amp_texture;
 layout(set = 18, binding = 8, r32ui) uniform uimage2D objectIdImg;
 #define USE_LTC_AREA_LIGHT
 #include "ltc_area_light.glsl"
+#define CLUSTER_LIST_CELLS fp_tiles.fp_tile_cells
+#include "cluster_light_list.glsl"
 #endif
 
 /* Dedicated material-blend layer arrays (set 19): unique textures for layers 0..7. */
@@ -1707,20 +1709,22 @@ void main() {
 							uint ty = min( uint( px.y / tilePxY ), tilesY - 1u );
 					uint zSlices = max( fp_params.fp_cluster_meta.x, 1u );
 					uint zMode = fp_params.fp_cluster_meta.y;
+					uint compactLists = fp_params.fp_cluster_meta.z;
+					uint clusterCount = max( fp_params.fp_cluster_meta.w, tilesX * tilesY * zSlices );
 					float zNear = max( fp_params.fp_cluster_z_range.x, 1e-3 );
 					float zFar = max( fp_params.fp_cluster_z_range.y, zNear + 1e-3 );
 					uint slice = fp_view_depth_to_slice( abs( wc.w ), zSlices, zMode, zNear, zFar );
 					uint tileId = fp_cluster_index( tx, ty, tilesX, tilesY, slice, zSlices );
-					uint tbase = tileId * 8u;
 					float nLights = fp_lights.fp_light_data[0].x;
 					uint maxPerTile = uint( max( fp_lights.fp_light_data[0].z + 0.5, 1.0 ) );
-					maxPerTile = min( maxPerTile, 8u );
+					uint legacyMax = 8u;
+					maxPerTile = min( maxPerTile, compactLists != 0u ? 32u : legacyMax );
 					uint skipMask = floatBitsToUint( pbrForwardPlus.y );
 					vec3 fpDiffAcc = vec3( 0.0 );
 					vec3 fpSpecAcc = vec3( 0.0 );
 					float fpSpecStrAcc = 0.65;
 					for ( uint k = 0u; k < maxPerTile; k++ ) {
-						uint li = fp_tiles.fp_tile_cells[ tbase + k ];
+						uint li = Cluster_FetchLightIndex( tileId, k, compactLists, legacyMax, clusterCount );
 						if ( li == 0xFFFFFFFFu ) {
 							continue;
 						}
@@ -2022,6 +2026,8 @@ void main() {
 				uint ty = min( uint( px.y / tilePxY ), tilesY - 1u );
 				uint zSlices = max( fp_params.fp_cluster_meta.x, 1u );
 				uint zMode = fp_params.fp_cluster_meta.y;
+				uint compactLists = fp_params.fp_cluster_meta.z;
+				uint clusterCount = max( fp_params.fp_cluster_meta.w, tilesX * tilesY * zSlices );
 				float zNear = max( fp_params.fp_cluster_z_range.x, 1e-3 );
 				float zFar = max( fp_params.fp_cluster_z_range.y, zNear + 1e-3 );
 				float viewZ = zNear;
@@ -2033,12 +2039,21 @@ void main() {
 #endif
 				uint slice = fp_view_depth_to_slice( viewZ, zSlices, zMode, zNear, zFar );
 				uint tileId = fp_cluster_index( tx, ty, tilesX, tilesY, slice, zSlices );
-				uint base = tileId * 8u;
+				uint legacyMax = 8u;
 				uint maxPerTile = uint( max( fp_lights.fp_light_data[0].z + 0.5, 1.0 ) );
-				maxPerTile = min( maxPerTile, 8u );
+				maxPerTile = min( maxPerTile, compactLists != 0u ? 32u : legacyMax );
 				vec3 col;
 				float blend = fp_dbg;
-				if ( fp_dbg >= 1.5 ) {
+				if ( fp_dbg >= 5.5 ) {
+					/* r_clusterDebug / r_forwardPlusDebug 6: Z-slice colors + crosshair slice id. */
+					float t = ( zSlices > 1u ) ? ( float( slice ) / float( zSlices - 1u ) ) : 0.0;
+					col = mix( vec3( 0.1, 0.9, 0.35 ), vec3( 0.95, 0.15, 0.85 ), t );
+					vec2 cross = abs( px - vec2( vwDbg, vhDbg ) * 0.5 );
+					if ( max( cross.x, cross.y ) < 3.0 ) {
+						col = vec3( float( slice ) / max( float( zSlices ), 1.0 ) );
+					}
+					blend = clamp( fp_dbg - 5.0, 0.2, 1.0 );
+				} else if ( fp_dbg >= 1.5 ) {
 					/* Z-slice ID visualization (set r_forwardPlusDebug 2). */
 					float t = ( zSlices > 1u ) ? ( float( slice ) / float( zSlices - 1u ) ) : 0.0;
 					col = mix( vec3( 0.15, 0.35, 1.0 ), vec3( 1.0, 0.2, 0.05 ), t );
@@ -2046,7 +2061,7 @@ void main() {
 				} else {
 					float occ = 0.0;
 					for ( uint k = 0u; k < maxPerTile; k++ ) {
-						if ( fp_tiles.fp_tile_cells[ base + k ] != 0xFFFFFFFFu ) {
+						if ( Cluster_FetchLightIndex( tileId, k, compactLists, legacyMax, clusterCount ) != 0xFFFFFFFFu ) {
 							occ += 1.0;
 						}
 					}

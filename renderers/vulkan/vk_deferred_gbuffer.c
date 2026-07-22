@@ -79,6 +79,8 @@ typedef struct {
 	float zNear;
 	float zFar;
 	float specularAA; /* normal-variance roughness inflate (parity with Forward+ ApplySpecularAA) */
+	uint32_t compactLists;
+	uint32_t clusterCount;
 } vk_deferred_light_push_t;
 
 typedef struct {
@@ -1307,10 +1309,10 @@ static void vk_dgb_fill_light_push( vk_deferred_light_push_t *push, uint32_t wid
 	push->zSlices = vk.forward_plus.z_slices > 0u ? vk.forward_plus.z_slices : 1u;
 	push->zSliceMode = ( r_forwardPlusZSliceMode && r_forwardPlusZSliceMode->integer ) ? 1u : 0u;
 	{
-		float zn = ( r_znear && r_znear->value > 0.0f ) ? r_znear->value : 4.0f;
-		float zf = backEnd.viewParms.zFar;
+		float zn = vk.forward_plus.cluster_z_near;
+		float zf = vk.forward_plus.cluster_z_far;
 		if ( zn < 1e-3f ) {
-			zn = 4.0f;
+			zn = ( r_znear && r_znear->value > 0.0f ) ? r_znear->value : 4.0f;
 		}
 		if ( zf <= zn + 1e-3f ) {
 			zf = zn + 4000.0f;
@@ -1320,6 +1322,8 @@ static void vk_dgb_fill_light_push( vk_deferred_light_push_t *push, uint32_t wid
 	}
 	push->specularAA = ( r_pbr_specularAA && r_pbr_specularAA->integer ) ?
 		Com_Clamp( 0.0f, 2.0f, r_pbr_specularAAStrength ? r_pbr_specularAAStrength->value : 0.5f ) : 0.0f;
+	push->compactLists = vk.forward_plus.compact_lists ? 1u : 0u;
+	push->clusterCount = vk.forward_plus.tile_capacity_tiles;
 	if ( vk_frequency_aware_active() ) {
 		float fa = vk_frequency_aware_specular_aa_strength();
 		if ( fa > push->specularAA ) {
@@ -1668,7 +1672,7 @@ static void vk_dgb_composite_lit_to_color( uint32_t width, uint32_t height )
 	if ( vk.deferred_gbuffer.frame_capture_ok ) {
 		push.additive = 1u;
 	}
-	push.hybridCompare = ( r_hybridCompare && r_hybridCompare->integer ) ? 1u : 0u;
+	push.hybridCompare = ( r_hybridCompare && r_hybridCompare->integer > 0 ) ? (uint32_t)r_hybridCompare->integer : 0u;
 
 	qvkCmdBindPipeline( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.deferred_gbuffer.composite_gfx_pipeline );
 	qvkCmdBindDescriptorSets( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS,

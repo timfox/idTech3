@@ -11,6 +11,7 @@ docs/RENDERER_2026_ARCHITECTURE_PASS.md.
 #include "tr_local.h"
 #include "vk.h"
 #include "vk_forward_plus.h"
+#include "vk_cluster_contract.h"
 #include "vk_image_layout.h"
 #include "vk_util.h"
 #include "vk_view_state.h"
@@ -28,12 +29,27 @@ docs/RENDERER_2026_ARCHITECTURE_PASS.md.
 #define VK_FP_MAX_TILES (256u * 256u)
 #define VK_FP_MAX_Z_SLICES 16u
 #define VK_FP_MAX_CLUSTERS (VK_FP_MAX_TILES * 8u)
-/* Tile SSBO stores VK_FP_MAX_PER_TILE uint32 indices per cluster; r_forwardPlusMaxPerTile clamps active count to [MIN, MAX]. */
+/* Legacy fixed-slot stride; compact uses header+index pool (see CLUSTER_LIST_META_UINTS). */
 #define VK_FP_MIN_PER_TILE 4u
 #define VK_FP_MAX_PER_TILE 8u
+#define VK_FP_MAX_COMPACT_PER_CLUSTER 32u
+#define VK_FP_CLUSTER_LIST_META_UINTS 4u
+#define VK_FP_DEFAULT_INDEX_CAP (256u * 1024u)
 #define VK_FP_PARAM_BYTES 256u
 #define VK_FP_DUMMY_LIGHT_FLOATS 32u
 #define VK_FP_DUMMY_TILE_UINTS 32u
+
+/* M2 cvars — registered in vk_cluster_register_cvars(). */
+cvar_t *r_clusterCompactLists;
+cvar_t *r_clusterZFar;
+cvar_t *r_clusterMaxIndices;
+cvar_t *r_clusterMaxLightsPerCluster;
+cvar_t *r_clusterOverflowPolicy;
+cvar_t *r_clusterForceBuildFailure;
+cvar_t *r_clusterForceOverflow;
+cvar_t *r_clusterForceStaleGeneration;
+cvar_t *r_clusterInspect;
+extern cvar_t *r_renderMode;
 
 static uint32_t vk_fp_active_z_slices( void )
 {
@@ -51,6 +67,64 @@ static uint32_t vk_fp_active_z_slices( void )
 	return z;
 }
 
+static qboolean vk_fp_want_compact_lists( void )
+{
+	int mode;
+
+	if ( vk.forward_plus.fallback_legacy ) {
+		return qfalse;
+	}
+	if ( r_clusterForceBuildFailure && r_clusterForceBuildFailure->integer ) {
+		return qfalse;
+	}
+	if ( r_clusterCompactLists && r_clusterCompactLists->integer == 0 ) {
+		return qfalse;
+	}
+	/* Default: compact on for clustered modes (renderMode 3 or zSlices>1); mode 2 may stay legacy. */
+	if ( r_clusterCompactLists && r_clusterCompactLists->integer > 0 ) {
+		return qtrue;
+	}
+	mode = r_renderMode ? r_renderMode->integer : 2;
+	if ( mode == 3 || ( r_forwardPlusZSlices && r_forwardPlusZSlices->integer > 1 ) ) {
+		return qtrue;
+	}
+	return qfalse;
+}
+
+static uint32_t vk_fp_index_capacity( uint32_t total_clusters )
+{
+	uint32_t cap = VK_FP_DEFAULT_INDEX_CAP;
+	uint32_t min_cap;
+
+	if ( r_clusterMaxIndices && r_clusterMaxIndices->integer > 0 ) {
+		cap = (uint32_t)r_clusterMaxIndices->integer;
+	}
+	min_cap = total_clusters * 4u;
+	if ( cap < min_cap ) {
+		cap = min_cap;
+	}
+	if ( cap > 4u * 1024u * 1024u ) {
+		cap = 4u * 1024u * 1024u;
+	}
+	return cap;
+}
+
+static uint32_t vk_fp_compact_max_per_cluster( void )
+{
+	uint32_t v = VK_FP_MAX_COMPACT_PER_CLUSTER;
+
+	if ( r_clusterMaxLightsPerCluster ) {
+		v = (uint32_t)r_clusterMaxLightsPerCluster->integer;
+	}
+	if ( v < 1u ) {
+		v = 1u;
+	}
+	if ( v > VK_FP_MAX_COMPACT_PER_CLUSTER ) {
+		v = VK_FP_MAX_COMPACT_PER_CLUSTER;
+	}
+	return v;
+}
+
 static void vk_fp_compute_tile_grid( uint32_t *tiles_x, uint32_t *tiles_y, uint32_t *z_slices_out,
 	uint32_t *total_clusters, VkDeviceSize *tile_bytes )
 {
@@ -58,6 +132,7 @@ static void vk_fp_compute_tile_grid( uint32_t *tiles_x, uint32_t *tiles_y, uint3
 	uint32_t vh = vk_get_render_target_height();
 	uint32_t flat;
 	uint32_t z_slices = vk_fp_active_z_slices();
+	qboolean compact = vk_fp_want_compact_lists();
 
 	if ( vw < 16u ) {
 		vw = 1280u;
@@ -81,11 +156,28 @@ static void vk_fp_compute_tile_grid( uint32_t *tiles_x, uint32_t *tiles_y, uint3
 	}
 	*z_slices_out = z_slices;
 	*total_clusters = flat * z_slices;
-	*tile_bytes = (VkDeviceSize)*total_clusters * (VkDeviceSize)VK_FP_MAX_PER_TILE * sizeof( uint32_t );
+	vk.forward_plus.compact_lists = compact;
+	if ( compact ) {
+		uint32_t idx_cap = vk_fp_index_capacity( *total_clusters );
+		vk.forward_plus.index_capacity = idx_cap;
+		*tile_bytes = (VkDeviceSize)(
+			VK_FP_CLUSTER_LIST_META_UINTS +
+			( *total_clusters * 2u ) +
+			idx_cap ) * sizeof( uint32_t );
+	} else {
+		vk.forward_plus.index_capacity = 0u;
+		*tile_bytes = (VkDeviceSize)*total_clusters * (VkDeviceSize)VK_FP_MAX_PER_TILE * sizeof( uint32_t );
+	}
 }
+
+static void *vk_fp_tile_mapped = NULL;
 
 static void vk_fp_destroy_tile_buffer_only( void )
 {
+	if ( vk_fp_tile_mapped != NULL && vk.forward_plus.tile_memory != VK_NULL_HANDLE ) {
+		qvkUnmapMemory( vk.device, vk.forward_plus.tile_memory );
+		vk_fp_tile_mapped = NULL;
+	}
 	if ( vk.forward_plus.tile_buffer != VK_NULL_HANDLE ) {
 		qvkDestroyBuffer( vk.device, vk.forward_plus.tile_buffer, NULL );
 		vk.forward_plus.tile_buffer = VK_NULL_HANDLE;
@@ -146,12 +238,19 @@ static void vk_fp_ensure_tile_for_render_resolution( void )
 		return;
 	}
 
-	vk_fp_compute_tile_grid( &tiles_x, &tiles_y, &z_slices, &total_clusters, &tile_bytes );
+	{
+		qboolean prev_compact = vk.forward_plus.compact_lists;
+		uint32_t prev_idx = vk.forward_plus.index_capacity;
 
-	changed = ( tiles_x != vk.forward_plus.tiles_x || tiles_y != vk.forward_plus.tiles_y ||
-		z_slices != vk.forward_plus.z_slices ||
-		total_clusters != vk.forward_plus.tile_capacity_tiles ||
-		vk.forward_plus.tile_buffer == VK_NULL_HANDLE );
+		vk_fp_compute_tile_grid( &tiles_x, &tiles_y, &z_slices, &total_clusters, &tile_bytes );
+
+		changed = ( tiles_x != vk.forward_plus.tiles_x || tiles_y != vk.forward_plus.tiles_y ||
+			z_slices != vk.forward_plus.z_slices ||
+			total_clusters != vk.forward_plus.tile_capacity_tiles ||
+			prev_compact != vk.forward_plus.compact_lists ||
+			prev_idx != vk.forward_plus.index_capacity ||
+			vk.forward_plus.tile_buffer == VK_NULL_HANDLE );
+	}
 
 	if ( !changed ) {
 		return;
@@ -200,12 +299,16 @@ static void vk_fp_ensure_tile_for_render_resolution( void )
 	vk.forward_plus.tiles_y = tiles_y;
 	vk.forward_plus.z_slices = z_slices;
 	vk.forward_plus.tile_capacity_tiles = total_clusters;
+	if ( qvkMapMemory( vk.device, new_mem, 0, VK_WHOLE_SIZE, 0, &vk_fp_tile_mapped ) != VK_SUCCESS ) {
+		vk_fp_tile_mapped = NULL;
+	}
 
 	vk_fp_update_compute_descriptor_tile_binding();
 	vk_forward_plus_init_graphics_descriptors();
 
-	ri.Printf( PRINT_DEVELOPER, "[VK][Forward+] cluster grid resized to %ux%ux%u (%u clusters)\n",
-		(unsigned)tiles_x, (unsigned)tiles_y, (unsigned)z_slices, (unsigned)total_clusters );
+	ri.Printf( PRINT_DEVELOPER, "[VK][Forward+] cluster grid resized to %ux%ux%u (%u clusters, compact=%d)\n",
+		(unsigned)tiles_x, (unsigned)tiles_y, (unsigned)z_slices, (unsigned)total_clusters,
+		vk.forward_plus.compact_lists ? 1 : 0 );
 }
 
 typedef struct {
@@ -221,6 +324,10 @@ typedef struct {
 	uint32_t z_slice_mode; /* 0=linear view depth, 1=log */
 	float z_near;
 	float z_far;
+	uint32_t compact_lists;
+	uint32_t index_capacity;
+	uint32_t overflow_policy;
+	uint32_t force_overflow;
 } vk_fp_push_t;
 
 static VkDescriptorSet vk_fp_graphics_descriptor = VK_NULL_HANDLE;
@@ -447,14 +554,7 @@ void vk_forward_plus_init_graphics_descriptors( void )
 
 static void vk_fp_destroy_buffers( void )
 {
-	if ( vk.forward_plus.tile_buffer != VK_NULL_HANDLE ) {
-		qvkDestroyBuffer( vk.device, vk.forward_plus.tile_buffer, NULL );
-		vk.forward_plus.tile_buffer = VK_NULL_HANDLE;
-	}
-	if ( vk.forward_plus.tile_memory != VK_NULL_HANDLE ) {
-		qvkFreeMemory( vk.device, vk.forward_plus.tile_memory, NULL );
-		vk.forward_plus.tile_memory = VK_NULL_HANDLE;
-	}
+	vk_fp_destroy_tile_buffer_only();
 	if ( vk.forward_plus.param_buffer != VK_NULL_HANDLE ) {
 		qvkDestroyBuffer( vk.device, vk.forward_plus.param_buffer, NULL );
 		vk.forward_plus.param_buffer = VK_NULL_HANDLE;
@@ -522,6 +622,7 @@ static void vk_fp_destroy_light_buffer( void )
 
 void vk_forward_plus_shutdown( void )
 {
+	vk_cluster_unregister_commands();
 	vk_forward_plus_on_descriptor_pool_destroyed();
 	vk_fp_destroy_buffers();
 	vk_fp_destroy_light_buffer();
@@ -670,6 +771,10 @@ static void vk_fp_create_buffers_and_compute( void )
 		return;
 	}
 	SET_OBJECT_NAME( vk.forward_plus.tile_buffer, "forward+ tile indices", VK_DEBUG_REPORT_OBJECT_TYPE_BUFFER_EXT );
+	if ( qvkMapMemory( vk.device, vk.forward_plus.tile_memory, 0, VK_WHOLE_SIZE, 0, &vk_fp_tile_mapped ) != VK_SUCCESS ) {
+		vk_fp_tile_mapped = NULL;
+		ri.Printf( PRINT_WARNING, S_COLOR_YELLOW "[VK][Forward+] tile buffer map failed; compact meta reset disabled\n" S_COLOR_WHITE );
+	}
 
 	bci.size = VK_FP_PARAM_BYTES;
 	bci.usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
@@ -919,6 +1024,7 @@ void vk_forward_plus_init( void )
 
 	vk_fp_create_buffers_and_compute();
 	vk.forward_plus.cluster_list_generation = 1u;
+	vk_cluster_register_commands();
 
 	ri.Printf( PRINT_ALL, "[VK][Forward+] r_forwardPlus=1 device-local light SSBO + staging %u bytes (tile cull + PBR read VRAM)\n",
 		(unsigned)vk.forward_plus.capacity_bytes );
@@ -1248,25 +1354,48 @@ static void vk_forward_plus_dispatch_tile_cull_internal( qboolean use_depth_cull
 	param_f[21] = backEnd.refdef.vieworg[1];
 	param_f[22] = backEnd.refdef.vieworg[2];
 	param_f[23] = 0.0f;
-	/* clusterMeta: z_slices, z_mode, unused, unused */
+	/* clusterMeta: z_slices, z_mode, compactLists, totalClusters */
 	param_u[24] = vk.forward_plus.z_slices > 0u ? vk.forward_plus.z_slices : 1u;
 	param_u[25] = ( r_forwardPlusZSliceMode && r_forwardPlusZSliceMode->integer ) ? 1u : 0u;
-	param_u[26] = 0u;
-	param_u[27] = 0u;
-	/* clusterZRange: near, far */
+	param_u[26] = vk.forward_plus.compact_lists ? 1u : 0u;
+	param_u[27] = vk.forward_plus.tile_capacity_tiles;
+	/* clusterZRange: near, far, zScale, zBias */
 	{
 		float zn = ( r_znear && r_znear->value > 0.0f ) ? r_znear->value : 4.0f;
 		float zf = backEnd.viewParms.zFar;
+		float clusterFar = ( r_clusterZFar && r_clusterZFar->value > 0.0f ) ? r_clusterZFar->value : 4096.0f;
+		float zScale = 0.0f, zBias = 0.0f;
 		if ( zn < 1e-3f ) {
 			zn = 4.0f;
 		}
 		if ( zf <= zn + 1e-3f ) {
 			zf = zn + 4000.0f;
 		}
+		if ( clusterFar < zf ) {
+			zf = clusterFar;
+		}
+		if ( zf <= zn + 1e-3f ) {
+			zf = zn + 1.0f;
+		}
+		Cluster_DeriveLogZScaleBias( zn, zf, param_u[24], &zScale, &zBias );
+		vk.forward_plus.cluster_z_near = zn;
+		vk.forward_plus.cluster_z_far = zf;
+		vk.forward_plus.z_scale = zScale;
+		vk.forward_plus.z_bias = zBias;
 		param_f[28] = zn;
 		param_f[29] = zf;
-		param_f[30] = 0.0f;
-		param_f[31] = 0.0f;
+		param_f[30] = zScale;
+		param_f[31] = zBias;
+	}
+
+	/* Compact: reset atomic index cursor + overflow counter before ClusterFill. */
+	if ( vk.forward_plus.compact_lists && vk_fp_tile_mapped != NULL ) {
+		uint32_t *meta = (uint32_t *)vk_fp_tile_mapped;
+		meta[0] = 0u;
+		meta[1] = 0u;
+		meta[2] = VK_CLUSTER_FLAG_COMPACT_LISTS |
+			( ( r_forwardPlusZSliceMode && r_forwardPlusZSliceMode->integer ) ? VK_CLUSTER_FLAG_LOG_Z : 0u );
+		meta[3] = vk.forward_plus.cluster_list_generation;
 	}
 
 	Com_Memset( barriers, 0, sizeof( barriers ) );
@@ -1308,20 +1437,40 @@ static void vk_forward_plus_dispatch_tile_cull_internal( qboolean use_depth_cull
 		push.total_tiles = vk.forward_plus.tiles_x * vk.forward_plus.tiles_y * push.z_slices;
 	}
 	push.num_lights = vk.forward_plus.last_packed_count;
-	push.max_per_tile = vk.forward_plus.max_per_tile;
+	if ( vk.forward_plus.compact_lists ) {
+		push.max_per_tile = vk_fp_compact_max_per_cluster();
+		vk.forward_plus.max_per_tile = push.max_per_tile;
+	} else {
+		push.max_per_tile = vk.forward_plus.max_per_tile;
+	}
 	push.luminance_sort = ( r_forwardPlusLuminanceSort && r_forwardPlusLuminanceSort->integer ) ? 1u : 0u;
 	push.distance_sort = ( r_forwardPlusDistanceSort && r_forwardPlusDistanceSort->integer ) ? 1u : 0u;
+	push.overflow_policy = ( r_clusterOverflowPolicy ) ? (uint32_t)r_clusterOverflowPolicy->integer : 2u;
+	if ( push.overflow_policy > 2u ) {
+		push.overflow_policy = 2u;
+	}
+	/* Policy 2 = importance (luminance); policy 1 = stable light index order (no sort). */
+	if ( vk.forward_plus.compact_lists && push.overflow_policy == 2u ) {
+		push.luminance_sort = 1u;
+		push.distance_sort = 0u;
+	} else if ( vk.forward_plus.compact_lists && push.overflow_policy == 1u ) {
+		push.luminance_sort = 0u;
+		push.distance_sort = 0u;
+	}
 	if ( push.distance_sort && push.luminance_sort ) {
 		push.luminance_sort = 0u;
 	}
 	push.depth_cull = use_depth_cull ? 1u : 0u;
 	push.hi_z = ( use_depth_cull && r_forwardPlusHiZ && r_forwardPlusHiZ->integer ) ? 1u : 0u;
 	push.z_slice_mode = ( r_forwardPlusZSliceMode && r_forwardPlusZSliceMode->integer ) ? 1u : 0u;
+	push.compact_lists = vk.forward_plus.compact_lists ? 1u : 0u;
+	push.index_capacity = vk.forward_plus.index_capacity;
+	push.force_overflow = ( r_clusterForceOverflow && r_clusterForceOverflow->integer ) ? 1u : 0u;
 	{
-		float zn = ( r_znear && r_znear->value > 0.0f ) ? r_znear->value : 4.0f;
-		float zf = backEnd.viewParms.zFar;
+		float zn = vk.forward_plus.cluster_z_near;
+		float zf = vk.forward_plus.cluster_z_far;
 		if ( zn < 1e-3f ) {
-			zn = 4.0f;
+			zn = ( r_znear && r_znear->value > 0.0f ) ? r_znear->value : 4.0f;
 		}
 		if ( zf <= zn + 1e-3f ) {
 			zf = zn + 4000.0f;
@@ -1364,12 +1513,21 @@ static void vk_forward_plus_dispatch_tile_cull_internal( qboolean use_depth_cull
 	qvkCmdDispatch( vk.cmd->command_buffer, ( push.total_tiles + 63u ) / 64u, 1, 1 );
 
 	barriers[0].srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
-	barriers[0].dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+	barriers[0].dstAccessMask = VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_HOST_READ_BIT;
 	barriers[0].buffer = vk.forward_plus.tile_buffer;
 	qvkCmdPipelineBarrier( vk.cmd->command_buffer,
 		VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-		VK_PIPELINE_STAGE_VERTEX_SHADER_BIT | VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT | VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+		VK_PIPELINE_STAGE_VERTEX_SHADER_BIT | VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT | VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT | VK_PIPELINE_STAGE_HOST_BIT,
 		0, 0, NULL, 1, barriers, 0, NULL );
+
+	if ( vk.forward_plus.compact_lists && vk_fp_tile_mapped != NULL ) {
+		uint32_t *meta = (uint32_t *)vk_fp_tile_mapped;
+		vk.forward_plus.last_index_used = meta[0];
+		vk.forward_plus.last_overflow_count = meta[1];
+		if ( meta[1] > 0u ) {
+			meta[2] |= VK_CLUSTER_FLAG_OVERFLOW;
+		}
+	}
 
 	if ( use_depth_cull && vk.depth_image != VK_NULL_HANDLE ) {
 		record_depth_image_layout_transition( vk.cmd->command_buffer, depth_aspect,
@@ -1382,11 +1540,27 @@ static void vk_forward_plus_dispatch_tile_cull_internal( qboolean use_depth_cull
 void vk_forward_plus_dispatch_tile_cull( void )
 {
 	vk_spine_pass_begin( VK_SPINE_PASS_TILE_CONSTRUCT );
+
+	if ( r_clusterForceBuildFailure && r_clusterForceBuildFailure->integer ) {
+		if ( !vk.forward_plus.fallback_legacy ) {
+			ri.Printf( PRINT_WARNING, S_COLOR_YELLOW
+				"[VK][cluster] Cluster build failed — Fallback path selected (legacy fixed-slot 2D)\n" S_COLOR_WHITE );
+			vk.forward_plus.fallback_legacy = qtrue;
+			vk_fp_ensure_tile_for_render_resolution();
+		}
+	} else if ( vk.forward_plus.fallback_legacy ) {
+		ri.Printf( PRINT_ALL, "[VK][cluster] Force build failure cleared — compact path restored\n" );
+		vk.forward_plus.fallback_legacy = qfalse;
+		vk_fp_ensure_tile_for_render_resolution();
+	}
+
 	vk_forward_plus_dispatch_tile_cull_internal( qfalse );
 	if ( vk.forward_plus.tile_buffer != VK_NULL_HANDLE ) {
-		vk.forward_plus.cluster_list_generation++;
-		if ( vk.forward_plus.cluster_list_generation == 0u ) {
-			vk.forward_plus.cluster_list_generation = 1u;
+		if ( !( r_clusterForceStaleGeneration && r_clusterForceStaleGeneration->integer ) ) {
+			vk.forward_plus.cluster_list_generation++;
+			if ( vk.forward_plus.cluster_list_generation == 0u ) {
+				vk.forward_plus.cluster_list_generation = 1u;
+			}
 		}
 	}
 	vk_spine_pass_end( VK_SPINE_PASS_TILE_CONSTRUCT );
@@ -1397,9 +1571,11 @@ void vk_forward_plus_dispatch_tile_cull_after_opaque( void )
 	vk_spine_pass_begin( VK_SPINE_PASS_TILE_CONSTRUCT );
 	vk_forward_plus_dispatch_tile_cull_internal( qtrue );
 	if ( vk.forward_plus.tile_buffer != VK_NULL_HANDLE ) {
-		vk.forward_plus.cluster_list_generation++;
-		if ( vk.forward_plus.cluster_list_generation == 0u ) {
-			vk.forward_plus.cluster_list_generation = 1u;
+		if ( !( r_clusterForceStaleGeneration && r_clusterForceStaleGeneration->integer ) ) {
+			vk.forward_plus.cluster_list_generation++;
+			if ( vk.forward_plus.cluster_list_generation == 0u ) {
+				vk.forward_plus.cluster_list_generation = 1u;
+			}
 		}
 	}
 	vk_spine_pass_end( VK_SPINE_PASS_TILE_CONSTRUCT );
@@ -1413,6 +1589,8 @@ uint32_t vk_cluster_list_generation( void )
 void vk_cluster_assert_shared_consumers( const char *consumer )
 {
 	static uint32_t s_last_logged_gen;
+	static VkBuffer s_last_tile;
+	static VkBuffer s_last_light;
 	const char *who = consumer && consumer[0] ? consumer : "unknown";
 
 	if ( vk.forward_plus.tile_buffer == VK_NULL_HANDLE || vk.forward_plus.buffer == VK_NULL_HANDLE ) {
@@ -1420,14 +1598,196 @@ void vk_cluster_assert_shared_consumers( const char *consumer )
 			"[VK][cluster] assert (%s): Forward+ light/tile SSBOs missing\n" S_COLOR_WHITE, who );
 		return;
 	}
+	if ( s_last_tile != VK_NULL_HANDLE && s_last_tile != vk.forward_plus.tile_buffer ) {
+		ri.Printf( PRINT_WARNING, S_COLOR_YELLOW
+			"[VK][cluster] assert (%s): header/tile buffer handle mismatch\n" S_COLOR_WHITE, who );
+	}
+	if ( s_last_light != VK_NULL_HANDLE && s_last_light != vk.forward_plus.buffer ) {
+		ri.Printf( PRINT_WARNING, S_COLOR_YELLOW
+			"[VK][cluster] assert (%s): light buffer handle mismatch\n" S_COLOR_WHITE, who );
+	}
+	s_last_tile = vk.forward_plus.tile_buffer;
+	s_last_light = vk.forward_plus.buffer;
 	if ( vk.forward_plus.cluster_list_generation != s_last_logged_gen ) {
 		ri.Printf( PRINT_DEVELOPER,
-			"[VK][cluster] shared consumers ok (%s): tile=%p light=%p gen=%u tiles=%ux%ux%u\n",
+			"[VK][cluster] shared consumers ok (%s): headers=%p light=%p gen=%u tiles=%ux%ux%u compact=%d idx=%u/%u overflow=%u\n",
 			who, (void *)vk.forward_plus.tile_buffer, (void *)vk.forward_plus.buffer,
 			vk.forward_plus.cluster_list_generation,
-			vk.forward_plus.tiles_x, vk.forward_plus.tiles_y, vk.forward_plus.z_slices );
+			vk.forward_plus.tiles_x, vk.forward_plus.tiles_y, vk.forward_plus.z_slices,
+			vk.forward_plus.compact_lists ? 1 : 0,
+			vk.forward_plus.last_index_used, vk.forward_plus.index_capacity,
+			vk.forward_plus.last_overflow_count );
 		s_last_logged_gen = vk.forward_plus.cluster_list_generation;
 	}
+}
+
+static void vk_cluster_inspect_f( void )
+{
+	uint32_t *cells;
+	uint32_t tilesX, tilesY, zSlices, clusterCount;
+	uint32_t cx, cy, slice, tileId;
+	uint32_t k, count, offset;
+	float zn, zf, viewZ;
+
+	if ( !vk_fp_tile_mapped || vk.forward_plus.tile_buffer == VK_NULL_HANDLE ) {
+		ri.Printf( PRINT_ALL, "cluster_inspect: no tile buffer\n" );
+		return;
+	}
+	tilesX = vk.forward_plus.tiles_x;
+	tilesY = vk.forward_plus.tiles_y;
+	zSlices = vk.forward_plus.z_slices > 0u ? vk.forward_plus.z_slices : 1u;
+	clusterCount = vk.forward_plus.tile_capacity_tiles;
+	cx = tilesX / 2u;
+	cy = tilesY / 2u;
+	zn = vk.forward_plus.cluster_z_near;
+	zf = vk.forward_plus.cluster_z_far;
+	viewZ = 0.5f * ( zn + zf );
+	slice = Cluster_ViewDepthToSlice( viewZ, zSlices,
+		( r_forwardPlusZSliceMode && r_forwardPlusZSliceMode->integer ) ? 1u : 0u,
+		zn, zf, vk.forward_plus.z_scale, vk.forward_plus.z_bias );
+	{
+		gpuClusterParams_t p;
+		Com_Memset( &p, 0, sizeof( p ) );
+		p.clusterCountX = tilesX;
+		p.clusterCountY = tilesY;
+		p.clusterCountZ = zSlices;
+		p.tileSizeX = VK_FP_TILE_DIM;
+		p.tileSizeY = VK_FP_TILE_DIM;
+		p.zNear = zn;
+		p.zFar = zf;
+		p.zScale = vk.forward_plus.z_scale;
+		p.zBias = vk.forward_plus.z_bias;
+		tileId = Cluster_IndexFromPixelAndViewDepth( cx * VK_FP_TILE_DIM + 8u, cy * VK_FP_TILE_DIM + 8u,
+			viewZ, &p, ( r_forwardPlusZSliceMode && r_forwardPlusZSliceMode->integer ) ? 1u : 0u );
+	}
+	cells = (uint32_t *)vk_fp_tile_mapped;
+	ri.Printf( PRINT_ALL, "cluster_inspect: tile=(%u,%u) slice=%u id=%u compact=%d gen=%u\n",
+		cx, cy, slice, tileId, vk.forward_plus.compact_lists ? 1 : 0,
+		vk.forward_plus.cluster_list_generation );
+	if ( vk.forward_plus.compact_lists ) {
+		offset = cells[VK_FP_CLUSTER_LIST_META_UINTS + tileId * 2u];
+		count = cells[VK_FP_CLUSTER_LIST_META_UINTS + tileId * 2u + 1u];
+		ri.Printf( PRINT_ALL, "  header offset=%u count=%u\n", offset, count );
+		for ( k = 0u; k < count && k < 32u; k++ ) {
+			uint32_t base = VK_FP_CLUSTER_LIST_META_UINTS + clusterCount * 2u;
+			ri.Printf( PRINT_ALL, "  light[%u]=%u\n", k, cells[base + offset + k] );
+		}
+	} else {
+		uint32_t base = tileId * VK_FP_MAX_PER_TILE;
+		for ( k = 0u; k < VK_FP_MAX_PER_TILE; k++ ) {
+			if ( cells[base + k] == 0xFFFFFFFFu ) {
+				break;
+			}
+			ri.Printf( PRINT_ALL, "  light[%u]=%u\n", k, cells[base + k] );
+		}
+	}
+}
+
+static void vk_hybrid_compare_status_f( void )
+{
+	cvar_t *warn = ri.Cvar_Get( "r_hybridCompareWarn", "0.05", CVAR_ARCHIVE_ND | CVAR_CHEAT );
+	cvar_t *fail = ri.Cvar_Get( "r_hybridCompareFail", "0.25", CVAR_ARCHIVE_ND | CVAR_CHEAT );
+	cvar_t *hc = ri.Cvar_Get( "r_hybridCompare", "0", CVAR_ARCHIVE_ND | CVAR_CHEAT );
+	ri.Printf( PRINT_ALL, "hybrid_compare_status: mode=%d warn=%.3f fail=%.3f gen=%u compact=%d overflow=%u\n",
+		hc ? hc->integer : 0,
+		warn ? warn->value : 0.05f,
+		fail ? fail->value : 0.25f,
+		vk.forward_plus.cluster_list_generation,
+		vk.forward_plus.compact_lists ? 1 : 0,
+		vk.forward_plus.last_overflow_count );
+}
+
+static void vk_cluster_status_f( void )
+{
+	uint32_t total = vk.forward_plus.tile_capacity_tiles;
+	ri.Printf( PRINT_ALL,
+		"cluster_status: grid=%ux%ux%u tile=%u compact=%d fallback=%d gen=%u\n"
+		"  lights=%u indices=%u/%u overflow=%u policy=%d zNear=%.2f zFar=%.2f zScale=%.4f\n",
+		vk.forward_plus.tiles_x, vk.forward_plus.tiles_y, vk.forward_plus.z_slices,
+		VK_FP_TILE_DIM,
+		vk.forward_plus.compact_lists ? 1 : 0,
+		vk.forward_plus.fallback_legacy ? 1 : 0,
+		vk.forward_plus.cluster_list_generation,
+		vk.forward_plus.last_packed_count,
+		vk.forward_plus.last_index_used, vk.forward_plus.index_capacity,
+		vk.forward_plus.last_overflow_count,
+		r_clusterOverflowPolicy ? r_clusterOverflowPolicy->integer : 2,
+		vk.forward_plus.cluster_z_near, vk.forward_plus.cluster_z_far,
+		vk.forward_plus.z_scale );
+	if ( total > 0u && vk.forward_plus.index_capacity > 0u ) {
+		float util = (float)vk.forward_plus.last_index_used / (float)vk.forward_plus.index_capacity;
+		float avg = (float)vk.forward_plus.last_index_used / (float)total;
+		ri.Printf( PRINT_ALL, "  utilization=%.1f%% avgOcc=%.2f maxPerCluster=%u\n",
+			util * 100.0f, avg, vk.forward_plus.max_per_tile );
+	}
+}
+
+static void vk_cluster_z_test_f( void )
+{
+	uint32_t Z = vk_fp_active_z_slices();
+	float zn = ( r_znear && r_znear->value > 0.0f ) ? r_znear->value : 4.0f;
+	float zf = ( r_clusterZFar && r_clusterZFar->value > 0.0f ) ? r_clusterZFar->value : 4096.0f;
+	float zScale = 0.0f, zBias = 0.0f;
+	uint32_t i;
+	uint32_t zMode = ( r_forwardPlusZSliceMode && r_forwardPlusZSliceMode->integer ) ? 1u : 0u;
+
+	if ( zf <= zn + 1e-3f ) {
+		zf = zn + 4096.0f;
+	}
+	Cluster_DeriveLogZScaleBias( zn, zf, Z, &zScale, &zBias );
+	ri.Printf( PRINT_ALL, "cluster_z_test: Z=%u mode=%s near=%.3f far=%.3f scale=%.6f bias=%.6f\n",
+		Z, zMode ? "log2" : "linear", zn, zf, zScale, zBias );
+	for ( i = 0u; i < Z; i++ ) {
+		float sn = 0.0f, sf = 0.0f;
+		Cluster_SliceDepthRange( i, Z, zMode, zn, zf, zScale, zBias, &sn, &sf );
+		ri.Printf( PRINT_ALL, "  slice %u: near=%.3f far=%.3f thickness=%.3f ratio=%.3f\n",
+			i, sn, sf, sf - sn, ( sn > 1e-3f ) ? ( sf / sn ) : 0.0f );
+	}
+}
+
+void vk_cluster_register_commands( void )
+{
+	r_clusterCompactLists = ri.Cvar_Get( "r_clusterCompactLists", "-1", CVAR_ARCHIVE_ND | CVAR_LATCH );
+	ri.Cvar_CheckRange( r_clusterCompactLists, "-1", "1", CV_INTEGER );
+	ri.Cvar_SetDescription( r_clusterCompactLists,
+		"Cluster light lists: -1=auto (compact for mode 3 / Z-slices>1), 0=legacy fixed 8-slot, 1=force compact header+index. Latched." );
+	r_clusterZFar = ri.Cvar_Get( "r_clusterZFar", "4096", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_clusterZFar, "16", "131072", CV_FLOAT );
+	ri.Cvar_SetDescription( r_clusterZFar,
+		"Cluster Z far clamp. Effective far = min(r_clusterZFar, camera_zFar), floored above zNear." );
+	r_clusterMaxIndices = ri.Cvar_Get( "r_clusterMaxIndices", "262144", CVAR_ARCHIVE_ND | CVAR_LATCH );
+	ri.Cvar_CheckRange( r_clusterMaxIndices, "4096", "4194304", CV_INTEGER );
+	ri.Cvar_SetDescription( r_clusterMaxIndices, "Compact cluster light-index pool capacity (uints). Latched." );
+	r_clusterMaxLightsPerCluster = ri.Cvar_Get( "r_clusterMaxLightsPerCluster", "32", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_clusterMaxLightsPerCluster, "1", "32", CV_INTEGER );
+	ri.Cvar_SetDescription( r_clusterMaxLightsPerCluster, "Max lights retained per cluster (compact path)." );
+	r_clusterOverflowPolicy = ri.Cvar_Get( "r_clusterOverflowPolicy", "2", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_clusterOverflowPolicy, "0", "2", CV_INTEGER );
+	ri.Cvar_SetDescription( r_clusterOverflowPolicy,
+		"0=diagnostic empty+overflow meta, 1=truncate by light index, 2=importance retention (default)." );
+	r_clusterForceBuildFailure = ri.Cvar_Get( "r_clusterForceBuildFailure", "0", CVAR_CHEAT );
+	ri.Cvar_CheckRange( r_clusterForceBuildFailure, "0", "1", CV_INTEGER );
+	r_clusterForceOverflow = ri.Cvar_Get( "r_clusterForceOverflow", "0", CVAR_CHEAT );
+	ri.Cvar_CheckRange( r_clusterForceOverflow, "0", "1", CV_INTEGER );
+	r_clusterForceStaleGeneration = ri.Cvar_Get( "r_clusterForceStaleGeneration", "0", CVAR_CHEAT );
+	ri.Cvar_CheckRange( r_clusterForceStaleGeneration, "0", "1", CV_INTEGER );
+	r_clusterInspect = ri.Cvar_Get( "r_clusterInspect", "0", CVAR_CHEAT );
+	ri.Cvar_CheckRange( r_clusterInspect, "0", "1", CV_INTEGER );
+	ri.Cvar_SetDescription( r_clusterInspect, "Print cluster header/indices under crosshair once when set." );
+
+	ri.Cmd_AddCommand( "cluster_status", vk_cluster_status_f );
+	ri.Cmd_AddCommand( "cluster_z_test", vk_cluster_z_test_f );
+	ri.Cmd_AddCommand( "cluster_inspect", vk_cluster_inspect_f );
+	ri.Cmd_AddCommand( "hybrid_compare_status", vk_hybrid_compare_status_f );
+	ri.Printf( PRINT_ALL, "[VK][cluster] M2 compact lists ready (cluster_status, cluster_z_test, r_clusterZFar)\n" );
+}
+
+void vk_cluster_unregister_commands( void )
+{
+	ri.Cmd_RemoveCommand( "cluster_status" );
+	ri.Cmd_RemoveCommand( "cluster_z_test" );
+	ri.Cmd_RemoveCommand( "cluster_inspect" );
+	ri.Cmd_RemoveCommand( "hybrid_compare_status" );
 }
 
 void vk_cluster_dispatch_tile_cull( void )

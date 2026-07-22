@@ -9,7 +9,7 @@
 
 layout(local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
 
-#define MAX_PER_TILE 8u
+#define MAX_PER_TILE 32u
 #define REC_VEC4S 4u
 const float DEF_PI = 3.14159265;
 
@@ -49,10 +49,14 @@ layout(push_constant) uniform Push {
 	float zNear;
 	float zFar;
 	float specularAA;
+	uint compactLists;
+	uint clusterCount;
 } pc;
 
 #define USE_LTC_AREA_LIGHT
 #include "ltc_area_light.glsl"
+#define CLUSTER_LIST_CELLS tiles.cells
+#include "cluster_light_list.glsl"
 #include "deferred_lighting_common.glsl"
 
 void main() {

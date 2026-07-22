@@ -1,72 +1,80 @@
 /*
  * Shared Forward+ / clustered light-grid helpers.
+ * M2: thin wrappers over cluster_contract.glsl (authoritative).
  * Cluster layout: flat 2D tile first (slice 0), then +tilesX*tilesY per Z slice.
  * zSlices==1 preserves historical 2D tiled indexing (tileId * MAX_PER_TILE).
  *
  * Depth: use positive view-space distance (abs of reconstructed view Z / clip.w).
- * Slice modes: 0 = linear in [zNear,zFar], 1 = logarithmic.
+ * Slice modes: 0 = linear in [zNear,zFar], 1 = logarithmic (log2 + zScale/zBias).
  */
 
 #ifndef FORWARD_PLUS_CLUSTER_GLSL
 #define FORWARD_PLUS_CLUSTER_GLSL
 
+#include "cluster_contract.glsl"
+
 uint fp_cluster_xy_count( uint tilesX, uint tilesY )
 {
-	return max( tilesX * tilesY, 1u );
+	return Cluster_XYCount( tilesX, tilesY );
 }
 
 uint fp_view_depth_to_slice( float viewDepth, uint zSlices, uint zMode, float zNear, float zFar )
 {
-	if ( zSlices <= 1u ) {
-		return 0u;
+	float zScale = 0.0;
+	float zBias = 0.0;
+	if ( zMode == 1u && zSlices > 1u ) {
+		float zn = max( zNear, 1e-3 );
+		float zf = max( zFar, zn + 1e-3 );
+		float logNear = log2( zn );
+		float logFar = log2( zf );
+		float denom = max( logFar - logNear, 1e-5 );
+		zScale = float( zSlices ) / denom;
+		zBias = -logNear * zScale;
 	}
-	float zn = max( zNear, 1e-3 );
-	float zf = max( zFar, zn + 1e-3 );
-	float z = clamp( abs( viewDepth ), zn, zf );
-	float t;
-	if ( zMode == 1u ) {
-		t = log( z / zn ) / max( log( zf / zn ), 1e-5 );
-	} else {
-		t = ( z - zn ) / ( zf - zn );
-	}
-	t = clamp( t, 0.0, 0.9999 );
-	return min( uint( t * float( zSlices ) ), zSlices - 1u );
+	return Cluster_ViewDepthToSlice( viewDepth, zSlices, zMode, zNear, zFar, zScale, zBias );
 }
 
 uint fp_cluster_index( uint tx, uint ty, uint tilesX, uint tilesY, uint slice, uint zSlices )
 {
-	uint xy = ty * tilesX + tx;
-	if ( zSlices <= 1u ) {
-		return xy;
-	}
-	return xy + slice * fp_cluster_xy_count( tilesX, tilesY );
+	ClusterParams p;
+	p.clusterCountX = tilesX;
+	p.clusterCountY = tilesY;
+	p.clusterCountZ = zSlices;
+	p.tileSizeX = CLUSTER_TILE_SIZE_X;
+	p.tileSizeY = CLUSTER_TILE_SIZE_Y;
+	p.lightIndexCapacity = 0u;
+	p.zNear = 0.0;
+	p.zFar = 0.0;
+	p.zScale = 0.0;
+	p.zBias = 0.0;
+	p.generation = 0u;
+	p.overflowCount = 0u;
+	p.flags = 0u;
+	p.reserved = 0u;
+	return Cluster_IndexFromTileAndSlice( tx, ty, slice, p );
 }
 
 /* Slice [near,far] in positive view depth for slice i of zSlices. */
 void fp_slice_depth_range( uint slice, uint zSlices, uint zMode, float zNear, float zFar,
 	out float sliceNear, out float sliceFar )
 {
-	float zn = max( zNear, 1e-3 );
-	float zf = max( zFar, zn + 1e-3 );
-	if ( zSlices <= 1u ) {
-		sliceNear = zn;
-		sliceFar = zf;
-		return;
+	float zScale = 0.0;
+	float zBias = 0.0;
+	if ( zMode == 1u && zSlices > 1u ) {
+		float zn = max( zNear, 1e-3 );
+		float zf = max( zFar, zn + 1e-3 );
+		float logNear = log2( zn );
+		float logFar = log2( zf );
+		float denom = max( logFar - logNear, 1e-5 );
+		zScale = float( zSlices ) / denom;
+		zBias = -logNear * zScale;
 	}
-	float t0 = float( slice ) / float( zSlices );
-	float t1 = float( slice + 1u ) / float( zSlices );
-	if ( zMode == 1u ) {
-		sliceNear = zn * pow( zf / zn, t0 );
-		sliceFar = zn * pow( zf / zn, t1 );
-	} else {
-		sliceNear = mix( zn, zf, t0 );
-		sliceFar = mix( zn, zf, t1 );
-	}
+	Cluster_SliceDepthRange( slice, zSlices, zMode, zNear, zFar, zScale, zBias, sliceNear, sliceFar );
 }
 
 bool fp_light_overlaps_slice( float lightNear, float lightFar, float sliceNear, float sliceFar )
 {
-	return !( lightFar < sliceNear || lightNear > sliceFar );
+	return Cluster_LightOverlapsSlice( lightNear, lightFar, sliceNear, sliceFar );
 }
 
 #endif /* FORWARD_PLUS_CLUSTER_GLSL */

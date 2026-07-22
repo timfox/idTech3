@@ -3590,12 +3590,13 @@ static void R_Register( void )
 	ri.Cvar_SetDescription( r_forwardPlusMaxPerTile, "Forward+ tile list length per 16px tile (min VK_FP_MIN_PER_TILE, max VK_FP_MAX_PER_TILE in vk_forward_plus.c; latched). Lower values reduce GPU work when \\r_forwardPlus 1. Requires vid_restart after change." );
 	ri.Cvar_SetGroup( r_forwardPlusMaxPerTile, CVG_RENDERER );
 	r_forwardPlusDebug = ri.Cvar_Get( "r_forwardPlusDebug", "0", CVAR_ARCHIVE_ND );
-	ri.Cvar_CheckRange( r_forwardPlusDebug, "0", "3", CV_FLOAT );
+	ri.Cvar_CheckRange( r_forwardPlusDebug, "0", "6", CV_FLOAT );
 	ri.Cvar_SetDescription( r_forwardPlusDebug,
 		"Forward+ / clustered debug overlay:\n"
 		" 0 = off\n"
 		" 0.08–1.0 = lights-per-cluster occupancy heatmap (uses Z-slice when r_forwardPlusZSlices>1)\n"
 		" 2 = Z-slice ID colors\n"
+		" 6 = Z-slice colors + crosshair slice id (Clustered Hybrid M2)\n"
 		"Requires \\r_forwardPlus 1." );
 	ri.Cvar_SetGroup( r_forwardPlusDebug, CVG_RENDERER );
 	r_forwardPlusShade = ri.Cvar_Get( "r_forwardPlusShade", "0", CVAR_ARCHIVE_ND );

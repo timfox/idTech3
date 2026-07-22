@@ -1152,6 +1152,10 @@ unsigned int Com_TouchMemory( void );
 
 // commandLine should not include the executable name (argv[0])
 void Com_Init( char *commandLine );
+#ifdef __cplusplus
+extern "C"
+#endif
+void Com_Cpp20Status_Init( void );
 void Com_FrameInit( void );
 void Com_Frame( qboolean noDelay );
 

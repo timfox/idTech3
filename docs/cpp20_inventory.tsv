@@ -1,0 +1,23 @@
+# path	language	target	class	abi_sensitive	difficulty	owner_milestone	notes
+engine/core/md4.cpp	cpp	cpp	CPP_WITH_MECHANICAL_FIXES	low	low	foundation	Com_BlockChecksum; converted
+engine/core/md5.cpp	cpp	cpp	CPP_WITH_MECHANICAL_FIXES	low	low	foundation	MD5 helpers; converted
+engine/core/huffman_static.cpp	cpp	cpp	CPP_WITH_MECHANICAL_FIXES	low	low	foundation	static Huffman tables; converted
+engine/core/q_utf8.cpp	cpp	cpp	CPP_WITH_MECHANICAL_FIXES	low	low	foundation	UTF-8; converted
+renderers/vulkan/vk_cluster_math.cpp	cpp	cpp	CPP_READY	low	low	foundation	cluster Z CPU ref; converted
+engine/core/cpp20_abi_guards.cpp	cpp	cpp	CPP_READY	n/a	low	foundation	ABI static_assert TU
+engine/core/cpp20_status.cpp	cpp	cpp	CPP_READY	n/a	low	foundation	cpp20_status command
+engine/core/cm_bounds.c	c	cpp	CPP_READY	low	low	next	unit_cm_bounds
+engine/core/huffman.c	c	cpp	CPP_WITH_MECHANICAL_FIXES	med	med	next	after static
+engine/core/q_shared.c	c	split_first	CPP_BLOCKED_BY_ABI	high	high	later	info strings live here; do not convert whole file
+engine/core/q_math.c	c	cpp_later	CPP_WITH_MECHANICAL_FIXES	med	med	later	deterministic math
+engine/core/msg.c	c	keep_c	CPP_BLOCKED_BY_ABI	high	high	defer	snapshot encoding
+engine/core/net_chan.c	c	keep_c	CPP_BLOCKED_BY_ABI	high	high	defer	networking
+engine/core/vm.c	c	keep_c	CPP_BLOCKED_BY_ABI	high	high	defer	QVM
+engine/core/cm_trace.c	c	keep_c	CPP_BLOCKED_BY_ABI	high	high	defer	collision
+engine/core/files.c	c	cpp_later	CPP_WITH_MECHANICAL_FIXES	med	high	later	filesystem
+runtime/client/core/cl_compat_math.c	c	cpp	CPP_READY	low	low	next	unit tested
+renderers/vulkan/vk_forward_plus.c	c	keep_c_facade	CPP_BLOCKED_BY_ABI	high	high	defer	renderer hot path
+renderers/vulkan/vk_render_path.c	c	cpp	CPP_WITH_MECHANICAL_FIXES	low	med	next	C façade OK
+third_party/	c/cpp	unchanged	THIRD_PARTY_DO_NOT_CONVERT	n/a	n/a	never	vendored
+engine/core/q_shared.h	h	c_and_cpp	KEEP_C_EXTERNAL_BOUNDARY	high	n/a	ongoing	dual include required
+engine/core/qcommon.h	h	c_and_cpp	KEEP_C_EXTERNAL_BOUNDARY	high	n/a	ongoing	dual include required

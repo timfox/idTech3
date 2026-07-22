@@ -43,6 +43,8 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 message(STATUS "Engine C++ standard: C++${IDTECH3_CXX_STANDARD}")
 
+include( ${CMAKE_SOURCE_DIR}/cmake/IdTech3Cpp20.cmake )
+
 option(C_STANDARD_STRICT "Enable the stricter warning set for engine builds" ON)
 option(CI_BUILD "Enable CI-specific behaviors such as warnings-as-errors" OFF)
 option(USE_FLUX "Enable FLUX.2 image generation support" ON)
@@ -117,7 +119,12 @@ if(CI_BUILD)
 endif()
 
 function(idtech3_first_party_warnings_as_errors target_name)
-  if(NOT CI_BUILD OR NOT TARGET ${target_name})
+  if(NOT TARGET ${target_name})
+    return()
+  endif()
+  # Per-target C++20 policy (no global -fno-exceptions — FreeUSD/third_party need exceptions).
+  idtech3_cpp20_apply_target_flags(${target_name})
+  if(NOT CI_BUILD)
     return()
   endif()
   if(MSVC)
@@ -4024,7 +4031,7 @@ if(BUILD_UNIT_TESTS)
 		tests/stub_qcommon_min.c
 		tests/stub_msg_cvar.c
 		engine/core/msg.c
-		engine/core/huffman_static.c)
+		engine/core/huffman_static.cpp)
 	target_include_directories(unit_msg PRIVATE ${IDTECH3_UNIT_INCLUDE_DIRS})
 	target_compile_definitions(unit_msg PRIVATE DEDICATED)
 	if(NOT MSVC)
@@ -4225,6 +4232,17 @@ if(BUILD_UNIT_TESTS)
 	endif()
 	add_test(NAME unit_bsp30_triangulate COMMAND unit_bsp30_triangulate)
 	set_tests_properties(unit_bsp30_triangulate PROPERTIES LABELS "unit;validation;bsp30")
+
+	add_executable(unit_cluster_math
+		tests/unit/test_cluster_math.c
+		renderers/vulkan/vk_cluster_math.cpp)
+	target_include_directories(unit_cluster_math PRIVATE
+		${CMAKE_SOURCE_DIR}/renderers/vulkan)
+	if(NOT MSVC)
+		target_link_libraries(unit_cluster_math PRIVATE m)
+	endif()
+	add_test(NAME unit_cluster_math COMMAND unit_cluster_math)
+	set_tests_properties(unit_cluster_math PROPERTIES LABELS "unit;validation;cluster")
 
 	add_executable(unit_engine_decal_map
 		tests/unit/test_engine_decal_map.c
@@ -4617,7 +4635,7 @@ if(BUILD_UNIT_TESTS)
 		tests/stub_qcommon_min.c
 		tests/stub_sv_auth_deps.c
 		runtime/server/sv_auth.c
-		engine/core/md5.c
+		engine/core/md5.cpp
 		engine/core/q_shared.c
 		engine/core/q_math.c)
 	target_include_directories(unit_sv_auth PRIVATE ${IDTECH3_UNIT_INCLUDE_DIRS})

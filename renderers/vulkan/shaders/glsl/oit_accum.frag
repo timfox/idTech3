@@ -28,6 +28,9 @@ layout(std430, set = 2, binding = 2) readonly buffer FpParamSSBO {
 	vec4 fp_cluster_z_range;
 } fp_params;
 
+#define CLUSTER_LIST_CELLS fp_tiles.fp_tile_cells
+#include "cluster_light_list.glsl"
+
 layout(location = 0) in vec2 frag_tex_coord0;
 layout(location = 1) in vec4 frag_color0;
 layout(location = 2) in vec3 frag_world_pos;
@@ -69,26 +72,22 @@ vec3 oit_forward_plus_add( vec3 baseRgb, vec3 N, vec3 worldPos, out bool cluster
 	uint ty = min( uint( px.y / tilePxY ), tilesY - 1u );
 	uint zSlices = max( fp_params.fp_cluster_meta.x, 1u );
 	uint zMode = fp_params.fp_cluster_meta.y;
+	uint compactLists = fp_params.fp_cluster_meta.z;
+	uint clusterCount = max( fp_params.fp_cluster_meta.w, tilesX * tilesY * zSlices );
 	float zNear = max( fp_params.fp_cluster_z_range.x, 1e-3 );
 	float zFar = max( fp_params.fp_cluster_z_range.y, zNear + 1e-3 );
 	uint slice = fp_view_depth_to_slice( abs( wc.w ), zSlices, zMode, zNear, zFar );
 	uint tileId = fp_cluster_index( tx, ty, tilesX, tilesY, slice, zSlices );
-	uint clusterCount = tilesX * tilesY * zSlices;
-	uint tileLen = clusterCount * 8u;
+	uint legacyMax = 8u;
 	if ( tileId >= clusterCount ) {
 		clusterOob = true;
 		return fpAdd;
 	}
-	uint tbase = tileId * 8u;
 	float nLights = fp_lights.fp_light_data[0].x;
 	uint maxPerTile = uint( max( fp_lights.fp_light_data[0].z + 0.5, 1.0 ) );
-	maxPerTile = min( maxPerTile, 8u );
+	maxPerTile = min( maxPerTile, compactLists != 0u ? 32u : legacyMax );
 	for ( uint k = 0u; k < maxPerTile; k++ ) {
-		if ( tbase + k >= tileLen ) {
-			clusterOob = true;
-			break;
-		}
-		uint li = fp_tiles.fp_tile_cells[ tbase + k ];
+		uint li = Cluster_FetchLightIndex( tileId, k, compactLists, legacyMax, clusterCount );
 		if ( li == 0xFFFFFFFFu ) {
 			continue;
 		}

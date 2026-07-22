@@ -4105,6 +4105,7 @@ void Com_Init( char *commandLine ) {
 	Cmd_AddCommand( "writeconfig", Com_WriteConfig_f );
 	Cmd_SetCommandCompletionFunc( "writeconfig", Cmd_CompleteWriteCfgName );
 	Cmd_AddCommand( "game_restart", Com_GameRestart_f );
+	Com_Cpp20Status_Init();
 
 	s = va( "%s %s %s %s", Q3_VERSION, PLATFORM_STRING, __DATE__, __TIME__ );
 	com_version = Cvar_Get( "version", s, CVAR_PROTECTED | CVAR_ROM | CVAR_SERVERINFO );

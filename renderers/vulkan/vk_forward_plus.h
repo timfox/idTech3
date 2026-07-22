@@ -15,6 +15,8 @@ uint32_t vk_forward_plus_get_max_per_tile_cap( void );
 /* Contract: deferred lighting + Forward+ fragment bind the same tile buffer generation. */
 void vk_cluster_assert_shared_consumers( const char *consumer );
 uint32_t vk_cluster_list_generation( void );
+void vk_cluster_register_commands( void );
+void vk_cluster_unregister_commands( void );
 
 /* Thin wrappers naming the shared cluster API (call existing Forward+ implementations). */
 void vk_cluster_dispatch_tile_cull( void );

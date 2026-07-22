@@ -187,17 +187,21 @@ vec3 shadeDeferredPixel( uvec2 pix ) {
 	uint ty = min( uint( float( pix.y ) / tilePxY ), tilesY - 1u );
 	uint slice = fp_view_depth_to_slice( abs( viewPos.z ), zSlices, pc.zSliceMode, pc.zNear, pc.zFar );
 	uint tileId = fp_cluster_index( tx, ty, tilesX, tilesY, slice, zSlices );
-	uint tbase = tileId * MAX_PER_TILE;
+	uint clusterCount = max( pc.clusterCount, tilesX * tilesY * zSlices );
+	uint legacyMax = 8u;
 
 	uint nPack = uint( max( lights.data[0].x + 0.5, 0.0 ) );
 	uint nLights = min( pc.numLights, nPack );
 	uint maxPer = min( pc.maxPerTile, MAX_PER_TILE );
+	if ( pc.compactLists == 0u ) {
+		maxPer = min( maxPer, legacyMax );
+	}
 
 	vec3 diffuseAcc = vec3( 0.0 );
 	vec3 specularAcc = vec3( 0.0 );
 
 	for ( uint k = 0u; k < maxPer; k++ ) {
-		uint li = tiles.cells[ tbase + k ];
+		uint li = Cluster_FetchLightIndex( tileId, k, pc.compactLists, legacyMax, clusterCount );
 		if ( li == 0xFFFFFFFFu ) {
 			break;
 		}

@@ -79,6 +79,8 @@ typedef struct {
 	float zNear;
 	float zFar;
 	float specularAA;
+	uint32_t compactLists;
+	uint32_t clusterCount;
 } vrcs_light_push_t;
 
 typedef struct {
@@ -659,6 +661,8 @@ static void VRCS_FillLightPush( vrcs_light_push_t *push, uint32_t width, uint32_
 			push->specularAA = Com_Clamp( 0.0f, 2.0f, fa );
 		}
 	}
+	push->compactLists = vk.forward_plus.compact_lists ? 1u : 0u;
+	push->clusterCount = vk.forward_plus.tile_capacity_tiles;
 }
 
 qboolean vk_vrcs_dispatch_deferred_lighting( uint32_t width, uint32_t height )
