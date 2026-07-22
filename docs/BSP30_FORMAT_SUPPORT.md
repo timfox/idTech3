@@ -33,3 +33,29 @@ Point queries use the BSP30 render-node tree. Player and box sweeps use the
 map's precomputed clipnode hull and add only the residual idTech3 box extent.
 This preserves surf ramps and edges without importing an external physics or
 SDK implementation.
+
+## Face triangulation and plane winding
+
+BSP30 faces are edge-walked rings that may be **non-convex**. The renderer
+triangulates each face with **ear clipping** (`R_Bsp30_TriangulateFace` in
+`renderers/common/tr_bsp30_triangulate.c`) instead of a triangle-fan from
+vertex 0 (which emits exterior triangles on reflex n-gons).
+
+After loading vertices, the face plane is **aligned to the Newell normal** of
+the vertex ring. A mismatched `face.side` / surfedge winding left
+`plane.normal` anti-parallel to the geometry on `surf_aztec` letter brushes;
+`R_CullSurface` then dropped front-facing faces while neighbors remained,
+producing shredded “AZ” letters and hard black wedges. This is a static
+geometry / cull bug — not temporal AA.
+
+Regression: `ctest -R unit_bsp30_triangulate`.
+
+## Surface identity (surf_aztec “AZ”)
+
+| Property | Value |
+|---|---|
+| Type | BSP30 brush faces (not MD3, decal, sprite, or glyph mesh) |
+| Entity | `func_illusionary` `"model" "*17"` |
+| Texture | `black` (WAD `de_aztec.wad`; checkerboard fallback if WAD absent) |
+| Shader | auto `*bsp30/black` |
+| Approx. bbox | x −2744…−2382, y 256…263, z 1958…2320 |

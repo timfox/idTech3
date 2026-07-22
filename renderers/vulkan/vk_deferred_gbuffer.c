@@ -344,6 +344,31 @@ qboolean vk_deferred_lighting_active( void )
 	return vk_deferred_lighting_wanted();
 }
 
+qboolean vk_deferred_lighting_path_ready( void )
+{
+	if ( !vk_deferred_lighting_wanted() ) {
+		return qfalse;
+	}
+	if ( vk.deferredGbufferFallbackActive ) {
+		return qfalse;
+	}
+	if ( !vk.deferredGbufferAllocated ||
+		vk.deferred_gbuffer_albedo == VK_NULL_HANDLE ||
+		vk.deferred_gbuffer_albedo_view == VK_NULL_HANDLE ||
+		vk.deferred_lighting_image == VK_NULL_HANDLE ||
+		vk.deferred_lighting_view == VK_NULL_HANDLE ) {
+		return qfalse;
+	}
+	if ( vk.forward_plus.buffer == VK_NULL_HANDLE || vk.forward_plus.tile_buffer == VK_NULL_HANDLE ) {
+		return qfalse;
+	}
+	/* Sticky soft-fails: do not hand off dynamics if lighting/composite cannot run. */
+	if ( vk.deferred_gbuffer.lighting_create_failed || vk.deferred_gbuffer.composite_create_failed ) {
+		return qfalse;
+	}
+	return qtrue;
+}
+
 qboolean vk_unified_clustered_active( void )
 {
 	return ( R_RenderMode_IsUnifiedClustered() &&
@@ -367,17 +392,32 @@ qboolean vk_deferred_opaque_transparent_split( void )
 
 qboolean vk_unified_clustered_opaque_handoff( void )
 {
-	/* Opaque world pass: hand dynamics to deferred. Skip weapon/UI views. */
+	/* Opaque world pass: hand dynamics to deferred. Skip weapon/UI views.
+	 * Fail open to Forward+ when the deferred path cannot finish (avoids black REPLACE). */
 	if ( backEnd.drawSurfFilter != 1 ) {
 		return qfalse;
 	}
 	if ( vk_classify_current_view() != VK_VIEW_CLASS_MAIN_WORLD ) {
 		return qfalse;
 	}
+	if ( !vk_deferred_lighting_path_ready() ) {
+		return qfalse;
+	}
 	if ( vk_unified_clustered_active() ) {
+		if ( !vk.deferred_gbuffer.handoff_ready_logged ) {
+			ri.Printf( PRINT_ALL,
+				"[VK][deferred] opaque handoff ready (mode %d) — Forward+ dynamics deferred to compute\n",
+				r_renderMode ? r_renderMode->integer : -1 );
+			vk.deferred_gbuffer.handoff_ready_logged = qtrue;
+		}
 		return qtrue;
 	}
 	if ( r_renderMode && r_renderMode->integer == 1 && vk_deferred_lighting_active() ) {
+		if ( !vk.deferred_gbuffer.handoff_ready_logged ) {
+			ri.Printf( PRINT_ALL,
+				"[VK][deferred] opaque handoff ready (mode 1) — Forward+ dynamics deferred to compute\n" );
+			vk.deferred_gbuffer.handoff_ready_logged = qtrue;
+		}
 		return qtrue;
 	}
 	return qfalse;
@@ -421,6 +461,8 @@ static void vk_dgb_destroy_pipeline( void )
 	vk.deferred_gbuffer.fill_logged = qfalse;
 	vk.deferred_gbuffer.descriptor_generation = 0u;
 	vk.deferred_gbuffer.lighting_descriptor_generation = 0u;
+	vk.deferred_gbuffer.frame_capture_ok = qfalse;
+	vk.deferred_gbuffer.frame_lighting_ok = qfalse;
 }
 
 void vk_deferred_gbuffer_invalidate_runtime( void )
@@ -428,6 +470,10 @@ void vk_deferred_gbuffer_invalidate_runtime( void )
 	vk_dgb_destroy_pipeline();
 	vk.deferred_gbuffer.lighting_logged = qfalse;
 	vk.deferred_gbuffer.composite_logged = qfalse;
+	vk.deferred_gbuffer.composite_skip_logged = qfalse;
+	vk.deferred_gbuffer.handoff_ready_logged = qfalse;
+	vk.deferred_gbuffer.frame_capture_ok = qfalse;
+	vk.deferred_gbuffer.frame_lighting_ok = qfalse;
 	vk.deferred_gbuffer.lighting_create_failed = qfalse;
 	vk.deferred_gbuffer.composite_create_failed = qfalse;
 	vk.deferred_gbuffer.debug_create_failed = qfalse;
@@ -521,11 +567,17 @@ void vk_deferred_gbuffer_status_f( void )
 		vk_deferred_gbuffer_generation_valid() ? "yes" : "no",
 		vk.deferredGbufferExtentW, vk.deferredGbufferExtentH, w, h );
 	ri.Printf( PRINT_ALL, "viewClass : %s\n", vk_view_class_name( vk_classify_current_view() ) );
-	ri.Printf( PRINT_ALL, "runtime   : fillPipe=%s lightPipe=%s descGen=%u lightDescGen=%u\n",
+	ri.Printf( PRINT_ALL, "runtime   : fillPipe=%s lightPipe=%s composite=%s descGen=%u lightDescGen=%u\n",
 		vk.deferred_gbuffer.pipeline_ready ? "yes" : "no",
 		vk.deferred_gbuffer.lighting_pipeline_ready ? "yes" : "no",
+		vk.deferred_gbuffer.composite_gfx_ready ? "yes" : "no",
 		vk.deferred_gbuffer.descriptor_generation,
 		vk.deferred_gbuffer.lighting_descriptor_generation );
+	ri.Printf( PRINT_ALL, "pathReady : %s handoff=%s frame capture=%s lighting=%s\n",
+		vk_deferred_lighting_path_ready() ? "yes" : "no",
+		vk_unified_clustered_opaque_handoff() ? "yes" : "no",
+		vk.deferred_gbuffer.frame_capture_ok ? "yes" : "no",
+		vk.deferred_gbuffer.frame_lighting_ok ? "yes" : "no" );
 	ri.Printf( PRINT_ALL, "fallback  : active=%s reason=%s\n",
 		vk.deferredGbufferFallbackActive ? "yes" : "no",
 		vk.deferredGbufferFallbackReason[0] ? vk.deferredGbufferFallbackReason : "none" );
@@ -794,6 +846,9 @@ void vk_deferred_gbuffer_capture_after_geometry( void )
 	uint32_t gx, gy;
 	qboolean resume_main;
 
+	vk.deferred_gbuffer.frame_capture_ok = qfalse;
+	vk.deferred_gbuffer.frame_lighting_ok = qfalse;
+
 	if ( !vk_deferred_gbuffer_fill_wanted() ) {
 		return;
 	}
@@ -838,6 +893,7 @@ void vk_deferred_gbuffer_capture_after_geometry( void )
 		if ( resume_main ) {
 			vk_resume_current_render_pass();
 		}
+		vk_spine_pass_end( VK_SPINE_PASS_GBUFFER_FILL );
 		return;
 	}
 
@@ -881,15 +937,35 @@ void vk_deferred_gbuffer_capture_after_geometry( void )
 		VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
 		0, 0 );
 
+	/* Scene base for additive composite is the color copy — mark even if normal fill fails. */
+	vk.deferred_gbuffer.frame_capture_ok = qtrue;
+
 	if ( !vk.deferredGbufferDirectExport ) {
 		vk_dgb_update_descriptors();
 		if ( vk.deferred_gbuffer.descriptor_generation != vk.deferredGbufferGeneration ) {
 			ri.Printf( PRINT_WARNING, S_COLOR_YELLOW
 				"[VK][deferred] skip fill dispatch: descriptor gen %u != resource gen %u\n" S_COLOR_WHITE,
 				vk.deferred_gbuffer.descriptor_generation, vk.deferredGbufferGeneration );
+			/* Restore color layout before resume — early return used to leave TRANSFER_SRC. */
+			record_image_layout_transition( vk.cmd->command_buffer, vk.color_image, VK_IMAGE_ASPECT_COLOR_BIT,
+				VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+				0, 0 );
+			if ( !vk.deferredGbufferDirectExport ) {
+				record_image_layout_transition( vk.cmd->command_buffer, vk.deferred_gbuffer_normal, VK_IMAGE_ASPECT_COLOR_BIT,
+					VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+					0, 0 );
+				record_image_layout_transition( vk.cmd->command_buffer, vk.deferred_gbuffer_material, VK_IMAGE_ASPECT_COLOR_BIT,
+					VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+					0, 0 );
+			}
+			record_depth_image_layout_transition( vk.cmd->command_buffer, depth_aspect,
+				VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
+				VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT | VK_PIPELINE_STAGE_TRANSFER_BIT,
+				VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT );
 			if ( resume_main ) {
 				vk_resume_current_render_pass();
 			}
+			vk_spine_pass_end( VK_SPINE_PASS_GBUFFER_FILL );
 			return;
 		}
 
@@ -1253,32 +1329,32 @@ static void vk_dgb_fill_light_push( vk_deferred_light_push_t *push, uint32_t wid
 	}
 }
 
-static void vk_dgb_dispatch_lighting_compute( uint32_t width, uint32_t height )
+static qboolean vk_dgb_dispatch_lighting_compute( uint32_t width, uint32_t height )
 {
 	vk_deferred_light_push_t push;
 	uint32_t gx, gy;
 	VkImageAspectFlags depth_aspect;
 
 	if ( !vk_deferred_lighting_wanted() ) {
-		return;
+		return qfalse;
 	}
 	vk_deferred_gbuffer_ensure_runtime();
 	if ( !vk.cmd || vk.cmd->command_buffer == VK_NULL_HANDLE ) {
-		return;
+		return qfalse;
 	}
 	if ( vk.forward_plus.buffer == VK_NULL_HANDLE || vk.forward_plus.tile_buffer == VK_NULL_HANDLE ||
 		vk.deferred_lighting_image == VK_NULL_HANDLE || vk.deferred_lighting_view == VK_NULL_HANDLE ) {
-		return;
+		return qfalse;
 	}
 
 	/* VRCS path: SRI + pack + wave-packed lighting + deblock (own pipelines). */
 	if ( vk_vrcs_dispatch_deferred_lighting( width, height ) ) {
-		return;
+		return qtrue;
 	}
 
 	vk_dgb_create_lighting_pipeline();
 	if ( !vk.deferred_gbuffer.lighting_pipeline_ready || vk.deferred_gbuffer.lighting_pipeline == VK_NULL_HANDLE ) {
-		return;
+		return qfalse;
 	}
 
 	if ( !vk.deferred_gbuffer.lighting_logged ) {
@@ -1319,7 +1395,7 @@ static void vk_dgb_dispatch_lighting_compute( uint32_t width, uint32_t height )
 		record_image_layout_transition( vk.cmd->command_buffer, vk.deferred_lighting_image, VK_IMAGE_ASPECT_COLOR_BIT,
 			VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
 			0, 0 );
-		return;
+		return qfalse;
 	}
 	vk_dgb_fill_light_push( &push, width, height );
 
@@ -1341,6 +1417,7 @@ static void vk_dgb_dispatch_lighting_compute( uint32_t width, uint32_t height )
 		VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
 		VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
 		VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT );
+	return qtrue;
 }
 
 static void vk_dgb_create_composite_gfx_pipeline( void )
@@ -1588,6 +1665,10 @@ static void vk_dgb_composite_lit_to_color( uint32_t width, uint32_t height )
 	vk_dgb_update_composite_descriptor();
 
 	push.additive = vk_deferred_unlit_base_wanted() ? 1u : 0u;
+	/* Never REPLACE with dynamic-only when we have a captured scene base — that path blacks maps. */
+	if ( vk.deferred_gbuffer.frame_capture_ok ) {
+		push.additive = 1u;
+	}
 
 	qvkCmdBindPipeline( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.deferred_gbuffer.composite_gfx_pipeline );
 	qvkCmdBindDescriptorSets( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
@@ -1612,6 +1693,7 @@ static void vk_dgb_composite_lit_to_color( uint32_t width, uint32_t height )
 void vk_deferred_lighting_apply_after_geometry( void )
 {
 	uint32_t width, height;
+	qboolean lighting_ok;
 
 	if ( !vk_deferred_lighting_wanted() ) {
 		return;
@@ -1636,10 +1718,35 @@ void vk_deferred_lighting_apply_after_geometry( void )
 	vk_spine_note_read( VK_SPINE_RES_DEPTH, VK_SPINE_PASS_DEFERRED_LIGHTING,
 		VK_SPINE_ACCESS_DEPTH_READ );
 
-	vk_dgb_dispatch_lighting_compute( width, height );
+	lighting_ok = vk_dgb_dispatch_lighting_compute( width, height );
+	vk.deferred_gbuffer.frame_lighting_ok = lighting_ok;
+
+	/*
+	 * Fullscreen composite REPLACES HDR color. Only do that when this frame has a valid
+	 * scene-base capture and lighting RT write — otherwise leave the opaque lightmapped
+	 * buffer intact (fail open) instead of painting black / empty albedo.
+	 */
+	if ( !vk.deferred_gbuffer.frame_capture_ok || !lighting_ok ) {
+		if ( !vk.deferred_gbuffer.composite_skip_logged ) {
+			ri.Printf( PRINT_WARNING, S_COLOR_YELLOW
+				"[VK][deferred] skip composite REPLACE (capture_ok=%d lighting_ok=%d) — keeping opaque color\n"
+				S_COLOR_WHITE,
+				vk.deferred_gbuffer.frame_capture_ok ? 1 : 0,
+				lighting_ok ? 1 : 0 );
+			vk.deferred_gbuffer.composite_skip_logged = qtrue;
+		}
+		vk_spine_pass_end( VK_SPINE_PASS_DEFERRED_LIGHTING );
+		return;
+	}
 
 	vk_dgb_create_composite_gfx_pipeline();
 	if ( !vk.deferred_gbuffer.composite_gfx_ready || vk.deferred_gbuffer.composite_gfx_pipeline == VK_NULL_HANDLE ) {
+		if ( !vk.deferred_gbuffer.composite_skip_logged ) {
+			ri.Printf( PRINT_WARNING, S_COLOR_YELLOW
+				"[VK][deferred] skip composite REPLACE (composite pipeline unavailable) — keeping opaque color\n"
+				S_COLOR_WHITE );
+			vk.deferred_gbuffer.composite_skip_logged = qtrue;
+		}
 		vk_spine_pass_end( VK_SPINE_PASS_DEFERRED_LIGHTING );
 		return;
 	}
@@ -1647,7 +1754,7 @@ void vk_deferred_lighting_apply_after_geometry( void )
 	if ( !vk.deferred_gbuffer.composite_logged ) {
 		ri.Printf( PRINT_ALL,
 			"[VK][deferred] composite scene base + dynamic lighting to color (additive=%s)\n",
-			vk_deferred_unlit_base_wanted() ? "1" : "0" );
+			( vk_deferred_unlit_base_wanted() || vk.deferred_gbuffer.frame_capture_ok ) ? "1" : "0" );
 		vk.deferred_gbuffer.composite_logged = qtrue;
 	}
 

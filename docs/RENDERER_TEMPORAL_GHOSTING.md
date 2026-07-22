@@ -16,6 +16,10 @@ Observed on Surf (`fs_game surf`, `surf_aztec`) and similar first-person views:
 - Nearby world pixels look contaminated by previous weapon positions.
 - The weapon MD3 itself is valid (confirmed offline; geometry is not duplicated in the asset).
 
+**Not this doc:** static shredded / wedge fragments on the world “AZ” letter mesh
+are BSP30 face-plane winding + triangulation (`docs/BSP30_FORMAT_SUPPORT.md`),
+not temporal history.
+
 ## Runtime state of the Surf repro (measured)
 
 | Consumer | Typical Surf value | Notes |

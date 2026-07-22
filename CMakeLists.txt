@@ -1981,6 +1981,7 @@ set(RENDERER_COMMON_SRCS
 	renderers/vulkan/tr_model_md5.c
 	renderers/common/tr_image_ktx2.c
 	renderers/common/tr_noise.c
+	renderers/common/tr_bsp30_triangulate.c
 )
 include(${CMAKE_SOURCE_DIR}/cmake/modules/UberToolsSources.cmake)
 idtech3_append_ubertools_renderer_sources()
@@ -4213,6 +4214,17 @@ if(BUILD_UNIT_TESTS)
 	endif()
 	add_test(NAME unit_tiki_parse COMMAND unit_tiki_parse)
 	set_tests_properties(unit_tiki_parse PROPERTIES LABELS "unit;validation;ubertools")
+
+	add_executable(unit_bsp30_triangulate
+		tests/unit/test_bsp30_triangulate.c
+		renderers/common/tr_bsp30_triangulate.c)
+	target_include_directories(unit_bsp30_triangulate PRIVATE
+		${CMAKE_SOURCE_DIR}/renderers/common)
+	if(NOT MSVC)
+		target_link_libraries(unit_bsp30_triangulate PRIVATE m)
+	endif()
+	add_test(NAME unit_bsp30_triangulate COMMAND unit_bsp30_triangulate)
+	set_tests_properties(unit_bsp30_triangulate PROPERTIES LABELS "unit;validation;bsp30")
 
 	add_executable(unit_engine_decal_map
 		tests/unit/test_engine_decal_map.c

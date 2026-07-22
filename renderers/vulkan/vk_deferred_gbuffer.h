@@ -28,6 +28,8 @@ qboolean vk_deferred_gbuffer_active( void );
 qboolean vk_deferred_gbuffer_fill_wanted( void );
 qboolean vk_deferred_lighting_active( void );
 qboolean vk_deferred_unlit_base_wanted( void );
+/* Resources + no fallback: opaque may hand dynamics to deferred (fail open to Forward+ if false). */
+qboolean vk_deferred_lighting_path_ready( void );
 /* r_renderMode 3: Unified Clustered Renderer (deferred opaque + Forward+ transparent). */
 qboolean vk_unified_clustered_active( void );
 qboolean vk_deferred_opaque_transparent_split( void );

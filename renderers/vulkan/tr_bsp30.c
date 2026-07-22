@@ -15,6 +15,7 @@ depend on Half-Life SDK source, headers, or libraries.
 
 #include "tr_local.h"
 #include "../../engine/core/qfiles_bsp30.h"
+#include "../common/tr_bsp30_triangulate.h"
 
 typedef struct {
 	const byte *base;
@@ -427,8 +428,6 @@ static void GS_LoadSurfaces( bsp30RenderLoad_t *load ) {
 		if ( side ) {
 			VectorNegate( face->plane.normal, face->plane.normal );
 			face->plane.dist = -face->plane.dist;
-			face->plane.type = PlaneTypeForNormal( face->plane.normal );
-			SetPlaneSignbits( &face->plane );
 		}
 
 		texinfo = &texinfos[texinfoIndex];
@@ -453,9 +452,6 @@ static void GS_LoadSurfaces( bsp30RenderLoad_t *load ) {
 			}
 			for ( k = 0; k < 3; k++ ) {
 				point[k] = LittleFloat( vertices[vertexIndex].point[k] );
-#ifdef USE_VK_PBR
-				point[3 + k] = face->plane.normal[k];
-#endif
 			}
 #ifdef USE_VK_PBR
 			point[6] = ( DotProduct( point, texinfo->vecs[0] ) + LittleFloat( texinfo->vecs[0][3] ) ) / textureWidth;
@@ -470,11 +466,72 @@ static void GS_LoadSurfaces( bsp30RenderLoad_t *load ) {
 #endif
 		}
 
-		for ( j = 0; j < numPoints - 2; j++ ) {
+		/*
+		 * Align face plane with vertex winding (Newell). BSP30 face.side plus
+		 * surfedge order can leave plane.normal anti-parallel to the ring.
+		 * R_CullSurface then drops front-facing letter faces while neighbors
+		 * remain — shredded AZ / hard black wedges on surf_aztec *17.
+		 */
+		{
+			vec3_t newell;
+			float newellLen;
+			int k;
+
+			VectorClear( newell );
+			for ( j = 0; j < numPoints; j++ ) {
+				const float *p0 = face->points[j];
+				const float *p1 = face->points[( j + 1 ) % numPoints];
+				newell[0] += ( p0[1] - p1[1] ) * ( p0[2] + p1[2] );
+				newell[1] += ( p0[2] - p1[2] ) * ( p0[0] + p1[0] );
+				newell[2] += ( p0[0] - p1[0] ) * ( p0[1] + p1[1] );
+			}
+			newellLen = VectorLength( newell );
+			if ( newellLen > 1e-6f ) {
+				VectorScale( newell, 1.0f / newellLen, newell );
+				if ( DotProduct( newell, face->plane.normal ) < 0.0f ) {
+					VectorNegate( face->plane.normal, face->plane.normal );
+					face->plane.dist = -face->plane.dist;
+				}
+			}
+			face->plane.type = PlaneTypeForNormal( face->plane.normal );
+			SetPlaneSignbits( &face->plane );
+#ifdef USE_VK_PBR
+			for ( j = 0; j < numPoints; j++ ) {
+				for ( k = 0; k < 3; k++ ) {
+					face->points[j][3 + k] = face->plane.normal[k];
+				}
+			}
+#endif
+		}
+
+		/*
+		 * Ear-clip non-convex BSP30 faces. Triangle-fan from vertex 0 produces
+		 * exterior triangles on reflex n-gons (additional AZ wedges).
+		 */
+		{
+			float xyz[BSP30_TRIANGULATE_MAX_POINTS * 3];
 			int *indices = (int *)( (byte *)face + face->ofsIndices );
-			indices[j * 3 + 0] = 0;
-			indices[j * 3 + 1] = j + 1;
-			indices[j * 3 + 2] = j + 2;
+			int wrote;
+
+			if ( numPoints <= BSP30_TRIANGULATE_MAX_POINTS ) {
+				for ( j = 0; j < numPoints; j++ ) {
+					xyz[j * 3 + 0] = face->points[j][0];
+					xyz[j * 3 + 1] = face->points[j][1];
+					xyz[j * 3 + 2] = face->points[j][2];
+				}
+				wrote = R_Bsp30_TriangulateFace( xyz, numPoints, indices, numIndices );
+				if ( wrote != numIndices ) {
+					ri.Printf( PRINT_WARNING,
+						"BSP30: face %d triangulation size mismatch (%d vs %d)\n",
+						i, wrote, numIndices );
+				}
+			} else {
+				for ( j = 0; j < numPoints - 2; j++ ) {
+					indices[j * 3 + 0] = 0;
+					indices[j * 3 + 1] = j + 1;
+					indices[j * 3 + 2] = j + 2;
+				}
+			}
 		}
 #ifdef USE_VK_PBR
 		vk_mikkt_bsp_face_generate( face );

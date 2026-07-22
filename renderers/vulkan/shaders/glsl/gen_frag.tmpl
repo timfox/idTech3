@@ -1678,7 +1678,8 @@ void main() {
 	vec3 fpAdd = vec3( 0.0 );
 #ifdef USE_FORWARD_PLUS_FRAG
 #if defined(USE_FORWARD_PLUS_WORLD_POS)
-	/* Mode 3 Unified Clustered opaque: skip Forward+ add (deferred compute owns dynamics). */
+	/* Opaque handoff: skip Forward+ add (deferred compute owns dynamics). Mode 1 no longer
+	 * bakes this via deferred_unlit_base_strength — only pbrDebugMode.y from the CPU handoff. */
 	float hybridDeferredOpaque = pbrDebugMode.y;
 	if ( !deferredAdditiveHandoff && ( forward_plus_shade_strength > 1e-6 || pbrForwardPlus.x > 1e-6 ) ) {
 		uint tilesX = uint( fp_lights.fp_light_data[1].x + 0.5 );

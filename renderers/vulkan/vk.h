@@ -891,6 +891,12 @@ typedef struct {
 		qboolean composite_gfx_ready;
 		qboolean composite_logged;
 		qboolean composite_create_failed; /* soft-fail sticky; cleared on invalidate */
+		/* Per-frame: color→albedo copy succeeded (scene base for additive composite). */
+		qboolean frame_capture_ok;
+		/* Per-frame: deferred lighting compute wrote deferred_lighting_image. */
+		qboolean frame_lighting_ok;
+		qboolean composite_skip_logged; /* once: skipped REPLACE to avoid black frame */
+		qboolean handoff_ready_logged;
 	} deferred_gbuffer;
 	VkImage deferred_gbuffer_albedo;
 	VkImageView deferred_gbuffer_albedo_view;
