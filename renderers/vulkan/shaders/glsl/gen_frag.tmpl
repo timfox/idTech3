@@ -218,6 +218,7 @@ layout (constant_id = 10) const int acff = 0; // NONE, RGB, RGBA, ALPHA
 
 #extension GL_GOOGLE_include_directive : require
 #include "glint_ndf.glsl"
+#include "gbuffer_octahedral.glsl"
 #ifdef USE_FORWARD_PLUS_FRAG
 #include "forward_plus_cluster.glsl"
 #endif
@@ -411,6 +412,7 @@ layout (constant_id = 40) const float forward_plus_shade_strength = 0.0;
 layout (constant_id = 41) const float deferred_unlit_base_strength = 0.0;
 layout (constant_id = 42) const int material_blend_layers = 0; // 0=off, 2..8
 layout (constant_id = 43) const int material_height_mask = 0;  // bit i => layer i has height
+layout (constant_id = 44) const int gbuffer_compact = 0;      // 1: octahedral dual-write into material.ba
 
 /* Remapped layer slots when material_blend_layers >= 2:
  * Prefer set-19 blend_* arrays (unique layers 0..7).
@@ -1615,9 +1617,18 @@ void main() {
 	deferredClearcoat = clamp( deferredClearcoat + clamp( pbrSurfaceEvolution.x, 0.0, 1.0 ) * 0.35, 0.0, 1.0 );
 
 #ifdef USE_DEFERRED_EXPORT
-	/* World-space normal + material; a = clearcoat weight for deferred lobe parity. */
-	out_deferred_normal = vec4( normalize( N ), 1.0 );
-	out_deferred_material = vec4( metalness, roughness, AO, deferredClearcoat );
+	/* World-space normal scaffold; material.a = clearcoat (or AO in .a when compact dual-write). */
+	{
+		vec3 nExport = normalize( N );
+		out_deferred_normal = vec4( nExport, ( gbuffer_compact != 0 ) ? clamp( AO, 0.0, 1.0 ) : 1.0 );
+		if ( gbuffer_compact != 0 ) {
+			/* Compact G-buffer 2.0 prep: metal/rough + octahedral; AO in normal.a; clearcoat defaults in lighting. */
+			vec2 oct = GbufEncodeOctahedral( nExport );
+			out_deferred_material = vec4( metalness, roughness, oct );
+		} else {
+			out_deferred_material = vec4( metalness, roughness, AO, deferredClearcoat );
+		}
+	}
 #ifdef USE_VISIBILITY_EXPORT
 	{
 		uint drawId = 0u;

@@ -46,7 +46,7 @@ Complex / transparent → Forward+ or OIT (see r_oit, mode 3)
 | G2 emissive + AO + ext | `R8G8B8A8_UNORM` or FP16 emissive | 4–8 |
 | **Write target** | | **12–16** |
 
-**Shipping scaffold:** 24 B/px write (FP16×3). Prep: `r_gbufferCompact 1` dual-writes octahedral into material.ba via `gbuffer_octahedral.glsl`. Deferred lighting (`deferred_lighting_common.glsl`) decodes oct from material.ba when compact is on; AO/clearcoat use defaults.
+**Shipping scaffold:** 24 B/px write (FP16×3). Dual-write: `r_gbufferCompact 1` packs octahedral into material.ba (direct MRT + depth fill) and AO into normal.a; deferred lighting decodes oct. Clearcoat still defaults to 0 until G2 cutover.
 
 Separate: velocity, temporal class, object id, reversed-Z depth.
 

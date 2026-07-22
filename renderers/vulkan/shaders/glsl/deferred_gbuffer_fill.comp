@@ -63,11 +63,13 @@ void main() {
 
 	if ( !validDepth( depth ) ) {
 		vec4 matOut = baseMaterial;
+		float nA = 0.0;
 		if ( ( pc.gbufferFlags & GBUFFER_FLAG_COMPACT_DUAL_WRITE ) != 0u ) {
 			vec2 oct = GbufEncodeOctahedral( vec3( 0.0, 0.0, 1.0 ) );
 			matOut = vec4( baseMaterial.rg, oct );
+			nA = 1.0; /* AO default for sky/empty */
 		}
-		imageStore( normalOut, ivec2( pix ), vec4( 0.0, 0.0, 1.0, 0.0 ) );
+		imageStore( normalOut, ivec2( pix ), vec4( 0.0, 0.0, 1.0, nA ) );
 		imageStore( materialOut, ivec2( pix ), matOut );
 		return;
 	}
@@ -124,10 +126,11 @@ void main() {
 		fallbackMetalness = mix( baseMaterial.r, fallbackMetalness, 0.5 );
 	}
 
-	imageStore( normalOut, ivec2( pix ), vec4( n, confidence ) );
+	imageStore( normalOut, ivec2( pix ), vec4( n,
+		( ( pc.gbufferFlags & GBUFFER_FLAG_COMPACT_DUAL_WRITE ) != 0u ) ? fallbackAO : confidence ) );
 	if ( ( pc.gbufferFlags & GBUFFER_FLAG_COMPACT_DUAL_WRITE ) != 0u ) {
 		vec2 oct = GbufEncodeOctahedral( n );
-		/* Compact prep: octahedral in material.ba; scaffold XYZ stays in normalOut for lighting. */
+		/* Compact prep: octahedral in material.ba; AO in normal.a; scaffold XYZ in normal.rgb. */
 		imageStore( materialOut, ivec2( pix ), vec4( fallbackMetalness, fallbackRoughness, oct ) );
 	} else {
 		/* material.a = sourceConfidence (same signal as normal.a) for classify. */

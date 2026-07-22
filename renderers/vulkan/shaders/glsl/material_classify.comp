@@ -18,7 +18,7 @@ layout(r8ui, set = 0, binding = 2) uniform writeonly uimage2D classOut;
 layout(push_constant) uniform Push {
 	uvec2 extent;
 	uint hasMaterial;
-	uint reserved;
+	uint gbufferCompact; /* 1: material.ba is octahedral; AO/conf heuristics unsafe */
 } pc;
 
 const uint CLASS_EMPTY = 0u;
@@ -53,8 +53,8 @@ void main() {
 		vec4 mat = texture( materialTex, uv );
 		float metal = mat.r;
 		float rough = mat.g;
-		float ao = mat.b;
-		float conf = mat.a;
+		float ao = ( pc.gbufferCompact != 0u ) ? 1.0 : mat.b;
+		float conf = ( pc.gbufferCompact != 0u ) ? 1.0 : mat.a;
 
 		/* Low confidence: stay simple opaque (energy-neutral vs Forward+). */
 		if ( conf < 0.35 ) {

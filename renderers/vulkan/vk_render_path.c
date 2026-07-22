@@ -289,7 +289,9 @@ void R_RenderPath_RegisterCvars( void )
 
 	r_gbufferCompact = ri.Cvar_Get( "r_gbufferCompact", "0", CVAR_ARCHIVE_ND | CVAR_LATCH );
 	ri.Cvar_CheckRange( r_gbufferCompact, "0", "1", CV_INTEGER );
-	ri.Cvar_SetDescription( r_gbufferCompact, "Compact G-buffer 2.0 prep (latched). See docs/GBUFFER_2.md." );
+	ri.Cvar_SetDescription( r_gbufferCompact,
+		"Compact G-buffer 2.0 prep (latched). Dual-writes octahedral into material.ba (direct MRT + depth fill);\n"
+		"AO in normal.a; lighting decodes oct. See docs/GBUFFER_2.md." );
 	ri.Cvar_SetGroup( r_gbufferCompact, CVG_RENDERER );
 
 	if ( !s_statusCmdRegistered ) {

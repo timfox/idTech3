@@ -18,6 +18,7 @@ Coexists with classic G-buffer; does not replace deferred lighting consumers.
 #include "vk_util.h"
 #include "vk_view_state.h"
 #include "vk_post_fog.h"
+#include "vk_render_path.h"
 #include "tr_render_mode_vk.h"
 
 static void vk_visbuf_validate_compute_break( const char *stage, qboolean resume_main )
@@ -54,7 +55,7 @@ typedef struct {
 typedef struct {
 	uint32_t extent[2];
 	uint32_t hasMaterial;
-	uint32_t reserved;
+	uint32_t gbufferCompact; /* 1: material.ba is octahedral — skip AO/conf heuristics */
 } vk_visbuf_classify_push_t;
 
 typedef struct {
@@ -776,6 +777,7 @@ void vk_visibility_buffer_capture_after_geometry( void )
 			class_push.extent[1] = height;
 			class_push.hasMaterial = ( vk.deferred_gbuffer_material_view != VK_NULL_HANDLE &&
 				vk_deferred_gbuffer_fill_wanted() ) ? 1u : 0u;
+			class_push.gbufferCompact = ( r_gbufferCompact && r_gbufferCompact->integer ) ? 1u : 0u;
 
 			qvkCmdBindPipeline( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE,
 				vk.visibility_buffer.classify_pipeline );

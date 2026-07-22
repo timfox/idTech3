@@ -5,7 +5,7 @@
 **Status:** Design + bandwidth reporting + dual-write prep (`r_gbufferCompact`, `gbuffer_octahedral.glsl`). Full layout migration is **not** shipping yet.  
 **Related:** [BLACK_FRAME_REGRESSION.md](BLACK_FRAME_REGRESSION.md) · [RENDERER_IDTECH7_SPRINT.md](RENDERER_IDTECH7_SPRINT.md) · deferred fill in `vk_deferred_gbuffer.c`
 
-**Prep (cheat):** `r_gbufferCompact 1` dual-writes octahedral into `material.ba` while normals stay scaffold XYZ; deferred lighting uses AO/clearcoat defaults when compact is on. `gbuffer_bandwidth` reports scaffold vs compact target B/px and Forward+ fallback %.
+**Prep (cheat):** `r_gbufferCompact 1` dual-writes octahedral into `material.ba` on **direct MRT export** (`gen_frag.tmpl`) and depth-fill; AO lives in `normal.a`; deferred lighting decodes oct and samples AO from normal.a (clearcoat defaults to 0). `gbuffer_bandwidth` reports scaffold vs compact target B/px and Forward+ fallback %.
 
 ---
 

@@ -58,6 +58,7 @@ struct Vk_Pipeline_FragSpecData {
 	float   deferred_unlit_base_strength;
 	int32_t material_blend_layers;
 	int32_t material_height_mask;
+	int32_t gbuffer_compact; /* 1: dual-write octahedral into deferred material.ba */
 #endif
 };
 

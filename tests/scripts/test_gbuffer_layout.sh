@@ -27,6 +27,7 @@ pass "gbuffer bandwidth wiring present"
 
 if [[ -f "$ROOT/renderers/vulkan/shaders/glsl/gbuffer_octahedral.glsl" ]]; then
 	grep -q 'GbufEncodeOctahedral' "$ROOT/renderers/vulkan/shaders/glsl/gbuffer_octahedral.glsl" || fail "octahedral encode missing"
+	grep -q 'gbuffer_compact\|GbufEncodeOctahedral' "$ROOT/renderers/vulkan/shaders/glsl/gen_frag.tmpl" || fail "gen_frag must dual-write octahedral when compact"
 	pass "gbuffer_octahedral.glsl present"
 else
 	grep -q 'gbuffer_octahedral' "$DOC0" || fail "GBUFFER_2_0 must mention gbuffer_octahedral.glsl"

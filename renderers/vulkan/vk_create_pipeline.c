@@ -10,6 +10,7 @@ Split from vk.c.
 #include "tr_local.h"
 #include "vk_create_pipeline.h"
 #include "vk_pipeline_helpers.h"
+#include "vk_render_path.h"
 
 /* r_hdr 3: 64-bit (RGBA64F) uses dvec4 fragment output; select HDR64 shaders when active */
 static inline qboolean vk_hdr64_active( void )
@@ -66,9 +67,9 @@ VkPipeline vk_create_pipeline( const Vk_Pipeline_Def *def, renderPass_t renderPa
     struct Vk_Pipeline_FragSpecData frag_spec_data;
 
 #ifdef USE_VK_PBR
-	/* ADD_FRAG_SPEC: 11 base (0..10) + 33 PBR (constant_id 11..43) = 44 entries. */
+	/* ADD_FRAG_SPEC: 11 base (0..10) + 34 PBR (constant_id 11..44) = 45 entries. */
 	VkSpecializationMapEntry spec_entries[48];
-	_Static_assert( sizeof( spec_entries ) / sizeof( spec_entries[0] ) >= 44u,
+	_Static_assert( sizeof( spec_entries ) / sizeof( spec_entries[0] ) >= 45u,
 		"vk_create_pipeline: spec_entries[] too small for PBR fragment specialization map" );
 #else
 	VkSpecializationMapEntry spec_entries[12];
@@ -837,6 +838,7 @@ VkPipeline vk_create_pipeline( const Vk_Pipeline_Def *def, renderPass_t renderPa
 	ADD_FRAG_SPEC( 41, deferred_unlit_base_strength );
 	ADD_FRAG_SPEC( 42, material_blend_layers );
 	ADD_FRAG_SPEC( 43, material_height_mask );
+	ADD_FRAG_SPEC( 44, gbuffer_compact );
 
 	// only use w value, specgloss maps are not supported
 	frag_spec_data.specularScale_x = def->specularScale[0];
@@ -878,6 +880,7 @@ VkPipeline vk_create_pipeline( const Vk_Pipeline_Def *def, renderPass_t renderPa
 	frag_spec_data.deferred_unlit_base_strength = 0.0f;
 	frag_spec_data.material_blend_layers = 0;
 	frag_spec_data.material_height_mask = 0;
+	frag_spec_data.gbuffer_compact = ( r_gbufferCompact && r_gbufferCompact->integer ) ? 1 : 0;
 
 	if ( def->vk_pbr_flags & PBR_HAS_NORMALMAP )
 		frag_spec_data.normal_texture_set = 0;

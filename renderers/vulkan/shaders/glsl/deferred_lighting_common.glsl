@@ -100,13 +100,14 @@ const uint CLASS_ALPHA_TEST = 5u;
 vec3 SampleDeferredNormal( vec2 uv, vec4 material, out float normalConfidence )
 {
 	vec4 nSamp = texture( normalTex, uv );
-	normalConfidence = clamp( nSamp.w, 0.0, 1.0 );
 	vec3 Nsamp;
 	if ( pc.gbufferCompact != 0u ) {
-		/* Compact dual-write: octahedral in material.ba; prefer decode over scaffold XYZ. */
+		/* Compact dual-write: octahedral in material.ba; normal.a holds AO (confidence = 1). */
 		Nsamp = GbufDecodeOctahedral( material.ba );
+		normalConfidence = 1.0;
 	} else {
 		Nsamp = nSamp.xyz;
+		normalConfidence = clamp( nSamp.w, 0.0, 1.0 );
 	}
 	return Nsamp;
 }
@@ -187,9 +188,17 @@ vec3 shadeDeferredPixel( uvec2 pix ) {
 	float metalness = mix( 0.0, clamp( material.r, 0.0, 1.0 ), shadingConfidence );
 	float roughness = mix( 0.92, clamp( material.g, 0.04, 1.0 ), shadingConfidence );
 	roughness = ApplyDeferredSpecularAA( roughness, uv, ivec2( pix ), Nsamp );
-	/* Compact packs oct in .ba — AO/clearcoat use defaults until production cutover. */
-	float materialAO = ( pc.gbufferCompact != 0u ) ? 1.0 : clamp( material.b, 0.0, 1.0 );
-	float clearcoat = ( pc.gbufferCompact != 0u ) ? 0.0 : clamp( material.a, 0.0, 1.0 );
+	/* Compact: AO in normal.a; clearcoat defaults (material.ba is octahedral). */
+	float materialAO;
+	float clearcoat;
+	if ( pc.gbufferCompact != 0u ) {
+		materialAO = clamp( texture( normalTex, uv ).a, 0.0, 1.0 );
+		clearcoat = 0.0;
+	} else {
+		materialAO = clamp( material.b, 0.0, 1.0 );
+		/* Direct MRT: material.a = clearcoat. Depth-fill packs confidence here — treat as 0 coat. */
+		clearcoat = ( pc.normalsAreWorld != 0u ) ? clamp( material.a, 0.0, 1.0 ) : 0.0;
+	}
 	float aoCoupling = mix( 1.0, materialAO, clamp( pc.aoStrength, 0.0, 1.0 ) * shadingConfidence );
 	vec3 V = safeNormalizeOr( -viewPos, vec3( 0.0, 0.0, 1.0 ) );
 	N = safeNormalizeOr( mix( vec3( 0.0, 0.0, 1.0 ), N, max( shadingConfidence, 0.15 ) ), vec3( 0.0, 0.0, 1.0 ) );

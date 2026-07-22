@@ -66,6 +66,7 @@ tests=(
 	test_roughness_filter
 	test_probe_selection
 	test_reflection_fallback
+	test_gbuffer_octahedral
 )
 
 # Cluster indexing lives in cmake target unit_cluster_math (links vk_cluster_math.cpp).

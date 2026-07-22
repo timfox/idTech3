@@ -30,7 +30,7 @@ Shared: GPU scene, materials, lights, clusters, shadows, probes, atmosphere, exp
 |---|------|--------|
 | 1 | Black-frame / SceneHDR validation | **Done** — `renderer_validate_frame`, `renderer_resource_status`, `renderer_capture_black_frame`, `renderer_draw_status` |
 | 1b | Frame contract (FC Phase 1) | **Done** — `renderer_frame_status`, `renderer_capture_frame_contract`, per-resource history + black-frame class |
-| 2 | Compact G-buffer design + bandwidth | **Prep** — octahedral helpers, `r_gbufferCompact` dual-write, `gbuffer_bandwidth` scaffold vs compact + Forward+ fallback % |
+| 2 | Compact G-buffer design + bandwidth | **Dual-write** — direct MRT + depth-fill octahedral (`r_gbufferCompact`); AO in `normal.a`; lighting oct decode; `test_gbuffer_octahedral` |
 | 3 | Unify BRDF (Deferred / Forward+ / WBOIT) | **Done** — `pbr_brdf_core.glsl` in Forward+/OIT, deferred, and `gen_frag.tmpl` |
 | 4 | Specular AA (Toksvig + geo floor + glancing) | **Hardened** — shipping baseline; `r_pbr_specularAA` kill switch; no LEAN this sprint |
 | 5 | GPU scene records expansion | **Done** — prevTransform, objectId, temporalGeneration, shadowFlags, renderFlags; `r_gpuDrawCompare`; `gpu_scene_layout` |
