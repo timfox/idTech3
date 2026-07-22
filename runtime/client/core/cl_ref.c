@@ -130,10 +130,29 @@ on renderer registration cache alone; use vid_restart if anything looks stale.
 =================
 */
 static void CL_ReloadTtf_f( void ) {
+	fontInfo_t canary;
+	const char *path;
+
 	if ( !re.RegisterFont ) {
 		Com_Printf( S_COLOR_YELLOW "reloadTtf: renderer not loaded.\n" );
 		return;
 	}
+
+	/* Map scripts often re-exec surf.cfg while FreeType is torn down between
+	 * REF_KEEP_CONTEXT shutdown and the next R_Init. Clearing first would wipe
+	 * working HUD fonts and leave stale/empty handles → SIGSEGV on draw. */
+	path = Cvar_VariableString( "r_font" );
+	if ( !path || !path[0] ) {
+		Com_Printf( S_COLOR_YELLOW "reloadTtf: r_font is empty.\n" );
+		return;
+	}
+	Com_Memset( &canary, 0, sizeof( canary ) );
+	re.RegisterFont( path, 12, &canary );
+	if ( !canary.glyphs[ (int)'M' & 255 ].glyph && !canary.glyphs[ (int)'0' & 255 ].glyph ) {
+		Com_Printf( S_COLOR_YELLOW "reloadTtf: FreeType not ready; skipped (will load on next R_Init).\n" );
+		return;
+	}
+
 	if ( re.ClearTrueTypeFontCache ) {
 		re.ClearTrueTypeFontCache();
 	} else {

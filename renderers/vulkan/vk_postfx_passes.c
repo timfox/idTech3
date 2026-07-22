@@ -28,6 +28,7 @@ SSAO/HBAO pass, and vk_bloom. Split from vk.c.
 #include "vk_forward_plus.h"
 #include "vk_temporal.h"
 #include "vk_oit_certify.h"
+#include "vk_black_frame.h"
 
 static void vk_oit_validate_pass_break( const char *stage )
 {
@@ -427,6 +428,12 @@ void vk_oit_pass( const struct drawSurfsCommand_s *cmd )
 	vk.oitDrawCount = 0;
 	vk_oit_certify_frame_tick();
 
+	if ( vk_black_frame_force_minimal_scene() ) {
+		vk_oit_note_fallback( "r_forceMinimalScene 1" );
+		vk_spine_note_oit_skipped();
+		return;
+	}
+
 	if ( vk.oitCapturePending & VK_OIT_CAPTURE_CONTEXT ) {
 		ri.Printf( PRINT_ALL,
 			"[VK][OIT] FrameContext frame=%u cmd=%u swap=%u genAtt=%u genDesc=%u "
@@ -481,7 +488,11 @@ void vk_oit_pass( const struct drawSurfsCommand_s *cmd )
 	vk_get_active_render_extent( &fullWidth, &fullHeight );
 
 	if ( !vk_oit_resources_ready( fullWidth, fullHeight, mboit ) ) {
+		/* Already left MAIN; must reopen a color path or SceneHDR is orphaned (black 3D). */
+		vk_oit_note_fallback( "OIT resources not ready for extent" );
+		vk.oitFallbackCount++;
 		vk_spine_note_oit_skipped();
+		vk_begin_post_bloom_render_pass();
 		return;
 	}
 
@@ -526,6 +537,7 @@ void vk_oit_pass( const struct drawSurfsCommand_s *cmd )
 	}
 
 	/* Copy opaque scene to fog_scene for resolve */
+	vk_black_frame_note_writer( "OITOpaqueCopy" );
 	vk_copy_color_to_fog_scene( fullWidth, fullHeight );
 
 	if ( vk.msaaActive ) {

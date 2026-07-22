@@ -47,6 +47,14 @@ void CL_ShutdownAll( void ) {
 		if ( CL_GameSwitch() ) {
 			CL_Ref_Shutdown( REF_DESTROY_WINDOW );
 		} else {
+			/* REF_KEEP_CONTEXT still tears down FreeType atlases — drop client
+			 * TTF handles before re.Shutdown so HUD/console cannot SEGV on
+			 * stale glyph shaders while the renderer is between shutdown/init. */
+			cls.builtInTtfActive = qfalse;
+			Com_Memset( cls.builtInHudFonts, 0, sizeof( cls.builtInHudFonts ) );
+			Com_Memset( &cls.builtInConsoleFont, 0, sizeof( cls.builtInConsoleFont ) );
+			Com_Memset( cls.builtInHudRefLinePx, 0, sizeof( cls.builtInHudRefLinePx ) );
+			cls.builtInConsoleRefLinePx = 0;
 			re.Shutdown( REF_KEEP_CONTEXT );
 		}
 	}

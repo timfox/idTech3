@@ -21,6 +21,7 @@
 #include "vk_upscale.h"
 #include "vk_view_state.h"
 #include "vk_volumetric_pass.h"
+#include "vk_black_frame.h"
 #ifdef USE_IMGUI
 #include "inspector/vk_imgui.h"
 #endif
@@ -490,6 +491,9 @@ void vk_end_frame_record_capture_if_needed( void )
 
 void vk_end_frame_prepare_post_process( VkImageView *post_fog_src, VkImageView *luminance_src )
 {
+	vk_black_frame_note_writer( "PreBloom" );
+	vk_black_frame_check_before_ui();
+
 	if ( post_fog_src ) {
 		*post_fog_src = VK_NULL_HANDLE;
 	}

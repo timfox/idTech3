@@ -2,13 +2,14 @@
  * Shared BRDF / light eval for deferred lighting and VRCS variant.
  * Expects: DEF_PI, MAX_PER_TILE, REC_VEC4S, lights, tiles, pc push with lighting fields.
  *
- * Diffuse matches Forward+ Disney/Burley Fd (gen_frag.tmpl Diffuse_Burley + Fresnel kD).
+ * Core BRDF: pbr_brdf_core.glsl (shared with Forward+ / OIT).
  */
 
 #ifndef DEFERRED_LIGHTING_COMMON_GLSL
 #define DEFERRED_LIGHTING_COMMON_GLSL
 
 #include "forward_plus_cluster.glsl"
+#include "pbr_brdf_core.glsl"
 
 float viewZFromDepth( float depth ) {
 	return -pc.projInfo.w / max( depth + pc.projInfo.z, 1e-6 );
@@ -34,29 +35,20 @@ vec3 safeNormalizeOr( vec3 v, vec3 fallbackDir ) {
 }
 
 float Pow5( float x ) {
-	float x2 = x * x;
-	return x2 * x2 * x;
+	return PbrPow5( x );
 }
 
 /* Disney 2012 diffuse — same formulation as Forward+ Diffuse_Burley. */
 vec3 Diffuse_Burley( vec3 diffuseColor, float NE, float NL, float LH, float roughness ) {
-	float FD90 = 0.5 + 2.0 * LH * LH * roughness;
-	float lightScatter = 1.0 + ( FD90 - 1.0 ) * Pow5( 1.0 - NL );
-	float viewScatter = 1.0 + ( FD90 - 1.0 ) * Pow5( 1.0 - NE );
-	return diffuseColor * ( 1.0 / DEF_PI ) * lightScatter * viewScatter;
+	return PbrDiffuseBurley( diffuseColor, NE, NL, LH, roughness );
 }
 
 float D_GGX( float NH, float alpha ) {
-	float alphaSq = alpha * alpha;
-	float d = ( NH * alphaSq - NH ) * NH + 1.0;
-	return alphaSq / ( DEF_PI * d * d );
+	return PbrD_GGX( NH, alpha );
 }
 
 float CalcVisibility( float NL, float NE, float alpha ) {
-	float alphaSq = alpha * alpha;
-	float lambdaE = NL * sqrt( ( -NE * alphaSq + NE ) * NE + alphaSq );
-	float lambdaL = NE * sqrt( ( -NL * alphaSq + NL ) * NL + alphaSq );
-	return 0.5 / max( lambdaE + lambdaL, 1e-7 );
+	return PbrVisibilitySmithGGX( NL, NE, alpha );
 }
 
 /* Attenuation only (no N·L) — matches Forward+ att * Fd * NL separation. */
@@ -109,7 +101,7 @@ float ApplyDeferredSpecularAA( float roughness, vec2 uv, ivec2 pix )
 	if ( pc.specularAA <= 0.0 ) {
 		return roughness;
 	}
-	/* Screen-space normal variance (compute path; Toksvig-style inflate, Ultra 1.12). */
+	/* Screen-space normal variance (compute path; Toksvig + geometric floor). */
 	ivec2 sz = textureSize( normalTex, 0 );
 	ivec2 px = clamp( pix, ivec2( 0 ), sz - ivec2( 1 ) );
 	vec3 nC = texture( normalTex, uv ).xyz;
@@ -117,11 +109,13 @@ float ApplyDeferredSpecularAA( float roughness, vec2 uv, ivec2 pix )
 	vec3 nY = texelFetch( normalTex, clamp( px + ivec2( 0, 1 ), ivec2( 0 ), sz - ivec2( 1 ) ), 0 ).xyz;
 	vec3 dndx = nX - nC;
 	vec3 dndy = nY - nC;
-	float variance = min( dot( dndx, dndx ) + dot( dndy, dndy ), 0.5 );
-	float toksvig = variance / ( 1.0 + variance );
-	float alpha = max( roughness * roughness, 0.0004 );
-	alpha = clamp( alpha + toksvig * pc.specularAA, 0.0004, 1.0 );
-	return clamp( sqrt( alpha ), 0.02, 1.0 );
+	float variance = dot( dndx, dndx ) + dot( dndy, dndy );
+	float r = PbrSpecularAARoughness( roughness, variance, 0.0, pc.specularAA );
+	float depth = texture( depthTex, uv ).r;
+	vec3 viewPos = reconstructViewPos( uv, depth );
+	vec3 V = safeNormalizeOr( -viewPos, vec3( 0.0, 0.0, 1.0 ) );
+	float NV = clamp( abs( dot( normalize( nC ), V ) ), 0.0, 1.0 );
+	return PbrGlancingRoughness( r, NV );
 }
 
 vec3 shadeDeferredPixel( uvec2 pix ) {

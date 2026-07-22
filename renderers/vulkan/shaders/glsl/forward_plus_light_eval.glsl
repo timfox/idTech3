@@ -1,46 +1,39 @@
 /* Shared Forward+ / OIT light evaluation (Burley diffuse + GGX specular).
  * Expects: fp_lights, fp_tiles, fp_params SSBOs and CLUSTER_LIST_CELLS + cluster_light_list.glsl.
- * Used by oit_accum.frag / oit_accum_mboit.frag; keep in sync with deferred_lighting_common.glsl.
+ * Core BRDF: pbr_brdf_core.glsl (shared with deferred_lighting_common.glsl).
  */
 #ifndef FORWARD_PLUS_LIGHT_EVAL_GLSL
 #define FORWARD_PLUS_LIGHT_EVAL_GLSL
 
+#include "pbr_brdf_core.glsl"
+
 #ifndef FP_EVAL_PI
-#define FP_EVAL_PI 3.14159265358979323846
+#define FP_EVAL_PI PBR_BRDF_PI
 #endif
 
 float FpEval_Pow5( float x )
 {
-	float x2 = x * x;
-	return x2 * x2 * x;
+	return PbrPow5( x );
 }
 
 vec3 FpEval_Diffuse_Burley( vec3 diffuseColor, float NE, float NL, float LH, float roughness )
 {
-	float FD90 = 0.5 + 2.0 * LH * LH * roughness;
-	float lightScatter = 1.0 + ( FD90 - 1.0 ) * FpEval_Pow5( 1.0 - NL );
-	float viewScatter = 1.0 + ( FD90 - 1.0 ) * FpEval_Pow5( 1.0 - NE );
-	return diffuseColor * ( 1.0 / FP_EVAL_PI ) * lightScatter * viewScatter;
+	return PbrDiffuseBurley( diffuseColor, NE, NL, LH, roughness );
 }
 
 float FpEval_D_GGX( float NH, float alpha )
 {
-	float alphaSq = alpha * alpha;
-	float d = ( NH * alphaSq - NH ) * NH + 1.0;
-	return alphaSq / ( FP_EVAL_PI * d * d );
+	return PbrD_GGX( NH, alpha );
 }
 
 float FpEval_Visibility( float NL, float NE, float alpha )
 {
-	float alphaSq = alpha * alpha;
-	float lambdaE = NL * sqrt( ( -NE * alphaSq + NE ) * NE + alphaSq );
-	float lambdaL = NE * sqrt( ( -NL * alphaSq + NL ) * NL + alphaSq );
-	return 0.5 / max( lambdaE + lambdaL, 1e-7 );
+	return PbrVisibilitySmithGGX( NL, NE, alpha );
 }
 
 vec3 FpEval_FresnelSchlick( float cosTheta, vec3 F0 )
 {
-	return F0 + ( vec3( 1.0 ) - F0 ) * FpEval_Pow5( 1.0 - cosTheta );
+	return PbrFresnelSchlick( cosTheta, F0 );
 }
 
 /* lightingDebug: 0=full, 1=diffuse, 2=specular, 3=direct, 6=cluster count heat */

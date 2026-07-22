@@ -629,18 +629,28 @@ float ApplySpecularAA( in float roughness, in vec3 N )
 		return roughness;
 	}
 
-	/* Screen-space normal variance (shaded N). Toksvig-style inflate of α. */
+	/* Screen-space normal variance (shaded N). Toksvig + geometric floor (pbr_brdf_core). */
 	vec3 dndx = dFdx( N );
 	vec3 dndy = dFdy( N );
-	float variance = min( dot( dndx, dndx ) + dot( dndy, dndy ), 0.5 );
-	/* Geometric contribution from interpolated vertex normals (subpixel bevels; preserves hard edges via discontinuities). */
+	float variance = dot( dndx, dndx ) + dot( dndy, dndy );
+	/* Geometric contribution from interpolated vertex normals (subpixel bevels). */
 	vec3 gdx = dFdx( var_Normal.xyz );
 	vec3 gdy = dFdy( var_Normal.xyz );
-	variance = min( variance + 0.35 * ( dot( gdx, gdx ) + dot( gdy, gdy ) ), 0.5 );
-	float toksvig = variance / ( 1.0 + variance );
-	float alpha = max( roughness * roughness, 0.0004 );
-	alpha = clamp( alpha + toksvig * pbrAdvancedParams.w, 0.0004, 1.0 );
-	return clamp( sqrt( alpha ), 0.02, 1.0 );
+	float geoVariance = dot( gdx, gdx ) + dot( gdy, gdy );
+	float r = roughness;
+	{
+		float v = min( variance + 0.35 * geoVariance, 0.5 );
+		float toksvig = v / ( 1.0 + v );
+		float alpha = max( roughness * roughness, 0.0004 );
+		float geoAlpha = clamp( geoVariance * 0.25, 0.0, 0.25 );
+		alpha = max( alpha, geoAlpha );
+		alpha = clamp( alpha + toksvig * pbrAdvancedParams.w, 0.0004, 1.0 );
+		r = clamp( sqrt( alpha ), 0.02, 1.0 );
+	}
+	/* Grazing-angle highlight stability (view from interpolated view dir). */
+	float NV = clamp( abs( dot( N, normalize( var_ViewDir.xyz ) ) ), 0.0, 1.0 );
+	float g = clamp( 1.0 - NV, 0.0, 1.0 );
+	return clamp( r + g * g * 0.08, 0.02, 1.0 );
 }
 
 float WrapLambert( in float NL, in float w )

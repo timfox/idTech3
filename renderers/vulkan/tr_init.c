@@ -124,6 +124,7 @@ glstatic_t	gls;
 #include "vk_device.h"
 #include "vk_forward_plus.h"
 #include "vk_render_path.h"
+#include "vk_black_frame.h"
 #include "vk_aa_policy.h"
 static void VkInfo_f( void );
 static void VulkanInfo_f( void );
@@ -4057,6 +4058,7 @@ void R_Init( void ) {
 	R_ApplyRenderModeLatch();
 #ifdef USE_VULKAN
 	R_RenderPath_RegisterCvars();
+	vk_black_frame_register();
 #endif
 	VK_RasterUltra_Enforce();
 	vk_aa_policy_apply();

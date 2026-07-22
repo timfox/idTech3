@@ -28,6 +28,11 @@ typedef struct vkOitPushConstants_s {
 	float fogColorB;
 } vkOitPushConstants_t;
 
+_Static_assert( sizeof( vkOitPushConstants_t ) == 224,
+	"OIT push constants must stay 224 bytes (pipeline_layout_oit_* ranges)" );
+_Static_assert( sizeof( vkMvpPushConstants_t ) == 160,
+	"MVP push constants must match VkPushConstantRange in vk_init_device.c" );
+
 static VkRect2D vk_scene_src_rect;
 static qboolean vk_scene_src_rect_valid;
 

@@ -222,7 +222,6 @@ static int SCR_HudTtfTargetPixelHeightForVirtual( float virtualHeight ) {
 	int basePt;
 	int targetPx;
 	float pixelScale;
-	float floorVirt;
 
 	basePt = Cvar_VariableIntegerValue( "r_fontSize" );
 	if ( basePt <= 0 ) {
@@ -232,37 +231,30 @@ static int SCR_HudTtfTargetPixelHeightForVirtual( float virtualHeight ) {
 	pixelScale = SCR_UiPixelScale();
 	/*
 	 * Rasterize near the requested virtual HUD height so each tier stays close
-	 * to 1:1 atlas pixels.  Upscaling blurs; mipmapped downscale is cheaper.
-	 * r_fontSize still floors the target for the large tier.
+	 * to 1:1 atlas pixels.  Cap hard: 4K * 26 virt with dpi 144 + 2048 atlases
+	 * exhausts Vulkan image chunks (MAX_IMAGE_CHUNKS) and aborts the large tier.
 	 */
 	if ( virtualHeight < 4.0f ) {
 		virtualHeight = 4.0f;
 	}
 	targetPx = (int)( virtualHeight * pixelScale + 0.5f );
-	floorVirt = virtualHeight;
-	if ( floorVirt >= 20.0f && targetPx < basePt ) {
+	if ( virtualHeight >= 18.0f && targetPx < basePt ) {
 		targetPx = basePt;
 	}
 	if ( targetPx < 10 ) {
 		targetPx = 10;
 	}
-	if ( targetPx > 96 ) {
-		targetPx = 96;
+	/* Keep FreeType atlases modest so sm+md+lg+console fit after reloadTtf. */
+	if ( targetPx > 36 ) {
+		targetPx = 36;
 	}
 	return targetPx;
 }
 
-static int SCR_HudTtfTargetPixelHeight( void ) {
-	/* Large-tier default (timer / speed digits ~24–28 virtual). */
-	return SCR_HudTtfTargetPixelHeightForVirtual( 26.0f );
-}
-
-static int SCR_ComputeHudTtfPointSize( void ) {
-	return SCR_TtfPointSizeForPixelHeight( SCR_HudTtfTargetPixelHeight() );
-}
-
 static int SCR_ComputeHudTtfPointSizeTier( int tier ) {
-	static const float virtH[3] = { 8.0f, 14.0f, 26.0f };
+	/* Virtual heights match HUD labels / body / timer-speed digits. */
+	static const float virtH[3] = { 8.0f, 13.0f, 20.0f };
+	int pt;
 
 	if ( tier < 0 ) {
 		tier = 0;
@@ -270,7 +262,18 @@ static int SCR_ComputeHudTtfPointSizeTier( int tier ) {
 	if ( tier > 2 ) {
 		tier = 2;
 	}
-	return SCR_TtfPointSizeForPixelHeight( SCR_HudTtfTargetPixelHeightForVirtual( virtH[tier] ) );
+	pt = SCR_TtfPointSizeForPixelHeight( SCR_HudTtfTargetPixelHeightForVirtual( virtH[tier] ) );
+	/* Extra clamp on the large tier — 28pt@144dpi was OOMing atlas pages. */
+	if ( tier == 2 && pt > 18 ) {
+		pt = 18;
+	}
+	if ( tier == 1 && pt > 14 ) {
+		pt = 14;
+	}
+	if ( tier == 0 && pt > 11 ) {
+		pt = 11;
+	}
+	return pt;
 }
 
 static const char *SCR_HudTtfPathForTier( int tier ) {
@@ -434,10 +437,31 @@ void CL_RegisterBuiltInTrueTypeFonts( void ) {
 	int i;
 	int registered;
 	glyphInfo_t *g;
+	fontInfo_t probe;
 	static const char *tierName[3] = { "small", "medium", "large" };
 
 	if ( !Cvar_VariableIntegerValue( "cl_builtInTtf" ) ) {
 		return;
+	}
+
+	if ( !re.RegisterFont ) {
+		return;
+	}
+
+	hudPath = Cvar_VariableString( "r_font" );
+	if ( !hudPath || !hudPath[0] ) {
+		return;
+	}
+
+	/* Probe before wiping — map-load re-exec can call us with FreeType down. */
+	Com_Memset( &probe, 0, sizeof( probe ) );
+	re.RegisterFont( hudPath, SCR_ComputeHudTtfPointSizeTier( 2 ), &probe );
+	if ( !SCR_HudTtfRefLineFromFont( &probe ) ) {
+		Com_Printf( S_COLOR_YELLOW "Client: TrueType probe failed for \"%s\"; keeping prior HUD fonts\n", hudPath );
+		return;
+	}
+	if ( re.ClearTrueTypeFontCache ) {
+		re.ClearTrueTypeFontCache();
 	}
 
 	cls.builtInTtfActive = qfalse;
@@ -449,40 +473,38 @@ void CL_RegisterBuiltInTrueTypeFonts( void ) {
 	cls.builtInConsolePointSize = 0;
 	cls.builtInConsoleCellW = 0;
 
-	if ( !re.RegisterFont ) {
-		return;
-	}
-
-	hudPath = Cvar_VariableString( "r_font" );
-	if ( !hudPath || !hudPath[0] ) {
-		return;
-	}
-
 	registered = 0;
-	for ( i = 0; i < 3; i++ ) {
-		tierPath = SCR_HudTtfPathForTier( i );
-		if ( !tierPath || !tierPath[0] ) {
-			tierPath = hudPath;
+	/* Register large first so timer/speed digits win if image memory is tight. */
+	{
+		static const int order[3] = { 2, 1, 0 };
+
+		for ( i = 0; i < 3; i++ ) {
+			const int tier = order[i];
+
+			tierPath = SCR_HudTtfPathForTier( tier );
+			if ( !tierPath || !tierPath[0] ) {
+				tierPath = hudPath;
+			}
+			hudPt[tier] = SCR_ComputeHudTtfPointSizeTier( tier );
+			re.RegisterFont( tierPath, hudPt[tier], &cls.builtInHudFonts[tier] );
+			cls.builtInHudRefLinePx[tier] = SCR_HudTtfRefLineFromFont( &cls.builtInHudFonts[tier] );
+			if ( cls.builtInHudRefLinePx[tier] <= 0 ) {
+				Com_Memset( &cls.builtInHudFonts[tier], 0, sizeof( cls.builtInHudFonts[tier] ) );
+				cls.builtInHudRefLinePx[tier] = 0;
+				cls.builtInHudPointSize[tier] = 0;
+				Com_Printf( S_COLOR_YELLOW "Client: HUD TrueType %s \"%s\" @ %dpt failed\n",
+					tierName[tier], tierPath, hudPt[tier] );
+				continue;
+			}
+			cls.builtInHudPointSize[tier] = hudPt[tier];
+			registered++;
+			Com_Printf( "Client: HUD TrueType %s \"%s\" @ %dpt (ref ~%dpx)\n",
+				tierName[tier], tierPath, hudPt[tier], cls.builtInHudRefLinePx[tier] );
 		}
-		hudPt[i] = SCR_ComputeHudTtfPointSizeTier( i );
-		re.RegisterFont( tierPath, hudPt[i], &cls.builtInHudFonts[i] );
-		cls.builtInHudRefLinePx[i] = SCR_HudTtfRefLineFromFont( &cls.builtInHudFonts[i] );
-		if ( cls.builtInHudRefLinePx[i] <= 0 ) {
-			Com_Memset( &cls.builtInHudFonts[i], 0, sizeof( cls.builtInHudFonts[i] ) );
-			cls.builtInHudRefLinePx[i] = 0;
-			cls.builtInHudPointSize[i] = 0;
-			Com_Printf( S_COLOR_YELLOW "Client: HUD TrueType %s \"%s\" @ %dpt failed\n",
-				tierName[i], tierPath, hudPt[i] );
-			continue;
-		}
-		cls.builtInHudPointSize[i] = hudPt[i];
-		registered++;
-		Com_Printf( "Client: HUD TrueType %s \"%s\" @ %dpt (ref ~%dpx)\n",
-			tierName[i], tierPath, hudPt[i], cls.builtInHudRefLinePx[i] );
 	}
 
 	if ( !registered ) {
-		Com_Printf( S_COLOR_YELLOW "Client: could not load r_font \"%s\" (TrueType); using bitmap charset for HUD\n", hudPath );
+		Com_Printf( S_COLOR_YELLOW "Client: could not load r_font \"%s\" (TrueType); keeping prior HUD fonts / bitmap fallback\n", hudPath );
 		return;
 	}
 
@@ -563,8 +585,8 @@ void CL_RegisterBuiltInTrueTypeFonts( void ) {
 	Com_Printf( "Client: built-in HUD TrueType tiers sm/md/lg @ %d/%d/%dpt (targets ~%d/%d/%dpx, dpi %d)\n",
 		cls.builtInHudPointSize[0], cls.builtInHudPointSize[1], cls.builtInHudPointSize[2],
 		SCR_HudTtfTargetPixelHeightForVirtual( 8.0f ),
-		SCR_HudTtfTargetPixelHeightForVirtual( 14.0f ),
-		SCR_HudTtfTargetPixelHeightForVirtual( 26.0f ),
+		SCR_HudTtfTargetPixelHeightForVirtual( 13.0f ),
+		SCR_HudTtfTargetPixelHeightForVirtual( 20.0f ),
 		Cvar_VariableIntegerValue( "r_fontDpi" ) );
 	if ( r_fontKerning ) {
 		Com_Printf( "Client: r_fontKerning %i (proportional xSkip + FreeType kern; Rougier HAL-05430837)\n",

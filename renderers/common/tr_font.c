@@ -496,7 +496,11 @@ static glyphInfo_t *RE_ConstructGlyphInfo( unsigned char *imageOut, int *xOut, i
 		}
 
 		if (glyph.height > *maxHeight) {
-			*maxHeight = glyph.height;
+			/* Never let one oversized glyph poison maxHeight: the second
+			 * packing pass treats maxHeight >= atlasEdge as "skip all". */
+			if ( glyph.height < atlasEdge ) {
+				*maxHeight = glyph.height;
+			}
 		}
 
 		if (calcHeight) {
@@ -742,6 +746,7 @@ void RE_RegisterFont(const char *fontName, int pointSize, fontInfo_t *font) {
 		ri.Printf(PRINT_ALL, "RE_RegisterFont: called with empty name\n");
 		return;
 	}
+	Com_Memset( font, 0, sizeof( *font ) );
 
 	resolvedFontName = fontName;
 	if ( !Q_stricmp( fontName, "fonts/impact.ttf" ) || !Q_stricmp( fontName, "impact.ttf" ) ) {
@@ -935,6 +940,10 @@ try_freetype:
 	for (i = GLYPH_START; i <= GLYPH_END; i++) {
 		RE_ConstructGlyphInfo(out, &xOut, &yOut, &maxHeight, face, (unsigned char)i, qtrue, lcdAtlas);
 	}
+	/* Vertical-hint / LCD outliers can still leave maxHeight unusable. */
+	if ( maxHeight <= 0 || maxHeight >= atlasSize - 1 ) {
+		maxHeight = ( atlasSize > 64 ) ? ( atlasSize / 16 ) : 16;
+	}
 
 	xOut = 0;
 	yOut = 0;
@@ -995,6 +1004,15 @@ try_freetype:
 	#else
 		image = R_CreateImage(name, NULL, imageBuff, atlasSize, atlasSize, R_FontAtlasFlags());
 	#endif
+			ri.Free(imageBuff);
+			if ( !image ) {
+				ri.Printf( PRINT_WARNING, "RE_RegisterFont: R_CreateImage failed for '%s' page %d\n",
+					name, imageNumber - 1 );
+				ri.Free( out );
+				R_FontReleaseSlotFace( regSlot );
+				Com_Memset( font, 0, sizeof( *font ) );
+				return;
+			}
 			h = RE_RegisterShaderFromImage(name, LIGHTMAP_2D, image, qfalse);
 			for (j = lastStart; j < i; j++) {
 				font->glyphs[j].glyph = h;
@@ -1004,7 +1022,6 @@ try_freetype:
 			Com_Memset(out, 0, atlasBytes);
 			xOut = 0;
 			yOut = 0;
-			ri.Free(imageBuff);
 			if (i == GLYPH_END + 1) {
 				i++;
 			}

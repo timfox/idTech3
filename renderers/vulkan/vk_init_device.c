@@ -1278,6 +1278,18 @@ void vk_initialize( void )
 			desc.pPushConstantRanges = &push_range;
 			VK_CHECK( qvkCreatePipelineLayout( vk.device, &desc, NULL, &vk.pipeline_layout_oit_accum ) );
 			SET_OBJECT_NAME( vk.pipeline_layout_oit_accum, "pipeline layout - oit_accum", VK_DEBUG_REPORT_OBJECT_TYPE_PIPELINE_LAYOUT_EXT );
+			{
+				VkPhysicalDeviceProperties oitProps;
+				qvkGetPhysicalDeviceProperties( vk.physical_device, &oitProps );
+				ri.Printf( PRINT_ALL,
+					"[VK][OIT] push layout: accum/moments/mboit=%u B resolve=%u B deviceMax=%u\n",
+					224u, 16u, (unsigned)oitProps.limits.maxPushConstantsSize );
+				if ( oitProps.limits.maxPushConstantsSize < 224u ) {
+					ri.Printf( PRINT_WARNING, S_COLOR_YELLOW
+						"[VK][OIT] device maxPushConstantsSize %u < 224 — OIT push may be invalid\n"
+						S_COLOR_WHITE, (unsigned)oitProps.limits.maxPushConstantsSize );
+				}
+			}
 
 			if ( r_oit->integer == 2 ) {
 				/* MBOIT pass 1: set 0 = tex0, set 1 = opaque depth */
@@ -1287,7 +1299,8 @@ void vk_initialize( void )
 				desc.pSetLayouts = set_layouts;
 				push_range.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
 				push_range.offset = 0;
-				push_range.size = 192;
+				/* Match vkOitPushConstants_t (224): moments previously 192 while CPU pushed 224. */
+				push_range.size = 224;
 				desc.pushConstantRangeCount = 1;
 				desc.pPushConstantRanges = &push_range;
 				VK_CHECK( qvkCreatePipelineLayout( vk.device, &desc, NULL, &vk.pipeline_layout_oit_moments ) );

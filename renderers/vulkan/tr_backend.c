@@ -62,6 +62,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "vk_ht_throughput.h"
 #include "vk_hiz.h"
 #include "vk_selective_sun_shadow.h"
+#include "vk_black_frame.h"
 #include "vk_sun_csm.h"
 #include "vk_vshadow.h"
 #include "vk_capture_pipeline.h"
@@ -2682,7 +2683,8 @@ static const void *RB_DrawSurfs( const void *data ) {
 		}
 		backEnd.drawSurfFilter = 2; /* transparent only (Forward+ shade) */
 		backEnd.reactiveMaskStamp = qfalse;
-		if ( r_oit && r_oit->integer && r_fbo && r_fbo->integer ) {
+		if ( r_oit && r_oit->integer && r_fbo && r_fbo->integer &&
+			!vk_black_frame_force_minimal_scene() ) {
 			/* OIT replaces Forward+ transparent shade; r_oitForwardPlus samples the shared tile/Z grid. */
 			{
 				static qboolean s_oit_mode3_logged;
@@ -2714,7 +2716,8 @@ static const void *RB_DrawSurfs( const void *data ) {
 			backEnd.reactiveMaskStamp = qfalse;
 		}
 		backEnd.drawSurfFilter = 0;
-	} else if ( r_oit && r_oit->integer && r_fbo && r_fbo->integer ) {
+	} else if ( r_oit && r_oit->integer && r_fbo && r_fbo->integer &&
+		!vk_black_frame_force_minimal_scene() ) {
 		backEnd.drawSurfFilter = 1; /* opaque only */
 		/* Stochastic foliage may stamp during opaque when r_stochasticAlpha is on. */
 		backEnd.reactiveMaskStamp = qfalse;
@@ -2726,25 +2729,34 @@ static const void *RB_DrawSurfs( const void *data ) {
 		RB_RenderDrawSurfList( cmd->drawSurfs, cmd->numDrawSurfs );
 		backEnd.reactiveMaskStamp = qfalse;
 		backEnd.drawSurfFilter = 0;
+		vk_black_frame_note_writer( "ForwardOpaque" );
+		vk_black_frame_note_draw( VK_BF_DRAW_OPAQUE, (uint32_t)cmd->numDrawSurfs );
+		vk_black_frame_note_draw( VK_BF_DRAW_FORWARD_OPAQUE, (uint32_t)cmd->numDrawSurfs );
 		/*
 		 * Mode-2 / non-split + WBOIT: G-buffer / AV sidecars must run BEFORE OIT.
 		 * vk_oit_pass ends the main pass, resolves into HDR, and opens post_bloom.
 		 * Running capture afterward ends post_bloom, transitions color_image for
 		 * TRANSFER, and never restores the resolved HDR — all-black 3D with UI alive.
 		 */
-		if ( !( cmd->refdef.rdflags & RDF_NOWORLDMODEL ) ) {
+		if ( !( cmd->refdef.rdflags & RDF_NOWORLDMODEL ) &&
+			!vk_black_frame_force_minimal_scene() ) {
 			vk_deferred_gbuffer_capture_after_geometry();
+			vk_black_frame_note_writer( "GBufferCapture" );
 			vk_deferred_decals_apply_to_gbuffer();
 			vk_visibility_buffer_capture_after_geometry();
+			vk_black_frame_note_writer( "VisBufCapture" );
 			vk_ambient_visibility_apply_after_geometry();
 			if ( vk_visibility_late_shade_wanted() ) {
 				vk_visibility_late_shade_apply_after_geometry();
 			} else if ( vk_deferred_lighting_active() ) {
 				/* Mode 2 normally does not want deferred lighting; gate keeps fail-open. */
 				vk_deferred_lighting_apply_after_geometry();
+				vk_black_frame_note_writer( "DeferredComposite" );
 			}
 		}
 		vk_oit_pass( cmd );
+		vk_black_frame_note_writer( "WBOITResolve" );
+		vk_black_frame_note_draw( VK_BF_DRAW_OIT, (uint32_t)cmd->numDrawSurfs );
 		RB_DrawRefractiveAfterOit( cmd );
 	} else
 #endif
@@ -3275,6 +3287,7 @@ static const void *RB_SwapBuffers( const void *data ) {
 	s_skipDeferredWeaponSurfaces = qfalse;
 	s_drawDeferredWeaponSurfacesOnly = qfalse;
 	R_RenderPath_BeginFrame();
+	vk_black_frame_begin_frame();
 	{
 		cvar_t *clusterDebug = ri.Cvar_Get( "r_clusterDebug", "-1", CVAR_ARCHIVE_ND );
 		if ( clusterDebug && clusterDebug->integer >= 0 && r_forwardPlusDebug ) {

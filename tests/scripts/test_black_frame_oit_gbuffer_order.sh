@@ -39,6 +39,42 @@ grep -q 'mode == 17' "$RESOLVE" || fail 'r_oitDebug 17 empty-pixel preservation 
 grep -q 'mode == 18' "$RESOLVE" || fail 'r_oitDebug 18 opaque input missing'
 pass 'WBOIT empty-pixel / debug 17–18 present'
 
+# Fail-open: resources-not-ready after end_render_pass must open post_bloom.
+POSTFX="$ROOT/renderers/vulkan/vk_postfx_passes.c"
+grep -q 'OIT resources not ready for extent' "$POSTFX" || \
+	fail 'OIT must note fallback when resources not ready after end_render_pass'
+awk '
+  /OIT resources not ready for extent/ { saw=1 }
+  saw && /vk_begin_post_bloom_render_pass/ { ok=1; exit }
+  saw && /^}/ { exit }
+  END { exit (ok ? 0 : 1) }
+' "$POSTFX" || fail 'OIT resources-not-ready path must begin post_bloom (no orphan SceneHDR)'
+pass 'OIT fail-open resumes post_bloom when resources missing'
+
+# Black-frame diagnostics module present.
+BF="$ROOT/renderers/vulkan/vk_black_frame.c"
+[[ -f "$BF" ]] || fail 'missing vk_black_frame.c'
+grep -q 'r_forceMinimalScene' "$BF" || fail 'r_forceMinimalScene missing'
+grep -q 'BLACK FRAME DETECTED' "$BF" || fail 'black-frame detector string missing'
+grep -q 'renderer_validate_frame' "$BF" || fail 'renderer_validate_frame command missing'
+grep -q 'renderer_resource_status' "$BF" || fail 'renderer_resource_status command missing'
+grep -q 'renderer_capture_black_frame' "$BF" || fail 'renderer_capture_black_frame command missing'
+pass 'black-frame M1 validation commands present'
+
+# Shared BRDF core
+CORE="$ROOT/renderers/vulkan/shaders/glsl/pbr_brdf_core.glsl"
+[[ -f "$CORE" ]] || fail 'missing pbr_brdf_core.glsl'
+grep -q 'pbr_brdf_core.glsl' "$ROOT/renderers/vulkan/shaders/glsl/forward_plus_light_eval.glsl" || \
+	fail 'forward_plus_light_eval must include pbr_brdf_core'
+grep -q 'pbr_brdf_core.glsl' "$ROOT/renderers/vulkan/shaders/glsl/deferred_lighting_common.glsl" || \
+	fail 'deferred_lighting_common must include pbr_brdf_core'
+pass 'shared pbr_brdf_core wired to Forward+/Deferred'
+
+# Docs
+[[ -f "$ROOT/docs/GBUFFER_2_0.md" ]] || fail 'missing docs/GBUFFER_2_0.md'
+[[ -f "$ROOT/docs/RENDERER_IDTECH7_SPRINT.md" ]] || fail 'missing docs/RENDERER_IDTECH7_SPRINT.md'
+pass 'G-buffer 2.0 + idTech7 sprint docs present'
+
 if [[ $failures -ne 0 ]]; then
 	echo "$failures check(s) failed"
 	exit 1
