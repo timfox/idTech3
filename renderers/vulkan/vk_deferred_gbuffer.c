@@ -24,6 +24,7 @@ Mode 3 = Unified Clustered Renderer (deferred opaque + Forward+ transparent).
 #include "vk_frequency_aware.h"
 #include "vk_ltc.h"
 #include "vk_forward_plus.h"
+#include "vk_shadow_contract.h"
 
 static void vk_dgb_validate_compute_break( const char *stage, qboolean resume_main )
 {
@@ -54,6 +55,7 @@ typedef struct {
 	vec4_t projInfo;
 	vec4_t materialParams;
 	uint32_t extent[2];
+	uint32_t gbufferFlags;
 } vk_deferred_gbuf_push_t;
 
 typedef struct {
@@ -81,6 +83,11 @@ typedef struct {
 	float specularAA; /* normal-variance roughness inflate (parity with Forward+ ApplySpecularAA) */
 	uint32_t compactLists;
 	uint32_t clusterCount;
+	uint32_t gbufferCompact; /* 1: decode octahedral from material.ba; AO/clearcoat defaults */
+	uint32_t shadowFlags;
+	float shadowStrength;
+	uint32_t shadowGeneration;
+	uint32_t _shadowPad;
 } vk_deferred_light_push_t;
 
 typedef struct {
@@ -88,6 +95,10 @@ typedef struct {
 	uint32_t hybridCompare;
 } vk_deferred_composite_push_t;
 
+static qboolean s_gbufferCompactDualWriteLogged;
+/* Bump when deferred lighting descriptor layout changes (shadow SSBO bindings). */
+static const uint32_t s_deferredLightingLayoutVersion = 12u;
+static uint32_t s_deferredLightingLayoutBuilt;
 static void vk_dgb_create_pipeline( void );
 static void vk_dgb_create_lighting_pipeline( void );
 static void vk_dgb_create_composite_gfx_pipeline( void );
@@ -528,6 +539,12 @@ void vk_deferred_gbuffer_ensure_runtime( void )
 	}
 
 	if ( vk_deferred_lighting_pipelines_wanted() ) {
+		if ( s_deferredLightingLayoutBuilt != s_deferredLightingLayoutVersion &&
+			vk.deferred_gbuffer.lighting_pipeline_ready ) {
+			ri.Printf( PRINT_ALL, "[VK][deferred] recreating lighting pipeline for shadow contract bindings\n" );
+			vk_dgb_destroy_lighting_pipeline();
+			s_deferredLightingLayoutBuilt = 0u;
+		}
 		if ( !vk.deferred_gbuffer.lighting_pipeline_ready ||
 			vk.deferred_gbuffer.lighting_pipeline == VK_NULL_HANDLE ||
 			vk.deferred_gbuffer.lighting_descriptor == VK_NULL_HANDLE ) {
@@ -836,6 +853,14 @@ static void vk_dgb_fill_proj_info( vk_deferred_gbuf_push_t *push )
 	push->materialParams[2] = r_deferredNormalEdgeThreshold ?
 		Com_Clamp( 0.001f, 1.0f, r_deferredNormalEdgeThreshold->value ) : 0.08f;
 	push->materialParams[3] = vk.msaaActive ? 1.0f : 0.0f;
+	push->gbufferFlags = 0u;
+	if ( r_gbufferCompact && r_gbufferCompact->integer ) {
+		push->gbufferFlags |= 1u;
+		if ( !s_gbufferCompactDualWriteLogged ) {
+			ri.Printf( PRINT_ALL, "[VK][gbuffer] compact dual-write active\n" );
+			s_gbufferCompactDualWriteLogged = qtrue;
+		}
+	}
 }
 
 void vk_deferred_gbuffer_capture_after_geometry( void )
@@ -1009,7 +1034,7 @@ void vk_deferred_gbuffer_capture_after_geometry( void )
 
 static void vk_dgb_create_lighting_descriptor_layout( void )
 {
-	VkDescriptorSetLayoutBinding bindings[10];
+	VkDescriptorSetLayoutBinding bindings[12];
 	VkDescriptorSetLayoutCreateInfo desc;
 
 	if ( vk.deferred_gbuffer.lighting_layout != VK_NULL_HANDLE ) {
@@ -1058,10 +1083,19 @@ static void vk_dgb_create_lighting_descriptor_layout( void )
 	bindings[9].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
 	bindings[9].descriptorCount = 1;
 	bindings[9].stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+	/* Shadow contract SSBO + sun CSM atlas */
+	bindings[10].binding = 10;
+	bindings[10].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+	bindings[10].descriptorCount = 1;
+	bindings[10].stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+	bindings[11].binding = 11;
+	bindings[11].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+	bindings[11].descriptorCount = 1;
+	bindings[11].stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
 
 	Com_Memset( &desc, 0, sizeof( desc ) );
 	desc.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-	desc.bindingCount = 10;
+	desc.bindingCount = 12;
 	desc.pBindings = bindings;
 	if ( qvkCreateDescriptorSetLayout( vk.device, &desc, NULL, &vk.deferred_gbuffer.lighting_layout ) != VK_SUCCESS ) {
 		vk.deferred_gbuffer.lighting_layout = VK_NULL_HANDLE;
@@ -1141,9 +1175,9 @@ static void vk_dgb_create_lighting_pipeline( void )
 		VkDescriptorSetAllocateInfo alloc;
 
 		pool_sizes[0].type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-		pool_sizes[0].descriptorCount = 2;
+		pool_sizes[0].descriptorCount = 3;
 		pool_sizes[1].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-		pool_sizes[1].descriptorCount = 7;
+		pool_sizes[1].descriptorCount = 8;
 		pool_sizes[2].type = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
 		pool_sizes[2].descriptorCount = 1;
 
@@ -1178,21 +1212,33 @@ static void vk_dgb_create_lighting_pipeline( void )
 
 	vk.deferred_gbuffer.lighting_pipeline_ready = qtrue;
 	vk.deferred_gbuffer.lighting_create_failed = qfalse;
+	s_deferredLightingLayoutBuilt = s_deferredLightingLayoutVersion;
 	ri.Printf( PRINT_ALL, "[VK][deferred] lighting compute pipeline ready\n" );
 }
 
 static void vk_dgb_update_lighting_descriptors( void )
 {
-	VkDescriptorBufferInfo buf_infos[2];
-	VkDescriptorImageInfo img_infos[6];
-	VkWriteDescriptorSet writes[8];
+	VkDescriptorBufferInfo buf_infos[3];
+	VkDescriptorImageInfo img_infos[7];
+	VkWriteDescriptorSet writes[12];
 	Vk_Sampler_Def sd;
 	VkImageView depth_view;
 	VkImageView class_view;
+	VkImageView shadow_view;
+	VkBuffer shadow_ssbo;
+	VkImageLayout shadow_layout;
 	int i;
+	static qboolean s_shadowBindLogged;
+	qboolean haveRealShadow;
 
 	if ( vk.deferred_gbuffer.lighting_descriptor == VK_NULL_HANDLE ) {
 		return;
+	}
+
+	/* Always refresh core light/G-buffer bindings. Shadow SSBO is best-effort. */
+	shadow_ssbo = vk_shadow_contract_ssbo();
+	if ( shadow_ssbo != VK_NULL_HANDLE ) {
+		vk_shadow_contract_upload_ssbo();
 	}
 
 	Com_Memset( buf_infos, 0, sizeof( buf_infos ) );
@@ -1202,6 +1248,11 @@ static void vk_dgb_update_lighting_descriptors( void )
 	buf_infos[1].buffer = vk.forward_plus.tile_buffer;
 	buf_infos[1].offset = 0;
 	buf_infos[1].range = VK_WHOLE_SIZE;
+	if ( shadow_ssbo != VK_NULL_HANDLE ) {
+		buf_infos[2].buffer = shadow_ssbo;
+		buf_infos[2].offset = 0;
+		buf_infos[2].range = VK_WHOLE_SIZE;
+	}
 
 	depth_view = vk.depth_image_view_sample ? vk.depth_image_view_sample : vk.depth_image_view;
 	Com_Memset( &sd, 0, sizeof( sd ) );
@@ -1214,8 +1265,21 @@ static void vk_dgb_update_lighting_descriptors( void )
 	if ( class_view == VK_NULL_HANDLE ) {
 		class_view = vk.deferred_class_stub_view;
 	}
-	if ( class_view == VK_NULL_HANDLE ) {
+	if ( class_view == VK_NULL_HANDLE || depth_view == VK_NULL_HANDLE ||
+		vk.deferred_gbuffer_albedo_view == VK_NULL_HANDLE ||
+		vk.deferred_lighting_view == VK_NULL_HANDLE ) {
 		return;
+	}
+
+	haveRealShadow = qfalse;
+	shadow_view = vk.sun_shadow_sample_view ? vk.sun_shadow_sample_view : vk.sun_shadow_view;
+	shadow_layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
+	if ( shadow_view != VK_NULL_HANDLE ) {
+		haveRealShadow = qtrue;
+	} else if ( tr.whiteImage && tr.whiteImage->view != VK_NULL_HANDLE ) {
+		/* Color stub — never claim DEPTH layout on a color view (validation hazard). */
+		shadow_view = tr.whiteImage->view;
+		shadow_layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 	}
 
 	Com_Memset( img_infos, 0, sizeof( img_infos ) );
@@ -1234,8 +1298,14 @@ static void vk_dgb_update_lighting_descriptors( void )
 	img_infos[4].imageView = vk.deferred_lighting_view;
 	img_infos[4].imageLayout = VK_IMAGE_LAYOUT_GENERAL;
 	img_infos[5].sampler = vk_find_sampler( &sd );
-	img_infos[5].imageView = class_view != VK_NULL_HANDLE ? class_view : vk.deferred_class_stub_view;
+	img_infos[5].imageView = class_view;
 	img_infos[5].imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+	if ( shadow_view != VK_NULL_HANDLE ) {
+		img_infos[6].sampler = ( haveRealShadow && vk.sun_shadow_sampler ) ?
+			vk.sun_shadow_sampler : vk_find_sampler( &sd );
+		img_infos[6].imageView = shadow_view;
+		img_infos[6].imageLayout = shadow_layout;
+	}
 
 	Com_Memset( writes, 0, sizeof( writes ) );
 	for ( i = 0; i < 2; i++ ) {
@@ -1266,11 +1336,41 @@ static void vk_dgb_update_lighting_descriptors( void )
 	writes[7].descriptorCount = 1;
 	writes[7].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
 	writes[7].pImageInfo = &img_infos[5];
+	/* Bindings 10/11 are declared in the lighting shader — always update when possible. */
+	if ( shadow_ssbo == VK_NULL_HANDLE || shadow_view == VK_NULL_HANDLE ) {
+		ri.Printf( PRINT_DEVELOPER, S_COLOR_YELLOW
+			"[VK][deferred] lighting descriptors incomplete (shadow ssbo=%p view=%p)\n" S_COLOR_WHITE,
+			(void *)shadow_ssbo, (void *)shadow_view );
+		/* Still update 0–7 so lighting works; shadowFlags stay 0 so shader skips sample. */
+		qvkUpdateDescriptorSets( vk.device, 8, writes, 0, NULL );
+		vk_ltc_init();
+		vk_ltc_update_deferred_lighting_descriptors( vk.deferred_gbuffer.lighting_descriptor );
+		vk.deferred_gbuffer.lighting_descriptor_generation = vk.deferredGbufferGeneration;
+		return;
+	}
+	writes[8].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+	writes[8].dstSet = vk.deferred_gbuffer.lighting_descriptor;
+	writes[8].dstBinding = 10;
+	writes[8].descriptorCount = 1;
+	writes[8].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+	writes[8].pBufferInfo = &buf_infos[2];
+	writes[9].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+	writes[9].dstSet = vk.deferred_gbuffer.lighting_descriptor;
+	writes[9].dstBinding = 11;
+	writes[9].descriptorCount = 1;
+	writes[9].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+	writes[9].pImageInfo = &img_infos[6];
 
-	qvkUpdateDescriptorSets( vk.device, 8, writes, 0, NULL );
+	qvkUpdateDescriptorSets( vk.device, 10, writes, 0, NULL );
 	vk_ltc_init();
 	vk_ltc_update_deferred_lighting_descriptors( vk.deferred_gbuffer.lighting_descriptor );
 	vk.deferred_gbuffer.lighting_descriptor_generation = vk.deferredGbufferGeneration;
+
+	if ( !s_shadowBindLogged && shadow_ssbo != VK_NULL_HANDLE && haveRealShadow ) {
+		ri.Printf( PRINT_ALL,
+			"[VK][deferred] shadow contract SSBO bound (binding 10) + sunShadowMap (binding 11)\n" );
+		s_shadowBindLogged = qtrue;
+	}
 }
 
 static void vk_dgb_fill_light_push( vk_deferred_light_push_t *push, uint32_t width, uint32_t height )
@@ -1324,6 +1424,21 @@ static void vk_dgb_fill_light_push( vk_deferred_light_push_t *push, uint32_t wid
 		Com_Clamp( 0.0f, 2.0f, r_pbr_specularAAStrength ? r_pbr_specularAAStrength->value : 0.5f ) : 0.0f;
 	push->compactLists = vk.forward_plus.compact_lists ? 1u : 0u;
 	push->clusterCount = vk.forward_plus.tile_capacity_tiles;
+	push->gbufferCompact = ( r_gbufferCompact && r_gbufferCompact->integer ) ? 1u : 0u;
+	push->shadowFlags = 0u;
+	push->shadowStrength = 0.0f;
+	push->shadowGeneration = vk_shadow_contract_generation();
+	push->_shadowPad = 0u;
+	if ( vk.sun_shadow_valid && vk_shadow_contract_ssbo() != VK_NULL_HANDLE &&
+		( vk.sun_shadow_sample_view || vk.sun_shadow_view ) &&
+		( !r_pbrSunShadow || r_pbrSunShadow->integer ) ) {
+		const GpuShadowRecord *rec0 = vk_shadow_contract_record( 0 );
+		if ( rec0 && rec0->allocated ) {
+			push->shadowFlags = 1u;
+			push->shadowStrength = ( r_pbrSunShadowStrength ) ?
+				Com_Clamp( 0.0f, 1.0f, r_pbrSunShadowStrength->value ) : 1.0f;
+		}
+	}
 	if ( vk_frequency_aware_active() ) {
 		float fa = vk_frequency_aware_specular_aa_strength();
 		if ( fa > push->specularAA ) {
@@ -1724,6 +1839,9 @@ void vk_deferred_lighting_apply_after_geometry( void )
 
 	lighting_ok = vk_dgb_dispatch_lighting_compute( width, height );
 	vk.deferred_gbuffer.frame_lighting_ok = lighting_ok;
+	if ( r_pbrSunShadow && r_pbrSunShadow->integer && vk.sun_shadow_valid && !R_ClassicLightingActive() ) {
+		vk_shadow_contract_note_consumer( 0, "deferred" );
+	}
 	vk_cluster_assert_shared_consumers( "deferred_lighting" );
 
 	/*

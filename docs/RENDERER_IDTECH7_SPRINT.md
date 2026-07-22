@@ -5,6 +5,8 @@
 
 Canonical ownership: [RENDERER_PATH_OWNERSHIP.md](RENDERER_PATH_OWNERSHIP.md) · Correctness gate: [BLACK_FRAME_REGRESSION.md](BLACK_FRAME_REGRESSION.md) · G-buffer: [GBUFFER_2_0.md](GBUFFER_2_0.md)
 
+**Foundation Consolidation (2026-07):** Shared foundation docs + smoke tests supersede isolated sprint notes for frame contract, GPU scene, BRDF, shadows, reflections, indirect, HDR, and reference lab. Hub: run `tests/scripts/test_foundation_consolidation.sh`. Docs: [RENDERER_FRAME_CONTRACT.md](RENDERER_FRAME_CONTRACT.md), [GPU_SCENE.md](GPU_SCENE.md), [GPU_DRIVEN_RENDERING.md](GPU_DRIVEN_RENDERING.md), [GBUFFER_2.md](GBUFFER_2.md), [SHARED_BRDF.md](SHARED_BRDF.md), [SPECULAR_AA.md](SPECULAR_AA.md), [SHADOW_CONTRACT.md](SHADOW_CONTRACT.md), [REFLECTION_HIERARCHY.md](REFLECTION_HIERARCHY.md), [INDIRECT_LIGHTING.md](INDIRECT_LIGHTING.md), [HDR_PIPELINE.md](HDR_PIPELINE.md), [RENDERER_LAB.md](RENDERER_LAB.md).
+
 ---
 
 ## Primary architecture (locked)
@@ -27,17 +29,17 @@ Shared: GPU scene, materials, lights, clusters, shadows, probes, atmosphere, exp
 | # | Item | Status |
 |---|------|--------|
 | 1 | Black-frame / SceneHDR validation | **Done** — `renderer_validate_frame`, `renderer_resource_status`, `renderer_capture_black_frame`, `renderer_draw_status` |
-| 2 | Compact G-buffer design + bandwidth | **Design + reporting** — see GBUFFER_2_0.md; layout migration not shipping |
-| 3 | Unify BRDF (Deferred / Forward+ / WBOIT) | **Core shared** — `pbr_brdf_core.glsl`; gen_frag still has local wrappers for non-light-eval paths |
-| 4 | Specular AA (Toksvig + geo floor + glancing) | **Hardened** in Forward+ `ApplySpecularAA` and deferred `ApplyDeferredSpecularAA` |
-| 5 | GPU scene records expansion | Existing Raster Ultra 1.6 scaffold — next: widen records (not this patch) |
-| 6 | Hi-Z + indirect draw validation | Existing `vk_hiz` / `gpu_scene_status` — compare path next |
-| 7 | Meshlet: one BSP class + one dynamic model | Existing `vk_meshlets` — conversion pilot next |
-| 8 | Virtual-shadow design / page-table prototype | Existing Raster Ultra 1.9 `vk_vshadow` |
-| 9 | Reflection-source hierarchy debug | **Not started** — planned `r_reflectionDebug` |
-| 10 | Renderer laboratory expansion | Reference Lab + regression specs exist — Surf-speed suite next |
+| 2 | Compact G-buffer design + bandwidth | **Prep** — octahedral helpers, `r_gbufferCompact` dual-write, `gbuffer_bandwidth` scaffold vs compact + Forward+ fallback % |
+| 3 | Unify BRDF (Deferred / Forward+ / WBOIT) | **Done** — `pbr_brdf_core.glsl` in Forward+/OIT, deferred, and `gen_frag.tmpl` |
+| 4 | Specular AA (Toksvig + geo floor + glancing) | **Hardened** — shipping baseline; `r_pbr_specularAA` kill switch; no LEAN this sprint |
+| 5 | GPU scene records expansion | **Done** — prevTransform, objectId, temporalGeneration, shadowFlags, renderFlags; `r_gpuDrawCompare` |
+| 6 | Hi-Z + indirect draw validation | **Done** — compute downsample (`hiz_downsample.comp`), conservative sample, `hiz_status` / `gpu_scene_status` |
+| 7 | Meshlet: one BSP class + one dynamic model | **Done** — `r_meshletsBspPilot` (SF_FACE), `r_meshletsModelPilot` (static MD3; animated skip) |
+| 8 | Virtual-shadow page fill | **Done** — claim_dirty → depth-fill companion mark; `vshadow_status` counters; CSM fallback default |
+| 9 | Reflection-source hierarchy debug | **Done** — `r_reflectionDebug` aliases `r_shrDebug` source IDs |
+| 10 | Renderer laboratory expansion | **Done** — `VK_REFLAB_SCENE_SURF_SPEED` + `demo_reference_lab_surf_speed.cfg` + `test_reference_lab_surf_speed.sh` |
 
-**Do not start:** ReSTIR, full ray-traced GI, neural reconstruction in this sprint.
+**Do not claim:** ReSTIR, full ray-traced GI, neural reconstruction, full G-buffer layout cutover, replacing BSP default draws, M5–M27 program milestones.
 
 ---
 
@@ -50,6 +52,10 @@ renderer_resource_status
 renderer_capture_black_frame
 gbuffer_bandwidth
 render_path_status verbose
+gpu_scene_status
+hiz_status
+meshlet_status
+vshadow_status
 ```
 
 Validation checks: SceneHDR present, OIT gen match, no post-OIT G-buffer capture, exposure finite/non-zero, writer chain when opaques drew.
@@ -60,24 +66,33 @@ Validation checks: SceneHDR present, OIT gen match, no post-OIT G-buffer capture
 
 `renderers/vulkan/shaders/glsl/pbr_brdf_core.glsl`
 
-- Burley diffuse, GGX NDF, Smith visibility, Schlick Fresnel  
-- Multiscatter energy helper  
-- Specular AA + glancing roughness helpers  
-
 Consumed by:
 
 - `forward_plus_light_eval.glsl` (OIT / Forward+ clustered)  
 - `deferred_lighting_common.glsl`  
+- `gen_frag.tmpl` (opaque Forward+ shade)
+
+Regression: `tests/scripts/test_pbr_brdf_core.sh`
 
 ---
 
-## Next blockers before claiming Milestone 2–4 complete
+## Specular AA baseline
 
-1. Compact G-buffer encode/decode + dual-write parity.  
-2. Route `gen_frag.tmpl` lighting through `pbr_brdf_core` (or generated include).  
-3. LEAN / filtered roughness maps (optional Ultra).  
-4. `r_reflectionDebug` hierarchy visualization.  
-5. Automated Surf-speed lab path in Reference Lab.
+Toksvig + geometric floor + glancing roughness. Optional Ultra LEAN deferred. Kill switch: `r_pbr_specularAA`.
+
+---
+
+## Opt-in overlays (defaults safe)
+
+| Cvar | Default | Notes |
+|------|---------|-------|
+| `r_gbufferCompact` | 0 | Dual-write oct into material.ba; lighting uses scaffold AO when compact |
+| `r_gpuScene` / `r_hiZ` | 0 | GPU-driven path + Hi-Z; classic draws remain default |
+| `r_gpuDrawCompare` | 0 | Classic vs GPU cull metrics |
+| `r_meshletsBspPilot` | 0 | BSP face meshlet pilot |
+| `r_meshletsModelPilot` | 1 | Static MD3 when `r_meshlets` 1 |
+| `r_reflectionDebug` | 0 | Hierarchy false-color (cheat) |
+| `r_vshadowFallbackCsm` | 1 | Keep CSM sampling until page residency proven |
 
 ---
 

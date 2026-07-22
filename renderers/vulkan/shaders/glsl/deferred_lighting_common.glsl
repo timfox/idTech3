@@ -10,6 +10,7 @@
 
 #include "forward_plus_cluster.glsl"
 #include "pbr_brdf_core.glsl"
+#include "gbuffer_octahedral.glsl"
 
 float viewZFromDepth( float depth ) {
 	return -pc.projInfo.w / max( depth + pc.projInfo.z, 1e-6 );
@@ -96,7 +97,21 @@ const uint CLASS_TRANSMISSION = 3u;
 const uint CLASS_EMISSIVE = 4u;
 const uint CLASS_ALPHA_TEST = 5u;
 
-float ApplyDeferredSpecularAA( float roughness, vec2 uv, ivec2 pix )
+vec3 SampleDeferredNormal( vec2 uv, vec4 material, out float normalConfidence )
+{
+	vec4 nSamp = texture( normalTex, uv );
+	normalConfidence = clamp( nSamp.w, 0.0, 1.0 );
+	vec3 Nsamp;
+	if ( pc.gbufferCompact != 0u ) {
+		/* Compact dual-write: octahedral in material.ba; prefer decode over scaffold XYZ. */
+		Nsamp = GbufDecodeOctahedral( material.ba );
+	} else {
+		Nsamp = nSamp.xyz;
+	}
+	return Nsamp;
+}
+
+float ApplyDeferredSpecularAA( float roughness, vec2 uv, ivec2 pix, vec3 nC )
 {
 	if ( pc.specularAA <= 0.0 ) {
 		return roughness;
@@ -104,9 +119,17 @@ float ApplyDeferredSpecularAA( float roughness, vec2 uv, ivec2 pix )
 	/* Screen-space normal variance (compute path; Toksvig + geometric floor). */
 	ivec2 sz = textureSize( normalTex, 0 );
 	ivec2 px = clamp( pix, ivec2( 0 ), sz - ivec2( 1 ) );
-	vec3 nC = texture( normalTex, uv ).xyz;
-	vec3 nX = texelFetch( normalTex, clamp( px + ivec2( 1, 0 ), ivec2( 0 ), sz - ivec2( 1 ) ), 0 ).xyz;
-	vec3 nY = texelFetch( normalTex, clamp( px + ivec2( 0, 1 ), ivec2( 0 ), sz - ivec2( 1 ) ), 0 ).xyz;
+	vec3 nX;
+	vec3 nY;
+	if ( pc.gbufferCompact != 0u ) {
+		vec4 mX = texelFetch( materialTex, clamp( px + ivec2( 1, 0 ), ivec2( 0 ), sz - ivec2( 1 ) ), 0 );
+		vec4 mY = texelFetch( materialTex, clamp( px + ivec2( 0, 1 ), ivec2( 0 ), sz - ivec2( 1 ) ), 0 );
+		nX = GbufDecodeOctahedral( mX.ba );
+		nY = GbufDecodeOctahedral( mY.ba );
+	} else {
+		nX = texelFetch( normalTex, clamp( px + ivec2( 1, 0 ), ivec2( 0 ), sz - ivec2( 1 ) ), 0 ).xyz;
+		nY = texelFetch( normalTex, clamp( px + ivec2( 0, 1 ), ivec2( 0 ), sz - ivec2( 1 ) ), 0 ).xyz;
+	}
 	vec3 dndx = nX - nC;
 	vec3 dndy = nY - nC;
 	float variance = dot( dndx, dndx ) + dot( dndy, dndy );
@@ -149,8 +172,9 @@ vec3 shadeDeferredPixel( uvec2 pix ) {
 	}
 
 	vec3 viewPos = reconstructViewPos( uv, depth );
-	vec3 Nsamp = texture( normalTex, uv ).xyz;
-	float normalConfidence = clamp( texture( normalTex, uv ).w, 0.0, 1.0 );
+	vec4 material = texture( materialTex, uv );
+	float normalConfidence = 1.0;
+	vec3 Nsamp = SampleDeferredNormal( uv, material, normalConfidence );
 	vec3 N;
 	if ( pc.normalsAreWorld != 0u ) {
 		N = safeNormalizeOr( ( pc.viewMatrix * vec4( Nsamp, 0.0 ) ).xyz, vec3( 0.0, 0.0, 1.0 ) );
@@ -158,14 +182,14 @@ vec3 shadeDeferredPixel( uvec2 pix ) {
 		N = safeNormalizeOr( Nsamp, vec3( 0.0, 0.0, 1.0 ) );
 	}
 	vec3 albedo = texture( albedoTex, uv ).rgb;
-	vec4 material = texture( materialTex, uv );
-	float materialConfidence = 1.0; /* clearcoat packed in material.a; confidence from normal.w */
+	float materialConfidence = 1.0;
 	float shadingConfidence = min( normalConfidence, materialConfidence );
 	float metalness = mix( 0.0, clamp( material.r, 0.0, 1.0 ), shadingConfidence );
 	float roughness = mix( 0.92, clamp( material.g, 0.04, 1.0 ), shadingConfidence );
-	roughness = ApplyDeferredSpecularAA( roughness, uv, ivec2( pix ) );
-	float materialAO = clamp( material.b, 0.0, 1.0 );
-	float clearcoat = clamp( material.a, 0.0, 1.0 );
+	roughness = ApplyDeferredSpecularAA( roughness, uv, ivec2( pix ), Nsamp );
+	/* Compact packs oct in .ba — AO/clearcoat use defaults until production cutover. */
+	float materialAO = ( pc.gbufferCompact != 0u ) ? 1.0 : clamp( material.b, 0.0, 1.0 );
+	float clearcoat = ( pc.gbufferCompact != 0u ) ? 0.0 : clamp( material.a, 0.0, 1.0 );
 	float aoCoupling = mix( 1.0, materialAO, clamp( pc.aoStrength, 0.0, 1.0 ) * shadingConfidence );
 	vec3 V = safeNormalizeOr( -viewPos, vec3( 0.0, 0.0, 1.0 ) );
 	N = safeNormalizeOr( mix( vec3( 0.0, 0.0, 1.0 ), N, max( shadingConfidence, 0.15 ) ), vec3( 0.0, 0.0, 1.0 ) );
@@ -296,6 +320,18 @@ vec3 shadeDeferredPixel( uvec2 pix ) {
 		/* Multiply/legacy: ambient floor on albedo + Burley dynamic (albedo already in Fd). */
 		lit = ( albedo * vec3( 0.04 ) + diffuseAcc + specularAcc ) * roughMod * pc.strength;
 	}
+
+	/* Foundation: apply cascade-0 sun shadow from GpuShadowRecord SSBO when valid. */
+#ifdef DEFERRED_HAS_SHADOW_CONTRACT
+	if ( ( pc.shadowFlags & 1u ) != 0u && pc.shadowStrength > 0.0 ) {
+		mat4 invView = inverse( pc.viewMatrix );
+		vec3 worldPos = ( invView * vec4( viewPos, 1.0 ) ).xyz;
+		float sunVis = ShadowContract_SampleCascade(
+			shadows.records[0], sunShadowMap, worldPos, pc.shadowStrength );
+		/* Soften: keep some ambient so deferred doesn't go fully black in shadow. */
+		lit *= mix( 0.35, 1.0, sunVis );
+	}
+#endif
 	return lit;
 }
 

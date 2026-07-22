@@ -10,6 +10,14 @@ Milestone 1: frame-production validation before feature expansion.
 #include "vk_black_frame.h"
 #include "vk_deferred_gbuffer.h"
 #include "vk_render_path.h"
+#include "vk_frame_contract.h"
+#include "vk_hdr_pipeline.h"
+#include "vk_shadow_contract.h"
+#include "vk_depth_contract.h"
+#include "vk_renderer_perf.h"
+#include "vk_reflection_hierarchy.h"
+#include "vk_indirect_light.h"
+#include "vk_shading_compare.h"
 
 #define VK_BF_MAX_WRITERS 32
 
@@ -19,7 +27,6 @@ static cvar_t *r_captureBlackFrame;
 static cvar_t *r_forcePassColor;
 static cvar_t *r_gbufferBandwidth;
 static cvar_t *r_gbufferDebug;
-static cvar_t *r_materialPathReason;
 
 static char s_writers[VK_BF_MAX_WRITERS][48];
 static int s_writerCount;
@@ -90,8 +97,11 @@ static void VK_BF_PrintResourceMeta( void )
 
 static void VK_BF_PrintGBufferBandwidth( void )
 {
-	uint32_t w, h, bpp, writeBpp, readBpp;
-	uint64_t pixels, writeBytes, readBytes, storeBytes;
+	uint32_t w, h, bpp, writeBpp, readBpp, compactWriteBpp, compactReadBpp;
+	uint64_t pixels, writeBytes, readBytes, compactWriteBytes, compactReadBytes;
+	uint32_t deferredN = 0u, fpOpaqueN = 0u, opaqueTotal;
+	float fpFallbackPct;
+	int compactOn;
 
 	w = vk.deferredGbufferExtentW ? vk.deferredGbufferExtentW :
 		( vk.mainColorWidth ? vk.mainColorWidth : vk.renderWidth );
@@ -109,22 +119,35 @@ static void VK_BF_PrintGBufferBandwidth( void )
 	readBpp = writeBpp + VK_BF_FormatBytesPerPixel( VK_FORMAT_D32_SFLOAT );
 	writeBytes = pixels * (uint64_t)writeBpp;
 	readBytes = pixels * (uint64_t)readBpp;
-	storeBytes = writeBytes;
+	/* G-buffer 2.0 compact target: 3× R8G8B8A8 (12 B/px write; ~16 B/px read with depth). */
+	compactWriteBpp = VK_BF_FormatBytesPerPixel( VK_FORMAT_R8G8B8A8_UNORM ) * 3u;
+	compactReadBpp = compactWriteBpp + VK_BF_FormatBytesPerPixel( VK_FORMAT_D32_SFLOAT );
+	compactWriteBytes = pixels * (uint64_t)compactWriteBpp;
+	compactReadBytes = pixels * (uint64_t)compactReadBpp;
+	R_RenderPath_GetOpaqueCounts( &deferredN, &fpOpaqueN );
+	opaqueTotal = deferredN + fpOpaqueN;
+	fpFallbackPct = ( opaqueTotal > 0u ) ?
+		( 100.0f * (float)fpOpaqueN / (float)opaqueTotal ) : 0.0f;
+	compactOn = ( r_gbufferCompact && r_gbufferCompact->integer ) ? 1 : 0;
 	ri.Printf( PRINT_ALL,
-		"G-buffer bandwidth (scaffold R16F4×3):\n"
-		"  extent=%ux%u pixels=%llu\n"
-		"  bytes/opaque-pixel write=%u read(deferred)~=%u\n"
-		"  write/frame write≈%llu (%.2f MiB) read≈%llu (%.2f MiB)\n"
-		"  allocated=%s gen=%u directExport=%s\n"
-		"  GBuffer 2.0 target: octahedral + compact material (~12–16 B/px write)\n",
-		w, h, (unsigned long long)pixels,
+		"G-buffer bandwidth (scaffold R16F4×3 = %u B/px write, ~%u B/px deferred read):\n"
+		"  extent=%ux%u pixels=%llu r_gbufferCompact=%d (dual-write + lighting oct decode)\n"
+		"  scaffold write/frame≈%llu (%.2f MiB) read≈%llu (%.2f MiB)\n"
+		"  compact target=%u B/px write ~%u B/px read (goal ≤16 / ≤20 B/px)\n"
+		"  compact target write≈%llu (%.2f MiB) read≈%llu (%.2f MiB)\n"
+		"  Forward+ opaque fallback=%.1f%% (deferred=%u fpOpaque=%u)\n"
+		"  allocated=%s gen=%u directExport=%s\n",
 		writeBpp, readBpp,
+		w, h, (unsigned long long)pixels, compactOn,
 		(unsigned long long)writeBytes, (double)writeBytes / ( 1024.0 * 1024.0 ),
 		(unsigned long long)readBytes, (double)readBytes / ( 1024.0 * 1024.0 ),
+		compactWriteBpp, compactReadBpp,
+		(unsigned long long)compactWriteBytes, (double)compactWriteBytes / ( 1024.0 * 1024.0 ),
+		(unsigned long long)compactReadBytes, (double)compactReadBytes / ( 1024.0 * 1024.0 ),
+		fpFallbackPct, deferredN, fpOpaqueN,
 		vk.deferredGbufferAllocated ? "yes" : "no",
 		vk.deferredGbufferGeneration,
 		vk.deferredGbufferDirectExport ? "yes" : "no" );
-	(void)storeBytes;
 }
 
 static void VK_BF_PrintResourceStatus( void )
@@ -240,6 +263,8 @@ static uint32_t VK_BF_ValidateFrame( qboolean printPass )
 	/* 8) Push-constant note */
 	ri.Printf( PRINT_ALL,
 		"NOTE: OIT push=224 B / resolve=16 B (see startup [VK][OIT] push layout)\n" );
+
+	fails += vk_frame_contract_validate( printPass );
 
 	VK_BF_PrintChain();
 	ri.Printf( PRINT_ALL, "validate_frame: %u failure(s)\n", fails );
@@ -374,11 +399,6 @@ void vk_black_frame_register( void )
 		"G-buffer debug (mirrors r_deferredGBufferDebug 0–6). Prefer deferred cvar for compositing." );
 	ri.Cvar_SetGroup( r_gbufferDebug, CVG_RENDERER );
 
-	r_materialPathReason = ri.Cvar_Get( "r_materialPathReason", "0", CVAR_CHEAT );
-	ri.Cvar_CheckRange( r_materialPathReason, "0", "1", CV_INTEGER );
-	ri.Cvar_SetDescription( r_materialPathReason,
-		"When 1, log why materials route Deferred vs Forward+ (developer)." );
-	ri.Cvar_SetGroup( r_materialPathReason, CVG_RENDERER );
 
 	if ( !s_cmdsRegistered ) {
 		ri.Cmd_AddCommand( "frame_output_status", VK_BF_FrameOutputStatus_f );
@@ -401,6 +421,14 @@ void vk_black_frame_begin_frame( void )
 	s_writerCount = 0;
 	Com_Memset( s_drawCounts, 0, sizeof( s_drawCounts ) );
 	s_indicesSubmitted = 0;
+	vk_frame_contract_begin_frame();
+	vk_depth_contract_begin_frame();
+	vk_hdr_pipeline_begin_frame();
+	vk_shadow_contract_begin_frame();
+	vk_reflection_hierarchy_begin_frame();
+	vk_indirect_light_begin_frame();
+	vk_renderer_perf_begin_frame();
+	vk_shading_compare_begin_frame();
 }
 
 void vk_black_frame_note_writer( const char *passName )
@@ -416,6 +444,39 @@ void vk_black_frame_note_writer( const char *passName )
 	}
 	Q_strncpyz( s_writers[s_writerCount], passName, sizeof( s_writers[0] ) );
 	s_writerCount++;
+	if ( !Q_stricmpn( passName, "ForwardOpaque", 13 ) ||
+		!Q_stricmpn( passName, "DeferredComposite", 17 ) ||
+		!Q_stricmpn( passName, "WBOITResolve", 12 ) ||
+		!Q_stricmpn( passName, "OITResolve", 10 ) ||
+		!Q_stricmpn( passName, "OITOpaqueCopy", 13 ) ||
+		!Q_stricmpn( passName, "PreBloom", 8 ) ) {
+		vk_frame_contract_note_writer( "SceneHDR", passName );
+		vk_hdr_pipeline_note_stage( VK_HDR_STAGE_SCENE, passName );
+	}
+	if ( !Q_stricmpn( passName, "ForwardOpaque", 13 ) ||
+		!Q_stricmpn( passName, "GBufferCapture", 14 ) ) {
+		vk_frame_contract_note_writer( "SceneDepth", passName );
+		vk_depth_contract_note_writer( passName );
+	}
+	if ( !Q_stricmpn( passName, "GBufferCapture", 14 ) ) {
+		vk_frame_contract_note_writer( "GBuffer0", passName );
+		vk_frame_contract_note_writer( "GBuffer1", passName );
+		vk_frame_contract_note_writer( "GBuffer2", passName );
+		vk_hdr_pipeline_note_stage( VK_HDR_STAGE_SCENE, passName );
+	}
+	if ( !Q_stricmpn( passName, "Bloom", 5 ) ) {
+		vk_hdr_pipeline_note_stage( VK_HDR_STAGE_BLOOM, passName );
+		vk_frame_contract_note_writer( "BloomSource", passName );
+	}
+	if ( !Q_stricmpn( passName, "Tonemap", 7 ) || !Q_stricmpn( passName, "ToneMap", 7 ) ) {
+		vk_hdr_pipeline_note_stage( VK_HDR_STAGE_TONEMAP, passName );
+		vk_frame_contract_note_writer( "ToneMapSource", passName );
+	}
+	if ( !Q_stricmpn( passName, "DepthPrepass", 12 ) ||
+		!Q_stricmpn( passName, "OpaqueDepth", 11 ) ) {
+		vk_frame_contract_note_writer( "SceneDepth", passName );
+		vk_depth_contract_note_writer( passName );
+	}
 }
 
 void vk_black_frame_note_draw( vkBlackFrameDrawKind_t kind, uint32_t count )
@@ -424,6 +485,14 @@ void vk_black_frame_note_draw( vkBlackFrameDrawKind_t kind, uint32_t count )
 		return;
 	}
 	s_drawCounts[kind] += count;
+}
+
+uint32_t vk_black_frame_draw_count( vkBlackFrameDrawKind_t kind )
+{
+	if ( kind < 0 || kind >= VK_BF_DRAW_COUNT ) {
+		return 0u;
+	}
+	return s_drawCounts[kind];
 }
 
 void vk_black_frame_note_indices( uint32_t indices )

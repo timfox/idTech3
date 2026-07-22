@@ -1,0 +1,50 @@
+#version 450
+/*
+ * Hi-Z mip downsample for reversed-Z depth.
+ *
+ * Reversed-Z: near plane → 1.0, far plane → 0.0. For conservative occlusion tests we
+ * need the farthest depth in each 2×2 footprint (near=1, far=0) — use min(), not max().
+ *
+ * Bindings:
+ *   0 — full-res depth (sampler2D) when pc.srcLevel == 0
+ *   1 — previous mip (readonly image2D) when pc.srcLevel > 0
+ *   2 — output mip (writeonly image2D)
+ *
+ * Push constants carry source/destination level sizes in pixels.
+ */
+layout( local_size_x = 8, local_size_y = 8, local_size_z = 1 ) in;
+
+layout( set = 0, binding = 0 ) uniform sampler2D depthTex;
+layout( r32f, set = 0, binding = 1 ) uniform readonly image2D srcMip;
+layout( r32f, set = 0, binding = 2 ) uniform writeonly image2D dstMip;
+
+layout( push_constant ) uniform Push {
+	uvec2 srcExtent;
+	uvec2 dstExtent;
+	uint srcLevel;
+	uint _pad;
+} pc;
+
+void main()
+{
+	uvec2 pix = gl_GlobalInvocationID.xy;
+	if ( pix.x >= pc.dstExtent.x || pix.y >= pc.dstExtent.y ) {
+		return;
+	}
+
+	float z;
+	if ( pc.srcLevel == 0u ) {
+		vec2 uv = ( vec2( pix ) + 0.5 ) / vec2( pc.dstExtent );
+		z = texture( depthTex, uv ).r;
+	} else {
+		ivec2 base = ivec2( pix ) * 2;
+		float z00 = imageLoad( srcMip, base ).r;
+		float z10 = imageLoad( srcMip, base + ivec2( 1, 0 ) ).r;
+		float z01 = imageLoad( srcMip, base + ivec2( 0, 1 ) ).r;
+		float z11 = imageLoad( srcMip, base + ivec2( 1, 1 ) ).r;
+		/* reversed-Z conservative farthest depth */
+		z = min( min( z00, z10 ), min( z01, z11 ) );
+	}
+
+	imageStore( dstMip, ivec2( pix ), vec4( z ) );
+}

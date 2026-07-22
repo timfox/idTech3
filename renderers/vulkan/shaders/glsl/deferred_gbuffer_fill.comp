@@ -1,10 +1,14 @@
 #version 450
+#extension GL_GOOGLE_include_directive : require
 
 /*
  * Deferred G-buffer scaffold: view-space normal + material contract from depth.
  * Albedo is copied separately (scene color -> deferred_gbuffer_albedo).
  * materialOut = metalness, roughness, AO, sourceConfidence.
+ * r_gbufferCompact 1: dual-write octahedral normal into material.ba (scaffold XYZ in normalOut).
  */
+
+#include "gbuffer_octahedral.glsl"
 
 layout(local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
 
@@ -14,9 +18,12 @@ layout(rgba16f, set = 0, binding = 2) uniform writeonly image2D materialOut;
 
 layout(push_constant) uniform Push {
 	vec4 projInfo; /* invProj00, invProj11, proj10, proj14 (SSAO-compatible) */
-	vec4 materialParams; /* metalness, roughness, normal edge threshold, reserved */
+	vec4 materialParams; /* metalness, roughness, normal edge threshold, msaaSafe */
 	uvec2 extent;
+	uint gbufferFlags; /* bit0: compact dual-write oct into material.ba */
 } pc;
+
+const uint GBUFFER_FLAG_COMPACT_DUAL_WRITE = 1u;
 
 float viewZFromDepth( float depth ) {
 	return -pc.projInfo.w / max( depth + pc.projInfo.z, 1e-6 );
@@ -55,8 +62,13 @@ void main() {
 		clamp( pc.materialParams.y, 0.04, 1.0 ), 1.0, 0.0 );
 
 	if ( !validDepth( depth ) ) {
+		vec4 matOut = baseMaterial;
+		if ( ( pc.gbufferFlags & GBUFFER_FLAG_COMPACT_DUAL_WRITE ) != 0u ) {
+			vec2 oct = GbufEncodeOctahedral( vec3( 0.0, 0.0, 1.0 ) );
+			matOut = vec4( baseMaterial.rg, oct );
+		}
 		imageStore( normalOut, ivec2( pix ), vec4( 0.0, 0.0, 1.0, 0.0 ) );
-		imageStore( materialOut, ivec2( pix ), baseMaterial );
+		imageStore( materialOut, ivec2( pix ), matOut );
 		return;
 	}
 
@@ -113,6 +125,12 @@ void main() {
 	}
 
 	imageStore( normalOut, ivec2( pix ), vec4( n, confidence ) );
-	/* material.a = sourceConfidence (same signal as normal.a) for classify. */
-	imageStore( materialOut, ivec2( pix ), vec4( fallbackMetalness, fallbackRoughness, fallbackAO, confidence ) );
+	if ( ( pc.gbufferFlags & GBUFFER_FLAG_COMPACT_DUAL_WRITE ) != 0u ) {
+		vec2 oct = GbufEncodeOctahedral( n );
+		/* Compact prep: octahedral in material.ba; scaffold XYZ stays in normalOut for lighting. */
+		imageStore( materialOut, ivec2( pix ), vec4( fallbackMetalness, fallbackRoughness, oct ) );
+	} else {
+		/* material.a = sourceConfidence (same signal as normal.a) for classify. */
+		imageStore( materialOut, ivec2( pix ), vec4( fallbackMetalness, fallbackRoughness, fallbackAO, confidence ) );
+	}
 }

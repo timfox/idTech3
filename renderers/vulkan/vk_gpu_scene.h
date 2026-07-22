@@ -54,7 +54,7 @@ typedef enum {
  *  - flags high bits reserved for M2 materialPathReason / temporalClass
  * Do not force-enable GPU-driven draws from this scaffold alone.
  */
-typedef struct {
+typedef struct GpuSceneObject {
 	uint32_t handle;
 	uint32_t meshId;
 	uint32_t materialId;
@@ -71,8 +71,25 @@ typedef struct {
 	uint32_t visibleAge;        /* frames visible — anti one-frame pop */
 	uint32_t lastReject;
 	uint32_t generation;
-	uint32_t _pad;              /* reserve: future temporalClass */
-} vkGpuSceneInstance_t;
+	uint32_t objectGeneration;
+	uint32_t temporalClass;
+	uint32_t shadowFlags;
+	uint32_t lightmapIndex;
+	uint32_t reflectionProbeIndex;
+	uint32_t irradianceProbeIndex;
+	uint32_t animationIndex;
+	uint32_t surfaceId;
+	uint32_t renderFlags;
+	float    currentModel[16];
+	float    previousModel[16];
+	float    normalMatrix[12];
+	float    boundsSphere[4];
+	float    boundsMin[4];
+	float    boundsMax[4];
+	uint32_t _pad;
+} GpuSceneObject;
+
+typedef GpuSceneObject vkGpuSceneInstance_t;
 
 typedef struct {
 	uint32_t meshId;
@@ -129,6 +146,11 @@ void vk_gpu_scene_cull_and_build_indirect( void );
 
 uint32_t vk_gpu_scene_visible_count( void );
 uint32_t vk_gpu_scene_indirect_count( void );
+uint32_t vk_gpu_scene_generation( void );
+qboolean vk_gpu_scene_driven_active( void );
+void vk_gpu_scene_telemetry( uint32_t *outCandidates, uint32_t *outFrustumRejected,
+	uint32_t *outHizRejected, uint32_t *outGeneratedDraws );
+qboolean vk_gpu_scene_validate_layout( void );
 const uint32_t *vk_gpu_scene_visible_handles( void );
 const vkGpuSceneDrawCmd_t *vk_gpu_scene_indirect_cmds( void );
 

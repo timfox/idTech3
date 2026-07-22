@@ -10,6 +10,7 @@ Never add RT + SSR + probe at full strength.
 #include "tr_local.h"
 #include "vk.h"
 #include "vk_selective_reflection.h"
+#include "vk_reflection_hierarchy.h"
 #include "vk_rtx.h"
 #include "vk_hybrid1.h"
 #include "vk_postfx.h"
@@ -143,6 +144,32 @@ static qboolean SHR_SsrHealthReady( void )
 	return qtrue;
 }
 
+static void SHR_NoteHierarchy( void )
+{
+	vkReflectSource_t src = VK_REFLECT_SRC_PROBE;
+	float weight = 1.0f;
+
+	switch ( shr.owner ) {
+	case VK_SHR_OWNER_SSR:
+		src = VK_REFLECT_SRC_SSR;
+		break;
+	case VK_SHR_OWNER_RT:
+	case VK_SHR_OWNER_PATH_TRACER:
+		src = VK_REFLECT_SRC_RAY;
+		break;
+	case VK_SHR_OWNER_PROBE:
+	case VK_SHR_OWNER_FALLBACK:
+		src = VK_REFLECT_SRC_PROBE;
+		break;
+	case VK_SHR_OWNER_OFF:
+	default:
+		src = VK_REFLECT_SRC_NONE;
+		weight = 0.0f;
+		break;
+	}
+	vk_reflection_hierarchy_note( src, weight, shr.fallbackReason );
+}
+
 static void SHR_ResolveOwner( void )
 {
 	const char *pref;
@@ -151,18 +178,21 @@ static void SHR_ResolveOwner( void )
 
 	if ( !SHR_FeatureRequested() ) {
 		SHR_SetFallback( "none" );
+		SHR_NoteHierarchy();
 		return;
 	}
 
 	if ( SHR_PathtraceBlocks() ) {
 		shr.owner = VK_SHR_OWNER_PATH_TRACER;
 		SHR_SetFallback( "shr_blocked_by_pathtrace" );
+		SHR_NoteHierarchy();
 		return;
 	}
 
 	if ( !vk.fboActive ) {
 		shr.owner = VK_SHR_OWNER_PROBE;
 		SHR_SetFallback( "shr_requires_fbo" );
+		SHR_NoteHierarchy();
 		return;
 	}
 
@@ -171,11 +201,13 @@ static void SHR_ResolveOwner( void )
 	if ( !Q_stricmp( pref, "off" ) ) {
 		shr.owner = VK_SHR_OWNER_OFF;
 		SHR_SetFallback( "shr_owner_forced_off" );
+		SHR_NoteHierarchy();
 		return;
 	}
 	if ( !Q_stricmp( pref, "probe" ) ) {
 		shr.owner = VK_SHR_OWNER_PROBE;
 		SHR_SetFallback( "shr_owner_forced_probe" );
+		SHR_NoteHierarchy();
 		return;
 	}
 	if ( !Q_stricmp( pref, "ssr" ) ) {
@@ -185,31 +217,35 @@ static void SHR_ResolveOwner( void )
 		} else {
 			shr.owner = VK_SHR_OWNER_PROBE;
 		}
+		SHR_NoteHierarchy();
 		return;
 	}
 	if ( !Q_stricmp( pref, "hybrid1_rt" ) || !Q_stricmp( pref, "rt" ) || !Q_stricmp( pref, "auto" ) ) {
 		if ( SHR_RtHealthReady() ) {
 			shr.owner = VK_SHR_OWNER_RT;
 			SHR_SetFallback( "none" );
+			SHR_NoteHierarchy();
 			return;
 		}
 		if ( SHR_SsrHealthReady() ) {
 			shr.owner = VK_SHR_OWNER_SSR;
-			/* fallback reason already set by RT health, or overwrite */
 			if ( !Q_stricmp( shr.fallbackReason, "none" ) ) {
 				SHR_SetFallback( "shr_rt_demote_to_ssr" );
 			}
+			SHR_NoteHierarchy();
 			return;
 		}
 		shr.owner = VK_SHR_OWNER_PROBE;
 		if ( !Q_stricmp( shr.fallbackReason, "none" ) ) {
 			SHR_SetFallback( "shr_rt_ssr_demote_to_probe" );
 		}
+		SHR_NoteHierarchy();
 		return;
 	}
 
 	shr.owner = VK_SHR_OWNER_PROBE;
 	SHR_SetFallback( "shr_owner_unknown_pref" );
+	SHR_NoteHierarchy();
 }
 
 static void SHR_Status_f( void )

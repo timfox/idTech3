@@ -27,6 +27,8 @@ When enabled, MD3 surfaces (≤512 verts / ≤1024 tris) bake at load, skip add 
 | `r_meshletsMdiDraw` | GPU `vkCmdDrawIndexedIndirect` for tess-relative meshlet ranges (default 0) |
 | `r_meshletsLod` | Screen-space projected AABB LOD cull (default 0) |
 | `r_meshletsLodPixels` | Minimum projected diagonal in pixels to keep (default 2) |
+| `r_meshletsBspPilot` | Cheat: meshlet bake/cull for small BSP `SF_FACE` (default 0) |
+| `r_meshletsModelPilot` | Static MD3 meshlet path; skip animated (default 1) |
 | `meshlet_status` | Bake/cache/cull/LOD/compact/MDI counts |
 
 ## API
@@ -42,7 +44,7 @@ When enabled, MD3 surfaces (≤512 verts / ≤1024 tris) bake at load, skip add 
 
 - Persistent per-surface IBO (avoid remapping into tess)
 - `VK_EXT_mesh_shader` task/mesh pipelines
-- BSP world / skinned meshlets
+- Full BSP world / skinned meshlets (pilot: `r_meshletsBspPilot` for one face class)
 - GPU cull / continuous cluster LOD streaming
 
 ## Raster Ultra 1.6

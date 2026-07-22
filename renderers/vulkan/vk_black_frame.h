@@ -28,6 +28,7 @@ void vk_black_frame_register( void );
 void vk_black_frame_begin_frame( void );
 void vk_black_frame_note_writer( const char *passName );
 void vk_black_frame_note_draw( vkBlackFrameDrawKind_t kind, uint32_t count );
+uint32_t vk_black_frame_draw_count( vkBlackFrameDrawKind_t kind );
 void vk_black_frame_note_indices( uint32_t indices );
 void vk_black_frame_check_before_ui( void );
 qboolean vk_black_frame_force_minimal_scene( void );

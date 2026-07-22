@@ -125,6 +125,14 @@ glstatic_t	gls;
 #include "vk_forward_plus.h"
 #include "vk_render_path.h"
 #include "vk_black_frame.h"
+#include "vk_frame_contract.h"
+#include "vk_shadow_contract.h"
+#include "vk_depth_contract.h"
+#include "vk_shading_compare.h"
+#include "vk_reflection_hierarchy.h"
+#include "vk_indirect_light.h"
+#include "vk_hdr_pipeline.h"
+#include "vk_renderer_perf.h"
 #include "vk_aa_policy.h"
 static void VkInfo_f( void );
 static void VulkanInfo_f( void );
@@ -4059,6 +4067,14 @@ void R_Init( void ) {
 #ifdef USE_VULKAN
 	R_RenderPath_RegisterCvars();
 	vk_black_frame_register();
+	vk_frame_contract_register();
+	vk_shadow_contract_register();
+	vk_depth_contract_register();
+	vk_shading_compare_register();
+	vk_reflection_hierarchy_register();
+	vk_indirect_light_register();
+	vk_hdr_pipeline_register();
+	vk_renderer_perf_register();
 #endif
 	VK_RasterUltra_Enforce();
 	vk_aa_policy_apply();

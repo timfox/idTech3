@@ -81,6 +81,7 @@ typedef struct {
 	float specularAA;
 	uint32_t compactLists;
 	uint32_t clusterCount;
+	uint32_t gbufferCompact;
 } vrcs_light_push_t;
 
 typedef struct {
@@ -138,6 +139,7 @@ extern cvar_t *r_deferredAOCoupling;
 extern cvar_t *r_deferredMaterialClassify;
 extern cvar_t *r_deferredUnlitBase;
 extern cvar_t *r_taa;
+extern cvar_t *r_gbufferCompact;
 
 static void VRCS_DestroyBuffer( vrcs_buffer_t *b )
 {
@@ -663,6 +665,7 @@ static void VRCS_FillLightPush( vrcs_light_push_t *push, uint32_t width, uint32_
 	}
 	push->compactLists = vk.forward_plus.compact_lists ? 1u : 0u;
 	push->clusterCount = vk.forward_plus.tile_capacity_tiles;
+	push->gbufferCompact = ( r_gbufferCompact && r_gbufferCompact->integer ) ? 1u : 0u;
 }
 
 qboolean vk_vrcs_dispatch_deferred_lighting( uint32_t width, uint32_t height )

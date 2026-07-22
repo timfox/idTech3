@@ -13,6 +13,8 @@ layout(local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
 #define REC_VEC4S 4u
 const float DEF_PI = 3.14159265;
 
+#include "shadow_contract.glsl"
+
 layout(std430, set = 0, binding = 0) readonly buffer LightSSBO {
 	vec4 data[];
 } lights;
@@ -29,6 +31,10 @@ layout(rgba16f, set = 0, binding = 6) uniform writeonly image2D outLit;
 layout(set = 0, binding = 7) uniform usampler2D classMap;
 layout(set = 0, binding = 8) uniform sampler2D ltcMatTex;
 layout(set = 0, binding = 9) uniform sampler2D ltcAmpTex;
+layout(std430, set = 0, binding = 10) readonly buffer ShadowContractSSBO {
+	GpuShadowGpuRecord records[];
+} shadows;
+layout(set = 0, binding = 11) uniform sampler2D sunShadowMap;
 
 layout(push_constant) uniform Push {
 	mat4 viewMatrix;
@@ -51,12 +57,18 @@ layout(push_constant) uniform Push {
 	float specularAA;
 	uint compactLists;
 	uint clusterCount;
+	uint gbufferCompact;
+	uint shadowFlags; /* bit0: sun shadow valid + SSBO bound */
+	float shadowStrength;
+	uint shadowGeneration;
+	uint _shadowPad;
 } pc;
 
 #define USE_LTC_AREA_LIGHT
 #include "ltc_area_light.glsl"
 #define CLUSTER_LIST_CELLS tiles.cells
 #include "cluster_light_list.glsl"
+#define DEFERRED_HAS_SHADOW_CONTRACT
 #include "deferred_lighting_common.glsl"
 
 void main() {

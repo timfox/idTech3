@@ -46,8 +46,32 @@ renderPath_t R_SelectSurfaceRenderPath(
 /* True when selected path hands opaque dynamics to deferred (skip Forward+ add). */
 qboolean R_RenderPath_WantsDeferredHandoff( renderPath_t path );
 
-/* r_renderPathDebug / r_hybridCompare accessors (may be NULL before register). */
+
+/*
+ * Material feature routing (Foundation Consolidation — docs/GBUFFER_2.md).
+ */
+#define R_MAT_FEAT_ANISOTROPY     (1u << 0)
+#define R_MAT_FEAT_TRANSMISSION   (1u << 1)
+#define R_MAT_FEAT_REFRACTION     (1u << 2)
+#define R_MAT_FEAT_LAYERED        (1u << 3)
+#define R_MAT_FEAT_SKIN           (1u << 4)
+#define R_MAT_FEAT_WATER          (1u << 5)
+#define R_MAT_FEAT_COMPLEX_COAT   (1u << 6)
+#define R_MAT_FEAT_FORWARD_ONLY \
+	( R_MAT_FEAT_ANISOTROPY | R_MAT_FEAT_TRANSMISSION | R_MAT_FEAT_REFRACTION | \
+	  R_MAT_FEAT_LAYERED | R_MAT_FEAT_SKIN | R_MAT_FEAT_WATER | R_MAT_FEAT_COMPLEX_COAT )
+
+renderPath_t R_SelectMaterialRenderPath(
+	const shader_t *shader,
+	unsigned materialFeatureFlags,
+	const char **outReason );
+
+void R_RenderPath_GetOpaqueCounts( uint32_t *outDeferred, uint32_t *outForwardPlus );
+
 extern cvar_t *r_renderPathDebug;
 extern cvar_t *r_hybridCompare;
+extern cvar_t *r_materialPathDebug;
+extern cvar_t *r_materialPathReason;
+extern cvar_t *r_gbufferCompact;
 
 #endif /* USE_VULKAN */

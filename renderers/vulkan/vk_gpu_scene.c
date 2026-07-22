@@ -27,6 +27,8 @@ static cvar_t *r_gpuSceneDebug;
 static cvar_t *r_gpuSceneWorldType;
 static cvar_t *r_gpuSceneHlod;
 static cvar_t *r_gpuSceneLodHysteresis;
+static cvar_t *r_gpuDriven;
+static cvar_t *r_gpuDrawCompare;
 
 static char s_worldFallbackReason[96];
 
@@ -188,14 +190,18 @@ void vk_gpu_scene_register_cvars( void )
 	ri.Cvar_CheckRange( r_gpuSceneLodHysteresis, "0", "1", CV_INTEGER );
 
 	r_gpuSceneDebug = ri.Cvar_Get( "r_gpuSceneDebug", "0", CVAR_ARCHIVE_ND );
-	ri.Cvar_CheckRange( r_gpuSceneDebug, "0", "4", CV_INTEGER );
+	ri.Cvar_CheckRange( r_gpuSceneDebug, "0", "9", CV_INTEGER );
 	ri.Cvar_SetDescription( r_gpuSceneDebug,
-		"GPU scene debug:\n"
-		" 0 off\n"
-		" 1 bounds\n"
-		" 2 rejection reasons\n"
-		" 3 LOD/HLOD\n"
-		" 4 indirect counts" );
+		"GPU scene debug 0-9 (object/material/mesh/temporal/path/gen/prev/shadow/probe)." );
+
+	r_gpuDriven = ri.Cvar_Get( "r_gpuDriven", "0", CVAR_ARCHIVE_ND | CVAR_LATCH );
+	ri.Cvar_CheckRange( r_gpuDriven, "0", "1", CV_INTEGER );
+	ri.Cvar_SetDescription( r_gpuDriven, "GPU-driven draw submission: 0 direct, 1 indirect lists." );
+	ri.Cvar_SetGroup( r_gpuDriven, CVG_RENDERER );
+	r_gpuDrawCompare = ri.Cvar_Get( "r_gpuDrawCompare", "0", CVAR_CHEAT );
+	ri.Cvar_CheckRange( r_gpuDrawCompare, "0", "1", CV_INTEGER );
+	ri.Cvar_SetDescription( r_gpuDrawCompare, "Compare direct vs GPU-driven draws (cheat)." );
+	ri.Cvar_SetGroup( r_gpuDrawCompare, CVG_RENDERER );
 }
 
 void vk_gpu_scene_init( void )
@@ -207,6 +213,10 @@ void vk_gpu_scene_init( void )
 	s_meshCount = 0;
 	s_visibleCount = 0;
 	s_indirectCount = 0;
+	Com_Memset( s_indirect, 0, sizeof( s_indirect ) );
+	if ( s_indirectMapped ) {
+		Com_Memset( s_indirectMapped, 0, sizeof( vkGpuSceneDrawCmd_t ) * VK_GPU_SCENE_INDIRECT_MAX );
+	}
 	s_nextHandle = 1;
 	s_generation = 1;
 	s_rejectFrustum = s_rejectHiz = s_rejectLod = s_rejectStream = 0;
@@ -214,6 +224,7 @@ void vk_gpu_scene_init( void )
 
 	if ( !s_cmds ) {
 		ri.Cmd_AddCommand( "gpu_scene_status", vk_gpu_scene_status_f );
+		ri.Cmd_AddCommand( "gpu_scene_layout", vk_gpu_scene_layout_f );
 		s_cmds = qtrue;
 	}
 
@@ -237,6 +248,10 @@ void vk_gpu_scene_shutdown( void )
 	s_meshCount = 0;
 	s_visibleCount = 0;
 	s_indirectCount = 0;
+	Com_Memset( s_indirect, 0, sizeof( s_indirect ) );
+	if ( s_indirectMapped ) {
+		Com_Memset( s_indirectMapped, 0, sizeof( vkGpuSceneDrawCmd_t ) * VK_GPU_SCENE_INDIRECT_MAX );
+	}
 }
 
 qboolean vk_gpu_scene_active( void )
@@ -330,6 +345,10 @@ void vk_gpu_scene_on_world_load( void )
 	s_meshCount = 0;
 	s_visibleCount = 0;
 	s_indirectCount = 0;
+	Com_Memset( s_indirect, 0, sizeof( s_indirect ) );
+	if ( s_indirectMapped ) {
+		Com_Memset( s_indirectMapped, 0, sizeof( vkGpuSceneDrawCmd_t ) * VK_GPU_SCENE_INDIRECT_MAX );
+	}
 	vk_hiz_on_camera_cut();
 	R_Meshlets_InvalidateCache();
 	ri.Printf( PRINT_DEVELOPER, "[VK][GPUScene] world load gen=%u (classic BSP path intact)\n",
@@ -342,6 +361,10 @@ void vk_gpu_scene_on_world_unload( void )
 	s_meshCount = 0;
 	s_visibleCount = 0;
 	s_indirectCount = 0;
+	Com_Memset( s_indirect, 0, sizeof( s_indirect ) );
+	if ( s_indirectMapped ) {
+		Com_Memset( s_indirectMapped, 0, sizeof( vkGpuSceneDrawCmd_t ) * VK_GPU_SCENE_INDIRECT_MAX );
+	}
 	vk_hiz_on_camera_cut();
 }
 
@@ -356,6 +379,10 @@ void vk_gpu_scene_on_vid_restart( void )
 	/* Keep instance table across soft restart; invalidate draw buffers only. */
 	s_visibleCount = 0;
 	s_indirectCount = 0;
+	Com_Memset( s_indirect, 0, sizeof( s_indirect ) );
+	if ( s_indirectMapped ) {
+		Com_Memset( s_indirectMapped, 0, sizeof( vkGpuSceneDrawCmd_t ) * VK_GPU_SCENE_INDIRECT_MAX );
+	}
 }
 
 void vk_gpu_scene_begin_frame( void )
@@ -365,6 +392,10 @@ void vk_gpu_scene_begin_frame( void )
 	}
 	s_visibleCount = 0;
 	s_indirectCount = 0;
+	Com_Memset( s_indirect, 0, sizeof( s_indirect ) );
+	if ( s_indirectMapped ) {
+		Com_Memset( s_indirectMapped, 0, sizeof( vkGpuSceneDrawCmd_t ) * VK_GPU_SCENE_INDIRECT_MAX );
+	}
 	s_rejectFrustum = s_rejectHiz = s_rejectLod = s_rejectStream = 0;
 }
 
@@ -496,6 +527,10 @@ void vk_gpu_scene_cull_and_build_indirect( void )
 	s_cullFrames++;
 	s_visibleCount = 0;
 	s_indirectCount = 0;
+	Com_Memset( s_indirect, 0, sizeof( s_indirect ) );
+	if ( s_indirectMapped ) {
+		Com_Memset( s_indirectMapped, 0, sizeof( vkGpuSceneDrawCmd_t ) * VK_GPU_SCENE_INDIRECT_MAX );
+	}
 
 	/* Classic / hybrid: never claim BSP surfaces via this path. */
 	if ( vk_gpu_scene_world_type() == VK_WORLD_TYPE_CLASSIC_BSP && s_instanceCount == 0 ) {
@@ -592,6 +627,36 @@ void vk_gpu_scene_cull_and_build_indirect( void )
 
 	if ( doIndirect && s_indirectMapped && s_indirectCount > 0 ) {
 		Com_Memcpy( s_indirectMapped, s_indirect, sizeof( vkGpuSceneDrawCmd_t ) * s_indirectCount );
+	}
+
+	/* Side-by-side host validation: visible handles vs indirect firstInstance IDs. */
+	if ( r_gpuDrawCompare && r_gpuDrawCompare->integer ) {
+		uint32_t mismatches = 0u;
+		uint32_t n = s_visibleCount < s_indirectCount ? s_visibleCount : s_indirectCount;
+		uint32_t j;
+		uint32_t invalidCmds = 0u;
+
+		for ( j = 0; j < n; j++ ) {
+			if ( s_indirect[j].firstInstance != s_visible[j] ) {
+				mismatches++;
+			}
+			if ( s_indirect[j].indexCount == 0u && s_indirect[j].instanceCount != 0u ) {
+				invalidCmds++;
+			}
+			if ( s_indirect[j].instanceCount > 4096u ) {
+				invalidCmds++;
+			}
+		}
+		if ( s_visibleCount != s_indirectCount ) {
+			mismatches += ( s_visibleCount > s_indirectCount )
+				? ( s_visibleCount - s_indirectCount )
+				: ( s_indirectCount - s_visibleCount );
+		}
+		ri.Printf( PRINT_ALL,
+			"[VK][gpuDrawCompare] visible=%u indirect=%u idMismatches=%u invalidCmds=%u "
+			"frustumRej=%u hizRej=%u (host list parity; color/depth GPU compare pending)\n",
+			s_visibleCount, s_indirectCount, mismatches, invalidCmds,
+			s_rejectFrustum, s_rejectHiz );
 	}
 }
 
@@ -723,6 +788,8 @@ void vk_gpu_scene_status_f( void )
 		s_indirectCount, s_indirectMapped ? "yes" : "no" );
 	ri.Printf( PRINT_ALL, "rejects      : frustum=%u hiz=%u lod=%u stream=%u\n",
 		s_rejectFrustum, s_rejectHiz, s_rejectLod, s_rejectStream );
+	ri.Printf( PRINT_ALL, "drawCompare  : r_gpuDrawCompare=%d (logs ID mismatches; GPU color/depth pending)\n",
+		r_gpuDrawCompare ? r_gpuDrawCompare->integer : 0 );
 	ri.Printf( PRINT_ALL, "cull_frames  : %u\n", s_cullFrames );
 	ri.Printf( PRINT_ALL, "meshlets     : companion r_meshlets (stable cache + MDI)\n" );
 	ri.Printf( PRINT_ALL, "classic_bsp  : default; terrain never replaces BSP without metadata\n" );
@@ -730,3 +797,38 @@ void vk_gpu_scene_status_f( void )
 	ri.Printf( PRINT_ALL, "===================================================\n" );
 	vk_hiz_status_f();
 }
+
+void vk_gpu_scene_layout_f( void )
+{
+	ri.Printf( PRINT_ALL, "======== GPU Scene Layout ========\n" );
+	ri.Printf( PRINT_ALL, "GpuSceneObject sizeof=%zu align16=%s\n",
+		sizeof( GpuSceneObject ),
+		( sizeof( GpuSceneObject ) % 16u ) == 0u ? "yes" : "NO" );
+	ri.Printf( PRINT_ALL, "vkGpuSceneMesh_t sizeof=%zu\n", sizeof( vkGpuSceneMesh_t ) );
+	ri.Printf( PRINT_ALL, "vkGpuSceneDrawCmd_t sizeof=%zu (VkDrawIndexedIndirectCommand)\n",
+		sizeof( vkGpuSceneDrawCmd_t ) );
+	ri.Printf( PRINT_ALL, "capacities: instances=%u meshes=%u meshlets=%u indirect=%u\n",
+		VK_GPU_SCENE_MAX_INSTANCES, VK_GPU_SCENE_MAX_MESHES,
+		VK_GPU_SCENE_MAX_MESHLETS, VK_GPU_SCENE_INDIRECT_MAX );
+	ri.Printf( PRINT_ALL,
+		"fields: transform+prevTransform, materialId/meshId/objectId, generation, "
+		"temporalClass, shadowFlags, probe indices, current/previousModel, normalMatrix\n" );
+	ri.Printf( PRINT_ALL, "validate_layout=%s\n",
+		vk_gpu_scene_validate_layout() ? "PASS" : "FAIL" );
+	ri.Printf( PRINT_ALL, "==================================\n" );
+}
+
+uint32_t vk_gpu_scene_generation( void ) { return s_generation; }
+qboolean vk_gpu_scene_driven_active( void ) {
+	return ( vk_gpu_scene_active() && r_gpuDriven && r_gpuDriven->integer ) ? qtrue : qfalse;
+}
+void vk_gpu_scene_telemetry( uint32_t *a, uint32_t *b, uint32_t *c, uint32_t *d ) {
+	if ( a ) *a = s_instanceCount;
+	if ( b ) *b = s_rejectFrustum;
+	if ( c ) *c = s_rejectHiz;
+	if ( d ) *d = s_indirectCount;
+}
+qboolean vk_gpu_scene_validate_layout( void ) {
+	return ( sizeof( GpuSceneObject ) % 16u ) == 0u ? qtrue : qfalse;
+}
+

@@ -1790,6 +1790,7 @@ typedef struct {
 		VkShaderModule fluid_pressure_cs;
 		VkShaderModule fluid_gradient_cs;
 		VkShaderModule forward_plus_tile_cull_cs;
+		VkShaderModule hiz_downsample_cs;
 		VkShaderModule deferred_gbuffer_fill_cs;
 		VkShaderModule deferred_gbuffer_debug_fs;
 		VkShaderModule deferred_lighting_cs;

@@ -63,7 +63,9 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "vk_hiz.h"
 #include "vk_selective_sun_shadow.h"
 #include "vk_black_frame.h"
+#include "vk_frame_contract.h"
 #include "vk_sun_csm.h"
+#include "vk_shadow_contract.h"
 #include "vk_vshadow.h"
 #include "vk_capture_pipeline.h"
 #include "vk_image_layout.h"
@@ -2049,6 +2051,21 @@ static void RB_RenderSunShadowMap( const drawSurfsCommand_t *cmd )
 		if ( c == 0 ) {
 			Com_Memcpy( vk.sun_shadow_matrix0, shadowViewProj, sizeof( vk.sun_shadow_matrix0 ) );
 		}
+		{
+			GpuShadowRecord *rec = vk_shadow_contract_alloc( (uint32_t)c, (uint32_t)c );
+			if ( rec ) {
+				int grid = ( cascades <= 1 ) ? 1 : 2;
+				float ts = 1.0f / (float)grid;
+				float ox = (float)( c % grid ) * ts;
+				float oy = (float)( c / grid ) * ts;
+				vk_shadow_contract_set_transform( (uint32_t)c, shadowViewProj );
+				vk_shadow_contract_set_extent( (uint32_t)c, (uint32_t)tile, (uint32_t)tile );
+				vk_shadow_contract_set_atlas( (uint32_t)c, ts, ts, ox, oy );
+				vk_shadow_contract_set_bias_filter( (uint32_t)c,
+					( r_fogShadowBias ) ? r_fogShadowBias->value : 0.001f,
+					( r_fogShadowPcfRadius ) ? r_fogShadowPcfRadius->value : 1.0f );
+			}
+		}
 		anyOk = 1;
 
 		backEnd.viewParms = shadowViewParms;
@@ -2067,6 +2084,7 @@ static void RB_RenderSunShadowMap( const drawSurfsCommand_t *cmd )
 	if ( !anyOk ) {
 		Matrix16Identity( vk.sun_shadow_matrix0 );
 	}
+	vk_shadow_contract_upload_ssbo();
 
 	if ( VK_SunCSM_Debug() >= 2 && anyOk ) {
 		ri.Printf( PRINT_ALL, "[VK][CSM] cascades=%d atlas=%ux%u tile=%u splits=%.0f/%.0f/%.0f/%.0f\n",
@@ -2775,6 +2793,11 @@ static const void *RB_DrawSurfs( const void *data ) {
 	RB_RenderDrawSurfList( cmd->drawSurfs, cmd->numDrawSurfs );
 #ifdef USE_VULKAN
 		backEnd.reactiveMaskStamp = qfalse;
+		if ( !( cmd->refdef.rdflags & RDF_NOWORLDMODEL ) ) {
+			vk_black_frame_note_writer( "ForwardOpaque" );
+			vk_black_frame_note_draw( VK_BF_DRAW_OPAQUE, (uint32_t)cmd->numDrawSurfs );
+			vk_black_frame_note_draw( VK_BF_DRAW_FORWARD_OPAQUE, (uint32_t)cmd->numDrawSurfs );
+		}
 #endif
 	}
 
@@ -3153,6 +3176,8 @@ static const void *RB_FinishBloom( const void *data )
 		vk_ssao_pass();
 	}
 	if ( r_bloom->integer && !vk_temporal_defer_bloom_for_weapon() ) {
+		vk_black_frame_note_writer( "Bloom" );
+		vk_frame_contract_note_reader( "SceneHDR", "Bloom" );
 		vk_bloom();
 	}
 	if ( vk.lensFlareActive ) {

@@ -413,6 +413,8 @@ void vk_bind_generated_shaders( void ){
     vk_set_shader_name( vk.modules.forward_plus_tile_cull_cs, "forward_plus_tile_cull_cs" );
     vk.modules.deferred_gbuffer_fill_cs = SHADER_MODULE( deferred_gbuffer_fill_cs );
     vk_set_shader_name( vk.modules.deferred_gbuffer_fill_cs, "deferred_gbuffer_fill_cs" );
+    vk.modules.hiz_downsample_cs = SHADER_MODULE( hiz_downsample_cs );
+    vk_set_shader_name( vk.modules.hiz_downsample_cs, "hiz_downsample_cs" );
     vk.modules.deferred_gbuffer_debug_fs = SHADER_MODULE( deferred_gbuffer_debug_fs );
     vk_set_shader_name( vk.modules.deferred_gbuffer_debug_fs, "deferred_gbuffer_debug_fs" );
     vk.modules.visibility_buffer_fill_cs = SHADER_MODULE( visibility_buffer_fill_cs );

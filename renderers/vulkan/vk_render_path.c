@@ -15,6 +15,9 @@ Clustered Hybrid M1 — R_SelectSurfaceRenderPath + path debug counters.
 
 cvar_t *r_renderPathDebug;
 cvar_t *r_hybridCompare;
+cvar_t *r_materialPathDebug;
+cvar_t *r_materialPathReason;
+cvar_t *r_gbufferCompact;
 
 static uint32_t s_pathCounts[RENDER_PATH_COUNT];
 static qboolean s_statusCmdRegistered;
@@ -274,9 +277,92 @@ void R_RenderPath_RegisterCvars( void )
 	ri.Cvar_Get( "r_hybridCompareWarn", "0.05", CVAR_ARCHIVE_ND | CVAR_CHEAT );
 	ri.Cvar_Get( "r_hybridCompareFail", "0.25", CVAR_ARCHIVE_ND | CVAR_CHEAT );
 
+	r_materialPathDebug = ri.Cvar_Get( "r_materialPathDebug", "0", CVAR_CHEAT );
+	ri.Cvar_CheckRange( r_materialPathDebug, "0", "1", CV_INTEGER );
+	ri.Cvar_SetDescription( r_materialPathDebug, "Log R_SelectMaterialRenderPath decisions (cheat)." );
+	ri.Cvar_SetGroup( r_materialPathDebug, CVG_RENDERER );
+
+	r_materialPathReason = ri.Cvar_Get( "r_materialPathReason", "0", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_materialPathReason, "0", "1", CV_INTEGER );
+	ri.Cvar_SetDescription( r_materialPathReason, "When 1, print material path fallback reason." );
+	ri.Cvar_SetGroup( r_materialPathReason, CVG_RENDERER );
+
+	r_gbufferCompact = ri.Cvar_Get( "r_gbufferCompact", "0", CVAR_ARCHIVE_ND | CVAR_LATCH );
+	ri.Cvar_CheckRange( r_gbufferCompact, "0", "1", CV_INTEGER );
+	ri.Cvar_SetDescription( r_gbufferCompact, "Compact G-buffer 2.0 prep (latched). See docs/GBUFFER_2.md." );
+	ri.Cvar_SetGroup( r_gbufferCompact, CVG_RENDERER );
+
 	if ( !s_statusCmdRegistered ) {
 		ri.Cmd_AddCommand( "render_path_status", R_RenderPath_Status_f );
 		s_statusCmdRegistered = qtrue;
 		ri.Printf( PRINT_ALL, "[VK][path] R_SelectSurfaceRenderPath ready (r_renderPathDebug, r_hybridCompare, render_path_status)\n" );
+	}
+}
+
+renderPath_t R_SelectMaterialRenderPath(
+	const shader_t *shader,
+	unsigned materialFeatureFlags,
+	const char **outReason )
+{
+	const char *reason = "deferred_standard";
+	renderPath_t path;
+	const int mode = r_renderMode ? r_renderMode->integer : 0;
+
+	if ( materialFeatureFlags & R_MAT_FEAT_FORWARD_ONLY ) {
+		path = RENDER_PATH_FORWARD_PLUS_OPAQUE;
+		if ( materialFeatureFlags & R_MAT_FEAT_TRANSMISSION ) {
+			reason = "unsupported_deferred:transmission";
+		} else if ( materialFeatureFlags & R_MAT_FEAT_REFRACTION ) {
+			reason = "unsupported_deferred:refraction";
+		} else if ( materialFeatureFlags & R_MAT_FEAT_ANISOTROPY ) {
+			reason = "unsupported_deferred:anisotropy";
+		} else if ( materialFeatureFlags & R_MAT_FEAT_WATER ) {
+			reason = "unsupported_deferred:water";
+		} else if ( materialFeatureFlags & R_MAT_FEAT_SKIN ) {
+			reason = "unsupported_deferred:skin";
+		} else if ( materialFeatureFlags & R_MAT_FEAT_LAYERED ) {
+			reason = "unsupported_deferred:layered";
+		} else {
+			reason = "unsupported_deferred:complex_coat";
+		}
+		goto done;
+	}
+
+	if ( R_Path_IsTransparentShader( shader ) ) {
+		path = ( r_oit && r_oit->integer ) ? RENDER_PATH_OIT : RENDER_PATH_FORWARD_PLUS_TRANSPARENT;
+		reason = "transparent";
+		goto done;
+	}
+
+	if ( ( mode == 1 || mode == 3 || mode == 4 ) && vk_deferred_lighting_path_ready() ) {
+		path = RENDER_PATH_DEFERRED_OPAQUE;
+		reason = "deferred_standard";
+		goto done;
+	}
+
+	path = RENDER_PATH_FORWARD_PLUS_OPAQUE;
+	reason = "forward_plus_fallback";
+
+done:
+	if ( outReason ) {
+		*outReason = reason;
+	}
+	if ( ( r_materialPathDebug && r_materialPathDebug->integer ) ||
+		( r_materialPathReason && r_materialPathReason->integer ) ) {
+		ri.Printf( PRINT_ALL, "[VK][materialPath] shader=%s path=%s flags=0x%x reason=%s\n",
+			( shader && shader->name[0] ) ? shader->name : "(null)",
+			R_RenderPath_Name( path ), materialFeatureFlags, reason );
+	}
+	R_RenderPath_Note( path );
+	return path;
+}
+
+void R_RenderPath_GetOpaqueCounts( uint32_t *outDeferred, uint32_t *outForwardPlus )
+{
+	if ( outDeferred ) {
+		*outDeferred = s_pathCounts[RENDER_PATH_DEFERRED_OPAQUE];
+	}
+	if ( outForwardPlus ) {
+		*outForwardPlus = s_pathCounts[RENDER_PATH_FORWARD_PLUS_OPAQUE];
 	}
 }

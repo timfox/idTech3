@@ -61,6 +61,7 @@ static color4ub_t RB_TintedFogColor( const fog_t *fog ) {
 	return color;
 }
 #include "vk_skybox_hdr.h"
+#include "vk_shadow_contract.h"
 
 extern cvar_t *r_shLighting;
 extern cvar_t *r_shWorldLighting;
@@ -133,6 +134,7 @@ static void VK_FillPbrSunShadowUniform( vkUniform_t *ubo ) {
 		1.0f / (float)grid,
 		VK_SunCSM_CascadeBlend(),
 		vk.sun_shadow_near > 0.0f ? vk.sun_shadow_near : 4.0f );
+	vk_shadow_contract_note_consumer( 0, "forward_plus" );
 }
 
 static qboolean R_StageHasLightmap( const shaderStage_t *pStage ) {

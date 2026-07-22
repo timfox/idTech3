@@ -61,6 +61,7 @@ layout(push_constant) uniform Push {
 	float specularAA;
 	uint compactLists;
 	uint clusterCount;
+	uint gbufferCompact;
 } pc;
 
 #define CLUSTER_LIST_CELLS tiles.cells

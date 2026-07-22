@@ -38,6 +38,7 @@ Split from vk.c.
 #include "vk_material_cache.h"
 #include "vk_surface_evolution.h"
 #include "vk_vshadow.h"
+#include "vk_shadow_contract.h"
 #include "vk_present_color.h"
 #include "vk_exposure_histogram.h"
 #include "vk_cinematic_camera.h"
@@ -137,6 +138,7 @@ void vk_shutdown( refShutdownCode_t code )
 	vk_exposure_histogram_shutdown();
 	vk_present_color_shutdown();
 	vk_vshadow_shutdown();
+	vk_shadow_contract_shutdown();
 	vk_surface_evolution_shutdown();
 	vk_material_cache_shutdown();
 	vk_material_instance_shutdown();

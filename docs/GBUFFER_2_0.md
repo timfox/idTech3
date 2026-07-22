@@ -1,7 +1,11 @@
 # Compact G-buffer 2.0 Design
 
-**Status:** Design + bandwidth reporting (Milestone 2). Layout migration is **not** shipping yet.  
+**Routing + bandwidth summary:** [GBUFFER_2.md](GBUFFER_2.md)
+
+**Status:** Design + bandwidth reporting + dual-write prep (`r_gbufferCompact`, `gbuffer_octahedral.glsl`). Full layout migration is **not** shipping yet.  
 **Related:** [BLACK_FRAME_REGRESSION.md](BLACK_FRAME_REGRESSION.md) · [RENDERER_IDTECH7_SPRINT.md](RENDERER_IDTECH7_SPRINT.md) · deferred fill in `vk_deferred_gbuffer.c`
+
+**Prep (cheat):** `r_gbufferCompact 1` dual-writes octahedral into `material.ba` while normals stay scaffold XYZ; deferred lighting uses AO/clearcoat defaults when compact is on. `gbuffer_bandwidth` reports scaffold vs compact target B/px and Forward+ fallback %.
 
 ---
 
