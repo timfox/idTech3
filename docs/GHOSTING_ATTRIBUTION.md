@@ -1,7 +1,5 @@
-# Ghosting Attribution
+# Ghosting Attribution (P1)
 
-Separate SceneHDR trails from bloom extract / pyramid / composite. Bloom has no temporal history by default (`HISTORY_BLOOM` invalid).
-
-Commands: `bloom_ghosting_status` · `r_bloomGhostingDebug` · `r_ghostIsolation` · `temporal_history_status`.
-
-See [TEMPORAL_HISTORY_REGISTRY.md](TEMPORAL_HISTORY_REGISTRY.md).
+Stage: `P1_CERT_GHOSTING`  
+Isolation: `r_ghostIsolation` (diagnostic). Cert soak reruns isolation modes.  
+Every visible trail must map to a named history owner or fail `UNATTRIBUTED_GHOSTING`.

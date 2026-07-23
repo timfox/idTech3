@@ -42,6 +42,31 @@ TESTS=(
 	test_iq_firefly_metrics.sh
 	test_iq_edge_metrics.sh
 	test_iq_temporal_history_live.sh
+	test_p1_live_state_machine.sh
+	test_p1_live_preflight.sh
+	test_p1_fixture_visibility.sh
+	test_p1_readback_identity.sh
+	test_p1_bloom_source_live.sh
+	test_p1_firefly_live.sh
+	test_p1_bloom_pyramid_live.sh
+	test_p1_velocity_live.sh
+	test_p1_temporal_reset_live.sh
+	test_p1_ghosting_attribution_live.sh
+	test_p1_specular_stability_live.sh
+	test_p1_normal_mip_live.sh
+	test_p1_gbuffer_quantization_live.sh
+	test_p1_material_decode_live.sh
+	test_p1_lighting_parity_live.sh
+	test_p1_lighting_ownership_live.sh
+	test_p1_cluster_parity_live.sh
+	test_p1_edge_quality_live.sh
+	test_p1_smaa_live.sh
+	test_p1_msaa_oit_live.sh
+	test_p1_texture_lod_live.sh
+	test_p1_lifecycle_live.sh
+	test_p1_evidence_invalidation.sh
+	test_p1_failure_bundles.sh
+	test_p1_final_promotion.sh
 	test_wboit_production_certification.sh
 	test_wboit_cert_evidence.sh
 	test_renderer_lab_capture.sh

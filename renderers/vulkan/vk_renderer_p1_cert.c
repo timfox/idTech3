@@ -30,13 +30,23 @@ const char *vk_renderer_p1_cert_stage_name( p1CertStage_t stage )
 	case P1_CERT_STAGE_PROFILE: return "P1_CERT_PROFILE";
 	case P1_CERT_STAGE_BLOOM_SOURCE: return "P1_CERT_BLOOM_SOURCE";
 	case P1_CERT_STAGE_BLOOM_FIREFLY: return "P1_CERT_BLOOM_FIREFLY";
+	case P1_CERT_STAGE_BLOOM_PYRAMID: return "P1_CERT_BLOOM_PYRAMID";
 	case P1_CERT_STAGE_GBUFFER_QUANT: return "P1_CERT_GBUFFER_QUANT";
+	case P1_CERT_STAGE_MATERIAL_DECODE: return "P1_CERT_MATERIAL_DECODE";
 	case P1_CERT_STAGE_TEMPORAL_HISTORY: return "P1_CERT_TEMPORAL_HISTORY";
 	case P1_CERT_STAGE_VELOCITY: return "P1_CERT_VELOCITY";
+	case P1_CERT_STAGE_TEMPORAL_RESET: return "P1_CERT_TEMPORAL_RESET";
+	case P1_CERT_STAGE_GHOSTING: return "P1_CERT_GHOSTING";
+	case P1_CERT_STAGE_SPECULAR_STABILITY: return "P1_CERT_SPECULAR_STABILITY";
+	case P1_CERT_STAGE_NORMAL_MIP: return "P1_CERT_NORMAL_MIP";
 	case P1_CERT_STAGE_EDGE: return "P1_CERT_EDGE";
 	case P1_CERT_STAGE_SMAA: return "P1_CERT_SMAA";
+	case P1_CERT_STAGE_MSAA_POLICY: return "P1_CERT_MSAA_POLICY";
+	case P1_CERT_STAGE_TEXTURE_LOD: return "P1_CERT_TEXTURE_LOD";
 	case P1_CERT_STAGE_LIGHTING_PARITY: return "P1_CERT_LIGHTING_PARITY";
+	case P1_CERT_STAGE_LIGHTING_OWNERSHIP: return "P1_CERT_LIGHTING_OWNERSHIP";
 	case P1_CERT_STAGE_CLUSTER_PARITY: return "P1_CERT_CLUSTER_PARITY";
+	case P1_CERT_STAGE_LIFECYCLE: return "P1_CERT_LIFECYCLE";
 	case P1_CERT_STAGE_SOAK: return "P1_CERT_SOAK";
 	default: return "UNKNOWN";
 	}
@@ -89,13 +99,23 @@ rendererP1Evidence_t vk_renderer_p1_cert_required_evidence( p1CertStage_t stage 
 		return P1_EVIDENCE_SOAK;
 	case P1_CERT_STAGE_BLOOM_SOURCE:
 	case P1_CERT_STAGE_BLOOM_FIREFLY:
+	case P1_CERT_STAGE_BLOOM_PYRAMID:
 	case P1_CERT_STAGE_GBUFFER_QUANT:
+	case P1_CERT_STAGE_MATERIAL_DECODE:
 	case P1_CERT_STAGE_TEMPORAL_HISTORY:
 	case P1_CERT_STAGE_VELOCITY:
+	case P1_CERT_STAGE_TEMPORAL_RESET:
+	case P1_CERT_STAGE_GHOSTING:
+	case P1_CERT_STAGE_SPECULAR_STABILITY:
+	case P1_CERT_STAGE_NORMAL_MIP:
 	case P1_CERT_STAGE_EDGE:
 	case P1_CERT_STAGE_SMAA:
+	case P1_CERT_STAGE_MSAA_POLICY:
+	case P1_CERT_STAGE_TEXTURE_LOD:
 	case P1_CERT_STAGE_LIGHTING_PARITY:
+	case P1_CERT_STAGE_LIGHTING_OWNERSHIP:
 	case P1_CERT_STAGE_CLUSTER_PARITY:
+	case P1_CERT_STAGE_LIFECYCLE:
 		return P1_EVIDENCE_GPU_READBACK;
 	default:
 		return P1_EVIDENCE_NONE;
@@ -155,36 +175,51 @@ static void P1_Cert_RecomputeLevel( void )
 	}
 	s_level = RENDERER_P1_PROFILE_CERTIFIED;
 
+	/* GPU_CORE: bloom source + firefly + pyramid + G-buffer full fidelity */
 	gpuCore = P1_Cert_StagePassOk( P1_CERT_STAGE_BLOOM_SOURCE ) &&
 		P1_Cert_StagePassOk( P1_CERT_STAGE_BLOOM_FIREFLY ) &&
+		P1_Cert_StagePassOk( P1_CERT_STAGE_BLOOM_PYRAMID ) &&
 		P1_Cert_StagePassOk( P1_CERT_STAGE_GBUFFER_QUANT );
 	if ( !gpuCore ) {
 		return;
 	}
 	s_level = RENDERER_P1_GPU_CORE_CERTIFIED;
 
+	/* TEMPORAL: velocity + history + resets + ghosting + specular */
 	temporal = P1_Cert_StagePassOk( P1_CERT_STAGE_TEMPORAL_HISTORY ) &&
-		P1_Cert_StagePassOk( P1_CERT_STAGE_VELOCITY );
+		P1_Cert_StagePassOk( P1_CERT_STAGE_VELOCITY ) &&
+		P1_Cert_StagePassOk( P1_CERT_STAGE_TEMPORAL_RESET ) &&
+		P1_Cert_StagePassOk( P1_CERT_STAGE_GHOSTING ) &&
+		P1_Cert_StagePassOk( P1_CERT_STAGE_SPECULAR_STABILITY );
 	if ( !temporal ) {
 		return;
 	}
 	s_level = RENDERER_P1_TEMPORAL_CERTIFIED;
 
+	/* EDGE: native edges + SMAA + MSAA policy + texture LOD */
 	edge = P1_Cert_StagePassOk( P1_CERT_STAGE_EDGE ) &&
-		P1_Cert_StagePassOk( P1_CERT_STAGE_SMAA );
+		P1_Cert_StagePassOk( P1_CERT_STAGE_SMAA ) &&
+		P1_Cert_StagePassOk( P1_CERT_STAGE_MSAA_POLICY ) &&
+		P1_Cert_StagePassOk( P1_CERT_STAGE_TEXTURE_LOD );
 	if ( !edge ) {
 		return;
 	}
 	s_level = RENDERER_P1_EDGE_CERTIFIED;
 
-	lighting = P1_Cert_StagePassOk( P1_CERT_STAGE_LIGHTING_PARITY ) &&
+	/* LIGHTING_PARITY: material decode + deferred/forward + ownership + clusters */
+	lighting = P1_Cert_StagePassOk( P1_CERT_STAGE_MATERIAL_DECODE ) &&
+		P1_Cert_StagePassOk( P1_CERT_STAGE_LIGHTING_PARITY ) &&
+		P1_Cert_StagePassOk( P1_CERT_STAGE_LIGHTING_OWNERSHIP ) &&
 		P1_Cert_StagePassOk( P1_CERT_STAGE_CLUSTER_PARITY );
 	if ( !lighting ) {
 		return;
 	}
 	s_level = RENDERER_P1_LIGHTING_PARITY_CERTIFIED;
 
-	if ( P1_Cert_StagePassOk( P1_CERT_STAGE_SOAK ) ) {
+	/* IMAGE_QUALITY: all prior + lifecycle + soak; no manual evidence */
+	if ( P1_Cert_StagePassOk( P1_CERT_STAGE_LIFECYCLE ) &&
+		P1_Cert_StagePassOk( P1_CERT_STAGE_SOAK ) &&
+		P1_Cert_StagePassOk( P1_CERT_STAGE_NORMAL_MIP ) ) {
 		int i;
 		qboolean anyManual = qfalse;
 		for ( i = 0; i < (int)P1_CERT_STAGE_COUNT; i++ ) {
@@ -294,7 +329,7 @@ void vk_renderer_p1_cert_invalidate_all( const char *reason )
 
 qboolean vk_renderer_p1_cert_export_json( const char *path )
 {
-	char buf[16384];
+	char buf[32768];
 	char outPath[MAX_OSPATH];
 	int off = 0;
 	int i;

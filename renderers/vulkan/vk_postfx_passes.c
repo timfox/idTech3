@@ -36,6 +36,7 @@ SSAO/HBAO pass, and vk_bloom. Split from vk.c.
 #include "vk_bloom_source_contract.h"
 #include "vk_renderer_iq_p1.h"
 #include "vk_iq_lab.h"
+#include "vk_renderer_p1_live.h"
 #include "vk_black_frame.h"
 
 static void vk_oit_validate_pass_break( const char *stage )
@@ -1251,6 +1252,7 @@ qboolean vk_bloom( void )
 	vk_postfx_draw_fullscreen_quad();
 	vk_end_render_pass();
 	vk_iq_lab_on_bloom_extract();
+	vk_renderer_p1_live_on_bloom_extract();
 
 	if ( canBlitDownsample ) {
 		// Split pipeline: downsample first, then blur at same resolution.

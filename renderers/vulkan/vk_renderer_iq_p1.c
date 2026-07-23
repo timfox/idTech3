@@ -8,6 +8,7 @@ Renderer IQ P1 hub — profile, history registry, ghost isolation, certification
 #include "vk.h"
 #include "vk_renderer_iq_p1.h"
 #include "vk_renderer_p1_cert.h"
+#include "vk_renderer_p1_live.h"
 #include "vk_iq_lab.h"
 #include "vk_iq_cert_geometry.h"
 #include "vk_bloom_source_contract.h"
@@ -110,6 +111,7 @@ void vk_renderer_iq_p1_begin_frame( void )
 	vk_temporal_history_note( HISTORY_BLOOM, qfalse, "bloom extract non-temporal" );
 	vk_temporal_history_note( HISTORY_EXPOSURE, qfalse, "exposure default" );
 	vk_renderer_p1_cert_begin_frame();
+	vk_renderer_p1_live_begin_frame();
 }
 
 void vk_temporal_history_note( rendererHistoryOwner_t owner, qboolean valid,
@@ -596,6 +598,7 @@ void vk_renderer_iq_p1_register( void )
 	vk_renderer_p1_cert_register();
 	vk_iq_cert_geometry_register();
 	vk_iq_lab_register();
+	vk_renderer_p1_live_register();
 
 	if ( !s_cmds ) {
 		ri.Cmd_AddCommand( "renderer_iq_profile_status", IQ_ProfileStatus_f );

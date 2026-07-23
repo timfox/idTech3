@@ -13,6 +13,7 @@ Phase 1.5 — IQ live certification lab: queue, deferred GPU snapshots, evaluate
 #include "vk_cert_readback.h"
 #include "vk_cert_metrics.h"
 #include "vk_bloom_source_contract.h"
+#include "vk_renderer_p1_live.h"
 
 #include <math.h>
 #include <string.h>
@@ -417,6 +418,9 @@ qboolean vk_iq_lab_armed( void )
 
 void vk_iq_lab_on_bloom_extract( void )
 {
+	if ( vk_renderer_p1_live_running() ) {
+		return; /* Phase 1.6 live controller owns capture */
+	}
 	if ( s_pendingEval == IQ_LAB_EVAL_NONE || s_evalAwaitingSnapshot ) {
 		return;
 	}
@@ -498,7 +502,8 @@ static void IQ_Lab_Status_f( void )
 
 static void IQ_CertifyCore_f( void )
 {
-	IQ_Lab_RunCore();
+	/* Phase 1.6: prefer live state machine. */
+	vk_renderer_p1_live_start( "core" );
 }
 
 void vk_iq_lab_register( void )
