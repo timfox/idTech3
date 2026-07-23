@@ -4229,6 +4229,13 @@ if(BUILD_UNIT_TESTS)
 	add_test(NAME unit_oit_alpha_normalize COMMAND unit_oit_alpha_normalize)
 	set_tests_properties(unit_oit_alpha_normalize PROPERTIES LABELS "unit;validation;oit")
 
+	add_executable(unit_depth_view tests/unit/test_depth_view.c)
+	if(NOT MSVC)
+		target_link_libraries(unit_depth_view PRIVATE m)
+	endif()
+	add_test(NAME unit_depth_view COMMAND unit_depth_view)
+	set_tests_properties(unit_depth_view PROPERTIES LABELS "unit;validation;depth")
+
 	add_executable(unit_bsp30_triangulate
 		tests/unit/test_bsp30_triangulate.c
 		renderers/common/tr_bsp30_triangulate.c)

@@ -20,6 +20,7 @@ atlases, froxel/fluid volumes, and teardown (split from vk.c).
 #include "vk_deferred_gbuffer.h"
 #include "vk_pass_registry.h"
 #include "tr_render_mode_vk.h"
+#include "vk_hdr_resolve_contract.h"
 
 static void vk_create_fog_noise_texture( void );
 static void vk_destroy_sun_shadow_resources( void );
@@ -1205,9 +1206,11 @@ void vk_create_attachments( void )
 
 	SET_OBJECT_NAME( vk.depth_image, "depth attachment", VK_DEBUG_REPORT_OBJECT_TYPE_IMAGE_EXT );
 	SET_OBJECT_NAME( vk.depth_image_view, "depth attachment", VK_DEBUG_REPORT_OBJECT_TYPE_IMAGE_VIEW_EXT );
+	vk_hdr_resolve_note_depth_recreate();
 
 		SET_OBJECT_NAME( vk.color_image, "color attachment", VK_DEBUG_REPORT_OBJECT_TYPE_IMAGE_EXT );
 		SET_OBJECT_NAME( vk.color_image_view, "color attachment", VK_DEBUG_REPORT_OBJECT_TYPE_IMAGE_VIEW_EXT );
+		vk_hdr_resolve_note_scene_hdr_recreate();
 		SET_OBJECT_NAME( vk.ui_overlay_image, "ui overlay attachment", VK_DEBUG_REPORT_OBJECT_TYPE_IMAGE_EXT );
 		SET_OBJECT_NAME( vk.ui_overlay_image_view, "ui overlay attachment view", VK_DEBUG_REPORT_OBJECT_TYPE_IMAGE_VIEW_EXT );
 		SET_OBJECT_NAME( vk.fog_scene_image, "fog scene copy", VK_DEBUG_REPORT_OBJECT_TYPE_IMAGE_EXT );

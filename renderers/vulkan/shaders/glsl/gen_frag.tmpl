@@ -259,6 +259,7 @@ layout(std430, set = 18, binding = 2) readonly buffer FpParamSSBO {
 	vec4 fp_view_org;
 	uvec4 fp_cluster_meta;
 	vec4 fp_cluster_z_range;
+	vec4 fp_view_forward; /* xyz = viewParms.or.axis[0], w=1 if valid */
 } fp_params;
 layout(set = 18, binding = 4) uniform sampler2D fp_sun_shadow_map;
 layout(set = 18, binding = 5, r8) uniform image2D reactiveMaskImg;

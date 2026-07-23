@@ -1387,6 +1387,14 @@ static void vk_forward_plus_dispatch_tile_cull_internal( qboolean use_depth_cull
 		param_f[30] = zScale;
 		param_f[31] = zBias;
 	}
+	/* Phase 2.3.2: camera forward for certified positive view-depth (Q3 axis[0]). */
+	{
+		const float *fwd = backEnd.viewParms.or.axis[0];
+		param_f[32] = fwd[0];
+		param_f[33] = fwd[1];
+		param_f[34] = fwd[2];
+		param_f[35] = 1.0f;
+	}
 
 	/* Compact: reset atomic index cursor + overflow counter before ClusterFill. */
 	if ( vk.forward_plus.compact_lists && vk_fp_tile_mapped != NULL ) {

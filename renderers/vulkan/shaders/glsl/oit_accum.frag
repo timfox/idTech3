@@ -10,7 +10,7 @@
 #extension GL_GOOGLE_include_directive : require
 #include "forward_plus_cluster.glsl"
 #include "oit_source_normalize.glsl"
-#define DEPTH_TO_WEIGHT(z) (z)
+#include "depth_view.glsl"
 
 layout (constant_id = 0) const int manual_depth_test = 0;
 layout (constant_id = 1) const int forward_plus_lit = 0;
@@ -30,6 +30,7 @@ layout(std430, set = 2, binding = 2) readonly buffer FpParamSSBO {
 	vec4 fp_view_org;
 	uvec4 fp_cluster_meta;
 	vec4 fp_cluster_z_range;
+	vec4 fp_view_forward; /* xyz = viewParms.or.axis[0], w=1 if valid */
 } fp_params;
 
 #include "shadow_contract.glsl"
@@ -162,7 +163,13 @@ void main() {
 		uint cascades = uint( clamp( pc.cascadeCount, 1.0, 4.0 ) );
 		float sunVis = 1.0;
 		if ( cascades > 0u && ( shadows.records[0].flags & 1u ) != 0u ) {
-			float viewDist = length( frag_world_pos - fp_params.fp_view_org.xyz );
+			float znShadow = max( fp_params.fp_cluster_z_range.x, 1e-3 );
+			float zfShadow = max( fp_params.fp_cluster_z_range.y, znShadow + 1e-3 );
+			float viewDist = Depth_ReconstructPositiveViewDepth( gl_FragCoord.z, znShadow, zfShadow );
+			if ( fp_params.fp_view_forward.w > 0.5 ) {
+				viewDist = Depth_PositiveViewFromWorld( frag_world_pos, fp_params.fp_view_org.xyz,
+					fp_params.fp_view_forward.xyz );
+			}
 			sunVis = ShadowContract_SampleCSM_FromRecords(
 				shadows.records[0], shadows.records[1], shadows.records[2], shadows.records[3],
 				sunShadowMap, frag_world_pos, viewDist, 1.0, cascades );
@@ -190,11 +197,23 @@ void main() {
 		}
 	}
 
-	/* Stage B fog: fog lit surface radiance once by camera→fragment transmittance.
-	 * Opaque background is assumed already fogged; resolve must not fog transparent again.
-	 * Mode 1 = production per-fragment T. Mode 2/3 = same T path today (moments optional later). */
+	/* Stage B fog: per-fragment transmittance using certified positive view-depth
+	 * (−viewSpace.z / axis[0] dot). Opaque already fogged; no second resolve fog.
+	 * Mode 1 = production. Mode 2/3 = same T path today. */
+	float viewDepth;
 	{
-		float viewDepth = length( frag_world_pos - fp_params.fp_view_org.xyz );
+		float zn = max( fp_params.fp_cluster_z_range.x, 1e-3 );
+		float zf = max( fp_params.fp_cluster_z_range.y, zn + 1e-3 );
+		if ( !( zf > zn ) ) {
+			zn = 8.0;
+			zf = 8192.0;
+		}
+		if ( fp_params.fp_view_forward.w > 0.5 ) {
+			viewDepth = Depth_PositiveViewFromWorld( frag_world_pos, fp_params.fp_view_org.xyz,
+				fp_params.fp_view_forward.xyz );
+		} else {
+			viewDepth = Depth_ReconstructPositiveViewDepth( gl_FragCoord.z, zn, zf );
+		}
 		float Tfog = 1.0;
 		float dens = max( pc.fogDensity, 0.0 );
 		if ( pc.fogMode >= 1 && dens > 1e-6 ) {
@@ -221,6 +240,10 @@ void main() {
 		} else if ( pc.fogDebug == 7 ) {
 			/* Difference cue: show (1-T) — larger = more attenuated vs unfogged lit. */
 			litRgb = vec3( 1.0 - Tfog );
+		} else if ( pc.fogDebug == 8 ) {
+			/* Cert: show |cameraDistance - viewDepth| heat (should be small on-axis). */
+			float camDist = Depth_CameraDistance( frag_world_pos, fp_params.fp_view_org.xyz );
+			litRgb = vec3( clamp( abs( camDist - viewDepth ) * 0.01, 0.0, 1.0 ) );
 		}
 	}
 
@@ -232,16 +255,24 @@ void main() {
 		litRgb = max( litRgb, vec3( 0.0 ) );
 	}
 
-	/* McGuire weight with moderated scale so depth still discriminates (avoid always-hit 3e3). */
-	float zTrad = clamp( 1.0 - DEPTH_TO_WEIGHT( gl_FragCoord.z ), 0.0, 1.0 );
-	float aFactor = pow( min( 1.0, alpha * 10.0 ) + 0.01, 3.0 );
-	float zFactor = pow( 1.0 - zTrad * 0.9, 3.0 );
-	float w = clamp( aFactor * 1e3 * zFactor, 1e-2, 3e3 );
-	if ( isnan( w ) || isinf( w ) ) {
-		out_color = vec4( 1.0, 0.0, 1.0, 1.0 );
-		out_reveal = 0.0;
-		return;
+	/* McGuire weight: same curve; depth input is certified view-depth → [0,1] (not raw device Z). */
+	{
+		float zn = max( fp_params.fp_cluster_z_range.x, 1e-3 );
+		float zf = max( fp_params.fp_cluster_z_range.y, zn + 1e-3 );
+		if ( !( zf > zn ) ) {
+			zn = 8.0;
+			zf = 8192.0;
+		}
+		float zTrad = Depth_ViewDepthToTraditional01( viewDepth, zn, zf );
+		float aFactor = pow( min( 1.0, alpha * 10.0 ) + 0.01, 3.0 );
+		float zFactor = pow( 1.0 - zTrad * 0.9, 3.0 );
+		float w = clamp( aFactor * 1e3 * zFactor, 1e-2, 3e3 );
+		if ( isnan( w ) || isinf( w ) ) {
+			out_color = vec4( 1.0, 0.0, 1.0, 1.0 );
+			out_reveal = 0.0;
+			return;
+		}
+		out_color = vec4( litRgb * alpha, alpha ) * w; /* unassociated lit × opacity × w */
+		out_reveal = alpha;
 	}
-	out_color = vec4( litRgb * alpha, alpha ) * w; /* unassociated lit × opacity × w */
-	out_reveal = alpha;
 }

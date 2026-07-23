@@ -4,6 +4,7 @@
  */
 #extension GL_GOOGLE_include_directive : require
 #include "forward_plus_cluster.glsl"
+#include "depth_view.glsl"
 layout (constant_id = 0) const int manual_depth_test = 0;
 layout (constant_id = 1) const int forward_plus_lit = 0;
 
@@ -24,6 +25,7 @@ layout(std430, set = 4, binding = 2) readonly buffer FpParamSSBO {
 	vec4 fp_view_org;
 	uvec4 fp_cluster_meta;
 	vec4 fp_cluster_z_range;
+	vec4 fp_view_forward;
 } fp_params;
 
 #include "shadow_contract.glsl"
@@ -122,7 +124,13 @@ void main() {
 		uint cascades = uint( clamp( pc._pad0, 1.0, 4.0 ) );
 		float sunVis = 1.0;
 		if ( cascades > 0u && ( shadows.records[0].flags & 1u ) != 0u ) {
-			float viewDist = length( frag_world_pos - fp_params.fp_view_org.xyz );
+			float znShadow = max( fp_params.fp_cluster_z_range.x, 1e-3 );
+			float zfShadow = max( fp_params.fp_cluster_z_range.y, znShadow + 1e-3 );
+			float viewDist = Depth_ReconstructPositiveViewDepth( gl_FragCoord.z, znShadow, zfShadow );
+			if ( fp_params.fp_view_forward.w > 0.5 ) {
+				viewDist = Depth_PositiveViewFromWorld( frag_world_pos, fp_params.fp_view_org.xyz,
+					fp_params.fp_view_forward.xyz );
+			}
 			sunVis = ShadowContract_SampleCSM_FromRecords(
 				shadows.records[0], shadows.records[1], shadows.records[2], shadows.records[3],
 				sunShadowMap, frag_world_pos, viewDist, 1.0, cascades );
@@ -143,7 +151,19 @@ void main() {
 		litRgb = ( pc.lightingDebug == 6 ) ? addLit : ( litRgb + addLit );
 	}
 	{
-		float viewDepth = length( frag_world_pos - fp_params.fp_view_org.xyz );
+		float zn = max( fp_params.fp_cluster_z_range.x, 1e-3 );
+		float zf = max( fp_params.fp_cluster_z_range.y, zn + 1e-3 );
+		if ( !( zf > zn ) ) {
+			zn = 8.0;
+			zf = 8192.0;
+		}
+		float viewDepth;
+		if ( fp_params.fp_view_forward.w > 0.5 ) {
+			viewDepth = Depth_PositiveViewFromWorld( frag_world_pos, fp_params.fp_view_org.xyz,
+				fp_params.fp_view_forward.xyz );
+		} else {
+			viewDepth = Depth_ReconstructPositiveViewDepth( gl_FragCoord.z, zn, zf );
+		}
 		float Tfog = 1.0;
 		float dens = max( pc.fogDensity, 0.0 );
 		if ( pc.fogMode >= 1 && dens > 1e-6 ) {

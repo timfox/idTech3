@@ -29,6 +29,7 @@ SSAO/HBAO pass, and vk_bloom. Split from vk.c.
 #include "vk_shadow_contract.h"
 #include "vk_temporal.h"
 #include "vk_oit_certify.h"
+#include "vk_hdr_resolve_contract.h"
 #include "vk_black_frame.h"
 
 static void vk_oit_validate_pass_break( const char *stage )
@@ -257,6 +258,12 @@ void vk_copy_color_to_fog_scene( uint32_t width, uint32_t height )
 		VK_PIPELINE_STAGE_TRANSFER_BIT,
 		VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT | VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT );
 	vk.fog_scene_layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+	vk_hdr_resolve_note_fog_scene_copy( copyW, copyH );
+	if ( ri.Cvar_VariableIntegerValue( "r_hdrResolveDebug" ) >= 1 ) {
+		ri.Printf( PRINT_DEVELOPER,
+			"[VK][hdr-resolve] fog_scene copy %ux%u gen=%u\n",
+			copyW, copyH, vk_hdr_resolve_fog_scene_generation() );
+	}
 }
 
 static void vk_oit_note_fallback( const char *reason )
@@ -651,6 +658,27 @@ void vk_oit_pass( const struct drawSurfsCommand_s *cmd )
 			vk_spine_pass_end( VK_SPINE_PASS_OIT_RESOLVE );
 			vk_begin_post_bloom_render_pass();
 			return;
+		}
+
+		{
+			char resolveErr[160];
+			if ( !vk_hdr_resolve_runtime_validate( qtrue, resolveErr, sizeof( resolveErr ) ) ) {
+				vk_oit_note_fallback( resolveErr[0] ? resolveErr : "hdr resolve integrity failed" );
+				if ( ri.Cvar_VariableIntegerValue( "r_hdrResolveDebug" ) >= 1 ) {
+					ri.Printf( PRINT_ALL, S_COLOR_YELLOW "[VK][hdr-resolve] pre-resolve FAIL: %s\n" S_COLOR_WHITE,
+						resolveErr[0] ? resolveErr : "unknown" );
+				}
+				vk.oitUnhealthy = qtrue;
+				vk.oitFallbackCount++;
+				vk_spine_note_oit_skipped();
+				backEnd.oitBucketFilter = 0;
+				vk_spine_pass_end( VK_SPINE_PASS_OIT_RESOLVE );
+				vk_begin_post_bloom_render_pass();
+				return;
+			}
+			if ( ri.Cvar_VariableIntegerValue( "r_hdrResolveDebug" ) >= 2 ) {
+				vk_hdr_resolve_status_f();
+			}
 		}
 
 		if ( vk.oitFrameState != VK_OIT_FRAME_CLEARED &&

@@ -787,11 +787,11 @@ static void VK_OitFogStatus_f( void )
 		"  accumulationFog=%s\n"
 		"  resolveFog=%s\n"
 		"  volumetricSource=%s\n"
-		"  depthApprox=view-space distance from fp_view_org / clip w\n"
+		"  depthApprox=certified positive view-depth (-viewSpace.z / axis[0]; depth_view.glsl)\n"
 		"  doubleFogPrevention=%s\n"
 		"  passOrder=opaque(+vol) -> WBOIT fogged-lit accum -> resolve over fogged opaque -> weapon -> bloom\n",
 		fogMode, density, r_oitFogDebug ? r_oitFogDebug->integer : 0,
-		( fogMode >= 1 ) ? "fragment lit radiance * T(camera,frag)" : "none (legacy)",
+		( fogMode >= 1 ) ? "fragment lit radiance * T(viewDepth)" : "none (legacy)",
 		( fogMode >= 1 ) ? "no second full-screen fog on transparent result" : "post stack may fog entire HDR",
 		( fogMode >= 1 )
 			? "opaque froxel before OIT (vk_volumetric_fog_before_oit; frame-end skipped via doneFog)"
@@ -833,11 +833,12 @@ void vk_oit_certify_init( void )
 	ri.Cvar_SetGroup( r_oitFogDensity, CVG_RENDERER );
 
 	r_oitFogDebug = ri.Cvar_Get( "r_oitFogDebug", "0", CVAR_CHEAT );
-	ri.Cvar_CheckRange( r_oitFogDebug, "0", "7", CV_INTEGER );
+	ri.Cvar_CheckRange( r_oitFogDebug, "0", "8", CV_INTEGER );
 	ri.Cvar_SetDescription( r_oitFogDebug,
 		"OIT fog debug (cheat):\n"
-		" 1 depth  2 transmittance  3 in-scatter  4 weighted depth\n"
-		" 5 weighted T  6 double-fog detector  7 opaque/translucent difference" );
+		" 1 viewDepth  2 transmittance  3 in-scatter  4 weighted depth\n"
+		" 5 weighted T  6 double-fog detector  7 opaque/translucent difference\n"
+		" 8 |cameraDistance-viewDepth| heat (cert)" );
 	ri.Cvar_SetGroup( r_oitFogDebug, CVG_RENDERER );
 
 	if ( ri.Cmd_AddCommand ) {

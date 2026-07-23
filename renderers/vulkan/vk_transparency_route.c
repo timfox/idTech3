@@ -11,6 +11,8 @@ Raster Ultra 1.4 — transparency classification + refractive exclusion helpers.
 #include "vk_oit_certify.h"
 #include "vk_oit_contract.h"
 #include "vk_oit_alpha.h"
+#include "vk_depth_contract.h"
+#include "vk_hdr_resolve_contract.h"
 
 static cvar_t *r_transparencyDebug;
 static cvar_t *r_refractiveExcludeOit;
@@ -64,6 +66,7 @@ static void VK_Oit_Status_f( void )
 		"  implementation=%s mode=%d effective=%d classify=%d forwardPlus=%d refractiveExclude=%d directTest=%d\n"
 		"  contract: WBOIT v%u hash=0x%08x (oit_contract_status)\n"
 		"  alpha: cert=%s (oit_alpha_status)\n"
+		"  depth: contract v%u hash=0x%08x (depth_contract_status)\n"
 		"  profileSource=%s renderMode=%d\n"
 		"  formats: accum=R16G16B16A16_SFLOAT reveal=R16_SFLOAT color=%s\n"
 		"  litPath=%s\n"
@@ -88,6 +91,7 @@ static void VK_Oit_Status_f( void )
 		ri.Cvar_VariableIntegerValue( "r_oitDirectTest" ),
 		oitContract->contractVersion, oitContract->contractHash,
 		vk_oit_alpha_cert_level_name( vk_oit_alpha_certification_level() ),
+		vk_depth_contract_get()->contractVersion, vk_depth_contract_get()->contractHash,
 		vk.oitProfileSourceHint[0] ? vk.oitProfileSourceHint : "(runtime)",
 		renderMode,
 		vk_format_string( vk.color_format ),
@@ -344,6 +348,7 @@ void vk_transparency_route_init( void )
 	vk_oit_contract_register();
 	vk_oit_alpha_register();
 	vk_oit_certify_init();
+	vk_hdr_resolve_contract_register();
 }
 
 void vk_transparency_route_shutdown( void )
@@ -356,6 +361,9 @@ void vk_transparency_route_shutdown( void )
 		ri.Cmd_RemoveCommand( "oit_perf" );
 		ri.Cmd_RemoveCommand( "oit_contract_status" );
 		ri.Cmd_RemoveCommand( "oit_contract_validate" );
+		ri.Cmd_RemoveCommand( "hdr_resolve_status" );
+		ri.Cmd_RemoveCommand( "oit_resolve_status" );
+		ri.Cmd_RemoveCommand( "hdr_resolve_validate" );
 	}
 	s_inited = qfalse;
 }

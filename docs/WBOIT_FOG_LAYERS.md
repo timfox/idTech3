@@ -4,6 +4,8 @@ Fog ownership for production WBOIT (`r_oit 1`): opaque background is fogged once
 
 **Authoritative color / OIT order:** [COLOR_PIPELINE.md](COLOR_PIPELINE.md) (Phase 1 contract). This doc only owns fog-through-layers rules inside that spine.
 
+**Authoritative depth / view-depth:** [DEPTH_CONTRACT.md](DEPTH_CONTRACT.md) (Phase 2.3.1). Fog must use positive view-depth — not raw device depth.
+
 **Related:** [MOMENT_OIT_STOCHASTIC_ALPHA.md](MOMENT_OIT_STOCHASTIC_ALPHA.md) · [WBOIT_GPU_CERTIFICATION.md](WBOIT_GPU_CERTIFICATION.md) (B6a fog/volumetrics case) · [OIT_FUTURE_TRACKS.md](OIT_FUTURE_TRACKS.md)
 
 **Demo:** `exec demo_wboit_fog_layers.cfg`
@@ -44,7 +46,7 @@ Console verification: `oit_fog_status` prints `passOrder=` matching the chain ab
 | WBOIT resolve | **No second fog** | Weighted blend over **already fogged** opaque HDR |
 | Post stack (bloom/exposure/tonemap) | **No extra world fog** | Full-screen fog on transparent result is forbidden when `r_oitFogMode>=1` |
 
-**Background already fogged:** resolve reads fogged opaque color underneath; transparent layers only need camera→fragment transmittance on their own lit contribution.
+**Background already fogged:** resolve reads fogged opaque color underneath; transparent layers only need camera→fragment transmittance (certified view-depth) on their own lit contribution.
 
 **No second full-screen fog on transparent result:** when `r_oitFogMode>=1`, the post stack must not re-fog the resolved HDR layer. `oit_fog_status` reports `resolveFog=no second full-screen fog on transparent result`.
 
@@ -59,12 +61,12 @@ T = exp( -density × viewDepth )
 lit' = lit × T
 ```
 
-- `viewDepth` — distance from `fp_view_org` to fragment world position (see `oit_accum.frag`)
+- `viewDepth` — certified positive view-depth (`Depth_PositiveViewFromWorld` / linearized device Z; see [DEPTH_CONTRACT.md](DEPTH_CONTRACT.md) Phase 2.3.2)
 - `density` — `r_oitFogDensity` (0 disables fog even if mode ≥ 1)
 - `lit` — Forward+ lit radiance (or unlit base) **before** weighting
 - No in-scatter into WBOIT accum (keeps weights stable); fog color comes from opaque path
 
-Shader reference: `renderers/vulkan/shaders/glsl/oit_accum.frag` (`pc.fogMode >= 1 && pc.fogDensity > 1e-6`).
+Shader reference: `renderers/vulkan/shaders/glsl/oit_accum.frag` (`pc.fogMode >= 1 && pc.fogDensity > 1e-6`, `depth_view.glsl`).
 
 ---
 
@@ -83,17 +85,18 @@ Shader reference: `renderers/vulkan/shaders/glsl/oit_accum.frag` (`pc.fogMode >=
 
 Exponential density for `T=exp(-density×viewDepth)`. Set `>0` with mode ≥ 1 to enable. Demo uses `0.002`.
 
-### `r_oitFogDebug` (0–7, cheat)
+### `r_oitFogDebug` (0–8, cheat)
 
 | Value | View |
 |-------|------|
-| 1 | View depth |
+| 1 | Certified view-depth |
 | 2 | Transmittance `T` |
 | 3 | In-scatter (placeholder) |
 | 4 | Weighted depth |
 | 5 | Weighted `T` |
 | 6 | Double-fog detector (magenta if mode off but density set) |
 | 7 | Opaque vs translucent fog difference |
+| 8 | `|cameraDistance − viewDepth|` heat (cert; on-axis should be small) |
 
 Requires `sv_cheats 1`.
 

@@ -1,4 +1,10 @@
 #version 460
+/* Soft particle splat — Phase 2.3.3: scene depth via certified Depth_LinearizeReversedZ.
+ * Particle depth = -viewSpace.z (same metric as WBOIT fog/weight).
+ */
+#extension GL_GOOGLE_include_directive : require
+#include "../depth_view.glsl"
+
 layout(local_size_x = 8, local_size_y = 8) in;
 
 struct Particle {
@@ -17,7 +23,7 @@ layout(r8, set = 0, binding = 3) uniform image2D reactiveMask;
 
 layout(push_constant) uniform Push {
 	uvec4 extentMeta; /* xy extent, z count, w normalsUnused */
-	vec4  projInfo;
+	vec4  projInfo;   /* invP00, invP11, P10, P14 — also derives zNear/zFar */
 	mat4  view;
 	mat4  proj;
 	vec4  params0; /* softScale, emissiveBoost, lightAmbient, stampReactive */
@@ -25,11 +31,17 @@ layout(push_constant) uniform Push {
 
 bool valid_depth( float d ) { return d > 0.0 && d < 0.999999; }
 
-vec3 view_pos( vec2 uv, float depth ) {
-	float viewZ = -pc.projInfo.w / max( depth + pc.projInfo.z, 1e-6 );
-	vec2 ndc = uv * 2.0 - 1.0;
-	return vec3( ndc.x * ( -viewZ ) * pc.projInfo.x,
-		ndc.y * ( -viewZ ) * pc.projInfo.y, viewZ );
+/* Vulkan reversed-Z proj: P10=zn/(zf-zn), P14=zf*zn/(zf-zn). */
+void Depth_PlanesFromProjInfo( out float zNear, out float zFar )
+{
+	float p10 = pc.projInfo.z;
+	float p14 = pc.projInfo.w;
+	zFar = p14 / max( abs( p10 ), 1e-6 );
+	zNear = p14 / max( abs( p10 ) + 1.0, 1e-6 );
+	if ( !( zFar > zNear ) ) {
+		zNear = 8.0;
+		zFar = 8192.0;
+	}
 }
 
 void main() {
@@ -43,7 +55,9 @@ void main() {
 		imageStore( sceneColor, ip, scene );
 		return;
 	}
-	vec3 centerVS = view_pos( uv, depth );
+	float zn, zf;
+	Depth_PlanesFromProjInfo( zn, zf );
+	float sceneDepth = Depth_LinearizeReversedZ( depth, zn, zf );
 	vec3 accum = vec3( 0.0 );
 	float cov = 0.0;
 	float softScale = max( pc.params0.x, 0.01 );
@@ -58,10 +72,10 @@ void main() {
 		float px = length( ( puv - uv ) * vec2( pc.extentMeta.xy ) );
 		float radius = max( p.velSize.w, 1.0 );
 		if ( px > radius * 2.0 ) continue;
-		/* Soft particle: fade when particle depth is behind scene within softness. */
+		/* Soft particle: fade when particle depth is behind scene within softness.
+		 * Both depths are certified positive view-depth (−viewSpace.z). */
 		vec4 pVS4 = pc.view * vec4( p.posLife.xyz, 1.0 );
-		float pDepth = -pVS4.z;
-		float sceneDepth = -centerVS.z;
+		float pDepth = max( -pVS4.z, 0.0 );
 		float softR = max( p.meta.z, 1.0 ) * softScale;
 		float soft = clamp( ( sceneDepth - pDepth + softR ) / ( softR * 2.0 ), 0.0, 1.0 );
 		float fall = 1.0 - smoothstep( 0.0, radius, px );

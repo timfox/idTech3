@@ -11,6 +11,7 @@ Enforces space + stage order for scene-linear HDR + WBOIT production OIT.
 #include "vk_hdr_pipeline.h"
 #include "vk_oit_contract.h"
 #include "vk_oit_alpha.h"
+#include "vk_depth_contract.h"
 
 static cvar_t *r_colorContractDebug;
 static qboolean s_cmds;
@@ -265,6 +266,8 @@ static void VK_Color_PipelineStatus_f( void )
 		oitC->contractVersion, oitC->contractHash );
 	ri.Printf( PRINT_ALL, "alpha cert=%s (oit_alpha_status)\n",
 		vk_oit_alpha_cert_level_name( vk_oit_alpha_certification_level() ) );
+	ri.Printf( PRINT_ALL, "depth contract v%u hash=0x%08x (depth_contract_status)\n",
+		vk_depth_contract_get()->contractVersion, vk_depth_contract_get()->contractHash );
 	ri.Printf( PRINT_ALL,
 		"validate=%s fails=%u spaceMismatch=%u orderViol=%u (frame space=%u order=%u)\n",
 		valid ? "PASS" : "FAIL", s_validateFails, s_spaceMismatches, s_orderViolations,

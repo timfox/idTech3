@@ -32,6 +32,12 @@ fi
 grep -q 'hiz_status' "$ROOT/docs/GPU_DRIVEN_RENDERING.md" || fail "GPU_DRIVEN doc must mention hiz_status"
 pass "Hi-Z documented in GPU_DRIVEN_RENDERING.md"
 
+if [[ -f "$ROOT/docs/DEPTH_CONTRACT.md" ]]; then
+	grep -q 'reversedZ\|reversed-Z' "$ROOT/docs/DEPTH_CONTRACT.md" || fail "DEPTH_CONTRACT.md must document reversed-Z"
+	grep -q 'depthContract_t' "$ROOT/renderers/vulkan/vk_depth_contract.h" || fail "depthContract_t missing"
+	pass "Phase 2.3.1 depth contract present"
+fi
+
 if [[ $failures -ne 0 ]]; then
 	echo "$failures check(s) failed"
 	exit 1
