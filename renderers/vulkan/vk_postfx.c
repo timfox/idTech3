@@ -413,6 +413,11 @@ qboolean PostFX_PostPipelinesNeedUpdate(void) {
 	int oitState = ( r_oit && r_oit->integer ) ? 1 : 0;
 	cvar_t *r_bloom_scatter = ri.Cvar_Get( "r_bloom_scatter", "0.72", 0 );
 	cvar_t *r_bloom_energy = ri.Cvar_Get( "r_bloom_energyPreserve", "1", 0 );
+	cvar_t *r_ffClamp = ri.Cvar_Get( "r_bloomFireflyClamp", "1", 0 );
+	cvar_t *r_ffRatio = ri.Cvar_Get( "r_bloomFireflyRatio", "4.0", 0 );
+	cvar_t *r_ffAbs = ri.Cvar_Get( "r_bloomFireflyAbsolute", "0.25", 0 );
+	cvar_t *r_ffNeigh = ri.Cvar_Get( "r_bloomFireflyNeighborhood", "1", 0 );
+	cvar_t *r_ffDbg = ri.Cvar_Get( "r_bloomFireflyDebug", "0", 0 );
 	const uint32_t fboColorFmt = (uint32_t)vk.color_format;
 
 	/* r_ssr on/off: toggles whether vk_update_post_process_pipelines builds the SSR subpass. */
@@ -424,6 +429,11 @@ qboolean PostFX_PostPipelinesNeedUpdate(void) {
 		( r_bloomKnee && r_bloomKnee->modified ) ||
 		( r_bloom_scatter && r_bloom_scatter->modified ) ||
 		( r_bloom_energy && r_bloom_energy->modified ) ||
+		( r_ffClamp && r_ffClamp->modified ) ||
+		( r_ffRatio && r_ffRatio->modified ) ||
+		( r_ffAbs && r_ffAbs->modified ) ||
+		( r_ffNeigh && r_ffNeigh->modified ) ||
+		( r_ffDbg && r_ffDbg->modified ) ||
 		( r_ssao && r_ssao->modified ) ||
 		( r_ext_smaa && r_ext_smaa->modified ) ||
 		( r_oit && r_oit->modified ) ||
@@ -464,6 +474,11 @@ void PostFX_NotifyPostPipelinesRebuilt( void ) {
 	int oitState = ( r_oit && r_oit->integer ) ? 1 : 0;
 	cvar_t *r_bloom_scatter = ri.Cvar_Get( "r_bloom_scatter", "0.72", 0 );
 	cvar_t *r_bloom_energy = ri.Cvar_Get( "r_bloom_energyPreserve", "1", 0 );
+	cvar_t *r_ffClamp = ri.Cvar_Get( "r_bloomFireflyClamp", "1", 0 );
+	cvar_t *r_ffRatio = ri.Cvar_Get( "r_bloomFireflyRatio", "4.0", 0 );
+	cvar_t *r_ffAbs = ri.Cvar_Get( "r_bloomFireflyAbsolute", "0.25", 0 );
+	cvar_t *r_ffNeigh = ri.Cvar_Get( "r_bloomFireflyNeighborhood", "1", 0 );
+	cvar_t *r_ffDbg = ri.Cvar_Get( "r_bloomFireflyDebug", "0", 0 );
 
 	lastBloomState = bloomState;
 	lastSSAOState = ssaoState;
@@ -495,6 +510,21 @@ void PostFX_NotifyPostPipelinesRebuilt( void ) {
 	}
 	if ( r_bloom_energy ) {
 		r_bloom_energy->modified = qfalse;
+	}
+	if ( r_ffClamp ) {
+		r_ffClamp->modified = qfalse;
+	}
+	if ( r_ffRatio ) {
+		r_ffRatio->modified = qfalse;
+	}
+	if ( r_ffAbs ) {
+		r_ffAbs->modified = qfalse;
+	}
+	if ( r_ffNeigh ) {
+		r_ffNeigh->modified = qfalse;
+	}
+	if ( r_ffDbg ) {
+		r_ffDbg->modified = qfalse;
 	}
 	if ( r_ssao ) {
 		r_ssao->modified = qfalse;

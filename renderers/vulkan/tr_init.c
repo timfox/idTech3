@@ -134,6 +134,7 @@ glstatic_t	gls;
 #include "vk_hdr_pipeline.h"
 #include "vk_color_contract.h"
 #include "vk_scene_hdr_ownership.h"
+#include "vk_renderer_iq_p1.h"
 #include "vk_renderer_perf.h"
 #include "vk_aa_policy.h"
 static void VkInfo_f( void );
@@ -4088,6 +4089,7 @@ void R_Init( void ) {
 	vk_hdr_pipeline_register();
 	vk_color_contract_register();
 	vk_scene_hdr_ownership_register();
+	vk_renderer_iq_p1_register();
 	vk_renderer_perf_register();
 #endif
 	VK_RasterUltra_Enforce();

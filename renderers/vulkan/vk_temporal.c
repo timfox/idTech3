@@ -1,6 +1,7 @@
 #include "tr_local.h"
 #include "vk.h"
 #include "vk_temporal.h"
+#include "vk_renderer_iq_p1.h"
 #include "vk_util.h"
 #include "vk_view_state.h"
 #include "vk_ambient_visibility.h"
@@ -1196,6 +1197,11 @@ qboolean vk_temporal_reconstruction_wanted( void )
 	 * AZ-decal echoes). AA policy sets r_taa 1 when applying modes 3–5 at init.
 	 */
 	if ( r_taa && r_taa->integer ) {
+		/* IQ P1-G: ghost isolation can disable TAA without clearing the cvar permanently. */
+		const int iso = vk_ghost_isolation_mode();
+		if ( iso == 1 || iso == 7 ) {
+			return qfalse;
+		}
 		return qtrue;
 	}
 	r_tsr = ri.Cvar_Get( "r_tsr", "1", CVAR_ARCHIVE_ND );

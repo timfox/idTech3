@@ -20,8 +20,8 @@ static inline qboolean vk_post_process_hdr64_active( void )
 	return vk.color_format == VK_FORMAT_R64G64B64A64_SFLOAT;
 }
 
-/* Fragment specialization constants 0..28 (29 entries); keep in sync with assignments in vk_create_post_process_pipeline. */
-#define VK_POST_PROCESS_FRAG_SPEC_MAP_COUNT 29
+/* Fragment specialization constants 0..33 (34 entries); keep in sync with assignments in vk_create_post_process_pipeline. */
+#define VK_POST_PROCESS_FRAG_SPEC_MAP_COUNT 34
 
 typedef struct {
 	float gamma;
@@ -53,6 +53,11 @@ typedef struct {
 	float sharpen;
 	float bloom_scatter;
 	int bloom_energy_preserve;
+	int bloom_firefly_clamp;
+	float bloom_firefly_ratio;
+	float bloom_firefly_absolute;
+	int bloom_firefly_neighborhood;
+	int bloom_firefly_debug;
 } Vk_PostProcess_FragSpecData;
 
 static void vk_post_process_set_shader_stage_desc( VkPipelineShaderStageCreateInfo *desc, VkShaderStageFlagBits stage, VkShaderModule shader_module, const char *entry )
@@ -446,6 +451,18 @@ void vk_create_post_process_pipeline( int program_index, uint32_t width, uint32_
 		frag_spec_data.bloom_scatter = ( r_bloom_scatter && r_bloom_scatter->value > 0.0f ) ? r_bloom_scatter->value : 0.72f;
 		frag_spec_data.bloom_energy_preserve = ( r_bloom_energy && r_bloom_energy->integer ) ? 1 : 0;
 	}
+	{
+		cvar_t *ffClamp = ri.Cvar_Get( "r_bloomFireflyClamp", "1", 0 );
+		cvar_t *ffRatio = ri.Cvar_Get( "r_bloomFireflyRatio", "4.0", 0 );
+		cvar_t *ffAbs = ri.Cvar_Get( "r_bloomFireflyAbsolute", "0.25", 0 );
+		cvar_t *ffNeigh = ri.Cvar_Get( "r_bloomFireflyNeighborhood", "1", 0 );
+		cvar_t *ffDbg = ri.Cvar_Get( "r_bloomFireflyDebug", "0", 0 );
+		frag_spec_data.bloom_firefly_clamp = ( ffClamp && ffClamp->integer ) ? 1 : 0;
+		frag_spec_data.bloom_firefly_ratio = ( ffRatio && ffRatio->value > 0.0f ) ? ffRatio->value : 4.0f;
+		frag_spec_data.bloom_firefly_absolute = ( ffAbs && ffAbs->value >= 0.0f ) ? ffAbs->value : 0.25f;
+		frag_spec_data.bloom_firefly_neighborhood = ffNeigh ? ffNeigh->integer : 1;
+		frag_spec_data.bloom_firefly_debug = ffDbg ? ffDbg->integer : 0;
+	}
 
 	if ( !vk_post_process_surface_format_color_depth( vk.present_format.format, &frag_spec_data.depth_r, &frag_spec_data.depth_g, &frag_spec_data.depth_b ) ) {
 		ri.Printf( PRINT_ALL, "Format %s not recognized, dither to assume 8bpc\n", vk_format_string( vk.base_format.format ) );
@@ -538,6 +555,21 @@ void vk_create_post_process_pipeline( int program_index, uint32_t width, uint32_
 	spec_entries[28].constantID = 28;
 	spec_entries[28].offset = offsetof( Vk_PostProcess_FragSpecData, bloom_energy_preserve );
 	spec_entries[28].size = sizeof( frag_spec_data.bloom_energy_preserve );
+	spec_entries[29].constantID = 29;
+	spec_entries[29].offset = offsetof( Vk_PostProcess_FragSpecData, bloom_firefly_clamp );
+	spec_entries[29].size = sizeof( frag_spec_data.bloom_firefly_clamp );
+	spec_entries[30].constantID = 30;
+	spec_entries[30].offset = offsetof( Vk_PostProcess_FragSpecData, bloom_firefly_ratio );
+	spec_entries[30].size = sizeof( frag_spec_data.bloom_firefly_ratio );
+	spec_entries[31].constantID = 31;
+	spec_entries[31].offset = offsetof( Vk_PostProcess_FragSpecData, bloom_firefly_absolute );
+	spec_entries[31].size = sizeof( frag_spec_data.bloom_firefly_absolute );
+	spec_entries[32].constantID = 32;
+	spec_entries[32].offset = offsetof( Vk_PostProcess_FragSpecData, bloom_firefly_neighborhood );
+	spec_entries[32].size = sizeof( frag_spec_data.bloom_firefly_neighborhood );
+	spec_entries[33].constantID = 33;
+	spec_entries[33].offset = offsetof( Vk_PostProcess_FragSpecData, bloom_firefly_debug );
+	spec_entries[33].size = sizeof( frag_spec_data.bloom_firefly_debug );
 
 	_Static_assert( sizeof( spec_entries ) / sizeof( spec_entries[0] ) >= (size_t)VK_POST_PROCESS_FRAG_SPEC_MAP_COUNT,
 		"vk_create_post_process_pipeline: spec_entries[] smaller than VK_POST_PROCESS_FRAG_SPEC_MAP_COUNT" );

@@ -155,6 +155,10 @@ Stage enums in `vkColorPipelineStage_t` match this list 1:1. Runtime writers cal
 - With `r_oit >= 1`, `r_oitFogMode 0` is refused (effective mode 1); frame-end volumetric must not re-fog resolved WBOIT.
 - `r_oit 2` (MBOIT) requires `r_oitAllowExperimentalMboit 1`; otherwise WBOIT fallback.
 
+### IQ P1 (image quality)
+
+See [RENDERER_P1_CERTIFICATION.md](RENDERER_P1_CERTIFICATION.md) and `exec modern_raster_iq_reference.cfg`. Bloom firefly clamp is extract-only (`r_bloomFireflyClamp`).
+
 `oit_status` `passOrder=` mirrors the production spine abbreviated as:
 
 ```text

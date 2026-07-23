@@ -368,7 +368,7 @@ vec4 shadeDeferredPixel( uvec2 pix ) {
 		}
 	}
 
-	float roughMod = mix( 1.0, 0.85, roughness );
+	float roughMod = 1.0; /* IQ P1-O: was mix(1,0.85,roughness) — deferred/Forward+ seam */
 
 	/* Milestone 3: full directional sun BRDF (Burley + GGX + multiscatter + clearcoat). */
 	vec3 sunDiffuse = vec3( 0.0 );

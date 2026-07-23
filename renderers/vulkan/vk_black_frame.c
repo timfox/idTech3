@@ -22,6 +22,8 @@ Milestone 1: frame-production validation before feature expansion.
 #include "vk_indirect_light.h"
 #include "vk_shading_compare.h"
 #include "vk_scene_hdr_ownership.h"
+#include "vk_bloom_source_contract.h"
+#include "vk_renderer_iq_p1.h"
 
 #define VK_BF_MAX_WRITERS 32
 
@@ -431,6 +433,8 @@ void vk_black_frame_begin_frame( void )
 	vk_color_contract_begin_frame();
 	vk_hdr_resolve_begin_frame();
 	vk_scene_hdr_ownership_begin_frame();
+	vk_bloom_source_contract_begin_frame();
+	vk_renderer_iq_p1_begin_frame();
 	vk_oit_alpha_begin_frame();
 	vk_shadow_contract_begin_frame();
 	vk_reflection_hierarchy_begin_frame();

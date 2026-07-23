@@ -33,6 +33,7 @@ SSAO/HBAO pass, and vk_bloom. Split from vk.c.
 #include "vk_oit_lab.h"
 #include "vk_hdr_resolve_contract.h"
 #include "vk_scene_hdr_ownership.h"
+#include "vk_bloom_source_contract.h"
 #include "vk_black_frame.h"
 
 static void vk_oit_validate_pass_break( const char *stage )
@@ -1226,6 +1227,9 @@ qboolean vk_bloom( void )
 
 	// bloom extraction
 	vk_begin_bloom_extract_render_pass();
+	vk_bloom_source_note_extract( "bloom_extract" );
+	vk_scene_hdr_note_writer( SCENE_HDR_BLOOM_SOURCE, "bloom_extract",
+		SCENE_HDR_WRITE_COMPOSE );
 	qvkCmdBindPipeline( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.bloom_extract_pipeline );
 	{
 		VkDescriptorSet bloom_sets[3] = {

@@ -35,6 +35,8 @@ TESTS=(
 	test_hdr_resolve_integrity.sh
 	test_oit_weight_contract.sh
 	test_renderer_iq_p0.sh
+	test_renderer_iq_p1.sh
+	test_renderer_p1_certification.sh
 	test_wboit_production_certification.sh
 	test_wboit_cert_evidence.sh
 	test_renderer_lab_capture.sh

@@ -310,11 +310,19 @@ void R_RenderPath_RegisterCvars( void )
 	ri.Cvar_CheckRange( r_gbufferCompact, "0", "2", CV_INTEGER );
 	ri.Cvar_SetDescription( r_gbufferCompact,
 		"G-buffer storage layout only (after material correctness). Latched.\n"
-		" 0 = expanded scaffold\n"
+		" 0 = expanded scaffold (required for IQ reference / parity evidence)\n"
 		" 1 = compact dual-write\n"
 		" 2 = compact + extension lookup (future)\n"
-		"Does not repair classic material export. See docs/DEFERRED_HONESTY.md." );
+		"Does not repair classic material export. See docs/DEFERRED_HONESTY.md / r_gbufferQuality." );
 	ri.Cvar_SetGroup( r_gbufferCompact, CVG_RENDERER );
+	/* IQ P1-L: full-fidelity quality forces expanded layout. */
+	if ( ri.Cvar_VariableIntegerValue( "r_gbufferQuality" ) >= 2 &&
+		r_gbufferCompact->integer != 0 ) {
+		ri.Printf( PRINT_WARNING, S_COLOR_YELLOW
+			"[VK][gbuffer] r_gbufferQuality 2 requires r_gbufferCompact 0; forcing compact off\n"
+			S_COLOR_WHITE );
+		ri.Cvar_Set( "r_gbufferCompact", "0" );
+	}
 
 	vk_deferred_honesty_register();
 
