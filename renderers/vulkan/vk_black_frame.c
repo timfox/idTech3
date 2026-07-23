@@ -13,6 +13,7 @@ Milestone 1: frame-production validation before feature expansion.
 #include "vk_frame_contract.h"
 #include "vk_hdr_pipeline.h"
 #include "vk_color_contract.h"
+#include "vk_oit_alpha.h"
 #include "vk_shadow_contract.h"
 #include "vk_depth_contract.h"
 #include "vk_renderer_perf.h"
@@ -426,6 +427,7 @@ void vk_black_frame_begin_frame( void )
 	vk_depth_contract_begin_frame();
 	vk_hdr_pipeline_begin_frame();
 	vk_color_contract_begin_frame();
+	vk_oit_alpha_begin_frame();
 	vk_shadow_contract_begin_frame();
 	vk_reflection_hierarchy_begin_frame();
 	vk_indirect_light_begin_frame();

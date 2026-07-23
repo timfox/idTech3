@@ -1,11 +1,11 @@
 # Color Pipeline Contract
 
-**Status:** Phase 1 spaces/order + **Phase 2.1 WBOIT contract freeze**.  
-**Code:** `vk_color_contract.c` / `vk_oit_contract.c`  
-**Commands:** `color_pipeline_status`, `color_pipeline_validate`, `oit_contract_status`, `oit_contract_validate`  
-**Debug:** `r_colorContractDebug` (0–2)
+**Status:** Phase 1 spaces/order + Phase 2.1 WBOIT freeze + **Phase 2.2 alpha normalization**.  
+**Code:** `vk_color_contract.c` / `vk_oit_contract.c` / `vk_oit_alpha.c`  
+**Commands:** `color_pipeline_status`, `oit_contract_status`, `oit_alpha_status`, `material_alpha_status`  
+**Debug:** `r_colorContractDebug`, `r_alphaDebug`, `r_transparentEdgePolicy`
 
-This document is the single contract for scene-linear color and transparency. Older notes in [HDR_PIPELINE.md](HDR_PIPELINE.md) and [WBOIT_FOG_LAYERS.md](WBOIT_FOG_LAYERS.md) defer to this order for composition. Exact WBOIT math/formats/blends: [WBOIT_CONTRACT.md](WBOIT_CONTRACT.md).
+This document is the single contract for scene-linear color and transparency. Older notes in [HDR_PIPELINE.md](HDR_PIPELINE.md) and [WBOIT_FOG_LAYERS.md](WBOIT_FOG_LAYERS.md) defer to this order for composition. Exact WBOIT math/formats/blends: [WBOIT_CONTRACT.md](WBOIT_CONTRACT.md). Alpha source encoding: [WBOIT_ALPHA_ENCODING.md](WBOIT_ALPHA_ENCODING.md).
 
 **Do not** start virtual shadows, DDGI, meshlets, ray tracing, or further GPU-driven migration until color/OIT certification passes.
 
@@ -163,19 +163,26 @@ Full 17-step contract remains authoritative in this doc and `color_pipeline_stat
 
 ---
 
-## Certification (Phase 1 + 2.1)
+## Certification (Phase 1 + 2.1 + 2.2)
 
 Static gates:
 
 - `tests/scripts/test_color_pipeline_contract.sh` — spaces + 17-stage order
 - `tests/scripts/test_oit_contract.sh` — frozen WBOIT `oitContract_t`
+- `tests/scripts/test_oit_alpha_contract.sh` — Phase 2.2 alpha encoding / normalize / accum
 
-Both run via `test_foundation_consolidation.sh`.
+Run via `test_foundation_consolidation.sh`. Unit: `unit_oit_alpha_normalize`.
 
 ### Phase 2.1 — WBOIT contract freeze
 
 Authoritative struct: `oitContract_t` in `vk_oit_contract.h`. Print with `oit_contract_status`. Details: [WBOIT_CONTRACT.md](WBOIT_CONTRACT.md).
 
-Later Phase 2 work (not started here): premul/straight fringe audits, fog-depth cases, HDR resolve integrity vs SceneHDR generation — see [WBOIT_GPU_CERTIFICATION.md](WBOIT_GPU_CERTIFICATION.md).
+### Phase 2.2 — Alpha encoding normalization
+
+Source encodings, `NormalizeOitSource`, material declarations, classic translation, edge diagnostics, fault injection. Cert: `oit_alpha_validate` → `OIT_ALPHA_EDGE_CERTIFIED`. Docs: [WBOIT_ALPHA_ENCODING.md](WBOIT_ALPHA_ENCODING.md).
+
+### Phase 2.3 (next)
+
+Transparent depth reconstruction and per-fragment fog — [WBOIT_FOG_LAYERS.md](WBOIT_FOG_LAYERS.md). Do not start until alpha reaches `OIT_ALPHA_EDGE_CERTIFIED`.
 
 **Do not** add new transparency features until basic WBOIT equations, formats, blends, fog ownership, and resolve chain are proven against this freeze.

@@ -1,12 +1,15 @@
 #version 450
 /* Weighted blended OIT (production):
- *  RT0 accumulates (color * alpha * weight, alpha * weight)
- *  RT1 tracks revealage = product(1 - alpha)
+ *  Source → NormalizeOitSource → unassociatedRadiance + opacity
+ *  Light unassociated radiance in SCENE_LINEAR_HDR
+ *  RT0 accumulates (radiance * opacity * weight, opacity * weight)
+ *  RT1 tracks revealage = product(1 - opacity)
  * Optional Forward+ dynamic lights (set 2) when r_oitForwardPlus is on.
  * Lighting uses shared Burley+GGX (forward_plus_light_eval.glsl).
  */
 #extension GL_GOOGLE_include_directive : require
 #include "forward_plus_cluster.glsl"
+#include "oit_source_normalize.glsl"
 #define DEPTH_TO_WEIGHT(z) (z)
 
 layout (constant_id = 0) const int manual_depth_test = 0;
@@ -65,13 +68,34 @@ layout(push_constant) uniform Transform {
 	float sunColorG;
 	float sunColorB;
 	float sunAmbient;
-	float _pad0;
-	float _pad1;
+	float cascadeCount;
+	int alphaPack; /* enc | dbg<<8 | edge<<16 | emissive<<24 */
 } pc;
 
 void main() {
-	vec4 base = textureLod(tex0, frag_tex_coord0, 0.0) * frag_color0;
-	float alpha = clamp( base.a, 0.0, 0.999 );
+	vec4 decoded = textureLod(tex0, frag_tex_coord0, 0.0) * frag_color0;
+	uint srcEnc = uint( pc.alphaPack & 0xff );
+	int alphaDbg = ( pc.alphaPack >> 8 ) & 0xff;
+	int edgePol = ( pc.alphaPack >> 16 ) & 0xff;
+	OitSourcePolicy policy;
+	policy.epsilon = 1e-5;
+	policy.edgePolicy = edgePol;
+	policy.allowEmissiveAtZeroAlpha = false;
+
+	OitSurfaceSample samp = NormalizeOitSource( decoded, srcEnc, policy );
+	if ( ( samp.flags & OIT_SAMPLE_FLAG_REJECTED ) != 0u &&
+		srcEnc != OIT_SOURCE_ALPHA_STRAIGHT && srcEnc != OIT_SOURCE_ALPHA_UNKNOWN &&
+		srcEnc != OIT_SOURCE_ALPHA_PREMULTIPLIED && srcEnc != OIT_SOURCE_ALPHA_OPAQUE ) {
+		discard;
+	}
+	if ( ( samp.flags & OIT_SAMPLE_FLAG_NON_FINITE ) != 0u ) {
+		out_color = vec4( 1.0, 0.0, 1.0, 1.0 );
+		out_reveal = 0.0;
+		return;
+	}
+
+	float alpha = clamp( samp.opacity, 0.0, 0.999 );
+	vec3 baseRgb = samp.unassociatedRadiance;
 	/* OpenArena / Q3 glass often stores opacity in blend mode with texture alpha ≈ 1.
 	 * Soften coverage so WBOIT revealage still shows the opaque background. */
 	if ( pc.coverageScale > 0.0 && pc.coverageScale < 0.999 && alpha > 0.85 ) {
@@ -79,8 +103,26 @@ void main() {
 		alpha = clamp( pc.coverageScale * vertA, 0.04, 0.82 );
 	}
 	if ( alpha < 1e-3 ) discard;
-	if ( isnan( alpha ) || isinf( alpha ) || any( isnan( base.rgb ) ) || any( isinf( base.rgb ) ) ) {
-		out_color = vec4( 1.0, 0.0, 1.0, 1.0 );
+
+	/* Alpha debug views (cheat): override lit path later. */
+	if ( alphaDbg == 5 ) {
+		float zflag = ( ( samp.flags & OIT_SAMPLE_FLAG_ZERO_ALPHA_RGB ) != 0u ) ? 1.0 : 0.0;
+		out_color = vec4( zflag, 0.0, 1.0 - zflag, 1.0 );
+		out_reveal = 0.0;
+		return;
+	}
+	if ( alphaDbg == 8 ) {
+		out_color = vec4( samp.associatedRadiance, 1.0 );
+		out_reveal = 0.0;
+		return;
+	}
+	if ( alphaDbg == 9 ) {
+		out_color = vec4( samp.unassociatedRadiance, 1.0 );
+		out_reveal = 0.0;
+		return;
+	}
+	if ( alphaDbg == 10 ) {
+		out_color = vec4( vec3( alpha ), 1.0 );
 		out_reveal = 0.0;
 		return;
 	}
@@ -110,14 +152,14 @@ void main() {
 	float amb = clamp( pc.sunAmbient, 0.0, 1.0 );
 	/* If vertex is already lit (dark or colored), keep base; if white, add ambient fill. */
 	float ambMix = smoothstep( 0.85, 0.98, vertLum );
-	vec3 litRgb = base.rgb * mix( 1.0, max( amb, 0.15 ), ambMix );
+	vec3 litRgb = baseRgb * mix( 1.0, max( amb, 0.15 ), ambMix );
 
 	if ( pc.sunStrength > 1e-4 ) {
 		vec3 L = normalize( vec3( pc.sunDirX, pc.sunDirY, pc.sunDirZ ) );
 		float NL = max( dot( N, L ), 0.0 );
 		/* Soft wrap so thin glass picks up some sun even at grazing angles. */
 		float wrap = clamp( NL * 0.85 + 0.15, 0.0, 1.0 );
-		uint cascades = uint( clamp( pc._pad0, 1.0, 4.0 ) );
+		uint cascades = uint( clamp( pc.cascadeCount, 1.0, 4.0 ) );
 		float sunVis = 1.0;
 		if ( cascades > 0u && ( shadows.records[0].flags & 1u ) != 0u ) {
 			float viewDist = length( frag_world_pos - fp_params.fp_view_org.xyz );
@@ -125,7 +167,7 @@ void main() {
 				shadows.records[0], shadows.records[1], shadows.records[2], shadows.records[3],
 				sunShadowMap, frag_world_pos, viewDist, 1.0, cascades );
 		}
-		litRgb += base.rgb * vec3( pc.sunColorR, pc.sunColorG, pc.sunColorB ) *
+		litRgb += baseRgb * vec3( pc.sunColorR, pc.sunColorG, pc.sunColorB ) *
 			wrap * pc.sunStrength * sunVis;
 	}
 
@@ -134,7 +176,7 @@ void main() {
 		uint lightCount = 0u;
 		float roughness = 0.45;
 		float metalness = 0.0;
-		vec3 addLit = FpEval_ForwardPlusAdd( base.rgb, N, V, frag_world_pos, roughness, metalness,
+		vec3 addLit = FpEval_ForwardPlusAdd( baseRgb, N, V, frag_world_pos, roughness, metalness,
 			pc.lightingDebug, clusterOob, lightCount );
 		if ( clusterOob || any( isnan( addLit ) ) || any( isinf( addLit ) ) ) {
 			out_color = vec4( 1.0, 0.0, 1.0, 1.0 );
@@ -200,6 +242,6 @@ void main() {
 		out_reveal = 0.0;
 		return;
 	}
-	out_color = vec4( litRgb * alpha, alpha ) * w;
+	out_color = vec4( litRgb * alpha, alpha ) * w; /* unassociated lit × opacity × w */
 	out_reveal = alpha;
 }

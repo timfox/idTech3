@@ -4222,6 +4222,13 @@ if(BUILD_UNIT_TESTS)
 	add_test(NAME unit_tiki_parse COMMAND unit_tiki_parse)
 	set_tests_properties(unit_tiki_parse PROPERTIES LABELS "unit;validation;ubertools")
 
+	add_executable(unit_oit_alpha_normalize tests/unit/test_oit_alpha_normalize.c)
+	if(NOT MSVC)
+		target_link_libraries(unit_oit_alpha_normalize PRIVATE m)
+	endif()
+	add_test(NAME unit_oit_alpha_normalize COMMAND unit_oit_alpha_normalize)
+	set_tests_properties(unit_oit_alpha_normalize PROPERTIES LABELS "unit;validation;oit")
+
 	add_executable(unit_bsp30_triangulate
 		tests/unit/test_bsp30_triangulate.c
 		renderers/common/tr_bsp30_triangulate.c)

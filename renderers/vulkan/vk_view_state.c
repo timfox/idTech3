@@ -5,6 +5,7 @@
 #include "vk_frequency_aware.h"
 #include "vk_upscale.h"
 #include "vk_object_id.h"
+#include "vk_oit_alpha.h"
 #include <math.h>
 
 typedef struct vkMvpPushConstants_s {
@@ -27,8 +28,9 @@ typedef struct vkOitPushConstants_s {
 	float sunDir[3];     /* world-space direction toward sun */
 	float sunStrength;   /* 0 = sun term off */
 	float sunColor[3];
-	float sunAmbient;    /* albedo * ambient when vertex looks unlit */
-	float _pad[2];
+	float sunAmbient;
+	float cascadeCount; /* CSM cascade count (was _pad0) */
+	int alphaPack;      /* enc | dbg<<8 | edge<<16 | emissive<<24 */
 } vkOitPushConstants_t;
 
 _Static_assert( sizeof( vkOitPushConstants_t ) == 256,
@@ -1092,9 +1094,18 @@ void vk_update_mvp( const float *m )
 			? ( ( r_pbrSunShadowStrength ) ? Com_Clamp( 0.0f, 1.0f, r_pbrSunShadowStrength->value ) : 1.0f )
 			: 0.65f;
 		oit_push.sunAmbient = 0.28f;
-		oit_push._pad[0] = (float)( ( vk.sun_shadow_cascade_count > 0u ) ?
+		oit_push.cascadeCount = (float)( ( vk.sun_shadow_cascade_count > 0u ) ?
 			( ( vk.sun_shadow_cascade_count > 4u ) ? 4u : vk.sun_shadow_cascade_count ) : 1u );
-		oit_push._pad[1] = vk.sun_shadow_valid ? 1.0f : 0.0f;
+		{
+			materialTransparencyInfo_t ainfo;
+			oitSourceAlphaEncoding_t enc = OIT_SOURCE_ALPHA_STRAIGHT;
+			if ( tess.shader ) {
+				vk_oit_alpha_query_shader( tess.shader, &ainfo );
+				enc = ainfo.sourceEncoding;
+				vk_oit_alpha_note_route( enc, ainfo.path );
+			}
+			oit_push.alphaPack = vk_oit_alpha_pack_push( enc );
+		}
 	}
 	vk_capture_weapon_matrices();
 	push_constants.reserved[0] = ( tess.sdfUiEdge >= 0.0f ) ? tess.sdfUiEdge : 0.0f;

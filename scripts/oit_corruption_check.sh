@@ -108,7 +108,7 @@ grep -q 'oit_accum_additive_pipeline' "$ROOT/renderers/vulkan/vk.h" || {
   echo "FAIL additive OIT accum pipeline missing"; fail=1; }
 grep -q 'colorWriteMask = 0' "$ROOT/renderers/vulkan/vk_pipeline_helpers.c" || {
   echo "FAIL additive reveal write-mask off missing"; fail=1; }
-grep -q 'alpha < 1e-3' "$ROOT/renderers/vulkan/shaders/glsl/oit_accum.frag" || {
+grep -qE 'alpha < 1e-3' "$ROOT/renderers/vulkan/shaders/glsl/oit_accum.frag" || {
   echo "FAIL soft-alpha discard floor missing"; fail=1; }
 grep -q 'smoothstep( 0.0, 0.04, coverage )' "$ROOT/renderers/vulkan/shaders/glsl/oit_resolve.frag" || {
   echo "FAIL resolve soft coverage missing"; fail=1; }

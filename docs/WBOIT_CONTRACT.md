@@ -7,9 +7,17 @@
 
 Parent color order: [COLOR_PIPELINE.md](COLOR_PIPELINE.md). Fog ownership: [WBOIT_FOG_LAYERS.md](WBOIT_FOG_LAYERS.md). GPU soak: [WBOIT_GPU_CERTIFICATION.md](WBOIT_GPU_CERTIFICATION.md).
 
-**Do not** change blend factors, clears, formats, weight, or resolve equations without bumping `OIT_CONTRACT_VERSION`, updating this document, and re-running certification.
+**Do not** change fields without bumping `OIT_CONTRACT_VERSION` and updating this document.
 
-MBOIT (`r_oit 2`) is **out of scope** until it carries an equivalent frozen contract.
+## Source vs internal (Phase 2.2)
+
+| Concept | Meaning |
+|---------|---------|
+| Source encoding | How the **texture/material** stores RGB vs α (`oitSourceAlphaEncoding_t`) |
+| Internal sample | `unassociatedRadiance` + `opacity` after `NormalizeOitSource` |
+| Accum buffer | Already stores `(radiance×opacity×w, opacity×w)` — associated weighted |
+
+See [WBOIT_ALPHA_ENCODING.md](WBOIT_ALPHA_ENCODING.md). The frozen blend/resolve equations below are unchanged.
 
 ---
 

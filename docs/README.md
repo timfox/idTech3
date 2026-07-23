@@ -63,6 +63,7 @@ Documentation is grouped by **tier**. Most files remain at their historical path
 - [RENDERER_2027.md](RENDERER_2027.md) — GPU-driven hybrid visibility north-star (vis buffer Phase 1)
 - [COLOR_PIPELINE.md](COLOR_PIPELINE.md) — authoritative color spaces + 17-stage order; WBOIT production OIT (`color_pipeline_status`)
 - [WBOIT_CONTRACT.md](WBOIT_CONTRACT.md) — Phase 2.1 frozen WBOIT formats/blends/equations (`oit_contract_status`)
+- [WBOIT_ALPHA_ENCODING.md](WBOIT_ALPHA_ENCODING.md) — Phase 2.2 source vs internal alpha (`oit_alpha_status`)
 - [MOMENT_OIT_STOCHASTIC_ALPHA.md](MOMENT_OIT_STOCHASTIC_ALPHA.md) — production WBOIT (`r_oit 1`), experimental MBOIT (`r_oit 2`), stochastic alpha
 - [WBOIT_GPU_CERTIFICATION.md](WBOIT_GPU_CERTIFICATION.md) — live GPU cert levels, B0–B7 operator runner, soak (`oit_certify_wboit` / `oit_soak_wboit`)
 - [WBOIT_FOG_LAYERS.md](WBOIT_FOG_LAYERS.md) — fog-through-layers pass order, `r_oitFogMode`, no double-fog on resolve
