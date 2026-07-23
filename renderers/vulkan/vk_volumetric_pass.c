@@ -6,6 +6,7 @@
 #include "vk_volumetric_pass.h"
 #include "vk_post_aa.h"
 #include "vk_render_pass.h"
+#include "vk_scene_hdr_ownership.h"
 
 void vk_volumetric_skip_cleanup( const char *reason, uint32_t restoreDepthSrcStages )
 {
@@ -38,13 +39,29 @@ void vk_volumetric_skip_cleanup( const char *reason, uint32_t restoreDepthSrcSta
 void vk_volumetric_fog_before_oit( void )
 {
 	cvar_t *fogMode;
+	int mode;
 	static qboolean s_logged;
+	static qboolean s_forcedModeLogged;
 
 	if ( backEnd.doneFog ) {
 		return;
 	}
 	fogMode = ri.Cvar_Get( "r_oitFogMode", "1", 0 );
-	if ( !fogMode || fogMode->integer < 1 ) {
+	mode = fogMode ? fogMode->integer : 1;
+	/*
+	 * IQ P0-E: with production WBOIT, refuse legacy fogMode 0 (post-stack fog of
+	 * resolved HDR). Force effective mode 1 for this frame's pre-OIT froxel.
+	 */
+	if ( r_oit && r_oit->integer >= 1 && mode < 1 ) {
+		if ( !s_forcedModeLogged ) {
+			ri.Printf( PRINT_WARNING, S_COLOR_YELLOW
+				"[VK][fog] r_oitFogMode 0 refused with r_oit>=1 (double-fog risk); "
+				"using mode 1 for opaque pre-OIT volumetric\n" S_COLOR_WHITE );
+			s_forcedModeLogged = qtrue;
+		}
+		mode = 1;
+	}
+	if ( mode < 1 ) {
 		return; /* Legacy mode 0: keep frame-end volumetric over full HDR. */
 	}
 	if ( !r_oit || !r_oit->integer || !r_fbo || !r_fbo->integer ) {
@@ -56,11 +73,13 @@ void vk_volumetric_fog_before_oit( void )
 
 	if ( !s_logged ) {
 		ri.Printf( PRINT_ALL,
-			"[VK][fog] pre-OIT volumetric (r_oitFogMode=%d): opaque fogged before WBOIT resolve\n",
-			fogMode->integer );
+			"[VK][fog] pre-OIT volumetric (r_oitFogMode effective=%d): opaque fogged before WBOIT resolve\n",
+			mode );
 		s_logged = qtrue;
 	}
 	/* Match frame-end: leave MAIN so color can leave COLOR_ATTACHMENT. */
 	vk_end_render_pass();
 	vk_volumetric_fog_pass();
+	vk_scene_hdr_note_writer( SCENE_HDR_VOLUMETRIC, "volumetric_fog_pre_oit",
+		SCENE_HDR_WRITE_COMPOSE );
 }

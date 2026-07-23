@@ -1226,6 +1226,17 @@ qboolean vk_temporal_want_weapon_after_world_post( void )
 		return qtrue;
 	}
 	/*
+	 * IQ P0-C: COLOR_PIPELINE requires weapon HDR before bloom. When bloom mode 1
+	 * (combined extract) is active, defer weapon until after world post even if
+	 * TAA reconstruction is off, so bloom can run after the weapon flush.
+	 */
+	if ( vk.fboActive &&
+		r_bloom && r_bloom->integer &&
+		r_weaponBloomMode && r_weaponBloomMode->integer == 1 &&
+		r_temporalWeaponAfterTaa && r_temporalWeaponAfterTaa->integer ) {
+		return qtrue;
+	}
+	/*
 	 * Architecture B for unsupported view-model consumers: world SSR/SSAO
 	 * finish first, then the weapon is composited by the existing deferred
 	 * weapon pass. This keeps DEPTH_RANGE_WEAPON color/depth out of those
@@ -1248,12 +1259,11 @@ qboolean vk_temporal_want_weapon_after_world_post( void )
 
 qboolean vk_temporal_defer_bloom_for_weapon( void )
 {
-	/* Mode 1 only: combined HDR before one global bloom.
+	/* Mode 1: combined HDR before one global bloom (weapon must be present).
 	 * Mode 2 keeps legacy world bloom order and adds dedicated weapon bloom after the flush. */
 	return vk.fboActive && r_bloom && r_bloom->integer &&
 		r_weaponBloomMode && r_weaponBloomMode->integer == 1 &&
-		vk_temporal_want_weapon_after_world_post() &&
-		vk_temporal_reconstruction_wanted();
+		vk_temporal_want_weapon_after_world_post();
 }
 
 qboolean vk_temporal_want_dedicated_weapon_bloom( void )

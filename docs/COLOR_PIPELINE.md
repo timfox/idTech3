@@ -145,7 +145,15 @@ Stage enums in `vkColorPipelineStage_t` match this list 1:1. Runtime writers cal
 | `vk_color_contract_begin_frame()` | Clear per-frame stage notes (with black-frame begin) |
 | `vk_color_contract_note_stage()` | Record writer + check space / order |
 | `vk_color_contract_validate()` | Static table + frame mismatches |
+| `vk_scene_hdr_ownership_*` | IQ P0-A SceneHDR last-writer ownership (`scene_hdr_status`) |
 | Black-frame pass names | Map `ForwardOpaque` / `WBOIT*` / `Bloom` / `Tonemap` / … into stages |
+
+### IQ P0 ownership rules (SceneHDR)
+
+- Raster / neural GI must not **replace** SceneHDR after `WBOIT_RESOLVE` (`vk_scene_hdr_allows_pre_oit_gi`).
+- Production spine: opaque → OIT resolve → refraction → **weapon** → bloom (`r_weaponBloomMode 1` defers bloom until after weapon flush even without TAA).
+- With `r_oit >= 1`, `r_oitFogMode 0` is refused (effective mode 1); frame-end volumetric must not re-fog resolved WBOIT.
+- `r_oit 2` (MBOIT) requires `r_oitAllowExperimentalMboit 1`; otherwise WBOIT fallback.
 
 `oit_status` `passOrder=` mirrors the production spine abbreviated as:
 

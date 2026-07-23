@@ -516,7 +516,18 @@ void vk_end_frame_prepare_post_process( VkImageView *post_fog_src, VkImageView *
 	}
 
 	if ( !backEnd.doneFog ) {
-		vk_volumetric_fog_pass();
+		const int fogMode = ri.Cvar_VariableIntegerValue( "r_oitFogMode" );
+		const int fogModeEff = ( r_oit && r_oit->integer >= 1 && fogMode < 1 ) ? 1 : fogMode;
+		if ( r_oit && r_oit->integer >= 1 &&
+			vk.oitFrameState == VK_OIT_FRAME_RESOLVED &&
+			fogModeEff >= 1 ) {
+			backEnd.doneFog = qtrue;
+			vk_log_post_fog_rebind( "end_frame volumetric skipped (WBOIT double-fog prevention)",
+				vk.color_image_view );
+			vk_update_post_fog_descriptors( vk.color_image_view );
+		} else {
+			vk_volumetric_fog_pass();
+		}
 	} else {
 		vk_log_post_fog_rebind( "end_frame volumetric skipped (scene+2D on color_image)", vk.color_image_view );
 		vk_update_post_fog_descriptors( vk.color_image_view );

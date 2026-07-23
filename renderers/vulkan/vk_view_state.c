@@ -1050,7 +1050,11 @@ void vk_update_mvp( const float *m )
 	Com_Memcpy( oit_push.model, backEnd.or.modelMatrix, sizeof( oit_push.model ) );
 	oit_push.lightingDebug = ri.Cvar_VariableIntegerValue( "r_oitLightingDebug" );
 	oit_push.parityCompare = ri.Cvar_VariableIntegerValue( "r_oitParityCompare" );
-	oit_push.fogMode = ri.Cvar_VariableIntegerValue( "r_oitFogMode" );
+	{
+		/* IQ P0-E: with WBOIT/MBOIT active, never push fogMode 0 into accum (double-fog). */
+		const int fogMode = ri.Cvar_VariableIntegerValue( "r_oitFogMode" );
+		oit_push.fogMode = ( r_oit && r_oit->integer >= 1 && fogMode < 1 ) ? 1 : fogMode;
+	}
 	oit_push.fogDebug = ri.Cvar_VariableIntegerValue( "r_oitFogDebug" );
 	{
 		cvar_t *fogDen = ri.Cvar_Get( "r_oitFogDensity", "0.0", 0 );

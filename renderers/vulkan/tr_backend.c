@@ -54,6 +54,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "vk_object_id.h"
 #include "vk_ambient_visibility.h"
 #include "vk_raster_gi.h"
+#include "vk_scene_hdr_ownership.h"
 #include "vk_gpu_particles.h"
 #include "vk_deferred_decals.h"
 #include "vk_distortion.h"
@@ -2599,6 +2600,8 @@ void RB_FlushDeferredWeaponAfterTaa( VkImageView *post_fog_src, VkImageView *lum
 	vk_set_scene_post_fog_source( vk.color_image_view );
 	vk_set_post_chain_last_writer( r_weaponTemporalMode && r_weaponTemporalMode->integer == 2 ?
 		"weapon_temporal_mode2" : "weapon_after_world_post" );
+	vk_scene_hdr_note_writer( SCENE_HDR_WEAPON, "weapon_after_world_post",
+		SCENE_HDR_WRITE_COMPOSE );
 
 	if ( r_temporalDebug && r_temporalDebug->integer ) {
 		ri.Printf( PRINT_DEVELOPER,
@@ -2857,17 +2860,25 @@ static const void *RB_DrawSurfs( const void *data ) {
 			}
 		}
 	}
-	vk_niv_apply_after_geometry();
-	vk_raster_gi_apply_after_geometry();
+	/*
+	 * IQ P0-B: geometry-time GI / neural stacks must not rewrite SceneHDR after
+	 * WBOIT resolve (or mid-accum). Particles / distortion / splat remain free.
+	 */
+	if ( vk_scene_hdr_allows_pre_oit_gi() ) {
+		vk_niv_apply_after_geometry();
+		vk_raster_gi_apply_after_geometry();
+		vk_surfel_gi_apply_after_geometry();
+		vk_rcgi_apply_after_geometry();
+		vk_nist_apply_after_geometry();
+		vk_nvc_apply_after_geometry();
+		vk_vfgi_apply_after_geometry();
+		vk_renderformer_apply_after_geometry();
+		vk_wpt_apply_after_geometry();
+		vk_fsa_build_importance_after_geometry();
+	} else {
+		vk_scene_hdr_log_gi_blocked( "post-OIT geometry GI stack" );
+	}
 	vk_gpu_particles_apply_after_geometry();
-	vk_surfel_gi_apply_after_geometry();
-	vk_rcgi_apply_after_geometry();
-	vk_nist_apply_after_geometry();
-	vk_nvc_apply_after_geometry();
-	vk_vfgi_apply_after_geometry();
-	vk_renderformer_apply_after_geometry();
-	vk_wpt_apply_after_geometry();
-	vk_fsa_build_importance_after_geometry();
 	if ( R_SQZ_Active() ) {
 		vk_sqz_apply_after_geometry();
 	} else if ( R_WSP_Active() ) {

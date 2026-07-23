@@ -32,6 +32,7 @@ SSAO/HBAO pass, and vk_bloom. Split from vk.c.
 #include "vk_oit_cert_geometry.h"
 #include "vk_oit_lab.h"
 #include "vk_hdr_resolve_contract.h"
+#include "vk_scene_hdr_ownership.h"
 #include "vk_black_frame.h"
 
 static void vk_oit_validate_pass_break( const char *stage )
@@ -425,6 +426,19 @@ void vk_oit_pass( const struct drawSurfsCommand_s *cmd )
 	qboolean directTest = ( ri.Cvar_VariableIntegerValue( "r_oitDirectTest" ) != 0 );
 	int bucket;
 	int bucket_count;
+	static qboolean s_mboitBlockedWarned;
+
+	/* IQ P0-F: MBOIT is not production — require explicit cheat opt-in. */
+	if ( mboit && ri.Cvar_VariableIntegerValue( "r_oitAllowExperimentalMboit" ) <= 0 ) {
+		if ( !s_mboitBlockedWarned ) {
+			ri.Printf( PRINT_WARNING, S_COLOR_YELLOW
+				"[VK][OIT] r_oit 2 (MBOIT) blocked: resolve is still WBOIT-like. "
+				"Falling back to WBOIT. Set r_oitAllowExperimentalMboit 1 to override.\n"
+				S_COLOR_WHITE );
+			s_mboitBlockedWarned = qtrue;
+		}
+		mboit = qfalse;
+	}
 
 	vk.oitClearedThisFrame = qfalse;
 	vk.oitWeaponExcluded = qtrue; /* world OIT never admits RF_FIRST_PERSON / RF_DEPTHHACK */
@@ -758,6 +772,8 @@ void vk_oit_pass( const struct drawSurfsCommand_s *cmd )
 		/* RP finalLayout is SHADER_READ_ONLY — ready for fog_scene copy / post_bloom. */
 		vk.oitFrameState = VK_OIT_FRAME_RESOLVED;
 		vk.oitResolveCount++;
+		vk_scene_hdr_note_writer( SCENE_HDR_WBOIT_RESOLVE, "WBOITResolve",
+			SCENE_HDR_WRITE_COMPOSE );
 		if ( ri.Cvar_VariableIntegerValue( "r_oitForceDoubleResolve" ) && bucket == bucket_count - 1 ) {
 			/* Second resolve attempt: refuse by leaving state RESOLVED and counting corruption. */
 			vk.oitCorruptionCount++;
@@ -1173,7 +1189,26 @@ qboolean vk_bloom( void )
 	vk_deferred_gbuffer_draw_debug();
 	vk_visibility_buffer_draw_debug();
 	if ( !backEnd.doneFog ) {
-		vk_volumetric_fog_pass();
+		/* IQ P0-E: never frame-end fog resolved WBOIT HDR when production fog owns layers. */
+		const int fogMode = ri.Cvar_VariableIntegerValue( "r_oitFogMode" );
+		const int fogModeEff = ( r_oit && r_oit->integer >= 1 && fogMode < 1 ) ? 1 : fogMode;
+		if ( r_oit && r_oit->integer >= 1 &&
+			vk.oitFrameState == VK_OIT_FRAME_RESOLVED &&
+			fogModeEff >= 1 ) {
+			static qboolean s_loggedSkip;
+			if ( !s_loggedSkip ) {
+				ri.Printf( PRINT_ALL,
+					"[VK][fog] skip frame-end volumetric after WBOIT resolve "
+					"(double-fog prevention; r_oitFogMode effective=%d)\n",
+					fogModeEff );
+				s_loggedSkip = qtrue;
+			}
+			backEnd.doneFog = qtrue;
+		} else {
+			vk_volumetric_fog_pass();
+			vk_scene_hdr_note_writer( SCENE_HDR_VOLUMETRIC, "volumetric_fog",
+				SCENE_HDR_WRITE_COMPOSE );
+		}
 	}
 
 	/* Ensure color_image is ready for sampling before bloom extract */
@@ -1336,6 +1371,8 @@ qboolean vk_bloom( void )
 		vk_set_scene_post_fog_source( vk.color_image_view );
 		vk_update_post_fog_descriptors( vk.color_image_view );
 		vk_set_post_chain_last_writer( "bloom" );
+		vk_scene_hdr_note_writer( SCENE_HDR_BLOOM_SOURCE, "bloom",
+			SCENE_HDR_WRITE_COMPOSE );
 		if ( r_postAaAfterBloom && r_postAaAfterBloom->integer && vk_post_aa_output_active() ) {
 			vk_post_scene_aa_apply();
 		}

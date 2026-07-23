@@ -1,5 +1,8 @@
 #version 450
 
+#extension GL_GOOGLE_include_directive : require
+#include "depth_view.glsl"
+
 layout(set = 0, binding = 0) uniform sampler2D texture0;
 layout(set = 1, binding = 0) uniform sampler2D depthTex;
 layout(set = 2, binding = 0) uniform PostFXParams {
@@ -446,12 +449,12 @@ vec3 samplePostLdr( vec2 uv, bool hdrResolve, bool postGrade ) {
 	return applyPostColorAdjust( clamp( sampleExposed, 0.0, 1.0 ), postGrade );
 }
 
-/* Linear depth from depth buffer (0=near, 1=far). Assumes perspective depth. */
+/* Linear depth from depth buffer (reversed-Z: device near→1, far→0). */
 float linearDepthFromBuffer( float depthNdc ) {
 	float zNear = postfx.depthParams.x;
 	float zFar = postfx.depthParams.y;
 	if ( zFar <= zNear ) return zNear;
-	return zNear * zFar / ( zFar - depthNdc * ( zFar - zNear ) );
+	return Depth_LinearizeReversedZ( depthNdc, zNear, zFar );
 }
 
 /* Camera motion blur: sample along velocity vector. */

@@ -128,8 +128,17 @@ void main() {
 	}
 
 	int mode = pc.debugMode;
+	/* IQ P0-F: MBOIT path still uses McGuire WBOIT resolve math. When oitMode==2,
+	 * leave a developer-visible magenta corner marker if debugMode==0 so operators
+	 * do not mistake experimental MBOIT for a certified moments resolve. */
 	if ( mode <= 0 ) {
 		out_color = vec4( resolved, 1.0 );
+		if ( pc.oitMode == 2 ) {
+			ivec2 marker = opaqueSize / 32;
+			if ( all( lessThan( px, max( marker, ivec2( 4 ) ) ) ) ) {
+				out_color = vec4( oit_magenta(), 1.0 );
+			}
+		}
 		return;
 	}
 

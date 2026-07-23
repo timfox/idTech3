@@ -8,6 +8,7 @@ Raster-only; RT locked by Raster Ultra. Ownership: docs/RASTER_ULTRA_1.3.md.
 #include "tr_local.h"
 #include "vk.h"
 #include "vk_raster_gi.h"
+#include "vk_scene_hdr_ownership.h"
 #include "vk_radiance_clipmap.h"
 #include "vk_util.h"
 #include "vk_image_layout.h"
@@ -1420,6 +1421,10 @@ void vk_raster_gi_apply_after_geometry( void )
 	if ( rgi.appliedThisFrame || !vk_raster_gi_active() || !vk.cmd || !backEnd.doneSurfaces ) {
 		return;
 	}
+	if ( !vk_scene_hdr_allows_pre_oit_gi() ) {
+		vk_scene_hdr_log_gi_blocked( "raster_gi" );
+		return;
+	}
 	if ( vk_classify_current_view() != VK_VIEW_CLASS_MAIN_WORLD ) {
 		return;
 	}
@@ -1640,6 +1645,17 @@ void vk_raster_gi_apply_after_geometry( void )
 
 	vk_spine_note_write( VK_SPINE_RES_INDIRECT_DIFFUSE, VK_SPINE_PASS_RASTER_GI, VK_SPINE_ACCESS_STORAGE_WRITE );
 	vk_spine_note_write( VK_SPINE_RES_HDR_COLOR, VK_SPINE_PASS_RASTER_GI, VK_SPINE_ACCESS_COLOR_WRITE );
+	if ( !vk_scene_hdr_note_writer( SCENE_HDR_GI, "raster_gi", SCENE_HDR_WRITE_REPLACE ) ) {
+		record_image_layout_transition( cmd, vk.color_image, VK_IMAGE_ASPECT_COLOR_BIT,
+			VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+			0, 0 );
+		record_depth_image_layout_transition( cmd, depthAspect,
+			VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
+			VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+			VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT );
+		vk_spine_pass_end( VK_SPINE_PASS_RASTER_GI );
+		return;
+	}
 	qvkCmdBindPipeline( cmd, VK_PIPELINE_BIND_POINT_COMPUTE, rgi.resolvePipe );
 	qvkCmdBindDescriptorSets( cmd, VK_PIPELINE_BIND_POINT_COMPUTE, rgi.resolvePL, 0, 1, &rgi.resolveSet, 0, NULL );
 	qvkCmdPushConstants( cmd, rgi.resolvePL, VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof( resolvePush ), &resolvePush );

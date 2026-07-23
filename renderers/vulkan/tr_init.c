@@ -133,6 +133,7 @@ glstatic_t	gls;
 #include "vk_indirect_light.h"
 #include "vk_hdr_pipeline.h"
 #include "vk_color_contract.h"
+#include "vk_scene_hdr_ownership.h"
 #include "vk_renderer_perf.h"
 #include "vk_aa_policy.h"
 static void VkInfo_f( void );
@@ -3090,9 +3091,19 @@ static void R_Register( void )
 		"Order-independent transparency:\n"
 		" 0 - off (sorted alpha)\n"
 		" 1 - WBOIT (production / Spine 1.1 certified path)\n"
-		" 2 - MBOIT / Moment Transparency (experimental; not Spine 1.1 certified)\n"
+		" 2 - MBOIT / Moment Transparency (experimental; blocked unless "
+		"\\r_oitAllowExperimentalMboit 1 — resolve remains WBOIT-like)\n"
 		"Requires \\r_fbo 1." );
 	ri.Cvar_SetGroup( r_oit, CVG_RENDERER );
+	{
+		cvar_t *r_oitAllowExperimentalMboit =
+			ri.Cvar_Get( "r_oitAllowExperimentalMboit", "0", CVAR_CHEAT | CVAR_ARCHIVE_ND );
+		ri.Cvar_CheckRange( r_oitAllowExperimentalMboit, "0", "1", CV_INTEGER );
+		ri.Cvar_SetDescription( r_oitAllowExperimentalMboit,
+			"IQ P0-F: allow r_oit 2 (MBOIT). Default 0 forces WBOIT fallback because "
+			"MBOIT resolve is not production-certified." );
+		ri.Cvar_SetGroup( r_oitAllowExperimentalMboit, CVG_RENDERER );
+	}
 	r_oitForwardPlus = ri.Cvar_Get( "r_oitForwardPlus", "1", CVAR_ARCHIVE_ND | CVAR_LATCH );
 	ri.Cvar_CheckRange( r_oitForwardPlus, "0", "1", CV_INTEGER );
 	ri.Cvar_SetDescription( r_oitForwardPlus, "Forward+-lit OIT accumulation (tile lights on transparent surfaces). Default 1. Applies to \\r_oit 1 (WBOIT) and \\r_oit 2 (MBOIT accum; moments pass stays unlit). Requires \\r_forwardPlus 1. Mode 3: use with OIT instead of Forward+ transparent shade." );
@@ -4076,6 +4087,7 @@ void R_Init( void ) {
 	vk_indirect_light_register();
 	vk_hdr_pipeline_register();
 	vk_color_contract_register();
+	vk_scene_hdr_ownership_register();
 	vk_renderer_perf_register();
 #endif
 	VK_RasterUltra_Enforce();
