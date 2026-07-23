@@ -18,6 +18,7 @@
 #include "vk_render_pass.h"
 #include "vk_scene_pass.h"
 #include "vk_temporal.h"
+#include "vk_renderer_iq_p1.h"
 #include "vk_upscale.h"
 #include "vk_view_state.h"
 #include "vk_volumetric_pass.h"
@@ -825,6 +826,7 @@ void vk_end_frame_record_taa_pass( VkImageView *post_fog_src, VkImageView *lumin
 	vk.temporal.hasValidTAAHistory = qtrue;
 	vk.temporal.prevColorValid = qtrue;
 	vk.temporal.taaHistoryFrameId[writeIndex] = vk.temporal.frameIndex;
+	vk_temporal_history_note( HISTORY_TAA, qtrue, NULL );
 	if ( !vk_temporal_store_previous_depth( writeIndex ) ) {
 		/* Color may still be presented, but cannot be trusted as temporal history
 		 * without its matching previous-depth ownership. */

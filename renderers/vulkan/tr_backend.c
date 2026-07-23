@@ -27,6 +27,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "vk_ui_blur.h"
 #include "vk_vegetation_gpu.h"
 #include "vk_temporal.h"
+#include "vk_renderer_iq_p1.h"
 #include "vk_pass_registry.h"
 #include "vk_forward_plus.h"
 #include "vk_deferred_gbuffer.h"
@@ -2479,6 +2480,7 @@ static qboolean RB_ResolveIndependentWeaponHistory( VkImageView worldView,
 	vk.temporal.weaponHistoryValid = qtrue;
 	vk.temporal.weaponHistoryFrameId[writeIndex] = vk.temporal.frameIndex;
 	vk.temporal.weaponDepthFrameId[writeIndex] = vk.temporal.frameIndex;
+	vk_temporal_history_note( HISTORY_WEAPON, qtrue, NULL );
 	if ( vk.weapon_temporal_query_pool != VK_NULL_HANDLE && qvkCmdWriteTimestamp ) {
 		const uint32_t queryBase = vk.cmd_index * VK_WEAPON_TEMPORAL_QUERY_SLOTS;
 		qvkCmdWriteTimestamp( vk.cmd->command_buffer, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,

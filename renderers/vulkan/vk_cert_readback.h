@@ -20,6 +20,10 @@ typedef enum {
 	CERT_RB_BLOOM_SOURCE,
 	CERT_RB_TONEMAP_INPUT,
 	CERT_RB_FINAL_DISPLAY,
+	CERT_RB_BLOOM_EXTRACT,
+	CERT_RB_GBUFFER_ALBEDO,
+	CERT_RB_GBUFFER_NORMAL,
+	CERT_RB_MOTION_VECTORS,
 	CERT_RB_COUNT
 } certReadbackResource_t;
 
@@ -53,6 +57,18 @@ typedef struct certOitSnapshot_s {
 	certReadbackCapture_t resolved;
 } certOitSnapshot_t;
 
+/* Phase 1.5 — IQ snapshot: bloom source/extract + optional G-buffer/motion. */
+typedef struct certIqSnapshot_s {
+	qboolean valid;
+	uint64_t frameNumber;
+	uint32_t generation;
+	certReadbackCapture_t bloomSource;
+	certReadbackCapture_t bloomExtract;
+	certReadbackCapture_t gbufferAlbedo;
+	certReadbackCapture_t gbufferNormal;
+	certReadbackCapture_t motion;
+} certIqSnapshot_t;
+
 void vk_cert_readback_register( void );
 void vk_cert_readback_shutdown( void );
 
@@ -73,6 +89,15 @@ qboolean vk_cert_readback_record_oit_snapshot( VkCommandBuffer cmd, int cmdIndex
 qboolean vk_cert_readback_oit_snapshot_pending( int cmdIndex );
 qboolean vk_cert_readback_finalize_oit_snapshot( int cmdIndex, certOitSnapshot_t *out );
 const certOitSnapshot_t *vk_cert_readback_last_oit_snapshot( void );
+
+/*
+ * Phase 1.5 — record bloom source + extract (+ optional G-buffer/motion) into the
+ * CURRENT command buffer after bloom extract. Finalize after rendering_finished_fence.
+ */
+qboolean vk_cert_readback_record_iq_snapshot( VkCommandBuffer cmd, int cmdIndex );
+qboolean vk_cert_readback_iq_snapshot_pending( int cmdIndex );
+qboolean vk_cert_readback_finalize_iq_snapshot( int cmdIndex, certIqSnapshot_t *out );
+const certIqSnapshot_t *vk_cert_readback_last_iq_snapshot( void );
 
 qboolean vk_cert_readback_decode_to_rgba( VkFormat format, uint32_t width, uint32_t height,
 	uint32_t rowPitchBytes, const void *src, float *dstRgba );

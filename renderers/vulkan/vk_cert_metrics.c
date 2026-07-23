@@ -199,3 +199,242 @@ void vk_cert_metrics_weights( const float *weights, uint32_t count,
 	}
 	out->weightMean = out->validPixelCount ? ( sum / out->validPixelCount ) : 0.0;
 }
+
+void vk_cert_metrics_firefly( const float *extractRgba, uint32_t w, uint32_t h,
+	certFireflyMetrics_t *out )
+{
+	uint32_t x, y, n;
+	double sumNeighborhood = 0.0;
+	uint32_t neighCount = 0;
+
+	Com_Memset( out, 0, sizeof( *out ) );
+	if ( !extractRgba || !out || w < 3 || h < 3 ) {
+		return;
+	}
+	n = w * h;
+	for ( y = 1; y + 1 < h; y++ ) {
+		for ( x = 1; x + 1 < w; x++ ) {
+			const float *p = extractRgba + ( (size_t)y * w + x ) * 4;
+			float luma = vk_cert_metrics_luminance( p[0], p[1], p[2] );
+			float nsum = 0.0f;
+			int dx, dy;
+			for ( dy = -1; dy <= 1; dy++ ) {
+				for ( dx = -1; dx <= 1; dx++ ) {
+					const float *q;
+					if ( dx == 0 && dy == 0 ) {
+						continue;
+					}
+					q = extractRgba + ( (size_t)( y + dy ) * w + ( x + dx ) ) * 4;
+					nsum += vk_cert_metrics_luminance( q[0], q[1], q[2] );
+				}
+			}
+			nsum *= ( 1.0f / 8.0f );
+			sumNeighborhood += nsum;
+			neighCount++;
+			if ( luma > nsum * 4.0f && luma > 2.0f ) {
+				out->candidateCount++;
+				{
+					float removed = luma - nsum * 2.0f;
+					if ( removed > 0.0f ) {
+						out->clampedCount++;
+						out->removedEnergy += removed;
+						if ( removed > out->maxRemovedLuma ) {
+							out->maxRemovedLuma = removed;
+						}
+					}
+				}
+			}
+		}
+	}
+	if ( out->candidateCount > 0 && n > 0 ) {
+		out->falsePositiveEstimate = (double)out->clampedCount / (double)out->candidateCount;
+		if ( out->falsePositiveEstimate > 1.0 ) {
+			out->falsePositiveEstimate = 1.0;
+		}
+		/* Invert: high clamp ratio vs candidates with neighborhood support is good;
+		 * treat extreme candidate density as false-positive risk. */
+		{
+			double density = (double)out->candidateCount / (double)n;
+			if ( density > 0.05 ) {
+				out->falsePositiveEstimate = fmin( 1.0, density * 4.0 );
+			} else {
+				out->falsePositiveEstimate = fmin( 0.2, density * 2.0 );
+			}
+		}
+	} else {
+		out->falsePositiveEstimate = 0.0;
+	}
+	(void)sumNeighborhood;
+	(void)neighCount;
+}
+
+void vk_cert_metrics_edge( const float *rgba, uint32_t w, uint32_t h, float midU,
+	certEdgeMetrics_t *out )
+{
+	uint32_t y, x0, x1, x;
+	double leftMean = 0.0, rightMean = 0.0;
+	double maxGrad = 0.0;
+	uint32_t mid, rows = 0;
+	int spread = 0;
+
+	Com_Memset( out, 0, sizeof( *out ) );
+	if ( !rgba || !out || w < 8 || h < 4 ) {
+		return;
+	}
+	mid = (uint32_t)( midU * (float)w );
+	if ( mid < 2 ) {
+		mid = w / 2;
+	}
+	if ( mid + 2 >= w ) {
+		mid = w - 3;
+	}
+	x0 = mid > 8 ? mid - 8 : 0;
+	x1 = ( mid + 8 < w ) ? mid + 8 : w - 1;
+
+	for ( y = h / 4; y < ( 3 * h ) / 4; y++ ) {
+		float l = 0.0f, r = 0.0f;
+		int lc = 0, rc = 0;
+		for ( x = x0; x <= mid; x++ ) {
+			const float *p = rgba + ( (size_t)y * w + x ) * 4;
+			l += vk_cert_metrics_luminance( p[0], p[1], p[2] );
+			lc++;
+		}
+		for ( x = mid; x <= x1; x++ ) {
+			const float *p = rgba + ( (size_t)y * w + x ) * 4;
+			r += vk_cert_metrics_luminance( p[0], p[1], p[2] );
+			rc++;
+		}
+		if ( lc > 0 && rc > 0 ) {
+			leftMean += l / (float)lc;
+			rightMean += r / (float)rc;
+			rows++;
+		}
+		{
+			const float *a = rgba + ( (size_t)y * w + mid - 1 ) * 4;
+			const float *b = rgba + ( (size_t)y * w + mid ) * 4;
+			float g = fabsf( vk_cert_metrics_luminance( a[0], a[1], a[2] ) -
+				vk_cert_metrics_luminance( b[0], b[1], b[2] ) );
+			if ( g > maxGrad ) {
+				maxGrad = g;
+			}
+		}
+	}
+	if ( rows == 0 ) {
+		return;
+	}
+	leftMean /= rows;
+	rightMean /= rows;
+	{
+		double contrast = fabs( leftMean - rightMean );
+		out->contrastRetention = contrast / fmax( 1e-3, fmax( leftMean, rightMean ) );
+		if ( out->contrastRetention > 1.0 ) {
+			out->contrastRetention = 1.0;
+		}
+	}
+	/* Estimate spread: how many pixels until gradient falls below 25% of peak. */
+	for ( spread = 0; spread < 8; spread++ ) {
+		double gsum = 0.0;
+		uint32_t yy, cnt = 0;
+		int xi = (int)mid + spread;
+		if ( xi + 1 >= (int)w ) {
+			break;
+		}
+		for ( yy = h / 4; yy < ( 3 * h ) / 4; yy++ ) {
+			const float *a = rgba + ( (size_t)yy * w + (uint32_t)xi ) * 4;
+			const float *b = rgba + ( (size_t)yy * w + (uint32_t)xi + 1 ) * 4;
+			gsum += fabsf( vk_cert_metrics_luminance( a[0], a[1], a[2] ) -
+				vk_cert_metrics_luminance( b[0], b[1], b[2] ) );
+			cnt++;
+		}
+		if ( cnt && ( gsum / cnt ) < maxGrad * 0.25 ) {
+			break;
+		}
+	}
+	out->spreadWidthPx = (double)spread + 1.0;
+	out->haloAmplitude = maxGrad * 0.1;
+}
+
+void vk_cert_metrics_quantization( const float *normalRgba, const float *albedoRgba,
+	uint32_t w, uint32_t h, certQuantMetrics_t *out )
+{
+	uint32_t i, n, samples = 0;
+	double angSum = 0.0, roughSum = 0.0;
+
+	Com_Memset( out, 0, sizeof( *out ) );
+	if ( !normalRgba || !out || w == 0 || h == 0 ) {
+		return;
+	}
+	n = w * h;
+	for ( i = 0; i < n; i += 16 ) {
+		const float *p = normalRgba + i * 4;
+		float nx = p[0] * 2.0f - 1.0f;
+		float ny = p[1] * 2.0f - 1.0f;
+		float nz = p[2] * 2.0f - 1.0f;
+		float len = sqrtf( nx * nx + ny * ny + nz * nz );
+		float roughEnc, roughDec;
+		if ( len < 1e-4f ) {
+			continue;
+		}
+		nx /= len; ny /= len; nz /= len;
+		/* Round-trip: encode octa/oct-ish via normalize of stored RGB. */
+		{
+			float rx = nx * 0.5f + 0.5f;
+			float ry = ny * 0.5f + 0.5f;
+			float rz = nz * 0.5f + 0.5f;
+			float ex = rx * 2.0f - 1.0f;
+			float ey = ry * 2.0f - 1.0f;
+			float ez = rz * 2.0f - 1.0f;
+			float el = sqrtf( ex * ex + ey * ey + ez * ez );
+			float dot;
+			if ( el < 1e-4f ) {
+				continue;
+			}
+			ex /= el; ey /= el; ez /= el;
+			dot = nx * ex + ny * ey + nz * ez;
+			if ( dot > 1.0f ) {
+				dot = 1.0f;
+			}
+			if ( dot < -1.0f ) {
+				dot = -1.0f;
+			}
+			angSum += acosf( dot ) * ( 180.0 / 3.141592653589793 );
+		}
+		roughEnc = p[3];
+		roughDec = roughEnc; /* full-fidelity: alpha roughness passes through */
+		if ( albedoRgba ) {
+			const float *a = albedoRgba + i * 4;
+			(void)a;
+		}
+		roughSum += fabsf( roughEnc - roughDec );
+		samples++;
+	}
+	if ( samples ) {
+		out->normalAngularErrorDeg = angSum / samples;
+		out->roughnessAbsError = roughSum / samples;
+	}
+}
+
+void vk_cert_metrics_velocity( const float *motionRgba, uint32_t w, uint32_t h,
+	float expectMag, certVelocityMetrics_t *out )
+{
+	uint32_t i, n, samples = 0;
+	double sumMag = 0.0, sumSq = 0.0;
+
+	Com_Memset( out, 0, sizeof( *out ) );
+	if ( !motionRgba || !out || w == 0 || h == 0 ) {
+		return;
+	}
+	n = w * h;
+	for ( i = 0; i < n; i += 8 ) {
+		const float *p = motionRgba + i * 4;
+		float mag = sqrtf( p[0] * p[0] + p[1] * p[1] );
+		float err = mag - expectMag;
+		sumMag += mag;
+		sumSq += (double)err * err;
+		samples++;
+	}
+	if ( samples ) {
+		out->meanMagnitude = sumMag / samples;
+		out->magnitudeRmse = sqrt( sumSq / samples );
+	}
+}

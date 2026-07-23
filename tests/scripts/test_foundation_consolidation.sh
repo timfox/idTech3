@@ -37,6 +37,11 @@ TESTS=(
 	test_renderer_iq_p0.sh
 	test_renderer_iq_p1.sh
 	test_renderer_p1_certification.sh
+	test_renderer_p1_cert_levels.sh
+	test_iq_live_cert_contract.sh
+	test_iq_firefly_metrics.sh
+	test_iq_edge_metrics.sh
+	test_iq_temporal_history_live.sh
 	test_wboit_production_certification.sh
 	test_wboit_cert_evidence.sh
 	test_renderer_lab_capture.sh

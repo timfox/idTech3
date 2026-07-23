@@ -13,6 +13,7 @@ composite fullscreen draw, SMAA subpasses. Split from vk.c.
 #include "vk_atmosphere.h"
 #include "vk_volumetric_params.h"
 #include "vk_volumetric_pass.h"
+#include "vk_renderer_iq_p1.h"
 #include "vk_post_aa.h"
 #include "vk_volumetric_internal.h"
 #include "vk_sim_render_debug.h"
@@ -630,6 +631,7 @@ static void vk_copy_froxel_history( void )
 	}
 
 	vk.has_prev_volumetric = qtrue;
+	vk_temporal_history_note( HISTORY_VOLUMETRIC, qtrue, NULL );
 }
 
 static void vk_volumetric_composite_pass( void )
@@ -675,6 +677,7 @@ void vk_reset_volumetric_history( void )
 	vk_volumetric_noise_time = 0.0f;
 	vk_near_static_view_frames = 0;
 	Com_Memset( &vk_volumetric_validation_state, 0, sizeof( vk_volumetric_validation_state ) );
+	vk_temporal_history_note( HISTORY_VOLUMETRIC, qfalse, "volumetric history reset" );
 }
 
 void vk_volumetric_fog_pass( void )

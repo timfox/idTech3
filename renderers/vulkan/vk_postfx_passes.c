@@ -34,6 +34,8 @@ SSAO/HBAO pass, and vk_bloom. Split from vk.c.
 #include "vk_hdr_resolve_contract.h"
 #include "vk_scene_hdr_ownership.h"
 #include "vk_bloom_source_contract.h"
+#include "vk_renderer_iq_p1.h"
+#include "vk_iq_lab.h"
 #include "vk_black_frame.h"
 
 static void vk_oit_validate_pass_break( const char *stage )
@@ -850,6 +852,10 @@ void vk_ssr_pass( void )
 		return;
 	}
 
+	vk_temporal_history_note( HISTORY_SSR,
+		ri.Cvar_VariableIntegerValue( "r_temporalSSR" ) ? qtrue : qfalse,
+		ri.Cvar_VariableIntegerValue( "r_temporalSSR" ) ? NULL : "r_temporalSSR 0" );
+
 	/* Selective Hybrid Reflections: exclusive owner — do not write SSR when RT owns. */
 	if ( !vk_shr_ssr_allowed() ) {
 		return;
@@ -965,6 +971,8 @@ qboolean vk_ssao_pass( void )
 		}
 		return qfalse;
 	}
+
+	vk_temporal_history_note( HISTORY_AO, qtrue, NULL );
 
 	{
 		typedef struct {
@@ -1230,6 +1238,7 @@ qboolean vk_bloom( void )
 	vk_bloom_source_note_extract( "bloom_extract" );
 	vk_scene_hdr_note_writer( SCENE_HDR_BLOOM_SOURCE, "bloom_extract",
 		SCENE_HDR_WRITE_COMPOSE );
+	vk_temporal_history_note( HISTORY_BLOOM, qfalse, "extract non-temporal" );
 	qvkCmdBindPipeline( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.bloom_extract_pipeline );
 	{
 		VkDescriptorSet bloom_sets[3] = {
@@ -1241,6 +1250,7 @@ qboolean vk_bloom( void )
 	}
 	vk_postfx_draw_fullscreen_quad();
 	vk_end_render_pass();
+	vk_iq_lab_on_bloom_extract();
 
 	if ( canBlitDownsample ) {
 		// Split pipeline: downsample first, then blur at same resolution.

@@ -102,6 +102,10 @@ const char *vk_cert_readback_resource_name( certReadbackResource_t r )
 	case CERT_RB_BLOOM_SOURCE: return "BloomSourceHDR";
 	case CERT_RB_TONEMAP_INPUT: return "ToneMapInputHDR";
 	case CERT_RB_FINAL_DISPLAY: return "FinalDisplay";
+	case CERT_RB_BLOOM_EXTRACT: return "BloomExtractHDR";
+	case CERT_RB_GBUFFER_ALBEDO: return "GBufferAlbedo";
+	case CERT_RB_GBUFFER_NORMAL: return "GBufferNormal";
+	case CERT_RB_MOTION_VECTORS: return "MotionVectors";
 	default: return "?";
 	}
 }
@@ -204,6 +208,14 @@ qboolean vk_cert_readback_decode_to_rgba( VkFormat format, uint32_t width, uint3
 				const uint16_t *p = (const uint16_t *)( row + x * 2 );
 				d[0] = vk_cert_half_to_float( p[0] );
 				d[1] = d[2] = 0.0f;
+				d[3] = 1.0f;
+				break;
+			}
+			case VK_FORMAT_R16G16_SFLOAT: {
+				const uint16_t *p = (const uint16_t *)( row + x * 4 );
+				d[0] = vk_cert_half_to_float( p[0] );
+				d[1] = vk_cert_half_to_float( p[1] );
+				d[2] = 0.0f;
 				d[3] = 1.0f;
 				break;
 			}
@@ -581,6 +593,7 @@ static qboolean CERT_RecordOne( VkCommandBuffer cmd, certSnapBuf_t *b, VkImage i
 	VkBufferImageCopy region;
 	switch ( format ) {
 	case VK_FORMAT_R16_SFLOAT: bpp = 2; break;
+	case VK_FORMAT_R16G16_SFLOAT: bpp = 4; break;
 	case VK_FORMAT_R16G16B16A16_SFLOAT: bpp = 8; break;
 	case VK_FORMAT_R32G32B32A32_SFLOAT: bpp = 16; break;
 	case VK_FORMAT_R8G8B8A8_UNORM:
@@ -723,6 +736,173 @@ qboolean vk_cert_readback_finalize_oit_snapshot( int cmdIndex, certOitSnapshot_t
 const certOitSnapshot_t *vk_cert_readback_last_oit_snapshot( void )
 {
 	return s_lastOit.valid ? &s_lastOit : NULL;
+}
+
+/* -------- Phase 1.5 IQ snapshot (bloom + optional G-buffer / motion) -------- */
+
+typedef struct {
+	qboolean pending;
+	qboolean ready;
+	uint64_t frameNumber;
+	uint32_t generation;
+	qboolean haveExtract;
+	qboolean haveAlbedo;
+	qboolean haveNormal;
+	qboolean haveMotion;
+	certSnapBuf_t buf[5]; /* source, extract, albedo, normal, motion */
+} certIqSnapSlot_t;
+
+static certIqSnapSlot_t s_iqSnap[NUM_COMMAND_BUFFERS];
+static certIqSnapshot_t s_lastIq;
+
+qboolean vk_cert_readback_record_iq_snapshot( VkCommandBuffer cmd, int cmdIndex )
+{
+	certIqSnapSlot_t *slot;
+	uint32_t w, h;
+	VkFormat bloomFmt;
+
+	if ( !cmd || cmdIndex < 0 || cmdIndex >= NUM_COMMAND_BUFFERS || vk.device_lost ) {
+		return qfalse;
+	}
+	if ( !vk.color_image ) {
+		return qfalse;
+	}
+	slot = &s_iqSnap[cmdIndex];
+	slot->haveExtract = qfalse;
+	slot->haveAlbedo = qfalse;
+	slot->haveNormal = qfalse;
+	slot->haveMotion = qfalse;
+	w = (uint32_t)glConfig.vidWidth;
+	h = (uint32_t)glConfig.vidHeight;
+	if ( w == 0 || h == 0 ) {
+		return qfalse;
+	}
+
+	if ( !CERT_RecordOne( cmd, &slot->buf[0], vk.color_image, vk.color_format, w, h,
+		VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL ) ) {
+		slot->pending = qfalse;
+		ri.Printf( PRINT_WARNING, "cert_readback: failed IQ bloom source copy\n" );
+		return qfalse;
+	}
+
+	bloomFmt = vk.bloom_format ? vk.bloom_format : VK_FORMAT_R16G16B16A16_SFLOAT;
+	if ( vk.bloom_image[0] != VK_NULL_HANDLE ) {
+		uint32_t bw = vk.bloom_mip_extent[0].width ? vk.bloom_mip_extent[0].width : w;
+		uint32_t bh = vk.bloom_mip_extent[0].height ? vk.bloom_mip_extent[0].height : h;
+		if ( CERT_RecordOne( cmd, &slot->buf[1], vk.bloom_image[0], bloomFmt, bw, bh,
+			VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL ) ) {
+			slot->haveExtract = qtrue;
+		}
+	}
+
+	if ( vk.deferred_gbuffer_albedo != VK_NULL_HANDLE ) {
+		if ( CERT_RecordOne( cmd, &slot->buf[2], vk.deferred_gbuffer_albedo,
+			VK_FORMAT_R16G16B16A16_SFLOAT, w, h, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL ) ) {
+			slot->haveAlbedo = qtrue;
+		}
+	}
+	if ( vk.deferred_gbuffer_normal != VK_NULL_HANDLE ) {
+		if ( CERT_RecordOne( cmd, &slot->buf[3], vk.deferred_gbuffer_normal,
+			VK_FORMAT_R16G16B16A16_SFLOAT, w, h, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL ) ) {
+			slot->haveNormal = qtrue;
+		}
+	}
+	if ( vk.motion_vector_image != VK_NULL_HANDLE ) {
+		if ( CERT_RecordOne( cmd, &slot->buf[4], vk.motion_vector_image,
+			VK_FORMAT_R16G16_SFLOAT, w, h, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL ) ) {
+			slot->haveMotion = qtrue;
+		}
+	}
+
+	slot->pending = qtrue;
+	slot->ready = qfalse;
+	slot->frameNumber = (uint64_t)tr.frameCount;
+	slot->generation = vk.deferredGbufferGeneration;
+	return qtrue;
+}
+
+qboolean vk_cert_readback_iq_snapshot_pending( int cmdIndex )
+{
+	if ( cmdIndex < 0 || cmdIndex >= NUM_COMMAND_BUFFERS ) {
+		return qfalse;
+	}
+	return s_iqSnap[cmdIndex].pending;
+}
+
+qboolean vk_cert_readback_finalize_iq_snapshot( int cmdIndex, certIqSnapshot_t *out )
+{
+	certIqSnapSlot_t *slot;
+	int i;
+	static const int need[] = { 0 }; /* source always required */
+
+	if ( cmdIndex < 0 || cmdIndex >= NUM_COMMAND_BUFFERS ) {
+		return qfalse;
+	}
+	slot = &s_iqSnap[cmdIndex];
+	if ( !slot->pending ) {
+		return qfalse;
+	}
+
+	for ( i = 0; i < 5; i++ ) {
+		qboolean want = ( i == 0 ) ||
+			( i == 1 && slot->haveExtract ) ||
+			( i == 2 && slot->haveAlbedo ) ||
+			( i == 3 && slot->haveNormal ) ||
+			( i == 4 && slot->haveMotion );
+		if ( !want ) {
+			continue;
+		}
+		{
+			certSnapBuf_t *b = &slot->buf[i];
+			if ( !b->mapped || !b->rgba ||
+				!vk_cert_readback_decode_to_rgba( b->format, b->width, b->height,
+					b->width * b->bpp, b->mapped, b->rgba ) ) {
+				slot->pending = qfalse;
+				ri.Printf( PRINT_WARNING, "cert_readback: IQ snapshot decode failed slot=%d\n", i );
+				return qfalse;
+			}
+		}
+	}
+
+	Com_Memset( &s_lastIq, 0, sizeof( s_lastIq ) );
+	s_lastIq.valid = qtrue;
+	s_lastIq.frameNumber = slot->frameNumber;
+	s_lastIq.generation = slot->generation;
+	CERT_FillCaptureFromSnap( &s_lastIq.bloomSource, &slot->buf[0], CERT_RB_BLOOM_SOURCE,
+		slot->frameNumber, slot->generation );
+	if ( slot->haveExtract ) {
+		CERT_FillCaptureFromSnap( &s_lastIq.bloomExtract, &slot->buf[1], CERT_RB_BLOOM_EXTRACT,
+			slot->frameNumber, slot->generation );
+	}
+	if ( slot->haveAlbedo ) {
+		CERT_FillCaptureFromSnap( &s_lastIq.gbufferAlbedo, &slot->buf[2], CERT_RB_GBUFFER_ALBEDO,
+			slot->frameNumber, slot->generation );
+	}
+	if ( slot->haveNormal ) {
+		CERT_FillCaptureFromSnap( &s_lastIq.gbufferNormal, &slot->buf[3], CERT_RB_GBUFFER_NORMAL,
+			slot->frameNumber, slot->generation );
+	}
+	if ( slot->haveMotion ) {
+		CERT_FillCaptureFromSnap( &s_lastIq.motion, &slot->buf[4], CERT_RB_MOTION_VECTORS,
+			slot->frameNumber, slot->generation );
+	}
+	slot->pending = qfalse;
+	slot->ready = qtrue;
+	if ( out ) {
+		*out = s_lastIq;
+	}
+	(void)need;
+	ri.Printf( PRINT_ALL,
+		"cert_readback: IQ snapshot ready frame=%llu extract=%d gbuf=%d motion=%d %ux%u\n",
+		(unsigned long long)s_lastIq.frameNumber,
+		slot->haveExtract, slot->haveNormal, slot->haveMotion,
+		s_lastIq.bloomSource.width, s_lastIq.bloomSource.height );
+	return qtrue;
+}
+
+const certIqSnapshot_t *vk_cert_readback_last_iq_snapshot( void )
+{
+	return s_lastIq.valid ? &s_lastIq : NULL;
 }
 
 void vk_cert_readback_register( void )

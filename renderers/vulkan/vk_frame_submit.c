@@ -39,6 +39,7 @@ Extracted from vk.c for incremental modularization.
 #include "vk_scene_pass.h"
 #include "vk_staging.h"
 #include "vk_oit_lab.h"
+#include "vk_iq_lab.h"
 #include "vk_swapchain.h"
 #include "vk_temporal.h"
 #include "vk_pass_registry.h"
@@ -267,6 +268,8 @@ void vk_begin_frame( void )
 		VK_CHECK( qvkResetFences( vk.device, 1, &vk.cmd->rendering_finished_fence ) );
 		/* Phase 2.6C: finalize deferred OIT cert snapshot recorded on this cmd slot. */
 		vk_oit_lab_finalize_frame( vk.cmd_index );
+		/* Phase 1.5: finalize IQ cert snapshot after bloom extract. */
+		vk_iq_lab_finalize_frame( vk.cmd_index );
 		if ( vk.volumetric_query_pool != VK_NULL_HANDLE &&
 			vk_volumetric_perf_wanted() ) {
 			vk_update_volumetric_perf_queries();

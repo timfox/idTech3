@@ -7,6 +7,9 @@ Renderer IQ P1 hub — profile, history registry, ghost isolation, certification
 #include "tr_local.h"
 #include "vk.h"
 #include "vk_renderer_iq_p1.h"
+#include "vk_renderer_p1_cert.h"
+#include "vk_iq_lab.h"
+#include "vk_iq_cert_geometry.h"
 #include "vk_bloom_source_contract.h"
 #include "vk_color_contract.h"
 #include "vk_scene_hdr_ownership.h"
@@ -19,6 +22,7 @@ Renderer IQ P1 hub — profile, history registry, ghost isolation, certification
 
 typedef struct {
 	qboolean valid;
+	qboolean notedThisFrame;
 	char resetReason[48];
 	uint32_t noteCount;
 	uint32_t resetCount;
@@ -38,6 +42,7 @@ static cvar_t *r_bloomGhostingDebug;
 static cvar_t *r_bloomDebug;
 static uint32_t s_p1GatePass[P1_GATE_COUNT];
 static uint32_t s_p1GateFail[P1_GATE_COUNT];
+static rendererP1Evidence_t s_gateEvidence[P1_GATE_COUNT];
 
 static const char *HistoryOwnerName( rendererHistoryOwner_t o )
 {
@@ -78,8 +83,33 @@ static const char *P1GateName( rendererP1Gate_t g )
 
 void vk_renderer_iq_p1_begin_frame( void )
 {
-	/* Preserve cumulative counters; slots keep last known validity. */
-	(void)0;
+	int i;
+	for ( i = 0; i < HISTORY_OWNER_COUNT; i++ ) {
+		s_hist[i].notedThisFrame = qfalse;
+	}
+	/* Disabled consumers still must register ownership (inactive) each frame. */
+	if ( !r_taa || !r_taa->integer ) {
+		vk_temporal_history_note( HISTORY_TAA, qfalse, "r_taa 0" );
+	}
+	if ( !ri.Cvar_VariableIntegerValue( "r_ssr" ) ||
+		!ri.Cvar_VariableIntegerValue( "r_temporalSSR" ) ) {
+		vk_temporal_history_note( HISTORY_SSR, qfalse, "ssr temporal off" );
+	}
+	if ( !ri.Cvar_VariableIntegerValue( "r_ssao" ) ||
+		!ri.Cvar_VariableIntegerValue( "r_temporalAO" ) ) {
+		vk_temporal_history_note( HISTORY_AO, qfalse, "ao temporal off" );
+	}
+	if ( !ri.Cvar_VariableIntegerValue( "r_volumetricFog" ) ||
+		!ri.Cvar_VariableIntegerValue( "r_temporalFog" ) ) {
+		vk_temporal_history_note( HISTORY_VOLUMETRIC, qfalse, "fog temporal off" );
+	}
+	if ( !ri.Cvar_VariableIntegerValue( "r_temporalWeapon" ) &&
+		!ri.Cvar_VariableIntegerValue( "r_temporalWeaponAfterTaa" ) ) {
+		vk_temporal_history_note( HISTORY_WEAPON, qfalse, "weapon temporal off" );
+	}
+	vk_temporal_history_note( HISTORY_BLOOM, qfalse, "bloom extract non-temporal" );
+	vk_temporal_history_note( HISTORY_EXPOSURE, qfalse, "exposure default" );
+	vk_renderer_p1_cert_begin_frame();
 }
 
 void vk_temporal_history_note( rendererHistoryOwner_t owner, qboolean valid,
@@ -92,6 +122,7 @@ void vk_temporal_history_note( rendererHistoryOwner_t owner, qboolean valid,
 	}
 	s = &s_hist[owner];
 	s->noteCount++;
+	s->notedThisFrame = qtrue;
 	if ( !valid && s->valid ) {
 		s->resetCount++;
 	}
@@ -101,6 +132,42 @@ void vk_temporal_history_note( rendererHistoryOwner_t owner, qboolean valid,
 	} else if ( valid ) {
 		s->resetReason[0] = '\0';
 	}
+}
+
+qboolean vk_temporal_history_noted_this_frame( rendererHistoryOwner_t owner )
+{
+	if ( owner < 0 || owner >= HISTORY_OWNER_COUNT ) {
+		return qfalse;
+	}
+	return s_hist[owner].notedThisFrame;
+}
+
+qboolean vk_temporal_history_unowned_active( void )
+{
+	/* Active temporal consumers must note ownership each frame when enabled. */
+	if ( r_taa && r_taa->integer && !s_hist[HISTORY_TAA].notedThisFrame ) {
+		return qtrue;
+	}
+	if ( ri.Cvar_VariableIntegerValue( "r_ssr" ) &&
+		ri.Cvar_VariableIntegerValue( "r_temporalSSR" ) &&
+		!s_hist[HISTORY_SSR].notedThisFrame ) {
+		return qtrue;
+	}
+	if ( ri.Cvar_VariableIntegerValue( "r_ssao" ) &&
+		ri.Cvar_VariableIntegerValue( "r_temporalAO" ) &&
+		!s_hist[HISTORY_AO].notedThisFrame ) {
+		return qtrue;
+	}
+	if ( ri.Cvar_VariableIntegerValue( "r_volumetricFog" ) &&
+		ri.Cvar_VariableIntegerValue( "r_temporalFog" ) &&
+		!s_hist[HISTORY_VOLUMETRIC].notedThisFrame ) {
+		return qtrue;
+	}
+	if ( ri.Cvar_VariableIntegerValue( "r_temporalWeapon" ) &&
+		!s_hist[HISTORY_WEAPON].notedThisFrame ) {
+		return qtrue;
+	}
+	return qfalse;
 }
 
 int vk_ghost_isolation_mode( void )
@@ -332,31 +399,40 @@ static void EvaluateP1Gates( void )
 
 	for ( i = 0; i < P1_GATE_COUNT; i++ ) {
 		qboolean pass = qfalse;
+		rendererP1Evidence_t ev = P1_EVIDENCE_STATIC;
 
 		switch ( (rendererP1Gate_t)i ) {
 		case P1_GATE_BLOOM_SOURCE:
 			pass = vk_bloom_source_contract_validate( err, sizeof( err ) );
+			ev = P1_EVIDENCE_STATIC;
 			break;
 		case P1_GATE_BLOOM_FIREFLY:
+			/* Cvar alone is STATIC; GPU firefly is recorded via iq_lab stages. */
 			pass = ( r_bloomFireflyClamp && r_bloomFireflyClamp->integer ) ? qtrue : qfalse;
+			ev = P1_EVIDENCE_STATIC;
 			break;
 		case P1_GATE_NO_UNOWNED_HISTORY:
-			pass = qtrue; /* registry exists; unidentified owners not allowed by API */
+			pass = !vk_temporal_history_unowned_active();
+			ev = P1_EVIDENCE_STATIC;
 			break;
 		case P1_GATE_GBUFFER_FULL_FIDELITY:
 			pass = ( vk_gbuffer_quality_effective() >= 2 &&
 				( !r_gbufferCompact || !r_gbufferCompact->integer ) ) ? qtrue : qfalse;
+			ev = P1_EVIDENCE_STATIC;
 			break;
 		case P1_GATE_MSAA_POLICY:
 			pass = !( ri.Cvar_VariableIntegerValue( "r_ext_multisample" ) > 0 &&
 				r_oit && r_oit->integer >= 1 );
+			ev = P1_EVIDENCE_STATIC;
 			break;
 		case P1_GATE_SMAA:
 			pass = ( ri.Cvar_VariableIntegerValue( "r_ext_smaa" ) != 0 ||
 				ri.Cvar_VariableIntegerValue( "r_aaMode" ) == 2 ) ? qtrue : qfalse;
+			ev = P1_EVIDENCE_STATIC;
 			break;
 		case P1_GATE_TEXTURE_LOD:
 			pass = ( atof( ri.Cvar_VariableString( "r_lodBias" ) ) >= -0.001 ) ? qtrue : qfalse;
+			ev = P1_EVIDENCE_STATIC;
 			break;
 		case P1_GATE_VELOCITY:
 		case P1_GATE_SPECULAR_STABILITY:
@@ -364,13 +440,16 @@ static void EvaluateP1Gates( void )
 		case P1_GATE_LIGHTING_OWNERSHIP:
 		case P1_GATE_CLUSTER_PARITY:
 		case P1_GATE_EDGE_REFERENCE:
-			/* Scaffold gates: pass when IQ profile is active (static contract). */
-			pass = vk_renderer_iq_profile_validate( err, sizeof( err ) );
+			/* Measured gates: PENDING until iq_lab records GPU_READBACK. */
+			pass = qfalse;
+			ev = P1_EVIDENCE_PENDING;
 			break;
 		default:
 			pass = qfalse;
+			ev = P1_EVIDENCE_NONE;
 			break;
 		}
+		s_gateEvidence[i] = ev;
 		if ( pass ) {
 			s_p1GatePass[i]++;
 		} else {
@@ -379,16 +458,35 @@ static void EvaluateP1Gates( void )
 	}
 }
 
+rendererP1Evidence_t vk_renderer_p1_gate_evidence( rendererP1Gate_t gate )
+{
+	if ( gate < 0 || gate >= P1_GATE_COUNT ) {
+		return P1_EVIDENCE_NONE;
+	}
+	return s_gateEvidence[gate];
+}
+
 void vk_renderer_p1_status_f( void )
 {
 	int i;
-	int fail = 0;
+	rendererP1Level_t lvl;
 
+	vk_renderer_p1_cert_refresh_static();
 	EvaluateP1Gates();
-	ri.Printf( PRINT_ALL, "=== Renderer P1 certification ===\n" );
+	lvl = vk_renderer_p1_cert_level();
+
+	ri.Printf( PRINT_ALL, "=== Renderer P1 certification (Phase 1.5 honest ladder) ===\n" );
+	ri.Printf( PRINT_ALL,
+		"LEVEL: %s\n"
+		"  (PROFILE_CERTIFIED is the maximum from static/cvar checklist alone;\n"
+		"   IMAGE_QUALITY_CERTIFIED requires iq_certify_core GPU evidence)\n",
+		vk_renderer_p1_level_name( lvl ) );
+
 	for ( i = 0; i < P1_GATE_COUNT; i++ ) {
 		char err[64];
-		qboolean latest = qtrue;
+		qboolean latest = qfalse;
+		const char *evName;
+
 		switch ( (rendererP1Gate_t)i ) {
 		case P1_GATE_BLOOM_FIREFLY:
 			latest = ( r_bloomFireflyClamp && r_bloomFireflyClamp->integer ) ? qtrue : qfalse;
@@ -412,19 +510,28 @@ void vk_renderer_p1_status_f( void )
 				ri.Cvar_VariableIntegerValue( "r_aaMode" ) == 2 ) ? qtrue : qfalse;
 			break;
 		case P1_GATE_NO_UNOWNED_HISTORY:
-			latest = qtrue;
+			latest = !vk_temporal_history_unowned_active();
+			break;
+		case P1_GATE_VELOCITY:
+		case P1_GATE_SPECULAR_STABILITY:
+		case P1_GATE_DEFERRED_FORWARD_PARITY:
+		case P1_GATE_LIGHTING_OWNERSHIP:
+		case P1_GATE_CLUSTER_PARITY:
+		case P1_GATE_EDGE_REFERENCE:
+			latest = qfalse;
+			s_gateEvidence[i] = P1_EVIDENCE_PENDING;
 			break;
 		default:
-			latest = vk_renderer_iq_profile_validate( err, sizeof( err ) );
+			latest = qfalse;
 			break;
 		}
-		ri.Printf( PRINT_ALL, "  %s %s\n", latest ? "PASS" : "FAIL", P1GateName( (rendererP1Gate_t)i ) );
-		if ( !latest ) {
-			fail++;
-		}
+		evName = vk_renderer_p1_evidence_name( s_gateEvidence[i] );
+		ri.Printf( PRINT_ALL, "  %s %s evidence=%s\n",
+			latest ? "PASS" : ( s_gateEvidence[i] == P1_EVIDENCE_PENDING ? "PEND" : "FAIL" ),
+			P1GateName( (rendererP1Gate_t)i ), evName );
 	}
-	ri.Printf( PRINT_ALL, "LEVEL: %s\n",
-		fail == 0 ? "RENDERER_P1_IMAGE_QUALITY_CERTIFIED" : "RENDERER_P1_IN_PROGRESS" );
+	ri.Printf( PRINT_ALL,
+		"stages: iq_certification_status | iq_certify_core | iq_lab_status\n" );
 }
 
 static void RendererP1Certify_f( void )
@@ -486,6 +593,9 @@ void vk_renderer_iq_p1_register( void )
 	ri.Cvar_Get( "r_specularAADebug", "0", CVAR_CHEAT );
 
 	vk_bloom_source_contract_register();
+	vk_renderer_p1_cert_register();
+	vk_iq_cert_geometry_register();
+	vk_iq_lab_register();
 
 	if ( !s_cmds ) {
 		ri.Cmd_AddCommand( "renderer_iq_profile_status", IQ_ProfileStatus_f );
@@ -510,9 +620,13 @@ void vk_renderer_iq_p1_register( void )
 	vk_temporal_history_note( HISTORY_BLOOM, qfalse, "no bloom temporal buffer" );
 	vk_temporal_history_note( HISTORY_TAA, qfalse, "inactive" );
 	vk_temporal_history_note( HISTORY_WEAPON, qfalse, "inactive" );
+	vk_temporal_history_note( HISTORY_SSR, qfalse, "inactive" );
+	vk_temporal_history_note( HISTORY_AO, qfalse, "inactive" );
+	vk_temporal_history_note( HISTORY_VOLUMETRIC, qfalse, "inactive" );
+	vk_temporal_history_note( HISTORY_EXPOSURE, qfalse, "inactive" );
 
 	ri.Printf( PRINT_ALL,
-		"[VK][IQ-P1] hub ready (renderer_iq_profile_* / renderer_p1_status / temporal_history_status)\n" );
+		"[VK][IQ-P1] hub ready (honest multi-level cert; iq_certify_core for GPU evidence)\n" );
 }
 
 #endif /* USE_VULKAN */

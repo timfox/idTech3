@@ -33,7 +33,9 @@ pass 'Bloom firefly control'
 
 grep -q 'HISTORY_TAA' "$ROOT/renderers/vulkan/vk_renderer_iq_p1.h" || fail 'history registry enum'
 grep -q 'r_ghostIsolation' "$ROOT/renderers/vulkan/vk_renderer_iq_p1.c" || fail 'ghost isolation'
-grep -q 'RENDERER_P1_IMAGE_QUALITY_CERTIFIED' "$ROOT/renderers/vulkan/vk_renderer_iq_p1.c" || fail 'P1 cert level'
+grep -q 'RENDERER_P1_IMAGE_QUALITY_CERTIFIED' "$ROOT/renderers/vulkan/vk_renderer_iq_p1.h" || fail 'P1 cert level enum'
+grep -q 'RENDERER_P1_PROFILE_CERTIFIED' "$ROOT/renderers/vulkan/vk_renderer_iq_p1.h" || fail 'PROFILE level'
+grep -q 'vk_renderer_p1_cert_register' "$ROOT/renderers/vulkan/vk_renderer_iq_p1.c" || fail 'p1_cert registered'
 pass 'History + ghost isolation + P1 cert hub'
 
 grep -q 'roughMod = 1.0' "$ROOT/renderers/vulkan/shaders/glsl/deferred_lighting_common.glsl" || \

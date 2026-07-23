@@ -508,6 +508,7 @@ void vk_reset_taa_history( void )
 	vk.temporal.classHasPrev = qfalse;
 	vk_object_id_reset();
 	vk_reset_weapon_history();
+	vk_temporal_history_note( HISTORY_TAA, qfalse, "taa history reset" );
 }
 
 void vk_reset_weapon_history( void )
@@ -515,6 +516,7 @@ void vk_reset_weapon_history( void )
 	vk.temporal.weaponHistoryValid = qfalse;
 	vk.temporal.weaponHistoryIndex = 0u;
 	vk.temporal.weaponHistoryResetSerial++;
+	vk_temporal_history_note( HISTORY_WEAPON, qfalse, "weapon history reset" );
 }
 
 qboolean vk_temporal_prepare_current_depth( void )
@@ -1138,6 +1140,7 @@ void vk_temporal_update_auto_exposure( void )
 
 				vk.temporal.filteredAvgLogLuminance = avgLogLum;
 				vk.temporal.hasValidLuminance = qtrue;
+				vk_temporal_history_note( HISTORY_EXPOSURE, qtrue, NULL );
 
 				{
 					float sceneLum = powf( 2.0f, vk.temporal.filteredAvgLogLuminance );
@@ -1151,6 +1154,7 @@ void vk_temporal_update_auto_exposure( void )
 			if ( hardReset || ( cameraCut && significantCut ) ) {
 				vk.temporal.hasValidLuminance = qfalse;
 				vk.temporal.filteredAvgLogLuminance = 0.0f;
+				vk_temporal_history_note( HISTORY_EXPOSURE, qfalse, "exposure reset" );
 			}
 			targetExp = manualExposure;
 		}

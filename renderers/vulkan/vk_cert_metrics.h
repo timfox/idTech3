@@ -73,4 +73,38 @@ void vk_cert_metrics_revealage( const float *gpuReveal, const float *expected, u
 void vk_cert_metrics_weights( const float *weights, uint32_t count,
 	float minW, float maxW, certMetrics_t *out );
 
+/* Phase 1.5 — IQ metrics from GPU readback. */
+typedef struct certFireflyMetrics_s {
+	uint32_t candidateCount;
+	uint32_t clampedCount;
+	double removedEnergy;
+	double maxRemovedLuma;
+	double falsePositiveEstimate;
+} certFireflyMetrics_t;
+
+typedef struct certEdgeMetrics_s {
+	double spreadWidthPx;
+	double contrastRetention;
+	double haloAmplitude;
+} certEdgeMetrics_t;
+
+typedef struct certQuantMetrics_s {
+	double normalAngularErrorDeg;
+	double roughnessAbsError;
+} certQuantMetrics_t;
+
+typedef struct certVelocityMetrics_s {
+	double magnitudeRmse;
+	double meanMagnitude;
+} certVelocityMetrics_t;
+
+void vk_cert_metrics_firefly( const float *extractRgba, uint32_t w, uint32_t h,
+	certFireflyMetrics_t *out );
+void vk_cert_metrics_edge( const float *rgba, uint32_t w, uint32_t h, float midU,
+	certEdgeMetrics_t *out );
+void vk_cert_metrics_quantization( const float *normalRgba, const float *albedoRgba,
+	uint32_t w, uint32_t h, certQuantMetrics_t *out );
+void vk_cert_metrics_velocity( const float *motionRgba, uint32_t w, uint32_t h,
+	float expectMag, certVelocityMetrics_t *out );
+
 #endif /* USE_VULKAN */
