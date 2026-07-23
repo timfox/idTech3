@@ -11,6 +11,7 @@
 #include "forward_plus_cluster.glsl"
 #include "pbr_brdf_core.glsl"
 #include "gbuffer_octahedral.glsl"
+#include "lightmap_decode.glsl"
 
 float viewZFromDepth( float depth ) {
 	return -pc.projInfo.w / max( depth + pc.projInfo.z, 1e-6 );
@@ -101,7 +102,7 @@ vec3 SampleDeferredNormal( vec2 uv, vec4 material, out float normalConfidence )
 {
 	vec4 nSamp = texture( normalTex, uv );
 	vec3 Nsamp;
-	if ( pc.gbufferCompact != 0u && pc.mixedMaterial == 0u ) {
+	if ( pc.gbufferCompact != 0u ) {
 		/* Compact dual-write: octahedral in material.ba; normal.a holds AO (confidence = 1). */
 		Nsamp = GbufDecodeOctahedral( material.ba );
 		normalConfidence = 1.0;
@@ -122,7 +123,7 @@ float ApplyDeferredSpecularAA( float roughness, vec2 uv, ivec2 pix, vec3 nC )
 	ivec2 px = clamp( pix, ivec2( 0 ), sz - ivec2( 1 ) );
 	vec3 nX;
 	vec3 nY;
-	if ( pc.gbufferCompact != 0u && pc.mixedMaterial == 0u ) {
+	if ( pc.gbufferCompact != 0u ) {
 		vec4 mX = texelFetch( materialTex, clamp( px + ivec2( 1, 0 ), ivec2( 0 ), sz - ivec2( 1 ) ), 0 );
 		vec4 mY = texelFetch( materialTex, clamp( px + ivec2( 0, 1 ), ivec2( 0 ), sz - ivec2( 1 ) ), 0 );
 		nX = GbufDecodeOctahedral( mX.ba );
@@ -141,6 +142,38 @@ float ApplyDeferredSpecularAA( float roughness, vec2 uv, ivec2 pix, vec3 nC )
 	float NV = clamp( abs( dot( normalize( nC ), V ) ), 0.0, 1.0 );
 	return PbrGlancingRoughness( r, NV );
 }
+
+#ifdef DEFERRED_HAS_IBL
+/*
+ * Sky split-sum IBL (prefilter + BRDF LUT + irradiance). Local probe pick is v2.
+ * skipDiffuse: lightmap already owns static diffuse for this pixel.
+ */
+vec3 DeferredEvalSkyIBL( vec3 Nview, vec3 Vview, vec3 albedoIn, vec3 F0in,
+	float metalIn, float roughIn, float aoIn, bool skipDiffuse )
+{
+	mat4 invView = inverse( pc.viewMatrix );
+	vec3 Nw = safeNormalizeOr( ( invView * vec4( Nview, 0.0 ) ).xyz, vec3( 0.0, 0.0, 1.0 ) );
+	vec3 Vw = safeNormalizeOr( ( invView * vec4( Vview, 0.0 ) ).xyz, vec3( 0.0, 0.0, 1.0 ) );
+	vec3 Rw = reflect( -Vw, Nw );
+	Rw.y *= -1.0;
+	vec3 Nsample = Nw;
+	Nsample.y *= -1.0;
+	float NdotV = clamp( abs( dot( Nw, Vw ) ), 0.0, 1.0 );
+	uint envLevels = textureQueryLevels( prefilterCube );
+	float maxLod = ( envLevels > 0u ) ? float( envLevels - 1u ) : 0.0;
+	float envLod = min( clamp( roughIn, 0.02, 1.0 ) * 6.0, maxLod );
+	vec3 prefilter = textureLod( prefilterCube, Rw, envLod ).rgb;
+	vec2 envBrdf = texture( brdfLutTex, vec2( NdotV, 1.0 - clamp( roughIn, 0.0, 1.0 ) ) ).rg;
+	vec3 FssEss = F0in * envBrdf.x + vec3( envBrdf.y );
+	vec3 specIbl = prefilter * FssEss;
+	vec3 diffIbl = vec3( 0.0 );
+	if ( !skipDiffuse ) {
+		vec3 irr = texture( irradianceCube, Nsample ).rgb;
+		diffIbl = irr * albedoIn * ( 1.0 - metalIn ) * aoIn;
+	}
+	return diffIbl + specIbl;
+}
+#endif
 
 vec4 shadeDeferredPixel( uvec2 pix ) {
 	vec2 uv = ( vec2( pix ) + 0.5 ) / vec2( pc.extent );
@@ -189,27 +222,27 @@ vec4 shadeDeferredPixel( uvec2 pix ) {
 	float roughness = mix( 0.92, clamp( material.g, 0.04, 1.0 ), shadingConfidence );
 	roughness = ApplyDeferredSpecularAA( roughness, uv, ivec2( pix ), Nsamp );
 
-	/* MIXED_MATERIAL_DEFERRED: owned pixels pack lightmap in material.ba + normal.a-bias. */
-	const float ownerBias = 1024.0;
+	/* MIXED_MATERIAL_DEFERRED: ownership + lightmap from GBufferSurfaceData. */
 	bool mixedOwned = false;
 	vec3 lightmapIrr = vec3( 1.0 );
 	if ( pc.mixedMaterial != 0u ) {
-		float na = texture( normalTex, uv ).a;
-		mixedOwned = ( na >= ( ownerBias * 0.5 ) );
+#ifdef DEFERRED_HAS_SURFACE
+		vec4 surf = texture( surfaceTex, uv );
+		mixedOwned = ( surf.a > 0.5 );
 		if ( !mixedOwned ) {
 			return vec4( 0.0 );
 		}
-		lightmapIrr = vec3( material.b, material.a, na - ownerBias );
-		lightmapIrr = max( lightmapIrr, vec3( 0.0 ) );
+		lightmapIrr = max( surf.rgb, vec3( 0.0 ) );
+#else
+		/* Paths without SurfaceData cannot own mixed pixels. */
+		return vec4( 0.0 );
+#endif
 	}
 
 	/* Compact: AO in normal.a; clearcoat defaults (material.ba is octahedral). */
 	float materialAO;
 	float clearcoat;
-	if ( pc.mixedMaterial != 0u && mixedOwned ) {
-		materialAO = 1.0;
-		clearcoat = 0.0;
-	} else if ( pc.gbufferCompact != 0u ) {
+	if ( pc.gbufferCompact != 0u ) {
 		materialAO = clamp( texture( normalTex, uv ).a, 0.0, 1.0 );
 		clearcoat = 0.0;
 	} else {
@@ -310,16 +343,13 @@ vec4 shadeDeferredPixel( uvec2 pix ) {
 			specularAcc += lc.rgb * addBoost * att * ( D * Vis * F * NL ) *
 				mix( 1.0, aoCoupling, 0.5 ) * pc.specularStrength * classSpecScale * shadingConfidence;
 
-			/* Clearcoat: dielectric F0=0.04 lobe; attenuate base (Forward+ parity). */
+			/* Clearcoat: shared lobe (Forward+ / pbr_brdf_core parity). */
 			if ( clearcoat > 1e-4 ) {
 				float ccRough = mix( 0.08, 0.35, roughness );
-				float ccAlpha = max( ccRough * ccRough, 0.001 );
-				float ccD = D_GGX( NH, ccAlpha );
-				float ccVis = CalcVisibility( NL, NE, ccAlpha );
-				vec3 ccF = vec3( 0.04 ) + ( vec3( 1.0 ) - vec3( 0.04 ) ) * Pow5( 1.0 - VH );
 				specularAcc *= ( 1.0 - clearcoat * 0.85 );
-				specularAcc += lc.rgb * addBoost * att * ( ccD * ccVis * ccF * NL ) *
-					clearcoat * pc.specularStrength * shadingConfidence;
+				specularAcc += lc.rgb * addBoost * att *
+					clearcoat_lobe( NH, NL, NE, VH, clearcoat, ccRough ) * NL *
+					pc.specularStrength * shadingConfidence;
 			}
 		}
 	}
@@ -339,34 +369,90 @@ vec4 shadeDeferredPixel( uvec2 pix ) {
 	}
 
 	float roughMod = mix( 1.0, 0.85, roughness );
-	vec3 lit;
-	if ( pc.mixedMaterial != 0u && mixedOwned ) {
-		/* True material deferred: static lightmap term + clustered dynamics (not SceneBaseLit). */
-		vec3 kDstatic = vec3( 1.0 - metalness );
-		vec3 staticTerm = albedo * kDstatic * lightmapIrr * aoCoupling;
-		lit = ( staticTerm + diffuseAcc + specularAcc ) * roughMod * pc.strength;
-	} else if ( pc.additive != 0u ) {
-		/* Additive hybrid: Fd already includes albedo × kD (Forward+ parity). */
-		lit = ( diffuseAcc + specularAcc ) * roughMod * pc.strength;
-	} else {
-		/* Multiply/legacy: ambient floor on albedo + Burley dynamic (albedo already in Fd). */
-		lit = ( albedo * vec3( 0.04 ) + diffuseAcc + specularAcc ) * roughMod * pc.strength;
-	}
 
-	/* Foundation: multi-cascade sun CSM from GpuShadowRecord SSBO (Forward+ parity). */
+	/* Milestone 3: full directional sun BRDF (Burley + GGX + multiscatter + clearcoat). */
+	vec3 sunDiffuse = vec3( 0.0 );
+	vec3 sunSpecular = vec3( 0.0 );
+	uint sunFlags = uint( pc.sunRadiance.w + 0.5 );
+	bool sunBrdf = ( sunFlags & 1u ) != 0u;
+	bool lmOwnsDiffuse = ( sunFlags & 2u ) != 0u;
+	if ( sunBrdf && ( pc.mixedMaterial == 0u || mixedOwned ) ) {
+		vec3 Lsun = safeNormalizeOr( pc.sunDir.xyz, vec3( 0.0, 0.0, 1.0 ) );
+		if ( pc.normalsAreWorld != 0u ) {
+			/* N is view-space above; transform sun L into view for N·L. */
+			Lsun = safeNormalizeOr( ( pc.viewMatrix * vec4( Lsun, 0.0 ) ).xyz, Lsun );
+		}
+		float NLsun = max( dot( N, Lsun ), 0.0 );
+		if ( NLsun > 1e-5 ) {
+			vec3 Hsun = normalize( Lsun + V );
+			float LHsun = max( dot( Lsun, Hsun ), 0.0 );
+			float VHsun = max( dot( V, Hsun ), 0.0 );
+			float NHsun = max( dot( N, Hsun ), 0.0 );
+			vec3 Fsun = F0 + ( 1.0 - F0 ) * Pow5( 1.0 - VHsun );
+			vec3 kDsun = ( vec3( 1.0 ) - Fsun ) * ( 1.0 - metalness );
+			vec3 sunRad = max( pc.sunRadiance.rgb, vec3( 0.0 ) );
+			/* When lightmap owns static diffuse, skip sun Burley to avoid double baking. */
+			if ( !( pc.mixedMaterial != 0u && mixedOwned && lmOwnsDiffuse &&
+					( lightmapIrr.r + lightmapIrr.g + lightmapIrr.b ) > 1e-4 ) ) {
+				sunDiffuse = sunRad * Diffuse_Burley( albedo, NE, NLsun, LHsun, roughness ) *
+					kDsun * NLsun * aoCoupling;
+			}
+			if ( pc.specular != 0u ) {
+				float alpha = max( roughness * roughness, 0.04 );
+				float D = D_GGX( NHsun, alpha );
+				float Vis = CalcVisibility( NLsun, NE, alpha );
+				vec3 ms = PbrEnergyCompensation( F0, roughness );
+				sunSpecular = sunRad * ( D * Vis * Fsun * NLsun ) * ms *
+					mix( 1.0, aoCoupling, 0.5 ) * pc.specularStrength;
+				if ( clearcoat > 1e-4 ) {
+					float ccRough = mix( 0.08, 0.35, roughness );
+					sunSpecular *= ( 1.0 - clearcoat * 0.85 );
+					sunSpecular += sunRad * clearcoat_lobe( NHsun, NLsun, NE, VHsun, clearcoat, ccRough ) *
+						NLsun * pc.specularStrength;
+				}
+			}
+		}
+	}
+	vec3 sunTerm = sunDiffuse + sunSpecular;
+
+	float sunVis = 1.0;
 #ifdef DEFERRED_HAS_SHADOW_CONTRACT
 	if ( ( pc.shadowFlags & 1u ) != 0u && pc.shadowStrength > 0.0 ) {
 		mat4 invView = inverse( pc.viewMatrix );
 		vec3 worldPos = ( invView * vec4( viewPos, 1.0 ) ).xyz;
 		float viewDist = max( length( viewPos ), max( pc.shadowNear, 0.1 ) );
-		float sunVis = ShadowContract_SampleCSM(
+		sunVis = ShadowContract_SampleCSM(
 			shadows.records[0], shadows.records[1], shadows.records[2], shadows.records[3],
 			sunShadowMap, worldPos, viewDist, pc.shadowStrength,
 			pc.shadowCascadeCount, pc.shadowSplits, pc.shadowNear, pc.shadowBlend );
-		/* Soften: keep some ambient so deferred doesn't go fully black in shadow. */
-		lit *= mix( 0.35, 1.0, sunVis );
 	}
 #endif
+
+	vec3 iblTerm = vec3( 0.0 );
+#ifdef DEFERRED_HAS_IBL
+	if ( ( pc.iblFlags & 1u ) != 0u && pc.specular != 0u &&
+		( pc.mixedMaterial == 0u || mixedOwned ) ) {
+		bool skipIblDiff = ( pc.mixedMaterial != 0u && mixedOwned &&
+			( lightmapIrr.r + lightmapIrr.g + lightmapIrr.b ) > 1e-4 );
+		iblTerm = DeferredEvalSkyIBL( N, V, albedo, F0, metalness, roughness, aoCoupling, skipIblDiff ) *
+			max( pc.iblStrength, 0.0 );
+	}
+#endif
+
+	vec3 lit;
+	if ( pc.mixedMaterial != 0u && mixedOwned ) {
+		/* Static LM + sun BRDF (CSM on primary only) + clustered dynamics (unshadowed by sun CSM). */
+		vec3 staticTerm = DeferredStaticDiffuseFromLightmap( albedo, metalness, lightmapIrr, aoCoupling );
+		vec3 primary = ( staticTerm + sunTerm ) * sunVis;
+		lit = ( primary + diffuseAcc + specularAcc + iblTerm ) * roughMod * pc.strength;
+	} else if ( pc.additive != 0u ) {
+		/* Hybrid additive: dynamics only (SceneBaseLit already has primary + sunVis + IBL). */
+		lit = ( diffuseAcc + specularAcc ) * roughMod * pc.strength;
+	} else {
+		lit = ( albedo * vec3( 0.04 ) + diffuseAcc + specularAcc + sunTerm * sunVis + iblTerm ) *
+			roughMod * pc.strength;
+	}
+
 	/* .a = deferred pixel ownership for MIXED_MATERIAL_DEFERRED composite replace. */
 	float ownerA = ( pc.mixedMaterial != 0u && mixedOwned ) ? 1.0 : 0.0;
 	return vec4( lit, ownerA );

@@ -1747,10 +1747,11 @@ static void CM_Trace( trace_t *results, const vec3_t start, const vec3_t end, co
 		}
 #ifndef BSPC
 		/*
-		 * Decisive comparison: native clipnode hull (point through pre-expanded
-		 * hull 1/3) versus a naive full-box sweep through hull 0. When these
-		 * disagree at a ramp transition, movement receives different planes
-		 * than BSP30 would have produced.
+		 * Diagnostic only: native pre-expanded clip hull versus a full-box
+		 * sweep through the render BSP (hull 0). This is NOT a GoldSrc expected
+		 * baseline — clipnode topology differs from the render tree. Use it to
+		 * spot large plane disagreements; trust planeKind on the native side
+		 * after dist-aware HULL_FACE promotion.
 		 */
 		if ( cm_bsp30Compare && cm_bsp30Compare->integer &&
 				cm.numBSP30ClipNodes > 0 &&
@@ -1786,9 +1787,10 @@ static void CM_Trace( trace_t *results, const vec3_t start, const vec3_t end, co
 							naive.trace.plane.normal[2] ) > 0.001f ) {
 				Com_Printf(
 						"cm_bsp30Compare mismatch: "
-						"native(f=%.6f ss=%d as=%d n=(%.4f %.4f %.4f) "
-						"kind=%d clip=%d ext=(%.1f %.1f %.1f)) "
-						"naiveBox(f=%.6f ss=%d as=%d n=(%.4f %.4f %.4f) "
+						"clipHull(f=%.6f ss=%d as=%d n=(%.4f %.4f %.4f) "
+						"kind=%d clip=%d plane=%d hull=%d "
+						"ext=(%.1f %.1f %.1f)) "
+						"renderBox(f=%.6f ss=%d as=%d n=(%.4f %.4f %.4f) "
 						"kind=%d clip=%d ext=(%.1f %.1f %.1f))\n",
 						tw.trace.fraction,
 						tw.trace.startsolid,
@@ -1798,6 +1800,8 @@ static void CM_Trace( trace_t *results, const vec3_t start, const vec3_t end, co
 						tw.trace.plane.normal[2],
 						(int)tw.trace.planeKind,
 						tw.trace.sourceClipnode,
+						tw.trace.sourcePlane,
+						tw.trace.sourceHull,
 						traceExtents[0],
 						traceExtents[1],
 						traceExtents[2],

@@ -27,6 +27,7 @@ Mode 3 = Unified Clustered Renderer (deferred opaque + Forward+ transparent).
 #include "vk_shadow_contract.h"
 #include "vk_sun_csm.h"
 #include "vk_deferred_honesty.h"
+#include "vk_skybox_hdr.h"
 
 static void vk_dgb_validate_compute_break( const char *stage, qboolean resume_main )
 {
@@ -86,7 +87,7 @@ typedef struct {
 	uint32_t compactLists;
 	uint32_t clusterCount;
 	uint32_t gbufferCompact; /* 1: decode octahedral from material.ba; AO/clearcoat defaults */
-	uint32_t mixedMaterial; /* 1: MIXED_MATERIAL_DEFERRED — LM + owner packing */
+	uint32_t mixedMaterial; /* 1: MIXED_MATERIAL_DEFERRED — LM + owner from SurfaceData */
 	uint32_t shadowFlags;
 	float shadowStrength;
 	float shadowNear;
@@ -94,7 +95,11 @@ typedef struct {
 	float shadowBlend;
 	uint32_t shadowCascadeCount; /* 1..4 CSM cascades */
 	uint32_t shadowGeneration;
-	uint32_t _shadowPad0;
+	/* Milestone 3: directional sun BRDF (world-space). */
+	float sunDir[4];      /* xyz = L (toward sun), w = angular radius (rad, 0=dirac) */
+	float sunRadiance[4]; /* rgb = radiance, w = flags: bit0=BRDF enable, bit1=LM owns diffuse */
+	uint32_t iblFlags;    /* bit0: sky IBL enable */
+	float iblStrength;
 } vk_deferred_light_push_t;
 
 typedef struct {
@@ -108,7 +113,7 @@ static_assert( sizeof( vk_deferred_light_push_t ) <= 256, "deferred light push e
 
 static qboolean s_gbufferCompactDualWriteLogged;
 /* Bump when deferred lighting descriptor/push layout changes. */
-static const uint32_t s_deferredLightingLayoutVersion = 14u;
+static const uint32_t s_deferredLightingLayoutVersion = 17u;
 static uint32_t s_deferredLightingLayoutBuilt;
 static void vk_dgb_create_pipeline( void );
 static void vk_dgb_create_lighting_pipeline( void );
@@ -1050,7 +1055,7 @@ void vk_deferred_gbuffer_capture_after_geometry( void )
 
 static void vk_dgb_create_lighting_descriptor_layout( void )
 {
-	VkDescriptorSetLayoutBinding bindings[12];
+	VkDescriptorSetLayoutBinding bindings[16];
 	VkDescriptorSetLayoutCreateInfo desc;
 
 	if ( vk.deferred_gbuffer.lighting_layout != VK_NULL_HANDLE ) {
@@ -1108,10 +1113,28 @@ static void vk_dgb_create_lighting_descriptor_layout( void )
 	bindings[11].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
 	bindings[11].descriptorCount = 1;
 	bindings[11].stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+	/* M3 sky IBL: BRDF LUT + prefilter + irradiance */
+	bindings[12].binding = 12;
+	bindings[12].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+	bindings[12].descriptorCount = 1;
+	bindings[12].stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+	bindings[13].binding = 13;
+	bindings[13].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+	bindings[13].descriptorCount = 1;
+	bindings[13].stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+	bindings[14].binding = 14;
+	bindings[14].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+	bindings[14].descriptorCount = 1;
+	bindings[14].stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+	/* M3 GBufferSurfaceData (lightmap + ownership) */
+	bindings[15].binding = 15;
+	bindings[15].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+	bindings[15].descriptorCount = 1;
+	bindings[15].stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
 
 	Com_Memset( &desc, 0, sizeof( desc ) );
 	desc.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-	desc.bindingCount = 12;
+	desc.bindingCount = 16;
 	desc.pBindings = bindings;
 	if ( qvkCreateDescriptorSetLayout( vk.device, &desc, NULL, &vk.deferred_gbuffer.lighting_layout ) != VK_SUCCESS ) {
 		vk.deferred_gbuffer.lighting_layout = VK_NULL_HANDLE;
@@ -1193,7 +1216,7 @@ static void vk_dgb_create_lighting_pipeline( void )
 		pool_sizes[0].type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
 		pool_sizes[0].descriptorCount = 3;
 		pool_sizes[1].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-		pool_sizes[1].descriptorCount = 8;
+		pool_sizes[1].descriptorCount = 12;
 		pool_sizes[2].type = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
 		pool_sizes[2].descriptorCount = 1;
 
@@ -1235,17 +1258,25 @@ static void vk_dgb_create_lighting_pipeline( void )
 static void vk_dgb_update_lighting_descriptors( void )
 {
 	VkDescriptorBufferInfo buf_infos[3];
-	VkDescriptorImageInfo img_infos[7];
-	VkWriteDescriptorSet writes[12];
+	VkDescriptorImageInfo img_infos[11];
+	VkWriteDescriptorSet writes[16];
 	Vk_Sampler_Def sd;
+	Vk_Sampler_Def sd_linear;
 	VkImageView depth_view;
 	VkImageView class_view;
 	VkImageView shadow_view;
+	VkImageView brdf_view;
+	VkImageView prefilter_view;
+	VkImageView irradiance_view;
+	VkImageView surface_view;
 	VkBuffer shadow_ssbo;
 	VkImageLayout shadow_layout;
 	int i;
 	static qboolean s_shadowBindLogged;
+	static qboolean s_iblBindLogged;
+	static qboolean s_surfaceBindLogged;
 	qboolean haveRealShadow;
+	qboolean haveIbl;
 
 	if ( vk.deferred_gbuffer.lighting_descriptor == VK_NULL_HANDLE ) {
 		return;
@@ -1275,6 +1306,9 @@ static void vk_dgb_update_lighting_descriptors( void )
 	sd.gl_mag_filter = sd.gl_min_filter = GL_NEAREST;
 	sd.address_mode = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
 	sd.noAnisotropy = qtrue;
+	Com_Memset( &sd_linear, 0, sizeof( sd_linear ) );
+	sd_linear.gl_mag_filter = sd_linear.gl_min_filter = GL_LINEAR;
+	sd_linear.address_mode = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
 
 	/* Prefer material class map; fall back to stub R8UI when classify is off. */
 	class_view = vk.visibility_buffer_class_view;
@@ -1287,6 +1321,11 @@ static void vk_dgb_update_lighting_descriptors( void )
 		return;
 	}
 
+	surface_view = vk.deferred_gbuffer_surface_view;
+	if ( surface_view == VK_NULL_HANDLE && tr.whiteImage ) {
+		surface_view = tr.whiteImage->view;
+	}
+
 	haveRealShadow = qfalse;
 	shadow_view = vk.sun_shadow_sample_view ? vk.sun_shadow_sample_view : vk.sun_shadow_view;
 	shadow_layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
@@ -1296,6 +1335,28 @@ static void vk_dgb_update_lighting_descriptors( void )
 		/* Color stub — never claim DEPTH layout on a color view (validation hazard). */
 		shadow_view = tr.whiteImage->view;
 		shadow_layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+	}
+
+	brdf_view = vk.brdflut_image_view;
+	if ( brdf_view == VK_NULL_HANDLE && tr.whiteImage ) {
+		brdf_view = tr.whiteImage->view;
+	}
+	prefilter_view = VK_NULL_HANDLE;
+	irradiance_view = VK_NULL_HANDLE;
+	SkyboxHDR_GetCubemapViews( &prefilter_view, &irradiance_view );
+	if ( prefilter_view == VK_NULL_HANDLE && tr.emptyCubemap ) {
+		prefilter_view = tr.emptyCubemap->view;
+	}
+	if ( irradiance_view == VK_NULL_HANDLE && tr.emptyCubemap ) {
+		irradiance_view = tr.emptyCubemap->view;
+	}
+	/* Bindings 12–14 must always be written (layout requires them). */
+	haveIbl = ( brdf_view != VK_NULL_HANDLE && prefilter_view != VK_NULL_HANDLE &&
+		irradiance_view != VK_NULL_HANDLE );
+	if ( !haveIbl ) {
+		ri.Printf( PRINT_DEVELOPER, S_COLOR_YELLOW
+			"[VK][deferred] IBL stub views incomplete (brdf=%p pref=%p irr=%p)\n" S_COLOR_WHITE,
+			(void *)brdf_view, (void *)prefilter_view, (void *)irradiance_view );
 	}
 
 	Com_Memset( img_infos, 0, sizeof( img_infos ) );
@@ -1321,6 +1382,22 @@ static void vk_dgb_update_lighting_descriptors( void )
 			vk.sun_shadow_sampler : vk_find_sampler( &sd );
 		img_infos[6].imageView = shadow_view;
 		img_infos[6].imageLayout = shadow_layout;
+	}
+	if ( haveIbl ) {
+		img_infos[7].sampler = vk_find_sampler( &sd_linear );
+		img_infos[7].imageView = brdf_view;
+		img_infos[7].imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+		img_infos[8].sampler = vk_find_sampler( &sd_linear );
+		img_infos[8].imageView = prefilter_view;
+		img_infos[8].imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+		img_infos[9].sampler = vk_find_sampler( &sd_linear );
+		img_infos[9].imageView = irradiance_view;
+		img_infos[9].imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+	}
+	if ( surface_view != VK_NULL_HANDLE ) {
+		img_infos[10].sampler = vk_find_sampler( &sd );
+		img_infos[10].imageView = surface_view;
+		img_infos[10].imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 	}
 
 	Com_Memset( writes, 0, sizeof( writes ) );
@@ -1361,6 +1438,36 @@ static void vk_dgb_update_lighting_descriptors( void )
 		qvkUpdateDescriptorSets( vk.device, 8, writes, 0, NULL );
 		vk_ltc_init();
 		vk_ltc_update_deferred_lighting_descriptors( vk.deferred_gbuffer.lighting_descriptor );
+		if ( haveIbl ) {
+			writes[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+			writes[0].dstSet = vk.deferred_gbuffer.lighting_descriptor;
+			writes[0].dstBinding = 12;
+			writes[0].descriptorCount = 1;
+			writes[0].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+			writes[0].pImageInfo = &img_infos[7];
+			writes[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+			writes[1].dstSet = vk.deferred_gbuffer.lighting_descriptor;
+			writes[1].dstBinding = 13;
+			writes[1].descriptorCount = 1;
+			writes[1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+			writes[1].pImageInfo = &img_infos[8];
+			writes[2].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+			writes[2].dstSet = vk.deferred_gbuffer.lighting_descriptor;
+			writes[2].dstBinding = 14;
+			writes[2].descriptorCount = 1;
+			writes[2].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+			writes[2].pImageInfo = &img_infos[9];
+			qvkUpdateDescriptorSets( vk.device, 3, writes, 0, NULL );
+		}
+		if ( surface_view != VK_NULL_HANDLE ) {
+			writes[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+			writes[0].dstSet = vk.deferred_gbuffer.lighting_descriptor;
+			writes[0].dstBinding = 15;
+			writes[0].descriptorCount = 1;
+			writes[0].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+			writes[0].pImageInfo = &img_infos[10];
+			qvkUpdateDescriptorSets( vk.device, 1, writes, 0, NULL );
+		}
 		vk.deferred_gbuffer.lighting_descriptor_generation = vk.deferredGbufferGeneration;
 		return;
 	}
@@ -1380,6 +1487,48 @@ static void vk_dgb_update_lighting_descriptors( void )
 	qvkUpdateDescriptorSets( vk.device, 10, writes, 0, NULL );
 	vk_ltc_init();
 	vk_ltc_update_deferred_lighting_descriptors( vk.deferred_gbuffer.lighting_descriptor );
+
+	if ( haveIbl ) {
+		writes[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+		writes[0].dstSet = vk.deferred_gbuffer.lighting_descriptor;
+		writes[0].dstBinding = 12;
+		writes[0].descriptorCount = 1;
+		writes[0].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+		writes[0].pImageInfo = &img_infos[7];
+		writes[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+		writes[1].dstSet = vk.deferred_gbuffer.lighting_descriptor;
+		writes[1].dstBinding = 13;
+		writes[1].descriptorCount = 1;
+		writes[1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+		writes[1].pImageInfo = &img_infos[8];
+		writes[2].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+		writes[2].dstSet = vk.deferred_gbuffer.lighting_descriptor;
+		writes[2].dstBinding = 14;
+		writes[2].descriptorCount = 1;
+		writes[2].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+		writes[2].pImageInfo = &img_infos[9];
+		qvkUpdateDescriptorSets( vk.device, 3, writes, 0, NULL );
+		if ( !s_iblBindLogged ) {
+			ri.Printf( PRINT_ALL,
+				"[VK][deferred] sky IBL bound (bindings 12–14: BRDF LUT + prefilter + irradiance)\n" );
+			s_iblBindLogged = qtrue;
+		}
+	}
+	if ( surface_view != VK_NULL_HANDLE ) {
+		writes[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+		writes[0].dstSet = vk.deferred_gbuffer.lighting_descriptor;
+		writes[0].dstBinding = 15;
+		writes[0].descriptorCount = 1;
+		writes[0].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+		writes[0].pImageInfo = &img_infos[10];
+		qvkUpdateDescriptorSets( vk.device, 1, writes, 0, NULL );
+		if ( !s_surfaceBindLogged ) {
+			ri.Printf( PRINT_ALL,
+				"[VK][deferred] SurfaceData bound (binding 15: lightmap + ownership)\n" );
+			s_surfaceBindLogged = qtrue;
+		}
+	}
+
 	vk.deferred_gbuffer.lighting_descriptor_generation = vk.deferredGbufferGeneration;
 
 	if ( !s_shadowBindLogged && shadow_ssbo != VK_NULL_HANDLE && haveRealShadow ) {
@@ -1452,7 +1601,50 @@ static void vk_dgb_fill_light_push( vk_deferred_light_push_t *push, uint32_t wid
 	push->shadowBlend = VK_SunCSM_CascadeBlend();
 	push->shadowCascadeCount = 1u;
 	push->shadowGeneration = vk_shadow_contract_generation();
-	push->_shadowPad0 = 0u;
+	/* Directional sun for M3 BRDF (world space; L points toward the sun). */
+	{
+		vec3_t sunL;
+		float len;
+		VectorCopy( tr.sunDirection, sunL );
+		len = VectorLength( sunL );
+		if ( len > 1e-5f ) {
+			VectorScale( sunL, 1.0f / len, sunL );
+		} else {
+			sunL[0] = 0.35f;
+			sunL[1] = 0.75f;
+			sunL[2] = 0.55f;
+			VectorNormalize( sunL );
+		}
+		push->sunDir[0] = sunL[0];
+		push->sunDir[1] = sunL[1];
+		push->sunDir[2] = sunL[2];
+		push->sunDir[3] = 0.0f; /* angular radius reserved */
+		push->sunRadiance[0] = tr.sunLight[0];
+		push->sunRadiance[1] = tr.sunLight[1];
+		push->sunRadiance[2] = tr.sunLight[2];
+		/* Enable sun BRDF for mixed material deferred; bit1 = lightmap owns static diffuse. */
+		{
+			uint32_t sunFlags = 0u;
+			cvar_t *sunBrdf = ri.Cvar_Get( "r_deferredSunBrdf", "1", CVAR_ARCHIVE_ND );
+			if ( R_DeferredMixedMaterialWanted() && ( !sunBrdf || sunBrdf->integer ) ) {
+				sunFlags |= 1u;
+				sunFlags |= 2u; /* LM owns diffuse when packed; sun adds specular (+ outdoor diffuse if no LM) */
+			}
+			push->sunRadiance[3] = (float)sunFlags;
+		}
+	}
+	/* Sky IBL for mixed deferred (spec always; diffuse skipped when LM owns static). */
+	{
+		cvar_t *ibl = ri.Cvar_Get( "r_deferredIbl", "1", CVAR_ARCHIVE_ND );
+		cvar_t *iblStr = ri.Cvar_Get( "r_deferredIblStrength", "1", CVAR_ARCHIVE_ND );
+		push->iblFlags = 0u;
+		push->iblStrength = 0.0f;
+		if ( R_DeferredMixedMaterialWanted() && ( !ibl || ibl->integer ) &&
+			vk.brdflut_image_view != VK_NULL_HANDLE ) {
+			push->iblFlags = 1u;
+			push->iblStrength = iblStr ? Com_Clamp( 0.0f, 4.0f, iblStr->value ) : 1.0f;
+		}
+	}
 	if ( vk.sun_shadow_valid && vk_shadow_contract_ssbo() != VK_NULL_HANDLE &&
 		( vk.sun_shadow_sample_view || vk.sun_shadow_view ) &&
 		( !r_pbrSunShadow || r_pbrSunShadow->integer ) ) {

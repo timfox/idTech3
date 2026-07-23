@@ -474,6 +474,8 @@ static void vk_create_deferred_gbuffer_scaffold( void )
 	vk.deferred_gbuffer_normal_view = VK_NULL_HANDLE;
 	vk.deferred_gbuffer_material = VK_NULL_HANDLE;
 	vk.deferred_gbuffer_material_view = VK_NULL_HANDLE;
+	vk.deferred_gbuffer_surface = VK_NULL_HANDLE;
+	vk.deferred_gbuffer_surface_view = VK_NULL_HANDLE;
 	vk.deferred_lighting_image = VK_NULL_HANDLE;
 	vk.deferred_lighting_view = VK_NULL_HANDLE;
 	vk.deferred_class_stub = VK_NULL_HANDLE;
@@ -511,6 +513,10 @@ static void vk_create_deferred_gbuffer_scaffold( void )
 			&vk.deferred_gbuffer_material, &vk.deferred_gbuffer_material_view,
 			VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, qfalse ) ||
 		!vk_create_fullres_color_attachment_soft( VK_FORMAT_R16G16B16A16_SFLOAT,
+			gbufUsage | VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
+			&vk.deferred_gbuffer_surface, &vk.deferred_gbuffer_surface_view,
+			VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, qfalse ) ||
+		!vk_create_fullres_color_attachment_soft( VK_FORMAT_R16G16B16A16_SFLOAT,
 			gbufUsage | VK_IMAGE_USAGE_STORAGE_BIT,
 			&vk.deferred_lighting_image, &vk.deferred_lighting_view,
 			VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, qfalse ) ||
@@ -529,6 +535,7 @@ static void vk_create_deferred_gbuffer_scaffold( void )
 	if ( vk.deferred_gbuffer_albedo == VK_NULL_HANDLE ||
 		vk.deferred_gbuffer_normal == VK_NULL_HANDLE ||
 		vk.deferred_gbuffer_material == VK_NULL_HANDLE ||
+		vk.deferred_gbuffer_surface == VK_NULL_HANDLE ||
 		vk.deferred_lighting_image == VK_NULL_HANDLE ) {
 		vk_deferred_gbuffer_set_fallback( "gbuffer_image_create_failed" );
 		vk.deferredGbufferAllocated = qfalse;
@@ -564,7 +571,7 @@ static void vk_create_deferred_gbuffer_scaffold( void )
 		}
 	}
 	ri.Printf( PRINT_ALL,
-		"[VK][deferred] G-buffer scaffold: albedo (scene color format) + normal RGBA16F + material RGBA16F + motion sidecar + lighting RGBA16F + class stub%s%s\n",
+		"[VK][deferred] G-buffer scaffold: albedo + normal + material + surface(LM/owner) + motion + lighting + class stub%s%s\n",
 		vk.deferredGbufferDirectExport ? " (direct material export)" : " (depth fallback export)",
 		vk.visibilityBufferDirectExport ? " + PrimID MRT" : "" );
 }
@@ -595,6 +602,7 @@ static void vk_finalize_deferred_gbuffer_scaffold( void )
 		vk.deferred_gbuffer_albedo_view == VK_NULL_HANDLE ||
 		vk.deferred_gbuffer_normal_view == VK_NULL_HANDLE ||
 		vk.deferred_gbuffer_material_view == VK_NULL_HANDLE ||
+		vk.deferred_gbuffer_surface_view == VK_NULL_HANDLE ||
 		vk.deferred_lighting_view == VK_NULL_HANDLE ) {
 		vk_deferred_gbuffer_set_fallback(
 			( failInject && failInject->string &&
@@ -1346,6 +1354,10 @@ void vk_create_attachments( void )
 	if ( vk.deferred_gbuffer_material ) {
 		SET_OBJECT_NAME( vk.deferred_gbuffer_material, "deferred gbuffer material", VK_DEBUG_REPORT_OBJECT_TYPE_IMAGE_EXT );
 		SET_OBJECT_NAME( vk.deferred_gbuffer_material_view, "deferred gbuffer material view", VK_DEBUG_REPORT_OBJECT_TYPE_IMAGE_VIEW_EXT );
+	}
+	if ( vk.deferred_gbuffer_surface ) {
+		SET_OBJECT_NAME( vk.deferred_gbuffer_surface, "deferred gbuffer surface", VK_DEBUG_REPORT_OBJECT_TYPE_IMAGE_EXT );
+		SET_OBJECT_NAME( vk.deferred_gbuffer_surface_view, "deferred gbuffer surface view", VK_DEBUG_REPORT_OBJECT_TYPE_IMAGE_VIEW_EXT );
 	}
 	if ( vk.deferred_lighting_image ) {
 		SET_OBJECT_NAME( vk.deferred_lighting_image, "deferred lighting", VK_DEBUG_REPORT_OBJECT_TYPE_IMAGE_EXT );
@@ -2777,6 +2789,12 @@ void vk_destroy_attachments( void )
 		qvkDestroyImageView( vk.device, vk.deferred_gbuffer_material_view, NULL );
 		vk.deferred_gbuffer_material = VK_NULL_HANDLE;
 		vk.deferred_gbuffer_material_view = VK_NULL_HANDLE;
+	}
+	if ( vk.deferred_gbuffer_surface ) {
+		qvkDestroyImage( vk.device, vk.deferred_gbuffer_surface, NULL );
+		qvkDestroyImageView( vk.device, vk.deferred_gbuffer_surface_view, NULL );
+		vk.deferred_gbuffer_surface = VK_NULL_HANDLE;
+		vk.deferred_gbuffer_surface_view = VK_NULL_HANDLE;
 	}
 	if ( vk.deferred_lighting_image ) {
 		qvkDestroyImage( vk.device, vk.deferred_lighting_image, NULL );

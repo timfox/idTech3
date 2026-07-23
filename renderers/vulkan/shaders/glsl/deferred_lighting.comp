@@ -35,6 +35,12 @@ layout(std430, set = 0, binding = 10) readonly buffer ShadowContractSSBO {
 	GpuShadowGpuRecord records[];
 } shadows;
 layout(set = 0, binding = 11) uniform sampler2D sunShadowMap;
+/* Milestone 3: sky IBL (Forward+ set 5/8/10 parity — sky cubemap only for now). */
+layout(set = 0, binding = 12) uniform sampler2D brdfLutTex;
+layout(set = 0, binding = 13) uniform samplerCube prefilterCube;
+layout(set = 0, binding = 14) uniform samplerCube irradianceCube;
+/* M3: GBufferSurfaceData — lightmap.rgb + ownership.a (dedicated; not packed into material/normal). */
+layout(set = 0, binding = 15) uniform sampler2D surfaceTex;
 
 layout(push_constant) uniform Push {
 	mat4 viewMatrix;
@@ -57,8 +63,8 @@ layout(push_constant) uniform Push {
 	float specularAA;
 	uint compactLists;
 	uint clusterCount;
-	uint gbufferCompact; /* 1: decode octahedral from material.ba; AO/clearcoat defaults */
-	uint mixedMaterial; /* 1: MIXED_MATERIAL_DEFERRED — LM in G-buffer, owner in normal.a */
+	uint gbufferCompact; /* 1: decode octahedral from material.ba; AO in normal.a */
+	uint mixedMaterial; /* 1: MIXED_MATERIAL_DEFERRED — LM+owner from surfaceTex */
 	uint shadowFlags; /* bit0: sun shadow valid + SSBO bound */
 	float shadowStrength;
 	float shadowNear;
@@ -66,7 +72,10 @@ layout(push_constant) uniform Push {
 	float shadowBlend; /* edge blend fraction 0..0.5 */
 	uint shadowCascadeCount; /* 1..4 CSM cascades */
 	uint shadowGeneration;
-	uint _shadowPad0;
+	vec4 sunDir; /* xyz = L toward sun (world), w = angular radius */
+	vec4 sunRadiance; /* rgb = radiance, w = flags (bit0 BRDF, bit1 LM owns diffuse) */
+	uint iblFlags; /* bit0: sky IBL enable */
+	float iblStrength;
 } pc;
 
 #define USE_LTC_AREA_LIGHT
@@ -74,6 +83,8 @@ layout(push_constant) uniform Push {
 #define CLUSTER_LIST_CELLS tiles.cells
 #include "cluster_light_list.glsl"
 #define DEFERRED_HAS_SHADOW_CONTRACT
+#define DEFERRED_HAS_IBL
+#define DEFERRED_HAS_SURFACE
 #include "deferred_lighting_common.glsl"
 
 void main() {

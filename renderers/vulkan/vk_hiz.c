@@ -51,6 +51,7 @@ static cvar_t *r_hiZMinVisibleFrames;
 static cvar_t *r_hiZLargeObjectPx;
 static cvar_t *r_hiZDebug;
 static cvar_t *r_hizDebug;
+static cvar_t *r_hizDebugMip;
 
 #define VK_HIZ_HOST_MAX_DIM 64
 
@@ -767,18 +768,18 @@ void vk_hiz_register_cvars( void )
 		"Projected AABB diagonal (px) above which Hi-Z never rejects (large-object handling)." );
 
 	r_hiZDebug = ri.Cvar_Get( "r_hiZDebug", "0", CVAR_ARCHIVE_ND );
-	ri.Cvar_CheckRange( r_hiZDebug, "0", "2", CV_INTEGER );
+	ri.Cvar_CheckRange( r_hiZDebug, "0", "6", CV_INTEGER );
 	ri.Cvar_SetDescription( r_hiZDebug,
-		"Hi-Z debug (alias r_hizDebug): 0 off, 1 pyramid stats, 2 reject heatmap." );
-	/* Alias for Foundation Consolidation naming (r_hizDebug). */
-	(void)ri.Cvar_Get( "r_hizDebug", "0", CVAR_ARCHIVE_ND );
-	ri.Cvar_SetDescription( r_hiZDebug,
-		"Hi-Z debug verbosity (pyramid build / future visualization)." );
+		"Hi-Z debug: 0 off, 1 mip0, 2 selectable mip (r_hizDebugMip), 3 linear depth, "
+		"4 object test mip, 5 occlusion compare, 6 invalid pixels." );
 
 	r_hizDebug = ri.Cvar_Get( "r_hizDebug", "0", CVAR_ARCHIVE_ND );
-	ri.Cvar_CheckRange( r_hizDebug, "0", "2", CV_INTEGER );
-	ri.Cvar_SetDescription( r_hizDebug,
-		"Alias for r_hiZDebug (alternate naming)." );
+	ri.Cvar_CheckRange( r_hizDebug, "0", "6", CV_INTEGER );
+	ri.Cvar_SetDescription( r_hizDebug, "Alias for r_hiZDebug." );
+
+	r_hizDebugMip = ri.Cvar_Get( "r_hizDebugMip", "0", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_hizDebugMip, "0", "11", CV_INTEGER );
+	ri.Cvar_SetDescription( r_hizDebugMip, "Mip level for r_hizDebug / r_hiZDebug mode 2." );
 }
 
 static void HIZ_DestroyPyramid( void )
@@ -1076,12 +1077,15 @@ void vk_hiz_status_f( void )
 	ri.Printf( PRINT_ALL, "builds     : %u\n", s_buildCount );
 	ri.Printf( PRINT_ALL, "tests      : %u rejected=%u biasKeep=%u hostRejects=%u\n",
 		s_tests, s_rejected, s_biasKeep, s_hostSampleRejects );
-	ri.Printf( PRINT_ALL, "debug      : r_hiZDebug=%d r_hizDebug=%d\n",
+	ri.Printf( PRINT_ALL, "debug      : r_hiZDebug=%d r_hizDebug=%d mip=%d\n",
 		r_hiZDebug ? r_hiZDebug->integer : 0,
-		r_hizDebug ? r_hizDebug->integer : 0 );
+		r_hizDebug ? r_hizDebug->integer : 0,
+		r_hizDebugMip ? r_hizDebugMip->integer : 0 );
 	ri.Printf( PRINT_ALL, "note       : r_forwardPlusHiZ is tile probe pad — not this pyramid\n" );
 	ri.Printf( PRINT_ALL, "policy     : minVisibleFrames=%d largeObjectPx=%.0f; reversed-Z min mip\n",
 		r_hiZMinVisibleFrames ? r_hiZMinVisibleFrames->integer : 2,
 		r_hiZLargeObjectPx ? r_hiZLargeObjectPx->value : 256.0f );
+	ri.Printf( PRINT_ALL, "reduction  : farthest=min() (reversed-Z); consumers=gpu_scene,occlusion\n" );
+	ri.Printf( PRINT_ALL, "generation : builds=%u gpuBuilds=%u\n", s_buildCount, s_gpuBuildCount );
 	ri.Printf( PRINT_ALL, "==========================================\n" );
 }

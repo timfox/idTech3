@@ -37,6 +37,8 @@ layout(std430, set = 0, binding = 9) readonly buffer TileCoords {
 	uint coords[];
 } tileCoords;
 
+layout(set = 0, binding = 10) uniform sampler2D surfaceTex;
+
 layout(push_constant) uniform Push {
 	mat4 viewMatrix;
 	vec4 projInfo;
@@ -62,11 +64,14 @@ layout(push_constant) uniform Push {
 	uint compactLists;
 	uint clusterCount;
 	uint gbufferCompact;
-	uint mixedMaterial; /* 1: MIXED_MATERIAL_DEFERRED owner/LM packing */
+	uint mixedMaterial; /* 1: MIXED_MATERIAL_DEFERRED — LM+owner from surfaceTex */
+	vec4 sunDir;
+	vec4 sunRadiance;
 } pc;
 
 #define CLUSTER_LIST_CELLS tiles.cells
 #include "cluster_light_list.glsl"
+#define DEFERRED_HAS_SURFACE
 #include "deferred_lighting_common.glsl"
 
 void storeWithCopies( uvec2 pix, uint copyBits, vec4 lit ) {

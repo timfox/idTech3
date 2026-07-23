@@ -189,22 +189,48 @@ void CM_LoadBSP30Map( const byte *buffer, int length, const char *name ) {
 	}
 
 	/*
-	 * Clipnode-only planes that share a world-face normal are hull expansions of
-	 * real geometry, not bevels. Promote those so surf movement keeps them as
-	 * velocity constraints.
+	 * Clipnode-only planes that match a world face after classic hull expansion
+	 * (same normal, dist ≈ face_dist + support(halfExtents)) are HULL_FACE.
+	 * Normal-only matching was wrong: any +X/+Y/+Z world face re-labeled every
+	 * axial clip bevel as HULL_FACE, hiding real bevels from surf diagnostics.
 	 */
-	for ( i = 0; i < numPlanes; i++ ) {
-		if ( cm.bsp30PlaneKind[i] == (byte)TRACE_PLANE_WORLD_FACE ) {
-			continue;
-		}
-		for ( j = 0; j < numPlanes; j++ ) {
-			if ( cm.bsp30PlaneKind[j] != (byte)TRACE_PLANE_WORLD_FACE ) {
+	{
+		static const vec3_t hullHalfExtents[] = {
+			{ 16.0f, 16.0f, 36.0f }, /* hull 1 stand */
+			{ 32.0f, 32.0f, 32.0f }, /* hull 2 */
+			{ 16.0f, 16.0f, 18.0f }  /* hull 3 duck */
+		};
+		const float distEps = 0.5f;
+		unsigned h;
+
+		for ( i = 0; i < numPlanes; i++ ) {
+			if ( cm.bsp30PlaneKind[i] == (byte)TRACE_PLANE_WORLD_FACE ) {
 				continue;
 			}
-			if ( DotProduct( cm.planes[i].normal, cm.planes[j].normal ) >
-					0.9995f ) {
-				cm.bsp30PlaneKind[i] = (byte)TRACE_PLANE_HULL_FACE;
-				break;
+			for ( j = 0; j < numPlanes; j++ ) {
+				float ndot;
+
+				if ( cm.bsp30PlaneKind[j] != (byte)TRACE_PLANE_WORLD_FACE ) {
+					continue;
+				}
+				ndot = DotProduct( cm.planes[i].normal, cm.planes[j].normal );
+				if ( ndot <= 0.9995f ) {
+					continue;
+				}
+				for ( h = 0; h < 3; h++ ) {
+					float expand =
+							fabsf( cm.planes[j].normal[0] ) * hullHalfExtents[h][0] +
+							fabsf( cm.planes[j].normal[1] ) * hullHalfExtents[h][1] +
+							fabsf( cm.planes[j].normal[2] ) * hullHalfExtents[h][2];
+					if ( fabsf( cm.planes[i].dist -
+							( cm.planes[j].dist + expand ) ) <= distEps ) {
+						cm.bsp30PlaneKind[i] = (byte)TRACE_PLANE_HULL_FACE;
+						break;
+					}
+				}
+				if ( cm.bsp30PlaneKind[i] == (byte)TRACE_PLANE_HULL_FACE ) {
+					break;
+				}
 			}
 		}
 	}

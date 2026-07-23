@@ -3,7 +3,7 @@
 **Status:** Foundation Consolidation — opt-in cull → indirect path (Raster Ultra).  
 **Related:** [GPU_SCENE.md](GPU_SCENE.md) · [MESHLETS.md](MESHLETS.md) · `vk_gpu_scene.c` · `vk_hiz.c`
 
-**`r_gpuDriven`** (consolidation alias): when `1`, enables `r_gpuScene 1` + cull + indirect pack. Underlying cvars remain granular for safe rollout.
+**`r_gpuDriven`** (consolidation alias): modes 0 direct / 1 GPU / 2 compare; when `1`, enables `r_gpuScene 1` + cull + indirect pack. Underlying cvars remain granular for safe rollout.
 
 ---
 
@@ -101,9 +101,9 @@ Telemetry exported via `gpu_scene_status`, `renderer_perf`, and `r_gpuDrawCompar
 
 ## Next milestone hooks
 
-- Formal `r_gpuDriven` cvar alias in `vk_gpu_scene.c`.
 - GPU-side compact + indirect compute (eliminate host readback).
 - PVS → GPU instance mark for streamed sectors.
 - CI gate: `r_gpuDrawCompare` delta < threshold on reference lab LOD scene.
+- Production pilot IndirectDraw consumer after Phase 1–3 certification.
 
 Regression: `tests/scripts/test_gpu_draw_parity.sh` · `tests/scripts/test_hiz_reversed_z.sh`

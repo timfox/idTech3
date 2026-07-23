@@ -19,16 +19,31 @@ cvar_t *r_deferredArchitecture;
 cvar_t *r_deferredCompositeMode;
 cvar_t *r_deferredEligibilityDebug;
 cvar_t *r_gbufferInvalidPolicy;
+cvar_t *r_legacyDeferredRoughness;
+cvar_t *r_legacyDeferredSpecular;
+cvar_t *r_deferredLightmapMode;
+cvar_t *r_deferredLightmapDebug;
+cvar_t *r_deferredOwnershipDebug;
+cvar_t *r_deferredCompositeDebug;
+cvar_t *r_deferredArchitectureCompare;
 
 typedef struct {
 	uint32_t opaqueSurfaces;
 	uint32_t deferredEligibleFull;
 	uint32_t deferredEligibleApprox;
 	uint32_t deferredExported;
+	uint32_t trueGBufferSurfaces;
+	uint32_t additiveHybridSurfaces;
 	uint32_t forwardFallback;
 	uint32_t unsupported;
 	uint32_t defaultGBuffer;
 	uint32_t litSceneAsBase;
+	uint32_t gbufferBaseColor;
+	uint32_t deferredLightmap;
+	uint32_t forwardLightmap;
+	uint32_t doubleShaded;
+	uint32_t unowned;
+	uint32_t invalidGBuffer;
 	uint32_t validNormals;
 	uint32_t validMaterial;
 	uint32_t pbrNative;
@@ -112,7 +127,53 @@ const char *R_DeferredEligibilityReason_Name( deferredEligibilityReason_t reason
 	case DEFERRED_REASON_PATH_NOT_READY: return "PATH_NOT_READY";
 	case DEFERRED_REASON_PBR_NATIVE: return "PBR_NATIVE";
 	case DEFERRED_REASON_CLASSIC_TRANSLATED: return "CLASSIC_TRANSLATED";
+	case DEFERRED_REASON_BASE_COLOR_EXPORT_UNREPRESENTABLE: return "BASE_COLOR_EXPORT_UNREPRESENTABLE";
 	default: return "UNKNOWN";
+	}
+}
+
+const char *R_DeferredPixelOwner_Name( deferredPixelOwner_t owner )
+{
+	switch ( owner ) {
+	case PIXEL_OWNER_NONE: return "NONE";
+	case PIXEL_OWNER_DEFERRED_FULL: return "DEFERRED_FULL";
+	case PIXEL_OWNER_DEFERRED_APPROX: return "DEFERRED_APPROX";
+	case PIXEL_OWNER_FORWARD_FALLBACK: return "FORWARD_FALLBACK";
+	case PIXEL_OWNER_SKY: return "SKY";
+	case PIXEL_OWNER_SPECIAL: return "SPECIAL";
+	default: return "UNKNOWN";
+	}
+}
+
+static const char *DH_RgbGenName( int gen )
+{
+	switch ( gen ) {
+	case CGEN_IDENTITY: return "identity";
+	case CGEN_IDENTITY_LIGHTING: return "identityLighting";
+	case CGEN_EXACT_VERTEX: return "exactVertex";
+	case CGEN_VERTEX: return "vertex";
+	case CGEN_CONST: return "const";
+	case CGEN_ENTITY: return "entity";
+	case CGEN_ONE_MINUS_ENTITY: return "oneMinusEntity";
+	case CGEN_ONE_MINUS_VERTEX: return "oneMinusVertex";
+	case CGEN_WAVEFORM: return "waveform";
+	case CGEN_LIGHTING_DIFFUSE: return "lightingDiffuse";
+	case CGEN_FOG: return "fog";
+	default: return "bad";
+	}
+}
+
+static const char *DH_TcGenName( int gen )
+{
+	switch ( gen ) {
+	case TCGEN_TEXTURE: return "texture";
+	case TCGEN_LIGHTMAP: return "lightmap";
+	case TCGEN_IDENTITY: return "identity";
+	case TCGEN_ENVIRONMENT_MAPPED: return "environment";
+	case TCGEN_ENVIRONMENT_MAPPED_FP: return "environmentFP";
+	case TCGEN_FOG: return "fog";
+	case TCGEN_VECTOR: return "vector";
+	default: return "bad";
 	}
 }
 
@@ -219,14 +280,24 @@ ClassicShaderMaterialInfo R_TranslateClassicShaderToMaterial( const shader_t *sh
 	ClassicShaderMaterialInfo info;
 	int i, activeStages = 0, diffuseStages = 0, lmStages = 0;
 	int firstDiffuse = -1, firstLm = -1;
+	float roughDefault, specDefault;
 
 	Com_Memset( &info, 0, sizeof( info ) );
 	info.baseColorStage = -1;
 	info.lightmapStage = -1;
 	info.failReason = DEFERRED_REASON_NO_BASE_COLOR_EXPORT;
+	info.rgbGen = CGEN_BAD;
+	info.tcGen = TCGEN_BAD;
+	roughDefault = ( r_legacyDeferredRoughness ) ? r_legacyDeferredRoughness->value : 0.72f;
+	specDefault = ( r_legacyDeferredSpecular ) ? r_legacyDeferredSpecular->value : 0.04f;
+	info.legacyRoughness = roughDefault;
+	info.legacySpecularF0 = specDefault;
+	Q_strncpyz( info.rgbGenName, "none", sizeof( info.rgbGenName ) );
+	Q_strncpyz( info.tcGenName, "none", sizeof( info.tcGenName ) );
 
 	if ( !shader ) {
 		Q_strncpyz( info.summary, "null shader", sizeof( info.summary ) );
+		info.translateAudit = BASE_COLOR_EXPORT_UNREPRESENTABLE;
 		return info;
 	}
 
@@ -251,7 +322,6 @@ ClassicShaderMaterialInfo R_TranslateClassicShaderToMaterial( const shader_t *sh
 			continue;
 		}
 
-		/* Diffuse-like stage: opaque or alpha-test, not pure add. */
 		if ( src == GLS_SRCBLEND_ONE && dst == GLS_DSTBLEND_ONE ) {
 			info.unsupportedStageCount++;
 			continue;
@@ -259,12 +329,14 @@ ClassicShaderMaterialInfo R_TranslateClassicShaderToMaterial( const shader_t *sh
 		if ( DH_StageHasComplexTcMod( st ) ) {
 			info.failReason = DEFERRED_REASON_UNSUPPORTED_TCMOD;
 			info.unsupportedStageCount++;
+			info.translateAudit = BASE_COLOR_EXPORT_UNREPRESENTABLE;
 			Q_strncpyz( info.summary, "unsupported tcMod/env", sizeof( info.summary ) );
 			return info;
 		}
 		if ( DH_StageHasAnimation( st ) ) {
 			info.failReason = DEFERRED_REASON_UNSUPPORTED_ANIMATION;
 			info.unsupportedStageCount++;
+			info.translateAudit = BASE_COLOR_EXPORT_UNREPRESENTABLE;
 			Q_strncpyz( info.summary, "animated/video stage", sizeof( info.summary ) );
 			return info;
 		}
@@ -289,32 +361,88 @@ ClassicShaderMaterialInfo R_TranslateClassicShaderToMaterial( const shader_t *sh
 #endif
 	}
 
+	(void)activeStages;
+
 	if ( firstDiffuse < 0 ) {
 		info.failReason = DEFERRED_REASON_NO_BASE_COLOR_EXPORT;
+		info.translateAudit = BASE_COLOR_EXPORT_UNREPRESENTABLE;
 		Q_strncpyz( info.summary, "no diffuse stage", sizeof( info.summary ) );
 		return info;
 	}
 
-	/* Certified subset: 1 diffuse (+ optional lightmap). Extra non-LM stages → Forward+. */
 	if ( diffuseStages > 1 ) {
 		info.failReason = DEFERRED_REASON_MULTISTAGE_CLASSIC_SHADER;
 		info.unsupportedStageCount = diffuseStages - 1;
+		info.translateAudit = BASE_COLOR_EXPORT_UNREPRESENTABLE;
 		Com_sprintf( info.summary, sizeof( info.summary ),
 			"multistage classic (%d diffuse)", diffuseStages );
 		return info;
+	}
+
+	/* Audit base-color rgbGen / tcGen — do not guess unsupported generators. */
+	{
+		const shaderStage_t *base = shader->stages[firstDiffuse];
+		colorGen_t rgb = base->bundle[0].rgbGen;
+		texCoordGen_t tc = base->bundle[0].tcGen;
+
+		info.rgbGen = (int)rgb;
+		info.tcGen = (int)tc;
+		Q_strncpyz( info.rgbGenName, DH_RgbGenName( (int)rgb ), sizeof( info.rgbGenName ) );
+		Q_strncpyz( info.tcGenName, DH_TcGenName( (int)tc ), sizeof( info.tcGenName ) );
+
+		if ( tc != TCGEN_TEXTURE && tc != TCGEN_IDENTITY && tc != TCGEN_BAD ) {
+			info.failReason = DEFERRED_REASON_BASE_COLOR_EXPORT_UNREPRESENTABLE;
+			info.translateAudit = BASE_COLOR_EXPORT_UNREPRESENTABLE;
+			Com_sprintf( info.summary, sizeof( info.summary ),
+				"unrepresentable tcGen=%s", info.tcGenName );
+			return info;
+		}
+
+		switch ( rgb ) {
+		case CGEN_IDENTITY:
+		case CGEN_IDENTITY_LIGHTING:
+			info.translateAudit |= BASE_COLOR_STAGE_VALID;
+			break;
+		case CGEN_VERTEX:
+		case CGEN_EXACT_VERTEX:
+			info.vertexColorModulation = qtrue;
+			info.translateAudit |= BASE_COLOR_STAGE_VALID | BASE_COLOR_VERTEX_MODULATION_VALID;
+			break;
+		case CGEN_CONST:
+			info.constantColorModulation = qtrue;
+			info.translateAudit |= BASE_COLOR_STAGE_VALID | BASE_COLOR_CONSTANT_MODULATION_VALID;
+			break;
+		case CGEN_ENTITY:
+			/* Entity modulate is allowed as constant-like modulation for world props. */
+			info.constantColorModulation = qtrue;
+			info.translateAudit |= BASE_COLOR_STAGE_VALID | BASE_COLOR_CONSTANT_MODULATION_VALID;
+			break;
+		default:
+			info.failReason = DEFERRED_REASON_BASE_COLOR_EXPORT_UNREPRESENTABLE;
+			info.translateAudit = BASE_COLOR_EXPORT_UNREPRESENTABLE;
+			Com_sprintf( info.summary, sizeof( info.summary ),
+				"unrepresentable rgbGen=%s", info.rgbGenName );
+			return info;
+		}
 	}
 
 	info.hasBaseColor = qtrue;
 	info.baseColorStage = firstDiffuse;
 	info.hasLightmap = ( lmStages > 0 || ( shader->lightmapIndex >= 0 ) ) ? qtrue : qfalse;
 	info.lightmapStage = firstLm;
+	if ( info.hasLightmap ) {
+		info.translateAudit |= LIGHTMAP_STAGE_VALID;
+	}
+	info.materialResponseDefaulted = info.hasSpecularOrPhysical ? qfalse : qtrue;
 	info.valid = qtrue;
 	info.failReason = DEFERRED_REASON_CLASSIC_TRANSLATED;
 	Com_sprintf( info.summary, sizeof( info.summary ),
-		"translated diffuse@%d lm=%s nrm=%d spec=%d emit=%d atest=%d",
-		firstDiffuse, info.hasLightmap ? "yes" : "no",
+		"translated diffuse@%d rgbGen=%s tcGen=%s lm=%s nrm=%d spec=%d emit=%d atest=%d approxMat=%d",
+		firstDiffuse, info.rgbGenName, info.tcGenName,
+		info.hasLightmap ? "yes" : "no",
 		info.hasNormalMap ? 1 : 0, info.hasSpecularOrPhysical ? 1 : 0,
-		info.hasEmissive ? 1 : 0, info.alphaTested ? 1 : 0 );
+		info.hasEmissive ? 1 : 0, info.alphaTested ? 1 : 0,
+		info.materialResponseDefaulted ? 1 : 0 );
 	return info;
 }
 
@@ -327,6 +455,24 @@ static DeferredEligibilityResult DH_Make(
 	r.eligibility = elig;
 	r.reason = reason;
 	r.reasonName = R_DeferredEligibilityReason_Name( reason );
+	switch ( elig ) {
+	case DEFERRED_ELIGIBLE_FULL:
+		r.owner = PIXEL_OWNER_DEFERRED_FULL;
+		break;
+	case DEFERRED_ELIGIBLE_APPROXIMATE:
+	case DEFERRED_DEBUG_FORCED:
+		r.owner = PIXEL_OWNER_DEFERRED_APPROX;
+		break;
+	case DEFERRED_FORWARD_FALLBACK:
+		r.owner = PIXEL_OWNER_FORWARD_FALLBACK;
+		break;
+	case DEFERRED_UNSUPPORTED:
+		r.owner = ( reason == DEFERRED_REASON_SKY ) ? PIXEL_OWNER_SKY : PIXEL_OWNER_SPECIAL;
+		break;
+	default:
+		r.owner = PIXEL_OWNER_NONE;
+		break;
+	}
 	return r;
 }
 
@@ -421,21 +567,37 @@ DeferredEligibilityResult R_GetDeferredEligibility(
 			if ( st->vk_pbr_flags & ( PBR_HAS_TRANSMISSION | PBR_HAS_ANISOTROPY | PBR_HAS_SUBSURFACE ) ) {
 				return DH_Make( DEFERRED_FORWARD_FALLBACK, DEFERRED_REASON_FORWARD_ONLY_POLICY );
 			}
+			/* Sheen has no G-buffer channel — always Forward+ until extension buffer. */
+			if ( st->vk_pbr_flags & PBR_HAS_SHEEN ) {
+				return DH_Make( DEFERRED_FORWARD_FALLBACK, DEFERRED_REASON_FORWARD_ONLY_POLICY );
+			}
+			/* Clearcoat packs on expanded material.a; compact drops the channel. */
+			if ( ( st->vk_pbr_flags & PBR_HAS_CLEARCOAT ) &&
+				( r_gbufferCompact && r_gbufferCompact->integer ) ) {
+				return DH_Make( DEFERRED_FORWARD_FALLBACK, DEFERRED_REASON_FORWARD_ONLY_POLICY );
+			}
 		}
 		flags |= GBUFFER_PBR_NATIVE;
+		flags |= GBUFFER_VALID_BASE_COLOR | GBUFFER_VALID_NORMAL | GBUFFER_VALID_OWNERSHIP;
 		if ( hasN ) {
-			flags |= GBUFFER_VALID_NORMAL;
+			/* authored normal map */
+		} else {
+			flags |= GBUFFER_APPROXIMATED; /* geometric normal only */
 		}
 		if ( hasM ) {
 			flags |= GBUFFER_VALID_MATERIAL;
+		} else {
+			flags |= GBUFFER_VALID_MATERIAL | GBUFFER_APPROXIMATED;
 		}
-		flags |= GBUFFER_VALID_BASE_COLOR;
-		/* Arch 0 only: SceneBaseLit is sampled as deferred "albedo". */
+		if ( shader->lightmapIndex >= 0 ) {
+			flags |= GBUFFER_VALID_LIGHTMAP;
+		}
 		if ( !R_DeferredMixedMaterialWanted() ) {
 			flags |= GBUFFER_USING_LIT_SCENE_AS_BASE;
 		}
 		res = DH_Make( DEFERRED_ELIGIBLE_FULL, DEFERRED_REASON_PBR_NATIVE );
 		res.gbufferFlags = flags;
+		res.owner = PIXEL_OWNER_DEFERRED_FULL;
 		return res;
 	}
 #endif
@@ -444,21 +606,19 @@ DeferredEligibilityResult R_GetDeferredEligibility(
 	res.classic = R_TranslateClassicShaderToMaterial( shader );
 	if ( !res.classic.valid ) {
 		deferredEligibilityReason_t fail = res.classic.failReason;
-		/* Strict: surface unsupported for deferred — do not silently treat as normal Forward+. */
 		if ( R_DeferredStrictValidationWanted() ) {
 			res = DH_Make( DEFERRED_UNSUPPORTED, fail );
 		} else {
 			res = DH_Make( DEFERRED_FORWARD_FALLBACK, fail );
 		}
-		res.classic = R_TranslateClassicShaderToMaterial( shader ); /* restore details */
+		res.classic = R_TranslateClassicShaderToMaterial( shader );
 		res.reasonName = R_DeferredEligibilityReason_Name( res.reason );
 		return res;
 	}
 
 	/*
-	 * MIXED_MATERIAL_DEFERRED needs the gbuf/PBR fragment path for unlit + LM MRT packing.
-	 * Pipeline export is gated on vk_pbr_flags — pure classic lightmap draws stay Forward+
-	 * (hybrid arch 0 can still use SceneBaseLit additive for them).
+	 * MIXED_MATERIAL_DEFERRED needs the gbuf/PBR fragment path for unlit + LM packing.
+	 * Pure classic lightmap draws without vk_pbr_flags stay Forward+.
 	 */
 	if ( R_DeferredMixedMaterialWanted() ) {
 		qboolean canExport = qfalse;
@@ -478,14 +638,18 @@ DeferredEligibilityResult R_GetDeferredEligibility(
 	res.eligibility = DEFERRED_ELIGIBLE_APPROXIMATE;
 	res.reason = DEFERRED_REASON_CLASSIC_TRANSLATED;
 	res.reasonName = R_DeferredEligibilityReason_Name( res.reason );
-	res.gbufferFlags = GBUFFER_TRANSLATED_CLASSIC | GBUFFER_APPROXIMATED | GBUFFER_VALID_BASE_COLOR;
-	/* Geometry normals + default rough/metal are enough for mixed unlit export. */
-	res.gbufferFlags |= GBUFFER_VALID_NORMAL | GBUFFER_VALID_MATERIAL;
-	if ( res.classic.hasNormalMap ) {
-		res.gbufferFlags |= GBUFFER_VALID_NORMAL;
+	res.owner = PIXEL_OWNER_DEFERRED_APPROX;
+	res.gbufferFlags = GBUFFER_TRANSLATED_CLASSIC | GBUFFER_APPROXIMATED |
+		GBUFFER_VALID_BASE_COLOR | GBUFFER_VALID_NORMAL | GBUFFER_VALID_MATERIAL |
+		GBUFFER_VALID_OWNERSHIP;
+	if ( res.classic.hasLightmap ) {
+		res.gbufferFlags |= GBUFFER_VALID_LIGHTMAP;
 	}
-	if ( res.classic.hasSpecularOrPhysical ) {
-		res.gbufferFlags |= GBUFFER_VALID_MATERIAL;
+	if ( res.classic.hasEmissive ) {
+		res.gbufferFlags |= GBUFFER_VALID_EMISSIVE;
+	}
+	if ( res.classic.materialResponseDefaulted ) {
+		res.gbufferFlags |= GBUFFER_APPROXIMATED;
 	}
 	if ( !R_DeferredMixedMaterialWanted() ) {
 		res.gbufferFlags |= GBUFFER_USING_LIT_SCENE_AS_BASE;
@@ -527,12 +691,14 @@ void R_DeferredHonesty_NoteEligibility( const DeferredEligibilityResult *res )
 	switch ( res->eligibility ) {
 	case DEFERRED_ELIGIBLE_FULL:
 		s_frame.deferredEligibleFull++;
+		s_frame.trueGBufferSurfaces++;
 		if ( res->gbufferFlags & GBUFFER_PBR_NATIVE ) {
 			s_frame.pbrNative++;
 		}
 		break;
 	case DEFERRED_ELIGIBLE_APPROXIMATE:
 		s_frame.deferredEligibleApprox++;
+		s_frame.trueGBufferSurfaces++;
 		if ( res->gbufferFlags & GBUFFER_TRANSLATED_CLASSIC ) {
 			s_frame.classicTranslated++;
 		}
@@ -557,6 +723,22 @@ void R_DeferredHonesty_NoteEligibility( const DeferredEligibilityResult *res )
 	}
 	if ( res->gbufferFlags & GBUFFER_USING_LIT_SCENE_AS_BASE ) {
 		s_frame.litSceneAsBase++;
+		s_frame.additiveHybridSurfaces++;
+	}
+	if ( ( res->gbufferFlags & GBUFFER_VALID_BASE_COLOR ) &&
+		!( res->gbufferFlags & GBUFFER_USING_LIT_SCENE_AS_BASE ) &&
+		R_DeferredHonesty_WantsDeferredPath( res ) ) {
+		s_frame.gbufferBaseColor++;
+	}
+	if ( ( res->gbufferFlags & GBUFFER_VALID_LIGHTMAP ) &&
+		R_DeferredHonesty_WantsDeferredPath( res ) &&
+		R_DeferredMixedMaterialWanted() ) {
+		s_frame.deferredLightmap++;
+	} else if ( res->classic.hasLightmap || ( res->gbufferFlags & GBUFFER_VALID_LIGHTMAP ) ) {
+		if ( res->eligibility == DEFERRED_FORWARD_FALLBACK ||
+			( res->gbufferFlags & GBUFFER_USING_LIT_SCENE_AS_BASE ) ) {
+			s_frame.forwardLightmap++;
+		}
 	}
 }
 
@@ -577,6 +759,37 @@ void R_DeferredHonesty_NoteDefaultGBuffer( void )
 void R_DeferredHonesty_NoteLitSceneAsBase( void )
 {
 	s_frame.litSceneAsBase++;
+	s_frame.additiveHybridSurfaces++;
+}
+
+void R_DeferredHonesty_NoteGBufferBaseColor( void )
+{
+	s_frame.gbufferBaseColor++;
+}
+
+void R_DeferredHonesty_NoteDeferredLightmap( void )
+{
+	s_frame.deferredLightmap++;
+}
+
+void R_DeferredHonesty_NoteForwardLightmap( void )
+{
+	s_frame.forwardLightmap++;
+}
+
+void R_DeferredHonesty_NoteDoubleShaded( void )
+{
+	s_frame.doubleShaded++;
+}
+
+void R_DeferredHonesty_NoteUnowned( void )
+{
+	s_frame.unowned++;
+}
+
+void R_DeferredHonesty_NoteInvalidGBuffer( void )
+{
+	s_frame.invalidGBuffer++;
 }
 
 void R_DeferredStatus_f( void )
@@ -593,8 +806,8 @@ void R_DeferredStatus_f( void )
 	if ( arch >= DEFERRED_ARCH_MIXED_MATERIAL ) {
 		brdfParity = "partial (shared GGX; mixed unlit base + deferred lightmap; sun=CSM modulate)";
 		layout = ( r_gbufferCompact && r_gbufferCompact->integer )
-			? "scaffold_fp16 (mixed packs LM; compact dual-write overridden on owned)"
-			: "scaffold_fp16 (albedo=unlit base for owned; LM in G-buffer)";
+			? "scaffold_fp16 + SurfaceData (compact oct in material.ba; LM+owner in surface)"
+			: "scaffold_fp16 + SurfaceData (albedo=unlit base; LM+owner in surface MRT)";
 		ownership =
 			"  ownership: eligible → unlit GBufferBaseColor + deferred static(LM)+dynamic;\n"
 			"             ineligible → Forward+ SceneBaseLit; composite replaces owned pixels\n";
@@ -624,21 +837,32 @@ void R_DeferredStatus_f( void )
 	ri.Printf( PRINT_ALL,
 		"opaqueSurfaces=%u\n"
 		"deferredEligible=%u (full=%u approx=%u)\n"
+		"trueGBufferSurfaces=%u additiveHybridSurfaces=%u\n"
 		"deferredExported=%u\n"
 		"forwardFallback=%u unsupported=%u\n"
+		"pixelsUsingSceneBaseLit=%u\n"
+		"pixelsUsingGBufferBaseColor=%u\n"
+		"pixelsDeferredLightmap=%u pixelsForwardLightmap=%u\n"
+		"doubleShadedPixels=%u unownedPixels=%u invalidGBufferPixels=%u\n"
 		"defaultGBufferValues=%u\n"
-		"litSceneColorAsDeferredBase=%u\n"
 		"validNormals=%u validMaterialParams=%u\n"
 		"pbrNative=%u classicTranslated=%u\n",
 		s_frame.opaqueSurfaces, eligible,
 		s_frame.deferredEligibleFull, s_frame.deferredEligibleApprox,
+		s_frame.trueGBufferSurfaces, s_frame.additiveHybridSurfaces,
 		s_frame.deferredExported, s_frame.forwardFallback, s_frame.unsupported,
-		s_frame.defaultGBuffer, s_frame.litSceneAsBase,
+		s_frame.litSceneAsBase, s_frame.gbufferBaseColor,
+		s_frame.deferredLightmap, s_frame.forwardLightmap,
+		s_frame.doubleShaded, s_frame.unowned, s_frame.invalidGBuffer,
+		s_frame.defaultGBuffer,
 		s_frame.validNormals, s_frame.validMaterial,
 		s_frame.pbrNative, s_frame.classicTranslated );
 	ri.Printf( PRINT_ALL,
-		"NOTE: Label=%s. Full BRDF parity / sun BRDF / IBL-in-compute are later phases.\n"
-		"  Classic OA without translation → Forward+ (or UNSUPPORTED in strict). See docs/DEFERRED_HONESTY.md\n",
+		"NOTE: Label=%s. Arch0=hybrid reference; Arch1=mixed unlit+LM ownership.\n"
+		"  doubleShaded/unowned should be 0 in MIXED_MATERIAL_DEFERRED.\n"
+		"  Full sun BRDF + sky IBL + SurfaceData LM/owner shipping (M3); local probes remain.\n"
+		"  Compact clearcoat still Forward+; expanded mixed clearcoat uses material.a.\n"
+		"  See docs/DEFERRED_HONESTY.md\n",
 		R_DeferredArchitecture_Name( arch ) );
 }
 
@@ -670,14 +894,24 @@ void R_MaterialTranslateStatus_f( void )
 		0,
 #endif
 		sh->lightmapIndex, sh->numDeforms );
-	ri.Printf( PRINT_ALL, "  translation.valid=%d summary=%s\n", info.valid ? 1 : 0, info.summary );
-	ri.Printf( PRINT_ALL, "  baseColorStage=%d lightmapStage=%d unsupported=%d\n",
-		info.baseColorStage, info.lightmapStage, info.unsupportedStageCount );
+	ri.Printf( PRINT_ALL, "  translation.valid=%d audit=0x%x summary=%s\n",
+		info.valid ? 1 : 0, info.translateAudit, info.summary );
+	ri.Printf( PRINT_ALL, "  baseColorStage=%d rgbGen=%s (%d) vertexMod=%d constMod=%d\n",
+		info.baseColorStage, info.rgbGenName, info.rgbGen,
+		info.vertexColorModulation ? 1 : 0, info.constantColorModulation ? 1 : 0 );
+	ri.Printf( PRINT_ALL, "  tcGen=%s lightmapStage=%d lightmapValid=%d unsupported=%d\n",
+		info.tcGenName, info.lightmapStage, ( info.translateAudit & LIGHTMAP_STAGE_VALID ) ? 1 : 0,
+		info.unsupportedStageCount );
+	ri.Printf( PRINT_ALL, "  logicalBaseColor=diffuse×rgbGen (lightmap NOT multiplied)\n" );
+	ri.Printf( PRINT_ALL, "  materialResponse: rough=%g F0=%g defaulted=%d (approx flag)\n",
+		info.legacyRoughness, info.legacySpecularF0, info.materialResponseDefaulted ? 1 : 0 );
 	ri.Printf( PRINT_ALL, "  normal=%d specular/physical=%d emissive=%d alphaTest=%d twoSided=%d\n",
 		info.hasNormalMap ? 1 : 0, info.hasSpecularOrPhysical ? 1 : 0,
 		info.hasEmissive ? 1 : 0, info.alphaTested ? 1 : 0, info.twoSided ? 1 : 0 );
-	ri.Printf( PRINT_ALL, "  eligibility=%s reason=%s gbufferFlags=0x%x\n",
-		R_DeferredEligibility_Name( elig.eligibility ), elig.reasonName, elig.gbufferFlags );
+	ri.Printf( PRINT_ALL, "  eligibility=%s owner=%s reason=%s gbufferFlags=0x%x\n",
+		R_DeferredEligibility_Name( elig.eligibility ),
+		R_DeferredPixelOwner_Name( elig.owner ),
+		elig.reasonName, elig.gbufferFlags );
 }
 
 void vk_deferred_honesty_register( void )
@@ -721,7 +955,55 @@ void vk_deferred_honesty_register( void )
 		"Invalid G-buffer policy: 0=debug magenta 1=Forward+ fallback (default) 2=safe unlit diagnostic." );
 	ri.Cvar_SetGroup( r_gbufferInvalidPolicy, CVG_RENDERER );
 
+	r_legacyDeferredRoughness = ri.Cvar_Get( "r_legacyDeferredRoughness", "0.72", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_legacyDeferredRoughness, "0.04", "1", CV_FLOAT );
+	ri.Cvar_SetDescription( r_legacyDeferredRoughness,
+		"Default perceptual roughness for certified classic materials without physical maps." );
+	ri.Cvar_SetGroup( r_legacyDeferredRoughness, CVG_RENDERER );
+
+	r_legacyDeferredSpecular = ri.Cvar_Get( "r_legacyDeferredSpecular", "0.04", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_legacyDeferredSpecular, "0", "0.08", CV_FLOAT );
+	ri.Cvar_SetDescription( r_legacyDeferredSpecular,
+		"Default dielectric F0 for certified classic diffuse materials (migration tuning)." );
+	ri.Cvar_SetGroup( r_legacyDeferredSpecular, CVG_RENDERER );
+
+	r_deferredLightmapMode = ri.Cvar_Get( "r_deferredLightmapMode", "0", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_deferredLightmapMode, "0", "2", CV_INTEGER );
+	ri.Cvar_SetDescription( r_deferredLightmapMode,
+		"Deferred lightmap: 0=non-directional irradiance 1=deluxe directional diffuse (when packed) 2=debug compare." );
+	ri.Cvar_SetGroup( r_deferredLightmapMode, CVG_RENDERER );
+
+	r_deferredLightmapDebug = ri.Cvar_Get( "r_deferredLightmapDebug", "0", CVAR_CHEAT );
+	ri.Cvar_CheckRange( r_deferredLightmapDebug, "0", "5", CV_INTEGER );
+	ri.Cvar_SetDescription( r_deferredLightmapDebug,
+		"1=raw LM 2=decoded LM 3=deluxe dir 4=static diffuse 5=LM validity." );
+	ri.Cvar_SetGroup( r_deferredLightmapDebug, CVG_RENDERER );
+
+	r_deferredOwnershipDebug = ri.Cvar_Get( "r_deferredOwnershipDebug", "0", CVAR_CHEAT );
+	ri.Cvar_CheckRange( r_deferredOwnershipDebug, "0", "3", CV_INTEGER );
+	ri.Cvar_SetDescription( r_deferredOwnershipDebug,
+		"1=owner colors 2=double writes (red) 3=unowned (magenta)." );
+	ri.Cvar_SetGroup( r_deferredOwnershipDebug, CVG_RENDERER );
+
+	r_deferredCompositeDebug = ri.Cvar_Get( "r_deferredCompositeDebug", "0", CVAR_CHEAT );
+	ri.Cvar_CheckRange( r_deferredCompositeDebug, "0", "4", CV_INTEGER );
+	ri.Cvar_SetDescription( r_deferredCompositeDebug,
+		"1=deferred input 2=Forward+ fallback 3=ownership 4=combined." );
+	ri.Cvar_SetGroup( r_deferredCompositeDebug, CVG_RENDERER );
+
+	r_deferredArchitectureCompare = ri.Cvar_Get( "r_deferredArchitectureCompare", "0", CVAR_CHEAT );
+	ri.Cvar_CheckRange( r_deferredArchitectureCompare, "0", "1", CV_INTEGER );
+	ri.Cvar_SetDescription( r_deferredArchitectureCompare,
+		"1=split left arch0 hybrid / right arch1 mixed (requires vid_restart + arch latch care)." );
+	ri.Cvar_SetGroup( r_deferredArchitectureCompare, CVG_RENDERER );
+
 	ri.Cvar_Get( "r_deferredForceEligibility", "0", CVAR_CHEAT );
+	ri.Cvar_Get( "r_materialExportCompare", "0", CVAR_CHEAT );
+	ri.Cvar_Get( "r_lightmapParityCompare", "0", CVAR_CHEAT );
+	ri.Cvar_Get( "r_deferredLightingParity", "0", CVAR_CHEAT ); /* 1=diff 2=sun 3=local 4=shadow 5=LM 6=final */
+	ri.Cvar_Get( "r_deferredSunBrdf", "1", CVAR_ARCHIVE_ND ); /* 1=enable sun BRDF in mixed deferred */
+	ri.Cvar_Get( "r_deferredIbl", "1", CVAR_ARCHIVE_ND ); /* 1=sky IBL in mixed deferred lighting */
+	ri.Cvar_Get( "r_deferredIblStrength", "1", CVAR_ARCHIVE_ND );
 
 	ri.Cmd_AddCommand( "deferred_status", R_DeferredStatus_f );
 	ri.Cmd_AddCommand( "material_translate_status", R_MaterialTranslateStatus_f );
@@ -729,7 +1011,7 @@ void vk_deferred_honesty_register( void )
 	s_registered = qtrue;
 	if ( !s_logged ) {
 		ri.Printf( PRINT_ALL,
-			"[VK][deferred] architecture=%s composite=%s (honesty milestone; not full deferred)\n",
+			"[VK][deferred] architecture=%s composite=%s (honesty M2; mixed unlit+LM when arch>=1)\n",
 			R_DeferredArchitecture_Name( (deferredArchitecture_t)r_deferredArchitecture->integer ),
 			R_DeferredCompositeMode_Name( (deferredCompositeMode_t)r_deferredCompositeMode->integer ) );
 		s_logged = qtrue;

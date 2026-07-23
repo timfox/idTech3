@@ -40,7 +40,7 @@ static uint32_t vk_fullres_framebuffer_height( void )
 
 void vk_create_framebuffers( void )
 {
-	VkImageView framebuffer_attachments[7];
+	VkImageView framebuffer_attachments[8];
 	VkFramebufferCreateInfo desc;
 	uint32_t n;
 	const uint32_t fullresWidth = vk_fullres_framebuffer_width();
@@ -79,16 +79,17 @@ void vk_create_framebuffers( void )
 				desc.attachmentCount = 3;
 				if ( vk.deferredGbufferDirectExport )
 				{
-					desc.attachmentCount = 5;
+					desc.attachmentCount = 6;
 					framebuffer_attachments[3] = vk.deferred_gbuffer_normal_view;
 					framebuffer_attachments[4] = vk.deferred_gbuffer_material_view;
+					framebuffer_attachments[5] = vk.deferred_gbuffer_surface_view;
 					if ( vk.visibilityBufferDirectExport &&
 						vk.visibility_buffer_ids_view != VK_NULL_HANDLE &&
 						vk.visibility_buffer_bary_view != VK_NULL_HANDLE )
 					{
-						desc.attachmentCount = 7;
-						framebuffer_attachments[5] = vk.visibility_buffer_ids_view;
-						framebuffer_attachments[6] = vk.visibility_buffer_bary_view;
+						desc.attachmentCount = 8;
+						framebuffer_attachments[6] = vk.visibility_buffer_ids_view;
+						framebuffer_attachments[7] = vk.visibility_buffer_bary_view;
 					}
 				}
 				if ( vk.msaaActive )

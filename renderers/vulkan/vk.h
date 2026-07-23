@@ -905,6 +905,9 @@ typedef struct {
 	VkImageView deferred_gbuffer_normal_view;
 	VkImage deferred_gbuffer_material;
 	VkImageView deferred_gbuffer_material_view;
+	/* MIXED_MATERIAL_DEFERRED: lm.rgb + owner in .a (dedicated — not packed into material/normal). */
+	VkImage deferred_gbuffer_surface;
+	VkImageView deferred_gbuffer_surface_view;
 	VkImage deferred_lighting_image;
 	VkImageView deferred_lighting_view;
 	/* 1x1 R8_UINT stub (value 1 = SIMPLE_OPAQUE) when material class map is unavailable. */

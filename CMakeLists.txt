@@ -4233,6 +4233,17 @@ if(BUILD_UNIT_TESTS)
 	add_test(NAME unit_bsp30_triangulate COMMAND unit_bsp30_triangulate)
 	set_tests_properties(unit_bsp30_triangulate PROPERTIES LABELS "unit;validation;bsp30")
 
+	add_executable(unit_gpu_frustum
+		tests/unit/test_gpu_frustum.c)
+	target_include_directories(unit_gpu_frustum PRIVATE
+		${CMAKE_SOURCE_DIR}/renderers/vulkan)
+	if(NOT MSVC)
+		target_link_libraries(unit_gpu_frustum PRIVATE m)
+	endif()
+	add_test(NAME unit_gpu_frustum COMMAND unit_gpu_frustum)
+	set_tests_properties(unit_gpu_frustum PROPERTIES LABELS "unit;validation;gpu_visibility")
+
+
 	add_executable(unit_cluster_math
 		tests/unit/test_cluster_math.c
 		renderers/vulkan/vk_cluster_math.cpp)

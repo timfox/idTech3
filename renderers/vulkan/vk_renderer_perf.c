@@ -47,7 +47,7 @@ static void VK_RendererMemory_f( void )
 		(double)colorBytes / ( 1024.0 * 1024.0 ),
 		(double)depthBytes / ( 1024.0 * 1024.0 ),
 		(double)gbufferBytes / ( 1024.0 * 1024.0 ) );
-	ri.Printf( PRINT_ALL, "GpuSceneObject[%u] sizeof=%zu budget ~%.2f MiB\n",
+	ri.Printf( PRINT_ALL, "GpuSceneObject / gpuSceneObject_t[%u] sizeof=%zu budget ~%.2f MiB\n",
 		4096u, sizeof( GpuSceneObject ),
 		(double)sceneObjBytes / ( 1024.0 * 1024.0 ) );
 	ri.Printf( PRINT_ALL, "staging=%zu geometry=%zu\n",

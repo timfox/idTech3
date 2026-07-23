@@ -9,6 +9,16 @@ TESTS=(
 	test_gpu_scene_layout.sh
 	test_gpu_draw_parity.sh
 	test_hiz_reversed_z.sh
+	test_gpu_scene_generation.sh
+	test_gpu_object_identity.sh
+	test_gpu_frustum_culling.sh
+	test_gpu_occlusion_culling.sh
+	test_indirect_command_bounds.sh
+	test_indirect_stale_prevention.sh
+	test_gpu_render_path_buckets.sh
+	test_gpu_dynamic_object_lifecycle.sh
+	test_gpu_capacity_fallback.sh
+	test_gpu_frame_ownership.sh
 	test_gbuffer_layout.sh
 	test_material_routing.sh
 	test_brdf_parity.sh
@@ -21,6 +31,12 @@ TESTS=(
 	test_deferred_honesty.sh
 	test_deferred_eligibility.sh
 	test_deferred_mixed_material.sh
+	test_deferred_architecture_modes.sh
+	test_gbuffer_true_base_color.sh
+	test_deferred_lightmap_term.sh
+	test_deferred_no_double_shading.sh
+	test_deferred_mixed_composite.sh
+	test_deferred_lighting_parity.sh
 )
 
 failures=0

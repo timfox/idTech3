@@ -84,6 +84,8 @@ typedef struct {
 	uint32_t clusterCount;
 	uint32_t gbufferCompact;
 	uint32_t mixedMaterial;
+	float sunDir[4];
+	float sunRadiance[4];
 } vrcs_light_push_t;
 
 typedef struct {
@@ -364,7 +366,7 @@ static qboolean VRCS_CreateComputePipe( VkShaderModule mod, VkDescriptorSetLayou
 
 static qboolean VRCS_CreatePipelines( void )
 {
-	VkDescriptorSetLayoutBinding binds[10];
+	VkDescriptorSetLayoutBinding binds[11];
 
 	VRCS_DestroyPipelines();
 
@@ -464,7 +466,11 @@ static qboolean VRCS_CreatePipelines( void )
 	binds[9].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
 	binds[9].descriptorCount = 1;
 	binds[9].stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
-	if ( !VRCS_CreateComputePipe( vk.modules.deferred_lighting_vrcs_cs, binds, 10, sizeof( vrcs_light_push_t ),
+	binds[10].binding = 10;
+	binds[10].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+	binds[10].descriptorCount = 1;
+	binds[10].stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+	if ( !VRCS_CreateComputePipe( vk.modules.deferred_lighting_vrcs_cs, binds, 11, sizeof( vrcs_light_push_t ),
 		&vrcs.light_layout, &vrcs.light_pl, &vrcs.light_pipe, &vrcs.light_pool, &vrcs.light_set,
 		"vrcs deferred lighting" ) ) {
 		return qfalse;
@@ -669,6 +675,26 @@ static void VRCS_FillLightPush( vrcs_light_push_t *push, uint32_t width, uint32_
 	push->clusterCount = vk.forward_plus.tile_capacity_tiles;
 	push->gbufferCompact = ( r_gbufferCompact && r_gbufferCompact->integer ) ? 1u : 0u;
 	push->mixedMaterial = R_DeferredMixedMaterialWanted() ? 1u : 0u;
+	{
+		vec3_t sunL;
+		float len;
+		VectorCopy( tr.sunDirection, sunL );
+		len = VectorLength( sunL );
+		if ( len > 1e-5f ) {
+			VectorScale( sunL, 1.0f / len, sunL );
+		} else {
+			sunL[0] = 0.35f; sunL[1] = 0.75f; sunL[2] = 0.55f;
+			VectorNormalize( sunL );
+		}
+		push->sunDir[0] = sunL[0];
+		push->sunDir[1] = sunL[1];
+		push->sunDir[2] = sunL[2];
+		push->sunDir[3] = 0.0f;
+		push->sunRadiance[0] = tr.sunLight[0];
+		push->sunRadiance[1] = tr.sunLight[1];
+		push->sunRadiance[2] = tr.sunLight[2];
+		push->sunRadiance[3] = R_DeferredMixedMaterialWanted() ? 3.0f : 0.0f;
+	}
 }
 
 qboolean vk_vrcs_dispatch_deferred_lighting( uint32_t width, uint32_t height )
@@ -676,7 +702,7 @@ qboolean vk_vrcs_dispatch_deferred_lighting( uint32_t width, uint32_t height )
 	VkCommandBuffer cmd;
 	VkImageAspectFlags depth_aspect;
 	VkSampler sampler;
-	VkDescriptorImageInfo imgInfo[8];
+	VkDescriptorImageInfo imgInfo[9];
 	VkDescriptorBufferInfo bufInfo[4];
 	VkWriteDescriptorSet writes[12];
 	vrcs_sri_push_t sriPush;
@@ -879,6 +905,10 @@ qboolean vk_vrcs_dispatch_deferred_lighting( uint32_t width, uint32_t height )
 	imgInfo[5].sampler = sampler;
 	imgInfo[5].imageView = classView;
 	imgInfo[5].imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+	imgInfo[6].sampler = sampler;
+	imgInfo[6].imageView = vk.deferred_gbuffer_surface_view ?
+		vk.deferred_gbuffer_surface_view : ( tr.whiteImage ? tr.whiteImage->view : classView );
+	imgInfo[6].imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 
 	nWrites = 0;
 	writes[nWrites].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
@@ -950,6 +980,13 @@ qboolean vk_vrcs_dispatch_deferred_lighting( uint32_t width, uint32_t height )
 	writes[nWrites].descriptorCount = 1;
 	writes[nWrites].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
 	writes[nWrites].pBufferInfo = &bufInfo[3];
+	nWrites++;
+	writes[nWrites].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+	writes[nWrites].dstSet = vrcs.light_set;
+	writes[nWrites].dstBinding = 10;
+	writes[nWrites].descriptorCount = 1;
+	writes[nWrites].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+	writes[nWrites].pImageInfo = &imgInfo[6];
 	nWrites++;
 	qvkUpdateDescriptorSets( vk.device, nWrites, writes, 0, NULL );
 

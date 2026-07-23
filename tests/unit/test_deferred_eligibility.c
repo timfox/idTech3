@@ -15,6 +15,7 @@ static const char *reason_name( int reason )
 	case 11: return "TRANSMISSION_OR_REFRACTION";
 	case 18: return "PBR_NATIVE";
 	case 19: return "CLASSIC_TRANSLATED";
+	case 20: return "BASE_COLOR_EXPORT_UNREPRESENTABLE";
 	default: return "UNKNOWN";
 	}
 }
@@ -32,6 +33,10 @@ int main( void )
 	}
 	if ( strcmp( reason_name( 19 ), "CLASSIC_TRANSLATED" ) != 0 ) {
 		fprintf( stderr, "FAIL: reason 19\n" );
+		fails++;
+	}
+	if ( strcmp( reason_name( 20 ), "BASE_COLOR_EXPORT_UNREPRESENTABLE" ) != 0 ) {
+		fprintf( stderr, "FAIL: reason 20\n" );
 		fails++;
 	}
 	if ( fails ) {

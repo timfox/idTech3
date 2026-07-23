@@ -21,15 +21,20 @@ pass "DEFERRED_HONESTY.md M2 vocabulary"
 grep -q 'MIXED_MATERIAL_DEFERRED' "$H" || fail "honesty.c must emit MIXED_MATERIAL_DEFERRED"
 grep -q 'R_DeferredMixedMaterialWanted' "$HH" || fail "R_DeferredMixedMaterialWanted missing"
 grep -q 'DEFERRED_ARCH_MIXED_MATERIAL' "$HH" || fail "DEFERRED_ARCH_MIXED_MATERIAL missing"
-grep -q 'DEFERRED_OWNER_BIAS\|1024' "$HH" || fail "owner bias constant missing"
-pass "honesty arch helpers"
+grep -q 'DEFERRED_OWNER_BIAS\|DEFERRED_SURFACE_OWNER' "$HH" || fail "ownership constants missing"
+grep -q 'deferred_gbuffer_surface\|GBufferSurfaceData\|out_deferred_surface' \
+	"$ROOT/renderers/vulkan/vk.h" \
+	"$ROOT/renderers/vulkan/shaders/glsl/gen_frag.tmpl" || fail "SurfaceData MRT missing"
+pass "honesty arch helpers + SurfaceData"
 
 grep -q 'deferredMixedHandoff' "$GF" || fail "gen_frag must gate mixed handoff"
-grep -q 'staticLightExport' "$GF" || fail "gen_frag must export static light"
+grep -q 'out_deferred_surface\|GBufferSurfaceData\|staticLightExport' "$GF" || fail "gen_frag must export SurfaceData"
 grep -q 'gbufferBaseColor' "$GF" || fail "gen_frag must export unlit base"
-pass "gen_frag mixed export"
+if grep -qE '1024\.0|ownerBias' "$GF"; then fail "gen_frag must not use owner bias packing"; fi
+pass "gen_frag mixed SurfaceData export"
 
-grep -q 'mixedMaterial' "$LC" || fail "lighting common must handle mixedMaterial"
+grep -q 'DEFERRED_HAS_SURFACE\|surfaceTex\|surf\.a' "$LC" || fail "lighting must decode SurfaceData"
+if grep -qE 'ownerBias|1024\.0' "$LC"; then fail "lighting must not use ownerBias packing"; fi
 grep -q 'staticTerm\|lightmapIrr' "$LC" || fail "lighting must apply lightmap static term"
 grep -q 'mixedMaterial' "$CF" || fail "composite must handle mixed ownership"
 pass "deferred lighting + composite mixed path"

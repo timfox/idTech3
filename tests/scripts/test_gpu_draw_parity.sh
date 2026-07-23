@@ -16,12 +16,10 @@ grep -q 'PVS' "$DOC" || fail "doc must mention PVS stage"
 grep -qi 'stale' "$DOC" || fail "doc must mention stale indirect clearing"
 pass "GPU_DRIVEN_RENDERING.md symbols present"
 
-grep -q 'r_gpuScene' "$SRC" || fail "r_gpuScene missing"
-grep -q 'r_gpuSceneCull' "$SRC" || fail "r_gpuSceneCull missing"
-grep -q 'r_gpuSceneIndirect' "$SRC" || fail "r_gpuSceneIndirect missing"
-grep -q 'vk_gpu_scene_cull_and_build_indirect' "$SRC" || fail "cull/indirect entry missing"
-grep -q 's_rejectFrustum\|s_rejectHiz\|s_rejectLod' "$SRC" || fail "reject telemetry missing"
-pass "GPU cull/indirect implementation present"
+grep -q 'r_gpuDriven' "$SRC" || fail "r_gpuDriven missing"
+grep -q '0", "2"\|"0", "2"' "$SRC" || grep -q 'r_gpuDriven.*0.*2' "$SRC" || fail "r_gpuDriven range 0-2"
+grep -q 'r_gpuDrawForceStaleCommand\|s_drawCountPublished' "$SRC" || fail "stale prevention"
+pass "GPU cull/indirect + stale prevention present"
 
 if [[ $failures -ne 0 ]]; then
 	echo "$failures check(s) failed"

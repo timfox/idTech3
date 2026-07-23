@@ -109,9 +109,10 @@ layout(location = 1) out vec2 out_motion;
 #ifdef USE_DEFERRED_EXPORT
 layout(location = 2) out vec4 out_deferred_normal;
 layout(location = 3) out vec4 out_deferred_material;
+layout(location = 4) out vec4 out_deferred_surface; /* GBufferSurfaceData: lm.rgb + owner.a */
 #ifdef USE_VISIBILITY_EXPORT
-layout(location = 4) out uvec2 out_vis_ids; /* drawId, primId */
-layout(location = 5) out vec2 out_vis_bary;
+layout(location = 5) out uvec2 out_vis_ids; /* drawId, primId */
+layout(location = 6) out vec2 out_vis_bary;
 #endif
 #endif
 #endif
@@ -1644,23 +1645,21 @@ void main() {
 	}
 
 #ifdef USE_DEFERRED_EXPORT
-	/* World-space normal scaffold; material.a = clearcoat (or AO in .a when compact dual-write).
-	 * MIXED owned pixels: material = metal/rough/lm.rg, normal.a = lm.b + DEFERRED_OWNER_BIAS. */
+	/* World-space normal + material (documented channels). SurfaceData holds LM + owner. */
 	{
 		vec3 nExport = normalize( N );
-		const float ownerBias = 1024.0;
-		if ( deferredMixedHandoff && deferredAdditiveHandoff ) {
-			out_deferred_normal = vec4( nExport, staticLightExport.b + ownerBias );
-			out_deferred_material = vec4( metalness, roughness, staticLightExport.r, staticLightExport.g );
+		out_deferred_normal = vec4( nExport, ( gbuffer_compact != 0 ) ? clamp( AO, 0.0, 1.0 ) : 1.0 );
+		if ( gbuffer_compact != 0 ) {
+			/* Compact: metal/rough + octahedral; AO in normal.a; clearcoat via Forward+ or defaults. */
+			vec2 oct = GbufEncodeOctahedral( nExport );
+			out_deferred_material = vec4( metalness, roughness, oct );
 		} else {
-			out_deferred_normal = vec4( nExport, ( gbuffer_compact != 0 ) ? clamp( AO, 0.0, 1.0 ) : 1.0 );
-			if ( gbuffer_compact != 0 ) {
-				/* Compact G-buffer 2.0 prep: metal/rough + octahedral; AO in normal.a; clearcoat defaults in lighting. */
-				vec2 oct = GbufEncodeOctahedral( nExport );
-				out_deferred_material = vec4( metalness, roughness, oct );
-			} else {
-				out_deferred_material = vec4( metalness, roughness, AO, deferredClearcoat );
-			}
+			out_deferred_material = vec4( metalness, roughness, AO, deferredClearcoat );
+		}
+		if ( deferredMixedHandoff && deferredAdditiveHandoff ) {
+			out_deferred_surface = vec4( staticLightExport, 1.0 );
+		} else {
+			out_deferred_surface = vec4( 0.0 );
 		}
 	}
 #ifdef USE_VISIBILITY_EXPORT

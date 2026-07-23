@@ -1,6 +1,6 @@
 # Deferred Honesty Milestone
 
-**Status:** Milestone 2 shipping (mixed material deferred + lightmap ownership)  
+**Status:** Milestone 3 — lighting parity + dedicated SurfaceData (MIXED_MATERIAL_DEFERRED)  
 **Related:** [GBUFFER_2.md](GBUFFER_2.md) · [RENDERER_PATH_OWNERSHIP.md](RENDERER_PATH_OWNERSHIP.md) · [SHARED_BRDF.md](SHARED_BRDF.md)
 
 ---
@@ -9,62 +9,72 @@
 
 | Value | Name | Role |
 |------:|------|------|
-| **0** | `HYBRID_ADDITIVE_DEFERRED` | Forward+/legacy writes **SceneBaseLit**; deferred adds clustered dynamics. Compatibility / reference. |
+| **0** | `HYBRID_ADDITIVE_DEFERRED` | Forward+/legacy writes **SceneBaseLit**; deferred adds clustered dynamics. Compatibility / reference — **not** full deferred. |
 | **1** | `MIXED_MATERIAL_DEFERRED` | Eligible surfaces export **unlit** G-buffer; deferred owns **lightmap static + dynamics**. Ineligible stay Forward+. **Production target.** |
-| **2** | `STRICT_DEFERRED_VALIDATION` | Same mixed path; non-translatable / invalid surfaces are **UNSUPPORTED** (no silent Forward+). |
-| **3** | `DEFERRED_COMPARISON` | Mixed deferred vs Forward+ (split via hybridCompare). |
+| **2** | `STRICT_DEFERRED_VALIDATION` | Mixed path; non-translatable / invalid → **UNSUPPORTED** (no silent Forward+). |
+| **3** | `DEFERRED_COMPARISON` | Mixed deferred vs Forward+ (split). |
 
-### `HYBRID_ADDITIVE_DEFERRED` (0)
+Opt-in config: `exec modern_deferred_mixed.cfg` (then `vid_restart`). Default remains arch **0** until OA parity captures pass.
 
-| Owner | Role |
-|-------|------|
-| Forward+ / legacy fragment | **SceneBaseLit** — lightmaps, vertex primary, IBL-in-fragment where applicable |
-| Deferred compute | **DeferredDynamicLighting** — clustered point/spot (+ area) on top |
-| Composite | `CombinedSceneHDR ≈ SceneBaseLit + DeferredDynamic` |
+### Logical resources
 
-### `MIXED_MATERIAL_DEFERRED` (1)
+| Name | Meaning |
+|------|---------|
+| **GBufferBaseColor** | Unlit diffuse × rgbGen modulation only (albedo attachment / color copy for owned) |
+| **GBufferNormal** | World-space shading normal; compact: `.a` = AO |
+| **GBufferMaterial** | Expanded: `(metal, rough, AO, clearcoat)`; compact: `(metal, rough, oct.xy)` |
+| **GBufferSurfaceData** | Dedicated MRT: `.rgb` = lightmap / static irradiance, `.a` = ownership `1` / `0` |
+| **GBufferEmissive** | Material emissive (fragment path; not mixed into base) |
+| **GBufferValidity** | CPU/GPU flags: `GBUFFER_VALID_*`, `APPROXIMATED`, `TRANSLATED_CLASSIC`, `PBR_NATIVE`, `USING_LIT_SCENE_AS_BASE` |
+| **GBufferOwnership** | `PIXEL_OWNER_*` + lighting `.a` owner mask in mixed mode |
+| **SceneBaseLit** | Full Forward+/legacy lit opaque (arch 0 base; Forward+ fallback in arch 1) |
+| **DeferredLightingHDR** | Compute output (dynamics-only in arch 0; static+dynamic for owned in arch 1) |
+| **ForwardFallbackHDR** | Scene color for ineligible opaques |
+| **CombinedSceneHDR** | Ownership composite result |
 
-| Owner | Role |
-|-------|------|
-| Eligible opaque fragment | **GBufferBaseColor** (unlit), normal, metal/rough, **lightmap irradiance** packed into G-buffer; `out_color` = unlit (albedo copy) |
-| Deferred compute | `static = albedo × (1−metal) × lightmap` + clustered dynamics; **owner mask** in lighting `.a` |
-| Ineligible opaque | Full Forward+ **SceneBaseLit**; deferred writes zero |
-| Composite | Owned pixels **replace** with deferred HDR; others keep scene base |
+### Mixed packing (owned pixels) — SurfaceData
 
-Packing (owned pixels): `material = (metal, rough, lm.r, lm.g)`, `normal.a = lm.b + 1024` (owner bias).
+Lightmap and ownership live in **GBufferSurfaceData** (`R16G16B16A16_SFLOAT` MRT location 4):
+
+- `surface.rgb` = static lightmap / irradiance export
+- `surface.a` = `1` owned, `0` unowned (clears are unowned)
+
+Material and normal keep documented semantics (no `material.ba` LM pack; no `normal.a + 1024` owner bias).
+
+### Lightmap decode
+
+Shared helper: `shaders/glsl/lightmap_decode.glsl`. Decoded BSP lightmaps are a **scene-linear irradiance / baked diffuse radiance proxy** after `lightmap_scale` (overbright), optional sRGB decode. Not exposure, fog, or tonemap. Static term:
+
+`staticDiffuse = baseColor × (1 − metal) × lightmapIrradiance × AO`
 
 ---
 
 ## Eligibility
 
-Authoritative API: `R_GetDeferredEligibility()` in `vk_deferred_honesty.c`.
+`R_GetDeferredEligibility()` — tint via `r_deferredEligibilityDebug`.
 
-| Result | Tint (`r_deferredEligibilityDebug 1`) | Path |
-|--------|----------------------------------------|------|
-| `ELIGIBLE_FULL` | green | Deferred opaque (native PBR) |
-| `ELIGIBLE_APPROXIMATE` | yellow | Certified translated classic |
-| `FORWARD_FALLBACK` | blue | Forward+ opaque |
-| `UNSUPPORTED` | magenta | Sky / weapon / transparent / portal / refractive (strict: also failed classic) |
-| `DEBUG_FORCED` | red | `r_deferredForceEligibility` |
+| Result | Path |
+|--------|------|
+| `ELIGIBLE_FULL` | Native PBR deferred |
+| `ELIGIBLE_APPROXIMATE` | Certified translated classic (gbuf path required in mixed) |
+| `FORWARD_FALLBACK` | Forward+ |
+| `UNSUPPORTED` | Sky / weapon / transparent / portal / refractive (strict: failed classic) |
 
-Non-translatable classic multi-stage / env / animated shaders **do not** enter deferred by accident.
-
-**Mixed export gate:** `MIXED_MATERIAL_DEFERRED` only takes deferred ownership when the draw can use the gbuf/PBR fragment path (`hasPBR` or stage `vk_pbr_flags`). Certified classics without that path remain Forward+ (no black holes). Hybrid arch 0 can still light them via SceneBaseLit.
+**Mixed export gate:** needs gbuf/PBR fragment path (`hasPBR` or stage `vk_pbr_flags`).
 
 ---
 
-## Classic translation (certified subset)
+## Classic translation
 
-`R_TranslateClassicShaderToMaterial()` accepts:
+Certified: one diffuse ± lightmap ± alpha-test ± optional PBR maps.
 
-- single diffuse stage
-- optional lightmap stage
-- optional alpha-test
-- optional PBR maps on that stage (normal / physical / emissive)
+**rgbGen audit:** `identity`, `identityLighting`, `vertex`, `exactVertex`, `const`, `entity` only. Others → `BASE_COLOR_EXPORT_UNREPRESENTABLE` → Forward+.
 
-Rejects (→ Forward+ or UNSUPPORTED in strict): multi-diffuse stages, complex tcMods, env maps, animation/video, deforms, portals, blends, transmission/refraction.
+Audit bits: `BASE_COLOR_STAGE_VALID`, `BASE_COLOR_VERTEX_MODULATION_VALID`, `BASE_COLOR_CONSTANT_MODULATION_VALID`, `LIGHTMAP_STAGE_VALID`.
 
-Console: `material_translate_status <shader-name>`
+Legacy material defaults (visible approximation): `r_legacyDeferredRoughness` (0.72), `r_legacyDeferredSpecular` (0.04 F0), flagged `GBUFFER_APPROXIMATED`.
+
+`material_translate_status <shader>` prints stage, rgbGen, tcGen, LM, logical base color, eligibility, owner.
 
 ---
 
@@ -72,27 +82,76 @@ Console: `material_translate_status <shader-name>`
 
 | Name | Role |
 |------|------|
-| `r_deferredArchitecture` | 0 hybrid · **1 mixed** · 2 strict · 3 compare (latched) |
-| `r_deferredCompositeMode` | 0 additive · 1 full replace · 2 side-by-side · 3 material validate |
-| `r_deferredEligibilityDebug` | Eligibility false-color |
-| `r_gbufferInvalidPolicy` | 0 magenta · **1 Forward+** · 2 unlit diag |
-| `r_gbufferCompact` | Storage layout; mixed owned pixels override compact packing |
-| `deferred_status` | Honesty counters + architecture label |
-| `material_translate_status` | Per-shader translation dump |
+| `r_deferredArchitecture` | 0–3 latched |
+| `r_gbufferInvalidPolicy` | 0 magenta · **1 Forward+** · 2 unlit |
+| `r_legacyDeferredRoughness` / `r_legacyDeferredSpecular` | Classic defaults |
+| `r_deferredLightmapMode` | 0 irradiance · 1 deluxe (when available) · 2 compare |
+| `r_deferredLightmapDebug` | 1–5 LM debug |
+| `r_deferredOwnershipDebug` | 1–3 ownership / double / unowned |
+| `r_deferredCompositeDebug` | 1–4 composite inputs |
+| `r_deferredArchitectureCompare` | arch0 vs arch1 split helper |
+| `deferred_status` | Full M2/M3 counters |
+| `material_translate_status` | Per-shader translation |
 
 ---
 
-## Missing (later phases)
+## `deferred_status` counters
 
-- Full sun BRDF in compute (today: CSM visibility modulate)
-- Shared lobed parity (IBL / sheen / SSS) in deferred
-- Dedicated lightmap MRT (today: packed into material/normal)
-- Compact decode parity tests
-- OA material validation map captures
-- Double-shade removal is done for **eligible** mixed pixels; hybrid arch 0 still additive by design
+architecture · eligible · true-G-buffer · additive-hybrid · Forward+ fallback · SceneBaseLit pixels · GBufferBaseColor pixels · deferred LM · Forward+ LM · **doubleShaded** · **unowned** · **invalidGBuffer**
+
+In `MIXED_MATERIAL_DEFERRED`, double-shaded and unowned should stay **0**.
 
 ---
 
-## Regression
+## Milestone 3 — lighting parity + SurfaceData
 
-`tests/scripts/test_deferred_honesty.sh` · `tests/scripts/test_deferred_eligibility.sh` · `tests/scripts/test_deferred_mixed_material.sh`
+### Shipping
+
+- Full sun BRDF in compute: Burley + GGX + multiscatter + clearcoat lobe; CSM on primary only
+- Sky IBL: BRDF LUT + prefilter + irradiance (`r_deferredIbl`, bindings 12–14); LM owns diffuse ⇒ skip sky diffuse
+- **GBufferSurfaceData** MRT + lighting binding 15 — replaces overloaded `material.ba` / `normal.a+1024` pack
+- Compact octahedral decode works with mixed (oct in `material.ba`, AO in `normal.a`)
+- Expanded mixed clearcoat from `material.a` (compact clearcoat still Forward+)
+- Shared local lights: Forward+ tile SSBOs + Burley/GGX/`clearcoat_lobe`
+
+### Remaining / deferred
+
+- Local reflection / irradiance probe pick (sky cubemap only for now)
+- Compact clearcoat channel (extension buffer) — coat materials **Forward+** when compact
+- Deluxe directional in compute (cvar reserved)
+- GPU material-export / lightmap parity live stats
+- Interactive OA capture matrix
+- Promote arch 1 to default only after live OA validation
+
+### Cvars (M3)
+
+- `r_deferredSunBrdf 1` (default): evaluate directional sun in mixed deferred
+- `r_deferredIbl 1` / `r_deferredIblStrength`: sky split-sum IBL for owned deferred pixels
+- Lightmap owns static diffuse (`sunFlags` bit1): sun/IBL add specular without double-baking diffuse
+- CSM modulates `staticTerm + sunTerm` only — clustered locals stay undarkened (Forward+ primary parity)
+- `r_deferredLightingParity` reserved for difference views
+
+### Local-light / lobe parity
+
+| Term | Deferred mixed | Notes |
+|------|----------------|-------|
+| Point / spot / attenuation | Shared tile lists | Same `attenPointLight` / spot packing |
+| Area (LTC) | Shared when LTC bound | VRCS path skips area |
+| Sun CSM | Primary only | Locals not multiplied by sunVis |
+| Clearcoat | Expanded (incl. mixed) | Compact → Forward+ |
+| Sheen / anisotropy | Forward+ | Explicit eligibility gate |
+
+---
+
+## Recommended next after M3 parity
+
+Promote arch 1 to `modern_clustered.cfg` only after live OA validation, then **GPU-driven scene + meshlets** (stop expanding deferred).
+
+---
+
+## Configs / tests
+
+- `config/modern_deferred_mixed.cfg`
+- `config/demo_deferred_material_export.cfg`
+- `config/demo_deferred_lightmap_parity.cfg`
+- `tests/scripts/test_deferred_*.sh` / `test_gbuffer_*.sh` / `test_lightmap_parity.sh` / `test_material_export_parity.sh`
