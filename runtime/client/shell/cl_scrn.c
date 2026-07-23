@@ -244,16 +244,19 @@ static int SCR_HudTtfTargetPixelHeightForVirtual( float virtualHeight ) {
 	if ( targetPx < 10 ) {
 		targetPx = 10;
 	}
-	/* Keep FreeType atlases modest so sm+md+lg+console fit after reloadTtf. */
-	if ( targetPx > 36 ) {
-		targetPx = 36;
+	/*
+	 * Allow sharper large-tier glyphs (menu "SURF", timer digits) without the
+	 * old 28pt@144dpi / 2048 atlas OOM.  48px @ 96dpi ≈ 36pt before clamp.
+	 */
+	if ( targetPx > 48 ) {
+		targetPx = 48;
 	}
 	return targetPx;
 }
 
 static int SCR_ComputeHudTtfPointSizeTier( int tier ) {
-	/* Virtual heights match HUD labels / body / timer-speed digits. */
-	static const float virtH[3] = { 8.0f, 13.0f, 20.0f };
+	/* Virtual heights match HUD labels / body / timer + pause title. */
+	static const float virtH[3] = { 8.0f, 13.0f, 24.0f };
 	int pt;
 
 	if ( tier < 0 ) {
@@ -263,12 +266,15 @@ static int SCR_ComputeHudTtfPointSizeTier( int tier ) {
 		tier = 2;
 	}
 	pt = SCR_TtfPointSizeForPixelHeight( SCR_HudTtfTargetPixelHeightForVirtual( virtH[tier] ) );
-	/* Extra clamp on the large tier — 28pt@144dpi was OOMing atlas pages. */
-	if ( tier == 2 && pt > 18 ) {
-		pt = 18;
+	/*
+	 * Large tier: 24pt@96dpi stays well under the prior OOM case (28pt@144dpi).
+	 * Medium/small keep modest so three atlases + console still fit.
+	 */
+	if ( tier == 2 && pt > 24 ) {
+		pt = 24;
 	}
-	if ( tier == 1 && pt > 14 ) {
-		pt = 14;
+	if ( tier == 1 && pt > 16 ) {
+		pt = 16;
 	}
 	if ( tier == 0 && pt > 11 ) {
 		pt = 11;

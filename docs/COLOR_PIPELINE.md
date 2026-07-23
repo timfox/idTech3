@@ -1,8 +1,8 @@
 # Color Pipeline Contract
 
-**Status:** Phase 1–2.5 complete + **Phase 2.6 / 2.6A** evidence-backed live WBOIT certification (lab, readback, metrics).  
-**Code:** `vk_color_contract.c` / `vk_oit_contract.c` / `vk_oit_alpha.c` / `vk_depth_contract.c` / `vk_hdr_resolve_contract.c` / `vk_oit_weight_contract.c` / `vk_wboit_production_cert.c` / `vk_cert_readback.c` / `vk_cert_metrics.c` / `vk_oit_lab.c` / `vk_transparency_lab.c` / `vk_specialized_transparency.c`  
-**Commands:** `color_pipeline_status`, `oit_contract_status`, `oit_weight_status`, `wboit_production_status`, `oit_lab_run`, `cert_readback_capture`, `oit_certification_export`  
+**Status:** Phase 1–2.5 complete + **Phase 2.6 / 2.6A / 2.6B** evidence-backed live WBOIT certification (lab, readback, metrics, deterministic GPU fixtures, `oit_certify_core`).  
+**Code:** `vk_color_contract.c` / `vk_oit_contract.c` / `vk_oit_alpha.c` / `vk_depth_contract.c` / `vk_hdr_resolve_contract.c` / `vk_oit_weight_contract.c` / `vk_wboit_production_cert.c` / `vk_cert_readback.c` / `vk_cert_metrics.c` / `vk_oit_cert_geometry.c` / `vk_oit_lab.c` / `vk_transparency_lab.c` / `vk_specialized_transparency.c`  
+**Commands:** `color_pipeline_status`, `oit_contract_status`, `oit_weight_status`, `wboit_production_status`, `oit_certify_core`, `oit_lab_run`, `cert_readback_capture`, `oit_certification_export`  
 **Debug:** `r_oitCertificationDebug`, `r_transparencyReference`, `r_oitAllowManualCertification`, `r_requireWboitCertification`
 
 This document is the single contract for scene-linear color and transparency. Older notes in [HDR_PIPELINE.md](HDR_PIPELINE.md) and [WBOIT_FOG_LAYERS.md](WBOIT_FOG_LAYERS.md) defer to this order for composition. Exact WBOIT math/formats/blends: [WBOIT_CONTRACT.md](WBOIT_CONTRACT.md). Alpha source encoding: [WBOIT_ALPHA_ENCODING.md](WBOIT_ALPHA_ENCODING.md). Live GPU certification: [WBOIT_LIVE_CERTIFICATION.md](WBOIT_LIVE_CERTIFICATION.md). Specialized routes: [TRANSPARENCY_ROUTING.md](TRANSPARENCY_ROUTING.md).

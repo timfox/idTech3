@@ -29,6 +29,8 @@ SSAO/HBAO pass, and vk_bloom. Split from vk.c.
 #include "vk_shadow_contract.h"
 #include "vk_temporal.h"
 #include "vk_oit_certify.h"
+#include "vk_oit_cert_geometry.h"
+#include "vk_oit_lab.h"
 #include "vk_hdr_resolve_contract.h"
 #include "vk_black_frame.h"
 
@@ -618,6 +620,8 @@ void vk_oit_pass( const struct drawSurfsCommand_s *cmd )
 			backEnd.oitAccumPass = qtrue;
 			backEnd.drawSurfFilter = 2;
 			RB_RenderDrawSurfList( cmd->drawSurfs, cmd->numDrawSurfs );
+			/* Phase 2.6B: inject deterministic certification panes into live WBOIT accum. */
+			vk_oit_cert_geometry_draw_bucket( backEnd.oitBucketFilter );
 			backEnd.oitAccumPass = qfalse;
 			backEnd.drawSurfFilter = 0;
 			vk.oitFrameState = VK_OIT_FRAME_ACCUMULATED;
@@ -779,6 +783,11 @@ void vk_oit_pass( const struct drawSurfsCommand_s *cmd )
 	vk.oitLastFallbackReason[0] = '\0';
 	vk.oitUnhealthy = qfalse;
 	vk_spine_pass_end( VK_SPINE_PASS_OIT_RESOLVE );
+
+	/* Phase 2.6B: evaluate armed cert fixtures against GPU readback (WBOIT only). */
+	if ( !mboit ) {
+		vk_oit_lab_on_oit_resolved();
+	}
 
 	if ( vk.msaaActive ) {
 		VkImageAspectFlags depth_aspect = VK_IMAGE_ASPECT_DEPTH_BIT;
