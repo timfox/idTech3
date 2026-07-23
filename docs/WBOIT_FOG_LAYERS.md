@@ -2,6 +2,8 @@
 
 Fog ownership for production WBOIT (`r_oit 1`): opaque background is fogged once; transparent surfaces receive **per-fragment lit fog** during accumulation; resolve must **not** apply a second full-screen fog pass on the transparent result.
 
+**Authoritative color / OIT order:** [COLOR_PIPELINE.md](COLOR_PIPELINE.md) (Phase 1 contract). This doc only owns fog-through-layers rules inside that spine.
+
 **Related:** [MOMENT_OIT_STOCHASTIC_ALPHA.md](MOMENT_OIT_STOCHASTIC_ALPHA.md) · [WBOIT_GPU_CERTIFICATION.md](WBOIT_GPU_CERTIFICATION.md) (B6a fog/volumetrics case) · [OIT_FUTURE_TRACKS.md](OIT_FUTURE_TRACKS.md)
 
 **Demo:** `exec demo_wboit_fog_layers.cfg`
@@ -13,8 +15,10 @@ Fog ownership for production WBOIT (`r_oit 1`): opaque background is fogged once
 World HDR is built in this order (Spine 1.1 / mode 3 clustered path):
 
 ```text
-opaque (+ volumetrics) → WBOIT fogged-lit accum → resolve over fogged opaque → weapon → bloom → exposure → tonemap → UI
+opaque (+ owned froxel fog) → WBOIT fogged-lit accum → resolve over fogged opaque
+  → refraction → weapon → bloom → exposure → tonemap → grade → display → UI
 ```
+(See [COLOR_PIPELINE.md](COLOR_PIPELINE.md) for the full 17-stage list; froxel may run before OIT while other volumetrics remain post-weapon where owned.)
 
 ```mermaid
 flowchart LR

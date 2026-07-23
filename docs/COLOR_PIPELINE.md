@@ -1,0 +1,170 @@
+# Color Pipeline Contract
+
+**Status:** Phase 1 — authoritative spaces + stage order (Color Pipeline Reconstruction / Production OIT).  
+**Code:** `vk_color_contract.c` / `vk_color_contract.h`  
+**Commands:** `color_pipeline_status`, `color_pipeline_validate`  
+**Debug:** `r_colorContractDebug` (0–2)
+
+This document is the single contract for scene-linear color and transparency. Older notes in [HDR_PIPELINE.md](HDR_PIPELINE.md) and [WBOIT_FOG_LAYERS.md](WBOIT_FOG_LAYERS.md) defer to this order for composition.
+
+**Do not** start virtual shadows, DDGI, meshlets, ray tracing, or further GPU-driven migration until color/OIT certification passes.
+
+---
+
+## Production policy
+
+| Path | Cvar | Policy |
+|------|------|--------|
+| WBOIT | `r_oit 1` | **Production** general-purpose OIT |
+| MBOIT | `r_oit 2` | **Experimental** until same certification as WBOIT |
+| Specialized | refractive / portal / screenMap | After OIT resolve; not in WBOIT accum |
+| Off | `r_oit 0` | Sorted alpha (legacy); still must respect spaces below |
+
+All transparent lighting and OIT composition occur in **SCENE_LINEAR_HDR**. No pass may mix gamma-encoded, pre-exposed, tone-mapped, premultiplied, or straight-alpha data without an explicit encode/decode at a named stage boundary.
+
+---
+
+## Color spaces
+
+```text
+TEXTURE_SRGB
+TEXTURE_LINEAR
+SCENE_LINEAR_HDR
+PREEXPOSED_SCENE_LINEAR_HDR
+DISPLAY_LINEAR
+DISPLAY_ENCODED
+```
+
+| Space | Meaning | Typical owners |
+|-------|---------|----------------|
+| `TEXTURE_SRGB` | Encoded albedo / emissive samples before decode | Sampler sRGB views |
+| `TEXTURE_LINEAR` | Decoded material inputs (albedo, roughness scalars already linear) | Texture decode / material eval |
+| `SCENE_LINEAR_HDR` | Scene radiance before exposure; opaque + transparent + bloom | Lighting, OIT, weapon, volumetrics |
+| `PREEXPOSED_SCENE_LINEAR_HDR` | Scene HDR × exposure | Auto-exposure apply |
+| `DISPLAY_LINEAR` | Tone-mapped, still linear for grading | Tonemap, color grade |
+| `DISPLAY_ENCODED` | Transfer-function encoded for swapchain / UI | Display transform, UI |
+
+### Alpha encodings
+
+| Encoding | Use |
+|----------|-----|
+| `opaque` | No alpha blend |
+| `straight` | RGB unrelated to α (material opacity before premultiply) |
+| `premultiplied` | WBOIT accum color × weight (RGB already × α factors) |
+| `coverage` | Reveal / ∏(1−α) product for WBOIT resolve |
+
+---
+
+## Required pass order
+
+```text
+ 1. Texture decode
+ 2. Material evaluation
+ 3. Opaque scene-linear lighting
+ 4. Sky and atmosphere
+ 5. Opaque HDR composition
+ 6. Transparent scene-linear lighting
+ 7. OIT accumulation
+ 8. OIT resolve over opaque HDR
+ 9. Specialized refraction
+10. Weapon HDR composition
+11. Volumetric integration where owned
+12. Bloom extraction and convolution
+13. Exposure
+14. Tone mapping
+15. Color grading
+16. Display transform
+17. UI composition
+```
+
+```mermaid
+flowchart TD
+  T[1 Texture decode] --> M[2 Material eval]
+  M --> OL[3 Opaque lighting]
+  OL --> SK[4 Sky / atmosphere]
+  SK --> OH[5 Opaque HDR]
+  OH --> TL[6 Transparent lighting]
+  TL --> OA[7 OIT accum]
+  OA --> OR[8 OIT resolve]
+  OR --> RF[9 Refraction]
+  RF --> WP[10 Weapon HDR]
+  WP --> VO[11 Volumetric owned]
+  VO --> BL[12 Bloom]
+  BL --> EX[13 Exposure]
+  EX --> TM[14 Tonemap]
+  TM --> CG[15 Color grade]
+  CG --> DT[16 Display]
+  DT --> UI[17 UI]
+```
+
+Stage enums in `vkColorPipelineStage_t` match this list 1:1. Runtime writers call `vk_color_contract_note_stage()`.
+
+---
+
+## Stage ↔ expected space / alpha
+
+| # | Stage | Space | Alpha |
+|---|-------|-------|-------|
+| 1 | texture_decode | `TEXTURE_LINEAR` (from `TEXTURE_SRGB` where applicable) | opaque |
+| 2 | material_eval | `SCENE_LINEAR_HDR` inputs | opaque / straight opacity |
+| 3 | opaque_lighting | `SCENE_LINEAR_HDR` | opaque |
+| 4 | sky_atmosphere | `SCENE_LINEAR_HDR` | opaque |
+| 5 | opaque_hdr_composite | `SCENE_LINEAR_HDR` | opaque |
+| 6 | transparent_lighting | `SCENE_LINEAR_HDR` | straight |
+| 7 | oit_accum | `SCENE_LINEAR_HDR` | premultiplied |
+| 8 | oit_resolve | `SCENE_LINEAR_HDR` | coverage |
+| 9 | refraction | `SCENE_LINEAR_HDR` | specialized |
+| 10 | weapon_hdr | `SCENE_LINEAR_HDR` | opaque |
+| 11 | volumetric | `SCENE_LINEAR_HDR` | as owned |
+| 12 | bloom | `SCENE_LINEAR_HDR` | opaque |
+| 13 | exposure | `PREEXPOSED_SCENE_LINEAR_HDR` | opaque |
+| 14 | tonemap | `DISPLAY_LINEAR` | opaque |
+| 15 | color_grade | `DISPLAY_LINEAR` | opaque |
+| 16 | display_transform | `DISPLAY_ENCODED` | opaque |
+| 17 | ui | `DISPLAY_ENCODED` | straight |
+
+---
+
+## Hard rules
+
+1. **Decode once.** Albedo from sRGB textures becomes linear before lighting. Do not light in encoded space.
+2. **OIT before exposure/tonemap.** Accum and resolve write `SCENE_LINEAR_HDR` over opaque HDR. Never resolve into LDR or display-encoded targets.
+3. **Premultiply only at accum.** Transparent lit radiance uses straight α for coverage; WBOIT weights produce premultiplied accum + coverage reveal.
+4. **No double fog on resolve.** Fog ownership: [WBOIT_FOG_LAYERS.md](WBOIT_FOG_LAYERS.md).
+5. **Weapon after OIT.** Viewmodel HDR composites after resolve/refraction, still scene-linear.
+6. **Bloom before exposure** (or bloom on pre-exposed only if the exposure stage owns both — current spine: bloom on scene HDR, then exposure).
+7. **UI last.** UI draws in `DISPLAY_ENCODED`; do not feed UI into bloom/tonemap.
+
+---
+
+## Runtime enforcement
+
+| Hook | Role |
+|------|------|
+| `vk_color_contract_register()` | Cvars + `color_pipeline_*` commands (from `R_Init`) |
+| `vk_color_contract_begin_frame()` | Clear per-frame stage notes (with black-frame begin) |
+| `vk_color_contract_note_stage()` | Record writer + check space / order |
+| `vk_color_contract_validate()` | Static table + frame mismatches |
+| Black-frame pass names | Map `ForwardOpaque` / `WBOIT*` / `Bloom` / `Tonemap` / … into stages |
+
+`oit_status` `passOrder=` mirrors the production spine abbreviated as:
+
+```text
+opaque→deferred→oit_accum→oit_resolve→refractive→weapon→bloom→exposure→tonemap→grade→display→ui
+```
+
+Full 17-step contract remains authoritative in this doc and `color_pipeline_status`.
+
+---
+
+## Relation to HDR_PIPELINE.md
+
+[HDR_PIPELINE.md](HDR_PIPELINE.md) covers post-chain bookkeeping (`vk_hdr_pipeline_*`: scene / bloom / exposure / tonemap / gamma). Color Pipeline Phase 1 **extends** that with texture→material→OIT→weapon ordering and explicit spaces. Prefer `color_pipeline_status` when diagnosing transparency or space mismatches; use `hdr_pipeline_status` for post-chain writer spine.
+
+---
+
+## Certification (Phase 1)
+
+Static gates: `tests/scripts/test_color_pipeline_contract.sh` (via `test_foundation_consolidation.sh`).
+
+Later phases: GPU WBOIT certification cases, straight/premul fringe fixes, fog-depth cases — see [WBOIT_GPU_CERTIFICATION.md](WBOIT_GPU_CERTIFICATION.md).

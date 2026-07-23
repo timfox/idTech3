@@ -27,6 +27,7 @@ TESTS=(
 	test_reflection_fallback.sh
 	test_indirect_light_parity.sh
 	test_hdr_composition.sh
+	test_color_pipeline_contract.sh
 	test_renderer_lab_capture.sh
 	test_deferred_honesty.sh
 	test_deferred_eligibility.sh

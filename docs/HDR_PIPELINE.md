@@ -3,6 +3,8 @@
 **Status:** Foundation Consolidation — post-chain stage ownership and composition order.  
 **Source:** `vk_hdr_pipeline.c` · **Validation:** `vk_black_frame.c`, `vk_frame_end.c`
 
+**Superseding contract for full image formation (texture → OIT → display):** [COLOR_PIPELINE.md](COLOR_PIPELINE.md). This page remains the HDR post-chain bookkeeping detail (`vk_hdr_pipeline_*`).
+
 ---
 
 ## Ownership

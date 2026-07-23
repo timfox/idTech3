@@ -12,6 +12,7 @@ Milestone 1: frame-production validation before feature expansion.
 #include "vk_render_path.h"
 #include "vk_frame_contract.h"
 #include "vk_hdr_pipeline.h"
+#include "vk_color_contract.h"
 #include "vk_shadow_contract.h"
 #include "vk_depth_contract.h"
 #include "vk_renderer_perf.h"
@@ -424,6 +425,7 @@ void vk_black_frame_begin_frame( void )
 	vk_frame_contract_begin_frame();
 	vk_depth_contract_begin_frame();
 	vk_hdr_pipeline_begin_frame();
+	vk_color_contract_begin_frame();
 	vk_shadow_contract_begin_frame();
 	vk_reflection_hierarchy_begin_frame();
 	vk_indirect_light_begin_frame();
@@ -454,6 +456,23 @@ void vk_black_frame_note_writer( const char *passName )
 		vk_hdr_pipeline_note_stage( VK_HDR_STAGE_SCENE, passName );
 	}
 	if ( !Q_stricmpn( passName, "ForwardOpaque", 13 ) ||
+		!Q_stricmpn( passName, "DeferredComposite", 17 ) ) {
+		vk_color_contract_note_stage( VK_COLOR_STAGE_OPAQUE_HDR_COMPOSITE, passName,
+			VK_COLOR_SPACE_SCENE_LINEAR_HDR, VK_ALPHA_ENCODING_OPAQUE );
+	}
+	if ( !Q_stricmpn( passName, "WBOITAccum", 10 ) || !Q_stricmpn( passName, "OITAccum", 8 ) ) {
+		vk_color_contract_note_stage( VK_COLOR_STAGE_OIT_ACCUM, passName,
+			VK_COLOR_SPACE_SCENE_LINEAR_HDR, VK_ALPHA_ENCODING_PREMULTIPLIED );
+	}
+	if ( !Q_stricmpn( passName, "WBOITResolve", 12 ) || !Q_stricmpn( passName, "OITResolve", 10 ) ) {
+		vk_color_contract_note_stage( VK_COLOR_STAGE_OIT_RESOLVE, passName,
+			VK_COLOR_SPACE_SCENE_LINEAR_HDR, VK_ALPHA_ENCODING_COVERAGE );
+	}
+	if ( !Q_stricmpn( passName, "Weapon", 6 ) ) {
+		vk_color_contract_note_stage( VK_COLOR_STAGE_WEAPON_HDR, passName,
+			VK_COLOR_SPACE_SCENE_LINEAR_HDR, VK_ALPHA_ENCODING_OPAQUE );
+	}
+	if ( !Q_stricmpn( passName, "ForwardOpaque", 13 ) ||
 		!Q_stricmpn( passName, "GBufferCapture", 14 ) ) {
 		vk_frame_contract_note_writer( "SceneDepth", passName );
 		vk_depth_contract_note_writer( passName );
@@ -467,10 +486,26 @@ void vk_black_frame_note_writer( const char *passName )
 	if ( !Q_stricmpn( passName, "Bloom", 5 ) ) {
 		vk_hdr_pipeline_note_stage( VK_HDR_STAGE_BLOOM, passName );
 		vk_frame_contract_note_writer( "BloomSource", passName );
+		vk_color_contract_note_stage( VK_COLOR_STAGE_BLOOM, passName,
+			VK_COLOR_SPACE_SCENE_LINEAR_HDR, VK_ALPHA_ENCODING_OPAQUE );
+	}
+	if ( !Q_stricmpn( passName, "Exposure", 8 ) || !Q_stricmpn( passName, "Luminance", 9 ) ) {
+		vk_color_contract_note_stage( VK_COLOR_STAGE_EXPOSURE, passName,
+			VK_COLOR_SPACE_PREEXPOSED_SCENE_LINEAR_HDR, VK_ALPHA_ENCODING_OPAQUE );
 	}
 	if ( !Q_stricmpn( passName, "Tonemap", 7 ) || !Q_stricmpn( passName, "ToneMap", 7 ) ) {
 		vk_hdr_pipeline_note_stage( VK_HDR_STAGE_TONEMAP, passName );
 		vk_frame_contract_note_writer( "ToneMapSource", passName );
+		vk_color_contract_note_stage( VK_COLOR_STAGE_TONEMAP, passName,
+			VK_COLOR_SPACE_DISPLAY_LINEAR, VK_ALPHA_ENCODING_OPAQUE );
+	}
+	if ( !Q_stricmpn( passName, "Gamma", 5 ) || !Q_stricmpn( passName, "Display", 7 ) ) {
+		vk_color_contract_note_stage( VK_COLOR_STAGE_DISPLAY_TRANSFORM, passName,
+			VK_COLOR_SPACE_DISPLAY_ENCODED, VK_ALPHA_ENCODING_OPAQUE );
+	}
+	if ( !Q_stricmpn( passName, "UI", 2 ) || !Q_stricmpn( passName, "UiOverlay", 9 ) ) {
+		vk_color_contract_note_stage( VK_COLOR_STAGE_UI, passName,
+			VK_COLOR_SPACE_DISPLAY_ENCODED, VK_ALPHA_ENCODING_STRAIGHT );
 	}
 	if ( !Q_stricmpn( passName, "DepthPrepass", 12 ) ||
 		!Q_stricmpn( passName, "OpaqueDepth", 11 ) ) {

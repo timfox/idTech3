@@ -5,7 +5,7 @@
 
 Canonical ownership: [RENDERER_PATH_OWNERSHIP.md](RENDERER_PATH_OWNERSHIP.md) · Correctness gate: [BLACK_FRAME_REGRESSION.md](BLACK_FRAME_REGRESSION.md) · G-buffer: [GBUFFER_2_0.md](GBUFFER_2_0.md)
 
-**Foundation Consolidation (2026-07):** Shared foundation docs + smoke tests supersede isolated sprint notes for frame contract, GPU scene, BRDF, shadows, reflections, indirect, HDR, and reference lab. Hub: run `tests/scripts/test_foundation_consolidation.sh`. Docs: [RENDERER_FRAME_CONTRACT.md](RENDERER_FRAME_CONTRACT.md), [GPU_SCENE.md](GPU_SCENE.md), [GPU_DRIVEN_RENDERING.md](GPU_DRIVEN_RENDERING.md), [GBUFFER_2.md](GBUFFER_2.md), [SHARED_BRDF.md](SHARED_BRDF.md), [SPECULAR_AA.md](SPECULAR_AA.md), [SHADOW_CONTRACT.md](SHADOW_CONTRACT.md), [REFLECTION_HIERARCHY.md](REFLECTION_HIERARCHY.md), [INDIRECT_LIGHTING.md](INDIRECT_LIGHTING.md), [HDR_PIPELINE.md](HDR_PIPELINE.md), [RENDERER_LAB.md](RENDERER_LAB.md).
+**Foundation Consolidation (2026-07):** Shared foundation docs + smoke tests supersede isolated sprint notes for frame contract, GPU scene, BRDF, shadows, reflections, indirect, HDR, and reference lab. Hub: run `tests/scripts/test_foundation_consolidation.sh`. Docs: [RENDERER_FRAME_CONTRACT.md](RENDERER_FRAME_CONTRACT.md), [GPU_SCENE.md](GPU_SCENE.md), [GPU_DRIVEN_RENDERING.md](GPU_DRIVEN_RENDERING.md), [GBUFFER_2.md](GBUFFER_2.md), [SHARED_BRDF.md](SHARED_BRDF.md), [SPECULAR_AA.md](SPECULAR_AA.md), [SHADOW_CONTRACT.md](SHADOW_CONTRACT.md), [REFLECTION_HIERARCHY.md](REFLECTION_HIERARCHY.md), [INDIRECT_LIGHTING.md](INDIRECT_LIGHTING.md), [COLOR_PIPELINE.md](COLOR_PIPELINE.md), [HDR_PIPELINE.md](HDR_PIPELINE.md), [RENDERER_LAB.md](RENDERER_LAB.md).
 
 ---
 

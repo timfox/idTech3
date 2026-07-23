@@ -73,7 +73,7 @@ static void VK_Oit_Status_f( void )
 		"  lastInvalidation=%s\n"
 		"  lastFallback=%s\n"
 		"  FrameContext: frame=%u cmdIndex=%u swapchainImage=%u (fif=%d swapCount=%u)\n"
-		"  viewClass=%s passOrder=opaque->deferred->oit_accum->oit_resolve->refractive->weapon->post->ui\n"
+		"  viewClass=%s passOrder=opaque->deferred->oit_accum->oit_resolve->refractive->weapon->bloom->exposure->tonemap->grade->display->ui\n"
 		"  resolveRP=UNDEFINED/DONT_CARE→SHADER_READ (discard; fullscreen rewrite)\n"
 		"  perfUs: clear=%u accum=%u resolve=%u (CPU markers; see oit_perf)\n",
 		VK_Oit_ImplName( requested ), requested, effective,
