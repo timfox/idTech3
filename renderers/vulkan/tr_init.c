@@ -3097,12 +3097,12 @@ static void R_Register( void )
 	ri.Cvar_CheckRange( r_oitForwardPlus, "0", "1", CV_INTEGER );
 	ri.Cvar_SetDescription( r_oitForwardPlus, "Forward+-lit OIT accumulation (tile lights on transparent surfaces). Default 1. Applies to \\r_oit 1 (WBOIT) and \\r_oit 2 (MBOIT accum; moments pass stays unlit). Requires \\r_forwardPlus 1. Mode 3: use with OIT instead of Forward+ transparent shade." );
 	ri.Cvar_SetGroup( r_oitForwardPlus, CVG_RENDERER );
-	r_oitClassify = ri.Cvar_Get( "r_oitClassify", "0", CVAR_ARCHIVE_ND | CVAR_LATCH );
+	r_oitClassify = ri.Cvar_Get( "r_oitClassify", "1", CVAR_ARCHIVE_ND | CVAR_LATCH );
 	ri.Cvar_CheckRange( r_oitClassify, "0", "1", CV_INTEGER );
 	ri.Cvar_SetDescription( r_oitClassify,
-		"Class-specialized OIT buckets (P4):\n"
-		" 0 - single transparent bucket (default)\n"
-		" 1 - split alpha-blend (MBOIT/WBOIT) vs additive particles (WBOIT, no moments)\n"
+		"Class-specialized OIT buckets (Phase 2.5 additive separation):\n"
+		" 0 - single transparent bucket (legacy)\n"
+		" 1 - split alpha-blend (WBOIT reveal) vs additive (accum, no revealage) [production default]\n"
 		"Requires \\r_oit 1 or 2. Hair cards stay on \\r_stochasticAlpha." );
 	ri.Cvar_SetGroup( r_oitClassify, CVG_RENDERER );
 	r_oitDebug = ri.Cvar_Get( "r_oitDebug", "0", CVAR_CHEAT );

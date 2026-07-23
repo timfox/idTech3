@@ -49,6 +49,7 @@ pass "WBOIT_CONTRACT.md"
 
 # Implementation must match freeze (shaders / blend / clear).
 grep -q 'out_color = vec4( litRgb \* alpha, alpha ) \* w' "$ACCUM" || fail "accum equation drift"
+grep -q 'OitWeight_BoundedProduction\|oit_weight.glsl' "$ACCUM" || fail "bounded weight helper missing"
 grep -q 'out_reveal = alpha' "$ACCUM" || fail "reveal shader out=alpha drift"
 grep -q 'C_avg \* coverage + opaque \* revealage\|c_avg \* coverage + opaque \* revealage' "$RESOLVE" || \
 	grep -q 'c_avg \* coverage + opaque \* revealage' "$RESOLVE" || fail "resolve equation drift"

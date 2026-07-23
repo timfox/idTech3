@@ -4236,6 +4236,13 @@ if(BUILD_UNIT_TESTS)
 	add_test(NAME unit_depth_view COMMAND unit_depth_view)
 	set_tests_properties(unit_depth_view PROPERTIES LABELS "unit;validation;depth")
 
+	add_executable(unit_oit_weight tests/unit/test_oit_weight.c)
+	if(NOT MSVC)
+		target_link_libraries(unit_oit_weight PRIVATE m)
+	endif()
+	add_test(NAME unit_oit_weight COMMAND unit_oit_weight)
+	set_tests_properties(unit_oit_weight PROPERTIES LABELS "unit;validation;oit")
+
 	add_executable(unit_bsp30_triangulate
 		tests/unit/test_bsp30_triangulate.c
 		renderers/common/tr_bsp30_triangulate.c)

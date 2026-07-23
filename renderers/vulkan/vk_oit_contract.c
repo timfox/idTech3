@@ -45,7 +45,7 @@ static void VK_Oit_Contract_FillWboit( oitContract_t *c )
 	c->sourceAlphaEncoding = OIT_ALPHA_STRAIGHT;
 	c->accumulationMode = OIT_ACCUM_WEIGHTED_COLOR;
 	c->revealageMode = OIT_REVEAL_PRODUCT_ONE_MINUS_ALPHA;
-	c->weightMode = OIT_WEIGHT_MCGUIRE_MODERATED;
+	c->weightMode = OIT_WEIGHT_BOUNDED_PRODUCTION;
 	c->depthConvention = OIT_DEPTH_REVERSED_Z_GREATER_OR_EQUAL;
 	c->resolveMode = OIT_RESOLVE_MCGUIRE_BAVOIL;
 
@@ -112,15 +112,6 @@ const char *vk_oit_revealage_mode_name( oitRevealageMode_t m )
 	}
 }
 
-const char *vk_oit_weight_mode_name( oitWeightMode_t m )
-{
-	switch ( m ) {
-	case OIT_WEIGHT_MCGUIRE_MODERATED:
-		return "mcguire_moderated aFactor*1e3*zFactor clamp[1e-2,3e3]";
-	default: return "unknown";
-	}
-}
-
 const char *vk_oit_resolve_mode_name( oitResolveMode_t m )
 {
 	switch ( m ) {
@@ -172,9 +163,10 @@ qboolean vk_oit_contract_validate( const oitContract_t *c, char *errBuf, int err
 	if ( c->sourceAlphaEncoding != OIT_ALPHA_STRAIGHT ||
 		!c->premultipliedRadiance ||
 		c->revealageMode != OIT_REVEAL_PRODUCT_ONE_MINUS_ALPHA ||
-		c->resolveMode != OIT_RESOLVE_MCGUIRE_BAVOIL ) {
+		c->resolveMode != OIT_RESOLVE_MCGUIRE_BAVOIL ||
+		c->weightMode != OIT_WEIGHT_BOUNDED_PRODUCTION ) {
 		if ( errBuf && errBufSize > 0 ) {
-			Q_strncpyz( errBuf, "WBOIT alpha/accum/reveal/resolve mode drift", errBufSize );
+			Q_strncpyz( errBuf, "WBOIT alpha/accum/reveal/resolve/weight mode drift", errBufSize );
 		}
 		return qfalse;
 	}
@@ -243,7 +235,7 @@ void vk_oit_contract_print( const oitContract_t *c )
 	ri.Printf( PRINT_ALL, "reveal: mode=%s format=R16_SFLOAT clear=%.0f\n",
 		vk_oit_revealage_mode_name( c->revealageMode ), c->revealageClear );
 	ri.Printf( PRINT_ALL, "  blend RT1: src=ZERO dst=ONE_MINUS_SRC_COLOR (shader out=alpha)\n" );
-	ri.Printf( PRINT_ALL, "weight: %s\n", vk_oit_weight_mode_name( c->weightMode ) );
+	ri.Printf( PRINT_ALL, "weight: %s (see oit_weight_status)\n", vk_oit_weight_mode_name( c->weightMode ) );
 	ri.Printf( PRINT_ALL, "depth: reversed-Z GREATER_OR_EQUAL write=%d\n", c->depthWrite ? 1 : 0 );
 	ri.Printf( PRINT_ALL,
 		"fog: contractPerFragment=%d runtime r_oitFogMode=%d "
@@ -284,13 +276,14 @@ static void VK_Oit_ContractValidate_f( void )
 void vk_oit_contract_register( void )
 {
 	(void)vk_oit_contract_wboit();
+	vk_oit_weight_contract_register();
 	if ( !s_cmds ) {
 		ri.Cmd_AddCommand( "oit_contract_status", VK_Oit_ContractStatus_f );
 		ri.Cmd_AddCommand( "oit_contract_validate", VK_Oit_ContractValidate_f );
 		s_cmds = qtrue;
 		ri.Printf( PRINT_ALL,
-			"[VK][oit] Phase 2.1 WBOIT contract frozen v%u hash=0x%08x "
-			"(oit_contract_status / oit_contract_validate)\n",
+			"[VK][oit] Phase 2.1/2.5 WBOIT contract frozen v%u hash=0x%08x "
+			"(oit_contract_status / oit_weight_status)\n",
 			OIT_CONTRACT_VERSION, s_wboit.contractHash );
 	}
 }

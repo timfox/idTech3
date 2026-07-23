@@ -33,6 +33,7 @@ TESTS=(
 	test_depth_contract.sh
 	test_oit_view_depth.sh
 	test_hdr_resolve_integrity.sh
+	test_oit_weight_contract.sh
 	test_renderer_lab_capture.sh
 	test_deferred_honesty.sh
 	test_deferred_eligibility.sh

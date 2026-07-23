@@ -12,7 +12,7 @@
 
 #include "../common/tr_types.h"
 
-#define OIT_CONTRACT_VERSION 1u
+#define OIT_CONTRACT_VERSION 2u
 
 typedef enum {
 	OIT_ALPHA_STRAIGHT = 0,       /* material α before WBOIT premultiply */
@@ -27,9 +27,7 @@ typedef enum {
 	OIT_REVEAL_PRODUCT_ONE_MINUS_ALPHA = 0 /* shader writes α; blend → ∏(1-α) */
 } oitRevealageMode_t;
 
-typedef enum {
-	OIT_WEIGHT_MCGUIRE_MODERATED = 0 /* aFactor*1e3*zFactor, clamp [1e-2,3e3] */
-} oitWeightMode_t;
+#include "vk_oit_weight_contract.h"
 
 typedef enum {
 	OIT_DEPTH_REVERSED_Z_GREATER_OR_EQUAL = 0
@@ -86,7 +84,7 @@ void vk_oit_contract_register( void );
 const char *vk_oit_alpha_encoding_name( oitAlphaEncoding_t e );
 const char *vk_oit_accum_mode_name( oitAccumulationMode_t m );
 const char *vk_oit_revealage_mode_name( oitRevealageMode_t m );
-const char *vk_oit_weight_mode_name( oitWeightMode_t m );
 const char *vk_oit_resolve_mode_name( oitResolveMode_t m );
+/* Weight mode names: vk_oit_weight_mode_name in vk_oit_weight_contract.h */
 
 #endif /* USE_VULKAN */

@@ -11,6 +11,7 @@
 #include "forward_plus_cluster.glsl"
 #include "oit_source_normalize.glsl"
 #include "depth_view.glsl"
+#include "oit_weight.glsl"
 
 layout (constant_id = 0) const int manual_depth_test = 0;
 layout (constant_id = 1) const int forward_plus_lit = 0;
@@ -255,7 +256,7 @@ void main() {
 		litRgb = max( litRgb, vec3( 0.0 ) );
 	}
 
-	/* McGuire weight: same curve; depth input is certified view-depth → [0,1] (not raw device Z). */
+	/* Phase 2.5: BOUNDED_PRODUCTION weight (oit_weight.glsl / oitWeightContract_t). */
 	{
 		float zn = max( fp_params.fp_cluster_z_range.x, 1e-3 );
 		float zf = max( fp_params.fp_cluster_z_range.y, zn + 1e-3 );
@@ -263,10 +264,7 @@ void main() {
 			zn = 8.0;
 			zf = 8192.0;
 		}
-		float zTrad = Depth_ViewDepthToTraditional01( viewDepth, zn, zf );
-		float aFactor = pow( min( 1.0, alpha * 10.0 ) + 0.01, 3.0 );
-		float zFactor = pow( 1.0 - zTrad * 0.9, 3.0 );
-		float w = clamp( aFactor * 1e3 * zFactor, 1e-2, 3e3 );
+		float w = OitWeight_BoundedProduction( alpha, viewDepth, zn, zf );
 		if ( isnan( w ) || isinf( w ) ) {
 			out_color = vec4( 1.0, 0.0, 1.0, 1.0 );
 			out_reveal = 0.0;

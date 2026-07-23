@@ -26,7 +26,10 @@ pass "depth_view.glsl helpers"
 grep -q 'depth_view.glsl' "$OIT" || fail "oit_accum must include depth_view.glsl"
 grep -q 'fp_view_forward' "$OIT" || fail "oit_accum must declare fp_view_forward"
 grep -q 'Depth_PositiveViewFromWorld' "$OIT" || fail "oit_accum must use certified view-depth"
-grep -q 'Depth_ViewDepthToTraditional01' "$OIT" || fail "oit_accum weight must use traditional01 from view-depth"
+grep -q 'OitWeight_BoundedProduction\|Depth_ViewDepthToTraditional01' "$OIT" || \
+	grep -q 'Depth_ViewDepthToTraditional01' "$ROOT/renderers/vulkan/shaders/glsl/oit_weight.glsl" || \
+	fail "oit weight must map view-depth via traditional01"
+pass "oit_accum uses certified view-depth weight path"
 # Production fog must not use bare Euclidean length against fp_view_org.
 if grep -n 'length( *frag_world_pos *- *fp_params\.fp_view_org' "$OIT" | grep -v 'Depth_CameraDistance\|fogDebug == 8\|cert'; then
 	fail "oit_accum still uses Euclidean camera distance for production fog/weight"

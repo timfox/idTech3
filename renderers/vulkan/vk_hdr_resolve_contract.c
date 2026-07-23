@@ -203,7 +203,8 @@ void vk_hdr_resolve_contract_print( const hdrResolveContract_t *c )
 		base->noSecondFogOnResolve ? 1 : 0, base->requireExtentMatch ? 1 : 0,
 		base->requireOitGenMatch ? 1 : 0 );
 	ri.Printf( PRINT_ALL,
-		"generations: sceneHdr=%u depth=%u fogScene=%u fogCopiedThisFrame=%d copy=%ux%u\n",
+		"generations: sceneHdr=%u depth=%u fogScene=%u fogCopiedThisFrame=%d copy=%ux%u\n"
+		"  currentFrameSceneHdrOwnership=fog_scene snapshot before OIT (exact copy this frame)\n",
 		s_sceneHdrGeneration, s_depthGeneration, s_fogSceneGeneration,
 		s_fogCopiedThisFrame ? 1 : 0, s_fogSceneCopyW, s_fogSceneCopyH );
 	ri.Printf( PRINT_ALL, "oit: attGen=%u descGen=%u frameState=%u\n",

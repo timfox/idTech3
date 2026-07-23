@@ -13,6 +13,7 @@ Raster Ultra 1.4 — transparency classification + refractive exclusion helpers.
 #include "vk_oit_alpha.h"
 #include "vk_depth_contract.h"
 #include "vk_hdr_resolve_contract.h"
+#include "vk_oit_weight_contract.h"
 
 static cvar_t *r_transparencyDebug;
 static cvar_t *r_refractiveExcludeOit;
@@ -65,6 +66,7 @@ static void VK_Oit_Status_f( void )
 		"oit_status:\n"
 		"  implementation=%s mode=%d effective=%d classify=%d forwardPlus=%d refractiveExclude=%d directTest=%d\n"
 		"  contract: WBOIT v%u hash=0x%08x (oit_contract_status)\n"
+		"  weight: %s hash=0x%08x (oit_weight_status)\n"
 		"  alpha: cert=%s (oit_alpha_status)\n"
 		"  depth: contract v%u hash=0x%08x (depth_contract_status)\n"
 		"  profileSource=%s renderMode=%d\n"
@@ -90,6 +92,8 @@ static void VK_Oit_Status_f( void )
 		r_refractiveExcludeOit ? r_refractiveExcludeOit->integer : 1,
 		ri.Cvar_VariableIntegerValue( "r_oitDirectTest" ),
 		oitContract->contractVersion, oitContract->contractHash,
+		vk_oit_weight_mode_name( vk_oit_weight_contract_get()->mode ),
+		vk_oit_weight_contract_get()->contractHash,
 		vk_oit_alpha_cert_level_name( vk_oit_alpha_certification_level() ),
 		vk_depth_contract_get()->contractVersion, vk_depth_contract_get()->contractHash,
 		vk.oitProfileSourceHint[0] ? vk.oitProfileSourceHint : "(runtime)",
@@ -307,6 +311,10 @@ static void VK_TransparencyRoute_Status_f( void )
 {
 	ri.Printf( PRINT_ALL,
 		"transparencyRoute: oit=%d classify=%d refractiveExclude=%d debug=%d\n"
+		"  Phase 2.5 routing:\n"
+		"    ordinary WBOIT ← SRC_ALPHA / ONE_MINUS_SRC_ALPHA (glass/smoke)\n"
+		"    additive bucket ← ONE/ONE (no revealage; r_oitClassify 1)\n"
+		"    excluded from OIT ← modulate/filter, refractive/screenMap, UI, decal\n"
 		"  classes: alpha_tested sorted_alpha wboit additive modulate refractive "
 		"water glass distortion particle decal ui\n",
 		r_oit ? r_oit->integer : 0,

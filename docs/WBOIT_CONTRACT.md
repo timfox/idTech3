@@ -28,7 +28,7 @@ See [WBOIT_ALPHA_ENCODING.md](WBOIT_ALPHA_ENCODING.md). The frozen blend/resolve
 | `sourceAlphaEncoding` | **straight** (material α before WBOIT weight) |
 | `accumulationMode` | **weighted color** `out = (lit × α × w, α × w)` |
 | `revealageMode` | **∏(1−α)** — shader writes `α`; blend implements product |
-| `weightMode` | McGuire moderated: `aFactor × 1e3 × zFactor`, clamp `[1e-2, 3e3]` |
+| `weightMode` | **BOUNDED_PRODUCTION** (`oitWeightContract_t`) |
 | `sceneLinear` | **true** (`SCENE_LINEAR_HDR`) |
 | `preExposed` | **false** (accum/resolve before exposure) |
 | `premultipliedRadiance` | **true** (accum RGB already × α × w) |
@@ -50,9 +50,11 @@ See [WBOIT_ALPHA_ENCODING.md](WBOIT_ALPHA_ENCODING.md). The frozen blend/resolve
 ```text
 # Accum (oit_accum.frag)
 lit'   = lit * Tfog          # Tfog = exp(-density * viewDepth) when fog mode ≥ 1
-w      = clamp(aFactor * 1e3 * zFactor, 1e-2, 3e3)
+w      = OitWeight_BoundedProduction(alpha, viewDepth, zNear, zFar)
+       # see docs/WBOIT_WEIGHT_CONTRACT.md — clamp [1e-2, 3e3], positive view-depth
 accum  = (lit' * alpha * w, alpha * w)   # RT0 ONE/ONE
 reveal = alpha                            # RT1 → product(1-alpha) via blend
+# Additive ONE/ONE: reveal write-mask off (r_oitClassify 1)
 
 # Resolve (oit_resolve.frag)
 if empty(accum): C_out = C_opaque

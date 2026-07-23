@@ -764,6 +764,17 @@ void RB_RenderDrawSurfList( drawSurf_t *drawSurfs, int numDrawSurfs ) {
 				continue;
 			if ( backEnd.drawSurfFilter == 2 && backEnd.oitBucketFilter == 2 && !additive )
 				continue;
+			/* Phase 2.5: blend modes WBOIT cannot represent stay off ordinary OIT accum. */
+			if ( backEnd.drawSurfFilter == 2 &&
+				( backEnd.oitAccumPass || backEnd.oitMomentsPass ) ) {
+				const vkTransparencyClass_t xcls = vk_transparency_classify_shader( shader );
+				if ( xcls == VK_XPARENT_MODULATE ||
+					xcls == VK_XPARENT_DISTORTION_ONLY ||
+					xcls == VK_XPARENT_UI ||
+					xcls == VK_XPARENT_DECAL ) {
+					continue;
+				}
+			}
 			/* Raster Ultra 1.4: refractive/screenMap never enter WBOIT/MBOIT. */
 			if ( backEnd.drawSurfFilter == 2 &&
 				( backEnd.oitAccumPass || backEnd.oitMomentsPass ) &&

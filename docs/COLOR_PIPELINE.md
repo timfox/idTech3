@@ -1,8 +1,8 @@
 # Color Pipeline Contract
 
-**Status:** Phase 1 spaces/order + Phase 2.1 WBOIT freeze + Phase 2.2 alpha + Phase 2.3 depth/fog + **Phase 2.4 HDR resolve integrity**.  
-**Code:** `vk_color_contract.c` / `vk_oit_contract.c` / `vk_oit_alpha.c` / `vk_depth_contract.c` / `vk_hdr_resolve_contract.c`  
-**Commands:** `color_pipeline_status`, `oit_contract_status`, `oit_alpha_status`, `depth_contract_status`, `hdr_resolve_status`  
+**Status:** Phase 1–2.4 complete + **Phase 2.5** bounded weight / additive separation.  
+**Code:** `vk_color_contract.c` / `vk_oit_contract.c` / `vk_oit_alpha.c` / `vk_depth_contract.c` / `vk_hdr_resolve_contract.c` / `vk_oit_weight_contract.c`  
+**Commands:** `color_pipeline_status`, `oit_contract_status`, `oit_weight_status`, `oit_alpha_status`, `depth_contract_status`, `hdr_resolve_status`  
 **Debug:** `r_colorContractDebug`, `r_alphaDebug`, `r_transparentEdgePolicy`, `r_hdrResolveDebug`
 
 This document is the single contract for scene-linear color and transparency. Older notes in [HDR_PIPELINE.md](HDR_PIPELINE.md) and [WBOIT_FOG_LAYERS.md](WBOIT_FOG_LAYERS.md) defer to this order for composition. Exact WBOIT math/formats/blends: [WBOIT_CONTRACT.md](WBOIT_CONTRACT.md). Alpha source encoding: [WBOIT_ALPHA_ENCODING.md](WBOIT_ALPHA_ENCODING.md).
@@ -163,7 +163,7 @@ Full 17-step contract remains authoritative in this doc and `color_pipeline_stat
 
 ---
 
-## Certification (Phase 1 + 2.1–2.4)
+## Certification (Phase 1 + 2.1–2.5)
 
 Static gates:
 
@@ -172,8 +172,9 @@ Static gates:
 - `tests/scripts/test_oit_alpha_contract.sh` — Phase 2.2 alpha encoding / normalize / accum
 - `tests/scripts/test_depth_contract.sh` / `test_oit_view_depth.sh` — Phase 2.3 depth + view-depth fog
 - `tests/scripts/test_hdr_resolve_integrity.sh` — Phase 2.4 resolve / fog_scene generations
+- `tests/scripts/test_oit_weight_contract.sh` — Phase 2.5 bounded weight + additive routing
 
-Run via `test_foundation_consolidation.sh`. Unit: `unit_oit_alpha_normalize`, `unit_depth_view`.
+Run via `test_foundation_consolidation.sh`. Unit: `unit_oit_alpha_normalize`, `unit_depth_view`, `unit_oit_weight`.
 
 ### Phase 2.1 — WBOIT contract freeze
 
@@ -193,6 +194,13 @@ Source encodings, `NormalizeOitSource`, material declarations, classic translati
 
 Frozen resolve ownership: fog_scene opaque base, empty → opaque, scene-linear before exposure, generation matching. Commands: `hdr_resolve_status` / `hdr_resolve_validate`. Gate: `test_hdr_resolve_integrity.sh`. Doc: [HDR_RESOLVE_INTEGRITY.md](HDR_RESOLVE_INTEGRITY.md).
 
-Do not tune WBOIT weight **coefficients** except when replacing invalid depth inputs (done for view-depth). Refraction remains specialized after resolve.
+### Phase 2.5 — Bounded weight, additive separation, blend routing
+
+- **2.5.1** `oitWeightContract_t` BOUNDED_PRODUCTION — [WBOIT_WEIGHT_CONTRACT.md](WBOIT_WEIGHT_CONTRACT.md) (`oit_weight_status`)
+- Additive ONE/ONE: `r_oitClassify 1` default, reveal write-mask off
+- Modulate / refractive / UI / decal excluded from ordinary WBOIT accum
+- `oitContract_t` v2 references bounded weight mode
+
+Do not tune WBOIT weight **coefficients** without bumping `OIT_WEIGHT_CONTRACT_VERSION`. Refraction remains specialized after resolve.
 
 **Do not** add new transparency features until basic WBOIT equations, formats, blends, fog ownership, and resolve chain are proven against this freeze.
