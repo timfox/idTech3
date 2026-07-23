@@ -9,6 +9,7 @@ Raster Ultra 1.4 — transparency classification + refractive exclusion helpers.
 #include "vk_transparency_route.h"
 #include "vk_forward_plus.h"
 #include "vk_oit_certify.h"
+#include "vk_oit_contract.h"
 
 static cvar_t *r_transparencyDebug;
 static cvar_t *r_refractiveExcludeOit;
@@ -35,6 +36,7 @@ static void VK_Oit_Status_f( void )
 	const int taa = ( r_taa && r_taa->integer ) ? r_taa->integer : 0;
 	const int aaMode = ( r_aaMode && r_aaMode->integer ) ? r_aaMode->integer : 0;
 	const int renderMode = ( r_renderMode && r_renderMode->integer ) ? r_renderMode->integer : 0;
+	const oitContract_t *oitContract = vk_oit_contract_wboit();
 
 	if ( requested > 0 && vk.fboActive &&
 		vk.oitDescriptorGeneration == vk.oitAttachmentGeneration &&
@@ -59,6 +61,7 @@ static void VK_Oit_Status_f( void )
 	ri.Printf( PRINT_ALL,
 		"oit_status:\n"
 		"  implementation=%s mode=%d effective=%d classify=%d forwardPlus=%d refractiveExclude=%d directTest=%d\n"
+		"  contract: WBOIT v%u hash=0x%08x (oit_contract_status)\n"
 		"  profileSource=%s renderMode=%d\n"
 		"  formats: accum=R16G16B16A16_SFLOAT reveal=R16_SFLOAT color=%s\n"
 		"  litPath=%s\n"
@@ -81,6 +84,7 @@ static void VK_Oit_Status_f( void )
 		r_oitForwardPlus ? r_oitForwardPlus->integer : 0,
 		r_refractiveExcludeOit ? r_refractiveExcludeOit->integer : 1,
 		ri.Cvar_VariableIntegerValue( "r_oitDirectTest" ),
+		oitContract->contractVersion, oitContract->contractHash,
 		vk.oitProfileSourceHint[0] ? vk.oitProfileSourceHint : "(runtime)",
 		renderMode,
 		vk_format_string( vk.color_format ),
@@ -329,6 +333,7 @@ void vk_transparency_route_init( void )
 	s_inited = qtrue;
 	ri.Printf( PRINT_ALL, "[VK][Xparent] transparency routing initialized (refractiveExcludeOit=%d)\n",
 		r_refractiveExcludeOit->integer );
+	vk_oit_contract_register();
 	vk_oit_certify_init();
 }
 
@@ -340,6 +345,8 @@ void vk_transparency_route_shutdown( void )
 		ri.Cmd_RemoveCommand( "oit_status" );
 		ri.Cmd_RemoveCommand( "oit_capture" );
 		ri.Cmd_RemoveCommand( "oit_perf" );
+		ri.Cmd_RemoveCommand( "oit_contract_status" );
+		ri.Cmd_RemoveCommand( "oit_contract_validate" );
 	}
 	s_inited = qfalse;
 }

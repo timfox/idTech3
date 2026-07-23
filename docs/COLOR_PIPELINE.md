@@ -1,11 +1,11 @@
 # Color Pipeline Contract
 
-**Status:** Phase 1 — authoritative spaces + stage order (Color Pipeline Reconstruction / Production OIT).  
-**Code:** `vk_color_contract.c` / `vk_color_contract.h`  
-**Commands:** `color_pipeline_status`, `color_pipeline_validate`  
+**Status:** Phase 1 spaces/order + **Phase 2.1 WBOIT contract freeze**.  
+**Code:** `vk_color_contract.c` / `vk_oit_contract.c`  
+**Commands:** `color_pipeline_status`, `color_pipeline_validate`, `oit_contract_status`, `oit_contract_validate`  
 **Debug:** `r_colorContractDebug` (0–2)
 
-This document is the single contract for scene-linear color and transparency. Older notes in [HDR_PIPELINE.md](HDR_PIPELINE.md) and [WBOIT_FOG_LAYERS.md](WBOIT_FOG_LAYERS.md) defer to this order for composition.
+This document is the single contract for scene-linear color and transparency. Older notes in [HDR_PIPELINE.md](HDR_PIPELINE.md) and [WBOIT_FOG_LAYERS.md](WBOIT_FOG_LAYERS.md) defer to this order for composition. Exact WBOIT math/formats/blends: [WBOIT_CONTRACT.md](WBOIT_CONTRACT.md).
 
 **Do not** start virtual shadows, DDGI, meshlets, ray tracing, or further GPU-driven migration until color/OIT certification passes.
 
@@ -163,8 +163,19 @@ Full 17-step contract remains authoritative in this doc and `color_pipeline_stat
 
 ---
 
-## Certification (Phase 1)
+## Certification (Phase 1 + 2.1)
 
-Static gates: `tests/scripts/test_color_pipeline_contract.sh` (via `test_foundation_consolidation.sh`).
+Static gates:
 
-Later phases: GPU WBOIT certification cases, straight/premul fringe fixes, fog-depth cases — see [WBOIT_GPU_CERTIFICATION.md](WBOIT_GPU_CERTIFICATION.md).
+- `tests/scripts/test_color_pipeline_contract.sh` — spaces + 17-stage order
+- `tests/scripts/test_oit_contract.sh` — frozen WBOIT `oitContract_t`
+
+Both run via `test_foundation_consolidation.sh`.
+
+### Phase 2.1 — WBOIT contract freeze
+
+Authoritative struct: `oitContract_t` in `vk_oit_contract.h`. Print with `oit_contract_status`. Details: [WBOIT_CONTRACT.md](WBOIT_CONTRACT.md).
+
+Later Phase 2 work (not started here): premul/straight fringe audits, fog-depth cases, HDR resolve integrity vs SceneHDR generation — see [WBOIT_GPU_CERTIFICATION.md](WBOIT_GPU_CERTIFICATION.md).
+
+**Do not** add new transparency features until basic WBOIT equations, formats, blends, fog ownership, and resolve chain are proven against this freeze.

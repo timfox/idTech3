@@ -2,6 +2,8 @@
 
 **WBOIT (`r_oit 1`) is the production transparency path** for glass, smoke, particles, and overlapping translucent layers. **MBOIT (`r_oit 2`) remains experimental** — see [Appendix: MBOIT](#appendix-mboit-moment-transparency-r_oit-2) and [OIT_FUTURE_TRACKS.md](OIT_FUTURE_TRACKS.md).
 
+**Frozen math / formats / blends:** [WBOIT_CONTRACT.md](WBOIT_CONTRACT.md) (`oit_contract_status`). Color order: [COLOR_PIPELINE.md](COLOR_PIPELINE.md).
+
 | Mode | Class | Technique |
 |------|-------|-----------|
 | `r_oit 0` | Off | Sorted alpha blend |
