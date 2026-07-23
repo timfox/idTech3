@@ -1,6 +1,6 @@
 # Color Pipeline Contract
 
-**Status:** Phase 1–2.5 complete + **Phase 2.6 / 2.6A / 2.6B** evidence-backed live WBOIT certification (lab, readback, metrics, deterministic GPU fixtures, `oit_certify_core`).  
+**Status:** Phase 1–2.5 complete + **Phase 2.6 / 2.6A / 2.6B / 2.6C** live WBOIT certification (deferred GPU snapshots, `oit_certify_core` → soak → production promotion).  
 **Code:** `vk_color_contract.c` / `vk_oit_contract.c` / `vk_oit_alpha.c` / `vk_depth_contract.c` / `vk_hdr_resolve_contract.c` / `vk_oit_weight_contract.c` / `vk_wboit_production_cert.c` / `vk_cert_readback.c` / `vk_cert_metrics.c` / `vk_oit_cert_geometry.c` / `vk_oit_lab.c` / `vk_transparency_lab.c` / `vk_specialized_transparency.c`  
 **Commands:** `color_pipeline_status`, `oit_contract_status`, `oit_weight_status`, `wboit_production_status`, `oit_certify_core`, `oit_lab_run`, `cert_readback_capture`, `oit_certification_export`  
 **Debug:** `r_oitCertificationDebug`, `r_transparencyReference`, `r_oitAllowManualCertification`, `r_requireWboitCertification`

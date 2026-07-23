@@ -31,6 +31,9 @@ typedef enum {
 vkOitCertLevel_t vk_oit_certification_level( void );
 const char *vk_oit_certification_level_name( vkOitCertLevel_t level );
 
+/* Phase 2.6C: GPU evidence core queue completed → LIVE_BASIC/LIVE_FULL. */
+void vk_oit_certify_note_gpu_core_complete( void );
+
 #ifdef __cplusplus
 }
 #endif

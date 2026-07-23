@@ -640,8 +640,8 @@ void vk_wboit_production_cert_register( void )
 	s_cmds = qtrue;
 
 	ri.Printf( PRINT_ALL,
-		"[VK][OIT] Phase 2.6A evidence-backed cert ready\n"
-		"[VK][OIT] WBOIT: %s (manual cannot grant PRODUCTION; use oit_lab_run)\n",
+		"[VK][OIT] Phase 2.6C live cert ready (deferred snapshots + oit_certify_core)\n"
+		"[VK][OIT] WBOIT: %s (manual cannot grant PRODUCTION)\n",
 		vk_wboit_production_level_name( s_level ) );
 	if ( r_requireWboitCertification && r_requireWboitCertification->integer >= 1 &&
 		s_level < WBOIT_PRODUCTION_CERTIFIED ) {

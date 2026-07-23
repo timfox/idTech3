@@ -619,14 +619,16 @@ void vk_oit_pass( const struct drawSurfsCommand_s *cmd )
 		if ( !directTest && ( bucket_mboit ? vk.oit_accum_mboit_pipeline : vk.oit_accum_pipeline ) ) {
 			backEnd.oitAccumPass = qtrue;
 			backEnd.drawSurfFilter = 2;
-			RB_RenderDrawSurfList( cmd->drawSurfs, cmd->numDrawSurfs );
-			/* Phase 2.6B: inject deterministic certification panes into live WBOIT accum. */
+			if ( !vk_oit_lab_isolate_world() ) {
+				RB_RenderDrawSurfList( cmd->drawSurfs, cmd->numDrawSurfs );
+			}
+			/* Phase 2.6B/C: inject deterministic certification panes into live WBOIT accum. */
 			vk_oit_cert_geometry_draw_bucket( backEnd.oitBucketFilter );
 			backEnd.oitAccumPass = qfalse;
 			backEnd.drawSurfFilter = 0;
 			vk.oitFrameState = VK_OIT_FRAME_ACCUMULATED;
 			vk.oitAccumPassCount++;
-			vk.oitDrawCount += (uint32_t)cmd->numDrawSurfs;
+			vk.oitDrawCount += vk_oit_lab_isolate_world() ? 0u : (uint32_t)cmd->numDrawSurfs;
 		}
 		vk_end_render_pass();
 

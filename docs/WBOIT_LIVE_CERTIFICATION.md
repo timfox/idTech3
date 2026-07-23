@@ -1,75 +1,58 @@
-# WBOIT Live Certification (Phase 2.6 / 2.6A / 2.6B)
+# WBOIT Live Certification (Phase 2.6 / 2.6A / 2.6B / 2.6C)
 
-**Status:** Evidence-backed controller + GPU readback + **renderer-owned deterministic fixtures** (`vk_oit_cert_geometry`) + `oit_certify_core` orchestration.  
-**Level today:** `WBOIT_STATIC_CERTIFIED` until live `r_oit 1` frames run the fixture queue and produce matching GPU evidence.
+**Status:** Live execution path with **deferred OIT GPU snapshots**, fixture isolation, failure triage, and auto soak chain.  
+**Level today:** `WBOIT_STATIC_CERTIFIED` until a live `oit_certify_core` run completes GPU stages + soak on your device.
 
-## Evidence policy (2.6A)
+## Operator sequence (Phase 2.6C)
 
-Every stage result carries `wboitCertEvidence_t`:
-
-| Evidence | May grant PRODUCTION? |
-|----------|------------------------|
-| `STATIC` | No (contract/resources only) |
-| `CPU_REFERENCE` | No |
-| `GPU_READBACK` / `GPU_REDUCTION` | Yes (when stage requires it) |
-| `LIFECYCLE` / `SOAK` | Yes for those stages |
-| `MANUAL_OVERRIDE` | **No** by default (`r_oitAllowManualCertification 0`) |
-
-`oit_cert_stage pass …` always stamps **`MANUAL_OVERRIDE`** and cannot grant `WBOIT_PRODUCTION_CERTIFIED`.
-
-Required evidence per stage is enforced in `vk_wboit_cert_required_evidence()`.
-
-## Phase 2.6B — deterministic GPU fixtures
-
-Core stages arm pane/particle scenarios (`cert/wboit_pane`, `cert/wboit_additive`) that draw through the **live** WBOIT accum pipelines during `vk_oit_pass`. After resolve, `vk_oit_lab_on_oit_resolved()` captures fog/accum/revealage/resolved HDR and records PASS/FAIL/PENDING with GPU evidence.
-
-Frozen contracts (equations, formats, blends, revealage, weights) are **not** changed by fixtures.
-
-### One-command core queue
-
-```
+```text
 +set r_oit 1 +set r_fbo 1
+load a valid world
 oit_certify_core
 ```
 
-Advances each successful OIT frame: empty → single → revealage → alpha → weight → order (6 perms) → fog → additive → HDR → lifecycle, then `oit_certification_export`.
+Or: `exec demo_wboit_certify_core.cfg` after map load.
 
-Requires an in-world camera (not menu-only). Check progress with `oit_lab_status` / `wboit_production_status` / `oit_cert_geometry_status`.
+### What happens
+
+1. Core fixture stages arm → draw through live WBOIT accum (world transparents skipped when `r_oitCertIsolate 1`).
+2. After resolve, fog/accum/revealage/resolved are **copied in the same command buffer**.
+3. After the frame fence, snapshots are decoded and evaluated (never mid-frame unsubmitted images).
+4. PASS advances; FAIL stops (triage); PENDING retries (`r_oitCertMaxRetries`).
+5. On GPU queue complete → marks `LIVE_FULL` + exports JSON.
+6. Chains `oit_soak_wboit N` (`r_oitCertSoakMinutes`, default **1**; formal shipping **30**).
+7. Clean soak → `WBOIT_EVIDENCE_SOAK` → may grant **`WBOIT_PRODUCTION_CERTIFIED`**.
+
+## Evidence policy (2.6A)
+
+| Evidence | May grant PRODUCTION? |
+|----------|------------------------|
+| `STATIC` / `CPU_REFERENCE` | No |
+| `GPU_READBACK` / `GPU_REDUCTION` | Yes (when required) |
+| `LIFECYCLE` / `SOAK` | Yes for those stages |
+| `MANUAL_OVERRIDE` | **No** by default |
 
 ## Commands
 
 | Command | Role |
 |---------|------|
-| `oit_certify_core` | Queue all core fixture-backed GPU stages |
-| `oit_lab_list` / `oit_lab_run` / `oit_lab_run_group` | Deterministic lab |
-| `oit_lab_status` / `oit_lab_reset` | Lab session |
-| `oit_cert_geometry_status` | Armed fixture panes |
-| `cert_readback_capture` / `flush` / `status` | GPU readback |
-| `wboit_production_status` | Stage + evidence matrix |
-| `oit_certification_export` | Write `render_cert/wboit_certification.json` |
-| `oit_certification_invalidate` | Invalidate prior evidence |
-| `oit_certification_import` | Display-only (never certifies this device) |
-| `oit_soak_wboit` | Soak → `WBOIT_EVIDENCE_SOAK` on clean completion |
+| `oit_certify_core` | GPU fixture queue + LIVE_FULL + optional soak |
+| `oit_lab_*` | Manual lab control |
+| `oit_cert_geometry_status` | Armed fixtures |
+| `cert_readback_*` | Manual readback |
+| `wboit_production_status` | Stage matrix + level |
+| `oit_soak_wboit [minutes]` | Soak evidence |
 
 ## Cvars
 
-- `r_oitAllowManualCertification` (default **0**)
-- `r_requireWboitCertification` (default **1** = warn)
-- `r_oitLabFreeze` (default **1**)
-- `r_certReadbackBlocking` (default **1**)
-
-## Lab groups
-
-`core` `alpha` `weight` `order` `fog` `additive` `resolve` `lifecycle` `soak` `specialized` `mboit` `all`
+- `r_oitCertIsolate` (default **1**) — deterministic fixtures only
+- `r_oitCertSoakMinutes` (default **1**; formal **30**)
+- `r_oitCertContinueOnFail` (default **0**)
+- `r_oitCertMaxRetries` (default **8**)
+- `r_oitLabFreeze` / `r_certReadbackBlocking` / `r_oitAllowManualCertification`
 
 ## Persistence
 
-Evidence is exported to `render_cert/wboit_certification.json` and must be invalidated when any OIT/alpha/depth/weight/resolve contract, accum/resolve shader, blend, format, pass order, fog ownership, or color-space convention changes.
+`render_cert/wboit_certification.json` — invalidate when contracts/shaders/blends/formats change.
 
-## Startup
-
-Prints real level, e.g. `WBOIT: WBOIT_STATIC_CERTIFIED` — never claims production from manual flags.
-
-Specialized refraction/portal/weapon/bloom paths remain scaffolds until production cert.
-
-See also [WBOIT_CERTIFICATION_THRESHOLDS.md](WBOIT_CERTIFICATION_THRESHOLDS.md), [TRANSPARENCY_ROUTING.md](TRANSPARENCY_ROUTING.md).
+See [WBOIT_CERTIFICATION_THRESHOLDS.md](WBOIT_CERTIFICATION_THRESHOLDS.md), [COLOR_PIPELINE.md](COLOR_PIPELINE.md).

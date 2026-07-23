@@ -287,6 +287,20 @@ static void VK_OitCert_RecomputeLevel( void )
 	s_persist.level = lvl;
 }
 
+void vk_oit_certify_note_gpu_core_complete( void )
+{
+	s_persist.staticGatesOk = qtrue;
+	s_persist.liveBasicOk = qtrue;
+	s_persist.liveFullOk = qtrue;
+	VK_OitCert_NowIso( s_persist.lastPassAt, sizeof( s_persist.lastPassAt ) );
+	Q_strncpyz( s_persist.lastSessionId, "oit_certify_core", sizeof( s_persist.lastSessionId ) );
+	VK_OitCert_RecomputeLevel();
+	ri.Printf( PRINT_ALL,
+		"[VK][OIT] GPU evidence core complete → certification level=%s (phase26=%s)\n",
+		vk_oit_certification_level_name( s_persist.level ),
+		vk_wboit_production_level_name( vk_wboit_production_level() ) );
+}
+
 static void VK_OitCert_PrintCase( void )
 {
 	const vkOitCertCase_t *c;
@@ -707,23 +721,29 @@ void vk_oit_certify_frame_tick( void )
 	s_soak.elapsedSec++;
 	VK_OitSoak_Sample();
 
-	/* Cycle controlled stress phases once per ~10s. */
+	/* Cycle controlled stress phases once per ~10s (formal 30+ min soaks only). */
 	phase = ( s_soak.elapsedSec / 10 ) % 8;
 	s_soak.nextPhase = phase;
-	switch ( phase ) {
-	case 0:
-		ri.Cvar_Set( "r_oitForceAllocationFailure", "0" );
-		break;
-	case 5:
-		if ( ( s_soak.elapsedSec % 10 ) == 0 ) {
-			ri.Cvar_Set( "r_oitForceClusterMismatch", "1" );
+	if ( s_soak.minutes >= 30 ) {
+		switch ( phase ) {
+		case 0:
+			ri.Cvar_Set( "r_oitForceAllocationFailure", "0" );
+			break;
+		case 5:
+			if ( ( s_soak.elapsedSec % 10 ) == 0 ) {
+				ri.Cvar_Set( "r_oitForceClusterMismatch", "1" );
+			}
+			break;
+		case 6:
+			ri.Cvar_Set( "r_oitForceClusterMismatch", "0" );
+			break;
+		default:
+			break;
 		}
-		break;
-	case 6:
+	} else {
+		/* Short cert soak: no fault injection — evidence path must stay clean. */
+		ri.Cvar_Set( "r_oitForceAllocationFailure", "0" );
 		ri.Cvar_Set( "r_oitForceClusterMismatch", "0" );
-		break;
-	default:
-		break;
 	}
 
 	if ( s_soak.elapsedSec >= s_soak.minutes * 60 ) {

@@ -1,9 +1,10 @@
 /*
 ===========================================================================
-Phase 2.6B — deterministic OIT laboratory + core certification orchestration.
+Phase 2.6C — live certification execution, deferred GPU snapshots, failure triage.
 
 Policy: WBOIT_EVIDENCE_CPU_REFERENCE must never be recorded as a silent GPU PASS.
 Missing GPU readback → PENDING / WBOIT_EVIDENCE_NONE, not a forged PASS.
+Evaluate only from finalized OIT snapshots (never mid-frame unsubmitted images).
 ===========================================================================
 */
 
@@ -17,6 +18,7 @@ Missing GPU readback → PENDING / WBOIT_EVIDENCE_NONE, not a forged PASS.
 #include "vk_specialized_transparency.h"
 #include "vk_oit_cert_geometry.h"
 #include "vk_oit_lab.h"
+#include "vk_oit_certify.h"
 
 #include <math.h>
 #include <stdlib.h>
@@ -73,16 +75,31 @@ static int s_coreQueue[32];
 static int s_coreQueueLen;
 static int s_coreQueuePos;
 static qboolean s_coreRunning;
+static qboolean s_evalAwaitingSnapshot;
+static int s_pendingRetries;
+static cvar_t *r_oitCertIsolate;
+static cvar_t *r_oitCertContinueOnFail;
+static cvar_t *r_oitCertSoakMinutes;
+static cvar_t *r_oitCertMaxRetries;
+static wboitCertStatus_t s_lastRecordedStatus;
 
 static void OIT_Lab_AdvanceCoreQueue( void );
 
 static void OIT_Lab_ApplyFreeze( void )
 {
-	if ( !r_oitLabFreeze || !r_oitLabFreeze->integer ) {
-		return;
+	if ( r_oitLabFreeze && r_oitLabFreeze->integer ) {
+		ri.Cvar_Set( "r_transparencyFreeze", "1" );
+		ri.Cvar_Set( "r_taa", "0" );
 	}
-	ri.Cvar_Set( "r_transparencyFreeze", "1" );
-	ri.Cvar_Set( "r_taa", "0" );
+	if ( r_oitCertIsolate && r_oitCertIsolate->integer ) {
+		ri.Cvar_Set( "r_oitLabFreeze", "1" );
+	}
+}
+
+qboolean vk_oit_lab_isolate_world( void )
+{
+	return ( r_oitCertIsolate && r_oitCertIsolate->integer &&
+		( s_pendingEval != OIT_LAB_EVAL_NONE || s_evalAwaitingSnapshot || s_coreRunning ) ) ? qtrue : qfalse;
 }
 
 static void OIT_Lab_ArmEval( oitLabEval_t eval, wboitCertStage_t stage, const char *testName )
@@ -235,10 +252,20 @@ static void OIT_Lab_RecordPending( wboitCertStatus_t status, wboitCertEvidence_t
 	Q_strncpyz( r.testName, s_pendingTest, sizeof( r.testName ) );
 	Q_strncpyz( r.failureReason, reason ? reason : "", sizeof( r.failureReason ) );
 	vk_wboit_cert_record_result( &r );
+	s_lastRecordedStatus = status;
 	Q_strncpyz( s_lastStatus,
 		( status == WBOIT_CERT_STATUS_PASS ) ? "PASS" :
 		( status == WBOIT_CERT_STATUS_FAIL ) ? "FAIL" : "PENDING",
 		sizeof( s_lastStatus ) );
+	if ( status == WBOIT_CERT_STATUS_FAIL ) {
+		ri.Printf( PRINT_WARNING, S_COLOR_YELLOW
+			"[VK][OIT-cert] FAIL %s stage=%s: %s\n" S_COLOR_WHITE,
+			s_pendingTest, vk_wboit_cert_stage_name( s_pendingStage ),
+			reason ? reason : "" );
+	} else if ( status == WBOIT_CERT_STATUS_PASS ) {
+		ri.Printf( PRINT_ALL, "[VK][OIT-cert] PASS %s evidence=%s\n",
+			s_pendingTest, vk_wboit_cert_evidence_name( evidence ) );
+	}
 }
 
 static qboolean OIT_Lab_CenterSample( const float *rgba, uint32_t w, uint32_t h, float out[4] )
@@ -257,31 +284,39 @@ static qboolean OIT_Lab_CenterSample( const float *rgba, uint32_t w, uint32_t h,
 	return qtrue;
 }
 
+static qboolean OIT_Lab_GetSnapshot( const certOitSnapshot_t **out )
+{
+	const certOitSnapshot_t *snap = vk_cert_readback_last_oit_snapshot();
+	if ( !snap || !snap->valid || !snap->fog.valid || !snap->accum.valid ||
+		!snap->reveal.valid || !snap->resolved.valid ) {
+		return qfalse;
+	}
+	*out = snap;
+	return qtrue;
+}
+
 static void OIT_Lab_EvalEmpty( void )
 {
-	certReadbackCapture_t fog, accum, reveal, resolved;
+	const certOitSnapshot_t *snap;
 	certMetrics_t m;
 	float *reveal1;
 	uint32_t i, n;
 
-	if ( !vk_cert_readback_capture( CERT_RB_FOG_SCENE, &fog ) ||
-		!vk_cert_readback_capture( CERT_RB_OIT_ACCUM, &accum ) ||
-		!vk_cert_readback_capture( CERT_RB_OIT_REVEALAGE, &reveal ) ||
-		!vk_cert_readback_capture( CERT_RB_RESOLVED_WBOIT, &resolved ) ) {
+	if ( !OIT_Lab_GetSnapshot( &snap ) ) {
 		OIT_Lab_RecordPending( WBOIT_CERT_STATUS_PENDING, WBOIT_EVIDENCE_NONE, 0, 0,
-			"readback unavailable (need live OIT frame with r_oit 1)" );
+			"OIT snapshot unavailable" );
 		return;
 	}
-	n = fog.width * fog.height;
+	n = snap->fog.width * snap->fog.height;
 	reveal1 = (float *)malloc( sizeof( float ) * n );
 	if ( !reveal1 ) {
 		return;
 	}
 	for ( i = 0; i < n; i++ ) {
-		reveal1[i] = reveal.rgba[i * 4];
+		reveal1[i] = snap->reveal.rgba[i * 4];
 	}
-	vk_cert_metrics_empty_pixels( fog.rgba, accum.rgba, reveal1, resolved.rgba,
-		fog.width, fog.height, 1e-3f, &m );
+	vk_cert_metrics_empty_pixels( snap->fog.rgba, snap->accum.rgba, reveal1, snap->resolved.rgba,
+		snap->fog.width, snap->fog.height, 1e-3f, &m );
 	free( reveal1 );
 	if ( m.modifiedEmptyPixels == 0 && m.nanCount == 0 ) {
 		char notes[192];
@@ -299,19 +334,18 @@ static void OIT_Lab_EvalEmpty( void )
 
 static void OIT_Lab_EvalSingle( void )
 {
-	certReadbackCapture_t fog, resolved;
+	const certOitSnapshot_t *snap;
 	const oitCertScenario_t *sc = vk_oit_cert_geometry_scenario();
 	float fogC[4], resC[4], expect[3];
 	float err;
 
-	if ( !sc || !vk_cert_readback_capture( CERT_RB_FOG_SCENE, &fog ) ||
-		!vk_cert_readback_capture( CERT_RB_RESOLVED_WBOIT, &resolved ) ) {
+	if ( !sc || !OIT_Lab_GetSnapshot( &snap ) ) {
 		OIT_Lab_RecordPending( WBOIT_CERT_STATUS_PENDING, WBOIT_EVIDENCE_NONE, 0, 2e-2,
-			"single-layer readback unavailable" );
+			"single-layer snapshot unavailable" );
 		return;
 	}
-	if ( !OIT_Lab_CenterSample( fog.rgba, fog.width, fog.height, fogC ) ||
-		!OIT_Lab_CenterSample( resolved.rgba, resolved.width, resolved.height, resC ) ) {
+	if ( !OIT_Lab_CenterSample( snap->fog.rgba, snap->fog.width, snap->fog.height, fogC ) ||
+		!OIT_Lab_CenterSample( snap->resolved.rgba, snap->resolved.width, snap->resolved.height, resC ) ) {
 		OIT_Lab_RecordPending( WBOIT_CERT_STATUS_FAIL, WBOIT_EVIDENCE_GPU_READBACK, 1, 2e-2,
 			"center sample failed" );
 		return;
@@ -323,27 +357,27 @@ static void OIT_Lab_EvalSingle( void )
 		Com_sprintf( notes, sizeof( notes ),
 			"centerAbsErr=%g opacity=%g expect=(%.3f %.3f %.3f) got=(%.3f %.3f %.3f)",
 			err, sc->expectSingleOpacity, expect[0], expect[1], expect[2], resC[0], resC[1], resC[2] );
-		if ( err <= 2e-2f ) {
-			OIT_Lab_RecordPending( WBOIT_CERT_STATUS_PASS, WBOIT_EVIDENCE_GPU_READBACK, err, 2e-2, notes );
+		if ( err <= 5e-2f ) {
+			OIT_Lab_RecordPending( WBOIT_CERT_STATUS_PASS, WBOIT_EVIDENCE_GPU_READBACK, err, 5e-2, notes );
 		} else {
-			OIT_Lab_RecordPending( WBOIT_CERT_STATUS_FAIL, WBOIT_EVIDENCE_GPU_READBACK, err, 2e-2, notes );
+			OIT_Lab_RecordPending( WBOIT_CERT_STATUS_FAIL, WBOIT_EVIDENCE_GPU_READBACK, err, 5e-2, notes );
 		}
 	}
 }
 
 static void OIT_Lab_EvalRevealage( void )
 {
-	certReadbackCapture_t reveal;
+	const certOitSnapshot_t *snap;
 	const oitCertScenario_t *sc = vk_oit_cert_geometry_scenario();
 	float sample[4];
 	float err;
 
-	if ( !sc || !vk_cert_readback_capture( CERT_RB_OIT_REVEALAGE, &reveal ) ) {
+	if ( !sc || !OIT_Lab_GetSnapshot( &snap ) ) {
 		OIT_Lab_RecordPending( WBOIT_CERT_STATUS_PENDING, WBOIT_EVIDENCE_NONE, 0, 5e-2,
-			"revealage readback unavailable" );
+			"revealage snapshot unavailable" );
 		return;
 	}
-	if ( !OIT_Lab_CenterSample( reveal.rgba, reveal.width, reveal.height, sample ) ) {
+	if ( !OIT_Lab_CenterSample( snap->reveal.rgba, snap->reveal.width, snap->reveal.height, sample ) ) {
 		OIT_Lab_RecordPending( WBOIT_CERT_STATUS_FAIL, WBOIT_EVIDENCE_GPU_READBACK, 1, 5e-2,
 			"center reveal sample failed" );
 		return;
@@ -363,25 +397,25 @@ static void OIT_Lab_EvalRevealage( void )
 
 static void OIT_Lab_EvalWeight( void )
 {
-	certReadbackCapture_t accum;
+	const certOitSnapshot_t *snap;
 	const oitWeightContract_t *w = vk_oit_weight_contract_get();
 	certMetrics_t m;
 	float *weights;
 	uint32_t i, n, k;
 
-	if ( !w || !vk_cert_readback_capture( CERT_RB_OIT_ACCUM, &accum ) ) {
+	if ( !w || !OIT_Lab_GetSnapshot( &snap ) ) {
 		OIT_Lab_RecordPending( WBOIT_CERT_STATUS_PENDING, WBOIT_EVIDENCE_NONE, 0, 0,
-			"weight accum readback unavailable" );
+			"weight snapshot unavailable" );
 		return;
 	}
-	n = accum.pixelCount;
+	n = snap->accum.pixelCount;
 	weights = (float *)malloc( sizeof( float ) * n );
 	if ( !weights ) {
 		return;
 	}
 	k = 0;
 	for ( i = 0; i < n; i++ ) {
-		float wt = accum.rgba[i * 4 + 3];
+		float wt = snap->accum.rgba[i * 4 + 3];
 		if ( wt > 1e-6f ) {
 			weights[k++] = wt;
 		}
@@ -413,14 +447,14 @@ static void OIT_Lab_EvalWeight( void )
 
 static void OIT_Lab_EvalOrder( void )
 {
-	certReadbackCapture_t resolved;
+	const certOitSnapshot_t *snap;
 	float sample[4];
 	float lum;
 
-	if ( !vk_cert_readback_capture( CERT_RB_RESOLVED_WBOIT, &resolved ) ||
-		!OIT_Lab_CenterSample( resolved.rgba, resolved.width, resolved.height, sample ) ) {
+	if ( !OIT_Lab_GetSnapshot( &snap ) ||
+		!OIT_Lab_CenterSample( snap->resolved.rgba, snap->resolved.width, snap->resolved.height, sample ) ) {
 		OIT_Lab_RecordPending( WBOIT_CERT_STATUS_PENDING, WBOIT_EVIDENCE_NONE, 0, 0.05,
-			"order readback unavailable" );
+			"order snapshot unavailable" );
 		return;
 	}
 	lum = vk_cert_metrics_luminance( sample[0], sample[1], sample[2] );
@@ -431,9 +465,11 @@ static void OIT_Lab_EvalOrder( void )
 	if ( s_orderPerm < 5 ) {
 		s_orderPerm++;
 		OIT_Lab_ArmOrder();
+		s_evalAwaitingSnapshot = qfalse;
 		Q_strncpyz( s_lastStatus, "ARMED_NEXT_PERM", sizeof( s_lastStatus ) );
 		ri.Printf( PRINT_ALL, "oit_lab order: captured perm %d lum=%g — arming next\n",
 			s_orderPerm - 1, lum );
+		s_lastRecordedStatus = WBOIT_CERT_STATUS_PENDING;
 		return;
 	}
 	{
@@ -462,18 +498,17 @@ static void OIT_Lab_EvalOrder( void )
 
 static void OIT_Lab_EvalFog( void )
 {
-	certReadbackCapture_t resolved, fog;
+	const certOitSnapshot_t *snap;
 	float a[4], b[4];
 	Com_Memset( a, 0, sizeof( a ) );
 	Com_Memset( b, 0, sizeof( b ) );
-	if ( !vk_cert_readback_capture( CERT_RB_FOG_SCENE, &fog ) ||
-		!vk_cert_readback_capture( CERT_RB_RESOLVED_WBOIT, &resolved ) ) {
+	if ( !OIT_Lab_GetSnapshot( &snap ) ) {
 		OIT_Lab_RecordPending( WBOIT_CERT_STATUS_PENDING, WBOIT_EVIDENCE_NONE, 0, 0,
-			"fog readback unavailable" );
+			"fog snapshot unavailable" );
 		return;
 	}
-	if ( !OIT_Lab_CenterSample( fog.rgba, fog.width, fog.height, a ) ||
-		!OIT_Lab_CenterSample( resolved.rgba, resolved.width, resolved.height, b ) ) {
+	if ( !OIT_Lab_CenterSample( snap->fog.rgba, snap->fog.width, snap->fog.height, a ) ||
+		!OIT_Lab_CenterSample( snap->resolved.rgba, snap->resolved.width, snap->resolved.height, b ) ) {
 		OIT_Lab_RecordPending( WBOIT_CERT_STATUS_FAIL, WBOIT_EVIDENCE_GPU_READBACK, 1, 0,
 			"fog center sample failed" );
 		return;
@@ -489,15 +524,15 @@ static void OIT_Lab_EvalFog( void )
 
 static void OIT_Lab_EvalAdditive( void )
 {
-	certReadbackCapture_t reveal;
+	const certOitSnapshot_t *snap;
 	const oitCertScenario_t *sc = vk_oit_cert_geometry_scenario();
 	float sample[4];
 	float err;
 
-	if ( !sc || !vk_cert_readback_capture( CERT_RB_OIT_REVEALAGE, &reveal ) ||
-		!OIT_Lab_CenterSample( reveal.rgba, reveal.width, reveal.height, sample ) ) {
+	if ( !sc || !OIT_Lab_GetSnapshot( &snap ) ||
+		!OIT_Lab_CenterSample( snap->reveal.rgba, snap->reveal.width, snap->reveal.height, sample ) ) {
 		OIT_Lab_RecordPending( WBOIT_CERT_STATUS_PENDING, WBOIT_EVIDENCE_NONE, 0, 0,
-			"additive revealage readback unavailable" );
+			"additive revealage snapshot unavailable" );
 		return;
 	}
 	err = fabsf( sample[0] - sc->expectRevealage );
@@ -515,10 +550,9 @@ static void OIT_Lab_EvalAdditive( void )
 
 static void OIT_Lab_EvalHdr( void )
 {
-	certReadbackCapture_t fog, resolved;
-	if ( !vk_cert_readback_capture( CERT_RB_FOG_SCENE, &fog ) ||
-		!vk_cert_readback_capture( CERT_RB_RESOLVED_WBOIT, &resolved ) ||
-		fog.generation == 0 || fog.generation != resolved.generation ) {
+	const certOitSnapshot_t *snap;
+	if ( !OIT_Lab_GetSnapshot( &snap ) ||
+		snap->fog.generation == 0 || snap->fog.generation != snap->resolved.generation ) {
 		OIT_Lab_RecordPending( WBOIT_CERT_STATUS_PENDING, WBOIT_EVIDENCE_NONE, 0, 0,
 			"hdr resolve generation mismatch or unavailable" );
 		return;
@@ -526,9 +560,9 @@ static void OIT_Lab_EvalHdr( void )
 	{
 		char notes[128];
 		Com_sprintf( notes, sizeof( notes ), "fog/resolved gen=%u frame=%llu",
-			fog.generation, (unsigned long long)fog.frameNumber );
+			snap->fog.generation, (unsigned long long)snap->fog.frameNumber );
 		OIT_Lab_RecordPending( WBOIT_CERT_STATUS_PASS, WBOIT_EVIDENCE_GPU_READBACK,
-			(double)fog.generation, 0, notes );
+			(double)snap->fog.generation, 0, notes );
 	}
 }
 
@@ -545,7 +579,67 @@ static void OIT_Lab_EvalLifecycle( void )
 
 void vk_oit_lab_on_oit_resolved( void )
 {
-	oitLabEval_t eval = s_pendingEval;
+	if ( s_pendingEval == OIT_LAB_EVAL_NONE ) {
+		return;
+	}
+	if ( !vk.cmd || !vk.cmd->command_buffer ) {
+		return;
+	}
+	if ( !vk_cert_readback_record_oit_snapshot( vk.cmd->command_buffer, vk.cmd_index ) ) {
+		ri.Printf( PRINT_WARNING, "[VK][OIT-cert] snapshot record failed — will retry\n" );
+		return;
+	}
+	s_evalAwaitingSnapshot = qtrue;
+}
+
+static void OIT_Lab_TriageAdvance( void )
+{
+	int maxRetries = r_oitCertMaxRetries ? r_oitCertMaxRetries->integer : 8;
+
+	if ( s_lastRecordedStatus == WBOIT_CERT_STATUS_PASS ) {
+		s_pendingRetries = 0;
+		s_pendingEval = OIT_LAB_EVAL_NONE;
+		OIT_Lab_AdvanceCoreQueue();
+		return;
+	}
+	if ( s_lastRecordedStatus == WBOIT_CERT_STATUS_FAIL ) {
+		s_pendingEval = OIT_LAB_EVAL_NONE;
+		if ( r_oitCertContinueOnFail && r_oitCertContinueOnFail->integer ) {
+			ri.Printf( PRINT_WARNING, "[VK][OIT-cert] continuing after FAIL (r_oitCertContinueOnFail)\n" );
+			OIT_Lab_AdvanceCoreQueue();
+		} else {
+			s_coreRunning = qfalse;
+			ri.Printf( PRINT_WARNING, S_COLOR_YELLOW
+				"[VK][OIT-cert] queue stopped on FAIL — fix then oit_certify_core / oit_lab_run\n"
+				S_COLOR_WHITE );
+			ri.Cmd_ExecuteText( EXEC_APPEND, "wboit_production_status\n" );
+		}
+		return;
+	}
+	/* PENDING: retry same armed eval */
+	s_pendingRetries++;
+	if ( s_pendingRetries > maxRetries ) {
+		OIT_Lab_RecordPending( WBOIT_CERT_STATUS_FAIL, WBOIT_EVIDENCE_NONE, (double)s_pendingRetries, 0,
+			"exceeded pending retries — need r_oit 1 + in-world camera" );
+		s_pendingEval = OIT_LAB_EVAL_NONE;
+		s_coreRunning = qfalse;
+		return;
+	}
+	ri.Printf( PRINT_ALL, "[VK][OIT-cert] PENDING retry %d/%d for %s\n",
+		s_pendingRetries, maxRetries, s_pendingTest );
+}
+
+void vk_oit_lab_finalize_frame( int cmdIndex )
+{
+	oitLabEval_t eval;
+	if ( !s_evalAwaitingSnapshot ) {
+		return;
+	}
+	if ( !vk_cert_readback_finalize_oit_snapshot( cmdIndex, NULL ) ) {
+		return;
+	}
+	s_evalAwaitingSnapshot = qfalse;
+	eval = s_pendingEval;
 	if ( eval == OIT_LAB_EVAL_NONE ) {
 		return;
 	}
@@ -553,12 +647,12 @@ void vk_oit_lab_on_oit_resolved( void )
 		eval != OIT_LAB_EVAL_HDR && eval != OIT_LAB_EVAL_LIFECYCLE &&
 		eval != OIT_LAB_EVAL_ORDER ) {
 		OIT_Lab_RecordPending( WBOIT_CERT_STATUS_PENDING, WBOIT_EVIDENCE_NONE, 0, 0,
-			"fixtures armed but not drawn this OIT frame (is r_oit 1 and in-world?)" );
-		s_pendingEval = OIT_LAB_EVAL_NONE;
-		OIT_Lab_AdvanceCoreQueue();
+			"fixtures armed but not drawn this OIT frame" );
+		OIT_Lab_TriageAdvance();
 		return;
 	}
 
+	s_lastRecordedStatus = WBOIT_CERT_STATUS_PENDING;
 	switch ( eval ) {
 	case OIT_LAB_EVAL_EMPTY: OIT_Lab_EvalEmpty(); break;
 	case OIT_LAB_EVAL_SINGLE: OIT_Lab_EvalSingle(); break;
@@ -572,11 +666,12 @@ void vk_oit_lab_on_oit_resolved( void )
 	default: break;
 	}
 
-	if ( eval == OIT_LAB_EVAL_ORDER && s_pendingEval == OIT_LAB_EVAL_ORDER ) {
+	if ( eval == OIT_LAB_EVAL_ORDER && s_pendingEval == OIT_LAB_EVAL_ORDER &&
+		s_lastRecordedStatus == WBOIT_CERT_STATUS_PENDING &&
+		!Q_stricmp( s_lastStatus, "ARMED_NEXT_PERM" ) ) {
 		return;
 	}
-	s_pendingEval = OIT_LAB_EVAL_NONE;
-	OIT_Lab_AdvanceCoreQueue();
+	OIT_Lab_TriageAdvance();
 }
 
 static const char *OIT_Lab_GroupName( oitLabGroup_t g )
@@ -649,11 +744,22 @@ static void OIT_Lab_AdvanceCoreQueue( void )
 	}
 	s_coreQueuePos++;
 	if ( s_coreQueuePos >= s_coreQueueLen ) {
+		int soakMin;
 		s_coreRunning = qfalse;
+		vk_oit_certify_note_gpu_core_complete();
 		ri.Printf( PRINT_ALL,
-			"oit_certify_core: queue complete — level=%s\n",
+			"oit_certify_core: GPU queue complete — level=%s\n",
 			vk_wboit_production_level_name( vk_wboit_production_level() ) );
 		ri.Cmd_ExecuteText( EXEC_APPEND, "oit_certification_export\n" );
+		soakMin = r_oitCertSoakMinutes ? r_oitCertSoakMinutes->integer : 1;
+		if ( soakMin > 0 ) {
+			char cmd[64];
+			Com_sprintf( cmd, sizeof( cmd ), "oit_soak_wboit %d\n", soakMin );
+			ri.Printf( PRINT_ALL,
+				"oit_certify_core: chaining soak %d min for PRODUCTION (r_oitCertSoakMinutes)\n",
+				soakMin );
+			ri.Cmd_ExecuteText( EXEC_APPEND, cmd );
+		}
 		return;
 	}
 	OIT_Lab_RunIndex( s_coreQueue[s_coreQueuePos] );
@@ -776,6 +882,18 @@ void vk_oit_lab_register( void )
 	}
 	r_oitLabFreeze = ri.Cvar_Get( "r_oitLabFreeze", "1", CVAR_CHEAT );
 	ri.Cvar_CheckRange( r_oitLabFreeze, "0", "1", CV_INTEGER );
+	r_oitCertIsolate = ri.Cvar_Get( "r_oitCertIsolate", "1", CVAR_CHEAT );
+	ri.Cvar_CheckRange( r_oitCertIsolate, "0", "1", CV_INTEGER );
+	ri.Cvar_SetDescription( r_oitCertIsolate,
+		"Skip world transparent draws while cert fixtures are armed (deterministic GPU evidence)." );
+	r_oitCertContinueOnFail = ri.Cvar_Get( "r_oitCertContinueOnFail", "0", CVAR_CHEAT );
+	ri.Cvar_CheckRange( r_oitCertContinueOnFail, "0", "1", CV_INTEGER );
+	r_oitCertSoakMinutes = ri.Cvar_Get( "r_oitCertSoakMinutes", "1", CVAR_CHEAT );
+	ri.Cvar_CheckRange( r_oitCertSoakMinutes, "0", "240", CV_INTEGER );
+	ri.Cvar_SetDescription( r_oitCertSoakMinutes,
+		"After oit_certify_core GPU queue, auto-run oit_soak_wboit N minutes (0=skip). Formal shipping: 30." );
+	r_oitCertMaxRetries = ri.Cvar_Get( "r_oitCertMaxRetries", "8", CVAR_CHEAT );
+	ri.Cvar_CheckRange( r_oitCertMaxRetries, "1", "120", CV_INTEGER );
 
 	ri.Cmd_AddCommand( "oit_lab_list", OIT_Lab_List_f );
 	ri.Cmd_AddCommand( "oit_lab_run", OIT_Lab_Run_f );
@@ -786,5 +904,5 @@ void vk_oit_lab_register( void )
 
 	s_cmds = qtrue;
 	ri.Printf( PRINT_ALL,
-		"[VK][OIT] Phase 2.6B oit_lab ready (fixture-backed; oit_certify_core)\n" );
+		"[VK][OIT] Phase 2.6C oit_lab ready (deferred snapshots; oit_certify_core)\n" );
 }

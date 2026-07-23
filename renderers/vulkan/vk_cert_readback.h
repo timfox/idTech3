@@ -1,7 +1,7 @@
 #pragma once
 
 /*
- * Phase 2.6A — certification GPU readback (blocking for explicit cert frames).
+ * Phase 2.6A/2.6C — certification GPU readback + deferred OIT frame snapshots.
  */
 
 #ifdef USE_VULKAN
@@ -37,11 +37,21 @@ typedef struct certReadbackCapture_s {
 	uint32_t oitContractHash;
 	uint32_t weightContractHash;
 	uint32_t resolveContractHash;
-	/* Host float RGBA (decoded); size = width*height*4 floats. Caller must not free. */
+	/* Host float RGBA (decoded). Owned by readback module until next overwrite of that slot. */
 	float *rgba;
 	uint32_t pixelCount;
 	qboolean valid;
 } certReadbackCapture_t;
+
+typedef struct certOitSnapshot_s {
+	qboolean valid;
+	uint64_t frameNumber;
+	uint32_t generation;
+	certReadbackCapture_t fog;
+	certReadbackCapture_t accum;
+	certReadbackCapture_t reveal;
+	certReadbackCapture_t resolved;
+} certOitSnapshot_t;
 
 void vk_cert_readback_register( void );
 void vk_cert_readback_shutdown( void );
@@ -49,12 +59,21 @@ void vk_cert_readback_shutdown( void );
 const char *vk_cert_readback_resource_name( certReadbackResource_t r );
 float vk_cert_half_to_float( uint16_t h );
 
-/* Blocking capture of a named resource into the last-capture slot. */
+/* Blocking capture of a named resource into the last-capture slot (overwrites shared scratch). */
 qboolean vk_cert_readback_capture( certReadbackResource_t resource, certReadbackCapture_t *out );
 void vk_cert_readback_flush( void );
 const certReadbackCapture_t *vk_cert_readback_last( void );
 
-/* Decode packed half/float bytes into float RGBA (allocates via ri.Hunk_AllocateTempMemory if needed externally). */
+/*
+ * Phase 2.6C — record fog/accum/reveal/resolved copies into the CURRENT command buffer
+ * immediately after WBOIT resolve (before bloom/TAA overwrite color). Finalize after the
+ * frame's rendering_finished_fence (begin_frame wait).
+ */
+qboolean vk_cert_readback_record_oit_snapshot( VkCommandBuffer cmd, int cmdIndex );
+qboolean vk_cert_readback_oit_snapshot_pending( int cmdIndex );
+qboolean vk_cert_readback_finalize_oit_snapshot( int cmdIndex, certOitSnapshot_t *out );
+const certOitSnapshot_t *vk_cert_readback_last_oit_snapshot( void );
+
 qboolean vk_cert_readback_decode_to_rgba( VkFormat format, uint32_t width, uint32_t height,
 	uint32_t rowPitchBytes, const void *src, float *dstRgba );
 
