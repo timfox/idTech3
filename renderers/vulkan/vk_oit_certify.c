@@ -7,6 +7,7 @@ WBOIT live certification runner, soak, anomaly capture, certification status.
 #include "tr_local.h"
 #include "vk.h"
 #include "vk_oit_certify.h"
+#include "vk_wboit_production_cert.h"
 #include "vk_forward_plus.h"
 #include "vk_device.h"
 
@@ -732,6 +733,8 @@ void vk_oit_certify_frame_tick( void )
 			s_persist.liveSoakedOk = qtrue;
 			s_persist.soakMinutesCompleted = s_soak.minutes;
 			VK_OitCert_RecomputeLevel();
+			vk_wboit_cert_stage_pass( WBOIT_CERT_STAGE_SOAK, 0.0f, 0.0f,
+				"oit_soak_wboit completed with zero anomalies" );
 			ri.Printf( PRINT_ALL, "oit_soak_wboit COMPLETE clean — LIVE_SOAKED eligible\n" );
 		} else {
 			ri.Printf( PRINT_WARNING, S_COLOR_YELLOW
@@ -756,7 +759,8 @@ static void VK_OitCertificationStatus_f( void )
 		"  certifiedGpu=%s certifiedDriver=%s\n"
 		"  certifiedBinaryHash=%s certifiedShaderHash=%s\n"
 		"  missing=%s\n"
-		"  note=STATIC_GATES alone is NOT Spine 1.1 certification\n",
+		"  note=STATIC_GATES alone is NOT Spine 1.1 / WBOIT_PRODUCTION_CERTIFIED\n"
+		"  phase26Level=%s (use wboit_production_status for stage matrix)\n",
 		vk_oit_certification_level_name( s_persist.level ),
 		s_persist.staticGatesOk ? 1 : 0,
 		s_persist.liveBasicOk ? 1 : 0,
@@ -773,7 +777,8 @@ static void VK_OitCertificationStatus_f( void )
 			? "complete live B0-B7 + export"
 			: ( s_persist.level < VK_OIT_CERT_LIVE_SOAKED )
 				? "run oit_soak_wboit 30 with zero anomalies"
-				: "(none)" );
+				: "(none)",
+		vk_wboit_production_level_name( vk_wboit_production_level() ) );
 }
 
 static void VK_OitFogStatus_f( void )

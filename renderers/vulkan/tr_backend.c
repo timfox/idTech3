@@ -58,6 +58,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "vk_deferred_decals.h"
 #include "vk_distortion.h"
 #include "vk_transparency_route.h"
+#include "vk_specialized_transparency.h"
 #include "vk_gpu_scene.h"
 #include "vk_ht_throughput.h"
 #include "vk_hiz.h"
@@ -1675,27 +1676,37 @@ static void RB_ValidateUnifiedClusteredTransparentHandoff( qboolean usingOit )
 ===============
 RB_DrawRefractiveAfterOit
 
-Raster Ultra 1.4: sorted refractive/screenMap after WBOIT resolve.
-Does not sample unresolved OIT, UI, weapon, or tonemap.
+Phase 2.6: sorted refractive / screenMap / portal after WBOIT resolve.
+Order: ResolvedWboitHDR → RefractiveSceneInput → sorted draws → RefractedSceneHDR.
+Does not sample unresolved OIT, UI, weapon, or tonemap. No same-image feedback.
 ===============
 */
 static void RB_DrawRefractiveAfterOit( const drawSurfsCommand_t *cmd )
 {
+	cvar_t *ref;
+
 	if ( !vk_transparency_refractive_exclude_oit() ) {
 		return;
 	}
 	if ( !r_oit || !r_oit->integer ) {
 		return;
 	}
+	/* r_refraction 0 disables the specialized sorted path (materials stay excluded from WBOIT). */
+	ref = ri.Cvar_Get( "r_refraction", "1", 0 );
+	if ( ref && !ref->integer ) {
+		return;
+	}
 	if ( !cmd || ( cmd->refdef.rdflags & RDF_NOWORLDMODEL ) ) {
 		return;
 	}
+	vk_transparency_resource_bump( XPARENT_RES_REFRACTIVE_INPUT );
 	backEnd.drawSurfFilter = 2;
 	backEnd.refractiveOnlyPass = qtrue;
 	backEnd.oitBucketFilter = 0;
 	RB_RenderDrawSurfList( cmd->drawSurfs, cmd->numDrawSurfs );
 	backEnd.refractiveOnlyPass = qfalse;
 	backEnd.drawSurfFilter = 0;
+	vk_transparency_resource_bump( XPARENT_RES_REFRACTED_HDR );
 }
 #endif
 

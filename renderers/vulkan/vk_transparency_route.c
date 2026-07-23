@@ -14,6 +14,9 @@ Raster Ultra 1.4 — transparency classification + refractive exclusion helpers.
 #include "vk_depth_contract.h"
 #include "vk_hdr_resolve_contract.h"
 #include "vk_oit_weight_contract.h"
+#include "vk_wboit_production_cert.h"
+#include "vk_transparency_lab.h"
+#include "vk_specialized_transparency.h"
 
 static cvar_t *r_transparencyDebug;
 static cvar_t *r_refractiveExcludeOit;
@@ -315,6 +318,7 @@ static void VK_TransparencyRoute_Status_f( void )
 		"    ordinary WBOIT ← SRC_ALPHA / ONE_MINUS_SRC_ALPHA (glass/smoke)\n"
 		"    additive bucket ← ONE/ONE (no revealage; r_oitClassify 1)\n"
 		"    excluded from OIT ← modulate/filter, refractive/screenMap, UI, decal\n"
+		"  Phase 2.6: post-WBOIT refraction/special/portal/weapon (see refraction_status)\n"
 		"  classes: alpha_tested sorted_alpha wboit additive modulate refractive "
 		"water glass distortion particle decal ui\n",
 		r_oit ? r_oit->integer : 0,
@@ -357,6 +361,9 @@ void vk_transparency_route_init( void )
 	vk_oit_alpha_register();
 	vk_oit_certify_init();
 	vk_hdr_resolve_contract_register();
+	vk_wboit_production_cert_register();
+	vk_transparency_lab_register();
+	vk_specialized_transparency_register();
 }
 
 void vk_transparency_route_shutdown( void )

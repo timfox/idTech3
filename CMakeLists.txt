@@ -4243,6 +4243,13 @@ if(BUILD_UNIT_TESTS)
 	add_test(NAME unit_oit_weight COMMAND unit_oit_weight)
 	set_tests_properties(unit_oit_weight PROPERTIES LABELS "unit;validation;oit")
 
+	add_executable(unit_wboit_live_cert tests/unit/test_wboit_live_cert.c)
+	if(NOT MSVC)
+		target_link_libraries(unit_wboit_live_cert PRIVATE m)
+	endif()
+	add_test(NAME unit_wboit_live_cert COMMAND unit_wboit_live_cert)
+	set_tests_properties(unit_wboit_live_cert PROPERTIES LABELS "unit;validation;oit")
+
 	add_executable(unit_bsp30_triangulate
 		tests/unit/test_bsp30_triangulate.c
 		renderers/common/tr_bsp30_triangulate.c)
