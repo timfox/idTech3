@@ -1,64 +1,54 @@
-# WBOIT Live Certification (Phase 2.6)
+# WBOIT Live Certification (Phase 2.6 / 2.6A)
 
-**Status:** Controller + laboratory + specialized route scaffolds landed.  
-**Production level:** granted only after live GPU stages + soak — **not** by static grep gates alone.
+**Status:** Evidence-backed controller + GPU readback + deterministic `oit_lab` cases.  
+**Level today:** `WBOIT_STATIC_CERTIFIED` until GPU lab cases produce matching evidence.
+
+## Evidence policy (2.6A)
+
+Every stage result carries `wboitCertEvidence_t`:
+
+| Evidence | May grant PRODUCTION? |
+|----------|------------------------|
+| `STATIC` | No (contract/resources only) |
+| `CPU_REFERENCE` | No |
+| `GPU_READBACK` / `GPU_REDUCTION` | Yes (when stage requires it) |
+| `LIFECYCLE` / `SOAK` | Yes for those stages |
+| `MANUAL_OVERRIDE` | **No** by default (`r_oitAllowManualCertification 0`) |
+
+`oit_cert_stage pass …` always stamps **`MANUAL_OVERRIDE`** and cannot grant `WBOIT_PRODUCTION_CERTIFIED`.
+
+Required evidence per stage is enforced in `vk_wboit_cert_required_evidence()`.
 
 ## Commands
 
 | Command | Role |
 |---------|------|
-| `oit_certify_wboit` | Legacy B0–B7 operator matrix |
-| `oit_certification_status` | Legacy levels + Phase 2.6 production level |
-| `wboit_production_status` | Stage matrix + `WBOIT_*_CERTIFIED` levels |
-| `oit_cert_stage pass\|fail\|skip <STAGE>` | Record live GPU stage outcomes |
-| `oit_certification_capture [name]` | Arm capture root |
-| `oit_certification_abort` | Reset pending stages; re-run CPU contract gates |
-| `oit_soak_wboit` | Long soak; clean completion marks `WBOIT_CERT_SOAK` |
+| `oit_lab_list` / `oit_lab_run` / `oit_lab_run_group` | Deterministic lab |
+| `oit_lab_status` / `oit_lab_reset` | Lab session |
+| `cert_readback_capture` / `flush` / `status` | GPU readback |
+| `wboit_production_status` | Stage + evidence matrix |
+| `oit_certification_export` | Write `render_cert/wboit_certification.json` |
+| `oit_certification_invalidate` | Invalidate prior evidence |
+| `oit_certification_import` | Display-only (never certifies this device) |
+| `oit_soak_wboit` | Soak → `WBOIT_EVIDENCE_SOAK` on clean completion |
 
-## Stages
+## Cvars
 
-```text
-WBOIT_CERT_CONTRACT
-WBOIT_CERT_RESOURCES
-WBOIT_CERT_EMPTY_PIXEL
-WBOIT_CERT_SINGLE_LAYER
-WBOIT_CERT_REVEALAGE
-WBOIT_CERT_ORDER_STABILITY
-WBOIT_CERT_ALPHA_ENCODING
-WBOIT_CERT_DEPTH
-WBOIT_CERT_FOG
-WBOIT_CERT_ADDITIVE
-WBOIT_CERT_HDR_RESOLVE
-WBOIT_CERT_EXPOSURE
-WBOIT_CERT_LIFECYCLE
-WBOIT_CERT_SOAK
-```
+- `r_oitAllowManualCertification` (default **0**)
+- `r_requireWboitCertification` (default **1** = warn)
+- `r_oitLabFreeze` (default **1**)
+- `r_certReadbackBlocking` (default **1**)
 
-Each stage reports: result, observed, threshold, failing material/region, contract hashes, resource generations, capture path.
+## Lab groups
 
-## Levels
+`core` `alpha` `weight` `order` `fog` `additive` `resolve` `lifecycle` `soak` `specialized` `mboit` `all`
 
-| Level | Requirement |
-|-------|-------------|
-| `WBOIT_STATIC_CERTIFIED` | Module registered; foundation contracts validate |
-| `WBOIT_GPU_CORE_CERTIFIED` | Contract + resources + empty + single + revealage + alpha + order PASS |
-| `WBOIT_FOG_HDR_CERTIFIED` | Core + depth + fog + additive + HDR resolve + exposure PASS |
-| `WBOIT_LIFECYCLE_CERTIFIED` | Fog/HDR + lifecycle PASS |
-| `WBOIT_PRODUCTION_CERTIFIED` | Lifecycle + soak PASS **and** legacy `LIVE_FULL` |
+## Persistence
 
-## Frozen equations
+Evidence is exported to `render_cert/wboit_certification.json` and must be invalidated when any OIT/alpha/depth/weight/resolve contract, accum/resolve shader, blend, format, pass order, fog ownership, or color-space convention changes.
 
-Do **not** retune WBOIT weight coefficients during live certification. Coefficient changes require contract version bump, hash update, shader rebuild, static + live recert.
+## Startup
 
-## Debug
+Prints real level, e.g. `WBOIT: WBOIT_STATIC_CERTIFIED` — never claims production from manual flags.
 
-- `r_oitCertificationDebug` 1–4 — empty mask / fog_scene / resolved / difference  
-- `r_oitRevealageDebug` 1–4 — GPU / expected / difference / additive contamination  
-
-## Laboratory
-
-See `r_transparencyReference`, `r_transparencyFreeze`, `transparency_lab_status`, [TRANSPARENCY_ROUTING.md](TRANSPARENCY_ROUTING.md).
-
-## Thresholds
-
-See [WBOIT_CERTIFICATION_THRESHOLDS.md](WBOIT_CERTIFICATION_THRESHOLDS.md).
+See also [WBOIT_CERTIFICATION_THRESHOLDS.md](WBOIT_CERTIFICATION_THRESHOLDS.md), [TRANSPARENCY_ROUTING.md](TRANSPARENCY_ROUTING.md).

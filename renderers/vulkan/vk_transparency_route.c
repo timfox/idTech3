@@ -17,6 +17,8 @@ Raster Ultra 1.4 — transparency classification + refractive exclusion helpers.
 #include "vk_wboit_production_cert.h"
 #include "vk_transparency_lab.h"
 #include "vk_specialized_transparency.h"
+#include "vk_cert_readback.h"
+#include "vk_oit_lab.h"
 
 static cvar_t *r_transparencyDebug;
 static cvar_t *r_refractiveExcludeOit;
@@ -363,6 +365,8 @@ void vk_transparency_route_init( void )
 	vk_hdr_resolve_contract_register();
 	vk_wboit_production_cert_register();
 	vk_transparency_lab_register();
+	vk_cert_readback_register();
+	vk_oit_lab_register();
 	vk_specialized_transparency_register();
 }
 

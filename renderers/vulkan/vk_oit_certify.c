@@ -733,8 +733,17 @@ void vk_oit_certify_frame_tick( void )
 			s_persist.liveSoakedOk = qtrue;
 			s_persist.soakMinutesCompleted = s_soak.minutes;
 			VK_OitCert_RecomputeLevel();
-			vk_wboit_cert_stage_pass( WBOIT_CERT_STAGE_SOAK, 0.0f, 0.0f,
-				"oit_soak_wboit completed with zero anomalies" );
+			{
+				wboitCertStageResult_t sr;
+				Com_Memset( &sr, 0, sizeof( sr ) );
+				sr.stage = WBOIT_CERT_STAGE_SOAK;
+				sr.status = WBOIT_CERT_STATUS_PASS;
+				sr.evidenceType = WBOIT_EVIDENCE_SOAK;
+				sr.observed = (double)s_soak.minutes;
+				Q_strncpyz( sr.testName, "oit_soak_wboit", sizeof( sr.testName ) );
+				Q_strncpyz( sr.failureReason, "soak completed with zero anomalies", sizeof( sr.failureReason ) );
+				vk_wboit_cert_record_result( &sr );
+			}
 			ri.Printf( PRINT_ALL, "oit_soak_wboit COMPLETE clean — LIVE_SOAKED eligible\n" );
 		} else {
 			ri.Printf( PRINT_WARNING, S_COLOR_YELLOW
