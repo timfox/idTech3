@@ -46,6 +46,8 @@ static cvar_t		*r_fontShadow;
 static cvar_t		*r_fontSubpixel;
 static cvar_t		*r_fontSubpixelPos;
 static cvar_t		*r_fontKerning;
+static cvar_t		*r_fontDebug;
+static cvar_t		*r_fontMaxRasterUpscale;
 static cvar_t		*r_textMode;
 static cvar_t		*cl_builtInTtfConsole;
 
@@ -197,6 +199,38 @@ static int SCR_TtfPointSizeForPixelHeight( int targetPx ) {
 	return pt;
 }
 
+typedef enum fontSizeUnit_e {
+	FONT_SIZE_PIXELS = 0,
+	FONT_SIZE_POINTS
+} fontSizeUnit_t;
+
+/*
+ * One authoritative logical-size conversion. HUD sizes are already pixels in
+ * 640x480 virtual space, so DPI must not be applied to them a second time.
+ */
+static int R_FontRequestedPixelHeight( float logicalSize, float uiScale, int deviceDpi,
+		fontSizeUnit_t unit ) {
+	float pixels;
+
+	if ( unit == FONT_SIZE_POINTS ) {
+		pixels = logicalSize * (float)deviceDpi / 72.0f * uiScale;
+	} else {
+		pixels = logicalSize * uiScale;
+	}
+	return (int)floorf( Com_Clamp( 1.0f, 512.0f, pixels ) + 0.5f );
+}
+
+/*
+ * FreeType ppem describes the em square, not visible cap/digit ink. Inter's
+ * HUD reference line is roughly 3/4 em, so allocate a ppem at or above the
+ * requested on-screen ink height. Slight downsampling is preferable to
+ * magnifying a smaller bitmap.
+ */
+static int SCR_TtfPointSizeForRefLineHeight( int targetPx ) {
+	int rasterPpem = ( targetPx * 4 + 2 ) / 3;
+	return SCR_TtfPointSizeForPixelHeight( rasterPpem );
+}
+
 static float SCR_UiPixelScale( void ) {
 	float pixelScale;
 
@@ -230,27 +264,21 @@ static int SCR_HudTtfTargetPixelHeightForVirtual( float virtualHeight ) {
 	}
 
 	pixelScale = SCR_UiPixelScale();
-	/*
-	 * Rasterize near the requested virtual HUD height so each tier stays close
-	 * to 1:1 atlas pixels.  Cap hard: 4K * 26 virt with dpi 144 + 2048 atlases
-	 * exhausts Vulkan image chunks (MAX_IMAGE_CHUNKS) and aborts the large tier.
-	 */
+	/* Rasterize near the requested virtual HUD ink height. */
 	if ( virtualHeight < 4.0f ) {
 		virtualHeight = 4.0f;
 	}
-	targetPx = (int)( virtualHeight * pixelScale + 0.5f );
+	targetPx = R_FontRequestedPixelHeight( virtualHeight, pixelScale,
+		Cvar_VariableIntegerValue( "r_fontDpi" ), FONT_SIZE_PIXELS );
 	if ( virtualHeight >= 18.0f && targetPx < basePt ) {
 		targetPx = basePt;
 	}
 	if ( targetPx < 10 ) {
 		targetPx = 10;
 	}
-	/*
-	 * Allow sharper large-tier glyphs (menu "SURF", timer digits) without the
-	 * old 28pt@144dpi / 2048 atlas OOM.  48px @ 96dpi ≈ 36pt before clamp.
-	 */
-	if ( targetPx > 48 ) {
-		targetPx = 48;
+	/* Keep pathological UI scales bounded; the point-size converter also caps. */
+	if ( targetPx > 128 ) {
+		targetPx = 128;
 	}
 	return targetPx;
 }
@@ -266,20 +294,7 @@ static int SCR_ComputeHudTtfPointSizeTier( int tier ) {
 	if ( tier > 2 ) {
 		tier = 2;
 	}
-	pt = SCR_TtfPointSizeForPixelHeight( SCR_HudTtfTargetPixelHeightForVirtual( virtH[tier] ) );
-	/*
-	 * Large tier: 24pt@96dpi stays well under the prior OOM case (28pt@144dpi).
-	 * Medium/small keep modest so three atlases + console still fit.
-	 */
-	if ( tier == 2 && pt > 24 ) {
-		pt = 24;
-	}
-	if ( tier == 1 && pt > 16 ) {
-		pt = 16;
-	}
-	if ( tier == 0 && pt > 11 ) {
-		pt = 11;
-	}
+	pt = SCR_TtfPointSizeForRefLineHeight( SCR_HudTtfTargetPixelHeightForVirtual( virtH[tier] ) );
 	return pt;
 }
 
@@ -333,7 +348,6 @@ static qboolean SCR_HudTtfTierActive( int tier ) {
 
 static void SCR_PickHudTtf( float virtualSize, const fontInfo_t **fontOut, int *refPxOut ) {
 	float targetPx;
-	float bestDist;
 	int best;
 	int i;
 
@@ -345,17 +359,23 @@ static void SCR_PickHudTtf( float virtualSize, const fontInfo_t **fontOut, int *
 
 	targetPx = virtualSize * SCR_UiPixelScale();
 	best = -1;
-	bestDist = 1.0e9f;
+	/* Choose the smallest raster that is not smaller than the requested ink. */
 	for ( i = 0; i < 3; i++ ) {
-		float dist;
-
 		if ( !SCR_HudTtfTierActive( i ) ) {
 			continue;
 		}
-		dist = fabsf( (float)cls.builtInHudRefLinePx[i] - targetPx );
-		if ( dist < bestDist ) {
-			bestDist = dist;
+		if ( (float)cls.builtInHudRefLinePx[i] >= targetPx &&
+				( best < 0 || cls.builtInHudRefLinePx[i] < cls.builtInHudRefLinePx[best] ) ) {
 			best = i;
+		}
+	}
+	/* Above the largest tier, use the largest raster to minimize any upscale. */
+	if ( best < 0 ) {
+		for ( i = 0; i < 3; i++ ) {
+			if ( SCR_HudTtfTierActive( i ) &&
+					( best < 0 || cls.builtInHudRefLinePx[i] > cls.builtInHudRefLinePx[best] ) ) {
+				best = i;
+			}
 		}
 	}
 	if ( best < 0 ) {
@@ -363,6 +383,40 @@ static void SCR_PickHudTtf( float virtualSize, const fontInfo_t **fontOut, int *
 	}
 	*fontOut = &cls.builtInHudFonts[best];
 	*refPxOut = cls.builtInHudRefLinePx[best];
+	if ( r_fontDebug && r_fontDebug->integer > 0 && *refPxOut > 0 ) {
+		static int lastWarningFrame = -1;
+		const float ratio = targetPx / (float)*refPxOut;
+		const float limit = r_fontMaxRasterUpscale ? r_fontMaxRasterUpscale->value : 1.10f;
+
+		if ( ratio > limit && lastWarningFrame != cls.framecount ) {
+			Com_Printf( S_COLOR_YELLOW
+				"FONT_GLYPH_UPSCALED requested=%.2fpx raster=%dpx ratio=%.3fx limit=%.3fx\n",
+				targetPx, *refPxOut, ratio, limit );
+			lastWarningFrame = cls.framecount;
+		}
+	}
+}
+
+static void SCR_FontDrawStatus_f( void ) {
+	const float scale = SCR_UiPixelScale();
+	const float timerPx = 22.0f * scale;
+	int i;
+
+	Com_Printf( "======== font_draw_status ========\n" );
+	Com_Printf( "display=%dx%d uiScale=%.3f dpi=%d timerRequested=%.2fpx\n",
+		cls.glconfig.vidWidth, cls.glconfig.vidHeight, scale,
+		Cvar_VariableIntegerValue( "r_fontDpi" ), timerPx );
+	for ( i = 0; i < 3; i++ ) {
+		Com_Printf( "tier[%d]: pointSize=%d rasterRef=%dpx active=%d\n", i,
+			cls.builtInHudPointSize[i], cls.builtInHudRefLinePx[i],
+			SCR_HudTtfTierActive( i ) );
+	}
+	if ( cls.builtInHudRefLinePx[2] > 0 ) {
+		const float ratio = timerPx / (float)cls.builtInHudRefLinePx[2];
+		Com_Printf( "timer rasterToScreenScale=%.3fx %s\n", ratio,
+			ratio > ( r_fontMaxRasterUpscale ? r_fontMaxRasterUpscale->value : 1.10f )
+				? "FONT_GLYPH_UPSCALED" : "native/downsampled" );
+	}
 }
 
 static int SCR_ComputeConsoleTtfPointSize( void ) {
@@ -1725,6 +1779,16 @@ void SCR_Init( void ) {
 	Cvar_SetDescription( r_fontKerning,
 		"Rougier HAL-05430839: apply FreeType GPOS/kern pairs when advancing TrueType HUD/console text (with proportional xSkip)." );
 
+	r_fontDebug = Cvar_Get( "r_fontDebug", "0", CVAR_TEMP );
+	Cvar_CheckRange( r_fontDebug, "0", "3", CV_INTEGER );
+	Cvar_SetDescription( r_fontDebug,
+		"TrueType quality diagnostics: 0=off, 1=size/tier warnings, 2=glyph scaling, 3=verbose." );
+
+	r_fontMaxRasterUpscale = Cvar_Get( "r_fontMaxRasterUpscale", "1.10", CVAR_ARCHIVE );
+	Cvar_CheckRange( r_fontMaxRasterUpscale, "1.0", "2.0", CV_FLOAT );
+	Cvar_SetDescription( r_fontMaxRasterUpscale,
+		"Maximum accepted screen-to-raster glyph scale before font diagnostics report FONT_GLYPH_UPSCALED." );
+
 	r_textMode = Cvar_Get( "r_textMode", "0", CVAR_ARCHIVE );
 	Cvar_CheckRange( r_textMode, "0", "4", CV_INTEGER );
 	Cvar_SetDescription( r_textMode,
@@ -1740,6 +1804,7 @@ void SCR_Init( void ) {
 	}
 
 	UIFilter_Init();
+	Cmd_AddCommand( "font_draw_status", SCR_FontDrawStatus_f );
 
 	scr_initialized = qtrue;
 }
@@ -1751,6 +1816,7 @@ SCR_Done
 ==================
 */
 void SCR_Done( void ) {
+	Cmd_RemoveCommand( "font_draw_status" );
 	scr_initialized = qfalse;
 }
 

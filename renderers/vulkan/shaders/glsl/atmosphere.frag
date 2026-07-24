@@ -93,7 +93,14 @@ void main() {
 	vec3 sunDir = normalize(atm.sunDirection.xyz);
 
 	float observerHeight = max(atm.viewOrigin.z, 1.0);
-	vec3 origin = vec3(0.0, PLANET_RADIUS + observerHeight, 0.0);
+	/*
+	 * id Tech world space is Z-up.  Keeping the observer on the atmosphere's
+	 * Y axis while feeding this shader Z-up view and sun directions rotated
+	 * the density gradient relative to every ray.  Near the forward Mie lobe
+	 * that appeared as a tall, sun-centred gray plume instead of a radial
+	 * atmospheric halo.
+	 */
+	vec3 origin = vec3(0.0, 0.0, PLANET_RADIUS + observerHeight);
 
 	vec2 atmoHit = raySphereIntersect(origin, rayDir, ATMOSPHERE_RADIUS);
 	if (atmoHit.y < 0.0) {
@@ -141,7 +148,13 @@ void main() {
 		}
 	}
 
-	vec3 color = scale * sunIntensity * (phaseR * rayleighBeta * totalRayleigh + phaseM * mieBeta * totalMie);
+	/*
+	 * Preserve illuminant chromaticity.  Previously sunColor.rgb was ignored,
+	 * so the spectrally flat Mie term became a neutral-gray veil around the
+	 * sun even when the physical sun was warm.
+	 */
+	vec3 color = atm.sunColor.rgb * scale * sunIntensity *
+		(phaseR * rayleighBeta * totalRayleigh + phaseM * mieBeta * totalMie);
 
 	out_color = vec4(color, 1.0);
 }

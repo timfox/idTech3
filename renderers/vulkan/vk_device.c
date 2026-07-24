@@ -139,9 +139,16 @@ static VkFormat get_hdr_format( VkPhysicalDevice physical_device, VkFormat base_
 static VkFormat get_bloom_format( VkPhysicalDevice physical_device, VkFormat fallback )
 {
 	const VkFormat preferred[] = {
+		/*
+		 * Bloom carries broad, low-contrast HDR gradients. Packed 10-bit
+		 * UNORM visibly posterizes solar and atmospheric halos before the
+		 * tone mapper gets a chance to compress them. Keep it floating point
+		 * through extraction, downsampling, and reconstruction.
+		 */
+		VK_FORMAT_R16G16B16A16_SFLOAT,
+		VK_FORMAT_B10G11R11_UFLOAT_PACK32,
 		VK_FORMAT_A2B10G10R10_UNORM_PACK32,
-		VK_FORMAT_A2R10G10B10_UNORM_PACK32,
-		VK_FORMAT_B10G11R11_UFLOAT_PACK32
+		VK_FORMAT_A2R10G10B10_UNORM_PACK32
 	};
 	const VkFormatFeatureFlags required = VK_FORMAT_FEATURE_COLOR_ATTACHMENT_BIT |
 		VK_FORMAT_FEATURE_SAMPLED_IMAGE_BIT |

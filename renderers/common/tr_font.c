@@ -476,6 +476,7 @@ static glyphInfo_t *RE_ConstructGlyphInfo( unsigned char *imageOut, int *xOut, i
 	static glyphInfo_t glyph;
 	const int atlasSize = R_FontAtlasSize();
 	const int atlasEdge = atlasSize - 1;
+	const int atlasPadding = 2;
 	unsigned char *src, *dst;
 	float scaled_width, scaled_height;
 	FT_Bitmap *bitmap = NULL;
@@ -540,12 +541,12 @@ static glyphInfo_t *RE_ConstructGlyphInfo( unsigned char *imageOut, int *xOut, i
 		}
 
 		// we need to make sure we fit
-		if (*xOut + scaled_width + 1 >= atlasEdge) {
+		if (*xOut + scaled_width + atlasPadding >= atlasEdge) {
 			*xOut = 0;
-			*yOut += *maxHeight + 1;
+			*yOut += *maxHeight + atlasPadding;
 		}
 
-		if (*yOut + *maxHeight + 1 >= atlasEdge) {
+		if (*yOut + *maxHeight + atlasPadding >= atlasEdge) {
 			/* Empty page still too small: skip glyph (do not request another page). */
 			if ( *xOut == 0 && *yOut == 0 ) {
 				if ( ownedBitmap ) {
@@ -634,7 +635,7 @@ static glyphInfo_t *RE_ConstructGlyphInfo( unsigned char *imageOut, int *xOut, i
 		glyph.s2 = glyph.s + (float)scaled_width / (float)atlasSize;
 		glyph.t2 = glyph.t + (float)scaled_height / (float)atlasSize;
 
-		*xOut += scaled_width + 1;
+		*xOut += scaled_width + atlasPadding;
 
 		if ( ownedBitmap ) {
 			ri.Free( bitmap->buffer );
@@ -743,7 +744,6 @@ void RE_RegisterFont(const char *fontName, int pointSize, fontInfo_t *font) {
 	glyphInfo_t *glyph;
 	image_t *image;
 	qhandle_t h;
-	float max;
 	int dpi = R_FontDeviceDpi();
 	float glyphScale;
 	void *faceData;
@@ -984,22 +984,18 @@ try_freetype:
 				Com_Memcpy( imageBuff, out, newSize );
 			} else {
 				left = 0;
-				max = 0;
-				for (k = 0; k < scaledSize; k++) {
-					if (max < out[k]) {
-						max = out[k];
-					}
-				}
-
-				if (max > 0) {
-					max = 255 / max;
-				}
-
+				/*
+				 * Preserve FreeType's coverage exactly. The old page-wide
+				 * normalization promoted the strongest sample to 255, which
+				 * changed weight from page to page and visibly thickened
+				 * small/light glyphs whenever their native peak was below
+				 * full coverage.
+				 */
 				for (k = 0; k < scaledSize; k++) {
 					imageBuff[left++] = 255;
 					imageBuff[left++] = 255;
 					imageBuff[left++] = 255;
-					imageBuff[left++] = ((float)out[k] * max);
+					imageBuff[left++] = out[k];
 				}
 			}
 

@@ -78,6 +78,8 @@ static qboolean vk_post_process_surface_format_color_depth( VkFormat format, int
 		case VK_FORMAT_R8G8B8A8_SRGB:
 		case VK_FORMAT_B8G8R8A8_UNORM:
 		case VK_FORMAT_B8G8R8A8_SRGB:
+		case VK_FORMAT_A8B8G8R8_UNORM_PACK32:
+		case VK_FORMAT_A8B8G8R8_SRGB_PACK32:
 			*r = *g = *b = 8;
 			return qtrue;
 		case VK_FORMAT_A2R10G10B10_UNORM_PACK32:
@@ -464,8 +466,13 @@ void vk_create_post_process_pipeline( int program_index, uint32_t width, uint32_
 		frag_spec_data.bloom_firefly_debug = ffDbg ? ffDbg->integer : 0;
 	}
 
-	if ( !vk_post_process_surface_format_color_depth( vk.present_format.format, &frag_spec_data.depth_r, &frag_spec_data.depth_g, &frag_spec_data.depth_b ) ) {
-		ri.Printf( PRINT_ALL, "Format %s not recognized, dither to assume 8bpc\n", vk_format_string( vk.base_format.format ) );
+	/*
+	 * Quantize for the image this pipeline actually writes. Capture is always
+	 * RGBA8 even when the swapchain is 10-bit; using present_format there
+	 * leaves the later 8-bit store undithered and reintroduces banding.
+	 */
+	if ( !vk_post_process_surface_format_color_depth( target_format, &frag_spec_data.depth_r, &frag_spec_data.depth_g, &frag_spec_data.depth_b ) ) {
+		ri.Printf( PRINT_ALL, "Format %s not recognized, dither to assume 8bpc\n", vk_format_string( target_format ) );
 	}
 
 	spec_entries[0].constantID = 0;

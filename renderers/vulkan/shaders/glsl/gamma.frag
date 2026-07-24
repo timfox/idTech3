@@ -41,9 +41,9 @@ layout(constant_id = 3) const float bloom_threshold = 0.6;
 layout(constant_id = 4) const float bloom_intensity = 0.5;
 layout(constant_id = 5) const int bloom_threshold_mode = 0;
 layout(constant_id = 6) const int bloom_modulate = 0;
-layout(constant_id = 8) const int depth_r = 255;
-layout(constant_id = 9) const int depth_g = 255;
-layout(constant_id = 10) const int depth_b = 255;
+layout(constant_id = 8) const int depth_r = 8;
+layout(constant_id = 9) const int depth_g = 8;
+layout(constant_id = 10) const int depth_b = 8;
 layout(constant_id = 12) const float bloom_knee = 0.5;
 layout(constant_id = 14) const int apply_srgb_gamma = 0;
 
@@ -66,32 +66,43 @@ layout(push_constant) uniform PaniniPC {
 
 const vec3 sRGB = vec3( 0.2126, 0.7152, 0.0722 );
 
-const int bayerSize = 8;
-const float bayerMatrix[bayerSize * bayerSize] = float[](
-	0,  32, 8,  40, 2,  34, 10, 42,
-	48, 16, 56, 24, 50, 18, 58, 26,
-	12, 44, 4,  36, 14, 46, 6,  38,
-	60, 28, 52, 20, 62, 30, 54, 22,
-	3,  35, 11, 43, 1,  33, 9,  41,
-	51, 19, 59, 27, 49, 17, 57, 25,
-	15, 47, 7,  39, 13, 45, 5,  37,
-	63, 31, 55, 23, 61, 29, 53, 21
-);
-
 float threshold() {
-	ivec2 coord = ivec2( gl_FragCoord.xy );
-	ivec2 bayerCoord = coord % bayerSize;
-	float bayerSample = bayerMatrix[bayerCoord.x + bayerCoord.y * bayerSize];
-	return (bayerSample + 0.5) / float( bayerSize * bayerSize );
+	/*
+	 * Interleaved-gradient noise has blue-noise-like high-frequency energy
+	 * without a texture fetch. Rotate its phase over time so the quantizer
+	 * cannot form a stationary Bayer grid or reinforce radial sky contours.
+	 * One shared threshold preserves neutral grays without chromatic speckle.
+	 */
+	float phase = floor( paniniPC.paniniPad0 * 60.0 );
+	vec2 coord = gl_FragCoord.xy + vec2( phase * 47.0, phase * 17.0 );
+	return fract( 52.9829189 * fract( dot( coord, vec2( 0.06711056, 0.00583715 ) ) ) );
 }
 
 vec3 dither( vec3 color ) {
-	ivec3 depth = ivec3( depth_r, depth_g, depth_b );
-	vec3 denormalized = color * depth;
+	/*
+	 * depth_* stores channel bit depth, not the number of representable
+	 * intervals. Eight-bit output therefore has 255 intervals, not eight.
+	 * Using the bit count directly collapses the frame into a handful of
+	 * posterized values when r_dither is enabled.
+	 */
+	vec3 bits = clamp( vec3( depth_r, depth_g, depth_b ), vec3( 1.0 ), vec3( 16.0 ) );
+	vec3 levels = exp2( bits ) - vec3( 1.0 );
+	vec3 denormalized = clamp( color, 0.0, 1.0 ) * levels;
 	vec3 low = floor( denormalized );
 	vec3 frac = denormalized - low;
 	vec3 dithered = low + step( threshold(), frac );
-	return dithered / depth;
+	return dithered / levels;
+}
+
+/* Inverse of linearToDisplay().  An sRGB swapchain performs the forward
+ * conversion after this shader, so final-output dithering must briefly enter
+ * display-encoded space and return to linear.  Dithering scene-linear values
+ * spends most code points on highlights and leaves dark gradients banded. */
+vec3 displayToLinear( vec3 x ) {
+	bvec3 lo = lessThanEqual( x, vec3( 0.04045 ) );
+	vec3 low = x / 12.92;
+	vec3 high = pow( max( ( x + 0.055 ) / 1.055, vec3( 0.0 ) ), vec3( 2.4 ) );
+	return mix( high, low, lo );
 }
 
 float postPreExposureScale( void ) { return max( postfx.colorBalance.w, 0.001 ); }
@@ -717,9 +728,6 @@ void main() {
 			vec3 luma = vec3( dot( ldr, sRGB ) );
 			ldr = mix( ldr, luma, postGreyscale() );
 		}
-		if ( postDitherMode() == 1 ) {
-			ldr = dither( ldr );
-		}
 	}
 
 	if ( postChromaticAberration() > 0.0 && postGradeActive ) {
@@ -814,6 +822,18 @@ void main() {
 
 	if ( apply_srgb_gamma != 0 ) {
 		ldr = linearToDisplay( ldr );
+	}
+
+	/* Quantization is the final color operation.  Keep it after grading, CA,
+	 * vignette, grain, and transfer encoding so none of those stages can
+	 * recreate banded ramps.  For an sRGB attachment Vulkan applies the
+	 * encoding on store, hence the display-space round trip here. */
+	if ( postDitherMode() == 1 ) {
+		if ( apply_srgb_gamma != 0 ) {
+			ldr = dither( ldr );
+		} else {
+			ldr = displayToLinear( dither( linearToDisplay( ldr ) ) );
+		}
 	}
 
 	out_color = vec4( ldr, 1.0 );

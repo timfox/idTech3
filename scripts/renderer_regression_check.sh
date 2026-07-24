@@ -1117,6 +1117,15 @@ echo "Forward+ specular / energy renorm + HDR/AgX honesty:"
 GEN_FRAG_TMPL="$PROJECT_ROOT/renderers/vulkan/shaders/glsl/gen_frag.tmpl"
 GAMMA_FRAG="$PROJECT_ROOT/renderers/vulkan/shaders/glsl/gamma.frag"
 VK_DEVICE="$PROJECT_ROOT/renderers/vulkan/vk_device.c"
+if ! grep -q 'const int depth_r = 8' "$GAMMA_FRAG" 2>/dev/null ||
+   ! grep -q 'const int depth_g = 8' "$GAMMA_FRAG" 2>/dev/null ||
+   ! grep -q 'const int depth_b = 8' "$GAMMA_FRAG" 2>/dev/null; then
+  fail "gamma.frag display-depth specialization defaults must be bit counts (8), not quantization levels (255)"
+elif ! grep -q 'levels = exp2( bits ).*1.0' "$GAMMA_FRAG" 2>/dev/null; then
+  fail "gamma.frag dithering must convert channel bit counts to (2^bits)-1 quantization intervals"
+else
+  pass "Display dither uses safe 8-bit defaults and 255 quantization intervals"
+fi
 if ! grep -q 'r_forwardPlusSpecularStrength' "$TR_INIT_VK" 2>/dev/null; then
   fail "tr_init.c missing r_forwardPlusSpecularStrength cvar"
 elif ! grep -q 'r_forwardPlusEnergyRenorm' "$TR_INIT_VK" 2>/dev/null; then

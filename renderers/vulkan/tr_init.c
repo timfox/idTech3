@@ -1894,9 +1894,9 @@ static void R_Register( void )
 	ri.Cvar_SetDescription( r_greyscale, "Desaturate rendered frame, requires \\r_fbo 1." );
 	ri.Cvar_SetGroup( r_greyscale, CVG_RENDERER );
 
-	r_dither = ri.Cvar_Get( "r_dither", "0", CVAR_ARCHIVE_ND );
+	r_dither = ri.Cvar_Get( "r_dither", "1", CVAR_ARCHIVE_ND );
 	ri.Cvar_CheckRange( r_dither, "0", "1", CV_INTEGER );
-	ri.Cvar_SetDescription(r_dither, "Set dithering mode:\n 0 - disabled\n 1 - ordered\nRequires " S_COLOR_CYAN "\\r_fbo 1." );
+	ri.Cvar_SetDescription(r_dither, "Set final display-space dithering:\n 0 - disabled\n 1 - temporally decorrelated interleaved-gradient noise (recommended; reduces 8/10-bit gradient banding)\nRequires " S_COLOR_CYAN "\\r_fbo 1." );
 	ri.Cvar_SetGroup( r_dither, CVG_RENDERER );
 
 	r_presentBits = ri.Cvar_Get( "r_presentBits", "24", CVAR_ARCHIVE_ND | CVAR_LATCH );
