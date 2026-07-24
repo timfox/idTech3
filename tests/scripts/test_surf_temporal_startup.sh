@@ -51,7 +51,8 @@ required = {
     "r_tsr": "0",
     "r_taaMotionVectors": "0",
     "r_temporalSSR": "0",
-    "r_bloom": "0",
+    # Global bloom is non-temporal and remains compatible with the SMAA policy.
+    "r_bloom": "1",
     "r_weaponSsrIsolation": "1",
 }
 

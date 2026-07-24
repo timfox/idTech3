@@ -176,16 +176,27 @@ void main() {
 	}
 
 	/* At depth discontinuities (object edges, silhouettes), dFdx/dFdy gradients are
-	 * unreliable and produce halos. Reject pixels where neighbor depth differs too much. */
+	 * unreliable and produce halos. Reject using relative positive view-depth. */
 	float maxDepthGradient = pc.misc2.w;
 	if ( maxDepthGradient > 0.0 ) {
 		vec2 invSize = vec2( pc.misc.y, pc.misc.z );
+		float viewCenter = max( -viewZFromDepth( depth ), 1e-3 );
 		float dx = textureLod( depthTex, frag_tex_coord + vec2( invSize.x, 0.0 ), 0.0 ).r;
 		float dy = textureLod( depthTex, frag_tex_coord + vec2( 0.0, invSize.y ), 0.0 ).r;
 		float dxm = textureLod( depthTex, frag_tex_coord - vec2( invSize.x, 0.0 ), 0.0 ).r;
 		float dym = textureLod( depthTex, frag_tex_coord - vec2( 0.0, invSize.y ), 0.0 ).r;
-		float maxDiff = max( max( abs( dx - depth ), abs( dxm - depth ) ), max( abs( dy - depth ), abs( dym - depth ) ) );
-		if ( maxDiff > maxDepthGradient ) {
+		float vx = max( -viewZFromDepth( dx ), 1e-3 );
+		float vy = max( -viewZFromDepth( dy ), 1e-3 );
+		float vxm = max( -viewZFromDepth( dxm ), 1e-3 );
+		float vym = max( -viewZFromDepth( dym ), 1e-3 );
+		float maxRel = max( max( abs( vx - viewCenter ), abs( vxm - viewCenter ) ),
+			max( abs( vy - viewCenter ), abs( vym - viewCenter ) ) ) / viewCenter;
+		/* Legacy cvars (~0.08) were device-Z; map small values to relative. */
+		float gradTol = maxDepthGradient;
+		if ( maxDepthGradient > 0.0 && maxDepthGradient < 0.5 ) {
+			gradTol = max( maxDepthGradient * 2.5, 0.02 );
+		}
+		if ( maxRel > gradTol ) {
 			out_color = vec4( 1.0 );
 			return;
 		}

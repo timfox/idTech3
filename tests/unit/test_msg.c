@@ -304,13 +304,13 @@ static int test_delta_usercmd_roundtrip(void)
 
 	MSG_Init( &msg, buf, MAX_MSGLEN );
 	MSG_Bitstream( &msg );
-	MSG_WriteDeltaUsercmdKey( &msg, 0x11223344, &from, &to );
+	MSG_WriteDeltaUsercmdKey( &msg, 0x11223344, &from, &to, 16 );
 
 	MSG_BeginReading( &msg );
 	{
 		usercmd_t out;
 		memset( &out, 0, sizeof( out ) );
-		MSG_ReadDeltaUsercmdKey( &msg, 0x11223344, &from, &out );
+		MSG_ReadDeltaUsercmdKey( &msg, 0x11223344, &from, &out, 16 );
 		ASSERT_EQ( out.serverTime, to.serverTime, "delta cmd time" );
 		ASSERT_EQ( out.angles[0], to.angles[0], "delta cmd pitch" );
 		ASSERT_EQ( out.angles[1], to.angles[1], "delta cmd yaw (non-negative)" );
@@ -341,17 +341,47 @@ static int test_delta_usercmd_no_change(void)
 
 	MSG_Init( &msg, buf, MAX_MSGLEN );
 	MSG_Bitstream( &msg );
-	MSG_WriteDeltaUsercmdKey( &msg, 0, &a, &a );
+	MSG_WriteDeltaUsercmdKey( &msg, 0, &a, &a, 16 );
 
 	MSG_BeginReading( &msg );
 	{
 		usercmd_t out;
 		memset( &out, 0xff, sizeof( out ) );
-		MSG_ReadDeltaUsercmdKey( &msg, 0, &a, &out );
+		MSG_ReadDeltaUsercmdKey( &msg, 0, &a, &out, 16 );
 		ASSERT_EQ( out.serverTime, a.serverTime, "no-change time" );
 		ASSERT_EQ( out.angles[0], a.angles[0], "no-change angles[0]" );
 		ASSERT_EQ( out.forwardmove, a.forwardmove, "no-change forward" );
 		ASSERT_EQ( out.weapon, a.weapon, "no-change weapon" );
+	}
+	return 0;
+}
+
+static int test_delta_usercmd_vr_buttons32(void)
+{
+	byte buf[MAX_MSGLEN_BUF];
+	msg_t msg;
+	usercmd_t from, to;
+	/* Pitch/yaw packed into bits 12-25 (protocol: never all-zero for VR) */
+	const int vrButtons = (7 << 12) | (64 << 19) | 0x001; /* bit0 + VR payload */
+
+	memset( &from, 0, sizeof( from ) );
+	memset( &to, 0, sizeof( to ) );
+	from.serverTime = 1000;
+	to.serverTime = 1008;
+	to.buttons = vrButtons;
+	to.weapon = 2;
+
+	MSG_Init( &msg, buf, MAX_MSGLEN );
+	MSG_Bitstream( &msg );
+	MSG_WriteDeltaUsercmdKey( &msg, 0x55aa, &from, &to, 32 );
+
+	MSG_BeginReading( &msg );
+	{
+		usercmd_t out;
+		memset( &out, 0, sizeof( out ) );
+		MSG_ReadDeltaUsercmdKey( &msg, 0x55aa, &from, &out, 32 );
+		ASSERT_EQ( out.buttons, vrButtons, "32-bit VR buttons roundtrip" );
+		ASSERT_EQ( out.weapon, to.weapon, "weapon after 32-bit buttons" );
 	}
 	return 0;
 }
@@ -389,5 +419,6 @@ int main( void )
 	if ( test_msg_hash_key() ) return 1;
 	if ( test_delta_usercmd_roundtrip() ) return 1;
 	if ( test_delta_usercmd_no_change() ) return 1;
+	if ( test_delta_usercmd_vr_buttons32() ) return 1;
 	return 0;
 }

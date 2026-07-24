@@ -20,8 +20,9 @@ layout(rgba16f, set = 0, binding = 11) uniform writeonly image2D auxOut;
 layout(push_constant) uniform TemporalPush {
 	uvec4 extentFlags;       /* xy extent, z reset, w normalsAreWorld */
 	mat4 invView;
-	vec4 params0;            /* base history, depth tolerance, normal dot, bent dot */
+	vec4 params0;            /* base history, relative depth tol, normal dot, bent dot */
 	vec4 params1;            /* hit tolerance, max history, use motion, hybrid */
+	vec4 projInfo;           /* invProj00, invProj11, proj10, proj14 */
 } pc;
 
 void main() {
@@ -57,8 +58,10 @@ void main() {
 	vec3 hBent = av_oct_decode(h.gb);
 	vec3 hNormal = av_oct_decode(hg.gb);
 
-	float depthConf = 1.0 - smoothstep(pc.params0.y, pc.params0.y * 4.0,
-		abs(depth - hg.r));
+	float curView = av_positive_view_depth(depth, pc.projInfo);
+	float histView = av_positive_view_depth(hg.r, pc.projInfo);
+	float depthRel = abs(curView - histView) / max(curView, 0.05);
+	float depthConf = 1.0 - smoothstep(pc.params0.y, pc.params0.y * 4.0, depthRel);
 	float normalConf = smoothstep(pc.params0.z, 1.0, dot(normal, hNormal));
 	float bentConf = smoothstep(pc.params0.w, 1.0, dot(curBent, hBent));
 	float hitConf = 1.0 - smoothstep(pc.params1.x, pc.params1.x * 3.0,

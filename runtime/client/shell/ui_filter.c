@@ -39,7 +39,15 @@ qboolean UIFilter_Available( void ) {
 	if ( !re.UIBackdropBlur || !re.UIFilterLayer ) {
 		return qfalse;
 	}
-	return (qboolean)( Cvar_VariableIntegerValue( "ui_blurQuality" ) > 0 );
+	if ( Cvar_VariableIntegerValue( "ui_blurQuality" ) <= 0 ) {
+		return qfalse;
+	}
+	/* Renderer publishes readiness after init / swapchain restore. Missing or
+	 * 0 means compositor is down — fall back to plain translucent panels. */
+	if ( Cvar_VariableIntegerValue( "ui_blurReady" ) <= 0 ) {
+		return qfalse;
+	}
+	return qtrue;
 }
 
 /*

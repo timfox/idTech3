@@ -853,9 +853,12 @@ void vk_ssr_pass( void )
 		return;
 	}
 
-	vk_temporal_history_note( HISTORY_SSR,
-		ri.Cvar_VariableIntegerValue( "r_temporalSSR" ) ? qtrue : qfalse,
-		ri.Cvar_VariableIntegerValue( "r_temporalSSR" ) ? NULL : "r_temporalSSR 0" );
+	/*
+	 * This raster SSR implementation consumes only current SceneHDR + depth.
+	 * It owns no production history. Experimental temporal SSR is quarantined
+	 * independently and cannot alter this pass or SceneHDR.
+	 */
+	vk_temporal_history_note( HISTORY_SSR, qfalse, "current-frame-only SSR" );
 
 	/* Selective Hybrid Reflections: exclusive owner — do not write SSR when RT owns. */
 	if ( !vk_shr_ssr_allowed() ) {
@@ -997,12 +1000,17 @@ qboolean vk_ssao_pass( void )
 			VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL, 0, 0 );
 
 		vk_begin_ssao_render_pass();
-		if ( r_ssaoMethod && r_ssaoMethod->integer && vk.hbao_pipeline != VK_NULL_HANDLE ) {
-			qvkCmdBindPipeline( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.hbao_pipeline );
-		} else {
-			qvkCmdBindPipeline( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.ssao_pipeline );
+		qvkCmdBindPipeline( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
+			( r_ssaoMethod && r_ssaoMethod->integer && vk.hbao_pipeline != VK_NULL_HANDLE )
+				? vk.hbao_pipeline : vk.ssao_pipeline );
+		{
+			VkDescriptorSet ssaoGenSets[2] = {
+				vk.depth_descriptor[vk.cmd_index],
+				vk.depth_descriptor[vk.cmd_index]
+			};
+			qvkCmdBindDescriptorSets( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
+				vk.pipeline_layout_ssao, 0, 2, ssaoGenSets, 0, NULL );
 		}
-		qvkCmdBindDescriptorSets( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.pipeline_layout_ssao, 0, 1, &vk.depth_descriptor[vk.cmd_index], 0, NULL );
 
 		push.projInfo[0] = ( backEnd.viewParms.projectionMatrix[0] != 0.0f ) ? 1.0f / backEnd.viewParms.projectionMatrix[0] : 1.0f;
 		push.projInfo[1] = ( backEnd.viewParms.projectionMatrix[5] != 0.0f ) ? 1.0f / backEnd.viewParms.projectionMatrix[5] : 1.0f;
@@ -1041,10 +1049,30 @@ qboolean vk_ssao_pass( void )
 
 		vk_begin_ssao_blur_render_pass();
 		qvkCmdBindPipeline( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.ssao_blur_pipeline );
-		qvkCmdBindDescriptorSets( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.pipeline_layout_ssao, 0, 1, &vk.ssao_descriptor, 0, NULL );
+		{
+			VkDescriptorSet ssaoBlurSets[2] = {
+				vk.ssao_descriptor,
+				vk.depth_descriptor[vk.cmd_index]
+			};
+			qvkCmdBindDescriptorSets( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
+				vk.pipeline_layout_ssao, 0, 2, ssaoBlurSets, 0, NULL );
+		}
 
 		push.params[0] = ( r_ssaoBlurRadius && r_ssaoBlurRadius->integer >= 0 ) ? (float)r_ssaoBlurRadius->integer : 2.0f;
-		push.params[1] = push.params[2] = push.params[3] = 0.0f;
+		/* Relative positive-view-depth sharpness for bilateral AO blur. */
+		push.params[1] = 48.0f;
+		push.params[2] = push.params[3] = 0.0f;
+		/*
+		 * HBAO generation uses misc = { directions, steps, signed invWidth,
+		 * invHeight }, while ssao_blur.frag requires
+		 * { unused, invWidth, invHeight, depthIsReversed }.  Reusing the HBAO
+		 * values made the blur step by `numSteps` UV units horizontally and a
+		 * negative reciprocal vertically, sampling unrelated silhouettes.
+		 */
+		push.misc[0] = 0.0f;
+		push.misc[1] = ( ssaoTexW > 0u ) ? 1.0f / (float)ssaoTexW : 1.0f;
+		push.misc[2] = ( ssaoTexH > 0u ) ? 1.0f / (float)ssaoTexH : 1.0f;
+		push.misc[3] = depthIsReversed;
 		qvkCmdPushConstants( vk.cmd->command_buffer, vk.pipeline_layout_ssao, VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof( push ), &push );
 		vk_postfx_draw_fullscreen_quad();
 		vk_end_render_pass();

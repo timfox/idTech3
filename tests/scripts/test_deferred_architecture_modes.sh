@@ -55,10 +55,13 @@ case "$(basename "$0")" in
     grep -q 'r_lightmapParityCompare\|r_deferredLightmapMode' "$H" || fail "LM parity cvars"
     pass "lightmap parity hooks" ;;
   test_deferred_architecture_modes.sh)
-    grep -q 'HYBRID_ADDITIVE_DEFERRED' "$H" || fail "arch0"
-    grep -q 'MIXED_MATERIAL_DEFERRED' "$H" || fail "arch1"
-    grep -q 'STRICT_DEFERRED_VALIDATION' "$H" || fail "arch2"
-    grep -q 'DEFERRED_COMPARISON' "$H" || fail "arch3"
+    grep -q 'DEFERRED_ARCH_FORWARD_PLUS_REFERENCE = 0' "$HH" || fail "arch0 Forward+"
+    grep -q 'DEFERRED_ARCH_ADDITIVE_HYBRID = 1' "$HH" || fail "arch1 hybrid"
+    grep -q 'DEFERRED_ARCH_FULL_FIDELITY = 2' "$HH" || fail "arch2 full fidelity"
+    grep -q 'DEFERRED_ARCH_COMPARE = 3' "$HH" || fail "arch3 comparison"
+    grep -q 'DEFERRED_ARCH_STRICT_VALIDATION = 4' "$HH" || fail "arch4 strict"
+    grep -q 'deferred_architecture_status' "$H" || fail "status command"
+    grep -q 'deferred_architecture_validate' "$H" || fail "validate command"
     [[ -f "$ROOT/config/modern_deferred_mixed.cfg" ]] || fail "modern_deferred_mixed.cfg"
     pass "architecture modes + cfg" ;;
   test_deferred_oa_matrix.sh)

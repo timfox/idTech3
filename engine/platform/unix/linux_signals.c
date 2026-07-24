@@ -33,7 +33,14 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "qcommon.h"
 #include "linux_local.h"
 
-static qboolean signalcaught = qfalse;
+// Pending async signal recorded by signal_handler_async. sig_atomic_t
+// + volatile is the only safe type combination to read/write across
+// a signal handler per POSIX. Drained by Sys_CheckPendingSignal from
+// non-signal context (the main loop in unix_main).
+static volatile sig_atomic_t signal_pending = 0;
+
+// Recursion guard for the in-context fault handler.
+static qboolean fault_caught = qfalse;
 static pthread_t mainThreadId;
 
 extern void NORETURN Sys_Exit( int code );
@@ -54,17 +61,30 @@ static const char *signal_name( int sig )
 	}
 }
 
-static void signal_handler( int sig )
+// Async-safe handler for "external please stop" signals (TERM, HUP, QUIT).
+// Sets a flag and returns; the engine's main loop drains the flag between
+// Com_Frame iterations and runs SV_Shutdown from normal context.
+static void signal_handler_async( int sig )
+{
+	if ( signal_pending == 0 ) {
+		signal_pending = sig;
+	}
+}
+
+// In-context handler for synchronous fault signals. Returning from these is
+// undefined behavior on most platforms, so cleanup happens here.
+static void signal_handler_fatal( int sig )
 {
 	char msg[256];
 	qboolean isMainThread = pthread_equal( pthread_self(), mainThreadId );
 
-	if ( signalcaught == qtrue )
+	if ( fault_caught )
 	{
 		fprintf( stderr, "DOUBLE SIGNAL FAULT: Received signal %d (%s), forcing exit...\n",
 			sig, signal_name( sig ) );
 		Sys_Exit( 1 );
 	}
+	fault_caught = qtrue;
 
 	fprintf( stderr, "\n" );
 	fprintf( stderr, "========================================\n" );
@@ -121,7 +141,6 @@ static void signal_handler( int sig )
 
 	fprintf( stderr, "========================================\n\n" );
 
-	signalcaught = qtrue;
 	Com_sprintf( msg, sizeof( msg ), "Signal caught (%d: %s)", sig, signal_name( sig ) );
 	VM_Forced_Unload_Start();
 #ifndef DEDICATED
@@ -129,7 +148,32 @@ static void signal_handler( int sig )
 #endif
 	SV_Shutdown( msg );
 	VM_Forced_Unload_Done();
-	Sys_Exit( 0 );
+	Sys_Exit( 1 );
+}
+
+
+// Drains the pending-async-signal flag. Called by unix_main between
+// Com_Frame iterations. NORETURN when a signal was pending.
+void Sys_CheckPendingSignal( void )
+{
+	int  sig;
+	char msg[256];
+
+	sig = (int)signal_pending;
+	if ( sig == 0 ) {
+		return;
+	}
+
+	fprintf( stderr, "Received signal %d (%s), exiting...\n", sig, signal_name( sig ) );
+	Com_sprintf( msg, sizeof( msg ), "Signal caught (%d: %s)", sig, signal_name( sig ) );
+
+	VM_Forced_Unload_Start();
+#ifndef DEDICATED
+	CL_Shutdown( msg, qtrue );
+#endif
+	SV_Shutdown( msg );
+	VM_Forced_Unload_Done();
+	Sys_Exit( 1 );
 }
 
 
@@ -138,13 +182,14 @@ void InitSig( void )
 	mainThreadId = pthread_self();
 
 	signal( SIGINT, SIG_IGN );
-	signal( SIGHUP, signal_handler );
-	signal( SIGQUIT, signal_handler );
-	signal( SIGILL, signal_handler );
-	signal( SIGTRAP, signal_handler );
-	signal( SIGIOT, signal_handler );
-	signal( SIGBUS, signal_handler );
-	signal( SIGFPE, signal_handler );
-	signal( SIGSEGV, signal_handler );
-	signal( SIGTERM, signal_handler );
+	signal( SIGHUP, signal_handler_async );
+	signal( SIGQUIT, signal_handler_async );
+	signal( SIGTERM, signal_handler_async );
+
+	signal( SIGILL, signal_handler_fatal );
+	signal( SIGTRAP, signal_handler_fatal );
+	signal( SIGIOT, signal_handler_fatal );
+	signal( SIGBUS, signal_handler_fatal );
+	signal( SIGFPE, signal_handler_fatal );
+	signal( SIGSEGV, signal_handler_fatal );
 }

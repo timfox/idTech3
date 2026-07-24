@@ -211,8 +211,9 @@ void vk_aa_policy_register_cvars( void )
 	ri.Cvar_CheckRange( r_weaponTemporalHistoryWeight, "0", "0.9", CV_FLOAT );
 	r_weaponTemporalVarianceGamma = ri.Cvar_Get( "r_weaponTemporalVarianceGamma", "0.75", CVAR_ARCHIVE_ND );
 	ri.Cvar_CheckRange( r_weaponTemporalVarianceGamma, "0.1", "3", CV_FLOAT );
-	r_weaponTemporalDepthThreshold = ri.Cvar_Get( "r_weaponTemporalDepthThreshold", "0.025", CVAR_ARCHIVE_ND );
-	ri.Cvar_CheckRange( r_weaponTemporalDepthThreshold, "0.001", "0.25", CV_FLOAT );
+	/* Relative positive view-depth tolerance (was device-Z 0.025). */
+	r_weaponTemporalDepthThreshold = ri.Cvar_Get( "r_weaponTemporalDepthThreshold", "0.04", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_weaponTemporalDepthThreshold, "0.001", "0.5", CV_FLOAT );
 	r_weaponTemporalReactiveScale = ri.Cvar_Get( "r_weaponTemporalReactiveScale", "1.0", CVAR_ARCHIVE_ND );
 	ri.Cvar_CheckRange( r_weaponTemporalReactiveScale, "0", "4", CV_FLOAT );
 	ri.Cvar_SetGroup( r_weaponTemporalHistoryWeight, CVG_RENDERER );

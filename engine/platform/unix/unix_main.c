@@ -1187,6 +1187,7 @@ int main( int argc, const char* argv[] )
 #ifdef __linux__
 		Sys_ConfigureFPU();
 #endif
+		Sys_CheckPendingSignal();
 
 #ifdef DEDICATED
 		// run the game

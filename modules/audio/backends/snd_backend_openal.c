@@ -690,7 +690,15 @@ static void S_AL_UpdateListener( void ) {
 	alListener3f( AL_POSITION, alListenerOrigin[0], alListenerOrigin[1], alListenerOrigin[2] );
 	alListener3f( AL_VELOCITY, alListenerVelocity[0], alListenerVelocity[1], alListenerVelocity[2] );
 	alListenerfv( AL_ORIENTATION, orientation );
-	alListenerf( AL_GAIN, s_volume ? s_volume->value : 1.0f );
+	{
+		float gain = s_volume ? s_volume->value : 1.0f;
+		if ( ( !gw_active && !gw_minimized && s_muteWhenUnfocused && s_muteWhenUnfocused->integer )
+			|| ( gw_minimized && s_muteWhenMinimized && s_muteWhenMinimized->integer )
+			|| ( clc.demoplaying && com_timescale && com_timescale->value == 0.0f ) ) {
+			gain = 0.0f;
+		}
+		alListenerf( AL_GAIN, gain );
+	}
 
 	// Update doppler settings
 	if ( s_doppler && s_doppler->integer ) {
@@ -700,6 +708,18 @@ static void S_AL_UpdateListener( void ) {
 	if ( s_openalDopplerSpeed ) {
 		alDopplerVelocity( s_openalDopplerSpeed->value );
 	}
+}
+
+static int S_AL_ActiveChannelCount( void ) {
+	int i;
+	int count = 0;
+
+	for ( i = 0; i < MAX_CHANNELS; ++i ) {
+		if ( alChannels[i].inUse ) {
+			count++;
+		}
+	}
+	return count;
 }
 
 static int S_AL_FindFreeChannel( int now ) {
@@ -820,6 +840,14 @@ static void S_AL_UpdateLoopingSounds( void ) {
 
 		channel = S_AL_FindLoopChannel( ent );
 		if ( channel < 0 ) {
+			// Skip distant new loops when the pool is nearly full, otherwise
+			// far ambients on loop-heavy maps thrash slots with closer loops.
+			if ( S_AL_ActiveChannelCount() > MAX_CHANNELS * 7 / 8 ) {
+				float maxRange = ( s_openalMaxDistance ? s_openalMaxDistance->value : 2000.0f ) + 512.0f;
+				if ( DistanceSquared( loop->origin, alListenerOrigin ) >= maxRange * maxRange ) {
+					continue;
+				}
+			}
 			channel = S_AL_FindFreeChannel( Sys_Milliseconds() );
 			if ( channel < 0 ) {
 				continue;
@@ -1592,6 +1620,14 @@ static void S_AL_StartSound( const vec3_t origin, int entityNum, int entchannel,
 	buffer = S_AL_GetBufferForSfx( sfxHandle );
 	if ( !buffer ) {
 		return;
+	}
+
+	// Under pool pressure, drop distant one-shots instead of thrashing loops.
+	if ( origin && S_AL_ActiveChannelCount() > MAX_CHANNELS * 7 / 8 ) {
+		float maxRange = ( s_openalMaxDistance ? s_openalMaxDistance->value : 2000.0f ) + 512.0f;
+		if ( DistanceSquared( origin, alListenerOrigin ) >= maxRange * maxRange ) {
+			return;
+		}
 	}
 
 	now = Sys_Milliseconds();

@@ -27,7 +27,7 @@ layout(set = 2, binding = 0) uniform PostFXParams {
 	vec4 lensEffects1;     /* outlineStrength, outlineThreshold, filmLook, sharpen */
 	vec4 runtimeFlags;     /* greyscale, dither, postDebug, postEnabled */
 	vec4 lutParams;        /* lutIntensity, lutEnabled, lutStripDim, invGamma */
-	vec4 autoExposureParams; /* avgLogLum, targetLum, minExposure, maxExposure */
+	vec4 autoExposureParams; /* avgLogLum, targetLum, adaptedExposure(-1=off EV-rel), maxExposure */
 	vec4 localExposureParams; /* enabled, strength, shadowClampEV, highlightClampEV */
 	vec4 taaParams;        /* validHistory, stationaryFeedback, motionFeedback, sharpen */
 } postfx;
@@ -134,14 +134,28 @@ vec3 Tonemap_Reinhard( vec3 x ) {
 	return x / ( x + vec3( 1.0 ) );
 }
 
+/*
+ * Filmic toe/shoulder with Hable-style white-point normalization:
+ *   FilmicPartial(x) / FilmicPartial(whitePoint)
+ * White point is the scene-linear value that maps to display 1.0 — it must NOT
+ * pre-divide the whole ramp (x/wp before the curve), or midtones collapse
+ * (e.g. 0.18 → ~0.07 at wp=2.5). That crush looked like global underexposure.
+ */
+float FilmicPartial( float x, float toePow, float shoulderStrength ) {
+	float mapped = pow( max( x, 0.0 ), toePow );
+	return mapped / ( mapped + shoulderStrength );
+}
+
 float FilmicLuminanceCurve( float x, float toe, float shoulder, float whitePoint ) {
-	float safeWhite = max( whitePoint, 1e-4 );
-	float t = max( x / safeWhite, 0.0 );
 	float toePow = mix( 1.0, 2.4, clamp( toe, 0.0, 1.0 ) );
 	float shoulderStrength = mix( 0.45, 2.6, clamp( shoulder, 0.0, 1.0 ) );
-	float mapped = pow( t, toePow );
-	float normalizedWhite = 1.0 / ( 1.0 + shoulderStrength );
-	return clamp( ( mapped / ( mapped + shoulderStrength ) ) / normalizedWhite, 0.0, 1.0 );
+	float yw = FilmicPartial( max( whitePoint, 1e-4 ), toePow, shoulderStrength );
+	return clamp( FilmicPartial( x, toePow, shoulderStrength ) / max( yw, 1e-5 ), 0.0, 1.0 );
+}
+
+/* Neutral diagnostic: midtones near ACES, no artistic black crush. */
+vec3 Tonemap_NeutralReference( vec3 x ) {
+	return ACESFilm( max( x, vec3( 0.0 ) ) );
 }
 
 vec3 Tonemap_Filmic( vec3 x ) {
@@ -236,7 +250,23 @@ vec3 applyLocalExposure( vec2 uv, vec3 hdr ) {
 	localLogLum += sampleHdrLogLum( uv + vec2( -farOffset.x, farOffset.y ) ) * 0.06;
 
 	float deltaEv = ( postAvgLogLum() - localLogLum ) * postLocalExposureStrength();
-	deltaEv = clamp( deltaEv, -postLocalExposureHighlightClamp(), postLocalExposureShadowClamp() );
+	/*
+	 * Asymmetric local exposure: crushing bright local regions is useful;
+	 * lifting dark regions toward the frame average is the primary outdoor
+	 * gray-veil / elevated-black failure (especially with HDR sky averages).
+	 * Cap positive lift much harder than negative crush.
+	 */
+	float crushMax = postLocalExposureHighlightClamp();
+	float liftMax = min( postLocalExposureShadowClamp(), 0.35 );
+	/* Further suppress lift when the frame average is already bright (outdoor). */
+	if ( postAvgLogLum() > 0.0 ) {
+		liftMax *= 0.35;
+	}
+	if ( deltaEv > 0.0 ) {
+		deltaEv = min( deltaEv, liftMax );
+	} else {
+		deltaEv = max( deltaEv, -crushMax );
+	}
 	return hdr * exp2( deltaEv );
 }
 
@@ -405,6 +435,8 @@ vec3 doTonemap( vec3 value ) {
 		return Tonemap_Filmic( value );
 	} else if ( tonemapMode == 4 ) {
 		return Tonemap_AgX( value );
+	} else if ( tonemapMode == 5 ) {
+		return Tonemap_NeutralReference( value );
 	}
 	return value;
 }
@@ -485,6 +517,13 @@ vec3 applyMotionBlur( vec3 ldr, vec2 uv, bool postGrade ) {
 		vec2 suv = uv + step * t * 2.0;
 		if ( any( lessThan( suv, vec2( 0.0 ) ) ) || any( greaterThan( suv, vec2( 1.0 ) ) ) )
 			continue;
+		float sd = textureLod( depthTex, suv, 0.0 ).r;
+		if ( sd <= 0.0 || sd >= 1.0 )
+			continue;
+		float sv = linearDepthFromBuffer( sd );
+		float cv = linearDepthFromBuffer( depthNdc );
+		if ( Depth_BilateralWeight( cv, sv, 32.0 ) < 0.05 )
+			continue;
 		float w = 1.0 - abs( t ) * 2.0;
 		acc += samplePostLdr( suv, true, postGrade ) * w;
 		wacc += w;
@@ -518,6 +557,12 @@ vec3 applyDepthOfField( vec3 ldr, vec2 uv, bool postGrade ) {
 		vec2 offset = vec2( cos( a ), sin( a ) ) * coc;
 		vec2 suv = uv + offset;
 		if ( any( lessThan( suv, vec2( 0.0 ) ) ) || any( greaterThan( suv, vec2( 1.0 ) ) ) )
+			continue;
+		float sd = textureLod( depthTex, suv, 0.0 ).r;
+		if ( sd <= 0.0 || sd >= 1.0 )
+			continue;
+		float sv = linearDepthFromBuffer( sd );
+		if ( Depth_BilateralWeight( linearDepth, sv, 24.0 ) < 0.05 )
 			continue;
 		acc += samplePostLdr( suv, true, postGrade );
 		wacc += 1.0;
@@ -630,13 +675,30 @@ void main() {
 
 		if ( postGradeActive && postSharpenStrength() > 0.0 ) {
 			vec2 texel = 1.0 / vec2( textureSize( texture0, 0 ) );
+			float centerDepth = textureLod( depthTex, uv, 0.0 ).r;
+			float centerView = linearDepthFromBuffer( centerDepth );
 			vec3 ldrL = samplePostLdr( clamp( uv + vec2( -texel.x, 0.0 ), 0.0, 1.0 ), hdrResolveActive, postGradeActive );
 			vec3 ldrR = samplePostLdr( clamp( uv + vec2(  texel.x, 0.0 ), 0.0, 1.0 ), hdrResolveActive, postGradeActive );
 			vec3 ldrU = samplePostLdr( clamp( uv + vec2( 0.0, -texel.y ), 0.0, 1.0 ), hdrResolveActive, postGradeActive );
 			vec3 ldrD = samplePostLdr( clamp( uv + vec2( 0.0,  texel.y ), 0.0, 1.0 ), hdrResolveActive, postGradeActive );
+			/* Suppress unsharp at depth discontinuities (silhouette ringing). */
+			float edgeDepthGate = 1.0;
+			if ( centerDepth > 0.0 && centerDepth < 1.0 ) {
+				float dL = textureLod( depthTex, clamp( uv + vec2( -texel.x, 0.0 ), 0.0, 1.0 ), 0.0 ).r;
+				float dR = textureLod( depthTex, clamp( uv + vec2(  texel.x, 0.0 ), 0.0, 1.0 ), 0.0 ).r;
+				float dU = textureLod( depthTex, clamp( uv + vec2( 0.0, -texel.y ), 0.0, 1.0 ), 0.0 ).r;
+				float dD = textureLod( depthTex, clamp( uv + vec2( 0.0,  texel.y ), 0.0, 1.0 ), 0.0 ).r;
+				float wMin = min( min(
+					Depth_BilateralWeight( centerView, linearDepthFromBuffer( dL ), 32.0 ),
+					Depth_BilateralWeight( centerView, linearDepthFromBuffer( dR ), 32.0 ) ),
+					min(
+					Depth_BilateralWeight( centerView, linearDepthFromBuffer( dU ), 32.0 ),
+					Depth_BilateralWeight( centerView, linearDepthFromBuffer( dD ), 32.0 ) ) );
+				edgeDepthGate = smoothstep( 0.05, 0.35, wMin );
+			}
 			vec3 blur = ( ldrL + ldrR + ldrU + ldrD ) * 0.25;
 			float edge = max( dot( ldr, sRGB ) - dot( blur, sRGB ), 0.0 );
-			float adaptive = smoothstep( 0.01, 0.20, edge );
+			float adaptive = smoothstep( 0.01, 0.20, edge ) * edgeDepthGate;
 			float strength = clamp( postSharpenStrength(), 0.0, 1.5 ) * mix( 0.25, 1.0, adaptive );
 			vec3 localMin = min( min( ldrL, ldrR ), min( ldrU, ldrD ) );
 			vec3 localMax = max( max( ldrL, ldrR ), max( ldrU, ldrD ) );

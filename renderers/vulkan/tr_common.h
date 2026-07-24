@@ -116,6 +116,7 @@ void R_InitFreeType( void );
 void R_DoneFreeType( void );
 void R_WorldToLocal( const vec3_t world, vec3_t local );
 void RE_RegisterFont(const char *fontName, int pointSize, fontInfo_t *font);
+qboolean RE_RegisterFontAtlas( const char *fontName, int pointSize, const char *alphabet, fontAtlasInfo_t *out );
 void RE_ClearTrueTypeFontCache( void );
 float RE_GetFontKerning( const fontInfo_t *font, int prevIndex, int nextIndex );
 void R_VectorFont_Init( void );

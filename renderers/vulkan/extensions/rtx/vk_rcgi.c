@@ -474,7 +474,7 @@ static qboolean RCGI_CreatePipelines( void )
 	plci.pSetLayouts = &rcgi.final_gather_layout;
 	VK_CHECK( qvkCreatePipelineLayout( vk.device, &plci, NULL, &rcgi.final_gather_pl ) );
 
-	pcr.size = sizeof( uint32_t ) * 4 + sizeof( float ) * 4;
+	pcr.size = sizeof( uint32_t ) * 4 + sizeof( float ) * 8;
 	plci.pSetLayouts = &rcgi.denoise_layout;
 	VK_CHECK( qvkCreatePipelineLayout( vk.device, &plci, NULL, &rcgi.denoise_pl ) );
 
@@ -934,6 +934,7 @@ void vk_rcgi_apply_after_geometry( void )
 	struct {
 		uint32_t params[4];
 		float sigma[4];
+		float zRange[4];
 	} denoisePush;
 
 	struct {
@@ -1278,9 +1279,12 @@ void vk_rcgi_apply_after_geometry( void )
 	denoisePush.params[0] = rcgi.gatherW;
 	denoisePush.params[1] = rcgi.gatherH;
 	denoisePush.sigma[0] = 1.0f;
-	denoisePush.sigma[1] = 40.0f;
+	denoisePush.sigma[1] = 48.0f; /* relative view-depth sharpness */
 	denoisePush.sigma[2] = 8.0f;
 	denoisePush.sigma[3] = 0.0f;
+	denoisePush.zRange[0] = r_znear->value;
+	denoisePush.zRange[1] = backEnd.viewParms.zFar;
+	denoisePush.zRange[2] = denoisePush.zRange[3] = 0.0f;
 	record_image_layout_transition( cmd, rcgi.gatherA.image, VK_IMAGE_ASPECT_COLOR_BIT,
 		VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
 		VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT );
@@ -1332,7 +1336,9 @@ void vk_rcgi_apply_after_geometry( void )
 	upscalePush.params[2] = rcgi.gatherW;
 	upscalePush.params[3] = rcgi.gatherH;
 	upscalePush.temporal[0] = 0.12f;
-	upscalePush.temporal[1] = upscalePush.temporal[2] = upscalePush.temporal[3] = 0.0f;
+	upscalePush.temporal[1] = 48.0f; /* relative view-depth sharpness */
+	upscalePush.temporal[2] = r_znear->value;
+	upscalePush.temporal[3] = backEnd.viewParms.zFar;
 	gx = ( rcgi.width + 7u ) / 8u;
 	gy = ( rcgi.height + 7u ) / 8u;
 	qvkCmdBindPipeline( cmd, VK_PIPELINE_BIND_POINT_COMPUTE, rcgi.upscale_pipe );

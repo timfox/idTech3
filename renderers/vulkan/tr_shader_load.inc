@@ -301,7 +301,7 @@ static void CreateInternalShaders( void ) {
 	stages[0].active = qtrue;
 	stages[0].bundle[0].rgbGen = CGEN_VERTEX;
 	stages[0].uiVectorText = 1u;
-	stages[0].stateBits = GLS_DEPTHTEST_DISABLE | GLS_SRCBLEND_SRC_ALPHA | GLS_DSTBLEND_ONE_MINUS_SRC_ALPHA;
+	stages[0].stateBits = GLS_DEPTHTEST_DISABLE | GLS_SRCBLEND_ONE | GLS_DSTBLEND_ONE_MINUS_SRC_ALPHA;
 	tr.vectorFontShader = FinishShader();
 }
 

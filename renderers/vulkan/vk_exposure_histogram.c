@@ -25,10 +25,10 @@ void vk_exposure_histogram_register_cvars( void )
 	if ( r_exposureHistogram ) {
 		return;
 	}
-	r_exposureHistogram = ri.Cvar_Get( "r_exposureHistogram", "0", CVAR_ARCHIVE_ND | CVAR_LATCH );
+	r_exposureHistogram = ri.Cvar_Get( "r_exposureHistogram", "0", CVAR_ARCHIVE_ND );
 	ri.Cvar_CheckRange( r_exposureHistogram, "0", "1", CV_INTEGER );
 	ri.Cvar_SetDescription( r_exposureHistogram,
-		"Raster Ultra 1.10 histogram/metering exposure controller (latched).\n"
+		"Histogram/metering exposure controller (runtime; no latch).\n"
 		"Works with r_exposure_auto; adds meter modes, EV clamps, cut/map reset." );
 	ri.Cvar_SetGroup( r_exposureHistogram, CVG_RENDERER );
 
@@ -46,8 +46,11 @@ void vk_exposure_histogram_register_cvars( void )
 
 	r_exposureMinEV = ri.Cvar_Get( "r_exposureMinEV", "-4", CVAR_ARCHIVE_ND );
 	r_exposureMaxEV = ri.Cvar_Get( "r_exposureMaxEV", "4", CVAR_ARCHIVE_ND );
-	r_exposureSkyWeight = ri.Cvar_Get( "r_exposureSkyWeight", "0.35", CVAR_ARCHIVE_ND );
-	ri.Cvar_CheckRange( r_exposureSkyWeight, "0", "1", CV_FLOAT );
+	r_exposureSkyWeight = ri.Cvar_Get( "r_exposureSkyWeight", "0.75", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_exposureSkyWeight, "0", "2", CV_FLOAT );
+	ri.Cvar_SetDescription( r_exposureSkyWeight,
+		"How strongly bright upper-frame (sky) samples drive auto-exposure. "
+		"0=ignore sky, 0.75=balanced, 1=full, >1 amplify. Sun extremes still trimmed by r_autoExposure_highPercent." );
 
 	r_exposureDebug = ri.Cvar_Get( "r_exposureDebug", "0", CVAR_ARCHIVE_ND );
 	ri.Cvar_CheckRange( r_exposureDebug, "0", "2", CV_INTEGER );
@@ -140,10 +143,11 @@ void vk_exposure_histogram_notify_luminance( float avgLogLum, qboolean valid )
 	s_state.lastAvgLogLum = avgLogLum;
 	/* EV relative to mid-grey: negative log2(scene) style */
 	ev = -avgLogLum + s_state.compensationEV;
-	if ( r_exposureSkyWeight && r_exposureSkyWeight->value < 1.0f && avgLogLum > 0.5f ) {
-		/* Soft sky/outlier rejection — pull bright skies toward mid. */
-		ev *= ( 0.65f + 0.35f * r_exposureSkyWeight->value );
-	}
+	/*
+	 * Do not attenuate bright-sky EV — Source eye adaptation must darken when
+	 * looking at HDR sky. Extreme sun is handled by luminance highPercent trim.
+	 */
+	(void)r_exposureSkyWeight;
 	ev = Com_Clamp( s_state.minEV, s_state.maxEV, ev );
 	s_state.targetEV = ev;
 	if ( !s_state.valid ) {
@@ -178,8 +182,8 @@ float vk_exposure_histogram_meter_scale( void )
 	default:
 		break;
 	}
-	/* Compensation in linear from EV */
-	scale *= powf( 2.0f, s_state.compensationEV * 0.5f );
+	/* Compensation in linear from EV (full stop scale). */
+	scale *= powf( 2.0f, s_state.compensationEV );
 	return scale;
 }
 

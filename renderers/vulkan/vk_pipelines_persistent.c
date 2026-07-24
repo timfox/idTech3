@@ -156,8 +156,15 @@ void vk_alloc_persistent_pipelines( void )
 		vk.occlusion_bbox_pipeline = vk_find_pipeline_ext( 0, &def, qtrue );
 	}
 
-	// DrawTris()
-	state_bits = GLS_POLYMODE_LINE | GLS_DEPTHMASK_TRUE;
+	/*
+	 * DrawTris()
+	 *
+	 * This is an overlay over geometry already accepted by the authoritative
+	 * front-end draw list.  Keep depth testing enabled, but never let the
+	 * diagnostic pass modify world depth.  Vulkan uses reversed-Z, so the
+	 * normal pipeline compare is GREATER_OR_EQUAL.
+	 */
+	state_bits = GLS_POLYMODE_LINE;
 	{
 		Com_Memset( &def, 0, sizeof( def ) );
 		def.state_bits = state_bits;

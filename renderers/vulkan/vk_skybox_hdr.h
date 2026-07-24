@@ -103,6 +103,19 @@ void SkyboxHDR_SetIntensity(float intensity);
 void SkyboxHDR_SampleDirection(const float *dir, float *outRGB);
 void SkyboxHDR_SampleIrradiance(const float *normal, float *outRGB);
 
+/* Scene-linear RGBA32F faces for DrawSkyBox into SceneHDR (Quake Z-up outerbox order).
+ * Not tone-mapped; values may exceed 1.0. Specular prefilter is IBL-only. */
+qboolean SkyboxHDR_BuildDisplayFaces( void );
+image_t *SkyboxHDR_GetDisplayFace( int outerboxIndex );
+void SkyboxHDR_ClearDisplayFaces( void );
+
+/* Apply worldspawn / map keys: path + optional exposure/rotation/intensity/projection. */
+qboolean SkyboxHDR_ConfigureFromMap( const char *path, float exposure, float rotation,
+	float intensity, int projection );
+
+/* Enable histogram eye adaptation for HDR sky (r_exposure_auto + metering). */
+void SkyboxHDR_EnableEyeAdaptation( void );
+
 #ifdef __cplusplus
 }
 #endif

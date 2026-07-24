@@ -9,6 +9,7 @@ Documentation is grouped by **tier**. Most files remain at their historical path
 - [BUILD.md](../BUILD.md)
 - [DEVELOPMENT_SETUP.md](DEVELOPMENT_SETUP.md)
 - [STEAM.md](STEAM.md) — Steamworks API (`USE_STEAM`), Deck, achievements, overlay
+- [OPENHMD.md](OPENHMD.md) — OpenHMD VR head tracking / software stereo (`USE_OPENHMD`)
 - [ENGINE_MODULE_MANIFEST.md](ENGINE_MODULE_MANIFEST.md) — build profile + source gates
 - [DEPRECATION_POLICY.md](DEPRECATION_POLICY.md)
 

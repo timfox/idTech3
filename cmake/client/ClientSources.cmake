@@ -20,12 +20,17 @@ set(IDTECH3_CLIENT_CORE_SRCS
 	${_IDTECH3_CLIENT_REL}/core/cl_parse.c
 	${_IDTECH3_CLIENT_REL}/core/cl_net_chan.c
 	${_IDTECH3_CLIENT_REL}/core/cl_cgame.c
+	${_IDTECH3_CLIENT_REL}/core/cl_tv.c
+	${_IDTECH3_CLIENT_REL}/core/cl_fonts.c
 	${_IDTECH3_CLIENT_REL}/core/cl_compat_math.c
 	${_IDTECH3_CLIENT_REL}/core/cl_input.c
 	${_IDTECH3_CLIENT_REL}/core/cl_keys.c
 	${_IDTECH3_CLIENT_REL}/core/cl_serverbrowser.c
 	${_IDTECH3_CLIENT_REL}/core/cl_app_crdt.c
 	${_IDTECH3_CLIENT_REL}/core/cl_oscar.c
+	${_IDTECH3_CLIENT_REL}/core/cl_discord.c
+	${_IDTECH3_CLIENT_REL}/core/cl_discord_proto.c
+	${_IDTECH3_CLIENT_REL}/core/cl_rconset.c
 )
 
 set(IDTECH3_CLIENT_MEDIA_SRCS
@@ -49,6 +54,7 @@ set(IDTECH3_CLIENT_PLATFORM_SRCS
 	${_IDTECH3_CLIENT_REL}/platform/cl_curl.c
 	${_IDTECH3_CLIENT_REL}/platform/cl_torrent.cpp
 	${_IDTECH3_CLIENT_REL}/platform/cl_steam.c
+	${_IDTECH3_CLIENT_REL}/platform/cl_openhmd.c
 	${_IDTECH3_CLIENT_REL}/platform/cl_websocket.c
 	${_IDTECH3_CLIENT_REL}/platform/cl_mumble.c
 	${_IDTECH3_CLIENT_REL}/platform/cl_voip.c

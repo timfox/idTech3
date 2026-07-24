@@ -125,6 +125,7 @@ static cvar_t *com_logfile;		// 1 = buffer log, 2 = flush after each print
 static cvar_t *com_showtrace;
 cvar_t	*com_version;
 static cvar_t *com_buildScript;	// for automated data building scripts
+static cvar_t *com_writeConfig;	// 0 = skip archived q3config write-back (multi-instance hosts)
 
 #ifndef DEDICATED
 static cvar_t	*com_introPlayed;
@@ -4062,6 +4063,10 @@ void Com_Init( char *commandLine ) {
 	com_buildScript = Cvar_Get( "com_buildScript", "0", 0 );
 	Cvar_SetDescription( com_buildScript, "Loads all game assets, regardless whether they are required or not." );
 
+	com_writeConfig = Cvar_Get( "com_writeConfig", "1", CVAR_ARCHIVE );
+	Cvar_CheckRange( com_writeConfig, "0", "1", CV_INTEGER );
+	Cvar_SetDescription( com_writeConfig, "Write archived cvars back to q3config.cfg. Set 0 for multi-instance dedicated hosts that share a homepath and must not cross-contaminate configs." );
+
 	Cvar_Get( "com_errorMessage", "", CVAR_ROM | CVAR_NORESTART );
 
 #ifndef DEDICATED
@@ -4266,6 +4271,7 @@ void Com_Init( char *commandLine ) {
 	Com_Printf( "--- Common Initialization Complete ---\n" );
 
 	NET_Init();
+	SV_TVStream_Init();		// Surf TVL: bind live loopback listener now that net_port is registered
 	
 	// Network logging
 	if ( Com_LogVerbosity() >= 1 ) {
@@ -4335,6 +4341,10 @@ void Com_WriteConfiguration( void ) {
 	// if we are quitting without fully initializing, make sure
 	// we don't write out anything
 	if ( !com_fullyInitialized ) {
+		return;
+	}
+
+	if ( com_writeConfig && !com_writeConfig->integer ) {
 		return;
 	}
 

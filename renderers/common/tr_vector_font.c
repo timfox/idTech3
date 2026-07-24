@@ -35,6 +35,11 @@ static vectorFont_t vectorFont;
 static vectorGlyphletAtlas_t vectorGlyphletAtlas;
 static qhandle_t vectorFontShaderHandle = 0;
 static cvar_t *r_vectorFontMode;
+static cvar_t *r_vectorFontCoverage;
+static cvar_t *r_vectorFontHinting;
+static cvar_t *r_vectorFontStemDarkening;
+static cvar_t *r_vectorFontPixelSnap;
+static cvar_t *r_vectorFontDebug;
 
 #define VECTOR_FONT_MODE_LENGYEL      0
 #define VECTOR_FONT_MODE_LOOP_BLINN   2
@@ -69,6 +74,8 @@ typedef struct {
 } vecCurveSeg_t;
 
 #define VECTOR_MAX_CURVE_SEGS 8192
+#define VECTOR_INITIAL_TEXELS 4096
+#define VECTOR_MAX_PACKED_TEXELS ( 16 * 1024 * 1024 )
 
 typedef struct {
 	vecCurveSeg_t   curves[VECTOR_MAX_CURVE_SEGS];
@@ -86,7 +93,14 @@ static float VecCurve_MaxX( const vecCurveSeg_t *c ) {
 	return m;
 }
 
-static void VecOutline_SortCurves( vecOutlineBuilder_t *b ) {
+static float VecCurve_MaxY( const vecCurveSeg_t *c ) {
+	float m = c->p1.y;
+	if ( c->p2.y > m ) m = c->p2.y;
+	if ( c->p3.y > m ) m = c->p3.y;
+	return m;
+}
+
+static void VecOutline_SortCurvesByMaxX( vecOutlineBuilder_t *b ) {
 	int i;
 	int j;
 	for ( i = 0; i < b->numCurves - 1; i++ ) {
@@ -98,6 +112,71 @@ static void VecOutline_SortCurves( vecOutlineBuilder_t *b ) {
 			}
 		}
 	}
+}
+
+static void VecOutline_SortCurvesByMaxY( vecOutlineBuilder_t *b ) {
+	int i;
+	int j;
+	for ( i = 0; i < b->numCurves - 1; i++ ) {
+		for ( j = i + 1; j < b->numCurves; j++ ) {
+			if ( VecCurve_MaxY( &b->curves[j] ) > VecCurve_MaxY( &b->curves[i] ) ) {
+				vecCurveSeg_t tmp = b->curves[i];
+				b->curves[i] = b->curves[j];
+				b->curves[j] = tmp;
+			}
+		}
+	}
+}
+
+static void VecOutline_PackCurves( float *texels, int *texelCount, const vecCurveSeg_t *curves, int numCurves ) {
+	int c;
+	for ( c = 0; c < numCurves; c++ ) {
+		const vecCurveSeg_t *cv = &curves[c];
+		texels[*texelCount * 4 + 0] = cv->p1.x;
+		texels[*texelCount * 4 + 1] = cv->p1.y;
+		texels[*texelCount * 4 + 2] = cv->p2.x;
+		texels[*texelCount * 4 + 3] = cv->p2.y;
+		( *texelCount )++;
+		texels[*texelCount * 4 + 0] = cv->p3.x;
+		texels[*texelCount * 4 + 1] = cv->p3.y;
+		texels[*texelCount * 4 + 2] = 0.0f;
+		texels[*texelCount * 4 + 3] = 0.0f;
+		( *texelCount )++;
+	}
+}
+
+static qboolean VecOutline_EnsureTexelCapacity( float **texels, int *capacity, int required ) {
+	float *grown;
+	int newCapacity;
+
+	if ( required <= *capacity ) {
+		return qtrue;
+	}
+	if ( required < 0 || required > VECTOR_MAX_PACKED_TEXELS ) {
+		return qfalse;
+	}
+
+	newCapacity = *capacity;
+	while ( newCapacity < required ) {
+		if ( newCapacity > VECTOR_MAX_PACKED_TEXELS / 2 ) {
+			newCapacity = VECTOR_MAX_PACKED_TEXELS;
+			break;
+		}
+		newCapacity *= 2;
+	}
+
+	grown = ri.Malloc( (size_t)newCapacity * 4u * sizeof( *grown ) );
+	if ( !grown ) {
+		return qfalse;
+	}
+	Com_Memset( grown, 0, (size_t)newCapacity * 4u * sizeof( *grown ) );
+	if ( *texels ) {
+		Com_Memcpy( grown, *texels, (size_t)( *capacity ) * 4u * sizeof( *grown ) );
+		ri.Free( *texels );
+	}
+	*texels = grown;
+	*capacity = newCapacity;
+	return qtrue;
 }
 
 #ifdef BUILD_FREETYPE
@@ -237,7 +316,12 @@ static qboolean R_VectorFont_BuildFromFace( FT_Face face, const char *ttfPath ) 
 	h = Com_GenerateHashValue( ttfPath, 256 );
 	Com_sprintf( imageName, sizeof( imageName ), "fonts/_vcur_%lu", h );
 
-	texelCapacity = VECTOR_MAX_CURVE_SEGS * GLYPHS_PER_FONT * VECTOR_TEXELS_PER_CURVE;
+	/*
+	 * Grow with actual outline complexity.  Reserving the per-glyph worst
+	 * case for all 256 legacy slots consumed 1 GiB after adding the duplicate
+	 * Y-sorted list, even for an ordinary Latin HUD font.
+	 */
+	texelCapacity = VECTOR_INITIAL_TEXELS;
 	texels = ri.Malloc( (size_t)texelCapacity * 4 * sizeof( *texels ) );
 	if ( !texels ) {
 		return qfalse;
@@ -275,10 +359,13 @@ static qboolean R_VectorFont_BuildFromFace( FT_Face face, const char *ttfPath ) 
 		if ( !VecOutline_FromGlyph( slot, &builder ) ) {
 			continue;
 		}
-		VecOutline_SortCurves( &builder );
 
-		if ( texelCount + builder.numCurves * VECTOR_TEXELS_PER_CURVE > texelCapacity ) {
-			ri.Printf( PRINT_WARNING, "R_VectorFont_BuildFromFace: curve texture overflow for '%c'\n", ch );
+		/* Dual sorted lists (Lengyel): X-sorted for horizontal rays, Y-sorted for vertical.
+		 * Each list is packed contiguously; shader Y list starts at curveStart + curveCount*2. */
+		if ( !VecOutline_EnsureTexelCapacity( &texels, &texelCapacity,
+			texelCount + builder.numCurves * VECTOR_TEXELS_PER_CURVE * 2 ) ) {
+			ri.Printf( PRINT_WARNING,
+				"R_VectorFont_BuildFromFace: packed curve storage limit reached for '%c'\n", ch );
 			break;
 		}
 
@@ -299,19 +386,12 @@ static qboolean R_VectorFont_BuildFromFace( FT_Face face, const char *ttfPath ) 
 				if ( pts[p]->y < emBottom ) emBottom = pts[p]->y;
 				if ( pts[p]->y > emTop ) emTop = pts[p]->y;
 			}
-
-			texels[texelCount * 4 + 0] = cv->p1.x;
-			texels[texelCount * 4 + 1] = cv->p1.y;
-			texels[texelCount * 4 + 2] = cv->p2.x;
-			texels[texelCount * 4 + 3] = cv->p2.y;
-			texelCount++;
-
-			texels[texelCount * 4 + 0] = cv->p3.x;
-			texels[texelCount * 4 + 1] = cv->p3.y;
-			texels[texelCount * 4 + 2] = 0.0f;
-			texels[texelCount * 4 + 3] = 0.0f;
-			texelCount++;
 		}
+
+		VecOutline_SortCurvesByMaxX( &builder );
+		VecOutline_PackCurves( texels, &texelCount, builder.curves, builder.numCurves );
+		VecOutline_SortCurvesByMaxY( &builder );
+		VecOutline_PackCurves( texels, &texelCount, builder.curves, builder.numCurves );
 
 		g->emLeft = emLeft;
 		g->emBottom = emBottom;
@@ -329,12 +409,17 @@ static qboolean R_VectorFont_BuildFromFace( FT_Face face, const char *ttfPath ) 
 	if ( height < 1 ) {
 		height = 1;
 	}
+	if ( !VecOutline_EnsureTexelCapacity( &texels, &texelCapacity, width * height ) ) {
+		ri.Printf( PRINT_WARNING, "R_VectorFont_BuildFromFace: unable to pad curve texture\n" );
+		ri.Free( texels );
+		return qfalse;
+	}
 
 	image = R_CreateImageRGBA32F( imageName, texels, width, height, IMGFLAG_CLAMPTOEDGE | IMGFLAG_NOSCALE );
 	vectorFont.curveImage = image;
 	vectorFont.curveTexWidth = width;
 	vectorFont.curveTexHeight = height;
-	vectorFont.totalCurves = texelCount / VECTOR_TEXELS_PER_CURVE;
+	vectorFont.totalCurves = texelCount / ( VECTOR_TEXELS_PER_CURVE * 2 ); /* unique curves (X+Y lists) */
 	vectorFont.loaded = qtrue;
 
 	if ( R_VectorFont_EffectiveMode() == VECTOR_FONT_MODE_LOOP_BLINN ) {
@@ -358,11 +443,87 @@ static qboolean R_VectorFont_BuildFromFace( FT_Face face, const char *ttfPath ) 
 
 #endif /* BUILD_FREETYPE */
 
+static void VectorFont_Status_f( void ) {
+	ri.Printf( PRINT_ALL,
+		"=== vector_font_status ===\n"
+		"  loaded=%d path='%s' curves=%d tex=%dx%d mode=%d\n"
+		"  coverage=%d hinting=%d stemDarken=%.2f pixelSnap=%d debug=%d\n"
+		"  atlas-free: curve control points + dual sorted lists (no SDF/MSDF glyph atlas)\n"
+		"  shaping: UTF-8 legacy fallback (HarfBuzz face cache not yet connected)\n"
+		"  cubic policy: fixed midpoint quadratic conversion (not certified)\n"
+		"  temporal: HUD draws into ui_overlay (post TAA/tonemap)\n",
+		vectorFont.loaded ? 1 : 0,
+		vectorFont.ttfPath,
+		vectorFont.totalCurves,
+		vectorFont.curveTexWidth,
+		vectorFont.curveTexHeight,
+		R_VectorFont_EffectiveMode(),
+		r_vectorFontCoverage ? r_vectorFontCoverage->integer : 2,
+		r_vectorFontHinting ? r_vectorFontHinting->integer : 0,
+		r_vectorFontStemDarkening ? r_vectorFontStemDarkening->value : 0.0f,
+		r_vectorFontPixelSnap ? r_vectorFontPixelSnap->integer : 0,
+		r_vectorFontDebug ? r_vectorFontDebug->integer : 0 );
+}
+
+static void VectorFont_Validate_f( void ) {
+	ri.Printf( PRINT_ALL,
+		"=== vector_font_validate ===\n"
+		"  Lengyel winding: dual-axis X/Y sorted curve lists\n"
+		"  Blend: premultiplied (ONE, ONE_MINUS_SRC_ALPHA)\n"
+		"  Coverage: r_vectorFontCoverage 0=center 1=dual-axis 2=adaptive-SS(default) 3=ultra\n"
+		"  Hinting: r_vectorFontHinting 0=unhinted(world) 1=light 2=native UI ppem\n"
+		"  Commands: vector_font_status | vector_font_validate | vector_font_memory_status\n" );
+}
+
+static void VectorFont_Certify_f( void ) {
+	ri.Printf( PRINT_ALL,
+		"=== vector_font_certify ===\n"
+		"  state=INCOMPLETE\n"
+		"  PASS atlas-free outline extraction, dual-axis curve lists, premultiplied blend\n"
+		"  PASS bounded curve storage (grows with actual outline complexity)\n"
+		"  BLOCKED HarfBuzz face/font cache and glyph-index outline cache\n"
+		"  BLOCKED adaptive-error cubic conversion and numerical reference metrics\n"
+		"  BLOCKED hinted per-ppem vector cache, COLR layers, world-space certification\n"
+		"  The legacy bitmap/SDF renderers remain the production fallback.\n" );
+}
+
+static void VectorFont_Memory_f( void ) {
+	size_t curveBytes = (size_t)vectorFont.curveTexWidth * (size_t)vectorFont.curveTexHeight * 16u;
+	ri.Printf( PRINT_ALL,
+		"=== vector_font_memory_status ===\n"
+		"  curveTexture RGBA32F: %dx%d (~%zu bytes)\n"
+		"  uniqueCurves=%d (stored twice: X-sorted + Y-sorted)\n"
+		"  Note: atlas-free eliminates raster glyph pages; vector+band storage remains.\n",
+		vectorFont.curveTexWidth, vectorFont.curveTexHeight, curveBytes,
+		vectorFont.totalCurves );
+}
+
 void R_VectorFont_Init( void ) {
 	r_vectorFontMode = ri.Cvar_Get( "r_vectorFontMode", "0", CVAR_ARCHIVE );
 	ri.Cvar_SetDescription( r_vectorFontMode,
 		"Vector font algorithm when r_vectorFont 1: 0 = Lengyel JCGT 2017 (curve texture + winding), "
 		"2 = Loop & Blinn glyphlets (AMD GPUOpen; NV mesh dispatch when r_vk_meshShaderNV 1). reloadTtf after change." );
+	r_vectorFontCoverage = ri.Cvar_Get( "r_vectorFontCoverage", "2", CVAR_ARCHIVE );
+	ri.Cvar_CheckRange( r_vectorFontCoverage, "0", "3", CV_INTEGER );
+	ri.Cvar_SetDescription( r_vectorFontCoverage,
+		"Analytical coverage: 0=center diagnostic, 1=dual-axis, 2=adaptive boundary SS (production), 3=ultra SS." );
+	r_vectorFontHinting = ri.Cvar_Get( "r_vectorFontHinting", "0", CVAR_ARCHIVE );
+	ri.Cvar_CheckRange( r_vectorFontHinting, "0", "2", CV_INTEGER );
+	ri.Cvar_SetDescription( r_vectorFontHinting,
+		"0=unhinted outlines (world-space), 1=light FreeType hinting, 2=native TrueType hinting for screen UI." );
+	r_vectorFontStemDarkening = ri.Cvar_Get( "r_vectorFontStemDarkening", "0", CVAR_ARCHIVE );
+	ri.Cvar_CheckRange( r_vectorFontStemDarkening, "0", "1", CV_FLOAT );
+	r_vectorFontPixelSnap = ri.Cvar_Get( "r_vectorFontPixelSnap", "0", CVAR_ARCHIVE );
+	ri.Cvar_CheckRange( r_vectorFontPixelSnap, "0", "2", CV_INTEGER );
+	r_vectorFontDebug = ri.Cvar_Get( "r_vectorFontDebug", "0", CVAR_TEMP );
+	ri.Cvar_CheckRange( r_vectorFontDebug, "0", "15", CV_INTEGER );
+
+	ri.Cmd_AddCommand( "vector_font_status", VectorFont_Status_f );
+	ri.Cmd_AddCommand( "vector_font_validate", VectorFont_Validate_f );
+	ri.Cmd_AddCommand( "vector_font_memory_status", VectorFont_Memory_f );
+	ri.Cmd_AddCommand( "vector_font_gpu_status", VectorFont_Status_f );
+	ri.Cmd_AddCommand( "vector_font_certify", VectorFont_Certify_f );
+
 	R_VectorGlyphletAtlas_Init( &vectorGlyphletAtlas );
 	R_VectorFont_Clear();
 	VK_VectorFont_Init();
@@ -373,6 +534,11 @@ int R_VectorFont_Mode( void ) {
 }
 
 void R_VectorFont_Shutdown( void ) {
+	ri.Cmd_RemoveCommand( "vector_font_status" );
+	ri.Cmd_RemoveCommand( "vector_font_validate" );
+	ri.Cmd_RemoveCommand( "vector_font_memory_status" );
+	ri.Cmd_RemoveCommand( "vector_font_gpu_status" );
+	ri.Cmd_RemoveCommand( "vector_font_certify" );
 	VK_VectorFont_Shutdown();
 	R_VectorGlyphletAtlas_Shutdown( &vectorGlyphletAtlas );
 	R_VectorFont_Clear();
@@ -506,6 +672,13 @@ qboolean R_VectorFont_DrawString( float x, float y, float scale, const char *tex
 
 	if ( !R_VectorFont_IsEnabled() || !text || !text[0] || scale <= 0.0f ) {
 		return qfalse;
+	}
+
+	if ( r_vectorFontPixelSnap && r_vectorFontPixelSnap->integer >= 1 ) {
+		y = (float)floor( (double)y + 0.5 );
+		if ( r_vectorFontPixelSnap->integer >= 2 ) {
+			x = (float)floor( (double)x + 0.5 );
+		}
 	}
 
 	if ( R_VectorFont_EffectiveMode() == VECTOR_FONT_MODE_LOOP_BLINN ) {

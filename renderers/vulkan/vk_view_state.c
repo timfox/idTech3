@@ -1122,7 +1122,10 @@ void vk_update_mvp( const float *m )
 		push_constants.reserved[0] = (float)tess.vectorCurveStart;
 		push_constants.reserved[1] = (float)tess.vectorCurveCount;
 		push_constants.reserved[2] = (float)tess.vectorCurveTexWidth;
-		push_constants.reserved[3] = 0.0f;
+		{
+			cvar_t *cov = ri.Cvar_Get( "r_vectorFontCoverage", "2", 0 );
+			push_constants.reserved[3] = (float)( cov ? cov->integer : 2 );
+		}
 	} else if ( tess.subpixelShift >= 0.0f ) {
 		push_constants.reserved[0] = tess.subpixelShift;
 		push_constants.reserved[1] = tess.subpixelInvTexWidth;

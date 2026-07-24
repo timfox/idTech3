@@ -9,6 +9,7 @@ Clustered Hybrid M1 — R_SelectSurfaceRenderPath + path debug counters.
 #include "tr_local.h"
 #include "vk_render_path.h"
 #include "vk_deferred_honesty.h"
+#include "vk_deferred_certification.h"
 #include "vk_deferred_gbuffer.h"
 #include "vk_transparency_route.h"
 #include "tr_render_mode_vk.h"
@@ -73,6 +74,7 @@ void R_RenderPath_BeginFrame( void )
 {
 	Com_Memset( s_pathCounts, 0, sizeof( s_pathCounts ) );
 	vk_deferred_honesty_begin_frame();
+	vk_deferred_certification_begin_frame();
 }
 
 void R_RenderPath_Note( renderPath_t path )
@@ -325,6 +327,7 @@ void R_RenderPath_RegisterCvars( void )
 	}
 
 	vk_deferred_honesty_register();
+	vk_deferred_certification_register();
 
 	if ( !s_statusCmdRegistered ) {
 		ri.Cmd_AddCommand( "render_path_status", R_RenderPath_Status_f );

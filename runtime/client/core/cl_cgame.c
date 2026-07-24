@@ -23,6 +23,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 #include "client.h"
 #include "cl_cvars.h"
+#include "cl_rconset.h"
 #include "../../physics/phys_bullet.h"
 #include "../../physics/phys_character.h"
 #include "../../physics/phys_ragdoll_bind.h"
@@ -620,6 +621,7 @@ static void CL_ConfigstringModified( void ) {
 	const char	*dup;
 	gameState_t	oldGs;
 	int			len;
+	char		tvInfo[MAX_INFO_STRING];
 
 	index = atoi( Cmd_Argv(1) );
 	if ( (unsigned) index >= MAX_CONFIGSTRINGS ) {
@@ -627,6 +629,13 @@ static void CL_ConfigstringModified( void ) {
 	}
 	// get everything after "cs <num>"
 	s = Cmd_ArgsFrom(2);
+
+	/* During Surf TVD playback, ensure \tv\1 is always present in CS_SERVERINFO */
+	if ( tvPlay.active && index == CS_SERVERINFO && s[0] ) {
+		Q_strncpyz( tvInfo, s, sizeof( tvInfo ) );
+		Info_SetValueForKey( tvInfo, "tv", "1" );
+		s = tvInfo;
+	}
 
 	old = cl.gameState.stringData + cl.gameState.stringOffsets[ index ];
 	if ( !strcmp( old, s ) ) {
@@ -732,6 +741,20 @@ rescan:
 			Com_Error( ERR_SERVERDISCONNECT, "Server disconnected" );
 	}
 
+	/* Surf TV demo download notification from server */
+	if ( !strcmp( cmd, "tvdemo" ) ) {
+		if ( argc >= 2 ) {
+			Q_strncpyz( clc.tvDemoFile, Cmd_Argv(1), sizeof( clc.tvDemoFile ) );
+			if ( argc >= 3 ) {
+				Q_strncpyz( clc.tvDemoMap, Cmd_Argv(2), sizeof( clc.tvDemoMap ) );
+			} else {
+				clc.tvDemoMap[0] = '\0';
+			}
+			Com_DPrintf( "Surf TV: demo available for download: %s (map: %s)\n", clc.tvDemoFile, clc.tvDemoMap );
+		}
+		return qfalse;
+	}
+
 	if ( !strcmp( cmd, "bcs0" ) ) {
 		Com_sprintf( bigConfigString, BIG_INFO_STRING, "cs %s \"%s", Cmd_Argv(1), Cmd_Argv(2) );
 		return qfalse;
@@ -762,6 +785,21 @@ rescan:
 		// reparse the string, because CL_ConfigstringModified may have done another Cmd_TokenizeString()
 		Cmd_TokenizeString( s );
 		return qtrue;
+	}
+
+	if ( !strcmp( cmd, "auth_fail" ) ) {
+		// Clear auth credentials — server/hub says our token is invalid.
+		// Pass through to cgame for any user-visible message.
+		Cvar_Set( "cl_authToken", "" );
+		return qtrue;
+	}
+
+	if ( !strcmp( cmd, "rcon_autoset" ) ) {
+		// Encrypted rconPassword push from a server-side admin path.
+		// Handled entirely engine-side; do not pass to cgame (otherwise
+		// stock cgame prints "Unknown client game command").
+		CL_HandleRconAutoset( Cmd_Argv( 1 ) );
+		return qfalse;
 	}
 
 	if ( !strcmp( cmd, "map_restart" ) ) {
@@ -884,6 +922,12 @@ static qboolean CL_GetValue( char* value, int valueSize, const char* key ) {
 		return qtrue;
 	}
 
+	// Capability flag (no syscall): renderer honors RF_ANIMFRAME.
+	if ( !Q_stricmp( key, "R_animFrame" ) ) {
+		Com_sprintf( value, valueSize, "1" );
+		return qtrue;
+	}
+
 	if ( !Q_stricmp( key, "trap_Phys_CreateBody" ) ) {
 		Com_sprintf( value, valueSize, "%i", CG_PHYS_CREATEBODY );
 		return qtrue;
@@ -947,6 +991,11 @@ static qboolean CL_GetValue( char* value, int valueSize, const char* key ) {
 
 	if ( !Q_stricmp( key, "trap_CM_BoxTraceEx" ) ) {
 		Com_sprintf( value, valueSize, "%i", CG_CM_BOXTRACE_EX );
+		return qtrue;
+	}
+
+	if ( !Q_stricmp( key, "trap_R_RegisterFontAtlas_Q3E" ) && re.RegisterFontAtlas ) {
+		Com_sprintf( value, valueSize, "%i", CG_R_REGISTERFONTATLAS );
 		return qtrue;
 	}
 
@@ -1142,6 +1191,9 @@ static intptr_t CL_CgameSystemCalls( intptr_t *args ) {
 		return 0;
 	case CG_S_RESPATIALIZE:
 		S_Respatialize( args[1], VMA(2), VMA(3), args[4] );
+		if ( tvPlay.active ) {
+			VectorCopy( ((float*)VMA(2)), tvPlay.viewOrigin );
+		}
 		return 0;
 	case CG_S_REGISTERSOUND:
 		return S_RegisterSound( VMA(1), args[2] );
@@ -1162,6 +1214,12 @@ static intptr_t CL_CgameSystemCalls( intptr_t *args ) {
 	case CG_R_REGISTERFONT:
 		re.RegisterFont( VMA(1), args[2], VMA(3));
 		return 0;
+	case CG_R_REGISTERFONTATLAS:
+		if ( !re.RegisterFontAtlas ) {
+			return qfalse;
+		}
+		VM_CHECKBOUNDS( cgvm, args[4], sizeof( fontAtlasInfo_t ) );
+		return re.RegisterFontAtlas( VMA(1), args[2], VMA(3), VMA(4) );
 	case CG_R_CLEARSCENE:
 		re.ClearScene();
 		return 0;
@@ -2173,7 +2231,9 @@ void CL_SetCGameTime( void ) {
 				clc.firstDemoFrameSkipped = qtrue;
 				return;
 			}
-			CL_ReadDemoMessage();
+			if ( !tvPlay.active ) {
+				CL_ReadDemoMessage();
+			}
 		}
 		if ( cl.newSnapshots ) {
 			cl.newSnapshots = qfalse;
@@ -2196,39 +2256,40 @@ void CL_SetCGameTime( void ) {
 	}
 
 	if ( cl.snap.serverTime - cl.oldFrameServerTime < 0 ) {
-		Com_Error( ERR_DROP, "cl.snap.serverTime < cl.oldFrameServerTime" );
+		if ( !tvPlay.active ) {
+			Com_Error( ERR_DROP, "cl.snap.serverTime < cl.oldFrameServerTime" );
+		}
 	}
 	cl.oldFrameServerTime = cl.snap.serverTime;
 
+	// Surf TVD at end: freeze time on last frame so nothing advances
+	if ( tvPlay.active && tvPlay.atEnd ) {
+		cl.serverTime = cl.snap.serverTime;
+		Cvar_SetIntegerValue( "cl_tvTime",
+			tvPlay.serverTime - tvPlay.firstServerTime );
+		return;
+	}
+
 	// get our current view of time
-	demoFreezed = clc.demoplaying && com_timescale->value == 0.0f;
+	demoFreezed = clc.demoplaying && com_timescale->value == 0.0f
+		&& !( tvPlay.active && tvPlay.live );
 	if ( demoFreezed ) {
-		// \timescale 0 is used to lock a demo in place for single frame advances
 		cl.serverTimeDelta -= cls.frametime;
 	} else {
-		// cl_timeNudge is a user adjustable cvar that allows more
-		// or less latency to be added in the interest of better
-		// smoothness or better responsiveness.
 		cl.serverTime = cls.realtime + cl.serverTimeDelta - CL_TimeNudge();
 
-		// guarantee that time will never flow backwards, even if
-		// serverTimeDelta made an adjustment or cl_timeNudge was changed
 		if ( cl.serverTime - cl.oldServerTime < 0 ) {
-			cl.serverTime = cl.oldServerTime;
+			if ( !tvPlay.active ) {
+				cl.serverTime = cl.oldServerTime;
+			}
 		}
 		cl.oldServerTime = cl.serverTime;
 
-		// note if we are almost past the latest frame (without timeNudge),
-		// so we will try and adjust back a bit when the next snapshot arrives
-		//if ( cls.realtime + cl.serverTimeDelta >= cl.snap.serverTime - 5 ) {
 		if ( cls.realtime + cl.serverTimeDelta - cl.snap.serverTime >= -5 ) {
 			cl.extrapolatedSnapshot = qtrue;
 		}
 	}
 
-	// if we have gotten new snapshots, drift serverTimeDelta
-	// don't do this every frame, or a period of packet loss would
-	// make a huge adjustment
 	if ( cl.newSnapshots ) {
 		CL_AdjustTimeDelta();
 	}
@@ -2237,14 +2298,6 @@ void CL_SetCGameTime( void ) {
 		return;
 	}
 
-	// if we are playing a demo back, we can just keep reading
-	// messages from the demo file until the cgame definitely
-	// has valid snapshots to interpolate between
-
-	// a timedemo will always use a deterministic set of time samples
-	// no matter what speed machine it is run on,
-	// while a normal demo may have different time samples
-	// each time it is played back
 	if ( com_timedemo->integer ) {
 		if ( !clc.timeDemoStart ) {
 			clc.timeDemoStart = Sys_Milliseconds();
@@ -2253,13 +2306,57 @@ void CL_SetCGameTime( void ) {
 		cl.serverTime = clc.timeDemoBaseTime + clc.timeDemoFrames * 50;
 	}
 
-	//while ( cl.serverTime >= cl.snap.serverTime ) {
+	if ( tvPlay.active ) {
+		if ( tvPlay.live ) {
+			if ( !tvPlay.atEnd ) {
+				while ( cl.serverTime - cl.snap.serverTime >= 0 ) {
+					if ( !CL_TV_NextLiveFrame() ) {
+						break;
+					}
+					if ( tvPlay.atEnd ) {
+						break;
+					}
+					if ( cls.state != CA_ACTIVE ) {
+						break;
+					}
+					CL_TV_BuildSnapshot();
+				}
+			}
+			if ( tvPlay.liveClockResync ) {
+				tvPlay.liveClockResync = qfalse;
+				CL_TV_ResyncLiveClock();
+			}
+#ifdef __EMSCRIPTEN__
+			else {
+				CL_TV_AdjustLiveClock();
+			}
+#endif
+			if ( tvPlay.bootstrapped ) {
+				Cvar_SetIntegerValue( "cl_tvTime", tvPlay.serverTime - tvPlay.firstServerTime );
+			}
+			if ( tvPlay.atEnd ) {
+				Cvar_SetIntegerValue( "cl_tvLiveEnded", 1 );
+			}
+			return;
+		}
+		if ( com_timescale->value != 0.0f ) {
+			while ( cl.serverTime - cl.snap.serverTime >= 0 ) {
+				CL_TV_ReadFrame();
+				if ( tvPlay.atEnd ) {
+					break;
+				}
+				CL_TV_BuildSnapshot();
+			}
+		}
+		Cvar_SetIntegerValue( "cl_tvTime",
+			tvPlay.serverTime - tvPlay.firstServerTime );
+		return;
+	}
+
 	while ( cl.serverTime - cl.snap.serverTime >= 0 ) {
-		// feed another message, which should change
-		// the contents of cl.snap
 		CL_ReadDemoMessage();
 		if ( cls.state != CA_ACTIVE ) {
-			return; // end of demo
+			return;
 		}
 	}
 }

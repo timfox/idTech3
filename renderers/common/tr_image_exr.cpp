@@ -97,6 +97,10 @@ void R_LoadEXR_HDR(const char *filename, float **pic, int *width, int *height) {
 	int fileSize;
 	const char *err = NULL;
 	int ret;
+	float *exrData = NULL;
+	float *zoneCopy = NULL;
+	int w = 0, h = 0;
+	size_t bytes;
 
 	*pic = NULL;
 	*width = 0;
@@ -107,16 +111,40 @@ void R_LoadEXR_HDR(const char *filename, float **pic, int *width, int *height) {
 		return;
 	}
 
-	ret = LoadEXRFromMemory(pic, width, height, (const unsigned char *)fileData, (size_t)fileSize, &err);
+	ret = LoadEXRFromMemory(&exrData, &w, &h, (const unsigned char *)fileData, (size_t)fileSize, &err);
 	FS_FreeFile(fileData);
 
-	if (ret != TINYEXR_SUCCESS) {
+	if (ret != TINYEXR_SUCCESS || !exrData) {
 		if (err) {
 			Com_Printf(S_COLOR_YELLOW "EXR HDR: %s: %s\n", filename, err);
 			FreeEXRErrorMessage(err);
 		}
-		*pic = NULL;
+		if (exrData) {
+			free(exrData);
+		}
+		return;
 	}
+
+	if (w <= 0 || h <= 0 || w > 16384 || h > 16384) {
+		Com_Printf(S_COLOR_YELLOW "EXR HDR: %s: invalid dimensions %dx%d\n", filename, w, h);
+		free(exrData);
+		return;
+	}
+
+	/* tinyexr uses malloc; engine callers free with Z_Free — copy into zone memory. */
+	bytes = (size_t)w * (size_t)h * 4u * sizeof(float);
+	zoneCopy = (float *)Z_Malloc((int)bytes);
+	if (!zoneCopy) {
+		Com_Printf(S_COLOR_YELLOW "EXR HDR: %s: out of memory (%dx%d)\n", filename, w, h);
+		free(exrData);
+		return;
+	}
+	Com_Memcpy(zoneCopy, exrData, bytes);
+	free(exrData);
+
+	*pic = zoneCopy;
+	*width = w;
+	*height = h;
 }
 
 qboolean R_SaveEXR(const char *filename, const float *rgba, int width, int height) {

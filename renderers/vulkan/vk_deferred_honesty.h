@@ -8,13 +8,15 @@
  */
 
 typedef enum {
-	DEFERRED_ARCH_ADDITIVE_HYBRID = 0, /* SceneBaseLit + deferred dynamics (reference) */
-	DEFERRED_ARCH_MIXED_MATERIAL = 1,  /* true G-buffer + deferred static/dynamic for eligible */
-	DEFERRED_ARCH_STRICT_VALIDATION = 2, /* eligible deferred; invalid shown, no silent fallback */
-	DEFERRED_ARCH_COMPARE = 3          /* Forward+ vs mixed deferred comparison */
+	DEFERRED_ARCH_FORWARD_PLUS_REFERENCE = 0,
+	DEFERRED_ARCH_ADDITIVE_HYBRID = 1,
+	DEFERRED_ARCH_FULL_FIDELITY = 2,
+	DEFERRED_ARCH_COMPARE = 3,
+	DEFERRED_ARCH_STRICT_VALIDATION = 4
 } deferredArchitecture_t;
 
-#define DEFERRED_ARCH_MIXED_ELIGIBILITY DEFERRED_ARCH_MIXED_MATERIAL
+#define DEFERRED_ARCH_MIXED_MATERIAL DEFERRED_ARCH_FULL_FIDELITY
+#define DEFERRED_ARCH_MIXED_ELIGIBILITY DEFERRED_ARCH_FULL_FIDELITY
 
 /* G-buffer normal.a owner bias for MIXED_MATERIAL_DEFERRED lightmap packing. */
 /* Legacy: owner bias used when LM packed into normal.a (retired — SurfaceData.a is 0/1). */
@@ -73,15 +75,23 @@ typedef enum {
 	BASE_COLOR_EXPORT_UNREPRESENTABLE = ( 1u << 4 )
 } classicTranslateAudit_t;
 
-typedef enum {
-	PIXEL_OWNER_NONE = 0,
-	PIXEL_OWNER_DEFERRED_FULL,
-	PIXEL_OWNER_DEFERRED_APPROX,
-	PIXEL_OWNER_FORWARD_FALLBACK,
-	PIXEL_OWNER_SKY,
-	PIXEL_OWNER_SPECIAL,
-	PIXEL_OWNER_FORWARD_BASE = PIXEL_OWNER_FORWARD_FALLBACK /* legacy alias */
-} deferredPixelOwner_t;
+typedef enum opaqueLightingOwner_e {
+	OPAQUE_OWNER_INVALID = 0,
+	OPAQUE_OWNER_DEFERRED,
+	OPAQUE_OWNER_FORWARD_PLUS,
+	OPAQUE_OWNER_LIGHTMAP_ONLY,
+	OPAQUE_OWNER_EXPLICIT_FULLBRIGHT,
+	OPAQUE_OWNER_SPECIALIZED
+} opaqueLightingOwner_t;
+
+typedef opaqueLightingOwner_t deferredPixelOwner_t;
+#define PIXEL_OWNER_NONE OPAQUE_OWNER_INVALID
+#define PIXEL_OWNER_DEFERRED_FULL OPAQUE_OWNER_DEFERRED
+#define PIXEL_OWNER_DEFERRED_APPROX OPAQUE_OWNER_DEFERRED
+#define PIXEL_OWNER_FORWARD_FALLBACK OPAQUE_OWNER_FORWARD_PLUS
+#define PIXEL_OWNER_FORWARD_BASE OPAQUE_OWNER_FORWARD_PLUS
+#define PIXEL_OWNER_SKY OPAQUE_OWNER_SPECIALIZED
+#define PIXEL_OWNER_SPECIAL OPAQUE_OWNER_SPECIALIZED
 
 typedef enum {
 	GBUFFER_VALID_BASE_COLOR = ( 1u << 0 ),
@@ -133,6 +143,16 @@ typedef struct DeferredEligibilityResult_s {
 	const char *reasonName;
 } DeferredEligibilityResult;
 
+typedef struct deferredOwnershipSnapshot_s {
+	uint32_t eligibleMaterials;
+	uint32_t deferredOwnedDraws;
+	uint32_t forwardOwnedDraws;
+	uint32_t unsupportedMaterials;
+	uint32_t invalidOwnerPixels;
+	uint32_t doubleOwnerPixels;
+	uint32_t fullbrightEscapeCount;
+} deferredOwnershipSnapshot_t;
+
 void vk_deferred_honesty_register( void );
 void vk_deferred_honesty_begin_frame( void );
 
@@ -162,6 +182,7 @@ void R_DeferredHonesty_NoteForwardLightmap( void );
 void R_DeferredHonesty_NoteDoubleShaded( void );
 void R_DeferredHonesty_NoteUnowned( void );
 void R_DeferredHonesty_NoteInvalidGBuffer( void );
+void R_DeferredHonesty_GetOwnershipSnapshot( deferredOwnershipSnapshot_t *out );
 
 qboolean R_DeferredHonesty_WantsDeferredPath( const DeferredEligibilityResult *res );
 

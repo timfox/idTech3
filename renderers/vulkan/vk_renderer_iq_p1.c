@@ -41,6 +41,8 @@ static cvar_t *r_bloomFireflyDebug;
 static cvar_t *r_bloomTemporalOrder;
 static cvar_t *r_bloomGhostingDebug;
 static cvar_t *r_bloomDebug;
+static cvar_t *r_ssrTemporal;
+static cvar_t *r_allowExperimentalTemporalSSR;
 static uint32_t s_p1GatePass[P1_GATE_COUNT];
 static uint32_t s_p1GateFail[P1_GATE_COUNT];
 static rendererP1Evidence_t s_gateEvidence[P1_GATE_COUNT];
@@ -92,10 +94,12 @@ void vk_renderer_iq_p1_begin_frame( void )
 	if ( !r_taa || !r_taa->integer ) {
 		vk_temporal_history_note( HISTORY_TAA, qfalse, "r_taa 0" );
 	}
-	if ( !ri.Cvar_VariableIntegerValue( "r_ssr" ) ||
-		!ri.Cvar_VariableIntegerValue( "r_temporalSSR" ) ) {
-		vk_temporal_history_note( HISTORY_SSR, qfalse, "ssr temporal off" );
-	}
+	/* Production/current-frame SSR never registers a temporal history owner. */
+	vk_temporal_history_note( HISTORY_SSR, qfalse,
+		( r_ssrTemporal && r_ssrTemporal->integer &&
+		  r_allowExperimentalTemporalSSR && r_allowExperimentalTemporalSSR->integer )
+			? "experimental temporal SSR uncertified"
+			: "temporal SSR quarantined" );
 	if ( !ri.Cvar_VariableIntegerValue( "r_ssao" ) ||
 		!ri.Cvar_VariableIntegerValue( "r_temporalAO" ) ) {
 		vk_temporal_history_note( HISTORY_AO, qfalse, "ao temporal off" );
@@ -150,11 +154,7 @@ qboolean vk_temporal_history_unowned_active( void )
 	if ( r_taa && r_taa->integer && !s_hist[HISTORY_TAA].notedThisFrame ) {
 		return qtrue;
 	}
-	if ( ri.Cvar_VariableIntegerValue( "r_ssr" ) &&
-		ri.Cvar_VariableIntegerValue( "r_temporalSSR" ) &&
-		!s_hist[HISTORY_SSR].notedThisFrame ) {
-		return qtrue;
-	}
+	/* Quarantined SSR has no production history allocation to own. */
 	if ( ri.Cvar_VariableIntegerValue( "r_ssao" ) &&
 		ri.Cvar_VariableIntegerValue( "r_temporalAO" ) &&
 		!s_hist[HISTORY_AO].notedThisFrame ) {
@@ -212,8 +212,47 @@ void vk_renderer_iq_profile_apply( void )
 	ri.Cvar_Set( "r_weaponBloomMode", "1" );
 	ri.Cvar_Set( "r_temporalWeaponAfterTaa", "1" );
 	ri.Cvar_Set( "r_fbo", "1" );
+	ri.Cvar_Set( "r_ssrTemporal", "0" );
+	ri.Cvar_Set( "r_temporalSSR", "0" );
+	ri.Cvar_Set( "r_allowExperimentalTemporalSSR", "0" );
 	ri.Printf( PRINT_ALL,
 		"[VK][IQ] applied modern_raster_iq_reference (latched cvars need vid_restart)\n" );
+}
+
+static void SsrTemporalStatus_f( void )
+{
+	const qboolean requested = ( r_ssrTemporal && r_ssrTemporal->integer ) ? qtrue : qfalse;
+	const qboolean allowed = ( r_allowExperimentalTemporalSSR &&
+		r_allowExperimentalTemporalSSR->integer ) ? qtrue : qfalse;
+	ri.Printf( PRINT_ALL,
+		"Temporal SSR: requested=%d permission=%d effective=%d certification=%s\n"
+		"  stable SSR path: %s\n"
+		"  history allocation: none\n"
+		"  history sampling: none\n"
+		"  production history owner: no\n"
+		"  SceneHDR temporal modification: no\n",
+		requested, allowed, requested && allowed,
+		requested && allowed ? "EXPERIMENTAL_UNCERTIFIED" : "QUARANTINED",
+		ri.Cvar_VariableIntegerValue( "r_ssr" ) ? "current-frame-only" : "disabled" );
+	if ( requested && allowed ) {
+		ri.Printf( PRINT_WARNING,
+			"Temporal SSR is experimental and not IQ-certified.\n" );
+	}
+}
+
+static void SsrTemporalValidate_f( void )
+{
+	const qboolean requested = ( r_ssrTemporal && r_ssrTemporal->integer ) ? qtrue : qfalse;
+	const qboolean allowed = ( r_allowExperimentalTemporalSSR &&
+		r_allowExperimentalTemporalSSR->integer ) ? qtrue : qfalse;
+	if ( requested && !allowed ) {
+		ri.Printf( PRINT_ERROR,
+			"ssr_temporal_validate: FAIL request bypassed quarantine policy\n" );
+		return;
+	}
+	ri.Printf( PRINT_ALL,
+		"ssr_temporal_validate: PASS (%s; zero production history)\n",
+		requested && allowed ? "experimental/uncertified" : "stable/quarantined" );
 }
 
 qboolean vk_renderer_iq_profile_validate( char *errBuf, int errBufSize )
@@ -553,6 +592,9 @@ void vk_renderer_iq_p1_register( void )
 	ri.Cvar_SetDescription( r_gbufferQuality,
 		"G-buffer quality: 0=compact 1=balanced 2=full-fidelity IQ reference. Pair with r_gbufferCompact 0." );
 	ri.Cvar_SetGroup( r_gbufferQuality, CVG_RENDERER );
+	r_ssrTemporal = ri.Cvar_Get( "r_ssrTemporal", "0", CVAR_ARCHIVE_ND );
+	r_allowExperimentalTemporalSSR =
+		ri.Cvar_Get( "r_allowExperimentalTemporalSSR", "0", CVAR_ARCHIVE_ND );
 
 	r_bloomFireflyClamp = ri.Cvar_Get( "r_bloomFireflyClamp", "1", CVAR_ARCHIVE_ND );
 	ri.Cvar_CheckRange( r_bloomFireflyClamp, "0", "1", CV_INTEGER );
@@ -606,6 +648,8 @@ void vk_renderer_iq_p1_register( void )
 		ri.Cmd_AddCommand( "renderer_iq_profile_apply", IQ_ProfileApply_f );
 		ri.Cmd_AddCommand( "temporal_history_status", vk_temporal_history_status_f );
 		ri.Cmd_AddCommand( "temporal_history_validate", vk_temporal_history_status_f );
+		ri.Cmd_AddCommand( "ssr_temporal_status", SsrTemporalStatus_f );
+		ri.Cmd_AddCommand( "ssr_temporal_validate", SsrTemporalValidate_f );
 		ri.Cmd_AddCommand( "ghosting_isolation_status", GhostIsolationStatus_f );
 		ri.Cmd_AddCommand( "bloom_pyramid_status", BloomPyramidStatus_f );
 		ri.Cmd_AddCommand( "bloom_filter_status", BloomPyramidStatus_f );

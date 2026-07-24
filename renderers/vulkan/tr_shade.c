@@ -34,6 +34,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "vk_sun_csm.h"
 #include "vk_surface_evolution.h"
 #include "vk_frequency_aware.h"
+#include "vk_bsp_viz.h"
 #endif
 #include "../common/tr_vector_font.h"
 #ifdef USE_VULKAN
@@ -254,6 +255,17 @@ static void R_BindAnimatedImage( const textureBundle_t *bundle ) {
 		return;
 	}
 
+	// RF_ANIMFRAME: caller drives the frame via refEntity->frame instead of by time.
+	if ( backEnd.currentEntity && ( backEnd.currentEntity->e.renderfx & RF_ANIMFRAME ) ) {
+		index = backEnd.currentEntity->e.frame;
+		if ( index < 0 ) {
+			index = 0;
+		}
+		index %= bundle->numImageAnimations;
+		GL_Bind( bundle->image[ index ] );
+		return;
+	}
+
 	// it is necessary to do this messy calc to make sure animations line up
 	// exactly with waveforms of the same frequency
 	//v = tess.shaderTime * bundle->imageAnimationSpeed * FUNCTABLE_SIZE;
@@ -282,8 +294,10 @@ Draws triangle outlines for debugging
 static void DrawTris( const shaderCommands_t *input ) {
 #ifdef USE_VULKAN
 	uint32_t pipeline;
+	Vk_Depth_Range depthRange;
+	const int showtrisMode = vk_bsp_viz_effective_showtris();
 
-	if ( r_showtris->integer == 1 && backEnd.drawConsole )
+	if ( showtrisMode == 1 && backEnd.drawConsole )
 		return;
 
 	if ( tess.numIndexes == 0 )
@@ -308,7 +322,19 @@ static void DrawTris( const shaderCommands_t *input ) {
 	}
 
 	vk_bind_pipeline( pipeline );
-	vk_draw_geometry( DEPTH_RANGE_ZERO, qtrue );
+	/*
+	 * Mode 1 is a visible-surface visualization: retain the submitted
+	 * geometry's real depth so opaque foreground surfaces occlude it.
+	 * DEPTH_RANGE_ZERO maps to 1.0 in the Vulkan reversed-Z viewport and
+	 * therefore makes every line pass as nearest geometry.  Preserve that
+	 * old behavior only as the explicit through-wall developer mode 2
+	 * (r_showtris 2, r_bspViz 4, or r_bspVizThroughWalls 1).
+	 *
+	 * DrawTris pipelines do not write depth; the final qfalse also prevents
+	 * the draw helper from treating this diagnostic as a depth-writing draw.
+	 */
+	depthRange = ( showtrisMode == 2 ) ? DEPTH_RANGE_ZERO : DEPTH_RANGE_NORMAL;
+	vk_draw_geometry( depthRange, qfalse );
 
 #else
 	if ( r_showtris->integer == 1 && backEnd.drawConsole )
@@ -374,7 +400,17 @@ static void DrawNormals( const shaderCommands_t *input ) {
 	vk_bind_pipeline( vk.normals_debug_pipeline );
 	vk_bind_index();
 	vk_bind_geometry( TESS_XYZ | TESS_ST0 | TESS_RGBA0 );
-	vk_draw_geometry( DEPTH_RANGE_ZERO, qtrue );
+	/*
+	 * Default normals overlay is depth-tested (visible-only). Through-wall
+	 * normals remain available via r_shownormals 2 or r_bspVizThroughWalls.
+	 */
+	{
+		const Vk_Depth_Range nr =
+			( r_shownormals->integer >= 2 || vk_bsp_viz_want_through_walls() )
+				? DEPTH_RANGE_ZERO
+				: DEPTH_RANGE_NORMAL;
+		vk_draw_geometry( nr, qtrue );
+	}
 #else
 	GL_ClientState( 0, CLS_NONE );
 
@@ -2642,9 +2678,15 @@ void RB_EndSurface( void ) {
 	//
 	// draw debugging stuff
 	//
+#ifdef USE_VULKAN
+	if ( vk_bsp_viz_effective_showtris() ) {
+		DrawTris( input );
+	}
+#else
 	if ( r_showtris->integer ) {
 		DrawTris( input );
 	}
+#endif
 	if ( r_shownormals->integer ) {
 		DrawNormals( input );
 	}

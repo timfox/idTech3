@@ -344,16 +344,14 @@ void PostFX_RegisterCvars(void) {
 
 qboolean PostFX_SSR_IsEnabled(void)
 {
-	cvar_t *r_temporalSSR;
-
 	if ( !r_ssr || r_ssr->integer <= 0 ) {
 		return qfalse;
 	}
-	/* Independent bisect gate — does not change r_ssr default. */
-	r_temporalSSR = ri.Cvar_Get( "r_temporalSSR", "1", CVAR_ARCHIVE_ND );
-	if ( r_temporalSSR && !r_temporalSSR->integer ) {
-		return qfalse;
-	}
+	/*
+	 * The production pass is current-frame-only.  Temporal SSR is a separate,
+	 * experimental policy and must never gate the safe current-frame path.
+	 * r_temporalSSR remains a compatibility alias registered by tr_init.c.
+	 */
 	return qtrue;
 }
 float PostFX_SSR_GetMaxDistance(void) { return r_ssr_maxDistance ? r_ssr_maxDistance->value : 100.0f; }

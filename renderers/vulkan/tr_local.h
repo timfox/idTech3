@@ -1983,6 +1983,10 @@ extern	cvar_t	*r_shownormals;					// draws wireframe normals
 extern	cvar_t	*r_clear;						// force screen clear every frame
 
 extern	cvar_t	*r_shadows;						// controls shadows: 0 = none, 1 = blur, 2 = stencil, 3 = black planar projection
+extern	cvar_t	*r_shadowDistance;				// shadow volume extrusion distance in game units
+extern	cvar_t	*r_shadowClip;					// clip stencil shadows against BSP walls
+extern	cvar_t	*r_shadowClipPenetration;		// how far shadow back faces extend past a wall surface
+extern	cvar_t	*r_shadowClipExtension;			// max distance a shadow vertex can be extended to match neighbors
 extern	cvar_t	*r_flares;						// light flares
 
 extern	cvar_t	*r_intensity;
@@ -2174,6 +2178,7 @@ shader_t	*R_FindShader( const char *name, int lightmapIndex, qboolean mipRawImag
 shader_t	*R_GetShaderByHandle( qhandle_t hShader );
 shader_t	*R_GetShaderByState( int index, long *cycleTime );
 shader_t	*R_FindShaderByName( const char *name );
+shader_t	*R_CreateSkyShaderFromFaces( const char *name, image_t *faces[6] );
 void		R_InitShaders( void );
 void		R_ShaderList_f( void );
 void		RE_RemapShader(const char *oldShader, const char *newShader, const char *timeOffset);

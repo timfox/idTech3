@@ -902,10 +902,12 @@ void vk_end_frame_record_luminance_pass( VkImageView luminance_src )
 		cvar_t *lowPercent = ri.Cvar_Get( "r_autoExposure_lowPercent", "0.02", 0 );
 		cvar_t *highPercent = ri.Cvar_Get( "r_autoExposure_highPercent", "0.01", 0 );
 		cvar_t *centerWeight = ri.Cvar_Get( "r_autoExposure_centerWeight", "0.60", 0 );
+		cvar_t *skyWeight = ri.Cvar_Get( "r_exposureSkyWeight", "0.75", 0 );
 		meter.lowPercent = Com_Clamp( 0.0f, 0.45f, lowPercent ? lowPercent->value : 0.02f );
 		meter.highPercent = Com_Clamp( 0.0f, 0.45f, highPercent ? highPercent->value : 0.01f );
 		meter.centerWeight = Com_Clamp( 0.0f, 1.5f, centerWeight ? centerWeight->value : 0.60f );
-		meter.reserved = 0.0f;
+		/* Bright upper-frame samples (sky) participate; 0 excludes, 1 neutral, >1 stronger. */
+		meter.reserved = Com_Clamp( 0.0f, 2.0f, skyWeight ? skyWeight->value : 0.75f );
 		qvkCmdPushConstants( vk.cmd->command_buffer, vk.luminance_pipeline_layout,
 			VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof( meter ), &meter );
 	}

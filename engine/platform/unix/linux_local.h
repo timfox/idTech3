@@ -50,5 +50,6 @@ char *strlwr (char *s);
 
 // signals.c
 void InitSig(void);
+void Sys_CheckPendingSignal(void);
 
 #endif // __LINUX_LOCAL_H__

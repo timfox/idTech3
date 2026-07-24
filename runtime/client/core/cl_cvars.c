@@ -111,6 +111,15 @@ void CL_InitCvars( void )
 
 	cl_reconnectArgs = Cvar_Get( "cl_reconnectArgs", "", CVAR_ARCHIVE_ND | CVAR_NOTABCOMPLETE );
 
+	// Hub auth token used to decrypt rcon_autoset payloads. CVAR_PROTECTED
+	// so QVMs cannot set it; set from engine login / config / +set.
+	// Cleared client-side on auth_fail server command.
+	{
+		cvar_t *authToken = Cvar_Get( "cl_authToken", "", CVAR_ARCHIVE_ND | CVAR_PROTECTED );
+		Cvar_SetDescription( authToken,
+			"Long-lived hub authentication token. Used to decrypt rcon_autoset blobs; cleared on auth_fail." );
+	}
+
 	Cvar_Get ("name", "UnnamedPlayer", CVAR_USERINFO | CVAR_ARCHIVE_ND );
 	Cvar_Get ("rate", "25000", CVAR_USERINFO | CVAR_ARCHIVE );
 	Cvar_Get ("snaps", "40", CVAR_USERINFO | CVAR_ARCHIVE );
@@ -126,6 +135,8 @@ void CL_InitCvars( void )
 
 	Cvar_Get ("password", "", CVAR_USERINFO | CVAR_NORESTART);
 	Cvar_Get ("cg_predictItems", "1", CVAR_USERINFO | CVAR_ARCHIVE );
+	// Advertise flatscreen client over the VR usercmd button protocol.
+	Cvar_Get ("vr", "0", CVAR_USERINFO | CVAR_ROM );
 
 	Cvar_Get ("cg_viewsize", "100", CVAR_ARCHIVE_ND );
 	Cvar_Get ("cg_stereoSeparation", "0", CVAR_ROM);

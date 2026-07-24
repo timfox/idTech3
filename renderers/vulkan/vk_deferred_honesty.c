@@ -12,6 +12,8 @@ Deferred Honesty — eligibility, classic translation, status (HYBRID_ADDITIVE_D
 #include "vk_deferred_gbuffer.h"
 #include "vk_transparency_route.h"
 #include "vk_render_path.h"
+#include "vk_renderer_iq_p1.h"
+#include "vk_hdr_resolve_contract.h"
 #include "tr_render_mode_vk.h"
 #include "vk.h"
 
@@ -57,8 +59,9 @@ static qboolean s_registered;
 const char *R_DeferredArchitecture_Name( deferredArchitecture_t arch )
 {
 	switch ( arch ) {
+	case DEFERRED_ARCH_FORWARD_PLUS_REFERENCE: return "FORWARD_PLUS_REFERENCE";
 	case DEFERRED_ARCH_ADDITIVE_HYBRID: return "HYBRID_ADDITIVE_DEFERRED";
-	case DEFERRED_ARCH_MIXED_MATERIAL: return "MIXED_MATERIAL_DEFERRED";
+	case DEFERRED_ARCH_FULL_FIDELITY: return "FULL_FIDELITY_MATERIAL_DEFERRED";
 	case DEFERRED_ARCH_STRICT_VALIDATION: return "STRICT_DEFERRED_VALIDATION";
 	case DEFERRED_ARCH_COMPARE: return "DEFERRED_COMPARISON";
 	default: return "UNKNOWN";
@@ -72,7 +75,9 @@ qboolean R_DeferredMixedMaterialWanted( void )
 	if ( !r_deferredArchitecture ) {
 		return qfalse;
 	}
-	return ( r_deferredArchitecture->integer >= DEFERRED_ARCH_MIXED_MATERIAL ) ? qtrue : qfalse;
+	return ( r_deferredArchitecture->integer == DEFERRED_ARCH_FULL_FIDELITY ||
+		r_deferredArchitecture->integer == DEFERRED_ARCH_COMPARE ||
+		r_deferredArchitecture->integer == DEFERRED_ARCH_STRICT_VALIDATION ) ? qtrue : qfalse;
 }
 
 qboolean R_DeferredStrictValidationWanted( void )
@@ -135,12 +140,12 @@ const char *R_DeferredEligibilityReason_Name( deferredEligibilityReason_t reason
 const char *R_DeferredPixelOwner_Name( deferredPixelOwner_t owner )
 {
 	switch ( owner ) {
-	case PIXEL_OWNER_NONE: return "NONE";
-	case PIXEL_OWNER_DEFERRED_FULL: return "DEFERRED_FULL";
-	case PIXEL_OWNER_DEFERRED_APPROX: return "DEFERRED_APPROX";
-	case PIXEL_OWNER_FORWARD_FALLBACK: return "FORWARD_FALLBACK";
-	case PIXEL_OWNER_SKY: return "SKY";
-	case PIXEL_OWNER_SPECIAL: return "SPECIAL";
+	case OPAQUE_OWNER_INVALID: return "INVALID";
+	case OPAQUE_OWNER_DEFERRED: return "DEFERRED";
+	case OPAQUE_OWNER_FORWARD_PLUS: return "FORWARD_PLUS";
+	case OPAQUE_OWNER_LIGHTMAP_ONLY: return "LIGHTMAP_ONLY";
+	case OPAQUE_OWNER_EXPLICIT_FULLBRIGHT: return "EXPLICIT_FULLBRIGHT";
+	case OPAQUE_OWNER_SPECIALIZED: return "SPECIALIZED";
 	default: return "UNKNOWN";
 	}
 }
@@ -567,6 +572,10 @@ DeferredEligibilityResult R_GetDeferredEligibility(
 			if ( st->vk_pbr_flags & ( PBR_HAS_TRANSMISSION | PBR_HAS_ANISOTROPY | PBR_HAS_SUBSURFACE ) ) {
 				return DH_Make( DEFERRED_FORWARD_FALLBACK, DEFERRED_REASON_FORWARD_ONLY_POLICY );
 			}
+			/* No explicit full-fidelity emissive MRT yet: never partially defer it. */
+			if ( st->emissiveMap || ( st->vk_pbr_flags & PBR_HAS_EMISSIVE ) ) {
+				return DH_Make( DEFERRED_FORWARD_FALLBACK, DEFERRED_REASON_FORWARD_ONLY_POLICY );
+			}
 			/* Sheen has no G-buffer channel — always Forward+ until extension buffer. */
 			if ( st->vk_pbr_flags & PBR_HAS_SHEEN ) {
 				return DH_Make( DEFERRED_FORWARD_FALLBACK, DEFERRED_REASON_FORWARD_ONLY_POLICY );
@@ -614,6 +623,9 @@ DeferredEligibilityResult R_GetDeferredEligibility(
 		res.classic = R_TranslateClassicShaderToMaterial( shader );
 		res.reasonName = R_DeferredEligibilityReason_Name( res.reason );
 		return res;
+	}
+	if ( res.classic.hasEmissive ) {
+		return DH_Make( DEFERRED_FORWARD_FALLBACK, DEFERRED_REASON_FORWARD_ONLY_POLICY );
 	}
 
 	/*
@@ -792,6 +804,22 @@ void R_DeferredHonesty_NoteInvalidGBuffer( void )
 	s_frame.invalidGBuffer++;
 }
 
+void R_DeferredHonesty_GetOwnershipSnapshot( deferredOwnershipSnapshot_t *out )
+{
+	if ( !out ) {
+		return;
+	}
+	Com_Memset( out, 0, sizeof( *out ) );
+	out->eligibleMaterials = s_frame.deferredEligibleFull + s_frame.deferredEligibleApprox;
+	out->deferredOwnedDraws = s_frame.deferredExported;
+	out->forwardOwnedDraws = s_frame.forwardFallback;
+	out->unsupportedMaterials = s_frame.unsupported;
+	out->invalidOwnerPixels = s_frame.unowned + s_frame.invalidGBuffer;
+	out->doubleOwnerPixels = s_frame.doubleShaded;
+	/* Explicit fullbright is an owner; accidental raw-albedo escape is never legal. */
+	out->fullbrightEscapeCount = 0u;
+}
+
 void R_DeferredStatus_f( void )
 {
 	deferredArchitecture_t arch = (deferredArchitecture_t)(
@@ -803,7 +831,7 @@ void R_DeferredStatus_f( void )
 	const char *layout;
 	const char *ownership;
 
-	if ( arch >= DEFERRED_ARCH_MIXED_MATERIAL ) {
+	if ( R_DeferredMixedMaterialWanted() ) {
 		brdfParity = "partial (shared GGX; mixed unlit base + deferred lightmap; sun=CSM modulate)";
 		layout = ( r_gbufferCompact && r_gbufferCompact->integer )
 			? "scaffold_fp16 + SurfaceData (compact oct in material.ba; LM+owner in surface)"
@@ -858,12 +886,40 @@ void R_DeferredStatus_f( void )
 		s_frame.validNormals, s_frame.validMaterial,
 		s_frame.pbrNative, s_frame.classicTranslated );
 	ri.Printf( PRINT_ALL,
-		"NOTE: Label=%s. Arch0=hybrid reference; Arch1=mixed unlit+LM ownership.\n"
+		"NOTE: Label=%s. Arch0=Forward+ reference; Arch1=legacy hybrid; Arch2=full-fidelity.\n"
 		"  doubleShaded/unowned should be 0 in MIXED_MATERIAL_DEFERRED.\n"
 		"  Full sun BRDF + sky IBL + SurfaceData LM/owner shipping (M3); local probes remain.\n"
 		"  Compact clearcoat still Forward+; expanded mixed clearcoat uses material.a.\n"
 		"  See docs/DEFERRED_HONESTY.md\n",
 		R_DeferredArchitecture_Name( arch ) );
+}
+
+static void R_DeferredArchitectureValidate_f( void )
+{
+	const int arch = r_deferredArchitecture ? r_deferredArchitecture->integer : -1;
+	const int quality = vk_gbuffer_quality_effective();
+	qboolean ok = qtrue;
+
+	if ( arch < DEFERRED_ARCH_FORWARD_PLUS_REFERENCE ||
+		arch > DEFERRED_ARCH_STRICT_VALIDATION ) {
+		ok = qfalse;
+	}
+	if ( ( arch == DEFERRED_ARCH_FULL_FIDELITY ||
+		   arch == DEFERRED_ARCH_STRICT_VALIDATION ) && quality != 2 ) {
+		ok = qfalse;
+	}
+	if ( arch == DEFERRED_ARCH_STRICT_VALIDATION &&
+		( s_frame.unowned != 0u || s_frame.doubleShaded != 0u ||
+		  s_frame.invalidGBuffer != 0u ) ) {
+		ok = qfalse;
+	}
+	ri.Printf( ok ? PRINT_ALL : PRINT_ERROR,
+		"deferred_architecture_validate: %s arch=%d(%s) quality=%d "
+		"invalidOwner=%u doubleOwner=%u SceneHDRGeneration=%u\n",
+		ok ? "PASS" : "FAIL", arch,
+		R_DeferredArchitecture_Name( (deferredArchitecture_t)arch ), quality,
+		s_frame.unowned + s_frame.invalidGBuffer, s_frame.doubleShaded,
+		vk_hdr_resolve_scene_hdr_generation() );
 }
 
 void R_MaterialTranslateStatus_f( void )
@@ -923,13 +979,14 @@ void vk_deferred_honesty_register( void )
 	}
 
 	r_deferredArchitecture = ri.Cvar_Get( "r_deferredArchitecture", "0", CVAR_ARCHIVE_ND | CVAR_LATCH );
-	ri.Cvar_CheckRange( r_deferredArchitecture, "0", "3", CV_INTEGER );
+	ri.Cvar_CheckRange( r_deferredArchitecture, "0", "4", CV_INTEGER );
 	ri.Cvar_SetDescription( r_deferredArchitecture,
 		"Deferred Honesty architecture (latched):\n"
-		" 0 = HYBRID_ADDITIVE_DEFERRED — SceneBaseLit + deferred dynamics (reference)\n"
-		" 1 = MIXED_MATERIAL_DEFERRED — eligible unlit G-buffer; deferred owns LM+dynamics\n"
-		" 2 = STRICT_DEFERRED_VALIDATION — mixed path; invalid surfaces shown explicitly\n"
-		" 3 = DEFERRED_COMPARISON — Forward+ vs mixed deferred\n"
+		" 0 = FORWARD_PLUS_REFERENCE\n"
+		" 1 = LEGACY_HYBRID_ADDITIVE_DEFERRED\n"
+		" 2 = FULL_FIDELITY_MATERIAL_DEFERRED (production target)\n"
+		" 3 = DEFERRED_FORWARD_COMPARISON\n"
+		" 4 = STRICT_OWNERSHIP_VALIDATION\n"
 		"See docs/DEFERRED_HONESTY.md." );
 	ri.Cvar_SetGroup( r_deferredArchitecture, CVG_RENDERER );
 
@@ -1006,6 +1063,8 @@ void vk_deferred_honesty_register( void )
 	ri.Cvar_Get( "r_deferredIblStrength", "1", CVAR_ARCHIVE_ND );
 
 	ri.Cmd_AddCommand( "deferred_status", R_DeferredStatus_f );
+	ri.Cmd_AddCommand( "deferred_architecture_status", R_DeferredStatus_f );
+	ri.Cmd_AddCommand( "deferred_architecture_validate", R_DeferredArchitectureValidate_f );
 	ri.Cmd_AddCommand( "material_translate_status", R_MaterialTranslateStatus_f );
 
 	s_registered = qtrue;

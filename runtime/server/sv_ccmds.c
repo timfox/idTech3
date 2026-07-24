@@ -319,6 +319,10 @@ static void SV_MapRestart_f( void ) {
 	// make sure that level time is not zero
 	//sv.time = sv.time ? sv.time : 8;
 
+	// Per-match Surf TV demo boundary (map_restart / tournament rotation)
+	SV_TV_FinalizeRecording();
+	SV_TV_AutoStart();
+
 	SV_RestartGameProgs();
 
 	// run a few frames to allow everything to settle
@@ -1593,6 +1597,8 @@ void SV_AddOperatorCommands( void ) {
 #endif
 	Cmd_AddCommand( "filter", SV_AddFilter_f );
 	Cmd_AddCommand( "filtercmd", SV_AddFilterCmd_f );
+	Cmd_AddCommand( "tvrecord", SV_TV_StartRecord_f );
+	Cmd_AddCommand( "tvstop", SV_TV_StopRecord_f );
 }
 
 

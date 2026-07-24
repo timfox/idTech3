@@ -1,0 +1,546 @@
+// Surf engine loader - ES module
+// Exports loadEngine() for use by standalone player, demo player, and tracker integration
+
+const CLIENT_NAME = '@CLIENT_NAME@';
+const BASEGAME = '@BASEGAME@';
+const EMSCRIPTEN_PRELOAD_FILE = '@EMSCRIPTEN_PRELOAD_FILE@' === 'ON';
+
+const CACHE_NAME = `${CLIENT_NAME}-assets-v1`;
+const cacheAvailable = typeof caches !== 'undefined';
+
+function authHeaders(url, authToken) {
+    if (!authToken) return {};
+    try { if (new URL(url).origin !== location.origin) return {}; } catch {}
+    return { 'Authorization': `Bearer ${authToken}` };
+}
+
+// Read a Response body chunk-by-chunk, calling onChunk(byteCount) for each
+// piece received. Used by loadEngine to drive a real-bytes progress bar
+// instead of one that jumps to "done" the moment headers arrive.
+async function readBodyWithProgress(response, expectedLength, onChunk) {
+    if (!expectedLength || !response.body || !response.body.getReader) {
+        // Without a Content-Length or a streaming body we can't report
+        // partial progress; buffer the whole thing and credit it at the end.
+        const buf = await response.arrayBuffer();
+        if (expectedLength) onChunk(expectedLength);
+        return new Uint8Array(buf);
+    }
+    const reader = response.body.getReader();
+    const chunks = [];
+    let received = 0;
+    while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        chunks.push(value);
+        received += value.byteLength;
+        onChunk(value.byteLength);
+    }
+    // Reconcile any drift between Content-Length and bytes actually
+    // delivered so the bar settles at exactly 100%.
+    if (received !== expectedLength) onChunk(expectedLength - received);
+    const out = new Uint8Array(received);
+    let off = 0;
+    for (const c of chunks) { out.set(c, off); off += c.byteLength; }
+    return out;
+}
+
+async function cachedFetch(url, label, statusEl, authToken) {
+    const auth = authHeaders(url, authToken);
+    if (cacheAvailable) {
+        try {
+            const cache = await caches.open(CACHE_NAME);
+            const cached = await cache.match(url);
+            if (cached) {
+                const headers = { ...auth };
+                const lastModified = cached.headers.get('Last-Modified');
+                const etag = cached.headers.get('ETag');
+                if (lastModified) headers['If-Modified-Since'] = lastModified;
+                if (etag) headers['If-None-Match'] = etag;
+                if (!lastModified && !etag) {
+                    if (label && statusEl) statusEl.textContent = `${label} (cached)`;
+                    return cached;
+                }
+                try {
+                    const response = await fetch(url, { headers });
+                    if (response.status === 304) {
+                        if (label && statusEl) statusEl.textContent = `${label} (cached)`;
+                        return cached;
+                    }
+                    if (response.ok) {
+                        cache.put(url, response.clone()).catch(() => {});
+                        if (label && statusEl) statusEl.textContent = `${label} (updated)`;
+                        return response;
+                    }
+                    return cached;
+                } catch (e) {
+                    if (label && statusEl) statusEl.textContent = `${label} (cached)`;
+                    return cached;
+                }
+            }
+            const response = await fetch(url, { headers: auth });
+            if (response.ok) {
+                cache.put(url, response.clone()).catch(() => {});
+            }
+            return response;
+        } catch (e) {
+            // Cache API unavailable (e.g. non-secure context), fall through
+        }
+    }
+    return fetch(url, { headers: auth });
+}
+
+/**
+ * Load and run the Surf engine.
+ *
+ * @param {Object} opts
+ * @param {HTMLCanvasElement} opts.canvas - Target canvas element
+ * @param {HTMLElement} opts.statusEl - Element for status messages
+ * @param {string} opts.enginePath - Path to engine .js/.wasm files (e.g. '/engine/')
+ * @param {string} [opts.configUrl] - URL to config JSON (defaults to enginePath + CLIENT_NAME-config.json)
+ * @param {string} [opts.demoUrl] - URL of the .tvd demo file
+ * @param {string} [opts.liveUrl] - URL of a live TVL1 stream (mutually exclusive with demoUrl)
+ * @param {string} [opts.fsGame] - Explicit game dir for a live stream (TVL1 has no configstrings to sniff)
+ * @param {string[]} [opts.extraPk3s] - Additional pk3 URLs to load
+ * @param {string} [opts.extraArgs] - Additional engine command-line arguments
+ * @param {string} [opts.authToken] - Bearer token for authenticated asset fetches
+ * @param {function} [opts.onProgress] - Progress callback(loaded, total)
+ * @param {function} [opts.onReady] - Called once after the first rendered frame
+ * @returns {Promise<Object>} The Emscripten Module instance
+ */
+export async function loadEngine({ canvas, statusEl, enginePath, configUrl, demoUrl, liveUrl, fsGame, extraPk3s = [], extraArgs = '', authToken, onProgress, onReady }) {
+    if (window.location.protocol === 'file:') {
+        throw new Error('Browser security restrictions prevent loading wasm from a file: URL. Serve this file via a web server.');
+    }
+
+    const progress = onProgress || (() => {});
+
+    const fs_basegame = BASEGAME;
+    let fs_game = '';
+
+    const configFilename = configUrl || (enginePath + `${CLIENT_NAME}-config.json`);
+    const dataURL = new URL('/', location.origin);
+
+    let generatedArguments = `
+        +set sv_pure 0
+        +set net_enabled 0
+        +set fs_basegame "${fs_basegame}"
+        +set com_hunkMegs 512
+    `;
+    if (extraArgs) generatedArguments += ` ${extraArgs} `;
+
+    // Load config for game assets
+    const configPromise = EMSCRIPTEN_PRELOAD_FILE ? Promise.resolve({[BASEGAME]: {files: []}})
+      : fetch(configFilename).then(r => r.ok ? r.json() : {});
+
+    // Load demo file
+    let demoData = null;
+    let demoFilename = null;
+    let demoMapName = null;
+    if (demoUrl) {
+        statusEl.textContent = 'Downloading demo...';
+        const resp = await fetch(demoUrl);
+        if (!resp.ok) {
+            statusEl.textContent = `Failed to fetch demo: ${resp.status}`;
+            throw new Error(`Failed to fetch demo: ${resp.status}`);
+        }
+        demoData = new Uint8Array(await resp.arrayBuffer());
+        const urlPath = new URL(demoUrl, window.location.href).pathname;
+        demoFilename = urlPath.split('/').pop() || 'demo.tvd';
+        generatedArguments += ` +demo ${demoFilename} `;
+
+        // Parse TVD header to extract map name (offset 16, null-terminated string)
+        if (demoData.length > 20 && String.fromCharCode(...demoData.slice(0, 4)) === 'TVD1') {
+            let end = demoData.indexOf(0, 16);
+            if (end > 16) demoMapName = new TextDecoder().decode(demoData.slice(16, end));
+
+            // Parse configstrings to extract fs_game from CS_SYSTEMINFO (index 1)
+            if (!fs_game) {
+                let off = end + 1;
+                let tsEnd = demoData.indexOf(0, off);
+                if (tsEnd > off) {
+                    off = tsEnd + 1;
+                    while (off + 2 <= demoData.length) {
+                        const csIdx = demoData[off] | (demoData[off+1] << 8);
+                        off += 2;
+                        if (csIdx === 0xFFFF) break;
+                        if (off + 2 > demoData.length) break;
+                        const csLen = demoData[off] | (demoData[off+1] << 8);
+                        off += 2;
+                        if (csIdx === 1 && csLen > 0) {
+                            const csStr = new TextDecoder().decode(demoData.slice(off, off + csLen));
+                            const m = csStr.match(/\\fs_game\\([^\\]*)/);
+                            if (m && m[1]) fs_game = m[1];
+                            break;
+                        }
+                        off += csLen;
+                    }
+                }
+            }
+        }
+
+        if (fs_game) generatedArguments += ` +set fs_game "${fs_game}" `;
+    }
+
+    // Live stream: buffer just enough of the plaintext TVL1 header to learn the
+    // map, then leave the reader open for preRun to drain into the FS as bytes arrive.
+    let liveReader = null, liveInitialBytes = null, liveAbort = null;
+    if (liveUrl) {
+        statusEl.textContent = 'Connecting to live stream...';
+        liveAbort = new AbortController();
+        const resp = await fetch(liveUrl, { signal: liveAbort.signal });
+        if (!resp.ok) {
+            statusEl.textContent = `Live unavailable: ${resp.status}`;
+            throw new Error(`live ${resp.status}`);
+        }
+        const reader = resp.body.getReader();
+        // Buffer the plaintext TVL1 header (to learn the map) AND the first
+        // complete TVLs segment. The engine applies that first keyframe at open
+        // time (CL_TV_OpenLive) so cl.gameState has the configstrings before the
+        // cgame inits — without them CG_Init fails "Client/Server game mismatch".
+        // We only parse clear-text lengths here; the payload stays opaque.
+        let acc = new Uint8Array(0);
+        let headerEnd = -1, firstSegEnd = -1;
+        let headerGameName = '';
+        const concat = (a, b) => { const o = new Uint8Array(a.length + b.length); o.set(a); o.set(b, a.length); return o; };
+        for (;;) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            acc = concat(acc, value);
+            // TVL1 header: magic(4)+ver(4)+svFps(4)+maxClients(4)
+            //   +mapLen(2)+map +tsLen(2)+ts +gameLen(2)+game(fs_game)
+            if (headerEnd < 0 && acc.length >= 18) {
+                if (String.fromCharCode(acc[0], acc[1], acc[2], acc[3]) !== 'TVL1') throw new Error('not a TVL1 stream');
+                const mapLen = acc[16] | (acc[17] << 8);
+                if (acc.length >= 20 + mapLen) {
+                    const tsLen = acc[18 + mapLen] | (acc[19 + mapLen] << 8);
+                    const tsEnd = 20 + mapLen + tsLen;   // start of the fs_game field
+                    if (acc.length >= tsEnd + 2) {
+                        const gameLen = acc[tsEnd] | (acc[tsEnd + 1] << 8);
+                        if (acc.length >= tsEnd + 2 + gameLen) {
+                            demoMapName = new TextDecoder().decode(acc.slice(18, 18 + mapLen));
+                            if (gameLen) headerGameName = new TextDecoder().decode(acc.slice(tsEnd + 2, tsEnd + 2 + gameLen));
+                            headerEnd = tsEnd + 2 + gameLen;
+                        }
+                    }
+                }
+            }
+            // First TVLs segment header: magic(4)+keyframeTime(4)+payloadLen(4 LE)
+            if (headerEnd >= 0 && firstSegEnd < 0 && acc.length >= headerEnd + 12) {
+                const he = headerEnd;
+                const pl = (acc[he + 8] | (acc[he + 9] << 8) | (acc[he + 10] << 16)) + acc[he + 11] * 0x1000000;
+                firstSegEnd = he + 12 + pl;
+            }
+            if (firstSegEnd >= 0 && acc.length >= firstSegEnd) break;
+        }
+        fs_game = headerGameName || fsGame || ''; // header wins; empty = baseq3
+        // The .tvd extension is required: it's what routes the engine's +demo
+        // command to the TV player (cl_main.c). The TVL1-vs-TVD1 magic then
+        // selects live vs VOD inside CL_TV_Open. So keep the extension even
+        // though these bytes are a live stream, not a recording.
+        // Live no longer uses a MEMFS file — the engine pulls from an in-memory
+        // byte-feed ring fed via CL_TV_FeedBytes (see preRun). tv_openlive opens the
+        // stream off that ring (replacing "+demo live.tvd"), so a held-open viewer
+        // session across many matches no longer grows a file without bound.
+        generatedArguments += ` +tv_openlive `;
+        if (fs_game) generatedArguments += ` +set fs_game "${fs_game}" `;
+        liveReader = reader;
+        liveInitialBytes = acc;
+    }
+
+    statusEl.textContent = 'Loading engine...';
+
+    const SurfEngine = (await import(enginePath + `${CLIENT_NAME}.js`)).default;
+    // Resolve with the module as soon as preRun fires so callers can abort early
+    let resolveModule;
+    const modulePromise = new Promise((resolve) => { resolveModule = resolve; });
+
+    // Track all AudioContexts created by the engine (OpenAL and SDL2 both
+    // create contexts inside the Emscripten module closure where we can't
+    // reach them directly).  We patch the constructor temporarily so
+    // shutdown() can close every context the engine opened.
+    const audioContexts = new Set();
+    const _OrigAC = globalThis.AudioContext;
+    const _OrigWebkitAC = globalThis.webkitAudioContext;
+    function patchedAC(...args) {
+        const ctx = new _OrigAC(...args);
+        audioContexts.add(ctx);
+        return ctx;
+    }
+    if (_OrigAC) {
+        Object.setPrototypeOf(patchedAC, _OrigAC);
+        patchedAC.prototype = _OrigAC.prototype;
+        globalThis.AudioContext = patchedAC;
+    }
+    if (_OrigWebkitAC) globalThis.webkitAudioContext = patchedAC;
+
+    // iOS Safari requires a user gesture to resume a suspended AudioContext.
+    // Emscripten's SDL2 attempts this internally but can miss edge cases.
+    function resumeAudio() {
+        if (typeof SDL2 !== 'undefined' && SDL2.audioContext) {
+            SDL2.audioContext.resume();
+            document.removeEventListener('click', resumeAudio, true);
+            document.removeEventListener('touchstart', resumeAudio, true);
+        }
+    }
+    document.addEventListener('click', resumeAudio, true);
+    document.addEventListener('touchstart', resumeAudio, true);
+
+    // Suppress the click that captures pointer lock so it doesn't reach the game
+    // (prevents inadvertently changing follow target in demo playback)
+    let gobbleMouseUp = false;
+    canvas.addEventListener('mousedown', (e) => {
+        if (e.button === 0 && !document.pointerLockElement) {
+            e.stopImmediatePropagation();
+            canvas.requestPointerLock();
+            gobbleMouseUp = true;
+        }
+    }, true);
+    canvas.addEventListener('mouseup', (e) => {
+        if (gobbleMouseUp) {
+            e.stopImmediatePropagation();
+            gobbleMouseUp = false;
+        }
+    }, true);
+
+    SurfEngine({
+        canvas: canvas,
+        arguments: generatedArguments.trim().split(/\s+/),
+        locateFile: (file) => enginePath + file,
+        onExit: () => {
+            modulePromise.then(mod => { if (mod.shutdown) mod.shutdown(); });
+        },
+        postMainLoop: () => {
+            // Fire one-shot onNextFrame callbacks after each engine frame
+            if (modulePromise._nextFrameCbs && modulePromise._nextFrameCbs.length) {
+                const cbs = modulePromise._nextFrameCbs.splice(0);
+                for (const cb of cbs) { try { cb(); } catch {} }
+            }
+            // Autoplay policy creates each AudioContext suspended and re-suspends on
+            // tab background; a map-change reboot makes a brand-new one. The page already
+            // has a user gesture, so a programmatic resume succeeds here where the
+            // click/touchstart listener can't (the viewer is just watching). No-op once running.
+            for (const ctx of audioContexts) {
+                if (ctx.state === 'suspended') { try { ctx.resume(); } catch {} }
+            }
+            // Fire onReady once on the first rendered frame
+            if (onReady && !modulePromise._readyFired) {
+                modulePromise._readyFired = true;
+                try { onReady(); } catch {}
+            }
+        },
+        preRun: [async (mod) => {
+            resolveModule(mod);
+            // Provide onNextFrame helper: queues a callback for after the next engine frame
+            modulePromise._nextFrameCbs = [];
+            mod.onNextFrame = (cb) => { modulePromise._nextFrameCbs.push(cb); };
+            mod.shutdown = function shutdown() {
+                if (mod._shuttingDown) return;
+                mod._shuttingDown = true;
+                // Abort the live fetch so its unconsumed octet-stream doesn't linger
+                // after teardown — on a feed switch iOS Safari surfaces it as a "download" prompt.
+                if (liveAbort) { try { liveAbort.abort(); } catch (e) {} }
+                // Close every AudioContext the engine created (OpenAL and/or SDL2)
+                for (const ctx of audioContexts) {
+                    try { ctx.close(); } catch (e) {}
+                }
+                audioContexts.clear();
+                // Restore the original AudioContext constructor
+                if (_OrigAC) globalThis.AudioContext = _OrigAC;
+                if (_OrigWebkitAC) globalThis.webkitAudioContext = _OrigWebkitAC;
+                // Clean up event listeners added by this loader
+                document.removeEventListener('click', resumeAudio, true);
+                document.removeEventListener('touchstart', resumeAudio, true);
+                window.removeEventListener('pagehide', mod.shutdown);
+                if (document.pointerLockElement === canvas) {
+                    document.exitPointerLock();
+                }
+            };
+            // iOS bfcache: back freezes the page instead of unloading it, looping
+            // the last audio buffer — tear down on pagehide, reload on restore.
+            window.addEventListener('pagehide', mod.shutdown);
+            window.addEventListener('pageshow', (e) => {
+                if (e.persisted) window.location.reload();
+            });
+            mod.addRunDependency('setup-surf-filesystem');
+            try {
+                    const config = await configPromise;
+
+                    // Flatten everything we need to fetch from the network
+                    // (gamedir files, caller-supplied extras, demo map pk3)
+                    // so progress is tracked uniformly across all of them.
+                    const assets = [];
+                    for (const gamedir of [fs_basegame, fs_game]) {
+                        if (gamedir === '') continue;
+                        if (!config[gamedir] || !config[gamedir].files) {
+                            console.warn(`Game directory '${gamedir}' not found in ${configFilename}.`);
+                            continue;
+                        }
+                        for (const file of config[gamedir].files) {
+                            const name = file.src.match(/[^/]+$/)[0];
+                            assets.push({ url: new URL(file.src, dataURL).href, dir: file.dst, name });
+                        }
+                    }
+                    for (const url of extraPk3s) {
+                        const u = new URL(url, window.location.href).href;
+                        assets.push({ url: u, dir: `/${fs_basegame}`, name: u.split('/').pop() });
+                    }
+                    if (demoMapName) {
+                        const name = `${demoMapName.toLowerCase()}.pk3`;
+                        assets.push({ url: new URL(`demopk3s/maps/${name}`, dataURL).href, dir: `/${fs_basegame}`, name, optional: true });
+                    }
+
+                    // Kick off every fetch in parallel; cachedFetch returns a
+                    // ready Response from CacheStorage when possible.
+                    const fetches = assets.map(a => cachedFetch(a.url, `Loading ${a.name}`, statusEl, authToken));
+
+                    // Wait for every header before reading any body, so
+                    // totalBytes is fixed up front and the bar can't
+                    // momentarily decrease as later Content-Lengths arrive.
+                    const responses = await Promise.all(fetches);
+                    const lengths = responses.map(r => parseInt(r.headers.get('Content-Length') || '0', 10));
+                    let totalBytes = lengths.reduce((a, b) => a + b, 0);
+                    let loadedBytes = 0;
+                    progress(loadedBytes, totalBytes);
+
+                    // Stream every body in parallel so progress reflects real
+                    // network throughput. Reading them serially would let
+                    // later bodies pile up in the browser's HTTP buffer and
+                    // "instantly complete" when finally drained.
+                    const bodies = responses.map((r, i) => {
+                        if (!r.ok) return Promise.resolve(null);
+                        return readBodyWithProgress(r, lengths[i], (delta) => {
+                            loadedBytes += delta;
+                            progress(loadedBytes, totalBytes);
+                        });
+                    });
+
+                    // Drain bodies in fetch order so FS writes stay deterministic.
+                    for (let i = 0; i < assets.length; i++) {
+                        const a = assets[i];
+                        statusEl.textContent = `Loading ${a.name}...`;
+                        if (!responses[i].ok) {
+                            const tag = a.optional ? 'Optional asset not found' : 'Failed to fetch';
+                            console.warn(`${tag}: ${a.url} (${responses[i].status})`);
+                            continue;
+                        }
+                        const data = await bodies[i];
+                        if (!data) continue;
+                        mod.FS.mkdirTree(a.dir);
+                        mod.FS.writeFile(`${a.dir}/${a.name}`, data);
+                    }
+
+                    // Load demo file into virtual filesystem
+                    if (demoData && demoFilename) {
+                        mod.FS.mkdirTree(`/${fs_basegame}/demos`);
+                        mod.FS.writeFile(`/${fs_basegame}/demos/${demoFilename}`, demoData);
+                    }
+
+                    // Live stream: push bytes into the engine's byte-feed ring
+                    // (CL_TV_FeedBytes) instead of a growing MEMFS file. FeedBytes
+                    // returns the count it accepted; when the ring is full (the engine
+                    // stalled — e.g. a backgrounded tab) we wait and re-feed the
+                    // remainder. That backpressure bounds memory, and the engine's
+                    // catch-up skips the backlog on resume.
+                    if (liveUrl && liveReader) {
+                        const FEED_CAP = 256 * 1024;
+                        const feedBuf = mod._malloc(FEED_CAP);
+                        // Feed up to the ring's free space; return how many bytes were
+                        // accepted (0 when full). Copies through a fixed heap buffer.
+                        const feedPiece = (u8, off) => {
+                            const piece = Math.min(FEED_CAP, u8.length - off);
+                            mod.HEAPU8.set(u8.subarray(off, off + piece), feedBuf);
+                            return mod.ccall('CL_TV_FeedBytes', 'number', ['number', 'number'], [feedBuf, piece]);
+                        };
+                        // Seed the buffered header + first segment SYNCHRONOUSLY so they
+                        // are in the ring before the "+tv_openlive" command line runs
+                        // (preRun completes before the + args execute). The ring is empty
+                        // here, so it all fits.
+                        for (let off = 0; off < liveInitialBytes.length; ) {
+                            off += feedPiece(liveInitialBytes, off);
+                        }
+                        // Drain subsequent chunks, applying backpressure when the ring is full.
+                        (async () => {
+                            const feed = async (u8) => {
+                                for (let off = 0; off < u8.length; ) {
+                                    if (mod._shuttingDown) return;
+                                    const n = feedPiece(u8, off);
+                                    off += n;
+                                    if (off < u8.length) await new Promise(r => setTimeout(r, 16)); // ring full: let the engine drain
+                                }
+                            };
+                            try {
+                                for (;;) {
+                                    const { done, value } = await liveReader.read();
+                                    if (done) break;                 // clean end: in-band TVLe already fed
+                                    await feed(value);
+                                }
+                            } catch (e) {
+                                console.warn('live stream error', e);
+                            } finally {
+                                try { mod._free(feedBuf); } catch (e2) {}
+                                // Backstop for a dropped connection (no in-band TVLe): tell the engine to stop.
+                                try { mod.ccall('Cbuf_AddText', null, ['string'], ['set cl_tvStreamClosed 1\n']); } catch (e3) {}
+                            }
+                        })();
+
+                        // Live map change: on a TVLe->TVL1 boundary the engine pauses and
+                        // writes the next match's map into cl_tvPendingMap when that map's
+                        // pk3 isn't in the VFS. Fetch the per-map pk3 (same artifact the boot
+                        // path uses), drop it into the gamedir, then set cl_tvAssetsReady so
+                        // the engine FS_Restarts and reloads in place. This is the browser's
+                        // equivalent of a native client's HTTP map download — curl is compiled
+                        // out of the WASM build, so JS fetch is the only transport.
+                        (async () => {
+                            let handled = '';
+                            for (;;) {
+                                await new Promise(r => setTimeout(r, 200));
+                                if (mod._shuttingDown) break;
+                                let pending;
+                                try { pending = mod.ccall('Cvar_VariableString', 'string', ['string'], ['cl_tvPendingMap']); }
+                                catch (e) { break; } // module gone
+                                if (!pending) { handled = ''; continue; }
+                                if (pending === handled) continue;
+                                handled = pending;
+                                const name = `${pending.toLowerCase()}.pk3`;
+                                try {
+                                    const resp = await cachedFetch(new URL(`demopk3s/maps/${name}`, dataURL).href, `Loading ${pending}`, statusEl, authToken);
+                                    if (resp.ok) {
+                                        mod.FS.writeFile(`/${fs_basegame}/${name}`, new Uint8Array(await resp.arrayBuffer()));
+                                    } else {
+                                        console.warn(`Map pk3 not found: ${name} (${resp.status})`);
+                                    }
+                                } catch (e) {
+                                    console.warn('Map pk3 fetch failed', e);
+                                }
+                                // Signal even on failure so the engine proceeds (and errors
+                                // visibly via CM_LoadMap) rather than hanging forever.
+                                try { mod.ccall('Cbuf_AddText', null, ['string'], ['set cl_tvAssetsReady 1\n']); } catch (e) {}
+                            }
+                        })();
+                    }
+
+
+                    // Generate autoexec.cfg from config cvars and binds
+                    let autoexec = '';
+                    if (config.cvars) {
+                        for (const [name, value] of Object.entries(config.cvars))
+                            autoexec += `set ${name} "${value}"\n`;
+                    }
+                    if (config.binds) {
+                        for (const [key, cmd] of Object.entries(config.binds))
+                            autoexec += `bind ${key} "${cmd}"\n`;
+                    }
+                    if (autoexec) {
+                        mod.FS.mkdirTree(`/${fs_basegame}`);
+                        mod.FS.writeFile(`/${fs_basegame}/autoexec.cfg`, autoexec);
+                    }
+                } finally {
+                    mod.removeRunDependency('setup-surf-filesystem');
+                }
+
+                statusEl.style.display = 'none';
+            }],
+        });
+
+    return modulePromise;
+}

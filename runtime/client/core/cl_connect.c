@@ -67,6 +67,11 @@ qboolean CL_Disconnect( qboolean showMainMenu ) {
 		CL_StopRecord_f();
 	}
 
+	// Stop Surf TV playback
+	if ( tvPlay.active ) {
+		CL_TV_Close();
+	}
+
 	// Stop demo playback
 	if ( clc.demofile != FS_INVALID_HANDLE ) {
 		FS_FCloseFile( clc.demofile );
@@ -80,6 +85,17 @@ qboolean CL_Disconnect( qboolean showMainMenu ) {
 	}
 	*clc.downloadTempName = *clc.downloadName = '\0';
 	Cvar_Set( "cl_downloadName", "" );
+
+#ifdef USE_CURL
+	CL_TV_CleanupDownload();
+#endif
+	clc.tvDemoFile[0] = '\0';
+	clc.tvDemoMap[0] = '\0';
+	clc.tvDemoPendingUrl[0] = '\0';
+	clc.tvDemoPendingLocal[0] = '\0';
+	Cvar_Set( "cl_tvdOffer", "" );
+	Cvar_Set( "cl_voteYesKey", "" );
+	Cvar_Set( "cl_voteNoKey", "" );
 
 	// Stop recording any video
 	if ( CL_VideoRecording() ) {
@@ -165,6 +181,20 @@ void CL_ForwardCommandToServer( const char *string ) {
 	if ( !strcmp( cmd, "userinfo" ) ) {
 		return;
 	}
+
+#ifdef USE_CURL
+	/* intercept "vote yes/no" when a Surf TVD offer is pending */
+	if ( !Q_stricmp( cmd, "vote" ) && cl_tvdOffer && cl_tvdOffer->string[0] ) {
+		const char *arg = Cmd_Argv( 1 );
+		if ( arg[0] == 'y' || arg[0] == 'Y' || arg[0] == '1' ) {
+			CL_TVDYes_f();
+			return;
+		} else if ( arg[0] == 'n' || arg[0] == 'N' || arg[0] == '0' ) {
+			CL_TVDNo_f();
+			return;
+		}
+	}
+#endif
 
 	if ( clc.demoplaying || cls.state < CA_CONNECTED || cmd[0] == '+' ) {
 		Com_Printf( "Unknown command \"%s" S_COLOR_WHITE "\"\n", cmd );
@@ -922,6 +952,10 @@ static void CL_CheckTimeout( void ) {
 	//
 	// check timeout
 	//
+	if ( tvPlay.active ) {
+		clc.lastPacketTime = cls.realtime;
+		return;
+	}
 	if ( ( !CL_CheckPaused() || !sv_paused->integer )
 		&& cls.state >= CA_CONNECTED && cls.state != CA_CINEMATIC
 		&& cls.realtime - clc.lastPacketTime > cl_timeout->integer * 1000 ) {

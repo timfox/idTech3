@@ -385,9 +385,9 @@ static qboolean AV_CreatePipelines( void )
 	if ( !AV_CreateLayout( gtaoTypes, ARRAY_LEN( gtaoTypes ), 128u, &av.gtaoLayout, &av.gtaoPL ) ) {
 		return qfalse;
 	}
-	if ( !AV_CreateLayout( temporalTypes, ARRAY_LEN( temporalTypes ), 112u, &av.temporalLayout, &av.temporalPL ) ||
-		!AV_CreateLayout( filterTypes, ARRAY_LEN( filterTypes ), 96u, &av.filterLayout, &av.filterPL ) ||
-		!AV_CreateLayout( compositeTypes, ARRAY_LEN( compositeTypes ), 32u, &av.compositeLayout, &av.compositePL ) ) {
+	if ( !AV_CreateLayout( temporalTypes, ARRAY_LEN( temporalTypes ), 128u, &av.temporalLayout, &av.temporalPL ) ||
+		!AV_CreateLayout( filterTypes, ARRAY_LEN( filterTypes ), 112u, &av.filterLayout, &av.filterPL ) ||
+		!AV_CreateLayout( compositeTypes, ARRAY_LEN( compositeTypes ), 64u, &av.compositeLayout, &av.compositePL ) ) {
 		return qfalse;
 	}
 	av.gtaoPipe = AV_CreateComputePipeline( av.gtaoCS, av.gtaoPL, "Ambient Visibility GTAO pipeline" );
@@ -893,9 +893,9 @@ void vk_ambient_visibility_apply_after_geometry( void )
 
 	struct { uint32_t ef[4]; float proj[4]; float inv[16]; float p0[4]; float p1[4]; } gtaoPush;
 	struct { uint32_t ef[4]; float proj[4]; float inv[16]; float p0[4]; uint32_t p1[4]; } rtaoPush;
-	struct { uint32_t ef[4]; float inv[16]; float p0[4]; float p1[4]; } temporalPush;
-	struct { uint32_t ef[4]; float inv[16]; float p[4]; } filterPush;
-	struct { uint32_t em[4]; float p[4]; } compositePush;
+	struct { uint32_t ef[4]; float inv[16]; float p0[4]; float p1[4]; float proj[4]; } temporalPush;
+	struct { uint32_t ef[4]; float inv[16]; float p[4]; float proj[4]; } filterPush;
+	struct { uint32_t em[4]; float p[4]; uint32_t te[4]; float proj[4]; } compositePush;
 
 	if ( av.appliedThisFrame || !vk_ambient_visibility_active() || !vk.cmd || !backEnd.doneSurfaces ) return;
 	if ( vk_classify_current_view() != VK_VIEW_CLASS_MAIN_WORLD ) return;
@@ -1055,10 +1055,12 @@ void vk_ambient_visibility_apply_after_geometry( void )
 		temporalPush.ef[0] = av.traceWidth; temporalPush.ef[1] = av.traceHeight;
 		temporalPush.ef[2] = ( !av.historyValid || !r_rtaoTemporal->integer ) ? 1u : 0u; temporalPush.ef[3] = normalsAreWorld;
 		Com_Memcpy( temporalPush.inv, invView, sizeof( invView ) );
-		temporalPush.p0[0] = r_rtaoTemporal->integer ? 0.88f : 0.0f; temporalPush.p0[1] = 0.0025f;
+		/* Relative positive-view-depth tolerance (was raw device-Z 0.0025). */
+		temporalPush.p0[0] = r_rtaoTemporal->integer ? 0.88f : 0.0f; temporalPush.p0[1] = 0.04f;
 		temporalPush.p0[2] = 0.85f; temporalPush.p0[3] = 0.75f;
 		temporalPush.p1[0] = 0.18f; temporalPush.p1[1] = (float)r_rtaoMaxHistory->integer;
 		temporalPush.p1[2] = vk.motion_vector_view ? 1.0f : 0.0f; temporalPush.p1[3] = effectiveMode == 4u ? 1.0f : 0.0f;
+		Com_Memcpy( temporalPush.proj, projInfo, sizeof( projInfo ) );
 		qvkCmdBindPipeline( cmd, VK_PIPELINE_BIND_POINT_COMPUTE, av.temporalPipe );
 		qvkCmdBindDescriptorSets( cmd, VK_PIPELINE_BIND_POINT_COMPUTE, av.temporalPL, 0, 1, &av.temporalSet, 0, NULL );
 		qvkCmdPushConstants( cmd, av.temporalPL, VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof( temporalPush ), &temporalPush );
@@ -1079,7 +1081,9 @@ void vk_ambient_visibility_apply_after_geometry( void )
 		Com_Memset( &filterPush, 0, sizeof( filterPush ) );
 		filterPush.ef[0] = av.traceWidth; filterPush.ef[1] = av.traceHeight; filterPush.ef[2] = normalsAreWorld;
 		filterPush.ef[3] = r_rtaoSpatialFilter->integer ? 1u : 0u; Com_Memcpy( filterPush.inv, invView, sizeof( invView ) );
-		filterPush.p[0] = 600.0f; filterPush.p[1] = 24.0f; filterPush.p[2] = 20.0f; filterPush.p[3] = 1.0f;
+		/* Relative view-depth sharpness (was device-Z * 600). */
+		filterPush.p[0] = 48.0f; filterPush.p[1] = 24.0f; filterPush.p[2] = 20.0f; filterPush.p[3] = 1.0f;
+		Com_Memcpy( filterPush.proj, projInfo, sizeof( projInfo ) );
 		qvkCmdBindPipeline( cmd, VK_PIPELINE_BIND_POINT_COMPUTE, av.filterPipe );
 		qvkCmdBindDescriptorSets( cmd, VK_PIPELINE_BIND_POINT_COMPUTE, av.filterPL, 0, 1, &av.filterSet, 0, NULL );
 		qvkCmdPushConstants( cmd, av.filterPL, VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof( filterPush ), &filterPush );
@@ -1098,7 +1102,8 @@ void vk_ambient_visibility_apply_after_geometry( void )
 		vk.color_format == VK_FORMAT_R16G16B16A16_SFLOAT &&
 		( vk_deferred_lighting_active() ||
 		  ( r_renderMode && r_renderMode->integer == 2 && vk_deferred_gbuffer_active() ) ) ) {
-		AV_ImageWrite( &writes[0], &infos[0], av.compositeSet, 0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, linear, finalImage->view, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL );
+		/* Nearest for final AV: reduced-res path uses texelFetch + bilateral weights. */
+		AV_ImageWrite( &writes[0], &infos[0], av.compositeSet, 0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, nearest, finalImage->view, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL );
 		AV_ImageWrite( &writes[1], &infos[1], av.compositeSet, 1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, nearest, currentAux->view, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL );
 		AV_ImageWrite( &writes[2], &infos[2], av.compositeSet, 2, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, linear, av.gtao.view, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL );
 		AV_ImageWrite( &writes[3], &infos[3], av.compositeSet, 3, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, linear, av.reference.view, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL );
@@ -1134,6 +1139,8 @@ void vk_ambient_visibility_apply_after_geometry( void )
 		compositePush.em[3] = needReference ? 1u : 0u; compositePush.p[0] = r_ambientVisibilityStrength->value;
 		compositePush.p[1] = (float)effectiveMode; compositePush.p[2] = rtReady ? 1.0f : 0.0f;
 		compositePush.p[3] = r_ambientVisibilityFloor ? r_ambientVisibilityFloor->value : 0.28f;
+		compositePush.te[0] = av.traceWidth; compositePush.te[1] = av.traceHeight;
+		Com_Memcpy( compositePush.proj, projInfo, sizeof( projInfo ) );
 		qvkCmdBindPipeline( cmd, VK_PIPELINE_BIND_POINT_COMPUTE, av.compositePipe );
 		qvkCmdBindDescriptorSets( cmd, VK_PIPELINE_BIND_POINT_COMPUTE, av.compositePL, 0, 1, &av.compositeSet, 0, NULL );
 		qvkCmdPushConstants( cmd, av.compositePL, VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof( compositePush ), &compositePush );

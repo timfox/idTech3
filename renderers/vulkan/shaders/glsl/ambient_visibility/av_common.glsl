@@ -74,6 +74,17 @@ vec3 av_view_position(vec2 uv, float depth, vec4 projInfo) {
 		ndc.y * (-viewZ) * projInfo.y, viewZ);
 }
 
+/* Positive view-depth (meters along camera forward). Matches Depth_LinearizeReversedZ metric. */
+float av_positive_view_depth(float deviceDepth, vec4 projInfo) {
+	return max(projInfo.w / max(deviceDepth + projInfo.z, 1e-6), 0.0);
+}
+
+float av_bilateral_depth_weight(float centerView, float sampleView, float sharpness) {
+	float cd = max(centerView, 1e-3);
+	float rel = abs(sampleView - centerView) / cd;
+	return exp2(-rel * max(sharpness, 0.0));
+}
+
 vec3 av_world_normal(vec3 sampledNormal, uint normalsAreWorld, mat4 invView) {
 	vec3 n = av_safe_normalize(sampledNormal, vec3(0.0, 0.0, 1.0));
 	return normalsAreWorld != 0u ? n :

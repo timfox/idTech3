@@ -1383,6 +1383,12 @@ void SV_ClientEnterWorld( client_t *client ) {
 	VM_Call( gvm, 1, GAME_CLIENT_BEGIN, clientNum );
 	Com_ScriptEmitEvent( "client_begin", address, client->name, clientNum, isBot ? 1 : 0 );
 
+	// Surf TV: send download notification once the client is fully active
+	if ( client->tvDemoPending && tv.lastRecordedFile[0] ) {
+		SV_AddServerCommand( client, va( "tvdemo \"%s/%s\" \"%s\"", FS_GetCurrentGameDir(), tv.lastRecordedFile, tv.lastRecordedMap ) );
+		client->tvDemoPending = qfalse;
+	}
+
 #ifdef USE_LUA
 	SV_AppCrdt_ClientEnterWorld( client );
 #endif
@@ -2086,6 +2092,14 @@ void SV_UserinfoChanged( client_t *cl, qboolean updateUserinfo, qboolean runFilt
 	if ( !updateUserinfo )
 		return;
 
+	// Hub-supplied name lock: if auth_ok pushed a canonical name, override
+	// whatever the client sent in userinfo. The override is silent — the
+	// client's /name attempt simply doesn't take. Persists across map
+	// changes because client_t is engine-side memory.
+	if ( cl->lockedName[0] ) {
+		Info_SetValueForKey( cl->userinfo, "name", cl->lockedName );
+	}
+
 	// name for C code
 	val = Info_ValueForKey( cl->userinfo, "name" );
 	// truncate if it is too long as it may cause memory corruption in OSP mod
@@ -2116,6 +2130,10 @@ void SV_UserinfoChanged( client_t *cl, qboolean updateUserinfo, qboolean runFilt
 		SV_DropClient( cl, "userinfo string length exceeded" );
 
 	Info_SetValueForKey( cl->userinfo, "tld", cl->tld );
+
+	// Check if client is VR (userinfo "vr" value-gated)
+	val = Info_ValueForKey( cl->userinfo, "vr" );
+	cl->isVR = ( atoi( val ) == 1 );
 
 	if ( runFilter )
 	{
@@ -2450,7 +2468,7 @@ static void SV_UserMove( client_t *cl, msg_t *msg, qboolean delta ) {
 	oldcmd = &nullcmd;
 	for ( i = 0 ; i < cmdCount ; i++ ) {
 		cmd = &cmds[i];
-		MSG_ReadDeltaUsercmdKey( msg, key, oldcmd, cmd );
+		MSG_ReadDeltaUsercmdKey( msg, key, oldcmd, cmd, cl->isVR ? 32 : 16 );
 		oldcmd = cmd;
 	}
 

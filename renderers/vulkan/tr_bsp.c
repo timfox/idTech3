@@ -34,6 +34,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "vk_temporal.h"
 #include "vk_vshadow.h"
 #include "vk_exposure_histogram.h"
+#include "vk_bsp_viz.h"
 #include "vk_ndgi.h"
 #include "vk_niv.h"
 #include "vk_nslm.h"
@@ -1058,7 +1059,11 @@ static void ParseFace( const dsurface_t *ds, const drawVert_t *verts, msurface_t
 
 	indexes += LittleLong( ds->firstIndex );
 	for ( i = 0 ; i < numIndexes ; i++ ) {
-		((int *)((byte *)cv + cv->ofsIndices ))[i] = LittleLong( indexes[ i ] );
+		int idx = LittleLong( indexes[ i ] );
+		if ( idx < 0 || idx >= numPoints ) {
+			ri.Error( ERR_DROP, "Bad index in face surface (%d not in [0,%d))", idx, numPoints );
+		}
+		((int *)((byte *)cv + cv->ofsIndices ))[i] = idx;
 	}
 
 	indexes = (int*)((byte *) cv + cv->ofsIndices);
@@ -2977,6 +2982,7 @@ void RE_LoadWorldMap( const char *name ) {
 	VK_VegGpu_OnWorldLoad();
 	vk_vshadow_on_map_change();
 	vk_exposure_histogram_on_map_change();
+	vk_bsp_viz_on_map_change();
 
 	// set default sun direction to be used if it isn't
 	// overridden by a shader

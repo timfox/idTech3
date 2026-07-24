@@ -66,6 +66,8 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "vk_hiz.h"
 #include "vk_selective_sun_shadow.h"
 #include "vk_black_frame.h"
+#include "vk_geometry_corruption.h"
+#include "vk_mesh_halo.h"
 #include "vk_frame_contract.h"
 #include "vk_sun_csm.h"
 #include "vk_shadow_contract.h"
@@ -3357,6 +3359,8 @@ static const void *RB_SwapBuffers( const void *data ) {
 	s_drawDeferredWeaponSurfacesOnly = qfalse;
 	R_RenderPath_BeginFrame();
 	vk_black_frame_begin_frame();
+	vk_geometry_corruption_begin_frame();
+	vk_mesh_halo_begin_frame();
 	{
 		cvar_t *clusterDebug = ri.Cvar_Get( "r_clusterDebug", "-1", CVAR_ARCHIVE_ND );
 		if ( clusterDebug && clusterDebug->integer >= 0 && r_forwardPlusDebug ) {

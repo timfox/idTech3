@@ -2,12 +2,14 @@
 ===========================================================================
 Copyright (C) 2026 Gopex LLC. All rights reserved.
 
-BSP30 planar face triangulation (ear clipping).
+BSP30 planar face triangulation (ear clipping + hub-fan fallback).
 
 GoldSrc / BSP30 faces may be non-convex n-gons. Triangle-fan from vertex 0
 emits exterior triangles that appear as hard black wedges around letter
 meshes (e.g. surf_aztec func_illusionary *17 "AZ"). Ear clipping keeps
-triangles inside the polygon.
+triangles inside the polygon when it succeeds; when it does not, try every
+vertex as a fan hub and keep the first triangulation whose centroids lie
+inside the polygon.
 ===========================================================================
 */
 
@@ -69,7 +71,6 @@ static int Bsp30_ProjectFace( const float *xyz, int numPoints, float *out2,
 		normal[2] += ( p0[0] - p1[0] ) * ( p0[1] + p1[1] );
 	}
 	if ( !Bsp30_Normalize3( normal ) ) {
-		/* Degenerate: fall back to first non-parallel edge pair. */
 		Bsp30_Sub3( xyz + 3, xyz, e0 );
 		for ( i = 2; i < numPoints; i++ ) {
 			Bsp30_Sub3( xyz + i * 3, xyz, e1 );
@@ -203,56 +204,20 @@ static int Bsp30_EarClip( const float *poly2, int numPoints, int ccw, int *outIn
 	return tris * 3;
 }
 
-static void Bsp30_FanFallback( int numPoints, int *outIndices ) {
-	int j;
-	for ( j = 0; j < numPoints - 2; j++ ) {
-		outIndices[j * 3 + 0] = 0;
-		outIndices[j * 3 + 1] = j + 1;
-		outIndices[j * 3 + 2] = j + 2;
+static void Bsp30_FanFromHub( int numPoints, int hub, int *outIndices ) {
+	int j, t = 0;
+	for ( j = 1; j < numPoints - 1; j++ ) {
+		int a = ( hub + j ) % numPoints;
+		int b = ( hub + j + 1 ) % numPoints;
+		outIndices[t * 3 + 0] = hub;
+		outIndices[t * 3 + 1] = a;
+		outIndices[t * 3 + 2] = b;
+		t++;
 	}
 }
 
-int R_Bsp30_TriangulateFace( const float *xyz, int numPoints, int *outIndices,
-	int maxIndices ) {
-	float poly2[BSP30_TRIANGULATE_MAX_POINTS * 2];
-	float area2;
-	int n;
-
-	if ( !xyz || !outIndices || numPoints < 3 ) {
-		return -1;
-	}
-	if ( maxIndices < ( numPoints - 2 ) * 3 ) {
-		return -1;
-	}
-	if ( numPoints == 3 ) {
-		outIndices[0] = 0;
-		outIndices[1] = 1;
-		outIndices[2] = 2;
-		return 3;
-	}
-	if ( numPoints > BSP30_TRIANGULATE_MAX_POINTS ) {
-		Bsp30_FanFallback( numPoints, outIndices );
-		return ( numPoints - 2 ) * 3;
-	}
-
-	if ( !Bsp30_ProjectFace( xyz, numPoints, poly2, &area2 ) ) {
-		Bsp30_FanFallback( numPoints, outIndices );
-		return ( numPoints - 2 ) * 3;
-	}
-
-	n = Bsp30_EarClip( poly2, numPoints, area2 >= 0.0f, outIndices, maxIndices );
-	if ( n > 0 ) {
-		return n;
-	}
-
-	/* Try opposite winding if projection / winding disagreed. */
-	n = Bsp30_EarClip( poly2, numPoints, area2 < 0.0f, outIndices, maxIndices );
-	if ( n > 0 ) {
-		return n;
-	}
-
-	Bsp30_FanFallback( numPoints, outIndices );
-	return ( numPoints - 2 ) * 3;
+static void Bsp30_FanFallback( int numPoints, int *outIndices ) {
+	Bsp30_FanFromHub( numPoints, 0, outIndices );
 }
 
 int R_Bsp30_TriangleCentroidInside( const float *xyz, int numPoints,
@@ -281,7 +246,6 @@ int R_Bsp30_TriangleCentroidInside( const float *xyz, int numPoints,
 		}
 		cx = ( poly2[i0 * 2] + poly2[i1 * 2] + poly2[i2 * 2] ) / 3.0f;
 		cy = ( poly2[i0 * 2 + 1] + poly2[i1 * 2 + 1] + poly2[i2 * 2 + 1] ) / 3.0f;
-		/* Ray cast point-in-polygon. */
 		for ( i = 0; i < numPoints; i++ ) {
 			float x1 = poly2[i * 2], y1 = poly2[i * 2 + 1];
 			float x2 = poly2[( ( i + 1 ) % numPoints ) * 2];
@@ -296,4 +260,54 @@ int R_Bsp30_TriangleCentroidInside( const float *xyz, int numPoints,
 		}
 	}
 	return 1;
+}
+
+int R_Bsp30_TriangulateFace( const float *xyz, int numPoints, int *outIndices,
+	int maxIndices ) {
+	float poly2[BSP30_TRIANGULATE_MAX_POINTS * 2];
+	float area2;
+	int n;
+	int hub;
+	int need;
+
+	if ( !xyz || !outIndices || numPoints < 3 ) {
+		return -1;
+	}
+	need = ( numPoints - 2 ) * 3;
+	if ( maxIndices < need ) {
+		return -1;
+	}
+	if ( numPoints == 3 ) {
+		outIndices[0] = 0;
+		outIndices[1] = 1;
+		outIndices[2] = 2;
+		return 3;
+	}
+	if ( numPoints > BSP30_TRIANGULATE_MAX_POINTS ) {
+		Bsp30_FanFallback( numPoints, outIndices );
+		return need;
+	}
+
+	if ( Bsp30_ProjectFace( xyz, numPoints, poly2, &area2 ) ) {
+		n = Bsp30_EarClip( poly2, numPoints, area2 >= 0.0f, outIndices, maxIndices );
+		if ( n > 0 && R_Bsp30_TriangleCentroidInside( xyz, numPoints, outIndices, n ) ) {
+			return n;
+		}
+		n = Bsp30_EarClip( poly2, numPoints, area2 < 0.0f, outIndices, maxIndices );
+		if ( n > 0 && R_Bsp30_TriangleCentroidInside( xyz, numPoints, outIndices, n ) ) {
+			return n;
+		}
+	}
+
+	/* Hub search: any vertex that fans without exterior centroids. */
+	for ( hub = 0; hub < numPoints; hub++ ) {
+		Bsp30_FanFromHub( numPoints, hub, outIndices );
+		if ( R_Bsp30_TriangleCentroidInside( xyz, numPoints, outIndices, need ) ) {
+			return need;
+		}
+	}
+
+	/* Last resort: vertex-0 fan (may still wedge on pathological rings). */
+	Bsp30_FanFallback( numPoints, outIndices );
+	return need;
 }

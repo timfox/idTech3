@@ -131,16 +131,27 @@ void vk_update_postfx_params( uint32_t cmd_index )
 	r_autoExposure_target = ri.Cvar_Get( "r_exposure_auto_target", "1.0", 0 );
 	r_autoExposure_min = ri.Cvar_Get( "r_autoExposure_min", "0.5", 0 );
 	r_autoExposure_max = ri.Cvar_Get( "r_autoExposure_max", "4.0", 0 );
-	r_localExposure = ri.Cvar_Get( "r_localExposure", "1", 0 );
-	r_localExposure_strength = ri.Cvar_Get( "r_localExposure_strength", "0.35", 0 );
-	r_localExposure_shadowClamp = ri.Cvar_Get( "r_localExposure_shadowClamp", "1.5", 0 );
+	r_localExposure = ri.Cvar_Get( "r_localExposure", "0", 0 );
+	r_localExposure_strength = ri.Cvar_Get( "r_localExposure_strength", "0.25", 0 );
+	r_localExposure_shadowClamp = ri.Cvar_Get( "r_localExposure_shadowClamp", "0.25", 0 );
 	r_localExposure_highlightClamp = ri.Cvar_Get( "r_localExposure_highlightClamp", "1.5", 0 );
 	params.autoExposureParams[0] = vk.temporal.hasValidLuminance ? vk.temporal.filteredAvgLogLuminance :
 		log2f( fmaxf( 1e-4f, ( r_autoExposure_target ? r_autoExposure_target->value : 1.0f ) /
 			fmaxf( r_exposure ? r_exposure->value : 1.0f, 1e-4f ) ) );
 	params.autoExposureParams[1] = fmaxf( r_autoExposure_target ? r_autoExposure_target->value : 1.0f, 1e-4f );
-	params.autoExposureParams[2] = fmaxf( r_autoExposure_min ? r_autoExposure_min->value : 0.5f, 0.01f );
-	params.autoExposureParams[3] = fmaxf( r_autoExposure_max ? r_autoExposure_max->value : 4.0f, params.autoExposureParams[2] );
+	/*
+	 * Pack adaptedExposure for bloom EV-relative thresholding (bloom.frag).
+	 * Disabled when r_bloomThresholdEVRelative is 0 (negative sentinel).
+	 * min/max EV clamps remain on the CPU side of auto-exposure.
+	 */
+	{
+		cvar_t *evRel = ri.Cvar_Get( "r_bloomThresholdEVRelative", "1", CVAR_ARCHIVE_ND );
+		float adapted = ( vk.adaptedExposure > 0.0f ) ? vk.adaptedExposure :
+			( ( r_exposure && r_exposure->value > 0.0f ) ? r_exposure->value : 1.0f );
+		params.autoExposureParams[2] = ( evRel && evRel->integer ) ? adapted : -1.0f;
+		params.autoExposureParams[3] = fmaxf( r_autoExposure_max ? r_autoExposure_max->value : 4.0f,
+			fmaxf( r_autoExposure_min ? r_autoExposure_min->value : 0.5f, 0.01f ) );
+	}
 	params.localExposureParams[0] = ( r_localExposure && r_localExposure->integer ) ? 1.0f : 0.0f;
 	params.localExposureParams[1] = Com_Clamp( 0.0f, 1.0f, r_localExposure_strength ? r_localExposure_strength->value : 0.35f );
 	params.localExposureParams[2] = Com_Clamp( 0.0f, 3.0f, r_localExposure_shadowClamp ? r_localExposure_shadowClamp->value : 1.5f );
@@ -196,7 +207,7 @@ void vk_update_postfx_params( uint32_t cmd_index )
 	params.weaponTemporalParams[1] = r_weaponTemporalVarianceGamma ?
 		r_weaponTemporalVarianceGamma->value : 0.75f;
 	params.weaponTemporalParams[2] = r_weaponTemporalDepthThreshold ?
-		r_weaponTemporalDepthThreshold->value : 0.025f;
+		r_weaponTemporalDepthThreshold->value : 0.04f;
 	params.weaponTemporalParams[3] = r_weaponTemporalReactiveScale ?
 		r_weaponTemporalReactiveScale->value : 1.0f;
 	params.temporalDebugParams[0] = r_temporalDebugVectorScale ?

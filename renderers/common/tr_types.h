@@ -54,6 +54,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 #define RF_SPRITE_YAWLOCK	0x0400		// RT_SPRITE: cylindrical billboard (yaw locked, world up)
 #define RF_SPRITE_FLIPBOOK	0x0800		// RT_SPRITE: atlas UV from frame + oldframe(cols) + skinNum(rows)
+#define RF_ANIMFRAME		0x1000		// index animMap by refEntity->frame, not time (caller-driven)
 
 // refdef flags
 #define RDF_NOWORLDMODEL	0x0001		// used for player configuration screen

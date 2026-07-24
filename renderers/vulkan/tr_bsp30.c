@@ -4,9 +4,8 @@ BSP30 / Half-Life BSP v30 renderer bridge.
 
 BSP30 faces are reconstructed from edges and surfedges and submitted as
 ordinary idTech3 planar surfaces. Embedded indexed textures are expanded to
-RGBA at load time. BSP30 lightmaps use a different packing model, so this
-initial bridge uses vertex-white lighting while retaining the original base
-textures and geometry.
+RGBA at load time. Lighting lump samples are converted to per-vertex colors
+(GoldSrc luxel grid, style 0) so surfaces are not fullbright albedo.
 
 This is an independent binary-format implementation. It does not include or
 depend on Half-Life SDK source, headers, or libraries.
@@ -16,6 +15,7 @@ depend on Half-Life SDK source, headers, or libraries.
 #include "tr_local.h"
 #include "../../engine/core/qfiles_bsp30.h"
 #include "../common/tr_bsp30_triangulate.h"
+#include "vk_skybox_hdr.h"
 
 typedef struct {
 	const byte *base;
@@ -26,9 +26,24 @@ typedef struct {
 	int *textureWidths;
 	int *textureHeights;
 	int numTextures;
+	shader_t *skyShader;
+	char skyname[MAX_QPATH];
+	char skyboxHdr[MAX_QPATH];
+	float skyboxHdrExposure;
+	float skyboxHdrRotation;
+	float skyboxHdrIntensity;
+	int skyboxHdrProjection;
 } bsp30RenderLoad_t;
 
 #define BSP30_MAX_WADS 16
+#define BSP30_TEX_SPECIAL 1
+/* GoldSrc / Quake luxel spacing (world units per lightmap texel). */
+#define BSP30_LUXEL_SIZE 16.0f
+#define BSP30_MAX_LUXEL_DIM 256
+
+static int s_bsp30LitFaces;
+static int s_bsp30WhiteFaces;
+static int s_bsp30SpecialFaces;
 
 typedef struct {
 	byte *data;
@@ -130,21 +145,24 @@ static image_t *GS_CreateTextureImage( const char *shaderName,
 
 static image_t *GS_CreateFallbackImage( const char *shaderName, const char *textureName ) {
 	byte rgba[64 * 64 * 4];
-	unsigned hash = 2166136261u;
 	int x, y;
-	const unsigned char *s = (const unsigned char *)textureName;
 
-	while ( *s ) {
-		hash = ( hash ^ *s++ ) * 16777619u;
-	}
+	/*
+	 * Missing content must not masquerade as authored color.  The previous
+	 * name-hashed palette produced large pastel surfaces which skewed scene
+	 * exposure and made a missing asset look like a color-management fault.
+	 * Keep luminance bounded and hue-neutral; reserve magenta for the border.
+	 */
+	(void)textureName;
 	for ( y = 0; y < 64; y++ ) {
 		for ( x = 0; x < 64; x++ ) {
 			int p = ( y * 64 + x ) * 4;
 			int checker = ( ( x >> 3 ) ^ ( y >> 3 ) ) & 1;
 			int grid = ( x == 0 || y == 0 || x == 63 || y == 63 );
-			rgba[p + 0] = grid ? 255 : (byte)( 48 + ( ( hash >> 0 ) & 127 ) * ( checker ? 1 : 2 ) / 2 );
-			rgba[p + 1] = grid ? 64 : (byte)( 48 + ( ( hash >> 8 ) & 127 ) * ( checker ? 1 : 2 ) / 2 );
-			rgba[p + 2] = grid ? 255 : (byte)( 48 + ( ( hash >> 16 ) & 127 ) * ( checker ? 1 : 2 ) / 2 );
+			byte neutral = checker ? 48 : 24;
+			rgba[p + 0] = grid ? 255 : neutral;
+			rgba[p + 1] = grid ? 0 : neutral;
+			rgba[p + 2] = grid ? 255 : neutral;
 			rgba[p + 3] = 255;
 		}
 	}
@@ -161,6 +179,225 @@ static const char *GS_BaseName( const char *path ) {
 		path++;
 	}
 	return base;
+}
+
+/*
+ * Parse worldspawn keys used for sky / HDR environment.
+ * Half-Life uses "skyname"; editor bridge adds skybox_hdr*.
+ */
+static void GS_ParseWorldspawnSky( bsp30RenderLoad_t *load ) {
+	const byte *entities = GS_LumpData( load, BSP30_LUMP_ENTITIES );
+	int entityLength = GS_LumpLength( load, BSP30_LUMP_ENTITIES );
+	char *entityText;
+	const char *parse;
+	const char *token;
+
+	load->skyboxHdrExposure = 1.0f;
+	load->skyboxHdrRotation = 0.0f;
+	load->skyboxHdrIntensity = 1.0f;
+	load->skyboxHdrProjection = 0;
+	load->skyname[0] = '\0';
+	load->skyboxHdr[0] = '\0';
+	load->skyShader = NULL;
+
+	if ( entityLength <= 0 ) {
+		return;
+	}
+
+	entityText = ri.Hunk_AllocateTempMemory( entityLength + 1 );
+	Com_Memcpy( entityText, entities, entityLength );
+	entityText[entityLength] = '\0';
+	parse = entityText;
+
+	if ( *( token = COM_Parse( &parse ) ) == '{' ) {
+		while ( parse && *( token = COM_Parse( &parse ) ) && token[0] != '}' ) {
+			char key[MAX_TOKEN_CHARS];
+			Q_strncpyz( key, token, sizeof( key ) );
+			token = COM_Parse( &parse );
+			if ( !token || !token[0] ) {
+				break;
+			}
+			if ( !Q_stricmp( key, "skyname" ) || !Q_stricmp( key, "sky" ) ) {
+				Q_strncpyz( load->skyname, token, sizeof( load->skyname ) );
+			} else if ( !Q_stricmp( key, "skybox_hdr" ) ) {
+				Q_strncpyz( load->skyboxHdr, token, sizeof( load->skyboxHdr ) );
+			} else if ( !Q_stricmp( key, "skybox_hdr_exposure" ) ) {
+				load->skyboxHdrExposure = Q_atof( token );
+			} else if ( !Q_stricmp( key, "skybox_hdr_rotation" ) ) {
+				load->skyboxHdrRotation = Q_atof( token );
+			} else if ( !Q_stricmp( key, "skybox_hdr_intensity" ) ) {
+				load->skyboxHdrIntensity = Q_atof( token );
+			} else if ( !Q_stricmp( key, "skybox_hdr_projection" ) ) {
+				load->skyboxHdrProjection = atoi( token );
+			}
+		}
+	}
+	ri.Hunk_FreeTempMemory( entityText );
+}
+
+/*
+ * Optional maps/<map>.skybox_hdr sidecar (applied when worldspawn has no skybox_hdr).
+ * First non-empty line: panorama path. Optional lines: exposure/rotation/intensity/projection <value>
+ */
+static void GS_TryLoadSkyboxSidecar( bsp30RenderLoad_t *load, const char *mapname ) {
+	char sidecar[MAX_QPATH];
+	char *text = NULL;
+	const char *parse;
+	const char *token;
+	int len;
+	const char *base;
+	const char *slash;
+
+	if ( load->skyboxHdr[0] || !mapname || !mapname[0] ) {
+		return;
+	}
+
+	Q_strncpyz( sidecar, mapname, sizeof( sidecar ) );
+	COM_StripExtension( sidecar, sidecar, sizeof( sidecar ) );
+	Q_strcat( sidecar, sizeof( sidecar ), ".skybox_hdr" );
+
+	len = ri.FS_ReadFile( sidecar, (void **)&text );
+	if ( len <= 0 || !text ) {
+		/* Also try basename under maps/ if mapname was not maps/... */
+		slash = strrchr( mapname, '/' );
+		base = slash ? slash + 1 : mapname;
+		Com_sprintf( sidecar, sizeof( sidecar ), "maps/%s", base );
+		COM_StripExtension( sidecar, sidecar, sizeof( sidecar ) );
+		Q_strcat( sidecar, sizeof( sidecar ), ".skybox_hdr" );
+		len = ri.FS_ReadFile( sidecar, (void **)&text );
+		if ( len <= 0 || !text ) {
+			return;
+		}
+	}
+
+	parse = text;
+	while ( 1 ) {
+		token = COM_Parse( &parse );
+		if ( !token || !token[0] ) {
+			break;
+		}
+		/* Skip # comments (rest of line). */
+		if ( token[0] == '#' ) {
+			while ( parse && *parse && *parse != '\n' ) {
+				parse++;
+			}
+			continue;
+		}
+		if ( !load->skyboxHdr[0] && Q_stricmp( token, "exposure" ) &&
+				Q_stricmp( token, "rotation" ) && Q_stricmp( token, "intensity" ) &&
+				Q_stricmp( token, "projection" ) ) {
+			Q_strncpyz( load->skyboxHdr, token, sizeof( load->skyboxHdr ) );
+			continue;
+		}
+		if ( !Q_stricmp( token, "exposure" ) ) {
+			token = COM_Parse( &parse );
+			if ( token && token[0] ) {
+				load->skyboxHdrExposure = Q_atof( token );
+			}
+		} else if ( !Q_stricmp( token, "rotation" ) ) {
+			token = COM_Parse( &parse );
+			if ( token && token[0] ) {
+				load->skyboxHdrRotation = Q_atof( token );
+			}
+		} else if ( !Q_stricmp( token, "intensity" ) ) {
+			token = COM_Parse( &parse );
+			if ( token && token[0] ) {
+				load->skyboxHdrIntensity = Q_atof( token );
+			}
+		} else if ( !Q_stricmp( token, "projection" ) ) {
+			token = COM_Parse( &parse );
+			if ( token && token[0] ) {
+				load->skyboxHdrProjection = atoi( token );
+			}
+		}
+	}
+
+	ri.FS_FreeFile( text );
+	if ( load->skyboxHdr[0] ) {
+		ri.Printf( PRINT_ALL, "...BSP30 skybox sidecar %s -> %s\n", sidecar, load->skyboxHdr );
+	}
+}
+
+static image_t *GS_FindEnvSkyFace( const char *skyname, const char *suf ) {
+	char pathname[MAX_QPATH];
+	image_t *image;
+	imgFlags_t flags = IMGFLAG_CLAMPTOEDGE | IMGFLAG_MIPMAP;
+
+	/* Half-Life: gfx/env/<name>rt.tga (no underscore). */
+	Com_sprintf( pathname, sizeof( pathname ), "gfx/env/%s%s", skyname, suf );
+	image = R_FindImageFile( pathname, flags, 0 );
+	if ( image ) {
+		return image;
+	}
+
+	/* Quake 3 style: gfx/env/<name>_rt.tga */
+	Com_sprintf( pathname, sizeof( pathname ), "gfx/env/%s_%s", skyname, suf );
+	image = R_FindImageFile( pathname, flags, 0 );
+	if ( image ) {
+		return image;
+	}
+
+	Com_sprintf( pathname, sizeof( pathname ), "env/%s%s", skyname, suf );
+	image = R_FindImageFile( pathname, flags, 0 );
+	if ( image ) {
+		return image;
+	}
+
+	Com_sprintf( pathname, sizeof( pathname ), "env/%s_%s", skyname, suf );
+	return R_FindImageFile( pathname, flags, 0 );
+}
+
+static shader_t *GS_CreateSkyShader( bsp30RenderLoad_t *load ) {
+	static const char *suf[6] = { "rt", "bk", "lf", "ft", "up", "dn" };
+	image_t *faces[6];
+	int i;
+	qboolean any = qfalse;
+
+	Com_Memset( faces, 0, sizeof( faces ) );
+
+	if ( SkyboxHDR_IsLoaded() ) {
+		SkyboxHDR_BuildDisplayFaces();
+		for ( i = 0; i < 6; i++ ) {
+			faces[i] = SkyboxHDR_GetDisplayFace( i );
+			if ( faces[i] ) {
+				any = qtrue;
+			}
+		}
+		if ( any ) {
+			ri.Printf( PRINT_ALL, "...BSP30 sky: HDR/OpenEXR display faces\n" );
+			return R_CreateSkyShaderFromFaces( "*bsp30/sky_hdr", faces );
+		}
+	}
+
+	if ( load->skyname[0] ) {
+		for ( i = 0; i < 6; i++ ) {
+			faces[i] = GS_FindEnvSkyFace( load->skyname, suf[i] );
+			if ( faces[i] ) {
+				any = qtrue;
+			} else {
+				faces[i] = tr.defaultImage;
+			}
+		}
+		if ( any ) {
+			ri.Printf( PRINT_ALL, "...BSP30 sky: env faces for skyname '%s'\n", load->skyname );
+			return R_CreateSkyShaderFromFaces( va( "*bsp30/sky_%s", load->skyname ), faces );
+		}
+		ri.Printf( PRINT_WARNING, "...BSP30 sky: skyname '%s' env faces not found\n", load->skyname );
+	}
+
+	/* Minimal sky so sky brushes still take the sky iterator (solid/fastsky clear). */
+	for ( i = 0; i < 6; i++ ) {
+		faces[i] = tr.defaultImage;
+	}
+	return R_CreateSkyShaderFromFaces( "*bsp30/sky", faces );
+}
+
+static qboolean GS_IsSkyTextureName( const char *textureName ) {
+	if ( !textureName || !textureName[0] ) {
+		return qfalse;
+	}
+	/* GoldSrc sky brushes use the texture named "sky" (or sky*). */
+	return ( !Q_stricmpn( textureName, "sky", 3 ) ) ? qtrue : qfalse;
 }
 
 static int GS_LoadReferencedWads( const bsp30RenderLoad_t *load,
@@ -288,6 +525,10 @@ static void GS_LoadTextures( bsp30RenderLoad_t *load ) {
 	}
 	numWads = needsWads ? GS_LoadReferencedWads( load, wads ) : 0;
 
+	if ( !load->skyShader ) {
+		load->skyShader = GS_CreateSkyShader( load );
+	}
+
 	for ( i = 0; i < numTextures; i++ ) {
 		int textureOffset = LittleLong( ((const int32_t *)( lump + 4 ))[i] );
 		const bsp30_miptex_t *miptex;
@@ -318,6 +559,13 @@ static void GS_LoadTextures( bsp30RenderLoad_t *load ) {
 		}
 		load->textureWidths[i] = (int)width;
 		load->textureHeights[i] = (int)height;
+
+		if ( GS_IsSkyTextureName( textureName ) ) {
+			load->textureShaders[i] = load->skyShader ? load->skyShader : tr.defaultShader;
+			load->world->shaders[i].surfaceFlags |= SURF_SKY;
+			continue;
+		}
+
 		image = GS_CreateTextureImage( shaderName, miptex, lumpLength - textureOffset );
 		if ( image ) {
 			embeddedCount++;
@@ -361,6 +609,134 @@ static void GS_LoadPlanes( bsp30RenderLoad_t *load ) {
 		plane->type = PlaneTypeForNormal( plane->normal );
 		SetPlaneSignbits( plane );
 	}
+}
+
+/*
+================
+GS_FaceLightmapExtents
+
+Compute lightmap mins (in luxels) and size for a face from texture vectors.
+================
+*/
+static qboolean GS_FaceLightmapExtents( const float (*points)[VERTEXSIZE], int numPoints,
+		const bsp30_texinfo_t *texinfo, int lightmapMins[2], int lightmapSize[2] ) {
+	float mins[2], maxs[2];
+	float vecs[2][4];
+	int i, axis;
+
+	for ( axis = 0; axis < 2; axis++ ) {
+		int c;
+		for ( c = 0; c < 4; c++ ) {
+			vecs[axis][c] = LittleFloat( texinfo->vecs[axis][c] );
+		}
+	}
+
+	mins[0] = mins[1] = 1e30f;
+	maxs[0] = maxs[1] = -1e30f;
+	for ( i = 0; i < numPoints; i++ ) {
+		float s = DotProduct( points[i], vecs[0] ) + vecs[0][3];
+		float t = DotProduct( points[i], vecs[1] ) + vecs[1][3];
+		if ( s < mins[0] ) mins[0] = s;
+		if ( t < mins[1] ) mins[1] = t;
+		if ( s > maxs[0] ) maxs[0] = s;
+		if ( t > maxs[1] ) maxs[1] = t;
+	}
+
+	for ( axis = 0; axis < 2; axis++ ) {
+		int imin = (int)floor( mins[axis] / BSP30_LUXEL_SIZE );
+		int imax = (int)ceil( maxs[axis] / BSP30_LUXEL_SIZE );
+		lightmapMins[axis] = imin;
+		lightmapSize[axis] = imax - imin + 1;
+		if ( lightmapSize[axis] < 1 ) {
+			lightmapSize[axis] = 1;
+		}
+		if ( lightmapSize[axis] > BSP30_MAX_LUXEL_DIM ) {
+			return qfalse;
+		}
+	}
+	return qtrue;
+}
+
+/*
+================
+GS_SampleFaceLuxel
+
+Bilinear sample style-0 RGB from the BSP30 lighting lump.
+================
+*/
+static void GS_SampleFaceLuxel( const byte *lighting, int lightingLen, int lightofs,
+		int lightmapMins[2], int lightmapSize[2],
+		const bsp30_texinfo_t *texinfo, const float *point, byte outRGB[4] ) {
+	float vecs[2][4];
+	float s, t, ls, lt;
+	int x0, y0, x1, y1;
+	float fx, fy;
+	int stride;
+	int base;
+	int axis, c;
+	float r = 0.0f, g = 0.0f, b = 0.0f;
+	float w00, w10, w01, w11;
+	const byte *p00, *p10, *p01, *p11;
+
+	outRGB[0] = outRGB[1] = outRGB[2] = 255;
+	outRGB[3] = 255;
+
+	if ( !lighting || lightingLen <= 0 || lightofs < 0 ) {
+		return;
+	}
+	if ( lightmapSize[0] < 1 || lightmapSize[1] < 1 ) {
+		return;
+	}
+
+	for ( axis = 0; axis < 2; axis++ ) {
+		for ( c = 0; c < 4; c++ ) {
+			vecs[axis][c] = LittleFloat( texinfo->vecs[axis][c] );
+		}
+	}
+
+	s = DotProduct( point, vecs[0] ) + vecs[0][3];
+	t = DotProduct( point, vecs[1] ) + vecs[1][3];
+	ls = s / BSP30_LUXEL_SIZE - (float)lightmapMins[0];
+	lt = t / BSP30_LUXEL_SIZE - (float)lightmapMins[1];
+
+	if ( ls < 0.0f ) ls = 0.0f;
+	if ( lt < 0.0f ) lt = 0.0f;
+	if ( ls > (float)( lightmapSize[0] - 1 ) ) ls = (float)( lightmapSize[0] - 1 );
+	if ( lt > (float)( lightmapSize[1] - 1 ) ) lt = (float)( lightmapSize[1] - 1 );
+
+	x0 = (int)ls;
+	y0 = (int)lt;
+	x1 = x0 + 1;
+	y1 = y0 + 1;
+	if ( x1 >= lightmapSize[0] ) x1 = lightmapSize[0] - 1;
+	if ( y1 >= lightmapSize[1] ) y1 = lightmapSize[1] - 1;
+	fx = ls - (float)x0;
+	fy = lt - (float)y0;
+
+	stride = lightmapSize[0] * 3;
+	base = lightofs;
+	if ( base < 0 || base + lightmapSize[0] * lightmapSize[1] * 3 > lightingLen ) {
+		return;
+	}
+
+	p00 = lighting + base + y0 * stride + x0 * 3;
+	p10 = lighting + base + y0 * stride + x1 * 3;
+	p01 = lighting + base + y1 * stride + x0 * 3;
+	p11 = lighting + base + y1 * stride + x1 * 3;
+
+	w00 = ( 1.0f - fx ) * ( 1.0f - fy );
+	w10 = fx * ( 1.0f - fy );
+	w01 = ( 1.0f - fx ) * fy;
+	w11 = fx * fy;
+
+	r = w00 * p00[0] + w10 * p10[0] + w01 * p01[0] + w11 * p11[0];
+	g = w00 * p00[1] + w10 * p10[1] + w01 * p01[1] + w11 * p11[1];
+	b = w00 * p00[2] + w10 * p10[2] + w01 * p01[2] + w11 * p11[2];
+
+	outRGB[0] = (byte)(int)Com_Clamp( 0.0f, 255.0f, r + 0.5f );
+	outRGB[1] = (byte)(int)Com_Clamp( 0.0f, 255.0f, g + 0.5f );
+	outRGB[2] = (byte)(int)Com_Clamp( 0.0f, 255.0f, b + 0.5f );
+	outRGB[3] = 255;
 }
 
 static int GS_SurfaceVertex( const bsp30RenderLoad_t *load, int surfedgeIndex ) {
@@ -445,7 +821,6 @@ static void GS_LoadSurfaces( bsp30RenderLoad_t *load ) {
 		for ( j = 0; j < numPoints; j++ ) {
 			int vertexIndex = GS_SurfaceVertex( load, firstEdge + j );
 			float *point = face->points[j];
-			byte white[4] = { 255, 255, 255, 255 };
 			int k;
 			if ( vertexIndex < 0 || vertexIndex >= numVertices ) {
 				ri.Error( ERR_DROP, "%s: invalid BSP30 vertex", __func__ );
@@ -457,13 +832,54 @@ static void GS_LoadSurfaces( bsp30RenderLoad_t *load ) {
 			point[6] = ( DotProduct( point, texinfo->vecs[0] ) + LittleFloat( texinfo->vecs[0][3] ) ) / textureWidth;
 			point[7] = ( DotProduct( point, texinfo->vecs[1] ) + LittleFloat( texinfo->vecs[1][3] ) ) / textureHeight;
 			point[8] = point[9] = 0.0f;
-			R_ColorShiftLightingBytes( white, (byte *)&point[10], qtrue );
 #else
 			point[3] = ( DotProduct( point, texinfo->vecs[0] ) + LittleFloat( texinfo->vecs[0][3] ) ) / textureWidth;
 			point[4] = ( DotProduct( point, texinfo->vecs[1] ) + LittleFloat( texinfo->vecs[1][3] ) ) / textureHeight;
 			point[5] = point[6] = 0.0f;
-			R_ColorShiftLightingBytes( white, (byte *)&point[7], qtrue );
 #endif
+		}
+
+		/* Sample GoldSrc lighting lump into vertex colors (style 0). */
+		{
+			byte lit[4] = { 255, 255, 255, 255 };
+			int lightmapMins[2] = { 0, 0 };
+			int lightmapSize[2] = { 1, 1 };
+			int lightofs = LittleLong( faces[i].lightofs );
+			int texFlags = LittleLong( texinfo->flags );
+			const byte *lighting = GS_LumpData( load, BSP30_LUMP_LIGHTING );
+			int lightingLen = GS_LumpLength( load, BSP30_LUMP_LIGHTING );
+			qboolean useLit = qfalse;
+
+			if ( !( texFlags & BSP30_TEX_SPECIAL ) &&
+					faces[i].styles[0] != 255 &&
+					lightofs >= 0 &&
+					GS_FaceLightmapExtents( face->points, numPoints, texinfo, lightmapMins, lightmapSize ) ) {
+				useLit = qtrue;
+			}
+
+			if ( useLit ) {
+				s_bsp30LitFaces++;
+			} else if ( texFlags & BSP30_TEX_SPECIAL ) {
+				s_bsp30SpecialFaces++;
+			} else {
+				s_bsp30WhiteFaces++;
+			}
+
+			for ( j = 0; j < numPoints; j++ ) {
+				float *point = face->points[j];
+				if ( useLit ) {
+					GS_SampleFaceLuxel( lighting, lightingLen, lightofs, lightmapMins, lightmapSize,
+						texinfo, point, lit );
+				} else {
+					lit[0] = lit[1] = lit[2] = 255;
+					lit[3] = 255;
+				}
+#ifdef USE_VK_PBR
+				R_ColorShiftLightingBytes( lit, (byte *)&point[10], qtrue );
+#else
+				R_ColorShiftLightingBytes( lit, (byte *)&point[7], qtrue );
+#endif
+			}
 		}
 
 		/*
@@ -538,6 +954,10 @@ static void GS_LoadSurfaces( bsp30RenderLoad_t *load ) {
 #endif
 		surface->data = (surfaceType_t *)face;
 	}
+
+	ri.Printf( PRINT_ALL,
+		"...BSP30 lighting: %d faces sampled from lighting lump, %d special/unlit, %d white-fallback\n",
+		s_bsp30LitFaces, s_bsp30SpecialFaces, s_bsp30WhiteFaces );
 }
 
 static void GS_LoadMarksurfaces( bsp30RenderLoad_t *load ) {
@@ -694,10 +1114,34 @@ void R_LoadBSP30World( const char *mapname, const byte *buffer, int size, world_
 	load.header = (const bsp30_header_t *)buffer;
 	load.world = world;
 
+	s_bsp30LitFaces = 0;
+	s_bsp30WhiteFaces = 0;
+	s_bsp30SpecialFaces = 0;
+
 	GS_ValidateHeader( &load, mapname );
 	tr.numLightmaps = 0;
 	tr.mergeLightmaps = qfalse;
 	tr.worldDeluxeMapping = qfalse;
+
+	GS_ParseWorldspawnSky( &load );
+	GS_TryLoadSkyboxSidecar( &load, mapname );
+	if ( load.skyboxHdr[0] ) {
+		if ( SkyboxHDR_ConfigureFromMap( load.skyboxHdr, load.skyboxHdrExposure,
+				load.skyboxHdrRotation, load.skyboxHdrIntensity, load.skyboxHdrProjection ) ) {
+			ri.Printf( PRINT_ALL, "...BSP30 skybox_hdr '%s'\n", load.skyboxHdr );
+		} else {
+			ri.Printf( PRINT_WARNING, "...BSP30 skybox_hdr failed to load '%s'\n",
+					load.skyboxHdr );
+		}
+	} else {
+		/*
+		 * No map-requested HDR sky — clear so a prior map's panorama does not
+		 * leak onto this BSP (e.g. surf_aztec → another map).
+		 */
+		ri.Cvar_Set( "r_skyboxHDR", "" );
+		SkyboxHDR_UpdateRuntime();
+	}
+
 	GS_LoadTextures( &load );
 	GS_LoadPlanes( &load );
 	GS_LoadSurfaces( &load );

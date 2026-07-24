@@ -217,6 +217,8 @@ typedef enum {
 	 */
 	CG_CM_BOXTRACE_EX,
 
+	CG_R_REGISTERFONTATLAS,
+
 	CG_TRAP_GETVALUE = COM_TRAP_GETVALUE,
 
 } cgameImport_t;

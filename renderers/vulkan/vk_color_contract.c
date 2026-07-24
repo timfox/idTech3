@@ -259,6 +259,18 @@ static void VK_Color_PipelineStatus_f( void )
 		"       refract→weapon→volumetric→bloom→exposure→tonemap→grade→display→ui\n" );
 	ri.Printf( PRINT_ALL,
 		"spaces: TEXTURE_SRGB|LINEAR → SCENE_LINEAR_HDR → PREEXPOSED → DISPLAY_LINEAR → DISPLAY_ENCODED\n" );
+	ri.Printf( PRINT_ALL,
+		"lightmaps: bytes=%s scale=%.3f mapOverbright=%d intensity=%.3f\n",
+		( r_lightmap_srgb_decode && r_lightmap_srgb_decode->integer )
+			? "sRGB (decoded to linear)" : "linear",
+		r_hdr_lightmap_scale ? r_hdr_lightmap_scale->value : 1.0f,
+		r_mapOverBrightBits ? r_mapOverBrightBits->integer : 0,
+		r_intensity ? r_intensity->value : 1.0f );
+	if ( r_hdr_lightmap_scale && r_hdr_lightmap_scale->value > 4.0f ) {
+		ri.Printf( PRINT_WARNING, S_COLOR_YELLOW
+			"  warning: lightmap scale > 4 can dominate exposure; verify this is intentional\n"
+			S_COLOR_WHITE );
+	}
 	ri.Printf( PRINT_ALL, "OIT production=%s (r_oit=%d: 0=off 1=WBOIT production 2=MBOIT experimental)\n",
 		( oit == 1 ) ? "WBOIT" : ( oit == 2 ) ? "MBOIT(experimental)" : "off",
 		oit );

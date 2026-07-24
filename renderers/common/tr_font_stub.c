@@ -185,6 +185,17 @@ void RE_RegisterFont( const char *fontName, int pointSize, fontInfo_t *font ) {
 	ri.Printf( PRINT_DEVELOPER, "RE_RegisterFont: no cached font data for '%s' at %dpt\n", fontName, pointSize );
 }
 
+qboolean RE_RegisterFontAtlas( const char *fontName, int pointSize, const char *alphabet, fontAtlasInfo_t *out ) {
+	(void)fontName;
+	(void)pointSize;
+	(void)alphabet;
+	if ( out ) {
+		Com_Memset( out, 0, sizeof( *out ) );
+	}
+	ri.Printf( PRINT_WARNING, "RE_RegisterFontAtlas: FreeType not available\n" );
+	return qfalse;
+}
+
 void RE_ClearTrueTypeFontCache( void ) {
 	registeredFontCount = 0;
 	Com_Memset( registeredFont, 0, sizeof( registeredFont ) );

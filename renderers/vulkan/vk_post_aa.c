@@ -13,6 +13,10 @@ typedef struct {
 	float localContrast;
 	int maxSearchSteps;
 	float corner_rounding;
+	float zNear;
+	float zFar;
+	float depthRejectRel;
+	float pad;
 } SMAAPushConstants_t;
 
 typedef struct {
@@ -30,7 +34,8 @@ qboolean vk_post_aa_output_active( void )
 }
 
 static qboolean vk_run_smaa_pass( VkPipeline pipeline, VkRenderPass pass, VkFramebuffer framebuffer,
-	VkDescriptorSet color_descriptor, VkDescriptorSet aux_descriptor, uint32_t width, uint32_t height )
+	VkDescriptorSet color_descriptor, VkDescriptorSet aux_descriptor, uint32_t width, uint32_t height,
+	qboolean bindDepthForCompose )
 {
 	if ( !pipeline || pass == VK_NULL_HANDLE || framebuffer == VK_NULL_HANDLE ||
 		vk.pipeline_layout_smaa == VK_NULL_HANDLE || color_descriptor == VK_NULL_HANDLE ) {
@@ -58,14 +63,23 @@ static qboolean vk_run_smaa_pass( VkPipeline pipeline, VkRenderPass pass, VkFram
 		}
 		pc.corner_rounding = ( r_smaa_corner_rounding && r_smaa_corner_rounding->value >= 0.0f ) ?
 			( r_smaa_corner_rounding->value <= 1.0f ? r_smaa_corner_rounding->value : 1.0f ) : 0.2f;
+		pc.zNear = ( r_znear && r_znear->value > 0.0f ) ? r_znear->value : 4.0f;
+		pc.zFar = backEnd.viewParms.zFar > pc.zNear ? backEnd.viewParms.zFar : 4096.0f;
+		pc.depthRejectRel = 0.05f;
+		pc.pad = 0.0f;
 		qvkCmdPushConstants( vk.cmd->command_buffer, vk.pipeline_layout_smaa, VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof( pc ), &pc );
 	}
 
 	{
-		VkDescriptorSet descriptor_sets[2];
+		VkDescriptorSet descriptor_sets[3];
+		uint32_t setCount = 2u;
 		descriptor_sets[0] = color_descriptor;
 		descriptor_sets[1] = ( aux_descriptor != VK_NULL_HANDLE ) ? aux_descriptor : color_descriptor;
-		qvkCmdBindDescriptorSets( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.pipeline_layout_smaa, 0, 2, descriptor_sets, 0, NULL );
+		if ( bindDepthForCompose && vk.depth_descriptor[vk.cmd_index] != VK_NULL_HANDLE ) {
+			descriptor_sets[2] = vk.depth_descriptor[vk.cmd_index];
+			setCount = 3u;
+		}
+		qvkCmdBindDescriptorSets( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.pipeline_layout_smaa, 0, setCount, descriptor_sets, 0, NULL );
 	}
 
 	{
@@ -116,17 +130,17 @@ static qboolean vk_smaa_passes( void )
 	vk_spine_expect_layout( VK_SPINE_RES_HDR_COLOR, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
 		VK_SPINE_PASS_SMAA, "smaa_edge_input" );
 	if ( !vk_run_smaa_pass( vk.smaa_edge_pipeline, vk.render_pass.smaa_edge, vk.framebuffers.smaa_edge,
-		vk.smaa_edge_descriptor, vk.smaa_edge_descriptor, w, h ) ) {
+		vk.smaa_edge_descriptor, vk.smaa_edge_descriptor, w, h, qfalse ) ) {
 		vk_spine_pass_end( VK_SPINE_PASS_SMAA );
 		return qfalse;
 	}
 	if ( !vk_run_smaa_pass( vk.smaa_blend_pipeline, vk.render_pass.smaa_blend, vk.framebuffers.smaa_blend,
-		vk.smaa_edge_descriptor, vk.smaa_blend_descriptor, w, h ) ) {
+		vk.smaa_edge_descriptor, vk.smaa_blend_descriptor, w, h, qfalse ) ) {
 		vk_spine_pass_end( VK_SPINE_PASS_SMAA );
 		return qfalse;
 	}
 	if ( !vk_run_smaa_pass( vk.smaa_compose_pipeline, vk.render_pass.smaa_compose, vk.framebuffers.smaa_compose,
-		vk.smaa_edge_descriptor, vk.smaa_compose_descriptor, w, h ) ) {
+		vk.smaa_edge_descriptor, vk.smaa_compose_descriptor, w, h, qtrue ) ) {
 		vk_spine_pass_end( VK_SPINE_PASS_SMAA );
 		return qfalse;
 	}

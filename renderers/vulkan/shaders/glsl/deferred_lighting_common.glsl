@@ -10,6 +10,7 @@
 
 #include "forward_plus_cluster.glsl"
 #include "pbr_brdf_core.glsl"
+#include "surface_material_decode.glsl"
 #include "gbuffer_octahedral.glsl"
 #include "lightmap_decode.glsl"
 
@@ -251,6 +252,14 @@ vec4 shadeDeferredPixel( uvec2 pix ) {
 		clearcoat = ( pc.normalsAreWorld != 0u ) ? clamp( material.a, 0.0, 1.0 ) : 0.0;
 	}
 	float aoCoupling = mix( 1.0, materialAO, clamp( pc.aoStrength, 0.0, 1.0 ) * shadingConfidence );
+	SurfaceMaterial surfaceMaterial = SurfaceMaterialDecodeCanonical(
+		albedo, 1.0, Nsamp, roughness, metalness, materialAO,
+		vec3( 0.0 ), clearcoat, mix( 0.08, 0.35, roughness ), 0.0,
+		0u, 0u, mixedOwned ? OPAQUE_OWNER_DEFERRED : OPAQUE_OWNER_FORWARD_PLUS, 0u );
+	albedo = surfaceMaterial.baseColor;
+	roughness = surfaceMaterial.perceptualRoughness;
+	metalness = surfaceMaterial.metallic;
+	materialAO = surfaceMaterial.ambientOcclusion;
 	vec3 V = safeNormalizeOr( -viewPos, vec3( 0.0, 0.0, 1.0 ) );
 	N = safeNormalizeOr( mix( vec3( 0.0, 0.0, 1.0 ), N, max( shadingConfidence, 0.15 ) ), vec3( 0.0, 0.0, 1.0 ) );
 	vec3 F0 = mix( vec3( 0.04 ), albedo, metalness );

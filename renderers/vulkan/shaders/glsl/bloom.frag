@@ -1,6 +1,39 @@
 #version 450
+#extension GL_GOOGLE_include_directive : require
+
+#include "depth_view.glsl"
 
 layout(set = 0, binding = 0) uniform sampler2D texture0;
+layout(set = 1, binding = 0) uniform sampler2D depthTex;
+layout(set = 2, binding = 0) uniform PostFXParams {
+	mat4 invViewProj;
+	mat4 prevViewProj;
+	mat4 viewMatrix;
+	vec4 motionBlur;
+	vec4 depthOfField;
+	vec4 frameInfo;
+	vec4 depthParams;
+	vec4 toneMapParams0;
+	vec4 toneMapParams1;
+	vec4 colorBalance;
+	vec4 colorGrade;
+	vec4 colorGrade2;
+	vec4 shadowsLift;
+	vec4 midsGamma;
+	vec4 highlightsGain;
+	vec4 splitShadow;
+	vec4 splitHighlight;
+	vec4 lensEffects0;
+	vec4 lensEffects1;
+	vec4 runtimeFlags;
+	vec4 lutParams;
+	vec4 autoExposureParams;
+	vec4 localExposureParams;
+	vec4 taaParams;
+	vec4 temporalValidity;
+	vec4 weaponTemporalParams;
+	vec4 temporalDebugParams;
+} postfx;
 
 layout(location = 0) in vec2 frag_tex_coord;
 
@@ -18,39 +51,74 @@ layout(constant_id = 32) const int firefly_neighborhood = 1;
 layout(constant_id = 33) const int firefly_debug = 0;
 
 const vec3 sRGB = vec3( 0.2126, 0.7152, 0.0722 );
+const float BLOOM_EDGE_DEPTH_SHARP = 64.0;
+const float BLOOM_EDGE_SUPPRESS_REL = 0.08;
 
 float luma( vec3 c ) {
 	return max( dot( sRGB, c ), 0.0 );
 }
 
-/* Soft threshold: smooth transition from threshold to threshold+knee (Karis/UE4 style). */
 float softWeight( float v ) {
 	float k = max( knee, 0.001 );
 	return smoothstep( threshold, threshold + k, v );
 }
 
-/* Robust local luminance: cross or 3×3 (median-of-sort / trimmed mean approximation). */
+/*
+ * Exposure-relative bloom: threshold against exposed luminance so the knee stays
+ * perceptually stable as eye adaptation moves. autoExposureParams.z packs
+ * adaptedExposure (see vk_postfx_params.c).
+ */
+float bloomMeterLuma( float sceneLuma ) {
+	float adapted = max( postfx.autoExposureParams.z, 1e-4 );
+	/* z <= 0 means EV-relative disabled by host packing. */
+	if ( postfx.autoExposureParams.z <= 0.0 ) {
+		return sceneLuma;
+	}
+	return sceneLuma * adapted;
+}
+
+float viewDepthAt( vec2 uv ) {
+	float d = textureLod( depthTex, uv, 0.0 ).r;
+	return Depth_LinearizeReversedZ( d, postfx.depthParams.x, postfx.depthParams.y );
+}
+
+/* Depth-aware firefly reference: ignore unrelated surfaces at silhouettes so
+ * bright foreground does not raise the local reference on background pixels
+ * (and vice versa), which seeds bloom energy outside the true mesh contour. */
 float robustNeighborhoodLuma( vec2 uv ) {
 	vec2 texel = 1.0 / vec2( textureSize( texture0, 0 ) );
 	float samples[9];
 	int n = 0;
+	float centerView = viewDepthAt( uv );
+	float centerL = luma( textureLod( texture0, uv, 0.0 ).rgb );
 
-	if ( firefly_neighborhood <= 0 ) {
-		/* Cross: center + 4-neighbors. */
-		samples[n++] = luma( textureLod( texture0, uv, 0.0 ).rgb );
-		samples[n++] = luma( textureLod( texture0, uv + vec2( texel.x, 0.0 ), 0.0 ).rgb );
-		samples[n++] = luma( textureLod( texture0, uv - vec2( texel.x, 0.0 ), 0.0 ).rgb );
-		samples[n++] = luma( textureLod( texture0, uv + vec2( 0.0, texel.y ), 0.0 ).rgb );
-		samples[n++] = luma( textureLod( texture0, uv - vec2( 0.0, texel.y ), 0.0 ).rgb );
-	} else {
-		for ( int y = -1; y <= 1; y++ ) {
-			for ( int x = -1; x <= 1; x++ ) {
-				samples[n++] = luma( textureLod( texture0, uv + vec2( float( x ), float( y ) ) * texel, 0.0 ).rgb );
+	samples[n++] = centerL;
+
+	int yMin = -1;
+	int yMax = 1;
+	int xMin = -1;
+	int xMax = 1;
+
+	for ( int y = yMin; y <= yMax; y++ ) {
+		for ( int x = xMin; x <= xMax; x++ ) {
+			if ( x == 0 && y == 0 ) {
+				continue;
 			}
+			/* Cross-only mode: center was added above; retain all four axial
+			 * neighbors and skip only diagonals. */
+			if ( firefly_neighborhood <= 0 && x != 0 && y != 0 ) {
+				continue;
+			}
+			vec2 suv = uv + vec2( float( x ), float( y ) ) * texel;
+			float sv = viewDepthAt( suv );
+			float dw = Depth_BilateralWeight( centerView, sv, BLOOM_EDGE_DEPTH_SHARP );
+			if ( dw < 0.05 ) {
+				continue;
+			}
+			samples[n++] = luma( textureLod( texture0, suv, 0.0 ).rgb );
 		}
 	}
 
-	/* Insertion sort first n samples; take median (or trimmed mean for mode 2). */
 	for ( int i = 1; i < n; i++ ) {
 		float key = samples[i];
 		int j = i - 1;
@@ -62,7 +130,6 @@ float robustNeighborhoodLuma( vec2 uv ) {
 	}
 
 	if ( firefly_neighborhood >= 2 && n >= 5 ) {
-		/* Trimmed mean: drop lowest and highest. */
 		float sum = 0.0;
 		for ( int i = 1; i < n - 1; i++ ) {
 			sum += samples[i];
@@ -70,6 +137,35 @@ float robustNeighborhoodLuma( vec2 uv ) {
 		return sum / float( n - 2 );
 	}
 	return samples[n / 2];
+}
+
+/* Suppress extract on the far/dark side of a strong depth edge when a near
+ * bright neighbor would otherwise leak into BloomSourceHDR before the pyramid. */
+float silhouetteExtractGate( vec2 uv, float centerLuma ) {
+	vec2 texel = 1.0 / vec2( textureSize( depthTex, 0 ) );
+	float centerView = viewDepthAt( uv );
+	float maxNearLuma = centerLuma;
+	float maxRel = 0.0;
+	vec2 offs[4] = vec2[]( vec2( texel.x, 0.0 ), vec2( -texel.x, 0.0 ),
+		vec2( 0.0, texel.y ), vec2( 0.0, -texel.y ) );
+	for ( int i = 0; i < 4; i++ ) {
+		vec2 suv = uv + offs[i];
+		float sv = viewDepthAt( suv );
+		float rel = abs( sv - centerView ) / max( centerView, 1e-3 );
+		maxRel = max( maxRel, rel );
+		/* Neighbor is in front of center (smaller positive view-depth). */
+		if ( sv + 1e-3 < centerView ) {
+			maxNearLuma = max( maxNearLuma, luma( textureLod( texture0, suv, 0.0 ).rgb ) );
+		}
+	}
+	if ( maxRel < BLOOM_EDGE_SUPPRESS_REL ) {
+		return 1.0;
+	}
+	/* Far-side pixel next to much brighter foreground: do not seed bloom. */
+	if ( maxNearLuma > centerLuma * 1.35 + 0.05 ) {
+		return 0.0;
+	}
+	return 1.0;
 }
 
 vec3 applyFireflyClamp( vec3 source, out float localRef, out float clampedLuma, out float removed ) {
@@ -119,18 +215,25 @@ void main() {
 		return;
 	}
 
+	float edgeGate = silhouetteExtractGate( frag_tex_coord, luma( base ) );
+	base *= edgeGate;
+
 	float weight;
 	if ( extract_mode == 1 ) {
-		weight = softWeight( ( base.r + base.g + base.b ) * 0.33333333 );
+		weight = softWeight( bloomMeterLuma( ( base.r + base.g + base.b ) * 0.33333333 ) );
 	} else if ( extract_mode == 2 ) {
-		weight = softWeight( dot( sRGB, base ) );
+		weight = softWeight( bloomMeterLuma( dot( sRGB, base ) ) );
 	} else {
 		float brightest = max( max( base.r, base.g ), base.b );
-		weight = softWeight( brightest );
+		weight = softWeight( bloomMeterLuma( brightest ) );
 	}
 
 	if ( firefly_debug == 6 ) {
 		out_color = vec4( base * weight, 1.0 );
+		return;
+	}
+	if ( firefly_debug == 7 ) {
+		out_color = vec4( vec3( edgeGate ), 1.0 );
 		return;
 	}
 

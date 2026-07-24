@@ -30,6 +30,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "cl_vector_font.h"
 #include "ui_filter.h"
 #include "q_utf8.h"
+#include "cl_openhmd.h"
 
 static qboolean	scr_initialized;		// ready to draw
 
@@ -1923,7 +1924,7 @@ void SCR_UpdateScreen( void ) {
 	{
 		int in_anaglyphMode = Cvar_VariableIntegerValue("r_anaglyphMode");
 		// if running in stereo, we need to draw the frame twice
-		if ( cls.glconfig.stereoEnabled || in_anaglyphMode) {
+		if ( cls.glconfig.stereoEnabled || in_anaglyphMode || OHMD_WantStereo() ) {
 			SCR_DrawScreenField( STEREO_LEFT );
 			SCR_DrawScreenField( STEREO_RIGHT );
 		} else {

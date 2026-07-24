@@ -190,7 +190,7 @@ static void mdfour_result(struct mdfour *md, byte *out)
 	copy4(out+12, md->D);
 }
 
-static void mdfour(byte *out, const byte *in, int n)
+static void mdfour_digest(byte *out, const byte *in, int n)
 {
 	struct mdfour md;
 	mdfour_begin(&md);
@@ -205,7 +205,7 @@ unsigned Com_BlockChecksum (const void *buffer, int length)
 	int				digest[4];
 	unsigned	val;
 
-	mdfour( (byte *)digest, (const byte *)buffer, length );
+	mdfour_digest( (byte *)digest, (const byte *)buffer, length );
 	
 	val = digest[0] ^ digest[1] ^ digest[2] ^ digest[3];
 

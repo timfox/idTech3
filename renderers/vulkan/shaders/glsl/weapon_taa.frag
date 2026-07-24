@@ -1,4 +1,7 @@
 #version 450
+#extension GL_GOOGLE_include_directive : require
+
+#include "depth_view.glsl"
 
 layout(set = 0, binding = 0) uniform sampler2D currentCombinedColor;
 layout(set = 1, binding = 0) uniform sampler2D currentDepth;
@@ -71,11 +74,18 @@ void main() {
 		all(lessThanEqual(historyUV, vec2(1.0)));
 	vec2 safeHistoryUV = validMotion ? clamp(historyUV, 0.0, 1.0) : uv;
 	float previousClass = textureLod(previousClassTex, safeHistoryUV, 0.0).r;
-	float depthNow = textureLod(currentDepth, uv, 0.0).r;
-	float depthPrev = textureLod(previousWeaponDepth, safeHistoryUV, 0.0).r;
-	float depthError = abs(depthNow - depthPrev);
+	/* Relative positive view-depth (meters), matching world TAA / AV.
+	 * Raw device-Z under-rejects at reversed-Z weapon range [0.6,1] and leaves
+	 * luminous temporal fringes outside the current-frame silhouette. */
+	float zNear = max(postfx.depthParams.x, 1e-4);
+	float zFar = max(postfx.depthParams.y, zNear + 1e-3);
+	float depthNowNdc = textureLod(currentDepth, uv, 0.0).r;
+	float depthPrevNdc = textureLod(previousWeaponDepth, safeHistoryUV, 0.0).r;
+	float viewNow = Depth_LinearizeReversedZ(depthNowNdc, zNear, zFar);
+	float viewPrev = Depth_LinearizeReversedZ(depthPrevNdc, zNear, zFar);
+	float relativeDepthError = abs(viewNow - viewPrev) / max(max(viewNow, viewPrev), 1e-3);
 	float depthThreshold = max(postfx.weaponTemporalParams.z, 1e-5);
-	float depthConfidence = 1.0 - smoothstep(depthThreshold * 0.25, depthThreshold, depthError);
+	float depthConfidence = 1.0 - smoothstep(depthThreshold * 0.25, depthThreshold, relativeDepthError);
 	float rawReactive = textureLod(reactiveMaskTex, uv, 0.0).r;
 	float reactive = rawReactive * max(postfx.weaponTemporalParams.w, 0.0);
 	float debugMode = postfx.shadowsLift.w;

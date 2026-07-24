@@ -413,11 +413,57 @@ qboolean FS_Initialized( void ) {
 
 /*
 =================
+FS_SurfPakIndex
+
+For Surf paks (zzz-surf-announcer), returns the index into
+fs_serverReferencedPaks[] whose name matches this pack, or -1 if no
+match.  Matches both exact base names (e.g. "zzz-surf-announcer") and
+checksummed download variants (e.g. "zzz-surf-announcer.0abcdef0").
+=================
+*/
+#ifndef DEDICATED
+static int FS_SurfPakIndex( const pack_t *pack ) {
+	static const char *surfPaks[] = {
+		"zzz-surf-announcer"
+	};
+	size_t t;
+	int i;
+	const char *base;
+	int baseLen;
+	char qualifiedName[MAX_OSPATH];
+
+	for ( t = 0; t < ARRAY_LEN( surfPaks ); t++ ) {
+		base = surfPaks[t];
+		baseLen = (int)strlen( base );
+
+		if ( Q_stricmpn( pack->pakBasename, base, baseLen ) != 0 )
+			continue;
+		/* Exact match or checksummed variant (basename.xxxxxxxx). */
+		if ( pack->pakBasename[baseLen] != '\0' &&
+		     pack->pakBasename[baseLen] != '.' )
+			continue;
+
+		Com_sprintf( qualifiedName, sizeof( qualifiedName ),
+		             "%s/%s", pack->pakGamename, base );
+
+		for ( i = 0; i < fs_numServerReferencedPaks; i++ ) {
+			if ( !fs_serverReferencedPakNames[i] )
+				continue;
+			if ( !Q_stricmp( fs_serverReferencedPakNames[i], qualifiedName ) )
+				return i;
+		}
+	}
+	return -1;
+}
+#endif
+
+
+/*
+=================
 FS_PakIsPure
 =================
 */
 static qboolean FS_PakIsPure( const pack_t *pack ) {
-	(void)pack;
 #ifndef DEDICATED
 	int i;
 	if ( fs_numServerPaks ) {
@@ -430,6 +476,14 @@ static qboolean FS_PakIsPure( const pack_t *pack ) {
 			}
 		}
 		return qfalse;	// not on the pure server pak list
+	}
+
+	/* Non-pure mode: Surf announcer still requires a server checksum match
+	   so the correct version loads even without sv_pure. */
+	if ( fs_numServerReferencedPaks ) {
+		i = FS_SurfPakIndex( pack );
+		if ( i >= 0 && pack->checksum != fs_serverReferencedPaks[i] )
+			return qfalse;
 	}
 #endif
 	return qtrue;

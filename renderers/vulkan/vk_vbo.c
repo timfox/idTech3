@@ -24,6 +24,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "vk.h"
 #include "vk_cmd.h"
 #include "vk_util.h"
+#include "vk_geometry_corruption.h"
 
 #ifdef USE_VBO
 
@@ -1027,13 +1028,31 @@ static void VBO_AddItemDataToSoftBuffer( int itemIndex )
 {
 	vbo_t *vbo = &world_vbo;
 	const vbo_item_t *vi = vbo->items + itemIndex;
-
 	const uint32_t offset = vk_tess_index( vi->num_indexes, vbo->ibo_buffer + vi->soft_offset );
+	uint32_t expected;
 
-	if ( vbo->soft_buffer_indexes == 0 )
-	{
-		// start recording into host-visible memory
+	/* Overflow returns ~0U and schedules a geometry-buffer resize. Do not
+	 * inflate soft draw counts or bind a poison index offset — that submits
+	 * garbage UINT32 indices and explodes triangles across the screen. */
+	if ( offset == ~0U ) {
+		vk_geometry_corruption_note_soft_ibo_reject();
+		return;
+	}
+
+	if ( vbo->soft_buffer_indexes == 0 ) {
 		vbo->soft_buffer_offset = offset;
+	} else {
+		expected = vbo->soft_buffer_offset +
+			vbo->soft_buffer_indexes * (uint32_t)sizeof( tess.indexes[0] );
+		if ( offset != expected ) {
+			/* Non-contiguous tess ring within one PrepareQueues pass. */
+			ri.Printf( PRINT_WARNING,
+				"[VBO] soft IBO non-contiguous upload (got %u expected %u); dropping soft run\n",
+				offset, expected );
+			vbo->soft_buffer_indexes = 0;
+			vbo->soft_buffer_offset = 0;
+			return;
+		}
 	}
 
 	vbo->soft_buffer_indexes += vi->num_indexes;
@@ -1069,7 +1088,7 @@ void VBO_RenderIBOItems( void )
 	}
 
 	// from host-visible memory
-	if ( vbo->soft_buffer_indexes )
+	if ( vbo->soft_buffer_indexes && vbo->soft_buffer_offset != ~0U )
 	{
 		vk_bind_index_buffer( vk.cmd->vertex_buffer, vbo->soft_buffer_offset );
 

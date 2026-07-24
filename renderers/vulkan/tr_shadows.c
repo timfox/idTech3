@@ -21,6 +21,33 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 */
 #include "tr_local.h"
 
+#include <math.h>
+
+
+/*
+=================
+R_ShadowClipDist
+
+Trace a ray through the clip BSP (which includes detail brushes) to find
+the nearest solid surface, then place the shadow back face just past it.
+=================
+*/
+static float R_ShadowClipDist( const vec3_t start, const vec3_t dir, float maxDist ) {
+	trace_t	trace;
+	vec3_t	end;
+
+	VectorMA( start, maxDist, dir, end );
+
+	ri.CM_PointTrace( &trace, start, end, CONTENTS_SOLID );
+
+	if ( trace.fraction >= 1.0f ) {
+		return maxDist;	// no solid hit, use full distance
+	}
+
+	// place back face just past the wall surface
+	return trace.fraction * maxDist + r_shadowClipPenetration->value;
+}
+
 
 /*
 
@@ -36,7 +63,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 typedef struct {
 	int		i2;
-	int		facing;
+	int		count;	// signed directed-edge accumulator
 } edgeDef_t;
 
 #define	MAX_EDGE_DEFS	32
@@ -44,88 +71,94 @@ typedef struct {
 static	edgeDef_t	edgeDefs[SHADER_MAX_VERTEXES][MAX_EDGE_DEFS];
 static	int			numEdgeDefs[SHADER_MAX_VERTEXES];
 static	int			facing[SHADER_MAX_INDEXES/3];
+static	int			numLitTris;
+static	int			litTriIndexes[SHADER_MAX_INDEXES];
+static	float		clipDists[SHADER_MAX_VERTEXES];
+static	qboolean	needsTrace[SHADER_MAX_VERTEXES];
+static	int			weld[SHADER_MAX_VERTEXES];
+static	float		clipDistsPreB[SHADER_MAX_VERTEXES];	// per-vertex clip distances before Phase B
 
-static void R_AddEdgeDef( int i1, int i2, int f ) {
-	int		c;
+// Accumulate an undirected edge with a signed count, oriented by lo<hi.
+// A manifold edge between two lit tris gets +1 and -1 (opposite windings) ->
+// net 0 -> not a silhouette. A boundary/silhouette edge gets one sign only ->
+// net +/-1 -> emitted. Non-manifold edges sum to a consistent net value, keeping
+// stencil parity balanced instead of leaking.
+static void R_AddSilEdge( int a, int b ) {
+	int		lo, hi, dir, c, k;
 
-	c = numEdgeDefs[ i1 ];
-	if ( c == MAX_EDGE_DEFS ) {
-		return;		// overflow
+	if ( a == b ) {
+		return;		// degenerate after welding
 	}
-	edgeDefs[ i1 ][ c ].i2 = i2;
-	edgeDefs[ i1 ][ c ].facing = f;
+	if ( a < b ) { lo = a; hi = b; dir =  1; }
+	else         { lo = b; hi = a; dir = -1; }
 
-	numEdgeDefs[ i1 ]++;
+	c = numEdgeDefs[ lo ];
+	for ( k = 0; k < c; k++ ) {
+		if ( edgeDefs[ lo ][ k ].i2 == hi ) {	// existing undirected edge
+			edgeDefs[ lo ][ k ].count += dir;
+			return;
+		}
+	}
+	if ( c < MAX_EDGE_DEFS ) {
+		edgeDefs[ lo ][ c ].i2    = hi;
+		edgeDefs[ lo ][ c ].count = dir;
+		numEdgeDefs[ lo ]++;
+	}
 }
 
 
 static void R_CalcShadowEdges( void ) {
-	qboolean sil_edge;
-	int		i;
-	int		c, c2;
-	int		j, k;
-	int		i2;
-	color4ub_t *colors;
+	int		lo, k;
 
 	tess.numIndexes = 0;
 
-	// an edge is NOT a silhouette edge if its face doesn't face the light,
-	// or if it has a reverse paired edge that also faces the light.
-	// A well behaved polyhedron would have exactly two faces for each edge,
-	// but lots of models have dangling edges or overfanned edges
-	for ( i = 0; i < tess.numVertexes; i++ ) {
-		c = numEdgeDefs[ i ];
-		for ( j = 0 ; j < c ; j++ ) {
-			if ( !edgeDefs[ i ][ j ].facing ) {
+	// emit a silhouette quad for every edge with a non-zero signed count.
+	// net>0 keeps the lo->hi orientation, net<0 reverses it, so the emitted
+	// winding always matches the lit triangle that contributed the edge.
+	for ( lo = 0; lo < tess.numVertexes; lo++ ) {
+		int c = numEdgeDefs[ lo ];
+		for ( k = 0; k < c; k++ ) {
+			int hi  = edgeDefs[ lo ][ k ].i2;
+			int net = edgeDefs[ lo ][ k ].count;
+			int ia, ib, n;
+
+			if ( net == 0 ) {
 				continue;
 			}
+			if ( net > 0 ) { ia = lo; ib = hi; }
+			else           { ia = hi; ib = lo; net = -net; }
 
-			sil_edge = qtrue;
-			i2 = edgeDefs[ i ][ j ].i2;
-			c2 = numEdgeDefs[ i2 ];
-			for ( k = 0 ; k < c2 ; k++ ) {
-				if ( edgeDefs[ i2 ][ k ].i2 == i && edgeDefs[ i2 ][ k ].facing ) {
-					sil_edge = qfalse;
-					break;
-				}
-			}
-
-			// if it doesn't share the edge with another front facing
-			// triangle, it is a sil edge
-			if ( sil_edge ) {
-				if ( tess.numIndexes > (int)ARRAY_LEN( tess.indexes ) - 6 ) {
-					i = tess.numVertexes;
-					break;
+			for ( n = 0; n < net; n++ ) {		// net is ~always 1
+				if ( tess.numIndexes > ARRAY_LEN( tess.indexes ) - 6 ) {
+					goto done;
 				}
 #ifdef USE_VULKAN
-				tess.indexes[ tess.numIndexes + 0 ] = i;
-				tess.indexes[ tess.numIndexes + 1 ] = i2;
-				tess.indexes[ tess.numIndexes + 2 ] = i + tess.numVertexes;
-				tess.indexes[ tess.numIndexes + 3 ] = i2;
-				tess.indexes[ tess.numIndexes + 4 ] = i2 + tess.numVertexes;
-				tess.indexes[ tess.numIndexes + 5 ] = i + tess.numVertexes;
+				tess.indexes[ tess.numIndexes + 0 ] = ia;
+				tess.indexes[ tess.numIndexes + 1 ] = ib;
+				tess.indexes[ tess.numIndexes + 2 ] = ia + tess.numVertexes;
+				tess.indexes[ tess.numIndexes + 3 ] = ib;
+				tess.indexes[ tess.numIndexes + 4 ] = ib + tess.numVertexes;
+				tess.indexes[ tess.numIndexes + 5 ] = ia + tess.numVertexes;
 #else
-				tess.indexes[ tess.numIndexes + 0 ] = i;
-				tess.indexes[ tess.numIndexes + 1 ] = i + tess.numVertexes;
-				tess.indexes[ tess.numIndexes + 2 ] = i2;
-				tess.indexes[ tess.numIndexes + 3 ] = i2;
-				tess.indexes[ tess.numIndexes + 4 ] = i + tess.numVertexes;
-				tess.indexes[ tess.numIndexes + 5 ] = i2 + tess.numVertexes;
+				tess.indexes[ tess.numIndexes + 0 ] = ia;
+				tess.indexes[ tess.numIndexes + 1 ] = ia + tess.numVertexes;
+				tess.indexes[ tess.numIndexes + 2 ] = ib;
+				tess.indexes[ tess.numIndexes + 3 ] = ib;
+				tess.indexes[ tess.numIndexes + 4 ] = ia + tess.numVertexes;
+				tess.indexes[ tess.numIndexes + 5 ] = ib + tess.numVertexes;
 #endif
 				tess.numIndexes += 6;
 			}
 		}
 	}
-
+done:
 #ifdef USE_VULKAN
 	tess.numVertexes *= 2;
-
-	colors = &tess.svars.colors[0][0]; // we need at least 2x SHADER_MAX_VERTEXES there
-
-	for ( i = 0; i < tess.numVertexes; i++ ) {
-		Vector4Set( colors[i].rgba, 50, 50, 50, 255 );
-	}
+	// Shadow pipelines have colorWriteMask = 0, so only position data is needed.
+	// Binding 1 (color) and 2 (texcoord) are declared by TYPE_SINGLE_TEXTURE but
+	// left unbound — the GPU never reads them.
 #endif
+	;
 }
 
 
@@ -155,58 +188,238 @@ void RB_ShadowTessEnd( void ) {
 		return;
 	}
 
+#ifdef USE_PMLIGHT
 	if ( r_dlightMode->integer == 2 && r_shadows->integer == 2 )
 		VectorCopy( backEnd.currentEntity->shadowLightDir, lightDir );
 	else
+#endif
 		VectorCopy( backEnd.currentEntity->lightDir, lightDir );
 
-	// clamp projection by height
-	if ( lightDir[2] > 0.1 ) {
-		float s = 0.1 / lightDir[2];
-		VectorScale( lightDir, s, lightDir );
-	}
+	// project vertexes away from light direction, clipped to BSP walls
+	{
+		float	extrusionDist = r_shadowDistance->value;
+		vec3_t	worldNegLightDir;
 
-	// project vertexes away from light direction
-	for ( i = 0; i < tess.numVertexes; i++ ) {
-		VectorMA( tess.xyz[i], -512, lightDir, tess.xyz[i+tess.numVertexes] );
-	}
+		// decide which triangles face the light (must happen before clip distance
+		// computation so we can identify silhouette edge vertices and only trace those)
+		Com_Memset( numEdgeDefs, 0, tess.numVertexes * sizeof( numEdgeDefs[0] ) );
 
-	// decide which triangles face the light
-	Com_Memset( numEdgeDefs, 0, tess.numVertexes * sizeof( numEdgeDefs[0] ) );
+		// build positional weld map: weld[i] = canonical vertex index sharing i's
+		// position. UV seams split one logical vertex into several index copies;
+		// welding by position collapses them so the silhouette forms closed loops.
+		// Hashed on tess.xyz before extrusion (only indices < tess.numVertexes).
+		{
+			#define WELD_EPS    0.05f
+			#define WELD_INVEPS ( 1.0f / WELD_EPS )
+			// hsize must be a power of two for the open-addressing probe to cover
+			// every slot. next_pow2( 2*numVertexes ) < 4*SHADER_MAX_VERTEXES, so the
+			// table always fits and no (non-pow2) cap is needed.
+			static int htab[ 4 * SHADER_MAX_VERTEXES ];
+			int hsize = 1;
+			while ( hsize < tess.numVertexes * 2 ) hsize <<= 1;
+			Com_Memset( htab, 0xff, hsize * sizeof( htab[0] ) );	// fill with -1
 
-	numTris = tess.numIndexes / 3;
-	for ( i = 0 ; i < numTris ; i++ ) {
-		int		i1, i2, i3;
-		vec3_t	d1, d2, normal;
-		float	*v1, *v2, *v3;
-		float	d;
-
-		i1 = tess.indexes[ i*3 + 0 ];
-		i2 = tess.indexes[ i*3 + 1 ];
-		i3 = tess.indexes[ i*3 + 2 ];
-
-		v1 = tess.xyz[ i1 ];
-		v2 = tess.xyz[ i2 ];
-		v3 = tess.xyz[ i3 ];
-
-		VectorSubtract( v2, v1, d1 );
-		VectorSubtract( v3, v1, d2 );
-		CrossProduct( d1, d2, normal );
-
-		d = DotProduct( normal, lightDir );
-		if ( d > 0 ) {
-			facing[ i ] = 1;
-		} else {
-			facing[ i ] = 0;
+			for ( i = 0; i < tess.numVertexes; i++ ) {
+				int kx = (int)floorf( tess.xyz[i][0] * WELD_INVEPS + 0.5f );
+				int ky = (int)floorf( tess.xyz[i][1] * WELD_INVEPS + 0.5f );
+				int kz = (int)floorf( tess.xyz[i][2] * WELD_INVEPS + 0.5f );
+				unsigned h = ( (unsigned)kx * 73856093u ) ^ ( (unsigned)ky * 19349663u )
+						   ^ ( (unsigned)kz * 83492791u );
+				h &= (unsigned)( hsize - 1 );
+				weld[i] = i;
+				for ( ; htab[h] != -1; h = ( h + 1 ) & ( hsize - 1 ) ) {
+					int j = htab[h];
+					if ( (int)floorf( tess.xyz[j][0] * WELD_INVEPS + 0.5f ) == kx &&
+						 (int)floorf( tess.xyz[j][1] * WELD_INVEPS + 0.5f ) == ky &&
+						 (int)floorf( tess.xyz[j][2] * WELD_INVEPS + 0.5f ) == kz ) {
+						weld[i] = weld[j];	// same position -> share canonical id
+						break;
+					}
+				}
+				if ( weld[i] == i ) htab[h] = i;	// first occurrence claims the slot
+			}
 		}
 
-		// create the edges
-		R_AddEdgeDef( i1, i2, facing[ i ] );
-		R_AddEdgeDef( i2, i3, facing[ i ] );
-		R_AddEdgeDef( i3, i1, facing[ i ] );
+		numTris = tess.numIndexes / 3;
+		for ( i = 0 ; i < numTris ; i++ ) {
+			int		i1, i2, i3;
+			vec3_t	d1, d2, normal;
+			float	*v1, *v2, *v3;
+			float	d;
+
+			i1 = tess.indexes[ i*3 + 0 ];
+			i2 = tess.indexes[ i*3 + 1 ];
+			i3 = tess.indexes[ i*3 + 2 ];
+
+			v1 = tess.xyz[ i1 ];
+			v2 = tess.xyz[ i2 ];
+			v3 = tess.xyz[ i3 ];
+
+			VectorSubtract( v2, v1, d1 );
+			VectorSubtract( v3, v1, d2 );
+			CrossProduct( d1, d2, normal );
+
+			d = DotProduct( normal, lightDir );
+			if ( d > 0 ) {
+				facing[ i ] = 1;
+			} else {
+				facing[ i ] = 0;
+			}
+
+			// create the silhouette edges from welded indices, lit tris only
+			if ( facing[ i ] ) {
+				R_AddSilEdge( weld[i1], weld[i2] );
+				R_AddSilEdge( weld[i2], weld[i3] );
+				R_AddSilEdge( weld[i3], weld[i1] );
+			}
+		}
+
+			// save lit-facing triangle indices for back cap
+		numLitTris = 0;
+		for ( i = 0; i < numTris; i++ ) {
+			if ( facing[i] ) {
+				litTriIndexes[ numLitTris*3 + 0 ] = tess.indexes[ i*3 + 0 ];
+				litTriIndexes[ numLitTris*3 + 1 ] = tess.indexes[ i*3 + 1 ];
+				litTriIndexes[ numLitTris*3 + 2 ] = tess.indexes[ i*3 + 2 ];
+				numLitTris++;
+			}
+		}
+
+		if ( r_shadowClip->integer && tr.world ) {
+			int j;
+			// entity-local lightDir to world space, negated for extrusion
+			for ( j = 0; j < 3; j++ )
+				worldNegLightDir[j] = -( lightDir[0] * backEnd.or.axis[0][j]
+									   + lightDir[1] * backEnd.or.axis[1][j]
+									   + lightDir[2] * backEnd.or.axis[2][j] );
+
+			// mark vertices on lit-facing triangles — back-facing vertices
+			// don't contribute to silhouette edges or back caps, so skip them
+			Com_Memset( needsTrace, 0, tess.numVertexes * sizeof( needsTrace[0] ) );
+			for ( i = 0; i < numTris; i++ ) {
+				if ( facing[i] ) {
+					needsTrace[ tess.indexes[ i*3 + 0 ] ] = qtrue;
+					needsTrace[ tess.indexes[ i*3 + 1 ] ] = qtrue;
+					needsTrace[ tess.indexes[ i*3 + 2 ] ] = qtrue;
+				}
+			}
+		}
+
+		// Phase A: compute per-vertex clip distances (skip back-facing vertices)
+		for ( i = 0; i < tess.numVertexes; i++ ) {
+			clipDists[i] = extrusionDist;
+
+			if ( r_shadowClip->integer && tr.world && needsTrace[i] ) {
+				int j;
+				vec3_t worldPos;
+				float clipped;
+				for ( j = 0; j < 3; j++ )
+					worldPos[j] = tess.xyz[i][0] * backEnd.or.axis[0][j]
+								+ tess.xyz[i][1] * backEnd.or.axis[1][j]
+								+ tess.xyz[i][2] * backEnd.or.axis[2][j]
+								+ backEnd.or.origin[j];
+
+				clipped = R_ShadowClipDist( worldPos, worldNegLightDir, clipDists[i] );
+				if ( clipped < clipDists[i] )
+					clipDists[i] = clipped;
+			}
+		}
+
+		// snapshot the traced clip distances so Phase B extends from this fixed base
+		Com_Memcpy( clipDistsPreB, clipDists, tess.numVertexes * sizeof( clipDists[0] ) );
+
+		// Phase B: extend each vertex toward its triangle's max clip distance, capped
+		// at r_shadowClipExtension past its own traced distance. Reading the snapshot
+		// bounds the total extension across the triangles a vertex shares.
+		if ( r_shadowClip->integer && tr.world ) {
+			float ext = r_shadowClipExtension->value;
+			int t, numTrisLocal = tess.numIndexes / 3;
+			for ( t = 0; t < numTrisLocal; t++ ) {
+				int e;
+				int idx[3];
+				float maxD;
+				idx[0] = tess.indexes[ t*3 + 0 ];
+				idx[1] = tess.indexes[ t*3 + 1 ];
+				idx[2] = tess.indexes[ t*3 + 2 ];
+				maxD = clipDistsPreB[ idx[0] ];
+				if ( clipDistsPreB[ idx[1] ] > maxD ) maxD = clipDistsPreB[ idx[1] ];
+				if ( clipDistsPreB[ idx[2] ] > maxD ) maxD = clipDistsPreB[ idx[2] ];
+				// skip if any vertex didn't hit solid (would pull the face to full distance)
+				if ( maxD >= extrusionDist )
+					continue;
+				for ( e = 0; e < 3; e++ ) {
+					int v = idx[e];
+					float target = maxD;
+					if ( target > clipDistsPreB[v] + ext )
+						target = clipDistsPreB[v] + ext;
+					if ( target > clipDists[v] )
+						clipDists[v] = target;
+				}
+			}
+		}
+
+		// Unify each weld group to one clip distance so the welded silhouette sides
+		// and the original-index caps extrude to the same place.
+		if ( r_shadowClip->integer && tr.world ) {
+			static float gmaxTraced[SHADER_MAX_VERTEXES];
+			for ( i = 0; i < tess.numVertexes; i++ )
+				gmaxTraced[i] = -1.0f;
+			// give each group the farthest clip distance among its hit members, so
+			// coincident seam copies extrude together. Members still at full distance
+			// (back-facing or missed) are excluded.
+			for ( i = 0; i < tess.numVertexes; i++ )
+				if ( clipDists[i] < extrusionDist && clipDists[i] > gmaxTraced[ weld[i] ] )
+					gmaxTraced[ weld[i] ] = clipDists[i];
+			for ( i = 0; i < tess.numVertexes; i++ )
+				if ( gmaxTraced[ weld[i] ] >= 0.0f )
+					clipDists[i] = gmaxTraced[ weld[i] ];
+		}
+
+		// Phase C: extrude vertices using final clip distances
+		for ( i = 0; i < tess.numVertexes; i++ ) {
+			VectorMA( tess.xyz[i], -clipDists[i], lightDir, tess.xyz[i+tess.numVertexes] );
+		}
 	}
 
 	R_CalcShadowEdges();
+
+	// back cap: lit-facing tris at extruded positions (original winding for VK Y-flip)
+	{
+		int nvOrig = tess.numVertexes / 2;
+		for ( i = 0; i < numLitTris; i++ ) {
+			if ( tess.numIndexes > ARRAY_LEN( tess.indexes ) - 3 )
+				break;
+#ifdef USE_VULKAN
+			tess.indexes[ tess.numIndexes + 0 ] = litTriIndexes[ i*3 + 0 ] + nvOrig;
+			tess.indexes[ tess.numIndexes + 1 ] = litTriIndexes[ i*3 + 1 ] + nvOrig;
+			tess.indexes[ tess.numIndexes + 2 ] = litTriIndexes[ i*3 + 2 ] + nvOrig;
+#else
+			tess.indexes[ tess.numIndexes + 0 ] = litTriIndexes[ i*3 + 0 ] + nvOrig;
+			tess.indexes[ tess.numIndexes + 1 ] = litTriIndexes[ i*3 + 2 ] + nvOrig;
+			tess.indexes[ tess.numIndexes + 2 ] = litTriIndexes[ i*3 + 1 ] + nvOrig;
+#endif
+			tess.numIndexes += 3;
+		}
+	}
+
+	// near cap: lit-facing tris at original positions, wound opposite the far
+	// cap, closing the volume on the light side as z-fail requires.
+	{
+		for ( i = 0; i < numLitTris; i++ ) {
+			if ( tess.numIndexes > ARRAY_LEN( tess.indexes ) - 3 )
+				break;
+#ifdef USE_VULKAN
+			tess.indexes[ tess.numIndexes + 0 ] = litTriIndexes[ i*3 + 0 ];
+			tess.indexes[ tess.numIndexes + 1 ] = litTriIndexes[ i*3 + 2 ];
+			tess.indexes[ tess.numIndexes + 2 ] = litTriIndexes[ i*3 + 1 ];
+#else
+			tess.indexes[ tess.numIndexes + 0 ] = litTriIndexes[ i*3 + 0 ];
+			tess.indexes[ tess.numIndexes + 1 ] = litTriIndexes[ i*3 + 1 ];
+			tess.indexes[ tess.numIndexes + 2 ] = litTriIndexes[ i*3 + 2 ];
+#endif
+			tess.numIndexes += 3;
+		}
+	}
 
 	// draw the silhouette edges
 #ifdef USE_VULKAN
@@ -223,7 +436,7 @@ void RB_ShadowTessEnd( void ) {
 	}
 	vk_bind_pipeline( pipeline[0] ); // back-sided
 	vk_bind_index();
-	vk_bind_geometry( TESS_XYZ | TESS_RGBA0 );
+	vk_bind_geometry( TESS_XYZ );
 	vk_draw_geometry( DEPTH_RANGE_NORMAL, qtrue );
 	vk_bind_pipeline( pipeline[1] ); // front-sided
 	vk_draw_geometry( DEPTH_RANGE_NORMAL, qtrue );
@@ -238,8 +451,6 @@ void RB_ShadowTessEnd( void ) {
 	if ( qglLockArraysEXT )
 		qglLockArraysEXT( 0, tess.numVertexes*2 );
 
-	// draw the silhouette edges
-
 	qglDisable( GL_TEXTURE_2D );
 	//GL_Bind( tr.whiteImage );
 	GL_State( GLS_SRCBLEND_ONE | GLS_DSTBLEND_ZERO );
@@ -250,7 +461,8 @@ void RB_ShadowTessEnd( void ) {
 	qglColorMask( GL_FALSE, GL_FALSE, GL_FALSE, GL_FALSE );
 
 	qglEnable( GL_STENCIL_TEST );
-	qglStencilFunc( GL_ALWAYS, 1, 255 );
+	qglStencilFunc( GL_EQUAL, 0, 0x80 );   // skip entity-marked pixels (bit 7 set)
+	qglStencilMask( 0x7F );                 // only write shadow count to bits 0-6
 
 	GL_Cull( CT_BACK_SIDED );
 	qglStencilOp( GL_KEEP, GL_KEEP, GL_INCR );
@@ -264,6 +476,9 @@ void RB_ShadowTessEnd( void ) {
 
 	if ( qglUnlockArraysEXT )
 		qglUnlockArraysEXT();
+
+	qglStencilMask( 0xFF );
+	qglDisable( GL_STENCIL_TEST );
 
 	// re-enable writing to the color buffer
 	qglColorMask(rgba[0], rgba[1], rgba[2], rgba[3]);
@@ -309,11 +524,6 @@ void RB_ShadowFinish( void ) {
 		return;
 	}
 	if ( glConfig.stencilBits < 4 ) {
-		static qboolean warned;
-		if ( !warned ) {
-			ri.Printf( PRINT_WARNING, "Stencil shadows disabled: stencil %d bits (need 8). Set r_stencilbits 8 and vid_restart.\n", glConfig.stencilBits );
-			warned = qtrue;
-		}
 		return;
 	}
 
@@ -350,20 +560,26 @@ void RB_ShadowFinish( void ) {
 
 #else
 	qglEnable( GL_STENCIL_TEST );
-	qglStencilFunc( GL_NOTEQUAL, 0, 255 );
+	qglStencilFunc( GL_NOTEQUAL, 0, 0x7F );  // check shadow bits 0-6 only
 
 	qglDisable( GL_CLIP_PLANE0 );
 	GL_Cull( CT_TWO_SIDED );
 
 	qglDisable( GL_TEXTURE_2D );
 
+	// override projection to avoid portal oblique near plane clipping
+	qglMatrixMode( GL_PROJECTION );
+	qglPushMatrix();
+	qglLoadIdentity();
+	qglOrtho( -100, 100, -100, 100, -100, 100 );
+	qglMatrixMode( GL_MODELVIEW );
 	qglLoadIdentity();
 
 	qglColor4f( 0.6f, 0.6f, 0.6f, 1 );
-	GL_State( GLS_DEPTHMASK_TRUE | GLS_SRCBLEND_DST_COLOR | GLS_DSTBLEND_ZERO );
+	GL_State( GLS_SRCBLEND_DST_COLOR | GLS_DSTBLEND_ZERO | GLS_DEPTHTEST_DISABLE );
 
 	//qglColor4f( 1, 0, 0, 1 );
-	//GL_State( GLS_DEPTHMASK_TRUE | GLS_SRCBLEND_ONE | GLS_DSTBLEND_ZERO );
+	//GL_State( GLS_SRCBLEND_ONE | GLS_DSTBLEND_ZERO | GLS_DEPTHTEST_DISABLE );
 
 	GL_ClientState( 0, CLS_NONE );
 	qglVertexPointer( 3, GL_FLOAT, 0, verts );
@@ -371,6 +587,11 @@ void RB_ShadowFinish( void ) {
 
 	qglColor4f( 1, 1, 1, 1 );
 	qglDisable( GL_STENCIL_TEST );
+
+	// restore projection
+	qglMatrixMode( GL_PROJECTION );
+	qglPopMatrix();
+	qglMatrixMode( GL_MODELVIEW );
 
 	qglEnable( GL_TEXTURE_2D );
 #endif
@@ -401,9 +622,11 @@ void RB_ProjectionShadowDeform( void ) {
 
 	groundDist = backEnd.or.origin[2] - backEnd.currentEntity->e.shadowPlane;
 
+#ifdef USE_PMLIGHT
 	if ( r_dlightMode->integer == 2 && r_shadows->integer == 2 )
 		VectorCopy( backEnd.currentEntity->shadowLightDir, lightDir );
 	else
+#endif
 		VectorCopy( backEnd.currentEntity->lightDir, lightDir );
 
 	d = DotProduct( lightDir, ground );

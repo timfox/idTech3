@@ -22,6 +22,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 // cl.input.c  -- builds an intended movement command to send to the server
 
 #include "client.h"
+#include "cl_openhmd.h"
 #include "script_emit.h"
 #include "cl_voip.h"
 
@@ -469,7 +470,8 @@ void CL_MouseEvent( int dx, int dy /*, int time*/ ) {
 =================
 CL_JoystickEvent
 
-Joystick values stay set until changed
+Joystick values stay set until changed.
+SE_JOYSTICK_AXIS contract is -127..127; SDL may emit ±32767.
 =================
 */
 void CL_JoystickEvent( int axis, int value, int time ) {
@@ -477,6 +479,9 @@ void CL_JoystickEvent( int axis, int value, int time ) {
 	if ( axis < 0 || axis >= MAX_JOYSTICK_AXIS ) {
 		Com_Error( ERR_DROP, "CL_JoystickEvent: bad axis %i", axis );
 	} else {
+		if ( value > 127 || value < -127 ) {
+			value = ( value * 127 ) / 32767;
+		}
 		cl.joystickAxis[axis] = value;
 	}
 }
@@ -485,38 +490,40 @@ void CL_JoystickEvent( int axis, int value, int time ) {
 /*
 =================
 CL_JoystickMove
+
+Dual-stick layout for SDL gamepads / Steam Deck:
+  AXIS_SIDE / AXIS_FORWARD / AXIS_UP → movement
+  AXIS_YAW / AXIS_PITCH → look (right stick via j_yaw_axis / j_pitch_axis)
 =================
 */
 static void CL_JoystickMove( usercmd_t *cmd ) {
-	//int		movespeed;
 	float	anglespeed;
+	float	jyaw, jpitch, jforward, jside, jup;
 
 	if ( in_speed.active ^ cl_run->integer ) {
-		//movespeed = 2;
+		/* running */
 	} else {
-		//movespeed = 1;
 		cmd->buttons |= BUTTON_WALKING;
 	}
 
 	if ( in_speed.active ) {
-		anglespeed = 0.001 * cls.frametime * cl_anglespeedkey->value;
+		anglespeed = 0.001f * cls.frametime * cl_anglespeedkey->value;
 	} else {
-		anglespeed = 0.001 * cls.frametime;
+		anglespeed = 0.001f * cls.frametime;
 	}
 
-	if ( !in_strafe.active ) {
-		cl.viewangles[YAW] += anglespeed * cl_yawspeed->value * cl.joystickAxis[AXIS_SIDE];
-	} else {
-		cmd->rightmove = ClampCharMove( cmd->rightmove + cl.joystickAxis[AXIS_SIDE] );
-	}
+	jyaw = Cvar_VariableValue( "j_yaw" );
+	jpitch = Cvar_VariableValue( "j_pitch" );
+	jforward = Cvar_VariableValue( "j_forward" );
+	jside = Cvar_VariableValue( "j_side" );
+	jup = Cvar_VariableValue( "j_up" );
 
-	if ( in_mlooking ) {
-		cl.viewangles[PITCH] += anglespeed * cl_pitchspeed->value * cl.joystickAxis[AXIS_FORWARD];
-	} else {
-		cmd->forwardmove = ClampCharMove( cmd->forwardmove + cl.joystickAxis[AXIS_FORWARD] );
-	}
+	cl.viewangles[YAW] += anglespeed * jyaw * (float)cl.joystickAxis[AXIS_YAW];
+	cl.viewangles[PITCH] += anglespeed * jpitch * (float)cl.joystickAxis[AXIS_PITCH];
 
-	cmd->upmove = ClampCharMove( cmd->upmove + cl.joystickAxis[AXIS_UP] );
+	cmd->rightmove = ClampCharMove( cmd->rightmove + (int)( jside * (float)cl.joystickAxis[AXIS_SIDE] ) );
+	cmd->forwardmove = ClampCharMove( cmd->forwardmove + (int)( jforward * (float)cl.joystickAxis[AXIS_FORWARD] ) );
+	cmd->upmove = ClampCharMove( cmd->upmove + (int)( jup * (float)cl.joystickAxis[AXIS_UP] ) );
 }
 
 
@@ -691,10 +698,15 @@ static usercmd_t CL_CreateCmd( void ) {
 	CL_KeyMove( &cmd );
 
 	// get basic movement from mouse
-	CL_MouseMove( &cmd );
+	if ( !OHMD_BlockMouseLook() ) {
+		CL_MouseMove( &cmd );
+	}
 
 	// get basic movement from joystick
 	CL_JoystickMove( &cmd );
+
+	/* HMD orientation owns viewangles when OpenHMD is active. */
+	OHMD_ApplyViewAngles();
 
 	// check to make sure the angles haven't wrapped
 	if ( cl.viewangles[PITCH] - oldAngles[PITCH] > 90 ) {
@@ -911,7 +923,8 @@ void CL_WritePacket( int repeat ) {
 		for ( i = 0 ; i < count ; i++ ) {
 			j = (cl.cmdNumber - count + i + 1) & CMD_MASK;
 			cmd = &cl.cmds[j];
-			MSG_WriteDeltaUsercmdKey (&buf, key, oldcmd, cmd);
+			MSG_WriteDeltaUsercmdKey (&buf, key, oldcmd, cmd,
+				( clc.serverSupportsVR && Cvar_VariableIntegerValue( "vr" ) == 1 ) ? 32 : 16);
 			oldcmd = cmd;
 		}
 	}

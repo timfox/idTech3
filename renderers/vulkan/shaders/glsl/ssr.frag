@@ -40,17 +40,26 @@ vec3 normalFromDepth(vec2 uv, vec2 invSize, float maxDepthGradient, out bool val
 	float dxm = texture(depthTexture, uv - vec2(invSize.x, 0.0)).r;
 	float dym = texture(depthTexture, uv - vec2(0.0, invSize.y)).r;
 
-	float maxDiff = max(max(abs(dx - d), abs(dxm - d)), max(abs(dy - d), abs(dym - d)));
-	if (maxDiff > maxDepthGradient) {
-		valid = false;
-		return vec3(0.0);
-	}
-
 	vec3 p = viewFromDepth(uv, d);
 	vec3 px = viewFromDepth(uv + vec2(invSize.x, 0.0), dx);
 	vec3 py = viewFromDepth(uv + vec2(0.0, invSize.y), dy);
 	vec3 pxm = viewFromDepth(uv - vec2(invSize.x, 0.0), dxm);
 	vec3 pym = viewFromDepth(uv - vec2(0.0, invSize.y), dym);
+
+	/* Reject silhouette neighborhoods using positive view-depth (not device-Z). */
+	float cv = max( -p.z, 1e-3 );
+	float maxRel = max(
+		max( abs( -px.z - cv ), abs( -pxm.z - cv ) ),
+		max( abs( -py.z - cv ), abs( -pym.z - cv ) ) ) / cv;
+	float gradTol = max( maxDepthGradient, 0.02 );
+	/* Legacy cvars were tuned for device-Z (~0.08). Map small values to relative. */
+	if ( maxDepthGradient > 0.0 && maxDepthGradient < 0.5 ) {
+		gradTol = max( maxDepthGradient * 2.5, 0.02 );
+	}
+	if ( maxRel > gradTol ) {
+		valid = false;
+		return vec3(0.0);
+	}
 
 	vec3 ddx = (px - pxm) * 0.5;
 	vec3 ddy = (py - pym) * 0.5;

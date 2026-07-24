@@ -22,10 +22,49 @@ layout(std430, set = 0, binding = 8) buffer ReferenceMetrics {
 layout(push_constant) uniform CompositePush {
 	uvec4 extentMode;        /* xy full extent, z debug, w referenceValid */
 	vec4 params;             /* apply strength, mode, traced mask, visibility floor */
+	uvec4 traceExtent;       /* xy AV buffer extent (may be half-res), zw unused */
+	vec4 projInfo;           /* invProj00, invProj11, proj10, proj14 */
 } pc;
 
 vec3 heat(float e) {
 	return clamp(vec3(1.5 * e, 1.5 - abs(e * 3.0 - 1.5), 1.5 * (1.0 - e)), 0.0, 1.0);
+}
+
+/* Fetch AV with depth-aware upsample when the buffer is smaller than the frame.
+ * Uses the four nearest low-res texels (no bilinear across depth edges). */
+vec4 av_sample_filtered(vec2 uv, float centerDepth) {
+	uint tw = max(pc.traceExtent.x, 1u);
+	uint th = max(pc.traceExtent.y, 1u);
+	uint fw = max(pc.extentMode.x, 1u);
+	uint fh = max(pc.extentMode.y, 1u);
+	bool reduced = (tw < fw) || (th < fh);
+	if (!reduced || !av_valid_depth(centerDepth)) {
+		return textureLod(finalAV, uv, 0.0);
+	}
+	float centerView = av_positive_view_depth(centerDepth, pc.projInfo);
+	vec2 lowCoord = uv * vec2(tw, th) - 0.5;
+	ivec2 base = ivec2(floor(lowCoord));
+	vec2 f = fract(lowCoord);
+	ivec2 offs[4] = ivec2[](ivec2(0, 0), ivec2(1, 0), ivec2(0, 1), ivec2(1, 1));
+	float spat[4] = float[]((1.0 - f.x) * (1.0 - f.y), f.x * (1.0 - f.y),
+		(1.0 - f.x) * f.y, f.x * f.y);
+	vec4 accum = vec4(0.0);
+	float wsum = 0.0;
+	ivec2 tmax = ivec2(int(tw) - 1, int(th) - 1);
+	for (int i = 0; i < 4; ++i) {
+		ivec2 tc = clamp(base + offs[i], ivec2(0), tmax);
+		vec2 suv = (vec2(tc) + 0.5) / vec2(tw, th);
+		float sd = textureLod(depthTex, suv, 0.0).r;
+		float sv = av_positive_view_depth(sd, pc.projInfo);
+		float w = spat[i] * av_bilateral_depth_weight(centerView, sv, 48.0);
+		accum += texelFetch(finalAV, tc, 0) * w;
+		wsum += w;
+	}
+	if (wsum < 1e-5) {
+		ivec2 nearest = clamp(ivec2(round(uv * vec2(tw, th) - 0.5)), ivec2(0), tmax);
+		return texelFetch(finalAV, nearest, 0);
+	}
+	return accum / wsum;
 }
 
 void main() {
@@ -33,7 +72,8 @@ void main() {
 	if (any(greaterThanEqual(pix, pc.extentMode.xy))) return;
 	ivec2 ip = ivec2(pix);
 	vec2 uv = (vec2(pix) + 0.5) / vec2(pc.extentMode.xy);
-	vec4 av = textureLod(finalAV, uv, 0.0);
+	float centerDepth = textureLod(depthTex, uv, 0.0).r;
+	vec4 av = av_sample_filtered(uv, centerDepth);
 	vec4 aux = textureLod(finalAux, uv, 0.0);
 	vec4 gtao = textureLod(rawGTAO, uv, 0.0);
 	vec4 ref = textureLod(referenceAV, uv, 0.0);
@@ -43,7 +83,7 @@ void main() {
 	uint debugMode = pc.extentMode.z;
 	vec3 outRgb = scene.rgb;
 	if (pc.extentMode.w != 0u && (pix.x & 3u) == 0u && (pix.y & 3u) == 0u &&
-		av_valid_depth(textureLod(depthTex, uv, 0.0).r)) {
+		av_valid_depth(centerDepth)) {
 		float visibilityError = abs(av.r - ref.r);
 		float bentError = acos(clamp(dot(av_oct_decode(av.gb), av_oct_decode(ref.gb)), -1.0, 1.0)) / AV_PI;
 		atomicAdd(metrics.visibilityErrorSum, uint(clamp(visibilityError, 0.0, 1.0) * 2048.0 + 0.5));
@@ -69,24 +109,18 @@ void main() {
 		float a = acos(clamp(dot(av_oct_decode(av.gb), av_oct_decode(ref.gb)), -1.0, 1.0)) / AV_PI;
 		outRgb = heat(a);
 	} else if (debugMode == 17u) {
-		/* Visibility-cone specular fallback proxy; explicit traced reflections do not use it. */
 		float so = clamp(pow(av.r, mix(1.0, 0.25, av.a)), 0.0, 1.0);
 		outRgb = vec3(so);
 	} else if (debugMode == 20u) {
 		outRgb = vec3(1.0 - gtao.a, gtao.a, 0.0);
 	} else if (debugMode == 0u) {
-		/* CLASS_TRANSMISSION=3 and CLASS_EMISSIVE=4 are intentionally untouched.
-		 * Do not multiply full HDR by raw AO (that crushes lightmaps + direct + emissive).
-		 * Soft floor + luminance-weighted apply approximate "indirect only" ownership. */
-		if (cls != 3u && cls != 4u && av_valid_depth(textureLod(depthTex, uv, 0.0).r)) {
+		if (cls != 3u && cls != 4u && av_valid_depth(centerDepth)) {
 			float strength = clamp(pc.params.x, 0.0, 1.0);
 			float floorV = clamp(pc.params.w, 0.0, 0.75);
 			float rawVis = clamp(av.r, 0.0, 1.0);
 			float visibility = mix(1.0, rawVis, strength);
 			visibility = mix(floorV, 1.0, visibility);
 			float lum = dot(scene.rgb, vec3(0.2126, 0.7152, 0.0722));
-			/* Bright lit texels (likely direct/lightmap peaks) keep more energy;
-			 * darker recesses receive more AO grounding. */
 			float indirectWeight = clamp(1.0 - smoothstep(0.08, 0.85, lum), 0.15, 1.0);
 			float apply = mix(1.0, visibility, indirectWeight);
 			outRgb = scene.rgb * apply;

@@ -61,7 +61,7 @@ check "$DGB" 'vk.motion_vector_view' 'deferred debug can inspect real motion sid
 check "$DGB" 'direct material/motion export' 'direct export path preserves material shader output'
 check "$DGB" 'vk_end_render_pass' 'G-buffer capture leaves render pass before compute'
 check "$DGB" 'vk_resume_current_render_pass' 'G-buffer capture resumes main render pass'
-check "$ATTACH" 'material RGBA16F' 'deferred scaffold allocates expanded material export target'
+check "$ATTACH" 'deferred_gbuffer_material.*deferred_gbuffer_material_view' 'deferred scaffold allocates expanded material export target'
 check "$ATTACH" 'deferredGbufferDirectExport' 'deferred scaffold selects direct export when safe'
 check "$RPASS" 'colorRefs\[2\].attachment = 3' 'main render pass attaches direct normal target'
 check "$RPASS" 'colorRefs\[3\].attachment = 4' 'main render pass attaches direct material target'

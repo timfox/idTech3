@@ -747,7 +747,34 @@ static void CL_CompleteDemoName( const char *args, int argNum ) {
 
 	arg = Cmd_Argv( 1 );
 
+	// Surf TVD: route .tvd recordings to CL_TV_Open
 	ext_test = strrchr( arg, '.' );
+	if ( ext_test && !Q_stricmp( ext_test, ".tvd" ) ) {
+		Com_sprintf( name, sizeof( name ), "demos/%s", arg );
+
+		Cvar_Set( "sv_killserver", "2" );
+		CL_Disconnect( qtrue );
+
+		clc.demoplaying = qtrue;
+		Con_Close();
+
+		if ( !CL_TV_Open( name ) ) {
+			Com_Printf( S_COLOR_YELLOW "couldn't open Surf TV demo %s\n", name );
+			clc.demoplaying = qfalse;
+			return;
+		}
+
+		clc.lastPacketTime = cls.realtime;
+
+		Q_strncpyz( clc.demoName, arg, sizeof( clc.demoName ) );
+		Q_strncpyz( cls.servername, arg, sizeof( cls.servername ) );
+		cls.state = CA_CONNECTED;
+		clc.firstDemoFrameSkipped = qfalse;
+
+		CL_InitDownloads();
+		return;
+	}
+
 	if ( ext_test && !Q_stricmpn( ext_test + 1, DEMOEXT, ARRAY_LEN( DEMOEXT ) - 1 ) ) {
 		protocol = atoi( ext_test + ARRAY_LEN( DEMOEXT ) );
 

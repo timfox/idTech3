@@ -9,10 +9,12 @@ layout(push_constant) uniform LuminanceMetering {
 	float lowPercent;
 	float highPercent;
 	float centerWeight;
-	float reserved;
+	float skyWeight; /* 0=ignore bright upper samples, 1=neutral, >1 amplify sky in meter */
 } meter;
 
 const vec3 LUMA = vec3(0.2126, 0.7152, 0.0722);
+/* Soft-reject sun-core samples that survive percentile trim (stops above trimmed median). */
+const float SUN_REJECT_STOPS = 4.0;
 
 shared float s_logLum[256];
 shared float s_weight[256];
@@ -38,11 +40,29 @@ void main() {
 	float fy = (float(ly) + 0.5) / 16.0;
 	vec2 uv = vec2(fx, fy);
 	vec3 rgb = texture(hdrColorTexture, uv).rgb;
+	/* Skip non-finite pixels — they must not enter metering. */
 	float lum = max(dot(rgb, LUMA), 1e-6);
+	if ( !( lum == lum ) || isinf( lum ) ) {
+		lum = 1e-6;
+	}
 	float logLum = log2(lum);
 	vec2 centered = uv * 2.0 - 1.0;
 	float radial = clamp(1.0 - dot(centered, centered) * 0.5, 0.0, 1.0);
 	float weight = mix(1.0, 1.0 + max(meter.centerWeight, 0.0) * 3.0, radial * radial);
+
+	/*
+	 * Source-style sky participation: bright samples toward the top of the frame
+	 * (typical sky) influence metering by r_exposureSkyWeight. Extremes are still
+	 * trimmed by highPercent (sun disk) before the average.
+	 */
+	{
+		float skyW = clamp( meter.skyWeight, 0.0, 2.0 );
+		float upper = smoothstep( 0.55, 0.15, fy ); /* fy=0 top */
+		float bright = smoothstep( 0.4, 2.0, lum );
+		float skyLikely = upper * bright;
+		weight *= mix( 1.0, max( skyW, 0.05 ), skyLikely );
+	}
+
 	s_logLum[li] = logLum;
 	s_weight[li] = weight;
 
@@ -73,13 +93,25 @@ void main() {
 		float weightedSum = 0.0;
 		float weightSum = 0.0;
 		float avgLogLum;
+		float medianLog;
 
 		startIndex = clamp(startIndex, 0, 255);
 		endIndex = clamp(endIndex, startIndex + 1, 256);
 
+		/* Median of the percentile-trimmed band — sun core sits far above this. */
+		medianLog = s_logLum[( startIndex + endIndex - 1 ) / 2];
+
 		for (int i = startIndex; i < endIndex; ++i) {
-			weightedSum += s_logLum[i] * s_weight[i];
-			weightSum += s_weight[i];
+			float w = s_weight[i];
+			/*
+			 * Soft sun-core rejection: samples more than SUN_REJECT_STOPS above the
+			 * trimmed median keep a tiny residual weight so they cannot dominate,
+			 * while the broad bright sky (near the median) still pulls exposure down.
+			 */
+			float over = max( s_logLum[i] - medianLog - SUN_REJECT_STOPS, 0.0 );
+			w *= exp( -over * 2.0 );
+			weightedSum += s_logLum[i] * w;
+			weightSum += w;
 		}
 
 		avgLogLum = (weightSum > 0.0) ? (weightedSum / weightSum) : s_logLum[128];

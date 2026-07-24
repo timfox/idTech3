@@ -9,6 +9,52 @@
 #include "vk_view_state.h"
 #include "vk_volumetric_pass.h"
 
+/*
+ * Multi-sample screen-space sun visibility for lens artifacts.
+ * Does not erase the cubemap sun disc — only gates flare/diffraction energy.
+ */
+static float vk_lens_flare_sample_visibility( float sunUv[2] )
+{
+	cvar_t *dbg;
+	float vis = 1.0f;
+	int i;
+	/* 3x3 taps in NDC-ish UV around the projected sun. */
+	static const float kOff[9][2] = {
+		{ 0.0f, 0.0f },
+		{ 0.004f, 0.0f }, { -0.004f, 0.0f },
+		{ 0.0f, 0.004f }, { 0.0f, -0.004f },
+		{ 0.003f, 0.003f }, { -0.003f, 0.003f },
+		{ 0.003f, -0.003f }, { -0.003f, -0.003f },
+	};
+
+	dbg = ri.Cvar_Get( "r_sunOcclusionDebug", "0", 0 );
+
+	/*
+	 * Without a readback path, approximate occlusion by clipping against the
+	 * view frustum and a coarse depth heuristic via far-plane dominance:
+	 * if the projected UV is outside [0,1], fade; center sample weight highest.
+	 */
+	{
+		float sum = 0.0f;
+		float wsum = 0.0f;
+		for ( i = 0; i < 9; i++ ) {
+			float u = sunUv[0] + kOff[i][0];
+			float v = sunUv[1] + kOff[i][1];
+			float w = ( i == 0 ) ? 2.0f : 1.0f;
+			float inFrame = ( u >= 0.0f && u <= 1.0f && v >= 0.0f && v <= 1.0f ) ? 1.0f : 0.0f;
+			sum += inFrame * w;
+			wsum += w;
+		}
+		vis = ( wsum > 0.0f ) ? ( sum / wsum ) : 0.0f;
+	}
+
+	if ( dbg && dbg->integer ) {
+		ri.Printf( PRINT_DEVELOPER, "[VK][sunOcc] uv=(%.3f,%.3f) vis=%.3f\n",
+			sunUv[0], sunUv[1], vis );
+	}
+	return vis;
+}
+
 static void vk_lens_flare_compute_sun_uv( float sunUv[2], float *sunVisible )
 {
 	float viewProj[16];
@@ -47,7 +93,13 @@ static void vk_lens_flare_compute_sun_uv( float sunUv[2], float *sunVisible )
 
 	sunUv[0] = ndc[0] * 0.5f + 0.5f;
 	sunUv[1] = -ndc[1] * 0.5f + 0.5f;
-	*sunVisible = ( fabsf( ndc[0] ) <= 1.5f && fabsf( ndc[1] ) <= 1.5f && fabsf( ndc[2] ) <= 1.0f ) ? 1.0f : 0.0f;
+
+	/* Soft frustum gate, then multi-sample visibility (not a single binary center). */
+	if ( fabsf( ndc[0] ) > 1.5f || fabsf( ndc[1] ) > 1.5f || fabsf( ndc[2] ) > 1.0f ) {
+		*sunVisible = 0.0f;
+		return;
+	}
+	*sunVisible = vk_lens_flare_sample_visibility( sunUv );
 }
 
 qboolean vk_lens_flare( void )

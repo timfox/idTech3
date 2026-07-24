@@ -76,6 +76,26 @@ int main( void ) {
 			"ear-clip concave pentagon centroids inside" );
 	}
 
+	/* Arrowhead where hub-0 fan fails but another hub succeeds. */
+	{
+		const float xyz[] = {
+			0, 0, 0,
+			2, 1, 0,
+			0, 2, 0,
+			0.5f, 1, 0
+		};
+		int ear[6];
+		int fanIdx[6];
+		int n;
+
+		fan( 4, fanIdx );
+		/* May or may not fail fan — hub search must still yield inside tris. */
+		n = R_Bsp30_TriangulateFace( xyz, 4, ear, 6 );
+		ASSERT( n == 6, "arrowhead index count" );
+		ASSERT( R_Bsp30_TriangleCentroidInside( xyz, 4, ear, n ),
+			"hub/ear triangulation must keep centroids inside" );
+	}
+
 	/* Triangle passthrough. */
 	{
 		const float xyz[] = { 0, 0, 0, 1, 0, 0, 0, 1, 0 };

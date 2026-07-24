@@ -10,6 +10,7 @@ Split from vk.c.
 #include "tr_local.h"
 #include "vk_meshlets.h"
 #include "vk_shadow_contract.h"
+#include "vk_geometry_corruption.h"
 
 #ifdef USE_VK_PBR
 #include "vk_forward_plus.h"
@@ -663,6 +664,9 @@ void vk_draw_geometry( Vk_Depth_Range depth_range, qboolean indexed ) {
 	}
 	if ( !vk.cmd || vk.cmd->command_buffer == VK_NULL_HANDLE || !vk.inRenderPass )
 		return;
+	if ( !vk_geometry_corruption_allow_draw() ) {
+		return;
+	}
 
 	/* MVP push may have run before IQM/glTF GPU skin data was committed to the geometry buffer;
 	 * refresh so prev_mvp matches the SSBO binding for this indexed draw. */

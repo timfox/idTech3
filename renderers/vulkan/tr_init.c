@@ -134,6 +134,13 @@ glstatic_t	gls;
 #include "vk_hdr_pipeline.h"
 #include "vk_color_contract.h"
 #include "vk_scene_hdr_ownership.h"
+#include "vk_geometry_corruption.h"
+#include "vk_mesh_halo.h"
+#include "vk_ghost_lighting.h"
+#include "vk_hdr_sun.h"
+#include "vk_world_presentation.h"
+#include "vk_gray_veil.h"
+#include "vk_bsp_viz.h"
 #include "vk_renderer_iq_p1.h"
 #include "vk_renderer_perf.h"
 #include "vk_aa_policy.h"
@@ -510,6 +517,10 @@ cvar_t	*r_drawBuffer;
 cvar_t	*r_lightmap;
 cvar_t	*r_vertexLight;
 cvar_t	*r_shadows;
+cvar_t	*r_shadowDistance;
+cvar_t	*r_shadowClip;
+cvar_t	*r_shadowClipPenetration;
+cvar_t	*r_shadowClipExtension;
 cvar_t	*r_flares;
 cvar_t	*r_nobind;
 cvar_t	*r_singleShader;
@@ -2069,9 +2080,14 @@ static void R_Register( void )
 	r_nobind = ri.Cvar_Get ("r_nobind", "0", CVAR_CHEAT);
 	ri.Cvar_SetDescription( r_nobind, "Backend debugging tool: Disables texture binding." );
 	r_showtris = ri.Cvar_Get ("r_showtris", "0", CVAR_CHEAT);
-	ri.Cvar_SetDescription( r_showtris, "Debugging tool: Wireframe rendering of polygon triangles in the world." );
+	ri.Cvar_SetDescription( r_showtris,
+		"Debugging tool: wireframe of the authoritative submitted geometry "
+		"(0=off, 1=visible/depth-tested, 2=explicit through-walls)." );
+	ri.Cvar_CheckRange( r_showtris, "0", "2", CV_INTEGER );
 	r_shownormals = ri.Cvar_Get( "r_shownormals", "0", CVAR_CHEAT );
-	ri.Cvar_SetDescription( r_shownormals, "Debugging tool: Show wireframe surface normals." );
+	ri.Cvar_SetDescription( r_shownormals,
+		"Debugging tool: surface normals (0=off, 1=depth-tested, 2=through-walls)." );
+	ri.Cvar_CheckRange( r_shownormals, "0", "2", CV_INTEGER );
 	r_clear = ri.Cvar_Get( "r_clear", "0", 0 );
 	ri.Cvar_SetDescription( r_clear, "Forces screen buffer clearing every frame, removing any hall of mirrors effect in void.\n Use \\r_clearColor to set color." );
 	r_offsetFactor = ri.Cvar_Get( "r_offsetFactor", "-2", CVAR_CHEAT | CVAR_LATCH );
@@ -2093,6 +2109,14 @@ static void R_Register( void )
 	r_noportals = ri.Cvar_Get( "r_noportals", "0", 0 );
 	ri.Cvar_SetDescription(r_noportals, "Disables in-game portals, valid values: 0: Portals enabled\n 1: Portals disabled\n 2: Portals and mirrors disabled" );
 	r_shadows = ri.Cvar_Get( "cg_shadows", "1", 0 );
+	r_shadowDistance = ri.Cvar_Get( "r_shadowDistance", "256", CVAR_ARCHIVE_ND );
+	ri.Cvar_SetDescription( r_shadowDistance, "Stencil shadow (cg_shadows 2) extrusion distance" );
+	r_shadowClip = ri.Cvar_Get( "r_shadowClip", "1", CVAR_ARCHIVE_ND );
+	ri.Cvar_SetDescription( r_shadowClip, "Clip stencil shadow volumes against solid surfaces to prevent wall/floor bleed-through" );
+	r_shadowClipPenetration = ri.Cvar_Get( "r_shadowClipPenetration", "4", CVAR_ARCHIVE_ND );
+	ri.Cvar_SetDescription( r_shadowClipPenetration, "How far (in game units) shadow back faces extend past a wall surface." );
+	r_shadowClipExtension = ri.Cvar_Get( "r_shadowClipExtension", "16", CVAR_ARCHIVE_ND );
+	ri.Cvar_SetDescription( r_shadowClipExtension, "Max distance a shadow vertex can be extended to match its neighbors." );
 
 	r_marksOnTriangleMeshes = ri.Cvar_Get("r_marksOnTriangleMeshes", "0", CVAR_ARCHIVE_ND );
 	ri.Cvar_SetDescription( r_marksOnTriangleMeshes, "Enables impact marks on triangle mesh surfaces (ie: MD3 models.) Requires impact marks to be enabled in the game code." );
@@ -2103,18 +2127,22 @@ static void R_Register( void )
 	ri.Cvar_SetDescription( r_screenshotJpegQuality, "Controls quality of Jpeg screenshots when using screenshotJpeg." );
 
 	r_bloom_threshold = ri.Cvar_Get( "r_bloom_threshold", "0.6", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_bloom_threshold, "0.0", "64.0", CV_FLOAT );
 	ri.Cvar_SetDescription( r_bloom_threshold, "Color level to extract to bloom texture, default is 0.6." );
 	ri.Cvar_SetGroup( r_bloom_threshold, CVG_RENDERER );
 
 	r_bloom_threshold_mode = ri.Cvar_Get( "r_bloom_threshold_mode", "0", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_bloom_threshold_mode, "0", "2", CV_INTEGER );
 	ri.Cvar_SetDescription( r_bloom_threshold_mode, "Color extraction mode:\n 0: (r|g|b) >= threshold\n 1: (r + g + b ) / 3 >= threshold\n 2: luma(r, g, b) >= threshold" );
 	ri.Cvar_SetGroup( r_bloom_threshold_mode, CVG_RENDERER );
 
 	r_bloom_intensity = ri.Cvar_Get( "r_bloom_intensity", "0.5", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_bloom_intensity, "0.0", "4.0", CV_FLOAT );
 	ri.Cvar_SetDescription( r_bloom_intensity, "Final bloom blend factor, default is 0.5." );
 	ri.Cvar_SetGroup( r_bloom_intensity, CVG_RENDERER );
 
 	r_bloom_modulate = ri.Cvar_Get( "r_bloom_modulate", "0", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_bloom_modulate, "0", "2", CV_INTEGER );
 	ri.Cvar_SetDescription( r_bloom_modulate, "Modulate extracted color:\n 0: off (color = color, i.e. no changes)\n 1: by itself (color = color * color)\n 2: by intensity (color = color * luma(color))" );
 	ri.Cvar_SetGroup( r_bloom_modulate, CVG_RENDERER );
 
@@ -2185,9 +2213,9 @@ static void R_Register( void )
 	}
 
 	{
-		cvar_t *local_exp = ri.Cvar_Get( "r_localExposure", "1", CVAR_ARCHIVE_ND );
-		cvar_t *local_exp_strength = ri.Cvar_Get( "r_localExposure_strength", "0.35", CVAR_ARCHIVE_ND );
-		cvar_t *local_exp_shadow = ri.Cvar_Get( "r_localExposure_shadowClamp", "1.5", CVAR_ARCHIVE_ND );
+		cvar_t *local_exp = ri.Cvar_Get( "r_localExposure", "0", CVAR_ARCHIVE_ND );
+		cvar_t *local_exp_strength = ri.Cvar_Get( "r_localExposure_strength", "0.25", CVAR_ARCHIVE_ND );
+		cvar_t *local_exp_shadow = ri.Cvar_Get( "r_localExposure_shadowClamp", "0.25", CVAR_ARCHIVE_ND );
 		cvar_t *local_exp_highlight = ri.Cvar_Get( "r_localExposure_highlightClamp", "1.5", CVAR_ARCHIVE_ND );
 		ri.Cvar_CheckRange( local_exp, "0", "1", CV_INTEGER );
 		ri.Cvar_CheckRange( local_exp_strength, "0.0", "1.0", CV_FLOAT );
@@ -2215,8 +2243,10 @@ static void R_Register( void )
 	}
 
 	r_tonemap = ri.Cvar_Get( "r_tonemap", "3", CVAR_ARCHIVE_ND );
-	ri.Cvar_CheckRange( r_tonemap, "0", "4", CV_INTEGER );
-	ri.Cvar_SetDescription( r_tonemap, "Tonemapping: 0=off, 1=Reinhard, 2=ACES, 3=Filmic (Hable/Uncharted2, default), 4=AgX (punchy, saturated)." );
+	ri.Cvar_CheckRange( r_tonemap, "0", "5", CV_INTEGER );
+	ri.Cvar_SetDescription( r_tonemap,
+		"Tonemapping: 0=off, 1=Reinhard, 2=ACES, 3=Filmic (Hable/Uncharted2, default), "
+		"4=AgX, 5=neutral_reference (ACES diagnostic, no artistic crush)." );
 	ri.Cvar_SetGroup( r_tonemap, CVG_RENDERER );
 
 	r_post = ri.Cvar_Get( "r_post", "1", CVAR_ARCHIVE_ND );
@@ -3868,7 +3898,10 @@ static void R_Register( void )
 	{
 		cvar_t *r_tsr = ri.Cvar_Get( "r_tsr", "1", CVAR_ARCHIVE_ND );
 		cvar_t *r_temporalAO = ri.Cvar_Get( "r_temporalAO", "1", CVAR_ARCHIVE_ND );
-		cvar_t *r_temporalSSR = ri.Cvar_Get( "r_temporalSSR", "1", CVAR_ARCHIVE_ND );
+		cvar_t *r_temporalSSR = ri.Cvar_Get( "r_temporalSSR", "0", CVAR_ARCHIVE_ND );
+		cvar_t *r_ssrTemporal = ri.Cvar_Get( "r_ssrTemporal", "0", CVAR_ARCHIVE_ND );
+		cvar_t *r_allowExperimentalTemporalSSR =
+			ri.Cvar_Get( "r_allowExperimentalTemporalSSR", "0", CVAR_ARCHIVE_ND );
 		cvar_t *r_temporalFog = ri.Cvar_Get( "r_temporalFog", "1", CVAR_ARCHIVE_ND );
 		cvar_t *r_temporalTransparency = ri.Cvar_Get( "r_temporalTransparency", "1", CVAR_ARCHIVE_ND );
 		cvar_t *r_dof = ri.Cvar_Get( "r_dof", "0", CVAR_ARCHIVE_ND );
@@ -3885,9 +3918,30 @@ static void R_Register( void )
 
 		ri.Cvar_CheckRange( r_temporalSSR, "0", "1", CV_INTEGER );
 		ri.Cvar_SetDescription( r_temporalSSR,
-			"Master enable for SSR as a temporal-adjacent consumer. 0 disables SSR even when r_ssr 1 "
-			"(use for weapon-trail bisect; see docs/RENDERER_TEMPORAL_GHOSTING.md)." );
+			"Deprecated compatibility alias for r_ssrTemporal. Temporal SSR is experimental and "
+			"does not gate current-frame-only r_ssr." );
 		ri.Cvar_SetGroup( r_temporalSSR, CVG_RENDERER );
+		ri.Cvar_CheckRange( r_ssrTemporal, "0", "1", CV_INTEGER );
+		ri.Cvar_SetDescription( r_ssrTemporal,
+			"Experimental temporal SSR request. Ignored unless r_allowExperimentalTemporalSSR 1; "
+			"never enabled by stable or IQ-reference profiles." );
+		ri.Cvar_SetGroup( r_ssrTemporal, CVG_RENDERER );
+		ri.Cvar_CheckRange( r_allowExperimentalTemporalSSR, "0", "1", CV_INTEGER );
+		ri.Cvar_SetDescription( r_allowExperimentalTemporalSSR,
+			"Research-only permission gate for uncertified Temporal SSR." );
+		ri.Cvar_SetGroup( r_allowExperimentalTemporalSSR, CVG_RENDERER );
+		if ( r_temporalSSR->integer && !r_ssrTemporal->integer ) {
+			ri.Cvar_Set( "r_ssrTemporal", "1" );
+		}
+		if ( r_ssrTemporal->integer && !r_allowExperimentalTemporalSSR->integer ) {
+			ri.Cvar_Set( "r_ssrTemporal", "0" );
+			ri.Cvar_Set( "r_temporalSSR", "0" );
+			ri.Printf( PRINT_WARNING,
+				"[VK][SSR] temporal request rejected by r_allowExperimentalTemporalSSR 0\n" );
+		} else if ( r_ssrTemporal->integer ) {
+			ri.Printf( PRINT_WARNING,
+				"Temporal SSR is experimental and not IQ-certified.\n" );
+		}
 
 		ri.Cvar_CheckRange( r_temporalFog, "0", "1", CV_INTEGER );
 		ri.Cvar_SetDescription( r_temporalFog,
@@ -4089,6 +4143,13 @@ void R_Init( void ) {
 	vk_hdr_pipeline_register();
 	vk_color_contract_register();
 	vk_scene_hdr_ownership_register();
+	vk_geometry_corruption_register();
+	vk_mesh_halo_register();
+	vk_ghost_lighting_register();
+	vk_hdr_sun_register();
+	vk_world_presentation_register();
+	vk_gray_veil_register();
+	vk_bsp_viz_register();
 	vk_renderer_iq_p1_register();
 	vk_renderer_perf_register();
 #endif
@@ -4426,6 +4487,7 @@ refexport_t *GetRefAPI ( int apiVersion, refimport_t *rimp ) {
 	re.UploadCinematic = RE_UploadCinematic;
 
 	re.RegisterFont = RE_RegisterFont;
+	re.RegisterFontAtlas = RE_RegisterFontAtlas;
 	re.ClearTrueTypeFontCache = RE_ClearTrueTypeFontCache;
 	re.GetFontKerning = RE_GetFontKerning;
 	re.RemapShader = RE_RemapShader;

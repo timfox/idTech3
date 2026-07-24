@@ -46,8 +46,10 @@ Code: `src/renderers/common/tr_vector_font.c`, `src/client/cl_vector_font.c`, sh
 
 ## Planned extensions
 
-- **`VK_EXT_mesh_shader`** (AMD RDNA) — same glyphlet buffers; NV path is the first wired implementation.
-- Deluxe/barycentric variants per [research/amd-gpuopen-loop-blinn-mesh-fonts.md](research/amd-gpuopen-loop-blinn-mesh-fonts.md).
+- Full HarfBuzz face caching (`BUILD_HARFBUZZ`) for complex scripts.
+- Horizontal/vertical band lists beyond dual sorted early-exit.
+- `VK_EXT_mesh_shader` (AMD RDNA) for mode 2.
+- See [VECTOR_FONT_RENDERING.md](VECTOR_FONT_RENDERING.md) for the production Lengyel contract.
 
 ## Comparison to other text paths
 |------|-------|-------|

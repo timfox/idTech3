@@ -72,11 +72,39 @@ Steam client must be running for `SteamAPI_Init` to succeed. Failure is non-fata
 | `CL_Frame` | `Steam_Frame()` then rich presence |
 | `CL_Shutdown` | `Steam_Shutdown()` (client teardown only; shared shutdown stays in `Com_Shutdown`) |
 
-Steam Input this pass is **status-only** (`Init` + connected controller count in `steam_status`). Full action-set remapping is not wired yet.
+Steam Input this pass initializes Steam Input and reports connected controller
+count in `steam_status`. Full Steamworks action-set remapping / glyph APIs are
+not wired yet; Deck play uses **SDL3 gamepad → `PAD0_*` keys** with binds from
+`steamdeck.cfg`.
+
+## Steam Deck controls
+
+When `IsSteamRunningOnSteamDeck()` (or `SteamDeck=1` / Gamescope env) is true,
+the client sets `in_steamDeck 1` and `exec steamdeck.cfg`:
+
+| Control | Action |
+|---------|--------|
+| Left stick | Move (analog) |
+| Right stick | Look (analog freelook) |
+| A | Jump |
+| B | Crouch |
+| X | Scores |
+| Y | Screenshot |
+| RT / RB | Attack |
+| LT | Crouch (alt) |
+| LB / L3 | Walk (hold; `cl_run 1`) |
+| START / BACK | Pause menu (same as ESC) |
+| D-pad | Menu navigation (unbound in-game) |
+
+Surf JS overlays (`ui/surf/menu.js`, `mapselect.js`, `leaderboard.js`) accept
+`PAD0_DPAD_*`, `PAD0_A` / `PAD0_B` via `ui/surf/pad.js`.
+
+Dual-stick look requires `in_joystickUseAnalog 1` plus the stick binds in
+`steamdeck.cfg`, and `CL_JoystickMove` consuming `AXIS_YAW` / `AXIS_PITCH`.
 
 ## Related
 
 - [P2P_NETWORKING.md](P2P_NETWORKING.md) — `net_p2p` / Steam SDR
 - [DEVELOPMENT_SETUP.md](DEVELOPMENT_SETUP.md) — CMake feature flags
 - [PLATFORM_GATED.md](PLATFORM_GATED.md) — product SKU gating for store release
-- [config/steamdeck.cfg](../config/steamdeck.cfg) — Deck defaults (gamepad, fullscreen, 60 FPS, Vulkan)
+- [config/steamdeck.cfg](../config/steamdeck.cfg) — Deck defaults (gamepad binds, fullscreen, 60 FPS, Vulkan)

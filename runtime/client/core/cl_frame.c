@@ -14,6 +14,7 @@ Copyright (C) 2026 Gopex LLC. All rights reserved.
 #include "cl_voip.h"
 #include "cl_websocket.h"
 #include "cl_steam.h"
+#include "cl_openhmd.h"
 #include "cl_genetic_gan.h"
 #include "cl_ml_worker.h"
 #include "cl_flux.h"
@@ -24,6 +25,7 @@ Copyright (C) 2026 Gopex LLC. All rights reserved.
 #include "lua_debug.h"
 #include "cl_app_crdt.h"
 #include "cl_oscar.h"
+#include "cl_discord.h"
 
 qboolean CL_CheckPaused( void )
 {
@@ -126,12 +128,14 @@ void CL_Frame( int msec, int realMsec ) {
 	WS_Frame();
 	Steam_Frame();
 	CL_Steam_UpdateRichPresence();
+	OHMD_Frame();
 
 #ifdef USE_LUA
 	LuaDebug_WatchTick( Sys_Milliseconds() );
 	CL_AppCrdt_Frame();
 #endif
 	CL_Oscar_Frame();
+	CL_Discord_Frame();
 
 	Con_RunConsole();
 }

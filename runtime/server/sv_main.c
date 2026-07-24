@@ -256,6 +256,11 @@ void QDECL SV_SendServerCommand( client_t *cl, const char *fmt, ... ) {
 	len = Q_vsnprintf( message, sizeof( message ), fmt, argptr );
 	va_end( argptr );
 
+	// Surf TV recording hook
+	if ( tv.recording ) {
+		SV_TV_CaptureServerCommand( cl ? (int)(cl - svs.clients) : -1, message );
+	}
+
 	if ( cl != NULL ) {
 		// outdated clients can't properly decode 1023-chars-long strings
 		// http://aluigi.altervista.org/adv/q3msgboom-adv.txt
@@ -887,6 +892,74 @@ Shift down the remaining args
 Redirect all printfs
 ===============
 */
+// SV_LogRconAudit appends one timestamped line to the game-mod log
+// file referenced by g_log. Returns silently when g_log is unset or
+// can't be opened. Caller is responsible for ensuring `prefix` is the
+// well-known token the hub collector parses ("RconExec:" or
+// "RconDenied:").
+static void SV_LogRconAudit( const char *prefix, const netadr_t *from, const char *body ) {
+	char         logPath[MAX_QPATH];
+	fileHandle_t f;
+	qtime_t      now;
+	char         line[1024];
+	int          len;
+
+	Cvar_VariableStringBuffer( "g_log", logPath, sizeof( logPath ) );
+	if ( !logPath[0] ) {
+		return;
+	}
+	f = FS_FOpenFileAppend( logPath );
+	if ( f == FS_INVALID_HANDLE ) {
+		return;
+	}
+	Com_RealTime( &now );
+	len = Com_sprintf( line, sizeof( line ),
+		"%04i-%02i-%02iT%02i:%02i:%02i %s %s%s%s\n",
+		now.tm_year + 1900, now.tm_mon + 1, now.tm_mday,
+		now.tm_hour, now.tm_min, now.tm_sec,
+		prefix,
+		NET_AdrToString( from ),
+		body && body[0] ? " " : "",
+		body ? body : "" );
+	if ( len > 0 ) {
+		FS_Write( line, len, f );
+	}
+	FS_FCloseFile( f );
+}
+
+// SV_LogRconDenied records a rejected rcon attempt — wrong password,
+// no password set, or otherwise refused. The attempted password is
+// deliberately NOT included in the audit log.
+static void SV_LogRconDenied( const netadr_t *from ) {
+	SV_LogRconAudit( "RconDenied:", from, "" );
+}
+
+// SV_LogRconExec records an accepted rcon command into the mod's game
+// log (path lives in the g_log cvar). Attribution is the GUID of the
+// connected client whose remote address matches `from`; if no client
+// matches, the GUID field is emitted as "-". Skips hub-driven
+// automation commands (already audited hub-side).
+static void SV_LogRconExec( const netadr_t *from, const char *guid, const char *cmd ) {
+	char body[1024];
+
+	// Skip hub-driven automation rcon. These are not human actions —
+	// they're side effects of player join / chat / auth flow.
+	//   - sv_cmd rcon_autoset : autoset, audited as rcon.autoset hub-side
+	//   - sv_cmd print / cp   : welcome / claim replies / center-prints
+	//   - auth_fail / auth_ok : engine-side auth notifications
+	if ( !Q_stricmpn( cmd, "sv_cmd rcon_autoset", 19 ) ||
+	     !Q_stricmpn( cmd, "sv_cmd print ", 13 ) ||
+	     !Q_stricmpn( cmd, "sv_cmd cp ", 10 ) ||
+	     !Q_stricmpn( cmd, "auth_fail", 9 ) ||
+	     !Q_stricmpn( cmd, "auth_ok", 7 ) ) {
+		return;
+	}
+
+	Com_sprintf( body, sizeof( body ), "%s %s",
+		( guid && guid[0] ) ? guid : "-", cmd );
+	SV_LogRconAudit( "RconExec:", from, body );
+}
+
 static void SVC_RemoteCommand( const netadr_t *from ) {
 	static rateLimit_t bucket;
 	qboolean	valid;
@@ -918,6 +991,7 @@ static void SVC_RemoteCommand( const netadr_t *from ) {
 
 		valid = qfalse;
 		Com_Printf( "Bad rcon from %s: %s\n", NET_AdrToString( from ), Cmd_ArgsFrom( 2 ) );
+		SV_LogRconDenied( from );
 	}
 
 	// start redirecting all print outputs to the packet
@@ -951,6 +1025,24 @@ static void SVC_RemoteCommand( const netadr_t *from ) {
 		}
 		while ( *cmd_aux == ' ' )
 			cmd_aux++;
+
+		// Audit before Cmd_ExecuteString so a command that kicks the
+		// originator still records who issued it.
+		{
+			char rconGuid[33] = "";
+			int  i;
+			for ( i = 0; svs.clients && i < sv_maxclients->integer; i++ ) {
+				const client_t *cl = &svs.clients[i];
+				if ( cl->state < CS_CONNECTED ) continue;
+				if ( cl->netchan.remoteAddress.type == NA_BOT ) continue;
+				if ( !NET_CompareAdr( &cl->netchan.remoteAddress, from ) ) continue;
+				Q_strncpyz( rconGuid,
+					Info_ValueForKey( cl->userinfo, "cl_guid" ),
+					sizeof( rconGuid ) );
+				break;
+			}
+			SV_LogRconExec( from, rconGuid, cmd_aux );
+		}
 
 		Cmd_ExecuteString( cmd_aux );
 	}
@@ -1470,6 +1562,8 @@ void SV_Frame( int msec ) {
 		// let everything in the world think and move
 		VM_Call( gvm, 1, GAME_RUN_FRAME, sv.time );
 
+		SV_TV_WriteFrame();
+
 		SV_Physics_Frame( frameMsec );
 
 		// record entity positions for backward reconciliation
@@ -1488,6 +1582,8 @@ void SV_Frame( int msec ) {
 
 	// send messages back to the clients
 	SV_SendClientMessages();
+
+	SV_TVStream_RunListener();
 
 	// send a heartbeat to the master if needed
 	SV_MasterHeartbeat(HEARTBEAT_FOR_MASTER);

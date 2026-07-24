@@ -48,4 +48,22 @@ float Depth_ViewDepthToTraditional01( float viewDepth, float zNear, float zFar )
 	return clamp( ( viewDepth - zn ) / ( zf - zn ), 0.0, 1.0 );
 }
 
+/*
+ * Bilateral weight on positive view-depth (meters). Prefer relative error so
+ * near and far discontinuities reject at similar geometric scales. Never feed
+ * raw device-Z into this — reverse-Z nonlinear deltas under-reject near edges.
+ */
+float Depth_BilateralWeight( float centerViewDepth, float sampleViewDepth, float sharpness )
+{
+	float cd = max( centerViewDepth, 1e-3 );
+	float delta = abs( sampleViewDepth - centerViewDepth );
+	float rel = delta / cd;
+	return exp2( -rel * max( sharpness, 0.0 ) );
+}
+
+float Depth_NormalWeight( vec3 centerN, vec3 sampleN, float power )
+{
+	return pow( max( dot( centerN, sampleN ), 0.0 ), max( power, 1.0 ) );
+}
+
 #endif

@@ -15,6 +15,8 @@ test -f engine/core/steam_shared.h || fail "missing steam_shared.h"
 test -f docs/STEAM.md || fail "missing docs/STEAM.md"
 test -f steam_appid.txt || fail "missing steam_appid.txt"
 test -f config/steamdeck.cfg || fail "missing config/steamdeck.cfg"
+grep -q 'bind PAD0_A' config/steamdeck.cfg || fail "steamdeck.cfg missing PAD0 binds"
+grep -q 'in_joystickUseAnalog' config/steamdeck.cfg || fail "steamdeck.cfg missing analog sticks"
 
 grep -q 'OPTION(USE_STEAM "Enable Steam API' CMakeLists.txt || fail "missing USE_STEAM option"
 grep -q 'Enable Steam API.*" ON)' CMakeLists.txt || fail "USE_STEAM should default ON"

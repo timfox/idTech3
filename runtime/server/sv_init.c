@@ -199,6 +199,11 @@ void SV_SetConfigstring (int index, const char *val) {
 	}
 	sv.configstrings[index] = CopyString( val );
 
+	// Surf TV recording hook
+	if ( tv.recording ) {
+		SV_TV_ConfigstringChanged( index );
+	}
+
 	// send it to all the clients if we aren't
 	// spawning a new server
 	if ( sv.state == SS_GAME || sv.restarting ) {
@@ -373,9 +378,9 @@ static void SV_Startup( void ) {
 		Com_Error( ERR_FATAL, "SV_Startup: svs.initialized" );
 	}
 
-	SV_AllocClients( sv_maxclients->integer );
-
-	sv_maxclients->modified = qfalse;
+	// SV_BoundMaxClients flushes a boot-time latched value; sizing from
+	// sv_maxclients->integer directly allocated the default for good.
+	SV_AllocClients( SV_BoundMaxClients( 1 ) );
 
 	svs.initialized = qtrue;
 
@@ -385,6 +390,9 @@ static void SV_Startup( void ) {
 	}
 
 	Cvar_Set( "sv_running", "1" );
+
+	// Advertise VR usercmd button packing to clients
+	Cvar_Get( "vr_support", "1", CVAR_SERVERINFO | CVAR_ROM );
 
 	// Join the ipv6 multicast group now that a map is running so clients can scan for us on the local network.
 #ifdef USE_IPV6
@@ -489,6 +497,12 @@ void SV_SpawnServer( const char *mapname, qboolean killBots ) {
 	int			checksum;
 	qboolean	isBot;
 	const char	*p;
+
+	// Stop any active Surf TV recording before map change
+	SV_TV_FinalizeRecording();
+
+	// End the prior map's live stream session
+	SV_TV_StreamEnd();
 
 	// shut down the existing game if it is running
 	SV_ShutdownGameProgs();
@@ -692,6 +706,8 @@ void SV_SpawnServer( const char *mapname, qboolean killBots ) {
 					// the new gamestate will be sent
 					svs.clients[i].state = CS_CONNECTED;
 					svs.clients[i].gentity = NULL;
+					// mark for Surf TV demo download notification if available
+					svs.clients[i].tvDemoPending = ( sv_tvDownload->integer && tv.lastRecordedFile[0] ) ? qtrue : qfalse;
 				} else {
 					SV_ClientEnterWorld( &svs.clients[i] );
 				}
@@ -793,6 +809,15 @@ void SV_SpawnServer( const char *mapname, qboolean killBots ) {
 
 	Sys_SetStatus( "Running map %s", mapname );
 
+	// Auto-start Surf TV recording if enabled
+	SV_TV_AutoStart();
+
+	// (Re)bind the live-TV listener (idempotent on normal map rotation)
+	SV_TVStream_Init();
+
+	// Begin the live stream session for this map
+	SV_TV_StreamBegin();
+
 	// suppress hitch warning
 	Com_FrameInit();
 }
@@ -815,6 +840,8 @@ void SV_Init( void )
 	SV_Auth_Init();
 
 	SV_AddOperatorCommands();
+
+	SV_TV_Init();
 
 	if ( com_dedicated->integer )
 		SV_AddDedicatedCommands();
@@ -1033,6 +1060,12 @@ void SV_Shutdown( const char *finalmsg ) {
 	if ( !com_sv_running || !com_sv_running->integer ) {
 		return;
 	}
+
+	// Stop any active Surf TV recording before shutdown
+	SV_TV_FinalizeRecording();
+
+	SV_TV_StreamEnd();
+	SV_TVStream_Shutdown();
 
 	Com_Printf( "----- Server Shutdown (%s) -----\n", finalmsg );
 

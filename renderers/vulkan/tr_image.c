@@ -2280,7 +2280,7 @@ R_CreateDefaultImage
 ==================
 */
 static void R_CreateDefaultImage( void ) {
-	int		x;
+	int		x, y;
 	byte	data[DEFAULT_SIZE][DEFAULT_SIZE][4];
 
 	if ( r_defaultImage->string[0] )
@@ -2294,28 +2294,21 @@ static void R_CreateDefaultImage( void ) {
 			return;
 	}
 
-	// the default image will be a box, to allow you to see the mapping coordinates
-	Com_Memset( data, 32, sizeof( data ) );
-	for ( x = 0 ; x < DEFAULT_SIZE ; x++ ) {
-		data[0][x][0] =
-		data[0][x][1] =
-		data[0][x][2] =
-		data[0][x][3] = 255;
-
-		data[x][0][0] =
-		data[x][0][1] =
-		data[x][0][2] =
-		data[x][0][3] = 255;
-
-		data[DEFAULT_SIZE-1][x][0] =
-		data[DEFAULT_SIZE-1][x][1] =
-		data[DEFAULT_SIZE-1][x][2] =
-		data[DEFAULT_SIZE-1][x][3] = 255;
-
-		data[x][DEFAULT_SIZE-1][0] =
-		data[x][DEFAULT_SIZE-1][1] =
-		data[x][DEFAULT_SIZE-1][2] =
-		data[x][DEFAULT_SIZE-1][3] = 255;
+	/*
+	 * Neutral diagnostic fallback.  Keep missing images out of the authored
+	 * palette and bound their luminance so auto-exposure is not driven by a
+	 * full-white placeholder.  Magenta is confined to a one-pixel border.
+	 */
+	for ( y = 0; y < DEFAULT_SIZE; y++ ) {
+		for ( x = 0; x < DEFAULT_SIZE; x++ ) {
+			const qboolean border =
+				( x == 0 || y == 0 || x == DEFAULT_SIZE - 1 || y == DEFAULT_SIZE - 1 );
+			const byte neutral = ( ( ( x >> 2 ) ^ ( y >> 2 ) ) & 1 ) ? 48 : 24;
+			data[x][y][0] = border ? 255 : neutral;
+			data[x][y][1] = border ? 0 : neutral;
+			data[x][y][2] = border ? 255 : neutral;
+			data[x][y][3] = 255;
+		}
 	}
 
 	tr.defaultImage = R_CreateImage( "*default", NULL, (byte *)data, DEFAULT_SIZE, DEFAULT_SIZE, IMGFLAG_MIPMAP, 0, 0 );

@@ -7,6 +7,7 @@ Client pak/map download path (UDP server list + optional cURL).
 */
 
 #include "client.h"
+#include <time.h>
 #include "cl_download.h"
 #include "cl_connect.h"
 #include "cl_torrent.h"
@@ -15,6 +16,7 @@ Client pak/map download path (UDP server list + optional cURL).
 
 #ifdef USE_CURL
 #include "cl_curl.h"
+#include "cm_stream.h"
 
 download_t download;
 #endif
@@ -100,6 +102,11 @@ static void CL_DownloadsComplete( void ) {
 	// initialize the CGame
 	cls.cgameStarted = qtrue;
 	CL_InitCGame();
+
+	// Surf TVD: Build second snapshot after CG_Init so cgame can read it.
+	if ( tvPlay.active ) {
+		CL_TV_BuildSnapshot();
+	}
 
 	if ( clc.demofile == FS_INVALID_HANDLE ) {
 		Cmd_AddCommand( "callvote", NULL );
@@ -334,7 +341,7 @@ CL_CMStream_PrefetchHandler
 Sector pk3 HTTP prefetch when cm_stream requests adjacent cells (sv_sectorURL).
 ===============
 */
-void CL_CMStream_PrefetchHandler( const char *localName, const char *remoteURL )
+static void CL_CMStream_PrefetchHandler( const char *localName, const char *remoteURL )
 {
 	cvar_t *allow;
 
@@ -431,6 +438,35 @@ static void CL_Download_f( void )
 }
 #endif // USE_CURL
 
+
+#ifdef USE_CURL
+cvar_t *cl_tvDownload;
+cvar_t *cl_tvdOffer;
+cvar_t *cl_voteYesKey;
+cvar_t *cl_voteNoKey;
+
+void CL_TVDYes_f( void ) {
+	if ( !cl_tvdOffer || !cl_tvdOffer->string[0] ) {
+		return;
+	}
+	if ( clc.tvDemoPendingUrl[0] && clc.tvDemoPendingLocal[0] ) {
+		CL_TV_BeginDownload( clc.tvDemoPendingLocal, clc.tvDemoPendingUrl );
+	}
+	Cvar_Set( "cl_tvdOffer", "" );
+	clc.tvDemoPendingUrl[0] = '\0';
+	clc.tvDemoPendingLocal[0] = '\0';
+}
+
+void CL_TVDNo_f( void ) {
+	if ( !cl_tvdOffer || !cl_tvdOffer->string[0] ) {
+		return;
+	}
+	Cvar_Set( "cl_tvdOffer", "" );
+	clc.tvDemoPendingUrl[0] = '\0';
+	clc.tvDemoPendingLocal[0] = '\0';
+}
+#endif
+
 /*
 ==================
 CL_Download_Frame
@@ -445,6 +481,46 @@ qboolean CL_Download_Frame( int msec, int realMsec ) {
 #ifdef USE_CURL
 	if ( download.cURL ) {
 		Com_DL_Perform( &download );
+	}
+	if ( tvDownload.cURL ) {
+		CL_TV_PerformDownload();
+	}
+
+	/* Surf TV: initiate TVD download once the client has entered the game */
+	if ( cls.state == CA_ACTIVE && clc.tvDemoFile[0]
+		&& !Com_DL_InProgress( &tvDownload ) && cl_tvDownload && cl_tvDownload->integer ) {
+		if ( clc.sv_dlURL[0] && CL_cURL_Init() ) {
+			time_t now;
+			struct tm *tm_info;
+
+			Com_sprintf( clc.tvDemoPendingUrl, sizeof( clc.tvDemoPendingUrl ),
+				"%s/%s", clc.sv_dlURL, clc.tvDemoFile );
+
+			now = time( NULL );
+			tm_info = localtime( &now );
+			if ( tm_info && clc.tvDemoMap[0] ) {
+				char timestamp[32];
+				strftime( timestamp, sizeof( timestamp ), "%Y%m%d_%H%M%S", tm_info );
+				Com_sprintf( clc.tvDemoPendingLocal, sizeof( clc.tvDemoPendingLocal ),
+					"demos/%s_%s.tvd", timestamp, clc.tvDemoMap );
+			} else {
+				Q_strncpyz( clc.tvDemoPendingLocal, clc.tvDemoFile,
+					sizeof( clc.tvDemoPendingLocal ) );
+			}
+
+			Cvar_Set( "cl_tvdOffer", clc.tvDemoPendingLocal );
+			if ( cl_tvDownload->integer >= 2 ) {
+				CL_TV_BeginDownload( clc.tvDemoPendingLocal, clc.tvDemoPendingUrl );
+				Cvar_Set( "cl_tvdOffer", "" );
+				clc.tvDemoPendingUrl[0] = '\0';
+				clc.tvDemoPendingLocal[0] = '\0';
+			} else {
+				Com_Printf( "Surf TV demo available: %s (vote yes/no or tvdyes/tvdno)\n",
+					clc.tvDemoPendingLocal );
+			}
+		}
+		clc.tvDemoFile[0] = '\0';
+		clc.tvDemoMap[0] = '\0';
 	}
 
 	if ( clc.downloadCURLM ) {
@@ -488,6 +564,14 @@ void CL_Download_Init( void ) {
 
 	Cmd_AddCommand( "download", CL_Download_f );
 	Cmd_AddCommand( "dlmap", CL_Download_f );
+	Cmd_AddCommand( "tvdyes", CL_TVDYes_f );
+	Cmd_AddCommand( "tvdno", CL_TVDNo_f );
+
+	cl_tvDownload = Cvar_Get( "cl_tvDownload", "1", CVAR_ARCHIVE_ND );
+	Cvar_SetDescription( cl_tvDownload, "Surf TV: download TVD recordings from server via HTTP at end of match.\n 0 - off\n 1 - prompt\n 2 - auto-accept" );
+	cl_tvdOffer = Cvar_Get( "cl_tvdOffer", "", CVAR_ROM );
+	cl_voteYesKey = Cvar_Get( "cl_voteYesKey", "", CVAR_ROM );
+	cl_voteNoKey = Cvar_Get( "cl_voteNoKey", "", CVAR_ROM );
 #if !defined( DEDICATED ) && defined( USE_CURL )
 	CM_Stream_SetPrefetchHandler( CL_CMStream_PrefetchHandler );
 #endif

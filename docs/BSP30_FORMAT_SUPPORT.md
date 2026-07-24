@@ -9,6 +9,13 @@ textures, sounds, models, and other assets retain their respective copyrights
 and licenses. The engine repository does not bundle Valve or Counter-Strike
 WAD files.
 
+## Lighting
+
+BSP30 faces carry `styles[]` + `lightofs` into `BSP30_LUMP_LIGHTING` (RGB luxels,
+16-unit GoldSrc grid). The renderer samples style 0 into **vertex colors**
+(`LIGHTMAP_BY_VERTEX`) so ordinary surfaces are not fullbright albedo. Special /
+unlit faces remain white. See `docs/GHOST_FULLBRIGHT.md`.
+
 ## Textures
 
 BSP30 maps may either embed each indexed texture and palette or store only a
@@ -27,6 +34,41 @@ them. If a referenced WAD or texture is absent, the renderer generates a
 clearly visible, name-stable checker material so the map remains navigable
 without proprietary assets.
 
+## Sky and HDR environment
+
+BSP30 sky brushes use the GoldSrc texture name `sky` (or `sky*`). The loader
+assigns those faces a sky shader (`RB_StageIteratorSky`) instead of a diffuse
+WAD material.
+
+Worldspawn keys:
+
+| Key | Description |
+|-----|-------------|
+| `skyname` | Classic `gfx/env/<name>{rt,bk,lf,ft,up,dn}` faces (HL naming; Q3 `_rt` also tried) |
+| `skybox_hdr` | Path to an OpenEXR (`.exr`) or Radiance (`.hdr`) equirectangular panorama |
+| `skybox_hdr_exposure` | Exposure multiplier |
+| `skybox_hdr_rotation` | Yaw degrees |
+| `skybox_hdr_intensity` | IBL intensity |
+| `skybox_hdr_projection` | `0` equirect (default; auto for ~2:1), `1` cubemap faces, … |
+
+When `skybox_hdr` is set (or `r_skyboxHDR`), the engine loads the panorama via
+**tinyexr** (OpenEXR), converts it to a cubemap for IBL, and builds **scene-linear
+RGBA32F** outerbox faces (values may exceed 1.0) so the sky writes into SceneHDR
+with `r_skyOwner 2`. Visible radiance uses `r_skyExposureEV` / `r_skyLuminanceScale`
+(not Reinhard→RGBA8). See [HDR_SKY_RENDERING.md](HDR_SKY_RENDERING.md).
+
+Cvars: `r_skyboxHDR`, `r_skyboxHDR_exposure`, `r_skyboxHDR_rotation`,
+`r_skyboxHDR_intensity`, `r_skyboxHDR_projection`, `r_skyOwner`,
+`r_skyExposureEV`, `r_skyLuminanceScale`.
+
+Per-map sidecar (no BSP edit required): `maps/<map>.skybox_hdr` — first token is
+the panorama path; optional `exposure` / `rotation` / `intensity` / `projection`
+tokens follow. Example: `maps/surf_aztec.skybox_hdr` → `env/aarfontein_dirt_road_4k.exr`.
+Maps without worldspawn/`skybox_hdr` sidecar clear `r_skyboxHDR` so panoramas do
+not leak between levels.
+
+See also [EDITOR_BRIDGE.md](EDITOR_BRIDGE.md) for the full key list.
+
 ## Collision
 
 Point queries use the BSP30 render-node tree. Player and box sweeps use the
@@ -38,8 +80,10 @@ SDK implementation.
 
 BSP30 faces are edge-walked rings that may be **non-convex**. The renderer
 triangulates each face with **ear clipping** (`R_Bsp30_TriangulateFace` in
-`renderers/common/tr_bsp30_triangulate.c`) instead of a triangle-fan from
-vertex 0 (which emits exterior triangles on reflex n-gons).
+`renderers/common/tr_bsp30_triangulate.c`). When ear-clip fails the centroid-
+inside test, every vertex is tried as a **fan hub** and the first triangulation
+whose triangle centroids lie inside the polygon is kept. A vertex-0 fan is only
+the last resort (and is what produced the original AZ letter wedges).
 
 After loading vertices, the face plane is **aligned to the Newell normal** of
 the vertex ring. A mismatched `face.side` / surfedge winding left
@@ -48,7 +92,9 @@ the vertex ring. A mismatched `face.side` / surfedge winding left
 producing shredded “AZ” letters and hard black wedges. This is a static
 geometry / cull bug — not temporal AA.
 
-Regression: `ctest -R unit_bsp30_triangulate`.
+Regression: `ctest -R unit_bsp30_triangulate`,
+`tests/scripts/test_geometry_corruption_regression.sh`.
+See also [EXPLODING_GEOMETRY.md](EXPLODING_GEOMETRY.md).
 
 ## Surface identity (surf_aztec “AZ”)
 

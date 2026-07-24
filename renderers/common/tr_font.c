@@ -110,6 +110,12 @@ static int registeredPointSize[MAX_FONTS];
 static FT_Face registeredFace[MAX_FONTS];
 static void *registeredFaceData[MAX_FONTS];
 
+#define MAX_FONT_ATLASES 64
+static fontAtlasInfo_t registeredAtlas[MAX_FONT_ATLASES];
+static char registeredAtlasKey[MAX_FONT_ATLASES][MAX_QPATH];
+static int registeredAtlasCount = 0;
+static int registeredAtlasRover = 0;
+
 static void R_FontSetupFaceSize( FT_Face face, int pointSize );
 
 static void R_FontReleaseSlotFace( int slot ) {
@@ -694,6 +700,10 @@ void RE_ClearTrueTypeFontCache( void ) {
 	R_FontReleaseAllFaces();
 	registeredFontCount = 0;
 	Com_Memset( registeredFont, 0, sizeof( registeredFont ) );
+	registeredAtlasCount = 0;
+	registeredAtlasRover = 0;
+	Com_Memset( registeredAtlas, 0, sizeof( registeredAtlas ) );
+	Com_Memset( registeredAtlasKey, 0, sizeof( registeredAtlasKey ) );
 	ri.Printf( PRINT_DEVELOPER, "RE_ClearTrueTypeFontCache: TrueType registration cache cleared\n" );
 }
 
@@ -1067,6 +1077,335 @@ try_freetype:
 	}
 }
 }
+
+/*
+==================
+RE_FontBuildCharset / RE_RegisterFontAtlas
+
+Bake an alphabet into atlas page(s) for cgame/UI (trap_R_RegisterFontAtlas_Q3E).
+==================
+*/
+static void RE_FontBuildCharset( const char *alphabet, byte charset[256] ) {
+	int i;
+
+	Com_Memset( charset, 0, 256 );
+	if ( !alphabet || !alphabet[0] ) {
+		for ( i = GLYPH_CHARSTART; i < GLYPH_CHAREND; i++ ) {
+			charset[i] = 1;
+		}
+		return;
+	}
+	while ( *alphabet ) {
+		charset[(unsigned char)*alphabet++] = 1;
+	}
+}
+
+static unsigned int RE_FontCharsetHash( const byte charset[256] ) {
+	unsigned int h = 5381;
+	int i;
+
+	for ( i = 0; i < 256; i++ ) {
+		h = ( ( h << 5 ) + h ) + charset[i];
+	}
+	return h;
+}
+
+static void RE_FontAtlasCacheKey( const char *fontName, int pointSize, const byte charset[256], char *out, int outSize ) {
+	char base[MAX_QPATH];
+	char pathCopy[MAX_QPATH];
+	const char *skip;
+	unsigned int ah;
+
+	ah = RE_FontCharsetHash( charset );
+	if ( !fontName || !fontName[0] ) {
+		Com_sprintf( out, outSize, "atlas_%i_%08x", pointSize, ah );
+		return;
+	}
+	Q_strncpyz( pathCopy, fontName, sizeof( pathCopy ) );
+	skip = COM_SkipPath( pathCopy );
+	COM_StripExtension( skip, base, sizeof( base ) );
+	if ( !base[0] ) {
+		Q_strncpyz( base, "font", sizeof( base ) );
+	}
+	Com_sprintf( out, outSize, "%s_%i_%08x", base, pointSize, ah );
+}
+
+static void RE_FontAtlasCacheStore( const char *key, fontAtlasInfo_t *font ) {
+	int slot;
+
+	if ( registeredAtlasCount < MAX_FONT_ATLASES ) {
+		slot = registeredAtlasCount++;
+	} else {
+		slot = registeredAtlasRover;
+		registeredAtlasRover = ( registeredAtlasRover + 1 ) % MAX_FONT_ATLASES;
+		ri.Printf( PRINT_WARNING, "RE_RegisterFontAtlas: cache full, replacing slot %i\n", slot );
+	}
+	Q_strncpyz( registeredAtlasKey[slot], key, sizeof( registeredAtlasKey[slot] ) );
+	Com_Memcpy( &registeredAtlas[slot], font, sizeof( fontAtlasInfo_t ) );
+}
+
+static void RE_FontExpandPageRGBA( unsigned char *gray, unsigned char *rgba, int atlasSize, int usedH ) {
+	int k, usedPixels, fullPixels;
+	float max, scale;
+
+	if ( usedH < 1 ) {
+		usedH = 1;
+	}
+	if ( usedH > atlasSize ) {
+		usedH = atlasSize;
+	}
+
+	usedPixels = atlasSize * usedH;
+	fullPixels = atlasSize * atlasSize;
+
+	max = 0;
+	for ( k = 0; k < usedPixels; k++ ) {
+		if ( max < gray[k] ) {
+			max = gray[k];
+		}
+	}
+	scale = ( max > 0 ) ? ( 255.0f / max ) : 0.0f;
+
+	for ( k = 0; k < usedPixels; k++ ) {
+		rgba[k * 4 + 0] = 255;
+		rgba[k * 4 + 1] = 255;
+		rgba[k * 4 + 2] = 255;
+		rgba[k * 4 + 3] = (unsigned char)( (float)gray[k] * scale );
+	}
+	if ( usedPixels < fullPixels ) {
+		Com_Memset( rgba + usedPixels * 4, 0, ( fullPixels - usedPixels ) * 4 );
+	}
+}
+
+qboolean RE_RegisterFontAtlas( const char *fontName, int pointSize, const char *alphabet, fontAtlasInfo_t *out ) {
+	int i;
+	char cacheKey[MAX_QPATH];
+	byte charset[256];
+	FT_Face face;
+	int j, xOut, yOut, lastStart, imageNumber;
+	int maxHeight, pageUsedH;
+	unsigned char *buf, *imageBuff;
+	glyphInfo_t *glyph = NULL;
+	image_t *image;
+	qhandle_t h;
+	char imgName[MAX_QPATH];
+	char fontBase[MAX_QPATH];
+	char pathCopy[MAX_QPATH];
+	int charList[256];
+	int charCount;
+	int ci;
+	float ascenderPx;
+	float descenderPx;
+	float heightPx;
+	void *faceData;
+	int len;
+	const int atlasSize = R_FontAtlasSize();
+	const int atlasBytes = atlasSize * atlasSize;
+
+	if ( !out ) {
+		return qfalse;
+	}
+	Com_Memset( out, 0, sizeof( *out ) );
+
+	if ( !fontName || !fontName[0] ) {
+		ri.Printf( PRINT_ALL, "RE_RegisterFontAtlas: empty font name\n" );
+		return qfalse;
+	}
+	if ( pointSize <= 0 ) {
+		pointSize = 12;
+	}
+
+	RE_FontBuildCharset( alphabet, charset );
+	RE_FontAtlasCacheKey( fontName, pointSize, charset, cacheKey, sizeof( cacheKey ) );
+
+	for ( i = 0; i < registeredAtlasCount; i++ ) {
+		if ( Q_stricmp( cacheKey, registeredAtlasKey[i] ) == 0 ) {
+			Com_Memcpy( out, &registeredAtlas[i], sizeof( *out ) );
+			return qtrue;
+		}
+	}
+
+	if ( ftLibrary == NULL ) {
+		ri.Printf( PRINT_WARNING, "RE_RegisterFontAtlas: FreeType not initialized\n" );
+		return qfalse;
+	}
+
+	charCount = 0;
+	for ( i = 0; i < 256; i++ ) {
+		if ( charset[i] ) {
+			charList[charCount++] = i;
+		}
+	}
+	if ( charCount <= 0 ) {
+		ri.Printf( PRINT_WARNING, "RE_RegisterFontAtlas: empty alphabet\n" );
+		return qfalse;
+	}
+
+	len = ri.FS_ReadFile( fontName, &faceData );
+	if ( len <= 0 ) {
+		ri.Printf( PRINT_WARNING, "RE_RegisterFontAtlas: Unable to read '%s'\n", fontName );
+		return qfalse;
+	}
+	if ( FT_New_Memory_Face( ftLibrary, faceData, len, 0, &face ) ) {
+		ri.Printf( PRINT_WARNING, "RE_RegisterFontAtlas: unable to allocate face\n" );
+		ri.FS_FreeFile( faceData );
+		return qfalse;
+	}
+
+	R_FontSetupFaceSize( face, pointSize );
+
+	ascenderPx = (float)( face->size->metrics.ascender >> 6 );
+	descenderPx = (float)( -( face->size->metrics.descender >> 6 ) );
+	heightPx = (float)( face->size->metrics.height >> 6 );
+	if ( heightPx < 1.0f ) {
+		heightPx = ascenderPx + descenderPx;
+	}
+	if ( heightPx < 1.0f ) {
+		heightPx = (float)pointSize;
+	}
+	if ( ascenderPx < 1.0f ) {
+		ascenderPx = heightPx * 0.8f;
+	}
+
+	buf = ri.Malloc( atlasBytes );
+	if ( !buf ) {
+		ri.Printf( PRINT_WARNING, "RE_RegisterFontAtlas: malloc failed\n" );
+		FT_Done_Face( face );
+		ri.FS_FreeFile( faceData );
+		return qfalse;
+	}
+	Com_Memset( buf, 0, atlasBytes );
+
+	maxHeight = 0;
+	xOut = 0;
+	yOut = 0;
+	for ( ci = 0; ci < charCount; ci++ ) {
+		RE_ConstructGlyphInfo( buf, &xOut, &yOut, &maxHeight, face, (unsigned char)charList[ci], qtrue, qfalse );
+	}
+	if ( maxHeight < 1 ) {
+		maxHeight = 1;
+	}
+	if ( maxHeight >= atlasSize - 1 ) {
+		maxHeight = ( atlasSize > 64 ) ? ( atlasSize / 16 ) : 16;
+	}
+	if ( heightPx < (float)maxHeight ) {
+		heightPx = (float)maxHeight;
+	}
+
+	xOut = 0;
+	yOut = 0;
+	ci = 0;
+	lastStart = 0;
+	imageNumber = 0;
+	pageUsedH = 0;
+
+	Q_strncpyz( pathCopy, fontName, sizeof( pathCopy ) );
+	COM_StripExtension( COM_SkipPath( pathCopy ), fontBase, sizeof( fontBase ) );
+	if ( !fontBase[0] ) {
+		Q_strncpyz( fontBase, "fontAtlas", sizeof( fontBase ) );
+	}
+
+	out->pointSize = pointSize;
+	out->lineHeight = heightPx;
+	out->ascender = ascenderPx;
+	out->descender = descenderPx;
+	Q_strncpyz( out->name, cacheKey, sizeof( out->name ) );
+
+	while ( ci <= charCount ) {
+		if ( ci == charCount ) {
+			xOut = yOut = -1;
+		} else {
+			glyph = RE_ConstructGlyphInfo( buf, &xOut, &yOut, &maxHeight, face,
+				(unsigned char)charList[ci], qfalse, qfalse );
+			if ( xOut >= 0 && yOut >= 0 ) {
+				int bottom = yOut + maxHeight + 1;
+				if ( bottom > pageUsedH ) {
+					pageUsedH = bottom;
+				}
+			}
+		}
+
+		if ( xOut == -1 || yOut == -1 ) {
+			if ( imageNumber >= FONT_ATLAS_MAX_PAGES ) {
+				ri.Printf( PRINT_WARNING, "RE_RegisterFontAtlas: too many pages for '%s'\n", fontName );
+				ri.Free( buf );
+				FT_Done_Face( face );
+				ri.FS_FreeFile( faceData );
+				Com_Memset( out, 0, sizeof( *out ) );
+				return qfalse;
+			}
+			imageBuff = ri.Malloc( atlasBytes * 4 );
+			if ( !imageBuff ) {
+				ri.Free( buf );
+				FT_Done_Face( face );
+				ri.FS_FreeFile( faceData );
+				Com_Memset( out, 0, sizeof( *out ) );
+				return qfalse;
+			}
+			RE_FontExpandPageRGBA( buf, imageBuff, atlasSize, pageUsedH );
+
+			Com_sprintf( imgName, sizeof( imgName ), "*fontAtlas/%s_%i_%i", fontBase, imageNumber, pointSize );
+#if defined(RENDERER_VULKAN)
+			image = R_CreateImage( imgName, NULL, imageBuff, atlasSize, atlasSize, R_FontAtlasFlags(), 0, 0 );
+#else
+			image = R_CreateImage( imgName, NULL, imageBuff, atlasSize, atlasSize, R_FontAtlasFlags() );
+#endif
+			ri.Free( imageBuff );
+			if ( !image ) {
+				ri.Printf( PRINT_WARNING, "RE_RegisterFontAtlas: R_CreateImage failed\n" );
+				ri.Free( buf );
+				FT_Done_Face( face );
+				ri.FS_FreeFile( faceData );
+				Com_Memset( out, 0, sizeof( *out ) );
+				return qfalse;
+			}
+			h = RE_RegisterShaderFromImage( imgName, LIGHTMAP_2D, image, qfalse );
+
+			if ( out->atlasCount < FONT_ATLAS_MAX_PAGES ) {
+				out->atlases[out->atlasCount++] = h;
+			}
+
+			for ( j = lastStart; j < ci; j++ ) {
+				int ch = charList[j];
+				out->glyphs[ch].glyph = h;
+			}
+			lastStart = ci;
+			Com_Memset( buf, 0, atlasBytes );
+			xOut = 0;
+			yOut = 0;
+			pageUsedH = 0;
+			imageNumber++;
+			if ( ci == charCount ) {
+				ci++;
+			}
+		} else {
+			int ch = charList[ci];
+			out->glyphs[ch].height = glyph->height;
+			out->glyphs[ch].top = glyph->top;
+			out->glyphs[ch].xSkip = glyph->xSkip;
+			out->glyphs[ch].imageWidth = glyph->imageWidth;
+			out->glyphs[ch].imageHeight = glyph->imageHeight;
+			out->glyphs[ch].s = glyph->s;
+			out->glyphs[ch].t = glyph->t;
+			out->glyphs[ch].s2 = glyph->s2;
+			out->glyphs[ch].t2 = glyph->t2;
+			ci++;
+		}
+	}
+
+	ri.Free( buf );
+	FT_Done_Face( face );
+	ri.FS_FreeFile( faceData );
+
+	if ( out->atlasCount <= 0 ) {
+		Com_Memset( out, 0, sizeof( *out ) );
+		return qfalse;
+	}
+
+	RE_FontAtlasCacheStore( cacheKey, out );
+	return qtrue;
+}
+
 void R_InitFreeType(void) {
 	if ( FT_Init_FreeType( &ftLibrary ) ) {
 		ri.Printf( PRINT_WARNING, "R_InitFreeType: Unable to initialize FreeType.\n" );
@@ -1083,6 +1422,8 @@ void R_InitFreeType(void) {
 	}
 	R_FontReleaseAllFaces();
 	registeredFontCount = 0;
+	registeredAtlasCount = 0;
+	registeredAtlasRover = 0;
 }
 
 
@@ -1093,6 +1434,8 @@ void R_DoneFreeType(void) {
 		ftLibrary = NULL;
 	}
 	registeredFontCount = 0;
+	registeredAtlasCount = 0;
+	registeredAtlasRover = 0;
 }
 
 #endif

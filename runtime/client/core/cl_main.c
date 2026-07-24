@@ -25,6 +25,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "cl_cvars.h"
 #include "cl_lifecycle.h"
 #include "cl_gameframe.h"
+#include "cl_rconset.h"
 #include "cl_emoji.h"
 #include "cl_osp.h"
 #include "cl_voip.h"
@@ -33,6 +34,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "cl_superhud.h"
 #include "cl_websocket.h"
 #include "cl_steam.h"
+#include "cl_openhmd.h"
 #include "cl_menuvideo.h"
 #include "cl_sdf_font.h"
 #include "cl_vector_font.h"
@@ -55,6 +57,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "cl_cmds.h"
 #include "script_emit.h"
 #include "cl_oscar.h"
+#include "cl_discord.h"
 #ifdef USE_LUA
 #include "lua_debug.h"
 #include "g_lua_bindings.h"
@@ -198,6 +201,7 @@ void CL_Init( void ) {
 	CL_InitInput();
 
 	CL_InitCvars();
+	CL_RconsetSelfTest();
 
 	CL_Connect_Init();
 	CL_Cmds_Init();
@@ -220,6 +224,7 @@ void CL_Init( void ) {
 	SHUD_Init();
 	WS_Init();
 	Steam_Init();
+	OHMD_Init();
 	MenuVideo_Init();
 	SDF_Init();
 	VectorFont_Init();
@@ -229,6 +234,7 @@ void CL_Init( void ) {
 	CL_Proc_Init();
 	CL_ServerBrowser_Init();
 	CL_Download_Init();
+	CL_TV_Init();
 	CL_Ref_Init();
 #ifdef USE_FLUX
 	CL_Flux_Init();
@@ -252,6 +258,9 @@ void CL_Init( void ) {
 	CL_AppCrdt_Init();
 #endif
 	CL_Oscar_Init();
+	CL_Discord_Init();
+
+	CL_InitFonts();
 
 	Com_Printf( "----- Client Initialization Complete -----\n" );
 }

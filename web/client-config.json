@@ -1,0 +1,19 @@
+{
+  "cvars": {
+    "r_fullscreen": 0,
+    "cg_shadows": 2,
+    "fs_game": "surf",
+    "s_khz": 48
+  },
+  "binds": {},
+  "surf": {
+    "files": [
+      { "src": "api/surf/pak0.pk3", "dst": "/surf" }
+    ]
+  },
+  "baseq3": {
+    "files": [
+      { "src": "api/q3/baseq3/pak0.pk3", "dst": "/baseq3" }
+    ]
+  }
+}

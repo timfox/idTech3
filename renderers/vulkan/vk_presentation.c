@@ -29,6 +29,7 @@ Extracted from vk.c for incremental modularization.
 #include "vk_swapchain.h"
 #include "vk_sync.h"
 #include "vk_temporal.h"
+#include "vk_ui_blur.h"
 #include "vk_util.h"
 #ifdef USE_IMGUI
 #include "inspector/vk_imgui.h"
@@ -163,6 +164,13 @@ void vk_restore_presentation_targets( void )
 #ifdef VK_PBR_BRDFLUT
 	vk_create_brfdlut();
 #endif
+
+	/*
+	 * UI backdrop blur pipelines are created against overlay_compose. That pass
+	 * (and its framebuffers) were just rebuilt — reinitalize so composite stays
+	 * compatible after fullscreen / suboptimal swapchain restarts.
+	 */
+	vk_ui_blur_init();
 
 	vk_temporal_request_sticky_reset( VK_TEMPORAL_RESET_SWAPCHAIN_CHANGE );
 }

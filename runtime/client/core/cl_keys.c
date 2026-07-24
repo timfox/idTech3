@@ -587,6 +587,36 @@ static void Message_Key( int key ) {
 
 /*
 ===================
+CL_RemapGamepadMenuKey
+
+Map SDL PAD0_* buttons to classic keys so stock Q3/OA menus (which only
+understand arrows / Enter / Escape / JOY1-4) work on Steam Deck.
+===================
+*/
+static int CL_RemapGamepadMenuKey( int key )
+{
+	switch ( key ) {
+	case K_PAD0_A:
+	case K_PAD0_RIGHTTRIGGER:
+		return K_ENTER;
+	case K_PAD0_B:
+		return K_ESCAPE;
+	case K_PAD0_DPAD_UP:
+		return K_UPARROW;
+	case K_PAD0_DPAD_DOWN:
+		return K_DOWNARROW;
+	case K_PAD0_DPAD_LEFT:
+		return K_LEFTARROW;
+	case K_PAD0_DPAD_RIGHT:
+		return K_RIGHTARROW;
+	default:
+		return key;
+	}
+}
+
+
+/*
+===================
 CL_KeyDownEvent
 
 Called by CL_KeyEvent to handle a keypress
@@ -649,8 +679,8 @@ static void CL_KeyDownEvent( int key, unsigned time )
 		}
 	}
 
-	// escape is always handled special
-	if ( key == K_ESCAPE ) {
+	// escape is always handled special (Steam Deck: START / BACK also toggle pause)
+	if ( key == K_ESCAPE || key == K_PAD0_START || key == K_PAD0_BACK ) {
 #ifdef USE_CURL
 		if ( Com_DL_InProgress( &download ) && download.mapAutoDownload ) {
 			Com_DL_Cleanup( &download );
@@ -658,6 +688,17 @@ static void CL_KeyDownEvent( int key, unsigned time )
 #endif
 		/* HavenRP City Menu: close overlay instead of opening the Q3 pause menu. */
 		if ( CL_RpMenuActive() ) {
+			/* Pop Surf JS overlays first (map select / leaderboard), then pause. */
+			if ( Cvar_VariableIntegerValue( "ui_surfMapSelect" ) ) {
+				Cvar_Set( "ui_surfMapSelect", "0" );
+				Key_ClearStates();
+				return;
+			}
+			if ( Cvar_VariableIntegerValue( "ui_surfLeaderboard" ) ) {
+				Cvar_Set( "ui_surfLeaderboard", "0" );
+				Key_ClearStates();
+				return;
+			}
 			Cvar_Set( "ui_rpMenu", "0" );
 			Key_ClearStates();
 			return;
@@ -713,7 +754,7 @@ static void CL_KeyDownEvent( int key, unsigned time )
 			return;
 		}
 
-		VM_Call( uivm, 2, UI_KEY_EVENT, key, qtrue );
+		VM_Call( uivm, 2, UI_KEY_EVENT, CL_RemapGamepadMenuKey( key ), qtrue );
 		return;
 	}
 
@@ -722,7 +763,7 @@ static void CL_KeyDownEvent( int key, unsigned time )
 		Console_Key( key );
 	} else if ( Key_GetCatcher( ) & KEYCATCH_UI ) {
 		if ( uivm ) {
-			VM_Call( uivm, 2, UI_KEY_EVENT, key, qtrue );
+			VM_Call( uivm, 2, UI_KEY_EVENT, CL_RemapGamepadMenuKey( key ), qtrue );
 		}
 	} else if ( Key_GetCatcher( ) & KEYCATCH_CGAME ) {
 		if ( cgvm ) {
@@ -793,7 +834,7 @@ static void CL_KeyUpEvent( int key, unsigned time )
 
 	if ( Key_GetCatcher() & KEYCATCH_UI ) {
 		if ( uivm ) {
-			VM_Call( uivm, 2, UI_KEY_EVENT, key, qfalse );
+			VM_Call( uivm, 2, UI_KEY_EVENT, CL_RemapGamepadMenuKey( key ), qfalse );
 		}
 	} else if ( Key_GetCatcher() & KEYCATCH_CGAME ) {
 		if ( cgvm ) {

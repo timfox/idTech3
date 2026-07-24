@@ -67,7 +67,7 @@ void vk_scene_hdr_ownership_begin_frame( void )
 	s_own.extentHeight = vk.renderHeight;
 	s_own.blockedWrites = blocked; /* cumulative diagnostics */
 	s_own.allowedWrites = allowed;
-	s_loggedGiBlock = qfalse;
+	/* Keep s_loggedGiBlock across frames — expected OIT ownership must not spam. */
 }
 
 const sceneHdrOwnership_t *vk_scene_hdr_ownership_get( void )
@@ -188,13 +188,16 @@ void vk_scene_hdr_ownership_register( void )
 	ri.Printf( PRINT_ALL, "[VK][SceneHDR] ownership tracking enabled (scene_hdr_status)\n" );
 }
 
-/* Used by GI gates for a one-shot operator message. */
+/* Expected when WBOIT owns SceneHDR — only log under ownership debug, once. */
 void vk_scene_hdr_log_gi_blocked( const char *passName )
 {
 	if ( s_loggedGiBlock ) {
 		return;
 	}
 	s_loggedGiBlock = qtrue;
+	if ( !r_sceneHdrOwnershipDebug || r_sceneHdrOwnershipDebug->integer < 1 ) {
+		return;
+	}
 	ri.Printf( PRINT_WARNING, S_COLOR_YELLOW
 		"[VK][SceneHDR] skipped %s: SceneHDR owned by post-OIT path (oitState=%u last=%s)\n"
 		S_COLOR_WHITE,

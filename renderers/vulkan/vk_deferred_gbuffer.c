@@ -357,6 +357,10 @@ static qboolean vk_dgb_fail_inject( const char *which )
 /* Pipelines may be built whenever G-buffer resources exist — not gated on per-frame fill. */
 static qboolean vk_deferred_lighting_pipelines_wanted( void )
 {
+	if ( !r_deferredArchitecture ||
+		r_deferredArchitecture->integer == DEFERRED_ARCH_FORWARD_PLUS_REFERENCE ) {
+		return qfalse;
+	}
 	if ( !vk_deferred_gbuffer_active() || !r_deferredLighting || !r_deferredLighting->integer ) {
 		return qfalse;
 	}

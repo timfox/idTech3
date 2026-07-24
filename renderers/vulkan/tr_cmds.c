@@ -548,10 +548,11 @@ void RE_BeginFrame( stereoFrame_t stereoFrame ) {
 			ri.Error( ERR_FATAL, "RE_BeginFrame: Stereo is enabled, but stereoFrame was %i", stereoFrame );
 		}
 	} else {
-		if ( stereoFrame != STEREO_CENTER ) {
-			ri.Error( ERR_FATAL, "RE_BeginFrame: Stereo is disabled, but stereoFrame was %i", stereoFrame );
-		}
-
+		/*
+		 * Software stereo (OpenHMD / anaglyph): LEFT/RIGHT are valid and share
+		 * the mono swapchain; eye offset comes from r_stereoSeparation in
+		 * R_SetupProjection. Do not fatal on non-CENTER frames.
+		 */
 #ifdef USE_VULKAN
 		cmd->buffer = 0;
 #else

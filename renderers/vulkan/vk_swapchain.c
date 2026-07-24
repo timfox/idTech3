@@ -125,8 +125,13 @@ void vk_create_swapchain( VkPhysicalDevice physical_device, VkDevice device, VkS
 	vk.swapchain_extent_valid = qtrue;
 	desc.imageArrayLayers = 1;
 	desc.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+	/* Reset before create: presentation restore reuses the live vk struct. */
+	vk.swapchainTransferSrc = qfalse;
 	if ( !vk.fboActive ) {
 		desc.imageUsage |= VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
+		/* UI blur copies the tonemapped present image; keep the capability flag
+		 * in sync with imageUsage (was missing here → blur died after restart). */
+		vk.swapchainTransferSrc = qtrue;
 	} else if ( ( surface_caps.supportedUsageFlags & VK_IMAGE_USAGE_TRANSFER_SRC_BIT ) != 0 ) {
 		/* UI backdrop-filter blur copies the tonemapped swapchain into a transient
 		 * pooled texture (never sampling the live image). Requires TRANSFER_SRC. */

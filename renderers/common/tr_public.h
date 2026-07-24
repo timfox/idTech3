@@ -112,6 +112,7 @@ typedef struct {
 	void    (*A3D_RenderGeometry) (void *pVoidA3D, void *pVoidGeom, void *pVoidMat, void *pVoidGeomStatus);
 #endif
 	void	(*RegisterFont)(const char *fontName, int pointSize, fontInfo_t *font);
+	qboolean (*RegisterFontAtlas)(const char *fontName, int pointSize, const char *alphabet, fontAtlasInfo_t *out);
 	void	(*ClearTrueTypeFontCache)( void );
 	float	(*GetFontKerning)( const fontInfo_t *font, int prevIndex, int nextIndex );
 	void	(*RemapShader)(const char *oldShader, const char *newShader, const char *offsetTime);
@@ -240,6 +241,9 @@ typedef struct {
 	void	(*Cmd_ExecuteText)( cbufExec_t exec_when, const char *text );
 
 	byte	*(*CM_ClusterPVS)(int cluster);
+
+	// lightweight point trace for stencil shadow clipping (world brushes)
+	void	(*CM_PointTrace)( trace_t *results, const vec3_t start, const vec3_t end, int brushmask );
 
 	// visualization for debugging collision detection
 	void	(*CM_DrawDebugSurface)( void (*drawPoly)(int color, int numPoints, float *points) );

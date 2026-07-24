@@ -1934,6 +1934,299 @@ void CM_BoxTrace( trace_t *results, const vec3_t start, const vec3_t end,
 
 /*
 ==================
+CM_PointTraceThroughBrush
+
+Simplified brush trace for zero-extent (point) traces.
+Skips capsule logic and offset expansion — uses plane->dist directly.
+==================
+*/
+static void CM_PointTraceThroughBrush( traceWork_t *tw, cbrush_t *brush ) {
+	int			i;
+	cplane_t	*plane, *clipplane;
+	float		enterFrac, leaveFrac;
+	float		d1, d2;
+	qboolean	getout, startout;
+	float		f;
+	cbrushside_t	*side, *leadside;
+
+	enterFrac = -1.0;
+	leaveFrac = 1.0;
+	clipplane = NULL;
+
+	if ( !brush->numsides ) {
+		return;
+	}
+
+	c_brush_traces++;
+
+	getout = qfalse;
+	startout = qfalse;
+	leadside = NULL;
+
+	for ( i = 0; i < brush->numsides; i++ ) {
+		side = brush->sides + i;
+		plane = side->plane;
+
+		// point trace: no offset expansion needed
+		d1 = DotProduct( tw->start, plane->normal ) - plane->dist;
+		d2 = DotProduct( tw->end, plane->normal ) - plane->dist;
+
+		if ( d2 > 0 ) {
+			getout = qtrue;
+		}
+		if ( d1 > 0 ) {
+			startout = qtrue;
+		}
+
+		if ( d1 > 0 && ( d2 >= SURFACE_CLIP_EPSILON || d2 >= d1 ) ) {
+			return;
+		}
+
+		if ( d1 <= 0 && d2 <= 0 ) {
+			continue;
+		}
+
+		if ( d1 > d2 ) {	// enter
+			f = ( d1 - SURFACE_CLIP_EPSILON ) / ( d1 - d2 );
+			if ( f < 0 ) {
+				f = 0;
+			}
+			if ( f > enterFrac ) {
+				enterFrac = f;
+				clipplane = plane;
+				leadside = side;
+			}
+		} else {	// leave
+			f = ( d1 + SURFACE_CLIP_EPSILON ) / ( d1 - d2 );
+			if ( f > 1 ) {
+				f = 1;
+			}
+			if ( f < leaveFrac ) {
+				leaveFrac = f;
+			}
+		}
+	}
+
+	if ( !startout ) {
+		tw->trace.startsolid = qtrue;
+		if ( !getout ) {
+			tw->trace.allsolid = qtrue;
+			tw->trace.fraction = 0;
+			tw->trace.contents = brush->contents;
+		}
+		return;
+	}
+
+	if ( enterFrac < leaveFrac ) {
+		if ( enterFrac > -1 && enterFrac < tw->trace.fraction ) {
+			if ( enterFrac < 0 ) {
+				enterFrac = 0;
+			}
+			tw->trace.fraction = enterFrac;
+			if ( clipplane != NULL ) {
+				tw->trace.plane = *clipplane;
+			}
+			if ( leadside != NULL ) {
+				tw->trace.surfaceFlags = leadside->surfaceFlags;
+			}
+			tw->trace.contents = brush->contents;
+		}
+	}
+}
+
+
+/*
+==================
+CM_PointTraceThroughLeaf
+
+Simplified leaf trace for point traces — tests brushes only (skips
+patches), using the point-optimized brush trace.
+==================
+*/
+static void CM_PointTraceThroughLeaf( traceWork_t *tw, cLeaf_t *leaf ) {
+	int			k;
+	int			brushnum;
+	cbrush_t	*b;
+
+	for ( k = 0; k < leaf->numLeafBrushes; k++ ) {
+		brushnum = cm.leafbrushes[leaf->firstLeafBrush + k];
+
+		b = &cm.brushes[brushnum];
+		if ( b->checkcount == cm.checkcount ) {
+			continue;
+		}
+		b->checkcount = cm.checkcount;
+
+		if ( !( b->contents & tw->contents ) ) {
+			continue;
+		}
+
+		if ( !CM_BoundsIntersect( tw->bounds[0], tw->bounds[1],
+					b->bounds[0], b->bounds[1] ) ) {
+			continue;
+		}
+
+		CM_PointTraceThroughBrush( tw, b );
+		if ( !tw->trace.fraction ) {
+			return;
+		}
+	}
+}
+
+
+/*
+==================
+CM_PointTraceThroughTree
+
+Simplified BSP tree walk for point traces — offset is always 0.
+==================
+*/
+static void CM_PointTraceThroughTree( traceWork_t *tw, int num,
+		float p1f, float p2f, vec3_t p1, vec3_t p2 ) {
+	cNode_t		*node;
+	cplane_t	*plane;
+	float		t1, t2;
+	float		frac, frac2;
+	float		idist;
+	vec3_t		mid;
+	int			side;
+	float		midf;
+
+	if ( tw->trace.fraction <= p1f ) {
+		return;
+	}
+
+	if ( num < 0 ) {
+		CM_PointTraceThroughLeaf( tw, &cm.leafs[-1-num] );
+		return;
+	}
+
+	node = cm.nodes + num;
+	plane = node->plane;
+
+	if ( plane->type < 3 ) {
+		t1 = p1[plane->type] - plane->dist;
+		t2 = p2[plane->type] - plane->dist;
+	} else {
+		t1 = DotProduct( plane->normal, p1 ) - plane->dist;
+		t2 = DotProduct( plane->normal, p2 ) - plane->dist;
+	}
+
+	// offset = 0 for point traces
+	if ( t1 >= 1 && t2 >= 1 ) {
+		CM_PointTraceThroughTree( tw, node->children[0], p1f, p2f, p1, p2 );
+		return;
+	}
+	if ( t1 < -1 && t2 < -1 ) {
+		CM_PointTraceThroughTree( tw, node->children[1], p1f, p2f, p1, p2 );
+		return;
+	}
+
+	if ( t1 < t2 ) {
+		idist = 1.0 / ( t1 - t2 );
+		side = 1;
+		frac2 = ( t1 + SURFACE_CLIP_EPSILON ) * idist;
+		frac = ( t1 + SURFACE_CLIP_EPSILON ) * idist;
+	} else if ( t1 > t2 ) {
+		idist = 1.0 / ( t1 - t2 );
+		side = 0;
+		frac2 = ( t1 - SURFACE_CLIP_EPSILON ) * idist;
+		frac = ( t1 + SURFACE_CLIP_EPSILON ) * idist;
+	} else {
+		side = 0;
+		frac = 1;
+		frac2 = 0;
+	}
+
+	if ( frac < 0 ) {
+		frac = 0;
+	}
+	if ( frac > 1 ) {
+		frac = 1;
+	}
+
+	midf = p1f + ( p2f - p1f ) * frac;
+
+	mid[0] = p1[0] + frac * ( p2[0] - p1[0] );
+	mid[1] = p1[1] + frac * ( p2[1] - p1[1] );
+	mid[2] = p1[2] + frac * ( p2[2] - p1[2] );
+
+	CM_PointTraceThroughTree( tw, node->children[side], p1f, midf, p1, mid );
+
+	if ( frac2 < 0 ) {
+		frac2 = 0;
+	}
+	if ( frac2 > 1 ) {
+		frac2 = 1;
+	}
+
+	midf = p1f + ( p2f - p1f ) * frac2;
+
+	mid[0] = p1[0] + frac2 * ( p2[0] - p1[0] );
+	mid[1] = p1[1] + frac2 * ( p2[1] - p1[1] );
+	mid[2] = p1[2] + frac2 * ( p2[2] - p1[2] );
+
+	CM_PointTraceThroughTree( tw, node->children[side^1], midf, p2f, mid, p2 );
+}
+
+
+/*
+==================
+CM_PointTrace
+
+Lightweight point trace against world model 0 (CONTENTS_SOLID).
+Optimized for shadow clipping: skips capsule/box setup, offset expansion,
+patch checks, and uses minimal traceWork_t initialization.
+==================
+*/
+void CM_PointTrace( trace_t *results, const vec3_t start, const vec3_t end,
+		int brushmask ) {
+	int			i;
+	traceWork_t	tw;
+
+	cm.checkcount++;
+	c_traces++;
+
+	// minimal init — only what the point trace path needs
+	Com_Memset( &tw.trace, 0, sizeof( tw.trace ) );
+	tw.trace.fraction = 1.0f;
+
+	if ( !cm.numNodes ) {
+		*results = tw.trace;
+		return;
+	}
+
+	tw.contents = brushmask;
+	VectorCopy( start, tw.start );
+	VectorCopy( end, tw.end );
+	tw.isPoint = qtrue;
+
+	// bounds: tight bbox around the ray
+	for ( i = 0; i < 3; i++ ) {
+		if ( tw.start[i] < tw.end[i] ) {
+			tw.bounds[0][i] = tw.start[i];
+			tw.bounds[1][i] = tw.end[i];
+		} else {
+			tw.bounds[0][i] = tw.end[i];
+			tw.bounds[1][i] = tw.start[i];
+		}
+	}
+
+	CM_PointTraceThroughTree( &tw, 0, 0, 1, tw.start, tw.end );
+
+	if ( tw.trace.fraction == 1 ) {
+		VectorCopy( end, tw.trace.endpos );
+	} else {
+		for ( i = 0; i < 3; i++ ) {
+			tw.trace.endpos[i] = start[i] + tw.trace.fraction * ( end[i] - start[i] );
+		}
+	}
+
+	*results = tw.trace;
+}
+
+/*
+==================
 CM_TransformedBoxTrace
 
 Handles offsetting and rotation of the end points for moving and

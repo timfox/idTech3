@@ -1,9 +1,12 @@
 #version 450
 /*
- * GPU vector font fragment shader (Lengyel JCGT 2017 / Slug reference, MIT).
- * Evaluates quadratic Bezier winding coverage from a curve control-point texture.
- * reserved[0] = curveStart (texel index), reserved[1] = curveCount,
- * reserved[2] = curveTexWidth, reserved[3] unused.
+ * GPU vector font — Lengyel JCGT 2017 / Slug winding coverage.
+ * Dual curve lists: X-sorted for horizontal rays, Y-sorted for vertical.
+ * reserved[0]=curveStartX, reserved[1]=curveCount, reserved[2]=curveTexWidth,
+ * reserved[3]=coverageMode (0 center, 1 dual-axis, 2 adaptive boundary SS).
+ *
+ * Atlas-free: curve control points + acceleration live in GPU textures/buffers;
+ * no raster glyph/MSDF atlas is used.
  */
 layout(location = 0) centroid in vec4 frag_color0;
 layout(location = 1) centroid in vec2 frag_tex_coord0;
@@ -21,7 +24,7 @@ layout(push_constant) uniform Transform {
 	float curveStart;
 	float curveCount;
 	float curveTexWidth;
-	float _pad;
+	float coverageMode;
 	float _pad2[7];
 } pc;
 
@@ -72,11 +75,10 @@ vec4 fetchCurveTexel( int index ) {
 	return texelFetch( curveTexture, loc, 0 );
 }
 
-float renderGlyphCoverage( vec2 renderCoord ) {
+/* Dual-axis analytical coverage (Lengyel). startX / startY select sorted lists. */
+float renderGlyphCoverageAt( vec2 renderCoord, int startX, int startY, int count ) {
 	vec2 emsPerPixel = fwidth( renderCoord );
 	vec2 pixelsPerEm = 1.0 / max( emsPerPixel, vec2( 1.0 / 65536.0 ) );
-	int start = int( pc.curveStart );
-	int count = int( pc.curveCount );
 	float xcov = 0.0;
 	float xwgt = 0.0;
 	float ycov = 0.0;
@@ -84,7 +86,7 @@ float renderGlyphCoverage( vec2 renderCoord ) {
 	int i;
 
 	for ( i = 0; i < count; i++ ) {
-		int idx = start + i * 2;
+		int idx = startX + i * 2;
 		vec4 p12 = fetchCurveTexel( idx ) - vec4( renderCoord, renderCoord );
 		vec2 p3 = fetchCurveTexel( idx + 1 ).xy - renderCoord;
 
@@ -107,7 +109,7 @@ float renderGlyphCoverage( vec2 renderCoord ) {
 	}
 
 	for ( i = 0; i < count; i++ ) {
-		int idx = start + i * 2;
+		int idx = startY + i * 2;
 		vec4 p12 = fetchCurveTexel( idx ) - vec4( renderCoord, renderCoord );
 		vec2 p3 = fetchCurveTexel( idx + 1 ).xy - renderCoord;
 
@@ -135,6 +137,47 @@ float renderGlyphCoverage( vec2 renderCoord ) {
 	return clamp( coverage, 0.0, 1.0 );
 }
 
+float renderGlyphCoverage( vec2 renderCoord ) {
+	int startX = int( pc.curveStart );
+	int count = int( pc.curveCount );
+	int startY = startX + count * 2; /* Y-sorted duplicate list */
+	int mode = int( pc.coverageMode + 0.5 );
+
+	if ( mode <= 0 ) {
+		/* Diagnostic: single dual-axis sample at pixel center. */
+		return renderGlyphCoverageAt( renderCoord, startX, startY, count );
+	}
+
+	float center = renderGlyphCoverageAt( renderCoord, startX, startY, count );
+	if ( mode == 1 ) {
+		return center;
+	}
+
+	/* Mode 2+: adaptive boundary supersampling in stable pixel-space offsets. */
+	vec2 emsPerPixel = fwidth( renderCoord );
+	bool nearBoundary = center > 0.02 && center < 0.98;
+	if ( !nearBoundary && mode < 3 ) {
+		return center;
+	}
+
+	/* Rotated stratified 4-tap (HIGH) or 8-tap (ULTRA when mode>=3). */
+	vec2 offs4[4] = vec2[](
+		vec2( -0.375, -0.125 ),
+		vec2(  0.125, -0.375 ),
+		vec2( -0.125,  0.375 ),
+		vec2(  0.375,  0.125 ) );
+	float accum = center;
+	float wsum = 1.0;
+	int n = ( mode >= 3 ) ? 8 : 4;
+	for ( int s = 0; s < n; s++ ) {
+		vec2 o = ( s < 4 ) ? offs4[s] : offs4[s - 4] * vec2( -1.0, 1.0 ) + vec2( 0.0625, -0.0625 );
+		vec2 samplePos = renderCoord + o * emsPerPixel;
+		accum += renderGlyphCoverageAt( samplePos, startX, startY, count );
+		wsum += 1.0;
+	}
+	return clamp( accum / wsum, 0.0, 1.0 );
+}
+
 void main() {
 	out_motion = vec2( 0.0 );
 	if ( abs( var_CurrentClip.w ) > 1e-6 && abs( var_PrevClip.w ) > 1e-6 ) {
@@ -144,5 +187,7 @@ void main() {
 	}
 
 	float cov = renderGlyphCoverage( frag_tex_coord0 );
-	out_color = vec4( frag_color0.rgb, frag_color0.a * cov );
+	/* Premultiplied linear-light coverage (blend: ONE, ONE_MINUS_SRC_ALPHA). */
+	vec3 rgb = frag_color0.rgb * ( frag_color0.a * cov );
+	out_color = vec4( rgb, frag_color0.a * cov );
 }

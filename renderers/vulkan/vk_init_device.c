@@ -1196,16 +1196,17 @@ void vk_initialize( void )
 		SET_OBJECT_NAME( vk.pipeline_layout_blend, "pipeline layout - blend", VK_DEBUG_REPORT_OBJECT_TYPE_PIPELINE_LAYOUT_EXT );
 
 		{
-			VkDescriptorSetLayout smaa_layouts[2];
+			VkDescriptorSetLayout smaa_layouts[3];
 			VkPipelineLayoutCreateInfo smaa_desc;
 			VkPushConstantRange smaa_push_range;
 
 			smaa_layouts[0] = vk.set_layout_sampler;
 			smaa_layouts[1] = vk.set_layout_sampler;
+			smaa_layouts[2] = vk.set_layout_sampler;
 
 			smaa_push_range.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
 			smaa_push_range.offset = 0;
-			/* 32 bytes: SMAA uses 16; spatial adaptive SS push uses 24. */
+			/* 32 bytes: SMAA edge/blend 16; compose depth reject 32; spatial adaptive 24. */
 			smaa_push_range.size = 32;
 
 			Com_Memset( &smaa_desc, 0, sizeof( smaa_desc ) );
@@ -1221,9 +1222,10 @@ void vk_initialize( void )
 			SET_OBJECT_NAME( vk.pipeline_layout_smaa, "pipeline layout - smaa", VK_DEBUG_REPORT_OBJECT_TYPE_PIPELINE_LAYOUT_EXT );
 		}
 
-		// ssao pipeline layout (depth sampler + push constants)
+		// ssao pipeline layout (set0 = AO or depth for gen; set1 = depth for blur)
 		set_layouts[0] = vk.set_layout_sampler;
-		desc.setLayoutCount = 1;
+		set_layouts[1] = vk.set_layout_sampler;
+		desc.setLayoutCount = 2;
 		desc.pSetLayouts = set_layouts;
 		push_range.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
 		push_range.offset = 0;

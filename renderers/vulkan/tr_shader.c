@@ -4932,6 +4932,55 @@ qhandle_t RE_RegisterShaderFromImage(const char *name, int lightmapIndex, image_
 
 /*
 ====================
+R_CreateSkyShaderFromFaces
+
+Build a sky shader whose outerbox faces are already-resident images
+(tone-mapped HDR display faces, or classic env faces).
+====================
+*/
+shader_t *R_CreateSkyShaderFromFaces( const char *name, image_t *faces[6] ) {
+	unsigned long hash;
+	shader_t *sh;
+	int i;
+
+	if ( !name || !name[0] ) {
+		return tr.defaultShader;
+	}
+
+	hash = generateHashValue( name, FILE_HASH_SIZE );
+	for ( sh = hashTable[hash]; sh; sh = sh->next ) {
+		if ( !Q_stricmp( sh->name, name ) && sh->isSky ) {
+			if ( faces ) {
+				for ( i = 0; i < 6; i++ ) {
+					if ( faces[i] ) {
+						sh->sky.outerbox[i] = faces[i];
+					}
+				}
+			}
+			return sh;
+		}
+	}
+
+	InitShader( name, LIGHTMAP_NONE );
+	shader.isSky = qtrue;
+	shader.surfaceFlags |= SURF_SKY;
+	shader.sky.cloudHeight = 512.0f;
+	R_InitSkyTexCoords( shader.sky.cloudHeight );
+
+	for ( i = 0; i < 6; i++ ) {
+		if ( faces && faces[i] ) {
+			shader.sky.outerbox[i] = faces[i];
+		} else {
+			shader.sky.outerbox[i] = tr.defaultImage;
+		}
+	}
+
+	return FinishShader();
+}
+
+
+/*
+====================
 RE_RegisterShaderLightMap
 
 This is the exported shader entry point for the rest of the system

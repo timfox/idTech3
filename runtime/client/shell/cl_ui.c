@@ -902,6 +902,11 @@ static qboolean UI_GetValue( char* value, int valueSize, const char* key ) {
 		return qtrue;
 	}
 
+	if ( !Q_stricmp( key, "trap_R_RegisterFontAtlas_Q3E" ) && re.RegisterFontAtlas ) {
+		Com_sprintf( value, valueSize, "%i", UI_R_REGISTERFONTATLAS );
+		return qtrue;
+	}
+
 	return qfalse;
 }
 
@@ -1217,6 +1222,13 @@ static intptr_t CL_UISystemCalls( intptr_t *args ) {
 	case UI_R_REGISTERFONT:
 		re.RegisterFont( VMA(1), args[2], VMA(3));
 		return 0;
+
+	case UI_R_REGISTERFONTATLAS:
+		if ( !re.RegisterFontAtlas ) {
+			return qfalse;
+		}
+		VM_CHECKBOUNDS( uivm, args[4], sizeof( fontAtlasInfo_t ) );
+		return re.RegisterFontAtlas( VMA(1), args[2], VMA(3), VMA(4) );
 
 	// shared syscalls
 

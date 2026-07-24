@@ -6,6 +6,7 @@
 #define FORWARD_PLUS_LIGHT_EVAL_GLSL
 
 #include "pbr_brdf_core.glsl"
+#include "surface_material_decode.glsl"
 
 #ifndef FP_EVAL_PI
 #define FP_EVAL_PI PBR_BRDF_PI
@@ -48,6 +49,13 @@ vec3 FpEval_ForwardPlusAdd(
 	out bool clusterOob,
 	out uint lightCountOut )
 {
+	SurfaceMaterial surfaceMaterial = SurfaceMaterialDecodeCanonical(
+		albedo, 1.0, N, roughness, metalness, 1.0, vec3( 0.0 ),
+		0.0, roughness, 0.0, 0u, 0u, OPAQUE_OWNER_FORWARD_PLUS, 0u );
+	albedo = surfaceMaterial.baseColor;
+	N = surfaceMaterial.normalWS;
+	roughness = surfaceMaterial.perceptualRoughness;
+	metalness = surfaceMaterial.metallic;
 	vec3 fpAdd = vec3( 0.0 );
 	vec3 diffAccum = vec3( 0.0 );
 	vec3 specAccum = vec3( 0.0 );

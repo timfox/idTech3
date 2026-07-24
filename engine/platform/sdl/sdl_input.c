@@ -1362,7 +1362,7 @@ static void IN_GamepadMove( void )
 		if (f < 0.0f)
 			f = 0.0f;
 
-		axis = (int)(32767 * ((axis < 0) ? -f : f));
+		axis = (int)(127 * ((axis < 0) ? -f : f));
 
 		if (axis != oldAxis)
 		{

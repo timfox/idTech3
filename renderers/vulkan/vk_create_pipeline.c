@@ -1408,9 +1408,14 @@ VkPipeline vk_create_pipeline( const Vk_Pipeline_Def *def, renderPass_t renderPa
 	depth_stencil_state.stencilTestEnable = (def->shadow_phase != SHADOW_DISABLED) ? VK_TRUE : VK_FALSE;
 
 	if (def->shadow_phase == SHADOW_EDGES) {
+		// z-fail (Carmack's reverse): count fragments behind scene geometry.
+		// WRAP keeps the count modular across nested volumes; requires closed
+		// near+far caps from RB_ShadowTessEnd.
 		depth_stencil_state.front.failOp = VK_STENCIL_OP_KEEP;
-		depth_stencil_state.front.passOp = (def->face_culling == CT_FRONT_SIDED) ? VK_STENCIL_OP_INCREMENT_AND_CLAMP : VK_STENCIL_OP_DECREMENT_AND_CLAMP;
-		depth_stencil_state.front.depthFailOp = VK_STENCIL_OP_KEEP;
+		depth_stencil_state.front.passOp = VK_STENCIL_OP_KEEP;
+		depth_stencil_state.front.depthFailOp = (def->face_culling == CT_FRONT_SIDED)
+			? VK_STENCIL_OP_DECREMENT_AND_WRAP
+			: VK_STENCIL_OP_INCREMENT_AND_WRAP;
 		depth_stencil_state.front.compareOp = VK_COMPARE_OP_ALWAYS;
 		depth_stencil_state.front.compareMask = 255;
 		depth_stencil_state.front.writeMask = 255;

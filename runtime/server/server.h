@@ -168,6 +168,7 @@ typedef struct client_s {
 	char			lastClientCommandString[MAX_STRING_CHARS];
 	sharedEntity_t	*gentity;			// SV_GentityNum(clientnum)
 	char			name[MAX_NAME_LENGTH];			// extracted from userinfo, high bits masked
+	char			lockedName[MAX_NAME_LENGTH];	// hub-supplied canonical name; when set, overrides userinfo "name"
 
 	gameStateAck_t	gamestateAck;
 	qboolean		downloading;		// set at "download", reset at gamestate retransmission
@@ -223,6 +224,10 @@ typedef struct client_s {
 
 	char			tld[3]; // "XX\0"
 	const char		*country;
+
+	qboolean		isVR;				// Client is VR (from userinfo "vr")
+
+	qboolean		tvDemoPending;		// Surf TV: notify client to download last .tvd
 
 } client_t;
 
@@ -503,6 +508,146 @@ void SV_Trace( trace_t *results, const vec3_t start, const vec3_t mins, const ve
 void SV_ClipToEntity( trace_t *trace, const vec3_t start, const vec3_t mins, const vec3_t maxs, const vec3_t end, int entityNum, int contentmask, qboolean capsule );
 // clip to a specific entity
 
+
+//
+// Surf TV recording / live stream (sv_tv.c, sv_tvstream.c) — TVD1/TVL1 wire format
+//
+#include "zstd.h"
+
+#define MAX_TV_MSGLEN      (256*1024)
+#define MAX_TV_CMDS        256
+#define MAX_TV_CMDBUF      (64*1024)
+#define ZSTD_OUT_BUF_SIZE  (128*1024)
+#define MAX_TV_VOIP_PACKETS 128
+#define MAX_TV_VOIP_BUF    (64*1024)
+
+typedef struct {
+    int         target;     // client index or -1 for broadcast
+    int         offset;     // offset into cmdBuf
+    int         len;
+} tvCmd_t;
+
+#ifdef USE_VOIP
+typedef struct {
+    int         sender;
+    int         generation;
+    int         sequence;
+    int         frames;
+    int         flags;
+    uint8_t     recips[(MAX_CLIENTS + 7) / 8];
+    int         offset;     // offset into voipBuf
+    int         len;        // encoded data length
+} tvVoipPacket_t;
+#endif
+
+typedef struct {
+    qboolean    recording;
+    qboolean    autoPending;    // waiting for first human client before auto-start
+    fileHandle_t file;
+    unsigned int fileOffset;
+    unsigned int fileOffsetHi; // for >4GB (unlikely)
+
+    int         frameCount;
+    int         firstServerTime;
+    int         lastServerTime;
+
+    // Previous-frame baselines for delta encoding
+    entityState_t   prevEntities[MAX_GENTITIES];
+    byte            prevEntityBitmask[MAX_GENTITIES/8]; // 128 bytes
+    playerState_t   prevPlayers[MAX_CLIENTS];
+    byte            prevPlayerBitmask[MAX_CLIENTS/8];   // 8 bytes
+
+    // Per-frame server command capture
+    tvCmd_t     cmds[MAX_TV_CMDS];
+    int         cmdCount;
+    char        cmdBuf[MAX_TV_CMDBUF];
+    int         cmdBufUsed;
+
+    // Per-frame configstring change tracking
+    qboolean    csChanged[MAX_CONFIGSTRINGS];
+
+#ifdef USE_VOIP
+    // Per-frame VOIP capture
+    tvVoipPacket_t voipPackets[MAX_TV_VOIP_PACKETS];
+    int         voipCount;
+    byte        voipBuf[MAX_TV_VOIP_BUF];
+    int         voipBufUsed;
+#endif
+
+    // Write buffer
+    byte        msgBuf[MAX_TV_MSGLEN];
+
+    qboolean    autoRecording;      // started by auto-record (not manual tvrecord)
+    qboolean    keepRecording;      // threshold met, do not auto-delete
+    int         thresholdMetTime;   // sv.time when threshold was first continuously met (0 = not met)
+    char        recordingPath[MAX_QPATH]; // path for potential deletion
+    char        lastRecordedFile[MAX_QPATH]; // finalized demo path for download notification
+    char        lastRecordedMap[MAX_QPATH];  // map name at time of recording
+
+    // Zstd streaming compression
+    ZSTD_CStream    *cstream;
+    byte            zstdOutBuf[ZSTD_OUT_BUF_SIZE];
+} tvState_t;
+
+extern tvState_t tv;
+
+// --- Live TV stream tap (sv_tvstream.c) ---
+// A loopback TCP broadcast of the in-progress match in the "TVL1" wire
+// format. Independent of the .tvd disk recording; taps the same in-memory
+// frame. Single-threaded, non-blocking, polled from the server frame.
+#define MAX_TV_STREAM_CONSUMERS 4
+#define TV_STREAM_OUTBUF_SIZE   (1*1024*1024) // per-consumer queue; overflow => drop consumer
+#define TV_STREAM_SEGBUF_SIZE   (1*1024*1024) // current-segment compressed payload assembly
+#define TV_STREAM_ZSTD_OUT      (128*1024)
+// KEEP IN SYNC with runtime/client/client.h TV_SEG_UNCOMPRESSED_MAX.
+#define TV_SEG_UNCOMPRESSED_MAX (2*1024*1024)
+
+typedef struct {
+	int      fd;          // socket fd, or -1 if slot unused
+	qboolean headerSent;  // StreamHeader queued yet?
+	qboolean started;     // admitted at a keyframe boundary (eligible for segments)?
+	byte     out[TV_STREAM_OUTBUF_SIZE];
+	int      outHead;     // first unsent byte
+	int      outTail;     // one past last queued byte
+} tvConsumer_t;
+
+typedef struct {
+	int          listenFd;   // listening socket, or -1
+	int          listenPort; // port we bound (== net_port at bind time)
+	tvConsumer_t consumers[MAX_TV_STREAM_CONSUMERS];
+
+	qboolean     active;           // a stream session is live (warmup..map end), independent of recording
+	qboolean     forceKeyframe;    // emit a keyframe on the next frame (re-base consumers after a baseline reset)
+	qboolean     segActive;        // a segment is currently being assembled
+	int          segKeyframeTime;  // serverTime of the current segment's keyframe
+	int          lastKeyframeTime; // serverTime of the last keyframe emitted
+	ZSTD_CStream *cstream;         // tap's own compressor, reset per segment
+	byte         segBuf[TV_STREAM_SEGBUF_SIZE];
+	int          segLen;           // compressed bytes accumulated in segBuf
+	int          segUncompressed;  // uncompressed bytes added to the current segment (bounds against TV_SEG_UNCOMPRESSED_MAX)
+	byte         zstdOut[TV_STREAM_ZSTD_OUT];
+	byte         frameBuf[MAX_TV_MSGLEN]; // scratch for building a keyframe frame
+} tvStreamState_t;
+
+extern tvStreamState_t tvs;
+
+void SV_TVStream_Init( void );       // bind loopback listener (idempotent; needs net_port)
+void SV_TVStream_Shutdown( void );    // close listener + all consumers
+void SV_TVStream_RunListener( void ); // accept new conns + pump output (per frame)
+void SV_TVStream_StartStream( void ); // stream session start: reset stream state
+void SV_TVStream_Frame( const byte *deltaData, int deltaLen, int serverTime ); // per streamed frame
+void SV_TVStream_EndStream( void );   // stream session end: finalize segment + send TVLe
+qboolean SV_TVStream_IsActive( void );  // is a stream session live?
+void SV_TVStream_ForceKeyframe( void ); // emit a keyframe on the next frame
+
+extern cvar_t *sv_tvAuto;
+extern cvar_t *sv_tvAutoMinPlayers;
+extern cvar_t *sv_tvAutoMinPlayersSecs;
+extern cvar_t *sv_tvpath;
+extern cvar_t *sv_tvDownload;
+extern cvar_t *sv_tvLive;
+extern cvar_t *sv_tvLiveKeyframeMsec;
+
 //
 // sv_net_chan.c
 //
@@ -518,3 +663,18 @@ void SV_LoadFilters( const char *filename );
 const char *SV_RunFilters( const char *userinfo, const netadr_t *addr );
 void SV_AddFilter_f( void );
 void SV_AddFilterCmd_f( void );
+
+//
+// sv_tv.c
+//
+void SV_TV_Init( void );
+void SV_TV_StartRecord_f( void );
+void SV_TV_StopRecord_f( void );
+void SV_TV_WriteFrame( void );
+void SV_TV_StopRecord( qboolean discard );
+void SV_TV_FinalizeRecording( void );  // stop + threshold-based save/discard (match boundary)
+void SV_TV_ConfigstringChanged( int index );
+void SV_TV_CaptureServerCommand( int target, const char *cmd );
+void SV_TV_AutoStart( void );
+void SV_TV_StreamBegin( void );  // begin a live stream session for the current map (if sv_tvLive)
+void SV_TV_StreamEnd( void );    // end the current map's live stream session

@@ -145,6 +145,91 @@ typedef struct {
 
 extern	clientActive_t		cl;
 
+
+// TV playback state (Surf TVD/TVL — separate from Owncast/cl_streaming)
+#include "zstd.h"
+
+#define MAX_TV_MSGLEN		(256*1024)
+#define TVD_ZSTD_IN_BUF_SIZE   (128*1024)
+#define TVD_ZSTD_OUT_BUF_SIZE  (256*1024)
+// KEEP TV_SEG_UNCOMPRESSED_MAX IN SYNC with runtime/server/server.h.
+#define TV_SEG_UNCOMPRESSED_MAX (2*1024*1024)  // >= server TV_SEG_UNCOMPRESSED_MAX (decompressed cap)
+#define TVD_SEGIN_MAX           (1*1024*1024)  // >= server TV_STREAM_SEGBUF_SIZE (compressed cap)
+
+typedef struct {
+	qboolean		active;
+	fileHandle_t	file;
+
+	// Header
+	int				svFps;
+	int				maxclients;
+
+	// Running state buffers
+	entityState_t	entities[MAX_GENTITIES];
+	byte			entityBitmask[MAX_GENTITIES/8];
+	playerState_t	players[MAX_CLIENTS];
+	byte			playerBitmask[MAX_CLIENTS/8];
+
+	// Frame tracking
+	int				serverTime;
+
+	// Viewpoint
+	int				viewpoint;
+	vec3_t			viewOrigin;		// updated by cgame via respatialize trap
+
+
+	// Read buffer
+	byte			msgBuf[MAX_TV_MSGLEN];
+
+	// Duration info
+	int				totalDuration;		// from header, in msec
+	int				firstServerTime;
+	int				lastServerTime;
+
+	// EOF tracking
+	qboolean		atEnd;
+
+	// Seek state
+	qboolean		seeking;
+
+	// Saved initial state for seeking (configstrings are delta-encoded from header)
+	long			firstFrameOffset;
+	gameState_t		initialGameState;
+
+	// Zstd streaming decompression
+	ZSTD_DStream	*dstream;
+	byte			zstdInBuf[TVD_ZSTD_IN_BUF_SIZE];
+	size_t			zstdInSize;
+	size_t			zstdInPos;
+	byte			zstdOutBuf[TVD_ZSTD_OUT_BUF_SIZE];
+	size_t			zstdOutSize;
+	size_t			zstdOutPos;
+	qboolean		zstdStreamEnded;
+
+	// Live (TVL1) streaming mode
+	qboolean		live;              // true when playing a TVL1 live stream (not a TVD1 VOD)
+	qboolean		bootstrapped;      // true once the first keyframe segment has built a snapshot
+	qboolean		needInitialCatchUp; // WASM: trim the boot-time backlog once steady play begins
+	qboolean		liveClockResync;    // WASM: snap the clock after catch-up
+	qboolean		reconcileSilent;    // WASM: next keyframe configstring changes are state sync
+	int				effKeepMs;          // WASM: adaptive jitter cushion
+	int				lastKeepAdapt;      // WASM: cls.realtime of last cushion adapt
+	qboolean		starved;            // WASM: underrun edge-trigger
+	float			clockSkewAccum;     // WASM: sub-ms accumulator for adaptive clock
+	byte			segIn[TVD_SEGIN_MAX];
+	byte			segOut[TV_SEG_UNCOMPRESSED_MAX];
+	size_t			segOutLen;
+	size_t			segCursor;
+	qboolean		segFirstRecord;
+
+	// Live map change asset gate (WASM / JS fetch path)
+	qboolean		awaitingAssets;
+	qboolean		awaitingHeader;
+	char			pendingMap[MAX_QPATH];
+} tvPlayback_t;
+
+extern tvPlayback_t tvPlay;
+
 #define EM_GAMESTATE 1
 #define EM_SNAPSHOT  2
 #define EM_COMMAND   4
@@ -250,6 +335,17 @@ typedef struct {
 	int		demoCommandSequence;
 	int		demoDeltaNum;
 	int		demoMessageSequence;
+
+	// Server advertises vr_support=1; VR clients pack head angles into
+	// usercmd buttons bits 12-25 and write 32-bit buttons.
+	qboolean	serverSupportsVR;
+
+
+	// Surf TV demo download offer (HTTP via cl_curl)
+	char		tvDemoFile[MAX_QPATH];
+	char		tvDemoMap[MAX_QPATH];
+	char		tvDemoPendingUrl[MAX_OSPATH];
+	char		tvDemoPendingLocal[MAX_OSPATH];
 
 } clientConnection_t;
 
@@ -391,12 +487,19 @@ extern	qboolean	cl_oldGameSet;
 #ifdef USE_CURL
 
 extern		download_t	download;
+extern		download_t	tvDownload;
 qboolean	Com_DL_Perform( download_t *dl );
 void		Com_DL_Cleanup( download_t *dl );
 qboolean	Com_DL_Begin( download_t *dl, const char *localName, const char *remoteURL, qboolean autoDownload );
 qboolean	Com_DL_InProgress( const download_t *dl );
 qboolean	Com_DL_ValidFileName( const char *fileName );
 qboolean	CL_Download( const char *cmd, const char *pakname, qboolean autoDownload );
+
+qboolean	CL_TV_BeginDownload( const char *localName, const char *remoteURL );
+qboolean	CL_TV_PerformDownload( void );
+void		CL_TV_CleanupDownload( void );
+void		CL_TVDYes_f( void );
+void		CL_TVDNo_f( void );
 
 #endif
 
@@ -411,6 +514,10 @@ extern	refexport_t		re;		// interface to refresh .dll
 // cvars
 //
 extern	cvar_t	*cl_noprint;
+extern	cvar_t	*cl_tvDownload;
+extern	cvar_t	*cl_tvdOffer;
+extern	cvar_t	*cl_voteYesKey;
+extern	cvar_t	*cl_voteNoKey;
 extern	cvar_t	*cl_debugMove;
 extern	cvar_t	*cl_timegraph;
 extern	cvar_t	*cl_shownet;
@@ -503,6 +610,8 @@ qboolean CL_GetModeInfo( int *width, int *height, float *windowAspect, int mode,
 void CL_InitInput( void );
 void CL_RegisterBuiltInTrueTypeFonts( void );
 void CL_RefreshBuiltInTrueTypeFonts( void );
+void CL_InitFonts( void );
+const char *CL_FontResolvedPath( void );
 int SCR_ConsoleCharWidth( void );
 void CL_ClearInput( void );
 void CL_SendCmd( void );
@@ -608,6 +717,27 @@ void CIN_CloseAllVideos(void);
 // cl_cgame.c
 //
 void CL_InitCGame( void );
+
+//
+// cl_tv.c — Surf TVD/TVL playback (separate from Owncast/cl_streaming)
+//
+extern cvar_t *cl_tvViewpoint;
+extern cvar_t *cl_tvTime;
+extern cvar_t *cl_tvDuration;
+
+void CL_TV_Init( void );
+qboolean CL_TV_Open( const char *filename );
+void CL_TV_Close( void );
+void CL_TV_ReadFrame( void );
+qboolean CL_TV_NextLiveFrame( void );
+void CL_TV_BuildSnapshot( void );
+void CL_TV_ResyncLiveClock( void );
+#ifdef __EMSCRIPTEN__
+void CL_TV_AdjustLiveClock( void );
+#endif
+void CL_TV_Seek( int targetTime );
+const char *CL_TV_GetPlayerList( void );
+
 void CL_ShutdownCGame( void );
 void CL_TryEarlyStockBaseq3Profile( void );
 qboolean CL_GameCommand( void );

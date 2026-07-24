@@ -1170,21 +1170,37 @@ void vk_temporal_update_auto_exposure( void )
 		}
 
 		if ( !hardReset && vk.adaptedExposure > 0.0f ) {
-			speed = ( targetExp > vk.adaptedExposure ) ? speedUp : speedDown;
+			/*
+			 * Asymmetric eye adaptation:
+			 *   target < current → scene brighter → darken faster (speedDown)
+			 *   target > current → scene darker  → brighten slower (speedUp)
+			 * Exponential: current += (target - current) * (1 - exp(-rate * dt))
+			 * speedUp/Down already include a ~16ms frame factor from cvar * 0.016.
+			 */
+			float darkenForBrightSceneRate = speedDown;
+			float brightenForDarkSceneRate = speedUp;
+			float rate = ( targetExp < vk.adaptedExposure ) ? darkenForBrightSceneRate : brightenForDarkSceneRate;
 			float ratio = targetExp / vk.adaptedExposure;
 			if ( ratio < 0.75f ) {
-				speed = ( speed < speedDown ) ? speedDown : speed;
+				rate = ( rate < darkenForBrightSceneRate ) ? darkenForBrightSceneRate : rate;
 			} else if ( ratio > 1.5f ) {
-				speed = ( speed < speedUp ) ? speedUp : speed;
+				rate = ( rate < brightenForDarkSceneRate ) ? brightenForDarkSceneRate : rate;
 			}
+			speed = 1.0f - expf( -rate );
 		}
 
 		if ( stateTransition ) {
 			speed = ( speed < 0.30f ) ? 0.30f : speed;
 		}
 
-		vk.adaptedExposure += ( targetExp - vk.adaptedExposure ) * speed;
-		vk.adaptedExposure = ( vk.adaptedExposure < minExposure ) ? minExposure : ( vk.adaptedExposure > maxExposure ? maxExposure : vk.adaptedExposure );
+		{
+			cvar_t *freeze = ri.Cvar_Get( "r_autoExposureFreeze", "0", 0 );
+			if ( !( freeze && freeze->integer ) ) {
+				vk.adaptedExposure += ( targetExp - vk.adaptedExposure ) * speed;
+				vk.adaptedExposure = ( vk.adaptedExposure < minExposure ) ? minExposure :
+					( vk.adaptedExposure > maxExposure ? maxExposure : vk.adaptedExposure );
+			}
+		}
 	}
 }
 

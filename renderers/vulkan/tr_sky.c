@@ -23,6 +23,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "tr_local.h"
 #ifdef USE_VULKAN
 #include "vk_sky_owner.h"
+#include "vk_scene_hdr_ownership.h"
 #endif
 
 #define SKY_SUBDIVISIONS		8
@@ -763,11 +764,15 @@ void RB_StageIteratorSky( void ) {
 #ifdef USE_VULKAN
 	/*
 	 * Raster Ultra 1.7: exclusive sky ownership.
-	 * When physical/HDR/solid owns the sky, suppress classic skybox + cloud shells
-	 * so they cannot double-contribute radiance with atmosphere.
+	 * Physical sky suppresses classic shells. HDR ownership draws scene-linear
+	 * RGBA32F outerbox faces into the float SceneHDR color target (not LDR).
 	 */
 	if ( !vk_sky_owner_wants_classic_skybox() ) {
-		return;
+		if ( !( vk_sky_owner_wants_hdr_sky() &&
+				tess.shader->sky.outerbox[0] &&
+				tess.shader->sky.outerbox[0] != tr.defaultImage ) ) {
+			return;
+		}
 	}
 #endif
 
@@ -801,6 +806,10 @@ void RB_StageIteratorSky( void ) {
 	// draw the outer skybox
 	if ( tess.shader->sky.outerbox[0] && tess.shader->sky.outerbox[0] != tr.defaultImage ) {
 #ifdef USE_VULKAN
+		if ( vk_sky_owner_wants_hdr_sky() ) {
+			vk_scene_hdr_note_writer( SCENE_HDR_SKY_ATMOSPHERE, "hdr_skybox_radiance_faces",
+				SCENE_HDR_WRITE_COMPOSE );
+		}
 		DrawSkyBox( tess.shader );
 #else
 		GL_ClientState( 1, CLS_NONE );

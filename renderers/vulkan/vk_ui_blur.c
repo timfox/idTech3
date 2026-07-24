@@ -530,6 +530,8 @@ void vk_ui_blur_register_cvars( void ) {
 		"Radius (virtual px) at/above which UI blur switches from separable Gaussian to dual-Kawase" );
 	ui_blurCache = ri.Cvar_Get( "ui_blurCache", "1", CVAR_ARCHIVE_ND );
 	ri.Cvar_SetDescription( ui_blurCache, "Cache the shared backdrop pyramid across static frames" );
+	/* Latched by init/shutdown; client uses this for translucent fallback. */
+	ri.Cvar_Get( "ui_blurReady", "0", CVAR_ROM );
 
 	ri.Cmd_AddCommand( "ui_blur_status", uib_status_f );
 }
@@ -546,6 +548,8 @@ void vk_ui_blur_init( void ) {
 		vk_ui_blur_shutdown();
 	}
 	Com_Memset( &uib, 0, sizeof( uib ) );
+	/* Client SCR_UIBackdropBlur checks this for translucent fallback. */
+	ri.Cvar_Set( "ui_blurReady", "0" );
 
 	if ( !ui_blurQuality ) {
 		vk_ui_blur_register_cvars();
@@ -628,11 +632,13 @@ void vk_ui_blur_init( void ) {
 	}
 
 	uib.initialized = qtrue;
+	ri.Cvar_Set( "ui_blurReady", "1" );
 	ri.Printf( PRINT_ALL, "[VK][ui-blur] CSS filter/backdrop-filter compositor ready (quality=%d, %ux%u pool)\n",
 		quality, uib.level[0][0].width, uib.level[0][0].height );
 }
 
 void vk_ui_blur_shutdown( void ) {
+	ri.Cvar_Set( "ui_blurReady", "0" );
 	if ( !uib.initialized ) {
 		return;
 	}

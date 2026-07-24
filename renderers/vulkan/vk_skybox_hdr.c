@@ -14,6 +14,8 @@ irradiance and prefiltered mip chains for PBR IBL lighting.
 
 #include "tr_local.h"
 #include "vk_skybox_hdr.h"
+#include "vk_texture_image.h"
+#include "vk_sky_owner.h"
 #include <math.h>
 
 static skyboxHDR_t skybox;
@@ -24,6 +26,23 @@ static cvar_t *r_skyboxHDR;
 static cvar_t *r_skyboxHDR_exposure;
 static cvar_t *r_skyboxHDR_rotation;
 static cvar_t *r_skyboxHDR_intensity;
+static cvar_t *r_skyboxHDR_projection;
+static cvar_t *r_skyExposureEV;
+static cvar_t *r_skyLuminanceScale;
+static cvar_t *r_skyHdrDebug;
+static cvar_t *r_skyLod;
+static cvar_t *r_skyFaceSize;
+
+static image_t *s_displayFaces[6];
+static int s_displayFaceSize;
+static float s_displayLumMin, s_displayLumMax, s_displayLumMean;
+static int s_displayAbove1, s_displayAbove4, s_displayAbove16;
+static const char *s_firstFlattenStage = "SKY_HDR_VALUES_CLAMPED"; /* historical; cleared after float path */
+
+static void SkyboxHDR_Status_f( void );
+static void SkyboxHDR_Validate_f( void );
+static void SkyboxHDR_Capture_f( void );
+static void SkyboxHDR_ExposureStatus_f( void );
 
 extern void R_LoadEXR_HDR(const char *filename, float **pic, int *width, int *height);
 extern void R_LoadHDR_Float(const char *filename, float **pic, int *width, int *height);
@@ -201,9 +220,17 @@ static void SkyboxHDR_SampleEquirect(const float *data, int w, int h, const floa
 	if (py >= h) py = h - 1;
 
 	int idx = (py * w + px) * 4;
-	outRGB[0] = data[idx + 0] * skybox.exposure * skybox.tintR;
-	outRGB[1] = data[idx + 1] * skybox.exposure * skybox.tintG;
-	outRGB[2] = data[idx + 2] * skybox.exposure * skybox.tintB;
+	/* Raw scene-linear sample (no IBL exposure bake). */
+	outRGB[0] = data[idx + 0] * skybox.tintR;
+	outRGB[1] = data[idx + 1] * skybox.tintG;
+	outRGB[2] = data[idx + 2] * skybox.tintB;
+}
+
+static void SkyboxHDR_SampleEquirectForIBL(const float *data, int w, int h, const float *dir, float *outRGB) {
+	SkyboxHDR_SampleEquirect( data, w, h, dir, outRGB );
+	outRGB[0] *= skybox.exposure * skybox.intensity;
+	outRGB[1] *= skybox.exposure * skybox.intensity;
+	outRGB[2] *= skybox.exposure * skybox.intensity;
 }
 
 static void SkyboxHDR_DirFromCubeFace(int face, float u, float v, float *dir) {
@@ -303,16 +330,47 @@ static qboolean SkyboxHDR_UploadGPUImages( void ) {
 
 void SkyboxHDR_RegisterCvars(void) {
 	r_skyboxHDR = ri.Cvar_Get("r_skyboxHDR", "", CVAR_ARCHIVE);
-	ri.Cvar_SetDescription(r_skyboxHDR, "Path to HDR EXR/PNG skybox panorama (empty = disabled).");
+	ri.Cvar_SetDescription(r_skyboxHDR,
+		"Path to HDR equirectangular panorama (.exr via OpenEXR/tinyexr, or .hdr). Empty = disabled.");
 
 	r_skyboxHDR_exposure = ri.Cvar_Get("r_skyboxHDR_exposure", "1.0", CVAR_ARCHIVE);
 	ri.Cvar_SetDescription(r_skyboxHDR_exposure, "Exposure multiplier for HDR skybox.");
 
 	r_skyboxHDR_rotation = ri.Cvar_Get("r_skyboxHDR_rotation", "0.0", CVAR_ARCHIVE);
-	ri.Cvar_SetDescription(r_skyboxHDR_rotation, "Rotation of HDR skybox in degrees around Y axis.");
+	ri.Cvar_SetDescription(r_skyboxHDR_rotation, "Rotation of HDR skybox in degrees around vertical axis.");
 
 	r_skyboxHDR_intensity = ri.Cvar_Get("r_skyboxHDR_intensity", "1.0", CVAR_ARCHIVE);
 	ri.Cvar_SetDescription(r_skyboxHDR_intensity, "IBL lighting intensity multiplier from HDR skybox.");
+
+	r_skyboxHDR_projection = ri.Cvar_Get( "r_skyboxHDR_projection", "0", CVAR_ARCHIVE );
+	ri.Cvar_CheckRange( r_skyboxHDR_projection, "0", "4", CV_INTEGER );
+	ri.Cvar_SetDescription( r_skyboxHDR_projection,
+		"0=equirectangular (default, also auto for ~2:1 images), 1=cubemap faces, "
+		"2=vertical cross, 3=horizontal cross, 4=spherical mirror." );
+
+	r_skyExposureEV = ri.Cvar_Get( "r_skyExposureEV", "0.0", CVAR_ARCHIVE );
+	ri.Cvar_SetDescription( r_skyExposureEV,
+		"Scene-referred EV for visible HDR sky (exp2). Applied once before SceneHDR; not a post-tonemap boost." );
+
+	r_skyLuminanceScale = ri.Cvar_Get( "r_skyLuminanceScale", "1.0", CVAR_ARCHIVE );
+	ri.Cvar_SetDescription( r_skyLuminanceScale,
+		"Linear luminance scale for visible HDR sky after EV. Keep 1.0 unless calibrating assets." );
+
+	r_skyHdrDebug = ri.Cvar_Get( "r_skyHdrDebug", "0", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_skyHdrDebug, "0", "12", CV_INTEGER );
+	ri.Cvar_SetDescription( r_skyHdrDebug,
+		"HDR sky debug: 0 off, 3 values>1 heatmap policy, 5 mip, 10 pre-tonemap (see docs/HDR_SKY_RENDERING.md)." );
+
+	r_skyLod = ri.Cvar_Get( "r_skyLod", "0", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_skyLod, "0", "8", CV_INTEGER );
+	ri.Cvar_SetDescription( r_skyLod,
+		"Visible sky face lod shift after base size (0=base, 1=half, …). Prefer r_skyFaceSize for quality." );
+
+	r_skyFaceSize = ri.Cvar_Get( "r_skyFaceSize", "0", CVAR_ARCHIVE );
+	ri.Cvar_CheckRange( r_skyFaceSize, "0", "4096", CV_INTEGER );
+	ri.Cvar_SetDescription( r_skyFaceSize,
+		"Visible HDR sky cube-face resolution. 0=auto from panorama (≈ equirectWidth/2, clamped 512–2048). "
+		"4K EXR needs ≥1024; use 2048 for max detail. Not the IBL prefilter size." );
 }
 
 void SkyboxHDR_Init(void) {
@@ -325,11 +383,16 @@ void SkyboxHDR_Init(void) {
 	skybox.tintR = skybox.tintG = skybox.tintB = 1.0f;
 	skyboxLoadFailed = qfalse;
 	SkyboxHDR_ResetSH();
-	ri.Printf(PRINT_ALL, "HDR Skybox system initialized\n");
+	ri.Cmd_AddCommand( "sky_hdr_status", SkyboxHDR_Status_f );
+	ri.Cmd_AddCommand( "sky_hdr_validate", SkyboxHDR_Validate_f );
+	ri.Cmd_AddCommand( "sky_hdr_capture", SkyboxHDR_Capture_f );
+	ri.Cmd_AddCommand( "sky_exposure_status", SkyboxHDR_ExposureStatus_f );
+	ri.Printf(PRINT_ALL, "HDR Skybox system initialized (scene-linear visible sky)\n");
 }
 
 void SkyboxHDR_Shutdown(void) {
 	SkyboxHDR_DestroyGPUImages();
+	SkyboxHDR_ClearDisplayFaces();
 	SkyboxHDR_Unload();
 	skyboxLoadFailed = qfalse;
 }
@@ -343,6 +406,12 @@ qboolean SkyboxHDR_Load(const char *filename, skyboxProjection_t projection) {
 	if ( !SkyboxHDR_LoadPanoramaImage( filename, &hdrData, &w, &h ) ) {
 		ri.Printf(PRINT_WARNING, "SkyboxHDR: could not load %s\n", filename);
 		return qfalse;
+	}
+
+	/* ~2:1 panoramas are equirectangular even if projection was left at default. */
+	if ( projection != SKYBOX_PROJ_CUBEMAP_FACES &&
+			w > 0 && h > 0 && w >= ( h * 3 ) / 2 && w <= ( h * 5 ) / 2 ) {
+		projection = SKYBOX_PROJ_EQUIRECTANGULAR;
 	}
 
 	skybox.hdrData = hdrData;
@@ -359,10 +428,11 @@ qboolean SkyboxHDR_Load(const char *filename, skyboxProjection_t projection) {
 	SkyboxHDR_GenerateCubemap();
 	SkyboxHDR_GenerateIrradiance();
 	SkyboxHDR_GeneratePrefiltered();
+	SkyboxHDR_BuildDisplayFaces();
 
 	{
 		const char *ext = COM_GetExtension( filename );
-		const char *fmt = ( ext && !Q_stricmp( ext, "hdr" ) ) ? "Radiance .hdr" : "EXR";
+		const char *fmt = ( ext && !Q_stricmp( ext, "hdr" ) ) ? "Radiance .hdr" : "OpenEXR";
 		ri.Printf( PRINT_ALL, "SkyboxHDR: loaded %s (%dx%d, %s, %s projection)\n",
 			filename, w, h, fmt,
 			projection == SKYBOX_PROJ_EQUIRECTANGULAR ? "equirectangular" :
@@ -408,6 +478,7 @@ qboolean SkyboxHDR_LoadCubeFaces(const char *baseName) {
 	SkyboxHDR_GenerateIrradiance();
 	SkyboxHDR_GeneratePrefiltered();
 	SkyboxHDR_ExtractSHCoeffs();
+	SkyboxHDR_BuildDisplayFaces();
 
 	ri.Printf(PRINT_ALL, "SkyboxHDR: loaded 6 cubemap faces from %s (%dx%d)\n",
 		baseName, skybox.cubeSize, skybox.cubeSize);
@@ -416,6 +487,7 @@ qboolean SkyboxHDR_LoadCubeFaces(const char *baseName) {
 
 void SkyboxHDR_Unload(void) {
 	int f;
+	/* Keep display faces so map sky shaders retain valid image_t* across cvar reloads. */
 	if (skybox.hdrData) { Z_Free(skybox.hdrData); skybox.hdrData = NULL; }
 	for (f = 0; f < 6; f++) {
 		if (skybox.cubeFaces[f]) { Z_Free(skybox.cubeFaces[f]); skybox.cubeFaces[f] = NULL; }
@@ -448,7 +520,7 @@ void SkyboxHDR_GenerateCubemap(void) {
 				float dir[3], rgb[3];
 
 				SkyboxHDR_DirFromCubeFace(face, u, v, dir);
-				SkyboxHDR_SampleEquirect(skybox.hdrData, skybox.srcWidth, skybox.srcHeight, dir, rgb);
+				SkyboxHDR_SampleEquirectForIBL(skybox.hdrData, skybox.srcWidth, skybox.srcHeight, dir, rgb);
 
 				int idx = (y * size + x) * 4;
 				skybox.cubeFaces[face][idx + 0] = rgb[0];
@@ -576,6 +648,7 @@ qboolean SkyboxHDR_IsLoaded(void) { return skybox.loaded; }
 
 void SkyboxHDR_UpdateRuntime(void) {
 	qboolean changed;
+	qboolean displayOnly;
 
 	if ( vk.device == VK_NULL_HANDLE || !r_skyboxHDR ) {
 		return;
@@ -585,6 +658,26 @@ void SkyboxHDR_UpdateRuntime(void) {
 	changed = changed || ( r_skyboxHDR_exposure && r_skyboxHDR_exposure->modified );
 	changed = changed || ( r_skyboxHDR_rotation && r_skyboxHDR_rotation->modified );
 	changed = changed || ( r_skyboxHDR_intensity && r_skyboxHDR_intensity->modified );
+	changed = changed || ( r_skyboxHDR_projection && r_skyboxHDR_projection->modified );
+
+	displayOnly = ( r_skyExposureEV && r_skyExposureEV->modified ) ||
+		( r_skyLuminanceScale && r_skyLuminanceScale->modified ) ||
+		( r_skyLod && r_skyLod->modified ) ||
+		( r_skyFaceSize && r_skyFaceSize->modified );
+
+	if ( !changed && displayOnly && skybox.loaded ) {
+		skybox.exposure = r_skyboxHDR_exposure ? r_skyboxHDR_exposure->value : skybox.exposure;
+		skybox.rotation = r_skyboxHDR_rotation ? r_skyboxHDR_rotation->value : skybox.rotation;
+		skybox.intensity = r_skyboxHDR_intensity ? r_skyboxHDR_intensity->value : skybox.intensity;
+		SkyboxHDR_BuildDisplayFaces();
+		if ( r_skyExposureEV ) r_skyExposureEV->modified = qfalse;
+		if ( r_skyLuminanceScale ) r_skyLuminanceScale->modified = qfalse;
+		if ( r_skyLod ) r_skyLod->modified = qfalse;
+		if ( r_skyFaceSize ) r_skyFaceSize->modified = qfalse;
+		return;
+	}
+
+	changed = changed || displayOnly;
 
 	if ( !changed ) {
 		if ( !r_skyboxHDR->string[0] ) {
@@ -606,10 +699,18 @@ void SkyboxHDR_UpdateRuntime(void) {
 		}
 		SkyboxHDR_DestroyGPUImages();
 		SkyboxHDR_Unload();
+		SkyboxHDR_ClearDisplayFaces();
 		skyboxLoadFailed = qfalse;
 	} else {
+		skyboxProjection_t proj = SKYBOX_PROJ_EQUIRECTANGULAR;
+		if ( r_skyboxHDR_projection ) {
+			proj = (skyboxProjection_t)r_skyboxHDR_projection->integer;
+			if ( proj < 0 || proj >= SKYBOX_PROJ_COUNT ) {
+				proj = SKYBOX_PROJ_EQUIRECTANGULAR;
+			}
+		}
 		skyboxLoadFailed = qfalse;
-		if ( !SkyboxHDR_Load( r_skyboxHDR->string, SKYBOX_PROJ_EQUIRECTANGULAR ) ) {
+		if ( !SkyboxHDR_Load( r_skyboxHDR->string, proj ) ) {
 			SkyboxHDR_DestroyGPUImages();
 			SkyboxHDR_Unload();
 			skyboxLoadFailed = qtrue;
@@ -627,6 +728,11 @@ void SkyboxHDR_UpdateRuntime(void) {
 	if ( r_skyboxHDR_exposure ) r_skyboxHDR_exposure->modified = qfalse;
 	if ( r_skyboxHDR_rotation ) r_skyboxHDR_rotation->modified = qfalse;
 	if ( r_skyboxHDR_intensity ) r_skyboxHDR_intensity->modified = qfalse;
+	if ( r_skyboxHDR_projection ) r_skyboxHDR_projection->modified = qfalse;
+	if ( r_skyExposureEV ) r_skyExposureEV->modified = qfalse;
+	if ( r_skyLuminanceScale ) r_skyLuminanceScale->modified = qfalse;
+	if ( r_skyLod ) r_skyLod->modified = qfalse;
+	if ( r_skyFaceSize ) r_skyFaceSize->modified = qfalse;
 }
 
 qboolean SkyboxHDR_GetCubemapViews( VkImageView *prefilterOut, VkImageView *irradianceOut )
@@ -705,7 +811,7 @@ void SkyboxHDR_SetIntensity(float i) { skybox.intensity = i > 0 ? i : 0; }
 
 void SkyboxHDR_SampleDirection(const float *dir, float *outRGB) {
 	if (!skybox.loaded || !skybox.hdrData) { outRGB[0]=outRGB[1]=outRGB[2]=0; return; }
-	SkyboxHDR_SampleEquirect(skybox.hdrData, skybox.srcWidth, skybox.srcHeight, dir, outRGB);
+	SkyboxHDR_SampleEquirectForIBL(skybox.hdrData, skybox.srcWidth, skybox.srcHeight, dir, outRGB);
 }
 
 void SkyboxHDR_SampleIrradiance(const float *normal, float *outRGB) {
@@ -740,4 +846,513 @@ void SkyboxHDR_SampleIrradiance(const float *normal, float *outRGB) {
 	outRGB[0] = skybox.irradianceFaces[bestFace][idx+0];
 	outRGB[1] = skybox.irradianceFaces[bestFace][idx+1];
 	outRGB[2] = skybox.irradianceFaces[bestFace][idx+2];
+}
+
+static void SkyboxHDR_SampleCubeDirection( const float *dir, float *outRGB ) {
+	int face = 0;
+	float ax = fabsf( dir[0] ), ay = fabsf( dir[1] ), az = fabsf( dir[2] );
+	float uc, vc, u, v;
+	int size, px, py, idx;
+	const float *faceData;
+	float sc;
+
+	outRGB[0] = outRGB[1] = outRGB[2] = 0.0f;
+	if ( !skybox.cubeFaces[0] || skybox.cubeSize <= 0 ) {
+		return;
+	}
+
+	if ( ax >= ay && ax >= az ) {
+		face = ( dir[0] > 0.0f ) ? 0 : 1;
+		sc = fabsf( dir[0] );
+		if ( face == 0 ) {
+			uc = -dir[2] / sc;
+			vc = dir[1] / sc;
+		} else {
+			uc = dir[2] / sc;
+			vc = dir[1] / sc;
+		}
+	} else if ( ay >= ax && ay >= az ) {
+		face = ( dir[1] > 0.0f ) ? 2 : 3;
+		sc = fabsf( dir[1] );
+		if ( face == 2 ) {
+			uc = dir[0] / sc;
+			vc = -dir[2] / sc;
+		} else {
+			uc = dir[0] / sc;
+			vc = dir[2] / sc;
+		}
+	} else {
+		face = ( dir[2] > 0.0f ) ? 4 : 5;
+		sc = fabsf( dir[2] );
+		if ( face == 4 ) {
+			uc = dir[0] / sc;
+			vc = dir[1] / sc;
+		} else {
+			uc = -dir[0] / sc;
+			vc = dir[1] / sc;
+		}
+	}
+
+	faceData = skybox.cubeFaces[face];
+	if ( !faceData ) {
+		return;
+	}
+
+	u = ( uc + 1.0f ) * 0.5f;
+	v = ( vc + 1.0f ) * 0.5f;
+	size = skybox.cubeSize;
+	px = (int)( u * ( size - 1 ) + 0.5f );
+	py = (int)( v * ( size - 1 ) + 0.5f );
+	if ( px < 0 ) px = 0;
+	if ( px >= size ) px = size - 1;
+	if ( py < 0 ) py = 0;
+	if ( py >= size ) py = size - 1;
+	idx = ( py * size + px ) * 4;
+	outRGB[0] = faceData[idx + 0] * skybox.tintR;
+	outRGB[1] = faceData[idx + 1] * skybox.tintG;
+	outRGB[2] = faceData[idx + 2] * skybox.tintB;
+}
+
+/* Quake Z-up MakeSkyVec axes; same table as tr_sky.c. */
+static void SkyboxHDR_QuakeSkyDir( int axis, float s, float t, float *outDir ) {
+	static const int st_to_vec[6][3] = {
+		{3, -1, 2},
+		{-3, 1, 2},
+		{1, 3, 2},
+		{-1, -3, 2},
+		{-2, -1, 3},
+		{2, -1, -3}
+	};
+	float b[3];
+	int j, k;
+	float len;
+
+	b[0] = s;
+	b[1] = t;
+	b[2] = 1.0f;
+
+	for ( j = 0; j < 3; j++ ) {
+		k = st_to_vec[axis][j];
+		if ( k < 0 ) {
+			outDir[j] = -b[-k - 1];
+		} else {
+			outDir[j] = b[k - 1];
+		}
+	}
+
+	len = sqrtf( outDir[0] * outDir[0] + outDir[1] * outDir[1] + outDir[2] * outDir[2] );
+	if ( len > 0.0f ) {
+		outDir[0] /= len;
+		outDir[1] /= len;
+		outDir[2] /= len;
+	}
+}
+
+static float SkyboxHDR_Luminance( float r, float g, float b ) {
+	return 0.2126f * r + 0.7152f * g + 0.0722f * b;
+}
+
+static float SkyboxHDR_VisibleRadianceScale( void ) {
+	float ev = r_skyExposureEV ? r_skyExposureEV->value : 0.0f;
+	float scale = r_skyLuminanceScale ? r_skyLuminanceScale->value : 1.0f;
+	if ( scale <= 0.0f ) {
+		scale = 1.0f;
+	}
+	return exp2f( ev ) * scale;
+}
+
+/*
+ * Match visible cube faces to panorama density.
+ * A W×H equirect spans 360°; each cube face is 90° → ≈ W/4 texels for parity,
+ * but horizon detail benefits from closer to W/2. Auto uses W/2 clamped.
+ */
+static int SkyboxHDR_VisibleFaceSize( void ) {
+	int size = 1024;
+	int lodShift;
+
+	if ( r_skyFaceSize && r_skyFaceSize->integer > 0 ) {
+		size = r_skyFaceSize->integer;
+	} else if ( skybox.srcWidth > 0 ) {
+		/* 4096 equirect → 2048 faces; 2048 → 1024; floor at 512. */
+		size = skybox.srcWidth / 2;
+		if ( size < 512 ) {
+			size = 512;
+		}
+		if ( size > 2048 ) {
+			size = 2048;
+		}
+	}
+
+	/* Power-of-two round down for predictable GPU uploads. */
+	{
+		int pot = 512;
+		while ( pot < size && pot < 4096 ) {
+			pot <<= 1;
+		}
+		if ( pot > size && pot > 512 ) {
+			pot >>= 1;
+		}
+		size = pot;
+	}
+
+	lodShift = ( r_skyLod && r_skyLod->integer > 0 ) ? r_skyLod->integer : 0;
+	if ( lodShift > 0 ) {
+		size >>= lodShift;
+		if ( size < 64 ) {
+			size = 64;
+		}
+	}
+	return size;
+}
+
+void SkyboxHDR_ClearDisplayFaces( void ) {
+	Com_Memset( s_displayFaces, 0, sizeof( s_displayFaces ) );
+	s_displayFaceSize = 0;
+	s_displayLumMin = s_displayLumMax = s_displayLumMean = 0.0f;
+	s_displayAbove1 = s_displayAbove4 = s_displayAbove16 = 0;
+}
+
+image_t *SkyboxHDR_GetDisplayFace( int outerboxIndex ) {
+	if ( outerboxIndex < 0 || outerboxIndex >= 6 ) {
+		return NULL;
+	}
+	return s_displayFaces[outerboxIndex];
+}
+
+/*
+ * Visible sky outerbox: scene-linear RGBA32F (values may exceed 1.0).
+ * FIRST_STAGE_FLATTENING_SKY was previously Reinhard+gamma into RGBA8 UNORM
+ * (SKY_HDR_VALUES_CLAMPED / SKY_RENDERED_TO_LDR_TARGET). That path is removed.
+ */
+qboolean SkyboxHDR_BuildDisplayFaces( void ) {
+	static const int box_to_axis[6] = { 0, 2, 1, 3, 4, 5 };
+	static const char *faceNames[6] = {
+		"*skyHDR_rt", "*skyHDR_bk", "*skyHDR_lf",
+		"*skyHDR_ft", "*skyHDR_up", "*skyHDR_dn"
+	};
+	const int size = SkyboxHDR_VisibleFaceSize();
+	float *rgba;
+	int box, y, x;
+	float radScale;
+	double lumSum = 0.0;
+	int sampleCount = 0;
+
+	if ( !skybox.loaded || ( !skybox.hdrData && !skybox.cubeFaces[0] ) ) {
+		return qfalse;
+	}
+
+	rgba = (float *)ri.Hunk_AllocateTempMemory( size * size * 4 * (int)sizeof( float ) );
+	if ( !rgba ) {
+		return qfalse;
+	}
+
+	radScale = SkyboxHDR_VisibleRadianceScale();
+	s_displayLumMin = 1e30f;
+	s_displayLumMax = 0.0f;
+	s_displayAbove1 = s_displayAbove4 = s_displayAbove16 = 0;
+
+	for ( box = 0; box < 6; box++ ) {
+		const int axis = box_to_axis[box];
+
+		for ( y = 0; y < size; y++ ) {
+			for ( x = 0; x < size; x++ ) {
+				float u = ( (float)x + 0.5f ) / (float)size;
+				float v = ( (float)y + 0.5f ) / (float)size;
+				float s = u * 2.0f - 1.0f;
+				float t = 1.0f - v * 2.0f;
+				float dirQ[3], dirY[3], rgb[3];
+				float lum;
+				int idx = ( y * size + x ) * 4;
+
+				SkyboxHDR_QuakeSkyDir( axis, s, t, dirQ );
+				dirY[0] = dirQ[0];
+				dirY[1] = dirQ[2];
+				dirY[2] = -dirQ[1];
+
+				if ( skybox.hdrData ) {
+					SkyboxHDR_SampleEquirect( skybox.hdrData, skybox.srcWidth, skybox.srcHeight, dirY, rgb );
+				} else {
+					SkyboxHDR_SampleCubeDirection( dirY, rgb );
+				}
+
+				/* Scene-referred promotion — no 0–1 clamp, no Reinhard, no gamma. */
+				rgb[0] *= radScale;
+				rgb[1] *= radScale;
+				rgb[2] *= radScale;
+				if ( rgb[0] < 0.0f ) rgb[0] = 0.0f;
+				if ( rgb[1] < 0.0f ) rgb[1] = 0.0f;
+				if ( rgb[2] < 0.0f ) rgb[2] = 0.0f;
+
+				rgba[idx + 0] = rgb[0];
+				rgba[idx + 1] = rgb[1];
+				rgba[idx + 2] = rgb[2];
+				rgba[idx + 3] = 1.0f;
+
+				lum = SkyboxHDR_Luminance( rgb[0], rgb[1], rgb[2] );
+				if ( lum < s_displayLumMin ) s_displayLumMin = lum;
+				if ( lum > s_displayLumMax ) s_displayLumMax = lum;
+				lumSum += (double)lum;
+				sampleCount++;
+				if ( lum > 1.0f ) s_displayAbove1++;
+				if ( lum > 4.0f ) s_displayAbove4++;
+				if ( lum > 16.0f ) s_displayAbove16++;
+			}
+		}
+
+		if ( s_displayFaces[box] && s_displayFaceSize == size &&
+				s_displayFaces[box]->handle != VK_NULL_HANDLE &&
+				s_displayFaces[box]->internalFormat == VK_FORMAT_R32G32B32A32_SFLOAT ) {
+			vk_upload_image_rgba32f( s_displayFaces[box], size, size, rgba, size * size * 4 );
+		} else {
+			s_displayFaces[box] = R_CreateImageRGBA32F( faceNames[box], rgba, size, size,
+				IMGFLAG_CLAMPTOEDGE | IMGFLAG_NOLIGHTSCALE | IMGFLAG_NOSCALE );
+		}
+	}
+
+	s_displayFaceSize = size;
+	s_displayLumMean = sampleCount > 0 ? (float)( lumSum / (double)sampleCount ) : 0.0f;
+	s_firstFlattenStage = "NONE_SCENE_LINEAR_RGBA32F";
+	ri.Hunk_FreeTempMemory( rgba );
+	ri.Printf( PRINT_ALL,
+		"SkyboxHDR: scene-linear display faces %dx%d EV=%g scale=%g lum[min/mean/max]=%.4g/%.4g/%.4g above1/4/16=%d/%d/%d\n",
+		size, size,
+		r_skyExposureEV ? r_skyExposureEV->value : 0.0f,
+		r_skyLuminanceScale ? r_skyLuminanceScale->value : 1.0f,
+		s_displayLumMin, s_displayLumMean, s_displayLumMax,
+		s_displayAbove1, s_displayAbove4, s_displayAbove16 );
+	return ( s_displayFaces[0] != NULL ) ? qtrue : qfalse;
+}
+
+static void SkyboxHDR_Status_f( void ) {
+	const skyboxHDR_t *s = SkyboxHDR_Get();
+	const char *fmt = "unknown";
+	const char *cs = "SKY_SCENE_LINEAR_HDR";
+	const char *enc = "rgba32f_faces";
+
+	if ( s && s->filename[0] ) {
+		const char *ext = COM_GetExtension( s->filename );
+		if ( ext && !Q_stricmp( ext, "exr" ) ) {
+			fmt = "OpenEXR equirect/float";
+			cs = "SKY_TEXTURE_HALF_FLOAT";
+			enc = "exr_float_rgba";
+		} else if ( ext && !Q_stricmp( ext, "hdr" ) ) {
+			fmt = "Radiance RGBE";
+			cs = "SKY_TEXTURE_RGBE";
+			enc = "rgbe";
+		}
+	}
+
+	ri.Printf( PRINT_ALL, "======== sky_hdr_status ========\n" );
+	ri.Printf( PRINT_ALL, "FIRST_STAGE_FLATTENING_SKY: %s\n", s_firstFlattenStage );
+	ri.Printf( PRINT_ALL, "active material: %s\n",
+		( s && s->loaded ) ? s->filename : "(none)" );
+	ri.Printf( PRINT_ALL, "visible resource: SkyRadiance six-face RGBA32F (not specular prefilter)\n" );
+	ri.Printf( PRINT_ALL, "specular resource: *skyboxHDRPrefiltered (IBL only)\n" );
+	ri.Printf( PRINT_ALL, "irradiance resource: *skyboxHDRIrradiance (IBL only)\n" );
+	ri.Printf( PRINT_ALL, "source format: %s (%dx%d)\n", fmt,
+		s ? s->srcWidth : 0, s ? s->srcHeight : 0 );
+	ri.Printf( PRINT_ALL, "source color space: %s → promoted %s\n", cs, "SKY_SCENE_LINEAR_HDR" );
+	ri.Printf( PRINT_ALL, "HDR encoding: %s\n", enc );
+	ri.Printf( PRINT_ALL, "selected mip: 0 (visible sky; no roughness LOD)\n" );
+	ri.Printf( PRINT_ALL, "sampler: clamp-to-edge, face size %d (source %dx%d, r_skyFaceSize=%d)\n",
+		s_displayFaceSize,
+		s ? s->srcWidth : 0, s ? s->srcHeight : 0,
+		r_skyFaceSize ? r_skyFaceSize->integer : 0 );
+	ri.Printf( PRINT_ALL, "sampled luminance min/mean/max: %.6g / %.6g / %.6g\n",
+		s_displayLumMin, s_displayLumMean, s_displayLumMax );
+	ri.Printf( PRINT_ALL, "pixels above 1/4/16: %d / %d / %d\n",
+		s_displayAbove1, s_displayAbove4, s_displayAbove16 );
+	ri.Printf( PRINT_ALL, "SceneHDR: written via classic skybox_pipeline into float color (RGBA16F target)\n" );
+	ri.Printf( PRINT_ALL, "pre-exposure: sky faces unexposed (EV scale only); SceneHDR exposure later\n" );
+	ri.Printf( PRINT_ALL, "exposure multiplier (IBL): %g  visible EV: %g  luminanceScale: %g\n",
+		s ? s->exposure : 0.0f,
+		r_skyExposureEV ? r_skyExposureEV->value : 0.0f,
+		r_skyLuminanceScale ? r_skyLuminanceScale->value : 1.0f );
+	ri.Printf( PRINT_ALL, "fog policy: SKY_FOG_ATMOSPHERE_ONLY (HDR owner; no finite-depth fog on clear)\n" );
+	ri.Printf( PRINT_ALL, "volumetric policy: shared far-ray; no duplicate sky replace\n" );
+	ri.Printf( PRINT_ALL, "tone-map: shared SceneHDR → exposure → tonemap (sky not tonemapped twice)\n" );
+	ri.Printf( PRINT_ALL, "r_skyHdrDebug=%d r_skyLod=%d r_skyOwner=%d\n",
+		r_skyHdrDebug ? r_skyHdrDebug->integer : 0,
+		r_skyLod ? r_skyLod->integer : 0,
+		(int)vk_sky_owner() );
+	ri.Printf( PRINT_ALL, "================================\n" );
+}
+
+static void SkyboxHDR_Validate_f( void ) {
+	int fails = 0;
+
+	if ( !SkyboxHDR_IsLoaded() ) {
+		ri.Printf( PRINT_ALL, "sky_hdr_validate: SKIP (no HDR sky loaded)\n" );
+		return;
+	}
+	if ( !s_displayFaces[0] || s_displayFaces[0]->internalFormat != VK_FORMAT_R32G32B32A32_SFLOAT ) {
+		ri.Printf( PRINT_WARNING, "FAIL: visible sky faces are not RGBA32F\n" );
+		fails++;
+	}
+	if ( s_displayLumMax <= 0.0f ) {
+		ri.Printf( PRINT_WARNING, "FAIL: peak luminance <= 0\n" );
+		fails++;
+	}
+	if ( s_displayLumMax <= s_displayLumMin + 1e-6f ) {
+		ri.Printf( PRINT_WARNING, "FAIL: no luminance separation (flat field)\n" );
+		fails++;
+	}
+	if ( s_firstFlattenStage && Q_stricmpn( s_firstFlattenStage, "NONE", 4 ) != 0 ) {
+		ri.Printf( PRINT_WARNING, "FAIL: flatten stage still marked %s\n", s_firstFlattenStage );
+		fails++;
+	}
+	ri.Printf( PRINT_ALL, "sky_hdr_validate: %s (%d fail)\n", fails ? "FAIL" : "PASS", fails );
+}
+
+static void SkyboxHDR_Capture_f( void ) {
+	ri.Printf( PRINT_ALL, "sky_hdr_capture:\n" );
+	ri.Printf( PRINT_ALL, "  SkyTextureDecoded: OpenEXR/HDR float via R_LoadEXR_HDR / R_LoadHDR_Float\n" );
+	ri.Printf( PRINT_ALL, "  SkySceneLinear: display faces * exp2(r_skyExposureEV)*r_skyLuminanceScale\n" );
+	ri.Printf( PRINT_ALL, "  lum min/mean/max: %.6g / %.6g / %.6g\n",
+		s_displayLumMin, s_displayLumMean, s_displayLumMax );
+	ri.Printf( PRINT_ALL, "  FIRST_STAGE_FLATTENING_SKY: %s\n", s_firstFlattenStage );
+}
+
+static void SkyboxHDR_ExposureStatus_f( void ) {
+	cvar_t *autoExp = ri.Cvar_Get( "r_exposure_auto", "0", 0 );
+	cvar_t *minV = ri.Cvar_Get( "r_autoExposure_min", "0.5", 0 );
+	cvar_t *maxV = ri.Cvar_Get( "r_autoExposure_max", "4.0", 0 );
+	cvar_t *spdUp = ri.Cvar_Get( "r_autoExposure_speedUp", "1.5", 0 );
+	cvar_t *spdDn = ri.Cvar_Get( "r_autoExposure_speedDown", "3.0", 0 );
+	cvar_t *skyW = ri.Cvar_Get( "r_exposureSkyWeight", "0.75", 0 );
+	cvar_t *hiPct = ri.Cvar_Get( "r_autoExposure_highPercent", "0.01", 0 );
+
+	ri.Printf( PRINT_ALL, "======== sky_exposure_status ========\n" );
+	ri.Printf( PRINT_ALL, "r_exposure_auto     : %d (eye adaptation)\n", autoExp ? autoExp->integer : 0 );
+	ri.Printf( PRINT_ALL, "adaptedExposure     : %.4g\n", vk.adaptedExposure );
+	ri.Printf( PRINT_ALL, "manual r_exposure   : %.4g\n", r_exposure ? r_exposure->value : 1.0f );
+	ri.Printf( PRINT_ALL, "clamp [min,max]     : [%.3g, %.3g]\n",
+		minV ? minV->value : 0.5f, maxV ? maxV->value : 4.0f );
+	ri.Printf( PRINT_ALL, "speed up/down       : %.3g / %.3g (darken=down when sky bright)\n",
+		spdUp ? spdUp->value : 1.5f, spdDn ? spdDn->value : 3.0f );
+	ri.Printf( PRINT_ALL, "skyWeight / hiPct   : %.3g / %.3g\n",
+		skyW ? skyW->value : 0.75f, hiPct ? hiPct->value : 0.01f );
+	ri.Printf( PRINT_ALL, "filteredAvgLogLum   : %.4g valid=%d\n",
+		vk.temporal.filteredAvgLogLuminance, vk.temporal.hasValidLuminance ? 1 : 0 );
+	ri.Printf( PRINT_ALL, "policy: HDR sky in SceneHDR → luminance histogram → adaptedExposure → tonemap\n" );
+	ri.Printf( PRINT_ALL, "=====================================\n" );
+}
+
+/*
+ * Histogram eye adaptation defaults for HDR sky maps.
+ * Mapscripts enable via r_skyboxHDR_autoExposure 1 (preferred) or r_exposure_auto 1.
+ * Percentile trim + soft sun-core rejection keep the tiny sun disc from owning EV.
+ */
+void SkyboxHDR_EnableEyeAdaptation( void ) {
+	cvar_t *wantAuto;
+
+	/*
+	 * Outdoor HDR AE balance (SceneHDR → exposure → filmic):
+	 * - Floor adaptedExposure so doorway/sky cannot crush the whole frame dark.
+	 * - Allow interiors to open (max 8).
+	 * - Target ~0.18 middle gray; filmic white-point is highlight calibration only.
+	 */
+	ri.Cvar_Set( "r_autoExposure_min", "0.70" );
+	ri.Cvar_Set( "r_autoExposure_max", "8.0" );
+	ri.Cvar_Set( "r_exposure_auto_target", "0.18" );
+	/* Faster constriction than dilation (asymmetric eye). */
+	ri.Cvar_Set( "r_autoExposure_speedUp", "1.5" );   /* brighten into dark */
+	ri.Cvar_Set( "r_autoExposure_speedDown", "3.0" ); /* darken into bright */
+	ri.Cvar_Set( "r_autoExposure_centerWeight", "0.50" );
+	ri.Cvar_Set( "r_autoExposure_lowPercent", "0.05" );
+	ri.Cvar_Set( "r_autoExposure_highPercent", "0.05" );
+	ri.Cvar_Set( "r_exposureSkyWeight", "0.35" );
+	ri.Cvar_Set( "r_exposureComp", "0.25" );
+	ri.Cvar_Set( "r_exposureFixed", "0" );
+	ri.Cvar_Set( "r_exposureHistogram", "1" );
+	ri.Cvar_Set( "r_exposureMeter", "3" );
+	ri.Cvar_Set( "r_bloomThresholdEVRelative", "1" );
+	ri.Cvar_Set( "r_localExposure", "0" );
+	ri.Cvar_Set( "r_localExposure_shadowClamp", "0.25" );
+	/* Filmic: whitePoint = scene value → display 1 (not a midtone darken divisor). */
+	{
+		cvar_t *tm = ri.Cvar_Get( "r_tonemap", "3", 0 );
+		if ( !tm || tm->integer == 0 ) {
+			ri.Cvar_Set( "r_tonemap", "3" );
+		}
+	}
+	ri.Cvar_Set( "r_grade_toe", "0.10" );
+	ri.Cvar_Set( "r_grade_shoulder", "0.30" );
+	ri.Cvar_Set( "r_grade_whitePoint", "1.5" );
+	ri.Cvar_Set( "r_grade_highlightDesat", "0.06" );
+	ri.Cvar_Set( "r_grade_contrast", "1.0" );
+	ri.Cvar_Set( "r_grade_contrastPivot", "0.18" );
+	ri.Cvar_Set( "r_grade_vibrance", "0.08" );
+	ri.Cvar_Set( "r_grade_blackClip", "0" );
+	/* Reset adaptation so map load does not inherit a stale EV. */
+	vk.adaptedExposure = ( r_exposure && r_exposure->value > 0.0f ) ? r_exposure->value : 1.0f;
+	vk.temporal.hasValidLuminance = qfalse;
+	vk.temporal.filteredAvgLogLuminance = 0.0f;
+
+	wantAuto = ri.Cvar_Get( "r_skyboxHDR_autoExposure", "1", CVAR_ARCHIVE_ND );
+	if ( wantAuto && wantAuto->integer ) {
+		ri.Cvar_Set( "r_exposure_auto", "1" );
+		ri.Printf( PRINT_ALL,
+			"SkyboxHDR: eye adaptation ON (AE floor=0.70 target=0.18 skyW=0.35 filmic WP=1.5)\n" );
+	} else {
+		ri.Printf( PRINT_ALL,
+			"SkyboxHDR: eye adaptation curve ready (manual EV; set r_skyboxHDR_autoExposure 1 to enable)\n" );
+	}
+}
+
+qboolean SkyboxHDR_ConfigureFromMap( const char *path, float exposure, float rotation,
+		float intensity, int projection ) {
+	char buf[64];
+	const skyboxHDR_t *cur;
+
+	if ( !path || !path[0] ) {
+		return qfalse;
+	}
+
+	if ( exposure > 0.0f ) {
+		Com_sprintf( buf, sizeof( buf ), "%g", exposure );
+		ri.Cvar_Set( "r_skyboxHDR_exposure", buf );
+	}
+	Com_sprintf( buf, sizeof( buf ), "%g", rotation );
+	ri.Cvar_Set( "r_skyboxHDR_rotation", buf );
+	if ( intensity > 0.0f ) {
+		Com_sprintf( buf, sizeof( buf ), "%g", intensity );
+		ri.Cvar_Set( "r_skyboxHDR_intensity", buf );
+	}
+	if ( projection >= 0 && projection < SKYBOX_PROJ_COUNT ) {
+		Com_sprintf( buf, sizeof( buf ), "%d", projection );
+		ri.Cvar_Set( "r_skyboxHDR_projection", buf );
+	}
+
+	ri.Cvar_Set( "r_skyboxHDR", path );
+	/* Visible sky + IBL share the HDR owner when a map requests an EXR/HDR sky. */
+	ri.Cvar_Set( "r_skyOwner", "2" );
+	SkyboxHDR_EnableEyeAdaptation();
+
+	/*
+	 * Avoid a full unload/reload when BeginFrame already loaded this panorama
+	 * (archived cvar / mapscript). Re-applying exposure still rebuilds display faces.
+	 */
+	cur = SkyboxHDR_Get();
+	if ( cur && cur->loaded && !Q_stricmp( cur->filename, path ) &&
+			skyboxPrefilteredImage.handle != VK_NULL_HANDLE ) {
+		SkyboxHDR_SetExposure( r_skyboxHDR_exposure ? r_skyboxHDR_exposure->value : exposure );
+		SkyboxHDR_SetRotation( r_skyboxHDR_rotation ? r_skyboxHDR_rotation->value : rotation );
+		SkyboxHDR_SetIntensity( r_skyboxHDR_intensity ? r_skyboxHDR_intensity->value : intensity );
+		SkyboxHDR_BuildDisplayFaces();
+		if ( r_skyboxHDR ) {
+			r_skyboxHDR->modified = qfalse;
+		}
+		if ( r_skyboxHDR_exposure ) r_skyboxHDR_exposure->modified = qfalse;
+		if ( r_skyboxHDR_rotation ) r_skyboxHDR_rotation->modified = qfalse;
+		if ( r_skyboxHDR_intensity ) r_skyboxHDR_intensity->modified = qfalse;
+		if ( r_skyboxHDR_projection ) r_skyboxHDR_projection->modified = qfalse;
+		return qtrue;
+	}
+
+	if ( r_skyboxHDR ) {
+		r_skyboxHDR->modified = qtrue;
+	}
+	SkyboxHDR_UpdateRuntime();
+	return SkyboxHDR_IsLoaded();
 }

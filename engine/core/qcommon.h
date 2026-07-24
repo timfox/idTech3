@@ -121,8 +121,8 @@ float MSG_ReadAngle16 (msg_t *sb);
 void  MSG_ReadData(msg_t *sb, void *buffer, int size);
 int   MSG_ReadEntitynum(msg_t *sb);
 
-void MSG_WriteDeltaUsercmdKey( msg_t *msg, int key, const usercmd_t *from, const usercmd_t *to );
-void MSG_ReadDeltaUsercmdKey( msg_t *msg, int key, const usercmd_t *from, usercmd_t *to );
+void MSG_WriteDeltaUsercmdKey( msg_t *msg, int key, const usercmd_t *from, const usercmd_t *to, int buttonBits );
+void MSG_ReadDeltaUsercmdKey( msg_t *msg, int key, const usercmd_t *from, usercmd_t *to, int buttonBits );
 
 void MSG_WriteDeltaEntity( msg_t *msg, const entityState_t *from, const entityState_t *to, qboolean force );
 void MSG_ReadDeltaEntity( msg_t *msg, const entityState_t *from, entityState_t *to, int number );
@@ -1247,6 +1247,7 @@ void SV_Frame( int msec );
 void SV_TrackCvarChanges( void );
 void SV_PacketEvent( const netadr_t *from, msg_t *msg );
 int SV_FrameMsec( void );
+void SV_TVStream_Init( void );	/* Surf TVL live tap; bind after NET_Init (needs net_port) */
 qboolean SV_GameCommand( void );
 int SV_SendQueuedPackets( void );
 
