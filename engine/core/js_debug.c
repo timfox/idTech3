@@ -30,6 +30,7 @@ static cvar_t *js_compatTarget;
 static cvar_t *js_autoInit;
 static cvar_t *js_verbose;
 static cvar_t *js_verboseMenu;
+static cvar_t *js_hudPixelCoords;
 
 /* Current UI menu (UIMENU_*), set by client when menu changes */
 static int s_jsCurrentMenu = -1;
@@ -94,6 +95,10 @@ static void JsDebug_InitPolicyCvars( void ) {
 	if ( !js_verboseMenu ) {
 		js_verboseMenu = Cvar_Get( "js_verboseMenu", "main", CVAR_ARCHIVE_ND );
 		Cvar_SetDescription( js_verboseMenu, "Which menu to show verbose info: main, ingame, all, or none." );
+	}
+	if ( !js_hudPixelCoords ) {
+		js_hudPixelCoords = Cvar_Get( "js_hudPixelCoords", "0", CVAR_ARCHIVE_ND );
+		Cvar_SetDescription( js_hudPixelCoords, "Interpret JavaScript HUD drawing and cursor coordinates as physical screen pixels instead of 640x480 virtual coordinates." );
 	}
 }
 
@@ -714,11 +719,31 @@ static duk_ret_t Js_Binding_MaterialRegister( duk_context *ctx ) {
 	return 1;
 }
 
+static void Js_HudPixelToVirtualRect( float *x, float *y, float *w, float *h ) {
+	if ( js_hudPixelCoords && js_hudPixelCoords->integer ) {
+		const float sx = ( cls.glconfig.vidWidth > 0 ) ? ( 640.0f / (float)cls.glconfig.vidWidth ) : 1.0f;
+		const float sy = ( cls.glconfig.vidHeight > 0 ) ? ( 480.0f / (float)cls.glconfig.vidHeight ) : 1.0f;
+		if ( x ) *x *= sx;
+		if ( y ) *y *= sy;
+		if ( w ) *w *= sx;
+		if ( h ) *h *= sy;
+	}
+}
+
+static float Js_HudPixelToVirtualSize( float size ) {
+	if ( js_hudPixelCoords && js_hudPixelCoords->integer ) {
+		const float sy = ( cls.glconfig.vidHeight > 0 ) ? ( 480.0f / (float)cls.glconfig.vidHeight ) : 1.0f;
+		return size * sy;
+	}
+	return size;
+}
+
 static duk_ret_t Js_Binding_HudDrawPic( duk_context *ctx ) {
-	const float x = (float)duk_require_number( ctx, 0 );
-	const float y = (float)duk_require_number( ctx, 1 );
-	const float w = (float)duk_require_number( ctx, 2 );
-	const float h = (float)duk_require_number( ctx, 3 );
+	float x = (float)duk_require_number( ctx, 0 );
+	float y = (float)duk_require_number( ctx, 1 );
+	float w = (float)duk_require_number( ctx, 2 );
+	float h = (float)duk_require_number( ctx, 3 );
+	Js_HudPixelToVirtualRect( &x, &y, &w, &h );
 
 	if ( duk_is_number( ctx, 4 ) ) {
 		const qhandle_t shader = (qhandle_t)duk_to_int( ctx, 4 );
@@ -736,11 +761,11 @@ static duk_ret_t Js_Binding_HudDrawPic( duk_context *ctx ) {
  * 640x480 virtual coords; radius / cornerRadius in virtual px; tint straight-alpha.
  */
 static duk_ret_t Js_Binding_HudBackdropBlur( duk_context *ctx ) {
-	const float x = (float)duk_require_number( ctx, 0 );
-	const float y = (float)duk_require_number( ctx, 1 );
-	const float w = (float)duk_require_number( ctx, 2 );
-	const float h = (float)duk_require_number( ctx, 3 );
-	const float radius = (float)duk_require_number( ctx, 4 );
+	float x = (float)duk_require_number( ctx, 0 );
+	float y = (float)duk_require_number( ctx, 1 );
+	float w = (float)duk_require_number( ctx, 2 );
+	float h = (float)duk_require_number( ctx, 3 );
+	float radius = (float)duk_require_number( ctx, 4 );
 	const int top = duk_get_top( ctx );
 	const float cornerRadius = ( top > 5 ) ? (float)duk_to_number( ctx, 5 ) : 0.0f;
 	const float opacity = ( top > 6 ) ? (float)duk_to_number( ctx, 6 ) : 1.0f;
@@ -756,7 +781,9 @@ static duk_ret_t Js_Binding_HudBackdropBlur( duk_context *ctx ) {
 	if ( top > 11 ) {
 		rotation = (float)duk_to_number( ctx, 11 );
 	}
-	SCR_UIBackdropBlur( x, y, w, h, radius, cornerRadius, rotation, opacity, tint );
+	Js_HudPixelToVirtualRect( &x, &y, &w, &h );
+	radius = Js_HudPixelToVirtualSize( radius );
+	SCR_UIBackdropBlur( x, y, w, h, radius, Js_HudPixelToVirtualSize( cornerRadius ), rotation, opacity, tint );
 	return 0;
 }
 
@@ -765,12 +792,12 @@ static duk_ret_t Js_Binding_HudBackdropBlur( duk_context *ctx ) {
  * CSS filter: blur() — draws the image blurred (the element itself is blurred).
  */
 static duk_ret_t Js_Binding_HudFilterBlurPic( duk_context *ctx ) {
-	const float x = (float)duk_require_number( ctx, 0 );
-	const float y = (float)duk_require_number( ctx, 1 );
-	const float w = (float)duk_require_number( ctx, 2 );
-	const float h = (float)duk_require_number( ctx, 3 );
+	float x = (float)duk_require_number( ctx, 0 );
+	float y = (float)duk_require_number( ctx, 1 );
+	float w = (float)duk_require_number( ctx, 2 );
+	float h = (float)duk_require_number( ctx, 3 );
 	qhandle_t shader;
-	const float radius = (float)duk_require_number( ctx, 5 );
+	float radius = (float)duk_require_number( ctx, 5 );
 	const int top = duk_get_top( ctx );
 	const float cornerRadius = ( top > 6 ) ? (float)duk_to_number( ctx, 6 ) : 0.0f;
 	const float opacity = ( top > 7 ) ? (float)duk_to_number( ctx, 7 ) : 1.0f;
@@ -781,7 +808,9 @@ static duk_ret_t Js_Binding_HudFilterBlurPic( duk_context *ctx ) {
 	} else {
 		shader = re.RegisterShader( duk_require_string( ctx, 4 ) );
 	}
-	SCR_UIFilterLayer( x, y, w, h, shader, radius, cornerRadius, rotation, opacity );
+	Js_HudPixelToVirtualRect( &x, &y, &w, &h );
+	radius = Js_HudPixelToVirtualSize( radius );
+	SCR_UIFilterLayer( x, y, w, h, shader, radius, Js_HudPixelToVirtualSize( cornerRadius ), rotation, opacity );
 	return 0;
 }
 
@@ -789,10 +818,14 @@ static duk_ret_t Js_Binding_HudFilterBlurPic( duk_context *ctx ) {
 static vec4_t s_jsHudColor = { 1.0f, 1.0f, 1.0f, 1.0f };
 
 static duk_ret_t Js_Binding_HudDrawText( duk_context *ctx ) {
-	const float x = (float)duk_require_number( ctx, 0 );
-	const float y = (float)duk_require_number( ctx, 1 );
+	float x = (float)duk_require_number( ctx, 0 );
+	float y = (float)duk_require_number( ctx, 1 );
+	float w = 0.0f;
+	float h = 0.0f;
 	const char *text = duk_require_string( ctx, 2 );
-	const float size = ( duk_get_top( ctx ) > 3 ) ? (float)duk_to_number( ctx, 3 ) : 8.0f;
+	float size = ( duk_get_top( ctx ) > 3 ) ? (float)duk_to_number( ctx, 3 ) : 8.0f;
+	Js_HudPixelToVirtualRect( &x, &y, &w, &h );
+	size = Js_HudPixelToVirtualSize( size );
 
 	/* forceColor=true so embedded ^# codes don't override hudSetColor; pass stored RGBA.
 	   Fractional virtual coordinates keep aligned HUD text stable at high resolutions. */
@@ -1013,7 +1046,7 @@ static duk_ret_t Js_Binding_HudDrawRect( duk_context *ctx ) {
 	float y = (float)duk_require_number( ctx, 1 );
 	float w = (float)duk_require_number( ctx, 2 );
 	float h = (float)duk_require_number( ctx, 3 );
-	/* Match hudDrawPic / hudDrawText: 640x480 virtual coords. */
+	Js_HudPixelToVirtualRect( &x, &y, &w, &h );
 	SCR_DrawPic( x, y, w, h, cls.whiteShader );
 	return 0;
 }
@@ -1029,7 +1062,12 @@ static duk_ret_t Js_Binding_HudMeasureText( duk_context *ctx ) {
 	const char *text = duk_require_string( ctx, 0 );
 	const float size = ( duk_get_top( ctx ) > 1 ) ? (float)duk_to_number( ctx, 1 ) : 8.0f;
 
-	duk_push_number( ctx, (duk_double_t)SCR_MeasureHudStringWidth( size, text ) );
+	if ( js_hudPixelCoords && js_hudPixelCoords->integer ) {
+		const float sx = ( cls.glconfig.vidWidth > 0 ) ? ( (float)cls.glconfig.vidWidth / 640.0f ) : 1.0f;
+		duk_push_number( ctx, (duk_double_t)( SCR_MeasureHudStringWidth( Js_HudPixelToVirtualSize( size ), text ) * sx ) );
+	} else {
+		duk_push_number( ctx, (duk_double_t)SCR_MeasureHudStringWidth( size, text ) );
+	}
 	return 1;
 }
 
@@ -1047,6 +1085,10 @@ static duk_ret_t Js_Binding_GetCursorPos( duk_context *ctx ) {
 	float y = 240.0f;
 
 	CL_GetHudCursorVirtual( &x, &y );
+	if ( js_hudPixelCoords && js_hudPixelCoords->integer ) {
+		x *= ( cls.glconfig.vidWidth > 0 ) ? ( (float)cls.glconfig.vidWidth / 640.0f ) : 1.0f;
+		y *= ( cls.glconfig.vidHeight > 0 ) ? ( (float)cls.glconfig.vidHeight / 480.0f ) : 1.0f;
+	}
 	duk_push_object( ctx );
 	duk_push_number( ctx, (duk_double_t)x );
 	duk_put_prop_string( ctx, -2, "x" );

@@ -858,11 +858,15 @@ void CL_KeyEvent( int key, qboolean down, unsigned time )
 	 * real implementation or stub.  A guard here silently compiles the
 	 * emission out and JS overlays never receive input. */
 	Com_ScriptEmitEvent( "input_key", Key_KeynumToString( key ), NULL, key, down ? 1 : 0 );
-	/* Deliver virtual HUD coords with the click so City Menu hit-tests match the OS cursor. */
+	/* Deliver HUD coords with the click so JS hit-tests match getCursorPos(). */
 	if ( down && key == K_MOUSE1 && CL_RpMenuActive() ) {
 		float vx = 320.0f;
 		float vy = 240.0f;
 		CL_GetHudCursorVirtual( &vx, &vy );
+		if ( Cvar_VariableIntegerValue( "js_hudPixelCoords" ) ) {
+			vx *= ( cls.glconfig.vidWidth > 0 ) ? ( (float)cls.glconfig.vidWidth / 640.0f ) : 1.0f;
+			vy *= ( cls.glconfig.vidHeight > 0 ) ? ( (float)cls.glconfig.vidHeight / 480.0f ) : 1.0f;
+		}
 		Com_ScriptEmitEvent( "rp_click", NULL, NULL, (int)( vx + 0.5f ), (int)( vy + 0.5f ) );
 	}
 
