@@ -1084,11 +1084,7 @@ static duk_ret_t Js_Binding_GetCursorPos( duk_context *ctx ) {
 	float x = 320.0f;
 	float y = 240.0f;
 
-	CL_GetHudCursorVirtual( &x, &y );
-	if ( js_hudPixelCoords && js_hudPixelCoords->integer ) {
-		x *= ( cls.glconfig.vidWidth > 0 ) ? ( (float)cls.glconfig.vidWidth / 640.0f ) : 1.0f;
-		y *= ( cls.glconfig.vidHeight > 0 ) ? ( (float)cls.glconfig.vidHeight / 480.0f ) : 1.0f;
-	}
+	CL_GetJsHudCursor( &x, &y );
 	duk_push_object( ctx );
 	duk_push_number( ctx, (duk_double_t)x );
 	duk_put_prop_string( ctx, -2, "x" );

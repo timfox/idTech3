@@ -126,8 +126,11 @@ void vk_update_postfx_params( uint32_t cmd_index )
 	params.runtimeFlags[3] = (float)( ( r_post && r_post->integer ) ? 1 : 0 );
 	params.lutParams[0] = Com_Clamp( 0.0f, 1.0f, PostFX_GetLUTIntensity() );
 	params.lutParams[1] = ( PostFX_GetLUTImage() && PostFX_GetLUTImage() != tr.whiteImage ) ? 1.0f : 0.0f;
-	params.lutParams[2] = 32.0f;
-	params.lutParams[3] = ( r_gamma && r_gamma->value > 0.0f ) ? ( 1.0f / r_gamma->value ) : 1.0f;
+	/* lutParams.zw belong to the temporal jitter written further below. */
+	params.displayParams[0] = ( r_gamma && r_gamma->value > 0.0f ) ? ( 1.0f / r_gamma->value ) : 1.0f;
+	params.displayParams[1] = 0.0f;
+	params.displayParams[2] = 0.0f;
+	params.displayParams[3] = 0.0f;
 	r_autoExposure_target = ri.Cvar_Get( "r_exposure_auto_target", "1.0", 0 );
 	r_autoExposure_min = ri.Cvar_Get( "r_autoExposure_min", "0.5", 0 );
 	r_autoExposure_max = ri.Cvar_Get( "r_autoExposure_max", "4.0", 0 );

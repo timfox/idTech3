@@ -756,6 +756,8 @@ void CL_JsNotifyMenuChanged( int menu );
 
 /* HavenRP City Menu (ui_rpMenu): pointer mode without Q3 UI catcher. */
 qboolean CL_RpMenuActive( void );
+void     CL_ClearRpMenu( void );
+void     CL_GetJsHudCursor( float *outX, float *outY );
 void CL_GetHudCursorVirtual( float *outX, float *outY );
 /* Absolute window mouse (platform: sdl_input.c / win_input.c). */
 void IN_GetAbsMouse( int *x, int *y );

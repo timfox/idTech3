@@ -38,6 +38,11 @@ void CL_InitCvars( void )
 	Cvar_SetDescription( cv, "Route the in-game escape menu to the JavaScript overlay (ui_rpMenu pointer mode) instead of the native UI module." );
 	cv = Cvar_Get( "ui_rpMenu", "0", CVAR_TEMP );
 	Cvar_SetDescription( cv, "JS overlay menu active flag: releases the mouse cursor, suppresses game input, and lets scripts receive input_key/rp_click events." );
+	/* TEMP so a quit-while-open cannot archive "1" and permanently kill mouse look. */
+	cv = Cvar_Get( "ui_surfMapSelect", "0", CVAR_TEMP );
+	Cvar_SetDescription( cv, "Surf JS map-select overlay (also implies pointer mode via CL_RpMenuActive)." );
+	cv = Cvar_Get( "ui_surfLeaderboard", "0", CVAR_TEMP );
+	Cvar_SetDescription( cv, "Surf JS leaderboard overlay (also implies pointer mode via CL_RpMenuActive)." );
 	cl_motd = Cvar_Get( "cl_motd", "1", 0 );
 	Cvar_SetDescription( cl_motd, "Toggle the display of the 'Message of the day'. When Quake 3 Arena starts a map up, it sends the GL_RENDERER string to the Message Of The Day server at id. This responds back with a message of the day to the client." );
 

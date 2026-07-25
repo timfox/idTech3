@@ -688,7 +688,8 @@ static void CL_KeyDownEvent( int key, unsigned time )
 #endif
 		/* HavenRP City Menu: close overlay instead of opening the Q3 pause menu. */
 		if ( CL_RpMenuActive() ) {
-			/* Pop Surf JS overlays first (map select / leaderboard), then pause. */
+			/* Pop Surf JS overlays first (map select / leaderboard), then pause.
+			 * Final close clears every pointer-mode flag so mouse look returns. */
 			if ( Cvar_VariableIntegerValue( "ui_surfMapSelect" ) ) {
 				Cvar_Set( "ui_surfMapSelect", "0" );
 				Key_ClearStates();
@@ -699,7 +700,7 @@ static void CL_KeyDownEvent( int key, unsigned time )
 				Key_ClearStates();
 				return;
 			}
-			Cvar_Set( "ui_rpMenu", "0" );
+			CL_ClearRpMenu();
 			Key_ClearStates();
 			return;
 		}
@@ -862,11 +863,7 @@ void CL_KeyEvent( int key, qboolean down, unsigned time )
 	if ( down && key == K_MOUSE1 && CL_RpMenuActive() ) {
 		float vx = 320.0f;
 		float vy = 240.0f;
-		CL_GetHudCursorVirtual( &vx, &vy );
-		if ( Cvar_VariableIntegerValue( "js_hudPixelCoords" ) ) {
-			vx *= ( cls.glconfig.vidWidth > 0 ) ? ( (float)cls.glconfig.vidWidth / 640.0f ) : 1.0f;
-			vy *= ( cls.glconfig.vidHeight > 0 ) ? ( (float)cls.glconfig.vidHeight / 480.0f ) : 1.0f;
-		}
+		CL_GetJsHudCursor( &vx, &vy );
 		Com_ScriptEmitEvent( "rp_click", NULL, NULL, (int)( vx + 0.5f ), (int)( vy + 0.5f ) );
 	}
 

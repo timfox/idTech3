@@ -390,7 +390,23 @@ stays idle — still needs pointer mode (free look off, free cursor).
 =================
 */
 qboolean CL_RpMenuActive( void ) {
-	return ( Cvar_VariableIntegerValue( "ui_rpMenu" ) != 0 ) ? qtrue : qfalse;
+	return ( Cvar_VariableIntegerValue( "ui_rpMenu" ) != 0 ||
+	         Cvar_VariableIntegerValue( "ui_surfMapSelect" ) != 0 ||
+	         Cvar_VariableIntegerValue( "ui_surfLeaderboard" ) != 0 ) ? qtrue : qfalse;
+}
+
+/*
+=================
+CL_ClearRpMenu
+
+Leave pointer mode and restore mouse look / grab. Clears every Surf JS overlay
+flag that CL_RpMenuActive consults.
+=================
+*/
+void CL_ClearRpMenu( void ) {
+	Cvar_Set( "ui_surfMapSelect", "0" );
+	Cvar_Set( "ui_surfLeaderboard", "0" );
+	Cvar_Set( "ui_rpMenu", "0" );
 }
 
 
@@ -441,6 +457,39 @@ void CL_GetHudCursorVirtual( float *outX, float *outY ) {
 	if ( outY ) {
 		*outY = vy;
 	}
+}
+
+/*
+=================
+CL_GetJsHudCursor
+
+Cursor position in the same space JS overlays lay out and hit-test.
+With js_hudPixelCoords, that is drawable pixels / ui_scale (not letterboxed
+640x480), matching getScreenSize()-based layouts.
+=================
+*/
+void CL_GetJsHudCursor( float *outX, float *outY ) {
+	float uiScale;
+
+	if ( Cvar_VariableIntegerValue( "js_hudPixelCoords" ) ) {
+		int sx = 0;
+		int sy = 0;
+
+		IN_GetAbsMouse( &sx, &sy );
+		uiScale = Com_Clamp( 0.5f, 4.0f, Cvar_VariableValue( "ui_scale" ) );
+		if ( uiScale < 0.001f ) {
+			uiScale = 1.0f;
+		}
+		if ( outX ) {
+			*outX = (float)sx / uiScale;
+		}
+		if ( outY ) {
+			*outY = (float)sy / uiScale;
+		}
+		return;
+	}
+
+	CL_GetHudCursorVirtual( outX, outY );
 }
 
 

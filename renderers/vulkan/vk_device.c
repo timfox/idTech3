@@ -331,8 +331,17 @@ void vk_setup_surface_formats( VkPhysicalDevice physical_device )
 
 	vk.blitEnabled = vk_blit_enabled( physical_device, vk.color_format, vk.capture_format );
 
+	/*
+	 * Keep capture as display-encoded RGBA8 even when color→capture blit is
+	 * unsupported. Falling back to SceneHDR float made the capture/gamma path
+	 * write sRGB-encoded (and 8-bit-dithered) values into an FP buffer, which
+	 * is the wrong color space for screenshots and any shared capture users.
+	 * Without blit, screenshots use the shader capture resolve instead.
+	 */
 	if ( !vk.blitEnabled ) {
-		vk.capture_format = vk.color_format;
+		ri.Printf( PRINT_WARNING,
+			"[VK][fbo] color→capture blit unsupported (%s → %s); capture stays RGBA8 via shader resolve\n",
+			vk_format_string( vk.color_format ), vk_format_string( vk.capture_format ) );
 	}
 }
 

@@ -24,6 +24,8 @@ typedef struct {
 	float lensEffects0[4];     /* vignette, vignetteRadius, chromaticAberration, filmGrain */
 	float lensEffects1[4];     /* outlineStrength, outlineThreshold, filmLook, sharpen */
 	float runtimeFlags[4];     /* greyscale, dither, postDebug, postEnabled */
+	/* .zw are owned by the temporal upscale jitter (taa.frag samples with them).
+	 * Nothing else may pack into them — user gamma lives in displayParams. */
 	float lutParams[4];        /* lutIntensity, lutEnabled, jitterX (pixels), jitterY (pixels) */
 	float autoExposureParams[4]; /* avgLogLum, targetLum, minExposure, maxExposure */
 	float localExposureParams[4]; /* enabled, strength, shadowClampEV, highlightClampEV */
@@ -31,6 +33,7 @@ typedef struct {
 	float temporalValidity[4]; /* previous color, depth, class, weapon history */
 	float weaponTemporalParams[4]; /* historyWeight, varianceGamma, depthThreshold, reactiveScale */
 	float temporalDebugParams[4]; /* vectorScale, reserved */
+	float displayParams[4];    /* invGamma (1/r_gamma), reserved */
 } VkPostFXParams;
 
 typedef struct {

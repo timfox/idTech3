@@ -26,10 +26,14 @@ layout(set = 2, binding = 0) uniform PostFXParams {
 	vec4 lensEffects0;     /* vignette, vignetteRadius, chromaticAberration, filmGrain */
 	vec4 lensEffects1;     /* outlineStrength, outlineThreshold, filmLook, sharpen */
 	vec4 runtimeFlags;     /* greyscale, dither, postDebug, postEnabled */
-	vec4 lutParams;        /* lutIntensity, lutEnabled, lutStripDim, invGamma */
+	vec4 lutParams;        /* lutIntensity, lutEnabled, jitterX, jitterY */
 	vec4 autoExposureParams; /* avgLogLum, targetLum, adaptedExposure(-1=off EV-rel), maxExposure */
 	vec4 localExposureParams; /* enabled, strength, shadowClampEV, highlightClampEV */
 	vec4 taaParams;        /* validHistory, stationaryFeedback, motionFeedback, sharpen */
+	vec4 temporalValidity;
+	vec4 weaponTemporalParams;
+	vec4 temporalDebugParams;
+	vec4 displayParams;    /* invGamma, reserved */
 } postfx;
 layout(set = 3, binding = 0) uniform sampler2D lutTexture;
 
@@ -94,15 +98,28 @@ vec3 dither( vec3 color ) {
 	return dithered / levels;
 }
 
-/* Inverse of linearToDisplay().  An sRGB swapchain performs the forward
- * conversion after this shader, so final-output dithering must briefly enter
- * display-encoded space and return to linear.  Dithering scene-linear values
- * spends most code points on highlights and leaves dark gradients banded. */
-vec3 displayToLinear( vec3 x ) {
+/*
+ * True IEC 61966-2-1 sRGB OETF / EOTF.  Used for (1) UNORM swapchain encode and
+ * (2) the dither round-trip on sRGB swapchains.  Must stay inverses of each
+ * other — never mix these with the user r_gamma power curve.
+ */
+vec3 linearToSrgb( vec3 x ) {
+	bvec3 lo = lessThanEqual( x, vec3( 0.0031308 ) );
+	vec3 low = x * 12.92;
+	vec3 high = 1.055 * pow( max( x, vec3( 0.0 ) ), vec3( 1.0 / 2.4 ) ) - vec3( 0.055 );
+	return mix( high, low, lo );
+}
+
+vec3 srgbToLinear( vec3 x ) {
 	bvec3 lo = lessThanEqual( x, vec3( 0.04045 ) );
 	vec3 low = x / 12.92;
 	vec3 high = pow( max( ( x + 0.055 ) / 1.055, vec3( 0.0 ) ), vec3( 2.4 ) );
 	return mix( high, low, lo );
+}
+
+/* Legacy alias — call sites that meant "sRGB decode" keep compiling. */
+vec3 displayToLinear( vec3 x ) {
+	return srgbToLinear( x );
 }
 
 float postPreExposureScale( void ) { return max( postfx.colorBalance.w, 0.001 ); }
@@ -117,7 +134,14 @@ float postLegacyContrast( void ) { return max( postfx.colorGrade.z, 0.0 ); }
 float postSaturation( void ) { return max( postfx.colorGrade.x, 0.0 ) * max( postfx.colorGrade.w, 0.0 ); }
 float postVibrance( void ) { return clamp( postfx.colorGrade.y, -1.0, 1.0 ); }
 float postHueDegrees( void ) { return clamp( postfx.colorGrade2.x, -180.0, 180.0 ); }
-float postInvGamma( void ) { return max( postfx.lutParams.w, 1e-6 ); }
+/*
+ * 1/r_gamma. A non-positive value means the CPU never wrote it, so fall back to
+ * identity: pow(x, ~0) collapses every non-black pixel to white.
+ */
+float postInvGamma( void ) {
+	float inv = postfx.displayParams.x;
+	return inv > 0.0 ? clamp( inv, 0.1, 10.0 ) : 1.0;
+}
 float postVignetteIntensity( void ) { return max( postfx.lensEffects0.x, 0.0 ); }
 float postVignetteRadius( void ) { return max( postfx.lensEffects0.y, 0.0 ); }
 float postChromaticAberration( void ) { return max( postfx.lensEffects0.z, 0.0 ); }
@@ -131,6 +155,19 @@ bool postLocalExposureEnabled( void ) { return postfx.localExposureParams.x > 0.
 float postLocalExposureStrength( void ) { return clamp( postfx.localExposureParams.y, 0.0, 1.0 ); }
 float postLocalExposureShadowClamp( void ) { return max( postfx.localExposureParams.z, 0.0 ); }
 float postLocalExposureHighlightClamp( void ) { return max( postfx.localExposureParams.w, 0.0 ); }
+
+/*
+ * User r_gamma preference in display-linear (1 = identity).  Applied before
+ * the sRGB transfer so it cannot desync the dither encode/decode pair.
+ * lutParams.w stores 1/r_gamma from the CPU.
+ */
+vec3 applyUserGamma( vec3 x ) {
+	float inv = postInvGamma();
+	if ( abs( inv - 1.0 ) < 1e-4 ) {
+		return x;
+	}
+	return pow( max( x, vec3( 0.0 ) ), vec3( inv ) );
+}
 
 vec3 ACESFilm( vec3 x ) {
 	const float a = 2.51;
@@ -204,8 +241,14 @@ vec3 Tonemap_AgX( vec3 x ) {
 	return clamp( satRecovered, 0.0, 1.0 );
 }
 
+/*
+ * Deprecated name: previously this was pow(x, 1/r_gamma), which the sRGB
+ * dither path treated as a display encode — but displayToLinear was true sRGB.
+ * That mismatch crushed midtones whenever r_dither was on.  Keep the symbol as
+ * an sRGB encode so any remaining call sites stay color-correct.
+ */
 vec3 linearToDisplay( vec3 x ) {
-	return pow( max( x, vec3( 0.0 ) ), vec3( postInvGamma() ) );
+	return linearToSrgb( x );
 }
 
 vec3 sanitizeHdr( vec3 hdr ) {
@@ -820,20 +863,22 @@ void main() {
 		ldr = clamp( ldr, 0.0, 1.0 );
 	}
 
-	if ( apply_srgb_gamma != 0 ) {
-		ldr = linearToDisplay( ldr );
-	}
+	/* Display-linear user gamma, then a single sRGB transfer for present. */
+	ldr = applyUserGamma( ldr );
 
 	/* Quantization is the final color operation.  Keep it after grading, CA,
 	 * vignette, grain, and transfer encoding so none of those stages can
-	 * recreate banded ramps.  For an sRGB attachment Vulkan applies the
-	 * encoding on store, hence the display-space round trip here. */
-	if ( postDitherMode() == 1 ) {
-		if ( apply_srgb_gamma != 0 ) {
+	 * recreate banded ramps.  Dither in true sRGB-encoded space:
+	 *   UNORM swapchain — shader writes encoded bytes (dither then store)
+	 *   sRGB swapchain  — round-trip encode→dither→decode; HW encodes on store
+	 * Mixing pow(r_gamma) encode with sRGB decode used to warp every gradient. */
+	if ( apply_srgb_gamma != 0 ) {
+		ldr = linearToSrgb( ldr );
+		if ( postDitherMode() == 1 ) {
 			ldr = dither( ldr );
-		} else {
-			ldr = displayToLinear( dither( linearToDisplay( ldr ) ) );
 		}
+	} else if ( postDitherMode() == 1 ) {
+		ldr = srgbToLinear( dither( linearToSrgb( ldr ) ) );
 	}
 
 	out_color = vec4( ldr, 1.0 );
