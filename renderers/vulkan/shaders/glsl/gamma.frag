@@ -45,6 +45,10 @@ layout(constant_id = 3) const float bloom_threshold = 0.6;
 layout(constant_id = 4) const float bloom_intensity = 0.5;
 layout(constant_id = 5) const int bloom_threshold_mode = 0;
 layout(constant_id = 6) const int bloom_modulate = 0;
+/* 1 when this pipeline writes a display-quantized (integer) target. Float
+ * SceneHDR destinations must never be dithered — that would quantize an
+ * intermediate HDR buffer to 8-bit steps. r_dither stays the runtime toggle. */
+layout(constant_id = 7) const int target_quantized = 1;
 layout(constant_id = 8) const int depth_r = 8;
 layout(constant_id = 9) const int depth_g = 8;
 layout(constant_id = 10) const int depth_b = 8;
@@ -159,7 +163,7 @@ float postLocalExposureHighlightClamp( void ) { return max( postfx.localExposure
 /*
  * User r_gamma preference in display-linear (1 = identity).  Applied before
  * the sRGB transfer so it cannot desync the dither encode/decode pair.
- * lutParams.w stores 1/r_gamma from the CPU.
+ * displayParams.x stores 1/r_gamma from the CPU.
  */
 vec3 applyUserGamma( vec3 x ) {
 	float inv = postInvGamma();
@@ -872,12 +876,13 @@ void main() {
 	 *   UNORM swapchain — shader writes encoded bytes (dither then store)
 	 *   sRGB swapchain  — round-trip encode→dither→decode; HW encodes on store
 	 * Mixing pow(r_gamma) encode with sRGB decode used to warp every gradient. */
+	bool ditherThisTarget = target_quantized != 0 && postDitherMode() == 1;
 	if ( apply_srgb_gamma != 0 ) {
 		ldr = linearToSrgb( ldr );
-		if ( postDitherMode() == 1 ) {
+		if ( ditherThisTarget ) {
 			ldr = dither( ldr );
 		}
-	} else if ( postDitherMode() == 1 ) {
+	} else if ( ditherThisTarget ) {
 		ldr = srgbToLinear( dither( linearToSrgb( ldr ) ) );
 	}
 

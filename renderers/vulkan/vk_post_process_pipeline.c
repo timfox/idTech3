@@ -31,7 +31,7 @@ typedef struct {
 	float bloom_intensity;
 	int bloom_threshold_mode;
 	int bloom_modulate;
-	int dither;
+	int target_quantized;
 	int depth_r;
 	int depth_g;
 	int depth_b;
@@ -450,7 +450,6 @@ void vk_create_post_process_pipeline( int program_index, uint32_t width, uint32_
 	frag_spec_data.bloom_intensity = r_bloom_intensity->value;
 	frag_spec_data.bloom_threshold_mode = r_bloom_threshold_mode->integer;
 	frag_spec_data.bloom_modulate = r_bloom_modulate->integer;
-	frag_spec_data.dither = r_dither->integer;
 	frag_spec_data.exposure = r_exposure ? r_exposure->value : 1.0f;
 	frag_spec_data.bloom_knee = r_bloomKnee ? r_bloomKnee->value : 0.5f;
 	frag_spec_data.tonemap_mode = r_tonemap ? r_tonemap->integer : 2;
@@ -458,12 +457,15 @@ void vk_create_post_process_pipeline( int program_index, uint32_t width, uint32_
 	 * Display encode + dither belong only on integer present/capture targets.
 	 * SceneHDR float destinations must stay scene-linear: treating "not sRGB"
 	 * as "apply manual gamma" previously sRGB-encoded into FP16/FP32 buffers.
+	 * target_quantized is a property of the attachment, not of r_dither, so
+	 * toggling r_dither at runtime still works through the PostFX uniform.
 	 */
 	if ( vk_format_is_float( target_format ) ) {
 		frag_spec_data.apply_srgb_gamma = 0;
-		frag_spec_data.dither = 0;
+		frag_spec_data.target_quantized = 0;
 	} else {
 		frag_spec_data.apply_srgb_gamma = vk_post_process_format_is_srgb( target_format ) ? 0 : 1;
+		frag_spec_data.target_quantized = 1;
 	}
 	frag_spec_data.post_debug = r_post_debug ? r_post_debug->integer : 0;
 	frag_spec_data.vignette_intensity = PostFX_GetVignetteIntensity();
@@ -532,8 +534,8 @@ void vk_create_post_process_pipeline( int program_index, uint32_t width, uint32_
 	spec_entries[6].offset = offsetof( Vk_PostProcess_FragSpecData, bloom_modulate );
 	spec_entries[6].size = sizeof( frag_spec_data.bloom_modulate );
 	spec_entries[7].constantID = 7;
-	spec_entries[7].offset = offsetof( Vk_PostProcess_FragSpecData, dither );
-	spec_entries[7].size = sizeof( frag_spec_data.dither );
+	spec_entries[7].offset = offsetof( Vk_PostProcess_FragSpecData, target_quantized );
+	spec_entries[7].size = sizeof( frag_spec_data.target_quantized );
 	spec_entries[8].constantID = 8;
 	spec_entries[8].offset = offsetof( Vk_PostProcess_FragSpecData, depth_r );
 	spec_entries[8].size = sizeof( frag_spec_data.depth_r );
