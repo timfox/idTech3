@@ -1,0 +1,1 @@
+{"name":"ModelDoc","version":"1.0.0","description":"idTech3 Model Documentation System with WYSIWYG preview","author":"Tim Fox","mod_type":"tool","engine_version":"2026.1","dependencies":[]}
