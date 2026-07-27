@@ -3114,6 +3114,42 @@ static void Com_ExecuteCfg( void )
 	}
 }
 
+/*
+==================
+Com_ApplyStandaloneColorDefaults
+
+Standalone Surf builds require the HDR/tone-map UI path.  Old archived base
+configs can otherwise force r_hdr 0 before the renderer creates its framebuffers.
+==================
+*/
+static void Com_ApplyStandaloneColorDefaults( void )
+{
+	const char *fs_game = Cvar_VariableString( "fs_game" );
+	const char *fs_basegame = Cvar_VariableString( "fs_basegame" );
+	qboolean isSurf = qfalse;
+
+	if ( !Q_stricmp( cl_title, "Surf" ) ||
+	     !Q_stricmp( fs_game, "surf" ) ||
+	     !Q_stricmp( fs_basegame, "surf" ) ) {
+		isSurf = qtrue;
+	}
+
+	if ( !isSurf ) {
+		return;
+	}
+
+	if ( atoi( Cvar_VariableString( "r_hdr" ) ) <= 0 ) {
+		Com_Printf( "[Surf][color] overriding archived r_hdr 0; HDR stays enabled for stable tone-mapped UI\n" );
+		Cvar_Set( "r_hdr", "2" );
+	}
+	if ( atof( Cvar_VariableString( "r_gamma" ) ) != 1.0f ) {
+		Cvar_Set( "r_gamma", "1" );
+	}
+	if ( atoi( Cvar_VariableString( "r_dither" ) ) != 1 ) {
+		Cvar_Set( "r_dither", "1" );
+	}
+}
+
 
 /*
 ==================
@@ -3989,6 +4025,7 @@ void Com_Init( char *commandLine ) {
 
 	// override anything from the config files with command line args
 	Com_StartupVariable( NULL );
+	Com_ApplyStandaloneColorDefaults();
 
 	// get dedicated here for proper hunk megs initialization
 #ifdef DEDICATED
