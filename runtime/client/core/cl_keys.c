@@ -614,6 +614,17 @@ static int CL_RemapGamepadMenuKey( int key )
 	}
 }
 
+static void CL_ToggleFullscreen( void )
+{
+	int fullscreen = Cvar_VariableIntegerValue( "r_fullscreen" ) ? 0 : 1;
+
+	Cvar_SetValue( "r_fullscreen", fullscreen );
+	if ( fullscreen ) {
+		Cvar_Set( "r_modeFullscreen", "-2" );
+	}
+	Cbuf_ExecuteText( EXEC_APPEND, "vid_restart\n" );
+}
+
 
 /*
 ===================
@@ -639,8 +650,7 @@ static void CL_KeyDownEvent( int key, unsigned time )
 #ifndef _WIN32
 	if ( keys[K_ALT].down && key == K_ENTER )
 	{
-		Cvar_SetValue( "r_fullscreen", !Cvar_VariableIntegerValue( "r_fullscreen" ) );
-		Cbuf_ExecuteText( EXEC_APPEND, "vid_restart\n" );
+		CL_ToggleFullscreen();
 		return;
 	}
 #endif
@@ -654,8 +664,7 @@ static void CL_KeyDownEvent( int key, unsigned time )
 
 	if ( key == K_F11 && keys[key].repeats == 1 &&
 		( !com_dedicated || !com_dedicated->integer ) ) {
-		Cvar_SetValue( "r_fullscreen", !Cvar_VariableIntegerValue( "r_fullscreen" ) );
-		Cbuf_ExecuteText( EXEC_APPEND, "vid_restart\n" );
+		CL_ToggleFullscreen();
 		return;
 	}
 

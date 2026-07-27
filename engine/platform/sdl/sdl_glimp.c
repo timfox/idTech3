@@ -539,8 +539,8 @@ static int GLW_SetMode( int mode, const char *modeFS, qboolean fullscreen )
 
 		if ( fullscreen )
 		{
-#ifdef MACOS_X
-			/* Desktop fullscreen: no exclusive mode pointer */
+#if defined(MACOS_X) || defined(__linux__)
+			/* Desktop fullscreen: reliable across SDL3 compositors (Wayland, X11, macOS). */
 			if ( !SDL_SetWindowFullscreenMode( SDL_window, NULL ) )
 			{
 				Com_DPrintf( "SDL_SetWindowFullscreenMode(NULL) failed: %s\n", SDL_GetError() );
@@ -557,36 +557,10 @@ static int GLW_SetMode( int mode, const char *modeFS, qboolean fullscreen )
 			}
 #else
 			{
-				SDL_DisplayMode displayMode;
 				const SDL_DisplayMode *got;
-				SDL_DisplayID winDisplay = SDL_GetDisplayForWindow( SDL_window );
-				const SDL_DisplayMode *desk = winDisplay ? SDL_GetDesktopDisplayMode( winDisplay ) : NULL;
-
-				if ( !desk )
+				if ( !SDL_SetWindowFullscreenMode( SDL_window, NULL ) )
 				{
-					SDL_DestroyWindow( SDL_window );
-					SDL_window = NULL;
-					continue;
-				}
-
-				displayMode = *desk;
-				switch ( testColorBits )
-				{
-					case 16: displayMode.format = SDL_PIXELFORMAT_RGB565; break;
-					case 24: displayMode.format = SDL_PIXELFORMAT_RGB24;  break;
-					default: Com_DPrintf( "testColorBits is %d, can't fullscreen\n", testColorBits );
-						SDL_DestroyWindow( SDL_window );
-						SDL_window = NULL;
-						continue;
-				}
-
-				displayMode.w = config->vidWidth;
-				displayMode.h = config->vidHeight;
-				displayMode.refresh_rate = (float)Cvar_VariableIntegerValue( "r_displayRefresh" );
-
-				if ( !SDL_SetWindowFullscreenMode( SDL_window, &displayMode ) )
-				{
-					Com_DPrintf( "SDL_SetWindowFullscreenMode failed: %s\n", SDL_GetError( ) );
+					Com_DPrintf( "SDL_SetWindowFullscreenMode(NULL) failed: %s\n", SDL_GetError( ) );
 					SDL_DestroyWindow( SDL_window );
 					SDL_window = NULL;
 					continue;
@@ -699,10 +673,9 @@ static rserr_t GLimp_StartDriverAndSetMode( int mode, const char *modeFS, qboole
 
 	if ( fullscreen && in_nograb->integer )
 	{
-		Com_Printf( "Fullscreen not allowed with \\in_nograb 1\n");
-		Cvar_Set( "r_fullscreen", "0" );
-		r_fullscreen->modified = qfalse;
-		fullscreen = qfalse;
+		Com_Printf( "Fullscreen requested; disabling \\in_nograb\n" );
+		Cvar_Set( "in_nograb", "0" );
+		in_nograb->modified = qfalse;
 	}
 
 	if ( !SDL_WasInit( SDL_INIT_VIDEO ) )
