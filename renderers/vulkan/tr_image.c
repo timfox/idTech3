@@ -419,14 +419,22 @@ static void R_MipMap2( unsigned * const out, unsigned * const in, int inWidth, i
 	int			total;
 	int			outWidth, outHeight;
 	unsigned	*temp;
+	qboolean	heapTemp = qfalse;
 
 	outWidth = inWidth >> 1;
 	outHeight = inHeight >> 1;
 
-	if ( out == in )
-		temp = ri.Hunk_AllocateTempMemory( outWidth * outHeight * 4 );
-	else
+	if ( out == in ) {
+		int tempBytes = outWidth * outHeight * 4;
+		if ( tempBytes >= 16 * 1024 * 1024 ) {
+			temp = ri.Malloc( tempBytes );
+			heapTemp = qtrue;
+		} else {
+			temp = ri.Hunk_AllocateTempMemory( tempBytes );
+		}
+	} else {
 		temp = out;
+	}
 
 	inWidthMask = inWidth - 1;
 	inHeightMask = inHeight - 1;
@@ -462,7 +470,11 @@ static void R_MipMap2( unsigned * const out, unsigned * const in, int inWidth, i
 
 	if ( out == in ) {
 		Com_Memcpy( out, temp, outWidth * outHeight * 4 );
-		ri.Hunk_FreeTempMemory( temp );
+		if ( heapTemp ) {
+			ri.Free( temp );
+		} else {
+			ri.Hunk_FreeTempMemory( temp );
+		}
 	}
 }
 
