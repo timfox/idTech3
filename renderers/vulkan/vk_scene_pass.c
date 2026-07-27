@@ -279,6 +279,42 @@ static VkFramebuffer vk_scene_pass_resume_framebuffer( renderPass_t *pass )
 	return frameBuffer;
 }
 
+static VkRenderPass vk_scene_pass_resume_render_pass( renderPass_t targetPass )
+{
+	switch ( targetPass ) {
+	case RENDER_PASS_SCREENMAP:
+		return vk.render_pass.screenmap;
+	case RENDER_PASS_POST_BLOOM:
+		return vk.render_pass.post_bloom;
+	case RENDER_PASS_UI_OVERLAY:
+		return vk.render_pass.ui_overlay;
+	case RENDER_PASS_MAIN:
+	default:
+		/* Main render pass uses CLEAR loadOps (r_vk_clearhdr). Mid-frame
+		 * resumes after out-of-pass compute (G-buffer fill, visbuf, etc.)
+		 * must LOAD prior color/depth via main_resume. */
+		return ( vk.fboActive && vk.render_pass.main_resume != VK_NULL_HANDLE )
+			? vk.render_pass.main_resume
+			: vk.render_pass.main;
+	}
+}
+
+static void vk_scene_pass_report_resume_failure( renderPass_t requestedPass, renderPass_t targetPass,
+	VkRenderPass renderPass, VkFramebuffer frameBuffer )
+{
+	if ( !r_fboDebug || r_fboDebug->integer < 1 || !vk_post_fog_fbo_debug_throttle() ) {
+		return;
+	}
+
+	ri.Printf( PRINT_DEVELOPER, S_COLOR_YELLOW
+		"[VK][scene] resume_current_render_pass: failed requested=%s target=%s renderpass=%s framebuffer=%s swapchainIndex=%u\n",
+		vk_scene_pass_name( requestedPass ),
+		vk_scene_pass_name( targetPass ),
+		renderPass != VK_NULL_HANDLE ? "valid" : "null",
+		frameBuffer != VK_NULL_HANDLE ? "valid" : "null",
+		vk.cmd ? vk.cmd->swapchain_image_index : MAX_SWAPCHAIN_IMAGES );
+}
+
 void vk_begin_main_render_pass( void )
 {
 	VkFramebuffer frameBuffer = vk.framebuffers.main[ vk.cmd->swapchain_image_index ];
@@ -415,34 +451,13 @@ void vk_resume_current_render_pass( void )
 	vk_pass_diag_resume( vk_scene_pass_name( targetPass ), selfHeal );
 	vk_pass_diag_begin( vk_scene_pass_name( targetPass ), vk.renderWidth, vk.renderHeight );
 
-	switch ( targetPass ) {
-	case RENDER_PASS_SCREENMAP:
-		if ( frameBuffer != VK_NULL_HANDLE ) {
-			vk_begin_render_pass_tracked( vk.render_pass.screenmap, frameBuffer, qfalse, vk.renderWidth, vk.renderHeight );
+	{
+		VkRenderPass resumePass = vk_scene_pass_resume_render_pass( targetPass );
+		if ( resumePass == VK_NULL_HANDLE || frameBuffer == VK_NULL_HANDLE ) {
+			vk_scene_pass_report_resume_failure( requestedPass, targetPass, resumePass, frameBuffer );
+			return;
 		}
-		break;
-	case RENDER_PASS_POST_BLOOM:
-		if ( frameBuffer != VK_NULL_HANDLE ) {
-			vk_begin_render_pass_tracked( vk.render_pass.post_bloom, frameBuffer, qfalse, vk.renderWidth, vk.renderHeight );
-		}
-		break;
-	case RENDER_PASS_UI_OVERLAY:
-		if ( frameBuffer != VK_NULL_HANDLE ) {
-			vk_begin_render_pass_tracked( vk.render_pass.ui_overlay, frameBuffer, qfalse, vk.renderWidth, vk.renderHeight );
-		}
-		break;
-	case RENDER_PASS_MAIN:
-	default:
-		if ( frameBuffer != VK_NULL_HANDLE ) {
-			/* Main render pass uses CLEAR loadOps (r_vk_clearhdr). Mid-frame
-			 * resumes after out-of-pass compute (G-buffer fill, visbuf, etc.)
-			 * must LOAD prior color/depth via main_resume. */
-			VkRenderPass resumePass = ( vk.fboActive && vk.render_pass.main_resume != VK_NULL_HANDLE )
-				? vk.render_pass.main_resume
-				: vk.render_pass.main;
-			vk_begin_render_pass_tracked( resumePass, frameBuffer, qfalse, vk.renderWidth, vk.renderHeight );
-		}
-		break;
+		vk_begin_render_pass_tracked( resumePass, frameBuffer, qfalse, vk.renderWidth, vk.renderHeight );
 	}
 
 	vk.depth_image_layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
