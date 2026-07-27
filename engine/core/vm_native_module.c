@@ -13,6 +13,11 @@ int VM_BuildNativeModuleCandidates( const char *moduleName, char out[][MAX_QPATH
 	count++;
 
 	if ( count < maxCandidates ) {
+		(void)snprintf( out[count], MAX_QPATH, "lib%s%s", moduleName, DLL_EXT );
+		count++;
+	}
+
+	if ( count < maxCandidates ) {
 		(void)snprintf( out[count], MAX_QPATH, "%s." ARCH_STRING DLL_EXT, moduleName );
 		count++;
 	}

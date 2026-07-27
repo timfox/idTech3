@@ -959,7 +959,7 @@ static void Sys_SetBinaryPath( const char *path )
 	Q_strncpyz( binaryPath, path, sizeof( binaryPath ) );
 
 	d = dirname( binaryPath );
-	if ( d != NULL && d != binaryPath )
+	if ( d != NULL )
 	{
 		Q_strncpyz( binaryPath, d, sizeof( binaryPath ) );
 	}

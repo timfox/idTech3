@@ -3150,6 +3150,42 @@ static void Com_ApplyStandaloneColorDefaults( void )
 	}
 }
 
+/*
+==================
+Com_ApplySurfShippingProfile
+
+Surf ships a renderer profile in surf.cfg, but archived user config.cfg is
+loaded after it. Keep stale local experiments from disabling the certified
+Surf temporal path or selecting incompatible AO/deferred owners at startup.
+==================
+*/
+static void Com_ApplySurfShippingProfile( void )
+{
+	const char *fs_game = Cvar_VariableString( "fs_game" );
+	const char *fs_basegame = Cvar_VariableString( "fs_basegame" );
+
+	if ( Q_stricmp( fs_game, "surf" ) && Q_stricmp( fs_basegame, "surf" ) ) {
+		return;
+	}
+
+	Cvar_Set( "r_aaMode", "4" );
+	Cvar_Set( "r_taa", "1" );
+	Cvar_Set( "r_taaMotionVectors", "1" );
+	Cvar_Set( "r_weaponTemporalMode", "1" );
+	Cvar_Set( "r_temporalReactiveMask", "1" );
+	Cvar_Set( "r_temporalWeaponAfterTaa", "1" );
+	Cvar_Set( "r_weaponSsrIsolation", "1" );
+	Cvar_Set( "r_ssr", "1" );
+	Cvar_Set( "r_temporalSSR", "0" );
+
+	Cvar_Set( "r_renderMode", "2" );
+	Cvar_Set( "r_forwardPlus", "1" );
+	Cvar_Set( "r_forwardPlusShade", "1" );
+	Cvar_Set( "r_deferredLighting", "0" );
+	Cvar_Set( "r_ssao", "0" );
+	Cvar_Set( "r_ambientVisibilityMode", "2" );
+}
+
 
 /*
 ==================
@@ -3202,6 +3238,7 @@ void Com_GameRestart( int checksumFeed, qboolean clientRestart )
 
 		// Load new configuration
 		Com_ExecuteCfg();
+		Com_ApplySurfShippingProfile();
 
 #ifndef DEDICATED
 		if ( clientRestart )
@@ -4026,6 +4063,7 @@ void Com_Init( char *commandLine ) {
 	// override anything from the config files with command line args
 	Com_StartupVariable( NULL );
 	Com_ApplyStandaloneColorDefaults();
+	Com_ApplySurfShippingProfile();
 
 	// get dedicated here for proper hunk megs initialization
 #ifdef DEDICATED

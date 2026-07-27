@@ -126,10 +126,12 @@ assert_contains_literal "$cache_body" 'FS_BuildOSPath( fs_homepath->string, fs_g
 assert_contains_literal "$cache_body" 'Q_stricmp( base + strlen( base ) - 3, ".so" ) != 0' "non-Windows native extension guard"
 assert_contains_literal "$cache_body" '!strstr( base, ".dll" )' "Windows native extension guard"
 
-# The pk3 lookup order must still support legacy direct names, vm/, then modules/.
+# The pk3 lookup order must still support legacy direct names, vm/, libs/, base/libs/, then modules/.
 assert_order "$cache_body" 'len = FS_ReadFile( name, &fileBuf );' 'Com_sprintf( alt, sizeof( alt ), "vm/%s", name );' "direct name before vm fallback"
-assert_order "$cache_body" 'Com_sprintf( alt, sizeof( alt ), "vm/%s", name );' 'Com_sprintf( alt, sizeof( alt ), "modules/%s", name );' "vm fallback before modules fallback"
-assert_count_literal "$cache_body" 'FS_ReadFile(' 3 "pk3 native library read fallbacks"
+assert_order "$cache_body" 'Com_sprintf( alt, sizeof( alt ), "vm/%s", name );' 'Com_sprintf( alt, sizeof( alt ), "libs/%s", name );' "vm fallback before libs fallback"
+assert_order "$cache_body" 'Com_sprintf( alt, sizeof( alt ), "libs/%s", name );' 'Com_sprintf( alt, sizeof( alt ), "base/libs/%s", name );' "libs fallback before base/libs fallback"
+assert_order "$cache_body" 'Com_sprintf( alt, sizeof( alt ), "base/libs/%s", name );' 'Com_sprintf( alt, sizeof( alt ), "modules/%s", name );' "base/libs fallback before modules fallback"
+assert_count_literal "$cache_body" 'FS_ReadFile(' 5 "pk3 native library read fallbacks"
 
 # Existing cache files may only be reused when length and CRC match the pk3 payload.
 assert_contains_literal "$cache_body" 'crcPak = crc32_buffer( (const byte *)fileBuf, (unsigned int)len );' "pk3 payload CRC"
@@ -147,6 +149,8 @@ assert_contains_literal "$cache_body" 'Com_Printf( "FS_LoadLibrary: extracted pk
 
 # FS_LoadLibrary must try the pk3 cache before loose filesystem searchpaths.
 assert_order "$load_body" 'libHandle = FS_TryLoadLibraryFromPk3Cache( name );' 'while ( !libHandle && sp ) {' "pk3 cache attempted before loose modules"
+assert_order "$load_body" 'Com_sprintf( vmPath, sizeof( vmPath ), "vm/%s", name );' 'Com_sprintf( vmPath, sizeof( vmPath ), "libs/%s", name );' "loose vm before libs fallback"
+assert_order "$load_body" 'Com_sprintf( vmPath, sizeof( vmPath ), "libs/%s", name );' 'Com_sprintf( vmPath, sizeof( vmPath ), "base/libs/%s", name );' "loose libs before base/libs fallback"
 assert_contains_literal "$load_body" 'return libHandle;' "FS_LoadLibrary returns pk3 cache handle"
 
 echo "PASS: test_pk3_native_library_cache"

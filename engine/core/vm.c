@@ -1750,7 +1750,7 @@ TTimo: added some verbosity in debug
 */
 static void *VM_TryLoadNativeModule( const char *moduleName, char *filename, int filenameSize ) {
 	void		*libHandle;
-	char		candidates[3][MAX_QPATH];
+	char		candidates[4][MAX_QPATH];
 	int			i;
 	int			count;
 
