@@ -167,7 +167,11 @@ static byte *SkyboxHDR_BuildUploadBuffer( float *faces[6], int baseSize, int mip
 		}
 	}
 
-	buffer = (byte *)ri.Hunk_AllocateTempMemory( totalSize );
+	buffer = (byte *)ri.Malloc( totalSize );
+	if ( !buffer ) {
+		*outSize = 0;
+		return NULL;
+	}
 	dst = buffer;
 	mipSize = baseSize;
 
@@ -321,8 +325,8 @@ static qboolean SkyboxHDR_UploadGPUImages( void ) {
 	vk_upload_cubemap_mip_data( &skyboxIrradianceImage, skybox.irradianceSize, 1,
 		irradianceBuffer, irradianceSize, 4 * (int)sizeof( float ), qfalse );
 
-	ri.Hunk_FreeTempMemory( irradianceBuffer );
-	ri.Hunk_FreeTempMemory( prefilterBuffer );
+	ri.Free( irradianceBuffer );
+	ri.Free( prefilterBuffer );
 
 	SkyboxHDR_ExtractSHCoeffs();
 	return qtrue;
@@ -1041,7 +1045,7 @@ qboolean SkyboxHDR_BuildDisplayFaces( void ) {
 		return qfalse;
 	}
 
-	rgba = (float *)ri.Hunk_AllocateTempMemory( size * size * 4 * (int)sizeof( float ) );
+	rgba = (float *)ri.Malloc( size * size * 4 * (int)sizeof( float ) );
 	if ( !rgba ) {
 		return qfalse;
 	}
@@ -1112,7 +1116,7 @@ qboolean SkyboxHDR_BuildDisplayFaces( void ) {
 	s_displayFaceSize = size;
 	s_displayLumMean = sampleCount > 0 ? (float)( lumSum / (double)sampleCount ) : 0.0f;
 	s_firstFlattenStage = "NONE_SCENE_LINEAR_RGBA32F";
-	ri.Hunk_FreeTempMemory( rgba );
+	ri.Free( rgba );
 	ri.Printf( PRINT_ALL,
 		"SkyboxHDR: scene-linear display faces %dx%d EV=%g scale=%g lum[min/mean/max]=%.4g/%.4g/%.4g above1/4/16=%d/%d/%d\n",
 		size, size,

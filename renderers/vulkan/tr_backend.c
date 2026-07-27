@@ -739,7 +739,7 @@ void RB_RenderDrawSurfList( drawSurf_t *drawSurfs, int numDrawSurfs ) {
 						pathFlags |= R_PATH_FLAG_WEAPON_CANDIDATE;
 					}
 				}
-				path = R_SelectSurfaceRenderPath( shader, drawSurfs->surface, pathFlags, (int)viewCls );
+				path = R_SelectSurfaceRenderPath( shader, drawSurf->surface, pathFlags, (int)viewCls );
 				if ( backEnd.drawSurfFilter == 1 &&
 					( path == RENDER_PATH_FORWARD_PLUS_TRANSPARENT || path == RENDER_PATH_OIT ||
 					  path == RENDER_PATH_FORWARD_PLUS_WEAPON || path == RENDER_PATH_UI ) ) {
@@ -806,7 +806,7 @@ void RB_RenderDrawSurfList( drawSurf_t *drawSurfs, int numDrawSurfs ) {
 		// change the tess parameters if needed
 		// a "entityMergable" shader is a shader that can have surfaces from separate
 		// entities merged into a single batch, like smoke and blood puff sprites
-		if ( ( (oldSort ^ drawSurfs->sort ) & ~QSORT_REFENTITYNUM_MASK ) || !shader->entityMergable ) {
+		if ( ( (oldSort ^ drawSurf->sort ) & ~QSORT_REFENTITYNUM_MASK ) || !shader->entityMergable ) {
 			//if ( oldShader != NULL ) {
 				RB_EndSurface();
 			//}

@@ -28,6 +28,8 @@ typedef struct bspVisibilityFrame_s {
 	uint32_t visibleLeafCount;
 	uint32_t visibleSurfaceCount;
 	uint32_t submittedSurfaceCount;
+	uint32_t submittedSkySurfaceCount;
+	uint32_t submittedNonSkySurfaceCount;
 	uint32_t duplicateRejects;
 	uint32_t backfaceRejects;
 	uint32_t frustumRejects;
@@ -48,6 +50,7 @@ void vk_bsp_viz_note_mark_leaves( int32_t viewLeaf, int32_t viewCluster, int32_t
 	qboolean novisFallback );
 void vk_bsp_viz_note_leaf_accepted( void );
 void vk_bsp_viz_note_surface_accepted( void );
+void vk_bsp_viz_note_surface_classified( qboolean isSky );
 void vk_bsp_viz_note_surface_duplicate( void );
 void vk_bsp_viz_note_surface_backface( void );
 void vk_bsp_viz_note_leaf_frustum_reject( void );

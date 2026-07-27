@@ -383,6 +383,7 @@ static void R_AddWorldSurface( msurface_t *surf, int dlightBits ) {
 		R_AddDrawSurf( surf->data, surf->shader, surf->fogIndex, 0 );
 #ifdef USE_VULKAN
 		vk_bsp_viz_note_surface_accepted();
+		vk_bsp_viz_note_surface_classified( surf->shader && surf->shader->isSky );
 #endif
 		return;
 	}
@@ -396,6 +397,7 @@ static void R_AddWorldSurface( msurface_t *surf, int dlightBits ) {
 	R_AddDrawSurf( surf->data, surf->shader, surf->fogIndex, dlightBits );
 #ifdef USE_VULKAN
 	vk_bsp_viz_note_surface_accepted();
+	vk_bsp_viz_note_surface_classified( surf->shader && surf->shader->isSky );
 #endif
 }
 

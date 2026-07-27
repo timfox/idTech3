@@ -1320,7 +1320,7 @@ static void vk_forward_plus_dispatch_tile_cull_internal( qboolean use_depth_cull
 	if ( vk.forward_plus.tile_pipeline == VK_NULL_HANDLE || vk.forward_plus.descriptor == VK_NULL_HANDLE ) {
 		return;
 	}
-	if ( !vk.cmd || vk.cmd->command_buffer == VK_NULL_HANDLE || !vk.inRenderPass ) {
+	if ( !vk.cmd || vk.cmd->command_buffer == VK_NULL_HANDLE ) {
 		return;
 	}
 	if ( vk.forward_plus.param_mapped == NULL || vk.forward_plus.tile_buffer == VK_NULL_HANDLE ) {
@@ -1547,6 +1547,12 @@ static void vk_forward_plus_dispatch_tile_cull_internal( qboolean use_depth_cull
 
 void vk_forward_plus_dispatch_tile_cull( void )
 {
+	qboolean resume_main;
+
+	resume_main = ( vk.inRenderPass && vk.renderPassIndex == RENDER_PASS_MAIN ) ? qtrue : qfalse;
+	if ( vk.inRenderPass ) {
+		vk_end_render_pass();
+	}
 	vk_spine_pass_begin( VK_SPINE_PASS_TILE_CONSTRUCT );
 
 	if ( r_clusterForceBuildFailure && r_clusterForceBuildFailure->integer ) {
@@ -1572,10 +1578,19 @@ void vk_forward_plus_dispatch_tile_cull( void )
 		}
 	}
 	vk_spine_pass_end( VK_SPINE_PASS_TILE_CONSTRUCT );
+	if ( resume_main ) {
+		vk_resume_current_render_pass();
+	}
 }
 
 void vk_forward_plus_dispatch_tile_cull_after_opaque( void )
 {
+	qboolean resume_main;
+
+	resume_main = ( vk.inRenderPass && vk.renderPassIndex == RENDER_PASS_MAIN ) ? qtrue : qfalse;
+	if ( vk.inRenderPass ) {
+		vk_end_render_pass();
+	}
 	vk_spine_pass_begin( VK_SPINE_PASS_TILE_CONSTRUCT );
 	vk_forward_plus_dispatch_tile_cull_internal( qtrue );
 	if ( vk.forward_plus.tile_buffer != VK_NULL_HANDLE ) {
@@ -1587,6 +1602,9 @@ void vk_forward_plus_dispatch_tile_cull_after_opaque( void )
 		}
 	}
 	vk_spine_pass_end( VK_SPINE_PASS_TILE_CONSTRUCT );
+	if ( resume_main ) {
+		vk_resume_current_render_pass();
+	}
 }
 
 uint32_t vk_cluster_list_generation( void )

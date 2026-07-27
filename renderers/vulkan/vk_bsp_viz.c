@@ -28,7 +28,7 @@ static void BspViz_Status_f( void )
 		"  mode=%d throughWalls=%d visibilityMode=%d cullReasons=%d\n"
 		"  frame=%llu gen=%u mapGen=%u stale=%d\n"
 		"  viewLeaf=%d viewCluster=%d viewArea=%d novis=%d\n"
-		"  visibleLeaves=%u acceptedSurfaces=%u submitted=%u\n"
+			"  visibleLeaves=%u acceptedSurfaces=%u submitted=%u sky=%u nonSky=%u\n"
 		"  duplicates=%u backface=%u frustumReject=%u\n"
 		"  drawListSource=production_R_AddWorldSurfaces\n"
 		"  depthPolicy=%s\n"
@@ -45,9 +45,11 @@ static void BspViz_Status_f( void )
 		f->viewCluster,
 		f->viewArea,
 		f->novisActive ? 1 : 0,
-		f->visibleLeafCount,
-		f->visibleSurfaceCount,
-		f->submittedSurfaceCount,
+			f->visibleLeafCount,
+			f->visibleSurfaceCount,
+			f->submittedSurfaceCount,
+			f->submittedSkySurfaceCount,
+			f->submittedNonSkySurfaceCount,
 		f->duplicateRejects,
 		f->backfaceRejects,
 		f->frustumRejects,
@@ -200,6 +202,15 @@ void vk_bsp_viz_note_surface_accepted( void )
 {
 	s_frame.visibleSurfaceCount++;
 	s_frame.submittedSurfaceCount++;
+}
+
+void vk_bsp_viz_note_surface_classified( qboolean isSky )
+{
+	if ( isSky ) {
+		s_frame.submittedSkySurfaceCount++;
+	} else {
+		s_frame.submittedNonSkySurfaceCount++;
+	}
 }
 
 void vk_bsp_viz_note_surface_duplicate( void )
