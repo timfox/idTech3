@@ -275,4 +275,3 @@ VkImageView vk_debug_views_get_image_view( void )
     // This will be implemented when we have the actual debug view implementations
     return VK_NULL_HANDLE;
 }
-"

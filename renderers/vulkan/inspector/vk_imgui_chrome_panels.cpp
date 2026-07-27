@@ -37,7 +37,7 @@ static void VkImgui_DrawAboutInspectorPopup( void )
 		ImGui::TextWrapped( "Version: %s", glConfig.version_string );
 		ImGui::Spacing();
 		ImGui::TextWrapped(
-			"Toggle overlay input with F11 or \\toggle_imgui; set \\r_imgui 0 to hide CPU/UI work. "
+			"Toggle overlay input with \\toggle_imgui; set \\r_imgui 0 to hide CPU/UI work. "
 			"PostFX and related panels drive renderer cvars. "
 			"Set \\r_studio_tools 1 for id Studio-style panels "
 			"(Session, Console, Entities, Paint, Animation — see docs/IN_ENGINE_STUDIO_TOOLS.md)." );
@@ -53,7 +53,7 @@ static void VkImgui_DrawShortcutsPopup( void )
 {
 	if ( ImGui::BeginPopupModal( "InspectorShortcuts", nullptr, ImGuiWindowFlags_AlwaysAutoResize ) ) {
 		ImGui::TextWrapped(
-			"F11 or \\toggle_imgui toggles the inspector when the client is built with ImGui. "
+			"\\toggle_imgui toggles the inspector when the client is built with ImGui. "
 			"\\r_imgui 0 skips inspector CPU work; use Developer menu for a quick toggle." );
 		ImGui::Spacing();
 		ImGui::Separator();
@@ -282,7 +282,7 @@ static void VkImgui_DrawMenuBar( void )
 					ri.Cvar_SetValue( "r_imgui", riOn ? 1.0f : 0.0f );
 				}
 				if ( ImGui::IsItemHovered() ) {
-					ImGui::SetTooltip( "When off, skips ImGui BeginFrame/Draw CPU work. F11 still toggles from the client." );
+					ImGui::SetTooltip( "When off, skips ImGui BeginFrame/Draw CPU work. Use \\toggle_imgui from the console." );
 				}
 			}
 			if ( r_studio_tools ) {

@@ -7,13 +7,12 @@
 
 static qboolean vk_can_use_2d_overlay_path( void )
 {
+	cvar_t *debug = ri.Cvar_Get( "r_uiMenuDebug", "0", CVAR_CHEAT );
+
 	if ( !vk.fboActive ) {
 		return qfalse;
 	}
-	/* Menu/cinematic (no finished world view): UI overlay begin after an empty
-	 * main pass SIGSEGVs inside the NVIDIA driver (vk_begin_ui_overlay_*).
-	 * In-game HUD with doneWorldScene is fine — keep the overlay path there. */
-	if ( !tr.world || !backEnd.doneWorldScene ) {
+	if ( debug && debug->integer == 4 ) {
 		return qfalse;
 	}
 	if ( !vk.cmd || vk.cmd->swapchain_image_index >= MAX_SWAPCHAIN_IMAGES ) {
@@ -64,7 +63,9 @@ void vk_prepare_2d( void )
 
 	/* Cinematic/menu-only: no world, no RC_DRAW_SURFS, so no render pass was ever started.
 	 * Start a fresh main pass here so 2D can draw on a cleared color target instead of
-	 * inheriting stale swapchain/FBO contents from a previous frame.
+	 * inheriting stale swapchain/FBO contents from a previous frame. Keep the menu UI in
+	 * the SDR overlay; drawing it into post_bloom feeds already-display-space art through
+	 * HDR exposure/tonemap and blows out the title screen.
 	 * Use doneWorldScene (not tr.refdef.rdflags): HUD/weapon scenes set RDF_NOWORLDMODEL
 	 * after the world view and must not clear the HDR color target. */
 	if ( ( !tr.world || !backEnd.doneWorldScene ) && !vk.inRenderPass ) {

@@ -2047,9 +2047,9 @@ static void R_Register( void )
 #ifdef USE_IMGUI
 	r_imgui = ri.Cvar_Get( "r_imgui", "1", CVAR_ARCHIVE_ND );
 	ri.Cvar_SetDescription( r_imgui,
-		"Vulkan ImGui debug inspector overlay (0=off, 1=on). Toggle at runtime with F11 when enabled." );
+		"Vulkan ImGui debug inspector overlay (0=off, 1=on). Toggle at runtime with \\toggle_imgui." );
 	ri.Cvar_CheckRange( r_imgui, "0", "1", CV_INTEGER );
-	ri.Printf( PRINT_ALL, "[VK][imgui] debug inspector r_imgui=%d (F11 toggles when enabled)\n",
+	ri.Printf( PRINT_ALL, "[VK][imgui] debug inspector r_imgui=%d (toggle with \\toggle_imgui)\n",
 		r_imgui->integer );
 	r_studio_tools = ri.Cvar_Get( "r_studio_tools", "0", CVAR_ARCHIVE_ND );
 	ri.Cvar_CheckRange( r_studio_tools, "0", "1", CV_INTEGER );

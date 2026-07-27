@@ -1390,6 +1390,11 @@ RB_StretchPic
 static const void *RB_StretchPic( const void *data ) {
 	const stretchPicCommand_t	*cmd;
 	shader_t *shader;
+	color4ub_t debugColor;
+	const color4ub_t *quadColor = &backEnd.color2D;
+#ifdef USE_VULKAN
+	cvar_t *uiMenuDebug;
+#endif
 
 	cmd = (const stretchPicCommand_t *)data;
 
@@ -1401,6 +1406,28 @@ static const void *RB_StretchPic( const void *data ) {
 	}
 
 	shader = cmd->shader;
+#ifdef USE_VULKAN
+	uiMenuDebug = ri.Cvar_Get( "r_uiMenuDebug", "0", CVAR_CHEAT );
+	if ( uiMenuDebug && uiMenuDebug->integer > 0 ) {
+		qboolean isText = ( cmd->vectorCurveCount > 0 || cmd->subpixelShift >= 0.0f || cmd->sdfSmoothing >= 0.0f ||
+			( shader && ( Q_stristr( shader->name, "font" ) || Q_stristr( shader->name, "charset" ) ) ) );
+		qboolean isBackground = ( shader && Q_stristr( shader->name, "title-screen" ) );
+
+		if ( uiMenuDebug->integer == 1 && !isBackground ) {
+			return (const void *)(cmd + 1);
+		}
+		if ( uiMenuDebug->integer == 2 && !isText ) {
+			return (const void *)(cmd + 1);
+		}
+		if ( uiMenuDebug->integer == 3 ) {
+			debugColor.rgba[0] = 0;
+			debugColor.rgba[1] = isText ? 255 : 128;
+			debugColor.rgba[2] = 255;
+			debugColor.rgba[3] = backEnd.color2D.rgba[3];
+			quadColor = &debugColor;
+		}
+	}
+#endif
 	if ( shader != tess.shader || backEnd.currentEntity != &backEnd.entity2D ) {
 		if ( tess.numIndexes ) {
 			RB_EndSurface();
@@ -1413,7 +1440,7 @@ static const void *RB_StretchPic( const void *data ) {
 	VBO_UnBind();
 #endif
 
-	RB_AddQuadStamp2( cmd->x, cmd->y, cmd->w, cmd->h, cmd->s1, cmd->t1, cmd->s2, cmd->t2, backEnd.color2D );
+	RB_AddQuadStamp2( cmd->x, cmd->y, cmd->w, cmd->h, cmd->s1, cmd->t1, cmd->s2, cmd->t2, *quadColor );
 	if ( cmd->vectorCurveCount > 0 ) {
 		tess.vectorCurveStart = cmd->vectorCurveStart;
 		tess.vectorCurveCount = cmd->vectorCurveCount;
