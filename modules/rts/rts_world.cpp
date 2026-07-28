@@ -43,5 +43,27 @@ int RTS_GetEntityCount( void ) {
 	return static_cast<int>( rts::GetState().entities.size() );
 }
 
+int RTS_GetEntityOwner( rtsEntityId_t id ) {
+	const rts::Entity *entity = rts::FindEntityConst( id );
+	return entity ? entity->owner : RTS_OWNER_NEUTRAL;
 }
 
+int RTS_GetEntityPosition( rtsEntityId_t id, int *x, int *y ) {
+	const rts::Entity *entity = rts::FindEntityConst( id );
+	if ( !entity ) {
+		return 0;
+	}
+	if ( x ) {
+		*x = entity->x;
+	}
+	if ( y ) {
+		*y = entity->y;
+	}
+	return 1;
+}
+
+unsigned RTS_ComputeStateHash( void ) {
+	return rts::HashState();
+}
+
+}

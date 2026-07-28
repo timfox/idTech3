@@ -16,6 +16,14 @@ extern "C" {
 
 typedef int rtsEntityId_t;
 
+typedef enum rtsOwner_e {
+	RTS_OWNER_NEUTRAL = 0,
+	RTS_OWNER_PLAYER1 = 1,
+	RTS_OWNER_PLAYER2 = 2,
+	RTS_OWNER_PLAYER3 = 3,
+	RTS_OWNER_PLAYER4 = 4
+} rtsOwner_t;
+
 typedef enum rtsCommandType_e {
 	RTS_COMMAND_NONE = 0,
 	RTS_COMMAND_MOVE,
@@ -26,6 +34,8 @@ typedef enum rtsCommandType_e {
 
 typedef struct rtsCommand_s {
 	rtsCommandType_t type;
+	int playerId;
+	int sequence;
 	rtsEntityId_t entityId;
 	rtsEntityId_t targetEntityId;
 	int targetX;
@@ -41,8 +51,11 @@ int  RTS_PostCommand( const rtsCommand_t *cmd );
 int  RTS_GetTurnMsec( void );
 int  RTS_GetPendingCommandCount( void );
 int  RTS_GetEntityCount( void );
+int  RTS_GetEntityOwner( rtsEntityId_t id );
+int  RTS_GetEntityPosition( rtsEntityId_t id, int *x, int *y );
+int  RTS_SelectRect( int playerId, int minX, int minY, int maxX, int maxY, rtsEntityId_t *out, int maxOut );
+unsigned RTS_ComputeStateHash( void );
 
 #ifdef __cplusplus
 }
 #endif
-

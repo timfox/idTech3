@@ -6,14 +6,57 @@ RTS deterministic turn stepping.
 
 #include "rts_internal.h"
 
+#include <algorithm>
+
 namespace rts {
+
+static bool CommandLess(const rtsCommand_t &a, const rtsCommand_t &b) {
+	if (a.playerId != b.playerId) {
+		return a.playerId < b.playerId;
+	}
+	if (a.sequence != b.sequence) {
+		return a.sequence < b.sequence;
+	}
+	if (a.type != b.type) {
+		return a.type < b.type;
+	}
+	return a.entityId < b.entityId;
+}
+
+static bool CanControl(const rtsCommand_t &cmd, const Entity &entity) {
+	return cmd.playerId > RTS_OWNER_NEUTRAL && entity.owner == cmd.playerId;
+}
 
 void ApplyQueuedCommands(int msec) {
 	State &state = GetState();
 
+	std::stable_sort(state.pendingCommands.begin(), state.pendingCommands.end(), CommandLess);
+
 	for (const rtsCommand_t &cmd : state.pendingCommands) {
-		if (cmd.type == RTS_COMMAND_BUILD) {
-			CreateEntity(cmd.targetX, cmd.targetY);
+		switch (cmd.type) {
+		case RTS_COMMAND_BUILD:
+			CreateEntity(cmd.playerId, cmd.targetX, cmd.targetY);
+			break;
+		case RTS_COMMAND_MOVE:
+			if (Entity *entity = FindEntity(cmd.entityId)) {
+				if (CanControl(cmd, *entity)) {
+					entity->x = cmd.targetX;
+					entity->y = cmd.targetY;
+				}
+			}
+			break;
+		case RTS_COMMAND_ATTACK:
+			if (Entity *attacker = FindEntity(cmd.entityId)) {
+				Entity *target = FindEntity(cmd.targetEntityId);
+				if (target && CanControl(cmd, *attacker) && target->owner != attacker->owner) {
+					target->hitpoints -= 10;
+				}
+			}
+			break;
+		case RTS_COMMAND_STOP:
+		case RTS_COMMAND_NONE:
+		default:
+			break;
 		}
 	}
 
@@ -36,4 +79,3 @@ void RTS_RunTurn( int msec ) {
 }
 
 }
-

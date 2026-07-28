@@ -188,7 +188,10 @@ void vk_begin_frame( void )
 	}
 
 	if ( !ri.CL_IsMinimized() && vk_restart_swapchain_if_extent_mismatch( __func__, "begin_frame" ) ) {
-		return;
+		if ( vk.device_lost || vk.swapchain == VK_NULL_HANDLE ) {
+			vk.frame_count = 0;
+			return;
+		}
 	}
 
 	vk.inRenderPass = qfalse;

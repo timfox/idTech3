@@ -8,8 +8,10 @@ namespace rts {
 
 struct Entity {
 	rtsEntityId_t id = 0;
+	int owner = RTS_OWNER_NEUTRAL;
 	int x = 0;
 	int y = 0;
+	int hitpoints = 100;
 };
 
 struct State {
@@ -18,12 +20,15 @@ struct State {
 	rtsEntityId_t nextEntityId = 1;
 	std::vector<Entity> entities;
 	std::vector<rtsCommand_t> pendingCommands;
+	std::vector<rtsEntityId_t> selectionScratch;
 };
 
 State &GetState();
 void ResetState();
-rtsEntityId_t CreateEntity(int x, int y);
+rtsEntityId_t CreateEntity(int owner, int x, int y);
+Entity *FindEntity(rtsEntityId_t id);
+const Entity *FindEntityConst(rtsEntityId_t id);
 void ApplyQueuedCommands(int msec);
+unsigned HashState();
 
 }  // namespace rts
-

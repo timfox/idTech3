@@ -27,8 +27,10 @@ rg -q 'void RTS_Init\( void \);' "${ROOT}/modules/rts/rts_public.h" || fail "RTS
 rg -q 'void RTS_Shutdown\( void \);' "${ROOT}/modules/rts/rts_public.h" || fail "RTS_Shutdown missing"
 rg -q 'void RTS_RunTurn\( int msec \);' "${ROOT}/modules/rts/rts_public.h" || fail "RTS_RunTurn missing"
 rg -q 'int  RTS_PostCommand\( const rtsCommand_t \*cmd \);' "${ROOT}/modules/rts/rts_public.h" || fail "RTS_PostCommand missing"
+rg -q 'int  RTS_SelectRect\( int playerId' "${ROOT}/modules/rts/rts_public.h" || fail "RTS_SelectRect missing"
+rg -q 'unsigned RTS_ComputeStateHash\( void \);' "${ROOT}/modules/rts/rts_public.h" || fail "RTS_ComputeStateHash missing"
+rg -q 'std::stable_sort' "${ROOT}/modules/rts/rts_turn.cpp" || fail "turn command application must sort deterministically"
 rg -q 'ADD_LIBRARY\(rts_module STATIC' "${ROOT}/CMakeLists.txt" || fail "rts_module CMake target missing"
 rg -q 'modules/rts/rts_world.cpp' "${ROOT}/CMakeLists.txt" || fail "rts_world.cpp not wired"
 
 echo "PASS: test_rts_module"
-
