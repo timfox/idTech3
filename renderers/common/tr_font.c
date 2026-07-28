@@ -137,7 +137,7 @@ static void R_FontReleaseSlotFace( int slot ) {
 static void R_FontReleaseAllFaces( void ) {
 	int i;
 
-	for ( i = 0; i < MAX_FONTS; i++ ) {
+	for ( i = MAX_FONTS - 1; i >= 0; i-- ) {
 		R_FontReleaseSlotFace( i );
 	}
 }

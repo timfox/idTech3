@@ -626,7 +626,7 @@ static void GS_LoadTextures( bsp30RenderLoad_t *load ) {
 		}
 	}
 
-	for ( i = 0; i < numWads; i++ ) {
+	for ( i = numWads - 1; i >= 0; i-- ) {
 		ri.FS_FreeFile( wads[i].data );
 	}
 	ri.Printf( PRINT_ALL, "...BSP30 textures: %d embedded, %d from WAD3, %d generated fallbacks\n",
