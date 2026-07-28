@@ -1257,7 +1257,7 @@ void SkyboxHDR_EnableEyeAdaptation( void ) {
 	 * - Target ~0.18 middle gray; filmic white-point is highlight calibration only.
 	 */
 	ri.Cvar_Set( "r_autoExposure_min", "0.70" );
-	ri.Cvar_Set( "r_autoExposure_max", "8.0" );
+	ri.Cvar_Set( "r_autoExposure_max", "2.0" );
 	ri.Cvar_Set( "r_exposure_auto_target", "0.18" );
 	/* Faster constriction than dilation (asymmetric eye). */
 	ri.Cvar_Set( "r_autoExposure_speedUp", "1.5" );   /* brighten into dark */
@@ -1305,7 +1305,8 @@ void SkyboxHDR_EnableEyeAdaptation( void ) {
 }
 
 qboolean SkyboxHDR_ConfigureFromMap( const char *path, float exposure, float rotation,
-		float intensity, int projection ) {
+		float intensity, int projection, float visibleEV, float luminanceScale,
+		int faceSize ) {
 	char buf[64];
 	const skyboxHDR_t *cur;
 
@@ -1327,11 +1328,27 @@ qboolean SkyboxHDR_ConfigureFromMap( const char *path, float exposure, float rot
 		Com_sprintf( buf, sizeof( buf ), "%d", projection );
 		ri.Cvar_Set( "r_skyboxHDR_projection", buf );
 	}
+	/*
+	 * BSP30 HDR sidecars are consumed during world load, before some map scripts
+	 * are guaranteed to run. Carry the visible-sky contract here so the EXR sky
+	 * is not rebuilt with archived/default exposure values.
+	 */
+	Com_sprintf( buf, sizeof( buf ), "%g", visibleEV );
+	ri.Cvar_Set( "r_skyExposureEV", buf );
+	Com_sprintf( buf, sizeof( buf ), "%g", luminanceScale > 0.0f ? luminanceScale : 1.0f );
+	ri.Cvar_Set( "r_skyLuminanceScale", buf );
+	Com_sprintf( buf, sizeof( buf ), "%d", faceSize > 0 ? faceSize : 2048 );
+	ri.Cvar_Set( "r_skyFaceSize", buf );
 
 	ri.Cvar_Set( "r_skyboxHDR", path );
 	/* Visible sky + IBL share the HDR owner when a map requests an EXR/HDR sky. */
 	ri.Cvar_Set( "r_skyOwner", "2" );
 	SkyboxHDR_EnableEyeAdaptation();
+	ri.Cvar_Set( "r_exposureSkyWeight", "0.10" );
+	ri.Cvar_Set( "r_grade_toe", "0.08" );
+	ri.Cvar_Set( "r_grade_shoulder", "0.35" );
+	ri.Cvar_Set( "r_grade_whitePoint", "2.2" );
+	ri.Cvar_Set( "r_grade_highlightDesat", "0.0" );
 
 	/*
 	 * Avoid a full unload/reload when BeginFrame already loaded this panorama

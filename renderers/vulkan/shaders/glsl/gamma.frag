@@ -90,16 +90,14 @@ vec3 dither( vec3 color ) {
 	/*
 	 * depth_* stores channel bit depth, not the number of representable
 	 * intervals. Eight-bit output therefore has 255 intervals, not eight.
-	 * Using the bit count directly collapses the frame into a handful of
-	 * posterized values when r_dither is enabled.
+	 * Add centered sub-LSB noise instead of thresholding to a quantized value:
+	 * the attachment conversion performs the final rounding, while this avoids
+	 * hard visible dot lattices on bright HDR sky gradients.
 	 */
 	vec3 bits = clamp( vec3( depth_r, depth_g, depth_b ), vec3( 1.0 ), vec3( 16.0 ) );
 	vec3 levels = exp2( bits ) - vec3( 1.0 );
-	vec3 denormalized = clamp( color, 0.0, 1.0 ) * levels;
-	vec3 low = floor( denormalized );
-	vec3 frac = denormalized - low;
-	vec3 dithered = low + step( threshold(), frac );
-	return dithered / levels;
+	float n = threshold() - 0.5;
+	return clamp( color + vec3( n ) / levels, 0.0, 1.0 );
 }
 
 /*

@@ -555,7 +555,7 @@ quake3 set test blah + map test
 ============================================================================
 */
 
-#define	MAX_CONSOLE_LINES	32
+#define	MAX_CONSOLE_LINES	128
 static int	com_numConsoleLines;
 static char	*com_consoleLines[MAX_CONSOLE_LINES];
 
@@ -3138,6 +3138,11 @@ static void Com_ApplyStandaloneColorDefaults( void )
 		return;
 	}
 
+	if ( atoi( Cvar_VariableString( "com_surfShippingProfile" ) ) == 0 ) {
+		Com_Printf( "[Surf][color] com_surfShippingProfile 0; leaving color cvars unchanged for diagnostics\n" );
+		return;
+	}
+
 	if ( atoi( Cvar_VariableString( "r_hdr" ) ) <= 0 ) {
 		Com_Printf( "[Surf][color] overriding archived r_hdr 0; HDR stays enabled for stable tone-mapped UI\n" );
 		Cvar_Set( "r_hdr", "2" );
@@ -3145,8 +3150,15 @@ static void Com_ApplyStandaloneColorDefaults( void )
 	if ( atof( Cvar_VariableString( "r_gamma" ) ) != 1.0f ) {
 		Cvar_Set( "r_gamma", "1" );
 	}
-	if ( atoi( Cvar_VariableString( "r_dither" ) ) != 1 ) {
-		Cvar_Set( "r_dither", "1" );
+	if ( atoi( Cvar_VariableString( "r_dither" ) ) != 0 ) {
+		Cvar_Set( "r_dither", "0" );
+	}
+	if ( atoi( Cvar_VariableString( "r_post" ) ) != 1 ) {
+		Cvar_Set( "r_post", "1" );
+	}
+	if ( atoi( Cvar_VariableString( "r_fastsky" ) ) != 0 ) {
+		Com_Printf( "[Surf][color] overriding archived r_fastsky 1; HDR skybox must draw normally\n" );
+		Cvar_Set( "r_fastsky", "0" );
 	}
 }
 
@@ -3168,6 +3180,11 @@ static void Com_ApplySurfShippingProfile( void )
 		return;
 	}
 
+	if ( atoi( Cvar_VariableString( "com_surfShippingProfile" ) ) == 0 ) {
+		Com_Printf( "[Surf][profile] com_surfShippingProfile 0; leaving renderer cvars unchanged for diagnostics\n" );
+		return;
+	}
+
 	Cvar_Set( "r_aaMode", "4" );
 	Cvar_Set( "r_taa", "1" );
 	Cvar_Set( "r_taaMotionVectors", "1" );
@@ -3178,12 +3195,63 @@ static void Com_ApplySurfShippingProfile( void )
 	Cvar_Set( "r_ssr", "1" );
 	Cvar_Set( "r_temporalSSR", "0" );
 
+	Cvar_Set( "r_texturebits", "32" );
+	Cvar_Set( "r_fastsky", "0" );
 	Cvar_Set( "r_renderMode", "2" );
 	Cvar_Set( "r_forwardPlus", "1" );
 	Cvar_Set( "r_forwardPlusShade", "1" );
 	Cvar_Set( "r_deferredLighting", "0" );
 	Cvar_Set( "r_ssao", "0" );
 	Cvar_Set( "r_ambientVisibilityMode", "2" );
+
+	/* Stale local bisect/debug sessions can persist hard magenta/white
+	 * diagnostic views that look like a color-space regression. */
+	Cvar_Set( "r_post_debug", "0" );
+	Cvar_Set( "r_hdrStageDebug", "0" );
+	Cvar_Set( "r_fboDebug", "0" );
+	Cvar_Set( "r_fogDebug", "0" );
+	Cvar_Set( "r_debugDepth", "0" );
+	Cvar_Set( "r_debugSkyMask", "0" );
+	Cvar_Set( "r_debugSceneHDR", "0" );
+	Cvar_Set( "r_debugSceneHDR_Sky", "0" );
+	Cvar_Set( "r_debugSceneHDR_Particles", "0" );
+	Cvar_Set( "r_debugSceneHDR_OIT", "0" );
+	Cvar_Set( "r_debugFogRadiance", "0" );
+	Cvar_Set( "r_debugFogTransmittance", "0" );
+	Cvar_Set( "r_debugTemporalInput", "0" );
+	Cvar_Set( "r_debugPreviousDepth", "0" );
+	Cvar_Set( "r_debugTemporalResolved", "0" );
+	Cvar_Set( "r_debugPreTonemapHDR", "0" );
+	Cvar_Set( "r_debugFinalLDR", "0" );
+	Cvar_Set( "r_taaDebug", "0" );
+	Cvar_Set( "r_temporalDebug", "0" );
+	Cvar_Set( "r_debugHistoryRejection", "0" );
+	Cvar_Set( "r_debugHistoryColor", "0" );
+	Cvar_Set( "r_debugReactiveMask", "0" );
+	Cvar_Set( "r_debugMotionVectors", "0" );
+	Cvar_Set( "r_debugAdaptiveSampleMask", "0" );
+	Cvar_Set( "r_oitDebug", "0" );
+	Cvar_Set( "r_renderPathDebug", "0" );
+	Cvar_Set( "r_visibilityBufferDebug", "0" );
+	Cvar_Set( "r_deferredEligibilityDebug", "0" );
+	Cvar_Set( "r_deferredDebug", "0" );
+	Cvar_Set( "r_deferredGBufferDebug", "0" );
+	Cvar_Set( "r_forwardPlusDebug", "0" );
+	Cvar_Set( "r_clusterDebug", "-1" );
+	Cvar_Set( "r_bspViz", "0" );
+	Cvar_Set( "r_bspVizThroughWalls", "0" );
+	Cvar_Set( "r_showtris", "0" );
+	Cvar_Set( "r_shownormals", "0" );
+	Cvar_Set( "r_skyHdrDebug", "0" );
+	Cvar_Set( "r_bloomDebug", "0" );
+	Cvar_Set( "r_bloomFireflyDebug", "0" );
+	Cvar_Set( "r_volumetricFogValidation", "0" );
+	Cvar_Set( "r_volumetricFogShowcase", "0" );
+	Cvar_Set( "r_colorMipLevels", "0" );
+	Cvar_Set( "r_lightmap", "0" );
+	Cvar_Set( "r_singleShader", "0" );
+	Cvar_Set( "r_fullbright", "0" );
+	Cvar_Set( "r_mapGreyScale", "0" );
 }
 
 

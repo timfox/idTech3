@@ -32,7 +32,10 @@ typedef struct {
 	float skyboxHdrExposure;
 	float skyboxHdrRotation;
 	float skyboxHdrIntensity;
+	float skyboxHdrVisibleEV;
+	float skyboxHdrLuminanceScale;
 	int skyboxHdrProjection;
+	int skyboxHdrFaceSize;
 } bsp30RenderLoad_t;
 
 #define BSP30_MAX_WADS 16
@@ -138,7 +141,8 @@ static image_t *GS_CreateTextureImage( const char *shaderName,
 	}
 
 	image = R_CreateImage( shaderName, NULL, rgba, (int)width, (int)height,
-			IMGFLAG_MIPMAP | IMGFLAG_NO_COMPRESSION, 0, 0 );
+			IMGFLAG_MIPMAP | IMGFLAG_NO_COMPRESSION | IMGFLAG_NOLIGHTSCALE,
+			VK_FORMAT_R8G8B8A8_SRGB, 0 );
 	ri.Hunk_FreeTempMemory( rgba );
 	return image;
 }
@@ -167,7 +171,8 @@ static image_t *GS_CreateFallbackImage( const char *shaderName, const char *text
 		}
 	}
 	return R_CreateImage( shaderName, NULL, rgba, 64, 64,
-			IMGFLAG_MIPMAP | IMGFLAG_NO_COMPRESSION, 0, 0 );
+			IMGFLAG_MIPMAP | IMGFLAG_NO_COMPRESSION | IMGFLAG_NOLIGHTSCALE,
+			VK_FORMAT_R8G8B8A8_SRGB, 0 );
 }
 
 static const char *GS_BaseName( const char *path ) {
@@ -195,7 +200,10 @@ static void GS_ParseWorldspawnSky( bsp30RenderLoad_t *load ) {
 	load->skyboxHdrExposure = 1.0f;
 	load->skyboxHdrRotation = 0.0f;
 	load->skyboxHdrIntensity = 1.0f;
+	load->skyboxHdrVisibleEV = 1.0f;
+	load->skyboxHdrLuminanceScale = 1.0f;
 	load->skyboxHdrProjection = 0;
+	load->skyboxHdrFaceSize = 2048;
 	load->skyname[0] = '\0';
 	load->skyboxHdr[0] = '\0';
 	load->skyShader = NULL;
@@ -229,6 +237,12 @@ static void GS_ParseWorldspawnSky( bsp30RenderLoad_t *load ) {
 				load->skyboxHdrIntensity = Q_atof( token );
 			} else if ( !Q_stricmp( key, "skybox_hdr_projection" ) ) {
 				load->skyboxHdrProjection = atoi( token );
+			} else if ( !Q_stricmp( key, "skybox_hdr_visible_ev" ) ) {
+				load->skyboxHdrVisibleEV = Q_atof( token );
+			} else if ( !Q_stricmp( key, "skybox_hdr_luminance_scale" ) ) {
+				load->skyboxHdrLuminanceScale = Q_atof( token );
+			} else if ( !Q_stricmp( key, "skybox_hdr_face_size" ) ) {
+				load->skyboxHdrFaceSize = atoi( token );
 			}
 		}
 	}
@@ -237,7 +251,8 @@ static void GS_ParseWorldspawnSky( bsp30RenderLoad_t *load ) {
 
 /*
  * Optional maps/<map>.skybox_hdr sidecar (applied when worldspawn has no skybox_hdr).
- * First non-empty line: panorama path. Optional lines: exposure/rotation/intensity/projection <value>
+ * First non-empty line: panorama path. Optional lines:
+ * exposure/rotation/intensity/projection/visible_ev/luminance_scale/face_size <value>
  */
 static void GS_TryLoadSkyboxSidecar( bsp30RenderLoad_t *load, const char *mapname ) {
 	char sidecar[MAX_QPATH];
@@ -285,7 +300,8 @@ static void GS_TryLoadSkyboxSidecar( bsp30RenderLoad_t *load, const char *mapnam
 		}
 		if ( !load->skyboxHdr[0] && Q_stricmp( token, "exposure" ) &&
 				Q_stricmp( token, "rotation" ) && Q_stricmp( token, "intensity" ) &&
-				Q_stricmp( token, "projection" ) ) {
+				Q_stricmp( token, "projection" ) && Q_stricmp( token, "visible_ev" ) &&
+				Q_stricmp( token, "luminance_scale" ) && Q_stricmp( token, "face_size" ) ) {
 			Q_strncpyz( load->skyboxHdr, token, sizeof( load->skyboxHdr ) );
 			continue;
 		}
@@ -309,12 +325,31 @@ static void GS_TryLoadSkyboxSidecar( bsp30RenderLoad_t *load, const char *mapnam
 			if ( token && token[0] ) {
 				load->skyboxHdrProjection = atoi( token );
 			}
+		} else if ( !Q_stricmp( token, "visible_ev" ) ) {
+			token = COM_Parse( &parse );
+			if ( token && token[0] ) {
+				load->skyboxHdrVisibleEV = Q_atof( token );
+			}
+		} else if ( !Q_stricmp( token, "luminance_scale" ) ) {
+			token = COM_Parse( &parse );
+			if ( token && token[0] ) {
+				load->skyboxHdrLuminanceScale = Q_atof( token );
+			}
+		} else if ( !Q_stricmp( token, "face_size" ) ) {
+			token = COM_Parse( &parse );
+			if ( token && token[0] ) {
+				load->skyboxHdrFaceSize = atoi( token );
+			}
 		}
 	}
 
 	ri.FS_FreeFile( text );
 	if ( load->skyboxHdr[0] ) {
-		ri.Printf( PRINT_ALL, "...BSP30 skybox sidecar %s -> %s\n", sidecar, load->skyboxHdr );
+		ri.Printf( PRINT_ALL,
+			"...BSP30 skybox sidecar %s -> %s (exposure=%g rotation=%g intensity=%g projection=%d visibleEV=%g luminanceScale=%g faceSize=%d)\n",
+			sidecar, load->skyboxHdr, load->skyboxHdrExposure, load->skyboxHdrRotation,
+			load->skyboxHdrIntensity, load->skyboxHdrProjection, load->skyboxHdrVisibleEV,
+			load->skyboxHdrLuminanceScale, load->skyboxHdrFaceSize );
 	}
 }
 
@@ -496,6 +531,7 @@ static void GS_LoadTextures( bsp30RenderLoad_t *load ) {
 	bsp30WadFile_t wads[BSP30_MAX_WADS];
 	int numWads;
 	int embeddedCount = 0, wadCount = 0, fallbackCount = 0;
+	int skyTextureCount = 0;
 	qboolean needsWads = qfalse;
 	int i;
 
@@ -563,6 +599,7 @@ static void GS_LoadTextures( bsp30RenderLoad_t *load ) {
 		if ( GS_IsSkyTextureName( textureName ) ) {
 			load->textureShaders[i] = load->skyShader ? load->skyShader : tr.defaultShader;
 			load->world->shaders[i].surfaceFlags |= SURF_SKY;
+			skyTextureCount++;
 			continue;
 		}
 
@@ -584,6 +621,9 @@ static void GS_LoadTextures( bsp30RenderLoad_t *load ) {
 		}
 		shaderHandle = RE_RegisterShaderFromImage( shaderName, LIGHTMAP_BY_VERTEX, image, qfalse );
 		load->textureShaders[i] = R_GetShaderByHandle( shaderHandle );
+		if ( load->textureShaders[i] ) {
+			load->textureShaders[i]->cullType = CT_TWO_SIDED;
+		}
 	}
 
 	for ( i = 0; i < numWads; i++ ) {
@@ -591,6 +631,8 @@ static void GS_LoadTextures( bsp30RenderLoad_t *load ) {
 	}
 	ri.Printf( PRINT_ALL, "...BSP30 textures: %d embedded, %d from WAD3, %d generated fallbacks\n",
 			embeddedCount, wadCount, fallbackCount );
+	ri.Printf( PRINT_ALL, "...BSP30 sky textures: %d%s\n",
+			skyTextureCount, load->skyShader ? " using sky shader" : " without sky shader" );
 }
 
 static void GS_LoadPlanes( bsp30RenderLoad_t *load ) {
@@ -771,6 +813,7 @@ static void GS_LoadSurfaces( bsp30RenderLoad_t *load ) {
 	int numVertices = GS_LumpCount( load, BSP30_LUMP_VERTEXES, sizeof( *vertices ) );
 	int numTexinfos = GS_LumpCount( load, BSP30_LUMP_TEXINFO, sizeof( *texinfos ) );
 	int numPlanes = load->world->numplanes;
+	int skySurfaceCount = 0;
 	int i;
 
 	load->world->numsurfaces = numFaces;
@@ -815,6 +858,9 @@ static void GS_LoadSurfaces( bsp30RenderLoad_t *load ) {
 		}
 		else {
 			surface->shader = tr.defaultShader;
+		}
+		if ( surface->shader && surface->shader->isSky ) {
+			skySurfaceCount++;
 		}
 		surface->fogIndex = 0;
 
@@ -958,6 +1004,7 @@ static void GS_LoadSurfaces( bsp30RenderLoad_t *load ) {
 	ri.Printf( PRINT_ALL,
 		"...BSP30 lighting: %d faces sampled from lighting lump, %d special/unlit, %d white-fallback\n",
 		s_bsp30LitFaces, s_bsp30SpecialFaces, s_bsp30WhiteFaces );
+	ri.Printf( PRINT_ALL, "...BSP30 sky surfaces: %d\n", skySurfaceCount );
 }
 
 static void GS_LoadMarksurfaces( bsp30RenderLoad_t *load ) {
@@ -1127,7 +1174,9 @@ void R_LoadBSP30World( const char *mapname, const byte *buffer, int size, world_
 	GS_TryLoadSkyboxSidecar( &load, mapname );
 	if ( load.skyboxHdr[0] ) {
 		if ( SkyboxHDR_ConfigureFromMap( load.skyboxHdr, load.skyboxHdrExposure,
-				load.skyboxHdrRotation, load.skyboxHdrIntensity, load.skyboxHdrProjection ) ) {
+				load.skyboxHdrRotation, load.skyboxHdrIntensity, load.skyboxHdrProjection,
+				load.skyboxHdrVisibleEV, load.skyboxHdrLuminanceScale,
+				load.skyboxHdrFaceSize ) ) {
 			ri.Printf( PRINT_ALL, "...BSP30 skybox_hdr '%s'\n", load.skyboxHdr );
 		} else {
 			ri.Printf( PRINT_WARNING, "...BSP30 skybox_hdr failed to load '%s'\n",

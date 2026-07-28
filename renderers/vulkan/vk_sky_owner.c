@@ -17,10 +17,10 @@ void vk_sky_owner_register_cvars( void )
 	if ( r_skyOwner ) {
 		return;
 	}
-	r_skyOwner = ri.Cvar_Get( "r_skyOwner", "0", CVAR_ARCHIVE_ND | CVAR_LATCH );
+	r_skyOwner = ri.Cvar_Get( "r_skyOwner", "0", CVAR_ARCHIVE_ND );
 	ri.Cvar_CheckRange( r_skyOwner, "0", "3", CV_INTEGER );
 	ri.Cvar_SetDescription( r_skyOwner,
-		"Exclusive sky radiance owner (Raster Ultra 1.7, latched):\n"
+		"Exclusive sky radiance owner (Raster Ultra 1.7):\n"
 		" 0 classic skybox / skyParms (default — classic maps)\n"
 		" 1 physical atmosphere (Rayleigh/Mie; no RT)\n"
 		" 2 authored HDR cubemap / panorama\n"

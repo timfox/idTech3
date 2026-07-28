@@ -111,7 +111,8 @@ void SkyboxHDR_ClearDisplayFaces( void );
 
 /* Apply worldspawn / map keys: path + optional exposure/rotation/intensity/projection. */
 qboolean SkyboxHDR_ConfigureFromMap( const char *path, float exposure, float rotation,
-	float intensity, int projection );
+		float intensity, int projection, float visibleEV, float luminanceScale,
+		int faceSize );
 
 /* Enable histogram eye adaptation for HDR sky (r_exposure_auto + metering). */
 void SkyboxHDR_EnableEyeAdaptation( void );

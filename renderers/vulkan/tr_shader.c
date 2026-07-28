@@ -4964,6 +4964,7 @@ shader_t *R_CreateSkyShaderFromFaces( const char *name, image_t *faces[6] ) {
 	InitShader( name, LIGHTMAP_NONE );
 	shader.isSky = qtrue;
 	shader.surfaceFlags |= SURF_SKY;
+	shader.cullType = CT_TWO_SIDED;
 	shader.sky.cloudHeight = 512.0f;
 	R_InitSkyTexCoords( shader.sky.cloudHeight );
 

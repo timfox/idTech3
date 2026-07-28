@@ -2968,6 +2968,7 @@ void RE_LoadWorldMap( const char *name ) {
 		void *v;
 	} buffer;
 	byte		*startMarker;
+	qboolean	isBsp30World;
 
 	if ( tr.worldMapLoaded ) {
 		ri.Error( ERR_DROP, "ERROR: attempted to redundantly load world map" );
@@ -3027,7 +3028,8 @@ void RE_LoadWorldMap( const char *name ) {
 	startMarker = ri.Hunk_Alloc(0, h_low);
 	c_gridVerts = 0;
 
-	if ( LittleLong( *(const int32_t *)buffer.b ) == BSP30_BSP_VERSION ) {
+	isBsp30World = ( LittleLong( *(const int32_t *)buffer.b ) == BSP30_BSP_VERSION ) ? qtrue : qfalse;
+	if ( isBsp30World ) {
 		R_LoadBSP30World( name, buffer.b, size, &s_worldData );
 	}
 	else {
@@ -3089,7 +3091,9 @@ void RE_LoadWorldMap( const char *name ) {
 #endif	
 
 #ifdef USE_VBO
-	R_BuildWorldVBO( s_worldData.surfaces, s_worldData.numsurfaces );
+	if ( !isBsp30World ) {
+		R_BuildWorldVBO( s_worldData.surfaces, s_worldData.numsurfaces );
+	}
 #endif
 
 	tr.mapLoading = qfalse;
@@ -3107,7 +3111,7 @@ void RE_LoadWorldMap( const char *name ) {
 	R_MaterialPaint_OnMapLoad( s_worldData.baseName );
 #ifdef USE_VBO
 	/* Rebuild VBO after paint sidecar mutates drawvert colors. */
-	if ( R_MaterialPaint_NumVerts() > 0 ) {
+	if ( !isBsp30World && R_MaterialPaint_NumVerts() > 0 ) {
 		R_BuildWorldVBO( s_worldData.surfaces, s_worldData.numsurfaces );
 	}
 #endif

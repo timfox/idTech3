@@ -1528,7 +1528,7 @@ static void RB_IterateStagesGeneric( const shaderCommands_t *input )
 	uniform.pbrDebugMode[0] = pbr_debug;
 	uniform.pbrDebugMode[1] = 0.0f;
 	uniform.pbrDebugMode[2] = 0.0f;
-	uniform.pbrDebugMode[3] = vk_shr_suppress_gen_frag_ibl_spec() ? 1.0f : 0.0f;
+	uniform.pbrDebugMode[3] = 0.0f;
 #ifdef USE_VULKAN
 	{
 		unsigned pathFlags = 0u;
@@ -2398,7 +2398,7 @@ void VK_LightingPass( void )
 		}
 	}
 
-	abs_light = /* (pStage->stateBits & GLS_ATEST_BITS) && */ (cull == CT_TWO_SIDED) ? 1 : 0;
+	abs_light = ( ( pStage->stateBits & GLS_ATEST_BITS ) && cull == CT_TWO_SIDED ) ? 1 : 0;
 
 	if ( fog_stage )
 		vk_update_descriptor( VK_DESC_FOG_DLIGHT, tr.fogImage->descriptor );
