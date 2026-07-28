@@ -38,8 +38,35 @@ typedef enum {
 	BSP_FORMAT_BSP30_WITH_BSPX,
 	BSP_FORMAT_IBSP46_WITH_BSPX,
 	BSP_FORMAT_IBSP47_WITH_BSPX,
+	BSP_FORMAT_SOURCE_VBSP,
+	BSP_FORMAT_SOURCE_VBSP_L4D2,
+	BSP_FORMAT_SOURCE_VBSP_DARK_MESSIAH,
+	BSP_FORMAT_RESPAWN_RBSP,
+	BSP_FORMAT_RESPAWN_RBSP2,
+	BSP_FORMAT_RAVEN_RBSP,
+	BSP_FORMAT_APEX_RBSP,
 	BSP_FORMAT_NATIVE_XBSP
 } bspFormatFamily_t;
+
+typedef enum {
+	BSP_LUMP_LAYOUT_NONE = 0,
+	BSP_LUMP_LAYOUT_OFFSET_LENGTH,
+	BSP_LUMP_LAYOUT_OFFSET_LENGTH_VERSION_FOURCC,
+	BSP_LUMP_LAYOUT_VERSION_OFFSET_LENGTH_FOURCC
+} bspLumpLayout_t;
+
+typedef struct {
+	bspFormatFamily_t format;
+	const char *name;
+	uint32_t magic;
+	uint32_t version;
+	uint32_t headerSize;
+	uint32_t lumpCount;
+	uint32_t lumpDirectoryOffset;
+	uint32_t lumpStride;
+	bspLumpLayout_t lumpLayout;
+	uint32_t flags;
+} bspFormatDescriptor_t;
 
 typedef enum {
 	BSP_ERROR_NONE = 0,
@@ -227,6 +254,7 @@ bool BSP_CheckedMultiply(uint64_t count, uint64_t stride, uint64_t *result);
 bool BSP_IsSafeExternalPath(const char *path);
 const char *BSP_ErrorString(bspError_t error);
 const char *BSP_FormatName(bspFormatFamily_t format);
+const bspFormatDescriptor_t *BSP_FormatDescriptor(bspFormatFamily_t format);
 
 bspFormatFamily_t BSP_DetectFormat(const uint8_t *data, uint64_t size,
 	bspError_t *error);

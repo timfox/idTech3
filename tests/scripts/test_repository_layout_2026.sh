@@ -49,6 +49,7 @@ check_physical modules/navigation
 check_physical modules/physics
 check_physical modules/audio
 check_physical modules/botlib
+check_physical modules/rts
 check_physical runtime/cgame
 check_physical runtime/ui
 check_physical engine/asm
@@ -57,7 +58,7 @@ check_physical renderers
 check_physical third_party
 
 # Phase 5e: src/* forwarding shims must be gone.
-for d in qcommon client server game platform world navigation physics audio botlib \
+for d in qcommon client server game platform world navigation physics audio botlib rts \
 	cgame ui asm extensions renderers external; do
 	[ ! -e "${ROOT}/src/${d}" ] || fail "src/${d} shim must be removed (Phase 5e)"
 done

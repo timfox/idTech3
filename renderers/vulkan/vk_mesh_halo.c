@@ -84,6 +84,8 @@ void vk_mesh_halo_begin_frame( void )
 
 void vk_mesh_halo_register( void )
 {
+	static qboolean commandsRegistered = qfalse;
+
 	r_meshHaloDebug = ri.Cvar_Get( "r_meshHaloDebug", "0", CVAR_TEMP );
 	ri.Cvar_CheckRange( r_meshHaloDebug, "0", "8", CV_INTEGER );
 	ri.Cvar_SetDescription( r_meshHaloDebug,
@@ -91,6 +93,10 @@ void vk_mesh_halo_register( void )
 	r_meshHaloPassDebug = ri.Cvar_Get( "r_meshHaloPassDebug", "0", CVAR_TEMP );
 	ri.Cvar_CheckRange( r_meshHaloPassDebug, "0", "32", CV_INTEGER );
 
+	if ( commandsRegistered ) {
+		return;
+	}
+	commandsRegistered = qtrue;
 	ri.Cmd_AddCommand( "mesh_halo_status", MeshHalo_Status_f );
 	ri.Cmd_AddCommand( "mesh_halo_capture", MeshHalo_Capture_f );
 	ri.Cmd_AddCommand( "mesh_halo_validate", MeshHalo_Validate_f );

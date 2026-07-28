@@ -23,6 +23,7 @@ idtech3_layout_dir(IDTECH3_DIR_MODULE_NAVIGATION "modules/navigation" "src/navig
 idtech3_layout_dir(IDTECH3_DIR_MODULE_PHYSICS "modules/physics" "src/physics")
 idtech3_layout_dir(IDTECH3_DIR_MODULE_AUDIO "modules/audio" "src/audio")
 idtech3_layout_dir(IDTECH3_DIR_MODULE_BOTLIB "modules/botlib" "src/botlib")
+idtech3_layout_dir(IDTECH3_DIR_MODULE_RTS "modules/rts" "src/rts")
 idtech3_layout_dir(IDTECH3_DIR_RUNTIME_CGAME "runtime/cgame" "src/cgame")
 idtech3_layout_dir(IDTECH3_DIR_RUNTIME_UI "runtime/ui" "src/ui")
 idtech3_layout_dir(IDTECH3_DIR_ENGINE_ASM "engine/asm" "src/asm")

@@ -9,5 +9,6 @@ Optional gameplay systems gated by `IDTECH3_PROFILE` / `USE_*` flags.
 | `modules/physics/` | `src/physics` | `phys_enabled` |
 | `modules/audio/` | `src/audio` | always (core) |
 | `modules/botlib/` | `src/botlib` | always (dedicated server + `bot_enable`) |
+| `modules/rts/` | `src/rts` | `USE_RTS_SIM` |
 
 CMake: `IDTECH3_DIR_MODULE_*` in [`cmake/IdTech3Layout.cmake`](../cmake/IdTech3Layout.cmake).

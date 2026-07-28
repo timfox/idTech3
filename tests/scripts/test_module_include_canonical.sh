@@ -5,7 +5,7 @@ ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 cd "$ROOT"
 
 fail=0
-for domain in modules/navigation modules/physics modules/audio modules/world modules/botlib \
+for domain in modules/navigation modules/physics modules/audio modules/world modules/botlib modules/rts \
               runtime/client runtime/game runtime/server \
               engine renderers extensions; do
   if rg -n '#include\s+".*\.\./qcommon/' "$domain" --glob '*.{c,h,cpp,hpp}' --glob '!**/third_party/**' --glob '!**/external/**' 2>/dev/null; then
@@ -31,6 +31,10 @@ if ! rg -n 'target_include_directories\(recast_nav PRIVATE' -A8 CMakeLists.txt |
 fi
 if ! rg -n 'target_include_directories\(botlib PRIVATE' -A2 CMakeLists.txt | rg -q 'IDTECH3_DIR_ENGINE_CORE'; then
   echo "FAIL: botlib PRIVATE includes lack IDTECH3_DIR_ENGINE_CORE" >&2
+  fail=1
+fi
+if ! rg -n 'target_include_directories\(rts_module PRIVATE' -A4 CMakeLists.txt | rg -q 'IDTECH3_DIR_ENGINE_CORE'; then
+  echo "FAIL: rts_module PRIVATE includes lack IDTECH3_DIR_ENGINE_CORE" >&2
   fail=1
 fi
 # Audio compiles into client; client must see engine/core for flat qcommon headers.

@@ -66,6 +66,25 @@ static void make_ibsp(uint8_t *data, size_t size, uint32_t version) {
 	put32(data + 4, version);
 }
 
+static void make_vbsp(uint8_t *data, size_t size, uint32_t version) {
+	memset(data, 0, size);
+	memcpy(data, "VBSP", 4);
+	put32(data + 4, version);
+}
+
+static void make_dark_messiah_vbsp(uint8_t *data, size_t size) {
+	memset(data, 0, size);
+	memcpy(data, "VBSP", 4);
+	put16(data + 4, 20);
+	put16(data + 6, 4);
+}
+
+static void make_rbsp(uint8_t *data, size_t size, uint32_t version) {
+	memset(data, 0, size);
+	memcpy(data, "RBSP", 4);
+	put32(data + 4, version);
+}
+
 static void test_legacy_detection(void) {
 	uint8_t bsp30[124];
 	uint8_t ibsp[144];
@@ -81,6 +100,47 @@ static void test_legacy_detection(void) {
 		BSP_FORMAT_QUAKE3_IBSP47);
 	put32(ibsp + 4, 99);
 	assert(BSP_DetectFormat(ibsp, sizeof(ibsp), &error) == BSP_FORMAT_UNKNOWN);
+	assert(error == BSP_ERROR_VERSION);
+}
+
+static void test_source_family_detection(void) {
+	uint8_t vbsp[1036];
+	bspError_t error;
+	const bspFormatDescriptor_t *descriptor;
+
+	make_vbsp(vbsp, sizeof(vbsp), 20);
+	assert(BSP_DetectFormat(vbsp, sizeof(vbsp), &error) ==
+		BSP_FORMAT_SOURCE_VBSP);
+	descriptor = BSP_FormatDescriptor(BSP_FORMAT_SOURCE_VBSP);
+	assert(descriptor && descriptor->lumpCount == 64);
+	assert(descriptor->lumpLayout == BSP_LUMP_LAYOUT_OFFSET_LENGTH_VERSION_FOURCC);
+
+	make_vbsp(vbsp, sizeof(vbsp), 21);
+	assert(BSP_DetectFormat(vbsp, sizeof(vbsp), &error) ==
+		BSP_FORMAT_SOURCE_VBSP_L4D2);
+	descriptor = BSP_FormatDescriptor(BSP_FORMAT_SOURCE_VBSP_L4D2);
+	assert(descriptor && descriptor->lumpLayout == BSP_LUMP_LAYOUT_VERSION_OFFSET_LENGTH_FOURCC);
+
+	make_dark_messiah_vbsp(vbsp, sizeof(vbsp));
+	assert(BSP_DetectFormat(vbsp, sizeof(vbsp), &error) ==
+		BSP_FORMAT_SOURCE_VBSP_DARK_MESSIAH);
+}
+
+static void test_respawn_family_detection(void) {
+	uint8_t rbsp[1036];
+	bspError_t error;
+
+	make_rbsp(rbsp, sizeof(rbsp), 29);
+	assert(BSP_DetectFormat(rbsp, sizeof(rbsp), &error) ==
+		BSP_FORMAT_RESPAWN_RBSP);
+	make_rbsp(rbsp, sizeof(rbsp), 36);
+	assert(BSP_DetectFormat(rbsp, sizeof(rbsp), &error) ==
+		BSP_FORMAT_RESPAWN_RBSP2);
+	make_rbsp(rbsp, sizeof(rbsp), 47);
+	assert(BSP_DetectFormat(rbsp, sizeof(rbsp), &error) ==
+		BSP_FORMAT_APEX_RBSP);
+	make_rbsp(rbsp, sizeof(rbsp), 99);
+	assert(BSP_DetectFormat(rbsp, sizeof(rbsp), &error) == BSP_FORMAT_UNKNOWN);
 	assert(error == BSP_ERROR_VERSION);
 }
 
@@ -240,6 +300,8 @@ int main(void) {
 	test_checked_arithmetic();
 	test_paths();
 	test_legacy_detection();
+	test_source_family_detection();
+	test_respawn_family_detection();
 	test_bspx();
 	test_bspx_duplicate_and_overlap();
 	test_bspx_serialization();

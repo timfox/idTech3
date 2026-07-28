@@ -5,8 +5,51 @@
 
 #define BSP30_HEADER_SIZE (4u + 15u * 8u)
 #define IBSP_HEADER_SIZE (8u + 17u * 8u)
+#define VBSP_HEADER_LUMPS 64u
+#define VBSP_HEADER_SIZE (8u + VBSP_HEADER_LUMPS * 16u + 4u)
+#define VBSP_DARK_MESSIAH_HEADER_SIZE (8u + VBSP_HEADER_LUMPS * 16u + 4u)
 #define BSPX_HEADER_SIZE 8u
 #define BSPX_DIRECTORY_ENTRY_SIZE 32u
+
+#define BSP_MAGIC_IBSP 0x50534249u
+#define BSP_MAGIC_VBSP 0x50534256u
+#define BSP_MAGIC_RBSP 0x50534252u
+
+static const bspFormatDescriptor_t s_formatDescriptors[] = {
+	{ BSP_FORMAT_GOLDSRC_BSP30, "GoldSrc BSP30", 30u, 30u,
+		BSP30_HEADER_SIZE, 15u, 4u, 8u, BSP_LUMP_LAYOUT_OFFSET_LENGTH, 0u },
+	{ BSP_FORMAT_QUAKE3_IBSP46, "Quake 3 IBSP46", BSP_MAGIC_IBSP, 46u,
+		IBSP_HEADER_SIZE, 17u, 8u, 8u, BSP_LUMP_LAYOUT_OFFSET_LENGTH, 0u },
+	{ BSP_FORMAT_QUAKE3_IBSP47, "IBSP47", BSP_MAGIC_IBSP, 47u,
+		IBSP_HEADER_SIZE, 17u, 8u, 8u, BSP_LUMP_LAYOUT_OFFSET_LENGTH, 0u },
+	{ BSP_FORMAT_BSP30_WITH_BSPX, "GoldSrc BSP30 + BSPX", 30u, 30u,
+		BSP30_HEADER_SIZE, 15u, 4u, 8u, BSP_LUMP_LAYOUT_OFFSET_LENGTH, 0u },
+	{ BSP_FORMAT_IBSP46_WITH_BSPX, "IBSP46 + BSPX", BSP_MAGIC_IBSP, 46u,
+		IBSP_HEADER_SIZE, 17u, 8u, 8u, BSP_LUMP_LAYOUT_OFFSET_LENGTH, 0u },
+	{ BSP_FORMAT_IBSP47_WITH_BSPX, "IBSP47 + BSPX", BSP_MAGIC_IBSP, 47u,
+		IBSP_HEADER_SIZE, 17u, 8u, 8u, BSP_LUMP_LAYOUT_OFFSET_LENGTH, 0u },
+	{ BSP_FORMAT_SOURCE_VBSP, "Source VBSP", BSP_MAGIC_VBSP, 20u,
+		VBSP_HEADER_SIZE, VBSP_HEADER_LUMPS, 8u, 16u,
+		BSP_LUMP_LAYOUT_OFFSET_LENGTH_VERSION_FOURCC, 0u },
+	{ BSP_FORMAT_SOURCE_VBSP_L4D2, "Source VBSP L4D2/Contagion", BSP_MAGIC_VBSP, 21u,
+		VBSP_HEADER_SIZE, VBSP_HEADER_LUMPS, 8u, 16u,
+		BSP_LUMP_LAYOUT_VERSION_OFFSET_LENGTH_FOURCC, 0u },
+	{ BSP_FORMAT_SOURCE_VBSP_DARK_MESSIAH, "Source VBSP Dark Messiah", BSP_MAGIC_VBSP, 20u,
+		VBSP_DARK_MESSIAH_HEADER_SIZE, VBSP_HEADER_LUMPS, 8u, 16u,
+		BSP_LUMP_LAYOUT_OFFSET_LENGTH_VERSION_FOURCC, 0u },
+	{ BSP_FORMAT_RESPAWN_RBSP, "Respawn RBSP", BSP_MAGIC_RBSP, 29u,
+		VBSP_HEADER_SIZE, VBSP_HEADER_LUMPS, 8u, 16u,
+		BSP_LUMP_LAYOUT_OFFSET_LENGTH_VERSION_FOURCC, 0u },
+	{ BSP_FORMAT_RESPAWN_RBSP2, "Respawn RBSP2", BSP_MAGIC_RBSP, 36u,
+		VBSP_HEADER_SIZE, VBSP_HEADER_LUMPS, 8u, 16u,
+		BSP_LUMP_LAYOUT_OFFSET_LENGTH_VERSION_FOURCC, 0u },
+	{ BSP_FORMAT_APEX_RBSP, "Apex Legends RBSP", BSP_MAGIC_RBSP, 47u,
+		VBSP_HEADER_SIZE, VBSP_HEADER_LUMPS, 8u, 16u,
+		BSP_LUMP_LAYOUT_OFFSET_LENGTH_VERSION_FOURCC, 0u },
+	{ BSP_FORMAT_NATIVE_XBSP, "native XBSP", XBSP_MAGIC, XBSP_VERSION,
+		XBSP_HEADER_SIZE, XBSP_MAX_DIRECTORY_ENTRIES, XBSP_HEADER_SIZE,
+		XBSP_DIRECTORY_ENTRY_SIZE, BSP_LUMP_LAYOUT_NONE, 0u }
+};
 
 static uint16_t BSP_ReadU16(const uint8_t *p) {
 	return (uint16_t)p[0] | ((uint16_t)p[1] << 8);
@@ -98,19 +141,23 @@ const char *BSP_ErrorString(bspError_t error) {
 }
 
 const char *BSP_FormatName(bspFormatFamily_t format) {
-	static const char *const names[] = {
-		"unknown", "GoldSrc BSP30", "Quake 3 IBSP46", "IBSP47",
-		"GoldSrc BSP30 + BSPX", "IBSP46 + BSPX", "IBSP47 + BSPX",
-		"native XBSP"
-	};
-	return (unsigned)format < sizeof(names) / sizeof(names[0])
-		? names[format] : names[0];
+	const bspFormatDescriptor_t *descriptor = BSP_FormatDescriptor(format);
+	return descriptor ? descriptor->name : "unknown";
+}
+
+const bspFormatDescriptor_t *BSP_FormatDescriptor(bspFormatFamily_t format) {
+	size_t i;
+	for (i = 0; i < sizeof(s_formatDescriptors) / sizeof(s_formatDescriptors[0]); ++i) {
+		if (s_formatDescriptors[i].format == format) {
+			return &s_formatDescriptors[i];
+		}
+	}
+	return NULL;
 }
 
 static bool BSP_LegacyDirectoryEnd(const uint8_t *data, uint64_t size,
 	bspFormatFamily_t format, uint64_t *end, bspError_t *error) {
-	uint32_t count;
-	uint64_t directoryOffset;
+	const bspFormatDescriptor_t *descriptor;
 	uint64_t maximum;
 	uint32_t i;
 
@@ -118,28 +165,36 @@ static bool BSP_LegacyDirectoryEnd(const uint8_t *data, uint64_t size,
 		BSP_SetError(error, BSP_ERROR_ARGUMENT);
 		return false;
 	}
-	if (format == BSP_FORMAT_GOLDSRC_BSP30) {
-		count = 15;
-		directoryOffset = 4;
-		maximum = BSP30_HEADER_SIZE;
-	} else if (format == BSP_FORMAT_QUAKE3_IBSP46 ||
-		format == BSP_FORMAT_QUAKE3_IBSP47) {
-		count = 17;
-		directoryOffset = 8;
-		maximum = IBSP_HEADER_SIZE;
-	} else {
+	descriptor = BSP_FormatDescriptor(format);
+	if (!descriptor || descriptor->lumpLayout == BSP_LUMP_LAYOUT_NONE) {
 		BSP_SetError(error, BSP_ERROR_ARGUMENT);
 		return false;
 	}
-	if (!BSP_CheckedRange(size, 0, maximum)) {
+	maximum = descriptor->headerSize;
+	if (!BSP_CheckedRange(size, 0, descriptor->headerSize)) {
 		BSP_SetError(error, BSP_ERROR_TRUNCATED);
 		return false;
 	}
-	for (i = 0; i < count; ++i) {
-		const uint8_t *entry = data + directoryOffset + (uint64_t)i * 8u;
-		uint32_t offset = BSP_ReadU32(entry);
-		uint32_t length = BSP_ReadU32(entry + 4);
+	for (i = 0; i < descriptor->lumpCount; ++i) {
+		const uint8_t *entry = data + descriptor->lumpDirectoryOffset +
+			(uint64_t)i * descriptor->lumpStride;
+		uint32_t offset;
+		uint32_t length;
 		uint64_t lumpEnd;
+		switch (descriptor->lumpLayout) {
+		case BSP_LUMP_LAYOUT_OFFSET_LENGTH:
+		case BSP_LUMP_LAYOUT_OFFSET_LENGTH_VERSION_FOURCC:
+			offset = BSP_ReadU32(entry);
+			length = BSP_ReadU32(entry + 4);
+			break;
+		case BSP_LUMP_LAYOUT_VERSION_OFFSET_LENGTH_FOURCC:
+			offset = BSP_ReadU32(entry + 4);
+			length = BSP_ReadU32(entry + 8);
+			break;
+		default:
+			BSP_SetError(error, BSP_ERROR_ARGUMENT);
+			return false;
+		}
 		if (!BSP_CheckedRange(size, offset, length)) {
 			BSP_SetError(error, BSP_ERROR_RANGE);
 			return false;
@@ -188,6 +243,53 @@ static bspFormatFamily_t BSP_BaseFormat(const uint8_t *data, uint64_t size,
 		}
 		return BSP_FORMAT_GOLDSRC_BSP30;
 	}
+	if (memcmp(data, "VBSP", 4) == 0) {
+		if (size < 8) {
+			BSP_SetError(error, BSP_ERROR_TRUNCATED);
+			return BSP_FORMAT_UNKNOWN;
+		}
+		if (BSP_ReadU16(data + 4) == 20u && BSP_ReadU16(data + 6) == 4u) {
+			if (!BSP_LegacyDirectoryEnd(data, size,
+				BSP_FORMAT_SOURCE_VBSP_DARK_MESSIAH, &ignored, error)) {
+				return BSP_FORMAT_UNKNOWN;
+			}
+			return BSP_FORMAT_SOURCE_VBSP_DARK_MESSIAH;
+		}
+		version = BSP_ReadU32(data + 4);
+		if (version == 20u) {
+			if (!BSP_LegacyDirectoryEnd(data, size, BSP_FORMAT_SOURCE_VBSP,
+				&ignored, error)) {
+				return BSP_FORMAT_UNKNOWN;
+			}
+			return BSP_FORMAT_SOURCE_VBSP;
+		}
+		if (version == 21u) {
+			if (!BSP_LegacyDirectoryEnd(data, size, BSP_FORMAT_SOURCE_VBSP_L4D2,
+				&ignored, error)) {
+				return BSP_FORMAT_UNKNOWN;
+			}
+			return BSP_FORMAT_SOURCE_VBSP_L4D2;
+		}
+		BSP_SetError(error, BSP_ERROR_VERSION);
+		return BSP_FORMAT_UNKNOWN;
+	}
+	if (memcmp(data, "RBSP", 4) == 0) {
+		if (size < 8) {
+			BSP_SetError(error, BSP_ERROR_TRUNCATED);
+			return BSP_FORMAT_UNKNOWN;
+		}
+		version = BSP_ReadU32(data + 4);
+		if (version == 29u || version == 36u || version == 47u) {
+			bspFormatFamily_t format = version == 29u ? BSP_FORMAT_RESPAWN_RBSP :
+				(version == 36u ? BSP_FORMAT_RESPAWN_RBSP2 : BSP_FORMAT_APEX_RBSP);
+			if (!BSP_LegacyDirectoryEnd(data, size, format, &ignored, error)) {
+				return BSP_FORMAT_UNKNOWN;
+			}
+			return format;
+		}
+		BSP_SetError(error, BSP_ERROR_VERSION);
+		return BSP_FORMAT_UNKNOWN;
+	}
 	if (memcmp(data, "IBSP", 4) != 0) {
 		BSP_SetError(error, BSP_ERROR_MAGIC);
 		return BSP_FORMAT_UNKNOWN;
@@ -220,6 +322,12 @@ bspFormatFamily_t BSP_DetectFormat(const uint8_t *data, uint64_t size,
 			? base : BSP_FORMAT_UNKNOWN;
 	}
 	if (base == BSP_FORMAT_UNKNOWN) {
+		return base;
+	}
+	if (base != BSP_FORMAT_GOLDSRC_BSP30 &&
+		base != BSP_FORMAT_QUAKE3_IBSP46 &&
+		base != BSP_FORMAT_QUAKE3_IBSP47) {
+		BSP_SetError(error, BSP_ERROR_NONE);
 		return base;
 	}
 	if (BSPX_ReadDirectory(data, size, base, &directory, NULL)) {

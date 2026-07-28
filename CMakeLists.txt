@@ -2670,6 +2670,39 @@ if(NOT MSVC)
 endif()
 message(STATUS "ECS (EnTT): enabled")
 
+# --- RTS simulation module ---
+option(USE_RTS_SIM "Enable RTS-oriented deterministic simulation module" ON)
+if(USE_RTS_SIM)
+  enable_language(CXX)
+  ADD_LIBRARY(rts_module STATIC
+    modules/rts/rts_world.cpp
+    modules/rts/rts_turn.cpp
+    modules/rts/rts_command.cpp
+    modules/rts/rts_entity.cpp
+    modules/rts/rts_component.cpp
+    modules/rts/rts_selection.cpp
+    modules/rts/rts_obstruction.cpp
+    modules/rts/rts_path_grid.cpp
+    modules/rts/rts_vision.cpp
+    modules/rts/rts_replay.cpp
+    modules/rts/rts_usd_templates.cpp
+  )
+  idtech3_first_party_warnings_as_errors(rts_module)
+  set_target_properties(rts_module PROPERTIES
+    CXX_STANDARD ${IDTECH3_CXX_STANDARD}
+    CXX_STANDARD_REQUIRED ON
+    POSITION_INDEPENDENT_CODE ON
+  )
+  target_include_directories(rts_module PRIVATE
+    ${CMAKE_SOURCE_DIR}/modules/rts
+    ${IDTECH3_DIR_ENGINE_CORE}
+  )
+  if(NOT MSVC)
+    target_compile_options(rts_module PRIVATE -Wno-unused-parameter)
+  endif()
+  message(STATUS "RTS simulation module: enabled")
+endif()
+
 # --- Physics module (swappable substrate: box3d default, bullet / jolt optional) ---
 set(IDTECH3_PHYSICS_BACKEND "box3d" CACHE STRING "Physics substrate: box3d | bullet | jolt | none")
 set_property(CACHE IDTECH3_PHYSICS_BACKEND PROPERTY STRINGS box3d bullet jolt none)
@@ -4708,6 +4741,17 @@ if(BUILD_UNIT_TESTS)
 	endif()
 	add_test(NAME unit_sector_graph COMMAND unit_sector_graph)
 	set_tests_properties(unit_sector_graph PROPERTIES LABELS "unit;validation;openworld;sector_stream")
+
+	if(USE_RTS_SIM AND TARGET rts_module)
+		add_executable(unit_rts_module
+			tests/unit/test_rts_module.c)
+		target_include_directories(unit_rts_module PRIVATE
+			${IDTECH3_UNIT_INCLUDE_DIRS}
+			${CMAKE_SOURCE_DIR}/modules/rts)
+		target_link_libraries(unit_rts_module PRIVATE rts_module)
+		add_test(NAME unit_rts_module COMMAND unit_rts_module)
+		set_tests_properties(unit_rts_module PROPERTIES LABELS "unit;validation;rts")
+	endif()
 
 	add_executable(unit_cluster_graph
 		tests/unit/test_cluster_graph.c

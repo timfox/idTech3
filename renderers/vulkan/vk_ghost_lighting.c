@@ -172,6 +172,8 @@ static void HistoryQuarantine_f( void )
 
 void vk_ghost_lighting_register( void )
 {
+	static qboolean commandsRegistered = qfalse;
+
 	r_negativeGhostDebug = ri.Cvar_Get( "r_negativeGhostDebug", "0", CVAR_TEMP );
 	ri.Cvar_CheckRange( r_negativeGhostDebug, "0", "8", CV_INTEGER );
 	ri.Cvar_SetDescription( r_negativeGhostDebug,
@@ -191,6 +193,10 @@ void vk_ghost_lighting_register( void )
 	r_negativeGhostVelocityDebug = ri.Cvar_Get( "r_negativeGhostVelocityDebug", "0", CVAR_TEMP );
 	r_fullbrightExposureDebug = ri.Cvar_Get( "r_fullbrightExposureDebug", "0", CVAR_TEMP );
 
+	if ( commandsRegistered ) {
+		return;
+	}
+	commandsRegistered = qtrue;
 	ri.Cmd_AddCommand( "ghost_lighting_status", GhostLighting_Status_f );
 	ri.Cmd_AddCommand( "ghost_lighting_capture", GhostLighting_Capture_f );
 	ri.Cmd_AddCommand( "ghost_lighting_bisect", GhostLighting_Bisect_f );

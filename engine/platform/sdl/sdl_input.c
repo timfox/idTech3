@@ -2161,9 +2161,6 @@ void HandleEvents( void )
 					int logicalW = 0, logicalH = 0;
 					int pixelW = 0, pixelH = 0;
 					static int s_lastPixelW, s_lastPixelH;
-					static int s_lastResizeRestartMs;
-					int now;
-					int dw, dh;
 
 					SDL_GetWindowSize( SDL_window, &logicalW, &logicalH );
 					SDL_GetWindowSizeInPixels( SDL_window, &pixelW, &pixelH );
@@ -2179,31 +2176,21 @@ void HandleEvents( void )
 							s_lastPixelH = pixelH;
 							if ( pixelW != cls.glconfig.vidWidth || pixelH != cls.glconfig.vidHeight ) {
 								/*
-								 * Fit/WM chrome often leaves a 1–2px fight (archived
-								 * r_customHeight 1011 vs fitted drawable 1010). Sync
-								 * cvars to the live glconfig and skip destroy restarts.
-								 * Also ignore configure storms right after mode set.
+								 * Vulkan owns live swapchain/FBO resize from begin/present.
+								 * Do not queue vid_restart while dragging the window: SDL can
+								 * deliver dozens of pixel-size events, and the full renderer
+								 * restart fights the live swapchain rebuild path. Keep the
+								 * client/platform dimensions and archived r_custom* in sync so
+								 * viewport math and the next launch see the same drawable size.
 								 */
-								now = Sys_Milliseconds();
-								dw = abs( pixelW - cls.glconfig.vidWidth );
-								dh = abs( pixelH - cls.glconfig.vidHeight );
-								if ( ( dw <= 2 && dh <= 2 ) ||
-									( glw_state.modeSetTime &&
-										( now - glw_state.modeSetTime ) < 750 ) ) {
-									Cvar_SetIntegerValue( "r_customWidth", cls.glconfig.vidWidth );
-									Cvar_SetIntegerValue( "r_customHeight", cls.glconfig.vidHeight );
-									break;
-								}
-								if ( s_lastResizeRestartMs &&
-									( now - s_lastResizeRestartMs ) < 1000 ) {
-									break;
-								}
-								s_lastResizeRestartMs = now;
 								Cvar_Set( "r_mode", "-1" );
 								Cvar_SetIntegerValue( "r_customWidth", pixelW );
 								Cvar_SetIntegerValue( "r_customHeight", pixelH );
-								/* keep_window: Wayland/libdecor crashes on destroy loops. */
-								Cbuf_AddText( "vid_restart keep_window\n" );
+								cls.glconfig.vidWidth = pixelW;
+								cls.glconfig.vidHeight = pixelH;
+								if ( logicalW > 0 && logicalH > 0 ) {
+									cls.glconfig.windowAspect = (float)logicalW / (float)logicalH;
+								}
 							}
 						}
 					}

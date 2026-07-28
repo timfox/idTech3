@@ -119,6 +119,8 @@ static void BspViz_Stats_f( void )
 
 void vk_bsp_viz_register( void )
 {
+	static qboolean commandsRegistered = qfalse;
+
 	r_bspViz = ri.Cvar_Get( "r_bspViz", "0", CVAR_CHEAT );
 	ri.Cvar_CheckRange( r_bspViz, "0", "4", CV_INTEGER );
 	ri.Cvar_SetDescription( r_bspViz,
@@ -138,6 +140,10 @@ void vk_bsp_viz_register( void )
 	ri.Cvar_SetDescription( r_bspVisibilityMode,
 		"0=production 1=CPU reference (stats only) 2=compare (logs mismatches)." );
 
+	if ( commandsRegistered ) {
+		return;
+	}
+	commandsRegistered = qtrue;
 	ri.Cmd_AddCommand( "bsp_viz_status", BspViz_Status_f );
 	ri.Cmd_AddCommand( "bsp_viz_validate", BspViz_Validate_f );
 	ri.Cmd_AddCommand( "bsp_viz_depth_status", BspViz_Status_f );
