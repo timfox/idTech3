@@ -3,6 +3,8 @@
 **Status:** Foundation  
 **Applies to:** Newly converted internal C++20 TUs
 
+C++23-specific guidance lives in [CPP23_MIGRATION.md](CPP23_MIGRATION.md). Until `IDTECH3_CXX_STANDARD` is raised by CMake for a target, code in that target must stay within the C++20 subset described here.
+
 ## Allowed early
 
 - `nullptr`

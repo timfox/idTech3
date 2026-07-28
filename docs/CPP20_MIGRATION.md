@@ -1,8 +1,8 @@
 # C++20 Migration Program
 
 **Status:** Foundation milestone (Phases 1–2 + first leaf batch)  
-**Language level:** C++20 only (`IDTECH3_CXX_STANDARD` / `-std=c++20`). Do not depend on C++23+.  
-**Related:** [CPP20_ABI_BOUNDARIES.md](CPP20_ABI_BOUNDARIES.md), [CPP20_CONVERSION_ORDER.md](CPP20_CONVERSION_ORDER.md), [CPP20_STYLE.md](CPP20_STYLE.md)
+**Language level:** C++20 only (`IDTECH3_CXX_STANDARD` / `-std=c++20`). Do not depend on C++23+ in this foundation track.  
+**Related:** [CPP20_ABI_BOUNDARIES.md](CPP20_ABI_BOUNDARIES.md), [CPP20_CONVERSION_ORDER.md](CPP20_CONVERSION_ORDER.md), [CPP20_STYLE.md](CPP20_STYLE.md), [CPP23_MIGRATION.md](CPP23_MIGRATION.md)
 
 ## Goal
 
@@ -15,6 +15,8 @@ Compile progressively more of the existing engine as **C++20** while preserving:
 - bisectability (one conversion commit per file where practical)
 
 This is a **compatibility migration**, not a rewrite.
+
+The C++23 plan is documented separately in [CPP23_MIGRATION.md](CPP23_MIGRATION.md). Treat C++23 as the next staged language target; do not start using C++23-only library or language features in files governed by this C++20 program until the build system and CI matrix explicitly opt in.
 
 ## Non-goals (this program)
 
