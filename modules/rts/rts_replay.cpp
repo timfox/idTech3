@@ -18,6 +18,7 @@ unsigned HashState() {
 	unsigned hash = 2166136261u;
 
 	hash = HashMix(hash, static_cast<unsigned>(state.turnMsec));
+	hash = HashMix(hash, static_cast<unsigned>(state.currentTurn));
 	hash = HashMix(hash, static_cast<unsigned>(state.nextEntityId));
 	hash = HashMix(hash, static_cast<unsigned>(state.entities.size()));
 	for (const Entity &entity : state.entities) {

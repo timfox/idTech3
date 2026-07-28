@@ -19,7 +19,12 @@ int RTS_PostCommand( const rtsCommand_t *cmd ) {
 		RTS_Init();
 	}
 
-	rts::GetState().pendingCommands.push_back( *cmd );
+	rtsCommand_t queued = *cmd;
+	if ( queued.turn <= rts::GetState().currentTurn ) {
+		queued.turn = rts::GetState().currentTurn + 1;
+	}
+
+	rts::GetState().pendingCommands.push_back( queued );
 	return 1;
 }
 

@@ -30,6 +30,18 @@ static void vk_create_local_shadow_resources( void );
 static void vk_destroy_froxel_images( void );
 static void vk_create_froxel_images( void );
 
+static void vk_destroy_image_and_view( VkImage *image, VkImageView *view )
+{
+	if ( view && *view != VK_NULL_HANDLE ) {
+		qvkDestroyImageView( vk.device, *view, NULL );
+		*view = VK_NULL_HANDLE;
+	}
+	if ( image && *image != VK_NULL_HANDLE ) {
+		qvkDestroyImage( vk.device, *image, NULL );
+		*image = VK_NULL_HANDLE;
+	}
+}
+
 typedef struct vk_attach_desc_s  {
 	VkImage descriptor;
 	VkImageView *image_view;
@@ -1545,10 +1557,6 @@ static void vk_destroy_sun_shadow_resources( void )
 	if ( vk.sun_shadow_sampler ) {
 		vk.sun_shadow_sampler = VK_NULL_HANDLE;
 	}
-	if ( vk.sun_shadow_image ) {
-		qvkDestroyImage( vk.device, vk.sun_shadow_image, NULL );
-		vk.sun_shadow_image = VK_NULL_HANDLE;
-	}
 	if ( vk.sun_shadow_view ) {
 		qvkDestroyImageView( vk.device, vk.sun_shadow_view, NULL );
 		vk.sun_shadow_view = VK_NULL_HANDLE;
@@ -1557,29 +1565,33 @@ static void vk_destroy_sun_shadow_resources( void )
 		qvkDestroyImageView( vk.device, vk.sun_shadow_sample_view, NULL );
 		vk.sun_shadow_sample_view = VK_NULL_HANDLE;
 	}
+	if ( vk.sun_shadow_image ) {
+		qvkDestroyImage( vk.device, vk.sun_shadow_image, NULL );
+		vk.sun_shadow_image = VK_NULL_HANDLE;
+	}
 	if ( vk.sun_shadow_memory ) {
 		qvkFreeMemory( vk.device, vk.sun_shadow_memory, NULL );
 		vk.sun_shadow_memory = VK_NULL_HANDLE;
-	}
-	if ( vk.sun_shadow_color_image ) {
-		qvkDestroyImage( vk.device, vk.sun_shadow_color_image, NULL );
-		vk.sun_shadow_color_image = VK_NULL_HANDLE;
 	}
 	if ( vk.sun_shadow_color_view ) {
 		qvkDestroyImageView( vk.device, vk.sun_shadow_color_view, NULL );
 		vk.sun_shadow_color_view = VK_NULL_HANDLE;
 	}
+	if ( vk.sun_shadow_color_image ) {
+		qvkDestroyImage( vk.device, vk.sun_shadow_color_image, NULL );
+		vk.sun_shadow_color_image = VK_NULL_HANDLE;
+	}
 	if ( vk.sun_shadow_color_memory ) {
 		qvkFreeMemory( vk.device, vk.sun_shadow_color_memory, NULL );
 		vk.sun_shadow_color_memory = VK_NULL_HANDLE;
 	}
-	if ( vk.sun_shadow_color_msaa_image ) {
-		qvkDestroyImage( vk.device, vk.sun_shadow_color_msaa_image, NULL );
-		vk.sun_shadow_color_msaa_image = VK_NULL_HANDLE;
-	}
 	if ( vk.sun_shadow_color_msaa_view ) {
 		qvkDestroyImageView( vk.device, vk.sun_shadow_color_msaa_view, NULL );
 		vk.sun_shadow_color_msaa_view = VK_NULL_HANDLE;
+	}
+	if ( vk.sun_shadow_color_msaa_image ) {
+		qvkDestroyImage( vk.device, vk.sun_shadow_color_msaa_image, NULL );
+		vk.sun_shadow_color_msaa_image = VK_NULL_HANDLE;
 	}
 	if ( vk.sun_shadow_color_msaa_memory ) {
 		qvkFreeMemory( vk.device, vk.sun_shadow_color_msaa_memory, NULL );
@@ -1748,10 +1760,6 @@ static void vk_destroy_local_shadow_resources( void )
 		}
 	}
 
-	if ( vk.local_spot_shadow_atlas_image ) {
-		qvkDestroyImage( vk.device, vk.local_spot_shadow_atlas_image, NULL );
-		vk.local_spot_shadow_atlas_image = VK_NULL_HANDLE;
-	}
 	if ( vk.local_spot_shadow_atlas_view ) {
 		qvkDestroyImageView( vk.device, vk.local_spot_shadow_atlas_view, NULL );
 		vk.local_spot_shadow_atlas_view = VK_NULL_HANDLE;
@@ -1760,28 +1768,28 @@ static void vk_destroy_local_shadow_resources( void )
 		qvkDestroyImageView( vk.device, vk.local_spot_shadow_atlas_sample_view, NULL );
 		vk.local_spot_shadow_atlas_sample_view = VK_NULL_HANDLE;
 	}
+	if ( vk.local_spot_shadow_atlas_image ) {
+		qvkDestroyImage( vk.device, vk.local_spot_shadow_atlas_image, NULL );
+		vk.local_spot_shadow_atlas_image = VK_NULL_HANDLE;
+	}
 	if ( vk.local_spot_shadow_atlas_memory ) {
 		qvkFreeMemory( vk.device, vk.local_spot_shadow_atlas_memory, NULL );
 		vk.local_spot_shadow_atlas_memory = VK_NULL_HANDLE;
 	}
 
-	if ( vk.local_spot_shadow_color_image ) {
-		qvkDestroyImage( vk.device, vk.local_spot_shadow_color_image, NULL );
-		vk.local_spot_shadow_color_image = VK_NULL_HANDLE;
-	}
 	if ( vk.local_spot_shadow_color_view ) {
 		qvkDestroyImageView( vk.device, vk.local_spot_shadow_color_view, NULL );
 		vk.local_spot_shadow_color_view = VK_NULL_HANDLE;
+	}
+	if ( vk.local_spot_shadow_color_image ) {
+		qvkDestroyImage( vk.device, vk.local_spot_shadow_color_image, NULL );
+		vk.local_spot_shadow_color_image = VK_NULL_HANDLE;
 	}
 	if ( vk.local_spot_shadow_color_memory ) {
 		qvkFreeMemory( vk.device, vk.local_spot_shadow_color_memory, NULL );
 		vk.local_spot_shadow_color_memory = VK_NULL_HANDLE;
 	}
 
-	if ( vk.local_point_shadow_array_image ) {
-		qvkDestroyImage( vk.device, vk.local_point_shadow_array_image, NULL );
-		vk.local_point_shadow_array_image = VK_NULL_HANDLE;
-	}
 	if ( vk.local_point_shadow_array_view ) {
 		qvkDestroyImageView( vk.device, vk.local_point_shadow_array_view, NULL );
 		vk.local_point_shadow_array_view = VK_NULL_HANDLE;
@@ -1790,18 +1798,22 @@ static void vk_destroy_local_shadow_resources( void )
 		qvkDestroyImageView( vk.device, vk.local_point_shadow_array_sample_view, NULL );
 		vk.local_point_shadow_array_sample_view = VK_NULL_HANDLE;
 	}
+	if ( vk.local_point_shadow_array_image ) {
+		qvkDestroyImage( vk.device, vk.local_point_shadow_array_image, NULL );
+		vk.local_point_shadow_array_image = VK_NULL_HANDLE;
+	}
 	if ( vk.local_point_shadow_array_memory ) {
 		qvkFreeMemory( vk.device, vk.local_point_shadow_array_memory, NULL );
 		vk.local_point_shadow_array_memory = VK_NULL_HANDLE;
 	}
 
-	if ( vk.local_point_shadow_color_array_image ) {
-		qvkDestroyImage( vk.device, vk.local_point_shadow_color_array_image, NULL );
-		vk.local_point_shadow_color_array_image = VK_NULL_HANDLE;
-	}
 	if ( vk.local_point_shadow_color_array_view ) {
 		qvkDestroyImageView( vk.device, vk.local_point_shadow_color_array_view, NULL );
 		vk.local_point_shadow_color_array_view = VK_NULL_HANDLE;
+	}
+	if ( vk.local_point_shadow_color_array_image ) {
+		qvkDestroyImage( vk.device, vk.local_point_shadow_color_array_image, NULL );
+		vk.local_point_shadow_color_array_image = VK_NULL_HANDLE;
 	}
 	if ( vk.local_point_shadow_color_array_memory ) {
 		qvkFreeMemory( vk.device, vk.local_point_shadow_color_array_memory, NULL );
@@ -1995,124 +2007,124 @@ static void vk_create_local_shadow_resources( void )
 
 static void vk_destroy_froxel_images( void )
 {
-	if ( vk.froxel_volume_image ) {
-		qvkDestroyImage( vk.device, vk.froxel_volume_image, NULL );
-		vk.froxel_volume_image = VK_NULL_HANDLE;
-	}
 	if ( vk.froxel_volume_view ) {
 		qvkDestroyImageView( vk.device, vk.froxel_volume_view, NULL );
 		vk.froxel_volume_view = VK_NULL_HANDLE;
+	}
+	if ( vk.froxel_volume_image ) {
+		qvkDestroyImage( vk.device, vk.froxel_volume_image, NULL );
+		vk.froxel_volume_image = VK_NULL_HANDLE;
 	}
 	if ( vk.froxel_volume_memory ) {
 		qvkFreeMemory( vk.device, vk.froxel_volume_memory, NULL );
 		vk.froxel_volume_memory = VK_NULL_HANDLE;
 	}
 
-	if ( vk.froxel_history_image ) {
-		qvkDestroyImage( vk.device, vk.froxel_history_image, NULL );
-		vk.froxel_history_image = VK_NULL_HANDLE;
-	}
 	if ( vk.froxel_history_view ) {
 		qvkDestroyImageView( vk.device, vk.froxel_history_view, NULL );
 		vk.froxel_history_view = VK_NULL_HANDLE;
+	}
+	if ( vk.froxel_history_image ) {
+		qvkDestroyImage( vk.device, vk.froxel_history_image, NULL );
+		vk.froxel_history_image = VK_NULL_HANDLE;
 	}
 	if ( vk.froxel_history_memory ) {
 		qvkFreeMemory( vk.device, vk.froxel_history_memory, NULL );
 		vk.froxel_history_memory = VK_NULL_HANDLE;
 	}
-	if ( vk.froxel_extinction_image ) {
-		qvkDestroyImage( vk.device, vk.froxel_extinction_image, NULL );
-		vk.froxel_extinction_image = VK_NULL_HANDLE;
-	}
 	if ( vk.froxel_extinction_view ) {
 		qvkDestroyImageView( vk.device, vk.froxel_extinction_view, NULL );
 		vk.froxel_extinction_view = VK_NULL_HANDLE;
+	}
+	if ( vk.froxel_extinction_image ) {
+		qvkDestroyImage( vk.device, vk.froxel_extinction_image, NULL );
+		vk.froxel_extinction_image = VK_NULL_HANDLE;
 	}
 	if ( vk.froxel_extinction_memory ) {
 		qvkFreeMemory( vk.device, vk.froxel_extinction_memory, NULL );
 		vk.froxel_extinction_memory = VK_NULL_HANDLE;
 	}
-	if ( vk.froxel_light_image ) {
-		qvkDestroyImage( vk.device, vk.froxel_light_image, NULL );
-		vk.froxel_light_image = VK_NULL_HANDLE;
-	}
 	if ( vk.froxel_light_view ) {
 		qvkDestroyImageView( vk.device, vk.froxel_light_view, NULL );
 		vk.froxel_light_view = VK_NULL_HANDLE;
+	}
+	if ( vk.froxel_light_image ) {
+		qvkDestroyImage( vk.device, vk.froxel_light_image, NULL );
+		vk.froxel_light_image = VK_NULL_HANDLE;
 	}
 	if ( vk.froxel_light_memory ) {
 		qvkFreeMemory( vk.device, vk.froxel_light_memory, NULL );
 		vk.froxel_light_memory = VK_NULL_HANDLE;
 	}
-	if ( vk.froxel_clamp_image ) {
-		qvkDestroyImage( vk.device, vk.froxel_clamp_image, NULL );
-		vk.froxel_clamp_image = VK_NULL_HANDLE;
-	}
 	if ( vk.froxel_clamp_view ) {
 		qvkDestroyImageView( vk.device, vk.froxel_clamp_view, NULL );
 		vk.froxel_clamp_view = VK_NULL_HANDLE;
+	}
+	if ( vk.froxel_clamp_image ) {
+		qvkDestroyImage( vk.device, vk.froxel_clamp_image, NULL );
+		vk.froxel_clamp_image = VK_NULL_HANDLE;
 	}
 	if ( vk.froxel_clamp_memory ) {
 		qvkFreeMemory( vk.device, vk.froxel_clamp_memory, NULL );
 		vk.froxel_clamp_memory = VK_NULL_HANDLE;
 	}
 	for ( int i = 0; i < 2; i++ ) {
-		if ( vk.fluid_velocity_images[i] ) {
-			qvkDestroyImage( vk.device, vk.fluid_velocity_images[i], NULL );
-			vk.fluid_velocity_images[i] = VK_NULL_HANDLE;
-		}
 		if ( vk.fluid_velocity_views[i] ) {
 			qvkDestroyImageView( vk.device, vk.fluid_velocity_views[i], NULL );
 			vk.fluid_velocity_views[i] = VK_NULL_HANDLE;
+		}
+		if ( vk.fluid_velocity_images[i] ) {
+			qvkDestroyImage( vk.device, vk.fluid_velocity_images[i], NULL );
+			vk.fluid_velocity_images[i] = VK_NULL_HANDLE;
 		}
 		if ( vk.fluid_velocity_memory[i] ) {
 			qvkFreeMemory( vk.device, vk.fluid_velocity_memory[i], NULL );
 			vk.fluid_velocity_memory[i] = VK_NULL_HANDLE;
 		}
-		if ( vk.fluid_density_images[i] ) {
-			qvkDestroyImage( vk.device, vk.fluid_density_images[i], NULL );
-			vk.fluid_density_images[i] = VK_NULL_HANDLE;
-		}
 		if ( vk.fluid_density_views[i] ) {
 			qvkDestroyImageView( vk.device, vk.fluid_density_views[i], NULL );
 			vk.fluid_density_views[i] = VK_NULL_HANDLE;
+		}
+		if ( vk.fluid_density_images[i] ) {
+			qvkDestroyImage( vk.device, vk.fluid_density_images[i], NULL );
+			vk.fluid_density_images[i] = VK_NULL_HANDLE;
 		}
 		if ( vk.fluid_density_memory[i] ) {
 			qvkFreeMemory( vk.device, vk.fluid_density_memory[i], NULL );
 			vk.fluid_density_memory[i] = VK_NULL_HANDLE;
 		}
-		if ( vk.fluid_pressure_images[i] ) {
-			qvkDestroyImage( vk.device, vk.fluid_pressure_images[i], NULL );
-			vk.fluid_pressure_images[i] = VK_NULL_HANDLE;
-		}
 		if ( vk.fluid_pressure_views[i] ) {
 			qvkDestroyImageView( vk.device, vk.fluid_pressure_views[i], NULL );
 			vk.fluid_pressure_views[i] = VK_NULL_HANDLE;
+		}
+		if ( vk.fluid_pressure_images[i] ) {
+			qvkDestroyImage( vk.device, vk.fluid_pressure_images[i], NULL );
+			vk.fluid_pressure_images[i] = VK_NULL_HANDLE;
 		}
 		if ( vk.fluid_pressure_memory[i] ) {
 			qvkFreeMemory( vk.device, vk.fluid_pressure_memory[i], NULL );
 			vk.fluid_pressure_memory[i] = VK_NULL_HANDLE;
 		}
 	}
-	if ( vk.fluid_divergence_image ) {
-		qvkDestroyImage( vk.device, vk.fluid_divergence_image, NULL );
-		vk.fluid_divergence_image = VK_NULL_HANDLE;
-	}
 	if ( vk.fluid_divergence_view ) {
 		qvkDestroyImageView( vk.device, vk.fluid_divergence_view, NULL );
 		vk.fluid_divergence_view = VK_NULL_HANDLE;
+	}
+	if ( vk.fluid_divergence_image ) {
+		qvkDestroyImage( vk.device, vk.fluid_divergence_image, NULL );
+		vk.fluid_divergence_image = VK_NULL_HANDLE;
 	}
 	if ( vk.fluid_divergence_memory ) {
 		qvkFreeMemory( vk.device, vk.fluid_divergence_memory, NULL );
 		vk.fluid_divergence_memory = VK_NULL_HANDLE;
 	}
-	if ( vk.volumetric_telemetry_image ) {
-		qvkDestroyImage( vk.device, vk.volumetric_telemetry_image, NULL );
-		vk.volumetric_telemetry_image = VK_NULL_HANDLE;
-	}
 	if ( vk.volumetric_telemetry_view ) {
 		qvkDestroyImageView( vk.device, vk.volumetric_telemetry_view, NULL );
 		vk.volumetric_telemetry_view = VK_NULL_HANDLE;
+	}
+	if ( vk.volumetric_telemetry_image ) {
+		qvkDestroyImage( vk.device, vk.volumetric_telemetry_image, NULL );
+		vk.volumetric_telemetry_image = VK_NULL_HANDLE;
 	}
 	if ( vk.volumetric_telemetry_memory ) {
 		qvkFreeMemory( vk.device, vk.volumetric_telemetry_memory, NULL );
@@ -2121,13 +2133,13 @@ static void vk_destroy_froxel_images( void )
 	if ( vk.fog_noise_sampler ) {
 		vk.fog_noise_sampler = VK_NULL_HANDLE;
 	}
-	if ( vk.fog_noise_image ) {
-		qvkDestroyImage( vk.device, vk.fog_noise_image, NULL );
-		vk.fog_noise_image = VK_NULL_HANDLE;
-	}
 	if ( vk.fog_noise_view ) {
 		qvkDestroyImageView( vk.device, vk.fog_noise_view, NULL );
 		vk.fog_noise_view = VK_NULL_HANDLE;
+	}
+	if ( vk.fog_noise_image ) {
+		qvkDestroyImage( vk.device, vk.fog_noise_image, NULL );
+		vk.fog_noise_image = VK_NULL_HANDLE;
 	}
 	if ( vk.fog_noise_memory ) {
 		qvkFreeMemory( vk.device, vk.fog_noise_memory, NULL );

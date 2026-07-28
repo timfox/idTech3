@@ -35,8 +35,16 @@ int RTS_GetTurnMsec( void ) {
 	return rts::GetState().turnMsec;
 }
 
+int RTS_GetCurrentTurn( void ) {
+	return rts::GetState().currentTurn;
+}
+
 int RTS_GetPendingCommandCount( void ) {
 	return static_cast<int>( rts::GetState().pendingCommands.size() );
+}
+
+int RTS_GetExecutedCommandCount( void ) {
+	return static_cast<int>( rts::GetState().executedCommands.size() );
 }
 
 int RTS_GetEntityCount( void ) {

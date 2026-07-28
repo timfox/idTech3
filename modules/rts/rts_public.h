@@ -34,6 +34,7 @@ typedef enum rtsCommandType_e {
 
 typedef struct rtsCommand_s {
 	rtsCommandType_t type;
+	int turn;
 	int playerId;
 	int sequence;
 	rtsEntityId_t entityId;
@@ -49,7 +50,9 @@ void RTS_RunTurn( int msec );
 int  RTS_PostCommand( const rtsCommand_t *cmd );
 
 int  RTS_GetTurnMsec( void );
+int  RTS_GetCurrentTurn( void );
 int  RTS_GetPendingCommandCount( void );
+int  RTS_GetExecutedCommandCount( void );
 int  RTS_GetEntityCount( void );
 int  RTS_GetEntityOwner( rtsEntityId_t id );
 int  RTS_GetEntityPosition( rtsEntityId_t id, int *x, int *y );

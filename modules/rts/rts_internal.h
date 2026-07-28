@@ -16,10 +16,12 @@ struct Entity {
 
 struct State {
 	bool initialized = false;
+	int currentTurn = 0;
 	int turnMsec = 0;
 	rtsEntityId_t nextEntityId = 1;
 	std::vector<Entity> entities;
 	std::vector<rtsCommand_t> pendingCommands;
+	std::vector<rtsCommand_t> executedCommands;
 	std::vector<rtsEntityId_t> selectionScratch;
 };
 

@@ -11,6 +11,9 @@ RTS deterministic turn stepping.
 namespace rts {
 
 static bool CommandLess(const rtsCommand_t &a, const rtsCommand_t &b) {
+	if (a.turn != b.turn) {
+		return a.turn < b.turn;
+	}
 	if (a.playerId != b.playerId) {
 		return a.playerId < b.playerId;
 	}
@@ -29,10 +32,16 @@ static bool CanControl(const rtsCommand_t &cmd, const Entity &entity) {
 
 void ApplyQueuedCommands(int msec) {
 	State &state = GetState();
+	const int turnToRun = state.currentTurn + 1;
+	std::vector<rtsCommand_t> remaining;
 
 	std::stable_sort(state.pendingCommands.begin(), state.pendingCommands.end(), CommandLess);
 
 	for (const rtsCommand_t &cmd : state.pendingCommands) {
+		if (cmd.turn > turnToRun) {
+			remaining.push_back(cmd);
+			continue;
+		}
 		switch (cmd.type) {
 		case RTS_COMMAND_BUILD:
 			CreateEntity(cmd.playerId, cmd.targetX, cmd.targetY);
@@ -58,9 +67,11 @@ void ApplyQueuedCommands(int msec) {
 		default:
 			break;
 		}
+		state.executedCommands.push_back(cmd);
 	}
 
-	state.pendingCommands.clear();
+	state.pendingCommands = remaining;
+	state.currentTurn = turnToRun;
 	state.turnMsec += msec;
 }
 

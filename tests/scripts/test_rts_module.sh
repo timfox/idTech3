@@ -27,6 +27,8 @@ rg -q 'void RTS_Init\( void \);' "${ROOT}/modules/rts/rts_public.h" || fail "RTS
 rg -q 'void RTS_Shutdown\( void \);' "${ROOT}/modules/rts/rts_public.h" || fail "RTS_Shutdown missing"
 rg -q 'void RTS_RunTurn\( int msec \);' "${ROOT}/modules/rts/rts_public.h" || fail "RTS_RunTurn missing"
 rg -q 'int  RTS_PostCommand\( const rtsCommand_t \*cmd \);' "${ROOT}/modules/rts/rts_public.h" || fail "RTS_PostCommand missing"
+rg -q 'int  RTS_GetCurrentTurn\( void \);' "${ROOT}/modules/rts/rts_public.h" || fail "RTS_GetCurrentTurn missing"
+rg -q 'int  RTS_GetExecutedCommandCount\( void \);' "${ROOT}/modules/rts/rts_public.h" || fail "RTS_GetExecutedCommandCount missing"
 rg -q 'int  RTS_SelectRect\( int playerId' "${ROOT}/modules/rts/rts_public.h" || fail "RTS_SelectRect missing"
 rg -q 'unsigned RTS_ComputeStateHash\( void \);' "${ROOT}/modules/rts/rts_public.h" || fail "RTS_ComputeStateHash missing"
 rg -q 'std::stable_sort' "${ROOT}/modules/rts/rts_turn.cpp" || fail "turn command application must sort deterministically"

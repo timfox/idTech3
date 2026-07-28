@@ -24,10 +24,13 @@ int main(void) {
 
 	RTS_Init();
 	ASSERT(RTS_GetTurnMsec() == 0, "initial turn time");
+	ASSERT(RTS_GetCurrentTurn() == 0, "initial turn number");
 	ASSERT(RTS_GetPendingCommandCount() == 0, "initial command queue");
+	ASSERT(RTS_GetExecutedCommandCount() == 0, "initial replay command log");
 	ASSERT(RTS_GetEntityCount() == 0, "initial entity count");
 
 	cmd.type = RTS_COMMAND_BUILD;
+	cmd.turn = 1;
 	cmd.playerId = RTS_OWNER_PLAYER1;
 	cmd.sequence = 2;
 	cmd.entityId = 0;
@@ -45,7 +48,9 @@ int main(void) {
 
 	RTS_RunTurn(50);
 	ASSERT(RTS_GetTurnMsec() == 50, "turn time after step");
+	ASSERT(RTS_GetCurrentTurn() == 1, "turn number after first step");
 	ASSERT(RTS_GetPendingCommandCount() == 0, "queue drained after turn");
+	ASSERT(RTS_GetExecutedCommandCount() == 2, "replay command log after first step");
 	ASSERT(RTS_GetEntityCount() == 2, "build commands create entities");
 	ASSERT(RTS_GetEntityOwner(1) == RTS_OWNER_PLAYER1, "first built entity owner");
 	ASSERT(RTS_GetEntityPosition(1, &x, &y) == 1, "first built entity position readable");
@@ -57,6 +62,7 @@ int main(void) {
 
 	hashBeforeMove = RTS_ComputeStateHash();
 	move.type = RTS_COMMAND_MOVE;
+	move.turn = 3;
 	move.playerId = RTS_OWNER_PLAYER1;
 	move.sequence = 3;
 	move.entityId = 1;
@@ -70,7 +76,16 @@ int main(void) {
 
 	RTS_RunTurn(50);
 	ASSERT(RTS_GetTurnMsec() == 100, "turn time after second step");
-	ASSERT(RTS_GetPendingCommandCount() == 0, "queue drained after turn");
+	ASSERT(RTS_GetCurrentTurn() == 2, "turn number after second step");
+	ASSERT(RTS_GetPendingCommandCount() == 1, "future command remains queued");
+	ASSERT(RTS_GetEntityPosition(1, &x, &y) == 1, "future move did not execute early");
+	ASSERT(x == 16 && y == 32, "future move leaves position unchanged");
+
+	RTS_RunTurn(50);
+	ASSERT(RTS_GetTurnMsec() == 150, "turn time after third step");
+	ASSERT(RTS_GetCurrentTurn() == 3, "turn number after third step");
+	ASSERT(RTS_GetPendingCommandCount() == 0, "queue drained after scheduled turn");
+	ASSERT(RTS_GetExecutedCommandCount() == 3, "replay command log after move");
 	ASSERT(RTS_GetEntityPosition(1, &x, &y) == 1, "moved entity position readable");
 	ASSERT(x == 512 && y == 256, "move command updates controlled entity");
 	hashAfterMove = RTS_ComputeStateHash();
@@ -78,6 +93,7 @@ int main(void) {
 
 	RTS_Shutdown();
 	ASSERT(RTS_GetTurnMsec() == 0, "shutdown resets turn time");
+	ASSERT(RTS_GetCurrentTurn() == 0, "shutdown resets turn number");
 	ASSERT(RTS_GetEntityCount() == 0, "shutdown resets entities");
 
 	printf("PASS: unit_rts_module\n");
