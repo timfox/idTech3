@@ -25,6 +25,9 @@ DGB="$(idtech3_file renderers/vulkan/vk_deferred_gbuffer.c src/renderers/vulkan/
 SHADE="$(idtech3_file renderers/vulkan/tr_shade.c src/renderers/vulkan/tr_shade.c)"
 BACKEND="$(idtech3_file renderers/vulkan/tr_backend.c src/renderers/vulkan/tr_backend.c)"
 INIT="$(idtech3_file renderers/vulkan/tr_init.c src/renderers/vulkan/tr_init.c)"
+MODE_H="$(idtech3_file renderers/vulkan/tr_render_mode_vk.h src/renderers/vulkan/tr_render_mode_vk.h)"
+MODE_C="$(idtech3_file renderers/vulkan/tr_render_mode_vk.c src/renderers/vulkan/tr_render_mode_vk.c)"
+DIAG="$(idtech3_file renderers/vulkan/tr_init_diagnostics.inc src/renderers/vulkan/tr_init_diagnostics.inc)"
 COMP="$(idtech3_file renderers/vulkan/shaders/glsl/deferred_lighting_composite.frag src/renderers/vulkan/shaders/glsl/deferred_lighting_composite.frag)"
 GEN="$(idtech3_file renderers/vulkan/shaders/glsl/gen_frag.tmpl src/renderers/vulkan/shaders/glsl/gen_frag.tmpl)"
 DOC="$ROOT/docs/RENDERER_PATH_OWNERSHIP.md"
@@ -49,6 +52,11 @@ check "$FP_C" 'VK_FP_RECORD_STRIDE' 'Forward+ record size asserted at init'
 check "$INIT" 'r_clusterZSlices' 'r_clusterZSlices alias registered'
 check "$INIT" 'r_clusterDebug' 'r_clusterDebug alias registered'
 check "$INIT" 'R_RenderPath_RegisterCvars' 'path cvars registered at init'
+check "$MODE_H" 'renderModeProfile_t' 'render mode profile ABI declared'
+check "$MODE_C" 's_renderModeProfiles' 'render mode profile table implemented'
+check "$MODE_C" 'tier_a_certified_raster' 'mode profile names certified raster'
+check "$MODE_C" 'tier_c_path_traced_reference' 'mode profile names PT reference'
+check "$DIAG" 'mode want' 'renderer status prints mode profile contract'
 check "$COMP" 'hybridCompare' 'composite supports hybridCompare discard'
 check "$GEN" 'pbrDebugMode.y > 1.5' 'gen_frag hybridCompare left/right handoff'
 check "$GEN" 'pbrDebugMode.z >= 0.5' 'gen_frag path debug tint'

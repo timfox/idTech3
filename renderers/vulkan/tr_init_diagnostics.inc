@@ -542,9 +542,19 @@ static int R_RendererPrintCompatibilityWarnings( qboolean printOk )
 
 static void R_RendererProfile_f( void )
 {
+	const renderModeProfile_t *modeProfile = R_RenderMode_CurrentProfile();
+
 	ri.Printf( PRINT_ALL, "======== Renderer Profile ========\n" );
 	ri.Printf( PRINT_ALL, "active    : %s\n", R_RendererProfileName() );
-	ri.Printf( PRINT_ALL, "mode      : %d (0=forward, 1=deferred, 2=modern Forward+, 3=Unified Clustered)\n", R_CvarInteger( r_renderMode ) );
+	ri.Printf( PRINT_ALL, "mode      : %d %s (%s)\n",
+		modeProfile->mode, modeProfile->name, modeProfile->tier );
+	ri.Printf( PRINT_ALL, "contract  : fp=%s gbuffer=%s deferred=%s split=%s pt=%s default=%s\n",
+		R_YesNo( modeProfile->wantsForwardPlus ),
+		R_YesNo( modeProfile->wantsGBuffer ),
+		R_YesNo( modeProfile->wantsDeferredLighting ),
+		R_YesNo( modeProfile->wantsOpaqueTransparentSplit ),
+		R_YesNo( modeProfile->wantsPathTracing ),
+		R_YesNo( modeProfile->productionDefault ) );
 	ri.Printf( PRINT_ALL, "base      : exec modern_vulkan.cfg\n" );
 	ri.Printf( PRINT_ALL, "overlays  : exec vulkan_overlay_deferred.cfg | vulkan_overlay_unified_clustered.cfg | vulkan_overlay_rtx.cfg | vulkan_overlay_hybrid1.cfg\n" );
 	ri.Printf( PRINT_ALL, "classic   : exec classic_baseq3.cfg or classic_openarena_native.cfg\n" );
@@ -568,6 +578,7 @@ static void R_RendererStatus_f( void )
 	const qboolean surfelOn = R_NamedCvarInteger( "r_surfelGi" ) ? qtrue : qfalse;
 	const qboolean rcgiOn = R_NamedCvarInteger( "r_rcgi" ) ? qtrue : qfalse;
 	const qboolean hybridOn = R_NamedCvarInteger( "r_hybrid1" ) ? qtrue : qfalse;
+	const renderModeProfile_t *modeProfile = R_RenderMode_CurrentProfile();
 	const qboolean ssrOn = R_NamedCvarInteger( "r_ssr" ) ? qtrue : qfalse;
 	const qboolean ssaoOn = R_NamedCvarInteger( "r_ssao" ) ? qtrue : qfalse;
 	const qboolean rasterGiOn = vk_raster_gi_active();
@@ -665,7 +676,15 @@ static void R_RendererStatus_f( void )
 	ri.Printf( PRINT_ALL, "======== Renderer Status (Raster Ultra 2.0) ========\n" );
 	ri.Printf( PRINT_ALL, "profile   : %s (r_havenrpProfile=%s)\n",
 		R_RendererProfileName(), R_NamedCvarString( "r_havenrpProfile" ) );
-	ri.Printf( PRINT_ALL, "mode req  : r_renderMode=%d\n", mode );
+	ri.Printf( PRINT_ALL, "mode req  : r_renderMode=%d %s (%s)\n",
+		mode, modeProfile->name, modeProfile->tier );
+	ri.Printf( PRINT_ALL, "mode want : fp=%s gbuffer=%s deferred=%s split=%s pt=%s default=%s\n",
+		R_YesNo( modeProfile->wantsForwardPlus ),
+		R_YesNo( modeProfile->wantsGBuffer ),
+		R_YesNo( modeProfile->wantsDeferredLighting ),
+		R_YesNo( modeProfile->wantsOpaqueTransparentSplit ),
+		R_YesNo( modeProfile->wantsPathTracing ),
+		R_YesNo( modeProfile->productionDefault ) );
 	ri.Printf( PRINT_ALL, "mode eff  : %s forwardPlus=%d deferredGBuffer=%d deferredLighting=%d\n",
 		R_RendererProfileName(), R_CvarInteger( r_forwardPlus ),
 		R_CvarInteger( r_deferredGBuffer ), R_CvarInteger( r_deferredLighting ) );

@@ -88,9 +88,9 @@ grep -q 'ri.Cmd_AddCommand( "renderer_modern_safe"' "$TR_INIT" || fail "renderer
 grep -q 'Renderer Subsystems' "$TR_INIT_DIAG" || fail "renderer_subsystems must print a subsystem health table"
 grep -q 'modern profile expects r_forwardPlusDepthCull 1' "$TR_INIT_DIAG" || fail "modern compatibility must warn when Forward+ depth cull drifts off"
 grep -q 'renderer_modern_safe + vid_restart' "$TR_INIT_DIAG" || fail "modern compatibility must point to modern-safe recovery"
-grep -q 'r_renderMode->integer != 1 && r_renderMode->integer != 2 && r_renderMode->integer != 3' "$DGB" || fail "G-buffer active helper must allow mode 1/2/3 sidecar"
-grep -q 'r_renderMode->integer != 1 && r_renderMode->integer != 2 && r_renderMode->integer != 3' "$ATTACH" || fail "G-buffer allocation must allow mode 1/2/3 sidecar"
-grep -q 'mode == 1 || mode == 3' "$DGB" || fail "deferred lighting must remain limited to deferred and unified-clustered modes"
+grep -q 'R_RenderMode_WantsGBuffer' "$DGB" || fail "G-buffer active helper must use render mode profile helper"
+grep -q 'R_RenderMode_WantsGBuffer' "$ATTACH" || fail "G-buffer allocation must use render mode profile helper"
+grep -q 'R_RenderMode_WantsDeferredLighting' "$DGB" || fail "deferred lighting must use render mode profile helper"
 grep -q 'R_LatchCvarInt( r_forwardPlusDepthCull, "r_forwardPlusDepthCull", 1 )' renderers/vulkan/tr_render_mode_vk.c || fail "mode latch must restore Forward+ depth cull in modern/clustered modes"
 grep -q 'R_LatchCvarInt( r_deferredLighting, "r_deferredLighting", 0 )' renderers/vulkan/tr_render_mode_vk.c || fail "mode 2 latch must disable deferred lighting leftovers"
 

@@ -124,6 +124,7 @@ glstatic_t	gls;
 #include "vk_device.h"
 #include "vk_forward_plus.h"
 #include "vk_render_path.h"
+#include "tr_render_mode_vk.h"
 #include "vk_black_frame.h"
 #include "vk_frame_contract.h"
 #include "vk_shadow_contract.h"

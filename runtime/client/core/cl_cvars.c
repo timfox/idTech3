@@ -64,7 +64,9 @@ void CL_InitCvars( void )
 		"Auto graphics profile on cgame load: baseq3+cgame.qvm -> classic_baseq3.cfg; "
 		"OpenArena native -> classic_openarena_native.cfg unless modern/hybrid already requested "
 		"(r_fbo+r_pbr, selective hybrid, or cl_preferModernGraphics 1) -> modern_openarena.cfg; "
-		"other native cgame -> modern_native.cfg. Set 0 to disable auto selection." );
+		"other native cgame -> modern_native.cfg, which inherits modern_vulkan.cfg. "
+		"Vulkan overlays include vulkan_overlay_deferred.cfg, vulkan_overlay_unified_clustered.cfg, "
+		"vulkan_overlay_rtx.cfg, and vulkan_overlay_hybrid1.cfg. Set 0 to disable auto selection." );
 
 	cl_preferModernGraphics = Cvar_Get( "cl_preferModernGraphics", "0", CVAR_ARCHIVE_ND );
 	Cvar_CheckRange( cl_preferModernGraphics, "0", "1", CV_INTEGER );

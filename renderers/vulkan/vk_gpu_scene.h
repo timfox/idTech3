@@ -2,6 +2,9 @@
 
 /*
  * GPU-Driven Visibility Milestone 1 — Phase 1: persistent GPU scene contract.
+ * Clustered Hybrid M1 schema contract: one object record feeds deferred,
+ * Forward+, OIT, shadows, velocity, and debug ownership without changing the
+ * CPU correctness path.
  *
  * One authoritative scene database shared by:
  *   deferred opaque · Forward+ opaque fallback · alpha-test · WBOIT · shadows ·

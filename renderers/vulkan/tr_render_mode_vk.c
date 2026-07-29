@@ -16,6 +16,33 @@ No frame generation. No intentional one-frame presentation latency.
 
 cvar_t *r_presentAdaptiveRecon;
 
+static const renderModeProfile_t s_renderModeProfiles[] = {
+	{ 0, "classic_forward", "legacy", qfalse, qfalse, qfalse, qfalse, qfalse, qfalse },
+	{ 1, "deferred_split", "development", qtrue, qtrue, qtrue, qtrue, qfalse, qfalse },
+	{ 2, "tier_a_certified_raster", "spine_a", qtrue, qtrue, qfalse, qfalse, qfalse, qtrue },
+	{ 3, "unified_clustered_raster", "spine_a_plus", qtrue, qtrue, qtrue, qtrue, qfalse, qfalse },
+	{ 4, "tier_b_selective_hybrid", "spine_b", qtrue, qtrue, qtrue, qtrue, qfalse, qfalse },
+	{ 5, "tier_c_path_traced_reference", "spine_c", qtrue, qtrue, qtrue, qtrue, qtrue, qfalse }
+};
+
+const renderModeProfile_t *R_RenderMode_ProfileForValue( int mode )
+{
+	int i;
+
+	for ( i = 0; i < (int)( sizeof( s_renderModeProfiles ) / sizeof( s_renderModeProfiles[0] ) ); i++ ) {
+		if ( s_renderModeProfiles[i].mode == mode ) {
+			return &s_renderModeProfiles[i];
+		}
+	}
+
+	return &s_renderModeProfiles[0];
+}
+
+const renderModeProfile_t *R_RenderMode_CurrentProfile( void )
+{
+	return R_RenderMode_ProfileForValue( r_renderMode ? r_renderMode->integer : 0 );
+}
+
 static void R_LatchCvarInt( cvar_t *cv, const char *name, int value )
 {
 	char buf[16];
@@ -110,16 +137,7 @@ qboolean R_RenderMode_WantsOpaqueTransparentSplit( void )
 
 const char *R_RenderMode_TierName( void )
 {
-	const int mode = r_renderMode ? r_renderMode->integer : 0;
-
-	switch ( mode ) {
-	case 2: return "tier_a_certified_raster";
-	case 3: return "unified_clustered_raster";
-	case 4: return "tier_b_selective_hybrid";
-	case 5: return "tier_c_path_traced_reference";
-	case 1: return "deferred_split";
-	default: return "classic_forward";
-	}
+	return R_RenderMode_CurrentProfile()->name;
 }
 
 qboolean R_PresentAdaptiveRecon_Allowed( void )

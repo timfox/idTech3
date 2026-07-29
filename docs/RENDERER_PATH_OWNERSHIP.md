@@ -18,6 +18,12 @@ Visibility-buffer late shade remains an **opt-in sidecar** on modes 1–3 (`r_vi
 
 Canonical selector: `R_SelectSurfaceRenderPath()` in [`renderers/vulkan/vk_render_path.c`](../renderers/vulkan/vk_render_path.c). Debug: `r_renderPathDebug`, `render_path_status`.
 
+Mode metadata lives in `renderModeProfile_t` via `R_RenderMode_ProfileForValue()` /
+`R_RenderMode_CurrentProfile()` in [`renderers/vulkan/tr_render_mode_vk.c`](../renderers/vulkan/tr_render_mode_vk.c).
+Renderer diagnostics use this table to print the requested mode name, tier, and
+feature contract (`Forward+`, G-buffer, deferred lighting, opaque/transparent
+split, path tracing, production default) without duplicating mode rules.
+
 ## Mode 3 surface-class ownership
 
 **Honest label:** when deferred lighting is active, architecture is selected by **`r_deferredArchitecture`** — see [DEFERRED_HONESTY.md](DEFERRED_HONESTY.md). Default **`HYBRID_ADDITIVE_DEFERRED`**: fragment paths write **SceneBaseLit**; deferred compute adds dynamics. **`MIXED_MATERIAL_DEFERRED`** (arch 1): eligible surfaces export unlit G-buffer + deferred lightmap ownership.
