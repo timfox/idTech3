@@ -22,9 +22,10 @@ AA="$ROOT/renderers/vulkan/vk_aa_policy.c"
 [[ -f "$STABLE" && -f "$QUALITY" && -f "$TEMPORAL" && -f "$SAFE" ]] || fail "missing profile cfgs"
 
 # --- Stable shipping spine ---
-cvar_is "$STABLE" r_renderMode 2 || fail "stable expects Forward+ renderMode 2"
+cvar_is "$STABLE" r_renderMode 3 || fail "stable expects Unified Clustered renderMode 3"
 cvar_is "$STABLE" r_taa 0 || fail "stable must keep TAA off"
-cvar_is "$STABLE" r_oit 0 || fail "stable must keep OIT off"
+cvar_is "$STABLE" r_oit 1 || fail "stable expects production WBOIT"
+cvar_is "$STABLE" r_oitForwardPlus 1 || fail "stable expects clustered-lit OIT"
 cvar_is "$STABLE" r_aaMode 2 || fail "stable expects SMAA (r_aaMode 2)"
 cvar_is "$STABLE" r_ssao 0 || fail "stable must keep legacy SSAO off when AV owns AO"
 # One AO owner: GTAO mode 2 (documented Spine table); do not require mode 4
@@ -37,7 +38,7 @@ fi
 if grep -q 'seta r_hybrid1 ' "$STABLE"; then
   cvar_is "$STABLE" r_hybrid1 0 || fail "stable must not enable Hybrid1"
 fi
-pass "stable matrix: Forward+ + SMAA + GTAO, no TAA/OIT/RT"
+pass "stable matrix: Unified Clustered + SMAA + GTAO + WBOIT, no TAA/RT"
 
 # --- Quality overlay ---
 grep -q 'exec modern_vulkan_stable.cfg' "$QUALITY" || fail "quality must exec stable base"
@@ -68,14 +69,16 @@ grep -q 'historyBleed' "$TAA_FRAG" || fail "taa.frag missing historyBleed anti-e
 grep -q 'Heuristic reactive always runs' "$TAA_FRAG" || fail "taa.frag must keep heuristic reactive independent of stamp mask"
 pass "temporal overlay: TAA+MVs, aaMode 4, no cleanup halo, weapon-after pinned"
 
-# --- Unified Clustered (opt-in mode 3; must not displace Spine stable mode 2) ---
+# --- Unified Clustered default mode 3 ---
 CLUSTERED="$ROOT/config/modern_clustered.cfg"
 UC_OVERLAY="$ROOT/config/vulkan_overlay_unified_clustered.cfg"
 GEN_FRAG="$ROOT/renderers/vulkan/shaders/glsl/gen_frag.tmpl"
 OIT_ACCUM="$ROOT/renderers/vulkan/shaders/glsl/oit_accum.frag"
 OIT_MBOIT="$ROOT/renderers/vulkan/shaders/glsl/oit_accum_mboit.frag"
 [[ -f "$CLUSTERED" && -f "$UC_OVERLAY" ]] || fail "missing modern_clustered / unified clustered overlay"
-cvar_is "$STABLE" r_renderMode 2 || fail "stable must remain renderMode 2 (clustered is opt-in)"
+cvar_is "$STABLE" r_renderMode 3 || fail "stable must remain renderMode 3"
+cvar_is "$STABLE" r_forwardPlusZSlices 8 || fail "stable expects ZSlices 8"
+cvar_is "$STABLE" r_forwardPlusZSliceMode 1 || fail "stable expects logarithmic clustered Z slicing"
 cvar_is "$CLUSTERED" r_renderMode 3 || fail "modern_clustered expects r_renderMode 3"
 cvar_is "$CLUSTERED" r_forwardPlusZSlices 8 || fail "modern_clustered expects ZSlices 8"
 cvar_is "$CLUSTERED" r_taa 0 || fail "modern_clustered must keep TAA off (SMAA baseline)"
@@ -84,11 +87,11 @@ cvar_is "$UC_OVERLAY" r_forwardPlusZSlices 8 || fail "unified clustered overlay 
 grep -q 'forward_plus_cluster.glsl' "$GEN_FRAG" || fail "gen_frag.tmpl must include forward_plus_cluster.glsl"
 grep -q 'fp_cluster_index' "$GEN_FRAG" || fail "gen_frag.tmpl must use fp_cluster_index"
 grep -q 'forward_plus_cluster.glsl' "$OIT_ACCUM" || fail "oit_accum.frag must include forward_plus_cluster.glsl"
-grep -q 'fp_cluster_index' "$OIT_ACCUM" || fail "oit_accum.frag must use fp_cluster_index"
+grep -q 'FpEval_ForwardPlusAdd' "$OIT_ACCUM" || fail "oit_accum.frag must use shared clustered Forward+ lighting"
 grep -q 'forward_plus_cluster.glsl' "$OIT_MBOIT" || fail "oit_accum_mboit.frag must include forward_plus_cluster.glsl"
-grep -q 'fp_cluster_index' "$OIT_MBOIT" || fail "oit_accum_mboit.frag must use fp_cluster_index"
+grep -q 'FpEval_ForwardPlusAdd' "$OIT_MBOIT" || fail "oit_accum_mboit.frag must use shared clustered Forward+ lighting"
 grep -q 'Soft-cap Forward+ specular' "$GEN_FRAG" || fail "gen_frag.tmpl missing Forward+ specular soft-cap"
-pass "clustered opt-in: mode 3 + ZSlices 8, shared cluster GLSL, soft-cap; stable stays mode 2"
+pass "clustered default: mode 3 + ZSlices 8, shared cluster GLSL, soft-cap"
 
 # --- Safe recovery ---
 cvar_is "$SAFE" r_taa 0 || fail "gfx_safe must disable TAA"
@@ -115,7 +118,7 @@ cvar_is "$CERT" r_spineCert 1 || fail "Spine 1.1 cert expects r_spineCert 1"
 grep -q 'spine_1_1_oit_taa_weapon' "$REG_C" || fail "Spine 1.1 certified combo id missing"
 grep -q 'vk_spine_is_spine_1_1_combo' "$REG_C" || fail "Spine 1.1 combo detector missing"
 # Shipping defaults still must not enable OIT+TAA together
-cvar_is "$STABLE" r_renderMode 2 || fail "stable must remain mode 2 after Spine 1.1"
+cvar_is "$STABLE" r_renderMode 3 || fail "stable must remain mode 3 after Spine 1.1"
 pass "Spine 1.1 cert overlay present; shipping matrix unchanged"
 
 # --- Spine 1.2 mode model (opt-in; must not displace Tier A) ---

@@ -44,7 +44,11 @@ void ApplyQueuedCommands(int msec) {
 		}
 		switch (cmd.type) {
 		case RTS_COMMAND_BUILD:
-			CreateEntity(cmd.playerId, cmd.targetX, cmd.targetY);
+			if ( cmd.playerId > RTS_OWNER_NEUTRAL && cmd.playerId < kMaxPlayers &&
+					state.playerResources[cmd.playerId] >= kBuildCost ) {
+				state.playerResources[cmd.playerId] -= kBuildCost;
+				CreateEntity(cmd.playerId, cmd.targetX, cmd.targetY);
+			}
 			break;
 		case RTS_COMMAND_MOVE:
 			if (Entity *entity = FindEntity(cmd.entityId)) {
@@ -59,6 +63,16 @@ void ApplyQueuedCommands(int msec) {
 				Entity *target = FindEntity(cmd.targetEntityId);
 				if (target && CanControl(cmd, *attacker) && target->owner != attacker->owner) {
 					target->hitpoints -= 10;
+				}
+			}
+			break;
+		case RTS_COMMAND_GATHER:
+			if ( cmd.playerId > RTS_OWNER_NEUTRAL && cmd.playerId < kMaxPlayers ) {
+				if ( Entity *entity = FindEntity(cmd.entityId) ) {
+					if ( CanControl(cmd, *entity) ) {
+						const int amount = cmd.data > 0 ? cmd.data : kDefaultGatherAmount;
+						state.playerResources[cmd.playerId] += amount;
+					}
 				}
 			}
 			break;

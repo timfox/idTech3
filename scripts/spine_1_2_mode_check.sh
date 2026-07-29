@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Spine 1.2 mode model static contracts (Selective Hybrid + PT Reference).
-# Does not change boot defaults; forbids FG / presentation latency policies.
+# Keeps boot on clustered raster; forbids FG / presentation latency policies.
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
@@ -20,10 +20,10 @@ PT="$ROOT/config/vulkan_overlay_pt_reference.cfg"
 DOC="$ROOT/docs/RENDERER_SPINE_1.2.md"
 
 [[ -f "$STABLE" ]] || fail "missing modern_vulkan_stable.cfg"
-grep -qE 'seta r_renderMode 2' "$STABLE" || fail "stable must remain mode 2 (Tier A)"
+grep -qE 'seta r_renderMode 3' "$STABLE" || fail "stable must remain mode 3 (Unified Clustered Tier A)"
 grep -qE 'seta r_hybrid1 0' "$STABLE" || fail "stable must keep Hybrid1 off"
 grep -qE 'seta r_rtx 0' "$STABLE" || fail "stable must keep RTX off"
-pass "boot Tier A: mode 2, RT/Hybrid1 off"
+pass "boot Tier A: mode 3 clustered raster, RT/Hybrid1 off"
 
 grep -qE 'Cvar_CheckRange\( r_renderMode, "0", "5"' "$INIT" || fail "r_renderMode range must be 0-5"
 grep -q 'case 4:' "$MODE_C" || fail "mode 4 latch missing"

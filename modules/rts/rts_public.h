@@ -29,7 +29,8 @@ typedef enum rtsCommandType_e {
 	RTS_COMMAND_MOVE,
 	RTS_COMMAND_ATTACK,
 	RTS_COMMAND_STOP,
-	RTS_COMMAND_BUILD
+	RTS_COMMAND_BUILD,
+	RTS_COMMAND_GATHER
 } rtsCommandType_t;
 
 typedef struct rtsCommand_s {
@@ -56,6 +57,8 @@ int  RTS_GetExecutedCommandCount( void );
 int  RTS_GetEntityCount( void );
 int  RTS_GetEntityOwner( rtsEntityId_t id );
 int  RTS_GetEntityPosition( rtsEntityId_t id, int *x, int *y );
+int  RTS_GetEntityHitpoints( rtsEntityId_t id );
+int  RTS_GetPlayerResources( int playerId );
 int  RTS_SelectRect( int playerId, int minX, int minY, int maxX, int maxY, rtsEntityId_t *out, int maxOut );
 int  RTS_FindGridPath( int width, int height, const unsigned char *blocked, int startX, int startY, int goalX, int goalY, int *outX, int *outY, int maxOut );
 unsigned RTS_ComputeStateHash( void );

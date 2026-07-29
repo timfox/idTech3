@@ -178,7 +178,7 @@ void vk_update_postfx_params( uint32_t cmd_index )
 		/*
 		 * Deferred lighting (mode 1/3) writes view-dependent specular into color_image
 		 * before TAA. Prefer current more aggressively so highlight trails do not ghost.
-		 * Stable (mode 2, r_deferredLighting 0) is unaffected.
+		 * Legacy mode 2 without deferred lighting is unaffected.
 		 */
 		deferredLit = ( r_deferredLighting && r_deferredLighting->integer &&
 			r_renderMode && ( r_renderMode->integer == 1 || r_renderMode->integer == 3 ) ) ? qtrue : qfalse;

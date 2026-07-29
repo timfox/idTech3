@@ -16,6 +16,9 @@
 int main(void) {
 	rtsCommand_t cmd;
 	rtsCommand_t move;
+	rtsCommand_t enemyBuild;
+	rtsCommand_t attack;
+	rtsCommand_t gather;
 	rtsEntityId_t selected[4];
 	unsigned char blocked[25] = { 0 };
 	int pathX[16];
@@ -33,6 +36,7 @@ int main(void) {
 	ASSERT(RTS_GetPendingCommandCount() == 0, "initial command queue");
 	ASSERT(RTS_GetExecutedCommandCount() == 0, "initial replay command log");
 	ASSERT(RTS_GetEntityCount() == 0, "initial entity count");
+	ASSERT(RTS_GetPlayerResources(RTS_OWNER_PLAYER1) == 500, "initial player resources");
 
 	cmd.type = RTS_COMMAND_BUILD;
 	cmd.turn = 1;
@@ -57,7 +61,9 @@ int main(void) {
 	ASSERT(RTS_GetPendingCommandCount() == 0, "queue drained after turn");
 	ASSERT(RTS_GetExecutedCommandCount() == 2, "replay command log after first step");
 	ASSERT(RTS_GetEntityCount() == 2, "build commands create entities");
+	ASSERT(RTS_GetPlayerResources(RTS_OWNER_PLAYER1) == 300, "build commands spend resources");
 	ASSERT(RTS_GetEntityOwner(1) == RTS_OWNER_PLAYER1, "first built entity owner");
+	ASSERT(RTS_GetEntityHitpoints(1) == 100, "first built entity starts with full hitpoints");
 	ASSERT(RTS_GetEntityPosition(1, &x, &y) == 1, "first built entity position readable");
 	ASSERT(x == 16 && y == 32, "stable command ordering by player/sequence");
 
@@ -95,6 +101,44 @@ int main(void) {
 	ASSERT(x == 512 && y == 256, "move command updates controlled entity");
 	hashAfterMove = RTS_ComputeStateHash();
 	ASSERT(hashBeforeMove != hashAfterMove, "state hash changes after deterministic state mutation");
+
+	enemyBuild = cmd;
+	enemyBuild.turn = 4;
+	enemyBuild.playerId = RTS_OWNER_PLAYER2;
+	enemyBuild.sequence = 4;
+	enemyBuild.targetX = 1024;
+	enemyBuild.targetY = 256;
+	ASSERT(RTS_PostCommand(&enemyBuild) == 1, "post enemy build command");
+	RTS_RunTurn(50);
+	ASSERT(RTS_GetEntityCount() == 3, "enemy build creates entity");
+	ASSERT(RTS_GetEntityOwner(3) == RTS_OWNER_PLAYER2, "enemy entity owner");
+	ASSERT(RTS_GetEntityHitpoints(3) == 100, "enemy entity starts with full hitpoints");
+
+	attack.type = RTS_COMMAND_ATTACK;
+	attack.turn = 5;
+	attack.playerId = RTS_OWNER_PLAYER1;
+	attack.sequence = 5;
+	attack.entityId = 1;
+	attack.targetEntityId = 3;
+	attack.targetX = 0;
+	attack.targetY = 0;
+	attack.data = 0;
+	ASSERT(RTS_PostCommand(&attack) == 1, "post attack command");
+	RTS_RunTurn(50);
+	ASSERT(RTS_GetEntityHitpoints(3) == 90, "attack reduces enemy hitpoints");
+
+	gather.type = RTS_COMMAND_GATHER;
+	gather.turn = 6;
+	gather.playerId = RTS_OWNER_PLAYER1;
+	gather.sequence = 6;
+	gather.entityId = 1;
+	gather.targetEntityId = 0;
+	gather.targetX = 0;
+	gather.targetY = 0;
+	gather.data = 75;
+	ASSERT(RTS_PostCommand(&gather) == 1, "post gather command");
+	RTS_RunTurn(50);
+	ASSERT(RTS_GetPlayerResources(RTS_OWNER_PLAYER1) == 375, "gather command adds resources");
 
 	blocked[1 * 5 + 2] = 1;
 	blocked[2 * 5 + 2] = 1;

@@ -9,8 +9,8 @@
 |------|------|----------|
 | **0** | Classic forward (projector) | no |
 | **1** | Deferred split (opaque deferred + Forward+ transparent) | opt-in (`deferred_vulkan.cfg`) |
-| **2** | Forward+ primary | **yes** — `modern_vulkan.cfg` → `modern_vulkan_stable.cfg` |
-| **3** | Unified Clustered Hybrid | opt-in (`modern_clustered.cfg`) |
+| **2** | Forward+ legacy recovery | no — `gfx_safe.cfg` / low-latency fallback |
+| **3** | Unified Clustered Hybrid | **yes** — `modern_vulkan.cfg` → `modern_vulkan_stable.cfg` |
 | **4** | Tier B Selective Hybrid (RTX) | opt-in — **do not reclaim for vis-buffer** |
 | **5** | Tier C path-traced reference | opt-in |
 

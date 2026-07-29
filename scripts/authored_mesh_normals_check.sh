@@ -22,7 +22,7 @@ need "docs/AUTHORED_MESH_NORMALS.md"
 grep -q 'r_meshNormalPolicy' "$ROOT/renderers/vulkan/tr_mesh_normal_policy.c" || { echo "FAIL cvar missing"; fail=1; }
 grep -q 'R_MeshNormalPolicy_ProcessGLTFModel' "$ROOT/renderers/vulkan/tr_model_gltf.c" || { echo "FAIL glTF hook missing"; fail=1; }
 grep -q 'R_MeshNormalPolicy_Init' "$ROOT/renderers/vulkan/tr_init.c" || { echo "FAIL init hook missing"; fail=1; }
-grep -q 'meshNrm' "$ROOT/renderers/vulkan/tr_init_diagnostics.inc" || { echo "FAIL status line missing"; fail=1; }
+grep -q 'meshNrm' "$ROOT/renderers/vulkan/diagnostics/tr_init_diagnostics.inc" || { echo "FAIL status line missing"; fail=1; }
 grep -q 'tr_mesh_normal_policy.c' "$ROOT/engine/platform/win32/msvc2017/vulkan.vcxproj" || { echo "FAIL MSVC entry missing"; fail=1; }
 
 # Certified default must stay 0 in overlay docs / code default

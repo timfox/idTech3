@@ -347,8 +347,8 @@ elif ! grep -q 'seta r_aaMode 2' "$PROJECT_ROOT/config/modern_vulkan_stable.cfg"
   fail "modern_vulkan_stable.cfg must default r_aaMode 2 (SMAA 1x)"
 elif ! grep -q 'seta r_taa 0' "$PROJECT_ROOT/config/modern_vulkan_stable.cfg" 2>/dev/null; then
   fail "modern_vulkan_stable.cfg must default r_taa 0 (SMAA baseline)"
-elif ! grep -q 'seta r_renderMode 2' "$PROJECT_ROOT/config/modern_vulkan_stable.cfg" 2>/dev/null; then
-  fail "modern_vulkan_stable.cfg must default Forward+ mode 2"
+elif ! grep -q 'seta r_renderMode 3' "$PROJECT_ROOT/config/modern_vulkan_stable.cfg" 2>/dev/null; then
+  fail "modern_vulkan_stable.cfg must default Unified Clustered mode 3"
 elif ! test -f "$PROJECT_ROOT/config/gfx_safe.cfg"; then
   fail "missing config/gfx_safe.cfg recovery profile"
 elif ! grep -q 'vk_get_render_target_width' "$PROJECT_ROOT/renderers/vulkan/vk_post_aa.c" 2>/dev/null; then

@@ -462,8 +462,8 @@ static int R_RendererPrintCompatibilityWarnings( qboolean printOk )
 				R_RENDERER_WARN( "quality/rt/experimental profile expects r_deferredGBuffer 1 and r_deferredGBufferFill 1.\n" );
 			}
 		}
-		if ( r_deferredLighting && r_deferredLighting->integer ) {
-			R_RENDERER_WARN( "modern profile keeps r_deferredLighting 0; use renderer_modern_safe + vid_restart after mode-1/3 experiments.\n" );
+		if ( r_renderMode && r_renderMode->integer == 3 && ( !r_deferredLighting || !r_deferredLighting->integer ) ) {
+			R_RENDERER_WARN( "modern clustered profile expects r_deferredLighting 1 for opaque deferred lighting; use renderer_modern_safe + vid_restart after experiments.\n" );
 		}
 		if ( !R_RendererForwardPlusRuntimeReady() ) {
 			R_RENDERER_WARN( "modern profile cvars are active, but Forward+ runtime resources are incomplete (light/tile buffers or compute pipeline missing).\n" );

@@ -435,6 +435,8 @@ typedef enum {
 	G_RTS_GET_ENTITY_COUNT,		/* int RTS_GetEntityCount( void ) */
 	G_RTS_GET_ENTITY_OWNER,		/* int RTS_GetEntityOwner( rtsEntityId_t id ) */
 	G_RTS_GET_ENTITY_POSITION,	/* int RTS_GetEntityPosition( rtsEntityId_t id, int *x, int *y ) */
+	G_RTS_GET_ENTITY_HITPOINTS,	/* int RTS_GetEntityHitpoints( rtsEntityId_t id ) */
+	G_RTS_GET_PLAYER_RESOURCES,	/* int RTS_GetPlayerResources( int playerId ) */
 	G_RTS_COMPUTE_STATE_HASH,	/* unsigned RTS_ComputeStateHash( void ) */
 	/*
 	 * Surf extended trace. Writes a zero-initialized, versioned surfTraceEx_t

@@ -2,16 +2,16 @@
 
 **Status:** Foundation in progress — mode model + ownership gates landed; selective RT signal matrix and present-time adaptive recon are **not** fully certified.
 
-Spine 1.0 remains the certified production contract. Boot path is unchanged:
+Spine Tier A remains the certified production contract. Boot path:
 
-`modern_vulkan.cfg` → [`modern_vulkan_stable.cfg`](../config/modern_vulkan_stable.cfg) → **Forward+ mode 2** + SMAA + GTAO + TAA/OIT/RT off.
+`modern_vulkan.cfg` → [`modern_vulkan_stable.cfg`](../config/modern_vulkan_stable.cfg) → **Unified Clustered mode 3** + SMAA + GTAO + WBOIT, with TAA/RT off.
 
 ## Product tiers
 
 | Tier | Mode | Role |
 |------|------|------|
-| **A — Certified Raster** | `r_renderMode 2` | Production spine (boot default) |
-| Unified Clustered raster | `r_renderMode 3` | Opt-in deferred opaque + Forward+ transparent |
+| **A — Certified Raster** | `r_renderMode 3` | Production spine (boot default): deferred opaque + clustered transparent/OIT |
+| Forward+ legacy recovery | `r_renderMode 2` | Recovery / low-latency fallback |
 | **B — Selective Hybrid** | `r_renderMode 4` | Clustered raster primary; exclusive RT signal owners |
 | **C — Path-Traced Reference** | `r_renderMode 5` | Exclusive PT lighting (not an additive overlay) |
 
@@ -21,7 +21,7 @@ Spine 1.0 remains the certified production contract. Boot path is unchanged:
 - **No interpolated frame between simulation frames**
 - **No intentional one-frame presentation latency**
 - **Do not** turn all experimental systems on at once
-- **Do not** replace the certified Forward+ raster spine
+- **Do not** replace the certified clustered raster spine without updating the mode contract
 - **No** double lighting / double AO
 - **No** RT requirement for normal gameplay
 - **No** path-tracing overlay on top of completed raster lighting

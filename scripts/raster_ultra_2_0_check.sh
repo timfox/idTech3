@@ -43,7 +43,7 @@ if grep -n 'vk_spine_validate_ultra_frame_contract' "$ROOT/renderers/vulkan/vk_p
     fail=1
   fi
 fi
-grep -q 'raster_gi' "$ROOT/renderers/vulkan/tr_init_diagnostics.inc" || {
+grep -q 'raster_gi' "$ROOT/renderers/vulkan/diagnostics/tr_init_diagnostics.inc" || {
   echo "FAIL havenrp status must report raster_gi owner"
   fail=1
 }

@@ -693,6 +693,18 @@ static qboolean SV_GetValue( char* value, int valueSize, const char* key )
 		return qtrue;
 	}
 
+	if ( !Q_stricmp( key, "trap_RTS_GetEntityHitpoints" ) )
+	{
+		Com_sprintf( value, valueSize, "%i", G_RTS_GET_ENTITY_HITPOINTS );
+		return qtrue;
+	}
+
+	if ( !Q_stricmp( key, "trap_RTS_GetPlayerResources" ) )
+	{
+		Com_sprintf( value, valueSize, "%i", G_RTS_GET_PLAYER_RESOURCES );
+		return qtrue;
+	}
+
 	if ( !Q_stricmp( key, "trap_RTS_ComputeStateHash" ) )
 	{
 		Com_sprintf( value, valueSize, "%i", G_RTS_COMPUTE_STATE_HASH );
@@ -1635,6 +1647,12 @@ static intptr_t SV_GameSystemCalls( intptr_t *args ) {
 
 	case G_RTS_GET_ENTITY_POSITION:
 		return RTS_GetEntityPosition( args[1], (int *)VMA( 2 ), (int *)VMA( 3 ) );
+
+	case G_RTS_GET_ENTITY_HITPOINTS:
+		return RTS_GetEntityHitpoints( args[1] );
+
+	case G_RTS_GET_PLAYER_RESOURCES:
+		return RTS_GetPlayerResources( args[1] );
 
 	case G_RTS_COMPUTE_STATE_HASH:
 		return (intptr_t)RTS_ComputeStateHash();

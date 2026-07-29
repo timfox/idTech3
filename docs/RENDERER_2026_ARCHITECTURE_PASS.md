@@ -25,7 +25,7 @@ For the second-half execution plan that prioritizes shipping-path stabilization,
 
 ### What still limits the architecture
 
-- The Vulkan renderer now has a documented **modern default**: `modern_vulkan.cfg` uses **`r_renderMode 2`** clustered Forward+ (`r_forwardPlus`, `r_forwardPlusShade`, up to **64** GPU lights via `VK_FP_MAX_GPU_LIGHTS`) with HDR/PBR/TAA and a deferred G-buffer sidecar. Full deferred lighting remains `r_renderMode 1` / `r_deferredLighting 1` and is not the default.
+- The Vulkan renderer now has a documented **modern default**: `modern_vulkan.cfg` uses **`r_renderMode 3`** Unified Clustered (`r_forwardPlus`, `r_forwardPlusShade`, `r_forwardPlusZSlices 8`, up to **64** GPU lights via `VK_FP_MAX_GPU_LIGHTS`) with HDR/PBR/SMAA, WBOIT, deferred opaque lighting, and clustered transparent/OIT lighting. Mode 2 remains a legacy Forward+ recovery path.
 - Dynamic lighting on the **classic** path still uses **`MAX_DLIGHTS == 32`** surface **`dlightBits`**; Forward+ packs **`refdef.dlights`** separately (see [FORWARD_PLUS_PIPELINE_AUDIT.md](FORWARD_PLUS_PIPELINE_AUDIT.md)).
 - Temporal behavior is fragmented. Volumetric fog, exposure, motion vectors, occlusion visibility, and post effects each track history differently.
 - As of **July 18, 2026**, late-frame tuning changes inside an otherwise working mode-2 stack can still reproduce black/corrupted output and **`VK_ERROR_DEVICE_LOST`**, which is a sign that pass ownership and post-stack safety are still not fully robust.
@@ -163,7 +163,7 @@ Use **Vulkan as the only shipping renderer**, invest in **DXR + WebGPU** as road
 
 ## Phase 2: Lighting Scale
 
-- Add Vulkan light records plus cluster/tile culling. **Incremental (engine):** `r_forwardPlus 1` (default **1**) allocates light + tile SSBOs, packs up to **`VK_FP_MAX_GPU_LIGHTS` (64)** from `refdef.dlights` (classic **`tess.dlightBits`** skip still applies to indices **0–31** only), and runs **compute tile cull** (`forward_plus_tile_cull.comp`, **16 px** tiles, up to **8** slots per tile via latched **`r_forwardPlusMaxPerTile`**). **`r_renderMode 2`** latches Forward+ shade on via `tr_render_mode_vk.c`. Tile grid uses **`vk_get_render_target_width/height`**; SSBOs reallocate on resize. **PBR:** `r_forwardPlusDebug`, **`r_forwardPlusShade`** (pipeline invalidation on change). **Formal audit:** [FORWARD_PLUS_PIPELINE_AUDIT.md](FORWARD_PLUS_PIPELINE_AUDIT.md).
+- Add Vulkan light records plus cluster/tile culling. **Incremental (engine):** `r_forwardPlus 1` (default **1**) allocates light + cluster SSBOs, packs up to **`VK_FP_MAX_GPU_LIGHTS` (64)** from `refdef.dlights` (classic **`tess.dlightBits`** skip still applies to indices **0–31** only), and runs **compute cluster cull** (`forward_plus_tile_cull.comp`, **16 px** tiles, up to **8** slots per tile/slice via latched **`r_forwardPlusMaxPerTile`**). **`r_renderMode 3`** latches Forward+ shade, overflow shade, G-buffer, deferred lighting, and 8 logarithmic Z slices via `tr_render_mode_vk.c`. Tile grid uses **`vk_get_render_target_width/height`**; SSBOs reallocate on resize. **PBR/OIT:** `r_forwardPlusDebug`, **`r_forwardPlusShade`** (pipeline invalidation on change). **Formal audit:** [FORWARD_PLUS_PIPELINE_AUDIT.md](FORWARD_PLUS_PIPELINE_AUDIT.md).
 - Introduce Forward+ shading for local lights.
 - Keep shadow budgets conservative and explicit.
 

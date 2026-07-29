@@ -23,8 +23,13 @@ void ResetState() {
 extern "C" {
 
 void RTS_Init( void ) {
+	int i;
+
 	rts::ResetState();
 	rts::GetState().initialized = true;
+	for ( i = RTS_OWNER_PLAYER1; i <= RTS_OWNER_PLAYER4; i++ ) {
+		rts::GetState().playerResources[i] = rts::kInitialPlayerResources;
+	}
 }
 
 void RTS_Shutdown( void ) {
@@ -68,6 +73,18 @@ int RTS_GetEntityPosition( rtsEntityId_t id, int *x, int *y ) {
 		*y = entity->y;
 	}
 	return 1;
+}
+
+int RTS_GetEntityHitpoints( rtsEntityId_t id ) {
+	const rts::Entity *entity = rts::FindEntityConst( id );
+	return entity ? entity->hitpoints : 0;
+}
+
+int RTS_GetPlayerResources( int playerId ) {
+	if ( playerId <= RTS_OWNER_NEUTRAL || playerId >= rts::kMaxPlayers ) {
+		return 0;
+	}
+	return rts::GetState().playerResources[playerId];
 }
 
 unsigned RTS_ComputeStateHash( void ) {

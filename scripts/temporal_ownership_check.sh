@@ -15,7 +15,7 @@ BE="$ROOT/renderers/vulkan/tr_backend.c"
 PRES="$ROOT/renderers/vulkan/vk_presentation.c"
 BSP="$ROOT/renderers/vulkan/tr_bsp.c"
 INIT="$ROOT/renderers/vulkan/tr_init.c"
-DIAG="$ROOT/renderers/vulkan/tr_init_diagnostics.inc"
+DIAG="$ROOT/renderers/vulkan/diagnostics/tr_init_diagnostics.inc"
 FRAME="$ROOT/renderers/vulkan/vk_frame_end.c"
 
 [[ -f "$TEMP_C" && -f "$TEMP_H" ]] || fail "missing vk_temporal sources"

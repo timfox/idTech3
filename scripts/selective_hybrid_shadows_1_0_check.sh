@@ -22,7 +22,7 @@ RQ="$ROOT/renderers/vulkan/shaders/glsl/selective_hybrid/shs_sun_shadow.comp"
 COMP="$ROOT/renderers/vulkan/shaders/glsl/hybrid1/hybrid1_composite.comp"
 
 [[ -f "$STABLE" ]] || fail "missing modern_vulkan_stable.cfg"
-grep -qE 'seta r_renderMode 2' "$STABLE" || fail "stable must remain mode 2"
+grep -qE 'seta r_renderMode 3' "$STABLE" || fail "stable must remain mode 3"
 grep -qE 'seta r_hybrid1 0' "$STABLE" || fail "stable must keep Hybrid1 off"
 ! grep -q 'r_selectiveHybridSunShadow 1' "$MODERN" "$STABLE" || fail "boot configs must not enable SHS"
 pass "boot spine untouched"
@@ -44,7 +44,7 @@ grep -q 'ignoreIntersectionEXT' "$ROOT/renderers/vulkan/shaders/glsl/hybrid1/hyb
 grep -q 'RTX_PRIM_MATERIAL_FLAG_ALPHA_TEST' "$ROOT/renderers/vulkan/extensions/rtx/vk_rtx_bindless.h" || fail "alpha-test prim flag missing"
 grep -q 'shsMode' "$COMP" || fail "composite SHS sun-term mode missing"
 grep -q 'r_shsFailInject' "$SHS_C" || fail "fail inject missing"
-grep -q 'sunShadow=' "$ROOT/renderers/vulkan/tr_init_diagnostics.inc" || fail "havenrp status sun owner missing"
+grep -q 'sunShadow=' "$ROOT/renderers/vulkan/diagnostics/tr_init_diagnostics.inc" || fail "havenrp status sun owner missing"
 pass "ownership router + raw RQ + composite + fail inject + status"
 
 grep -q 'hist_shadow' "$HYB" || fail "dedicated shadow history missing"

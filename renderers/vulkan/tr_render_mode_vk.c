@@ -5,7 +5,7 @@ Copyright (C) 2026 Gopex LLC. All rights reserved.
 Apply latched r_renderMode to Vulkan lighting path
 (forward / deferred / Forward+ / Unified Clustered / Selective Hybrid / PT Reference).
 
-Spine 1.0 boot remains mode 2 (modern_vulkan_stable.cfg). Modes 4–5 are opt-in.
+Spine boot defaults to mode 3 (modern_vulkan_stable.cfg). Modes 4–5 are opt-in.
 No frame generation. No intentional one-frame presentation latency.
 ===========================================================================
 */
@@ -19,8 +19,8 @@ cvar_t *r_presentAdaptiveRecon;
 static const renderModeProfile_t s_renderModeProfiles[] = {
 	{ 0, "classic_forward", "legacy", qfalse, qfalse, qfalse, qfalse, qfalse, qfalse },
 	{ 1, "deferred_split", "development", qtrue, qtrue, qtrue, qtrue, qfalse, qfalse },
-	{ 2, "tier_a_certified_raster", "spine_a", qtrue, qtrue, qfalse, qfalse, qfalse, qtrue },
-	{ 3, "unified_clustered_raster", "spine_a_plus", qtrue, qtrue, qtrue, qtrue, qfalse, qfalse },
+	{ 2, "forward_plus_legacy_raster", "legacy_recovery", qtrue, qtrue, qfalse, qfalse, qfalse, qfalse },
+	{ 3, "unified_clustered_raster", "spine_a", qtrue, qtrue, qtrue, qtrue, qfalse, qtrue },
 	{ 4, "tier_b_selective_hybrid", "spine_b", qtrue, qtrue, qtrue, qtrue, qfalse, qfalse },
 	{ 5, "tier_c_path_traced_reference", "spine_c", qtrue, qtrue, qtrue, qtrue, qtrue, qfalse }
 };
@@ -73,6 +73,8 @@ static void R_LatchUnifiedClusteredBase( void )
 {
 	R_LatchCvarInt( r_forwardPlus, "r_forwardPlus", 1 );
 	R_LatchCvarInt( r_forwardPlusDepthCull, "r_forwardPlusDepthCull", 1 );
+	R_LatchCvarInt( r_forwardPlusZSlices, "r_forwardPlusZSlices", 8 );
+	R_LatchCvarInt( r_forwardPlusZSliceMode, "r_forwardPlusZSliceMode", 1 );
 	R_LatchCvarInt( r_deferredGBuffer, "r_deferredGBuffer", 1 );
 	R_LatchCvarInt( r_deferredGBufferFill, "r_deferredGBufferFill", 1 );
 	R_LatchCvarInt( r_deferredLighting, "r_deferredLighting", 1 );
@@ -88,7 +90,7 @@ static void R_LatchUnifiedClusteredBase( void )
 
 qboolean R_RenderMode_IsCertifiedRaster( void )
 {
-	return ( r_renderMode && r_renderMode->integer == 2 ) ? qtrue : qfalse;
+	return ( r_renderMode && r_renderMode->integer == 3 ) ? qtrue : qfalse;
 }
 
 qboolean R_RenderMode_IsUnifiedClustered( void )
@@ -239,8 +241,8 @@ void R_ApplyRenderModeLatch( void )
 		if ( mode != s_last_logged_mode ) {
 			ri.Printf( PRINT_ALL,
 				"[VK] Unified Clustered Renderer (r_renderMode 3): hybrid deferred opaque + "
-				"Forward+ transparent; shared light grid (GPU cap %u, Z-slices %d). Opt-in — "
-				"Spine 1.0 boot remains mode 2.\n",
+				"Forward+ transparent/OIT; shared clustered light grid (GPU cap %u, Z-slices %d). "
+				"Default raster spine.\n",
 				(unsigned)VK_FP_MAX_GPU_LIGHTS,
 				r_forwardPlusZSlices ? r_forwardPlusZSlices->integer : 1 );
 			s_last_logged_mode = mode;

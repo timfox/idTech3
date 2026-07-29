@@ -2859,8 +2859,8 @@ static void R_Register( void )
 		"Vulkan lighting path (latched, vid_restart).\n"
 		" 0: Forward (classic projector; r_forwardPlus may still be 1)\n"
 		" 1: Deferred opaque + Forward+ transparent (r_deferredLighting 1)\n"
-		" 2: Tier A Certified Raster — Forward+ primary (Spine 1.0 boot via modern_vulkan.cfg)\n"
-		" 3: Unified Clustered — deferred opaque + Forward+ transparent (opt-in)\n"
+		" 2: Forward+ legacy recovery — single 2D tiled raster lighting path\n"
+		" 3: Unified Clustered — deferred opaque + clustered Forward+/OIT transparent (default via modern_vulkan.cfg)\n"
 		" 4: Tier B Selective Hybrid — clustered raster + exclusive RT signal owners (opt-in; RTX)\n"
 		" 5: Tier C Path-Traced Reference — exclusive PT lighting (opt-in; not gameplay default)\n"
 		"See docs/RENDERER_SPINE_1.2.md. Recovery: exec modern_vulkan.cfg / gfx_safe.cfg." );
@@ -3735,7 +3735,7 @@ static void R_Register( void )
 	ri.Cvar_SetGroup( r_vdbFogBlend, CVG_RENDERER );
 	r_forwardPlus = ri.Cvar_Get( "r_forwardPlus", "1", CVAR_ARCHIVE_ND | CVAR_LATCH );
 	ri.Cvar_CheckRange( r_forwardPlus, "0", "1", CV_INTEGER );
-	ri.Cvar_SetDescription( r_forwardPlus, "Forward+ (default 1 on Vulkan): device-local light SSBO + per-tile cull (16px tiles; \\r_forwardPlusMaxPerTile 4-8). Packs up to 64 refdef dlights on GPU; tess.dlightBits skip applies to indices 0-31 only. PBR: \\r_forwardPlusDebug, \\r_forwardPlusShade. r_renderMode 2 forces this on. See docs/FORWARD_PLUS_PIPELINE_AUDIT.md." );
+	ri.Cvar_SetDescription( r_forwardPlus, "Clustered/Forward+ light lists (default 1 on Vulkan): device-local light SSBO + per-tile or per-cluster cull (16px tiles; \\r_forwardPlusMaxPerTile 4-8). Packs up to 64 refdef dlights on GPU; tess.dlightBits skip applies to indices 0-31 only. PBR/OIT: \\r_forwardPlusDebug, \\r_forwardPlusShade. r_renderMode 2/3/4/5 force this on; mode 3 is the default clustered opaque/transparent path. See docs/FORWARD_PLUS_PIPELINE_AUDIT.md." );
 	ri.Cvar_SetGroup( r_forwardPlus, CVG_RENDERER );
 	r_forwardPlusMaxPerTile = ri.Cvar_Get( "r_forwardPlusMaxPerTile", "8", CVAR_ARCHIVE_ND | CVAR_LATCH );
 	{

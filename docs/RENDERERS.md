@@ -19,9 +19,9 @@ Build: `./scripts/compile_engine.sh vulkan` (OpenGL/`opengl` arg is rejected).
 The Vulkan 1.4 renderer is the primary rendering backend, built as a shared library (`idtech3_vulkan.so`). Requests Vulkan 1.4 when available; validation layers (Khronos, then LUNARG fallback) are enabled in debug builds on all platforms.
 
 ### Current Architecture
-- **Modern Vulkan default:** `exec modern_vulkan.cfg` → `modern_vulkan_stable.cfg` (Forward+ mode 2, SMAA, GTAO, bloom, SH/IBL). Quality/WBOIT: `modern_vulkan_quality.cfg`. Recovery: `gfx_safe.cfg`. See [RENDERER_SPINE_1.0.md](RENDERER_SPINE_1.0.md).
-- `r_renderMode`: **0** forward (classic projector; `r_forwardPlus` may still be 1), **1** deferred lighting mode (G-buffer + optional `r_deferredLighting`), **2** Forward+ primary (**Spine default**), **3** Unified Clustered Renderer (deferred opaque + Forward+ transparent — `modern_clustered.cfg` / experimental). North-star 2027 stack builds on mode 3 — see [RENDERER_2027.md](RENDERER_2027.md).
-- **Deferred G-buffer sidecar:** `r_deferredGBuffer 1` + `r_deferredGBufferFill 1` now works with `r_renderMode` 1, 2, and 3. In mode 2/3 the deferred G-buffer sidecar captures albedo/normal/material for temporal, neural, RT, and debug consumers. `r_deferredLighting` runs in modes **1** and **3** (ignored in mode 2).
+- **Modern Vulkan default:** `exec modern_vulkan.cfg` → `modern_vulkan_stable.cfg` (Unified Clustered mode 3, SMAA, GTAO, bloom, SH/IBL, WBOIT). Quality: `modern_vulkan_quality.cfg`. Recovery: `gfx_safe.cfg`. See [RENDERER_SPINE_1.0.md](RENDERER_SPINE_1.0.md).
+- `r_renderMode`: **0** forward (classic projector; `r_forwardPlus` may still be 1), **1** deferred lighting mode, **2** Forward+ legacy recovery, **3** Unified Clustered Renderer (**Spine default**: deferred opaque + clustered Forward+/OIT transparent), **4/5** hybrid/reference modes. North-star 2027 stack builds on mode 3 — see [RENDERER_2027.md](RENDERER_2027.md).
+- **Deferred G-buffer sidecar and lighting:** the deferred G-buffer sidecar (`r_deferredGBuffer 1` + `r_deferredGBufferFill 1`) works with `r_renderMode` 1, 2, and 3. In default mode 3, opaque surfaces use deferred lighting while transparent/OIT surfaces consume the same clustered Forward+ lists. `r_deferredLighting` runs in modes **1** and **3** (ignored in mode 2).
 - Vulkan is the supported rendering backend
 - **Shared temporal reset policy** (`vk_temporal.c`): centralizes history invalidation for volumetrics, motion vectors, exposure. Resize, map load, camera cut, and missing prev-frame data trigger resets. Used by Temporal Reconstruction (`r_taa` / `r_aaMode` 4–5) and volumetric history.
 - See [RENDERER_SPINE_1.0.md](RENDERER_SPINE_1.0.md) for the production-spine milestone (stabilize before adding techniques)
@@ -36,7 +36,7 @@ exec modern_vulkan.cfg
 vid_restart
 ```
 
-`modern_native.cfg` inherits this profile automatically when `cl_autoGraphicsProfile 1` loads a native cgame. The shipping default is the **Spine stable Forward+** profile (`modern_vulkan_stable.cfg`): mode 2, **SMAA 1x**, GTAO, no TAA/OIT/RT/vis-buffer/open-world. Opt-in quality (WBOIT+SSR): `exec modern_vulkan_quality.cfg`. Unified Clustered: `exec modern_clustered.cfg`. Temporal Reconstruction: `exec vulkan_overlay_temporal_recon.cfg`. Bisect with `exec gfx_safe.cfg` or `renderer_modern_safe`.
+`modern_native.cfg` inherits this profile automatically when `cl_autoGraphicsProfile 1` loads a native cgame. The shipping default is the **Spine stable Unified Clustered** profile (`modern_vulkan_stable.cfg`): mode 3, **SMAA 1x**, GTAO, WBOIT, no TAA/RT/vis-buffer/open-world. Quality (SSR + volumetrics): `exec modern_vulkan_quality.cfg`. `exec modern_clustered.cfg` reasserts the same clustered defaults after experiments. Temporal Reconstruction: `exec vulkan_overlay_temporal_recon.cfg`. Bisect with `exec gfx_safe.cfg` or `renderer_modern_safe`.
 
 For an in-session recovery back to the documented modern baseline after deferred or clustered experiments:
 
@@ -45,7 +45,7 @@ renderer_modern_safe
 vid_restart
 ```
 
-This restores mode 2 Forward+, depth-cull, the sidecar G-buffer, HDR/PBR, SMAA baseline (TAA off), and turns deferred lighting / OIT / Hybrid1 / open-world back off.
+This restores the mode 3 clustered default, depth-cull, 8 logarithmic Z slices, deferred opaque lighting, clustered-lit WBOIT, HDR/PBR, SMAA baseline (TAA off), and turns Hybrid1 / open-world back off.
 
 The CI confidence target for this path is `test_modern_renderer_profile_runtime`: source-only checks run on normal hosted CI, while the self-hosted renderer Tier B workflow launches the client and exercises `renderer_profile`, `renderer_status`, and `renderer_compatibility` against the minimal renderer validation pack. `renderer_status` includes dedicated `lighting` and `gi/neural` rows so Forward+/SSAO/volumetrics/IBL plus NDGI/NIV/VFGI/NVC readiness can be checked without digging through individual cvars.
 
@@ -53,15 +53,15 @@ The CI confidence target for this path is `test_modern_renderer_profile_runtime`
 |------|------------------|
 | Framebuffer/HDR | `r_fbo 1`, `r_hdr 2` |
 | Materials | `r_pbr 1`, `r_materialBlend 1` |
-| Lighting | `r_renderMode 2`, `r_forwardPlus 1`, `r_forwardPlusShade 1`, `r_forwardPlusDepthCull 1`, `r_deferredLighting 0` |
+| Lighting | `r_renderMode 3`, `r_forwardPlus 1`, `r_forwardPlusShade 1`, `r_forwardPlusDepthCull 1`, `r_forwardPlusZSlices 8`, `r_forwardPlusZSliceMode 1`, `r_deferredLighting 1` |
 | Deferred data | `r_deferredGBuffer 1`, `r_deferredGBufferFill 1` |
 | Ambient visibility | `r_ambientVisibilityMode 2` production GTAO; legacy `r_ssao 0` |
-| Presentation AA | `r_aaMode 2` (SMAA 1x), `r_taa 0` |
+| Presentation AA | `r_aaMode 2` (SMAA 1x), `r_taa 0`, `r_taaMotionVectors 1` |
 | Post AA | `r_ext_smaa 1`, `r_postAaAfterBloom 1` |
 
 ### Vulkan Overlays
 
-The renderer profile rule is: start from **one** modern base (`modern_vulkan.cfg` → stable Forward+ mode 2), then apply an overlay only for the experimental path you want to test.
+The renderer profile rule is: start from **one** modern base (`modern_vulkan.cfg` → stable Unified Clustered mode 3), then apply an overlay only for the experimental path you want to test.
 
 | Overlay | Use | Notes |
 |---------|-----|-------|
@@ -106,13 +106,13 @@ renderer_deferred_safe
 vid_restart
 ```
 
-This profile sets `r_renderMode 1`, `r_deferredGBuffer 1`, `r_deferredGBufferFill 1`, and `r_deferredLighting 1`. It uses the same **opaque deferred + Forward+ transparent** split as mode 3 (`r_forwardPlusShade 1` on transparent; opaque handoff skips Forward+ add). Prefer `r_ext_multisample 0` for direct material export; MSAA uses depth-fallback fill with `deferredMsaaSafeMaterials` confidence floor. Safe debug: `renderer_deferred_safe`. Shipping default remains `modern_vulkan.cfg` (Spine stable mode 2).
+This profile sets `r_renderMode 1`, `r_deferredGBuffer 1`, `r_deferredGBufferFill 1`, and `r_deferredLighting 1`. It uses the same **opaque deferred + Forward+ transparent** split as mode 3 (`r_forwardPlusShade 1` on transparent; opaque handoff skips Forward+ add). Prefer `r_ext_multisample 0` for direct material export; MSAA uses depth-fallback fill with `deferredMsaaSafeMaterials` confidence floor. Safe debug: `renderer_deferred_safe`. Shipping default remains `modern_vulkan.cfg` (Spine stable mode 3).
 
 The G-buffer fill copies scene albedo. On **non-MSAA** FBO frames, opaque PBR shaders **directly export** normals and material (metalness/roughness/AO). **MSAA** forces the depth-derived fallback (default metal/rough/AO=1). Prefer `r_ext_multisample 0` with `modern_vulkan.cfg` for true material export. Fallback defaults: `r_deferredDefaultMetalness`, `r_deferredDefaultRoughness`, `r_deferredNormalEdgeThreshold`.
 
 ### Vulkan Forward+ scaffolding
 
-**GPU light packing + per-tile cull** on the forward path (`r_forwardPlus` default **1**; `r_renderMode 2` / `modern_vulkan.cfg` force it on):
+**GPU light packing + per-cluster cull** on the default clustered path (`r_forwardPlus` default **1**; `r_renderMode 3` / `modern_vulkan.cfg` force it on):
 
 | Cvar | Role |
 |------|------|
@@ -309,11 +309,11 @@ The old SSAO/HBAO implementation remains available only as mode 1 and as a fallb
 |------|---------|-------------|
 | `r_fbo` | 1 | Framebuffer objects (required for PBR, HDR, bloom, MSAA, SMAA, SSAO). Use vid_restart after changing. |
 | `r_pbr` | 1 | Physically Based Rendering (metalness/roughness, IBL). Requires r_fbo 1. |
-| `r_renderMode` | 0 | **0** forward, **1** deferred lighting mode, **2** Forward+ primary (**Spine shipping default** via `modern_vulkan.cfg` → `modern_vulkan_stable.cfg`), **3** Unified Clustered (opt-in `modern_clustered.cfg`). Latched; `vid_restart`. Path ownership: [RENDERER_PATH_OWNERSHIP.md](RENDERER_PATH_OWNERSHIP.md). |
+| `r_renderMode` | 0 | **0** forward, **1** deferred lighting mode, **2** Forward+ legacy recovery, **3** Unified Clustered (**Spine shipping default** via `modern_vulkan.cfg` → `modern_vulkan_stable.cfg`). Latched; `vid_restart`. Path ownership: [RENDERER_PATH_OWNERSHIP.md](RENDERER_PATH_OWNERSHIP.md). |
 | `r_deferredGBuffer` | 0 | With `r_renderMode` 1/2/3: allocate albedo/normal/material/lighting G-buffer images. `modern_vulkan.cfg` sets **1** as a sidecar. Latched; `r_fbo` 1. |
 | `r_deferredGBufferFill` | 0 | With G-buffer RTs: copy scene albedo after geometry (mode 3: after opaque). On non-MSAA FBO frames, opaque PBR material shaders directly export normals and material; MSAA/legacy paths keep the depth-derived fallback. Material is RGBA16F: metalness, roughness, AO, source confidence. `modern_vulkan.cfg` sets **1**. |
 | `r_deferredGBufferDebug` | 0 | Before bloom: show G-buffer on scene color (1=albedo, 2=normal, 3=material, 4=lighting, 5=normal confidence, 6=motion vectors from the main material pass). |
-| `r_deferredLighting` | 0 | Deferred dynamic lights (Forward+ tiles, point+spot): Disney/Burley **Fd** + Fresnel **kD**, GGX specular. Modes **1** and **3** (also 4). Mode 1/3 keep Forward+ shade for transparent; opaque handoff skips Forward+ add when path-ready. Ignored by mode-2 modern default. |
+| `r_deferredLighting` | 0 | Deferred dynamic lights (Forward+ clusters, point+spot): Disney/Burley **Fd** + Fresnel **kD**, GGX specular. Modes **1** and **3** (also 4). Mode 1/3 keep Forward+ shade for transparent; opaque handoff skips Forward+ add when path-ready. Enabled by the mode-3 modern default. |
 | `r_deferredUnlitBase` | 1 | Additive dynamic on static-lit scene copy; skips classic lit-surf pass. **0** = legacy multiply composite. |
 | `r_deferredLightingStrength` | 1 | Scale deferred dynamic diffuse (0–4). |
 | `r_deferredSpecular` | 1 | GGX + Smith + Fresnel specular on deferred dynamic lights (0=diffuse only). |

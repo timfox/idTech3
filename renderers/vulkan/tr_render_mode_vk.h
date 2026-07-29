@@ -29,12 +29,12 @@ typedef struct renderModeProfile_s {
 void R_ApplyRenderModeLatch( void );
 
 /* Product tiers (Spine 1.2):
- *  2 — Tier A Certified Raster (Forward+)
- *  3 — Unified Clustered raster
+ *  2 — Forward+ legacy recovery
+ *  3 — Unified Clustered raster (default certified raster)
  *  4 — Tier B Selective Hybrid
  *  5 — Tier C Full Path-Traced Reference
  */
-qboolean R_RenderMode_IsCertifiedRaster( void );      /* mode 2 */
+qboolean R_RenderMode_IsCertifiedRaster( void );      /* mode 3 */
 qboolean R_RenderMode_IsUnifiedClustered( void );     /* mode 3 or 4 base raster */
 qboolean R_RenderMode_IsSelectiveHybrid( void );      /* mode 4 */
 qboolean R_RenderMode_IsPathTracedReference( void );  /* mode 5 */

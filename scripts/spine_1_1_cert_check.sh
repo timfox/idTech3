@@ -17,17 +17,17 @@ REG_H="$ROOT/renderers/vulkan/vk_pass_registry.h"
 FRAME="$ROOT/renderers/vulkan/vk_frame_end.c"
 DESC="$ROOT/renderers/vulkan/vk_descriptor_sets.c"
 OIT="$ROOT/renderers/vulkan/vk_postfx_passes.c"
-DIAG="$ROOT/renderers/vulkan/tr_init_diagnostics.inc"
+DIAG="$ROOT/renderers/vulkan/diagnostics/tr_init_diagnostics.inc"
 
 [[ -f "$STABLE" ]] || fail "missing modern_vulkan_stable.cfg"
 [[ -f "$CERT" ]] || fail "missing vulkan_overlay_spine_1_1_cert.cfg"
 [[ -f "$TEMPORAL" ]] || fail "missing temporal recon overlay"
 
-# Boot remains Spine 1.0 shipping
-grep -qE 'seta r_renderMode 2' "$STABLE" || fail "stable must remain mode 2"
+# Boot remains clustered raster shipping
+grep -qE 'seta r_renderMode 3' "$STABLE" || fail "stable must remain mode 3"
 grep -qE 'seta r_taa 0' "$STABLE" || fail "stable must keep TAA off"
-grep -qE 'seta r_oit 0' "$STABLE" || fail "stable must keep OIT off"
-pass "boot stable remains mode2 + no TAA/OIT"
+grep -qE 'seta r_oit 1' "$STABLE" || fail "stable must keep production WBOIT on"
+pass "boot stable remains mode3 + WBOIT, no TAA"
 
 # Cert overlay pins
 grep -q 'exec modern_clustered.cfg' "$CERT" || fail "cert must exec modern_clustered"

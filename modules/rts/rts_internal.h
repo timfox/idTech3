@@ -6,6 +6,11 @@
 
 namespace rts {
 
+constexpr int kMaxPlayers = RTS_OWNER_PLAYER4 + 1;
+constexpr int kInitialPlayerResources = 500;
+constexpr int kBuildCost = 100;
+constexpr int kDefaultGatherAmount = 25;
+
 struct Entity {
 	rtsEntityId_t id = 0;
 	int owner = RTS_OWNER_NEUTRAL;
@@ -23,6 +28,7 @@ struct State {
 	std::vector<rtsCommand_t> pendingCommands;
 	std::vector<rtsCommand_t> executedCommands;
 	std::vector<rtsEntityId_t> selectionScratch;
+	int playerResources[kMaxPlayers] = {};
 };
 
 State &GetState();

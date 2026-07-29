@@ -99,7 +99,7 @@ pass "weapon/NOWORLDMODEL guard on non-split path"
 grep -q 'r_dgbFailInject' "$DGB_C" "$ATT" || fail "r_dgbFailInject missing"
 grep -q 'r_avFailInject' "$AV_C" || fail "r_avFailInject missing"
 grep -q 'deferred_gbuffer_status' "$ROOT/renderers/vulkan/tr_init.c" || fail "deferred_gbuffer_status command missing"
-grep -q 'gbuffer   :' "$ROOT/renderers/vulkan/tr_init_diagnostics.inc" || fail "havenrp_renderer_status gbuffer block missing"
+grep -q 'gbuffer   :' "$ROOT/renderers/vulkan/diagnostics/tr_init_diagnostics.inc" || fail "havenrp_renderer_status gbuffer block missing"
 pass "failure injection + diagnostics"
 
 # Forward+ AV composite (mode 2)

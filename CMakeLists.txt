@@ -4073,6 +4073,7 @@ if(BUILD_UNIT_TESTS)
 		${CMAKE_SOURCE_DIR}
 		${CMAKE_SOURCE_DIR}/modules
 		${CMAKE_SOURCE_DIR}/runtime
+		${CMAKE_SOURCE_DIR}/runtime/server
 		${CMAKE_SOURCE_DIR}/extensions/research
 		${IDTECH3_DIR_ENGINE_CORE}
 	)

@@ -1,8 +1,8 @@
 # Unified Clustered Renderer
 
-The **Unified Clustered Renderer** (`r_renderMode 3`) is the engine’s high-fidelity **opt-in** lighting path. It combines deferred opaque shading, GPU-built light lists, Forward+ transparency, order-independent transparency, temporal reconstruction, and visibility-buffer migration within one coordinated frame architecture.
+The **Unified Clustered Renderer** (`r_renderMode 3`) is the engine’s default high-fidelity raster lighting path. It combines deferred opaque shading, GPU-built light lists, Forward+ transparency, order-independent transparency, temporal reconstruction, and visibility-buffer migration within one coordinated frame architecture.
 
-Spine 1.0 shipping default remains **Forward+ mode 2** (`modern_vulkan.cfg` → `modern_vulkan_stable.cfg`). Mode 3 is enabled via `modern_clustered.cfg` or the overlay below — see [RENDERER_SPINE_1.0.md](RENDERER_SPINE_1.0.md). Spine 1.1 opt-in cert (mode 3 + WBOIT + Temporal Reconstruction + weapon-after): [RENDERER_SPINE_1.1.md](RENDERER_SPINE_1.1.md).
+The shipping raster default is **Unified Clustered mode 3** (`modern_vulkan.cfg` → `modern_vulkan_stable.cfg`): opaque surfaces use deferred clustered lighting, and transparent/OIT surfaces sample the same clustered Forward+ lists. `modern_clustered.cfg` remains as a compatibility overlay that reasserts the same clustered defaults. Spine 1.1 opt-in cert (mode 3 + WBOIT + Temporal Reconstruction + weapon-after): [RENDERER_SPINE_1.1.md](RENDERER_SPINE_1.1.md).
 
 Surface-class ownership (opaque deferred vs Forward+ transparent/weapon/OIT) is defined in [RENDERER_PATH_OWNERSHIP.md](RENDERER_PATH_OWNERSHIP.md). Visibility-buffer late shade is an **opt-in sidecar** (`r_visibilityBuffer`), not `r_renderMode 4` (mode 4 remains Tier B Selective Hybrid).
 
@@ -70,7 +70,7 @@ Also called historically: Hybrid Clustered Deferred Renderer / Deferred + Forwar
 
 ## Enable
 
-Opt-in profile: `exec modern_clustered.cfg` (or overlay below). Spine stable default stays mode 2.
+Default profile: `exec modern_vulkan.cfg`. Compatibility overlay: `exec modern_clustered.cfg` (or the overlay below) to reassert the clustered contract after experiments.
 
 ```
 exec vulkan_overlay_unified_clustered.cfg
