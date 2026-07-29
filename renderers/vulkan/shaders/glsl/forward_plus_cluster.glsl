@@ -77,4 +77,34 @@ bool fp_light_overlaps_slice( float lightNear, float lightFar, float sliceNear, 
 	return Cluster_LightOverlapsSlice( lightNear, lightFar, sliceNear, sliceFar );
 }
 
+uvec2 fp_light_slice_span( float lightNear, float lightFar, uint zSlices, uint zMode,
+	float zNear, float zFar )
+{
+	ClusterParams p;
+	p.clusterCountX = 1u;
+	p.clusterCountY = 1u;
+	p.clusterCountZ = zSlices;
+	p.tileSizeX = CLUSTER_TILE_SIZE_X;
+	p.tileSizeY = CLUSTER_TILE_SIZE_Y;
+	p.lightIndexCapacity = 0u;
+	p.zNear = zNear;
+	p.zFar = zFar;
+	p.zScale = 0.0;
+	p.zBias = 0.0;
+	p.generation = 0u;
+	p.overflowCount = 0u;
+	p.flags = 0u;
+	p.reserved = 0u;
+	if ( zMode == 1u && zSlices > 1u ) {
+		float zn = max( zNear, 1e-3 );
+		float zf = max( zFar, zn + 1e-3 );
+		float logNear = log2( zn );
+		float logFar = log2( zf );
+		float denom = max( logFar - logNear, 1e-5 );
+		p.zScale = float( zSlices ) / denom;
+		p.zBias = -logNear * p.zScale;
+	}
+	return Cluster_LightSliceSpan( lightNear, lightFar, p, zMode );
+}
+
 #endif /* FORWARD_PLUS_CLUSTER_GLSL */

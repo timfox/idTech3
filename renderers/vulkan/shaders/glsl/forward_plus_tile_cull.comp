@@ -280,8 +280,15 @@ void main() {
 				lightFar = max(lightFar, abs(tipW) + radius);
 			}
 		}
-		if (zSlices > 1u && !fp_light_overlaps_slice(lightNear, lightFar, sliceNear, sliceFar)) {
-			continue;
+		if (zSlices > 1u) {
+			uvec2 lightSlices = fp_light_slice_span(lightNear, lightFar, zSlices,
+				pc.zSliceMode, pc.zNear, pc.zFar);
+			if (slice < lightSlices.x || slice > lightSlices.y) {
+				continue;
+			}
+			if (!fp_light_overlaps_slice(lightNear, lightFar, sliceNear, sliceFar)) {
+				continue;
+			}
 		}
 
 		if (pc.depthCull != 0u && originOnScreen) {

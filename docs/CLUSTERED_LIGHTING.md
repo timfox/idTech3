@@ -21,6 +21,8 @@ Cluster index order is `xy + z * (clusterCountX * clusterCountY)`. CPU helpers m
 - `Cluster_LightSliceSpan` maps a light's near/far view-depth bounds to the first/last Z slices it can affect.
 - `Cluster_LightOverlapsSlice` is the shared conservative interval test used by binning.
 
+GLSL exposes the same primitive as `fp_light_slice_span` for the compute culler. The culler rejects clusters by slice id first, then keeps the interval overlap test as the conservative guard for boundary cases.
+
 ## Log Z slicing
 
 ```

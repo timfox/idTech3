@@ -119,7 +119,45 @@ void Cluster_SliceDepthRange( uint slice, uint clusterCountZ, uint zMode,
 
 bool Cluster_LightOverlapsSlice( float lightNear, float lightFar, float sliceNear, float sliceFar )
 {
-	return !( lightFar < sliceNear || lightNear > sliceFar );
+	float ln = lightNear;
+	float lf = lightFar;
+	float sn = sliceNear;
+	float sf = sliceFar;
+	if ( ln != ln || lf != lf || sn != sn || sf != sf ) {
+		return false;
+	}
+	if ( lf < ln ) {
+		float t = ln;
+		ln = lf;
+		lf = t;
+	}
+	if ( sf < sn ) {
+		float t = sn;
+		sn = sf;
+		sf = t;
+	}
+	return !( lf < sn || ln > sf );
+}
+
+uvec2 Cluster_LightSliceSpan( float lightNear, float lightFar, ClusterParams p, uint zMode )
+{
+	float ln = lightNear;
+	float lf = lightFar;
+	if ( lf < ln ) {
+		float t = ln;
+		ln = lf;
+		lf = t;
+	}
+	uint firstSlice = Cluster_ViewDepthToSlice( ln, p.clusterCountZ, zMode,
+		p.zNear, p.zFar, p.zScale, p.zBias );
+	uint lastSlice = Cluster_ViewDepthToSlice( lf, p.clusterCountZ, zMode,
+		p.zNear, p.zFar, p.zScale, p.zBias );
+	if ( lastSlice < firstSlice ) {
+		uint t = firstSlice;
+		firstSlice = lastSlice;
+		lastSlice = t;
+	}
+	return uvec2( firstSlice, lastSlice );
 }
 
 #endif /* CLUSTER_CONTRACT_GLSL */

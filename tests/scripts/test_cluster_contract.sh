@@ -21,6 +21,7 @@ CONTRACT="$(idtech3_file renderers/vulkan/vk_cluster_contract.h src/renderers/vu
 GLSL="$(idtech3_file renderers/vulkan/shaders/glsl/cluster_contract.glsl src/renderers/vulkan/shaders/glsl/cluster_contract.glsl)"
 MATH="$(idtech3_file renderers/vulkan/vk_cluster_math.cpp src/renderers/vulkan/vk_cluster_math.cpp)"
 FP_CLUSTER="$(idtech3_file renderers/vulkan/shaders/glsl/forward_plus_cluster.glsl src/renderers/vulkan/shaders/glsl/forward_plus_cluster.glsl)"
+FP_CULL="$(idtech3_file renderers/vulkan/shaders/glsl/forward_plus_tile_cull.comp src/renderers/vulkan/shaders/glsl/forward_plus_tile_cull.comp)"
 LIST="$(idtech3_file renderers/vulkan/shaders/glsl/cluster_light_list.glsl src/renderers/vulkan/shaders/glsl/cluster_light_list.glsl)"
 UNIT="$ROOT/tests/unit/test_cluster_math.c"
 DOC="$ROOT/docs/CLUSTERED_LIGHTING.md"
@@ -32,10 +33,13 @@ check "$CONTRACT" 'Cluster_LightSliceSpan' 'C declares light slice span'
 check "$GLSL" 'Cluster_ViewDepthToSlice' 'GLSL ViewDepthToSlice'
 check "$GLSL" 'Cluster_IndexFromPixelAndViewDepth' 'GLSL IndexFromPixel'
 check "$GLSL" 'Cluster_LightOverlapsSlice' 'GLSL light/slice overlap'
+check "$GLSL" 'Cluster_LightSliceSpan' 'GLSL light slice span'
 check "$MATH" 'Cluster_DeriveLogZScaleBias' 'CPU math implements derive'
 check "$MATH" 'Cluster_IndexFromTileAndSlice' 'CPU math implements tile/slice index'
 check "$MATH" 'Cluster_LightSliceSpan' 'CPU math implements light span'
 check "$FP_CLUSTER" 'cluster_contract.glsl' 'forward_plus_cluster wraps contract'
+check "$FP_CLUSTER" 'fp_light_slice_span' 'forward_plus_cluster exposes light span wrapper'
+check "$FP_CULL" 'fp_light_slice_span' 'compute culler bins by light slice span'
 check "$LIST" 'Cluster_FetchLightIndex' 'shared light-list fetch'
 check "$UNIT" 'Cluster_LightSliceSpan' 'unit covers light slice spans'
 check "$DOC" 'r_clusterZFar' 'docs mention zFar policy'
