@@ -669,6 +669,7 @@ void CL_SaveConsoleHistory( void );
 void	SCR_Init( void );
 void	SCR_Done( void );
 void	SCR_UpdateScreen( void );
+void	CL_UpdateScreenGeometry( void );
 
 /* Implemented in qcommon/js_debug.c — run JS frame HUD during SCR_DrawScreenField. */
 void	JsDebug_DrawFrame( int msec, int realMsec );

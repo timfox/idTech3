@@ -1780,6 +1780,9 @@ void IN_Restart_f( void )
 
 void IN_Frame( void )
 {
+	if ( com_dedicated && com_dedicated->integer ) {
+		return;
+	}
 
 #ifdef USE_JOYSTICK
 	IN_JoyMove();

@@ -363,7 +363,27 @@ void CL_Ref_InitRenderer( void ) {
 	g_console_field_width = ((cls.glconfig.vidWidth / SCR_ConsoleCharWidth())) - 2;
 	g_consoleField.widthInChars = g_console_field_width;
 
-	// for 640x480 virtualized screen
+	CL_UpdateScreenGeometry();
+
+	SCR_Init();
+
+	CL_RegisterBuiltInTrueTypeFonts();
+}
+
+/*
+================
+CL_UpdateScreenGeometry
+
+Refresh client-side virtual-screen scaling after live drawable-size changes.
+Renderer init computes this once, but Vulkan/SDL resize can update glconfig
+without a full vid_restart.
+================
+*/
+void CL_UpdateScreenGeometry( void ) {
+	if ( cls.glconfig.vidWidth <= 0 || cls.glconfig.vidHeight <= 0 ) {
+		return;
+	}
+
 	cls.biasY = 0;
 	cls.biasX = 0;
 	if ( cls.glconfig.vidWidth * 480 > cls.glconfig.vidHeight * 640 ) {
@@ -375,10 +395,6 @@ void CL_Ref_InitRenderer( void ) {
 		cls.scale = cls.glconfig.vidWidth * (1.0/640.0);
 		cls.biasY = 0.5 * ( cls.glconfig.vidHeight - ( cls.glconfig.vidWidth * (480.0/640) ) );
 	}
-
-	SCR_Init();
-
-	CL_RegisterBuiltInTrueTypeFonts();
 }
 /*
 ============

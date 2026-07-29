@@ -2191,6 +2191,8 @@ void HandleEvents( void )
 								if ( logicalW > 0 && logicalH > 0 ) {
 									cls.glconfig.windowAspect = (float)logicalW / (float)logicalH;
 								}
+								CL_UpdateScreenGeometry();
+								Con_CheckResize();
 							}
 						}
 					}
@@ -2306,6 +2308,10 @@ IN_Frame
 */
 void IN_Frame( void )
 {
+	if ( ( com_dedicated && com_dedicated->integer ) || !SDL_window ) {
+		return;
+	}
+
 #ifdef USE_JOYSTICK
 	IN_JoyMove();
 #endif

@@ -3197,12 +3197,16 @@ static void Com_ApplySurfShippingProfile( void )
 
 	Cvar_Set( "r_texturebits", "32" );
 	Cvar_Set( "r_fastsky", "0" );
-	Cvar_Set( "r_renderMode", "2" );
-	Cvar_Set( "r_forwardPlus", "1" );
-	Cvar_Set( "r_forwardPlusShade", "1" );
+	Cvar_Set( "r_renderMode", "0" );
+	Cvar_Set( "r_pbr", "0" );
+	Cvar_Set( "r_pbr_shExtract", "0" );
+	Cvar_Set( "r_pbrSunShadow", "0" );
+	Cvar_Set( "r_forwardPlus", "0" );
+	Cvar_Set( "r_forwardPlusShade", "0" );
 	Cvar_Set( "r_deferredLighting", "0" );
 	Cvar_Set( "r_ssao", "0" );
-	Cvar_Set( "r_ambientVisibilityMode", "2" );
+	Cvar_Set( "r_ambientVisibilityMode", "0" );
+	Cvar_Set( "r_shWorldLighting", "0" );
 	Cvar_Set( "r_bspStream", "0" );
 	Cvar_Set( "cm_stream", "1" );
 	Cvar_Set( "cm_streamMerge", "0" );
