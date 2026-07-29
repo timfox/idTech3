@@ -54,6 +54,8 @@ deferred_lightmap_parity|deferred_deluxe_parity)
 	has "$GLSL/deferred_lighting_common.glsl" 'lightmapIrr' "lightmap term"
 	has "$GLSL/lightmap_decode.glsl" 'DeferredStaticDiffuseFromDeluxeApprox' "deluxe approximation"
 	has "$GLSL/deferred_lighting_common.glsl" 'lightmapMode' "lightmap mode switch"
+	has "$HONEST" 'R_DeferredLightmapMode_Name' "lightmap mode status"
+	has "$CERT" 'lightmapMode' "lightmap mode contract"
 	has "$ROOT/docs/DEFERRED_LIGHTMAPS.md" 'Directional deluxe' "deluxe policy"
 	;;
 deferred_ibl_parity)

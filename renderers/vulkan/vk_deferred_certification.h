@@ -16,6 +16,7 @@ typedef struct deferredRenderingContract_s {
 	uint32_t brdfVersion;
 	uint32_t clusterContractVersion;
 	uint32_t lightmapContractVersion;
+	uint32_t lightmapMode;
 	uint32_t shadowContractVersion;
 	uint32_t aoOwnershipVersion;
 	uint32_t emissiveOwnershipVersion;

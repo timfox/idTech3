@@ -15,3 +15,8 @@ terms for comparison captures. Materials that require an exact deluxe/custom
 stage must remain Forward-owned. `lightmap_parity_validate` therefore requires
 GPU reference evidence before certification and must detect missing, doubled,
 gamma-wrong, UV-mismatched, or invalid-owner lightmaps.
+
+`deferred_status`, `deferred_contract_status`, and `deferred_certify_status`
+print the active lightmap mode. The deferred contract hash includes that mode,
+so switching between irradiance, directional approximation, and compare modes
+invalidates stale certification evidence.

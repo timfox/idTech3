@@ -59,6 +59,8 @@ static void DeferredContractRefresh( void )
 	s_contract.brdfVersion = 2u; /* pbr_brdf_core.glsl */
 	s_contract.clusterContractVersion = 2u;
 	s_contract.lightmapContractVersion = 2u;
+	s_contract.lightmapMode = ( r_deferredLightmapMode ) ?
+		(uint32_t)Com_Clamp( 0.0f, 2.0f, (float)r_deferredLightmapMode->integer ) : 0u;
 	s_contract.shadowContractVersion = 1u;
 	s_contract.aoOwnershipVersion = 1u;
 	s_contract.emissiveOwnershipVersion = 1u;
@@ -103,11 +105,12 @@ static void DeferredContractStatus_f( void )
 	DeferredContractRefresh();
 	ri.Printf( PRINT_ALL,
 		"DeferredContract v%u hash=%08x quality=%u normal=%u material=%u owner=%u "
-		"BRDF=%u cluster=%u LM=%u shadow=%u AO=%u emissive=%u\n",
+		"BRDF=%u cluster=%u LM=%u LMMode=%u(%s) shadow=%u AO=%u emissive=%u\n",
 		s_contract.version, s_contract.hash, s_contract.gbufferQuality,
 		s_contract.normalEncoding, s_contract.materialEncoding,
 		s_contract.ownershipEncoding, s_contract.brdfVersion,
 		s_contract.clusterContractVersion, s_contract.lightmapContractVersion,
+		s_contract.lightmapMode, R_DeferredLightmapMode_Name( (int)s_contract.lightmapMode ),
 		s_contract.shadowContractVersion, s_contract.aoOwnershipVersion,
 		s_contract.emissiveOwnershipVersion );
 }
@@ -220,9 +223,10 @@ static void DeferredCertifyStatus_f( void )
 	}
 	ri.Printf( PRINT_ALL,
 		"deferred certification=%s contract=%08x gbufferGen=%u clusterGen=%u "
-		"GPUEvidence=%s aborted=%d\n",
+		"lightmapMode=%u(%s) GPUEvidence=%s aborted=%d\n",
 		DeferredLevelName( s_level ), s_contract.hash, vk.deferredGbufferGeneration,
-		vk_cluster_list_generation(),
+		vk_cluster_list_generation(), s_contract.lightmapMode,
+		R_DeferredLightmapMode_Name( (int)s_contract.lightmapMode ),
 		s_level > DEFERRED_STATIC_READY ? "current" : "missing", s_abort );
 }
 

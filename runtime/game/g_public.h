@@ -439,6 +439,7 @@ typedef enum {
 	G_RTS_GET_ENTITY_RESOURCES,	/* int RTS_GetEntityResources( rtsEntityId_t id ) */
 	G_RTS_GET_PLAYER_RESOURCES,	/* int RTS_GetPlayerResources( int playerId ) */
 	G_RTS_SELECT_RECT,		/* int RTS_SelectRect( int playerId, int minX, int minY, int maxX, int maxY, rtsEntityId_t *out, int maxOut ) */
+	G_RTS_FIND_GRID_PATH,		/* int RTS_FindGridPath( int width, int height, const unsigned char *blocked, int startX, int startY, int goalX, int goalY, int *outX, int *outY, int maxOut ) */
 	G_RTS_COMPUTE_STATE_HASH,	/* unsigned RTS_ComputeStateHash( void ) */
 	G_COLLADA_GET_RUNTIME_PATH,	/* int Collada_GetRuntimePath( const char *sourcePath, int type, char *out, int outSize ) */
 	/*

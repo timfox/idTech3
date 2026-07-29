@@ -168,6 +168,7 @@ const char *R_DeferredEligibilityReason_Name( deferredEligibilityReason_t reason
 const char *R_DeferredArchitecture_Name( deferredArchitecture_t arch );
 const char *R_DeferredCompositeMode_Name( deferredCompositeMode_t mode );
 const char *R_DeferredPixelOwner_Name( deferredPixelOwner_t owner );
+const char *R_DeferredLightmapMode_Name( int mode );
 
 ClassicShaderMaterialInfo R_TranslateClassicShaderToMaterial( const shader_t *shader );
 

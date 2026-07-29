@@ -150,6 +150,16 @@ const char *R_DeferredPixelOwner_Name( deferredPixelOwner_t owner )
 	}
 }
 
+const char *R_DeferredLightmapMode_Name( int mode )
+{
+	switch ( mode ) {
+	case 0: return "IRRADIANCE";
+	case 1: return "DELUXE_APPROX";
+	case 2: return "COMPARE";
+	default: return "UNKNOWN";
+	}
+}
+
 static const char *DH_RgbGenName( int gen )
 {
 	switch ( gen ) {
@@ -826,6 +836,7 @@ void R_DeferredStatus_f( void )
 		r_deferredArchitecture ? r_deferredArchitecture->integer : 0 );
 	deferredCompositeMode_t comp = (deferredCompositeMode_t)(
 		r_deferredCompositeMode ? r_deferredCompositeMode->integer : 0 );
+	const int lmMode = r_deferredLightmapMode ? r_deferredLightmapMode->integer : 0;
 	uint32_t eligible = s_frame.deferredEligibleFull + s_frame.deferredEligibleApprox;
 	const char *brdfParity;
 	const char *layout;
@@ -857,6 +868,10 @@ void R_DeferredStatus_f( void )
 	ri.Printf( PRINT_ALL, "%s", ownership );
 	ri.Printf( PRINT_ALL, "compositeMode=%d (%s)\n", (int)comp, R_DeferredCompositeMode_Name( comp ) );
 	ri.Printf( PRINT_ALL, "gbufferLayout=%s\n", layout );
+	ri.Printf( PRINT_ALL, "lightmapMode=%d (%s) contract=%s\n",
+		lmMode, R_DeferredLightmapMode_Name( lmMode ),
+		lmMode == 0 ? "non_directional_irradiance" :
+		lmMode == 1 ? "directional_approximation" : "irradiance_vs_directional_compare" );
 	ri.Printf( PRINT_ALL, "sharedBrdfParity=%s\n", brdfParity );
 	ri.Printf( PRINT_ALL, "pathReady=%s lightingActive=%s directExport=%s\n",
 		vk_deferred_lighting_path_ready() ? "yes" : "no",
@@ -1027,7 +1042,7 @@ void vk_deferred_honesty_register( void )
 	r_deferredLightmapMode = ri.Cvar_Get( "r_deferredLightmapMode", "0", CVAR_ARCHIVE_ND );
 	ri.Cvar_CheckRange( r_deferredLightmapMode, "0", "2", CV_INTEGER );
 	ri.Cvar_SetDescription( r_deferredLightmapMode,
-		"Deferred lightmap: 0=non-directional irradiance 1=deluxe directional diffuse (when packed) 2=debug compare." );
+		"Deferred lightmap: 0=non-directional irradiance 1=deluxe directional approximation 2=debug compare." );
 	ri.Cvar_SetGroup( r_deferredLightmapMode, CVG_RENDERER );
 
 	r_deferredLightmapDebug = ri.Cvar_Get( "r_deferredLightmapDebug", "0", CVAR_CHEAT );
