@@ -24,6 +24,9 @@ grep -q 'VK_SPINE_PASS_WORLD_OPAQUE' "$REG_H" || fail "world_opaque pass id miss
 grep -q 'VK_SPINE_PASS_TEMPORAL_RECON' "$REG_H" || fail "temporal_recon pass id missing"
 grep -q 'VK_SPINE_PASS_WEAPON' "$REG_H" || fail "weapon pass id missing"
 grep -q 'VK_SPINE_RES_HDR_COLOR' "$REG_H" || fail "hdr_color resource id missing"
+grep -q 'VK_SPINE_RES_VISIBILITY_IDS' "$REG_H" || fail "visibility ids resource id missing"
+grep -q 'VK_SPINE_RES_VISIBILITY_BARY' "$REG_H" || fail "visibility bary resource id missing"
+grep -q 'VK_SPINE_RES_VISIBILITY_CLASS' "$REG_H" || fail "visibility class resource id missing"
 grep -q 'VK_SPINE_ACCESS_HISTORY_READ' "$REG_H" || fail "history access kinds missing"
 grep -q 'vk_spine_status_f' "$REG_H" || fail "spine_status API missing"
 grep -q 'r_spineValidate' "$REG_C" || fail "r_spineValidate cvar missing"
@@ -34,7 +37,7 @@ for p in FRAME_PREP LIGHT_PACK TILE_CONSTRUCT SUN_SHADOW WORLD_OPAQUE GBUFFER_FI
   DEFERRED_LIGHTING FORWARD_PLUS_OPAQUE SSR AMBIENT_VISIBILITY FROXEL_VOLUME \
   TRANSPARENT_FORWARD_PLUS WBOIT_ACCUM MBOIT_MOMENTS MBOIT_ACCUM OIT_RESOLVE \
   REACTIVE_MASK TEMPORAL_RECON SMAA BLOOM EYE_ADAPTATION WEAPON HUD_2D \
-  PRESENTATION HISTORY_MAINT; do
+  PRESENTATION HISTORY_MAINT VISIBILITY_FILL MATERIAL_CLASSIFY; do
   grep -q "VK_SPINE_PASS_${p}" "$REG_H" || fail "missing pass id VK_SPINE_PASS_${p}"
 done
 pass "minimum production spine passes declared"

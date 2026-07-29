@@ -37,15 +37,15 @@ Do **not** invent further `r_renderMode` values beyond Spine 1.2 without a certi
 
 ## Phase 1 (landed)
 
-Compact **visibility-buffer sidecar** coexisting with the classic G-buffer:
+Compact **visibility-buffer production path** coexisting with the classic G-buffer:
 
 | Cvar | Role |
 |------|------|
-| `r_visibilityBuffer` | Latch: allocate ID + bary + class RTs (needs `r_fbo`, `r_renderMode` 1/2/3) |
-| `r_visibilityBufferFill` | After opaque (mode 3) or geometry: compute fill of packed draw/prim IDs + bary proxies |
+| `r_visibilityBuffer` | Latch: allocate ID + bary + class RTs (production default in `modern_vulkan.cfg`; needs `r_fbo`, `r_renderMode` 1/2/3) |
+| `r_visibilityBufferFill` | After opaque (mode 3) or geometry: fill packed draw/prim IDs + bary data; production default prefers PrimID MRT (`2`) |
 | `r_visibilityBufferDebug` | 0=off, 1=drawId, 2=primId, 3=bary, 4=material class, 5=late-shade scaffold (albedo×class) |
-| `r_materialClassify` | Compute class map from G-buffer material + depth (needs visbuf latch; **not** Morton fill) |
-| `r_deferredMaterialClassify` | Deferred lighting consumes class map (default **0**; manual opt-in only) |
+| `r_materialClassify` | Compute class map from G-buffer material + depth (production default; needs visbuf latch; **not** Morton fill) |
+| `r_deferredMaterialClassify` | Deferred lighting consumes class map (production default **1**) |
 
 **Phase 1.5 (fill + late-shade preview):**
 
@@ -58,18 +58,25 @@ Compact **visibility-buffer sidecar** coexisting with the classic G-buffer:
 - With `r_deferredMaterialClassify 1` + classify fill, specialized opaque dispatch uses the class map (EMPTY=sky; LAYERED/TRANSMISSION tune; EMISSIVE skips additive). ALPHA_TEST is reserved for real cutouts and is not inferred from low confidence.
 - **VRCS:** `r_vrcs 1` wraps deferred lighting compute with variable-rate primaries + deblock — see [VARIABLE_RATE_COMPUTE.md](VARIABLE_RATE_COMPUTE.md).
 
-Enable:
+Production profile:
+
+```
+exec modern_vulkan.cfg
+vid_restart
+```
+
+Explicit overlay/re-apply path:
 
 ```
 exec vulkan_overlay_visibility_2027.cfg
 vid_restart
 ```
 
-Demo: `exec demo_visibility_2027.cfg`. The overlay keeps `r_deferredMaterialClassify 0` by default; enable it manually only when validating the experimental deferred consumer. Console: `visibility_buffer_status`, `renderer_status`.
+Demo: `exec demo_visibility_2027.cfg`. Console: `visibility_buffer_status`, `renderer_status`.
 
 **Phase 1 encoding note:** `r_visibilityBufferFill 1` is depth-derived (tile draw id + depth prim proxy + intra-tile bary). `r_visibilityBufferFill 2` prefers true `gl_PrimitiveID` + monotonic drawId MRT (UV bary weights) when deferred direct export is non-MSAA; falls back to depth proxy otherwise. Neural/Hybrid1 consumers still read the classic G-buffer.
 
-**Exclusive late-shade:** `r_visibilityBufferLateShade 1` (default 0) runs opaque lighting once from PrimID + G-buffer MRTs + Forward+ tiles and **skips** classic deferred lighting (no dual path).
+**Exclusive late-shade:** `r_visibilityBufferLateShade 1` (default 0) runs opaque lighting once from PrimID + G-buffer MRTs + Forward+ tiles and **skips** classic deferred lighting (no dual path). It remains staged until graph-owned opaque pass execution is promoted; production currently uses the class-map deferred consumer.
 
 ## Phase ladder
 

@@ -7,11 +7,6 @@
 namespace rts {
 
 constexpr int kMaxPlayers = RTS_OWNER_PLAYER4 + 1;
-constexpr int kInitialPlayerResources = 500;
-constexpr int kBuildCost = 100;
-constexpr int kDefaultGatherAmount = 25;
-constexpr int kDefaultResourceNodeAmount = 500;
-
 struct Entity {
 	rtsEntityId_t id = 0;
 	int owner = RTS_OWNER_NEUTRAL;

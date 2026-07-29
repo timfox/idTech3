@@ -37,9 +37,9 @@ int main(void) {
 	ASSERT(RTS_GetPendingCommandCount() == 0, "initial command queue");
 	ASSERT(RTS_GetExecutedCommandCount() == 0, "initial replay command log");
 	ASSERT(RTS_GetEntityCount() == 0, "initial entity count");
-	ASSERT(RTS_GetPlayerResources(RTS_OWNER_PLAYER1) == 500, "initial player resources");
+	ASSERT(RTS_GetPlayerResources(RTS_OWNER_PLAYER1) == 0, "initial player resources");
 
-	cmd.type = RTS_COMMAND_BUILD;
+	cmd.type = RTS_COMMAND_CREATE_ENTITY;
 	cmd.turn = 1;
 	cmd.playerId = RTS_OWNER_PLAYER1;
 	cmd.sequence = 2;
@@ -61,8 +61,8 @@ int main(void) {
 	ASSERT(RTS_GetCurrentTurn() == 1, "turn number after first step");
 	ASSERT(RTS_GetPendingCommandCount() == 0, "queue drained after turn");
 	ASSERT(RTS_GetExecutedCommandCount() == 2, "replay command log after first step");
-	ASSERT(RTS_GetEntityCount() == 2, "build commands create entities");
-	ASSERT(RTS_GetPlayerResources(RTS_OWNER_PLAYER1) == 300, "build commands spend resources");
+	ASSERT(RTS_GetEntityCount() == 2, "create commands create entities");
+	ASSERT(RTS_GetPlayerResources(RTS_OWNER_PLAYER1) == 0, "create commands do not apply game economy");
 	ASSERT(RTS_GetEntityOwner(1) == RTS_OWNER_PLAYER1, "first built entity owner");
 	ASSERT(RTS_GetEntityHitpoints(1) == 100, "first built entity starts with full hitpoints");
 	ASSERT(RTS_GetEntityResources(1) == 0, "combat entity has no resources");
@@ -74,7 +74,7 @@ int main(void) {
 	ASSERT(RTS_SelectRect(RTS_OWNER_PLAYER2, 0, 0, 80, 140, selected, 4) == 0, "selection filters owner");
 
 	hashBeforeMove = RTS_ComputeStateHash();
-	move.type = RTS_COMMAND_MOVE;
+	move.type = RTS_COMMAND_SET_POSITION;
 	move.turn = 3;
 	move.playerId = RTS_OWNER_PLAYER1;
 	move.sequence = 3;
@@ -110,26 +110,26 @@ int main(void) {
 	enemyBuild.sequence = 4;
 	enemyBuild.targetX = 1024;
 	enemyBuild.targetY = 256;
-	ASSERT(RTS_PostCommand(&enemyBuild) == 1, "post enemy build command");
+	ASSERT(RTS_PostCommand(&enemyBuild) == 1, "post enemy create command");
 	RTS_RunTurn(50);
-	ASSERT(RTS_GetEntityCount() == 3, "enemy build creates entity");
+	ASSERT(RTS_GetEntityCount() == 3, "enemy create creates entity");
 	ASSERT(RTS_GetEntityOwner(3) == RTS_OWNER_PLAYER2, "enemy entity owner");
 	ASSERT(RTS_GetEntityHitpoints(3) == 100, "enemy entity starts with full hitpoints");
 
-	attack.type = RTS_COMMAND_ATTACK;
+	attack.type = RTS_COMMAND_SET_HITPOINTS;
 	attack.turn = 5;
-	attack.playerId = RTS_OWNER_PLAYER1;
+	attack.playerId = RTS_OWNER_NEUTRAL;
 	attack.sequence = 5;
-	attack.entityId = 1;
-	attack.targetEntityId = 3;
+	attack.entityId = 3;
+	attack.targetEntityId = 0;
 	attack.targetX = 0;
 	attack.targetY = 0;
-	attack.data = 0;
-	ASSERT(RTS_PostCommand(&attack) == 1, "post attack command");
+	attack.data = 90;
+	ASSERT(RTS_PostCommand(&attack) == 1, "post hitpoint set command");
 	RTS_RunTurn(50);
-	ASSERT(RTS_GetEntityHitpoints(3) == 90, "attack reduces enemy hitpoints");
+	ASSERT(RTS_GetEntityHitpoints(3) == 90, "hitpoint set updates enemy hitpoints");
 
-	resource.type = RTS_COMMAND_SPAWN_RESOURCE;
+	resource.type = RTS_COMMAND_CREATE_ENTITY;
 	resource.turn = 6;
 	resource.playerId = RTS_OWNER_NEUTRAL;
 	resource.sequence = 6;
@@ -144,27 +144,30 @@ int main(void) {
 	ASSERT(RTS_GetEntityOwner(4) == RTS_OWNER_NEUTRAL, "resource entity owner");
 	ASSERT(RTS_GetEntityResources(4) == 100, "resource entity starts with stock");
 
-	gather.type = RTS_COMMAND_GATHER;
+	gather.type = RTS_COMMAND_SET_ENTITY_RESOURCES;
 	gather.turn = 7;
-	gather.playerId = RTS_OWNER_PLAYER1;
+	gather.playerId = RTS_OWNER_NEUTRAL;
 	gather.sequence = 7;
-	gather.entityId = 1;
-	gather.targetEntityId = 4;
+	gather.entityId = 4;
+	gather.targetEntityId = 0;
 	gather.targetX = 0;
 	gather.targetY = 0;
-	gather.data = 75;
-	ASSERT(RTS_PostCommand(&gather) == 1, "post gather command");
+	gather.data = 25;
+	ASSERT(RTS_PostCommand(&gather) == 1, "post resource stock set command");
 	RTS_RunTurn(50);
-	ASSERT(RTS_GetPlayerResources(RTS_OWNER_PLAYER1) == 375, "gather command adds resources");
-	ASSERT(RTS_GetEntityResources(4) == 25, "gather command depletes resource stock");
+	ASSERT(RTS_GetPlayerResources(RTS_OWNER_PLAYER1) == 0, "resource stock set does not apply game economy");
+	ASSERT(RTS_GetEntityResources(4) == 25, "resource stock set updates resource stock");
 
+	gather.type = RTS_COMMAND_SET_PLAYER_RESOURCES;
 	gather.turn = 8;
+	gather.playerId = RTS_OWNER_PLAYER1;
 	gather.sequence = 8;
-	gather.data = 75;
-	ASSERT(RTS_PostCommand(&gather) == 1, "post gather depletion command");
+	gather.entityId = 0;
+	gather.data = 400;
+	ASSERT(RTS_PostCommand(&gather) == 1, "post player resource set command");
 	RTS_RunTurn(50);
-	ASSERT(RTS_GetPlayerResources(RTS_OWNER_PLAYER1) == 400, "gather clamps to remaining resource stock");
-	ASSERT(RTS_GetEntityResources(4) == 0, "resource stock can be depleted");
+	ASSERT(RTS_GetPlayerResources(RTS_OWNER_PLAYER1) == 400, "player resource set updates resources");
+	ASSERT(RTS_GetEntityResources(4) == 25, "player resource set leaves resource stock unchanged");
 
 	blocked[1 * 5 + 2] = 1;
 	blocked[2 * 5 + 2] = 1;

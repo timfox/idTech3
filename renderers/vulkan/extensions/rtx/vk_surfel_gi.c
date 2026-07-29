@@ -19,6 +19,7 @@ Chocolate RTX path; spawn / ray-query update / resolve / composite.
 #include "vk_view_state.h"
 #include "vk_cmd.h"
 #include "vk_ambient_visibility.h"
+#include "vk_pass_registry.h"
 
 #ifdef USE_VULKAN_RTX
 #include "vk_surfel_gi_spirv.inc"
@@ -628,7 +629,7 @@ void vk_surfel_gi_init( void )
 		return;
 	}
 	if ( !r_surfelGi ) {
-		r_surfelGi = ri.Cvar_Get( "r_surfelGi", "0", CVAR_ARCHIVE_ND | CVAR_LATCH );
+		r_surfelGi = ri.Cvar_Get( "r_surfelGi", "1", CVAR_ARCHIVE_ND | CVAR_LATCH );
 		r_surfelGi_max = ri.Cvar_Get( "r_surfelGi_max", "16384", CVAR_ARCHIVE_ND | CVAR_LATCH );
 		r_surfelGi_radius = ri.Cvar_Get( "r_surfelGi_radius", "0.35", CVAR_ARCHIVE_ND );
 		r_surfelGi_updateRate = ri.Cvar_Get( "r_surfelGi_updateRate", "4", CVAR_ARCHIVE_ND );
@@ -1041,6 +1042,7 @@ void vk_surfel_gi_apply_after_geometry( void )
 	spawnPush.params[2] = attempts;
 	spawnPush.params[3] = 0;
 
+	vk_spine_pass_begin( VK_SPINE_PASS_SURFEL_GI_UPDATE );
 	qvkCmdBindPipeline( cmd, VK_PIPELINE_BIND_POINT_COMPUTE, sgi.spawn_pipe );
 	qvkCmdBindDescriptorSets( cmd, VK_PIPELINE_BIND_POINT_COMPUTE, sgi.spawn_pl, 0, 1, &sgi.spawn_set, 0, NULL );
 	qvkCmdPushConstants( cmd, sgi.spawn_pl, VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof( spawnPush ), &spawnPush );
@@ -1071,6 +1073,7 @@ void vk_surfel_gi_apply_after_geometry( void )
 	qvkCmdBindDescriptorSets( cmd, VK_PIPELINE_BIND_POINT_COMPUTE, sgi.update_pl, 0, 1, &sgi.update_set, 0, NULL );
 	qvkCmdPushConstants( cmd, sgi.update_pl, VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof( updatePush ), &updatePush );
 	qvkCmdDispatch( cmd, ( sgi.capacity + 63u ) / 64u, 1, 1 );
+	vk_spine_pass_end( VK_SPINE_PASS_SURFEL_GI_UPDATE );
 
 	qvkCmdPipelineBarrier( cmd, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
 		0, 1, &memBarrier, 0, NULL, 0, NULL );
@@ -1087,6 +1090,7 @@ void vk_surfel_gi_apply_after_geometry( void )
 		hashPush.params[2] = hashPush.params[3] = 0;
 		hashPush.grid[0] = r_surfelGi_cellSize ? r_surfelGi_cellSize->value : 64.0f;
 		hashPush.grid[1] = hashPush.grid[2] = hashPush.grid[3] = 0.0f;
+		vk_spine_pass_begin( VK_SPINE_PASS_SURFEL_GI_HASH );
 		qvkCmdBindPipeline( cmd, VK_PIPELINE_BIND_POINT_COMPUTE, sgi.hash_pipe );
 		qvkCmdBindDescriptorSets( cmd, VK_PIPELINE_BIND_POINT_COMPUTE, sgi.hash_pl, 0, 1, &sgi.hash_set, 0, NULL );
 		qvkCmdPushConstants( cmd, sgi.hash_pl, VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof( hashPush ), &hashPush );
@@ -1098,6 +1102,7 @@ void vk_surfel_gi_apply_after_geometry( void )
 		hashPush.params[1] = 0u; /* scatter */
 		qvkCmdPushConstants( cmd, sgi.hash_pl, VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof( hashPush ), &hashPush );
 		qvkCmdDispatch( cmd, ( sgi.capacity + 63u ) / 64u, 1, 1 );
+		vk_spine_pass_end( VK_SPINE_PASS_SURFEL_GI_HASH );
 
 		qvkCmdPipelineBarrier( cmd, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
 			0, 1, &memBarrier, 0, NULL, 0, NULL );
@@ -1117,6 +1122,7 @@ void vk_surfel_gi_apply_after_geometry( void )
 	resolvePush.params[2] = ( r_surfelGi_skipSky && r_surfelGi_skipSky->integer ) ? 1u : 0u;
 	resolvePush.params[3] = 0;
 
+	vk_spine_pass_begin( VK_SPINE_PASS_SURFEL_GI_RESOLVE );
 	qvkCmdBindPipeline( cmd, VK_PIPELINE_BIND_POINT_COMPUTE, sgi.resolve_pipe );
 	qvkCmdBindDescriptorSets( cmd, VK_PIPELINE_BIND_POINT_COMPUTE, sgi.resolve_pl, 0, 1, &sgi.resolve_set, 0, NULL );
 	qvkCmdPushConstants( cmd, sgi.resolve_pl, VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof( resolvePush ), &resolvePush );
@@ -1127,6 +1133,7 @@ void vk_surfel_gi_apply_after_geometry( void )
 	record_image_layout_transition( cmd, sgi.irradiance.image, VK_IMAGE_ASPECT_COLOR_BIT,
 		VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
 		VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT );
+	vk_spine_pass_end( VK_SPINE_PASS_SURFEL_GI_RESOLVE );
 
 	/* Hybrid1 fusion: keep irradiance for Hybrid1 composite; skip Surfel scene add (no double GI).
 	 * Radiance Cache GI also owns diffuse when active (prefer RcGI over Surfel composite). */
@@ -1156,6 +1163,7 @@ void vk_surfel_gi_apply_after_geometry( void )
 	compPush.avStrength = vk_ambient_visibility_strength();
 	compPush.pad[0] = compPush.pad[1] = 0;
 
+	vk_spine_pass_begin( VK_SPINE_PASS_SURFEL_GI_COMPOSITE );
 	qvkCmdBindPipeline( cmd, VK_PIPELINE_BIND_POINT_COMPUTE, sgi.composite_pipe );
 	qvkCmdBindDescriptorSets( cmd, VK_PIPELINE_BIND_POINT_COMPUTE, sgi.composite_pl, 0, 1, &sgi.composite_set, 0, NULL );
 	qvkCmdPushConstants( cmd, sgi.composite_pl, VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof( compPush ), &compPush );
@@ -1164,6 +1172,7 @@ void vk_surfel_gi_apply_after_geometry( void )
 	record_image_layout_transition( cmd, vk.color_image, VK_IMAGE_ASPECT_COLOR_BIT,
 		VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
 		0, 0 );
+	vk_spine_pass_end( VK_SPINE_PASS_SURFEL_GI_COMPOSITE );
 
 	sgi.frame++;
 }
@@ -1177,7 +1186,7 @@ void vk_surfel_gi_init( void )
 		ri.Printf( PRINT_ALL, "[SurfelGI] chocolate stub (build with -DUSE_VULKAN_RTX=ON)\n" );
 		logged = qtrue;
 	}
-	ri.Cvar_Get( "r_surfelGi", "0", CVAR_ARCHIVE_ND | CVAR_LATCH );
+	ri.Cvar_Get( "r_surfelGi", "1", CVAR_ARCHIVE_ND | CVAR_LATCH );
 }
 
 void vk_surfel_gi_shutdown( void ) {}

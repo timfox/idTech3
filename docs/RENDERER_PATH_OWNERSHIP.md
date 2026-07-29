@@ -14,7 +14,9 @@
 | **4** | Tier B Selective Hybrid (RTX) | opt-in — **do not reclaim for vis-buffer** |
 | **5** | Tier C path-traced reference | opt-in |
 
-Visibility-buffer late shade remains an **opt-in sidecar** on modes 1–3 (`r_visibilityBuffer` / `r_visibilityLateShade`), not a new `r_renderMode`.
+Visibility buffer + material classify is production mode-3 infrastructure in `modern_vulkan.cfg`.
+Exclusive visibility-buffer late shade remains an opt-in staged consumer
+(`r_visibilityBufferLateShade`), not a new `r_renderMode`.
 
 Canonical selector: `R_SelectSurfaceRenderPath()` in [`renderers/vulkan/vk_render_path.c`](../renderers/vulkan/vk_render_path.c). Debug: `r_renderPathDebug`, `render_path_status`.
 

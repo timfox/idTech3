@@ -56,6 +56,24 @@ static float bound_offset( float o, float m )
 	return o;
 }
 
+static float image_rmse_rgb( const float *a, const float *b, int pixels )
+{
+	double sum = 0.0;
+	int i, c;
+	for ( i = 0; i < pixels; i++ ) {
+		for ( c = 0; c < 3; c++ ) {
+			double d = (double)a[i * 4 + c] - (double)b[i * 4 + c];
+			sum += d * d;
+		}
+	}
+	return (float)sqrt( sum / (double)( pixels * 3 ) );
+}
+
+static int image_diff_passes( float rmse, float maxAbs, float meanRelLum )
+{
+	return rmse <= 0.035f && maxAbs <= 0.08f && meanRelLum <= 0.08f;
+}
+
 /* Mirror vk_special_blend_select / shadow policy enums numerically. */
 enum {
 	SPECIAL_BLEND_NONE = 0,
@@ -93,6 +111,18 @@ int main( void )
 	float out[3];
 	float opacities[] = { 0.f, 1.f / 255.f, 0.01f, 0.1f, 0.25f, 0.5f, 0.75f, 0.9f, 0.99f, 1.f };
 	float T[3];
+	float ref[8] = {
+		0.20f, 0.30f, 0.40f, 1.0f,
+		0.60f, 0.50f, 0.40f, 1.0f
+	};
+	float good[8] = {
+		0.205f, 0.295f, 0.400f, 1.0f,
+		0.590f, 0.505f, 0.405f, 1.0f
+	};
+	float bad[8] = {
+		0.40f, 0.30f, 0.40f, 1.0f,
+		0.60f, 0.20f, 0.40f, 1.0f
+	};
 	int i;
 
 	ASSERT( fabsf( got - expect ) < 1e-5f, "revealage product" );
@@ -122,6 +152,10 @@ int main( void )
 	ASSERT( special_blend_select( 0, 0, 1 ) == SPECIAL_BLEND_MULTISTAGE, "multistage route" );
 
 	ASSERT( ( TRANSPARENT_SHADOW_RECEIVE & TRANSPARENT_SHADOW_NONE ) == 0, "shadow flags distinct" );
+	ASSERT( image_diff_passes( image_rmse_rgb( ref, good, 2 ), 0.01f, 0.02f ),
+		"GPU image-diff accepts small deterministic error" );
+	ASSERT( !image_diff_passes( image_rmse_rgb( ref, bad, 2 ), 0.30f, 0.20f ),
+		"GPU image-diff rejects visible error" );
 
 	printf( "unit_wboit_live_cert: OK\n" );
 	return 0;

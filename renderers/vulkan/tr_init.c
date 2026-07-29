@@ -2893,7 +2893,7 @@ static void R_Register( void )
 	ri.Cvar_CheckRange( r_visibilityBuffer, "0", "1", CV_INTEGER );
 	ri.Cvar_SetDescription( r_visibilityBuffer,
 		"With r_renderMode 1/2/3: allocate compact visibility-buffer RTs (IDs R32G32_UINT, bary R16G16_UNORM, class R8_UINT). "
-		"2027 Phase 1 foundation; coexists with r_deferredGBuffer. Requires r_fbo 1 and vid_restart. See docs/RENDERER_2027.md." );
+		"Production mode-3 visibility foundation; coexists with r_deferredGBuffer. Requires r_fbo 1 and vid_restart. See docs/RENDERER_2027.md." );
 	ri.Cvar_SetGroup( r_visibilityBuffer, CVG_RENDERER );
 	if ( r_visibilityBuffer && r_visibilityBuffer->integer ) {
 		ri.Printf( PRINT_ALL, "[VK][visbuf] r_visibilityBuffer=1 (visibility RTs when r_renderMode 1/2/3)\n" );
@@ -2919,7 +2919,7 @@ static void R_Register( void )
 	r_visibilityBufferLateShade = ri.Cvar_Get( "r_visibilityBufferLateShade", "0", CVAR_ARCHIVE_ND | CVAR_LATCH );
 	ri.Cvar_CheckRange( r_visibilityBufferLateShade, "0", "1", CV_INTEGER );
 	ri.Cvar_SetDescription( r_visibilityBufferLateShade,
-		"Exclusive late-shade opaque lighting (PrimID fill=2, non-MSAA): skips classic deferred lighting and shades once from G-buffer MRTs + Forward+ tiles. Default 0. Requires r_visibilityBuffer 1, r_visibilityBufferFill 2, r_deferredLighting 1." );
+		"Exclusive late-shade opaque lighting (PrimID fill=2, non-MSAA): skips classic deferred lighting and shades once from G-buffer MRTs + Forward+ tiles. Default 0 while graph-owned execution is staged. Requires r_visibilityBuffer 1, r_visibilityBufferFill 2, r_deferredLighting 1." );
 	ri.Cvar_SetGroup( r_visibilityBufferLateShade, CVG_RENDERER );
 	if ( r_visibilityBufferLateShade && r_visibilityBufferLateShade->integer ) {
 		ri.Printf( PRINT_ALL, "[VK][visbuf] r_visibilityBufferLateShade=1 (exclusive late-shade; no dual deferred lighting)\n" );
@@ -2927,8 +2927,8 @@ static void R_Register( void )
 	r_materialClassify = ri.Cvar_Get( "r_materialClassify", "1", CVAR_ARCHIVE_ND );
 	ri.Cvar_CheckRange( r_materialClassify, "0", "1", CV_INTEGER );
 	ri.Cvar_SetDescription( r_materialClassify,
-		"With r_visibilityBufferFill 1: compute material class map (simple/layered/transmission/emissive/alpha_test) "
-		"from G-buffer material + depth. Phase 1 stub for specialized shade dispatch." );
+		"With r_visibilityBuffer 1: compute material class map (simple/layered/transmission/emissive/alpha_test) "
+		"from G-buffer material + depth for production deferred dispatch." );
 	ri.Cvar_SetGroup( r_materialClassify, CVG_RENDERER );
 	if ( r_materialClassify && r_materialClassify->integer ) {
 		ri.Printf( PRINT_ALL, "[VK][visbuf] r_materialClassify=1 (class map after visibility fill)\n" );

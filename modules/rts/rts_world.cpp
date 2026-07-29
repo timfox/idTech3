@@ -23,13 +23,8 @@ void ResetState() {
 extern "C" {
 
 void RTS_Init( void ) {
-	int i;
-
 	rts::ResetState();
 	rts::GetState().initialized = true;
-	for ( i = RTS_OWNER_PLAYER1; i <= RTS_OWNER_PLAYER4; i++ ) {
-		rts::GetState().playerResources[i] = rts::kInitialPlayerResources;
-	}
 }
 
 void RTS_Shutdown( void ) {

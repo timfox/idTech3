@@ -21,6 +21,7 @@ The Vulkan 1.4 renderer is the primary rendering backend, built as a shared libr
 ### Current Architecture
 - **Modern Vulkan default:** `exec modern_vulkan.cfg` → `modern_vulkan_stable.cfg` (Unified Clustered mode 3, SMAA, GTAO, bloom, SH/IBL, WBOIT). Quality: `modern_vulkan_quality.cfg`. Recovery: `gfx_safe.cfg`. See [RENDERER_SPINE_1.0.md](RENDERER_SPINE_1.0.md).
 - `r_renderMode`: **0** forward (classic projector; `r_forwardPlus` may still be 1), **1** deferred lighting mode, **2** Forward+ legacy recovery, **3** Unified Clustered Renderer (**Spine default**: deferred opaque + clustered Forward+/OIT transparent), **4/5** hybrid/reference modes. North-star 2027 stack builds on mode 3 — see [RENDERER_2027.md](RENDERER_2027.md).
+- **Visibility buffer + material classify:** production mode 3 enables `r_visibilityBuffer 1`, `r_visibilityBufferFill 2`, `r_materialClassify 1`, and `r_deferredMaterialClassify 1`. The path prefers PrimID/drawId MRT export and falls back to depth-proxy fill; deferred opaque lighting consumes the class map by default.
 - **Deferred G-buffer sidecar and lighting:** the deferred G-buffer sidecar (`r_deferredGBuffer 1` + `r_deferredGBufferFill 1`) works with `r_renderMode` 1, 2, and 3. In default mode 3, opaque surfaces use deferred lighting while transparent/OIT surfaces consume the same clustered Forward+ lists. `r_deferredLighting` runs in modes **1** and **3** (ignored in mode 2).
 - Vulkan is the supported rendering backend
 - **Shared temporal reset policy** (`vk_temporal.c`): centralizes history invalidation for volumetrics, motion vectors, exposure. Resize, map load, camera cut, and missing prev-frame data trigger resets. Used by Temporal Reconstruction (`r_taa` / `r_aaMode` 4–5) and volumetric history.
@@ -36,7 +37,7 @@ exec modern_vulkan.cfg
 vid_restart
 ```
 
-`modern_native.cfg` inherits this profile automatically when `cl_autoGraphicsProfile 1` loads a native cgame. The shipping default is the **Spine stable Unified Clustered** profile (`modern_vulkan_stable.cfg`): mode 3, **SMAA 1x**, GTAO, WBOIT, no TAA/RT/vis-buffer/open-world. Quality (SSR + volumetrics): `exec modern_vulkan_quality.cfg`. `exec modern_clustered.cfg` reasserts the same clustered defaults after experiments. Temporal Reconstruction: `exec vulkan_overlay_temporal_recon.cfg`. Bisect with `exec gfx_safe.cfg` or `renderer_modern_safe`.
+`modern_native.cfg` inherits this profile automatically when `cl_autoGraphicsProfile 1` loads a native cgame. The shipping default is the **Spine stable Unified Clustered** profile (`modern_vulkan_stable.cfg`): mode 3, **SMAA 1x**, GTAO, WBOIT, visibility buffer + material classify, no TAA/RT/late-shade/open-world. Quality (SSR + volumetrics): `exec modern_vulkan_quality.cfg`. `exec modern_clustered.cfg` reasserts the same clustered defaults after experiments. Temporal Reconstruction: `exec vulkan_overlay_temporal_recon.cfg`. Bisect with `exec gfx_safe.cfg` or `renderer_modern_safe`.
 
 For an in-session recovery back to the documented modern baseline after deferred or clustered experiments:
 
@@ -55,6 +56,7 @@ The CI confidence target for this path is `test_modern_renderer_profile_runtime`
 | Materials | `r_pbr 1`, `r_materialBlend 1` |
 | Lighting | `r_renderMode 3`, `r_forwardPlus 1`, `r_forwardPlusShade 1`, `r_forwardPlusDepthCull 1`, `r_forwardPlusZSlices 8`, `r_forwardPlusZSliceMode 1`, `r_deferredLighting 1` |
 | Deferred data | `r_deferredGBuffer 1`, `r_deferredGBufferFill 1` |
+| Visibility/classify | `r_visibilityBuffer 1`, `r_visibilityBufferFill 2`, `r_materialClassify 1`, `r_deferredMaterialClassify 1`, `r_visibilityBufferLateShade 0` |
 | Ambient visibility | `r_ambientVisibilityMode 2` production GTAO; legacy `r_ssao 0` |
 | Presentation AA | `r_aaMode 2` (SMAA 1x), `r_taa 0`, `r_taaMotionVectors 1` |
 | Post AA | `r_ext_smaa 1`, `r_postAaAfterBloom 1` |
@@ -71,7 +73,7 @@ The renderer profile rule is: start from **one** modern base (`modern_vulkan.cfg
 | `vulkan_overlay_temporal_perf.cfg` | Perf reconstruction | `r_aaMode 4` + `r_renderScale` / upscale |
 | `vulkan_overlay_unified_clustered_safe.cfg` | Unified Clustered safe baseline | Mode 3 with TAA/SMAA/FXAA/OIT off and MSAA pinned off so clustered lighting and pass ordering can be debugged in isolation. |
 | `vulkan_overlay_oit_clustered.cfg` | Mode 3 + WBOIT | Unified Clustered + production `r_oit 1` (MBOIT is experimental-only via `vulkan_overlay_mboit.cfg`). See [MOMENT_OIT_STOCHASTIC_ALPHA.md](MOMENT_OIT_STOCHASTIC_ALPHA.md). |
-| `vulkan_overlay_visibility_2027.cfg` | 2027 visibility foundation | Mode 3 + G-buffer + `r_visibilityBuffer` + material classify. See [RENDERER_2027.md](RENDERER_2027.md). |
+| `vulkan_overlay_visibility_2027.cfg` | Visibility foundation re-apply/debug | Mode 3 + G-buffer + `r_visibilityBuffer` + material classify. Already enabled by `modern_vulkan.cfg`; useful after experiments. See [RENDERER_2027.md](RENDERER_2027.md). |
 | `vulkan_overlay_rtx.cfg` | Plain RTX demo pass | Requires `USE_VULKAN_RTX`; keeps the modern Forward+ base and enables shared TLAS/entity BLAS. |
 | `vulkan_overlay_hybrid1.cfg` | Hybrid1 ray/raster path | Requires `USE_VULKAN_RTX`; enables shared TLAS/entity BLAS, Hybrid1 channels, and adaptive Ambient Visibility mode 4. |
 

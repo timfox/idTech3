@@ -15,6 +15,7 @@ Coexists with classic G-buffer; does not replace deferred lighting consumers.
 #include "vk_image_layout.h"
 #include "vk_render_pass.h"
 #include "vk_scene_pass.h"
+#include "vk_pass_registry.h"
 #include "vk_util.h"
 #include "vk_view_state.h"
 #include "vk_post_fog.h"
@@ -713,6 +714,7 @@ void vk_visibility_buffer_capture_after_geometry( void )
 	}
 
 	if ( do_fill ) {
+		vk_spine_pass_begin( VK_SPINE_PASS_VISIBILITY_FILL );
 		if ( !vk.visibility_buffer.fill_logged ) {
 			ri.Printf( PRINT_ALL,
 				"[VK][visbuf] r_visibilityBufferFill=%d (depth-derived draw/prim id + bary proxy)\n",
@@ -749,6 +751,7 @@ void vk_visibility_buffer_capture_after_geometry( void )
 		record_image_layout_transition( vk.cmd->command_buffer, vk.visibility_buffer_bary,
 			VK_IMAGE_ASPECT_COLOR_BIT,
 			VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, 0, 0 );
+		vk_spine_pass_end( VK_SPINE_PASS_VISIBILITY_FILL );
 	} else if ( vk.visibilityBufferDirectExport && r_visibilityBufferFill &&
 		r_visibilityBufferFill->integer >= 2 && !vk.visibility_buffer.fill_logged ) {
 		ri.Printf( PRINT_ALL,
@@ -760,6 +763,7 @@ void vk_visibility_buffer_capture_after_geometry( void )
 		vk_visbuf_create_classify_pipeline();
 		if ( vk.visibility_buffer.classify_pipeline_ready &&
 			vk.visibility_buffer.classify_pipeline != VK_NULL_HANDLE ) {
+			vk_spine_pass_begin( VK_SPINE_PASS_MATERIAL_CLASSIFY );
 			if ( !vk.visibility_buffer.classify_logged ) {
 				ri.Printf( PRINT_ALL,
 					"[VK][visbuf] r_materialClassify=1 (class map from G-buffer material + depth)\n" );
@@ -791,6 +795,7 @@ void vk_visibility_buffer_capture_after_geometry( void )
 			record_image_layout_transition( vk.cmd->command_buffer, vk.visibility_buffer_class,
 				VK_IMAGE_ASPECT_COLOR_BIT,
 				VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, 0, 0 );
+			vk_spine_pass_end( VK_SPINE_PASS_MATERIAL_CLASSIFY );
 		}
 	}
 

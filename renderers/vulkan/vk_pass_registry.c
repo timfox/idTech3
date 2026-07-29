@@ -7,6 +7,7 @@ Lightweight Spine pass / resource registry implementation.
 #include "tr_local.h"
 #include "vk.h"
 #include "vk_pass_registry.h"
+#include "vk_render_graph.h"
 #include "vk_scene_pass.h"
 #include "vk_temporal.h"
 #include "vk_util.h"
@@ -119,6 +120,7 @@ static const vkSpineResourceEdge s_reads_deferred_light[] = {
 	{ VK_SPINE_RES_GBUFFER_NORMAL, VK_SPINE_ACCESS_SAMPLED_READ },
 	{ VK_SPINE_RES_GBUFFER_MATERIAL, VK_SPINE_ACCESS_SAMPLED_READ },
 	{ VK_SPINE_RES_DEPTH, VK_SPINE_ACCESS_DEPTH_READ },
+	{ VK_SPINE_RES_VISIBILITY_CLASS, VK_SPINE_ACCESS_SAMPLED_READ },
 };
 static const vkSpineResourceEdge s_writes_deferred_light[] = {
 	{ VK_SPINE_RES_DEFERRED_LIGHTING, VK_SPINE_ACCESS_STORAGE_WRITE | VK_SPINE_ACCESS_COLOR_WRITE },
@@ -266,6 +268,54 @@ static const vkSpineResourceEdge s_reads_froxel[] = {
 };
 static const vkSpineResourceEdge s_writes_froxel[] = {
 	{ VK_SPINE_RES_FROXEL_SCATTER, VK_SPINE_ACCESS_STORAGE_WRITE | VK_SPINE_ACCESS_HISTORY_WRITE },
+};
+static const vkSpineResourceEdge s_reads_visibility_fill[] = {
+	{ VK_SPINE_RES_DEPTH, VK_SPINE_ACCESS_DEPTH_READ },
+};
+static const vkSpineResourceEdge s_writes_visibility_fill[] = {
+	{ VK_SPINE_RES_VISIBILITY_IDS, VK_SPINE_ACCESS_STORAGE_WRITE | VK_SPINE_ACCESS_COLOR_WRITE },
+	{ VK_SPINE_RES_VISIBILITY_BARY, VK_SPINE_ACCESS_STORAGE_WRITE | VK_SPINE_ACCESS_COLOR_WRITE },
+};
+static const vkSpineResourceEdge s_reads_material_classify[] = {
+	{ VK_SPINE_RES_DEPTH, VK_SPINE_ACCESS_DEPTH_READ },
+	{ VK_SPINE_RES_GBUFFER_MATERIAL, VK_SPINE_ACCESS_SAMPLED_READ },
+};
+static const vkSpineResourceEdge s_writes_material_classify[] = {
+	{ VK_SPINE_RES_VISIBILITY_CLASS, VK_SPINE_ACCESS_STORAGE_WRITE | VK_SPINE_ACCESS_COLOR_WRITE },
+};
+static const vkSpineResourceEdge s_reads_surfel_update[] = {
+	{ VK_SPINE_RES_DEPTH, VK_SPINE_ACCESS_DEPTH_READ },
+	{ VK_SPINE_RES_GBUFFER_NORMAL, VK_SPINE_ACCESS_SAMPLED_READ },
+	{ VK_SPINE_RES_GBUFFER_ALBEDO, VK_SPINE_ACCESS_SAMPLED_READ },
+	{ VK_SPINE_RES_FORWARD_PLUS_LIGHTS, VK_SPINE_ACCESS_STORAGE_READ },
+};
+static const vkSpineResourceEdge s_writes_surfel_update[] = {
+	{ VK_SPINE_RES_SURFEL_POOL, VK_SPINE_ACCESS_STORAGE_WRITE },
+};
+static const vkSpineResourceEdge s_reads_surfel_hash[] = {
+	{ VK_SPINE_RES_SURFEL_POOL, VK_SPINE_ACCESS_STORAGE_READ },
+};
+static const vkSpineResourceEdge s_writes_surfel_hash[] = {
+	{ VK_SPINE_RES_SURFEL_HASH, VK_SPINE_ACCESS_STORAGE_WRITE },
+};
+static const vkSpineResourceEdge s_reads_surfel_resolve[] = {
+	{ VK_SPINE_RES_DEPTH, VK_SPINE_ACCESS_DEPTH_READ },
+	{ VK_SPINE_RES_GBUFFER_NORMAL, VK_SPINE_ACCESS_SAMPLED_READ },
+	{ VK_SPINE_RES_SURFEL_POOL, VK_SPINE_ACCESS_STORAGE_READ },
+	{ VK_SPINE_RES_SURFEL_HASH, VK_SPINE_ACCESS_STORAGE_READ },
+	{ VK_SPINE_RES_AV_FILTERED, VK_SPINE_ACCESS_SAMPLED_READ },
+};
+static const vkSpineResourceEdge s_writes_surfel_resolve[] = {
+	{ VK_SPINE_RES_SURFEL_IRRADIANCE, VK_SPINE_ACCESS_STORAGE_WRITE | VK_SPINE_ACCESS_COLOR_WRITE },
+};
+static const vkSpineResourceEdge s_reads_surfel_composite[] = {
+	{ VK_SPINE_RES_DEPTH, VK_SPINE_ACCESS_DEPTH_READ },
+	{ VK_SPINE_RES_GBUFFER_ALBEDO, VK_SPINE_ACCESS_SAMPLED_READ },
+	{ VK_SPINE_RES_SURFEL_IRRADIANCE, VK_SPINE_ACCESS_SAMPLED_READ },
+	{ VK_SPINE_RES_AV_FILTERED, VK_SPINE_ACCESS_SAMPLED_READ },
+};
+static const vkSpineResourceEdge s_writes_surfel_composite[] = {
+	{ VK_SPINE_RES_HDR_COLOR, VK_SPINE_ACCESS_STORAGE_WRITE | VK_SPINE_ACCESS_COLOR_WRITE },
 };
 
 #define VK_SPINE_VIEW_MAIN ( 1u << VK_VIEW_CLASS_MAIN_WORLD )
@@ -431,6 +481,42 @@ static const vkSpinePassDesc s_passes[VK_SPINE_PASS_COUNT] = {
 	[VK_SPINE_PASS_HISTORY_MAINT] = {
 		VK_SPINE_PASS_HISTORY_MAINT, "history_maint", VK_SPINE_CAT_MAINTENANCE, VK_SPINE_PHASE_FRAME_END,
 		VK_SPINE_VIEW_ANY, qtrue, qtrue, NULL, 0, NULL, 0
+	},
+	[VK_SPINE_PASS_VISIBILITY_FILL] = {
+		VK_SPINE_PASS_VISIBILITY_FILL, "visibility_fill", VK_SPINE_CAT_DEFERRED, VK_SPINE_PHASE_WORLD_OPAQUE,
+		VK_SPINE_VIEW_MAIN, qtrue, qfalse,
+		s_reads_visibility_fill, (int)ARRAY_LEN( s_reads_visibility_fill ),
+		s_writes_visibility_fill, (int)ARRAY_LEN( s_writes_visibility_fill )
+	},
+	[VK_SPINE_PASS_MATERIAL_CLASSIFY] = {
+		VK_SPINE_PASS_MATERIAL_CLASSIFY, "material_classify", VK_SPINE_CAT_DEFERRED, VK_SPINE_PHASE_OPAQUE_LIGHTING,
+		VK_SPINE_VIEW_MAIN, qtrue, qfalse,
+		s_reads_material_classify, (int)ARRAY_LEN( s_reads_material_classify ),
+		s_writes_material_classify, (int)ARRAY_LEN( s_writes_material_classify )
+	},
+	[VK_SPINE_PASS_SURFEL_GI_UPDATE] = {
+		VK_SPINE_PASS_SURFEL_GI_UPDATE, "surfel_gi_update", VK_SPINE_CAT_RAY_TRACING, VK_SPINE_PHASE_POST,
+		VK_SPINE_VIEW_MAIN, qtrue, qtrue,
+		s_reads_surfel_update, (int)ARRAY_LEN( s_reads_surfel_update ),
+		s_writes_surfel_update, (int)ARRAY_LEN( s_writes_surfel_update )
+	},
+	[VK_SPINE_PASS_SURFEL_GI_HASH] = {
+		VK_SPINE_PASS_SURFEL_GI_HASH, "surfel_gi_hash", VK_SPINE_CAT_RAY_TRACING, VK_SPINE_PHASE_POST,
+		VK_SPINE_VIEW_MAIN, qtrue, qfalse,
+		s_reads_surfel_hash, (int)ARRAY_LEN( s_reads_surfel_hash ),
+		s_writes_surfel_hash, (int)ARRAY_LEN( s_writes_surfel_hash )
+	},
+	[VK_SPINE_PASS_SURFEL_GI_RESOLVE] = {
+		VK_SPINE_PASS_SURFEL_GI_RESOLVE, "surfel_gi_resolve", VK_SPINE_CAT_RAY_TRACING, VK_SPINE_PHASE_POST,
+		VK_SPINE_VIEW_MAIN, qtrue, qfalse,
+		s_reads_surfel_resolve, (int)ARRAY_LEN( s_reads_surfel_resolve ),
+		s_writes_surfel_resolve, (int)ARRAY_LEN( s_writes_surfel_resolve )
+	},
+	[VK_SPINE_PASS_SURFEL_GI_COMPOSITE] = {
+		VK_SPINE_PASS_SURFEL_GI_COMPOSITE, "surfel_gi_composite", VK_SPINE_CAT_RAY_TRACING, VK_SPINE_PHASE_POST,
+		VK_SPINE_VIEW_MAIN, qtrue, qfalse,
+		s_reads_surfel_composite, (int)ARRAY_LEN( s_reads_surfel_composite ),
+		s_writes_surfel_composite, (int)ARRAY_LEN( s_writes_surfel_composite )
 	},
 	[VK_SPINE_PASS_TERRAIN_LOD] = {
 		VK_SPINE_PASS_TERRAIN_LOD, "terrain_lod", VK_SPINE_CAT_SCENE_PREP, VK_SPINE_PHASE_WORLD_OPAQUE,
@@ -641,6 +727,12 @@ const char *vk_spine_resource_name( vkSpineResourceId res )
 	case VK_SPINE_RES_RADIANCE_CLIPMAP: return "radiance_clipmap";
 	case VK_SPINE_RES_RADIANCE_CACHE_IRRADIANCE: return "radiance_cache_irradiance";
 	case VK_SPINE_RES_INDIRECT_DIFFUSE: return "indirect_diffuse";
+	case VK_SPINE_RES_VISIBILITY_IDS: return "visibility_ids";
+	case VK_SPINE_RES_VISIBILITY_BARY: return "visibility_bary";
+	case VK_SPINE_RES_VISIBILITY_CLASS: return "visibility_class";
+	case VK_SPINE_RES_SURFEL_POOL: return "surfel_pool";
+	case VK_SPINE_RES_SURFEL_HASH: return "surfel_hash";
+	case VK_SPINE_RES_SURFEL_IRRADIANCE: return "surfel_irradiance";
 	case VK_SPINE_RES_TERRAIN_HEIGHT: return "terrain_height";
 	case VK_SPINE_RES_TERRAIN_CHUNK_META: return "terrain_chunk_meta";
 	case VK_SPINE_RES_TERRAIN_LOD_STATE: return "terrain_lod_state";
@@ -771,6 +863,8 @@ static void vk_spine_set_resource_alive( vkSpineResourceId res, qboolean alive, 
 
 void vk_spine_registry_init( void )
 {
+	vkSpinePassId pass;
+
 	Com_Memset( &s_spine, 0, sizeof( s_spine ) );
 	s_spine.initialized = qtrue;
 	s_spine.attachmentGeneration = 1u;
@@ -793,6 +887,12 @@ void vk_spine_registry_init( void )
 		ri.Cmd_AddCommand( "pass_registry_status", vk_spine_status_f );
 		ri.Cmd_AddCommand( "spine_status", vk_spine_status_f );
 	}
+	vk_render_graph_init();
+	for ( pass = (vkSpinePassId)1; pass < VK_SPINE_PASS_COUNT; pass++ ) {
+		vk_render_graph_declare_pass( pass,
+			s_passes[pass].reads, s_passes[pass].readCount,
+			s_passes[pass].writes, s_passes[pass].writeCount );
+	}
 	/* Attachments may already exist (init order: create_attachments before registry). */
 	if ( vk.color_image != VK_NULL_HANDLE ) {
 		uint32_t aw = 0, ah = 0;
@@ -811,6 +911,7 @@ void vk_spine_registry_init( void )
 
 void vk_spine_registry_shutdown( void )
 {
+	vk_render_graph_shutdown();
 	if ( ri.Cmd_RemoveCommand ) {
 		ri.Cmd_RemoveCommand( "pass_registry_status" );
 		ri.Cmd_RemoveCommand( "spine_status" );
@@ -833,6 +934,7 @@ void vk_spine_frame_begin( void )
 	s_spine.oitResolvedThisFrame = qfalse;
 	s_spine.oitSkippedThisFrame = qfalse;
 	s_spine.certFrameIndex++;
+	vk_render_graph_begin_frame();
 	Com_Memset( s_spine.framePassMask, 0, sizeof( s_spine.framePassMask ) );
 	for ( i = 0; i < VK_SPINE_RES_COUNT; i++ ) {
 		/* Keep alive/generation/extent across frames; clear per-frame edge stamps. */
@@ -889,6 +991,7 @@ void vk_spine_frame_end( void )
 	vk_spine_validate_ultra_frame_contract();
 	vk_spine_cert_check_black_frame();
 	vk_spine_cert_check_resource_growth();
+	vk_render_graph_end_frame();
 	s_spine.currentPhase = VK_SPINE_PHASE_FRAME_END;
 	s_spine.openCount = 0;
 }
@@ -904,6 +1007,7 @@ void vk_spine_pass_begin( vkSpinePassId pass )
 	desc = &s_passes[pass];
 	s_spine.lastBegun = pass;
 	vk_spine_mark_observed( pass );
+	vk_render_graph_observe_pass( pass );
 
 	if ( s_spine.openCount < VK_SPINE_MAX_OPEN ) {
 		s_spine.openStack[s_spine.openCount++] = pass;

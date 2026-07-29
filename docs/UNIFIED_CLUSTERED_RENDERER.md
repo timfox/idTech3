@@ -4,7 +4,7 @@ The **Unified Clustered Renderer** (`r_renderMode 3`) is the engine’s default 
 
 The shipping raster default is **Unified Clustered mode 3** (`modern_vulkan.cfg` → `modern_vulkan_stable.cfg`): opaque surfaces use deferred clustered lighting, and transparent/OIT surfaces sample the same clustered Forward+ lists. `modern_clustered.cfg` remains as a compatibility overlay that reasserts the same clustered defaults. Spine 1.1 opt-in cert (mode 3 + WBOIT + Temporal Reconstruction + weapon-after): [RENDERER_SPINE_1.1.md](RENDERER_SPINE_1.1.md).
 
-Surface-class ownership (opaque deferred vs Forward+ transparent/weapon/OIT) is defined in [RENDERER_PATH_OWNERSHIP.md](RENDERER_PATH_OWNERSHIP.md). Visibility-buffer late shade is an **opt-in sidecar** (`r_visibilityBuffer`), not `r_renderMode 4` (mode 4 remains Tier B Selective Hybrid).
+Surface-class ownership (opaque deferred vs Forward+ transparent/weapon/OIT) is defined in [RENDERER_PATH_OWNERSHIP.md](RENDERER_PATH_OWNERSHIP.md). The visibility buffer + material classify path is production mode-3 infrastructure; exclusive visibility late-shade remains an opt-in staged consumer, not `r_renderMode 4` (mode 4 remains Tier B Selective Hybrid).
 
 Shared cluster aliases: `r_clusterZSlices` → `r_forwardPlusZSlices`, `r_clusterDebug` → `r_forwardPlusDebug`, `r_clusterTileSize` = 16.
 
@@ -101,7 +101,7 @@ Or use the safe overlay directly: `exec vulkan_overlay_unified_clustered_safe.cf
 
 Depth is **not** cleared between opaque lighting and transparent draws.
 
-Deferred lighting transforms direct-export **world** normals to view space, and can consume the material class map when `r_deferredMaterialClassify` and `r_materialClassify` are on — see [RENDERER_2027.md](RENDERER_2027.md).
+Deferred lighting transforms direct-export **world** normals to view space, and consumes the material class map by default in the production profile when `r_deferredMaterialClassify` and `r_materialClassify` are on — see [RENDERER_2027.md](RENDERER_2027.md).
 
 ## Weapon / HUD pass contract
 

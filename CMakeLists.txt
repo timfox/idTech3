@@ -3226,6 +3226,13 @@ set_tests_properties(test_visibility_buffer PROPERTIES
 	LABELS "scripts;validation;renderer"
 	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_visibility_buffer.sh;${CMAKE_SOURCE_DIR}/renderers/vulkan/vk_visibility_buffer.c;${CMAKE_SOURCE_DIR}/docs/RENDERER_2027.md")
 
+add_test(NAME test_render_graph
+	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_render_graph.sh
+	WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+set_tests_properties(test_render_graph PROPERTIES
+	LABELS "scripts;validation;renderer"
+	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_render_graph.sh;${CMAKE_SOURCE_DIR}/renderers/vulkan/vk_render_graph.c;${CMAKE_SOURCE_DIR}/docs/RENDER_GRAPH.md")
+
 add_test(NAME test_mboit_stochastic
 	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_mboit_stochastic.sh
 	WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
