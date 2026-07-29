@@ -30,7 +30,7 @@
 - `p2p_connect_browser <local|global|favorites> <index>`
 
 `p2p_address` prints the current shareable P2P address: `steam:STEAMID64` for Steam SDR or `udp:host:port` for direct UDP when `net_p2pAdvertiseAddress` is configured or ICE auto-advertise resolves a candidate.
-`p2p_status` also reports current ICE path state plus direct-UDP punch session state, which helps debug peer ownership, fallback, and keepalive behavior.
+`p2p_status` also reports a compact `P2P summary` line, current ICE path state, and direct-UDP punch session state, which helps debug peer ownership, fallback, and keepalive behavior.
 `p2p_connect` normalizes the input and forwards to `connect` with either a `steam:` or `udp:` address. For `udp:` peers it starts ICE-lite (when enabled) and, with `net_p2pIceDeferConnect 1`, waits for nomination/timeout before `connect`; otherwise it punches and connects immediately.
 `p2p_punch` explicitly starts a direct-UDP punchthrough helper session to a peer.
 `p2p_punch_status` prints active punch peers, attempts, and whether a peer has acknowledged the punchthrough flow.
@@ -84,6 +84,10 @@ The `direct_udp` backend includes a symmetric connectionless helper path built o
   - `net_p2pPunchKeepalive 1`
 
 This is ICE-lite rather than a full interactive ICE agent, but it covers host + STUN reflexive + optional TURN relay discovery and active symmetric UDP punching.
+
+Code that needs status without parsing console text can call `NET_P2P_GetPathStatus`.
+It fills `p2p_path_status_t` with backend, local address, ICE activity/result,
+deferred-connect state, candidate/check counts, and active/acknowledged punch peer counts.
 
 ### ICE connectivity checks (`direct_udp`)
 

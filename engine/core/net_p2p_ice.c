@@ -453,6 +453,32 @@ qboolean NET_P2P_IceConsumeDeferredConnect( char *buffer, int bufferSize )
 	return qtrue;
 }
 
+void NET_P2P_IceGetStatus( p2p_path_status_t *status )
+{
+	if ( !status ) {
+		return;
+	}
+
+	status->iceActive = net_p2pIceConnect.active;
+	status->iceSuccess = net_p2pIceConnect.success;
+	status->iceComplete = net_p2pIceConnect.complete;
+	status->connectDeferred = net_p2pIceConnect.deferConnect;
+	status->connectReady = net_p2pIceConnect.connectReady;
+	status->iceRemoteCandidates = net_p2pIceConnect.remoteCount;
+	status->iceChecksSent = net_p2pIceConnect.checkIndex;
+	status->iceNominatedTxn = net_p2pIceConnect.nominatedTxn;
+
+	if ( net_p2pIceConnect.active && net_p2pIceConnect.deadlineMs > 0 ) {
+		status->iceTimeoutRemainingMs = net_p2pIceConnect.deadlineMs - Sys_Milliseconds();
+		if ( status->iceTimeoutRemainingMs < 0 ) {
+			status->iceTimeoutRemainingMs = 0;
+		}
+	}
+
+	Q_strncpyz( status->icePeerAddress, net_p2pIceConnect.peerAddress, sizeof( status->icePeerAddress ) );
+	Q_strncpyz( status->iceNominatedAddress, net_p2pIceConnect.nominatedAddress, sizeof( status->iceNominatedAddress ) );
+}
+
 void NET_P2P_IcePrintStatus( void )
 {
 	if ( net_p2pIceConnect.active ) {

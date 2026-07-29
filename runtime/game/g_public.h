@@ -427,6 +427,7 @@ typedef enum {
 	G_RTS_INIT,			/* void RTS_Init( void ) */
 	G_RTS_SHUTDOWN,			/* void RTS_Shutdown( void ) */
 	G_RTS_RUN_TURN,			/* void RTS_RunTurn( int msec ) */
+	G_RTS_POST_COMMAND,		/* int RTS_PostCommand( const rtsCommand_t *cmd ) */
 	G_RTS_GET_TURN_MSEC,		/* int RTS_GetTurnMsec( void ) */
 	G_RTS_GET_CURRENT_TURN,		/* int RTS_GetCurrentTurn( void ) */
 	G_RTS_GET_PENDING_COMMAND_COUNT,	/* int RTS_GetPendingCommandCount( void ) */

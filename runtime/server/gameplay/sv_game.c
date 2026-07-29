@@ -645,6 +645,12 @@ static qboolean SV_GetValue( char* value, int valueSize, const char* key )
 		return qtrue;
 	}
 
+	if ( !Q_stricmp( key, "trap_RTS_PostCommand" ) )
+	{
+		Com_sprintf( value, valueSize, "%i", G_RTS_POST_COMMAND );
+		return qtrue;
+	}
+
 	if ( !Q_stricmp( key, "trap_RTS_GetTurnMsec" ) )
 	{
 		Com_sprintf( value, valueSize, "%i", G_RTS_GET_TURN_MSEC );
@@ -1593,6 +1599,9 @@ static intptr_t SV_GameSystemCalls( intptr_t *args ) {
 	case G_RTS_RUN_TURN:
 		RTS_RunTurn( args[1] );
 		return 0;
+
+	case G_RTS_POST_COMMAND:
+		return RTS_PostCommand( (const rtsCommand_t *)VMA( 1 ) );
 
 	case G_RTS_GET_TURN_MSEC:
 		return RTS_GetTurnMsec();

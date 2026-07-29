@@ -235,6 +235,7 @@ static void CL_ShowIP_f( void ) {
 
 static void CL_P2PStatus_f( void ) {
 	char address[MAX_STRING_CHARS];
+	p2p_path_status_t status;
 
 	Com_Printf( "P2P backend: %s\n", NET_P2P_BackendName() );
 	Com_Printf( "P2P supported: %s\n", NET_P2P_IsSupported() ? "yes" : "no" );
@@ -245,6 +246,17 @@ static void CL_P2PStatus_f( void ) {
 		Com_Printf( "P2P address: %s\n", address );
 	} else {
 		Com_Printf( "P2P address: unavailable\n" );
+	}
+
+	if ( NET_P2P_GetPathStatus( &status ) ) {
+		Com_Printf( "P2P summary: backend:%s ice:%s remoteCands:%d checks:%d punch:%d/%d deferred:%s\n",
+			status.backend,
+			status.iceActive ? "active" : ( status.iceSuccess ? "success" : ( status.iceComplete ? "fallback" : "idle" ) ),
+			status.iceRemoteCandidates,
+			status.iceChecksSent,
+			status.punchAcknowledgedPeers,
+			status.punchActivePeers,
+			status.connectDeferred ? "yes" : ( status.connectReady ? "ready" : "no" ) );
 	}
 
 	NET_P2P_PrintPathStatus();

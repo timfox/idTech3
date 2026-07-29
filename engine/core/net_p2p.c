@@ -539,6 +539,43 @@ void NET_P2P_PrintPathStatus( void )
 	NET_P2P_PrintPunchStatus();
 }
 
+qboolean NET_P2P_GetPathStatus( p2p_path_status_t *status )
+{
+	int i;
+	char address[MAX_STRING_CHARS];
+
+	if ( !status ) {
+		return qfalse;
+	}
+
+	Com_Memset( status, 0, sizeof( *status ) );
+	status->enabled = NET_P2P_IsEnabled();
+	status->ready = NET_P2P_IsReady();
+	status->usingSteamSdr = NET_P2P_UsesSteamSdrBackend();
+	Q_strncpyz( status->backend, NET_P2P_BackendName(), sizeof( status->backend ) );
+
+	if ( NET_P2P_GetLocalAddressString( address, sizeof( address ) ) ) {
+		Q_strncpyz( status->localAddress, address, sizeof( status->localAddress ) );
+	}
+
+	NET_P2P_IceGetStatus( status );
+
+	for ( i = 0; i < P2P_PUNCH_MAX_PEERS; i++ ) {
+		const p2p_punch_peer_t *peer = &net_p2pPunchPeers[i];
+
+		if ( !peer->active ) {
+			continue;
+		}
+
+		status->punchActivePeers++;
+		if ( peer->acknowledged ) {
+			status->punchAcknowledgedPeers++;
+		}
+	}
+
+	return qtrue;
+}
+
 void NET_P2P_BeginMasterList( const char *masterAddress )
 {
 	NET_P2P_NatBeginMasterList( masterAddress );

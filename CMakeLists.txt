@@ -3878,6 +3878,12 @@ set_tests_properties(test_p2p_ice_guard PROPERTIES
 	LABELS "p2p;scripts"
 	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_p2p_ice_guard.sh;${CMAKE_SOURCE_DIR}/engine/core/net_p2p_ice.c;${CMAKE_SOURCE_DIR}/runtime/server/core/sv_ccmds.c")
 
+add_test(NAME test_p2p_demo
+	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_p2p_demo.sh)
+set_tests_properties(test_p2p_demo PROPERTIES
+	LABELS "p2p;scripts;examples"
+	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_p2p_demo.sh;${CMAKE_SOURCE_DIR}/examples/p2p_demo/p2p_demo.cpp;${CMAKE_SOURCE_DIR}/examples/p2p_demo/CMakeLists.txt")
+
 add_test(NAME test_oscar_bridge
 	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_oscar_bridge.sh all)
 set_tests_properties(test_oscar_bridge PROPERTIES

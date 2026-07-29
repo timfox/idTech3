@@ -3217,8 +3217,11 @@ static void Com_ApplySurfShippingProfile( void )
 	Cvar_Set( "r_font", "fonts/NotoSansDisplay-Bold.ttf" );
 	Cvar_Set( "r_consoleFont", "fonts/NotoSansDisplay-Regular.ttf" );
 	Cvar_Set( "r_fontMipmap", "0" );
-	Cvar_Set( "r_fontShadow", "0" );
-	Cvar_Set( "r_fontGamma", "0.95" );
+	Cvar_Set( "r_sdfEnable", "0" );
+	Cvar_Set( "r_fontShadow", "1" );
+	Cvar_Set( "r_fontGamma", "1.0" );
+	Cvar_Set( "cl_uiFilter", "0" );
+	Cvar_Set( "r_lightmap_srgb_decode", "0" );
 	Cvar_Set( "cl_geneticGan", "0" );
 
 	/* Stale local bisect/debug sessions can persist hard magenta/white

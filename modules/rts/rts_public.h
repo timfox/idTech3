@@ -57,6 +57,7 @@ int  RTS_GetEntityCount( void );
 int  RTS_GetEntityOwner( rtsEntityId_t id );
 int  RTS_GetEntityPosition( rtsEntityId_t id, int *x, int *y );
 int  RTS_SelectRect( int playerId, int minX, int minY, int maxX, int maxY, rtsEntityId_t *out, int maxOut );
+int  RTS_FindGridPath( int width, int height, const unsigned char *blocked, int startX, int startY, int goalX, int goalY, int *outX, int *outY, int maxOut );
 unsigned RTS_ComputeStateHash( void );
 
 #ifdef __cplusplus

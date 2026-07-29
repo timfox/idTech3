@@ -17,8 +17,13 @@ int main(void) {
 	rtsCommand_t cmd;
 	rtsCommand_t move;
 	rtsEntityId_t selected[4];
+	unsigned char blocked[25] = { 0 };
+	int pathX[16];
+	int pathY[16];
 	unsigned hashBeforeMove;
 	unsigned hashAfterMove;
+	int pathCount;
+	int i;
 	int x = 0;
 	int y = 0;
 
@@ -90,6 +95,24 @@ int main(void) {
 	ASSERT(x == 512 && y == 256, "move command updates controlled entity");
 	hashAfterMove = RTS_ComputeStateHash();
 	ASSERT(hashBeforeMove != hashAfterMove, "state hash changes after deterministic state mutation");
+
+	blocked[1 * 5 + 2] = 1;
+	blocked[2 * 5 + 2] = 1;
+	blocked[3 * 5 + 2] = 1;
+	pathCount = RTS_FindGridPath(5, 5, blocked, 0, 2, 4, 2, pathX, pathY, 16);
+	ASSERT(pathCount == 9, "path grid routes around vertical obstruction");
+	ASSERT(pathX[0] == 0 && pathY[0] == 2, "path starts at requested cell");
+	ASSERT(pathX[pathCount - 1] == 4 && pathY[pathCount - 1] == 2, "path ends at requested cell");
+	for (i = 0; i < pathCount; ++i) {
+		ASSERT(!(pathX[i] == 2 && pathY[i] >= 1 && pathY[i] <= 3), "path avoids blocked cells");
+	}
+	ASSERT(RTS_FindGridPath(5, 5, blocked, 0, 2, 4, 2, NULL, NULL, 0) == pathCount, "path query returns required length without output arrays");
+	blocked[2 * 5 + 0] = 1;
+	ASSERT(RTS_FindGridPath(5, 5, blocked, 0, 2, 4, 2, pathX, pathY, 16) == 0, "blocked start rejects path");
+	blocked[2 * 5 + 0] = 0;
+	blocked[0 * 5 + 2] = 1;
+	blocked[4 * 5 + 2] = 1;
+	ASSERT(RTS_FindGridPath(5, 5, blocked, 0, 2, 4, 2, pathX, pathY, 16) == 0, "sealed wall has no path");
 
 	RTS_Shutdown();
 	ASSERT(RTS_GetTurnMsec() == 0, "shutdown resets turn time");
