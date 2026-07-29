@@ -949,6 +949,28 @@ qboolean vk_hiz_ready( void )
 	return ( vk_hiz_active() && s_ready && s_gpuBuilt && !s_cameraCut ) ? qtrue : qfalse;
 }
 
+qboolean vk_hiz_get_pyramid_sample_info( vkHizPyramidSampleInfo_t *out )
+{
+	qboolean ready = vk_hiz_ready();
+
+	if ( !out ) {
+		return ready;
+	}
+
+	Com_Memset( out, 0, sizeof( *out ) );
+	out->view = s_pyramid.viewAll;
+	out->layout = s_pyramid.layout;
+	out->width = s_pyramid.width;
+	out->height = s_pyramid.height;
+	out->levels = s_pyramid.levels;
+	out->ready = ready;
+
+	if ( out->view == VK_NULL_HANDLE || out->layout != VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL ) {
+		out->ready = qfalse;
+	}
+	return out->ready;
+}
+
 void vk_hiz_build( void )
 {
 	VkCommandBuffer cmd;

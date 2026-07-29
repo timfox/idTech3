@@ -21,6 +21,7 @@ docs/RENDERER_2026_ARCHITECTURE_PASS.md.
 #include "vk_ltc.h"
 #include "vk_scene_platform.h"
 #include "vk_photometric.h"
+#include "vk_hiz.h"
 
 #define VK_FP_RECORD_STRIDE (sizeof(float) * 16) /* 4 x vec4 per light */
 #define VK_FP_HEADER_BYTES (sizeof(float) * 8) /* 2 x vec4: count/meta + tile grid / viewport */
@@ -1726,9 +1727,12 @@ static void vk_hybrid_compare_status_f( void )
 static void vk_cluster_status_f( void )
 {
 	uint32_t total = vk.forward_plus.tile_capacity_tiles;
+	vkHizPyramidSampleInfo_t hizInfo;
+	qboolean hizReady = vk_hiz_get_pyramid_sample_info( &hizInfo );
 	ri.Printf( PRINT_ALL,
 		"cluster_status: grid=%ux%ux%u tile=%u compact=%d fallback=%d gen=%u\n"
-		"  lights=%u indices=%u/%u overflow=%u policy=%d zNear=%.2f zFar=%.2f zScale=%.4f\n",
+		"  lights=%u indices=%u/%u overflow=%u policy=%d zNear=%.2f zFar=%.2f zScale=%.4f\n"
+		"  depthCull=%d probePad=%d hizPyramid=%s %ux%u mips=%u layout=%u\n",
 		vk.forward_plus.tiles_x, vk.forward_plus.tiles_y, vk.forward_plus.z_slices,
 		VK_FP_TILE_DIM,
 		vk.forward_plus.compact_lists ? 1 : 0,
@@ -1739,7 +1743,11 @@ static void vk_cluster_status_f( void )
 		vk.forward_plus.last_overflow_count,
 		r_clusterOverflowPolicy ? r_clusterOverflowPolicy->integer : 2,
 		vk.forward_plus.cluster_z_near, vk.forward_plus.cluster_z_far,
-		vk.forward_plus.z_scale );
+		vk.forward_plus.z_scale,
+		r_forwardPlusDepthCull ? r_forwardPlusDepthCull->integer : 0,
+		r_forwardPlusHiZ ? r_forwardPlusHiZ->integer : 0,
+		hizReady ? "ready" : ( vk_hiz_active() ? "not-ready" : "off" ),
+		hizInfo.width, hizInfo.height, hizInfo.levels, (unsigned)hizInfo.layout );
 	if ( total > 0u && vk.forward_plus.index_capacity > 0u ) {
 		float util = (float)vk.forward_plus.last_index_used / (float)vk.forward_plus.index_capacity;
 		float avg = (float)vk.forward_plus.last_index_used / (float)total;

@@ -16,6 +16,17 @@ void vk_hiz_on_camera_cut( void );
 qboolean vk_hiz_active( void );
 qboolean vk_hiz_ready( void );
 
+typedef struct vkHizPyramidSampleInfo_s {
+	VkImageView view;
+	VkImageLayout layout;
+	uint32_t width;
+	uint32_t height;
+	uint32_t levels;
+	qboolean ready;
+} vkHizPyramidSampleInfo_t;
+
+qboolean vk_hiz_get_pyramid_sample_info( vkHizPyramidSampleInfo_t *out );
+
 /* Build / refresh pyramid from current depth (after depth prepass when available). */
 void vk_hiz_build( void );
 
