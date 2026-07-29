@@ -71,9 +71,18 @@ uint32_t Cluster_ViewDepthToSlice( float viewDepth, uint32_t clusterCountZ, uint
 uint32_t Cluster_IndexFromPixelAndViewDepth( uint32_t pixelX, uint32_t pixelY, float viewDepth,
 	const gpuClusterParams_t *params, uint32_t zMode );
 
+uint32_t Cluster_IndexFromTileAndSlice( uint32_t tileX, uint32_t tileY, uint32_t slice,
+	const gpuClusterParams_t *params );
+
 void Cluster_SliceDepthRange( uint32_t slice, uint32_t clusterCountZ, uint32_t zMode,
 	float zNear, float zFar, float zScale, float zBias,
 	float *outNear, float *outFar );
+
+uint32_t Cluster_LightOverlapsSlice( float lightNear, float lightFar,
+	float sliceNear, float sliceFar );
+
+void Cluster_LightSliceSpan( float lightNear, float lightFar, const gpuClusterParams_t *params,
+	uint32_t zMode, uint32_t *outFirstSlice, uint32_t *outLastSlice );
 
 uint32_t Cluster_TotalCount( const gpuClusterParams_t *params );
 

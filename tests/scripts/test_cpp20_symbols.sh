@@ -34,6 +34,7 @@ compile_check() {
 compile_check "$ROOT/engine/core/md4.cpp" "Com_BlockChecksum"
 compile_check "$ROOT/engine/core/q_utf8.cpp" "Q_UTF8_Decode"
 compile_check "$ROOT/renderers/vulkan/vk_cluster_math.cpp" "Cluster_DeriveLogZScaleBias"
+compile_check "$ROOT/renderers/vulkan/vk_cluster_math.cpp" "Cluster_LightSliceSpan"
 
 if [[ $failures -ne 0 ]]; then echo "$failures failed"; exit 1; fi
 echo "All cpp20 symbol checks passed."

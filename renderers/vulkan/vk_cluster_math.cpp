@@ -124,10 +124,29 @@ uint32_t Cluster_IndexFromPixelAndViewDepth( uint32_t pixelX, uint32_t pixelY, f
 	}
 	slice = Cluster_ViewDepthToSlice( viewDepth, cz, zMode, params->zNear, params->zFar,
 		params->zScale, params->zBias );
+	return Cluster_IndexFromTileAndSlice( tx, ty, slice, params );
+}
+
+uint32_t Cluster_IndexFromTileAndSlice( uint32_t tileX, uint32_t tileY, uint32_t slice,
+	const gpuClusterParams_t *params )
+{
+	uint32_t cx, cy, cz;
+	uint32_t tx, ty, sz;
+
+	if ( !params ) {
+		return 0u;
+	}
+	cx = params->clusterCountX > 0u ? params->clusterCountX : 1u;
+	cy = params->clusterCountY > 0u ? params->clusterCountY : 1u;
+	cz = params->clusterCountZ > 0u ? params->clusterCountZ : 1u;
+	tx = tileX < cx ? tileX : cx - 1u;
+	ty = tileY < cy ? tileY : cy - 1u;
+	sz = slice < cz ? slice : cz - 1u;
+
 	if ( cz <= 1u ) {
 		return ty * cx + tx;
 	}
-	return ( ty * cx + tx ) + slice * ( cx * cy );
+	return ( ty * cx + tx ) + sz * ( cx * cy );
 }
 
 void Cluster_SliceDepthRange( uint32_t slice, uint32_t clusterCountZ, uint32_t zMode,
@@ -168,6 +187,65 @@ void Cluster_SliceDepthRange( uint32_t slice, uint32_t clusterCountZ, uint32_t z
 	}
 	if ( outFar ) {
 		*outFar = sf;
+	}
+}
+
+uint32_t Cluster_LightOverlapsSlice( float lightNear, float lightFar,
+	float sliceNear, float sliceFar )
+{
+	float ln = lightNear;
+	float lf = lightFar;
+	float sn = sliceNear;
+	float sf = sliceFar;
+
+	if ( ln != ln || lf != lf || sn != sn || sf != sf ) {
+		return 0u;
+	}
+	if ( lf < ln ) {
+		float t = ln;
+		ln = lf;
+		lf = t;
+	}
+	if ( sf < sn ) {
+		float t = sn;
+		sn = sf;
+		sf = t;
+	}
+	return !( lf < sn || ln > sf ) ? 1u : 0u;
+}
+
+void Cluster_LightSliceSpan( float lightNear, float lightFar, const gpuClusterParams_t *params,
+	uint32_t zMode, uint32_t *outFirstSlice, uint32_t *outLastSlice )
+{
+	uint32_t first = 0u;
+	uint32_t last = 0u;
+
+	if ( params ) {
+		float ln = lightNear;
+		float lf = lightFar;
+		uint32_t cz = params->clusterCountZ > 0u ? params->clusterCountZ : 1u;
+
+		if ( lf < ln ) {
+			float t = ln;
+			ln = lf;
+			lf = t;
+		}
+		first = Cluster_ViewDepthToSlice( ln, cz, zMode, params->zNear, params->zFar,
+			params->zScale, params->zBias );
+		last = Cluster_ViewDepthToSlice( lf, cz, zMode, params->zNear, params->zFar,
+			params->zScale, params->zBias );
+		if ( last < first ) {
+			uint32_t t = first;
+			first = last;
+			last = t;
+		}
+	}
+
+	if ( outFirstSlice ) {
+		*outFirstSlice = first;
+	}
+	if ( outLastSlice ) {
+		*outLastSlice = last;
 	}
 }
 

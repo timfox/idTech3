@@ -102,8 +102,49 @@ int main( void )
 			uint32_t idx = Cluster_IndexFromPixelAndViewDepth( 0, 0,
 				0.5f * ( zNear + zFar ), &p, 1u );
 			ASSERT( idx == midSlice * 8u, "3D cluster index = slice*XY" );
+			ASSERT( Cluster_IndexFromTileAndSlice( 3u, 1u, midSlice, &p ) ==
+				7u + midSlice * 8u, "tile/slice cluster index" );
+			ASSERT( Cluster_IndexFromTileAndSlice( 99u, 99u, 99u, &p ) ==
+				7u + ( Z - 1u ) * 8u, "tile/slice clamps to grid" );
 			ASSERT( Cluster_TotalCount( &p ) == 4u * 2u * Z, "3D total" );
 		}
+	}
+
+	/* Light depth spans drive clustered binning. */
+	{
+		gpuClusterParams_t p;
+		uint32_t first = 99u, last = 99u;
+		uint32_t pointSlice;
+		float sn = 0.0f, sf = 0.0f;
+
+		memset( &p, 0, sizeof( p ) );
+		p.clusterCountX = 4;
+		p.clusterCountY = 2;
+		p.clusterCountZ = Z;
+		p.tileSizeX = 16;
+		p.tileSizeY = 16;
+		p.zNear = zNear;
+		p.zFar = zFar;
+		Cluster_DeriveLogZScaleBias( zNear, zFar, Z, &p.zScale, &p.zBias );
+
+		pointSlice = Cluster_ViewDepthToSlice( 128.0f, Z, 1u, zNear, zFar, p.zScale, p.zBias );
+		Cluster_LightSliceSpan( 128.0f, 128.0f, &p, 1u, &first, &last );
+		ASSERT( first == pointSlice && last == pointSlice, "point light span stays in one slice" );
+
+		Cluster_LightSliceSpan( 64.0f, 512.0f, &p, 1u, &first, &last );
+		ASSERT( first < last, "deep light spans multiple clustered Z slices" );
+		ASSERT( first == Cluster_ViewDepthToSlice( 64.0f, Z, 1u, zNear, zFar, p.zScale, p.zBias ),
+			"span first slice matches near bound" );
+		ASSERT( last == Cluster_ViewDepthToSlice( 512.0f, Z, 1u, zNear, zFar, p.zScale, p.zBias ),
+			"span last slice matches far bound" );
+
+		Cluster_SliceDepthRange( first, Z, 1u, zNear, zFar, p.zScale, p.zBias, &sn, &sf );
+		ASSERT( Cluster_LightOverlapsSlice( 64.0f, 512.0f, sn, sf ) == 1u,
+			"light overlaps first slice range" );
+		ASSERT( Cluster_LightOverlapsSlice( 512.0f, 64.0f, sf, sn ) == 1u,
+			"overlap helper tolerates swapped inputs" );
+		ASSERT( Cluster_LightOverlapsSlice( 1024.0f, 2048.0f, sn, sf ) == 0u,
+			"far light rejects near slice" );
 	}
 
 	ASSERT( sizeof( gpuClusterHeader_t ) == 8, "header size" );

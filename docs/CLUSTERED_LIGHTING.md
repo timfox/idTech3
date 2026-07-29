@@ -14,6 +14,13 @@ Shared CPU/GPU types in `renderers/vulkan/vk_cluster_contract.h` and `shaders/gl
 
 `viewDepth` is **positive** forward view-space distance (`abs(view Z)` / clip `w`).
 
+Cluster index order is `xy + z * (clusterCountX * clusterCountY)`. CPU helpers mirror the GLSL helpers:
+
+- `Cluster_IndexFromPixelAndViewDepth` maps a screen pixel plus view depth into one 3D cluster.
+- `Cluster_IndexFromTileAndSlice` maps explicit tile/slice coordinates and clamps to the grid.
+- `Cluster_LightSliceSpan` maps a light's near/far view-depth bounds to the first/last Z slices it can affect.
+- `Cluster_LightOverlapsSlice` is the shared conservative interval test used by binning.
+
 ## Log Z slicing
 
 ```
@@ -39,6 +46,7 @@ Tile SSBO layout:
 Build (single compute pass, markers `ClusterClear`→`ClusterFill`):
 
 - Per cluster: conservative XY + log-Z overlap, importance/index truncate to `r_clusterMaxLightsPerCluster` (default **32**)
+- Light Z membership uses the same near/far span contract as `Cluster_LightSliceSpan`, avoiding Forward+'s single depth interval blind spot when one screen tile contains foreground and distant geometry.
 - `atomicAdd` into shared index pool; overflow recorded deterministically
 
 Legacy fallback: fixed **8** slots/cluster (`r_clusterCompactLists 0` or `r_clusterForceBuildFailure 1`).
