@@ -3819,7 +3819,7 @@ static void R_Register( void )
 	r_forwardPlusHiZ = ri.Cvar_Get( "r_forwardPlusHiZ", "1", CVAR_ARCHIVE_ND );
 	ri.Cvar_CheckRange( r_forwardPlusHiZ, "0", "1", CV_INTEGER );
 	ri.Cvar_SetDescription( r_forwardPlusHiZ,
-		"When 1 with \\r_forwardPlusDepthCull 1, expand depth probes (forwardPlusHiZPyramid) for hierarchical occlusion of large lights. Default 1." );
+		"When 1 with \\r_forwardPlusDepthCull 1, expand same-frame depth probes for conservative large-light rejection. This is a probe pad, not the vk_hiz pyramid. Default 1." );
 	ri.Cvar_SetGroup( r_forwardPlusHiZ, CVG_RENDERER );
 	r_forwardPlusZSlices = ri.Cvar_Get( "r_forwardPlusZSlices", "1", CVAR_ARCHIVE_ND | CVAR_LATCH );
 	ri.Cvar_CheckRange( r_forwardPlusZSlices, "1", "16", CV_INTEGER );

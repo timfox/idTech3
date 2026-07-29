@@ -44,7 +44,7 @@ layout(push_constant) uniform Push {
 	uint luminanceSort;
 	uint distanceSort;
 	uint depthCull;
-	uint hiZ; /* forwardPlusHiZPyramid: expand probes with light screen radius */
+	uint hiZ; /* forwardPlusHiZProbePad: expand depth probes for large light volumes */
 	uint zSlices;
 	uint zSliceMode;
 	float zNear;
@@ -181,14 +181,15 @@ void main() {
 	vec3 viewOrg = params.viewOrg.xyz;
 
 	/* Precompute tile depth range once when depth cull is on (lightVolumeDepthCull).
-	 * With hiZ: expand probe footprint so large lights see hierarchical nearest depth. */
+	 * With hiZ: expand probe footprint so large lights sample a wider nearest-depth region.
+	 * This is not the vk_hiz pyramid; it is a cheap same-frame probe pad. */
 	float sceneNearest = 0.0;
 	if (pc.depthCull != 0u) {
 		float minX = float(tileX) * tilePxX;
 		float minY = float(tileY) * tilePxY;
 		float maxX = minX + tilePxX;
 		float maxY = minY + tilePxY;
-		/* forwardPlusHiZPyramid: pad tile AABB by up to 2 tiles for conservative large-light cull. */
+		/* forwardPlusHiZProbePad: pad tile AABB by up to 2 tiles for conservative large-light cull. */
 		float padX = (pc.hiZ != 0u) ? tilePxX * 2.0 : 0.0;
 		float padY = (pc.hiZ != 0u) ? tilePxY * 2.0 : 0.0;
 		minX = max(minX - padX, 0.0);

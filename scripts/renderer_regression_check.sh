@@ -229,6 +229,21 @@ else
 fi
 
 echo ""
+echo "Forward+ depth cull naming: r_forwardPlusHiZ is probe padding, not vk_hiz pyramid:"
+FP_C="$PROJECT_ROOT/renderers/vulkan/vk_forward_plus.c"
+FP_GLSL="$PROJECT_ROOT/renderers/vulkan/shaders/glsl/forward_plus_tile_cull.comp"
+TR_INIT_VK="$PROJECT_ROOT/renderers/vulkan/tr_init.c"
+if grep -q 'forwardPlusHiZPyramid\|hierarchical probes\|hierarchical occlusion' "$FP_C" "$FP_GLSL" "$TR_INIT_VK" 2>/dev/null; then
+  fail "Forward+ HiZ still uses pyramid/hierarchical wording without sampling vk_hiz"
+elif ! grep -q 'forwardPlusHiZProbePad' "$FP_GLSL" 2>/dev/null; then
+  fail "forward_plus_tile_cull.comp missing forwardPlusHiZProbePad marker"
+elif ! grep -q 'probe pad, not the vk_hiz pyramid' "$TR_INIT_VK" 2>/dev/null; then
+  fail "tr_init.c r_forwardPlusHiZ description must distinguish probe pad from vk_hiz pyramid"
+else
+  pass "r_forwardPlusHiZ clearly documented as same-frame probe padding"
+fi
+
+echo ""
 echo "TAA shader: YCoCg variance clip / neighborhood stats before history blend:"
 TAA_FRAG="$PROJECT_ROOT/renderers/vulkan/shaders/glsl/taa.frag"
 if ! grep -q 'neighborhoodYCoCgStats\|RGBToYCoCg' "$TAA_FRAG" 2>/dev/null; then

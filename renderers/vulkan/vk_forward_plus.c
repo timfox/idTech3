@@ -319,7 +319,7 @@ typedef struct {
 	uint32_t luminance_sort;
 	uint32_t distance_sort;
 	uint32_t depth_cull;
-	uint32_t hi_z; /* r_forwardPlusHiZ: hierarchical depth probes for large lights */
+	uint32_t hi_z; /* r_forwardPlusHiZ: expanded same-frame depth probes for large lights */
 	uint32_t z_slices;
 	uint32_t z_slice_mode; /* 0=linear view depth, 1=log */
 	float z_near;
@@ -1499,7 +1499,7 @@ static void vk_forward_plus_dispatch_tile_cull_internal( qboolean use_depth_cull
 		if ( !depth_cull_logged ) {
 			ri.Printf( PRINT_ALL,
 				"[VK][Forward+] r_forwardPlusDepthCull=1 (depth prepass + tile cull; lightVolumeDepthCull)%s\n",
-				push.hi_z ? "; r_forwardPlusHiZ=1 hierarchical probes" : "" );
+				push.hi_z ? "; r_forwardPlusHiZ=1 expanded same-frame probes" : "" );
 			depth_cull_logged = qtrue;
 		}
 	}
