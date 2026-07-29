@@ -249,6 +249,10 @@ cvar_t	*r_dlightMode;
 cvar_t	*r_dlightScale;
 cvar_t	*r_dlightIntensity;
 cvar_t	*r_dlightSaturation;
+cvar_t	*r_deferredLightDemo;
+cvar_t	*r_deferredLightDemoCount;
+cvar_t	*r_deferredLightDemoRadius;
+cvar_t	*r_deferredLightDemoAnimate;
 #ifdef USE_VULKAN
 cvar_t	*r_device;
 #ifdef USE_VBO
@@ -1335,6 +1339,7 @@ static void R_Register( void )
 	ri.Cmd_AddCommand( "vulkaninfo", VulkanInfo_f );
 	ri.Cmd_AddCommand( "renderer_status", R_RendererStatus_f );
 	ri.Cmd_AddCommand( "havenrp_renderer_status", R_HavenRPRendererStatus_f );
+	ri.Cmd_AddCommand( "deferred_many_lights_status", R_DeferredLightDemoStatus_f );
 	ri.Cmd_AddCommand( "deferred_gbuffer_status", vk_deferred_gbuffer_status_f );
 	ri.Cmd_AddCommand( "temporal_status", vk_temporal_status_f );
 	ri.Cmd_AddCommand( "r_dumpTemporalState", vk_temporal_status_f );
@@ -1772,6 +1777,27 @@ static void R_Register( void )
 
 	r_dlightBacks = ri.Cvar_Get( "r_dlightBacks", "1", CVAR_ARCHIVE_ND );
 	ri.Cvar_SetDescription( r_dlightBacks, "Whether or not dynamic lights should light up back-face culled geometry, affects only VQ3 dynamic lights." );
+	r_deferredLightDemo = ri.Cvar_Get( "r_deferredLightDemo", "0", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_deferredLightDemo, "0", "1", CV_INTEGER );
+	ri.Cvar_SetDescription( r_deferredLightDemo,
+		"Renderer-owned many-light demo injection for deferred/clustered validation. "
+		"Default off; enable with demo_deferred_many_lights.cfg." );
+	ri.Cvar_SetGroup( r_deferredLightDemo, CVG_RENDERER );
+	r_deferredLightDemoCount = ri.Cvar_Get( "r_deferredLightDemoCount", "64", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_deferredLightDemoCount, "0", "64", CV_INTEGER );
+	ri.Cvar_SetDescription( r_deferredLightDemoCount,
+		"Number of deterministic demo dynamic lights injected into the main world view." );
+	ri.Cvar_SetGroup( r_deferredLightDemoCount, CVG_RENDERER );
+	r_deferredLightDemoRadius = ri.Cvar_Get( "r_deferredLightDemoRadius", "360", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_deferredLightDemoRadius, "32", "2048", CV_FLOAT );
+	ri.Cvar_SetDescription( r_deferredLightDemoRadius,
+		"Radius/intensity of deferred many-light demo lights." );
+	ri.Cvar_SetGroup( r_deferredLightDemoRadius, CVG_RENDERER );
+	r_deferredLightDemoAnimate = ri.Cvar_Get( "r_deferredLightDemoAnimate", "1", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_deferredLightDemoAnimate, "0", "1", CV_INTEGER );
+	ri.Cvar_SetDescription( r_deferredLightDemoAnimate,
+		"Animate deferred many-light demo positions and color phases." );
+	ri.Cvar_SetGroup( r_deferredLightDemoAnimate, CVG_RENDERER );
 	r_finish = ri.Cvar_Get( "r_finish", "0", CVAR_ARCHIVE_ND );
 	ri.Cvar_SetDescription( r_finish, "Force a glFinish call after rendering a scene." );
 	r_textureMode = ri.Cvar_Get( "r_textureMode", "GL_LINEAR_MIPMAP_NEAREST", CVAR_ARCHIVE );
@@ -4282,6 +4308,7 @@ static void RE_Shutdown( refShutdownCode_t code ) {
 	ri.Cmd_RemoveCommand( "vulkaninfo" );
 	ri.Cmd_RemoveCommand( "renderer_status" );
 	ri.Cmd_RemoveCommand( "havenrp_renderer_status" );
+	ri.Cmd_RemoveCommand( "deferred_many_lights_status" );
 	ri.Cmd_RemoveCommand( "renderer_profile" );
 	ri.Cmd_RemoveCommand( "ui_blur_status" );
 	ri.Cmd_RemoveCommand( "renderer_health" );

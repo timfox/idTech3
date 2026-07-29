@@ -1542,6 +1542,10 @@ extern cvar_t	*r_dlightMode;			// 0 - vq3, 1 - pmlight
 extern cvar_t	*r_dlightScale;			// 0.1 - 1.0
 extern cvar_t	*r_dlightIntensity;		// 0.1 - 1.0
 extern cvar_t	*r_dlightSaturation;	// 0.0 - 1.0
+extern cvar_t	*r_deferredLightDemo;
+extern cvar_t	*r_deferredLightDemoCount;
+extern cvar_t	*r_deferredLightDemoRadius;
+extern cvar_t	*r_deferredLightDemoAnimate;
 #ifdef USE_VULKAN
 extern cvar_t	*r_device;
 #ifdef USE_VBO
@@ -2438,6 +2442,7 @@ void RE_AddAreaLightToScene( const vec3_t org, float halfWidth, float halfHeight
 	const vec3_t right, const vec3_t up, float intensity, float r, float g, float b );
 void RE_AddAdditiveLightToScene( const vec3_t org, float intensity, float r, float g, float b );
 void RE_AddLinearLightToScene( const vec3_t start, const vec3_t end, float intensity, float r, float g, float b );
+void R_DeferredLightDemoStatus_f( void );
 
 void RE_RenderScene( const refdef_t *fd );
 void RE_BeginScene( const refdef_t *fd );

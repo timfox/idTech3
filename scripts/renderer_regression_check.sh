@@ -488,6 +488,15 @@ else
 fi
 
 echo ""
+echo "Deferred many-lights demo:"
+if ! bash "$PROJECT_ROOT/tests/scripts/test_deferred_many_lights_demo.sh" >/tmp/deferred_many_lights_demo_check.log 2>&1; then
+  cat /tmp/deferred_many_lights_demo_check.log
+  fail "deferred many-lights demo static gate failed"
+else
+  pass "deferred many-lights demo config + renderer-owned 64-light injector wired"
+fi
+
+echo ""
 echo "G-buffer / Ambient Visibility lifecycle:"
 if [[ ! -x "$PROJECT_ROOT/scripts/gbuffer_av_lifecycle_check.sh" && ! -f "$PROJECT_ROOT/scripts/gbuffer_av_lifecycle_check.sh" ]]; then
   fail "missing scripts/gbuffer_av_lifecycle_check.sh"
