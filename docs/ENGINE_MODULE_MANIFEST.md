@@ -27,7 +27,7 @@ Profile bundles: [`cmake/IdTech3Profile.cmake`](../cmake/IdTech3Profile.cmake), 
 
 ## Qcommon — engine core
 
-CMake: [`cmake/EngineQcommonSources.cmake`](../cmake/EngineQcommonSources.cmake) → `idtech3_init_qcommon_sources()` (replaces `AUX_SOURCE_DIRECTORY` on `src/qcommon/`).
+CMake: [`cmake/EngineQcommonSources.cmake`](../cmake/EngineQcommonSources.cmake) -> `idtech3_init_qcommon_sources()` (replaces `AUX_SOURCE_DIRECTORY` on the old flat qcommon tree).
 
 Gated files stripped from glob and re-appended via extension macros / CMakeLists (`vm_*`, `net_dtls`, `net_sdr`, open-world `.cpp`/`.c`).
 
@@ -35,11 +35,11 @@ Gated files stripped from glob and re-appended via extension macros / CMakeLists
 
 ## Botlib — AI / AAS
 
-CMake: [`cmake/modules/BotlibSources.cmake`](../cmake/modules/BotlibSources.cmake) → `idtech3_init_botlib_sources()`.
+CMake: [`cmake/modules/BotlibSources.cmake`](../cmake/modules/BotlibSources.cmake) -> `idtech3_init_botlib_sources()`.
 
 | Path | Tier | Gate |
 |------|------|------|
-| `modules/botlib/*.c` (`src/botlib` shim) | core | always (dedicated server + `bot_enable`) |
+| `modules/botlib/*.c` | core | always (dedicated server + `bot_enable`) |
 
 Test: `test_botlib_bounded_strings.sh`.
 
@@ -47,11 +47,11 @@ Test: `test_botlib_bounded_strings.sh`.
 
 ## Audio — MP3 codec
 
-CMake: [`cmake/modules/AudioMp3Sources.cmake`](../cmake/modules/AudioMp3Sources.cmake) → `idtech3_append_mp3_client_sources()` when **`USE_MP3`**.
+CMake: [`cmake/modules/AudioMp3Sources.cmake`](../cmake/modules/AudioMp3Sources.cmake) -> `idtech3_append_mp3_client_sources()` when **`USE_MP3`**.
 
 | Path | Tier | Gate |
 |------|------|------|
-| `src/audio/mp3/*.c` | core | `USE_MP3` |
+| `modules/audio/mp3/*.c` | core | `USE_MP3` |
 
 ---
 
@@ -61,7 +61,7 @@ CMake: [`cmake/server/ServerSources.cmake`](../cmake/server/ServerSources.cmake)
 
 | Path | Tier | Gate |
 |------|------|------|
-| `src/server/*.c` (core) | core | glob manifest |
+| `runtime/server/{core,client,gameplay,net,services,world}/*.c` | core | explicit domain manifest |
 | `runtime/server/world/sv_openworld.c` | module | `USE_OPEN_WORLD` |
 
 ---
@@ -70,20 +70,20 @@ CMake: [`cmake/server/ServerSources.cmake`](../cmake/server/ServerSources.cmake)
 
 Gate: **`USE_RESEARCH_EXTENSIONS`** (OFF in `core`/`game`, ON in `full`/`research`).
 
-CMake: [`cmake/IdTech3QcommonExtensions.cmake`](../cmake/IdTech3QcommonExtensions.cmake) → `idtech3_append_research_qcommon_sources()`.
+CMake: [`cmake/IdTech3QcommonExtensions.cmake`](../cmake/IdTech3QcommonExtensions.cmake) -> `idtech3_append_research_qcommon_sources()`.
 
 | Path | Tier | Runtime cvar / notes | Test |
 |------|------|----------------------|------|
-| `src/extensions/research/vuda/` | extension | `r_vuda`, `cl_vuda` | `tests/scripts/test_vuda.sh` |
-| `src/extensions/research/vksplat/` | extension | `r_vksplat` | `tests/scripts/test_vksplat.sh` |
-| `src/extensions/research/curast/` | extension | `r_curast` | `tests/scripts/test_curast.sh` |
-| `src/extensions/research/infernux/` | extension | Infernux batch | `tests/scripts/test_python.sh` |
-| `src/extensions/research/mimir/` | extension | `r_mimir` | `tests/scripts/test_mimir.sh` |
-| `src/extensions/research/iris/` | extension | `r_iris` | `tests/scripts/test_iris.sh` |
-| `src/extensions/research/radiusfps/` | extension | `cl_radiusfps_*` | `tests/scripts/test_radiusfps.sh` |
-| `src/extensions/research/gccfer/` | extension | `cl_gccfer_*` | `tests/scripts/test_gccfer.sh` |
-| `src/extensions/research/dax/` | extension | `cl_dax_*` | `tests/scripts/test_dax.sh` |
-| `src/extensions/research/x3dpra/` | extension | `cl_x3dpra_*` | `tests/scripts/test_x3dpra.sh` |
+| `extensions/research/vuda/` | extension | `r_vuda`, `cl_vuda` | `tests/scripts/test_vuda.sh` |
+| `extensions/research/vksplat/` | extension | `r_vksplat` | `tests/scripts/test_vksplat.sh` |
+| `extensions/research/curast/` | extension | `r_curast` | `tests/scripts/test_curast.sh` |
+| `extensions/research/infernux/` | extension | Infernux batch | `tests/scripts/test_python.sh` |
+| `extensions/research/mimir/` | extension | `r_mimir` | `tests/scripts/test_mimir.sh` |
+| `extensions/research/iris/` | extension | `r_iris` | `tests/scripts/test_iris.sh` |
+| `extensions/research/radiusfps/` | extension | `cl_radiusfps_*` | `tests/scripts/test_radiusfps.sh` |
+| `extensions/research/gccfer/` | extension | `cl_gccfer_*` | `tests/scripts/test_gccfer.sh` |
+| `extensions/research/dax/` | extension | `cl_dax_*` | `tests/scripts/test_dax.sh` |
+| `extensions/research/x3dpra/` | extension | `cl_x3dpra_*` | `tests/scripts/test_x3dpra.sh` |
 | `extensions/research/howdark/` | extension | `cl_howdark_enable` — Filip & Vávra black materials | `tests/scripts/test_howdark.sh` |
 | `extensions/research/nebrdf/` | extension | `cl_nebrdf_enable` — Shen et al. neural-enhanced BRDF | `tests/scripts/test_nebrdf.sh` |
 | `extensions/research/rtfem/` | extension | `cl_rtfem_enable` — Parker & O’Brien SCA 2009 FEM scaffold | `tests/scripts/test_rtfem.sh` |
@@ -117,7 +117,7 @@ CMake: `idtech3_append_open_world_qcommon_sources()`.
 
 ## Client — domain layout (2026)
 
-CMake: [`cmake/client/ClientSources.cmake`](../cmake/client/ClientSources.cmake) (explicit manifest; no `AUX_SOURCE_DIRECTORY` on `src/client/`).
+CMake: [`cmake/client/ClientSources.cmake`](../cmake/client/ClientSources.cmake) (explicit manifest; no `AUX_SOURCE_DIRECTORY` on the old flat client tree).
 
 | Folder | Tier | Notes |
 |--------|------|-------|
@@ -148,7 +148,7 @@ CMake: [`cmake/client/ClientExtensionSources.cmake`](../cmake/client/ClientExten
 | `src/client/world/cl_openworld.cpp` | module | `USE_OPEN_WORLD` | `test_openworld*.sh` |
 | `src/client/world/cl_proc.cpp` | module | `USE_OPEN_WORLD` | `test_proc.sh` |
 | `src/extensions/emulator/emulator_*.c` | extension | `USE_IDTECH3_EMULATOR` | `test_idtech3_emulator.sh`, `unit_emulator_contract` |
-| `src/renderers/vulkan/extensions/scaffold/vk_emulator_screen.c` | extension | always linked; active when `r_emulatorScreen 1` + `USE_IDTECH3_EMULATOR` build | same |
+| `renderers/vulkan/extensions/scaffold/vk_emulator_screen.c` | extension | always linked; active when `r_emulatorScreen 1` + `USE_IDTECH3_EMULATOR` build | same |
 
 Headers: `src/extensions/generative/*.h`, `src/client/cl_flux.h`, `src/client/cl_trellis.h`, `extensions/emulator/emulator_types.h`.
 
@@ -167,7 +167,7 @@ CMake: [`cmake/renderers/VulkanExtensionSources.cmake`](../cmake/renderers/Vulka
 | `extensions/rtx/` — `VK_RTX_CORE_SRCS` (`vk_rtx*`) | core+RTX | always linked; stubs when `USE_VULKAN_RTX` OFF |
 | `extensions/rtx/` — `VK_RTX_EXPERIMENTAL_SRCS` | extension | `USE_EXPERIMENTAL_RENDERERS` |
 | `extensions/scaffold/` — `VK_SCAFFOLD_EXTENSION_SRCS` | extension | `USE_EXPERIMENTAL_RENDERERS` |
-| `src/renderers/vulkan/*.c` (root) | core | [`VulkanCoreSources.cmake`](../cmake/renderers/VulkanCoreSources.cmake) — `idtech3_init_vulkan_core_sources()` |
+| `renderers/vulkan/*.c` (root) | core | [`VulkanCoreSources.cmake`](../cmake/renderers/VulkanCoreSources.cmake) - `idtech3_init_vulkan_core_sources()` |
 | `vk_experimental_renderer_stubs.c` | core | used when experimental OFF |
 
 Test: `test_vulkan_extensions_layout.sh`.
@@ -184,7 +184,7 @@ CMake: [`cmake/modules/ClientGameAiSources.cmake`](../cmake/modules/ClientGameAi
 |------|------|------|
 | `runtime/game/middleware/g_director.c` ... `g_bt.c` (middleware TUs) | module | `USE_GAME_AI_MIDDLEWARE` |
 | `runtime/game/systems/g_engine_systems.c` | core | always (telemetry/replay/save/quest) |
-| `src/game/game_middleware_stubs.c` | core | when middleware OFF |
+| `runtime/game/middleware/game_middleware_stubs.c` | core | when middleware OFF |
 
 Test: `test_game_ai_middleware.sh`.
 
@@ -192,10 +192,10 @@ Test: `test_game_ai_middleware.sh`.
 
 ## Always-on core (do not gate without manifest update)
 
-- `src/qcommon/*` (except gated net/world/research above)
-- `src/client/*` except extension strips in ClientExtensionSources
-- `src/server/*`, `src/game/*` except AI middleware strip list, `src/audio/*`, `src/platform/*`
-- `src/renderers/common/*`, `src/renderers/vulkan/*` minus extension manifests
+- `engine/core/*` (except gated net/world/research above)
+- `runtime/client/*` except extension strips in ClientExtensionSources
+- `runtime/server/*`, `runtime/game/*` except AI middleware strip list, `modules/audio/*`, `engine/platform/*`
+- `renderers/common/*`, `renderers/vulkan/*` minus extension manifests
 
 ---
 
@@ -218,15 +218,15 @@ Docs: [UBERTOOLS_CLEAN_ROOM.md](UBERTOOLS_CLEAN_ROOM.md), [BABBLE.md](BABBLE.md)
 
 ## Governance
 
-- New unconditional `list(APPEND QCOMMON_SRCS` / `CLIENT_SRCS` in root `CMakeLists.txt` is **forbidden** — use cmake module macros; CI: `scripts/ci/audit_unconditional_sources.sh`.
-- Physical moves require one-release include shims — see [`docs/DEPRECATION_POLICY.md`](DEPRECATION_POLICY.md).
+- New unconditional `list(APPEND QCOMMON_SRCS` / `CLIENT_SRCS` in root `CMakeLists.txt` is **forbidden** - use cmake module macros; CI: `scripts/ci/audit_unconditional_sources.sh`.
+- Physical moves require manifest/docs/tests updates. Do not add new `src/*` forwarding shims; if a temporary bridge is still needed, track it in [`docs/core/SHIM_REMOVAL_CHECKLIST.md`](core/SHIM_REMOVAL_CHECKLIST.md).
 - PR checklist: manifest updated when sources move or gates change.
 
 ---
 
 ## Deferred (Phase 5+)
 
-- Top-level `engine/`, `runtime/`, `modules/` physical roots — [REPOSITORY_LAYOUT_2026.md](core/REPOSITORY_LAYOUT_2026.md)
-- `src/external/` → `third_party/` rename
-- ~~`USE_GAME_AI_MIDDLEWARE`~~ — wired; `g_engine_systems.c` always on; `game_middleware_stubs.c` in `core`
+- Top-level `engine/`, `runtime/`, `modules/`, `extensions/`, `renderers/`, `third_party/` physical roots - done; see [REPOSITORY_LAYOUT_2026.md](core/REPOSITORY_LAYOUT_2026.md)
+- `third_party/` rename - done
+- ~~`USE_GAME_AI_MIDDLEWARE`~~ - wired; `g_engine_systems.c` always on; `game_middleware_stubs.c` in `runtime/game/middleware`
 - MSVC project codegen from CMake

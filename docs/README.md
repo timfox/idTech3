@@ -60,6 +60,7 @@ Documentation is grouped by **tier**. Most files remain at their historical path
 - [CLUSTERED_LIGHTING.md](CLUSTERED_LIGHTING.md) — Clustered Hybrid M2 log-Z grid, compact lists, overflow, hybrid compare
 - [CPP20_MIGRATION.md](CPP20_MIGRATION.md) — slow C→C++20 compatibility migration (foundation)
 - [CPP23_MIGRATION.md](CPP23_MIGRATION.md) — staged plan for raising converted engine-owned C++ from C++20 to C++23
+- [MODULARIZATION_GUIDE.md](MODULARIZATION_GUIDE.md) — rules and validation for further source-domain splits
 - [RASTER_ULTRA_1.0.md](RASTER_ULTRA_1.0.md) — Raster Ultra base (high-end raster-only; RT locked off). Later milestones: [1.1](RASTER_ULTRA_1.1.md) lighting · [1.3](RASTER_ULTRA_1.3.md) probe GI · [1.4](RASTER_ULTRA_1.4.md) transparency/particles/decals · [1.5](RASTER_ULTRA_1.5.md) present-time AA · [1.6](RASTER_ULTRA_1.6.md) GPU geometry · [1.7](RASTER_ULTRA_1.7.md) atmosphere/weather · [1.8](RASTER_ULTRA_1.8.md) materials · [1.9](RASTER_ULTRA_1.9.md) virtual shadows · [1.10](RASTER_ULTRA_1.10.md) HDR presentation · [1.11](RASTER_ULTRA_1.11.md) reference lab · [1.12](RASTER_ULTRA_1.12.md) frequency-aware / moiré suppression
 - [RENDERER_SPINE_1.0.md](RENDERER_SPINE_1.0.md) — production-certified frame matrix (stabilize before new techniques)- [AUTHORED_MESH_NORMALS.md](AUTHORED_MESH_NORMALS.md) — experimental DCC hard-edge / authored-normal import policy
 - [RENDERER_2027.md](RENDERER_2027.md) — GPU-driven hybrid visibility north-star (vis buffer Phase 1)
@@ -83,7 +84,7 @@ Documentation is grouped by **tier**. Most files remain at their historical path
 
 ## Repository layout (2026)
 
-Top-level symlinks (`engine/`, `runtime/`, `modules/`, `extensions/`, `renderers/`) → canonical `src/*` tree. **Legacy paths under `src/` remain authoritative.** See [core/REPOSITORY_LAYOUT_2026.md](core/REPOSITORY_LAYOUT_2026.md), [core/LEGACY_AND_MODERN.md](core/LEGACY_AND_MODERN.md), and [ENGINE_REORG_PLAN.md](ENGINE_REORG_PLAN.md).
+Canonical source roots are `engine/`, `runtime/`, `modules/`, `extensions/`, `renderers/`, and `third_party/`. The old `src/*` forwarding shims are gone; only layout bridges for remaining cross-domain includes/MSVC compatibility remain. See [core/REPOSITORY_LAYOUT_2026.md](core/REPOSITORY_LAYOUT_2026.md), [core/LEGACY_AND_MODERN.md](core/LEGACY_AND_MODERN.md), and [ENGINE_REORG_PLAN.md](ENGINE_REORG_PLAN.md).
 
 ## Archive
 

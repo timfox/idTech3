@@ -5,7 +5,7 @@
 | Principle | Rule |
 |-----------|------|
 | No capability loss | `full` / `research` profile or `-DUSE_*=ON` |
-| **Legacy intact** | QVM, pk3, traps, cvars; **`src/*` forwarding shims** → `engine/` / `runtime/` / `modules/` |
+| **Legacy intact** | QVM, pk3, traps, cvars; physical roots are `engine/`, `runtime/`, `modules/`, `extensions/`, `renderers/`, `third_party/` |
 | No mod break | One-release shims; see [LEGACY_AND_MODERN.md](core/LEGACY_AND_MODERN.md) |
 | Layer cake → folders | Core → Modules → Extensions ([BRANCHES.md](BRANCHES.md)) |
 | Incremental | One domain per PR + wiring tests |
@@ -45,7 +45,7 @@ See [BUILD.md](../BUILD.md) profile matrix and [ENGINE_MODULE_MANIFEST.md](ENGIN
 
 ## Next high-value PRs (structure-first)
 
-1. ~~**Runtime client folders**~~ — `src/client/{core,world,media,platform}` done; generative stays in `extensions/generative/`.
+1. ~~**Runtime client folders**~~ — `runtime/client/{core,world,media,platform,shell}` done; generative stays in `extensions/generative/`.
 2. ~~**`USE_GAME_AI_MIDDLEWARE`**~~ — Director/GOAP/Horde/BT gated; `g_engine_systems` always on.
 3. ~~**`renderers/vulkan/extensions/`**~~ — `neural/`, `splats/`, `rtx/`, `scaffold/` done.
 4. ~~**`third_party/`**~~ — symlink + `IDTECH3_DIR_THIRD_PARTY` in `IdTech3Layout.cmake`.
@@ -55,6 +55,7 @@ See [BUILD.md](../BUILD.md) profile matrix and [ENGINE_MODULE_MANIFEST.md](ENGIN
 8. ~~**Phase 5d**~~ — MSVC manifest sync + CI (`scripts/msvc/sync_all_vcxproj.sh`). See **`docs/MSVC_CODEGEN.md`**.
 9. ~~**Phase 5e**~~ — drop `src/*` shims. See **`docs/core/SHIM_REMOVAL_CHECKLIST.md`**.
 10. **Layout-bridge include rewrite** — flat headers + `IDTECH3_DIR_ENGINE_CORE`. **Done** for `modules/*`, `runtime/{client,game,server}`, `engine/`, `renderers/`, `extensions/` (no remaining `#include "../qcommon/..."`). Bridges (`modules/qcommon`, `engine/platform/qcommon`, …) kept until MSVC / `"qcommon/..."` include audit. See **`docs/core/SHIM_REMOVAL_CHECKLIST.md`**.
+11. **Runtime domain splits** — client, server, and game runtime implementations are now grouped by domain folders with ABI-facing headers kept at their roots. See **`runtime/README.md`** and **`docs/MODULARIZATION_GUIDE.md`**.
 
 ## Validation (every phase)
 
