@@ -7,7 +7,7 @@ source "$(dirname "$0")/idtech3_test_paths.sh"
 idtech3_test_paths_init "$ROOT"
 
 APP_CRDT="$(idtech3_file engine/core/app_crdt.c src/qcommon/app_crdt.c)"
-SV_CRDT="$(idtech3_file runtime/server/sv_app_crdt.c src/server/sv_app_crdt.c)"
+SV_CRDT="$(idtech3_file runtime/server/services/sv_app_crdt.c src/server/sv_app_crdt.c)"
 CL_CRDT="$(idtech3_file runtime/client/core/cl_app_crdt.c src/client/core/cl_app_crdt.c)"
 LUA_DBG="$(idtech3_file engine/core/lua_debug.c src/qcommon/lua_debug.c)"
 

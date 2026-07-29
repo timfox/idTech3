@@ -147,14 +147,14 @@ else
 	fail "legacy cgame snapshot path missing from cl_cgame.c"
 fi
 
-if grep -q 'SV_EnsureGameVersionConfigstring' "$PROJECT_ROOT/runtime/server/sv_init.c"; then
+if grep -q 'SV_EnsureGameVersionConfigstring' "$PROJECT_ROOT/runtime/server/core/sv_init.c"; then
 	pass "server CS_GAME_VERSION retail fallback wired"
 else
 	fail "SV_EnsureGameVersionConfigstring missing from sv_init.c"
 fi
 
 if grep -q 'CM_Stream_OnBaseMapLoad' "$PROJECT_ROOT/engine/core/cm_stream.c" && \
-   grep -q 'SV_OpenWorld_OnMapLoad' "$PROJECT_ROOT/runtime/server/sv_openworld.c"; then
+   grep -q 'SV_OpenWorld_OnMapLoad' "$PROJECT_ROOT/runtime/server/world/sv_openworld.c"; then
 	pass "classic map guards clear sector collision overlays"
 else
 	fail "classic map sector overlay guards missing"

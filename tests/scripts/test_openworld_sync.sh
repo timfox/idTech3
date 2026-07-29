@@ -10,7 +10,7 @@ cd "$ROOT"
 
 echo "[test_openworld_sync] checking sources..."
 BSP_STREAM="$(idtech3_require_file renderers/vulkan/tr_bsp_stream.c src/renderers/vulkan/tr_bsp_stream.c)"
-SV_OW="$(idtech3_require_file runtime/server/sv_openworld.c src/server/sv_openworld.c)"
+SV_OW="$(idtech3_require_file runtime/server/world/sv_openworld.c src/server/sv_openworld.c)"
 CM_STREAM="$(idtech3_require_file engine/core/cm_stream.c src/qcommon/cm_stream.c)"
 CL_OW="$(idtech3_require_file runtime/client/world/cl_openworld.cpp src/client/world/cl_openworld.cpp)"
 BG="$(idtech3_require_file runtime/game/bg_public.h src/game/bg_public.h)"

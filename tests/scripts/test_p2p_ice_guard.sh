@@ -11,7 +11,7 @@ pass() { echo "PASS: $*"; }
 test -f engine/core/net_p2p_ice.c || fail "missing net_p2p_ice.c"
 grep -q 'ignoring candidates from unexpected peer' engine/core/net_p2p_ice.c || fail "missing unexpected peer candidate guard"
 grep -q 'ignoring check ack from unexpected peer' engine/core/net_p2p_ice.c || fail "missing unexpected peer check-ack guard"
-grep -q 'NET_P2P_PrintPathStatus' runtime/server/sv_ccmds.c || fail "missing path status hook in server p2p_status"
+grep -q 'NET_P2P_PrintPathStatus' runtime/server/core/sv_ccmds.c || fail "missing path status hook in server p2p_status"
 grep -q 'NET_P2P_PrintPathStatus' runtime/client/core/cl_cmds.c || fail "missing path status hook in client p2p_status"
 
 if [ "${IDTECH3_P2P_ICE_GUARD_LIVE:-0}" != "1" ]; then

@@ -12,9 +12,9 @@ echo "[test_nav_bake] checking sources..."
 NAV="$(idtech3_require_file modules/navigation/nav_recast.cpp src/navigation/nav_recast.cpp)"
 idtech3_require_file modules/navigation/nav_recast.h src/navigation/nav_recast.h >/dev/null
 NAV_BSP="$(idtech3_require_file modules/navigation/nav_bsp_extract.cpp src/navigation/nav_bsp_extract.cpp)"
-SV_OW="$(idtech3_require_file runtime/server/sv_openworld.c src/server/sv_openworld.c)"
+SV_OW="$(idtech3_require_file runtime/server/world/sv_openworld.c src/server/sv_openworld.c)"
 CL_OW="$(idtech3_require_file runtime/client/world/cl_openworld.cpp src/client/world/cl_openworld.cpp)"
-SV_INIT="$(idtech3_require_file runtime/server/sv_init.c src/server/sv_init.c)"
+SV_INIT="$(idtech3_require_file runtime/server/core/sv_init.c src/server/sv_init.c)"
 
 echo "[test_nav_bake] grep API symbols..."
 rg -q 'Nav_BakeSectorTile' "$NAV"

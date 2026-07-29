@@ -155,8 +155,8 @@ rg -q '\"fluid\"' modules/physics/phys_solvers.c
 echo "[test_physics] full Box3D integration surface..."
 LUA_PHYSICS="runtime/game/g_lua_physics_bindings.inc"
 test -f "$LUA_PHYSICS"
-rg -q 'SV_Physics_Frame' runtime/server/sv_physics.c
-rg -q 'sv_physSpawn' runtime/server/sv_physics.c
+rg -q 'SV_Physics_Frame' runtime/server/gameplay/sv_physics.c
+rg -q 'sv_physSpawn' runtime/server/gameplay/sv_physics.c
 rg -q 'EnginePhysMap_Parse' engine/core/engine_phys_map.c
 rg -q 'misc_phys_box' engine/core/engine_phys_map.c
 rg -q 'G_PHYS_CREATEBODY' runtime/game/g_public.h

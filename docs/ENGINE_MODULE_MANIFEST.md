@@ -62,7 +62,7 @@ CMake: [`cmake/server/ServerSources.cmake`](../cmake/server/ServerSources.cmake)
 | Path | Tier | Gate |
 |------|------|------|
 | `src/server/*.c` (core) | core | glob manifest |
-| `src/server/sv_openworld.c` | module | `USE_OPEN_WORLD` |
+| `runtime/server/world/sv_openworld.c` | module | `USE_OPEN_WORLD` |
 
 ---
 

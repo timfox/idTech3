@@ -7,12 +7,12 @@ Copyright (C) 2026 Gopex LLC. All rights reserved.
 #include "server.h"
 #include "sv_physics.h"
 #include "engine_phys_map.h"
-#include "../physics/phys_bullet.h"
-#include "../physics/phys_props.h"
-#include "../physics/phys_middleware.h"
-#include "../physics/phys_character.h"
-#include "../physics/phys_ragdoll_bind.h"
-#include "../physics/phys_dmm.h"
+#include "phys_bullet.h"
+#include "phys_props.h"
+#include "phys_middleware.h"
+#include "phys_character.h"
+#include "phys_ragdoll_bind.h"
+#include "phys_dmm.h"
 
 static cvar_t *sv_physSpawn;
 static cvar_t *sv_physEnabled;

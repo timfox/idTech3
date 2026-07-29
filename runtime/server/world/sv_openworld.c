@@ -8,8 +8,8 @@ Copyright (C) 2026 Gopex LLC. All rights reserved.
 #include "sv_openworld.h"
 #include "cm_stream.h"
 #include "cm_stream_merge.h"
-#include "../game/bg_public.h"
-#include "../world/world_residency.h"
+#include "bg_public.h"
+#include "world_residency.h"
 
 static cvar_t *sv_openWorld;
 static cvar_t *sv_openWorldCollision;

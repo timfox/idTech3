@@ -18,7 +18,7 @@ check_alias() {
 }
 
 CFILE="runtime/client/core/cl_cgame.c"
-SFILE="runtime/server/sv_game.c"
+SFILE="runtime/server/gameplay/sv_game.c"
 
 check_alias "$CFILE" "trap_Phys_CreateBody" "CG_PHYS_CREATEBODY"
 check_alias "$CFILE" "trap_Phys_DestroyBody" "CG_PHYS_DESTROYBODY"

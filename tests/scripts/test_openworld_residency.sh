@@ -12,7 +12,7 @@ echo "[test_openworld_residency] checking sources..."
 RESIDENCY="$(idtech3_require_file modules/world/world_residency.cpp src/world/world_residency.cpp)"
 idtech3_require_file modules/world/world_residency.h src/world/world_residency.h >/dev/null
 WORLD_OPEN="$(idtech3_require_file modules/world/world_open.cpp src/world/world_open.cpp)"
-SV_OW="$(idtech3_require_file runtime/server/sv_openworld.c src/server/sv_openworld.c)"
+SV_OW="$(idtech3_require_file runtime/server/world/sv_openworld.c src/server/sv_openworld.c)"
 CL_OW="$(idtech3_require_file runtime/client/world/cl_openworld.cpp src/client/world/cl_openworld.cpp)"
 DISTRICT="$(idtech3_require_file modules/world/world_district.cpp src/world/world_district.cpp)"
 

@@ -24,13 +24,14 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "server.h"
 #include "sv_engine_sprites.h"
 #include "sv_engine_decals.h"
-#include "../physics/phys_character.h"
-#include "../physics/phys_bullet.h"
-#include "../physics/phys_ragdoll_bind.h"
+#include "phys_character.h"
+#include "phys_bullet.h"
+#include "phys_ragdoll_bind.h"
 #include "com_loc.h"
 #include "engine_db.h"
+#include "modules/rts/rts_public.h"
 
-#include "../botlib/botlib.h"
+#include "botlib.h"
 
 botlib_export_t	*botlib_export;
 
@@ -623,6 +624,48 @@ static qboolean SV_GetValue( char* value, int valueSize, const char* key )
 	if ( !Q_stricmp( key, "trap_TraceEx" ) )
 	{
 		Com_sprintf( value, valueSize, "%i", G_TRACE_EX );
+		return qtrue;
+	}
+
+	if ( !Q_stricmp( key, "trap_RTS_Init" ) )
+	{
+		Com_sprintf( value, valueSize, "%i", G_RTS_INIT );
+		return qtrue;
+	}
+
+	if ( !Q_stricmp( key, "trap_RTS_Shutdown" ) )
+	{
+		Com_sprintf( value, valueSize, "%i", G_RTS_SHUTDOWN );
+		return qtrue;
+	}
+
+	if ( !Q_stricmp( key, "trap_RTS_RunTurn" ) )
+	{
+		Com_sprintf( value, valueSize, "%i", G_RTS_RUN_TURN );
+		return qtrue;
+	}
+
+	if ( !Q_stricmp( key, "trap_RTS_GetTurnMsec" ) )
+	{
+		Com_sprintf( value, valueSize, "%i", G_RTS_GET_TURN_MSEC );
+		return qtrue;
+	}
+
+	if ( !Q_stricmp( key, "trap_RTS_GetCurrentTurn" ) )
+	{
+		Com_sprintf( value, valueSize, "%i", G_RTS_GET_CURRENT_TURN );
+		return qtrue;
+	}
+
+	if ( !Q_stricmp( key, "trap_RTS_GetEntityCount" ) )
+	{
+		Com_sprintf( value, valueSize, "%i", G_RTS_GET_ENTITY_COUNT );
+		return qtrue;
+	}
+
+	if ( !Q_stricmp( key, "trap_RTS_ComputeStateHash" ) )
+	{
+		Com_sprintf( value, valueSize, "%i", G_RTS_COMPUTE_STATE_HASH );
 		return qtrue;
 	}
 
@@ -1526,6 +1569,36 @@ static intptr_t SV_GameSystemCalls( intptr_t *args ) {
 
 	case G_ENGINE_DB_PROFILE_DELETE:
 		return EngineDB_ProfileDelete( (const char *)VMA( 1 ) ) ? 1 : 0;
+
+	case G_RTS_INIT:
+		RTS_Init();
+		return 0;
+
+	case G_RTS_SHUTDOWN:
+		RTS_Shutdown();
+		return 0;
+
+	case G_RTS_RUN_TURN:
+		RTS_RunTurn( args[1] );
+		return 0;
+
+	case G_RTS_GET_TURN_MSEC:
+		return RTS_GetTurnMsec();
+
+	case G_RTS_GET_CURRENT_TURN:
+		return RTS_GetCurrentTurn();
+
+	case G_RTS_GET_PENDING_COMMAND_COUNT:
+		return RTS_GetPendingCommandCount();
+
+	case G_RTS_GET_EXECUTED_COMMAND_COUNT:
+		return RTS_GetExecutedCommandCount();
+
+	case G_RTS_GET_ENTITY_COUNT:
+		return RTS_GetEntityCount();
+
+	case G_RTS_COMPUTE_STATE_HASH:
+		return (intptr_t)RTS_ComputeStateHash();
 
 	default:
 		Com_Error( ERR_DROP, "Bad game system trap: %ld", (long int) args[0] );

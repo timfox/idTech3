@@ -646,15 +646,15 @@ elif ! grep -q 'CS_ENGINE_SPRITE_SHADERS' "$PROJECT_ROOT/runtime/game/bg_public.
   fail "bg_public.h missing CS_ENGINE_SPRITE_SHADERS"
 elif ! grep -q 'EngineSpriteMap_Parse' "${PROJECT_ROOT}/engine/core/engine_sprite_map.c" 2>/dev/null; then
   fail "engine_sprite_map.c missing shared map parser"
-elif ! grep -q 'SV_EngineSprites_LoadMap' "$PROJECT_ROOT/runtime/server/sv_init.c" 2>/dev/null; then
+elif ! grep -q 'SV_EngineSprites_LoadMap' "$PROJECT_ROOT/runtime/server/core/sv_init.c" 2>/dev/null; then
   fail "sv_init.c should load map sprite shaders on CM_LoadMap"
-elif ! grep -q 'SV_EngineSprites_SpawnMapEntities' "$PROJECT_ROOT/runtime/server/sv_init.c" 2>/dev/null; then
+elif ! grep -q 'SV_EngineSprites_SpawnMapEntities' "$PROJECT_ROOT/runtime/server/core/sv_init.c" 2>/dev/null; then
   fail "sv_init.c should spawn map sprite snapshot ents after game init"
 elif ! grep -q 'CS_ENGINE_SPRITE_META' "$PROJECT_ROOT/runtime/game/bg_public.h" 2>/dev/null; then
   fail "bg_public.h missing CS_ENGINE_SPRITE_META"
 elif ! grep -q 'G_ENGINE_SPRITE_SPAWN' "$PROJECT_ROOT/runtime/game/g_public.h" 2>/dev/null; then
   fail "g_public.h missing G_ENGINE_SPRITE_SPAWN game trap"
-elif ! grep -q 'SV_EngineSprite_SpawnFromDef' "$PROJECT_ROOT/runtime/server/sv_engine_sprites.c" 2>/dev/null; then
+elif ! grep -q 'SV_EngineSprite_SpawnFromDef' "$PROJECT_ROOT/runtime/server/gameplay/sv_engine_sprites.c" 2>/dev/null; then
   fail "sv_engine_sprites.c missing runtime spawn helper"
 elif ! grep -q 'registerTable(L, "Sprites"' \
 	"$PROJECT_ROOT/runtime/game/g_lua_bindings.c" \

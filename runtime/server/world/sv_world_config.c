@@ -8,8 +8,8 @@ Server-authoritative world config transitions (CS_ENGINE_WORLD_CONFIG).
 
 #include "server.h"
 #include "sv_world_config.h"
-#include "../game/bg_public.h"
-#include "../world/world_config.h"
+#include "bg_public.h"
+#include "world_config.h"
 
 static cvar_t *sv_worldConfigEnable;
 static cvar_t *sv_worldConfig;

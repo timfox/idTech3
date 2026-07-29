@@ -59,7 +59,7 @@ Startup when residency enables graph: `[sector_graph] stream_reach hops=… node
 
 ## Multiplayer
 
-Server [`WorldResidency_UpdateServerOrigins`](../runtime/server/sv_openworld.c) passes **all active player origins** as BFS sources before collision planning. Clients use the same filter locally when `r_graphStreamReach 1`; server collision allow-list remains authoritative.
+Server [`WorldResidency_UpdateServerOrigins`](../runtime/server/world/sv_openworld.c) passes **all active player origins** as BFS sources before collision planning. Clients use the same filter locally when `r_graphStreamReach 1`; server collision allow-list remains authoritative.
 
 ## Console
 

@@ -28,7 +28,7 @@ TR_IMAGE="$(idtech3_file renderers/vulkan/tr_image.c src/renderers/vulkan/tr_ima
 CL_CGAME="$(idtech3_file runtime/client/core/cl_cgame.c src/client/core/cl_cgame.c)"
 CM_STREAM="$(idtech3_file engine/core/cm_stream.c src/qcommon/cm_stream.c)"
 CM_LOAD="$(idtech3_file engine/core/cm_load.c src/qcommon/cm_load.c)"
-SV_OPENWORLD="$(idtech3_file runtime/server/sv_openworld.c src/server/sv_openworld.c)"
+SV_OPENWORLD="$(idtech3_file runtime/server/world/sv_openworld.c src/server/sv_openworld.c)"
 
 check() {
   if ! grep -q "$2" "$1" 2>/dev/null; then

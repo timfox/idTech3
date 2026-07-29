@@ -15,7 +15,7 @@ Networked engine sprite entityState contract (see also cl_engine_sprites.c):
 #include "q_shared.h"
 #include "qcommon.h"
 #include "engine_sprite_map.h"
-#include "../game/bg_public.h"
+#include "bg_public.h"
 #include "server.h"
 #include "sv_engine_sprites.h"
 

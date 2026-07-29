@@ -1523,6 +1523,7 @@ target_include_directories(qcommon PRIVATE
   ${CMAKE_SOURCE_DIR}/modules/audio
   ${CMAKE_SOURCE_DIR}/third_party/libzstd
 )
+idtech3_server_include_domains(qcommon)
 idtech3_apply_research_include_dirs(qcommon)
 idtech3_apply_research_compile_defs(qcommon)
 set_property(TARGET qcommon PROPERTY POSITION_INDEPENDENT_CODE ON)
@@ -1590,6 +1591,7 @@ target_include_directories(qcommon_ded PRIVATE
   ${CMAKE_SOURCE_DIR}/modules/audio
   ${CMAKE_SOURCE_DIR}/third_party/libzstd
 )
+idtech3_server_include_domains(qcommon_ded)
 idtech3_apply_research_include_dirs(qcommon_ded)
 idtech3_apply_research_compile_defs(qcommon_ded)
 set_property(TARGET qcommon_ded PROPERTY POSITION_INDEPENDENT_CODE ON)
@@ -2895,6 +2897,9 @@ if(TARGET recast_nav)
   TARGET_LINK_LIBRARIES(${CNAME}${BINEXT} PRIVATE recast_nav)
 endif()
 TARGET_LINK_LIBRARIES(${CNAME}${BINEXT} PRIVATE ecs_module)
+if(USE_RTS_SIM AND TARGET rts_module)
+	TARGET_LINK_LIBRARIES(${CNAME}${BINEXT} PRIVATE rts_module)
+endif()
 if(USE_FLUX)
 	TARGET_COMPILE_DEFINITIONS(${CNAME}${BINEXT} PRIVATE USE_FLUX)
 	if(TARGET cflux2)
@@ -2931,6 +2936,9 @@ ADD_EXECUTABLE(${DNAME}${BINEXT} ${EXE_TYPE} ${Q3_SRCS})
 ENDIF()
 idtech3_first_party_warnings_as_errors(${DNAME}${BINEXT})
 TARGET_LINK_LIBRARIES(${DNAME}${BINEXT} PRIVATE qcommon_ded botlib phys_module idtech3_zstd)
+if(USE_RTS_SIM AND TARGET rts_module)
+	TARGET_LINK_LIBRARIES(${DNAME}${BINEXT} PRIVATE rts_module)
+endif()
 if(TARGET Threads::Threads)
   TARGET_LINK_LIBRARIES(${DNAME}${BINEXT} PRIVATE Threads::Threads)
 endif()
@@ -3483,7 +3491,7 @@ add_test(NAME test_openworld_sync
 	WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
 set_tests_properties(test_openworld_sync PROPERTIES
 	LABELS "scripts;validation;openworld;sector_stream"
-	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_openworld_sync.sh;${CMAKE_SOURCE_DIR}/renderers/vulkan/tr_bsp_stream.c;${CMAKE_SOURCE_DIR}/runtime/server/sv_openworld.c")
+	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_openworld_sync.sh;${CMAKE_SOURCE_DIR}/renderers/vulkan/tr_bsp_stream.c;${CMAKE_SOURCE_DIR}/runtime/server/world/sv_openworld.c")
 
 add_test(NAME test_bsp_stream_vbo
 	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_bsp_stream_vbo.sh
@@ -3664,7 +3672,7 @@ add_test(NAME test_trap_getvalue_aliases
 	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_trap_getvalue_aliases.sh)
 set_tests_properties(test_trap_getvalue_aliases PROPERTIES
 	LABELS "scripts;validation;client;server;compat"
-	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_trap_getvalue_aliases.sh;${CMAKE_SOURCE_DIR}/runtime/client/core/cl_cgame.c;${CMAKE_SOURCE_DIR}/runtime/server/sv_game.c")
+	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_trap_getvalue_aliases.sh;${CMAKE_SOURCE_DIR}/runtime/client/core/cl_cgame.c;${CMAKE_SOURCE_DIR}/runtime/server/gameplay/sv_game.c")
 
 add_test(NAME test_voip_lip_flap
 	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_voip_lip_flap.sh)
@@ -3832,7 +3840,7 @@ add_test(NAME test_p2p_reconnect
 	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_p2p_reconnect.sh)
 set_tests_properties(test_p2p_reconnect PROPERTIES
 	LABELS "p2p;scripts"
-	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_p2p_reconnect.sh;${CMAKE_SOURCE_DIR}/tests/scripts/idtech3_minimal_content_smoke.sh;${CMAKE_SOURCE_DIR}/runtime/client/core/cl_p2p_session.c;${CMAKE_SOURCE_DIR}/runtime/server/sv_client.c")
+	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_p2p_reconnect.sh;${CMAKE_SOURCE_DIR}/tests/scripts/idtech3_minimal_content_smoke.sh;${CMAKE_SOURCE_DIR}/runtime/client/core/cl_p2p_session.c;${CMAKE_SOURCE_DIR}/runtime/server/client/sv_client.c")
 
 add_test(NAME test_p2p_migrate
 	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_p2p_migrate.sh)
@@ -3844,7 +3852,7 @@ add_test(NAME test_p2p_ice_guard
 	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_p2p_ice_guard.sh)
 set_tests_properties(test_p2p_ice_guard PROPERTIES
 	LABELS "p2p;scripts"
-	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_p2p_ice_guard.sh;${CMAKE_SOURCE_DIR}/engine/core/net_p2p_ice.c;${CMAKE_SOURCE_DIR}/runtime/server/sv_ccmds.c")
+	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_p2p_ice_guard.sh;${CMAKE_SOURCE_DIR}/engine/core/net_p2p_ice.c;${CMAKE_SOURCE_DIR}/runtime/server/core/sv_ccmds.c")
 
 add_test(NAME test_oscar_bridge
 	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_oscar_bridge.sh all)
@@ -4772,7 +4780,7 @@ if(BUILD_UNIT_TESTS)
 		tests/unit/test_sv_auth.c
 		tests/stub_qcommon_min.c
 		tests/stub_sv_auth_deps.c
-		runtime/server/sv_auth.c
+		runtime/server/services/sv_auth.c
 		engine/core/md5.cpp
 		engine/core/q_shared.c
 		engine/core/q_math.c)

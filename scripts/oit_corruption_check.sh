@@ -66,20 +66,20 @@ grep -q 'demo_oit_isolation.cfg' "$ROOT/scripts/compile_engine.sh" || {
   echo "FAIL compile_engine.sh must ship demo_oit_isolation.cfg"; fail=1; }
 grep -q 'seta sv_pure 0' "$ROOT/config/repro_oit_corruption.cfg" || {
   echo "FAIL repro cfg must set sv_pure 0 (avoids Unpure reconnect crash)"; fail=1; }
-grep -q 'CVAR_ARCHIVE );' "$ROOT/runtime/server/sv_init.c" && \
-  grep -A1 'sv_p2pHostMigration = Cvar_Get' "$ROOT/runtime/server/sv_init.c" | grep -q 'CVAR_ARCHIVE' || {
+grep -q 'CVAR_ARCHIVE );' "$ROOT/runtime/server/core/sv_init.c" && \
+  grep -A1 'sv_p2pHostMigration = Cvar_Get' "$ROOT/runtime/server/core/sv_init.c" | grep -q 'CVAR_ARCHIVE' || {
   echo "FAIL sv_p2p* must not use CVAR_SERVERINFO (overflow)"; fail=1; }
-if grep -E 'sv_p2pHostMigration = Cvar_Get\(.*"sv_p2pHostMigration".*CVAR_SERVERINFO' "$ROOT/runtime/server/sv_init.c" >/dev/null; then
+if grep -E 'sv_p2pHostMigration = Cvar_Get\(.*"sv_p2pHostMigration".*CVAR_SERVERINFO' "$ROOT/runtime/server/core/sv_init.c" >/dev/null; then
   echo "FAIL sv_p2pHostMigration still CVAR_SERVERINFO"
   fail=1
 else
   echo "OK  sv_p2p* not stuffed into CVAR_SERVERINFO"
 fi
-grep -q 'flags &= ~(int)CVAR_SERVERINFO' "$ROOT/runtime/server/sv_init.c" || {
+grep -q 'flags &= ~(int)CVAR_SERVERINFO' "$ROOT/runtime/server/core/sv_init.c" || {
   echo "FAIL must clear leftover CVAR_SERVERINFO on sv_p2p*"; fail=1; }
-grep -q 'NET_P2P_IsEnabled' "$ROOT/runtime/server/sv_main.c" || {
+grep -q 'NET_P2P_IsEnabled' "$ROOT/runtime/server/core/sv_main.c" || {
   echo "FAIL SV_AddP2PServerInfo must skip when net_p2p off"; fail=1; }
-grep -q 'g_airControl->flags &= ~(int)CVAR_SERVERINFO' "$ROOT/runtime/server/sv_enhanced.c" || {
+grep -q 'g_airControl->flags &= ~(int)CVAR_SERVERINFO' "$ROOT/runtime/server/gameplay/sv_enhanced.c" || {
   echo "FAIL enhanced movement must leave SERVERINFO budget for OA keys"; fail=1; }
 grep -q 'seta net_p2p 0' "$ROOT/config/repro_oit_corruption.cfg" || {
   echo "FAIL repro must disable net_p2p"; fail=1; }

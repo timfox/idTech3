@@ -7,7 +7,7 @@ fail() { echo "FAIL: $*" >&2; exit 1; }
 test -f "$ROOT/docs/WORLD_CONFIG.md" || fail "docs missing"
 test -f "$ROOT/modules/world/world_config.cpp" || fail "world_config.cpp missing"
 test -f "$ROOT/modules/world/world_config.h" || fail "world_config.h missing"
-test -f "$ROOT/runtime/server/sv_world_config.c" || fail "sv_world_config.c missing"
+test -f "$ROOT/runtime/server/world/sv_world_config.c" || fail "sv_world_config.c missing"
 test -f "$ROOT/tests/data/world/testmap.wcfg" || fail "fixture wcfg missing"
 test -f "$ROOT/config/vulkan_overlay_world_config.cfg" || fail "overlay missing"
 

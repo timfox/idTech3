@@ -424,6 +424,15 @@ typedef enum {
 	G_ENGINE_DB_PROFILE_SET,	/* qboolean EngineDB_ProfileSet( const char *key, const char *value ) */
 	G_ENGINE_DB_PROFILE_GET,	/* qboolean EngineDB_ProfileGet( const char *key, char *out, int outSize ) */
 	G_ENGINE_DB_PROFILE_DELETE,	/* qboolean EngineDB_ProfileDelete( const char *key ) */
+	G_RTS_INIT,			/* void RTS_Init( void ) */
+	G_RTS_SHUTDOWN,			/* void RTS_Shutdown( void ) */
+	G_RTS_RUN_TURN,			/* void RTS_RunTurn( int msec ) */
+	G_RTS_GET_TURN_MSEC,		/* int RTS_GetTurnMsec( void ) */
+	G_RTS_GET_CURRENT_TURN,		/* int RTS_GetCurrentTurn( void ) */
+	G_RTS_GET_PENDING_COMMAND_COUNT,	/* int RTS_GetPendingCommandCount( void ) */
+	G_RTS_GET_EXECUTED_COMMAND_COUNT,/* int RTS_GetExecutedCommandCount( void ) */
+	G_RTS_GET_ENTITY_COUNT,		/* int RTS_GetEntityCount( void ) */
+	G_RTS_COMPUTE_STATE_HASH,	/* unsigned RTS_ComputeStateHash( void ) */
 	/*
 	 * Surf extended trace. Writes a zero-initialized, versioned surfTraceEx_t
 	 * including BSP30 provenance. Legacy G_TRACE / G_TRACECAPSULE are unchanged
@@ -480,4 +489,3 @@ typedef enum {
 
 	GAME_EXPORT_LAST
 } gameExport_t;
-
