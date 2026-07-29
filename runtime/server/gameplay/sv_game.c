@@ -30,6 +30,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "com_loc.h"
 #include "engine_db.h"
 #include "modules/rts/rts_public.h"
+#include "modules/collada/collada_public.h"
 
 #include "botlib.h"
 
@@ -714,6 +715,11 @@ static qboolean SV_GetValue( char* value, int valueSize, const char* key )
 	if ( !Q_stricmp( key, "trap_RTS_ComputeStateHash" ) )
 	{
 		Com_sprintf( value, valueSize, "%i", G_RTS_COMPUTE_STATE_HASH );
+		return qtrue;
+	}
+	if ( !Q_stricmp( key, "trap_Collada_GetRuntimePath" ) )
+	{
+		Com_sprintf( value, valueSize, "%i", G_COLLADA_GET_RUNTIME_PATH );
 		return qtrue;
 	}
 
@@ -1665,6 +1671,10 @@ static intptr_t SV_GameSystemCalls( intptr_t *args ) {
 
 	case G_RTS_COMPUTE_STATE_HASH:
 		return (intptr_t)RTS_ComputeStateHash();
+
+	case G_COLLADA_GET_RUNTIME_PATH:
+		return Collada_GetRuntimePath( (const char *)VMA( 1 ), (colladaAssetType_t)args[2],
+				(char *)VMA( 3 ), args[4] );
 
 	default:
 		Com_Error( ERR_DROP, "Bad game system trap: %ld", (long int) args[0] );

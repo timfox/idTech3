@@ -439,6 +439,7 @@ typedef enum {
 	G_RTS_GET_ENTITY_RESOURCES,	/* int RTS_GetEntityResources( rtsEntityId_t id ) */
 	G_RTS_GET_PLAYER_RESOURCES,	/* int RTS_GetPlayerResources( int playerId ) */
 	G_RTS_COMPUTE_STATE_HASH,	/* unsigned RTS_ComputeStateHash( void ) */
+	G_COLLADA_GET_RUNTIME_PATH,	/* int Collada_GetRuntimePath( const char *sourcePath, int type, char *out, int outSize ) */
 	/*
 	 * Surf extended trace. Writes a zero-initialized, versioned surfTraceEx_t
 	 * including BSP30 provenance. Legacy G_TRACE / G_TRACECAPSULE are unchanged

@@ -26,6 +26,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "aiwc.h"
 #include "bubblesh.h"
 #include "ttp.h"
+#include "modules/dap/dap_interface.h"
 #include "jobs.h"
 #include "defer.h"
 #include "steam_shared.h"
@@ -4438,6 +4439,7 @@ void Com_Init( char *commandLine ) {
 	Com_Printf( "--- Common Initialization Complete ---\n" );
 
 	NET_Init();
+	DAP_Init();
 	SV_TVStream_Init();		// Surf TVL: bind live loopback listener now that net_port is registered
 	
 	// Network logging
@@ -4911,6 +4913,7 @@ Com_Shutdown
 =================
 */
 static void Com_Shutdown( void ) {
+	DAP_Shutdown();
 	Defer_Flush();
 	Jobs_Shutdown();
 	Defer_Shutdown();

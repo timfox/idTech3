@@ -1,0 +1,131 @@
+/* Copyright (C) 2025 Wildfire Games.
+ * SPDX-License-Identifier: GPL-2.0-or-later
+ */
+
+/*
+ * Provides an interface for a vector in R4 and allows vector and
+ * scalar operations on it
+ */
+
+#ifndef INCLUDED_VECTOR4D
+#define INCLUDED_VECTOR4D
+
+#include <cstddef>
+#include <span>
+
+class CVector4D
+{
+public:
+	CVector4D() : X(0.0f), Y(0.0f), Z(0.0f), W(0.0f) { }
+
+	CVector4D(float x, float y, float z, float w) : X(x), Y(y), Z(z), W(w) { }
+
+	bool operator==(const CVector4D& t) const
+	{
+		return (X == t.X && Y == t.Y && Z == t.Z && W == t.W);
+	}
+
+	bool operator!=(const CVector4D& t) const
+	{
+		return !(*this == t);
+	}
+
+	CVector4D operator-() const
+	{
+		return CVector4D(-X, -Y, -Z, -W);
+	}
+
+	CVector4D operator+(const CVector4D& t) const
+	{
+		return CVector4D(X+t.X, Y+t.Y, Z+t.Z, W+t.W);
+	}
+
+	CVector4D operator-(const CVector4D& t) const
+	{
+		return CVector4D(X-t.X, Y-t.Y, Z-t.Z, W-t.W);
+	}
+
+	CVector4D operator*(const CVector4D& t) const
+	{
+		return CVector4D(X*t.X, Y*t.Y, Z*t.Z, W*t.W);
+	}
+
+	CVector4D operator*(float f) const
+	{
+		return CVector4D(X*f, Y*f, Z*f, W*f);
+	}
+
+	CVector4D operator/(float f) const
+	{
+		float inv_f = 1.0f / f;
+		return CVector4D(X*inv_f, Y*inv_f, Z*inv_f, W*inv_f);
+	}
+
+	CVector4D& operator+=(const CVector4D& t)
+	{
+		X += t.X;
+		Y += t.Y;
+		Z += t.Z;
+		W += t.W;
+		return *this;
+	}
+
+	CVector4D& operator-=(const CVector4D& t)
+	{
+		X -= t.X;
+		Y -= t.Y;
+		Z -= t.Z;
+		W -= t.W;
+		return *this;
+	}
+
+	CVector4D& operator*=(const CVector4D& t)
+	{
+		X *= t.X;
+		Y *= t.Y;
+		Z *= t.Z;
+		W *= t.W;
+		return *this;
+	}
+
+	CVector4D& operator*=(float f)
+	{
+		X *= f;
+		Y *= f;
+		Z *= f;
+		W *= f;
+		return *this;
+	}
+
+	CVector4D& operator/=(float f)
+	{
+		float inv_f = 1.0f / f;
+		X *= inv_f;
+		Y *= inv_f;
+		Z *= inv_f;
+		W *= inv_f;
+		return *this;
+	}
+
+	float Dot(const CVector4D& a) const
+	{
+		return X*a.X + Y*a.Y + Z*a.Z + W*a.W;
+	}
+
+	// Returns 4 element array of floats, e.g. for vec4 uniforms.
+	std::span<const float, 4> AsFloatArray() const
+	{
+		// Additional check to prevent a weird compiler has a different
+		// alignement for an array and a class members.
+		static_assert(
+			sizeof(CVector4D) == sizeof(float) * 4u &&
+			offsetof(CVector4D, X) == 0 &&
+			offsetof(CVector4D, W) == sizeof(float) * 3u,
+			"CVector4D should be properly layouted to use AsFloatArray");
+		return std::span<const float, 4>(&X, 4);
+	}
+
+	float X, Y, Z, W;
+};
+
+#endif // INCLUDED_VECTOR4D

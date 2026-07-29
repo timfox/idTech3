@@ -1,10 +1,13 @@
-# Meshlets (CPU cull + compact / MDI draw)
+# Virtual Geometry Meshlets
 
-Chocolate **Nanite-lite**: bake triangle clusters (meshlets) at **model load** into a local-space cache, frustum-cull on CPU, then draw only visible triangles. Does **not** require mesh shaders.
+Northlight-inspired virtual geometry path for this renderer: bake triangle clusters (meshlets) at **model load** into a local-space cache, frustum/cone-cull and screen-LOD those clusters, compact visible triangles, then draw visible ranges with indexed MDI when available.
+
+This is not a proprietary Northlight implementation. The production path is portable Vulkan meshlet MDI, with optional `VK_NV_mesh_shader` capability kept behind `r_vk_meshShaderNV` for mesh-shader experiments and diagnostics.
 
 ## Enable
 
 ```
+set r_virtualGeometry 1
 set r_meshlets 1
 set r_meshletsCompact 1
 set r_meshletsMdi 1
@@ -21,6 +24,7 @@ When enabled, MD3 surfaces (≤512 verts / ≤1024 tris) bake at load, skip add 
 
 | | |
 |--|--|
+| `r_virtualGeometry` | Master switch for virtual geometry meshlets (default 1; safe profile sets 0) |
 | `r_meshlets` | Default 0 |
 | `r_meshletsCompact` | Partial triangle draw from visible meshlets (default 1; also implied by MDI draw) |
 | `r_meshletsMdi` | Pack `VkDrawIndexedIndirectCommand` metrics (default 0) |
@@ -43,7 +47,7 @@ When enabled, MD3 surfaces (≤512 verts / ≤1024 tris) bake at load, skip add 
 ## Deferred
 
 - Persistent per-surface IBO (avoid remapping into tess)
-- `VK_EXT_mesh_shader` task/mesh pipelines
+- Production mesh-shader pipelines after the MDI path remains certified on target hardware
 - Full BSP world / skinned meshlets (pilot: `r_meshletsBspPilot` for one face class)
 - GPU cull / continuous cluster LOD streaming
 

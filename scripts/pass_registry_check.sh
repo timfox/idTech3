@@ -27,6 +27,11 @@ grep -q 'VK_SPINE_RES_HDR_COLOR' "$REG_H" || fail "hdr_color resource id missing
 grep -q 'VK_SPINE_RES_VISIBILITY_IDS' "$REG_H" || fail "visibility ids resource id missing"
 grep -q 'VK_SPINE_RES_VISIBILITY_BARY' "$REG_H" || fail "visibility bary resource id missing"
 grep -q 'VK_SPINE_RES_VISIBILITY_CLASS' "$REG_H" || fail "visibility class resource id missing"
+grep -q 'VK_SPINE_RES_VIRTUAL_GEOMETRY_MESHLETS' "$REG_H" || fail "virtual geometry meshlet resource id missing"
+grep -q 'VK_SPINE_RES_VIRTUAL_GEOMETRY_INDIRECT' "$REG_H" || fail "virtual geometry indirect resource id missing"
+grep -q 'VK_SPINE_RES_SURFEL_POOL' "$REG_H" || fail "surfel pool resource id missing"
+grep -q 'VK_SPINE_RES_SURFEL_HASH' "$REG_H" || fail "surfel hash resource id missing"
+grep -q 'VK_SPINE_RES_SURFEL_IRRADIANCE' "$REG_H" || fail "surfel irradiance resource id missing"
 grep -q 'VK_SPINE_ACCESS_HISTORY_READ' "$REG_H" || fail "history access kinds missing"
 grep -q 'vk_spine_status_f' "$REG_H" || fail "spine_status API missing"
 grep -q 'r_spineValidate' "$REG_C" || fail "r_spineValidate cvar missing"
@@ -37,7 +42,9 @@ for p in FRAME_PREP LIGHT_PACK TILE_CONSTRUCT SUN_SHADOW WORLD_OPAQUE GBUFFER_FI
   DEFERRED_LIGHTING FORWARD_PLUS_OPAQUE SSR AMBIENT_VISIBILITY FROXEL_VOLUME \
   TRANSPARENT_FORWARD_PLUS WBOIT_ACCUM MBOIT_MOMENTS MBOIT_ACCUM OIT_RESOLVE \
   REACTIVE_MASK TEMPORAL_RECON SMAA BLOOM EYE_ADAPTATION WEAPON HUD_2D \
-  PRESENTATION HISTORY_MAINT VISIBILITY_FILL MATERIAL_CLASSIFY; do
+  PRESENTATION HISTORY_MAINT VISIBILITY_FILL MATERIAL_CLASSIFY \
+  VIRTUAL_GEOMETRY_CULL VIRTUAL_GEOMETRY_DRAW \
+  SURFEL_GI_UPDATE SURFEL_GI_HASH SURFEL_GI_RESOLVE SURFEL_GI_COMPOSITE; do
   grep -q "VK_SPINE_PASS_${p}" "$REG_H" || fail "missing pass id VK_SPINE_PASS_${p}"
 done
 pass "minimum production spine passes declared"
@@ -84,6 +91,10 @@ grep -q 'VK_SPINE_PASS_SMAA' "$ROOT/renderers/vulkan/vk_post_aa.c" || \
   fail "SMAA must be observed"
 grep -q 'VK_SPINE_PASS_SUN_SHADOW' "$ROOT/renderers/vulkan/vk_sun_shadow_pass.c" || \
   fail "sun shadow must be observed"
+grep -q 'VK_SPINE_PASS_VIRTUAL_GEOMETRY_CULL' "$ROOT/renderers/vulkan/vk_meshlets.c" || \
+  fail "virtual geometry cull must be observed"
+grep -q 'VK_SPINE_PASS_VIRTUAL_GEOMETRY_DRAW' "$ROOT/renderers/vulkan/vk_meshlets.c" || \
+  fail "virtual geometry draw must be observed"
 grep -q 'VK_SPINE_PASS_FROXEL_VOLUME' "$ROOT/renderers/vulkan/vk_volumetric_pass_compute.c" || \
   fail "froxel volume must be observed"
 grep -q 'vk_spine_note_clear' "$ROOT/renderers/vulkan/vk_render_pass.c" || \

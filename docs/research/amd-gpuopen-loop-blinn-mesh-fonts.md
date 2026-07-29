@@ -27,7 +27,7 @@ Glyph preprocessing: TrueType outlines → constrained Delaunay triangulation of
 Today:
 
 - `r_vectorFont 1` already gives **resolution-independent** console/HUD text without atlases (see [VECTOR_FONT.md](../VECTOR_FONT.md)).
-- `r_vk_meshShaderNV 1` only enables **`VK_NV_mesh_shader`** at device create; **no mesh pipelines or font dispatch** are wired yet.
+- `r_vk_meshShaderNV 1` enables **`VK_NV_mesh_shader`** at device create for virtual-geometry/font experiments; the portable production virtual-geometry path remains indexed MDI.
 - AMD RDNA uses **`VK_EXT_mesh_shader`** (not in our bundled `vulkan_core.h` snapshot); NVIDIA path is the first experimental hook.
 
 ## Implementation checklist (future)

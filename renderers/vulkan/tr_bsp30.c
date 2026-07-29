@@ -619,7 +619,7 @@ static void GS_LoadTextures( bsp30RenderLoad_t *load ) {
 			image = GS_CreateFallbackImage( shaderName, textureName );
 			fallbackCount++;
 		}
-		shaderHandle = RE_RegisterShaderFromImage( shaderName, LIGHTMAP_BY_VERTEX, image, qfalse );
+		shaderHandle = RE_RegisterBSP30ShaderFromImage( shaderName, image );
 		load->textureShaders[i] = R_GetShaderByHandle( shaderHandle );
 		if ( load->textureShaders[i] ) {
 			load->textureShaders[i]->cullType = CT_TWO_SIDED;

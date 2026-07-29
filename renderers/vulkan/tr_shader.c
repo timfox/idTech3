@@ -4929,6 +4929,45 @@ qhandle_t RE_RegisterShaderFromImage(const char *name, int lightmapIndex, image_
 	return sh->index;
 }
 
+qhandle_t RE_RegisterBSP30ShaderFromImage(const char *name, image_t *image) {
+	unsigned long hash;
+	shader_t	*sh;
+
+	hash = generateHashValue(name, FILE_HASH_SIZE);
+
+	for (sh=hashTable[hash]; sh; sh=sh->next) {
+		if ( (sh->lightmapSearchIndex == LIGHTMAP_BY_VERTEX || sh->defaultShader) &&
+				!Q_stricmp(sh->name, name)) {
+			return sh->index;
+		}
+	}
+
+	InitShader( name, LIGHTMAP_BY_VERTEX );
+
+	/*
+	 * BSP30 lighting is synthesized into vertex colors.  A single
+	 * CGEN_EXACT_VERTEX albedo stage makes the modern fragment path multiply
+	 * that color into the texture and then reuse it as static light.  Split
+	 * albedo and vertex light so the color is applied exactly once.
+	 */
+	stages[0].bundle[0].image[0] = image;
+	stages[0].active = qtrue;
+	stages[0].bundle[0].tcGen = TCGEN_TEXTURE;
+	stages[0].bundle[0].rgbGen = CGEN_IDENTITY;
+	stages[0].bundle[0].alphaGen = AGEN_SKIP;
+	stages[0].stateBits = GLS_DEFAULT;
+
+	stages[1].bundle[0].image[0] = tr.whiteImage;
+	stages[1].active = qtrue;
+	stages[1].bundle[0].tcGen = TCGEN_TEXTURE;
+	stages[1].bundle[0].rgbGen = CGEN_EXACT_VERTEX;
+	stages[1].bundle[0].alphaGen = AGEN_IDENTITY;
+	stages[1].stateBits = GLS_SRCBLEND_DST_COLOR | GLS_DSTBLEND_ZERO;
+
+	sh = FinishShader();
+	return sh->index;
+}
+
 
 /*
 ====================

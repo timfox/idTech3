@@ -12,6 +12,7 @@ See docs/MESHLETS.md.
 #include "vk.h"
 #include "vk_util.h"
 #include "vk_meshlets.h"
+#include "vk_pass_registry.h"
 
 #define MESHLET_CACHE_SLOTS 256
 #define MESHLET_MDI_FRAME_MAX 2048
@@ -23,6 +24,7 @@ typedef struct {
 } meshlet_cache_entry_t;
 
 static cvar_t *r_meshlets;
+static cvar_t *r_virtualGeometry;
 static cvar_t *r_meshletsMdi;
 static cvar_t *r_meshletsMdiDraw;
 static cvar_t *r_meshletsCompact;
@@ -41,6 +43,7 @@ static int s_mdiTris;
 static int s_mdiDrawCalls;
 static int s_compactIndexes;
 static int s_compactSurfaces;
+static int s_virtualGeometrySurfaces;
 static uint32_t s_cacheGeneration;
 static meshlet_cache_entry_t s_cache[MESHLET_CACHE_SLOTS];
 static meshlet_draw_cmd_t s_mdiCmds[MESHLET_MAX_PER_SURFACE];
@@ -75,14 +78,25 @@ static void Meshlets_Status_f( void )
 		s_mdiDrawCalls,
 		( r_meshletsCompact && r_meshletsCompact->integer ) ? 1 : 0,
 		s_compactIndexes, s_compactSurfaces );
+	ri.Printf( PRINT_ALL,
+		"  virtualGeometry=%d meshShaderNVReady=%d path=%s\n",
+		( r_virtualGeometry && r_virtualGeometry->integer ) ? s_virtualGeometrySurfaces : 0,
+		( vk.meshShaderNV && qvkCmdDrawMeshTasksNV ) ? 1 : 0,
+		( r_meshletsMdiDraw && r_meshletsMdiDraw->integer ) ? "meshlet_mdi" : "meshlet_compact" );
 }
 
 void R_Meshlets_Init( void )
 {
+	r_virtualGeometry = ri.Cvar_Get( "r_virtualGeometry", "1", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_virtualGeometry, "0", "1", CV_INTEGER );
+	ri.Cvar_SetDescription( r_virtualGeometry,
+		"Master switch for the virtual geometry renderer path. Uses portable meshlet compact/MDI draws; optional NV mesh shaders stay behind r_vk_meshShaderNV." );
+	ri.Cvar_SetGroup( r_virtualGeometry, CVG_RENDERER );
+
 	r_meshlets = ri.Cvar_Get( "r_meshlets", "0", CVAR_ARCHIVE_ND );
 	ri.Cvar_CheckRange( r_meshlets, "0", "1", CV_INTEGER );
 	ri.Cvar_SetDescription( r_meshlets,
-		"Meshlet bake + CPU frustum cull for dense static meshes (Nanite-lite). Default 0." );
+		"Virtual geometry meshlet path: bake clusters, cull/LOD visible clusters, compact/MDI draw static dense meshes. Default 0." );
 	ri.Cvar_SetGroup( r_meshlets, CVG_RENDERER );
 
 	r_meshletsMdi = ri.Cvar_Get( "r_meshletsMdi", "0", CVAR_ARCHIVE_ND );
@@ -121,6 +135,7 @@ void R_Meshlets_Init( void )
 	s_cullVisible = s_cullTotal = s_lodCulled = s_coneCulled = 0;
 	s_mdiCount = s_mdiTris = s_mdiDrawCalls = 0;
 	s_compactIndexes = s_compactSurfaces = 0;
+	s_virtualGeometrySurfaces = 0;
 	s_frameCmdCount = 0;
 	s_mdiDrawLogged = qfalse;
 	s_cacheGeneration = 1;
@@ -158,6 +173,9 @@ void R_Meshlets_Shutdown( void )
 
 qboolean R_Meshlets_Active( void )
 {
+	if ( r_virtualGeometry && !r_virtualGeometry->integer ) {
+		return qfalse;
+	}
 	return ( r_meshlets && r_meshlets->integer ) ? qtrue : qfalse;
 }
 
@@ -695,8 +713,20 @@ qboolean R_Meshlets_TryDrawIndirect( void )
 		VK_PIPELINE_STAGE_HOST_BIT, VK_PIPELINE_STAGE_DRAW_INDIRECT_BIT,
 		0, 1, &barrier, 0, NULL, 0, NULL );
 
+	vk_spine_pass_begin( VK_SPINE_PASS_VIRTUAL_GEOMETRY_DRAW );
+	vk_spine_note_read( VK_SPINE_RES_VIRTUAL_GEOMETRY_INDIRECT,
+		VK_SPINE_PASS_VIRTUAL_GEOMETRY_DRAW, VK_SPINE_ACCESS_INDIRECT_READ );
+	vk_spine_note_read( VK_SPINE_RES_VIRTUAL_GEOMETRY_MESHLETS,
+		VK_SPINE_PASS_VIRTUAL_GEOMETRY_DRAW, VK_SPINE_ACCESS_STORAGE_READ );
+	vk_spine_note_write( VK_SPINE_RES_HDR_COLOR,
+		VK_SPINE_PASS_VIRTUAL_GEOMETRY_DRAW, VK_SPINE_ACCESS_COLOR_WRITE );
+	vk_spine_note_write( VK_SPINE_RES_DEPTH,
+		VK_SPINE_PASS_VIRTUAL_GEOMETRY_DRAW, VK_SPINE_ACCESS_DEPTH_WRITE );
+
 	qvkCmdDrawIndexedIndirect( vk.cmd->command_buffer, s_mdiBuffer, 0, drawCount,
 		(uint32_t)sizeof( meshlet_draw_cmd_t ) );
+
+	vk_spine_pass_end( VK_SPINE_PASS_VIRTUAL_GEOMETRY_DRAW );
 
 	s_mdiDrawCalls += (int)drawCount;
 	if ( !s_mdiDrawLogged ) {
@@ -717,6 +747,7 @@ int R_Meshlets_AppendVisibleIndexes( md3Surface_t *surface, int vertexBase,
 	int mcount, vcount, i, k, written;
 	int Bob;
 	qboolean enqueueMdi;
+	qboolean passOpen = qfalse;
 
 	s_compactIndexes = 0;
 	if ( !surface || !R_Meshlets_WantCompact() ) {
@@ -736,10 +767,20 @@ int R_Meshlets_AppendVisibleIndexes( md3Surface_t *surface, int vertexBase,
 		return -1;
 	}
 
+	vk_spine_pass_begin( VK_SPINE_PASS_VIRTUAL_GEOMETRY_CULL );
+	passOpen = qtrue;
 	vcount = R_Meshlets_CullViewFrustumXform( meshlets, mcount, entityAxis, entityOrigin,
 		visible, MESHLET_MAX_PER_SURFACE );
+	vk_spine_note_read( VK_SPINE_RES_DEPTH,
+		VK_SPINE_PASS_VIRTUAL_GEOMETRY_CULL, VK_SPINE_ACCESS_DEPTH_READ );
+	vk_spine_note_write( VK_SPINE_RES_VIRTUAL_GEOMETRY_MESHLETS,
+		VK_SPINE_PASS_VIRTUAL_GEOMETRY_CULL, VK_SPINE_ACCESS_STORAGE_WRITE );
 	if ( vcount <= 0 ) {
+		vk_spine_note_write( VK_SPINE_RES_VIRTUAL_GEOMETRY_INDIRECT,
+			VK_SPINE_PASS_VIRTUAL_GEOMETRY_CULL, VK_SPINE_ACCESS_STORAGE_WRITE );
+		vk_spine_pass_end( VK_SPINE_PASS_VIRTUAL_GEOMETRY_CULL );
 		s_compactSurfaces++;
+		s_virtualGeometrySurfaces++;
 		return 0;
 	}
 
@@ -747,6 +788,12 @@ int R_Meshlets_AppendVisibleIndexes( md3Surface_t *surface, int vertexBase,
 		meshlet_draw_cmd_t cmds[MESHLET_MAX_PER_SURFACE];
 		R_Meshlets_PackIndirect( meshlets, visible, vcount, cmds, MESHLET_MAX_PER_SURFACE,
 			(int32_t)vertexBase );
+	}
+	vk_spine_note_write( VK_SPINE_RES_VIRTUAL_GEOMETRY_INDIRECT,
+		VK_SPINE_PASS_VIRTUAL_GEOMETRY_CULL, VK_SPINE_ACCESS_STORAGE_WRITE );
+	if ( passOpen ) {
+		vk_spine_pass_end( VK_SPINE_PASS_VIRTUAL_GEOMETRY_CULL );
+		passOpen = qfalse;
 	}
 
 	enqueueMdi = R_Meshlets_WantMdiDraw();
@@ -781,5 +828,6 @@ int R_Meshlets_AppendVisibleIndexes( md3Surface_t *surface, int vertexBase,
 	tess.numIndexes += written;
 	s_compactIndexes = written;
 	s_compactSurfaces++;
+	s_virtualGeometrySurfaces++;
 	return written;
 }

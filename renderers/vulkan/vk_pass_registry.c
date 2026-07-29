@@ -317,6 +317,21 @@ static const vkSpineResourceEdge s_reads_surfel_composite[] = {
 static const vkSpineResourceEdge s_writes_surfel_composite[] = {
 	{ VK_SPINE_RES_HDR_COLOR, VK_SPINE_ACCESS_STORAGE_WRITE | VK_SPINE_ACCESS_COLOR_WRITE },
 };
+static const vkSpineResourceEdge s_reads_virtual_geometry_cull[] = {
+	{ VK_SPINE_RES_DEPTH, VK_SPINE_ACCESS_DEPTH_READ },
+};
+static const vkSpineResourceEdge s_writes_virtual_geometry_cull[] = {
+	{ VK_SPINE_RES_VIRTUAL_GEOMETRY_MESHLETS, VK_SPINE_ACCESS_STORAGE_WRITE },
+	{ VK_SPINE_RES_VIRTUAL_GEOMETRY_INDIRECT, VK_SPINE_ACCESS_STORAGE_WRITE },
+};
+static const vkSpineResourceEdge s_reads_virtual_geometry_draw[] = {
+	{ VK_SPINE_RES_VIRTUAL_GEOMETRY_MESHLETS, VK_SPINE_ACCESS_STORAGE_READ },
+	{ VK_SPINE_RES_VIRTUAL_GEOMETRY_INDIRECT, VK_SPINE_ACCESS_INDIRECT_READ },
+};
+static const vkSpineResourceEdge s_writes_virtual_geometry_draw[] = {
+	{ VK_SPINE_RES_HDR_COLOR, VK_SPINE_ACCESS_COLOR_WRITE },
+	{ VK_SPINE_RES_DEPTH, VK_SPINE_ACCESS_DEPTH_WRITE },
+};
 
 #define VK_SPINE_VIEW_MAIN ( 1u << VK_VIEW_CLASS_MAIN_WORLD )
 #define VK_SPINE_VIEW_WEAPON ( 1u << VK_VIEW_CLASS_WEAPON )
@@ -493,6 +508,18 @@ static const vkSpinePassDesc s_passes[VK_SPINE_PASS_COUNT] = {
 		VK_SPINE_VIEW_MAIN, qtrue, qfalse,
 		s_reads_material_classify, (int)ARRAY_LEN( s_reads_material_classify ),
 		s_writes_material_classify, (int)ARRAY_LEN( s_writes_material_classify )
+	},
+	[VK_SPINE_PASS_VIRTUAL_GEOMETRY_CULL] = {
+		VK_SPINE_PASS_VIRTUAL_GEOMETRY_CULL, "virtual_geometry_cull", VK_SPINE_CAT_SCENE_PREP,
+		VK_SPINE_PHASE_WORLD_OPAQUE, VK_SPINE_VIEW_MAIN, qtrue, qfalse,
+		s_reads_virtual_geometry_cull, (int)ARRAY_LEN( s_reads_virtual_geometry_cull ),
+		s_writes_virtual_geometry_cull, (int)ARRAY_LEN( s_writes_virtual_geometry_cull )
+	},
+	[VK_SPINE_PASS_VIRTUAL_GEOMETRY_DRAW] = {
+		VK_SPINE_PASS_VIRTUAL_GEOMETRY_DRAW, "virtual_geometry_draw", VK_SPINE_CAT_OPAQUE_RASTER,
+		VK_SPINE_PHASE_WORLD_OPAQUE, VK_SPINE_VIEW_MAIN, qtrue, qfalse,
+		s_reads_virtual_geometry_draw, (int)ARRAY_LEN( s_reads_virtual_geometry_draw ),
+		s_writes_virtual_geometry_draw, (int)ARRAY_LEN( s_writes_virtual_geometry_draw )
 	},
 	[VK_SPINE_PASS_SURFEL_GI_UPDATE] = {
 		VK_SPINE_PASS_SURFEL_GI_UPDATE, "surfel_gi_update", VK_SPINE_CAT_RAY_TRACING, VK_SPINE_PHASE_POST,
@@ -730,6 +757,8 @@ const char *vk_spine_resource_name( vkSpineResourceId res )
 	case VK_SPINE_RES_VISIBILITY_IDS: return "visibility_ids";
 	case VK_SPINE_RES_VISIBILITY_BARY: return "visibility_bary";
 	case VK_SPINE_RES_VISIBILITY_CLASS: return "visibility_class";
+	case VK_SPINE_RES_VIRTUAL_GEOMETRY_MESHLETS: return "virtual_geometry_meshlets";
+	case VK_SPINE_RES_VIRTUAL_GEOMETRY_INDIRECT: return "virtual_geometry_indirect";
 	case VK_SPINE_RES_SURFEL_POOL: return "surfel_pool";
 	case VK_SPINE_RES_SURFEL_HASH: return "surfel_hash";
 	case VK_SPINE_RES_SURFEL_IRRADIANCE: return "surfel_irradiance";

@@ -84,7 +84,7 @@ Demo: `exec demo_visibility_2027.cfg`. Console: `visibility_buffer_status`, `ren
 |-------|--------|
 | **P1** | Visibility foundation + material-class stub (this doc / cvars above) |
 | **P1.5** | Visbuf Morton/depth fill + late-shade debug mode 5 |
-| **P2** | GPU-driven meshlets — **`r_meshletsMdiDraw`** + **`r_meshletsLod`** screen LOD; persistent IBO + mesh shaders remain follow-up ([MESHLETS.md](MESHLETS.md)) |
+| **P2** | Virtual geometry meshlets — **default stable profile request** with `r_virtualGeometry`, `r_meshletsMdiDraw`, and `r_meshletsLod`; persistent IBO + production mesh-shader pipelines remain follow-up ([MESHLETS.md](MESHLETS.md)) |
 | **P3** | Reservoir-sampled hybrid path — ReSTIR DI on Hybrid1, NVC/FSA; **bindless A.1c** bary UV + PrimUv ([RTX_HIT_SHADER_UV.md](RTX_HIT_SHADER_UV.md)) |
 | **P4** | Material-classified OIT — mode 3 + MBOIT overlay; `r_oitClassify 1` two-bucket (alpha-blend vs additive); further class paths remain follow-up ([MOMENT_OIT_STOCHASTIC_ALPHA.md](MOMENT_OIT_STOCHASTIC_ALPHA.md)) |
 | **P5** | Neural material/texture reconstruction (chocolate scaffold; no mandatory vendor SDK) |
@@ -97,7 +97,7 @@ Demo: `exec demo_visibility_2027.cfg`. Console: `visibility_buffer_status`, `ren
 | 1 | Neural shaders / materials | NIV/NDGI/VFGI scaffolds | In-shader decode + appearance LOD |
 | 2 | Ray reconstruction / ReSTIR | Hybrid1 + NVC scaffold | Reservoir-sampled hybrid path layer |
 | 3 | Visibility buffer | Classic G-buffer + P1 sidecar | Compact prim/bary/depth + late shade |
-| 4 | GPU-driven / Work Graphs | Meshlets CPU cull | Indirect draws → mesh shaders / WG |
+| 4 | GPU-driven / Work Graphs | Virtual geometry meshlets + indexed MDI | Production mesh shaders / WG |
 | 5 | Virtualized meshlets | MD3 meshlets + **MDI GPU draw** + **screen LOD** + sector stream | Continuous cluster LOD streaming |
 | 6 | Unified Clustered spine | Mode 3 EXISTS — 2D tiles today; depth clusters planned extension | Spine for all layers |
 | 7 | Stochastic alpha | `r_stochasticAlpha` | Temporally stable coverage + OMM |

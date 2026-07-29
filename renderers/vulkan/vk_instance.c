@@ -565,7 +565,7 @@ static qboolean vk_create_device( VkPhysicalDevice physical_device, int device_i
 			device_extension_count < ARRAY_LEN( device_extension_list ) ) {
 			device_extension_list[ device_extension_count++ ] = VK_NV_MESH_SHADER_EXTENSION_NAME;
 			vk.meshShaderNV = qtrue;
-			ri.Printf( PRINT_ALL, "[VK] VK_NV_mesh_shader enabled (experimental; no mesh draw path yet)\n" );
+			ri.Printf( PRINT_ALL, "[VK] VK_NV_mesh_shader enabled for virtual geometry experiments; meshlet MDI fallback remains available\n" );
 		}
 #ifdef USE_VUDA
 		vk.vudaInteropCapable = qfalse;

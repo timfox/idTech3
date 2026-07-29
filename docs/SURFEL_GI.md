@@ -2,7 +2,7 @@
 
 **GIBS** (Global Illumination Based on Surfels) caches indirect diffuse in a pool of world-space surfels, updates them with **VK_KHR_ray_query** against the shared RTX TLAS, then resolves to a screen irradiance buffer and composites into the HDR scene color.
 
-Inspired by SurfelGI / SIGGRAPH-style surfel GI; revived on the modern chocolate RTX path (`USE_VULKAN_RTX`).
+Inspired by SurfelGI / SIGGRAPH-style surfel GI; promoted as the production default indirect RT request on the modern Vulkan profile. Non-RTX builds/devices keep the cvar inert through the stub/fail-open gates.
 
 ## Requirements
 
@@ -10,7 +10,19 @@ Inspired by SurfelGI / SIGGRAPH-style surfel GI; revived on the modern chocolate
 - GPU: KHR acceleration structure + RT pipeline + **ray query**
 - Runtime: `r_fbo 1`, deferred G-buffer normals (`r_deferredGBufferFill 1` recommended), and a ready world/entity TLAS (`r_rtx` / `r_hybrid1` / `r_surfelGi` latch enables RT device features)
 
-## Enable
+## Production Default
+
+`modern_vulkan.cfg` requests Surfel GI by default:
+
+```
+seta r_surfelGi 1
+seta r_surfelGiDensity 2
+seta r_surfelGi_hybrid1Fusion 1
+```
+
+This only becomes active when the renderer is built with `USE_VULKAN_RTX`, the device exposes ray query, FBO is active, and the shared RTX scene/TLAS is ready. `gfx_safe.cfg` forces `r_surfelGi 0`.
+
+## Enable / Demo
 
 ```
 exec demo_surfel_gi.cfg
@@ -34,7 +46,7 @@ Console: **`surfel_gi_status`**.
 
 | Cvar | Default | Role |
 |------|---------|------|
-| `r_surfelGi` | 0 | Master (latched) |
+| `r_surfelGi` | 1 | Master (latched); fail-open/inert without `USE_VULKAN_RTX` + ray query |
 | `r_surfelGi_max` | 16384 | Surfel capacity (latched) |
 | `r_surfelGi_radius` | 0.35 | Spawn radius |
 | `r_surfelGi_updateRate` | 4 | Update stride (frames) |
@@ -63,6 +75,8 @@ Console: **`surfel_gi_status`**.
 5. **Composite** — `albedo * irradiance * strength` added to `vk.color_image` **unless** Hybrid1 fusion is active (then irradiance is handed to Hybrid1 composite)
 
 Runs after geometry (with NIV-class overlays) via `vk_surfel_gi_apply_after_geometry`.
+The pass is visible to Spine/render graph as `surfel_gi_update`, `surfel_gi_hash`,
+`surfel_gi_resolve`, and `surfel_gi_composite`.
 
 ## Density budgeting
 
@@ -93,4 +107,4 @@ See `docs/HYBRID_RENDERING1.md`.
 
 ## Status
 
-v1: spawn/update/resolve/composite + world albedo/normal hits + entity (customIndex==1) albedo/normal SSBOs + stale recycle + spatial hash resolve + **Hybrid1 channel fusion** (`r_surfelGi_hybrid1Fusion`) + **density budgeting** (`r_surfelGiDensity`, adaptive spawn, min-sep, 16-slot hash buckets). World/entity pack-time UV thumbs via `r_rtxWorldUvSample` / `r_rtxEntityUvSample`. Still open: UV-sampled textures in hit shaders.
+Production default: spawn/update/resolve/composite + world albedo/normal hits + entity (customIndex==1) albedo/normal SSBOs + stale recycle + spatial hash resolve + **Hybrid1 channel fusion** (`r_surfelGi_hybrid1Fusion`) + **density budgeting** (`r_surfelGiDensity`, adaptive spawn, min-sep, 16-slot hash buckets). World/entity pack-time UV thumbs via `r_rtxWorldUvSample` / `r_rtxEntityUvSample`; bindless material/UV descriptors are wired for the update shader. Remaining work is quality tuning and deeper hit-shader material specialization, not basic production enablement.

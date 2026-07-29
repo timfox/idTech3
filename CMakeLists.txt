@@ -2696,6 +2696,69 @@ if(NOT MSVC)
 endif()
 message(STATUS "ECS (EnTT): enabled")
 
+# --- Engine math module ---
+option(USE_ENGINE_MATH "Enable native engine math support module" ON)
+if(USE_ENGINE_MATH)
+  enable_language(CXX)
+  ADD_LIBRARY(idtech3_math STATIC
+    modules/math/maths/BoundingBoxAligned.cpp
+    modules/math/maths/BoundingBoxOriented.cpp
+    modules/math/maths/BoundingSphere.cpp
+    modules/math/maths/Brush.cpp
+    modules/math/maths/Fixed.cpp
+    modules/math/maths/Frustum.cpp
+    modules/math/maths/MD5.cpp
+    modules/math/maths/Matrix3D.cpp
+    modules/math/maths/NUSpline.cpp
+    modules/math/maths/Plane.cpp
+    modules/math/maths/Quaternion.cpp
+    modules/math/maths/Rect.cpp
+    modules/math/maths/Size2D.cpp
+    modules/math/maths/Sqrt.cpp
+    modules/math/maths/Vector2D.cpp
+    modules/math/maths/Vector3D.cpp
+  )
+  idtech3_first_party_warnings_as_errors(idtech3_math)
+  set_target_properties(idtech3_math PROPERTIES
+    CXX_STANDARD ${IDTECH3_CXX_STANDARD}
+    CXX_STANDARD_REQUIRED ON
+    POSITION_INDEPENDENT_CODE ON
+  )
+  target_include_directories(idtech3_math PUBLIC
+    ${CMAKE_SOURCE_DIR}/modules/math
+  )
+  target_include_directories(idtech3_math PRIVATE
+    ${IDTECH3_DIR_ENGINE_CORE}
+  )
+  if(NOT MSVC)
+    target_compile_options(idtech3_math PRIVATE -Wno-unused-parameter)
+  endif()
+  message(STATUS "Engine math module: enabled")
+endif()
+
+# --- Debug Adapter Protocol module ---
+option(USE_DAP_INTERFACE "Enable native engine Debug Adapter Protocol interface" ON)
+if(USE_DAP_INTERFACE)
+  enable_language(CXX)
+  ADD_LIBRARY(dap_interface_module STATIC
+    modules/dap/dap_interface.cpp
+  )
+  idtech3_first_party_warnings_as_errors(dap_interface_module)
+  set_target_properties(dap_interface_module PROPERTIES
+    CXX_STANDARD ${IDTECH3_CXX_STANDARD}
+    CXX_STANDARD_REQUIRED ON
+    POSITION_INDEPENDENT_CODE ON
+  )
+  target_include_directories(dap_interface_module PRIVATE
+    ${CMAKE_SOURCE_DIR}/modules/dap
+    ${IDTECH3_DIR_ENGINE_CORE}
+  )
+  if(NOT MSVC)
+    target_compile_options(dap_interface_module PRIVATE -Wno-unused-parameter)
+  endif()
+  message(STATUS "DAP interface module: enabled")
+endif()
+
 # --- RTS simulation module ---
 option(USE_RTS_SIM "Enable RTS-oriented deterministic simulation module" ON)
 if(USE_RTS_SIM)
@@ -2727,6 +2790,63 @@ if(USE_RTS_SIM)
     target_compile_options(rts_module PRIVATE -Wno-unused-parameter)
   endif()
   message(STATUS "RTS simulation module: enabled")
+endif()
+
+# --- Collada asset module ---
+option(USE_COLLADA_ASSETS "Enable engine-owned Collada asset support" ON)
+if(USE_COLLADA_ASSETS)
+  enable_language(CXX)
+  find_package(LibXml2 REQUIRED)
+  set(IDTECH3_FCOLLADA_ROOT "/home/tim/Desktop/rts/libraries/source/fcollada" CACHE PATH
+    "Path to the imported FCollada dependency used by engine Collada conversion")
+  set(IDTECH3_FCOLLADA_LIBRARY "${IDTECH3_FCOLLADA_ROOT}/lib/libFColladaSR.a" CACHE FILEPATH
+    "FCollada static library")
+  ADD_LIBRARY(collada_asset_module STATIC
+    modules/collada/collada_asset.cpp
+    modules/collada/converter/CommonConvert.cpp
+    modules/collada/converter/DLL.cpp
+    modules/collada/converter/Decompose.cpp
+    modules/collada/converter/GeomReindex.cpp
+    modules/collada/converter/Maths.cpp
+    modules/collada/converter/PMDConvert.cpp
+    modules/collada/converter/PSAConvert.cpp
+    modules/collada/converter/StdSkeletons.cpp
+    modules/collada/converter/XMLFix.cpp
+    modules/collada/converter/precompiled.cpp
+  )
+  idtech3_first_party_warnings_as_errors(collada_asset_module)
+  set_target_properties(collada_asset_module PROPERTIES
+    CXX_STANDARD ${IDTECH3_CXX_STANDARD}
+    CXX_STANDARD_REQUIRED ON
+    POSITION_INDEPENDENT_CODE ON
+  )
+  target_include_directories(collada_asset_module PRIVATE
+    ${CMAKE_SOURCE_DIR}/modules/collada
+    ${CMAKE_SOURCE_DIR}/modules/collada/converter
+    ${IDTECH3_FCOLLADA_ROOT}/include
+    ${LIBXML2_INCLUDE_DIR}
+    ${IDTECH3_DIR_ENGINE_CORE}
+  )
+  target_link_libraries(collada_asset_module PRIVATE
+    ${IDTECH3_FCOLLADA_LIBRARY}
+    LibXml2::LibXml2
+  )
+  target_compile_definitions(collada_asset_module PRIVATE
+    LINUX
+  )
+  if(NOT MSVC)
+    target_compile_options(collada_asset_module PRIVATE
+      -fexceptions
+      -Wno-deprecated-declarations
+      -Wno-undef
+      -Wno-shadow
+      -Wno-cast-qual
+      -Wno-extra-semi
+      -Wno-unused-parameter
+      -Wno-unused-variable
+    )
+  endif()
+  message(STATUS "Collada asset module: enabled")
 endif()
 
 # --- Physics module (swappable substrate: box3d default, bullet / jolt optional) ---
@@ -2921,8 +3041,17 @@ if(TARGET recast_nav)
   TARGET_LINK_LIBRARIES(${CNAME}${BINEXT} PRIVATE recast_nav)
 endif()
 TARGET_LINK_LIBRARIES(${CNAME}${BINEXT} PRIVATE ecs_module)
+if(USE_DAP_INTERFACE AND TARGET dap_interface_module)
+	TARGET_LINK_LIBRARIES(${CNAME}${BINEXT} PRIVATE dap_interface_module)
+endif()
+if(USE_ENGINE_MATH AND TARGET idtech3_math)
+	TARGET_LINK_LIBRARIES(${CNAME}${BINEXT} PRIVATE idtech3_math)
+endif()
 if(USE_RTS_SIM AND TARGET rts_module)
 	TARGET_LINK_LIBRARIES(${CNAME}${BINEXT} PRIVATE rts_module)
+endif()
+if(USE_COLLADA_ASSETS AND TARGET collada_asset_module)
+	TARGET_LINK_LIBRARIES(${CNAME}${BINEXT} PRIVATE collada_asset_module)
 endif()
 if(USE_FLUX)
 	TARGET_COMPILE_DEFINITIONS(${CNAME}${BINEXT} PRIVATE USE_FLUX)
@@ -2960,8 +3089,17 @@ ADD_EXECUTABLE(${DNAME}${BINEXT} ${EXE_TYPE} ${Q3_SRCS})
 ENDIF()
 idtech3_first_party_warnings_as_errors(${DNAME}${BINEXT})
 TARGET_LINK_LIBRARIES(${DNAME}${BINEXT} PRIVATE qcommon_ded botlib phys_module idtech3_zstd)
+if(USE_DAP_INTERFACE AND TARGET dap_interface_module)
+	TARGET_LINK_LIBRARIES(${DNAME}${BINEXT} PRIVATE dap_interface_module)
+endif()
+if(USE_ENGINE_MATH AND TARGET idtech3_math)
+	TARGET_LINK_LIBRARIES(${DNAME}${BINEXT} PRIVATE idtech3_math)
+endif()
 if(USE_RTS_SIM AND TARGET rts_module)
 	TARGET_LINK_LIBRARIES(${DNAME}${BINEXT} PRIVATE rts_module)
+endif()
+if(USE_COLLADA_ASSETS AND TARGET collada_asset_module)
+	TARGET_LINK_LIBRARIES(${DNAME}${BINEXT} PRIVATE collada_asset_module)
 endif()
 if(TARGET Threads::Threads)
   TARGET_LINK_LIBRARIES(${DNAME}${BINEXT} PRIVATE Threads::Threads)
@@ -3226,12 +3364,26 @@ set_tests_properties(test_visibility_buffer PROPERTIES
 	LABELS "scripts;validation;renderer"
 	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_visibility_buffer.sh;${CMAKE_SOURCE_DIR}/renderers/vulkan/vk_visibility_buffer.c;${CMAKE_SOURCE_DIR}/docs/RENDERER_2027.md")
 
+add_test(NAME test_surfel_gi
+	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_surfel_gi.sh
+	WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+set_tests_properties(test_surfel_gi PROPERTIES
+	LABELS "scripts;validation;renderer;rtx"
+	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_surfel_gi.sh;${CMAKE_SOURCE_DIR}/renderers/vulkan/extensions/rtx/vk_surfel_gi.c;${CMAKE_SOURCE_DIR}/docs/SURFEL_GI.md")
+
 add_test(NAME test_render_graph
 	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_render_graph.sh
 	WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
 set_tests_properties(test_render_graph PROPERTIES
 	LABELS "scripts;validation;renderer"
 	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_render_graph.sh;${CMAKE_SOURCE_DIR}/renderers/vulkan/vk_render_graph.c;${CMAKE_SOURCE_DIR}/docs/RENDER_GRAPH.md")
+
+add_test(NAME test_virtual_geometry
+	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_virtual_geometry.sh
+	WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+set_tests_properties(test_virtual_geometry PROPERTIES
+	LABELS "scripts;validation;renderer"
+	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_virtual_geometry.sh;${CMAKE_SOURCE_DIR}/renderers/vulkan/vk_meshlets.c;${CMAKE_SOURCE_DIR}/docs/MESHLETS.md")
 
 add_test(NAME test_mboit_stochastic
 	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_mboit_stochastic.sh
@@ -4811,6 +4963,32 @@ if(BUILD_UNIT_TESTS)
 		target_link_libraries(unit_rts_module PRIVATE rts_module)
 		add_test(NAME unit_rts_module COMMAND unit_rts_module)
 		set_tests_properties(unit_rts_module PROPERTIES LABELS "unit;validation;rts")
+	endif()
+
+	if(USE_COLLADA_ASSETS AND TARGET collada_asset_module)
+		add_executable(unit_collada_asset
+			tests/unit/test_collada_asset.c)
+		target_include_directories(unit_collada_asset PRIVATE
+			${IDTECH3_UNIT_INCLUDE_DIRS}
+			${CMAKE_SOURCE_DIR}/modules/collada)
+		target_link_libraries(unit_collada_asset PRIVATE collada_asset_module)
+		add_test(NAME unit_collada_asset COMMAND unit_collada_asset)
+		set_tests_properties(unit_collada_asset PROPERTIES LABELS "unit;validation;assets;collada")
+	endif()
+
+	if(USE_DAP_INTERFACE AND TARGET dap_interface_module)
+		add_executable(unit_dap_interface
+			tests/unit/test_dap_interface.c
+			tests/stub_qcommon_min.c
+			tests/stub_dap_deps.c
+			engine/core/q_shared.c
+			engine/core/q_math.c)
+		target_include_directories(unit_dap_interface PRIVATE
+			${IDTECH3_UNIT_INCLUDE_DIRS}
+			${CMAKE_SOURCE_DIR}/modules/dap)
+		target_link_libraries(unit_dap_interface PRIVATE dap_interface_module)
+		add_test(NAME unit_dap_interface COMMAND unit_dap_interface)
+		set_tests_properties(unit_dap_interface PROPERTIES LABELS "unit;validation;dap")
 	endif()
 
 	add_executable(unit_cluster_graph

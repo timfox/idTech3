@@ -1,0 +1,175 @@
+/* Copyright (C) 2025 Wildfire Games.
+ * SPDX-License-Identifier: GPL-2.0-or-later
+ */
+
+#ifndef INCLUDED_FIXED_VECTOR3D
+#define INCLUDED_FIXED_VECTOR3D
+
+#include "lib/types.h"
+#include "maths/Fixed.h"
+#include "maths/Sqrt.h"
+
+class CFixedVector3D
+{
+public:
+	fixed X, Y, Z;
+
+	CFixedVector3D() { }
+
+	CFixedVector3D(fixed X, fixed Y, fixed Z) : X(X), Y(Y), Z(Z) { }
+
+	/// Vector equality
+	bool operator==(const CFixedVector3D& v) const
+	{
+		return (X == v.X && Y == v.Y && Z == v.Z);
+	}
+
+	/// Vector inequality
+	bool operator!=(const CFixedVector3D& v) const
+	{
+		return (X != v.X || Y != v.Y || Z != v.Z);
+	}
+
+	/// Vector addition
+	CFixedVector3D operator+(const CFixedVector3D& v) const
+	{
+		return CFixedVector3D(X + v.X, Y + v.Y, Z + v.Z);
+	}
+
+	/// Vector subtraction
+	CFixedVector3D operator-(const CFixedVector3D& v) const
+	{
+		return CFixedVector3D(X - v.X, Y - v.Y, Z - v.Z);
+	}
+
+	/// Negation
+	CFixedVector3D operator-() const
+	{
+		return CFixedVector3D(-X, -Y, -Z);
+	}
+
+	/// Vector addition
+	CFixedVector3D& operator+=(const CFixedVector3D& v)
+	{
+		*this = *this + v;
+		return *this;
+	}
+
+	/// Vector subtraction
+	CFixedVector3D& operator-=(const CFixedVector3D& v)
+	{
+		*this = *this - v;
+		return *this;
+	}
+
+
+	/**
+	 * Returns the length of the vector.
+	 * Will not overflow if the result can be represented as type 'fixed'.
+	 */
+	fixed Length() const
+	{
+		// Do intermediate calculations with 64-bit ints to avoid overflows
+		u64 xx = SQUARE_U64_FIXED(X);
+		u64 yy = SQUARE_U64_FIXED(Y);
+		u64 zz = SQUARE_U64_FIXED(Z);
+		u64 t = xx + yy;
+		CheckUnsignedAdditionOverflow(t, xx, L"Overflow in CFixedVector3D::Length() part 1")
+
+		u64 d2 = t + zz;
+		CheckUnsignedAdditionOverflow(d2, t, L"Overflow in CFixedVector3D::Length() part 2")
+
+		u32 d = isqrt64(d2);
+
+		CheckU32CastOverflow(d, i32, L"Overflow in CFixedVector3D::Length() part 3")
+		fixed r;
+		r.SetInternalValue((i32)d);
+		return r;
+	}
+
+	/**
+	 * Normalize the vector so that length is close to 1.
+	 * If length is 0, does nothing.
+	 */
+	void Normalize()
+	{
+		fixed l = Length();
+		if (!l.IsZero())
+		{
+			X = X / l;
+			Y = Y / l;
+			Z = Z / l;
+		}
+	}
+
+	/**
+	 * Normalize the vector so that length is close to n.
+	 * If length is 0, does nothing.
+	 */
+	void Normalize(fixed n)
+	{
+		fixed l = Length();
+		if (!l.IsZero())
+		{
+			X = X.MulDiv(n, l);
+			Y = Y.MulDiv(n, l);
+			Z = Z.MulDiv(n, l);
+		}
+	}
+
+	/**
+	 * Compute the cross product of this vector with another.
+	 */
+	CFixedVector3D Cross(const CFixedVector3D& v)
+	{
+		i64 y_vz = MUL_I64_I32_I32(Y.GetInternalValue(), v.Z.GetInternalValue());
+		i64 z_vy = MUL_I64_I32_I32(Z.GetInternalValue(), v.Y.GetInternalValue());
+		CheckSignedSubtractionOverflow(i64, y_vz, z_vy, L"Overflow in CFixedVector3D::Cross() part 1", L"Underflow in CFixedVector3D::Cross() part 1")
+		i64 x = y_vz - z_vy;
+		x >>= fixed::fract_bits;
+
+		i64 z_vx = MUL_I64_I32_I32(Z.GetInternalValue(), v.X.GetInternalValue());
+		i64 x_vz = MUL_I64_I32_I32(X.GetInternalValue(), v.Z.GetInternalValue());
+		CheckSignedSubtractionOverflow(i64, z_vx, x_vz, L"Overflow in CFixedVector3D::Cross() part 2", L"Underflow in CFixedVector3D::Cross() part 2")
+		i64 y = z_vx - x_vz;
+		y >>= fixed::fract_bits;
+
+		i64 x_vy = MUL_I64_I32_I32(X.GetInternalValue(), v.Y.GetInternalValue());
+		i64 y_vx = MUL_I64_I32_I32(Y.GetInternalValue(), v.X.GetInternalValue());
+		CheckSignedSubtractionOverflow(i64, x_vy, y_vx, L"Overflow in CFixedVector3D::Cross() part 3", L"Underflow in CFixedVector3D::Cross() part 3")
+		i64 z = x_vy - y_vx;
+		z >>= fixed::fract_bits;
+
+		CheckCastOverflow(x, i32, L"Overflow in CFixedVector3D::Cross() part 4", L"Underflow in CFixedVector3D::Cross() part 4")
+		CheckCastOverflow(y, i32, L"Overflow in CFixedVector3D::Cross() part 5", L"Underflow in CFixedVector3D::Cross() part 5")
+		CheckCastOverflow(z, i32, L"Overflow in CFixedVector3D::Cross() part 6", L"Underflow in CFixedVector3D::Cross() part 6")
+		CFixedVector3D ret;
+		ret.X.SetInternalValue((i32)x);
+		ret.Y.SetInternalValue((i32)y);
+		ret.Z.SetInternalValue((i32)z);
+		return ret;
+	}
+
+	/**
+	 * Compute the dot product of this vector with another.
+	 */
+	fixed Dot(const CFixedVector3D& v)
+	{
+		i64 x = MUL_I64_I32_I32(X.GetInternalValue(), v.X.GetInternalValue());
+		i64 y = MUL_I64_I32_I32(Y.GetInternalValue(), v.Y.GetInternalValue());
+		i64 z = MUL_I64_I32_I32(Z.GetInternalValue(), v.Z.GetInternalValue());
+		CheckSignedAdditionOverflow(i64, x, y, L"Overflow in CFixedVector3D::Dot() part 1", L"Underflow in CFixedVector3D::Dot() part 1")
+		i64 t = x + y;
+
+		CheckSignedAdditionOverflow(i64, t, z, L"Overflow in CFixedVector3D::Dot() part 2", L"Underflow in CFixedVector3D::Dot() part 2")
+		i64 sum = t + z;
+		sum >>= fixed::fract_bits;
+		CheckCastOverflow(sum, i32, L"Overflow in CFixedVector3D::Dot() part 3", L"Underflow in CFixedVector3D::Dot() part 3")
+
+		fixed ret;
+		ret.SetInternalValue((i32)sum);
+		return ret;
+	}
+};
+
+#endif // INCLUDED_FIXED_VECTOR3D

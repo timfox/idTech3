@@ -1,0 +1,64 @@
+/* Copyright (C) 2009 Wildfire Games.
+ * SPDX-License-Identifier: GPL-2.0-or-later
+ */
+
+#ifndef INCLUDED_QUATERNION
+#define INCLUDED_QUATERNION
+
+#include "Vector3D.h"
+
+class CMatrix3D;
+
+class CQuaternion
+{
+public:
+	CVector3D	m_V;
+	float		m_W;
+
+public:
+	CQuaternion();
+	CQuaternion(float x, float y, float z, float w);
+
+	CQuaternion operator + (const CQuaternion &quat) const;
+	CQuaternion &operator += (const CQuaternion &quat);
+
+	CQuaternion operator - (const CQuaternion &quat) const;
+	CQuaternion &operator -= (const CQuaternion &quat);
+
+	CQuaternion operator * (const CQuaternion &quat) const;
+	CQuaternion &operator *= (const CQuaternion &quat);
+
+	CQuaternion operator * (float factor) const;
+
+	float Dot(const CQuaternion& quat) const;
+
+	void FromEulerAngles (float x, float y, float z);
+	CVector3D ToEulerAngles();
+
+	// Convert the quaternion to matrix
+	CMatrix3D ToMatrix() const;
+	void ToMatrix(CMatrix3D& result) const;
+
+	// Sphere interpolation
+	void Slerp(const CQuaternion& from, const CQuaternion& to, float ratio);
+
+	// Normalised linear interpolation
+	void Nlerp(const CQuaternion& from, const CQuaternion& to, float ratio);
+
+	// Create a quaternion from axis/angle representation of a rotation
+	void FromAxisAngle(const CVector3D& axis, float angle);
+
+	// Convert the quaternion to axis/angle representation of a rotation
+	void ToAxisAngle(CVector3D& axis, float& angle);
+
+	// Normalize this quaternion
+	void Normalize();
+
+	// Rotate a vector by this quaternion. Assumes the quaternion is normalised.
+	CVector3D Rotate(const CVector3D& vec) const;
+
+	// Calculate q^-1. Assumes the quaternion is normalised.
+	CQuaternion GetInverse() const;
+};
+
+#endif
