@@ -444,7 +444,7 @@ void vk_oit_pass( const struct drawSurfsCommand_s *cmd )
 	if ( mboit && ri.Cvar_VariableIntegerValue( "r_oitAllowExperimentalMboit" ) <= 0 ) {
 		if ( !s_mboitBlockedWarned ) {
 			ri.Printf( PRINT_WARNING, S_COLOR_YELLOW
-				"[VK][OIT] r_oit 2 (MBOIT) blocked: resolve is still WBOIT-like. "
+				"[VK][OIT] r_oit 2 (MBOIT) blocked: not production-certified. "
 				"Falling back to WBOIT. Set r_oitAllowExperimentalMboit 1 to override.\n"
 				S_COLOR_WHITE );
 			s_mboitBlockedWarned = qtrue;

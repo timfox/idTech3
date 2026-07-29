@@ -681,6 +681,18 @@ static qboolean SV_GetValue( char* value, int valueSize, const char* key )
 		return qtrue;
 	}
 
+	if ( !Q_stricmp( key, "trap_RTS_GetEntityOwner" ) )
+	{
+		Com_sprintf( value, valueSize, "%i", G_RTS_GET_ENTITY_OWNER );
+		return qtrue;
+	}
+
+	if ( !Q_stricmp( key, "trap_RTS_GetEntityPosition" ) )
+	{
+		Com_sprintf( value, valueSize, "%i", G_RTS_GET_ENTITY_POSITION );
+		return qtrue;
+	}
+
 	if ( !Q_stricmp( key, "trap_RTS_ComputeStateHash" ) )
 	{
 		Com_sprintf( value, valueSize, "%i", G_RTS_COMPUTE_STATE_HASH );
@@ -1617,6 +1629,12 @@ static intptr_t SV_GameSystemCalls( intptr_t *args ) {
 
 	case G_RTS_GET_ENTITY_COUNT:
 		return RTS_GetEntityCount();
+
+	case G_RTS_GET_ENTITY_OWNER:
+		return RTS_GetEntityOwner( args[1] );
+
+	case G_RTS_GET_ENTITY_POSITION:
+		return RTS_GetEntityPosition( args[1], (int *)VMA( 2 ), (int *)VMA( 3 ) );
 
 	case G_RTS_COMPUTE_STATE_HASH:
 		return (intptr_t)RTS_ComputeStateHash();

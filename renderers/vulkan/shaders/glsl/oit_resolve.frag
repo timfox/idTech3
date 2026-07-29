@@ -44,6 +44,24 @@ vec3 oit_magenta( void )
 	return vec3( 1.0, 0.0, 1.0 );
 }
 
+float oit_mboit_coverage_from_b0( float b0 )
+{
+	float opticalDepth = clamp( b0, 0.0, 32.0 );
+	float coverage = 1.0 - exp( -opticalDepth );
+	if ( oit_invalid( coverage ) ) {
+		return 0.0;
+	}
+	return clamp( coverage, 0.0, 1.0 );
+}
+
+float oit_mboit_mean_depth( float b0, vec4 moments )
+{
+	if ( b0 <= 1e-5 || oit_invalid4( moments ) ) {
+		return 0.0;
+	}
+	return clamp( moments.x / max( b0, 1e-5 ), 0.0, 1.0 );
+}
+
 void main() {
 	ivec2 px = ivec2( gl_FragCoord.xy );
 	ivec2 opaqueSize = textureSize( opaqueTex, 0 );
@@ -61,8 +79,14 @@ void main() {
 	vec3 opaque = texelFetch( opaqueTex, px, 0 ).rgb;
 	vec4 accum = texelFetch( oitAccumTex, px, 0 );
 	float revealage = texelFetch( oitRevealTex, px, 0 ).r;
+	vec4 moments = texelFetch( oitMomentsTex, px, 0 );
+	float b0 = texelFetch( oitB0Tex, px, 0 ).r;
 
 	if ( oit_invalid3( opaque ) || oit_invalid4( accum ) || oit_invalid( revealage ) ) {
+		out_color = vec4( oit_magenta(), 1.0 );
+		return;
+	}
+	if ( pc.oitMode == 2 && ( oit_invalid4( moments ) || oit_invalid( b0 ) ) ) {
 		out_color = vec4( oit_magenta(), 1.0 );
 		return;
 	}
@@ -98,7 +122,10 @@ void main() {
 		}
 	}
 
-	float coverage = 1.0 - revealage;
+	float coverage = ( pc.oitMode == 2 ) ? oit_mboit_coverage_from_b0( b0 ) : ( 1.0 - revealage );
+	if ( pc.oitMode == 2 ) {
+		revealage = 1.0 - coverage;
+	}
 	if ( coverage < 1e-5 ) {
 		out_color = vec4( opaque, 1.0 );
 		return;
@@ -128,17 +155,8 @@ void main() {
 	}
 
 	int mode = pc.debugMode;
-	/* IQ P0-F: MBOIT path still uses McGuire WBOIT resolve math. When oitMode==2,
-	 * leave a developer-visible magenta corner marker if debugMode==0 so operators
-	 * do not mistake experimental MBOIT for a certified moments resolve. */
 	if ( mode <= 0 ) {
 		out_color = vec4( resolved, 1.0 );
-		if ( pc.oitMode == 2 ) {
-			ivec2 marker = opaqueSize / 32;
-			if ( all( lessThan( px, max( marker, ivec2( 4 ) ) ) ) ) {
-				out_color = vec4( oit_magenta(), 1.0 );
-			}
-		}
 		return;
 	}
 
@@ -162,19 +180,11 @@ void main() {
 		/* Pass ownership: green=has OIT coverage, blue=opaque only. */
 		out_color = vec4( coverage > 1e-4 ? vec3( 0.1, 0.9, 0.2 ) : vec3( 0.1, 0.2, 0.9 ), 1.0 );
 	} else if ( mode == 9 ) {
-		vec4 moments = texelFetch( oitMomentsTex, px, 0 );
-		if ( oit_invalid4( moments ) ) {
-			out_color = vec4( oit_magenta(), 1.0 );
-		} else {
-			out_color = vec4( abs( moments.rgb ), 1.0 );
-		}
+		out_color = oit_invalid4( moments ) ? vec4( oit_magenta(), 1.0 ) :
+			vec4( abs( moments.rgb ), 1.0 );
 	} else if ( mode == 10 ) {
-		float b0 = texelFetch( oitB0Tex, px, 0 ).r;
-		if ( oit_invalid( b0 ) ) {
-			out_color = vec4( oit_magenta(), 1.0 );
-		} else {
-			out_color = vec4( vec3( clamp( b0 * 0.25, 0.0, 1.0 ) ), 1.0 );
-		}
+		out_color = oit_invalid( b0 ) ? vec4( oit_magenta(), 1.0 ) :
+			vec4( vec3( clamp( b0 * 0.25, 0.0, 1.0 ) ), 1.0 );
 	} else if ( mode == 11 ) {
 		/* Cluster / light heuristic proxy: coverage × accum weight magnitude. */
 		float heat = clamp( coverage * min( accum.a, 16.0 ) * 0.1, 0.0, 1.0 );
@@ -213,6 +223,12 @@ void main() {
 	} else if ( mode == 19 ) {
 		/* Final resolved coverage. */
 		out_color = vec4( vec3( coverage ), 1.0 );
+	} else if ( mode == 20 ) {
+		/* MBOIT optical-depth coverage from b0 (WBOIT shows revealage-derived coverage). */
+		out_color = vec4( vec3( ( pc.oitMode == 2 ) ? oit_mboit_coverage_from_b0( b0 ) : coverage ), 1.0 );
+	} else if ( mode == 21 ) {
+		/* MBOIT first moment mean depth. */
+		out_color = vec4( vec3( oit_mboit_mean_depth( b0, moments ) ), 1.0 );
 	} else {
 		out_color = vec4( resolved, 1.0 );
 	}

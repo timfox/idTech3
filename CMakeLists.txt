@@ -4369,6 +4369,13 @@ if(BUILD_UNIT_TESTS)
 	add_test(NAME unit_wboit_live_cert COMMAND unit_wboit_live_cert)
 	set_tests_properties(unit_wboit_live_cert PROPERTIES LABELS "unit;validation;oit")
 
+	add_executable(unit_mboit_resolve tests/unit/test_mboit_resolve.c)
+	if(NOT MSVC)
+		target_link_libraries(unit_mboit_resolve PRIVATE m)
+	endif()
+	add_test(NAME unit_mboit_resolve COMMAND unit_mboit_resolve)
+	set_tests_properties(unit_mboit_resolve PROPERTIES LABELS "unit;validation;oit;mboit")
+
 	add_executable(unit_bsp30_triangulate
 		tests/unit/test_bsp30_triangulate.c
 		renderers/common/tr_bsp30_triangulate.c)

@@ -3133,7 +3133,7 @@ static void R_Register( void )
 		ri.Cvar_CheckRange( r_oitAllowExperimentalMboit, "0", "1", CV_INTEGER );
 		ri.Cvar_SetDescription( r_oitAllowExperimentalMboit,
 			"IQ P0-F: allow r_oit 2 (MBOIT). Default 0 forces WBOIT fallback because "
-			"MBOIT resolve is not production-certified." );
+			"MBOIT is not production-certified." );
 		ri.Cvar_SetGroup( r_oitAllowExperimentalMboit, CVG_RENDERER );
 	}
 	r_oitForwardPlus = ri.Cvar_Get( "r_oitForwardPlus", "1", CVAR_ARCHIVE_ND | CVAR_LATCH );
@@ -3149,7 +3149,7 @@ static void R_Register( void )
 		"Requires \\r_oit 1 or 2. Hair cards stay on \\r_stochasticAlpha." );
 	ri.Cvar_SetGroup( r_oitClassify, CVG_RENDERER );
 	r_oitDebug = ri.Cvar_Get( "r_oitDebug", "0", CVAR_CHEAT );
-	ri.Cvar_CheckRange( r_oitDebug, "0", "19", CV_INTEGER );
+	ri.Cvar_CheckRange( r_oitDebug, "0", "21", CV_INTEGER );
 	ri.Cvar_SetDescription( r_oitDebug,
 		"OIT resolve debug view (cheat):\n"
 		" 0 - composite\n"
@@ -3172,6 +3172,8 @@ static void R_Register( void )
 		" 17 - empty-pixel preservation (green=passthrough)\n"
 		" 18 - opaque input to resolve\n"
 		" 19 - final resolved coverage\n"
+		" 20 - MBOIT optical-depth coverage from b0\n"
+		" 21 - MBOIT first-moment mean depth\n"
 		"NaN/Inf → preserve opaque (never full black)." );
 	ri.Cvar_SetGroup( r_oitDebug, CVG_RENDERER );
 	{

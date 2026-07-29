@@ -110,7 +110,7 @@ grep -q 'colorWriteMask = 0' "$ROOT/renderers/vulkan/vk_pipeline_helpers.c" || {
   echo "FAIL additive reveal write-mask off missing"; fail=1; }
 grep -qE 'alpha < 1e-3' "$ROOT/renderers/vulkan/shaders/glsl/oit_accum.frag" || {
   echo "FAIL soft-alpha discard floor missing"; fail=1; }
-grep -q 'smoothstep( 0.0, .*coverage )' "$ROOT/renderers/vulkan/shaders/glsl/oit_resolve.frag" || {
+grep -q 'smoothstep( 0.0, 0.008, coverage )' "$ROOT/renderers/vulkan/shaders/glsl/oit_resolve.frag" || {
   echo "FAIL resolve soft coverage missing"; fail=1; }
 
 # Boot must not force OIT corruption repro

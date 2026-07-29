@@ -1,6 +1,6 @@
 # Order-Independent Transparency (WBOIT Production)
 
-**WBOIT (`r_oit 1`) is the production transparency path** for glass, smoke, particles, and overlapping translucent layers. **MBOIT (`r_oit 2`) remains experimental** — see [Appendix: MBOIT](#appendix-mboit-moment-transparency-r_oit-2) and [OIT_FUTURE_TRACKS.md](OIT_FUTURE_TRACKS.md).
+**WBOIT (`r_oit 1`) is the production transparency path** for glass, smoke, particles, and overlapping translucent layers. **MBOIT (`r_oit 2`) remains experimental** while it is promoted through the same measured parity/soak gates — see [Appendix: MBOIT](#appendix-mboit-moment-transparency-r_oit-2) and [OIT_FUTURE_TRACKS.md](OIT_FUTURE_TRACKS.md).
 
 **Frozen math / formats / blends:** [WBOIT_CONTRACT.md](WBOIT_CONTRACT.md) (`oit_contract_status`). Color order: [COLOR_PIPELINE.md](COLOR_PIPELINE.md).
 
@@ -101,7 +101,7 @@ Full cert invariants: [RENDERER_SPINE_1.1.md](RENDERER_SPINE_1.1.md).
 | `oit_status` | Frame state, generations, extents, cluster gen, unhealthy flags |
 | `oit_perf` | CPU markers for clear / accum / resolve |
 | `oit_capture stages` | Stage capture helper |
-| `r_oitDebug` 0–16 | Resolve-stage views (cheat); 14/15 = band/tile isolation |
+| `r_oitDebug` 0–21 | Resolve-stage views (cheat); 14/15 = band/tile isolation, 20/21 = MBOIT coverage/mean-depth |
 | `r_oitDirectTest` 0–2 | Clear+resolve without transparent draws (cheat) |
 | `r_oitExtentDebug` | Extent/viewport/generation overlay (cheat) |
 | `r_oitLightingDebug` 1–8 | Lit accum term views / BRDF-diff vs opaque (cheat) |
@@ -194,7 +194,9 @@ Key hardening (resolve layout, frame state, weapon exclusion, additive reveal ma
 1. Opaque geometry (depth write)
 2. **Moments pass** — optical depth `d = -log(1-α)` and power moments `d·(z,z²,z³,z⁴)`
 3. **Accum pass** — reconstruct transmittance from moments + WBOIT-style weighted color
-4. **Resolve** — composite onto opaque background
+4. **Resolve** — composite onto opaque background using optical-depth coverage `coverage = 1 - exp(-b0)` instead of the WBOIT revealage product
+
+The first production hardening step is now in-tree: `oit_resolve.frag` has an MBOIT-specific optical-depth coverage branch, plus debug views `r_oitDebug 20` (coverage from `b0`) and `r_oitDebug 21` (first-moment mean depth). CPU reference coverage is in `unit_mboit_resolve`.
 
 ```
 seta r_fbo 1

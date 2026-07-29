@@ -46,11 +46,11 @@ layout(push_constant) uniform Transform {
 	mat4 prevMvp;
 } pc;
 
-out gl_MeshPerVertexNV {
-	vec4 color;
-	vec2 canon;
-	float triType;
-} gl_MeshVerticesNV[];
+layout(location = 0) out vec4 frag_color[];
+layout(location = 1) flat out float frag_triType[];
+layout(location = 2) out vec2 frag_canon[];
+layout(location = 13) out vec4 var_CurrentClip[];
+layout(location = 14) out vec4 var_PrevClip[];
 
 void main() {
 	uint charIdx = gl_WorkGroupID.x;
@@ -63,17 +63,20 @@ void main() {
 	uint p;
 
 	if ( vCount == 0u || pCount == 0u || vCount > 128u || pCount > 128u ) {
-		SetMeshOutputsNV( 0, 0 );
+		gl_PrimitiveCountNV = 0u;
 		return;
 	}
 
 	for ( i = 0u; i < vCount; i++ ) {
 		vec4 src = glyphVerts.data[gi.vertexBaseIndex + i];
 		vec2 screen = vec2( ch.posX + src.x * ch.scale, ch.posY - src.y * ch.scale );
-		gl_MeshVerticesNV[i].gl_Position = pc.mvp * vec4( screen, 0.0, 1.0 );
-		gl_MeshVerticesNV[i].color = ch.color;
-		gl_MeshVerticesNV[i].canon = src.zw;
-		gl_MeshVerticesNV[i].triType = 0.0;
+		vec4 clip = pc.mvp * vec4( screen, 0.0, 1.0 );
+		gl_MeshVerticesNV[i].gl_Position = clip;
+		frag_color[i] = ch.color;
+		frag_canon[i] = src.zw;
+		frag_triType[i] = 0.0;
+		var_CurrentClip[i] = clip;
+		var_PrevClip[i] = pc.prevMvp * vec4( screen, 0.0, 1.0 );
 	}
 
 	for ( p = 0u; p < pCount; p++ ) {
@@ -82,11 +85,13 @@ void main() {
 		uint i1 = glyphIndices.data[ib + 1u] - gi.vertexBaseIndex;
 		uint i2 = glyphIndices.data[ib + 2u] - gi.vertexBaseIndex;
 		float pType = float( glyphPrimTypes.data[gi.primBaseIndex + p] );
-		gl_PrimitiveIndicesNV[p] = uvec3( i0, i1, i2 );
-		gl_MeshVerticesNV[i0].triType = pType;
-		gl_MeshVerticesNV[i1].triType = pType;
-		gl_MeshVerticesNV[i2].triType = pType;
+		gl_PrimitiveIndicesNV[p * 3u + 0u] = i0;
+		gl_PrimitiveIndicesNV[p * 3u + 1u] = i1;
+		gl_PrimitiveIndicesNV[p * 3u + 2u] = i2;
+		frag_triType[i0] = pType;
+		frag_triType[i1] = pType;
+		frag_triType[i2] = pType;
 	}
 
-	SetMeshOutputsNV( vCount, pCount );
+	gl_PrimitiveCountNV = pCount;
 }
