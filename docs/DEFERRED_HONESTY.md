@@ -113,12 +113,13 @@ In `MIXED_MATERIAL_DEFERRED`, double-shaded and unowned should stay **0**.
 - Compact octahedral decode works with mixed (oct in `material.ba`, AO in `normal.a`)
 - Expanded mixed clearcoat from `material.a` (compact clearcoat still Forward+)
 - Shared local lights: Forward+ tile SSBOs + Burley/GGX/`clearcoat_lobe`
+- Deluxe mode: `r_deferredLightmapMode 1/2` uses a conservative directional approximation from lightmap energy + dominant sun direction until a true deluxe-vector channel ships
 
 ### Remaining / deferred
 
 - Local reflection / irradiance probe pick (sky cubemap only for now)
 - Compact clearcoat channel (extension buffer) — coat materials **Forward+** when compact
-- Deluxe directional in compute (cvar reserved)
+- True packed deluxe-vector decode in compute (current mode is approximate)
 - GPU material-export / lightmap parity live stats
 - Interactive OA capture matrix
 - Promote arch 1 to default only after live OA validation

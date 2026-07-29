@@ -26,6 +26,9 @@ layout(push_constant) uniform CompositePush {
 	vec4 projInfo;           /* invProj00, invProj11, proj10, proj14 */
 } pc;
 
+const uint CLASS_TRANSMISSION = 3u;
+const uint CLASS_EMISSIVE = 4u;
+
 vec3 heat(float e) {
 	return clamp(vec3(1.5 * e, 1.5 - abs(e * 3.0 - 1.5), 1.5 * (1.0 - e)), 0.0, 1.0);
 }
@@ -114,7 +117,7 @@ void main() {
 	} else if (debugMode == 20u) {
 		outRgb = vec3(1.0 - gtao.a, gtao.a, 0.0);
 	} else if (debugMode == 0u) {
-		if (cls != 3u && cls != 4u && av_valid_depth(centerDepth)) {
+		if (cls != CLASS_TRANSMISSION && cls != CLASS_EMISSIVE && av_valid_depth(centerDepth)) {
 			float strength = clamp(pc.params.x, 0.0, 1.0);
 			float floorV = clamp(pc.params.w, 0.0, 0.75);
 			float rawVis = clamp(av.r, 0.0, 1.0);

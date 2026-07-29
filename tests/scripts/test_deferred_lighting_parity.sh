@@ -34,6 +34,8 @@ pass "M3 lobe Forward+ routing"
 
 grep -q 'binding = 15\|surfaceTex\|DEFERRED_HAS_SURFACE\|GBufferSurfaceData' "$COMP" "$LC" "$GBUF" "$DOC" || \
 	fail "SurfaceData binding / docs"
+grep -q 'lightmapMode\|lightmapDeluxeStrength' "$COMP" "$LC" "$GBUF" || fail "deferred lightmap mode push"
+grep -q 'DeferredStaticDiffuseFromDeluxeApprox' "$LC" "$ROOT/renderers/vulkan/shaders/glsl/lightmap_decode.glsl" || fail "deferred deluxe approximation helper"
 if grep -qE 'ownerBias|1024\.0' "$LC"; then fail "retired LM pack still in lighting"; fi
 pass "M3 SurfaceData path"
 

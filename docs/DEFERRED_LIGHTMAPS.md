@@ -6,8 +6,12 @@ The Deferred light loop skips duplicate static sun diffuse when the lightmap
 owns that term. Forward-owned classic materials retain the original Forward+
 lightmap evaluation from start to finish.
 
-Directional deluxe evaluation is not production-certified yet. Materials that
-require an unrepresentable deluxe/custom stage must remain Forward-owned.
-`lightmap_parity_validate` therefore requires GPU reference evidence before
-certification and must detect missing, doubled, gamma-wrong, UV-mismatched, or
-invalid-owner lightmaps.
+Directional deluxe mode is implemented as a conservative compute-side
+approximation until `GBufferSurfaceData` grows a true deluxe-vector channel:
+`r_deferredLightmapMode 1` preserves `SurfaceData.rgb` energy and applies a
+bounded normal-facing directional shape from the dominant sun direction.
+`r_deferredLightmapMode 2` blends irradiance-only and approximate directional
+terms for comparison captures. Materials that require an exact deluxe/custom
+stage must remain Forward-owned. `lightmap_parity_validate` therefore requires
+GPU reference evidence before certification and must detect missing, doubled,
+gamma-wrong, UV-mismatched, or invalid-owner lightmaps.

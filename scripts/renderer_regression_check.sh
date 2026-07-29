@@ -255,10 +255,10 @@ elif ! grep -q 'deferred opaque + Forward+ transparent' "$RENDER_MODE_C" 2>/dev/
   fail "tr_render_mode_vk.c mode 1 should document deferred opaque + Forward+ transparent"
 elif ! grep -q 'Unified Clustered Renderer' "$RENDER_MODE_C" 2>/dev/null; then
   fail "tr_render_mode_vk.c missing r_renderMode 3 Unified Clustered latch"
-elif ! grep -q 'CheckRange( r_renderMode, "0", "3"' "$TR_INIT_VK" 2>/dev/null; then
-  fail "tr_init.c r_renderMode CheckRange should allow 0-3"
+elif ! grep -q 'CheckRange( r_renderMode, "0", "5"' "$TR_INIT_VK" 2>/dev/null; then
+  fail "tr_init.c r_renderMode CheckRange should allow 0-5 (Spine 1.2 modes 4/5)"
 else
-  pass "R_ApplyRenderModeLatch wired (tr_render_mode_vk.c, R_Init, vk_forward_plus, mode 3)"
+  pass "R_ApplyRenderModeLatch wired (tr_render_mode_vk.c, R_Init, vk_forward_plus, modes 3/4/5)"
 fi
 
 echo ""
@@ -268,6 +268,7 @@ DGB_UC="$PROJECT_ROOT/renderers/vulkan/vk_deferred_gbuffer.c"
 GEN_FRAG_UC="$PROJECT_ROOT/renderers/vulkan/shaders/glsl/gen_frag.tmpl"
 OIT_ACCUM_UC="$PROJECT_ROOT/renderers/vulkan/shaders/glsl/oit_accum.frag"
 OIT_MBOIT_UC="$PROJECT_ROOT/renderers/vulkan/shaders/glsl/oit_accum_mboit.frag"
+FP_LIGHT_EVAL_UC="$PROJECT_ROOT/renderers/vulkan/shaders/glsl/forward_plus_light_eval.glsl"
 if ! grep -q 'vk_unified_clustered_active' "$DGB_UC" 2>/dev/null; then
   fail "vk_deferred_gbuffer.c missing vk_unified_clustered_active"
 elif ! grep -q 'vk_unified_clustered_active' "$TB_C" 2>/dev/null; then
@@ -288,8 +289,8 @@ elif ! grep -q 'Soft-cap Forward+ specular' "$GEN_FRAG_UC" 2>/dev/null; then
   fail "gen_frag.tmpl missing Forward+ specular soft-cap (deferred parity)"
 elif ! grep -q 'forward_plus_cluster.glsl' "$OIT_ACCUM_UC" 2>/dev/null; then
   fail "oit_accum.frag must include forward_plus_cluster.glsl"
-elif ! grep -q 'fp_cluster_index' "$OIT_ACCUM_UC" 2>/dev/null; then
-  fail "oit_accum.frag must use fp_cluster_index"
+elif ! grep -q 'forward_plus_light_eval.glsl' "$OIT_ACCUM_UC" 2>/dev/null || ! grep -q 'fp_cluster_index' "$FP_LIGHT_EVAL_UC" 2>/dev/null; then
+  fail "oit_accum.frag must route Forward+ lighting through shared fp_cluster_index helper"
 elif ! grep -q 'forward_plus_cluster.glsl' "$OIT_MBOIT_UC" 2>/dev/null; then
   fail "oit_accum_mboit.frag must include forward_plus_cluster.glsl"
 elif ! grep -q 'r_oitForwardPlus' "$TB_C" 2>/dev/null; then
@@ -326,7 +327,8 @@ elif grep -q '!vk.temporal.unreliableMotionThisFrame' "$VK_FRAME_END" 2>/dev/nul
   fail "vk_frame_end.c must not skip the whole TAA pass on unreliableMotionThisFrame (use taaParams confidence)"
 elif ! grep -q 'vk_barrier_motion_vector_for_sampling' "$VK_FRAME_END" 2>/dev/null; then
   fail "vk_frame_end.c missing motion-vector barrier before TAA"
-elif ! grep -q 'vk_entity_note_motion_reliability' "$PROJECT_ROOT/renderers/vulkan/vk_view_state.c" 2>/dev/null; then
+elif ! grep -q 'vk_motion_resolve_entity' "$PROJECT_ROOT/renderers/vulkan/vk_view_state.c" 2>/dev/null || \
+     ! grep -q 'vk_motion_invalid_reason_name' "$PROJECT_ROOT/renderers/vulkan/vk_view_state.c" 2>/dev/null; then
   fail "vk_view_state.c missing per-entity motion reliability notes"
 else
   pass "TAA uses per-frame history confidence; per-entity motion policy wired"
@@ -354,7 +356,8 @@ elif ! test -f "$PROJECT_ROOT/config/gfx_safe.cfg"; then
 elif ! grep -q 'vk_get_render_target_width' "$PROJECT_ROOT/renderers/vulkan/vk_post_aa.c" 2>/dev/null; then
   fail "vk_post_aa.c must size SMAA from render target extent"
 elif ! grep -q 'RF_FIRST_PERSON' "$PROJECT_ROOT/renderers/vulkan/vk_view_state.c" 2>/dev/null || \
-     ! awk '/vk_entity_poison_global_motion/,/^}/' "$PROJECT_ROOT/renderers/vulkan/vk_view_state.c" | grep -q 'return qfalse'; then
+     ! grep -q 'VK_MOTION_INVALID_FIRST_PERSON' "$PROJECT_ROOT/renderers/vulkan/vk_view_state.c" 2>/dev/null || \
+     ! grep -q 'weaponMatricesHavePrev' "$PROJECT_ROOT/renderers/vulkan/vk_view_state.c" 2>/dev/null; then
   fail "RF_FIRST_PERSON must not poison whole-frame temporal motion"
 elif ! grep -q 'RGBToYCoCg\|YCoCg' "$TAA_FRAG" 2>/dev/null; then
   fail "taa.frag missing YCoCg variance clip path"
@@ -382,6 +385,33 @@ elif ! grep -q 'vk_can_use_2d_overlay_path' "$PROJECT_ROOT/renderers/vulkan/vk_2
   fail "vk_2d_transition.c missing menu-safe overlay gating"
 else
   pass "HUD/menu UI overlay survives post AA/TAA and composites after gamma"
+fi
+
+echo ""
+echo "Renderer debug views lifecycle:"
+DBG_VIEWS="$PROJECT_ROOT/renderers/vulkan/vk_debug_views.c"
+if ! test -f "$DBG_VIEWS"; then
+  fail "missing renderers/vulkan/vk_debug_views.c"
+elif ! grep -q 'vk_debug_views.c' "$PROJECT_ROOT/cmake/renderers/VulkanCoreSources.cmake" 2>/dev/null; then
+  fail "vk_debug_views.c must be documented in Vulkan core source manifest"
+elif ! grep -q '#include "vk_debug_views.h"' "$TR_INIT_VK" 2>/dev/null || \
+     ! grep -q 'vk_debug_views_init' "$TR_INIT_VK" 2>/dev/null || \
+     ! grep -q 'vk_debug_views_shutdown' "$TR_INIT_VK" 2>/dev/null; then
+  fail "debug views must be initialized and shut down with renderer lifecycle"
+elif ! grep -q '#include "vk_debug_views.h"' "$PROJECT_ROOT/renderers/vulkan/vk_frame_submit.c" 2>/dev/null || \
+     ! grep -q 'vk_debug_views_begin_frame' "$PROJECT_ROOT/renderers/vulkan/vk_frame_submit.c" 2>/dev/null; then
+  fail "debug views must update once per Vulkan frame"
+elif ! grep -q 'ri.Cmd_AddCommand( "debug_view"' "$DBG_VIEWS" 2>/dev/null || \
+     ! grep -q 'ri.Cmd_RemoveCommand( "debug_view"' "$DBG_VIEWS" 2>/dev/null; then
+  fail "debug_view command must have balanced add/remove lifecycle"
+elif grep -q 'TODO: Implement debug view pass recording\|TODO: Return the appropriate image view' "$DBG_VIEWS" 2>/dev/null; then
+  fail "debug views must not ship TODO-only pass/image hooks"
+elif ! grep -q 'vk.depth_image_view_sample' "$DBG_VIEWS" 2>/dev/null || \
+     ! grep -q 'vk.reactive_mask_view' "$DBG_VIEWS" 2>/dev/null || \
+     ! grep -q 'vk.taa_history_image_view' "$DBG_VIEWS" 2>/dev/null; then
+  fail "debug views must resolve real renderer image views"
+else
+  pass "debug views lifecycle, command API, and image-view routing wired"
 fi
 
 echo ""
@@ -427,6 +457,14 @@ elif ! grep -q 'vk_deferred_unlit_base_wanted' "$DGB_C" 2>/dev/null; then
   fail "vk_deferred_gbuffer.c missing vk_deferred_unlit_base_wanted"
 elif ! grep -q 'pc.additive\|additive' "$PROJECT_ROOT/renderers/vulkan/shaders/glsl/deferred_lighting_common.glsl" 2>/dev/null; then
   fail "deferred_lighting_common.glsl missing additive composite path"
+elif ! grep -q 'matClass == CLASS_TRANSMISSION' "$PROJECT_ROOT/renderers/vulkan/shaders/glsl/deferred_lighting_common.glsl" 2>/dev/null || \
+     ! grep -q 'Transmission/refraction stay Forward+ owned' "$PROJECT_ROOT/renderers/vulkan/shaders/glsl/deferred_lighting_common.glsl" 2>/dev/null; then
+  fail "deferred lighting must skip transmission-class pixels and leave them Forward+ owned"
+elif ! grep -q 'lightmapMode' "$PROJECT_ROOT/renderers/vulkan/shaders/glsl/deferred_lighting.comp" 2>/dev/null || \
+     ! grep -q 'lightmapMode' "$DGB_C" 2>/dev/null || \
+     ! grep -q 'lightmapMode' "$PROJECT_ROOT/renderers/vulkan/vk_vrcs.c" 2>/dev/null || \
+     ! grep -q 'DeferredStaticDiffuseFromDeluxeApprox' "$PROJECT_ROOT/renderers/vulkan/shaders/glsl/lightmap_decode.glsl" 2>/dev/null; then
+  fail "deferred deluxe lightmap mode must be threaded through standard + VRCS compute paths"
 elif ! grep -q 'r_deferredLightingStrength = ri.Cvar_Get' "$TR_INIT_VK" 2>/dev/null; then
   fail "tr_init.c missing r_deferredLightingStrength cvar"
 elif ! grep -q 'vk_deferred_unlit_base_wanted' "$PROJECT_ROOT/renderers/vulkan/tr_shade.c" 2>/dev/null; then
@@ -541,7 +579,8 @@ elif ! grep -q 'rayQueryInitializeEXT' "$AV_GLSL/av_rtao.comp" 2>/dev/null; then
 elif ! grep -q 'historyGeo' "$AV_GLSL/av_temporal.comp" 2>/dev/null || \
      ! grep -q 'motionTex' "$AV_GLSL/av_temporal.comp" 2>/dev/null; then
   fail "Ambient Visibility temporal pass missing dedicated geometry/motion history"
-elif ! grep -q 'CLASS_TRANSMISSION=3' "$AV_GLSL/av_composite.comp" 2>/dev/null; then
+elif ! grep -Eq 'CLASS_TRANSMISSION[[:space:]]*=[[:space:]]*3u' "$AV_GLSL/av_composite.comp" 2>/dev/null || \
+     ! grep -Eq 'CLASS_EMISSIVE[[:space:]]*=[[:space:]]*4u' "$AV_GLSL/av_composite.comp" 2>/dev/null; then
   fail "Ambient Visibility composite missing transmission/emissive exclusion policy"
 elif ! grep -q 'vk_ambient_visibility_view' "$PROJECT_ROOT/renderers/vulkan/extensions/rtx/vk_rcgi.c" 2>/dev/null || \
      ! grep -q 'vk_ambient_visibility_view' "$PROJECT_ROOT/renderers/vulkan/extensions/rtx/vk_surfel_gi.c" 2>/dev/null; then
@@ -771,7 +810,8 @@ elif ! grep -q 'r_temporalWeaponAfterTaa' "$PROJECT_ROOT/renderers/vulkan/vk_aa_
   fail "vk_aa_policy.c missing r_temporalWeaponAfterTaa registration"
 elif ! grep -q 'stochMode >= 2 && !vk_temporal_reconstruction_wanted' "$PROJECT_ROOT/renderers/vulkan/vk_view_state.c" 2>/dev/null; then
   fail "vk_view_state.c missing stochastic mode-2 fallback when TAA off"
-elif ! grep -qE 'reactive > 0\.(82|90)' "$TAA_FRAG" 2>/dev/null; then
+elif ! grep -q 'reactiveHard = adaptive ? 0.65 : 0.82' "$TAA_FRAG" 2>/dev/null || \
+     ! grep -q 'reactive > reactiveHard' "$TAA_FRAG" 2>/dev/null; then
   fail "taa.frag missing hard reactive history reject"
 else
 	pass "Weapon-after-TAA + stochastic TAA-off fallback + reactive hard reject"
@@ -784,6 +824,7 @@ OIT_PASS="$PROJECT_ROOT/renderers/vulkan/vk_postfx_passes.c"
 VK_VOL_INT="$PROJECT_ROOT/renderers/vulkan/vk_volumetric_internal.c"
 VK_TEMP="$PROJECT_ROOT/renderers/vulkan/vk_temporal.c"
 VK_DESC="$PROJECT_ROOT/renderers/vulkan/vk_descriptor_sets.c"
+OIT_WEIGHT="$PROJECT_ROOT/renderers/vulkan/shaders/glsl/oit_weight.glsl"
 if ! grep -q 'texelFetch( oitAccumTex' "$OIT_RESOLVE" 2>/dev/null; then
   fail "oit_resolve.frag must texelFetch OIT buffers (not LINEAR textureLod)"
 elif ! grep -q 'vk_oit_barrier_targets_for_sampling' "$OIT_PASS" 2>/dev/null; then
@@ -796,15 +837,18 @@ elif ! grep -q 'Commit previous-frame matrices once at frame end' "$VK_TEMP" 2>/
   fail "vk_temporal_commit_frame_state must own prev matrix commit"
 elif ! grep -q 'vk_temporal_capture_world_viewparms' "$VK_TEMP" 2>/dev/null; then
   fail "world viewparms must be snapshotted before weapon flush for prev-matrix commit"
-elif ! grep -q 'clamp( base.a, 0.0, 0.999 )' "$PROJECT_ROOT/renderers/vulkan/shaders/glsl/oit_accum.frag" 2>/dev/null; then
-  fail "WBOIT accum must clamp alpha like MBOIT"
-elif ! grep -q 'zTrad = clamp( 1.0 - DEPTH_TO_WEIGHT' "$PROJECT_ROOT/renderers/vulkan/shaders/glsl/oit_accum.frag" 2>/dev/null; then
+elif ! grep -Eq 'clamp\([[:space:]]*(base\.a|samp\.opacity)[[:space:]]*,[[:space:]]*0\.0[[:space:]]*,[[:space:]]*0\.999[[:space:]]*\)' "$PROJECT_ROOT/renderers/vulkan/shaders/glsl/oit_accum.frag" 2>/dev/null; then
+  fail "WBOIT accum must clamp normalized opacity like MBOIT"
+elif ! grep -q 'Depth_ViewDepthToTraditional01' "$OIT_WEIGHT" 2>/dev/null; then
   fail "WBOIT must adapt McGuire weight for reversed-Z (zTrad)"
-elif ! grep -q 'clamp( aFactor \* 1e8 \* zFactor, 1e-2, 3e3 )' "$PROJECT_ROOT/renderers/vulkan/shaders/glsl/oit_accum.frag" 2>/dev/null; then
+elif ! grep -q 'clamp( aFactor \* OIT_W_LUMA_SCALE \* zFactor, OIT_W_MIN, OIT_W_MAX )' "$OIT_WEIGHT" 2>/dev/null || \
+     ! grep -q 'OIT_W_MIN = 1e-2' "$OIT_WEIGHT" 2>/dev/null || \
+     ! grep -q 'OIT_W_MAX = 3e3' "$OIT_WEIGHT" 2>/dev/null; then
   fail "WBOIT weight must clamp [1e-2, 3e3] to prevent fp16 underflow stipple"
 elif ! grep -q 'coverage < 1e-4' "$PROJECT_ROOT/renderers/vulkan/shaders/glsl/oit_resolve.frag" 2>/dev/null; then
   fail "OIT resolve must skip tiny coverage (underflow stipple guard)"
-elif ! grep -q 'Stamp after resolve' "$PROJECT_ROOT/renderers/vulkan/vk_postfx_passes.c" 2>/dev/null; then
+elif ! grep -q 'Stamp once after final bucket resolve' "$PROJECT_ROOT/renderers/vulkan/vk_postfx_passes.c" 2>/dev/null || \
+     ! awk '/vk_begin_render_pass_tracked\( vk.render_pass.oit_resolve/,/vk_reactive_mask_stamp_from_reveal/' "$PROJECT_ROOT/renderers/vulkan/vk_postfx_passes.c" | grep -q 'vk_reactive_mask_stamp_from_reveal'; then
   fail "reactive stamp must run after OIT resolve (not between accum and composite)"
 elif grep -q 'Com_Memcpy( vk_prev_viewproj_matrix, params.viewProj' "$PROJECT_ROOT/renderers/vulkan/vk_volumetric_params.c" 2>/dev/null; then
   fail "volumetric must not overwrite shared prev matrices mid-frame"
@@ -1001,27 +1045,36 @@ else
 fi
 
 echo ""
-echo "Forward+ tile cull: MAX_PER_TILE vs VK_FP_MAX_PER_TILE (tile SSBO stride):"
+echo "Forward+ tile cull: MAX_LEGACY_PER_TILE vs VK_FP_MAX_PER_TILE (legacy tile SSBO stride):"
 FP_C="$PROJECT_ROOT/renderers/vulkan/vk_forward_plus.c"
-max_tile_sh="$(sed -n 's/^#define MAX_PER_TILE[[:space:]]*\([0-9][0-9]*\).*$/\1/p' "$FP_COMP" | head -1)"
-max_tile_c="$(sed -n 's/^#define VK_FP_MAX_PER_TILE[[:space:]]*\([0-9][0-9]*\).*$/\1/p' "$FP_C" | head -1)"
-if [[ -z "$max_tile_sh" || -z "$max_tile_c" ]]; then
-  fail "could not parse MAX_PER_TILE from forward_plus_tile_cull.comp or VK_FP_MAX_PER_TILE from vk_forward_plus.c"
-elif [[ "$max_tile_sh" != "$max_tile_c" ]]; then
-  fail "MAX_PER_TILE ($max_tile_sh) != VK_FP_MAX_PER_TILE ($max_tile_c) - compute vs host tile layout disagree"
+legacy_tile_sh="$(sed -n 's/^#define MAX_LEGACY_PER_TILE[[:space:]]*\([0-9][0-9]*\)u*.*$/\1/p' "$FP_COMP" | head -1)"
+compact_tile_sh="$(sed -n 's/^#define MAX_COMPACT_PER_TILE[[:space:]]*\([0-9][0-9]*\)u*.*$/\1/p' "$FP_COMP" | head -1)"
+max_tile_c="$(sed -n 's/^#define VK_FP_MAX_PER_TILE[[:space:]]*\([0-9][0-9]*\)u*.*$/\1/p' "$FP_C" | head -1)"
+max_compact_c="$(sed -n 's/^#define VK_FP_MAX_COMPACT_PER_CLUSTER[[:space:]]*\([0-9][0-9]*\)u*.*$/\1/p' "$FP_C" | head -1)"
+if [[ -z "$legacy_tile_sh" || -z "$max_tile_c" ]]; then
+  fail "could not parse MAX_LEGACY_PER_TILE from forward_plus_tile_cull.comp or VK_FP_MAX_PER_TILE from vk_forward_plus.c"
+elif [[ "$legacy_tile_sh" != "$max_tile_c" ]]; then
+  fail "MAX_LEGACY_PER_TILE ($legacy_tile_sh) != VK_FP_MAX_PER_TILE ($max_tile_c) - compute vs host legacy tile layout disagree"
 else
-  pass "MAX_PER_TILE=$max_tile_sh matches VK_FP_MAX_PER_TILE"
+  pass "MAX_LEGACY_PER_TILE=$legacy_tile_sh matches VK_FP_MAX_PER_TILE"
+fi
+if [[ -z "$compact_tile_sh" || -z "$max_compact_c" ]]; then
+  fail "could not parse MAX_COMPACT_PER_TILE from forward_plus_tile_cull.comp or VK_FP_MAX_COMPACT_PER_CLUSTER from vk_forward_plus.c"
+elif [[ "$compact_tile_sh" != "$max_compact_c" ]]; then
+  fail "MAX_COMPACT_PER_TILE ($compact_tile_sh) != VK_FP_MAX_COMPACT_PER_CLUSTER ($max_compact_c) - compact cluster layout disagree"
+else
+  pass "MAX_COMPACT_PER_TILE=$compact_tile_sh matches VK_FP_MAX_COMPACT_PER_CLUSTER"
 fi
 
 echo ""
-echo "Forward+ tile cap: VK_FP_MIN_PER_TILE vs MAX_PER_TILE (shader slot layout):"
-min_tile_c="$(sed -n 's/^#define VK_FP_MIN_PER_TILE[[:space:]]*\([0-9][0-9]*\).*$/\1/p' "$FP_C" | head -1)"
-if [[ -z "$min_tile_c" || -z "$max_tile_sh" ]]; then
-  fail "could not parse VK_FP_MIN_PER_TILE from vk_forward_plus.c or MAX_PER_TILE from forward_plus_tile_cull.comp"
-elif [[ "$min_tile_c" -gt "$max_tile_sh" ]]; then
-  fail "VK_FP_MIN_PER_TILE ($min_tile_c) > MAX_PER_TILE ($max_tile_sh) - r_forwardPlusMaxPerTile range would be empty"
+echo "Forward+ tile cap: VK_FP_MIN_PER_TILE vs MAX_LEGACY_PER_TILE (shader slot layout):"
+min_tile_c="$(sed -n 's/^#define VK_FP_MIN_PER_TILE[[:space:]]*\([0-9][0-9]*\)u*.*$/\1/p' "$FP_C" | head -1)"
+if [[ -z "$min_tile_c" || -z "$legacy_tile_sh" ]]; then
+  fail "could not parse VK_FP_MIN_PER_TILE from vk_forward_plus.c or MAX_LEGACY_PER_TILE from forward_plus_tile_cull.comp"
+elif [[ "$min_tile_c" -gt "$legacy_tile_sh" ]]; then
+  fail "VK_FP_MIN_PER_TILE ($min_tile_c) > MAX_LEGACY_PER_TILE ($legacy_tile_sh) - r_forwardPlusMaxPerTile range would be empty"
 else
-  pass "VK_FP_MIN_PER_TILE=$min_tile_c <= MAX_PER_TILE=$max_tile_sh"
+  pass "VK_FP_MIN_PER_TILE=$min_tile_c <= MAX_LEGACY_PER_TILE=$legacy_tile_sh"
 fi
 
 echo ""
@@ -1058,16 +1111,17 @@ else
 fi
 
 echo ""
-echo "Forward+ PBR fragment: tile SSBO stride (tileId * N) matches MAX_PER_TILE:"
-fp_stride="$(grep -E 'tileId \* [0-9]+u' "$GEN_FRAG" 2>/dev/null | sed -n 's/.*tileId \* \([0-9][0-9]*\)u.*/\1/p' | head -1)"
-if [[ -z "$fp_stride" ]]; then
-  fail "gen_frag.tmpl: expected tileId * <N>u for Forward+ tile base (fp_tiles stride)"
-elif [[ -z "$max_tile_sh" ]]; then
-  fail "could not re-use MAX_PER_TILE from forward_plus_tile_cull.comp for gen_frag stride check"
-elif [[ "$fp_stride" != "$max_tile_sh" ]]; then
-  fail "gen_frag.tmpl tile stride uses * ${fp_stride}u but MAX_PER_TILE=$max_tile_sh - tile SSBO layout vs fragment disagree"
+echo "Forward+ PBR fragment: legacy tile SSBO stride goes through shared cluster helper:"
+FP_CLUSTER_HELPER="$PROJECT_ROOT/renderers/vulkan/shaders/glsl/cluster_light_list.glsl"
+if ! grep -q 'Cluster_FetchLightIndex' "$GEN_FRAG" 2>/dev/null || \
+   ! grep -q 'Cluster_FetchLightIndex' "$PROJECT_ROOT/renderers/vulkan/shaders/glsl/forward_plus_light_eval.glsl" 2>/dev/null; then
+ fail "Forward+ fragment paths must fetch light indices through Cluster_FetchLightIndex"
+elif [[ -z "$legacy_tile_sh" ]]; then
+  fail "could not re-use MAX_LEGACY_PER_TILE from forward_plus_tile_cull.comp for cluster helper stride check"
+elif ! grep -qE '(tileId|clusterId)[[:space:]]*\*[[:space:]]*(legacyMax|maxPerLegacy)' "$FP_CLUSTER_HELPER" 2>/dev/null; then
+  fail "Cluster_FetchLightIndex must use tileId * legacyMax for legacy tile SSBO layout"
 else
-  pass "gen_frag.tmpl tile stride * ${fp_stride}u matches MAX_PER_TILE"
+  pass "Forward+ fragment paths use Cluster_FetchLightIndex legacyMax stride (MAX_LEGACY_PER_TILE=$legacy_tile_sh)"
 fi
 
 echo ""

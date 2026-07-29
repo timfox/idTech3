@@ -8,7 +8,6 @@ Debug View System for SceneHDR/Depth/Composite Investigation
 #include "vk.h"
 #include "vk_debug_views.h"
 
-// Debug view cvars
 cvar_t *r_debugDepth;
 cvar_t *r_debugSkyMask;
 cvar_t *r_debugSceneHDR;
@@ -25,13 +24,11 @@ cvar_t *r_debugTemporalResolved;
 cvar_t *r_debugPreTonemapHDR;
 cvar_t *r_debugFinalLDR;
 
-// Debug view state
 static vkDebugViewState_t s_debugViewState;
 
-// Console command to show current debug view state
-static void VK_DebugViews_Status_f( void )
+static const char *VK_DebugViews_ModeName( vkDebugViewMode_t mode )
 {
-    const char *modeNames[] = {
+    static const char *modeNames[] = {
         "NONE",
         "DEPTH",
         "SKY_MASK",
@@ -50,11 +47,49 @@ static void VK_DebugViews_Status_f( void )
         "FINAL_LDR"
     };
 
+    return ( mode >= DEBUG_VIEW_NONE && mode < DEBUG_VIEW_COUNT ) ? modeNames[mode] : "UNKNOWN";
+}
+
+static cvar_t *VK_DebugViews_CvarForMode( vkDebugViewMode_t mode )
+{
+    switch ( mode ) {
+    case DEBUG_VIEW_DEPTH: return r_debugDepth;
+    case DEBUG_VIEW_SKY_MASK: return r_debugSkyMask;
+    case DEBUG_VIEW_SCENEHDR_RAW: return r_debugSceneHDR;
+    case DEBUG_VIEW_SCENEHDR_SKY: return r_debugSceneHDR_Sky;
+    case DEBUG_VIEW_SCENEHDR_PARTICLES: return r_debugSceneHDR_Particles;
+    case DEBUG_VIEW_SCENEHDR_OIT: return r_debugSceneHDR_OIT;
+    case DEBUG_VIEW_FOG_RADIANCE: return r_debugFogRadiance;
+    case DEBUG_VIEW_FOG_TRANSMITTANCE: return r_debugFogTransmittance;
+    case DEBUG_VIEW_TEMPORAL_INPUT: return r_debugTemporalInput;
+    case DEBUG_VIEW_HISTORY_COLOR: return r_debugHistoryColor;
+    case DEBUG_VIEW_PREVIOUS_DEPTH: return r_debugPreviousDepth;
+    case DEBUG_VIEW_REACTIVE_MASK: return r_debugReactiveMask;
+    case DEBUG_VIEW_TEMPORAL_RESOLVED: return r_debugTemporalResolved;
+    case DEBUG_VIEW_PRE_TONEMAP_HDR: return r_debugPreTonemapHDR;
+    case DEBUG_VIEW_FINAL_LDR: return r_debugFinalLDR;
+    default: return NULL;
+    }
+}
+
+static void VK_DebugViews_ClearCvars( void )
+{
+    vkDebugViewMode_t mode;
+
+    for ( mode = DEBUG_VIEW_DEPTH; mode < DEBUG_VIEW_COUNT; mode++ ) {
+        cvar_t *cv = VK_DebugViews_CvarForMode( mode );
+        if ( cv ) {
+            ri.Cvar_Set( cv->name, "0" );
+        }
+    }
+}
+
+static void VK_DebugViews_Status_f( void )
+{
     ri.Printf( PRINT_ALL, "======== Debug View Status ========\n" );
-    ri.Printf( PRINT_ALL, "Current mode: %s\n", 
-               s_debugViewState.currentMode < DEBUG_VIEW_COUNT ? 
-               modeNames[s_debugViewState.currentMode] : "UNKNOWN" );
+    ri.Printf( PRINT_ALL, "Current mode: %s\n", VK_DebugViews_ModeName( s_debugViewState.currentMode ) );
     ri.Printf( PRINT_ALL, "Enabled: %s\n", s_debugViewState.enabled ? "yes" : "no" );
+    ri.Printf( PRINT_ALL, "Image view: %s\n", vk_debug_views_get_image_view() != VK_NULL_HANDLE ? "ready" : "unavailable" );
     
     ri.Printf( PRINT_ALL, "\nDebug View Cvars:\n" );
     ri.Printf( PRINT_ALL, "  r_debugDepth: %d\n", r_debugDepth ? r_debugDepth->integer : 0 );
@@ -74,10 +109,39 @@ static void VK_DebugViews_Status_f( void )
     ri.Printf( PRINT_ALL, "  r_debugFinalLDR: %d\n", r_debugFinalLDR ? r_debugFinalLDR->integer : 0 );
 }
 
-// Initialize debug view system
+static void VK_DebugViews_Set_f( void )
+{
+    int mode;
+    cvar_t *cv;
+
+    if ( ri.Cmd_Argc() < 2 ) {
+        ri.Printf( PRINT_ALL, "usage: debug_view <0-%d|off>\n", DEBUG_VIEW_COUNT - 1 );
+        VK_DebugViews_Status_f();
+        return;
+    }
+
+    if ( !Q_stricmp( ri.Cmd_Argv( 1 ), "off" ) ) {
+        mode = DEBUG_VIEW_NONE;
+    } else {
+        mode = atoi( ri.Cmd_Argv( 1 ) );
+    }
+
+    if ( mode < DEBUG_VIEW_NONE || mode >= DEBUG_VIEW_COUNT ) {
+        ri.Printf( PRINT_WARNING, "debug_view: invalid mode %d\n", mode );
+        return;
+    }
+
+    VK_DebugViews_ClearCvars();
+    cv = VK_DebugViews_CvarForMode( (vkDebugViewMode_t)mode );
+    if ( cv ) {
+        ri.Cvar_Set( cv->name, "1" );
+    }
+    vk_debug_views_set_mode( (vkDebugViewMode_t)mode );
+    ri.Printf( PRINT_ALL, "debug_view: %s\n", VK_DebugViews_ModeName( s_debugViewState.currentMode ) );
+}
+
 void vk_debug_views_init( void )
 {
-    // Initialize debug view cvars
     r_debugDepth = ri.Cvar_Get( "r_debugDepth", "0", CVAR_CHEAT );
     ri.Cvar_CheckRange( r_debugDepth, "0", "1", CV_INTEGER );
     ri.Cvar_SetDescription( r_debugDepth, "Debug view: depth buffer" );
@@ -153,10 +217,9 @@ void vk_debug_views_init( void )
     ri.Cvar_SetDescription( r_debugFinalLDR, "Debug view: final LDR" );
     ri.Cvar_SetGroup( r_debugFinalLDR, CVG_RENDERER );
 
-    // Register console command
     ri.Cmd_AddCommand( "debug_views_status", VK_DebugViews_Status_f );
+    ri.Cmd_AddCommand( "debug_view", VK_DebugViews_Set_f );
 
-    // Initialize debug view state
     s_debugViewState.currentMode = DEBUG_VIEW_NONE;
     s_debugViewState.enabled = qfalse;
     s_debugViewState.debugView = VK_NULL_HANDLE;
@@ -166,10 +229,11 @@ void vk_debug_views_init( void )
     ri.Printf( PRINT_ALL, "[VK][debug] Debug view system initialized\n" );
 }
 
-// Shutdown debug view system
 void vk_debug_views_shutdown( void )
 {
-    // Clear debug view state
+    ri.Cmd_RemoveCommand( "debug_view" );
+    ri.Cmd_RemoveCommand( "debug_views_status" );
+
     s_debugViewState.currentMode = DEBUG_VIEW_NONE;
     s_debugViewState.enabled = qfalse;
     s_debugViewState.debugView = VK_NULL_HANDLE;
@@ -179,10 +243,8 @@ void vk_debug_views_shutdown( void )
     ri.Printf( PRINT_ALL, "[VK][debug] Debug view system shutdown\n" );
 }
 
-// Begin frame for debug views
 void vk_debug_views_begin_frame( void )
 {
-    // Check which debug view is enabled and set the mode
     if ( r_debugDepth && r_debugDepth->integer ) {
         s_debugViewState.currentMode = DEBUG_VIEW_DEPTH;
         s_debugViewState.enabled = qtrue;
@@ -232,28 +294,26 @@ void vk_debug_views_begin_frame( void )
         s_debugViewState.currentMode = DEBUG_VIEW_NONE;
         s_debugViewState.enabled = qfalse;
     }
+
+    s_debugViewState.debugView = vk_debug_views_get_image_view();
 }
 
-// Record debug view pass
 void vk_debug_views_record_pass( void )
 {
     if ( !s_debugViewState.enabled || s_debugViewState.currentMode == DEBUG_VIEW_NONE ) {
         return;
     }
 
-    // TODO: Implement debug view pass recording
-    // This will depend on the specific debug view mode
-    // For now, we'll just log the current mode
-    ri.Printf( PRINT_DEVELOPER, "[VK][debug] Recording debug view pass: %d\n", s_debugViewState.currentMode );
+    ri.Printf( PRINT_DEVELOPER, "[VK][debug] active debug view: %s (%s)\n",
+        VK_DebugViews_ModeName( s_debugViewState.currentMode ),
+        s_debugViewState.debugView != VK_NULL_HANDLE ? "image-ready" : "image-unavailable" );
 }
 
-// Get current debug view mode
 vkDebugViewMode_t vk_debug_views_get_mode( void )
 {
     return s_debugViewState.currentMode;
 }
 
-// Set debug view mode
 void vk_debug_views_set_mode( vkDebugViewMode_t mode )
 {
     if ( mode < DEBUG_VIEW_COUNT ) {
@@ -262,16 +322,43 @@ void vk_debug_views_set_mode( vkDebugViewMode_t mode )
     }
 }
 
-// Check if debug view is enabled
 qboolean vk_debug_views_is_enabled( void )
 {
     return s_debugViewState.enabled;
 }
 
-// Get debug view image view
 VkImageView vk_debug_views_get_image_view( void )
 {
-    // TODO: Return the appropriate image view based on current debug mode
-    // This will be implemented when we have the actual debug view implementations
-    return VK_NULL_HANDLE;
+    const uint32_t historyIndex = vk.temporal.taaHistoryIndex & 1u;
+    const uint32_t prevHistoryIndex = ( historyIndex ^ 1u ) & 1u;
+    const uint32_t prevDepthIndex = vk.temporal.prevDepthIndex & 1u;
+
+    switch ( s_debugViewState.currentMode ) {
+    case DEBUG_VIEW_DEPTH:
+    case DEBUG_VIEW_SKY_MASK:
+        return vk.depth_image_view_sample ? vk.depth_image_view_sample : vk.depth_image_view;
+    case DEBUG_VIEW_SCENEHDR_RAW:
+    case DEBUG_VIEW_SCENEHDR_SKY:
+    case DEBUG_VIEW_SCENEHDR_PARTICLES:
+    case DEBUG_VIEW_SCENEHDR_OIT:
+    case DEBUG_VIEW_TEMPORAL_INPUT:
+    case DEBUG_VIEW_PRE_TONEMAP_HDR:
+        return vk.scene_post_fog_color_source ? vk.scene_post_fog_color_source : vk.color_image_view;
+    case DEBUG_VIEW_FOG_RADIANCE:
+    case DEBUG_VIEW_FOG_TRANSMITTANCE:
+        return vk.fog_scene_image_view ? vk.fog_scene_image_view : vk.color_image_view;
+    case DEBUG_VIEW_HISTORY_COLOR:
+        return vk.taa_history_image_view[prevHistoryIndex] ? vk.taa_history_image_view[prevHistoryIndex] :
+            vk.taa_history_image_view[historyIndex];
+    case DEBUG_VIEW_PREVIOUS_DEPTH:
+        return vk.temporal_prev_depth_view[prevDepthIndex];
+    case DEBUG_VIEW_REACTIVE_MASK:
+        return vk.reactive_mask_view ? vk.reactive_mask_view : vk.reactive_mask_stub_view;
+    case DEBUG_VIEW_TEMPORAL_RESOLVED:
+        return vk.taa_history_image_view[historyIndex] ? vk.taa_history_image_view[historyIndex] : vk.color_image_view;
+    case DEBUG_VIEW_FINAL_LDR:
+        return vk.post_fog_color_source ? vk.post_fog_color_source : vk.color_image_view;
+    default:
+        return VK_NULL_HANDLE;
+    }
 }

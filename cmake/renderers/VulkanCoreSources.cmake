@@ -13,6 +13,7 @@ set(VK_CORE_RENDERER_PATTERNS
 	vk_visibility_buffer.c
 	vk_forward_plus.c
 	vk_temporal.c
+	vk_debug_views.c
 	vk_vector_font.c
 	vk_nanovdb_decode.c
 	tr_font

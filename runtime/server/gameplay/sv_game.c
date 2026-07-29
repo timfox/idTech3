@@ -712,6 +712,12 @@ static qboolean SV_GetValue( char* value, int valueSize, const char* key )
 		return qtrue;
 	}
 
+	if ( !Q_stricmp( key, "trap_RTS_SelectRect" ) )
+	{
+		Com_sprintf( value, valueSize, "%i", G_RTS_SELECT_RECT );
+		return qtrue;
+	}
+
 	if ( !Q_stricmp( key, "trap_RTS_ComputeStateHash" ) )
 	{
 		Com_sprintf( value, valueSize, "%i", G_RTS_COMPUTE_STATE_HASH );
@@ -1668,6 +1674,10 @@ static intptr_t SV_GameSystemCalls( intptr_t *args ) {
 
 	case G_RTS_GET_PLAYER_RESOURCES:
 		return RTS_GetPlayerResources( args[1] );
+
+	case G_RTS_SELECT_RECT:
+		return RTS_SelectRect( args[1], args[2], args[3], args[4], args[5],
+				(rtsEntityId_t *)VMA( 6 ), args[7] );
 
 	case G_RTS_COMPUTE_STATE_HASH:
 		return (intptr_t)RTS_ComputeStateHash();

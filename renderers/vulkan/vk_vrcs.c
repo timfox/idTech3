@@ -86,6 +86,8 @@ typedef struct {
 	uint32_t mixedMaterial;
 	float sunDir[4];
 	float sunRadiance[4];
+	uint32_t lightmapMode;
+	float lightmapDeluxeStrength;
 } vrcs_light_push_t;
 
 typedef struct {
@@ -675,6 +677,8 @@ static void VRCS_FillLightPush( vrcs_light_push_t *push, uint32_t width, uint32_
 	push->clusterCount = vk.forward_plus.tile_capacity_tiles;
 	push->gbufferCompact = ( r_gbufferCompact && r_gbufferCompact->integer ) ? 1u : 0u;
 	push->mixedMaterial = R_DeferredMixedMaterialWanted() ? 1u : 0u;
+	push->lightmapMode = ( r_deferredLightmapMode ) ? (uint32_t)Com_Clamp( 0.0f, 2.0f, (float)r_deferredLightmapMode->integer ) : 0u;
+	push->lightmapDeluxeStrength = ( push->lightmapMode != 0u ) ? 1.0f : 0.0f;
 	{
 		vec3_t sunL;
 		float len;

@@ -37,6 +37,7 @@ typedef struct {
 	uint32_t observedCount;
 	uint32_t compiledCount;
 	uint32_t dependencyCount;
+	uint32_t frameViolationCount;
 	uint32_t violationCount;
 	qboolean imported[VK_SPINE_RES_COUNT];
 	vkRenderGraphNode nodes[VK_SPINE_PASS_COUNT];
@@ -72,6 +73,47 @@ static qboolean vk_rg_access_reads( uint32_t access )
 		VK_SPINE_ACCESS_HISTORY_READ ) ) != 0u ? qtrue : qfalse;
 }
 
+static const char *vk_rg_access_name( uint32_t access )
+{
+	if ( access & VK_SPINE_ACCESS_INDIRECT_READ ) {
+		return "indirect-read";
+	}
+	if ( access & VK_SPINE_ACCESS_STORAGE_READ ) {
+		return "storage-read";
+	}
+	if ( access & VK_SPINE_ACCESS_SAMPLED_READ ) {
+		return "sampled-read";
+	}
+	if ( access & VK_SPINE_ACCESS_DEPTH_READ ) {
+		return "depth-read";
+	}
+	if ( access & VK_SPINE_ACCESS_DEPTH_WRITE ) {
+		return "depth-write";
+	}
+	if ( access & VK_SPINE_ACCESS_COLOR_WRITE ) {
+		return "color-write";
+	}
+	if ( access & VK_SPINE_ACCESS_STORAGE_WRITE ) {
+		return "storage-write";
+	}
+	if ( access & VK_SPINE_ACCESS_TRANSFER_READ ) {
+		return "transfer-read";
+	}
+	if ( access & VK_SPINE_ACCESS_TRANSFER_WRITE ) {
+		return "transfer-write";
+	}
+	if ( access & VK_SPINE_ACCESS_AS_READ ) {
+		return "as-read";
+	}
+	if ( access & VK_SPINE_ACCESS_HISTORY_READ ) {
+		return "history-read";
+	}
+	if ( access & VK_SPINE_ACCESS_HISTORY_WRITE ) {
+		return "history-write";
+	}
+	return "access";
+}
+
 static void vk_rg_record_error( const char *fmt, ... )
 {
 	va_list ap;
@@ -82,6 +124,7 @@ static void vk_rg_record_error( const char *fmt, ... )
 	va_end( ap );
 
 	s_rg.violationCount++;
+	s_rg.frameViolationCount++;
 	Q_strncpyz( s_rg.lastError, buf, sizeof( s_rg.lastError ) );
 	ri.Printf( PRINT_DEVELOPER, S_COLOR_YELLOW "[VK][render_graph] %s\n", buf );
 }
@@ -97,6 +140,8 @@ static void vk_rg_default_imports( void )
 	vk_render_graph_import_resource( VK_SPINE_RES_SHADOW_SUN );
 	vk_render_graph_import_resource( VK_SPINE_RES_PROBE_GRID );
 	vk_render_graph_import_resource( VK_SPINE_RES_VISIBILITY_CLASS );
+	vk_render_graph_import_resource( VK_SPINE_RES_VIRTUAL_GEOMETRY_MESHLETS );
+	vk_render_graph_import_resource( VK_SPINE_RES_VIRTUAL_GEOMETRY_INDIRECT );
 	vk_render_graph_import_resource( VK_SPINE_RES_AV_FILTERED );
 	vk_render_graph_import_resource( VK_SPINE_RES_SURFEL_HASH );
 	vk_render_graph_import_resource( VK_SPINE_RES_SURFEL_IRRADIANCE );
@@ -135,12 +180,14 @@ void vk_render_graph_init( void )
 	s_rg.initialized = qtrue;
 	if ( ri.Cmd_AddCommand ) {
 		ri.Cmd_AddCommand( "render_graph_status", vk_render_graph_status_f );
+		ri.Cmd_AddCommand( "render_graph_dot", vk_render_graph_dot_f );
 	}
 }
 
 void vk_render_graph_shutdown( void )
 {
 	if ( ri.Cmd_RemoveCommand ) {
+		ri.Cmd_RemoveCommand( "render_graph_dot" );
 		ri.Cmd_RemoveCommand( "render_graph_status" );
 	}
 	Com_Memset( &s_rg, 0, sizeof( s_rg ) );
@@ -202,6 +249,7 @@ void vk_render_graph_begin_frame( void )
 	s_rg.observedCount = 0u;
 	s_rg.compiledCount = 0u;
 	s_rg.dependencyCount = 0u;
+	s_rg.frameViolationCount = 0u;
 	s_rg.lastError[0] = '\0';
 	Com_Memset( s_rg.imported, 0, sizeof( s_rg.imported ) );
 	for ( i = 0; i < VK_SPINE_PASS_COUNT; i++ ) {
@@ -359,17 +407,28 @@ uint32_t vk_render_graph_observed_count( void )
 
 uint32_t vk_render_graph_compiled_count( void )
 {
+	if ( s_rg.initialized && !s_rg.compiled ) {
+		vk_render_graph_compile();
+	}
 	return s_rg.compiledCount;
 }
 
 uint32_t vk_render_graph_dependency_count( void )
 {
+	if ( s_rg.initialized && !s_rg.compiled ) {
+		vk_render_graph_compile();
+	}
 	return s_rg.dependencyCount;
 }
 
 uint32_t vk_render_graph_violation_count( void )
 {
 	return s_rg.violationCount;
+}
+
+uint32_t vk_render_graph_frame_violation_count( void )
+{
+	return s_rg.frameViolationCount;
 }
 
 const char *vk_render_graph_last_error( void )
@@ -382,9 +441,9 @@ void vk_render_graph_status_f( void )
 	uint32_t i;
 
 	vk_render_graph_compile();
-	ri.Printf( PRINT_ALL, "Vulkan render graph: frame=%u observed=%u compiled=%u deps=%u violations=%u%s\n",
+	ri.Printf( PRINT_ALL, "Vulkan render graph: frame=%u observed=%u compiled=%u deps=%u frameViolations=%u totalViolations=%u%s\n",
 		s_rg.frameIndex, s_rg.observedCount, s_rg.compiledCount, s_rg.dependencyCount,
-		s_rg.violationCount, s_rg.cycleDetected ? " cycle=yes" : "" );
+		s_rg.frameViolationCount, s_rg.violationCount, s_rg.cycleDetected ? " cycle=yes" : "" );
 	if ( s_rg.lastError[0] ) {
 		ri.Printf( PRINT_ALL, "  last: %s\n", s_rg.lastError );
 	}
@@ -394,9 +453,31 @@ void vk_render_graph_status_f( void )
 	}
 	ri.Printf( PRINT_ALL, "\n" );
 	for ( i = 0u; i < s_rg.dependencyCount; i++ ) {
-		ri.Printf( PRINT_ALL, "  dep: %s -> %s via %s\n",
+		ri.Printf( PRINT_ALL, "  dep: %s -> %s via %s (%s)\n",
 			vk_spine_pass_name( s_rg.deps[i].from ),
 			vk_spine_pass_name( s_rg.deps[i].to ),
-			vk_spine_resource_name( s_rg.deps[i].resource ) );
+			vk_spine_resource_name( s_rg.deps[i].resource ),
+			vk_rg_access_name( s_rg.deps[i].access ) );
 	}
+}
+
+void vk_render_graph_dot_f( void )
+{
+	uint32_t i;
+
+	vk_render_graph_compile();
+	ri.Printf( PRINT_ALL, "digraph vulkan_render_graph {\n" );
+	ri.Printf( PRINT_ALL, "  rankdir=LR;\n" );
+	ri.Printf( PRINT_ALL, "  node [shape=box,fontname=\"monospace\"];\n" );
+	for ( i = 0u; i < s_rg.compiledCount; i++ ) {
+		ri.Printf( PRINT_ALL, "  \"%s\";\n", vk_spine_pass_name( s_rg.order[i] ) );
+	}
+	for ( i = 0u; i < s_rg.dependencyCount; i++ ) {
+		ri.Printf( PRINT_ALL, "  \"%s\" -> \"%s\" [label=\"%s %s\"];\n",
+			vk_spine_pass_name( s_rg.deps[i].from ),
+			vk_spine_pass_name( s_rg.deps[i].to ),
+			vk_spine_resource_name( s_rg.deps[i].resource ),
+			vk_rg_access_name( s_rg.deps[i].access ) );
+	}
+	ri.Printf( PRINT_ALL, "}\n" );
 }

@@ -100,6 +100,8 @@ typedef struct {
 	float sunRadiance[4]; /* rgb = radiance, w = flags: bit0=BRDF enable, bit1=LM owns diffuse */
 	uint32_t iblFlags;    /* bit0: sky IBL enable */
 	float iblStrength;
+	uint32_t lightmapMode; /* 0=irradiance, 1=deluxe approximation, 2=compare */
+	float lightmapDeluxeStrength;
 } vk_deferred_light_push_t;
 
 typedef struct {
@@ -1595,6 +1597,8 @@ static void vk_dgb_fill_light_push( vk_deferred_light_push_t *push, uint32_t wid
 	push->clusterCount = vk.forward_plus.tile_capacity_tiles;
 	push->gbufferCompact = ( r_gbufferCompact && r_gbufferCompact->integer ) ? 1u : 0u;
 	push->mixedMaterial = R_DeferredMixedMaterialWanted() ? 1u : 0u;
+	push->lightmapMode = ( r_deferredLightmapMode ) ? (uint32_t)Com_Clamp( 0.0f, 2.0f, (float)r_deferredLightmapMode->integer ) : 0u;
+	push->lightmapDeluxeStrength = ( push->lightmapMode != 0u ) ? 1.0f : 0.0f;
 	push->shadowFlags = 0u;
 	push->shadowStrength = 0.0f;
 	push->shadowNear = ( vk.sun_shadow_near > 0.0f ) ? vk.sun_shadow_near : 4.0f;

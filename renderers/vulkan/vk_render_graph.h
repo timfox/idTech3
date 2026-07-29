@@ -33,8 +33,10 @@ void vk_render_graph_end_frame( void );
 uint32_t vk_render_graph_observed_count( void );
 uint32_t vk_render_graph_compiled_count( void );
 uint32_t vk_render_graph_dependency_count( void );
+uint32_t vk_render_graph_frame_violation_count( void );
 uint32_t vk_render_graph_violation_count( void );
 const char *vk_render_graph_last_error( void );
 void vk_render_graph_status_f( void );
+void vk_render_graph_dot_f( void );
 
 #endif /* VK_RENDER_GRAPH_H */

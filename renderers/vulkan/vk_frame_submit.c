@@ -63,6 +63,7 @@ Extracted from vk.c for incremental modularization.
 #include "vk_vrcs.h"
 #include "vk_grtx.h"
 #include "vk_vuda.h"
+#include "vk_debug_views.h"
 
 #ifdef __ANDROID__
 #include "platform/android/android_surface_glue.h"
@@ -457,6 +458,7 @@ void vk_prepare_frame_temporal_state( void )
 	vk_scene_platform_begin_frame();
 	vk_ht_throughput_begin_frame();
 	vk_ht_animation_begin_frame();
+	vk_debug_views_begin_frame();
 	vk_spine_frame_begin();
 	vk_update_postfx_params( vk.cmd_index );
 	vk.temporal.preparedThisFrame = qtrue;

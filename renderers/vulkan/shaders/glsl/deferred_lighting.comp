@@ -76,6 +76,8 @@ layout(push_constant) uniform Push {
 	vec4 sunRadiance; /* rgb = radiance, w = flags (bit0 BRDF, bit1 LM owns diffuse) */
 	uint iblFlags; /* bit0: sky IBL enable */
 	float iblStrength;
+	uint lightmapMode; /* 0=irradiance, 1=deluxe approximation, 2=compare */
+	float lightmapDeluxeStrength;
 } pc;
 
 #define USE_LTC_AREA_LIGHT

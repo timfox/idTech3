@@ -192,6 +192,10 @@ vec4 shadeDeferredPixel( uvec2 pix ) {
 		if ( matClass == CLASS_EMPTY ) {
 			return vec4( 0.0 );
 		}
+		if ( matClass == CLASS_TRANSMISSION ) {
+			/* Transmission/refraction stay Forward+ owned; deferred cannot reconstruct the required layer state. */
+			return vec4( 0.0 );
+		}
 		if ( matClass == CLASS_ALPHA_TEST ) {
 			matClass = CLASS_SIMPLE_OPAQUE;
 		}
@@ -200,9 +204,6 @@ vec4 shadeDeferredPixel( uvec2 pix ) {
 		}
 		if ( matClass == CLASS_LAYERED ) {
 			classSpecScale = 1.12;
-		} else if ( matClass == CLASS_TRANSMISSION ) {
-			classSpecScale = 0.75;
-			classDiffScale = 0.85;
 		}
 	}
 
@@ -451,7 +452,21 @@ vec4 shadeDeferredPixel( uvec2 pix ) {
 	vec3 lit;
 	if ( pc.mixedMaterial != 0u && mixedOwned ) {
 		/* Static LM + sun BRDF (CSM on primary only) + clustered dynamics (unshadowed by sun CSM). */
-		vec3 staticTerm = DeferredStaticDiffuseFromLightmap( albedo, metalness, lightmapIrr, aoCoupling );
+		vec3 staticTerm;
+		if ( pc.lightmapMode != 0u ) {
+			vec3 dominantL = safeNormalizeOr( pc.sunDir.xyz, vec3( 0.0, 0.0, 1.0 ) );
+			if ( pc.normalsAreWorld != 0u ) {
+				dominantL = safeNormalizeOr( ( pc.viewMatrix * vec4( dominantL, 0.0 ) ).xyz, dominantL );
+			}
+			staticTerm = DeferredStaticDiffuseFromDeluxeApprox( albedo, metalness, lightmapIrr,
+				aoCoupling, N, dominantL, pc.lightmapDeluxeStrength );
+			if ( pc.lightmapMode == 2u ) {
+				vec3 irradianceOnly = DeferredStaticDiffuseFromLightmap( albedo, metalness, lightmapIrr, aoCoupling );
+				staticTerm = mix( irradianceOnly, staticTerm, 0.5 );
+			}
+		} else {
+			staticTerm = DeferredStaticDiffuseFromLightmap( albedo, metalness, lightmapIrr, aoCoupling );
+		}
 		vec3 primary = ( staticTerm + sunTerm ) * sunVis;
 		lit = ( primary + diffuseAcc + specularAcc + iblTerm ) * roughMod * pc.strength;
 	} else if ( pc.additive != 0u ) {

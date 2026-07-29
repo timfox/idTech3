@@ -14,7 +14,9 @@ keep recording commands while the graph learns the frame and validates ordering.
 - Adds write-after-write and read-before-write dependencies for shared resources.
 - Topologically compiles the observed frame into a deterministic pass order.
 - Detects unresolved resource reads and dependency cycles.
-- Exposes `render_graph_status` for the compiled frame order, dependency edges, and violations.
+- Exposes `render_graph_status` for the compiled frame order, dependency edges, per-frame
+  violations, and cumulative violations.
+- Exposes `render_graph_dot` for Graphviz-compatible dependency output with resource/access labels.
 - Provides `vk_render_graph_set_pass_executor` and `vk_render_graph_execute` for migrating passes
   from observation-only recording to graph-owned execution.
 
@@ -31,6 +33,10 @@ At runtime:
 
 This means current renderer behavior is preserved, but every frame now produces a compiled graph
 that can be inspected and validated.
+
+`renderer_status` prints a compact `graph` row, and `renderer_subsystems` prints a fuller
+`rendergraph` row with observed pass count, compiled pass count, dependency count, per-frame
+violations, and total violations.
 
 ## Migration Path
 
@@ -53,6 +59,7 @@ Console:
 
 ```text
 render_graph_status
+render_graph_dot
 ```
 
 Useful companion commands:
@@ -60,6 +67,8 @@ Useful companion commands:
 ```text
 spine_status
 pass_registry_status
+renderer_status
+renderer_subsystems
 ```
 
 Static regression:

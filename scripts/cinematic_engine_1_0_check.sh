@@ -56,7 +56,7 @@ grep -q 'USE_LTC_AREA_LIGHT' "$ROOT/renderers/vulkan/shaders/glsl/deferred_light
 grep -q 'screenshotEXR' "$ROOT/renderers/vulkan/tr_init.c" || {
   echo "FAIL screenshotEXR command missing"; fail=1;
 }
-grep -q 'RB_TakeScreenshotEXR\|R_SaveEXR' "$ROOT/renderers/vulkan/tr_init_capture.inc" || {
+grep -q 'RB_TakeScreenshotEXR\|R_SaveEXR' "$ROOT/renderers/vulkan/diagnostics/tr_init_capture.inc" || {
   echo "FAIL EXR capture path missing"; fail=1;
 }
 grep -q 'vk_photometric_kelvin_to_rgb' "$ROOT/renderers/vulkan/vk_photometric.c" || {

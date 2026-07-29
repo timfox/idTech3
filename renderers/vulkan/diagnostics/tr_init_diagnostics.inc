@@ -698,6 +698,12 @@ static void R_RendererStatus_f( void )
 		vk_spine_violation_count(),
 		vk_spine_attachment_generation(),
 		vk_spine_descriptor_generation() );
+	ri.Printf( PRINT_ALL, "graph     : observed=%u compiled=%u deps=%u frameViol=%u totalViol=%u\n",
+		vk_render_graph_observed_count(),
+		vk_render_graph_compiled_count(),
+		vk_render_graph_dependency_count(),
+		vk_render_graph_frame_violation_count(),
+		vk_render_graph_violation_count() );
 	ri.Printf( PRINT_ALL, "shs       : active=%d rtOwns=%d fallback=%s failInject=0x%x\n",
 		vk_shs_active() ? 1 : 0, vk_shs_rt_owns_sun() ? 1 : 0,
 		vk_shs_fallback_reason(), vk_shs_fail_inject() );
@@ -1082,6 +1088,12 @@ static void R_RendererSubsystems_f( void )
 	ri.Printf( PRINT_ALL, "framegraph : fbo=%s hdr=%d color=%s renderTarget=%ux%u\n",
 		R_YesNo( vk.fboActive ), R_CvarInteger( r_hdr ), vk_format_string( vk.color_format ),
 		vk.renderWidth, vk.renderHeight );
+	ri.Printf( PRINT_ALL, "rendergraph: observed=%u compiled=%u deps=%u frameViol=%u totalViol=%u\n",
+		vk_render_graph_observed_count(),
+		vk_render_graph_compiled_count(),
+		vk_render_graph_dependency_count(),
+		vk_render_graph_frame_violation_count(),
+		vk_render_graph_violation_count() );
 	ri.Printf( PRINT_ALL, "materials  : pbr=%d blend=%d gbuffer=%s fill=%d directExport=%s\n",
 		R_CvarInteger( r_pbr ), R_CvarInteger( r_materialBlend ),
 		R_YesNo( vk.deferredGbufferAllocated ), R_CvarInteger( r_deferredGBufferFill ),

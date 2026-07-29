@@ -96,6 +96,8 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "vk_ht_animation.h"
 #include "vk_gpu_scene.h"
 #include "vk_pass_registry.h"
+#include "vk_render_graph.h"
+#include "vk_debug_views.h"
 #include "vk_raster_gi.h"
 #include "vk_selective_sun_shadow.h"
 #include "vk_selective_reflection.h"
@@ -4097,6 +4099,7 @@ void R_Init( void ) {
 	vk_photometric_init();
 	vk_ht_throughput_init();
 	vk_ht_animation_init();
+	vk_debug_views_init();
 	if ( vk_ltc_uploaded() ) {
 		ri.Printf( PRINT_DEVELOPER, "[VK] Photometric LTC GPU path ready\n" );
 	}
@@ -4256,6 +4259,7 @@ static void RE_Shutdown( refShutdownCode_t code ) {
 	vk_ltc_shutdown();
 	vk_ht_throughput_shutdown();
 	vk_ht_animation_shutdown();
+	vk_debug_views_shutdown();
 	vk_frequency_aware_shutdown();
 	VK_VegGpu_Shutdown();
 	VK_Biome_Shutdown();
