@@ -51,7 +51,7 @@ source_checks() {
 	local rtx="config/vulkan_overlay_rtx.cfg"
 	local hybrid="config/vulkan_overlay_hybrid1.cfg"
 	local tr_init="renderers/vulkan/tr_init.c"
-	local tr_diag="renderers/vulkan/tr_init_diagnostics.inc"
+	local tr_diag="renderers/vulkan/diagnostics/tr_init_diagnostics.inc"
 
 	[[ -f "$cfg" ]] || fail "missing modern Vulkan profile"
 	[[ -f "$stable" ]] || fail "missing modern_vulkan_stable.cfg"

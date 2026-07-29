@@ -1,10 +1,12 @@
 # Renderers
 
-2026 layout alias: `renderers/` → `src/renderers/` (Vulkan shipping backend).
+Canonical renderer sources. Vulkan is the shipping backend; platform scaffolds
+for Metal/DXR remain optional/non-shipping.
 
 | Path | Role |
 |------|------|
 | `renderers/vulkan/` | Core Forward+, deferred, BSP, volumetrics |
+| `renderers/vulkan/diagnostics/` | Init/status/capture diagnostics included by `tr_init.c` |
 | `renderers/vulkan/extensions/` | Neural, splats, RTX, scaffold (profile-gated) |
 | `renderers/vulkan/inspector/` | ImGui debug UI |
 | `renderers/common/` | Shared font/stub code |

@@ -17,7 +17,7 @@ check() {
   fi
 }
 
-TR_DIAG="$(idtech3_file renderers/vulkan/tr_init_diagnostics.inc src/renderers/vulkan/tr_init_diagnostics.inc)"
+TR_DIAG="$(idtech3_file renderers/vulkan/diagnostics/tr_init_diagnostics.inc src/renderers/vulkan/diagnostics/tr_init_diagnostics.inc)"
 TR_INIT="$(idtech3_file renderers/vulkan/tr_init.c src/renderers/vulkan/tr_init.c)"
 
 check "$TR_DIAG" 'R_RendererRecommendedRecoveryCommand' 'diagnostics expose renderer recovery helper'

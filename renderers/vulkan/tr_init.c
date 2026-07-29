@@ -1218,7 +1218,7 @@ Note: Statics are not reinitialized between fs_game changes.
 ==============================================================================
 */
 
-#include "tr_init_capture.inc"
+#include "diagnostics/tr_init_capture.inc"
 
 /*
 ** GL_SetDefaultState
@@ -1290,8 +1290,8 @@ static void GL_SetDefaultState( void )
 }
 
 
-#include "tr_init_info.inc"
-#include "tr_init_diagnostics.inc"
+#include "diagnostics/tr_init_info.inc"
+#include "diagnostics/tr_init_diagnostics.inc"
 
 /*
 ===============

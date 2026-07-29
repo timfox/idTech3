@@ -154,7 +154,7 @@ That makes late post/bloom work a first-class stabilization target.
 - `renderers/vulkan/vk_shutdown.c`
 - `renderers/vulkan/vk_frame_submit.c`
 - `renderers/vulkan/vk_cmd.c`
-- `renderers/vulkan/tr_init_diagnostics.inc`
+- `renderers/vulkan/diagnostics/tr_init_diagnostics.inc`
 
 ### Tasks
 
@@ -190,7 +190,7 @@ That makes late post/bloom work a first-class stabilization target.
 - `config/modern_vulkan.cfg`
 - `config/deferred_vulkan.cfg`
 - runtime overlay configs under `config/`
-- startup diagnostics in `renderers/vulkan/tr_init_diagnostics.inc`
+- startup diagnostics in `renderers/vulkan/diagnostics/tr_init_diagnostics.inc`
 
 ### Tasks
 

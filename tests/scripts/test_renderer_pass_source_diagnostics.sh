@@ -18,7 +18,7 @@ check() {
 }
 
 TR_INIT="$(idtech3_file renderers/vulkan/tr_init.c src/renderers/vulkan/tr_init.c)"
-TR_DIAG="$(idtech3_file renderers/vulkan/tr_init_diagnostics.inc src/renderers/vulkan/tr_init_diagnostics.inc)"
+TR_DIAG="$(idtech3_file renderers/vulkan/diagnostics/tr_init_diagnostics.inc src/renderers/vulkan/diagnostics/tr_init_diagnostics.inc)"
 POST_FOG_H="$(idtech3_file renderers/vulkan/vk_post_fog.h src/renderers/vulkan/vk_post_fog.h)"
 
 check "$TR_INIT" '#include "vk_post_fog.h"' 'renderer init includes post-fog diagnostics helpers'
@@ -35,8 +35,8 @@ check "$TR_DIAG" 'restart   : count=%u last=%s' 'renderer_status prints swapchai
 check "$TR_DIAG" 'restartAt : recent=%s ms=%d' 'renderer_status prints swapchain restart timing summary'
 check "$TR_DIAG" 'sources   : postFog=%s scene=%s luminance=%s' 'renderer_status prints scene-source summary'
 check "$TR_DIAG" 'cubemaps  : runtime=%s total=%d ready=%d incomplete=%d hdrFallback=%s localReady=%s debug=' 'renderer_status prints cubemap readiness summary'
-check "$TR_DIAG" 'forward+  : enabled=%d ready=%s shade=%.2f maxPerTile=%d lumSort=%d distSort=%d depthCull=%d' 'renderer_status prints Forward+ runtime readiness summary'
-check "$TR_DIAG" 'gbuffer   : cvar=%d fill=%d ready=%s allocated=%s directExport=%s debug=%d' 'renderer_status prints deferred runtime readiness summary'
+check "$TR_DIAG" 'mode want : fp=%s gbuffer=%s deferred=%s split=%s pt=%s default=%s' 'renderer_status prints render mode feature contract'
+check "$TR_DIAG" 'gbuffer   : req=%s alloc=%s fill=%s gen=%u valid=%s extent=%ux%u view=%s' 'renderer_status prints deferred runtime readiness summary'
 check "$TR_DIAG" 'passes: inRenderPass=%s active=%s uiOverlay=%s sourcesHealthy=%s' 'renderer_compatibility prints pass ownership summary'
 check "$TR_DIAG" 'present: swapchainHealthy=%s extent=%ux%u images=%u fullscreen=%d srgb=%d' 'renderer_compatibility prints presentation summary'
 check "$TR_DIAG" 'restart: count=%u last=%s' 'renderer_compatibility prints swapchain restart summary'

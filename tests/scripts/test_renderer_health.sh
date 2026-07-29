@@ -18,7 +18,7 @@ check() {
 }
 
 TR_INIT="$(idtech3_file renderers/vulkan/tr_init.c src/renderers/vulkan/tr_init.c)"
-TR_DIAG="$(idtech3_file renderers/vulkan/tr_init_diagnostics.inc src/renderers/vulkan/tr_init_diagnostics.inc)"
+TR_DIAG="$(idtech3_file renderers/vulkan/diagnostics/tr_init_diagnostics.inc src/renderers/vulkan/diagnostics/tr_init_diagnostics.inc)"
 
 check "$TR_DIAG" 'R_RendererHealthLabel' 'diagnostics expose renderer health label helper'
 check "$TR_DIAG" 'R_RendererHealth_f' 'renderer health command implementation exists'

@@ -15,7 +15,7 @@ RTX_OVERLAY="config/vulkan_overlay_rtx.cfg"
 HYBRID_OVERLAY="config/vulkan_overlay_hybrid1.cfg"
 NATIVE="config/modern_native.cfg"
 TR_INIT="renderers/vulkan/tr_init.c"
-TR_INIT_DIAG="renderers/vulkan/tr_init_diagnostics.inc"
+TR_INIT_DIAG="renderers/vulkan/diagnostics/tr_init_diagnostics.inc"
 DGB="renderers/vulkan/vk_deferred_gbuffer.c"
 ATTACH="renderers/vulkan/vk_attachments.c"
 

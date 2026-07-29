@@ -25,7 +25,7 @@ rg -q 'renderer_clustered_safe' "$ROOT/renderers/vulkan/tr_init.c" || fail "clus
 rg -q 'exec vulkan_overlay_unified_clustered.cfg' "$ROOT/config/vulkan_overlay_unified_clustered_safe.cfg" || fail "safe overlay layers on mode 3 overlay"
 rg -q 'seta r_taa 0' "$ROOT/config/vulkan_overlay_unified_clustered_safe.cfg" || fail "safe overlay disables TAA"
 rg -q 'seta r_oit 0' "$ROOT/config/vulkan_overlay_unified_clustered_safe.cfg" || fail "safe overlay disables OIT"
-rg -q 'Unified Clustered is safer with TAA/SMAA/FXAA/post-AA disabled while debugging; use renderer_clustered_safe' "$ROOT/renderers/vulkan/tr_init_diagnostics.inc" || fail "compatibility warnings point users at clustered-safe recovery"
+rg -q 'Unified Clustered is safer with TAA/SMAA/FXAA/post-AA disabled while debugging; use renderer_clustered_safe' "$ROOT/renderers/vulkan/diagnostics/tr_init_diagnostics.inc" || fail "compatibility warnings point users at clustered-safe recovery"
 rg -q 'skips Forward\+ transparent' "$ROOT/renderers/vulkan/tr_backend.c" || fail "OIT mode3 honesty log missing"
 rg -q 'r_oitForwardPlus' "$ROOT/renderers/vulkan/tr_backend.c" || fail "OIT Forward+ lit mode3 log"
 rg -q 'vulkan_overlay_oit_clustered' "$ROOT/docs/UNIFIED_CLUSTERED_RENDERER.md" || fail "OIT clustered docs missing"

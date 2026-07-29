@@ -105,7 +105,7 @@ check "$DGB" 'skip composite REPLACE' 'composite fails open when capture/lightin
 check "$DGB" 'frame_capture_ok' 'additive composite forced when scene base captured'
 check "$TR_INIT" 'r_deferredMaterialClassify = ri.Cvar_Get' 'r_deferredMaterialClassify cvar'
 check "$DGB" 'deferred_class_stub' 'class stub descriptor fallback'
-check "$ROOT/renderers/vulkan/tr_init_diagnostics.inc" 'renderer_deferred_safe + vid_restart' 'compatibility warnings point users at deferred-safe recovery'
+check "$ROOT/renderers/vulkan/diagnostics/tr_init_diagnostics.inc" 'renderer_deferred_safe + vid_restart' 'compatibility warnings point users at deferred-safe recovery'
 check "$TR_BACKEND" 'vk_deferred_lighting_apply_after_geometry' 'backend lighting hook'
 check "$ROOT/scripts/compile_shaders.sh" 'deferred_lighting_composite_fs' 'composite shader registered'
 
