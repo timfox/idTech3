@@ -20,6 +20,7 @@ composite fullscreen draw, SMAA subpasses. Split from vk.c.
 #include "vk_post_fog.h"
 #include "vk_temporal.h"
 #include "vk_pass_registry.h"
+#include "vk_scene_pass.h"
 #include "vk_nslm.h"
 
 static const float vk_local_shadow_flip_matrix[16] = {
@@ -142,9 +143,12 @@ static void vk_end_local_point_shadow_render_pass( void )
 static void vk_begin_volumetric_render_pass( void )
 {
 	VkFramebuffer frameBuffer = vk.framebuffers.volumetric[ vk.cmd->swapchain_image_index ];
+	uint32_t width = 0;
+	uint32_t height = 0;
 
-	vk.renderWidth = glConfig.vidWidth;
-	vk.renderHeight = glConfig.vidHeight;
+	vk_get_active_render_extent( &width, &height );
+	vk.renderWidth = (int)width;
+	vk.renderHeight = (int)height;
 	vk.renderScaleX = vk.renderScaleY = 1.0f;
 
 	vk_begin_render_pass_tracked( vk.render_pass.volumetric, frameBuffer, qfalse, vk.renderWidth, vk.renderHeight );
@@ -450,7 +454,7 @@ static void vk_volumetric_compute_pass( void )
 	if ( r_fogDebug && r_fogDebug->integer >= 1 && ( vk.volumetric_frame % 120u ) == 0u ) {
 		ri.Printf( PRINT_ALL,
 			"[VK][fog] screen=%dx%d froxel=%ux%ux%u groups=%ux%ux%u volImg=0x%llx volView=0x%llx compSet=0x%llx fragSet=0x%llx\n",
-			glConfig.vidWidth, glConfig.vidHeight,
+			vk.renderWidth, vk.renderHeight,
 			vk.froxel_width, vk.froxel_height, vk.froxel_slices,
 			groups_x, groups_y, groups_z,
 			(unsigned long long)(uintptr_t)vk.froxel_volume_image,
@@ -803,13 +807,19 @@ void vk_volumetric_fog_pass( void )
 		VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT );
 	{
 		VkImageCopy copy_region;
+		uint32_t copy_width = vk.mainColorWidth ? vk.mainColorWidth :
+			( vk.renderWidth > 0 ? (uint32_t)vk.renderWidth :
+				( glConfig.vidWidth > 0 ? (uint32_t)glConfig.vidWidth : 1u ) );
+		uint32_t copy_height = vk.mainColorHeight ? vk.mainColorHeight :
+			( vk.renderHeight > 0 ? (uint32_t)vk.renderHeight :
+				( glConfig.vidHeight > 0 ? (uint32_t)glConfig.vidHeight : 1u ) );
 		Com_Memset( &copy_region, 0, sizeof( copy_region ) );
 		copy_region.srcSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
 		copy_region.srcSubresource.layerCount = 1;
 		copy_region.dstSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
 		copy_region.dstSubresource.layerCount = 1;
-		copy_region.extent.width = glConfig.vidWidth;
-		copy_region.extent.height = glConfig.vidHeight;
+		copy_region.extent.width = copy_width;
+		copy_region.extent.height = copy_height;
 		copy_region.extent.depth = 1;
 		qvkCmdCopyImage( vk.cmd->command_buffer,
 			vk.color_image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,

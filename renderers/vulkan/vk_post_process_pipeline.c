@@ -636,13 +636,13 @@ void vk_create_post_process_pipeline( int program_index, uint32_t width, uint32_
 	if ( program_index == 0 ) {
 		viewport.x = 0.0f + vk.blitX0;
 		viewport.y = 0.0f + vk.blitY0;
-		viewport.width = gls.windowWidth - vk.blitX0 * 2;
-		viewport.height = gls.windowHeight - vk.blitY0 * 2;
+		viewport.width = (float)MAX( 1, gls.windowWidth - vk.blitX0 * 2 );
+		viewport.height = (float)MAX( 1, gls.windowHeight - vk.blitY0 * 2 );
 	} else {
 		viewport.x = 0.0f;
 		viewport.y = 0.0f;
-		viewport.width = width;
-		viewport.height = height;
+		viewport.width = (float)MAX( 1, width );
+		viewport.height = (float)MAX( 1, height );
 	}
 
 	viewport.minDepth = 0.0f;

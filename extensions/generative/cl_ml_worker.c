@@ -228,8 +228,20 @@ void CL_MlWorker_Frame( void )
 
 void CL_MlWorker_Cancel( clMlTask_t *task )
 {
+	(void)CL_MlWorker_CancelTimed( task, 0 );
+}
+
+qboolean CL_MlWorker_CancelTimed( clMlTask_t *task, int timeoutMs )
+{
 	if ( !task ) {
-		return;
+		return qtrue;
+	}
+	if ( !task->worker && task->state == CL_ML_TASK_IDLE ) {
+		task->jobHandle = JOBS_INVALID_HANDLE;
+#if USE_SDL
+		task->sdlThread = NULL;
+#endif
+		return qtrue;
 	}
 
 #if USE_SDL
@@ -242,6 +254,27 @@ void CL_MlWorker_Cancel( clMlTask_t *task )
 #endif
 
 	if ( task->jobHandle != JOBS_INVALID_HANDLE ) {
+		const int startMs = Com_Milliseconds();
+		while ( !Jobs_IsComplete( task->jobHandle ) ) {
+			Jobs_Pump( 1 );
+			if ( timeoutMs > 0 && Com_Milliseconds() - startMs >= timeoutMs ) {
+				Com_Printf( S_COLOR_YELLOW
+					"ML worker: timed out cancelling '%s' after %d ms; abandoning background job for shutdown\n",
+					task->name[0] ? task->name : "<unnamed>", timeoutMs );
+				task->jobHandle = JOBS_INVALID_HANDLE;
+				task->state = CL_ML_TASK_FAILED;
+				if ( s_mlBusy && ( !task->name[0] || !Q_stricmp( s_mlOwner, task->name ) ) ) {
+					s_mlBusy = qfalse;
+					s_mlOwner[0] = '\0';
+				}
+				return qfalse;
+			}
+#ifndef _MSC_VER
+			sched_yield();
+#else
+			SwitchToThread();
+#endif
+		}
 		Jobs_Wait( task->jobHandle );
 		task->jobHandle = JOBS_INVALID_HANDLE;
 	}
@@ -254,4 +287,5 @@ void CL_MlWorker_Cancel( clMlTask_t *task )
 		s_mlBusy = qfalse;
 		s_mlOwner[0] = '\0';
 	}
+	return qtrue;
 }

@@ -635,17 +635,19 @@ qboolean VK_VectorFont_MeshReady( void ) {
 static void VF_Push2DState( void ) {
 	VkViewport viewport;
 	VkRect2D scissor;
+	const uint32_t targetWidth = vk_get_render_target_width();
+	const uint32_t targetHeight = vk_get_render_target_height();
 
 	viewport.x = 0.0f;
 	viewport.y = 0.0f;
-	viewport.width = (float)glConfig.vidWidth;
-	viewport.height = (float)glConfig.vidHeight;
+	viewport.width = (float)targetWidth;
+	viewport.height = (float)targetHeight;
 	viewport.minDepth = 0.0f;
 	viewport.maxDepth = 1.0f;
 	scissor.offset.x = 0;
 	scissor.offset.y = 0;
-	scissor.extent.width = (uint32_t)glConfig.vidWidth;
-	scissor.extent.height = (uint32_t)glConfig.vidHeight;
+	scissor.extent.width = targetWidth;
+	scissor.extent.height = targetHeight;
 	qvkCmdSetViewport( vk.cmd->command_buffer, 0, 1, &viewport );
 	qvkCmdSetScissor( vk.cmd->command_buffer, 0, 1, &scissor );
 }

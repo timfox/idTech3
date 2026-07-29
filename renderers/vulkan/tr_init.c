@@ -2492,7 +2492,7 @@ static void R_Register( void )
 
 	r_volumetricFogGridDim = ri.Cvar_Get( "r_volumetricFogGridDim", "0 0 64", CVAR_ARCHIVE_ND | CVAR_LATCH );
 	ri.Cvar_SetDescription( r_volumetricFogGridDim,
-		"Froxel grid (x y z). Default \"0 0 64\" = half-res (vidWidth/2, vidHeight/2, clamped to 640x360) with 64 slices. "
+		"Froxel grid (x y z). Default \"0 0 64\" = half-res (vidWidth/2, vidHeight/2, clamped to 320x180) with 64 slices. "
 		"Explicit sizes e.g. \"160 90 96\" override the auto clamp. Requires vid_restart." );
 	ri.Cvar_SetGroup( r_volumetricFogGridDim, CVG_RENDERER );
 

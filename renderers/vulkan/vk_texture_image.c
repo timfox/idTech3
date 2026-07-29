@@ -20,14 +20,14 @@ void vk_create_image( image_t *image, int width, int height, int mip_levels ) {
 	VkImageCreateFlags	image_flags = 0;
 	VkImageViewType		view_type = (VkImageViewType)VK_IMAGE_VIEW_TYPE_2D;
 
-	if ( image->handle ) {
-		qvkDestroyImage( vk.device, image->handle, NULL );
-		image->handle = VK_NULL_HANDLE;
-	}
-
 	if ( image->view ) {
 		qvkDestroyImageView( vk.device, image->view, NULL );
 		image->view = VK_NULL_HANDLE;
+	}
+
+	if ( image->handle ) {
+		qvkDestroyImage( vk.device, image->handle, NULL );
+		image->handle = VK_NULL_HANDLE;
 	}
 
 	if ( image->flags & IMGFLAG_CUBEMAP ) {

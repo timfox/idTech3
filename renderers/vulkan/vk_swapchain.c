@@ -14,6 +14,35 @@ Extracted from vk.c for incremental modularization.
 #include "vk_swapchain.h"
 #include "vk_util.h"
 
+static void vk_sync_renderer_extent_from_swapchain( const VkExtent2D *extent )
+{
+	qboolean scaledRender = qfalse;
+
+	if ( !extent || extent->width == 0 || extent->height == 0 ) {
+		return;
+	}
+
+	gls.windowWidth = (int)extent->width;
+	gls.windowHeight = (int)extent->height;
+
+	if ( vk.fboActive && r_renderScale && r_renderScale->integer ) {
+		scaledRender = qtrue;
+	}
+
+	if ( !scaledRender ) {
+		glConfig.vidWidth = (int)extent->width;
+		glConfig.vidHeight = (int)extent->height;
+		gls.captureWidth = glConfig.vidWidth;
+		gls.captureHeight = glConfig.vidHeight;
+		if ( extent->height > 0 ) {
+			glConfig.windowAspect = (float)extent->width / (float)extent->height;
+		}
+		if ( ri.CL_SetScaling ) {
+			ri.CL_SetScaling( 1.0f, gls.captureWidth, gls.captureHeight );
+		}
+	}
+}
+
 void vk_create_swapchain( VkPhysicalDevice physical_device, VkDevice device, VkSurfaceKHR surface,
 	VkSurfaceFormatKHR surface_format, VkSwapchainKHR *swapchain, qboolean verbose )
 {
@@ -123,6 +152,7 @@ void vk_create_swapchain( VkPhysicalDevice physical_device, VkDevice device, VkS
 	desc.imageExtent = image_extent;
 	vk.swapchain_extent = image_extent;
 	vk.swapchain_extent_valid = qtrue;
+	vk_sync_renderer_extent_from_swapchain( &image_extent );
 	desc.imageArrayLayers = 1;
 	desc.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
 	/* Reset before create: presentation restore reuses the live vk struct. */

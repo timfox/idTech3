@@ -922,8 +922,10 @@ static void GS_LoadSurfaces( bsp30RenderLoad_t *load ) {
 				}
 #ifdef USE_VK_PBR
 				R_ColorShiftLightingBytes( lit, (byte *)&point[10], qtrue );
+				R_LinearizeLightingBytesForHDR( (byte *)&point[10] );
 #else
 				R_ColorShiftLightingBytes( lit, (byte *)&point[7], qtrue );
+				R_LinearizeLightingBytesForHDR( (byte *)&point[7] );
 #endif
 			}
 		}

@@ -681,6 +681,7 @@ static qboolean R_BspStream_ParsePlanarFace( const dsurface_t *ds, const drawVer
 		}
 		R_BspStream_ApplyLightmapST( &cv->points[i][8], &cv->points[i][9], lightmapX, lightmapY, mergedAtlas );
 		R_ColorShiftLightingBytes( verts[i].color.rgba, (byte *)&cv->points[i][10], qtrue );
+		R_LinearizeLightingBytesForHDR( (byte *)&cv->points[i][10] );
 #else
 		for ( j = 0; j < 2; j++ ) {
 			cv->points[i][3 + j] = LittleFloat( verts[i].st[j] );
@@ -688,6 +689,7 @@ static qboolean R_BspStream_ParsePlanarFace( const dsurface_t *ds, const drawVer
 		}
 		R_BspStream_ApplyLightmapST( &cv->points[i][5], &cv->points[i][6], lightmapX, lightmapY, mergedAtlas );
 		R_ColorShiftLightingBytes( verts[i].color.rgba, (byte *)&cv->points[i][7], qtrue );
+		R_LinearizeLightingBytesForHDR( (byte *)&cv->points[i][7] );
 #endif
 		AddPointToBounds( cv->points[i], patchMins, patchMaxs );
 	}
@@ -768,6 +770,7 @@ static qboolean R_BspStream_ParsePatchFace( const dsurface_t *ds, const drawVert
 			points[i].lightmap[j] = LittleFloat( verts[i].lightmap[j] );
 		}
 		R_ColorShiftLightingBytes( verts[i].color.rgba, points[i].color.rgba, qtrue );
+		R_LinearizeLightingBytesForHDR( points[i].color.rgba );
 		if ( mergedAtlas ) {
 			R_BspStream_ApplyLightmapST( &points[i].lightmap[0], &points[i].lightmap[1],
 				lightmapX, lightmapY, qtrue );

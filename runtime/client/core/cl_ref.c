@@ -23,6 +23,20 @@ static cvar_t *cl_renderer;
 static void CL_InitGLimp_Cvars( void );
 static void CL_InitRef( void );
 
+static qboolean CL_IsSurfStartupContext( void )
+{
+	const char *fs_game = Cvar_VariableString( "fs_game" );
+	const char *pwd = Sys_Pwd();
+
+	if ( fs_game && !Q_stricmp( fs_game, "surf" ) ) {
+		return qtrue;
+	}
+	if ( pwd && ( strstr( pwd, "/release/surf" ) || strstr( pwd, "\\release\\surf" ) ) ) {
+		return qtrue;
+	}
+	return qfalse;
+}
+
 #if defined(USE_RENDERER_DLOPEN) && USE_RENDERER_DLOPEN
 /*
 =================
@@ -822,6 +836,13 @@ static void CL_InitGLimp_Cvars( void )
 	r_customwidth = Cvar_Get( "r_customWidth", "1600", CVAR_ARCHIVE | CVAR_LATCH );
 	r_customheight = Cvar_Get( "r_customHeight", "1024", CVAR_ARCHIVE | CVAR_LATCH );
 #endif
+	if ( CL_IsSurfStartupContext() &&
+		Cvar_VariableIntegerValue( "r_fullscreen" ) == 0 &&
+		r_mode->integer == -1 &&
+		( r_customwidth->integer < 1024 || r_customheight->integer < 576 ) ) {
+		Cvar_Set( "r_customWidth", "1280" );
+		Cvar_Set( "r_customHeight", "720" );
+	}
 	Cvar_CheckRange( r_mode, "-2", va( "%i", s_numVidModes-1 ), CV_INTEGER );
 	Cvar_SetDescription( r_mode, "Set video mode:\n -2 - use current desktop resolution\n -1 - use \\r_customWidth and \\r_customHeight\n  0..N - enter \\modelist for details" );
 #ifdef _DEBUG

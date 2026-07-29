@@ -58,8 +58,10 @@ void vk_create_framebuffers( void )
 		desc.attachmentCount = 2;
 		if ( !vk.fboActive )
 		{
-			desc.width = gls.windowWidth;
-			desc.height = gls.windowHeight;
+			desc.width = vk.swapchain_extent_valid ? vk.swapchain_extent.width : (uint32_t)gls.windowWidth;
+			desc.height = vk.swapchain_extent_valid ? vk.swapchain_extent.height : (uint32_t)gls.windowHeight;
+			if ( desc.width == 0 ) desc.width = (uint32_t)glConfig.vidWidth;
+			if ( desc.height == 0 ) desc.height = (uint32_t)glConfig.vidHeight;
 			framebuffer_attachments[0] = vk.swapchain_image_views[n];
 			framebuffer_attachments[1] = vk.depth_image_view;
 			VK_CHECK( qvkCreateFramebuffer( vk.device, &desc, NULL, &vk.framebuffers.main[n] ) );
@@ -243,7 +245,7 @@ void vk_create_framebuffers( void )
 			framebuffer_attachments[0] = vk.cubeMap.color_image_view[j+1];
 
 			if ( vk.msaaActive ) {
-				framebuffer_attachments[2] = vk.cubeMap.color_image_view_msaa[0];
+				framebuffer_attachments[2] = vk.cubeMap.color_image_view_msaa[j+1];
 			}
 
 			VK_CHECK( qvkCreateFramebuffer( vk.device, &desc, NULL, &vk.framebuffers.cubemap[j] ) );
@@ -337,8 +339,8 @@ void vk_create_framebuffers( void )
 
 		for ( n = 0; n < ARRAY_LEN( vk.framebuffers.blur ); n += 2 )
 		{
-			width /= 2;
-			height /= 2;
+			width = MAX( 1u, width / 2u );
+			height = MAX( 1u, height / 2u );
 
 			desc.renderPass = vk.render_pass.blur[n];
 			desc.width = width;

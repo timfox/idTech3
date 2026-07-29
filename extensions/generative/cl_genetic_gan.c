@@ -425,6 +425,7 @@ void CL_GeneticGan_Init( void )
 	Cmd_AddCommand( "genome_view", CL_GeneticGanView_f );
 
 	Com_Memset( &genetic_gan_job, 0, sizeof( genetic_gan_job ) );
+	CL_MlWorker_InitTask( &s_decodeTask, "genetic_gan", NULL, NULL, NULL );
 
 	if ( GeneticGan_Enabled() ) {
 		Com_Printf( "Genetic GAN ML: enabled (async %s, auto_import %s; docs/GENETIC_GAN.md)\n",
@@ -435,7 +436,7 @@ void CL_GeneticGan_Init( void )
 
 void CL_GeneticGan_Shutdown( void )
 {
-	CL_MlWorker_Cancel( &s_decodeTask );
+	(void)CL_MlWorker_CancelTimed( &s_decodeTask, 1000 );
 	CL_GeneticGan_ClearQueue();
 	Cmd_RemoveCommand( "genome_generate" );
 	Cmd_RemoveCommand( "genome_decode_status" );

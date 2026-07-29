@@ -358,8 +358,16 @@ void vk_begin_bloom_extract_render_pass( void )
 void vk_begin_blur_render_pass( uint32_t index )
 {
 	VkFramebuffer frameBuffer = vk.framebuffers.blur[ index ];
-	uint32_t width = gls.captureWidth / ( 2 << ( index / 2 ) );
-	uint32_t height = gls.captureHeight / ( 2 << ( index / 2 ) );
+	const uint32_t mipIndex = index + 1;
+	uint32_t width = MAX( 1u, (uint32_t)gls.captureWidth / ( 2u << ( index / 2 ) ) );
+	uint32_t height = MAX( 1u, (uint32_t)gls.captureHeight / ( 2u << ( index / 2 ) ) );
+
+	if ( mipIndex < ARRAY_LEN( vk.bloom_mip_extent ) &&
+		vk.bloom_mip_extent[mipIndex].width > 0 &&
+		vk.bloom_mip_extent[mipIndex].height > 0 ) {
+		width = vk.bloom_mip_extent[mipIndex].width;
+		height = vk.bloom_mip_extent[mipIndex].height;
+	}
 
 	//vk.renderPassIndex = RENDER_PASS_BLOOM_EXTRACT; // doesn't matter, we will use dedicated pipelines
 

@@ -2152,6 +2152,7 @@ void		R_Init( void );
 void		R_SetColorMappings( void );
 void		R_GammaCorrect( byte *buffer, int bufSize );
 void		R_ColorShiftLightingBytes( const byte in[4], byte out[4], qboolean hasAlpha );
+void		R_LinearizeLightingBytesForHDR( byte color[4] );
 
 void	R_ImageList_f( void );
 qboolean R_ReloadTexture( const char *name );

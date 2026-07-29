@@ -54,6 +54,7 @@ void        CL_MlWorker_InitTask( clMlTask_t *task, const char *name, clMlWorker
                 clMlDeferFn_t defer, void *data );
 
 void        CL_MlWorker_Cancel( clMlTask_t *task );
+qboolean    CL_MlWorker_CancelTimed( clMlTask_t *task, int timeoutMs );
 void        CL_MlWorker_Release( const char *name );
 
 #else
@@ -69,6 +70,9 @@ static inline void CL_MlWorker_InitTask( clMlTask_t *task, const char *name, clM
 	(void)task; (void)name; (void)worker; (void)defer; (void)data;
 }
 static inline void CL_MlWorker_Cancel( clMlTask_t *task ) { (void)task; }
+static inline qboolean CL_MlWorker_CancelTimed( clMlTask_t *task, int timeoutMs ) {
+	(void)task; (void)timeoutMs; return qtrue;
+}
 static inline void CL_MlWorker_Release( const char *name ) { (void)name; }
 
 #endif

@@ -3203,6 +3203,23 @@ static void Com_ApplySurfShippingProfile( void )
 	Cvar_Set( "r_deferredLighting", "0" );
 	Cvar_Set( "r_ssao", "0" );
 	Cvar_Set( "r_ambientVisibilityMode", "2" );
+	Cvar_Set( "r_bspStream", "0" );
+	Cvar_Set( "cm_stream", "1" );
+	Cvar_Set( "cm_streamMerge", "0" );
+	Cvar_Set( "cm_openWorldCollision", "0" );
+	Cvar_Set( "r_volumetricFog", "1" );
+	Cvar_Set( "r_volumetricFogGridDim", "160 90 64" );
+	Cvar_Set( "r_volumetricFogQuality", "2" );
+	Cvar_Set( "r_volumetricFogResolutionScale", "1.0" );
+	Cvar_Set( "r_fogFluid", "0" );
+	Cvar_Set( "r_fontHudSmall", "fonts/NotoSansDisplay-Regular.ttf" );
+	Cvar_Set( "r_fontHudMedium", "fonts/NotoSansDisplay-Regular.ttf" );
+	Cvar_Set( "r_font", "fonts/NotoSansDisplay-Bold.ttf" );
+	Cvar_Set( "r_consoleFont", "fonts/NotoSansDisplay-Regular.ttf" );
+	Cvar_Set( "r_fontMipmap", "0" );
+	Cvar_Set( "r_fontShadow", "0" );
+	Cvar_Set( "r_fontGamma", "0.95" );
+	Cvar_Set( "cl_geneticGan", "0" );
 
 	/* Stale local bisect/debug sessions can persist hard magenta/white
 	 * diagnostic views that look like a color-space regression. */

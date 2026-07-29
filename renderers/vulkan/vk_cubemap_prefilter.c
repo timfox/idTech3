@@ -367,15 +367,34 @@ void vk_destroy_cubemap_prefilter( void ){
 	{
 		def = &prefilters[i];
 
-		qvkDestroyRenderPass( vk.device, def->renderpass, NULL );
-		qvkDestroyFramebuffer( vk.device, def->offscreen.framebuffer, NULL );
-		qvkFreeMemory( vk.device, def->offscreen.memory, NULL );
-		qvkDestroyImageView( vk.device, def->offscreen.view, NULL );
-		qvkDestroyImage( vk.device, def->offscreen.image, NULL );
-		def->offscreen.image = VK_NULL_HANDLE;
-		def->offscreen.view = VK_NULL_HANDLE;
-		qvkDestroyPipeline( vk.device, def->pipeline, NULL );
-		qvkDestroyPipelineLayout( vk.device, def->pipeline_layout, NULL );
+		if ( def->offscreen.framebuffer != VK_NULL_HANDLE ) {
+			qvkDestroyFramebuffer( vk.device, def->offscreen.framebuffer, NULL );
+			def->offscreen.framebuffer = VK_NULL_HANDLE;
+		}
+		if ( def->renderpass != VK_NULL_HANDLE ) {
+			qvkDestroyRenderPass( vk.device, def->renderpass, NULL );
+			def->renderpass = VK_NULL_HANDLE;
+		}
+		if ( def->offscreen.view != VK_NULL_HANDLE ) {
+			qvkDestroyImageView( vk.device, def->offscreen.view, NULL );
+			def->offscreen.view = VK_NULL_HANDLE;
+		}
+		if ( def->offscreen.image != VK_NULL_HANDLE ) {
+			qvkDestroyImage( vk.device, def->offscreen.image, NULL );
+			def->offscreen.image = VK_NULL_HANDLE;
+		}
+		if ( def->offscreen.memory != VK_NULL_HANDLE ) {
+			qvkFreeMemory( vk.device, def->offscreen.memory, NULL );
+			def->offscreen.memory = VK_NULL_HANDLE;
+		}
+		if ( def->pipeline != VK_NULL_HANDLE ) {
+			qvkDestroyPipeline( vk.device, def->pipeline, NULL );
+			def->pipeline = VK_NULL_HANDLE;
+		}
+		if ( def->pipeline_layout != VK_NULL_HANDLE ) {
+			qvkDestroyPipelineLayout( vk.device, def->pipeline_layout, NULL );
+			def->pipeline_layout = VK_NULL_HANDLE;
+		}
 	}
 
 	Com_Memset( &prefilters, 0, sizeof( prefilters ) );

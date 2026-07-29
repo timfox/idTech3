@@ -145,6 +145,32 @@ void R_ColorShiftLightingBytes( const byte in[4], byte out[4], qboolean hasAlpha
 	}
 }
 
+static byte R_sRGBToLinearByte( byte value )
+{
+	float c = (float)value * ( 1.0f / 255.0f );
+	float linear;
+
+	if ( c <= 0.04045f ) {
+		linear = c * ( 1.0f / 12.92f );
+	} else {
+		linear = powf( ( c + 0.055f ) * ( 1.0f / 1.055f ), 2.4f );
+	}
+
+	return (byte)Com_Clamp( 0.0f, 255.0f, linear * 255.0f + 0.5f );
+}
+
+void R_LinearizeLightingBytesForHDR( byte color[4] )
+{
+	if ( !color || !r_hdr || r_hdr->integer <= 0 ||
+			!r_lightmap_srgb_decode || !r_lightmap_srgb_decode->integer ) {
+		return;
+	}
+
+	color[0] = R_sRGBToLinearByte( color[0] );
+	color[1] = R_sRGBToLinearByte( color[1] );
+	color[2] = R_sRGBToLinearByte( color[2] );
+}
+
 
 #define LIGHTMAP_SIZE 128
 #define LIGHTMAP_BORDER 2
@@ -1038,6 +1064,7 @@ static void ParseFace( const dsurface_t *ds, const drawVert_t *verts, msurface_t
 			cv->points[i][8+j] = LittleFloat( verts[i].lightmap[j] );
 		}
 		R_ColorShiftLightingBytes( verts[i].color.rgba, (byte *)&cv->points[i][10], qtrue );
+		R_LinearizeLightingBytesForHDR( (byte *)&cv->points[i][10] );
 		if ( lightmapNum >= 0 && tr.mergeLightmaps ) {
 			// adjust lightmap coords
 			cv->points[i][8] = cv->points[i][8] * tr.lightmapScale[0] + lightmapX;
@@ -1049,6 +1076,7 @@ static void ParseFace( const dsurface_t *ds, const drawVert_t *verts, msurface_t
 			cv->points[i][5+j] = LittleFloat( verts[i].lightmap[j] );
 		}
 		R_ColorShiftLightingBytes( verts[i].color.rgba, (byte *)&cv->points[i][7], qtrue );
+		R_LinearizeLightingBytesForHDR( (byte *)&cv->points[i][7] );
 		if ( lightmapNum >= 0 && tr.mergeLightmaps ) {
 			// adjust lightmap coords
 			cv->points[i][5] = cv->points[i][5] * tr.lightmapScale[0] + lightmapX;
@@ -1168,6 +1196,7 @@ static void ParseMesh( const dsurface_t *ds, const drawVert_t *verts, msurface_t
 			points[i].lightmap[j] = LittleFloat( verts[i].lightmap[j] );
 		}
 		R_ColorShiftLightingBytes( verts[i].color.rgba, points[i].color.rgba, qtrue );
+		R_LinearizeLightingBytesForHDR( points[i].color.rgba );
 		if ( lightmapNum >= 0 && tr.mergeLightmaps ) {
 			// adjust lightmap coords
 			points[i].lightmap[0] = points[i].lightmap[0] * tr.lightmapScale[0] + lightmapX;
@@ -1249,6 +1278,7 @@ static void ParseTriSurf( const dsurface_t *ds, const drawVert_t *verts, msurfac
 		}
 
 		R_ColorShiftLightingBytes( verts[i].color.rgba, tri->verts[i].color.rgba, qtrue );
+		R_LinearizeLightingBytesForHDR( tri->verts[i].color.rgba );
 		if ( lightmapNum >= 0 && tr.mergeLightmaps ) {
 			// adjust lightmap coords
 			tri->verts[i].lightmap[0] = tri->verts[i].lightmap[0] * tr.lightmapScale[0] + lightmapX;
