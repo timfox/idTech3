@@ -50,6 +50,12 @@ void ApplyQueuedCommands(int msec) {
 				CreateEntity(cmd.playerId, cmd.targetX, cmd.targetY);
 			}
 			break;
+		case RTS_COMMAND_SPAWN_RESOURCE:
+			if ( cmd.playerId == RTS_OWNER_NEUTRAL ) {
+				const int amount = cmd.data > 0 ? cmd.data : kDefaultResourceNodeAmount;
+				CreateEntity(RTS_OWNER_NEUTRAL, cmd.targetX, cmd.targetY, amount);
+			}
+			break;
 		case RTS_COMMAND_MOVE:
 			if (Entity *entity = FindEntity(cmd.entityId)) {
 				if (CanControl(cmd, *entity)) {
@@ -69,9 +75,12 @@ void ApplyQueuedCommands(int msec) {
 		case RTS_COMMAND_GATHER:
 			if ( cmd.playerId > RTS_OWNER_NEUTRAL && cmd.playerId < kMaxPlayers ) {
 				if ( Entity *entity = FindEntity(cmd.entityId) ) {
-					if ( CanControl(cmd, *entity) ) {
+					Entity *resource = FindEntity(cmd.targetEntityId);
+					if ( CanControl(cmd, *entity) && resource && resource->owner == RTS_OWNER_NEUTRAL && resource->resources > 0 ) {
 						const int amount = cmd.data > 0 ? cmd.data : kDefaultGatherAmount;
-						state.playerResources[cmd.playerId] += amount;
+						const int gathered = std::min(amount, resource->resources);
+						resource->resources -= gathered;
+						state.playerResources[cmd.playerId] += gathered;
 					}
 				}
 			}

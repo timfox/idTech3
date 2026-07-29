@@ -10,6 +10,7 @@ constexpr int kMaxPlayers = RTS_OWNER_PLAYER4 + 1;
 constexpr int kInitialPlayerResources = 500;
 constexpr int kBuildCost = 100;
 constexpr int kDefaultGatherAmount = 25;
+constexpr int kDefaultResourceNodeAmount = 500;
 
 struct Entity {
 	rtsEntityId_t id = 0;
@@ -17,6 +18,7 @@ struct Entity {
 	int x = 0;
 	int y = 0;
 	int hitpoints = 100;
+	int resources = 0;
 };
 
 struct State {
@@ -33,7 +35,7 @@ struct State {
 
 State &GetState();
 void ResetState();
-rtsEntityId_t CreateEntity(int owner, int x, int y);
+rtsEntityId_t CreateEntity(int owner, int x, int y, int resources = 0);
 Entity *FindEntity(rtsEntityId_t id);
 const Entity *FindEntityConst(rtsEntityId_t id);
 void ApplyQueuedCommands(int msec);

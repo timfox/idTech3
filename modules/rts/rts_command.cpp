@@ -12,7 +12,10 @@ int RTS_PostCommand( const rtsCommand_t *cmd ) {
 	if ( !cmd || cmd->type == RTS_COMMAND_NONE ) {
 		return 0;
 	}
-	if ( cmd->playerId <= RTS_OWNER_NEUTRAL ) {
+	if ( cmd->type != RTS_COMMAND_SPAWN_RESOURCE && cmd->playerId <= RTS_OWNER_NEUTRAL ) {
+		return 0;
+	}
+	if ( cmd->type == RTS_COMMAND_SPAWN_RESOURCE && cmd->playerId != RTS_OWNER_NEUTRAL ) {
 		return 0;
 	}
 	if ( !rts::GetState().initialized ) {

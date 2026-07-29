@@ -8,7 +8,7 @@ RTS entity storage.
 
 namespace rts {
 
-rtsEntityId_t CreateEntity(int owner, int x, int y) {
+rtsEntityId_t CreateEntity(int owner, int x, int y, int resources) {
 	State &state = GetState();
 	Entity entity;
 
@@ -16,6 +16,7 @@ rtsEntityId_t CreateEntity(int owner, int x, int y) {
 	entity.owner = owner;
 	entity.x = x;
 	entity.y = y;
+	entity.resources = resources;
 	state.entities.push_back(entity);
 	return entity.id;
 }

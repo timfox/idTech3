@@ -94,6 +94,17 @@ void vk_cert_metrics_compare_rgba( const float *a, const float *b, uint32_t w, u
 	}
 }
 
+qboolean vk_cert_metrics_image_diff_passes( const certMetrics_t *m,
+	double rmseLimit, double maxAbsLimit, double meanRelLumLimit )
+{
+	if ( !m || m->validPixelCount == 0 || m->nanCount || m->infCount ) {
+		return qfalse;
+	}
+	return ( m->rmse <= rmseLimit &&
+		m->maxAbsRgb <= maxAbsLimit &&
+		m->meanRelLum <= meanRelLumLimit ) ? qtrue : qfalse;
+}
+
 void vk_cert_metrics_empty_pixels( const float *fogSceneRgba, const float *accumRgba,
 	const float *revealR, const float *resolvedRgba, uint32_t w, uint32_t h,
 	float eps, certMetrics_t *out )

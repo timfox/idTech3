@@ -19,6 +19,7 @@ int main(void) {
 	rtsCommand_t enemyBuild;
 	rtsCommand_t attack;
 	rtsCommand_t gather;
+	rtsCommand_t resource;
 	rtsEntityId_t selected[4];
 	unsigned char blocked[25] = { 0 };
 	int pathX[16];
@@ -64,6 +65,7 @@ int main(void) {
 	ASSERT(RTS_GetPlayerResources(RTS_OWNER_PLAYER1) == 300, "build commands spend resources");
 	ASSERT(RTS_GetEntityOwner(1) == RTS_OWNER_PLAYER1, "first built entity owner");
 	ASSERT(RTS_GetEntityHitpoints(1) == 100, "first built entity starts with full hitpoints");
+	ASSERT(RTS_GetEntityResources(1) == 0, "combat entity has no resources");
 	ASSERT(RTS_GetEntityPosition(1, &x, &y) == 1, "first built entity position readable");
 	ASSERT(x == 16 && y == 32, "stable command ordering by player/sequence");
 
@@ -127,18 +129,42 @@ int main(void) {
 	RTS_RunTurn(50);
 	ASSERT(RTS_GetEntityHitpoints(3) == 90, "attack reduces enemy hitpoints");
 
+	resource.type = RTS_COMMAND_SPAWN_RESOURCE;
+	resource.turn = 6;
+	resource.playerId = RTS_OWNER_NEUTRAL;
+	resource.sequence = 6;
+	resource.entityId = 0;
+	resource.targetEntityId = 0;
+	resource.targetX = 256;
+	resource.targetY = 256;
+	resource.data = 100;
+	ASSERT(RTS_PostCommand(&resource) == 1, "post resource spawn command");
+	RTS_RunTurn(50);
+	ASSERT(RTS_GetEntityCount() == 4, "resource spawn creates neutral entity");
+	ASSERT(RTS_GetEntityOwner(4) == RTS_OWNER_NEUTRAL, "resource entity owner");
+	ASSERT(RTS_GetEntityResources(4) == 100, "resource entity starts with stock");
+
 	gather.type = RTS_COMMAND_GATHER;
-	gather.turn = 6;
+	gather.turn = 7;
 	gather.playerId = RTS_OWNER_PLAYER1;
-	gather.sequence = 6;
+	gather.sequence = 7;
 	gather.entityId = 1;
-	gather.targetEntityId = 0;
+	gather.targetEntityId = 4;
 	gather.targetX = 0;
 	gather.targetY = 0;
 	gather.data = 75;
 	ASSERT(RTS_PostCommand(&gather) == 1, "post gather command");
 	RTS_RunTurn(50);
 	ASSERT(RTS_GetPlayerResources(RTS_OWNER_PLAYER1) == 375, "gather command adds resources");
+	ASSERT(RTS_GetEntityResources(4) == 25, "gather command depletes resource stock");
+
+	gather.turn = 8;
+	gather.sequence = 8;
+	gather.data = 75;
+	ASSERT(RTS_PostCommand(&gather) == 1, "post gather depletion command");
+	RTS_RunTurn(50);
+	ASSERT(RTS_GetPlayerResources(RTS_OWNER_PLAYER1) == 400, "gather clamps to remaining resource stock");
+	ASSERT(RTS_GetEntityResources(4) == 0, "resource stock can be depleted");
 
 	blocked[1 * 5 + 2] = 1;
 	blocked[2 * 5 + 2] = 1;

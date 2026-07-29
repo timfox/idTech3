@@ -80,6 +80,11 @@ int RTS_GetEntityHitpoints( rtsEntityId_t id ) {
 	return entity ? entity->hitpoints : 0;
 }
 
+int RTS_GetEntityResources( rtsEntityId_t id ) {
+	const rts::Entity *entity = rts::FindEntityConst( id );
+	return entity ? entity->resources : 0;
+}
+
 int RTS_GetPlayerResources( int playerId ) {
 	if ( playerId <= RTS_OWNER_NEUTRAL || playerId >= rts::kMaxPlayers ) {
 		return 0;

@@ -27,6 +27,10 @@ unsigned HashState() {
 		hash = HashMix(hash, static_cast<unsigned>(entity.x));
 		hash = HashMix(hash, static_cast<unsigned>(entity.y));
 		hash = HashMix(hash, static_cast<unsigned>(entity.hitpoints));
+		hash = HashMix(hash, static_cast<unsigned>(entity.resources));
+	}
+	for (int resources : state.playerResources) {
+		hash = HashMix(hash, static_cast<unsigned>(resources));
 	}
 	return hash;
 }

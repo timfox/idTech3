@@ -49,7 +49,8 @@ typedef enum {
 	OIT_LAB_EVAL_FOG,
 	OIT_LAB_EVAL_ADDITIVE,
 	OIT_LAB_EVAL_HDR,
-	OIT_LAB_EVAL_LIFECYCLE
+	OIT_LAB_EVAL_LIFECYCLE,
+	OIT_LAB_EVAL_MBOIT_SINGLE
 } oitLabEval_t;
 
 typedef struct {
@@ -82,6 +83,9 @@ static cvar_t *r_oitCertContinueOnFail;
 static cvar_t *r_oitCertSoakMinutes;
 static cvar_t *r_oitCertMaxRetries;
 static wboitCertStatus_t s_lastRecordedStatus;
+static certMetrics_t s_lastMboitImageDiff;
+static char s_lastMboitStatus[32];
+static char s_lastMboitNotes[192];
 
 static void OIT_Lab_AdvanceCoreQueue( void );
 
@@ -218,8 +222,15 @@ static qboolean OIT_Lab_ArmSpecialized( void )
 
 static qboolean OIT_Lab_ArmMboit( void )
 {
-	ri.Printf( PRINT_ALL, "oit_lab mboit: experimental — does not affect WBOIT cert\n" );
-	s_pendingEval = OIT_LAB_EVAL_NONE;
+	oitCertScenario_t sc;
+	const float color[3] = { 0.25f, 0.6f, 0.95f };
+	ri.Cvar_Set( "r_oit", "2" );
+	ri.Cvar_Set( "r_oitForwardPlus", "1" );
+	vk_oit_cert_geometry_make_single_layer( &sc, 0.42f, color, 256.0f );
+	Q_strncpyz( sc.name, "mboit_single_layer_diff", sizeof( sc.name ) );
+	vk_oit_cert_geometry_arm( &sc );
+	OIT_Lab_ArmEval( OIT_LAB_EVAL_MBOIT_SINGLE, WBOIT_CERT_STAGE_COUNT, "mboit_single_layer_diff" );
+	ri.Printf( PRINT_ALL, "oit_lab mboit: armed live image-diff single-layer case (r_oit 2)\n" );
 	return qtrue;
 }
 
@@ -295,6 +306,51 @@ static qboolean OIT_Lab_GetSnapshot( const certOitSnapshot_t **out )
 	return qtrue;
 }
 
+static qboolean OIT_Lab_BuildSingleLayerReference( const certOitSnapshot_t *snap,
+	const oitCertScenario_t *sc, float **refOut, uint8_t **maskOut, uint32_t *maskCountOut )
+{
+	uint32_t i, n, maskCount = 0;
+	float *ref;
+	uint8_t *mask;
+	if ( !snap || !sc || !snap->fog.rgba || !snap->accum.rgba || !snap->reveal.rgba ||
+		!snap->resolved.rgba || snap->fog.width != snap->resolved.width ||
+		snap->fog.height != snap->resolved.height ) {
+		return qfalse;
+	}
+	n = snap->fog.width * snap->fog.height;
+	ref = (float *)malloc( sizeof( float ) * n * 4 );
+	mask = (uint8_t *)malloc( sizeof( uint8_t ) * n );
+	if ( !ref || !mask ) {
+		free( ref );
+		free( mask );
+		return qfalse;
+	}
+	for ( i = 0; i < n; i++ ) {
+		const float *fog = snap->fog.rgba + i * 4;
+		float *dst = ref + i * 4;
+		float accumWeight = snap->accum.rgba[i * 4 + 3];
+		float reveal = snap->reveal.rgba[i * 4];
+		mask[i] = ( accumWeight > 1e-5f || reveal < 0.999f ) ? 1u : 0u;
+		if ( mask[i] ) {
+			vk_oit_cert_geometry_expect_source_over( sc->expectSingleColor,
+				sc->expectSingleOpacity, fog, dst );
+			dst[3] = 1.0f;
+			maskCount++;
+		} else {
+			dst[0] = fog[0];
+			dst[1] = fog[1];
+			dst[2] = fog[2];
+			dst[3] = fog[3];
+		}
+	}
+	*refOut = ref;
+	*maskOut = mask;
+	if ( maskCountOut ) {
+		*maskCountOut = maskCount;
+	}
+	return qtrue;
+}
+
 static void OIT_Lab_EvalEmpty( void )
 {
 	const certOitSnapshot_t *snap;
@@ -338,6 +394,10 @@ static void OIT_Lab_EvalSingle( void )
 	const oitCertScenario_t *sc = vk_oit_cert_geometry_scenario();
 	float fogC[4], resC[4], expect[3];
 	float err;
+	float *ref = NULL;
+	uint8_t *mask = NULL;
+	uint32_t maskCount = 0;
+	certMetrics_t diff;
 
 	if ( !sc || !OIT_Lab_GetSnapshot( &snap ) ) {
 		OIT_Lab_RecordPending( WBOIT_CERT_STATUS_PENDING, WBOIT_EVIDENCE_NONE, 0, 2e-2,
@@ -352,16 +412,74 @@ static void OIT_Lab_EvalSingle( void )
 	}
 	vk_oit_cert_geometry_expect_source_over( sc->expectSingleColor, sc->expectSingleOpacity, fogC, expect );
 	err = fmaxf( fabsf( resC[0] - expect[0] ), fmaxf( fabsf( resC[1] - expect[1] ), fabsf( resC[2] - expect[2] ) ) );
+	vk_cert_metrics_clear( &diff );
+	if ( !OIT_Lab_BuildSingleLayerReference( snap, sc, &ref, &mask, &maskCount ) || maskCount == 0 ) {
+		free( ref );
+		free( mask );
+		OIT_Lab_RecordPending( WBOIT_CERT_STATUS_PENDING, WBOIT_EVIDENCE_NONE, err, 2e-2,
+			"single-layer image-diff reference unavailable" );
+		return;
+	}
+	vk_cert_metrics_compare_rgba( snap->resolved.rgba, ref, snap->resolved.width, snap->resolved.height,
+		mask, &diff );
+	free( ref );
+	free( mask );
 	{
 		char notes[192];
 		Com_sprintf( notes, sizeof( notes ),
-			"centerAbsErr=%g opacity=%g expect=(%.3f %.3f %.3f) got=(%.3f %.3f %.3f)",
-			err, sc->expectSingleOpacity, expect[0], expect[1], expect[2], resC[0], resC[1], resC[2] );
-		if ( err <= 5e-2f ) {
-			OIT_Lab_RecordPending( WBOIT_CERT_STATUS_PASS, WBOIT_EVIDENCE_GPU_READBACK, err, 5e-2, notes );
+			"imageDiff rmse=%g maxAbs=%g meanRelLum=%g pixels=%u centerAbs=%g",
+			diff.rmse, diff.maxAbsRgb, diff.meanRelLum, diff.validPixelCount, err );
+		if ( err <= 5e-2f &&
+			vk_cert_metrics_image_diff_passes( &diff, 3.5e-2, 8.0e-2, 8.0e-2 ) ) {
+			OIT_Lab_RecordPending( WBOIT_CERT_STATUS_PASS, WBOIT_EVIDENCE_GPU_IMAGE_DIFF,
+				diff.rmse, 3.5e-2, notes );
 		} else {
-			OIT_Lab_RecordPending( WBOIT_CERT_STATUS_FAIL, WBOIT_EVIDENCE_GPU_READBACK, err, 5e-2, notes );
+			OIT_Lab_RecordPending( WBOIT_CERT_STATUS_FAIL, WBOIT_EVIDENCE_GPU_IMAGE_DIFF,
+				diff.rmse, 3.5e-2, notes );
 		}
+	}
+}
+
+static void OIT_Lab_EvalMboitSingle( void )
+{
+	const certOitSnapshot_t *snap;
+	const oitCertScenario_t *sc = vk_oit_cert_geometry_scenario();
+	float *ref = NULL;
+	uint8_t *mask = NULL;
+	uint32_t maskCount = 0;
+	certMetrics_t diff;
+	if ( !sc || !OIT_Lab_GetSnapshot( &snap ) ) {
+		Q_strncpyz( s_lastMboitStatus, "PENDING", sizeof( s_lastMboitStatus ) );
+		Q_strncpyz( s_lastMboitNotes, "MBOIT image-diff snapshot unavailable", sizeof( s_lastMboitNotes ) );
+		s_lastRecordedStatus = WBOIT_CERT_STATUS_PENDING;
+		return;
+	}
+	vk_cert_metrics_clear( &diff );
+	if ( !OIT_Lab_BuildSingleLayerReference( snap, sc, &ref, &mask, &maskCount ) || maskCount == 0 ) {
+		free( ref );
+		free( mask );
+		Q_strncpyz( s_lastMboitStatus, "PENDING", sizeof( s_lastMboitStatus ) );
+		Q_strncpyz( s_lastMboitNotes, "MBOIT image-diff reference unavailable", sizeof( s_lastMboitNotes ) );
+		s_lastRecordedStatus = WBOIT_CERT_STATUS_PENDING;
+		return;
+	}
+	vk_cert_metrics_compare_rgba( snap->resolved.rgba, ref, snap->resolved.width, snap->resolved.height,
+		mask, &diff );
+	free( ref );
+	free( mask );
+	s_lastMboitImageDiff = diff;
+	Com_sprintf( s_lastMboitNotes, sizeof( s_lastMboitNotes ),
+		"rmse=%g maxAbs=%g meanRelLum=%g pixels=%u", diff.rmse, diff.maxAbsRgb,
+		diff.meanRelLum, diff.validPixelCount );
+	if ( vk_cert_metrics_image_diff_passes( &diff, 4.5e-2, 9.0e-2, 1.0e-1 ) ) {
+		Q_strncpyz( s_lastMboitStatus, "PASS", sizeof( s_lastMboitStatus ) );
+		s_lastRecordedStatus = WBOIT_CERT_STATUS_PASS;
+		ri.Printf( PRINT_ALL, "[VK][MBOIT-cert] PASS image-diff %s\n", s_lastMboitNotes );
+	} else {
+		Q_strncpyz( s_lastMboitStatus, "FAIL", sizeof( s_lastMboitStatus ) );
+		s_lastRecordedStatus = WBOIT_CERT_STATUS_FAIL;
+		ri.Printf( PRINT_WARNING, S_COLOR_YELLOW "[VK][MBOIT-cert] FAIL image-diff %s\n" S_COLOR_WHITE,
+			s_lastMboitNotes );
 	}
 }
 
@@ -663,6 +781,7 @@ void vk_oit_lab_finalize_frame( int cmdIndex )
 	case OIT_LAB_EVAL_ADDITIVE: OIT_Lab_EvalAdditive(); break;
 	case OIT_LAB_EVAL_HDR: OIT_Lab_EvalHdr(); break;
 	case OIT_LAB_EVAL_LIFECYCLE: OIT_Lab_EvalLifecycle(); break;
+	case OIT_LAB_EVAL_MBOIT_SINGLE: OIT_Lab_EvalMboitSingle(); break;
 	default: break;
 	}
 
@@ -865,6 +984,20 @@ static void OIT_Lab_Status_f( void )
 		vk_oit_cert_geometry_was_drawn() ? 1 : 0 );
 }
 
+static void OIT_Lab_MboitStatus_f( void )
+{
+	ri.Printf( PRINT_ALL,
+		"mboit_image_diff_status: status=%s rmse=%g maxAbs=%g meanRelLum=%g pixels=%u\n"
+		"  notes=%s\n"
+		"  command: oit_lab_run mboit_compare\n",
+		s_lastMboitStatus[0] ? s_lastMboitStatus : "PENDING",
+		s_lastMboitImageDiff.rmse,
+		s_lastMboitImageDiff.maxAbsRgb,
+		s_lastMboitImageDiff.meanRelLum,
+		s_lastMboitImageDiff.validPixelCount,
+		s_lastMboitNotes[0] ? s_lastMboitNotes : "-" );
+}
+
 static void OIT_Lab_Reset_f( void )
 {
 	s_pendingEval = OIT_LAB_EVAL_NONE;
@@ -901,6 +1034,7 @@ void vk_oit_lab_register( void )
 	ri.Cmd_AddCommand( "oit_lab_status", OIT_Lab_Status_f );
 	ri.Cmd_AddCommand( "oit_lab_reset", OIT_Lab_Reset_f );
 	ri.Cmd_AddCommand( "oit_certify_core", OIT_CertifyCore_f );
+	ri.Cmd_AddCommand( "mboit_image_diff_status", OIT_Lab_MboitStatus_f );
 
 	s_cmds = qtrue;
 	ri.Printf( PRINT_ALL,

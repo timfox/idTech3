@@ -71,6 +71,7 @@ const char *vk_wboit_cert_evidence_name( wboitCertEvidence_t e )
 	case WBOIT_EVIDENCE_STATIC: return "STATIC";
 	case WBOIT_EVIDENCE_CPU_REFERENCE: return "CPU_REFERENCE";
 	case WBOIT_EVIDENCE_GPU_READBACK: return "GPU_READBACK";
+	case WBOIT_EVIDENCE_GPU_IMAGE_DIFF: return "GPU_IMAGE_DIFF";
 	case WBOIT_EVIDENCE_GPU_REDUCTION: return "GPU_REDUCTION";
 	case WBOIT_EVIDENCE_LIFECYCLE: return "LIFECYCLE";
 	case WBOIT_EVIDENCE_SOAK: return "SOAK";
@@ -126,7 +127,13 @@ qboolean vk_wboit_cert_evidence_satisfies( wboitCertEvidence_t have, wboitCertEv
 	if ( need == WBOIT_EVIDENCE_GPU_READBACK && have == WBOIT_EVIDENCE_GPU_REDUCTION ) {
 		return qtrue;
 	}
+	if ( need == WBOIT_EVIDENCE_GPU_READBACK && have == WBOIT_EVIDENCE_GPU_IMAGE_DIFF ) {
+		return qtrue;
+	}
 	if ( need == WBOIT_EVIDENCE_GPU_REDUCTION && have == WBOIT_EVIDENCE_GPU_READBACK ) {
+		return qtrue;
+	}
+	if ( need == WBOIT_EVIDENCE_GPU_REDUCTION && have == WBOIT_EVIDENCE_GPU_IMAGE_DIFF ) {
 		return qtrue;
 	}
 	return qfalse;
@@ -372,7 +379,7 @@ qboolean vk_wboit_cert_export_json( const char *path )
 	VK_WboitCert_RecomputeLevel();
 	off += Com_sprintf( buf + off, sizeof( buf ) - off,
 		"{\n"
-		"  \"schema\": \"wboit_certification/2.6A\",\n"
+		"  \"schema\": \"wboit_certification/2.7-image-diff\",\n"
 		"  \"level\": \"%s\",\n"
 		"  \"device\": \"%s\",\n"
 		"  \"importNote\": \"%s\",\n"

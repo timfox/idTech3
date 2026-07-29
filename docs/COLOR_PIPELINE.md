@@ -1,8 +1,8 @@
 # Color Pipeline Contract
 
-**Status:** Phase 1–2.5 complete + **Phase 2.6 / 2.6A / 2.6B / 2.6C** live WBOIT certification (deferred GPU snapshots, `oit_certify_core` → soak → production promotion).  
+**Status:** Phase 1–2.5 complete + **Phase 2.7** live WBOIT/MBOIT GPU image-diff certification (deferred GPU snapshots, fixture references, `oit_certify_core` → soak → production promotion).  
 **Code:** `vk_color_contract.c` / `vk_oit_contract.c` / `vk_oit_alpha.c` / `vk_depth_contract.c` / `vk_hdr_resolve_contract.c` / `vk_oit_weight_contract.c` / `vk_wboit_production_cert.c` / `vk_cert_readback.c` / `vk_cert_metrics.c` / `vk_oit_cert_geometry.c` / `vk_oit_lab.c` / `vk_transparency_lab.c` / `vk_specialized_transparency.c`  
-**Commands:** `color_pipeline_status`, `oit_contract_status`, `oit_weight_status`, `wboit_production_status`, `oit_certify_core`, `oit_lab_run`, `cert_readback_capture`, `oit_certification_export`  
+**Commands:** `color_pipeline_status`, `oit_contract_status`, `oit_weight_status`, `wboit_production_status`, `oit_certify_core`, `oit_lab_run`, `mboit_image_diff_status`, `cert_readback_capture`, `oit_certification_export`  
 **Debug:** `r_oitCertificationDebug`, `r_transparencyReference`, `r_oitAllowManualCertification`, `r_requireWboitCertification`
 
 This document is the single contract for scene-linear color and transparency. Older notes in [HDR_PIPELINE.md](HDR_PIPELINE.md) and [WBOIT_FOG_LAYERS.md](WBOIT_FOG_LAYERS.md) defer to this order for composition. Exact WBOIT math/formats/blends: [WBOIT_CONTRACT.md](WBOIT_CONTRACT.md). Alpha source encoding: [WBOIT_ALPHA_ENCODING.md](WBOIT_ALPHA_ENCODING.md). Live GPU certification: [WBOIT_LIVE_CERTIFICATION.md](WBOIT_LIVE_CERTIFICATION.md). Specialized routes: [TRANSPARENCY_ROUTING.md](TRANSPARENCY_ROUTING.md).
@@ -16,11 +16,34 @@ This document is the single contract for scene-linear color and transparency. Ol
 | Path | Cvar | Policy |
 |------|------|--------|
 | WBOIT | `r_oit 1` | **Production** general-purpose OIT |
-| MBOIT | `r_oit 2` | **Experimental** until same certification as WBOIT |
+| MBOIT | `r_oit 2` | **Experimental** until it passes its own live GPU image-diff matrix; WBOIT certification does not transfer |
 | Specialized | refractive / portal / screenMap | After OIT resolve; not in WBOIT accum |
 | Off | `r_oit 0` | Sorted alpha (legacy); still must respect spaces below |
 
 All transparent lighting and OIT composition occur in **SCENE_LINEAR_HDR**. No pass may mix gamma-encoded, pre-exposed, tone-mapped, premultiplied, or straight-alpha data without an explicit encode/decode at a named stage boundary.
+
+### Live GPU Image-Diff Certification
+
+WBOIT production promotion requires measured GPU evidence. The live lab records fog/accum/reveal/resolved snapshots after OIT resolve, builds deterministic CPU references for fixture pixels, and records **GPU image-diff** evidence (`WBOIT_EVIDENCE_GPU_IMAGE_DIFF`) with RMSE, max absolute RGB error, mean relative luminance error, and valid pixel count. Center-sample checks are retained only as a sanity signal; they are not sufficient for production promotion.
+
+Required command path:
+
+```text
+exec modern_vulkan.cfg
+oit_certify_core
+wboit_production_status
+oit_certification_export
+```
+
+MBOIT has a separate live gate:
+
+```text
+exec vulkan_overlay_mboit.cfg
+oit_lab_run mboit_compare
+mboit_image_diff_status
+```
+
+`mboit_image_diff_status` reports the last MBOIT single-layer GPU image-diff result. It does not mark WBOIT production stages and should be expanded into a full MBOIT matrix before `r_oit 2` becomes a shipping default.
 
 ---
 

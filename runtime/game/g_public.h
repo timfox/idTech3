@@ -436,6 +436,7 @@ typedef enum {
 	G_RTS_GET_ENTITY_OWNER,		/* int RTS_GetEntityOwner( rtsEntityId_t id ) */
 	G_RTS_GET_ENTITY_POSITION,	/* int RTS_GetEntityPosition( rtsEntityId_t id, int *x, int *y ) */
 	G_RTS_GET_ENTITY_HITPOINTS,	/* int RTS_GetEntityHitpoints( rtsEntityId_t id ) */
+	G_RTS_GET_ENTITY_RESOURCES,	/* int RTS_GetEntityResources( rtsEntityId_t id ) */
 	G_RTS_GET_PLAYER_RESOURCES,	/* int RTS_GetPlayerResources( int playerId ) */
 	G_RTS_COMPUTE_STATE_HASH,	/* unsigned RTS_ComputeStateHash( void ) */
 	/*

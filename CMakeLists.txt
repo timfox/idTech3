@@ -3233,6 +3233,13 @@ set_tests_properties(test_mboit_stochastic PROPERTIES
 	LABELS "scripts;validation;renderer"
 	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_mboit_stochastic.sh;${CMAKE_SOURCE_DIR}/renderers/vulkan/shaders/glsl/oit_moments.frag;${CMAKE_SOURCE_DIR}/docs/MOMENT_OIT_STOCHASTIC_ALPHA.md")
 
+add_test(NAME test_oit_live_image_diff_cert
+	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_oit_live_image_diff_cert.sh
+	WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+set_tests_properties(test_oit_live_image_diff_cert PROPERTIES
+	LABELS "scripts;validation;renderer;oit;mboit"
+	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_oit_live_image_diff_cert.sh;${CMAKE_SOURCE_DIR}/renderers/vulkan/vk_oit_lab.c;${CMAKE_SOURCE_DIR}/renderers/vulkan/vk_wboit_production_cert.c")
+
 add_test(NAME test_upscale
 	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_upscale.sh
 	WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})

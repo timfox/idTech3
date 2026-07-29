@@ -57,6 +57,10 @@ float vk_cert_metrics_luminance( float r, float g, float b );
 void vk_cert_metrics_compare_rgba( const float *a, const float *b, uint32_t w, uint32_t h,
 	const uint8_t *mask, certMetrics_t *out );
 
+/* Image-diff acceptance gate used by live OIT certification. */
+qboolean vk_cert_metrics_image_diff_passes( const certMetrics_t *m,
+	double rmseLimit, double maxAbsLimit, double meanRelLumLimit );
+
 /*
  * Empty-pixel gate: for pixels with accumWeight≈0 and revealage≈1,
  * resolved must match fog_scene within eps.
