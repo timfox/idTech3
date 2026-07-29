@@ -12,7 +12,7 @@ echo "[test_fog_biology] checking sources..."
 FB="$(idtech3_require_file modules/world/fog_biology.cpp src/world/fog_biology.cpp)"
 idtech3_require_file modules/world/fog_biology.h src/world/fog_biology.h >/dev/null
 CL_GF="$(idtech3_require_file runtime/client/core/cl_gameframe.c src/client/core/cl_gameframe.c)"
-LUA_B="$(idtech3_file runtime/game/g_lua_bindings.c src/game/g_lua_bindings.c)"
+LUA_B="$(idtech3_file runtime/game/scripting/g_lua_bindings.c src/game/g_lua_bindings.c)"
 
 rg -q 'fog_biology.cpp' CMakeLists.txt
 

@@ -1683,19 +1683,20 @@ endif()
 list(APPEND CLIENT_SRCS
   modules/audio/mixer/snd_mixer.c
   modules/audio/snd_music_adaptive.c
-  runtime/game/g_director.c
-  runtime/game/g_response.c
-  runtime/game/g_choreography.c
-  runtime/game/g_dismember.c
-  runtime/game/g_facial.c
-  runtime/game/g_horde.c
-  runtime/game/g_goap.c
-  runtime/game/g_aiml.c
-  runtime/game/g_eda.c
-  runtime/game/g_engine_systems.c
-  runtime/game/g_bt.c
-  runtime/game/g_entity_bridge.c
-  runtime/game/g_lua_bindings.c
+  runtime/game/middleware/g_director.c
+  runtime/game/middleware/g_response.c
+  runtime/game/middleware/g_choreography.c
+  runtime/game/middleware/g_dismember.c
+  runtime/game/middleware/g_facial.c
+  runtime/game/middleware/g_animgraph.c
+  runtime/game/middleware/g_horde.c
+  runtime/game/middleware/g_goap.c
+  runtime/game/middleware/g_aiml.c
+  runtime/game/middleware/g_eda.c
+  runtime/game/systems/g_engine_systems.c
+  runtime/game/middleware/g_bt.c
+  runtime/game/systems/g_entity_bridge.c
+  runtime/game/scripting/g_lua_bindings.c
 )
 include(${CMAKE_SOURCE_DIR}/cmake/modules/ClientGameAiSources.cmake)
 include(${CMAKE_SOURCE_DIR}/cmake/modules/UberToolsSources.cmake)
@@ -1899,7 +1900,18 @@ IF(USE_SYSTEM_JPEG)
 	ADD_LIBRARY(client OBJECT ${CLIENT_SRCS})
 	find_package(JPEG REQUIRED)
 	TARGET_COMPILE_DEFINITIONS(client PRIVATE -DUSE_SYSTEM_JPEG)
-	target_include_directories(client PRIVATE ${CMAKE_SOURCE_DIR}/runtime/game)
+	target_include_directories(client PRIVATE
+		${CMAKE_SOURCE_DIR}/runtime/game
+		${CMAKE_SOURCE_DIR}/runtime/game/middleware
+		${CMAKE_SOURCE_DIR}/runtime/game/systems
+		${CMAKE_SOURCE_DIR}/runtime/game/scripting
+		${CMAKE_SOURCE_DIR}/runtime/game/ecs
+		${CMAKE_SOURCE_DIR}/modules/dialogue
+		${CMAKE_SOURCE_DIR}/modules/navigation
+		${CMAKE_SOURCE_DIR}/modules/physics
+		${CMAKE_SOURCE_DIR}/modules/world
+		${CMAKE_SOURCE_DIR}/renderers/common
+		${CMAKE_SOURCE_DIR}/renderers/vulkan)
 	target_include_directories(client PRIVATE ${CMAKE_SOURCE_DIR}/extensions/generative)
 	if(USE_OPUS)
 		target_compile_definitions(client PRIVATE INCLUDE_INTTYPES_H=1 INCLUDE_SYS_TYPES_H=1)
@@ -1921,7 +1933,18 @@ ELSE()
 	# Ensure client can find qcommon headers needed by some client-side modules (eg. mp3)
 	target_include_directories(client PRIVATE ${IDTECH3_DIR_ENGINE_CORE} ${EXTERNAL_JPEG_SRC_DIR})
 	# ECS (EnTT) - alternative to gentity
-	target_include_directories(client PRIVATE ${CMAKE_SOURCE_DIR}/runtime/game)
+	target_include_directories(client PRIVATE
+		${CMAKE_SOURCE_DIR}/runtime/game
+		${CMAKE_SOURCE_DIR}/runtime/game/middleware
+		${CMAKE_SOURCE_DIR}/runtime/game/systems
+		${CMAKE_SOURCE_DIR}/runtime/game/scripting
+		${CMAKE_SOURCE_DIR}/runtime/game/ecs
+		${CMAKE_SOURCE_DIR}/modules/dialogue
+		${CMAKE_SOURCE_DIR}/modules/navigation
+		${CMAKE_SOURCE_DIR}/modules/physics
+		${CMAKE_SOURCE_DIR}/modules/world
+		${CMAKE_SOURCE_DIR}/renderers/common
+		${CMAKE_SOURCE_DIR}/renderers/vulkan)
 	# Audio module headers (moved from client/)
 	target_include_directories(client PRIVATE
 		${CMAKE_SOURCE_DIR}/modules/audio
@@ -2657,7 +2680,7 @@ endif()
 
 # --- ECS (EnTT) module - alternative to gentity ---
 enable_language(CXX)
-ADD_LIBRARY(ecs_module STATIC runtime/game/ecs.cpp)
+ADD_LIBRARY(ecs_module STATIC runtime/game/ecs/ecs.cpp)
 set_target_properties(ecs_module PROPERTIES
   CXX_STANDARD ${IDTECH3_CXX_STANDARD}
   CXX_STANDARD_REQUIRED ON
@@ -2665,6 +2688,7 @@ set_target_properties(ecs_module PROPERTIES
 target_include_directories(ecs_module PRIVATE
   ${EXTERNAL_INCLUDE}/entt/single_include
   ${CMAKE_SOURCE_DIR}/runtime/game
+  ${CMAKE_SOURCE_DIR}/runtime/game/ecs
   ${IDTECH3_DIR_ENGINE_CORE}
 )
 if(NOT MSVC)
@@ -3165,7 +3189,7 @@ add_test(NAME test_engine_save
 	WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
 set_tests_properties(test_engine_save PROPERTIES
 	LABELS "scripts;validation;engine"
-	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_engine_save.sh;${CMAKE_SOURCE_DIR}/runtime/game/g_engine_systems.c")
+	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_engine_save.sh;${CMAKE_SOURCE_DIR}/runtime/game/systems/g_engine_systems.c")
 
 add_test(NAME test_squeezeme
 	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_squeezeme.sh
@@ -3684,7 +3708,7 @@ add_test(NAME test_facs_facial
 	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_facs_facial.sh)
 set_tests_properties(test_facs_facial PROPERTIES
 	LABELS "scripts;validation;client;facs"
-	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_facs_facial.sh;${CMAKE_SOURCE_DIR}/runtime/game/g_facial.c;${CMAKE_SOURCE_DIR}/docs/FACS.md")
+	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_facs_facial.sh;${CMAKE_SOURCE_DIR}/runtime/game/middleware/g_facial.c;${CMAKE_SOURCE_DIR}/docs/FACS.md")
 
 add_test(NAME test_freeusd_wiring
 	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_freeusd_wiring.sh)

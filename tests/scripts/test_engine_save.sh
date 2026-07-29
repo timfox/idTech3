@@ -4,7 +4,7 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 source "$ROOT/tests/scripts/idtech3_test_paths.sh"
 idtech3_test_paths_init "$ROOT"
-SRC="$(idtech3_require_file runtime/game/g_engine_systems.c src/game/g_engine_systems.c)"
+SRC="$(idtech3_require_file runtime/game/systems/g_engine_systems.c src/game/g_engine_systems.c)"
 
 grep -q 'EngineSave_JsonEscapeLabel' "$SRC" || {
   echo "missing EngineSave_JsonEscapeLabel in g_engine_systems.c" >&2

@@ -19,7 +19,7 @@ CL_GG="$(idtech3_require_file extensions/generative/cl_genetic_gan.c src/extensi
 idtech3_require_file extensions/generative/cl_genetic_gan.h src/extensions/generative/cl_genetic_gan.h >/dev/null
 CL_GEN="$(idtech3_require_file extensions/generative/cl_generative.c src/extensions/generative/cl_generative.c)"
 CL_MAIN="$(idtech3_require_file runtime/client/core/cl_main.c src/client/core/cl_main.c)"
-LUA_B="$(idtech3_require_file runtime/game/g_lua_bindings.c src/game/g_lua_bindings.c)"
+LUA_B="$(idtech3_require_file runtime/game/scripting/g_lua_bindings.c src/game/g_lua_bindings.c)"
 test -f scripts/genetic_gan_decode.py || fail "missing genetic_gan_decode.py"
 
 rg -q 'genetic_gan.cpp' cmake/IdTech3QcommonExtensions.cmake CMakeLists.txt

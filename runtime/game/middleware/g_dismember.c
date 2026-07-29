@@ -13,7 +13,7 @@ Dismemberment and extended gibs implementation.
 #include "q_shared.h"
 #include "qcommon.h"
 #include "g_dismember.h"
-#include "../physics/phys_bullet.h"
+#include "phys_bullet.h"
 #include <math.h>
 
 #define MAX_DISMEMBER_INSTANCES 64

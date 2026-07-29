@@ -657,8 +657,8 @@ elif ! grep -q 'G_ENGINE_SPRITE_SPAWN' "$PROJECT_ROOT/runtime/game/g_public.h" 2
 elif ! grep -q 'SV_EngineSprite_SpawnFromDef' "$PROJECT_ROOT/runtime/server/gameplay/sv_engine_sprites.c" 2>/dev/null; then
   fail "sv_engine_sprites.c missing runtime spawn helper"
 elif ! grep -q 'registerTable(L, "Sprites"' \
-	"$PROJECT_ROOT/runtime/game/g_lua_bindings.c" \
-	"$PROJECT_ROOT/runtime/game/g_lua_registration.inc" 2>/dev/null; then
+	"$PROJECT_ROOT/runtime/game/scripting/g_lua_bindings.c" \
+	"$PROJECT_ROOT/runtime/game/scripting/g_lua_registration.inc" 2>/dev/null; then
   fail "g_lua_bindings.c missing Engine.Sprites Lua table"
 elif ! grep -q 'CG_ENGINE_SPRITE_ADD_LOCAL' "$PROJECT_ROOT/runtime/cgame/cg_public.h" 2>/dev/null; then
   fail "cg_public.h missing CG_ENGINE_SPRITE_ADD_LOCAL cgame trap"
@@ -680,8 +680,8 @@ elif ! grep -q 'CS_ENGINE_DECAL_SHADERS' "$PROJECT_ROOT/runtime/game/bg_public.h
 elif ! grep -q 'AddEngineDecalToScene' "$PROJECT_ROOT/renderers/common/tr_public.h" 2>/dev/null; then
   fail "tr_public.h missing AddEngineDecalToScene"
 elif ! grep -q 'registerTable(L, "Decals"' \
-	"$PROJECT_ROOT/runtime/game/g_lua_bindings.c" \
-	"$PROJECT_ROOT/runtime/game/g_lua_registration.inc" 2>/dev/null; then
+	"$PROJECT_ROOT/runtime/game/scripting/g_lua_bindings.c" \
+	"$PROJECT_ROOT/runtime/game/scripting/g_lua_registration.inc" 2>/dev/null; then
   fail "g_lua_bindings.c missing Engine.Decals Lua table"
 else
   pass "engine-native decals (CS + EF_DECAL + renderer bridge)"

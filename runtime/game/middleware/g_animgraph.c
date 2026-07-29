@@ -36,7 +36,6 @@ qboolean G_AnimGraph_Load( const char *path ) {
 	void *buf;
 	int len;
 	const char *p;
-	char token[MAX_TOKEN_CHARS];
 
 	if ( !g_animgraph || !g_animgraph->integer || !path || !path[0] ) {
 		return qfalse;

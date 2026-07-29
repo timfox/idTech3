@@ -18,9 +18,9 @@ Reads BSP entity key/values and configures engine systems.
 #include "g_director.h"
 #endif
 #ifdef USE_OPEN_WORLD
-#include "../world/world_config.h"
+#include "world_config.h"
 #endif
-#include "../client/shell/cl_map_background.h"
+#include "cl_map_background.h"
 
 static const char *EB_ParseToken(const char **text) {
 	return COM_Parse(text);

@@ -15,7 +15,7 @@ state run 1 0.15
 
 ## Runtime
 
-- [g_animgraph.c](../runtime/game/g_animgraph.c): `G_AnimGraph_Load`, `SetState`, `Update`
+- [g_animgraph.c](../runtime/game/middleware/g_animgraph.c): `G_AnimGraph_Load`, `SetState`, `Update`
 - Cvar `g_animgraph` (default 1)
 - Lua: `Engine.AnimGraph.load`, `setState`, `update`
 - Studio **Animation** panel: preview via ImGui Studio (extend `r_studio_tools`)

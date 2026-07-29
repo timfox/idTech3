@@ -657,6 +657,18 @@ static qboolean SV_GetValue( char* value, int valueSize, const char* key )
 		return qtrue;
 	}
 
+	if ( !Q_stricmp( key, "trap_RTS_GetPendingCommandCount" ) )
+	{
+		Com_sprintf( value, valueSize, "%i", G_RTS_GET_PENDING_COMMAND_COUNT );
+		return qtrue;
+	}
+
+	if ( !Q_stricmp( key, "trap_RTS_GetExecutedCommandCount" ) )
+	{
+		Com_sprintf( value, valueSize, "%i", G_RTS_GET_EXECUTED_COMMAND_COUNT );
+		return qtrue;
+	}
+
 	if ( !Q_stricmp( key, "trap_RTS_GetEntityCount" ) )
 	{
 		Com_sprintf( value, valueSize, "%i", G_RTS_GET_ENTITY_COUNT );

@@ -182,8 +182,8 @@ CMake: [`cmake/modules/ClientGameAiSources.cmake`](../cmake/modules/ClientGameAi
 
 | Path | Tier | Gate |
 |------|------|------|
-| `src/game/g_director.c` … `g_bt.c` (11 TU) | module | `USE_GAME_AI_MIDDLEWARE` |
-| `src/game/g_engine_systems.c` | core | always (telemetry/replay/save/quest) |
+| `runtime/game/middleware/g_director.c` ... `g_bt.c` (middleware TUs) | module | `USE_GAME_AI_MIDDLEWARE` |
+| `runtime/game/systems/g_engine_systems.c` | core | always (telemetry/replay/save/quest) |
 | `src/game/game_middleware_stubs.c` | core | when middleware OFF |
 
 Test: `test_game_ai_middleware.sh`.

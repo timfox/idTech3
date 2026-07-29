@@ -33,7 +33,7 @@ Usage from Lua:
 #include "g_engine_systems.h"
 
 #ifdef USE_OPEN_WORLD
-#include "../world/world_config.h"
+#include "world_config.h"
 #endif
 
 #ifdef USE_LUA
@@ -51,31 +51,31 @@ Usage from Lua:
 #include "g_response.h"
 #endif
 #include "ecs.h"
-#include "../physics/phys_bullet.h"
-#include "../physics/phys_events.h"
-#include "../physics/phys_materials.h"
-#include "../physics/phys_props.h"
-#include "../physics/phys_volumes.h"
-#include "../world/fog_biology.h"
-#include "../world/genetic_gan.h"
+#include "phys_bullet.h"
+#include "phys_events.h"
+#include "phys_materials.h"
+#include "phys_props.h"
+#include "phys_volumes.h"
+#include "fog_biology.h"
+#include "genetic_gan.h"
 #ifdef USE_ARC_BLANC
-#include "../world/arc_blanc/arc_blanc.h"
+#include "arc_blanc/arc_blanc.h"
 #endif
-#include "../physics/phys_procedural_anim.h"
-#include "../physics/phys_ik.h"
-#include "../navigation/nav_recast.h"
-#include "../client/cl_particles.h"
-#include "../client/cl_engine_sprites.h"
-#include "../client/cl_engine_decals.h"
-#include "../client/core/cl_p2p_session.h"
-#include "../physics/phys_character.h"
-#include "../physics/phys_ragdoll_bind.h"
-#include "../physics/phys_character.h"
-#include "../physics/phys_dmm.h"
-#include "../physics/phys_middleware.h"
+#include "phys_procedural_anim.h"
+#include "phys_ik.h"
+#include "nav_recast.h"
+#include "cl_particles.h"
+#include "cl_engine_sprites.h"
+#include "cl_engine_decals.h"
+#include "cl_p2p_session.h"
+#include "phys_character.h"
+#include "phys_ragdoll_bind.h"
+#include "phys_character.h"
+#include "phys_dmm.h"
+#include "phys_middleware.h"
 #include "g_animgraph.h"
-#include "../renderers/common/tr_public.h"
-#include "../audio/snd_music_adaptive.h"
+#include "tr_public.h"
+#include "snd_music_adaptive.h"
 
 extern refexport_t re;
 
@@ -316,7 +316,7 @@ static int l_response_trigger(lua_State *L) {
 
 /* ========== VDB bindings ========== */
 
-#include "../renderers/vulkan/vk_vdb.h"
+#include "vk_vdb.h"
 
 static int l_vdb_load(lua_State *L) {
 	lua_pushinteger(L, VDB_Load(luaL_checkstring(L, 1), luaL_optstring(L, 2, "density")));
@@ -1210,7 +1210,7 @@ static int l_loc_lookup( lua_State *L ) {
 	return 1;
 }
 #ifdef USE_BABBLE
-#include "../../../modules/dialogue/babble.h"
+#include "babble.h"
 static int l_babble_load( lua_State *L ) {
 	lua_pushinteger( L, Babble_LoadFile( luaL_checkstring( L, 1 ) ) );
 	return 1;

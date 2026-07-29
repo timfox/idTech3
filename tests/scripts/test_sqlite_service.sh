@@ -14,8 +14,8 @@ fail() {
 ENGINE_DB="$(idtech3_file engine/core/engine_db.c src/qcommon/engine_db.c)"
 CSHARP_ENGINE="$(idtech3_file engine/core/csharp/IdTech3.Engine.cs src/qcommon/csharp/IdTech3.Engine.cs)"
 PYTHON_DEBUG="$(idtech3_file engine/core/python_debug.c src/qcommon/python_debug.c)"
-LUA_BINDINGS="$(idtech3_file runtime/game/g_lua_bindings.c src/game/g_lua_bindings.c)"
-LUA_REGISTRATION="$(idtech3_file runtime/game/g_lua_registration.inc src/game/g_lua_registration.inc)"
+LUA_BINDINGS="$(idtech3_file runtime/game/scripting/g_lua_bindings.c src/game/g_lua_bindings.c)"
+LUA_REGISTRATION="$(idtech3_file runtime/game/scripting/g_lua_registration.inc src/game/g_lua_registration.inc)"
 
 grep -q 'option(USE_SQLITE "Enable native SQLite gameplay/profile database support" ON)' "$ROOT/CMakeLists.txt" || fail "missing USE_SQLITE option"
 grep -q 'find_package(SQLite3 QUIET)' "$ROOT/CMakeLists.txt" || fail "missing SQLite3 discovery"

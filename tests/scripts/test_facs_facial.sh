@@ -7,10 +7,10 @@ source "$ROOT/tests/scripts/idtech3_test_paths.sh"
 idtech3_test_paths_init "$ROOT"
 fail() { echo "FAIL: $*" >&2; exit 1; }
 
-FACE="$(idtech3_require_file runtime/game/g_facial.c src/game/g_facial.c)"
+FACE="$(idtech3_require_file runtime/game/middleware/g_facial.c src/game/g_facial.c)"
 FACEH="$(idtech3_require_file runtime/game/g_facial.h src/game/g_facial.h)"
-LUA="$(idtech3_require_file runtime/game/g_lua_bindings.c src/game/g_lua_bindings.c)"
-LUA_REG="$(idtech3_require_file runtime/game/g_lua_registration.inc src/game/g_lua_registration.inc)"
+LUA="$(idtech3_require_file runtime/game/scripting/g_lua_bindings.c src/game/g_lua_bindings.c)"
+LUA_REG="$(idtech3_require_file runtime/game/scripting/g_lua_registration.inc src/game/g_lua_registration.inc)"
 CGAME="${IDTECH3_CLIENT}/core/cl_cgame.c"
 DOC="${ROOT}/docs/FACS.md"
 

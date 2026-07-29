@@ -1,6 +1,6 @@
 # FACS facial animation
 
-Ekman & Friesen **Facial Action Coding System** Action Units drive the engine face layer (`runtime/game/g_facial.c`). AUs map to flex controllers, which map to IQM/glTF morph target names.
+Ekman & Friesen **Facial Action Coding System** Action Units drive the engine face layer (`runtime/game/middleware/g_facial.c`). AUs map to flex controllers, which map to IQM/glTF morph target names.
 
 ## Toggle
 
