@@ -18,5 +18,8 @@ void vk_day_night_begin_frame( void );
 
 float vk_day_night_time_of_day( void );
 qboolean vk_day_night_active( void );
+float vk_day_night_day_factor( void );
+float vk_day_night_sun_elevation( void );
+float vk_day_night_shadow_factor( void );
 
 #endif /* USE_VULKAN */

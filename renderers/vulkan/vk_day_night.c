@@ -20,6 +20,8 @@ static cvar_t *r_dayNightNorthYaw;
 static cvar_t *r_dayNightSunScale;
 static cvar_t *r_dayNightMoonScale;
 static cvar_t *r_dayNightAmbientScale;
+static cvar_t *r_dayNightShadowFade;
+static cvar_t *r_dayNightMoonShadow;
 static cvar_t *r_dayNightDebug;
 
 static vec3_t s_baseSunLight = { 1.0f, 1.0f, 1.0f };
@@ -164,6 +166,30 @@ float vk_day_night_time_of_day( void )
 	return s_timeOfDay;
 }
 
+float vk_day_night_day_factor( void )
+{
+	return vk_day_night_active() ? s_dayFactor : 1.0f;
+}
+
+float vk_day_night_sun_elevation( void )
+{
+	return vk_day_night_active() ? s_sunElevation : 1.0f;
+}
+
+float vk_day_night_shadow_factor( void )
+{
+	float fade;
+	float moon;
+
+	if ( !vk_day_night_active() ) {
+		return 1.0f;
+	}
+
+	fade = r_dayNightShadowFade ? DN_Clamp01( r_dayNightShadowFade->value ) : 1.0f;
+	moon = r_dayNightMoonShadow ? DN_Clamp01( r_dayNightMoonShadow->value ) : 0.18f;
+	return Com_Clamp( 0.0f, 1.0f, s_dayFactor * fade + ( 1.0f - s_dayFactor ) * moon );
+}
+
 void vk_day_night_register_cvars( void )
 {
 	if ( r_dayNight ) {
@@ -208,6 +234,14 @@ void vk_day_night_register_cvars( void )
 	ri.Cvar_CheckRange( r_dayNightAmbientScale, "0", "2", CV_FLOAT );
 	ri.Cvar_SetDescription( r_dayNightAmbientScale, "Twilight fill added around sunrise and sunset." );
 
+	r_dayNightShadowFade = ri.Cvar_Get( "r_dayNightShadowFade", "1", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_dayNightShadowFade, "0", "1", CV_FLOAT );
+	ri.Cvar_SetDescription( r_dayNightShadowFade, "Scales daytime sun-shadow strength when day/night lighting is active." );
+
+	r_dayNightMoonShadow = ri.Cvar_Get( "r_dayNightMoonShadow", "0.18", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_dayNightMoonShadow, "0", "1", CV_FLOAT );
+	ri.Cvar_SetDescription( r_dayNightMoonShadow, "Night directional shadow floor for moonlit day/night lighting. Set 0 to skip deep-night sun CSM." );
+
 	r_dayNightDebug = ri.Cvar_Get( "r_dayNightDebug", "0", CVAR_ARCHIVE_ND );
 	ri.Cvar_CheckRange( r_dayNightDebug, "0", "2", CV_INTEGER );
 	ri.Cvar_SetDescription( r_dayNightDebug, "Print day/night world-lighting state changes." );
@@ -216,7 +250,7 @@ void vk_day_night_register_cvars( void )
 static void vk_day_night_status_f( void )
 {
 	ri.Printf( PRINT_ALL,
-		"daynight_status: active=%d map=%s time=%.2f realTime=%d cycleMin=%.2f day=%.2f elev=%.2f\n"
+		"daynight_status: active=%d map=%s time=%.2f realTime=%d cycleMin=%.2f day=%.2f elev=%.2f shadow=%.2f\n"
 		"  sunDir=(%.3f %.3f %.3f) sunLight=(%.3f %.3f %.3f)\n"
 		"  authoredDir=(%.3f %.3f %.3f) authoredLight=(%.3f %.3f %.3f)\n",
 		vk_day_night_active() ? 1 : 0,
@@ -226,6 +260,7 @@ static void vk_day_night_status_f( void )
 		r_dayNightCycleMinutes ? r_dayNightCycleMinutes->value : 0.0f,
 		s_dayFactor,
 		s_sunElevation,
+		vk_day_night_shadow_factor(),
 		tr.sunDirection[0], tr.sunDirection[1], tr.sunDirection[2],
 		tr.sunLight[0], tr.sunLight[1], tr.sunLight[2],
 		s_baseSunDir[0], s_baseSunDir[1], s_baseSunDir[2],

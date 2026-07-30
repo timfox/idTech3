@@ -1271,16 +1271,20 @@ elif ! grep -q 'tr.sunDirection' "$DAY_NIGHT_C" 2>/dev/null || ! grep -q 'tr.sun
   fail "day/night must drive canonical tr.sunDirection/tr.sunLight"
 elif ! grep -q 'ri.Com_RealTime' "$DAY_NIGHT_C" 2>/dev/null || ! grep -q 'ri.Milliseconds' "$DAY_NIGHT_C" 2>/dev/null; then
   fail "day/night must support wall-clock and accelerated cycle timing"
+elif ! grep -q 'vk_day_night_shadow_factor' "$DAY_NIGHT_H" "$DAY_NIGHT_C" 2>/dev/null; then
+  fail "day/night must expose an effective shadow factor"
+elif ! grep -q 'vk_day_night_shadow_factor' "$PROJECT_ROOT/renderers/vulkan/tr_backend.c" "$PROJECT_ROOT/renderers/vulkan/tr_shade.c" "$PROJECT_ROOT/renderers/vulkan/vk_deferred_gbuffer.c" "$PROJECT_ROOT/renderers/vulkan/vk_view_state.c" 2>/dev/null; then
+  fail "day/night shadow factor must drive CSM production and raster/deferred/OIT consumers"
 elif ! grep -q 'vk_day_night_begin_frame' "$PROJECT_ROOT/renderers/vulkan/vk_frame_submit.c" 2>/dev/null; then
   fail "day/night must update before renderer frame consumers"
 elif ! grep -q 'vk_day_night_on_world_load' "$PROJECT_ROOT/renderers/vulkan/tr_bsp.c" 2>/dev/null; then
   fail "day/night must capture authored map sun after world load"
 elif ! grep -q 'daynight_status' "$DAY_NIGHT_C" 2>/dev/null; then
   fail "day/night must expose daynight_status diagnostics"
-elif [[ ! -f "$DAY_NIGHT_CFG" ]] || ! grep -q 'seta r_dayNight 1' "$DAY_NIGHT_CFG" 2>/dev/null; then
+elif [[ ! -f "$DAY_NIGHT_CFG" ]] || ! grep -q 'seta r_dayNight 1' "$DAY_NIGHT_CFG" 2>/dev/null || ! grep -q 'r_dayNightMoonShadow' "$DAY_NIGHT_CFG" 2>/dev/null; then
   fail "day/night overlay config missing"
 else
-  pass "Day/night world lighting drives canonical sun from real time"
+  pass "Day/night world lighting drives canonical sun and shadow strength from real time"
 fi
 
 echo ""

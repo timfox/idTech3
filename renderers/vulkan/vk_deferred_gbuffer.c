@@ -26,6 +26,7 @@ Mode 3 = Unified Clustered Renderer (deferred opaque + Forward+ transparent).
 #include "vk_forward_plus.h"
 #include "vk_shadow_contract.h"
 #include "vk_sun_csm.h"
+#include "vk_day_night.h"
 #include "vk_deferred_honesty.h"
 #include "vk_skybox_hdr.h"
 
@@ -1675,8 +1676,9 @@ static void vk_dgb_fill_light_push( vk_deferred_light_push_t *push, uint32_t wid
 				}
 			}
 			push->shadowFlags = 1u;
-			push->shadowStrength = ( r_pbrSunShadowStrength ) ?
-				Com_Clamp( 0.0f, 1.0f, r_pbrSunShadowStrength->value ) : 1.0f;
+			push->shadowStrength = ( ( r_pbrSunShadowStrength ) ?
+				Com_Clamp( 0.0f, 1.0f, r_pbrSunShadowStrength->value ) : 1.0f ) *
+				vk_day_night_shadow_factor();
 			push->shadowCascadeCount = cascades;
 			vk_shadow_contract_note_consumer( 0, "deferred" );
 			for ( ci = 1u; ci < cascades; ci++ ) {

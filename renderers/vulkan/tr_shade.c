@@ -32,6 +32,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "vk_selective_sun_shadow.h"
 #include "vk_selective_reflection.h"
 #include "vk_sun_csm.h"
+#include "vk_day_night.h"
 #include "vk_surface_evolution.h"
 #include "vk_frequency_aware.h"
 #include "vk_bsp_viz.h"
@@ -124,7 +125,9 @@ static void VK_FillPbrSunShadowUniform( vkUniform_t *ubo ) {
 	ubo->pbrSunShadowParams[0] = ( r_fogShadowBias ) ? r_fogShadowBias->value : 0.001f;
 	ubo->pbrSunShadowParams[1] = ( r_fogShadowPcfRadius ) ? r_fogShadowPcfRadius->value : 1.0f;
 	ubo->pbrSunShadowParams[2] = 1.0f;
-	ubo->pbrSunShadowParams[3] = ( r_pbrSunShadowStrength ) ? Com_Clamp( 0.0f, 1.0f, r_pbrSunShadowStrength->value ) : 1.0f;
+	ubo->pbrSunShadowParams[3] = ( ( r_pbrSunShadowStrength ) ?
+		Com_Clamp( 0.0f, 1.0f, r_pbrSunShadowStrength->value ) : 1.0f ) *
+		vk_day_night_shadow_factor();
 
 	Vector4Set( ubo->pbrSunShadowSplits,
 		vk.sun_shadow_splits[0],

@@ -6,6 +6,7 @@
 #include "vk_upscale.h"
 #include "vk_object_id.h"
 #include "vk_oit_alpha.h"
+#include "vk_day_night.h"
 #include <math.h>
 
 typedef struct vkMvpPushConstants_s {
@@ -1095,7 +1096,8 @@ void vk_update_mvp( const float *m )
 			oit_push.sunColor[0] = oit_push.sunColor[1] = oit_push.sunColor[2] = 1.0f;
 		}
 		oit_push.sunStrength = ( !R_ClassicLightingActive() && r_pbrSunShadow && r_pbrSunShadow->integer )
-			? ( ( r_pbrSunShadowStrength ) ? Com_Clamp( 0.0f, 1.0f, r_pbrSunShadowStrength->value ) : 1.0f )
+			? ( ( ( r_pbrSunShadowStrength ) ? Com_Clamp( 0.0f, 1.0f, r_pbrSunShadowStrength->value ) : 1.0f ) *
+				vk_day_night_shadow_factor() )
 			: 0.65f;
 		oit_push.sunAmbient = 0.28f;
 		oit_push.cascadeCount = (float)( ( vk.sun_shadow_cascade_count > 0u ) ?

@@ -70,6 +70,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "vk_mesh_halo.h"
 #include "vk_frame_contract.h"
 #include "vk_sun_csm.h"
+#include "vk_day_night.h"
 #include "vk_shadow_contract.h"
 #include "vk_vshadow.h"
 #include "vk_capture_pipeline.h"
@@ -1806,6 +1807,9 @@ static qboolean RB_ShouldRenderSunShadowMap( const drawSurfsCommand_t *cmd )
 		return qfalse;
 	}
 	if ( !pbrSun && !fogSun ) {
+		return qfalse;
+	}
+	if ( vk_day_night_shadow_factor() <= 0.001f && !fogSun ) {
 		return qfalse;
 	}
 	if ( !cmd || cmd->numDrawSurfs <= 0 ) {

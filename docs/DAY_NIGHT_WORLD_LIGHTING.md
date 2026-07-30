@@ -20,6 +20,8 @@ Existing passes already consume those fields, so the cycle reaches physical sky/
 | `r_dayNightSunScale` | `1` | Daytime authored sun multiplier. |
 | `r_dayNightMoonScale` | `0.035` | Night directional light fraction. |
 | `r_dayNightAmbientScale` | `0.18` | Twilight fill around sunrise/sunset. |
+| `r_dayNightShadowFade` | `1` | Daytime sun-shadow strength scale. |
+| `r_dayNightMoonShadow` | `0.18` | Night directional shadow floor. Set `0` to skip deep-night raster CSM when fog shadows do not need it. |
 
 ## Usage
 
@@ -36,3 +38,5 @@ seta r_dayNightCycleMinutes 2
 ```
 
 The overlay enables `r_skyOwner 1` and `r_atmosphere 1` so the sun motion is visible immediately. The lighting system itself does not require physical sky; classic skyboxes still keep their authored textures while world lighting follows the cycle.
+
+Sun shadows use the same real-time lighting state. Forward+/PBR, deferred, and OIT shadow strength are multiplied by `vk_day_night_shadow_factor()`, which fades through sunrise/sunset and uses `r_dayNightMoonShadow` at night. When that factor is effectively zero, raster CSM skips rendering unless volumetric fog shadows still need the depth.
