@@ -147,6 +147,35 @@ extern cvar_t *r_deferredUnlitBase;
 extern cvar_t *r_taa;
 extern cvar_t *r_gbufferCompact;
 
+static const char *VRCS_InactiveReason( void )
+{
+	if ( !r_vrcs || !r_vrcs->integer ) {
+		return "r_vrcs_off";
+	}
+	if ( !vk_deferred_lighting_active() ) {
+		return "deferred_lighting_inactive";
+	}
+	if ( vk.modules.vrcs_sri_cs == VK_NULL_HANDLE ) {
+		return "missing_sri_shader";
+	}
+	if ( vk.modules.vrcs_pack_cs == VK_NULL_HANDLE ) {
+		return "missing_pack_shader";
+	}
+	if ( vk.modules.deferred_lighting_vrcs_cs == VK_NULL_HANDLE ) {
+		return "missing_lighting_shader";
+	}
+	if ( vk.modules.vrcs_deblock_cs == VK_NULL_HANDLE ) {
+		return "missing_deblock_shader";
+	}
+	if ( vk.forward_plus.buffer == VK_NULL_HANDLE || vk.forward_plus.tile_buffer == VK_NULL_HANDLE ) {
+		return "missing_forward_plus_buffers";
+	}
+	if ( vk.deferred_lighting_image == VK_NULL_HANDLE || vk.deferred_lighting_view == VK_NULL_HANDLE ) {
+		return "missing_deferred_lighting_target";
+	}
+	return "ready";
+}
+
 static void VRCS_DestroyBuffer( vrcs_buffer_t *b )
 {
 	if ( b->buffer != VK_NULL_HANDLE ) {
@@ -532,17 +561,7 @@ static qboolean VRCS_EnsureResources( uint32_t width, uint32_t height )
 
 qboolean vk_vrcs_active( void )
 {
-	if ( !r_vrcs || !r_vrcs->integer ) {
-		return qfalse;
-	}
-	if ( !vk_deferred_lighting_active() ) {
-		return qfalse;
-	}
-	if ( !vrcs.ready && ( vk.modules.vrcs_sri_cs == VK_NULL_HANDLE ||
-		vk.modules.deferred_lighting_vrcs_cs == VK_NULL_HANDLE ) ) {
-		return qfalse;
-	}
-	return qtrue;
+	return ( strcmp( VRCS_InactiveReason(), "ready" ) == 0 ) ? qtrue : qfalse;
 }
 
 void vk_vrcs_init( void )
@@ -1075,10 +1094,12 @@ qboolean vk_vrcs_dispatch_deferred_lighting( uint32_t width, uint32_t height )
 
 void vk_vrcs_status_f( void )
 {
-	ri.Printf( PRINT_ALL, "[VRCS] r_vrcs=%d active=%d ready=%d frame=%u\n",
+	const char *reason = VRCS_InactiveReason();
+	ri.Printf( PRINT_ALL, "[VRCS] r_vrcs=%d active=%d ready=%d reason=%s frame=%u\n",
 		r_vrcs ? r_vrcs->integer : 0,
 		vk_vrcs_active() ? 1 : 0,
 		vrcs.ready ? 1 : 0,
+		reason,
 		vrcs.frame );
 	ri.Printf( PRINT_ALL, "[VRCS] ext=%ux%u sri=%ux%u tiles=%ux%u quality=%d extraHalf=%d deblock=%d debug=%d\n",
 		vrcs.width, vrcs.height, vrcs.sriW, vrcs.sriH, vrcs.tilesX, vrcs.tilesY,
@@ -1094,4 +1115,12 @@ void vk_vrcs_status_f( void )
 		vk.modules.vrcs_pack_cs != VK_NULL_HANDLE,
 		vk.modules.deferred_lighting_vrcs_cs != VK_NULL_HANDLE,
 		vk.modules.vrcs_deblock_cs != VK_NULL_HANDLE );
+	ri.Printf( PRINT_ALL, "[VRCS] resources fpLights=%d fpTiles=%d lightImage=%d lightView=%d headers=%d coords=%d sriImage=%d\n",
+		vk.forward_plus.buffer != VK_NULL_HANDLE,
+		vk.forward_plus.tile_buffer != VK_NULL_HANDLE,
+		vk.deferred_lighting_image != VK_NULL_HANDLE,
+		vk.deferred_lighting_view != VK_NULL_HANDLE,
+		vrcs.tileHeaders.buffer != VK_NULL_HANDLE,
+		vrcs.tileCoords.buffer != VK_NULL_HANDLE,
+		vrcs.sri.image != VK_NULL_HANDLE );
 }

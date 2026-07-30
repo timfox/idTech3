@@ -503,6 +503,35 @@ else
 fi
 
 echo ""
+echo "Variable-Rate Compute Shading (VRCS):"
+VRCS_C="$PROJECT_ROOT/renderers/vulkan/vk_vrcs.c"
+VRCS_H="$PROJECT_ROOT/renderers/vulkan/vk_vrcs.h"
+VRCS_DOC="$PROJECT_ROOT/docs/VARIABLE_RATE_COMPUTE.md"
+VRCS_DEMO="$PROJECT_ROOT/examples/demo_game/mod/demo_vrcs.cfg"
+if [[ ! -f "$VRCS_C" || ! -f "$VRCS_H" ]]; then
+  fail "missing VRCS host module"
+elif ! grep -q 'r_vrcs = ri.Cvar_Get' "$VRCS_C" 2>/dev/null || ! grep -q 'CVAR_LATCH' "$VRCS_C" 2>/dev/null; then
+  fail "VRCS must expose a latched r_vrcs cvar"
+elif ! grep -q 'deferred_lighting_vrcs_cs' "$PROJECT_ROOT/scripts/compile_shaders.sh" 2>/dev/null || \
+     ! grep -q 'vrcs_sri_cs' "$PROJECT_ROOT/scripts/compile_shaders.sh" 2>/dev/null || \
+     ! grep -q 'vrcs_pack_cs' "$PROJECT_ROOT/scripts/compile_shaders.sh" 2>/dev/null || \
+     ! grep -q 'vrcs_deblock_cs' "$PROJECT_ROOT/scripts/compile_shaders.sh" 2>/dev/null; then
+  fail "VRCS shader stages must be compiled into generated modules"
+elif ! grep -q 'vk_vrcs_dispatch_deferred_lighting' "$DGB_C" 2>/dev/null; then
+  fail "VRCS must wrap deferred lighting dispatch with fallback"
+elif ! grep -q 'VRCS_InactiveReason' "$VRCS_C" 2>/dev/null || ! grep -q 'reason=%s' "$VRCS_C" 2>/dev/null; then
+  fail "VRCS status must report the inactive/dispatch blocker reason"
+elif ! grep -q 'missing_pack_shader' "$VRCS_C" 2>/dev/null || ! grep -q 'missing_deblock_shader' "$VRCS_C" 2>/dev/null; then
+  fail "VRCS active gate must account for all four compute shader modules"
+elif ! grep -q 'resources fpLights' "$VRCS_C" 2>/dev/null; then
+  fail "VRCS status must expose runtime resource readiness"
+elif [[ ! -f "$VRCS_DOC" || ! -f "$VRCS_DEMO" ]]; then
+  fail "VRCS docs/demo config missing"
+else
+  pass "VRCS deferred-lighting wrapper, shaders, fallback, and status diagnostics wired"
+fi
+
+echo ""
 echo "Deferred many-lights demo:"
 if ! bash "$PROJECT_ROOT/tests/scripts/test_deferred_many_lights_demo.sh" >/tmp/deferred_many_lights_demo_check.log 2>&1; then
   cat /tmp/deferred_many_lights_demo_check.log

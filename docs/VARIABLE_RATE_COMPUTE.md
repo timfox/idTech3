@@ -26,6 +26,8 @@ vid_restart
 
 Console: **`vrcs_status`**.
 
+`vrcs_status` reports the activation reason (`ready`, `r_vrcs_off`, `deferred_lighting_inactive`, missing shader module names, or missing runtime resources) plus the current Forward+/deferred target/resource readiness. This is the quickest way to tell whether VRCS is actually dispatching or whether the normal deferred lighting fallback is still in use.
+
 ## Cvars
 
 | Cvar | Default | Role |
@@ -50,6 +52,7 @@ Console: **`vrcs_status`**.
 
 - When packing cannot retire ≥1 wave of 32, the tile forces full 1×1 rate.
 - Deblocker intentionally spills across triangle edges; TAA absorbs most silhouette error.
+- If any required shader module or deferred/Forward+ runtime resource is unavailable, the engine falls back to the standard deferred lighting compute path.
 - References (public): Martin Fuller, “Variable Rate Compute Shaders”; Michal Drobot, software VRS deblocker (SIGGRAPH 2020).
 
 ## Files

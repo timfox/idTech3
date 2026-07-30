@@ -15,6 +15,7 @@ set(IDTECH3_CLIENT_CORE_SRCS
 	${_IDTECH3_CLIENT_REL}/core/cl_p2p_session.c
 	${_IDTECH3_CLIENT_REL}/core/cl_cmds.c
 	${_IDTECH3_CLIENT_REL}/core/cl_ref.c
+	${_IDTECH3_CLIENT_REL}/core/cl_rts_demo.c
 	${_IDTECH3_CLIENT_REL}/core/cl_pipeline.c
 	${_IDTECH3_CLIENT_REL}/core/cl_gameframe.c
 	${_IDTECH3_CLIENT_REL}/core/cl_parse.c

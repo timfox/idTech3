@@ -93,6 +93,7 @@ static void ( *re_RenderScene )( const refdef_t *fd );
 static void CL_RenderSceneWithDistricts( const refdef_t *fd ) {
 	if ( !CL_StockBaseq3Mode() ) {
 		CL_District_AddRefEntitiesToScene();
+		CL_RTSDemo_AddRefEntitiesToScene();
 	}
 	if ( re_RenderScene ) {
 		re_RenderScene( fd );
@@ -679,6 +680,7 @@ static void CL_InitRef( void ) {
 	re = *ret;
 	re_RenderScene = re.RenderScene;
 	re.RenderScene = CL_RenderSceneWithDistricts;
+	CL_RTSDemo_Init();
 
 #ifdef USE_ARC_BLANC
 	ArcBlanc_SetGpuStepFn( re.ArcBlancGpuOceanStep );

@@ -19,6 +19,8 @@ void CL_Ref_ShutdownCommands( void );
 void CL_Ref_Shutdown( refShutdownCode_t code );
 void CL_Ref_InitRenderer( void );
 void CL_Ref_VidRestart( refShutdownCode_t shutdownCode );
+void CL_RTSDemo_Init( void );
+void CL_RTSDemo_AddRefEntitiesToScene( void );
 
 #ifdef __cplusplus
 }
