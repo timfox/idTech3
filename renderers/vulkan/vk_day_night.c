@@ -310,7 +310,7 @@ void vk_day_night_begin_frame( void )
 	s_timeOfDay = DN_TimeOfDay();
 	DN_Evaluate( s_timeOfDay, dir, light, &s_sunElevation, &s_dayFactor );
 	VectorCopy( dir, tr.sunDirection );
-	VectorScale( light, vk_weather_direct_sun_factor(), light );
+	VectorScale( light, vk_weather_direct_sun_factor() * vk_weather_lightning_factor(), light );
 	VectorCopy( light, tr.sunLight );
 
 	if ( r_dayNightDebug && r_dayNightDebug->integer > 1 ) {

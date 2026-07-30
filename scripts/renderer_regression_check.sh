@@ -1275,6 +1275,10 @@ elif ! grep -q 'vk_weather_direct_sun_factor' "$PROJECT_ROOT/renderers/vulkan/vk
   fail "weather must publish and day/night must consume direct sun dimming"
 elif ! grep -q 'vk_weather_shadow_factor' "$PROJECT_ROOT/renderers/vulkan/vk_weather.h" "$PROJECT_ROOT/renderers/vulkan/vk_weather.c" "$DAY_NIGHT_C" 2>/dev/null; then
   fail "weather must publish and day/night must consume shadow dimming"
+elif ! grep -q 'r_weatherDynamic' "$PROJECT_ROOT/renderers/vulkan/vk_weather.c" 2>/dev/null || ! grep -q 'Weather_ChooseDynamicPreset' "$PROJECT_ROOT/renderers/vulkan/vk_weather.c" 2>/dev/null; then
+  fail "weather must support deterministic dynamic preset transitions"
+elif ! grep -q 'vk_weather_lightning_factor' "$PROJECT_ROOT/renderers/vulkan/vk_weather.h" "$PROJECT_ROOT/renderers/vulkan/vk_weather.c" "$DAY_NIGHT_C" 2>/dev/null; then
+  fail "weather lightning factor must feed canonical day/night lighting"
 elif ! grep -q 'Weather feeds canonical day/night sun radiance' "$PROJECT_ROOT/renderers/vulkan/vk_frame_submit.c" 2>/dev/null; then
   fail "weather must update before day/night prepares canonical sun lighting"
 elif ! grep -q 'vk_day_night_shadow_factor' "$DAY_NIGHT_H" "$DAY_NIGHT_C" 2>/dev/null; then
