@@ -2,7 +2,7 @@
 ===========================================================================
 Copyright (C) 2026 Gopex LLC. All rights reserved.
 
-Mesh import: STL (binary/ASCII), minimal Collada (triangle position soup),
+Mesh import: STL (binary/ASCII), native static Collada geometry,
 and line-based vertex soup for ASCII interchange (.fbx/.usd/.usda/.ma).
 ===========================================================================
 */
@@ -324,6 +324,373 @@ static qboolean R_LoadSTL( model_t *mod, int lod, const char *name, const byte *
 	return R_MeshImport_FinalizeMD3( mod, lod, name, verts, nv, inds, ni );
 }
 
+static const char *R_DAE_FindAttr( const char *tagStart, const char *tagEnd, const char *attr ) {
+	char pat[64];
+	const char *p;
+
+	Com_sprintf( pat, sizeof( pat ), "%s=\"", attr );
+	p = Q_stristr( tagStart, pat );
+	if ( !p || p >= tagEnd ) {
+		return NULL;
+	}
+	p += strlen( pat );
+	return p < tagEnd ? p : NULL;
+}
+
+static qboolean R_DAE_CopyAttr( const char *tagStart, const char *tagEnd, const char *attr, char *out, int outSize ) {
+	const char *p = R_DAE_FindAttr( tagStart, tagEnd, attr );
+	const char *e;
+	int n;
+
+	if ( !p || outSize <= 0 ) {
+		return qfalse;
+	}
+	e = strchr( p, '"' );
+	if ( !e || e > tagEnd ) {
+		return qfalse;
+	}
+	n = (int)( e - p );
+	if ( n >= outSize ) {
+		n = outSize - 1;
+	}
+	Com_Memcpy( out, p, (size_t)n );
+	out[n] = '\0';
+	return qtrue;
+}
+
+static const char *R_DAE_FindElementWithId( const char *text, const char *element, const char *id ) {
+	char openPat[64];
+	const char *p = text;
+
+	Com_sprintf( openPat, sizeof( openPat ), "<%s", element );
+	while ( ( p = Q_stristr( p, openPat ) ) != NULL ) {
+		const char *gt = strchr( p, '>' );
+		char found[128];
+		if ( !gt ) {
+			return NULL;
+		}
+		if ( R_DAE_CopyAttr( p, gt, "id", found, sizeof( found ) ) && !Q_stricmp( found, id ) ) {
+			return p;
+		}
+		p = gt + 1;
+	}
+	return NULL;
+}
+
+static int R_DAE_ReadFloatArray( const char *sourceElem, float *out, int maxFloats ) {
+	const char *fa = Q_stristr( sourceElem, "<float_array" );
+	const char *gt;
+	const char *close;
+	int n = 0;
+
+	if ( !fa ) {
+		return 0;
+	}
+	gt = strchr( fa, '>' );
+	close = Q_stristr( fa, "</float_array>" );
+	if ( !gt || !close || close <= gt ) {
+		return 0;
+	}
+	while ( gt < close && n < maxFloats ) {
+		char *endp = NULL;
+		double d = strtod( gt, &endp );
+		if ( endp == gt ) {
+			gt++;
+			continue;
+		}
+		out[n++] = (float)d;
+		gt = endp;
+	}
+	return n;
+}
+
+static int R_DAE_SourceStride( const char *sourceElem ) {
+	const char *acc = Q_stristr( sourceElem, "<accessor" );
+	const char *gt;
+	char stride[32];
+
+	if ( !acc ) {
+		return 3;
+	}
+	gt = strchr( acc, '>' );
+	if ( !gt || !R_DAE_CopyAttr( acc, gt, "stride", stride, sizeof( stride ) ) ) {
+		return 3;
+	}
+	return MAX( 1, atoi( stride ) );
+}
+
+static qboolean R_DAE_ResolveVertexPositionSource( const char *text, const char *verticesId,
+	char *positionSource, int positionSourceSize ) {
+	const char *vertices = R_DAE_FindElementWithId( text, "vertices", verticesId );
+	const char *end = vertices ? Q_stristr( vertices, "</vertices>" ) : NULL;
+	const char *input;
+
+	if ( !vertices || !end ) {
+		return qfalse;
+	}
+	input = vertices;
+	while ( ( input = Q_stristr( input, "<input" ) ) != NULL && input < end ) {
+		const char *gt = strchr( input, '>' );
+		char semantic[64];
+		char source[128];
+		if ( !gt || gt > end ) {
+			break;
+		}
+		if ( R_DAE_CopyAttr( input, gt, "semantic", semantic, sizeof( semantic ) ) &&
+			!Q_stricmp( semantic, "POSITION" ) &&
+			R_DAE_CopyAttr( input, gt, "source", source, sizeof( source ) ) ) {
+			Q_strncpyz( positionSource, source[0] == '#' ? source + 1 : source, positionSourceSize );
+			return qtrue;
+		}
+		input = gt + 1;
+	}
+	return qfalse;
+}
+
+static qboolean R_DAE_FindInput( const char *start, const char *end, const char *semantic,
+	char *sourceOut, int sourceOutSize, int *offsetOut ) {
+	const char *input = start;
+
+	while ( ( input = Q_stristr( input, "<input" ) ) != NULL && input < end ) {
+		const char *gt = strchr( input, '>' );
+		char sem[64];
+		char source[128];
+		char offset[32];
+		if ( !gt || gt > end ) {
+			break;
+		}
+		if ( R_DAE_CopyAttr( input, gt, "semantic", sem, sizeof( sem ) ) &&
+			!Q_stricmp( sem, semantic ) &&
+			R_DAE_CopyAttr( input, gt, "source", source, sizeof( source ) ) ) {
+			Q_strncpyz( sourceOut, source[0] == '#' ? source + 1 : source, sourceOutSize );
+			if ( offsetOut ) {
+				*offsetOut = 0;
+				if ( R_DAE_CopyAttr( input, gt, "offset", offset, sizeof( offset ) ) ) {
+					*offsetOut = atoi( offset );
+				}
+			}
+			return qtrue;
+		}
+		input = gt + 1;
+	}
+	return qfalse;
+}
+
+static int R_DAE_ReadInts( const char *start, const char *end, int *out, int maxInts ) {
+	int n = 0;
+
+	while ( start < end && n < maxInts ) {
+		char *endp = NULL;
+		long v = strtol( start, &endp, 10 );
+		if ( endp == start ) {
+			start++;
+			continue;
+		}
+		out[n++] = (int)v;
+		start = endp;
+	}
+	return n;
+}
+
+static qboolean R_LoadDAE_NativeStatic( model_t *mod, int lod, const char *name, char *text ) {
+	const char *prim = Q_stristr( text, "<triangles" );
+	const char *primClose = NULL;
+	const char *primTagEnd;
+	const char *pElem;
+	const char *pClose;
+	const char *vcountElem = NULL;
+	const char *vcountClose = NULL;
+	qboolean isPolylist = qfalse;
+	char vertexSource[128] = "";
+	char positionSource[128] = "";
+	char texcoordSource[128] = "";
+	char material[128] = "";
+	float *positions;
+	float *texcoords = NULL;
+	float *verts;
+	float *st;
+	int *raw;
+	int *inds;
+	int posCount, posStride;
+	int texCount = 0, texStride = 2;
+	int vertexOffset = -1;
+	int texOffset = -1;
+	int maxOffset = 0;
+	int rawCount;
+	int nv = 0;
+	int i;
+	qboolean ok = qfalse;
+
+	if ( !prim ) {
+		prim = Q_stristr( text, "<polylist" );
+		isPolylist = prim ? qtrue : qfalse;
+	}
+	if ( !prim ) {
+		return qfalse;
+	}
+	primTagEnd = strchr( prim, '>' );
+	primClose = Q_stristr( prim, isPolylist ? "</polylist>" : "</triangles>" );
+	if ( !primTagEnd || !primClose || primClose <= primTagEnd ) {
+		return qfalse;
+	}
+
+	if ( R_DAE_CopyAttr( prim, primTagEnd, "material", material, sizeof( material ) ) ) {
+		/* Common Q3 content uses shader-like material symbols; keep plain symbols as-is. */
+	}
+
+	if ( !R_DAE_FindInput( primTagEnd, primClose, "VERTEX", vertexSource, sizeof( vertexSource ), &vertexOffset ) ) {
+		if ( !R_DAE_FindInput( primTagEnd, primClose, "POSITION", positionSource, sizeof( positionSource ), &vertexOffset ) ) {
+			return qfalse;
+		}
+	} else if ( !R_DAE_ResolveVertexPositionSource( text, vertexSource, positionSource, sizeof( positionSource ) ) ) {
+		return qfalse;
+	}
+	R_DAE_FindInput( primTagEnd, primClose, "TEXCOORD", texcoordSource, sizeof( texcoordSource ), &texOffset );
+
+	{
+		const char *posElem = R_DAE_FindElementWithId( text, "source", positionSource );
+		if ( !posElem ) {
+			return qfalse;
+		}
+		positions = (float *)ri.Malloc( sizeof( float ) * MIMP_MAX_VERTS * 3 );
+		if ( !positions ) {
+			return qfalse;
+		}
+		posCount = R_DAE_ReadFloatArray( posElem, positions, MIMP_MAX_VERTS * 3 );
+		posStride = R_DAE_SourceStride( posElem );
+	}
+	if ( posCount < posStride || posStride < 3 ) {
+		ri.Free( positions );
+		return qfalse;
+	}
+
+	if ( texcoordSource[0] ) {
+		const char *texElem = R_DAE_FindElementWithId( text, "source", texcoordSource );
+		if ( texElem ) {
+			texcoords = (float *)ri.Malloc( sizeof( float ) * MIMP_MAX_VERTS * 2 );
+			if ( texcoords ) {
+				texCount = R_DAE_ReadFloatArray( texElem, texcoords, MIMP_MAX_VERTS * 2 );
+				texStride = R_DAE_SourceStride( texElem );
+				if ( texStride < 2 || texCount < texStride ) {
+					texCount = 0;
+				}
+			}
+		}
+	}
+
+	pElem = Q_stristr( primTagEnd, "<p>" );
+	pClose = pElem ? Q_stristr( pElem, "</p>" ) : NULL;
+	if ( !pElem || !pClose || pClose > primClose ) {
+		ri.Free( positions );
+		if ( texcoords ) {
+			ri.Free( texcoords );
+		}
+		return qfalse;
+	}
+	pElem = strchr( pElem, '>' ) + 1;
+	raw = (int *)ri.Malloc( sizeof( int ) * MIMP_MAX_VERTS * 4 );
+	verts = (float *)ri.Malloc( sizeof( float ) * MIMP_MAX_VERTS * 3 );
+	st = (float *)ri.Malloc( sizeof( float ) * MIMP_MAX_VERTS * 2 );
+	inds = (int *)ri.Malloc( sizeof( int ) * MIMP_MAX_VERTS );
+	if ( !raw || !verts || !st || !inds ) {
+		goto done;
+	}
+	rawCount = R_DAE_ReadInts( pElem, pClose, raw, MIMP_MAX_VERTS * 4 );
+
+	if ( texOffset > maxOffset ) {
+		maxOffset = texOffset;
+	}
+	if ( vertexOffset > maxOffset ) {
+		maxOffset = vertexOffset;
+	}
+	if ( maxOffset < 0 || rawCount <= 0 ) {
+		goto done;
+	}
+	maxOffset++;
+
+	if ( isPolylist ) {
+		vcountElem = Q_stristr( primTagEnd, "<vcount>" );
+		vcountClose = vcountElem ? Q_stristr( vcountElem, "</vcount>" ) : NULL;
+		if ( vcountElem && vcountClose && vcountClose < primClose ) {
+			vcountElem = strchr( vcountElem, '>' ) + 1;
+		} else {
+			vcountElem = vcountClose = NULL;
+		}
+	}
+
+	if ( vcountElem ) {
+		int *vcounts = (int *)ri.Malloc( sizeof( int ) * MIMP_MAX_TRIS );
+		int vc = vcounts ? R_DAE_ReadInts( vcountElem, vcountClose, vcounts, MIMP_MAX_TRIS ) : 0;
+		int rawAt = 0;
+		int poly;
+		if ( !vcounts ) {
+			goto done;
+		}
+		for ( poly = 0; poly < vc && nv + 3 <= MIMP_MAX_VERTS; ++poly ) {
+			int corner;
+			if ( vcounts[poly] != 3 ) {
+				rawAt += vcounts[poly] * maxOffset;
+				continue;
+			}
+			for ( corner = 0; corner < 3 && rawAt + maxOffset <= rawCount; ++corner, rawAt += maxOffset ) {
+				int pi = raw[rawAt + vertexOffset];
+				int ti = texOffset >= 0 ? raw[rawAt + texOffset] : -1;
+				if ( pi < 0 || pi * posStride + 2 >= posCount ) {
+					ri.Free( vcounts );
+					goto done;
+				}
+				verts[nv * 3 + 0] = positions[pi * posStride + 0];
+				verts[nv * 3 + 1] = positions[pi * posStride + 1];
+				verts[nv * 3 + 2] = positions[pi * posStride + 2];
+				st[nv * 2 + 0] = ( texcoords && ti >= 0 && ti * texStride + 1 < texCount ) ? texcoords[ti * texStride + 0] : 0.0f;
+				st[nv * 2 + 1] = ( texcoords && ti >= 0 && ti * texStride + 1 < texCount ) ? 1.0f - texcoords[ti * texStride + 1] : 0.0f;
+				inds[nv] = nv;
+				nv++;
+			}
+		}
+		ri.Free( vcounts );
+	} else {
+		for ( i = 0; i + maxOffset <= rawCount && nv < MIMP_MAX_VERTS; i += maxOffset ) {
+			int pi = raw[i + vertexOffset];
+			int ti = texOffset >= 0 ? raw[i + texOffset] : -1;
+			if ( pi < 0 || pi * posStride + 2 >= posCount ) {
+				goto done;
+			}
+			verts[nv * 3 + 0] = positions[pi * posStride + 0];
+			verts[nv * 3 + 1] = positions[pi * posStride + 1];
+			verts[nv * 3 + 2] = positions[pi * posStride + 2];
+			st[nv * 2 + 0] = ( texcoords && ti >= 0 && ti * texStride + 1 < texCount ) ? texcoords[ti * texStride + 0] : 0.0f;
+			st[nv * 2 + 1] = ( texcoords && ti >= 0 && ti * texStride + 1 < texCount ) ? 1.0f - texcoords[ti * texStride + 1] : 0.0f;
+			inds[nv] = nv;
+			nv++;
+		}
+	}
+
+	if ( nv >= 3 && nv % 3 == 0 ) {
+		ok = R_MeshImport_FinalizeMD3Ex( mod, lod, name, verts, nv, inds, nv,
+			material[0] ? material : NULL, texcoords ? st : NULL );
+	}
+
+done:
+	ri.Free( positions );
+	if ( texcoords ) {
+		ri.Free( texcoords );
+	}
+	if ( raw ) {
+		ri.Free( raw );
+	}
+	if ( verts ) {
+		ri.Free( verts );
+	}
+	if ( st ) {
+		ri.Free( st );
+	}
+	if ( inds ) {
+		ri.Free( inds );
+	}
+	return ok;
+}
+
 static qboolean R_LoadDAE_FloatSoup( model_t *mod, int lod, const char *name, char *text ) {
 	float pos[49152];
 	int np = 0;
@@ -448,7 +815,10 @@ static qboolean R_LoadMeshFile( model_t *mod, int lod, const char *path, const c
 		if ( text ) {
 			Com_Memcpy( text, buf, (size_t)sz );
 			text[sz] = '\0';
-			ok = R_LoadDAE_FloatSoup( mod, lod, path, text );
+			ok = R_LoadDAE_NativeStatic( mod, lod, path, text );
+			if ( !ok ) {
+				ok = R_LoadDAE_FloatSoup( mod, lod, path, text );
+			}
 			ri.Free( text );
 		}
 	} else {

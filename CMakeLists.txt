@@ -1538,6 +1538,9 @@ if(USE_DUKTAPE AND DUKTAPE_FOUND)
   target_compile_definitions(qcommon PRIVATE USE_DUKTAPE)
   target_include_directories(qcommon PRIVATE ${DUKTAPE_INCLUDE_DIR})
 endif()
+if(USE_RTS_SIM AND TARGET rts_module)
+  target_compile_definitions(qcommon PRIVATE USE_RTS_SIM)
+endif()
 if(USE_RADIUSFPS_CUDA)
   target_compile_definitions(qcommon PRIVATE RADIUSFPS_HAVE_CUDA=1)
 endif()
@@ -1605,6 +1608,9 @@ endif()
 if(USE_DUKTAPE AND DUKTAPE_FOUND)
   target_compile_definitions(qcommon_ded PRIVATE USE_DUKTAPE)
   target_include_directories(qcommon_ded PRIVATE ${DUKTAPE_INCLUDE_DIR})
+endif()
+if(USE_RTS_SIM AND TARGET rts_module)
+  target_compile_definitions(qcommon_ded PRIVATE USE_RTS_SIM)
 endif()
 if(USE_RADIUSFPS_CUDA)
   target_compile_definitions(qcommon_ded PRIVATE RADIUSFPS_HAVE_CUDA=1)
@@ -2770,6 +2776,7 @@ if(USE_RTS_SIM)
     modules/rts/rts_entity.cpp
     modules/rts/rts_component.cpp
     modules/rts/rts_selection.cpp
+	modules/rts/rts_gui.cpp
     modules/rts/rts_obstruction.cpp
     modules/rts/rts_path_grid.cpp
     modules/rts/rts_vision.cpp

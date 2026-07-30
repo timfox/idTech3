@@ -51,6 +51,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "cl_emulator.h"
 #include "cl_serverbrowser.h"
 #include "cl_ref.h"
+#include "cl_rts_gui.h"
 #include "cl_connect.h"
 #include "cl_download.h"
 #include "cl_demo.h"
@@ -222,6 +223,7 @@ void CL_Init( void ) {
 	CL_Mumble_Init();
 	CL_Streaming_Init();
 	SHUD_Init();
+	CL_RTSGui_Init();
 	WS_Init();
 	Steam_Init();
 	OHMD_Init();

@@ -26,6 +26,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "cl_voip.h"
 #include "cl_menuvideo.h"
 #include "cl_superhud.h"
+#include "cl_rts_gui.h"
 #include "cl_sdf_font.h"
 #include "cl_vector_font.h"
 #include "ui_filter.h"
@@ -1890,6 +1891,7 @@ static void SCR_DrawScreenField( stereoFrame_t stereoFrame ) {
 				// always supply STEREO_CENTER as vieworg offset is now done by the engine.
 				CL_CGameRendering( stereoFrame );
 				SHUD_Render( cls.glconfig.vidWidth, cls.glconfig.vidHeight );
+				CL_RTSGui_Render();
 				SCR_DrawDemoRecording();
 #ifdef USE_OPUS
 				SCR_DrawVoipMeter();

@@ -33,6 +33,7 @@ int main(void) {
 	int y = 0;
 	char modelPath[MAX_QPATH];
 	rtsRenderEntity_t renderEntities[8];
+	rtsGuiState_t guiState;
 	int renderCount;
 
 	RTS_Init();
@@ -93,10 +94,22 @@ int main(void) {
 	ASSERT(RTS_SelectRect(RTS_OWNER_PLAYER1, 0, 0, 80, 140, selected, 4) == 2, "select player entities in rect");
 	ASSERT(selected[0] == 1 && selected[1] == 2, "selection order follows entity order");
 	ASSERT(RTS_SelectRect(RTS_OWNER_PLAYER2, 0, 0, 80, 140, selected, 4) == 0, "selection filters owner");
+	ASSERT(RTS_GuiSelectRect(RTS_OWNER_PLAYER1, 0, 0, 80, 140) == 2, "GUI selection records player entities");
+	ASSERT(RTS_GuiGetSelection(RTS_OWNER_PLAYER1, selected, 4) == 2, "GUI selection count readable");
+	ASSERT(selected[0] == 1 && selected[1] == 2, "GUI selection preserves entity order");
+	ASSERT(RTS_GuiGetState(RTS_OWNER_PLAYER1, &guiState) == 1, "GUI state readable");
+	ASSERT(guiState.selectedCount == 2 && guiState.primarySelection == 1, "GUI state exports primary selection");
+	ASSERT(RTS_GuiIssueMoveSelected(RTS_OWNER_PLAYER1, 96, 160) == 2, "GUI move posts one order per selected entity");
+	ASSERT(RTS_GetPendingCommandCount() == 2, "GUI move orders queue for next turn");
+	RTS_RunTurn(50);
+	ASSERT(RTS_GetEntityPosition(1, &x, &y) == 1 && x == 96 && y == 160, "GUI move updates first selected entity");
+	ASSERT(RTS_GetEntityPosition(2, &x, &y) == 1 && x == 96 && y == 160, "GUI move updates second selected entity");
+	RTS_GuiClearSelection(RTS_OWNER_PLAYER1);
+	ASSERT(RTS_GuiGetSelection(RTS_OWNER_PLAYER1, selected, 4) == 0, "GUI selection clears");
 
 	hashBeforeMove = RTS_ComputeStateHash();
 	move.type = RTS_COMMAND_SET_POSITION;
-	move.turn = 3;
+	move.turn = 4;
 	move.playerId = RTS_OWNER_PLAYER1;
 	move.sequence = 3;
 	move.entityId = 1;
@@ -109,24 +122,24 @@ int main(void) {
 	ASSERT(RTS_GetPendingCommandCount() == 1, "queued command count");
 
 	RTS_RunTurn(50);
-	ASSERT(RTS_GetTurnMsec() == 100, "turn time after second step");
-	ASSERT(RTS_GetCurrentTurn() == 2, "turn number after second step");
+	ASSERT(RTS_GetTurnMsec() == 150, "turn time after second step");
+	ASSERT(RTS_GetCurrentTurn() == 3, "turn number after second step");
 	ASSERT(RTS_GetPendingCommandCount() == 1, "future command remains queued");
 	ASSERT(RTS_GetEntityPosition(1, &x, &y) == 1, "future move did not execute early");
-	ASSERT(x == 16 && y == 32, "future move leaves position unchanged");
+	ASSERT(x == 96 && y == 160, "future move leaves position unchanged");
 
 	RTS_RunTurn(50);
-	ASSERT(RTS_GetTurnMsec() == 150, "turn time after third step");
-	ASSERT(RTS_GetCurrentTurn() == 3, "turn number after third step");
+	ASSERT(RTS_GetTurnMsec() == 200, "turn time after third step");
+	ASSERT(RTS_GetCurrentTurn() == 4, "turn number after third step");
 	ASSERT(RTS_GetPendingCommandCount() == 0, "queue drained after scheduled turn");
-	ASSERT(RTS_GetExecutedCommandCount() == 3, "replay command log after move");
+	ASSERT(RTS_GetExecutedCommandCount() == 5, "replay command log after move");
 	ASSERT(RTS_GetEntityPosition(1, &x, &y) == 1, "moved entity position readable");
 	ASSERT(x == 512 && y == 256, "move command updates controlled entity");
 	hashAfterMove = RTS_ComputeStateHash();
 	ASSERT(hashBeforeMove != hashAfterMove, "state hash changes after deterministic state mutation");
 
 	enemyBuild = cmd;
-	enemyBuild.turn = 4;
+	enemyBuild.turn = 5;
 	enemyBuild.playerId = RTS_OWNER_PLAYER2;
 	enemyBuild.sequence = 4;
 	enemyBuild.targetX = 1024;
@@ -138,7 +151,7 @@ int main(void) {
 	ASSERT(RTS_GetEntityHitpoints(3) == 100, "enemy entity starts with full hitpoints");
 
 	attack.type = RTS_COMMAND_SET_HITPOINTS;
-	attack.turn = 5;
+	attack.turn = 6;
 	attack.playerId = RTS_OWNER_NEUTRAL;
 	attack.sequence = 5;
 	attack.entityId = 3;
@@ -151,7 +164,7 @@ int main(void) {
 	ASSERT(RTS_GetEntityHitpoints(3) == 90, "hitpoint set updates enemy hitpoints");
 
 	resource.type = RTS_COMMAND_CREATE_ENTITY;
-	resource.turn = 6;
+	resource.turn = 7;
 	resource.playerId = RTS_OWNER_NEUTRAL;
 	resource.sequence = 6;
 	resource.entityId = 0;
@@ -166,7 +179,7 @@ int main(void) {
 	ASSERT(RTS_GetEntityResources(4) == 100, "resource entity starts with stock");
 
 	gather.type = RTS_COMMAND_SET_ENTITY_RESOURCES;
-	gather.turn = 7;
+	gather.turn = 8;
 	gather.playerId = RTS_OWNER_NEUTRAL;
 	gather.sequence = 7;
 	gather.entityId = 4;
@@ -180,7 +193,7 @@ int main(void) {
 	ASSERT(RTS_GetEntityResources(4) == 25, "resource stock set updates resource stock");
 
 	gather.type = RTS_COMMAND_SET_PLAYER_RESOURCES;
-	gather.turn = 8;
+	gather.turn = 9;
 	gather.playerId = RTS_OWNER_PLAYER1;
 	gather.sequence = 8;
 	gather.entityId = 0;

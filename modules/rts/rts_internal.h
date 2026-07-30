@@ -33,6 +33,7 @@ struct State {
 	std::vector<rtsCommand_t> pendingCommands;
 	std::vector<rtsCommand_t> executedCommands;
 	std::vector<rtsEntityId_t> selectionScratch;
+	std::array<std::vector<rtsEntityId_t>, kMaxPlayers> guiSelections;
 	int playerResources[kMaxPlayers] = {};
 	std::array<ModelBinding, kMaxPlayers> defaultModels = {};
 };

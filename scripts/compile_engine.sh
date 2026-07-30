@@ -565,6 +565,14 @@ copy_to_release() {
       [ -f "$f" ] || continue
       cp -f "$f" "$dest/base/scripts/"
     done
+    if [ -d "$PROJECT_ROOT/scripts/js" ]; then
+      mkdir -p "$dest/base/scripts/js"
+      cp -f "$PROJECT_ROOT/scripts/js/"*.js "$dest/base/scripts/js/" 2>/dev/null || true
+    fi
+    if [ -d "$PROJECT_ROOT/base/scripts/js" ]; then
+      mkdir -p "$dest/base/scripts/js"
+      cp -f "$PROJECT_ROOT/base/scripts/js/"*.js "$dest/base/scripts/js/" 2>/dev/null || true
+    fi
     shopt -u nullglob
   fi
   if [ -f "$PROJECT_ROOT/config/steamdeck.cfg" ]; then

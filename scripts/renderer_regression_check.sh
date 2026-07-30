@@ -780,6 +780,26 @@ else
 fi
 
 echo ""
+echo "Native Collada model loading:"
+MESH_IMPORT_C="$PROJECT_ROOT/renderers/common/tr_model_mesh_import.c"
+if [[ ! -f "$MESH_IMPORT_C" ]]; then
+  fail "missing renderer mesh import module"
+elif ! grep -q 'R_LoadDAE_NativeStatic' "$MESH_IMPORT_C" 2>/dev/null; then
+  fail "DAE must use a native static Collada loader, not only float soup/conversion"
+elif ! grep -q 'R_DAE_ResolveVertexPositionSource' "$MESH_IMPORT_C" 2>/dev/null || \
+     ! grep -q 'R_DAE_FindInput' "$MESH_IMPORT_C" 2>/dev/null; then
+  fail "native Collada loader must resolve VERTEX/POSITION inputs"
+elif ! grep -q 'TEXCOORD' "$MESH_IMPORT_C" 2>/dev/null || \
+     ! grep -q 'R_MeshImport_FinalizeMD3Ex' "$MESH_IMPORT_C" 2>/dev/null; then
+  fail "native Collada loader must preserve basic UVs into renderer mesh data"
+elif ! grep -q 'ok = R_LoadDAE_NativeStatic' "$MESH_IMPORT_C" 2>/dev/null || \
+     ! grep -q 'R_LoadDAE_FloatSoup' "$MESH_IMPORT_C" 2>/dev/null; then
+  fail "DAE loader must try native Collada before legacy fallback"
+else
+  pass "native Collada .dae static geometry loads directly through renderer mesh import"
+fi
+
+echo ""
 echo "Network eFlags wire width (engine flags bits 20-23):"
 if ! grep -q '{ NETF(eFlags), 24 }' "${PROJECT_ROOT}/engine/core/msg.c" 2>/dev/null; then
   fail "msg.c eFlags must be 24 bits for EF_BILLBOARD..EF_DECAL"

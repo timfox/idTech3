@@ -2,6 +2,10 @@
 #include "qcommon.h"
 #include "js_debug.h"
 
+#ifdef USE_RTS_SIM
+#include "../../modules/rts/rts_public.h"
+#endif
+
 #ifdef USE_DUKTAPE
 
 #include <duktape.h>
@@ -1094,6 +1098,81 @@ static duk_ret_t Js_Binding_GetCursorPos( duk_context *ctx ) {
 }
 #endif
 
+#ifdef USE_RTS_SIM
+static int JsDebug_RtsPlayerArg( duk_context *ctx, int index ) {
+	return duk_get_top( ctx ) > index ? duk_to_int( ctx, index ) : RTS_OWNER_PLAYER1;
+}
+
+static duk_ret_t Js_Binding_RtsState( duk_context *ctx ) {
+	rtsGuiState_t state;
+	const int playerId = JsDebug_RtsPlayerArg( ctx, 0 );
+
+	if ( !RTS_GuiGetState( playerId, &state ) ) {
+		duk_push_null( ctx );
+		return 1;
+	}
+
+	duk_push_object( ctx );
+	duk_push_int( ctx, state.playerId );
+	duk_put_prop_string( ctx, -2, "playerId" );
+	duk_push_int( ctx, state.currentTurn );
+	duk_put_prop_string( ctx, -2, "turn" );
+	duk_push_int( ctx, state.entityCount );
+	duk_put_prop_string( ctx, -2, "entityCount" );
+	duk_push_int( ctx, state.playerResources );
+	duk_put_prop_string( ctx, -2, "resources" );
+	duk_push_int( ctx, state.selectedCount );
+	duk_put_prop_string( ctx, -2, "selectedCount" );
+	duk_push_int( ctx, state.primarySelection );
+	duk_put_prop_string( ctx, -2, "primarySelection" );
+	duk_push_int( ctx, state.primaryHitpoints );
+	duk_put_prop_string( ctx, -2, "primaryHitpoints" );
+	duk_push_int( ctx, state.primaryResources );
+	duk_put_prop_string( ctx, -2, "primaryResources" );
+	duk_push_int( ctx, state.pendingCommands );
+	duk_put_prop_string( ctx, -2, "pendingCommands" );
+	return 1;
+}
+
+static duk_ret_t Js_Binding_RtsSelectRect( duk_context *ctx ) {
+	const int playerId = JsDebug_RtsPlayerArg( ctx, 0 );
+	const int minX = duk_require_int( ctx, 1 );
+	const int minY = duk_require_int( ctx, 2 );
+	const int maxX = duk_require_int( ctx, 3 );
+	const int maxY = duk_require_int( ctx, 4 );
+
+	duk_push_int( ctx, RTS_GuiSelectRect( playerId, minX, minY, maxX, maxY ) );
+	return 1;
+}
+
+static duk_ret_t Js_Binding_RtsClearSelection( duk_context *ctx ) {
+	RTS_GuiClearSelection( JsDebug_RtsPlayerArg( ctx, 0 ) );
+	return 0;
+}
+
+static duk_ret_t Js_Binding_RtsMoveSelected( duk_context *ctx ) {
+	const int playerId = JsDebug_RtsPlayerArg( ctx, 0 );
+	const int targetX = duk_require_int( ctx, 1 );
+	const int targetY = duk_require_int( ctx, 2 );
+
+	duk_push_int( ctx, RTS_GuiIssueMoveSelected( playerId, targetX, targetY ) );
+	return 1;
+}
+
+static void JsDebug_RegisterRtsBindings( duk_context *ctx ) {
+	duk_push_object( ctx );
+	duk_push_c_function( ctx, Js_Binding_RtsState, DUK_VARARGS );
+	duk_put_prop_string( ctx, -2, "state" );
+	duk_push_c_function( ctx, Js_Binding_RtsSelectRect, 5 );
+	duk_put_prop_string( ctx, -2, "selectRect" );
+	duk_push_c_function( ctx, Js_Binding_RtsClearSelection, DUK_VARARGS );
+	duk_put_prop_string( ctx, -2, "clearSelection" );
+	duk_push_c_function( ctx, Js_Binding_RtsMoveSelected, 3 );
+	duk_put_prop_string( ctx, -2, "moveSelected" );
+	duk_put_prop_string( ctx, -2, "rts" );
+}
+#endif
+
 static void JsDebug_RegisterBindings( void ) {
 	duk_push_global_object( s_jsContext );
 
@@ -1191,6 +1270,10 @@ static void JsDebug_RegisterBindings( void ) {
 
 	duk_push_c_function( s_jsContext, Js_Binding_GetMilliseconds, 0 );
 	duk_put_prop_string( s_jsContext, -2, "getMilliseconds" );
+
+#ifdef USE_RTS_SIM
+	JsDebug_RegisterRtsBindings( s_jsContext );
+#endif
 
 	duk_push_string( s_jsContext, "Duktape" );
 	duk_put_prop_string( s_jsContext, -2, "engine" );

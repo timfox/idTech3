@@ -58,6 +58,24 @@ typedef struct rtsRenderEntity_s {
 	float scale;
 } rtsRenderEntity_t;
 
+#define RTS_GUI_MAX_SELECTION 32
+
+/*
+ * Client-facing session state modelled after 0 A.D.'s session GUI queries.
+ * It is data only: presentation belongs to the native client shell or Lua.
+ */
+typedef struct rtsGuiState_s {
+	int playerId;
+	int currentTurn;
+	int entityCount;
+	int pendingCommands;
+	int playerResources;
+	int selectedCount;
+	rtsEntityId_t primarySelection;
+	int primaryHitpoints;
+	int primaryResources;
+} rtsGuiState_t;
+
 void RTS_Init( void );
 void RTS_Shutdown( void );
 void RTS_RunTurn( int msec );
@@ -79,6 +97,11 @@ int  RTS_SetDefaultModelForOwner( int owner, const char *modelPath, qhandle_t mo
 int  RTS_BuildRenderEntities( rtsRenderEntity_t *outEntities, int maxOut, float zOrigin, float unitScale );
 int  RTS_GetPlayerResources( int playerId );
 int  RTS_SelectRect( int playerId, int minX, int minY, int maxX, int maxY, rtsEntityId_t *out, int maxOut );
+void RTS_GuiClearSelection( int playerId );
+int  RTS_GuiSelectRect( int playerId, int minX, int minY, int maxX, int maxY );
+int  RTS_GuiGetSelection( int playerId, rtsEntityId_t *out, int maxOut );
+int  RTS_GuiGetState( int playerId, rtsGuiState_t *outState );
+int  RTS_GuiIssueMoveSelected( int playerId, int targetX, int targetY );
 int  RTS_FindGridPath( int width, int height, const unsigned char *blocked, int startX, int startY, int goalX, int goalY, int *outX, int *outY, int maxOut );
 unsigned RTS_ComputeStateHash( void );
 
