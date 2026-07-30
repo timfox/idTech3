@@ -64,7 +64,7 @@ Full ray-marched cloud density (shape/erosion noise) is scaffolded; coverage-dri
 
 Presets: clear, cloudy, overcast, rain, storm, snow, dust, fog.
 
-Smooth blend via `r_weatherTransition`. Outputs coverage, precipitation, fog scale, aerosol, wetness/puddle rates, sun visibility, lightning probability.
+Smooth blend via `r_weatherTransition`. Outputs coverage, precipitation, fog scale, aerosol, wetness/puddle rates, sun visibility, lightning probability. `r_weatherSunDim` and `r_weatherShadowDim` control how strongly that visibility dims canonical world sun radiance and directional shadow strength.
 
 ## Precipitation
 

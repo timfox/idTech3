@@ -6,6 +6,7 @@ Real-time day/night world lighting.
 
 #include "tr_local.h"
 #include "vk_day_night.h"
+#include "vk_weather.h"
 
 #ifdef USE_VULKAN
 
@@ -187,7 +188,9 @@ float vk_day_night_shadow_factor( void )
 
 	fade = r_dayNightShadowFade ? DN_Clamp01( r_dayNightShadowFade->value ) : 1.0f;
 	moon = r_dayNightMoonShadow ? DN_Clamp01( r_dayNightMoonShadow->value ) : 0.18f;
-	return Com_Clamp( 0.0f, 1.0f, s_dayFactor * fade + ( 1.0f - s_dayFactor ) * moon );
+	return Com_Clamp( 0.0f, 1.0f,
+		( s_dayFactor * fade + ( 1.0f - s_dayFactor ) * moon ) *
+		vk_weather_shadow_factor() );
 }
 
 void vk_day_night_register_cvars( void )
@@ -307,6 +310,7 @@ void vk_day_night_begin_frame( void )
 	s_timeOfDay = DN_TimeOfDay();
 	DN_Evaluate( s_timeOfDay, dir, light, &s_sunElevation, &s_dayFactor );
 	VectorCopy( dir, tr.sunDirection );
+	VectorScale( light, vk_weather_direct_sun_factor(), light );
 	VectorCopy( light, tr.sunLight );
 
 	if ( r_dayNightDebug && r_dayNightDebug->integer > 1 ) {

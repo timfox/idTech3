@@ -47,6 +47,8 @@ const vkWeatherState_t *vk_weather_state( void );
 qboolean vk_weather_is_outdoor_view( void );
 
 float vk_weather_sun_visibility( void );
+float vk_weather_direct_sun_factor( void );
+float vk_weather_shadow_factor( void );
 float vk_weather_fog_density_scale( void );
 float vk_weather_cloud_coverage( void );
 float vk_weather_precipitation( void );

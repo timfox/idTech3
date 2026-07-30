@@ -40,3 +40,5 @@ seta r_dayNightCycleMinutes 2
 The overlay enables `r_skyOwner 1` and `r_atmosphere 1` so the sun motion is visible immediately. The lighting system itself does not require physical sky; classic skyboxes still keep their authored textures while world lighting follows the cycle.
 
 Sun shadows use the same real-time lighting state. Forward+/PBR, deferred, and OIT shadow strength are multiplied by `vk_day_night_shadow_factor()`, which fades through sunrise/sunset and uses `r_dayNightMoonShadow` at night. When that factor is effectively zero, raster CSM skips rendering unless volumetric fog shadows still need the depth.
+
+Weather is folded into the same spine. `vk_weather_direct_sun_factor()` dims canonical `tr.sunLight` for opaque/deferred/OIT/RT consumers, while `vk_weather_shadow_factor()` dims directional shadow strength. Use `r_weatherSunDim` and `r_weatherShadowDim` to tune how much overcast, rain, storm, snow, dust, and fog presets affect direct lighting and shadows.

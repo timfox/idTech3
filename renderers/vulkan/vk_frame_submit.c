@@ -453,6 +453,8 @@ void vk_prepare_frame_temporal_state( void )
 		vk_reset_taa_history();
 	}
 
+	/* Weather feeds canonical day/night sun radiance and shadow strength. */
+	vk_weather_update();
 	vk_day_night_begin_frame();
 	vk_temporal_begin_frame();
 	vk_spatial_aa_begin_frame();
@@ -611,7 +613,6 @@ void vk_end_frame( void )
 		vk_vshadow_on_camera_cut();
 		vk_exposure_histogram_on_camera_cut();
 	}
-	vk_weather_update();
 	vk_surface_evolution_update();
 	vk_vshadow_begin_frame();
 	vk_cinematic_camera_begin_frame();

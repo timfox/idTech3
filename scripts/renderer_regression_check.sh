@@ -1271,6 +1271,12 @@ elif ! grep -q 'tr.sunDirection' "$DAY_NIGHT_C" 2>/dev/null || ! grep -q 'tr.sun
   fail "day/night must drive canonical tr.sunDirection/tr.sunLight"
 elif ! grep -q 'ri.Com_RealTime' "$DAY_NIGHT_C" 2>/dev/null || ! grep -q 'ri.Milliseconds' "$DAY_NIGHT_C" 2>/dev/null; then
   fail "day/night must support wall-clock and accelerated cycle timing"
+elif ! grep -q 'vk_weather_direct_sun_factor' "$PROJECT_ROOT/renderers/vulkan/vk_weather.h" "$PROJECT_ROOT/renderers/vulkan/vk_weather.c" "$DAY_NIGHT_C" 2>/dev/null; then
+  fail "weather must publish and day/night must consume direct sun dimming"
+elif ! grep -q 'vk_weather_shadow_factor' "$PROJECT_ROOT/renderers/vulkan/vk_weather.h" "$PROJECT_ROOT/renderers/vulkan/vk_weather.c" "$DAY_NIGHT_C" 2>/dev/null; then
+  fail "weather must publish and day/night must consume shadow dimming"
+elif ! grep -q 'Weather feeds canonical day/night sun radiance' "$PROJECT_ROOT/renderers/vulkan/vk_frame_submit.c" 2>/dev/null; then
+  fail "weather must update before day/night prepares canonical sun lighting"
 elif ! grep -q 'vk_day_night_shadow_factor' "$DAY_NIGHT_H" "$DAY_NIGHT_C" 2>/dev/null; then
   fail "day/night must expose an effective shadow factor"
 elif ! grep -q 'vk_day_night_shadow_factor' "$PROJECT_ROOT/renderers/vulkan/tr_backend.c" "$PROJECT_ROOT/renderers/vulkan/tr_shade.c" "$PROJECT_ROOT/renderers/vulkan/vk_deferred_gbuffer.c" "$PROJECT_ROOT/renderers/vulkan/vk_view_state.c" 2>/dev/null; then

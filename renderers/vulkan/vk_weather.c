@@ -14,6 +14,8 @@ static cvar_t *r_weather;
 static cvar_t *r_weatherPreset;
 static cvar_t *r_weatherTransition;
 static cvar_t *r_weatherIndoor;
+static cvar_t *r_weatherSunDim;
+static cvar_t *r_weatherShadowDim;
 static cvar_t *r_weatherDebug;
 
 static vkWeatherState_t s_state;
@@ -133,6 +135,16 @@ void vk_weather_register_cvars( void )
 	ri.Cvar_SetDescription( r_weatherIndoor,
 		"Force indoor classification for weather (suppress precip/cloud shadows). "
 		"Auto portal/leaf classification can replace this later." );
+
+	r_weatherSunDim = ri.Cvar_Get( "r_weatherSunDim", "1", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_weatherSunDim, "0", "1", CV_FLOAT );
+	ri.Cvar_SetDescription( r_weatherSunDim,
+		"How strongly weather sunVisibility dims canonical world sun radiance." );
+
+	r_weatherShadowDim = ri.Cvar_Get( "r_weatherShadowDim", "1", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_weatherShadowDim, "0", "1", CV_FLOAT );
+	ri.Cvar_SetDescription( r_weatherShadowDim,
+		"How strongly weather sunVisibility dims directional sun shadow strength." );
 
 	r_weatherDebug = ri.Cvar_Get( "r_weatherDebug", "0", CVAR_ARCHIVE_ND );
 	ri.Cvar_CheckRange( r_weatherDebug, "0", "2", CV_INTEGER );
@@ -258,6 +270,32 @@ float vk_weather_sun_visibility( void )
 	return Com_Clamp( 0.0f, 1.0f, s_state.sunVisibility );
 }
 
+float vk_weather_direct_sun_factor( void )
+{
+	float vis;
+	float dim;
+
+	if ( !vk_weather_active() ) {
+		return 1.0f;
+	}
+	vis = vk_weather_sun_visibility();
+	dim = r_weatherSunDim ? Com_Clamp( 0.0f, 1.0f, r_weatherSunDim->value ) : 1.0f;
+	return Com_Clamp( 0.0f, 1.0f, 1.0f - ( 1.0f - vis ) * dim );
+}
+
+float vk_weather_shadow_factor( void )
+{
+	float vis;
+	float dim;
+
+	if ( !vk_weather_active() ) {
+		return 1.0f;
+	}
+	vis = vk_weather_sun_visibility();
+	dim = r_weatherShadowDim ? Com_Clamp( 0.0f, 1.0f, r_weatherShadowDim->value ) : 1.0f;
+	return Com_Clamp( 0.0f, 1.0f, 1.0f - ( 1.0f - vis ) * dim );
+}
+
 float vk_weather_fog_density_scale( void )
 {
 	if ( !vk_weather_active() ) {
@@ -304,6 +342,8 @@ void vk_weather_status_f( void )
 	ri.Printf( PRINT_ALL, "fogDensityScale: %.2f\n", s_state.fogDensityScale );
 	ri.Printf( PRINT_ALL, "aerosol        : %.2f\n", s_state.aerosol );
 	ri.Printf( PRINT_ALL, "sunVisibility  : %.2f\n", s_state.sunVisibility );
+	ri.Printf( PRINT_ALL, "sun/shadow     : %.2f / %.2f\n",
+		vk_weather_direct_sun_factor(), vk_weather_shadow_factor() );
 	ri.Printf( PRINT_ALL, "wetnessRate    : %.2f puddle=%.2f\n",
 		s_state.wetnessRate, s_state.puddleRate );
 	ri.Printf( PRINT_ALL, "wind           : %.2f lightningProb=%.3f\n",
