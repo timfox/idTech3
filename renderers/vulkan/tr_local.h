@@ -1730,6 +1730,7 @@ extern cvar_t	*r_forwardPlusLuminanceSort;
 extern cvar_t	*r_forwardPlusDistanceSort;
 extern cvar_t	*r_forwardPlusDepthCull;
 extern cvar_t	*r_forwardPlusHiZ;
+extern cvar_t	*r_forwardPlusHiZPyramid;
 extern cvar_t	*r_forwardPlusZSlices;
 extern cvar_t	*r_forwardPlusZSliceMode;
 extern cvar_t	*r_forwardPlusSpecularStrength;

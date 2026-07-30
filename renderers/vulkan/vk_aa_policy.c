@@ -90,7 +90,7 @@ void vk_aa_policy_register_cvars( void )
 	const qboolean isSurf = ( !Q_stricmp( fs_game, "surf" ) ||
 		!Q_stricmp( fs_basegame, "surf" ) ) ? qtrue : qfalse;
 
-	r_aaMode = ri.Cvar_Get( "r_aaMode", isSurf ? "4" : "2", CVAR_ARCHIVE_ND | CVAR_LATCH );
+	r_aaMode = ri.Cvar_Get( "r_aaMode", "2", CVAR_ARCHIVE_ND | CVAR_LATCH );
 	ri.Cvar_CheckRange( r_aaMode, "0", "6", CV_INTEGER );
 	ri.Cvar_SetDescription( r_aaMode,
 		"Presentation AA policy:\n"
@@ -104,11 +104,7 @@ void vk_aa_policy_register_cvars( void )
 		"Applies r_ext_smaa / r_ext_fxaa / r_taa. Latched; vid_restart for SMAA/FXAA.\n"
 		"Migration: former mode 3 (SMAA T2x) is now adaptive recon — use mode 2 for SMAA-only." );
 	ri.Cvar_SetGroup( r_aaMode, CVG_RENDERER );
-	if ( isSurf && r_aaMode->integer != 4 ) {
-		ri.Cvar_Set( "r_aaMode", "4" );
-		r_aaMode->integer = 4;
-		r_aaMode->modified = qtrue;
-	}
+	(void)isSurf;
 
 	r_temporalHistoryWeight = ri.Cvar_Get( "r_temporalHistoryWeight", "0.72", CVAR_ARCHIVE_ND );
 	ri.Cvar_CheckRange( r_temporalHistoryWeight, "0", "0.95", CV_FLOAT );

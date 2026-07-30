@@ -478,6 +478,7 @@ cvar_t	*r_forwardPlusLuminanceSort;
 cvar_t	*r_forwardPlusDistanceSort;
 cvar_t	*r_forwardPlusDepthCull;
 cvar_t	*r_forwardPlusHiZ;
+cvar_t	*r_forwardPlusHiZPyramid;
 cvar_t	*r_forwardPlusZSlices;
 cvar_t	*r_forwardPlusZSliceMode;
 cvar_t	*r_forwardPlusSpecularStrength;
@@ -3821,6 +3822,11 @@ static void R_Register( void )
 	ri.Cvar_SetDescription( r_forwardPlusHiZ,
 		"When 1 with \\r_forwardPlusDepthCull 1, expand same-frame depth probes for conservative large-light rejection. This is a probe pad, not the vk_hiz pyramid. Default 1." );
 	ri.Cvar_SetGroup( r_forwardPlusHiZ, CVG_RENDERER );
+	r_forwardPlusHiZPyramid = ri.Cvar_Get( "r_forwardPlusHiZPyramid", "0", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_forwardPlusHiZPyramid, "0", "1", CV_INTEGER );
+	ri.Cvar_SetDescription( r_forwardPlusHiZPyramid,
+		"When 1 with \\r_forwardPlusDepthCull 1 and \\r_hiZ 1, Forward+ tile cull samples the real vk_hiz pyramid on binding 9. Experimental; keep 0 for stable boot." );
+	ri.Cvar_SetGroup( r_forwardPlusHiZPyramid, CVG_RENDERER );
 	r_forwardPlusZSlices = ri.Cvar_Get( "r_forwardPlusZSlices", "1", CVAR_ARCHIVE_ND | CVAR_LATCH );
 	ri.Cvar_CheckRange( r_forwardPlusZSlices, "1", "16", CV_INTEGER );
 	ri.Cvar_SetDescription( r_forwardPlusZSlices,

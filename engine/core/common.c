@@ -3168,8 +3168,8 @@ static void Com_ApplyStandaloneColorDefaults( void )
 Com_ApplySurfShippingProfile
 
 Surf ships a renderer profile in surf.cfg, but archived user config.cfg is
-loaded after it. Keep stale local experiments from disabling the certified
-Surf temporal path or selecting incompatible AO/deferred owners at startup.
+loaded after it. Keep stale local experiments from selecting incompatible
+deferred, temporal, SSR, and lighting owners at startup.
 ==================
 */
 static void Com_ApplySurfShippingProfile( void )
@@ -3186,28 +3186,28 @@ static void Com_ApplySurfShippingProfile( void )
 		return;
 	}
 
-	Cvar_Set( "r_aaMode", "4" );
-	Cvar_Set( "r_taa", "1" );
-	Cvar_Set( "r_taaMotionVectors", "1" );
-	Cvar_Set( "r_weaponTemporalMode", "1" );
-	Cvar_Set( "r_temporalReactiveMask", "1" );
-	Cvar_Set( "r_temporalWeaponAfterTaa", "1" );
-	Cvar_Set( "r_weaponSsrIsolation", "1" );
-	Cvar_Set( "r_ssr", "1" );
+	Cvar_Set( "r_aaMode", "2" );
+	Cvar_Set( "r_taa", "0" );
+	Cvar_Set( "r_taaMotionVectors", "0" );
+	Cvar_Set( "r_weaponTemporalMode", "0" );
+	Cvar_Set( "r_temporalReactiveMask", "0" );
+	Cvar_Set( "r_temporalWeaponAfterTaa", "0" );
+	Cvar_Set( "r_weaponSsrIsolation", "0" );
+	Cvar_Set( "r_ssr", "0" );
 	Cvar_Set( "r_temporalSSR", "0" );
 
 	Cvar_Set( "r_texturebits", "32" );
 	Cvar_Set( "r_fastsky", "0" );
-	Cvar_Set( "r_renderMode", "0" );
-	Cvar_Set( "r_pbr", "0" );
-	Cvar_Set( "r_pbr_shExtract", "0" );
+	Cvar_Set( "r_renderMode", "3" );
+	Cvar_Set( "r_pbr", "1" );
+	Cvar_Set( "r_pbr_shExtract", "1" );
 	Cvar_Set( "r_pbrSunShadow", "0" );
-	Cvar_Set( "r_forwardPlus", "0" );
-	Cvar_Set( "r_forwardPlusShade", "0" );
-	Cvar_Set( "r_deferredLighting", "0" );
+	Cvar_Set( "r_forwardPlus", "1" );
+	Cvar_Set( "r_forwardPlusShade", "1" );
+	Cvar_Set( "r_deferredLighting", "1" );
 	Cvar_Set( "r_ssao", "0" );
-	Cvar_Set( "r_ambientVisibilityMode", "0" );
-	Cvar_Set( "r_shWorldLighting", "0" );
+	Cvar_Set( "r_ambientVisibilityMode", "2" );
+	Cvar_Set( "r_shWorldLighting", "1" );
 	Cvar_Set( "r_bspStream", "0" );
 	Cvar_Set( "cm_stream", "1" );
 	Cvar_Set( "cm_streamMerge", "0" );

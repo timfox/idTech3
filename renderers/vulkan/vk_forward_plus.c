@@ -321,6 +321,8 @@ typedef struct {
 	uint32_t distance_sort;
 	uint32_t depth_cull;
 	uint32_t hi_z; /* r_forwardPlusHiZ: expanded same-frame depth probes for large lights */
+	uint32_t hiz_pyramid;
+	uint32_t hiz_levels;
 	uint32_t z_slices;
 	uint32_t z_slice_mode; /* 0=linear view depth, 1=log */
 	float z_near;
@@ -446,7 +448,7 @@ static void vk_fp_write_graphics_descriptor( VkBuffer light_buf, VkBuffer tile_b
 
 void vk_forward_plus_create_set_layout( void )
 {
-	VkDescriptorSetLayoutBinding binds[9];
+	VkDescriptorSetLayoutBinding binds[10];
 	VkDescriptorSetLayoutCreateInfo layout_ci;
 
 #ifdef USE_VK_PBR
@@ -494,11 +496,16 @@ void vk_forward_plus_create_set_layout( void )
 	binds[8].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
 	binds[8].descriptorCount = 1;
 	binds[8].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+	/* Real vk_hiz pyramid for optional Forward+ light-volume depth cull. */
+	binds[9].binding = 9;
+	binds[9].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+	binds[9].descriptorCount = 1;
+	binds[9].stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
 
 	layout_ci.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
 	layout_ci.pNext = NULL;
 	layout_ci.flags = 0;
-	layout_ci.bindingCount = 9;
+	layout_ci.bindingCount = 10;
 	layout_ci.pBindings = binds;
 	VK_CHECK( qvkCreateDescriptorSetLayout( vk.device, &layout_ci, NULL, &vk.set_layout_forward_plus ) );
 	SET_OBJECT_NAME( vk.set_layout_forward_plus, "descriptor set layout - forward+", VK_DEBUG_REPORT_OBJECT_TYPE_DESCRIPTOR_SET_LAYOUT_EXT );
@@ -925,10 +932,11 @@ static void vk_fp_create_buffers_and_compute( void )
 
 void vk_forward_plus_update_depth_descriptor( void )
 {
-	VkDescriptorImageInfo depth_info;
-	VkWriteDescriptorSet write;
+	VkDescriptorImageInfo image_infos[2];
+	VkWriteDescriptorSet writes[2];
 	Vk_Sampler_Def depth_sd;
 	VkImageView depth_view;
+	vkHizPyramidSampleInfo_t hiz_info;
 
 	depth_view = vk.depth_image_view_sample ? vk.depth_image_view_sample : vk.depth_image_view;
 	if ( vk.forward_plus.descriptor == VK_NULL_HANDLE || depth_view == VK_NULL_HANDLE ) {
@@ -940,19 +948,41 @@ void vk_forward_plus_update_depth_descriptor( void )
 	depth_sd.address_mode = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
 	depth_sd.noAnisotropy = qtrue;
 
-	Com_Memset( &depth_info, 0, sizeof( depth_info ) );
-	depth_info.sampler = vk_find_sampler( &depth_sd );
-	depth_info.imageView = depth_view;
-	depth_info.imageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
+	Com_Memset( image_infos, 0, sizeof( image_infos ) );
+	image_infos[0].sampler = vk_find_sampler( &depth_sd );
+	image_infos[0].imageView = depth_view;
+	image_infos[0].imageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
 
-	Com_Memset( &write, 0, sizeof( write ) );
-	write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-	write.dstSet = vk.forward_plus.descriptor;
-	write.dstBinding = 3;
-	write.descriptorCount = 1;
-	write.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-	write.pImageInfo = &depth_info;
-	qvkUpdateDescriptorSets( vk.device, 1, &write, 0, NULL );
+	Com_Memset( writes, 0, sizeof( writes ) );
+	writes[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+	writes[0].dstSet = vk.forward_plus.descriptor;
+	writes[0].dstBinding = 3;
+	writes[0].descriptorCount = 1;
+	writes[0].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+	writes[0].pImageInfo = &image_infos[0];
+
+	if ( vk_hiz_get_pyramid_sample_info( &hiz_info ) ) {
+		image_infos[1].sampler = image_infos[0].sampler;
+		image_infos[1].imageView = hiz_info.view;
+		image_infos[1].imageLayout = hiz_info.layout;
+	} else {
+		image_infos[1] = image_infos[0];
+	}
+	writes[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+	writes[1].dstSet = vk.forward_plus.descriptor;
+	writes[1].dstBinding = 9;
+	writes[1].descriptorCount = 1;
+	writes[1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+	writes[1].pImageInfo = &image_infos[1];
+
+	qvkUpdateDescriptorSets( vk.device, 2, writes, 0, NULL );
+
+#ifdef USE_VK_PBR
+	if ( vk_fp_graphics_descriptor != VK_NULL_HANDLE && vk_fp_graphics_descriptor != vk.forward_plus.descriptor ) {
+		writes[1].dstSet = vk_fp_graphics_descriptor;
+		qvkUpdateDescriptorSets( vk.device, 1, &writes[1], 0, NULL );
+	}
+#endif
 }
 
 void vk_forward_plus_update_sun_shadow_descriptor( void )
@@ -1313,6 +1343,7 @@ static void vk_forward_plus_dispatch_tile_cull_internal( qboolean use_depth_cull
 	const float *view;
 	const float *proj_gl;
 	VkImageAspectFlags depth_aspect = VK_IMAGE_ASPECT_DEPTH_BIT;
+	vkHizPyramidSampleInfo_t hiz_info;
 
 	if ( !r_forwardPlus || !r_forwardPlus->integer ) {
 		return;
@@ -1471,6 +1502,10 @@ static void vk_forward_plus_dispatch_tile_cull_internal( qboolean use_depth_cull
 	}
 	push.depth_cull = use_depth_cull ? 1u : 0u;
 	push.hi_z = ( use_depth_cull && r_forwardPlusHiZ && r_forwardPlusHiZ->integer ) ? 1u : 0u;
+	push.hiz_pyramid = ( push.depth_cull &&
+		r_forwardPlusHiZPyramid && r_forwardPlusHiZPyramid->integer &&
+		vk_hiz_get_pyramid_sample_info( &hiz_info ) ) ? 1u : 0u;
+	push.hiz_levels = push.hiz_pyramid ? hiz_info.levels : 1u;
 	push.z_slice_mode = ( r_forwardPlusZSliceMode && r_forwardPlusZSliceMode->integer ) ? 1u : 0u;
 	push.compact_lists = vk.forward_plus.compact_lists ? 1u : 0u;
 	push.index_capacity = vk.forward_plus.index_capacity;
@@ -1500,7 +1535,8 @@ static void vk_forward_plus_dispatch_tile_cull_internal( qboolean use_depth_cull
 		if ( !depth_cull_logged ) {
 			ri.Printf( PRINT_ALL,
 				"[VK][Forward+] r_forwardPlusDepthCull=1 (depth prepass + tile cull; lightVolumeDepthCull)%s\n",
-				push.hi_z ? "; r_forwardPlusHiZ=1 expanded same-frame probes" : "" );
+				push.hiz_pyramid ? "; vk_hiz pyramid sampling enabled" :
+					( push.hi_z ? "; r_forwardPlusHiZ=1 expanded same-frame probes" : "" ) );
 			depth_cull_logged = qtrue;
 		}
 	}
@@ -1516,6 +1552,7 @@ static void vk_forward_plus_dispatch_tile_cull_internal( qboolean use_depth_cull
 		}
 	}
 
+	vk_forward_plus_update_depth_descriptor();
 	qvkCmdPushConstants( vk.cmd->command_buffer, vk.forward_plus.pipeline_layout,
 		VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof( push ), &push );
 
@@ -1729,10 +1766,12 @@ static void vk_cluster_status_f( void )
 	uint32_t total = vk.forward_plus.tile_capacity_tiles;
 	vkHizPyramidSampleInfo_t hizInfo;
 	qboolean hizReady = vk_hiz_get_pyramid_sample_info( &hizInfo );
+	qboolean hizDispatch = ( r_forwardPlusDepthCull && r_forwardPlusDepthCull->integer &&
+		r_forwardPlusHiZPyramid && r_forwardPlusHiZPyramid->integer && hizReady ) ? qtrue : qfalse;
 	ri.Printf( PRINT_ALL,
 		"cluster_status: grid=%ux%ux%u tile=%u compact=%d fallback=%d gen=%u\n"
 		"  lights=%u indices=%u/%u overflow=%u policy=%d zNear=%.2f zFar=%.2f zScale=%.4f\n"
-		"  depthCull=%d probePad=%d hizPyramid=%s %ux%u mips=%u layout=%u\n",
+		"  depthCull=%d probePad=%d pyramidCvar=%d pyramidDispatch=%d hizPyramid=%s %ux%u mips=%u layout=%u\n",
 		vk.forward_plus.tiles_x, vk.forward_plus.tiles_y, vk.forward_plus.z_slices,
 		VK_FP_TILE_DIM,
 		vk.forward_plus.compact_lists ? 1 : 0,
@@ -1746,6 +1785,8 @@ static void vk_cluster_status_f( void )
 		vk.forward_plus.z_scale,
 		r_forwardPlusDepthCull ? r_forwardPlusDepthCull->integer : 0,
 		r_forwardPlusHiZ ? r_forwardPlusHiZ->integer : 0,
+		r_forwardPlusHiZPyramid ? r_forwardPlusHiZPyramid->integer : 0,
+		hizDispatch ? 1 : 0,
 		hizReady ? "ready" : ( vk_hiz_active() ? "not-ready" : "off" ),
 		hizInfo.width, hizInfo.height, hizInfo.levels, (unsigned)hizInfo.layout );
 	if ( total > 0u && vk.forward_plus.index_capacity > 0u ) {

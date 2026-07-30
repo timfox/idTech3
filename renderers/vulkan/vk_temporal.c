@@ -134,6 +134,8 @@ void vk_surf_validate_temporal_config_f( void )
 		vk.temporal_prev_depth_descriptor[0] != VK_NULL_HANDLE &&
 		vk.temporal_prev_depth_descriptor[1] != VK_NULL_HANDLE &&
 		vk.temporal_depth_history_copy_pipeline != VK_NULL_HANDLE;
+	const qboolean surfSpatialProfile =
+		!taaEnabled && r_aaMode && r_aaMode->integer == 2 && mode == 0;
 	int failures = 0;
 	int warnings = 0;
 
@@ -153,12 +155,16 @@ void vk_surf_validate_temporal_config_f( void )
 	}
 	if ( taaEnabled ) {
 		vk_surf_validation_line( "PASS", "r_taa", "1 (Temporal Reconstruction active)" );
+	} else if ( surfSpatialProfile ) {
+		vk_surf_validation_line( "PASS", "r_taa", "0 (SMAA spatial profile)" );
 	} else {
 		vk_surf_validation_line( "FAIL", "r_taa", "0; Surf shipping path requires 1" );
 		failures++;
 	}
 	if ( r_aaMode && r_aaMode->integer == 4 ) {
 		vk_surf_validation_line( "PASS", "r_aaMode", "4 (native Temporal Reconstruction)" );
+	} else if ( surfSpatialProfile ) {
+		vk_surf_validation_line( "PASS", "r_aaMode", "2 (SMAA 1x)" );
 	} else {
 		vk_surf_validation_line( "WARN", "r_aaMode", "expected 4; AA policy may override r_taa" );
 		warnings++;
@@ -166,6 +172,9 @@ void vk_surf_validate_temporal_config_f( void )
 	if ( mode == 1 || mode == 2 ) {
 		vk_surf_validation_line( "PASS", "r_weaponTemporalMode",
 			mode == 1 ? "1 (classified shared history)" : "2 (independent weapon history)" );
+	} else if ( surfSpatialProfile ) {
+		vk_surf_validation_line( "PASS", "r_weaponTemporalMode",
+			"0 (no weapon history in spatial profile)" );
 	} else {
 		vk_surf_validation_line( "FAIL", "r_weaponTemporalMode",
 			"expected 1 or 2; mode 0 is a current-frame correctness baseline" );
@@ -173,6 +182,9 @@ void vk_surf_validate_temporal_config_f( void )
 	}
 	if ( classAvailable ) {
 		vk_surf_validation_line( "PASS", "weapon class target", "R8 ping-pong + stamp pipeline available" );
+	} else if ( surfSpatialProfile && !classEnabled ) {
+		vk_surf_validation_line( "PASS", "weapon class target",
+			"not required without weapon temporal history" );
 	} else {
 		vk_surf_validation_line( classEnabled ? "FAIL" : "WARN", "weapon class target",
 			classEnabled ? "classification enabled without a valid class texture/pipeline" :
@@ -185,6 +197,9 @@ void vk_surf_validate_temporal_config_f( void )
 	}
 	if ( reactiveEnabled ) {
 		vk_surf_validation_line( "PASS", "r_temporalReactiveMask", "1" );
+	} else if ( surfSpatialProfile ) {
+		vk_surf_validation_line( "PASS", "r_temporalReactiveMask",
+			"0 (reactive mask not needed without TAA)" );
 	} else {
 		vk_surf_validation_line( "FAIL", "r_temporalReactiveMask",
 			"0; weapon silhouettes cannot stamp reactive coverage" );
@@ -192,6 +207,9 @@ void vk_surf_validate_temporal_config_f( void )
 	}
 	if ( reactiveAvailable ) {
 		vk_surf_validation_line( "PASS", "weapon reactive target", "R8 target + weapon stamp pipeline available" );
+	} else if ( surfSpatialProfile && !reactiveEnabled ) {
+		vk_surf_validation_line( "PASS", "weapon reactive target",
+			"not required without Temporal Reconstruction" );
 	} else {
 		vk_surf_validation_line( reactiveEnabled ? "FAIL" : "WARN", "weapon reactive target",
 			reactiveEnabled ? "reactive masking enabled without a reactive target/pipeline" :
@@ -204,12 +222,18 @@ void vk_surf_validate_temporal_config_f( void )
 	}
 	if ( velocityEnabled ) {
 		vk_surf_validation_line( "PASS", "r_taaMotionVectors", "1" );
+	} else if ( surfSpatialProfile ) {
+		vk_surf_validation_line( "PASS", "r_taaMotionVectors",
+			"0 (motion vectors not needed without TAA)" );
 	} else {
 		vk_surf_validation_line( "FAIL", "r_taaMotionVectors",
 			"0; temporal weapon resolve requires weapon MVP velocity" );
 		failures++;
 	}
-	if ( velocityAvailable ) {
+	if ( surfSpatialProfile ) {
+		vk_surf_validation_line( "PASS", "weapon MVP velocity path",
+			"not required without temporal weapon resolve" );
+	} else if ( velocityAvailable ) {
 		vk_surf_validation_line( "PASS", "weapon MVP velocity path",
 			"motion target available; first-person prev MVP capture enabled" );
 	} else {
@@ -222,6 +246,9 @@ void vk_surf_validate_temporal_config_f( void )
 			vk_temporal_defer_bloom_for_weapon() ?
 				"after world TAA, before one combined HDR bloom" :
 				"after world TAA (weapon bloom intentionally disabled)" );
+	} else if ( surfSpatialProfile ) {
+		vk_surf_validation_line( "PASS", "weapon composition",
+			"standard pre-bloom composition without world TAA history" );
 	} else {
 		vk_surf_validation_line( "FAIL", "weapon composition",
 			"pre-bloom; set r_temporalWeaponAfterTaa 1 and r_weaponSsrIsolation 1" );
@@ -229,6 +256,9 @@ void vk_surf_validate_temporal_config_f( void )
 	}
 	if ( r_weaponSsrIsolation && r_weaponSsrIsolation->integer ) {
 		vk_surf_validation_line( "PASS", "r_weaponSsrIsolation", "1" );
+	} else if ( surfSpatialProfile ) {
+		vk_surf_validation_line( "PASS", "r_weaponSsrIsolation",
+			"0 (SSR disabled in spatial profile)" );
 	} else {
 		vk_surf_validation_line( "FAIL", "r_weaponSsrIsolation",
 			"0; weapon depth may contaminate world SSR/SSAO" );
@@ -252,7 +282,10 @@ void vk_surf_validate_temporal_config_f( void )
 		warnings++;
 	}
 
-	if ( previousDepthAvailable ) {
+	if ( surfSpatialProfile ) {
+		vk_surf_validation_line( "PASS", "previous depth",
+			"not required without Temporal Reconstruction" );
+	} else if ( previousDepthAvailable ) {
 		vk_surf_validation_line( "PASS", "previous depth",
 			"dual R32F history + copy pipeline + descriptors available" );
 	} else {

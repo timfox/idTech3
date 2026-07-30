@@ -233,7 +233,7 @@ echo "Forward+ depth cull naming: r_forwardPlusHiZ is probe padding, not vk_hiz 
 FP_C="$PROJECT_ROOT/renderers/vulkan/vk_forward_plus.c"
 FP_GLSL="$PROJECT_ROOT/renderers/vulkan/shaders/glsl/forward_plus_tile_cull.comp"
 TR_INIT_VK="$PROJECT_ROOT/renderers/vulkan/tr_init.c"
-if grep -q 'forwardPlusHiZPyramid\|hierarchical probes\|hierarchical occlusion' "$FP_C" "$FP_GLSL" "$TR_INIT_VK" 2>/dev/null; then
+if grep -q 'hierarchical probes\|hierarchical occlusion' "$FP_C" "$FP_GLSL" "$TR_INIT_VK" 2>/dev/null; then
   fail "Forward+ HiZ still uses pyramid/hierarchical wording without sampling vk_hiz"
 elif ! grep -q 'forwardPlusHiZProbePad' "$FP_GLSL" 2>/dev/null; then
   fail "forward_plus_tile_cull.comp missing forwardPlusHiZProbePad marker"
@@ -1216,10 +1216,12 @@ elif ! grep -q 'spotFrustumTileCull\|spot_frustum_tile_overlap' "$FP_COMP" 2>/de
   fail "forward_plus_tile_cull.comp must implement spotFrustumTileCull for linear lights"
 elif ! grep -q 'lightVolumeDepthCull' "$FP_COMP" 2>/dev/null; then
   fail "forward_plus_tile_cull.comp must implement lightVolumeDepthCull (volume Z vs sceneNearest)"
-elif ! grep -q 'forwardPlusHiZPyramid\|hiZ' "$FP_COMP" 2>/dev/null; then
-  fail "forward_plus_tile_cull.comp must implement forwardPlusHiZPyramid / hiZ push"
+elif ! grep -q 'forwardPlusHiZProbePad' "$FP_COMP" 2>/dev/null || ! grep -q 'uint hiZ' "$FP_COMP" 2>/dev/null; then
+  fail "forward_plus_tile_cull.comp must implement forwardPlusHiZProbePad / hiZ push"
 elif ! grep -q 'r_forwardPlusHiZ' "$TR_INIT_VK" 2>/dev/null; then
   fail "tr_init.c missing r_forwardPlusHiZ cvar"
+elif ! grep -q 'r_forwardPlusHiZPyramid' "$TR_INIT_VK" 2>/dev/null; then
+  fail "tr_init.c missing r_forwardPlusHiZPyramid cvar"
 elif ! grep -q 'aliases to 32-bit HDR' "$VK_DEVICE" 2>/dev/null; then
   fail "vk_device.c must honestly alias r_hdr 3 to 32-bit HDR"
 elif ! grep -q 'toneMapParams0' "$GAMMA_FRAG" 2>/dev/null || ! grep -q 'Tonemap_AgX' "$GAMMA_FRAG" 2>/dev/null; then
@@ -1232,6 +1234,28 @@ elif ! grep -q 'AgX = 4\|AgX (\`4\`)' "$PROJECT_ROOT/docs/samples/renderer_regre
   fail "05_postfx.md must document AgX as r_tonemap 4 (Filmic is 3)"
 else
   pass "Forward+ specular/renorm cvars + spot frustum + light-volume depth + AgX grade knobs"
+fi
+
+echo ""
+echo "Forward+ vk_hiz pyramid sampling bridge:"
+VK_HIZ_H="$PROJECT_ROOT/renderers/vulkan/vk_hiz.h"
+VK_HIZ_C="$PROJECT_ROOT/renderers/vulkan/vk_hiz.c"
+if ! grep -q 'vk_hiz_get_pyramid_sample_info' "$VK_HIZ_H" "$VK_HIZ_C" "$FP_C" 2>/dev/null; then
+  fail "vk_hiz pyramid sample-info API must be exposed and consumed by Forward+"
+elif ! grep -q 'binding = 9' "$FP_COMP" 2>/dev/null || ! grep -q 'dstBinding = 9' "$FP_C" 2>/dev/null; then
+  fail "Forward+ tile cull must bind vk_hiz pyramid on descriptor binding 9"
+elif ! grep -q 'uint hizPyramid' "$FP_COMP" 2>/dev/null || ! grep -q 'push.hiz_pyramid' "$FP_C" 2>/dev/null; then
+  fail "Forward+ tile cull must gate pyramid sampling with push.hiz_pyramid"
+elif ! grep -q 'r_forwardPlusHiZPyramid' "$FP_C" 2>/dev/null; then
+  fail "Forward+ tile cull must gate real pyramid sampling with r_forwardPlusHiZPyramid"
+elif ! grep -q 'uint hizLevels' "$FP_COMP" 2>/dev/null || ! grep -q 'push.hiz_levels' "$FP_C" 2>/dev/null; then
+  fail "Forward+ tile cull must clamp pyramid LOD with live vk_hiz mip count"
+elif ! grep -q 'textureLod(hizPyramidTexture' "$FP_COMP" 2>/dev/null; then
+  fail "forward_plus_tile_cull.comp must sample vk_hiz pyramid with textureLod"
+elif ! grep -q 'pyramidDispatch' "$FP_C" 2>/dev/null; then
+  fail "cluster_status must report whether Forward+ will actually dispatch with vk_hiz pyramid sampling"
+else
+  pass "Forward+ can bind and optionally sample vk_hiz pyramid for depth cull"
 fi
 
 echo ""

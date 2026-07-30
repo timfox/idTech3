@@ -97,7 +97,7 @@ Linear array: **`total_tiles × MAX_PER_TILE`** **`uint32`** indices. Unused slo
 - **Point:** screen-space sphere AABB vs tile (`sphere_tile_overlap`).
 - **Linear/spot (`spotFrustumTileCull`):** coverage from origin + tip + segment mid, expanded by cone opening (`cos_outer` / `segLen` from packed records).
 
-**Depth cull (`depthCull` / `r_forwardPlusDepthCull` 1 — `lightVolumeDepthCull`):** sample tile corners + center; reject when the light **volume** nearest Z is behind `sceneNearest` (reversed-Z). `r_forwardPlusHiZ 1` expands this same-frame probe footprint for large lights; it does **not** sample the separate `vk_hiz` pyramid yet. Full Forward+ pyramid sampling remains a follow-up.
+**Depth cull (`depthCull` / `r_forwardPlusDepthCull` 1 — `lightVolumeDepthCull`):** sample tile corners + center; reject when the light **volume** nearest Z is behind `sceneNearest` (reversed-Z). `r_forwardPlusHiZ 1` expands this same-frame probe footprint for large lights. When `r_forwardPlusHiZPyramid 1` and the separate `vk_hiz` pyramid is active and ready (`r_hiZ 1` after a build), binding 9 supplies that pyramid and the compute shader samples an explicit mip with `textureLod`, clamped by the live pyramid mip count.
 
 ---
 
@@ -162,7 +162,7 @@ Linear array: **`total_tiles × MAX_PER_TILE`** **`uint32`** indices. Unused slo
 | Item | Severity | Note |
 |------|-----------|------|
 | **Tile overload ordering** | Low–Medium (quality) | **`r_forwardPlusDistanceSort`** (nearest) or **`r_forwardPlusLuminanceSort`** (brightest, default when distance off) when a tile exceeds **`maxPerTile`**; else index order. |
-| **Depth cull probes** | Low–Medium (quality) | **`r_forwardPlusDepthCull` 1** rejects lights behind the **nearest** of 5 tile probes (corners+center), or 9 padded probes when **`r_forwardPlusHiZ` 1**. Still open: full light-volume vs `vk_hiz` pyramid. |
+| **Depth cull probes** | Low–Medium (quality) | **`r_forwardPlusDepthCull` 1** rejects lights behind the **nearest** of 5 tile probes (corners+center), or 9 padded probes when **`r_forwardPlusHiZ` 1**. When **`r_forwardPlusHiZPyramid` 1** and `vk_hiz` is ready, the tile cull samples the pyramid too; still open: GPU quality validation and thresholds. |
 | **Primary + Forward+ energy** | Medium (art) | Tunable via **`r_forwardPlusEnergyRenorm`** / **`r_forwardPlusSpecularStrength`** (defaults **0** / **0.65**; mode-2 owns dynamics so renorm stays off). |
 | **Sphere screen approximation** | Low–Medium | Conservative enough for prototyping; not a tight spotlight frustum test. |
 | **`dlightBits` 32-bit** | Low | Matches **`MAX_DLIGHTS`** today; document if caps change. |
@@ -174,7 +174,7 @@ As of **July 18, 2026**, live renderer bisecting also showed that an otherwise w
 
 ### Suggested next steps (roadmap)
 
-1. **Depth-aware culling** — **partial:** **`r_forwardPlusDepthCull`** light-volume Z vs 5 probes; **`r_forwardPlusHiZ`** widens that to a padded 9-probe footprint; **`spotFrustumTileCull`** for linear lights. Still open: sampling the real `vk_hiz` pyramid.
+1. **Depth-aware culling** — **partial:** **`r_forwardPlusDepthCull`** light-volume Z vs 5 probes; **`r_forwardPlusHiZ`** widens that to a padded 9-probe footprint; **`r_forwardPlusHiZPyramid`** opts into real `vk_hiz` pyramid sampling on binding 9; **`spotFrustumTileCull`** handles linear lights. Still open: broader GPU validation and quality thresholds for production default use.
 2. **Sort or priority** — **done for overload:** **`r_forwardPlusDistanceSort`** and **`r_forwardPlusLuminanceSort`** (see §4).
 3. **Decouple** Forward+ light ceiling from **`MAX_DLIGHTS`** only if the **game protocol** and **`tess.dlightBits`** story are redesigned together.
 4. **Tier B** map with mixed point + spot lights to validate heatmap vs ground truth.
