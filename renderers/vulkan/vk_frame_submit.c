@@ -64,6 +64,7 @@ Extracted from vk.c for incremental modularization.
 #include "vk_grtx.h"
 #include "vk_vuda.h"
 #include "vk_debug_views.h"
+#include "vk_day_night.h"
 
 #ifdef __ANDROID__
 #include "platform/android/android_surface_glue.h"
@@ -452,6 +453,7 @@ void vk_prepare_frame_temporal_state( void )
 		vk_reset_taa_history();
 	}
 
+	vk_day_night_begin_frame();
 	vk_temporal_begin_frame();
 	vk_spatial_aa_begin_frame();
 	vk_frequency_aware_begin_frame();

@@ -73,6 +73,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "vk_gpu_scene.h"
 #include "vk_hiz.h"
 #include "vk_sky_owner.h"
+#include "vk_day_night.h"
 #include "vk_weather.h"
 #include "vk_volumetric_clouds.h"
 #include "vk_material_ir.h"
@@ -4110,6 +4111,7 @@ void R_Init( void ) {
 	R_Meshlets_Init();
 	vk_gpu_scene_init();
 	vk_sky_owner_init();
+	vk_day_night_init();
 	vk_weather_init();
 	vk_volumetric_clouds_init();
 	vk_material_ir_init();

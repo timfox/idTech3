@@ -35,6 +35,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "vk_vshadow.h"
 #include "vk_exposure_histogram.h"
 #include "vk_bsp_viz.h"
+#include "vk_day_night.h"
 #include "vk_ndgi.h"
 #include "vk_niv.h"
 #include "vk_nslm.h"
@@ -3154,6 +3155,7 @@ void RE_LoadWorldMap( const char *name ) {
 	R_FSA_OnMapLoad( s_worldData.baseName );
 	R_VFGI_OnMapLoad( s_worldData.baseName );
 	R_RenderFormer_OnMapLoad( s_worldData.baseName );
+	vk_day_night_on_world_load( s_worldData.baseName );
 	vk_grtx_on_map_load( s_worldData.baseName );
 	vk_raster_gi_on_map_load();
 	if ( !R_SQZ_Enabled() ) {

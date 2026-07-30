@@ -1259,6 +1259,31 @@ else
 fi
 
 echo ""
+echo "Day/night real-time world lighting:"
+DAY_NIGHT_C="$PROJECT_ROOT/renderers/vulkan/vk_day_night.c"
+DAY_NIGHT_H="$PROJECT_ROOT/renderers/vulkan/vk_day_night.h"
+DAY_NIGHT_CFG="$PROJECT_ROOT/config/vulkan_overlay_day_night.cfg"
+if [[ ! -f "$DAY_NIGHT_C" || ! -f "$DAY_NIGHT_H" ]]; then
+  fail "vk_day_night module must exist"
+elif ! grep -q 'r_dayNight' "$DAY_NIGHT_C" 2>/dev/null || ! grep -q 'r_dayNightUseRealTime' "$DAY_NIGHT_C" 2>/dev/null; then
+  fail "day/night must expose real-time world-lighting cvars"
+elif ! grep -q 'tr.sunDirection' "$DAY_NIGHT_C" 2>/dev/null || ! grep -q 'tr.sunLight' "$DAY_NIGHT_C" 2>/dev/null; then
+  fail "day/night must drive canonical tr.sunDirection/tr.sunLight"
+elif ! grep -q 'ri.Com_RealTime' "$DAY_NIGHT_C" 2>/dev/null || ! grep -q 'ri.Milliseconds' "$DAY_NIGHT_C" 2>/dev/null; then
+  fail "day/night must support wall-clock and accelerated cycle timing"
+elif ! grep -q 'vk_day_night_begin_frame' "$PROJECT_ROOT/renderers/vulkan/vk_frame_submit.c" 2>/dev/null; then
+  fail "day/night must update before renderer frame consumers"
+elif ! grep -q 'vk_day_night_on_world_load' "$PROJECT_ROOT/renderers/vulkan/tr_bsp.c" 2>/dev/null; then
+  fail "day/night must capture authored map sun after world load"
+elif ! grep -q 'daynight_status' "$DAY_NIGHT_C" 2>/dev/null; then
+  fail "day/night must expose daynight_status diagnostics"
+elif [[ ! -f "$DAY_NIGHT_CFG" ]] || ! grep -q 'seta r_dayNight 1' "$DAY_NIGHT_CFG" 2>/dev/null; then
+  fail "day/night overlay config missing"
+else
+  pass "Day/night world lighting drives canonical sun from real time"
+fi
+
+echo ""
 echo "Volumetric fog compute: VDB bindings 17-18 + params (host vs volumetric_fog.comp):"
 VF_COMP="$PROJECT_ROOT/renderers/vulkan/shaders/glsl/volumetric/volumetric_fog.comp"
 VF_FRAG="$PROJECT_ROOT/renderers/vulkan/shaders/glsl/volumetric/volumetric_fog.frag"
