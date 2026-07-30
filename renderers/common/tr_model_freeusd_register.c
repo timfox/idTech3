@@ -145,7 +145,7 @@ qhandle_t R_RegisterFreeusdMesh( const char *name, model_t *mod ) {
 		}
 
 		ok = R_MeshImport_FinalizeMD3Ex( mod, lod, namebuf, verts, numVerts, inds, numIdx,
-			shaderName[0] ? shaderName : NULL, vertSt );
+			shaderName[0] ? shaderName : NULL, vertSt, NULL );
 		ri.Free( verts );
 		ri.Free( inds );
 		if ( vertSt ) {

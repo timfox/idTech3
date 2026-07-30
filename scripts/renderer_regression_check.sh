@@ -792,6 +792,9 @@ elif ! grep -q 'R_DAE_ResolveVertexPositionSource' "$MESH_IMPORT_C" 2>/dev/null 
 elif ! grep -q 'TEXCOORD' "$MESH_IMPORT_C" 2>/dev/null || \
      ! grep -q 'R_MeshImport_FinalizeMD3Ex' "$MESH_IMPORT_C" 2>/dev/null; then
   fail "native Collada loader must preserve basic UVs into renderer mesh data"
+elif ! grep -q 'NORMAL' "$MESH_IMPORT_C" 2>/dev/null || \
+     ! grep -q 'vertNormals' "$MESH_IMPORT_C" 2>/dev/null; then
+  fail "native Collada loader must preserve authored normals when present"
 elif ! grep -q 'ok = R_LoadDAE_NativeStatic' "$MESH_IMPORT_C" 2>/dev/null || \
      ! grep -q 'R_LoadDAE_FloatSoup' "$MESH_IMPORT_C" 2>/dev/null; then
   fail "DAE loader must try native Collada before legacy fallback"

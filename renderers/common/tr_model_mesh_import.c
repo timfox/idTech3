@@ -54,12 +54,12 @@ static short R_Mimp_LatLong( const vec3_t n ) {
 
 qboolean R_MeshImport_FinalizeMD3( model_t *mod, int lod, const char *name,
 	float *verts, int numVerts, int *inds, int numIdx ) {
-	return R_MeshImport_FinalizeMD3Ex( mod, lod, name, verts, numVerts, inds, numIdx, NULL, NULL );
+	return R_MeshImport_FinalizeMD3Ex( mod, lod, name, verts, numVerts, inds, numIdx, NULL, NULL, NULL );
 }
 
 qboolean R_MeshImport_FinalizeMD3Ex( model_t *mod, int lod, const char *name,
 	float *verts, int numVerts, int *inds, int numIdx,
-	const char *shaderName, const float *vertSt ) {
+	const char *shaderName, const float *vertSt, const float *vertNormals ) {
 	const char *surfShader = shaderName && shaderName[0] ? shaderName : "textures/common/white";
 	int numTris = numIdx / 3;
 	int i, s, v, t;
@@ -197,7 +197,16 @@ qboolean R_MeshImport_FinalizeMD3Ex( model_t *mod, int lod, const char *name,
 			xyz[v].xyz[0] = (short)( p[0] * 64.0f );
 			xyz[v].xyz[1] = (short)( p[1] * 64.0f );
 			xyz[v].xyz[2] = (short)( p[2] * 64.0f );
-			xyz[v].normal = 0;
+			if ( vertNormals ) {
+				vec3_t n;
+				n[0] = vertNormals[gi * 3 + 0];
+				n[1] = vertNormals[gi * 3 + 1];
+				n[2] = vertNormals[gi * 3 + 2];
+				VectorNormalize( n );
+				xyz[v].normal = R_Mimp_LatLong( n );
+			} else {
+				xyz[v].normal = 0;
+			}
 		}
 
 		for ( t = 0; t < surfTris; t++ ) {
@@ -213,10 +222,12 @@ qboolean R_MeshImport_FinalizeMD3Ex( model_t *mod, int lod, const char *name,
 			VectorSubtract( verts + i2 * 3, verts + i0 * 3, e2 );
 			CrossProduct( e1, e2, fn );
 			VectorNormalize( fn );
-			for ( j = 0; j < 3; j++ ) {
-				int vi = inds[ vertOffset + t * 3 + j ] - vertOffset;
-				if ( vi >= 0 && vi < surfVerts ) {
-					xyz[vi].normal = R_Mimp_LatLong( fn );
+			if ( !vertNormals ) {
+				for ( j = 0; j < 3; j++ ) {
+					int vi = inds[ vertOffset + t * 3 + j ] - vertOffset;
+					if ( vi >= 0 && vi < surfVerts ) {
+						xyz[vi].normal = R_Mimp_LatLong( fn );
+					}
 				}
 			}
 			tri[t].indexes[0] = t * 3 + 0;
@@ -504,17 +515,22 @@ static qboolean R_LoadDAE_NativeStatic( model_t *mod, int lod, const char *name,
 	char vertexSource[128] = "";
 	char positionSource[128] = "";
 	char texcoordSource[128] = "";
+	char normalSource[128] = "";
 	char material[128] = "";
 	float *positions;
 	float *texcoords = NULL;
+	float *normals = NULL;
 	float *verts;
+	float *vertNormals;
 	float *st;
 	int *raw;
 	int *inds;
 	int posCount, posStride;
 	int texCount = 0, texStride = 2;
+	int normCount = 0, normStride = 3;
 	int vertexOffset = -1;
 	int texOffset = -1;
+	int normalOffset = -1;
 	int maxOffset = 0;
 	int rawCount;
 	int nv = 0;
@@ -546,6 +562,7 @@ static qboolean R_LoadDAE_NativeStatic( model_t *mod, int lod, const char *name,
 		return qfalse;
 	}
 	R_DAE_FindInput( primTagEnd, primClose, "TEXCOORD", texcoordSource, sizeof( texcoordSource ), &texOffset );
+	R_DAE_FindInput( primTagEnd, primClose, "NORMAL", normalSource, sizeof( normalSource ), &normalOffset );
 
 	{
 		const char *posElem = R_DAE_FindElementWithId( text, "source", positionSource );
@@ -578,6 +595,20 @@ static qboolean R_LoadDAE_NativeStatic( model_t *mod, int lod, const char *name,
 		}
 	}
 
+	if ( normalSource[0] ) {
+		const char *normElem = R_DAE_FindElementWithId( text, "source", normalSource );
+		if ( normElem ) {
+			normals = (float *)ri.Malloc( sizeof( float ) * MIMP_MAX_VERTS * 3 );
+			if ( normals ) {
+				normCount = R_DAE_ReadFloatArray( normElem, normals, MIMP_MAX_VERTS * 3 );
+				normStride = R_DAE_SourceStride( normElem );
+				if ( normStride < 3 || normCount < normStride ) {
+					normCount = 0;
+				}
+			}
+		}
+	}
+
 	pElem = Q_stristr( primTagEnd, "<p>" );
 	pClose = pElem ? Q_stristr( pElem, "</p>" ) : NULL;
 	if ( !pElem || !pClose || pClose > primClose ) {
@@ -590,15 +621,19 @@ static qboolean R_LoadDAE_NativeStatic( model_t *mod, int lod, const char *name,
 	pElem = strchr( pElem, '>' ) + 1;
 	raw = (int *)ri.Malloc( sizeof( int ) * MIMP_MAX_VERTS * 4 );
 	verts = (float *)ri.Malloc( sizeof( float ) * MIMP_MAX_VERTS * 3 );
+	vertNormals = (float *)ri.Malloc( sizeof( float ) * MIMP_MAX_VERTS * 3 );
 	st = (float *)ri.Malloc( sizeof( float ) * MIMP_MAX_VERTS * 2 );
 	inds = (int *)ri.Malloc( sizeof( int ) * MIMP_MAX_VERTS );
-	if ( !raw || !verts || !st || !inds ) {
+	if ( !raw || !verts || !vertNormals || !st || !inds ) {
 		goto done;
 	}
 	rawCount = R_DAE_ReadInts( pElem, pClose, raw, MIMP_MAX_VERTS * 4 );
 
 	if ( texOffset > maxOffset ) {
 		maxOffset = texOffset;
+	}
+	if ( normalOffset > maxOffset ) {
+		maxOffset = normalOffset;
 	}
 	if ( vertexOffset > maxOffset ) {
 		maxOffset = vertexOffset;
@@ -635,6 +670,7 @@ static qboolean R_LoadDAE_NativeStatic( model_t *mod, int lod, const char *name,
 			for ( corner = 0; corner < 3 && rawAt + maxOffset <= rawCount; ++corner, rawAt += maxOffset ) {
 				int pi = raw[rawAt + vertexOffset];
 				int ti = texOffset >= 0 ? raw[rawAt + texOffset] : -1;
+				int ni = normalOffset >= 0 ? raw[rawAt + normalOffset] : -1;
 				if ( pi < 0 || pi * posStride + 2 >= posCount ) {
 					ri.Free( vcounts );
 					goto done;
@@ -644,6 +680,9 @@ static qboolean R_LoadDAE_NativeStatic( model_t *mod, int lod, const char *name,
 				verts[nv * 3 + 2] = positions[pi * posStride + 2];
 				st[nv * 2 + 0] = ( texcoords && ti >= 0 && ti * texStride + 1 < texCount ) ? texcoords[ti * texStride + 0] : 0.0f;
 				st[nv * 2 + 1] = ( texcoords && ti >= 0 && ti * texStride + 1 < texCount ) ? 1.0f - texcoords[ti * texStride + 1] : 0.0f;
+				vertNormals[nv * 3 + 0] = ( normals && ni >= 0 && ni * normStride + 2 < normCount ) ? normals[ni * normStride + 0] : 0.0f;
+				vertNormals[nv * 3 + 1] = ( normals && ni >= 0 && ni * normStride + 2 < normCount ) ? normals[ni * normStride + 1] : 0.0f;
+				vertNormals[nv * 3 + 2] = ( normals && ni >= 0 && ni * normStride + 2 < normCount ) ? normals[ni * normStride + 2] : 1.0f;
 				inds[nv] = nv;
 				nv++;
 			}
@@ -653,6 +692,7 @@ static qboolean R_LoadDAE_NativeStatic( model_t *mod, int lod, const char *name,
 		for ( i = 0; i + maxOffset <= rawCount && nv < MIMP_MAX_VERTS; i += maxOffset ) {
 			int pi = raw[i + vertexOffset];
 			int ti = texOffset >= 0 ? raw[i + texOffset] : -1;
+			int ni = normalOffset >= 0 ? raw[i + normalOffset] : -1;
 			if ( pi < 0 || pi * posStride + 2 >= posCount ) {
 				goto done;
 			}
@@ -661,6 +701,9 @@ static qboolean R_LoadDAE_NativeStatic( model_t *mod, int lod, const char *name,
 			verts[nv * 3 + 2] = positions[pi * posStride + 2];
 			st[nv * 2 + 0] = ( texcoords && ti >= 0 && ti * texStride + 1 < texCount ) ? texcoords[ti * texStride + 0] : 0.0f;
 			st[nv * 2 + 1] = ( texcoords && ti >= 0 && ti * texStride + 1 < texCount ) ? 1.0f - texcoords[ti * texStride + 1] : 0.0f;
+			vertNormals[nv * 3 + 0] = ( normals && ni >= 0 && ni * normStride + 2 < normCount ) ? normals[ni * normStride + 0] : 0.0f;
+			vertNormals[nv * 3 + 1] = ( normals && ni >= 0 && ni * normStride + 2 < normCount ) ? normals[ni * normStride + 1] : 0.0f;
+			vertNormals[nv * 3 + 2] = ( normals && ni >= 0 && ni * normStride + 2 < normCount ) ? normals[ni * normStride + 2] : 1.0f;
 			inds[nv] = nv;
 			nv++;
 		}
@@ -668,7 +711,7 @@ static qboolean R_LoadDAE_NativeStatic( model_t *mod, int lod, const char *name,
 
 	if ( nv >= 3 && nv % 3 == 0 ) {
 		ok = R_MeshImport_FinalizeMD3Ex( mod, lod, name, verts, nv, inds, nv,
-			material[0] ? material : NULL, texcoords ? st : NULL );
+			material[0] ? material : NULL, texcoords ? st : NULL, normals ? vertNormals : NULL );
 	}
 
 done:
@@ -676,11 +719,17 @@ done:
 	if ( texcoords ) {
 		ri.Free( texcoords );
 	}
+	if ( normals ) {
+		ri.Free( normals );
+	}
 	if ( raw ) {
 		ri.Free( raw );
 	}
 	if ( verts ) {
 		ri.Free( verts );
+	}
+	if ( vertNormals ) {
+		ri.Free( vertNormals );
 	}
 	if ( st ) {
 		ri.Free( st );

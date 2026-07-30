@@ -9,6 +9,7 @@ Supported native render path:
 - `<triangles>` and triangle-only `<polylist>`
 - `VERTEX` → `POSITION` source resolution
 - Optional `TEXCOORD` input
+- Optional `NORMAL` input, preserved per face corner for authored smoothing and hard-edge splits
 - Optional primitive `material` symbol as the surface shader name
 - In-memory MD3-style renderer surface finalization, the same mesh-import path used by STL and other lightweight interchange formats
 

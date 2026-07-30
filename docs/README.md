@@ -54,7 +54,7 @@ Documentation is grouped by **tier**. Most files remain at their historical path
 
 - [QUICKSTART.md](QUICKSTART.md)
 - [MOD_SDK.md](MOD_SDK.md)
-- [COLLADA.md](COLLADA.md) — native renderer `.dae` static model loading, separate from PMD/PSA conversion tooling
+- [COLLADA.md](COLLADA.md) — native renderer `.dae` static model loading with UVs/authored normals, separate from PMD/PSA conversion tooling
 - [VOXEL_SPRITES.md](VOXEL_SPRITES.md) — MagicaVoxel `.vox` cube-mesh props (`misc_voxel` / `voxel_spawn`)
 - [UNIFIED_CLUSTERED_RENDERER.md](UNIFIED_CLUSTERED_RENDERER.md) — `r_renderMode 3` Unified Clustered (heterogeneous shading / lighting ownership)
 - [RENDERER_PATH_OWNERSHIP.md](RENDERER_PATH_OWNERSHIP.md) — surface-class path owners, shared clusters, `R_SelectSurfaceRenderPath`

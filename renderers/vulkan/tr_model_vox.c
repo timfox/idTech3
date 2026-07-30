@@ -240,7 +240,7 @@ qhandle_t R_RegisterVOX( const char *name, model_t *mod )
 	}
 
 	ok = R_MeshImport_FinalizeMD3Ex( mod, 0, name, verts, numVerts, inds, numIdx,
-		shaderName, sts );
+		shaderName, sts, NULL );
 	{
 		int voxelCount = vox.numVoxels;
 		free( verts );
