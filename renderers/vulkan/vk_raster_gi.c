@@ -19,6 +19,7 @@ Raster-only; RT locked by Raster Ultra. Ownership: docs/RASTER_ULTRA_1.3.md.
 #include "vk_cmd.h"
 #include "vk_raster_ultra.h"
 #include "vk_pathtrace.h"
+#include "vk_day_night.h"
 
 #include <math.h>
 
@@ -712,11 +713,13 @@ static void RGI_UpdateProbeLighting( rgiProbe_t *p, const trRefdef_t *refdef )
 	/* Soft sun sky irradiance (not recursive). */
 	if ( tr.sunDirection[0] || tr.sunDirection[1] || tr.sunDirection[2] ) {
 		float sky = Com_Clamp( 0.0f, 1.0f, tr.sunDirection[2] * 0.5f + 0.5f );
+		vec3_t skyAmbient;
+		vk_day_night_sky_ambient( skyAmbient );
 		p->skyVis = sky;
 		if ( p->interior < 0.5f ) {
-			dyn[0] += 0.02f * sky;
-			dyn[1] += 0.02f * sky;
-			dyn[2] += 0.025f * sky;
+			dyn[0] += 0.02f * sky * skyAmbient[0];
+			dyn[1] += 0.02f * sky * skyAmbient[1];
+			dyn[2] += 0.025f * sky * skyAmbient[2];
 		}
 	} else {
 		p->skyVis = 0.5f;

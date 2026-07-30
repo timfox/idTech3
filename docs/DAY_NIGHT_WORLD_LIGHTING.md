@@ -7,6 +7,8 @@
 
 Existing passes already consume those fields, so the cycle reaches physical sky/atmosphere, volumetric fog, cascaded sun shadows, deferred sun BRDF, entity lighting, and RTX/Hybrid paths through the normal lighting spine.
 
+The module also publishes `vk_day_night_sky_ambient()`, a weather-aware sky ambient tint used by raster GI probes and the dynamic radiance clipmap. This keeps indirect outdoor fill coherent with noon, twilight, moonlit night, and overcast/storm dimming instead of leaving probe sky injection pinned to a simple sun-elevation heuristic.
+
 ## Controls
 
 | Cvar | Default | Notes |

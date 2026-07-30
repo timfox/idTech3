@@ -68,6 +68,8 @@ Smooth blend via `r_weatherTransition`. Outputs coverage, precipitation, fog sca
 
 Dynamic mode (`r_weatherDynamic 1`) advances through deterministic preset transitions after `r_weatherDynamicMinTime`..`r_weatherDynamicMaxTime` seconds, with `r_weatherVolatility` biasing toward rain/storm states. `r_weatherSeed` makes the sequence repeatable. Storm/rain lightning uses `r_weatherLightning` and `r_weatherLightningScale`; the flash factor is folded into canonical sun radiance through the day/night lighting spine.
 
+Raster GI probes and the radiance clipmap consume `vk_day_night_sky_ambient()`, so weather and time-of-day now tint/dim outdoor indirect sky injection as well as direct sun and shadows.
+
 ## Precipitation
 
 Intensity hooks for rain/snow (`vk_weather_precipitation`, wetness rate). Client weather particle emitters remain the draw path; GPU Ultra particles stay FX. Reactivity: stamp via existing reactive mask when precip systems draw.

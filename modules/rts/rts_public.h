@@ -46,6 +46,18 @@ typedef struct rtsCommand_s {
 	int data;
 } rtsCommand_t;
 
+typedef struct rtsRenderEntity_s {
+	rtsEntityId_t entityId;
+	int owner;
+	int hitpoints;
+	int resources;
+	qhandle_t modelHandle;
+	char modelPath[MAX_QPATH];
+	float origin[3];
+	float yawDegrees;
+	float scale;
+} rtsRenderEntity_t;
+
 void RTS_Init( void );
 void RTS_Shutdown( void );
 void RTS_RunTurn( int msec );
@@ -60,6 +72,11 @@ int  RTS_GetEntityOwner( rtsEntityId_t id );
 int  RTS_GetEntityPosition( rtsEntityId_t id, int *x, int *y );
 int  RTS_GetEntityHitpoints( rtsEntityId_t id );
 int  RTS_GetEntityResources( rtsEntityId_t id );
+qhandle_t RTS_GetEntityModelHandle( rtsEntityId_t id );
+int  RTS_GetEntityModelPath( rtsEntityId_t id, char *outPath, int outPathSize );
+int  RTS_SetEntityModel( rtsEntityId_t id, const char *modelPath, qhandle_t modelHandle );
+int  RTS_SetDefaultModelForOwner( int owner, const char *modelPath, qhandle_t modelHandle );
+int  RTS_BuildRenderEntities( rtsRenderEntity_t *outEntities, int maxOut, float zOrigin, float unitScale );
 int  RTS_GetPlayerResources( int playerId );
 int  RTS_SelectRect( int playerId, int minX, int minY, int maxX, int maxY, rtsEntityId_t *out, int maxOut );
 int  RTS_FindGridPath( int width, int height, const unsigned char *blocked, int startX, int startY, int goalX, int goalY, int *outX, int *outY, int maxOut );

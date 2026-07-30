@@ -1285,6 +1285,8 @@ elif ! grep -q 'vk_day_night_shadow_factor' "$DAY_NIGHT_H" "$DAY_NIGHT_C" 2>/dev
   fail "day/night must expose an effective shadow factor"
 elif ! grep -q 'vk_day_night_shadow_factor' "$PROJECT_ROOT/renderers/vulkan/tr_backend.c" "$PROJECT_ROOT/renderers/vulkan/tr_shade.c" "$PROJECT_ROOT/renderers/vulkan/vk_deferred_gbuffer.c" "$PROJECT_ROOT/renderers/vulkan/vk_view_state.c" 2>/dev/null; then
   fail "day/night shadow factor must drive CSM production and raster/deferred/OIT consumers"
+elif ! grep -q 'vk_day_night_sky_ambient' "$DAY_NIGHT_H" "$DAY_NIGHT_C" "$PROJECT_ROOT/renderers/vulkan/vk_raster_gi.c" "$PROJECT_ROOT/renderers/vulkan/vk_radiance_clipmap.c" 2>/dev/null; then
+  fail "day/night sky ambient must drive raster GI and radiance cache sky injection"
 elif ! grep -q 'vk_day_night_begin_frame' "$PROJECT_ROOT/renderers/vulkan/vk_frame_submit.c" 2>/dev/null; then
   fail "day/night must update before renderer frame consumers"
 elif ! grep -q 'vk_day_night_on_world_load' "$PROJECT_ROOT/renderers/vulkan/tr_bsp.c" 2>/dev/null; then

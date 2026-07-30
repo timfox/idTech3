@@ -31,6 +31,7 @@ static char s_mapName[MAX_QPATH];
 static float s_timeOfDay = 12.0f;
 static float s_dayFactor = 1.0f;
 static float s_sunElevation = 1.0f;
+static vec3_t s_skyAmbient = { 1.0f, 1.0f, 1.0f };
 static qboolean s_haveWorld;
 static qboolean s_cmds;
 
@@ -118,6 +119,10 @@ static void DN_Evaluate( float tod, vec3_t outDir, vec3_t outLight, float *outEl
 	vec3_t twilightTint = { 1.0f, 0.54f, 0.30f };
 	vec3_t nightTint = { 0.12f, 0.18f, 0.34f };
 	vec3_t tint;
+	vec3_t skyDay = { 0.80f, 0.92f, 1.0f };
+	vec3_t skyTwilight = { 1.0f, 0.50f, 0.28f };
+	vec3_t skyNight = { 0.05f, 0.07f, 0.14f };
+	float skyPower;
 	float intensity;
 	int i;
 
@@ -138,6 +143,13 @@ static void DN_Evaluate( float tod, vec3_t outDir, vec3_t outLight, float *outEl
 		float warmTint = dayTint[i] * ( 1.0f - warmth ) + twilightTint[i] * warmth;
 		tint[i] = warmTint * ( day + twilight * 0.35f ) + nightTint[i] * ( 1.0f - day );
 		outLight[i] = s_baseSunLight[i] * tint[i] * intensity;
+	}
+
+	skyPower = ( 0.04f + 0.96f * DN_SmoothStep( -0.18f, 0.38f, elev ) ) *
+		vk_weather_direct_sun_factor();
+	for ( i = 0; i < 3; ++i ) {
+		float skyTint = skyDay[i] * day + skyTwilight[i] * twilight * 0.55f + skyNight[i] * ( 1.0f - day );
+		s_skyAmbient[i] = Com_Clamp( 0.0f, 1.5f, skyTint * skyPower );
 	}
 
 	if ( outElevation ) {
@@ -191,6 +203,20 @@ float vk_day_night_shadow_factor( void )
 	return Com_Clamp( 0.0f, 1.0f,
 		( s_dayFactor * fade + ( 1.0f - s_dayFactor ) * moon ) *
 		vk_weather_shadow_factor() );
+}
+
+void vk_day_night_sky_ambient( vec3_t outAmbient )
+{
+	if ( !outAmbient ) {
+		return;
+	}
+	if ( !vk_day_night_active() ) {
+		outAmbient[0] = 1.0f;
+		outAmbient[1] = 1.0f;
+		outAmbient[2] = 1.0f;
+		return;
+	}
+	VectorCopy( s_skyAmbient, outAmbient );
 }
 
 void vk_day_night_register_cvars( void )
@@ -255,6 +281,7 @@ static void vk_day_night_status_f( void )
 	ri.Printf( PRINT_ALL,
 		"daynight_status: active=%d map=%s time=%.2f realTime=%d cycleMin=%.2f day=%.2f elev=%.2f shadow=%.2f\n"
 		"  sunDir=(%.3f %.3f %.3f) sunLight=(%.3f %.3f %.3f)\n"
+		"  skyAmbient=(%.3f %.3f %.3f)\n"
 		"  authoredDir=(%.3f %.3f %.3f) authoredLight=(%.3f %.3f %.3f)\n",
 		vk_day_night_active() ? 1 : 0,
 		s_mapName[0] ? s_mapName : "<none>",
@@ -266,6 +293,7 @@ static void vk_day_night_status_f( void )
 		vk_day_night_shadow_factor(),
 		tr.sunDirection[0], tr.sunDirection[1], tr.sunDirection[2],
 		tr.sunLight[0], tr.sunLight[1], tr.sunLight[2],
+		s_skyAmbient[0], s_skyAmbient[1], s_skyAmbient[2],
 		s_baseSunDir[0], s_baseSunDir[1], s_baseSunDir[2],
 		s_baseSunLight[0], s_baseSunLight[1], s_baseSunLight[2] );
 }

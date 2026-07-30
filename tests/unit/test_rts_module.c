@@ -3,6 +3,7 @@
  * Run: ctest -R unit_rts_module
  */
 #include <stdio.h>
+#include <string.h>
 
 #include "rts_public.h"
 
@@ -30,6 +31,9 @@ int main(void) {
 	int i;
 	int x = 0;
 	int y = 0;
+	char modelPath[MAX_QPATH];
+	rtsRenderEntity_t renderEntities[8];
+	int renderCount;
 
 	RTS_Init();
 	ASSERT(RTS_GetTurnMsec() == 0, "initial turn time");
@@ -38,6 +42,8 @@ int main(void) {
 	ASSERT(RTS_GetExecutedCommandCount() == 0, "initial replay command log");
 	ASSERT(RTS_GetEntityCount() == 0, "initial entity count");
 	ASSERT(RTS_GetPlayerResources(RTS_OWNER_PLAYER1) == 0, "initial player resources");
+	ASSERT(RTS_SetDefaultModelForOwner(RTS_OWNER_PLAYER1, "models/rts/worker.dae", 42) == 1, "set player default model");
+	ASSERT(RTS_SetDefaultModelForOwner(99, "models/rts/bad.dae", 1) == 0, "reject invalid default model owner");
 
 	cmd.type = RTS_COMMAND_CREATE_ENTITY;
 	cmd.turn = 1;
@@ -66,8 +72,23 @@ int main(void) {
 	ASSERT(RTS_GetEntityOwner(1) == RTS_OWNER_PLAYER1, "first built entity owner");
 	ASSERT(RTS_GetEntityHitpoints(1) == 100, "first built entity starts with full hitpoints");
 	ASSERT(RTS_GetEntityResources(1) == 0, "combat entity has no resources");
+	ASSERT(RTS_GetEntityModelHandle(1) == 42, "created entity inherits owner model handle");
+	ASSERT(RTS_GetEntityModelPath(1, modelPath, sizeof(modelPath)) == 1, "created entity model path readable");
+	ASSERT(strcmp(modelPath, "models/rts/worker.dae") == 0, "created entity inherits owner model path");
+	ASSERT(RTS_SetEntityModel(1, "models/rts/commander.glb", 77) == 1, "override entity model");
+	ASSERT(RTS_GetEntityModelHandle(1) == 77, "entity model handle override readable");
+	ASSERT(RTS_GetEntityModelPath(1, modelPath, sizeof(modelPath)) == 1, "overridden entity model path readable");
+	ASSERT(strcmp(modelPath, "models/rts/commander.glb") == 0, "entity model path override readable");
 	ASSERT(RTS_GetEntityPosition(1, &x, &y) == 1, "first built entity position readable");
 	ASSERT(x == 16 && y == 32, "stable command ordering by player/sequence");
+	renderCount = RTS_BuildRenderEntities(renderEntities, 8, 24.0f, 2.0f);
+	ASSERT(renderCount == 2, "render entity export count");
+	ASSERT(renderEntities[0].entityId == 1, "render entity id exported");
+	ASSERT(renderEntities[0].modelHandle == 77, "render entity model handle exported");
+	ASSERT(strcmp(renderEntities[0].modelPath, "models/rts/commander.glb") == 0, "render entity model path exported");
+	ASSERT(renderEntities[0].origin[0] == 32.0f && renderEntities[0].origin[1] == 64.0f && renderEntities[0].origin[2] == 24.0f, "render entity origin exported");
+	ASSERT(renderEntities[0].scale == 2.0f, "render entity scale exported");
+	ASSERT(RTS_BuildRenderEntities(NULL, 0, 0.0f, 1.0f) == 2, "render entity count query without output");
 
 	ASSERT(RTS_SelectRect(RTS_OWNER_PLAYER1, 0, 0, 80, 140, selected, 4) == 2, "select player entities in rect");
 	ASSERT(selected[0] == 1 && selected[1] == 2, "selection order follows entity order");
@@ -191,6 +212,7 @@ int main(void) {
 	ASSERT(RTS_GetTurnMsec() == 0, "shutdown resets turn time");
 	ASSERT(RTS_GetCurrentTurn() == 0, "shutdown resets turn number");
 	ASSERT(RTS_GetEntityCount() == 0, "shutdown resets entities");
+	ASSERT(RTS_GetEntityModelHandle(1) == 0, "shutdown resets model handles");
 
 	printf("PASS: unit_rts_module\n");
 	return 0;

@@ -15,6 +15,7 @@ Camera-centered multi-level clipmap; raster-only. Ownership: docs/RASTER_ULTRA_1
 #include "vk_raster_ultra.h"
 #include "vk_deferred_gbuffer.h"
 #include "vk_view_state.h"
+#include "vk_day_night.h"
 
 #include <math.h>
 
@@ -804,16 +805,18 @@ static void RC_InjectCell( rcCell_t *c, const trRefdef_t *refdef )
 	if ( tr.sunDirection[0] || tr.sunDirection[1] || tr.sunDirection[2] ) {
 		float sky = Com_Clamp( 0.0f, 1.0f, tr.sunDirection[2] * 0.5f + 0.5f );
 		float skyScale = r_radianceCacheSkyScale ? r_radianceCacheSkyScale->value : 0.02f;
+		vec3_t skyAmbient;
 		mnode_t *leaf = RC_PointInLeaf( c->origin );
 		qboolean interior = qfalse;
+		vk_day_night_sky_ambient( skyAmbient );
 		if ( leaf && ( leaf->area == -1 || ( leaf->contents & CONTENTS_SOLID ) ) ) {
 			interior = qtrue;
 		}
 		/* Heuristic: clusters with low sky visibility stay dark. */
 		if ( !interior && sky > 0.2f ) {
-			dyn[0] += skyScale * sky;
-			dyn[1] += skyScale * sky;
-			dyn[2] += skyScale * sky * 1.1f;
+			dyn[0] += skyScale * sky * skyAmbient[0];
+			dyn[1] += skyScale * sky * skyAmbient[1];
+			dyn[2] += skyScale * sky * skyAmbient[2] * 1.1f;
 			L1z[2] += skyScale * sky * 0.3f;
 		}
 	}

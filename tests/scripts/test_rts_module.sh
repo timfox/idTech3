@@ -21,6 +21,7 @@ check_file modules/rts/rts_path_grid.cpp
 check_file modules/rts/rts_vision.cpp
 check_file modules/rts/rts_replay.cpp
 check_file modules/rts/rts_usd_templates.cpp
+check_file docs/RTS_MODEL_RENDERING.md
 
 rg -q 'extern "C"' "${ROOT}/modules/rts/rts_public.h" || fail "rts_public.h must expose a C-compatible API"
 rg -q 'void RTS_Init\( void \);' "${ROOT}/modules/rts/rts_public.h" || fail "RTS_Init missing"
@@ -30,8 +31,16 @@ rg -q 'int  RTS_PostCommand\( const rtsCommand_t \*cmd \);' "${ROOT}/modules/rts
 rg -q 'int  RTS_GetCurrentTurn\( void \);' "${ROOT}/modules/rts/rts_public.h" || fail "RTS_GetCurrentTurn missing"
 rg -q 'int  RTS_GetExecutedCommandCount\( void \);' "${ROOT}/modules/rts/rts_public.h" || fail "RTS_GetExecutedCommandCount missing"
 rg -q 'int  RTS_SelectRect\( int playerId' "${ROOT}/modules/rts/rts_public.h" || fail "RTS_SelectRect missing"
+rg -q 'RTS_SetEntityModel' "${ROOT}/modules/rts/rts_public.h" || fail "RTS_SetEntityModel missing"
+rg -q 'RTS_SetDefaultModelForOwner' "${ROOT}/modules/rts/rts_public.h" || fail "RTS_SetDefaultModelForOwner missing"
+rg -q 'RTS_BuildRenderEntities' "${ROOT}/modules/rts/rts_public.h" || fail "RTS_BuildRenderEntities missing"
+rg -q 'rtsRenderEntity_t' "${ROOT}/modules/rts/rts_public.h" || fail "rtsRenderEntity_t missing"
 rg -q 'unsigned RTS_ComputeStateHash\( void \);' "${ROOT}/modules/rts/rts_public.h" || fail "RTS_ComputeStateHash missing"
 rg -q 'std::stable_sort' "${ROOT}/modules/rts/rts_turn.cpp" || fail "turn command application must sort deterministically"
+rg -q 'modelHandle' "${ROOT}/modules/rts/rts_internal.h" || fail "RTS entities must store renderer model handles"
+rg -q 'modelPath' "${ROOT}/modules/rts/rts_internal.h" || fail "RTS entities must store model paths"
+rg -q 'RE_RegisterModel' "${ROOT}/docs/RTS_MODEL_RENDERING.md" || fail "RTS model rendering doc must describe renderer registration"
+rg -q 'RTS_BuildRenderEntities' "${ROOT}/docs/RTS_MODEL_RENDERING.md" || fail "RTS model rendering doc must describe render export"
 rg -q 'ADD_LIBRARY\(rts_module STATIC' "${ROOT}/CMakeLists.txt" || fail "rts_module CMake target missing"
 rg -q 'modules/rts/rts_world.cpp' "${ROOT}/CMakeLists.txt" || fail "rts_world.cpp not wired"
 

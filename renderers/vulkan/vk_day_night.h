@@ -21,5 +21,6 @@ qboolean vk_day_night_active( void );
 float vk_day_night_day_factor( void );
 float vk_day_night_sun_elevation( void );
 float vk_day_night_shadow_factor( void );
+void vk_day_night_sky_ambient( vec3_t outAmbient );
 
 #endif /* USE_VULKAN */
