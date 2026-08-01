@@ -77,3 +77,4 @@ mods/playfield/
 *_content.pk3
 **/maps/swamp_*.bsp
 **/maps/swamp_*.aas
+.aider*
