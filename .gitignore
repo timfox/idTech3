@@ -78,3 +78,4 @@ mods/playfield/
 **/maps/swamp_*.bsp
 **/maps/swamp_*.aas
 .aider*
+.fetchcontent-cache/idtech3_sdl3-src/android-project/.gradle/8.12/fileHashes/fileHashes.lock
