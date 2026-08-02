@@ -22,7 +22,13 @@ grep -q 'VK_COMPARE_OP_GREATER_OR_EQUAL' "$PIPE" || fail "depth compare must use
 pass "reversed-Z depth compare present"
 
 if [[ -f "$ROOT/renderers/vulkan/shaders/glsl/hiz_downsample.comp" ]]; then
-	grep -q 'min(' "$ROOT/renderers/vulkan/shaders/glsl/hiz_downsample.comp" || fail "hiz_downsample must use min for reversed-Z farthest"
+	HIZ_CS="$ROOT/renderers/vulkan/shaders/glsl/hiz_downsample.comp"
+	grep -q 'min(' "$HIZ_CS" || fail "hiz_downsample must use min for reversed-Z farthest"
+	grep -q 'texelFetch( depthTex' "$HIZ_CS" || fail "first Hi-Z level must aggregate depth texels conservatively"
+	grep -q 'srcLast' "$HIZ_CS" || fail "Hi-Z downsample must clamp odd-sized mip footprints"
+	if grep -q 'texture( depthTex' "$HIZ_CS"; then
+		fail "first Hi-Z level must not use filtered depth sampling"
+	fi
 	pass "hiz_downsample.comp conservative min present"
 else
 	grep -q 'hiz_downsample' "$ROOT/renderers/vulkan/shaders/spirv/shader_binding.c" || fail "shader binding must reference hiz_downsample"

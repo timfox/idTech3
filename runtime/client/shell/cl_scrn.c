@@ -1842,7 +1842,8 @@ static void SCR_DrawScreenField( stereoFrame_t stereoFrame ) {
 	 * 640x480 missing-texture surface over the modern UI. */
 	jsOverlayActive = Cvar_VariableIntegerValue( "ui_rpMenu" ) ||
 		Cvar_VariableIntegerValue( "ui_social" ) ||
-		Cvar_VariableIntegerValue( "ui_1337MainMenu" );
+		Cvar_VariableIntegerValue( "ui_1337MainMenu" ) ||
+		Cvar_VariableIntegerValue( "ui_1337StoreMenu" );
 	uiFullscreen = (uivm && VM_Call( uivm, 0, UI_IS_FULLSCREEN )) && !jsOverlayActive;
 
 	// wide aspect ratio screens need to have the sides cleared

@@ -82,10 +82,21 @@ void CL_JsNotifyMenuChanged( int menu ) {
 	 * fallback. */
 	if ( menu == UIMENU_MAIN ) {
 		Cvar_Set( "ui_1337MainMenu", "1" );
+		Cvar_Set( "ui_rpMenu", "1" );
+		/* The JS menu is the owner; leave the legacy VM inactive so its
+		 * missing art cannot be composited underneath the glass surface. */
+		if ( uivm && Cvar_VariableIntegerValue( "cl_jsEscapeMenu" ) ) {
+			Key_SetCatcher( Key_GetCatcher() & ~KEYCATCH_UI );
+			VM_Call( uivm, 1, UI_SET_ACTIVE_MENU, UIMENU_NONE );
+		}
 	} else if ( menu == UIMENU_INGAME && Cvar_VariableIntegerValue( "cl_jsEscapeMenu" ) ) {
 		/* Some callers open UIMENU_INGAME directly instead of going through the
 		 * Escape-key branch. Keep those paths on the same Surf glass pause UI. */
 		Cvar_Set( "ui_rpMenu", "1" );
+		if ( uivm ) {
+			Key_SetCatcher( Key_GetCatcher() & ~KEYCATCH_UI );
+			VM_Call( uivm, 1, UI_SET_ACTIVE_MENU, UIMENU_NONE );
+		}
 	} else if ( menu == UIMENU_NONE ) {
 		Cvar_Set( "ui_1337MainMenu", "0" );
 	}

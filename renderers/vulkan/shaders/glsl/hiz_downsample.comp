@@ -32,19 +32,26 @@ void main()
 		return;
 	}
 
-	float z;
+	/* Every destination texel represents a clamped 2x2 source footprint. */
+	uvec2 srcLast = max( pc.srcExtent, uvec2( 1u ) ) - uvec2( 1u );
+	uvec2 base = min( pix * 2u, srcLast );
+	uvec2 p10 = min( base + uvec2( 1u, 0u ), srcLast );
+	uvec2 p01 = min( base + uvec2( 0u, 1u ), srcLast );
+	uvec2 p11 = min( base + uvec2( 1u, 1u ), srcLast );
+	float z00, z10, z01, z11;
 	if ( pc.srcLevel == 0u ) {
-		vec2 uv = ( vec2( pix ) + 0.5 ) / vec2( pc.dstExtent );
-		z = texture( depthTex, uv ).r;
+		z00 = texelFetch( depthTex, ivec2( base ), 0 ).r;
+		z10 = texelFetch( depthTex, ivec2( p10 ), 0 ).r;
+		z01 = texelFetch( depthTex, ivec2( p01 ), 0 ).r;
+		z11 = texelFetch( depthTex, ivec2( p11 ), 0 ).r;
 	} else {
-		ivec2 base = ivec2( pix ) * 2;
-		float z00 = imageLoad( srcMip, base ).r;
-		float z10 = imageLoad( srcMip, base + ivec2( 1, 0 ) ).r;
-		float z01 = imageLoad( srcMip, base + ivec2( 0, 1 ) ).r;
-		float z11 = imageLoad( srcMip, base + ivec2( 1, 1 ) ).r;
-		/* reversed-Z conservative farthest depth */
-		z = min( min( z00, z10 ), min( z01, z11 ) );
+		z00 = imageLoad( srcMip, ivec2( base ) ).r;
+		z10 = imageLoad( srcMip, ivec2( p10 ) ).r;
+		z01 = imageLoad( srcMip, ivec2( p01 ) ).r;
+		z11 = imageLoad( srcMip, ivec2( p11 ) ).r;
 	}
+	/* reversed-Z conservative farthest depth */
+	float z = min( min( z00, z10 ), min( z01, z11 ) );
 
 	imageStore( dstMip, ivec2( pix ), vec4( z ) );
 }
