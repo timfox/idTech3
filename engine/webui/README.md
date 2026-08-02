@@ -14,7 +14,8 @@ HTML-based UI for menus, tournament systems, and other web-based interfaces.
 │   ├── webui_main.c (core implementation)
 │   ├── webui_win32.c (Windows WebView2)
 │   ├── webui_linux.c (Linux WebKitGTK)
-│   └── webui_macos.c (macOS WKWebView)
+│   ├── webui_macos.mm (macOS WKWebView)
+│   └── webui_android.c (Android WebView)
 └── WebView Wrappers (MIT)
     └── webview/webview (common API)
 ```
@@ -37,6 +38,12 @@ HTML-based UI for menus, tournament systems, and other web-based interfaces.
 - **Backend**: WKWebView (Apple SDK)
 - **License**: Apple Software License
 - **Framework**: WebKit.framework
+
+### Android
+- **Backend**: Android WebView (Apache 2.0)
+- **License**: Apache 2.0 (compatible with GPL-2)
+- **API Level**: 21+ (Android 5.0+)
+- **Dependency**: Java/Kotlin, JNI bridge
 
 ## Licensing Compliance
 
@@ -80,6 +87,12 @@ sudo pacman -S webkit2gtk
 ### macOS
 - Xcode 12+ (WebKit.framework included)
 - macOS 10.10+ (WKWebView available)
+
+### Android
+- Android Studio 4.0+
+- Android SDK API level 21+
+- Java 8+ or Kotlin
+- Android WebView (built-in)
 
 ## API Reference
 
@@ -181,13 +194,20 @@ if(USE_WEBUI)
     # macOS
     if(APPLE)
         find_library(WEBKIT WebKit)
+        find_library(COCOA Cocoa)
+    endif()
+    
+    # Android
+    if(ANDROID)
+        # No external dependencies needed - Android WebView is built-in
     endif()
     
     target_sources(engine PRIVATE
         engine/webui/webui_main.c
         engine/webui/webui_win32.c
         engine/webui/webui_linux.c
-        engine/webui/webui_macos.c
+        engine/webui/webui_macos.mm
+        engine/webui/webui_android.c
     )
     
     target_include_directories(engine PRIVATE engine/webui)
@@ -198,7 +218,9 @@ if(USE_WEBUI)
     elseif(UNIX AND NOT APPLE)
         target_link_libraries(engine PRIVATE PkgConfig::WEBKIT2GTK)
     elseif(APPLE)
-        target_link_libraries(engine PRIVATE ${WEBKIT})
+        target_link_libraries(engine PRIVATE ${WEBKIT} ${COCOA})
+    elseif(ANDROID)
+        target_link_libraries(engine PRIVATE log jnigraphics)
     endif()
 endif()
 ```
@@ -240,6 +262,30 @@ endif()
 3. Verify message passing
 4. Check window rendering
 
+### Android
+1. Build with Android Studio
+2. Test WebUI initialization
+3. Verify message passing
+4. Check WebView rendering
+
+## Troubleshooting
+
+### Windows
+- **WebView2 not found**: Install WebView2 Runtime
+- **SDK missing**: Install WebView2 SDK
+- **Runtime version**: Use evergreen runtime
+
+### Linux
+- **WebKitGTK not found**: Install libwebkit2gtk-4.1-dev
+- **Dynamic linking**: Ensure WebKitGTK is dynamically linked
+- **Version compatibility**: Use WebKitGTK-4.1 or later
+
+### Android
+1. Build with Android Studio
+2. Test WebUI initialization
+3. Verify message passing
+4. Check WebView rendering
+
 ## Troubleshooting
 
 ### Windows
@@ -256,6 +302,11 @@ endif()
 - **WebKit not found**: Use Xcode 12+
 - **Framework path**: Check WebKit.framework location
 - **Deployment target**: macOS 10.10+
+
+### Android
+- **WebView not found**: Check Android API level 21+
+- **JNI not found**: Ensure library is loaded with `System.loadLibrary("webui")`
+- **Messages not passing**: Verify @JavascriptInterface annotation on Java methods
 
 ## Future Enhancements
 

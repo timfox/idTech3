@@ -91,20 +91,45 @@ if(USE_WEBUI)
             set(USE_WEBUI OFF CACHE BOOL "Enable WebView integration" FORCE)
         endif()
         
+    elseif(ANDROID)
+        # Android: WebView
+        message(STATUS "WebUI: Android platform - WebView")
+        
+        # Add webui source files
+        target_sources(engine PRIVATE
+            engine/webui/webui_main.c
+            engine/webui/webui_android.c
+        )
+        
+        # Add include directories
+        target_include_directories(engine PRIVATE
+            engine/webui
+        )
+        
+        # Link log library for Android logging
+        target_link_libraries(engine PRIVATE
+            log
+            jnigraphics
+        )
+        
+        # Define WebView flag
+        add_definitions(-DWEBUI_USE_WEBVIEW)
+        
     elseif(APPLE)
         # macOS: WKWebView
         message(STATUS "WebUI: macOS platform - WKWebView")
         
         # Find WebKit framework
         find_library(WEBKIT WebKit)
+        find_library(COCOA Cocoa)
         
-        if(WEBKIT)
+        if(WEBKIT AND COCOA)
             message(STATUS "WebUI: WebKit framework found at ${WEBKIT}")
             
             # Add webui source files
             target_sources(engine PRIVATE
                 engine/webui/webui_main.c
-                engine/webui/webui_macos.c
+                engine/webui/webui_macos.mm
             )
             
             # Add include directories
@@ -112,15 +137,16 @@ if(USE_WEBUI)
                 engine/webui
             )
             
-            # Link WebKit
+            # Link WebKit and Cocoa frameworks
             target_link_libraries(engine PRIVATE
                 ${WEBKIT}
+                ${COCOA}
             )
             
             # Define WKWebView flag
             add_definitions(-DWEBUI_USE_WKWEBVIEW)
         else()
-            message(WARNING "WebUI: WebKit framework not found, WebUI disabled")
+            message(WARNING "WebUI: WebKit or Cocoa framework not found, WebUI disabled")
             set(USE_WEBUI OFF CACHE BOOL "Enable WebView integration" FORCE)
         endif()
         
@@ -132,3 +158,4 @@ if(USE_WEBUI)
 else()
     message(STATUS "WebUI: Disabled")
 endif()
+

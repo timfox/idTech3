@@ -21,19 +21,43 @@
 #include <string>
 #include <queue>
 
-/* WKWebView objects */
-static NSWindow *s_window = nullptr;
-static WKWebView *s_webView = nullptr;
-static WKWebViewConfiguration *s_webViewConfig = nullptr;
-static pthread_t s_mainThread;
-static bool s_mainThreadRunning = false;
+/* Forward declarations */
+static void *MainThread(void *arg);
 
 /* Message queue for thread-safe communication */
 static std::queue<std::string> s_messageQueue;
 static pthread_mutex_t s_messageMutex;
 
-/* Forward declarations */
-static void *MainThread(void *arg);
+/* Script message handler implementation */
+@interface WKScriptMessageHandlerImpl : NSObject <WKScriptMessageHandler>
+@end
+
+@implementation WKScriptMessageHandlerImpl
+
+- (void)userContentController:(WKUserContentController *)userContentController 
+      didReceiveScriptMessage:(WKScriptMessage *)message {
+    if ([message.name isEqualToString:@"game"]) {
+        NSString *body = message.body;
+        if ([body isKindOfClass:[NSString class]]) {
+            const char *json = [body UTF8String];
+            if (json) {
+                pthread_mutex_lock(&s_messageMutex);
+                s_messageQueue.push(std::string(json));
+                pthread_mutex_unlock(&s_messageMutex);
+            }
+        }
+    }
+}
+
+@end
+
+/* WKWebView objects */
+static NSWindow *s_window = nullptr;
+static WKWebView *s_webView = nullptr;
+static WKWebViewConfiguration *s_webViewConfig = nullptr;
+static WKScriptMessageHandlerImpl *s_messageHandler = nullptr;
+static pthread_t s_mainThread;
+static bool s_mainThreadRunning = false;
 
 /* Initialize Cocoa and create web view */
 static bool CreateWKWebView(const webui_config_t *config) {
@@ -59,16 +83,15 @@ static bool CreateWKWebView(const webui_config_t *config) {
         [s_webViewConfig setJavaScriptEnabled:YES];
         [s_webViewConfig setDeveloperExtrasEnabled:config->debug_tools ? YES : NO];
         
-        /* Create web view */
-        s_webView = [[WKWebView alloc] initWithFrame:frame configuration:s_webViewConfig];
+        /* Create script message handler */
+        s_messageHandler = [[WKScriptMessageHandlerImpl alloc] init];
         
         /* Set up message handling */
-        [s_webView setNavigationDelegate:s_webView];
-        [s_webView setUIDelegate:s_webView];
+        [s_webViewConfig.userContentController addScriptMessageHandler:s_messageHandler
+                                                                name:@"game"];
         
-        /* Add script message handler */
-        [s_webView.configuration.userContentController addScriptMessageHandler:[WKScriptMessageHandlerImpl new] 
-                                                                      name:@"game"];
+        /* Create web view */
+        s_webView = [[WKWebView alloc] initWithFrame:frame configuration:s_webViewConfig];
         
         /* Add web view to window content view */
         [[s_window contentView] addSubview:s_webView];
@@ -109,29 +132,6 @@ static bool CreateWKWebView(const webui_config_t *config) {
     
     return true;
 }
-
-/* Script message handler implementation */
-@interface WKScriptMessageHandlerImpl : NSObject <WKScriptMessageHandler>
-@end
-
-@implementation WKScriptMessageHandlerImpl
-
-- (void)userContentController:(WKUserContentController *)userContentController 
-      didReceiveScriptMessage:(WKScriptMessage *)message {
-    if ([message.name isEqualToString:@"game"]) {
-        NSString *body = message.body;
-        if ([body isKindOfClass:[NSString class]]) {
-            const char *json = [body UTF8String];
-            if (json) {
-                pthread_mutex_lock(&s_messageMutex);
-                s_messageQueue.push(std::string(json));
-                pthread_mutex_unlock(&s_messageMutex);
-            }
-        }
-    }
-}
-
-@end
 
 /* Main thread function */
 static void *MainThread(void *arg) {
@@ -229,6 +229,7 @@ void WebUI_ShutdownMacOS(void) {
     /* Clean up WebKit objects */
     @autoreleasepool {
         if (s_webView) {
+            [s_webView.configuration.userContentController removeScriptMessageHandlerForName:@"game"];
             [s_webView removeFromSuperview];
             [s_webView release];
             s_webView = nullptr;
@@ -243,6 +244,11 @@ void WebUI_ShutdownMacOS(void) {
         if (s_webViewConfig) {
             [s_webViewConfig release];
             s_webViewConfig = nullptr;
+        }
+        
+        if (s_messageHandler) {
+            [s_messageHandler release];
+            s_messageHandler = nullptr;
         }
     }
     
