@@ -1833,10 +1833,17 @@ This will be called twice if rendering in stereo mode
 */
 static void SCR_DrawScreenField( stereoFrame_t stereoFrame ) {
 	qboolean uiFullscreen;
+	qboolean jsOverlayActive;
 
 	re.BeginFrame( stereoFrame );
 
-	uiFullscreen = (uivm && VM_Call( uivm, 0, UI_IS_FULLSCREEN ));
+	/* JS Surf overlays own the screen when pointer mode is active. The legacy
+	 * UI VM reports UIMENU_INGAME as fullscreen and would otherwise paint its
+	 * 640x480 missing-texture surface over the modern UI. */
+	jsOverlayActive = Cvar_VariableIntegerValue( "ui_rpMenu" ) ||
+		Cvar_VariableIntegerValue( "ui_social" ) ||
+		Cvar_VariableIntegerValue( "ui_1337MainMenu" );
+	uiFullscreen = (uivm && VM_Call( uivm, 0, UI_IS_FULLSCREEN )) && !jsOverlayActive;
 
 	// wide aspect ratio screens need to have the sides cleared
 	// unless they are displaying game renderings
@@ -1925,7 +1932,7 @@ static void SCR_DrawScreenField( stereoFrame_t stereoFrame ) {
 	MenuVideo_Draw();
 
 	// the menu draws next
-	if ( Key_GetCatcher( ) & KEYCATCH_UI && uivm ) {
+	if ( Key_GetCatcher( ) & KEYCATCH_UI && uivm && !jsOverlayActive ) {
 		VM_Call( uivm, 1, UI_REFRESH, cls.realtime );
 	}
 
@@ -1936,7 +1943,7 @@ static void SCR_DrawScreenField( stereoFrame_t stereoFrame ) {
 	/* Surf HUD synthetic preview is intentionally available from the menu so
 	 * layout work does not require joining a server.  Normal scripts retain the
 	 * historical CA_ACTIVE-only frame behavior. */
-	if ( cls.state == CA_ACTIVE || Cvar_VariableIntegerValue( "cg_surfHudDebug" ) ) {
+	if ( cls.state == CA_ACTIVE || Cvar_VariableIntegerValue( "cg_surfHudDebug" ) || jsOverlayActive ) {
 		if ( re.FinishBloom ) {
 			re.FinishBloom();
 		}

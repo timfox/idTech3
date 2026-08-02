@@ -81,6 +81,8 @@ typedef struct {
 	int nextRequestId;
 	int reconnectAttempt;
 	int reconnectAt;
+	int lastMessageAt;
+	int lastPresenceAt;
 	char bosHost[128];
 	int bosPort;
 	byte authCookie[OSCAR_RAW_MAX_COOKIE];
@@ -118,6 +120,29 @@ static cvar_t *oscar_defaultRoom;
 static cvar_t *oscar_reconnect;
 static cvar_t *oscar_reconnectMaxDelay;
 static cvar_t *oscar_debug;
+static void OSCAR_SetError( const char *error );
+
+static qboolean OSCAR_ValidateSocialText( const char *value, int maxLen, const char *label ) {
+	const unsigned char *p;
+	int len;
+
+	if ( !value || !value[0] ) {
+		OSCAR_SetError( va( "%s is empty", label ) );
+		return qfalse;
+	}
+	len = (int)strlen( value );
+	if ( len >= maxLen ) {
+		OSCAR_SetError( va( "%s is too long", label ) );
+		return qfalse;
+	}
+	for ( p = (const unsigned char *)value; *p; p++ ) {
+		if ( *p < 0x20 && *p != '\n' && *p != '\t' ) {
+			OSCAR_SetError( va( "%s contains control characters", label ) );
+			return qfalse;
+		}
+	}
+	return qtrue;
+}
 static cvar_t *oscar_presence;
 static cvar_t *oscar_notify;
 static cvar_t *oscar_rosterSnapshot;
@@ -1348,6 +1373,17 @@ static qboolean OSCAR_JoinRoomDirect( const char *room )
 qboolean OSCAR_SendIM( const char *screenName, const char *message )
 {
 	char json[OSCAR_MAX_JSON_FRAME];
+	int now = Sys_Milliseconds();
+
+	if ( !OSCAR_ValidateSocialText( screenName, MAX_NAME_LENGTH, "account id" ) ||
+		!OSCAR_ValidateSocialText( message, MAX_STRING_CHARS, "message" ) ) {
+		return qfalse;
+	}
+	if ( oscar.lastMessageAt && now - oscar.lastMessageAt < 250 ) {
+		OSCAR_SetError( "message rate limit" );
+		return qfalse;
+	}
+	oscar.lastMessageAt = now;
 
 	if ( oscar.mode == OSCAR_MODE_DIRECT ) {
 		return OSCAR_SendDirectIM( screenName, message );
@@ -1411,6 +1447,17 @@ qboolean OSCAR_SendRoomMessage( const char *room, const char *message )
 	const char *sender = oscar_account && oscar_account->string[0] ? oscar_account->string : "idtech3";
 	byte frame[OSCAR_RAW_MAX_FRAME];
 	int len;
+	int now = Sys_Milliseconds();
+
+	if ( !OSCAR_ValidateSocialText( target, MAX_QPATH, "party id" ) ||
+		!OSCAR_ValidateSocialText( message, MAX_STRING_CHARS, "party message" ) ) {
+		return qfalse;
+	}
+	if ( oscar.lastMessageAt && now - oscar.lastMessageAt < 250 ) {
+		OSCAR_SetError( "party message rate limit" );
+		return qfalse;
+	}
+	oscar.lastMessageAt = now;
 
 	if ( oscar.mode == OSCAR_MODE_DIRECT ) {
 		if ( oscar.chatPhase != OSCAR_CHAT_ONLINE || oscar.chatSocket == OSCAR_INVALID_SOCKET ) {
@@ -1433,6 +1480,17 @@ qboolean OSCAR_SendRoomMessage( const char *room, const char *message )
 qboolean OSCAR_SetPresence( const char *status, const char *message )
 {
 	char json[OSCAR_MAX_JSON_FRAME];
+	int now = Sys_Milliseconds();
+
+	if ( !OSCAR_ValidateSocialText( status, 32, "presence" ) ||
+		( message && message[0] && !OSCAR_ValidateSocialText( message, MAX_STRING_CHARS, "status" ) ) ) {
+		return qfalse;
+	}
+	if ( oscar.lastPresenceAt && now - oscar.lastPresenceAt < 1000 ) {
+		OSCAR_SetError( "presence rate limit" );
+		return qfalse;
+	}
+	oscar.lastPresenceAt = now;
 
 	if ( oscar.mode == OSCAR_MODE_DIRECT ) {
 		(void)message;
@@ -1459,8 +1517,7 @@ static qboolean OSCAR_SendDirectBuddySub( const char *screenName, qboolean add )
 
 qboolean OSCAR_AddBuddy( const char *screenName )
 {
-	if ( !screenName || !screenName[0] ) {
-		OSCAR_SetError( "screen name required" );
+	if ( !OSCAR_ValidateSocialText( screenName, MAX_NAME_LENGTH, "screen name" ) ) {
 		return qfalse;
 	}
 	if ( oscar.mode == OSCAR_MODE_DIRECT ) {
@@ -1476,8 +1533,7 @@ qboolean OSCAR_AddBuddy( const char *screenName )
 
 qboolean OSCAR_RemoveBuddy( const char *screenName )
 {
-	if ( !screenName || !screenName[0] ) {
-		OSCAR_SetError( "screen name required" );
+	if ( !OSCAR_ValidateSocialText( screenName, MAX_NAME_LENGTH, "screen name" ) ) {
 		return qfalse;
 	}
 	if ( oscar.mode == OSCAR_MODE_DIRECT ) {

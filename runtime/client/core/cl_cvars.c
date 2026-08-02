@@ -34,8 +34,8 @@ void CL_InitCvars( void )
 	cl_noprint = Cvar_Get( "cl_noprint", "0", 0 );
 	Cvar_SetDescription( cl_noprint, "Disable printing of information in the console." );
 
-	cv = Cvar_Get( "cl_jsEscapeMenu", "0", CVAR_ARCHIVE_ND );
-	Cvar_SetDescription( cv, "Route the in-game escape menu to the JavaScript overlay (ui_rpMenu pointer mode) instead of the native UI module." );
+	cv = Cvar_Get( "cl_jsEscapeMenu", "1", CVAR_ARCHIVE_ND );
+	Cvar_SetDescription( cv, "Route the in-game escape menu to the Surf JavaScript glass overlay (ui_rpMenu pointer mode) instead of the legacy native UI module." );
 	cv = Cvar_Get( "ui_rpMenu", "0", CVAR_TEMP );
 	Cvar_SetDescription( cv, "JS overlay menu active flag: releases the mouse cursor, suppresses game input, and lets scripts receive input_key/rp_click events." );
 	/* TEMP so a quit-while-open cannot archive "1" and permanently kill mouse look. */
@@ -43,6 +43,24 @@ void CL_InitCvars( void )
 	Cvar_SetDescription( cv, "Surf JS map-select overlay (also implies pointer mode via CL_RpMenuActive)." );
 	cv = Cvar_Get( "ui_surfLeaderboard", "0", CVAR_TEMP );
 	Cvar_SetDescription( cv, "Surf JS leaderboard overlay (also implies pointer mode via CL_RpMenuActive)." );
+	cv = Cvar_Get( "ui_social", "0", CVAR_TEMP );
+	Cvar_SetDescription( cv, "1337 Social overlay active flag; releases mouse capture while open." );
+	/* The legacy UI VM still owns the menu lifecycle.  Keep the polished Surf
+	 * menus in the same lifecycle by mirroring its top-level menu state into
+	 * explicit, non-archived JS flags. */
+	cv = Cvar_Get( "ui_1337MainMenu", "0", CVAR_TEMP );
+	Cvar_SetDescription( cv, "Surf 1337 glass main menu active flag." );
+	cv = Cvar_Get( "ui_1337PlayMenu", "0", CVAR_TEMP );
+	cv = Cvar_Get( "ui_1337TournamentMenu", "0", CVAR_TEMP );
+	cv = Cvar_Get( "ui_1337TrainingMenu", "0", CVAR_TEMP );
+	cv = Cvar_Get( "ui_1337ReplayMenu", "0", CVAR_TEMP );
+	cv = Cvar_Get( "ui_1337LeaderboardsMenu", "0", CVAR_TEMP );
+	cv = Cvar_Get( "ui_1337ProfileMenu", "0", CVAR_TEMP );
+	cv = Cvar_Get( "ui_1337SettingsMenu", "0", CVAR_TEMP );
+	cv = Cvar_Get( "social_mock", "0", CVAR_ARCHIVE_ND );
+	Cvar_SetDescription( cv, "1337 Social deterministic mock roster for UI development (0=live OSCAR, 1=mock)." );
+	cv = Cvar_Get( "social_dnd", "0", CVAR_ARCHIVE );
+	Cvar_SetDescription( cv, "Suppress noncritical 1337 Social notifications during focused runs." );
 	cl_motd = Cvar_Get( "cl_motd", "1", 0 );
 	Cvar_SetDescription( cl_motd, "Toggle the display of the 'Message of the day'. When Quake 3 Arena starts a map up, it sends the GL_RENDERER string to the Message Of The Day server at id. This responds back with a message of the day to the client." );
 

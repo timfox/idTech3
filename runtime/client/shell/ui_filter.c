@@ -127,6 +127,43 @@ void SCR_UIBackdropBlur( float x, float y, float w, float h, float radius,
 
 /*
 ===============
+SCR_UIBackdropBlurScreen
+
+Queue a backdrop blur using native framebuffer pixels. This is deliberately
+separate from the virtual 640x480 API: a full-width console must not inherit
+the 4:3 aspect-fit letterbox used by normal UI panels.
+===============
+*/
+qboolean SCR_UIBackdropBlurScreen( float x, float y, float w, float h, float radius,
+	float cornerRadius, float rotation, float opacity, const vec4_t tint )
+{
+	uiBackdropFilter_t bf;
+	float screenW = (float)cls.glconfig.vidWidth;
+	float screenH = (float)cls.glconfig.vidHeight;
+
+	if ( w <= 0.0f || h <= 0.0f || radius <= 0.0f || opacity <= 0.0f ||
+		screenW <= 0.0f || screenH <= 0.0f || !UIFilter_Available() ) {
+		return qfalse;
+	}
+
+	Com_Memset( &bf, 0, sizeof( bf ) );
+	bf.rect[0] = Com_Clamp( 0.0f, 1.0f, x / screenW );
+	bf.rect[1] = Com_Clamp( 0.0f, 1.0f, y / screenH );
+	bf.rect[2] = Com_Clamp( 0.0f, 1.0f, ( x + w ) / screenW );
+	bf.rect[3] = Com_Clamp( 0.0f, 1.0f, ( y + h ) / screenH );
+	bf.cornerRadius = UIFilter_NormalizedCorner( cornerRadius, w, h );
+	bf.radius = radius;
+	bf.rotation = rotation;
+	bf.opacity = Com_Clamp( 0.0f, 1.0f, opacity );
+	if ( tint ) {
+		Vector4Copy( tint, bf.tint );
+	}
+	re.UIBackdropBlur( &bf );
+	return qtrue;
+}
+
+/*
+===============
 SCR_UIFilterLayer
 ===============
 */

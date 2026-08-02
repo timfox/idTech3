@@ -890,33 +890,38 @@ static void Con_DrawSolidConsole( float frac ) {
 	if ( yf < 1.0 ) {
 		yf = 0;
 	} else {
-		// custom console background color
-		if ( cl_conColor->string[0] ) {
-			// track changes
-			if ( strcmp( cl_conColor->string, conColorString ) ) 
-			{
-				Q_strncpyz( conColorString, cl_conColor->string, sizeof( conColorString ) );
-				Q_strncpyz( buf, cl_conColor->string, sizeof( buf ) );
-				Com_Split( buf, v, 4, ' ' );
-				for ( i = 0; i < 4 ; i++ ) {
-					conColorValue[ i ] = Q_atof( v[ i ] ) / 255.0f;
-					if ( conColorValue[ i ] > 1.0f ) {
-						conColorValue[ i ] = 1.0f;
-					} else if ( conColorValue[ i ] < 0.0f ) {
-						conColorValue[ i ] = 0.0f;
+		/* The console is a compositor surface, not an ordinary UI quad. Keep
+		 * its tint black at 80% and blur the scene behind it; console text is
+		 * submitted afterwards and therefore remains crisp. */
+		{
+			float bgColor[4] = { 0.0f, 0.0f, 0.0f, 0.8f };
+
+			/* Preserve an explicitly configured color, while the Surf default
+			 * remains "0 0 0 204" (black, 80% alpha). */
+			if ( cl_conColor->string[0] ) {
+				// track changes
+				if ( strcmp( cl_conColor->string, conColorString ) )
+				{
+					Q_strncpyz( conColorString, cl_conColor->string, sizeof( conColorString ) );
+					Q_strncpyz( buf, cl_conColor->string, sizeof( buf ) );
+					Com_Split( buf, v, 4, ' ' );
+					for ( i = 0; i < 4 ; i++ ) {
+						conColorValue[ i ] = Q_atof( v[ i ] ) / 255.0f;
+						if ( conColorValue[ i ] > 1.0f ) {
+							conColorValue[ i ] = 1.0f;
+						} else if ( conColorValue[ i ] < 0.0f ) {
+							conColorValue[ i ] = 0.0f;
+						}
 					}
 				}
+				Vector4Copy( conColorValue, bgColor );
 			}
-			re.SetColor( conColorValue );
-			re.DrawStretchPic( 0, 0, wf, yf, 0, 0, 1, 1, cls.whiteShader );
-		} else {
-			float bgColor[4];
-			float op = con_opacity && con_opacity->value >= 0.0f ? con_opacity->value : 1.0f;
-			if ( op > 1.0f ) op = 1.0f;
-			bgColor[0] = bgColor[1] = bgColor[2] = 1.0f;
-			bgColor[3] = op;
-			re.SetColor( bgColor );
-			re.DrawStretchPic( 0, 0, wf, yf, 0, 0, 1, 1, cls.consoleShader );
+
+			if ( !SCR_UIBackdropBlurScreen( 0.0f, 0.0f, wf, yf, 24.0f,
+				0.0f, 0.0f, 1.0f, bgColor ) ) {
+				re.SetColor( bgColor );
+				re.DrawStretchPic( 0, 0, wf, yf, 0, 0, 1, 1, cls.whiteShader );
+			}
 		}
 
 	}

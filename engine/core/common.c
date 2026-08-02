@@ -723,6 +723,10 @@ void Com_StartupVariable( const char *match ) {
 				Cvar_Get( name, Cmd_ArgsFrom( 2 ), CVAR_USER_CREATED );
 			else if ( !match && ( flags & CVAR_INIT ) )
 				continue;
+			/* com_hunkMegs is latched, but its command-line value must win
+			 * over an archived config before the hunk allocator is created. */
+			else if ( !Q_stricmp( name, "com_hunkMegs" ) )
+				Cvar_Set2( name, Cmd_ArgsFrom( 2 ), qtrue );
 			else
 				Cvar_Set2( name, Cmd_ArgsFrom( 2 ), qfalse );
 		}
@@ -2290,10 +2294,14 @@ static void Com_InitHunkMemory( void ) {
 
 	// allocate the stack based hunk allocator
 	cv = Cvar_Get( "com_hunkMegs", XSTRING( DEF_COMHUNKMEGS ), CVAR_LATCH | CVAR_ARCHIVE );
-	Cvar_CheckRange( cv, XSTRING( MIN_COMHUNKMEGS ), NULL, CV_INTEGER );
+	/* s_hunkTotal is an int byte count, so 2047 MB is the largest safe
+	 * configured value (2048 MB wraps past INT_MAX). */
+	Cvar_CheckRange( cv, XSTRING( MIN_COMHUNKMEGS ), "2047", CV_INTEGER );
 	Cvar_SetDescription( cv, "The size of the hunk memory segment." );
 
-	s_hunkTotal = cv->integer * 1024 * 1024;
+	/* Keep the byte conversion in a wide type; values above 2047 MB must
+	 * still be rejected by the range contract rather than wrapping negative. */
+	s_hunkTotal = (int64_t)cv->integer * 1024 * 1024;
 
 	s_hunkData = calloc( s_hunkTotal + 63, 1 );
 	if ( !s_hunkData ) {
@@ -3223,9 +3231,14 @@ static void Com_ApplySurfShippingProfile( void )
 	Cvar_Set( "r_consoleFont", "fonts/NotoSansDisplay-Regular.ttf" );
 	Cvar_Set( "r_fontMipmap", "0" );
 	Cvar_Set( "r_sdfEnable", "0" );
-	Cvar_Set( "r_fontShadow", "1" );
+    /* Surf's TTF HUD is designed without a duplicate underpass/shadow.
+     * Keep this profile deterministic; users can opt into a shadow from the
+     * menu or console when they actually want one. */
+    Cvar_Set( "r_fontShadow", "0" );
 	Cvar_Set( "r_fontGamma", "1.0" );
-	Cvar_Set( "cl_uiFilter", "0" );
+    /* Glass panels use the renderer compositor when available; the client
+     * wrapper still supplies a translucent fallback on unsupported paths. */
+    Cvar_Set( "cl_uiFilter", "1" );
 	Cvar_Set( "r_lightmap_srgb_decode", "0" );
 	Cvar_Set( "cl_geneticGan", "0" );
 

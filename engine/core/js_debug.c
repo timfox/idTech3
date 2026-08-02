@@ -11,6 +11,7 @@
 #include <duktape.h>
 #ifndef DEDICATED
 #include "../client/client.h"
+#include "net_oscar.h"
 #endif
 
 #define MAX_JS_TRACKED_SCRIPTS 64
@@ -459,6 +460,174 @@ static duk_ret_t Js_Binding_Exec( duk_context *ctx ) {
 	return 0;
 }
 
+#ifndef DEDICATED
+/*
+ * Social bindings intentionally expose only normalized OSCAR operations.
+ * JavaScript never receives sockets, FLAP frames, credentials, or raw JSON.
+ */
+static const char *Js_SocialString( duk_context *ctx, int index, size_t maxLen, const char *field ) {
+	const char *value = duk_require_string( ctx, index );
+	const unsigned char *p = (const unsigned char *)value;
+	size_t len = strlen( value );
+
+	if ( len == 0 || len >= maxLen ) {
+		duk_error( ctx, DUK_ERR_TYPE_ERROR, "social %s is empty or too long", field );
+	}
+	while ( *p ) {
+		if ( *p < 0x20 && *p != '\n' && *p != '\t' ) {
+			duk_error( ctx, DUK_ERR_TYPE_ERROR, "social %s contains control characters", field );
+		}
+		p++;
+	}
+	return value;
+}
+
+static void Js_SocialPushBuddy( duk_context *ctx, const oscarBuddy_t *buddy ) {
+	duk_push_object( ctx );
+	duk_push_string( ctx, buddy->screenName );
+	duk_put_prop_string( ctx, -2, "accountId" );
+	duk_push_string( ctx, buddy->screenName );
+	duk_put_prop_string( ctx, -2, "displayName" );
+	duk_push_string( ctx, buddy->status );
+	duk_put_prop_string( ctx, -2, "presence" );
+	duk_push_string( ctx, buddy->awayMessage );
+	duk_put_prop_string( ctx, -2, "statusText" );
+	duk_push_boolean( ctx, buddy->online );
+	duk_put_prop_string( ctx, -2, "online" );
+}
+
+static duk_ret_t Js_Binding_SocialStatus( duk_context *ctx ) {
+	oscarBuddy_t buddy;
+	int i;
+
+	duk_push_object( ctx );
+	duk_push_boolean( ctx, OSCAR_IsAvailable() );
+	duk_put_prop_string( ctx, -2, "available" );
+	duk_push_int( ctx, OSCAR_GetState() );
+	duk_put_prop_string( ctx, -2, "state" );
+	duk_push_string( ctx, OSCAR_GetStatusString() );
+	duk_put_prop_string( ctx, -2, "stateText" );
+	duk_push_string( ctx, OSCAR_GetLastError() );
+	duk_put_prop_string( ctx, -2, "lastError" );
+	duk_push_int( ctx, OSCAR_GetReconnectAttempt() );
+	duk_put_prop_string( ctx, -2, "reconnectAttempt" );
+	duk_push_int( ctx, OSCAR_BuddyCount() );
+	duk_put_prop_string( ctx, -2, "buddyCount" );
+	duk_push_array( ctx );
+	for ( i = 0; i < OSCAR_BuddyCount(); i++ ) {
+		if ( OSCAR_BuddyGet( i, &buddy ) ) {
+			Js_SocialPushBuddy( ctx, &buddy );
+			duk_put_prop_index( ctx, -2, (duk_uarridx_t)i );
+		}
+	}
+	duk_put_prop_string( ctx, -2, "roster" );
+	return 1;
+}
+
+static duk_ret_t Js_Binding_SocialPoll( duk_context *ctx ) {
+	oscarEvent_t event;
+	const char *name = "notification";
+
+	if ( !OSCAR_PollEvent( &event ) ) {
+		duk_push_null( ctx );
+		return 1;
+	}
+	duk_push_object( ctx );
+	duk_push_int( ctx, 1 ); duk_put_prop_string( ctx, -2, "version" );
+	duk_push_int( ctx, event.type ); duk_put_prop_string( ctx, -2, "type" );
+	switch ( event.type ) {
+	case OSCAR_EVENT_CONNECTED: name = "social.connectionChanged"; break;
+	case OSCAR_EVENT_DISCONNECTED: name = "social.connectionChanged"; break;
+	case OSCAR_EVENT_INSTANT_MESSAGE: name = "social.messageReceived"; break;
+	case OSCAR_EVENT_ROOM_MESSAGE: name = "social.partyMessage"; break;
+	case OSCAR_EVENT_PRESENCE_CHANGED: name = "social.presenceChanged"; break;
+	case OSCAR_EVENT_REQUEST_COMPLETE: name = "social.messageDelivered"; break;
+	case OSCAR_EVENT_ERROR: name = "social.messageFailed"; break;
+	default: break;
+	}
+	duk_push_string( ctx, name ); duk_put_prop_string( ctx, -2, "name" );
+	duk_push_int( ctx, event.requestId ); duk_put_prop_string( ctx, -2, "requestId" );
+	duk_push_boolean( ctx, event.ok ); duk_put_prop_string( ctx, -2, "ok" );
+	duk_push_string( ctx, event.room ); duk_put_prop_string( ctx, -2, "room" );
+	duk_push_string( ctx, event.screenName ); duk_put_prop_string( ctx, -2, "accountId" );
+	duk_push_string( ctx, event.status ); duk_put_prop_string( ctx, -2, "presence" );
+	duk_push_string( ctx, event.text ); duk_put_prop_string( ctx, -2, "text" );
+	return 1;
+}
+
+static duk_ret_t Js_Binding_SocialConnect( duk_context *ctx ) {
+	(void)ctx;
+	duk_push_boolean( ctx, OSCAR_Connect() );
+	return 1;
+}
+
+static duk_ret_t Js_Binding_SocialDisconnect( duk_context *ctx ) {
+	const char *reason = duk_get_top( ctx ) > 0
+		? Js_SocialString( ctx, 0, 128, "reason" ) : "social overlay closed";
+	OSCAR_Disconnect( reason );
+	return 0;
+}
+
+static duk_ret_t Js_Binding_SocialSetPresence( duk_context *ctx ) {
+	const char *presence = Js_SocialString( ctx, 0, 32, "presence" );
+	const char *message = duk_get_top( ctx ) > 1
+		? Js_SocialString( ctx, 1, MAX_STRING_CHARS, "status" ) : "";
+	duk_push_boolean( ctx, OSCAR_SetPresence( presence, message ) );
+	return 1;
+}
+
+static duk_ret_t Js_Binding_SocialSendMessage( duk_context *ctx ) {
+	const char *account = Js_SocialString( ctx, 0, MAX_NAME_LENGTH, "accountId" );
+	const char *message = Js_SocialString( ctx, 1, MAX_STRING_CHARS, "message" );
+	duk_push_boolean( ctx, OSCAR_SendIM( account, message ) );
+	return 1;
+}
+
+static duk_ret_t Js_Binding_SocialAddContact( duk_context *ctx ) {
+	duk_push_boolean( ctx, OSCAR_AddBuddy( Js_SocialString( ctx, 0, MAX_NAME_LENGTH, "accountId" ) ) );
+	return 1;
+}
+
+static duk_ret_t Js_Binding_SocialRemoveContact( duk_context *ctx ) {
+	duk_push_boolean( ctx, OSCAR_RemoveBuddy( Js_SocialString( ctx, 0, MAX_NAME_LENGTH, "accountId" ) ) );
+	return 1;
+}
+
+static duk_ret_t Js_Binding_SocialJoinParty( duk_context *ctx ) {
+	duk_push_boolean( ctx, OSCAR_JoinRoom( Js_SocialString( ctx, 0, MAX_QPATH, "party id" ) ) );
+	return 1;
+}
+
+static duk_ret_t Js_Binding_SocialLeaveParty( duk_context *ctx ) {
+	const char *party = duk_get_top( ctx ) > 0 ? Js_SocialString( ctx, 0, MAX_QPATH, "party id" ) : NULL;
+	duk_push_boolean( ctx, OSCAR_LeaveRoom( party ) );
+	return 1;
+}
+
+static duk_ret_t Js_Binding_SocialSendPartyMessage( duk_context *ctx ) {
+	const char *party = Js_SocialString( ctx, 0, MAX_QPATH, "party id" );
+	const char *message = Js_SocialString( ctx, 1, MAX_STRING_CHARS, "party message" );
+	duk_push_boolean( ctx, OSCAR_SendRoomMessage( party, message ) );
+	return 1;
+}
+
+static void JsDebug_RegisterSocialBindings( duk_context *ctx ) {
+	duk_push_object( ctx );
+	duk_push_c_function( ctx, Js_Binding_SocialStatus, 0 ); duk_put_prop_string( ctx, -2, "status" );
+	duk_push_c_function( ctx, Js_Binding_SocialPoll, 0 ); duk_put_prop_string( ctx, -2, "poll" );
+	duk_push_c_function( ctx, Js_Binding_SocialConnect, 0 ); duk_put_prop_string( ctx, -2, "connect" );
+	duk_push_c_function( ctx, Js_Binding_SocialDisconnect, 1 ); duk_put_prop_string( ctx, -2, "disconnect" );
+	duk_push_c_function( ctx, Js_Binding_SocialSetPresence, 2 ); duk_put_prop_string( ctx, -2, "setPresence" );
+	duk_push_c_function( ctx, Js_Binding_SocialSendMessage, 2 ); duk_put_prop_string( ctx, -2, "sendMessage" );
+	duk_push_c_function( ctx, Js_Binding_SocialAddContact, 1 ); duk_put_prop_string( ctx, -2, "addContact" );
+	duk_push_c_function( ctx, Js_Binding_SocialRemoveContact, 1 ); duk_put_prop_string( ctx, -2, "removeContact" );
+	duk_push_c_function( ctx, Js_Binding_SocialJoinParty, 1 ); duk_put_prop_string( ctx, -2, "joinParty" );
+	duk_push_c_function( ctx, Js_Binding_SocialLeaveParty, 1 ); duk_put_prop_string( ctx, -2, "leaveParty" );
+	duk_push_c_function( ctx, Js_Binding_SocialSendPartyMessage, 2 ); duk_put_prop_string( ctx, -2, "sendPartyMessage" );
+	duk_put_prop_string( ctx, -2, "social" );
+}
+#endif
+
 static duk_ret_t Js_Binding_ReadFile( duk_context *ctx ) {
 	const char *path = duk_require_string( ctx, 0 );
 	void *buffer = NULL;
@@ -725,12 +894,15 @@ static duk_ret_t Js_Binding_MaterialRegister( duk_context *ctx ) {
 
 static void Js_HudPixelToVirtualRect( float *x, float *y, float *w, float *h ) {
 	if ( js_hudPixelCoords && js_hudPixelCoords->integer ) {
-		const float sx = ( cls.glconfig.vidWidth > 0 ) ? ( 640.0f / (float)cls.glconfig.vidWidth ) : 1.0f;
-		const float sy = ( cls.glconfig.vidHeight > 0 ) ? ( 480.0f / (float)cls.glconfig.vidHeight ) : 1.0f;
-		if ( x ) *x *= sx;
-		if ( y ) *y *= sy;
-		if ( w ) *w *= sx;
-		if ( h ) *h *= sy;
+		/* SCR_AdjustFrom640 aspect-fits a 640x480 canvas. Convert physical
+		 * pixels back through that same transform, including horizontal bars. */
+		float scale = ( cls.glconfig.vidHeight > 0 ) ? (float)cls.glconfig.vidHeight / 480.0f : 1.0f;
+		float offsetX = ((float)cls.glconfig.vidWidth - 640.0f * scale) * 0.5f;
+		if ( scale < 0.001f ) scale = 1.0f;
+		if ( x ) *x = (*x - offsetX) / scale;
+		if ( y ) *y /= scale;
+		if ( w ) *w /= scale;
+		if ( h ) *h /= scale;
 	}
 }
 
@@ -1275,6 +1447,10 @@ static void JsDebug_RegisterBindings( void ) {
 	JsDebug_RegisterRtsBindings( s_jsContext );
 #endif
 
+#ifndef DEDICATED
+	JsDebug_RegisterSocialBindings( s_jsContext );
+#endif
+
 	duk_push_string( s_jsContext, "Duktape" );
 	duk_put_prop_string( s_jsContext, -2, "engine" );
 	duk_push_string( s_jsContext, js_compatTarget ? js_compatTarget->string : "es5.1-duktape" );
@@ -1726,7 +1902,7 @@ void Cmd_JsList_f( void ) {
 	}
 
 	Com_Printf( "JavaScript: runtime initialized\n" );
-	Com_Printf( "JavaScript: API namespace idtech3 (print, cvarGet, cvarSet, exec, readFile, writeFile, appendFile, include, require, on, off, textureLoad, textureReload, materialRegister, hudDrawPic, hudDrawText, hudMeasureText, hudDrawRect)\n" );
+	Com_Printf( "JavaScript: API namespace idtech3 (print, cvarGet, cvarSet, exec, readFile, writeFile, appendFile, include, require, on, off, social, textureLoad, textureReload, materialRegister, hudDrawPic, hudDrawText, hudMeasureText, hudDrawRect)\n" );
 	Com_Printf( "JavaScript: script path policy ui/, client/, frontend/, scripts/js/\n" );
 	Com_Printf( "JavaScript: callbacks frame=%d map_load=%d client_connect=%d ui_open=%d ui_close=%d menu_changed=%d input_key=%d mouse_move=%d console_open=%d\n",
 		JsDebug_EventCallbackCount( "frame" ),

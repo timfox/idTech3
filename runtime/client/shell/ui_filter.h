@@ -33,6 +33,12 @@ qboolean UIFilter_Available( void );
 void SCR_UIBackdropBlur( float x, float y, float w, float h, float radius,
 	float cornerRadius, float rotation, float opacity, const vec4_t tint );
 
+/* Native render-pixel variant for surfaces that intentionally span the full
+ * widescreen framebuffer (for example the developer console). Returns qtrue
+ * when the renderer compositor accepted the blur operation. */
+qboolean SCR_UIBackdropBlurScreen( float x, float y, float w, float h, float radius,
+	float cornerRadius, float rotation, float opacity, const vec4_t tint );
+
 /*
  * Filtered layer (CSS filter: blur(radius)) drawing a single shader/image.
  * Same coordinate conventions as SCR_UIBackdropBlur. Falls back to a plain

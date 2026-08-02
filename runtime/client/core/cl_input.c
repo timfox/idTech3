@@ -392,7 +392,8 @@ stays idle — still needs pointer mode (free look off, free cursor).
 qboolean CL_RpMenuActive( void ) {
 	return ( Cvar_VariableIntegerValue( "ui_rpMenu" ) != 0 ||
 	         Cvar_VariableIntegerValue( "ui_surfMapSelect" ) != 0 ||
-	         Cvar_VariableIntegerValue( "ui_surfLeaderboard" ) != 0 ) ? qtrue : qfalse;
+	         Cvar_VariableIntegerValue( "ui_surfLeaderboard" ) != 0 ||
+	         Cvar_VariableIntegerValue( "ui_social" ) != 0 ) ? qtrue : qfalse;
 }
 
 /*
@@ -406,6 +407,8 @@ flag that CL_RpMenuActive consults.
 void CL_ClearRpMenu( void ) {
 	Cvar_Set( "ui_surfMapSelect", "0" );
 	Cvar_Set( "ui_surfLeaderboard", "0" );
+	Cvar_Set( "ui_surfTournament", "0" );
+	Cvar_Set( "ui_social", "0" );
 	Cvar_Set( "ui_rpMenu", "0" );
 }
 
@@ -480,12 +483,11 @@ void CL_GetJsHudCursor( float *outX, float *outY ) {
 		if ( uiScale < 0.001f ) {
 			uiScale = 1.0f;
 		}
-		if ( outX ) {
-			*outX = (float)sx / uiScale;
-		}
-		if ( outY ) {
-			*outY = (float)sy / uiScale;
-		}
+
+		/* Pixel-mode JS layout uses drawable pixels. Keep cursor coordinates in
+		 * that same space; hudDraw* performs the matching aspect transform. */
+		if ( outX ) *outX = (float)sx / uiScale;
+		if ( outY ) *outY = (float)sy / uiScale;
 		return;
 	}
 

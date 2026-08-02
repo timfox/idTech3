@@ -76,6 +76,20 @@ static void CL_LuaRegisterAll( void *luaState )
 void CL_JsNotifyMenuChanged( int menu ) {
 	const char *menuName = "unknown";
 
+	/* Native menu activation is the authoritative entry point for both the
+	 * console and the Escape key.  Mirror it into the Surf JS menu flags so a
+	 * missing legacy menu shader can never leave the user on the magenta VM
+	 * fallback. */
+	if ( menu == UIMENU_MAIN ) {
+		Cvar_Set( "ui_1337MainMenu", "1" );
+	} else if ( menu == UIMENU_INGAME && Cvar_VariableIntegerValue( "cl_jsEscapeMenu" ) ) {
+		/* Some callers open UIMENU_INGAME directly instead of going through the
+		 * Escape-key branch. Keep those paths on the same Surf glass pause UI. */
+		Cvar_Set( "ui_rpMenu", "1" );
+	} else if ( menu == UIMENU_NONE ) {
+		Cvar_Set( "ui_1337MainMenu", "0" );
+	}
+
 	switch ( menu ) {
 		case UIMENU_NONE: menuName = "none"; break;
 		case UIMENU_MAIN: menuName = "main"; break;

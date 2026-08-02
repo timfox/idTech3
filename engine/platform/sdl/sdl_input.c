@@ -733,6 +733,11 @@ static void IN_DeactivateMouse( void )
 
 		SDL_SetWindowMouseGrab( SDL_window, false );
 		IN_SetRelativeMouse( qfalse );
+		/* JS pointer overlays use absolute coordinates, but must remain confined
+		 * to a windowed game so the cursor can actually reach the UI edges. */
+		if ( uiActive && !( Key_GetCatcher() & KEYCATCH_UI ) ) {
+			SDL_SetWindowMouseGrab( SDL_window, true );
+		}
 		mouse_frac_x = 0.0f;
 		mouse_frac_y = 0.0f;
 

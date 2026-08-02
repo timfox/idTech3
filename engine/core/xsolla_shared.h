@@ -133,4 +133,3 @@ qboolean XSOLLA_IsInitialized(void);
 #endif
 
 #endif // _XOLLA_SHARED_H_
-"

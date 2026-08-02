@@ -90,6 +90,21 @@ static void CL_Open_f( void ) {
 	Cvar_Set( "ui_open_tab", "" );
 	Com_Printf( "open: unhandled target '%s'\n", target );
 }
+
+static void CL_SocialToggle_f( void ) {
+	const qboolean pointerActive = Cvar_VariableIntegerValue( "ui_rpMenu" ) != 0 ||
+		Cvar_VariableIntegerValue( "ui_social" ) != 0 ||
+		Cvar_VariableIntegerValue( "ui_surfMapSelect" ) != 0 ||
+		Cvar_VariableIntegerValue( "ui_surfLeaderboard" ) != 0;
+	if ( pointerActive ) {
+		CL_ClearRpMenu();
+		Key_ClearStates();
+		return;
+	}
+	Cvar_Set( "ui_1337MainMenu", "0" );
+	Cvar_Set( "ui_social", "1" );
+	Cvar_Set( "ui_rpMenu", "1" );
+}
 static void CL_SetPlayerName_f( void ) {
 	if ( Cmd_Argc() < 2 ) {
 		Com_Printf( "usage: %s <name>\n", Cmd_Argv( 0 ) );
@@ -620,6 +635,7 @@ void CL_Cmds_Init( void ) {
 	Cmd_AddCommand( "playername", CL_SetPlayerName_f );
 	Cmd_AddCommand( "setname", CL_SetPlayerName_f );
 	Cmd_AddCommand( "open", CL_Open_f );
+	Cmd_AddCommand( "social_toggle", CL_SocialToggle_f );
 	Cmd_AddCommand( "p2p_status", CL_P2PStatus_f );
 	Cmd_AddCommand( "p2p_address", CL_P2PAddress_f );
 	Cmd_AddCommand( "p2p_connect", CL_P2PConnect_f );
