@@ -71,6 +71,7 @@ Modernized id Tech 3: **Vulkan renderer with PBR**, validation and smoke-tested 
 * Console/logging for connection diagnostics and real-time network statistics
 
 **Systems** (game and engine extensions):
+* Native Webview
 * AIML 3.0 chatbot scripting (see `g_aiml.c` / Lua `Engine.AIML`)
 * Goal Oriented Action Planner (AI planning)
 * Flocking and boids (crowd AI)
