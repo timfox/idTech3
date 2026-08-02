@@ -1,0 +1,50 @@
+# Performance Testing Makefile
+# This Makefile provides commands for performance testing and regression detection
+
+.PHONY: perf-benchmarks perf-regression perf-report perf-clean perf-all
+
+# Default target
+all: perf-all
+
+# Run all performance benchmarks
+perf-benchmarks:
+	@echo "Running performance benchmarks..."
+	@mkdir -p build-perf
+	@cd build-perf && cmake ../gamesrc -DCMAKE_BUILD_TYPE=Debug -DBUILD_TESTING=ON
+	@cmake --build build-perf --parallel $(nproc)
+	@python3 scripts/perf_regression_detector.py --run-benchmarks --output-dir build-perf
+
+# Run performance regression detection
+perf-regression:
+	@echo "Running performance regression detection..."
+	@python3 scripts/perf_regression_detector.py --baseline baseline.json --current build-perf/current.json
+
+# Generate performance report
+perf-report:
+	@echo "Generating performance report..."
+	@python3 scripts/perf_regression_detector.py --baseline baseline.json --current build-perf/current.json --output perf_report_$(shell date +%Y%m%d_%H%M%S).json
+
+# Clean performance artifacts
+perf-clean:
+	@echo "Cleaning performance artifacts..."
+	@rm -rf build-perf
+	@rm -f perf_*.json current.json baseline.json
+
+# Run all performance checks
+perf-all: perf-benchmarks perf-regression perf-report
+
+# Compare with baseline
+perf-compare:
+	@echo "Comparing current performance with baseline..."
+	@python3 scripts/perf_regression_detector.py --baseline baseline.json --current build-perf/current.json --output perf_report.json
+
+# Update baseline
+perf-update-baseline:
+	@echo "Updating baseline with current performance data..."
+	@cp build-perf/current.json baseline.json
+	@echo "Baseline updated successfully"
+
+# Run benchmarks with specific configuration
+perf-custom:
+	@echo "Running custom performance benchmarks..."
+	@python3 scripts/perf_regression_detector.py --run-benchmarks --output-dir $(OUTPUT_DIR) --baseline $(BASELINE) --current $(CURRENT)
