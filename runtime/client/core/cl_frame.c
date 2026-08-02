@@ -22,6 +22,7 @@ Copyright (C) 2026 Gopex LLC. All rights reserved.
 #include "cl_generative.h"
 #include "cl_vuda.h"
 #include "cl_emulator.h"
+#include "cl_xsolla.h"
 #include "lua_debug.h"
 #include "cl_app_crdt.h"
 #include "cl_oscar.h"
@@ -86,6 +87,9 @@ void CL_Frame( int msec, int realMsec ) {
 	CL_VUDA_Frame();
 #endif
 	CL_Emulator_Frame();
+#ifdef USE_XSOLLA
+	CL_Xsolla_Frame();
+#endif
 
 	cls.realFrametime = realMsec;
 
@@ -136,6 +140,10 @@ void CL_Frame( int msec, int realMsec ) {
 #endif
 	CL_Oscar_Frame();
 	CL_Discord_Frame();
+#ifdef USE_XSOLLA
+	CL_Xsolla_Frame();
+#endif
 
 	Con_RunConsole();
 }
+
