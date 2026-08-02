@@ -582,6 +582,15 @@ static void HIZ_BindMipDescriptors( VkImageView depthView, VkImageView srcView, 
 	depthInfo.imageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
 
 	Com_Memset( &srcInfo, 0, sizeof( srcInfo ) );
+	/*
+	 * The first level reads the depth sampler instead of srcMip, but binding 1
+	 * is still statically present in the shader interface. Keep the descriptor
+	 * valid on that dispatch as well; the destination view is never read when
+	 * srcLevel == 0.
+	 */
+	if ( srcView == VK_NULL_HANDLE ) {
+		srcView = dstView;
+	}
 	srcInfo.imageView = srcView;
 	srcInfo.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
 
@@ -603,20 +612,16 @@ static void HIZ_BindMipDescriptors( VkImageView depthView, VkImageView srcView, 
 	writes[1].descriptorCount = 1;
 	writes[1].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
 	writes[1].pImageInfo = &dstInfo;
-	writeCount = 2;
+	writes[1].dstBinding = 1;
+	writes[1].pImageInfo = &srcInfo;
 
-	if ( srcView != VK_NULL_HANDLE ) {
-		writes[1].dstBinding = 1;
-		writes[1].pImageInfo = &srcInfo;
-
-		writes[2].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-		writes[2].dstSet = s_compute.descriptor;
-		writes[2].dstBinding = 2;
-		writes[2].descriptorCount = 1;
-		writes[2].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
-		writes[2].pImageInfo = &dstInfo;
-		writeCount = 3;
-	}
+	writes[2].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+	writes[2].dstSet = s_compute.descriptor;
+	writes[2].dstBinding = 2;
+	writes[2].descriptorCount = 1;
+	writes[2].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+	writes[2].pImageInfo = &dstInfo;
+	writeCount = 3;
 
 	qvkUpdateDescriptorSets( vk.device, writeCount, writes, 0, NULL );
 }
