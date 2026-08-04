@@ -281,8 +281,58 @@ extern "C" void CL_District_Init( void ) {
 
 	Cvar_SetDescription( Cvar_Get( "r_districtDraw", "1", CVAR_ARCHIVE ),
 		"When 1, draw loaded district proxy/full FreeUSD meshes at manifest origins each frame." );
+	Cvar_SetDescription( Cvar_Get( "r_districtAnchorView", "0", CVAR_ARCHIVE ),
+		"Validation mode: place each loaded district bounds center at the current camera. "
+		"Use for USDA proof captures; leaves authored world placement unchanged when 0." );
+	Cvar_SetDescription( Cvar_Get( "r_districtCamera", "0", CVAR_ARCHIVE ),
+		"Validation camera: replace the gameplay view with an automatic camera aimed at the loaded district bounds. "
+		"This makes USDA proof captures independent of the active BSP map." );
+	Cvar_SetDescription( Cvar_Get( "r_districtOnly", "0", CVAR_ARCHIVE ),
+		"Validation scene mode: hide the active BSP world while rendering loaded district entities." );
+	Cvar_SetDescription( Cvar_Get( "r_districtCameraDistance", "1.0", CVAR_ARCHIVE ),
+		"Validation camera distance in district extents; lower values move the USDA proof camera into the scene." );
 
 	Com_Printf( "World districts: district_load, district_list, district_proxy (r_district 1, r_districtDraw 1)\n" );
+}
+
+extern "C" void CL_District_ApplyView( refdef_t *fd ) {
+	const worldDistrict_t *d;
+	vec3_t center, half, eye, direction, angles;
+	float extent, distanceScale;
+
+	if ( !fd || !Cvar_VariableIntegerValue( "r_districtCamera" ) ) {
+		return;
+	}
+	d = WorldDistrict_Get( 0 );
+	if ( !d || !d->active ) {
+		return;
+	}
+
+	VectorAdd( d->boundsMin, d->boundsMax, center );
+	VectorScale( center, 0.5f, center );
+	VectorSubtract( d->boundsMax, d->boundsMin, half );
+	extent = MAX( half[0], MAX( half[1], half[2] ) );
+	if ( extent < 64.0f ) {
+		extent = 512.0f;
+	}
+	distanceScale = Cvar_Get( "r_districtCameraDistance", "1.0", CVAR_ARCHIVE )->value;
+	if ( distanceScale < 0.1f ) {
+		distanceScale = 0.1f;
+	}
+
+	/* The default fixture is Z-up and its long axis is Y. Keep this camera
+	 * derived from the manifest bounds so it remains useful for other USDA
+	 * districts instead of baking OpenArena spawn coordinates into the proof. */
+	VectorCopy( center, eye );
+	eye[1] -= extent * distanceScale;
+	eye[2] += extent * 0.05f;
+	VectorSubtract( center, eye, direction );
+	vectoangles( direction, angles );
+	AnglesToAxis( angles, fd->viewaxis );
+	VectorCopy( eye, fd->vieworg );
+	if ( Cvar_VariableIntegerValue( "r_districtOnly" ) ) {
+		fd->rdflags |= RDF_NOWORLDMODEL;
+	}
 }
 
 extern "C" void CL_District_Frame( void ) {
@@ -312,6 +362,7 @@ extern "C" void CL_District_AddRefEntitiesToScene( void ) {
 		const worldDistrict_t *d = WorldDistrict_Get( i );
 		refEntity_t ent;
 		qhandle_t model = 0;
+		vec3_t drawOrigin;
 
 		if ( !d ) {
 			continue;
@@ -334,7 +385,14 @@ extern "C" void CL_District_AddRefEntitiesToScene( void ) {
 		Com_Memset( &ent, 0, sizeof( ent ) );
 		ent.reType = RT_MODEL;
 		ent.hModel = model;
-		VectorCopy( d->origin, ent.origin );
+		VectorCopy( d->origin, drawOrigin );
+		if ( Cvar_VariableIntegerValue( "r_districtAnchorView" ) ) {
+			vec3_t center;
+			VectorAdd( d->boundsMin, d->boundsMax, center );
+			VectorScale( center, 0.5f, center );
+			VectorSubtract( cl.snap.ps.origin, center, drawOrigin );
+		}
+		VectorCopy( drawOrigin, ent.origin );
 		ent.axis[0][0] = 1.0f;
 		ent.axis[1][1] = 1.0f;
 		ent.axis[2][2] = 1.0f;

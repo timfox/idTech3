@@ -91,12 +91,24 @@ static void CL_SanitizeRendererName( const char *raw, char *out, size_t outSize 
 static void ( *re_RenderScene )( const refdef_t *fd );
 
 static void CL_RenderSceneWithDistricts( const refdef_t *fd ) {
-	if ( !CL_StockBaseq3Mode() ) {
+	refdef_t districtFd;
+	const refdef_t *sceneFd = fd;
+
+	if ( fd && Cvar_VariableIntegerValue( "r_districtCamera" ) ) {
+		districtFd = *fd;
+		CL_District_ApplyView( &districtFd );
+		sceneFd = &districtFd;
+	}
+	/* OpenArena normally selects the retail compatibility profile, which
+	 * intentionally suppresses modern district entities. An explicit district
+	 * camera is a validation scene request and must be allowed to cross that
+	 * gate; ordinary gameplay remains unchanged. */
+	if ( !CL_StockBaseq3Mode() || Cvar_VariableIntegerValue( "r_districtCamera" ) ) {
 		CL_District_AddRefEntitiesToScene();
 		CL_RTSDemo_AddRefEntitiesToScene();
 	}
 	if ( re_RenderScene ) {
-		re_RenderScene( fd );
+		re_RenderScene( sceneFd );
 	}
 }
 static void CL_Vid_Restart_f( void );

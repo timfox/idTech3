@@ -7,6 +7,7 @@ USD / USDA mesh tessellation via FreeUSD (C++ only; no tr_local.h).
 */
 
 #include <cstdlib>
+#include <cmath>
 #include <cstring>
 #include <memory>
 #include <span>
@@ -64,6 +65,20 @@ static void R_Freeusd_TransformPoint( const freeusd::gf::Matrix4d &m, float lx, 
 	*ox = static_cast<float>( x * m.m[0] + y * m.m[4] + z * m.m[8] + m.m[12] );
 	*oy = static_cast<float>( x * m.m[1] + y * m.m[5] + z * m.m[9] + m.m[13] );
 	*oz = static_cast<float>( x * m.m[2] + y * m.m[6] + z * m.m[10] + m.m[14] );
+}
+
+static void R_Freeusd_TransformNormal( const freeusd::gf::Matrix4d &m, float lx, float ly, float lz,
+	float *ox, float *oy, float *oz ) {
+	float length;
+	*ox = lx * (float)m.m[0] + ly * (float)m.m[4] + lz * (float)m.m[8];
+	*oy = lx * (float)m.m[1] + ly * (float)m.m[5] + lz * (float)m.m[9];
+	*oz = lx * (float)m.m[2] + ly * (float)m.m[6] + lz * (float)m.m[10];
+	length = sqrtf( *ox * *ox + *oy * *oy + *oz * *oz );
+	if ( length > 0.00001f ) {
+		*ox /= length;
+		*oy /= length;
+		*oz /= length;
+	}
 }
 
 static const freeusd::usdUtils::EngineSceneNode *R_Freeusd_FindNode(
@@ -167,9 +182,11 @@ static freeusd::sdf::Path R_Freeusd_ChooseMeshPath(
 	return candidates[pickIdx].path;
 }
 
-static void R_Freeusd_AssetPathToShaderQpath( const std::string &asset, char *out, size_t outSize ) {
+static void R_Freeusd_AssetPathToShaderQpath( const std::string &asset, const char *usdQpath,
+	char *out, size_t outSize ) {
 	std::string p = asset;
 	size_t dot;
+	size_t slash;
 
 	while ( !p.empty() && ( p.front() == '@' || p.front() == ' ' ) ) {
 		p.erase( p.begin() );
@@ -179,6 +196,16 @@ static void R_Freeusd_AssetPathToShaderQpath( const std::string &asset, char *ou
 	}
 	if ( p.size() >= 2 && p[0] == '.' && p[1] == '/' ) {
 		p = p.substr( 2 );
+	}
+	for ( char &c : p ) {
+		if ( c == '\\' ) c = '/';
+	}
+	if ( usdQpath && p.rfind( "textures/", 0 ) == 0 ) {
+		std::string base = usdQpath;
+		slash = base.find_last_of( '/' );
+		if ( slash != std::string::npos ) {
+			p = base.substr( 0, slash + 1 ) + p;
+		}
 	}
 	dot = p.find_last_of( '.' );
 	if ( dot != std::string::npos ) {
@@ -190,30 +217,78 @@ static void R_Freeusd_AssetPathToShaderQpath( const std::string &asset, char *ou
 	Q_strncpyz( out, p.c_str(), (int)outSize );
 }
 
+struct FreeusdAlphaPolicy {
+	qboolean hasOpacity = qfalse;
+	qboolean hasOpacityThreshold = qfalse;
+	float opacity = 1.0f;
+	float opacityThreshold = 0.0f;
+};
+
 static void R_Freeusd_ResolveShaderForMesh( std::shared_ptr<freeusd::usd::Stage> stage,
-	const freeusd::usdUtils::EngineSceneNode *node, double time,
-	char *out, size_t outSize ) {
+	const freeusd::usdUtils::EngineSceneNode *node, const freeusd::sdf::Path &meshPath,
+	const char *usdQpath, double time,
+	char *out, size_t outSize, FreeusdAlphaPolicy *alphaOut ) {
 	std::string texPath;
 	freeusd::usdShade::Material material;
 	freeusd::usdShade::PreviewSurface preview;
 	freeusd::gf::Vec3f diffuse;
 	freeusd::sdf::Path surfaceShader;
+	freeusd::sdf::Path materialPath;
+	freeusd::tf::Token binding( "material:binding" );
 
 	if ( !out || outSize < 2 ) {
 		return;
 	}
+	if ( alphaOut ) *alphaOut = FreeusdAlphaPolicy{};
 	/* Default matches idtech3_demo.pk3 (demo_bootstrap.shader "white"); generic bases often use textures/common/white via mesh-import fallback when unbound. */
 	Q_strncpyz( out, "white", (int)outSize );
 
 	if ( !ri.Cvar_VariableIntegerValue( "r_freeusdShaderMap" ) ) {
 		return;
 	}
-	if ( !node || !node->has_material_binding || node->material_path.IsEmpty() ) {
-		return;
+	/* Prefer the snapshot binding, but verify the authored prim as well.  Some
+	 * USDA layers put material:binding on the mesh, while others put it on a
+	 * GeomSubset or an enclosing Xform.  Keeping this fallback here makes the
+	 * renderer independent of which optional EngineScene metadata survived
+	 * composition. */
+	if ( node && meshPath == node->path && node->has_material_binding && !node->material_path.IsEmpty() ) {
+		materialPath = node->material_path;
 	}
-
-	material = freeusd::usdShade::Material::ReadFromPrim( stage, node->material_path );
+	if ( materialPath.IsEmpty() ) {
+		freeusd::sdf::Path probe = meshPath;
+		for ( int depth = 0; depth < 8 && !probe.IsEmpty(); depth++ ) {
+			freeusd::usd::Prim prim = stage->GetPrimAtPath( probe );
+			if ( prim.IsValid() ) {
+				const auto targets = prim.GetRelationshipTargets( binding );
+				if ( !targets.empty() ) {
+					materialPath = targets.front();
+					break;
+				}
+				if ( probe == meshPath ) {
+					const auto subsets = prim.GetChildren();
+					for ( const auto &subset : subsets ) {
+						const auto subsetTargets = subset.GetRelationshipTargets( binding );
+						if ( !subsetTargets.empty() ) {
+							materialPath = subsetTargets.front();
+							break;
+						}
+					}
+				}
+			}
+			if ( !materialPath.IsEmpty() ) {
+				break;
+			}
+			probe = probe.GetParentPath();
+		}
+	}
+	if ( !materialPath.IsEmpty() ) {
+		material = freeusd::usdShade::Material::ReadFromPrim( stage, materialPath );
+	}
 	if ( !material ) {
+		if ( ri.Cvar_VariableIntegerValue( "developer" ) ) {
+			ri.Printf( PRINT_DEVELOPER, "FreeUSD: no material resolved for %s (node=%s)\n",
+				meshPath.GetString().c_str(), node ? "present" : "missing" );
+		}
 		return;
 	}
 
@@ -232,35 +307,74 @@ static void R_Freeusd_ResolveShaderForMesh( std::shared_ptr<freeusd::usd::Stage>
 	}
 
 	if ( !preview ) {
+		if ( ri.Cvar_VariableIntegerValue( "developer" ) ) {
+			ri.Printf( PRINT_DEVELOPER, "FreeUSD: material has no PreviewSurface for %s\n",
+				node && !node->material_path.IsEmpty() ? node->material_path.GetString().c_str() : meshPath.GetString().c_str() );
+		}
 		return;
+	}
+	if ( alphaOut ) {
+		alphaOut->hasOpacity = preview.GetOpacity( &alphaOut->opacity, time ) ? qtrue : qfalse;
+		alphaOut->hasOpacityThreshold = preview.GetOpacityThreshold( &alphaOut->opacityThreshold, time ) ? qtrue : qfalse;
+	}
+
+	/* Keep the source material's alpha policy visible at the renderer seam.
+	 * The eventual per-subset surface builder will consume these values to
+	 * select alpha-test versus WBOIT; logging them here also makes a USDA
+	 * import auditable instead of silently treating every surface as opaque. */
+	if ( ri.Cvar_VariableIntegerValue( "developer" ) ) {
+		float opacity = 1.0f;
+		float opacityThreshold = 0.5f;
+		const qboolean hasOpacity = preview.GetOpacity( &opacity, time ) ? qtrue : qfalse;
+		const qboolean hasOpacityThreshold = preview.GetOpacityThreshold( &opacityThreshold, time ) ? qtrue : qfalse;
+		ri.Printf( PRINT_DEVELOPER,
+			"FreeUSD: material alpha policy %s opacity=%.3f%s threshold=%.3f%s (blend=%s, alpha-test=%s)\n",
+			materialPath.GetString().c_str(), opacity,
+			 hasOpacity ? "" : " default",
+			opacityThreshold, hasOpacityThreshold ? "" : " default",
+			( hasOpacity && opacity < 0.999f ) ? "candidate" : "no",
+			( hasOpacityThreshold && opacityThreshold > 0.0f ) ? "candidate" : "no" );
 	}
 
 	if ( preview.GetDiffuseTextureAssetPath( &texPath, time ) && !texPath.empty() ) {
-		R_Freeusd_AssetPathToShaderQpath( texPath, out, outSize );
+		R_Freeusd_AssetPathToShaderQpath( texPath, usdQpath, out, outSize );
 		ri.Printf( PRINT_DEVELOPER, "FreeUSD: material %s -> shader '%s'\n",
-			node->material_path.GetString().c_str(), out );
+			materialPath.GetString().c_str(), out );
 		return;
 	}
 
 	if ( preview.GetDiffuseColor( &diffuse, time ) ) {
 		ri.Printf( PRINT_DEVELOPER,
 			"FreeUSD: PreviewSurface diffuse (%.3f,%.3f,%.3f) on %s — using '%s' (no diffuse texture)\n",
-			diffuse.x(), diffuse.y(), diffuse.z(), node->material_path.GetString().c_str(), out );
+			diffuse.x(), diffuse.y(), diffuse.z(), materialPath.GetString().c_str(), out );
 	}
 }
 
+struct FreeusdGeomSubsetInfo {
+	std::vector<int> faces;
+	char shaderName[R_FREEUSD_SHADERNAME_MAX];
+	FreeusdAlphaPolicy alpha;
+};
+
 static qboolean R_Freeusd_LoadMeshPrim( std::shared_ptr<freeusd::usd::Stage> stage,
 	const freeusd::usdUtils::EngineSceneSnapshot &snap,
-	const freeusd::sdf::Path &meshPath, double time,
-	float **outVerts, int *outNumVerts, int **outInds, int *outNumIdx, float **outVertSt ) {
+	const freeusd::sdf::Path &meshPath, const char *usdQpath, double time,
+	float **outVerts, int *outNumVerts, int **outInds, int *outNumIdx,
+	float **outVertSt, float **outVertNormals,
+	freeusdMeshSurface_t **outSurfaces, int *outNumSurfaces ) {
 	freeusd::usdGeom::Mesh mesh( stage->GetPrimAtPath( meshPath ) );
 	std::vector<freeusd::gf::Vec3f> points;
 	std::vector<int> faceCounts;
 	std::vector<int> faceIndices;
 	std::vector<freeusd::usdGeom::TexCoord2f> primSt;
+	std::vector<freeusd::gf::Vec3f> normals;
+	std::vector<FreeusdGeomSubsetInfo> subsets;
+	std::vector<int> faceSubset;
+	std::vector<int> triSubset;
 	const freeusd::usdUtils::EngineSceneNode *node;
 	float *verts = nullptr;
 	float *vertSt = nullptr;
+	float *vertNormals = nullptr;
 	int *inds = nullptr;
 	qboolean haveSt = qfalse;
 	int numVerts = 0;
@@ -273,8 +387,13 @@ static qboolean R_Freeusd_LoadMeshPrim( std::shared_ptr<freeusd::usd::Stage> sta
 	*outNumVerts = 0;
 	*outInds = nullptr;
 	*outNumIdx = 0;
+	if ( outSurfaces ) *outSurfaces = nullptr;
+	if ( outNumSurfaces ) *outNumSurfaces = 0;
 	if ( outVertSt ) {
 		*outVertSt = nullptr;
+	}
+	if ( outVertNormals ) {
+		*outVertNormals = nullptr;
 	}
 
 	if ( !mesh ) {
@@ -285,6 +404,7 @@ static qboolean R_Freeusd_LoadMeshPrim( std::shared_ptr<freeusd::usd::Stage> sta
 	faceCounts = mesh.GetFaceVertexCounts( time );
 	faceIndices = mesh.GetFaceVertexIndices( time );
 	primSt = mesh.GetPrimvarsSt( time );
+	normals = mesh.GetNormals( time );
 	if ( points.empty() || faceCounts.empty() || faceIndices.empty() ) {
 		ri.Printf( PRINT_WARNING, "FreeUSD mesh '%s': no tessellatable geometry\n",
 			meshPath.GetString().c_str() );
@@ -296,8 +416,34 @@ static qboolean R_Freeusd_LoadMeshPrim( std::shared_ptr<freeusd::usd::Stage> sta
 			maxTris += c - 2;
 		}
 	}
-	if ( maxTris <= 0 || maxTris * 3 > SHADER_MAX_INDEXES ) {
+	if ( maxTris <= 0 ) {
 		return qfalse;
+	}
+	faceSubset.assign( faceCounts.size(), -1 );
+	{
+		const freeusd::usd::Prim meshPrim = mesh.GetPrim();
+		const freeusd::tf::Token indicesToken( "indices" );
+		for ( const auto &child : meshPrim.GetChildren() ) {
+			freeusd::tf::Token type;
+			std::string typeText;
+			const freeusd::vt::Value typeValue = child.GetAttribute( freeusd::tf::Token( "elementType" ), time );
+			if ( !typeValue.GetToken( &type ) ) typeValue.GetString( &typeText );
+			if ( ( !type.IsEmpty() && type.GetText() != "face" ) || ( !typeText.empty() && typeText != "face" ) ) continue;
+			std::vector<std::int32_t> authoredFaces;
+			if ( !child.GetAttribute( indicesToken, time ).GetInt32Array( &authoredFaces ) || authoredFaces.empty() ) continue;
+			FreeusdGeomSubsetInfo info;
+			Q_strncpyz( info.shaderName, "white", sizeof( info.shaderName ) );
+			const freeusd::usdUtils::EngineSceneNode *subsetNode = R_Freeusd_FindNode( snap, meshPath );
+			R_Freeusd_ResolveShaderForMesh( stage, subsetNode, child.GetPath(), usdQpath, time,
+				info.shaderName, sizeof( info.shaderName ), &info.alpha );
+			for ( const std::int32_t face : authoredFaces ) {
+				if ( face >= 0 && face < (std::int32_t)faceSubset.size() && faceSubset[(size_t)face] < 0 ) {
+					faceSubset[(size_t)face] = (int)subsets.size();
+					info.faces.push_back( face );
+				}
+			}
+			if ( !info.faces.empty() ) subsets.push_back( info );
+		}
 	}
 
 	numVerts = maxTris * 3;
@@ -307,7 +453,11 @@ static qboolean R_Freeusd_LoadMeshPrim( std::shared_ptr<freeusd::usd::Stage> sta
 	if ( haveSt && outVertSt ) {
 		vertSt = (float *)ri.Malloc( (size_t)numVerts * 2 * sizeof( *vertSt ) );
 	}
-	if ( !verts || !inds || ( haveSt && outVertSt && !vertSt ) ) {
+	if ( normals.size() == points.size() && outVertNormals ) {
+		vertNormals = (float *)ri.Malloc( (size_t)numVerts * 3 * sizeof( *vertNormals ) );
+	}
+	if ( !verts || !inds || ( haveSt && outVertSt && !vertSt ) ||
+		( normals.size() == points.size() && outVertNormals && !vertNormals ) ) {
 		if ( verts ) {
 			ri.Free( verts );
 		}
@@ -316,6 +466,9 @@ static qboolean R_Freeusd_LoadMeshPrim( std::shared_ptr<freeusd::usd::Stage> sta
 		}
 		if ( vertSt ) {
 			ri.Free( vertSt );
+		}
+		if ( vertNormals ) {
+			ri.Free( vertNormals );
 		}
 		return qfalse;
 	}
@@ -371,8 +524,14 @@ static qboolean R_Freeusd_LoadMeshPrim( std::shared_ptr<freeusd::usd::Stage> sta
 					vertSt[vo * 2 + 0] = primSt[pi].s;
 					vertSt[vo * 2 + 1] = primSt[pi].t;
 				}
+				if ( vertNormals ) {
+					R_Freeusd_TransformNormal( node ? node->local_to_world_transform : freeusd::gf::Matrix4d{},
+						normals[pi].x(), normals[pi].y(), normals[pi].z(),
+						&vertNormals[vo * 3 + 0], &vertNormals[vo * 3 + 1], &vertNormals[vo * 3 + 2] );
+				}
 			}
-			numTris++;
+		numTris++;
+			triSubset.push_back( f < (int)faceSubset.size() ? faceSubset[(size_t)f] : -1 );
 		}
 		faceBase += nv;
 	}
@@ -383,9 +542,58 @@ static qboolean R_Freeusd_LoadMeshPrim( std::shared_ptr<freeusd::usd::Stage> sta
 		if ( vertSt ) {
 			ri.Free( vertSt );
 		}
+		if ( vertNormals ) {
+			ri.Free( vertNormals );
+		}
 		return qfalse;
 	}
 	numVerts = numTris * 3;
+
+	/* Group triangle-expanded vertices by authored material. MD3 has no
+	 * per-triangle material index, so grouping is the point where GeomSubset
+	 * ownership becomes real render surfaces. */
+	if ( !subsets.empty() && (int)triSubset.size() == numTris ) {
+		std::vector<int> order;
+		std::vector<int> counts( subsets.size(), 0 );
+		int unassigned = 0;
+		for ( int ti = 0; ti < numTris; ti++ ) {
+			const int si = triSubset[(size_t)ti];
+			if ( si >= 0 && si < (int)subsets.size() ) counts[(size_t)si]++;
+			else unassigned++;
+		}
+		for ( size_t si = 0; si < subsets.size(); si++ ) for ( int ti = 0; ti < numTris; ti++ ) if ( triSubset[(size_t)ti] == (int)si ) order.push_back( ti );
+		for ( int ti = 0; ti < numTris; ti++ ) if ( triSubset[(size_t)ti] < 0 ) order.push_back( ti );
+		std::vector<float> groupedVerts( (size_t)numVerts * 3u ), groupedSt, groupedNormals;
+		if ( vertSt ) groupedSt.resize( (size_t)numVerts * 2u );
+		if ( vertNormals ) groupedNormals.resize( (size_t)numVerts * 3u );
+		for ( int newTri = 0; newTri < numTris; newTri++ ) {
+			const int oldTri = order[(size_t)newTri];
+			Com_Memcpy( groupedVerts.data() + (size_t)newTri * 9u, verts + (size_t)oldTri * 9u, 9u * sizeof( float ) );
+			if ( vertSt ) Com_Memcpy( groupedSt.data() + (size_t)newTri * 6u, vertSt + (size_t)oldTri * 6u, 6u * sizeof( float ) );
+			if ( vertNormals ) Com_Memcpy( groupedNormals.data() + (size_t)newTri * 9u, vertNormals + (size_t)oldTri * 9u, 9u * sizeof( float ) );
+		}
+		Com_Memcpy( verts, groupedVerts.data(), groupedVerts.size() * sizeof( float ) );
+		if ( vertSt ) Com_Memcpy( vertSt, groupedSt.data(), groupedSt.size() * sizeof( float ) );
+		if ( vertNormals ) Com_Memcpy( vertNormals, groupedNormals.data(), groupedNormals.size() * sizeof( float ) );
+		if ( outSurfaces ) {
+			const int outputCount = (int)subsets.size() + ( unassigned ? 1 : 0 );
+			freeusdMeshSurface_t *surfaceOut = (freeusdMeshSurface_t *)ri.Malloc( (size_t)outputCount * sizeof( *surfaceOut ) );
+			int firstTri = 0, outIndex = 0;
+			if ( surfaceOut ) {
+				for ( size_t si = 0; si < subsets.size(); si++ ) if ( counts[si] > 0 ) {
+					surfaceOut[outIndex].firstTri = firstTri; surfaceOut[outIndex].numTris = counts[si];
+					Q_strncpyz( surfaceOut[outIndex].shaderName, subsets[si].shaderName, sizeof( surfaceOut[outIndex].shaderName ) );
+					surfaceOut[outIndex].hasOpacity = subsets[si].alpha.hasOpacity;
+					surfaceOut[outIndex].hasOpacityThreshold = subsets[si].alpha.hasOpacityThreshold;
+					surfaceOut[outIndex].opacity = subsets[si].alpha.opacity;
+					surfaceOut[outIndex].opacityThreshold = subsets[si].alpha.opacityThreshold;
+					firstTri += counts[si]; outIndex++;
+				}
+				if ( unassigned ) { surfaceOut[outIndex].firstTri = firstTri; surfaceOut[outIndex].numTris = unassigned; Q_strncpyz( surfaceOut[outIndex].shaderName, "white", sizeof( surfaceOut[outIndex].shaderName ) ); outIndex++; }
+				*outSurfaces = surfaceOut; if ( outNumSurfaces ) *outNumSurfaces = outIndex;
+			}
+		}
+	}
 
 	/* Fan triangulation may skip bad corners; shrink over-allocated buffers. */
 	if ( numVerts < maxTris * 3 ) {
@@ -403,6 +611,9 @@ static qboolean R_Freeusd_LoadMeshPrim( std::shared_ptr<freeusd::usd::Stage> sta
 			ri.Free( inds );
 			if ( vertSt ) {
 				ri.Free( vertSt );
+			}
+			if ( vertNormals ) {
+				ri.Free( vertNormals );
 			}
 			return qfalse;
 		}
@@ -424,6 +635,18 @@ static qboolean R_Freeusd_LoadMeshPrim( std::shared_ptr<freeusd::usd::Stage> sta
 			ri.Free( vertSt );
 			vertSt = tightSt;
 		}
+		if ( vertNormals ) {
+			float *tightNormals = (float *)ri.Malloc( (size_t)numVerts * 3 * sizeof( *tightNormals ) );
+			if ( !tightNormals ) {
+				ri.Free( verts ); ri.Free( inds );
+				if ( vertSt ) ri.Free( vertSt );
+				ri.Free( vertNormals );
+				return qfalse;
+			}
+			Com_Memcpy( tightNormals, vertNormals, (size_t)numVerts * 3 * sizeof( *tightNormals ) );
+			ri.Free( vertNormals );
+			vertNormals = tightNormals;
+		}
 	}
 
 	ri.Printf( PRINT_DEVELOPER, "FreeUSD: tessellated mesh %s (%d tris%s)\n",
@@ -438,13 +661,113 @@ static qboolean R_Freeusd_LoadMeshPrim( std::shared_ptr<freeusd::usd::Stage> sta
 	} else if ( vertSt ) {
 		ri.Free( vertSt );
 	}
+	if ( outVertNormals ) {
+		*outVertNormals = vertNormals;
+	} else if ( vertNormals ) {
+		ri.Free( vertNormals );
+	}
+	return qtrue;
+}
+
+static qboolean R_Freeusd_LoadMeshSet( std::shared_ptr<freeusd::usd::Stage> stage,
+	const freeusd::usdUtils::EngineSceneSnapshot &snap,
+	const std::vector<FreeusdMeshCandidate> &candidates, const char *usdQpath, int triangleBudget, double time,
+	float **outVerts, int *outNumVerts, int **outInds, int *outNumIdx,
+	float **outVertSt, float **outVertNormals,
+	freeusdMeshSurface_t **outSurfaces, int *outNumSurfaces ) {
+	std::vector<float> allVerts;
+	std::vector<int> allInds;
+	std::vector<float> allSt;
+	std::vector<float> allNormals;
+	int acceptedTris = 0;
+	qboolean allHaveSt = qtrue;
+	qboolean allHaveNormals = qtrue;
+	*outVerts = nullptr;
+	*outInds = nullptr;
+	*outVertSt = nullptr;
+	*outVertNormals = nullptr;
+	*outNumVerts = 0;
+	*outNumIdx = 0;
+	if ( outSurfaces ) *outSurfaces = nullptr;
+	if ( outNumSurfaces ) *outNumSurfaces = 0;
+	std::vector<freeusdMeshSurface_t> allSurfaces;
+
+	for ( const auto &candidate : candidates ) {
+		float *verts = nullptr, *st = nullptr, *normals = nullptr;
+		freeusdMeshSurface_t *meshSurfaces = nullptr;
+		int numMeshSurfaces = 0;
+		int *inds = nullptr, numVerts = 0, numIdx = 0;
+		if ( acceptedTris >= triangleBudget ||
+			acceptedTris + candidate.numTris > triangleBudget ) {
+			break;
+		}
+		if ( !R_Freeusd_LoadMeshPrim( stage, snap, candidate.path, usdQpath, time, &verts, &numVerts,
+			&inds, &numIdx, &st, &normals, &meshSurfaces, &numMeshSurfaces ) ) {
+			continue;
+		}
+		const int triBase = (int)allInds.size() / 3;
+		allVerts.insert( allVerts.end(), verts, verts + (size_t)numVerts * 3u );
+		allInds.insert( allInds.end(), inds, inds + numIdx );
+		if ( st ) {
+			allSt.insert( allSt.end(), st, st + (size_t)numVerts * 2u );
+		} else {
+			allHaveSt = qfalse;
+		}
+		if ( normals ) allNormals.insert( allNormals.end(), normals, normals + (size_t)numVerts * 3u );
+		else allHaveNormals = qfalse;
+		acceptedTris += numIdx / 3;
+		for ( int si = 0; si < numMeshSurfaces; si++ ) {
+			freeusdMeshSurface_t surface = meshSurfaces[si];
+			surface.firstTri += triBase;
+			allSurfaces.push_back( surface );
+		}
+		ri.Free( verts );
+		ri.Free( inds );
+		if ( st ) ri.Free( st );
+		if ( normals ) ri.Free( normals );
+		if ( meshSurfaces ) ri.Free( meshSurfaces );
+	}
+
+	if ( allVerts.empty() || allInds.empty() ) return qfalse;
+	*outVerts = (float *)ri.Malloc( allVerts.size() * sizeof( float ) );
+	*outInds = (int *)ri.Malloc( allInds.size() * sizeof( int ) );
+	if ( !*outVerts || !*outInds ) {
+		if ( *outVerts ) ri.Free( *outVerts );
+		if ( *outInds ) ri.Free( *outInds );
+		*outVerts = nullptr;
+		*outInds = nullptr;
+		return qfalse;
+	}
+	Com_Memcpy( *outVerts, allVerts.data(), allVerts.size() * sizeof( float ) );
+	Com_Memcpy( *outInds, allInds.data(), allInds.size() * sizeof( int ) );
+	if ( allHaveSt && allSt.size() == allVerts.size() / 3u * 2u ) {
+		*outVertSt = (float *)ri.Malloc( allSt.size() * sizeof( float ) );
+		if ( *outVertSt ) Com_Memcpy( *outVertSt, allSt.data(), allSt.size() * sizeof( float ) );
+	}
+	if ( allHaveNormals && allNormals.size() == allVerts.size() ) {
+		*outVertNormals = (float *)ri.Malloc( allNormals.size() * sizeof( float ) );
+		if ( *outVertNormals ) Com_Memcpy( *outVertNormals, allNormals.data(), allNormals.size() * sizeof( float ) );
+	}
+	if ( outSurfaces && !allSurfaces.empty() ) {
+		*outSurfaces = (freeusdMeshSurface_t *)ri.Malloc( allSurfaces.size() * sizeof( freeusdMeshSurface_t ) );
+		if ( *outSurfaces ) {
+			Com_Memcpy( *outSurfaces, allSurfaces.data(), allSurfaces.size() * sizeof( freeusdMeshSurface_t ) );
+			if ( outNumSurfaces ) *outNumSurfaces = (int)allSurfaces.size();
+		}
+	}
+	*outNumVerts = (int)( allVerts.size() / 3u );
+	*outNumIdx = (int)allInds.size();
+	ri.Printf( PRINT_DEVELOPER, "FreeUSD: composed %zu meshes (%d tris, budget %d)\n",
+		candidates.size(), acceptedTris, triangleBudget );
 	return qtrue;
 }
 
 }  // namespace
 
 extern "C" qboolean R_Freeusd_BuildMeshBuffers( const char *qpath, float **verts, int *numVerts,
-	int **inds, int *numIdx, float **vertSt, char *shaderNameOut, int shaderNameOutSize ) {
+	int **inds, int *numIdx, float **vertSt, float **vertNormals,
+	char *shaderNameOut, int shaderNameOutSize,
+	freeusdMeshSurface_t **surfacesOut, int *numSurfacesOut ) {
 	std::string osPath = R_Freeusd_BuildOSPath( qpath );
 	std::string err;
 	std::shared_ptr<freeusd::usd::Stage> stage;
@@ -463,7 +786,13 @@ extern "C" qboolean R_Freeusd_BuildMeshBuffers( const char *qpath, float **verts
 	}
 
 	snap = freeusd::usdUtils::BuildEngineSceneSnapshot( *stage, diagnosticTime );
-	chosen = R_Freeusd_ChooseMeshPath( stage, snap, diagnosticTime );
+	const std::vector<FreeusdMeshCandidate> candidates = R_Freeusd_ListMeshCandidates( stage, snap, diagnosticTime );
+	const qboolean importAll = ri.Cvar_VariableIntegerValue( "r_freeusdImportAllMeshes" ) ? qtrue : qfalse;
+	if ( importAll && !candidates.empty() ) {
+		chosen = candidates.front().path;
+	} else {
+		chosen = R_Freeusd_ChooseMeshPath( stage, snap, diagnosticTime );
+	}
 
 	if ( chosen.IsEmpty() ) {
 		ri.Printf( PRINT_WARNING, "FreeUSD: no Mesh prims in '%s' (primOrder=%zu nodes=%zu)\n",
@@ -486,12 +815,22 @@ extern "C" qboolean R_Freeusd_BuildMeshBuffers( const char *qpath, float **verts
 
 	if ( shaderNameOut && shaderNameOutSize > 0 ) {
 		const freeusd::usdUtils::EngineSceneNode *node = R_Freeusd_FindNode( snap, chosen );
-		R_Freeusd_ResolveShaderForMesh( stage, node, R_Freeusd_TimeCode(), shaderNameOut,
-			(size_t)shaderNameOutSize );
+		R_Freeusd_ResolveShaderForMesh( stage, node, chosen, qpath, R_Freeusd_TimeCode(), shaderNameOut,
+			(size_t)shaderNameOutSize, nullptr );
 	}
+	if ( surfacesOut ) *surfacesOut = nullptr;
+	if ( numSurfacesOut ) *numSurfacesOut = 0;
+	if ( vertNormals ) *vertNormals = nullptr;
 
-	const qboolean loaded = R_Freeusd_LoadMeshPrim( stage, snap, chosen, diagnosticTime, verts, numVerts,
-		inds, numIdx, vertSt );
+	qboolean loaded;
+	if ( importAll ) {
+		loaded = R_Freeusd_LoadMeshSet( stage, snap, candidates,
+			qpath, ri.Cvar_VariableIntegerValue( "r_freeusdMeshBudget" ), diagnosticTime,
+			verts, numVerts, inds, numIdx, vertSt, vertNormals, surfacesOut, numSurfacesOut );
+	} else {
+		loaded = R_Freeusd_LoadMeshPrim( stage, snap, chosen, qpath, diagnosticTime,
+			verts, numVerts, inds, numIdx, vertSt, vertNormals, surfacesOut, numSurfacesOut );
+	}
 	if ( !loaded ) {
 		ri.Printf( PRINT_WARNING, "FreeUSD: mesh buffer build failed for '%s'\n",
 			chosen.GetString().c_str() );

@@ -25,15 +25,20 @@ static cvar_t *r_freeusd = NULL;
 
 #ifndef USE_FREEUSD
 qboolean R_Freeusd_BuildMeshBuffers( const char *qpath, float **verts, int *numVerts,
-	int **inds, int *numIdx, float **vertSt, char *shaderNameOut, int shaderNameOutSize ) {
+	int **inds, int *numIdx, float **vertSt, float **vertNormals,
+	char *shaderNameOut, int shaderNameOutSize,
+	freeusdMeshSurface_t **surfacesOut, int *numSurfacesOut ) {
 	(void)qpath;
 	(void)verts;
 	(void)numVerts;
 	(void)inds;
 	(void)numIdx;
 	(void)vertSt;
+	(void)vertNormals;
 	(void)shaderNameOut;
 	(void)shaderNameOutSize;
+	(void)surfacesOut;
+	(void)numSurfacesOut;
 	return qfalse;
 }
 #endif
@@ -51,6 +56,8 @@ void R_Freeusd_Init( void ) {
 	cvar_t *idx;
 	cvar_t *time;
 	cvar_t *pathFilter;
+	cvar_t *allMeshes;
+	cvar_t *meshBudget;
 
 	r_freeusd = ri.Cvar_Get( "r_freeusd", "1", CVAR_ARCHIVE );
 	ri.Cvar_SetDescription( r_freeusd,
@@ -70,6 +77,14 @@ void R_Freeusd_Init( void ) {
 	pathFilter = ri.Cvar_Get( "r_freeusdMeshPath", "", CVAR_ARCHIVE );
 	ri.Cvar_SetDescription( pathFilter,
 		"Optional substring filter on prim path when selecting a mesh (empty = all meshes)." );
+
+	allMeshes = ri.Cvar_Get( "r_freeusdImportAllMeshes", "0", CVAR_ARCHIVE_ND );
+	ri.Cvar_SetDescription( allMeshes,
+		"When 1, compose multiple USDA mesh prims into one chunked GPU model." );
+	meshBudget = ri.Cvar_Get( "r_freeusdMeshBudget", "250000", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( meshBudget, "1", "2000000", CV_INTEGER );
+	ri.Cvar_SetDescription( meshBudget,
+		"Triangle budget for r_freeusdImportAllMeshes; prevents unbounded scene residency." );
 
 	{
 		cvar_t *shaderMap = ri.Cvar_Get( "r_freeusdShaderMap", "1", CVAR_ARCHIVE );
@@ -115,7 +130,10 @@ qhandle_t R_RegisterFreeusdMesh( const char *name, model_t *mod ) {
 		int *inds = NULL;
 		int numIdx = 0;
 		float *vertSt = NULL;
+		float *vertNormals = NULL;
 		char shaderName[R_FREEUSD_SHADERNAME_MAX];
+		freeusdMeshSurface_t *meshSurfaces = NULL;
+		int numMeshSurfaces = 0;
 		qboolean ok;
 		if ( !Q_stricmp( fext, "usd" ) || !Q_stricmp( fext, "usda" ) ) {
 			/* USDA LODs are authored as separate assets, not by the MD3
@@ -141,8 +159,8 @@ qhandle_t R_RegisterFreeusdMesh( const char *name, model_t *mod ) {
 		}
 
 		shaderName[0] = '\0';
-		if ( !R_Freeusd_BuildMeshBuffers( namebuf, &verts, &numVerts, &inds, &numIdx, &vertSt,
-				shaderName, (int)sizeof( shaderName ) ) ) {
+		if ( !R_Freeusd_BuildMeshBuffers( namebuf, &verts, &numVerts, &inds, &numIdx, &vertSt, &vertNormals,
+				shaderName, (int)sizeof( shaderName ), &meshSurfaces, &numMeshSurfaces ) ) {
 			if ( verts ) {
 				ri.Free( verts );
 			}
@@ -152,15 +170,44 @@ qhandle_t R_RegisterFreeusdMesh( const char *name, model_t *mod ) {
 			if ( vertSt ) {
 				ri.Free( vertSt );
 			}
+			if ( vertNormals ) {
+				ri.Free( vertNormals );
+			}
+			if ( meshSurfaces ) {
+				ri.Free( meshSurfaces );
+			}
 			break;
 		}
 
-		ok = R_MeshImport_FinalizeMD3Ex( mod, lod, namebuf, verts, numVerts, inds, numIdx,
-			shaderName[0] ? shaderName : NULL, vertSt, NULL );
+		if ( meshSurfaces && numMeshSurfaces > 0 ) {
+			meshImportSurface_t *importSurfaces = (meshImportSurface_t *)ri.Malloc( (size_t)numMeshSurfaces * sizeof( *importSurfaces ) );
+			int si;
+			for ( si = 0; si < numMeshSurfaces; si++ ) {
+				importSurfaces[si].firstTri = meshSurfaces[si].firstTri;
+				importSurfaces[si].numTris = meshSurfaces[si].numTris;
+				importSurfaces[si].shaderName = meshSurfaces[si].shaderName;
+				importSurfaces[si].hasOpacity = meshSurfaces[si].hasOpacity ? qtrue : qfalse;
+				importSurfaces[si].hasOpacityThreshold = meshSurfaces[si].hasOpacityThreshold ? qtrue : qfalse;
+				importSurfaces[si].opacity = meshSurfaces[si].opacity;
+				importSurfaces[si].opacityThreshold = meshSurfaces[si].opacityThreshold;
+			}
+			ok = importSurfaces ? R_MeshImport_FinalizeMD3Multi( mod, lod, namebuf, verts, numVerts, inds, numIdx,
+				importSurfaces, numMeshSurfaces, vertSt, vertNormals ) : qfalse;
+			if ( importSurfaces ) ri.Free( importSurfaces );
+		} else {
+			ok = R_MeshImport_FinalizeMD3Ex( mod, lod, namebuf, verts, numVerts, inds, numIdx,
+				shaderName[0] ? shaderName : NULL, vertSt, vertNormals );
+		}
 		ri.Free( verts );
 		ri.Free( inds );
 		if ( vertSt ) {
 			ri.Free( vertSt );
+		}
+		if ( vertNormals ) {
+			ri.Free( vertNormals );
+		}
+		if ( meshSurfaces ) {
+			ri.Free( meshSurfaces );
 		}
 		if ( !ok ) {
 			break;

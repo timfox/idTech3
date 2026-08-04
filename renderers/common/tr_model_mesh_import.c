@@ -20,7 +20,9 @@ and line-based vertex soup for ASCII interchange (.fbx/.usd/.usda/.ma).
 
 #define MIMP_MAX_VERTS   SHADER_MAX_VERTEXES
 #define MIMP_MAX_TRIS    (SHADER_MAX_INDEXES / 3)
-#define MIMP_SURF_VERTS  MIMP_MAX_VERTS
+/* Keep each generated surface within the tessellator budget without splitting
+ * a triangle across two surfaces. */
+#define MIMP_SURF_VERTS  ((MIMP_MAX_VERTS / 3) * 3)
 
 static float R_Mimp_LeFloatBytes( const byte *p ) {
 	union {
@@ -49,6 +51,29 @@ static short R_Mimp_LatLong( const vec3_t n ) {
 		unsigned la = (unsigned)( lat * ( 255.0f / ( 2.0f * (float)M_PI ) ) ) & 0xff;
 		unsigned ln = (unsigned)( lng * ( 255.0f / (float)M_PI ) ) & 0xff;
 		return (short)( ( la << 8 ) | ln );
+	}
+}
+
+static void R_Mimp_ApplyAuthoredAlpha( shader_t *shader, const meshImportSurface_t *surface ) {
+	shaderStage_t *stage;
+	if ( !shader || !surface || !surface->hasOpacity || !shader->stages[0] ) {
+		return;
+	}
+	stage = shader->stages[0];
+	shader->authoredOpacity = qtrue;
+	shader->authoredOpacityValue = Com_Clamp( 0.0f, 1.0f, surface->opacity );
+	shader->authoredOpacityThreshold = surface->hasOpacityThreshold;
+	shader->authoredOpacityThresholdValue = Com_Clamp( 0.0f, 1.0f, surface->opacityThreshold );
+	stage->stateBits &= ~( GLS_BLEND_BITS | GLS_ATEST_BITS );
+	if ( surface->hasOpacityThreshold && surface->opacityThreshold > 0.0f ) {
+		/* Q3 has three alpha-test thresholds; GE_80 is the closest portable
+		 * representation of a USDA 0.5 opacityThreshold. */
+		stage->stateBits |= GLS_ATEST_GE_80;
+		shader->sort = SS_OPAQUE;
+	} else if ( surface->opacity < 0.999f ) {
+		stage->stateBits |= GLS_SRCBLEND_SRC_ALPHA | GLS_DSTBLEND_ONE_MINUS_SRC_ALPHA;
+		stage->stateBits &= ~GLS_DEPTHMASK_TRUE;
+		shader->sort = SS_BLEND0;
 	}
 }
 
@@ -178,6 +203,7 @@ qboolean R_MeshImport_FinalizeMD3Ex( model_t *mod, int lod, const char *name,
 		{
 			shader_t *sh = R_FindShader( md3Shader->name, LIGHTMAP_NONE, qtrue );
 			md3Shader->shaderIndex = sh->defaultShader ? 0 : sh->index;
+			R_Mimp_ApplyAuthoredAlpha( sh, NULL );
 		}
 
 		tri = (md3Triangle_t *)( (byte *)surf + surf->ofsTriangles );
@@ -244,6 +270,129 @@ qboolean R_MeshImport_FinalizeMD3Ex( model_t *mod, int lod, const char *name,
 	mod->md3[lod] = md3;
 	ri.Printf( PRINT_DEVELOPER, "MeshImport: %s (%d verts, %d tris) shader '%s'\n",
 		name, numVerts, numTris, surfShader );
+	return qtrue;
+}
+
+qboolean R_MeshImport_FinalizeMD3Multi( model_t *mod, int lod, const char *name,
+	float *verts, int numVerts, int *inds, int numIdx,
+	const meshImportSurface_t *surfaces, int numSurfaces,
+	const float *vertSt, const float *vertNormals ) {
+	int s, v, t, numTris = numIdx / 3, numOutSurfaces = 0, surfSize = 0;
+	int *segFirst, *segTris, *segSource;
+	vec3_t mins, maxs, localOrigin;
+	float radius;
+	md3Header_t *md3;
+	md3Frame_t *frame;
+	md3Surface_t *surf;
+
+	if ( !mod || !verts || !inds || !surfaces || numSurfaces <= 0 ||
+		numVerts <= 0 || numTris <= 0 || numIdx % 3 != 0 ) {
+		return qfalse;
+	}
+
+	segFirst = (int *)ri.Malloc( (size_t)numSurfaces * ( ( numTris + MIMP_SURF_VERTS / 3 - 1 ) /
+		( MIMP_SURF_VERTS / 3 ) + 1 ) * sizeof( *segFirst ) );
+	segTris = (int *)ri.Malloc( (size_t)numSurfaces * ( ( numTris + MIMP_SURF_VERTS / 3 - 1 ) /
+		( MIMP_SURF_VERTS / 3 ) + 1 ) * sizeof( *segTris ) );
+	segSource = (int *)ri.Malloc( (size_t)numSurfaces * ( ( numTris + MIMP_SURF_VERTS / 3 - 1 ) /
+		( MIMP_SURF_VERTS / 3 ) + 1 ) * sizeof( *segSource ) );
+	if ( !segFirst || !segTris || !segSource ) {
+		if ( segFirst ) ri.Free( segFirst );
+		if ( segTris ) ri.Free( segTris );
+		if ( segSource ) ri.Free( segSource );
+		return qfalse;
+	}
+
+	mins[0] = maxs[0] = verts[0]; mins[1] = maxs[1] = verts[1]; mins[2] = maxs[2] = verts[2];
+	for ( v = 1; v < numVerts; v++ ) {
+		const float *p = verts + v * 3;
+		int a;
+		for ( a = 0; a < 3; a++ ) {
+			if ( p[a] < mins[a] ) mins[a] = p[a];
+			if ( p[a] > maxs[a] ) maxs[a] = p[a];
+		}
+	}
+	localOrigin[0] = ( mins[0] + maxs[0] ) * 0.5f;
+	localOrigin[1] = ( mins[1] + maxs[1] ) * 0.5f;
+	localOrigin[2] = ( mins[2] + maxs[2] ) * 0.5f;
+	radius = 0.5f * sqrtf( ( maxs[0] - mins[0] ) * ( maxs[0] - mins[0] ) +
+		( maxs[1] - mins[1] ) * ( maxs[1] - mins[1] ) +
+		( maxs[2] - mins[2] ) * ( maxs[2] - mins[2] ) );
+
+	for ( s = 0; s < numSurfaces; s++ ) {
+		int first = Com_Clamp( 0, numTris, surfaces[s].firstTri );
+		int count = Com_Clamp( 0, numTris - first, surfaces[s].numTris );
+		while ( count > 0 ) {
+			const int chunk = count > MIMP_SURF_VERTS / 3 ? MIMP_SURF_VERTS / 3 : count;
+			segFirst[numOutSurfaces] = first;
+			segSource[numOutSurfaces] = first;
+			segTris[numOutSurfaces] = chunk;
+			numOutSurfaces++;
+			first += chunk; count -= chunk;
+		}
+	}
+	if ( numOutSurfaces <= 0 ) {
+		ri.Free( segFirst ); ri.Free( segTris ); ri.Free( segSource );
+		return qfalse;
+	}
+	for ( s = 0; s < numOutSurfaces; s++ ) {
+		const int sv = segTris[s] * 3;
+		surfSize += sizeof( md3Surface_t ) + sizeof( md3Shader_t ) +
+			segTris[s] * sizeof( md3Triangle_t ) + sv * ( sizeof( md3St_t ) + sizeof( md3XyzNormal_t ) );
+	}
+
+	md3 = (md3Header_t *)ri.Hunk_Alloc( sizeof( md3Header_t ) + sizeof( md3Frame_t ) + surfSize, h_low );
+	Com_Memset( md3, 0, sizeof( md3Header_t ) + sizeof( md3Frame_t ) + surfSize );
+	md3->ident = MD3_IDENT; md3->version = MD3_VERSION; Q_strncpyz( md3->name, name, sizeof( md3->name ) );
+	md3->numFrames = 1; md3->numSurfaces = numOutSurfaces; md3->ofsFrames = sizeof( md3Header_t );
+	md3->ofsTags = sizeof( md3Header_t ) + sizeof( md3Frame_t ); md3->ofsSurfaces = md3->ofsTags;
+	md3->ofsEnd = sizeof( md3Header_t ) + sizeof( md3Frame_t ) + surfSize;
+	frame = (md3Frame_t *)( (byte *)md3 + md3->ofsFrames );
+	Q_strncpyz( frame->name, "default", sizeof( frame->name ) ); VectorCopy( mins, frame->bounds[0] );
+	VectorCopy( maxs, frame->bounds[1] ); VectorCopy( localOrigin, frame->localOrigin ); frame->radius = radius;
+
+	surf = (md3Surface_t *)( (byte *)md3 + md3->ofsSurfaces );
+	for ( s = 0; s < numOutSurfaces; s++ ) {
+		const int triCount = segTris[s], srcVert = segSource[s] * 3, surfVerts = triCount * 3;
+		md3Shader_t *md3Shader; md3Triangle_t *tri; md3St_t *st; md3XyzNormal_t *xyz;
+		const char *shader = "textures/common/white";
+		int owner;
+		for ( owner = 0; owner < numSurfaces; owner++ ) {
+			if ( surfaces[owner].firstTri <= segFirst[s] &&
+				segFirst[s] < surfaces[owner].firstTri + surfaces[owner].numTris ) {
+				if ( surfaces[owner].shaderName && surfaces[owner].shaderName[0] ) shader = surfaces[owner].shaderName;
+				break;
+			}
+		}
+		surf->ident = SF_MD3; Com_sprintf( surf->name, sizeof( surf->name ), "meshimport_s%d", s );
+		surf->numFrames = 1; surf->numShaders = 1; surf->numVerts = surfVerts; surf->numTriangles = triCount;
+		surf->ofsShaders = sizeof( md3Surface_t ); surf->ofsTriangles = surf->ofsShaders + sizeof( md3Shader_t );
+		surf->ofsSt = surf->ofsTriangles + triCount * sizeof( md3Triangle_t );
+		surf->ofsXyzNormals = surf->ofsSt + surfVerts * sizeof( md3St_t );
+		surf->ofsEnd = surf->ofsXyzNormals + surfVerts * sizeof( md3XyzNormal_t );
+		md3Shader = (md3Shader_t *)( (byte *)surf + surf->ofsShaders ); Q_strncpyz( md3Shader->name, shader, sizeof( md3Shader->name ) );
+		{ shader_t *sh = R_FindShader( md3Shader->name, LIGHTMAP_NONE, qtrue ); md3Shader->shaderIndex = sh->defaultShader ? 0 : sh->index; R_Mimp_ApplyAuthoredAlpha( sh, &surfaces[owner] ); }
+		tri = (md3Triangle_t *)( (byte *)surf + surf->ofsTriangles ); st = (md3St_t *)( (byte *)surf + surf->ofsSt );
+		xyz = (md3XyzNormal_t *)( (byte *)surf + surf->ofsXyzNormals );
+		for ( v = 0; v < surfVerts; v++ ) {
+			const int gi = srcVert + v; const float *p = verts + gi * 3;
+			st[v].st[0] = vertSt ? vertSt[gi * 2 + 0] : 0.0f; st[v].st[1] = vertSt ? vertSt[gi * 2 + 1] : 0.0f;
+			xyz[v].xyz[0] = (short)( p[0] * 64.0f ); xyz[v].xyz[1] = (short)( p[1] * 64.0f ); xyz[v].xyz[2] = (short)( p[2] * 64.0f );
+			if ( vertNormals ) { vec3_t n = { vertNormals[gi*3+0], vertNormals[gi*3+1], vertNormals[gi*3+2] }; VectorNormalize( n ); xyz[v].normal = R_Mimp_LatLong( n ); }
+			else xyz[v].normal = 0;
+		}
+		for ( t = 0; t < triCount; t++ ) {
+			vec3_t e1, e2, fn; int base = t * 3;
+			VectorSubtract( verts + (srcVert + base + 1) * 3, verts + (srcVert + base) * 3, e1 );
+			VectorSubtract( verts + (srcVert + base + 2) * 3, verts + (srcVert + base) * 3, e2 ); CrossProduct( e1, e2, fn ); VectorNormalize( fn );
+			if ( !vertNormals ) { xyz[base+0].normal = xyz[base+1].normal = xyz[base+2].normal = R_Mimp_LatLong( fn ); }
+			tri[t].indexes[0] = base + 0; tri[t].indexes[1] = base + 1; tri[t].indexes[2] = base + 2;
+		}
+		surf = (md3Surface_t *)( (byte *)surf + surf->ofsEnd );
+	}
+	mod->type = MOD_MESH; mod->dataSize = 0; mod->md3[lod] = md3;
+	ri.Free( segFirst ); ri.Free( segTris ); ri.Free( segSource );
+	ri.Printf( PRINT_DEVELOPER, "MeshImport: %s (%d tris, %d material surfaces)\n", name, numTris, numOutSurfaces );
 	return qtrue;
 }
 

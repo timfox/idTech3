@@ -585,6 +585,11 @@ typedef struct shader_s {
 	int			lightingBundle;
 	qboolean	fogCollapse;
 	int			tessFlags;
+	/* Authored USDA alpha policy applied to an imported material surface. */
+	qboolean	authoredOpacity;
+	qboolean	authoredOpacityThreshold;
+	float		authoredOpacityValue;
+	float		authoredOpacityThresholdValue;
 
 #ifdef USE_VBO
 	// VBO structures

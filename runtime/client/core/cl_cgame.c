@@ -565,6 +565,12 @@ static qboolean CL_ExportSnapshotToCgame( int snapshotNumber, int vmDest, void *
 }
 
 static void CL_AddRefEntityToSceneFromCgame( int vmSrc, void *vmRefEntity, qboolean intShaderTime ) {
+	/* A district-only validation scene owns primary visibility. Do not let the
+	 * active OpenArena QVM repopulate the capture with weapons, items, or player
+	 * entities after the refdef camera has been redirected to USDA space. */
+	if ( Cvar_VariableIntegerValue( "r_districtOnly" ) ) {
+		return;
+	}
 	if ( CL_UsesLegacyQvmLayout() ) {
 		VM_CHECKBOUNDS( cgvm, vmSrc, sizeof( retailRefEntity_t ) );
 		CL_AddRetailRefEntityToScene( (const retailRefEntity_t *)vmRefEntity, intShaderTime );
