@@ -52,6 +52,7 @@ cvar_t *r_clusterForceBuildFailure;
 cvar_t *r_clusterForceOverflow;
 cvar_t *r_clusterForceStaleGeneration;
 cvar_t *r_clusterInspect;
+static cvar_t *r_clusterTransparentPrepass;
 extern cvar_t *r_renderMode;
 
 static uint32_t vk_fp_active_z_slices( void )
@@ -1842,6 +1843,10 @@ static void vk_cluster_status_f( void )
 		hizDispatch ? 1 : 0,
 		hizReady ? "ready" : ( vk_hiz_active() ? "not-ready" : "off" ),
 		hizInfo.width, hizInfo.height, hizInfo.levels, (unsigned)hizInfo.layout );
+	ri.Printf( PRINT_ALL,
+		"  transparentGrid=shared_cluster_lists prepass=%s msaa=forward_native\n",
+		r_clusterTransparentPrepass && r_clusterTransparentPrepass->integer
+			? "requested_not_wired" : "not_wired" );
 	{
 		const vkVShadowBudget_t *shadow = vk_vshadow_budget();
 		const char *opaqueOwner = ( r_renderMode && r_renderMode->integer == 3 &&
@@ -1914,11 +1919,16 @@ void vk_cluster_register_commands( void )
 	r_clusterInspect = ri.Cvar_Get( "r_clusterInspect", "0", CVAR_CHEAT );
 	ri.Cvar_CheckRange( r_clusterInspect, "0", "1", CV_INTEGER );
 	ri.Cvar_SetDescription( r_clusterInspect, "Print cluster header/indices under crosshair once when set." );
+	r_clusterTransparentPrepass = ri.Cvar_Get( "r_clusterTransparentPrepass", "0", CVAR_ARCHIVE_ND | CVAR_LATCH );
+	ri.Cvar_CheckRange( r_clusterTransparentPrepass, "0", "1", CV_INTEGER );
+	ri.Cvar_SetDescription( r_clusterTransparentPrepass,
+		"Olsson transparent active-cluster prepass contract; 1 requests the future all-geometry mark pass. Not wired yet; latched." );
 
 	ri.Cmd_AddCommand( "cluster_status", vk_cluster_status_f );
 	ri.Cmd_AddCommand( "cluster_z_test", vk_cluster_z_test_f );
 	ri.Cmd_AddCommand( "cluster_inspect", vk_cluster_inspect_f );
 	ri.Cmd_AddCommand( "hybrid_compare_status", vk_hybrid_compare_status_f );
+	ri.Cmd_AddCommand( "cluster_transparent_status", vk_cluster_status_f );
 	ri.Printf( PRINT_ALL, "[VK][cluster] M2 compact lists ready (cluster_status, cluster_z_test, r_clusterZFar)\n" );
 }
 
@@ -1928,6 +1938,7 @@ void vk_cluster_unregister_commands( void )
 	ri.Cmd_RemoveCommand( "cluster_z_test" );
 	ri.Cmd_RemoveCommand( "cluster_inspect" );
 	ri.Cmd_RemoveCommand( "hybrid_compare_status" );
+	ri.Cmd_RemoveCommand( "cluster_transparent_status" );
 }
 
 void vk_cluster_dispatch_tile_cull( void )

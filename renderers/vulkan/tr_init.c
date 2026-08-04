@@ -57,6 +57,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "extensions/scaffold/vk_webcam_screen.h"
 #include "extensions/scaffold/vk_hair_deferred.h"
 #include "extensions/scaffold/vk_vector_brush.h"
+#include "extensions/neural/vk_neural_deferred.h"
 #include "vk_raygun.h"
 #include "vk_fluidsim.h"
 #include "vk_terrain.h"
@@ -4184,6 +4185,7 @@ void R_Init( void ) {
 	R_CuRast_Init();
 	vk_hair_deferred_init();
 	vk_vector_brush_init();
+	vk_neural_deferred_init();
 	R_GraphBfs_Init();
 	R_Mimir_Init();
 	R_Iris_Init();
@@ -4406,6 +4408,7 @@ static void RE_Shutdown( refShutdownCode_t code ) {
 	R_CuRast_Shutdown();
 	vk_hair_deferred_shutdown();
 	vk_vector_brush_shutdown();
+	vk_neural_deferred_shutdown();
 	R_Mimir_Shutdown();
 	R_Iris_Shutdown();
 	R_WSP_Shutdown();

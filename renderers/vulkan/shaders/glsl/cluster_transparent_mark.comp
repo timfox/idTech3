@@ -1,0 +1,39 @@
+#version 450
+/* Olsson et al. transparency proof: mark clusters touched by all geometry
+ * before transparent shading. The live geometry prepass and active-list
+ * compaction remain a follow-up execution stage. */
+layout(local_size_x = 64, local_size_y = 1, local_size_z = 1) in;
+
+/* x,y screen pixel; z positive view depth. */
+layout(std430, set = 0, binding = 0) readonly buffer TransparentSamples { vec4 samples[]; };
+layout(std430, set = 0, binding = 1) buffer ActiveClusters { uint clusterFlags[]; };
+
+layout(push_constant) uniform TransparentMarkPush {
+	uint sampleCount;
+	uint width;
+	uint tileSize;
+	uint zSlices;
+	float zNear;
+	float zFar;
+	float zScale;
+	float zBias;
+} pc;
+
+uint depthSlice(float depth) {
+	return uint(clamp(floor(log2(max(depth, pc.zNear)) * pc.zScale + pc.zBias),
+		0.0, float(max(pc.zSlices, 1u) - 1u)));
+}
+
+void main() {
+	uint sampleIndex = gl_GlobalInvocationID.x;
+	if (sampleIndex >= pc.sampleCount || pc.width == 0u || pc.tileSize == 0u) return;
+	vec4 sampleValue = samples[sampleIndex];
+	if (sampleValue.x < 0.0 || sampleValue.y < 0.0 || sampleValue.z <= 0.0) return;
+	uint tilesX = (pc.width + pc.tileSize - 1u) / pc.tileSize;
+	uint tileX = uint(sampleValue.x) / pc.tileSize;
+	uint tileY = uint(sampleValue.y) / pc.tileSize;
+	uint slice = depthSlice(sampleValue.z);
+	uint cluster = tileX + tileY * tilesX + slice * tilesX *
+		((pc.width + pc.tileSize - 1u) / pc.tileSize);
+	atomicOr(clusterFlags[cluster], 1u);
+}

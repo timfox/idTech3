@@ -451,6 +451,8 @@ compile_shader("comp", "curast/curast_stage1.comp", "curast_stage1_cs", binding_
 compile_shader("comp", "curast/curast_resolve.comp", "curast_resolve_cs", binding_expr="vk.modules.curast_resolve_cs")
 compile_shader("comp", "hair_deferred/hair_lod.comp", "hair_lod_cs")
 compile_shader("comp", "hair_deferred/hair_visibility_atomic.comp", "hair_visibility_atomic_cs")
+compile_shader("comp", "neural_deferred/neural_energy_guard.comp", "neural_energy_guard_cs")
+compile_shader("comp", "cluster_transparent_mark.comp", "cluster_transparent_mark_cs")
 compile_shader("comp", "vector_brush/vector_brush_resample.comp", "vector_brush_resample_cs")
 compile_shader("comp", "graph/graph_bfs_expand.comp", "graph_bfs_expand_cs", binding_expr="vk.modules.graph_bfs_expand_cs")
 compile_shader("comp", "arc_blanc/arc_blanc_htilde.comp", "arc_blanc_htilde_cs", binding_expr="vk.modules.arc_blanc_htilde_cs")

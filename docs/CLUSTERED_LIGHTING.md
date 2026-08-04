@@ -8,6 +8,17 @@ instead of the depth-discontinuity failure mode of ordinary tiled shading.
 **Status:** Milestone 2  
 **Related:** [RENDERER_PATH_OWNERSHIP.md](RENDERER_PATH_OWNERSHIP.md), [UNIFIED_CLUSTERED_RENDERER.md](UNIFIED_CLUSTERED_RENDERER.md)
 
+The transparency/MSAA extension from Olsson, Billeter, and Assarsson
+(SIGGRAPH 2012) is an explicit follow-up boundary here. Current WBOIT/Forward+
+samples the shared cluster selected from the transparent fragment’s tile and
+depth; it does not yet run the paper’s all-geometry prepass that marks only
+clusters touched by transparent layers. `cluster_transparent_mark.comp` is the
+compiled active-cluster marking proof, while `r_clusterTransparentPrepass`
+reports `not_wired` until geometry submission and active-list compaction own
+the same graph resources. MSAA remains native on Forward+/WBOIT; deferred
+G-buffer MSAA is still a separate bandwidth-heavy path and is not silently
+enabled.
+
 ## Contract
 
 Shared CPU/GPU types in `renderers/vulkan/vk_cluster_contract.h` and `shaders/glsl/cluster_contract.glsl`:
@@ -89,6 +100,7 @@ Assert: `vk_cluster_assert_shared_consumers()` logs header/light handles + gener
 | `r_clusterForceBuildFailure` | Force legacy fallback (logged) |
 | `r_clusterForceOverflow` | Force overflow path |
 | `r_clusterForceStaleGeneration` | Skip generation bump (stale detect) |
+| `r_clusterTransparentPrepass` | Request paper-style all-geometry transparent active-cluster prepass (currently not wired) |
 
 ## Memory (approx)
 

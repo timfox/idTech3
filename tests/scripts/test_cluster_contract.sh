@@ -54,6 +54,10 @@ check "$UNIT" 'Cluster_LightSliceSpan' 'unit covers light slice spans'
 check "$DOC" 'r_clusterZFar' 'docs mention zFar policy'
 check "$DOC" 'Olsson' 'docs identify clustered-shading reference'
 check "$ROOT/docs/CLUSTERED_LIGHTING.md" 'normal-cone clustering' 'normal-cluster follow-up is explicit'
+check "$DOC" 'cluster_transparent_mark.comp' 'transparent active-cluster proof is documented'
+check "$ROOT/renderers/vulkan/vk_forward_plus.c" 'r_clusterTransparentPrepass' 'transparent prepass ownership gate is explicit'
+check "$ROOT/renderers/vulkan/shaders/glsl/cluster_transparent_mark.comp" 'atomicOr' 'transparent proof marks active clusters atomically'
+check "$ROOT/scripts/compile_shaders.sh" 'cluster_transparent_mark.comp' 'transparent proof shader is compiled'
 check "$ROOT/CMakeLists.txt" 'unit_cluster_math' 'CMake registers unit_cluster_math'
 
 if [[ $failures -ne 0 ]]; then

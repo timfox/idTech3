@@ -47,6 +47,7 @@ set(VK_ARC_BLANC_VK_SRCS
 set(VK_RENDERER_SIDECAR_SRCS
 	${_VK_EXT}/scaffold/vk_hair_deferred.c
 	${_VK_EXT}/scaffold/vk_vector_brush.c
+	${_VK_EXT}/neural/vk_neural_deferred.c
 )
 
 set(VK_RTX_CORE_SRCS
