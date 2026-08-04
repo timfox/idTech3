@@ -7,11 +7,14 @@
 
 def Xform "root"
 {
-    def Xform "District_Sponza" (
-        kind = "assembly"
-    )
-    {
-        double3 xformOp:translate = (0, 0, 0)
+	def Xform "District_Sponza" (
+		kind = "assembly"
+		customData = {
+			string fullMesh = "world/districts/sponza.usda",
+		}
+	)
+	{
+		double3 xformOp:translate = (0, 0, 0)
         uniform token[] xformOpOrder = ["xformOp:translate"]
     }
 }

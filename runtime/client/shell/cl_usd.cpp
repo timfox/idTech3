@@ -82,10 +82,31 @@ static void CL_USD_Info_f( void ) {
 		return;
 	}
 	const auto snap = freeusd::usdUtils::BuildEngineSceneSnapshot( *stage, 1.0 );
+	int baseColorTextures = 0;
+	int normalTextures = 0;
+	int metallicTextures = 0;
+	int roughnessTextures = 0;
+	int occlusionTextures = 0;
+	int emissiveTextures = 0;
+	for ( const auto &materialPath : snap.material_paths ) {
+		const freeusd::usdShade::Material material = freeusd::usdShade::Material::ReadFromPrim( stage, materialPath );
+		const freeusd::sdf::Path shaderPath = material.GetSurfaceShaderPath();
+		const freeusd::usdShade::PreviewSurface preview =
+			freeusd::usdShade::PreviewSurface::ReadFromPrim( stage, shaderPath );
+		std::string asset;
+		if ( preview.GetDiffuseTextureAssetPath( &asset, 1.0 ) && !asset.empty() ) ++baseColorTextures;
+		if ( preview.GetNormalTextureAssetPath( &asset, 1.0 ) && !asset.empty() ) ++normalTextures;
+		if ( preview.GetMetallicTextureAssetPath( &asset, 1.0 ) && !asset.empty() ) ++metallicTextures;
+		if ( preview.GetRoughnessTextureAssetPath( &asset, 1.0 ) && !asset.empty() ) ++roughnessTextures;
+		if ( preview.GetOcclusionTextureAssetPath( &asset, 1.0 ) && !asset.empty() ) ++occlusionTextures;
+		if ( preview.GetEmissiveTextureAssetPath( &asset, 1.0 ) && !asset.empty() ) ++emissiveTextures;
+	}
 	Com_Printf( "defaultPrim: %s\n", snap.default_prim_name.c_str() );
 	Com_Printf( "prims: %zu  materials: %zu  lux lights: %zu  meshes(skel-bound): %zu\n",
 		snap.prim_order.size(), snap.material_paths.size(), snap.lux_light_paths.size(),
 		snap.skel_bound_geom_paths.size() );
+	Com_Printf( "PreviewSurface texture channels: baseColor=%d normal=%d metallic=%d roughness=%d occlusion=%d emissive=%d\n",
+		baseColorTextures, normalTextures, metallicTextures, roughnessTextures, occlusionTextures, emissiveTextures );
 	if ( snap.meters_per_unit.has_value() ) {
 		Com_Printf( "metersPerUnit: %g\n", *snap.meters_per_unit );
 	}

@@ -5077,6 +5077,13 @@ qhandle_t RE_RegisterShader( const char *name ) {
 		return 0;
 	}
 
+	/* "white" is a renderer-owned builtin, not a loose white.tga asset.
+	 * Registering it through the ordinary image path incorrectly returned the
+	 * default missing-image shader and contaminated every HUD rectangle. */
+	if ( !Q_stricmp( name, "white" ) && tr.whiteShader ) {
+		return tr.whiteShader->index;
+	}
+
 	sh = R_FindShader( name, LIGHTMAP_2D, qtrue );
 
 	// we want to return 0 if the shader failed to
@@ -5105,6 +5112,10 @@ qhandle_t RE_RegisterShaderNoMip( const char *name ) {
 	if ( strlen( name ) >= MAX_QPATH ) {
 		ri.Printf( PRINT_ALL, "Shader name exceeds MAX_QPATH\n" );
 		return 0;
+	}
+
+	if ( !Q_stricmp( name, "white" ) && tr.whiteShader ) {
+		return tr.whiteShader->index;
 	}
 
 	sh = R_FindShader( name, LIGHTMAP_2D, qfalse );

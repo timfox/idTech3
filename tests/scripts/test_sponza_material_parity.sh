@@ -3,12 +3,14 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 CFG="$ROOT/examples/demo_game/mod/sponza_material_parity.cfg"
+BENCHMARK_CFG="$ROOT/examples/demo_game/mod/sponza_benchmark.cfg"
 USD_BRIDGE="$ROOT/renderers/common/tr_model_freeusd.cpp"
 SPONZA_USDA="$ROOT/sponza/main_sponza/NewSponza_Main_USD_Zup_003.usda"
 
 fail() { echo "FAIL: $*" >&2; exit 1; }
 
 [[ -f "$CFG" ]] || fail "Sponza parity config missing"
+[[ -f "$BENCHMARK_CFG" ]] || fail "Sponza benchmark config missing"
 [[ -f "$USD_BRIDGE" ]] || fail "FreeUSD material bridge missing"
 [[ -f "$SPONZA_USDA" ]] || fail "repo Sponza USDA payload missing"
 grep -q 'district_load world/sponza_fixture.usda' "$CFG" || fail "USDA fixture not loaded"
@@ -32,6 +34,7 @@ grep -q 'GetEmissiveTextureAssetPath' "$USD_BRIDGE" || fail "USDA emissive textu
 grep -q 'vk_create_usda_orm_texture' "$ROOT/renderers/common/tr_model_mesh_import.c" || fail "USDA metallic/roughness channels are not packed into ORMS"
 grep -q 'GetMetallicTextureAssetPath' "$USD_BRIDGE" || fail "USDA metallic texture connections are not resolved"
 grep -q 'GetRoughnessTextureAssetPath' "$USD_BRIDGE" || fail "USDA roughness texture connections are not resolved"
+grep -q 'PreviewSurface texture channels' "$ROOT/runtime/client/shell/cl_usd.cpp" || fail "USDA channel-level audit is missing"
 grep -q 'R_Freeusd_AssetPathToShaderQpath( texPath, usdQpath' "$USD_BRIDGE" || fail "relative texture paths are not resolved"
 # Keep the fixture useful as a material-parity proof, rather than only a mesh
 # import proof. These channels are authored by the Sponza PreviewSurface graph.

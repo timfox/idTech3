@@ -101,6 +101,28 @@ permutations consume the same physical payload used by native assets. Scalar
 fallback values and authored emissive color remain the next material parity gate
 before this is a complete PBR proof.
 
+Live reader proof from the freshly built client against the 417 MiB root layer:
+
+```text
+FreeUSD: opened ../../sponza/main_sponza/NewSponza_Main_USD_Zup_003.usda (0.1.0)
+defaultPrim: root
+metersPerUnit: 0.01
+upAxis: Z
+recommended runtime mode: pre_baked_assets_only
+layerStack=0 refs=1 payloads=0 inherits=0 specializes=0 variants=0 timeSamples=0
+previewSurface=1 textures=1 lux=0 physics=0 openVDB=0
+PreviewSurface texture channels: baseColor=25 normal=24 metallic=24 roughness=24 occlusion=0 emissive=0
+```
+
+The texture count is resolved through referenced NodeGraph children rather than
+being inferred from the root USDA text. This keeps the audit aligned with the
+same composed stage used by the renderer.
+
+The channel counts are intentionally reported separately: Sponza has 28
+PreviewSurface materials, but only 25 have a resolved base-color texture and 24
+have each of normal, metallic, and roughness. Occlusion and emissive are
+currently scalar/default inputs in the source layer.
+
 After that gate, the first capture will certify mode-3 deferred opaque
 lighting, Forward+ clustered lights, WBOIT alpha/additive transparency, SSAO,
 and shadow-atlas ownership in one frame, followed by one-feature-at-a-time A/B

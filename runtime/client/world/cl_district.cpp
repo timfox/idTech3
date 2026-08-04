@@ -106,6 +106,22 @@ extern "C" qboolean WorldDistrict_ParseManifestFreeUSD( const char *osPath, cons
 		d->origin[0] = (float)node.local_to_world_transform.m[12];
 		d->origin[1] = (float)node.local_to_world_transform.m[13];
 		d->origin[2] = (float)node.local_to_world_transform.m[14];
+		/*
+		 * A validation manifest may point at a large external payload without
+		 * copying it into the game tree.  Keep the conventional slug fallback
+		 * in WorldDistrict_DefaultPaths, but honor an explicit authored path
+		 * when present.  This is also the ownership boundary for benchmark
+		 * fixtures: the manifest owns which full scene is loaded.
+		 */
+		{
+			const auto prim = stage->GetPrimAtPath( node.path );
+			std::string fullMeshPath;
+			if ( prim.IsValid() && prim.HasCustomDataKey( "fullMesh" ) &&
+				prim.GetCustomData( "fullMesh" ).GetString( &fullMeshPath ) &&
+				!fullMeshPath.empty() ) {
+				Q_strncpyz( d->fullMeshPath, fullMeshPath.c_str(), sizeof( d->fullMeshPath ) );
+			}
+		}
 		d->active = qtrue;
 		d->state = WD_STATE_UNLOADED;
 		count++;
