@@ -18,7 +18,7 @@ export GAME_BASE=/path/to/base
 ./scripts/gpu_golden_capture.sh --capture
 ```
 
-Uses `+exec gpu_golden_capture.cfg` (pins `r_filmGrain 0` / `r_chromaticAberration 0` / `r_hdr 2`) then compares PNGs under `tests/data/golden/`.
+Uses `+exec gpu_golden_capture.cfg` (pins `r_filmGrain 0` / `r_chromaticAberration 0` / `r_hdr 2`) and collects `screenshots/renderer_golden.jpg` into `tests/data/golden/captures/`.
 
 **Headless CI**: leave placeholders under `tests/data/golden/placeholder/`; operators with a display commit real PNGs when intentional.
 

@@ -2682,6 +2682,7 @@ static const void *RB_DrawSurfs( const void *data ) {
 	vk_prepare_frame_temporal_state();
 	vk_forward_plus_ensure_render_resolution();
 	vk_forward_plus_update_for_refdef();
+	vk_cluster_transparent_begin_frame();
 	RB_RenderSunShadowMap( cmd );
 #endif
 
@@ -2767,6 +2768,9 @@ static const void *RB_DrawSurfs( const void *data ) {
 			}
 		}
 		backEnd.drawSurfFilter = 2; /* transparent only (Forward+ shade) */
+		vk_cluster_transparent_note_submission(
+			( r_oit && r_oit->integer && r_fbo && r_fbo->integer &&
+			!vk_black_frame_force_minimal_scene() ) ? "wboit" : "forward_plus" );
 		backEnd.reactiveMaskStamp = qfalse;
 		if ( r_oit && r_oit->integer && r_fbo && r_fbo->integer &&
 			!vk_black_frame_force_minimal_scene() ) {

@@ -62,6 +62,8 @@ while IFS= read -r line || [[ -n "$line" ]]; do
 done < "${MANIFEST}"
 
 if [[ "$CAPTURE" -eq 1 ]]; then
+	CAPTURE_HOME=$(mktemp -d "${TMPDIR:-/tmp}/idtech3-golden.XXXXXX")
+	trap 'rm -rf "$CAPTURE_HOME"' EXIT
 	if [[ ! -x "$ENGINE" ]]; then
 		echo "WARN: capture skipped — engine not found: $ENGINE"
 	elif [[ -z "${DISPLAY:-}" ]]; then
@@ -75,7 +77,15 @@ if [[ "$CAPTURE" -eq 1 ]]; then
 		if [[ -n "${GAME_BASE:-}" ]]; then
 			GAME_ARGS+=( +set fs_basepath "${GAME_BASE}" )
 		fi
-		"$ENGINE" "${GAME_ARGS[@]}" +exec gpu_golden_capture.cfg 2>/dev/null || true
+		"$ENGINE" "${GAME_ARGS[@]}" +set fs_homepath "$CAPTURE_HOME" +exec gpu_golden_capture.cfg 2>/dev/null || true
+		capture_file=$(find "$CAPTURE_HOME" -type f -name 'renderer_golden.jpg' -print -quit)
+		if [[ -n "$capture_file" ]]; then
+			mkdir -p "${GOLDEN_DIR}/captures"
+			cp "$capture_file" "${GOLDEN_DIR}/captures/renderer_golden.jpg"
+			echo "Captured: ${GOLDEN_DIR}/captures/renderer_golden.jpg"
+		else
+			echo "WARN: capture completed without renderer_golden.jpg"
+		fi
 	fi
 fi
 

@@ -53,6 +53,15 @@ cvar_t *r_clusterForceOverflow;
 cvar_t *r_clusterForceStaleGeneration;
 cvar_t *r_clusterInspect;
 static cvar_t *r_clusterTransparentPrepass;
+
+typedef struct {
+	uint32_t frameGeneration;
+	uint32_t submissions;
+	uint32_t wboitSubmissions;
+	uint32_t forwardSubmissions;
+} vkClusterTransparentFrame_t;
+static vkClusterTransparentFrame_t s_transparentFrame;
+static int s_transparentFrameNumber = -1;
 extern cvar_t *r_renderMode;
 
 static uint32_t vk_fp_active_z_slices( void )
@@ -69,6 +78,42 @@ static uint32_t vk_fp_active_z_slices( void )
 		z = 1u;
 	}
 	return z;
+}
+
+void vk_cluster_transparent_begin_frame( void )
+{
+	/* RB_DrawSurfs may run more than once for portals/stereo. Keep one
+	 * ownership ledger for the whole renderer frame instead of losing the
+	 * first view's transparent submissions. */
+	if ( s_transparentFrameNumber == tr.frameCount ) {
+		return;
+	}
+	Com_Memset( &s_transparentFrame, 0, sizeof( s_transparentFrame ) );
+	s_transparentFrameNumber = tr.frameCount;
+	s_transparentFrame.frameGeneration = vk.forward_plus.cluster_list_generation;
+}
+
+void vk_cluster_transparent_note_submission( const char *owner )
+{
+	s_transparentFrame.submissions++;
+	if ( owner && !Q_stricmp( owner, "wboit" ) ) {
+		s_transparentFrame.wboitSubmissions++;
+	} else {
+		s_transparentFrame.forwardSubmissions++;
+	}
+}
+
+void vk_cluster_transparent_print_status( void )
+{
+	ri.Printf( PRINT_ALL,
+		"  transparentSubmission: frameGen=%u submissions=%u forward=%u wboit=%u "
+		"activeMask=%s\n",
+		s_transparentFrame.frameGeneration,
+		s_transparentFrame.submissions,
+		s_transparentFrame.forwardSubmissions,
+		s_transparentFrame.wboitSubmissions,
+		r_clusterTransparentPrepass && r_clusterTransparentPrepass->integer
+			? "requested_not_wired" : "conservative_shared_grid" );
 }
 
 static qboolean vk_fp_want_compact_lists( void )
@@ -1845,8 +1890,9 @@ static void vk_cluster_status_f( void )
 		hizInfo.width, hizInfo.height, hizInfo.levels, (unsigned)hizInfo.layout );
 	ri.Printf( PRINT_ALL,
 		"  transparentGrid=shared_cluster_lists prepass=%s msaa=forward_native\n",
-		r_clusterTransparentPrepass && r_clusterTransparentPrepass->integer
+			r_clusterTransparentPrepass && r_clusterTransparentPrepass->integer
 			? "requested_not_wired" : "not_wired" );
+	vk_cluster_transparent_print_status();
 	{
 		const vkVShadowBudget_t *shadow = vk_vshadow_budget();
 		const char *opaqueOwner = ( r_renderMode && r_renderMode->integer == 3 &&
