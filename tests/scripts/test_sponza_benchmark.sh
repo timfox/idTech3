@@ -21,9 +21,11 @@ for value in \
 	'set r_customWidth 1280' \
 	'set r_customHeight 720' \
 	'set r_renderScale 0' \
+	'set r_picmip 5' \
 	'set r_taa 0' \
 	'set r_districtCamera 1' \
 	'set r_districtOnly 1' \
+	'set r_districtAnchorView 0' \
 	'set r_freeusdShaderMap 1' \
 	'set r_freeusdMeshBudget 250000' \
 	'district_load world/sponza_fixture.usda'; do
@@ -37,6 +39,8 @@ done
 
 grep -qF 'screenshotJPEG sponza_benchmark_capture' "$CAPTURE_CFG" ||
 	fail "single-process capture JPEG missing"
+grep -qF 'set r_freeusdShaderMap 0' "$CAPTURE_CFG" ||
+	fail "ownership benchmark must use bounded material fallback"
 for capture in forwardplus deferred wboit; do
 	grep -qF "${capture}.jpg" "$DOC" ||
 		fail "benchmark missing ${capture} JPEG capture"

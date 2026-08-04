@@ -32,6 +32,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "ui_filter.h"
 #include "q_utf8.h"
 #include "cl_openhmd.h"
+#include "cl_district.h"
 
 static qboolean	scr_initialized;		// ready to draw
 
@@ -1843,6 +1844,12 @@ static void SCR_DrawScreenField( stereoFrame_t stereoFrame ) {
 	qboolean jsOverlayActive;
 
 	re.BeginFrame( stereoFrame );
+	/* A native validation package can load a USDA district without shipping a
+	 * cgame VM. Submit its engine-owned scene before the connection/menu layer
+	 * so the renderer still receives a real refdef in that mode. */
+	if ( !cgvm && Cvar_VariableIntegerValue( "r_districtCamera" ) ) {
+		CL_District_RenderStandalone();
+	}
 
 	/* JS Surf overlays own the screen when pointer mode is active. The legacy
 	 * UI VM reports UIMENU_INGAME as fullscreen and would otherwise paint its
@@ -1904,7 +1911,9 @@ static void SCR_DrawScreenField( stereoFrame_t stereoFrame ) {
 				break;
 			case CA_ACTIVE:
 				// always supply STEREO_CENTER as vieworg offset is now done by the engine.
-				CL_CGameRendering( stereoFrame );
+				if ( cgvm ) {
+					CL_CGameRendering( stereoFrame );
+				}
 				SHUD_Render( cls.glconfig.vidWidth, cls.glconfig.vidHeight );
 				CL_RTSGui_Render();
 				SCR_DrawDemoRecording();

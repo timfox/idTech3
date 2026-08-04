@@ -16,10 +16,12 @@ run_case() {
 	local mode="$2"
 	local deferred="$3"
 	local oit="$4"
-	local home="$OUT/home_$name"
+	local home="${IDTECH3_HOME:-$HOME/.fox}"
 	local log="$OUT/${name}.log"
 
 	mkdir -p "$home"
+	# The source-tree setup in SPONZA_USDA_BENCHMARK.md supplies the USDA links
+	# in the base game tree; this home path only isolates config/screenshots.
 	echo "[sponza] ${name}: renderMode=${mode} deferred=${deferred} oit=${oit}"
 	timeout "${SPONZA_BENCHMARK_TIMEOUT:-120}s" xvfb-run -a "$ENGINE" \
 		+set fs_basepath "$BASE" \
@@ -40,7 +42,8 @@ run_case() {
 		echo "frame contract failed for ${name}; see ${log}" >&2
 		return 1
 	}
-	find "$home" -type f -name 'sponza_benchmark_capture.jpg' -exec cp {} "$OUT/${name}.jpg" \; -quit
+	find "$home" -type f -name 'sponza_benchmark_capture.jpg' -mmin -5 \
+		-exec cp {} "$OUT/${name}.jpg" \; -quit
 	[[ -s "$OUT/${name}.jpg" ]] || {
 		echo "capture missing for ${name}; see ${log}" >&2
 		return 1

@@ -122,6 +122,38 @@ extern "C" qboolean WorldDistrict_ParseManifestFreeUSD( const char *osPath, cons
 				Q_strncpyz( d->fullMeshPath, fullMeshPath.c_str(), sizeof( d->fullMeshPath ) );
 			}
 		}
+		/* The lightweight manifest often has no authored bounds. Resolve the
+		 * explicit payload now and use its composed mesh bounds for camera and
+		 * residency decisions; the generic 1024-unit fallback is only for
+		 * manifests that genuinely have no payload metadata. */
+		if ( d->fullMeshPath[0] ) {
+			std::string payloadErr;
+			const std::string payloadOs = Cl_FreeusdBuildOsPath( d->fullMeshPath );
+			if ( !payloadOs.empty() ) {
+				auto payloadStage = freeusd::usd::Stage::OpenFromRootFile(
+					payloadOs, freeusd::usd::RootLayerSublayersPolicy::DepthFirst, &payloadErr );
+				if ( payloadStage ) {
+					const auto payloadSnap = freeusd::usdUtils::BuildEngineSceneSnapshot( *payloadStage, 1.0 );
+					freeusd::gf::BBox3d payloadBounds = freeusd::gf::BBox3d::Empty();
+					for ( const auto &payloadNode : payloadSnap.nodes ) {
+						if ( !payloadNode.world_bound.IsEmpty() ) {
+							payloadBounds = freeusd::gf::BBox3d::Union( payloadBounds, payloadNode.world_bound );
+						}
+					}
+					if ( !payloadBounds.IsEmpty() ) {
+						d->boundsMin[0] = (float)payloadBounds.min.x();
+						d->boundsMin[1] = (float)payloadBounds.min.y();
+						d->boundsMin[2] = (float)payloadBounds.min.z();
+						d->boundsMax[0] = (float)payloadBounds.max.x();
+						d->boundsMax[1] = (float)payloadBounds.max.y();
+						d->boundsMax[2] = (float)payloadBounds.max.z();
+						Com_Printf( "[world_district] %s payload bounds: (%.0f,%.0f,%.0f)..(%.0f,%.0f,%.0f)\n",
+							d->name, d->boundsMin[0], d->boundsMin[1], d->boundsMin[2],
+							d->boundsMax[0], d->boundsMax[1], d->boundsMax[2] );
+					}
+				}
+			}
+		}
 		d->active = qtrue;
 		d->state = WD_STATE_UNLOADED;
 		count++;
@@ -415,4 +447,29 @@ extern "C" void CL_District_AddRefEntitiesToScene( void ) {
 		ent.renderfx = RF_NOSHADOW;
 		re.AddRefEntityToScene( &ent, qfalse );
 	}
+}
+
+extern "C" void CL_District_RenderStandalone( void ) {
+	refdef_t fd;
+
+	if ( !Cvar_VariableIntegerValue( "r_district" ) ||
+		!Cvar_VariableIntegerValue( "r_districtCamera" ) ||
+		!WorldDistrict_GetCount() ) {
+		return;
+	}
+
+	/* Native validation packages may intentionally ship without a cgame VM.
+	 * In that case there is no CG_R_RENDERSCENE trap to reach the client
+	 * RenderScene wrapper. Keep submission engine-owned while using the same
+	 * wrapper as a cgame render. */
+	Com_Memset( &fd, 0, sizeof( fd ) );
+	fd.width = cls.glconfig.vidWidth;
+	fd.height = cls.glconfig.vidHeight;
+	fd.fov_x = 90.0f;
+	fd.fov_y = 60.0f;
+	fd.time = cls.realtime;
+	CL_District_ApplyView( &fd );
+
+	re.ClearScene();
+	re.RenderScene( &fd );
 }

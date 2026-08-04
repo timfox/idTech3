@@ -5,7 +5,17 @@ The source payload is `sponza/main_sponza/NewSponza_Main_USD_Zup_003.usda`,
 loaded through `world/sponza_fixture.usda`. The fixture keeps the USDA camera
 and isolates the host BSP, so a capture is not accidentally made from a
 random OpenArena map position. Its `fullMesh` metadata explicitly owns
-the full Sponza payload instead of relying on an implicit slug path.
+the full Sponza payload instead of relying on an implicit slug path. The
+benchmark uses payload-derived camera bounds and leaves authored model origin
+intact (`r_districtAnchorView 0`). `r_picmip 5` is
+fixed as the source-texture memory budget for repeatable runs. The ownership
+capture selects the largest composed mesh (`r_freeusdImportAllMeshes 0`) so
+the proof is bounded while the full multi-mesh residency path is still being
+stabilized.
+
+The isolated ownership capture intentionally disables `r_freeusdShaderMap` to
+avoid uploading the full-resolution USDA texture set. Authored texture/PBR
+interpretation remains covered by `sponza_material_parity.cfg`.
 
 Run the isolated benchmark with a display and the demo game data:
 
@@ -35,7 +45,9 @@ fixture with a fixed mesh budget, and emits a deterministic JPEG:
 | `deferred.jpg` | deferred G-buffer and clustered lighting |
 | `wboit.jpg` | unified clustered opaque + WBOIT transparency |
 
-Each checkpoint also prints `renderer_status` and
+When the demo package has no cgame VM, the client now submits this district
+through an engine-owned standalone refdef; normal cgame scenes retain the
+existing RenderScene wrapper. Each checkpoint also prints `renderer_status` and
 `renderer_capture_frame_contract`; the mode-specific checkpoints print
 `cluster_status`, `deferred_status`, or `oit_status`. Preserve those logs with
 the JPEGs when comparing a renderer change. A screenshot without a clean frame
