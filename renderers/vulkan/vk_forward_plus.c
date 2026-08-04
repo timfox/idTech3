@@ -59,6 +59,10 @@ typedef struct {
 	uint32_t submissions;
 	uint32_t wboitSubmissions;
 	uint32_t forwardSubmissions;
+	uint32_t candidates;
+	uint32_t accepted;
+	uint32_t additiveCandidates;
+	uint32_t additiveAccepted;
 } vkClusterTransparentFrame_t;
 static vkClusterTransparentFrame_t s_transparentFrame;
 static int s_transparentFrameNumber = -1;
@@ -103,15 +107,35 @@ void vk_cluster_transparent_note_submission( const char *owner )
 	}
 }
 
+void vk_cluster_transparent_note_candidate( qboolean additive )
+{
+	s_transparentFrame.candidates++;
+	if ( additive ) {
+		s_transparentFrame.additiveCandidates++;
+	}
+}
+
+void vk_cluster_transparent_note_accepted( qboolean additive )
+{
+	s_transparentFrame.accepted++;
+	if ( additive ) {
+		s_transparentFrame.additiveAccepted++;
+	}
+}
+
 void vk_cluster_transparent_print_status( void )
 {
 	ri.Printf( PRINT_ALL,
 		"  transparentSubmission: frameGen=%u submissions=%u forward=%u wboit=%u "
-		"activeMask=%s\n",
+		"candidates=%u accepted=%u additive=%u/%u activeMask=%s\n",
 		s_transparentFrame.frameGeneration,
 		s_transparentFrame.submissions,
 		s_transparentFrame.forwardSubmissions,
 		s_transparentFrame.wboitSubmissions,
+		s_transparentFrame.candidates,
+		s_transparentFrame.accepted,
+		s_transparentFrame.additiveCandidates,
+		s_transparentFrame.additiveAccepted,
 		r_clusterTransparentPrepass && r_clusterTransparentPrepass->integer
 			? "requested_not_wired" : "conservative_shared_grid" );
 }

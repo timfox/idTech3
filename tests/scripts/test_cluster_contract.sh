@@ -58,6 +58,8 @@ check "$DOC" 'cluster_transparent_mark.comp' 'transparent active-cluster proof i
 check "$ROOT/renderers/vulkan/vk_forward_plus.c" 'r_clusterTransparentPrepass' 'transparent prepass ownership gate is explicit'
 check "$ROOT/renderers/vulkan/vk_forward_plus.c" 'vk_cluster_transparent_begin_frame' 'transparent lifecycle resets at frame start'
 check "$ROOT/renderers/vulkan/tr_backend.c" 'vk_cluster_transparent_note_submission' 'transparent owner is recorded at submission'
+check "$ROOT/renderers/vulkan/tr_backend.c" 'vk_cluster_transparent_note_candidate' 'transparent candidates are counted at filter entry'
+check "$ROOT/renderers/vulkan/vk_forward_plus.c" 'additiveAccepted' 'transparent additive ownership is reported'
 check "$ROOT/renderers/vulkan/vk_forward_plus.c" 's_transparentFrameNumber == tr.frameCount' 'transparent ledger survives portal/stereo views'
 check "$ROOT/renderers/vulkan/shaders/glsl/cluster_transparent_mark.comp" 'atomicOr' 'transparent proof marks active clusters atomically'
 check "$ROOT/scripts/compile_shaders.sh" 'cluster_transparent_mark.comp' 'transparent proof shader is compiled'

@@ -54,6 +54,12 @@ grep -q 'out_reveal = alpha' "$ACCUM" || fail "reveal shader out=alpha drift"
 grep -q 'C_avg \* coverage + opaque \* revealage\|c_avg \* coverage + opaque \* revealage' "$RESOLVE" || \
 	grep -q 'c_avg \* coverage + opaque \* revealage' "$RESOLVE" || fail "resolve equation drift"
 grep -q 'accum.a < 1e-5' "$RESOLVE" || fail "empty-pixel preserve missing"
+grep -q 'pc.bucket == 1' "$RESOLVE" || fail "additive bucket must bypass revealage coverage"
+grep -q 'push_data\[3\] = ( bucket == 1 )' "$ROOT/renderers/vulkan/vk_postfx_passes.c" || fail "resolve must identify additive bucket"
+if grep -A6 's_reads_oit_resolve' "$ROOT/renderers/vulkan/vk_pass_registry.c" | grep -q 'VK_SPINE_RES_OIT_MOMENTS'; then
+	fail "WBOIT resolve registry must not require MBOIT moments"
+fi
+grep -q 'mboit_moments' "$ROOT/renderers/vulkan/vk_postfx_passes.c" || fail "MBOIT resolve must explicitly own moments layout"
 grep -q 'dstColorBlendFactor = VK_BLEND_FACTOR_ONE' "$PIPE" || fail "accum ONE/ONE drift"
 grep -q 'ONE_MINUS_SRC_COLOR' "$PIPE" || fail "reveal blend drift"
 grep -A6 'renderPass == vk.render_pass.oit_accum' "$RP" | grep -q '1.0f' || fail "reveal clear 1.0 in render pass"

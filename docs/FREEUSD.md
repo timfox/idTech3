@@ -44,6 +44,9 @@ cmake -DUSE_FREEUSD=OFF ...                        # disable (smaller link; no u
 - N-gons are fan-triangulated; result is a static MD3 mesh (no skeleton/animation yet).
 - `primvars:st` applied when point count matches; `material:binding` → `UsdPreviewSurface` diffuse texture → Q3 shader name (`r_freeusdShaderMap`).
 - Arbitrary binary `.usdc` scene decode is **not** supported unless the root layer is USDA or FreeUSD’s embedded-crate path applies.
+- The embedded USDA parser admits layers up to 512 MiB. This covers the 417 MiB
+  Sponza main validation layer while keeping parser allocation bounded; larger
+  foliage and candle layers require streamed/composed import.
 
 ## Client console
 

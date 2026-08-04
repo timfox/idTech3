@@ -680,6 +680,10 @@ void vk_oit_pass( const struct drawSurfsCommand_s *cmd )
 				VK_SPINE_PASS_OIT_RESOLVE, "oit_resolve" );
 			vk_spine_expect_layout( VK_SPINE_RES_OIT_REVEAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
 				VK_SPINE_PASS_OIT_RESOLVE, "oit_resolve" );
+			if ( mboit ) {
+				vk_spine_expect_layout( VK_SPINE_RES_OIT_MOMENTS, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+					VK_SPINE_PASS_OIT_RESOLVE, "mboit_moments" );
+			}
 		}
 
 		if ( vk.oitDescriptorGeneration != vk.oitAttachmentGeneration ) {
@@ -776,7 +780,7 @@ void vk_oit_pass( const struct drawSurfsCommand_s *cmd )
 			push_data[0] = ( r_oitDebug && r_oitDebug->integer > 0 ) ? r_oitDebug->integer : 0;
 			push_data[1] = mboit ? 2 : 1;
 			push_data[2] = ri.Cvar_VariableIntegerValue( "r_oitDirectTest" );
-			push_data[3] = 0;
+			push_data[3] = ( bucket == 1 ) ? 1 : 0;
 			qvkCmdPushConstants( vk.cmd->command_buffer, vk.pipeline_layout_oit_resolve,
 				VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof( push_data ), push_data );
 		}

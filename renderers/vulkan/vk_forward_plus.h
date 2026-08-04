@@ -20,6 +20,8 @@ void vk_cluster_unregister_commands( void );
 /* Transparent submission lifecycle; geometry marking remains a later GPU stage. */
 void vk_cluster_transparent_begin_frame( void );
 void vk_cluster_transparent_note_submission( const char *owner );
+void vk_cluster_transparent_note_candidate( qboolean additive );
+void vk_cluster_transparent_note_accepted( qboolean additive );
 void vk_cluster_transparent_print_status( void );
 
 /* Thin wrappers naming the shared cluster API (call existing Forward+ implementations). */

@@ -17,7 +17,7 @@ layout(push_constant) uniform OitResolvePush {
 	int debugMode; /* 0=composite, see r_oitDebug */
 	int oitMode;   /* 1=WBOIT, 2=MBOIT */
 	int directTest; /* 0=off, 1=clear+resolve, 2=synthetic UV gradient composite */
-	int pad1;
+	int bucket; /* 0=alpha/moments, 1=additive color-only */
 } pc;
 
 layout(location = 0) in vec2 frag_tex_coord;
@@ -99,6 +99,16 @@ void main() {
 		float v = float( px.y ) / float( max( opaqueSize.y - 1, 1 ) );
 		vec3 synth = vec3( u, v, 0.25 );
 		out_color = vec4( mix( opaque, synth, 0.5 ), 1.0 );
+		return;
+	}
+
+	/* Additive particles/coronas deliberately do not write revealage. Their
+	 * color must therefore bypass coverage reconstruction and layer directly
+	 * over the already-resolved bucket-0/opaque color. */
+	if ( pc.bucket == 1 ) {
+		vec3 additive = max( accum.rgb, vec3( 0.0 ) );
+		vec3 resolvedAdditive = opaque + additive;
+		out_color = vec4( oit_invalid3( resolvedAdditive ) ? opaque : resolvedAdditive, 1.0 );
 		return;
 	}
 

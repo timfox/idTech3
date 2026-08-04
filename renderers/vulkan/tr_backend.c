@@ -730,6 +730,9 @@ void RB_RenderDrawSurfList( drawSurf_t *drawSurfs, int numDrawSurfs ) {
 				( srcBlend == GLS_SRCBLEND_SRC_ALPHA && dstBlend == GLS_DSTBLEND_ONE_MINUS_SRC_ALPHA ) ||
 				additive
 			);
+			if ( backEnd.drawSurfFilter == 2 && transparent ) {
+				vk_cluster_transparent_note_candidate( additive );
+			}
 			if ( vk_deferred_opaque_transparent_split() ) {
 				unsigned pathFlags = 0u;
 				renderPath_t path;
@@ -796,6 +799,9 @@ void RB_RenderDrawSurfList( drawSurf_t *drawSurfs, int numDrawSurfs ) {
 			if ( backEnd.drawSurfFilter == 2 && backEnd.skipRefractivePass &&
 				vk_transparency_is_refractive( shader ) ) {
 				continue;
+			}
+			if ( backEnd.drawSurfFilter == 2 && transparent ) {
+				vk_cluster_transparent_note_accepted( additive );
 			}
 		}
 		if ( ( vk.renderPassIndex == RENDER_PASS_SCREENMAP || vk.renderPassIndex == RENDER_PASS_SUN_SHADOW ) &&
