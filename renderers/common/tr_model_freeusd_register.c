@@ -117,6 +117,13 @@ qhandle_t R_RegisterFreeusdMesh( const char *name, model_t *mod ) {
 		float *vertSt = NULL;
 		char shaderName[R_FREEUSD_SHADERNAME_MAX];
 		qboolean ok;
+		if ( !Q_stricmp( fext, "usd" ) || !Q_stricmp( fext, "usda" ) ) {
+			/* USDA LODs are authored as separate assets, not by the MD3
+			 * suffix convention.  Probe the requested asset once. */
+			if ( lod != 0 ) {
+				continue;
+			}
+		}
 
 		if ( lod ) {
 			Com_sprintf( namebuf, sizeof( namebuf ), "%.*s_%d.%s",
@@ -125,7 +132,11 @@ qhandle_t R_RegisterFreeusdMesh( const char *name, model_t *mod ) {
 			Q_strncpyz( namebuf, name, sizeof( namebuf ) );
 		}
 
-		if ( ri.FS_ReadFile( namebuf, NULL ) <= 0 ) {
+		/* Do not use the legacy FS_ReadFile existence probe for USDA.  It
+		 * materializes the whole layer in the hunk before FreeUSD can stream or
+		 * parse it, which is fatal for large validation scenes such as Sponza. */
+		if ( Q_stricmp( fext, "usd" ) && Q_stricmp( fext, "usda" ) &&
+			ri.FS_ReadFile( namebuf, NULL ) <= 0 ) {
 			continue;
 		}
 

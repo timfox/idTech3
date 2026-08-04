@@ -98,24 +98,35 @@ static std::vector<FreeusdMeshCandidate> R_Freeusd_ListMeshCandidates(
 	const freeusd::usdUtils::EngineSceneSnapshot &snap, double time ) {
 	std::vector<FreeusdMeshCandidate> out;
 	const char *pathFilter = ri.Cvar_VariableString( "r_freeusdMeshPath" );
-
-	for ( const auto &path : snap.prim_order ) {
+	auto inspectPath = [&]( const freeusd::sdf::Path &path ) {
 		freeusd::usdGeom::Mesh mesh( stage->GetPrimAtPath( path ) );
 		int numTris;
 
 		if ( !mesh || mesh.GetPoints( time ).empty() ) {
-			continue;
+			return;
 		}
 		numTris = R_Freeusd_CountMeshTris( mesh, time );
 		if ( numTris <= 0 ) {
-			continue;
+			return;
 		}
 		if ( pathFilter && pathFilter[0] ) {
 			if ( path.GetString().find( pathFilter ) == std::string::npos ) {
-				continue;
+				return;
 			}
 		}
 		out.push_back( { path, numTris } );
+	};
+
+	/* primOrder is optional USDA metadata.  Most exporters, including the
+	 * Sponza layer, provide the composed prim tree without authoring it. */
+	if ( !snap.prim_order.empty() ) {
+		for ( const auto &path : snap.prim_order ) {
+			inspectPath( path );
+		}
+	} else {
+		for ( const auto &node : snap.nodes ) {
+			inspectPath( node.path );
+		}
 	}
 	return out;
 }
@@ -439,6 +450,7 @@ extern "C" qboolean R_Freeusd_BuildMeshBuffers( const char *qpath, float **verts
 	std::shared_ptr<freeusd::usd::Stage> stage;
 	freeusd::usdUtils::EngineSceneSnapshot snap;
 	freeusd::sdf::Path chosen;
+	const double diagnosticTime = R_Freeusd_TimeCode();
 
 	if ( osPath.empty() ) {
 		return qfalse;
@@ -450,15 +462,25 @@ extern "C" qboolean R_Freeusd_BuildMeshBuffers( const char *qpath, float **verts
 		return qfalse;
 	}
 
-	{
-		const double time = R_Freeusd_TimeCode();
-
-		snap = freeusd::usdUtils::BuildEngineSceneSnapshot( *stage, time );
-		chosen = R_Freeusd_ChooseMeshPath( stage, snap, time );
-	}
+	snap = freeusd::usdUtils::BuildEngineSceneSnapshot( *stage, diagnosticTime );
+	chosen = R_Freeusd_ChooseMeshPath( stage, snap, diagnosticTime );
 
 	if ( chosen.IsEmpty() ) {
-		ri.Printf( PRINT_WARNING, "FreeUSD: no Mesh prims in '%s'\n", qpath );
+		ri.Printf( PRINT_WARNING, "FreeUSD: no Mesh prims in '%s' (primOrder=%zu nodes=%zu)\n",
+			qpath, snap.prim_order.size(), snap.nodes.size() );
+		if ( ri.Cvar_VariableIntegerValue( "developer" ) ) {
+			int inspected = 0;
+			for ( const auto &path : snap.prim_order ) {
+				freeusd::usdGeom::Mesh mesh( stage->GetPrimAtPath( path ) );
+				if ( inspected++ >= 8 ) {
+					break;
+				}
+				ri.Printf( PRINT_WARNING, "FreeUSD: candidate[%d] %s valid=%d points=%zu faces=%zu\n",
+					inspected - 1, path.GetString().c_str(), mesh ? 1 : 0,
+					mesh ? mesh.GetPoints( diagnosticTime ).size() : 0u,
+					mesh ? mesh.GetFaceVertexCounts( diagnosticTime ).size() : 0u );
+			}
+		}
 		return qfalse;
 	}
 
@@ -468,8 +490,13 @@ extern "C" qboolean R_Freeusd_BuildMeshBuffers( const char *qpath, float **verts
 			(size_t)shaderNameOutSize );
 	}
 
-	return R_Freeusd_LoadMeshPrim( stage, snap, chosen, R_Freeusd_TimeCode(), verts, numVerts, inds,
-		numIdx, vertSt );
+	const qboolean loaded = R_Freeusd_LoadMeshPrim( stage, snap, chosen, diagnosticTime, verts, numVerts,
+		inds, numIdx, vertSt );
+	if ( !loaded ) {
+		ri.Printf( PRINT_WARNING, "FreeUSD: mesh buffer build failed for '%s'\n",
+			chosen.GetString().c_str() );
+	}
+	return loaded;
 }
 
 #endif /* USE_FREEUSD */

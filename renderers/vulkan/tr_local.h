@@ -42,9 +42,10 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 #define MAX_TEXTURE_SIZE	32768
 
-#ifdef USE_VBO
-#define USE_VBO_GRID		/* put SF_GRID to VBO */
-#endif
+/* SF_GRID deliberately stays on the normal draw path.  Packing adaptive
+ * curve grids into the static VBO freezes their tessellation choice and can
+ * regress both streaming and frame time; only flat/static face and triangle
+ * surfaces use the VBO. */
 
 //#define USE_TESS_NEEDS_NORMAL
 //#define USE_TESS_NEEDS_ST2
