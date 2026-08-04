@@ -9,6 +9,7 @@ USD / USDA mesh tessellation via FreeUSD (C++ only; no tr_local.h).
 #include <cstdlib>
 #include <cmath>
 #include <cstring>
+#include <limits>
 #include <memory>
 #include <span>
 #include <string>
@@ -94,13 +95,16 @@ static const freeusd::usdUtils::EngineSceneNode *R_Freeusd_FindNode(
 static int R_Freeusd_CountMeshTris( const freeusd::usdGeom::Mesh &mesh, double time ) {
 	const std::vector<int> faceCounts = mesh.GetFaceVertexCounts( time );
 	const std::span<const int> faces( faceCounts );
-	int tris = 0;
+	long long tris = 0;
 	for ( int c : faces ) {
 		if ( c >= 3 ) {
 			tris += c - 2;
+			if ( tris >= std::numeric_limits<int>::max() ) {
+				return std::numeric_limits<int>::max();
+			}
 		}
 	}
-	return tris;
+	return (int)tris;
 }
 
 struct FreeusdMeshCandidate {
@@ -701,6 +705,7 @@ static qboolean R_Freeusd_LoadMeshSet( std::shared_ptr<freeusd::usd::Stage> stag
 	std::vector<float> allSt;
 	std::vector<float> allNormals;
 	int acceptedTris = 0;
+	int acceptedMeshes = 0;
 	qboolean allHaveSt = qtrue;
 	qboolean allHaveNormals = qtrue;
 	*outVerts = nullptr;
@@ -712,6 +717,23 @@ static qboolean R_Freeusd_LoadMeshSet( std::shared_ptr<freeusd::usd::Stage> stag
 	if ( outSurfaces ) *outSurfaces = nullptr;
 	if ( outNumSurfaces ) *outNumSurfaces = 0;
 	std::vector<freeusdMeshSurface_t> allSurfaces;
+
+	/* Reserve the bounded aggregate before tessellation. Repeated vector growth
+	 * retains old allocations and creates an avoidable transient residency
+	 * spike on large composed USDA scenes. */
+	size_t plannedTris = 0;
+	for ( const auto &candidate : candidates ) {
+		if ( candidate.numTris <= 0 ||
+			plannedTris + (size_t)candidate.numTris > (size_t)triangleBudget ) {
+			break;
+		}
+		plannedTris += (size_t)candidate.numTris;
+	}
+	allVerts.reserve( plannedTris * 9u );
+	allInds.reserve( plannedTris * 3u );
+	allSt.reserve( plannedTris * 6u );
+	allNormals.reserve( plannedTris * 9u );
+	allSurfaces.reserve( candidates.size() );
 
 	for ( const auto &candidate : candidates ) {
 		float *verts = nullptr, *st = nullptr, *normals = nullptr;
@@ -737,6 +759,7 @@ static qboolean R_Freeusd_LoadMeshSet( std::shared_ptr<freeusd::usd::Stage> stag
 		if ( normals ) allNormals.insert( allNormals.end(), normals, normals + (size_t)numVerts * 3u );
 		else allHaveNormals = qfalse;
 		acceptedTris += numIdx / 3;
+		acceptedMeshes++;
 		for ( int si = 0; si < numMeshSurfaces; si++ ) {
 			freeusdMeshSurface_t surface = meshSurfaces[si];
 			surface.firstTri += triBase;
@@ -778,8 +801,9 @@ static qboolean R_Freeusd_LoadMeshSet( std::shared_ptr<freeusd::usd::Stage> stag
 	}
 	*outNumVerts = (int)( allVerts.size() / 3u );
 	*outNumIdx = (int)allInds.size();
-	ri.Printf( PRINT_DEVELOPER, "FreeUSD: composed %zu meshes (%d tris, budget %d)\n",
-		candidates.size(), acceptedTris, triangleBudget );
+	ri.Printf( PRINT_DEVELOPER, "FreeUSD: composed %d/%zu meshes (%d tris, budget %d)%s\n",
+		acceptedMeshes, candidates.size(), acceptedTris, triangleBudget,
+		acceptedMeshes < (int)candidates.size() ? " [budget-truncated]" : "" );
 	return qtrue;
 }
 

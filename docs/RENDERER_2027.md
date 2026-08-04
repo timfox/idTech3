@@ -4,7 +4,7 @@ North-star architecture for the idTech3 Vulkan renderer.
 
 **Target name:** A GPU-driven hybrid visibility renderer using virtualized meshlet geometry, clustered compute shading, Forward+ transparency, reservoir-sampled ray tracing, and neural reconstruction.
 
-This is more than “deferred plus Forward+.” Shipping today uses those as foundation layers; 2027 work converges GPU-driven rasterization, selective path tracing, and neural reconstruction/compression.
+This is more than “deferred plus Forward+.” Shipping today uses those as foundation layers; 2027 work converges GPU-driven rasterization, selective path tracing, neural reconstruction/compression, and native USDA scene residency. Legacy `model_t`/MD3 import is a compatibility edge, never the authority for modern geometry ownership.
 
 ## Mode spine vs 2027 target
 
@@ -99,6 +99,7 @@ Demo: `exec demo_visibility_2027.cfg`. Console: `visibility_buffer_status`, `ren
 | 3 | Visibility buffer | Classic G-buffer + P1 sidecar | Compact prim/bary/depth + late shade |
 | 4 | GPU-driven / Work Graphs | Virtual geometry meshlets + indexed MDI | Production mesh shaders / WG |
 | 5 | Virtualized meshlets | MD3 meshlets + **MDI GPU draw** + **screen LOD** + sector stream | Continuous cluster LOD streaming |
+| 5a | Native USDA scene intake | FreeUSD composed prims through bounded MD3 bridge | Persistent per-prim GPU buffers, material handles, bounds, and residency budgets |
 | 6 | Unified Clustered spine | Mode 3 EXISTS — 2D tiles today; depth clusters planned extension | Spine for all layers |
 | 7 | Stochastic alpha | `r_stochasticAlpha` | Temporally stable coverage + OMM |
 | 8 | Classified OIT | Global WBOIT/MBOIT + **mode 3 overlay** | Per-material-class paths |

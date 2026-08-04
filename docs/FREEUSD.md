@@ -1,6 +1,6 @@
 # FreeUSD integration
 
-[idTech3](https://github.com/gopexllc/idtech3) embeds [FreeUSD](https://github.com/gopexllc/FreeUSD) (GPL-2.0-or-later) for **USDA-first** scene I/O, runtime assessment, and **UsdGeom mesh** import into the engine’s MD3-style mesh path.
+[idTech3](https://github.com/gopexllc/idtech3) embeds [FreeUSD](https://github.com/gopexllc/FreeUSD) (GPL-2.0-or-later) for **USDA-first** scene I/O, runtime assessment, and **UsdGeom mesh** import. The current MD3-style model path is a compatibility bridge, not the 2027 scene representation.
 
 This is **not** a full OpenUSD / Hydra / USD Imaging stack. Scope matches FreeUSD’s [engine-supported subset](https://github.com/gopexllc/FreeUSD/blob/main/docs/engine-supported-subset.md).
 
@@ -32,7 +32,7 @@ cmake -DUSE_FREEUSD=OFF ...                        # disable (smaller link; no u
 
 `core` profile sets `USE_FREEUSD=OFF` for a faster Q3/OA path.
 
-## Mesh models (renderer)
+## Mesh models (compatibility bridge)
 
 | Extension | Loader |
 |-----------|--------|
@@ -48,6 +48,26 @@ cmake -DUSE_FREEUSD=OFF ...                        # disable (smaller link; no u
   Sponza main validation layer while keeping parser allocation bounded; larger
   foliage and candle layers require streamed/composed import.
 
+The bridge is deliberately bounded. `r_freeusdImportAllMeshes 1` aggregates
+composed prims only up to `r_freeusdMeshBudget`; the renderer reports the
+accepted mesh count and whether the source set was budget-truncated. This keeps
+legacy `model_t` registration from becoming an implicit GPU residency policy.
+
+### 2027 native scene handoff
+
+The next FreeUSD renderer milestone is a native scene handoff with one record
+per composed mesh or GeomSubset:
+
+1. stable composed prim path and authored transform;
+2. world bounds and material handle;
+3. persistent vertex/index ownership suitable for meshlet/MDI culling;
+4. explicit alpha/PBR policy and shadow participation;
+5. residency state and budget accounting independent of `model_t`/MD3.
+
+Districts should consume that handoff directly. The MD3 bridge remains for
+OpenArena and legacy entity calls until the native path has matching golden
+coverage.
+
 ## Client console
 
 Requires `USE_FREEUSD` build and `com_freeusd 1` (default).
@@ -59,6 +79,7 @@ Requires `USE_FREEUSD` build and `com_freeusd 1` (default).
 | `usd_entities <path.usda>` | Prim hierarchy (`com_usdEntities 1`) |
 | `usd_shaders <path.usda>` | Materials and geom bindings (`com_usdShaders 1`) |
 | `usd_meshes <path.usda>` | List tessellatable `UsdGeom.Mesh` prims and triangle counts |
+| `usd_houdini <path.usda>` | Audit Houdini-style primvars, GeomSubset parents, material paths, variants, and time-sampled mesh data |
 | `usd_load <path.usda> [index]` | `RegisterModel` via renderer (optional mesh index; needs `r_freeusd` 1) |
 | `usd_shader_map <path.usda>` | Print mesh prim → resolved Q3 shader (preview of import mapping) |
 

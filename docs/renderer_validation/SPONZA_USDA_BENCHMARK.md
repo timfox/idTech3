@@ -9,9 +9,10 @@ the full Sponza payload instead of relying on an implicit slug path. The
 benchmark uses payload-derived camera bounds and leaves authored model origin
 intact (`r_districtAnchorView 0`). `r_picmip 5` is
 fixed as the source-texture memory budget for repeatable runs. The ownership
-capture selects the largest composed mesh (`r_freeusdImportAllMeshes 0`) so
-the proof is bounded while the full multi-mesh residency path is still being
-stabilized.
+capture traverses the full composed mesh set with an explicit 250,000-triangle
+residency budget; FreeUSD reports accepted meshes and budget truncation in the
+log. Raising that budget to 1,000,000 currently exceeds the Vulkan residency
+safe point, so it is intentionally not part of the proof capture.
 
 The isolated ownership capture intentionally disables `r_freeusdShaderMap` to
 avoid uploading the full-resolution USDA texture set. Authored texture/PBR

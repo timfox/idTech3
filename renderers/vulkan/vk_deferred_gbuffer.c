@@ -410,6 +410,12 @@ qboolean vk_deferred_lighting_path_ready( void )
 		vk.deferred_lighting_view == VK_NULL_HANDLE ) {
 		return qfalse;
 	}
+	/* Readiness is also an ownership gate. A resize/vid_restart can leave the
+	 * old images alive briefly; never advertise deferred ownership until the
+	 * active render extent still matches the current G-buffer generation. */
+	if ( !vk_deferred_gbuffer_generation_valid() ) {
+		return qfalse;
+	}
 	if ( vk.forward_plus.buffer == VK_NULL_HANDLE || vk.forward_plus.tile_buffer == VK_NULL_HANDLE ) {
 		return qfalse;
 	}
