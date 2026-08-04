@@ -124,12 +124,12 @@ void R_LoadHDR(const char *filename, byte **pic, int *width, int *height) {
 
 	*pic = NULL; *width = 0; *height = 0;
 
-	fileSize = FS_ReadFile(filename, &fileData);
+	fileSize = FS_ReadFileMalloc(filename, &fileData);
 	if (fileSize <= 0 || !fileData) return;
 
 	if (!HDR_ReadHeader((const byte *)fileData, fileSize, &w, &h, &dataOff)) {
 		Com_Printf(S_COLOR_YELLOW "HDR: invalid header in %s\n", filename);
-		FS_FreeFile(fileData);
+		FS_FreeFileMalloc(fileData);
 		return;
 	}
 
@@ -139,11 +139,11 @@ void R_LoadHDR(const char *filename, byte **pic, int *width, int *height) {
 	if (!HDR_DecodeRLE((const byte *)fileData, fileSize, dataOff, w, h, hdrData)) {
 		Com_Printf(S_COLOR_YELLOW "HDR: decode error in %s\n", filename);
 		Z_Free(hdrData);
-		FS_FreeFile(fileData);
+		FS_FreeFileMalloc(fileData);
 		return;
 	}
 
-	FS_FreeFile(fileData);
+	FS_FreeFileMalloc(fileData);
 
 	out = (byte *)Z_Malloc(numPixels * 4);
 	for (i = 0; i < numPixels; i++) {
@@ -171,14 +171,14 @@ void R_LoadHDR_Float(const char *filename, float **pic, int *width, int *height)
 	*width = 0;
 	*height = 0;
 
-	fileSize = FS_ReadFile(filename, &fileData);
+	fileSize = FS_ReadFileMalloc(filename, &fileData);
 	if (fileSize <= 0 || !fileData) {
 		return;
 	}
 
 	if (!HDR_ReadHeader((const byte *)fileData, fileSize, &w, &h, &dataOff)) {
 		Com_Printf(S_COLOR_YELLOW "HDR: invalid header in %s\n", filename);
-		FS_FreeFile(fileData);
+		FS_FreeFileMalloc(fileData);
 		return;
 	}
 
@@ -188,11 +188,11 @@ void R_LoadHDR_Float(const char *filename, float **pic, int *width, int *height)
 	if (!HDR_DecodeRLE((const byte *)fileData, fileSize, dataOff, w, h, hdrData)) {
 		Com_Printf(S_COLOR_YELLOW "HDR: decode error in %s\n", filename);
 		Z_Free(hdrData);
-		FS_FreeFile(fileData);
+		FS_FreeFileMalloc(fileData);
 		return;
 	}
 
-	FS_FreeFile(fileData);
+	FS_FreeFileMalloc(fileData);
 
 	*pic = hdrData;
 	*width = w;

@@ -12,12 +12,17 @@
 #include "oit_source_normalize.glsl"
 #include "depth_view.glsl"
 #include "oit_weight.glsl"
+#include "lightmap_decode.glsl"
 
 layout (constant_id = 0) const int manual_depth_test = 0;
 layout (constant_id = 1) const int forward_plus_lit = 0;
 
 layout(set = 0, binding = 0) uniform sampler2D tex0;
 layout(set = 1, binding = 0) uniform sampler2D opaqueDepthTex;
+layout(set = 4, binding = 0) uniform sampler2D normalMap;
+layout(set = 5, binding = 0) uniform sampler2D physicalMap;
+layout(set = 6, binding = 0) uniform sampler2D emissiveMap;
+layout(set = 7, binding = 0) uniform sampler2D lightmap;
 
 layout(set = 2, binding = 0) readonly buffer FpLightSSBO {
 	vec4 fp_light_data[];
@@ -75,7 +80,9 @@ layout(push_constant) uniform Transform {
 } pc;
 
 void main() {
-	vec4 decoded = textureLod(tex0, frag_tex_coord0, 0.0) * frag_color0;
+	/* Use the material sampler's implicit LOD so transparent textures honor
+	 * trilinear/aniso filtering; resolve attachments remain exact texelFetch. */
+	vec4 decoded = texture( tex0, frag_tex_coord0 ) * frag_color0;
 	uint srcEnc = uint( pc.alphaPack & 0xff );
 	int alphaDbg = ( pc.alphaPack >> 8 ) & 0xff;
 	int edgePol = ( pc.alphaPack >> 16 ) & 0xff;
@@ -144,6 +151,38 @@ void main() {
 	if ( dot( N, N ) < 1e-8 ) {
 		N = vec3( 0.0, 0.0, 1.0 );
 	}
+	SurfaceMaterial surfaceMaterial = SurfaceMaterialDecodeLegacy(
+		baseRgb, alpha, N, vec3( 0.0 ), 0u, 0u,
+		OPAQUE_OWNER_FORWARD_PLUS, 0u );
+	uint materialFlags = uint( max( pc.parityCompare, 0 ) ) >> 8;
+	if ( ( materialFlags & 1u ) != 0u ) {
+		vec3 dpdx = dFdx( frag_world_pos );
+		vec3 dpdy = dFdy( frag_world_pos );
+		vec2 duvDx = dFdx( frag_tex_coord0 );
+		vec2 duvDy = dFdy( frag_tex_coord0 );
+		vec3 T = normalize( dpdx * duvDy.y - dpdy * duvDx.y );
+		vec3 B = normalize( -dpdx * duvDy.x + dpdy * duvDx.x );
+		vec3 nTS = texture( normalMap, frag_tex_coord0 ).xyz * 2.0 - 1.0;
+		N = normalize( mat3( T, B, N ) * nTS );
+	}
+	if ( ( materialFlags & 2u ) != 0u ) {
+		vec4 orms = texture( physicalMap, frag_tex_coord0 );
+		surfaceMaterial = SurfaceMaterialDecodeCanonical(
+			baseRgb, alpha, N, mix( 0.01, 1.0, orms.g ), orms.b, orms.r,
+			vec3( 0.0 ), 0.0, mix( 0.01, 1.0, orms.g ), 0.0,
+			0u, 0u, OPAQUE_OWNER_FORWARD_PLUS, 0u );
+	}
+	if ( ( materialFlags & 4u ) != 0u ) {
+		surfaceMaterial.emissive = max( texture( emissiveMap, frag_tex_coord0 ).rgb, vec3( 0.0 ) );
+	}
+	/* Transparent stages generally have no lightmap UV. When a material does
+	 * advertise one, use its base UV as the legacy-compatible fallback. */
+	if ( ( materialFlags & 8u ) != 0u ) {
+		surfaceMaterial.baseColor *= LightmapDecodeIrradiance(
+			texture( lightmap, frag_tex_coord0 ).rgb, 1.0, 0 );
+	}
+	baseRgb = surfaceMaterial.baseColor;
+	N = surfaceMaterial.normalWS;
 	/* Face toward camera so backfaces still get some sun on two-sided glass. */
 	vec3 V = normalize( fp_params.fp_view_org.xyz - frag_world_pos );
 	if ( dot( N, V ) < 0.0 ) {
@@ -182,10 +221,10 @@ void main() {
 	if ( forward_plus_lit != 0 ) {
 		bool clusterOob = false;
 		uint lightCount = 0u;
-		float roughness = 0.45;
-		float metalness = 0.0;
-		vec3 addLit = FpEval_ForwardPlusAdd( baseRgb, N, V, frag_world_pos, roughness, metalness,
+		vec3 addLit = FpEval_ForwardPlusAdd( surfaceMaterial.baseColor, surfaceMaterial.normalWS,
+			V, frag_world_pos, surfaceMaterial.perceptualRoughness, surfaceMaterial.metallic,
 			pc.lightingDebug, clusterOob, lightCount );
+		addLit += surfaceMaterial.emissive;
 		if ( clusterOob || any( isnan( addLit ) ) || any( isinf( addLit ) ) ) {
 			out_color = vec4( 1.0, 0.0, 1.0, 1.0 );
 			out_reveal = 0.0;

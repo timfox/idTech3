@@ -2087,8 +2087,9 @@ static void RB_IterateStagesGeneric( const shaderCommands_t *input )
 			}
 			
 			// Commented out descriptor updates for removed PBR features
-			// if ( pStage->vk_pbr_flags & PBR_HAS_EMISSIVE )
-			// 	vk_update_descriptor_if_changed( VK_DESC_PBR_EMISSIVE, pStage->emissiveMap->descriptor );
+			if ( ( pStage->vk_pbr_flags & PBR_HAS_EMISSIVE ) && pStage->emissiveMap )
+				vk_update_descriptor_if_changed_with_image( VK_DESC_PBR_EMISSIVE,
+					pStage->emissiveMap->descriptor, pStage->emissiveMap );
 
 			// if ( pStage->vk_pbr_flags & PBR_HAS_CLEARCOAT )
 			// 	vk_update_descriptor_if_changed( VK_DESC_PBR_CLEARCOAT, pStage->clearcoatMap->descriptor );

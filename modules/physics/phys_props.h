@@ -60,6 +60,8 @@ physBodyHandle_t    PhysProp_CreateBox( const vec3_t origin, const vec3_t halfEx
 	physBodyType_t type, float mass, int materialId );
 physBodyHandle_t    PhysProp_CreateSphere( const vec3_t origin, float radius,
 	physBodyType_t type, float mass, int materialId );
+physBodyHandle_t    PhysProp_CreateCapsule( const vec3_t origin, float radius, float height,
+	physBodyType_t type, float mass, int materialId );
 physBodyHandle_t    PhysProp_CreateFromAABB( const vec3_t mins, const vec3_t maxs,
 	physBodyType_t type, float mass, int materialId );
 physBodyHandle_t    PhysProp_CreateClipBox( const vec3_t origin, const vec3_t halfExtents );

@@ -38,13 +38,13 @@ void R_LoadEXR(const char *filename, byte **pic, int *width, int *height) {
 	*width = 0;
 	*height = 0;
 
-	fileSize = FS_ReadFile(filename, &fileData);
+	fileSize = FS_ReadFileMalloc(filename, &fileData);
 	if (fileSize <= 0 || !fileData) {
 		return;
 	}
 
 	ret = LoadEXRFromMemory(&rgba, &w, &h, (const unsigned char *)fileData, (size_t)fileSize, &err);
-	FS_FreeFile(fileData);
+	FS_FreeFileMalloc(fileData);
 
 	if (ret != TINYEXR_SUCCESS || !rgba) {
 		if (err) {
@@ -106,13 +106,13 @@ void R_LoadEXR_HDR(const char *filename, float **pic, int *width, int *height) {
 	*width = 0;
 	*height = 0;
 
-	fileSize = FS_ReadFile(filename, &fileData);
+	fileSize = FS_ReadFileMalloc(filename, &fileData);
 	if (fileSize <= 0 || !fileData) {
 		return;
 	}
 
 	ret = LoadEXRFromMemory(&exrData, &w, &h, (const unsigned char *)fileData, (size_t)fileSize, &err);
-	FS_FreeFile(fileData);
+	FS_FreeFileMalloc(fileData);
 
 	if (ret != TINYEXR_SUCCESS || !exrData) {
 		if (err) {

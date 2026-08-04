@@ -215,6 +215,10 @@ void record_image_layout_transition( VkCommandBuffer command_buffer, VkImage ima
 	barrier.subresourceRange.layerCount = VK_REMAINING_ARRAY_LAYERS;
 
 	qvkCmdPipelineBarrier( command_buffer, src_stage, dst_stage, 0, 0, NULL, 0, NULL, 1, &barrier );
+	/* All renderer-owned images pass through this helper.  Keep the Spine resource
+	 * owner synchronized here instead of relying on scattered note calls. */
+	vk_spine_transition_image( image, old_layout, new_layout,
+		vk_spine_current_pass(), "image_transition" );
 }
 
 void record_depth_image_layout_transition( VkCommandBuffer command_buffer, VkImageAspectFlags image_aspect_flags,

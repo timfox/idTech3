@@ -36,6 +36,21 @@ int bigchar_height;
 int smallchar_width;
 int smallchar_height;
 
+/* TrueType glyph cells need a little leading because their ink height and
+ * FreeType reference line are smaller than the legacy 16px bitmap cell. */
+static int Con_LineHeight( void ) {
+	float spacing;
+	int h = smallchar_height;
+
+	if ( h < 1 || !Cvar_VariableIntegerValue( "cl_builtInTtfConsole" ) ) {
+		return MAX( 1, h );
+	}
+	spacing = Cvar_VariableValue( "r_fontConsoleLineSpacing" );
+	spacing = Com_Clamp( 0.0f, 0.25f, spacing );
+	h += (int)ceilf( (float)h * spacing );
+	return MAX( 1, h );
+}
+
 typedef struct {
 	qboolean	initialized;
 
@@ -79,6 +94,7 @@ cvar_t		*con_height;
 cvar_t		*con_inputMode;
 cvar_t		*con_showVersion;
 cvar_t		*con_drawInput;
+cvar_t		*con_textEffects;
 
 int			g_console_field_width;
 
@@ -94,6 +110,65 @@ static char Con_ColorCodeForIndex( int colorIndex ) {
 	}
 
 	return COLOR_WHITE;
+}
+
+#define CON_EFFECT_RANDOM_COLOR 63
+
+static int Con_RuneColorTag( const char *text ) {
+	static const struct { const char *name; int color; } tags[] = {
+		{ "red", 1 }, { "dre", 10 }, { "lre", 11 }, { "ora", 12 },
+		{ "or1", 13 }, { "or2", 14 }, { "or3", 15 }, { "yel", 3 },
+		{ "gr1", 16 }, { "gre", 2 }, { "gr2", 17 }, { "gr3", 18 },
+		{ "blu", 4 }, { "cya", 5 }, { "mag", 6 }, { "bla", 0 },
+		{ "whi", 7 }, { "ran", CON_EFFECT_RANDOM_COLOR }
+	};
+	int i;
+
+	if ( !text || text[0] != '@' || text[4] != '@' ) {
+		return -1;
+	}
+	for ( i = 0; i < (int)( sizeof( tags ) / sizeof( tags[0] ) ); i++ ) {
+		if ( !Q_stricmpn( text + 1, tags[i].name, 3 ) ) {
+			return tags[i].color;
+		}
+	}
+	return -1;
+}
+
+static qboolean Con_RunePositionTag( const char *text, int *position ) {
+	int value;
+	if ( !text || text[0] != '~' || text[4] != '~' ||
+		text[1] < '0' || text[1] > '9' || text[2] < '0' || text[2] > '9' ||
+		text[3] < '0' || text[3] > '9' ) {
+		return qfalse;
+	}
+	value = ( text[1] - '0' ) * 100 + ( text[2] - '0' ) * 10 + ( text[3] - '0' );
+	if ( position ) {
+		*position = value;
+	}
+	return qtrue;
+}
+
+int Con_TextEffectColorAt( const char *text, int length, int fallback ) {
+	int color = fallback;
+	int i = 0;
+	if ( !text || length < 0 ) return color;
+	while ( i < length && text[i] ) {
+		int tagged = Con_RuneColorTag( text + i );
+		if ( tagged >= 0 && i + 5 <= length ) {
+			color = tagged == CON_EFFECT_RANDOM_COLOR ?
+				( 1 + ( ( cls.realtime / 160 ) % 6 ) ) : tagged;
+			i += 5;
+			continue;
+		}
+		if ( Q_IsColorString( text + i ) && i + 2 <= length ) {
+			color = ColorIndexFromChar( text[i + 1] );
+			i += 2;
+			continue;
+		}
+		i++;
+	}
+	return color;
 }
 
 static void Con_LineToString( const short *text, int width, char *out, size_t outSize ) {
@@ -118,8 +193,11 @@ static void Con_LineToString( const short *text, int width, char *out, size_t ou
 	}
 
 	for ( i = 0; i <= lastNonSpace && outPos + 1 < outSize; i++ ) {
-		const int colorIndex = ( text[i] >> 8 ) & 63;
+		int colorIndex = ( text[i] >> 8 ) & 63;
 		const char ch = (char)( text[i] & 0xff );
+		if ( colorIndex == CON_EFFECT_RANDOM_COLOR ) {
+			colorIndex = 1 + ( ( cls.realtime / 160 + i ) % 6 );
+		}
 
 		if ( colorIndex != currentColor && outPos + 3 < outSize ) {
 			out[outPos++] = Q_COLOR_ESCAPE;
@@ -140,7 +218,8 @@ Con_ToggleConsole_f
 */
 void Con_ToggleConsole_f( void ) {
 	// Can't toggle the console when it's the only thing available
-    if ( cls.state == CA_DISCONNECTED && Key_GetCatcher() == KEYCATCH_CONSOLE ) {
+    if ( cls.state == CA_DISCONNECTED && Key_GetCatcher() == KEYCATCH_CONSOLE &&
+         !CL_RpMenuActive() ) {
 		return;
 	}
 
@@ -390,7 +469,7 @@ void Con_CheckResize( void )
 		if ( width > MAX_CONSOLE_WIDTH )
 			width = MAX_CONSOLE_WIDTH;
 
-		vispage = cls.glconfig.vidHeight / ( smallchar_height * 2 ) - 1;
+		vispage = cls.glconfig.vidHeight / ( Con_LineHeight() * 2 ) - 1;
 
 		if ( old_vispage == vispage && old_width == width )
 			return;
@@ -516,6 +595,9 @@ void Con_Init( void )
 	Cvar_SetDescription( con_showVersion, "Show engine version at bottom of console. Set to 0 for custom game branding." );
 	con_drawInput = Cvar_Get( "con_drawInput", "1", CVAR_ARCHIVE_ND );
 	Cvar_SetDescription( con_drawInput, "Draw console input line (] prompt and cursor). Set to 0 to hide (e.g. for custom game UIs)." );
+	con_textEffects = Cvar_Get( "con_textEffects", "1", CVAR_ARCHIVE_ND );
+	Cvar_SetDescription( con_textEffects,
+		"Enable RuneScape-style console tags: @red@ colors and ~000~ to ~999~ horizontal positioning." );
 
 	/* Ensure FreeType console glyphs are requested once the renderer is up.
 	   SCR_Init / CL_RegisterBuiltInTrueTypeFonts own the actual load; this
@@ -683,6 +765,25 @@ void CL_ConsolePrint( const char *txt ) {
 	colorIndex = ColorIndex( COLOR_WHITE );
 
 	while ( (c = *txt) != 0 ) {
+		if ( con_textEffects && con_textEffects->integer ) {
+			int taggedColor = Con_RuneColorTag( txt );
+			int taggedPosition;
+			if ( taggedColor >= 0 ) {
+				colorIndex = taggedColor;
+				txt += 5;
+				continue;
+			}
+			if ( Con_RunePositionTag( txt, &taggedPosition ) ) {
+				if ( con.newline ) {
+					Con_NewLine();
+					Con_Fixup();
+					con.newline = qfalse;
+				}
+				con.x = taggedPosition < con.linewidth ? taggedPosition : con.linewidth - 1;
+				txt += 5;
+				continue;
+			}
+		}
 		if ( Q_IsColorString( txt ) && *(txt+1) != '\n' ) {
 			colorIndex = ColorIndexFromChar( *(txt+1) );
 			txt += 2;
@@ -760,12 +861,13 @@ Draw the editline after a ] prompt
 */
 static void Con_DrawInput( void ) {
 	int		y;
+	const int lineHeight = Con_LineHeight();
 
 	if ( cls.state != CA_DISCONNECTED && !(Key_GetCatcher( ) & KEYCATCH_CONSOLE ) ) {
 		return;
 	}
 
-	y = con.vislines - ( smallchar_height * 2 );
+	y = con.vislines - ( lineHeight * 2 );
 
 	re.SetColor( con.color );
 
@@ -792,6 +894,7 @@ static void Con_DrawNotify( void )
 	int		time;
 	int		skip;
 	char	lineBuf[CON_LINEBUF_SIZE];
+	const int lineHeight = Con_LineHeight();
 
 	re.SetColor( g_color_table[ ColorIndex( COLOR_WHITE ) ] );
 
@@ -818,7 +921,7 @@ static void Con_DrawNotify( void )
 				lineBuf, g_color_table[ ColorIndex( COLOR_WHITE ) ], qfalse, qfalse );
 		}
 
-		v += smallchar_height;
+		v += lineHeight;
 	}
 
 	re.SetColor( NULL );
@@ -928,9 +1031,9 @@ static void Con_DrawSolidConsole( float frac ) {
 
 	// draw the text
 	con.vislines = lines;
-	rows = lines / smallchar_height - 1;	// rows of text to draw
+	rows = lines / Con_LineHeight() - 1;	// rows of text to draw
 
-	y = lines - (smallchar_height * 3);
+	y = lines - (Con_LineHeight() * 3);
 
 	row = con.display;
 
@@ -942,21 +1045,21 @@ static void Con_DrawSolidConsole( float frac ) {
 			SCR_DrawSmallStringExt( con.xadjust + ( x + 1 ) * SCR_ConsoleCharWidth(), y, "^",
 				g_color_table[ ColorIndex( COLOR_RED ) ], qtrue, qtrue );
 		}
-		y -= smallchar_height;
+		y -= Con_LineHeight();
 		row--;
 	}
 
 #ifdef USE_CURL
 	if ( download.progress[ 0 ] ) 
 	{
-		SCR_DrawSmallStringExt( SCR_ConsoleCharWidth(), lines - smallchar_height,
+		SCR_DrawSmallStringExt( SCR_ConsoleCharWidth(), lines - Con_LineHeight(),
 			download.progress, g_color_table[ ColorIndex( COLOR_CYAN ) ], qtrue, qtrue );
 	}
 #endif
 
 	re.SetColor( g_color_table[ ColorIndex( COLOR_WHITE ) ] );
 
-	for ( i = 0 ; i < rows ; i++, y -= smallchar_height, row-- )
+	for ( i = 0 ; i < rows ; i++, y -= Con_LineHeight(), row-- )
 	{
 		if ( row < 0 )
 			break;
@@ -982,7 +1085,7 @@ static void Con_DrawSolidConsole( float frac ) {
 	if ( con_showVersion->integer && com_version && com_version->string[0] )
 	{
 		re.SetColor( g_color_table[ ColorIndex( COLOR_WHITE ) ] );
-		SCR_DrawSmallString( con.xadjust + SCR_ConsoleCharWidth(), lines - smallchar_height,
+		SCR_DrawSmallString( con.xadjust + SCR_ConsoleCharWidth(), lines - Con_LineHeight(),
 			com_version->string, (int)strlen( com_version->string ) );
 	}
 
@@ -1003,7 +1106,10 @@ void Con_DrawConsole( void ) {
 
 	// if disconnected, render console full screen
 	if ( cls.state == CA_DISCONNECTED ) {
-		if ( !( catcher & (KEYCATCH_UI | KEYCATCH_CGAME)) ) {
+		/* Surf's title screen is a JavaScript overlay and intentionally does
+		 * not install the legacy KEYCATCH_UI catcher. Do not let the disconnected
+		 * startup console cover it while ui_1337MainMenu is active. */
+		if ( !( catcher & (KEYCATCH_UI | KEYCATCH_CGAME)) && !CL_RpMenuActive() ) {
 			Con_DrawSolidConsole( 1.0 );
 			return;
 		}

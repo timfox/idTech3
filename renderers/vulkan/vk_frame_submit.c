@@ -27,6 +27,7 @@ Extracted from vk.c for incremental modularization.
 #include "vk_volumetric_clouds.h"
 #include "vk_surface_evolution.h"
 #include "vk_vshadow.h"
+#include "vk_selective_rt.h"
 #include "vk_cinematic_camera.h"
 #include "vk_exposure_histogram.h"
 #include "vk_reference_lab.h"
@@ -241,6 +242,7 @@ void vk_begin_frame( void )
 
 	vk.cmd = &vk.tess[ vk.cmd_index ];
 
+	vk_srt_frame_begin();
 	vk_shs_frame_begin();
 	vk_shr_frame_begin();
 #ifdef USE_VULKAN_RTX

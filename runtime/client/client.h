@@ -395,6 +395,8 @@ typedef struct {
 	int			punkbuster;
 	int			g_humanplayers;
 	int			g_needpass;
+	int			surfRankMin;
+	int			surfRankMax;
 } serverInfo_t;
 
 typedef struct {
@@ -658,6 +660,7 @@ void Con_ToggleConsole_f( void );
 void Con_ClearNotify( void );
 void Con_RunConsole( void );
 void Con_DrawConsole( void );
+int  Con_TextEffectColorAt( const char *text, int length, int fallback );
 void Con_PageUp( int lines );
 void Con_PageDown( int lines );
 void Con_Top( void );
@@ -677,6 +680,10 @@ void	CL_UpdateScreenGeometry( void );
 
 /* Implemented in qcommon/js_debug.c — run JS frame HUD during SCR_DrawScreenField. */
 void	JsDebug_DrawFrame( int msec, int realMsec );
+int		CL_JsServerCount( int source );
+qboolean CL_JsServerRefresh( int source );
+void		CL_JsServerInfo( int source, int index, char *buf, int buflen );
+void		CL_JsServerAddress( int source, int index, char *buf, int buflen );
 
 void	SCR_DebugGraph( float value );
 

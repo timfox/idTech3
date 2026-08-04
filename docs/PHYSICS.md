@@ -179,4 +179,4 @@ Then drive poses with `Phys_RagdollSetBoneAnimTarget` / `Phys_RagdollApplyMd3Fra
 | `phys_maxLinearSpeed` | 0 | Soft Step max linear speed clamp (0 = off) |
 | `phys_speculative` | 1 | Soft Step speculative contacts |
 
-Console: `phys_spawn_ragdoll`, `phys_hit_ragdoll`, `phys_spawn_dmm`, `phys_hit_dmm`, `phys_record_*`, `phys_replay` (hash), `phys_replay_open|step|seek|close`, `phys_closest`, `phys_set_continuous`, `phys_debug_flags`, `phys_rebuild_tree`, `phys_explode`, `phys_ray_all`, `phys_wind`, `phys_set_friction`, `phys_set_restitution`, `phys_set_filter`, `phys_dump`.
+Console: `phys_spawn_ragdoll`, `phys_hit_ragdoll`, `phys_spawn_dmm`, `phys_hit_dmm`, `phys_spawn_box`, `phys_spawn_sphere`, `phys_spawn_capsule`, `phys_record_*`, `phys_replay` (hash), `phys_replay_open|step|seek|close`, `phys_closest`, `phys_set_continuous`, `phys_debug_flags`, `phys_rebuild_tree`, `phys_explode`, `phys_ray_all`, `phys_wind`, `phys_set_friction`, `phys_set_restitution`, `phys_set_filter`, `phys_dump`.

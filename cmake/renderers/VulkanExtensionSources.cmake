@@ -42,6 +42,13 @@ set(VK_ARC_BLANC_VK_SRCS
 	${_VK_EXT}/scaffold/vk_arc_blanc_gpu.c
 )
 
+# Renderer-owned sidecars are linked in every profile because tr_init exposes
+# their cvars/status contracts even when their opt-in execution gates are off.
+set(VK_RENDERER_SIDECAR_SRCS
+	${_VK_EXT}/scaffold/vk_hair_deferred.c
+	${_VK_EXT}/scaffold/vk_vector_brush.c
+)
+
 set(VK_RTX_CORE_SRCS
 	${_VK_EXT}/rtx/vk_rtx.c
 	${_VK_EXT}/rtx/vk_rtx_material.c
@@ -117,6 +124,7 @@ macro(idtech3_apply_vulkan_extension_sources)
 	list(APPEND RENDERER_VK_SRCS ${VK_CHOCOLATE_SPLAT_SRCS})
 	list(APPEND RENDERER_VK_SRCS ${VK_CHOCOLATE_RTX_SRCS})
 	list(APPEND RENDERER_VK_SRCS ${VK_ARC_BLANC_VK_SRCS})
+	list(APPEND RENDERER_VK_SRCS ${VK_RENDERER_SIDECAR_SRCS})
 	message(STATUS "Chocolate renderers: MGS/WSP/SqueezeMe + Hybrid1/Raygun + ArcBlanc (cvars off; ArcBlanc needs USE_ARC_BLANC, RT demos need USE_VULKAN_RTX)")
 
 	if(USE_EXPERIMENTAL_RENDERERS)

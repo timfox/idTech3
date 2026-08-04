@@ -1,4 +1,6 @@
 #version 450
+#extension GL_GOOGLE_include_directive : require
+#include "surface_material_decode.glsl"
 
 layout(set = 0, binding = 0) uniform UBO {
 	// light/env parameters:
@@ -111,13 +113,7 @@ void main() {
 		}
 	} else
 	// specialization: alpha-test function
-	if (alpha_test_func == 1) {
-		if (base.a == alpha_test_value) discard;
-	} else if (alpha_test_func == 2) {
-		if (base.a >= alpha_test_value) discard;
-	} else if (alpha_test_func == 3) {
-		if (base.a < alpha_test_value) discard;
-	}
+	if (!SurfaceAlphaTestPassLegacy(base.a, alpha_test_value, alpha_test_func)) discard;
 
 	vec4 lightColorRadius = lightColor;
 
@@ -139,6 +135,11 @@ void main() {
 	float intensFactor = 1.0 - dot(L.xyz, L.xyz) * lightColorRadius.w;
 #endif
 
+	/* Keep the classic projector on the same softened radial curve as
+	 * deferred/Forward+ point lights. The radius and midpoint response stay
+	 * unchanged; only the cutoff derivative is smoothed. */
+	float radial = max( intensFactor, 0.0 );
+	intensFactor = radial * radial * ( 3.0 - 2.0 * radial );
 	if (intensFactor <= 0.0)
 		discard;
 	vec3 intens = lightColorRadius.rgb * intensFactor;

@@ -31,6 +31,9 @@ GEN_FRAG="$(idtech3_file renderers/vulkan/shaders/glsl/gen_frag.tmpl src/rendere
 TR_INIT="$(idtech3_file renderers/vulkan/tr_init.c src/renderers/vulkan/tr_init.c)"
 TR_BACKEND="$(idtech3_file renderers/vulkan/tr_backend.c src/renderers/vulkan/tr_backend.c)"
 DEFERRED_CFG="$ROOT/config/deferred_vulkan.cfg"
+HONESTY="$ROOT/renderers/vulkan/vk_deferred_honesty.c"
+HONESTY_H="$ROOT/renderers/vulkan/vk_deferred_honesty.h"
+VK_SHUTDOWN="$ROOT/renderers/vulkan/vk_shutdown.c"
 
 check "$DEFERRED_CFG" 'seta r_renderMode 1' 'deferred profile selects mode 1'
 check "$DEFERRED_CFG" 'seta r_deferredLighting 1' 'deferred profile enables deferred lighting'
@@ -53,9 +56,15 @@ check "$TR_INIT" 'r_deferredNormalEdgeThreshold = ri.Cvar_Get' 'deferred normal 
 check "$TR_INIT" 'r_deferredGBufferDebug, "0", "6"' 'deferred debug exposes confidence and motion modes'
 check "$TR_INIT" 'r_renderMode 1/2' 'G-buffer cvar documents mode 1/2 sidecar'
 check "$DGB" 'materialParams' 'G-buffer push carries material/normal params'
+check "$DGB" 'Com_Clamp( 0.0f, 6.0f, r_forwardPlusDebug->value )' 'deferred debug preserves Forward+ occupancy and Z-slice modes'
+check "$DGB" 'deferred push debug ABI changed' 'deferred CPU push layout asserts clustered debug offset'
 check "$DGB" 'R_RenderMode_WantsGBuffer' 'G-buffer active via render-mode helper (modes 1/2/3+)'
 check "$DGB" 'R_RenderMode_WantsDeferredLighting' 'deferred lighting active via render-mode helper (modes 1/3/4)'
+check "$DGB" 'Readiness is a renderer/resource property' 'deferred path readiness is independent of UI/weapon view class'
 check "$LIT_ENTRY" 'deferred_lighting_common.glsl' 'deferred lighting entry includes shared shade helpers'
+check "$LIT_ENTRY" 'deferredClusterDebug' 'deferred compute visualizes clustered occupancy and Z-slice coverage'
+check "$LIT_ENTRY" 'float shadowSplit0' 'deferred push constants keep cascade splits scalar-packed with the C ABI'
+check "$LIT" 'pc.shadowSplit0' 'deferred lighting expands scalar-packed cascade splits for shadow evaluation'
 check "$DGB" 'normal confidence' 'deferred debug logs normal confidence mode'
 check "$DGB" 'vk.motion_vector_view' 'deferred debug can inspect real motion sidecar'
 check "$DGB" 'direct material/motion export' 'direct export path preserves material shader output'
@@ -79,6 +88,7 @@ check "$GBUF_FILL" 'confidence' 'G-buffer normal pass stores reconstruction conf
 check "$GBUF_DEBUG" 'pc.mode == 5' 'deferred debug shader visualizes normal confidence'
 check "$GBUF_DEBUG" 'pc.mode == 6' 'deferred debug shader visualizes motion vectors'
 check "$TR_BACKEND" 'vk_deferred_lighting_active' 'classic lit pass skipped when deferred lighting active'
+check "$TR_BACKEND" 'G-buffer inspection is independent of bloom' 'G-buffer debug runs when bloom is disabled'
 check "$DGB" 'vk_deferred_composite_push_t' 'composite push constants'
 check "$DGB" 'deferred_gbuffer_albedo_view' 'composite scene base descriptor'
 check "$COMP" 'sceneBaseTex' 'composite scene base sampler'
@@ -110,6 +120,9 @@ check "$DGB" 'deferred_class_stub' 'class stub descriptor fallback'
 check "$ROOT/renderers/vulkan/diagnostics/tr_init_diagnostics.inc" 'renderer_deferred_safe + vid_restart' 'compatibility warnings point users at deferred-safe recovery'
 check "$TR_BACKEND" 'vk_deferred_lighting_apply_after_geometry' 'backend lighting hook'
 check "$ROOT/scripts/compile_shaders.sh" 'deferred_lighting_composite_fs' 'composite shader registered'
+check "$HONESTY" 'void vk_deferred_honesty_shutdown' 'deferred status lifecycle teardown'
+check "$HONESTY_H" 'vk_deferred_honesty_shutdown' 'deferred honesty shutdown declaration'
+check "$VK_SHUTDOWN" 'vk_deferred_honesty_shutdown();' 'renderer shutdown removes deferred commands'
 
 if [[ $failures -ne 0 ]]; then
   echo "$failures check(s) failed"

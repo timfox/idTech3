@@ -19,7 +19,9 @@
 | `PREMULTIPLIED_SOURCE` | Associated authoring |
 | `EDGE_DILATED_STRAIGHT` | Straight with dilated RGB |
 
-Mip transitions: dilate color into transparent texels offline when using straight + bilinear/aniso.
+OIT source passes use implicit-LOD sampling, so mip transitions honor the active
+trilinear/aniso sampler. Dilate color into transparent texels offline when using
+straight alpha to prevent RGB fringes at bilinear/mip boundaries.
 
 Texture atlases: keep transparent padding dilated; avoid neighboring sprite color bleeding across α=0 gutters (clamp edges of atlas regions when possible).
 

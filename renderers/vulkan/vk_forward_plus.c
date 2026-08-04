@@ -22,6 +22,7 @@ docs/RENDERER_2026_ARCHITECTURE_PASS.md.
 #include "vk_scene_platform.h"
 #include "vk_photometric.h"
 #include "vk_hiz.h"
+#include "vk_vshadow.h"
 
 #define VK_FP_RECORD_STRIDE (sizeof(float) * 16) /* 4 x vec4 per light */
 #define VK_FP_HEADER_BYTES (sizeof(float) * 8) /* 2 x vec4: count/meta + tile grid / viewport */
@@ -36,6 +37,7 @@ docs/RENDERER_2026_ARCHITECTURE_PASS.md.
 #define VK_FP_MAX_COMPACT_PER_CLUSTER 32u
 #define VK_FP_CLUSTER_LIST_META_UINTS 4u
 #define VK_FP_DEFAULT_INDEX_CAP (256u * 1024u)
+#define VK_FP_MAX_INDEX_CAP (16u * 1024u * 1024u)
 #define VK_FP_PARAM_BYTES 256u
 #define VK_FP_DUMMY_LIGHT_FLOATS 32u
 #define VK_FP_DUMMY_TILE_UINTS 32u
@@ -94,8 +96,20 @@ static qboolean vk_fp_want_compact_lists( void )
 
 static uint32_t vk_fp_index_capacity( uint32_t total_clusters )
 {
-	uint32_t cap = VK_FP_DEFAULT_INDEX_CAP;
+	uint32_t cap;
 	uint32_t min_cap;
+	uint32_t max_lights = ( r_clusterMaxLightsPerCluster &&
+		r_clusterMaxLightsPerCluster->integer > 0 ) ?
+		(uint32_t)r_clusterMaxLightsPerCluster->integer : VK_FP_MAX_COMPACT_PER_CLUSTER;
+	/* Unified clustered records several depth/pre-opaque and post-opaque culls
+	 * per frame. Keep four-pass headroom in the auto pool; explicit
+	 * r_clusterMaxIndices remains available for memory-constrained targets. */
+	uint64_t auto_cap = (uint64_t)total_clusters * (uint64_t)max_lights * 4u;
+
+	if ( auto_cap > VK_FP_MAX_INDEX_CAP ) {
+		auto_cap = VK_FP_MAX_INDEX_CAP;
+	}
+	cap = auto_cap > 0u ? (uint32_t)auto_cap : VK_FP_DEFAULT_INDEX_CAP;
 
 	if ( r_clusterMaxIndices && r_clusterMaxIndices->integer > 0 ) {
 		cap = (uint32_t)r_clusterMaxIndices->integer;
@@ -104,8 +118,8 @@ static uint32_t vk_fp_index_capacity( uint32_t total_clusters )
 	if ( cap < min_cap ) {
 		cap = min_cap;
 	}
-	if ( cap > 4u * 1024u * 1024u ) {
-		cap = 4u * 1024u * 1024u;
+	if ( cap > VK_FP_MAX_INDEX_CAP ) {
+		cap = VK_FP_MAX_INDEX_CAP;
 	}
 	return cap;
 }
@@ -172,6 +186,36 @@ static void vk_fp_compute_tile_grid( uint32_t *tiles_x, uint32_t *tiles_y, uint3
 }
 
 static void *vk_fp_tile_mapped = NULL;
+
+/* Compact-list metadata is written by the cull dispatch, not by the CPU.
+ * Console inspection is an explicit diagnostic operation, so synchronize the
+ * queue there before reading the mapped header. Never do this in the render
+ * loop: a premature read reports zero occupancy and would stall every frame. */
+static void vk_fp_sync_cluster_stats( void )
+{
+	VkMappedMemoryRange range;
+
+	if ( !vk.forward_plus.compact_lists || vk_fp_tile_mapped == NULL ||
+		vk.forward_plus.tile_memory == VK_NULL_HANDLE ) {
+		return;
+	}
+	if ( vk.queue != VK_NULL_HANDLE && qvkQueueWaitIdle != NULL ) {
+		qvkQueueWaitIdle( vk.queue );
+	}
+	if ( qvkInvalidateMappedMemoryRanges != NULL ) {
+		Com_Memset( &range, 0, sizeof( range ) );
+		range.sType = VK_STRUCTURE_TYPE_MAPPED_MEMORY_RANGE;
+		range.memory = vk.forward_plus.tile_memory;
+		range.offset = 0;
+		range.size = VK_WHOLE_SIZE;
+		qvkInvalidateMappedMemoryRanges( vk.device, 1, &range );
+	}
+	{
+		const uint32_t *meta = (const uint32_t *)vk_fp_tile_mapped;
+		vk.forward_plus.last_index_used = meta[0];
+		vk.forward_plus.last_overflow_count = meta[1];
+	}
+}
 
 static void vk_fp_destroy_tile_buffer_only( void )
 {
@@ -1454,7 +1498,10 @@ static void vk_forward_plus_dispatch_tile_cull_internal( qboolean use_depth_cull
 	barriers[1].size = VK_WHOLE_SIZE;
 
 	barriers[2].sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER;
-	barriers[2].srcAccessMask = 0;
+	/* The compact cursor/header is reset by the host immediately before the
+	 * cull dispatch. Make that write visible to the shader before atomics run;
+	 * srcAccess=0 allowed the cursor to accumulate across dispatches/frames. */
+	barriers[2].srcAccessMask = VK_ACCESS_HOST_WRITE_BIT;
 	barriers[2].dstAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
 	barriers[2].buffer = vk.forward_plus.tile_buffer;
 	barriers[2].offset = 0;
@@ -1565,15 +1612,6 @@ static void vk_forward_plus_dispatch_tile_cull_internal( qboolean use_depth_cull
 		VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
 		VK_PIPELINE_STAGE_VERTEX_SHADER_BIT | VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT | VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT | VK_PIPELINE_STAGE_HOST_BIT,
 		0, 0, NULL, 1, barriers, 0, NULL );
-
-	if ( vk.forward_plus.compact_lists && vk_fp_tile_mapped != NULL ) {
-		uint32_t *meta = (uint32_t *)vk_fp_tile_mapped;
-		vk.forward_plus.last_index_used = meta[0];
-		vk.forward_plus.last_overflow_count = meta[1];
-		if ( meta[1] > 0u ) {
-			meta[2] |= VK_CLUSTER_FLAG_OVERFLOW;
-		}
-	}
 
 	if ( use_depth_cull && vk.depth_image != VK_NULL_HANDLE ) {
 		record_depth_image_layout_transition( vk.cmd->command_buffer, depth_aspect,
@@ -1697,6 +1735,7 @@ static void vk_cluster_inspect_f( void )
 		ri.Printf( PRINT_ALL, "cluster_inspect: no tile buffer\n" );
 		return;
 	}
+	vk_fp_sync_cluster_stats();
 	tilesX = vk.forward_plus.tiles_x;
 	tilesY = vk.forward_plus.tiles_y;
 	zSlices = vk.forward_plus.z_slices > 0u ? vk.forward_plus.z_slices : 1u;
@@ -1764,13 +1803,27 @@ static void vk_hybrid_compare_status_f( void )
 static void vk_cluster_status_f( void )
 {
 	uint32_t total = vk.forward_plus.tile_capacity_tiles;
+	uint32_t stored = 0u;
+	uint32_t observed_max = 0u;
+	uint32_t i;
 	vkHizPyramidSampleInfo_t hizInfo;
 	qboolean hizReady = vk_hiz_get_pyramid_sample_info( &hizInfo );
 	qboolean hizDispatch = ( r_forwardPlusDepthCull && r_forwardPlusDepthCull->integer &&
 		r_forwardPlusHiZPyramid && r_forwardPlusHiZPyramid->integer && hizReady ) ? qtrue : qfalse;
+	vk_fp_sync_cluster_stats();
+	if ( vk.forward_plus.compact_lists && vk_fp_tile_mapped != NULL ) {
+		const uint32_t *cells = (const uint32_t *)vk_fp_tile_mapped;
+		for ( i = 0u; i < total; ++i ) {
+			const uint32_t count = cells[VK_FP_CLUSTER_LIST_META_UINTS + i * 2u + 1u];
+			stored += count;
+			if ( count > observed_max ) {
+				observed_max = count;
+			}
+		}
+	}
 	ri.Printf( PRINT_ALL,
 		"cluster_status: grid=%ux%ux%u tile=%u compact=%d fallback=%d gen=%u\n"
-		"  lights=%u indices=%u/%u overflow=%u policy=%d zNear=%.2f zFar=%.2f zScale=%.4f\n"
+		"  lights=%u alloc=%u/%u stored=%u overflow=%u policy=%d zNear=%.2f zFar=%.2f zScale=%.4f\n"
 		"  depthCull=%d probePad=%d pyramidCvar=%d pyramidDispatch=%d hizPyramid=%s %ux%u mips=%u layout=%u\n",
 		vk.forward_plus.tiles_x, vk.forward_plus.tiles_y, vk.forward_plus.z_slices,
 		VK_FP_TILE_DIM,
@@ -1778,7 +1831,7 @@ static void vk_cluster_status_f( void )
 		vk.forward_plus.fallback_legacy ? 1 : 0,
 		vk.forward_plus.cluster_list_generation,
 		vk.forward_plus.last_packed_count,
-		vk.forward_plus.last_index_used, vk.forward_plus.index_capacity,
+		vk.forward_plus.last_index_used, vk.forward_plus.index_capacity, stored,
 		vk.forward_plus.last_overflow_count,
 		r_clusterOverflowPolicy ? r_clusterOverflowPolicy->integer : 2,
 		vk.forward_plus.cluster_z_near, vk.forward_plus.cluster_z_far,
@@ -1789,11 +1842,23 @@ static void vk_cluster_status_f( void )
 		hizDispatch ? 1 : 0,
 		hizReady ? "ready" : ( vk_hiz_active() ? "not-ready" : "off" ),
 		hizInfo.width, hizInfo.height, hizInfo.levels, (unsigned)hizInfo.layout );
+	{
+		const vkVShadowBudget_t *shadow = vk_vshadow_budget();
+		const char *opaqueOwner = ( r_renderMode && r_renderMode->integer == 3 &&
+			r_deferredLighting && r_deferredLighting->integer ) ? "deferred" : "forward_plus";
+		const char *transparentOwner = ( r_oit && r_oit->integer ) ? "wboit" : "forward_plus";
+		ri.Printf( PRINT_ALL,
+			"  ownership: opaque=%s transparent=%s generation=%u shadowPages=%u/%u shadowLights=%u/%u shadowDrops=%u\n",
+			opaqueOwner, transparentOwner, vk.forward_plus.cluster_list_generation,
+			shadow ? shadow->pagesClaimed : 0u, shadow ? shadow->physicalPageBudget : 0u,
+			shadow ? shadow->localLightsAccepted : 0u, shadow ? shadow->localLightBudget : 0u,
+			shadow ? shadow->budgetDrops : 0u );
+	}
 	if ( total > 0u && vk.forward_plus.index_capacity > 0u ) {
 		float util = (float)vk.forward_plus.last_index_used / (float)vk.forward_plus.index_capacity;
-		float avg = (float)vk.forward_plus.last_index_used / (float)total;
-		ri.Printf( PRINT_ALL, "  utilization=%.1f%% avgOcc=%.2f maxPerCluster=%u\n",
-			util * 100.0f, avg, vk.forward_plus.max_per_tile );
+		float avg = (float)stored / (float)total;
+		ri.Printf( PRINT_ALL, "  allocationUtilization=%.1f%% avgStoredOcc=%.2f maxStored=%u maxPerCluster=%u\n",
+			util * 100.0f, avg, observed_max, vk.forward_plus.max_per_tile );
 	}
 }
 
@@ -1830,9 +1895,9 @@ void vk_cluster_register_commands( void )
 	ri.Cvar_CheckRange( r_clusterZFar, "16", "131072", CV_FLOAT );
 	ri.Cvar_SetDescription( r_clusterZFar,
 		"Cluster Z far clamp. Effective far = min(r_clusterZFar, camera_zFar), floored above zNear." );
-	r_clusterMaxIndices = ri.Cvar_Get( "r_clusterMaxIndices", "262144", CVAR_ARCHIVE_ND | CVAR_LATCH );
-	ri.Cvar_CheckRange( r_clusterMaxIndices, "4096", "4194304", CV_INTEGER );
-	ri.Cvar_SetDescription( r_clusterMaxIndices, "Compact cluster light-index pool capacity (uints). Latched." );
+	r_clusterMaxIndices = ri.Cvar_Get( "r_clusterMaxIndices", "0", CVAR_ARCHIVE_ND | CVAR_LATCH );
+	ri.Cvar_CheckRange( r_clusterMaxIndices, "0", "16777216", CV_INTEGER );
+	ri.Cvar_SetDescription( r_clusterMaxIndices, "Compact cluster light-index pool capacity (uints); 0=auto-size from clusters x max lights, capped at 16M (64 MiB). Latched." );
 	r_clusterMaxLightsPerCluster = ri.Cvar_Get( "r_clusterMaxLightsPerCluster", "32", CVAR_ARCHIVE_ND );
 	ri.Cvar_CheckRange( r_clusterMaxLightsPerCluster, "1", "32", CV_INTEGER );
 	ri.Cvar_SetDescription( r_clusterMaxLightsPerCluster, "Max lights retained per cluster (compact path)." );

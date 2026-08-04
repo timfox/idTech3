@@ -64,10 +64,25 @@ typedef struct vkVShadowStats_s {
 	uint32_t localRequests;
 	uint32_t localAtlasFallbacks;
 	uint32_t missingPageFallbacks;
+	uint32_t budgetDrops;
+	uint32_t localLightsAccepted;
+	uint32_t casterDrawBudget;
 	uint32_t pagePoolBytes;
 	uint32_t frameNumber;
 	float    fallbackPercent; /* 0..100 CSM/atlas share */
 } vkVShadowStats_t;
+
+/* One budget surface shared by CSM/atlas fallback and virtual clipmap pages. */
+typedef struct vkVShadowBudget_s {
+	uint32_t physicalPageBudget;
+	uint32_t pageRenderBudget;
+	uint32_t localLightBudget;
+	uint32_t casterDrawBudget;
+	uint32_t memoryBudgetBytes;
+	uint32_t pagesClaimed;
+	uint32_t localLightsAccepted;
+	uint32_t budgetDrops;
+} vkVShadowBudget_t;
 
 typedef struct vkVShadowClipmapState_s {
 	int      levels;
@@ -116,6 +131,7 @@ uint32_t vk_vshadow_virtual_id( int clipLevel, int pageX, int pageY, vkVShadowLi
 
 const vkVShadowPageMeta_t *vk_vshadow_page_meta( uint32_t physIndex );
 const vkVShadowStats_t *vk_vshadow_stats( void );
+const vkVShadowBudget_t *vk_vshadow_budget( void );
 const vkVShadowClipmapState_t *vk_vshadow_clipmap_state( void );
 
 /* Local-light demand; may fall back to atlas when pool exhausted. */

@@ -401,6 +401,17 @@ void vk_update_attachment_descriptors( void ) {
 			info.imageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
 			desc.dstSet = vk.ssr_descriptor[1];
 			qvkUpdateDescriptorSets( vk.device, 1, &desc, 0, NULL );
+
+			/* SSR reads the authoritative deferred material seam. */
+			sd.gl_mag_filter = sd.gl_min_filter = GL_LINEAR;
+			info.sampler = vk_find_sampler( &sd );
+			info.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+			info.imageView = vk.deferred_gbuffer_normal_view ? vk.deferred_gbuffer_normal_view : vk.color_image_view;
+			desc.dstSet = vk.ssr_descriptor[2];
+			qvkUpdateDescriptorSets( vk.device, 1, &desc, 0, NULL );
+			info.imageView = vk.deferred_gbuffer_material_view ? vk.deferred_gbuffer_material_view : vk.color_image_view;
+			desc.dstSet = vk.ssr_descriptor[3];
+			qvkUpdateDescriptorSets( vk.device, 1, &desc, 0, NULL );
 		}
 
 		// bloom images
@@ -1187,8 +1198,9 @@ void vk_init_descriptors( void )
 		}
 
 		if ( PostFX_SSR_IsEnabled() ) {
-			VK_CHECK( qvkAllocateDescriptorSets( vk.device, &alloc, &vk.ssr_descriptor[0] ) );
-			VK_CHECK( qvkAllocateDescriptorSets( vk.device, &alloc, &vk.ssr_descriptor[1] ) );
+			for ( i = 0; i < ARRAY_LEN( vk.ssr_descriptor ); i++ ) {
+				VK_CHECK( qvkAllocateDescriptorSets( vk.device, &alloc, &vk.ssr_descriptor[i] ) );
+			}
 		}
 
 		if ( r_bloom->integer )

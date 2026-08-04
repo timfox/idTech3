@@ -1,5 +1,10 @@
 # Clustered Lighting (Clustered Hybrid M2)
 
+The cluster layout follows Olsson, Billeter, and Assarsson,
+*Clustered Deferred and Forward Shading* (HPG 2012): fixed screen tiles plus
+exponentially spaced view-depth partitions provide bounded 3D light volumes
+instead of the depth-discontinuity failure mode of ordinary tiled shading.
+
 **Status:** Milestone 2  
 **Related:** [RENDERER_PATH_OWNERSHIP.md](RENDERER_PATH_OWNERSHIP.md), [UNIFIED_CLUSTERED_RENDERER.md](UNIFIED_CLUSTERED_RENDERER.md)
 
@@ -53,6 +58,11 @@ Build (single compute pass, markers `ClusterClear`→`ClusterFill`):
 
 Legacy fallback: fixed **8** slots/cluster (`r_clusterCompactLists 0` or `r_clusterForceBuildFailure 1`).
 
+The current engine intentionally stops at position/depth clustering. The
+paper's optional normal-cone clustering and hierarchical million-light
+assignment are follow-up work; `cluster_status` and the overflow policy are
+the current bounded ownership contract.
+
 ## Overflow policy (`r_clusterOverflowPolicy`)
 
 | Value | Behavior |
@@ -71,7 +81,7 @@ Assert: `vk_cluster_assert_shared_consumers()` logs header/light handles + gener
 
 | Command / cvar | Purpose |
 |----------------|---------|
-| `cluster_status` | Grid, slices, capacity, utilization, overflow, generation |
+| `cluster_status` | Grid, slices, capacity, utilization, overflow, generation, active opaque/transparent owners, and shadow-page/light budget admission |
 | `cluster_inspect` / `r_clusterInspect` | Crosshair cluster header + light indices |
 | `r_clusterDebug` / `r_forwardPlusDebug` **6** | Z-slice colors + crosshair slice id |
 | `r_hybridCompare` **0–8** | Split / abs RGB / relative luma / diffuse / spec / cluster / membership / shadow |
@@ -87,7 +97,7 @@ At 1920×1080, tile 16, Z=8 → ~120×68×8 ≈ 65K clusters.
 | Path | Footprint |
 |------|-----------|
 | Legacy | `clusters × 8 × 4` ≈ 2.1 MB |
-| Compact | `16 + clusters×8 + r_clusterMaxIndices×4` ≈ 0.5 MB headers + 1 MB indices (default 256K) |
+| Compact | `16 + clusters×8 + r_clusterMaxIndices×4` ≈ 0.5 MB headers + 1 MB indices (default 256K; auto cap 16M indices / 64 MiB) |
 
 Scale roughly with `ceil(W/16)×ceil(H/16)×Z`.
 

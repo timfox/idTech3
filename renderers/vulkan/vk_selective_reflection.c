@@ -15,6 +15,7 @@ Never add RT + SSR + probe at full strength.
 #include "vk_hybrid1.h"
 #include "vk_postfx.h"
 #include "tr_render_mode_vk.h"
+#include "vk_selective_rt.h"
 
 typedef struct {
 	qboolean inited;
@@ -105,6 +106,10 @@ static qboolean SHR_RtHealthReady( void )
 	}
 	if ( !vk_rtx_scene_ready() || !shr.tlasOk ) {
 		SHR_SetFallback( vk_rtx_scene_ready() ? "shr_tlas_unhealthy" : "shr_tlas_not_ready" );
+		return qfalse;
+	}
+	if ( !vk_srt_admit_reflection() ) {
+		SHR_SetFallback( "shr_selective_budget" );
 		return qfalse;
 	}
 	if ( !vk.rtxAvailable || !shr.rtPipelineOk || !vk_hybrid1_active() ) {

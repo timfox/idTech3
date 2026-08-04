@@ -25,6 +25,8 @@ void vk_render_graph_set_pass_executor( vkSpinePassId pass,
 
 void vk_render_graph_begin_frame( void );
 void vk_render_graph_import_resource( vkSpineResourceId res );
+qboolean vk_render_graph_enter_pass( vkSpinePassId pass );
+void vk_render_graph_leave_pass( vkSpinePassId pass );
 void vk_render_graph_observe_pass( vkSpinePassId pass );
 qboolean vk_render_graph_compile( void );
 qboolean vk_render_graph_execute( void );

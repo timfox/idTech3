@@ -231,6 +231,35 @@ static void PhysMiddleware_SpawnSphere_f( void ) {
 		body, radius, origin[0], origin[1], origin[2] );
 }
 
+static void PhysMiddleware_SpawnCapsule_f( void ) {
+	vec3_t origin;
+	float radius, height, mass;
+	physBodyHandle_t body;
+
+	VectorSet( origin, 0.0f, 0.0f, 64.0f );
+	radius = 8.0f;
+	height = 32.0f;
+	mass = 20.0f;
+	if ( Cmd_Argc() >= 4 ) {
+		origin[0] = (float)atof( Cmd_Argv( 1 ) );
+		origin[1] = (float)atof( Cmd_Argv( 2 ) );
+		origin[2] = (float)atof( Cmd_Argv( 3 ) );
+	}
+	if ( Cmd_Argc() >= 5 ) {
+		radius = (float)atof( Cmd_Argv( 4 ) );
+	}
+	if ( Cmd_Argc() >= 6 ) {
+		height = (float)atof( Cmd_Argv( 5 ) );
+	}
+	if ( Cmd_Argc() >= 7 ) {
+		mass = (float)atof( Cmd_Argv( 6 ) );
+	}
+	body = PhysProp_CreateCapsule( origin, radius, height, PHYS_BODY_DYNAMIC, mass, PHYS_MAT_RUBBER );
+	PhysMiddleware_TrackProp( body );
+	Com_Printf( "phys_spawn_capsule: body=%d r=%.1f h=%.1f mass=%.1f at (%.0f %.0f %.0f)\n",
+		body, radius, height, mass, origin[0], origin[1], origin[2] );
+}
+
 static void PhysMiddleware_SpawnStatic_f( void ) {
 	vec3_t origin, half;
 	physBodyHandle_t body;
@@ -1120,6 +1149,7 @@ void PhysMiddleware_RegisterCommands( void ) {
 	Cmd_AddCommand( "phys_clear_ragdolls", PhysMiddleware_ClearRagdolls_f );
 	Cmd_AddCommand( "phys_spawn_box", PhysMiddleware_SpawnBox_f );
 	Cmd_AddCommand( "phys_spawn_sphere", PhysMiddleware_SpawnSphere_f );
+	Cmd_AddCommand( "phys_spawn_capsule", PhysMiddleware_SpawnCapsule_f );
 	Cmd_AddCommand( "phys_spawn_static", PhysMiddleware_SpawnStatic_f );
 	Cmd_AddCommand( "phys_spawn_compound", PhysMiddleware_SpawnCompound_f );
 	Cmd_AddCommand( "phys_spawn_cloth", PhysMiddleware_SpawnCloth_f );
@@ -1200,6 +1230,7 @@ void PhysMiddleware_Shutdown( void ) {
 	Cmd_RemoveCommand( "phys_clear_ragdolls" );
 	Cmd_RemoveCommand( "phys_spawn_box" );
 	Cmd_RemoveCommand( "phys_spawn_sphere" );
+	Cmd_RemoveCommand( "phys_spawn_capsule" );
 	Cmd_RemoveCommand( "phys_spawn_static" );
 	Cmd_RemoveCommand( "phys_spawn_compound" );
 	Cmd_RemoveCommand( "phys_spawn_cloth" );

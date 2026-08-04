@@ -507,8 +507,7 @@ void SV_SpawnServer( const char *mapname, qboolean killBots ) {
 	// shut down the existing game if it is running
 	SV_ShutdownGameProgs();
 
-	Com_Printf( "------ Server Initialization ------\n" );
-	Com_Printf( "Server: %s\n", mapname );
+	Com_Printf( "[init][server] begin map=%s\n", mapname );
 
 	Sys_SetStatus( "Initializing server..." );
 
@@ -805,7 +804,7 @@ void SV_SpawnServer( const char *mapname, qboolean killBots ) {
 
 	Hunk_SetMark();
 
-	Com_Printf ("-----------------------------------\n");
+	Com_Printf ("[init][server] ready map=%s\n", mapname);
 
 	Sys_SetStatus( "Running map %s", mapname );
 
@@ -1067,7 +1066,7 @@ void SV_Shutdown( const char *finalmsg ) {
 	SV_TV_StreamEnd();
 	SV_TVStream_Shutdown();
 
-	Com_Printf( "----- Server Shutdown (%s) -----\n", finalmsg );
+	Com_Printf( "[shutdown][server] begin reason=\"%s\"\n", finalmsg );
 
 #ifdef USE_IPV6
 	NET_LeaveMulticast6();
@@ -1110,7 +1109,7 @@ void SV_Shutdown( const char *finalmsg ) {
 	Cvar_Set( "ui_singlePlayerActive", "0" );
 #endif
 
-	Com_Printf( "---------------------------\n" );
+	Com_Printf( "[shutdown][server] complete\n" );
 
 #ifndef DEDICATED
 	// disconnect any local clients

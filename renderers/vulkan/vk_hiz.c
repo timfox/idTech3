@@ -323,8 +323,13 @@ static float HIZ_SampleHostMin( int x0, int y0, int x1, int y1 )
 	/* reversed-Z: farthest in region = minimum stored depth */
 	zFar = 1.0f;
 	for ( y = y0; y <= y1; y++ ) {
+		const float *row = src->mapped + y * (int)src->width;
 		for ( x = x0; x <= x1; x++ ) {
-			float z = src->mapped[y * (int)src->width + x];
+			float z = row[x];
+			/* Reversed-Z clear/far is the global minimum; no lower result exists. */
+			if ( z <= 0.0f ) {
+				return 0.0f;
+			}
 			if ( z < zFar ) {
 				zFar = z;
 			}
@@ -696,8 +701,6 @@ static qboolean HIZ_DispatchGpuDownsample( VkCommandBuffer cmd )
 		VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT );
 
 	qvkCmdBindPipeline( cmd, VK_PIPELINE_BIND_POINT_COMPUTE, s_compute.pipeline );
-	qvkCmdBindDescriptorSets( cmd, VK_PIPELINE_BIND_POINT_COMPUTE, s_compute.pipelineLayout,
-		0, 1, &s_compute.descriptor, 0, NULL );
 
 	for ( mip = 0; mip < s_pyramid.levels; mip++ ) {
 		uint32_t dstW, dstH, srcW, srcH;
@@ -715,6 +718,13 @@ static qboolean HIZ_DispatchGpuDownsample( VkCommandBuffer cmd )
 		}
 
 		HIZ_BindMipDescriptors( depthView, srcView, s_pyramid.views[mip] );
+		/*
+		 * Descriptor contents are read when the command executes, not when
+		 * the set is updated. Rebind after each per-mip update so every
+		 * dispatch captures its own source/destination views.
+		 */
+		qvkCmdBindDescriptorSets( cmd, VK_PIPELINE_BIND_POINT_COMPUTE, s_compute.pipelineLayout,
+			0, 1, &s_compute.descriptor, 0, NULL );
 
 		Com_Memset( &push, 0, sizeof( push ) );
 		push.srcExtent[0] = srcW;

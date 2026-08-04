@@ -73,7 +73,7 @@ static void R_LatchUnifiedClusteredBase( void )
 {
 	R_LatchCvarInt( r_forwardPlus, "r_forwardPlus", 1 );
 	R_LatchCvarInt( r_forwardPlusDepthCull, "r_forwardPlusDepthCull", 1 );
-	R_LatchCvarInt( r_forwardPlusZSlices, "r_forwardPlusZSlices", 8 );
+	R_LatchCvarInt( r_forwardPlusZSlices, "r_forwardPlusZSlices", 16 );
 	R_LatchCvarInt( r_forwardPlusZSliceMode, "r_forwardPlusZSliceMode", 1 );
 	R_LatchCvarInt( r_deferredGBuffer, "r_deferredGBuffer", 1 );
 	R_LatchCvarInt( r_deferredGBufferFill, "r_deferredGBufferFill", 1 );

@@ -877,6 +877,21 @@ void R_DeferredStatus_f( void )
 		vk_deferred_lighting_path_ready() ? "yes" : "no",
 		vk_deferred_lighting_active() ? "yes" : "no",
 		vk.deferredGbufferDirectExport ? "yes" : "no" );
+	/* Keep the readiness gate actionable in live captures.  A mode/cvar report
+	 * alone cannot distinguish an extent mismatch, a soft fallback, or a late
+	 * missing clustered resource. */
+	ri.Printf( PRINT_ALL,
+		"pathGates: resources=%d fill=%d generation=%d fallback=%d images=%d lights=%d clusters=%d failures=%d/%d\n",
+		vk_deferred_gbuffer_resources_wanted() ? 1 : 0,
+		vk_deferred_gbuffer_fill_wanted() ? 1 : 0,
+		vk_deferred_gbuffer_generation_valid() ? 1 : 0,
+		vk.deferredGbufferFallbackActive ? 1 : 0,
+		( vk.deferred_lighting_image != VK_NULL_HANDLE &&
+			vk.deferred_lighting_view != VK_NULL_HANDLE ) ? 1 : 0,
+		( vk.forward_plus.buffer != VK_NULL_HANDLE ) ? 1 : 0,
+		( vk.forward_plus.tile_buffer != VK_NULL_HANDLE ) ? 1 : 0,
+		vk.deferred_gbuffer.lighting_create_failed ? 1 : 0,
+		vk.deferred_gbuffer.composite_create_failed ? 1 : 0 );
 	ri.Printf( PRINT_ALL,
 		"opaqueSurfaces=%u\n"
 		"deferredEligible=%u (full=%u approx=%u)\n"
@@ -1090,4 +1105,19 @@ void vk_deferred_honesty_register( void )
 			R_DeferredCompositeMode_Name( (deferredCompositeMode_t)r_deferredCompositeMode->integer ) );
 		s_logged = qtrue;
 	}
+}
+
+void vk_deferred_honesty_shutdown( void )
+{
+	if ( !s_registered ) {
+		return;
+	}
+
+	/* These handlers live in the Vulkan DSO. Remove them before vid_restart
+	 * unloads the DSO, otherwise deferred_status can call stale code. */
+	ri.Cmd_RemoveCommand( "deferred_status" );
+	ri.Cmd_RemoveCommand( "deferred_architecture_status" );
+	ri.Cmd_RemoveCommand( "deferred_architecture_validate" );
+	ri.Cmd_RemoveCommand( "material_translate_status" );
+	s_registered = qfalse;
 }

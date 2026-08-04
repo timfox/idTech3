@@ -567,12 +567,17 @@ static void R_AddDeferredLightDemoLights( void )
 	};
 	const int maxAdd = (int)ARRAY_LEN( backEndData->dlights ) - r_numdlights;
 	int count, i;
-	float radius, phase;
+	float radius, phase, distance, energy;
 
+	/* Keep the status counter tied to the main world scene. HUD/weapon/UI
+	 * scenes also call this hook and must not erase evidence that the world
+	 * received the synthetic lights earlier in the frame. */
+	if ( tr.refdef.rdflags & RDF_NOWORLDMODEL ) {
+		return;
+	}
 	r_deferredLightDemoLastAdded = 0;
 	if ( !r_deferredLightDemo || !r_deferredLightDemo->integer ||
-		!r_deferredLightDemoCount || r_deferredLightDemoCount->integer <= 0 ||
-		( tr.refdef.rdflags & RDF_NOWORLDMODEL ) ) {
+		!r_deferredLightDemoCount || r_deferredLightDemoCount->integer <= 0 ) {
 		return;
 	}
 
@@ -588,6 +593,10 @@ static void R_AddDeferredLightDemoLights( void )
 	}
 
 	radius = r_deferredLightDemoRadius ? r_deferredLightDemoRadius->value : 360.0f;
+	distance = r_deferredLightDemoDistance ?
+		Com_Clamp( 160.0f, 1024.0f, r_deferredLightDemoDistance->value ) : 520.0f;
+	energy = r_deferredLightDemoEnergy ?
+		Com_Clamp( 0.25f, 4.0f, r_deferredLightDemoEnergy->value ) : 1.0f;
 	phase = ( r_deferredLightDemoAnimate && r_deferredLightDemoAnimate->integer ) ?
 		(float)tr.refdef.floatTime : 0.0f;
 
@@ -601,12 +610,12 @@ static void R_AddDeferredLightDemoLights( void )
 		const float swirl = cosf( phase * 1.1f + (float)i * 0.23f );
 		const float colorPulse = 0.75f + 0.25f * sinf( phase * 2.3f + (float)i );
 
-		VectorMA( tr.refdef.vieworg, 520.0f + 38.0f * v, tr.refdef.viewaxis[0], org );
+		VectorMA( tr.refdef.vieworg, distance + 38.0f * v, tr.refdef.viewaxis[0], org );
 		VectorMA( org, u * 145.0f + swirl * 34.0f, tr.refdef.viewaxis[1], org );
 		VectorMA( org, 48.0f + v * 32.0f + wave * 70.0f, tr.refdef.viewaxis[2], org );
 
-		RE_AddDynamicLightToScene( org, radius, colors[i & 7][0] * colorPulse,
-			colors[i & 7][1] * colorPulse, colors[i & 7][2] * colorPulse, qfalse );
+		RE_AddDynamicLightToScene( org, radius, colors[i & 7][0] * colorPulse * energy,
+			colors[i & 7][1] * colorPulse * energy, colors[i & 7][2] * colorPulse * energy, qfalse );
 		r_deferredLightDemoLastAdded++;
 	}
 }
@@ -614,12 +623,14 @@ static void R_AddDeferredLightDemoLights( void )
 void R_DeferredLightDemoStatus_f( void )
 {
 	ri.Printf( PRINT_ALL,
-		"deferred many lights: enabled=%d requested=%d lastAdded=%d radius=%.1f animate=%d "
+		"deferred many lights: enabled=%d requested=%d lastAdded=%d radius=%.1f distance=%.1f energy=%.2f animate=%d "
 		"renderMode=%d deferredLighting=%d forwardPlus=%d\n",
 		r_deferredLightDemo ? r_deferredLightDemo->integer : 0,
 		r_deferredLightDemoCount ? r_deferredLightDemoCount->integer : 0,
 		r_deferredLightDemoLastAdded,
 		r_deferredLightDemoRadius ? r_deferredLightDemoRadius->value : 0.0f,
+		r_deferredLightDemoDistance ? r_deferredLightDemoDistance->value : 520.0f,
+		r_deferredLightDemoEnergy ? r_deferredLightDemoEnergy->value : 1.0f,
 		r_deferredLightDemoAnimate ? r_deferredLightDemoAnimate->integer : 0,
 		r_renderMode ? r_renderMode->integer : -1,
 		r_deferredLighting ? r_deferredLighting->integer : 0,
@@ -684,6 +695,7 @@ void RE_BeginScene( const refdef_t *fd ) {
 	tr.refdef.entities = &backEndData->entities[r_firstSceneEntity];
 
 	R_AddDeferredLightDemoLights();
+	R_SourceEntities_AddLights();
 
 	tr.refdef.num_dlights = r_numdlights - r_firstSceneDlight;
 	tr.refdef.dlights = &backEndData->dlights[r_firstSceneDlight];

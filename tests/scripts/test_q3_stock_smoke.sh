@@ -1,12 +1,30 @@
 #!/usr/bin/env bash
-# Runtime smoke: stock Quake III Arena map load via retail cgame.qvm (needs baseq3 pk3s).
+# Runtime smoke: OpenArena map load via the compatible QVM path.
+#
+# The test remains overridable with Q3_STOCK_BASEPATH/Q3_STOCK_BASEGAME/
+# Q3_STOCK_MAP for retail Q3 or another compatible installation.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 RELEASE="${1:-$ROOT/release}"
 CLIENT="$RELEASE/idtech3"
 TIMEOUT_SEC="${Q3_STOCK_SMOKE_TIMEOUT:-20}"
-BASEPATH="${Q3_STOCK_BASEPATH:-$RELEASE}"
+
+if [ -n "${Q3_STOCK_BASEPATH:-}" ]; then
+	BASEPATH="$Q3_STOCK_BASEPATH"
+else
+	BASEPATH="$RELEASE"
+	for candidate in \
+		"${OPENARENA_BASEPATH:-}" \
+		"$ROOT/../OpenArena/release" \
+		"$ROOT/../openarena" \
+		"/usr/share/games/openarena"; do
+		if [ -n "$candidate" ] && { [ -d "$candidate/openarena" ] || [ -d "$candidate/baseoa" ]; }; then
+			BASEPATH="$candidate"
+			break
+		fi
+	done
+fi
 
 if [ ! -x "$CLIENT" ]; then
 	echo "SKIP: no client at $CLIENT"
@@ -18,11 +36,19 @@ if ! command -v timeout >/dev/null 2>&1; then
 	exit 0
 fi
 
-BASEGAME="${Q3_STOCK_BASEGAME:-baseq3}"
-MAP="${Q3_STOCK_MAP:-q3dm1}"
+if [ -n "${Q3_STOCK_BASEGAME:-}" ]; then
+	BASEGAME="$Q3_STOCK_BASEGAME"
+elif [ -d "$BASEPATH/baseoa" ]; then
+	BASEGAME="baseoa"
+elif [ -d "$BASEPATH/openarena" ]; then
+	BASEGAME="openarena"
+else
+	BASEGAME="openarena"
+fi
+MAP="${Q3_STOCK_MAP:-dm4ish}"
 
 if ! find "$BASEPATH" -maxdepth 3 \( -name 'pak*.pk3' -o -name '*.pk3' \) 2>/dev/null | head -1 | grep -q .; then
-	echo "SKIP: no retail pk3 data under $BASEPATH (set Q3_STOCK_BASEPATH or install baseq3)"
+	echo "SKIP: no OpenArena pk3 data under $BASEPATH (set Q3_STOCK_BASEPATH or install OpenArena)"
 	exit 0
 fi
 
@@ -36,6 +62,10 @@ run_map() {
 		+set fs_basegame "$BASEGAME" \
 		+set sv_pure 0 \
 		+set r_fullscreen 0 \
+		+set r_mode 3 \
+		+set r_fbo 0 \
+		+set r_oit 0 \
+		+set r_ssao 0 \
 		+set com_idleSleep 0 \
 		+set cl_autoGraphicsProfile 1 \
 		+set activeAction "+forward; +attack" \
@@ -50,8 +80,8 @@ run_map() {
 		return 1
 	fi
 
-	if ! grep -qE 'cl_autoGraphicsProfile: classic baseq3|stock baseq3 mode' "$log"; then
-		echo "WARN: stock map $map — classic profile log not seen (cfg may be missing from base/)"
+	if ! grep -qE 'cl_autoGraphicsProfile: classic (baseq3|openarena)|stock (baseq3|OpenArena) mode' "$log"; then
+		echo "WARN: stock map $map — classic profile log not seen (cfg may be missing from OpenArena data)"
 	fi
 
 	if ! grep -q 'spawn CM AABB' "$log"; then

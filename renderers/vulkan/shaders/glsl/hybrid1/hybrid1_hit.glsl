@@ -2,6 +2,8 @@
  * Parent rchit must enable GL_EXT_nonuniform_qualifier.
  */
 
+#include "../surface_material_decode.glsl"
+
 layout( set = 0, binding = 9, std430 ) readonly buffer WorldAlbedoSSBO {
 	float rgb[];
 } worldAlbedo;
@@ -186,4 +188,13 @@ vec3 hybrid1_sampleHitAlbedo( sampler2D albedoTex )
 		return hybrid1_defaultAlbedo();
 	}
 	return albedo;
+}
+
+SurfaceMaterial hybrid1_decodeHitMaterial( vec3 baseColor, vec3 normalWS )
+{
+	/* RTX currently receives legacy-compatible scalar defaults until the
+	 * per-primitive physical-map stream is enabled. Keep that fallback in the
+	 * same canonical seam used by raster and transparency. */
+	return SurfaceMaterialDecodeLegacy( baseColor, 1.0, normalWS,
+		SURFACE_LEGACY_EMISSIVE, 0u, 0u, OPAQUE_OWNER_SPECIALIZED, 0u );
 }

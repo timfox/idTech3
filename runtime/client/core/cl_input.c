@@ -391,6 +391,7 @@ stays idle — still needs pointer mode (free look off, free cursor).
 */
 qboolean CL_RpMenuActive( void ) {
 	return ( Cvar_VariableIntegerValue( "ui_rpMenu" ) != 0 ||
+	         Cvar_VariableIntegerValue( "ui_1337MainMenu" ) != 0 ||
 	         Cvar_VariableIntegerValue( "ui_surfMapSelect" ) != 0 ||
 	         Cvar_VariableIntegerValue( "ui_surfLeaderboard" ) != 0 ||
 	         Cvar_VariableIntegerValue( "ui_social" ) != 0 ) ? qtrue : qfalse;
@@ -503,7 +504,11 @@ CL_MouseEvent
 void CL_MouseEvent( int dx, int dy /*, int time*/ ) {
 	/* Unguarded like CL_KeyEvent: Com_ScriptEmitEvent is always linked. */
 	Com_ScriptEmitEvent( "mouse_move", NULL, NULL, dx, dy );
-	if ( Key_GetCatcher() & KEYCATCH_UI ) {
+	if ( Cvar_VariableIntegerValue( "ui_social" ) ) {
+		/* Social owns the pointer while active; do not leak look deltas or
+		 * movement into the console, chat, legacy UI, or cgame. */
+		return;
+	} else if ( Key_GetCatcher() & KEYCATCH_UI ) {
 		VM_Call( uivm, 2, UI_MOUSE_EVENT, dx, dy );
 	} else if ( CL_RpMenuActive() ) {
 		/* Pointer mode for JS City Menu — do not apply look deltas. */

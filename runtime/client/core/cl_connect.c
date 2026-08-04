@@ -11,6 +11,7 @@ Client connection: connect/disconnect, rcon, OOB packets, resend/timeout.
 #include "cl_p2p_session.h"
 #include "cl_serverbrowser.h"
 #include "cl_demo.h"
+#include "cl_cmds.h"
 #include "net_p2p.h"
 
 #include <string.h>
@@ -55,6 +56,8 @@ qboolean CL_Disconnect( qboolean showMainMenu ) {
 	if ( !com_cl_running || !com_cl_running->integer ) {
 		return cl_restarted;
 	}
+
+	CL_SocialOverlayReset( "disconnect" );
 
 	if ( cl_disconnecting ) {
 		return cl_restarted;
@@ -301,6 +304,19 @@ void CL_Disconnect_f( void ) {
 				CL_JsNotifyMenuChanged( UIMENU_MAIN );
 			}
 		}
+	}
+
+	/*
+	 * `disconnect` is also the Surf pause-menu's "MAIN MENU" action.  The
+	 * command is intentionally idempotent, so it must still activate the menu
+	 * when the client was already disconnected (for example after a failed map
+	 * load or a previous disconnect).  Previously this branch did nothing,
+	 * leaving ui_1337MainMenu cleared and trapping the client outside the title
+	 * screen.
+	 */
+	if ( cls.state == CA_DISCONNECTED && uivm ) {
+		VM_Call( uivm, 1, UI_SET_ACTIVE_MENU, UIMENU_MAIN );
+		CL_JsNotifyMenuChanged( UIMENU_MAIN );
 	}
 }
 

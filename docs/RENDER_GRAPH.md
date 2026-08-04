@@ -1,8 +1,9 @@
 # Vulkan Render Graph
 
 The Vulkan renderer now has a real render graph core in `renderers/vulkan/vk_render_graph.c`.
-It is deliberately wired behind the existing Spine pass registry so the current renderer can
-keep recording commands while the graph learns the frame and validates ordering.
+It is wired behind the existing Spine pass registry. The current renderer still records
+commands in its established functions, but entry/exit and known-image ownership are now
+centralized at the graph boundary.
 
 ## What It Does
 
@@ -19,6 +20,10 @@ keep recording commands while the graph learns the frame and validates ordering.
 - Exposes `render_graph_dot` for Graphviz-compatible dependency output with resource/access labels.
 - Provides `vk_render_graph_set_pass_executor` and `vk_render_graph_execute` for migrating passes
   from observation-only recording to graph-owned execution.
+- `r_spineAuthoritative 1` (default) makes `vk_spine_pass_begin/end` enter and leave graph-owned
+  pass scopes. The single `record_image_layout_transition` helper reports every known renderer
+  image transition to the owning Spine resource, including old-layout mismatches when validation
+  is enabled.
 
 ## Current Integration
 
@@ -28,11 +33,13 @@ keep recording commands while the graph learns the frame and validates ordering.
 At runtime:
 
 - `vk_spine_frame_begin` calls `vk_render_graph_begin_frame`.
-- `vk_spine_pass_begin` calls `vk_render_graph_observe_pass`.
+- `vk_spine_pass_begin/end` call `vk_render_graph_enter_pass/leave_pass`; undeclared or mismatched
+  scopes are rejected and reported.
 - `vk_spine_frame_end` calls `vk_render_graph_end_frame`, which compiles the observed graph.
 
-This means current renderer behavior is preserved, but every frame now produces a compiled graph
-that can be inspected and validated.
+This preserves command recording order while making the graph the ownership boundary for pass
+scopes and known image layouts. Every frame still produces a compiled graph that can be inspected
+and validated.
 
 `renderer_status` prints a compact `graph` row, and `renderer_subsystems` prints a fuller
 `rendergraph` row with observed pass count, compiled pass count, dependency count, per-frame

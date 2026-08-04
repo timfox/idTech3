@@ -48,7 +48,10 @@ void CL_InitCvars( void )
 	/* The legacy UI VM still owns the menu lifecycle.  Keep the polished Surf
 	 * menus in the same lifecycle by mirroring its top-level menu state into
 	 * explicit, non-archived JS flags. */
-	cv = Cvar_Get( "ui_1337MainMenu", "0", CVAR_TEMP );
+	/* Surf starts in its native 1337 title screen.  The launcher may still
+	 * override this for direct map runs, but the executable must not depend on
+	 * a shell script to reach the main menu. */
+	cv = Cvar_Get( "ui_1337MainMenu", "1", CVAR_TEMP );
 	Cvar_SetDescription( cv, "Surf 1337 glass main menu active flag." );
 	cv = Cvar_Get( "ui_1337PlayMenu", "0", CVAR_TEMP );
 	cv = Cvar_Get( "ui_1337TournamentMenu", "0", CVAR_TEMP );

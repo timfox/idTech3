@@ -4056,6 +4056,8 @@ void Com_Init( char *commandLine ) {
 	const char *s;
 	int	qport;
 
+	Com_Printf( "[init][common] begin\n" );
+
 	// get the initial time base
 	Sys_Milliseconds();
 
@@ -4449,7 +4451,7 @@ void Com_Init( char *commandLine ) {
 	Cem_ConsoleInit();
 #endif
 
-	Com_Printf( "--- Common Initialization Complete ---\n" );
+	Com_Printf( "[init][common] complete\n" );
 
 	NET_Init();
 	DAP_Init();

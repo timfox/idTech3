@@ -86,6 +86,13 @@ WBOIT accum (`oit_accum.frag`) samples **CSM via shadow-contract set 3** (`Shado
 
 Contract tracking: CPU-only, negligible. CSM: 1–4 extra depth passes (GPU bound). Vshadow: amortized page fill — see [RASTER_ULTRA docs](RASTER_ULTRA_1.6.md).
 
+Shadow work is admitted through explicit budgets: physical pages
+(`r_vshadowPoolPages`), new page requests (`r_shadowPageRequestBudget`), dirty
+page renders (`r_vshadowRenderBudget`), local virtual-light requests
+(`r_shadowLocalLightBudget`), and reserved caster work
+(`r_shadowCasterDrawBudget`). Budget drops remain on the certified CSM/local
+atlas fallback path; ReSTIR and neural lighting do not allocate shadow work.
+
 ---
 
 ## Known limitations

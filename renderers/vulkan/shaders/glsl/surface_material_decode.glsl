@@ -6,6 +6,47 @@
 #ifndef SURFACE_MATERIAL_DECODE_GLSL
 #define SURFACE_MATERIAL_DECODE_GLSL
 
+/* These defaults are part of the legacy material ABI.  Every consumer that
+ * does not have a physical map uses the same values; do not duplicate them in
+ * a lighting path. */
+const float SURFACE_LEGACY_ROUGHNESS = 0.72;
+const float SURFACE_LEGACY_METALLIC = 0.0;
+const float SURFACE_LEGACY_AO = 1.0;
+const vec3 SURFACE_LEGACY_EMISSIVE = vec3( 0.0 );
+
+const uint SURFACE_ALPHA_TEST_NONE = 0u;
+const uint SURFACE_ALPHA_TEST_GT = 1u;
+const uint SURFACE_ALPHA_TEST_GE = 2u;
+/* Legacy alphaFunc encoding used by the generated raster pipelines. */
+const uint SURFACE_ALPHA_TEST_NE = 3u;
+const uint SURFACE_ALPHA_TEST_LT = 4u;
+const uint SURFACE_ALPHA_TEST_LE = 5u;
+
+bool SurfaceAlphaTestPass( float alpha, float threshold, uint mode )
+{
+	if ( mode == SURFACE_ALPHA_TEST_NONE ) {
+		return true;
+	}
+	if ( mode == SURFACE_ALPHA_TEST_NE ) {
+		return alpha != threshold;
+	}
+	if ( mode == SURFACE_ALPHA_TEST_LT ) {
+		return alpha < threshold;
+	}
+	if ( mode == SURFACE_ALPHA_TEST_LE ) {
+		return alpha <= threshold;
+	}
+	return ( mode == SURFACE_ALPHA_TEST_GE ) ? alpha >= threshold : alpha > threshold;
+}
+
+bool SurfaceAlphaTestPassLegacy( float alpha, float threshold, int func )
+{
+	if ( func == 1 ) return SurfaceAlphaTestPass( alpha, threshold, SURFACE_ALPHA_TEST_NE );
+	if ( func == 2 ) return SurfaceAlphaTestPass( alpha, threshold, SURFACE_ALPHA_TEST_LT );
+	if ( func == 3 ) return SurfaceAlphaTestPass( alpha, threshold, SURFACE_ALPHA_TEST_GE );
+	return true;
+}
+
 const uint OPAQUE_OWNER_INVALID = 0u;
 const uint OPAQUE_OWNER_DEFERRED = 1u;
 const uint OPAQUE_OWNER_FORWARD_PLUS = 2u;
@@ -53,6 +94,17 @@ SurfaceMaterial SurfaceMaterialDecodeCanonical(
 	m.lightingOwner = lightingOwner;
 	m.lightmapIndex = lightmapIndex;
 	return m;
+}
+
+SurfaceMaterial SurfaceMaterialDecodeLegacy(
+	vec3 baseColor, float opacity, vec3 normalWS,
+	vec3 emissive, uint materialFlags, uint shadingModel,
+	uint lightingOwner, uint lightmapIndex )
+{
+	return SurfaceMaterialDecodeCanonical( baseColor, opacity, normalWS,
+		SURFACE_LEGACY_ROUGHNESS, SURFACE_LEGACY_METALLIC, SURFACE_LEGACY_AO,
+		emissive, 0.0, SURFACE_LEGACY_ROUGHNESS, 0.0,
+		materialFlags, shadingModel, lightingOwner, lightmapIndex );
 }
 
 #endif

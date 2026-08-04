@@ -55,6 +55,8 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "extensions/scaffold/vk_arc_blanc.h"
 #include "extensions/scaffold/vk_emulator_screen.h"
 #include "extensions/scaffold/vk_webcam_screen.h"
+#include "extensions/scaffold/vk_hair_deferred.h"
+#include "extensions/scaffold/vk_vector_brush.h"
 #include "vk_raygun.h"
 #include "vk_fluidsim.h"
 #include "vk_terrain.h"
@@ -253,6 +255,8 @@ cvar_t	*r_dlightSaturation;
 cvar_t	*r_deferredLightDemo;
 cvar_t	*r_deferredLightDemoCount;
 cvar_t	*r_deferredLightDemoRadius;
+cvar_t	*r_deferredLightDemoDistance;
+cvar_t	*r_deferredLightDemoEnergy;
 cvar_t	*r_deferredLightDemoAnimate;
 #ifdef USE_VULKAN
 cvar_t	*r_device;
@@ -491,6 +495,9 @@ cvar_t	*r_dlightBacks;
 
 cvar_t	*r_lodbias;
 cvar_t	*r_lodscale;
+cvar_t	*r_bspLod;
+cvar_t	*r_bspLodDistance;
+cvar_t	*r_sourceEntities;
 
 cvar_t	*r_norefresh;
 cvar_t	*r_drawentities;
@@ -1330,6 +1337,10 @@ static void R_Register( void )
 	ri.Cmd_AddCommand( "shaderlist", R_ShaderList_f );
 	ri.Cmd_AddCommand( "skinlist", R_SkinList_f );
 	ri.Cmd_AddCommand( "modellist", R_Modellist_f );
+	ri.Cmd_AddCommand( "bsp_lod_status", R_BspLODStatus_f );
+	ri.Cmd_AddCommand( "source_vbsp_status", R_SourceVBSP_Status_f );
+	ri.Cmd_AddCommand( "source_fgd_load", R_SourceEntities_LoadFGD_f );
+	ri.Cmd_AddCommand( "source_fgd_status", R_SourceEntities_FGDStatus_f );
 	ri.Cmd_AddCommand( "screenshot", R_ScreenShot_f );
 	ri.Cmd_AddCommand( "screenshotJPEG", R_ScreenShot_f );
 	ri.Cmd_AddCommand( "screenshotBMP", R_ScreenShot_f );
@@ -1662,6 +1673,15 @@ static void R_Register( void )
 	r_lodCurveError = ri.Cvar_Get( "r_lodCurveError", "250", CVAR_ARCHIVE_ND );
 	ri.Cvar_CheckRange( r_lodCurveError, "-1", "8192", CV_FLOAT );
 	ri.Cvar_SetDescription( r_lodCurveError, "Level of detail error on curved surface grids. Higher values result in better quality at a distance." );
+	r_bspLod = ri.Cvar_Get( "r_bspLod", "1", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_bspLod, "0", "2", CV_INTEGER );
+	ri.Cvar_SetDescription( r_bspLod, "Planar BSP face LOD: 0 off, 1 balanced, 2 aggressive." );
+	r_bspLodDistance = ri.Cvar_Get( "r_bspLodDistance", "8", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_bspLodDistance, "1", "128", CV_FLOAT );
+	ri.Cvar_SetDescription( r_bspLodDistance, "Distance-to-face-radius ratio before planar BSP LOD reduces topology." );
+	r_sourceEntities = ri.Cvar_Get( "r_sourceEntities", "1", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_sourceEntities, "0", "1", CV_INTEGER );
+	ri.Cvar_SetDescription( r_sourceEntities, "Enable clean-room Source-inspired VBSP entity adapters." );
 	r_lodbias = ri.Cvar_Get( "r_lodbias", "-2", CVAR_ARCHIVE_ND );
 	ri.Cvar_SetDescription( r_lodbias, "Sets the level of detail of in-game models:\n -2: Ultra (further delays LOD transition in the distance)\n -1: Very High (delays LOD transition in the distance)\n 0: High\n 1: Medium\n 2: Low" );
 
@@ -1795,6 +1815,16 @@ static void R_Register( void )
 	ri.Cvar_SetDescription( r_deferredLightDemoRadius,
 		"Radius/intensity of deferred many-light demo lights." );
 	ri.Cvar_SetGroup( r_deferredLightDemoRadius, CVG_RENDERER );
+	r_deferredLightDemoDistance = ri.Cvar_Get( "r_deferredLightDemoDistance", "520", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_deferredLightDemoDistance, "160", "1024", CV_FLOAT );
+	ri.Cvar_SetDescription( r_deferredLightDemoDistance,
+		"Forward distance of deferred many-light demo lights; tune for map visibility." );
+	ri.Cvar_SetGroup( r_deferredLightDemoDistance, CVG_RENDERER );
+	r_deferredLightDemoEnergy = ri.Cvar_Get( "r_deferredLightDemoEnergy", "1", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_deferredLightDemoEnergy, "0.25", "4", CV_FLOAT );
+	ri.Cvar_SetDescription( r_deferredLightDemoEnergy,
+		"Color energy of deferred many-light demo lights; does not change radius or culling." );
+	ri.Cvar_SetGroup( r_deferredLightDemoEnergy, CVG_RENDERER );
 	r_deferredLightDemoAnimate = ri.Cvar_Get( "r_deferredLightDemoAnimate", "1", CVAR_ARCHIVE_ND );
 	ri.Cvar_CheckRange( r_deferredLightDemoAnimate, "0", "1", CV_INTEGER );
 	ri.Cvar_SetDescription( r_deferredLightDemoAnimate,
@@ -1802,7 +1832,7 @@ static void R_Register( void )
 	ri.Cvar_SetGroup( r_deferredLightDemoAnimate, CVG_RENDERER );
 	r_finish = ri.Cvar_Get( "r_finish", "0", CVAR_ARCHIVE_ND );
 	ri.Cvar_SetDescription( r_finish, "Force a glFinish call after rendering a scene." );
-	r_textureMode = ri.Cvar_Get( "r_textureMode", "GL_LINEAR_MIPMAP_NEAREST", CVAR_ARCHIVE );
+	r_textureMode = ri.Cvar_Get( "r_textureMode", "GL_LINEAR_MIPMAP_LINEAR", CVAR_ARCHIVE );
 	ri.Cvar_SetDescription( r_textureMode, "Texture interpolation mode:\n GL_NEAREST: Nearest neighbor interpolation and will therefore appear similar to Quake II except with the added colored lighting\n GL_LINEAR: Linear interpolation and will appear to blend in objects that are closer than the resolution that the textures are set as\n GL_NEAREST_MIPMAP_NEAREST: Nearest neighbor interpolation with mipmapping for bilinear hardware, mipmapping will blend objects that are farther away than the resolution that they are set as\n GL_LINEAR_MIPMAP_NEAREST: Linear interpolation with mipmapping for bilinear hardware\n GL_NEAREST_MIPMAP_LINEAR: Nearest neighbor interpolation with mipmapping for trilinear hardware\n GL_LINEAR_MIPMAP_LINEAR: Linear interpolation with mipmapping for trilinear hardware" );
 	ri.Cvar_SetGroup( r_textureMode, CVG_RENDERER );
 	r_mipLodBias = ri.Cvar_Get( "r_mipLodBias", "-0.75", CVAR_ARCHIVE );
@@ -4152,6 +4182,8 @@ void R_Init( void ) {
 	R_MGS_Init();
 	R_VKSplat_Init();
 	R_CuRast_Init();
+	vk_hair_deferred_init();
+	vk_vector_brush_init();
 	R_GraphBfs_Init();
 	R_Mimir_Init();
 	R_Iris_Init();
@@ -4302,6 +4334,10 @@ static void RE_Shutdown( refShutdownCode_t code ) {
 	vk_gpu_scene_on_world_unload();
 
 	ri.Cmd_RemoveCommand( "modellist" );
+	ri.Cmd_RemoveCommand( "bsp_lod_status" );
+	ri.Cmd_RemoveCommand( "source_vbsp_status" );
+	ri.Cmd_RemoveCommand( "source_fgd_load" );
+	ri.Cmd_RemoveCommand( "source_fgd_status" );
 	ri.Cmd_RemoveCommand( "screenshotBMP" );
 	ri.Cmd_RemoveCommand( "screenshotJPEG" );
 	ri.Cmd_RemoveCommand( "screenshotEXR" );
@@ -4368,6 +4404,8 @@ static void RE_Shutdown( refShutdownCode_t code ) {
 	R_VKSplat_Shutdown();
 	R_GraphBfs_Shutdown();
 	R_CuRast_Shutdown();
+	vk_hair_deferred_shutdown();
+	vk_vector_brush_shutdown();
 	R_Mimir_Shutdown();
 	R_Iris_Shutdown();
 	R_WSP_Shutdown();

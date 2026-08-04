@@ -92,10 +92,10 @@ typedef struct {
 	uint32_t shadowFlags;
 	float shadowStrength;
 	float shadowNear;
-	float shadowSplits[4]; /* 16-byte aligned — matches GLSL vec4 */
+	float shadowSplits[4]; /* scalar-packed to match deferred_lighting.comp */
 	float shadowBlend;
 	uint32_t shadowCascadeCount; /* 1..4 CSM cascades */
-	uint32_t shadowGeneration;
+	float forwardPlusDebug; /* deferred clustered occupancy blend; shadow generation is not shader-consumed */
 	/* Milestone 3: directional sun BRDF (world-space). */
 	float sunDir[4];      /* xyz = L (toward sun), w = angular radius (rad, 0=dirac) */
 	float sunRadiance[4]; /* rgb = radiance, w = flags: bit0=BRDF enable, bit1=LM owns diffuse */
@@ -113,10 +113,18 @@ typedef struct {
 
 static_assert( sizeof( vk_deferred_light_push_t ) % 4 == 0, "deferred light push align" );
 static_assert( sizeof( vk_deferred_light_push_t ) <= 256, "deferred light push exceeds common PC limit" );
+static_assert( offsetof( vk_deferred_light_push_t, shadowSplits ) == 180,
+	"deferred push shadow split ABI changed" );
+static_assert( offsetof( vk_deferred_light_push_t, forwardPlusDebug ) == 204,
+	"deferred push debug ABI changed" );
+static_assert( offsetof( vk_deferred_light_push_t, sunDir ) == 208,
+	"deferred push sun ABI changed" );
+static_assert( sizeof( vk_deferred_light_push_t ) == 256,
+	"deferred push size changed; update GLSL offsets and pipeline range" );
 
 static qboolean s_gbufferCompactDualWriteLogged;
 /* Bump when deferred lighting descriptor/push layout changes. */
-static const uint32_t s_deferredLightingLayoutVersion = 17u;
+static const uint32_t s_deferredLightingLayoutVersion = 18u;
 static uint32_t s_deferredLightingLayoutBuilt;
 static void vk_dgb_create_pipeline( void );
 static void vk_dgb_create_lighting_pipeline( void );
@@ -385,7 +393,11 @@ qboolean vk_deferred_lighting_active( void )
 
 qboolean vk_deferred_lighting_path_ready( void )
 {
-	if ( !vk_deferred_lighting_wanted() ) {
+	/* Readiness is a renderer/resource property, not a property of the view
+	 * currently being inspected.  vk_deferred_gbuffer_fill_wanted() correctly
+	 * rejects UI/weapon views, but using it here made deferred_status report
+	 * pathReady=no whenever the command was printed from the console. */
+	if ( !vk_deferred_lighting_pipelines_wanted() ) {
 		return qfalse;
 	}
 	if ( vk.deferredGbufferFallbackActive ) {
@@ -1600,6 +1612,8 @@ static void vk_dgb_fill_light_push( vk_deferred_light_push_t *push, uint32_t wid
 	push->mixedMaterial = R_DeferredMixedMaterialWanted() ? 1u : 0u;
 	push->lightmapMode = ( r_deferredLightmapMode ) ? (uint32_t)Com_Clamp( 0.0f, 2.0f, (float)r_deferredLightmapMode->integer ) : 0u;
 	push->lightmapDeluxeStrength = ( push->lightmapMode != 0u ) ? 1.0f : 0.0f;
+	push->forwardPlusDebug = ( r_forwardPlusDebug && r_forwardPlusDebug->value > 0.0f ) ?
+		Com_Clamp( 0.0f, 6.0f, r_forwardPlusDebug->value ) : 0.0f;
 	push->shadowFlags = 0u;
 	push->shadowStrength = 0.0f;
 	push->shadowNear = ( vk.sun_shadow_near > 0.0f ) ? vk.sun_shadow_near : 4.0f;
@@ -1609,7 +1623,6 @@ static void vk_dgb_fill_light_push( vk_deferred_light_push_t *push, uint32_t wid
 	push->shadowSplits[3] = vk.sun_shadow_splits[3];
 	push->shadowBlend = VK_SunCSM_CascadeBlend();
 	push->shadowCascadeCount = 1u;
-	push->shadowGeneration = vk_shadow_contract_generation();
 	/* Directional sun for M3 BRDF (world space; L points toward the sun). */
 	{
 		vec3_t sunL;

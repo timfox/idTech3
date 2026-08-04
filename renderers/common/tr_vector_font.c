@@ -33,6 +33,7 @@ extern FT_Library ftLibrary;
 
 static vectorFont_t vectorFont;
 static vectorGlyphletAtlas_t vectorGlyphletAtlas;
+static qboolean s_vectorFontInitialized;
 static qhandle_t vectorFontShaderHandle = 0;
 static cvar_t *r_vectorFontMode;
 static cvar_t *r_vectorFontCoverage;
@@ -499,6 +500,10 @@ static void VectorFont_Memory_f( void ) {
 }
 
 void R_VectorFont_Init( void ) {
+	if ( s_vectorFontInitialized ) {
+		return;
+	}
+	s_vectorFontInitialized = qtrue;
 	r_vectorFontMode = ri.Cvar_Get( "r_vectorFontMode", "0", CVAR_ARCHIVE );
 	ri.Cvar_SetDescription( r_vectorFontMode,
 		"Vector font algorithm when r_vectorFont 1: 0 = Lengyel JCGT 2017 (curve texture + winding), "
@@ -534,6 +539,9 @@ int R_VectorFont_Mode( void ) {
 }
 
 void R_VectorFont_Shutdown( void ) {
+	if ( !s_vectorFontInitialized ) {
+		return;
+	}
 	ri.Cmd_RemoveCommand( "vector_font_status" );
 	ri.Cmd_RemoveCommand( "vector_font_validate" );
 	ri.Cmd_RemoveCommand( "vector_font_memory_status" );
@@ -542,6 +550,7 @@ void R_VectorFont_Shutdown( void ) {
 	VK_VectorFont_Shutdown();
 	R_VectorGlyphletAtlas_Shutdown( &vectorGlyphletAtlas );
 	R_VectorFont_Clear();
+	s_vectorFontInitialized = qfalse;
 }
 
 qboolean R_VectorFont_IsEnabled( void ) {

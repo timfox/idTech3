@@ -213,7 +213,7 @@ static void CL_GenerateQKey( void )
 #endif
 
 void CL_Init( void ) {
-	Com_Printf( "----- Client Initialization -----\n" );
+	Com_Printf( "[init][client] begin\n" );
 
 	Con_Init();
 
@@ -289,5 +289,5 @@ void CL_Init( void ) {
 
 	CL_InitFonts();
 
-	Com_Printf( "----- Client Initialization Complete -----\n" );
+	Com_Printf( "[init][client] complete\n" );
 }

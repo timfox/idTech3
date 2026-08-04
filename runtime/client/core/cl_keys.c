@@ -20,6 +20,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 ===========================================================================
 */
 #include "client.h"
+#include "cl_cmds.h"
 #include "cl_emulator.h"
 #include "script_emit.h"
 
@@ -35,6 +36,7 @@ qboolean	chat_team;
 
 int			chat_playerNum;
 extern cvar_t	*con_inputMode;
+extern cvar_t	*con_textEffects;
 
 static void Field_CharEvent( field_t *edit, int ch );
 
@@ -65,6 +67,7 @@ static void Field_VariableSizeDraw( field_t *edit, int x, int y, int width, int 
 	char	str[MAX_STRING_CHARS], *s;
 	int		i;
 	int		curColor;
+	int		curColorIndex;
 
 	drawLen = edit->widthInChars - 1; // - 1 so there is always a space for the cursor
 	len = strlen( edit->buffer );
@@ -112,10 +115,16 @@ static void Field_VariableSizeDraw( field_t *edit, int x, int y, int width, int 
 			str[0] = '<';
 		}
 	}
+	if ( con_textEffects && con_textEffects->integer ) {
+		curColorIndex = Con_TextEffectColorAt( edit->buffer, prestep + edit->cursor,
+			ColorIndexFromChar( curColor ) );
+	} else {
+		curColorIndex = ColorIndexFromChar( curColor );
+	}
 
 	// draw it
 	if ( size == SCR_ConsoleCharWidth() ) {
-		SCR_DrawSmallStringExt( x, y, str, g_color_table[ ColorIndexFromChar( curColor ) ],
+		SCR_DrawSmallStringExt( x, y, str, g_color_table[ curColorIndex ],
 			qfalse, noColorEscape );
 		if ( len > drawLen + prestep ) {
 			SCR_DrawSmallStringExt( x + ( edit->widthInChars - 1 ) * size, y, ">",
@@ -127,7 +136,7 @@ static void Field_VariableSizeDraw( field_t *edit, int x, int y, int width, int 
 				g_color_table[ ColorIndex( COLOR_WHITE ) ], qfalse, noColorEscape );
 		}
 		// draw big string with drop shadow
-		SCR_DrawStringExt( x, y, BIGCHAR_WIDTH, str, g_color_table[ ColorIndexFromChar( curColor ) ],
+		SCR_DrawStringExt( x, y, BIGCHAR_WIDTH, str, g_color_table[ curColorIndex ],
 			qfalse, noColorEscape );
 	}
 
@@ -146,11 +155,13 @@ static void Field_VariableSizeDraw( field_t *edit, int x, int y, int width, int 
 		i = drawLen - strlen( str );
 
 		if ( size == SCR_ConsoleCharWidth() ) {
+			re.SetColor( g_color_table[ curColorIndex ] );
 			SCR_DrawSmallChar( x + ( edit->cursor - prestep - i ) * size, y, cursorChar );
 		} else {
 			str[0] = cursorChar;
 			str[1] = '\0';
-			SCR_DrawBigString( x + ( edit->cursor - prestep - i ) * BIGCHAR_WIDTH, y, str, 1.0, qfalse );
+			SCR_DrawStringExt( x + ( edit->cursor - prestep - i ) * BIGCHAR_WIDTH, y,
+				BIGCHAR_WIDTH, str, g_color_table[ curColorIndex ], qtrue, qtrue );
 		}
 	}
 }
@@ -767,7 +778,14 @@ static void CL_KeyDownEvent( int key, unsigned time )
 	}
 
 	// distribute the key down event to the appropriate handler
-	if ( Key_GetCatcher( ) & KEYCATCH_CONSOLE ) {
+	if ( Cvar_VariableIntegerValue( "ui_social" ) ) {
+		/* Social owns keys regardless of the catcher underneath it. */
+		const char *binding = Key_GetBinding( key );
+		if ( binding && strstr( binding, "social_toggle" ) ) {
+			Key_ParseBinding( key, qtrue, time );
+		}
+		return;
+	} else if ( Key_GetCatcher( ) & KEYCATCH_CONSOLE ) {
 		Console_Key( key );
 	} else if ( Key_GetCatcher( ) & KEYCATCH_UI ) {
 		if ( uivm ) {
@@ -783,8 +801,9 @@ static void CL_KeyDownEvent( int key, unsigned time )
 		Console_Key( key );
 	} else if ( CL_RpMenuActive() ) {
 		/* JS City Menu owns input via input_key — do not fire +attack / movement.
-		 * Still allow F4 so the toggle bind can close the menu. */
-		if ( key == K_F4 ) {
+		 * Still allow a key bound to social_toggle so the same bind can close it. */
+		const char *binding = Key_GetBinding( key );
+		if ( binding && strstr( binding, "social_toggle" ) ) {
 			Key_ParseBinding( key, qtrue, time );
 		}
 		return;
@@ -828,6 +847,10 @@ static void CL_KeyUpEvent( int key, unsigned time )
 		return;
 	}
 
+	if ( Cvar_VariableIntegerValue( "ui_social" ) ) {
+		return;
+	}
+
 	//
 	// key up events only perform actions if the game key binding is
 	// a button command (leading + sign).  These will be processed even in
@@ -861,6 +884,9 @@ Called by the system for both key up and key down events
 */
 void CL_KeyEvent( int key, qboolean down, unsigned time )
 {
+	/* Social owns Escape/Start/Back before script emission. If JS closes the
+	 * overlay first, this event would otherwise fall through and open pause. */
+	if ( down && CL_SocialOverlayHandleEscape( key ) ) return;
 	/* No USE_DUKTAPE/USE_CSHARP guard: client objects do not carry those
 	 * defines (qcommon does), and Com_ScriptEmitEvent is always linked —
 	 * real implementation or stub.  A guard here silently compiles the

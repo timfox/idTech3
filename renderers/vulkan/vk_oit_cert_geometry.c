@@ -27,18 +27,35 @@ static void OIT_Cert_EnsureShaders( void )
 	if ( !tr.whiteImage ) {
 		return;
 	}
-	h = RE_RegisterShaderFromImage( "cert/wboit_pane", LIGHTMAP_NONE, tr.whiteImage, qtrue );
+	/* LIGHTMAP_2D creates the vertex-color/vertex-alpha pipeline up front;
+	 * mutating a LIGHTMAP_NONE shader after registration leaves a pipeline
+	 * keyed for identity lighting and silently drops fixture coverage. */
+	h = RE_RegisterShaderFromImage( "cert/wboit_pane", LIGHTMAP_2D, tr.whiteImage, qtrue );
 	s_paneShader = R_GetShaderByHandle( h );
 	if ( s_paneShader && !s_paneShader->defaultShader && s_paneShader->stages[0] ) {
 		s_paneShader->sort = SS_BLEND0;
+		s_paneShader->cullType = CT_TWO_SIDED;
+		s_paneShader->tessFlags |= TESS_XYZ | TESS_RGBA0 | TESS_ST0;
+		s_paneShader->stages[0]->tessFlags |= TESS_XYZ | TESS_RGBA0 | TESS_ST0;
+		s_paneShader->stages[0]->bundle[0].rgbGen = CGEN_VERTEX;
+		s_paneShader->stages[0]->bundle[0].alphaGen = AGEN_VERTEX;
+		/* Vulkan pipeline culling is selected by the shader's face-culling
+		 * field; GLS_CULL_DISABLE is not part of this renderer's state-bit ABI. */
 		s_paneShader->stages[0]->stateBits =
+			GLS_DEPTHTEST_DISABLE |
 			GLS_SRCBLEND_SRC_ALPHA | GLS_DSTBLEND_ONE_MINUS_SRC_ALPHA;
 	}
-	h = RE_RegisterShaderFromImage( "cert/wboit_additive", LIGHTMAP_NONE, tr.whiteImage, qtrue );
+	h = RE_RegisterShaderFromImage( "cert/wboit_additive", LIGHTMAP_2D, tr.whiteImage, qtrue );
 	s_additiveShader = R_GetShaderByHandle( h );
 	if ( s_additiveShader && !s_additiveShader->defaultShader && s_additiveShader->stages[0] ) {
 		s_additiveShader->sort = SS_BLEND1;
+		s_additiveShader->cullType = CT_TWO_SIDED;
+		s_additiveShader->tessFlags |= TESS_XYZ | TESS_RGBA0 | TESS_ST0;
+		s_additiveShader->stages[0]->tessFlags |= TESS_XYZ | TESS_RGBA0 | TESS_ST0;
+		s_additiveShader->stages[0]->bundle[0].rgbGen = CGEN_VERTEX;
+		s_additiveShader->stages[0]->bundle[0].alphaGen = AGEN_VERTEX;
 		s_additiveShader->stages[0]->stateBits =
+			GLS_DEPTHTEST_DISABLE |
 			GLS_SRCBLEND_ONE | GLS_DSTBLEND_ONE;
 	}
 }
@@ -273,9 +290,17 @@ static void OIT_Cert_EmitPane( const oitCertPane_t *pane, shader_t *sh )
 	if ( !sh || !pane ) {
 		return;
 	}
-	VectorMA( backEnd.viewParms.or.origin, pane->viewDepth, fwd, center );
-	VectorScale( rt, pane->halfWidth, right );
-	VectorScale( upy, pane->halfHeight, up );
+	if ( backEnd.projection2D ) {
+		/* Certification panes use the 2D MVP so coverage validation is not
+		 * coupled to the current map camera, portal transform, or FOV. */
+		VectorSet( center, glConfig.vidWidth * 0.5f, glConfig.vidHeight * 0.5f, 0.5f );
+		VectorSet( right, pane->halfWidth, 0.0f, 0.0f );
+		VectorSet( up, 0.0f, pane->halfHeight, 0.0f );
+	} else {
+		VectorMA( backEnd.viewParms.or.origin, pane->viewDepth, fwd, center );
+		VectorScale( rt, pane->halfWidth, right );
+		VectorScale( upy, pane->halfHeight, up );
+	}
 
 	VectorSubtract( center, right, p[0] ); VectorSubtract( p[0], up, p[0] );
 	VectorAdd( center, right, p[1] ); VectorSubtract( p[1], up, p[1] );
@@ -327,6 +352,9 @@ void vk_oit_cert_geometry_draw_bucket( int bucketFilter )
 	shader_t *alphaSh;
 	shader_t *addSh;
 	qboolean drew = qfalse;
+	const trRefEntity_t *savedEntity;
+	orientationr_t savedOr;
+	qboolean savedProjection2D;
 
 	if ( !s_hasArmed || !backEnd.oitAccumPass ) {
 		return;
@@ -338,6 +366,21 @@ void vk_oit_cert_geometry_draw_bucket( int bucketFilter )
 		ri.Printf( PRINT_WARNING, "[VK][OIT-cert] pane shader unavailable\n" );
 		return;
 	}
+
+	/* RB_RenderDrawSurfList may leave the last model entity active. Fixtures
+	 * are world-space camera panes and must not inherit that model transform. */
+	savedEntity = backEnd.currentEntity;
+	savedOr = backEnd.or;
+	savedProjection2D = backEnd.projection2D;
+	backEnd.currentEntity = &tr.worldEntity;
+	backEnd.or = backEnd.viewParms.world;
+	backEnd.useFirstPersonProjection = qfalse;
+	backEnd.projection2D = qtrue;
+	tess.depthRange = DEPTH_RANGE_NORMAL;
+	/* The normal draw-surface loop refreshes MVP when the entity changes.  These
+	 * injected panes bypass that loop, so refresh the OIT push constants after
+	 * taking ownership of the deterministic 2D transform. */
+	vk_update_mvp( NULL );
 
 	/* Alpha bucket (or uncategorized). */
 	if ( bucketFilter != 2 ) {
@@ -388,6 +431,9 @@ void vk_oit_cert_geometry_draw_bucket( int bucketFilter )
 		s_drawnThisFrame = qtrue;
 		s_armed.drawnThisFrame = qtrue;
 	}
+	backEnd.currentEntity = savedEntity;
+	backEnd.or = savedOr;
+	backEnd.projection2D = savedProjection2D;
 }
 
 static void OIT_CertGeom_Status_f( void )

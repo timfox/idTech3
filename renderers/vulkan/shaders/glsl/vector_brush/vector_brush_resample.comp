@@ -1,0 +1,40 @@
+#version 450
+/* Ciallo foundation: one invocation owns one polyline edge and emits evenly
+ * spaced stamp records.  The final raster/blend stage remains overlay-owned. */
+layout(local_size_x = 64, local_size_y = 1, local_size_z = 1) in;
+
+/* x,y position; z radius; w opacity. */
+layout(std430, set = 0, binding = 0) readonly buffer BrushPoints { vec4 pointData[]; };
+/* first point, point count, brush/style index, layer. */
+layout(std430, set = 0, binding = 1) readonly buffer BrushStrokes { uvec4 strokeData[]; };
+/* x,y position; z radius; w opacity. */
+layout(std430, set = 0, binding = 2) writeonly buffer BrushStamps { vec4 stampData[]; };
+
+layout(push_constant) uniform BrushPush {
+	uint strokeCount;
+	uint strokeStride;
+	uint maxStampsPerEdge;
+	float spacing;
+} pc;
+
+void main() {
+	uint edge = gl_GlobalInvocationID.x;
+	uint stroke = edge / max(pc.strokeStride, 1u);
+	uint localEdge = edge % max(pc.strokeStride, 1u);
+	if (stroke >= pc.strokeCount) return;
+	uvec4 s = strokeData[stroke];
+	if (localEdge + 1u >= s.y) return;
+	vec4 a = pointData[s.x + localEdge];
+	vec4 b = pointData[s.x + localEdge + 1u];
+	vec2 delta = b.xy - a.xy;
+	float lengthEdge = length(delta);
+	uint count = min(max(uint(ceil(lengthEdge / max(pc.spacing, 0.001))), 1u),
+		pc.maxStampsPerEdge);
+	for (uint i = 0u; i < count; ++i) {
+		float t = (float(i) + 0.5) / float(count);
+		uint outIndex = (edge * pc.maxStampsPerEdge) + i;
+		stampData[outIndex] = vec4(mix(a.xy, b.xy, t), mix(a.z, b.z, t),
+			mix(a.w, b.w, t));
+	}
+}
+

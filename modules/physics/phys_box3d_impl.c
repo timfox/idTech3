@@ -172,6 +172,52 @@ static struct {
 	PhysRestitutionMixFn restitutionMixFn;
 } bx;
 
+static qboolean box_body_slot_available( void ) {
+	int i;
+	for ( i = 0; i < bx.bodyCount; i++ ) {
+		if ( !bx.bodies[i].active ) {
+			return qtrue;
+		}
+	}
+	return bx.bodyCount < PHYS_MAX_RIGID_BODIES ? qtrue : qfalse;
+}
+
+static int box_alloc_body_slot( void ) {
+	int i;
+	for ( i = 0; i < bx.bodyCount; i++ ) {
+		if ( !bx.bodies[i].active ) {
+			return i;
+		}
+	}
+	if ( bx.bodyCount >= PHYS_MAX_RIGID_BODIES ) {
+		return -1;
+	}
+	return bx.bodyCount++;
+}
+
+static qboolean box_constraint_slot_available( void ) {
+	int i;
+	for ( i = 0; i < bx.constraintCount; i++ ) {
+		if ( !bx.constraints[i].active ) {
+			return qtrue;
+		}
+	}
+	return bx.constraintCount < PHYS_MAX_CONSTRAINTS ? qtrue : qfalse;
+}
+
+static int box_alloc_constraint_slot( void ) {
+	int i;
+	for ( i = 0; i < bx.constraintCount; i++ ) {
+		if ( !bx.constraints[i].active ) {
+			return i;
+		}
+	}
+	if ( bx.constraintCount >= PHYS_MAX_CONSTRAINTS ) {
+		return -1;
+	}
+	return bx.constraintCount++;
+}
+
 static void box_destroy_mesh( b3MeshData *mesh ) {
 	int i;
 	if ( !mesh ) {
@@ -470,6 +516,20 @@ static void attach_shape( b3BodyId bodyId, const physBodyDef_t *def, float densi
 	}
 }
 
+/* Box3D removes joints attached to a body as part of b3DestroyBody(). Keep
+ * the engine-side handles in lockstep so callers cannot use a stale joint ID
+ * after destroying either endpoint. */
+static void box_invalidate_constraints_for_body( physBodyHandle_t body ) {
+	int i;
+	for ( i = 0; i < bx.constraintCount; i++ ) {
+		BoxConstraint *constraint = &bx.constraints[i];
+		if ( constraint->active &&
+			( constraint->bodyA == body || constraint->bodyB == body ) ) {
+			memset( constraint, 0, sizeof( *constraint ) );
+		}
+	}
+}
+
 static void get_dmm_preset( dmmMaterialType_t mat, float *stiff, float *yield, float *frac ) {
 	switch ( mat ) {
 	case DMM_GLASS:       *stiff = 70.0f; *yield = 30.0f; *frac = 40.0f; break;
@@ -738,11 +798,14 @@ physBodyHandle_t Phys_CreateBody_Impl( const physBodyDef_t *def ) {
 	float vol;
 	float density;
 
-	if ( !bx.initialized || !def || bx.bodyCount >= PHYS_MAX_RIGID_BODIES ) {
+	if ( !bx.initialized || !def || !box_body_slot_available() ) {
 		return -1;
 	}
 
-	idx = bx.bodyCount++;
+	idx = box_alloc_body_slot();
+	if ( idx < 0 ) {
+		return -1;
+	}
 	pb = &bx.bodies[idx];
 	memset( pb, 0, sizeof( *pb ) );
 
@@ -797,6 +860,7 @@ void Phys_DestroyBody_Impl( physBodyHandle_t h ) {
 	mesh = bx.bodies[h].meshData;
 	compound = bx.bodies[h].compoundData;
 	hf = bx.bodies[h].heightFieldData;
+	box_invalidate_constraints_for_body( h );
 	b3DestroyBody( bx.bodies[h].bodyId );
 	memset( &bx.bodies[h], 0, sizeof( bx.bodies[h] ) );
 	if ( mesh ) {
@@ -936,14 +1000,17 @@ physConstraintHandle_t Phys_CreateConstraint_Impl( const physConstraintDef_t *de
 	int idx;
 	b3Transform frameA, frameB;
 
-	if ( !bx.initialized || !def || bx.constraintCount >= PHYS_MAX_CONSTRAINTS ) {
+	if ( !bx.initialized || !def || !box_constraint_slot_available() ) {
 		return -1;
 	}
 	if ( !VALID_BODY( def->bodyA ) || !VALID_BODY( def->bodyB ) ) {
 		return -1;
 	}
 
-	idx = bx.constraintCount++;
+	idx = box_alloc_constraint_slot();
+	if ( idx < 0 ) {
+		return -1;
+	}
 	pc = &bx.constraints[idx];
 	memset( pc, 0, sizeof( *pc ) );
 	pc->bodyA = def->bodyA;
@@ -1137,6 +1204,11 @@ physConstraintHandle_t Phys_CreateConstraint_Impl( const physConstraintDef_t *de
 		pc->jointId = b3CreateSphericalJoint( bx.worldId, &jd );
 		break;
 	}
+	}
+
+	if ( !b3Joint_IsValid( pc->jointId ) ) {
+		memset( pc, 0, sizeof( *pc ) );
+		return -1;
 	}
 
 	pc->breakForce = def->breakForce;
@@ -2594,7 +2666,7 @@ physBodyHandle_t Phys_AddStaticTriMesh_Impl( const float *verts, int numVerts, c
 	if ( !bx.initialized || !verts || numVerts < 3 || !indices || numIndices < 3 ) {
 		return -1;
 	}
-	if ( bx.bodyCount >= PHYS_MAX_RIGID_BODIES || bx.meshCount >= (int)( sizeof( bx.meshes ) / sizeof( bx.meshes[0] ) ) ) {
+	if ( !box_body_slot_available() || bx.meshCount >= (int)( sizeof( bx.meshes ) / sizeof( bx.meshes[0] ) ) ) {
 		return -1;
 	}
 
@@ -2634,7 +2706,11 @@ physBodyHandle_t Phys_AddStaticTriMesh_Impl( const float *verts, int numVerts, c
 		return -1;
 	}
 
-	idx = bx.bodyCount++;
+	idx = box_alloc_body_slot();
+	if ( idx < 0 ) {
+		box_destroy_mesh( mesh );
+		return -1;
+	}
 	pb = &bx.bodies[idx];
 	memset( pb, 0, sizeof( *pb ) );
 
@@ -2677,7 +2753,7 @@ physBodyHandle_t Phys_AddStaticHeightField_Impl( const float *heights, int count
 	if ( !bx.initialized || !heights || countX < 2 || countY < 2 ) {
 		return -1;
 	}
-	if ( bx.bodyCount >= PHYS_MAX_RIGID_BODIES
+	if ( !box_body_slot_available()
 		|| bx.heightFieldCount >= (int)( sizeof( bx.heightFields ) / sizeof( bx.heightFields[0] ) ) ) {
 		return -1;
 	}
@@ -2730,7 +2806,11 @@ physBodyHandle_t Phys_AddStaticHeightField_Impl( const float *heights, int count
 		return -1;
 	}
 
-	idx = bx.bodyCount++;
+	idx = box_alloc_body_slot();
+	if ( idx < 0 ) {
+		box_destroy_heightfield( hf );
+		return -1;
+	}
 	pb = &bx.bodies[idx];
 	memset( pb, 0, sizeof( *pb ) );
 
@@ -2814,7 +2894,7 @@ physBodyHandle_t Phys_AddStaticCompoundBoxes_Impl( const float *centersXYZ, cons
 	if ( !bx.initialized || !centersXYZ || !halfExtentsXYZ || count < 1 ) {
 		return -1;
 	}
-	if ( bx.bodyCount >= PHYS_MAX_RIGID_BODIES || bx.compoundCount >= maxChildren ) {
+	if ( !box_body_slot_available() || bx.compoundCount >= maxChildren ) {
 		return -1;
 	}
 	if ( count > 4096 ) {
@@ -2862,7 +2942,11 @@ physBodyHandle_t Phys_AddStaticCompoundBoxes_Impl( const float *centersXYZ, cons
 		return -1;
 	}
 
-	idx = bx.bodyCount++;
+	idx = box_alloc_body_slot();
+	if ( idx < 0 ) {
+		box_destroy_compound( compound );
+		return -1;
+	}
 	pb = &bx.bodies[idx];
 	memset( pb, 0, sizeof( *pb ) );
 	bd = b3DefaultBodyDef();

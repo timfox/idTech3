@@ -53,6 +53,12 @@ static VkBuffer s_mdiBuffer;
 static VkDeviceMemory s_mdiMemory;
 static void *s_mdiMapped;
 static qboolean s_mdiDrawLogged;
+static VkBuffer s_surfaceIndexBuffer;
+static VkDeviceMemory s_surfaceIndexMemory;
+static uint32_t *s_surfaceIndexMapped;
+static uint32_t s_surfaceIndexCount;
+static uint32_t s_surfaceIndexGeneration;
+#define MESHLET_PERSISTENT_INDEX_CAPACITY (4u * 1024u * 1024u)
 
 static void Meshlets_Status_f( void )
 {
@@ -83,6 +89,12 @@ static void Meshlets_Status_f( void )
 		( r_virtualGeometry && r_virtualGeometry->integer ) ? s_virtualGeometrySurfaces : 0,
 		( vk.meshShaderNV && qvkCmdDrawMeshTasksNV ) ? 1 : 0,
 		( r_meshletsMdiDraw && r_meshletsMdiDraw->integer ) ? "meshlet_mdi" : "meshlet_compact" );
+	ri.Printf( PRINT_ALL, "  persistentIndexes=%s count=%u generation=%u gpuCull=%d hiz=%d streaming=%d\n",
+		R_Meshlets_PersistentIndexBufferReady() ? "yes" : "no",
+		s_surfaceIndexCount, s_surfaceIndexGeneration,
+		ri.Cvar_VariableIntegerValue( "r_meshletsGpuCull" ),
+		ri.Cvar_VariableIntegerValue( "r_meshletsHiZ" ),
+		ri.Cvar_VariableIntegerValue( "r_meshletsStreaming" ) );
 }
 
 void R_Meshlets_Init( void )
@@ -129,6 +141,21 @@ void R_Meshlets_Init( void )
 	ri.Cvar_SetDescription( r_meshletsLodPixels,
 		"Minimum projected AABB diagonal in pixels to keep a meshlet when r_meshletsLod 1. Default 2." );
 	ri.Cvar_SetGroup( r_meshletsLodPixels, CVG_RENDERER );
+	{
+		cvar_t *cv = ri.Cvar_Get( "r_meshletsGpuCull", "1", CVAR_ARCHIVE_ND );
+		ri.Cvar_CheckRange( cv, "0", "1", CV_INTEGER );
+		ri.Cvar_SetDescription( cv, "Use portable compute meshlet culling and GPU-generated indirect commands when resources are resident." );
+		cv = ri.Cvar_Get( "r_meshletsHiZ", "1", CVAR_ARCHIVE_ND );
+		ri.Cvar_CheckRange( cv, "0", "1", CV_INTEGER );
+		ri.Cvar_SetDescription( cv, "Allow conservative GPU Hi-Z rejection in the meshlet culler; disabled automatically until the pyramid is ready." );
+		cv = ri.Cvar_Get( "r_meshletsStreaming", "1", CVAR_ARCHIVE_ND );
+		ri.Cvar_CheckRange( cv, "0", "1", CV_INTEGER );
+		ri.Cvar_SetDescription( cv, "Gate GPU commands on persistent surface residency and select continuous meshlet LOD." );
+		cv = ri.Cvar_Get( "r_meshletsBsp", "1", CVAR_ARCHIVE_ND );
+		ri.Cvar_CheckRange( cv, "0", "1", CV_INTEGER );
+		cv = ri.Cvar_Get( "r_meshletsSkinned", "1", CVAR_ARCHIVE_ND );
+		ri.Cvar_CheckRange( cv, "0", "1", CV_INTEGER );
+	}
 
 	Com_Memset( s_cache, 0, sizeof( s_cache ) );
 	s_bakeCount = s_cacheHits = s_cacheMisses = 0;
@@ -167,6 +194,19 @@ void R_Meshlets_Shutdown( void )
 		qvkFreeMemory( vk.device, s_mdiMemory, NULL );
 		s_mdiMemory = VK_NULL_HANDLE;
 	}
+	if ( s_surfaceIndexMapped && s_surfaceIndexMemory != VK_NULL_HANDLE ) {
+		qvkUnmapMemory( vk.device, s_surfaceIndexMemory );
+		s_surfaceIndexMapped = NULL;
+	}
+	if ( s_surfaceIndexBuffer != VK_NULL_HANDLE ) {
+		qvkDestroyBuffer( vk.device, s_surfaceIndexBuffer, NULL );
+		s_surfaceIndexBuffer = VK_NULL_HANDLE;
+	}
+	if ( s_surfaceIndexMemory != VK_NULL_HANDLE ) {
+		qvkFreeMemory( vk.device, s_surfaceIndexMemory, NULL );
+		s_surfaceIndexMemory = VK_NULL_HANDLE;
+	}
+	s_surfaceIndexCount = 0;
 	Com_Memset( s_cache, 0, sizeof( s_cache ) );
 	s_frameCmdCount = 0;
 }
@@ -344,6 +384,9 @@ int R_Meshlets_CacheLocalKey( uint64_t key, const vec3_t *positions, int numVert
 	}
 	e->count = R_Meshlets_Bake( positions, numVerts, indexes, numIndexes,
 		e->meshlets, MESHLET_MAX_PER_SURFACE );
+	/* The persistent arena is independent of the CPU cache lifetime. A failed
+	 * upload intentionally leaves the CPU compact path available. */
+	(void)R_Meshlets_RegisterPersistentIndexes( key, indexes, numIndexes, NULL );
 	s_cacheMisses++;
 	return e->count;
 }
@@ -673,6 +716,60 @@ static qboolean Meshlets_EnsureMdiBuffer( void )
 	SET_OBJECT_NAME( s_mdiBuffer, "meshlet MDI commands", VK_DEBUG_REPORT_OBJECT_TYPE_BUFFER_EXT );
 	return qtrue;
 }
+
+static qboolean Meshlets_EnsurePersistentIndexBuffer( void )
+{
+	VkBufferCreateInfo bci;
+	VkMemoryRequirements mr;
+	VkMemoryAllocateInfo mai;
+	VkResult res;
+	if ( s_surfaceIndexBuffer != VK_NULL_HANDLE && s_surfaceIndexMapped ) return qtrue;
+	if ( !vk.device || vk.device_lost ) return qfalse;
+	Com_Memset( &bci, 0, sizeof( bci ) );
+	bci.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+	bci.size = (VkDeviceSize)MESHLET_PERSISTENT_INDEX_CAPACITY * sizeof( uint32_t );
+	bci.usage = VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
+		VK_BUFFER_USAGE_TRANSFER_DST_BIT;
+	bci.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+	res = qvkCreateBuffer( vk.device, &bci, NULL, &s_surfaceIndexBuffer );
+	if ( res != VK_SUCCESS ) return qfalse;
+	qvkGetBufferMemoryRequirements( vk.device, s_surfaceIndexBuffer, &mr );
+	Com_Memset( &mai, 0, sizeof( mai ) );
+	mai.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+	mai.allocationSize = mr.size;
+	mai.memoryTypeIndex = vk_find_memory_type( vk.physical_device, mr.memoryTypeBits,
+		VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT );
+	res = qvkAllocateMemory( vk.device, &mai, NULL, &s_surfaceIndexMemory );
+	if ( res != VK_SUCCESS ) { qvkDestroyBuffer( vk.device, s_surfaceIndexBuffer, NULL ); s_surfaceIndexBuffer = VK_NULL_HANDLE; return qfalse; }
+	res = qvkBindBufferMemory( vk.device, s_surfaceIndexBuffer, s_surfaceIndexMemory, 0 );
+	if ( res != VK_SUCCESS ) return qfalse;
+	res = qvkMapMemory( vk.device, s_surfaceIndexMemory, 0, bci.size, 0, (void **)&s_surfaceIndexMapped );
+	if ( res != VK_SUCCESS || !s_surfaceIndexMapped ) return qfalse;
+	SET_OBJECT_NAME( s_surfaceIndexBuffer, "persistent meshlet surface indexes", VK_DEBUG_REPORT_OBJECT_TYPE_BUFFER_EXT );
+	return qtrue;
+}
+
+qboolean R_Meshlets_RegisterPersistentIndexes( uint64_t key, const int *indexes,
+	int numIndexes, meshlet_surface_gpu_t *out )
+{
+	uint32_t i;
+	if ( out ) Com_Memset( out, 0, sizeof( *out ) );
+	if ( key == 0 || !indexes || numIndexes <= 0 ||
+		(uint64_t)s_surfaceIndexCount + (uint32_t)numIndexes > MESHLET_PERSISTENT_INDEX_CAPACITY ||
+		!Meshlets_EnsurePersistentIndexBuffer() ) return qfalse;
+	for ( i = 0; i < (uint32_t)numIndexes; ++i ) s_surfaceIndexMapped[s_surfaceIndexCount + i] = (uint32_t)indexes[i];
+	if ( out ) {
+		out->key = key; out->firstIndex = s_surfaceIndexCount; out->indexCount = (uint32_t)numIndexes;
+		out->generation = s_cacheGeneration; out->streamState = 0u; out->resident = qtrue;
+	}
+	s_surfaceIndexCount += (uint32_t)numIndexes;
+	s_surfaceIndexGeneration = s_cacheGeneration;
+	return qtrue;
+}
+
+qboolean R_Meshlets_PersistentIndexBufferReady( void ) { return s_surfaceIndexMapped ? qtrue : qfalse; }
+void *R_Meshlets_PersistentIndexBuffer( void ) { return (void *)s_surfaceIndexBuffer; }
+uint32_t R_Meshlets_PersistentIndexCount( void ) { return s_surfaceIndexCount; }
 
 qboolean R_Meshlets_TryDrawIndirect( void )
 {

@@ -24,6 +24,8 @@ check "$FP" 'vk_cluster_assert_shared_consumers' 'assert implemented'
 check "$FP" 'header/tile buffer handle' 'assert compares header handle'
 check "$DGB" 'vk_cluster_assert_shared_consumers' 'deferred calls assert'
 check "$FP" 'Cluster build failed' 'explicit fallback log'
+check "$FP" 'ownership: opaque=' 'cluster status reports lighting ownership'
+check "$FP" 'shadowPages=' 'cluster status reports shadow budget ownership'
 
 if [[ $failures -ne 0 ]]; then echo "$failures check(s) failed"; exit 1; fi
 echo "All cluster generation checks passed."

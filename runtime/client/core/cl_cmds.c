@@ -15,6 +15,80 @@ Miscellaneous client console commands (info, fs lists, UI open, etc.).
 
 #include <string.h>
 
+typedef struct {
+	qboolean active;
+	int returnCatcher;
+	int returnRpMenu;
+	int returnNoGrab;
+	int returnPaused;
+} socialOverlayState_t;
+
+static socialOverlayState_t socialOverlay;
+
+static void CL_SocialOverlayCloseInternal( const char *reason ) {
+	if ( !socialOverlay.active ) {
+		Cvar_Set( "ui_social", "0" );
+		return;
+	}
+	Cvar_Set( "ui_social", "0" );
+	Key_ClearStates();
+	Cvar_Set( "ui_rpMenu", socialOverlay.returnRpMenu ? "1" : "0" );
+	Cvar_Set( "in_nograb", socialOverlay.returnNoGrab ? "1" : "0" );
+	Key_SetCatcher( socialOverlay.returnCatcher );
+	socialOverlay.active = qfalse;
+	Com_Printf( "[social-overlay] pop reason=%s return=%s catcher=0x%x rp=%d nograb=%d paused=%d\n",
+		reason ? reason : "unknown",
+		socialOverlay.returnRpMenu ? "pause" : "gameplay",
+		socialOverlay.returnCatcher,
+		socialOverlay.returnRpMenu,
+		socialOverlay.returnNoGrab,
+		socialOverlay.returnPaused );
+}
+
+static void CL_SocialOverlayOpenInternal( const char *reason ) {
+	if ( socialOverlay.active ) {
+		Com_Printf( "[social-overlay] duplicate push ignored reason=%s\n", reason ? reason : "unknown" );
+		return;
+	}
+	socialOverlay.active = qtrue;
+	socialOverlay.returnCatcher = Key_GetCatcher();
+	socialOverlay.returnRpMenu = Cvar_VariableIntegerValue( "ui_rpMenu" );
+	socialOverlay.returnNoGrab = Cvar_VariableIntegerValue( "in_nograb" );
+	socialOverlay.returnPaused = Cvar_VariableIntegerValue( "cl_paused" );
+	Cvar_Set( "ui_social", "1" );
+	/* Social is a sibling modal. Do not push ui_rpMenu or touch cl_paused. */
+	Key_ClearStates();
+	Com_Printf( "[social-overlay] push reason=%s return=%s catcher=0x%x rp=%d nograb=%d paused=%d\n",
+		reason ? reason : "unknown",
+		socialOverlay.returnRpMenu ? "pause" : "gameplay",
+		socialOverlay.returnCatcher,
+		socialOverlay.returnRpMenu,
+		socialOverlay.returnNoGrab,
+		socialOverlay.returnPaused );
+}
+
+void CL_SocialOverlaySync( void ) {
+	const qboolean requested = Cvar_VariableIntegerValue( "ui_social" ) ? qtrue : qfalse;
+	if ( requested && !socialOverlay.active ) CL_SocialOverlayOpenInternal( "external-open" );
+	else if ( !requested && socialOverlay.active ) CL_SocialOverlayCloseInternal( "external-close" );
+}
+
+void CL_SocialOverlayReset( const char *reason ) {
+	if ( socialOverlay.active ) CL_SocialOverlayCloseInternal( reason ? reason : "lifecycle" );
+	else Cvar_Set( "ui_social", "0" );
+}
+
+qboolean CL_SocialOverlayHandleEscape( int key ) {
+	if ( key != K_ESCAPE && key != K_PAD0_START && key != K_PAD0_BACK ) return qfalse;
+	/* A direct JS/cvar open can receive Escape before the next client frame;
+	 * materialize its saved context before closing so it cannot fall through to
+	 * the pause opener. */
+	if ( Cvar_VariableIntegerValue( "ui_social" ) && !socialOverlay.active ) CL_SocialOverlayOpenInternal( "escape-sync" );
+	if ( !socialOverlay.active ) return qfalse;
+	CL_SocialOverlayCloseInternal( "escape/back" );
+	return qtrue;
+}
+
 static qboolean CL_SetActiveMenuByName( const char *name ) {
 	int menu = -1;
 
@@ -92,18 +166,13 @@ static void CL_Open_f( void ) {
 }
 
 static void CL_SocialToggle_f( void ) {
-	const qboolean pointerActive = Cvar_VariableIntegerValue( "ui_rpMenu" ) != 0 ||
-		Cvar_VariableIntegerValue( "ui_social" ) != 0 ||
-		Cvar_VariableIntegerValue( "ui_surfMapSelect" ) != 0 ||
-		Cvar_VariableIntegerValue( "ui_surfLeaderboard" ) != 0;
-	if ( pointerActive ) {
-		CL_ClearRpMenu();
-		Key_ClearStates();
+	if ( Cvar_VariableIntegerValue( "ui_social" ) && !socialOverlay.active ) CL_SocialOverlayOpenInternal( "toggle-sync" );
+	if ( socialOverlay.active ) {
+		CL_SocialOverlayCloseInternal( "toggle" );
 		return;
 	}
 	Cvar_Set( "ui_1337MainMenu", "0" );
-	Cvar_Set( "ui_social", "1" );
-	Cvar_Set( "ui_rpMenu", "1" );
+	CL_SocialOverlayOpenInternal( "toggle" );
 }
 static void CL_SetPlayerName_f( void ) {
 	if ( Cmd_Argc() < 2 ) {

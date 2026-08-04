@@ -42,7 +42,8 @@ rg -q '#include "vk_render_graph.h"' "$REG_C" || fail "pass registry must includ
 rg -q 'vk_render_graph_init' "$REG_C" || fail "registry init must init graph"
 rg -q 'vk_render_graph_declare_pass' "$REG_C" || fail "registry must declare passes to graph"
 rg -q 'vk_render_graph_begin_frame' "$REG_C" || fail "frame begin must begin graph"
-rg -q 'vk_render_graph_observe_pass' "$REG_C" || fail "pass begin must observe graph pass"
+rg -q 'vk_render_graph_enter_pass' "$REG_C" || fail "pass begin must enter graph-owned pass"
+rg -q 'vk_render_graph_leave_pass' "$REG_C" || fail "pass end must leave graph-owned pass"
 rg -q 'vk_render_graph_end_frame' "$REG_C" || fail "frame end must compile graph"
 rg -q 'vk_render_graph_shutdown' "$REG_C" || fail "registry shutdown must shutdown graph"
 

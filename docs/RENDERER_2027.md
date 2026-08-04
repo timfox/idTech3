@@ -85,7 +85,7 @@ Demo: `exec demo_visibility_2027.cfg`. Console: `visibility_buffer_status`, `ren
 | **P1** | Visibility foundation + material-class stub (this doc / cvars above) |
 | **P1.5** | Visbuf Morton/depth fill + late-shade debug mode 5 |
 | **P2** | Virtual geometry meshlets — **default stable profile request** with `r_virtualGeometry`, `r_meshletsMdiDraw`, and `r_meshletsLod`; persistent IBO + production mesh-shader pipelines remain follow-up ([MESHLETS.md](MESHLETS.md)) |
-| **P3** | Reservoir-sampled hybrid path — ReSTIR DI on Hybrid1, NVC/FSA; **bindless A.1c** bary UV + PrimUv ([RTX_HIT_SHADER_UV.md](RTX_HIT_SHADER_UV.md)) |
+| **P3** | Selective reservoir hybrid — raster primary visibility, Hybrid1/ReSTIR sidecars for sun shadows/reflections, bounded hero objects, NVC/FSA; **bindless A.1c** bary UV + PrimUv ([RTX_HIT_SHADER_UV.md](RTX_HIT_SHADER_UV.md)) |
 | **P4** | Material-classified OIT — mode 3 + MBOIT overlay; `r_oitClassify 1` two-bucket (alpha-blend vs additive); further class paths remain follow-up ([MOMENT_OIT_STOCHASTIC_ALPHA.md](MOMENT_OIT_STOCHASTIC_ALPHA.md)) |
 | **P5** | Neural material/texture reconstruction (chocolate scaffold; no mandatory vendor SDK) |
 | **P6** | Heterogeneous resolution, sparse volumetrics, OMM, character skin/hair paths |
@@ -109,6 +109,23 @@ Demo: `exec demo_visibility_2027.cfg`. Console: `visibility_buffer_status`, `ren
 | 13 | Sparse volumetrics | Froxel fog + VDB | Sparse hybrid volumetric lighting |
 | 14 | Digital humans | PBR slots + stochastic cards | Strand hair, SSS, tear-film |
 | 15 | Coherence scheduling | WPT scaffold | Ray/material sort, SER-like |
+
+### Selective RT ownership
+
+Selective Hybrid is an additive sidecar over the mode-3 raster spine. The
+clustered raster/visibility path owns primary visibility and remains valid when
+RT is unavailable. `vk_selective_rt` admits bounded secondary work through
+`r_selectiveShadowBudget`, `r_selectiveReflectionBudget`,
+`r_selectiveHeroObjectBudget`, and `r_selectiveRaysPerPixelBudget`.
+
+Hybrid1/ReSTIR may own sun-shadow and specular signals only after the SHS/SHR
+health checks pass. Hybrid1 now performs a bounded per-pixel reservoir update
+over the traced candidates, with frame-ping-pong storage; the raster depth and
+G-buffer still remain the visibility authority. The first hero-object class is
+first-person/view-model geometry; all other geometry remains raster-owned unless
+a later explicit hero classification is added. Rejected or unavailable work
+falls back to raster CSM, SSR, probes, or the normal clustered result—never to a
+partial primary RT visibility replacement.
 
 ## Related
 

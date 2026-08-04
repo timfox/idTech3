@@ -521,13 +521,17 @@ void vk_bind_descriptor_sets( void )
 		vk.pipeline_layout_oit_accum_mboit != VK_NULL_HANDLE ) {
 		/* MBOIT accum: set 0 = tex0; 1 = depth; 2 = moments; 3 = b0; 4 = Forward+; 5 = shadow. */
 		if ( vk.cmd->descriptor_set.current[VK_DESC_TEXTURE0] != VK_NULL_HANDLE ) {
-			VkDescriptorSet sets[6] = {
+			VkDescriptorSet sets[10] = {
 				vk.cmd->descriptor_set.current[VK_DESC_TEXTURE0],
 				vk.oit_depth_descriptor,
 				vk.oit_moments_descriptor,
 				vk.oit_b0_descriptor,
 				VK_NULL_HANDLE,
-				VK_NULL_HANDLE
+				VK_NULL_HANDLE,
+				vk.cmd->descriptor_set.current[VK_DESC_PBR_NORMAL],
+				vk.cmd->descriptor_set.current[VK_DESC_PBR_PHYSICAL],
+				vk.cmd->descriptor_set.current[VK_DESC_PBR_EMISSIVE],
+				vk.cmd->descriptor_set.current[VK_DESC_TEXTURE1]
 			};
 			uint32_t set_count = 1u;
 			if ( vk.oit_depth_descriptor != VK_NULL_HANDLE ) {
@@ -552,18 +556,25 @@ void vk_bind_descriptor_sets( void )
 					set_count = 6u;
 				}
 			}
+			if ( set_count >= 5u ) {
+				set_count = 10u;
+			}
 			qvkCmdBindDescriptorSets( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
 				vk.pipeline_layout_oit_accum_mboit, 0, set_count, sets, 0, NULL );
 		}
 	} else if ( backEnd.oitAccumPass && vk.pipeline_layout_oit_accum != VK_NULL_HANDLE ) {
 		/* OIT accum set 0 = tex0; set 1 = opaque depth; set 2 = Forward+; set 3 = shadow. */
 		if ( vk.cmd->descriptor_set.current[VK_DESC_TEXTURE0] != VK_NULL_HANDLE ) {
-			VkDescriptorSet sets[4];
+			VkDescriptorSet sets[8];
 			uint32_t set_count = 1u;
 			sets[0] = vk.cmd->descriptor_set.current[VK_DESC_TEXTURE0];
 			sets[1] = vk.oit_depth_descriptor;
 			sets[2] = VK_NULL_HANDLE;
 			sets[3] = VK_NULL_HANDLE;
+			sets[4] = vk.cmd->descriptor_set.current[VK_DESC_PBR_NORMAL];
+			sets[5] = vk.cmd->descriptor_set.current[VK_DESC_PBR_PHYSICAL];
+			sets[6] = vk.cmd->descriptor_set.current[VK_DESC_PBR_EMISSIVE];
+			sets[7] = vk.cmd->descriptor_set.current[VK_DESC_TEXTURE1];
 			if ( vk.oit_depth_descriptor != VK_NULL_HANDLE ) {
 				set_count = 2u;
 			}
@@ -585,6 +596,9 @@ void vk_bind_descriptor_sets( void )
 					sets[2] = shadow_set;
 					set_count = 3u;
 				}
+			}
+			if ( set_count >= 3u ) {
+				set_count = 8u;
 			}
 			qvkCmdBindDescriptorSets( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
 				vk.pipeline_layout_oit_accum, 0, set_count, sets, 0, NULL );

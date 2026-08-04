@@ -587,7 +587,10 @@ copy_to_release() {
       if [ -d "$dest/baseq3" ]; then
         cp -f "$PROJECT_ROOT/config/$cfg" "$dest/baseq3/$cfg"
       fi
-      # Also ship into active fs_game trees when present (openarena / havenrp).
+      # Also ship into active Q3-compatible game trees when present.
+      if [ -d "$dest/baseoa" ]; then
+        cp -f "$PROJECT_ROOT/config/$cfg" "$dest/baseoa/$cfg"
+      fi
       if [ -d "$dest/openarena" ]; then
         cp -f "$PROJECT_ROOT/config/$cfg" "$dest/openarena/$cfg"
       fi

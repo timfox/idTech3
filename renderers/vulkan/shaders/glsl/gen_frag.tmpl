@@ -1,4 +1,6 @@
 #version 450
+#extension GL_GOOGLE_include_directive : require
+#include "surface_material_decode.glsl"
 
 #ifdef USE_TX2
 #define USE_TX1
@@ -1359,12 +1361,8 @@ void main() {
 			/* GE128 / cutout: classic hashed alpha */
 			if ( a < noise ) discard;
 		}
-	} else if (alpha_test_func == 1) {
-		if (color0.a == alpha_test_value) discard;
-	} else if (alpha_test_func == 2) {
-		if (color0.a >= alpha_test_value) discard;
-	} else if (alpha_test_func == 3) {
-		if (color0.a < alpha_test_value) discard;
+	} else if (!SurfaceAlphaTestPassLegacy(color0.a, alpha_test_value, alpha_test_func)) {
+		discard;
 	}
 #endif
 
@@ -1829,10 +1827,11 @@ void main() {
 							if ( dist > rad ) {
 								continue;
 							}
-							/* Match classic projected dlight falloff (light_frag.tmpl / VK_SetLightParams):
-							 * intensFactor = 1 - (dist^2)/(rad^2), not (1-dist/rad)^2. */
+							/* Match deferred/clustered point-light falloff: preserve the
+							 * classic radial midpoint while smoothing the cutoff edge. */
 							float dr = dist / max( rad, 1e-4 );
-							att = clamp( 1.0 - dr * dr, 0.0, 1.0 );
+							float radial = clamp( 1.0 - dr * dr, 0.0, 1.0 );
+							att = radial * radial * ( 3.0 - 2.0 * radial );
 							Ldir = Lw / max( dist, 1e-4 );
 							NLfp = max( dot( N, Ldir ), 0.0 );
 						} else {

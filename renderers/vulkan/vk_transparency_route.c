@@ -374,6 +374,7 @@ void vk_transparency_route_init( void )
 
 void vk_transparency_route_shutdown( void )
 {
+	vk_oit_lab_shutdown();
 	vk_oit_certify_shutdown();
 	if ( ri.Cmd_RemoveCommand ) {
 		ri.Cmd_RemoveCommand( "transparency_route_status" );

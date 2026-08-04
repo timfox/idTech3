@@ -17,7 +17,10 @@ void main()
 {
 	vec3 base = hybrid1_sampleHitAlbedo( albedoTex );
 	vec3 N = hybrid1_sampleHitNormal();
-	float roughness = clamp( specRadiance.w, 0.02, 1.0 );
+	SurfaceMaterial material = hybrid1_decodeHitMaterial( base, N );
+	base = material.baseColor;
+	N = material.normalWS;
+	float roughness = material.perceptualRoughness;
 	vec3 hit = base;
 	vec3 V = normalize( -gl_WorldRayDirectionEXT );
 
@@ -28,7 +31,7 @@ void main()
 		if ( iblMode >= 1.5 ) {
 			float NdotV = clamp( abs( dot( N, V ) ), 0.0, 1.0 );
 			vec2 envBrdf = hybrid1_sampleEnvBRDF( brdfLut, NdotV, roughness );
-			vec3 F0 = mix( vec3( 0.04 ), base, clamp( 1.0 - roughness, 0.0, 1.0 ) );
+			vec3 F0 = mix( vec3( 0.04 ), base, material.metallic );
 			hit += ibl * ( F0 * envBrdf.x + envBrdf.y );
 		} else {
 			hit += ibl * ( 1.0 - roughness );

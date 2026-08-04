@@ -44,6 +44,7 @@ rg -q 'PhysMiddleware_Frame' "$PHYS_MIDDLEWARE"
 rg -q 'phys_spawn_ragdoll' "$PHYS_MIDDLEWARE"
 rg -q 'phys_spawn_box' "$PHYS_MIDDLEWARE"
 rg -q 'phys_impulse_sphere' "$PHYS_MIDDLEWARE"
+rg -q 'phys_spawn_capsule' "$PHYS_MIDDLEWARE"
 rg -q 'phys_spawn_shadow' "$PHYS_MIDDLEWARE"
 rg -q 'PhysProp_CreateShadow' "$PHYS_PROPS"
 rg -q 'PhysProp_CreateFromAABB' "$PHYS_PROPS"
@@ -166,6 +167,8 @@ rg -q 'phys_pmove' modules/physics/phys_character.c
 rg -q 'pmoveCorrect' runtime/game/scripting/g_lua_bindings.c "$LUA_PHYSICS"
 rg -q 'createConstraint' runtime/game/scripting/g_lua_bindings.c "$LUA_PHYSICS"
 rg -q 'b3CreateCylinder' modules/physics/phys_box3d_impl.c
+rg -q 'PHYS_SHAPE_CAPSULE' modules/physics/phys_props.c
+rg -q 'PhysProp_CreateCapsule' modules/physics/phys_props.c modules/physics/phys_props.h
 rg -q 'b3CreateHull' modules/physics/phys_box3d_impl.c
 rg -q 'b3Shape_SetFilter' modules/physics/phys_box3d_impl.c
 rg -q 'b3World_CastRayClosest' modules/physics/phys_box3d_impl.c
@@ -242,6 +245,13 @@ rg -q 'Phys_ApplyWind' modules/physics/phys_box3d_impl.c
 rg -q 'Phys_Explode' modules/physics/phys_bullet.h
 rg -q 'Phys_RayCastAll' modules/physics/phys_box3d_impl.c
 rg -q 'b3World_SetFrictionCallback' modules/physics/phys_box3d_impl.c
+rg -q 'box_invalidate_constraints_for_body' modules/physics/phys_box3d_impl.c
+rg -q 'stale joint' modules/physics/phys_box3d_impl.c
+rg -q 'box_alloc_body_slot' modules/physics/phys_box3d_impl.c
+rg -q 'box_body_slot_available' modules/physics/phys_box3d_impl.c
+rg -q 'box_alloc_constraint_slot' modules/physics/phys_box3d_impl.c
+rg -q 'box_constraint_slot_available' modules/physics/phys_box3d_impl.c
+rg -q 'b3Joint_IsValid' modules/physics/phys_box3d_impl.c
 rg -q 'phys_explode' modules/physics/phys_middleware.c
 rg -q 'rayCastAll' runtime/game/scripting/g_lua_registration.inc
 rg -q 'l_char_getState' runtime/game/scripting/g_lua_bindings.c

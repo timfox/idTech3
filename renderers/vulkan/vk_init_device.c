@@ -24,6 +24,7 @@ Extracted from vk.c for incremental modularization.
 #include "vk_pass_registry.h"
 #include "vk_forward_plus.h"
 #include "vk_shadow_contract.h"
+#include "vk_selective_rt.h"
 #include "vk_deferred_gbuffer.h"
 #include "vk_visibility_buffer.h"
 #include "vk_vrcs.h"
@@ -1286,6 +1287,12 @@ void vk_initialize( void )
 					desc.setLayoutCount = 3;
 				}
 			}
+			/* Material parity seam: normal, ORMS, emissive, and lightmap fallbacks. */
+			set_layouts[4] = vk.set_layout_sampler;
+			set_layouts[5] = vk.set_layout_sampler;
+			set_layouts[6] = vk.set_layout_sampler;
+			set_layouts[7] = vk.set_layout_sampler;
+			desc.setLayoutCount = 8;
 			desc.pSetLayouts = set_layouts;
 			push_range.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
 			push_range.offset = 0;
@@ -1341,6 +1348,11 @@ void vk_initialize( void )
 				} else {
 					ri.Printf( PRINT_WARNING, "[VK][OIT] Forward+ set layout missing; MBOIT accum unbound set4 — enable PBR/Forward+\n" );
 				}
+				set_layouts[6] = vk.set_layout_sampler;
+				set_layouts[7] = vk.set_layout_sampler;
+				set_layouts[8] = vk.set_layout_sampler;
+				set_layouts[9] = vk.set_layout_sampler;
+				desc.setLayoutCount = 10;
 				desc.pSetLayouts = set_layouts;
 				push_range.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
 				push_range.offset = 0;
@@ -1352,14 +1364,16 @@ void vk_initialize( void )
 			}
 		}
 
-		// ssr layout (set 0: color, set 1: depth, push constants: 2 mat4 + 2 vec4 = 160 bytes)
+		// ssr layout (color, depth, canonical GBuffer normal/material; 224-byte push)
 		set_layouts[0] = vk.set_layout_sampler;
 		set_layouts[1] = vk.set_layout_sampler;
-		desc.setLayoutCount = 2;
+		set_layouts[2] = vk.set_layout_sampler;
+		set_layouts[3] = vk.set_layout_sampler;
+		desc.setLayoutCount = 4;
 		desc.pSetLayouts = set_layouts;
 		push_range.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
 		push_range.offset = 0;
-		push_range.size = 160;
+		push_range.size = 240;
 		desc.pushConstantRangeCount = 1;
 		desc.pPushConstantRanges = &push_range;
 		VK_CHECK( qvkCreatePipelineLayout( vk.device, &desc, NULL, &vk.pipeline_layout_ssr ) );
@@ -1436,6 +1450,7 @@ void vk_initialize( void )
 	vk_distortion_init();
 	vk_shs_init();
 	vk_shr_init();
+	vk_srt_init();
 	vk_spine_registry_init();
 
 #ifdef VK_CUBEMAP

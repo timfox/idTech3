@@ -1,0 +1,51 @@
+#version 450
+/* Deferred hair: deterministic bundle LOD / indirect-dispatch preparation. */
+#extension GL_GOOGLE_include_directive : require
+layout(local_size_x = 64, local_size_y = 1, local_size_z = 1) in;
+
+/* boundsMin, boundsMax, then strand/control-point/style metadata. */
+layout(std430, set = 0, binding = 0) readonly buffer HairBundles { vec4 bundleData[]; };
+/* x=visible strands, y=control points, z=dispatch groups, w=lod quantization. */
+layout(std430, set = 0, binding = 1) writeonly buffer HairDispatch { uvec4 dispatchData[]; };
+
+layout(push_constant) uniform HairLodPush {
+	mat4 clipFromWorld;
+	vec4 viewportLambda; /* xy viewport, z global lambda, w frame seed */
+	uint bundleCount;
+	uint bundleStride;
+	uint maxStrands;
+	uint maxControlPoints;
+} pc;
+
+uint hash(uint x) {
+	x ^= x >> 16;
+	x *= 0x7feb352du;
+	x ^= x >> 15;
+	return x * 0x846ca68bu;
+}
+
+void main() {
+	uint bundle = gl_GlobalInvocationID.x;
+	if (bundle >= pc.bundleCount) return;
+	uint base = bundle * pc.bundleStride;
+	vec3 bmin = bundleData[base + 0u].xyz;
+	vec3 bmax = bundleData[base + 1u].xyz;
+	vec4 meta = bundleData[base + 2u];
+	vec3 center = 0.5 * (bmin + bmax);
+	vec4 clip = pc.clipFromWorld * vec4(center, 1.0);
+	float projected = 0.0;
+	if (clip.w > 0.0001) {
+		vec3 extent = abs(bmax - bmin);
+		projected = max(extent.x, max(extent.y, extent.z)) *
+			max(pc.viewportLambda.y, 1.0) / clip.w;
+	}
+	float lod = clamp(projected * max(pc.viewportLambda.z, 0.01), 0.0, 1.0);
+	uint fullStrands = min(uint(max(meta.x, 1.0)), pc.maxStrands);
+	uint fullControls = min(uint(max(meta.y, 2.0)), pc.maxControlPoints);
+	/* Stable stochastic offset prevents visible bundle-wide LOD popping. */
+	float jitter = float(hash(bundle ^ floatBitsToUint(pc.viewportLambda.w)) & 1023u) / 1024.0;
+	uint strands = clamp(uint(ceil(lod * float(fullStrands) + jitter)), 1u, fullStrands);
+	uint controls = clamp(uint(ceil(mix(2.0, float(fullControls), lod))), 2u, fullControls);
+	uint groups = (strands + 63u) / 64u;
+	dispatchData[bundle] = uvec4(strands, controls, groups, uint(round(lod * 255.0)));
+}

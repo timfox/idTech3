@@ -154,6 +154,7 @@ typedef struct deferredOwnershipSnapshot_s {
 } deferredOwnershipSnapshot_t;
 
 void vk_deferred_honesty_register( void );
+void vk_deferred_honesty_shutdown( void );
 void vk_deferred_honesty_begin_frame( void );
 
 DeferredEligibilityResult R_GetDeferredEligibility(

@@ -17,6 +17,7 @@ grep -q 'r_hiZ' "$HIZ" || fail "r_hiZ cvar missing"
 grep -q 'conservative\|Conservative' "$HIZ" || fail "conservative policy comment missing"
 grep -q 'srcView = dstView' "$HIZ" || fail "Hi-Z mip 0 must keep srcMip descriptor valid"
 grep -q 'writeCount = 3' "$HIZ" || fail "Hi-Z must update all compute descriptors on every mip"
+grep -q 'Descriptor contents are read when the command executes' "$HIZ" || fail "Hi-Z must rebind descriptors after each mip update"
 pass "Hi-Z module wired"
 
 grep -q 'reversed-Z\|reversed-Z' "$VS" || fail "vk_view_state must document reversed-Z"

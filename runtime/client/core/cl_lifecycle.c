@@ -83,6 +83,7 @@ void CL_FlushMemory( void ) {
 }
 
 void CL_MapLoading( void ) {
+	CL_SocialOverlayReset( "map-loading" );
 	if ( com_dedicated->integer ) {
 		cls.state = CA_DISCONNECTED;
 		Key_SetCatcher( KEYCATCH_CONSOLE );
@@ -181,7 +182,7 @@ void CL_Shutdown( const char *finalmsg, qboolean quit ) {
 		return;
 	}
 
-	Com_Printf( "----- Client Shutdown (%s) -----\n", finalmsg );
+	Com_Printf( "[shutdown][client] begin reason=\"%s\"\n", finalmsg );
 
 	if ( recursive ) {
 		Com_Printf( "WARNING: Recursive CL_Shutdown()\n" );
@@ -243,5 +244,5 @@ void CL_Shutdown( const char *finalmsg, qboolean quit ) {
 
 	Com_Memset( &cls, 0, sizeof( cls ) );
 	Key_SetCatcher( 0 );
-	Com_Printf( "-----------------------\n" );
+	Com_Printf( "[shutdown][client] complete\n" );
 }

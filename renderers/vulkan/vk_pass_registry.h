@@ -2,9 +2,9 @@
 ===========================================================================
 Lightweight Spine pass / resource registry (Renderer Spine 1.0).
 
-Not a frame-graph rewrite: declarative ownership + optional runtime validation
-around the existing Vulkan path. Cheap stamps always; full checks when
-r_spineValidate > 0 (or on DEVICE_LOST dump).
+Declarative ownership around the existing Vulkan path. Pass entry/exit and
+known-image layout transitions are graph-owned; full diagnostics remain
+available when r_spineValidate > 0 (or on DEVICE_LOST dump).
 ===========================================================================
 */
 #ifndef VK_PASS_REGISTRY_H
@@ -199,6 +199,12 @@ void vk_spine_note_read( vkSpineResourceId res, vkSpinePassId pass, uint32_t acc
 /* Attachment clear / layout-barrier contracts (cheap stamps; validated when r_spineValidate > 0). */
 void vk_spine_note_clear( vkSpineResourceId res, vkSpinePassId pass );
 void vk_spine_note_barrier( vkSpineResourceId res, vkSpinePassId pass, const char *reason );
+/* Authoritative image transition hook used by the single Vulkan transition helper. */
+void vk_spine_transition_image( VkImage image, VkImageLayout old_layout, VkImageLayout new_layout,
+	vkSpinePassId pass, const char *reason );
+/* Resolve a live Vulkan image to its Spine resource, or VK_SPINE_RES_NONE. */
+vkSpineResourceId vk_spine_resource_for_image( VkImage image );
+vkSpinePassId vk_spine_current_pass( void );
 /* Track expected VkImageLayout for Spine attachments (cheap stamp; expect checks when validating). */
 void vk_spine_note_layout( vkSpineResourceId res, VkImageLayout layout );
 void vk_spine_expect_layout( vkSpineResourceId res, VkImageLayout expected, vkSpinePassId pass, const char *where );

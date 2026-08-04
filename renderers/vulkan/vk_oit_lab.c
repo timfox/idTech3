@@ -416,8 +416,13 @@ static void OIT_Lab_EvalSingle( void )
 	if ( !OIT_Lab_BuildSingleLayerReference( snap, sc, &ref, &mask, &maskCount ) || maskCount == 0 ) {
 		free( ref );
 		free( mask );
-		OIT_Lab_RecordPending( WBOIT_CERT_STATUS_PENDING, WBOIT_EVIDENCE_NONE, err, 2e-2,
-			"single-layer image-diff reference unavailable" );
+		if ( vk_oit_cert_geometry_was_drawn() ) {
+			OIT_Lab_RecordPending( WBOIT_CERT_STATUS_FAIL, WBOIT_EVIDENCE_GPU_READBACK, err, 2e-2,
+				"fixture submitted but accum/reveal snapshot has no covered pixels" );
+		} else {
+			OIT_Lab_RecordPending( WBOIT_CERT_STATUS_PENDING, WBOIT_EVIDENCE_NONE, err, 2e-2,
+				"single-layer fixture was not drawn" );
+		}
 		return;
 	}
 	vk_cert_metrics_compare_rgba( snap->resolved.rgba, ref, snap->resolved.width, snap->resolved.height,
@@ -540,8 +545,13 @@ static void OIT_Lab_EvalWeight( void )
 	}
 	if ( k == 0 ) {
 		free( weights );
-		OIT_Lab_RecordPending( WBOIT_CERT_STATUS_PENDING, WBOIT_EVIDENCE_NONE, 0, 0,
-			"no weighted fragments — fixtures may not have drawn" );
+		if ( vk_oit_cert_geometry_was_drawn() ) {
+			OIT_Lab_RecordPending( WBOIT_CERT_STATUS_FAIL, WBOIT_EVIDENCE_GPU_REDUCTION, 0, 0,
+				"fixture submitted but accumulation weight stayed empty" );
+		} else {
+			OIT_Lab_RecordPending( WBOIT_CERT_STATUS_PENDING, WBOIT_EVIDENCE_NONE, 0, 0,
+				"no weighted fragments — fixture was not drawn" );
+		}
 		return;
 	}
 	vk_cert_metrics_weights( weights, k, w->minWeight, w->maxWeight, &m );
@@ -1039,4 +1049,31 @@ void vk_oit_lab_register( void )
 	s_cmds = qtrue;
 	ri.Printf( PRINT_ALL,
 		"[VK][OIT] Phase 2.6C oit_lab ready (deferred snapshots; oit_certify_core)\n" );
+}
+
+void vk_oit_lab_shutdown( void )
+{
+	if ( !s_cmds ) {
+		return;
+	}
+
+	/* Renderer commands point into the Vulkan DSO. Remove them before a
+	   vid_restart unloads the renderer; otherwise the command table can call
+	   stale function pointers on the next exec (notably oit_certify_core). */
+	ri.Cmd_RemoveCommand( "oit_lab_list" );
+	ri.Cmd_RemoveCommand( "oit_lab_run" );
+	ri.Cmd_RemoveCommand( "oit_lab_run_group" );
+	ri.Cmd_RemoveCommand( "oit_lab_status" );
+	ri.Cmd_RemoveCommand( "oit_lab_reset" );
+	ri.Cmd_RemoveCommand( "oit_certify_core" );
+	ri.Cmd_RemoveCommand( "mboit_image_diff_status" );
+
+	s_pendingEval = OIT_LAB_EVAL_NONE;
+	s_coreRunning = qfalse;
+	s_coreQueueLen = 0;
+	s_coreQueuePos = 0;
+	s_evalAwaitingSnapshot = qfalse;
+	s_pendingRetries = 0;
+	vk_oit_cert_geometry_clear();
+	s_cmds = qfalse;
 }

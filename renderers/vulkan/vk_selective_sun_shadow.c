@@ -16,6 +16,7 @@ Local lights stay on the raster shadow path for this milestone.
 #include "vk_view_state.h"
 #include "vk_deferred_gbuffer.h"
 #include "tr_render_mode_vk.h"
+#include "vk_selective_rt.h"
 
 #ifdef USE_VULKAN_RTX
 #include "vk_selective_sun_shadow_spirv.inc"
@@ -124,6 +125,10 @@ static qboolean SHS_RtHealthReady( void )
 	tlasReady = ( vk_rtx_scene_ready() && shs.tlasOk ) ? qtrue : qfalse;
 	if ( !tlasReady ) {
 		SHS_SetFallback( vk_rtx_scene_ready() ? "shs_tlas_unhealthy" : "shs_tlas_not_ready" );
+		return qfalse;
+	}
+	if ( !vk_srt_admit_shadow() ) {
+		SHS_SetFallback( "shs_selective_budget" );
 		return qfalse;
 	}
 

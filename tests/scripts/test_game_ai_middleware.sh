@@ -25,5 +25,7 @@ fi
 
 rg -q 'USE_GAME_AI_MIDDLEWARE' "$CL_GAMEFRAME" || fail "cl_gameframe guard missing"
 rg -q 'GameMiddleware_LogDisabled' "$CL_GAMEFRAME" || fail "middleware disabled log hook"
+rg -q 'agents\[i\]\.treeHandle = treeH' "$ROOT/runtime/game/middleware/g_bt.c" || fail "BT tree ownership missing"
+rg -q 'treeH = a->treeHandle' "$ROOT/runtime/game/middleware/g_bt.c" || fail "BT update must use owned tree"
 
 echo "test_game_ai_middleware: passed"

@@ -28,6 +28,33 @@ typedef struct {
 	uint32_t firstInstance;
 } meshlet_draw_cmd_t;
 
+/* GPU meshlet ABI. Keep this 16-byte aligned; it is consumed by the portable
+ * compute culler and by the optional mesh-shader path. */
+typedef struct {
+	float mins[3];
+	uint32_t firstIndex;
+	float maxs[3];
+	uint32_t indexCount;
+	float coneAxis[3];
+	float coneCutoff;
+	uint32_t surfaceIndex;
+	uint32_t lodMinPixels;
+	uint32_t lodMaxPixels;
+	uint32_t streamState;
+	uint32_t generation;
+} meshlet_gpu_record_t;
+
+/* Persistent per-surface index storage. The CPU tess index buffer remains a
+ * correctness fallback, but GPU-generated commands address this arena. */
+typedef struct {
+	uint64_t key;
+	uint32_t firstIndex;
+	uint32_t indexCount;
+	uint32_t generation;
+	uint32_t streamState;
+	qboolean resident;
+} meshlet_surface_gpu_t;
+
 void R_Meshlets_Init( void );
 void R_Meshlets_Shutdown( void );
 qboolean R_Meshlets_Active( void );
@@ -42,6 +69,13 @@ int R_Meshlets_Bake( const vec3_t *positions, int numVerts, const int *indexes, 
 uint64_t R_Meshlets_StableKey( const char *modelName, const char *surfaceName, int surfaceIndex );
 int R_Meshlets_CacheLocalKey( uint64_t key, const vec3_t *positions, int numVerts,
 	const int *indexes, int numIndexes );
+
+/* Register/copy a surface's indexes into persistent GPU-visible storage. */
+qboolean R_Meshlets_RegisterPersistentIndexes( uint64_t key, const int *indexes,
+	int numIndexes, meshlet_surface_gpu_t *out );
+qboolean R_Meshlets_PersistentIndexBufferReady( void );
+void *R_Meshlets_PersistentIndexBuffer( void );
+uint32_t R_Meshlets_PersistentIndexCount( void );
 int R_Meshlets_LookupKey( uint64_t key, const meshlet_t **outMeshlets );
 
 /* Legacy pointer key — hashes address + generation; prefer StableKey / CacheLocalKey. */

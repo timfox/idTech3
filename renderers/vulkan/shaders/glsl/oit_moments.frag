@@ -16,7 +16,7 @@ layout(location = 0) out vec4 out_moments;
 layout(location = 1) out float out_b0;
 
 void main() {
-	vec4 base = textureLod(tex0, frag_tex_coord0, 0.0) * frag_color0;
+	vec4 base = texture( tex0, frag_tex_coord0 ) * frag_color0;
 	float alpha = clamp(base.a, 0.0, 0.999);
 	if (alpha < 0.01) discard;
 

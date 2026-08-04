@@ -15,7 +15,11 @@ void main()
 {
 	vec3 base = hybrid1_sampleHitAlbedo( albedoTex );
 	vec3 N = hybrid1_sampleHitNormal();
+	SurfaceMaterial material = hybrid1_decodeHitMaterial( base, N );
+	base = material.baseColor;
+	N = material.normalWS;
 	vec3 hit = base * 0.15;
+	hit += material.emissive;
 
 	if ( h1.params3.z > 0.5 ) {
 		vec3 L = normalize( h1.sunDirection.xyz );

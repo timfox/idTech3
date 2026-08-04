@@ -408,6 +408,7 @@ compile_shader("comp", "terrain/cbt_terrain.comp", "cbt_terrain_cs", binding_exp
 compile_shader("comp", "forward_plus_tile_cull.comp", "forward_plus_tile_cull_cs", binding_expr="vk.modules.forward_plus_tile_cull_cs")
 compile_shader("comp", "deferred_gbuffer_fill.comp", "deferred_gbuffer_fill_cs", binding_expr="vk.modules.deferred_gbuffer_fill_cs")
 compile_shader("comp", "hiz_downsample.comp", "hiz_downsample_cs", binding_expr="vk.modules.hiz_downsample_cs")
+compile_shader("comp", "meshlet_cull_indirect.comp", "meshlet_cull_indirect_cs", binding_expr="vk.modules.meshlet_cull_indirect_cs")
 compile_shader("frag", "deferred_gbuffer_debug.frag", "deferred_gbuffer_debug_fs", binding_expr="vk.modules.deferred_gbuffer_debug_fs")
 compile_shader("comp", "visibility_buffer_fill.comp", "visibility_buffer_fill_cs", binding_expr="vk.modules.visibility_buffer_fill_cs")
 compile_shader("frag", "visibility_buffer_debug.frag", "visibility_buffer_debug_fs", binding_expr="vk.modules.visibility_buffer_debug_fs")
@@ -448,6 +449,9 @@ compile_shader("comp", "vksplat/vksplat_adam.comp", "vksplat_adam_cs", binding_e
 compile_shader("comp", "curast/curast_clear.comp", "curast_clear_cs", binding_expr="vk.modules.curast_clear_cs")
 compile_shader("comp", "curast/curast_stage1.comp", "curast_stage1_cs", binding_expr="vk.modules.curast_stage1_cs")
 compile_shader("comp", "curast/curast_resolve.comp", "curast_resolve_cs", binding_expr="vk.modules.curast_resolve_cs")
+compile_shader("comp", "hair_deferred/hair_lod.comp", "hair_lod_cs")
+compile_shader("comp", "hair_deferred/hair_visibility_atomic.comp", "hair_visibility_atomic_cs")
+compile_shader("comp", "vector_brush/vector_brush_resample.comp", "vector_brush_resample_cs")
 compile_shader("comp", "graph/graph_bfs_expand.comp", "graph_bfs_expand_cs", binding_expr="vk.modules.graph_bfs_expand_cs")
 compile_shader("comp", "arc_blanc/arc_blanc_htilde.comp", "arc_blanc_htilde_cs", binding_expr="vk.modules.arc_blanc_htilde_cs")
 compile_shader("comp", "arc_blanc/arc_blanc_fft_1d.comp", "arc_blanc_fft_1d_cs", binding_expr="vk.modules.arc_blanc_fft_1d_cs")
@@ -501,6 +505,7 @@ compile_shader("rgen", "hybrid1/hybrid1_diffuse.rgen", "hybrid1_diffuse_rgen_spv
 compile_shader("rmiss", "hybrid1/hybrid1_diffuse.rmiss", "hybrid1_diffuse_rmiss_spv", hybrid1_collect=True)
 compile_shader("rchit", "hybrid1/hybrid1_diffuse.rchit", "hybrid1_diffuse_rchit_spv", hybrid1_collect=True)
 compile_shader("comp", "hybrid1/hybrid1_temporal.comp", "hybrid1_temporal_cs", hybrid1_collect=True)
+compile_shader("comp", "hybrid1/hybrid1_restir.comp", "hybrid1_restir_cs", hybrid1_collect=True)
 compile_shader("comp", "hybrid1/hybrid1_atrous.comp", "hybrid1_atrous_cs", hybrid1_collect=True)
 compile_shader("comp", "hybrid1/hybrid1_composite.comp", "hybrid1_composite_cs", hybrid1_collect=True)
 
@@ -672,6 +677,7 @@ def write_vk_hybrid1_spirv_inc():
         ("hybrid1_diffuse_rmiss_spv", "vk_hybrid1_diffuse_rmiss_spv", "VK_HYBRID1_DIFFUSE_RMISS_SPV_SIZE"),
         ("hybrid1_diffuse_rchit_spv", "vk_hybrid1_diffuse_rchit_spv", "VK_HYBRID1_DIFFUSE_RCHIT_SPV_SIZE"),
         ("hybrid1_temporal_cs", "vk_hybrid1_temporal_cs_spv", "VK_HYBRID1_TEMPORAL_CS_SPV_SIZE"),
+        ("hybrid1_restir_cs", "vk_hybrid1_restir_cs_spv", "VK_HYBRID1_RESTIR_CS_SPV_SIZE"),
         ("hybrid1_atrous_cs", "vk_hybrid1_atrous_cs_spv", "VK_HYBRID1_ATROUS_CS_SPV_SIZE"),
         ("hybrid1_composite_cs", "vk_hybrid1_composite_cs_spv", "VK_HYBRID1_COMPOSITE_CS_SPV_SIZE"),
     ]

@@ -14,6 +14,8 @@ grep -q 'deluxe' "$DOC" || fail "doc must mention deluxe maps"
 grep -q 'GTAO\|AO' "$DOC" || fail "doc must mention GTAO/AO"
 grep -q 'r_indirectDebug' "$DOC" || fail "doc must mention r_indirectDebug"
 grep -q 'indirect_light_status' "$DOC" || fail "doc must mention indirect_light_status"
+grep -q 'inria-00480869v3\|Soler' "$DOC" || fail "doc must identify deferred indirect-lighting reference"
+grep -q 'single-level\|Hierarchical SSGI' "$DOC" || fail "doc must distinguish current SSGI from hierarchical follow-up"
 pass "INDIRECT_LIGHTING.md symbols present"
 
 if [[ -f "$ROOT/renderers/vulkan/vk_indirect_light.c" ]]; then

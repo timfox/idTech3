@@ -10,6 +10,7 @@ Vulkan render graph core.
 
 #define VK_RG_MAX_EDGES_PER_PASS 16
 #define VK_RG_MAX_DEPS 256
+#define VK_RG_MAX_ACTIVE 16
 
 typedef struct {
 	qboolean declared;
@@ -39,6 +40,8 @@ typedef struct {
 	uint32_t dependencyCount;
 	uint32_t frameViolationCount;
 	uint32_t violationCount;
+	vkSpinePassId activeStack[VK_RG_MAX_ACTIVE];
+	uint32_t activeCount;
 	qboolean imported[VK_SPINE_RES_COUNT];
 	vkRenderGraphNode nodes[VK_SPINE_PASS_COUNT];
 	vkRenderGraphDependency deps[VK_RG_MAX_DEPS];
@@ -251,6 +254,8 @@ void vk_render_graph_begin_frame( void )
 	s_rg.dependencyCount = 0u;
 	s_rg.frameViolationCount = 0u;
 	s_rg.lastError[0] = '\0';
+	s_rg.activeCount = 0u;
+	Com_Memset( s_rg.activeStack, 0, sizeof( s_rg.activeStack ) );
 	Com_Memset( s_rg.imported, 0, sizeof( s_rg.imported ) );
 	for ( i = 0; i < VK_SPINE_PASS_COUNT; i++ ) {
 		s_rg.nodes[i].observed = qfalse;
@@ -280,6 +285,41 @@ void vk_render_graph_observe_pass( vkSpinePassId pass )
 		s_rg.observedCount++;
 	}
 	s_rg.compiled = qfalse;
+}
+
+qboolean vk_render_graph_enter_pass( vkSpinePassId pass )
+{
+	if ( !s_rg.initialized || !vk_rg_valid_pass( pass ) ) {
+		return qfalse;
+	}
+	if ( !s_rg.nodes[pass].declared ) {
+		vk_rg_record_error( "entered undeclared pass %s", vk_spine_pass_name( pass ) );
+		return qfalse;
+	}
+	/* Entering a pass is the graph ownership boundary.  The legacy recorder
+	 * remains free to issue commands, but it can only do so inside a declared
+	 * graph pass. */
+	vk_render_graph_observe_pass( pass );
+	if ( s_rg.activeCount >= VK_RG_MAX_ACTIVE ) {
+		vk_rg_record_error( "pass stack overflow entering %s", vk_spine_pass_name( pass ) );
+		return qfalse;
+	}
+	s_rg.activeStack[s_rg.activeCount++] = pass;
+	return qtrue;
+}
+
+void vk_render_graph_leave_pass( vkSpinePassId pass )
+{
+	if ( !s_rg.initialized || !vk_rg_valid_pass( pass ) ) {
+		return;
+	}
+	if ( s_rg.activeCount == 0u || s_rg.activeStack[s_rg.activeCount - 1u] != pass ) {
+		vk_rg_record_error( "pass %s left while %s is active",
+			vk_spine_pass_name( pass ), s_rg.activeCount ?
+			vk_spine_pass_name( s_rg.activeStack[s_rg.activeCount - 1u] ) : "none" );
+		return;
+	}
+	s_rg.activeCount--;
 }
 
 qboolean vk_render_graph_compile( void )

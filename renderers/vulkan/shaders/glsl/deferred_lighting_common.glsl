@@ -64,7 +64,10 @@ float attenPointLight( vec3 lView, vec3 viewPos, float rad, out vec3 L ) {
 	}
 	L = toLight / max( dist, 1e-4 );
 	float dr = dist / rad;
-	return clamp( 1.0 - dr * dr, 0.0, 1.0 );
+	float radial = clamp( 1.0 - dr * dr, 0.0, 1.0 );
+	/* Smooth the influence boundary while preserving the classic midpoint
+	 * response and the same radius used by clustered culling. */
+	return radial * radial * ( 3.0 - 2.0 * radial );
 }
 
 float attenSpotLight( vec3 lView, vec3 viewPos, float rad,
@@ -434,7 +437,9 @@ vec4 shadeDeferredPixel( uvec2 pix ) {
 		sunVis = ShadowContract_SampleCSM(
 			shadows.records[0], shadows.records[1], shadows.records[2], shadows.records[3],
 			sunShadowMap, worldPos, viewDist, pc.shadowStrength,
-			pc.shadowCascadeCount, pc.shadowSplits, pc.shadowNear, pc.shadowBlend );
+			pc.shadowCascadeCount,
+			vec4( pc.shadowSplit0, pc.shadowSplit1, pc.shadowSplit2, pc.shadowSplit3 ),
+			pc.shadowNear, pc.shadowBlend );
 	}
 #endif
 

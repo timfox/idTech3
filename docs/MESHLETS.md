@@ -31,6 +31,10 @@ When enabled, MD3 surfaces (≤512 verts / ≤1024 tris) bake at load, skip add 
 | `r_meshletsMdiDraw` | GPU `vkCmdDrawIndexedIndirect` for tess-relative meshlet ranges (default 0) |
 | `r_meshletsLod` | Screen-space projected AABB LOD cull (default 0) |
 | `r_meshletsLodPixels` | Minimum projected diagonal in pixels to keep (default 2) |
+| `r_meshletsGpuCull` | Portable compute cull + GPU-generated indirect commands (default 1) |
+| `r_meshletsHiZ` | Conservative Hi-Z rejection when the pyramid is ready (default 1) |
+| `r_meshletsStreaming` | Gate commands on persistent surface residency (default 1) |
+| `r_meshletsBsp` / `r_meshletsSkinned` | Enable shared BSP and dynamic/skinned record inputs |
 | `r_meshletsBspPilot` | Cheat: meshlet bake/cull for small BSP `SF_FACE` (default 0) |
 | `r_meshletsModelPilot` | Static MD3 meshlet path; skip animated (default 1) |
 | `meshlet_status` | Bake/cache/cull/LOD/compact/MDI counts |
@@ -44,12 +48,18 @@ When enabled, MD3 surfaces (≤512 verts / ≤1024 tris) bake at load, skip add 
 - `R_Meshlets_TryDrawIndirect` — flush pending cmds from `vk_draw_geometry`
 - `R_Meshlets_BeginSurface` — clear per-batch MDI queue
 
-## Deferred
+## Portable GPU-driven baseline
 
-- Persistent per-surface IBO (avoid remapping into tess)
-- Production mesh-shader pipelines after the MDI path remains certified on target hardware
-- Full BSP world / skinned meshlets (pilot: `r_meshletsBspPilot` for one face class)
-- GPU cull / continuous cluster LOD streaming
+Surface indexes now have persistent GPU-visible storage, and
+`meshlet_cull_indirect.comp` consumes the shared meshlet/object records to do
+frustum, cone, screen-LOD, and conservative Hi-Z tests before atomically
+generating indexed-MDI commands. Scene generation and stream residency are
+part of the record ABI, so stale or evicted surfaces are rejected. BSP and
+skinned/dynamic pilots use this same record format and fall back to CPU compact
+submission while a stream is loading.
+
+Mesh shaders remain an optional optimization after portable MDI. They consume
+the same records and ownership; they are never required for correctness.
 
 ## Raster Ultra 1.6
 

@@ -142,7 +142,8 @@ vec3 FpEval_ForwardPlusAdd(
 				continue;
 			}
 			float dr = dist / max( rad, 1e-4 );
-			att = clamp( 1.0 - dr * dr, 0.0, 1.0 );
+			float radial = clamp( 1.0 - dr * dr, 0.0, 1.0 );
+			att = radial * radial * ( 3.0 - 2.0 * radial );
 			Ldir = Lw / max( dist, 1e-4 );
 		} else {
 			/* Spot: cone from packed axis + cosOuter/Inner in lpack.w / lc extras when present. */

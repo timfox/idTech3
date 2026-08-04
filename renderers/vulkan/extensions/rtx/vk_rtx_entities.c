@@ -11,6 +11,7 @@ for unknown types / pack failures.
 #include "tr_local.h"
 #include "tr_model_gltf.h"
 #include "vk_rtx_entities.h"
+#include "../../vk_selective_rt.h"
 #include "vk_rtx_material.h"
 #include "vk_rtx_bindless.h"
 
@@ -1238,6 +1239,11 @@ uint32_t vk_rtx_entities_pack( const trRefdef_t *refdef, const viewParms_t *view
 			} else if ( meshKind == 4 ) {
 				meshMdr++;
 			}
+		}
+		/* Hero sidecars are opt-in by visibility class; first-person/view-model
+		 * geometry is the initial bounded hero-object population. */
+		if ( ent->e.renderfx & RF_FIRST_PERSON ) {
+			(void)vk_srt_admit_hero_object();
 		}
 
 		if ( ( albedoRgb || normalNxyz ) && indexCount > indexBefore ) {

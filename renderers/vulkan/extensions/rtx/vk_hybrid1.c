@@ -76,6 +76,7 @@ static struct {
 	VkShaderModule      diffuse_rmiss;
 	VkShaderModule      diffuse_rchit;
 	VkShaderModule      temporal_cs;
+	VkShaderModule      restir_cs;
 	VkShaderModule      atrous_cs;
 	VkShaderModule      composite_cs;
 	VkDescriptorPool    rt_pool;
@@ -102,7 +103,12 @@ static struct {
 	VkDescriptorSetLayout temporal_dsl;
 	VkPipelineLayout    temporal_pl;
 	VkPipeline          temporal_pipeline;
+	VkPipeline          restir_pipeline;
 	VkDescriptorPool    temporal_pool;
+	VkDescriptorPool    restir_pool;
+	VkDescriptorSetLayout restir_dsl;
+	VkPipelineLayout    restir_pl;
+	VkDescriptorSet     restir_set;
 	VkDescriptorSet     temporal_shadow_set;
 	VkDescriptorSet     temporal_spec_set;
 	VkDescriptorSetLayout atrous_dsl;
@@ -297,7 +303,7 @@ static void HYBRID1_Status_f( void )
 		"  ggx=%d glint=%d iblMode=%d diffuseDirect=%d dlightShadows=%d\n"
 		"  composite shadowStr=%.2f specStr=%.2f diffuseStr=%.2f deferredGBuffer=%d\n"
 		"  surfelFusion=%d (Surfel irradiance as diffuse GI when both active)\n"
-		"  restir=%d ready=%d reservoirBytes=%zu ping=%u (P3 DI scaffold; shade pass TBD)\n"
+		"  restir=%d ready=%d reservoirBytes=%zu ping=%u (P3 DI reservoir update)\n"
 		"  tlas_mode=%s reason=%s\n"
 		"  note: Hybrid1 is the production RT lighting path; seta r_hybrid1Quality 1|2|3; rtx_status for TLAS/entities\n",
 		HYBRID1_StateString(),
@@ -573,7 +579,7 @@ static void HYBRID1_CreateImages( uint32_t w, uint32_t h )
 	HYBRID1_EnsureRestirBuffers( w, h );
 }
 
-#define HYBRID1_RESTIR_STRIDE 16u /* vec4 reservoir stub per pixel */
+#define HYBRID1_RESTIR_STRIDE 16u /* vec4: selected signal RGB + accumulated weight */
 
 static void HYBRID1_DestroyRestirBuffers( void )
 {
@@ -628,8 +634,72 @@ static void HYBRID1_EnsureRestirBuffers( uint32_t w, uint32_t h )
 	}
 	hybrid1.restir_reservoir_bytes = need;
 	hybrid1.restir_ready = qtrue;
-	ri.Printf( PRINT_ALL, "[VK][Hybrid1] ReSTIR DI scaffold: %ux%u reservoir ping-pong %zuB/slice\n",
+	ri.Printf( PRINT_ALL, "[VK][Hybrid1] ReSTIR DI reservoirs ready: %ux%u ping-pong %zuB/slice\n",
 		w, h, (size_t)need );
+}
+
+static void HYBRID1_RecordRestir( VkCommandBuffer cmd, qboolean doShadow, qboolean doSpec )
+{
+	VkDescriptorImageInfo images[2];
+	VkDescriptorBufferInfo buffers[2];
+	VkWriteDescriptorSet writes[4];
+	struct {
+		float extent[4];
+		uint32_t frame;
+		uint32_t useShadow;
+		uint32_t useSpec;
+		uint32_t pad;
+	} push;
+	uint32_t cur = hybrid1.frame_index & 1u;
+	uint32_t prev = cur ^ 1u;
+	uint32_t i;
+
+	if ( !r_hybrid1_restir || !r_hybrid1_restir->integer || !hybrid1.restir_ready ||
+		!hybrid1.restir_pipeline || !hybrid1.restir_set ) {
+		return;
+	}
+	Com_Memset( images, 0, sizeof( images ) );
+	images[0].sampler = HYBRID1_LinearSampler();
+	images[0].imageView = hybrid1.raw_shadow.view;
+	images[0].imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+	images[1].sampler = HYBRID1_LinearSampler();
+	images[1].imageView = hybrid1.raw_spec.view;
+	images[1].imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+	buffers[0].buffer = hybrid1.restir_reservoir[prev];
+	buffers[0].range = hybrid1.restir_reservoir_bytes;
+	buffers[1].buffer = hybrid1.restir_reservoir[cur];
+	buffers[1].range = hybrid1.restir_reservoir_bytes;
+	Com_Memset( writes, 0, sizeof( writes ) );
+	for ( i = 0; i < 4; i++ ) {
+		writes[i].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+		writes[i].dstSet = hybrid1.restir_set;
+		writes[i].dstBinding = i;
+		writes[i].descriptorCount = 1;
+		if ( i < 2 ) {
+			writes[i].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+			writes[i].pImageInfo = &images[i];
+		} else {
+			writes[i].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+			writes[i].pBufferInfo = &buffers[i - 2];
+		}
+	}
+	qvkUpdateDescriptorSets( vk.device, 4, writes, 0, NULL );
+	push.extent[0] = (float)hybrid1.width;
+	push.extent[1] = (float)hybrid1.height;
+	push.extent[2] = push.extent[3] = 0.0f;
+	push.frame = hybrid1.frame_index;
+	push.useShadow = doShadow ? 1u : 0u;
+	push.useSpec = doSpec ? 1u : 0u;
+	push.pad = 0u;
+	qvkCmdBindPipeline( cmd, VK_PIPELINE_BIND_POINT_COMPUTE, hybrid1.restir_pipeline );
+	qvkCmdBindDescriptorSets( cmd, VK_PIPELINE_BIND_POINT_COMPUTE, hybrid1.restir_pl, 0, 1,
+		&hybrid1.restir_set, 0, NULL );
+	qvkCmdPushConstants( cmd, hybrid1.restir_pl, VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof( push ), &push );
+	qvkCmdDispatch( cmd, ( hybrid1.width + 7u ) / 8u, ( hybrid1.height + 7u ) / 8u, 1 );
+	qvkCmdPipelineBarrier( cmd, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+		0, 0, NULL, 1, &(VkBufferMemoryBarrier){
+			VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER, NULL, VK_ACCESS_SHADER_WRITE_BIT, VK_ACCESS_SHADER_READ_BIT,
+			vk.queue_family_index, vk.queue_family_index, hybrid1.restir_reservoir[cur], 0, hybrid1.restir_reservoir_bytes }, 0, NULL );
 }
 
 static VkSampler HYBRID1_NearestSampler( void )
@@ -1285,6 +1355,9 @@ void vk_hybrid1_shutdown( void )
 	if ( hybrid1.temporal_pipeline != VK_NULL_HANDLE ) {
 		qvkDestroyPipeline( vk.device, hybrid1.temporal_pipeline, NULL );
 	}
+	if ( hybrid1.restir_pipeline != VK_NULL_HANDLE ) {
+		qvkDestroyPipeline( vk.device, hybrid1.restir_pipeline, NULL );
+	}
 	if ( hybrid1.shadow_pipeline != VK_NULL_HANDLE ) {
 		qvkDestroyPipeline( vk.device, hybrid1.shadow_pipeline, NULL );
 	}
@@ -1303,6 +1376,9 @@ void vk_hybrid1_shutdown( void )
 	if ( hybrid1.temporal_pl != VK_NULL_HANDLE ) {
 		qvkDestroyPipelineLayout( vk.device, hybrid1.temporal_pl, NULL );
 	}
+	if ( hybrid1.restir_pl != VK_NULL_HANDLE ) {
+		qvkDestroyPipelineLayout( vk.device, hybrid1.restir_pl, NULL );
+	}
 	if ( hybrid1.rt_pl != VK_NULL_HANDLE ) {
 		qvkDestroyPipelineLayout( vk.device, hybrid1.rt_pl, NULL );
 	}
@@ -1315,6 +1391,9 @@ void vk_hybrid1_shutdown( void )
 	if ( hybrid1.temporal_dsl != VK_NULL_HANDLE ) {
 		qvkDestroyDescriptorSetLayout( vk.device, hybrid1.temporal_dsl, NULL );
 	}
+	if ( hybrid1.restir_dsl != VK_NULL_HANDLE ) {
+		qvkDestroyDescriptorSetLayout( vk.device, hybrid1.restir_dsl, NULL );
+	}
 	if ( hybrid1.rt_dsl != VK_NULL_HANDLE ) {
 		qvkDestroyDescriptorSetLayout( vk.device, hybrid1.rt_dsl, NULL );
 	}
@@ -1326,6 +1405,9 @@ void vk_hybrid1_shutdown( void )
 	}
 	if ( hybrid1.temporal_pool != VK_NULL_HANDLE ) {
 		qvkDestroyDescriptorPool( vk.device, hybrid1.temporal_pool, NULL );
+	}
+	if ( hybrid1.restir_pool != VK_NULL_HANDLE ) {
+		qvkDestroyDescriptorPool( vk.device, hybrid1.restir_pool, NULL );
 	}
 	if ( hybrid1.rt_pool != VK_NULL_HANDLE ) {
 		qvkDestroyDescriptorPool( vk.device, hybrid1.rt_pool, NULL );
@@ -1365,6 +1447,9 @@ void vk_hybrid1_shutdown( void )
 	}
 	if ( hybrid1.temporal_cs != VK_NULL_HANDLE ) {
 		qvkDestroyShaderModule( vk.device, hybrid1.temporal_cs, NULL );
+	}
+	if ( hybrid1.restir_cs != VK_NULL_HANDLE ) {
+		qvkDestroyShaderModule( vk.device, hybrid1.restir_cs, NULL );
 	}
 	if ( hybrid1.atrous_cs != VK_NULL_HANDLE ) {
 		qvkDestroyShaderModule( vk.device, hybrid1.atrous_cs, NULL );
@@ -1472,6 +1557,7 @@ void vk_hybrid1_init( void )
 	hybrid1.diffuse_rmiss = HYBRID1_ShaderModule( vk_hybrid1_diffuse_rmiss_spv, VK_HYBRID1_DIFFUSE_RMISS_SPV_SIZE, "hybrid1_diffuse.rmiss" );
 	hybrid1.diffuse_rchit = HYBRID1_ShaderModule( vk_hybrid1_diffuse_rchit_spv, VK_HYBRID1_DIFFUSE_RCHIT_SPV_SIZE, "hybrid1_diffuse.rchit" );
 	hybrid1.temporal_cs = HYBRID1_ShaderModule( vk_hybrid1_temporal_cs_spv, VK_HYBRID1_TEMPORAL_CS_SPV_SIZE, "hybrid1_temporal.comp" );
+	hybrid1.restir_cs = HYBRID1_ShaderModule( vk_hybrid1_restir_cs_spv, VK_HYBRID1_RESTIR_CS_SPV_SIZE, "hybrid1_restir.comp" );
 	hybrid1.atrous_cs = HYBRID1_ShaderModule( vk_hybrid1_atrous_cs_spv, VK_HYBRID1_ATROUS_CS_SPV_SIZE, "hybrid1_atrous.comp" );
 	hybrid1.composite_cs = HYBRID1_ShaderModule( vk_hybrid1_composite_cs_spv, VK_HYBRID1_COMPOSITE_CS_SPV_SIZE, "hybrid1_composite.comp" );
 
@@ -1751,6 +1837,69 @@ void vk_hybrid1_init( void )
 	cpci.stage = csStage;
 	cpci.layout = hybrid1.temporal_pl;
 	VK_CHECK( qvkCreateComputePipelines( vk.device, vk.pipelineCache, 1, &cpci, NULL, &hybrid1.temporal_pipeline ) );
+
+	/* ReSTIR reservoir update: traced Hybrid1 candidates in, ping-pong SSBO out. */
+	{
+		VkDescriptorSetLayoutBinding restirBindings[4];
+		VkDescriptorPoolSize restirPoolSizes[2];
+		VkDescriptorSetAllocateInfo restirAlloc;
+		VkPipelineLayoutCreateInfo restirPlci;
+		VkComputePipelineCreateInfo restirCpci;
+		VkPipelineShaderStageCreateInfo restirStage;
+		VkPushConstantRange restirPc;
+		uint32_t ri;
+
+		Com_Memset( restirBindings, 0, sizeof( restirBindings ) );
+		for ( ri = 0; ri < 4; ri++ ) {
+			restirBindings[ri].binding = ri;
+			restirBindings[ri].descriptorCount = 1;
+			restirBindings[ri].stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+			restirBindings[ri].descriptorType = ( ri < 2 ) ?
+				VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER : VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+		}
+		Com_Memset( &dslci, 0, sizeof( dslci ) );
+		dslci.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+		dslci.bindingCount = 4;
+		dslci.pBindings = restirBindings;
+		VK_CHECK( qvkCreateDescriptorSetLayout( vk.device, &dslci, NULL, &hybrid1.restir_dsl ) );
+		Com_Memset( &restirPc, 0, sizeof( restirPc ) );
+		restirPc.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+		restirPc.size = 32;
+		Com_Memset( &restirPlci, 0, sizeof( restirPlci ) );
+		restirPlci.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+		restirPlci.setLayoutCount = 1;
+		restirPlci.pSetLayouts = &hybrid1.restir_dsl;
+		restirPlci.pushConstantRangeCount = 1;
+		restirPlci.pPushConstantRanges = &restirPc;
+		VK_CHECK( qvkCreatePipelineLayout( vk.device, &restirPlci, NULL, &hybrid1.restir_pl ) );
+		Com_Memset( restirPoolSizes, 0, sizeof( restirPoolSizes ) );
+		restirPoolSizes[0].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+		restirPoolSizes[0].descriptorCount = 2;
+		restirPoolSizes[1].type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+		restirPoolSizes[1].descriptorCount = 2;
+		Com_Memset( &dpci, 0, sizeof( dpci ) );
+		dpci.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+		dpci.maxSets = 1;
+		dpci.poolSizeCount = 2;
+		dpci.pPoolSizes = restirPoolSizes;
+		VK_CHECK( qvkCreateDescriptorPool( vk.device, &dpci, NULL, &hybrid1.restir_pool ) );
+		Com_Memset( &restirAlloc, 0, sizeof( restirAlloc ) );
+		restirAlloc.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+		restirAlloc.descriptorPool = hybrid1.restir_pool;
+		restirAlloc.descriptorSetCount = 1;
+		restirAlloc.pSetLayouts = &hybrid1.restir_dsl;
+		VK_CHECK( qvkAllocateDescriptorSets( vk.device, &restirAlloc, &hybrid1.restir_set ) );
+		Com_Memset( &restirStage, 0, sizeof( restirStage ) );
+		restirStage.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+		restirStage.stage = VK_SHADER_STAGE_COMPUTE_BIT;
+		restirStage.module = hybrid1.restir_cs;
+		restirStage.pName = "main";
+		Com_Memset( &restirCpci, 0, sizeof( restirCpci ) );
+		restirCpci.sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO;
+		restirCpci.stage = restirStage;
+		restirCpci.layout = hybrid1.restir_pl;
+		VK_CHECK( qvkCreateComputePipelines( vk.device, vk.pipelineCache, 1, &restirCpci, NULL, &hybrid1.restir_pipeline ) );
+	}
 
 	/* atrous */
 	Com_Memset( atrousBindings, 0, sizeof( atrousBindings ) );
@@ -2256,10 +2405,6 @@ void vk_hybrid1_record_pass( VkCommandBuffer cmd )
 		HYBRID1_TraceDispatch( cmd, hybrid1.diffuse_pipeline, hybrid1.sbt_diffuse_buffer );
 	}
 	hybrid1.traced = qtrue;
-	if ( r_hybrid1_restir && r_hybrid1_restir->integer && hybrid1.restir_ready ) {
-		/* P3: dispatch hybrid1_restir.comp here; ping-pong cur/prev buffers. */
-		(void)hybrid1.restir_reservoir[hybrid1.frame_index & 1u];
-	}
 
 	if ( doShadow ) {
 		HYBRID1_BarrierImage( cmd, hybrid1.raw_shadow.image, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
@@ -2275,6 +2420,9 @@ void vk_hybrid1_record_pass( VkCommandBuffer cmd )
 		HYBRID1_BarrierImage( cmd, hybrid1.raw_diffuse.image, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
 			VK_ACCESS_SHADER_WRITE_BIT, VK_ACCESS_SHADER_READ_BIT,
 			VK_PIPELINE_STAGE_RAY_TRACING_SHADER_BIT_KHR, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT );
+	}
+	if ( r_hybrid1_restir && r_hybrid1_restir->integer && hybrid1.restir_ready ) {
+		HYBRID1_RecordRestir( cmd, doShadow, doSpec );
 	}
 
 	if ( doShadow || doSpec ) {

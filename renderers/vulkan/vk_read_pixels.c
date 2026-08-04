@@ -45,11 +45,21 @@ void vk_read_pixels( byte *buffer, uint32_t width, uint32_t height )
 	uint32_t pixel_width;
 	uint32_t i, n;
 	qboolean invalidate_ptr;
+	VkResult frame_wait;
 
 	if ( vk.device_lost ) {
 		return;
 	}
-	VK_CHECK( qvkWaitForFences( vk.device, 1, &vk.cmd->rendering_finished_fence, VK_FALSE, 1e12 ) );
+	/* A screenshot is synchronous, but a WSI failure must not turn it into an
+	   unbounded renderer hang.  The frame normally signals well below this
+	   budget; abort this capture cleanly if the submission never completes. */
+	frame_wait = qvkWaitForFences( vk.device, 1, &vk.cmd->rendering_finished_fence,
+		VK_FALSE, 5ULL * 1000ULL * 1000ULL * 1000ULL );
+	if ( frame_wait == VK_TIMEOUT ) {
+		ri.Printf( PRINT_WARNING, "Vulkan: screenshot frame fence timed out; capture skipped\n" );
+		return;
+	}
+	VK_CHECK( frame_wait );
 
 	if ( vk.fboActive ) {
 		if ( vk.capture.image ) {

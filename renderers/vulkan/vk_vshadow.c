@@ -20,6 +20,9 @@ static cvar_t *r_vshadowAlphaCasters;
 static cvar_t *r_vshadowRenderBudget;
 static cvar_t *r_vshadowDebug;
 static cvar_t *r_vshadowSunDirThreshold;
+static cvar_t *r_vshadowLocalLightBudget;
+static cvar_t *r_vshadowCasterDrawBudget;
+static cvar_t *r_vshadowRequestBudget;
 
 static qboolean s_cmds;
 static qboolean s_inited;
@@ -44,6 +47,9 @@ static qboolean s_haveSun;
 static qboolean s_cameraCut;
 static qboolean s_mapChanged;
 static qboolean s_healthy;
+static vkVShadowBudget_t s_budget;
+static uint32_t s_localLightRequests;
+static uint32_t s_pageRequestsAccepted;
 
 static uint32_t VShadow_Hash( uint32_t virtualId )
 {
@@ -115,6 +121,19 @@ void vk_vshadow_register_cvars( void )
 
 	r_vshadowSunDirThreshold = ri.Cvar_Get( "r_vshadowSunDirThreshold", "0.02", CVAR_ARCHIVE_ND );
 	ri.Cvar_CheckRange( r_vshadowSunDirThreshold, "0.001", "0.5", CV_FLOAT );
+
+	r_vshadowLocalLightBudget = ri.Cvar_Get( "r_shadowLocalLightBudget", "8", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_vshadowLocalLightBudget, "0", "64", CV_INTEGER );
+	ri.Cvar_SetDescription( r_vshadowLocalLightBudget,
+		"Maximum local lights allowed to request virtual shadow pages per frame; excess lights use the local atlas/fallback." );
+	r_vshadowCasterDrawBudget = ri.Cvar_Get( "r_shadowCasterDrawBudget", "200000", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_vshadowCasterDrawBudget, "0", "2000000", CV_INTEGER );
+	ri.Cvar_SetDescription( r_vshadowCasterDrawBudget,
+		"Reserved shadow-caster index budget for atlas/clipmap updates (telemetry and future GPU cull admission)." );
+	r_vshadowRequestBudget = ri.Cvar_Get( "r_shadowPageRequestBudget", "64", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_vshadowRequestBudget, "1", va( "%d", VK_VSHADOW_MAX_DIRTY_QUEUE ), CV_INTEGER );
+	ri.Cvar_SetDescription( r_vshadowRequestBudget,
+		"Maximum new virtual shadow page requests admitted per frame." );
 }
 
 static void VShadow_ResetPool( void )
@@ -162,6 +181,11 @@ void vk_vshadow_init( void )
 	}
 	s_atlasGrid = g;
 	s_stats.pagePoolBytes = (uint32_t)( s_poolCapacity * s_pageSize * s_pageSize * 4 ); /* depth estimate */
+	s_budget.physicalPageBudget = (uint32_t)s_poolCapacity;
+	s_budget.pageRenderBudget = (uint32_t)( r_vshadowRenderBudget ? r_vshadowRenderBudget->integer : 8 );
+	s_budget.localLightBudget = (uint32_t)( r_vshadowLocalLightBudget ? r_vshadowLocalLightBudget->integer : 8 );
+	s_budget.casterDrawBudget = (uint32_t)( r_vshadowCasterDrawBudget ? r_vshadowCasterDrawBudget->integer : 200000 );
+	s_budget.memoryBudgetBytes = s_stats.pagePoolBytes;
 	VShadow_ResetPool();
 	Com_Memset( &s_clip, 0, sizeof( s_clip ) );
 	s_clip.levels = r_vshadowClipmapLevels ? r_vshadowClipmapLevels->integer : 4;
@@ -171,6 +195,8 @@ void vk_vshadow_init( void )
 	s_haveSun = qfalse;
 	s_cameraCut = qfalse;
 	s_mapChanged = qfalse;
+	s_localLightRequests = 0;
+	s_pageRequestsAccepted = 0;
 	s_healthy = qtrue;
 	s_inited = qtrue;
 
@@ -366,6 +392,13 @@ static uint32_t VShadow_EnsurePage( uint32_t virtualId, int clipLevel, float ori
 		}
 		return phys;
 	}
+	if ( s_pageRequestsAccepted >= (uint32_t)( r_vshadowRequestBudget ? r_vshadowRequestBudget->integer : VK_VSHADOW_MAX_DIRTY_QUEUE ) ) {
+		s_stats.budgetDrops++;
+		s_budget.budgetDrops++;
+		s_stats.missingPageFallbacks++;
+		return VK_VSHADOW_INVALID_PHYS;
+	}
+	s_pageRequestsAccepted++;
 
 	phys = VShadow_AllocPhysical();
 	if ( phys == VK_VSHADOW_INVALID_PHYS ) {
@@ -428,6 +461,14 @@ void vk_vshadow_begin_frame( void )
 	s_stats.localRequests = 0;
 	s_stats.localAtlasFallbacks = 0;
 	s_stats.missingPageFallbacks = 0;
+	s_stats.budgetDrops = 0;
+	s_stats.localLightsAccepted = 0;
+	s_stats.casterDrawBudget = s_budget.casterDrawBudget;
+	s_localLightRequests = 0;
+	s_pageRequestsAccepted = 0;
+	s_budget.pagesClaimed = 0;
+	s_budget.localLightsAccepted = 0;
+	s_budget.budgetDrops = 0;
 	s_dirtyCount = 0;
 	/* Unpin non-critical pages each frame; near pages re-pin on demand. */
 	for ( i = 0; i < s_poolCapacity; i++ ) {
@@ -580,12 +621,20 @@ int vk_vshadow_claim_dirty_pages( uint32_t *outPhysIndices, int maxOut )
 	if ( budget > maxOut ) {
 		budget = maxOut;
 	}
+	if ( budget > (int)s_budget.pageRenderBudget ) {
+		budget = (int)s_budget.pageRenderBudget;
+	}
 	for ( i = 0; i < s_dirtyCount && claimed < budget; i++ ) {
 		uint32_t phys = s_dirtyQueue[i];
 		if ( phys >= (uint32_t)s_poolCapacity || !s_pool[phys].dirty ) {
 			continue;
 		}
 		outPhysIndices[claimed++] = phys;
+	}
+	s_budget.pagesClaimed += (uint32_t)claimed;
+	if ( s_dirtyCount > claimed ) {
+		s_budget.budgetDrops += (uint32_t)( s_dirtyCount - claimed );
+		s_stats.budgetDrops += (uint32_t)( s_dirtyCount - claimed );
 	}
 	return claimed;
 }
@@ -615,6 +664,11 @@ const vkVShadowStats_t *vk_vshadow_stats( void )
 	return &s_stats;
 }
 
+const vkVShadowBudget_t *vk_vshadow_budget( void )
+{
+	return &s_budget;
+}
+
 const vkVShadowClipmapState_t *vk_vshadow_clipmap_state( void )
 {
 	return &s_clip;
@@ -632,6 +686,12 @@ qboolean vk_vshadow_request_local( vkVShadowLightKind_t kind, int lightIndex,
 		return qfalse;
 	}
 	s_stats.localRequests++;
+	if ( s_localLightRequests >= s_budget.localLightBudget ) {
+		s_stats.localAtlasFallbacks++;
+		s_stats.budgetDrops++;
+		s_budget.budgetDrops++;
+		return qfalse;
+	}
 	if ( importance < 0.05f || ( s_freeCount == 0 && s_stats.residentPages >= (uint32_t)s_poolCapacity ) ) {
 		s_stats.localAtlasFallbacks++;
 		return qfalse; /* caller keeps local atlas */
@@ -645,6 +705,9 @@ qboolean vk_vshadow_request_local( vkVShadowLightKind_t kind, int lightIndex,
 		s_stats.localAtlasFallbacks++;
 		return qfalse;
 	}
+	s_localLightRequests++;
+	s_stats.localLightsAccepted++;
+	s_budget.localLightsAccepted++;
 	return qtrue;
 }
 
@@ -666,6 +729,10 @@ void vk_vshadow_status_f( void )
 		st->evictions, st->allocationFailures, st->dirtyQueued, st->invalidations );
 	ri.Printf( PRINT_ALL, "local            : req=%u atlasFallback=%u missing=%u\n",
 		st->localRequests, st->localAtlasFallbacks, st->missingPageFallbacks );
+	ri.Printf( PRINT_ALL, "budget           : pages=%u/%u render=%u local=%u/%u caster=%u drops=%u bytes=%u\n",
+		s_budget.pagesClaimed, s_budget.physicalPageBudget, s_budget.pageRenderBudget,
+		s_budget.localLightsAccepted, s_budget.localLightBudget,
+		s_budget.casterDrawBudget, s_budget.budgetDrops, s_budget.memoryBudgetBytes );
 	ri.Printf( PRINT_ALL, "fallbackCSM      : %s percent=%.1f\n",
 		vk_vshadow_fallback_csm() ? "yes" : "no", st->fallbackPercent );
 	ri.Printf( PRINT_ALL, "alphaCasters     : %s\n", vk_vshadow_alpha_casters() ? "yes" : "no" );

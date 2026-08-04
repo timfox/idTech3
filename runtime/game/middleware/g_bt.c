@@ -169,6 +169,7 @@ btAgentHandle_t BT_CreateAgent(btTreeHandle_t treeH) {
 		if (!agents[i].active) {
 			Com_Memset(&agents[i], 0, sizeof(agents[i]));
 			agents[i].active = qtrue;
+			agents[i].treeHandle = treeH;
 			agents[i].rootNodeId = trees[treeH].rootNodeId;
 			agents[i].runningNodeId = -1;
 			return i;
@@ -409,33 +410,14 @@ void BT_Update(float dt) {
 		a = &agents[i];
 		if (!a->active || a->rootNodeId < 0) continue;
 
-		/* Find tree containing this agent's root (agents store rootNodeId; we need tree) */
-		treeH = -1;
-		{
-			int ti;
-			for (ti = 0; ti < BT_MAX_TREES; ti++) {
-				if (trees[ti].active && trees[ti].rootNodeId == a->rootNodeId) {
-					treeH = ti;
-					break;
-				}
-			}
-			/* Fallback: agents created from a tree share that tree's structure */
-			if (treeH < 0) {
-				for (ti = 0; ti < BT_MAX_TREES; ti++) {
-					if (trees[ti].active && a->rootNodeId < trees[ti].numNodes) {
-						treeH = ti;
-						break;
-					}
-				}
-			}
-		}
+		/* Keep the exact tree selected at creation time. Root node IDs are
+		 * local to each tree and are not globally unique. */
+		treeH = a->treeHandle;
 
-		if (treeH < 0) continue;
+		if (treeH < 0 || treeH >= BT_MAX_TREES || !trees[treeH].active) continue;
 
 		t = &trees[treeH];
 		a->ctx.dt = dt;
-		VectorCopy(a->ctx.agentPos, a->ctx.agentPos); /* keep existing */
-
 		/* Sync from Horde if linked */
 		if (a->ctx.hordeHandle >= 0) {
 			Horde_GetAgentPos(a->ctx.hordeHandle, a->ctx.agentPos);

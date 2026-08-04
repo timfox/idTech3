@@ -57,6 +57,13 @@ grep -q 'localAtlasFallbacks\|atlasFallback' "$ROOT/renderers/vulkan/vk_vshadow.
   fail=1
 }
 
+for token in "r_shadowLocalLightBudget" "r_shadowCasterDrawBudget" "r_shadowPageRequestBudget" "budgetDrops" "vk_vshadow_budget"; do
+  grep -q "$token" "$ROOT/renderers/vulkan/vk_vshadow.c" "$ROOT/renderers/vulkan/vk_vshadow.h" "$ROOT/docs/RASTER_ULTRA_1.9.md" || {
+    echo "FAIL missing explicit shadow budget contract: $token"
+    fail=1
+  }
+done
+
 # Boot / Ultra must not force r_vshadow
 for cfg in modern_vulkan.cfg modern_vulkan_stable.cfg modern_raster_ultra.cfg; do
   if [[ -f "$ROOT/config/$cfg" ]]; then

@@ -1,0 +1,33 @@
+#version 450
+/* Hair deferred milestone: portable packed visibility arbitration proof.
+ * A later strand rasterizer will invoke this with all covered pixels; this
+ * kernel intentionally keeps ownership/encoding explicit in the meantime. */
+#extension GL_EXT_shader_atomic_int64 : require
+#extension GL_EXT_shader_explicit_arithmetic_types_int64 : require
+layout(local_size_x = 64, local_size_y = 1, local_size_z = 1) in;
+
+/* x,y projected position; z normalized depth; w packed hair material key. */
+layout(std430, set = 0, binding = 0) readonly buffer HairSamples { vec4 samples[]; };
+/* One 64-bit word per pixel: high 32 bits depth, low 32 bits style/coverage. */
+layout(std430, set = 0, binding = 1) buffer HairVisibility { uint64_t visibility[]; };
+
+layout(push_constant) uniform HairVisibilityPush {
+	uint sampleCount;
+	uint width;
+	uint height;
+	uint sampleStride;
+} pc;
+
+void main() {
+	uint sampleIndex = gl_GlobalInvocationID.x;
+	if (sampleIndex >= pc.sampleCount || pc.width == 0u || pc.height == 0u) return;
+	vec4 value = samples[sampleIndex * max(pc.sampleStride, 1u)];
+	ivec2 pixel = ivec2(round(value.xy));
+	if (pixel.x < 0 || pixel.y < 0 || uint(pixel.x) >= pc.width || uint(pixel.y) >= pc.height) return;
+	uint index = uint(pixel.y) * pc.width + uint(pixel.x);
+	uint depth = uint(clamp(value.z, 0.0, 1.0) * 4294967295.0);
+	uint payload = floatBitsToUint(value.w);
+	uint64_t key = (uint64_t(depth) << 32) | uint64_t(payload);
+	/* Smaller depth wins; the packed word is the visibility owner’s atomic key. */
+	atomicMin(visibility[index], key);
+}

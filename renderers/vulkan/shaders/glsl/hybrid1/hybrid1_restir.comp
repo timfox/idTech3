@@ -1,0 +1,56 @@
+#version 450
+/*
+ * Selective Hybrid1 ReSTIR reservoir update.
+ * The raster depth/G-buffer remains the visibility authority; this pass only
+ * resamples already-traced shadow/specular candidates.
+ */
+layout(local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
+
+layout(set = 0, binding = 0) uniform sampler2D shadowTex;
+layout(set = 0, binding = 1) uniform sampler2D specTex;
+layout(std430, set = 0, binding = 2) readonly buffer PrevReservoir { vec4 prevReservoir[]; };
+layout(std430, set = 0, binding = 3) writeonly buffer CurReservoir { vec4 curReservoir[]; };
+
+layout(push_constant) uniform RestirPush {
+	vec4 extent;
+	uint frame;
+	uint useShadow;
+	uint useSpec;
+	uint pad;
+} pc;
+
+uint hash(uint x) {
+	x ^= x >> 16;
+	x *= 0x7feb352du;
+	x ^= x >> 15;
+	x *= 0x846ca68bu;
+	return x ^ (x >> 16);
+}
+
+void main() {
+	uvec2 p = gl_GlobalInvocationID.xy;
+	if (p.x >= uint(pc.extent.x) || p.y >= uint(pc.extent.y)) return;
+	uint index = p.y * uint(pc.extent.x) + p.x;
+	vec2 uv = (vec2(p) + 0.5) / pc.extent.xy;
+	vec2 neighborUv = clamp(uv + vec2(1.0, 0.0) / pc.extent.xy, vec2(0.0), vec2(1.0));
+	vec4 candidate = vec4(0.0);
+	vec4 spatial = vec4(0.0);
+	if (pc.useShadow != 0u) candidate = texture(shadowTex, uv);
+	if (pc.useShadow != 0u) spatial = texture(shadowTex, neighborUv);
+	if (pc.useSpec != 0u) candidate = (pc.useShadow != 0u) ?
+		mix(candidate, texture(specTex, uv), 0.5) : texture(specTex, uv);
+	if (pc.useSpec != 0u) spatial = (pc.useShadow != 0u) ?
+		mix(spatial, texture(specTex, neighborUv), 0.5) : texture(specTex, neighborUv);
+
+	vec4 previous = prevReservoir[index];
+	float candidateWeight = max(dot(abs(candidate.rgb), vec3(0.299, 0.587, 0.114)), 0.001);
+	float spatialWeight = max(dot(abs(spatial.rgb), vec3(0.299, 0.587, 0.114)), 0.001);
+	float previousWeight = (pc.frame == 0u) ? 0.0 : max(previous.w, 0.0);
+	uint h = hash(index ^ (pc.frame * 0x9e3779b9u));
+	float chooseCandidate = (float(h & 0xffffu) / 65535.0) *
+		(candidateWeight + spatialWeight + previousWeight);
+	vec4 selected = (chooseCandidate < candidateWeight) ? vec4(candidate.rgb, candidateWeight) :
+		((chooseCandidate < candidateWeight + spatialWeight) ? vec4(spatial.rgb, spatialWeight) : previous);
+	selected.w = min(candidateWeight + spatialWeight + previousWeight, 64.0);
+	curReservoir[index] = selected;
+}

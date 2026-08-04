@@ -20,6 +20,7 @@ Lightweight Spine pass / resource registry implementation.
 
 cvar_t *r_spineValidate;
 cvar_t *r_spineCert;
+cvar_t *r_spineAuthoritative;
 
 #define VK_SPINE_MAX_OPEN 8
 #define VK_SPINE_MAX_VIOLATIONS 16
@@ -623,6 +624,11 @@ qboolean vk_spine_validate_enabled( void )
 	return ( r_spineValidate && r_spineValidate->integer > 0 ) ? qtrue : qfalse;
 }
 
+vkSpinePassId vk_spine_current_pass( void )
+{
+	return ( s_spine.openCount > 0 ) ? s_spine.openStack[s_spine.openCount - 1] : VK_SPINE_PASS_NONE;
+}
+
 qboolean vk_spine_is_spine_1_1_combo( void )
 {
 	const int oit = r_oit ? r_oit->integer : 0;
@@ -912,6 +918,11 @@ void vk_spine_registry_init( void )
 	ri.Cvar_SetDescription( r_spineCert,
 		"Spine 1.1 certification asserts (black-frame / descriptor gen / OIT×TAA ownership). "
 		"Use with exec vulkan_overlay_spine_1_1_cert.cfg." );
+	r_spineAuthoritative = ri.Cvar_Get( "r_spineAuthoritative", "1", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_spineAuthoritative, "0", "1", CV_INTEGER );
+	ri.Cvar_SetDescription( r_spineAuthoritative,
+		"Make Spine the authoritative owner of known image layout transitions and pass/resource contracts. "
+		"Set 0 only when bisecting a renderer migration regression." );
 	if ( ri.Cmd_AddCommand ) {
 		ri.Cmd_AddCommand( "pass_registry_status", vk_spine_status_f );
 		ri.Cmd_AddCommand( "spine_status", vk_spine_status_f );
@@ -932,10 +943,11 @@ void vk_spine_registry_init( void )
 		/* vk_init_descriptors may run after us and will clear pending rebound. */
 	}
 	ri.Printf( PRINT_ALL,
-		"[VK][spine] pass/resource registry ready (r_spineValidate=%d r_spineCert=%d; "
+		"[VK][spine] pass/resource registry ready (r_spineValidate=%d r_spineCert=%d authoritative=%d; "
 		"Spine 1.1 WBOIT×TAA×weapon cert + DEVICE_LOST late-post context)\n",
 		r_spineValidate ? r_spineValidate->integer : 0,
-		r_spineCert ? r_spineCert->integer : 0 );
+		r_spineCert ? r_spineCert->integer : 0,
+		r_spineAuthoritative ? r_spineAuthoritative->integer : 0 );
 }
 
 void vk_spine_registry_shutdown( void )
@@ -1036,7 +1048,15 @@ void vk_spine_pass_begin( vkSpinePassId pass )
 	desc = &s_passes[pass];
 	s_spine.lastBegun = pass;
 	vk_spine_mark_observed( pass );
-	vk_render_graph_observe_pass( pass );
+	if ( r_spineAuthoritative && r_spineAuthoritative->integer ) {
+		if ( !vk_render_graph_enter_pass( pass ) ) {
+			vk_spine_record_violation( "graph rejected pass begin: %s", desc->name );
+			return;
+		}
+	} else {
+		/* Migration bisect mode keeps graph observation without owning scopes. */
+		vk_render_graph_observe_pass( pass );
+	}
 
 	if ( s_spine.openCount < VK_SPINE_MAX_OPEN ) {
 		s_spine.openStack[s_spine.openCount++] = pass;
@@ -1073,6 +1093,9 @@ void vk_spine_pass_end( vkSpinePassId pass )
 	}
 	s_spine.lastEnded = pass;
 	vk_spine_apply_declared_edges( pass, qtrue );
+	if ( r_spineAuthoritative && r_spineAuthoritative->integer ) {
+		vk_render_graph_leave_pass( pass );
+	}
 
 	if ( s_spine.openCount > 0 ) {
 		if ( s_spine.openStack[s_spine.openCount - 1] == pass ) {
@@ -1243,6 +1266,56 @@ void vk_spine_note_barrier( vkSpineResourceId res, vkSpinePassId pass, const cha
 			vk_spine_note_layout( res, VK_IMAGE_LAYOUT_GENERAL );
 		}
 	}
+}
+
+vkSpineResourceId vk_spine_resource_for_image( VkImage image )
+{
+	if ( !image ) {
+		return VK_SPINE_RES_NONE;
+	}
+	if ( image == vk.depth_image ) return VK_SPINE_RES_DEPTH;
+	if ( image == vk.color_image ) return VK_SPINE_RES_HDR_COLOR;
+	if ( image == vk.motion_vector_image ) return VK_SPINE_RES_MOTION_VECTORS;
+	if ( image == vk.deferred_gbuffer_albedo ) return VK_SPINE_RES_GBUFFER_ALBEDO;
+	if ( image == vk.deferred_gbuffer_normal ) return VK_SPINE_RES_GBUFFER_NORMAL;
+	if ( image == vk.deferred_gbuffer_material ) return VK_SPINE_RES_GBUFFER_MATERIAL;
+	if ( image == vk.deferred_lighting_image ) return VK_SPINE_RES_DEFERRED_LIGHTING;
+	if ( image == vk.ssao_image ) return VK_SPINE_RES_SSAO;
+	if ( image == vk.ssr_image ) return VK_SPINE_RES_SSR;
+	if ( image == vk.oit_accum_image ) return VK_SPINE_RES_OIT_ACCUM;
+	if ( image == vk.oit_reveal_image ) return VK_SPINE_RES_OIT_REVEAL;
+	if ( image == vk.oit_moments_image ) return VK_SPINE_RES_OIT_MOMENTS;
+	if ( image == vk.oit_b0_image ) return VK_SPINE_RES_OIT_B0;
+	if ( image == vk.reactive_mask_image ) return VK_SPINE_RES_REACTIVE_MASK;
+	if ( image == vk.sun_shadow_image ) return VK_SPINE_RES_SHADOW_SUN;
+	if ( image == vk.froxel_volume_image ) return VK_SPINE_RES_FROXEL_SCATTER;
+	if ( image == vk.bloom_image[0] || image == vk.bloom_image[1] ) return VK_SPINE_RES_BLOOM_CHAIN;
+	if ( image == vk.taa_history_image[0] || image == vk.taa_history_image[1] ) return VK_SPINE_RES_TAA_HISTORY;
+	return VK_SPINE_RES_NONE;
+}
+
+void vk_spine_transition_image( VkImage image, VkImageLayout old_layout, VkImageLayout new_layout,
+	vkSpinePassId pass, const char *reason )
+{
+	vkSpineResourceId res;
+	VkImageLayout owned_layout;
+
+	if ( !s_spine.initialized || !r_spineAuthoritative || !r_spineAuthoritative->integer ) {
+		return;
+	}
+	res = vk_spine_resource_for_image( image );
+	if ( res == VK_SPINE_RES_NONE ) {
+		return;
+	}
+	owned_layout = vk_spine_resource_layout( res );
+	if ( owned_layout != VK_IMAGE_LAYOUT_UNDEFINED && owned_layout != old_layout &&
+		vk_spine_validate_enabled() ) {
+		vk_spine_record_violation( "authoritative transition %s: requested %s, owner has %s (%s)",
+			vk_spine_resource_name( res ), vk_spine_layout_name( old_layout ),
+			vk_spine_layout_name( owned_layout ), reason ? reason : "transition" );
+	}
+	vk_spine_note_barrier( res, pass, reason ? reason : "image_transition" );
+	vk_spine_note_layout( res, new_layout );
 }
 
 qboolean vk_spine_resource_cleared_this_frame( vkSpineResourceId res )
@@ -1887,9 +1960,10 @@ void vk_spine_status_f( void )
 
 	vk_get_active_render_extent( &w, &h );
 	ri.Printf( PRINT_ALL, "======== Spine Pass/Resource Registry ========\n" );
-	ri.Printf( PRINT_ALL, "validate  : r_spineValidate=%d r_spineCert=%d enabled=%s spine11=%s\n",
+	ri.Printf( PRINT_ALL, "validate  : r_spineValidate=%d r_spineCert=%d authoritative=%d enabled=%s spine11=%s\n",
 		r_spineValidate ? r_spineValidate->integer : 0,
 		r_spineCert ? r_spineCert->integer : 0,
+		r_spineAuthoritative ? r_spineAuthoritative->integer : 0,
 		vk_spine_validate_enabled() ? "yes" : "no",
 		vk_spine_is_spine_1_1_combo() ? "yes" : "no" );
 	ri.Printf( PRINT_ALL, "generation: attachments=%u descriptors=%u pendingRebound=%s live=%u baseline=%u extent=%ux%u\n",

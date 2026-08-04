@@ -2984,6 +2984,79 @@ static void R_RenderAllCubemaps( void )
 #endif
 
 /*
+ * Build conservative topology LODs for planar BSP faces.  BSP faces are
+ * coplanar polygons, so reducing the boundary ring preserves the plane and
+ * keeps the full-resolution index list available for nearby views.  This is
+ * deliberately separate from curve LOD: it also covers Source VBSP faces.
+ */
+void R_BspBuildSurfaceLODs( world_t *world ) {
+	int surfaceIndex;
+
+	if ( !world || !world->surfaces ) return;
+	for ( surfaceIndex = 0; surfaceIndex < world->numsurfaces; surfaceIndex++ ) {
+		msurface_t *surface = &world->surfaces[surfaceIndex];
+		srfSurfaceFace_t *face;
+		int level;
+
+		if ( !surface->data || *surface->data != SF_FACE ) continue;
+		face = (srfSurfaceFace_t *)surface->data;
+		face->lodNumIndices[0] = face->lodNumIndices[1] = 0;
+		face->lodIndices[0] = face->lodIndices[1] = NULL;
+		for ( level = 0; level < 2; level++ ) {
+			int stride = 2 << level;
+			int boundaryCount;
+			int numIndices;
+			int *indices;
+			int i;
+
+			if ( face->numPoints < stride + 2 ) continue;
+			boundaryCount = ( face->numPoints - 1 ) / stride + 1;
+			if ( ( face->numPoints - 1 ) % stride ) boundaryCount++;
+			if ( boundaryCount < 3 ) continue;
+			numIndices = ( boundaryCount - 2 ) * 3;
+			indices = ri.Hunk_Alloc( numIndices * sizeof( *indices ), h_low );
+			for ( i = 0; i < boundaryCount - 2; i++ ) {
+				int p2 = ( i + 1 ) * stride;
+				int p3 = ( i + 2 ) * stride;
+				if ( p2 >= face->numPoints ) p2 = face->numPoints - 1;
+				if ( p3 >= face->numPoints ) p3 = face->numPoints - 1;
+				indices[i * 3 + 0] = 0;
+				indices[i * 3 + 1] = p2;
+				indices[i * 3 + 2] = p3;
+			}
+			face->lodNumIndices[level] = numIndices;
+			face->lodIndices[level] = indices;
+		}
+	}
+}
+
+void R_BspLODStatus_f( void ) {
+	int i;
+	int planarFaces = 0;
+	int lodFaces = 0;
+	int lodIndexes = 0;
+	if ( !tr.world || !tr.world->surfaces ) {
+		ri.Printf( PRINT_ALL, "BSP LOD: no world loaded\n" );
+		return;
+	}
+	for ( i = 0; i < tr.world->numsurfaces; ++i ) {
+		msurface_t *surface = &tr.world->surfaces[i];
+		srfSurfaceFace_t *face;
+		if ( !surface->data || *surface->data != SF_FACE ) continue;
+		++planarFaces;
+		face = (srfSurfaceFace_t *)surface->data;
+		if ( face->lodNumIndices[0] ) {
+			++lodFaces;
+			lodIndexes += face->lodNumIndices[0] + face->lodNumIndices[1];
+		}
+	}
+	ri.Printf( PRINT_ALL, "BSP LOD: mode=%d ratio=%.1f planarFaces=%d lodFaces=%d generatedIndexes=%d\n",
+		r_bspLod ? r_bspLod->integer : 0,
+		r_bspLodDistance ? r_bspLodDistance->value : 0.0f,
+		planarFaces, lodFaces, lodIndexes );
+}
+
+/*
 =================
 RE_LoadWorldMap
 
@@ -3000,10 +3073,13 @@ void RE_LoadWorldMap( const char *name ) {
 	} buffer;
 	byte		*startMarker;
 	qboolean	isBsp30World;
+	qboolean	isSourceVBSPWorld;
 
 	if ( tr.worldMapLoaded ) {
 		ri.Error( ERR_DROP, "ERROR: attempted to redundantly load world map" );
 	}
+	R_SourceVBSP_Clear();
+	R_SourceEntities_Clear();
 
 	R_SpriteProps_Clear();
 	RE_BspStream_ClearAll();
@@ -3060,8 +3136,12 @@ void RE_LoadWorldMap( const char *name ) {
 	c_gridVerts = 0;
 
 	isBsp30World = ( LittleLong( *(const int32_t *)buffer.b ) == BSP30_BSP_VERSION ) ? qtrue : qfalse;
+	isSourceVBSPWorld = ( size >= 4 && LittleLong( *(const uint32_t *)buffer.b ) == 0x50534256u ) ? qtrue : qfalse;
 	if ( isBsp30World ) {
 		R_LoadBSP30World( name, buffer.b, size, &s_worldData );
+	}
+	else if ( isSourceVBSPWorld ) {
+		R_LoadSourceVBSPWorld( name, buffer.b, size, &s_worldData );
 	}
 	else {
 	header = (dheader_t *)buffer.b;
@@ -3098,6 +3178,7 @@ void RE_LoadWorldMap( const char *name ) {
 	R_LoadEntities( &header->lumps[LUMP_ENTITIES] );
 	R_LoadLightGrid( &header->lumps[LUMP_LIGHTGRID] );
 	}
+	R_BspBuildSurfaceLODs( &s_worldData );
 
 #ifdef USE_VK_PBR
 	vk_generate_light_directions();
@@ -3122,7 +3203,7 @@ void RE_LoadWorldMap( const char *name ) {
 #endif	
 
 #ifdef USE_VBO
-	if ( !isBsp30World ) {
+	if ( !isBsp30World && !isSourceVBSPWorld ) {
 		R_BuildWorldVBO( s_worldData.surfaces, s_worldData.numsurfaces );
 	}
 #endif
@@ -3142,7 +3223,7 @@ void RE_LoadWorldMap( const char *name ) {
 	R_MaterialPaint_OnMapLoad( s_worldData.baseName );
 #ifdef USE_VBO
 	/* Rebuild VBO after paint sidecar mutates drawvert colors. */
-	if ( !isBsp30World && R_MaterialPaint_NumVerts() > 0 ) {
+	if ( !isBsp30World && !isSourceVBSPWorld && R_MaterialPaint_NumVerts() > 0 ) {
 		R_BuildWorldVBO( s_worldData.surfaces, s_worldData.numsurfaces );
 	}
 #endif

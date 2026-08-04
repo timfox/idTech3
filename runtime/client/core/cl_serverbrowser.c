@@ -271,6 +271,8 @@ static void CL_SetServerInfo(serverInfo_t *server, const char *info, int ping) {
 			server->punkbuster = atoi(Info_ValueForKey(info, "punkbuster"));
 			server->g_humanplayers = atoi(Info_ValueForKey(info, "g_humanplayers"));
 			server->g_needpass = atoi(Info_ValueForKey(info, "g_needpass"));
+			server->surfRankMin = atoi(Info_ValueForKey(info, "surf_rank_min"));
+			server->surfRankMax = atoi(Info_ValueForKey(info, "surf_rank_max"));
 		}
 		server->ping = ping;
 	}

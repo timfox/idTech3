@@ -29,6 +29,7 @@ static cvar_t *cl_stream_bitrate;
 static cvar_t *cl_stream_audio_bitrate;
 static cvar_t *cl_stream_queueMegs;
 static cvar_t *cl_stream_autoStart;
+static cvar_t *cl_stream_platform;
 
 typedef enum {
 	STREAM_BACKEND_NONE,
@@ -39,21 +40,29 @@ typedef enum {
 static qboolean stream_active = qfalse;
 static streamBackend_t stream_backend_active = STREAM_BACKEND_NONE;
 static char stream_last_command[8192];
+static qboolean stream_saved_streamer_mode;
+static qboolean stream_streamer_mode_saved;
+
+static void CL_StreamingStart_f( void );
+
+/* KICK publishes through a custom RTMPS service and supplies the key separately. */
+#define CL_STREAM_KICK_URL "rtmps://fa723fc1b171.global-contribute.live-video.net:443/app"
+#define CL_STREAM_IDTECH3TV_URL "rtmp://127.0.0.1:1935/live"
 
 static const char *CL_StreamingDefaultExternalTemplate( void )
 {
 #ifdef _WIN32
-	return "start \"idTech3 TV\" /B %P -y -f gdigrab -framerate %F -video_size %Wx%H -i desktop -f dshow -i audio=\"default\" -c:v libx264 -preset veryfast -tune zerolatency -b:v %V -pix_fmt yuv420p -c:a aac -b:a %Q -f flv \"%U/%K\"";
+	return "start \"idTech3 TV\" /B %P -y -f gdigrab -framerate %F -video_size %Wx%H -i desktop -f dshow -i audio=\"default\" -c:v libx264 -preset veryfast -tune zerolatency -b:v %V -minrate %V -maxrate %V -bufsize 2M -pix_fmt yuv420p -g 120 -keyint_min 120 -sc_threshold 0 -c:a aac -b:a %Q -f flv \"%U/%K\"";
 #elif defined(__APPLE__)
-	return "nohup %P -y -f avfoundation -framerate %F -video_size %Wx%H -i \"1:0\" -c:v libx264 -preset veryfast -tune zerolatency -b:v %V -pix_fmt yuv420p -c:a aac -b:a %Q -f flv \"%U/%K\" >/tmp/idtech3-tv-ffmpeg.log 2>&1 &";
+	return "nohup %P -y -f avfoundation -framerate %F -video_size %Wx%H -i \"1:0\" -c:v libx264 -preset veryfast -tune zerolatency -b:v %V -minrate %V -maxrate %V -bufsize 2M -pix_fmt yuv420p -g 120 -keyint_min 120 -sc_threshold 0 -c:a aac -b:a %Q -f flv \"%U/%K\" >/tmp/idtech3-tv-ffmpeg.log 2>&1 &";
 #else
-	return "nohup %P -y -f x11grab -framerate %F -video_size %Wx%H -i ${DISPLAY:-:0.0} -f pulse -i default -c:v libx264 -preset veryfast -tune zerolatency -b:v %V -pix_fmt yuv420p -c:a aac -b:a %Q -f flv \"%U/%K\" >/tmp/idtech3-tv-ffmpeg.log 2>&1 &";
+	return "nohup %P -y -f x11grab -framerate %F -video_size %Wx%H -i ${DISPLAY:-:0.0} -f pulse -i default -c:v libx264 -preset veryfast -tune zerolatency -b:v %V -minrate %V -maxrate %V -bufsize 2M -pix_fmt yuv420p -g 120 -keyint_min 120 -sc_threshold 0 -c:a aac -b:a %Q -f flv \"%U/%K\" >/tmp/idtech3-tv-ffmpeg.log 2>&1 &";
 #endif
 }
 
 static const char *CL_StreamingDefaultEngineTemplate( void )
 {
-	return "%P -f avi -i - -threads 0 -y -c:v libx264 -preset veryfast -tune zerolatency -b:v %V -pix_fmt yuv420p -c:a aac -b:a %Q -f flv \"%U/%K\"";
+	return "%P -f avi -i - -threads 0 -y -c:v libx264 -preset veryfast -tune zerolatency -b:v %V -minrate %V -maxrate %V -bufsize 2M -pix_fmt yuv420p -g 120 -keyint_min 120 -sc_threshold 0 -c:a aac -b:a %Q -f flv \"%U/%K\"";
 }
 
 static void CL_StreamingBuildExpand( cl_pipeline_expand_t *ex )
@@ -106,6 +115,7 @@ static void CL_StreamingStatus_f( void )
 
 	Com_Printf( "idTech3 TV streaming:\n" );
 	Com_Printf( "  enabled: %d active: %d\n", cl_stream_enable ? cl_stream_enable->integer : 0, stream_active );
+	Com_Printf( "  platform: %s\n", cl_stream_platform && cl_stream_platform->string[0] ? cl_stream_platform->string : "custom" );
 	Com_Printf( "  backend: %s%s\n",
 		cl_stream_backend ? cl_stream_backend->string : "engine",
 		stream_backend_active == STREAM_BACKEND_ENGINE ? " (engine capture active)" :
@@ -128,8 +138,58 @@ static void CL_StreamingStatus_f( void )
 			failed );
 	}
 	if ( stream_last_command[0] ) {
-		Com_Printf( "  last command: %s\n", stream_last_command );
+		/* The expanded command contains the protected stream key. Never echo it. */
+		Com_Printf( "  last command: configured (redacted)\n" );
 	}
+}
+
+static void CL_StreamingKickSetup_f( void )
+{
+	Cvar_Set( "cl_stream_platform", "kick" );
+	Cvar_Set( "cl_stream_enable", "1" );
+	Cvar_Set( "cl_stream_backend", "engine" );
+	Cvar_Set( "cl_stream_url", CL_STREAM_KICK_URL );
+	Cvar_Set( "cl_stream_width", "1920" );
+	Cvar_Set( "cl_stream_height", "1080" );
+	Cvar_Set( "cl_stream_fps", "60" );
+	Cvar_Set( "cl_stream_bitrate", "6000k" );
+	Cvar_Set( "cl_stream_audio_bitrate", "128k" );
+	if ( !cl_stream_title || !cl_stream_title->string[0] || !Q_stricmp( cl_stream_title->string, "idTech3 Live" ) ) {
+		Cvar_Set( "cl_stream_title", "Surf Live" );
+	}
+	Com_Printf( S_COLOR_GREEN "stream_kick_setup: configured KICK RTMPS capture.\n" );
+	Com_Printf( "stream_kick_setup: set cl_stream_key <your KICK stream key>, then run stream_start.\n" );
+	Com_Printf( "stream_kick_setup: key is protected and will not be shown by stream_status.\n" );
+}
+
+static void CL_StreamingKickStart_f( void )
+{
+	CL_StreamingKickSetup_f();
+	CL_StreamingStart_f();
+}
+
+static void CL_StreamingIdTech3TVSetup_f( void )
+{
+	Cvar_Set( "cl_stream_platform", "idtech3tv" );
+	Cvar_Set( "cl_stream_enable", "1" );
+	Cvar_Set( "cl_stream_backend", "engine" );
+	Cvar_Set( "cl_stream_url", CL_STREAM_IDTECH3TV_URL );
+	Cvar_Set( "cl_stream_width", "1280" );
+	Cvar_Set( "cl_stream_height", "720" );
+	Cvar_Set( "cl_stream_fps", "60" );
+	Cvar_Set( "cl_stream_bitrate", "5000k" );
+	Cvar_Set( "cl_stream_audio_bitrate", "128k" );
+	if ( !cl_stream_title || !cl_stream_title->string[0] || !Q_stricmp( cl_stream_title->string, "idTech3 Live" ) ) {
+		Cvar_Set( "cl_stream_title", "Surf Live" );
+	}
+	Com_Printf( S_COLOR_GREEN "stream_idtech3tv_setup: configured local idTech3TV/Owncast RTMP capture.\n" );
+	Com_Printf( "stream_idtech3tv_setup: run the server, set cl_stream_key to its configured key, then run stream_start.\n" );
+}
+
+static void CL_StreamingIdTech3TVStart_f( void )
+{
+	CL_StreamingIdTech3TVSetup_f();
+	CL_StreamingStart_f();
 }
 
 static void CL_StreamingStart_f( void )
@@ -174,6 +234,10 @@ static void CL_StreamingStart_f( void )
 		}
 		stream_backend_active = STREAM_BACKEND_ENGINE;
 	}
+	/* Protect player names and chat automatically while broadcasting. */
+	stream_saved_streamer_mode = Cvar_VariableIntegerValue( "cg_surfStreamerMode" ) != 0 ? qtrue : qfalse;
+	stream_streamer_mode_saved = qtrue;
+	Cvar_Set( "cg_surfStreamerMode", "1" );
 	stream_active = qtrue;
 	Com_Printf( S_COLOR_GREEN "stream_start: broadcaster launched\n" );
 }
@@ -189,6 +253,10 @@ static void CL_StreamingStop_f( void )
 	wasExternal = ( stream_backend_active == STREAM_BACKEND_EXTERNAL ) ? qtrue : qfalse;
 	if ( stream_backend_active == STREAM_BACKEND_ENGINE ) {
 		CL_CloseAVI( qfalse );
+	}
+	if ( stream_streamer_mode_saved ) {
+		Cvar_Set( "cg_surfStreamerMode", stream_saved_streamer_mode ? "1" : "0" );
+		stream_streamer_mode_saved = qfalse;
 	}
 	stream_active = qfalse;
 	stream_backend_active = STREAM_BACKEND_NONE;
@@ -241,14 +309,21 @@ void CL_Streaming_Init( void )
 	Cvar_SetDescription( cl_stream_queueMegs, "Maximum queued live-stream pipe data in MiB before capture chunks are dropped instead of growing memory." );
 	cl_stream_autoStart = Cvar_Get( "cl_stream_autoStart", "0", CVAR_ARCHIVE );
 	Cvar_CheckRange( cl_stream_autoStart, "0", "1", CV_INTEGER );
+	cl_stream_platform = Cvar_Get( "cl_stream_platform", "custom", CVAR_ARCHIVE );
+	Cvar_SetDescription( cl_stream_platform, "Streaming destination preset: custom or kick." );
 
 	Cmd_AddCommand( "stream_start", CL_StreamingStart_f );
 	Cmd_AddCommand( "stream_stop", CL_StreamingStop_f );
 	Cmd_AddCommand( "stream_status", CL_StreamingStatus_f );
+	Cmd_AddCommand( "stream_kick_setup", CL_StreamingKickSetup_f );
+	Cmd_AddCommand( "stream_kick_start", CL_StreamingKickStart_f );
+	Cmd_AddCommand( "stream_idtech3tv_setup", CL_StreamingIdTech3TVSetup_f );
+	Cmd_AddCommand( "stream_idtech3tv_start", CL_StreamingIdTech3TVStart_f );
 
 	stream_active = qfalse;
 	stream_backend_active = STREAM_BACKEND_NONE;
 	stream_last_command[0] = '\0';
+	stream_streamer_mode_saved = qfalse;
 	if ( cl_stream_autoStart && cl_stream_autoStart->integer ) {
 		CL_StreamingStart_f();
 	}
@@ -259,9 +334,17 @@ void CL_Streaming_Shutdown( void )
 	if ( stream_backend_active == STREAM_BACKEND_ENGINE ) {
 		CL_CloseAVI( qfalse );
 	}
+	if ( stream_streamer_mode_saved ) {
+		Cvar_Set( "cg_surfStreamerMode", stream_saved_streamer_mode ? "1" : "0" );
+		stream_streamer_mode_saved = qfalse;
+	}
 	stream_active = qfalse;
 	stream_backend_active = STREAM_BACKEND_NONE;
 	Cmd_RemoveCommand( "stream_start" );
 	Cmd_RemoveCommand( "stream_stop" );
 	Cmd_RemoveCommand( "stream_status" );
+	Cmd_RemoveCommand( "stream_kick_setup" );
+	Cmd_RemoveCommand( "stream_kick_start" );
+	Cmd_RemoveCommand( "stream_idtech3tv_setup" );
+	Cmd_RemoveCommand( "stream_idtech3tv_start" );
 }

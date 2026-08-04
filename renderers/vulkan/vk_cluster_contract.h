@@ -17,7 +17,7 @@ extern "C" {
 #define VK_CLUSTER_TILE_SIZE_X   16u
 #define VK_CLUSTER_TILE_SIZE_Y   16u
 #define VK_CLUSTER_HEADER_BYTES  8u
-#define VK_CLUSTER_PARAMS_BYTES  64u /* 16 x uint32 / floats packed */
+#define VK_CLUSTER_PARAMS_BYTES  56u /* 14 x uint32 / floats packed */
 
 /* Flags for gpuClusterParams_t.flags */
 #define VK_CLUSTER_FLAG_LOG_Z           1u
@@ -50,12 +50,14 @@ typedef struct gpuClusterParams_s {
 
 #ifdef __cplusplus
 static_assert( sizeof( gpuClusterHeader_t ) == 8, "gpuClusterHeader_t must be 8 bytes" );
-static_assert( sizeof( gpuClusterParams_t ) == 56, "gpuClusterParams_t must be 56 bytes" );
+static_assert( sizeof( gpuClusterParams_t ) == VK_CLUSTER_PARAMS_BYTES,
+	"gpuClusterParams_t size must match the GLSL ClusterParams ABI" );
 static_assert( sizeof( gpuClusterHeader_t ) == VK_CLUSTER_HEADER_BYTES,
 	"VK_CLUSTER_HEADER_BYTES mismatch" );
 #else
 _Static_assert( sizeof( gpuClusterHeader_t ) == 8, "gpuClusterHeader_t must be 8 bytes" );
-_Static_assert( sizeof( gpuClusterParams_t ) == 56, "gpuClusterParams_t must be 56 bytes" );
+_Static_assert( sizeof( gpuClusterParams_t ) == VK_CLUSTER_PARAMS_BYTES,
+	"gpuClusterParams_t size must match the GLSL ClusterParams ABI" );
 _Static_assert( sizeof( gpuClusterHeader_t ) == VK_CLUSTER_HEADER_BYTES,
 	"VK_CLUSTER_HEADER_BYTES mismatch" );
 #endif

@@ -931,6 +931,42 @@ static duk_ret_t Js_Binding_HudDrawPic( duk_context *ctx ) {
 	return 0;
 }
 
+static duk_ret_t Js_Binding_ServerBrowserRefresh( duk_context *ctx ) {
+	int source = duk_get_top( ctx ) > 0 ? duk_to_int( ctx, 0 ) : AS_GLOBAL;
+	duk_push_boolean( ctx, CL_JsServerRefresh( source ) );
+	return 1;
+}
+
+static duk_ret_t Js_Binding_ServerBrowserList( duk_context *ctx ) {
+	int source = duk_get_top( ctx ) > 0 ? duk_to_int( ctx, 0 ) : AS_GLOBAL;
+	int count = CL_JsServerCount( source );
+	char info[MAX_STRING_CHARS], address[MAX_STRING_CHARS];
+	int i;
+	duk_idx_t array;
+
+	if ( count < 0 ) count = 0;
+	if ( count > 4096 ) count = 4096;
+	duk_push_array( ctx );
+	array = duk_get_top_index( ctx );
+	for ( i = 0; i < count; i++ ) {
+		CL_JsServerInfo( source, i, info, sizeof( info ) );
+		CL_JsServerAddress( source, i, address, sizeof( address ) );
+		duk_push_object( ctx );
+		duk_push_string( ctx, Info_ValueForKey( info, "hostname" ) ); duk_put_prop_string( ctx, -2, "hostname" );
+		duk_push_string( ctx, Info_ValueForKey( info, "mapname" ) ); duk_put_prop_string( ctx, -2, "map" );
+		duk_push_int( ctx, atoi( Info_ValueForKey( info, "clients" ) ) ); duk_put_prop_string( ctx, -2, "players" );
+		duk_push_int( ctx, atoi( Info_ValueForKey( info, "sv_maxclients" ) ) ); duk_put_prop_string( ctx, -2, "maxPlayers" );
+		duk_push_int( ctx, atoi( Info_ValueForKey( info, "ping" ) ) ); duk_put_prop_string( ctx, -2, "ping" );
+		duk_push_string( ctx, Info_ValueForKey( info, "gametype" ) ); duk_put_prop_string( ctx, -2, "gametype" );
+		duk_push_string( ctx, address ); duk_put_prop_string( ctx, -2, "address" );
+		duk_push_boolean( ctx, atoi( Info_ValueForKey( info, "p2p" ) ) != 0 ); duk_put_prop_string( ctx, -2, "p2p" );
+		duk_push_int( ctx, atoi( Info_ValueForKey( info, "surf_rank_min" ) ) ); duk_put_prop_string( ctx, -2, "rankMin" );
+		duk_push_int( ctx, atoi( Info_ValueForKey( info, "surf_rank_max" ) ) ); duk_put_prop_string( ctx, -2, "rankMax" );
+		duk_put_prop_index( ctx, array, (duk_uarridx_t)i );
+	}
+	return 1;
+}
+
 /*
  * hudBackdropBlur(x, y, w, h, radius [, cornerRadius, opacity, r, g, b, a, rotation])
  * CSS backdrop-filter: blur() — blurs only content behind the panel rect.
@@ -1395,6 +1431,11 @@ static void JsDebug_RegisterBindings( void ) {
 
 	duk_push_c_function( s_jsContext, Js_Binding_Off, DUK_VARARGS );
 	duk_put_prop_string( s_jsContext, -2, "off" );
+
+	duk_push_c_function( s_jsContext, Js_Binding_ServerBrowserRefresh, 1 );
+	duk_put_prop_string( s_jsContext, -2, "serverBrowserRefresh" );
+	duk_push_c_function( s_jsContext, Js_Binding_ServerBrowserList, 1 );
+	duk_put_prop_string( s_jsContext, -2, "serverBrowserList" );
 
 #ifndef DEDICATED
 	duk_push_c_function( s_jsContext, Js_Binding_TextureLoad, DUK_VARARGS );

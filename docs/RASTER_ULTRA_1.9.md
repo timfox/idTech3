@@ -14,6 +14,12 @@ vid_restart
 
 Command: `vshadow_status`
 
+`vshadow_status` reports physical pages, memory, new-request admissions, page
+render claims, local-light admissions, caster budget, and budget drops. These
+budgets are authoritative for virtual shadow residency; ReSTIR and neural
+lighting consumers may only sample resident records and cannot allocate shadow
+work behind the shadow system's back.
+
 ## Architecture (genuine virtual pages)
 
 This is **not** a renamed CSM. The system implements:
@@ -22,6 +28,10 @@ This is **not** a renamed CSM. The system implements:
 |-----------|----------------|
 | Virtual page addressing | Packed `virtualId` (light \| clipLevel \| pageX \| pageY) |
 | Physical page cache | Fixed pool (`r_vshadowPoolPages`, default 64) with atlas grid coords |
+| Explicit residency budget | `r_vshadowPoolPages` + `r_shadowPageRequestBudget` cap new admissions |
+| Explicit update budget | `r_vshadowRenderBudget` limits dirty page renders per frame |
+| Explicit local-light budget | `r_shadowLocalLightBudget` limits virtual local-light requests; overflow stays in the local atlas |
+| Explicit caster budget | `r_shadowCasterDrawBudget` reserves shadow-caster workload and reports drops |
 | Page residency | `resident` / `initialized` / `pinned` / `staticCached` metadata |
 | Page-table lookup | Open-addressed table (`VK_VSHADOW_PAGE_TABLE_SLOTS`) |
 | Receiver demand | Clipmap rings around camera; local-light importance requests |

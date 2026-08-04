@@ -1109,6 +1109,15 @@ void vk_update_mvp( const float *m )
 				vk_oit_alpha_query_shader( tess.shader, &ainfo );
 				enc = ainfo.sourceEncoding;
 				vk_oit_alpha_note_route( enc, ainfo.path );
+				if ( tess.shader->stages[0] ) {
+					shaderStage_t *st = tess.shader->stages[0];
+					/* High parity bits advertise which optional material streams are
+					 * valid; low bits retain the existing alpha diagnostics. */
+					if ( st->normalMap ) oit_push.parityCompare |= ( 1 << 8 );
+					if ( st->physicalMap ) oit_push.parityCompare |= ( 1 << 9 );
+					if ( st->emissiveMap ) oit_push.parityCompare |= ( 1 << 10 );
+					if ( st->vk_pbr_flags & PBR_HAS_LIGHTMAP ) oit_push.parityCompare |= ( 1 << 11 );
+				}
 			}
 			oit_push.alphaPack = vk_oit_alpha_pack_push( enc );
 		}

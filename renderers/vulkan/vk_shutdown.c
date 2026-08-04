@@ -20,6 +20,7 @@ Split from vk.c.
 #include "vk_skybox_hdr.h"
 #include "vk_forward_plus.h"
 #include "vk_deferred_gbuffer.h"
+#include "vk_deferred_honesty.h"
 #include "vk_visibility_buffer.h"
 #include "vk_vrcs.h"
 #include "vk_rtx.h"
@@ -39,6 +40,7 @@ Split from vk.c.
 #include "vk_surface_evolution.h"
 #include "vk_vshadow.h"
 #include "vk_shadow_contract.h"
+#include "vk_selective_rt.h"
 #include "vk_present_color.h"
 #include "vk_exposure_histogram.h"
 #include "vk_cinematic_camera.h"
@@ -101,6 +103,7 @@ void vk_shutdown( refShutdownCode_t code )
 	vk_spine_registry_shutdown();
 	R_Dressi_Shutdown();
 	vk_deferred_gbuffer_invalidate_runtime();
+	vk_deferred_honesty_shutdown();
 	vk_visibility_buffer_shutdown();
 	vk_destroy_framebuffers();
 
@@ -138,6 +141,7 @@ void vk_shutdown( refShutdownCode_t code )
 	vk_exposure_histogram_shutdown();
 	vk_present_color_shutdown();
 	vk_vshadow_shutdown();
+	vk_srt_shutdown();
 	vk_shadow_contract_shutdown();
 	vk_surface_evolution_shutdown();
 	vk_material_cache_shutdown();

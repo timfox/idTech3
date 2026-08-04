@@ -2004,6 +2004,38 @@ void FS_FreeFile( void *buffer ) {
 	}
 }
 
+int FS_ReadFileMalloc( const char *qpath, void **buffer ) {
+	fileHandle_t h;
+	int len;
+	void *buf;
+
+	if ( !fs_searchpaths ) Com_Error( ERR_FATAL, "Filesystem call made without initialization" );
+	if ( !qpath || !qpath[0] ) Com_Error( ERR_FATAL, "FS_ReadFileMalloc with empty name" );
+	if ( !buffer ) {
+		len = FS_FOpenFileRead( qpath, &h, qfalse );
+		if ( h != FS_INVALID_HANDLE ) FS_FCloseFile( h );
+		return len;
+	}
+	*buffer = NULL;
+	len = FS_FOpenFileRead( qpath, &h, qfalse );
+	if ( h == FS_INVALID_HANDLE || len < 0 ) return -1;
+	buf = Z_Malloc( len + 1 );
+	if ( !buf ) { FS_FCloseFile( h ); return -1; }
+	if ( FS_Read( buf, len, h ) != len ) {
+		Z_Free( buf );
+		FS_FCloseFile( h );
+		return -1;
+	}
+	((byte *)buf)[len] = '\0';
+	FS_FCloseFile( h );
+	*buffer = buf;
+	return len;
+}
+
+void FS_FreeFileMalloc( void *buffer ) {
+	if ( buffer ) Z_Free( buffer );
+}
+
 
 /*
 ============

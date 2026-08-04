@@ -1,3 +1,4 @@
 # GPU golden manifest (Tier A: file presence + size; Tier B: perceptual hash)
 # Format: relative_path min_bytes max_bytes
 placeholder/README.txt 1 4096
+material_parity/README.txt 1 8192

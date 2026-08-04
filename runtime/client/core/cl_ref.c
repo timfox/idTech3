@@ -353,6 +353,7 @@ void CL_Ref_InitRenderer( void ) {
 
 	// this sets up the renderer and calls R_Init
 	re.BeginRegistration( &cls.glconfig );
+	Com_Printf( "[init][renderer] ready\n" );
 
 	// load character sets
 	cls.charSetShader = re.RegisterShader( "gfx/2d/bigchars" );
@@ -478,7 +479,7 @@ static void CL_InitRef( void ) {
 
 	CL_InitGLimp_Cvars();
 
-	Com_Printf( "----- Initializing Renderer ----\n" );
+	Com_Printf( "[init][renderer] begin\n" );
 
 #if defined(USE_RENDERER_DLOPEN) && USE_RENDERER_DLOPEN
 	/* "renderer" is an alias for cl_renderer. Vulkan is the only shipping backend. */
@@ -671,7 +672,7 @@ static void CL_InitRef( void ) {
 	ret = GetRefAPI( REF_API_VERSION, &rimp );
 #endif
 
-	Com_Printf( "-------------------------------\n");
+	Com_Printf( "[init][renderer] API ready\n" );
 
 	if ( !ret ) {
 		Com_Error (ERR_FATAL, "Couldn't initialize refresh" );

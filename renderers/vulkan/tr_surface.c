@@ -997,6 +997,38 @@ static void RB_SurfaceMesh(md3Surface_t *surface) {
 }
 
 
+static int RB_SurfaceFaceLOD( const srfSurfaceFace_t *surf, const unsigned **outIndices ) {
+	vec3_t mins, maxs, center, delta;
+	float radius, distance, ratio, threshold;
+	int i, level = 0;
+
+	*outIndices = (const unsigned *)(((const byte *)surf) + surf->ofsIndices);
+	if ( !r_bspLod || r_bspLod->integer <= 0 || !surf->lodNumIndices[0] ) return surf->numIndices;
+	VectorCopy( surf->points[0], mins );
+	VectorCopy( surf->points[0], maxs );
+	for ( i = 1; i < surf->numPoints; i++ ) AddPointToBounds( surf->points[i], mins, maxs );
+	VectorAdd( mins, maxs, center );
+	VectorScale( center, 0.5f, center );
+	VectorSubtract( maxs, center, delta );
+	radius = VectorLength( delta );
+	VectorSubtract( center, backEnd.viewParms.or.origin, delta );
+	distance = VectorLength( delta );
+	ratio = distance / MAX( radius, 1.0f );
+	threshold = r_bspLodDistance ? r_bspLodDistance->value : 8.0f;
+	if ( r_bspLod->integer > 1 ) threshold *= 0.5f;
+	if ( ratio > threshold * 2.0f && surf->lodNumIndices[1] ) level = 1;
+	else if ( ratio > threshold && surf->lodNumIndices[0] ) level = 0;
+	if ( level == 1 ) {
+		*outIndices = (const unsigned *)surf->lodIndices[1];
+		return surf->lodNumIndices[1];
+	}
+	if ( level == 0 && ratio > threshold ) {
+		*outIndices = (const unsigned *)surf->lodIndices[0];
+		return surf->lodNumIndices[0];
+	}
+	return surf->numIndices;
+}
+
 /*
 ==============
 RB_SurfaceFace
@@ -1012,9 +1044,13 @@ static void RB_SurfaceFace( const srfSurfaceFace_t *surf ) {
 	int			Bob;
 	int			numPoints;
 	int			dlightBits;
+	int			numIndices;
+
+	numIndices = RB_SurfaceFaceLOD( surf, &indices );
 
 #ifdef USE_VBO
 	if ( tess.allowVBO && surf->vboItemIndex && !surf->dlightBits &&
+			( !r_bspLod || !r_bspLod->integer || !surf->lodNumIndices[0] ) &&
 		RB_QueueSurfaceVBO( surf->vboItemIndex, SF_FACE ) ) {
 		return;
 	}
@@ -1022,7 +1058,7 @@ static void RB_SurfaceFace( const srfSurfaceFace_t *surf ) {
 	VBO_Flush();
 #endif // USE_VBO
 
-	RB_CHECKOVERFLOW( surf->numPoints, surf->numIndices );
+	RB_CHECKOVERFLOW( surf->numPoints, numIndices );
 
 #ifdef USE_VBO
 	tess.surfType = SF_FACE;
@@ -1031,15 +1067,13 @@ static void RB_SurfaceFace( const srfSurfaceFace_t *surf ) {
 	dlightBits = surf->dlightBits;
 	tess.dlightBits |= dlightBits;
 
-	indices = ( const unsigned * ) ( ( ( const char  * ) surf ) + surf->ofsIndices );
-
 	Bob = tess.numVertexes;
 	tessIndexes = tess.indexes + tess.numIndexes;
-	for ( i = surf->numIndices-1 ; i >= 0  ; i-- ) {
+	for ( i = numIndices-1 ; i >= 0  ; i-- ) {
 		tessIndexes[i] = indices[i] + Bob;
 	}
 
-	tess.numIndexes += surf->numIndices;
+	tess.numIndexes += numIndices;
 
 	numPoints = surf->numPoints;
 

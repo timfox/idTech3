@@ -45,6 +45,20 @@ Modes **1** and **3** share the opaque→deferred→transparent split when defer
 
 ## Shared cluster grid
 
+The deferred light-volume rule follows Ferko's deferred-lighting contract:
+cluster membership is only a conservative candidate set; the deferred shader
+must still evaluate the reconstructed surface position against the light's
+actual bounds. Directional sun lighting remains a separate owner because it
+covers the whole screen and is coupled to the shadow contract. HDR SceneHDR is
+not tone-mapped or bloom-processed until clustered direct lighting ownership is
+complete.
+
+The 3D subdivision follows Olsson et al. (HPG 2012): screen tiles are combined
+with logarithmic view-depth slices so light assignment remains bounded at depth
+discontinuities. Normal-cone culling is not yet enabled; any future
+normal-aware cluster owner must preserve the same generation and fallback
+contract.
+
 Deferred lighting, Forward+ shade, and OIT (`r_oitForwardPlus`) consume the **same** Forward+ light + compact header/index (or legacy tile) SSBOs (`cluster_contract.glsl` / `cluster_light_list.glsl`).
 
 | Alias / cvar | Backs onto |

@@ -1818,6 +1818,15 @@ static void CL_ApplyGraphicsProfile( vm_t *vm ) {
 	}
 
 	if ( isBaseQ3 && isQvm ) {
+		/* A QVM mod can still explicitly request the modern Vulkan stack.
+		 * Preserve that request across cgame loads/restarts; otherwise the
+		 * retail compatibility defaults force r_classicLighting=1 and make
+		 * deferred mode 3 report every opaque surface as ineligible. */
+		if ( CL_UserRequestedModernGraphics() ) {
+			cls.stockBaseq3 = qfalse;
+			Com_Printf( "[client] cl_autoGraphicsProfile: modern baseq3 QVM (preserving requested renderer mode)\n" );
+			return;
+		}
 		Com_Printf( "[client] cl_autoGraphicsProfile: classic baseq3 (cgame.qvm)\n" );
 		CL_ApplyClassicBaseq3Cvars();
 		Cbuf_AddText( "exec classic_baseq3.cfg\n" );
@@ -1872,7 +1881,12 @@ static void CL_ApplyGraphicsProfile( vm_t *vm ) {
 
 	if ( isQvm ) {
 		cls.stockBaseq3 = qfalse;
-		Com_Printf( "[client] cl_autoGraphicsProfile: QVM mod (classic lighting default preserved)\n" );
+		if ( CL_UserRequestedModernGraphics() ) {
+			Cvar_Set( "r_classicLighting", "0" );
+			Com_Printf( "[client] cl_autoGraphicsProfile: QVM mod (modern renderer requested; classic lighting disabled)\n" );
+		} else {
+			Com_Printf( "[client] cl_autoGraphicsProfile: QVM mod (classic lighting default preserved)\n" );
+		}
 	}
 }
 

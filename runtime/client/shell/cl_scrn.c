@@ -1751,6 +1751,13 @@ void SCR_Init( void ) {
 	Cvar_SetDescription( r_fontConsoleProportional,
 		"When 1, console/notify TrueType text advances by glyph xSkip + FreeType kerning (r_fontKerning). When 0, use a fixed monospace cell grid." );
 
+	{
+		cvar_t *spacing = Cvar_Get( "r_fontConsoleLineSpacing", "0.05", CVAR_ARCHIVE );
+		Cvar_CheckRange( spacing, "0.0", "0.25", CV_FLOAT );
+		Cvar_SetDescription( spacing,
+			"Additional TrueType console line leading as a fraction of the glyph cell height (0.05 = one pixel at the default cell size)." );
+	}
+
 	r_fontShadow = Cvar_Get( "r_fontShadow", "2", CVAR_ARCHIVE );
 	Cvar_CheckRange( r_fontShadow, "0", "8", CV_INTEGER );
 	Cvar_SetDescription( r_fontShadow,

@@ -3253,6 +3253,20 @@ set_tests_properties(gpu_golden_compare PROPERTIES
 	LABELS "validation;renderer;golden"
 	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/scripts/gpu_golden_capture.sh")
 
+add_test(NAME test_material_parity_golden
+	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_material_parity_golden.sh
+	WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+set_tests_properties(test_material_parity_golden PROPERTIES
+	LABELS "validation;renderer;golden"
+	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_material_parity_golden.sh;${CMAKE_SOURCE_DIR}/examples/demo_game/mod/material_parity_golden.cfg;${CMAKE_SOURCE_DIR}/tests/data/golden/material_parity/README.txt")
+
+add_test(NAME test_material_owner_contract
+	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_material_owner_contract.sh
+	WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+set_tests_properties(test_material_owner_contract PROPERTIES
+	LABELS "validation;renderer"
+	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_material_owner_contract.sh;${CMAKE_SOURCE_DIR}/renderers/vulkan/shaders/glsl/surface_material_decode.glsl")
+
 add_test(NAME check_artifacts
 	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/check_artifacts.sh ${CMAKE_SOURCE_DIR}/release
 	WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})

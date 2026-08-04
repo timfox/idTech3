@@ -1,0 +1,78 @@
+#version 450
+
+/* Portable geometry path: compute culling + GPU command generation.  This is
+ * intentionally an indexed-MDI ABI; mesh shaders are an optional consumer of
+ * the same records, never a prerequisite. */
+layout(local_size_x = 64, local_size_y = 1, local_size_z = 1) in;
+
+struct Meshlet {
+    vec3 mins; uint firstIndex;
+    vec3 maxs; uint indexCount;
+    vec3 coneAxis; float coneCutoff;
+    uint surfaceIndex; uint lodMinPixels; uint lodMaxPixels; uint streamState;
+    uint generation;
+};
+struct Object {
+    mat4 model;
+    vec4 sphere;
+    uint meshletFirst; uint meshletCount; uint generation; uint streamState;
+    uint flags; uint lodBias; uint lodHysteresis; uint objectId;
+};
+struct Draw { uint indexCount; uint instanceCount; uint firstIndex; int vertexOffset; uint firstInstance; };
+
+layout(std430, set=0, binding=0) readonly buffer Meshlets { Meshlet meshlet[]; } bMeshlets;
+layout(std430, set=0, binding=1) readonly buffer Objects { Object object[]; } bObjects;
+layout(std430, set=0, binding=2) writeonly buffer Commands { Draw command[]; } bCommands;
+layout(std430, set=0, binding=3) buffer Count { uint drawCount; } bCount;
+layout(set=0, binding=4) uniform sampler2D hiz;
+
+layout(push_constant) uniform CullPush {
+    mat4 viewProj;
+    vec4 frustum[6];
+    vec4 viewportAndLod; // xy extent, z lod bias, w min pixels
+    uint objectCount;
+    uint maxCommands;
+    uint generation;
+    uint useHiZ;
+} pc;
+
+bool sphereVisible(vec3 c, float r) {
+    for (uint p = 0u; p < 6u; ++p)
+        if (dot(pc.frustum[p].xyz, c) + pc.frustum[p].w < -r) return false;
+    return true;
+}
+
+void main() {
+    uint id = gl_GlobalInvocationID.x;
+    if (id >= pc.objectCount) return;
+    Object o = bObjects.object[id];
+    if (o.generation != pc.generation || o.streamState == 3u) return;
+    for (uint n = 0u; n < o.meshletCount; ++n) {
+        Meshlet m = bMeshlets.meshlet[o.meshletFirst + n];
+        if (m.generation != pc.generation || m.streamState != 0u) continue;
+        vec3 center = (m.mins + m.maxs) * 0.5;
+        vec3 extent = (m.maxs - m.mins) * 0.5;
+        center = (o.model * vec4(center, 1.0)).xyz;
+        float radius = length(extent);
+        if (!sphereVisible(center, radius)) continue;
+        vec4 clip = pc.viewProj * vec4(center, 1.0);
+        float pixels = radius * pc.viewportAndLod.y / max(abs(clip.w), 0.001);
+        float threshold = max(pc.viewportAndLod.w, 0.25) * exp2(float(o.lodBias));
+        if (pixels < threshold && m.lodMaxPixels > 0u) continue;
+        /* Hi-Z is conservative: the sampled pyramid only rejects an item when
+         * its projected footprint is fully behind the farthest depth sample. */
+        if (pc.useHiZ != 0u && clip.w > 0.0) {
+            vec2 uv = clip.xy / clip.w * 0.5 + 0.5;
+            float z = clip.z / clip.w;
+            if (uv.x >= 0.0 && uv.x <= 1.0 && uv.y >= 0.0 && uv.y <= 1.0 &&
+                z < textureLod(hiz, uv, 3.0).r) continue;
+        }
+        uint slot = atomicAdd(bCount.drawCount, 1u);
+        if (slot >= pc.maxCommands) continue;
+        bCommands.command[slot].indexCount = m.indexCount;
+        bCommands.command[slot].instanceCount = 1u;
+        bCommands.command[slot].firstIndex = m.firstIndex;
+        bCommands.command[slot].vertexOffset = 0;
+        bCommands.command[slot].firstInstance = o.objectId;
+    }
+}

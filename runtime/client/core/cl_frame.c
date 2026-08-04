@@ -7,6 +7,7 @@ Copyright (C) 2026 Gopex LLC. All rights reserved.
 #include "client.h"
 #include "cl_p2p_session.h"
 #include "cl_frame.h"
+#include "cl_cmds.h"
 #include "cl_gameframe.h"
 #include "cl_connect.h"
 #include "cl_demo.h"
@@ -72,6 +73,8 @@ void CL_Frame( int msec, int realMsec ) {
 	if ( !com_cl_running->integer ) {
 		return;
 	}
+
+	CL_SocialOverlaySync();
 
 	CL_P2P_SessionFrame();
 
@@ -146,4 +149,3 @@ void CL_Frame( int msec, int realMsec ) {
 
 	Con_RunConsole();
 }
-

@@ -68,10 +68,16 @@ layout(push_constant) uniform Push {
 	uint shadowFlags; /* bit0: sun shadow valid + SSBO bound */
 	float shadowStrength;
 	float shadowNear;
-	vec4 shadowSplits; /* cascade far view depths (std430 align 16) */
+	/* Keep these scalar: the C push struct carries the four cascade distances
+	 * contiguously at byte 180. A vec4 would align to byte 192 and shift every
+	 * following field, including clustered debug, beyond the 256-byte range. */
+	float shadowSplit0;
+	float shadowSplit1;
+	float shadowSplit2;
+	float shadowSplit3;
 	float shadowBlend; /* edge blend fraction 0..0.5 */
 	uint shadowCascadeCount; /* 1..4 CSM cascades */
-	uint shadowGeneration;
+	float forwardPlusDebug; /* deferred clustered occupancy blend */
 	vec4 sunDir; /* xyz = L toward sun (world), w = angular radius */
 	vec4 sunRadiance; /* rgb = radiance, w = flags (bit0 BRDF, bit1 LM owns diffuse) */
 	uint iblFlags; /* bit0: sky IBL enable */
@@ -89,10 +95,64 @@ layout(push_constant) uniform Push {
 #define DEFERRED_HAS_SURFACE
 #include "deferred_lighting_common.glsl"
 
+vec3 deferredClusterDebug( uvec2 pix, float debugMode ) {
+	vec2 uv = ( vec2( pix ) + 0.5 ) / vec2( pc.extent );
+	float depth = texture( depthTex, uv ).r;
+	if ( depth <= 0.0 || depth >= 1.0 ) {
+		return vec3( 0.02, 0.04, 0.18 );
+	}
+	vec3 viewPos = reconstructViewPos( uv, depth );
+	uint tilesX = max( pc.tileGrid.x, 1u );
+	uint tilesY = max( pc.tileGrid.y, 1u );
+	uint zSlices = max( pc.zSlices, 1u );
+	uint tx = min( uint( float( pix.x ) / max( float( pc.extent.x ) / float( tilesX ), 1.0 ) ), tilesX - 1u );
+	uint ty = min( uint( float( pix.y ) / max( float( pc.extent.y ) / float( tilesY ), 1.0 ) ), tilesY - 1u );
+	uint slice = fp_view_depth_to_slice( abs( viewPos.z ), zSlices, pc.zSliceMode, pc.zNear, pc.zFar );
+	uint clusterId = fp_cluster_index( tx, ty, tilesX, tilesY, slice, zSlices );
+	uint clusterCount = max( pc.clusterCount, tilesX * tilesY * zSlices );
+	uint legacyMax = min( max( pc.maxPerTile, 1u ), MAX_PER_TILE );
+	uint count = Cluster_FetchLightCount( clusterId, pc.compactLists, legacyMax, clusterCount );
+	float occupancy = clamp( float( count ) / max( float( pc.maxPerTile ), 1.0 ), 0.0, 1.0 );
+	vec3 color;
+	if ( debugMode >= 5.5 ) {
+		float t = ( zSlices > 1u ) ? ( float( slice ) / float( zSlices - 1u ) ) : 0.0;
+		color = mix( vec3( 0.1, 0.9, 0.35 ), vec3( 0.95, 0.15, 0.85 ), t );
+		vec2 cross = abs( vec2( pix ) - vec2( pc.extent ) * 0.5 );
+		if ( max( cross.x, cross.y ) < 3.0 ) {
+			color = vec3( float( slice ) / max( float( zSlices ), 1.0 ) );
+		}
+	} else if ( debugMode >= 1.5 ) {
+		float t = ( zSlices > 1u ) ? ( float( slice ) / float( zSlices - 1u ) ) : 0.0;
+		color = mix( vec3( 0.15, 0.35, 1.0 ), vec3( 1.0, 0.2, 0.05 ), t );
+	} else if ( occupancy < 0.25 ) {
+		color = mix( vec3( 0.02, 0.04, 0.18 ), vec3( 0.0, 0.55, 1.0 ), occupancy * 4.0 );
+	} else if ( occupancy < 0.5 ) {
+		color = mix( vec3( 0.0, 0.55, 1.0 ), vec3( 0.05, 0.85, 0.25 ), ( occupancy - 0.25 ) * 4.0 );
+	} else if ( occupancy < 0.75 ) {
+		color = mix( vec3( 0.05, 0.85, 0.25 ), vec3( 1.0, 0.88, 0.05 ), ( occupancy - 0.5 ) * 4.0 );
+	} else {
+		color = mix( vec3( 1.0, 0.88, 0.05 ), vec3( 0.92, 0.08, 0.02 ), ( occupancy - 0.75 ) * 4.0 );
+	}
+	vec2 tileSize = vec2( pc.extent ) / vec2( tilesX, tilesY );
+	vec2 f = fract( vec2( pix ) / tileSize );
+	float edge = min( min( f.x, 1.0 - f.x ), min( f.y, 1.0 - f.y ) );
+	return mix( vec3( 0.08 ), color, smoothstep( 0.0, 0.35, edge ) );
+}
+
 void main() {
 	uvec2 pix = gl_GlobalInvocationID.xy;
 	if ( pix.x >= pc.extent.x || pix.y >= pc.extent.y ) {
 		return;
 	}
-	imageStore( outLit, ivec2( pix ), shadeDeferredPixel( pix ) );
+	vec4 lit = shadeDeferredPixel( pix );
+	if ( pc.forwardPlusDebug > 0.0 ) {
+		float blend = pc.forwardPlusDebug;
+		if ( blend >= 5.5 ) {
+			blend = clamp( blend - 5.0, 0.2, 1.0 );
+		} else if ( blend >= 1.5 ) {
+			blend = clamp( blend - 1.0, 0.15, 1.0 );
+		}
+		lit.rgb = mix( lit.rgb, deferredClusterDebug( pix, pc.forwardPlusDebug ), blend );
+	}
+	imageStore( outLit, ivec2( pix ), lit );
 }

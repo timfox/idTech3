@@ -910,6 +910,8 @@ typedef struct {
 	int			numPoints;
 	int			numIndices;
 	int			ofsIndices;
+	int			lodNumIndices[2];
+	const int		*lodIndices[2];
 	float		points[1][VERTEXSIZE];	// variable sized
 										// there is a variable length list of indices here also
 } srfSurfaceFace_t;
@@ -1530,6 +1532,9 @@ extern cvar_t	*r_firstPersonZNear;			// near clip plane for first-person (reduce
 
 extern cvar_t	*r_lodbias;				// push/pull LOD transitions
 extern cvar_t	*r_lodscale;
+extern cvar_t	*r_bspLod;
+extern cvar_t	*r_bspLodDistance;
+extern cvar_t	*r_sourceEntities;
 
 extern cvar_t	*r_teleporterFlash;		// teleport hyperspace visual
 
@@ -1545,6 +1550,8 @@ extern cvar_t	*r_dlightSaturation;	// 0.0 - 1.0
 extern cvar_t	*r_deferredLightDemo;
 extern cvar_t	*r_deferredLightDemoCount;
 extern cvar_t	*r_deferredLightDemoRadius;
+extern cvar_t	*r_deferredLightDemoDistance;
+extern cvar_t	*r_deferredLightDemoEnergy;
 extern cvar_t	*r_deferredLightDemoAnimate;
 #ifdef USE_VULKAN
 extern cvar_t	*r_device;
@@ -2144,6 +2151,16 @@ void		RE_BeginFrame( stereoFrame_t stereoFrame );
 void		RE_BeginRegistration( glconfig_t *glconfig );
 void		RE_LoadWorldMap( const char *mapname );
 void		R_LoadBSP30World( const char *mapname, const byte *buffer, int size, world_t *world );
+void		R_LoadSourceVBSPWorld( const char *mapname, const byte *buffer, int size, world_t *world );
+void		R_BspBuildSurfaceLODs( world_t *world );
+void		R_BspLODStatus_f( void );
+void		R_SourceVBSP_Clear( void );
+void		R_SourceVBSP_Status_f( void );
+void		R_SourceEntities_Clear( void );
+void		R_SourceEntities_LoadEntityString( const char *entityString );
+void		R_SourceEntities_AddLights( void );
+void		R_SourceEntities_LoadFGD_f( void );
+void		R_SourceEntities_FGDStatus_f( void );
 void		RE_SetWorldVisData( const byte *vis );
 qhandle_t	RE_RegisterModel( const char *name );
 qhandle_t	RE_RegisterSkin( const char *name );

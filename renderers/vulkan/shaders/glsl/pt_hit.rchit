@@ -1,6 +1,9 @@
 #version 460
 #extension GL_EXT_ray_tracing : require
 #extension GL_EXT_nonuniform_qualifier : enable
+#extension GL_GOOGLE_include_directive : require
+
+#include "surface_material_decode.glsl"
 
 layout( location = 0 ) rayPayloadInEXT vec4 ptPayload;
 
@@ -112,9 +115,13 @@ void main()
 {
 	vec3 base = sampleWorldAlbedo();
 	vec3 N = sampleWorldNormal();
+	SurfaceMaterial material = SurfaceMaterialDecodeLegacy( base, 1.0, N,
+		SURFACE_LEGACY_EMISSIVE, 0u, 0u, OPAQUE_OWNER_SPECIALIZED, 0u );
+	base = material.baseColor;
+	N = material.normalWS;
 	vec3 V = normalize( -gl_WorldRayDirectionEXT );
 	float ndv = max( dot( N, V ), 0.0 );
-	vec3 emissive = vec3( 0.08, 0.07, 0.05 ) * ( 0.35 + 0.65 * ndv );
+	vec3 emissive = material.emissive;
 
 	ptPayload = vec4( base * ( 0.55 + 0.45 * ndv ) + emissive, 1.0 );
 }

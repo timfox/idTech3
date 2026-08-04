@@ -60,6 +60,8 @@ grep -q 'vk_spine_note_clear' "$REG_H" "$REG_C" || fail "clear contract API miss
 grep -q 'vk_spine_note_barrier' "$REG_H" "$REG_C" || fail "barrier contract API missing"
 grep -q 'vk_spine_note_layout' "$REG_H" "$REG_C" || fail "layout stamp API missing"
 grep -q 'vk_spine_expect_layout' "$REG_H" "$REG_C" || fail "layout expectation API missing"
+grep -q 'r_spineAuthoritative' "$REG_H" "$REG_C" || fail "authoritative spine cvar missing"
+grep -q 'vk_spine_transition_image' "$REG_H" "$REG_C" || fail "central image transition hook missing"
 grep -q 'layoutKnown' "$REG_C" || fail "layoutKnown tracking missing"
 grep -q 'OIT resolve read' "$REG_C" || fail "OIT resolve-without-clear validation missing"
 pass "validation (generation / phase / feature combos / clear-barrier / layout)"
@@ -105,6 +107,8 @@ grep -q 'vk_spine_note_barrier' "$ROOT/renderers/vulkan/vk_postfx_passes.c" || \
   fail "OIT sample barrier must stamp spine barrier"
 grep -q 'vk_spine_note_layout' "$ROOT/renderers/vulkan/vk_image_layout.c" || \
   fail "depth layout transitions must stamp spine layout"
+grep -q 'vk_spine_transition_image' "$ROOT/renderers/vulkan/vk_image_layout.c" || \
+  fail "all image layout transitions must feed authoritative spine ownership"
 grep -q 'vk_spine_expect_layout' "$ROOT/renderers/vulkan/vk_postfx_passes.c" || \
   fail "OIT resolve must expect sample layouts"
 grep -q 'vk_spine_expect_layout' "$ROOT/renderers/vulkan/vk_ambient_visibility.c" || \

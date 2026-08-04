@@ -153,6 +153,21 @@ physBodyHandle_t PhysProp_CreateSphere( const vec3_t origin, float radius,
 	return PhysProp_CreateDynamic( &def );
 }
 
+physBodyHandle_t PhysProp_CreateCapsule( const vec3_t origin, float radius, float height,
+	physBodyType_t type, float mass, int materialId ) {
+	physBodyDef_t def;
+
+	PhysProp_FillDefaults( &def, type, mass, materialId );
+	def.shape = PHYS_SHAPE_CAPSULE;
+	VectorCopy( origin, def.position );
+	def.radius = radius > 0.0f ? radius : 8.0f;
+	def.height = height > 0.0f ? height : 32.0f;
+	if ( type == PHYS_BODY_STATIC ) {
+		return PhysProp_CreateStatic( &def );
+	}
+	return PhysProp_CreateDynamic( &def );
+}
+
 physBodyHandle_t PhysProp_CreateFromAABB( const vec3_t mins, const vec3_t maxs,
 	physBodyType_t type, float mass, int materialId ) {
 	vec3_t origin, halfExtents;

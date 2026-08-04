@@ -1,5 +1,11 @@
 # Forward+ render pipeline — audit (Vulkan, 2026)
 
+The light-volume/deferred ordering in this audit is also compared against
+Ferko, *Real-time Lighting Effects using Deferred Shading* (CESCG 2012).
+That reference supports the current ownership decisions: reconstruct position
+from the depth G-buffer, reject light volumes against the reconstructed surface,
+keep directional lighting on the sun path, and preserve HDR until post.
+
 This document is a **technical audit** of the current **Forward+ scaffolding** in this fork: what runs, what data flows where, synchronization, known limitations, and **risk items** for future work. It complements the narrative in [RENDERER_2026_ARCHITECTURE_PASS.md](RENDERER_2026_ARCHITECTURE_PASS.md).
 
 **Scope:** `r_forwardPlus` (default **1** on Vulkan, **latched**), PBR-only descriptor integration, **dynamic lights** from `backEnd.refdef` (`dlight_t`), **no** replacement of the primary forward lighting path.
@@ -66,7 +72,7 @@ Packed as **`float`** array in **`vk_forward_plus_update_for_refdef`**:
 | `data[1]` | **x,y** = **`tiles_x`, `tiles_y`**, **z,w** = viewport **width/height** (render target pixels) |
 | `data[2 + i*4 …]` | Four **`vec4`** per light **i** (origin+radius, color+linear flag, axis/cone pack, etc.) — mirrors **`dlight_t`** fields |
 
-**PBR shade parity (incremental):** experimental Forward+ shade in **`gen_frag.tmpl`** uses the same **radial** falloff as the classic projected dlight path for **point** lights (`1 - (dist/radius)^2`, matching **`light_frag.tmpl`** / **`VK_SetLightParams`**). **Linear** lights use **`vk_linear_dlight_cone_cosines`** for outer/inner cone cosines (shared with volumetrics). Perpendicular tube falloff uses a **squared** rim term for closer behavior to the point sphere. **`dlight_t.additive`** is packed in the fourth record **`vec4` `.z`** and applies a small brightness boost (legacy **ADD** blend is not identical in PBR, but this reduces “flat” additive props). **`pbrForwardPlus.y`** still carries **`tess.dlightBits`** so indices already handled by the multi-pass projector are **skipped** in Forward+ shade.
+**PBR shade parity (incremental):** experimental Forward+ shade in **`gen_frag.tmpl`** uses the same **radial** falloff as deferred point lights: the classic `1 - (dist/radius)^2` response is remapped with a cubic smoothstep at the influence boundary, preserving the midpoint while reducing visible cutoff rings. **Linear** lights use **`vk_linear_dlight_cone_cosines`** for outer/inner cone cosines (shared with volumetrics). Perpendicular tube falloff uses a **squared** rim term for closer behavior to the point sphere. **`dlight_t.additive`** is packed in the fourth record **`vec4` `.z`** and applies a small brightness boost (legacy **ADD** blend is not identical in PBR, but this reduces “flat” additive props). **`pbrForwardPlus.y`** still carries **`tess.dlightBits`** so indices already handled by the multi-pass projector are **skipped** in Forward+ shade.
 
 **Caps:** up to **`VK_FP_MAX_GPU_LIGHTS` (64)** lights packed from **`backEnd.refdef.dlights`** (matches **`MAX_REAL_DLIGHTS`**). Surface **`tess.dlightBits`** still covers only the first **`MAX_DLIGHTS` (32)** indices for skip/double-count avoidance. Overflow beyond 64 is clamped with a **developer** log.
 

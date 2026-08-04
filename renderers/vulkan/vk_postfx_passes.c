@@ -21,6 +21,7 @@ SSAO/HBAO pass, and vk_bloom. Split from vk.c.
 #include "vk_view_state.h"
 #include "vk_deferred_gbuffer.h"
 #include "vk_visibility_buffer.h"
+#include "vk_render_path.h"
 #include "vk_reactive_mask.h"
 #include "vk_ambient_visibility.h"
 #include "vk_selective_reflection.h"
@@ -848,8 +849,11 @@ void vk_ssr_pass( void )
 	typedef struct {
 		float projection[16];
 		float invProjection[16];
+		float viewMatrix[16];
 		float params[4];   /* maxDistance, stepSize, thickness, fadeEdge */
 		float params2[4]; /* roughnessThreshold (Fresnel blend), intensity, maxDepthGradient, fresnelExponent */
+		uint32_t materialFlags;
+		uint32_t materialPad[3];
 	} vk_ssr_push_t;
 
 	VkImageAspectFlags depth_aspect = VK_IMAGE_ASPECT_DEPTH_BIT;
@@ -899,7 +903,7 @@ void vk_ssr_pass( void )
 
 	vk_begin_ssr_render_pass();
 	qvkCmdBindPipeline( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.ssr_pipeline );
-	qvkCmdBindDescriptorSets( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.pipeline_layout_ssr, 0, 2, vk.ssr_descriptor, 0, NULL );
+	qvkCmdBindDescriptorSets( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.pipeline_layout_ssr, 0, 4, vk.ssr_descriptor, 0, NULL );
 
 	Com_Memcpy( push.projection, backEnd.viewParms.projectionMatrix, sizeof( push.projection ) );
 	{
@@ -908,6 +912,8 @@ void vk_ssr_pass( void )
 			Com_Memcpy( inv, backEnd.viewParms.projectionMatrix, sizeof( inv ) );
 		Com_Memcpy( push.invProjection, inv, sizeof( push.invProjection ) );
 	}
+	Com_Memcpy( push.viewMatrix, backEnd.viewParms.world.modelViewMatrix, sizeof( push.viewMatrix ) );
+	push.materialFlags = ( r_gbufferCompact && r_gbufferCompact->integer ) ? 1u : 0u;
 	push.params[0] = PostFX_SSR_GetMaxDistance();
 	push.params[1] = PostFX_SSR_GetStepSize();
 	push.params[2] = PostFX_SSR_GetThickness();
@@ -1232,7 +1238,6 @@ qboolean vk_bloom( void )
 	}
 
 	vk_end_render_pass(); // end main/post-bloom continuation
-	vk_deferred_gbuffer_draw_debug();
 	vk_visibility_buffer_draw_debug();
 	if ( !backEnd.doneFog ) {
 		/* IQ P0-E: never frame-end fog resolved WBOIT HDR when production fog owns layers. */

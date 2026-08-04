@@ -1387,7 +1387,7 @@ typedef struct {
 	char oitProfileSourceHint[64];
 	VkImage ssr_image;
 	VkImageView ssr_image_view;
-	VkDescriptorSet ssr_descriptor[2];	/* [0]=color, [1]=depth */
+	VkDescriptorSet ssr_descriptor[4];	/* [0]=color, [1]=depth, [2]=normal, [3]=material */
 	VkImage vao_mask_image;
 	VkImageView vao_mask_image_view;
 
@@ -1796,6 +1796,7 @@ typedef struct {
 		VkShaderModule fluid_gradient_cs;
 		VkShaderModule forward_plus_tile_cull_cs;
 		VkShaderModule hiz_downsample_cs;
+		VkShaderModule meshlet_cull_indirect_cs;
 		VkShaderModule deferred_gbuffer_fill_cs;
 		VkShaderModule deferred_gbuffer_debug_fs;
 		VkShaderModule deferred_lighting_cs;

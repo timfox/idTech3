@@ -1,4 +1,7 @@
 #version 450
+#extension GL_GOOGLE_include_directive : require
+
+#include "surface_material_decode.glsl"
 
 /*
  * Screen-Space Reflections with confidence output.
@@ -8,6 +11,8 @@
 
 layout(set = 0, binding = 0) uniform sampler2D colorTexture;
 layout(set = 1, binding = 0) uniform sampler2D depthTexture;
+layout(set = 2, binding = 0) uniform sampler2D normalTexture;
+layout(set = 3, binding = 0) uniform sampler2D materialTexture;
 
 layout(location = 0) in vec2 frag_tex_coord;
 layout(location = 0) out vec4 out_color;
@@ -15,8 +20,10 @@ layout(location = 0) out vec4 out_color;
 layout(push_constant) uniform SSR_PC {
 	mat4 projection;
 	mat4 invProjection;
+	mat4 viewMatrix;
 	vec4 params;
 	vec4 params2;
+	uint materialFlags; /* bit 0 = compact GBuffer */
 } ssr;
 
 const int MAX_STEPS = 64;
@@ -80,6 +87,11 @@ void main() {
 	float intensity = ssr.params2.y;
 	float maxDepthGradient = ssr.params2.z;
 	float fresnelExponent = ssr.params2.w;
+	bool compactMaterial = ( ssr.materialFlags & 1u ) != 0u;
+	vec4 materialSample = texture( materialTexture, frag_tex_coord );
+	float roughness = materialSample.g;
+	float metallic = materialSample.r;
+	float ao = compactMaterial ? 1.0 : materialSample.b;
 
 	/* Negative fresnelExponent encodes r_temporalDebug while TAA is off. */
 	if (fresnelExponent < -0.5) {
@@ -117,19 +129,31 @@ void main() {
 	vec2 invSize = vec2(1.0) / textureSize(depthTexture, 0);
 	bool normalValid;
 	vec3 normal = normalFromDepth(frag_tex_coord, invSize, maxDepthGradient, normalValid);
+	/* SSR consumes the same canonical GBuffer normal as deferred lighting.
+	 * Fall back to depth derivatives only for legacy/no-GBuffer frames. */
+	vec4 gbufferNormal = texture( normalTexture, frag_tex_coord );
+	if ( dot( gbufferNormal.xyz, gbufferNormal.xyz ) > 0.25 ) {
+		normal = ( ssr.viewMatrix * vec4( gbufferNormal.xyz, 0.0 ) ).xyz;
+		normalValid = true;
+	}
 
 	if (!normalValid || length(normal) < 0.1) {
 		out_color = vec4(sceneColor, 0.0);
 		return;
 	}
 	normal = normalize(normal);
+	SurfaceMaterial material = SurfaceMaterialDecodeCanonical(
+		vec3( 1.0 ), 1.0, normal, roughness, metallic, ao,
+		SURFACE_LEGACY_EMISSIVE, 0.0, roughness, 0.0,
+		0u, 0u, OPAQUE_OWNER_DEFERRED, 0u );
+	normal = material.normalWS;
 
 	vec3 viewDir = normalize(viewPos);
 	float fresnelSSRWeight = 1.0;
 	if (roughnessThreshold > 0.0) {
 		float NdotV = clamp(dot(normal, normalize(-viewPos)), 0.0, 1.0);
 		float grazing = pow(max(1.0 - NdotV, 0.0), fresnelExponent);
-		fresnelSSRWeight = mix(1.0, grazing, roughnessThreshold);
+		fresnelSSRWeight = mix(1.0, grazing, roughnessThreshold * (1.0 - material.perceptualRoughness));
 	}
 	vec3 reflectDir = reflect(viewDir, normal);
 	/* Camera-facing / backface reject */

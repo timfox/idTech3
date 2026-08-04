@@ -811,6 +811,9 @@ void	FS_ForceFlush( fileHandle_t f );
 void	FS_FreeFile( void *buffer );
 // frees the memory returned by FS_ReadFile
 
+int		FS_ReadFileMalloc( const char *qpath, void **buffer );
+void	FS_FreeFileMalloc( void *buffer );
+
 void	FS_WriteFile( const char *qpath, const void *buffer, int size );
 // writes a complete file, creating any subdirectories needed
 

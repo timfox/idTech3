@@ -238,4 +238,20 @@ Frozen resolve ownership: fog_scene opaque base, empty → opaque, scene-linear 
 
 Do not tune WBOIT weight **coefficients** without bumping `OIT_WEIGHT_CONTRACT_VERSION`. Refraction remains specialized after resolve.
 
+### Phase 2.6 — Live WBOIT production certification and specialized transparency
+
+Phase 2.6 separates static source checks from runtime promotion. The live
+certification controller (`wboit_production_status`) records measured GPU
+image-diff evidence for the fog, accumulation, revealage, and resolved
+buffers, together with deterministic fixture results and soak evidence.
+`WBOIT_PRODUCTION_CERTIFIED` is granted only after the required stage matrix
+passes; static gates, center-pixel checks, and manual overrides do not grant
+production status. See [WBOIT_LIVE_CERTIFICATION.md](WBOIT_LIVE_CERTIFICATION.md)
+and [WBOIT_CERTIFICATION_THRESHOLDS.md](WBOIT_CERTIFICATION_THRESHOLDS.md).
+
+Refractive, portal, weapon, soft-particle, and other specialized routes stay
+outside ordinary WBOIT accumulation and are validated after resolve through
+the transparency routing/resource contracts. MBOIT remains experimental until
+its own live image-diff matrix passes.
+
 **Do not** add new transparency features until basic WBOIT equations, formats, blends, fog ownership, and resolve chain are proven against this freeze.

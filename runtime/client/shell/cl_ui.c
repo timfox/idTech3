@@ -443,6 +443,8 @@ static void LAN_GetServerInfo( int source, int n, char *buf, int buflen ) {
 		Info_SetValueForKey( info, "punkbuster", va("%i", server->punkbuster));
 		Info_SetValueForKey( info, "g_needpass", va("%i", server->g_needpass));
 		Info_SetValueForKey( info, "g_humanplayers", va("%i", server->g_humanplayers));
+		Info_SetValueForKey( info, "surf_rank_min", va("%i", server->surfRankMin));
+		Info_SetValueForKey( info, "surf_rank_max", va("%i", server->surfRankMax));
 		Q_strncpyz(buf, info, buflen);
 	} else {
 		if (buf) {
@@ -707,6 +709,22 @@ LAN_UpdateVisiblePings
 */
 static qboolean LAN_UpdateVisiblePings(int source ) {
 	return CL_UpdateVisiblePings_f(source);
+}
+
+int CL_JsServerCount( int source ) {
+	return LAN_GetServerCount( source );
+}
+
+qboolean CL_JsServerRefresh( int source ) {
+	return LAN_UpdateVisiblePings( source );
+}
+
+void CL_JsServerInfo( int source, int index, char *buf, int buflen ) {
+	LAN_GetServerInfo( source, index, buf, buflen );
+}
+
+void CL_JsServerAddress( int source, int index, char *buf, int buflen ) {
+	LAN_GetServerAddressString( source, index, buf, buflen );
 }
 
 

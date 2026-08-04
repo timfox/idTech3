@@ -2989,6 +2989,14 @@ static const void *RB_DrawBuffer( const void *data ) {
 
 #ifdef USE_VULKAN
 	vk_begin_frame();
+	/* vk_begin_frame can deliberately skip a frame while the device or
+	 * swapchain is being recovered.  In that case it clears frame_count and
+	 * leaves no command buffer for this command stream.  Do not let the
+	 * following RC_* entries dereference the previous slot (the first frame
+	 * after vid_restart used to fall through into deferred handoff here). */
+	if ( vk.frame_count == 0 || !vk.cmd ) {
+		return (const void *)(cmd + 1);
+	}
 	vk_ui_blur_begin_frame();
 
 	tess.depthRange = DEPTH_RANGE_NORMAL;
@@ -3257,6 +3265,9 @@ static const void *RB_FinishBloom( const void *data )
 		vk_frame_contract_note_reader( "SceneHDR", "Bloom" );
 		vk_bloom();
 	}
+	/* G-buffer inspection is independent of bloom. Keep it on the frame-finish
+	 * path so r_deferredGBufferDebug works in clean, bloom-disabled demos. */
+	vk_deferred_gbuffer_draw_debug();
 	if ( vk.lensFlareActive ) {
 		vk_lens_flare();
 	}
@@ -3520,6 +3531,14 @@ void RB_ExecuteRenderCommands( const void *data ) {
 			break;
 		case RC_DRAW_BUFFER:
 			data = RB_DrawBuffer( data );
+			/* A failed begin-frame is a complete frame abort.  The remaining
+			 * render commands belong to the same stale swapchain submission and
+			 * must not reach deferred, OIT, or present code. */
+#ifdef USE_VULKAN
+			if ( vk.frame_count == 0 || !vk.cmd ) {
+				return;
+			}
+#endif
 			break;
 		case RC_SWAP_BUFFERS:
 			data = RB_SwapBuffers( data );

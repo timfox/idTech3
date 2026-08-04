@@ -189,8 +189,13 @@ static qboolean uib_create_texture( uibTexture_t *t, uint32_t w, uint32_t h,
 	ci.usage = usage;
 	ci.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 	ci.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-	if ( qvkCreateImage( vk.device, &ci, NULL, &t->image ) != VK_SUCCESS ) {
-		return qfalse;
+	{
+		VkResult result = qvkCreateImage( vk.device, &ci, NULL, &t->image );
+		if ( result != VK_SUCCESS ) {
+			ri.Printf( PRINT_ALL, S_COLOR_YELLOW "[VK][ui-blur] image create failed: %s (%d) %ux%u format=%d usage=0x%x\n",
+				name ? name : "unnamed", result, t->width, t->height, format, usage );
+			return qfalse;
+		}
 	}
 
 	qvkGetImageMemoryRequirements( vk.device, t->image, &mr );
@@ -198,6 +203,8 @@ static qboolean uib_create_texture( uibTexture_t *t, uint32_t w, uint32_t h,
 	memType = vk_find_memory_type2( vk.physical_device, mr.memoryTypeBits,
 		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, NULL );
 	if ( memType == ~0U ) {
+		ri.Printf( PRINT_ALL, S_COLOR_YELLOW "[VK][ui-blur] no device-local memory type: %s (%ux%u)\n",
+			name ? name : "unnamed", t->width, t->height );
 		uib_destroy_texture( t );
 		return qfalse;
 	}
@@ -206,11 +213,17 @@ static qboolean uib_create_texture( uibTexture_t *t, uint32_t w, uint32_t h,
 	ai.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
 	ai.allocationSize = mr.size;
 	ai.memoryTypeIndex = memType;
-	if ( qvkAllocateMemory( vk.device, &ai, NULL, &t->memory ) != VK_SUCCESS ) {
-		uib_destroy_texture( t );
-		return qfalse;
+	{
+		VkResult result = qvkAllocateMemory( vk.device, &ai, NULL, &t->memory );
+		if ( result != VK_SUCCESS ) {
+			ri.Printf( PRINT_ALL, S_COLOR_YELLOW "[VK][ui-blur] image memory allocation failed: %s (%d) size=%llu\n",
+				name ? name : "unnamed", result, (unsigned long long)mr.size );
+			uib_destroy_texture( t );
+			return qfalse;
+		}
 	}
 	if ( qvkBindImageMemory( vk.device, t->image, t->memory, 0 ) != VK_SUCCESS ) {
+		ri.Printf( PRINT_ALL, S_COLOR_YELLOW "[VK][ui-blur] image bind failed: %s\n", name ? name : "unnamed" );
 		uib_destroy_texture( t );
 		return qfalse;
 	}
@@ -227,9 +240,14 @@ static qboolean uib_create_texture( uibTexture_t *t, uint32_t w, uint32_t h,
 	vi.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
 	vi.subresourceRange.levelCount = 1;
 	vi.subresourceRange.layerCount = 1;
-	if ( qvkCreateImageView( vk.device, &vi, NULL, &t->view ) != VK_SUCCESS ) {
-		uib_destroy_texture( t );
-		return qfalse;
+	{
+		VkResult result = qvkCreateImageView( vk.device, &vi, NULL, &t->view );
+		if ( result != VK_SUCCESS ) {
+			ri.Printf( PRINT_ALL, S_COLOR_YELLOW "[VK][ui-blur] image view failed: %s (%d) format=%d\n",
+				name ? name : "unnamed", result, format );
+			uib_destroy_texture( t );
+			return qfalse;
+		}
 	}
 
 	if ( name ) {
@@ -250,6 +268,7 @@ static qboolean uib_alloc_descriptor( uibTexture_t *t ) {
 	alloc.descriptorSetCount = 1;
 	alloc.pSetLayouts = &vk.set_layout_sampler;
 	if ( qvkAllocateDescriptorSets( vk.device, &alloc, &t->descriptor ) != VK_SUCCESS ) {
+		ri.Printf( PRINT_ALL, S_COLOR_YELLOW "[VK][ui-blur] descriptor allocation failed\n" );
 		return qfalse;
 	}
 
@@ -458,8 +477,13 @@ static VkFramebuffer uib_create_level_framebuffer( uibTexture_t *t ) {
 	fbi.width = t->width;
 	fbi.height = t->height;
 	fbi.layers = 1;
-	if ( qvkCreateFramebuffer( vk.device, &fbi, NULL, &fb ) != VK_SUCCESS ) {
-		return VK_NULL_HANDLE;
+	{
+		VkResult result = qvkCreateFramebuffer( vk.device, &fbi, NULL, &fb );
+		if ( result != VK_SUCCESS ) {
+			ri.Printf( PRINT_ALL, S_COLOR_YELLOW "[VK][ui-blur] framebuffer failed: %ux%u (%d)\n",
+				t->width, t->height, result );
+			return VK_NULL_HANDLE;
+		}
 	}
 	return fb;
 }
@@ -475,9 +499,13 @@ static qboolean uib_build_pool( int quality ) {
 	VkImageUsageFlags copyUsage =
 		VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
 
-	if ( baseW == 0 || baseH == 0 ) {
-		return qfalse;
-	}
+	/* During the first renderer bring-up the main color attachment can lag
+	 * behind swapchain creation, leaving renderWidth/Height unset.  The active
+	 * video extent is already valid at this point and is a safe pool-size
+	 * fallback; presentation restores overwrite the cached extent later. */
+	if ( baseW == 0 ) baseW = glConfig.vidWidth > 0 ? (uint32_t)glConfig.vidWidth : 0;
+	if ( baseH == 0 ) baseH = glConfig.vidHeight > 0 ? (uint32_t)glConfig.vidHeight : 0;
+	if ( baseW == 0 || baseH == 0 ) return qfalse;
 	uib_destroy_pool();
 
 	w0 = baseW >> shift; if ( w0 < 4 ) w0 = 4;
@@ -543,6 +571,7 @@ void vk_ui_blur_init( void ) {
 	VkDescriptorPoolCreateInfo dpci;
 	Vk_Sampler_Def sd;
 	int quality;
+	int builtQuality;
 
 	if ( uib.initialized ) {
 		vk_ui_blur_shutdown();
@@ -625,16 +654,31 @@ void vk_ui_blur_init( void ) {
 		return;
 	}
 
-	if ( !uib_build_pool( quality ) ) {
-		ri.Printf( PRINT_ALL, S_COLOR_YELLOW "[VK][ui-blur] transient pool allocation failed; blur disabled\n" );
+	/* Prefer the requested quality, but keep the compositor alive on devices
+	 * with a tight image-allocation budget.  The quarter-resolution pool still
+	 * provides a useful backdrop blur and is much cheaper than abandoning the
+	 * effect entirely. */
+	builtQuality = 0;
+	for ( builtQuality = quality; builtQuality >= 1; builtQuality-- ) {
+		if ( uib_build_pool( builtQuality ) ) {
+			break;
+		}
+	}
+	if ( builtQuality < 1 ) {
+		ri.Printf( PRINT_ALL, S_COLOR_YELLOW "[VK][ui-blur] transient pool allocation failed at all quality levels; blur disabled\n" );
 		uib.initialized = qtrue;
 		return;
 	}
 
 	uib.initialized = qtrue;
 	ri.Cvar_Set( "ui_blurReady", "1" );
-	ri.Printf( PRINT_ALL, "[VK][ui-blur] CSS filter/backdrop-filter compositor ready (quality=%d, %ux%u pool)\n",
-		quality, uib.level[0][0].width, uib.level[0][0].height );
+	if ( builtQuality != quality ) {
+		ri.Printf( PRINT_ALL, S_COLOR_YELLOW "[VK][ui-blur] requested quality=%d unavailable; using quality=%d (%ux%u pool)\n",
+			quality, builtQuality, uib.level[0][0].width, uib.level[0][0].height );
+	} else {
+		ri.Printf( PRINT_ALL, "[VK][ui-blur] CSS filter/backdrop-filter compositor ready (quality=%d, %ux%u pool)\n",
+			builtQuality, uib.level[0][0].width, uib.level[0][0].height );
+	}
 }
 
 void vk_ui_blur_shutdown( void ) {

@@ -49,7 +49,7 @@ void main()
 		return;
 	}
 
-	if ( a < 0.5 ) {
+	if ( !SurfaceAlphaTestPass( a, 0.5, SURFACE_ALPHA_TEST_GE ) ) {
 		ignoreIntersectionEXT;
 	}
 }
