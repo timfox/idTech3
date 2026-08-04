@@ -25,6 +25,10 @@ grep -q 'R_MeshImport_FinalizeMD3Multi' "$ROOT/renderers/common/tr_model_freeusd
 grep -q 'firstTri' "$ROOT/renderers/common/tr_model_freeusd.cpp" || fail "material surface triangle ranges are missing"
 grep -q 'GLS_SRCBLEND_SRC_ALPHA' "$ROOT/renderers/common/tr_model_mesh_import.c" || fail "USDA opacity is not translated to blend state"
 grep -q 'GLS_ATEST_GE_80' "$ROOT/renderers/common/tr_model_mesh_import.c" || fail "USDA opacityThreshold is not translated to alpha-test state"
+grep -q 'vk_create_normal_texture' "$ROOT/renderers/common/tr_model_mesh_import.c" || fail "USDA normal texture is not bound to the Vulkan material stage"
+grep -q 'vk_create_emissive_texture' "$ROOT/renderers/common/tr_model_mesh_import.c" || fail "USDA emissive texture is not bound to the Vulkan material stage"
+grep -q 'GetNormalTextureAssetPath' "$USD_BRIDGE" || fail "USDA normal texture connections are not resolved"
+grep -q 'GetEmissiveTextureAssetPath' "$USD_BRIDGE" || fail "USDA emissive texture connections are not resolved"
 grep -q 'R_Freeusd_AssetPathToShaderQpath( texPath, usdQpath' "$USD_BRIDGE" || fail "relative texture paths are not resolved"
 # Keep the fixture useful as a material-parity proof, rather than only a mesh
 # import proof. These channels are authored by the Sponza PreviewSurface graph.

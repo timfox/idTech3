@@ -93,9 +93,11 @@ relative to the USDA directory, PreviewSurface-to-NodeGraph-to-UsdUVTexture
 connections, and material bindings authored on the mesh, GeomSubset children,
 or enclosing Xforms. This last fallback is important for composed Sponza
 layers, where optional scene metadata does not always retain the binding.
-Authored world-space normals are also preserved. Full per-subset material splitting
-and shared baseColor/normal/roughness/metallic/emissive payloads across all
-renderer paths remain required before this is a PBR parity proof.
+Authored world-space normals are also preserved. GeomSubset surfaces now carry
+their authored normal and emissive texture qpaths into the Vulkan material stage,
+so PBR permutations are selected by the same shader flags used by native assets.
+Roughness/metallic packing and scalar fallback values remain the next material
+parity gate before this is a complete PBR proof.
 
 After that gate, the first capture will certify mode-3 deferred opaque
 lighting, Forward+ clustered lights, WBOIT alpha/additive transparency, SSAO,

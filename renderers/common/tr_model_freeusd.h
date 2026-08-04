@@ -20,6 +20,10 @@ typedef struct freeusdMeshSurface_s {
 	int firstTri;
 	int numTris;
 	char shaderName[R_FREEUSD_SHADERNAME_MAX];
+	/* Optional USDA PreviewSurface texture channels.  These are shader paths
+	 * without extensions, in the same namespace consumed by R_FindImageFile. */
+	char normalMap[R_FREEUSD_SHADERNAME_MAX];
+	char emissiveMap[R_FREEUSD_SHADERNAME_MAX];
 	int hasOpacity;
 	int hasOpacityThreshold;
 	float opacity;

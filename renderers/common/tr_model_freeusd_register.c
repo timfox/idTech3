@@ -186,6 +186,8 @@ qhandle_t R_RegisterFreeusdMesh( const char *name, model_t *mod ) {
 				importSurfaces[si].firstTri = meshSurfaces[si].firstTri;
 				importSurfaces[si].numTris = meshSurfaces[si].numTris;
 				importSurfaces[si].shaderName = meshSurfaces[si].shaderName;
+				importSurfaces[si].normalMap = meshSurfaces[si].normalMap;
+				importSurfaces[si].emissiveMap = meshSurfaces[si].emissiveMap;
 				importSurfaces[si].hasOpacity = meshSurfaces[si].hasOpacity ? qtrue : qfalse;
 				importSurfaces[si].hasOpacityThreshold = meshSurfaces[si].hasOpacityThreshold ? qtrue : qfalse;
 				importSurfaces[si].opacity = meshSurfaces[si].opacity;

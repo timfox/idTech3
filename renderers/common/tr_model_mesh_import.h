@@ -28,6 +28,8 @@ typedef struct meshImportSurface_s {
 	int firstTri;
 	int numTris;
 	const char *shaderName;
+	const char *normalMap;
+	const char *emissiveMap;
 	qboolean hasOpacity;
 	qboolean hasOpacityThreshold;
 	float opacity;

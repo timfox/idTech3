@@ -222,6 +222,8 @@ struct FreeusdAlphaPolicy {
 	qboolean hasOpacityThreshold = qfalse;
 	float opacity = 1.0f;
 	float opacityThreshold = 0.0f;
+	char normalMap[R_FREEUSD_SHADERNAME_MAX] = {};
+	char emissiveMap[R_FREEUSD_SHADERNAME_MAX] = {};
 };
 
 static void R_Freeusd_ResolveShaderForMesh( std::shared_ptr<freeusd::usd::Stage> stage,
@@ -316,6 +318,13 @@ static void R_Freeusd_ResolveShaderForMesh( std::shared_ptr<freeusd::usd::Stage>
 	if ( alphaOut ) {
 		alphaOut->hasOpacity = preview.GetOpacity( &alphaOut->opacity, time ) ? qtrue : qfalse;
 		alphaOut->hasOpacityThreshold = preview.GetOpacityThreshold( &alphaOut->opacityThreshold, time ) ? qtrue : qfalse;
+		std::string channelPath;
+		if ( preview.GetNormalTextureAssetPath( &channelPath, time ) && !channelPath.empty() ) {
+			R_Freeusd_AssetPathToShaderQpath( channelPath, usdQpath, alphaOut->normalMap, sizeof( alphaOut->normalMap ) );
+		}
+		if ( preview.GetEmissiveTextureAssetPath( &channelPath, time ) && !channelPath.empty() ) {
+			R_Freeusd_AssetPathToShaderQpath( channelPath, usdQpath, alphaOut->emissiveMap, sizeof( alphaOut->emissiveMap ) );
+		}
 	}
 
 	/* Keep the source material's alpha policy visible at the renderer seam.
@@ -583,6 +592,8 @@ static qboolean R_Freeusd_LoadMeshPrim( std::shared_ptr<freeusd::usd::Stage> sta
 				for ( size_t si = 0; si < subsets.size(); si++ ) if ( counts[si] > 0 ) {
 					surfaceOut[outIndex].firstTri = firstTri; surfaceOut[outIndex].numTris = counts[si];
 					Q_strncpyz( surfaceOut[outIndex].shaderName, subsets[si].shaderName, sizeof( surfaceOut[outIndex].shaderName ) );
+					Q_strncpyz( surfaceOut[outIndex].normalMap, subsets[si].alpha.normalMap, sizeof( surfaceOut[outIndex].normalMap ) );
+					Q_strncpyz( surfaceOut[outIndex].emissiveMap, subsets[si].alpha.emissiveMap, sizeof( surfaceOut[outIndex].emissiveMap ) );
 					surfaceOut[outIndex].hasOpacity = subsets[si].alpha.hasOpacity;
 					surfaceOut[outIndex].hasOpacityThreshold = subsets[si].alpha.hasOpacityThreshold;
 					surfaceOut[outIndex].opacity = subsets[si].alpha.opacity;

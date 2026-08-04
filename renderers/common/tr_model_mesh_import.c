@@ -77,6 +77,33 @@ static void R_Mimp_ApplyAuthoredAlpha( shader_t *shader, const meshImportSurface
 	}
 }
 
+static void R_Mimp_ApplyAuthoredMaterial( shader_t *shader, const meshImportSurface_t *surface ) {
+	shaderStage_t *stage;
+	if ( !shader || !surface || !shader->stages[0] ) {
+		return;
+	}
+	stage = shader->stages[0];
+#ifdef USE_VK_PBR
+	/* USDA channels are already normalized to engine qpaths by the FreeUSD
+	 * bridge.  Reuse the same image/pipeline setup as native PBR shaders so
+	 * deferred, Forward+, OIT, SSR, and RTX see the same material flags. */
+	if ( surface->normalMap && surface->normalMap[0] ) {
+		stage->normalMapType = PHYS_NORMAL;
+		if ( vk_create_normal_texture( stage, surface->normalMap, IMGFLAG_MIPMAP | IMGFLAG_PICMIP ) ) {
+			shader->hasPBR = qtrue;
+		}
+	}
+	if ( surface->emissiveMap && surface->emissiveMap[0] ) {
+		stage->emissiveMapType = PHYS_EMISSIVE;
+		if ( vk_create_emissive_texture( stage, surface->emissiveMap, IMGFLAG_MIPMAP | IMGFLAG_PICMIP ) ) {
+			shader->hasPBR = qtrue;
+		}
+	}
+#else
+	(void)surface;
+#endif
+}
+
 qboolean R_MeshImport_FinalizeMD3( model_t *mod, int lod, const char *name,
 	float *verts, int numVerts, int *inds, int numIdx ) {
 	return R_MeshImport_FinalizeMD3Ex( mod, lod, name, verts, numVerts, inds, numIdx, NULL, NULL, NULL );
@@ -371,7 +398,7 @@ qboolean R_MeshImport_FinalizeMD3Multi( model_t *mod, int lod, const char *name,
 		surf->ofsXyzNormals = surf->ofsSt + surfVerts * sizeof( md3St_t );
 		surf->ofsEnd = surf->ofsXyzNormals + surfVerts * sizeof( md3XyzNormal_t );
 		md3Shader = (md3Shader_t *)( (byte *)surf + surf->ofsShaders ); Q_strncpyz( md3Shader->name, shader, sizeof( md3Shader->name ) );
-		{ shader_t *sh = R_FindShader( md3Shader->name, LIGHTMAP_NONE, qtrue ); md3Shader->shaderIndex = sh->defaultShader ? 0 : sh->index; R_Mimp_ApplyAuthoredAlpha( sh, &surfaces[owner] ); }
+		{ shader_t *sh = R_FindShader( md3Shader->name, LIGHTMAP_NONE, qtrue ); md3Shader->shaderIndex = sh->defaultShader ? 0 : sh->index; R_Mimp_ApplyAuthoredAlpha( sh, &surfaces[owner] ); R_Mimp_ApplyAuthoredMaterial( sh, &surfaces[owner] ); }
 		tri = (md3Triangle_t *)( (byte *)surf + surf->ofsTriangles ); st = (md3St_t *)( (byte *)surf + surf->ofsSt );
 		xyz = (md3XyzNormal_t *)( (byte *)surf + surf->ofsXyzNormals );
 		for ( v = 0; v < surfVerts; v++ ) {
