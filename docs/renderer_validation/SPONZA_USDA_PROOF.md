@@ -94,10 +94,12 @@ connections, and material bindings authored on the mesh, GeomSubset children,
 or enclosing Xforms. This last fallback is important for composed Sponza
 layers, where optional scene metadata does not always retain the binding.
 Authored world-space normals are also preserved. GeomSubset surfaces now carry
-their authored normal and emissive texture qpaths into the Vulkan material stage,
-so PBR permutations are selected by the same shader flags used by native assets.
-Roughness/metallic packing and scalar fallback values remain the next material
-parity gate before this is a complete PBR proof.
+their authored normal, emissive, metallic, and roughness texture qpaths into the
+Vulkan material stage. Separate USDA metallic/roughness images are packed into
+the renderer's ORMS contract (metallic R, roughness G, occlusion B=1), so PBR
+permutations consume the same physical payload used by native assets. Scalar
+fallback values and authored emissive color remain the next material parity gate
+before this is a complete PBR proof.
 
 After that gate, the first capture will certify mode-3 deferred opaque
 lighting, Forward+ clustered lights, WBOIT alpha/additive transparency, SSAO,

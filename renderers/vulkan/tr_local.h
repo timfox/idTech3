@@ -2216,6 +2216,7 @@ void		RE_RemapShader(const char *oldShader, const char *newShader, const char *t
 qboolean vk_create_phyisical_texture( shaderStage_t *stage, const char *albedoMapName, imgFlags_t flags );
 qboolean vk_create_normal_texture( shaderStage_t *stage, const char *albedoMapName, imgFlags_t flags );
 qboolean vk_create_emissive_texture( shaderStage_t *stage, const char *albedoMapName, imgFlags_t flags );
+qboolean vk_create_usda_orm_texture( shaderStage_t *stage, const char *metallicMapName, const char *roughnessMapName, imgFlags_t flags );
 qboolean vk_create_clearcoat_texture( shaderStage_t *stage, const char *albedoMapName, imgFlags_t flags );
 qboolean vk_create_sheen_texture( shaderStage_t *stage, const char *albedoMapName, imgFlags_t flags );
 qboolean vk_create_anisotropy_texture( shaderStage_t *stage, const char *albedoMapName, imgFlags_t flags );

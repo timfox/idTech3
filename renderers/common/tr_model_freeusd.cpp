@@ -224,6 +224,8 @@ struct FreeusdAlphaPolicy {
 	float opacityThreshold = 0.0f;
 	char normalMap[R_FREEUSD_SHADERNAME_MAX] = {};
 	char emissiveMap[R_FREEUSD_SHADERNAME_MAX] = {};
+	char metallicMap[R_FREEUSD_SHADERNAME_MAX] = {};
+	char roughnessMap[R_FREEUSD_SHADERNAME_MAX] = {};
 };
 
 static void R_Freeusd_ResolveShaderForMesh( std::shared_ptr<freeusd::usd::Stage> stage,
@@ -324,6 +326,12 @@ static void R_Freeusd_ResolveShaderForMesh( std::shared_ptr<freeusd::usd::Stage>
 		}
 		if ( preview.GetEmissiveTextureAssetPath( &channelPath, time ) && !channelPath.empty() ) {
 			R_Freeusd_AssetPathToShaderQpath( channelPath, usdQpath, alphaOut->emissiveMap, sizeof( alphaOut->emissiveMap ) );
+		}
+		if ( preview.GetMetallicTextureAssetPath( &channelPath, time ) && !channelPath.empty() ) {
+			R_Freeusd_AssetPathToShaderQpath( channelPath, usdQpath, alphaOut->metallicMap, sizeof( alphaOut->metallicMap ) );
+		}
+		if ( preview.GetRoughnessTextureAssetPath( &channelPath, time ) && !channelPath.empty() ) {
+			R_Freeusd_AssetPathToShaderQpath( channelPath, usdQpath, alphaOut->roughnessMap, sizeof( alphaOut->roughnessMap ) );
 		}
 	}
 
@@ -594,6 +602,8 @@ static qboolean R_Freeusd_LoadMeshPrim( std::shared_ptr<freeusd::usd::Stage> sta
 					Q_strncpyz( surfaceOut[outIndex].shaderName, subsets[si].shaderName, sizeof( surfaceOut[outIndex].shaderName ) );
 					Q_strncpyz( surfaceOut[outIndex].normalMap, subsets[si].alpha.normalMap, sizeof( surfaceOut[outIndex].normalMap ) );
 					Q_strncpyz( surfaceOut[outIndex].emissiveMap, subsets[si].alpha.emissiveMap, sizeof( surfaceOut[outIndex].emissiveMap ) );
+					Q_strncpyz( surfaceOut[outIndex].metallicMap, subsets[si].alpha.metallicMap, sizeof( surfaceOut[outIndex].metallicMap ) );
+					Q_strncpyz( surfaceOut[outIndex].roughnessMap, subsets[si].alpha.roughnessMap, sizeof( surfaceOut[outIndex].roughnessMap ) );
 					surfaceOut[outIndex].hasOpacity = subsets[si].alpha.hasOpacity;
 					surfaceOut[outIndex].hasOpacityThreshold = subsets[si].alpha.hasOpacityThreshold;
 					surfaceOut[outIndex].opacity = subsets[si].alpha.opacity;

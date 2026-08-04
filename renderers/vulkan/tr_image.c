@@ -2086,6 +2086,45 @@ qboolean vk_create_phyisical_texture( shaderStage_t *stage, const char *name, im
 	return qtrue;
 }
 
+/* Pack separate USDA metallic/roughness textures into the ORMS contract:
+ * metallic=R, roughness=G, occlusion=B=1. */
+qboolean vk_create_usda_orm_texture( shaderStage_t *stage, const char *metallicMapName,
+	const char *roughnessMapName, imgFlags_t flags ) {
+	char packedName[MAX_QPATH];
+	byte *metalPic = NULL, *roughPic = NULL, *packedPic;
+	int mw = 0, mh = 0, rw = 0, rh = 0, width, height, pixels, i;
+	image_t *image;
+
+	if ( !stage || stage->physicalMapType != PHYS_ORMS ||
+		( ( !metallicMapName || !metallicMapName[0] ) && ( !roughnessMapName || !roughnessMapName[0] ) ) ) return qfalse;
+	if ( metallicMapName && metallicMapName[0] ) R_LoadImage( metallicMapName, &metalPic, &mw, &mh );
+	if ( roughnessMapName && roughnessMapName[0] ) R_LoadImage( roughnessMapName, &roughPic, &rw, &rh );
+	if ( !metalPic && !roughPic ) return qfalse;
+	width = metalPic ? mw : rw; height = metalPic ? mh : rh;
+	if ( width <= 0 || height <= 0 || ( metalPic && ( mw != width || mh != height ) ) || ( roughPic && ( rw != width || rh != height ) ) ) {
+		if ( metalPic ) ri.Free( metalPic ); if ( roughPic ) ri.Free( roughPic ); return qfalse;
+	}
+	Com_sprintf( packedName, sizeof( packedName ), "*usda_orm_%08x_%08x",
+		(unsigned)generateHashValue( metallicMapName ? metallicMapName : "" ),
+		(unsigned)generateHashValue( roughnessMapName ? roughnessMapName : "" ) );
+	image = R_GetLoadedImage( packedName, flags );
+	if ( image ) { stage->physicalMap = image; stage->vk_pbr_flags |= PBR_HAS_PHYSICALMAP; goto done; }
+	pixels = width * height;
+	packedPic = (byte *)ri.Malloc( (size_t)pixels * 4u );
+	if ( !packedPic ) { if ( metalPic ) ri.Free( metalPic ); if ( roughPic ) ri.Free( roughPic ); return qfalse; }
+	for ( i = 0; i < pixels; i++ ) {
+		packedPic[i * 4 + 0] = metalPic ? metalPic[i * 4 + 0] : 0;
+		packedPic[i * 4 + 1] = roughPic ? roughPic[i * 4 + 0] : 255;
+		packedPic[i * 4 + 2] = 255; packedPic[i * 4 + 3] = 255;
+	}
+	stage->physicalMap = R_CreateImage( packedName, NULL, packedPic, width, height, flags, 0, stage->physicalMapType );
+	ri.Free( packedPic );
+	if ( stage->physicalMap ) stage->vk_pbr_flags |= PBR_HAS_PHYSICALMAP;
+done:
+	if ( metalPic ) ri.Free( metalPic ); if ( roughPic ) ri.Free( roughPic );
+	return stage->physicalMap != NULL;
+}
+
 /*
 ================
 R_CreateDlightImage

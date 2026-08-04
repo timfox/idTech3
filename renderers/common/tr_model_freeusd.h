@@ -24,6 +24,8 @@ typedef struct freeusdMeshSurface_s {
 	 * without extensions, in the same namespace consumed by R_FindImageFile. */
 	char normalMap[R_FREEUSD_SHADERNAME_MAX];
 	char emissiveMap[R_FREEUSD_SHADERNAME_MAX];
+	char metallicMap[R_FREEUSD_SHADERNAME_MAX];
+	char roughnessMap[R_FREEUSD_SHADERNAME_MAX];
 	int hasOpacity;
 	int hasOpacityThreshold;
 	float opacity;

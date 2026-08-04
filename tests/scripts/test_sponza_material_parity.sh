@@ -29,6 +29,9 @@ grep -q 'vk_create_normal_texture' "$ROOT/renderers/common/tr_model_mesh_import.
 grep -q 'vk_create_emissive_texture' "$ROOT/renderers/common/tr_model_mesh_import.c" || fail "USDA emissive texture is not bound to the Vulkan material stage"
 grep -q 'GetNormalTextureAssetPath' "$USD_BRIDGE" || fail "USDA normal texture connections are not resolved"
 grep -q 'GetEmissiveTextureAssetPath' "$USD_BRIDGE" || fail "USDA emissive texture connections are not resolved"
+grep -q 'vk_create_usda_orm_texture' "$ROOT/renderers/common/tr_model_mesh_import.c" || fail "USDA metallic/roughness channels are not packed into ORMS"
+grep -q 'GetMetallicTextureAssetPath' "$USD_BRIDGE" || fail "USDA metallic texture connections are not resolved"
+grep -q 'GetRoughnessTextureAssetPath' "$USD_BRIDGE" || fail "USDA roughness texture connections are not resolved"
 grep -q 'R_Freeusd_AssetPathToShaderQpath( texPath, usdQpath' "$USD_BRIDGE" || fail "relative texture paths are not resolved"
 # Keep the fixture useful as a material-parity proof, rather than only a mesh
 # import proof. These channels are authored by the Sponza PreviewSurface graph.

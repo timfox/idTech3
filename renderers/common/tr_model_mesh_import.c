@@ -99,6 +99,14 @@ static void R_Mimp_ApplyAuthoredMaterial( shader_t *shader, const meshImportSurf
 			shader->hasPBR = qtrue;
 		}
 	}
+	if ( ( surface->metallicMap && surface->metallicMap[0] ) ||
+		( surface->roughnessMap && surface->roughnessMap[0] ) ) {
+		stage->physicalMapType = PHYS_ORMS;
+		if ( vk_create_usda_orm_texture( stage, surface->metallicMap, surface->roughnessMap,
+			IMGFLAG_MIPMAP | IMGFLAG_PICMIP ) ) {
+			shader->hasPBR = qtrue;
+		}
+	}
 #else
 	(void)surface;
 #endif
