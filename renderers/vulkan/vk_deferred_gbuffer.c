@@ -2108,8 +2108,14 @@ void vk_deferred_lighting_apply_after_geometry( void )
 		VK_SPINE_ACCESS_SAMPLED_READ );
 	vk_spine_note_read( VK_SPINE_RES_GBUFFER_NORMAL, VK_SPINE_PASS_DEFERRED_LIGHTING,
 		VK_SPINE_ACCESS_SAMPLED_READ );
+	vk_spine_note_read( VK_SPINE_RES_GBUFFER_MATERIAL, VK_SPINE_PASS_DEFERRED_LIGHTING,
+		VK_SPINE_ACCESS_SAMPLED_READ );
+	vk_spine_note_read( VK_SPINE_RES_VISIBILITY_CLASS, VK_SPINE_PASS_DEFERRED_LIGHTING,
+		VK_SPINE_ACCESS_SAMPLED_READ );
 	vk_spine_note_read( VK_SPINE_RES_DEPTH, VK_SPINE_PASS_DEFERRED_LIGHTING,
 		VK_SPINE_ACCESS_DEPTH_READ );
+	vk_spine_note_read( VK_SPINE_RES_FORWARD_PLUS_LIGHTS, VK_SPINE_PASS_DEFERRED_LIGHTING,
+		VK_SPINE_ACCESS_STORAGE_READ );
 
 	lighting_ok = vk_dgb_dispatch_lighting_compute( width, height );
 	vk.deferred_gbuffer.frame_lighting_ok = lighting_ok;

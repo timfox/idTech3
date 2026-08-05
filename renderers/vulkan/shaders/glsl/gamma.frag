@@ -254,11 +254,13 @@ vec3 linearToDisplay( vec3 x ) {
 }
 
 vec3 sanitizeHdr( vec3 hdr ) {
-	if ( isnan( hdr.r ) || isnan( hdr.g ) || isnan( hdr.b ) ||
-	     isinf( hdr.r ) || isinf( hdr.g ) || isinf( hdr.b ) ) {
-		return vec3( 0.0 );
-	}
-	return hdr;
+	/* SceneHDR is fed by deferred, OIT, SSR, and optional RT. Repair channels
+	 * independently so one bad contribution cannot black out the whole pixel.
+	 * Negative radiance is clamped before pow()/AgX see it. */
+	if ( isnan( hdr.r ) || isinf( hdr.r ) ) hdr.r = 0.0;
+	if ( isnan( hdr.g ) || isinf( hdr.g ) ) hdr.g = 0.0;
+	if ( isnan( hdr.b ) || isinf( hdr.b ) ) hdr.b = 0.0;
+	return max( hdr, vec3( 0.0 ) );
 }
 
 vec3 applyBloomKnee( vec3 color ) {
@@ -283,7 +285,7 @@ vec3 applyWhiteBalance( vec3 color ) {
 }
 
 float sampleHdrLogLum( vec2 uv ) {
-	vec3 sampleHdr = applyWhiteBalance( sanitizeHdr( textureLod( texture0, clamp( uv, 0.0, 1.0 ), 0.0 ).rgb ) );
+	vec3 sampleHdr = sanitizeHdr( applyWhiteBalance( sanitizeHdr( textureLod( texture0, clamp( uv, 0.0, 1.0 ), 0.0 ).rgb ) ) );
 	return log2( max( dot( sampleHdr, sRGB ), 1e-4 ) );
 }
 
@@ -519,7 +521,7 @@ vec3 applyPostColorAdjust( vec3 ldr, bool postActive ) {
 vec3 samplePostLdr( vec2 uv, bool hdrResolve, bool postGrade ) {
 	vec3 sampleHdr = sanitizeHdr( textureLod( texture0, uv, 0.0 ).rgb );
 	if ( hdrResolve ) {
-		sampleHdr = applyWhiteBalance( sampleHdr );
+		sampleHdr = sanitizeHdr( applyWhiteBalance( sampleHdr ) );
 	}
 	if ( postGrade ) {
 		sampleHdr = applyLocalExposure( uv, sampleHdr );
@@ -699,7 +701,7 @@ void main() {
 	bool hdrResolveActive = !noWorldLdr;
 	bool postGradeActive = postEnabled() && hdrResolveActive;
 	vec3 hdr = hdrResolveActive ?
-		applyWhiteBalance( sanitizeHdr( textureLod( texture0, uv, 0.0 ).rgb ) ) :
+		sanitizeHdr( applyWhiteBalance( sanitizeHdr( textureLod( texture0, uv, 0.0 ).rgb ) ) ) :
 		sanitizeHdr( textureLod( texture0, uv, 0.0 ).rgb );
 	if ( postGradeActive ) {
 		hdr = applyLocalExposure( uv, hdr );
@@ -782,9 +784,9 @@ void main() {
 			vec2 srcR = to_src_uv( caUV + caOffset );
 			vec2 srcB = to_src_uv( caUV - caOffset );
 			vec3 caHdr;
-			caHdr.r = applyWhiteBalance( textureLod( texture0, srcR, 0.0 ).rgb ).r;
+			caHdr.r = sanitizeHdr( applyWhiteBalance( sanitizeHdr( textureLod( texture0, srcR, 0.0 ).rgb ) ) ).r;
 			caHdr.g = ldr.g;
-			caHdr.b = applyWhiteBalance( textureLod( texture0, srcB, 0.0 ).rgb ).b;
+			caHdr.b = sanitizeHdr( applyWhiteBalance( sanitizeHdr( textureLod( texture0, srcB, 0.0 ).rgb ) ) ).b;
 			if ( postLocalExposureEnabled() ) {
 				caHdr.r *= exp2( clamp( ( postAvgLogLum() - sampleHdrLogLum( srcR ) ) * postLocalExposureStrength(),
 					-postLocalExposureHighlightClamp(), postLocalExposureShadowClamp() ) );
@@ -802,11 +804,11 @@ void main() {
 
 	if ( postOutlineStrength() > 0.0 && postGradeActive ) {
 		vec2 outlineTexel = 1.0 / vec2( textureSize( texture0, 0 ) );
-		float lumC  = dot( textureLod( texture0, uv, 0.0 ).rgb, sRGB );
-		float lumL  = dot( textureLod( texture0, uv + vec2(-outlineTexel.x, 0.0), 0.0 ).rgb, sRGB );
-		float lumR  = dot( textureLod( texture0, uv + vec2( outlineTexel.x, 0.0), 0.0 ).rgb, sRGB );
-		float lumU  = dot( textureLod( texture0, uv + vec2(0.0, -outlineTexel.y), 0.0 ).rgb, sRGB );
-		float lumD  = dot( textureLod( texture0, uv + vec2(0.0,  outlineTexel.y), 0.0 ).rgb, sRGB );
+		float lumC  = dot( sanitizeHdr( textureLod( texture0, uv, 0.0 ).rgb ), sRGB );
+		float lumL  = dot( sanitizeHdr( textureLod( texture0, uv + vec2(-outlineTexel.x, 0.0), 0.0 ).rgb ), sRGB );
+		float lumR  = dot( sanitizeHdr( textureLod( texture0, uv + vec2( outlineTexel.x, 0.0), 0.0 ).rgb ), sRGB );
+		float lumU  = dot( sanitizeHdr( textureLod( texture0, uv + vec2(0.0, -outlineTexel.y), 0.0 ).rgb ), sRGB );
+		float lumD  = dot( sanitizeHdr( textureLod( texture0, uv + vec2(0.0,  outlineTexel.y), 0.0 ).rgb ), sRGB );
 		float edgeH = abs( lumL - lumR );
 		float edgeV = abs( lumU - lumD );
 		float edge  = sqrt( edgeH * edgeH + edgeV * edgeV );

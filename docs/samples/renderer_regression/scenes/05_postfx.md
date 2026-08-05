@@ -17,7 +17,7 @@ Catch **MSAA, SMAA, SSAO, bloom**, plus **HDR/tonemap/grade** ordering and resol
 - SMAA/MSAA: edges stable; no **double image** or broken resolve. Prefer `r_ext_multisample 0` with modern profile for true G-buffer material export.
 - SSAO: contact shadowing appears near contact; no **screen-wide** darkening bug.
 - HDR: `r_hdr 2` holds highlight range; `r_hdr 3` must **alias to 32F** (startup warning) without format crashes.
-- Tonemap: `r_tonemap` Filmic (`3`) vs AgX (`4`) both respond to `r_grade_toe` / `r_grade_shoulder` / `r_grade_whitePoint` / `r_grade_highlightDesat`.
+- Tonemap: `r_tonemap` Filmic (`3`) vs AgX (`4`) both respond to `r_grade_toe` / `r_grade_shoulder` / `r_grade_whitePoint` / `r_grade_highlightDesat`; neutral reference (`5`) is the diagnostic baseline.
 - Grade/LUT: `r_post 1` + optional `r_grade_lut` does not black-screen; capture with `r_filmGrain 0` / `r_chromaticAberration 0`.
 - Hybrid1 overlay (Tier B / RTX build): after `exec vulkan_overlay_hybrid1.cfg` + `vid_restart`, `hybrid1_status` reports `tlas_mode=` / `reason=` without crashes; composite still readable.
 
@@ -28,7 +28,7 @@ Catch **MSAA, SMAA, SSAO, bloom**, plus **HDR/tonemap/grade** ordering and resol
 | AA | `r_ext_multisample`, `r_ext_smaa`, `r_postAaAfterBloom` |
 | AO/bloom | `r_ssao`, `r_bloom`, `r_bloom_threshold` |
 | HDR | `r_hdr` 0/1/2/3 (3 = alias to 2) |
-| Tonemap | `r_tonemap` 0–4; Filmic = 3, AgX = 4 |
+| Tonemap | `r_tonemap` 0–5; Filmic = 3, AgX = 4, neutral reference = 5 |
 | Grade | `r_grade_*`, `r_grade_lut`, `r_post` |
 | Golden-safe | `r_filmGrain 0`, `r_chromaticAberration 0` (`gpu_golden_capture.cfg`) |
 | Hybrid1 | `exec vulkan_overlay_hybrid1.cfg` (needs `USE_VULKAN_RTX`) |

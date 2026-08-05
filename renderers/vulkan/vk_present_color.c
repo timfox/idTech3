@@ -106,7 +106,7 @@ const vkPresentColorContract_t *vk_present_color_contract( void )
 		s_contract.displayMode == VK_PRESENT_COLOR_SCRGB ) ? qtrue : qfalse;
 	s_contract.hdrDisplayAvailable = ( s_hdr10Seen || s_scrgbSeen ) ? qtrue : qfalse;
 	if ( r_tonemap ) {
-		s_contract.tonemapMode = (vkTonemapMode_t)Com_Clamp( 0, 4, r_tonemap->integer );
+		s_contract.tonemapMode = (vkTonemapMode_t)Com_Clamp( 0, 5, r_tonemap->integer );
 	}
 	return &s_contract;
 }
@@ -116,7 +116,7 @@ int vk_present_color_preferred_tonemap( void )
 	if ( r_presentTonemapPreference && r_presentTonemapPreference->integer >= 0 ) {
 		return Com_Clamp( 0, 4, r_presentTonemapPreference->integer );
 	}
-	return r_tonemap ? r_tonemap->integer : 3;
+	return r_tonemap ? Com_Clamp( 0, 5, r_tonemap->integer ) : 3;
 }
 
 void vk_present_color_on_surface_formats( const VkSurfaceFormatKHR *candidates, uint32_t count )

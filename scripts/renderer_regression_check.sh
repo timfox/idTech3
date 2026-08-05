@@ -1280,6 +1280,14 @@ elif ! grep -q 'toneMapParams0' "$GAMMA_FRAG" 2>/dev/null || ! grep -q 'Tonemap_
   fail "gamma.frag Tonemap_AgX must use toneMapParams grade knobs"
 elif ! grep -q 'agxStrength\|invWhite\|highlightDesat' "$GAMMA_FRAG" 2>/dev/null; then
   fail "gamma.frag Tonemap_AgX should consume toe/shoulder/whitePoint/desat"
+elif ! grep -q 'Repair channels' "$GAMMA_FRAG" 2>/dev/null ||
+     ! grep -q 'return max( hdr, vec3( 0.0 ) )' "$GAMMA_FRAG" 2>/dev/null; then
+  fail "gamma.frag must sanitize SceneHDR per channel and clamp negative radiance"
+elif ! grep -q 'Neutral reference' "$PROJECT_ROOT/renderers/vulkan/inspector/vk_imgui_postfx_panels.cpp" 2>/dev/null; then
+  fail "tonemap inspector must expose r_tonemap 5 neutral reference mode"
+elif ! grep -q 'VK_TONEMAP_NEUTRAL_REFERENCE' "$PROJECT_ROOT/renderers/vulkan/vk_present_color.h" 2>/dev/null ||
+     ! grep -q 'Com_Clamp( 0, 5, r_tonemap->integer )' "$PROJECT_ROOT/renderers/vulkan/vk_present_color.c" 2>/dev/null; then
+  fail "present-color contract must preserve r_tonemap 5 diagnostic mode"
 elif ! grep -q 'default \*\*0\*\*' "$PROJECT_ROOT/docs/FORWARD_PLUS_PIPELINE_AUDIT.md" 2>/dev/null; then
   fail "FORWARD_PLUS_PIPELINE_AUDIT.md should document r_forwardPlusEnergyRenorm default **0**"
 elif ! grep -q 'AgX = 4\|AgX (\`4\`)' "$PROJECT_ROOT/docs/samples/renderer_regression/scenes/05_postfx.md" 2>/dev/null; then

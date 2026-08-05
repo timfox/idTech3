@@ -20,7 +20,8 @@ typedef enum {
 	VK_TONEMAP_REINHARD,
 	VK_TONEMAP_ACES,
 	VK_TONEMAP_FILMIC,
-	VK_TONEMAP_AGX
+	VK_TONEMAP_AGX,
+	VK_TONEMAP_NEUTRAL_REFERENCE
 } vkTonemapMode_t;
 
 typedef struct vkPresentColorContract_s {
@@ -50,7 +51,8 @@ void vk_present_color_apply_selection( VkSurfaceFormatKHR *inoutPresent );
 qboolean vk_present_color_active( void );
 const vkPresentColorContract_t *vk_present_color_contract( void );
 
-/* Prefer AgX (4) when Ultra overlay sets r_presentTonemapPreference. */
+/* Prefer AgX (4) when Ultra overlay sets r_presentTonemapPreference. The
+ * neutral-reference diagnostic (5) remains available through r_tonemap. */
 int vk_present_color_preferred_tonemap( void );
 
 void vk_present_color_status_f( void );

@@ -182,8 +182,8 @@ extern "C" void VkImgui_DrawPostFXPanel(void) {
 	if (ImGui::CollapsingHeader("Tonemapping", ImGuiTreeNodeFlags_DefaultOpen)) {
 		int tonemap = ri.Cvar_VariableIntegerValue( "r_tonemap" );
 		float exposure = VkImgui_CvarFloat( "r_exposure" );
-		const char *modes[] = { "None", "Reinhard", "ACES", "Filmic", "AgX" };
-		if ( ImGui::Combo( "Mode", &tonemap, modes, 5 ) ) {
+		const char *modes[] = { "None", "Reinhard", "ACES", "Filmic", "AgX", "Neutral reference" };
+		if ( ImGui::Combo( "Mode", &tonemap, modes, 6 ) ) {
 			ri.Cvar_Set( "r_tonemap", va( "%d", tonemap ) );
 		}
 		VkImgui_CvarSlider( "Exposure", "r_exposure", exposure, 0.01f, 10.0f );
