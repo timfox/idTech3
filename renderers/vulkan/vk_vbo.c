@@ -685,80 +685,6 @@ void R_BuildWorldVBO( msurface_t *surf, int surfCount )
 	msurface_t **surfList;
 	srfSurfaceFace_t *face;
 	srfTriangles_t *tris;
-#ifdef USE_VBO_GRID
-	srfGridMesh_t *grid;
-#endif
-	msurface_t *sf;
-	int ibo_size;
-	int vbo_size;
-	int i, n;
-
-	int numStaticSurfaces = 0;
-	int numStaticIndexes = 0;
-	int numStaticVertexes = 0;
-
-	if ( !r_vbo->integer )
-		return;
-
-	if ( glConfig.numTextureUnits < 3 ) {
-		ri.Printf( PRINT_WARNING, "... not enough texture units for VBO\n" );
-		return;
-	}
-
-	VBO_Cleanup();
-
-	vbo_size = 0;
-
-	// initial scan to count surfaces/indexes/vertexes for memory allocation
-	for ( i = 0, sf = surf; i < surfCount; i++, sf++ ) {
-		face = (srfSurfaceFace_t *) sf->data;
-		if ( face->surfaceType == SF_FACE && isStaticShader( sf->shader ) ) {
-			face->vboItemIndex = ++numStaticSurfaces;
-			numStaticVertexes += face->numPoints;
-			numStaticIndexes += face->numIndices;
-
-			vbo_size += face->numPoints * (sf->shader->svarsSize + sizeof( tess.xyz[0] ) + sizeof( tess.normal[0] ) );
-#ifdef USE_VK_PBR
-			if ( vk.pbrActive )
-				vbo_size += face->numPoints * ( sizeof(tess.qtangent[0]) +  sizeof(tess.lightdir[0]) );
-#endif
-			sf->shader->numVertexes += face->numPoints;
-			sf->shader->numIndexes += face->numIndices;
-			continue;
-		}
-		tris = (srfTriangles_t *) sf->data;
-		if ( tris->surfaceType == SF_TRIANGLES && isStaticShader( sf->shader ) ) {
-			tris->vboItemIndex = ++numStaticSurfaces;
-			numStaticVertexes += tris->numVerts;
-			numStaticIndexes += tris->numIndexes;
-
-			vbo_size += tris->numVerts * (sf->shader->svarsSize + sizeof( tess.xyz[0] ) + sizeof( tess.normal[0] ) );
-#ifdef USE_VK_PBR
-			if ( vk.pbrActive )
-				vbo_size += tris->numVerts * ( sizeof(tess.qtangent[0]) + sizeof(tess.lightdir[0]) );
-#endif
-			sf->shader->numVertexes += tris->numVerts;
-			sf->shader->numIndexes += tris->numIndexes;
-			continue;
-		}
-#ifdef USE_VBO_GRID
-		grid = (srfGridMesh_t *) sf->data;
-		if ( grid->surfaceType == SF_GRID && isStaticShader( sf->shader ) ) {
-			grid->vboItemIndex = ++numStaticSurfaces;
-			RB_SurfaceGridEstimate( grid, &grid->vboExpectVertices, &grid->vboExpectIndices );
-			numStaticVertexes += grid->vboExpectVertices;
-			numStaticIndexes += grid->vboExpectIndices;
-
-			vbo_size += grid->vboExpectVertices * (sf->shader->svarsSize + sizeof( tess.xyz[0] ) + sizeof( tess.normal[0] ) );
-#ifdef USE_VK_PBR
-			if ( vk.pbrActive )
-				vbo_size += grid->vboExpectVertices * ( sizeof(tess.qtangent[0]) + sizeof(tess.lightdir[0]) );
-#endif
-			sf->shader->numVertexes += grid->vboExpectVertices;
-			sf->shader->numIndexes += grid->vboExpectIndices;
-			continue;
-		}
-#endif // USE_VBO_GRID
 	}
 	if ( numStaticSurfaces == 0 ) {
 		ri.Printf( PRINT_ALL, "...no static surfaces for VBO\n" );
@@ -812,13 +738,6 @@ void R_BuildWorldVBO( msurface_t *surf, int surfCount )
 			surfList[ n++ ] = sf;
 			continue;
 		}
-#ifdef USE_VBO_GRID
-		grid = (srfGridMesh_t *) sf->data;
-		if ( grid->surfaceType == SF_GRID && grid->vboItemIndex ) {
-			surfList[ n++ ] = sf;
-			continue;
-		}
-#endif // USE_VBO_GRID
 	}
 
 	if ( n != numStaticSurfaces ) {
@@ -839,41 +758,6 @@ void R_BuildWorldVBO( msurface_t *surf, int surfCount )
 		sf = surfList[ i ];
 		face = (srfSurfaceFace_t *) sf->data;
 		tris = (srfTriangles_t *) sf->data;
-#ifdef USE_VBO_GRID
-		grid = (srfGridMesh_t *) sf->data;
-#endif
-		if ( face->surfaceType == SF_FACE )
-			face->vboItemIndex = i + 1;
-		else if (tris->surfaceType == SF_TRIANGLES) {
-			tris->vboItemIndex = i + 1;
-#ifdef USE_VBO_GRID
-		} else if (grid->surfaceType == SF_GRID) {
-			grid->vboItemIndex = i + 1;
-#endif
-		} else {
-			ri.Error( ERR_DROP, "Unexpected surface type" );
-		}
-		initItem( vbo->items + i + 1 );
-		RB_BeginSurface( sf->shader, 0 );
-		tess.allowVBO = qfalse; // block execution of VBO path as we need to tesselate geometry
-#ifdef USE_TESS_NEEDS_NORMAL
-		tess.needsNormal = qtrue;
-#endif
-#ifdef USE_TESS_NEEDS_ST2
-		tess.needsST2 = qtrue;
-#endif
-		// tesselate
-		rb_surfaceTable[ *sf->data ]( sf->data ); // VBO_PushData() may be called multiple times there
-		// setup colors and texture coordinates
-		VBO_PushData( i + 1, &tess );
-#ifdef USE_VBO_GRID
-		if ( grid->surfaceType == SF_GRID ) {
-			vbo_item_t *vi = vbo->items + i + 1;
-			if ( vi->num_vertexes != grid->vboExpectVertices || vi->num_indexes != grid->vboExpectIndices ) {
-				ri.Error( ERR_DROP, "Unexpected grid vertexes/indexes count" );
-			}
-		}
-#endif // USE_VBO_GRID
 		tess.numIndexes = 0;
 		tess.numVertexes = 0;
 	}
@@ -897,12 +781,6 @@ void R_BuildWorldVBO( msurface_t *surf, int surfCount )
 				tris->vboItemIndex = 0;
 				continue;
 			}
-#ifdef USE_VBO_GRID
-			grid = (srfGridMesh_t *) sf->data;
-			if ( grid->surfaceType == SF_GRID ) {
-				grid->vboItemIndex = 0;
-			}
-#endif
 		}
 		vbo->items_count = 0;
 	}
@@ -1427,12 +1305,6 @@ qboolean VBO_StreamUploadSurface( surfaceType_t *surface, shader_t *shader, int 
 
 	RB_BeginSurface( shader, 0 );
 	tess.allowVBO = qfalse;
-#ifdef USE_TESS_NEEDS_NORMAL
-	tess.needsNormal = qtrue;
-#endif
-#ifdef USE_TESS_NEEDS_ST2
-	tess.needsST2 = qtrue;
-#endif
 	rb_surfaceTable[*surface]( surface );
 	if ( tess.numIndexes <= 0 || tess.numVertexes <= 0 ) {
 		tess.numIndexes = savedIndexes;
