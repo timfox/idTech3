@@ -24,15 +24,10 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #define TR_LOCAL_H
 
 #define USE_VK_PBR
-#ifdef USE_VK_PBR
-	#define VK_PBR_BRDFLUT		// for inspecting codebase, does not toggle brdflut. 
-	#define VK_CUBEMAP	
-
-	#ifdef VK_CUBEMAP
-		#define REF_CUBEMAP_IRRADIANCE_SIZE		64
-		#define REF_CUBEMAP_SIZE				256
-	#endif
-#endif
+#define VK_PBR_BRDFLUT		// for inspecting codebase, does not toggle brdflut.
+#define VK_CUBEMAP
+#define REF_CUBEMAP_IRRADIANCE_SIZE		64
+#define REF_CUBEMAP_SIZE				256
 
 #define USE_VBO				// store static world geometry in VBO
 #define USE_FOG_COLLAPSE	// not compatible with legacy dlights
@@ -46,9 +41,6 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
  * curve grids into the static VBO freezes their tessellation choice and can
  * regress both streaming and frame time; only flat/static face and triangle
  * surfaces use the VBO. */
-
-//#define USE_TESS_NEEDS_NORMAL
-//#define USE_TESS_NEEDS_ST2
 
 #define SH_COEFF_COUNT 9
 
@@ -2229,10 +2221,6 @@ image_t *vk_create_pbr_albedo_srgb( const char *albedoMapName, imgFlags_t flags 
 //
 // tr_surface.c
 //
-#ifdef USE_VBO_GRID
-void		RB_SurfaceGridEstimate( srfGridMesh_t *cv, int *numVertexes, int *numIndexes ); 
-#endif
-
 /*
 ====================================================================
 
@@ -2296,14 +2284,6 @@ typedef struct shaderCommands_s
 	int		gltfGpuMorphCount;
 	float		gltfGpuMorphWeights[IQM_MORPH_TOP_K];
 #endif
-#endif
-
-	// info extracted from current shader
-#ifdef USE_TESS_NEEDS_NORMAL
-	int			needsNormal;
-#endif
-#ifdef USE_TESS_NEEDS_ST2
-	int			needsST2;
 #endif
 
 	int			numPasses;
