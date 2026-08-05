@@ -11,7 +11,6 @@ TAA descriptors and ping-pong commit. See vk_object_id.h for the rationale.
 #include "vk_image_layout.h"
 #include "vk_util.h"
 #include "vk_upscale.h"
-#ifdef USE_VK_PBR
 #include "vk_forward_plus.h"
 #endif
 
@@ -122,7 +121,6 @@ void vk_object_id_begin_frame( void )
 
 void vk_object_id_update_storage_descriptor( void )
 {
-#ifdef USE_VK_PBR
 	VkDescriptorImageInfo info;
 	VkWriteDescriptorSet write;
 	VkImageView view;
@@ -170,9 +168,6 @@ void vk_object_id_update_storage_descriptor( void )
 		write.dstSet = sets[i];
 		qvkUpdateDescriptorSets( vk.device, 1, &write, 0, NULL );
 	}
-#else
-	(void)0;
-#endif
 }
 
 void vk_barrier_object_id_for_sampling( const char *reason )
