@@ -80,6 +80,7 @@ macro(idtech3_append_open_world_qcommon_sources)
 	if(USE_OPEN_WORLD)
 		list(APPEND QCOMMON_SRCS
 			${_IDTECH3_WORLD}/world_district.cpp
+			${_IDTECH3_WORLD}/world_zone.cpp
 			${_IDTECH3_WORLD}/world_open.cpp
 			${_IDTECH3_WORLD}/world_config.cpp
 			${_IDTECH3_WORLD}/world_residency.cpp

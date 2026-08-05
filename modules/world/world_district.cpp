@@ -24,6 +24,7 @@ static cvar_t *r_districtProxy;
 static cvar_t *cm_districtStream;
 static cvar_t *r_districtSectorSize;
 static cvar_t *r_districtLoadRadius;
+static cvar_t *r_districtAutoFull;
 
 static void WorldDistrict_DefaultPaths( worldDistrict_t *d );
 static void WorldDistrict_ComputeSectors( worldDistrict_t *d );
@@ -71,6 +72,11 @@ void WorldDistrict_Init( void ) {
 	r_districtLoadRadius = Cvar_Get( "r_districtLoadRadius", "8192", CVAR_ARCHIVE );
 	Cvar_SetDescription( r_districtLoadRadius,
 		"View-driven residency radius for proxy/full district loads." );
+	r_districtAutoFull = Cvar_Get( "r_districtAutoFull", "0", CVAR_ARCHIVE );
+	Cvar_SetDescription( r_districtAutoFull,
+		"Automatically promote a resident proxy district to full geometry when near the view. "
+		"Disabled by default because full mesh registration is render-thread-owned; use "
+		"district_load_full explicitly or provide a proxy/streaming importer." );
 
 	districtCount = 0;
 	manifestPath[0] = '\0';
@@ -341,6 +347,14 @@ qboolean WorldDistrict_LoadFull( int index ) {
 		d->fullModel = registerModelFn( d->fullMeshPath );
 	}
 
+	if ( !d->fullModel ) {
+		d->state = WD_STATE_UNLOADED;
+		Com_Printf( S_COLOR_YELLOW
+			"[world_district] %s full load deferred/failed; no drawable model was committed\n",
+			d->name );
+		return qfalse;
+	}
+
 	d->state = WD_STATE_LOADED;
 	Com_Printf( "[world_district] %s full load (sectors %d,%d..%d,%d model %d)\n",
 		d->name, d->sectorX0, d->sectorY0, d->sectorX1, d->sectorY1, d->fullModel );
@@ -409,10 +423,13 @@ void WorldDistrict_UpdateView( const vec3_t viewOrigin, float loadRadius ) {
 		}
 
 		if ( districts[i].state == WD_STATE_UNLOADED ) {
-			if ( !WorldDistrict_LoadProxy( i ) ) {
-				(void)WorldDistrict_LoadFull( i );
-			}
-		} else if ( districts[i].state == WD_STATE_PROXY && dist < loadRadius * 0.5f ) {
+			/* A missing proxy is a normal streaming state. Do not synchronously
+			 * import a large USDA payload from the frame/update path. Full loading
+			 * remains explicit (district_load_full) or requires an already resident
+			 * proxy and the opt-in promotion policy below. */
+			(void)WorldDistrict_LoadProxy( i );
+		} else if ( r_districtAutoFull && r_districtAutoFull->integer &&
+			districts[i].state == WD_STATE_PROXY && dist < loadRadius * 0.5f ) {
 			(void)WorldDistrict_LoadFull( i );
 		}
 	}

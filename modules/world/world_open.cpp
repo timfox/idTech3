@@ -12,6 +12,7 @@ Copyright (C) 2026 Gopex LLC. All rights reserved.
 #include "world_open.h"
 #include "world_proc.h"
 #include "world_residency.h"
+#include "world_zone.h"
 
 static worldOpenSector_t sectors[WORLD_OPEN_SECTOR_MAX];
 static int sectorCount;
@@ -87,6 +88,7 @@ void WorldOpen_Init( void ) {
 	sectorUnloadFn = NULL;
 	Com_Memset( sectors, 0, sizeof( sectors ) );
 	WorldResidency_Init();
+	WorldZone_Init();
 	Com_Printf( "[world_open] open-world streaming layer initialized\n" );
 }
 
@@ -101,6 +103,7 @@ void WorldOpen_Shutdown( void ) {
 	sectorCount = 0;
 	openWorldEnabled = qfalse;
 	WorldResidency_Shutdown();
+	WorldZone_Shutdown();
 }
 
 void WorldOpen_SetSectorLoad( worldOpenSectorLoad_f fn ) {
@@ -270,7 +273,11 @@ void WorldOpen_UpdateView( const vec3_t viewOrigin, float radius ) {
 	int cellRadius;
 	worldOpenLayerMask_t layerMask = 0;
 
-	if ( !WorldOpen_IsEnabled() || !viewOrigin ) {
+	if ( !viewOrigin ) {
+		return;
+	}
+	WorldZone_UpdateView( viewOrigin );
+	if ( !WorldOpen_IsEnabled() ) {
 		return;
 	}
 

@@ -4290,6 +4290,28 @@ if(BUILD_UNIT_TESTS)
 	add_test(NAME unit_surfaceflags COMMAND unit_surfaceflags)
 	set_tests_properties(unit_surfaceflags PROPERTIES LABELS "unit;validation")
 
+	add_executable(unit_rect_allocator
+		tests/unit/test_rect_allocator.c
+		renderers/vulkan/vk_rect_allocator.c)
+	target_include_directories(unit_rect_allocator PRIVATE
+		${IDTECH3_UNIT_INCLUDE_DIRS}
+		${CMAKE_SOURCE_DIR}/renderers/vulkan)
+	add_test(NAME unit_rect_allocator COMMAND unit_rect_allocator)
+	set_tests_properties(unit_rect_allocator PROPERTIES LABELS "unit;validation;renderer")
+
+	add_executable(unit_world_zone
+		tests/unit/test_world_zone.c
+		modules/world/world_zone.cpp
+		tests/stub_world_residency_deps.c
+		tests/stub_qcommon_min.c
+		engine/core/q_shared.c
+		engine/core/q_math.c)
+	target_include_directories(unit_world_zone PRIVATE
+		${IDTECH3_UNIT_INCLUDE_DIRS}
+		${CMAKE_SOURCE_DIR}/modules/world)
+	add_test(NAME unit_world_zone COMMAND unit_world_zone)
+	set_tests_properties(unit_world_zone PROPERTIES LABELS "unit;validation;world")
+
 	add_executable(unit_qhelpers
 		tests/unit/test_q_helpers.c
 		tests/stub_qcommon_min.c

@@ -9,12 +9,15 @@ Client districts: FreeUSD manifest parse, console commands, view residency.
 extern "C" {
 #include "client.h"
 #include "../../world/world_district.h"
+#include "defer.h"
+#include "jobs.h"
 }
 
 #ifdef USE_FREEUSD
 
 #include "cl_freeusd_util.hpp"
 #include <cstring>
+#include <new>
 #include <string>
 
 #include "freeusd/c/freeusd.h"
@@ -22,6 +25,16 @@ extern "C" {
 #include "freeusd/usdUtils/engineScene.hpp"
 
 namespace {
+
+struct DistrictManifestJob {
+	char qpath[WORLD_DISTRICT_PATH_MAX];
+	char osPath[1024];
+	worldDistrict_t parsed[WORLD_DISTRICT_MAX];
+	int count;
+	qboolean ok;
+};
+
+static qboolean s_districtManifestBusy = qfalse;
 
 static bool WD_IsDistrictAssembly( const freeusd::usdUtils::EngineSceneNode &node ) {
 	const std::string path = node.path.GetString();
@@ -66,6 +79,41 @@ static void WD_BoundsFromNode( const freeusd::usdUtils::EngineSceneNode &node,
 }
 
 }  // namespace
+
+extern "C" qboolean WorldDistrict_ParseManifestFreeUSD( const char *osPath, const char *qpath,
+	worldDistrict_t *out, int maxOut, int *outCount );
+
+static void CL_District_ApplyManifestJob( void *data ) {
+	DistrictManifestJob *job = (DistrictManifestJob *)data;
+	if ( !job ) {
+		s_districtManifestBusy = qfalse;
+		return;
+	}
+	s_districtManifestBusy = qfalse;
+	if ( job->ok ) {
+		WorldDistrict_Import( job->count, job->parsed, job->qpath );
+		Com_Printf( "[world_district] async manifest ready: %s (%d district(s))\n",
+			job->qpath, job->count );
+	} else {
+		Com_Printf( S_COLOR_YELLOW "[world_district] async manifest failed: %s\n", job->qpath );
+	}
+	delete job;
+}
+
+static void CL_District_ParseManifestJob( void *data, uint32_t count ) {
+	DistrictManifestJob *job = (DistrictManifestJob *)data;
+	(void)count;
+	if ( !job ) {
+		return;
+	}
+	job->count = 0;
+	job->ok = WorldDistrict_ParseManifestFreeUSD( job->osPath, job->qpath,
+		job->parsed, WORLD_DISTRICT_MAX, &job->count );
+	if ( !Defer_Add( CL_District_ApplyManifestJob, job ) ) {
+		delete job;
+		s_districtManifestBusy = qfalse;
+	}
+}
 
 extern "C" qboolean WorldDistrict_ParseManifestFreeUSD( const char *osPath, const char *qpath,
 	worldDistrict_t *out, int maxOut, int *outCount ) {
@@ -244,6 +292,36 @@ static void CL_District_LoadManifest_f( void ) {
 		return;
 	}
 	qpath = Cmd_Argv( 1 );
+	if ( Cvar_VariableIntegerValue( "r_districtAsyncLoad" ) ) {
+		if ( s_districtManifestBusy ) {
+			Com_Printf( "[world_district] manifest load already in progress\n" );
+			return;
+		}
+#ifdef USE_FREEUSD
+		{
+			std::string os = Cl_FreeusdBuildOsPath( qpath );
+			DistrictManifestJob *job;
+			job = new ( std::nothrow ) DistrictManifestJob();
+			if ( !job || os.empty() ) {
+				delete job;
+				Com_Printf( S_COLOR_YELLOW "[world_district] async manifest allocation/path failure: %s\n", qpath );
+				return;
+			}
+			Com_Memset( job, 0, sizeof( *job ) );
+			Q_strncpyz( job->qpath, qpath, sizeof( job->qpath ) );
+			Q_strncpyz( job->osPath, os.c_str(), sizeof( job->osPath ) );
+			s_districtManifestBusy = qtrue;
+			if ( Jobs_SubmitWork( CL_District_ParseManifestJob, job, JOB_PRIORITY_LOW ) == JOBS_INVALID_HANDLE ) {
+				s_districtManifestBusy = qfalse;
+				delete job;
+				Com_Printf( S_COLOR_YELLOW "[world_district] async queue unavailable; retrying synchronously\n" );
+			} else {
+				Com_Printf( "[world_district] queued async manifest load: %s\n", qpath );
+				return;
+			}
+		}
+#endif
+	}
 
 #ifdef USE_FREEUSD
 	{
@@ -339,6 +417,8 @@ extern "C" void CL_District_Init( void ) {
 		"Validation scene mode: hide the active BSP world while rendering loaded district entities." );
 	Cvar_SetDescription( Cvar_Get( "r_districtCameraDistance", "1.0", CVAR_ARCHIVE ),
 		"Validation camera distance in district extents; lower values move the USDA proof camera into the scene." );
+	Cvar_SetDescription( Cvar_Get( "r_districtAsyncLoad", "1", CVAR_ARCHIVE ),
+		"Parse USDA district manifests on the engine job pool and commit them on the main thread." );
 
 	Com_Printf( "World districts: district_load, district_list, district_proxy (r_district 1, r_districtDraw 1)\n" );
 }
@@ -379,7 +459,14 @@ extern "C" void CL_District_ApplyView( refdef_t *fd ) {
 	AnglesToAxis( angles, fd->viewaxis );
 	VectorCopy( eye, fd->vieworg );
 	if ( Cvar_VariableIntegerValue( "r_districtOnly" ) ) {
-		fd->rdflags |= RDF_NOWORLDMODEL;
+		/* Keep the host BSP visible until a district model has actually been
+		 * committed. A failed/missing proxy must not turn the frame black while
+		 * asynchronous or explicit full residency is still pending. */
+		if ( ( d->proxyModel || d->fullModel ) &&
+			( d->state == WD_STATE_PROXY || d->state == WD_STATE_STREAMING ||
+			  d->state == WD_STATE_LOADED ) ) {
+			fd->rdflags |= RDF_NOWORLDMODEL;
+		}
 	}
 }
 

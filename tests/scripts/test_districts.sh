@@ -29,6 +29,20 @@ rg -q 'CL_District_Frame' "$CL_GF"
 rg -q 'CL_District_AddRefEntitiesToScene' "$CL_D"
 rg -q 'CL_RenderSceneWithDistricts' "$CL_REF"
 rg -q 'r_districtDraw' "$CL_D"
+rg -q 'r_districtAsyncLoad' "$CL_D"
+rg -q 'Jobs_SubmitWork' "$CL_D"
+rg -q 'Defer_Add' "$CL_D"
+rg -q 'r_districtAutoFull' "$WD"
+rg -q 'full load deferred/failed' "$WD"
+rg -q 'RDF_NOWORLDMODEL' "$CL_D"
+rg -q 'd->proxyModel \|\| d->fullModel' "$CL_D"
+ZONE="$ROOT/modules/world/world_zone.cpp"
+ZONE_H="$ROOT/modules/world/world_zone.h"
+test -f "$ZONE"
+test -f "$ZONE_H"
+rg -q 'WorldZone_UpdateView' "$ZONE"
+rg -q 'r_worldZoneBudget' "$ZONE"
+rg -q 'world_zone.cpp' cmake/IdTech3QcommonExtensions.cmake
 rg -q 'world_district.cpp' cmake/IdTech3QcommonExtensions.cmake
 rg -q 'cl_district.cpp' cmake/client/ClientExtensionSources.cmake
 
