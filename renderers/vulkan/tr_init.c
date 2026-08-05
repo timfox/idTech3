@@ -4500,6 +4500,12 @@ static void RE_NotifyWindowRestored( const char *reason )
 	vk_presentation_note_window_restored( reason ? reason : "client" );
 }
 
+static void RE_SetWorldZoneResidency( const worldZoneResidency_t *zones, int count )
+{
+	R_VT_SetWorldZoneResidency( zones, count );
+	vk_vshadow_set_world_zone_residency( zones, count );
+}
+
 /*
 @@@@@@@@@@@@@@@@@@@@@
 GetRefAPI
@@ -4553,6 +4559,7 @@ refexport_t *GetRefAPI ( int apiVersion, refimport_t *rimp ) {
 	re.AddEngineDecalToScene = RE_AddEngineDecalToScene;
 	re.ArcBlancUploadHeightMap = RE_ArcBlancUploadHeightMap;
 	re.ArcBlancGpuOceanStep = RE_ArcBlancGpuOceanStep;
+	re.SetWorldZoneResidency = RE_SetWorldZoneResidency;
 	re.EmulatorUploadFrame = RE_EmulatorUploadFrame;
 	re.WebcamUploadFrame = RE_WebcamUploadFrame;
 	re.NotifyWindowRestored = RE_NotifyWindowRestored;

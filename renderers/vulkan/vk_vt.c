@@ -78,6 +78,8 @@ static int s_virtualPages;
 static int s_physicalPages;
 static int s_atlasW;
 static int s_atlasH;
+static worldZoneResidency_t s_worldZones[REF_WORLD_ZONE_MAX];
+static int s_worldZoneCount;
 
 static vkSparseImage_t s_sparseImg;
 static vkSparsePool_t s_sparsePool;
@@ -140,7 +142,7 @@ static void VT_Status_f( void )
 		"[VK][VT] active=%d sparse=%d atlas=%dx%d page=%d virtual=%d physical=%d slots=%d/%d\n"
 		"  hits=%d misses=%d loads real=%d proc=%d binds=%d unbinds=%d\n"
 		"  feedback=%d gpu=%d dispatches=%d gpuSamples=%d fbHits=%d fbMisses=%d\n"
-		"  debug=%d sample=%d shader=%d gran=%ux%u\n",
+		"  debug=%d sample=%d shader=%d gran=%ux%u zones=%d\n",
 		R_VT_Active() ? 1 : 0,
 		s_useSparse ? 1 : 0,
 		s_atlasW, s_atlasH, s_pageSize,
@@ -155,7 +157,7 @@ static void VT_Status_f( void )
 		( r_vtSample && r_vtSample->integer ) ? 1 : 0,
 		s_atlasShader,
 		s_useSparse ? s_sparseImg.granW : (uint32_t)s_pageSize,
-		s_useSparse ? s_sparseImg.granH : (uint32_t)s_pageSize );
+		s_useSparse ? s_sparseImg.granH : (uint32_t)s_pageSize, s_worldZoneCount );
 	for ( i = 0; i < s_slotCapacity; i++ ) {
 		if ( s_slots[i].used && s_slots[i].name[0] ) {
 			ri.Printf( PRINT_ALL, "  slot %d: vid=%d xy=%d,%d %s\n",
@@ -743,6 +745,7 @@ void R_VT_Init( void )
 
 void R_VT_Shutdown( void )
 {
+	s_worldZoneCount = 0;
 	VT_UnbindAllSparse();
 	if ( s_useSparse ) {
 		if ( s_atlas ) {
@@ -757,6 +760,17 @@ void R_VT_Shutdown( void )
 	s_atlasShader = 0;
 	s_useSparse = qfalse;
 	Com_Memset( s_slots, 0, sizeof( s_slots ) );
+}
+
+void R_VT_SetWorldZoneResidency( const worldZoneResidency_t *zones, int count )
+{
+	if ( !zones || count <= 0 ) {
+		s_worldZoneCount = 0;
+		return;
+	}
+	count = MIN( count, REF_WORLD_ZONE_MAX );
+	Com_Memcpy( s_worldZones, zones, (size_t)count * sizeof( s_worldZones[0] ) );
+	s_worldZoneCount = count;
 }
 
 qboolean R_VT_Active( void )

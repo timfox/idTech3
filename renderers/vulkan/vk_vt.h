@@ -26,5 +26,6 @@ void R_VT_Feedback_BeginFrame( void );
 void R_VT_Feedback_RequestPage( int virtualPage );
 void R_VT_Feedback_RequestUV( float u, float v );
 void R_VT_Feedback_EndFrame( void );
+void R_VT_SetWorldZoneResidency( const worldZoneResidency_t *zones, int count );
 
 #endif

@@ -50,6 +50,8 @@ static qboolean s_healthy;
 static vkVShadowBudget_t s_budget;
 static uint32_t s_localLightRequests;
 static uint32_t s_pageRequestsAccepted;
+static worldZoneResidency_t s_worldZones[REF_WORLD_ZONE_MAX];
+static int s_worldZoneCount;
 
 static uint32_t VShadow_Hash( uint32_t virtualId )
 {
@@ -215,9 +217,21 @@ void vk_vshadow_init( void )
 
 void vk_vshadow_shutdown( void )
 {
+	s_worldZoneCount = 0;
 	VShadow_ResetPool();
 	s_inited = qfalse;
 	s_healthy = qfalse;
+}
+
+void vk_vshadow_set_world_zone_residency( const worldZoneResidency_t *zones, int count )
+{
+	if ( !zones || count <= 0 ) {
+		s_worldZoneCount = 0;
+		return;
+	}
+	count = MIN( count, REF_WORLD_ZONE_MAX );
+	Com_Memcpy( s_worldZones, zones, (size_t)count * sizeof( s_worldZones[0] ) );
+	s_worldZoneCount = count;
 }
 
 qboolean vk_vshadow_active( void )
@@ -719,6 +733,7 @@ void vk_vshadow_status_f( void )
 	ri.Printf( PRINT_ALL, "active           : %s healthy=%s\n",
 		vk_vshadow_active() ? "yes" : "no",
 		vk_vshadow_healthy() ? "yes" : "no" );
+	ri.Printf( PRINT_ALL, "world zones      : %d (texture/shadow residency snapshot)\n", s_worldZoneCount );
 	ri.Printf( PRINT_ALL, "pageSize         : %d pool=%d atlasGrid=%d budgetBytes~%u\n",
 		s_pageSize, s_poolCapacity, s_atlasGrid, st->pagePoolBytes );
 	ri.Printf( PRINT_ALL, "clipmap          : levels=%d baseWorld=%.0f valid=%s\n",

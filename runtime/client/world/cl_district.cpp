@@ -285,6 +285,22 @@ static qhandle_t CL_District_RegisterModel( const char *path ) {
 	return re.RegisterModel( path );
 }
 
+static void CL_District_PublishZoneResidency( void ) {
+	worldZoneResidency_t published[REF_WORLD_ZONE_MAX];
+	int i, count = MIN( WorldZone_GetCount(), REF_WORLD_ZONE_MAX );
+	if ( !re.SetWorldZoneResidency ) return;
+	Com_Memset( published, 0, sizeof( published ) );
+	for ( i = 0; i < count; i++ ) {
+		const worldZone_t *zone = WorldZone_Get( i );
+		if ( !zone ) continue;
+		VectorCopy( zone->boundsMin, published[i].boundsMin );
+		VectorCopy( zone->boundsMax, published[i].boundsMax );
+		published[i].residencyMask = zone->residencyMask;
+		published[i].resident = zone->state == WZ_STATE_RESIDENT ? qtrue : qfalse;
+	}
+	re.SetWorldZoneResidency( published, count );
+}
+
 static void CL_District_OnUnload( int index, const worldDistrict_t *d ) {
 	int x, y;
 
@@ -491,10 +507,12 @@ extern "C" void CL_District_Frame( void ) {
 	cvar_t *radius;
 
 	if ( !cl.snap.valid ) {
+		if ( re.SetWorldZoneResidency ) re.SetWorldZoneResidency( NULL, 0 );
 		return;
 	}
 	radius = Cvar_Get( "r_districtLoadRadius", "8192", CVAR_ARCHIVE );
 	WorldDistrict_UpdateView( cl.snap.ps.origin, radius ? radius->value : 8192.0f );
+	CL_District_PublishZoneResidency();
 }
 
 

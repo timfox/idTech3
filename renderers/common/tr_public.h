@@ -33,6 +33,14 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 typedef struct arcBlancGpuParams_s arcBlancGpuParams_t;
 
+#define REF_WORLD_ZONE_MAX 128
+typedef struct {
+	vec3_t boundsMin;
+	vec3_t boundsMax;
+	uint32_t residencyMask;
+	qboolean resident;
+} worldZoneResidency_t;
+
 //
 // these are the functions exported by the refresh module
 //
@@ -184,6 +192,9 @@ typedef struct {
 	 * normalized screen space. No-op on stub renderers / when unavailable. */
 	void (*UIBackdropBlur)( const uiBackdropFilter_t *bf );
 	void (*UIFilterLayer)( const uiCompositorLayer_t *layer );
+
+	/* USDA zone residency snapshot for texture/shadow page owners. */
+	void (*SetWorldZoneResidency)( const worldZoneResidency_t *zones, int count );
 
 } refexport_t;
 
