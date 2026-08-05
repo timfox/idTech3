@@ -41,6 +41,10 @@ ZONE_H="$ROOT/modules/world/world_zone.h"
 test -f "$ZONE"
 test -f "$ZONE_H"
 rg -q 'WorldZone_UpdateView' "$ZONE"
+rg -q 'WorldZone_Import' "$WD"
+rg -q 'WorldDistrict_ZoneLoad' "$WD"
+rg -q 'residencyMask' "$ZONE_H"
+rg -q 'zoneLoadRadius' "$CL_D"
 rg -q 'r_worldZoneBudget' "$ZONE"
 rg -q 'world_zone.cpp' cmake/IdTech3QcommonExtensions.cmake
 rg -q 'world_district.cpp' cmake/IdTech3QcommonExtensions.cmake
@@ -53,6 +57,7 @@ test -f tests/data/usd/world_proxies/south_proxy.usda
 test -f tests/data/usd/world_districts/north.usda
 rg -q 'District_North' tests/data/usd/world_playfield.usda
 rg -q 'purpose = "proxy"' tests/data/usd/world_playfield.usda
+rg -q 'residencyMask = 7' tests/data/usd/world_playfield.usda
 
 echo "[test_districts] demo cfg..."
 test -f examples/demo_game/mod/demo_districts.cfg

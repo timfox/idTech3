@@ -16,6 +16,10 @@ extern "C" {
 #define WORLD_ZONE_MAX 128
 #define WORLD_ZONE_NAME_MAX 64
 #define WORLD_ZONE_NEIGHBOR_MAX 8
+#define WORLD_ZONE_RESIDENCY_DISTRICT  ( 1u << 0 )
+#define WORLD_ZONE_RESIDENCY_TEXTURE   ( 1u << 1 )
+#define WORLD_ZONE_RESIDENCY_SHADOW    ( 1u << 2 )
+#define WORLD_ZONE_RESIDENCY_ALL       ( WORLD_ZONE_RESIDENCY_DISTRICT | WORLD_ZONE_RESIDENCY_TEXTURE | WORLD_ZONE_RESIDENCY_SHADOW )
 
 typedef enum {
 	WZ_STATE_INACTIVE = 0,
@@ -32,6 +36,8 @@ typedef struct worldZone_s {
 	float loadRadius;
 	float unloadRadius;
 	float priority;
+	uint32_t residencyMask;
+	int districtIndex;
 	int neighbors[WORLD_ZONE_NEIGHBOR_MAX];
 	int neighborCount;
 	worldZoneState_t state;
@@ -40,16 +46,19 @@ typedef struct worldZone_s {
 
 typedef qboolean ( *worldZoneLoad_f )( int index, const worldZone_t *zone );
 typedef void ( *worldZoneUnload_f )( int index, const worldZone_t *zone );
+typedef void ( *worldZoneResidency_f )( int index, const worldZone_t *zone, uint32_t mask, qboolean resident );
 
 void WorldZone_Init( void );
 void WorldZone_Shutdown( void );
 void WorldZone_SetCallbacks( worldZoneLoad_f loadFn, worldZoneUnload_f unloadFn );
+void WorldZone_SetResidencyCallback( worldZoneResidency_f fn );
 void WorldZone_Import( int count, const worldZone_t *zones );
 void WorldZone_Clear( void );
 void WorldZone_UpdateView( const vec3_t viewOrigin );
 int WorldZone_GetCount( void );
 const worldZone_t *WorldZone_Get( int index );
 int WorldZone_FindAtPoint( const vec3_t point );
+qboolean WorldZone_IsLayerResidentAtPoint( const vec3_t point, uint32_t layer );
 void WorldZone_Status( void );
 
 #ifdef __cplusplus

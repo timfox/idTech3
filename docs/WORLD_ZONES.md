@@ -12,6 +12,7 @@ Each zone contains:
 - authored AABB bounds;
 - load and unload radii with hysteresis;
 - a priority score;
+- a residency mask for district, texture, and shadow resources;
 - optional adjacency indices for future portal/stream prediction;
 - a resident/pending state.
 
@@ -23,5 +24,9 @@ texture, collision, and GPU page systems own their resources explicitly.
 ## Current integration
 
 The zone manager initializes with the open-world subsystem and updates before
-sector residency. It is currently an API-level layer; USDA manifest parsing
-will populate zones in the next step. Districts remain the payload owner.
+sector residency. USDA district assemblies populate one zone per district.
+Optional prim custom data keys are `zoneLoadRadius`, `zoneUnloadRadius`,
+`zonePriority`, and integer `residencyMask` (the default is all three owners).
+Districts remain the payload owner, while zone transitions trigger proxy
+district residency. `WorldZone_IsLayerResidentAtPoint` exposes the shared
+texture/shadow residency decision to renderer consumers.

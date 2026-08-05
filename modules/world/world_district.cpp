@@ -12,6 +12,7 @@ Copyright (C) 2026 Gopex LLC. All rights reserved.
 #include "world_district.h"
 #include "world_open.h"
 #include "world_residency.h"
+#include "world_zone.h"
 
 static worldDistrict_t districts[WORLD_DISTRICT_MAX];
 static int districtCount;
@@ -28,6 +29,27 @@ static cvar_t *r_districtAutoFull;
 
 static void WorldDistrict_DefaultPaths( worldDistrict_t *d );
 static void WorldDistrict_ComputeSectors( worldDistrict_t *d );
+
+static qboolean WorldDistrict_ZoneLoad( int index, const worldZone_t *zone ) {
+	int districtIndex = zone ? zone->districtIndex : -1;
+	(void)index;
+	if ( districtIndex < 0 || districtIndex >= districtCount ) {
+		return qtrue;
+	}
+	if ( zone && !( zone->residencyMask & WORLD_ZONE_RESIDENCY_DISTRICT ) ) {
+		return qtrue;
+	}
+	if ( districts[districtIndex].state == WD_STATE_UNLOADED ) {
+		return WorldDistrict_LoadProxy( districtIndex );
+	}
+	return qtrue;
+}
+
+static void WorldDistrict_ZoneUnload( int index, const worldZone_t *zone ) {
+	int districtIndex = zone ? zone->districtIndex : -1;
+	(void)index;
+	if ( districtIndex >= 0 && districtIndex < districtCount ) WorldDistrict_Unload( districtIndex );
+}
 
 void WorldDistrict_Import( int count, const worldDistrict_t *src, const char *path ) {
 	int i;
@@ -47,6 +69,21 @@ void WorldDistrict_Import( int count, const worldDistrict_t *src, const char *pa
 		districts[i].fullModel = 0;
 		WorldDistrict_DefaultPaths( &districts[i] );
 		WorldDistrict_ComputeSectors( &districts[i] );
+	}
+	{
+		worldZone_t zones[WORLD_ZONE_MAX];
+		Com_Memset( zones, 0, sizeof( zones ) );
+		for ( i = 0; i < count && i < WORLD_ZONE_MAX; i++ ) {
+			Q_strncpyz( zones[i].name, districts[i].name, sizeof( zones[i].name ) );
+			VectorCopy( districts[i].boundsMin, zones[i].boundsMin );
+			VectorCopy( districts[i].boundsMax, zones[i].boundsMax );
+			zones[i].loadRadius = districts[i].zoneLoadRadius > 0.0f ? districts[i].zoneLoadRadius : ( r_districtLoadRadius ? r_districtLoadRadius->value : 8192.0f );
+			zones[i].unloadRadius = districts[i].zoneUnloadRadius > 0.0f ? districts[i].zoneUnloadRadius : zones[i].loadRadius * 1.25f;
+			zones[i].priority = districts[i].zonePriority;
+			zones[i].residencyMask = districts[i].zoneResidencyMask ? districts[i].zoneResidencyMask : WORLD_ZONE_RESIDENCY_ALL;
+			zones[i].districtIndex = i;
+		}
+		WorldZone_Import( count, zones );
 	}
 	districtCount = count;
 	if ( path && path[0] ) {
@@ -77,6 +114,7 @@ void WorldDistrict_Init( void ) {
 		"Automatically promote a resident proxy district to full geometry when near the view. "
 		"Disabled by default because full mesh registration is render-thread-owned; use "
 		"district_load_full explicitly or provide a proxy/streaming importer." );
+	WorldZone_SetCallbacks( WorldDistrict_ZoneLoad, WorldDistrict_ZoneUnload );
 
 	districtCount = 0;
 	manifestPath[0] = '\0';
@@ -88,6 +126,7 @@ void WorldDistrict_Init( void ) {
 
 void WorldDistrict_Shutdown( void ) {
 	WorldDistrict_Clear();
+	WorldZone_SetCallbacks( NULL, NULL );
 }
 
 void WorldDistrict_SetRegisterModel( worldDistrictRegisterModel_f fn ) {
@@ -101,6 +140,7 @@ void WorldDistrict_SetOnUnload( worldDistrictOnUnload_f fn ) {
 void WorldDistrict_Clear( void ) {
 	int i;
 
+	WorldZone_Clear();
 	for ( i = 0; i < districtCount; i++ ) {
 		districts[i].active = qfalse;
 		districts[i].state = WD_STATE_UNLOADED;
@@ -402,6 +442,7 @@ void WorldDistrict_UpdateView( const vec3_t viewOrigin, float loadRadius ) {
 	if ( !r_district || !r_district->integer || districtCount <= 0 ) {
 		return;
 	}
+	WorldZone_UpdateView( viewOrigin );
 
 	for ( i = 0; i < districtCount; i++ ) {
 		vec3_t center;
@@ -415,20 +456,7 @@ void WorldDistrict_UpdateView( const vec3_t viewOrigin, float loadRadius ) {
 		VectorScale( center, 0.5f, center );
 		dist = Distance( viewOrigin, center );
 
-		if ( dist > loadRadius ) {
-			if ( districts[i].state != WD_STATE_UNLOADED ) {
-				WorldDistrict_Unload( i );
-			}
-			continue;
-		}
-
-		if ( districts[i].state == WD_STATE_UNLOADED ) {
-			/* A missing proxy is a normal streaming state. Do not synchronously
-			 * import a large USDA payload from the frame/update path. Full loading
-			 * remains explicit (district_load_full) or requires an already resident
-			 * proxy and the opt-in promotion policy below. */
-			(void)WorldDistrict_LoadProxy( i );
-		} else if ( r_districtAutoFull && r_districtAutoFull->integer &&
+		if ( r_districtAutoFull && r_districtAutoFull->integer &&
 			districts[i].state == WD_STATE_PROXY && dist < loadRadius * 0.5f ) {
 			(void)WorldDistrict_LoadFull( i );
 		}

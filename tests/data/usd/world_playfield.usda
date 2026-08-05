@@ -16,6 +16,12 @@ def Xform "World" (
     {
         def Xform "District_North" (
             kind = "assembly"
+            customData = {
+                float zoneLoadRadius = 8192
+                float zoneUnloadRadius = 10240
+                float zonePriority = 2
+                int residencyMask = 7
+            }
         )
         {
             double3 xformOp:translate = (4096, 4096, 0)
@@ -24,6 +30,12 @@ def Xform "World" (
 
         def Xform "District_South" (
             kind = "assembly"
+            customData = {
+                float zoneLoadRadius = 8192
+                float zoneUnloadRadius = 10240
+                float zonePriority = 1
+                int residencyMask = 7
+            }
         )
         {
             double3 xformOp:translate = (0, 0, 0)

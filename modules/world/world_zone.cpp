@@ -10,6 +10,7 @@ static worldZone_t s_zones[WORLD_ZONE_MAX];
 static int s_zoneCount;
 static worldZoneLoad_f s_loadFn;
 static worldZoneUnload_f s_unloadFn;
+static worldZoneResidency_f s_residencyFn;
 static cvar_t *r_worldZones;
 static cvar_t *r_worldZoneBudget;
 static cvar_t *r_worldZoneLoadRadius;
@@ -66,6 +67,7 @@ void WorldZone_Shutdown( void ) {
 	WorldZone_Clear();
 	s_loadFn = NULL;
 	s_unloadFn = NULL;
+	s_residencyFn = NULL;
 }
 
 void WorldZone_SetCallbacks( worldZoneLoad_f loadFn, worldZoneUnload_f unloadFn ) {
@@ -73,11 +75,18 @@ void WorldZone_SetCallbacks( worldZoneLoad_f loadFn, worldZoneUnload_f unloadFn 
 	s_unloadFn = unloadFn;
 }
 
+void WorldZone_SetResidencyCallback( worldZoneResidency_f fn ) {
+	s_residencyFn = fn;
+}
+
 void WorldZone_Clear( void ) {
 	int i;
 	for ( i = 0; i < s_zoneCount; ++i ) {
 		if ( s_zones[i].active && s_zones[i].state == WZ_STATE_RESIDENT && s_unloadFn ) {
 			s_unloadFn( i, &s_zones[i] );
+		}
+		if ( s_zones[i].active && s_zones[i].state == WZ_STATE_RESIDENT && s_residencyFn ) {
+			s_residencyFn( i, &s_zones[i], s_zones[i].residencyMask, qfalse );
 		}
 	}
 	Com_Memset( s_zones, 0, sizeof( s_zones ) );
@@ -94,6 +103,8 @@ void WorldZone_Import( int count, const worldZone_t *zones ) {
 		s_zones[i].active = qtrue;
 		s_zones[i].state = WZ_STATE_INACTIVE;
 		s_zones[i].neighborCount = MIN( s_zones[i].neighborCount, WORLD_ZONE_NEIGHBOR_MAX );
+		if ( !s_zones[i].residencyMask ) s_zones[i].residencyMask = WORLD_ZONE_RESIDENCY_ALL;
+		if ( s_zones[i].districtIndex < 0 ) s_zones[i].districtIndex = -1;
 	}
 	s_zoneCount = count;
 }
@@ -128,13 +139,17 @@ void WorldZone_UpdateView( const vec3_t point ) {
 		if ( s_zones[best].state != WZ_STATE_RESIDENT ) {
 			s_zones[best].lastScore = scores[best];
 			s_zones[best].state = WZ_STATE_PENDING_LOAD;
-			if ( !s_loadFn || s_loadFn( best, &s_zones[best] ) ) s_zones[best].state = WZ_STATE_RESIDENT;
+			if ( !s_loadFn || s_loadFn( best, &s_zones[best] ) ) {
+				s_zones[best].state = WZ_STATE_RESIDENT;
+				if ( s_residencyFn ) s_residencyFn( best, &s_zones[best], s_zones[best].residencyMask, qtrue );
+			}
 		}
 	}
 	for ( i = 0; i < s_zoneCount; ++i ) {
 		if ( s_zones[i].state == WZ_STATE_RESIDENT && WZ_DistanceToBounds( &s_zones[i], point ) > WZ_UnloadRadius( &s_zones[i] ) ) {
 			s_zones[i].state = WZ_STATE_PENDING_UNLOAD;
 			if ( s_unloadFn ) s_unloadFn( i, &s_zones[i] );
+			if ( s_residencyFn ) s_residencyFn( i, &s_zones[i], s_zones[i].residencyMask, qfalse );
 			s_zones[i].state = WZ_STATE_INACTIVE;
 		}
 	}
@@ -152,6 +167,12 @@ int WorldZone_FindAtPoint( const vec3_t point ) {
 	if ( !point ) return -1;
 	for ( i = 0; i < s_zoneCount; ++i ) if ( WZ_PointInBounds( &s_zones[i], point ) ) return i;
 	return -1;
+}
+
+qboolean WorldZone_IsLayerResidentAtPoint( const vec3_t point, uint32_t layer ) {
+	int index = WorldZone_FindAtPoint( point );
+	const worldZone_t *zone = WorldZone_Get( index );
+	return zone && zone->state == WZ_STATE_RESIDENT && ( zone->residencyMask & layer ) ? qtrue : qfalse;
 }
 
 void WorldZone_Status( void ) {

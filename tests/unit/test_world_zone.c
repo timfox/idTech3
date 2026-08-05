@@ -16,10 +16,12 @@ int main( void ) {
 	zones[0].unloadRadius = 512.0f;
 	WorldZone_Import( 1, zones );
 	CHECK( WorldZone_GetCount() == 1 );
+	CHECK( WorldZone_Get( 0 )->residencyMask == WORLD_ZONE_RESIDENCY_ALL );
 	CHECK( WorldZone_FindAtPoint( inside ) == 0 );
 	CHECK( WorldZone_FindAtPoint( outside ) == -1 );
 	WorldZone_UpdateView( inside );
 	CHECK( WorldZone_Get( 0 )->state == WZ_STATE_RESIDENT );
+	CHECK( WorldZone_IsLayerResidentAtPoint( inside, WORLD_ZONE_RESIDENCY_TEXTURE ) == qtrue );
 	WorldZone_UpdateView( outside );
 	CHECK( WorldZone_Get( 0 )->state == WZ_STATE_INACTIVE );
 	WorldZone_Shutdown();

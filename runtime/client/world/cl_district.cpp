@@ -9,6 +9,7 @@ Client districts: FreeUSD manifest parse, console commands, view residency.
 extern "C" {
 #include "client.h"
 #include "../../world/world_district.h"
+#include "../../world/world_zone.h"
 #include "defer.h"
 #include "jobs.h"
 }
@@ -17,6 +18,7 @@ extern "C" {
 
 #include "cl_freeusd_util.hpp"
 #include <cstring>
+#include <cstdint>
 #include <new>
 #include <string>
 
@@ -154,6 +156,21 @@ extern "C" qboolean WorldDistrict_ParseManifestFreeUSD( const char *osPath, cons
 		d->origin[0] = (float)node.local_to_world_transform.m[12];
 		d->origin[1] = (float)node.local_to_world_transform.m[13];
 		d->origin[2] = (float)node.local_to_world_transform.m[14];
+		d->zoneResidencyMask = WORLD_ZONE_RESIDENCY_ALL;
+		d->zonePriority = 1.0f;
+		{
+			const auto prim = stage->GetPrimAtPath( node.path );
+			double value;
+			std::int32_t mask;
+			if ( prim.IsValid() && prim.HasCustomDataKey( "zoneLoadRadius" ) &&
+				prim.GetCustomData( "zoneLoadRadius" ).GetDouble( &value ) ) d->zoneLoadRadius = (float)value;
+			if ( prim.IsValid() && prim.HasCustomDataKey( "zoneUnloadRadius" ) &&
+				prim.GetCustomData( "zoneUnloadRadius" ).GetDouble( &value ) ) d->zoneUnloadRadius = (float)value;
+			if ( prim.IsValid() && prim.HasCustomDataKey( "zonePriority" ) &&
+				prim.GetCustomData( "zonePriority" ).GetDouble( &value ) ) d->zonePriority = (float)value;
+			if ( prim.IsValid() && prim.HasCustomDataKey( "residencyMask" ) &&
+				prim.GetCustomData( "residencyMask" ).GetInt32( &mask ) ) d->zoneResidencyMask = (uint32_t)mask;
+		}
 		/*
 		 * A validation manifest may point at a large external payload without
 		 * copying it into the game tree.  Keep the conventional slug fallback

@@ -37,6 +37,10 @@ typedef struct worldDistrict_s {
 	vec3_t                origin;
 	vec3_t                boundsMin;
 	vec3_t                boundsMax;
+	float                 zoneLoadRadius;
+	float                 zoneUnloadRadius;
+	float                 zonePriority;
+	uint32_t              zoneResidencyMask;
 	int                   sectorX0;
 	int                   sectorY0;
 	int                   sectorX1;
