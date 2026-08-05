@@ -71,6 +71,7 @@ static int s_binds;
 static int s_unbinds;
 static int s_feedbackHits;
 static int s_feedbackMisses;
+static uint32_t s_zoneGatedFrames;
 static int s_lruTick;
 static qboolean s_useSparse;
 static int s_pageSize;
@@ -80,6 +81,16 @@ static int s_atlasW;
 static int s_atlasH;
 static worldZoneResidency_t s_worldZones[REF_WORLD_ZONE_MAX];
 static int s_worldZoneCount;
+
+static qboolean VT_HasResidentTextureZone( void )
+{
+	int i;
+	if ( s_worldZoneCount <= 0 ) return qtrue; /* legacy scenes have no snapshot */
+	for ( i = 0; i < s_worldZoneCount; i++ ) {
+		if ( s_worldZones[i].resident && ( s_worldZones[i].residencyMask & REF_WORLD_ZONE_RESIDENCY_TEXTURE ) ) return qtrue;
+	}
+	return qfalse;
+}
 
 static vkSparseImage_t s_sparseImg;
 static vkSparsePool_t s_sparsePool;
@@ -158,6 +169,7 @@ static void VT_Status_f( void )
 		s_atlasShader,
 		s_useSparse ? s_sparseImg.granW : (uint32_t)s_pageSize,
 		s_useSparse ? s_sparseImg.granH : (uint32_t)s_pageSize, s_worldZoneCount );
+	ri.Printf( PRINT_ALL, "  zone-gated feedback frames=%u\n", s_zoneGatedFrames );
 	for ( i = 0; i < s_slotCapacity; i++ ) {
 		if ( s_slots[i].used && s_slots[i].name[0] ) {
 			ri.Printf( PRINT_ALL, "  slot %d: vid=%d xy=%d,%d %s\n",
@@ -642,6 +654,7 @@ void R_VT_Init( void )
 	s_realLoads = s_procLoads = 0;
 	s_binds = s_unbinds = 0;
 	s_feedbackHits = s_feedbackMisses = 0;
+	s_zoneGatedFrames = 0;
 	s_lruTick = 1;
 	s_useSparse = qfalse;
 	s_pageSize = VT_PAGE_SIZE_DEFAULT;
@@ -795,7 +808,8 @@ qhandle_t R_VT_AtlasShader( void )
 
 qboolean R_VT_WantSample( void )
 {
-	return ( R_VT_Active() && r_vtSample && r_vtSample->integer && s_atlasShader ) ? qtrue : qfalse;
+	return ( R_VT_Active() && r_vtSample && r_vtSample->integer && s_atlasShader &&
+		VT_HasResidentTextureZone() ) ? qtrue : qfalse;
 }
 
 void R_VT_DebugDraw( void )
@@ -909,6 +923,10 @@ void R_VT_Feedback_BeginFrame( void )
 	if ( !R_VT_Active() || !r_vtFeedback || !r_vtFeedback->integer ) {
 		return;
 	}
+	if ( !VT_HasResidentTextureZone() ) {
+		s_zoneGatedFrames++;
+		return;
+	}
 	Com_Memset( s_feedbackBits, 0, sizeof( s_feedbackBits ) );
 	if ( s_feedbackMapped ) {
 		Com_Memset( s_feedbackMapped, 0, s_feedbackWordCount * sizeof( uint32_t ) );
@@ -920,7 +938,7 @@ void R_VT_Feedback_RequestPage( int virtualPage )
 {
 	uint32_t word, bit;
 
-	if ( !R_VT_Active() || !r_vtFeedback || !r_vtFeedback->integer ) {
+	if ( !R_VT_Active() || !r_vtFeedback || !r_vtFeedback->integer || !VT_HasResidentTextureZone() ) {
 		return;
 	}
 	if ( virtualPage < 0 || virtualPage >= s_virtualPages * s_virtualPages ) {
@@ -940,7 +958,7 @@ void R_VT_Feedback_RequestUV( float u, float v )
 {
 	int pageX, pageY;
 
-	if ( !R_VT_Active() || !r_vtFeedback || !r_vtFeedback->integer || s_virtualPages < 1 ) {
+	if ( !R_VT_Active() || !r_vtFeedback || !r_vtFeedback->integer || !VT_HasResidentTextureZone() || s_virtualPages < 1 ) {
 		return;
 	}
 	if ( u < 0.0f ) {
@@ -974,7 +992,7 @@ void R_VT_Feedback_EndFrame( void )
 	uint32_t w, b;
 	int vid;
 
-	if ( !R_VT_Active() || !r_vtFeedback || !r_vtFeedback->integer ) {
+	if ( !R_VT_Active() || !r_vtFeedback || !r_vtFeedback->integer || !VT_HasResidentTextureZone() ) {
 		return;
 	}
 

@@ -53,6 +53,16 @@ static uint32_t s_pageRequestsAccepted;
 static worldZoneResidency_t s_worldZones[REF_WORLD_ZONE_MAX];
 static int s_worldZoneCount;
 
+static qboolean VShadow_HasResidentShadowZone( void )
+{
+	int i;
+	if ( s_worldZoneCount <= 0 ) return qtrue; /* legacy scenes have no snapshot */
+	for ( i = 0; i < s_worldZoneCount; i++ ) {
+		if ( s_worldZones[i].resident && ( s_worldZones[i].residencyMask & REF_WORLD_ZONE_RESIDENCY_SHADOW ) ) return qtrue;
+	}
+	return qfalse;
+}
+
 static uint32_t VShadow_Hash( uint32_t virtualId )
 {
 	virtualId ^= virtualId >> 16;
@@ -478,6 +488,7 @@ void vk_vshadow_begin_frame( void )
 	s_stats.budgetDrops = 0;
 	s_stats.localLightsAccepted = 0;
 	s_stats.casterDrawBudget = s_budget.casterDrawBudget;
+	s_stats.zoneGatedUpdates = 0;
 	s_localLightRequests = 0;
 	s_pageRequestsAccepted = 0;
 	s_budget.pagesClaimed = 0;
@@ -550,6 +561,11 @@ void vk_vshadow_update( const float viewOrigin[3], const float sunDir[3],
 	}
 	if ( sunDir ) {
 		vk_vshadow_on_sun_direction( sunDir );
+	}
+	if ( !VShadow_HasResidentShadowZone() ) {
+		s_stats.zoneGatedUpdates++;
+		s_clip.valid = qfalse;
+		return;
 	}
 
 	levels = r_vshadowClipmapLevels ? r_vshadowClipmapLevels->integer : 4;
@@ -734,6 +750,7 @@ void vk_vshadow_status_f( void )
 		vk_vshadow_active() ? "yes" : "no",
 		vk_vshadow_healthy() ? "yes" : "no" );
 	ri.Printf( PRINT_ALL, "world zones      : %d (texture/shadow residency snapshot)\n", s_worldZoneCount );
+	ri.Printf( PRINT_ALL, "zone gated       : %u shadow updates skipped\n", st->zoneGatedUpdates );
 	ri.Printf( PRINT_ALL, "pageSize         : %d pool=%d atlasGrid=%d budgetBytes~%u\n",
 		s_pageSize, s_poolCapacity, s_atlasGrid, st->pagePoolBytes );
 	ri.Printf( PRINT_ALL, "clipmap          : levels=%d baseWorld=%.0f valid=%s\n",

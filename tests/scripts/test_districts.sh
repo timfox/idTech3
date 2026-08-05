@@ -45,6 +45,13 @@ rg -q 'WorldZone_Import' "$WD"
 rg -q 'WorldDistrict_ZoneLoad' "$WD"
 rg -q 'residencyMask' "$ZONE_H"
 rg -q 'zoneLoadRadius' "$CL_D"
+rg -q 'SetWorldZoneResidency' renderers/common/tr_public.h "$CL_D"
+rg -q 'R_VT_SetWorldZoneResidency' renderers/vulkan/vk_vt.c
+rg -q 'vk_vshadow_set_world_zone_residency' renderers/vulkan/vk_vshadow.c
+rg -q 'VT_HasResidentTextureZone' renderers/vulkan/vk_vt.c
+rg -q 'VShadow_HasResidentShadowZone' renderers/vulkan/vk_vshadow.c
+rg -q 'zoneGatedUpdates' renderers/vulkan/vk_vshadow.h renderers/vulkan/vk_vshadow.c
+rg -q 'zoneGatedFrames' renderers/vulkan/vk_vt.c
 rg -q 'r_worldZoneBudget' "$ZONE"
 rg -q 'world_zone.cpp' cmake/IdTech3QcommonExtensions.cmake
 rg -q 'world_district.cpp' cmake/IdTech3QcommonExtensions.cmake

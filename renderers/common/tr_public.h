@@ -34,6 +34,8 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 typedef struct arcBlancGpuParams_s arcBlancGpuParams_t;
 
 #define REF_WORLD_ZONE_MAX 128
+#define REF_WORLD_ZONE_RESIDENCY_TEXTURE ( 1u << 1 )
+#define REF_WORLD_ZONE_RESIDENCY_SHADOW  ( 1u << 2 )
 typedef struct {
 	vec3_t boundsMin;
 	vec3_t boundsMax;

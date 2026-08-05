@@ -67,6 +67,7 @@ typedef struct vkVShadowStats_s {
 	uint32_t budgetDrops;
 	uint32_t localLightsAccepted;
 	uint32_t casterDrawBudget;
+	uint32_t zoneGatedUpdates;
 	uint32_t pagePoolBytes;
 	uint32_t frameNumber;
 	float    fallbackPercent; /* 0..100 CSM/atlas share */
