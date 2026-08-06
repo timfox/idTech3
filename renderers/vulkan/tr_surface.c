@@ -391,10 +391,8 @@ static void RB_SurfaceTriangles( const srfTriangles_t *srf ) {
 	int			i;
 	const srfVert_t	*dv;
 	float		*xyz, *normal;
-#ifdef USE_VK_PBR
 	float				*qtangent;
 	float				*lightdir;
-#endif
 	float		*texCoords0;
 	float		*texCoords1;
 	uint32_t	*color;
@@ -428,10 +426,8 @@ static void RB_SurfaceTriangles( const srfTriangles_t *srf ) {
 	dv = srf->verts;
 	xyz = tess.xyz[ tess.numVertexes ];
 	normal = tess.normal[ tess.numVertexes ];
-#ifdef USE_VK_PBR
 	qtangent = tess.qtangent[ tess.numVertexes ];
 	lightdir = tess.lightdir[ tess.numVertexes ];
-#endif
 	texCoords0 = tess.texCoords[0][ tess.numVertexes ];
 	texCoords1 = tess.texCoords[1][ tess.numVertexes ];
 	color = &tess.vertexColors[ tess.numVertexes ].u32;
@@ -447,7 +443,6 @@ static void RB_SurfaceTriangles( const srfTriangles_t *srf ) {
 			normal[2] = dv->normal[2];
 		}
 
-#ifdef USE_VK_PBR
 		if( vk.pbrActive ) {
 			qtangent[0] = dv->qtangent[0];
 			qtangent[1] = dv->qtangent[1];
@@ -461,7 +456,6 @@ static void RB_SurfaceTriangles( const srfTriangles_t *srf ) {
 			lightdir[3] = 0.0;
 			lightdir += 4;
 		}
-#endif
 
 		texCoords0[0] = dv->st[0];
 		texCoords0[1] = dv->st[1];
@@ -1083,18 +1077,15 @@ static void RB_SurfaceFace( const srfSurfaceFace_t *surf ) {
 		}
 	}
 
-#ifdef USE_VK_PBR
 		if( vk.pbrActive && surf->qtangents )	
 			memcpy( &tess.qtangent[ tess.numVertexes ], surf->qtangents, numPoints * sizeof( vec4_t ) );	
 
 		if( vk.pbrActive && surf->lightdir )	
 			memcpy( &tess.lightdir[ tess.numVertexes ], surf->lightdir, numPoints * sizeof( vec4_t ) );
-#endif
 
 	for ( i = 0, v = surf->points[0], ndx = tess.numVertexes; i < numPoints; i++, v += VERTEXSIZE, ndx++ ) {
 		VectorCopy( v, tess.xyz[ndx]);
 
-#ifdef USE_VK_PBR
 		tess.texCoords[0][ndx][0] = v[6];
 		tess.texCoords[0][ndx][1] = v[7];
 		{
@@ -1106,19 +1097,6 @@ static void RB_SurfaceFace( const srfSurfaceFace_t *surf ) {
 			Com_Memcpy( &color, &v[10], sizeof( color ) );
 			Com_Memcpy( &tess.vertexColors[ndx], &color, sizeof( color ) );
 		}
-#else
-		tess.texCoords[0][ndx][0] = v[3];
-		tess.texCoords[0][ndx][1] = v[4];
-		{
-			tess.texCoords[1][ndx][0] = v[5];
-			tess.texCoords[1][ndx][1] = v[6];
-		}
-		{
-			uint32_t color;
-			Com_Memcpy( &color, &v[7], sizeof( color ) );
-			Com_Memcpy( &tess.vertexColors[ndx], &color, sizeof( color ) );
-		}
-#endif
 
 		tess.vertexDlightBits[ndx] = dlightBits;
 	}
@@ -1175,10 +1153,8 @@ static void RB_SurfaceGrid( srfGridMesh_t *cv ) {
 	float	*texCoords0;
 	float	*texCoords1;
 	float	*normal;
-#ifdef USE_VK_PBR
 	float	*qtangent;
 	float	*lightdir;
-#endif
 	uint32_t *color;
 	srfVert_t *dv;
 	int		rows, irows, vrows;
@@ -1260,10 +1236,8 @@ static void RB_SurfaceGrid( srfGridMesh_t *cv ) {
 
 		xyz = tess.xyz[numVertexes];
 		normal = tess.normal[numVertexes];
-#ifdef USE_VK_PBR
 		qtangent = tess.qtangent[numVertexes];
 		lightdir = tess.lightdir[numVertexes];
-#endif
 		texCoords0 = tess.texCoords[0][numVertexes];
 		texCoords1 = tess.texCoords[1][numVertexes];
 		color = &tess.vertexColors[numVertexes].u32;
@@ -1290,7 +1264,6 @@ static void RB_SurfaceGrid( srfGridMesh_t *cv ) {
 					normal += 4;
 				}
 
-#ifdef USE_VK_PBR
 				if( vk.pbrActive ) {
 					qtangent[0] = dv->qtangent[0];
 					qtangent[1] = dv->qtangent[1];
@@ -1304,7 +1277,6 @@ static void RB_SurfaceGrid( srfGridMesh_t *cv ) {
 					lightdir[3] = 0.0;
 					lightdir += 4;
 				}
-#endif
 
 				*color = dv->color.u32;
 				*vDlightBits++ = dlightBits;
@@ -1500,7 +1472,6 @@ static void RB_SurfaceSkip( void *surf ) {
 	(void)surf;
 }
 
-#ifdef USE_VK_PBR
 /*
 ================
 RB_GLTFRecomputeQtangentsForTessRange
@@ -1597,7 +1568,6 @@ static void RB_GLTFRecomputeQtangentsForTessRange( int vertBase, int numVerts, i
 	ri.Hunk_FreeTempMemory( btAcc );
 	ri.Hunk_FreeTempMemory( tanAcc );
 }
-#endif /* USE_VK_PBR */
 
 /*
 =============
@@ -1747,7 +1717,6 @@ void RB_GLTFSurface( const surfaceType_t *surface ) {
 		}
 	}
 
-#ifdef USE_VK_PBR
 	if ( r_gltfGpu && r_gltfGpu->integer && vk.cmd && vk.pbrActive && tess.shader && tess.shader->hasPBR &&
 		surf->vbo_vertex != TR_GLTF_VBO_HANDLE_INVALID && surf->vbo_index != TR_GLTF_VBO_HANDLE_INVALID &&
 		( haveJoints || useMorph ) &&
@@ -1913,7 +1882,6 @@ void RB_GLTFSurface( const surfaceType_t *surface ) {
 	tess.gltfUseGpuPipeline = qfalse;
 	tess.gltfGpuMorphActive = qfalse;
 	tess.gltfGpuMorphCount = 0;
-#endif /* USE_VK_PBR */
 
 	if ( surf->vbo_vertex != TR_GLTF_VBO_HANDLE_INVALID && surf->vbo_index != TR_GLTF_VBO_HANDLE_INVALID ) {
 		/* VBO path: set gltfDrawSurface for vk_bind_geometry to use */
@@ -2029,11 +1997,9 @@ void RB_GLTFSurface( const surfaceType_t *surface ) {
 			tess.indexes[tess.numIndexes + j] = (glIndex_t)( base + surf->indices[j] );
 		}
 		tess.numIndexes += surf->numIndices;
-#ifdef USE_VK_PBR
 		if ( vk.pbrActive && tess.shader && tess.shader->hasPBR ) {
 			RB_GLTFRecomputeQtangentsForTessRange( base, surf->numVertices, idxBase, surf->numIndices );
 		}
-#endif
 	}
 }
 
