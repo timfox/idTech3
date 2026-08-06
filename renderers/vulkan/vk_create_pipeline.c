@@ -18,13 +18,8 @@ static inline qboolean vk_hdr64_active( void )
 	return vk.color_format == VK_FORMAT_R64G64B64A64_SFLOAT;
 }
 
-#ifdef USE_VK_PBR
 static VkVertexInputBindingDescription bindings[10];
 static VkVertexInputAttributeDescription attribs[10];
-#else
-static VkVertexInputBindingDescription bindings[8];
-static VkVertexInputAttributeDescription attribs[8];
-#endif
 static uint32_t num_binds;
 static uint32_t num_attrs;
 
@@ -46,7 +41,6 @@ static void push_attr( uint32_t location, uint32_t binding, VkFormat format )
 }
 
 
-#ifdef USE_VK_PBR
 static VkShaderModule *vk_select_pbr_gen_vert( const Vk_Pipeline_Def *def, int use_pbr, int tx, int cl, int env )
 {
 	const int fog = def->fog_stage ? 1 : 0;
@@ -56,7 +50,6 @@ static VkShaderModule *vk_select_pbr_gen_vert( const Vk_Pipeline_Def *def, int u
 	}
 	return &vk.modules.vert.gen[use_pbr][tx][cl][env][fog];
 }
-#endif
 
 VkPipeline vk_create_pipeline( const Vk_Pipeline_Def *def, renderPass_t renderPassIndex, uint32_t def_index ) {
 	(void)def_index; // unused parameter
@@ -66,16 +59,10 @@ VkPipeline vk_create_pipeline( const Vk_Pipeline_Def *def, renderPass_t renderPa
 	//VkSpecializationInfo vert_spec_info;
     struct Vk_Pipeline_FragSpecData frag_spec_data;
 
-#ifdef USE_VK_PBR
 	/* ADD_FRAG_SPEC: 11 base (0..10) + 34 PBR (constant_id 11..44) = 45 entries. */
 	VkSpecializationMapEntry spec_entries[48];
 	_Static_assert( sizeof( spec_entries ) / sizeof( spec_entries[0] ) >= 45u,
 		"vk_create_pipeline: spec_entries[] too small for PBR fragment specialization map" );
-#else
-	VkSpecializationMapEntry spec_entries[12];
-	_Static_assert( sizeof( spec_entries ) / sizeof( spec_entries[0] ) >= 11u,
-		"vk_create_pipeline: spec_entries[] too small for non-PBR fragment specialization map" );
-#endif
 	
 	VkSpecializationInfo frag_spec_info;
 	VkPipelineVertexInputStateCreateInfo vertex_input_state;
@@ -103,7 +90,6 @@ VkPipeline vk_create_pipeline( const Vk_Pipeline_Def *def, renderPass_t renderPa
 	unsigned int atest_bits;
 	unsigned int state_bits = def->state_bits;
 
-#ifdef USE_VK_PBR
 	const int use_pbr = def->vk_pbr_flags ? 1 : 0;
 
 	switch ( def->shader_type ) {
@@ -308,205 +294,6 @@ VkPipeline vk_create_pipeline( const Vk_Pipeline_Def *def, renderPass_t renderPa
 			ri.Error(ERR_DROP, "create_pipeline: unknown shader type %i\n", def->shader_type);
 			return 0;
 	}
-#else
-	switch ( def->shader_type ) {
-
-		case TYPE_SIGNLE_TEXTURE_LIGHTING:
-			vs_module = &vk.modules.vert.light[0];
-			fs_module = &vk.modules.frag.light[0][0];
-			break;
-
-		case TYPE_SIGNLE_TEXTURE_LIGHTING_LINEAR:
-			vs_module = &vk.modules.vert.light[0];
-			fs_module = &vk.modules.frag.light[1][0];
-			break;
-
-		case TYPE_SIGNLE_TEXTURE_DF:
-			state_bits |= GLS_DEPTHMASK_TRUE;
-			vs_module = &vk.modules.vert.ident1[0][0][0];
-			fs_module = &vk.modules.frag.gen0_df;
-			break;
-
-		case TYPE_SIGNLE_TEXTURE_UI_SDF:
-			vs_module = &vk.modules.vert.gen[0][0][0][0];
-			fs_module = &vk.modules.frag.ui_sdf_text;
-			break;
-
-		case TYPE_SIGNLE_TEXTURE_UI_VECTOR:
-			vs_module = &vk.modules.vert.gen[0][0][0][0];
-			fs_module = &vk.modules.frag.ui_vector_text;
-			break;
-
-		case TYPE_SIGNLE_TEXTURE_FIXED_COLOR:
-			vs_module = &vk.modules.vert.fixed[0][0][0];
-			fs_module = &vk.modules.frag.fixed[0][0];
-			break;
-
-		case TYPE_SIGNLE_TEXTURE_FIXED_COLOR_ENV:
-			vs_module = &vk.modules.vert.fixed[0][1][0];
-			fs_module = &vk.modules.frag.fixed[0][0];
-			break;
-
-		case TYPE_SIGNLE_TEXTURE_ENT_COLOR:
-			vs_module = &vk.modules.vert.fixed[0][0][0];
-			fs_module = &vk.modules.frag.ent[0][0];
-			break;
-
-		case TYPE_SIGNLE_TEXTURE_ENT_COLOR_ENV:
-			vs_module = &vk.modules.vert.fixed[0][1][0];
-			fs_module = &vk.modules.frag.ent[0][0];
-			break;
-
-		case TYPE_SIGNLE_TEXTURE:
-			if ( def->hasFlowmap ) {
-				const int fog = def->fog_stage ? 1 : 0;
-				vs_module = &vk.modules.vert.gen[0][0][0][fog];
-				fs_module = &vk.modules.frag.flowmap[fog];
-			} else {
-				vs_module = &vk.modules.vert.gen[0][0][0][0];
-				fs_module = &vk.modules.frag.gen[0][0][0];
-			}
-			break;
-
-		case TYPE_SIGNLE_TEXTURE_ENV:
-			vs_module = &vk.modules.vert.gen[0][0][1][0];
-			fs_module = &vk.modules.frag.gen[0][0][0];
-			break;
-
-		case TYPE_SIGNLE_TEXTURE_IDENTITY:
-			vs_module = &vk.modules.vert.ident1[0][0][0];
-			fs_module = &vk.modules.frag.ident1[0][0];
-			break;
-
-		case TYPE_SIGNLE_TEXTURE_IDENTITY_ENV:
-			vs_module = &vk.modules.vert.ident1[0][1][0];
-			fs_module = &vk.modules.frag.ident1[0][0];
-			break;
-
-		case TYPE_MULTI_TEXTURE_ADD2_IDENTITY:
-		case TYPE_MULTI_TEXTURE_MUL2_IDENTITY:
-			vs_module = &vk.modules.vert.ident1[1][0][0];
-			fs_module = &vk.modules.frag.ident1[1][0];
-			break;
-
-		case TYPE_MULTI_TEXTURE_ADD2_IDENTITY_ENV:
-		case TYPE_MULTI_TEXTURE_MUL2_IDENTITY_ENV:
-			vs_module = &vk.modules.vert.ident1[1][1][0];
-			fs_module = &vk.modules.frag.ident1[1][0];
-			break;
-
-		case TYPE_MULTI_TEXTURE_ADD2_FIXED_COLOR:
-		case TYPE_MULTI_TEXTURE_MUL2_FIXED_COLOR:
-			vs_module = &vk.modules.vert.fixed[1][0][0];
-			fs_module = &vk.modules.frag.fixed[1][0];
-			break;
-
-		case TYPE_MULTI_TEXTURE_ADD2_FIXED_COLOR_ENV:
-		case TYPE_MULTI_TEXTURE_MUL2_FIXED_COLOR_ENV:
-			vs_module = &vk.modules.vert.fixed[1][1][0];
-			fs_module = &vk.modules.frag.fixed[1][0];
-			break;
-
-		case TYPE_MULTI_TEXTURE_MUL2:
-		case TYPE_MULTI_TEXTURE_ADD2_1_1:
-		case TYPE_MULTI_TEXTURE_ADD2:
-			vs_module = &vk.modules.vert.gen[1][0][0][0];
-			fs_module = &vk.modules.frag.gen[1][0][0];
-			break;
-
-		case TYPE_MULTI_TEXTURE_MUL2_ENV:
-		case TYPE_MULTI_TEXTURE_ADD2_1_1_ENV:
-		case TYPE_MULTI_TEXTURE_ADD2_ENV:
-			vs_module = &vk.modules.vert.gen[1][0][1][0];
-			fs_module = &vk.modules.frag.gen[1][0][0];
-			break;
-
-		case TYPE_MULTI_TEXTURE_MUL3:
-		case TYPE_MULTI_TEXTURE_ADD3_1_1:
-		case TYPE_MULTI_TEXTURE_ADD3:
-			vs_module = &vk.modules.vert.gen[2][0][0][0];
-			fs_module = &vk.modules.frag.gen[2][0][0];
-			break;
-
-		case TYPE_MULTI_TEXTURE_MUL3_ENV:
-		case TYPE_MULTI_TEXTURE_ADD3_1_1_ENV:
-		case TYPE_MULTI_TEXTURE_ADD3_ENV:
-			vs_module = &vk.modules.vert.gen[2][0][1][0];
-			fs_module = &vk.modules.frag.gen[2][0][0];
-			break;
-
-		case TYPE_BLEND2_ADD:
-		case TYPE_BLEND2_MUL:
-		case TYPE_BLEND2_ALPHA:
-		case TYPE_BLEND2_ONE_MINUS_ALPHA:
-		case TYPE_BLEND2_MIX_ALPHA:
-		case TYPE_BLEND2_MIX_ONE_MINUS_ALPHA:
-		case TYPE_BLEND2_DST_COLOR_SRC_ALPHA:
-			vs_module = &vk.modules.vert.gen[1][1][0][0];
-			fs_module = &vk.modules.frag.gen[1][1][0];
-			break;
-
-		case TYPE_BLEND2_ADD_ENV:
-		case TYPE_BLEND2_MUL_ENV:
-		case TYPE_BLEND2_ALPHA_ENV:
-		case TYPE_BLEND2_ONE_MINUS_ALPHA_ENV:
-		case TYPE_BLEND2_MIX_ALPHA_ENV:
-		case TYPE_BLEND2_MIX_ONE_MINUS_ALPHA_ENV:
-		case TYPE_BLEND2_DST_COLOR_SRC_ALPHA_ENV:
-			vs_module = &vk.modules.vert.gen[1][1][1][0];
-			fs_module = &vk.modules.frag.gen[1][1][0];
-			break;
-
-		case TYPE_BLEND3_ADD:
-		case TYPE_BLEND3_MUL:
-		case TYPE_BLEND3_ALPHA:
-		case TYPE_BLEND3_ONE_MINUS_ALPHA:
-		case TYPE_BLEND3_MIX_ALPHA:
-		case TYPE_BLEND3_MIX_ONE_MINUS_ALPHA:
-		case TYPE_BLEND3_DST_COLOR_SRC_ALPHA:
-			vs_module = &vk.modules.vert.gen[2][1][0][0];
-			fs_module = &vk.modules.frag.gen[2][1][0];
-			break;
-
-		case TYPE_BLEND3_ADD_ENV:
-		case TYPE_BLEND3_MUL_ENV:
-		case TYPE_BLEND3_ALPHA_ENV:
-		case TYPE_BLEND3_ONE_MINUS_ALPHA_ENV:
-		case TYPE_BLEND3_MIX_ALPHA_ENV:
-		case TYPE_BLEND3_MIX_ONE_MINUS_ALPHA_ENV:
-		case TYPE_BLEND3_DST_COLOR_SRC_ALPHA_ENV:
-			vs_module = &vk.modules.vert.gen[2][1][1][0];
-			fs_module = &vk.modules.frag.gen[2][1][0];
-			break;
-
-		case TYPE_COLOR_BLACK:
-		case TYPE_COLOR_WHITE:
-		case TYPE_COLOR_GREEN:
-		case TYPE_COLOR_RED:
-			vs_module = &vk.modules.color_vs;
-			fs_module = &vk.modules.color_fs;
-			break;
-
-		case TYPE_FOG_ONLY:
-			vs_module = &vk.modules.fog_vs;
-			fs_module = &vk.modules.fog_fs;
-			break;
-
-		case TYPE_DOT:
-			vs_module = &vk.modules.dot_vs;
-			fs_module = &vk.modules.dot_fs;
-			break;
-
-		case TYPE_OCCLUSION_BBOX:
-			vs_module = &vk.modules.color_vs;
-			fs_module = &vk.modules.color_fs;
-			break;
-
-		default:
-			ri.Error(ERR_DROP, "create_pipeline: unknown shader type %i\n", def->shader_type);
-			return 0;
-	}
-#endif
 	
 
 	if ( def->fog_stage ) {
@@ -535,7 +322,6 @@ VkPipeline vk_create_pipeline( const Vk_Pipeline_Def *def, renderPass_t renderPa
 		( renderPassIndex == RENDER_PASS_MAIN || renderPassIndex == RENDER_PASS_POST_BLOOM ) ) ? VK_TRUE : VK_FALSE;
 	main_visibility_export_target = ( main_deferred_export_target && vk.visibilityBufferDirectExport ) ? VK_TRUE : VK_FALSE;
 
-#ifdef USE_VK_PBR
 	if ( main_deferred_export_target && use_pbr && !vk_hdr64_active() ) {
 		const int fog = def->fog_stage ? 1 : 0;
 		switch ( def->shader_type ) {
@@ -619,7 +405,6 @@ VkPipeline vk_create_pipeline( const Vk_Pipeline_Def *def, renderPass_t renderPa
 				break;
 		}
 	}
-#endif
 
 	vk_set_shader_stage_desc(shader_stages+0, VK_SHADER_STAGE_VERTEX_BIT, *vs_module, "main");
 	vk_set_shader_stage_desc(shader_stages+1, VK_SHADER_STAGE_FRAGMENT_BIT, *fs_module, "main");
@@ -803,7 +588,6 @@ VkPipeline vk_create_pipeline( const Vk_Pipeline_Def *def, renderPass_t renderPa
 	ADD_FRAG_SPEC( 9, identity_alpha );
 	ADD_FRAG_SPEC( 10, acff );
 
-#ifdef USE_VK_PBR
 	ADD_FRAG_SPEC( 11, specularScale_x );
 	ADD_FRAG_SPEC( 12, specularScale_y );
 	ADD_FRAG_SPEC( 13, specularScale_z );
@@ -969,7 +753,6 @@ VkPipeline vk_create_pipeline( const Vk_Pipeline_Def *def, renderPass_t renderPa
 			frag_spec_data.deluxe_mapping = 0;
 		}
 	}
-#endif
 
 	frag_spec_data.lightmap_scale = ( r_hdr_lightmap_scale && r_hdr_lightmap_scale->value > 0.0f ) ?
 		r_hdr_lightmap_scale->value : 1.0f;
@@ -1260,7 +1043,6 @@ VkPipeline vk_create_pipeline( const Vk_Pipeline_Def *def, renderPass_t renderPa
 			break;
 	}
 
- #ifdef USE_VK_PBR  
     if( def->vk_pbr_flags ){   
 
 		if ( !has_normal )
@@ -1282,7 +1064,6 @@ VkPipeline vk_create_pipeline( const Vk_Pipeline_Def *def, renderPass_t renderPa
         push_bind( 9, sizeof(vec4_t) );							// lightdir
         push_attr( 9, 9, VK_FORMAT_R32G32B32A32_SFLOAT );
     }
-#endif
 
 	vertex_input_state.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
 	vertex_input_state.pNext = NULL;
@@ -1596,9 +1377,7 @@ VkPipeline vk_create_pipeline( const Vk_Pipeline_Def *def, renderPass_t renderPa
 		attachment_blend_states[1].colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT;
 	}
 	if ( main_deferred_export_target &&
-#ifdef USE_VK_PBR
 		use_pbr &&
-#endif
 		attachment_blend_state.blendEnable == VK_FALSE &&
 		def->shadow_phase == SHADOW_DISABLED &&
 		depth_stencil_state.depthTestEnable == VK_TRUE &&
@@ -1622,7 +1401,6 @@ VkPipeline vk_create_pipeline( const Vk_Pipeline_Def *def, renderPass_t renderPa
 	if ( r_vk_pipeline_debug && r_vk_pipeline_debug->integer ) {
 		ri.Printf( PRINT_DEVELOPER, "vk pipeline def#%u render_pass=%u shader=%u fog=%d state=0x%x allow_discard=%d discard_mode=%d\n",
 			def_index, renderPassIndex, def->shader_type, def->fog_stage, def->state_bits, def->allow_discard, frag_spec_data.discard_mode );
-#ifdef USE_VK_PBR
 		if ( def->vk_pbr_flags ) {
 			ri.Printf( PRINT_DEVELOPER, "vk pipeline PBR spec consts [19=%d 20=%d 21=%d 22=%d 23=%d 24=%d 25=%d 26=%d 27=%d 28=%d 29=%d]\n",
 				frag_spec_data.normal_texture_set,
@@ -1637,7 +1415,6 @@ VkPipeline vk_create_pipeline( const Vk_Pipeline_Def *def, renderPass_t renderPa
 				frag_spec_data.transmission_texture_set,
 				frag_spec_data.subsurface_texture_set );
 		}
-#endif
 	}
 
 	blend_state.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
