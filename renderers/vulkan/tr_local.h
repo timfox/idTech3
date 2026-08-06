@@ -404,10 +404,8 @@ typedef struct {
 	/* water flowmap: flow vectors offset texture UVs */
 	image_t			*flowmapImage;
 	float			flowmapSpeed;
-#ifdef USE_VK_PBR
 	// have no dedicated bundle indexes for pbr samplers
 	image_t			*deluxeMap;
-#endif
 } textureBundle_t;
 
 #ifdef USE_VULKAN
@@ -436,14 +434,11 @@ typedef struct {
 
 	uint32_t		vk_pipeline[2]; // normal,fogged
 	uint32_t		vk_mirror_pipeline[2];
-#ifdef USE_VK_PBR
 	uint32_t		vk_pipeline_gltf_gpu[2];
 	uint32_t		vk_mirror_pipeline_gltf_gpu[2];
-#endif
 
 	uint32_t		vk_pipeline_df; // depthFragment
 	uint32_t		vk_mirror_pipeline_df;
-#ifdef USE_VK_PBR
 	uint32_t		vk_pbr_flags;
 	image_t			*normalMap;
 	image_t			*physicalMap;
@@ -491,7 +486,6 @@ typedef struct {
 	vec4_t subsurfaceParams;
 	vec4_t shCoeffs[9];
 	float  parallaxBias;
-#endif
 #endif
 
 #ifdef USE_VBO
@@ -594,16 +588,12 @@ typedef struct shader_s {
 	int			numVertexes;
 	int			curVertexes;
 	int			curIndexes;
-#ifdef USE_VK_PBR
 	int			qtangentOffset;
 	int			lightdirOffset;
 #endif
-#endif
 
 	int			hasScreenMap;
-#ifdef USE_VK_PBR
 	qboolean	hasPBR;
-#endif
 
 	void	(*optimalStageIteratorFunc)( void );
 
@@ -884,11 +874,7 @@ typedef struct srfGridMesh_s {
 	srfVert_t		verts[1];		// variable sized
 } srfGridMesh_t;
 
-#ifdef USE_VK_PBR
 	#define	VERTEXSIZE	11
-#else
-	#define	VERTEXSIZE	8
-#endif
 typedef struct {
 	surfaceType_t	surfaceType;
 	cplane_t	plane;
@@ -899,10 +885,8 @@ typedef struct {
 	int			vboItemIndex;
 #endif
 	float		*normals;
-#ifdef USE_VK_PBR
 	float			*qtangents;
 	float			*lightdir;
-#endif
 
 	// triangle definitions (no normals at points)
 	int			numPoints;
@@ -1398,9 +1382,7 @@ typedef struct {
 	image_t					*blackImage;
 	image_t					*whiteImage;			// full of 0xff
 	image_t					*identityLightImage;	// full of tr.identityLightByte
-#ifdef USE_VK_PBR
 	image_t					*emptyImage;		// full of 0xff
-#endif
 #ifdef VK_CUBEMAP
 	image_t					*emptyCubemap;
 	int                     numCubemaps;
@@ -1556,14 +1538,12 @@ extern cvar_t	*r_device;
 #ifdef USE_VBO
 extern cvar_t	*r_vbo;
 #endif
-#ifdef USE_VK_PBR
 extern cvar_t	*r_pbr;
 extern cvar_t	*r_pbr_shExtract;
 extern cvar_t	*r_pbr_debug;
 extern cvar_t	*r_pbr_bindlog;
 #ifdef VK_CUBEMAP
 extern cvar_t	*r_ibl_forceCapture;
-#endif
 void		R_PBR_ResetBindLog( void );
 extern cvar_t	*r_pbr_packedPreferred;
 extern cvar_t	*r_pbr_multiScatter;
@@ -2204,7 +2184,6 @@ void		R_InitShaders( void );
 void		R_ShaderList_f( void );
 void		RE_RemapShader(const char *oldShader, const char *newShader, const char *timeOffset);
 
-#ifdef USE_VK_PBR
 qboolean vk_create_phyisical_texture( shaderStage_t *stage, const char *albedoMapName, imgFlags_t flags );
 qboolean vk_create_normal_texture( shaderStage_t *stage, const char *albedoMapName, imgFlags_t flags );
 qboolean vk_create_emissive_texture( shaderStage_t *stage, const char *albedoMapName, imgFlags_t flags );
@@ -2216,7 +2195,6 @@ qboolean vk_create_transmission_texture( shaderStage_t *stage, const char *albed
 qboolean vk_create_subsurface_texture( shaderStage_t *stage, const char *albedoMapName, imgFlags_t flags );
 qboolean vk_create_detail_texture( shaderStage_t *stage, const char *name, imgFlags_t flags );
 image_t *vk_create_pbr_albedo_srgb( const char *albedoMapName, imgFlags_t flags );
-#endif
 
 //
 // tr_surface.c
@@ -2242,10 +2220,8 @@ typedef struct shaderCommands_s
 	glIndex_t	indexes[SHADER_MAX_INDEXES] QALIGN(16);
 	vec4_t		xyz[SHADER_MAX_VERTEXES*2] QALIGN(16); // 2x needed for shadows
 	vec4_t		normal[SHADER_MAX_VERTEXES] QALIGN(16);
-#ifdef USE_VK_PBR
 	vec4_t		qtangent[SHADER_MAX_VERTEXES]					QALIGN(16);
 	vec4_t		lightdir[SHADER_MAX_VERTEXES]					QALIGN(16);
-#endif
 	vec2_t		texCoords[2][SHADER_MAX_VERTEXES] QALIGN(16);
 	vec2_t		texCoords00[SHADER_MAX_VERTEXES] QALIGN(16);
 	color4ub_t	vertexColors[SHADER_MAX_VERTEXES] QALIGN(16);
@@ -2278,12 +2254,10 @@ typedef struct shaderCommands_s
 #ifdef USE_VULKAN
 	Vk_Depth_Range depthRange;
 	const struct srfGLTFPrimitive_s *gltfDrawSurface; /* when set, draw from glTF VBO instead of tess */
-#ifdef USE_VK_PBR
 	qboolean	gltfUseGpuPipeline; /* PBR + glTF VBO with GPU skin/morph (persists until next Tess_Begin) */
 	qboolean	gltfGpuMorphActive;
 	int		gltfGpuMorphCount;
 	float		gltfGpuMorphWeights[IQM_MORPH_TOP_K];
-#endif
 #endif
 
 	int			numPasses;
@@ -2362,9 +2336,7 @@ qboolean R_ClassicLightingActive( void );
 void R_EvalSH9_RGB( const vec3_t shCoeffs[SH_COEFF_COUNT], const vec3_t normal, vec3_t out );
 qboolean R_WorldSHVertexColor( const vec3_t position, const vec3_t normal, byte rgba[4] );
 qboolean R_SampleLightGridSH( const world_t *world, const vec3_t position, vec3_t shCoeffs[SH_COEFF_COUNT] );
-#ifdef USE_VK_PBR
 int R_LightDirForPoint( vec3_t point, vec3_t lightDir, vec3_t normal, world_t *world );
-#endif
 void VK_LightingPass( void );
 qboolean R_LightCullBounds( const dlight_t* dl, const vec3_t mins, const vec3_t maxs );
 
@@ -2740,7 +2712,6 @@ void RE_VertexLighting( qboolean allowed );
 
 #endif
 
-#ifdef USE_VK_PBR
 // pbr
 // mikktspace
 void		vk_mikkt_bsp_tri_generate( srfTriangles_t *tri );
@@ -2749,7 +2720,6 @@ void		vk_mikkt_bsp_face_generate( srfSurfaceFace_t *face );
 void		R_AddConvolveCubemapCmd( cubemap_t *cubemap , int cubemapId );
 void		vk_generate_cubemaps( cubemap_t *cube );
 void		R_IssueRenderCommands( void );
-#endif
 
 #ifdef USE_VBO
 #define VBO_STREAM_ITEM_FLAG	0x40000000u
@@ -2764,10 +2734,8 @@ typedef struct stream_vbo_item_s {
 	int iboOffset;
 	int vboOffset;
 	int normalOffset;
-#ifdef USE_VK_PBR
 	int qtangentOffset;
 	int lightdirOffset;
-#endif
 	stream_vbo_stage_t stages[MAX_SHADER_STAGES];
 	int numStages;
 	int num_indexes;
