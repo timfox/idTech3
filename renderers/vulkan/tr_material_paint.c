@@ -66,11 +66,7 @@ static void MP_WriteFaceColor( srfSurfaceFace_t *face, int vertIndex, const byte
 	if ( !face || vertIndex < 0 || vertIndex >= face->numPoints ) {
 		return;
 	}
-#ifdef USE_VK_PBR
 	dst = (byte *)&face->points[vertIndex][10];
-#else
-	dst = (byte *)&face->points[vertIndex][7];
-#endif
 	dst[0] = rgba[0];
 	dst[1] = rgba[1];
 	dst[2] = rgba[2];
@@ -83,11 +79,7 @@ static void MP_ReadFaceColor( const srfSurfaceFace_t *face, int vertIndex, byte 
 		rgba[0] = rgba[1] = rgba[2] = rgba[3] = 0;
 		return;
 	}
-#ifdef USE_VK_PBR
 	src = (const byte *)&face->points[vertIndex][10];
-#else
-	src = (const byte *)&face->points[vertIndex][7];
-#endif
 	rgba[0] = src[0];
 	rgba[1] = src[1];
 	rgba[2] = src[2];
