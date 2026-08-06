@@ -349,26 +349,17 @@ static qboolean SV_Surface( const svLoad_t *load, int faceIndex,
 		point[0] = SV_F32( vertices + vertexIndex * SV_VERTEX_BYTES + 0 );
 		point[1] = SV_F32( vertices + vertexIndex * SV_VERTEX_BYTES + 4 );
 		point[2] = SV_F32( vertices + vertexIndex * SV_VERTEX_BYTES + 8 );
-#ifdef USE_VK_PBR
 		point[3] = face->plane.normal[0]; point[4] = face->plane.normal[1]; point[5] = face->plane.normal[2];
 		point[6] = point[0] * 0.01f; point[7] = point[1] * 0.01f;
 		point[8] = point[9] = 0.0f;
 		((byte *)&point[10])[0] = 255; ((byte *)&point[10])[1] = 255;
 		((byte *)&point[10])[2] = 255; ((byte *)&point[10])[3] = 255;
-#else
-		point[3] = point[0] * 0.01f; point[4] = point[1] * 0.01f;
-		point[5] = point[6] = 0.0f;
-		((byte *)&point[7])[0] = 255; ((byte *)&point[7])[1] = 255;
-		((byte *)&point[7])[2] = 255; ((byte *)&point[7])[3] = 255;
-#endif
 	}
 	for ( j = 0; j < edgeCount - 2; j++ ) {
 		int *indices = (int *)( (byte *)face + face->ofsIndices );
 		indices[j * 3 + 0] = 0; indices[j * 3 + 1] = j + 1; indices[j * 3 + 2] = j + 2;
 	}
-#ifdef USE_VK_PBR
 	vk_mikkt_bsp_face_generate( face );
-#endif
 	surface->data = (surfaceType_t *)face;
 	return qtrue;
 }
