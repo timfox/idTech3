@@ -860,7 +860,6 @@ static shader_t *ShaderForShaderNum( const int shaderNum, int lightmapNum ) {
 	return shader;
 }
 
-#ifdef USE_VK_PBR
 static void GenerateFaceLightDirs( srfSurfaceFace_t *face ) {
 	face->lightdir = (float*)ri.Hunk_Alloc( face->numPoints * sizeof(tess.lightdir[0]), h_low );
 
@@ -915,7 +914,6 @@ static void vk_generate_light_directions( void )
 		}
 	}
 }
-#endif
 
 void R_BspGenerateFaceNormals( srfSurfaceFace_t *face )
 {
@@ -1055,11 +1053,8 @@ static void ParseFace( const dsurface_t *ds, const drawVert_t *verts, msurface_t
 	for ( i = 0 ; i < numPoints ; i++ ) {
 		for ( j = 0 ; j < 3 ; j++ ) {
 			cv->points[i][j] = LittleFloat( verts[i].xyz[j] );
-#ifdef USE_VK_PBR
 			cv->points[i][3+j] = LittleFloat( verts[i].normal[j] );
-#endif
 		}
-#ifdef USE_VK_PBR
 		for ( j = 0 ; j < 2 ; j++ ) {
 			cv->points[i][6+j] = LittleFloat( verts[i].st[j] );
 			cv->points[i][8+j] = LittleFloat( verts[i].lightmap[j] );
@@ -1071,19 +1066,6 @@ static void ParseFace( const dsurface_t *ds, const drawVert_t *verts, msurface_t
 			cv->points[i][8] = cv->points[i][8] * tr.lightmapScale[0] + lightmapX;
 			cv->points[i][9] = cv->points[i][9] * tr.lightmapScale[1] + lightmapY;
 		}
-#else
-		for ( j = 0 ; j < 2 ; j++ ) {
-			cv->points[i][3+j] = LittleFloat( verts[i].st[j] );
-			cv->points[i][5+j] = LittleFloat( verts[i].lightmap[j] );
-		}
-		R_ColorShiftLightingBytes( verts[i].color.rgba, (byte *)&cv->points[i][7], qtrue );
-		R_LinearizeLightingBytesForHDR( (byte *)&cv->points[i][7] );
-		if ( lightmapNum >= 0 && tr.mergeLightmaps ) {
-			// adjust lightmap coords
-			cv->points[i][5] = cv->points[i][5] * tr.lightmapScale[0] + lightmapX;
-			cv->points[i][6] = cv->points[i][6] * tr.lightmapScale[1] + lightmapY;
-		}
-#endif
 	}
 
 	indexes += LittleLong( ds->firstIndex );
@@ -1135,9 +1117,7 @@ static void ParseFace( const dsurface_t *ds, const drawVert_t *verts, msurface_t
 	SetPlaneSignbits( &cv->plane );
 	cv->plane.type = PlaneTypeForNormal( cv->plane.normal );
 
-#ifdef USE_VK_PBR
 	vk_mikkt_bsp_face_generate( cv );
-#endif
 
 	surf->data = (surfaceType_t *)cv;
 }
@@ -1296,9 +1276,7 @@ static void ParseTriSurf( const dsurface_t *ds, const drawVert_t *verts, msurfac
 		}
 	}
 
-#ifdef USE_VK_PBR
 	vk_mikkt_bsp_tri_generate( tri );
-#endif
 }
 
 
@@ -3102,9 +3080,7 @@ void RE_LoadWorldMap( const char *name ) {
 
 	tr.worldMapLoaded = qtrue;
 
-#ifdef USE_VK_PBR
 	R_PBR_ResetBindLog();
-#endif
 
 	// load it
 	size = ri.FS_ReadFile( name, &buffer.v );
@@ -3180,7 +3156,6 @@ void RE_LoadWorldMap( const char *name ) {
 	}
 	R_BspBuildSurfaceLODs( &s_worldData );
 
-#ifdef USE_VK_PBR
 	vk_generate_light_directions();
 
 	#ifdef VK_CUBEMAP
@@ -3199,7 +3174,6 @@ void RE_LoadWorldMap( const char *name ) {
 					}
 				}
 			}
-		#endif
 #endif	
 
 #ifdef USE_VBO
