@@ -26,7 +26,6 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "vk_util.h"
 #include "vk_geometry_corruption.h"
 
-
 void vk_release_vbo( void )
 {
 	if ( vk.vbo.vertex_buffer )
@@ -680,6 +679,55 @@ void R_BuildWorldVBO( msurface_t *surf, int surfCount )
 	msurface_t **surfList;
 	srfSurfaceFace_t *face;
 	srfTriangles_t *tris;
+	msurface_t *sf;
+	int ibo_size;
+	int vbo_size;
+	int i, n;
+
+	int numStaticSurfaces = 0;
+	int numStaticIndexes = 0;
+	int numStaticVertexes = 0;
+
+	if ( !r_vbo->integer )
+		return;
+
+	if ( glConfig.numTextureUnits < 3 ) {
+		ri.Printf( PRINT_WARNING, "... not enough texture units for VBO\n" );
+		return;
+	}
+
+	VBO_Cleanup();
+
+	vbo_size = 0;
+
+	// initial scan to count surfaces/indexes/vertexes for memory allocation
+	for ( i = 0, sf = surf; i < surfCount; i++, sf++ ) {
+		face = (srfSurfaceFace_t *) sf->data;
+		if ( face->surfaceType == SF_FACE && isStaticShader( sf->shader ) ) {
+			face->vboItemIndex = ++numStaticSurfaces;
+			numStaticVertexes += face->numPoints;
+			numStaticIndexes += face->numIndices;
+
+			vbo_size += face->numPoints * (sf->shader->svarsSize + sizeof( tess.xyz[0] ) + sizeof( tess.normal[0] ) );
+			if ( vk.pbrActive )
+				vbo_size += face->numPoints * ( sizeof(tess.qtangent[0]) +  sizeof(tess.lightdir[0]) );
+			sf->shader->numVertexes += face->numPoints;
+			sf->shader->numIndexes += face->numIndices;
+			continue;
+		}
+		tris = (srfTriangles_t *) sf->data;
+		if ( tris->surfaceType == SF_TRIANGLES && isStaticShader( sf->shader ) ) {
+			tris->vboItemIndex = ++numStaticSurfaces;
+			numStaticVertexes += tris->numVerts;
+			numStaticIndexes += tris->numIndexes;
+
+			vbo_size += tris->numVerts * (sf->shader->svarsSize + sizeof( tess.xyz[0] ) + sizeof( tess.normal[0] ) );
+			if ( vk.pbrActive )
+				vbo_size += tris->numVerts * ( sizeof(tess.qtangent[0]) + sizeof(tess.lightdir[0]) );
+			sf->shader->numVertexes += tris->numVerts;
+			sf->shader->numIndexes += tris->numIndexes;
+			continue;
+		}
 	}
 	if ( numStaticSurfaces == 0 ) {
 		ri.Printf( PRINT_ALL, "...no static surfaces for VBO\n" );
@@ -753,6 +801,20 @@ void R_BuildWorldVBO( msurface_t *surf, int surfCount )
 		sf = surfList[ i ];
 		face = (srfSurfaceFace_t *) sf->data;
 		tris = (srfTriangles_t *) sf->data;
+		if ( face->surfaceType == SF_FACE )
+			face->vboItemIndex = i + 1;
+		else if (tris->surfaceType == SF_TRIANGLES) {
+			tris->vboItemIndex = i + 1;
+		} else {
+			ri.Error( ERR_DROP, "Unexpected surface type" );
+		}
+		initItem( vbo->items + i + 1 );
+		RB_BeginSurface( sf->shader, 0 );
+		tess.allowVBO = qfalse; // block execution of VBO path as we need to tesselate geometry
+		// tesselate
+		rb_surfaceTable[ *sf->data ]( sf->data ); // VBO_PushData() may be called multiple times there
+		// setup colors and texture coordinates
+		VBO_PushData( i + 1, &tess );
 		tess.numIndexes = 0;
 		tess.numVertexes = 0;
 	}
@@ -1325,5 +1387,3 @@ void VBO_RenderStreamItem( void )
 	vk_bind_index_buffer( vk.vbo.stream_vertex_buffer, (uint32_t)item->iboOffset );
 	vk_draw_indexed( (uint32_t)item->num_indexes, 0 );
 }
-
-
