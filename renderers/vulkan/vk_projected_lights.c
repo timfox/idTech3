@@ -5,7 +5,6 @@
  * Perspective projected lights with cookie textures and reversed-Z shadows.
  */
 #include "tr_local.h"
-#ifdef USE_VULKAN
 #include "vk_world_presentation.h"
 #include "vk_projected_lights.h"
 
@@ -43,4 +42,3 @@ void vk_projected_lights_register( void )
 	}
 	(void)r_projectedLightDebug;
 }
-#endif

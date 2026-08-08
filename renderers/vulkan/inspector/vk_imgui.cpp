@@ -122,7 +122,6 @@ extern "C" void VkImgui_Initialize(void) {
 	vkImguiState.inputState = qfalse;
 	imguiLastFrameTimeMs = 0;
 
-#ifdef USE_VULKAN
 	{
 		char errBuf[256];
 
@@ -138,7 +137,6 @@ extern "C" void VkImgui_Initialize(void) {
 			}
 		}
 	}
-#endif
 }
 
 extern "C" void VkImgui_Shutdown(void) {
@@ -146,13 +144,11 @@ extern "C" void VkImgui_Shutdown(void) {
 
 	if (imguiContext) {
 		VkImgui_SetCurrentContext();
-#ifdef USE_VULKAN
 		if ( vkImgBackendReady ) {
 			VkImgui_ShutdownVulkanBackend();
 			vkImgBackendReady = qfalse;
 			VkImgui_SetVulkanBackendReady( qfalse );
 		}
-#endif
 		ImGui::DestroyContext(imguiContext);
 		imguiContext = nullptr;
 	}
@@ -179,9 +175,7 @@ extern "C" void VkImgui_BeginFrame(void) {
 			VkImgui_ApplyInspectorStyle();
 		}
 	}
-#ifdef USE_VULKAN
 	VkImgui_NewFrameVulkan();
-#endif
 	ImGui::NewFrame();
 }
 
@@ -232,9 +226,7 @@ extern "C" void VkImgui_Draw(void) {
 }
 
 extern "C" void VkImgui_SwapchainRestarted(void) {
-#ifdef USE_VULKAN
 	VkImgui_NotifySwapchainRestart();
-#endif
 }
 
 extern "C" void VkImgui_BindGameColorImage(void) { }

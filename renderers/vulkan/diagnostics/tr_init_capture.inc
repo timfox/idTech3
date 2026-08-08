@@ -21,7 +21,6 @@ Return value must be freed with ri.Hunk_FreeTempMemory()
 */
 static byte *RB_ReadPixels(int x, int y, int width, int height, size_t *offset, int *padlen, int lineAlign )
 {
-#ifdef USE_VULKAN
 	byte *buffer, *bufstart;
 	int linelen;
 	int	bufAlign;
@@ -46,34 +45,6 @@ static byte *RB_ReadPixels(int x, int y, int width, int height, size_t *offset, 
 	*padlen = PAD(linelen, packAlign) - linelen;
 
 	return buffer;
-#else
-	byte *buffer, *bufstart;
-	int padwidth, linelen;
-	int	bufAlign;
-	GLint packAlign;
-
-	qglGetIntegerv(GL_PACK_ALIGNMENT, &packAlign);
-
-	linelen = width * 3;
-
-	if ( packAlign < lineAlign )
-		padwidth = PAD(linelen, lineAlign);
-	else
-		padwidth = PAD(linelen, packAlign);
-
-	bufAlign = MAX( packAlign, 16 ); // for SIMD
-
-	// Allocate a few more bytes so that we can choose an alignment we like
-	buffer = ri.Hunk_AllocateTempMemory(padwidth * height + *offset + bufAlign - 1);
-	bufstart = PADP((intptr_t) buffer + *offset, bufAlign);
-
-	qglReadPixels( x, y, width, height, GL_RGB, GL_UNSIGNED_BYTE, bufstart );
-
-	*offset = bufstart - buffer;
-	*padlen = PAD(linelen, packAlign) - linelen;
-
-	return buffer;
-#endif
 }
 
 
@@ -521,11 +492,7 @@ const void *RB_TakeVideoFrameCmd( const void *data )
 
 	cmd = (const videoFrameCommand_t *)data;
 
-#ifdef USE_VULKAN
 	packAlign = 1;
-#else
-	qglGetIntegerv(GL_PACK_ALIGNMENT, &packAlign);
-#endif
 
 	linelen = cmd->width * 3;
 
@@ -538,11 +505,7 @@ const void *RB_TakeVideoFrameCmd( const void *data )
 
 	cBuf = PADP(cmd->captureBuffer, packAlign);
 
-#ifdef USE_VULKAN
 	vk_read_pixels(cBuf, cmd->width, cmd->height);
-#else
-	qglReadPixels(0, 0, cmd->width, cmd->height, GL_RGB, GL_UNSIGNED_BYTE, cBuf);
-#endif
 
 	memcount = padwidth * cmd->height;
 

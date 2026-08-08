@@ -263,9 +263,7 @@ static srfSurfaceFace_t *R_BspStream_AllocTopFace( const vec3_t wmins, const vec
 	cv->numIndices = 6;
 	cv->ofsIndices = (int)( sizeof( *cv ) - sizeof( cv->points ) + sizeof( cv->points[0] ) * 4 );
 	cv->dlightBits = 0;
-#ifdef USE_VBO
 	cv->vboItemIndex = 0;
-#endif
 
 	VectorSet( corners[0], wmins[0], wmins[1], wmaxs[2] );
 	VectorSet( corners[1], wmaxs[0], wmins[1], wmaxs[2] );
@@ -365,9 +363,7 @@ static surfaceType_t *R_BspStream_BakeGridToTris( srfGridMesh_t *grid )
 	tri = ri.Hunk_Alloc( allocSize, h_low );
 	tri->surfaceType = SF_TRIANGLES;
 	tri->dlightBits = 0;
-#ifdef USE_VBO
 	tri->vboItemIndex = 0;
-#endif
 	tri->numVerts = numVerts;
 	tri->numIndexes = numIndexes;
 	tri->verts = (srfVert_t *)( tri + 1 );
@@ -646,9 +642,7 @@ static qboolean R_BspStream_ParsePlanarFace( const dsurface_t *ds, const drawVer
 	cv->numIndices = numIndexes;
 	cv->ofsIndices = ofsIndexes;
 	cv->dlightBits = 0;
-#ifdef USE_VBO
 	cv->vboItemIndex = 0;
-#endif
 
 	verts += LittleLong( ds->firstVert );
 	for ( i = 0; i < numPoints; i++ ) {

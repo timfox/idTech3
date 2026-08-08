@@ -19,9 +19,7 @@ Supports:
 
 #include "q_shared.h"
 
-#ifdef USE_VULKAN
 #include "vk.h"
-#endif
 
 #ifdef __cplusplus
 extern "C" {
@@ -63,10 +61,8 @@ void        VDB_SampleVec3( vdbHandle_t handle, float x, float y, float z, float
 qboolean    VDB_UploadToGPU( vdbHandle_t handle );
 qboolean    VDB_IsOnGPU( vdbHandle_t handle );
 qboolean    VDB_HasMajorantOnGPU( vdbHandle_t handle );
-#ifdef USE_VULKAN
 VkImageView VDB_GetGpuImageView( vdbHandle_t handle );
 VkImageView VDB_GetGpuMajorantView( vdbHandle_t handle );
-#endif
 qboolean    VDB_BindAsFogDensity( vdbHandle_t handle );
 vdbHandle_t VDB_GetBoundFogDensityHandle( void );
 int         VDB_GetGridCount( void );

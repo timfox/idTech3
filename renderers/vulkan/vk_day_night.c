@@ -8,7 +8,6 @@ Real-time day/night world lighting.
 #include "vk_day_night.h"
 #include "vk_weather.h"
 
-#ifdef USE_VULKAN
 
 #include <math.h>
 
@@ -350,4 +349,3 @@ void vk_day_night_begin_frame( void )
 	}
 }
 
-#endif /* USE_VULKAN */

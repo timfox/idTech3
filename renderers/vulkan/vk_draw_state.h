@@ -28,9 +28,7 @@ void *vk_alloc_storage( size_t size, uint32_t *offset );
 void vk_set_iqm_storage_offsets( uint32_t skin_offset, uint32_t morph_offset, uint32_t topo_offset );
 void vk_reset_iqm_storage_offsets( void );
 void vk_bind_index_buffer( VkBuffer buffer, uint32_t offset );
-#ifdef USE_VBO
 void vk_draw_indexed( uint32_t indexCount, uint32_t firstIndex );
-#endif
 void vk_reset_descriptor( int index );
 void vk_update_descriptor( int index, VkDescriptorSet descriptor );
 void vk_update_descriptor_offset( int index, uint32_t offset );
