@@ -1,6 +1,5 @@
 #pragma once
 
-#ifdef USE_VULKAN
 
 /*
  * Raster Ultra 1.7 — volumetric clouds + dedicated history + cloud shadows.
@@ -21,4 +20,3 @@ float vk_volumetric_clouds_sun_shadow_factor( void );
 
 void vk_volumetric_clouds_status_f( void );
 
-#endif /* USE_VULKAN */

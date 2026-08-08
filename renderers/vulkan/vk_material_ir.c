@@ -145,7 +145,6 @@ qboolean vk_material_ir_from_shader( const shader_t *shader, vkMaterialIR_t *out
 		out->antiMoireImportance = 2;
 	}
 
-#ifdef USE_VK_PBR
 	if ( stage->vk_pbr_flags ) {
 		out->shadeModel = VK_MAT_SHADE_PBR_METAL_ROUGH;
 		out->fromClassic = qfalse;
@@ -188,9 +187,6 @@ qboolean vk_material_ir_from_shader( const shader_t *shader, vkMaterialIR_t *out
 	} else {
 		s_classicCount++;
 	}
-#else
-	s_classicCount++;
-#endif
 
 	out->staticFeatures = feat;
 	out->valid = qtrue;

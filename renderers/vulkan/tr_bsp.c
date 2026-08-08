@@ -23,7 +23,6 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 #include "tr_local.h"
 #include "../../engine/core/qfiles_bsp30.h"
-#ifdef USE_VULKAN
 #include "vk.h"
 #include "vk_raster_gi.h"
 #include "tr_bsp_stream.h"
@@ -58,7 +57,6 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #define JSON_IMPLEMENTATION
 #include "json.h"
 #undef JSON_IMPLEMENTATION
-#endif
 #endif
 
 /*
@@ -538,12 +536,8 @@ void R_BspStreamLightmap_UploadTile( const bspStreamLightmapSlot_t *slot, const 
 
 	if ( tr.mergeLightmaps ) {
 		(void)R_ProcessLightmap( image, rgb128, 0.0f );
-#ifdef USE_VULKAN
 		vk_upload_image_data( s_bspStreamLm.atlas, slot->pixelX, slot->pixelY,
 			LIGHTMAP_LEN, LIGHTMAP_LEN, 1, image, LIGHTMAP_LEN * LIGHTMAP_LEN * 4, qtrue );
-#else
-		R_UploadSubImage( image, slot->pixelX, slot->pixelY, LIGHTMAP_LEN, LIGHTMAP_LEN, s_bspStreamLm.atlas );
-#endif
 	} else {
 		const byte *src = rgb128;
 
@@ -555,12 +549,8 @@ void R_BspStreamLightmap_UploadTile( const bspStreamLightmapSlot_t *slot, const 
 				src += 3;
 			}
 		}
-#ifdef USE_VULKAN
 		vk_upload_image_data( s_bspStreamLm.atlas, 0, 0,
 			LIGHTMAP_SIZE, LIGHTMAP_SIZE, 1, image, LIGHTMAP_SIZE * LIGHTMAP_SIZE * 4, qtrue );
-#else
-		R_UploadSubImage( image, 0, 0, LIGHTMAP_SIZE, LIGHTMAP_SIZE, s_bspStreamLm.atlas );
-#endif
 	}
 }
 
@@ -575,12 +565,8 @@ void R_BspStreamLightmap_UploadDeluxeTile( const bspStreamLightmapSlot_t *slot, 
 
 	if ( tr.mergeLightmaps ) {
 		(void)R_ProcessDeluxemap( image, rgb128 );
-#ifdef USE_VULKAN
 		vk_upload_image_data( s_bspStreamLm.deluxeAtlas, slot->pixelX, slot->pixelY,
 			LIGHTMAP_LEN, LIGHTMAP_LEN, 1, image, LIGHTMAP_LEN * LIGHTMAP_LEN * 4, qtrue );
-#else
-		R_UploadSubImage( image, slot->pixelX, slot->pixelY, LIGHTMAP_LEN, LIGHTMAP_LEN, s_bspStreamLm.deluxeAtlas );
-#endif
 	} else {
 		const byte *src = rgb128;
 		int x, y;
@@ -602,12 +588,8 @@ void R_BspStreamLightmap_UploadDeluxeTile( const bspStreamLightmapSlot_t *slot, 
 				src += 3;
 			}
 		}
-#ifdef USE_VULKAN
 		vk_upload_image_data( s_bspStreamLm.deluxeAtlas, 0, 0,
 			LIGHTMAP_SIZE, LIGHTMAP_SIZE, 1, image, LIGHTMAP_SIZE * LIGHTMAP_SIZE * 4, qtrue );
-#else
-		R_UploadSubImage( image, 0, 0, LIGHTMAP_SIZE, LIGHTMAP_SIZE, s_bspStreamLm.deluxeAtlas );
-#endif
 	}
 }
 
@@ -656,11 +638,7 @@ static void R_LoadMergedLightmaps( const lump_t *l, byte *image )
 
 				R_ProcessLightmap( image, buf + offs, maxIntensity );
 				
-#ifdef USE_VULKAN
 				vk_upload_image_data( tr.lightmaps[ i ], x * LIGHTMAP_LEN, y * LIGHTMAP_LEN, LIGHTMAP_LEN, LIGHTMAP_LEN, 1, image, LIGHTMAP_LEN * LIGHTMAP_LEN * 4, qtrue );
-#else
-				R_UploadSubImage( image, x * LIGHTMAP_LEN, y * LIGHTMAP_LEN, LIGHTMAP_LEN, LIGHTMAP_LEN, tr.lightmaps[ i ] );
-#endif
 
 				offs += LIGHTMAP_SIZE * LIGHTMAP_SIZE * 3;
 
@@ -674,11 +652,7 @@ static void R_LoadMergedLightmaps( const lump_t *l, byte *image )
 				}
 			}
 		}
-#ifdef USE_VULKAN
 		//
-#else
-		ri.Printf( PRINT_DEVELOPER, "lightmaps[%i]=%i\n", i, tr.lightmaps[i]->texnum );
-#endif
 	}
 
 	//if ( r_lightmap->integer == 2 )	{
@@ -860,7 +834,6 @@ static shader_t *ShaderForShaderNum( const int shaderNum, int lightmapNum ) {
 	return shader;
 }
 
-#ifdef USE_VK_PBR
 static void GenerateFaceLightDirs( srfSurfaceFace_t *face ) {
 	face->lightdir = (float*)ri.Hunk_Alloc( face->numPoints * sizeof(tess.lightdir[0]), h_low );
 
@@ -915,7 +888,6 @@ static void vk_generate_light_directions( void )
 		}
 	}
 }
-#endif
 
 void R_BspGenerateFaceNormals( srfSurfaceFace_t *face )
 {
@@ -1055,11 +1027,8 @@ static void ParseFace( const dsurface_t *ds, const drawVert_t *verts, msurface_t
 	for ( i = 0 ; i < numPoints ; i++ ) {
 		for ( j = 0 ; j < 3 ; j++ ) {
 			cv->points[i][j] = LittleFloat( verts[i].xyz[j] );
-#ifdef USE_VK_PBR
 			cv->points[i][3+j] = LittleFloat( verts[i].normal[j] );
-#endif
 		}
-#ifdef USE_VK_PBR
 		for ( j = 0 ; j < 2 ; j++ ) {
 			cv->points[i][6+j] = LittleFloat( verts[i].st[j] );
 			cv->points[i][8+j] = LittleFloat( verts[i].lightmap[j] );
@@ -1071,19 +1040,6 @@ static void ParseFace( const dsurface_t *ds, const drawVert_t *verts, msurface_t
 			cv->points[i][8] = cv->points[i][8] * tr.lightmapScale[0] + lightmapX;
 			cv->points[i][9] = cv->points[i][9] * tr.lightmapScale[1] + lightmapY;
 		}
-#else
-		for ( j = 0 ; j < 2 ; j++ ) {
-			cv->points[i][3+j] = LittleFloat( verts[i].st[j] );
-			cv->points[i][5+j] = LittleFloat( verts[i].lightmap[j] );
-		}
-		R_ColorShiftLightingBytes( verts[i].color.rgba, (byte *)&cv->points[i][7], qtrue );
-		R_LinearizeLightingBytesForHDR( (byte *)&cv->points[i][7] );
-		if ( lightmapNum >= 0 && tr.mergeLightmaps ) {
-			// adjust lightmap coords
-			cv->points[i][5] = cv->points[i][5] * tr.lightmapScale[0] + lightmapX;
-			cv->points[i][6] = cv->points[i][6] * tr.lightmapScale[1] + lightmapY;
-		}
-#endif
 	}
 
 	indexes += LittleLong( ds->firstIndex );
@@ -1135,9 +1091,7 @@ static void ParseFace( const dsurface_t *ds, const drawVert_t *verts, msurface_t
 	SetPlaneSignbits( &cv->plane );
 	cv->plane.type = PlaneTypeForNormal( cv->plane.normal );
 
-#ifdef USE_VK_PBR
 	vk_mikkt_bsp_face_generate( cv );
-#endif
 
 	surf->data = (surfaceType_t *)cv;
 }
@@ -1296,9 +1250,7 @@ static void ParseTriSurf( const dsurface_t *ds, const drawVert_t *verts, msurfac
 		}
 	}
 
-#ifdef USE_VK_PBR
 	vk_mikkt_bsp_tri_generate( tri );
-#endif
 }
 
 
@@ -3102,9 +3054,7 @@ void RE_LoadWorldMap( const char *name ) {
 
 	tr.worldMapLoaded = qtrue;
 
-#ifdef USE_VK_PBR
 	R_PBR_ResetBindLog();
-#endif
 
 	// load it
 	size = ri.FS_ReadFile( name, &buffer.v );
@@ -3120,11 +3070,9 @@ void RE_LoadWorldMap( const char *name ) {
 	// clear tr.world so if the level fails to load, the next
 	// try will not look at the partially loaded version
 	tr.world = NULL;
-#ifdef USE_VULKAN
 	/* Drop AV temporal history across map unload/reload (unoccluded defaults). */
 	vk_ambient_visibility_reset_history();
 	vk_temporal_request_sticky_reset( VK_TEMPORAL_RESET_WORLD_CHANGE );
-#endif
 
 	Com_Memset( &s_worldData, 0, sizeof( s_worldData ) );
 	Q_strncpyz( s_worldData.name, name, sizeof( s_worldData.name ) );
@@ -3180,7 +3128,6 @@ void RE_LoadWorldMap( const char *name ) {
 	}
 	R_BspBuildSurfaceLODs( &s_worldData );
 
-#ifdef USE_VK_PBR
 	vk_generate_light_directions();
 
 	#ifdef VK_CUBEMAP
@@ -3199,14 +3146,11 @@ void RE_LoadWorldMap( const char *name ) {
 					}
 				}
 			}
-		#endif
 #endif	
 
-#ifdef USE_VBO
 	if ( !isBsp30World && !isSourceVBSPWorld ) {
 		R_BuildWorldVBO( s_worldData.surfaces, s_worldData.numsurfaces );
 	}
-#endif
 
 	tr.mapLoading = qfalse;
 
@@ -3221,12 +3165,10 @@ void RE_LoadWorldMap( const char *name ) {
 	R_DecalProps_ParseFromEntityString( s_worldData.entityString );
 
 	R_MaterialPaint_OnMapLoad( s_worldData.baseName );
-#ifdef USE_VBO
 	/* Rebuild VBO after paint sidecar mutates drawvert colors. */
 	if ( !isBsp30World && !isSourceVBSPWorld && R_MaterialPaint_NumVerts() > 0 ) {
 		R_BuildWorldVBO( s_worldData.surfaces, s_worldData.numsurfaces );
 	}
-#endif
 
 	R_NDGI_OnMapLoad( s_worldData.baseName );
 	R_NIV_OnMapLoad( s_worldData.baseName );
