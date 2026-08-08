@@ -50,7 +50,7 @@ def unwrap_macro(text: str, macro: str) -> tuple[str, int]:
     )
     else_re = re.compile(r"^\s*#\s*else\b")
     elif_re = re.compile(r"^\s*#\s*elif\b")
-    endif_re = re.compile(r"^\s*#\s*endif\b")
+    endif_line_re = re.compile(r"^\s*#\s*endif\b[^\n]*\n", re.M)
 
     def is_macro_if(line: str) -> bool:
         return (
@@ -87,7 +87,7 @@ def unwrap_macro(text: str, macro: str) -> tuple[str, int]:
                 elif else_re.match(cur) and depth == 1:
                     in_false = True
                     had_else = True
-                elif endif_re.match(cur):
+                elif endif_line_re.match(cur):
                     depth -= 1
                     if depth > 0:
                         (false_lines if in_false else true_lines).append(cur)
