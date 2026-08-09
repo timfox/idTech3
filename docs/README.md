@@ -17,6 +17,8 @@ Documentation is grouped by **tier**. Most files remain at their historical path
 
 - [OPEN_WORLD.md](OPEN_WORLD.md)
 - [WORLD_CONFIG.md](WORLD_CONFIG.md) — named map-state configs (geometry/nav/spawns/lighting)
+- [WORLD_ZONES.md](WORLD_ZONES.md) — authored spatial zones (district/texture/shadow residency masks)
+- [WORLD_RESIDENCY.md](WORLD_RESIDENCY.md) — value-aware open-world sector cardinality
 - [DISTRICTS.md](DISTRICTS.md)
 - [PHYSICS.md](PHYSICS.md)
 - [PROC_PATTERNS.md](PROC_PATTERNS.md)
