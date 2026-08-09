@@ -1,6 +1,5 @@
 #pragma once
 
-#ifdef USE_VULKAN
 
 #include <stdint.h>
 
@@ -50,4 +49,3 @@ typedef enum deferredCertificationLevel_e {
 void vk_deferred_certification_register( void );
 void vk_deferred_certification_begin_frame( void );
 
-#endif

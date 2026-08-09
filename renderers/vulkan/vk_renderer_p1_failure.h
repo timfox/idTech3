@@ -4,7 +4,6 @@
  * Phase 1.6 — failure bundles under render_cert/failures/p1_<stage>_<case>_<ts>/
  */
 
-#ifdef USE_VULKAN
 
 #include "../common/tr_types.h"
 #include "vk_renderer_p1_cert.h"
@@ -37,4 +36,3 @@ const p1FailureBundle_t *vk_renderer_p1_last_failure( void );
 qboolean vk_renderer_p1_failure_capture( p1CertStage_t stage, uint32_t caseId,
 	p1FailClass_t klass, const char *reason, const char *extraMeta );
 
-#endif /* USE_VULKAN */

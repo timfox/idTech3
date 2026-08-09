@@ -337,9 +337,7 @@ static void RB_TestFlare( flare_t *f ) {
 	tess.xyz[0][2] = -f->drawZ;
 	tess.numVertexes = 1;
 
-#ifdef USE_VBO
 	tess.vboIndex = 0;
-#endif
 	// invalidate descriptors
 	for ( i = 0; i < VK_DESC_COUNT; i++ ) {
 		vk_reset_descriptor( i );

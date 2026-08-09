@@ -1,6 +1,5 @@
 #pragma once
 
-#ifdef USE_VULKAN
 
 /*
  * Layered AA policy (r_aaMode):
@@ -23,4 +22,3 @@ qboolean vk_aa_policy_wants_temporal_cleanup_smaa( void );
 qboolean vk_aa_policy_wants_smaa_t2x( void );
 qboolean vk_aa_policy_wants_present_adaptive( void );
 
-#endif /* USE_VULKAN */
