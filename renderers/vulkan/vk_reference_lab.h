@@ -1,6 +1,5 @@
 #pragma once
 
-#ifdef USE_VULKAN
 
 /*
  * Raster Ultra 1.11 — Rendering Reference Lab.
@@ -101,4 +100,3 @@ void vk_reference_lab_begin_frame( void );
 void vk_reference_lab_status_f( void );
 void vk_reference_lab_list_scenes_f( void );
 
-#endif /* USE_VULKAN */

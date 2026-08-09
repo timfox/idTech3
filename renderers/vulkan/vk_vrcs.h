@@ -1,6 +1,5 @@
 #pragma once
 
-#ifdef USE_VULKAN
 
 /*
  * Variable-Rate Compute Shading (VRCS) — chocolate deferred lighting path.
@@ -17,4 +16,3 @@ qboolean vk_vrcs_dispatch_deferred_lighting( uint32_t width, uint32_t height );
 
 void vk_vrcs_status_f( void );
 
-#endif /* USE_VULKAN */

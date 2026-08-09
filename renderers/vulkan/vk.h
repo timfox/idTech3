@@ -551,12 +551,10 @@ qboolean vk_bloom( void );
 qboolean vk_lens_flare( void );
 qboolean vk_ssao_pass( void );
 
-#ifdef USE_VBO
 void vk_release_vbo( void );
 void vk_release_stream_vbo( void );
 qboolean vk_alloc_vbo( const byte *vbo_data, int vbo_size );
 qboolean vk_upload_stream_vbo( const byte *vbo_data, int vbo_size );
-#endif
 void vk_update_mvp( const float *m );
 
 void vk_update_post_process_pipelines( void );

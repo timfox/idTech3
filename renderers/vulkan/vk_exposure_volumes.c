@@ -7,7 +7,6 @@
  */
 #include "tr_local.h"
 
-#ifdef USE_VULKAN
 
 #include "vk_world_presentation.h"
 #include "vk_exposure_volumes.h"
@@ -158,4 +157,3 @@ void vk_exposure_volumes_register( void )
 	}
 }
 
-#endif

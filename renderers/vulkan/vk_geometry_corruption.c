@@ -8,7 +8,6 @@ Geometry corruption diagnostics — exploding / stretched triangle isolation.
 #include "vk.h"
 #include "vk_geometry_corruption.h"
 
-#ifdef USE_VULKAN
 
 static cvar_t *r_geometryCorruptionDebug;
 static cvar_t *r_geometryDrawLimit;
@@ -193,4 +192,3 @@ void vk_geometry_corruption_register( void )
 	ri.Printf( PRINT_ALL, "[VK][geometry] corruption diagnostics ready (geometry_corruption_status)\n" );
 }
 
-#endif /* USE_VULKAN */

@@ -707,10 +707,8 @@ static qboolean vk_create_device( VkPhysicalDevice physical_device, int device_i
 			features.fragmentStoresAndAtomics = VK_TRUE;
 			vk.fragmentStores = qtrue;
 		}
-#ifdef USE_VK_PBR
 		if ( device_features.geometryShader )
 			features.geometryShader = VK_TRUE;
-#endif
 		if ( r_ext_texture_filter_anisotropic->integer && device_features.samplerAnisotropy ) {
 			features.samplerAnisotropy = VK_TRUE;
 			vk.samplerAnisotropy = qtrue;
