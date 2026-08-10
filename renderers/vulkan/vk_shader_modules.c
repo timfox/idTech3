@@ -189,10 +189,8 @@ void vk_create_shader_modules( void )
 	SET_OBJECT_NAME( vk.modules.weapon_taa_composite_fs, "weapon taa composite fragment module", VK_DEBUG_REPORT_OBJECT_TYPE_SHADER_MODULE_EXT );
 	SET_OBJECT_NAME( vk.modules.weapon_bloom_extract_fs, "weapon bloom extract fragment module", VK_DEBUG_REPORT_OBJECT_TYPE_SHADER_MODULE_EXT );
 
-#ifdef VK_PBR_BRDFLUT
 	vk.modules.brdflut_fs = SHADER_MODULE( brdflut_frag_spv );
 	SET_OBJECT_NAME( vk.modules.brdflut_fs, "brdf LUT fragment module", VK_DEBUG_REPORT_OBJECT_TYPE_SHADER_MODULE_EXT );
-#endif
 
 	vk.modules.filtercube_vs = SHADER_MODULE( filtercube_vert_spv );
 	SET_OBJECT_NAME( vk.modules.filtercube_vs, "filter cube vertex module", VK_DEBUG_REPORT_OBJECT_TYPE_SHADER_MODULE_EXT );

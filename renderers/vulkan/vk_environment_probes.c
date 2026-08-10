@@ -6,7 +6,6 @@
  * parallax-corrected box projection, prefiltered specular + irradiance.
  */
 #include "tr_local.h"
-#ifdef USE_VULKAN
 #include "vk_world_presentation.h"
 #include "vk_environment_probes.h"
 
@@ -64,4 +63,3 @@ void vk_environment_probes_register( void )
 	(void)r_probeDebug;
 	(void)s_probes;
 }
-#endif

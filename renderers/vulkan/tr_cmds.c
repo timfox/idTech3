@@ -115,12 +115,10 @@ void R_IssueRenderCommands( void ) {
 		if ( backEnd.throttle )
 			return; // or throttled on demand
 	} else {
-#ifdef USE_VULKAN
 		if ( ri.CL_IsMinimized() && !RE_CanMinimize() ) {
 			backEnd.screenshotMask = 0;
 			return;
 		}
-#endif
 	}
 
 	// actually start the commands going
@@ -167,9 +165,7 @@ returns NULL if there is not enough space for important commands
 =============
 */
 void *R_GetCommandBuffer( int bytes ) {
-#ifdef USE_VULKAN
 	tr.lastRenderCommand = RC_END_OF_LIST;
-#endif
 	return R_GetCommandBufferReserved( bytes, PAD( sizeof( swapBuffersCommand_t ), sizeof(void *) ) );
 }
 
@@ -194,15 +190,12 @@ void R_AddDrawSurfCmd( drawSurf_t *drawSurfs, int numDrawSurfs ) {
 	cmd->refdef = tr.refdef;
 	cmd->viewParms = tr.viewParms;
 
-#ifdef USE_VULKAN
 	tr.numDrawSurfCmds++;
 	if ( tr.drawSurfCmd == NULL ) {
 		tr.drawSurfCmd = cmd;
 	}
-#endif
 }
 
-#ifdef VK_CUBEMAP
 /*
 =============
 R_AddConvolveCubemapsCmd
@@ -220,7 +213,6 @@ void R_AddConvolveCubemapCmd( cubemap_t *cubemap , int cubemapId ) {
 	cmd->cubemap = cubemap;
 	cmd->cubemapId = cubemapId;
 }
-#endif
 
 /*
 =============
@@ -447,44 +439,6 @@ void RE_UIFilterLayer( const uiCompositorLayer_t *layer ) {
 #define MODE_GREEN_MAGENTA 4
 #define MODE_MAX	MODE_GREEN_MAGENTA
 
-#ifndef USE_VULKAN
-static void R_SetColorMode(GLboolean *rgba, stereoFrame_t stereoFrame, int colormode)
-{
-	rgba[0] = rgba[1] = rgba[2] = rgba[3] = GL_TRUE;
-
-	if(colormode > MODE_MAX)
-	{
-		if(stereoFrame == STEREO_LEFT)
-			stereoFrame = STEREO_RIGHT;
-		else if(stereoFrame == STEREO_RIGHT)
-			stereoFrame = STEREO_LEFT;
-
-		colormode -= MODE_MAX;
-	}
-
-	if(colormode == MODE_GREEN_MAGENTA)
-	{
-		if(stereoFrame == STEREO_LEFT)
-			rgba[0] = rgba[2] = GL_FALSE;
-		else if(stereoFrame == STEREO_RIGHT)
-			rgba[1] = GL_FALSE;
-	}
-	else
-	{
-		if(stereoFrame == STEREO_LEFT)
-			rgba[1] = rgba[2] = GL_FALSE;
-		else if(stereoFrame == STEREO_RIGHT)
-		{
-			rgba[0] = GL_FALSE;
-
-			if(colormode == MODE_RED_BLUE)
-				rgba[1] = GL_FALSE;
-			else if(colormode == MODE_RED_GREEN)
-				rgba[2] = GL_FALSE;
-		}
-	}
-}
-#endif
 
 
 /*
@@ -502,12 +456,10 @@ void RE_BeginFrame( stereoFrame_t stereoFrame ) {
 		return;
 	}
 
-#ifdef USE_VULKAN
 	if ( stereoFrame == STEREO_CENTER ) {
 		SkyboxHDR_UpdateRuntime();
 		R_VT_Feedback_BeginFrame();
 	}
-#endif
 
 #ifdef USE_IMGUI
 	if ( stereoFrame == STEREO_CENTER && r_imgui && r_imgui->integer ) {
@@ -518,12 +470,10 @@ void RE_BeginFrame( stereoFrame_t stereoFrame ) {
 
 	glState.finishCalled = qfalse;
 
-#ifdef USE_VULKAN
 	backEnd.doneBloom = qfalse;
 	backEnd.doneFog = qfalse;
 	backEnd.doneSSAO = qfalse;
 	backEnd.doneLensFlare = qfalse;
-#endif
 
 	backEnd.color2D.u32 = ~0U;
 
@@ -535,9 +485,7 @@ void RE_BeginFrame( stereoFrame_t stereoFrame ) {
 
 	cmd->commandId = RC_DRAW_BUFFER;
 
-#ifdef USE_VULKAN
 	tr.lastRenderCommand = RC_DRAW_BUFFER;
-#endif
 
 	if ( glConfig.stereoEnabled ) {
 		if ( stereoFrame == STEREO_LEFT ) {
@@ -553,14 +501,7 @@ void RE_BeginFrame( stereoFrame_t stereoFrame ) {
 		 * the mono swapchain; eye offset comes from r_stereoSeparation in
 		 * R_SetupProjection. Do not fatal on non-CENTER frames.
 		 */
-#ifdef USE_VULKAN
 		cmd->buffer = 0;
-#else
-		if ( !Q_stricmp( r_drawBuffer->string, "GL_FRONT" ) )
-			cmd->buffer = (int)GL_FRONT;
-		else
-			cmd->buffer = (int)GL_BACK;
-#endif
 	}
 
 	tr.refdef.stereoFrame = stereoFrame;
@@ -625,11 +566,9 @@ void RE_EndFrame( int *frontEndMsec, int *backEndMsec ) {
 			R_SetColorMappings();
 		}
 
-#ifdef USE_VULKAN
 		if ( PostFX_PostPipelinesNeedUpdate() ) {
 			vk_update_post_process_pipelines();
 		}
-#endif
 
 		ri.Cvar_ResetGroup( CVG_RENDERER, qtrue /* reset modified flags */ );
 	}
@@ -689,10 +628,8 @@ void RE_FinishBloom( void )
 
 qboolean RE_CanMinimize( void )
 {
-#ifdef USE_VULKAN
 	if ( vk.fboActive || vk.offscreenRender )
 		return qtrue;
-#endif
 	return qfalse;
 }
 

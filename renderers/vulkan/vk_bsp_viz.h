@@ -1,6 +1,5 @@
 #pragma once
 
-#ifdef USE_VULKAN
 
 #include "../common/tr_types.h"
 
@@ -67,4 +66,3 @@ int vk_bsp_viz_effective_showtris( void );
 
 const bspVisibilityFrame_t *vk_bsp_viz_current_frame( void );
 
-#endif

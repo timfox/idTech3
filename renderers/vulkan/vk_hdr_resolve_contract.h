@@ -7,7 +7,6 @@
  * See docs/HDR_RESOLVE_INTEGRITY.md.
  */
 
-#ifdef USE_VULKAN
 
 #include "../common/tr_types.h"
 
@@ -46,4 +45,3 @@ uint32_t vk_hdr_resolve_fog_scene_generation( void );
 uint32_t vk_hdr_resolve_scene_hdr_generation( void );
 uint32_t vk_hdr_resolve_depth_generation( void );
 
-#endif /* USE_VULKAN */

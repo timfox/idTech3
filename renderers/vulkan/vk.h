@@ -551,12 +551,10 @@ qboolean vk_bloom( void );
 qboolean vk_lens_flare( void );
 qboolean vk_ssao_pass( void );
 
-#ifdef USE_VBO
 void vk_release_vbo( void );
 void vk_release_stream_vbo( void );
 qboolean vk_alloc_vbo( const byte *vbo_data, int vbo_size );
 qboolean vk_upload_stream_vbo( const byte *vbo_data, int vbo_size );
-#endif
 void vk_update_mvp( const float *m );
 
 void vk_update_post_process_pipelines( void );
@@ -573,17 +571,13 @@ qboolean vk_create_gltf_buffers( const byte *vboData, int vboSize, const uint32_
 /* GPU occlusion culling: vk_occlusion.h */
 
 // cubemap
-#ifdef VK_CUBEMAP
 void vk_clear_cube_color( image_t *image, VkClearColorValue color );
 void vk_begin_cubemap_render_pass( void );
 void vk_create_cubemap_prefilter( void );
 void vk_destroy_cubemap_prefilter( void );
-#endif
 
-#ifdef VK_PBR_BRDFLUT
 void vk_create_brdflut_pipeline( void );
 void vk_create_brfdlut( void );
-#endif
 
 typedef struct vk_tess_s {
 	VkCommandBuffer command_buffer;
@@ -678,9 +672,7 @@ typedef struct {
 		VkRenderPass reactive_stamp;	/* R8 MAX-blend stamp from OIT reveal */
 		VkRenderPass temporal_class_stamp;	/* R8 MAX-blend stamp WEAPON from depth */
 		VkRenderPass ssr;
-#ifdef VK_PBR_BRDFLUT
 		VkRenderPass brdflut;
-#endif
 		VkRenderPass cubemap;
 		VkRenderPass smaa_edge;
 		VkRenderPass smaa_blend;
@@ -718,9 +710,7 @@ typedef struct {
 	VkPipelineLayout pipeline_layout_ssr;		// ssr (color + depth + push constants)
 	VkPipelineLayout pipeline_layout_atmosphere;	// atmosphere (push constants only)
 	VkPipelineLayout pipeline_layout_fp64_points;	// fp64 point cloud (push constants)
-#ifdef VK_PBR_BRDFLUT
 	VkPipelineLayout pipeline_layout_brdflut;
-#endif
 	VkDescriptorSetLayout volumetric_compute_layout;
 	VkDescriptorSetLayout volumetric_composite_layout;
 	VkDescriptorSetLayout volumetric_depth_resolve_layout;
@@ -1416,11 +1406,9 @@ typedef struct {
 		VkImageView image_view;
 	} capture;
 
-#ifdef VK_PBR_BRDFLUT
 	VkImage			brdflut_image;
 	VkImageView		brdflut_image_view;
 	VkDescriptorSet brdflut_image_descriptor;
-#endif
 
 	struct {
 		VkFramebuffer blur[VK_NUM_BLOOM_PASSES*2];
@@ -1439,9 +1427,7 @@ typedef struct {
 		VkFramebuffer overlay_compose[MAX_SWAPCHAIN_IMAGES];
 		VkFramebuffer screenmap;
 		VkFramebuffer capture;
-#ifdef VK_PBR_BRDFLUT
 		VkFramebuffer brdflut;
-#endif
 		VkFramebuffer cubemap[6];
 		VkFramebuffer smaa_edge;
 		VkFramebuffer smaa_blend;
@@ -1831,9 +1817,7 @@ typedef struct {
 		VkShaderModule dot_fs;
 		VkShaderModule dot_vs;
 
-#ifdef VK_PBR_BRDFLUT
 		VkShaderModule brdflut_fs;
-#endif
 		VkShaderModule filtercube_vs;
 		VkShaderModule filtercube_gm;
 		VkShaderModule irradiancecube_fs;
@@ -1924,9 +1908,7 @@ typedef struct {
 	VkPipeline ssao_depth_debug_pipeline;
 	VkPipeline ssr_pipeline;
 	VkPipeline atmosphere_pipeline;
-#ifdef VK_PBR_BRDFLUT
 	VkPipeline brdflut_pipeline;
-#endif
 
 	uint32_t frame_count;
 	qboolean active;
@@ -2096,9 +2078,7 @@ typedef struct {
 	qboolean fxaaActive;
 	qboolean lensFlareActive;
 	qboolean pbrActive;
-#ifdef VK_CUBEMAP
 	qboolean cubemapActive;
-#endif
 	qboolean pbr_ibl_using_hdr_fallback;
 	qboolean pbr_ibl_has_ready_local_cubemap;
 	int pbr_ibl_ready_cubemap_count;
