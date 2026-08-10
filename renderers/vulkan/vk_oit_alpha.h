@@ -6,7 +6,6 @@
  * See docs/WBOIT_ALPHA_ENCODING.md.
  */
 
-#ifdef USE_VULKAN
 
 #include "../common/tr_types.h"
 
@@ -157,4 +156,3 @@ void vk_oit_alpha_note_route( oitSourceAlphaEncoding_t enc, transparencyPath_t p
 /* Push-constant pack: encoding | (alphaDebug<<8) | (edgePolicy<<16) | (emissive<<24) */
 int vk_oit_alpha_pack_push( oitSourceAlphaEncoding_t enc );
 
-#endif /* USE_VULKAN */

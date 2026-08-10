@@ -7,7 +7,6 @@
  * viewmodel lighting, and material translation.
  */
 #include "tr_local.h"
-#ifdef USE_VULKAN
 #include "vk_world_presentation.h"
 #include "vk_world_feature_support.h"
 
@@ -127,4 +126,3 @@ void vk_world_feature_support_register( void )
 		s_cmds = qtrue;
 	}
 }
-#endif
