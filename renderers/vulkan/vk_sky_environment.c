@@ -6,7 +6,6 @@
  * Camera transform: origin' = envOrigin + (cameraOrigin - envOrigin) / scale
  */
 #include "tr_local.h"
-#ifdef USE_VULKAN
 #include "vk_world_presentation.h"
 #include "vk_sky_environment.h"
 
@@ -64,4 +63,3 @@ void vk_sky_environment_register( void )
 	}
 	(void)r_skyEnvironmentDebug;
 }
-#endif

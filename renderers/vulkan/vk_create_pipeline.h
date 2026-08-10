@@ -24,7 +24,6 @@ struct Vk_Pipeline_FragSpecData {
 	float   identity_color;
 	float	identity_alpha;
 	int32_t	acff;
-#ifdef USE_VK_PBR
 	float   specularScale_x;
 	float   specularScale_y;
 	float   specularScale_z;
@@ -59,7 +58,6 @@ struct Vk_Pipeline_FragSpecData {
 	int32_t material_blend_layers;
 	int32_t material_height_mask;
 	int32_t gbuffer_compact; /* 1: dual-write octahedral into deferred material.ba */
-#endif
 };
 
 VkPipeline vk_create_pipeline( const Vk_Pipeline_Def *def, renderPass_t renderPassIndex, uint32_t def_index );

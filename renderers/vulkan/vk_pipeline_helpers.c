@@ -9,9 +9,7 @@ bloom blur passes (split from vk.c).
 
 #include "tr_local.h"
 #include "vk_pipeline_helpers.h"
-#ifdef USE_VK_PBR
 #include "vk_forward_plus.h"
-#endif
 
 /* r_hdr 3: 64-bit (RGBA64F) uses dvec4 fragment output; select HDR64 shaders when active */
 static inline qboolean vk_hdr64_active( void )
@@ -168,11 +166,9 @@ void vk_create_oit_accum_pipeline( void )
 
 	if ( r_oitForwardPlus && r_oitForwardPlus->integer &&
 		vk.set_layout_forward_plus != VK_NULL_HANDLE ) {
-#ifdef USE_VK_PBR
 		if ( vk_forward_plus_get_graphics_descriptor_set() != VK_NULL_HANDLE ) {
 			forward_plus_lit = 1;
 		}
-#endif
 	}
 
 	if ( vk.oit_accum_pipeline != VK_NULL_HANDLE ) {
@@ -556,11 +552,9 @@ void vk_create_oit_accum_mboit_pipeline( void )
 
 	if ( r_oitForwardPlus && r_oitForwardPlus->integer &&
 		vk.set_layout_forward_plus != VK_NULL_HANDLE ) {
-#ifdef USE_VK_PBR
 		if ( vk_forward_plus_get_graphics_descriptor_set() != VK_NULL_HANDLE ) {
 			forward_plus_lit = 1;
 		}
-#endif
 	}
 
 	if ( vk.oit_accum_mboit_pipeline != VK_NULL_HANDLE ) {

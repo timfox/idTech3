@@ -8,7 +8,6 @@
  * See docs/COLOR_PIPELINE.md.
  */
 
-#ifdef USE_VULKAN
 
 #include "../common/tr_types.h"
 
@@ -69,4 +68,3 @@ void vk_scene_hdr_log_gi_blocked( const char *passName );
 
 void vk_scene_hdr_ownership_status_f( void );
 
-#endif /* USE_VULKAN */

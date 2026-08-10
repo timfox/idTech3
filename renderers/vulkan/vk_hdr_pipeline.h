@@ -1,6 +1,5 @@
 #pragma once
 
-#ifdef USE_VULKAN
 
 #include "../common/tr_types.h"
 
@@ -17,4 +16,3 @@ void vk_hdr_pipeline_register( void );
 void vk_hdr_pipeline_begin_frame( void );
 void vk_hdr_pipeline_note_stage( vkHdrStage_t stage, const char *passName );
 
-#endif /* USE_VULKAN */

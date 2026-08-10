@@ -1,6 +1,5 @@
 #pragma once
 
-#ifdef USE_VULKAN
 
 /*
  * Raster Ultra 1.8 — versioned processed-material cache.
@@ -41,4 +40,3 @@ void vk_material_cache_invalidate_all( void );
 const vkMaterialCacheStats_t *vk_material_cache_stats( void );
 void vk_material_cache_status_f( void );
 
-#endif /* USE_VULKAN */
