@@ -16,7 +16,6 @@ Split from vk.c.
 #include "vk_util.h"
 #include <math.h>
 
-#ifdef VK_CUBEMAP
 
 enum Target { IRRADIANCE = 0, PREFILTEREDENV = 1 };
 
@@ -747,7 +746,6 @@ void vk_generate_cubemaps( cubemap_t *cube )
 		}
 	}
 
-#ifdef USE_VK_PBR
 	if ( r_pbr_shExtract && r_pbr_shExtract->integer && vk.pbrActive && cube && cube->irradiance_image ) {
 		R_ResetCubemapSH( cube );
 		if ( vk_extract_sh_coeffs( cube->irradiance_image, cube->shCoeffs ) ) {
@@ -755,7 +753,6 @@ void vk_generate_cubemaps( cubemap_t *cube )
 			ri.Printf( PRINT_DEVELOPER, "PBR: extracted SH coeffs for cubemap '%s'\n", cube->name );
 		}
 	}
-#endif
 
 	command_buffer = vk_begin_command_buffer();
 	record_image_layout_transition( command_buffer, vk.cubeMap.color_image, VK_IMAGE_ASPECT_COLOR_BIT, 
@@ -779,9 +776,7 @@ void vk_begin_cubemap_render_pass( void )
 	vk_begin_render_pass_tracked( vk.render_pass.cubemap, frameBuffer, qtrue, vk.renderWidth, vk.renderHeight );
 }
 
-#endif /* VK_CUBEMAP */
 
-#ifdef VK_PBR_BRDFLUT
 void vk_create_brfdlut( void )
 {
 	if ( !vk.pbrActive )
@@ -832,4 +827,3 @@ void vk_create_brfdlut( void )
 		vk_end_command_buffer( command_buffer, __func__ );
 	}
 }
-#endif /* VK_PBR_BRDFLUT */

@@ -6,7 +6,6 @@
  * See docs/RENDERER_P1_CERTIFICATION.md and docs/RENDERER_IQ_LIVE_CERTIFICATION.md.
  */
 
-#ifdef USE_VULKAN
 
 #include "../common/tr_types.h"
 
@@ -89,4 +88,3 @@ rendererP1Evidence_t vk_renderer_p1_gate_evidence( rendererP1Gate_t gate );
 
 void vk_renderer_p1_status_f( void );
 
-#endif /* USE_VULKAN */

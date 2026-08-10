@@ -1,6 +1,5 @@
 #include "tr_local.h"
 
-#ifdef USE_VULKAN
 
 #include "vk.h"
 #include "vk_hdr_sun.h"
@@ -479,4 +478,3 @@ void vk_hdr_sun_register( void )
 	(void)r_sunDiffractionIntensity;
 }
 
-#endif /* USE_VULKAN */

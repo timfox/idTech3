@@ -83,7 +83,6 @@ static void R_Mimp_ApplyAuthoredMaterial( shader_t *shader, const meshImportSurf
 		return;
 	}
 	stage = shader->stages[0];
-#ifdef USE_VK_PBR
 	/* USDA channels are already normalized to engine qpaths by the FreeUSD
 	 * bridge.  Reuse the same image/pipeline setup as native PBR shaders so
 	 * deferred, Forward+, OIT, SSR, and RTX see the same material flags. */
@@ -107,9 +106,6 @@ static void R_Mimp_ApplyAuthoredMaterial( shader_t *shader, const meshImportSurf
 			shader->hasPBR = qtrue;
 		}
 	}
-#else
-	(void)surface;
-#endif
 }
 
 qboolean R_MeshImport_FinalizeMD3( model_t *mod, int lod, const char *name,

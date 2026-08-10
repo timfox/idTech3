@@ -19,7 +19,6 @@ Renderer IQ P1 hub — profile, history registry, ghost isolation, certification
 #include "vk_util.h"
 #include <stdlib.h>
 
-#ifdef USE_VULKAN
 
 typedef struct {
 	qboolean valid;
@@ -676,4 +675,3 @@ void vk_renderer_iq_p1_register( void )
 		"[VK][IQ-P1] hub ready (honest multi-level cert; iq_certify_core for GPU evidence)\n" );
 }
 
-#endif /* USE_VULKAN */
