@@ -1,6 +1,5 @@
 #pragma once
 
-#ifdef USE_VULKAN
 
 /*
  * Raster Ultra 1.10 — cinematic / physical camera model.
@@ -36,4 +35,3 @@ void vk_cinematic_camera_begin_frame( void );
 
 void vk_cinematic_camera_status_f( void );
 
-#endif /* USE_VULKAN */

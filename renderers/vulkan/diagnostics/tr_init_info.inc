@@ -36,7 +36,6 @@ static void GfxInfo( void )
 	const char *fsstrings[] = { "windowed", "fullscreen" };
 	const char *fs;
 	int mode;
-#ifdef USE_VULKAN
 	ri.Printf( PRINT_ALL, "\nVK_VENDOR: %s\n", glConfig.vendor_string );
 	ri.Printf( PRINT_ALL, "VK_RENDERER: %s\n", glConfig.renderer_string );
 	ri.Printf( PRINT_ALL, "VK_VERSION: %s\n", glConfig.version_string );
@@ -46,21 +45,8 @@ static void GfxInfo( void )
 
 	ri.Printf( PRINT_ALL, "\nVK_MAX_TEXTURE_SIZE: %d\n", glConfig.maxTextureSize );
 	ri.Printf( PRINT_ALL, "VK_MAX_TEXTURE_UNITS: %d\n", glConfig.numTextureUnits );
-#else
-	const char *enablestrings[] = { "disabled", "enabled" };
-
-	ri.Printf( PRINT_ALL, "\nGL_VENDOR: %s\n", glConfig.vendor_string );
-	ri.Printf( PRINT_ALL, "GL_RENDERER: %s\n", glConfig.renderer_string );
-	ri.Printf( PRINT_ALL, "GL_VERSION: %s\n", glConfig.version_string );
-	ri.Printf( PRINT_DEVELOPER, "GL_EXTENSIONS: " );
-	R_PrintLongString( glConfig.extensions_string );
-	ri.Printf( PRINT_ALL, "\n" );
-	ri.Printf( PRINT_ALL, "GL_MAX_TEXTURE_SIZE: %d\n", glConfig.maxTextureSize );
-	ri.Printf( PRINT_ALL, "GL_MAX_TEXTURE_UNITS_ARB: %d\n", glConfig.numTextureUnits );
-#endif
 
 	ri.Printf( PRINT_ALL, "\nPIXELFORMAT: color(%d-bits) Z(%d-bit) stencil(%d-bits)\n", glConfig.colorBits, glConfig.depthBits, glConfig.stencilBits );
-#ifdef USE_VULKAN
 	ri.Printf( PRINT_ALL, " presentation: %s\n", vk_format_string( vk.present_format.format ) );
 	if ( vk.color_format != vk.present_format.format ) {
 		ri.Printf( PRINT_ALL, " color: %s\n", vk_format_string( vk.color_format ) );
@@ -69,7 +55,6 @@ static void GfxInfo( void )
 		ri.Printf( PRINT_ALL, " capture: %s\n", vk_format_string( vk.capture_format ) );
 	}
 	ri.Printf( PRINT_ALL, " depth: %s\n", vk_format_string( vk.depth_format ) );
-#endif
 	if ( glConfig.isFullscreen )
 	{
 		const char *modefs = ri.Cvar_VariableString( "r_modeFullscreen" );
@@ -103,12 +88,6 @@ static void GfxInfo( void )
 		ri.Printf( PRINT_ALL, "N/A\n" );
 	}
 
-#ifndef USE_VULKAN
-	ri.Printf( PRINT_ALL, "multitexture: %s\n", enablestrings[qglActiveTextureARB != 0] );
-	ri.Printf( PRINT_ALL, "compiled vertex arrays: %s\n", enablestrings[qglLockArraysEXT != 0 ] );
-	ri.Printf( PRINT_ALL, "texenv add: %s\n", enablestrings[glConfig.textureEnvAddAvailable != 0] );
-	ri.Printf( PRINT_ALL, "compressed textures: %s\n", enablestrings[glConfig.textureCompression!=TC_NONE] );
-#endif
 }
 
 
@@ -132,11 +111,9 @@ static void VarInfo( void )
 	ri.Printf( PRINT_ALL, "texture bits: %d\n", r_texturebits ? (r_texturebits->integer ? r_texturebits->integer : 32) : 32 );
 	ri.Printf( PRINT_ALL, "picmip: %d%s\n", r_picmip ? r_picmip->integer : 0, (r_nomip && r_nomip->integer) ? ", worldspawn only" : "" );
 
-#ifdef USE_VULKAN
 	if ( r_vertexLight && r_vertexLight->integer ) {
 		ri.Printf( PRINT_ALL, "Note: using vertex lightmap approximation\n" );
 	}
-#if defined (USE_VK_PBR)
 	ri.Printf( PRINT_ALL, "PBR SH extraction: %s\n", (r_pbr_shExtract && r_pbr_shExtract->integer) ? "enabled" : "disabled" );
 	if ( r_glint && r_glint->integer ) {
 		ri.Printf( PRINT_ALL, "PBR glint NDF: enabled (r_glint 1)\n" );
@@ -147,16 +124,6 @@ static void VarInfo( void )
 	if ( r_pbr_debug && r_pbr_debug->integer ) {
 		ri.Printf( PRINT_ALL, "PBR debug view: mode %d (1=direct,2=ibl spec,3=irradiance,4=env samples,5-8=glint,17-19=resource health)\n", r_pbr_debug->integer );
 	}
-#endif
-#else
-	if ( (r_vertexLight && r_vertexLight->integer) || glConfig.hardwareType == GLHW_PERMEDIA2 ) {
-		ri.Printf( PRINT_ALL, "Note: using vertex lightmap approximation\n" );
-	} else if ( glConfig.hardwareType == GLHW_RAGEPRO ) {
-		ri.Printf( PRINT_ALL, "Note: ragePro approximations\n" );
-	} else if ( glConfig.hardwareType == GLHW_RIVA128 ) {
-		ri.Printf( PRINT_ALL, "Note: riva128 approximations\n" );
-	}
-#endif
 	if ( r_finish && r_finish->integer ) {
 		ri.Printf( PRINT_ALL, "Forcing glFinish\n" );
 	}
@@ -175,7 +142,6 @@ static void GfxInfo_f( void )
 }
 
 
-#ifdef USE_VULKAN
 static void VkInfo_f( void )
 {
 	ri.Printf(PRINT_ALL, "max_vertex_usage: %iKb\n", (int)((vk.stats.vertex_buffer_max + 1023) / 1024) );
@@ -228,4 +194,3 @@ static void VulkanInfo_f( void )
 		ri.Printf( PRINT_ALL, "Platform  : Raspberry Pi (V3DV)\n" );
 	ri.Printf( PRINT_ALL, "==============================\n" );
 }
-#endif
