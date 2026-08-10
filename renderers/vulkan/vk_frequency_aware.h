@@ -1,6 +1,5 @@
 #pragma once
 
-#ifdef USE_VULKAN
 
 /*
  * Raster Ultra 1.12 — Frequency-Aware Rendering + Moiré Suppression.
@@ -85,4 +84,3 @@ void vk_frequency_aware_scenes_f( void );
 const char *vk_frequency_aware_source_name( vkFreqAliasSource_t s );
 const char *vk_frequency_aware_tier_name( vkFreqTier_t t );
 
-#endif /* USE_VULKAN */

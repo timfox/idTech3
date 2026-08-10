@@ -5,7 +5,6 @@
  * Refractive / classic destination-dependent / portal / weapon / shadows.
  */
 
-#ifdef USE_VULKAN
 
 #include "../common/tr_types.h"
 #include "vk_transparency_route.h"
@@ -77,4 +76,3 @@ uint32_t vk_transparency_resource_generation( transparencyResourceId_t id );
 qboolean vk_transparency_resource_validate_pair( transparencyResourceId_t src, transparencyResourceId_t dst,
 	char *err, int errSize );
 
-#endif /* USE_VULKAN */

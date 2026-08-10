@@ -8,7 +8,6 @@ Phase 1.6 — versioned P1 numerical thresholds.
 #include "vk_renderer_p1_thresholds.h"
 #include <string.h>
 
-#ifdef USE_VULKAN
 
 static rendererP1Thresholds_t s_thr;
 static qboolean s_inited;
@@ -197,4 +196,3 @@ void vk_renderer_p1_thresholds_register( void )
 	}
 }
 
-#endif /* USE_VULKAN */

@@ -1,6 +1,5 @@
 #pragma once
 
-#ifdef USE_VULKAN
 
 #include "vk_material_ir.h"
 
@@ -48,4 +47,3 @@ void vk_material_instance_apply( const vkMaterialInstance_t *inst, vkMaterialIR_
 
 void vk_material_instance_status_f( void );
 
-#endif /* USE_VULKAN */
