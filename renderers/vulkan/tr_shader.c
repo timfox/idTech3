@@ -294,7 +294,6 @@ static qboolean ParseStage( shaderStage_t *stage, const char **text )
 	int i, depthMaskBits = GLS_DEPTHMASK_TRUE, blendSrcBits = 0, blendDstBits = 0, atestBits = 0, depthFuncBits = 0;
 	qboolean depthMaskExplicit = qfalse;
 
-#ifdef USE_VK_PBR
 	char				physicalAlbedoName[MAX_QPATH];
 	qboolean			physicalAlbedo = qfalse;
 	char				bufferNormalTextureName[MAX_QPATH];
@@ -307,11 +306,9 @@ static qboolean ParseStage( shaderStage_t *stage, const char **text )
 	char				bufferSubsurfaceTextureName[MAX_QPATH];
 	char				bufferDetailTextureName[MAX_QPATH];
 	bufferDetailTextureName[0] = '\0';
-#endif
 
 	stage->active = qfalse;
 
-#ifdef USE_VK_PBR
 	stage->normalMapType = PHYS_NONE;
 	stage->physicalMapType = PHYS_NONE;
 	stage->emissiveMapType = PHYS_NONE;
@@ -357,7 +354,6 @@ static qboolean ParseStage( shaderStage_t *stage, const char **text )
 	for ( i = 0; i < 9; i++ ) {
 		Vector4Set( stage->shCoeffs[i], 0.0f, 0.0f, 0.0f, 0.0f );
 	}
-#endif
 
 	while ( 1 )
 	{
@@ -453,13 +449,10 @@ static qboolean ParseStage( shaderStage_t *stage, const char **text )
 					return qfalse;
 				}
 
-#ifdef USE_VK_PBR
 				Q_strncpyz( physicalAlbedoName, token, sizeof(physicalAlbedoName) );
 				physicalAlbedo = qtrue;
-#endif
 			}
 		}
-#ifdef USE_VK_PBR
 		else if ( !Q_stricmp(token, "normalMap") || !Q_stricmp(token, "normalHeightMap") )
 		{
 			const qboolean isHeight = !Q_stricmp( token, "normalHeightMap" );
@@ -800,7 +793,6 @@ static qboolean ParseStage( shaderStage_t *stage, const char **text )
 			stage->materialBlend = qtrue;
 			stage->vk_pbr_flags |= PBR_HAS_MATERIAL_BLEND;
 		}
-#endif
 		//
 		// clampmap <name>
 		//
@@ -1151,7 +1143,6 @@ static qboolean ParseStage( shaderStage_t *stage, const char **text )
 
 			stage->specularScale[3] = atof( token );
 		}
-#ifdef USE_VK_PBR
 		else if ( !Q_stricmp( token, "emissivescale" ) )
 		{
 			token = COM_ParseExt( text, qfalse );
@@ -1379,7 +1370,6 @@ static qboolean ParseStage( shaderStage_t *stage, const char **text )
 			}
 			stage->vk_pbr_flags |= PBR_HAS_IRRADIANCE;
 		}
-#endif
 		//
 		// rgbGen
 		//
@@ -1653,7 +1643,6 @@ static qboolean ParseStage( shaderStage_t *stage, const char **text )
 		}
 	}
 
-#ifdef USE_VK_PBR
 	if ( vk.pbrActive && ( physicalAlbedo || stage->physicalMapType != PHYS_NONE ) ) {
 		uint32_t pbrIndex;
 		imgFlags_t flags = IMGFLAG_NOLIGHTSCALE;
@@ -1884,7 +1873,6 @@ static qboolean ParseStage( shaderStage_t *stage, const char **text )
 			}
 		}
 	}
-#endif
 
 	//
 	// if cgen isn't explicitly specified, use either identity or identitylighting
@@ -2973,11 +2961,6 @@ static int CollapseMultitexture( unsigned int st0bits, shaderStage_t *st0, shade
 	qboolean nonIdenticalColors;
 	qboolean swapLightmap;
 
-#ifndef USE_VULKAN
-	if ( !qglActiveTextureARB ) {
-		return 0;
-	}
-#endif
 
 	// make sure both stages are active
 	if ( !st0->active || !st1->active ) {
@@ -2988,15 +2971,6 @@ static int CollapseMultitexture( unsigned int st0bits, shaderStage_t *st0, shade
 		return 0;
 	}
 
-#ifndef USE_VULKAN
-	// on voodoo2, don't combine different tmus
-	if ( glConfig.driverType == GLDRV_VOODOO ) {
-		if ( st0->bundle[0].image[0]->TMU ==
-			 st1->bundle[0].image[0]->TMU ) {
-			return 0;
-		}
-	}
-#endif
 
 	abits = st0bits; // st0->stateBits;
 	bbits = st1->stateBits;
@@ -3029,7 +3003,6 @@ static int CollapseMultitexture( unsigned int st0bits, shaderStage_t *st0, shade
 		return 0;
 	}
 
-#ifdef USE_VULKAN
 	if ( mtEnv == GL_ADD && st0->bundle[0].rgbGen != CGEN_IDENTITY ) {
 		mtEnv = GL_ADD_NONIDENTITY;
 	}
@@ -3038,12 +3011,6 @@ static int CollapseMultitexture( unsigned int st0bits, shaderStage_t *st0, shade
 		// we don't support different blend modes in 3x mode, yet
 		return 0;
 	}
-#else
-	// an add collapse can only have identity colors
-	if ( mtEnv == GL_ADD && st0->rgbGen != CGEN_IDENTITY ) {
-		return 0;
-	}
-#endif
 
 	nonIdenticalColors = qfalse;
 
@@ -3071,16 +3038,12 @@ static int CollapseMultitexture( unsigned int st0bits, shaderStage_t *st0, shade
 
 	if ( nonIdenticalColors )
 	{
-#ifdef USE_VULKAN
 		switch ( mtEnv )
 		{
 			case GL_ADD:
 			case GL_ADD_NONIDENTITY: mtEnv = GL_BLEND_ADD; break;
 			case GL_MODULATE: mtEnv = GL_BLEND_MODULATE; break;
 		}
-#else
-		return 0;
-#endif
 	}
 
 	switch ( mtEnv ) {
@@ -3102,21 +3065,17 @@ static int CollapseMultitexture( unsigned int st0bits, shaderStage_t *st0, shade
 	}
 	else
 	{
-#ifdef USE_VULKAN
 		if ( st0->mtEnv )
 			st0->bundle[2] = st1->bundle[0]; // add to third bundle
 		else
-#endif
 			st0->bundle[1] = st1->bundle[0];
 	}
 
-#ifdef USE_VULKAN
 	if ( st0->mtEnv )
 	{
 		st0->mtEnv3 = mtEnv;
 	}
 	else
-#endif
 	{
 		// set the new blend state bits
 		st0->stateBits &= ~GLS_BLEND_BITS;
@@ -3128,7 +3087,6 @@ static int CollapseMultitexture( unsigned int st0bits, shaderStage_t *st0, shade
 
 	st0->numTexBundles++;
 
-#ifdef USE_VK_PBR
 	if( st1->vk_pbr_flags ) {
 		int li;
 		st0->vk_pbr_flags = st1->vk_pbr_flags;
@@ -3149,7 +3107,6 @@ static int CollapseMultitexture( unsigned int st0bits, shaderStage_t *st0, shade
 			st0->layerPhysicalType[li] = st1->layerPhysicalType[li];
 		}
 	}
-#endif
 
 	//
 	// move down subsequent shaders
@@ -3161,7 +3118,6 @@ static int CollapseMultitexture( unsigned int st0bits, shaderStage_t *st0, shade
 
 	Com_Memset( st0 + num_stages - 1, 0, sizeof( stages[0] ) );
 
-#ifdef USE_VULKAN
 	if ( vk.maxBoundDescriptorSets >= 8 && num_stages >= 3 && !st0->mtEnv3 )
 	{
 		if ( mtEnv == GL_BLEND_ONE_MINUS_ALPHA || mtEnv == GL_BLEND_ALPHA || mtEnv == GL_BLEND_MIX_ALPHA || mtEnv == GL_BLEND_MIX_ONE_MINUS_ALPHA || mtEnv == GL_BLEND_DST_COLOR_SRC_ALPHA )
@@ -3174,7 +3130,6 @@ static int CollapseMultitexture( unsigned int st0bits, shaderStage_t *st0, shade
 			return 1 + CollapseMultitexture( st0->stateBits, st0, st1, num_stages - 1 );
 		}
 	}
-#endif
 
 	return 1;
 }
@@ -3456,7 +3411,6 @@ static void FixRenderCommandList( int newShader ) {
 	}
 }
 
-#ifdef USE_VK_PBR
 static int R_VkLightmapBundleIndex( const shaderStage_t *stage ) {
 	int bundle;
 
@@ -3468,7 +3422,6 @@ static int R_VkLightmapBundleIndex( const shaderStage_t *stage ) {
 
 	return -1;
 }
-#endif
 
 
 static qboolean EqualACgen( const shaderStage_t *st1, const shaderStage_t *st2 )
@@ -4153,9 +4106,7 @@ static shader_t *FinishShader( void ) {
 		shader.fogPass = FP_LE;
 	}
 
-#ifdef USE_VULKAN
 
-#ifdef USE_FOG_COLLAPSE
 	if ( vk.maxBoundDescriptorSets >= 6 && !(shader.contentFlags & CONTENTS_FOG) && shader.fogPass != FP_NONE ) {
 		fogCollapse = qtrue;
 		if ( stage == 1 ) {
@@ -4207,7 +4158,6 @@ static shader_t *FinishShader( void ) {
 		// if there is no fogs - assume that we can apply all color optimizations without any restrictions
 		fogCollapse = qtrue;
 	}
-#endif
 
 	shader.tessFlags = TESS_XYZ;
 
@@ -4417,7 +4367,6 @@ static shader_t *FinishShader( void ) {
 
 			if ( pStage->vk_pbr_flags && def.shader_type >= TYPE_GENERIC_BEGIN  )
 			{
-			#ifdef USE_VK_PBR
 				const int lightmapBundle = R_VkLightmapBundleIndex( pStage );
 
 				def.vk_pbr_flags = pStage->vk_pbr_flags;
@@ -4468,7 +4417,6 @@ static shader_t *FinishShader( void ) {
 				} else {
 					def.vk_pbr_flags &= ~PBR_HAS_MATERIAL_BLEND;
 				}
-			#endif
 			}
 
 			if ( pStage->uiSdfText && def.shader_type == TYPE_SIGNLE_TEXTURE && pStage->numTexBundles == 1U
@@ -4485,7 +4433,6 @@ static shader_t *FinishShader( void ) {
 			pStage->vk_pipeline[0] = vk_find_pipeline_ext( 0, &def, qtrue );
 			def.mirror = qtrue;
 			pStage->vk_mirror_pipeline[0] = vk_find_pipeline_ext( 0, &def, qfalse );
-#ifdef USE_VK_PBR
 			if ( pStage->vk_pbr_flags ) {
 				Vk_Pipeline_Def gltfDef = def;
 				gltfDef.pbr_vert_mode = 1;
@@ -4507,13 +4454,10 @@ static shader_t *FinishShader( void ) {
 				pStage->vk_pipeline_gltf_gpu[0] = pStage->vk_pipeline[0];
 				pStage->vk_mirror_pipeline_gltf_gpu[0] = pStage->vk_mirror_pipeline[0];
 			}
-#endif
 
 			if ( pStage->depthFragment ) {
 				def.mirror = qfalse;
-				#ifdef USE_VK_PBR
 					def.vk_pbr_flags = 0;
-				#endif
 				def.shader_type = TYPE_SIGNLE_TEXTURE_DF;
 				pStage->vk_pipeline_df = vk_find_pipeline_ext( 0, &def, qtrue );
 				def.mirror = qtrue;
@@ -4522,7 +4466,6 @@ static shader_t *FinishShader( void ) {
 			}
 
 
-#ifdef USE_FOG_COLLAPSE
 			if ( fogCollapse && tr.numFogs > 0 ) {
 				Vk_Pipeline_Def fog_def;
 				Vk_Pipeline_Def fog_def_mirror;
@@ -4537,7 +4480,6 @@ static shader_t *FinishShader( void ) {
 
 				pStage->vk_pipeline[1] = vk_find_pipeline_ext( 0, &fog_def, qfalse );
 				pStage->vk_mirror_pipeline[1] = vk_find_pipeline_ext( 0, &fog_def_mirror, qfalse );
-#ifdef USE_VK_PBR
 				if ( pStage->vk_pbr_flags ) {
 					fog_def.pbr_vert_mode = 1;
 					fog_def_mirror.pbr_vert_mode = 1;
@@ -4558,16 +4500,13 @@ static shader_t *FinishShader( void ) {
 					pStage->vk_pipeline_gltf_gpu[1] = pStage->vk_pipeline[1];
 					pStage->vk_mirror_pipeline_gltf_gpu[1] = pStage->vk_mirror_pipeline[1];
 				}
-#endif
 
 				pStage->bundle[0].adjustColorsForFog = ACFF_NONE; // will be handled in shader from now
 
 				shader.fogCollapse = qtrue;
 			}
-#endif
 		}
 	}
-#endif // USE_VULKAN
 
 	FindLightingBundle();
 
