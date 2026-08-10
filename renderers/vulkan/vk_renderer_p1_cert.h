@@ -6,7 +6,6 @@
  * See docs/RENDERER_IQ_LIVE_CERTIFICATION.md.
  */
 
-#ifdef USE_VULKAN
 
 #include "../common/tr_types.h"
 #include "vk_renderer_iq_p1.h"
@@ -88,4 +87,3 @@ qboolean vk_renderer_p1_cert_export_json( const char *path );
 /* Refresh STATIC + PROFILE stages from live cvars/contracts (no GPU). */
 void vk_renderer_p1_cert_refresh_static( void );
 
-#endif /* USE_VULKAN */

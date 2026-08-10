@@ -9,7 +9,6 @@ Renderer IQ P0-A — SceneHDR writer ownership.
 #include "vk_scene_hdr_ownership.h"
 #include "vk_color_contract.h"
 
-#ifdef USE_VULKAN
 
 static sceneHdrOwnership_t s_own;
 static qboolean s_cmds;
@@ -206,4 +205,3 @@ void vk_scene_hdr_log_gi_blocked( const char *passName )
 		vk_scene_hdr_stage_name( s_own.lastWriter ) );
 }
 
-#endif /* USE_VULKAN */

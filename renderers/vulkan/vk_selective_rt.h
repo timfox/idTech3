@@ -1,6 +1,5 @@
 #pragma once
 
-#ifdef USE_VULKAN
 
 #include "../common/tr_types.h"
 
@@ -26,4 +25,3 @@ qboolean vk_srt_admit_hero_object( void );
 const vkSelectiveRtBudget_t *vk_srt_budget( void );
 void vk_srt_status_f( void );
 
-#endif
