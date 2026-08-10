@@ -10,7 +10,6 @@ Renderer IQ P1-B — BloomSourceHDR contract.
 #include "vk_color_contract.h"
 #include "vk_scene_hdr_ownership.h"
 
-#ifdef USE_VULKAN
 
 static bloomSourceContract_t s_bloom;
 static qboolean s_cmds;
@@ -173,4 +172,3 @@ void vk_bloom_source_contract_register( void )
 	ri.Printf( PRINT_ALL, "[VK][bloom-source] contract ready (bloom_source_status)\n" );
 }
 
-#endif /* USE_VULKAN */

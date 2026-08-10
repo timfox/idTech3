@@ -13,7 +13,6 @@
 #include "vk_forward_plus.h"
 #include "vk_hdr_resolve_contract.h"
 
-#ifdef USE_VULKAN
 
 static deferredRenderingContract_t s_contract;
 static deferredCertificationLevel_t s_level = DEFERRED_UNCERTIFIED;
@@ -313,4 +312,3 @@ void vk_deferred_certification_begin_frame( void )
 	}
 }
 
-#endif

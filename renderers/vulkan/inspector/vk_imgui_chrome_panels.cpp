@@ -26,11 +26,7 @@ static void VkImgui_DrawAboutInspectorPopup( void )
 		ImGui::TextUnformatted( Q3_VERSION );
 		ImGui::Separator();
 		ImGui::Text( "ImGui %s", IMGUI_VERSION );
-#ifdef USE_VULKAN
 		ImGui::Text( "Renderer API: Vulkan" );
-#else
-		ImGui::Text( "Renderer API: OpenGL" );
-#endif
 		ImGui::Spacing();
 		ImGui::TextWrapped( "Vendor: %s", glConfig.vendor_string );
 		ImGui::TextWrapped( "Device: %s", glConfig.renderer_string );
