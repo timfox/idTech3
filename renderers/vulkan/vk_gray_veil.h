@@ -7,8 +7,6 @@
 #ifndef VK_GRAY_VEIL_H
 #define VK_GRAY_VEIL_H
 
-#ifdef USE_VULKAN
 void vk_gray_veil_register( void );
-#endif
 
 #endif

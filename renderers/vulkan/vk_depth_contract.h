@@ -8,7 +8,6 @@
  * Do not change fields without bumping DEPTH_CONTRACT_VERSION and updating docs.
  */
 
-#ifdef USE_VULKAN
 
 #include "../common/tr_types.h"
 
@@ -85,4 +84,3 @@ float vk_depth_positive_view_from_world( const vec3_t worldPos, const vec3_t vie
 float vk_depth_camera_distance( const vec3_t worldPos, const vec3_t viewOrg );
 float vk_depth_view_depth_to_traditional01( float viewDepth, float zNear, float zFar );
 
-#endif /* USE_VULKAN */

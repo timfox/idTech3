@@ -363,7 +363,6 @@ ClassicShaderMaterialInfo R_TranslateClassicShaderToMaterial( const shader_t *sh
 		if ( st->stateBits & GLS_ATEST_BITS ) {
 			info.alphaTested = qtrue;
 		}
-#ifdef USE_VK_PBR
 		if ( st->normalMap ) {
 			info.hasNormalMap = qtrue;
 		}
@@ -373,7 +372,6 @@ ClassicShaderMaterialInfo R_TranslateClassicShaderToMaterial( const shader_t *sh
 		if ( st->emissiveMap || ( st->vk_pbr_flags & PBR_HAS_EMISSIVE ) ) {
 			info.hasEmissive = qtrue;
 		}
-#endif
 	}
 
 	(void)activeStages;
@@ -563,7 +561,6 @@ DeferredEligibilityResult R_GetDeferredEligibility(
 		return DH_Make( DEFERRED_UNSUPPORTED, DEFERRED_REASON_TRANSMISSION_OR_REFRACTION );
 	}
 
-#ifdef USE_VK_PBR
 	if ( shader->hasPBR ) {
 		unsigned flags = 0u;
 		int s;
@@ -619,7 +616,6 @@ DeferredEligibilityResult R_GetDeferredEligibility(
 		res.owner = PIXEL_OWNER_DEFERRED_FULL;
 		return res;
 	}
-#endif
 
 	/* Classic translation path */
 	res.classic = R_TranslateClassicShaderToMaterial( shader );
@@ -974,11 +970,7 @@ void R_MaterialTranslateStatus_f( void )
 	ri.Printf( PRINT_ALL, "material_translate_status: %s\n", sh->name );
 	ri.Printf( PRINT_ALL, "  stages=%d unfogged=%d hasPBR=%d lightmapIndex=%d deforms=%d\n",
 		info.stageCount, sh->numUnfoggedPasses,
-#ifdef USE_VK_PBR
 		sh->hasPBR ? 1 : 0,
-#else
-		0,
-#endif
 		sh->lightmapIndex, sh->numDeforms );
 	ri.Printf( PRINT_ALL, "  translation.valid=%d audit=0x%x summary=%s\n",
 		info.valid ? 1 : 0, info.translateAudit, info.summary );

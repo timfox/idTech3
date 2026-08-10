@@ -5,13 +5,11 @@
  * See docs/REFLECTION_HIERARCHY.md
  */
 
-#ifdef USE_VULKAN
 
 #include "../common/tr_types.h"
 
 #ifdef __cplusplus
 extern "C" {
-#endif
 
 typedef enum {
 	VK_REFLECT_SRC_NONE = 0,

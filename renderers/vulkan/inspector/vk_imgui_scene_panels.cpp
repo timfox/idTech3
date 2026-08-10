@@ -45,17 +45,14 @@ extern "C" void VkImgui_DrawProfiler(void) {
 	ImGui::Text( "Last 120 frames: min %.3f   avg %.3f   max %.3f ms", histMin, histSum / 120.0f, histMax );
 	ImGui::PlotLines( "Frame time (ms)", frameTimes, 120, frameIdx, nullptr, 0.0f, 33.0f, ImVec2( 0.0f, 96.0f ) );
 
-#ifdef USE_VULKAN
 	ImGui::SeparatorText( "Scene (last refdef)" );
 	ImGui::Text( "Ref entities: %d", VkImgScene_RefEntityCount() );
 	ImGui::Text( "Dynamic lights: %u", VkImgScene_DlightCount() );
 	ImGui::Text( "Draw surfs (batch): %d", VkImgScene_RefdefNumDrawSurfs() );
-#endif
 
 	ImGui::End();
 }
 
-#ifdef USE_VULKAN
 static const char *VkImgui_ReTypeLabel( refEntityType_t rt )
 {
 	switch ( rt ) {
@@ -129,7 +126,6 @@ static void VkImgui_ClearInspectorSelectionScene( void )
 	vkInspector.inspectorDlightIndex = -1;
 	vkInspector.shader.active = qfalse;
 }
-#endif
 
 extern "C" void VkImgui_DrawViewport(void) {
 	if ( !vkWindows.viewport.open ) return;
@@ -182,7 +178,6 @@ extern "C" void VkImgui_DrawViewport(void) {
 	if ( ImGui::IsItemHovered() ) {
 		ImGui::SetTooltip( "Reads tr.refdef from the last assembled scene (same frame as Objects)." );
 	}
-#ifdef USE_VULKAN
 	{
 		char wn[MAX_QPATH];
 		int rx, ry, rw, rh;
@@ -212,9 +207,6 @@ extern "C" void VkImgui_DrawViewport(void) {
 		ImGui::SeparatorText( "Display" );
 		ImGui::Text( "Game swaps to framebuffer; inspector uses docking passthrough (no embedded RT)." );
 	}
-#else
-	ImGui::TextWrapped( "Viewport diagnostics require Vulkan backend." );
-#endif
 	ImGui::End();
 }
 
@@ -225,7 +217,6 @@ extern "C" void VkImgui_DrawShaderEditor(void) {
 	if ( ImGui::IsItemHovered() ) {
 		ImGui::SetTooltip( "Browses tr.sortedShaders[]. Live .shader editing stays on the console (!)" );
 	}
-#ifdef USE_VULKAN
 	ImGui::InputTextWithHint( "Filter##shaderfilter", "substring...", vkInspector.searchKeyword, sizeof( vkInspector.searchKeyword ) );
 	if ( ImGui::Button( "Reload shader scripts" ) ) {
 		ri.Cmd_ExecuteText( EXEC_APPEND, "r_reloadShaders\n" );
@@ -277,9 +268,6 @@ extern "C" void VkImgui_DrawShaderEditor(void) {
 		}
 	}
 	ImGui::EndChild();
-#else
-	ImGui::Text( "Shader browser requires Vulkan renderer build." );
-#endif
 	ImGui::End();
 }
 
@@ -291,7 +279,6 @@ extern "C" void VkImgui_DrawObjects(void) {
 		ImGui::SetTooltip(
 			"Reads tr.world + current tr.refdef batch (same data the backend just rendered)." );
 	}
-#ifdef USE_VULKAN
 	ImGui::InputTextWithHint( "Filter##objfilter", "model path / index...", vkInspector.searchKeyword,
 		sizeof( vkInspector.searchKeyword ) );
 	if ( ImGui::SmallButton( "Clear selection##obj" ) ) {
@@ -432,9 +419,6 @@ extern "C" void VkImgui_DrawObjects(void) {
 		}
 		ImGui::TreePop();
 	}
-#else
-	ImGui::TextWrapped( "Object browser requires Vulkan + tr.refdef." );
-#endif
 	ImGui::End();
 }
 
@@ -447,7 +431,6 @@ extern "C" void VkImgui_DrawInspector(void) {
 			"Selection comes from Objects, Shaders list, or clear with Objects panel button." );
 	}
 	ImGui::Separator();
-#ifdef USE_VULKAN
 	if ( vkInspector.inspectorSelectionKind == VK_INSP_KIND_WORLD && VkImgScene_WorldLoaded() ) {
 		char wn[MAX_QPATH];
 		char wb[MAX_QPATH];
@@ -549,9 +532,6 @@ extern "C" void VkImgui_DrawInspector(void) {
 		ImGui::BulletText( "Pick a row in Objects (world / entity / dlight)." );
 		ImGui::BulletText( "Pick a shader in the Shaders panel." );
 	}
-#else
-	ImGui::TextWrapped( "Inspector requires Vulkan renderer + ImGui overlay." );
-#endif
 	ImGui::End();
 }
 
