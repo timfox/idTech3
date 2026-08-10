@@ -20,9 +20,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 ===========================================================================
 */
 #include "tr_local.h"
-#ifdef USE_VULKAN
 #include "vk_bsp_viz.h"
-#endif
 
 
 
@@ -361,9 +359,7 @@ R_AddWorldSurface
 */
 static void R_AddWorldSurface( msurface_t *surf, int dlightBits ) {
 	if ( surf->viewCount == tr.viewCount ) {
-#ifdef USE_VULKAN
 		vk_bsp_viz_note_surface_duplicate();
-#endif
 		return;		// already in this view
 	}
 
@@ -372,19 +368,15 @@ static void R_AddWorldSurface( msurface_t *surf, int dlightBits ) {
 
 	// try to cull before dlighting or adding
 	if ( R_CullSurface( surf->data, surf->shader ) ) {
-#ifdef USE_VULKAN
 		vk_bsp_viz_note_surface_backface();
-#endif
 		return;
 	}
 
 	if ( r_dlightMode->integer ) {
 		surf->vcVisible = tr.viewCount;
 		R_AddDrawSurf( surf->data, surf->shader, surf->fogIndex, 0 );
-#ifdef USE_VULKAN
 		vk_bsp_viz_note_surface_accepted();
 		vk_bsp_viz_note_surface_classified( surf->shader && surf->shader->isSky );
-#endif
 		return;
 	}
 
@@ -395,10 +387,8 @@ static void R_AddWorldSurface( msurface_t *surf, int dlightBits ) {
 	}
 
 	R_AddDrawSurf( surf->data, surf->shader, surf->fogIndex, dlightBits );
-#ifdef USE_VULKAN
 	vk_bsp_viz_note_surface_accepted();
 	vk_bsp_viz_note_surface_classified( surf->shader && surf->shader->isSky );
-#endif
 }
 
 
@@ -600,9 +590,7 @@ static void R_RecursiveWorldNode( mnode_t *node, unsigned int planeBits, unsigne
 			if ( planeBits & 1 ) {
 				r = BoxOnPlaneSide(node->mins, node->maxs, &tr.viewParms.frustum[0]);
 				if (r == 2) {
-#ifdef USE_VULKAN
 					vk_bsp_viz_note_leaf_frustum_reject();
-#endif
 					return;						// culled
 				}
 				if ( r == 1 ) {
@@ -613,9 +601,7 @@ static void R_RecursiveWorldNode( mnode_t *node, unsigned int planeBits, unsigne
 			if ( planeBits & 2 ) {
 				r = BoxOnPlaneSide(node->mins, node->maxs, &tr.viewParms.frustum[1]);
 				if (r == 2) {
-#ifdef USE_VULKAN
 					vk_bsp_viz_note_leaf_frustum_reject();
-#endif
 					return;						// culled
 				}
 				if ( r == 1 ) {
@@ -626,9 +612,7 @@ static void R_RecursiveWorldNode( mnode_t *node, unsigned int planeBits, unsigne
 			if ( planeBits & 4 ) {
 				r = BoxOnPlaneSide(node->mins, node->maxs, &tr.viewParms.frustum[2]);
 				if (r == 2) {
-#ifdef USE_VULKAN
 					vk_bsp_viz_note_leaf_frustum_reject();
-#endif
 					return;						// culled
 				}
 				if ( r == 1 ) {
@@ -639,9 +623,7 @@ static void R_RecursiveWorldNode( mnode_t *node, unsigned int planeBits, unsigne
 			if ( planeBits & 8 ) {
 				r = BoxOnPlaneSide(node->mins, node->maxs, &tr.viewParms.frustum[3]);
 				if (r == 2) {
-#ifdef USE_VULKAN
 					vk_bsp_viz_note_leaf_frustum_reject();
-#endif
 					return;						// culled
 				}
 				if ( r == 1 ) {
@@ -697,9 +679,7 @@ static void R_RecursiveWorldNode( mnode_t *node, unsigned int planeBits, unsigne
 		msurface_t	*surf, **mark;
 
 		tr.pc.c_leafs++;
-#ifdef USE_VULKAN
 		vk_bsp_viz_note_leaf_accepted();
-#endif
 
 		// add to z buffer bounds
 		if ( node->mins[0] < tr.viewParms.visBounds[0][0] ) {
@@ -819,13 +799,11 @@ static void R_MarkLeaves (void) {
 	cluster = leaf->cluster;
 	novisFallback = ( r_novis->integer || cluster == -1 ) ? qtrue : qfalse;
 
-#ifdef USE_VULKAN
 	vk_bsp_viz_note_mark_leaves(
 		(int32_t)( leaf - tr.world->nodes ),
 		cluster,
 		leaf->area,
 		novisFallback );
-#endif
 
 	// lockpvs lets designers walk around to determine the
 	// extent of the current pvs
@@ -907,9 +885,7 @@ void R_AddWorldSurfaces( void ) {
 		return;
 	}
 
-#ifdef USE_VULKAN
 	vk_bsp_viz_begin_frame();
-#endif
 
 	tr.currentEntityNum = REFENTITYNUM_WORLD;
 	tr.shiftedEntityNum = tr.currentEntityNum << QSORT_REFENTITYNUM_SHIFT;
@@ -924,9 +900,7 @@ void R_AddWorldSurfaces( void ) {
 	/* Do not clamp tr.refdef.num_dlights: Forward+ packs up to VK_FP_MAX_GPU_LIGHTS. */
 	R_RecursiveWorldNode( tr.world->nodes, 15, R_SurfaceDlightBitsMask( tr.refdef.num_dlights ) );
 
-#ifdef USE_VULKAN
 	vk_bsp_viz_finalize_world();
-#endif
 
 	if ( !r_dlightMode->integer )
 		return;

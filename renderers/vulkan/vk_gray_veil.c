@@ -7,7 +7,6 @@
  */
 #include "tr_local.h"
 
-#ifdef USE_VULKAN
 
 #include "vk.h"
 #include "vk_gray_veil.h"
@@ -544,4 +543,3 @@ void vk_gray_veil_register( void )
 	(void)r_displayTransferDebug;
 }
 
-#endif
