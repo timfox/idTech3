@@ -1,6 +1,5 @@
 #pragma once
 
-#ifdef USE_VULKAN
 
 /*
  * Renderer-owned real-time day/night world lighting.
@@ -23,4 +22,3 @@ float vk_day_night_sun_elevation( void );
 float vk_day_night_shadow_factor( void );
 void vk_day_night_sky_ambient( vec3_t outAmbient );
 
-#endif /* USE_VULKAN */

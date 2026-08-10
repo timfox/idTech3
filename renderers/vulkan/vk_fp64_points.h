@@ -9,7 +9,6 @@ Native vs emulated double-precision point visualization (arXiv:2408.09699).
 
 #include "tr_local.h"
 
-#ifdef USE_VULKAN
 
 typedef enum {
 	VK_FP64_POINTS_MODE_NATIVE = 0,
@@ -31,4 +30,3 @@ void VK_FP64_PointsDraw( void );
 qboolean VK_FP64_PointsReady( void );
 uint32_t VK_FP64_PointsVertexCount( void );
 
-#endif /* USE_VULKAN */

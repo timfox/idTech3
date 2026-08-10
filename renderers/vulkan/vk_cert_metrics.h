@@ -4,7 +4,6 @@
  * Phase 2.6A — certification metrics over float RGBA buffers.
  */
 
-#ifdef USE_VULKAN
 
 #include "../common/tr_types.h"
 
@@ -111,4 +110,3 @@ void vk_cert_metrics_quantization( const float *normalRgba, const float *albedoR
 void vk_cert_metrics_velocity( const float *motionRgba, uint32_t w, uint32_t h,
 	float expectMag, certVelocityMetrics_t *out );
 
-#endif /* USE_VULKAN */

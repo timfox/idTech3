@@ -8,7 +8,6 @@ current-frame supersampling, frequency-aware filters, and optional MSAA.
 
 #pragma once
 
-#ifdef USE_VULKAN
 
 typedef enum {
 	VK_SPATIAL_AA_TIER_OFF = 0,
@@ -56,4 +55,3 @@ void vk_spatial_aa_status_f( void );
 
 const char *vk_spatial_aa_tier_name( vkSpatialAaTier_t t );
 
-#endif /* USE_VULKAN */
