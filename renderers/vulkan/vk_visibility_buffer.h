@@ -1,6 +1,5 @@
 #pragma once
 
-#ifdef USE_VULKAN
 
 /* Material class IDs written by material_classify.comp (Phase 1 stub). */
 enum {
@@ -27,4 +26,3 @@ void vk_visibility_late_shade_apply_after_geometry( void );
 qboolean vk_visibility_buffer_draw_debug( void );
 void vk_visibility_buffer_status_f( void );
 
-#endif /* USE_VULKAN */

@@ -5,7 +5,6 @@
 
 #include <assert.h>
 
-#ifdef USE_VULKAN
 
 static cvar_t *r_shadowConsumerDebug;
 static GpuShadowRecord s_records[VK_SHADOW_CONTRACT_MAX_RECORDS];
@@ -432,4 +431,3 @@ void vk_shadow_contract_status_f( void )
 	}
 }
 
-#endif

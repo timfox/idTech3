@@ -5,14 +5,12 @@
  * See docs/RENDERER_FRAME_CONTRACT.md
  */
 
-#ifdef USE_VULKAN
 
 #include "../common/tr_types.h"
 #include <stdint.h>
 
 #ifdef __cplusplus
 extern "C" {
-#endif
 
 #define VK_FRAME_CONTRACT_MAX_READERS       8u
 #define VK_FRAME_CONTRACT_NAME_LEN          32u

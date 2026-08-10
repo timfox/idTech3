@@ -507,7 +507,6 @@ void vk_update_attachment_descriptors( void ) {
 			}
 		}
 
-#ifdef VK_PBR_BRDFLUT
 		if( vk.pbrActive )
 		{
 			// brdf
@@ -522,7 +521,6 @@ void vk_update_attachment_descriptors( void ) {
 				qvkUpdateDescriptorSets( vk.device, 1, &desc, 0, NULL );
 			}
 		}
-#endif
 	}
 	/* Attachment recreate must rebuild every dependent descriptor set. */
 	vk_spine_note_descriptors_rebound();
@@ -1227,10 +1225,8 @@ void vk_init_descriptors( void )
 		alloc.descriptorSetCount = 1;
 		VK_CHECK( qvkAllocateDescriptorSets( vk.device, &alloc, &vk.screenMap.color_descriptor ) ); // screenmap
 
-#ifdef VK_PBR_BRDFLUT
 		if( vk.pbrActive )
 			VK_CHECK( qvkAllocateDescriptorSets( vk.device, &alloc, &vk.brdflut_image_descriptor ) );
-#endif
 
 		// cubemap
 		VK_CHECK( qvkAllocateDescriptorSets( vk.device, &alloc, &vk.cubeMap.color_descriptor ) );

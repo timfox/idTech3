@@ -5,7 +5,6 @@
 #ifndef VK_WORLD_PRESENTATION_H
 #define VK_WORLD_PRESENTATION_H
 
-#ifdef USE_VULKAN
 
 typedef enum worldPresentationFeature_e {
 	WORLD_FEATURE_HDR_SKY            = 1u << 0,
@@ -213,5 +212,4 @@ void vk_world_exposure_settings_defaults( worldExposureSettings_t *out );
 void vk_world_exposure_settings_apply( const worldExposureSettings_t *settings );
 const worldExposureSettings_t *vk_world_exposure_settings_current( void );
 
-#endif /* USE_VULKAN */
 #endif

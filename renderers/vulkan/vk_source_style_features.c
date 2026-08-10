@@ -6,7 +6,5 @@
  * vk_world_presentation.c.
  */
 #include "tr_local.h"
-#ifdef USE_VULKAN
 #include "vk_source_style_features.h"
 /* Intentionally empty translation unit — symbols provided by vk_world_presentation. */
-#endif
