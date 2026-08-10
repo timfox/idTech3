@@ -11,7 +11,6 @@ Does not replace classic BSP / mode-2 certified boot. RT stays optional/off.
 
 #pragma once
 
-#ifdef USE_VULKAN
 
 #include "../common/tr_types.h"
 
@@ -118,4 +117,3 @@ void vk_ht_throughput_status_f( void );
 void vk_ht_decal_status_f( void );
 void vk_ht_res_status_f( void );
 
-#endif /* USE_VULKAN */

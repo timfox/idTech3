@@ -1158,14 +1158,12 @@ void vk_create_attachments( void )
 			VK_CHECK( qvkMapMemory( vk.device, vk.luminance_staging_memory, 0, 4, 0, &vk.luminance_staging_ptr ) );
 		}
 
-#ifdef VK_PBR_BRDFLUT
         // BRDF LUT
         if( vk.pbrActive ) {
             uint32_t size = 512;
             create_color_attachment( size, size, VK_SAMPLE_COUNT_1_BIT, VK_FORMAT_R16G16_SFLOAT,
                 sampledColorUsage, &vk.brdflut_image, &vk.brdflut_image_view , VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, qfalse, 0 );
         }
-#endif
 
 	} // if ( vk.fboActive )
 
@@ -1383,10 +1381,8 @@ void vk_create_attachments( void )
 		SET_OBJECT_NAME( vk.ssao_blur_image_view, "ssao blur attachment view", VK_DEBUG_REPORT_OBJECT_TYPE_IMAGE_VIEW_EXT );
 	}
 
-#ifdef VK_PBR_BRDFLUT
     SET_OBJECT_NAME( vk.brdflut_image, "brdf lut image", VK_DEBUG_REPORT_OBJECT_TYPE_IMAGE_EXT );
     SET_OBJECT_NAME( vk.brdflut_image_view, "brdf lut image view", VK_DEBUG_REPORT_OBJECT_TYPE_IMAGE_VIEW_EXT );
-#endif
 
     SET_OBJECT_NAME( vk.cubeMap.color_image, "cubemap image", VK_DEBUG_REPORT_OBJECT_TYPE_IMAGE_EXT );
     SET_OBJECT_NAME( vk.cubeMap.color_image_msaa, "cubemap msaa image", VK_DEBUG_REPORT_OBJECT_TYPE_IMAGE_EXT );
@@ -2760,11 +2756,9 @@ void vk_destroy_attachments( void )
 		vk_destroy_image_and_view( &vk.capture.image, &vk.capture.image_view );
 	}
 
-#ifdef VK_PBR_BRDFLUT
     if ( vk.brdflut_image_view ) {
         vk_destroy_image_and_view( &vk.brdflut_image, &vk.brdflut_image_view );
 	}
-#endif
 
 	// render world to cubemap
     for ( i = 0; i < ARRAY_LEN(vk.cubeMap.color_image_view); i++) {      

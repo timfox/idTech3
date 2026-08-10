@@ -24,7 +24,6 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "tr_local.h"
 #include "vk_util.h"
 #include "tr_material_paint.h"
-#ifdef USE_VULKAN
 #include "vk_deferred_gbuffer.h"
 #include "vk_deferred_honesty.h"
 #include "vk_render_path.h"
@@ -36,11 +35,8 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "vk_surface_evolution.h"
 #include "vk_frequency_aware.h"
 #include "vk_bsp_viz.h"
-#endif
 #include "../common/tr_vector_font.h"
-#ifdef USE_VULKAN
 #include "vk_postfx.h"
-#endif
 
 static color4ub_t RB_TintedFogColor( const fog_t *fog ) {
 	color4ub_t color;
@@ -147,11 +143,9 @@ static qboolean R_StageHasLightmap( const shaderStage_t *pStage ) {
 }
 
 static qboolean R_StageUsesWorldSH( const shaderStage_t *pStage ) {
-#ifdef USE_VK_PBR
 	if ( pStage->materialBlend || ( pStage->vk_pbr_flags & PBR_HAS_MATERIAL_BLEND ) ) {
 		return qfalse;
 	}
-#endif
 	if ( R_StageHasLightmap( pStage ) ) {
 		return qtrue;
 	}
@@ -196,11 +190,6 @@ static void RB_DrawWorldSHDebugOverride( void ) {
 R_DrawElements
 ==================
 */
-#ifndef USE_VULKAN
-void R_DrawElements( int numIndexes, const glIndex_t *indexes ) {
-	qglDrawElements( GL_TRIANGLES, numIndexes, GL_INDEX_TYPE, indexes );
-}
-#endif
 
 
 /*
@@ -212,9 +201,6 @@ SURFACE SHADERS
 */
 
 shaderCommands_t	tess;
-#ifndef USE_VULKAN
-static qboolean	setArraysOnce;
-#endif
 
 /*
 =================
@@ -295,7 +281,6 @@ Draws triangle outlines for debugging
 ================
 */
 static void DrawTris( const shaderCommands_t *input ) {
-#ifdef USE_VULKAN
 	uint32_t pipeline;
 	Vk_Depth_Range depthRange;
 	const int showtrisMode = vk_bsp_viz_effective_showtris();
@@ -309,14 +294,12 @@ static void DrawTris( const shaderCommands_t *input ) {
 	if ( r_fastsky->integer && input->shader->isSky )
 		return;
 
-#ifdef USE_VBO
 	if ( tess.vboIndex ) {
 		if ( tess.dlightPass )
 			pipeline = backEnd.viewParms.portalView == PV_MIRROR ? vk.tris_mirror_debug_red_pipeline : vk.tris_debug_red_pipeline;
 		else
 			pipeline = backEnd.viewParms.portalView == PV_MIRROR ? vk.tris_mirror_debug_green_pipeline : vk.tris_debug_green_pipeline;
 	} else
-#endif
 	{
 		if ( tess.dlightPass )
 			pipeline = backEnd.viewParms.portalView == PV_MIRROR ? vk.tris_mirror_debug_red_pipeline : vk.tris_debug_red_pipeline;
@@ -339,34 +322,6 @@ static void DrawTris( const shaderCommands_t *input ) {
 	depthRange = ( showtrisMode == 2 ) ? DEPTH_RANGE_ZERO : DEPTH_RANGE_NORMAL;
 	vk_draw_geometry( depthRange, qfalse );
 
-#else
-	if ( r_showtris->integer == 1 && backEnd.drawConsole )
-		return;
-
-	GL_ClientState( 0, CLS_NONE );
-	qglDisable( GL_TEXTURE_2D );
-
-	qglColor4f( 1, 1, 1, 1 );
-
-	GL_State( GLS_POLYMODE_LINE | GLS_DEPTHMASK_TRUE );
-	qglDepthRange( 0, 0 );
-
-	qglVertexPointer( 3, GL_FLOAT, sizeof( input->xyz[0] ), input->xyz );
-
-	if ( qglLockArraysEXT ) {
-		qglLockArraysEXT( 0, input->numVertexes );
-	}
-
-	R_DrawElements( input->numIndexes, input->indexes );
-
-	if ( qglUnlockArraysEXT ) {
-		qglUnlockArraysEXT();
-	}
-
-	qglEnable( GL_TEXTURE_2D );
-
-	qglDepthRange( 0, 1 );
-#endif
 }
 
 
@@ -379,14 +334,9 @@ Draws vertex normals for debugging
 */
 static void DrawNormals( const shaderCommands_t *input ) {
 	int		i;
-#if defined(USE_VULKAN)
 	(void)input;
-#endif
-#ifdef USE_VULKAN
-#ifdef USE_VBO
 	if ( tess.vboIndex )
 		return; // must be handled specially
-#endif
 
 	GL_Bind( tr.whiteImage );
 
@@ -414,37 +364,6 @@ static void DrawNormals( const shaderCommands_t *input ) {
 				: DEPTH_RANGE_NORMAL;
 		vk_draw_geometry( nr, qtrue );
 	}
-#else
-	GL_ClientState( 0, CLS_NONE );
-
-	qglDisable( GL_TEXTURE_2D );
-	qglColor4f( 1, 1, 1, 1 );
-
-	qglDepthRange( 0, 0 );	// never occluded
-
-	GL_State( GLS_DEPTHMASK_TRUE );
-
-	for ( i = tess.numVertexes-1; i >= 0; i-- ) {
-		VectorMA( tess.xyz[i], 2.0, tess.normal[i], tess.xyz[i*2 + 1] );
-		VectorCopy( tess.xyz[i], tess.xyz[i*2] );
-	}
-
-	qglVertexPointer( 3, GL_FLOAT, sizeof( tess.xyz[0] ), tess.xyz );
-
-	if ( qglLockArraysEXT ) {
-		qglLockArraysEXT( 0, tess.numVertexes * 2 );
-	}
-
-	qglDrawArrays( GL_LINES, 0, tess.numVertexes * 2 );
-
-	if ( qglUnlockArraysEXT ) {
-		qglUnlockArraysEXT();
-	}
-
-	qglEnable( GL_TEXTURE_2D );
-
-	qglDepthRange( 0, 1 );
-#endif
 }
 
 
@@ -461,13 +380,11 @@ void RB_BeginSurface( shader_t *shader, int fogNum ) {
 
 	shader_t *state;
 
-#ifdef USE_VBO
 	if ( shader->isStaticShader && !shader->remappedShader ) {
 		tess.allowVBO = qtrue;
 	} else {
 		tess.allowVBO = qfalse;
 	}
-#endif
 
 	if ( backEnd.currentEntity == &tr.worldEntity &&
 		( ( r_shWorldLighting && r_shWorldLighting->integer ) ||
@@ -490,9 +407,7 @@ void RB_BeginSurface( shader_t *shader, int fogNum ) {
 	tess.numIndexes = 0;
 	tess.numVertexes = 0;
 	tess.sdfUiEdge = -1.0f;
-#ifdef USE_VULKAN
 	R_Meshlets_BeginSurface();
-#endif
 	tess.subpixelShift = -1.0f;
 	tess.subpixelInvTexWidth = 0.0f;
 	tess.vectorCurveStart = 0;
@@ -500,14 +415,10 @@ void RB_BeginSurface( shader_t *shader, int fogNum ) {
 	tess.vectorCurveTexWidth = 0;
 	tess.shader = state;
 	tess.fogNum = fogNum;
-#ifdef USE_VULKAN
 	tess.gltfDrawSurface = NULL;
-#ifdef USE_VK_PBR
 	tess.gltfUseGpuPipeline = qfalse;
 	tess.gltfGpuMorphActive = qfalse;
 	tess.gltfGpuMorphCount = 0;
-#endif
-#endif
 	vk_reset_iqm_storage_offsets();
 	R_IQMBeginSurfaceBatch();
 
@@ -532,57 +443,6 @@ t0 = most upstream according to spec
 t1 = most downstream according to spec
 ===================
 */
-#ifndef USE_VULKAN
-static void DrawMultitextured( const shaderCommands_t *input, int stage ) {
-	const shaderStage_t *pStage;
-
-	pStage = tess.xstages[ stage ];
-
-	GL_State( pStage->stateBits );
-
-	if ( !setArraysOnce ) {
-		R_ComputeColors( 0, tess.svars.colors[0], pStage );
-		R_ComputeTexCoords( 0, &pStage->bundle[0] );
-		R_ComputeTexCoords( 1, &pStage->bundle[1] );
-		GL_ClientState( 0, CLS_TEXCOORD_ARRAY | CLS_COLOR_ARRAY );
-
-		qglTexCoordPointer( 2, GL_FLOAT, 0, input->svars.texcoordPtr[0] );
-		qglColorPointer( 4, GL_UNSIGNED_BYTE, 0, input->svars.colors[0].rgba );
-
-		GL_ClientState( 1, CLS_TEXCOORD_ARRAY );
-		qglTexCoordPointer( 2, GL_FLOAT, 0, input->svars.texcoordPtr[1] );
-	}
-
-	//
-	// base
-	//
-	GL_SelectTexture( 0 );
-	R_BindAnimatedImage( &pStage->bundle[0] );
-
-	//
-	// lightmap/secondary pass
-	//
-	GL_SelectTexture( 1 );
-	qglEnable( GL_TEXTURE_2D );
-	R_BindAnimatedImage( &pStage->bundle[1] );
-
-	if ( r_lightmap->integer ) {
-		GL_TexEnv( GL_REPLACE );
-	} else {
-		GL_TexEnv( pStage->mtEnv );
-	}
-
-	R_DrawElements( input->numIndexes, input->indexes );
-
-	//
-	// disable texturing on TEXTURE1, then select TEXTURE0
-	//
-	//GL_ClientState( 1, CLS_NONE );
-
-	qglDisable( GL_TEXTURE_2D );
-	GL_SelectTexture( 0 );
-}
-#endif
 
 
 /*
@@ -592,23 +452,14 @@ ProjectDlightTexture
 Perform dynamic lighting with another rendering pass
 ===================
 */
-#ifdef USE_VULKAN
 static qboolean ProjectDlightTexture( void ) {
-#else
-static void ProjectDlightTexture( void ) {
-#endif
 	int		i, l;
 	vec3_t	origin;
 	float	*texCoords;
 	byte	*colors;
 	byte	clipBits[SHADER_MAX_VERTEXES];
-#ifdef USE_VULKAN
 	uint32_t pipeline;
 	qboolean rebindIndex = qfalse;
-#else
-	float	texCoordsArray[SHADER_MAX_VERTEXES][2];
-	byte	colorArray[SHADER_MAX_VERTEXES][4];
-#endif
 	glIndex_t hitIndexes[SHADER_MAX_INDEXES];
 	int		numIndexes;
 	float	scale;
@@ -617,11 +468,7 @@ static void ProjectDlightTexture( void ) {
 	const dlight_t *dl;
 
 	if ( !backEnd.refdef.num_dlights ) {
-#ifdef USE_VULKAN
 		return rebindIndex;
-#else
-		return;
-#endif
 	}
 
 	for ( l = 0 ; l < (int)R_NumSurfaceDlights( backEnd.refdef.num_dlights ); l++ ) {
@@ -630,14 +477,9 @@ static void ProjectDlightTexture( void ) {
 			continue;	// this surface definitely doesn't have any of this light
 		}
 
-#ifdef USE_VULKAN
 		texCoords = (float*)&tess.svars.texcoords[0][0];
 		tess.svars.texcoordPtr[0] = tess.svars.texcoords[0];
 		colors = tess.svars.colors[0][0].rgba;
-#else
-		texCoords = texCoordsArray[0];
-		colors = colorArray[0];
-#endif
 
 		dl = &backEnd.refdef.dlights[l];
 		VectorCopy( dl->transformed, origin );
@@ -718,17 +560,9 @@ static void ProjectDlightTexture( void ) {
 			continue;
 		}
 
-#ifndef USE_VULKAN
-		GL_ClientState( 1, CLS_NONE );
-		GL_ClientState( 0, CLS_TEXCOORD_ARRAY | CLS_COLOR_ARRAY );
-
-		qglTexCoordPointer( 2, GL_FLOAT, 0, texCoordsArray[0] );
-		qglColorPointer( 4, GL_UNSIGNED_BYTE, 0, colorArray );
-#endif
 
 		GL_Bind( tr.dlightImage );
 
-#ifdef USE_VULKAN
 		if ( numIndexes != tess.numIndexes ) {
 			// re-bind index buffer for later fog pass
 			rebindIndex = qtrue;
@@ -738,25 +572,11 @@ static void ProjectDlightTexture( void ) {
 		vk_bind_index_ext( numIndexes, hitIndexes );
 		vk_bind_geometry( TESS_RGBA0 | TESS_ST0 );
 		vk_draw_geometry( DEPTH_RANGE_NORMAL, qtrue );
-#else
-		// include GLS_DEPTHFUNC_EQUAL so alpha tested surfaces don't add light
-		// where they aren't rendered
-
-		if ( dl->additive ) {
-			GL_State( GLS_SRCBLEND_ONE | GLS_DSTBLEND_ONE | GLS_DEPTHFUNC_EQUAL );
-		} else {
-			GL_State( GLS_SRCBLEND_DST_COLOR | GLS_DSTBLEND_ONE | GLS_DEPTHFUNC_EQUAL );
-		}
-
-		R_DrawElements( numIndexes, hitIndexes );
-#endif
 		backEnd.pc.c_totalIndexes += numIndexes;
 		backEnd.pc.c_dlightIndexes += numIndexes;
 	}
 
-#ifdef USE_VULKAN
 	return rebindIndex;
-#endif
 }
 
 
@@ -767,7 +587,6 @@ void VK_SetFogParams( vkUniform_t *uniform, int *fogStage );
 static vkUniform_t uniform;
 static vkUniformCamera_t uniform_camera;
 
-#ifdef USE_VK_PBR
 typedef struct vkPbrUniformBlock_s {
 	vec4_t emissiveScale;
 	vec4_t clearcoatScale;
@@ -803,9 +622,7 @@ static qboolean R_PBR_ShouldLogBindings( void )
 	}
 	return qfalse;
 }
-#endif
 
-#ifdef USE_VULKAN
 static inline void vk_update_descriptor_if_changed( int index, VkDescriptorSet descriptor )
 {
 	// vk_update_descriptor() already no-ops if the descriptor matches; this avoids the call entirely
@@ -822,7 +639,6 @@ static inline void vk_update_descriptor_if_changed_with_image( int index, VkDesc
 		vk.cmd->descriptor_set.image[ index ] = image;
 	}
 }
-#endif
 
 /*
 ===================
@@ -831,7 +647,6 @@ RB_FogPass
 Blends a fog texture on top of everything else
 ===================
 */
-#ifdef USE_VULKAN
 static void RB_FogPass( qboolean rebindIndex ) {
 	uint32_t pipeline = vk.fog_pipelines[tess.shader->fogPass - 1][tess.shader->cullType][tess.shader->polygonOffset];
 	int fog_stage;
@@ -845,30 +660,6 @@ static void RB_FogPass( qboolean rebindIndex ) {
 	vk_push_uniform( &uniform );
 	vk_update_descriptor( VK_DESC_FOG_ONLY, tr.fogImage->descriptor );
 	vk_draw_geometry( DEPTH_RANGE_NORMAL, qtrue );
-#else
-static void RB_FogPass( void ) {
-	const fog_t	*fog;
-	int			i;
-
-	RB_CalcFogTexCoords( ( float * ) tess.svars.texcoords[0] );
-
-	GL_ClientState( 1, CLS_NONE );
-	GL_ClientState( 0, CLS_TEXCOORD_ARRAY | CLS_COLOR_ARRAY );
-
-	qglColorPointer( 4, GL_UNSIGNED_BYTE, 0, tess.svars.colors[0].rgba );
-	qglTexCoordPointer( 2, GL_FLOAT, 0, tess.svars.texcoords[0] );
-
-	GL_SelectTexture( 0 );
-	GL_Bind( tr.fogImage );
-
-	if ( tess.shader->fogPass == FP_EQUAL ) {
-		GL_State( GLS_SRCBLEND_SRC_ALPHA | GLS_DSTBLEND_ONE_MINUS_SRC_ALPHA | GLS_DEPTHFUNC_EQUAL );
-	} else {
-		GL_State( GLS_SRCBLEND_SRC_ALPHA | GLS_DSTBLEND_ONE_MINUS_SRC_ALPHA );
-	}
-
-	R_DrawElements( tess.numIndexes, tess.indexes );
-#endif
 }
 
 
@@ -1414,7 +1205,6 @@ static void R_UpdatePbrIblRuntimeState( qboolean usingHdrSkybox, qboolean hasRea
 
 static void R_UpdatePBRCubemapDebugCvar( int cubemapIndex, const vec3_t pos )
 {
-#ifdef VK_CUBEMAP
 	static int lastIndex = -9999;
 	static vec3_t lastPos = { 0.0f, 0.0f, 0.0f };
 	int now = ri.Milliseconds();
@@ -1446,7 +1236,6 @@ static void R_UpdatePBRCubemapDebugCvar( int cubemapIndex, const vec3_t pos )
 	const cubemap_t *cube = &tr.cubemaps[cubemapIndex];
 	ri.Cvar_Set( "r_pbr_cubemapInfo", va( "PBR cubemap: %d '%s' (pos %.0f %.0f %.0f r=%.0f)",
 		cubemapIndex, cube->name, pos[0], pos[1], pos[2], cube->parallaxRadius ) );
-#endif
 }
 
 /*
@@ -1463,26 +1252,17 @@ static inline float LerpClamp( float value, float minValue, float maxValue )
 	return value;
 }
 
-#ifdef USE_VULKAN
 static void RB_IterateStagesGeneric( const shaderCommands_t *input, qboolean fogCollapse )
-#else
-static void RB_IterateStagesGeneric( const shaderCommands_t *input )
-#endif
 {
 	const shaderStage_t *pStage;
 	int tess_flags;
 	int stage, i;
 
-#ifdef USE_VULKAN
-#if 1
 	if ( r_shDebugView && r_shDebugView->integer == 3 ) {
 		RB_DrawWorldSHDebugOverride();
 		return;
 	}
-#endif
-#ifdef USE_VK_PBR
 	qboolean is_pbr_surface;
-#endif
 	uint32_t pipeline;
 	int fog_stage;
 	qboolean pushUniform;
@@ -1495,14 +1275,12 @@ static void RB_IterateStagesGeneric( const shaderCommands_t *input )
 
 	is_pbr_surface = qfalse;
 
-#ifdef USE_FOG_COLLAPSE
 	if ( fogCollapse ) {
 		VK_SetFogParams( &uniform, &fog_stage );
 		VectorCopy( backEnd.or.viewOrigin, uniform.eyePos );
 		vk_update_descriptor( VK_DESC_FOG_COLLAPSE, tr.fogImage->descriptor );
 		pushUniform = qtrue;
 	} else
-#endif
 	{
 		fog_stage = 0;
 		if ( tess_flags & TESS_VPOS ) {
@@ -1512,7 +1290,6 @@ static void RB_IterateStagesGeneric( const shaderCommands_t *input )
 		}
 	}
 
-#ifdef USE_VK_PBR
 	is_pbr_surface = vk_is_valid_pbr_surface( tess.shader->hasPBR );
 
 	// Debug view: render a non-PBR pass and optionally override texture0 binding.
@@ -1522,7 +1299,6 @@ static void RB_IterateStagesGeneric( const shaderCommands_t *input )
 	uniform.pbrDebugMode[1] = 0.0f;
 	uniform.pbrDebugMode[2] = 0.0f;
 	uniform.pbrDebugMode[3] = 0.0f;
-#ifdef USE_VULKAN
 	{
 		unsigned pathFlags = 0u;
 		vkViewClass_t viewCls = vk_classify_current_view();
@@ -1560,7 +1336,6 @@ static void RB_IterateStagesGeneric( const shaderCommands_t *input )
 			uniform.pbrDebugMode[3] = (float)( (int)elig.eligibility + 1 );
 		}
 	}
-#endif
 
 	if ( is_pbr_surface ) {
 		Com_Memcpy( &uniform_camera.modelMatrix, backEnd.or.modelMatrix, sizeof(float) * 16 );
@@ -1606,8 +1381,6 @@ static void RB_IterateStagesGeneric( const shaderCommands_t *input )
 		uniform.pbrForwardPlus[2] = 0.65f;
 		uniform.pbrForwardPlus[3] = 0.0f;
 	}
-#endif
-#endif // USE_VULKAN
 
 	for ( stage = 0; stage < MAX_SHADER_STAGES; stage++ )
 	{
@@ -1615,11 +1388,8 @@ static void RB_IterateStagesGeneric( const shaderCommands_t *input )
 		if ( !pStage )
 			break;
 
-#ifdef USE_VBO
 		tess.vboStage = stage;
-#endif
 
-#ifdef USE_VULKAN
 		tess_flags |= pStage->tessFlags;
 
 		for ( i = 0;  i < (int)pStage->numTexBundles; i++ ) {
@@ -1684,7 +1454,6 @@ static void RB_IterateStagesGeneric( const shaderCommands_t *input )
 			pipeline = vk_find_pipeline_ext( 0, &uiDef, qfalse );
 		}
 
-#ifdef USE_VK_PBR
 		if ( tess.shader && tess.shader->hasPBR && pStage->vk_pbr_flags && tess.gltfUseGpuPipeline ) {
 			if ( backEnd.viewParms.portalView == PV_MIRROR ) {
 				pipeline = pStage->vk_mirror_pipeline_gltf_gpu[fog_stage];
@@ -1692,9 +1461,7 @@ static void RB_IterateStagesGeneric( const shaderCommands_t *input )
 				pipeline = pStage->vk_pipeline_gltf_gpu[fog_stage];
 			}
 		}
-#endif
 
-#ifdef USE_VK_PBR
 		Vk_Pipeline_Def	def;
 		vk_get_pipeline_def( pipeline, &def );
 
@@ -2140,15 +1907,12 @@ static void RB_IterateStagesGeneric( const shaderCommands_t *input )
 					vk_update_descriptor(  VK_DESC_PBR_DELUXE, tr.whiteImage->descriptor );
 			}
 		}
-#endif
 
-#ifdef USE_VK_PBR
 		if ( !is_pbr_surface && pStage->vk_pbr_flags ) {
 			def.vk_pbr_flags = 0;
 			def.lightmap_bundle = -1;
 			pipeline = vk_find_pipeline_ext( 0, &def, qfalse );
 		}
-#endif
 
 		if ( ( backEnd.depthOnlyWorldPass || backEnd.forwardPlusDepthPrepass ) && pStage->depthFragment ) {
 			/* Occlusion pass: depth-only draw */
@@ -2173,45 +1937,6 @@ static void RB_IterateStagesGeneric( const shaderCommands_t *input )
 				vk_draw_geometry( tess.depthRange, qtrue );
 			}
 		}
-#else
-		R_ComputeColors( 0, tess.svars.colors[0].rgba, pStage );
-
-		R_ComputeTexCoords( 0, &pStage->bundle[0] );
-
-		//
-		// do multitexture
-		//
-		if ( pStage->bundle[1].image[0] != NULL )
-		{
-			DrawMultitextured( input, stage );
-		}
-		else
-		{
-			if ( !setArraysOnce )
-			{
-				R_ComputeTexCoords( 0, &pStage->bundle[0] );
-				R_ComputeColors( 0, tess.svars.colors[0], pStage );
-
-				GL_ClientState( 1, CLS_NONE );
-				GL_ClientState( 0, CLS_TEXCOORD_ARRAY | CLS_COLOR_ARRAY );
-
-				qglTexCoordPointer( 2, GL_FLOAT, 0, input->svars.texcoordPtr[0] );
-				qglColorPointer( 4, GL_UNSIGNED_BYTE, 0, input->svars.colors[0].rgba );
-			}
-
-			//
-			// set state
-			//
-			R_BindAnimatedImage( &pStage->bundle[0] );
-
-			GL_State( pStage->stateBits );
-
-			//
-			// draw
-			//
-			R_DrawElements( input->numIndexes, input->indexes );
-		}
-#endif
 
 		// allow skipping out to show just lightmaps during development
 		if ( r_lightmap->integer && ( pStage->bundle[0].lightmap != LIGHTMAP_INDEX_NONE || pStage->bundle[1].lightmap != LIGHTMAP_INDEX_NONE ) )
@@ -2220,17 +1945,14 @@ static void RB_IterateStagesGeneric( const shaderCommands_t *input )
 		tess_flags = 0;
 	}
 
-#ifdef USE_VULKAN
 	if ( pushUniform ) {
 		vk_push_uniform_cached( &uniform );
 	}
 	if ( tess_flags ) // fog-only shaders?
 		vk_bind_geometry( tess_flags );
-#endif
 }
 
 
-#ifdef USE_VULKAN
 
 void VK_SetFogParams( vkUniform_t *ubo, int *fogStage )
 {
@@ -2405,9 +2127,7 @@ void VK_LightingPass( void )
 	GL_SelectTexture( 0 );
 	R_BindAnimatedImage( &pStage->bundle[ tess.shader->lightingBundle ] );
 
-#ifdef USE_VBO
 	if ( tess.vboIndex == 0 )
-#endif
 	{
 		R_ComputeTexCoords( tess.shader->lightingBundle, &pStage->bundle[ tess.shader->lightingBundle ] );
 	}
@@ -2420,20 +2140,16 @@ void VK_LightingPass( void )
 
 void RB_StageIteratorGeneric( void )
 {
-#ifdef USE_VULKAN
 	qboolean rebindIndex = qfalse;
-#endif
 	qboolean fogCollapse = qfalse;
 	qboolean worldShOverride;
 
-#ifdef USE_VBO
 	if ( tess.vboIndex != 0 ) {
 		if ( !VBO_ItemIsStream( tess.vboIndex ) ) {
 			VBO_PrepareQueues();
 		}
 		tess.vboStage = 0;
 	} else
-#endif
 	RB_DeformTessGeometry();
 
 	if ( tess.dlightPass ) {
@@ -2441,9 +2157,7 @@ void RB_StageIteratorGeneric( void )
 		return;
 	}
 
-#ifdef USE_FOG_COLLAPSE
 	fogCollapse = tess.fogNum && tess.shader->fogPass && tess.shader->fogCollapse;
-#endif
 	worldShOverride = ( r_shDebugView && r_shDebugView->integer == 3 );
 
 	// call shader function
@@ -2451,153 +2165,23 @@ void RB_StageIteratorGeneric( void )
 
 	// now do any dynamic lighting needed
 	if ( r_dlightMode->integer == 0 )
-#ifdef USE_VULKAN
 	if ( !vk_deferred_unlit_base_wanted() )
 	/* Single-path Forward+: shade owns dynamics — skip classic projector. */
 	if ( !( r_forwardPlus && r_forwardPlus->integer && r_forwardPlusShade &&
 			r_forwardPlusShade->value > 0.0f && !vk_unified_clustered_opaque_handoff() &&
 			!R_ClassicLightingActive() ) )
-#endif
 	if ( !worldShOverride && tess.dlightBits && tess.shader->sort <= SS_OPAQUE && !(tess.shader->surfaceFlags & (SURF_NODLIGHT | SURF_SKY) ) ) {
 		if ( !fogCollapse ) {
-#ifdef USE_VULKAN
 			rebindIndex = ProjectDlightTexture();
-#else	
-			ProjectDlightTexture();
-#endif
 		}
 	}
 
 	// now do fog
 	if ( !worldShOverride && tess.fogNum && tess.shader->fogPass && !fogCollapse ) {
-#ifdef USE_VULKAN
 		RB_FogPass( rebindIndex );
-#else
-		RB_FogPass();
-#endif
 	}
 }
 
-#else
-
-/*
-** RB_StageIteratorGeneric
-*/
-void RB_StageIteratorGeneric( void )
-{
-	const shaderCommands_t *input;
-	shader_t		*shader;
-
-	RB_DeformTessGeometry();
-
-	input = &tess;
-	shader = input->shader;
-
-	//
-	// set face culling appropriately
-	//
-	GL_Cull( shader->cullType );
-
-	// set polygon offset if necessary
-	if ( shader->polygonOffset )
-	{
-		qglEnable( GL_POLYGON_OFFSET_FILL );
-		qglPolygonOffset( r_offsetFactor->value, r_offsetUnits->value );
-	}
-
-	//
-	// if there is only a single pass then we can enable color
-	// and texture arrays before we compile, otherwise we need
-	// to avoid compiling those arrays since they will change
-	// during multipass rendering
-	//
-	if ( tess.numPasses > 1 )
-	{
-		setArraysOnce = qfalse;
-
-		GL_ClientState( 1, CLS_NONE );
-		GL_ClientState( 0, CLS_NONE );
-	}
-	else
-	{
-		/* setArraysOnce may conflict with later lighting/fog. */
-		setArraysOnce = qtrue;
-
-		GL_ClientState( 0, CLS_COLOR_ARRAY | CLS_TEXCOORD_ARRAY );
-
-		if ( tess.xstages[0] )
-		{
-			R_ComputeColors( 0, tess.svars.colors, tess.xstages[0] );
-			qglColorPointer( 4, GL_UNSIGNED_BYTE, 0, tess.svars.colors[0].rgba );
-			R_ComputeTexCoords( 0, &tess.xstages[0]->bundle[0] );
-			qglTexCoordPointer( 2, GL_FLOAT, 0, tess.svars.texcoordPtr[0] );
-			if ( shader->multitextureEnv )
-			{
-				GL_ClientState( 1, CLS_TEXCOORD_ARRAY );
-				R_ComputeTexCoords( 1, &tess.xstages[0]->bundle[1] );
-				qglTexCoordPointer( 2, GL_FLOAT, 0, tess.svars.texcoordPtr[1] );
-			}
-			else
-			{
-				GL_ClientState( 1, CLS_NONE );
-			}
-		}
-	}
-
-	qglVertexPointer( 3, GL_FLOAT, sizeof( input->xyz[0] ), input->xyz ); // padded for SIMD
-
-	//
-	// lock XYZ
-	//
-	if ( qglLockArraysEXT )
-	{
-		qglLockArraysEXT( 0, input->numVertexes );
-	}
-
-	//
-	// call shader function
-	//
-	if ( r_shDebugView && r_shDebugView->integer == 3 ) {
-		RB_DrawWorldSHDebugOverride();
-	} else {
-		RB_IterateStagesGeneric( input );
-	}
-
-	//
-	// now do any dynamic lighting needed
-	//
-	if ( tess.dlightBits && tess.shader->sort <= SS_OPAQUE && !(tess.shader->surfaceFlags & (SURF_NODLIGHT | SURF_SKY) ) )
-	{
-		ProjectDlightTexture();
-	}
-
-	//
-	// now do fog
-	//
-	if ( tess.fogNum && tess.shader->fogPass )
-	{
-		RB_FogPass();
-	}
-
-	//
-	// unlock arrays
-	//
-	if ( qglUnlockArraysEXT )
-	{
-		qglUnlockArraysEXT();
-	}
-
-	GL_ClientState( 1, CLS_NONE );
-
-	//
-	// reset polygon offset
-	//
-	if ( shader->polygonOffset )
-	{
-		qglDisable( GL_POLYGON_OFFSET_FILL );
-	}
-}
-#endif // !USE_VULKAN
 
 
 /*
@@ -2628,9 +2212,7 @@ void RB_EndSurface( void ) {
 
 	// for debugging of sort order issues, stop rendering after a given sort value
 	if ( r_debugSort->integer && r_debugSort->integer < tess.shader->sort && !backEnd.doneSurfaces ) {
-#ifdef USE_VBO
 		tess.vboIndex = 0; //VBO_UnBind();
-#endif
 		return;
 	}
 
@@ -2652,35 +2234,25 @@ void RB_EndSurface( void ) {
 	//
 	// call off to shader specific tess end function
 	//
-#ifdef USE_VULKAN
 	if ( backEnd.projection2D ) {
 		backEnd.currentEntity = &backEnd.entity2D;
 		backEnd.useFirstPersonProjection = qfalse;
 		tess.depthRange = DEPTH_RANGE_NORMAL;
 		vk_update_mvp( NULL );
 	}
-#endif
-#ifdef USE_VULKAN
 	/* Deform vegetation verts on GPU before draw (staging filled during RB_DrawSurfs). */
 	if ( PostFX_VegWind_IsEnabled() && tess.shader && ( tess.shader->surfaceFlags & SURF_VEGETATION ) ) {
 		vk_vegetation_wind_prepare_draw();
 	}
-#endif
 	R_IQMCommitSurfaceBatch();
 	tess.shader->optimalStageIteratorFunc();
 
 	//
 	// draw debugging stuff
 	//
-#ifdef USE_VULKAN
 	if ( vk_bsp_viz_effective_showtris() ) {
 		DrawTris( input );
 	}
-#else
-	if ( r_showtris->integer ) {
-		DrawTris( input );
-	}
-#endif
 	if ( r_shownormals->integer ) {
 		DrawNormals( input );
 	}
@@ -2689,9 +2261,7 @@ void RB_EndSurface( void ) {
 	tess.numIndexes = 0;
 	tess.numVertexes = 0;
 
-#ifdef USE_VBO
 	tess.vboIndex = 0;
 	tess.vboStreamItem = NULL;
 	//VBO_ClearQueue();
-#endif
 }

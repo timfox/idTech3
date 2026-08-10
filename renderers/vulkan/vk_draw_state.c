@@ -107,23 +107,19 @@ void vk_bind_index_buffer( VkBuffer buffer, uint32_t offset )
 }
 
 
-#ifdef USE_VBO
 void vk_draw_indexed( uint32_t indexCount, uint32_t firstIndex )
 {
 	qvkCmdDrawIndexed( vk.cmd->command_buffer, indexCount, 1, firstIndex, 0, 0 );
 }
-#endif
 
 
 void vk_bind_index( void )
 {
-#ifdef USE_VBO
 	if ( tess.vboIndex ) {
 		vk.cmd->num_indexes = 0;
 		//qvkCmdBindIndexBuffer( vk.cmd->command_buffer, vk.vbo.index_buffer, tess.shader->iboOffset, VK_INDEX_TYPE_UINT32 );
 		return;
 	}
-#endif
 
 	vk_bind_index_ext( tess.numIndexes, tess.indexes );
 }
@@ -181,7 +177,6 @@ void vk_bind_geometry( uint32_t flags )
 		return;
 	}
 
-#ifdef USE_VBO
 	if ( tess.vboIndex ) {
 		if ( tess.vboStreamItem && vk.vbo.stream_vertex_buffer ) {
 			const stream_vbo_item_t *item = tess.vboStreamItem;
@@ -294,7 +289,6 @@ void vk_bind_geometry( uint32_t flags )
 		qvkCmdBindVertexBuffers( vk.cmd->command_buffer, bind_base, bind_count, shade_bufs, vk.cmd->vbo_offset + bind_base );
 
 	} else
-#endif // USE_VBO
 	{
 		shade_bufs[0] = shade_bufs[1] = shade_bufs[2] = shade_bufs[3] = shade_bufs[4] = shade_bufs[5] = shade_bufs[6] = shade_bufs[7] = vk.cmd->vertex_buffer;
 		shade_bufs[8] = vk.cmd->vertex_buffer;
@@ -347,7 +341,6 @@ void vk_bind_lighting( int stage, int bundle )
 	bind_base = -1;
 	bind_count = 0;
 
-#ifdef USE_VBO
 	if ( tess.vboIndex ) {
 
 		shade_bufs[0] = shade_bufs[1] = shade_bufs[2] = vk.vbo.vertex_buffer;
@@ -360,7 +353,6 @@ void vk_bind_lighting( int stage, int bundle )
 
 	}
 	else
-#endif // USE_VBO
 	{
 		shade_bufs[0] = shade_bufs[1] = shade_bufs[2] = vk.cmd->vertex_buffer;
 
@@ -668,13 +660,11 @@ void vk_draw_geometry( Vk_Depth_Range depth_range, qboolean indexed ) {
 	vk_update_depth_range( depth_range );
 
 	// issue draw call(s)
-#ifdef USE_VBO
 	if ( tess.vboStreamItem )
 		VBO_RenderStreamItem();
 	else if ( tess.vboIndex )
 		VBO_RenderIBOItems();
 	else
-#endif
 	if ( indexed ) {
 		if ( !R_Meshlets_TryDrawIndirect() ) {
 			qvkCmdDrawIndexed( vk.cmd->command_buffer, vk.cmd->num_indexes, 1, 0, 0, 0 );

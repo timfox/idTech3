@@ -12,7 +12,6 @@ TAA descriptors and ping-pong commit. See vk_object_id.h for the rationale.
 #include "vk_util.h"
 #include "vk_upscale.h"
 #include "vk_forward_plus.h"
-#endif
 
 static int s_object_id_cleared_frame = -1;
 

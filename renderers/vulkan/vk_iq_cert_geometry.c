@@ -7,7 +7,6 @@ Phase 1.5 — IQ certification fixture scenarios (ROI definitions).
 #include "tr_local.h"
 #include "vk_iq_cert_geometry.h"
 
-#ifdef USE_VULKAN
 
 static iqCertScenario_t s_scenario;
 static qboolean s_armed;
@@ -138,4 +137,3 @@ void vk_iq_cert_geometry_register( void )
 	}
 }
 
-#endif /* USE_VULKAN */

@@ -1,6 +1,5 @@
 #pragma once
 
-#ifdef USE_VULKAN
 
 /* GPU Forward+ light records (decoupled from surface dlightBits, which stays MAX_DLIGHTS). */
 #define VK_FP_MAX_GPU_LIGHTS 64
@@ -49,9 +48,6 @@ void vk_forward_plus_destroy_compute_pipeline( void );
 void vk_forward_plus_on_descriptor_pool_destroyed( void );
 void vk_forward_plus_update_depth_descriptor( void );
 void vk_forward_plus_update_sun_shadow_descriptor( void );
-#ifdef USE_VK_PBR
 void vk_forward_plus_init_graphics_descriptors( void );
 void vk_forward_plus_destroy_graphics_layout( void );
-#endif
 
-#endif /* USE_VULKAN */

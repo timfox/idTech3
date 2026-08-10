@@ -1,6 +1,5 @@
 #pragma once
 
-#ifdef USE_VULKAN
 
 /*
  * Raster Ultra 1.8 — surface evolution (wetness / snow / dust / rust / soot / moss).
@@ -32,4 +31,3 @@ void vk_surface_evolution_fill_ubo( vec4_t out );
 
 void vk_surface_evolution_status_f( void );
 
-#endif /* USE_VULKAN */
