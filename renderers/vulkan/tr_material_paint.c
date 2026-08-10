@@ -251,11 +251,9 @@ void R_MaterialPaint_FillStream2FromSurfaceData( const void *surfData, int first
 }
 
 void R_MaterialPaint_InvalidateWorldVBO( void ) {
-#ifdef USE_VBO
 	if ( tr.world && tr.world->numsurfaces > 0 ) {
 		R_BuildWorldVBO( tr.world->surfaces, tr.world->numsurfaces );
 	}
-#endif
 }
 
 /*

@@ -1225,7 +1225,6 @@ static void R_SimRenderDebug_f( void )
 	VK_SimRenderDebugStartupLog();
 }
 
-#ifdef USE_VULKAN
 #include "vk_fp64_points.h"
 
 /*
@@ -1593,4 +1592,3 @@ static void VkVolumetricValidate_f( void )
 
 	ri.Printf( PRINT_WARNING, "vkVolumetricValidate: unknown mode '%s'\n", mode );
 }
-#endif

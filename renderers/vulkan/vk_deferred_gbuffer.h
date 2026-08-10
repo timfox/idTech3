@@ -1,6 +1,5 @@
 #pragma once
 
-#ifdef USE_VULKAN
 
 /*
  * View classification for G-buffer / Ambient Visibility / temporal ownership.
@@ -53,4 +52,3 @@ qboolean vk_deferred_gbuffer_draw_debug( void );
 /* Dev: print generation/extent/fill/fallback; verify resources match. */
 void vk_deferred_gbuffer_status_f( void );
 
-#endif /* USE_VULKAN */
