@@ -20,7 +20,15 @@ STALE_PATTERNS=(
 	'^[[:space:]]*#[[:space:]]*ifdef[[:space:]]+USE_VBO_GRID\b'
 	'^[[:space:]]*#[[:space:]]*ifdef[[:space:]]+USE_TESS_NEEDS_NORMAL\b'
 	'^[[:space:]]*#[[:space:]]*ifdef[[:space:]]+USE_TESS_NEEDS_ST2\b'
+	'^[[:space:]]*#[[:space:]]*ifdef[[:space:]]+USE_PMLIGHT\b'
 	'^[[:space:]]*#[[:space:]]*ifndef[[:space:]]+USE_DEDICATED_ALLOCATION\b'
+	'^[[:space:]]*#[[:space:]]*ifdef[[:space:]]+USE_VBO\b'
+	'^[[:space:]]*#[[:space:]]*ifdef[[:space:]]+USE_FOG_COLLAPSE\b'
+	'^[[:space:]]*#[[:space:]]*ifdef[[:space:]]+USE_VK_PBR\b'
+	'^[[:space:]]*#[[:space:]]*ifndef[[:space:]]+USE_VK_PBR\b'
+	'^[[:space:]]*#[[:space:]]*ifndef[[:space:]]+USE_VULKAN\b'
+	'^[[:space:]]*#[[:space:]]*ifdef[[:space:]]+VK_CUBEMAP\b'
+	'^[[:space:]]*#[[:space:]]*ifdef[[:space:]]+VK_PBR_BRDFLUT\b'
 )
 
 for pat in "${STALE_PATTERNS[@]}"; do
