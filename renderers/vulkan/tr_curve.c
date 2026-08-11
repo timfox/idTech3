@@ -630,7 +630,6 @@ srfGridMesh_t *R_SubdividePatchToGrid( int width, int height,
 		height--;
 	}
 
-#if 1
 	// flip for longest tristrips as an optimization
 	// the results should be visually identical with or
 	// without this step
@@ -642,7 +641,6 @@ srfGridMesh_t *R_SubdividePatchToGrid( int width, int height,
 		height = t;
 		InvertCtrl( width, height, ctrl );
 	}
-#endif
 
 	// calculate normals
 	MakeMeshNormals( width, height, ctrl );
