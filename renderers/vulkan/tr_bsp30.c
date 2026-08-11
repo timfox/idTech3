@@ -874,15 +874,9 @@ static void GS_LoadSurfaces( bsp30RenderLoad_t *load ) {
 			for ( k = 0; k < 3; k++ ) {
 				point[k] = LittleFloat( vertices[vertexIndex].point[k] );
 			}
-#ifdef USE_VK_PBR
 			point[6] = ( DotProduct( point, texinfo->vecs[0] ) + LittleFloat( texinfo->vecs[0][3] ) ) / textureWidth;
 			point[7] = ( DotProduct( point, texinfo->vecs[1] ) + LittleFloat( texinfo->vecs[1][3] ) ) / textureHeight;
 			point[8] = point[9] = 0.0f;
-#else
-			point[3] = ( DotProduct( point, texinfo->vecs[0] ) + LittleFloat( texinfo->vecs[0][3] ) ) / textureWidth;
-			point[4] = ( DotProduct( point, texinfo->vecs[1] ) + LittleFloat( texinfo->vecs[1][3] ) ) / textureHeight;
-			point[5] = point[6] = 0.0f;
-#endif
 		}
 
 		/* Sample GoldSrc lighting lump into vertex colors (style 0). */
@@ -920,13 +914,8 @@ static void GS_LoadSurfaces( bsp30RenderLoad_t *load ) {
 					lit[0] = lit[1] = lit[2] = 255;
 					lit[3] = 255;
 				}
-#ifdef USE_VK_PBR
 				R_ColorShiftLightingBytes( lit, (byte *)&point[10], qtrue );
 				R_LinearizeLightingBytesForHDR( (byte *)&point[10] );
-#else
-				R_ColorShiftLightingBytes( lit, (byte *)&point[7], qtrue );
-				R_LinearizeLightingBytesForHDR( (byte *)&point[7] );
-#endif
 			}
 		}
 
@@ -959,13 +948,11 @@ static void GS_LoadSurfaces( bsp30RenderLoad_t *load ) {
 			}
 			face->plane.type = PlaneTypeForNormal( face->plane.normal );
 			SetPlaneSignbits( &face->plane );
-#ifdef USE_VK_PBR
 			for ( j = 0; j < numPoints; j++ ) {
 				for ( k = 0; k < 3; k++ ) {
 					face->points[j][3 + k] = face->plane.normal[k];
 				}
 			}
-#endif
 		}
 
 		/*
@@ -997,9 +984,7 @@ static void GS_LoadSurfaces( bsp30RenderLoad_t *load ) {
 				}
 			}
 		}
-#ifdef USE_VK_PBR
 		vk_mikkt_bsp_face_generate( face );
-#endif
 		surface->data = (surfaceType_t *)face;
 	}
 

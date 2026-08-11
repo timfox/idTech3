@@ -1,6 +1,5 @@
 #pragma once
 
-#ifdef USE_VULKAN
 
 #include "vuda/vuda_types.h"
 
@@ -20,4 +19,3 @@ void vk_vuda_after_queue_submit( void );
 qboolean vk_vuda_consume_compute_window( void );
 void vk_vuda_notify_cuda_complete( uint64_t value );
 
-#endif /* USE_VULKAN */

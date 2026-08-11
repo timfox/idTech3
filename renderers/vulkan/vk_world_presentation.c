@@ -6,7 +6,6 @@
  */
 #include "tr_local.h"
 
-#ifdef USE_VULKAN
 
 #include "vk.h"
 #include "vk_world_presentation.h"
@@ -351,4 +350,3 @@ void vk_world_presentation_register( void )
 		vk_world_presentation_enabled_mask() );
 }
 
-#endif /* USE_VULKAN */

@@ -26,7 +26,6 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "vk_util.h"
 #include "vk_geometry_corruption.h"
 
-#ifdef USE_VBO
 
 void vk_release_vbo( void )
 {
@@ -445,7 +444,6 @@ static void VBO_AddGeometry( vbo_t *vbo, vbo_item_t *vi, shaderCommands_t *input
 		// go to first color offset
 		offs = input->shader->normalOffset + input->shader->numVertexes * sizeof( input->normal[0] );
 
-#ifdef USE_VK_PBR
 		if( vk.pbrActive ) {
 			input->shader->qtangentOffset = input->shader->normalOffset + input->shader->numVertexes * sizeof(input->normal[0]);
 			input->shader->lightdirOffset = input->shader->qtangentOffset + input->shader->numVertexes * sizeof(input->qtangent[0]);
@@ -455,7 +453,6 @@ static void VBO_AddGeometry( vbo_t *vbo, vbo_item_t *vi, shaderCommands_t *input
 			// go to first color offset
 			offs = input->shader->lightdirOffset + input->shader->numVertexes * sizeof(input->qtangent[0]);
 		}
-#endif
 
 		for ( i = 0; i < MAX_VBO_STAGES; i++ )
 		{
@@ -552,7 +549,6 @@ static void VBO_AddGeometry( vbo_t *vbo, vbo_item_t *vi, shaderCommands_t *input
 	//Com_Printf( "v offs=%i size=%i\n", offs, size );
 	memcpy( vbo->vbo_buffer + offs, input->normal, size );
 
-#ifdef USE_VK_PBR
 	// qtangent
 	if( vk.pbrActive ) {	
 		offs = input->shader->qtangentOffset + input->shader->curVertexes * sizeof(input->qtangent[0]);
@@ -572,7 +568,6 @@ static void VBO_AddGeometry( vbo_t *vbo, vbo_item_t *vi, shaderCommands_t *input
 		//Com_Printf( "v offs=%i size=%i\n", offs, size );
 		memcpy(vbo->vbo_buffer + offs, input->lightdir, size);
 	}
-#endif
 
 	vi->num_indexes += input->numIndexes;
 	vi->num_vertexes += input->numVertexes;
@@ -685,80 +680,6 @@ void R_BuildWorldVBO( msurface_t *surf, int surfCount )
 	msurface_t **surfList;
 	srfSurfaceFace_t *face;
 	srfTriangles_t *tris;
-#ifdef USE_VBO_GRID
-	srfGridMesh_t *grid;
-#endif
-	msurface_t *sf;
-	int ibo_size;
-	int vbo_size;
-	int i, n;
-
-	int numStaticSurfaces = 0;
-	int numStaticIndexes = 0;
-	int numStaticVertexes = 0;
-
-	if ( !r_vbo->integer )
-		return;
-
-	if ( glConfig.numTextureUnits < 3 ) {
-		ri.Printf( PRINT_WARNING, "... not enough texture units for VBO\n" );
-		return;
-	}
-
-	VBO_Cleanup();
-
-	vbo_size = 0;
-
-	// initial scan to count surfaces/indexes/vertexes for memory allocation
-	for ( i = 0, sf = surf; i < surfCount; i++, sf++ ) {
-		face = (srfSurfaceFace_t *) sf->data;
-		if ( face->surfaceType == SF_FACE && isStaticShader( sf->shader ) ) {
-			face->vboItemIndex = ++numStaticSurfaces;
-			numStaticVertexes += face->numPoints;
-			numStaticIndexes += face->numIndices;
-
-			vbo_size += face->numPoints * (sf->shader->svarsSize + sizeof( tess.xyz[0] ) + sizeof( tess.normal[0] ) );
-#ifdef USE_VK_PBR
-			if ( vk.pbrActive )
-				vbo_size += face->numPoints * ( sizeof(tess.qtangent[0]) +  sizeof(tess.lightdir[0]) );
-#endif
-			sf->shader->numVertexes += face->numPoints;
-			sf->shader->numIndexes += face->numIndices;
-			continue;
-		}
-		tris = (srfTriangles_t *) sf->data;
-		if ( tris->surfaceType == SF_TRIANGLES && isStaticShader( sf->shader ) ) {
-			tris->vboItemIndex = ++numStaticSurfaces;
-			numStaticVertexes += tris->numVerts;
-			numStaticIndexes += tris->numIndexes;
-
-			vbo_size += tris->numVerts * (sf->shader->svarsSize + sizeof( tess.xyz[0] ) + sizeof( tess.normal[0] ) );
-#ifdef USE_VK_PBR
-			if ( vk.pbrActive )
-				vbo_size += tris->numVerts * ( sizeof(tess.qtangent[0]) + sizeof(tess.lightdir[0]) );
-#endif
-			sf->shader->numVertexes += tris->numVerts;
-			sf->shader->numIndexes += tris->numIndexes;
-			continue;
-		}
-#ifdef USE_VBO_GRID
-		grid = (srfGridMesh_t *) sf->data;
-		if ( grid->surfaceType == SF_GRID && isStaticShader( sf->shader ) ) {
-			grid->vboItemIndex = ++numStaticSurfaces;
-			RB_SurfaceGridEstimate( grid, &grid->vboExpectVertices, &grid->vboExpectIndices );
-			numStaticVertexes += grid->vboExpectVertices;
-			numStaticIndexes += grid->vboExpectIndices;
-
-			vbo_size += grid->vboExpectVertices * (sf->shader->svarsSize + sizeof( tess.xyz[0] ) + sizeof( tess.normal[0] ) );
-#ifdef USE_VK_PBR
-			if ( vk.pbrActive )
-				vbo_size += grid->vboExpectVertices * ( sizeof(tess.qtangent[0]) + sizeof(tess.lightdir[0]) );
-#endif
-			sf->shader->numVertexes += grid->vboExpectVertices;
-			sf->shader->numIndexes += grid->vboExpectIndices;
-			continue;
-		}
-#endif // USE_VBO_GRID
 	}
 	if ( numStaticSurfaces == 0 ) {
 		ri.Printf( PRINT_ALL, "...no static surfaces for VBO\n" );
@@ -812,13 +733,6 @@ void R_BuildWorldVBO( msurface_t *surf, int surfCount )
 			surfList[ n++ ] = sf;
 			continue;
 		}
-#ifdef USE_VBO_GRID
-		grid = (srfGridMesh_t *) sf->data;
-		if ( grid->surfaceType == SF_GRID && grid->vboItemIndex ) {
-			surfList[ n++ ] = sf;
-			continue;
-		}
-#endif // USE_VBO_GRID
 	}
 
 	if ( n != numStaticSurfaces ) {
@@ -839,41 +753,6 @@ void R_BuildWorldVBO( msurface_t *surf, int surfCount )
 		sf = surfList[ i ];
 		face = (srfSurfaceFace_t *) sf->data;
 		tris = (srfTriangles_t *) sf->data;
-#ifdef USE_VBO_GRID
-		grid = (srfGridMesh_t *) sf->data;
-#endif
-		if ( face->surfaceType == SF_FACE )
-			face->vboItemIndex = i + 1;
-		else if (tris->surfaceType == SF_TRIANGLES) {
-			tris->vboItemIndex = i + 1;
-#ifdef USE_VBO_GRID
-		} else if (grid->surfaceType == SF_GRID) {
-			grid->vboItemIndex = i + 1;
-#endif
-		} else {
-			ri.Error( ERR_DROP, "Unexpected surface type" );
-		}
-		initItem( vbo->items + i + 1 );
-		RB_BeginSurface( sf->shader, 0 );
-		tess.allowVBO = qfalse; // block execution of VBO path as we need to tesselate geometry
-#ifdef USE_TESS_NEEDS_NORMAL
-		tess.needsNormal = qtrue;
-#endif
-#ifdef USE_TESS_NEEDS_ST2
-		tess.needsST2 = qtrue;
-#endif
-		// tesselate
-		rb_surfaceTable[ *sf->data ]( sf->data ); // VBO_PushData() may be called multiple times there
-		// setup colors and texture coordinates
-		VBO_PushData( i + 1, &tess );
-#ifdef USE_VBO_GRID
-		if ( grid->surfaceType == SF_GRID ) {
-			vbo_item_t *vi = vbo->items + i + 1;
-			if ( vi->num_vertexes != grid->vboExpectVertices || vi->num_indexes != grid->vboExpectIndices ) {
-				ri.Error( ERR_DROP, "Unexpected grid vertexes/indexes count" );
-			}
-		}
-#endif // USE_VBO_GRID
 		tess.numIndexes = 0;
 		tess.numVertexes = 0;
 	}
@@ -897,12 +776,6 @@ void R_BuildWorldVBO( msurface_t *surf, int surfCount )
 				tris->vboItemIndex = 0;
 				continue;
 			}
-#ifdef USE_VBO_GRID
-			grid = (srfGridMesh_t *) sf->data;
-			if ( grid->surfaceType == SF_GRID ) {
-				grid->vboItemIndex = 0;
-			}
-#endif
 		}
 		vbo->items_count = 0;
 	}
@@ -1262,11 +1135,9 @@ static void VBO_StreamWriteGeometry( stream_vbo_item_t *item, shaderCommands_t *
 	int offs, size, i;
 
 	svarsSize = input->shader->svarsSize;
-#ifdef USE_VK_PBR
 	if ( vk.pbrActive ) {
 		svarsSize += (int)( input->numVertexes * ( sizeof( input->qtangent[0] ) + sizeof( input->lightdir[0] ) ) );
 	}
-#endif
 
 	VBO_StreamEnsureCapacity( input->numIndexes * (int)sizeof( input->indexes[0] ) +
 		input->numVertexes * ( (int)sizeof( input->xyz[0] ) + (int)sizeof( input->normal[0] ) + svarsSize ) );
@@ -1278,13 +1149,11 @@ static void VBO_StreamWriteGeometry( stream_vbo_item_t *item, shaderCommands_t *
 	item->normalOffset = item->vboOffset + input->numVertexes * (int)sizeof( input->xyz[0] );
 	offs = item->normalOffset + input->numVertexes * (int)sizeof( input->normal[0] );
 
-#ifdef USE_VK_PBR
 	if ( vk.pbrActive ) {
 		item->qtangentOffset = offs;
 		item->lightdirOffset = offs + input->numVertexes * (int)sizeof( input->qtangent[0] );
 		offs = item->lightdirOffset + input->numVertexes * (int)sizeof( input->lightdir[0] );
 	}
-#endif
 
 	stream_vbo.vbo_offset = VBO_StreamLayoutStages( item, input, offs );
 
@@ -1300,7 +1169,6 @@ static void VBO_StreamWriteGeometry( stream_vbo_item_t *item, shaderCommands_t *
 	size = input->numVertexes * (int)sizeof( input->normal[0] );
 	memcpy( stream_vbo.vbo_buffer + offs, input->normal, size );
 
-#ifdef USE_VK_PBR
 	if ( vk.pbrActive ) {
 		offs = item->qtangentOffset;
 		size = input->numVertexes * (int)sizeof( input->qtangent[0] );
@@ -1310,7 +1178,6 @@ static void VBO_StreamWriteGeometry( stream_vbo_item_t *item, shaderCommands_t *
 		size = input->numVertexes * (int)sizeof( input->lightdir[0] );
 		memcpy( stream_vbo.vbo_buffer + offs, input->lightdir, size );
 	}
-#endif
 
 	for ( i = 0; i < MAX_VBO_STAGES; i++ ) {
 		pStage = input->xstages[i];
@@ -1427,12 +1294,6 @@ qboolean VBO_StreamUploadSurface( surfaceType_t *surface, shader_t *shader, int 
 
 	RB_BeginSurface( shader, 0 );
 	tess.allowVBO = qfalse;
-#ifdef USE_TESS_NEEDS_NORMAL
-	tess.needsNormal = qtrue;
-#endif
-#ifdef USE_TESS_NEEDS_ST2
-	tess.needsST2 = qtrue;
-#endif
 	rb_surfaceTable[*surface]( surface );
 	if ( tess.numIndexes <= 0 || tess.numVertexes <= 0 ) {
 		tess.numIndexes = savedIndexes;
@@ -1466,4 +1327,3 @@ void VBO_RenderStreamItem( void )
 }
 
 
-#endif // USE_VBO

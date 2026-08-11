@@ -136,19 +136,15 @@ void vk_destroy_render_passes( void )
 		vk.render_pass.capture = VK_NULL_HANDLE;
 	}
 
-#ifdef VK_PBR_BRDFLUT
     if ( vk.render_pass.brdflut != VK_NULL_HANDLE ) {
         qvkDestroyRenderPass( vk.device, vk.render_pass.brdflut, NULL );
         vk.render_pass.brdflut = VK_NULL_HANDLE;
     }
-#endif
 
-#ifdef VK_CUBEMAP
     if ( vk.render_pass.cubemap != VK_NULL_HANDLE ) {
         qvkDestroyRenderPass( vk.device, vk.render_pass.cubemap, NULL );
         vk.render_pass.cubemap = VK_NULL_HANDLE;
     }
-#endif
 	if ( vk.render_pass.smaa_edge != VK_NULL_HANDLE ) {
 		qvkDestroyRenderPass( vk.device, vk.render_pass.smaa_edge, NULL );
 		vk.render_pass.smaa_edge = VK_NULL_HANDLE;
@@ -333,12 +329,10 @@ void vk_destroy_pipelines( qboolean resetCounter )
 		vk.oit_accum_mboit_pipeline = VK_NULL_HANDLE;
 	}
 
-#ifdef VK_PBR_BRDFLUT
     if( vk.brdflut_pipeline != VK_NULL_HANDLE ) {
         qvkDestroyPipeline( vk.device, vk.brdflut_pipeline, NULL );
         vk.brdflut_pipeline = VK_NULL_HANDLE;
     }
-#endif
 
 	for ( i = 0; i < ARRAY_LEN( vk.blur_pipeline ); i++ ) {
 		if ( vk.blur_pipeline[i] != VK_NULL_HANDLE ) {

@@ -18,7 +18,6 @@ Phase 1.5 — IQ live certification lab: queue, deferred GPU snapshots, evaluate
 #include <math.h>
 #include <string.h>
 
-#ifdef USE_VULKAN
 
 typedef enum {
 	IQ_LAB_EVAL_NONE = 0,
@@ -530,4 +529,3 @@ void vk_iq_lab_register( void )
 	ri.Printf( PRINT_ALL, "[VK][IQ] iq_lab registered (iq_certify_core / iq_lab_run)\n" );
 }
 
-#endif /* USE_VULKAN */

@@ -14,7 +14,6 @@ Renderer IQ Phase 1.5 — evidence-backed P1 certification ladder.
 #include <string.h>
 #include <time.h>
 
-#ifdef USE_VULKAN
 
 static qboolean s_cmds;
 static p1CertStageResult_t s_results[P1_CERT_STAGE_COUNT];
@@ -499,4 +498,3 @@ void vk_renderer_p1_cert_register( void )
 	vk_renderer_p1_cert_refresh_static();
 }
 
-#endif /* USE_VULKAN */
