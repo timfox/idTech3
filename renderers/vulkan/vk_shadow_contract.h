@@ -70,5 +70,3 @@ void vk_shadow_contract_status_f( void );
 #ifdef __cplusplus
 }
 #endif
-
-#endif /* USE_VULKAN */
