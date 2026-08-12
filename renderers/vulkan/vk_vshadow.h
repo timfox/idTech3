@@ -1,6 +1,5 @@
 #pragma once
 
-#ifdef USE_VULKAN
 
 /*
  * Raster Ultra 1.9 — virtualized raster shadows.
@@ -142,4 +141,3 @@ qboolean vk_vshadow_request_local( vkVShadowLightKind_t kind, int lightIndex,
 void vk_vshadow_status_f( void );
 void vk_vshadow_set_world_zone_residency( const worldZoneResidency_t *zones, int count );
 
-#endif /* USE_VULKAN */

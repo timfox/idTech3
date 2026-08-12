@@ -22,11 +22,9 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 #include "tr_local.h"
 #include "vk_ndgi.h"
-#ifdef USE_VULKAN
 #include "vk.h"
 #include "tr_sprite_props.h"
 #include "tr_decal_props.h"
-#endif
 
 static int			r_firstSceneDrawSurf;
 static int			r_firstSceneLitSurf;
@@ -377,12 +375,6 @@ static void RE_AddDynamicLightToScene( const vec3_t org, float intensity, float 
 	if ( intensity <= 0 ) {
 		return;
 	}
-#ifndef USE_VULKAN
-	// these cards don't have the correct blend mode
-	if ( glConfig.hardwareType == GLHW_RIVA128 || glConfig.hardwareType == GLHW_PERMEDIA2 ) {
-		return;
-	}
-#endif
 	if ( r_dlightMode->integer ) {
 		r *= r_dlightIntensity->value;
 		g *= r_dlightIntensity->value;
@@ -719,10 +711,8 @@ void RE_BeginScene( const refdef_t *fd ) {
 }
 
 void RE_EndScene( void ) {
-#ifdef USE_VULKAN
 	/* After this view's entities are finalized, stash morph weights for next frame's GPU motion vectors. */
 	vk_snap_gpu_morph_weights_for_motion();
-#endif
 	// the next scene rendered in this frame will tack on after this one
 	r_firstSceneDrawSurf = tr.refdef.numDrawSurfs;
 	r_firstSceneLitSurf = tr.refdef.numLitSurfs;
@@ -744,9 +734,7 @@ to handle mirrors,
 @@@@@@@@@@@@@@@@@@@@@
 */
 void RE_RenderScene( const refdef_t *fd ) {
-#ifdef USE_VULKAN
 	renderCommand_t	lastRenderCommand;
-#endif
 	viewParms_t		parms;
 	int				startTime;
 
@@ -806,15 +794,12 @@ void RE_RenderScene( const refdef_t *fd ) {
 
 	VectorCopy( fd->vieworg, parms.pvsOrigin );
 
-#ifdef USE_VULKAN
 	lastRenderCommand = tr.lastRenderCommand;
 	tr.drawSurfCmd = NULL;
 	tr.numDrawSurfCmds = 0;
-#endif
 
 	R_RenderView( &parms );
 
-#ifdef USE_VULKAN
 	if ( tr.needScreenMap )
 	{
 		if ( lastRenderCommand == RC_DRAW_BUFFER )
@@ -848,7 +833,6 @@ void RE_RenderScene( const refdef_t *fd ) {
 
 		tr.needScreenMap = 0;
 	}
-#endif
 
 	RE_EndScene();
 

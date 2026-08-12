@@ -5,7 +5,6 @@
  * Distinct from r_forwardPlusHiZ (tile probe padding only).
  */
 
-#ifdef USE_VULKAN
 
 void vk_hiz_register_cvars( void );
 void vk_hiz_init( void );
@@ -39,4 +38,3 @@ qboolean vk_hiz_aabb_visible( const vec3_t mins, const vec3_t maxs,
 
 void vk_hiz_status_f( void );
 
-#endif /* USE_VULKAN */
