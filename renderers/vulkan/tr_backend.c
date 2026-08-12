@@ -1799,6 +1799,7 @@ static qboolean RB_ResolveIndependentWeaponHistory( VkImageView worldView,
 		assert( vk.temporal.weaponHistoryFrameId[readIndex] + 1u == vk.temporal.frameIndex );
 		assert( vk.temporal.weaponDepthFrameId[readIndex] + 1u == vk.temporal.frameIndex );
 	}
+#endif
 	if ( worldView == VK_NULL_HANDLE || worldView == vk.color_image_view ||
 		vk.weapon_taa_pipeline == VK_NULL_HANDLE ||
 		vk.weapon_taa_composite_pipeline == VK_NULL_HANDLE ||
@@ -2037,7 +2038,6 @@ void RB_FlushDeferredWeaponAfterTaa( VkImageView *post_fog_src, VkImageView *lum
 	}
 	vk_spine_pass_end( VK_SPINE_PASS_WEAPON );
 }
-#endif
 
 /*
 =============
