@@ -460,10 +460,6 @@ static qboolean vk_create_device( VkPhysicalDevice physical_device, int device_i
 		else
 			vk.dedicatedAllocation = dedicatedAllocation;
 
-#ifndef USE_DEDICATED_ALLOCATION
-		vk.dedicatedAllocation = qfalse;
-#endif
-
 		device_extension_list[ device_extension_count++ ] = VK_KHR_SWAPCHAIN_EXTENSION_NAME;
 
 		if ( vk.dedicatedAllocation ) {

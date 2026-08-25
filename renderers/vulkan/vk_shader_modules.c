@@ -37,7 +37,6 @@ static VkShaderModule vk_shader_module_from_spirv( const uint8_t *bytes, int cou
 void vk_create_shader_modules( void )
 {
 	int i, j, k;
-
 	vk.modules.frag.gen0_df = SHADER_MODULE( frag_tx0_df );
 	SET_OBJECT_NAME( vk.modules.frag.gen0_df, "single-texture df fragment module", VK_DEBUG_REPORT_OBJECT_TYPE_SHADER_MODULE_EXT );
 

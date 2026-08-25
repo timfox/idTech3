@@ -338,6 +338,7 @@ for (i = 0; i < 2; i++) {
         }
     }
 
+
 	for ( i = 0; i < 2; i++ ) {
 		if ( vk.modules.vert.light[i] != VK_NULL_HANDLE ) {
 			qvkDestroyShaderModule( vk.device, vk.modules.vert.light[i], NULL );
@@ -385,6 +386,7 @@ for (i = 0; i < 2; i++) {
 			}
 		}
 	}
+
 
 	qvkDestroyShaderModule( vk.device, vk.modules.frag.gen0_df, NULL );
 	qvkDestroyShaderModule( vk.device, vk.modules.frag.ui_sdf_text, NULL );

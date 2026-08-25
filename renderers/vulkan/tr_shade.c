@@ -402,17 +402,7 @@ void RB_BeginSurface( shader_t *shader, int fogNum ) {
 		tess.dlightUpdateParams = qtrue;
 	}
 
-#ifdef USE_TESS_NEEDS_NORMAL
-	tess.needsNormal = state->needsNormal || tess.dlightPass || r_shownormals->integer ||
-		( backEnd.currentEntity == &tr.worldEntity &&
-		( ( r_shDebugView && r_shDebugView->integer ) ||
-		( r_shWorldLighting && r_shWorldLighting->integer && r_shLighting && r_shLighting->integer &&
-			!R_ClassicLightingActive() ) ) );
-#endif
 
-#ifdef USE_TESS_NEEDS_ST2
-	tess.needsST2 = state->needsST2;
-#endif
 
 	tess.numIndexes = 0;
 	tess.numVertexes = 0;
@@ -1268,7 +1258,6 @@ static void RB_IterateStagesGeneric( const shaderCommands_t *input, qboolean fog
 	int tess_flags;
 	int stage, i;
 
-#if 1
 	if ( r_shDebugView && r_shDebugView->integer == 3 ) {
 		RB_DrawWorldSHDebugOverride();
 		return;
@@ -1392,7 +1381,6 @@ static void RB_IterateStagesGeneric( const shaderCommands_t *input, qboolean fog
 		uniform.pbrForwardPlus[2] = 0.65f;
 		uniform.pbrForwardPlus[3] = 0.0f;
 	}
-#endif // USE_VULKAN
 
 	for ( stage = 0; stage < MAX_SHADER_STAGES; stage++ )
 	{
@@ -2152,9 +2140,7 @@ void VK_LightingPass( void )
 
 void RB_StageIteratorGeneric( void )
 {
-#ifdef USE_VULKAN
 	qboolean rebindIndex = qfalse;
-#endif
 	qboolean fogCollapse = qfalse;
 	qboolean worldShOverride;
 
@@ -2179,30 +2165,20 @@ void RB_StageIteratorGeneric( void )
 
 	// now do any dynamic lighting needed
 	if ( r_dlightMode->integer == 0 )
-#ifdef USE_VULKAN
 	if ( !vk_deferred_unlit_base_wanted() )
 	/* Single-path Forward+: shade owns dynamics — skip classic projector. */
 	if ( !( r_forwardPlus && r_forwardPlus->integer && r_forwardPlusShade &&
 			r_forwardPlusShade->value > 0.0f && !vk_unified_clustered_opaque_handoff() &&
 			!R_ClassicLightingActive() ) )
-#endif
 	if ( !worldShOverride && tess.dlightBits && tess.shader->sort <= SS_OPAQUE && !(tess.shader->surfaceFlags & (SURF_NODLIGHT | SURF_SKY) ) ) {
 		if ( !fogCollapse ) {
-#ifdef USE_VULKAN
 			rebindIndex = ProjectDlightTexture();
-#else	
-			ProjectDlightTexture();
-#endif
 		}
 	}
 
 	// now do fog
 	if ( !worldShOverride && tess.fogNum && tess.shader->fogPass && !fogCollapse ) {
-#ifdef USE_VULKAN
 		RB_FogPass( rebindIndex );
-#else
-		RB_FogPass();
-#endif
 	}
 }
 

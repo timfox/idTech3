@@ -1068,9 +1068,6 @@ static qboolean SurfIsOffscreen( const drawSurf_t *drawSurf, qboolean *isMirror 
 	R_DecomposeSort( drawSurf->sort, &entityNum, &shader, &fogNum, &dlighted );
 	RB_BeginSurface( shader, fogNum );
 	tess.allowVBO = qfalse;
-#ifdef USE_TESS_NEEDS_NORMAL
-	tess.needsNormal = qtrue;
-#endif
 	rb_surfaceTable[ *drawSurf->surface ]( drawSurf->surface );
 
 	for ( i = 0; i < tess.numVertexes; i++ )
