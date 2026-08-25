@@ -330,11 +330,9 @@ void RB_MDRSurfaceAnim( mdrSurface_t *surface )
 
 	int			frameSize;
 
-#ifdef USE_VBO
 	VBO_Flush();
 
 	tess.surfType = SF_MDR;
-#endif
 
 	// don't lerp if lerping off, or this is the only frame, or the last frame...
 	//

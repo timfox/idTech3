@@ -24,9 +24,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "tr_local.h"
 #include "tr_bsp_stream.h"
 #include "extensions/scaffold/vk_arc_blanc.h"
-#ifdef USE_VULKAN
 #include "vk_upscale.h"
-#endif
 
 #include <string.h> // memcpy
 
@@ -710,17 +708,10 @@ void R_SetupFirstPersonProjection( viewParms_t *dest, float *outProjection )
 		const float zNearClamped = ( zNear < 0.01f ) ? 0.01f : ( ( zNear > 8.0f ) ? 8.0f : zNear );
 		const float depth = zFar - zNearClamped;
 		if ( depth > 0.1f ) {
-#ifdef USE_VULKAN
 			outProjection[2]  = 0.0f;
 			outProjection[6]  = 0.0f;
 			outProjection[10] = zNearClamped / depth;
 			outProjection[14] = zFar * zNearClamped / depth;
-#else
-			outProjection[2]  = 0.0f;
-			outProjection[6]  = 0.0f;
-			outProjection[10] = -( zFar + zNearClamped ) / depth;
-			outProjection[14] = -2.0f * zFar * zNearClamped / depth;
-#endif
 		}
 	}
 }
@@ -741,13 +732,8 @@ static void R_SetupProjectionZ( viewParms_t *dest )
 
 	dest->projectionMatrix[2] = 0;
 	dest->projectionMatrix[6] = 0;
-#ifdef USE_VULKAN
 	dest->projectionMatrix[10] = zNear / depth;
 	dest->projectionMatrix[14] = zFar * zNear / depth;
-#else
-	dest->projectionMatrix[10] = -( zFar + zNear ) / depth;
-	dest->projectionMatrix[14] = -2 * zFar * zNear / depth;
-#endif
 
 	if ( dest->portalView != PV_NONE )
 	{
@@ -755,10 +741,8 @@ static void R_SetupProjectionZ( viewParms_t *dest )
 		float	plane2[4];
 		vec4_t q, c;
 
-#ifdef USE_VULKAN
 		dest->projectionMatrix[10] = - zFar / depth;
 		dest->projectionMatrix[14] = - zFar * zNear / depth;
-#endif
 		// transform portal plane into camera space
 		plane[0] = dest->portalPlane.normal[0];
 		plane[1] = dest->portalPlane.normal[1];
@@ -775,20 +759,12 @@ static void R_SetupProjectionZ( viewParms_t *dest )
 		q[0] = (SGN(plane2[0]) + dest->projectionMatrix[8]) / dest->projectionMatrix[0];
 		q[1] = (SGN(plane2[1]) + dest->projectionMatrix[9]) / dest->projectionMatrix[5];
 		q[2] = -1.0f;
-#ifdef USE_VULKAN
 		q[3] = - dest->projectionMatrix[10] / dest->projectionMatrix[14];
-#else
-		q[3] = (1.0f + dest->projectionMatrix[10]) / dest->projectionMatrix[14];
-#endif
 		VectorScale4( plane2, 2.0f / DotProduct4(plane2, q), c );
 
 		dest->projectionMatrix[2]  = c[0];
 		dest->projectionMatrix[6]  = c[1];
-#ifdef USE_VULKAN
 		dest->projectionMatrix[10] = c[2];
-#else
-		dest->projectionMatrix[10] = c[2] + 1.0f;
-#endif
 		dest->projectionMatrix[14] = c[3];
 
 		dest->projectionMatrix[2] = -dest->projectionMatrix[2];
@@ -1091,9 +1067,7 @@ static qboolean SurfIsOffscreen( const drawSurf_t *drawSurf, qboolean *isMirror 
 
 	R_DecomposeSort( drawSurf->sort, &entityNum, &shader, &fogNum, &dlighted );
 	RB_BeginSurface( shader, fogNum );
-#ifdef USE_VBO
 	tess.allowVBO = qfalse;
-#endif
 #ifdef USE_TESS_NEEDS_NORMAL
 	tess.needsNormal = qtrue;
 #endif
@@ -1705,14 +1679,12 @@ static void R_AddEntitySurfaces( void ) {
 			continue;
 		}
 
-#ifdef USE_VULKAN
 		/* GPU occlusion culling: skip entities occluded last frame */
 		if ( r_occlusionCulling && r_occlusionCulling->integer && ent->e.reType == RT_MODEL ) {
 			if ( tr.currentEntityNum < MAX_REFENTITIES && vk_entity_occlusion_visibility[tr.currentEntityNum] == 0 ) {
 				continue;
 			}
 		}
-#endif
 
 		// simple generated models, like sprites and beams, are not culled
 		switch ( ent->e.reType ) {
@@ -1834,9 +1806,7 @@ void R_RenderView( const viewParms_t *parms ) {
 	R_RotateForViewer();
 
 	R_SetupProjection( &tr.viewParms, r_zproj->value, qtrue );
-#ifdef USE_VULKAN
 	R_Upscale_ApplyProjectionJitter( tr.viewParms.projectionMatrix );
-#endif
 
 	R_GenerateDrawSurfs();
 

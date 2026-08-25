@@ -24,7 +24,6 @@ fixture visibility, frame identity, orchestration.
 #include <string.h>
 #include <time.h>
 
-#ifdef USE_VULKAN
 
 typedef struct {
 	const char *name;
@@ -952,4 +951,3 @@ void vk_renderer_p1_live_register( void )
 		"[VK][IQ] Phase 1.6 live state machine registered (iq_certify_core / renderer_p1_certify)\n" );
 }
 
-#endif /* USE_VULKAN */

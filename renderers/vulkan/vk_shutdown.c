@@ -62,17 +62,11 @@ Split from vk.c.
 #include "vk_pipeline_cache_disk.h"
 #include "vk_fp64_points.h"
 
-#ifdef USE_VBO
 void vk_release_vbo( void );
-#endif
 
 void vk_shutdown( refShutdownCode_t code )
 {
-#ifdef USE_VK_PBR
 	int i, j, k, l, m;
-#else
-	int i, j, k, l;
-#endif
 
 	if ( qvkQueuePresentKHR == NULL ) { /* not fully initialized */
 		goto __cleanup;
@@ -115,7 +109,6 @@ void vk_shutdown( refShutdownCode_t code )
 
 	vk_destroy_swapchain();
 
-#ifdef VK_CUBEMAP
 	vk_destroy_cubemap_prefilter();
 
 	image_t *img = tr.emptyCubemap;
@@ -130,7 +123,6 @@ void vk_shutdown( refShutdownCode_t code )
 
 		Com_Memset( &tr.cubemaps[ i ], 0, sizeof(cubemap_t) );
 	}
-#endif
 
 	SkyboxHDR_Shutdown();
 	vk_reference_lab_shutdown();
@@ -291,14 +283,10 @@ void vk_shutdown( refShutdownCode_t code )
 		qvkDestroyPipelineLayout( vk.device, vk.pipeline_layout_atmosphere, NULL );
 		vk.pipeline_layout_atmosphere = VK_NULL_HANDLE;
 	}
-#ifdef USE_VK_PBR
 	qvkDestroyPipelineLayout(vk.device, vk.pipeline_layout_brdflut, NULL);
-#endif
 
-#ifdef USE_VBO
 	vk_release_vbo();
 	vk_release_stream_vbo();
-#endif
 
 	vk_clean_staging_buffer();
 
@@ -317,7 +305,6 @@ void vk_shutdown( refShutdownCode_t code )
 	qvkDestroyBuffer( vk.device, vk.storage.buffer, NULL );
 	qvkFreeMemory( vk.device, vk.storage.memory, NULL );
 
-#ifdef USE_VK_PBR
 for (i = 0; i < 2; i++) {
         for (j = 0; j < 3; j++) {
             for (k = 0; k < 2; k++) {
@@ -350,30 +337,6 @@ for (i = 0; i < 2; i++) {
             }
         }
     }
-#else
-	for ( i = 0; i < 3; i++ ) {
-		for ( j = 0; j < 2; j++ ) {
-			for ( k = 0; k < 2; k++ ) {
-				for ( l = 0; l < 2; l++ ) {
-					if ( vk.modules.vert.gen[i][j][k][l] != VK_NULL_HANDLE ) {
-						qvkDestroyShaderModule( vk.device, vk.modules.vert.gen[i][j][k][l], NULL );
-						vk.modules.vert.gen[i][j][k][l] = VK_NULL_HANDLE;
-					}
-				}
-			}
-		}
-	}
-	for ( i = 0; i < 3; i++ ) {
-		for ( j = 0; j < 2; j++ ) {
-			for ( k = 0; k < 2; k++ ) {
-				if ( vk.modules.frag.gen[i][j][k] != VK_NULL_HANDLE ) {
-					qvkDestroyShaderModule( vk.device, vk.modules.frag.gen[i][j][k], NULL );
-					vk.modules.frag.gen[i][j][k] = VK_NULL_HANDLE;
-				}
-			}
-		}
-	}
-#endif
 
 	for ( i = 0; i < 2; i++ ) {
 		if ( vk.modules.vert.light[i] != VK_NULL_HANDLE ) {
@@ -388,7 +351,6 @@ for (i = 0; i < 2; i++) {
 		}
 	}
 
-#ifdef USE_VK_PBR
 	for ( i = 0; i < 2; i++ ) {
 		for ( j = 0; j < 2; j++ ) {
 			for ( k = 0; k < 2; k++ ) {
@@ -423,36 +385,6 @@ for (i = 0; i < 2; i++) {
 			}
 		}
 	}
-#else
-	for ( i = 0; i < 2; i++ ) {
-		for ( j = 0; j < 2; j++ ) {
-			for ( k = 0; k < 2; k++ ) {
-				qvkDestroyShaderModule( vk.device, vk.modules.vert.ident1[i][j][k], NULL );
-				vk.modules.vert.ident1[i][j][k] = VK_NULL_HANDLE;
-			}
-			qvkDestroyShaderModule( vk.device, vk.modules.frag.ident1[i][j], NULL );
-			vk.modules.frag.ident1[i][j] = VK_NULL_HANDLE;
-		}
-	}
-
-	for ( i = 0; i < 2; i++ ) {
-		for ( j = 0; j < 2; j++ ) {
-			for ( k = 0; k < 2; k++ ) {
-				qvkDestroyShaderModule( vk.device, vk.modules.vert.fixed[i][j][k], NULL );
-				vk.modules.vert.fixed[i][j][k] = VK_NULL_HANDLE;
-			}
-			qvkDestroyShaderModule( vk.device, vk.modules.frag.fixed[i][j], NULL );
-			vk.modules.frag.fixed[i][j] = VK_NULL_HANDLE;
-		}
-	}
-
-	for ( i = 0; i < 1; i++ ) {
-		for ( j = 0; j < 2; j++ ) {
-			qvkDestroyShaderModule( vk.device, vk.modules.frag.ent[i][j], NULL );
-			vk.modules.frag.ent[i][j] = VK_NULL_HANDLE;
-		}
-	}
-#endif
 
 	qvkDestroyShaderModule( vk.device, vk.modules.frag.gen0_df, NULL );
 	qvkDestroyShaderModule( vk.device, vk.modules.frag.ui_sdf_text, NULL );
@@ -599,9 +531,7 @@ for (i = 0; i < 2; i++) {
 	VK_DESTROY_SHADER_MODULE_FIELD( vk.modules.irradiancecube_fs );
 	VK_DESTROY_SHADER_MODULE_FIELD( vk.modules.prefilterenvmap_fs );
 
-#ifdef USE_VK_PBR
 	VK_DESTROY_SHADER_MODULE_FIELD( vk.modules.brdflut_fs );
-#endif
 
 	#undef VK_DESTROY_SHADER_MODULE_FIELD
 
