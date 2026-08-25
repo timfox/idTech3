@@ -22,6 +22,10 @@ STALE_PATTERNS=(
 	'^[[:space:]]*#[[:space:]]*ifdef[[:space:]]+USE_TESS_NEEDS_ST2\b'
 	'^[[:space:]]*#[[:space:]]*ifdef[[:space:]]+USE_PMLIGHT\b'
 	'^[[:space:]]*#[[:space:]]*ifndef[[:space:]]+USE_DEDICATED_ALLOCATION\b'
+)
+
+# Always-on renderer flags (excludes tr_backend.c — manual cleanup pending; GLSL keeps -DUSE_VK_PBR variants).
+ALWAYS_ON_PATTERNS=(
 	'^[[:space:]]*#[[:space:]]*ifdef[[:space:]]+USE_VBO\b'
 	'^[[:space:]]*#[[:space:]]*ifdef[[:space:]]+USE_FOG_COLLAPSE\b'
 	'^[[:space:]]*#[[:space:]]*ifdef[[:space:]]+USE_VK_PBR\b'
@@ -32,6 +36,13 @@ for pat in "${STALE_PATTERNS[@]}"; do
 	if grep -REq "$pat" "$VK_ROOT" --include='*.c' --include='*.h' --include='*.cpp' --include='*.inc'; then
 		grep -REn "$pat" "$VK_ROOT" --include='*.c' --include='*.h' --include='*.cpp' --include='*.inc' >&2 || true
 		fail "stale compile-time guard matched: $pat"
+	fi
+done
+
+for pat in "${ALWAYS_ON_PATTERNS[@]}"; do
+	if grep -REq "$pat" "$VK_ROOT" --include='*.c' --include='*.h' --include='*.cpp' --include='*.inc' --exclude='tr_backend.c'; then
+		grep -REn "$pat" "$VK_ROOT" --include='*.c' --include='*.h' --include='*.cpp' --include='*.inc' --exclude='tr_backend.c' >&2 || true
+		fail "stale always-on guard matched: $pat"
 	fi
 done
 

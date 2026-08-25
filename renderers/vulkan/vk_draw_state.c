@@ -219,7 +219,6 @@ void vk_bind_geometry( uint32_t flags )
 				vk.cmd->vbo_offset[7] = stage->rgb_offset[2];
 				vk_bind_index_attr( 7 );
 			}
-#ifdef USE_VK_PBR
 			if ( flags & TESS_PBR ) {
 				vk.cmd->vbo_offset[5] = item->normalOffset;
 				vk_bind_index_attr( 5 );
@@ -228,17 +227,14 @@ void vk_bind_geometry( uint32_t flags )
 				vk.cmd->vbo_offset[9] = item->lightdirOffset;
 				vk_bind_index_attr( 9 );
 			}
-#endif
 
 			qvkCmdBindVertexBuffers( vk.cmd->command_buffer, bind_base, bind_count, shade_bufs, vk.cmd->vbo_offset + bind_base );
 			return;
 		}
 
 		shade_bufs[0] = shade_bufs[1] = shade_bufs[2] = shade_bufs[3] = shade_bufs[4] = shade_bufs[5] = shade_bufs[6] = shade_bufs[7] = vk.vbo.vertex_buffer;
-#ifdef USE_VK_PBR
 		shade_bufs[8] = vk.vbo.vertex_buffer;
 		shade_bufs[9] = vk.vbo.vertex_buffer;
-#endif
 
 		if ( flags & TESS_XYZ ) {  // 0
 			vk.cmd->vbo_offset[0] = tess.shader->vboOffset + 0;
@@ -279,7 +275,6 @@ void vk_bind_geometry( uint32_t flags )
 			vk.cmd->vbo_offset[7] = tess.shader->stages[ tess.vboStage ]->rgb_offset[2];
 			vk_bind_index_attr( 7 );
 		}
-#ifdef USE_VK_PBR
 		if (flags & TESS_PBR) {
 			vk.cmd->vbo_offset[5] = tess.shader->normalOffset;
 			vk_bind_index_attr( 5 );
@@ -290,7 +285,6 @@ void vk_bind_geometry( uint32_t flags )
 			vk.cmd->vbo_offset[9] = tess.shader->lightdirOffset;
 			vk_bind_index_attr(9);
 		}
-#endif
 
 		qvkCmdBindVertexBuffers( vk.cmd->command_buffer, bind_base, bind_count, shade_bufs, vk.cmd->vbo_offset + bind_base );
 

@@ -12,6 +12,7 @@
 
 #ifdef __cplusplus
 extern "C" {
+#endif
 
 #define VK_SHADOW_CONTRACT_MAX_RECORDS 16u
 #define VK_SHADOW_CONTRACT_NAME_LEN    32u
@@ -69,5 +70,3 @@ void vk_shadow_contract_status_f( void );
 #ifdef __cplusplus
 }
 #endif
-
-#endif /* USE_VULKAN */

@@ -914,13 +914,11 @@ void R_EnsureImageThumb( image_t *image )
 	if ( !image || image->hasThumb || R_ImageSkipRtThumb( image ) ) {
 		return;
 	}
-#ifdef USE_VULKAN
 	if ( image->handle != VK_NULL_HANDLE && !vk.device_lost ) {
 		if ( vk_build_image_thumb_from_gpu( image ) ) {
 			return;
 		}
 	}
-#endif
 	R_BuildImageThumbFromAvgColor( image );
 }
 

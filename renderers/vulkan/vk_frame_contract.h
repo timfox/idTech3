@@ -11,6 +11,7 @@
 
 #ifdef __cplusplus
 extern "C" {
+#endif
 
 #define VK_FRAME_CONTRACT_MAX_READERS       8u
 #define VK_FRAME_CONTRACT_NAME_LEN          32u
@@ -90,5 +91,3 @@ void vk_frame_contract_capture_f( void );
 #ifdef __cplusplus
 }
 #endif
-
-#endif /* USE_VULKAN */

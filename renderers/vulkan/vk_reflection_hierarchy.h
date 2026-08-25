@@ -10,6 +10,7 @@
 
 #ifdef __cplusplus
 extern "C" {
+#endif
 
 typedef enum {
 	VK_REFLECT_SRC_NONE = 0,
@@ -40,5 +41,3 @@ void vk_reflection_hierarchy_note( vkReflectSource_t source, float weight, const
 #ifdef __cplusplus
 }
 #endif
-
-#endif /* USE_VULKAN */
