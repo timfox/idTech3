@@ -1493,10 +1493,8 @@ void vk_create_render_passes( void )
 	VK_CHECK( qvkCreateRenderPass( device, &desc, NULL, &vk.render_pass.local_point_shadow ) );
 	SET_OBJECT_NAME( vk.render_pass.local_point_shadow, "render pass - local point shadow", VK_DEBUG_REPORT_OBJECT_TYPE_RENDER_PASS_EXT );
 
-#ifdef VK_PBR_BRDFLUT
     if( vk.pbrActive )
     {
-    #ifdef VK_CUBEMAP 
         if ( vk.cubemapActive ) 
         {   			
 			desc.attachmentCount = 2;
@@ -1532,7 +1530,6 @@ void vk_create_render_passes( void )
             VK_CHECK(qvkCreateRenderPass(device, &desc, NULL, &vk.render_pass.cubemap));
             SET_OBJECT_NAME(vk.render_pass.cubemap, "render pass - cubemap", VK_DEBUG_REPORT_OBJECT_TYPE_RENDER_PASS_EXT);
         }  
-    #endif
 
         deps[0].srcSubpass = VK_SUBPASS_EXTERNAL;
         deps[0].dstSubpass = 0;
@@ -1581,5 +1578,4 @@ void vk_create_render_passes( void )
         VK_CHECK(qvkCreateRenderPass(device, &desc, NULL, &vk.render_pass.brdflut));
         SET_OBJECT_NAME(vk.render_pass.brdflut, "render pass - brdf lut", VK_DEBUG_REPORT_OBJECT_TYPE_RENDER_PASS_EXT);
     }
-#endif
 }

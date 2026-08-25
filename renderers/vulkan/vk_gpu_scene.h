@@ -15,7 +15,6 @@
  * No transient CPU pointers in GPU records. RT stays off under Raster Ultra.
  */
 
-#ifdef USE_VULKAN
 
 #include "../common/tr_types.h"
 
@@ -275,4 +274,3 @@ void vk_gpu_draw_status_f( void );
 void vk_gpu_frame_ownership_status_f( void );
 void vk_gpu_draw_perf_f( void );
 
-#endif /* USE_VULKAN */

@@ -126,7 +126,6 @@ glstate_t	glState;
 
 glstatic_t	gls;
 
-#ifdef USE_VULKAN
 #include "vk_device.h"
 #include "vk_forward_plus.h"
 #include "vk_render_path.h"
@@ -154,7 +153,6 @@ glstatic_t	gls;
 static void VkInfo_f( void );
 static void VulkanInfo_f( void );
 static void VkVolumetricValidate_f( void );
-#endif
 static void GfxInfo( void );
 static void VarInfo( void );
 static void GL_SetDefaultState( void );
@@ -259,19 +257,13 @@ cvar_t	*r_deferredLightDemoRadius;
 cvar_t	*r_deferredLightDemoDistance;
 cvar_t	*r_deferredLightDemoEnergy;
 cvar_t	*r_deferredLightDemoAnimate;
-#ifdef USE_VULKAN
 cvar_t	*r_device;
-#ifdef USE_VBO
 cvar_t	*r_vbo;
-#endif
-#ifdef USE_VK_PBR
 cvar_t	*r_pbr;
 cvar_t	*r_pbr_shExtract;
 cvar_t	*r_pbr_debug;
 cvar_t	*r_pbr_bindlog;
-#ifdef VK_CUBEMAP
 cvar_t	*r_ibl_forceCapture;
-#endif
 cvar_t	*r_pbr_packedPreferred;
 cvar_t	*r_pbr_multiScatter;
 cvar_t	*r_pbr_multiScatterStrength;
@@ -302,7 +294,6 @@ cvar_t	*r_pbr_iblIrradianceSize;
 cvar_t	*r_pbr_iblPrefilterSize;
 cvar_t	*r_pbr_showCubemap;
 cvar_t	*r_pbr_cubemapInfo;
-#endif
 cvar_t  *r_baseNormalX;
 cvar_t  *r_baseNormalY;
 cvar_t  *r_baseParallax;
@@ -490,7 +481,6 @@ cvar_t	*r_forwardPlusZSliceMode;
 cvar_t	*r_forwardPlusSpecularStrength;
 cvar_t	*r_forwardPlusEnergyRenorm;
 
-#endif // USE_VULKAN
 
 cvar_t	*r_dlightBacks;
 
@@ -721,71 +711,11 @@ static cvar_t* r_maxpolyverts;
 int		max_polys;
 int		max_polyverts;
 
-#ifdef USE_VULKAN
 
 #include "vk.h"
 Vk_Instance vk;
 Vk_World	vk_world;
 
-#else
-
-static char gl_extensions[ 32768 ];
-
-#define GLE( ret, name, ... ) ret ( APIENTRY * q##name )( __VA_ARGS__ );
-	QGL_Core_PROCS
-	QGL_Ext_PROCS
-#undef GLE
-
-typedef struct {
-	void **symbol;
-	const char *name;
-} sym_t;
-
-#define GLE( ret, name, ... ) { (void**)&q##name, XSTRING(name) },
-static sym_t core_procs[] = { QGL_Core_PROCS };
-static sym_t ext_procs[] = { QGL_Ext_PROCS };
-#undef GLE
-
-
-/*
-==================
-R_ResolveSymbols
-
-returns NULL on success or last failed symbol name otherwise
-==================
-*/
-static const char *R_ResolveSymbols( sym_t *syms, int count )
-{
-	int i;
-	for ( i = 0; i < count; i++ )
-	{
-		*syms[ i ].symbol = ri.GL_GetProcAddress( syms[ i ].name );
-		if ( *syms[ i ].symbol == NULL )
-		{
-			return syms[ i ].name;
-		}
-	}
-	return NULL;
-}
-
-
-static void R_ClearSymbols( sym_t *syms, int count )
-{
-	int i;
-	for ( i = 0; i < count; i++ )
-	{
-		*syms[ i ].symbol = NULL;
-	}
-}
-
-
-static void R_ClearSymTables( void )
-{
-	R_ClearSymbols( core_procs, ARRAY_LEN( core_procs ) );
-	R_ClearSymbols( ext_procs, ARRAY_LEN( ext_procs ) );
-}
-
-#endif
 
 
 // for modular renderer
@@ -812,231 +742,6 @@ void QDECL Com_Printf( const char *fmt, ... )
 #endif
 
 
-#ifndef USE_VULKAN
-/*
-** R_HaveExtension
-*/
-static qboolean R_HaveExtension( const char *ext )
-{
-	const char *ptr = Q_stristr( gl_extensions, ext );
-	if (ptr == NULL)
-		return qfalse;
-	ptr += strlen(ext);
-	return ((*ptr == ' ') || (*ptr == '\0'));  // verify its complete string.
-}
-
-
-/*
-** R_InitExtensions
-*/
-static void R_InitExtensions( void )
-{
-	GLint max_texture_size = 0;
-	float version;
-	size_t len;
-
-	if ( !qglGetString( GL_EXTENSIONS ) )
-	{
-		ri.Error( ERR_FATAL, "OpenGL installation is broken. Please fix video drivers and/or restart your system" );
-	}
-
-	// get our config strings
-	Q_strncpyz( glConfig.vendor_string, (char *)qglGetString (GL_VENDOR), sizeof( glConfig.vendor_string ) );
-	Q_strncpyz( glConfig.renderer_string, (char *)qglGetString (GL_RENDERER), sizeof( glConfig.renderer_string ) );
-	len = strlen( glConfig.renderer_string );
-	if ( len && glConfig.renderer_string[ len - 1 ] == '\n' )
-		glConfig.renderer_string[ len - 1 ] = '\0';
-	Q_strncpyz( glConfig.version_string, (char *)qglGetString( GL_VERSION ), sizeof( glConfig.version_string ) );
-
-	Q_strncpyz( gl_extensions, (char *)qglGetString( GL_EXTENSIONS ), sizeof( gl_extensions ) );
-	Q_strncpyz( glConfig.extensions_string, gl_extensions, sizeof( glConfig.extensions_string ) );
-
-	version = Q_atof( (const char *)qglGetString( GL_VERSION ) );
-	gl_version = (int)(version * 10.001);
-
-	glConfig.textureCompression = TC_NONE;
-
-	glConfig.textureEnvAddAvailable = qfalse;
-
-	textureFilterAnisotropic = qfalse;
-	maxAnisotropy = 0;
-
-	qglLockArraysEXT = NULL;
-	qglUnlockArraysEXT = NULL;
-
-	glConfig.numTextureUnits = 1;
-	qglMultiTexCoord2fARB = NULL;
-	qglActiveTextureARB = NULL;
-	qglClientActiveTextureARB = NULL;
-
-	gl_clamp_mode = GL_CLAMP; // by default
-
-	// OpenGL driver constants
-	qglGetIntegerv( GL_MAX_TEXTURE_SIZE, &max_texture_size );
-	glConfig.maxTextureSize = max_texture_size;
-
-	// stubbed or broken drivers may have reported 0...
-	if ( glConfig.maxTextureSize <= 0 )
-		glConfig.maxTextureSize = 0;
-	else if ( glConfig.maxTextureSize > MAX_TEXTURE_SIZE )
-		glConfig.maxTextureSize = MAX_TEXTURE_SIZE; // ResampleTexture() relies on that maximum
-
-	if ( !r_allowExtensions->integer )
-	{
-		ri.Printf( PRINT_ALL, "*** IGNORING OPENGL EXTENSIONS ***\n" );
-		return;
-	}
-
-	ri.Printf( PRINT_ALL, "Initializing OpenGL extensions\n" );
-
-	if ( R_HaveExtension( "GL_EXT_texture_edge_clamp" ) || R_HaveExtension( "GL_SGIS_texture_edge_clamp" ) ) {
-		gl_clamp_mode = GL_CLAMP_TO_EDGE;
-		ri.Printf( PRINT_ALL, "...using GL_EXT_texture_edge_clamp\n" );
-	} else {
-		ri.Printf( PRINT_ALL, "...GL_EXT_texture_edge_clamp not found\n" );
-		ri.Printf( PRINT_ALL, S_COLOR_YELLOW "...Degraded texture support likely!\n" );
-	}
-
-	// GL_EXT_texture_compression_s3tc
-	if ( R_HaveExtension( "GL_ARB_texture_compression" ) &&
-		 R_HaveExtension( "GL_EXT_texture_compression_s3tc" ) )
-	{
-		if ( r_ext_compressed_textures->integer ){
-			glConfig.textureCompression = TC_S3TC_ARB;
-			ri.Printf( PRINT_ALL, "...using GL_EXT_texture_compression_s3tc\n" );
-		} else {
-			ri.Printf( PRINT_ALL, "...ignoring GL_EXT_texture_compression_s3tc\n" );
-		}
-	} else {
-		ri.Printf( PRINT_ALL, "...GL_EXT_texture_compression_s3tc not found\n" );
-	}
-
-	// GL_S3_s3tc
-	if ( glConfig.textureCompression == TC_NONE && r_ext_compressed_textures->integer ) {
-		if ( R_HaveExtension( "GL_S3_s3tc" ) ) {
-			if ( r_ext_compressed_textures->integer ) {
-				glConfig.textureCompression = TC_S3TC;
-				ri.Printf( PRINT_ALL, "...using GL_S3_s3tc\n" );
-			} else {
-				glConfig.textureCompression = TC_NONE;
-				ri.Printf( PRINT_ALL, "...ignoring GL_S3_s3tc\n" );
-			}
-		} else {
-			ri.Printf( PRINT_ALL, "...GL_S3_s3tc not found\n" );
-		}
-	}
-
-	// GL_EXT_texture_env_add
-	if ( R_HaveExtension( "EXT_texture_env_add" ) ) {
-		if ( r_ext_texture_env_add->integer ) {
-			glConfig.textureEnvAddAvailable = qtrue;
-			ri.Printf( PRINT_ALL, "...using GL_EXT_texture_env_add\n" );
-		} else {
-			glConfig.textureEnvAddAvailable = qfalse;
-			ri.Printf( PRINT_ALL, "...ignoring GL_EXT_texture_env_add\n" );
-		}
-	} else {
-		ri.Printf( PRINT_ALL, "...GL_EXT_texture_env_add not found\n" );
-	}
-
-	// GL_ARB_multitexture
-	if ( R_HaveExtension( "GL_ARB_multitexture" ) )
-	{
-		if ( r_ext_multitexture->integer )
-		{
-			qglMultiTexCoord2fARB = ri.GL_GetProcAddress( "glMultiTexCoord2fARB" );
-			qglActiveTextureARB = ri.GL_GetProcAddress( "glActiveTextureARB" );
-			qglClientActiveTextureARB = ri.GL_GetProcAddress( "glClientActiveTextureARB" );
-
-			if ( qglActiveTextureARB && qglClientActiveTextureARB )
-			{
-				GLint textureUnits = 0;
-
-				qglGetIntegerv( GL_MAX_ACTIVE_TEXTURES_ARB, &textureUnits );
-
-				if ( textureUnits > 1 )
-				{
-					GLint max_shader_units = 0;
-					GLint max_bind_units = 0;
-
-					qglGetIntegerv( GL_MAX_TEXTURE_IMAGE_UNITS, &max_shader_units );
-					qglGetIntegerv( GL_MAX_COMBINED_TEXTURE_IMAGE_UNITS, &max_bind_units );
-
-					if ( max_bind_units > max_shader_units )
-						max_bind_units = max_shader_units;
-					if ( max_bind_units > MAX_TEXTURE_UNITS )
-						max_bind_units = MAX_TEXTURE_UNITS;
-
-					glConfig.numTextureUnits = MAX( textureUnits, max_bind_units );
-					ri.Printf( PRINT_ALL, "...using GL_ARB_multitexture\n" );
-				}
-				else
-				{
-					qglMultiTexCoord2fARB = NULL;
-					qglActiveTextureARB = NULL;
-					qglClientActiveTextureARB = NULL;
-					ri.Printf( PRINT_ALL, "...not using GL_ARB_multitexture, < 2 texture units\n" );
-				}
-			}
-		}
-		else
-		{
-			ri.Printf( PRINT_ALL, "...ignoring GL_ARB_multitexture\n" );
-		}
-	}
-	else
-	{
-		ri.Printf( PRINT_ALL, "...GL_ARB_multitexture not found\n" );
-	}
-
-	// GL_EXT_compiled_vertex_array
-	if ( R_HaveExtension( "GL_EXT_compiled_vertex_array" ) )
-	{
-		if ( r_ext_compiled_vertex_array->integer )
-		{
-			ri.Printf( PRINT_ALL, "...using GL_EXT_compiled_vertex_array\n" );
-			qglLockArraysEXT = ri.GL_GetProcAddress( "glLockArraysEXT" );
-			qglUnlockArraysEXT = ri.GL_GetProcAddress( "glUnlockArraysEXT" );
-			if ( !qglLockArraysEXT || !qglUnlockArraysEXT ) {
-				ri.Error( ERR_FATAL, "bad getprocaddress" );
-			}
-		}
-		else
-		{
-			ri.Printf( PRINT_ALL, "...ignoring GL_EXT_compiled_vertex_array\n" );
-		}
-	}
-	else
-	{
-		ri.Printf( PRINT_ALL, "...GL_EXT_compiled_vertex_array not found\n" );
-	}
-
-	if ( R_HaveExtension( "GL_EXT_texture_filter_anisotropic" ) )
-	{
-		if ( r_ext_texture_filter_anisotropic->integer ) {
-			qglGetIntegerv( GL_MAX_TEXTURE_MAX_ANISOTROPY_EXT, &maxAnisotropy );
-			if ( maxAnisotropy <= 0 ) {
-				ri.Printf( PRINT_ALL, "...GL_EXT_texture_filter_anisotropic not properly supported!\n" );
-				maxAnisotropy = 0;
-			}
-			else
-			{
-				ri.Printf( PRINT_ALL, "...using GL_EXT_texture_filter_anisotropic (max: %i)\n", maxAnisotropy );
-				textureFilterAnisotropic = qtrue;
-				maxAnisotropy = MIN( r_ext_texture_filter_anisotropic->integer, maxAnisotropy );
-			}
-		}
-		else
-		{
-			ri.Printf( PRINT_ALL, "...ignoring GL_EXT_texture_filter_anisotropic\n" );
-		}
-	}
-	else
-	{
-		ri.Printf( PRINT_ALL, "...GL_EXT_texture_filter_anisotropic not found\n" );
-	}
-}
-#endif
 
 
 /*
@@ -1062,7 +767,6 @@ static void InitOpenGL( void )
 
 	if ( glConfig.vidWidth == 0 )
 	{
-#ifdef USE_VULKAN
 		if ( !ri.VKimp_Init )
 		{
 			ri.Error( ERR_FATAL, "Vulkan interface is not initialized" );
@@ -1103,19 +807,6 @@ static void InitOpenGL( void )
 		}
 
 		vk_initialize();
-#else
-		const char *err;
-
-		ri.GLimp_Init( &glConfig );
-
-		R_ClearSymTables();
-
-		err = R_ResolveSymbols( core_procs, ARRAY_LEN( core_procs ) );
-		if ( err )
-			ri.Error( ERR_FATAL, "Error resolving core OpenGL function '%s'", err );
-
-		R_InitExtensions();
-#endif
 
 		glConfig.deviceSupportsGamma = qfalse;
 
@@ -1131,7 +822,6 @@ static void InitOpenGL( void )
 		gls.initTime = ri.Milliseconds();
 	}
 
-#ifdef USE_VULKAN
 	if ( !vk.active ) {
 		// might happen after REF_KEEP_WINDOW
 		vk_initialize();
@@ -1152,7 +842,6 @@ static void InitOpenGL( void )
 	if ( r_vdbFog && r_vdbFog->integer ) {
 		ri.Printf( PRINT_ALL, "[VK][fog] r_vdbFog=1 (blend bound VDB density in volumetric compute when GPU-uploaded)\n" );
 	}
-#endif
 
 	// set default state
 	GL_SetDefaultState();
@@ -1167,51 +856,11 @@ GL_CheckErrors
 ==================
 */
 void GL_CheckErrors( void ) {
-#ifdef USE_VULKAN
 	char validation_msg[512];
 
 	if ( vk_consume_validation_error( validation_msg, sizeof( validation_msg ) ) ) {
 		ri.Error( ERR_FATAL, "Vulkan validation: %s", validation_msg );
 	}
-#else
-	int		err;
-    const char *s;
-    char buf[32];
-
-    err = qglGetError();
-    if ( err == GL_NO_ERROR ) {
-        return;
-    }
-    if ( r_ignoreGLErrors->integer ) {
-        return;
-    }
-    switch( err ) {
-        case GL_INVALID_ENUM:
-            s = "GL_INVALID_ENUM";
-            break;
-        case GL_INVALID_VALUE:
-            s = "GL_INVALID_VALUE";
-            break;
-        case GL_INVALID_OPERATION:
-            s = "GL_INVALID_OPERATION";
-            break;
-        case GL_STACK_OVERFLOW:
-            s = "GL_STACK_OVERFLOW";
-            break;
-        case GL_STACK_UNDERFLOW:
-            s = "GL_STACK_UNDERFLOW";
-            break;
-        case GL_OUT_OF_MEMORY:
-            s = "GL_OUT_OF_MEMORY";
-            break;
-        default:
-            Com_sprintf( buf, sizeof(buf), "%i", err);
-            s = buf;
-            break;
-    }
-
-    ri.Error( ERR_FATAL, "GL_CheckErrors: %s", s );
-#endif
 }
 
 
@@ -1241,68 +890,9 @@ Note: Statics are not reinitialized between fs_game changes.
 */
 static void GL_SetDefaultState( void )
 {
-#ifdef USE_VULKAN
 	GL_TextureMode( r_textureMode->string );
 
 	glState.glStateBits = GLS_DEPTHTEST_DISABLE | GLS_DEPTHMASK_TRUE;
-#else
-	int i;
-
-	glState.currenttmu = 0;
-	glState.currentArray = 0;
-
-	for ( i = 0; i < MAX_TEXTURE_UNITS; i++ )
-	{
-		glState.currenttextures[ i ] = 0;
-		glState.glClientStateBits[ i ] = 0;
-	}
-
-	qglClearDepth( 1.0f );
-
-	qglCullFace( GL_FRONT );
-	glState.faceCulling = -1;
-
-	qglColor4f( 1.0f, 1.0f, 1.0f, 1.0f );
-
-	// initialize downstream texture unit if we're running
-	// in a multitexture environment
-	if ( qglActiveTextureARB )
-	{
-		qglActiveTextureARB( GL_TEXTURE1_ARB );
-		GL_TextureMode( r_textureMode->string );
-		GL_TexEnv( GL_MODULATE );
-		qglDisable( GL_TEXTURE_2D );
-		qglDisableClientState( GL_TEXTURE_COORD_ARRAY );
-		qglActiveTextureARB( GL_TEXTURE0_ARB );
-	}
-
-	qglEnable( GL_TEXTURE_2D );
-	GL_TextureMode( r_textureMode->string );
-	GL_TexEnv( GL_MODULATE );
-
-	qglShadeModel( GL_SMOOTH );
-	qglDepthFunc( GL_LEQUAL );
-
-	// the vertex array is always enabled, but the color and texture
-	// arrays are enabled and disabled around the compiled vertex array call
-	qglEnableClientState( GL_VERTEX_ARRAY );
-
-	qglDisableClientState( GL_TEXTURE_COORD_ARRAY );
-	qglDisableClientState( GL_COLOR_ARRAY );
-	qglDisableClientState( GL_NORMAL_ARRAY );
-
-	//
-	// make sure our GL state vector is set correctly
-	//
-	glState.glStateBits = GLS_DEPTHTEST_DISABLE | GLS_DEPTHMASK_TRUE;
-
-	qglPolygonMode( GL_FRONT_AND_BACK, GL_FILL );
-	qglDepthMask( GL_TRUE );
-	qglDisable( GL_DEPTH_TEST );
-	qglEnable( GL_SCISSOR_TEST );
-	qglDisable( GL_CULL_FACE );
-	qglDisable( GL_BLEND );
-#endif
 }
 
 
@@ -1316,13 +906,8 @@ RE_SyncRender
 */
 static void RE_SyncRender( void )
 {
-#ifdef USE_VULKAN
 	if ( vk.device )
 		vk_wait_idle();
-#else
-	if ( qglFinish && backEnd.doneSurfaces )
-		qglFinish();
-#endif
 }
 
 
@@ -1347,7 +932,6 @@ static void R_Register( void )
 	ri.Cmd_AddCommand( "screenshotBMP", R_ScreenShot_f );
 	ri.Cmd_AddCommand( "screenshotEXR", R_ScreenShot_f );
 	ri.Cmd_AddCommand( "gfxinfo", GfxInfo_f );
-#ifdef USE_VULKAN
 	vk_ui_blur_register_cvars();
 	ri.Cmd_AddCommand( "vkinfo", VkInfo_f );
 	ri.Cmd_AddCommand( "vulkaninfo", VulkanInfo_f );
@@ -1390,7 +974,6 @@ static void R_Register( void )
 	ri.Cmd_AddCommand( "fp64_points_load", R_FP64_PointsLoad_f );
 	ri.Cmd_AddCommand( "fp64_points_clear", R_FP64_PointsClear_f );
 	ri.Cmd_AddCommand( "fp64_points_benchmark", R_FP64_PointsBenchmark_f );
-#endif
 
 	//
 	// temporary latched variables that can only change over a restart
@@ -1453,11 +1036,8 @@ static void R_Register( void )
 	r_texturebits = ri.Cvar_Get( "r_texturebits", "0", CVAR_ARCHIVE_ND | CVAR_LATCH );
 	ri.Cvar_SetDescription( r_texturebits, "Number of texture bits per texture." );
 
-#if defined (USE_VULKAN) && defined (USE_VBO)
 	r_vbo = ri.Cvar_Get( "r_vbo", "1", CVAR_ARCHIVE | CVAR_LATCH );
 	ri.Cvar_SetDescription( r_vbo, "Use Vertex Buffer Objects to cache static map geometry, may improve FPS on modern GPUs, increases hunk memory usage by 15-30MB (map-dependent)." );
-#endif
-#if defined (USE_VULKAN) && defined (USE_VK_PBR)
 	r_pbr = ri.Cvar_Get("r_pbr", "1", CVAR_ARCHIVE_ND | CVAR_LATCH );
 	ri.Cvar_SetDescription( r_pbr, "Enables Physically Based Rendering (metalness/roughness, IBL, Cook-Torrance BRDF).\n"
 		"Requires " S_COLOR_CYAN "\\r_fbo 1" S_COLOR_WHITE " (vid_restart after changing).\n"
@@ -1492,13 +1072,11 @@ static void R_Register( void )
 		"Log PBR IBL/glint bind state once per map (env/irr VkImageView handles and descriptor writes)." );
 	ri.Cvar_SetGroup( r_pbr_bindlog, CVG_RENDERER );
 
-#ifdef VK_CUBEMAP
 	r_ibl_forceCapture = ri.Cvar_Get( "r_ibl_forceCapture", "0", CVAR_TEMP );
 	ri.Cvar_CheckRange( r_ibl_forceCapture, "0", "1", CV_INTEGER );
 	ri.Cvar_SetDescription( r_ibl_forceCapture,
 		"When 1, wait-idle after cubemap convolution and emit PBR IBL post logs (diagnostics)." );
 	ri.Cvar_SetGroup( r_ibl_forceCapture, CVG_RENDERER );
-#endif
 
 	r_glint = ri.Cvar_Get( "r_glint", "1", CVAR_ARCHIVE_ND );
 	ri.Cvar_CheckRange( r_glint, "0", "1", CV_INTEGER );
@@ -1652,7 +1230,6 @@ static void R_Register( void )
 	ri.Cvar_SetDescription( r_deluxeMapping, "Reading deluxemaps when compiled with q3map2:\n 0: off (approximated from lightgrid)\n 1: on (compiled deluxemaps)" );
 	r_deluxeSpecular	= ri.Cvar_Get("r_deluxeSpecular",	"1", CVAR_ARCHIVE );
 	ri.Cvar_SetDescription( r_deluxeSpecular, "Scale the specular response from deluxemaps" );
-#endif
 	r_mapGreyScale = ri.Cvar_Get( "r_mapGreyScale", "0", CVAR_ARCHIVE_ND | CVAR_LATCH );
 	ri.Cvar_CheckRange( r_mapGreyScale, "-1", "1", CV_FLOAT );
 	ri.Cvar_SetDescription(r_mapGreyScale, "Desaturate world map textures only, works independently from \\r_greyscale, negative values only desaturate lightmaps.");
@@ -2901,7 +2478,6 @@ static void R_Register( void )
 
 	r_showsky = ri.Cvar_Get( "r_showsky", "0", CVAR_LATCH );
 	ri.Cvar_SetDescription( r_showsky, "Forces sky in front of all surfaces." );
-#ifdef USE_VULKAN
 	r_device = ri.Cvar_Get( "r_device", "-1", CVAR_ARCHIVE_ND | CVAR_LATCH );
 	ri.Cvar_CheckRange( r_device, "-2", NULL, CV_INTEGER );
 	ri.Cvar_SetDescription( r_device, "Select physical device to render:\n" \
@@ -4058,7 +3634,6 @@ static void R_Register( void )
 		ri.Printf( PRINT_ALL, "[VK][temporal] r_temporalCpuSkinPrev=0 (conservative whole-frame motion invalidation on spawning animated entities)\n" );
 	}
 	R_RendererPrintCompatibilityWarnings( qfalse );
-	#endif // USE_VULKAN
 
 	// Register modular subsystem cvars
 	CBTerrain_RegisterCvars();
@@ -4078,9 +3653,6 @@ R_Init
 ===============
 */
 void R_Init( void ) {
-#ifndef USE_VULKAN
-	int	err;
-#endif
 	int i;
 	byte *ptr;
 
@@ -4091,9 +3663,7 @@ void R_Init( void ) {
 	Com_Memset( &backEnd, 0, sizeof( backEnd ) );
 	Com_Memset( &tess, 0, sizeof( tess ) );
 	Com_Memset( &glState, 0, sizeof( glState ) );
-#ifdef USE_VK_PBR
 	R_PBR_ResetBindLog();
-#endif
 
 	if ( sizeof( glconfig_t ) != 11324 )
 		ri.Error( ERR_FATAL, "Mod ABI incompatible: sizeof(glconfig_t) == %u != 11324", (unsigned int) sizeof( glconfig_t ) );
@@ -4168,7 +3738,6 @@ void R_Init( void ) {
 	if ( vk_ltc_uploaded() ) {
 		ri.Printf( PRINT_DEVELOPER, "[VK] Photometric LTC GPU path ready\n" );
 	}
-#ifdef USE_VULKAN
 	R_NDGI_Init();
 	R_NIV_Init();
 	R_NSLM_Init();
@@ -4196,16 +3765,12 @@ void R_Init( void ) {
 #ifdef USE_EXPERIMENTAL_RENDERERS
 	ri.Printf( PRINT_ALL,
 		"[VK] Experimental renderers linked (NDGI/NIV/NSLM/NIST/NVC/FSA/VFGI/RenderFormer/WPT/GRTX/VkSplat/...); enable r_* + vid_restart. See docs/NEURAL_RENDERER_PHASES.md\n" );
-#else
-	/* Individual stub lines come from vk_experimental_renderer_stubs.c */
-#endif
 #ifdef USE_VULKAN_RTX
 	ri.Printf( PRINT_ALL,
 		"[VK][RTX] USE_VULKAN_RTX=ON (Hybrid1/Raygun/pathtrace scaffolds linked; latch r_rtx/r_hybrid1/r_raygun before vid_restart)\n" );
 #endif
 #endif
 	R_ApplyRenderModeLatch();
-#ifdef USE_VULKAN
 	R_RenderPath_RegisterCvars();
 	vk_black_frame_register();
 	vk_frame_contract_register();
@@ -4226,7 +3791,6 @@ void R_Init( void ) {
 	vk_bsp_viz_register();
 	vk_renderer_iq_p1_register();
 	vk_renderer_perf_register();
-#endif
 	VK_RasterUltra_Enforce();
 	vk_aa_policy_apply();
 	ri.Printf( PRINT_ALL, "[VK] SH lighting: %s\n", r_shLighting && r_shLighting->integer ? "enabled" : "disabled" );
@@ -4263,15 +3827,11 @@ void R_Init( void ) {
 
 	VarInfo();
 
-#ifdef USE_VULKAN
 	vk_create_pipelines();
-#ifdef VK_PBR_BRDFLUT
 	vk_create_brfdlut();
-#endif
 	vk_validate_pbr_ibl_resources();
 	vk_surf_log_temporal_config();
 	vk_ui_blur_init();
-#endif
 
 	R_InitShaders();
 	R_VectorFont_Init();
@@ -4292,11 +3852,6 @@ void R_Init( void ) {
 	R_Emulator_Init();
 	R_Webcam_Init();
 
-#ifndef USE_VULKAN
-	err = qglGetError();
-	if ( err != GL_NO_ERROR )
-		ri.Printf( PRINT_WARNING, "glGetError() = 0x%x\n", err );
-#endif
 
 	ri.Printf( PRINT_ALL, "----- finished R_Init -----\n" );
 }
@@ -4308,13 +3863,11 @@ RE_Shutdown
 ===============
 */
 static void RE_Shutdown( refShutdownCode_t code ) {
-#ifdef USE_VULKAN
 	//if ( code == REF_KEEP_CONTEXT ) {
 	//	if ( ( ri.Milliseconds() - gls.initTime ) > 48 * 3600 * 1000 ) {
 	//		code = REF_KEEP_WINDOW; // destroy context
 	//	}
 	//}
-#endif
 	ri.Printf( PRINT_ALL, "RE_Shutdown( %i )\n", code );
 
 	vk_ui_blur_shutdown();
@@ -4349,7 +3902,6 @@ static void RE_Shutdown( refShutdownCode_t code ) {
 	ri.Cmd_RemoveCommand( "skinlist" );
 	ri.Cmd_RemoveCommand( "gfxinfo" );
 	ri.Cmd_RemoveCommand( "shaderstate" );
-#ifdef USE_VULKAN
 	ri.Cmd_RemoveCommand( "vkinfo" );
 	ri.Cmd_RemoveCommand( "vulkaninfo" );
 	ri.Cmd_RemoveCommand( "renderer_status" );
@@ -4375,13 +3927,10 @@ static void RE_Shutdown( refShutdownCode_t code ) {
 	ri.Cmd_RemoveCommand( "r_printWeaponPresentation" );
 	ri.Cmd_RemoveCommand( "surf_validateTemporalConfig" );
 	ri.Cmd_RemoveCommand( "r_printViewmodelProjection" );
-#endif
 
 	//if ( tr.registered ) {
 		//R_IssuePendingRenderCommands();
-#ifdef USE_VULKAN
 	R_VT_Shutdown();
-#endif
 		R_DeleteTextures();
 	//}
 
@@ -4389,7 +3938,6 @@ static void RE_Shutdown( refShutdownCode_t code ) {
 	VkImgui_Shutdown();
 #endif
 
-#ifdef USE_VULKAN
 	R_NDGI_Shutdown();
 	R_NIV_Shutdown();
 	R_NSLM_Shutdown();
@@ -4413,22 +3961,18 @@ static void RE_Shutdown( refShutdownCode_t code ) {
 	R_Iris_Shutdown();
 	R_WSP_Shutdown();
 	vk_release_resources();
-#endif
 
 	R_DoneFreeType();
 
 	R_Emulator_Shutdown();
 	R_Webcam_Shutdown();
 
-#ifdef USE_VULKAN
 	if ( r_device->modified ) {
 		code = REF_UNLOAD_DLL;
 	}
-#endif
 
 	// shut down platform specific OpenGL/Vulkan stuff
 	if ( code != REF_KEEP_CONTEXT ) {
-#ifdef USE_VULKAN
 		vk_shutdown( code );
 
 		Com_Memset( &glState, 0, sizeof( glState ) );
@@ -4439,17 +3983,6 @@ static void RE_Shutdown( refShutdownCode_t code ) {
 			}
 			Com_Memset( &glConfig, 0, sizeof( glConfig ) );
 		}
-#else
-		R_ClearSymTables();
-		Com_Memset( &glState, 0, sizeof( glState ) );
-
-		if ( code != REF_KEEP_WINDOW ) {
-			if ( ri.GLimp_Shutdown ) {
-				ri.GLimp_Shutdown( code == REF_UNLOAD_DLL ? qtrue : qfalse );
-			}
-			Com_Memset( &glConfig, 0, sizeof( glConfig ) );
-		}
-#endif
 	}
 
 	/*
@@ -4475,16 +4008,9 @@ Touch all images to make sure they are resident
 =============
 */
 static void RE_EndRegistration( void ) {
-#ifdef USE_VULKAN
 	vk_wait_idle();
 	// command buffer is not in recording state at this stage
 	// so we can't issue RB_ShowImages() there
-#else
-	R_IssuePendingRenderCommands();
-	if ( !ri.Sys_LowPhysicalMemory() ) {
-		RB_ShowImages();
-	}
-#endif
 }
 
 

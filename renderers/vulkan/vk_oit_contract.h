@@ -8,7 +8,6 @@
  * Do not change fields without bumping OIT_CONTRACT_VERSION and updating docs.
  */
 
-#ifdef USE_VULKAN
 
 #include "../common/tr_types.h"
 
@@ -87,4 +86,3 @@ const char *vk_oit_revealage_mode_name( oitRevealageMode_t m );
 const char *vk_oit_resolve_mode_name( oitResolveMode_t m );
 /* Weight mode names: vk_oit_weight_mode_name in vk_oit_weight_contract.h */
 
-#endif /* USE_VULKAN */

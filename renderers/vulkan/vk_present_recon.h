@@ -1,6 +1,5 @@
 #pragma once
 
-#ifdef USE_VULKAN
 
 /*
  * Raster Ultra 1.5 — Present-Time Adaptive Reconstruction.
@@ -31,4 +30,3 @@ void vk_present_recon_note_present( void );
 void vk_present_recon_status_f( void );
 void vk_motion_vector_cert_status_f( void );
 
-#endif /* USE_VULKAN */

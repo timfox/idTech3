@@ -578,11 +578,7 @@ void vk_print_viewmodel_projection_f( void )
 	ri.Printf( PRINT_ALL, "projection mode       : %s (r_firstPersonFovEnabled=%d)\n",
 		current->usingOverride ? "custom horizontal weapon FOV" : "scene/world projection",
 		current->overrideEnabled ? 1 : 0 );
-#ifdef USE_VULKAN
 	ri.Printf( PRINT_ALL, "reversed-Z state      : enabled (Vulkan 0..1 clip depth)\n" );
-#else
-	ri.Printf( PRINT_ALL, "reversed-Z state      : disabled\n" );
-#endif
 	ri.Printf( PRINT_ALL, "depth-range remap     : DEPTH_RANGE_WEAPON [0.600, 1.000]\n" );
 	ri.Printf( PRINT_ALL, "jitter state          : current=(%.4f, %.4f) px appliedToWeapon=%s\n",
 		current->jitterX, current->jitterY, current->jitterApplied ? "yes" : "no" );

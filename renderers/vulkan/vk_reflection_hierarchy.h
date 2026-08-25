@@ -5,7 +5,6 @@
  * See docs/REFLECTION_HIERARCHY.md
  */
 
-#ifdef USE_VULKAN
 
 #include "../common/tr_types.h"
 
@@ -42,5 +41,3 @@ void vk_reflection_hierarchy_note( vkReflectSource_t source, float weight, const
 #ifdef __cplusplus
 }
 #endif
-
-#endif /* USE_VULKAN */
