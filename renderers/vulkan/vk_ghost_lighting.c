@@ -1,6 +1,5 @@
 #include "tr_local.h"
 
-#ifdef USE_VULKAN
 
 #include "vk_ghost_lighting.h"
 
@@ -208,4 +207,3 @@ void vk_ghost_lighting_register( void )
 	ri.Cmd_AddCommand( "history_quarantine_apply", HistoryQuarantine_f );
 }
 
-#endif /* USE_VULKAN */

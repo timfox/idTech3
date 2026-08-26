@@ -1,6 +1,5 @@
 #pragma once
 
-#ifdef USE_VULKAN
 
 /*
  * Raster Ultra 1.10 — capture / screenshot color-space policy.
@@ -38,4 +37,3 @@ void vk_capture_pipeline_note_capture( void );
 
 void vk_capture_pipeline_status_f( void );
 
-#endif /* USE_VULKAN */

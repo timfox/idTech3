@@ -12,7 +12,6 @@ Phase 1.6 — evidence persistence + dependency invalidation.
 #include "vk_renderer_iq_p1.h"
 #include <string.h>
 
-#ifdef USE_VULKAN
 
 static qboolean s_cmds;
 
@@ -111,4 +110,3 @@ void vk_renderer_p1_evidence_register( void )
 	}
 }
 
-#endif /* USE_VULKAN */
