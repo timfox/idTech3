@@ -226,7 +226,6 @@ void vk_create_framebuffers( void )
 			}
 		}
 
-	#ifdef VK_CUBEMAP
 	if ( vk.cubemapActive )
 	{
 		// cubemap
@@ -252,7 +251,6 @@ void vk_create_framebuffers( void )
 			SET_OBJECT_NAME( vk.framebuffers.cubemap[j], va( "framebuffer - cubemap face %d", j ), VK_DEBUG_REPORT_OBJECT_TYPE_FRAMEBUFFER_EXT );
 		}
 	}
-	#endif
 
 	if ( vk.capture.image != VK_NULL_HANDLE )
 	{
@@ -474,7 +472,6 @@ void vk_create_framebuffers( void )
 		}
 	}
 
-	#ifdef VK_PBR_BRDFLUT
 	if( vk.pbrActive )
 	{
 		desc.renderPass = vk.render_pass.brdflut;
@@ -484,7 +481,6 @@ void vk_create_framebuffers( void )
 		VK_CHECK( qvkCreateFramebuffer( vk.device, &desc, NULL, &vk.framebuffers.brdflut ) );
 		SET_OBJECT_NAME( vk.framebuffers.brdflut, va( "framebuffer - brdf LUT" ), VK_DEBUG_REPORT_OBJECT_TYPE_FRAMEBUFFER_EXT );
 	}
-	#endif
 	}
 }
 
@@ -630,21 +626,17 @@ void vk_destroy_framebuffers( void ) {
 		}
 	}
 
-#ifdef VK_PBR_BRDFLUT
     if ( vk.framebuffers.brdflut != VK_NULL_HANDLE ) {
         qvkDestroyFramebuffer( vk.device, vk.framebuffers.brdflut, NULL );
         vk.framebuffers.brdflut = VK_NULL_HANDLE;
     }
-#endif
 
-#ifdef VK_CUBEMAP
     for ( n = 0; n < ARRAY_LEN( vk.framebuffers.cubemap ); n++ ) {
         if ( vk.framebuffers.cubemap[n] != VK_NULL_HANDLE ) {
             qvkDestroyFramebuffer( vk.device, vk.framebuffers.cubemap[n], NULL );
             vk.framebuffers.cubemap[n] = VK_NULL_HANDLE;
         }
     }
-#endif
 	for ( n = 0; n < ARRAY_LEN( vk.framebuffers.overlay_compose ); n++ ) {
 		if ( vk.framebuffers.overlay_compose[n] != VK_NULL_HANDLE ) {
 			qvkDestroyFramebuffer( vk.device, vk.framebuffers.overlay_compose[n], NULL );

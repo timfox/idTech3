@@ -109,7 +109,6 @@ typedef enum {
 #define VK_DESC_TEXTURE2     3
 #define VK_DESC_FOG_COLLAPSE 4
 
-#ifdef USE_VK_PBR
 	typedef float mat4_t[16];
 	#define VK_DESC_PBR_BRDFLUT				5
 	#define VK_DESC_PBR_NORMAL				6
@@ -127,9 +126,6 @@ typedef enum {
 	#define VK_DESC_FORWARD_PLUS			18 /* SSBO set: light + tile lists (PBR fragment) */
 	#define VK_DESC_PBR_BLEND_LAYERS		19 /* array samplers: albedo/normal/orm × 8 */
 	#define VK_DESC_COUNT	20
-#else
-	#define VK_DESC_COUNT   5
-#endif
 
 #include "vk_procs.h"
 
@@ -289,7 +285,6 @@ typedef struct {
 	int abs_light;
 	int allow_discard;
 
-#ifdef USE_VK_PBR
 	uint32_t				vk_pbr_flags;
 	int32_t					lightmap_bundle;
 	uint8_t					pbr_vert_mode; /* 0=default gen_vert, 1=glTF GPU skin+morph variant */
@@ -301,7 +296,6 @@ typedef struct {
 	vec4_t					normalScale;
 	float					parallaxBias;
 	float					material_blend_sharpness;
-#endif
 	unsigned int			hasFlowmap : 1;	// water flowmap: flow vectors offset texture UVs
 	int acff; // none, rgb, rgba, alpha
 	struct {
@@ -340,7 +334,6 @@ typedef struct vkUniform_s {
 	// flowmap: x=flowSpeed, y=flowTime (seconds), z=phaseCycle (0..1), w=unused
 	vec4_t flowmapParams;
 
-#ifdef USE_VK_PBR
 	vec4_t pbrEmissiveScale;
 	vec4_t pbrClearcoatScale;
 	vec4_t pbrSheenScale;
@@ -371,7 +364,6 @@ typedef struct vkUniform_s {
 	vec4_t pbrSunShadowMeta;
 	/* Raster Ultra 1.8 surface evolution: x=wetness y=snow z=dust/soot w=rust/moss/damage */
 	vec4_t pbrSurfaceEvolution;
-#endif
 } vkUniform_t;
 
 typedef struct vkUniformCamera_s {
@@ -394,7 +386,6 @@ typedef struct vkUniformCamera_s {
 #define TESS_ENT2  (4096) // uniform with ent.color[2]
 #define TESS_ENV   (512) // mark shader stage with environment mapping
 
-#ifdef USE_VK_PBR
 /* Must not collide with TESS_ENT0 (1024). */
 #define TESS_PBR   				( 0x8000u ) // PBR shader variant, qtangent vertex attribute and eyePos uniform
 
@@ -436,7 +427,6 @@ typedef struct vkUniformCamera_s {
 
 #define RGBtosRGB(a)					(((a) < 0.0031308f) ? (12.92f * (a)) : (1.055f * pow((a), 0.41666f) - 0.055f))
 #define sRGBtoRGB(a)					(((a) <= 0.04045f)  ? ((a) / 12.92f) : (pow((((a) + 0.055f) / 1.055f), 2.4)) )
-#endif
 
 typedef struct textureMapType_s {
 	uint32_t			type;
@@ -446,7 +436,6 @@ typedef struct textureMapType_s {
 
 static const textureMapType_t textureMapTypes[] = {
 	{ 0,				"",			{ VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY, } },
-#ifdef USE_VK_PBR
 	{ (uint32_t)PHYS_RMO,			"_rmo",		{ VK_COMPONENT_SWIZZLE_B, VK_COMPONENT_SWIZZLE_R, VK_COMPONENT_SWIZZLE_G, VK_COMPONENT_SWIZZLE_ONE,	} },
 	{ (uint32_t)PHYS_RMOS,			"_rmos",	{ VK_COMPONENT_SWIZZLE_B, VK_COMPONENT_SWIZZLE_R, VK_COMPONENT_SWIZZLE_G, VK_COMPONENT_SWIZZLE_A, } },
 	{ (uint32_t)PHYS_MOXR,			"_moxr",	{ VK_COMPONENT_SWIZZLE_G, VK_COMPONENT_SWIZZLE_A, VK_COMPONENT_SWIZZLE_R, VK_COMPONENT_SWIZZLE_ONE } },
@@ -461,7 +450,6 @@ static const textureMapType_t textureMapTypes[] = {
 	{ (uint32_t)PHYS_ANISOTROPY,	"_aniso",	{ VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY } },
 	{ (uint32_t)PHYS_TRANSMISSION,	"_transmission", { VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY } },
 	{ (uint32_t)PHYS_SUBSURFACE,	"_subsurface", { VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY } },
-#endif
 };
 
 //
@@ -563,12 +551,10 @@ qboolean vk_bloom( void );
 qboolean vk_lens_flare( void );
 qboolean vk_ssao_pass( void );
 
-#ifdef USE_VBO
 void vk_release_vbo( void );
 void vk_release_stream_vbo( void );
 qboolean vk_alloc_vbo( const byte *vbo_data, int vbo_size );
 qboolean vk_upload_stream_vbo( const byte *vbo_data, int vbo_size );
-#endif
 void vk_update_mvp( const float *m );
 
 void vk_update_post_process_pipelines( void );
@@ -585,17 +571,13 @@ qboolean vk_create_gltf_buffers( const byte *vboData, int vboSize, const uint32_
 /* GPU occlusion culling: vk_occlusion.h */
 
 // cubemap
-#ifdef VK_CUBEMAP
 void vk_clear_cube_color( image_t *image, VkClearColorValue color );
 void vk_begin_cubemap_render_pass( void );
 void vk_create_cubemap_prefilter( void );
 void vk_destroy_cubemap_prefilter( void );
-#endif
 
-#ifdef VK_PBR_BRDFLUT
 void vk_create_brdflut_pipeline( void );
 void vk_create_brfdlut( void );
-#endif
 
 typedef struct vk_tess_s {
 	VkCommandBuffer command_buffer;
@@ -615,14 +597,9 @@ typedef struct vk_tess_s {
 	uint32_t		iqm_skin_offset;
 	uint32_t		iqm_morph_offset;
 	uint32_t		gltf_topo_offset;
-#ifdef USE_VK_PBR
 	uint32_t			camera_ubo_offset;
 	VkDeviceSize		buf_offset[10];
 	VkDeviceSize		vbo_offset[10];
-#else
-	VkDeviceSize		buf_offset[8];
-	VkDeviceSize		vbo_offset[8];
-#endif
 
 	VkBuffer		curr_index_buffer;
 	uint32_t		curr_index_offset;
@@ -695,9 +672,7 @@ typedef struct {
 		VkRenderPass reactive_stamp;	/* R8 MAX-blend stamp from OIT reveal */
 		VkRenderPass temporal_class_stamp;	/* R8 MAX-blend stamp WEAPON from depth */
 		VkRenderPass ssr;
-#ifdef VK_PBR_BRDFLUT
 		VkRenderPass brdflut;
-#endif
 		VkRenderPass cubemap;
 		VkRenderPass smaa_edge;
 		VkRenderPass smaa_blend;
@@ -713,9 +688,7 @@ typedef struct {
 	VkDescriptorSetLayout set_layout_storage;	// feedback buffer
 	VkDescriptorSetLayout set_layout_postfx_uniform;	// post-process params uniform buffer
 	VkDescriptorSetLayout set_layout_oit_shadow;	/* WBOIT: shadow SSBO + sun atlas */
-#ifdef USE_VK_PBR
 	VkDescriptorSetLayout set_layout_forward_plus;	/* light + tile SSBOs (compute cull + PBR fragment debug) */
-#endif
 
 	VkPipelineLayout pipeline_layout;			// default shaders
 	VkPipelineLayout pipeline_layout_storage;	// flare test shader layout
@@ -737,9 +710,7 @@ typedef struct {
 	VkPipelineLayout pipeline_layout_ssr;		// ssr (color + depth + push constants)
 	VkPipelineLayout pipeline_layout_atmosphere;	// atmosphere (push constants only)
 	VkPipelineLayout pipeline_layout_fp64_points;	// fp64 point cloud (push constants)
-#ifdef VK_PBR_BRDFLUT
 	VkPipelineLayout pipeline_layout_brdflut;
-#endif
 	VkDescriptorSetLayout volumetric_compute_layout;
 	VkDescriptorSetLayout volumetric_composite_layout;
 	VkDescriptorSetLayout volumetric_depth_resolve_layout;
@@ -1435,11 +1406,9 @@ typedef struct {
 		VkImageView image_view;
 	} capture;
 
-#ifdef VK_PBR_BRDFLUT
 	VkImage			brdflut_image;
 	VkImageView		brdflut_image_view;
 	VkDescriptorSet brdflut_image_descriptor;
-#endif
 
 	struct {
 		VkFramebuffer blur[VK_NUM_BLOOM_PASSES*2];
@@ -1458,9 +1427,7 @@ typedef struct {
 		VkFramebuffer overlay_compose[MAX_SWAPCHAIN_IMAGES];
 		VkFramebuffer screenmap;
 		VkFramebuffer capture;
-#ifdef VK_PBR_BRDFLUT
 		VkFramebuffer brdflut;
-#endif
 		VkFramebuffer cubemap[6];
 		VkFramebuffer smaa_edge;
 		VkFramebuffer smaa_blend;
@@ -1665,17 +1632,11 @@ typedef struct {
 	//
 	struct {
 		struct {
-#ifdef USE_VK_PBR
 			VkShaderModule gen[2][3][2][2][2]; // pbr[0,1], tx[0,1,2], cl[0,1] env0[0,1] fog[0,1]
 			/* +USE_GLTF_GPU_SKIN; last dim: 0=bind T, 1=Gram–Schmidt, 2=topology+MikkT-inspired average */
 			VkShaderModule gen_gltf_gpu[2][3][2][2][2][3];
 			VkShaderModule ident1[2][2][2][2]; // pbr[0,1], tx[0,1], env0[0,1] fog[0,1]
 			VkShaderModule fixed[2][2][2][2];  // pbr[0,1], tx[0,1], env0[0,1] fog[0,1]
-#else
-			VkShaderModule gen[3][2][2][2]; // tx[0,1,2], cl[0,1] env0[0,1] fog[0,1]
-			VkShaderModule ident1[2][2][2]; // tx[0,1], env0[0,1] fog[0,1]
-			VkShaderModule fixed[2][2][2];  // tx[0,1], env0[0,1] fog[0,1]
-#endif			
 			VkShaderModule light[2];        // fog[0,1]
 		} vert;
 		struct {
@@ -1686,7 +1647,6 @@ typedef struct {
 			VkShaderModule ui_vector_glyphlet_frag;
 			VkShaderModule ui_subpixel_text;
 			VkShaderModule flowmap[2];      // fog[0,1] - water flowmap
-#ifdef USE_VK_PBR
 			VkShaderModule gen[2][3][2][2]; // pbr[0,1], tx[0,1,2] cl[0,1] fog[0,1]
 			VkShaderModule gbuf_gen[3][2][2]; // tx[0,1,2] cl[0,1] fog[0,1], PBR deferred export
 			VkShaderModule ident1[2][2][2]; // pbr[0,1], tx[0,1], fog[0,1]
@@ -1695,25 +1655,12 @@ typedef struct {
 			VkShaderModule gbuf_fixed[2][2]; // tx[0,1], fog[0,1], PBR deferred export
 			VkShaderModule ent[2][1][2];    // pbr[0,1], tx[0], fog[0,1]
 			VkShaderModule gbuf_ent[1][2];   // tx[0], fog[0,1], PBR deferred export
-#else
-			VkShaderModule gen[3][2][2]; // tx[0,1,2] cl[0,1] fog[0,1]
-			VkShaderModule ident1[2][2]; // tx[0,1], fog[0,1]
-			VkShaderModule fixed[2][2];  // tx[0,1], fog[0,1]
-			VkShaderModule ent[1][2];    // tx[0], fog[0,1]
-#endif
 			VkShaderModule light[2][2];  // linear[0,1] fog[0,1]
 			/* r_hdr 3 (64-bit) variants; used when color_format is RGBA64F */
-#ifdef USE_VK_PBR
 			VkShaderModule gen_hdr64[2][3][2][2];
 			VkShaderModule ident1_hdr64[2][2][2];
 			VkShaderModule fixed_hdr64[2][2][2];
 			VkShaderModule ent_hdr64[2][1][2];
-#else
-			VkShaderModule gen_hdr64[3][2][2];
-			VkShaderModule ident1_hdr64[2][2];
-			VkShaderModule fixed_hdr64[2][2];
-			VkShaderModule ent_hdr64[1][2];
-#endif
 			VkShaderModule light_hdr64[2][2];
 			VkShaderModule flowmap_hdr64[2];
 		} frag;
@@ -1870,9 +1817,7 @@ typedef struct {
 		VkShaderModule dot_fs;
 		VkShaderModule dot_vs;
 
-#ifdef VK_PBR_BRDFLUT
 		VkShaderModule brdflut_fs;
-#endif
 		VkShaderModule filtercube_vs;
 		VkShaderModule filtercube_gm;
 		VkShaderModule irradiancecube_fs;
@@ -1963,9 +1908,7 @@ typedef struct {
 	VkPipeline ssao_depth_debug_pipeline;
 	VkPipeline ssr_pipeline;
 	VkPipeline atmosphere_pipeline;
-#ifdef VK_PBR_BRDFLUT
 	VkPipeline brdflut_pipeline;
-#endif
 
 	uint32_t frame_count;
 	qboolean active;
@@ -2134,12 +2077,8 @@ typedef struct {
 	qboolean smaaActive;
 	qboolean fxaaActive;
 	qboolean lensFlareActive;
-#ifdef USE_VK_PBR
 	qboolean pbrActive;
-#endif
-#ifdef VK_CUBEMAP
 	qboolean cubemapActive;
-#endif
 	qboolean pbr_ibl_using_hdr_fallback;
 	qboolean pbr_ibl_has_ready_local_cubemap;
 	int pbr_ibl_ready_cubemap_count;
