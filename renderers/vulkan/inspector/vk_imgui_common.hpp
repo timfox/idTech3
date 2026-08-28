@@ -33,7 +33,6 @@ extern "C" struct SDL_Window *SDL_window;
 #endif
 
 #ifdef USE_VULKAN
-#	define USE_VK_PBR
 #	include "../vk.h"
 #endif
 
