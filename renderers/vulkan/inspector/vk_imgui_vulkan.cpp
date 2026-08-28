@@ -17,7 +17,6 @@ SDL3 mouse position when the inspector wants input.
 extern "C" {
 #include "q_shared.h"
 #include "../vk_instance.h"
-#define USE_VK_PBR
 #include "../vk.h"
 #include "../vk_render_pass.h"
 }
