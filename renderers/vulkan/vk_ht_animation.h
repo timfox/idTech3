@@ -12,7 +12,6 @@ are Slice B–C — stubs only here for ownership documentation.
 
 #pragma once
 
-#ifdef USE_VULKAN
 
 #include "../common/tr_types.h"
 
@@ -234,4 +233,3 @@ void vk_ht_animation_memory_f( void );
 void vk_ht_animation_profile_f( void );
 void vk_ht_deformation_status_f( void );
 
-#endif /* USE_VULKAN */

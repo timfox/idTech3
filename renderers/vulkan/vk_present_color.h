@@ -1,6 +1,5 @@
 #pragma once
 
-#ifdef USE_VULKAN
 
 /*
  * Raster Ultra 1.10 — scene-linear HDR + display transform contract.
@@ -57,4 +56,3 @@ int vk_present_color_preferred_tonemap( void );
 
 void vk_present_color_status_f( void );
 
-#endif /* USE_VULKAN */

@@ -21,10 +21,8 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 */
 // tr_sky.c
 #include "tr_local.h"
-#ifdef USE_VULKAN
 #include "vk_sky_owner.h"
 #include "vk_scene_hdr_ownership.h"
-#endif
 
 #define SKY_SUBDIVISIONS		8
 #define HALF_SKY_SUBDIVISIONS	(SKY_SUBDIVISIONS/2)
@@ -460,19 +458,12 @@ static void DrawSkySide( image_t *image, const int mins[2], const int maxs[2] )
 	if ( tess.numIndexes )
 	{
 		GL_Bind( image );
-#ifdef USE_VULKAN
 		tess.svars.texcoordPtr[0] = tess.texCoords[0];
 
 		vk_bind_pipeline( vk.skybox_pipeline );
 		vk_bind_index();
 		vk_bind_geometry( TESS_XYZ | TESS_ST0 );
 		vk_draw_geometry( r_showsky->integer ? DEPTH_RANGE_ZERO : DEPTH_RANGE_ONE, qtrue );
-#else
-		qglVertexPointer( 3, GL_FLOAT, 16, tess.xyz );
-		qglTexCoordPointer( 2, GL_FLOAT, 0, tess.texCoords[0] );
-
-		R_DrawElements( tess.numIndexes, tess.indexes );
-#endif
 		tess.numVertexes = 0;
 		tess.numIndexes = 0;
 	}
@@ -761,7 +752,6 @@ void RB_StageIteratorSky( void ) {
 		return;
 	}
 
-#ifdef USE_VULKAN
 	/*
 	 * Raster Ultra 1.7: exclusive sky ownership.
 	 * Physical sky suppresses classic shells. HDR ownership draws scene-linear
@@ -774,11 +764,8 @@ void RB_StageIteratorSky( void ) {
 			return;
 		}
 	}
-#endif
 
-#ifdef USE_VBO
 	VBO_UnBind();
-#endif
 
 	// go through all the polygons and project them onto
 	// the sky box to see which blocks on each side need
@@ -789,39 +776,19 @@ void RB_StageIteratorSky( void ) {
 	// front of everything to allow developers to see how
 	// much sky is getting sucked in
 
-#ifdef USE_VULKAN
 	if ( r_showsky->integer ) {
 		tess.depthRange = DEPTH_RANGE_ZERO;
 	} else {
 		tess.depthRange = DEPTH_RANGE_ONE;
 	}
-#else
-	if ( r_showsky->integer ) {
-		qglDepthRange( 0.0, 0.0 );
-	} else {
-		qglDepthRange( sky_min_depth, 1.0 );
-	}
-#endif
 
 	// draw the outer skybox
 	if ( tess.shader->sky.outerbox[0] && tess.shader->sky.outerbox[0] != tr.defaultImage ) {
-#ifdef USE_VULKAN
 		if ( vk_sky_owner_wants_hdr_sky() ) {
 			vk_scene_hdr_note_writer( SCENE_HDR_SKY_ATMOSPHERE, "hdr_skybox_radiance_faces",
 				SCENE_HDR_WRITE_COMPOSE );
 		}
 		DrawSkyBox( tess.shader );
-#else
-		GL_ClientState( 1, CLS_NONE );
-		GL_ClientState( 0, CLS_TEXCOORD_ARRAY );
-
-		qglColor4f( tr.identityLight, tr.identityLight, tr.identityLight, 1.0 );
-
-		GL_State( 0 );
-		GL_Cull( CT_FRONT_SIDED );
-
-		DrawSkyBox( tess.shader );
-#endif
 	}
 
 	// generate the vertexes for all the clouds, which will be drawn
@@ -834,11 +801,7 @@ void RB_StageIteratorSky( void ) {
 	}
 
 	// back to normal depth range
-#ifdef USE_VULKAN
 	tess.depthRange = DEPTH_RANGE_NORMAL;
-#else
-	qglDepthRange( 0.0, 1.0 );
-#endif
 
 	// note that sky was drawn so we will draw a sun later
 	backEnd.skyRenderedThisView = qtrue;

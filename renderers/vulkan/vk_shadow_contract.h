@@ -5,7 +5,6 @@
  * See docs/SHADOW_CONTRACT.md
  */
 
-#ifdef USE_VULKAN
 
 #include "../common/tr_types.h"
 #include "../common/vulkan/vulkan.h"
@@ -71,5 +70,3 @@ void vk_shadow_contract_status_f( void );
 #ifdef __cplusplus
 }
 #endif
-
-#endif /* USE_VULKAN */

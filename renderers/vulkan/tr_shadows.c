@@ -132,32 +132,21 @@ static void R_CalcShadowEdges( void ) {
 				if ( tess.numIndexes > ARRAY_LEN( tess.indexes ) - 6 ) {
 					goto done;
 				}
-#ifdef USE_VULKAN
 				tess.indexes[ tess.numIndexes + 0 ] = ia;
 				tess.indexes[ tess.numIndexes + 1 ] = ib;
 				tess.indexes[ tess.numIndexes + 2 ] = ia + tess.numVertexes;
 				tess.indexes[ tess.numIndexes + 3 ] = ib;
 				tess.indexes[ tess.numIndexes + 4 ] = ib + tess.numVertexes;
 				tess.indexes[ tess.numIndexes + 5 ] = ia + tess.numVertexes;
-#else
-				tess.indexes[ tess.numIndexes + 0 ] = ia;
-				tess.indexes[ tess.numIndexes + 1 ] = ia + tess.numVertexes;
-				tess.indexes[ tess.numIndexes + 2 ] = ib;
-				tess.indexes[ tess.numIndexes + 3 ] = ib;
-				tess.indexes[ tess.numIndexes + 4 ] = ia + tess.numVertexes;
-				tess.indexes[ tess.numIndexes + 5 ] = ib + tess.numVertexes;
-#endif
 				tess.numIndexes += 6;
 			}
 		}
 	}
 done:
-#ifdef USE_VULKAN
 	tess.numVertexes *= 2;
 	// Shadow pipelines have colorWriteMask = 0, so only position data is needed.
 	// Binding 1 (color) and 2 (texcoord) are declared by TYPE_SINGLE_TEXTURE but
 	// left unbound — the GPU never reads them.
-#endif
 	;
 }
 
@@ -178,22 +167,13 @@ void RB_ShadowTessEnd( void ) {
 	int		i;
 	int		numTris;
 	vec3_t	lightDir;
-#ifdef USE_VULKAN
 	uint32_t pipeline[2];
-#else
-	GLboolean rgba[4];
-#endif
 
 	if ( glConfig.stencilBits < 4 ) {
 		return;
 	}
 
-#ifdef USE_PMLIGHT
-	if ( r_dlightMode->integer == 2 && r_shadows->integer == 2 )
-		VectorCopy( backEnd.currentEntity->shadowLightDir, lightDir );
-	else
-#endif
-		VectorCopy( backEnd.currentEntity->lightDir, lightDir );
+	VectorCopy( backEnd.currentEntity->lightDir, lightDir );
 
 	// project vertexes away from light direction, clipped to BSP walls
 	{
@@ -389,15 +369,9 @@ void RB_ShadowTessEnd( void ) {
 		for ( i = 0; i < numLitTris; i++ ) {
 			if ( tess.numIndexes > ARRAY_LEN( tess.indexes ) - 3 )
 				break;
-#ifdef USE_VULKAN
 			tess.indexes[ tess.numIndexes + 0 ] = litTriIndexes[ i*3 + 0 ] + nvOrig;
 			tess.indexes[ tess.numIndexes + 1 ] = litTriIndexes[ i*3 + 1 ] + nvOrig;
 			tess.indexes[ tess.numIndexes + 2 ] = litTriIndexes[ i*3 + 2 ] + nvOrig;
-#else
-			tess.indexes[ tess.numIndexes + 0 ] = litTriIndexes[ i*3 + 0 ] + nvOrig;
-			tess.indexes[ tess.numIndexes + 1 ] = litTriIndexes[ i*3 + 2 ] + nvOrig;
-			tess.indexes[ tess.numIndexes + 2 ] = litTriIndexes[ i*3 + 1 ] + nvOrig;
-#endif
 			tess.numIndexes += 3;
 		}
 	}
@@ -408,21 +382,14 @@ void RB_ShadowTessEnd( void ) {
 		for ( i = 0; i < numLitTris; i++ ) {
 			if ( tess.numIndexes > ARRAY_LEN( tess.indexes ) - 3 )
 				break;
-#ifdef USE_VULKAN
 			tess.indexes[ tess.numIndexes + 0 ] = litTriIndexes[ i*3 + 0 ];
 			tess.indexes[ tess.numIndexes + 1 ] = litTriIndexes[ i*3 + 2 ];
 			tess.indexes[ tess.numIndexes + 2 ] = litTriIndexes[ i*3 + 1 ];
-#else
-			tess.indexes[ tess.numIndexes + 0 ] = litTriIndexes[ i*3 + 0 ];
-			tess.indexes[ tess.numIndexes + 1 ] = litTriIndexes[ i*3 + 1 ];
-			tess.indexes[ tess.numIndexes + 2 ] = litTriIndexes[ i*3 + 2 ];
-#endif
 			tess.numIndexes += 3;
 		}
 	}
 
 	// draw the silhouette edges
-#ifdef USE_VULKAN
 	GL_Bind( tr.whiteImage );
 
 	// mirrors have the culling order reversed
@@ -442,49 +409,6 @@ void RB_ShadowTessEnd( void ) {
 	vk_draw_geometry( DEPTH_RANGE_NORMAL, qtrue );
 
 	tess.numVertexes /= 2;
-#else
-	GL_ClientState( 1, CLS_NONE );
-	GL_ClientState( 0, CLS_NONE );
-
-	qglVertexPointer( 3, GL_FLOAT, sizeof( tess.xyz[0] ), tess.xyz );
-
-	if ( qglLockArraysEXT )
-		qglLockArraysEXT( 0, tess.numVertexes*2 );
-
-	qglDisable( GL_TEXTURE_2D );
-	//GL_Bind( tr.whiteImage );
-	GL_State( GLS_SRCBLEND_ONE | GLS_DSTBLEND_ZERO );
-	qglColor4f( 0.2f, 0.2f, 0.2f, 1.0f );
-
-	// don't write to the color buffer
-	qglGetBooleanv( GL_COLOR_WRITEMASK, rgba );
-	qglColorMask( GL_FALSE, GL_FALSE, GL_FALSE, GL_FALSE );
-
-	qglEnable( GL_STENCIL_TEST );
-	qglStencilFunc( GL_EQUAL, 0, 0x80 );   // skip entity-marked pixels (bit 7 set)
-	qglStencilMask( 0x7F );                 // only write shadow count to bits 0-6
-
-	GL_Cull( CT_BACK_SIDED );
-	qglStencilOp( GL_KEEP, GL_KEEP, GL_INCR );
-
-	R_DrawElements( tess.numIndexes, tess.indexes );
-
-	GL_Cull( CT_FRONT_SIDED );
-	qglStencilOp( GL_KEEP, GL_KEEP, GL_DECR );
-
-	R_DrawElements( tess.numIndexes, tess.indexes );
-
-	if ( qglUnlockArraysEXT )
-		qglUnlockArraysEXT();
-
-	qglStencilMask( 0xFF );
-	qglDisable( GL_STENCIL_TEST );
-
-	// re-enable writing to the color buffer
-	qglColorMask(rgba[0], rgba[1], rgba[2], rgba[3]);
-
-	qglEnable( GL_TEXTURE_2D );
-#endif
 
 	backEnd.doneShadows = qtrue;
 
@@ -503,10 +427,8 @@ overlap and double darken.
 =================
 */
 void RB_ShadowFinish( void ) {
-#ifdef USE_VULKAN
 	float tmp[16];
 	int i;
-#endif
 	static const vec3_t verts[4] = {
 		{ -100, 100, -10 },
 		{  100, 100, -10 },
@@ -527,7 +449,6 @@ void RB_ShadowFinish( void ) {
 		return;
 	}
 
-#ifdef USE_VULKAN
 	GL_Bind( tr.whiteImage );
 
 	for ( i = 0; i < 4; i++ )
@@ -558,43 +479,6 @@ void RB_ShadowFinish( void ) {
 	tess.numIndexes = 0;
 	tess.numVertexes = 0;
 
-#else
-	qglEnable( GL_STENCIL_TEST );
-	qglStencilFunc( GL_NOTEQUAL, 0, 0x7F );  // check shadow bits 0-6 only
-
-	qglDisable( GL_CLIP_PLANE0 );
-	GL_Cull( CT_TWO_SIDED );
-
-	qglDisable( GL_TEXTURE_2D );
-
-	// override projection to avoid portal oblique near plane clipping
-	qglMatrixMode( GL_PROJECTION );
-	qglPushMatrix();
-	qglLoadIdentity();
-	qglOrtho( -100, 100, -100, 100, -100, 100 );
-	qglMatrixMode( GL_MODELVIEW );
-	qglLoadIdentity();
-
-	qglColor4f( 0.6f, 0.6f, 0.6f, 1 );
-	GL_State( GLS_SRCBLEND_DST_COLOR | GLS_DSTBLEND_ZERO | GLS_DEPTHTEST_DISABLE );
-
-	//qglColor4f( 1, 0, 0, 1 );
-	//GL_State( GLS_SRCBLEND_ONE | GLS_DSTBLEND_ZERO | GLS_DEPTHTEST_DISABLE );
-
-	GL_ClientState( 0, CLS_NONE );
-	qglVertexPointer( 3, GL_FLOAT, 0, verts );
-	qglDrawArrays( GL_TRIANGLE_STRIP, 0, 4 );
-
-	qglColor4f( 1, 1, 1, 1 );
-	qglDisable( GL_STENCIL_TEST );
-
-	// restore projection
-	qglMatrixMode( GL_PROJECTION );
-	qglPopMatrix();
-	qglMatrixMode( GL_MODELVIEW );
-
-	qglEnable( GL_TEXTURE_2D );
-#endif
 }
 
 
@@ -622,12 +506,7 @@ void RB_ProjectionShadowDeform( void ) {
 
 	groundDist = backEnd.or.origin[2] - backEnd.currentEntity->e.shadowPlane;
 
-#ifdef USE_PMLIGHT
-	if ( r_dlightMode->integer == 2 && r_shadows->integer == 2 )
-		VectorCopy( backEnd.currentEntity->shadowLightDir, lightDir );
-	else
-#endif
-		VectorCopy( backEnd.currentEntity->lightDir, lightDir );
+	VectorCopy( backEnd.currentEntity->lightDir, lightDir );
 
 	d = DotProduct( lightDir, ground );
 	// don't let the shadows get too long or go negative

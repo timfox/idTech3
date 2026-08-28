@@ -209,7 +209,6 @@ static void MakeMeshNormals( int width, int height, srfVert_t ctrl[MAX_GRID_SIZE
 	}
 }
 
-#ifdef USE_VK_PBR
 static qboolean R_CalcTangentVectors( srfVert_t * dv[3] )
 {
 	int             i;
@@ -340,7 +339,6 @@ static int MakeMeshIndexes( int width, int height, glIndex_t indexes[(MAX_GRID_S
 
 	return numIndexes;
 }
-#endif
 
 /*
 ============
@@ -501,10 +499,8 @@ srfGridMesh_t *R_SubdividePatchToGrid( int width, int height,
 	memset( &next, 0, sizeof( next ) );
 	memset( &mid, 0, sizeof( mid ) );
 
-#ifdef USE_VK_PBR
 	int			numIndexes;
 	static glIndex_t indexes[(MAX_GRID_SIZE-1)*(MAX_GRID_SIZE-1)*2*3];
-#endif
 
 	for ( i = 0 ; i < width ; i++ ) {
 		for ( j = 0 ; j < height ; j++ ) {
@@ -634,7 +630,6 @@ srfGridMesh_t *R_SubdividePatchToGrid( int width, int height,
 		height--;
 	}
 
-#if 1
 	// flip for longest tristrips as an optimization
 	// the results should be visually identical with or
 	// without this step
@@ -646,15 +641,12 @@ srfGridMesh_t *R_SubdividePatchToGrid( int width, int height,
 		height = t;
 		InvertCtrl( width, height, ctrl );
 	}
-#endif
 
 	// calculate normals
 	MakeMeshNormals( width, height, ctrl );
 
-#ifdef USE_VK_PBR
 	numIndexes = MakeMeshIndexes( width, height, indexes );
 	MakeMeshTangentVectors( width, height, ctrl, numIndexes, indexes );
-#endif
 
 	return R_CreateSurfaceGridMesh( width, height, ctrl, errorTable );
 }
