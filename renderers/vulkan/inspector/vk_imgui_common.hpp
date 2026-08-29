@@ -32,18 +32,13 @@ extern cvar_t *r_studio_tools;
 extern "C" struct SDL_Window *SDL_window;
 #endif
 
-#ifdef USE_VULKAN
-#	define USE_VK_PBR
 #	include "../vk.h"
-#endif
 
 #include "vk_imgui.h"
 
-#ifdef USE_VULKAN
 extern "C" {
 #include "vk_imgui_scene.h"
 }
-#endif
 
 extern vkImguiInspector_t vkInspector;
 extern vkImguiWindows_t vkWindows;
