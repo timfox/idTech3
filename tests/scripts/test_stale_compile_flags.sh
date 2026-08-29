@@ -27,13 +27,14 @@ STALE_PATTERNS=(
 	'^[[:space:]]*#[[:space:]]*ifdef[[:space:]]+USE_VK_PBR\b'
 	'^[[:space:]]*#[[:space:]]*ifndef[[:space:]]+USE_VK_PBR\b'
 	'^[[:space:]]*#[[:space:]]*ifndef[[:space:]]+USE_VULKAN\b'
+	'^[[:space:]]*#[[:space:]]*ifdef[[:space:]]+USE_VULKAN\b'
 	'^[[:space:]]*#[[:space:]]*ifdef[[:space:]]+VK_CUBEMAP\b'
 	'^[[:space:]]*#[[:space:]]*ifdef[[:space:]]+VK_PBR_BRDFLUT\b'
 )
 
 for pat in "${STALE_PATTERNS[@]}"; do
-	if grep -REq "$pat" "$VK_ROOT" --include='*.c' --include='*.h' --include='*.cpp' --include='*.inc'; then
-		grep -REn "$pat" "$VK_ROOT" --include='*.c' --include='*.h' --include='*.cpp' --include='*.inc' >&2 || true
+	if grep -REq "$pat" "$VK_ROOT" --include='*.c' --include='*.h' --include='*.cpp' --include='*.hpp' --include='*.inc'; then
+		grep -REn "$pat" "$VK_ROOT" --include='*.c' --include='*.h' --include='*.cpp' --include='*.hpp' --include='*.inc' >&2 || true
 		fail "stale compile-time guard matched: $pat"
 	fi
 done
@@ -45,7 +46,7 @@ from pathlib import Path
 root = Path(sys.argv[1])
 bad = False
 for p in sorted(root.rglob('*')):
-    if p.suffix not in {'.c', '.h', '.cpp', '.inc'}:
+    if p.suffix not in {'.c', '.h', '.cpp', '.hpp', '.inc'}:
         continue
     stack = []
     for i, line in enumerate(p.read_text().splitlines(), 1):

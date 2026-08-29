@@ -26,7 +26,7 @@ ALWAYS_ON_MACROS = frozenset({
 
 
 def should_process(path: Path) -> bool:
-    if path.suffix not in {".c", ".h", ".cpp", ".inc"}:
+    if path.suffix not in {".c", ".h", ".cpp", ".hpp", ".inc"}:
         return False
     if path.name in SKIP_NAMES:
         return False
