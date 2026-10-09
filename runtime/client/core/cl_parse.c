@@ -542,6 +542,8 @@ static void CL_ParseServerInfo( void )
 		Info_ValueForKey(serverInfo, "sv_dlURL"),
 		sizeof(clc.sv_dlURL));
 
+	/* Compatibility idea credit: Trinity Engine advertises `vr_support=1` in
+	 * serverinfo before a VR client may switch to its extended usercmd format. */
 	clc.serverSupportsVR = ( atoi( Info_ValueForKey( serverInfo, "vr_support" ) ) == 1 );
 
 	/* remove ending slash in URLs */

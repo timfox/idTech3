@@ -340,8 +340,8 @@ typedef struct {
 	int		demoDeltaNum;
 	int		demoMessageSequence;
 
-	// Server advertises vr_support=1; VR clients pack head angles into
-	// usercmd buttons bits 12-25 and write 32-bit buttons.
+	// Compatibility design credit: Trinity Engine/Trinity VR. The server
+	// advertises vr_support=1 before VR clients use 32-bit usercmd buttons.
 	qboolean	serverSupportsVR;
 
 
