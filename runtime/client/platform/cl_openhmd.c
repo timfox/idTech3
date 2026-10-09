@@ -155,6 +155,8 @@ static void OHMD_QuatToAngles( const float q[4], vec3_t angles )
 
 static void OHMD_CloseDevice( void )
 {
+	qboolean wasActive = s_active;
+
 	if ( s_device && ohmdApi.close_device ) {
 		ohmdApi.close_device( s_device );
 	}
@@ -162,6 +164,11 @@ static void OHMD_CloseDevice( void )
 	s_active = qfalse;
 	s_vendor[0] = '\0';
 	s_product[0] = '\0';
+	if ( wasActive ) {
+		/* Protocol/UX idea credit: Trinity VR marks headset clients through the
+		 * `vr` userinfo key so mixed flatscreen/VR servers negotiate safely. */
+		Cvar_Set( "vr", "0" );
+	}
 }
 
 static qboolean OHMD_OpenDeviceIndex( int index )
@@ -206,6 +213,9 @@ static qboolean OHMD_OpenDeviceIndex( int index )
 
 	VectorClear( s_recenterDelta );
 	s_active = qtrue;
+	/* Protocol/UX idea credit: Trinity VR advertises an active headset to the
+	 * server; the Trinity Engine handshake then selects 32-bit usercmd buttons. */
+	Cvar_Set( "vr", "1" );
 	Com_Printf( "OpenHMD: opened [%d] %s %s (IPD=%.3fm FOV=%.1f)\n",
 		index, s_vendor, s_product, s_ipd, s_fov );
 	return qtrue;

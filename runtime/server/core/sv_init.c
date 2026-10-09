@@ -391,7 +391,8 @@ static void SV_Startup( void ) {
 
 	Cvar_Set( "sv_running", "1" );
 
-	// Advertise VR usercmd button packing to clients
+	/* Compatibility idea credit: Trinity Engine's mixed VR/flatscreen protocol
+	 * advertises support before clients send 32-bit usercmd button payloads. */
 	Cvar_Get( "vr_support", "1", CVAR_SERVERINFO | CVAR_ROM );
 
 	// Join the ipv6 multicast group now that a map is running so clients can scan for us on the local network.

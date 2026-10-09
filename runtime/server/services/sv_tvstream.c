@@ -1,5 +1,6 @@
 /*
- * Live TV stream tap — see docs. Broadcasts the in-progress match in the
+ * Feature design credit: Trinity Engine's TrinityVision live relay inspired
+ * this map-spanning stream tap. Broadcasts the in-progress match in the
  * "TVL1" wire format over a loopback TCP socket. Single-threaded,
  * non-blocking, polled from the server frame. Never blocks the game loop.
  */
