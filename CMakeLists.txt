@@ -201,6 +201,14 @@ else()
 endif()
 # --- End FindOpenAL.cmake
 
+# Vulkan headers are supplied by the system SDK on Linux/Windows and by the
+# Homebrew vulkan-headers keg on macOS CI.
+find_path(VULKAN_INCLUDE_DIR
+  NAMES vulkan/vulkan.h
+  PATH_SUFFIXES include
+  PATHS ${CMAKE_PREFIX_PATH} /usr/local /usr /opt/local /opt /opt/homebrew
+)
+
 if(NOT DEFINED USE_OPUS)
   option(USE_OPUS "Enable Opus codec support" ON)
 endif()
@@ -1236,6 +1244,24 @@ if(BUILD_FREETYPE)
   endif()
 endif()
 
+# Collada conversion is optional and depends on an external FCollada build.
+# Detect it before assembling qcommon so the ABI stub is selected consistently.
+set(_IDTECH3_FCOLLADA_DEFAULT OFF)
+if(EXISTS "${CMAKE_SOURCE_DIR}/third_party/fcollada/lib/libFColladaSR.a")
+	set(_IDTECH3_FCOLLADA_DEFAULT ON)
+endif()
+option(USE_COLLADA_ASSETS "Enable engine-owned Collada asset support" ${_IDTECH3_FCOLLADA_DEFAULT})
+if(USE_COLLADA_ASSETS)
+	set(IDTECH3_FCOLLADA_ROOT "${CMAKE_SOURCE_DIR}/third_party/fcollada" CACHE PATH
+		"Path to the imported FCollada dependency used by engine Collada conversion")
+	set(IDTECH3_FCOLLADA_LIBRARY "${IDTECH3_FCOLLADA_ROOT}/lib/libFColladaSR.a" CACHE FILEPATH
+		"FCollada static library")
+	if(NOT EXISTS "${IDTECH3_FCOLLADA_LIBRARY}")
+		message(WARNING "Collada asset support disabled: FCollada library not found at ${IDTECH3_FCOLLADA_LIBRARY}")
+		set(USE_COLLADA_ASSETS OFF)
+	endif()
+endif()
+
 include(${CMAKE_SOURCE_DIR}/cmake/EngineQcommonSources.cmake)
 include(${CMAKE_SOURCE_DIR}/cmake/engine/AsmSources.cmake)
 idtech3_init_qcommon_sources()
@@ -1244,6 +1270,10 @@ include(${CMAKE_SOURCE_DIR}/cmake/IdTech3IncludeDirs.cmake)
 include(${CMAKE_SOURCE_DIR}/cmake/IdTech3QcommonExtensions.cmake)
 idtech3_append_research_qcommon_sources()
 idtech3_append_open_world_qcommon_sources()
+if(NOT USE_COLLADA_ASSETS)
+	# Keep the game trap ABI linkable when the optional FCollada converter is absent.
+	list(APPEND QCOMMON_SRCS modules/collada/collada_asset_stub.c)
+endif()
 # exclude platform-dependent QVM JIT compilers; add the active backend below
 list(FILTER QCOMMON_SRCS EXCLUDE REGEX ".*vm_(aarch64|armv7l|powerpc|x86)\\.c")
 # exclude optional network modules; add when options enabled
@@ -2198,6 +2228,9 @@ IF(USE_RENDERER_DLOPEN)
 	# engine/ so #include "platform/android/..." resolves without relying only on the repo-root platform symlink
 	target_include_directories(${RENDERER_PREFIX}_vulkan${RENDEXT} PRIVATE ${CMAKE_SOURCE_DIR}/engine)
 	target_include_directories(${RENDERER_PREFIX}_vulkan${RENDEXT} PRIVATE ${IDTECH3_DIR_ENGINE_CORE})
+	if(VULKAN_INCLUDE_DIR)
+		target_include_directories(${RENDERER_PREFIX}_vulkan${RENDEXT} PRIVATE ${VULKAN_INCLUDE_DIR})
+	endif()
 	idtech3_vulkan_extension_include_dirs(${RENDERER_PREFIX}_vulkan${RENDEXT})
 	idtech3_apply_research_include_dirs(${RENDERER_PREFIX}_vulkan${RENDEXT})
 	if(USE_FREEUSD)
@@ -2284,6 +2317,9 @@ ELSE()
 	target_include_directories(${RENDERER_PREFIX}_vulkan PRIVATE ${CMAKE_SOURCE_DIR})
 	target_include_directories(${RENDERER_PREFIX}_vulkan PRIVATE ${CMAKE_SOURCE_DIR}/engine)
 	target_include_directories(${RENDERER_PREFIX}_vulkan PRIVATE ${IDTECH3_DIR_ENGINE_CORE})
+	if(VULKAN_INCLUDE_DIR)
+		target_include_directories(${RENDERER_PREFIX}_vulkan PRIVATE ${VULKAN_INCLUDE_DIR})
+	endif()
 	idtech3_vulkan_extension_include_dirs(${RENDERER_PREFIX}_vulkan)
 	idtech3_apply_research_include_dirs(${RENDERER_PREFIX}_vulkan)
 	if(USE_FREEUSD)
@@ -2503,7 +2539,8 @@ target_include_directories(q3ui PRIVATE
 	${CMAKE_SOURCE_DIR}
 	${CMAKE_SOURCE_DIR}/engine/platform
 	${CMAKE_SOURCE_DIR}/runtime/client
-	${CMAKE_SOURCE_DIR}/modules/audio)
+	${CMAKE_SOURCE_DIR}/modules/audio
+	${CMAKE_SOURCE_DIR}/third_party/libzstd)
 ENDIF()
 
 if(USE_LOCAL_HEADERS AND WIN32)
@@ -2737,7 +2774,14 @@ if(USE_ENGINE_MATH)
     ${IDTECH3_DIR_ENGINE_CORE}
   )
   if(NOT MSVC)
-    target_compile_options(idtech3_math PRIVATE -Wno-unused-parameter)
+    target_compile_options(idtech3_math PRIVATE
+      -Wno-unused-parameter
+      # Matrix3D intentionally uses a legacy anonymous union/struct layout;
+      # its constructor order follows the public matrix notation rather than
+      # the compiler's union member declaration order.
+      -Wno-pedantic
+      -Wno-reorder
+    )
   endif()
   message(STATUS "Engine math module: enabled")
 endif()
@@ -2800,14 +2844,9 @@ if(USE_RTS_SIM)
 endif()
 
 # --- Collada asset module ---
-option(USE_COLLADA_ASSETS "Enable engine-owned Collada asset support" ON)
 if(USE_COLLADA_ASSETS)
   enable_language(CXX)
   find_package(LibXml2 REQUIRED)
-  set(IDTECH3_FCOLLADA_ROOT "/home/tim/Desktop/rts/libraries/source/fcollada" CACHE PATH
-    "Path to the imported FCollada dependency used by engine Collada conversion")
-  set(IDTECH3_FCOLLADA_LIBRARY "${IDTECH3_FCOLLADA_ROOT}/lib/libFColladaSR.a" CACHE FILEPATH
-    "FCollada static library")
   ADD_LIBRARY(collada_asset_module STATIC
     modules/collada/collada_asset.cpp
     modules/collada/converter/CommonConvert.cpp

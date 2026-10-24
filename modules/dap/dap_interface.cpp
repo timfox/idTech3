@@ -313,7 +313,13 @@ void ServerThread( std::string address, int port ) {
 	}
 	if ( address.empty() ) {
 		serverAddr.sin_addr.s_addr = htonl( INADDR_LOOPBACK );
-	} else if ( inet_pton( AF_INET, address.c_str(), &serverAddr.sin_addr ) != 1 ) {
+	} else if (
+#ifdef _WIN32
+		InetPtonA( AF_INET, address.c_str(), &serverAddr.sin_addr ) != 1
+#else
+		inet_pton( AF_INET, address.c_str(), &serverAddr.sin_addr ) != 1
+#endif
+	) {
 		Com_Printf( S_COLOR_YELLOW "dap: invalid address '%s'\n", address.c_str() );
 		CloseSocket( g_serverSocket );
 		g_running = false;

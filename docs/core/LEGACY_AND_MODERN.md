@@ -33,7 +33,7 @@ Enable anything from `full` on a `game` build: `-DUSE_RESEARCH_EXTENSIONS=ON`, `
 2. **CMake manifests** use `IDTECH3_DIR_*` for includes and explicit client lists; `idtech3_legacy_src()` keeps AUX strip/append paths stable (Phase 5b).
 2. **`./scripts/q3_openarena_compat_check.sh`** passes on **`core`** profile builds.
 3. **QVM** remains in `vm.c`; native-first loading unchanged.
-4. **Public game API** — traps, `g_*` where exposed to QVM, pk3/fs layout — stable per [CLAUDE.md](../../CLAUDE.md) constitution.
+4. **Public game API** — traps, `g_*` where exposed to QVM, pk3/fs layout — stable under the repository's compatibility policy.
 5. **Deprecation shims** — one release minimum ([DEPRECATION_POLICY.md](../DEPRECATION_POLICY.md)).
 
 CI wiring: `test_legacy_intact.sh`, `test_repository_layout_2026.sh`, profile matrix in `.github/workflows/build.yml`.
