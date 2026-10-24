@@ -201,6 +201,14 @@ else()
 endif()
 # --- End FindOpenAL.cmake
 
+# Vulkan headers are supplied by the system SDK on Linux/Windows and by the
+# Homebrew vulkan-headers keg on macOS CI.
+find_path(VULKAN_INCLUDE_DIR
+  NAMES vulkan/vulkan.h
+  PATH_SUFFIXES include
+  PATHS ${CMAKE_PREFIX_PATH} /usr/local /usr /opt/local /opt /opt/homebrew
+)
+
 if(NOT DEFINED USE_OPUS)
   option(USE_OPUS "Enable Opus codec support" ON)
 endif()
@@ -2220,6 +2228,9 @@ IF(USE_RENDERER_DLOPEN)
 	# engine/ so #include "platform/android/..." resolves without relying only on the repo-root platform symlink
 	target_include_directories(${RENDERER_PREFIX}_vulkan${RENDEXT} PRIVATE ${CMAKE_SOURCE_DIR}/engine)
 	target_include_directories(${RENDERER_PREFIX}_vulkan${RENDEXT} PRIVATE ${IDTECH3_DIR_ENGINE_CORE})
+	if(VULKAN_INCLUDE_DIR)
+		target_include_directories(${RENDERER_PREFIX}_vulkan${RENDEXT} PRIVATE ${VULKAN_INCLUDE_DIR})
+	endif()
 	idtech3_vulkan_extension_include_dirs(${RENDERER_PREFIX}_vulkan${RENDEXT})
 	idtech3_apply_research_include_dirs(${RENDERER_PREFIX}_vulkan${RENDEXT})
 	if(USE_FREEUSD)
@@ -2306,6 +2317,9 @@ ELSE()
 	target_include_directories(${RENDERER_PREFIX}_vulkan PRIVATE ${CMAKE_SOURCE_DIR})
 	target_include_directories(${RENDERER_PREFIX}_vulkan PRIVATE ${CMAKE_SOURCE_DIR}/engine)
 	target_include_directories(${RENDERER_PREFIX}_vulkan PRIVATE ${IDTECH3_DIR_ENGINE_CORE})
+	if(VULKAN_INCLUDE_DIR)
+		target_include_directories(${RENDERER_PREFIX}_vulkan PRIVATE ${VULKAN_INCLUDE_DIR})
+	endif()
 	idtech3_vulkan_extension_include_dirs(${RENDERER_PREFIX}_vulkan)
 	idtech3_apply_research_include_dirs(${RENDERER_PREFIX}_vulkan)
 	if(USE_FREEUSD)

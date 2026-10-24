@@ -856,6 +856,7 @@ jobs:
         run: |
           SDL3_PREFIX=$(brew --prefix sdl3)
           OPENAL_PREFIX=$(brew --prefix openal-soft)
+          VULKAN_HEADERS_PREFIX=$(brew --prefix vulkan-headers)
           mkdir -p build-vk-${{ matrix.btype }}
           cmake -S . -B build-vk-${{ matrix.btype }} \
             -DCMAKE_BUILD_TYPE=${{ matrix.btype }} \
@@ -864,6 +865,7 @@ jobs:
             -DSDL3_DIR="${SDL3_PREFIX}/lib/cmake/SDL3" \
             -DOPENAL_INCLUDE_DIR="${OPENAL_PREFIX}/include" \
             -DOPENAL_LIBRARY="${OPENAL_PREFIX}/lib/libopenal.dylib" \
+            -DVULKAN_INCLUDE_DIR="${VULKAN_HEADERS_PREFIX}/include" \
             -DUSE_STB_TRUETYPE=ON \
             -DBUILD_FREETYPE=ON \
             -DENABLE_FORTIFY_SOURCE=OFF \
@@ -873,7 +875,7 @@ jobs:
             -DRENDERER_DEFAULT=vulkan \
             -DSKIP_IDPAK_CHECK=ON \
             -DSKIP_SHADER_REGEN=ON \
-            -DCMAKE_INCLUDE_PATH="${OPENAL_PREFIX}/include" \
+            -DCMAKE_INCLUDE_PATH="${OPENAL_PREFIX}/include;${VULKAN_HEADERS_PREFIX}/include" \
             -DCMAKE_LIBRARY_PATH="${OPENAL_PREFIX}/lib" \
             -Wno-dev
           cmake --build build-vk-${{ matrix.btype }} -j$(sysctl -n hw.logicalcpu)
