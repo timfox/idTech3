@@ -2774,7 +2774,14 @@ if(USE_ENGINE_MATH)
     ${IDTECH3_DIR_ENGINE_CORE}
   )
   if(NOT MSVC)
-    target_compile_options(idtech3_math PRIVATE -Wno-unused-parameter)
+    target_compile_options(idtech3_math PRIVATE
+      -Wno-unused-parameter
+      # Matrix3D intentionally uses a legacy anonymous union/struct layout;
+      # its constructor order follows the public matrix notation rather than
+      # the compiler's union member declaration order.
+      -Wno-pedantic
+      -Wno-reorder
+    )
   endif()
   message(STATUS "Engine math module: enabled")
 endif()
