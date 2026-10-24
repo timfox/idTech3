@@ -118,7 +118,7 @@
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
-      <AdditionalIncludeDirectories>$(OpenSslRoot)\include;..\..\..;..\..\..\..\runtime\server;..\..\..\external\src\jpeg;..\..\..\..\third_party\libzstd;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(OpenSslRoot)\include;..\..\..;..\..\..\..\runtime\server;..\..\..\..\modules\botlib;..\..\..\..\modules\physics;..\..\..\..\modules\world;..\..\..\external\src\jpeg;..\..\..\..\third_party\libzstd;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <Optimization>Disabled</Optimization>
       <PreprocessorDefinitions>WIN32;DEDICATED;_DEBUG;_WINDOWS;_CRT_SECURE_NO_DEPRECATE;_WINSOCK_DEPRECATED_NO_WARNINGS;USE_DTLS=1;USE_OPEN_WORLD=1;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <BasicRuntimeChecks>EnableFastChecks</BasicRuntimeChecks>
@@ -150,7 +150,7 @@
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>
-      <AdditionalIncludeDirectories>$(OpenSslRoot)\include;..\..\..;..\..\..\..\runtime\server;..\..\..\external\src\jpeg;..\..\..\..\third_party\libzstd;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(OpenSslRoot)\include;..\..\..;..\..\..\..\runtime\server;..\..\..\..\modules\botlib;..\..\..\..\modules\physics;..\..\..\..\modules\world;..\..\..\external\src\jpeg;..\..\..\..\third_party\libzstd;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <Optimization>Disabled</Optimization>
       <PreprocessorDefinitions>WIN32;DEDICATED;_DEBUG;_WINDOWS;_CRT_SECURE_NO_DEPRECATE;_WINSOCK_DEPRECATED_NO_WARNINGS;USE_DTLS=1;USE_OPEN_WORLD=1;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <BasicRuntimeChecks>EnableFastChecks</BasicRuntimeChecks>
@@ -180,7 +180,7 @@
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|ARM64'">
     <ClCompile>
-      <AdditionalIncludeDirectories>..\..\..;..\..\..\..\runtime\server;..\..\..\external\src\jpeg;..\..\..\..\third_party\libzstd;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\..\..;..\..\..\..\runtime\server;..\..\..\..\modules\botlib;..\..\..\..\modules\physics;..\..\..\..\modules\world;..\..\..\external\src\jpeg;..\..\..\..\third_party\libzstd;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <Optimization>Disabled</Optimization>
       <PreprocessorDefinitions>WIN32;DEDICATED;_DEBUG;_WINDOWS;_CRT_SECURE_NO_DEPRECATE;_WINSOCK_DEPRECATED_NO_WARNINGS;USE_OPEN_WORLD=1;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <BasicRuntimeChecks>EnableFastChecks</BasicRuntimeChecks>
@@ -209,7 +209,7 @@
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <ClCompile>
-      <AdditionalIncludeDirectories>$(OpenSslRoot)\include;..\..\..;..\..\..\..\runtime\server;..\..\..\external\src\jpeg;..\..\..\..\third_party\libzstd;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(OpenSslRoot)\include;..\..\..;..\..\..\..\runtime\server;..\..\..\..\modules\botlib;..\..\..\..\modules\physics;..\..\..\..\modules\world;..\..\..\external\src\jpeg;..\..\..\..\third_party\libzstd;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>WIN32;_WIN32;DEDICATED;NDEBUG;_WINDOWS;_CRT_SECURE_NO_DEPRECATE;_WINSOCK_DEPRECATED_NO_WARNINGS;USE_DTLS=1;USE_OPEN_WORLD=1;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <WarningLevel>Level4</WarningLevel>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
@@ -235,7 +235,7 @@
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <ClCompile>
-      <AdditionalIncludeDirectories>$(OpenSslRoot)\include;..\..\..;..\..\..\..\runtime\server;..\..\..\external\src\jpeg;..\..\..\..\third_party\libzstd;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(OpenSslRoot)\include;..\..\..;..\..\..\..\runtime\server;..\..\..\..\modules\botlib;..\..\..\..\modules\physics;..\..\..\..\modules\world;..\..\..\external\src\jpeg;..\..\..\..\third_party\libzstd;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>WIN32;_WIN32;DEDICATED;NDEBUG;_WINDOWS;_CRT_SECURE_NO_DEPRECATE;_WINSOCK_DEPRECATED_NO_WARNINGS;USE_DTLS=1;USE_OPEN_WORLD=1;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <WarningLevel>Level4</WarningLevel>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
@@ -258,7 +258,7 @@
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|ARM64'">
     <ClCompile>
-      <AdditionalIncludeDirectories>..\..\..;..\..\..\..\runtime\server;..\..\..\external\src\jpeg;..\..\..\..\third_party\libzstd;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\..\..;..\..\..\..\runtime\server;..\..\..\..\modules\botlib;..\..\..\..\modules\physics;..\..\..\..\modules\world;..\..\..\external\src\jpeg;..\..\..\..\third_party\libzstd;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>WIN32;_WIN32;DEDICATED;NDEBUG;_WINDOWS;_CRT_SECURE_NO_DEPRECATE;_WINSOCK_DEPRECATED_NO_WARNINGS;USE_OPEN_WORLD=1;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <WarningLevel>Level4</WarningLevel>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
