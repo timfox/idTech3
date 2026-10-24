@@ -289,16 +289,17 @@
     <ClCompile Include="..\..\qcommon\common.c" />
     <ClCompile Include="..\..\qcommon\defer.c" />
     <ClCompile Include="..\..\qcommon\jobs.c" />
-    <ClCompile Include="..\..\qcommon\q_utf8.c" />
+    <ClCompile Include="..\..\qcommon\q_utf8.cpp" />
+    <ClCompile Include="..\..\..\..\modules\collada\collada_asset_stub.c" />
     <ClCompile Include="..\..\qcommon\cvar.c" />
     <ClCompile Include="..\..\qcommon\files.c" />
     <ClCompile Include="..\..\qcommon\history.c" />
     <ClCompile Include="..\..\qcommon\huffman.c" />
-    <ClCompile Include="..\..\qcommon\huffman_static.c" />
+    <ClCompile Include="..\..\qcommon\huffman_static.cpp" />
     <ClCompile Include="..\..\qcommon\js_debug.c" />
     <ClCompile Include="..\..\qcommon\keys.c" />
-    <ClCompile Include="..\..\qcommon\md4.c" />
-    <ClCompile Include="..\..\qcommon\md5.c" />
+    <ClCompile Include="..\..\qcommon\md4.cpp" />
+    <ClCompile Include="..\..\qcommon\md5.cpp" />
     <ClCompile Include="..\..\qcommon\msg.c" />
     <ClCompile Include="..\..\qcommon\net_chan.c" />
     <ClCompile Include="..\..\qcommon\net_ip.c" />
@@ -325,17 +326,17 @@
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|ARM64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|ARM64'">true</ExcludedFromBuild>
     </ClCompile>
-    <ClCompile Include="..\..\server\sv_bot.c" />
-    <ClCompile Include="..\..\server\sv_ccmds.c" />
-    <ClCompile Include="..\..\server\sv_client.c" />
-    <ClCompile Include="..\..\server\sv_filter.c" />
-    <ClCompile Include="..\..\server\sv_game.c" />
-    <ClCompile Include="..\..\server\sv_init.c" />
-    <ClCompile Include="..\..\server\sv_enhanced.c" />
-    <ClCompile Include="..\..\server\sv_main.c" />
-    <ClCompile Include="..\..\server\sv_net_chan.c" />
-    <ClCompile Include="..\..\server\sv_snapshot.c" />
-    <ClCompile Include="..\..\server\sv_world.c" />
+    <ClCompile Include="..\..\server\gameplay\sv_bot.c" />
+    <ClCompile Include="..\..\server\core\sv_ccmds.c" />
+    <ClCompile Include="..\..\server\client\sv_client.c" />
+    <ClCompile Include="..\..\server\client\sv_filter.c" />
+    <ClCompile Include="..\..\server\gameplay\sv_game.c" />
+    <ClCompile Include="..\..\server\core\sv_init.c" />
+    <ClCompile Include="..\..\server\gameplay\sv_enhanced.c" />
+    <ClCompile Include="..\..\server\core\sv_main.c" />
+    <ClCompile Include="..\..\server\net\sv_net_chan.c" />
+    <ClCompile Include="..\..\server\client\sv_snapshot.c" />
+    <ClCompile Include="..\..\server\world\sv_world.c" />
     <ClCompile Include="..\win_main.c" />
     <ClCompile Include="..\win_shared.c" />
     <ClCompile Include="..\win_syscon.c" />
@@ -432,12 +433,12 @@
     <ClCompile Include="..\..\qcommon\ttp_model.c" />
     <ClCompile Include="..\..\qcommon\ttp_sim.c" />
     <ClCompile Include="..\..\qcommon\engine_phys_map.c" />
-    <ClCompile Include="..\..\server\sv_app_crdt.c" />
-    <ClCompile Include="..\..\server\sv_auth.c" />
-    <ClCompile Include="..\..\server\sv_engine_decals.c" />
-    <ClCompile Include="..\..\server\sv_engine_sprites.c" />
-    <ClCompile Include="..\..\server\sv_openworld.c" />
-    <ClCompile Include="..\..\server\sv_physics.c" />
+    <ClCompile Include="..\..\server\services\sv_app_crdt.c" />
+    <ClCompile Include="..\..\server\services\sv_auth.c" />
+    <ClCompile Include="..\..\server\gameplay\sv_engine_decals.c" />
+    <ClCompile Include="..\..\server\gameplay\sv_engine_sprites.c" />
+    <ClCompile Include="..\..\server\world\sv_openworld.c" />
+    <ClCompile Include="..\..\server\gameplay\sv_physics.c" />
     <ClCompile Include="..\..\..\physics\phys_bullet.c" />
     <ClCompile Include="..\..\..\physics\phys_character.c" />
     <ClCompile Include="..\..\..\physics\phys_procedural_anim.c" />
@@ -460,10 +461,20 @@
     <ClCompile Include="..\..\..\physics\phys_debugdraw.c" />
     <ClCompile Include="..\..\..\world\world_config.cpp" />
     <ClCompile Include="..\..\qcommon\net_oscar_roster.c" />
-    <ClCompile Include="..\..\server\sv_world_config.c" />
+    <ClCompile Include="..\..\server\world\sv_world_config.c" />
   <!-- IDTECH3_MSVC_MANIFEST_END -->
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>
+  <ItemGroup>
+    <ClCompile Include="..\..\qcommon\bsp_format.c" />
+    <ClCompile Include="..\..\qcommon\cm_bsp30.c" />
+    <ClCompile Include="..\..\qcommon\cm_bounds.cpp" />
+    <ClCompile Include="..\..\qcommon\cpp20_abi_guards.cpp" />
+    <ClCompile Include="..\..\qcommon\cpp20_status.cpp" />
+    <ClCompile Include="..\..\..\world\world_zone.cpp" />
+    <ClCompile Include="..\..\server\services\sv_tv.c" />
+    <ClCompile Include="..\..\server\services\sv_tvstream.c" />
+  </ItemGroup>
 </Project>

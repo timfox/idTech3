@@ -1432,10 +1432,12 @@ static void JsDebug_RegisterBindings( void ) {
 	duk_push_c_function( s_jsContext, Js_Binding_Off, DUK_VARARGS );
 	duk_put_prop_string( s_jsContext, -2, "off" );
 
+#ifndef DEDICATED
 	duk_push_c_function( s_jsContext, Js_Binding_ServerBrowserRefresh, 1 );
 	duk_put_prop_string( s_jsContext, -2, "serverBrowserRefresh" );
 	duk_push_c_function( s_jsContext, Js_Binding_ServerBrowserList, 1 );
 	duk_put_prop_string( s_jsContext, -2, "serverBrowserList" );
+#endif
 
 #ifndef DEDICATED
 	duk_push_c_function( s_jsContext, Js_Binding_TextureLoad, DUK_VARARGS );

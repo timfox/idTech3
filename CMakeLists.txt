@@ -1236,6 +1236,24 @@ if(BUILD_FREETYPE)
   endif()
 endif()
 
+# Collada conversion is optional and depends on an external FCollada build.
+# Detect it before assembling qcommon so the ABI stub is selected consistently.
+set(_IDTECH3_FCOLLADA_DEFAULT OFF)
+if(EXISTS "${CMAKE_SOURCE_DIR}/third_party/fcollada/lib/libFColladaSR.a")
+	set(_IDTECH3_FCOLLADA_DEFAULT ON)
+endif()
+option(USE_COLLADA_ASSETS "Enable engine-owned Collada asset support" ${_IDTECH3_FCOLLADA_DEFAULT})
+if(USE_COLLADA_ASSETS)
+	set(IDTECH3_FCOLLADA_ROOT "${CMAKE_SOURCE_DIR}/third_party/fcollada" CACHE PATH
+		"Path to the imported FCollada dependency used by engine Collada conversion")
+	set(IDTECH3_FCOLLADA_LIBRARY "${IDTECH3_FCOLLADA_ROOT}/lib/libFColladaSR.a" CACHE FILEPATH
+		"FCollada static library")
+	if(NOT EXISTS "${IDTECH3_FCOLLADA_LIBRARY}")
+		message(WARNING "Collada asset support disabled: FCollada library not found at ${IDTECH3_FCOLLADA_LIBRARY}")
+		set(USE_COLLADA_ASSETS OFF)
+	endif()
+endif()
+
 include(${CMAKE_SOURCE_DIR}/cmake/EngineQcommonSources.cmake)
 include(${CMAKE_SOURCE_DIR}/cmake/engine/AsmSources.cmake)
 idtech3_init_qcommon_sources()
@@ -1244,6 +1262,10 @@ include(${CMAKE_SOURCE_DIR}/cmake/IdTech3IncludeDirs.cmake)
 include(${CMAKE_SOURCE_DIR}/cmake/IdTech3QcommonExtensions.cmake)
 idtech3_append_research_qcommon_sources()
 idtech3_append_open_world_qcommon_sources()
+if(NOT USE_COLLADA_ASSETS)
+	# Keep the game trap ABI linkable when the optional FCollada converter is absent.
+	list(APPEND QCOMMON_SRCS modules/collada/collada_asset_stub.c)
+endif()
 # exclude platform-dependent QVM JIT compilers; add the active backend below
 list(FILTER QCOMMON_SRCS EXCLUDE REGEX ".*vm_(aarch64|armv7l|powerpc|x86)\\.c")
 # exclude optional network modules; add when options enabled
@@ -2800,14 +2822,9 @@ if(USE_RTS_SIM)
 endif()
 
 # --- Collada asset module ---
-option(USE_COLLADA_ASSETS "Enable engine-owned Collada asset support" ON)
 if(USE_COLLADA_ASSETS)
   enable_language(CXX)
   find_package(LibXml2 REQUIRED)
-  set(IDTECH3_FCOLLADA_ROOT "/home/tim/Desktop/rts/libraries/source/fcollada" CACHE PATH
-    "Path to the imported FCollada dependency used by engine Collada conversion")
-  set(IDTECH3_FCOLLADA_LIBRARY "${IDTECH3_FCOLLADA_ROOT}/lib/libFColladaSR.a" CACHE FILEPATH
-    "FCollada static library")
   ADD_LIBRARY(collada_asset_module STATIC
     modules/collada/collada_asset.cpp
     modules/collada/converter/CommonConvert.cpp

@@ -769,7 +769,7 @@ jobs:
 
             apt-get -o Acquire::Retries=5 -qq update
             apt-get -o Acquire::Retries=5 install -y make gcc g++ cmake ninja-build libstdc++-14-dev git
-            apt-get -o Acquire::Retries=5 -y install libcurl4-openssl-dev libssl-dev mesa-common-dev libxxf86dga-dev libxrandr-dev libxxf86vm-dev libasound-dev libopenal-dev libfreetype6-dev lua5.4 liblua5.4-dev libbullet-dev pkg-config glslang-tools ripgrep
+            apt-get -o Acquire::Retries=5 -y install libcurl4-openssl-dev libssl-dev libxml2-dev mesa-common-dev libxxf86dga-dev libxrandr-dev libxxf86vm-dev libasound-dev libopenal-dev libfreetype6-dev lua5.4 liblua5.4-dev libbullet-dev pkg-config glslang-tools ripgrep
 
             ./scripts/layout_forwarding_symlinks.sh
 
@@ -933,7 +933,9 @@ jobs:
           java-version: 17
 
       - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
+        uses: android-actions/setup-android@v4
+        with:
+          packages: platform-tools
 
       - name: Install NDK
         run: |
@@ -1073,7 +1075,9 @@ jobs:
           java-version: 17
 
       - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
+        uses: android-actions/setup-android@v4
+        with:
+          packages: platform-tools
 
       - name: Install NDK, CMake (match app/build.gradle), SDK platform 35
         run: |
