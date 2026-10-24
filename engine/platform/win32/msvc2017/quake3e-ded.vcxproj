@@ -322,6 +322,20 @@
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">true</ExcludedFromBuild>
     </ClCompile>
     <ClCompile Include="..\..\qcommon\vm_interpreted.c" />
+    <ClCompile Include="..\..\..\..\third_party\libzstd\zstd.c" />
+    <ClCompile Include="..\..\..\..\modules\dap\dap_interface.cpp" />
+    <ClCompile Include="..\..\..\..\modules\rts\rts_command.cpp" />
+    <ClCompile Include="..\..\..\..\modules\rts\rts_component.cpp" />
+    <ClCompile Include="..\..\..\..\modules\rts\rts_entity.cpp" />
+    <ClCompile Include="..\..\..\..\modules\rts\rts_gui.cpp" />
+    <ClCompile Include="..\..\..\..\modules\rts\rts_obstruction.cpp" />
+    <ClCompile Include="..\..\..\..\modules\rts\rts_path_grid.cpp" />
+    <ClCompile Include="..\..\..\..\modules\rts\rts_replay.cpp" />
+    <ClCompile Include="..\..\..\..\modules\rts\rts_selection.cpp" />
+    <ClCompile Include="..\..\..\..\modules\rts\rts_turn.cpp" />
+    <ClCompile Include="..\..\..\..\modules\rts\rts_usd_templates.cpp" />
+    <ClCompile Include="..\..\..\..\modules\rts\rts_vision.cpp" />
+    <ClCompile Include="..\..\..\..\modules\rts\rts_world.cpp" />
     <ClCompile Include="..\..\qcommon\vm_x86.c">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|ARM64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|ARM64'">true</ExcludedFromBuild>
@@ -470,7 +484,6 @@
   <ItemGroup>
     <ClCompile Include="..\..\qcommon\bsp_format.c" />
     <ClCompile Include="..\..\qcommon\cm_bsp30.c" />
-    <ClCompile Include="..\..\qcommon\cm_bounds.cpp" />
     <ClCompile Include="..\..\qcommon\cpp20_abi_guards.cpp" />
     <ClCompile Include="..\..\qcommon\cpp20_status.cpp" />
     <ClCompile Include="..\..\..\world\world_zone.cpp" />
