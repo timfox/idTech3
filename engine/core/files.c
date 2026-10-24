@@ -464,6 +464,9 @@ FS_PakIsPure
 =================
 */
 static qboolean FS_PakIsPure( const pack_t *pack ) {
+#ifdef DEDICATED
+	(void)pack;
+#endif
 #ifndef DEDICATED
 	int i;
 	if ( fs_numServerPaks ) {

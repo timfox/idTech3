@@ -461,6 +461,10 @@ static duk_ret_t Js_Binding_Exec( duk_context *ctx ) {
 }
 
 #ifndef DEDICATED
+#if defined(__GNUC__) || defined(__clang__)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wunused-value"
+#endif
 /*
  * Social bindings intentionally expose only normalized OSCAR operations.
  * JavaScript never receives sockets, FLAP frames, credentials, or raw JSON.
@@ -481,6 +485,9 @@ static const char *Js_SocialString( duk_context *ctx, int index, size_t maxLen, 
 	}
 	return value;
 }
+#if defined(__GNUC__) || defined(__clang__)
+#pragma GCC diagnostic pop
+#endif
 
 static void Js_SocialPushBuddy( duk_context *ctx, const oscarBuddy_t *buddy ) {
 	duk_push_object( ctx );
