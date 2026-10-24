@@ -833,7 +833,7 @@ jobs:
         run: |
           set -e
           for attempt in 1 2 3 4; do
-            if brew install coreutils sdl3 openal-soft cmake ninja freetype lua molten-vk bullet pkgconf glslang; then
+            if brew install coreutils sdl3 openal-soft zstd cmake ninja freetype lua molten-vk bullet pkgconf glslang; then
               exit 0
             fi
             echo "brew install attempt $attempt failed, retrying in $((attempt * 20))s..."
