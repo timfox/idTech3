@@ -2525,7 +2525,8 @@ target_include_directories(q3ui PRIVATE
 	${CMAKE_SOURCE_DIR}
 	${CMAKE_SOURCE_DIR}/engine/platform
 	${CMAKE_SOURCE_DIR}/runtime/client
-	${CMAKE_SOURCE_DIR}/modules/audio)
+	${CMAKE_SOURCE_DIR}/modules/audio
+	${CMAKE_SOURCE_DIR}/third_party/libzstd)
 ENDIF()
 
 if(USE_LOCAL_HEADERS AND WIN32)
