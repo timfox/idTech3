@@ -6,7 +6,6 @@
  * See docs/RENDERER_IQ_LIVE_CERTIFICATION.md.
  */
 
-#ifdef USE_VULKAN
 
 #include "../common/tr_types.h"
 #include "vk_renderer_p1_cert.h"
@@ -108,4 +107,3 @@ void vk_renderer_p1_live_retry_stage( p1CertStage_t stage );
 void vk_renderer_p1_live_resume( void );
 void vk_renderer_p1_live_from( p1CertStage_t stage );
 
-#endif /* USE_VULKAN */

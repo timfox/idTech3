@@ -1,6 +1,5 @@
 #pragma once
 
-#ifdef USE_VULKAN
 
 /*
  * Raster Ultra 1.10 — histogram / metering exposure controller.
@@ -48,4 +47,3 @@ float vk_exposure_histogram_meter_scale( void );
 
 void vk_exposure_histogram_status_f( void );
 
-#endif /* USE_VULKAN */

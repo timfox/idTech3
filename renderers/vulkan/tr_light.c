@@ -22,9 +22,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 // tr_light.c
 
 #include "tr_local.h"
-#ifdef USE_VULKAN
 #include "vk_raster_gi.h"
-#endif
 
 #define	DLIGHT_AT_RADIUS		16
 // at the edge of a dlight's influence, this amount of light will be added
@@ -140,15 +138,9 @@ R_DynamicLightUsesLegacyScale
 ===============
 */
 qboolean R_DynamicLightUsesLegacyScale( void ) {
-#ifdef USE_VULKAN
 	if ( glConfig.deviceSupportsGamma || vk.fboActive ) {
 		return qfalse;
 	}
-#else
-	if ( glConfig.deviceSupportsGamma ) {
-		return qfalse;
-	}
-#endif
 	return qtrue;
 }
 
@@ -645,7 +637,6 @@ void R_SetupEntityLighting( const trRefdef_t *refdef, trRefEntity_t *ent ) {
 		ent->shLightingValid = qfalse;
 	}
 
-#ifdef USE_VULKAN
 	/* Raster Ultra 1.3: dynamic objects — probe GI owns indirect diffuse when ready. */
 	if ( vk_raster_gi_probes_ready() ) {
 		vec3_t probeAmb;
@@ -664,7 +655,6 @@ void R_SetupEntityLighting( const trRefdef_t *refdef, trRefEntity_t *ent ) {
 			ent->ambientLight[2] = ent->ambientLight[2] * ( 1.0f - w * 0.75f ) + probeAmb[2] * w * 0.75f;
 		}
 	}
-#endif
 
 	// bonus items and view weapons have a fixed minimum add
 	if ( 1 /* ent->e.renderfx & RF_MINLIGHT */ ) {
