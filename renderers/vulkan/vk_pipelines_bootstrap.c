@@ -17,13 +17,10 @@ void vk_create_pipelines( void )
 
 	vk.pipelines_world_base = vk.pipelines_count;
 
-#ifdef VK_PBR_BRDFLUT
 	vk_create_brdflut_pipeline();
-#endif
 	vk_create_volumetric_pipelines();
 }
 
-#ifdef VK_PBR_BRDFLUT
 void vk_create_brdflut_pipeline( void )
 {
 	if ( !vk.pbrActive )
@@ -33,4 +30,3 @@ void vk_create_brdflut_pipeline( void )
 		vk_create_post_process_pipeline( 4, size, size );
 	}
 }
-#endif

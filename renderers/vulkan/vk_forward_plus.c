@@ -565,7 +565,6 @@ void vk_forward_plus_create_set_layout( void )
 	VkDescriptorSetLayoutBinding binds[10];
 	VkDescriptorSetLayoutCreateInfo layout_ci;
 
-#ifdef USE_VK_PBR
 	if ( vk.set_layout_forward_plus != VK_NULL_HANDLE ) {
 		return;
 	}
@@ -623,22 +622,18 @@ void vk_forward_plus_create_set_layout( void )
 	layout_ci.pBindings = binds;
 	VK_CHECK( qvkCreateDescriptorSetLayout( vk.device, &layout_ci, NULL, &vk.set_layout_forward_plus ) );
 	SET_OBJECT_NAME( vk.set_layout_forward_plus, "descriptor set layout - forward+", VK_DEBUG_REPORT_OBJECT_TYPE_DESCRIPTOR_SET_LAYOUT_EXT );
-#endif
 }
 
 void vk_forward_plus_destroy_graphics_layout( void )
 {
-#ifdef USE_VK_PBR
 	if ( vk.set_layout_forward_plus != VK_NULL_HANDLE ) {
 		qvkDestroyDescriptorSetLayout( vk.device, vk.set_layout_forward_plus, NULL );
 		vk.set_layout_forward_plus = VK_NULL_HANDLE;
 	}
-#endif
 }
 
 void vk_forward_plus_init_graphics_descriptors( void )
 {
-#ifdef USE_VK_PBR
 	VkDescriptorSetAllocateInfo alloc_ci;
 
 	if ( vk.set_layout_forward_plus == VK_NULL_HANDLE || vk.descriptor_pool == VK_NULL_HANDLE ) {
@@ -671,7 +666,6 @@ void vk_forward_plus_init_graphics_descriptors( void )
 	vk_object_id_update_storage_descriptor();
 	vk_ltc_init();
 	vk_ltc_update_forward_plus_descriptors( vk_fp_graphics_descriptor );
-#endif
 }
 
 static void vk_fp_destroy_buffers( void )
@@ -1091,12 +1085,10 @@ void vk_forward_plus_update_depth_descriptor( void )
 
 	qvkUpdateDescriptorSets( vk.device, 2, writes, 0, NULL );
 
-#ifdef USE_VK_PBR
 	if ( vk_fp_graphics_descriptor != VK_NULL_HANDLE && vk_fp_graphics_descriptor != vk.forward_plus.descriptor ) {
 		writes[1].dstSet = vk_fp_graphics_descriptor;
 		qvkUpdateDescriptorSets( vk.device, 1, &writes[1], 0, NULL );
 	}
-#endif
 }
 
 void vk_forward_plus_update_sun_shadow_descriptor( void )
@@ -1105,7 +1097,6 @@ void vk_forward_plus_update_sun_shadow_descriptor( void )
 	VkWriteDescriptorSet write;
 	VkImageView shadow_view;
 
-#ifdef USE_VK_PBR
 	shadow_view = vk.sun_shadow_sample_view;
 	if ( vk_fp_graphics_descriptor == VK_NULL_HANDLE || shadow_view == VK_NULL_HANDLE ) {
 		shadow_view = vk.depth_image_view_sample ? vk.depth_image_view_sample : vk.depth_image_view;
@@ -1141,7 +1132,6 @@ void vk_forward_plus_update_sun_shadow_descriptor( void )
 		write.dstSet = vk.forward_plus.descriptor;
 		qvkUpdateDescriptorSets( vk.device, 1, &write, 0, NULL );
 	}
-#endif
 }
 
 void vk_forward_plus_init( void )
@@ -1439,11 +1429,7 @@ void vk_forward_plus_upload_refdef( void )
 
 VkDescriptorSet vk_forward_plus_get_graphics_descriptor_set( void )
 {
-#ifdef USE_VK_PBR
 	return vk_fp_graphics_descriptor;
-#else
-	return VK_NULL_HANDLE;
-#endif
 }
 
 static void vk_forward_plus_dispatch_tile_cull_internal( qboolean use_depth_cull )

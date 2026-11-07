@@ -5,7 +5,6 @@
  * See docs/RENDERER_FRAME_CONTRACT.md
  */
 
-#ifdef USE_VULKAN
 
 #include "../common/tr_types.h"
 #include <stdint.h>
@@ -92,5 +91,3 @@ void vk_frame_contract_capture_f( void );
 #ifdef __cplusplus
 }
 #endif
-
-#endif /* USE_VULKAN */
