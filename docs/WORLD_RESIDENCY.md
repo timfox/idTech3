@@ -66,6 +66,11 @@ When **`r_graphStreamReach 1`**, [`WorldResidency`](../modules/world/world_resid
 
 When `WorldDistrict_StreamSectors` runs with `r_openWorldResidency 1`, it sets a district candidate filter (`WorldResidency_SetDistrictFilter`) and calls `WorldResidency_UpdateView` at the district centroid instead of brute-force loading every cell.
 
+**Spatial zones** ([WORLD_ZONES.md](WORLD_ZONES.md)) are orthogonal: they select
+which district payloads are resident under `r_worldZoneBudget` and publish GPU
+texture/shadow masks. Sector residency (`WorldResidency` / open-world disk) still
+governs `cm_stream`, nav tiles, and sprite scatter inside loaded districts.
+
 ## Limitations
 
 - The score function is an **approximate** submodular proxy (distance coverage + bonuses); no formal 1/2 guarantee is claimed in-engine.
@@ -82,5 +87,6 @@ ctest -R test_openworld_residency -V
 ## Related
 
 - [OPEN_WORLD.md](OPEN_WORLD.md) — open-world layers and MP sync
+- [WORLD_ZONES.md](WORLD_ZONES.md) — district-level zone budget (runs before sector planners)
 - [PROC_PATTERNS.md](PROC_PATTERNS.md) — regionId for matroid mode
 - [DISTRICTS.md](DISTRICTS.md) — district streaming

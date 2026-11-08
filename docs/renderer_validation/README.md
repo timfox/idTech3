@@ -16,6 +16,7 @@ Evidence for **Tier B** (automated + `GAME_BASE`) and **Tier C** (manual GPU / v
 
 | Document | Purpose |
 |----------|---------|
+| [SPONZA_USDA_BENCHMARK.md](SPONZA_USDA_BENCHMARK.md) | USDA Sponza fixture, renderer mode captures, `test_sponza_benchmark.sh` |
 | [SELF_HOSTED_TIER_B.md](SELF_HOSTED_TIER_B.md) | Enable Tier B on every `main` push via GitHub Actions + self-hosted runner |
 | [TEMPLATE_TIER_C.md](TEMPLATE_TIER_C.md) | Copy per session; record date, commit, maps, Vulkan GPU pass, validation-layer result |
 | [FINDINGS.md](FINDINGS.md) | Rolling log: Tier C GPU sessions + optional Tier A automated baseline rows |

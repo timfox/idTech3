@@ -2,12 +2,18 @@
 
 Engine-original **infinite walkable world** scaffolding: view-driven **sector residency** with three layers — modular BSP streaming, **per-chunk Detour nav tiles**, and **billboard scatter** — aligned with id Tech 8-style open worlds (engine-original conventions, not proprietary formats).
 
-Works alongside [DISTRICTS.md](DISTRICTS.md) (USD world partition), [WORLD_CONFIG.md](WORLD_CONFIG.md) (named map-state / geometry-set transitions), and [cm_stream](MOD_SDK.md) sector pk3 delivery.
+Works alongside [DISTRICTS.md](DISTRICTS.md) (USD world partition),
+[WORLD_ZONES.md](WORLD_ZONES.md) (district-level zone budget above sectors),
+[WORLD_RESIDENCY.md](WORLD_RESIDENCY.md) (optional value-aware sector selection),
+[WORLD_CONFIG.md](WORLD_CONFIG.md) (named map-state / geometry-set transitions),
+and [cm_stream](MOD_SDK.md) sector pk3 delivery.
 
 ## Architecture
 
 ```
 View position
+    └── CL_District_Frame (when districts loaded)
+            └── WorldZone_UpdateView (budgeted zones — see WORLD_ZONES.md)
     └── WorldOpen_UpdateView
             ├── r_openWorldResidency 0: legacy radius disk (r_openWorldRadius)
             └── r_openWorldResidency 1: WorldResidency (value + budget + bounded delta)
@@ -15,6 +21,9 @@ View position
                     ├── nav/sector_X_Y.nav → Detour addTile
                     └── sprites/sector_X_Y.ents → scatter
 ```
+
+Zones run **before** sector residency when a USDA manifest is active; sector
+planners do not replace district zones.
 
 | Layer | Asset path | Default |
 |-------|------------|---------|
