@@ -5,7 +5,6 @@
 #include "vk_renderer_perf.h"
 #include "vk_forward_plus.h"
 
-#ifdef USE_VULKAN
 
 static qboolean s_cmdsRegistered;
 
@@ -70,4 +69,3 @@ void vk_renderer_perf_begin_frame( void )
 {
 }
 
-#endif

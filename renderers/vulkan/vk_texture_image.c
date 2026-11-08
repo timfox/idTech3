@@ -447,14 +447,12 @@ void vk_update_descriptor_set( image_t *image, qboolean mipmap ) {
 
 	qvkUpdateDescriptorSets( vk.device, 1, &descriptor_write, 0, NULL );
 
-#if defined(USE_VK_PBR) && defined(VK_CUBEMAP)
 	if ( image && ( image->flags & IMGFLAG_CUBEMAP ) && r_pbr_bindlog && r_pbr_bindlog->integer ) {
 		ri.Printf( PRINT_ALL,
 			"PBR IBL descwrite: binding=0 (image descriptor) view=%p set=%p img=%s layout=SHADER_READ_ONLY\n",
 			(void *)image->view, (void *)image->descriptor,
 			( image->imgName && image->imgName[0] ) ? image->imgName : "<unnamed>" );
 	}
-#endif
 }
 
 

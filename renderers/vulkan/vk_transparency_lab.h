@@ -5,7 +5,6 @@
  * Sorted-alpha reference is certification-only, not a production WBOIT replacement.
  */
 
-#ifdef USE_VULKAN
 
 #include "../common/tr_types.h"
 
@@ -42,4 +41,3 @@ void vk_transparency_lab_beer_lambert( const float color[3], float distance, flo
 	float outTransmittance[3] );
 float vk_transparency_lab_refraction_offset_bound( float offsetPx, float maxOffsetPx );
 
-#endif /* USE_VULKAN */

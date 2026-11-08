@@ -5,7 +5,6 @@
  * See docs/BLOOM_SOURCE_INTEGRITY.md.
  */
 
-#ifdef USE_VULKAN
 
 #include "../common/tr_types.h"
 
@@ -47,4 +46,3 @@ const bloomSourceContract_t *vk_bloom_source_contract_get( void );
 qboolean vk_bloom_source_contract_validate( char *errBuf, int errBufSize );
 void vk_bloom_source_status_f( void );
 
-#endif /* USE_VULKAN */

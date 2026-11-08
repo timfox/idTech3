@@ -1,6 +1,5 @@
 #include "tr_local.h"
 
-#ifdef USE_VULKAN
 
 #include "vk_mesh_halo.h"
 
@@ -104,4 +103,3 @@ void vk_mesh_halo_register( void )
 	ri.Cmd_AddCommand( "mesh_halo_pass_status", MeshHalo_PassBisect_f );
 }
 
-#endif /* USE_VULKAN */
