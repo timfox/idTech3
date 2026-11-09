@@ -5,7 +5,6 @@
  * BSP/PVS remains Stage 0 (conservative). Does not replace classic draws.
  */
 
-#ifdef USE_VULKAN
 
 #include "../common/tr_types.h"
 
@@ -57,4 +56,3 @@ void vk_gpu_visibility_perf_f( void );
 qboolean vk_gpu_frustum_sphere_visible( const float sphere[4],
 	const float planeNormals[4][3], const float planeDists[4] );
 
-#endif /* USE_VULKAN */

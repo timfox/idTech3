@@ -90,9 +90,7 @@ void vk_teardown_presentation_targets( void )
 	vk_destroy_attachments();
 	vk_destroy_swapchain();
 	vk_destroy_sync_primitives();
-#ifdef VK_CUBEMAP
 	vk_destroy_cubemap_prefilter();
-#endif
 
 	vk_reset_presentation_runtime_state();
 	vk_pass_diag_reset();
@@ -124,12 +122,8 @@ void vk_restore_presentation_targets( void )
 	vk_create_render_passes();
 	vk_create_framebuffers();
 
-#ifdef VK_PBR_BRDFLUT
 	vk_create_brdflut_pipeline();
-#endif
-#ifdef VK_CUBEMAP
 	vk_create_cubemap_prefilter();
-#endif
 	vk_update_attachment_descriptors();
 	vk_update_volumetric_descriptors();
 	vk_reset_scene_src_rect_tracking();
@@ -161,9 +155,7 @@ void vk_restore_presentation_targets( void )
 	VkImgui_SwapchainRestarted();
 #endif
 
-#ifdef VK_PBR_BRDFLUT
 	vk_create_brfdlut();
-#endif
 
 	/*
 	 * UI backdrop blur pipelines are created against overlay_compose. That pass

@@ -165,9 +165,7 @@ void vk_begin_frame( void )
 	VkCommandBufferBeginInfo begin_info;
 	VkResult res;
 	qboolean needPost = qfalse;
-#ifdef USE_VK_PBR
 	qboolean needWorldPipeRebuild = qfalse;
-#endif
 
 	if ( vk.device_lost ) {
 		return;
@@ -199,7 +197,6 @@ void vk_begin_frame( void )
 
 	vk.inRenderPass = qfalse;
 
-#ifdef USE_VK_PBR
 	/* r_forwardPlusShade / r_deferredUnlitBase / r_deferredLighting change PBR fragment specialization
 	 * on world draw pipelines. Do not use vk_destroy_pipelines() here: it also tears down gamma/bloom/smaa
 	 * and other post paths unrelated to Forward+ (black screen if not rebuilt the same frame).
@@ -224,7 +221,6 @@ void vk_begin_frame( void )
 			vk_destroy_world_graphics_pipelines();
 		}
 	}
-#endif
 
 	if ( PostFX_NeedsPipelineUpdate() ) {
 		needPost = qtrue;
@@ -389,14 +385,12 @@ _retry:
 
 	Com_Memset( &vk.cmd->descriptor_set, 0, sizeof( vk.cmd->descriptor_set ) );
 	vk.cmd->descriptor_set.start = ~0U;
-#ifdef USE_VK_PBR
 	if ( vk.maxBoundDescriptorSets >= VK_DESC_COUNT ) {
 		VkDescriptorSet fp_set = vk_forward_plus_get_graphics_descriptor_set();
 		if ( fp_set != VK_NULL_HANDLE ) {
 			vk.cmd->descriptor_set.current[VK_DESC_FORWARD_PLUS] = fp_set;
 		}
 	}
-#endif
 
 	Com_Memset( &vk.cmd->scissor_rect, 0, sizeof( vk.cmd->scissor_rect ) );
 

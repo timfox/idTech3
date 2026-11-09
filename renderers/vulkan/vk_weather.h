@@ -1,6 +1,5 @@
 #pragma once
 
-#ifdef USE_VULKAN
 
 /*
  * Raster Ultra 1.7 — data-driven weather controller.
@@ -57,4 +56,3 @@ float vk_weather_wetness_rate( void );
 
 void vk_weather_status_f( void );
 
-#endif /* USE_VULKAN */

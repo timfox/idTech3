@@ -1,6 +1,5 @@
 #pragma once
 
-#ifdef USE_VULKAN
 
 #include "vk_material_ir.h"
 
@@ -64,4 +63,3 @@ void vk_material_graph_seed_height_wet( vkMaterialGraph_t *g );
 
 void vk_material_graph_status_f( void );
 
-#endif /* USE_VULKAN */
