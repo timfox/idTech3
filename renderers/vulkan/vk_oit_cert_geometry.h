@@ -5,7 +5,6 @@
  * Fixtures draw through the live oit_accum / additive pipelines during vk_oit_pass.
  */
 
-#ifdef USE_VULKAN
 
 #include "../common/tr_types.h"
 
@@ -69,4 +68,3 @@ qboolean vk_oit_cert_geometry_was_drawn( void );
 void vk_oit_cert_geometry_expect_source_over( const float layerRgb[3], float opacity,
 	const float fogRgb[3], float outRgb[3] );
 
-#endif /* USE_VULKAN */

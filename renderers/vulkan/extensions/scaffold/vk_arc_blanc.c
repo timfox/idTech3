@@ -289,9 +289,7 @@ static surfaceType_t *R_ArcBlanc_BuildPatch( int div, float tileSize, float orig
 	tri = ri.Hunk_Alloc( allocSize, h_low );
 	tri->surfaceType = SF_TRIANGLES;
 	tri->dlightBits = 0;
-#ifdef USE_VBO
 	tri->vboItemIndex = 0;
-#endif
 	tri->numVerts = numVerts;
 	tri->numIndexes = numIndexes;
 	tri->verts = (srfVert_t *)( tri + 1 );

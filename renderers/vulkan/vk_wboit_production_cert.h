@@ -7,7 +7,6 @@
  * See docs/WBOIT_LIVE_CERTIFICATION.md.
  */
 
-#ifdef USE_VULKAN
 
 #include "../common/tr_types.h"
 
@@ -117,4 +116,3 @@ float vk_wboit_cert_revealage_product( const float *alphas, int count );
 void vk_wboit_cert_source_over( const float layerRgb[3], float opacity,
 	const float fogRgb[3], float outRgb[3] );
 
-#endif /* USE_VULKAN */

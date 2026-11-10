@@ -23,9 +23,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 */
 
 #include "tr_local.h"
-#ifdef USE_VULKAN
 #include "vk_ht_animation.h"
-#endif
 
 #define	LL(x) x=LittleLong(x)
 
@@ -1198,7 +1196,6 @@ qboolean R_LoadIQM( model_t *mod, void *buffer, int filesize, const char *mod_na
 
 	(void)R_LoadIQMMorphSidecar( iqmData, mod_name );
 
-#ifdef USE_VULKAN
 	if ( vk_ht_animation_active() && iqmData->num_poses > 0 && iqmData->num_frames > 0 && iqmData->poses ) {
 		uint32_t topo = (uint32_t)iqmData->num_joints ^ ( (uint32_t)iqmData->num_poses << 8 );
 		uint32_t skId = vk_ht_anim_register_skeleton( mod_name, (uint32_t)iqmData->num_poses, topo );
@@ -1220,7 +1217,6 @@ qboolean R_LoadIQM( model_t *mod, void *buffer, int filesize, const char *mod_na
 				metrics.withinTolerance ? 0 : 1 );
 		}
 	}
-#endif
 
 	return qtrue;
 }
@@ -1901,11 +1897,9 @@ void RB_IQMSurfaceAnim( const surfaceType_t *surface ) {
 	const srfIQModel_t	*surf = (const srfIQModel_t *)surface;
 	iqmData_t	*data = surf->data;
 	const trRefEntity_t *ent = backEnd.currentEntity;
-#ifdef USE_VULKAN
 	/* currentEntity points at tr.worldEntity or refdef.entities[] (mutable storage);
 	 * const is for front-end discipline; avoid direct const-drop cast (-Wcast-qual). */
 	trRefEntity_t *entMutable = (trRefEntity_t *)(void *)(uintptr_t)backEnd.currentEntity;
-#endif
 	const iqmMorphSurface_t *morphSurface = NULL;
 	qboolean applyMorph = qfalse;
 	qboolean useGpuMorphPath = qfalse;
@@ -1940,11 +1934,7 @@ void RB_IQMSurfaceAnim( const surfaceType_t *surface ) {
 	applyMorph = ( ent && ent->morphActiveCount > 0 && morphSurface &&
 		morphSurface->deltaPos && morphSurface->deltaNorm &&
 		ent->morphActiveCount <= IQM_MORPH_TOP_K );
-#ifdef USE_VULKAN
 	useGpuMorphPath = vk_ht_anim_want_iqm_gpu_skin( applyMorph, data->num_poses );
-#else
-	useGpuMorphPath = ( applyMorph && data->num_poses > 0 );
-#endif
 
 	RB_CHECKOVERFLOW( surf->num_vertexes, surf->num_triangles * 3 );
 
@@ -2004,7 +1994,6 @@ void RB_IQMSurfaceAnim( const surfaceType_t *surface ) {
 						( applyMorph && weightIndex < ent->morphActiveCount ) ? ent->morphActiveWeight[weightIndex] : 0.0f;
 				}
 			}
-#ifdef USE_VULKAN
 			if ( applyMorph && entMutable && !entMutable->morphGpuWeightsPrimedSingleUse ) {
 				for ( weightIndex = 0; weightIndex < IQM_MORPH_TOP_K; weightIndex++ ) {
 					s_iqmGpuBatch.prevWeights[weightIndex] =
@@ -2016,7 +2005,6 @@ void RB_IQMSurfaceAnim( const surfaceType_t *surface ) {
 					s_iqmGpuBatch.prevWeights[weightIndex] = 0.0f;
 				}
 			} else
-#endif
 			{
 				for ( weightIndex = 0; weightIndex < IQM_MORPH_TOP_K; weightIndex++ ) {
 					if ( s_iqmGpuBatch.activeCount == ent->morphActiveCount ) {
@@ -2385,7 +2373,6 @@ void RB_IQMSurfaceAnim( const surfaceType_t *surface ) {
 		}
 	}
 
-#ifdef USE_VULKAN
 	if ( vk_ht_animation_active() && ent ) {
 		uint32_t instId;
 		vec3_t toEnt;
@@ -2412,7 +2399,6 @@ void RB_IQMSurfaceAnim( const surfaceType_t *surface ) {
 			? ( applyMorph ? VK_HT_DEFORM_MORPH_PLUS_SKIN_GPU : VK_HT_DEFORM_SKELETAL_GPU_VS )
 			: ( applyMorph ? VK_HT_DEFORM_MORPH_CPU : VK_HT_DEFORM_SKELETAL_CPU ) );
 	}
-#endif
 
 	tri = data->triangles + 3 * surf->first_triangle;
 	ptr = &tess.indexes[tess.numIndexes];

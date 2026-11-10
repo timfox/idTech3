@@ -1,6 +1,5 @@
 #pragma once
 
-#ifdef USE_VULKAN
 
 /*
  * Deferred Honesty Milestone — eligibility, classic translation, G-buffer validity,
@@ -203,4 +202,3 @@ extern cvar_t *r_deferredOwnershipDebug;
 extern cvar_t *r_deferredCompositeDebug;
 extern cvar_t *r_deferredArchitectureCompare;
 
-#endif /* USE_VULKAN */
