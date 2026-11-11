@@ -8,7 +8,6 @@ LTC LUT availability is reported; full area-light shading remains quality opt-in
 
 #pragma once
 
-#ifdef USE_VULKAN
 
 typedef enum {
 	VK_PHOTO_UNIT_LEGACY = 0,   /* classic Q3 dlight color*radius intensity */
@@ -49,4 +48,3 @@ void vk_photometric_status_f( void );
 
 const char *vk_photometric_unit_name( vkPhotometricUnit_t u );
 
-#endif /* USE_VULKAN */
