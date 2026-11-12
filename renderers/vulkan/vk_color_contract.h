@@ -8,7 +8,6 @@
  * See docs/COLOR_PIPELINE.md.
  */
 
-#ifdef USE_VULKAN
 
 #include "../common/tr_types.h"
 
@@ -76,4 +75,3 @@ qboolean vk_color_contract_wboit_is_production( void );
 /* Static + runtime checks: order, spaces, OIT production policy. */
 qboolean vk_color_contract_validate( char *errBuf, int errBufSize );
 
-#endif /* USE_VULKAN */

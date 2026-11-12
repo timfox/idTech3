@@ -397,7 +397,6 @@ void vk_create_post_process_pipeline( int program_index, uint32_t width, uint32_
 			target_format = vk.capture_format;
 			blend = qfalse;
 			break;
-#ifdef VK_PBR_BRDFLUT
 		case 4:
 			pipeline = &vk.brdflut_pipeline;
 			fsmodule = vk.modules.brdflut_fs;
@@ -408,7 +407,6 @@ void vk_create_post_process_pipeline( int program_index, uint32_t width, uint32_
 			target_format = vk.capture_format;
 			blend = qfalse;
 			break;
-#endif
 		default:
 			pipeline = &vk.gamma_pipeline;
 			fsmodule = vk.modules.gamma_fs;

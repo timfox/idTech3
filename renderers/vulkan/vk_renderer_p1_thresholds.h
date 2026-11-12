@@ -5,7 +5,6 @@
  * Changing thresholds invalidates affected evidence (thresholdHash).
  */
 
-#ifdef USE_VULKAN
 
 #include "../common/tr_types.h"
 
@@ -68,4 +67,3 @@ uint32_t vk_renderer_p1_thresholds_hash( void );
 qboolean vk_renderer_p1_thresholds_validate( char *errBuf, int errBufSize );
 void vk_renderer_p1_thresholds_export_json( const char *path );
 
-#endif /* USE_VULKAN */

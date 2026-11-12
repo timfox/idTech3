@@ -1,6 +1,5 @@
 #pragma once
 
-#ifdef USE_VULKAN
 
 /*
  * Raster Ultra 1.7 — exclusive sky radiance ownership.
@@ -32,4 +31,3 @@ qboolean vk_sky_owner_wants_hdr_sky( void );
 
 void vk_sky_owner_status_f( void );
 
-#endif /* USE_VULKAN */

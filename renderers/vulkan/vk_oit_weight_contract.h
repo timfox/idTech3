@@ -8,7 +8,6 @@
  * Do not change fields without bumping OIT_WEIGHT_CONTRACT_VERSION and docs.
  */
 
-#ifdef USE_VULKAN
 
 #include "../common/tr_types.h"
 
@@ -53,4 +52,3 @@ float vk_oit_weight_evaluate( const oitWeightContract_t *c, float opacity, float
 
 const char *vk_oit_weight_mode_name( oitWeightMode_t m );
 
-#endif /* USE_VULKAN */

@@ -1,6 +1,5 @@
 #pragma once
 
-#ifdef USE_VULKAN
 
 /*
  * Raster Ultra 1.8 — compact material intermediate representation.
@@ -133,4 +132,3 @@ uint32_t vk_material_ir_permutation_key( const vkMaterialIR_t *ir );
 
 void vk_material_ir_status_f( void );
 
-#endif /* USE_VULKAN */
