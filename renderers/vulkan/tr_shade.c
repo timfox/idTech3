@@ -334,9 +334,7 @@ Draws vertex normals for debugging
 */
 static void DrawNormals( const shaderCommands_t *input ) {
 	int		i;
-#if defined(USE_VULKAN)
 	(void)input;
-#endif
 	if ( tess.vboIndex )
 		return; // must be handled specially
 
@@ -1262,7 +1260,6 @@ static void RB_IterateStagesGeneric( const shaderCommands_t *input, qboolean fog
 	int tess_flags;
 	int stage, i;
 
-#if 1
 	if ( r_shDebugView && r_shDebugView->integer == 3 ) {
 		RB_DrawWorldSHDebugOverride();
 		return;
@@ -1386,7 +1383,6 @@ static void RB_IterateStagesGeneric( const shaderCommands_t *input, qboolean fog
 		uniform.pbrForwardPlus[2] = 0.65f;
 		uniform.pbrForwardPlus[3] = 0.0f;
 	}
-#endif // USE_VULKAN
 
 	for ( stage = 0; stage < MAX_SHADER_STAGES; stage++ )
 	{

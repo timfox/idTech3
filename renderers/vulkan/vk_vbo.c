@@ -26,7 +26,6 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "vk_util.h"
 #include "vk_geometry_corruption.h"
 
-
 void vk_release_vbo( void )
 {
 	if ( vk.vbo.vertex_buffer )
@@ -1325,5 +1324,3 @@ void VBO_RenderStreamItem( void )
 	vk_bind_index_buffer( vk.vbo.stream_vertex_buffer, (uint32_t)item->iboOffset );
 	vk_draw_indexed( (uint32_t)item->num_indexes, 0 );
 }
-
-

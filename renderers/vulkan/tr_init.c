@@ -304,7 +304,6 @@ cvar_t	*r_cubeMapping;
 #endif
 cvar_t	*r_deluxeMapping;
 cvar_t	*r_deluxeSpecular;
-#endif
 cvar_t   *r_vk_pipeline_debug;
 cvar_t	*r_vk_pipelineCacheDisk;
 cvar_t	*r_vk_colorWriteMaskDynamic;
@@ -481,8 +480,6 @@ cvar_t	*r_forwardPlusZSlices;
 cvar_t	*r_forwardPlusZSliceMode;
 cvar_t	*r_forwardPlusSpecularStrength;
 cvar_t	*r_forwardPlusEnergyRenorm;
-
-#endif // USE_VULKAN
 
 cvar_t	*r_dlightBacks;
 
@@ -1038,11 +1035,8 @@ static void R_Register( void )
 	r_texturebits = ri.Cvar_Get( "r_texturebits", "0", CVAR_ARCHIVE_ND | CVAR_LATCH );
 	ri.Cvar_SetDescription( r_texturebits, "Number of texture bits per texture." );
 
-#if defined (USE_VULKAN) && defined (USE_VBO)
 	r_vbo = ri.Cvar_Get( "r_vbo", "1", CVAR_ARCHIVE | CVAR_LATCH );
 	ri.Cvar_SetDescription( r_vbo, "Use Vertex Buffer Objects to cache static map geometry, may improve FPS on modern GPUs, increases hunk memory usage by 15-30MB (map-dependent)." );
-#endif
-#if defined (USE_VULKAN) && defined (USE_VK_PBR)
 	r_pbr = ri.Cvar_Get("r_pbr", "1", CVAR_ARCHIVE_ND | CVAR_LATCH );
 	ri.Cvar_SetDescription( r_pbr, "Enables Physically Based Rendering (metalness/roughness, IBL, Cook-Torrance BRDF).\n"
 		"Requires " S_COLOR_CYAN "\\r_fbo 1" S_COLOR_WHITE " (vid_restart after changing).\n"
@@ -1083,7 +1077,6 @@ static void R_Register( void )
 	ri.Cvar_SetDescription( r_ibl_forceCapture,
 		"When 1, wait-idle after cubemap convolution and emit PBR IBL post logs (diagnostics)." );
 	ri.Cvar_SetGroup( r_ibl_forceCapture, CVG_RENDERER );
-#endif
 
 	r_glint = ri.Cvar_Get( "r_glint", "1", CVAR_ARCHIVE_ND );
 	ri.Cvar_CheckRange( r_glint, "0", "1", CV_INTEGER );

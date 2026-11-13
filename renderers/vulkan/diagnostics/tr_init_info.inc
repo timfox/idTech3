@@ -114,7 +114,6 @@ static void VarInfo( void )
 	if ( r_vertexLight && r_vertexLight->integer ) {
 		ri.Printf( PRINT_ALL, "Note: using vertex lightmap approximation\n" );
 	}
-#if defined (USE_VK_PBR)
 	ri.Printf( PRINT_ALL, "PBR SH extraction: %s\n", (r_pbr_shExtract && r_pbr_shExtract->integer) ? "enabled" : "disabled" );
 	if ( r_glint && r_glint->integer ) {
 		ri.Printf( PRINT_ALL, "PBR glint NDF: enabled (r_glint 1)\n" );
@@ -125,15 +124,6 @@ static void VarInfo( void )
 	if ( r_pbr_debug && r_pbr_debug->integer ) {
 		ri.Printf( PRINT_ALL, "PBR debug view: mode %d (1=direct,2=ibl spec,3=irradiance,4=env samples,5-8=glint,17-19=resource health)\n", r_pbr_debug->integer );
 	}
-#else
-	if ( (r_vertexLight && r_vertexLight->integer) || glConfig.hardwareType == GLHW_PERMEDIA2 ) {
-		ri.Printf( PRINT_ALL, "Note: using vertex lightmap approximation\n" );
-	} else if ( glConfig.hardwareType == GLHW_RAGEPRO ) {
-		ri.Printf( PRINT_ALL, "Note: ragePro approximations\n" );
-	} else if ( glConfig.hardwareType == GLHW_RIVA128 ) {
-		ri.Printf( PRINT_ALL, "Note: riva128 approximations\n" );
-	}
-#endif
 	if ( r_finish && r_finish->integer ) {
 		ri.Printf( PRINT_ALL, "Forcing glFinish\n" );
 	}

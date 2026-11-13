@@ -1102,7 +1102,6 @@ static void RB_ValidateUnifiedClusteredTransparentHandoff( qboolean usingOit )
 	}
 }
 
-#ifdef USE_VULKAN
 /*
 ===============
 RB_DrawRefractiveAfterOit
@@ -1139,7 +1138,6 @@ static void RB_DrawRefractiveAfterOit( const drawSurfsCommand_t *cmd )
 	backEnd.drawSurfFilter = 0;
 	vk_transparency_resource_bump( XPARENT_RES_REFRACTED_HDR );
 }
-#endif
 
 static void RB_RepairUnifiedClusteredTransparentHandoff( qboolean usingOit )
 {
