@@ -6,7 +6,6 @@
  * absorption, foam, quality-tiered reflection/refraction.
  */
 #include "tr_local.h"
-#ifdef USE_VULKAN
 #include "vk_world_presentation.h"
 #include "vk_water_presentation.h"
 
@@ -47,4 +46,3 @@ void vk_water_presentation_register( void )
 	}
 	(void)r_waterDebug;
 }
-#endif

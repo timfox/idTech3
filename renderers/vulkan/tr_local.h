@@ -68,7 +68,6 @@ static inline unsigned int R_SurfaceDlightBitsMask( unsigned int numDlights )
 	return ( 1u << n ) - 1u;
 }
 
-#ifdef USE_VULKAN
 #include "vk.h"
 // GL constants substitutions
 typedef enum {
@@ -100,9 +99,6 @@ typedef enum {
 #define GLint				int
 #define GLuint				unsigned int
 #define GLboolean			VkBool32
-#else
-#define GL_INDEX_TYPE		GL_UNSIGNED_INT
-#endif
 
 typedef uint32_t glIndex_t;
 
@@ -408,11 +404,7 @@ typedef struct {
 	image_t			*deluxeMap;
 } textureBundle_t;
 
-#ifdef USE_VULKAN
 #define NUM_TEXTURE_BUNDLES 3
-#else
-#define NUM_TEXTURE_BUNDLES 2
-#endif
 
 typedef struct {
 	qboolean		active;
@@ -428,7 +420,6 @@ typedef struct {
 	unsigned int	uiSdfText : 1;
 	unsigned int	uiVectorText : 1;
 
-#ifdef USE_VULKAN
 	uint32_t		tessFlags;
 	uint32_t		numTexBundles;
 
@@ -488,10 +479,8 @@ typedef struct {
 	float  parallaxBias;
 #endif
 
-#ifdef USE_VBO
 	uint32_t		rgb_offset[NUM_TEXTURE_BUNDLES]; // within current shader
 	uint32_t		tex_offset[NUM_TEXTURE_BUNDLES]; // within current shader
-#endif
 
 } shaderStage_t;
 
@@ -577,7 +566,6 @@ typedef struct shader_s {
 	float		authoredOpacityValue;
 	float		authoredOpacityThresholdValue;
 
-#ifdef USE_VBO
 	// VBO structures
 	qboolean	isStaticShader;
 	int			svarsSize;
@@ -641,10 +629,8 @@ typedef struct {
 	struct drawSurf_s	*drawSurfs;
 	int			numLitSurfs;
 	struct litSurf_s	*litSurfs;
-#ifdef USE_VULKAN
 	qboolean	switchRenderPass;
 	qboolean	needScreenMap;
-#endif
 } trRefdef_t;
 
 
@@ -665,7 +651,6 @@ typedef struct image_s {
 	byte		thumbRGBA[TR_IMAGE_THUMB_SIZE * TR_IMAGE_THUMB_SIZE * 4];
 	qboolean		hasThumb;
 
-#ifdef USE_VULKAN
 	int			internalFormat;
 
 	VkSamplerAddressMode wrapClampMode;
@@ -677,11 +662,6 @@ typedef struct image_s {
 	// It is updated only once during image initialization.
 	VkDescriptorSet descriptor;
 	VkSampler	 vk_sampler;
-#else
-	GLuint		texnum;				// gl texture binding
-	GLint		internalFormat;
-	int			TMU;				// only needed for voodoo2
-#endif
 
 } image_t;
 
@@ -862,11 +842,9 @@ typedef struct srfGridMesh_s {
 	float			lodRadius;
 	int				lodFixed;
 	int				lodStitched;
-#ifdef USE_VBO
 	int				vboItemIndex;
 	int				vboExpectIndices;
 	int				vboExpectVertices;
-#endif
 	// vertexes
 	int				width, height;
 	float			*widthLodError;
@@ -881,9 +859,7 @@ typedef struct {
 
 	// dynamic lighting information
 	int			dlightBits;
-#ifdef USE_VBO
 	int			vboItemIndex;
-#endif
 	float		*normals;
 	float			*qtangents;
 	float			*lightdir;
@@ -905,9 +881,7 @@ typedef struct {
 
 	// dynamic lighting information
 	int				dlightBits;
-#ifdef USE_VBO
 	int				vboItemIndex;
-#endif
 
 	// culling information (bounds could be used for culling)
 	vec3_t			bounds[2];
@@ -1463,12 +1437,10 @@ typedef struct {
 	qboolean				mapLoading;
 
 	int						needScreenMap;
-#ifdef USE_VULKAN
 	drawSurfsCommand_t		*drawSurfCmd;
 	int						numDrawSurfCmds;
 	int						lastRenderCommand;
 	int						numFogs; // read before parsing shaders
-#endif
 
 	qboolean				vertexLightingAllowed;
 } trGlobals_t;
@@ -1485,10 +1457,8 @@ extern glstatic_t gls;
 
 extern void myGlMultMatrix(const float *a, const float *b, float *out);
 
-#ifdef USE_VULKAN
 extern Vk_Instance	vk;				// shouldn't be cleared during ref re-init
 extern Vk_World		vk_world;		// this data is cleared during ref re-init
-#endif
 
 //
 // cvars
@@ -1533,9 +1503,7 @@ extern cvar_t	*r_deferredLightDemoRadius;
 extern cvar_t	*r_deferredLightDemoDistance;
 extern cvar_t	*r_deferredLightDemoEnergy;
 extern cvar_t	*r_deferredLightDemoAnimate;
-#ifdef USE_VULKAN
 extern cvar_t	*r_device;
-#ifdef USE_VBO
 extern cvar_t	*r_vbo;
 #endif
 extern cvar_t	*r_pbr;
@@ -1565,7 +1533,6 @@ extern cvar_t	*r_pomShadow;
 extern cvar_t	*r_pomShadowSteps;
 extern cvar_t	*r_materialBlend;
 extern cvar_t	*r_materialBlendSharpness;
-#endif
 extern cvar_t	*r_baseNormalX;
 extern cvar_t	*r_baseNormalY;
 extern cvar_t	*r_baseParallax;
@@ -2232,13 +2199,11 @@ typedef struct shaderCommands_s
 	color4ub_t	constantColor255[SHADER_MAX_VERTEXES] QALIGN(16);
 #pragma pack(pop)
 
-#ifdef USE_VBO
 	surfaceType_t	surfType;
 	int			vboIndex;
 	int			vboStage;
 	qboolean	allowVBO;
 	const struct stream_vbo_item_s *vboStreamItem;
-#endif
 
 	shader_t	*shader;
 	double		shaderTime;	// -EC- set to double for frameloss fix
@@ -2251,7 +2216,6 @@ typedef struct shaderCommands_s
 	qboolean	dlightPass;
 	qboolean	dlightUpdateParams;
 
-#ifdef USE_VULKAN
 	Vk_Depth_Range depthRange;
 	const struct srfGLTFPrimitive_s *gltfDrawSurface; /* when set, draw from glTF VBO instead of tess */
 	qboolean	gltfUseGpuPipeline; /* PBR + glTF VBO with GPU skin/morph (persists until next Tess_Begin) */
@@ -2356,10 +2320,8 @@ SHADOWS
 void RB_ShadowTessEnd( void );
 void RB_ShadowFinish( void );
 void RB_ProjectionShadowDeform( void );
-#ifdef USE_VULKAN
 void RB_RenderDrawSurfList( drawSurf_t *drawSurfs, int numDrawSurfs );
 void RB_RenderVolumetricShadowView( const viewParms_t *shadowViewParms, drawSurf_t *drawSurfs, int numDrawSurfs );
-#endif
 
 /*
 ============================================================
@@ -2605,11 +2567,9 @@ typedef struct drawSurfsCommand_s {
 	int		numDrawSurfs;
 } drawSurfsCommand_t;
 
-#ifdef USE_VULKAN
 /* Defer first-person weapon until after world Temporal Reconstruction. */
 qboolean RB_TryDeferWeaponDrawSurfs( const drawSurfsCommand_t *cmd );
 void RB_FlushDeferredWeaponAfterTaa( VkImageView *post_fog_src, VkImageView *luminance_src );
-#endif
 
 typedef struct
 {
@@ -2705,11 +2665,6 @@ qboolean RE_CanMinimize( void );
 const glconfig_t *RE_GetConfig( void );
 void RE_VertexLighting( qboolean allowed );
 
-#ifndef USE_VULKAN
-#define GLE( ret, name, ... ) extern ret ( APIENTRY * q##name )( __VA_ARGS__ );
-	QGL_Core_PROCS;
-	QGL_Ext_PROCS;
-#undef GLE
 
 #endif
 
@@ -2722,7 +2677,6 @@ void		R_AddConvolveCubemapCmd( cubemap_t *cubemap , int cubemapId );
 void		vk_generate_cubemaps( cubemap_t *cube );
 void		R_IssueRenderCommands( void );
 
-#ifdef USE_VBO
 #define VBO_STREAM_ITEM_FLAG	0x40000000u
 #define VBO_STREAM_MAX_ITEMS	1024
 
@@ -2766,7 +2720,6 @@ extern void VBO_StreamClear( void );
 extern qboolean VBO_StreamUploadSurface( surfaceType_t *surface, shader_t *shader, int *outVboItemIndex );
 extern qboolean VBO_StreamFlushGpu( void );
 extern const stream_vbo_item_t *VBO_StreamGetItem( int itemIndex );
-#endif
 
 int R_GetLightmapCoords( int lightmapIndex, float *x, float *y );
 int R_GetLightmapPixelOffset( int lightmapIndex, int *pixelX, int *pixelY );

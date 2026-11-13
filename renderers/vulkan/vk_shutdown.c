@@ -62,9 +62,7 @@ Split from vk.c.
 #include "vk_pipeline_cache_disk.h"
 #include "vk_fp64_points.h"
 
-#ifdef USE_VBO
 void vk_release_vbo( void );
-#endif
 
 void vk_shutdown( refShutdownCode_t code )
 {
@@ -287,14 +285,10 @@ void vk_shutdown( refShutdownCode_t code )
 		qvkDestroyPipelineLayout( vk.device, vk.pipeline_layout_atmosphere, NULL );
 		vk.pipeline_layout_atmosphere = VK_NULL_HANDLE;
 	}
-#ifdef USE_VK_PBR
 	qvkDestroyPipelineLayout(vk.device, vk.pipeline_layout_brdflut, NULL);
-#endif
 
-#ifdef USE_VBO
 	vk_release_vbo();
 	vk_release_stream_vbo();
-#endif
 
 	vk_clean_staging_buffer();
 
@@ -541,9 +535,7 @@ for (i = 0; i < 2; i++) {
 	VK_DESTROY_SHADER_MODULE_FIELD( vk.modules.irradiancecube_fs );
 	VK_DESTROY_SHADER_MODULE_FIELD( vk.modules.prefilterenvmap_fs );
 
-#ifdef USE_VK_PBR
 	VK_DESTROY_SHADER_MODULE_FIELD( vk.modules.brdflut_fs );
-#endif
 
 	#undef VK_DESTROY_SHADER_MODULE_FIELD
 

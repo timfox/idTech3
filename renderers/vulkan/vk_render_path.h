@@ -1,6 +1,5 @@
 #pragma once
 
-#ifdef USE_VULKAN
 
 /*
  * Clustered Hybrid M1 — authoritative surface render-path selection.
@@ -74,4 +73,3 @@ extern cvar_t *r_materialPathDebug;
 extern cvar_t *r_materialPathReason;
 extern cvar_t *r_gbufferCompact;
 
-#endif /* USE_VULKAN */

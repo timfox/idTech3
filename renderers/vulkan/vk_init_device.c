@@ -172,16 +172,12 @@ void vk_initialize( void )
 	vk.prevClientState = CA_UNINITIALIZED;
 	Com_Memset( &vk.temporal, 0, sizeof( vk.temporal ) );
 	Com_Memset( &vk.forward_plus, 0, sizeof( vk.forward_plus ) );
-#ifdef USE_VK_PBR
 	vk.set_layout_forward_plus = VK_NULL_HANDLE;
 	vk.set_layout_oit_shadow = VK_NULL_HANDLE;
 	vk.oit_shadow_descriptor = VK_NULL_HANDLE;
-#endif
 	vk.uniform_alignment = props.limits.minUniformBufferOffsetAlignment;
 	vk.uniform_item_size = PAD( sizeof( vkUniform_t ), (size_t)vk.uniform_alignment );
-#ifdef USE_VK_PBR	
 	vk.uniform_camera_item_size = PAD( sizeof( vkUniformCamera_t ), (size_t)vk.uniform_alignment );
-#endif
 	// for flare visibility tests
 	vk.storage_alignment = MAX( props.limits.minStorageBufferOffsetAlignment, sizeof( uint32_t ) );
 
@@ -329,7 +325,6 @@ void vk_initialize( void )
 
 	vk.maxBoundDescriptorSets = props.limits.maxBoundDescriptorSets;
 
-#ifdef USE_VK_PBR
 	// Decide PBR activation and print a clear reason if disabled.
 	vk.pbrActive = qfalse;
 	if ( r_pbr->integer ) {
@@ -351,7 +346,6 @@ void vk_initialize( void )
 		ri.Printf( PRINT_WARNING,
 			"PBR IBL: runtime cubemap convolution is disabled on Vulkan; using fallback IBL.\n" );
 	}
-#endif
 #endif
 
 	glConfig.textureEnvAddAvailable = qtrue;
@@ -609,10 +603,8 @@ void vk_initialize( void )
 
 		pool_size[0].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
 			pool_size[0].descriptorCount = MAX_DRAWIMAGES + NUM_COMMAND_BUFFERS + NUM_COMMAND_BUFFERS + NUM_COMMAND_BUFFERS + 3 + 6 + VK_NUM_BLOOM_PASSES * 2 + 32 + NUM_COMMAND_BUFFERS + 1 + 3; // + TAA reactive[N] + reactive stamp reveal + object-id (curr/prev/stub)
-#ifdef USE_VK_PBR
         if ( vk.pbrActive )
             pool_size[0].descriptorCount += 2 + ( MAX_DRAWIMAGES * 9 ) + 24; // brdf-lut + irradiance | PBR maps | blend layer arrays (3×8)
-#endif
 
 		pool_size[1].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
 		pool_size[1].descriptorCount = NUM_COMMAND_BUFFERS * 2; // main + camera
@@ -658,7 +650,6 @@ void vk_initialize( void )
 
 	vk_forward_plus_create_set_layout();
 
-#ifdef USE_VK_PBR
 	/* Material-blend layer arrays: set 19, bindings 0..2 with descriptorCount 8 each. */
 	{
 		VkDescriptorSetLayoutBinding blend_bindings[3];
@@ -677,7 +668,6 @@ void vk_initialize( void )
 		blend_layout_desc.pBindings = blend_bindings;
 		VK_CHECK( qvkCreateDescriptorSetLayout( vk.device, &blend_layout_desc, NULL, &vk.set_layout_blend_layers ) );
 	}
-#endif
 
 		{
 			VkDescriptorSetLayoutBinding compute_bindings[19];
@@ -1078,7 +1068,6 @@ void vk_initialize( void )
 		set_layouts[2] = vk.set_layout_sampler; // lightmap / fog-only
 		set_layouts[3] = vk.set_layout_sampler; // blend
 		set_layouts[4] = vk.set_layout_sampler; // collapsed fog texture
-#ifdef USE_VK_PBR
 		set_layouts[5] = vk.set_layout_sampler; // brdf lut
 		set_layouts[6] = vk.set_layout_sampler; // normalMap
 		set_layouts[7] = vk.set_layout_sampler; // physicalMap
@@ -1094,7 +1083,6 @@ void vk_initialize( void )
 		set_layouts[17] = vk.set_layout_sampler; // detail
 		set_layouts[18] = vk.set_layout_forward_plus;
 		set_layouts[19] = vk.set_layout_blend_layers;
-#endif
 		desc.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
 		desc.pNext = NULL;
 		desc.flags = 0;

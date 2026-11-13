@@ -7,7 +7,6 @@ Uploads canonical mat/amp tables from ltc_tables.h for Forward+ / deferred.
 
 #pragma once
 
-#ifdef USE_VULKAN
 
 #include "vk.h"
 
@@ -33,4 +32,3 @@ void vk_ltc_update_deferred_lighting_descriptors( VkDescriptorSet set );
 
 void vk_ltc_status_f( void );
 
-#endif /* USE_VULKAN */

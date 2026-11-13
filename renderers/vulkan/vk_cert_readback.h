@@ -4,7 +4,6 @@
  * Phase 2.6A/2.6C — certification GPU readback + deferred OIT frame snapshots.
  */
 
-#ifdef USE_VULKAN
 
 #include "../common/tr_types.h"
 #include <vulkan/vulkan.h>
@@ -102,4 +101,3 @@ const certIqSnapshot_t *vk_cert_readback_last_iq_snapshot( void );
 qboolean vk_cert_readback_decode_to_rgba( VkFormat format, uint32_t width, uint32_t height,
 	uint32_t rowPitchBytes, const void *src, float *dstRgba );
 
-#endif /* USE_VULKAN */

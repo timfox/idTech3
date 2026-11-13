@@ -4,7 +4,5 @@
  */
 #ifndef VK_PROJECTED_LIGHTS_H
 #define VK_PROJECTED_LIGHTS_H
-#ifdef USE_VULKAN
 void vk_projected_lights_register( void );
-#endif
 #endif

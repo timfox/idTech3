@@ -12,7 +12,6 @@ Called from tr_init.c after pipeline creation.
 
 void vk_validate_pbr_ibl_resources( void )
 {
-#ifdef USE_VK_PBR
 	int i;
 
 	if ( !vk.pbrActive ) {
@@ -63,7 +62,6 @@ void vk_validate_pbr_ibl_resources( void )
 			ri.Printf( PRINT_ALL, "[VK] PBR IBL: local cubemaps ready=%d incomplete=%d\n",
 				vk.pbr_ibl_ready_cubemap_count, vk.pbr_ibl_incomplete_cubemap_count );
 		}
-#endif
 
 		if ( !brdfLutReady ) {
 			ri.Printf( PRINT_WARNING, "PBR IBL: BRDF LUT resources are incomplete, split-sum specular may fallback\n" );

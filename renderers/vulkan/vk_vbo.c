@@ -26,8 +26,6 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "vk_util.h"
 #include "vk_geometry_corruption.h"
 
-#ifdef USE_VBO
-
 void vk_release_vbo( void )
 {
 	if ( vk.vbo.vertex_buffer )
@@ -445,7 +443,6 @@ static void VBO_AddGeometry( vbo_t *vbo, vbo_item_t *vi, shaderCommands_t *input
 		// go to first color offset
 		offs = input->shader->normalOffset + input->shader->numVertexes * sizeof( input->normal[0] );
 
-#ifdef USE_VK_PBR
 		if( vk.pbrActive ) {
 			input->shader->qtangentOffset = input->shader->normalOffset + input->shader->numVertexes * sizeof(input->normal[0]);
 			input->shader->lightdirOffset = input->shader->qtangentOffset + input->shader->numVertexes * sizeof(input->qtangent[0]);
@@ -455,7 +452,6 @@ static void VBO_AddGeometry( vbo_t *vbo, vbo_item_t *vi, shaderCommands_t *input
 			// go to first color offset
 			offs = input->shader->lightdirOffset + input->shader->numVertexes * sizeof(input->qtangent[0]);
 		}
-#endif
 
 		for ( i = 0; i < MAX_VBO_STAGES; i++ )
 		{
@@ -552,7 +548,6 @@ static void VBO_AddGeometry( vbo_t *vbo, vbo_item_t *vi, shaderCommands_t *input
 	//Com_Printf( "v offs=%i size=%i\n", offs, size );
 	memcpy( vbo->vbo_buffer + offs, input->normal, size );
 
-#ifdef USE_VK_PBR
 	// qtangent
 	if( vk.pbrActive ) {	
 		offs = input->shader->qtangentOffset + input->shader->curVertexes * sizeof(input->qtangent[0]);
@@ -572,7 +567,6 @@ static void VBO_AddGeometry( vbo_t *vbo, vbo_item_t *vi, shaderCommands_t *input
 		//Com_Printf( "v offs=%i size=%i\n", offs, size );
 		memcpy(vbo->vbo_buffer + offs, input->lightdir, size);
 	}
-#endif
 
 	vi->num_indexes += input->numIndexes;
 	vi->num_vertexes += input->numVertexes;
@@ -1140,11 +1134,9 @@ static void VBO_StreamWriteGeometry( stream_vbo_item_t *item, shaderCommands_t *
 	int offs, size, i;
 
 	svarsSize = input->shader->svarsSize;
-#ifdef USE_VK_PBR
 	if ( vk.pbrActive ) {
 		svarsSize += (int)( input->numVertexes * ( sizeof( input->qtangent[0] ) + sizeof( input->lightdir[0] ) ) );
 	}
-#endif
 
 	VBO_StreamEnsureCapacity( input->numIndexes * (int)sizeof( input->indexes[0] ) +
 		input->numVertexes * ( (int)sizeof( input->xyz[0] ) + (int)sizeof( input->normal[0] ) + svarsSize ) );
@@ -1156,13 +1148,11 @@ static void VBO_StreamWriteGeometry( stream_vbo_item_t *item, shaderCommands_t *
 	item->normalOffset = item->vboOffset + input->numVertexes * (int)sizeof( input->xyz[0] );
 	offs = item->normalOffset + input->numVertexes * (int)sizeof( input->normal[0] );
 
-#ifdef USE_VK_PBR
 	if ( vk.pbrActive ) {
 		item->qtangentOffset = offs;
 		item->lightdirOffset = offs + input->numVertexes * (int)sizeof( input->qtangent[0] );
 		offs = item->lightdirOffset + input->numVertexes * (int)sizeof( input->lightdir[0] );
 	}
-#endif
 
 	stream_vbo.vbo_offset = VBO_StreamLayoutStages( item, input, offs );
 
@@ -1178,7 +1168,6 @@ static void VBO_StreamWriteGeometry( stream_vbo_item_t *item, shaderCommands_t *
 	size = input->numVertexes * (int)sizeof( input->normal[0] );
 	memcpy( stream_vbo.vbo_buffer + offs, input->normal, size );
 
-#ifdef USE_VK_PBR
 	if ( vk.pbrActive ) {
 		offs = item->qtangentOffset;
 		size = input->numVertexes * (int)sizeof( input->qtangent[0] );
@@ -1188,7 +1177,6 @@ static void VBO_StreamWriteGeometry( stream_vbo_item_t *item, shaderCommands_t *
 		size = input->numVertexes * (int)sizeof( input->lightdir[0] );
 		memcpy( stream_vbo.vbo_buffer + offs, input->lightdir, size );
 	}
-#endif
 
 	for ( i = 0; i < MAX_VBO_STAGES; i++ ) {
 		pStage = input->xstages[i];
@@ -1336,6 +1324,3 @@ void VBO_RenderStreamItem( void )
 	vk_bind_index_buffer( vk.vbo.stream_vertex_buffer, (uint32_t)item->iboOffset );
 	vk_draw_indexed( (uint32_t)item->num_indexes, 0 );
 }
-
-
-#endif // USE_VBO

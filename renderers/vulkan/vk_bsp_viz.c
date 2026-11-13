@@ -1,7 +1,6 @@
 #include "tr_local.h"
 #include "vk_bsp_viz.h"
 
-#ifdef USE_VULKAN
 
 /*
  * BSP visualization consumes the production visibility result (MarkLeaves +
@@ -299,4 +298,3 @@ const bspVisibilityFrame_t *vk_bsp_viz_current_frame( void )
 	return &s_frame;
 }
 
-#endif /* USE_VULKAN */

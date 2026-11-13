@@ -5,7 +5,6 @@
  * ROIs describe expected analysis regions; optional overlay draws when armed.
  */
 
-#ifdef USE_VULKAN
 
 #include "../common/tr_types.h"
 
@@ -55,4 +54,3 @@ void vk_iq_cert_geometry_make_roughness_ladder( iqCertScenario_t *out );
 void vk_iq_cert_geometry_make_motion_stripe( iqCertScenario_t *out );
 void vk_iq_cert_geometry_make_gbuffer_ramps( iqCertScenario_t *out );
 
-#endif /* USE_VULKAN */

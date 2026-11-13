@@ -1,6 +1,5 @@
 #pragma once
 
-#ifdef USE_VULKAN
 
 /*
  * Raster Ultra 1.10 — color grade ownership (CDL / LUT / lift-gamma-gain).
@@ -28,4 +27,3 @@ const vkColorGradeState_t *vk_color_grade_state( void );
 
 void vk_color_grade_status_f( void );
 
-#endif /* USE_VULKAN */
