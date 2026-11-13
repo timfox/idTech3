@@ -53,6 +53,24 @@ Shader source: [`renderers/vulkan/shaders/glsl/vt_feedback.comp`](../renderers/v
 
 Neural Dynamic GI dirty-page lightmap decode is unrelated; this module is albedo/page residency for MegaTexture-style streaming.
 
+## World zone gating
+
+When the client publishes spatial zones (`re.SetWorldZoneResidency` from
+`CL_District_PublishZoneResidency`), VT feedback and page bind paths require at
+least one **resident** zone with the texture bit (`REF_WORLD_ZONE_RESIDENCY_TEXTURE`).
+If every zone is inactive or the mask omits texture residency, the feedback pass
+is skipped and `vt_status` reports rising `zone-gated feedback frames`.
+
+Legacy maps with no district import keep `zones=0` and behave as before. See
+[WORLD_ZONES.md](WORLD_ZONES.md).
+
+## Physical atlas packing (`vk_rect_allocator`)
+
+`renderers/vulkan/vk_rect_allocator.*` provides a fixed-capacity rectangle
+packer (no heap allocs) with dirty-rectangle tracking for partial atlas uploads.
+It is covered by `ctest -R unit_rect_allocator`; wiring into the live VT atlas
+path is incremental.
+
 ## Limits
 
 - No rewriting all BSP diffuse UVs yet

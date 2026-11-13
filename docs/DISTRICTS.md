@@ -37,7 +37,33 @@ Auto-resolved paths (slug = lowercase name after `District_` prefix):
 
 ## Build
 
-Requires **`USE_FREEUSD=ON`** (default) for manifest parse. Core state machine lives in `src/world/world_district.cpp` (qcommon); FreeUSD parse and console commands in `src/client/cl_district.cpp`. Loaded meshes register via **`RegisterModel`** (`r_freeusd` 1) and draw each frame through **`CL_District_AddRefEntitiesToScene`** (wrapped into **`re.RenderScene`**).
+Requires **`USE_FREEUSD=ON`** (default) for manifest parse.
+
+| Layer | Canonical path |
+|-------|----------------|
+| District + zone state machine | `modules/world/world_district.cpp`, `modules/world/world_zone.cpp` |
+| FreeUSD manifest parse + frame hook | `runtime/client/world/cl_district.cpp` |
+
+Loaded meshes register via **`RegisterModel`** (`r_freeusd` 1) and draw each
+frame through **`CL_District_AddRefEntitiesToScene`** (or the engine-owned
+standalone refdef when no cgame VM is present — Sponza benchmark). Wrapped into
+**`re.RenderScene`** on normal game frames.
+
+### USD zone metadata
+
+Each `District_*` assembly prim may carry `customData` consumed at import time
+(see [WORLD_ZONES.md](WORLD_ZONES.md)):
+
+| Key | Purpose |
+|-----|---------|
+| `zoneLoadRadius` | Override default zone activation radius |
+| `zoneUnloadRadius` | Hysteresis release radius |
+| `zonePriority` | Tie-break when multiple zones compete under `r_worldZoneBudget` |
+| `residencyMask` | `1=district`, `2=texture`, `4=shadow` (default all) |
+| `fullMesh` | Explicit full USDA path (benchmark / large payloads) |
+
+`district_load` imports one spatial zone per district and wires
+`WorldZone_SetCallbacks` for proxy load/unload.
 
 ## Console
 
@@ -95,6 +121,8 @@ With **`r_bspStream 1`**, district/open-world sector merges draw planar faces, p
 
 ## Related docs
 
+- [WORLD_ZONES.md](WORLD_ZONES.md) — spatial zone budget, masks, renderer gating
 - [OPEN_WORLD.md](OPEN_WORLD.md) — view-driven sector streaming (BSP prefetch, per-chunk nav, billboard scatter; `r_bspStreamLod`, `bsp_stream_status`)
 - [FREEUSD.md](FREEUSD.md) — mesh import and `usd_*` tools
+- [renderer_validation/SPONZA_USDA_BENCHMARK.md](renderer_validation/SPONZA_USDA_BENCHMARK.md) — `fullMesh` + zone residency capture
 - [COMPATIBILITY.md](COMPATIBILITY.md) — retail mod loading (unchanged)

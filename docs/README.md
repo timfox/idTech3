@@ -16,6 +16,8 @@ Documentation is grouped by **tier**. Most files remain at their historical path
 ## Modules (world / gameplay)
 
 - [OPEN_WORLD.md](OPEN_WORLD.md)
+- [WORLD_RESIDENCY.md](WORLD_RESIDENCY.md) — value-aware sector budgets (`r_openWorldResidency`)
+- [WORLD_ZONES.md](WORLD_ZONES.md) — authored spatial zones (district/VT/shadow masks)
 - [WORLD_CONFIG.md](WORLD_CONFIG.md) — named map-state configs (geometry/nav/spawns/lighting)
 - [DISTRICTS.md](DISTRICTS.md)
 - [PHYSICS.md](PHYSICS.md)

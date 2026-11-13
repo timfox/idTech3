@@ -15,10 +15,16 @@ vid_restart
 Command: `vshadow_status`
 
 `vshadow_status` reports physical pages, memory, new-request admissions, page
-render claims, local-light admissions, caster budget, and budget drops. These
+render claims, local-light admissions, caster budget, budget drops, the active
+**world zone** snapshot count, and **zone gated** clipmap update skips. These
 budgets are authoritative for virtual shadow residency; ReSTIR and neural
 lighting consumers may only sample resident records and cannot allocate shadow
 work behind the shadow system's back.
+
+When USDA districts publish spatial zones, the clipmap update pass runs only if
+at least one resident zone includes `REF_WORLD_ZONE_RESIDENCY_SHADOW`. Otherwise
+`zone gated` increments and the clipmap stays invalid for that frame (CSM/atlas
+fallbacks still apply). See [WORLD_ZONES.md](WORLD_ZONES.md).
 
 ## Architecture (genuine virtual pages)
 
