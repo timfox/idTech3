@@ -265,7 +265,6 @@ cvar_t	*r_pbr_debug;
 cvar_t	*r_pbr_bindlog;
 #ifdef VK_CUBEMAP
 cvar_t	*r_ibl_forceCapture;
-#endif
 cvar_t	*r_pbr_packedPreferred;
 cvar_t	*r_pbr_multiScatter;
 cvar_t	*r_pbr_multiScatterStrength;
@@ -296,7 +295,6 @@ cvar_t	*r_pbr_iblIrradianceSize;
 cvar_t	*r_pbr_iblPrefilterSize;
 cvar_t	*r_pbr_showCubemap;
 cvar_t	*r_pbr_cubemapInfo;
-#endif
 cvar_t  *r_baseNormalX;
 cvar_t  *r_baseNormalY;
 cvar_t  *r_baseParallax;
