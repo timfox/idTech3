@@ -24,6 +24,10 @@ grep -q 'Software stereo' "$ROOT/renderers/vulkan/tr_cmds.c" || fail "RE_BeginFr
 grep -q 'dlopen' "$ROOT/runtime/client/platform/cl_openhmd.c" || fail "expected runtime dlopen"
 grep -q 'ohmd_status' "$ROOT/runtime/client/platform/cl_openhmd.c" || fail "missing ohmd_status"
 grep -q 'OHMD_ROTATION_QUAT' "$ROOT/runtime/client/platform/cl_openhmd.c" || fail "missing quat tracking"
+grep -q 'Cvar_Set( "vr", "1" )' "$ROOT/runtime/client/platform/cl_openhmd.c" || fail "active headset does not advertise VR"
+grep -q 'Cvar_Set( "vr", "0" )' "$ROOT/runtime/client/platform/cl_openhmd.c" || fail "closed headset does not clear VR"
+grep -q 'Trinity VR' "$ROOT/runtime/client/platform/cl_openhmd.c" || fail "VR protocol inspiration is not credited"
+grep -q 'idtech3-engine vr' "$ROOT/docs/OPENHMD.md" || fail "SDK VR launch profile is undocumented"
 grep -q 'vr_openhmd' "$ROOT/config/openhmd.cfg" || fail "openhmd.cfg missing vr_openhmd"
 
 echo "test_openhmd: PASS"

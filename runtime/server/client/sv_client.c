@@ -2131,7 +2131,8 @@ void SV_UserinfoChanged( client_t *cl, qboolean updateUserinfo, qboolean runFilt
 
 	Info_SetValueForKey( cl->userinfo, "tld", cl->tld );
 
-	// Check if client is VR (userinfo "vr" value-gated)
+	/* Compatibility idea credit: Trinity Engine uses the value-gated `vr`
+	 * userinfo key to preserve the legacy 16-bit path for flatscreen clients. */
 	val = Info_ValueForKey( cl->userinfo, "vr" );
 	cl->isVR = ( atoi( val ) == 1 );
 
@@ -2468,6 +2469,8 @@ static void SV_UserMove( client_t *cl, msg_t *msg, qboolean delta ) {
 	oldcmd = &nullcmd;
 	for ( i = 0 ; i < cmdCount ; i++ ) {
 		cmd = &cmds[i];
+		/* Protocol idea credit: Trinity Engine widens only VR clients' button
+		 * payloads, keeping the classic network encoding byte-for-byte intact. */
 		MSG_ReadDeltaUsercmdKey( msg, key, oldcmd, cmd, cl->isVR ? 32 : 16 );
 		oldcmd = cmd;
 	}

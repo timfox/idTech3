@@ -22,6 +22,9 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 #include "server.h"
 
+/* Feature design credit: Trinity Engine's TrinityVision system inspired this
+ * complete-state, seekable server-demo path and its `.tvd` container. */
+
 tvState_t tv;
 cvar_t *sv_tvAuto;
 cvar_t *sv_tvAutoMinPlayers;

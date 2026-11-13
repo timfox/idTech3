@@ -38,6 +38,7 @@ cvar_t *cl_tvMapSerial;
 cvar_t *cl_tvMapName;
 cvar_t *cl_tvPendingMap;
 cvar_t *cl_tvAssetsReady;
+static cvar_t *cl_tvSkip;
 
 typedef enum { TVSEG_OK, TVSEG_STARVED, TVSEG_ENDED, TVSEG_NEWSTREAM } tvSegResult_t;
 
@@ -45,6 +46,8 @@ static void CL_TV_View_f( void );
 static void CL_TV_ViewNext_f( void );
 static void CL_TV_ViewPrev_f( void );
 static void CL_TV_Seek_f( void );
+static void CL_TV_Forward_f( void );
+static void CL_TV_Backward_f( void );
 static qboolean CL_TV_OpenLive( const char *filename );
 static tvSegResult_t CL_TV_ReadStreamHeader( char *mapname, int mapnameSize );
 static qboolean CL_TV_LiveMapChange( void );
@@ -362,6 +365,9 @@ void CL_TV_Init( void ) {
 	// the engine FS_Restarts and completes the in-place map change.
 	cl_tvPendingMap = Cvar_Get( "cl_tvPendingMap", "", CVAR_ROM );
 	cl_tvAssetsReady = Cvar_Get( "cl_tvAssetsReady", "0", 0 );
+	cl_tvSkip = Cvar_Get( "cl_tvSkip", "10", CVAR_ARCHIVE );
+	Cvar_CheckRange( cl_tvSkip, "1", "600", CV_INTEGER );
+	Cvar_SetDescription( cl_tvSkip, "Seconds skipped by tv_forward/tv_backward during TVD playback." );
 
 #ifdef __EMSCRIPTEN__
 	// Browser live entry: the JS loader feeds the stream into the byte-feed ring,
@@ -788,6 +794,10 @@ static qboolean CL_TV_OpenLive( const char *filename ) {
 	Cmd_AddCommand( "tv_view", CL_TV_View_f );
 	Cmd_AddCommand( "tv_view_next", CL_TV_ViewNext_f );
 	Cmd_AddCommand( "tv_view_prev", CL_TV_ViewPrev_f );
+	/* Command UX credit: Trinity's demo controls use short next/previous aliases
+	 * that are practical for controller and spectator bindings. */
+	Cmd_AddCommand( "tv_next", CL_TV_ViewNext_f );
+	Cmd_AddCommand( "tv_prev", CL_TV_ViewPrev_f );
 
 	Cvar_SetIntegerValue( "cl_tvViewpoint", 0 );
 	Cvar_SetIntegerValue( "cl_tvTime", 0 );
@@ -1068,6 +1078,12 @@ qboolean CL_TV_Open( const char *filename ) {
 	Cmd_AddCommand( "tv_view_next", CL_TV_ViewNext_f );
 	Cmd_AddCommand( "tv_view_prev", CL_TV_ViewPrev_f );
 	Cmd_AddCommand( "tv_seek", CL_TV_Seek_f );
+	/* Playback UX credit: Trinity's game module introduced these bind-friendly
+	 * skip and viewpoint command names for TrinityVision playback. */
+	Cmd_AddCommand( "tv_forward", CL_TV_Forward_f );
+	Cmd_AddCommand( "tv_backward", CL_TV_Backward_f );
+	Cmd_AddCommand( "tv_next", CL_TV_ViewNext_f );
+	Cmd_AddCommand( "tv_prev", CL_TV_ViewPrev_f );
 
 	// Set duration cvar from header (written by server on recording close)
 	Cvar_SetIntegerValue( "cl_tvDuration", tvPlay.totalDuration );
@@ -1101,6 +1117,10 @@ void CL_TV_Close( void ) {
 	Cmd_RemoveCommand( "tv_view_next" );
 	Cmd_RemoveCommand( "tv_view_prev" );
 	Cmd_RemoveCommand( "tv_seek" );
+	Cmd_RemoveCommand( "tv_forward" );
+	Cmd_RemoveCommand( "tv_backward" );
+	Cmd_RemoveCommand( "tv_next" );
+	Cmd_RemoveCommand( "tv_prev" );
 
 	Com_Memset( &tvPlay, 0, sizeof( tvPlay ) );
 }
@@ -2457,6 +2477,44 @@ static void CL_TV_Seek_f( void ) {
 
 	seconds = atoi( Cmd_Argv( 1 ) );
 	CL_TV_Seek( tvPlay.firstServerTime + seconds * 1000 );
+}
+
+
+/*
+===============
+CL_TV_Skip
+
+Move relative to the current playback position. Kept separate from tv_seek so
+key bindings remain useful after an arbitrary seek or pause.
+===============
+*/
+static void CL_TV_Skip( int direction ) {
+	int target;
+
+	if ( !tvPlay.active ) {
+		Com_Printf( "Not playing a TV demo.\n" );
+		return;
+	}
+	if ( tvPlay.live ) {
+		Com_Printf( "Cannot seek a live TV stream.\n" );
+		return;
+	}
+
+	target = cl_tvTime->integer + direction * cl_tvSkip->integer * 1000;
+	if ( target < 0 ) {
+		target = 0;
+	} else if ( tvPlay.totalDuration > 0 && target > tvPlay.totalDuration ) {
+		target = tvPlay.totalDuration;
+	}
+	CL_TV_Seek( tvPlay.firstServerTime + target );
+}
+
+static void CL_TV_Forward_f( void ) {
+	CL_TV_Skip( 1 );
+}
+
+static void CL_TV_Backward_f( void ) {
+	CL_TV_Skip( -1 );
 }
 
 

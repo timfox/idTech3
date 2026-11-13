@@ -3329,6 +3329,20 @@ set_tests_properties(test_game_starter_template PROPERTIES
 	LABELS "scripts;validation;templates"
 	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_game_starter_template.sh;${CMAKE_SOURCE_DIR}/scripts/create_starter_game.sh;${CMAKE_SOURCE_DIR}/examples/templates/game.starter/game.idproj")
 
+add_test(NAME test_engine_installer
+	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_engine_installer.sh
+	WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+set_tests_properties(test_engine_installer PROPERTIES
+	LABELS "scripts;validation;packaging"
+	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_engine_installer.sh;${CMAKE_SOURCE_DIR}/scripts/install_engine.sh;${CMAKE_SOURCE_DIR}/scripts/idtech3-engine")
+
+add_test(NAME test_trinity_compatibility
+	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_trinity_compatibility.sh
+	WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+set_tests_properties(test_trinity_compatibility PROPERTIES
+	LABELS "scripts;validation;compatibility;vr"
+	REQUIRED_FILES "${CMAKE_SOURCE_DIR}/tests/scripts/test_trinity_compatibility.sh;${CMAKE_SOURCE_DIR}/runtime/client/core/cl_tv.c;${CMAKE_SOURCE_DIR}/docs/TRINITY_COMPATIBILITY.md")
+
 add_test(NAME test_sqlite_service
 	COMMAND ${CMAKE_SOURCE_DIR}/tests/scripts/test_sqlite_service.sh
 	WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
