@@ -2259,6 +2259,7 @@ typedef struct shaderCommands_s
 	int		gltfGpuMorphCount;
 	float		gltfGpuMorphWeights[IQM_MORPH_TOP_K];
 #endif
+#endif
 
 	int			numPasses;
 	shaderStage_t **xstages;
