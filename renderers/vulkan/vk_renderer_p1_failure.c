@@ -12,7 +12,6 @@ Phase 1.6 — failure bundles.
 #include <stdio.h>
 #include <time.h>
 
-#ifdef USE_VULKAN
 
 static p1FailureBundle_t s_last;
 static qboolean s_cmds;
@@ -137,4 +136,3 @@ void vk_renderer_p1_failure_register( void )
 	}
 }
 
-#endif /* USE_VULKAN */

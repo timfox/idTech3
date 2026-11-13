@@ -8,7 +8,6 @@ invalidation. Does not replace BSP ownership. No RT / TAA dependence.
 
 #pragma once
 
-#ifdef USE_VULKAN
 
 #include "../common/tr_types.h"
 
@@ -146,4 +145,3 @@ void vk_scene_platform_light_status_f( void );
 
 const char *vk_scene_platform_kind_name( vkSceneNodeKind_t k );
 
-#endif /* USE_VULKAN */

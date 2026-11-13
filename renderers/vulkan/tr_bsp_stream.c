@@ -263,9 +263,7 @@ static srfSurfaceFace_t *R_BspStream_AllocTopFace( const vec3_t wmins, const vec
 	cv->numIndices = 6;
 	cv->ofsIndices = (int)( sizeof( *cv ) - sizeof( cv->points ) + sizeof( cv->points[0] ) * 4 );
 	cv->dlightBits = 0;
-#ifdef USE_VBO
 	cv->vboItemIndex = 0;
-#endif
 
 	VectorSet( corners[0], wmins[0], wmins[1], wmaxs[2] );
 	VectorSet( corners[1], wmaxs[0], wmins[1], wmaxs[2] );
@@ -276,7 +274,6 @@ static srfSurfaceFace_t *R_BspStream_AllocTopFace( const vec3_t wmins, const vec
 		for ( j = 0; j < 3; j++ ) {
 			cv->points[i][j] = corners[i][j];
 		}
-#ifdef USE_VK_PBR
 		cv->points[i][3] = 0.0f;
 		cv->points[i][4] = 0.0f;
 		cv->points[i][5] = 1.0f;
@@ -285,13 +282,6 @@ static srfSurfaceFace_t *R_BspStream_AllocTopFace( const vec3_t wmins, const vec
 		cv->points[i][8] = 0.0f;
 		cv->points[i][9] = 0.0f;
 		cv->points[i][10] = 255.0f;
-#else
-		cv->points[i][3] = 0.0f;
-		cv->points[i][4] = 0.0f;
-		cv->points[i][5] = 0.0f;
-		cv->points[i][6] = 0.0f;
-		cv->points[i][7] = 255.0f;
-#endif
 	}
 
 	indexes = (int *)( (byte *)cv + cv->ofsIndices );
@@ -373,9 +363,7 @@ static surfaceType_t *R_BspStream_BakeGridToTris( srfGridMesh_t *grid )
 	tri = ri.Hunk_Alloc( allocSize, h_low );
 	tri->surfaceType = SF_TRIANGLES;
 	tri->dlightBits = 0;
-#ifdef USE_VBO
 	tri->vboItemIndex = 0;
-#endif
 	tri->numVerts = numVerts;
 	tri->numIndexes = numIndexes;
 	tri->verts = (srfVert_t *)( tri + 1 );
@@ -432,7 +420,6 @@ static qboolean R_BspStream_UsesStreamAtlas( const bspStreamPatch_t *patch, int 
 }
 
 
-#ifdef USE_VK_PBR
 static void R_BspStream_GenerateFaceLightDirs( srfSurfaceFace_t *face )
 {
 	int i;
@@ -490,7 +477,6 @@ static void R_BspStream_FinalizeGridPbr( srfGridMesh_t *grid )
 		R_LightDirForPoint( grid->verts[i].xyz, grid->verts[i].lightdir, grid->verts[i].normal, tr.world );
 	}
 }
-#endif
 
 
 static void R_BspStream_FinalizeSurfacePbr( surfaceType_t *surface, shader_t *shader )
@@ -500,19 +486,13 @@ static void R_BspStream_FinalizeSurfacePbr( surfaceType_t *surface, shader_t *sh
 	}
 	switch ( *surface ) {
 	case SF_FACE:
-#ifdef USE_VK_PBR
 		R_BspStream_FinalizeFacePbr( (srfSurfaceFace_t *)surface, shader );
-#endif
 		break;
 	case SF_TRIANGLES:
-#ifdef USE_VK_PBR
 		R_BspStream_FinalizeTriPbr( (srfTriangles_t *)surface );
-#endif
 		break;
 	case SF_GRID:
-#ifdef USE_VK_PBR
 		R_BspStream_FinalizeGridPbr( (srfGridMesh_t *)surface );
-#endif
 		break;
 	default:
 		break;
@@ -662,19 +642,14 @@ static qboolean R_BspStream_ParsePlanarFace( const dsurface_t *ds, const drawVer
 	cv->numIndices = numIndexes;
 	cv->ofsIndices = ofsIndexes;
 	cv->dlightBits = 0;
-#ifdef USE_VBO
 	cv->vboItemIndex = 0;
-#endif
 
 	verts += LittleLong( ds->firstVert );
 	for ( i = 0; i < numPoints; i++ ) {
 		for ( j = 0; j < 3; j++ ) {
 			cv->points[i][j] = LittleFloat( verts[i].xyz[j] ) + worldOrigin[j];
-#ifdef USE_VK_PBR
 			cv->points[i][3 + j] = LittleFloat( verts[i].normal[j] );
-#endif
 		}
-#ifdef USE_VK_PBR
 		for ( j = 0; j < 2; j++ ) {
 			cv->points[i][6 + j] = LittleFloat( verts[i].st[j] );
 			cv->points[i][8 + j] = LittleFloat( verts[i].lightmap[j] );
@@ -682,15 +657,6 @@ static qboolean R_BspStream_ParsePlanarFace( const dsurface_t *ds, const drawVer
 		R_BspStream_ApplyLightmapST( &cv->points[i][8], &cv->points[i][9], lightmapX, lightmapY, mergedAtlas );
 		R_ColorShiftLightingBytes( verts[i].color.rgba, (byte *)&cv->points[i][10], qtrue );
 		R_LinearizeLightingBytesForHDR( (byte *)&cv->points[i][10] );
-#else
-		for ( j = 0; j < 2; j++ ) {
-			cv->points[i][3 + j] = LittleFloat( verts[i].st[j] );
-			cv->points[i][5 + j] = LittleFloat( verts[i].lightmap[j] );
-		}
-		R_BspStream_ApplyLightmapST( &cv->points[i][5], &cv->points[i][6], lightmapX, lightmapY, mergedAtlas );
-		R_ColorShiftLightingBytes( verts[i].color.rgba, (byte *)&cv->points[i][7], qtrue );
-		R_LinearizeLightingBytesForHDR( (byte *)&cv->points[i][7] );
-#endif
 		AddPointToBounds( cv->points[i], patchMins, patchMaxs );
 	}
 

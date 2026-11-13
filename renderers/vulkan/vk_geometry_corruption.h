@@ -1,6 +1,5 @@
 #pragma once
 
-#ifdef USE_VULKAN
 
 #include "../common/tr_types.h"
 
@@ -11,4 +10,3 @@ void vk_geometry_corruption_note_index_reject( const char *reason );
 void vk_geometry_corruption_note_soft_ibo_reject( void );
 cvar_t *vk_geometry_corruption_debug_cvar( void );
 
-#endif
