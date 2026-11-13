@@ -35,9 +35,22 @@ Auto-resolved paths (slug = lowercase name after `District_` prefix):
 | Proxy | `world/proxies/<slug>_proxy.usda` |
 | Full | `world/districts/<slug>.usda` |
 
+## Spatial zones
+
+Each imported district becomes one **spatial zone** ([WORLD_ZONES.md](WORLD_ZONES.md)).
+`WorldZone_UpdateView` runs inside `WorldDistrict_UpdateView` before proxy/full
+promotion; zone load/unload callbacks drive district proxy residency when the
+`WORLD_ZONE_RESIDENCY_DISTRICT` bit is set. After each frame,
+`CL_District_PublishZoneResidency` publishes resident zone bounds to the Vulkan
+renderer for virtual-texture and virtual-shadow gating.
+
+Optional USDA custom data on district prims: `zoneLoadRadius`, `zoneUnloadRadius`,
+`zonePriority`, `residencyMask` (default all layers = `7`). Cvars: `r_worldZones`,
+`r_worldZoneBudget`, `r_worldZoneLoadRadius`, `r_worldZoneUnloadRadius`.
+
 ## Build
 
-Requires **`USE_FREEUSD=ON`** (default) for manifest parse. Core state machine lives in `src/world/world_district.cpp` (qcommon); FreeUSD parse and console commands in `src/client/cl_district.cpp`. Loaded meshes register via **`RegisterModel`** (`r_freeusd` 1) and draw each frame through **`CL_District_AddRefEntitiesToScene`** (wrapped into **`re.RenderScene`**).
+Requires **`USE_FREEUSD=ON`** (default) for manifest parse. Core state machine lives in `modules/world/world_district.cpp`; FreeUSD parse and console commands in `runtime/client/world/cl_district.cpp`. Loaded meshes register via **`RegisterModel`** (`r_freeusd` 1) and draw each frame through **`CL_District_AddRefEntitiesToScene`** (wrapped into **`re.RenderScene`**).
 
 ## Console
 
@@ -95,6 +108,8 @@ With **`r_bspStream 1`**, district/open-world sector merges draw planar faces, p
 
 ## Related docs
 
+- [WORLD_ZONES.md](WORLD_ZONES.md) — zone budget, residency masks, renderer VT/vshadow gating
 - [OPEN_WORLD.md](OPEN_WORLD.md) — view-driven sector streaming (BSP prefetch, per-chunk nav, billboard scatter; `r_bspStreamLod`, `bsp_stream_status`)
+- [WORLD_RESIDENCY.md](WORLD_RESIDENCY.md) — value-aware sector cardinality (runs after zones)
 - [FREEUSD.md](FREEUSD.md) — mesh import and `usd_*` tools
 - [COMPATIBILITY.md](COMPATIBILITY.md) — retail mod loading (unchanged)
