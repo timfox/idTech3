@@ -53,7 +53,6 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "vk_biome.h"
 #include "vk_vegetation_gpu.h"
 
-#ifdef VK_CUBEMAP
 #define JSON_IMPLEMENTATION
 #include "json.h"
 #undef JSON_IMPLEMENTATION
@@ -2625,10 +2624,8 @@ qboolean RE_GetEntityToken( char *buffer, int size ) {
 	}
 }
 
-#ifdef VK_CUBEMAP
 #ifndef MAX_SPAWN_VARS
 #define MAX_SPAWN_VARS 64
-#endif
 
 // derived from G_ParseSpawnVars() in g_spawn.c
 static qboolean R_ParseSpawnVars( char *spawnVarChars, int maxSpawnVarChars, int *numSpawnVars, char *spawnVars[MAX_SPAWN_VARS][2] )
@@ -3130,7 +3127,6 @@ void RE_LoadWorldMap( const char *name ) {
 
 	vk_generate_light_directions();
 
-	#ifdef VK_CUBEMAP
 			// load cubemaps
 			if ( vk.cubemapActive )
 			{
@@ -3187,12 +3183,10 @@ void RE_LoadWorldMap( const char *name ) {
 	R_SQZ_OnMapLoad( s_worldData.baseName );
 	R_WSP_OnMapLoad( s_worldData.baseName );
 
-#ifdef VK_CUBEMAP
 	// Render all cubemaps
 	if ( vk.cubemapActive && tr.numCubemaps )
 		R_RenderAllCubemaps();
 	else if ( vk.cubemapActive && vk.pbrActive && !tr.numCubemaps ) {
 		ri.Printf( PRINT_WARNING, S_COLOR_YELLOW "PBR IBL: no cubemaps found (env.json or cubemap entities). Reflections will look generic.\n" S_COLOR_WHITE );
 	}
-#endif
 }

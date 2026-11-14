@@ -341,7 +341,6 @@ void vk_initialize( void )
 		ri.Printf( PRINT_ALL, "PBR: disabled (r_pbr 0)\n" );
 	}
 
-#ifdef VK_CUBEMAP
 	if ( vk.pbrActive && r_cubeMapping->integer ) {
 		ri.Printf( PRINT_WARNING,
 			"PBR IBL: runtime cubemap convolution is disabled on Vulkan; using fallback IBL.\n" );
@@ -1378,7 +1377,6 @@ void vk_initialize( void )
 		VK_CHECK( qvkCreatePipelineLayout( vk.device, &desc, NULL, &vk.pipeline_layout_atmosphere ) );
 		SET_OBJECT_NAME( vk.pipeline_layout_atmosphere, "pipeline layout - atmosphere", VK_DEBUG_REPORT_OBJECT_TYPE_PIPELINE_LAYOUT_EXT );
 	
-#ifdef VK_PBR_BRDFLUT
 		if( vk.pbrActive ) {
 			desc.setLayoutCount = 1;
 			desc.pSetLayouts = &vk.set_layout_sampler;
@@ -1387,7 +1385,6 @@ void vk_initialize( void )
 			VK_CHECK(qvkCreatePipelineLayout(vk.device, &desc, NULL, &vk.pipeline_layout_brdflut));
 			SET_OBJECT_NAME(vk.pipeline_layout_brdflut, "pipeline layout - brdflut", VK_DEBUG_REPORT_OBJECT_TYPE_PIPELINE_LAYOUT_EXT);
 		}
-#endif	
 	}
 
 	vk.geometry_buffer_size_new = vk.defaults.geometry_size;
@@ -1441,9 +1438,7 @@ void vk_initialize( void )
 	vk_srt_init();
 	vk_spine_registry_init();
 
-#ifdef VK_CUBEMAP
 	vk_create_cubemap_prefilter();
-#endif
 
 	// preallocate staging buffer
 	if ( vk.defaults.staging_size == STAGING_BUFFER_SIZE_HI ) {

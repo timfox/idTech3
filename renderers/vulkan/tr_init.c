@@ -263,7 +263,6 @@ cvar_t	*r_pbr;
 cvar_t	*r_pbr_shExtract;
 cvar_t	*r_pbr_debug;
 cvar_t	*r_pbr_bindlog;
-#ifdef VK_CUBEMAP
 cvar_t	*r_ibl_forceCapture;
 cvar_t	*r_pbr_packedPreferred;
 cvar_t	*r_pbr_multiScatter;
@@ -290,7 +289,6 @@ cvar_t	*r_glintMaxLodClamp;
 cvar_t	*r_glintRoughnessLo;
 cvar_t	*r_glintRoughnessHi;
 cvar_t	*r_glintDMax;
-#ifdef VK_CUBEMAP
 cvar_t	*r_pbr_iblIrradianceSize;
 cvar_t	*r_pbr_iblPrefilterSize;
 cvar_t	*r_pbr_showCubemap;
@@ -299,9 +297,7 @@ cvar_t  *r_baseNormalX;
 cvar_t  *r_baseNormalY;
 cvar_t  *r_baseParallax;
 cvar_t  *r_baseSpecular;
-#ifdef VK_CUBEMAP
 cvar_t	*r_cubeMapping;
-#endif
 cvar_t	*r_deluxeMapping;
 cvar_t	*r_deluxeSpecular;
 cvar_t   *r_vk_pipeline_debug;
@@ -1071,7 +1067,6 @@ static void R_Register( void )
 		"Log PBR IBL/glint bind state once per map (env/irr VkImageView handles and descriptor writes)." );
 	ri.Cvar_SetGroup( r_pbr_bindlog, CVG_RENDERER );
 
-#ifdef VK_CUBEMAP
 	r_ibl_forceCapture = ri.Cvar_Get( "r_ibl_forceCapture", "0", CVAR_TEMP );
 	ri.Cvar_CheckRange( r_ibl_forceCapture, "0", "1", CV_INTEGER );
 	ri.Cvar_SetDescription( r_ibl_forceCapture,
@@ -1208,7 +1203,6 @@ static void R_Register( void )
 	r_baseNormalY	= ri.Cvar_Get("r_baseNormalY",		"1.0",	CVAR_ARCHIVE | CVAR_LATCH );
 	r_baseParallax	= ri.Cvar_Get("r_baseParallax",		"0.05",	CVAR_ARCHIVE | CVAR_LATCH );
 	r_baseSpecular	= ri.Cvar_Get( "r_baseSpecular",	"0.04",	CVAR_ARCHIVE | CVAR_LATCH );
-#ifdef VK_CUBEMAP
 	r_pbr_iblIrradianceSize = ri.Cvar_Get( "r_pbr_iblIrradianceSize", "64", CVAR_ARCHIVE_ND | CVAR_LATCH );
 	ri.Cvar_CheckRange( r_pbr_iblIrradianceSize, "16", "1024", CV_INTEGER );
 	ri.Cvar_SetDescription( r_pbr_iblIrradianceSize, "IBL irradiance cubemap size (resolution per face). Power-of-two recommended. Requires renderer restart." );
@@ -1225,12 +1219,10 @@ static void R_Register( void )
 	ri.Cvar_SetDescription( r_pbr_cubemapInfo, "Read-only-ish debug string updated by renderer when r_pbr_showCubemap is enabled." );
 
 	r_cubeMapping = ri.Cvar_Get( "r_cubeMapping", "0", CVAR_ARCHIVE | CVAR_LATCH );
-#endif
 	r_deluxeMapping		= ri.Cvar_Get("r_deluxeMapping",	"1", CVAR_ARCHIVE );
 	ri.Cvar_SetDescription( r_deluxeMapping, "Reading deluxemaps when compiled with q3map2:\n 0: off (approximated from lightgrid)\n 1: on (compiled deluxemaps)" );
 	r_deluxeSpecular	= ri.Cvar_Get("r_deluxeSpecular",	"1", CVAR_ARCHIVE );
 	ri.Cvar_SetDescription( r_deluxeSpecular, "Scale the specular response from deluxemaps" );
-#endif
 	r_mapGreyScale = ri.Cvar_Get( "r_mapGreyScale", "0", CVAR_ARCHIVE_ND | CVAR_LATCH );
 	ri.Cvar_CheckRange( r_mapGreyScale, "-1", "1", CV_FLOAT );
 	ri.Cvar_SetDescription(r_mapGreyScale, "Desaturate world map textures only, works independently from \\r_greyscale, negative values only desaturate lightmaps.");
@@ -3829,12 +3821,10 @@ void R_Init( void ) {
 	VarInfo();
 
 	vk_create_pipelines();
-#ifdef VK_PBR_BRDFLUT
 	vk_create_brfdlut();
 	vk_validate_pbr_ibl_resources();
 	vk_surf_log_temporal_config();
 	vk_ui_blur_init();
-#endif
 
 	R_InitShaders();
 	R_VectorFont_Init();

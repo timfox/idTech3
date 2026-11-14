@@ -109,7 +109,6 @@ void vk_shutdown( refShutdownCode_t code )
 
 	vk_destroy_swapchain();
 
-#ifdef VK_CUBEMAP
 	vk_destroy_cubemap_prefilter();
 
 	image_t *img = tr.emptyCubemap;
@@ -124,7 +123,6 @@ void vk_shutdown( refShutdownCode_t code )
 
 		Com_Memset( &tr.cubemaps[ i ], 0, sizeof(cubemap_t) );
 	}
-#endif
 
 	SkyboxHDR_Shutdown();
 	vk_reference_lab_shutdown();

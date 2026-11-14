@@ -1205,7 +1205,6 @@ static void R_UpdatePbrIblRuntimeState( qboolean usingHdrSkybox, qboolean hasRea
 
 static void R_UpdatePBRCubemapDebugCvar( int cubemapIndex, const vec3_t pos )
 {
-#ifdef VK_CUBEMAP
 	static int lastIndex = -9999;
 	static vec3_t lastPos = { 0.0f, 0.0f, 0.0f };
 	int now = ri.Milliseconds();
@@ -1237,7 +1236,6 @@ static void R_UpdatePBRCubemapDebugCvar( int cubemapIndex, const vec3_t pos )
 	const cubemap_t *cube = &tr.cubemaps[cubemapIndex];
 	ri.Cvar_Set( "r_pbr_cubemapInfo", va( "PBR cubemap: %d '%s' (pos %.0f %.0f %.0f r=%.0f)",
 		cubemapIndex, cube->name, pos[0], pos[1], pos[2], cube->parallaxRadius ) );
-#endif
 }
 
 /*

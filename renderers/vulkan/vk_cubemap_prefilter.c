@@ -16,7 +16,6 @@ Split from vk.c.
 #include "vk_util.h"
 #include <math.h>
 
-#ifdef VK_CUBEMAP
 
 enum Target { IRRADIANCE = 0, PREFILTEREDENV = 1 };
 
@@ -777,9 +776,7 @@ void vk_begin_cubemap_render_pass( void )
 	vk_begin_render_pass_tracked( vk.render_pass.cubemap, frameBuffer, qtrue, vk.renderWidth, vk.renderHeight );
 }
 
-#endif /* VK_CUBEMAP */
 
-#ifdef VK_PBR_BRDFLUT
 void vk_create_brfdlut( void )
 {
 	if ( !vk.pbrActive )
@@ -830,4 +827,3 @@ void vk_create_brfdlut( void )
 		vk_end_command_buffer( command_buffer, __func__ );
 	}
 }
-#endif /* VK_PBR_BRDFLUT */

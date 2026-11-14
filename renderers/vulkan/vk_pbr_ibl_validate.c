@@ -53,7 +53,6 @@ void vk_validate_pbr_ibl_resources( void )
 			brdfLutReady ? "ready" : "missing",
 			emptyCubemapReady ? "ready" : "missing" );
 
-#ifdef VK_CUBEMAP
 		ri.Printf( PRINT_ALL, "[VK] PBR IBL: runtime cubemap path %s\n",
 			vk.cubemapActive ? "enabled" : "disabled" );
 		if ( vk.cubemapActive && tr.numCubemaps == 0 ) {
@@ -70,5 +69,4 @@ void vk_validate_pbr_ibl_resources( void )
 			ri.Printf( PRINT_WARNING, "PBR IBL: empty cubemap fallback is missing\n" );
 		}
 	}
-#endif
 }

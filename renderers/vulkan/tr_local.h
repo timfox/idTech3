@@ -1361,7 +1361,6 @@ typedef struct {
 	image_t					*emptyCubemap;
 	int                     numCubemaps;
 	cubemap_t               *cubemaps;
-#endif
 
 	shader_t				*defaultShader;
 	shader_t				*whiteShader;
@@ -1510,7 +1509,6 @@ extern cvar_t	*r_pbr;
 extern cvar_t	*r_pbr_shExtract;
 extern cvar_t	*r_pbr_debug;
 extern cvar_t	*r_pbr_bindlog;
-#ifdef VK_CUBEMAP
 extern cvar_t	*r_ibl_forceCapture;
 void		R_PBR_ResetBindLog( void );
 extern cvar_t	*r_pbr_packedPreferred;
@@ -1521,7 +1519,6 @@ extern cvar_t	*r_pbr_specularAA;
 extern cvar_t	*r_pbr_specularAAStrength;
 extern cvar_t	*r_pbr_anisotropicSpecular;
 extern cvar_t	*r_pbr_iblAnisoStretch;
-#ifdef VK_CUBEMAP
 extern cvar_t	*r_pbr_iblIrradianceSize;
 extern cvar_t	*r_pbr_iblPrefilterSize;
 extern cvar_t	*r_pbr_showCubemap;
@@ -1537,12 +1534,9 @@ extern cvar_t	*r_baseNormalX;
 extern cvar_t	*r_baseNormalY;
 extern cvar_t	*r_baseParallax;
 extern cvar_t	*r_baseSpecular;
-#ifdef VK_CUBEMAP
 extern cvar_t	*r_cubeMapping;
-#endif
 extern cvar_t	*r_deluxeMapping;
 extern cvar_t	*r_deluxeSpecular;
-#endif
 extern cvar_t	*r_ssao;
 extern cvar_t	*r_ssaoMethod;
 extern cvar_t	*r_ssaoRadius;
@@ -1768,7 +1762,6 @@ extern cvar_t	*r_renderScale;
 extern cvar_t	*r_temporalDebug;
 extern cvar_t	*r_temporalCustomShaderMotion;
 extern cvar_t	*r_temporalCpuSkinPrev;
-#endif
 
 extern cvar_t	*r_dlightBacks;			// dlight non-facing surfaces for continuity
 

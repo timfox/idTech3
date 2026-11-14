@@ -196,7 +196,6 @@ void R_AddDrawSurfCmd( drawSurf_t *drawSurfs, int numDrawSurfs ) {
 	}
 }
 
-#ifdef VK_CUBEMAP
 /*
 =============
 R_AddConvolveCubemapsCmd
@@ -214,7 +213,6 @@ void R_AddConvolveCubemapCmd( cubemap_t *cubemap , int cubemapId ) {
 	cmd->cubemap = cubemap;
 	cmd->cubemapId = cubemapId;
 }
-#endif
 
 /*
 =============

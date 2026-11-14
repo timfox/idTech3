@@ -1670,7 +1670,6 @@ qboolean RB_TryDeferWeaponDrawSurfs( const drawSurfsCommand_t *cmd )
 	if ( !vk_temporal_want_weapon_after_world_post() ) {
 		return qfalse;
 	}
-#ifdef VK_CUBEMAP
 	if ( cmd->viewParms.targetCube != NULL ) {
 		return qfalse;
 	}
@@ -1800,7 +1799,6 @@ static qboolean RB_ResolveIndependentWeaponHistory( VkImageView worldView,
 		assert( vk.temporal.weaponHistoryFrameId[readIndex] + 1u == vk.temporal.frameIndex );
 		assert( vk.temporal.weaponDepthFrameId[readIndex] + 1u == vk.temporal.frameIndex );
 	}
-#endif
 	if ( worldView == VK_NULL_HANDLE || worldView == vk.color_image_view ||
 		vk.weapon_taa_pipeline == VK_NULL_HANDLE ||
 		vk.weapon_taa_composite_pipeline == VK_NULL_HANDLE ||
@@ -2111,7 +2109,6 @@ static const void *RB_DrawSurfs( const void *data ) {
 		vk_object_id_begin_frame();
 	}
 
-#ifdef VK_CUBEMAP
 	if ( backEnd.viewParms.targetCube != NULL ) 
 	{
 		vk_end_render_pass();
@@ -2120,7 +2117,6 @@ static const void *RB_DrawSurfs( const void *data ) {
 		backEnd.doneSurfaces = qtrue; // for bloom
 		return (const void*)(cmd + 1);
 	}
-#endif
 
 	if ( vk_deferred_opaque_transparent_split() ) {
 		/* Mode 1 deferred or mode 3 Unified Clustered:
@@ -2332,9 +2328,7 @@ static const void *RB_DrawSurfs( const void *data ) {
 	 * must not treat those as "no world" or HDR stays untone-mapped (black).
 	 */
 	if ( !( cmd->refdef.rdflags & RDF_NOWORLDMODEL )
-#ifdef VK_CUBEMAP
 		&& cmd->viewParms.targetCube == NULL
-#endif
 		) {
 		backEnd.doneWorldScene = qtrue;
 		vk_temporal_capture_world_viewparms();
@@ -2682,7 +2676,6 @@ static const void *RB_SwapBuffers( const void *data ) {
 	return (const void *)(cmd + 1);
 }
 
-#ifdef VK_CUBEMAP
 /*
 =============
 RB_PrefilterEnvMap
@@ -2749,7 +2742,6 @@ static const void *RB_PrefilterEnvMap( const void *data )
 
 	return (const void *)(cmd + 1);
 }
-#endif
 
 /*
 ====================
@@ -2814,11 +2806,9 @@ void RB_ExecuteRenderCommands( const void *data ) {
 		case RC_CLEARDEPTH:
 			data = RB_ClearDepth(data);
 			break;
-#ifdef VK_CUBEMAP
 		case RC_CONVOLVECUBEMAP:
 			data = RB_PrefilterEnvMap( data );
 			break;
-#endif
 		case RC_CLEARCOLOR:
 			data = RB_ClearColor(data);
 			break;
