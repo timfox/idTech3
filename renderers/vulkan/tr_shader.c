@@ -4510,7 +4510,6 @@ static shader_t *FinishShader( void ) {
 
 	FindLightingBundle();
 
-#if 1
 	// try to avoid redundant per-stage computations
 	Com_Memset( lastStage, 0, sizeof( lastStage ) );
 	for ( i = 0; i < shader.numUnfoggedPasses - 1; i++ ) {
@@ -4528,7 +4527,6 @@ static shader_t *FinishShader( void ) {
 			}
 		}
 	}
-#endif
 
 	// make sure that amplitude for TMOD_STRETCH is not zero
 	for ( i = 0; i < shader.numUnfoggedPasses; i++ ) {

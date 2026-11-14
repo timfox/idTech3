@@ -238,6 +238,20 @@ fi
 
 echo ""
 
+# --- Vulkan compile-flag cleanup guards (static; no build required) ---
+echo "Vulkan stale compile-flag guards:"
+if [ -x "$PROJECT_ROOT/tests/scripts/test_stale_compile_flags.sh" ]; then
+  if "$PROJECT_ROOT/tests/scripts/test_stale_compile_flags.sh"; then
+    pass "test_stale_compile_flags.sh"
+  else
+    fail "test_stale_compile_flags.sh"
+  fi
+else
+  warn "test_stale_compile_flags.sh not executable"
+fi
+
+echo ""
+
 # --- Shader validation ---
 echo "Shader checks:"
 if command -v glslangValidator &>/dev/null; then
