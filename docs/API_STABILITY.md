@@ -1,6 +1,6 @@
 # API Stability Charter
 
-This document formalizes the **layer cake** contract from [CLAUDE.md](../CLAUDE.md) for mod authors, native game modules, and idtech3.com SDK consumers.
+This document formalizes the engine's **layer cake** contract for mod authors, native game modules, and idtech3.com SDK consumers.
 
 ## Layers
 

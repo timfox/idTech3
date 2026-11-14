@@ -274,7 +274,7 @@ When C++23 work lands, update:
 - [CPP20_MIGRATION.md](CPP20_MIGRATION.md) if the C++20 baseline changes
 - [CPP20_CONVERSION_ORDER.md](CPP20_CONVERSION_ORDER.md) or a future `CPP23_CONVERSION_ORDER.md`
 - [DEVELOPMENT_SETUP.md](DEVELOPMENT_SETUP.md) for compiler requirements
-- `CLAUDE.md` / `AGENTS.md` only when build commands or repo policy change
+- Repository build and policy documentation only when build commands or repo policy change
 
 ## Open Questions
 
@@ -283,4 +283,3 @@ When C++23 work lands, update:
 - Do we want a custom STL allocator bridge before allowing broader containers?
 - Should converted renderer helper TUs use C++23 before core engine TUs?
 - What is the first authoritative sim path that should prove deterministic C++23 containers?
-

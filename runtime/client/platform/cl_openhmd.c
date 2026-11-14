@@ -11,9 +11,20 @@ OpenHMD VR: runtime-loaded head tracking and software stereo for HMDs.
 
 #ifdef USE_OPENHMD
 
-#include <dlfcn.h>
 #include <string.h>
 #include <math.h>
+
+#ifdef _WIN32
+#include <windows.h>
+#define OHMD_OPEN( name ) LoadLibraryA( name )
+#define OHMD_SYMBOL( lib, name ) ((void *)GetProcAddress( (HMODULE)(lib), name ))
+#define OHMD_CLOSE( lib ) FreeLibrary( (HMODULE)(lib) )
+#else
+#include <dlfcn.h>
+#define OHMD_OPEN( name ) dlopen( name, RTLD_NOW | RTLD_LOCAL )
+#define OHMD_SYMBOL( lib, name ) dlsym( lib, name )
+#define OHMD_CLOSE( lib ) dlclose( lib )
+#endif
 
 #include "openhmd.h"
 
@@ -69,9 +80,9 @@ static cvar_t *vr_openhmdRoll;
 
 #define OHMD_LOAD( name ) \
 	do { \
-		void *_sym = dlsym( ohmdApi.lib, "ohmd_" #name ); \
+		void *_sym = OHMD_SYMBOL( ohmdApi.lib, "ohmd_" #name ); \
 		if ( !_sym ) { \
-			Com_Printf( "OpenHMD: missing symbol ohmd_%s (%s)\n", #name, dlerror() ); \
+			Com_Printf( "OpenHMD: missing symbol ohmd_%s\n", #name ); \
 			return qfalse; \
 		} \
 		memcpy( &ohmdApi.name, &_sym, sizeof( ohmdApi.name ) ); \
@@ -80,8 +91,13 @@ static cvar_t *vr_openhmdRoll;
 static qboolean OHMD_LoadLibrary( void )
 {
 	const char *candidates[] = {
+#ifdef _WIN32
+		"openhmd.dll",
+		"libopenhmd.dll",
+#else
 		"libopenhmd.so.0",
 		"libopenhmd.so",
+#endif
 		NULL
 	};
 	int i;
@@ -91,7 +107,7 @@ static qboolean OHMD_LoadLibrary( void )
 	}
 
 	for ( i = 0; candidates[i]; i++ ) {
-		ohmdApi.lib = dlopen( candidates[i], RTLD_NOW | RTLD_LOCAL );
+		ohmdApi.lib = OHMD_OPEN( candidates[i] );
 		if ( ohmdApi.lib ) {
 			Com_Printf( "OpenHMD: loaded %s\n", candidates[i] );
 			break;
@@ -114,7 +130,7 @@ static qboolean OHMD_LoadLibrary( void )
 	OHMD_LOAD( device_getf );
 	OHMD_LOAD( device_setf );
 	{
-		void *sym = dlsym( ohmdApi.lib, "ohmd_get_version" );
+		void *sym = OHMD_SYMBOL( ohmdApi.lib, "ohmd_get_version" );
 		if ( sym ) {
 			memcpy( &ohmdApi.get_version, &sym, sizeof( ohmdApi.get_version ) );
 		}
@@ -394,7 +410,7 @@ void OHMD_Shutdown( void )
 	}
 	s_ctx = NULL;
 	if ( ohmdApi.lib ) {
-		dlclose( ohmdApi.lib );
+		OHMD_CLOSE( ohmdApi.lib );
 		ohmdApi.lib = NULL;
 	}
 	s_libOk = qfalse;

@@ -98,7 +98,7 @@ If your data lives in **`baseq3/`** instead:
 
 ## Compile the engine (so you have binaries to point at)
 
-From the repository root (see [BUILD.md](../BUILD.md) and [CLAUDE.md](../CLAUDE.md) for full detail):
+From the repository root (see [BUILD.md](../BUILD.md) for full detail):
 
 ```bash
 ./scripts/compile_engine.sh vulkan    # or: vulkan debug, etc.

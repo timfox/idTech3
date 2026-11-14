@@ -80,3 +80,17 @@ mods/playfield/
 .aider*
 .fetchcontent-cache/idtech3_sdl3-src/android-project/.gradle/8.12/fileHashes/fileHashes.lock
 sponza/
+
+# FetchContent downloads/build trees and local dependency state are not source.
+.fetchcontent-cache/
+
+# Local benchmark output and test logs.
+sponza_benchmark_results/*.log
+Testing/
+tests/LastTest.log
+tests/tmp/
+
+# Local editor/agent state and crash/debug output.
+.cursor/
+*.core
+*.trace

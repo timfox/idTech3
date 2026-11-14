@@ -4,7 +4,7 @@ Thank you for your interest in contributing. This document outlines how to get s
 
 ## Before You Start
 
-- Read [CLAUDE.md](../CLAUDE.md) for project goals, architecture, and coding conventions
+- Read [README.md](../README.md) and [BUILD.md](../BUILD.md) for project goals, architecture, and build conventions
 - Read [DEVELOPMENT_SETUP.md](DEVELOPMENT_SETUP.md) for build prerequisites and commands
 - Ensure your changes align with the layer cake (vanilla/chocolate/layercake) and never break backward compatibility
 
@@ -52,7 +52,7 @@ Tests include:
 
 ## Code Quality
 
-- Follow naming conventions in [CLAUDE.md](../CLAUDE.md)
+- Follow the naming conventions established by the surrounding code
 - Add logging for new code paths
 - Include error handling for edge cases
 - Prefer small, reviewable commits

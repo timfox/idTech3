@@ -769,7 +769,7 @@ jobs:
 
             apt-get -o Acquire::Retries=5 -qq update
             apt-get -o Acquire::Retries=5 install -y make gcc g++ cmake ninja-build libstdc++-14-dev git
-            apt-get -o Acquire::Retries=5 -y install libcurl4-openssl-dev libssl-dev mesa-common-dev libxxf86dga-dev libxrandr-dev libxxf86vm-dev libasound-dev libopenal-dev libfreetype6-dev lua5.4 liblua5.4-dev libbullet-dev pkg-config glslang-tools ripgrep
+            apt-get -o Acquire::Retries=5 -y install libcurl4-openssl-dev libssl-dev libxml2-dev mesa-common-dev libxxf86dga-dev libxrandr-dev libxxf86vm-dev libasound-dev libopenal-dev libfreetype6-dev lua5.4 liblua5.4-dev libbullet-dev pkg-config glslang-tools ripgrep
 
             ./scripts/layout_forwarding_symlinks.sh
 
@@ -833,7 +833,7 @@ jobs:
         run: |
           set -e
           for attempt in 1 2 3 4; do
-            if brew install coreutils sdl3 openal-soft cmake ninja freetype lua molten-vk bullet pkgconf glslang; then
+            if brew install coreutils sdl3 openal-soft zstd vulkan-headers cmake ninja freetype lua molten-vk bullet pkgconf glslang; then
               exit 0
             fi
             echo "brew install attempt $attempt failed, retrying in $((attempt * 20))s..."
@@ -856,6 +856,7 @@ jobs:
         run: |
           SDL3_PREFIX=$(brew --prefix sdl3)
           OPENAL_PREFIX=$(brew --prefix openal-soft)
+          VULKAN_HEADERS_PREFIX=$(brew --prefix vulkan-headers)
           mkdir -p build-vk-${{ matrix.btype }}
           cmake -S . -B build-vk-${{ matrix.btype }} \
             -DCMAKE_BUILD_TYPE=${{ matrix.btype }} \
@@ -864,6 +865,7 @@ jobs:
             -DSDL3_DIR="${SDL3_PREFIX}/lib/cmake/SDL3" \
             -DOPENAL_INCLUDE_DIR="${OPENAL_PREFIX}/include" \
             -DOPENAL_LIBRARY="${OPENAL_PREFIX}/lib/libopenal.dylib" \
+            -DVULKAN_INCLUDE_DIR="${VULKAN_HEADERS_PREFIX}/include" \
             -DUSE_STB_TRUETYPE=ON \
             -DBUILD_FREETYPE=ON \
             -DENABLE_FORTIFY_SOURCE=OFF \
@@ -873,7 +875,7 @@ jobs:
             -DRENDERER_DEFAULT=vulkan \
             -DSKIP_IDPAK_CHECK=ON \
             -DSKIP_SHADER_REGEN=ON \
-            -DCMAKE_INCLUDE_PATH="${OPENAL_PREFIX}/include" \
+            -DCMAKE_INCLUDE_PATH="${OPENAL_PREFIX}/include;${VULKAN_HEADERS_PREFIX}/include" \
             -DCMAKE_LIBRARY_PATH="${OPENAL_PREFIX}/lib" \
             -Wno-dev
           cmake --build build-vk-${{ matrix.btype }} -j$(sysctl -n hw.logicalcpu)
@@ -933,7 +935,9 @@ jobs:
           java-version: 17
 
       - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
+        uses: android-actions/setup-android@v4
+        with:
+          packages: platform-tools
 
       - name: Install NDK
         run: |
@@ -1073,7 +1077,9 @@ jobs:
           java-version: 17
 
       - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
+        uses: android-actions/setup-android@v4
+        with:
+          packages: platform-tools
 
       - name: Install NDK, CMake (match app/build.gradle), SDK platform 35
         run: |
