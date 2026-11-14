@@ -90,5 +90,3 @@ void vk_frame_contract_capture_f( void );
 #ifdef __cplusplus
 }
 #endif
-
-#endif /* USE_VULKAN */

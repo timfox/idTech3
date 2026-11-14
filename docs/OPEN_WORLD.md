@@ -179,6 +179,8 @@ Traces and `CM_PointContents` query merged sector brushes after the base BSP tre
 
 ## Related
 
+- [WORLD_ZONES.md](WORLD_ZONES.md) — spatial zone layer (runs before sector residency)
+- [WORLD_RESIDENCY.md](WORLD_RESIDENCY.md) — value-aware sector cardinality
 - [DISTRICTS.md](DISTRICTS.md) — USD districts + proxy meshes
 - [MOD_SDK.md](MOD_SDK.md) — `sv_sectorURL`, replication
 - Billboard map props: `r_spriteProps`, `misc_billboard` in [AGENTS.md](../AGENTS.md)
