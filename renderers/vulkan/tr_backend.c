@@ -2037,7 +2037,6 @@ void RB_FlushDeferredWeaponAfterTaa( VkImageView *post_fog_src, VkImageView *lum
 	}
 	vk_spine_pass_end( VK_SPINE_PASS_WEAPON );
 }
-#endif
 
 /*
 =============
