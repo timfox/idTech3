@@ -56,6 +56,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #define JSON_IMPLEMENTATION
 #include "json.h"
 #undef JSON_IMPLEMENTATION
+#endif
 
 /*
 
@@ -3141,6 +3142,7 @@ void RE_LoadWorldMap( const char *name ) {
 					}
 				}
 			}
+#endif	
 
 	if ( !isBsp30World && !isSourceVBSPWorld ) {
 		R_BuildWorldVBO( s_worldData.surfaces, s_worldData.numsurfaces );

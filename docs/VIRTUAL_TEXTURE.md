@@ -53,6 +53,15 @@ Shader source: [`renderers/vulkan/shaders/glsl/vt_feedback.comp`](../renderers/v
 
 Neural Dynamic GI dirty-page lightmap decode is unrelated; this module is albedo/page residency for MegaTexture-style streaming.
 
+## World-zone gating
+
+When a district manifest is loaded, resident zones with the texture layer bit
+(`REF_WORLD_ZONE_RESIDENCY_TEXTURE`) gate feedback and page work. If no zone
+snapshot is published (legacy maps) or at least one resident zone includes the
+texture bit, VT runs normally. Otherwise feedback drain, GPU dispatch, and page
+ensure are skipped for that frame. `vt_status` reports `zones=N` and
+`zone-gated feedback frames=`. See [WORLD_ZONES.md](WORLD_ZONES.md).
+
 ## Limits
 
 - No rewriting all BSP diffuse UVs yet

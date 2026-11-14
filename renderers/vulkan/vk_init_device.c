@@ -345,6 +345,7 @@ void vk_initialize( void )
 		ri.Printf( PRINT_WARNING,
 			"PBR IBL: runtime cubemap convolution is disabled on Vulkan; using fallback IBL.\n" );
 	}
+#endif
 
 	glConfig.textureEnvAddAvailable = qtrue;
 	if ( r_ext_texture_env_add->integer != 0 )

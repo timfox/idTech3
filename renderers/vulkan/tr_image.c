@@ -2052,6 +2052,7 @@ static void R_CreateBuiltinImages( void ) {
 	tr.emptyImage = R_CreateImage("*empty", NULL, (byte*)data, 2, 2, IMGFLAG_NONE, 0, 0);
 
 	tr.emptyCubemap = R_CreateImage( "*emptyCubemap", NULL, NULL, 1, 1, IMGFLAG_CUBEMAP, vk.color_format, 0 );
+#endif
 
 	R_CreateDlightImage();
 	R_CreateFogImage();

@@ -477,7 +477,6 @@ cvar_t	*r_forwardPlusZSliceMode;
 cvar_t	*r_forwardPlusSpecularStrength;
 cvar_t	*r_forwardPlusEnergyRenorm;
 
-
 cvar_t	*r_dlightBacks;
 
 cvar_t	*r_lodbias;

@@ -62,7 +62,11 @@ Console: **`world_residency_status`** — per-layer current/target/pending count
 
 When **`r_graphStreamReach 1`**, [`WorldResidency`](../modules/world/world_residency.cpp) intersects candidates with the sector graph k-hop mask from [`SectorGraph_UpdateReachability`](../modules/world/sector_graph.cpp). MP server path uses the union of all active player origins as BFS sources. See [GRAPH_COMPUTE.md](GRAPH_COMPUTE.md).
 
-## District integration
+## District + zone integration
+
+[Spatial zones](WORLD_ZONES.md) (`WorldZone_UpdateView`) run **before** sector
+residency on each frame — district proxy loads and renderer VT/vshadow gating
+are zone-driven. Sector cardinality (`WorldResidency_UpdateView`) is separate.
 
 When `WorldDistrict_StreamSectors` runs with `r_openWorldResidency 1`, it sets a district candidate filter (`WorldResidency_SetDistrictFilter`) and calls `WorldResidency_UpdateView` at the district centroid instead of brute-force loading every cell.
 

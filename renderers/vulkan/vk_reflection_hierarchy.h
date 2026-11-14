@@ -10,7 +10,6 @@
 
 #ifdef __cplusplus
 extern "C" {
-#endif
 
 typedef enum {
 	VK_REFLECT_SRC_NONE = 0,

@@ -15,8 +15,12 @@ vid_restart
 Command: `vshadow_status`
 
 `vshadow_status` reports physical pages, memory, new-request admissions, page
-render claims, local-light admissions, caster budget, and budget drops. These
-budgets are authoritative for virtual shadow residency; ReSTIR and neural
+render claims, local-light admissions, caster budget, budget drops, and
+**zone-gated** update skips when district zones are loaded but no resident zone
+includes the shadow layer bit. Legacy scenes without a zone snapshot are
+unaffected. See [WORLD_ZONES.md](WORLD_ZONES.md).
+
+These budgets are authoritative for virtual shadow residency; ReSTIR and neural
 lighting consumers may only sample resident records and cannot allocate shadow
 work behind the shadow system's back.
 

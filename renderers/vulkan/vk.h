@@ -2078,6 +2078,7 @@ typedef struct {
 	qboolean fxaaActive;
 	qboolean lensFlareActive;
 	qboolean pbrActive;
+#ifdef VK_CUBEMAP
 	qboolean cubemapActive;
 	qboolean pbr_ibl_using_hdr_fallback;
 	qboolean pbr_ibl_has_ready_local_cubemap;
