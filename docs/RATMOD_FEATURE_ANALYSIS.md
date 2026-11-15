@@ -293,7 +293,7 @@ While these are primarily game logic, they demonstrate the need for engine-level
 
 ## Architectural Recommendations
 
-### Layer Assignment (per CLAUDE.md Constitution)
+### Layer Assignment (per Engine Constitution)
 
 1. **Chocolate Layer** (enhancement, zero breaking changes):
    - Unlagged / backward reconciliation

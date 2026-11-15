@@ -19,6 +19,8 @@ _BRIDGE_RULES: list[tuple[str, str]] = [
     ("modules/navigation/", r"..\..\..\navigation"),
     ("modules/world/", r"..\..\..\world"),
     ("modules/botlib/", r"..\..\..\botlib"),
+    ("modules/collada/", r"..\..\..\..\modules\collada"),
+    ("modules/dialogue/", r"..\..\..\..\modules\dialogue"),
     ("renderers/", r"..\..\..\renderers"),
     ("third_party/", r"..\..\..\external"),
     ("extensions/", r"..\..\..\extensions"),
