@@ -139,7 +139,7 @@ The engine features a built-in, cross-platform Editor designed for rapid develop
 - Multi-user collaborative editing support (via server-client connections).
 - Extensible via plugins—extend with custom editors or workflow integrations.
 
-Refer to the documentation or `scripts/launch_editor.sh` to get started with the desktop Editor.
+For an installed, project-oriented workflow, see the [idTech3 Engine SDK quick start](docs/ENGINE_SDK_QUICKSTART.md). After installation, `idtech3-engine new`, `editor`, `run`, and `package` provide the standard create-to-ship loop from one command.
 
 
 ### Links
