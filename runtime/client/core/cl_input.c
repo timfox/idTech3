@@ -979,6 +979,8 @@ void CL_WritePacket( int repeat ) {
 		for ( i = 0 ; i < count ; i++ ) {
 			j = (cl.cmdNumber - count + i + 1) & CMD_MASK;
 			cmd = &cl.cmds[j];
+			/* Protocol idea credit: Trinity Engine/Trinity VR negotiate the
+			 * extended width before VR orientation bits can cross the wire. */
 			MSG_WriteDeltaUsercmdKey (&buf, key, oldcmd, cmd,
 				( clc.serverSupportsVR && Cvar_VariableIntegerValue( "vr" ) == 1 ) ? 32 : 16);
 			oldcmd = cmd;

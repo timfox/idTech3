@@ -242,6 +242,8 @@ void CL_OSP_Init( void ) {
 	cg_zoomAutoReset      = Cvar_Get( "cg_zoomAutoReset",      "1", CVAR_ARCHIVE );
 	cg_smoothDucking      = Cvar_Get( "cg_smoothDucking",      "0", CVAR_ARCHIVE );
 	cg_countdownTimer     = Cvar_Get( "cg_countdownTimer",     "0", CVAR_ARCHIVE );
+	/* Presentation idea credit: Trinity's game module popularized opt-in,
+	 * Quake Live-style damage plums for its mixed flatscreen/VR matches. */
 	cg_damagePlums        = Cvar_Get( "cg_damagePlums",        "0", CVAR_ARCHIVE );
 	cg_damagePlumsSize    = Cvar_Get( "cg_damagePlumsSize",    "1.0", CVAR_ARCHIVE );
 	cg_drawCenterMessages = Cvar_Get( "cg_drawCenterMessages", "1", CVAR_ARCHIVE );

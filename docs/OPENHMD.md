@@ -66,6 +66,12 @@ libopenhmd.so (dlopen)
 
 Display remains the mono SDL/Vulkan swapchain (side-by-side / anaglyph-friendly software stereo). Full distortion compositor and OpenXR submit are out of scope for this pass.
 
+When a device opens successfully, the client also publishes `vr=1` in userinfo;
+closing it restores `vr=0`. This follows the mixed VR/flatscreen negotiation
+idea introduced by Trinity Engine and Trinity VR. Use `idtech3-engine vr <project>`
+for the corresponding one-command SDK launch profile. This is protocol
+compatibility, not full OpenXR controller or haptics parity.
+
 ## Code
 
 | File | Role |
