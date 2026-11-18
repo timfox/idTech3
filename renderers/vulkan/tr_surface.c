@@ -1139,9 +1139,7 @@ static void RB_SurfaceGrid( srfGridMesh_t *cv ) {
 	int		dlightBits;
 	int		*vDlightBits;
 
-#ifdef USE_VBO
 	VBO_Flush();
-#endif
 
 	dlightBits = cv->dlightBits;
 	tess.dlightBits |= dlightBits;
