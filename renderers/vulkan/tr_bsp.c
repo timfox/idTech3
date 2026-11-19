@@ -56,7 +56,6 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #define JSON_IMPLEMENTATION
 #include "json.h"
 #undef JSON_IMPLEMENTATION
-#endif
 
 /*
 
@@ -2626,6 +2625,7 @@ qboolean RE_GetEntityToken( char *buffer, int size ) {
 
 #ifndef MAX_SPAWN_VARS
 #define MAX_SPAWN_VARS 64
+#endif
 
 // derived from G_ParseSpawnVars() in g_spawn.c
 static qboolean R_ParseSpawnVars( char *spawnVarChars, int maxSpawnVarChars, int *numSpawnVars, char *spawnVars[MAX_SPAWN_VARS][2] )
@@ -2930,7 +2930,6 @@ static void R_RenderAllCubemaps( void )
 		RE_EndFrame( &frontEndMsec, &backEndMsec );
 	}
 }
-#endif
 
 /*
  * Build conservative topology LODs for planar BSP faces.  BSP faces are
@@ -3142,7 +3141,6 @@ void RE_LoadWorldMap( const char *name ) {
 					}
 				}
 			}
-#endif	
 
 	if ( !isBsp30World && !isSourceVBSPWorld ) {
 		R_BuildWorldVBO( s_worldData.surfaces, s_worldData.numsurfaces );
