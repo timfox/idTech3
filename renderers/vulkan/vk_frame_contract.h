@@ -11,6 +11,7 @@
 
 #ifdef __cplusplus
 extern "C" {
+#endif
 
 #define VK_FRAME_CONTRACT_MAX_READERS       8u
 #define VK_FRAME_CONTRACT_NAME_LEN          32u
