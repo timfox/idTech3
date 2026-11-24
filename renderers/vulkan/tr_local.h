@@ -24,7 +24,6 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #define TR_LOCAL_H
 
 #define USE_VK_PBR
-#define VK_PBR_BRDFLUT		// for inspecting codebase, does not toggle brdflut.
 #define VK_CUBEMAP
 #define REF_CUBEMAP_IRRADIANCE_SIZE		64
 #define REF_CUBEMAP_SIZE				256
@@ -477,7 +476,6 @@ typedef struct {
 	vec4_t subsurfaceParams;
 	vec4_t shCoeffs[9];
 	float  parallaxBias;
-#endif
 
 	uint32_t		rgb_offset[NUM_TEXTURE_BUNDLES]; // within current shader
 	uint32_t		tex_offset[NUM_TEXTURE_BUNDLES]; // within current shader
@@ -578,7 +576,6 @@ typedef struct shader_s {
 	int			curIndexes;
 	int			qtangentOffset;
 	int			lightdirOffset;
-#endif
 
 	int			hasScreenMap;
 	qboolean	hasPBR;
@@ -1357,7 +1354,6 @@ typedef struct {
 	image_t					*whiteImage;			// full of 0xff
 	image_t					*identityLightImage;	// full of tr.identityLightByte
 	image_t					*emptyImage;		// full of 0xff
-#ifdef VK_CUBEMAP
 	image_t					*emptyCubemap;
 	int                     numCubemaps;
 	cubemap_t               *cubemaps;
@@ -1504,7 +1500,6 @@ extern cvar_t	*r_deferredLightDemoEnergy;
 extern cvar_t	*r_deferredLightDemoAnimate;
 extern cvar_t	*r_device;
 extern cvar_t	*r_vbo;
-#endif
 extern cvar_t	*r_pbr;
 extern cvar_t	*r_pbr_shExtract;
 extern cvar_t	*r_pbr_debug;
@@ -2215,8 +2210,6 @@ typedef struct shaderCommands_s
 	qboolean	gltfGpuMorphActive;
 	int		gltfGpuMorphCount;
 	float		gltfGpuMorphWeights[IQM_MORPH_TOP_K];
-#endif
-#endif
 
 	int			numPasses;
 	shaderStage_t **xstages;
@@ -2657,9 +2650,6 @@ void RE_ThrottleBackend( void );
 qboolean RE_CanMinimize( void );
 const glconfig_t *RE_GetConfig( void );
 void RE_VertexLighting( qboolean allowed );
-
-
-#endif
 
 // pbr
 // mikktspace
