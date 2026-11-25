@@ -12,6 +12,7 @@
 
 #ifdef __cplusplus
 extern "C" {
+#endif
 
 #define VK_SHADOW_CONTRACT_MAX_RECORDS 16u
 #define VK_SHADOW_CONTRACT_NAME_LEN    32u
