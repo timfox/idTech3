@@ -1056,19 +1056,6 @@ static void RB_SurfaceFace( const srfSurfaceFace_t *surf ) {
 			Com_Memcpy( &color, &v[10], sizeof( color ) );
 			Com_Memcpy( &tess.vertexColors[ndx], &color, sizeof( color ) );
 		}
-#else
-		tess.texCoords[0][ndx][0] = v[3];
-		tess.texCoords[0][ndx][1] = v[4];
-		{
-			tess.texCoords[1][ndx][0] = v[5];
-			tess.texCoords[1][ndx][1] = v[6];
-		}
-		{
-			uint32_t color;
-			Com_Memcpy( &color, &v[7], sizeof( color ) );
-			Com_Memcpy( &tess.vertexColors[ndx], &color, sizeof( color ) );
-		}
-#endif
 
 		tess.vertexDlightBits[ndx] = dlightBits;
 	}
@@ -1139,9 +1126,7 @@ static void RB_SurfaceGrid( srfGridMesh_t *cv ) {
 	int		dlightBits;
 	int		*vDlightBits;
 
-#ifdef USE_VBO
 	VBO_Flush();
-#endif
 
 	dlightBits = cv->dlightBits;
 	tess.dlightBits |= dlightBits;
