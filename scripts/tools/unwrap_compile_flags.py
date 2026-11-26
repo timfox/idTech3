@@ -17,6 +17,7 @@ ALWAYS_ON_MACROS = frozenset(
         "USE_VBO",
         "USE_VULKAN",
         "USE_FOG_COLLAPSE",
+        "VK_CUBEMAP",
     }
 )
 
