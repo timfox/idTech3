@@ -21,6 +21,8 @@ STALE_PATTERNS=(
 	'^[[:space:]]*#[[:space:]]*ifdef[[:space:]]+USE_TESS_NEEDS_NORMAL\b'
 	'^[[:space:]]*#[[:space:]]*ifdef[[:space:]]+USE_TESS_NEEDS_ST2\b'
 	'^[[:space:]]*#[[:space:]]*ifndef[[:space:]]+USE_DEDICATED_ALLOCATION\b'
+	'^[[:space:]]*#[[:space:]]*ifdef[[:space:]]+USE_VBO\b'
+	'^[[:space:]]*#[[:space:]]*ifdef[[:space:]]+VK_CUBEMAP\b'
 )
 
 for pat in "${STALE_PATTERNS[@]}"; do
