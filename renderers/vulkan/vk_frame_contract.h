@@ -87,6 +87,5 @@ void vk_frame_contract_snapshot( vkFrameContractSnapshot_t *out );
 void vk_frame_contract_status_f( void );
 void vk_frame_contract_capture_f( void );
 
-#ifdef __cplusplus
 }
 #endif

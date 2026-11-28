@@ -37,6 +37,5 @@ void vk_reflection_hierarchy_register( void );
 void vk_reflection_hierarchy_begin_frame( void );
 void vk_reflection_hierarchy_note( vkReflectSource_t source, float weight, const char *note );
 
-#ifdef __cplusplus
 }
 #endif

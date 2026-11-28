@@ -66,6 +66,5 @@ VkDescriptorSet vk_shadow_contract_oit_descriptor( void );
 void vk_shadow_contract_oit_update_descriptors( void );
 void vk_shadow_contract_status_f( void );
 
-#ifdef __cplusplus
 }
 #endif
